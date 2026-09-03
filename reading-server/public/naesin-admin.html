@@ -68,6 +68,15 @@
     details.rng>summary::before{content:'\25b8 ';color:var(--blue)}
     details.rng[open]>summary::before{content:'\25be '}
     details.rng .ppk{margin:3px 0 0 10px;font-size:12px;color:var(--muted);font-weight:600}
+    /* 「본문 진행」 — 네 지표가 한 칸에 들어간다. 줄바꿈은 지표 사이에서만 일어나야
+       '청크'와 '5/6'이 갈라져 다른 줄에 놓이는 일이 없다. */
+    .pgcell{white-space:normal;min-width:186px}
+    .pgcell .nw{white-space:nowrap}
+    /* 문장×단계 매트릭스 — 칸 하나가 사다리 한 단계(계약 3.2), 진하기가 그 단계에 머문 문장 수.
+       해석·백지 두 숫자만으로는 "어디서 막혔나"가 안 보인다 — 서버가 늘 보내던 byStage 를 여기서 쓴다. */
+    .mtx6{display:inline-grid;grid-template-columns:repeat(6,9px);gap:2px;margin-left:6px;vertical-align:middle}
+    .mtx6 i{display:block;height:9px;border-radius:2px;background:var(--blue)}
+    .mtx6 i.z{background:#e6edf1}
     .rtbl td{vertical-align:top}
     .rtbl input{min-height:34px;padding:0 7px;font-size:13px}
     .rtbl input.sc{width:72px}
@@ -116,6 +125,9 @@ const TYPE_LIST=[['w-e2k','영어→뜻'],['w-k2e','뜻→영어'],['w-spell','�
  ['s-kw','핵심어 빈칸'],['i-mcq','객관식(단일)'],['i-multi','객관식(복수)'],['mock','실전 모의']];
 const CODE_RE=/^[A-Za-z0-9-]{3,20}$/;   // 학생 코드 — 서버 등록 규칙과 동일
 const DATE_RE=/^\d{4}-\d{2}-\d{2}$/;
+/* 본문 사다리 6단의 이름(계약 3.2) — 단계 수는 6 그대로고 내용만 바뀌었다.
+   학생 앱 STAGE_NAMES 와 같은 말이어야 강사와 학생이 같은 화면을 이야기한다. */
+const STAGE_NAMES=['줄 해석','영어 청크 배열','핵심어 빈칸','문법 형태','줄 영작','단락 백지'];
 const WT_KEYS=['word','grammar','passage','writing'];
 const WT_LABEL={word:'단어',grammar:'어법',passage:'본문',writing:'서술형'};
 const MIN_N_CORR=3;     // 상관을 내는 최소 표본 — 서버 naesin-results.mjs 와 같은 값
@@ -284,6 +296,38 @@ function rangeCell(rg){
     return `<div class="ppk"><b>${esc(k)}</b> · 단어 ${numStr(pw.reached)}/${numStr(pw.total)} (안정 ${numStr(pw.stable)}) · 해석 ${numStr(ps.interpreted)}/${numStr(ps.total)} · 백지 ${numStr(ps.memorized)}/${numStr(ps.total)}</div>`;
   }).join('')}</details>`;
 }
+/* 본문 진행(계약 3.6) — 청크 트랙 · 단락 백지 · 누적 백지 · 종합 Check.
+   범위 합계가 오면 그것이 기준이다(시험은 보통 2~3과) — 팩 하나 값으로는 시험 범위를 못 잰다. */
+function passageOf(m){
+  const rg=rangeOf(m);
+  const p=(rg&&rg.passage)||(m&&m.passage);
+  return (p&&typeof p==='object'&&!Array.isArray(p))?p:null;
+}
+/* 분모가 없으면(팩에 단락 수가 없거나 값이 안 온 경우) 0/0 이 아니라 '—' — 아직 못 잰 것을 0으로 단정하지 않는다 */
+const frac=(a,b)=>{const t=num(b);return (t==null||t<=0)?'—':(numStr(a)+'/'+t);};
+function passageCell(m){
+  const p=passageOf(m);
+  if(!p)return '<span class="tag muted">—</span>';
+  const c=(p.check&&typeof p.check==='object'&&!Array.isArray(p.check))?p.check:null;
+  /* 누적 백지는 0이 '미시작'이라는 뜻이다(계약 3.6) — 0단락이라고 적으면 한 번 본 것처럼 읽힌다 */
+  const cum=num(p.cumulative);
+  return `<span class="nw"><span class="minibar"><i style="width:${pct(p.chunkDone,p.chunkTotal)}%"></i></span>청크 ${esc(frac(p.chunkDone,p.chunkTotal))}</span>`
+    +` · <span class="nw">단락 백지 ${esc(frac(p.paraBlank,p.paraTotal))}</span>`
+    +` · <span class="nw">누적 ${cum?esc(cum+'단락'):'—'}</span>`
+    +` · <span class="nw">종합 ${c?esc(frac(c.correct,c.total)):'—'}</span>`;
+}
+/* 문장×단계 매트릭스 한 칸 — byStage 를 여섯 칸으로. 값이 하나도 없으면 아무것도 그리지 않는다 */
+function stageCell(sn){
+  const bs=(sn&&sn.byStage&&typeof sn.byStage==='object'&&!Array.isArray(sn.byStage))?sn.byStage:null;
+  if(!bs)return '';
+  const vals=STAGE_NAMES.map((_,i)=>num(bs[i+1])||0);
+  const top=Math.max.apply(null,vals);
+  if(!top)return '';
+  const label=STAGE_NAMES.map((nm,i)=>(i+1)+'단계 '+nm+' '+vals[i]+'문장').join(', ');
+  return `<span class="mtx6" role="img" aria-label="문장×단계 — ${esc(label)}">`
+    +vals.map((v,i)=>`<i class="${v?'':'z'}" style="opacity:${v?(0.35+0.65*v/top).toFixed(2):'1'}" title="${esc((i+1)+'단계 '+STAGE_NAMES[i])} · ${esc(v+'문장')}"></i>`).join('')
+    +'</span>';
+}
 function studentRow(s){
   const m=(s.summary&&typeof s.summary==='object'&&!Array.isArray(s.summary))?s.summary:{};
   /* 범위 합계가 있으면 그것이 표의 기준값 — 팩 하나 값으로는 '시험 전 100%'를 잴 수 없다 */
@@ -299,8 +343,9 @@ function studentRow(s){
     <td>${esc(s.cls||'—')}</td>
     <td class="muted${rg?' pkcell':''}">${rg?rangeCell(rg):esc(m.packId||'—')}</td>
     <td><span class="minibar"><i style="width:${pct(w.reached,w.total)}%"></i></span>${numStr(w.reached)}/${numStr(w.total)} · 안정 ${numStr(w.stable)}${spell?` · <span class="tag warn">철자 확인 ${spell}</span>`:''}</td>
-    <td><span class="minibar"><i style="width:${pct(sn.interpreted,sn.total)}%"></i></span>${numStr(sn.interpreted)}/${numStr(sn.total)}</td>
+    <td><span class="minibar"><i style="width:${pct(sn.interpreted,sn.total)}%"></i></span>${numStr(sn.interpreted)}/${numStr(sn.total)}${stageCell(sn)}</td>
     <td><span class="minibar"><i class="g" style="width:${pct(sn.memorized,sn.total)}%"></i></span>${numStr(sn.memorized)}/${numStr(sn.total)}</td>
+    <td class="pgcell">${passageCell(m)}</td>
     <td>${done?`<span class="tag ok">${numStr(tk.correct)}/${numStr(tk.total)}</span>`:'<span class="tag muted">—</span>'}</td>
     <td class="muted">${fmtLast(s.lastActive)}</td></tr>`;
 }
@@ -319,8 +364,10 @@ function renderOverview(){
     </div>
     <div class="filters">${classes.map(c=>`<button class="chip" data-cls="${esc(c)}" aria-pressed="${c===FILTER}">${esc(c)}</button>`).join('')}</div>
     <div class="tbl"><table><thead><tr>
-      <th>이름</th><th>반</th><th>팩 · 시험 범위</th><th>단어 (도달·안정화)</th><th>해석 통과</th><th>백지 암송</th><th>${TASK?'과제 '+esc(TASK.date):'오늘 과제'}</th><th>마지막 학습</th></tr></thead>
-      <tbody>${list.length?list.map(studentRow).join(''):`<tr><td colspan="8" class="muted">아직 학습 기록이 있는 학생이 없어요 — 학생이 앱에서 훈련을 시작하면 여기 나타납니다.</td></tr>`}</tbody></table></div>
+      <th>이름</th><th>반</th><th>팩 · 시험 범위</th><th>단어 (도달·안정화)</th><th>해석 통과 · 문장×단계</th><th>백지 암송</th><th>본문 진행</th><th>${TASK?'과제 '+esc(TASK.date):'오늘 과제'}</th><th>마지막 학습</th></tr></thead>
+      <tbody>${list.length?list.map(studentRow).join(''):`<tr><td colspan="9" class="muted">아직 학습 기록이 있는 학생이 없어요 — 학생이 앱에서 훈련을 시작하면 여기 나타납니다.</td></tr>`}</tbody></table></div>
+    <p class="muted" style="margin:8px 0 0">문장×단계 ${STAGE_NAMES.map((nm,i)=>'①②③④⑤⑥'[i]+' '+esc(nm)).join(' · ')} — 칸이 진할수록 그 단계에 머문 문장이 많아요.</p>
+    <p class="muted" style="margin:2px 0 0">본문 진행 — 청크 뜻 세우기 통과 단락 · 단락 백지 통과 · 누적 백지가 이어 붙인 단락 · 종합 Check 점수. 범위가 있으면 범위 전체 합계예요.</p>
   </div>`;
   document.querySelectorAll('.chip[data-cls]').forEach(b=>b.onclick=()=>{FILTER=b.dataset.cls;renderOverview();});
 }

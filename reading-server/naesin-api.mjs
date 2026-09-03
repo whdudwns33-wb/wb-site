@@ -82,6 +82,23 @@ const strMax = (v, max) => (typeof v === 'string' ? v.slice(0, max) : '');
 const isoStr = (v) => (typeof v === 'string' && ISO_RE.test(v) ? v : '');
 const dateStr = (v) => (typeof v === 'string' && DATE_RE.test(v) ? v : '');
 
+/* 본문 암기 진행(계약 3.6) — 청크 트랙·단락 백지·누적 백지·종합 Check.
+   본문이 청크 → 줄 → 단락 3트랙으로 나뉘면서 문장 6단(byStage)만으로는 진행이 안 보인다.
+   서버는 뜻을 해석하지 않고 모양만 강제한다 — 숫자는 정수, check 는 {correct,total} 두 키뿐.
+   passage 가 없으면 키 자체를 만들지 않는다(range 와 같은 결) — 옛 저장본·옛 클라이언트의
+   요약에 빈 칸을 만들면 관리 화면이 '아직 안 함'과 '0개 함'을 구별하지 못한다. */
+function normalizePassage(p) {
+  if (!isObj(p)) return null;
+  const c = isObj(p.check) ? p.check : null;
+  return {
+    chunkDone: int0(p.chunkDone), chunkTotal: int0(p.chunkTotal),
+    paraBlank: int0(p.paraBlank), paraTotal: int0(p.paraTotal),
+    cumulative: int0(p.cumulative),
+    /* 종합 Check 는 '아직 안 봤다'(null)와 '0점'(0/40)이 다르다 — 객체가 아니면 null 그대로 */
+    check: c ? { correct: int0(c.correct), total: int0(c.total) } : null,
+  };
+}
+
 /* 범위 합계(계약 R1) — 실제 시험 범위는 보통 2~3과라, 팩 하나짜리 값으로는
    「시험 전 100% 완성」이 시험과 단위가 맞지 않는다. 학생 앱이 범위 전체 합과 팩별 값을
    같이 올리고, 관리 현황판·결과 상관이 이 합계를 쓴다.
@@ -102,6 +119,7 @@ function normalizeRange(r) {
       };
     }
   }
+  const passage = normalizePassage(r.passage);
   return {
     packIds: (Array.isArray(r.packIds) ? r.packIds : []).filter((x) => typeof x === 'string' && PACK_ID_RE.test(x)).slice(0, EXAM_PACKS_MAX),
     word: { total: int0(w.total), reached: int0(w.reached), stable: int0(w.stable), risky: int0(w.risky), needsSpellCheck: int0(w.needsSpellCheck) },
@@ -109,6 +127,8 @@ function normalizeRange(r) {
       total: int0(s.total), interpreted: int0(s.interpreted), memorized: int0(s.memorized),
       byStage: { 1: int0(bs[1]), 2: int0(bs[2]), 3: int0(bs[3]), 4: int0(bs[4]), 5: int0(bs[5]), 6: int0(bs[6]) },
     },
+    /* 범위 전체의 본문 진행 합계 — 팩(과)별 값보다 이것이 관리 현황판의 기준이다 */
+    ...(passage ? { passage } : {}),
     packs,
   };
 }
@@ -120,6 +140,7 @@ export function normalizeSummary(sum) {
   const bs = isObj(s.byStage) ? s.byStage : {};
   const t = isObj(sum.task) ? sum.task : null;
   const range = normalizeRange(sum.range);
+  const passage = normalizePassage(sum.passage);
   return {
     packId: typeof sum.packId === 'string' && PACK_ID_RE.test(sum.packId) ? sum.packId : '',
     word: { total: int0(w.total), reached: int0(w.reached), stable: int0(w.stable), risky: int0(w.risky), needsSpellCheck: int0(w.needsSpellCheck) },
@@ -127,8 +148,10 @@ export function normalizeSummary(sum) {
       total: int0(s.total), interpreted: int0(s.interpreted), memorized: int0(s.memorized),
       byStage: { 1: int0(bs[1]), 2: int0(bs[2]), 3: int0(bs[3]), 4: int0(bs[4]), 5: int0(bs[5]), 6: int0(bs[6]) },
     },
-    /* range 는 있을 때만 넣는다 — 옛 클라이언트(팩 하나만 보는 요약)의 저장본에 빈 칸을 만들지 않는다 */
+    /* range·passage 는 있을 때만 넣는다 — 옛 클라이언트(팩 하나만 보는 요약, 본문 3트랙 이전)의
+       저장본에 빈 칸을 만들지 않는다. 없는 값과 0을 관리 화면이 가를 수 있어야 한다. */
     ...(range ? { range } : {}),
+    ...(passage ? { passage } : {}),
     /* taskAt 은 관리 웹이 과제의 updatedAt 과 문자열 그대로 비교한다 — 형식만 확인하고 값은 손대지 않는다 */
     task: t ? { date: dateStr(t.date), taskAt: isoStr(t.taskAt), title: strMax(t.title, SUMMARY_TITLE_MAX), correct: int0(t.correct), total: int0(t.total) } : null,
     updatedAt: isoStr(sum.updatedAt),
