@@ -11,6 +11,13 @@ on:
       - 'shared/**'
   workflow_dispatch:
 
+env:
+  # wrangler 를 한 자리에서 고정한다. `wrangler@4` 는 실행할 때마다 최신 4.x 를 새로 받으므로
+  # 저장소가 그대로여도 CI 는 매번 다른 도구로 돈다 — 새 4.x 가 번들을 깨면 저장소에 원인이
+  # 없는 실패가 되고, 배포 #90·#91 처럼 운영이 뒤처진 뒤에야 안다. 올릴 때는 이 한 줄만 고친다
+  # (아래 캐시 키가 버전을 물고 있어 자동으로 새로 받는다).
+  WRANGLER: wrangler@4.129.0
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -92,13 +99,21 @@ jobs:
         run: node reading-server/build-dist.mjs
       - name: 배포본 캐시 무효화 검증
         run: node reading-server/dist-cache.test.mjs
+      # npx 는 받은 패키지를 ~/.npm/_npx 에 풀어 두고 다음 실행에서 그대로 쓴다. 그 자리만 캐시한다
+      # (_cacache 는 tarball 사본이라 _npx 가 있으면 필요 없다 — 240MB 대신 385MB 를 나르게 된다).
+      # 아래 두 스텝이 같은 설치를 나눠 쓴다. 키가 버전을 물고 있으니 WRANGLER 를 올리면 새로 받는다.
+      - name: wrangler 캐시
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm/_npx
+          key: npx-${{ runner.os }}-${{ env.WRANGLER }}
       # 배포 #90·#91 이 여기서 죽었다: 저장소 테스트는 전부 초록인데 워커 번들이
       # 'node:module' 을 찾다 실패했다(Node 에서는 잘 도는 코드였다). 실패가 배포 로그에만
       # 있어서 운영이 두 판 뒤처진 것을 한참 뒤에 알았다. dry-run 은 자격증명 없이도 돌고
       # 번들을 실제로 만들어 보므로, 같은 종류는 여기서 먼저 멈춘다.
       - name: 워커 번들 검증 (dry-run — 자격증명 없이 돈다)
         working-directory: reading-server
-        run: npx wrangler@4 deploy --dry-run --outdir=/tmp/wb-bundle
+        run: npx --yes --prefer-offline $WRANGLER deploy --dry-run --outdir=/tmp/wb-bundle
       - name: 번들에 Node 전용 모듈이 없는지
         run: |
           if grep -rl 'node:' /tmp/wb-bundle/*.js 2>/dev/null | head -1 | grep -q .; then
@@ -118,4 +133,4 @@ jobs:
             echo "::warning::CLOUDFLARE_API_TOKEN 시크릿이 없어 배포를 건너뜁니다. 저장소 Settings → Secrets and variables → Actions 에 추가하세요."
             exit 0
           fi
-          npx wrangler@4 deploy
+          npx --yes --prefer-offline $WRANGLER deploy
