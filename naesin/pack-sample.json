@@ -3,7 +3,7 @@
   "source": "WB 자체 제작 체험 팩 — 실제 교재·구매 자료와 무관한 창작 콘텐츠 (테스트·데모 전용)",
   "curriculum": "데모", "textbook": "체험", "grade": "중2", "lesson": 0,
   "lessonTitle": "A Morning by the Sea",
-  "counts": { "words": 8, "examples": 6, "definitions": 3, "polysemy": 1, "synAnt": 2 },
+  "counts": { "words": 8, "examples": 6, "definitions": 3, "polysemy": 1, "synAnt": 2, "oddOneItems": 2, "checkItems": 8 },
   "words": [
     { "id": "w-001", "headword": "seagull", "pos": "n.", "meaningKo": ["갈매기"], "sections": ["reading"], "irregularForms": null,
       "example": { "en": "A seagull landed on the railing of the boat.", "ko": "갈매기 한 마리가 배 난간에 내려앉았다." },
@@ -83,6 +83,55 @@
       "chunks": [ { "en": "I will always keep", "ko": "나는 항상 간직할 것이다" }, { "en": "that salty morning", "ko": "그 소금기 어린 아침을" }, { "en": "in my heart.", "ko": "내 마음속에" } ],
       "grammarNotes": [], "verbForms": [ { "base": "keep", "answer": "keep" } ], "grammarChoices": [],
       "writingKeywords": ["always", "keep", "salty", "heart"] }
+  ],
+  "oddOneItems": [
+    { "id": "odd-8-1", "dayGroup": "8/1", "kind": "lexical", "instructionKo": "본문과 다르게 바뀐 곳을 고르세요.",
+      "sentences": [
+        { "seq": 1, "text": "Last summer, my family took a fast train to the sea." },
+        { "seq": 2, "text": "When the doors opened, I heard seagulls calling above the waves." },
+        { "seq": 3, "text": "We built a small castle out of warm sand." }
+      ],
+      "options": ["Last summer", "a fast train", "seagulls calling", "out of warm sand"],
+      "answerIdx": 1, "correction": "a slow train",
+      "explanationKo": "본문은 '느린 기차(a slow train)'다 — 반대 뜻의 낱말로 바뀌었다." },
+    { "id": "odd-8-2", "dayGroup": "8/2", "kind": "grammatical", "instructionKo": "본문과 다르게 바뀐 곳을 고르세요.",
+      "sentences": [
+        { "seq": 4, "text": "My little brother asked me why does the tide come in at night." },
+        { "seq": 5, "text": "I will always keep that salty morning in my heart." }
+      ],
+      "options": ["My little brother", "why does the tide come in", "always keep", "in my heart"],
+      "answerIdx": 1, "correction": "why the tide comes in",
+      "explanationKo": "간접의문문은 '의문사+주어+동사' 어순이라 why the tide comes in 이 맞다." }
+  ],
+  "checkItems": [
+    { "id": "chk-1", "slot": "choice", "seq": 2, "promptKo": "빈칸에 알맞은 말을 고르세요.",
+      "textEn": "I heard seagulls ______ above the waves.",
+      "choices": ["calling", "to call", "calls"], "answerIdx": 0,
+      "explanationKo": "지각동사 heard 뒤 목적격보어 자리에는 v-ing(또는 동사원형)가 온다." },
+    { "id": "chk-2", "slot": "choice", "seq": 4, "promptKo": "빈칸에 알맞은 말을 고르세요.",
+      "textEn": "My little brother asked me ______ at night.",
+      "choices": ["why the tide comes in", "why does the tide come in", "why did the tide comes in"], "answerIdx": 0,
+      "explanationKo": "간접의문문은 의문사+주어+동사 어순이다." },
+    { "id": "chk-3", "slot": "choice", "seq": 5, "promptKo": "밑줄 친 salty 의 뜻으로 알맞은 것을 고르세요.",
+      "textEn": "I will always keep that salty morning in my heart.",
+      "choices": ["짠, 소금기가 있는", "달콤한", "시끄러운"], "answerIdx": 0,
+      "explanationKo": "salty 는 '소금기가 있는'이다." },
+    { "id": "chk-4", "slot": "choice", "seq": 3, "promptKo": "청크의 뜻으로 알맞은 것을 고르세요.",
+      "textEn": "out of warm sand",
+      "choices": ["따뜻한 모래로", "차가운 바닷물로", "작은 성 안에서"], "answerIdx": 0,
+      "explanationKo": "out of 는 재료를 나타낸다 — '따뜻한 모래로'." },
+    { "id": "chk-5", "slot": "blank", "seq": 1, "promptKo": "지난 여름, 우리 가족은 느린 기차를 타고 바다에 갔다.",
+      "textEn": "Last summer, my family took a ______ train to the sea.",
+      "blanks": [ { "answers": ["slow"], "hintKo": "느린" } ] },
+    { "id": "chk-6", "slot": "blank", "seq": 5, "promptKo": "나는 그 소금기 어린 아침을 항상 마음에 간직할 것이다.",
+      "textEn": "I will always ______ that salty morning in my ______.",
+      "blanks": [ { "answers": ["keep"], "hintKo": "간직할" }, { "answers": ["heart"], "hintKo": "마음" } ] },
+    { "id": "chk-7", "slot": "write", "seq": 3, "promptKo": "우리말을 영어로 쓰세요.",
+      "ko": "우리는 따뜻한 모래로 작은 성을 만들었다.", "keywords": ["build", "castle", "sand"],
+      "answers": ["We built a small castle out of warm sand."] },
+    { "id": "chk-8", "slot": "arrange", "seq": 4, "promptKo": "우리말에 맞게 배열하세요.",
+      "ko": "내 남동생은 왜 밤에 밀물이 들어오는지 나에게 물었다.",
+      "tokens": ["My little brother", "asked me", "why", "the tide", "comes in", "at night."] }
   ],
   "dialogues": [
     { "id": "d-01", "section": "Warm-up Talk",
