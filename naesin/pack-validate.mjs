@@ -5,6 +5,12 @@
  * 콘텐츠는 라이선스 자료라 저장소에 없다 — 이 검증기는 파이프라인의
  * "검수 게이트" 자동 검증 단계이며, 로컬 팩 디렉터리를 검사한다.
  *
+ * 검사 규칙은 여기 없다 — naesin/pack-check.js 하나에만 있다.
+ * 같은 규칙을 관리 웹 업로드와 제작 스튜디오 배포도 쓰기 때문에, 규칙을 복제하면
+ * "CLI는 통과인데 업로드가 막히는" 판정 불일치가 생긴다. 이 파일이 하는 일은
+ * 파일을 읽어 하나의 팩으로 합치고, 파일 수준 오류(파싱 실패·packId 불일치)를
+ * 붙인 뒤 결과를 사람이 읽게 찍는 것뿐이다.
+ *
  * 파일 구성 (있는 것만 검사, 최소 1개는 있어야 함):
  *   words.json      단어 마스터        sentences.json  본문 문장 마스터
  *   dialogues.json  대화문 마스터      patterns.json   문법 패턴 마스터
@@ -12,137 +18,85 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
+const CHECK = require('./pack-check.js');
 
 const dir = process.argv[2];
 if (!dir) { console.error('사용법: node naesin/pack-validate.mjs <팩 디렉터리>'); process.exit(1); }
 
-const errors = [];
-const warns = [];
-const summary = [];
-const err = (f, m) => errors.push(`${f}: ${m}`);
-const warn = (f, m) => warns.push(`${f}: ${m}`);
+const fileErrors = [];
 
 function load(name) {
   const p = path.join(dir, name);
   if (!fs.existsSync(p)) return null;
   try { return JSON.parse(fs.readFileSync(p, 'utf8')); }
-  catch (e) { err(name, `JSON 파싱 실패 — ${e.message}`); return null; }
+  catch (e) { fileErrors.push({ where: name, message: `JSON 파싱 실패 — ${e.message}` }); return null; }
 }
 
-const nonEmpty = (s) => typeof s === 'string' && s.trim().length > 0;
+/* 파일들을 하나의 팩으로 합친다 — 관리 웹 업로드가 브라우저에서 하는 것과 같은 병합이다.
+   같은 배열 필드가 여러 파일에 있으면 처음 것을 쓴다(업로드 화면의 assemble 과 같은 규칙). */
+const ARR_FIELDS = ['words', 'sentences', 'oddOneItems', 'checkItems', 'dialogues',
+  'keyExpressions', 'functions', 'vocabSidebar', 'readingQA', 'patterns'];
 
-/* ── words.json ─────────────────────────────── */
-const words = load('words.json');
-if (words) {
-  const f = 'words.json';
-  const list = words.words || [];
-  if (words.counts?.words != null && list.length !== words.counts.words)
-    err(f, `단어 수 불일치 — counts.words=${words.counts.words}, 실제 ${list.length}`);
-  const ids = new Set();
-  list.forEach((w, i) => {
-    const at = `words[${i}](${w.headword ?? '?'})`;
-    if (!nonEmpty(w.id)) err(f, `${at} id 없음`);
-    else if (ids.has(w.id)) err(f, `${at} id 중복: ${w.id}`);
-    else ids.add(w.id);
-    if (!nonEmpty(w.headword)) err(f, `${at} headword 없음`);
-    if (!Array.isArray(w.meaningKo) || !w.meaningKo.some(nonEmpty)) err(f, `${at} meaningKo 비었음`);
-    if (!Array.isArray(w.sections) || !w.sections.length) err(f, `${at} sections 비었음`);
-    else w.sections.forEach((s) => { if (s !== 'conversation' && s !== 'reading') err(f, `${at} 잘못된 section: ${s}`); });
-    if (w.example && !(nonEmpty(w.example.en) && nonEmpty(w.example.ko))) err(f, `${at} example en/ko 불완전`);
-    if (w.definition && !(nonEmpty(w.definition.en) && nonEmpty(w.definition.ko))) err(f, `${at} definition en/ko 불완전`);
-    if (w.senses) w.senses.forEach((s, j) => { if (!nonEmpty(s.meaningKo)) err(f, `${at} senses[${j}] meaningKo 없음`); });
-  });
-  const withEx = list.filter((w) => w.example).length;
-  const withDef = list.filter((w) => w.definition).length;
-  const poly = list.filter((w) => w.senses?.length).length;
-  summary.push(`words: ${list.length}개 (예문 ${withEx} · 영영풀이 ${withDef} · 다의어 ${poly})`);
-}
-
-/* ── sentences.json ─────────────────────────── */
-const sen = load('sentences.json');
-if (sen) {
-  const f = 'sentences.json';
-  const list = sen.sentences || [];
-  list.forEach((s, i) => {
-    const at = `sentences[${i}](seq ${s.seq ?? '?'})`;
-    if (s.seq !== i + 1) err(f, `${at} seq가 순번(${i + 1})과 다름`);
-    if (!['8/1', '8/2', '8/3'].includes(s.dayGroup)) err(f, `${at} dayGroup 이상: ${s.dayGroup}`);
-    if (!nonEmpty(s.en)) err(f, `${at} en 없음`);
-    if (!nonEmpty(s.ko)) err(f, `${at} ko 없음`);
-    if (!Array.isArray(s.keywords) || !s.keywords.length) warn(f, `${at} keywords 비었음`);
-    else s.keywords.forEach((k, j) => {
-      if (!(nonEmpty(k.en) && nonEmpty(k.ko))) err(f, `${at} keywords[${j}] en/ko 불완전`);
-      else if (!s.en.toLowerCase().includes(k.en.toLowerCase().replace(/\s+/g, ' ').trim().split(' ')[0]))
-        warn(f, `${at} 핵심어 "${k.en}"가 en에 안 보임 — 표기 확인`);
-    });
-    if (!Array.isArray(s.tokens) || s.tokens.length < 2) warn(f, `${at} tokens 부족(배열 훈련 불가)`);
-    if (s.chunks) {
-      /* 청크는 해석 판정의 기준 — 조각을 이어 붙이면 정본 en과 정확히 일치해야 한다 */
-      const flat = (t) => String(t).replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, '');
-      if (flat(s.chunks.map((c) => c.en).join(' ')) !== flat(s.en)) err(f, `${at} chunks 연결이 en과 불일치`);
-      s.chunks.forEach((c, j) => { if (!(nonEmpty(c.en) && nonEmpty(c.ko))) err(f, `${at} chunks[${j}] en/ko 불완전`); });
-    }
-  });
-  const kw = list.reduce((n, s) => n + (s.keywords?.length || 0), 0);
-  summary.push(`sentences: ${list.length}문장 (핵심어 ${kw} · 어색한곳 ${sen.oddOneItems?.length ?? 0} · Check ${sen.checkItems?.length ?? 0})`);
-}
-
-/* ── dialogues.json ─────────────────────────── */
-const dlg = load('dialogues.json');
-if (dlg) {
-  const f = 'dialogues.json';
-  const list = dlg.dialogues || [];
-  if (!list.length) err(f, 'dialogues 비었음');
-  let lines = 0;
-  list.forEach((d, i) => {
-    (d.lines || []).forEach((l, j) => {
-      lines += 1;
-      if (!(nonEmpty(l.speaker) && nonEmpty(l.en) && nonEmpty(l.ko))) err(f, `dialogues[${i}].lines[${j}] speaker/en/ko 불완전`);
-    });
-  });
-  summary.push(`dialogues: ${list.length}개 ${lines}줄 (핵심표현 ${dlg.keyExpressions?.length ?? 0} · 어휘 사이드바 ${dlg.vocabSidebar?.length ?? 0} · QA ${dlg.readingQA?.length ?? 0})`);
-}
-
-/* ── patterns.json ──────────────────────────── */
-const pat = load('patterns.json');
-if (pat) {
-  const f = 'patterns.json';
-  const list = pat.patterns || [];
-  list.forEach((p, i) => {
-    if (!nonEmpty(p.title)) err(f, `patterns[${i}] title 없음`);
-    if (!nonEmpty(p.conceptKo)) err(f, `patterns[${i}] conceptKo 없음`);
-    if (!p.textbookExamples?.length) warn(f, `patterns[${i}] 교과서 예문 없음`);
-  });
-  summary.push(`patterns: ${list.length}개`);
-}
-
-/* ── items-*.json ───────────────────────────── */
-for (const name of fs.readdirSync(dir).filter((n) => /^items-.*\.json$/.test(n)).sort()) {
+const sources = [];
+const where = {};
+for (const [name, section] of [['words.json', 'words'], ['sentences.json', 'sentences'],
+  ['dialogues.json', 'dialogues'], ['patterns.json', 'patterns']]) {
   const data = load(name);
   if (!data) continue;
-  const list = data.items || [];
-  list.forEach((it, i) => {
-    const at = `items[${i}](no ${it.no ?? '?'})`;
-    if (!nonEmpty(it.formatType)) err(name, `${at} formatType 없음`);
-    if (!Array.isArray(it.answer) || !it.answer.length) err(name, `${at} answer 비었음`);
-    if (Array.isArray(it.choices) && it.choices.length) {
-      const labels = new Set(it.choices.map((c) => String(c.label)));
-      it.answer.forEach((a) => { if (!labels.has(String(a))) err(name, `${at} 정답 "${a}"가 보기 label에 없음`); });
-      if (it.answerCount != null && it.answer.length !== it.answerCount)
-        err(name, `${at} answerCount(${it.answerCount}) ≠ 정답 수(${it.answer.length})`);
-    }
-  });
-  summary.push(`${name}: ${list.length}문항`);
+  sources.push({ name, data });
+  where[section] = name;
+  /* sentences.json 이 어색한 곳·종합 Check 도 함께 싣는다 — 오류 위치를 그 파일로 보이게 한다 */
+  if (section === 'sentences') { where.oddOneItems = name; where.checkItems = name; }
+}
+const itemFiles = fs.existsSync(dir)
+  ? fs.readdirSync(dir).filter((n) => /^items-.*\.json$/.test(n)).sort()
+  : [];
+for (const name of itemFiles) {
+  const data = load(name);
+  if (data) sources.push({ name, data });
 }
 
-/* ── packId 일치 ────────────────────────────── */
-const packIds = new Set([words, sen, dlg, pat].filter(Boolean).map((d) => d.packId).filter(Boolean));
-if (packIds.size > 1) err('(공통)', `packId 불일치: ${[...packIds].join(' / ')}`);
-if (!summary.length) { err('(공통)', '검사할 팩 파일이 하나도 없음'); }
+const pack = {};
+for (const { data } of sources) {
+  for (const k of ARR_FIELDS) {
+    if (Array.isArray(data[k]) && data[k].length && !(Array.isArray(pack[k]) && pack[k].length)) pack[k] = data[k];
+  }
+  if (Array.isArray(data.items) && data.items.length && !(Array.isArray(pack.items) && pack.items.length)) pack.items = data.items;
+  if (data.counts && !pack.counts) pack.counts = data.counts;
+  if (data.passage && !pack.passage) pack.passage = data.passage;
+  if (data.packId && !pack.packId) pack.packId = data.packId;
+}
+/* 문항 파일이 여러 개면 합쳐서 한 번에 본다 — 파일별로 나눠 보면 번호 중복을 못 잡는다 */
+const allItems = [];
+for (const { data } of sources) if (Array.isArray(data.items)) allItems.push(...data.items);
+if (allItems.length) pack.items = allItems;
 
-/* ── 결과 ───────────────────────────────────── */
+/* packId 는 파일 사이에서만 어긋날 수 있다(합친 뒤에는 하나뿐) — 여기서 본다 */
+const packIds = [...new Set(sources.map(({ data }) => data.packId).filter(Boolean))];
+if (packIds.length > 1) fileErrors.push({ where: '(공통)', message: `packId 불일치: ${packIds.join(' / ')}` });
+
+const itemsLabel = itemFiles.length === 1 ? itemFiles[0] : (itemFiles.length ? `items(${itemFiles.length}개 파일)` : 'items');
+const res = sources.length
+  ? CHECK.checkPack(pack, { where, itemsLabel })
+  : { errors: [{ where: '(공통)', message: '검사할 팩 파일이 하나도 없음' }], warns: [], summary: [] };
+
+const errors = [...fileErrors, ...res.errors];
+const line = (e) => `${e.where}: ${e.message}`;
+
 console.log(`팩 검증 — ${dir}`);
-summary.forEach((s) => console.log('  · ' + s));
-if (warns.length) { console.log(`\n경고 ${warns.length}건:`); warns.slice(0, 30).forEach((w) => console.log('  ⚠ ' + w)); if (warns.length > 30) console.log(`  … 외 ${warns.length - 30}건`); }
-if (errors.length) { console.log(`\n오류 ${errors.length}건:`); errors.slice(0, 50).forEach((e) => console.log('  ✗ ' + e)); if (errors.length > 50) console.log(`  … 외 ${errors.length - 50}건`); process.exit(1); }
-console.log('\n통과 — 오류 없음' + (warns.length ? ` (경고 ${warns.length}건은 검수 화면에서 확인)` : ''));
+res.summary.forEach((s) => console.log('  · ' + s));
+if (res.warns.length) {
+  console.log(`\n경고 ${res.warns.length}건:`);
+  res.warns.slice(0, 30).forEach((w) => console.log('  ⚠ ' + line(w)));
+  if (res.warns.length > 30) console.log(`  … 외 ${res.warns.length - 30}건`);
+}
+if (errors.length) {
+  console.log(`\n오류 ${errors.length}건:`);
+  errors.slice(0, 50).forEach((e) => console.log('  ✗ ' + line(e)));
+  if (errors.length > 50) console.log(`  … 외 ${errors.length - 50}건`);
+  process.exit(1);
+}
+console.log('\n통과 — 오류 없음' + (res.warns.length ? ` (경고 ${res.warns.length}건은 검수 화면에서 확인)` : ''));

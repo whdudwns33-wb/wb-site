@@ -1,0 +1,659 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex, nofollow">
+  <title>WB 내신브레인 · 팩 제작</title>
+  <style>
+    :root{--navy:#173957;--blue:#087ba6;--sky:#eaf7fb;--bg:#f3f7f8;--line:#d9e5e9;--muted:#647784;--ink:#20384c;--ok:#14755e;--warn:#8a4b08;--bad:#9b352b;--coral:#c9503c}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Noto Sans KR",sans-serif;line-height:1.6}
+    header{display:flex;align-items:center;gap:14px;padding:13px 20px;background:var(--navy);color:#fff}
+    header b{font-size:17px}header small{opacity:.75}
+    header .sp{flex:1}
+    .hbtn{min-height:38px;padding:6px 14px;border:1px solid #ffffff55;border-radius:10px;background:transparent;color:#fff;font-weight:800;cursor:pointer}
+    main{max-width:1180px;margin:auto;padding:18px 14px 60px}
+    .card{margin-bottom:14px;padding:16px 18px;border:1px solid var(--line);border-radius:14px;background:#fff}
+    h2{margin:0 0 6px;color:var(--navy);font-size:17px}
+    h3{margin:12px 0 6px;color:var(--navy);font-size:14px}
+    button{font:inherit;cursor:pointer}
+    input,select,textarea{font:inherit;padding:0 10px;border:1.5px solid #bfd7e1;border-radius:10px;background:#fff;color:var(--ink)}
+    input,select{min-height:42px}
+    textarea{padding:8px 10px;line-height:1.5;width:100%;resize:vertical}
+    .btn{min-height:42px;padding:6px 16px;border:0;border-radius:10px;background:var(--blue);color:#fff;font-weight:900}
+    .btn.ghost{background:#fff;border:1.5px solid #bfd7e1;color:var(--navy)}
+    .btn.sm{min-height:32px;padding:3px 10px;font-size:12.5px}
+    .btn.danger{background:#fff;border:1.5px solid #efc2bb;color:var(--bad)}
+    .btn.go{background:var(--ok)}
+    .btn:disabled{opacity:.45;cursor:default}
+    .tag{display:inline-block;padding:3px 9px;border-radius:999px;background:var(--sky);color:var(--blue);font-size:12px;font-weight:800}
+    .tag.ok{background:#e7f6f0;color:var(--ok)}.tag.bad{background:#fff0ef;color:var(--bad)}.tag.warn{background:#fff4e6;color:var(--warn)}.tag.muted{background:#eef2f4;color:var(--muted)}
+    .stats{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0 2px}
+    .stat{flex:1;min-width:104px;padding:10px;border:1px solid #d6ebf4;border-radius:12px;background:#f5fbfe;text-align:center}
+    .stat b{display:block;font-size:20px;color:var(--navy)}
+    .stat span{font-size:12px;color:var(--muted);font-weight:800}
+    .stat.warn{background:#fff0ef;border-color:#efc2bb}.stat.warn b{color:var(--bad)}
+    .tbl{overflow-x:auto}
+    table{border-collapse:collapse;width:100%;font-size:13.5px;white-space:nowrap}
+    th{background:#f0f5f7;color:var(--navy);font-size:12px}
+    th,td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:left;font-variant-numeric:tabular-nums}
+    tbody tr:nth-child(even) td{background:#f8fcfe}
+    .filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+    .chip{min-height:36px;padding:5px 13px;border-radius:999px;border:1.5px solid #bfd7e1;background:#fff;font-weight:800;color:var(--navy)}
+    .chip[aria-pressed="true"]{background:var(--sky);border-color:var(--blue)}
+    .grid-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;align-items:end}
+    .err{color:var(--bad);font-weight:700;font-size:13px;margin-top:8px}
+    .muted{color:var(--muted);font-size:12.5px}
+    #loginCard{max-width:380px;margin:60px auto}
+    .issues{margin:8px 0 0;padding:10px 12px;border-radius:10px;font-size:13px}
+    .issues.bad{background:#fff0ef}.issues.warn{background:#fff4e6}.issues.ok{background:#e7f6f0}
+    .issues div{margin:2px 0}
+    .banner{display:flex;gap:10px;align-items:center;max-width:1180px;margin:12px auto -6px;padding:10px 14px;border-radius:12px;background:#fff0ef;color:var(--bad);font-weight:800;font-size:13.5px}
+    .banner[hidden]{display:none}
+    .banner .sp{flex:1}
+    label.fld{display:block;font-size:12px;font-weight:800;color:var(--muted)}
+    label.fld input,label.fld select{width:100%}
+
+    /* ── 검수 두 칸 ──
+       왼쪽은 구매 자료에서 뽑은 원천, 오른쪽은 추출된 행. 원문을 옆에 두지 않으면
+       "이 행이 맞나"를 판단할 근거가 화면에 없다. 좁은 화면에서는 위아래로 쌓인다. */
+    .panes{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:12px;align-items:start}
+    @media (max-width:900px){.panes{grid-template-columns:1fr}}
+    .pane{border:1px solid var(--line);border-radius:12px;background:#fff;overflow:hidden}
+    .pane>h3{margin:0;padding:9px 12px;background:#f0f5f7;border-bottom:1px solid var(--line);font-size:13px}
+    #srcText{margin:0;padding:10px 12px;max-height:66vh;overflow:auto;white-space:pre-wrap;word-break:break-word;
+      font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;line-height:1.65;color:var(--ink)}
+    #srcText mark{background:#ffe9a8;color:var(--ink);border-radius:3px;padding:0 1px}
+    #rowList{max-height:66vh;overflow:auto;padding:6px}
+    .row{padding:8px 10px;border:1.5px solid transparent;border-radius:10px;margin-bottom:5px;background:#fbfdfe}
+    .row[aria-selected="true"]{border-color:var(--blue);background:var(--sky)}
+    .row .rh{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+    .row .rt{font-weight:800;font-size:13.5px;word-break:break-word;flex:1;min-width:0}
+    .row .rs{font-size:12.5px;color:var(--muted);word-break:break-word;margin-top:1px}
+    .row .ri{margin-top:4px;font-size:12px;font-weight:800;word-break:break-word}
+    .row .ri.bad{color:var(--bad)}.row .ri.warn{color:var(--warn)}
+    .row .ra{display:flex;gap:5px;margin-top:6px;flex-wrap:wrap}
+    .row.dropped .rt,.row.dropped .rs{text-decoration:line-through;color:var(--muted)}
+    .row textarea{margin-top:6px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;min-height:190px}
+    .keys{font-size:12px;color:var(--muted);font-weight:700}
+    .keys kbd{display:inline-block;min-width:17px;padding:0 4px;border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;background:#fff;font:inherit;font-weight:800;text-align:center}
+    .srcrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:7px 0;border-top:1px solid var(--line)}
+    .srcrow:first-of-type{border-top:0}
+  </style>
+</head>
+<body>
+<header><b>WB 내신브레인 · 팩 제작</b><small>원천 → AI 추출 → 검수 → 배포</small><span class="sp"></span>
+  <button class="hbtn" onclick="location.href='/admin/naesin-admin.html'">운영 관리</button>
+  <button class="hbtn" id="btnRefresh" hidden>새로고침</button>
+  <button class="hbtn" id="btnLogout" hidden>로그아웃</button>
+</header>
+<div class="banner" id="banner" role="alert" hidden><span id="bannerMsg"></span><span class="sp"></span><button class="btn sm ghost" id="bannerClose">닫기</button></div>
+<main id="app"></main>
+<script>
+'use strict';
+/* WB 내신브레인 팩 제작 스튜디오 — 원장·강사용 (기획서 §15-2).
+   운영 화면(naesin-admin.html)과 인증·말투를 공유하고 역할만 나눈다. 여기는 만들기,
+   저기는 배정·성취도다. 서버 계약은 reading-server/naesin-studio.mjs 하나뿐이다.
+
+   라이선스: 왼쪽 칸의 원천 텍스트와 추출 초안은 구매 자료에서 나온 것이다. 화면에만
+   띄우고 localStorage 에도 남기지 않는다 — 새로고침하면 서버에서 다시 받아 온다.
+   원천에는 마크업이 섞여 들어올 수 있으므로 모든 표시 값을 esc() 로 감싼다. */
+const $=s=>document.querySelector(s);
+const esc=t=>String(t==null?'':t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num=v=>{const n=Number(v);return Number.isFinite(n)?Math.round(n):null;};
+let TOKEN=localStorage.getItem('wbr.admin.token')||null;
+
+/* 서버가 아는 추출 종류(naesin-extract.mjs KINDS)와 그 종류가 함께 만들어 내는 곁딸린 배열.
+   words 추출은 단어만, sentences 추출은 문장 + 어색한 문장 찾기 + 종합 Check 까지 낸다. */
+const KINDS=['words','sentences','dialogues','patterns','items'];
+const KIND_KO={words:'단어',sentences:'본문 문장',dialogues:'대화문',patterns:'문법 패턴',items:'저장 문항',
+  oddOneItems:'어색한 문장 찾기',checkItems:'종합 Check'};
+const kindKo=k=>KIND_KO[k]||k;
+const STATE_KO={pending:'미검토',ok:'승인',fixed:'수정',dropped:'버림'};
+const STATUS_KO={draft:'원천만',review:'검수 중',ready:'배포 대기',published:'배포됨',failed:'실패'};
+/* 추출 실패 사유 — 서버 reason 을 사람 말로. no-key 는 실패가 아니라 '다른 길로 가라'는 안내다. */
+const REASON_KO={'no-key':'AI 키가 서버에 없어요 — 아래 「초안 JSON 붙여넣기」로 진행하세요.',
+  quota:'오늘 AI 사용 한도를 넘었어요.',network:'AI 서버에 닿지 못했어요.',refused:'AI가 응답을 거절했어요.',
+  parse:'AI 응답이 JSON 이 아니었어요.',shape:'AI 응답의 모양이 달라요.',empty:'원천 텍스트가 비어 있어요.',
+  'bad-kind':'추출 종류가 올바르지 않아요.'};
+const reasonKo=r=>REASON_KO[r]||(/^api-/.test(String(r))?('AI 서버 오류('+r+')'):('추출 실패('+r+')'));
+
+let VIEW='list';        // 'list' | 'job'
+let JOBS=null;          // 작업 목록 (null = 아직 못 받음)
+let JOB=null,GATE=null,SRC={};   // 열어 둔 작업 하나
+let SEL=null;           // 선택된 행의 검수 키 — 키보드 조작과 원천 강조의 기준
+let EDIT=null;          // 편집 중인 행의 검수 키
+let FKIND='all',FONLY='issue';   // 필터: 종류 · 무엇만 볼지('issue'|'pending'|'all')
+let NEWSRC=[];          // 새 작업에 붙인 원천 [{name,kind,text}] — 만들기 전까지 화면에만 있다
+let BUSY=false;
+
+async function api(path,opt){
+  let r;
+  try{r=await fetch('/api'+path,Object.assign({headers:{'Content-Type':'application/json',...(TOKEN?{Authorization:'Bearer '+TOKEN}:{})}},opt||{}));}
+  catch(e){const err=new Error('네트워크 오류 — 연결을 확인하고 다시 시도하세요.');err.network=true;throw err;}
+  const j=await r.json().catch(()=>({}));
+  if(r.status===401&&TOKEN){TOKEN=null;localStorage.removeItem('wbr.admin.token');renderLogin('세션이 만료됐어요. 다시 로그인해 주세요.');throw new Error('auth');}
+  if(!r.ok){const err=new Error(j.error||('HTTP '+r.status));err.status=r.status;err.body=j;throw err;}
+  return j;
+}
+const isAuth=e=>!!e&&e.message==='auth';
+function showBanner(msg){$('#bannerMsg').textContent=msg;$('#banner').hidden=false;}
+function hideBanner(){$('#banner').hidden=true;}
+function fail(e){if(isAuth(e))return;showBanner(e.message||String(e));}
+function fmtLast(t){if(!t)return '—';const d=(Date.now()-new Date(t))/60000;if(!Number.isFinite(d))return '—';
+  if(d<2)return '방금';if(d<60)return Math.round(d)+'분 전';if(d<1440)return Math.round(d/60)+'시간 전';return Math.round(d/1440)+'일 전';}
+
+function renderLogin(msg){
+  $('#btnRefresh').hidden=true;$('#btnLogout').hidden=true;hideBanner();
+  $('#app').innerHTML=`<div class="card" id="loginCard"><h2>강사 로그인</h2>
+    <p class="muted">관리 PIN을 입력하세요. (운영 관리와 같은 PIN)</p>
+    <div style="display:flex;gap:8px;margin-top:10px"><input id="pin" type="password" placeholder="PIN" style="flex:1">
+    <button class="btn" id="doLogin">로그인</button></div>
+    ${msg?`<p class="err">${esc(msg)}</p>`:''}</div>`;
+  $('#doLogin').onclick=async()=>{
+    try{const j=await api('/admin/login',{method:'POST',body:JSON.stringify({pin:$('#pin').value})});
+      TOKEN=j.token;localStorage.setItem('wbr.admin.token',TOKEN);openList();}
+    catch(e){if(!isAuth(e))renderLogin(e.message);}
+  };
+  $('#pin').addEventListener('keydown',e=>{if(e.key==='Enter')$('#doLogin').click();});
+}
+
+/* ── 행 요약 ──
+   종류마다 모양이 다르다. 검수자는 "이 행이 원문과 같은가"만 보므로 한 줄 제목 + 한 줄 부제로 줄인다. */
+function rowSummary(kind,row){
+  const r=(row&&typeof row==='object')?row:{};
+  const j=(a,sep)=>(Array.isArray(a)?a:[]).filter(x=>x!=null&&x!=='').join(sep||', ');
+  if(kind==='words')return {t:String(r.headword==null?'?':r.headword),s:j(r.meaningKo)+(r.example&&r.example.en?(' · 예문: '+r.example.en):'')};
+  if(kind==='sentences')return {t:(r.seq!=null?r.seq+'. ':'')+String(r.en==null?'?':r.en),s:String(r.ko==null?'':r.ko)+(r.dayGroup?(' · 단락 '+r.dayGroup):'')};
+  if(kind==='oddOneItems')return {t:String(r.id||'?')+' · '+(r.kind==='grammatical'?'어법':'어휘'),s:'정답 '+(num(r.answerIdx)!=null?(num(r.answerIdx)+1)+'번':'?')+' → '+String(r.correction==null?'':r.correction)};
+  if(kind==='checkItems')return {t:String(r.id||'?')+' · '+String(r.slot||'?'),s:String(r.promptKo||r.textEn||r.ko||'')};
+  if(kind==='dialogues'){const ln=Array.isArray(r.lines)?r.lines:[];return {t:String(r.title||('대화 '+(r.id||'')))+' · '+ln.length+'줄',s:ln.length?(String(ln[0].speaker||'')+': '+String(ln[0].en||'')):''};}
+  if(kind==='patterns')return {t:(r.patternNo!=null?r.patternNo+'. ':'')+String(r.title||'?'),s:String(r.conceptKo||'')};
+  if(kind==='items')return {t:(r.no!=null?r.no+'. ':'')+String(r.formatType||'?'),s:String(r.questionKo||r.question||r.promptKo||'')+' · 정답 '+j(r.answer,' ')};
+  return {t:JSON.stringify(r).slice(0,80),s:''};
+}
+/* 원천에서 이 행을 찾을 때 쓰는 실마리 — 원문에 그대로 있는 영어가 가장 낫다 */
+function anchorOf(kind,row){
+  const r=(row&&typeof row==='object')?row:{};
+  if(kind==='words')return r.headword;
+  if(kind==='sentences')return r.en;
+  if(kind==='oddOneItems'){const l=Array.isArray(r.sentences)?r.sentences:[];return l.length?l[0].text:r.correction;}
+  if(kind==='checkItems')return r.textEn||(Array.isArray(r.tokens)?r.tokens.join(' '):'')||r.promptKo;
+  if(kind==='dialogues'){const l=Array.isArray(r.lines)?r.lines:[];return l.length?l[0].en:r.title;}
+  if(kind==='patterns')return r.title;
+  if(kind==='items')return r.question||r.questionKo||r.stem;
+  return '';
+}
+
+/* ── 검수 키 ──
+   서버 rowKey 와 한 글자도 다르면 승인이 엉뚱한 행에 붙는다(naesin-studio.mjs rowKey 참조) */
+function rowKey(kind,row,i){
+  const r=(row&&typeof row==='object')?row:{};
+  const own=r.id!=null?String(r.id):r.seq!=null?('s'+r.seq):r.no!=null?('n'+r.no):r.patternNo!=null?('p'+r.patternNo):('i'+i);
+  return kind+':'+own;
+}
+/* 검사 메시지는 'words[3](apple) …' 로 시작한다 — 그 대괄호 번호가 조립된 팩의 인덱스다.
+   버린 행은 조립에서 빠지므로, 초안 인덱스로 되돌리려면 살아남은 순서를 다시 세야 한다. */
+function issueIndex(){
+  const draft=(JOB&&JOB.draft)||{},review=(JOB&&JOB.review)||{};
+  const map={};   // kind → [초안 인덱스] (조립 순서)
+  for(const kind of Object.keys(draft)){
+    const rows=Array.isArray(draft[kind])?draft[kind]:[];
+    map[kind]=[];
+    rows.forEach((row,i)=>{const rv=review[rowKey(kind,row,i)];if(rv&&rv.state==='dropped')return;map[kind].push(i);});
+  }
+  const byKey={},loose=[];
+  const put=(list,sev)=>(list||[]).forEach(it=>{
+    const m=/^([A-Za-z]+)\[(\d+)\]/.exec(String(it&&it.message||''));
+    const kind=m&&m[1],ai=m?Number(m[2]):-1;
+    const di=(kind&&map[kind]&&map[kind][ai]!=null)?map[kind][ai]:null;
+    if(di==null){loose.push({sev,...it});return;}
+    const rows=draft[kind];
+    const key=rowKey(kind,rows[di],di);
+    (byKey[key]=byKey[key]||[]).push({sev,message:it.message});
+  });
+  put(GATE&&GATE.errors,'bad');put(GATE&&GATE.warns,'warn');
+  return {byKey,loose};
+}
+
+/* 화면에 그릴 행 목록 — 필터를 적용한 평평한 배열 */
+function visibleRows(byKey){
+  const draft=(JOB&&JOB.draft)||{},review=(JOB&&JOB.review)||{};
+  const out=[];
+  for(const kind of Object.keys(draft)){
+    if(FKIND!=='all'&&FKIND!==kind)continue;
+    (Array.isArray(draft[kind])?draft[kind]:[]).forEach((row,i)=>{
+      const key=rowKey(kind,row,i);
+      const rv=review[key]||{state:'pending'};
+      const iss=byKey[key]||[];
+      if(FONLY==='issue'&&!iss.length)return;
+      if(FONLY==='pending'&&rv.state!=='pending')return;
+      out.push({kind,row,i,key,state:rv.state,note:rv.note||'',patch:rv.patch||null,issues:iss});
+    });
+  }
+  return out;
+}
+
+/* ── 원천 강조 ──
+   공백·대소문자를 지운 사본에서 찾고 원본 위치로 되돌린다. 추출된 문장은 원문의 줄바꿈이
+   지워진 경우가 많아 그냥 indexOf 로는 거의 못 찾는다. */
+function flatten(s){
+  let f='';const idx=[];
+  for(let i=0;i<s.length;i+=1){const c=s[i];if(/\s/.test(c))continue;f+=c.toLowerCase();idx.push(i);}
+  return {f,idx};
+}
+function srcHtml(text,anchor){
+  const t=String(text||'');
+  const a=String(anchor||'').trim();
+  if(!t)return '<span class="muted">이 종류의 원천 텍스트가 없어요. (초안만 넣은 작업)</span>';
+  if(a.length>=3){
+    const F=flatten(t),N=flatten(a);
+    if(N.f){
+      const p=F.f.indexOf(N.f);
+      if(p>=0){
+        const s=F.idx[p],e=F.idx[p+N.f.length-1]+1;
+        return esc(t.slice(0,s))+'<mark id="srcHit">'+esc(t.slice(s,e))+'</mark>'+esc(t.slice(e));
+      }
+    }
+  }
+  return esc(t);
+}
+
+/* ── 목록 화면 ── */
+async function openList(){
+  VIEW='list';JOB=null;GATE=null;SRC={};SEL=null;EDIT=null;
+  $('#btnRefresh').hidden=false;$('#btnLogout').hidden=false;
+  try{JOBS=(await api('/naesin/admin/jobs')).jobs||[];hideBanner();}
+  catch(e){if(isAuth(e))return;JOBS=null;fail(e);}
+  renderList();
+}
+function renderList(){
+  const rows=Array.isArray(JOBS)?JOBS:[];
+  $('#app').innerHTML=`
+  <div class="card"><h2>새 작업 <small>원천 텍스트를 붙여넣기</small></h2>
+    <p class="muted">구매 자료 PDF에서 <b>텍스트를 복사해</b> 종류별로 붙여넣습니다. <code>.txt</code>·<code>.json</code> 파일도 됩니다.
+      원천과 초안은 서버의 작업 저장소에만 있고 작업을 지우면 함께 지워집니다 — 저장소에 커밋되지 않습니다.</p>
+    <div class="grid-form" style="margin-top:8px">
+      <label class="fld">팩 id<input id="nPack" placeholder="2022-ne-m2-L6" autocapitalize="off" spellcheck="false"></label>
+      <label class="fld">교육과정<input id="nCur" placeholder="2022"></label>
+      <label class="fld">교과서<input id="nText" placeholder="능률(김성곤)"></label>
+      <label class="fld">학년<input id="nGrade" placeholder="중2"></label>
+      <label class="fld">과<input id="nLesson" type="number" min="1" max="20" placeholder="6"></label>
+      <label class="fld">과 제목<input id="nTitle" placeholder="Wonders of the World"></label>
+    </div>
+    <h3>원천 붙이기</h3>
+    <div class="filters">
+      <select id="nKind">${KINDS.map(k=>`<option value="${k}">${esc(kindKo(k))}</option>`).join('')}</select>
+      <input type="file" id="nFile" accept=".txt,.json,.md,text/plain,application/json">
+      <button class="btn sm ghost" id="btnAddSrc">이 종류로 추가</button>
+    </div>
+    <textarea id="nSrc" rows="6" placeholder="PDF에서 복사한 텍스트를 붙여넣으세요." spellcheck="false"></textarea>
+    <div id="nList" style="margin-top:8px"></div>
+    <div style="margin-top:10px"><button class="btn" id="btnCreate">작업 만들기</button></div>
+    <div id="nOut"></div>
+  </div>
+
+  <div class="card"><h2>작업 ${num(rows.length)||0}건</h2>
+    ${JOBS===null?'<p class="err">작업 목록을 불러오지 못했어요 — 새로고침으로 다시 시도하세요.</p>'
+      :!rows.length?'<p class="muted">아직 없어요. 위에서 원천을 붙여 첫 작업을 만드세요.</p>'
+      :`<div class="tbl"><table><thead><tr><th>팩 id</th><th>교과서·과</th><th>상태</th><th>행</th><th>검수</th><th>수정</th><th></th></tr></thead><tbody>
+        ${rows.map(jb=>{
+          const kinds=Object.keys(jb.counts||{});
+          const done=(jb.total||0)-(jb.pending||0);
+          const st=STATUS_KO[jb.status]||jb.status||'—';
+          const cls=jb.status==='published'?'ok':jb.status==='failed'?'bad':jb.status==='ready'?'ok':'';
+          return `<tr><td><b>${esc(jb.packId)}</b>${jb.error?'<br><span class="muted">'+esc(jb.error)+'</span>':''}</td>
+            <td>${esc((jb.meta&&jb.meta.textbook)||'—')}${jb.meta&&jb.meta.lesson!=null?' L'+num(jb.meta.lesson):''}</td>
+            <td><span class="tag ${cls}">${esc(st)}</span></td>
+            <td style="white-space:normal">${kinds.length?kinds.map(k=>`<span class="tag muted">${esc(kindKo(k))} ${num(jb.counts[k])}</span>`).join(' '):'—'}</td>
+            <td>${num(done)||0}/${num(jb.total)||0}${jb.issueCount?' <span class="tag warn">문제 '+num(jb.issueCount)+'</span>':''}</td>
+            <td>${esc(fmtLast(jb.updatedAt))}</td>
+            <td><button class="btn sm" data-open="${esc(jb.jobId)}">열기</button>
+              <button class="btn sm danger" data-del="${esc(jb.jobId)}">삭제</button></td></tr>`;
+        }).join('')}</tbody></table></div>`}
+  </div>`;
+  renderNewSrc();
+  $('#btnAddSrc').onclick=addSrc;
+  $('#btnCreate').onclick=createJob;
+  $('#nFile').onchange=async()=>{
+    const f=$('#nFile').files[0];if(!f)return;
+    $('#nSrc').value=await f.text();
+    if(!$('#nPack').value){const m=/([A-Za-z0-9-]{3,60})/.exec(f.name.replace(/\.(txt|json|md)$/i,''));if(m)$('#nPack').value=m[1];}
+  };
+  document.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>openJob(b.dataset.open));
+  document.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>delJob(b.dataset.del));
+}
+function renderNewSrc(){
+  $('#nList').innerHTML=NEWSRC.length
+    ? NEWSRC.map((s,i)=>`<div class="srcrow"><span class="tag">${esc(kindKo(s.kind))}</span>
+        <b style="flex:1;min-width:0;word-break:break-all">${esc(s.name)}</b>
+        <span class="muted">${num(s.text.length)}자</span>
+        <button class="btn sm danger" data-rmsrc="${i}">빼기</button></div>`).join('')
+    : '<p class="muted">붙인 원천이 없어요. 원천 없이 만들고 나중에 초안 JSON만 넣어도 됩니다.</p>';
+  document.querySelectorAll('[data-rmsrc]').forEach(b=>b.onclick=()=>{NEWSRC.splice(Number(b.dataset.rmsrc),1);renderNewSrc();});
+}
+function addSrc(){
+  const text=$('#nSrc').value;
+  if(!text.trim()){$('#nOut').innerHTML='<p class="err">붙일 텍스트가 비어 있어요.</p>';return;}
+  const kind=$('#nKind').value;
+  const f=$('#nFile').files[0];
+  NEWSRC.push({name:(f&&f.name)||(kindKo(kind)+' 붙여넣기'),kind,text});
+  $('#nSrc').value='';$('#nFile').value='';$('#nOut').innerHTML='';
+  renderNewSrc();
+}
+async function createJob(){
+  const lesson=$('#nLesson').value;
+  const b={packId:$('#nPack').value.trim(),
+    meta:{curriculum:$('#nCur').value.trim(),textbook:$('#nText').value.trim(),grade:$('#nGrade').value.trim(),
+      lesson:lesson===''?null:Number(lesson),lessonTitle:$('#nTitle').value.trim()},
+    sources:NEWSRC};
+  try{
+    const j=await api('/naesin/admin/job',{method:'POST',body:JSON.stringify(b)});
+    NEWSRC=[];hideBanner();openJob(j.jobId);
+  }catch(e){if(isAuth(e))return;$('#nOut').innerHTML='<p class="err">'+esc(e.message)+'</p>';}
+}
+async function delJob(id){
+  if(!confirm('작업과 원천 텍스트를 지웁니다. 이미 배포한 팩은 남습니다. 계속할까요?'))return;
+  try{await api('/naesin/admin/job',{method:'DELETE',body:JSON.stringify({jobId:id})});openList();}
+  catch(e){fail(e);}
+}
+
+/* ── 검수 화면 ── */
+async function openJob(id){
+  VIEW='job';EDIT=null;SEL=null;FKIND='all';FONLY='issue';
+  try{
+    const j=await api('/naesin/admin/job?id='+encodeURIComponent(id)+'&src=1');
+    JOB=j.job;GATE=j.gate;SRC=j.sources||{};hideBanner();
+  }catch(e){if(isAuth(e))return;fail(e);openList();return;}
+  renderJob();
+}
+function renderJob(){
+  if(!JOB){openList();return;}
+  const {byKey,loose}=issueIndex();
+  const rows=visibleRows(byKey);
+  if(SEL&&!rows.some(r=>r.key===SEL))SEL=null;
+  if(!SEL&&rows.length)SEL=rows[0].key;
+  const meta=JOB.meta||{};
+  const done=(GATE.total||0)-(GATE.pending||0);
+  const srcKinds=(JOB.sources||[]).map(s=>s.kind).filter((k,i,a)=>a.indexOf(k)===i);
+  const kinds=Object.keys(JOB.draft||{});
+  const clean=(()=>{const r=(JOB.review)||{};let n=0;
+    for(const kind of kinds)(JOB.draft[kind]||[]).forEach((row,i)=>{const k=rowKey(kind,row,i);
+      if(!(byKey[k]||[]).length&&!(r[k]&&r[k].state!=='pending'))n+=1;});
+    return n;})();
+
+  $('#app').innerHTML=`
+  <div class="card">
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <button class="btn sm ghost" id="btnBack">← 작업 목록</button>
+      <b style="font-size:16px;color:var(--navy)">${esc(JOB.packId)}</b>
+      <span class="tag">${esc(STATUS_KO[JOB.status]||JOB.status||'')}</span>
+      <span class="muted">${esc(meta.textbook||'')}${meta.lesson!=null?' L'+num(meta.lesson):''} ${esc(meta.lessonTitle||'')}</span>
+      <span class="sp" style="flex:1"></span>
+      <button class="btn go" id="btnPub" ${GATE.ok?'':'disabled'}>배포</button>
+    </div>
+    <div class="stats">
+      <div class="stat"><b>${num(GATE.total)||0}</b><span>행</span></div>
+      <div class="stat ${GATE.pending?'warn':''}"><b>${num(GATE.pending)||0}</b><span>미검토</span></div>
+      <div class="stat ${GATE.errors.length?'warn':''}"><b>${num(GATE.errors.length)||0}</b><span>검사 오류</span></div>
+      <div class="stat"><b>${num(GATE.warns.length)||0}</b><span>경고</span></div>
+      <div class="stat"><b>${num(done)||0}</b><span>검수 완료</span></div>
+    </div>
+    ${GATE.ok?'<div class="issues ok">검사 오류 0 · 미검토 0 — 배포할 수 있어요.</div>'
+      :`<div class="issues ${GATE.errors.length?'bad':'warn'}">${GATE.errors.length?('검사 오류 '+num(GATE.errors.length)+'건이 남아 배포할 수 없습니다. 해당 행을 고치거나 버리세요.'):('미검토 '+num(GATE.pending)+'행이 남았습니다.')}</div>`}
+    ${loose.length?`<div class="issues ${loose.some(x=>x.sev==='bad')?'bad':'warn'}"><b>행에 붙이지 못한 문제 ${num(loose.length)}건</b> — 팩 전체에 관한 것이라 개별 행에서 못 고칩니다.
+      ${loose.slice(0,8).map(x=>'<div>'+(x.sev==='bad'?'✕':'!')+' ['+esc(x.where)+'] '+esc(x.message)+'</div>').join('')}</div>`:''}
+    ${GATE.summary&&GATE.summary.length?`<p class="muted" style="margin-top:8px">${GATE.summary.map(esc).join(' · ')}</p>`:''}
+    <div id="pubOut"></div>
+  </div>
+
+  <div class="card"><h2>초안 만들기</h2>
+    <p class="muted">종류마다 따로 추출합니다 — 한 번에 다 돌리면 서버 시간 한도를 넘습니다. 다시 추출하면 그 종류의 검수 상태는 초기화됩니다.</p>
+    <div class="filters">
+      ${srcKinds.length?srcKinds.map(k=>`<button class="btn sm" data-ex="${esc(k)}">${esc(kindKo(k))} AI 추출</button>`).join('')
+        :'<span class="muted">붙인 원천이 없어 AI 추출은 못 씁니다 — 아래 초안 JSON 경로를 쓰세요.</span>'}
+    </div>
+    <div id="exOut"></div>
+    <details><summary style="cursor:pointer;font-weight:800;color:var(--navy)">초안 JSON 붙여넣기 (AI 키가 없을 때)</summary>
+      <p class="muted">다른 도구로 만든 팩 JSON을 그대로 붙여넣습니다. 최상위 키는
+        <code>words</code>·<code>sentences</code>·<code>oddOneItems</code>·<code>checkItems</code>·<code>dialogues</code>·<code>patterns</code>·<code>items</code>.</p>
+      <textarea id="draftJson" rows="7" placeholder='{"words":[...],"sentences":[...]}' spellcheck="false"></textarea>
+      <div style="margin-top:8px"><button class="btn ghost" id="btnDraft">초안으로 넣기</button></div>
+      <div id="draftOut"></div>
+    </details>
+  </div>
+
+  ${kinds.length?`<div class="card"><h2>검수 <small>${num(rows.length)||0}행 보임</small></h2>
+    <div class="filters">
+      <button class="chip" data-only="issue" aria-pressed="${FONLY==='issue'}">문제 있는 행만</button>
+      <button class="chip" data-only="pending" aria-pressed="${FONLY==='pending'}">미검토만</button>
+      <button class="chip" data-only="all" aria-pressed="${FONLY==='all'}">전체</button>
+      <span style="width:10px"></span>
+      <button class="chip" data-kind="all" aria-pressed="${FKIND==='all'}">모든 종류</button>
+      ${kinds.map(k=>`<button class="chip" data-kind="${esc(k)}" aria-pressed="${FKIND===k}">${esc(kindKo(k))} ${num((JOB.draft[k]||[]).length)}</button>`).join('')}
+      <span class="sp" style="flex:1"></span>
+      <button class="btn sm ghost" id="btnBulk" ${clean?'':'disabled'}>문제 없는 ${num(clean)||0}행 일괄 승인</button>
+    </div>
+    <p class="keys">전수 검토는 현실적으로 불가능합니다 — 자동 대조가 잡은 행만 사람이 보고, 나머지는 일괄 승인하세요.
+      키보드: <kbd>j</kbd>/<kbd>k</kbd> 이동 · <kbd>a</kbd> 승인 · <kbd>x</kbd> 버림 · <kbd>e</kbd> 편집 · <kbd>Esc</kbd> 취소</p>
+    <div class="panes">
+      <div class="pane"><h3>원천 <span class="muted" id="srcWho"></span></h3><pre id="srcText"></pre></div>
+      <div class="pane"><h3>추출 행</h3><div id="rowList"></div></div>
+    </div>
+  </div>`:'<div class="card"><p class="muted">아직 초안이 없어요. 위에서 AI 추출을 돌리거나 초안 JSON을 넣으세요.</p></div>'}`;
+
+  $('#btnBack').onclick=openList;
+  $('#btnPub').onclick=publish;
+  document.querySelectorAll('[data-ex]').forEach(b=>b.onclick=()=>runExtract(b.dataset.ex,b));
+  $('#btnDraft').onclick=putDraft;
+  document.querySelectorAll('[data-only]').forEach(b=>b.onclick=()=>{FONLY=b.dataset.only;SEL=null;renderJob();});
+  document.querySelectorAll('[data-kind]').forEach(b=>b.onclick=()=>{FKIND=b.dataset.kind;SEL=null;renderJob();});
+  const bulk=$('#btnBulk');if(bulk)bulk.onclick=bulkOk;
+  if(kinds.length){renderRows(rows);renderSrc(rows);}
+}
+
+function renderRows(rows){
+  const el=$('#rowList');if(!el)return;
+  el.innerHTML=rows.length?rows.map(r=>{
+    const sm=rowSummary(r.kind,r.patch?{...r.row,...r.patch}:r.row);
+    const tag=r.state==='pending'?'<span class="tag muted">미검토</span>'
+      :r.state==='ok'?'<span class="tag ok">승인</span>'
+      :r.state==='fixed'?'<span class="tag">수정</span>':'<span class="tag bad">버림</span>';
+    const editing=EDIT===r.key;
+    return `<div class="row ${r.state==='dropped'?'dropped':''}" data-key="${esc(r.key)}" aria-selected="${SEL===r.key}">
+      <div class="rh"><span class="tag muted">${esc(kindKo(r.kind))}</span>${tag}<span class="rt">${esc(sm.t)}</span></div>
+      ${sm.s?`<div class="rs">${esc(sm.s)}</div>`:''}
+      ${r.issues.map(x=>`<div class="ri ${x.sev}">${x.sev==='bad'?'✕':'!'} ${esc(x.message)}</div>`).join('')}
+      ${r.note?`<div class="rs">메모: ${esc(r.note)}</div>`:''}
+      ${editing?`<textarea data-ed="${esc(r.key)}" spellcheck="false">${esc(JSON.stringify(r.patch?{...r.row,...r.patch}:r.row,null,2))}</textarea>
+        <div class="ra"><button class="btn sm" data-save="${esc(r.key)}">저장</button>
+          <button class="btn sm ghost" data-cancel="1">취소</button>
+          <span class="muted">지운 키는 비운 값으로 저장됩니다.</span></div>`
+      :`<div class="ra">
+        <button class="btn sm ${r.state==='ok'?'':'ghost'}" data-ok="${esc(r.key)}">승인</button>
+        <button class="btn sm ghost" data-edit="${esc(r.key)}">편집</button>
+        <button class="btn sm danger" data-drop="${esc(r.key)}">${r.state==='dropped'?'되살리기':'버림'}</button>
+      </div>`}
+    </div>`;
+  }).join(''):'<p class="muted" style="padding:10px">이 필터에 걸리는 행이 없어요. 「전체」로 바꿔 보세요.</p>';
+
+  el.querySelectorAll('.row').forEach(d=>d.onclick=e=>{
+    if(e.target.closest('button')||e.target.closest('textarea'))return;
+    SEL=d.dataset.key;renderJob();
+  });
+  el.querySelectorAll('[data-ok]').forEach(b=>b.onclick=()=>review(b.dataset.ok,'ok'));
+  el.querySelectorAll('[data-drop]').forEach(b=>b.onclick=()=>{
+    const r=rows.find(x=>x.key===b.dataset.drop);
+    review(b.dataset.drop,r&&r.state==='dropped'?'pending':'dropped');
+  });
+  el.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>{EDIT=b.dataset.edit;SEL=b.dataset.edit;renderJob();});
+  el.querySelectorAll('[data-cancel]').forEach(b=>b.onclick=()=>{EDIT=null;renderJob();});
+  el.querySelectorAll('[data-save]').forEach(b=>b.onclick=()=>saveEdit(b.dataset.save));
+  const sel=el.querySelector('.row[aria-selected="true"]');
+  if(sel&&sel.scrollIntoView)sel.scrollIntoView({block:'nearest'});
+  const ta=el.querySelector('textarea[data-ed]');if(ta)ta.focus();
+}
+function renderSrc(rows){
+  const cur=rows.find(r=>r.key===SEL)||rows[0]||null;
+  const kind=cur?cur.kind:null;
+  /* 곁딸린 배열(oddOneItems·checkItems)은 sentences 원천에서 나온다 — 그 원문을 보여 준다 */
+  const srcKind=(kind==='oddOneItems'||kind==='checkItems')?'sentences':kind;
+  const who=$('#srcWho');
+  if(who)who.textContent=srcKind?(kindKo(srcKind)+(SRC[srcKind]?'':' · 없음')):'';
+  const el=$('#srcText');if(!el)return;
+  el.innerHTML=srcHtml(srcKind?SRC[srcKind]:'',cur?anchorOf(cur.kind,cur.patch?{...cur.row,...cur.patch}:cur.row):'');
+  const hit=el.querySelector('#srcHit');
+  if(hit&&hit.scrollIntoView)hit.scrollIntoView({block:'center'});
+}
+
+/* ── 검수 저장 ──
+   먼저 화면에 반영하고 서버에 보낸다(승인은 초당 여러 번 누르는 동작이라 왕복을 기다리면 못 쓴다).
+   실패하면 되돌리고 배너를 띄운다 — 조용히 넘기면 승인한 줄 알고 배포를 누른다. */
+async function review(key,state,patch,note){
+  if(!JOB)return;
+  const before=JOB.review?{...JOB.review}:{};
+  JOB.review={...before,[key]:{state,...(patch?{patch}:{}),...(note?{note}:{})}};
+  EDIT=null;SEL=key;renderJob();
+  try{
+    const body={jobId:JOB.jobId,key,state};
+    if(patch)body.patch=patch;
+    if(note)body.note=note;
+    const j=await api('/naesin/admin/job/review',{method:'POST',body:JSON.stringify(body)});
+    GATE=j.gate;JOB.status=(j.job&&j.job.status)||JOB.status;hideBanner();renderJob();
+  }catch(e){
+    if(isAuth(e))return;
+    JOB.review=before;renderJob();
+    showBanner('검수를 저장하지 못했어요 — '+(e.message||''));
+  }
+}
+async function bulkOk(){
+  if(!JOB)return;
+  const {byKey}=issueIndex();
+  const review=JOB.review||{};
+  const keys=[];
+  for(const kind of Object.keys(JOB.draft||{}))
+    (JOB.draft[kind]||[]).forEach((row,i)=>{
+      const k=rowKey(kind,row,i);
+      if((byKey[k]||[]).length)return;                 /* 문제 있는 행은 사람이 본다 */
+      if(review[k]&&review[k].state!=='pending')return;
+      keys.push(k);
+    });
+  if(!keys.length)return;
+  if(!confirm('자동 대조에서 문제가 없던 '+keys.length+'행을 승인합니다. 계속할까요?'))return;
+  try{
+    const j=await api('/naesin/admin/job/review',{method:'POST',
+      body:JSON.stringify({jobId:JOB.jobId,rows:keys.map(k=>({key:k,state:'ok'}))})});
+    GATE=j.gate;
+    keys.forEach(k=>{JOB.review=JOB.review||{};JOB.review[k]={state:'ok'};});
+    JOB.status=(j.job&&j.job.status)||JOB.status;hideBanner();renderJob();
+  }catch(e){fail(e);}
+}
+function saveEdit(key){
+  const ta=document.querySelector('textarea[data-ed="'+key.replace(/"/g,'\\"')+'"]');
+  if(!ta)return;
+  let obj;
+  try{obj=JSON.parse(ta.value);}
+  catch(e){showBanner('JSON 을 읽지 못했어요 — '+e.message);return;}
+  if(!obj||typeof obj!=='object'||Array.isArray(obj)){showBanner('행 하나는 객체여야 해요.');return;}
+  /* 서버는 patch 를 {...행, ...patch} 로 합친다 — 편집에서 지운 키는 그냥 두면 살아남는다.
+     빈 값으로 덮어 검사기가 '없음'으로 보게 한다(nonEmpty(null)은 false). */
+  const [kind]=key.split(':');
+  const rows=(JOB.draft||{})[kind]||[];
+  const orig=rows.find((row,i)=>rowKey(kind,row,i)===key)||{};
+  const patch={...obj};
+  for(const k of Object.keys(orig))if(!(k in patch))patch[k]=null;
+  review(key,'fixed',patch);
+}
+
+/* ── 추출·초안·배포 ── */
+async function runExtract(kind,btn){
+  if(BUSY)return;BUSY=true;
+  const old=btn.textContent;btn.disabled=true;btn.textContent='추출 중…';
+  $('#exOut').innerHTML='<p class="muted">AI가 원천을 읽고 있어요. 종류에 따라 1~2분 걸립니다.</p>';
+  try{
+    const j=await api('/naesin/admin/job/extract',{method:'POST',body:JSON.stringify({jobId:JOB.jobId,kind})});
+    if(!j.ok){
+      const parts=(j.parts||[]).filter(p=>!p.ok);
+      $('#exOut').innerHTML='<div class="issues bad"><b>'+esc(reasonKo(j.reason))+'</b>'
+        +(parts.length?'<div class="muted">실패한 구간 '+num(parts.length)+'개</div>':'')+'</div>';
+      BUSY=false;btn.disabled=false;btn.textContent=old;return;
+    }
+    /* 초안이 바뀌었으니 검수 상태·판정을 서버에서 다시 받는다 */
+    BUSY=false;
+    const msg=kindKo(kind)+' '+j.count+'행을 뽑았어요.'+((j.parts||[]).some(p=>!p.ok)?' (일부 구간 실패 — 원천을 나눠 다시 시도할 수 있어요)':'');
+    await openJob(JOB.jobId);
+    $('#exOut').innerHTML='<div class="issues ok">'+esc(msg)+'</div>';
+  }catch(e){
+    BUSY=false;btn.disabled=false;btn.textContent=old;
+    if(isAuth(e))return;
+    $('#exOut').innerHTML='<p class="err">'+esc(e.message)+'</p>';
+  }
+}
+async function putDraft(){
+  const raw=$('#draftJson').value;
+  let obj;
+  try{obj=JSON.parse(raw);}
+  catch(e){$('#draftOut').innerHTML='<p class="err">JSON 을 읽지 못했어요 — '+esc(e.message)+'</p>';return;}
+  if(!obj||typeof obj!=='object'||Array.isArray(obj)){$('#draftOut').innerHTML='<p class="err">최상위는 객체여야 해요.</p>';return;}
+  /* 팩 통짜 JSON을 그대로 붙여도 되게 — 배열이 아닌 최상위 키(packId·textbook 등)는 버린다 */
+  const draft={};
+  for(const [k,v] of Object.entries(obj))if(Array.isArray(v)&&v.length)draft[k]=v;
+  if(!Object.keys(draft).length){$('#draftOut').innerHTML='<p class="err">넣을 배열이 없어요.</p>';return;}
+  try{
+    await api('/naesin/admin/job/draft',{method:'POST',body:JSON.stringify({jobId:JOB.jobId,draft})});
+    await openJob(JOB.jobId);
+    $('#exOut').innerHTML='<div class="issues ok">'+esc(Object.keys(draft).map(k=>kindKo(k)+' '+draft[k].length+'행').join(' · '))+' 을 초안으로 넣었어요.</div>';
+  }catch(e){if(isAuth(e))return;$('#draftOut').innerHTML='<p class="err">'+esc(e.message)+'</p>';}
+}
+async function publish(){
+  if(!JOB)return;
+  if(!confirm(JOB.packId+' 을(를) 배포합니다. 같은 id 의 팩이 있으면 덮어씁니다. 계속할까요?'))return;
+  const btn=$('#btnPub');btn.disabled=true;btn.textContent='배포 중…';
+  try{
+    const j=await api('/naesin/admin/job/publish',{method:'POST',body:JSON.stringify({jobId:JOB.jobId})});
+    await openJob(JOB.jobId);
+    $('#pubOut').innerHTML='<div class="issues ok"><b>'+esc(j.packId)+' 배포 완료</b>'
+      +'<div>운영 관리의 「레슨 팩」에 나타납니다. 학생이 받으려면 <b>시험 범위에 넣어야</b> 합니다 — 팩 커버리지 카드를 확인하세요.</div>'
+      +(j.warns&&j.warns.length?'<div class="muted">경고 '+num(j.warns.length)+'건은 남아 있어요.</div>':'')+'</div>';
+  }catch(e){
+    if(isAuth(e))return;
+    const b=e.body||{};
+    $('#pubOut').innerHTML='<div class="issues bad"><b>'+esc(e.message)+'</b>'
+      +((b.errors||[]).slice(0,8).map(x=>'<div>✕ ['+esc(x.where)+'] '+esc(x.message)+'</div>').join(''))
+      +(b.pending?'<div>미검토 '+num(b.pending)+'행</div>':'')+'</div>';
+    const p=$('#btnPub');if(p){p.disabled=!(GATE&&GATE.ok);p.textContent='배포';}
+  }
+}
+
+/* ── 키보드 ──
+   검수는 같은 동작을 수백 번 반복한다 — 마우스로만 하면 팩 하나에 반나절이 그대로 돌아온다.
+   입력 칸에 있을 때는 가로채지 않는다(팩 id 에 'a'를 못 치면 안 된다). */
+document.addEventListener('keydown',e=>{
+  if(VIEW!=='job'||!JOB)return;
+  const t=e.target,tag=t&&t.tagName;
+  if(tag==='INPUT'||tag==='SELECT'||tag==='TEXTAREA'){
+    if(e.key==='Escape'&&tag==='TEXTAREA'&&t.dataset.ed){EDIT=null;renderJob();}
+    return;
+  }
+  if(e.metaKey||e.ctrlKey||e.altKey)return;
+  const {byKey}=issueIndex();
+  const rows=visibleRows(byKey);
+  if(!rows.length)return;
+  const at=Math.max(0,rows.findIndex(r=>r.key===SEL));
+  if(e.key==='j'||e.key==='ArrowDown'){e.preventDefault();SEL=rows[Math.min(rows.length-1,at+1)].key;EDIT=null;renderJob();return;}
+  if(e.key==='k'||e.key==='ArrowUp'){e.preventDefault();SEL=rows[Math.max(0,at-1)].key;EDIT=null;renderJob();return;}
+  if(!SEL)return;
+  if(e.key==='a'){e.preventDefault();review(SEL,'ok');return;}
+  if(e.key==='x'){e.preventDefault();review(SEL,rows[at]&&rows[at].state==='dropped'?'pending':'dropped');return;}
+  if(e.key==='e'){e.preventDefault();EDIT=SEL;renderJob();return;}
+  if(e.key==='Escape'){EDIT=null;renderJob();}
+});
+
+$('#bannerClose').onclick=hideBanner;
+$('#btnRefresh').onclick=()=>{if(VIEW==='job'&&JOB)openJob(JOB.jobId);else openList();};
+$('#btnLogout').onclick=()=>{TOKEN=null;localStorage.removeItem('wbr.admin.token');renderLogin();};
+if(TOKEN)openList();else renderLogin();
+</script>
+</body>
+</html>

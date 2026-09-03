@@ -30,7 +30,9 @@ export const WRONG_TYPE_KEYS = ['word', 'grammar', 'passage', 'writing'];
    워커는 req.json()이 몸통을 다 읽고서야 크기를 아는데, 그 전에 끊어야 메모리도 시간도 안 쓴다. */
 export const BODY_LIMIT_PACK = 4_718_592;   // 4.5MB — /admin/pack
 export const BODY_LIMIT_STATE = 307_200;    // 300KB — /state 를 비롯한 나머지 전부
-export const naesinBodyLimit = (p) => (p === '/api/naesin/admin/pack' ? BODY_LIMIT_PACK : BODY_LIMIT_STATE);
+/* 스튜디오 작업 생성·초안 넣기는 원천 텍스트(과 단위 자료)를 담아 팩과 같은 급이다 */
+const BIG_BODY_PATHS = ['/api/naesin/admin/pack', '/api/naesin/admin/job', '/api/naesin/admin/job/draft'];
+export const naesinBodyLimit = (p) => (BIG_BODY_PATHS.includes(p) ? BODY_LIMIT_PACK : BODY_LIMIT_STATE);
 
 /* 과제 학습 유형 키 — 학생 앱 quizTypes()·관리 웹 TYPE_LIST 와 같은 목록(계약 0.4).
    세 곳이 어긋나면 강사가 고른 유형이 학생 화면에서 조용히 빠진다. 여기서 모르는 키는 400으로 돌려
@@ -77,6 +79,26 @@ export const todayKst = (now) => new Date((now == null ? Date.now() : +now) + 9 
    저장(PUT /state)과 출력(overview) 양쪽에 건다 — 옛 저장본도 정규화된 모양으로만 나간다. */
 const ISO_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,6})?)?(?:Z|[+-]\d{2}:\d{2})?$/;
 const SUMMARY_TITLE_MAX = 80;
+/* 문항 신고 — 학생이 올리는 값이라 전부 상한을 둔다. 팩당 200건이면 정오표로 충분하고
+   그 이상은 같은 오류의 반복이라 오래된 것부터 버려도 잃는 것이 없다. */
+export const REPORT_REASONS = ['answer', 'broken', 'meaning', 'other'];
+const REPORT_MEMO_MAX = 200;
+const REPORT_REF_MAX = 80;
+const REPORTS_MAX = 200;
+const isReport = (r) => !!r && typeof r === 'object' && typeof r.id === 'string' && typeof r.itemRef === 'string';
+export function normalizeReport(r) {
+  return {
+    id: strMax(r.id, 40),
+    code: CODE_RE.test(r.code || '') ? r.code : '',
+    packId: PACK_ID_RE.test(r.packId || '') ? r.packId : '',
+    itemRef: strMax(r.itemRef, REPORT_REF_MAX),
+    reason: REPORT_REASONS.includes(r.reason) ? r.reason : 'other',
+    memo: strMax(r.memo, REPORT_MEMO_MAX),
+    at: isoStr(r.at),
+    resolved: !!r.resolved,
+    resolvedAt: isoStr(r.resolvedAt),
+  };
+}
 const int0 = (v) => { const n = Number(v); return Number.isFinite(n) ? Math.max(0, Math.trunc(n)) : 0; };
 const strMax = (v, max) => (typeof v === 'string' ? v.slice(0, max) : '');
 const isoStr = (v) => (typeof v === 'string' && ISO_RE.test(v) ? v : '');
@@ -262,6 +284,7 @@ async function scopesUsingPack(store, id) {
        getState(code), putState(code, rec), listStateCodes(),
        getExam(scope), putExam(scope, rec), deleteExam(scope), listExamScopes(),   // scope: 'default' | 학생코드
        getTask(scope), putTask(scope, rec),   // 수업 과제 — 현재는 'default'만 사용
+       getReports(packId), putReports(packId, list),   // 문항 신고 — 팩별 배열(최근 200건)
        getResult(code, examDate), putResult(code, examDate, rec), deleteResult(code, examDate),
        listResults(),                   // → [{code, examDate, ...rec}] — 원내 전체(성과 분석·예측의 표본)
        getStudent(code),                // 호스트 학생 명부 (읽기만)
@@ -350,8 +373,86 @@ export async function handleNaesin(ctx) {
     return j(200, { results, prediction: predictScore(all, summary) });
   }
 
+  /* 문항 신고 — 팩은 PDF에서 추출해 만들기 때문에 오탈자·잘못된 정답이 남을 수 있다.
+     학생이 수업 중에 발견한 것이 팩 정오표가 되어 품질이 계속 올라간다.
+     내용은 전부 화이트리스트로 정규화한다 — 이 값은 강사 화면에 그려지는 학생 입력이다. */
+  if (p === '/api/naesin/report' && method === 'POST' && !who.admin) {
+    const b = await body();
+    const bad = badBody(b); if (bad) return bad;
+    const packId = String(b.packId || '').trim();
+    if (!PACK_ID_RE.test(packId)) return j(400, { error: '팩 id가 필요해요.' });
+    /* 배정 밖 팩에 신고를 쌓을 이유가 없다 — 팩 서빙과 같은 기준으로 막는다 */
+    const { exam } = await resolveExam(store, who.code, ctx.now);
+    const allowed = Array.isArray(exam && exam.packIds) ? exam.packIds : [];
+    if (!allowed.includes(packId)) return j(403, { error: '배정되지 않은 교재예요.' });
+    const itemRef = strMax(String(b.itemRef || '').trim(), REPORT_REF_MAX);
+    if (!itemRef) return j(400, { error: '어느 문항인지 알 수 없어요.' });
+    const reason = REPORT_REASONS.includes(b.reason) ? b.reason : 'other';
+    const rec = {
+      id: 'rp-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8),
+      code: who.code, packId, itemRef, reason,
+      memo: strMax(String(b.memo == null ? '' : b.memo).trim(), REPORT_MEMO_MAX),
+      at: nowIso(), resolved: false,
+    };
+    const list = ((await store.getReports(packId)) || []).filter(isReport);
+    /* 같은 학생이 같은 문항을 여러 번 눌러도 한 건으로 둔다 — 정오표의 건수는 '몇 명이 걸렸나'여야 한다 */
+    const kept = list.filter((x) => !(x.code === rec.code && x.itemRef === rec.itemRef && !x.resolved));
+    kept.unshift(rec);
+    await store.putReports(packId, kept.slice(0, REPORTS_MAX));
+    return j(200, { ok: true });
+  }
+
   /* ── 관리자 (원장·강사 — 관리 PIN 토큰) ── */
   if (!who.admin) return j(403, { error: '권한이 없습니다.' });
+
+  /* 팩별 신고 목록 — 같은 문항에 여러 건이면 묶어서 건수로 준다(그게 정오표의 우선순위다) */
+  if (p === '/api/naesin/admin/reports' && method === 'GET') {
+    const want = String((ctx.query && ctx.query.get('packId')) || '').trim();
+    const ids = want ? [want] : ((await store.getPackIds()) || []);
+    const packs = [];
+    for (const id of ids) {
+      if (!PACK_ID_RE.test(id)) continue;
+      const list = ((await store.getReports(id)) || []).filter(isReport).map(normalizeReport);
+      if (!list.length) continue;
+      const open = list.filter((r) => !r.resolved);
+      const byItem = new Map();
+      for (const r of open) {
+        const cur = byItem.get(r.itemRef) || { itemRef: r.itemRef, count: 0, reasons: {}, latestAt: '', ids: [] };
+        cur.count += 1;
+        cur.reasons[r.reason] = (cur.reasons[r.reason] || 0) + 1;
+        if (r.at > cur.latestAt) cur.latestAt = r.at;
+        cur.ids.push(r.id);
+        byItem.set(r.itemRef, cur);
+      }
+      packs.push({
+        packId: id, openCount: open.length, total: list.length,
+        items: [...byItem.values()].sort((a, b) => b.count - a.count || b.latestAt.localeCompare(a.latestAt)),
+        reports: list,
+      });
+    }
+    packs.sort((a, b) => b.openCount - a.openCount || a.packId.localeCompare(b.packId));
+    return j(200, { packs, time: nowIso() });
+  }
+  /* 처리 완료 — id 하나 또는 itemRef 로 그 문항의 미처리 건을 한 번에 */
+  if (p === '/api/naesin/admin/reports/resolve' && method === 'POST') {
+    const b = await body();
+    const bad = badBody(b); if (bad) return bad;
+    const packId = String(b.packId || '').trim();
+    if (!PACK_ID_RE.test(packId)) return j(400, { error: '팩 id가 필요해요.' });
+    const id = String(b.id || '').trim();
+    const itemRef = String(b.itemRef || '').trim();
+    if (!id && !itemRef) return j(400, { error: 'id 또는 itemRef 필요' });
+    const list = ((await store.getReports(packId)) || []).filter(isReport);
+    let hit = 0;
+    const next = list.map((r) => {
+      const match = id ? r.id === id : r.itemRef === itemRef;
+      if (!match || r.resolved) return r;
+      hit += 1;
+      return { ...r, resolved: true, resolvedAt: nowIso() };
+    });
+    if (hit) await store.putReports(packId, next);
+    return j(200, { ok: true, resolved: hit });
+  }
 
   /* 수업 과제 등록·조회 — 수업시간에 전원이 같은 범위를 진행하게 하는 배정 */
   if (p === '/api/naesin/admin/task' && method === 'GET') {
