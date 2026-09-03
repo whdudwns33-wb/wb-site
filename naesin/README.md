@@ -41,10 +41,27 @@ reading-server/
 
 ## 서버 API (naesin-api.mjs)
 
-학생(토큰): `GET /api/naesin/pack?id=` → `{pack, updatedAt}` · `GET/PUT /state`
-(`{state}` 래핑, 256KB) · `GET /exam` → `{exam:{examDate,packIds}, scope}`
-관리(PIN): `POST /admin/pack {id, pack}` (4MB, packId 일치 검증) · `GET /admin/packs` ·
-`POST /admin/exam {scope:'default'|코드, examDate, packIds}` · `GET /admin/overview`
+학생(토큰)
+- `GET /pack?id=` → `{pack, updatedAt}` — **자기 유효 시험의 `packIds`에 든 팩만**, 아니면 403
+- `GET/PUT /state` → `{state, updatedAt}` — 300KB(UTF-8 바이트). `state.summary`는 서버가
+  화이트리스트로 정규화해 저장·출력한다(숫자 강제·문자열 길이 제한) — 학생 기기가 올린 값이
+  강사 화면에 그대로 그려지지 않게 하는 관문
+- `GET /exam` → `{exam:{examDate, packIds, wordDeadlineDays?}, scope}` — 개별 배정(만료 전) →
+  반 공통(`default`) → 빈 값. **만료 = `examDate < 오늘(KST)`** (`resolveExam`)
+- `GET /task` → `{task, scope}` — `task.updatedAt`이 학생 앱 완료 기록의 `taskAt` 원천
+
+관리(PIN)
+- 팩: `POST /admin/pack {id, pack}` (4.5MB, packId 일치) · `GET /admin/packs` ·
+  `DELETE /admin/pack {id}` — 배정에 쓰이는 팩이면 409 + `scopes`
+- 시험: `POST /admin/exam {scope, examDate, packIds, wordDeadlineDays?}` (실제 달력 날짜 검증) ·
+  `GET /admin/exams` → `{exams:[{scope, examDate, packIds, expired, …}]}` · `DELETE /admin/exam {scope}`
+- 과제: `GET/POST /admin/task` — `typeKeys`는 서버 화이트리스트(`TASK_TYPE_KEYS` + `g-<n>`),
+  학생 앱 `quizTypes()`·관리 웹 `TYPE_LIST`와 같은 목록이어야 한다
+- `GET /admin/overview` → 학생별 `summary`(정규화본) + 과제 완료 열
+
+공통: 몸통은 파싱 전 `content-length`로 끊는다(팩 4.5MB / 그 외 300KB). 학생 삭제(퇴원)는
+`naesin:state:<코드>`·`naesin:exam:<코드>`까지 지운다 — 같은 코드를 재사용해도 앞 학생 기록이
+따라오지 않는다. 배포 헤더 규칙은 `reading/_headers` 한 곳에만 있다(`naesin/_headers`는 안내문).
 
 ## 팩 제작 파이프라인 (새 출판사·새 과 자료가 오면)
 
@@ -71,7 +88,7 @@ reading-server/
 첫 팩(NE능률(김기택) 중2 L6: 단어 77·문장 25·청크 74·대화 6·패턴 2·문항 20 샘플)은
 원장이 JSON 사본을 보관 중이며 KV에 업로드되어 있다.
 
-## 현재 상태 (2026-09-02)
+## 현재 상태 (2026-09-03)
 
 **완료**: 기획서 v1.2 · 첫 팩 구조화·업로드 · 학생 앱 MVP · 서버 API · 관리 웹 ·
 CI/배포 · textbook.json 공개 노출 정리(KV 이전)와 동일 원칙 적용.
@@ -80,6 +97,16 @@ E 프로그레스 보드 홈(안정화 히트맵·문장×단계 매트릭스). 
 ① 대화문·핵심표현(3단계) ② 문법 개념→확인 문제 ③ 어휘 심화(다의어·유의반의)
 ④ 실전 모의(유형 혼합·10분 타이머·종료 후 일괄 채점) ⑤ 수업 모드(강사 과제 배정
 `/api/naesin/task`·완료 현황 overview 열).
+
+**전면 점검(2026-09-03)** — 코드 리뷰에서 나온 결함 64건을 전량 수정했다. 학습 정확도 쪽:
+철자 1회 실패 단어가 영영 도달 못 하던 경로, 77단어가 D-1까지 안정화되지 않던 배분,
+안정화 완료 후 오답에 강등이 없던 문제, 진단 '안다'만으로 게이트가 열리던 문제,
+4단계 통과가 5단계(영작)를 건너뛰던 이중 진급, 긴 문장에서 낱말 하나 틀려도 백지가
+통과하던 채점 임계. 운영 안전 쪽: 공용 태블릿에서 학생 간 기록이 섞이던 로컬 키,
+중도 종료(✕)가 '완료'로 기록되던 문제, 학생이 올린 요약이 강사 화면에서 실행될 수 있던
+경로(서버 정규화 + 화면 이스케이프), 개별 시험 배정이 영구히 반 공통을 이기던 해석,
+퇴원 후에도 남던 내신 기록, 배정 밖 팩 열람. 태블릿 UX: 44px 터치 타깃, 자동교정 차단,
+Enter 제출, 러너 접근성.
 
 **Phase 2 백로그** (기획서 §12·§14 매핑):
 - 문항 확장: Grammar 객관식 21~45 + 워크북(07)·주관식(09) 전량, 내용정리 점검 문항
