@@ -468,13 +468,19 @@ var WBGEN = (function () {
        문장    : 엔진 단계 정수 그대로 — 3 핵심어 빈칸, 4 클로즈+배열(2문항), 5 영작.
                  1·2·6단계는 앱이 직접 진행(읽기·해석·백지)하므로 여기선 만들지 않는다
      opts.states(또는 plan.states)로 상태 맵을 주면 도달 여부·로테이션에 쓴다. opts.now(ms)는
-     날짜 해시용 — 없으면 단어 상태만으로 정한다. */
+     날짜 해시용 — 없으면 Date.now()(rnd 미주입 시 Math.random과 같은 폴백). 0으로 고정하면
+     상태를 안 넘기는 호출자에게서 같은 단어가 매일 같은 유형으로만 나와, 로테이션에 든
+     무힌트 철자(도달 기회)가 영영 안 돌아온다. */
   function dailySet(pack, plan, rnd, opts) {
     rnd = rnd || Math.random;
     opts = opts || {};
     var states = opts.states || (plan && plan.states) || {};
-    var now = opts.now != null ? +opts.now : (plan && plan.now != null ? +plan.now : 0);
-    var dayNo = Math.floor(now / 86400000);
+    var now = opts.now != null ? +opts.now : (plan && plan.now != null ? +plan.now : Date.now());
+    /* 로테이션 자리를 바꾸는 '하루'는 로컬 달력이어야 한다 — UTC 일수로 세면 경계가
+       KST 09:00이라 같은 날 아침·오후에 유형이 바뀌고, 엔진의 날짜 판정(localDate)과도
+       어긋난다. 연·월·일을 자리수로 접어 단조 증가하는 정수만 만든다(해시 씨앗용). */
+    var dt = new Date(now);
+    var dayNo = dt.getFullYear() * 372 + dt.getMonth() * 31 + dt.getDate();
     var byId = {}, bySeq = {}, out = [];
     (pack.words || []).forEach(function (w) { byId[w.id] = w; });
     (pack.sentences || []).forEach(function (s) { bySeq[s.seq] = s; });

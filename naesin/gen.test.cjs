@@ -405,4 +405,40 @@ t('E16 dailySet — review 로테이션은 배열 위치가 아니라 단어 상
   assert.notStrictEqual(a, b);
 });
 
+/* 로테이션이 도는 '하루'는 엔진의 모든 날짜 판정(localDate)과 같은 로컬 달력이어야 한다 —
+   UTC 일수로 세면 경계가 KST 09:00이라 수업 중(아침 8시→10시)에 유형이 갈린다.
+   러너의 시간대와 무관하게 재현되도록 이 테스트만 원내 시간대로 고정한다. */
+t('dailySet — 로테이션의 하루 경계는 로컬 달력(UTC 일수가 아니다)', () => {
+  const realTZ = process.env.TZ;
+  try {
+    process.env.TZ = 'Asia/Seoul';
+    const type = (y, m, d, h) => G.dailySet(pack, { words: { review: ['w-001'] }, sentences: [] },
+      seeded(1), { now: new Date(y, m - 1, d, h).getTime() })[0].type;
+    const morning = type(2026, 9, 3, 8);    // 9/3 08:00 KST = 9/2 23:00 UTC — UTC 일수면 전날이다
+    assert.strictEqual(type(2026, 9, 3, 10), morning, '같은 날 아침·오전 유형이 갈리면 안 된다');
+    assert.strictEqual(type(2026, 9, 3, 23), morning, '같은 날 밤도 같은 유형');
+    assert.notStrictEqual(type(2026, 9, 2, 20), morning, '전날 저녁(같은 UTC 일)은 다른 날이다');
+    assert.notStrictEqual(type(2026, 9, 4, 8), morning, '다음 날은 유형이 돈다');
+  } finally {
+    if (realTZ === undefined) delete process.env.TZ; else process.env.TZ = realTZ;
+  }
+});
+
+t('E1/E16 dailySet — now 를 안 넘기면 Date.now() 기준으로 로테이션이 돈다(0 고정이면 무힌트 철자가 영영 안 온다)', () => {
+  const realNow = Date.now;
+  try {
+    const seen = [];
+    for (let d = 0; d < 4; d++) {
+      Date.now = () => d * 86400000 + 3600000;
+      seen.push(G.dailySet(pack, { words: { review: ['w-001'] }, sentences: [] }, seeded(1))[0].type);
+    }
+    assert.deepStrictEqual(seen.slice().sort(), ['cloze', 'defpick', 'mcq', 'spell'], '4일이면 네 유형: ' + seen.join(','));
+    Date.now = () => 5 * 86400000;
+    const withNow = G.dailySet(pack, { words: { review: ['w-001'] }, sentences: [] }, seeded(1), { now: 0 })[0].type;
+    Date.now = () => 6 * 86400000;
+    assert.strictEqual(G.dailySet(pack, { words: { review: ['w-001'] }, sentences: [] }, seeded(1), { now: 0 })[0].type, withNow, 'opts.now 가 있으면 시계와 무관하게 결정적');
+    assert.strictEqual(G.dailySet(pack, { words: { review: ['w-001'] }, sentences: [], now: 0 }, seeded(1))[0].type, withNow, 'plan.now 도 같다');
+  } finally { Date.now = realNow; }
+});
+
 console.log('\n통과 ' + passed + '개 — 문항 생성 모듈 검증 완료');

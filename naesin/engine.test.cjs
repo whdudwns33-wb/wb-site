@@ -320,10 +320,10 @@ t('게이트 — 강사 오버라이드·병행 모드는 미도달이어도 열
   assert.strictEqual(E.gate(done, EXAM, d1, { parallel: true }).reason, 'reached');
 });
 
-t('E20 게이트 — 시험이 지났거나 examDate 가 없으면 연습과 같다', () => {
+t('E20 게이트 — 시험이 지났거나 examDate 가 없으면 연습과 같다(D-0 은 아직 시험)', () => {
   const states = { a: E.createState('a', 'word', d1) };
   assert.strictEqual(E.gate(states, { examDate: '2026-09-01' }, d1).reason, 'practice', '시험 지남');
-  assert.strictEqual(E.gate(states, { examDate: '2026-09-02' }, d1).reason, 'practice', 'D-0 도 시험 후');
+  assert.strictEqual(E.gate(states, { examDate: '2026-09-02' }, d1).reason, 'word-gate', 'D-0(시험 당일)은 잠긴 채');
   assert.strictEqual(E.gate(states, { examDate: undefined }, d1).reason, 'practice', 'examDate 없음');
   assert.strictEqual(E.gate(states, {}, d1).reason, 'practice');
 });
@@ -392,20 +392,34 @@ t('planDay — 마감 경과 후 미도달 잔여는 회복 편성으로 계속 
   assert.ok(plan.note.indexOf('회복 편성') >= 0, '플랜 노트에 회복 편성 표기: ' + plan.note);
 });
 
-t('E20 시험 후 모드 — D-0 이하면 신규 편성 없이 자율 복습(after)', () => {
+t('E20 시험 후 모드 — 시험이 지나야(D-1 이하) 신규 편성 없이 자율 복습(after)', () => {
   const p = mkPack(20);
   const states = { w1: reachedState('w1', d1) };
-  const dExam = new Date(2026, 8, 12, 9).getTime(), dAfter = new Date(2026, 8, 14, 9).getTime();
-  [dExam, dAfter].forEach((now) => {
+  [new Date(2026, 8, 13, 9).getTime(), new Date(2026, 8, 14, 9).getTime()].forEach((now) => {
     const plan = E.planDay(p, states, EXAM, now);
     assert.strictEqual(plan.mode, 'after');
-    assert.ok(plan.dday <= 0);
+    assert.ok(plan.dday < 0);
     assert.deepStrictEqual(plan.words.fresh, [], '신규 없음');
     assert.deepStrictEqual(plan.words.relearn, ['w1'], '만기 도달 단어는 자율 복습');
     assert.ok(plan.note.indexOf('시험 종료 — 자율 복습') >= 0, plan.note);
     assert.ok(plan.note.indexOf('게이트') < 0, '시험 후엔 게이트 없음');
   });
   assert.strictEqual(E.planDay(p, {}, { examDate: undefined }, d1).mode, 'practice', 'examDate 없으면 연습');
+});
+
+/* 시험 당일 아침이 마지막 복습 기회다 — 여기서 편성이 0이 되면 그날 학습이 통째로 빈다 */
+t('D-0(시험 당일) — 아직 시험 모드, 단어 편성이 0이 아니고 게이트도 잠긴 채', () => {
+  const p = mkPack(20);
+  const states = { w1: reachedState('w1', d1) };
+  const dExam = new Date(2026, 8, 12, 8).getTime();   // 9/12 아침 = D-0
+  const plan = E.planDay(p, states, EXAM, dExam);
+  assert.strictEqual(plan.mode, 'exam');
+  assert.strictEqual(plan.dday, 0);
+  const n = plan.words.fresh.length + plan.words.review.length + plan.words.relearn.length;
+  assert.ok(n > 0, '시험 당일 편성이 비면 안 된다: ' + JSON.stringify(plan.words));
+  assert.ok(plan.words.fresh.length > 0, '미도달 잔량은 마감 경과 회복 편성으로 오늘 다 나온다');
+  assert.ok(plan.note.indexOf('D-0') >= 0, plan.note);
+  assert.strictEqual(E.gate({ a: E.createState('a', 'word', d1) }, EXAM, dExam).open, false, 'D-0 게이트는 잠긴 채');
 });
 
 t('planDay — 안정화 회전은 D-7~D-1에만, 잔여 회전/잔여일로 배분 (§14-1)', () => {
@@ -603,6 +617,22 @@ t('planDay — 게이트 잠김이면 5·6단계 문장 보류, 병행 모드면
   assert.ok(par.note.indexOf('병행') >= 0, par.note);
 });
 
+t('E19 planDay — 옛 상태의 비정수·범위 밖 단계(4.5·9·x)는 1~6 정수로 읽어 편성한다(dailySet 정수 키와 같은 눈)', () => {
+  const states = {};
+  const s2 = E.createState(E.sentenceId(2), 'sentence', d1); s2.stage = 4.5; states[s2.id] = s2;
+  const s3 = E.createState(E.sentenceId(3), 'sentence', d1); s3.stage = 9; states[s3.id] = s3;
+  const s4 = E.createState(E.sentenceId(4), 'sentence', d1); s4.stage = 'x'; states[s4.id] = s4;
+  const plan = E.planDay(pack, states, null, d1);
+  const by = {}; plan.sentences.forEach((x) => { by[x.seq] = x.stage; });
+  assert.deepStrictEqual([by[2], by[3], by[4]], [4, 6, 1]);
+  /* 4.5 는 5 미만 — 게이트 잠김에도 보류되지 않는다 */
+  const lockedStates = { 'w-001': E.createState('w-001', 'word', d1) };
+  lockedStates[s2.id] = s2; lockedStates[s3.id] = s3;
+  const locked = E.planDay(pack, lockedStates, EXAM, d1);
+  assert.ok(locked.sentences.some((x) => x.seq === 2 && x.stage === 4));
+  assert.ok(!locked.sentences.some((x) => x.seq === 3), '9→6 단계는 게이트 잠김에 보류');
+});
+
 /* ── 문장 사다리 진급·요약 (§4.2) ── */
 t('advanceStage — 통과 시 1→…→6, 실패는 단계 유지', () => {
   const s = E.createState(E.sentenceId(1), 'sentence', d1);
@@ -630,6 +660,46 @@ t('E7 advanceStage 이중 진급 가드 — 같은 세션(1분 안·같은 sessi
   assert.strictEqual(u.stage, 3, '다른 세션이면 바로 진급');
   E.advanceStage(u, true, d1 + 6 * 60000 + 1000, { session: 'C' });
   assert.strictEqual(u.stage, 4, '세션 키가 다르면 1분 안이어도 진급');
+});
+
+t('E7 advanceStage fromStage — 세트의 단계를 밝히면 1분 안의 빠른 정상 진급은 통과, 지난 단계용 세트만 무시', () => {
+  const s = E.createState(E.sentenceId(3), 'sentence', d1);
+  s.stage = 3;
+  E.advanceStage(s, true, d1, { fromStage: 3 });                 // 3단계 세트 통과
+  E.advanceStage(s, true, d1 + 45000, { fromStage: 4 });         // 45초 뒤 4단계 세트(클로즈+배열) 통과
+  assert.strictEqual(s.stage, 5, '1분 안이어도 다른 단계 세트면 정상 진급');
+  E.advanceStage(s, true, d1 + 50000, { fromStage: 4 });         // 같은 4단계 세트가 문항마다 부른 두 번째
+  assert.strictEqual(s.stage, 5, '이미 지난 단계용 세트는 무시');
+  E.advanceStage(s, true, d1 + 60000, { fromStage: '5' });       // 문자열 단계도 받는다
+  assert.strictEqual(s.stage, 6);
+  E.advanceStage(s, false, d1 + 70000, { fromStage: 6 });
+  assert.strictEqual(s.reached, false, '실패는 단계용 옵션과 무관하게 유지');
+  /* 옵션 없는 호출은 시간 안전판에 걸린다 — 앱이 fromStage 를 넘겨야 빠른 학생이 막히지 않는다 */
+  const u = E.createState(E.sentenceId(4), 'sentence', d1); u.stage = 3;
+  E.advanceStage(u, true, d1); E.advanceStage(u, true, d1 + 45000);
+  assert.strictEqual(u.stage, 4, '옵션 없이 1분 안 두 번째 호출은 무시(안전판)');
+});
+
+/* 옛 상태에 4.5 같은 비정수 단계가 남아 있어도 planDay·sentenceSummary(stageOf 내림)와
+   같은 눈으로 읽어야 한다 — 원시값을 비교하면 fromStage 4가 영영 안 맞아 진급이 막히고,
+   session 경로에선 5.5→6.5로 비정수가 번져 dailySet이 문항을 못 만든다 */
+t('advanceStage — 비정수 단계(4.5)는 stageOf(내림)로 읽어 정수로 진급한다', () => {
+  const a = E.createState(E.sentenceId(11), 'sentence', d1); a.stage = 4.5;
+  E.advanceStage(a, true, d1, { fromStage: 4 });
+  assert.strictEqual(a.stage, 5, 'planDay가 준 단계(4)와 맞아 진급');
+  assert.strictEqual(a.stageAdvancedFrom, 4);
+
+  const b = E.createState(E.sentenceId(12), 'sentence', d1); b.stage = 4.5;
+  E.advanceStage(b, true, d1, { session: 'A' });
+  assert.strictEqual(b.stage, 5, '세션 경로도 정수로 떨어진다');
+  E.advanceStage(b, true, d1 + 5000, { session: 'A' });
+  assert.strictEqual(b.stage, 5, '같은 세션 두 번째는 무시');
+  E.advanceStage(b, true, d1 + 6 * 60000, { session: 'B' });
+  assert.strictEqual(b.stage, 6);
+
+  const c = E.createState(E.sentenceId(13), 'sentence', d1); c.stage = 6.5;
+  E.advanceStage(c, true, d1, { fromStage: 6 });
+  assert.strictEqual(c.reached, true, '6 초과도 6으로 눌러 백지 통과로 처리');
 });
 
 t('advanceStage — 6단계(백지) 통과 = 도달, 이후는 단어와 같은 안정화 규칙', () => {

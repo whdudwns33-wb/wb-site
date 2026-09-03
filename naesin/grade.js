@@ -162,16 +162,75 @@ var WBGRADE = (function () {
   /* ── 토큰 LCS diff ──
      비교는 정규화한 키로, 표시는 원문 그대로 — 학생에게 "Warm 이 빠졌다"를 보여 줄 때
      소문자로 뭉갠 낱말이 아니라 정본의 낱말을 보여 줘야 한다. */
+  /* 구두점 뒤 공백을 빠뜨린 조각을 낱개로 쪼갠다 — 'summer,my'는 키가 'summer my'(공백
+     포함)라 정본의 어느 토큰과도 안 맞아, 정규화상 완전히 같은 덤프인데도 매칭·diff가
+     통째로 어긋난다. 구분자는 앞 토큰 표시에 붙여('summer,' + 'my') 원문 모양을 지킨다.
+     아포스트로피는 낱말 문자로 남긴다 — don't 를 여기서 쪼개면 축약 전개가 죽는다. */
+  function splitGlued(raw) {
+    var parts = String(raw).split(/([^A-Za-z0-9'’]+)/), out = [], pending = '', i;
+    for (i = 0; i < parts.length; i++) {
+      var piece = parts[i];
+      if (!piece) continue;
+      var key = (i % 2 === 0) ? normalizeEn(piece) : '';
+      if (!key) {                                   // 구두점 — 앞 토큰에, 앞이 없으면 다음 토큰 앞에
+        if (out.length) out[out.length - 1].text += piece;
+        else pending += piece;
+        continue;
+      }
+      /* glue = 원문에서 앞 조각과 공백 없이 붙어 있었다는 표시. 화면에 다시 이어 붙일 때
+         공백을 넣지 않으려는 것 — well-known 이 "well- known"으로, U.S.A. 가 "U. S. A."로
+         보이면 쪼갠 티가 난다. 학생이 정말 붙여 쓴 'summer,my'는 그대로 보인다. */
+      out.push({ text: pending + piece, key: key, glue: out.length > 0 });
+      pending = '';
+    }
+    if (pending && !out.length) out.push({ text: pending, key: '' });
+    return out;
+  }
+
   function displayTokens(sentence) {
     var out = [];
     String(sentence == null ? '' : sentence).split(/\s+/).forEach(function (t) {
       if (!t) return;
-      out.push({ text: t, key: normalizeEn(t) });
+      var key = normalizeEn(t);
+      if (key.indexOf(' ') >= 0) {                  // 키가 여러 낱말 — 붙은 조각인지 축약형인지 본다
+        var parts = splitGlued(t);
+        if (parts.length > 1) { parts.forEach(function (p) { out.push(p); }); return; }
+      }
+      out.push({ text: t, key: key });
     });
     return out;
   }
 
-  function tokenDiff(canonToks, stuToks) {
+  /* 비교용 평탄화 — 정규화가 낱말 수를 바꾸는 토큰을 정본과 같은 눈금으로 맞춘다.
+     don't → do·not(표기는 첫 조각만 갖는다 — 화면엔 원문 한 번만 나와야 한다),
+     can·not → cannot(normalizeEn의 마지막 규칙과 같은 병합). 이걸 안 하면 정규화상
+     완전히 같은 문장("I can not go." vs "I cannot go.")도 diff에 missing/extra가 뜨고,
+     분할 채점의 LCS도 같은 자리에서 헛돈다. */
+  function flatTokens(toks) {
+    var raw = [], out = [], i, k;
+    for (i = 0; i < toks.length; i++) {
+      var keys = toks[i].key ? toks[i].key.split(' ') : [];
+      if (!keys.length) { raw.push({ text: toks[i].text, key: '', glue: !!toks[i].glue }); continue; }
+      for (k = 0; k < keys.length; k++) {
+        raw.push({ text: k === 0 ? toks[i].text : '', key: keys[k], glue: k === 0 ? !!toks[i].glue : false });
+      }
+    }
+    for (i = 0; i < raw.length; i++) {
+      if (raw[i].key === 'can' && raw[i + 1] && raw[i + 1].key === 'not') {
+        var tx = raw[i].text && raw[i + 1].text
+          ? raw[i].text + (raw[i + 1].glue ? '' : ' ') + raw[i + 1].text
+          : (raw[i].text || raw[i + 1].text);
+        out.push({ text: tx, key: 'cannot', glue: !!raw[i].glue });
+        i += 1;
+        continue;
+      }
+      out.push(raw[i]);
+    }
+    return out;
+  }
+
+  function tokenDiff(canonDisp, stuDisp) {
+    var canonToks = flatTokens(canonDisp), stuToks = flatTokens(stuDisp);
     var m = canonToks.length, n = stuToks.length, i, j;
     var dp = []; // dp[i][j] = canon[i..]·stu[j..] 의 LCS 길이
     for (i = m; i >= 0; i--) {
@@ -183,20 +242,30 @@ var WBGRADE = (function () {
       }
     }
     var ops = [];
+    function op(type, tok) { return [type, tok.text, tok.key, !!tok.glue]; }
     i = 0; j = 0;
     while (i < m && j < n) {
-      if (canonToks[i].key === stuToks[j].key) { ops.push(['same', canonToks[i].text]); i++; j++; }
-      else if (dp[i + 1][j] >= dp[i][j + 1]) { ops.push(['missing', canonToks[i].text]); i++; } // 정본 쪽 먼저
-      else { ops.push(['extra', stuToks[j].text]); j++; }
+      if (canonToks[i].key === stuToks[j].key) { ops.push(op('same', canonToks[i])); i++; j++; }
+      else if (dp[i + 1][j] >= dp[i][j + 1]) { ops.push(op('missing', canonToks[i])); i++; } // 정본 쪽 먼저
+      else { ops.push(op('extra', stuToks[j])); j++; }
     }
-    while (i < m) { ops.push(['missing', canonToks[i].text]); i++; }
-    while (j < n) { ops.push(['extra', stuToks[j].text]); j++; }
-    /* 같은 종류가 이어지면 한 덩어리로 — 낱말마다 조각내면 화면이 읽히지 않는다 */
+    while (i < m) { ops.push(op('missing', canonToks[i])); i++; }
+    while (j < n) { ops.push(op('extra', stuToks[j])); j++; }
+    /* 같은 종류가 이어지면 한 덩어리로 — 낱말마다 조각내면 화면이 읽히지 않는다.
+       평탄화로 표기가 빈 조각(don't 의 not)은 앞 덩어리에 이미 원문이 있으니 건너뛰고,
+       그 조각이 덩어리를 새로 열 때만 정규화 키로라도 보여 준다. */
     var out = [];
-    ops.forEach(function (op) {
+    ops.forEach(function (o) {
       var last = out[out.length - 1];
-      if (last && last.type === op[0]) last.text += ' ' + op[1];
-      else out.push({ type: op[0], text: op[1] });
+      var tx = o[1], glue = o[3];
+      if (!tx) {
+        if (last && last.type === o[0]) return;
+        tx = o[2];                                  // 표기가 빈 조각이 덩어리를 열면 정규화 키로라도
+        glue = false;
+        if (!tx) return;
+      }
+      if (last && last.type === o[0]) last.text += (glue ? '' : ' ') + tx;
+      else out.push({ type: o[0], text: tx });
     });
     return out;
   }
@@ -259,7 +328,7 @@ var WBGRADE = (function () {
     var dp = [[]], back = [null];
     for (k = 0; k <= n; k++) dp[0][k] = k === 0 ? 0 : NEG;
     for (j = 1; j <= m; j++) {
-      var ck = cDisp[j - 1].map(function (t) { return t.key; }), L = ck.length;
+      var ck = flatTokens(cDisp[j - 1]).map(function (t) { return t.key; }), L = ck.length;
       var cap = (j === 1 || j === m) ? n : Math.max(12, 2 * L + 5);
       var row = [], bk = [];
       for (k = 0; k <= n; k++) { row[k] = NEG; bk[k] = -1; }
@@ -292,12 +361,17 @@ var WBGRADE = (function () {
 
   function matchPartition(stu, cKeys, cDisp) {
     var flat = [];
-    stu.forEach(function (s) { displayTokens(s.text).forEach(function (t) { flat.push(t); }); });
+    stu.forEach(function (s) { flatTokens(displayTokens(s.text)).forEach(function (t) { flat.push(t); }); });
     var segs = partitionTokens(flat, cDisp);
     var inputs = [], extras = [];
     segs.forEach(function (seg, j) {
       if (seg[1] <= seg[0]) { inputs[j] = null; return; }
-      var text = flat.slice(seg[0], seg[1]).map(function (t) { return t.text; }).join(' ');
+      /* 표기가 빈 조각(평탄화 부산물)은 건너뛰고, 원문에서 붙어 있던 조각은 붙여서 되살린다 */
+      var text = '';
+      flat.slice(seg[0], seg[1]).forEach(function (t) {
+        if (!t.text) return;
+        text += (!text || t.glue ? '' : ' ') + t.text;
+      });
       var keys = tokensOfNorm(text);
       var sim = simTokens(keys, cKeys[j]);
       if (sim < minSimFor(keys.length, cKeys[j].length)) { inputs[j] = null; extras.push(text); return; }

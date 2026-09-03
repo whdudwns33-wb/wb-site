@@ -151,6 +151,16 @@ var WBNAESIN = (function () {
     return s.lastCriterionAt != null && now - s.lastCriterionAt < CRITERION_GAP_MS;
   }
 
+  /* 문장 단계는 1~6 정수만 의미가 있다 — 옛 상태의 4.5 같은 값이 남아 있어도 플랜·요약이
+     같은 눈(내림, 범위 고정)으로 읽어 NaN 칸이나 생성기 누락(dailySet은 정수 키만 안다)이
+     생기지 않는다. */
+  function stageOf(s) {
+    var st = Math.floor(+(s && s.stage));
+    if (!(st >= 1)) st = 1;
+    if (st > STAGE_MAX) st = STAGE_MAX;
+    return st;
+  }
+
   /* 출발선 진단(§14-1) — results: [{id, known}]. '안다'는 신규 큐를 건너뛰지만
      4지선다 재인은 관대하므로 철자 재검증 플래그를 달고, 안정화는 0부터 다시 센다. */
   function applyDiagnostic(states, results, now) {
@@ -200,11 +210,12 @@ var WBNAESIN = (function () {
 
   /* 단어 선행 완성 게이트(§4.4) — 시험 모드에서 본문 5·6단계·실전 트랙 개방 여부.
      '도달'은 철자 재검증까지 끝난 것만 센다 — 진단 '안다'만으로 열리면 게이트가 없는 셈이다.
-     시험이 지났으면 잠글 이유가 없다(연습과 같음). */
+     시험 당일(D-0)까지는 잠근 채로 둔다 — 그날 아침 마지막 복습이 제일 중요하다. 시험이
+     지나야(D-1 이하) 잠글 이유가 없어진다(연습과 같음). */
   function gate(wordStates, exam, now, opts) {
     now = ms(now);
     exam = examOf(exam);
-    if (exam && daysUntil(exam.examDate, now) <= 0) exam = null;
+    if (exam && daysUntil(exam.examDate, now) < 0) exam = null;
     var done = 0, total = 0;
     values(wordStates).forEach(function (s) {
       if (s.kind !== 'word') return;
@@ -231,8 +242,9 @@ var WBNAESIN = (function () {
      철자로 도달 기회를 준다), relearn = 완전 인출(무힌트 철자) — 안정화 회전 + 철자 재검증.
      시험 모드: 단어 초회 도달 마감 = 시험 D-wordDeadlineDays(기본 7, 당일 포함),
      D-7~D-1엔 도달 단어의 안정화 회전을 잔여일로 나눠 배분(§14-1 망각 사각지대 방지).
-     D-7 전에도 만기 도달 단어는 review로 돌려 SRS를 끊지 않는다. 시험이 지나면(D-0 이하)
-     'after' — 신규 편성 없이 자율 복습만. */
+     D-7 전에도 만기 도달 단어는 review로 돌려 SRS를 끊지 않는다. 시험 당일(D-0)은 마지막
+     복습이 가장 중요하니 아직 시험 모드다 — 시험이 지나야(D-1 이하) 'after'가 되어 신규
+     편성 없이 자율 복습만 남는다(학생 앱의 daysUntil < 0 '시험 종료'와 같은 경계). */
   function planDay(pack, states, exam, now, opts) {
     now = ms(now);
     opts = opts || {};
@@ -252,7 +264,7 @@ var WBNAESIN = (function () {
     var maxSen = opts.maxSentences == null ? 5 : opts.maxSentences;
     var today = localDate(now);
     var dday = exam ? daysUntil(exam.examDate, now) : null;
-    var mode = !exam ? 'practice' : (dday <= 0 ? 'after' : 'exam');
+    var mode = !exam ? 'practice' : (dday < 0 ? 'after' : 'exam');   // D-0(시험 당일)은 아직 시험 모드
     var inWindow = mode === 'exam' && dday <= deadlineDays;   // D-마감~D-1 안정화 구간
 
     var freshCand = [], reviewCand = [], relearnCand = [];
@@ -313,7 +325,7 @@ var WBNAESIN = (function () {
     });
     var relearnN;
     if (inWindow) {
-      relearnN = Math.min(relearnCand.length, maxRe, Math.max(spellN, Math.ceil(rotations / dday)));
+      relearnN = Math.min(relearnCand.length, maxRe, Math.max(spellN, Math.ceil(rotations / Math.max(1, dday))));
     } else {
       relearnN = Math.min(relearnCand.length, maxRe);
     }
@@ -332,7 +344,7 @@ var WBNAESIN = (function () {
           if (!isStable(s) && s.due <= now && !successToday(s, now, today)) redo.push({ seq: sen.seq, stage: STAGE_MAX });
           return;
         }
-        var stage = s ? s.stage : 1;
+        var stage = s ? stageOf(s) : 1;
         if (!g.open && stage >= 5) return;
         sentences.push({ seq: sen.seq, stage: stage });
       });
@@ -365,9 +377,7 @@ var WBNAESIN = (function () {
     var out = { total: 0, byStage: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }, interpreted: 0, memorized: 0 };
     values(states).forEach(function (s) {
       if (s.kind !== 'sentence') return;
-      var st = Math.floor(+s.stage);
-      if (!(st >= 1)) st = 1;
-      if (st > STAGE_MAX) st = STAGE_MAX;
+      var st = stageOf(s);
       out.total += 1;
       out.byStage[st] += 1;
       if (st >= 3) out.interpreted += 1;        // 2단계(해석 쓰기) 통과 — 목표①
@@ -378,22 +388,35 @@ var WBNAESIN = (function () {
 
   /* 문장 사다리 진급(§4.2) — 통과 시 다음 단계, 6단계 통과는 완전 인출 성공으로
      처리해 단어와 같은 안정화 규칙(서로 다른 날 3회)을 탄다. 실패는 단계 유지.
-     이중 진급 가드: 같은 세션(opts.session이 같거나, 없으면 1분 안)에 두 번 부르면 두 번째는
-     무시 — 한 세트가 문항마다 부르는 앱 경로의 안전판이다. */
+     이중 진급 가드 — 한 세트(4단계 = 클로즈+배열 2문항)가 문항마다 부르면 5단계(영작)가
+     사라지므로 두 번째 호출은 무시한다. 판정 근거는 정확한 순서로:
+       opts.fromStage — 세트가 어느 단계용이었는지. 지금 단계와 다르면 이미 진급한 세트다.
+                        호출자가 아는 사실이라 가장 정확하다(3단계 통과 직후 4단계를 1분 안에
+                        끝내는 빠른 학생도 정상 진급한다).
+       opts.session   — 세트 식별자. 같은 세션에서 두 번째면 무시.
+       둘 다 없으면    — 마지막 진급 뒤 1분 안이면 무시(안전판. 앱이 세트 단위로 1회 부르는
+                        지금은 걸릴 일이 없지만, 걸리면 빠른 정상 진급도 막히니 앱은 fromStage를
+                        넘기는 게 맞다). */
   function advanceStage(s, passed, now, opts) {
     now = ms(now);
     s.last = now;
     if (!passed) return s;
-    if (s.stage < STAGE_MAX) {
+    /* 단계는 stageOf로 읽는다 — 옛 상태의 4.5 같은 값을 원시값 그대로 비교하면
+       planDay·sentenceSummary(내림)가 준 fromStage 4와 영영 안 맞아 진급이 막히고,
+       session 경로에선 5.5→6.5로 비정수가 번져 dailySet(정수 키)이 문항을 못 만든다. */
+    var cur = stageOf(s);
+    if (cur < STAGE_MAX) {
       var session = opts && opts.session != null ? opts.session : null;
-      var dup = session != null
-        ? s.stageSession === session
-        : (s.stageAdvancedAt != null && now - s.stageAdvancedAt < STAGE_GUARD_MS);
+      var fromStage = opts && opts.fromStage != null ? Math.floor(+opts.fromStage) : null;
+      var dup;
+      if (fromStage != null) dup = cur !== fromStage;
+      else if (session != null) dup = s.stageSession === session;
+      else dup = s.stageAdvancedAt != null && now - s.stageAdvancedAt < STAGE_GUARD_MS;
       if (dup) return s;
-      s.stageAdvancedFrom = s.stage;
+      s.stageAdvancedFrom = cur;
       s.stageAdvancedAt = now;
       if (session != null) s.stageSession = session;
-      s.stage += 1;
+      s.stage = cur + 1;
       return s;
     }
     return criterionSuccess(s, null, now);

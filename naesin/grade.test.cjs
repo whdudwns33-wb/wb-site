@@ -277,6 +277,58 @@ t('R7 diffPassage — 짧은 문장은 낱말 하나 겹친 것만으로 매칭�
   assert.strictEqual(G.diffPassage('No.', [{ seq: 1, en: 'Yes.' }]).missingCount, 1);
 });
 
+/* 아이들은 쉼표 뒤 공백을 자주 빠뜨린다 — 'summer,my' 한 토큰의 정규화 키가 'summer my'가
+   되어 정본 어느 토큰과도 안 맞으면, 정규화상 완전히 같은 덤프가 partial로 떨어진다 */
+t('diffPassage — 구두점 뒤 공백을 빠뜨려도 완전 일치는 ok, diff에 missing/extra가 없다', () => {
+  const glued = 'Last summer,my family took a slow train to the sea.';
+  const r = G.diffPassage(glued, [canon[0]]);
+  assert.strictEqual(r.perSentence[0].status, 'ok');
+  assert.strictEqual(r.perSentence[0].score, 1);
+  assert.deepStrictEqual(r.perSentence[0].diff.map((d) => d.type), ['same'], JSON.stringify(r.perSentence[0].diff));
+  /* 문장 경계에서 붙은 경우 — 구두점이 없어 2차 분할 경로로 간다 */
+  const dump = S[0].en.slice(0, -1) + ',' + S[1].en.slice(0, -1);
+  assert.strictEqual(G.splitSentences(dump).length, 1, '마침표가 없어 한 덩어리로 읽힌다');
+  const r2 = G.diffPassage(dump, canon.slice(0, 2));
+  assert.strictEqual(r2.okCount, 2, JSON.stringify(r2.perSentence.map((x) => x.seq + ':' + x.status + ':' + x.score)));
+  assert.deepStrictEqual(r2.extras, []);
+  r2.perSentence.forEach((x) => assert.deepStrictEqual(x.diff.map((d) => d.type), ['same']));
+});
+
+/* ok(정규화상 완전 일치)인데 diff에 빨간 표시가 뜨면 학생은 맞은 답을 틀린 줄 안다 —
+   1토큰↔2토큰 축약 전개(don't↔do not, cannot↔can not)를 비교 눈금에서 맞춘다 */
+t('diffPassage — ok 문장의 diff는 전부 same(축약형 전개도 포함)', () => {
+  const cases = [
+    ['I can not go.', 'I cannot go.'],
+    ['I cannot go.', 'I can not go.'],
+    ['I do not know.', "I don't know."],
+    ["I don't know.", 'I do not know.'],
+    ['I dont know.', "I don't know."],
+    ["I'd like it.", 'I would like it.'],
+    ['It is warm.', "It's warm."],
+  ];
+  cases.forEach(function (c) {
+    const r = G.diffPassage(c[0], [{ seq: 1, en: c[1] }]);
+    const d = r.perSentence[0];
+    assert.strictEqual(d.status, 'ok', c.join(' / ') + ' → ' + d.status);
+    assert.deepStrictEqual(d.diff.map((x) => x.type), ['same'], c.join(' / ') + ' → ' + JSON.stringify(d.diff));
+    assert.strictEqual(d.diff[0].text, c[1], '표시는 정본 문장 그대로');
+  });
+  /* 쪼갠 티가 나면 안 된다 — 하이픈 낱말·약어는 원문 모양 그대로 보여야 한다 */
+  [['He is a well-known writer.', 'He is a well-known writer.'],
+    ['He is a well known writer.', 'He is a well-known writer.'],
+    ['U.S.A.is big.', 'U.S.A. is big.']].forEach(function (c) {
+    const d = G.diffPassage(c[0], [{ seq: 1, en: c[1] }]).perSentence[0];
+    assert.strictEqual(d.status, 'ok', c.join(' / '));
+    assert.deepStrictEqual(d.diff, [{ type: 'same', text: c[1] }], JSON.stringify(d.diff));
+  });
+  /* 지문 전체에서도 — ok 문장에 missing/extra 가 하나라도 있으면 안 된다 */
+  const r = G.diffPassage(S.map((x) => x.en).join(' '), canon);
+  r.perSentence.forEach((pS) => {
+    if (pS.status !== 'ok') return;
+    assert.ok(!pS.diff.some((x) => x.type !== 'same'), pS.seq + ': ' + JSON.stringify(pS.diff));
+  });
+});
+
 t('gradeTranslationChunks — 모든 청크의 핵심 토큰이 있으면 coverage 1', () => {
   const r = G.gradeTranslationChunks(S[1].ko, S[1].chunks); // 모범 해석 그대로
   assert.strictEqual(r.perChunk.length, 3);
