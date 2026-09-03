@@ -21,19 +21,22 @@ const build = () => execFileSync(process.execPath, [path.join(HERE, 'build-dist.
 const swVer = (p) => (fs.readFileSync(p, 'utf8').match(/const VERSION = '([^']*)'/) || [])[1];
 const R_SW = path.join(DIST, 'sw.js');
 const V_SW = path.join(DIST, 'vocab', 'sw.js');
+const N_SW = path.join(DIST, 'naesin', 'sw.js');
 
 build();
-const before = { r: swVer(R_SW), v: swVer(V_SW) };
+const before = { r: swVer(R_SW), v: swVer(V_SW), n: swVer(N_SW) };
 
 t('배포본의 캐시 이름이 내용에서 나온다 — 손으로 적은 값이 아니다', () => {
   assert.ok(/^wbr-shell-[0-9a-f]{10}$/.test(before.r), '진로독서 sw.js: ' + before.r);
   assert.ok(/^wbv-shell-[0-9a-f]{10}$/.test(before.v), '워드브레인 sw.js: ' + before.v);
+  assert.ok(/^wbn-shell-[0-9a-f]{10}$/.test(before.n), '내신브레인 sw.js: ' + before.n);
 });
 
 t('두 번 빌드해도 같다 — 안 바뀐 배포에서 캐시가 헛되이 날아가지 않는다', () => {
   build();
   assert.strictEqual(swVer(R_SW), before.r);
   assert.strictEqual(swVer(V_SW), before.v);
+  assert.strictEqual(swVer(N_SW), before.n);
 });
 
 t('껍데기 파일이 바뀌면 캐시 이름이 바뀐다 — 학생이 새 코드를 받는다', () => {
@@ -41,6 +44,8 @@ t('껍데기 파일이 바뀌면 캐시 이름이 바뀐다 — 학생이 새 �
   const cases = [
     { file: path.join(HERE, '..', 'vocab', 'words.js'), sw: V_SW, was: before.v, what: '워드브레인 낱말' },
     { file: path.join(HERE, '..', 'reading', 'index.html'), sw: R_SW, was: before.r, what: '진로독서 앱' },
+    /* 내신은 아이콘으로 찌른다 — 코드 파일은 다른 작업자가 동시에 고치고 있을 수 있어 건드리지 않는다 */
+    { file: path.join(HERE, '..', 'naesin', 'icon.svg'), sw: N_SW, was: before.n, what: '내신브레인 앱' },
   ];
   for (const c of cases) {
     const orig = fs.readFileSync(c.file);
@@ -55,6 +60,7 @@ t('껍데기 파일이 바뀌면 캐시 이름이 바뀐다 — 학생이 새 �
   build();
   assert.strictEqual(swVer(R_SW), before.r, '되돌렸는데 값이 안 돌아왔다');
   assert.strictEqual(swVer(V_SW), before.v, '되돌렸는데 값이 안 돌아왔다');
+  assert.strictEqual(swVer(N_SW), before.n, '되돌렸는데 값이 안 돌아왔다');
 });
 
 t('지문 데이터 버전이 articles.json 과 version.json 에서 같다', () => {
@@ -73,6 +79,42 @@ t('미러용 원본 sw.js 는 손으로 붙인 번호를 그대로 지닌다', (
     const v = swVer(path.join(HERE, '..', app, 'sw.js'));
     assert.ok(/^wb[rv]-shell-v\d+$/.test(v), `${app}/sw.js 의 VERSION 이 이상합니다: ${v}`);
   });
+  /* 내신은 미러가 없어 원본에 해시 대신 'dev' 표식을 둔다 — 빌드가 원본을 고쳐 버렸으면 여기서 드러난다 */
+  const n = swVer(path.join(HERE, '..', 'naesin', 'sw.js'));
+  assert.ok(/^wbn-shell-(dev|v\d+)$/.test(n), `naesin/sw.js 의 VERSION 이 이상합니다: ${n}`);
+});
+
+/* _headers 규칙 — 배포본에 실리는 것은 reading/_headers 하나다(naesin/·vocab/ 의 것은 dist 에 없다).
+   세 앱과 관리 웹의 화면·코드가 no-store 인지, noindex 가 전 경로에 붙는지, 캐시를 무력화하는
+   /* Cache-Control 이 없는지를 파일 그대로 읽어 확인한다. */
+function parseHeaders(text) {
+  const rules = {}; let cur = null;
+  for (const raw of text.split(/\r?\n/)) {
+    if (!raw.trim() || raw.trim().startsWith('#')) continue;
+    if (!/^\s/.test(raw)) { cur = raw.trim(); rules[cur] = rules[cur] || {}; continue; }
+    const m = raw.trim().match(/^([^:]+):\s*(.*)$/);
+    if (m && cur) rules[cur][m[1].trim()] = m[2].trim();
+  }
+  return rules;
+}
+t('배포본 _headers — /naesin/*·/vocab/*·/admin/* 은 no-store, 전 경로 noindex, /* 에는 Cache-Control 없음', () => {
+  const distText = fs.readFileSync(path.join(DIST, '_headers'), 'utf8');
+  assert.strictEqual(distText, fs.readFileSync(path.join(HERE, '..', 'reading', '_headers'), 'utf8'), 'dist/_headers 는 reading/_headers 그대로여야 한다');
+  const rules = parseHeaders(distText);
+  for (const p of ['/naesin/*', '/vocab/*', '/admin/*']) {
+    assert.ok(rules[p], p + ' 규칙이 없다 — 그 앱의 옛 화면이 브라우저 캐시에 굳는다');
+    assert.strictEqual(rules[p]['Cache-Control'], 'no-store', p);
+  }
+  assert.ok(/noindex/.test(rules['/*']['X-Robots-Tag'] || ''), '전 경로 noindex 가 빠졌다');
+  assert.ok(/nosniff/.test(rules['/*']['X-Content-Type-Options'] || ''));
+  assert.strictEqual(rules['/*']['Cache-Control'], undefined, '/* 에 Cache-Control 을 두면 분할본의 max-age 와 합쳐져 캐시가 통째로 무력화된다');
+  assert.strictEqual(rules['/articles-L1.json']['Cache-Control'], 'public, max-age=604800', '분할본 캐시 규칙은 그대로');
+  /* 원본 자리의 두 파일은 안내 주석만 남는다 — 규칙이 두 곳에 있으면 한 곳만 고치는 사고가 난다 */
+  for (const app of ['naesin', 'vocab']) {
+    const own = fs.readFileSync(path.join(HERE, '..', app, '_headers'), 'utf8');
+    assert.ok(own.split(/\r?\n/).every((l) => !l.trim() || l.trim().startsWith('#')), app + '/_headers 에 규칙이 남아 있다 — reading/_headers 로 옮기세요');
+    assert.ok(!fs.existsSync(path.join(DIST, app, '_headers')), app + '/_headers 가 dist 에 실렸다');
+  }
 });
 
 console.log(`\nOK — ${passed}개 통과. 배포하면 학생 화면도 함께 바뀝니다.`);
