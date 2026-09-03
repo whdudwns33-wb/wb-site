@@ -975,6 +975,9 @@
     var m = ['<div class="card"><div class="spread"><h3 style="margin:0">서술형</h3>' +
       '<span class="small muted">' + (sess.i + 1) + ' / ' + sess.items.length + '</span></div></div>'];
     m.push('<div class="q"><div class="stem">' + it.stem + '</div>');
+    /* 저장 문항의 <보기>도 그려야 한다 — 안 그리면 발문만 뜨고 판단 근거가 없는 문항이 된다.
+       런타임 생성 문항(drawApply)만 그리고 있었는데, 단원집중 자료는 <보기> 제시형이 많다. */
+    if (it.bogi && it.bogi.text) m.push('<div class="bogi"><b>&lt;보기&gt;</b><br>' + esc(it.bogi.text) + '</div>');
     if ((it.conditions || []).length) {
       m.push('<div class="cond" id="cond">' + it.conditions.map(function (c, i) {
         return '<span data-ci="' + i + '">' + esc(c.text || c.kind) + '</span>';
@@ -1142,6 +1145,9 @@
     var m = ['<div class="card"><div class="spread"><h3 style="margin:0">' + esc(sess.title) + '</h3>' +
       '<span class="small muted">' + (sess.i + 1) + ' / ' + sess.items.length + '</span></div></div>'];
     m.push('<div class="q"><div class="stem">' + it.stem + '</div>');
+    /* 저장 문항의 <보기>도 그려야 한다 — 안 그리면 발문만 뜨고 판단 근거가 없는 문항이 된다.
+       런타임 생성 문항(drawApply)만 그리고 있었는데, 단원집중 자료는 <보기> 제시형이 많다. */
+    if (it.bogi && it.bogi.text) m.push('<div class="bogi"><b>&lt;보기&gt;</b><br>' + esc(it.bogi.text) + '</div>');
     if (it.format === 'mc5') {
       m.push('<div id="chs">' + (it.choices || []).map(function (c) {
         return '<button class="ch" data-no="' + c.no + '">' + c.no + '. ' + esc(c.text) + '</button>';
