@@ -20,6 +20,11 @@ var WBPACKCHECK = (function () {
   'use strict';
 
   var STAGE_DAYGROUP_MAX = 12;   /* 한 과의 단락이 이보다 많으면 추출이 어긋난 것으로 본다 */
+  /* 학생 앱이 가드 없이 읽는 배열 — 없으면 앱이 뜨지 않으므로 배포를 막는다 */
+  var REQUIRED_SECTIONS = [
+    { key: 'words', why: '홈 진단 카드·단어 암기가 죽는다', need: '[03] WORD TEST' },
+    { key: 'sentences', why: '본문 암기·성취도가 죽는다', need: '[02] 본문 워크북' },
+  ];
 
   function nonEmpty(s) { return typeof s === 'string' && s.trim().length > 0; }
   function isArr(a) { return Array.isArray(a); }
@@ -359,6 +364,15 @@ var WBPACKCHECK = (function () {
     checkPatterns(pack, c);
     checkItems(pack, c, opts && opts.itemsLabel);
     if (!c.summary.length) c.err('(공통)', '검사할 팩 내용이 하나도 없음');
+    /* 학생 앱은 pack.words·pack.sentences 를 가드 없이 읽는다(홈 진단 카드·본문 매트릭스).
+       둘 중 하나라도 배열이 아니면 첫 화면이 TypeError 로 죽는데, 오류 메시지도 없이
+       '교재를 불러오는 중…' 에 멈춘다. 그런 팩이 배포 관문을 통과해서는 안 된다.
+       (스튜디오 assemble 은 행이 0인 종류를 팩에서 아예 빼므로, 한 종류만 넣고 만들면
+        정확히 이 상태가 나온다 — 실제로 오류 0·경고 0 으로 통과하던 구멍이다.) */
+    REQUIRED_SECTIONS.forEach(function (r) {
+      if (!isArr(pack[r.key]) || !pack[r.key].length)
+        c.err('(공통)', r.key + ' 가 비었음 — ' + r.why + ' (' + r.need + ' 자료가 필요하다)');
+    });
     return { errors: c.errors, warns: c.warns, summary: c.summary };
   }
 
@@ -370,6 +384,7 @@ var WBPACKCHECK = (function () {
     checkItems: checkItems,
     collector: collector, flat: flat, words1: words1, nonEmpty: nonEmpty,
     CHECK_SLOTS: CHECK_SLOTS, STAGE_DAYGROUP_MAX: STAGE_DAYGROUP_MAX,
+    REQUIRED_SECTIONS: REQUIRED_SECTIONS,
   };
 })();
 
