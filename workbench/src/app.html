@@ -1630,7 +1630,12 @@ function renderSearch(){
     if(view.sHsType)f=f.filter(r=>(r.type||"").includes(view.sHsType));
     if(view.sEstab)f=f.filter(r=>((r.estab||"")+(r.feature||"")).includes(view.sEstab));
     if(view.sOwned)f=f.filter(r=>!r.bulk);
-    f.sort((a,b)=>(a.bulk===b.bulk?0:a.bulk?1:-1)||a.name.localeCompare(b.name,"ko"));
+    const so=view.sHsSort||"";
+    const rate=(r,i)=>r.met&&r.met[0]>0?r.met[i]/r.met[0]:-1;
+    if(so==="u4")f.sort((a,b)=>rate(b,2)-rate(a,2)||a.name.localeCompare(b.name,"ko"));
+    else if(so==="go")f.sort((a,b)=>rate(b,1)-rate(a,1)||a.name.localeCompare(b.name,"ko"));
+    else if(so==="st")f.sort((a,b)=>((b.met&&b.met[3])||0)-((a.met&&a.met[3])||0)||a.name.localeCompare(b.name,"ko"));
+    else f.sort((a,b)=>(a.bulk===b.bulk?0:a.bulk?1:-1)||a.name.localeCompare(b.name,"ko"));
     const perH=300,curH=pageClamp(f.length,perH,"sHsPage");
     const shown=f.slice(curH*perH,curH*perH+perH);
     body=`
@@ -1648,6 +1653,8 @@ function renderSearch(){
       <select onchange="view.sEstab=this.value;view.sHsPage=0;render()" style="width:88px">
         <option value="">설립 전체</option>${["공립","사립","국립"].map(x=>`<option ${view.sEstab===x?"selected":""}>${x}</option>`).join("")}</select>
       <button type="button" class="fchip ${view.sOwned?"on":""}" title="내신경쟁 평가를 보유한 학교만" onclick="view.sOwned=!view.sOwned;view.sHsPage=0;render()">평가 보유만</button>
+      <select onchange="view.sHsSort=this.value;view.sHsPage=0;render()" style="width:118px" title="정렬">
+        ${[["","이름순"],["u4","4년제 진학률↓"],["go","진학률↓"],["st","재적수↓"]].map(([v,l])=>`<option value="${v}" ${so===v?"selected":""}>${l}</option>`).join("")}</select>
       <button class="btn sm pri">검색</button>
     </div></form>
     <p style="font-size:12px;color:var(--ink2);margin:0 0 8px">${f.length.toLocaleString()}건${f.length>perH?` — ${curH*perH+1}~${Math.min(f.length,(curH+1)*perH)}건 표시`:""} · 총 ${rows.length.toLocaleString()}개교 (WB 평가 보유 ${rows.filter(r=>!r.bulk).length}곳)</p>
@@ -2480,7 +2487,7 @@ function hsCandHtml(){
   const picks=view.hsPicks||[];
   return allHsRows().filter(h=>h.type!=="초등학교"&&h.type!=="중학교"&&h.name.includes(q)&&!picks.includes(h.name)).slice(0,8)
     .map(h=>`<button class="mocksel" style="margin-top:6px" onclick="view.hsPicks=[...(view.hsPicks||[]),'${esc(h.name)}'];view.hsSchQ='';render()">
-      <b>${esc(h.name)}</b><span class="cnt">${esc(h.type||"")} · ${esc(h.region||"")}${h.level?" · 경쟁 "+esc(h.level):""}</span></button>`).join("");}
+      <b>${esc(h.name)}</b><span class="cnt">${esc(h.type||"")} · ${esc(h.region||"")}${h.level?" · 경쟁 "+esc(h.level):""}${h.met&&h.met[0]>0?" · 4년제 "+Math.round(h.met[2]/h.met[0]*100)+"%":""}</span></button>`).join("");}
 function mkQIn(el){view.mkQ=el.value;const c=document.getElementById("mkcand");if(c)c.innerHTML=mkCandHtml();}
 function hsQIn(el){view.hsSchQ=el.value;const c=document.getElementById("hscand");if(c)c.innerHTML=hsCandHtml();}
 /* 5등급제(현 고1·고2) → 9등급 등가 환산 — 입결 DB가 9등급 기준이므로 */
@@ -3082,7 +3089,8 @@ async function loadBulk(){
     if(!raw)throw new Error("키 없음");
     if(!window.DecompressionStream)throw new Error("NOGZIP");
     const key=await crypto.subtle.importKey("raw",b64(raw),{name:"AES-GCM"},false,["decrypt"]);
-    const res=await fetch("bulk.enc.json");
+    /* 빌드 태그를 쿼리에 붙여 배포 직후 브라우저 캐시의 구버전 bulk 가 새 index 와 짝지어지는 것을 막는다 */
+    const res=await fetch("bulk.enc.json?v="+encodeURIComponent(BUILD_TAG));
     if(!res.ok)throw new Error("HTTP "+res.status);
     const env=await res.json();
     /* 암호화 키가 빌드마다 바뀌므로, index와 bulk가 서로 다른 빌드면 여기서 정확히 알려야 한다 */

@@ -5,7 +5,7 @@
 
 | 파일 | 내용 | 복원 위치 |
 |---|---|---|
-| `bulk-data.enc.json` | 입결 5개년 46,656행 + 전국 고교 2,396개교 | `workbench/src/bulk-data.json` |
+| `bulk-data.enc.json` | 입결 5개년 46,656행 + 전국 고교 2,396개교(학교알리미 진학 실적·재적 2,355곳 포함) + 호남 초·중 1,555개교 | `workbench/src/bulk-data.json` |
 | `private-seed.enc.json` | 학생 14명 시드(관심대학·프로파일 포함) | `workbench/src/private-seed.json` |
 
 평문 금지 이유 — bulk: 어디가(대교협) 발표 재정리본이라 약관상 공개 재배포 불가.
