@@ -162,14 +162,14 @@ async function assertNoConflict(env, app, currentCaseId, studentId, staffId, ran
     const intervals = taskIntervals(task, range.date);
     if (intervals === null) continue;
     const sameStudent = String(task.studentId || '') === studentId;
-    const sameTeacher = String(task.staffId || row.owner || '') === staffId;
-    if (!sameStudent && !sameTeacher) continue;
+    // 보강 담당자의 정규 수업은 동시에 진행될 수 있다. 다만 같은 학생의
+    // 정규 수업과 겹치면 출결·메모 정본이 둘로 갈리므로 계속 차단한다.
+    if (!sameStudent) continue;
     if (!intervals.length) {
       problem('겹침을 확인할 수 없는 정규 수업이 있습니다. 먼저 정규 시간표를 확정해 주세요', 409, 'SCHEDULE_UNCONFIRMED');
     }
     if (intervals.some(([start, end]) => overlap(range.startTime, range.endTime, start, end))) {
-      problem(sameStudent ? '학생의 정규 수업과 시간이 겹칩니다' : '담당 선생님의 정규 수업과 시간이 겹칩니다', 409,
-        sameStudent ? 'STUDENT_SCHEDULE_CONFLICT' : 'STAFF_SCHEDULE_CONFLICT');
+      problem('학생의 정규 수업과 시간이 겹칩니다', 409, 'STUDENT_SCHEDULE_CONFLICT');
     }
   }
   const conflicts = await env.DB.prepare(
@@ -602,7 +602,7 @@ function regularConflictGuardStatement(env, app, row, studentId, staffId, range)
     "AND COALESCE(json_extract(regular.data,'$.deleted'),0)=0 " +
     "AND (json_extract(regular.data,'$.taskKind')='lesson_instruction' OR json_extract(regular.data,'$.lessonFormVersion') IS NOT NULL OR json_extract(regular.data,'$.intakeVersion') IS NOT NULL) " +
     "AND COALESCE(json_extract(regular.data,'$.lessonInstanceType'),'')<>'makeup' " +
-    "AND (json_extract(regular.data,'$.studentId')=? OR COALESCE(json_extract(regular.data,'$.staffId'),regular.owner)=?) " +
+    "AND json_extract(regular.data,'$.studentId')=? " +
     "AND (COALESCE(json_extract(regular.data,'$.start'),'')='' OR json_extract(regular.data,'$.start')<=?) " +
     "AND (COALESCE(json_extract(regular.data,'$.end'),'')='' OR json_extract(regular.data,'$.end')>=?) AND (" +
       "(COALESCE(json_array_length(json_extract(regular.data,'$.scheduleSlots')),0)=0 AND (" +
@@ -618,7 +618,7 @@ function regularConflictGuardStatement(env, app, row, studentId, staffId, range)
     ") AND NOT EXISTS (SELECT 1 FROM makeup_cases other WHERE other.app=? AND other.status='confirmed' " +
       'AND other.case_id<>? AND other.confirmed_start_at<? AND other.confirmed_end_at>? ' +
       'AND (other.student_id=? OR other.confirmed_staff_id=?))'
-  ).bind(app, row.case_id, Number(row.revision), row.status, app, studentId, staffId,
+  ).bind(app, row.case_id, Number(row.revision), row.status, app, studentId,
     range.date, range.date, range.date, day, day, range.date, range.date, day, range.endTime, range.startTime,
     app, row.case_id, range.endAt, range.startAt, studentId, staffId);
 }

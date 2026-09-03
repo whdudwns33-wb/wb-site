@@ -401,6 +401,61 @@ test('schedule atomically rejects a regular lesson inserted after its initial co
     .get(created.body.case.caseId).status, 'review_pending');
 });
 
+test('teacher-only regular overlap is allowed for schedule, restore, and direct completion', async () => {
+  const scheduleDb = new TestD1(); seed(scheduleDb);
+  const scheduleCase = await call(scheduleDb, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  });
+  scheduleDb.beforeBatch = () => insertTask(scheduleDb,
+    lesson('teacher-overlap-schedule', 'student-b', 'teacher-a', [3], '20:30', '21:30'));
+  const scheduled = await callAt(scheduleDb, all, {
+    action: 'schedule', caseId: scheduleCase.body.case.caseId, revision: scheduleCase.body.case.revision,
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00'
+  }, '2026-08-11T12:00:00+09:00');
+  assert.equal(scheduled.status, 200);
+
+  const restoreDb = new TestD1(); seed(restoreDb);
+  insertTask(restoreDb, lesson('teacher-overlap-restore', 'student-b', 'teacher-a', [3], '20:30', '21:30'));
+  const restoreCase = await createAndReview(restoreDb);
+  const proposed = await callAt(restoreDb, all, {
+    action: 'propose', caseId: restoreCase.caseId, revision: restoreCase.revision,
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00', staffId: 'teacher-a'
+  }, '2026-08-11T12:00:00+09:00');
+  assert.equal(proposed.status, 200);
+  restoreDb.prepare("UPDATE makeup_cases SET status='confirmed',confirmed_start_at=proposed_start_at," +
+    "confirmed_end_at=proposed_end_at,confirmed_staff_id=proposed_staff_id WHERE case_id=?")
+    .bind(restoreCase.caseId).run();
+  const restored = await call(restoreDb, all, {
+    action: 'restore_schedule', caseId: restoreCase.caseId, revision: proposed.body.case.revision
+  });
+  assert.equal(restored.status, 200);
+
+  const completeDb = new TestD1(); seed(completeDb);
+  insertTask(completeDb, lesson('teacher-overlap-complete', 'student-b', 'teacher-a', [2], '10:30', '11:30'));
+  const completeCase = await call(completeDb, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  });
+  const completed = await callAt(completeDb, all, {
+    action: 'complete', caseId: completeCase.body.case.caseId, revision: completeCase.body.case.revision,
+    date: '2026-08-11', startTime: '10:00', endTime: '11:00'
+  }, '2026-08-11T12:00:00+09:00');
+  assert.equal(completed.status, 200);
+});
+
+test('direct completion still rejects the student regular lesson overlap', async () => {
+  const db = new TestD1(); seed(db);
+  insertTask(db, lesson('student-overlap-complete', 'student-a', 'teacher-b', [2], '10:30', '11:30'));
+  const created = await call(db, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  });
+  const blocked = await callAt(db, all, {
+    action: 'complete', caseId: created.body.case.caseId, revision: created.body.case.revision,
+    date: '2026-08-11', startTime: '10:00', endTime: '11:00'
+  }, '2026-08-11T12:00:00+09:00');
+  assert.equal(blocked.status, 409);
+  assert.equal(blocked.body.code, 'STUDENT_SCHEDULE_CONFLICT');
+});
+
 test('schedule atomically rejects a source-teacher transfer after authorization', async () => {
   const db = new TestD1(); seed(db);
   const created = await call(db, own('teacher-a'), {
@@ -1209,10 +1264,9 @@ test('confirm maps a database-time parent decline race to PARENT_DECLINED', asyn
   assert.equal(result.body.code, 'PARENT_DECLINED');
 });
 
-test('proposal validates KST date/time, active roster/staff, and regular student/teacher conflicts', async () => {
+test('proposal validates KST date/time, active roster/staff, and regular student conflicts', async () => {
   const db = new TestD1(); seed(db);
   insertTask(db, lesson('student-conflict', 'student-a', 'teacher-a', [3], '16:00', '17:00'));
-  insertTask(db, lesson('teacher-conflict', 'student-b', 'teacher-b', [3], '18:00', '19:00'));
   const reviewed = await createAndReview(db);
   const invalidIso = await call(db, all, { action: 'propose', caseId: reviewed.caseId, revision: reviewed.revision,
     date: '2026-02-30', startTime: '16:30', endTime: '17:30', staffId: 'teacher-b' });
@@ -1221,10 +1275,6 @@ test('proposal validates KST date/time, active roster/staff, and regular student
     date: '2026-08-12', startTime: '16:30', endTime: '17:30', staffId: 'teacher-b' });
   assert.equal(studentConflict.status, 409);
   assert.equal(studentConflict.body.code, 'STUDENT_SCHEDULE_CONFLICT');
-  const staffConflict = await call(db, all, { action: 'propose', caseId: reviewed.caseId, revision: reviewed.revision,
-    date: '2026-08-12', startTime: '18:30', endTime: '19:30', staffId: 'teacher-b' });
-  assert.equal(staffConflict.status, 409);
-  assert.equal(staffConflict.body.code, 'STAFF_SCHEDULE_CONFLICT');
   const inactiveStaff = await call(db, all, { action: 'propose', caseId: reviewed.caseId, revision: reviewed.revision,
     date: '2026-08-12', startTime: '20:00', endTime: '21:00', staffId: 'teacher-inactive' });
   assert.equal(inactiveStaff.status, 409);
