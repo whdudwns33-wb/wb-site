@@ -108,6 +108,29 @@ test('관리자 미리보기는 실제 보호자 화면과 같은 정보 순서�
   assert.doesNotMatch(source, /data-response|참석 가능|일정 재조율/);
 });
 
+test('관리자 보호자 미리보기는 보강 생성 근거를 실제 보호자 화면과 동일하게 표시한다', () => {
+  const start = html.indexOf('let parentPreviewRequest = 0');
+  const end = html.indexOf('async function previewParentPortal', start);
+  const { parentPreviewHtml } = new Function('esc',
+    html.slice(start, end) + '; return { parentPreviewHtml };')(String);
+  const output = parentPreviewHtml({
+    capabilities: {}, today: {}, summary: {}, student: {},
+    makeups: [
+      { caseId: 'a', subject: '결석 보강', creationType: 'absence', sourceDate: '2026-09-01', statusLabel: '검토 중' },
+      { caseId: 'b', subject: '직접 보강 1', creationType: 'manual', manualReason: 'manual_absence', sourceDate: 'manual-date-1', statusLabel: '확정' },
+      { caseId: 'c', subject: '직접 보강 2', creationType: 'manual', manualReason: 'manual_exam', sourceDate: 'manual-date-2', statusLabel: '확정' },
+      { caseId: 'd', subject: '직접 보강 3', creationType: 'manual', manualReason: 'manual_other', sourceDate: 'manual-date-3', statusLabel: '확정' },
+      { caseId: 'e', subject: '과거 보강', creationType: 'unknown', sourceDate: 'unknown-private-date', statusLabel: '확인 중' }
+    ]
+  });
+  assert.match(output, /원 수업 2026-09-01/);
+  assert.match(output, /직접 생성 · 결석보강/);
+  assert.match(output, /직접 생성 · 시험보강/);
+  assert.match(output, /직접 생성 · 기타보강/);
+  assert.match(output, /보강 생성 정보 확인 중/);
+  assert.doesNotMatch(output, /manual-date-|unknown-private-date/);
+});
+
 test('보호자 공개 row는 같은 article 태그로 닫히고 후속 section을 내부에 삼키지 않는다', () => {
   const start = html.indexOf('let parentPreviewRequest = 0');
   const end = html.indexOf('async function saveGuardianPortalAccess', start);

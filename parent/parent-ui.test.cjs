@@ -171,6 +171,30 @@ test('주간 시간표는 서버 배열 순서와 무관하게 월요일부터 �
   assert.ok(output.indexOf('월 수업') < output.indexOf('토 수업'));
 });
 
+test('보호자 보강 목록은 검증된 생성 유형에 맞는 설명만 표시한다', () => {
+  const start = html.indexOf('const MAKEUP_TYPE_LABELS=');
+  const end = html.indexOf('function packRows', start);
+  assert.ok(start > 0 && end > start);
+  const escapeHtml = value => String(value == null ? '' : value)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  const { makeupRows } = new Function('esc', 'teacherLabel',
+    html.slice(start, end) + '; return { makeupRows };')(escapeHtml, value => String(value || ''));
+  const output = makeupRows([
+    { caseId: 'a', subject: '결석 보강', creationType: 'absence', sourceDate: '2026-09-01', statusLabel: '검토 중' },
+    { caseId: 'b', subject: '직접 보강 1', creationType: 'manual', manualReason: 'manual_absence', sourceDate: 'manual-date-1', statusLabel: '확정' },
+    { caseId: 'c', subject: '직접 보강 2', creationType: 'manual', manualReason: 'manual_exam', sourceDate: 'manual-date-2', statusLabel: '확정' },
+    { caseId: 'd', subject: '직접 보강 3', creationType: 'manual', manualReason: 'manual_other', sourceDate: 'manual-date-3', statusLabel: '확정' },
+    { caseId: 'e', subject: '과거 보강', creationType: 'unknown', sourceDate: 'unknown-private-date', statusLabel: '확인 중' }
+  ]).join('');
+  assert.match(output, /원 수업 2026-09-01/);
+  assert.match(output, /직접 생성 · 결석보강/);
+  assert.match(output, /직접 생성 · 시험보강/);
+  assert.match(output, /직접 생성 · 기타보강/);
+  assert.match(output, /보강 생성 정보 확인 중/);
+  assert.doesNotMatch(output, /manual-date-|unknown-private-date/);
+});
+
 test('담당자 이름에는 선생님 호칭을 한 번만 붙인다', () => {
   const start = html.indexOf('function teacherLabel(value)');
   const end = html.indexOf('function todayLessonRows', start);

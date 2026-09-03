@@ -170,9 +170,9 @@ async function seedGuardianBookIssue(db) {
     now - 1000, 'staff-a', now, 'staff-a', now - 1000, now).run();
 }
 
-function seedAwaitingMakeup(db, caseId = 'mu_parent_case') {
+function seedAwaitingMakeup(db, caseId = 'mu_parent_case', history = [], sourceDateOverride = '') {
   const now = Date.now();
-  const sourceDate = caseId.includes('confirm') ? '2026-08-11' : '2026-08-10';
+  const sourceDate = sourceDateOverride || (caseId.includes('confirm') ? '2026-08-11' : '2026-08-10');
   db.prepare(
     'INSERT INTO makeup_cases(app,case_id,student_id,source_task_id,source_date,source_teacher_id,' +
     'consumption_group_id,status,revision,proposed_start_at,proposed_end_at,proposed_staff_id,' +
@@ -180,7 +180,7 @@ function seedAwaitingMakeup(db, caseId = 'mu_parent_case') {
     "VALUES(?,?,?,?,?,?,?,'awaiting_parent',3,?,?,?,1,'proposal',3,?,?,?)"
   ).bind('task', caseId, 'student-a', 'lesson-a', sourceDate, 'staff-a', 'mc_' + caseId,
     '2026-08-20T16:00:00+09:00', '2026-08-20T17:00:00+09:00', 'staff-a',
-    JSON.stringify([]), now, now).run();
+    JSON.stringify(history), now, now).run();
   return caseId;
 }
 
@@ -931,6 +931,49 @@ test('관리자 미리보기는 동의·초대·보호자 세션 없이 같은 �
     return copy;
   };
   assert.deepEqual(comparable(preview.body), comparable(view.body));
+});
+
+test('보호자 보강 DTO는 첫 생성 이력으로만 유형을 증명하고 생성자 정보는 공개하지 않는다', async () => {
+  const db = new TestD1(); seed(db);
+  seedAwaitingMakeup(db, 'mu_origin_absence', [
+    { action: 'create_from_absence', actorId: 'private-absence-creator' }
+  ], '2026-08-10');
+  seedAwaitingMakeup(db, 'mu_origin_manual', [
+    { action: 'create_manual', reason: 'manual_exam', actorId: 'private-manual-creator', actorScope: 'own' }
+  ], '2026-08-11');
+  seedAwaitingMakeup(db, 'mu_origin_unknown', [
+    { action: 'review', actorId: 'private-reviewer' },
+    { action: 'create_manual', reason: 'manual_absence', actorId: 'private-late-creator' }
+  ], '2026-08-12');
+  seedAwaitingMakeup(db, 'mu_origin_invalid_reason', [
+    { action: 'create_manual', reason: 'private-unsafe-reason', actorId: 'private-invalid-creator' }
+  ], '2026-08-13');
+
+  const preview = await call(db, {
+    auth: admin, action: 'preview', studentId: 'student-a'
+  }, '', 'https://whdudwns33-wb.github.io');
+  assert.equal(preview.status, 200);
+  const rows = new Map(preview.body.makeups.map(row => [row.caseId, row]));
+  assert.deepEqual(
+    { creationType: rows.get('mu_origin_absence').creationType, manualReason: rows.get('mu_origin_absence').manualReason },
+    { creationType: 'absence', manualReason: '' }
+  );
+  assert.deepEqual(
+    { creationType: rows.get('mu_origin_manual').creationType, manualReason: rows.get('mu_origin_manual').manualReason },
+    { creationType: 'manual', manualReason: 'manual_exam' }
+  );
+  assert.deepEqual(
+    { creationType: rows.get('mu_origin_unknown').creationType, manualReason: rows.get('mu_origin_unknown').manualReason },
+    { creationType: 'unknown', manualReason: '' },
+    '후속 이력의 create_manual은 생성 근거로 승격하지 않는다'
+  );
+  assert.deepEqual(
+    { creationType: rows.get('mu_origin_invalid_reason').creationType, manualReason: rows.get('mu_origin_invalid_reason').manualReason },
+    { creationType: 'manual', manualReason: '' },
+    '허용 목록 밖 유형은 보호자에게 전달하지 않는다'
+  );
+  const raw = JSON.stringify(preview.body.makeups);
+  assert.doesNotMatch(raw, /private-|actorId|actorScope|createdBy|createdScope/);
 });
 
 test('같은 보호자 전화번호의 형제도 학생별 동의·초대 없이 자동 결합하지 않는다', async () => {

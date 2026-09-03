@@ -267,7 +267,7 @@ test('source absence shows makeup completion and list loads the full server limi
   assert.match(helper, /보강완료/);
   assert.match(row, /makeupCompletionTagHtml\(t, date, c\)/);
   assert.match(load, /action: 'list', limit: 500/);
-  assert.match(load, /\['makeup', 'today', 'week'\]\.includes\(route\)/);
+  assert.match(load, /\['makeup', 'today', 'week', 'schedule'\]\.includes\(route\)/);
 });
 
 test('schedule response applies the authoritative generated lesson task immediately', () => {

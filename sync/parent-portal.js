@@ -1278,6 +1278,30 @@ async function currentSessionPackTask(env, student, row, activeStaff) {
     taskIdentityHash === String(row.task_identity_hash || '') ? task : null;
 }
 
+const PUBLIC_MANUAL_MAKEUP_REASONS = new Set([
+  'manual_absence', 'manual_exam', 'manual_other'
+]);
+
+// 보호자에게는 보강 이력의 첫 생성 사건으로 증명된 유형만 공개한다. 후속 이력은 생성 근거가 아니다.
+function publicMakeupOrigin(row) {
+  const history = parseJson(row && row.history);
+  const first = Array.isArray(history) ? history[0] : null;
+  if (!first || typeof first !== 'object') {
+    return { creationType: 'unknown', manualReason: '' };
+  }
+  if (first.action === 'create_manual') {
+    const reason = String(first.reason || '');
+    return {
+      creationType: 'manual',
+      manualReason: PUBLIC_MANUAL_MAKEUP_REASONS.has(reason) ? reason : ''
+    };
+  }
+  if (first.action === 'create_from_absence') {
+    return { creationType: 'absence', manualReason: '' };
+  }
+  return { creationType: 'unknown', manualReason: '' };
+}
+
 async function publicOperations(env, student) {
   const studentId = String(student.id || '');
   const output = { makeups: [], sessionPacks: [] };
@@ -1301,9 +1325,12 @@ async function publicOperations(env, student) {
       const confirmed = String(row.confirmed_start_at || '');
       const shown = confirmed || proposed;
       const staffId = row.confirmed_staff_id || row.proposed_staff_id || '';
+      const origin = publicMakeupOrigin(row);
       output.makeups.push({
         caseId: String(row.case_id || ''),
         sourceDate: String(row.source_date || ''),
+        creationType: origin.creationType,
+        manualReason: origin.manualReason,
         subject: text(task.subject || task.className || '보강 수업'),
         status: String(row.status || ''),
         statusLabel: statusLabels[String(row.status || '')] || '확인 중',

@@ -419,7 +419,9 @@ test('completed makeup shares one consumption group with its original absence', 
     'INSERT INTO makeup_cases(app,case_id,student_id,source_task_id,source_date,source_teacher_id,consumption_group_id,' +
     'status,revision,completed_at,completed_by,reason,history,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
   ).bind('task', makeupCaseId, 'student-a', 'lesson-a', date, 'teacher-a', consumptionGroupId,
-    'completed', 2, Date.now(), 'teacher-a', null, '[]', Date.now(), Date.now()).run();
+    'completed', 2, Date.now(), 'teacher-a', null,
+    JSON.stringify([{ action: 'create_from_absence', actorId: 'teacher-a', at: Date.now() }]),
+    Date.now(), Date.now()).run();
   result = await call(db, {
     action: 'record', packId: pack.packId, revision: pack.revision, sourceType: 'makeup', sourceKey: makeupCaseId,
     checkKey: 'lesson-a|' + date, consumptionGroupId
@@ -433,6 +435,74 @@ test('completed makeup shares one consumption group with its original absence', 
     checkKey: 'lesson-a|' + date, consumptionGroupId
   }, own('teacher-a'));
   assert.equal(duplicate.body.idempotent, true);
+});
+
+test('only canonical absence/manual-absence origins can charge; exam, other, invalid, and unknown origins fail closed', async () => {
+  const db = seed();
+  let pack = (await create(db)).body.pack;
+  const date = '2026-08-05';
+  const consumptionGroupId = await group('lesson-a', date);
+  const makeupCaseId = await caseId('lesson-a', date);
+  const now = Date.now();
+  db.prepare(
+    'INSERT INTO makeup_cases(app,case_id,student_id,source_task_id,source_date,source_teacher_id,consumption_group_id,' +
+    'status,revision,completed_at,completed_by,reason,history,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+  ).bind('task', makeupCaseId, 'student-a', 'lesson-a', date, 'teacher-a', consumptionGroupId,
+    'completed', 2, now, 'teacher-a', null,
+    JSON.stringify([{ action: 'create_manual', reason: 'manual_absence', actorId: 'teacher-a', actorScope: 'own', at: now }]),
+    now, now).run();
+  let result = await call(db, {
+    action: 'record', packId: pack.packId, revision: pack.revision, sourceType: 'makeup', sourceKey: makeupCaseId,
+    consumptionGroupId
+  }, own('teacher-a'));
+  assert.equal(result.status, 200);
+  assert.equal(result.body.pack.usedSessions, 1);
+  pack = result.body.pack;
+  const duplicate = await call(db, {
+    action: 'record', packId: pack.packId, revision: pack.revision, sourceType: 'makeup', sourceKey: makeupCaseId,
+    consumptionGroupId
+  }, own('teacher-a'));
+  assert.equal(duplicate.status, 200);
+  assert.equal(duplicate.body.idempotent, true);
+
+  for (const [index, reason] of ['manual_exam', 'manual_other'].entries()) {
+    const blockedDate = '2026-08-' + String(6 + index).padStart(2, '0');
+    const blockedGroup = await group('lesson-a', blockedDate);
+    const blockedCase = await caseId('lesson-a', blockedDate);
+    db.prepare(
+      'INSERT INTO makeup_cases(app,case_id,student_id,source_task_id,source_date,source_teacher_id,consumption_group_id,' +
+      'status,revision,completed_at,completed_by,reason,history,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+    ).bind('task', blockedCase, 'student-a', 'lesson-a', blockedDate, 'teacher-a', blockedGroup,
+      'completed', 2, now, 'teacher-a', null,
+      JSON.stringify([{ action: 'create_manual', reason, actorId: 'teacher-a', actorScope: 'own', at: now }]),
+      now, now).run();
+    const blocked = await call(db, {
+      action: 'record', packId: pack.packId, revision: pack.revision, sourceType: 'makeup', sourceKey: blockedCase,
+      consumptionGroupId: blockedGroup
+    }, own('teacher-a'));
+    assert.equal(blocked.status, 409);
+    assert.equal(blocked.body.code, 'MANUAL_MAKEUP_NO_CHARGE');
+  }
+  for (const [index, history] of [
+    [{ action: 'create_manual', reason: 'tampered_type', actorId: 'teacher-a', at: now }],
+    { action: 'create_from_absence', actorId: 'teacher-a', at: now }
+  ].entries()) {
+    const blockedDate = '2026-08-' + String(8 + index).padStart(2, '0');
+    const blockedGroup = await group('lesson-a', blockedDate);
+    const blockedCase = await caseId('lesson-a', blockedDate);
+    db.prepare(
+      'INSERT INTO makeup_cases(app,case_id,student_id,source_task_id,source_date,source_teacher_id,consumption_group_id,' +
+      'status,revision,completed_at,completed_by,reason,history,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+    ).bind('task', blockedCase, 'student-a', 'lesson-a', blockedDate, 'teacher-a', blockedGroup,
+      'completed', 2, now, 'teacher-a', null, JSON.stringify(history), now, now).run();
+    const blocked = await call(db, {
+      action: 'record', packId: pack.packId, revision: pack.revision, sourceType: 'makeup', sourceKey: blockedCase,
+      consumptionGroupId: blockedGroup
+    }, own('teacher-a'));
+    assert.equal(blocked.status, 409);
+    assert.equal(blocked.body.code, index === 0 ? 'MANUAL_MAKEUP_NO_CHARGE' : 'MAKEUP_ORIGIN_NO_CHARGE');
+  }
+  assert.equal(db.database.prepare('SELECT count(*) AS n FROM session_pack_usage').get().n, 1);
 });
 
 test('approved absence consumes once when its completed makeup is recorded', async () => {
@@ -449,7 +519,9 @@ test('approved absence consumes once when its completed makeup is recorded', asy
     'INSERT INTO makeup_cases(app,case_id,student_id,source_task_id,source_date,source_teacher_id,consumption_group_id,' +
     'status,revision,completed_at,completed_by,reason,history,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
   ).bind('task', makeupCaseId, 'student-a', 'lesson-a', date, 'teacher-a', consumptionGroupId,
-    'completed', 2, Date.now(), 'teacher-a', null, '[]', Date.now(), Date.now()).run();
+    'completed', 2, Date.now(), 'teacher-a', null,
+    JSON.stringify([{ action: 'create_from_absence', actorId: 'teacher-a', at: Date.now() }]),
+    Date.now(), Date.now()).run();
   result = await call(db, {
     action: 'record', packId: pack.packId, revision: pack.revision, sourceType: 'makeup', sourceKey: makeupCaseId,
     consumptionGroupId
