@@ -194,7 +194,7 @@ function fmtLast(t){if(!t)return '—';const d=(Date.now()-new Date(t))/60000;if
 
 /* ── 팩 병합: 분리 추출 파일(words/sentences/dialogues/patterns/items-*) 또는 통짜 팩 ── */
 const TOP_FIELDS=['packId','curriculum','textbook','grade','lesson','lessonTitle','source','passage'];
-const ARR_FIELDS=['words','sentences','dialogues','keyExpressions','functions','vocabSidebar','readingQA','patterns'];
+const ARR_FIELDS=['words','sentences','dialogues','keyExpressions','functions','vocabSidebar','readingQA','patterns','oddOneItems','checkItems'];
 function assemble(files){
   const out={items:[]},ids=new Set(),errors=[];
   for(const f of files){
