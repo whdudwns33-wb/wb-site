@@ -1068,11 +1068,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-09-03.1"></script>
-<script src="./schedule-board-core.js?v=2026-09-03.1"></script>
-<script src="./asset-core.js?v=2026-09-03.1"></script>
-<script src="./qr-core.js?v=2026-09-03.1"></script>
-<script src="./acaflow-import-core.js?v=2026-09-03.1"></script>
+<script src="./lesson-form-core.js?v=2026-09-03.2"></script>
+<script src="./schedule-board-core.js?v=2026-09-03.2"></script>
+<script src="./asset-core.js?v=2026-09-03.2"></script>
+<script src="./qr-core.js?v=2026-09-03.2"></script>
+<script src="./acaflow-import-core.js?v=2026-09-03.2"></script>
 <script>
 "use strict";
 
@@ -7600,38 +7600,78 @@ const FEEDBACK_WEEKDAYS = [
 const FEEDBACK_STATUS_LABEL = {
   approval_waiting: ['원장 검토 대기', 'warn'],
   content_approved_send_blocked: ['문구 승인 · 발송 대기', ''],
-  sent: ['솔라피 발송 접수', ''],
+  sent: ['전달 확인 중 · 솔라피 접수', 'warn'],
   revision_requested: ['수정 요청', 'bad'],
   cancelled: ['취소', '']
 };
 
 const FEEDBACK_DELIVERY_LABEL = {
-  provider_queued: ['발송 접수 · 처리 중', 'warn'],
-  carrier_processing: ['통신사 전달 중', 'warn'],
-  delivered: ['학부모 수신 완료', ''],
-  failed: ['알림톡 발송 실패', 'bad'],
-  unknown: ['발송 결과 확인 필요', 'warn']
+  provider_queued: ['전달 확인 중 · 솔라피 접수', 'warn'],
+  carrier_processing: ['전달 확인 중 · 통신사 처리', 'warn'],
+  delivered: ['수신 완료', ''],
+  failed: ['발송 실패', 'bad'],
+  unknown: ['상태 확인 필요', 'warn']
 };
+
+const FEEDBACK_DELIVERY_CATEGORY_LABEL = {
+  delivered: '수신 완료',
+  pending: '전달 확인 중',
+  unknown: '상태 확인 필요',
+  failed: '발송 실패',
+  unsent: '미발송'
+};
+
+/** 요청 상태와 실제 전달 상태를 섞지 않는다. 전달 결과가 있으면 요청 행보다 우선한다. */
+function feedbackDeliveryCategory(item) {
+  if (!item || item.status === 'cancelled') return 'excluded';
+  const delivery = String(item.messageDeliveryState || '');
+  if (delivery === 'delivered') return 'delivered';
+  if (delivery === 'provider_queued' || delivery === 'carrier_processing') return 'pending';
+  if (delivery === 'unknown') return 'unknown';
+  if (delivery === 'failed') return 'failed';
+  const note = String(item.reviewNote || '');
+  if (note.startsWith('접수 여부 확인 필요') ||
+      note.startsWith('발송 결과를 자동으로 확인하지 못했습니다')) return 'unknown';
+  if (note.startsWith('카카오 발송이 거절되었습니다') ||
+      note.startsWith('카카오 발송 결과가 실패로 확인되었습니다')) return 'failed';
+  // 예전 sent 행은 솔라피 접수까지만 확인된 기록이다. 수신 완료로 추측하지 않는다.
+  if (item.status === 'sent') return 'pending';
+  return 'unsent';
+}
+
+function feedbackDeliveryCounts(rows) {
+  const counts = {
+    deliveredCount: 0, pendingCount: 0, unknownCount: 0,
+    failedCount: 0, unsentCount: 0, totalCount: 0
+  };
+  (Array.isArray(rows) ? rows : []).forEach(item => {
+    const category = feedbackDeliveryCategory(item);
+    if (category === 'excluded') return;
+    counts.totalCount += 1;
+    counts[category + 'Count'] += 1;
+  });
+  return counts;
+}
 
 function feedbackSendState(item) {
   const delivery = String(item && item.messageDeliveryState || '');
   if (FEEDBACK_DELIVERY_LABEL[delivery]) return { label: FEEDBACK_DELIVERY_LABEL[delivery] };
-  if (item && item.status === 'content_approved_send_blocked') {
-    const note = String(item.reviewNote || '');
-    if (note.startsWith('접수 여부 확인 필요')) return { label: ['접수 여부 확인 필요', 'warn'] };
-    if (note.startsWith('카카오 발송이 거절되었습니다')) return { label: ['알림톡 거절 · 확인 필요', 'bad'] };
-  }
+  const category = feedbackDeliveryCategory(item);
+  if (category === 'unknown') return { label: FEEDBACK_DELIVERY_LABEL.unknown };
+  if (category === 'failed') return { label: FEEDBACK_DELIVERY_LABEL.failed };
   return { label: FEEDBACK_STATUS_LABEL[item && item.status] || [item && item.status || '', ''] };
 }
 
 function feedbackReviewPrefix(item, ownCard) {
+  const category = feedbackDeliveryCategory(item);
+  if (category === 'delivered') return '이전 처리 메모 — ';
+  if (category === 'pending') return '전달 확인 중 — ';
+  if (category === 'unknown') return '⚠ 상태 확인 필요 — ';
+  if (category === 'failed') return '발송 실패 — ';
   if (item && item.status === 'revision_requested') {
     return ownCard ? '<b>원장 수정 요청</b><br>' : '수정 요청: ';
   }
-  const note = String(item && item.reviewNote || '');
-  if (note.startsWith('접수 여부 확인 필요')) return '⚠ 접수 여부 확인 — ';
-  if (note.startsWith('카카오 발송이 거절되었습니다')) return '발송 거절 — ';
-  return '⏳ 아직 안 나감 — ';
+  return '⏳ 미발송 — ';
 }
 
 function feedbackUpdatedAt(item) {
@@ -7648,10 +7688,7 @@ function feedbackUpdatedAtLabel(item) {
 }
 
 function feedbackIsUnsent(item) {
-  if (!item || item.status === 'cancelled') return false;
-  const delivery = String(item.messageDeliveryState || '');
-  if (delivery) return delivery !== 'delivered';
-  return item.status !== 'sent';
+  return feedbackDeliveryCategory(item) === 'unsent';
 }
 
 function feedbackWeekdayKey(value) {
@@ -7670,16 +7707,18 @@ function feedbackWeekdayLabel(value) {
 
 function feedbackWeekdaySummary(rows) {
   const summaries = FEEDBACK_WEEKDAYS.map(day => ({
-    key: day.key, day: day.day, label: day.label, sentCount: 0, unsentCount: 0, totalCount: 0
+    key: day.key, day: day.day, label: day.label,
+    deliveredCount: 0, pendingCount: 0, unknownCount: 0,
+    failedCount: 0, unsentCount: 0, totalCount: 0
   }));
   const byKey = new Map(summaries.map(summary => [summary.key, summary]));
   (Array.isArray(rows) ? rows : []).forEach(item => {
-    if (!item || item.status === 'cancelled') return;
+    const category = feedbackDeliveryCategory(item);
+    if (category === 'excluded') return;
     const summary = byKey.get(feedbackWeekdayKey(item.feedbackDate));
     if (!summary) return;
     summary.totalCount += 1;
-    if (feedbackIsUnsent(item)) summary.unsentCount += 1;
-    else summary.sentCount += 1;
+    summary[category + 'Count'] += 1;
   });
   return summaries;
 }
@@ -7741,11 +7780,20 @@ function feedbackLessonTimeLabel(item, taskOverride) {
   return String(task.time || '').trim() || '시간 미확인';
 }
 
-function feedbackSortRows(rows, unsentFirst, lessonTimeFirst) {
+function feedbackDeliverySortRank(item) {
+  const category = feedbackDeliveryCategory(item);
+  return ({ failed: 0, unknown: 1, unsent: 2, pending: 3, delivered: 4, excluded: 5 })[category] ?? 5;
+}
+
+function feedbackNeedsAttention(item) {
+  return ['failed', 'unknown', 'unsent'].includes(feedbackDeliveryCategory(item));
+}
+
+function feedbackSortRows(rows, attentionFirst, lessonTimeFirst) {
   return (Array.isArray(rows) ? rows : []).slice().sort((a, b) => {
-    if (unsentFirst) {
-      const unsentOrder = Number(feedbackIsUnsent(b)) - Number(feedbackIsUnsent(a));
-      if (unsentOrder) return unsentOrder;
+    if (attentionFirst) {
+      const stateOrder = feedbackDeliverySortRank(a) - feedbackDeliverySortRank(b);
+      if (stateOrder) return stateOrder;
     }
     if (lessonTimeFirst) {
       const leftTime = feedbackLessonStartMinutes(a), rightTime = feedbackLessonStartMinutes(b);
@@ -7770,14 +7818,18 @@ function feedbackTeacherGroups(rows, lessonTimeFirst) {
   });
   return Array.from(groups.values()).map(group => {
     group.rows = feedbackSortRows(group.rows, true, lessonTimeFirst);
-    group.unsentCount = group.rows.filter(feedbackIsUnsent).length;
-    group.sentCount = group.rows.filter(item => item && !feedbackIsUnsent(item) && item.status !== 'cancelled').length;
+    Object.assign(group, feedbackDeliveryCounts(group.rows));
+    group.attentionCount = group.rows.filter(feedbackNeedsAttention).length;
     group.latestUpdatedAt = group.rows.reduce((latest, item) => Math.max(latest, feedbackUpdatedAt(item)), 0);
-    group.latestUnsentAt = group.rows.filter(feedbackIsUnsent)
+    group.latestAttentionAt = group.rows.filter(feedbackNeedsAttention)
+      .reduce((latest, item) => Math.max(latest, feedbackUpdatedAt(item)), 0);
+    group.latestPendingAt = group.rows.filter(item => feedbackDeliveryCategory(item) === 'pending')
       .reduce((latest, item) => Math.max(latest, feedbackUpdatedAt(item)), 0);
     return group;
-  }).sort((a, b) => Number(b.unsentCount > 0) - Number(a.unsentCount > 0) ||
-    b.latestUnsentAt - a.latestUnsentAt || b.latestUpdatedAt - a.latestUpdatedAt ||
+  }).sort((a, b) => Number(b.attentionCount > 0) - Number(a.attentionCount > 0) ||
+    b.latestAttentionAt - a.latestAttentionAt ||
+    Number(b.pendingCount > 0) - Number(a.pendingCount > 0) || b.latestPendingAt - a.latestPendingAt ||
+    b.latestUpdatedAt - a.latestUpdatedAt ||
     a.owner.localeCompare(b.owner, 'ko'));
 }
 
@@ -7785,13 +7837,20 @@ function feedbackStoredMessageHtml(item) {
   const storedMessage = String(item && item.message || '');
   const message = storedMessage.trim() ? storedMessage : '저장된 최종 메시지가 없습니다.';
   const delivery = String(item && item.messageDeliveryState || '');
-  const label = delivery === 'delivered'
-    ? '학부모 수신 완료 · 최종 메시지'
-    : delivery === 'provider_queued' || delivery === 'carrier_processing'
-      ? '솔라피에서 처리 중인 최종 메시지'
-      : item && item.status === 'sent'
-        ? '솔라피에 접수된 최종 메시지'
-        : '저장된 최종 메시지 (미전송)';
+  const category = feedbackDeliveryCategory(item);
+  const label = category === 'delivered'
+    ? '수신 완료 · 최종 메시지'
+    : category === 'pending'
+      ? (delivery === 'carrier_processing'
+          ? '전달 확인 중 · 통신사 처리 중인 최종 메시지'
+          : '전달 확인 중 · 솔라피에 접수된 최종 메시지')
+      : category === 'unknown'
+        ? '상태 확인 필요 · 전송한 최종 메시지'
+        : category === 'failed'
+          ? '발송 실패 · 전송을 시도한 최종 메시지'
+          : category === 'excluded'
+            ? '취소된 최종 메시지'
+            : '미발송 · 저장된 최종 메시지';
   return '<div class="feedback-message-label">' + label + '</div>' +
     '<div class="feedback-message-text">' + esc(message) + '</div>';
 }
@@ -7893,25 +7952,42 @@ function feedbackQueueCard(item) {
       : '') + feedbackReasonHtml(item, false) + '</div></details>';
 }
 
+function feedbackDeliveryCountsHtml(counts, multiline) {
+  const separator = multiline ? '<br>' : ' · ';
+  return [
+    FEEDBACK_DELIVERY_CATEGORY_LABEL.delivered + ' ' + Number(counts && counts.deliveredCount || 0) + '건',
+    FEEDBACK_DELIVERY_CATEGORY_LABEL.pending + ' ' + Number(counts && counts.pendingCount || 0) + '건',
+    FEEDBACK_DELIVERY_CATEGORY_LABEL.unknown + ' ' + Number(counts && counts.unknownCount || 0) + '건',
+    FEEDBACK_DELIVERY_CATEGORY_LABEL.failed + ' ' + Number(counts && counts.failedCount || 0) + '건',
+    FEEDBACK_DELIVERY_CATEGORY_LABEL.unsent + ' ' + Number(counts && counts.unsentCount || 0) + '건'
+  ].join(separator);
+}
+
+function feedbackTeacherGroupStatusHtml(group) {
+  if (group.failedCount) return '<span class="pill bad">발송 실패 ' + group.failedCount + '건</span>';
+  if (group.unknownCount) return '<span class="pill warn">상태 확인 필요 ' + group.unknownCount + '건</span>';
+  if (group.unsentCount) return '<span class="pill warn">미발송 ' + group.unsentCount + '건</span>';
+  if (group.pendingCount) return '<span class="pill warn">전달 확인 중 ' + group.pendingCount + '건</span>';
+  return '<span class="pill">전체 수신 완료</span>';
+}
+
 function feedbackTeacherGroupHtml(group, weekdayKey) {
   const first = group.rows[0] || {};
   const staff = staffById(group.owner);
   const rawName = String((staff && staff.name) || first.teacherName || group.owner || '담당 선생님').trim();
   const teacherName = /(?:선생님|쌤)$/.test(rawName) ? rawName : rawName + ' 선생님';
-  const status = group.unsentCount
-    ? '<span class="pill warn">미발송 ' + group.unsentCount + '건</span>'
-    : '<span class="pill">전체 수신 완료</span>';
+  const status = feedbackTeacherGroupStatusHtml(group);
   return '<details class="card feedback-teacher-group" data-persist-key="feedback-teacher|' + esc(weekdayKey) + '|' + esc(group.owner) + '"><summary><span>' +
       '<span class="card-title">' + esc(teacherName) + '</span>' +
-      '<span class="small muted">수신 완료 ' + group.sentCount + '건 · 미발송 ' + group.unsentCount + '건</span></span>' + status + '</summary>' +
+      '<span class="small muted">' + feedbackDeliveryCountsHtml(group, false) + '</span></span>' + status + '</summary>' +
     '<div class="feedback-teacher-group-body">' + group.rows.map(feedbackQueueCard).join('') + '</div></details>';
 }
 
 function feedbackWeekdayButtonsHtml(rows) {
   return '<div class="feedback-weekday-grid" role="group" aria-label="피드백 검토 요일 선택">' + feedbackWeekdaySummary(rows).map(summary =>
     '<button type="button" class="feedback-weekday-button" data-act="feedbackweekday" data-day="' + esc(summary.key) + '" aria-pressed="' +
-      (feedbackWeekdayFilter === summary.key ? 'true' : 'false') + '"><b>' + esc(summary.label) + '</b><span>수신 완료 ' +
-      summary.sentCount + '건<br>미발송 ' + summary.unsentCount + '건</span></button>'
+      (feedbackWeekdayFilter === summary.key ? 'true' : 'false') + '"><b>' + esc(summary.label) + '</b><span>' +
+      feedbackDeliveryCountsHtml(summary, true) + '</span></button>'
   ).join('') + '</div>';
 }
 
@@ -7937,8 +8013,8 @@ function viewFeedbackReview() {
       } else {
         const daySummary = feedbackWeekdaySummary(visibleQueue).find(summary => summary.key === feedbackWeekdayFilter);
         const dayRows = feedbackFilterByWeekday(visibleQueue, feedbackWeekdayFilter);
-        h += '<div class="feedback-weekday-summary"><b>' + esc(daySummary ? daySummary.label : '선택 요일') + '</b> · 수신 완료 ' +
-          (daySummary ? daySummary.sentCount : 0) + '건 · 미발송 ' + (daySummary ? daySummary.unsentCount : 0) + '건</div>';
+        h += '<div class="feedback-weekday-summary"><b>' + esc(daySummary ? daySummary.label : '선택 요일') + '</b> · ' +
+          feedbackDeliveryCountsHtml(daySummary, false) + '</div>';
         if (!dayRows.length) {
           h += '<div class="card"><div class="empty"><b>💬</b>선택한 요일의 피드백 기록이 없습니다.</div></div>';
         } else {
@@ -21100,7 +21176,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-09-03.1';
+const APP_VER = '2026-09-03.2';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
