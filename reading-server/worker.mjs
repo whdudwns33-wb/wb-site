@@ -150,6 +150,9 @@ function naesinStore(env) {
     listExamScopes: async () => (await kvListAll(env, 'naesin:exam:')).map(k => k.slice('naesin:exam:'.length)),
     getTask: (s) => env.DB.get('naesin:task:' + s, 'json'),
     putTask: (s, rec) => env.DB.put('naesin:task:' + s, JSON.stringify(rec)),
+    /* 문항 신고 — 팩별 배열. 학생이 올리고 강사가 처리한다(팩 정오표의 원천) */
+    getReports: (id) => env.DB.get('naesin:report:' + id, 'json'),
+    putReports: (id, list) => env.DB.put('naesin:report:' + id, JSON.stringify(list)),
     /* 시험 결과 — 키는 naesin:result:<코드>:<시험일>. 코드도 날짜도 콜론을 못 쓰므로
        키에서 둘을 그대로 되읽을 수 있다(listResults). 학생 하나가 시험마다 한 줄. */
     getResult: (c, d) => env.DB.get('naesin:result:' + c + ':' + d, 'json'),
@@ -742,6 +745,13 @@ export default {
         /* 시험 결과도 이 학생 것이다 — 남으면 같은 코드의 새 학생 화면에 앞 학생 점수가 뜨고,
            원내 성과 분석에도 퇴원생이 계속 섞인다. 키가 코드로 시작하니 접두로 훑는다. */
         for (const k of await kvListAll(env, 'naesin:result:' + c + ':')) await drop(k);
+        /* 문항 신고는 팩 정오표라 남긴다 — 학생이 떠나도 그 문항의 오류는 그대로다.
+           다만 누가 올렸는지는 지운다(퇴원생 식별 정보를 팩 자료에 남길 이유가 없다). */
+        for (const k of await kvListAll(env, 'naesin:report:')) {
+          const list = await env.DB.get(k, 'json');
+          if (!Array.isArray(list) || !list.some((r) => r && r.code === c)) continue;
+          await env.DB.put(k, JSON.stringify(list.map((r) => (r && r.code === c ? { ...r, code: '' } : r))));
+        }
 
         /* 기기 토큰은 토큰 값으로 저장돼 코드로 찾을 수 없다 — 전부 훑어 이 학생 것만 지운다.
            남겨 두면 그 기기는 삭제 뒤에도 계속 로그인된 상태로 남는다. */

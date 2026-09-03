@@ -173,6 +173,20 @@
     .rtop .prog { flex: 1; }
     .rtop .quit { flex: none; font-size: 1.15rem; color: var(--soft); padding: 4px 10px; min-width: 44px; min-height: 44px;
       display: inline-flex; align-items: center; justify-content: center; }
+    /* 문항 신고 — 팩은 PDF에서 추출해 만들어서 오탈자가 남는다. 학생이 발견한 것이 정오표가 된다.
+       눈에 띄지 않게 두되 늘 같은 자리에 있어야 수업 중에 망설이지 않고 누른다. */
+    .rtop .flag { flex: none; font-size: 1rem; font-weight: 800; color: var(--soft); padding: 4px 10px;
+      min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
+    .rtop .flag.on { color: var(--ind); }
+    .flagbox { border-top: 1px solid var(--line); padding: 14px 16px 18px; background: #FAFBFC; }
+    .flagbox .ft { margin: 0 0 10px; font-size: 14px; font-weight: 700; }
+    .flagbox .frow { display: flex; flex-wrap: wrap; gap: 8px; }
+    .flagbox .frow button { min-height: 44px; padding: 0 14px; border: 1px solid var(--line); border-radius: 10px;
+      background: #fff; font-size: 14px; }
+    .flagbox .frow button.sel { border-color: var(--ind); background: var(--b1); font-weight: 700; }
+    .flagbox input { display: block; width: 100%; margin: 12px 0 0; padding: 12px; font-size: 16px;
+      border: 1px solid var(--line); border-radius: 10px; }
+    .flagbox .frow2 { display: flex; gap: 8px; margin-top: 12px; }
     .bar2 { height: 5px; background: #E5E9EF; border-radius: 3px; overflow: hidden; }
     .bar2 i { display: block; height: 100%; background: var(--ind); }
     .q { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 20px 22px; }
@@ -298,9 +312,25 @@
   <div class="rtop">
     <div class="prog"><div class="bar2"><i id="rBar" style="width:0%"></i></div>
       <span class="muted" id="rCount"></span></div>
+    <button class="flag" id="rFlag" aria-label="이 문제가 이상하면 선생님께 알리기" title="이 문제 이상해요">!</button>
     <button class="quit" id="rQuit" aria-label="중단하고 닫기">✕</button>
   </div>
   <div id="rBody"></div>
+  <div class="flagbox" id="rFlagBox" hidden>
+    <p class="ft">이 문제가 어떻게 이상한가요?</p>
+    <div class="frow" id="rFlagWhy">
+      <button type="button" data-r="answer">정답이 이상함</button>
+      <button type="button" data-r="broken">문장이 깨짐</button>
+      <button type="button" data-r="meaning">뜻이 틀림</button>
+      <button type="button" data-r="other">그 밖에</button>
+    </div>
+    <input id="rFlagMemo" type="text" maxlength="200" placeholder="한 줄로 적어 주세요 (없으면 비워도 됩니다)"
+      autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="done">
+    <div class="frow2">
+      <button type="button" class="btn p" id="rFlagSend">선생님께 알리기</button>
+      <button type="button" class="btn" id="rFlagCancel">그만두기</button>
+    </div>
+  </div>
 </div></div>
 
 <script src="./voice.js"></script>
@@ -3040,6 +3070,8 @@
   }
   function closeRunner() {
     $('runner').classList.remove('open');
+    /* 신고 창을 열어 둔 채 세션이 끝나면 다음 세션에 남의 문항 신고가 열려 있다 */
+    if (typeof closeFlag === 'function') closeFlag();
     document.body.style.overflow = '';
     if (lastFocus && lastFocus.focus && document.contains(lastFocus)) { try { lastFocus.focus(); } catch (e) {} }
     lastFocus = null;
@@ -3080,10 +3112,64 @@
     if (!confirm('중단하면 이번 세션 결과는 기록되지 않습니다. 중단할까요?')) return;
     endQueue(false);
   };
+
+  /* ── 문항 신고 ──
+     팩은 PDF를 AI로 읽어 만들기 때문에 오탈자·잘못된 정답이 남을 수 있다. 학생이 수업 중에
+     발견한 것을 바로 알리면 그것이 팩 정오표가 되어 품질이 계속 올라간다.
+     학습 흐름은 끊지 않는다 — 보내고 나면 문항은 그대로 진행된다. */
+  var flagReason = null;
+  function flagTarget() {
+    if (!RQ) return null;
+    if (RQ.custom) return RQ.flagRef ? { packId: RQ.flagPackId || curPackId(), itemRef: RQ.flagRef } : null;
+    var it = RQ.items && RQ.items[Math.min(RQ.i, RQ.items.length - 1)];
+    if (!it) return null;
+    return { packId: it.packId || curPackId(), itemRef: itemRefOf(it) };
+  }
+  /* 신고 식별자 — 오답노트 키(gen:<유형>:<대상>)와 같은 결로 만들어 강사가 같은 문항을 찾을 수 있게 */
+  function itemRefOf(it) {
+    var type = it.type || it.kind || 'item';
+    var ref = it.wordId || (it.checkId ? 'chk:' + it.checkId : null) || (it.id ? String(it.id) : null)
+      || (it.seq != null ? 's' + it.seq : null) || (it.day ? 'd' + it.day : null) || '?';
+    return ('gen:' + type + ':' + ref).slice(0, 80);
+  }
+  function closeFlag() {
+    $('rFlagBox').hidden = true;
+    $('rFlag').classList.remove('on');
+    flagReason = null;
+    $('rFlagMemo').value = '';
+    Array.prototype.forEach.call($('rFlagWhy').querySelectorAll('button'), function (b) { b.classList.remove('sel'); });
+  }
+  $('rFlag').onclick = function () {
+    if (!authed) { showBanner('체험 모드에서는 알릴 수 없어요.'); return; }
+    if (!flagTarget()) { showBanner('지금 화면에서는 알릴 수 없어요.'); return; }
+    var open = $('rFlagBox').hidden;
+    $('rFlagBox').hidden = !open;
+    $('rFlag').classList.toggle('on', open);
+    if (open) $('rFlagBox').scrollIntoView({ block: 'nearest' });
+  };
+  $('rFlagWhy').onclick = function (e) {
+    var b = e.target.closest('button[data-r]'); if (!b) return;
+    flagReason = b.getAttribute('data-r');
+    Array.prototype.forEach.call($('rFlagWhy').querySelectorAll('button'), function (x) { x.classList.toggle('sel', x === b); });
+  };
+  $('rFlagCancel').onclick = closeFlag;
+  $('rFlagMemo').onkeydown = function (e) { if (e.key === 'Enter') { e.preventDefault(); $('rFlagSend').click(); } };
+  $('rFlagSend').onclick = function () {
+    var t = flagTarget();
+    if (!t) { closeFlag(); return; }
+    var body = { packId: t.packId, itemRef: t.itemRef, reason: flagReason || 'other', memo: $('rFlagMemo').value.trim() };
+    closeFlag();
+    api('/report', { method: 'POST', body: JSON.stringify(body) })
+      .then(function () { showBanner('선생님께 전달했어요. 계속 풀어도 됩니다.'); })
+      /* 전달 실패도 학습을 막지 않는다 — 다만 조용히 넘기지는 않는다 */
+      .catch(function () { showBanner('전달하지 못했어요. 잠시 뒤 다시 눌러 주세요.'); });
+  };
   function stepRunner() {
     if (!RQ) return;
     if (RQ.i >= RQ.items.length) { endQueue(true); return; }
     $('rBar').style.width = Math.round(RQ.i / RQ.items.length * 100) + '%';
+    /* 문항이 넘어가면 신고 창을 닫는다 — 앞 문항에 대한 신고가 다음 문항으로 붙으면 안 된다 */
+    if (typeof closeFlag === 'function') closeFlag();
     countLine();
     renderItem(RQ.items[RQ.i], $('rBody'));
   }

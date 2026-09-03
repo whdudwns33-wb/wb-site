@@ -58,6 +58,7 @@ const naesinRoot = () => {
   db.naesin = db.naesin || { packs: {}, packIds: [], states: {}, exams: {} };
   db.naesin.tasks = db.naesin.tasks || {};
   db.naesin.results = db.naesin.results || {};
+  db.naesin.reports = db.naesin.reports || {};
   return db.naesin;
 };
 const naesinStore = {
@@ -75,6 +76,9 @@ const naesinStore = {
   listExamScopes: () => Object.keys(naesinRoot().exams),
   getTask: (s) => naesinRoot().tasks[s] || null,
   putTask: (s, rec) => { naesinRoot().tasks[s] = rec; persist(); },
+  /* 문항 신고 — 팩별 배열. 학생이 올리고 강사가 처리한다(팩 정오표의 원천) */
+  getReports: (id) => naesinRoot().reports[id] || null,
+  putReports: (id, list) => { naesinRoot().reports[id] = list; persist(); },
   /* 시험 결과 — db.naesin.results[코드][시험일] (워커의 naesin:result:<코드>:<시험일> 과 같은 것).
      학생 칸이 비면 지운다: 퇴원 확인(저장 파일에 코드가 남지 않는가)이 빈 껍데기에 걸리지 않게. */
   getResult: (c, d) => (naesinRoot().results[c] || {})[d] || null,
@@ -574,6 +578,13 @@ const server = http.createServer(async (req, res) => {
         drop(naesinRoot().states, c);
         drop(naesinRoot().exams, c);
         drop(naesinRoot().results, c);
+        /* 문항 신고는 팩 정오표라 남긴다 — 학생이 떠나도 그 문항의 오류는 그대로다.
+           다만 누가 올렸는지는 지운다(퇴원생 식별 정보를 팩 자료에 남길 이유가 없다). 워커와 동일. */
+        for (const [pid, list] of Object.entries(naesinRoot().reports)) {
+          if (!Array.isArray(list) || !list.some((r) => r && r.code === c)) continue;
+          naesinRoot().reports[pid] = list.map((r) => (r && r.code === c ? { ...r, code: '' } : r));
+          removed += 1;
+        }
         /* 기기 토큰은 토큰 값이 키라 코드로 못 찾는다 — 훑어서 이 학생 것만 */
         for (const [t, rec] of Object.entries(db.tokens)) if (rec && rec.code === c) drop(db.tokens, t);
         /* 승인 대기 줄에 남으면 지운 학생이 계속 뜬다 */
