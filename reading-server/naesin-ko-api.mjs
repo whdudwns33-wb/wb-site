@@ -31,6 +31,12 @@ const EXAM_PACKS_MAX = 20;
 const VERDICTS = ['pass', 'hold', 'fail'];
 
 const nowIso = () => new Date().toISOString();
+/* 새 팩이 지금 팩에 있던 것을 잃어버리는가 — works·sets·items 의 id 집합으로 본다 */
+const idsOf = (pack, key) => ((pack && pack[key]) || []).map((x) => x && (x.id || x.workId || x.setId)).filter(Boolean);
+const missingIds = (curPack, nextPack) => ['works', 'sets', 'items'].flatMap((k) => {
+  const have = new Set(idsOf(nextPack, k));
+  return idsOf(curPack, k).filter((x) => !have.has(x)).map((x) => k + ':' + x);
+});
 const size = (o) => JSON.stringify(o).length;
 
 /* 성취도 대시보드 한 줄.
@@ -206,6 +212,56 @@ export async function handleNaesinKo(ctx) {
     if (!PACK_ID_RE.test(id)) return j(400, { error: '팩 id가 필요해요.' });
     const rec = await store.getPending(id);
     return j(200, { pending: (rec && rec.pending) || [], updatedAt: (rec && rec.updatedAt) || null });
+  }
+
+  /* ── 루브릭 저작 결과 반영 (팩 추가 + 대기 목록에서 제거를 한 요청으로) ──
+     이 둘을 클라이언트가 두 번 나눠 부르면 반드시 어긋난다. 실측한 어긋남 셋:
+     ① 팩 저장 성공 + 대기 저장 실패 → 문항이 양쪽에 다 있거나 양쪽에 다 없다
+     ② 두 사람이 같이 저작 → 나중 저장이 앞 사람 문항을 통째로 덮는다(둘 다 '넣었어요'라고 뜬다)
+     ③ 화면이 서술형만 걸러 놓고 그 배열을 목록 전체로 올린다 → kind:'set' 같은 다른 검수 레코드가 사라진다
+     그래서 **대기 목록에서 무엇을 뺄지는 서버가 id 로 정한다.** 화면은 배열을 보내지 않는다.
+     packUpdatedAt 은 낙관적 잠금이다 — 불러온 뒤 팩이 바뀌었으면 쓰지 않고 409로 돌려보낸다. */
+  if (p === '/api/naesin-ko/admin/rubric' && method === 'POST') {
+    const b = await body();
+    if (!b) return j(400, { error: '올바른 JSON이 아니에요.' });
+    const id = String(b.id || '').trim();
+    if (!PACK_ID_RE.test(id)) return j(400, { error: '팩 id는 영문/숫자/하이픈 3~60자' });
+    const doneItemId = String(b.doneItemId || '').trim();
+    if (!ITEM_ID_RE.test(doneItemId)) return j(400, { error: '옮긴 문항 id가 필요해요.' });
+    const cur = await store.getPack(id);
+    if (!cur) return j(404, { error: '없는 팩이에요.' });
+    let rec = cur;
+    if (b.pack !== undefined) {
+      const pack = b.pack;
+      if (!pack || typeof pack !== 'object' || Array.isArray(pack)) return j(400, { error: 'pack 필요' });
+      if (pack.packId !== id) return j(400, { error: 'pack.packId가 id와 달라요.' });
+      if (size(pack) > PACK_MAX_BYTES) return j(413, { error: '팩이 너무 커요 (4MB 이내).' });
+      /* 낙관적 잠금 — 시각 대신 **무엇이 사라지는가**로 본다. 저작 화면은 불러온 팩에 문항을
+         더해서 통째로 보내므로, 그 사이 남이 넣은 것이 스냅샷에 없으면 이 저장이 그걸 지운다.
+         updatedAt 비교는 같은 밀리초에 두 번 저장되면 못 잡는다 — 사라지는 id 를 직접 센다. */
+      const lost = missingIds(cur.pack, pack);
+      if (lost.length) {
+        return j(409, { error: '불러온 뒤 팩이 바뀌었어요 — 다시 불러오고 저작하세요.', lost: lost.slice(0, 5) });
+      }
+      rec = { pack, updatedAt: nowIso() };
+    }
+    /* 팩에 없는 문항을 대기 목록에서 빼지 않는다 — 그게 '양쪽 어디에도 없는' 상태를 만드는 길이다.
+       pack 을 안 보낸 요청(이미 팩에 든 문항의 뒷정리)도 같은 검사를 지나야 한다. */
+    const inPack = (rec.pack.items || []).some((x) => x && x.id === doneItemId);
+    if (!inPack) return j(400, { error: '그 문항이 팩에 없어요 — 대기 목록에서 빼지 않았습니다.' });
+    if (b.pack !== undefined) {
+      await store.putPack(id, rec);
+      const ids = (await store.getPackIds()) || [];
+      if (!ids.includes(id)) { ids.push(id); await store.putPackIds(ids); }
+    }
+    const pend = await store.getPending(id);
+    const before = (pend && pend.pending) || [];
+    /* 서술형만이 아니라 모든 kind 를 훑어 id 로 지운다 — 나머지는 손대지 않는다 */
+    const after = before.filter((x) => !(x && x.item && x.item.id === doneItemId));
+    const prec = { pending: after, updatedAt: nowIso() };
+    if (after.length !== before.length) await store.putPending(id, prec);
+    return j(200, { ok: true, id, updatedAt: rec.updatedAt,
+      removed: before.length - after.length, pending: after.length });
   }
 
   /* 시험 배정 — scope가 'default'면 반 공통, 학생 코드면 그 학생만.

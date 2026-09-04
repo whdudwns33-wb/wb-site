@@ -64,6 +64,32 @@ for (const f of pages) {
   if (!build.includes("'" + f + "'")) E(`public/${f} 가 build-dist.mjs 에 없습니다 — 배포본에서 404가 납니다`);
 }
 
+/* ── 관리 화면이 부르는 스크립트가 배포본에 있는가 ──
+   화면은 public/ 전체가 서빙되는 로컬에서 만들지만 배포본은 파일을 한 장씩 복사한다.
+   <script src> 하나를 새로 걸고 복사 목록에 안 넣으면 운영에서만 404가 나고, 화면은
+   조용히 반만 도는 상태가 된다(루브릭 저작 카드가 grade.js 를 새로 부르며 실제로 겪을 뻔했다). */
+const distCopied = new Set([...build.matchAll(/'([^']+\.(?:js|json|html|webmanifest|svg))'/g)].map((m) => m[1]));
+for (const f of pages) {
+  const html = fs.readFileSync(path.join(DIR, 'public', f), 'utf8');
+  for (const m of html.matchAll(/<script\s+src="\/([^"]+)"/g)) {
+    const file = m[1].split('/').pop();
+    if (!distCopied.has(file))
+      E(`public/${f} 가 /${m[1]} 를 부르는데 build-dist.mjs 복사 목록에 ${file} 이 없습니다 — 운영에서 404가 납니다`);
+  }
+}
+
+/* ── 라우트가 쓰는 저장 어댑터가 워커·로컬 양쪽에 다 있는가 ──
+   naesin-ko-api.mjs 는 워커(KV)와 로컬 서버(파일)가 함께 쓴다. 한쪽 어댑터에만 메서드를
+   더하면 로컬에서 다 확인하고 배포한 뒤 운영에서만 500이 난다 — 이 파일이 막으려는 바로 그 일이다. */
+for (const api of ['naesin-ko-api.mjs', 'naesin-api.mjs', 'vocab-api.mjs']) {
+  const src = fs.readFileSync(path.join(DIR, api), 'utf8');
+  const used = new Set([...src.matchAll(/store\.([a-zA-Z]\w*)\s*\(/g)].map((m) => m[1]));
+  for (const fn of [...used].sort()) {
+    if (!worker.includes(fn + ':')) E(`${api} 가 store.${fn} 를 쓰는데 worker.mjs 어댑터에 없습니다 — 배포 후 운영에서만 실패합니다`);
+    if (!server.includes(fn + ':')) E(`${api} 가 store.${fn} 를 쓰는데 server.mjs 어댑터에 없습니다 — 로컬 확인이 운영과 달라집니다`);
+  }
+}
+
 /* ── 파일럿 지표 화면의 기준값이 코드와 같은가 ──
    화면에 적힌 70%·60%는 사람이 손으로 쓴 글이고, 판정은 vocab-api.mjs 의 PILOT 이 한다.
    한쪽만 고치면 화면이 "기준 70%"라고 써 놓고 75%로 판정하는 상태가 된다. */
@@ -90,4 +116,4 @@ if (errors.length) {
   console.error(`\nFAIL — ${errors.length}건`);
   process.exit(1);
 }
-console.log(`OK — 워커 가로채기 ${paths.size}개 · 관리 화면 ${pages.length}장 배포 배선 · 파일럿 기준값 일치`);
+console.log(`OK — 워커 가로채기 ${paths.size}개 · 관리 화면 ${pages.length}장 배포 배선(스크립트 포함) · 저장 어댑터 짝 맞음 · 파일럿 기준값 일치`);

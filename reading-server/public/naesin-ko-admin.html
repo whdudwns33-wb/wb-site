@@ -329,86 +329,150 @@ function renderReviews() {
 
 
 /* ── 서술형 루브릭 저작 ──
-   추출기가 못 만든 채점 요소를 사람이 쓰는 자리다. 두 가지를 이 화면이 책임진다:
+   추출기가 못 만든 채점 요소를 사람이 쓰는 자리다. 이 화면이 지는 책임 넷:
    ① 손으로 옮겨 적다 생기는 오타 — 모범답안 어절을 눌러 넣게 한다(글자 하나가 틀리면 채점이 틀린다)
-   ② 통과 못 하는 루브릭 — 저장 전에 **모범답안으로 검산**한다. 자료의 모범답안조차 pass 가
-      안 되는 루브릭을 팩에 넣으면 학생이 무엇을 써도 영영 보류가 된다(§4.1 5단계가 안 끝난다). */
-let RB = { packId: '', pending: [], pack: null, draft: {} };
+   ② 통과 못 하는 루브릭 — 저장 전에 **모범답안으로 검산**한다. 자료의 모범답안조차 요소를
+      못 채우는 루브릭을 팩에 넣으면 학생이 무엇을 써도 영영 보류가 된다(§4.1 5단계가 안 끝난다)
+   ③ 저작한 것을 잃지 않는다 — 타이핑 즉시 초안에 담고(다시 그려도 안 날아간다) 브라우저에도 남긴다.
+      세션이 끊겨도, 실수로 불러오기를 다시 눌러도 되찾을 수 있어야 한다
+   ④ 화면과 서버가 어긋나지 않는다 — 카드를 **문항 id 로** 잡고(인덱스로 잡으면 하나 빠질 때
+      전부 한 칸씩 밀려 옆 문항에 저작된다), 팩 추가와 대기 제거는 서버가 한 요청으로 처리한다 */
+let RB = { packId: '', pending: [], pack: null, draft: {}, busy: false, packIds: new Set() };
 
 function rbTokens(text) {
   /* 어절 단위로 자른다 — 조사·문장부호는 채점기(normalizeKo)가 알아서 떼므로 그대로 둔다 */
-  return String(text || '').split(/\s+/).map((x) => x.replace(/[.,!?"'‘’“”]/g, '')).filter((x) => x.length >= 2);
+  return String(text || '').split(/\s+/).map((x) => x.replace(/[.,!?"'‘’“”]/g, '')).filter((x) => x.length >= 1);
+}
+/* 발문은 <b> 강조를 담은 HTML 조각이다(학생 앱과 같은 관례) — 리터럴 꺾쇠는 &lt; 로 저장돼 있다.
+   목록 줄은 글자만 필요하니 태그를 떼고 엔티티를 되돌린다. 그냥 esc() 하면 '&lt;보기&gt;'가 그대로 보인다.
+   DOMParser 는 열리지 않는 문서라 여기서 img·script 가 뜨거나 돌지 않는다. */
+function rbPlain(html) {
+  return new DOMParser().parseFromString(String(html || ''), 'text/html').body.textContent || '';
+}
+/* 발문 원문을 보여 줄 때는 강조만 살리고 나머지는 글자로 만든다 — 팩은 관리자가 올리는 것이지만
+   업로드 파일 하나가 이 화면에서 스크립트를 돌릴 수 있게 두지 않는다(관리 토큰이 여기 있다) */
+function rbRich(html) {
+  return esc(rbPlain(html)).replace(/&amp;lt;(\/?)(b|i|u|em|strong|br)&amp;gt;/g, '<$1$2>');
 }
 function rbKey(it) { return it.id; }
+function rbStore() { return 'wbk.rubric.draft.' + RB.packId; }
+function rbSave() {
+  /* 저작한 것은 서버에 넣기 전까지 이 브라우저에만 있다 — 세션 만료·새로고침에 잃지 않게 남긴다 */
+  try { localStorage.setItem(rbStore(), JSON.stringify(RB.draft)); } catch (e) { /* 용량 초과는 무시 */ }
+}
 function rbDraftOf(it) {
   if (!RB.draft[rbKey(it)]) {
-    const seed = (it.rubric || []).map((r) => ({ element: r.element || '', kw: (r.keywords || []).join(', '), points: r.points == null ? '' : r.points }));
+    const seed = (it.rubric || []).map((r) => ({ element: r.element || '', kw: (r.keywords || []).join(', '), points: r.points == null ? '' : String(r.points) }));
     RB.draft[rbKey(it)] = seed.length ? seed : [{ element: '', kw: '', points: '' }];
   }
   return RB.draft[rbKey(it)];
 }
+/* 배점 — 빈칸은 1점(grade.js 규칙), 숫자가 아니거나 0 이하는 저작 실수다. 조용히 NaN 을 만들지 않는다 */
+function rbPoints(v) {
+  const s = String(v == null ? '' : v).trim();
+  if (!s) return { points: null };
+  const n = Number(s.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0)));
+  if (!isFinite(n) || n <= 0) return { points: null, bad: s };
+  return { points: n };
+}
 function rbBuild(it) {
   const rows = rbDraftOf(it).filter((r) => r.element.trim() || r.kw.trim());
-  return rows.map((r) => ({
+  return rows.map((r) => Object.assign({
     element: r.element.trim(),
     keywords: r.kw.split(',').map((x) => x.trim()).filter(Boolean),
-    points: r.points === '' ? null : Number(r.points),
     source: 'authored',
-  }));
+  }, { points: rbPoints(r.points).points }));
+}
+function rbBadPoints(it) {
+  return rbDraftOf(it).map((r) => rbPoints(r.points).bad).filter(Boolean);
 }
 /* 저작 중인 루브릭을 붙인 문항 — 검산과 저장이 같은 값을 본다 */
 function rbItem(it) { return Object.assign({}, it, { rubric: rbBuild(it) }); }
 
+/* 검산 — 무엇을 보는가: **루브릭이 자료의 모범답안을 알아보는가**.
+   그래서 판정 기준은 verdict 가 아니라 '요소가 다 충족되는가'다. 자료의 모범답안이 어절 나열이라
+   조건·문장 완결에서 걸리는 문항이 실제로 있는데(그건 자료 사정이지 루브릭 잘못이 아니다),
+   verdict 로만 재면 그런 문항은 어떤 루브릭으로도 영영 팩에 못 들어간다. */
 function rbCheck(it) {
   const item = rbItem(it);
-  if (!item.rubric.length) return { ok: false, why: '채점 요소가 없어요.', rows: [] };
-  const bad = item.rubric.filter((r) => !r.element || !r.keywords.length);
-  if (bad.length) return { ok: false, why: '요소 이름과 인정 키워드가 둘 다 있어야 해요.', rows: [] };
+  const bad = rbBadPoints(it);
+  if (bad.length) return { state: 'no', why: '배점은 0보다 큰 숫자로 쓰세요 — 지금 “' + bad[0] + '”. 비워 두면 1점입니다.', rows: [] };
+  if (!item.rubric.length) return { state: 'no', why: '채점 요소가 없어요.', rows: [] };
+  const holes = item.rubric.filter((r) => !r.element || !r.keywords.length);
+  if (holes.length) return { state: 'no', why: '요소 이름과 인정 키워드가 둘 다 있어야 해요.', rows: [] };
   const models = (item.modelAnswers || []).filter(Boolean);
-  if (!models.length) return { ok: true, why: '모범답안이 없어 검산은 못 했어요 — 표본 채점으로 확인하세요.', rows: [] };
+  if (!models.length) {
+    return { state: 'unverified', rows: [],
+      why: '이 문항은 자료에 모범답안이 없어 검산을 못 했습니다 — 넣더라도 표본 채점으로 꼭 확인하세요.' };
+  }
   const rows = models.map((m) => {
     const v = WBKOGRADE.gradeRubric(m, item);
-    return { answer: m, verdict: v.verdict, score: v.score, total: v.total,
-      missing: v.elements.filter((e) => !e.met).map((e) => e.element) };
+    const missing = v.elements.filter((e) => !e.met).map((e) => e.element);
+    return { answer: m, verdict: v.verdict, score: v.score, total: v.total, missing: missing, allMet: !missing.length };
   });
-  const ok = rows.some((r) => r.verdict === 'pass');
-  return { ok, rows,
-    why: ok ? '모범답안이 통과합니다 — 팩에 넣을 수 있어요.'
-      : '자료의 모범답안조차 통과하지 못해요. 요소를 줄이거나, 같은 뜻의 표현을 한 요소의 키워드로 묶으세요.' };
+  const full = rows.filter((r) => r.verdict === 'pass');
+  if (full.length) return { state: 'ok', rows: rows, why: '모범답안이 통과합니다 — 팩에 넣을 수 있어요.' };
+  const met = rows.filter((r) => r.allMet);
+  if (met.length) {
+    return { state: 'formOnly', rows: rows,
+      why: '채점 요소는 모범답안을 다 알아봅니다. 통과가 아닌 것은 자료의 모범답안이 조건(형식)이나 문장 완결을 못 지켜서예요 — 루브릭 문제가 아니니 넣어도 됩니다.' };
+  }
+  return { state: 'no', rows: rows,
+    why: '자료의 모범답안조차 요소를 못 채웁니다. 요소를 줄이거나, 같은 뜻의 표현을 한 요소의 키워드로 묶으세요.' };
+}
+const RB_OK = { ok: 1, unverified: 1, formOnly: 1 };
+function rbBadge(it) {
+  if (!rbBuild(it).length) return '';
+  const s = rbCheck(it).state;
+  if (s === 'ok') return '<span class="tag ok">검산 통과</span>';
+  if (s === 'formOnly') return '<span class="tag ok">요소 충족</span>';
+  if (s === 'unverified') return '<span class="tag warn">검산 못 함</span>';
+  return '<span class="tag warn">검산 필요</span>';
+}
+
+function rbRowsHtml(d) {
+  return d.map((r, k) => `<div class="el">
+    <input data-f="element" data-k="${k}" value="${esc(r.element)}" placeholder="예: 화자의 태도">
+    <input data-f="kw" data-k="${k}" value="${esc(r.kw)}" placeholder="예: 감사, 고마움">
+    <input data-f="points" data-k="${k}" value="${esc(String(r.points))}" placeholder="1">
+    <button type="button" class="x" data-del="${k}" title="이 요소 지우기">×</button></div>`).join('');
 }
 
 function rbRender() {
   const box = $('#rbList');
-  if (!RB.pending.length) { box.innerHTML = '<span class="muted">루브릭을 기다리는 서술형이 없어요.</span>'; return; }
+  if (!RB.pending.length) { box.innerHTML = '<span class="muted">루브릭을 기다리는 서술형이 없어요.</span>'; box.className = 'muted'; return; }
+  /* 펼쳐 둔 카드는 다시 그려도 펼쳐 둔다 — 문항 id 로 기억한다(번호는 하나 빠지면 밀린다) */
+  const open = new Set([...box.querySelectorAll('details.rub[open]')].map((d) => d.getAttribute('data-id')));
   box.innerHTML = RB.pending.map((p, i) => {
     const it = p.item;
     const d = rbDraftOf(it);
-    const done = rbBuild(it).length ? (rbCheck(it).ok ? '<span class="tag ok">검산 통과</span>' : '<span class="tag warn">검산 필요</span>') : '';
-    return `<details class="rub" data-i="${i}">
-      <summary>${esc(String(it.source && it.source.no || i + 1))}. ${esc(String(it.stem || '').replace(/<[^>]+>/g, '').slice(0, 60))}
-        <span class="tag muted">${esc(p.series || '')}</span>${done}</summary>
+    const dup = RB.packIds.has(it.id);
+    return `<details class="rub" data-id="${esc(it.id)}"${open.has(it.id) ? ' open' : ''}>
+      <summary>${esc(String((it.source && it.source.no) || i + 1))}. ${esc(rbPlain(it.stem).slice(0, 60))}
+        <span class="tag muted">${esc(p.series || '')}</span>
+        <span data-badge>${dup ? '<span class="tag warn">이미 팩에 있음</span>' : rbBadge(it)}</span></summary>
       <div class="body">
         <div>
-          <h4>발문</h4><div class="src">${it.stem || ''}</div>
+          <h4>발문</h4><div class="src">${rbRich(it.stem)}</div>
           ${(it.conditions || []).length ? `<h4>조건</h4><div class="src">${it.conditions.map((c) => esc(c.text || c.kind)).join('<br>')}</div>` : ''}
           <h4>모범답안 — 어절을 누르면 키워드로 들어갑니다</h4>
-          ${(it.modelAnswers || []).map((m) => `<div class="src">${rbTokens(m).map((t) => `<span class="tok" data-tok="${esc(t)}">${esc(t)}</span>`).join(' ')}</div>`).join('')}
+          ${(it.modelAnswers || []).length
+            ? (it.modelAnswers || []).map((m) => `<div class="src">${rbTokens(m).map((t) => `<button type="button" class="tok" data-tok="${esc(t)}">${esc(t)}</button>`).join(' ')}</div>`).join('')
+            : '<div class="src muted">자료에 모범답안이 없습니다 — 검산이 안 되니 표본 채점으로 확인하세요.</div>'}
           ${it.explanation && it.explanation.main ? `<h4>해설(참고)</h4><div class="src">${esc(it.explanation.main)}</div>` : ''}
         </div>
         <div>
           <h4>채점 요소 — 요소마다 하나라도 맞으면 충족</h4>
           <div class="el" style="font-size:11px;color:var(--muted);font-weight:800">
             <span>요소 이름</span><span>인정 키워드(쉼표)</span><span>배점</span><span></span></div>
-          <div data-rows>${d.map((r, k) => `<div class="el">
-            <input data-f="element" data-k="${k}" value="${esc(r.element)}" placeholder="예: 화자의 태도">
-            <input data-f="kw" data-k="${k}" value="${esc(r.kw)}" placeholder="예: 감사, 고마움">
-            <input data-f="points" data-k="${k}" value="${esc(String(r.points))}" placeholder="1">
-            <button class="x" data-del="${k}" title="이 요소 지우기">×</button></div>`).join('')}</div>
-          <button class="btn ghost sm" data-add="1">＋ 요소 추가</button>
+          <div data-rows>${rbRowsHtml(d)}</div>
+          <button type="button" class="btn ghost sm" data-add="1">＋ 요소 추가</button>
           <div class="chk" data-chk></div>
           <div class="row" style="margin-top:8px">
-            <button class="btn sm" data-check="1">모범답안으로 검산</button>
-            <button class="btn sm" data-put="1">팩에 넣기</button>
+            ${dup
+              ? '<button type="button" class="btn sm" data-drop="1">대기 목록에서 빼기</button>'
+              : '<button type="button" class="btn sm" data-check="1">모범답안으로 검산</button>' +
+                '<button type="button" class="btn sm" data-put="1">팩에 넣기</button>'}
           </div>
         </div>
       </div></details>`;
@@ -416,29 +480,24 @@ function rbRender() {
   box.className = '';
 }
 
-/* 지금 열려 있는 문항의 입력값을 초안에 담는다 — 다시 그려도 안 날아가게 */
-function rbSync(det) {
-  const i = Number(det.getAttribute('data-i'));
-  const it = RB.pending[i].item;
-  const d = rbDraftOf(it);
-  det.querySelectorAll('[data-f]').forEach((inp) => {
-    const k = Number(inp.getAttribute('data-k'));
-    if (d[k]) d[k][inp.getAttribute('data-f')] = inp.value;
-  });
-  return { i, it, det };
+function rbCardOf(id) { return $('#rbList').querySelector(`details.rub[data-id="${CSS.escape(id)}"]`); }
+function rbItemOf(det) {
+  const id = det.getAttribute('data-id');
+  return (RB.pending.filter((p) => p.item.id === id)[0] || {}).item || null;
 }
 
 function rbShowCheck(det, it) {
   const r = rbCheck(it);
+  const ok = !!RB_OK[r.state];
   det.querySelector('[data-chk]').innerHTML =
-    `<div class="ln"><b class="${r.ok ? 'ok' : 'no'}">${r.ok ? '통과' : '아직'}</b> ${esc(r.why)}</div>` +
+    `<div class="ln"><b class="${ok ? 'ok' : 'no'}">${r.state === 'ok' ? '통과' : (ok ? '넣어도 됨' : '아직')}</b> ${esc(r.why)}</div>` +
     r.rows.map((x) => `<div class="ln"><b class="${x.verdict === 'pass' ? 'ok' : x.verdict === 'hold' ? 'hold' : 'no'}">${x.verdict}</b>
-      ${x.score}/${x.total}점 ${x.missing.length ? `· 빠짐: ${esc(x.missing.join(', '))}` : ''}
+      ${x.score}/${x.total}점 ${x.missing.length ? `· 빠짐: ${esc(x.missing.join(', '))}` : '· 요소 모두 충족'}
       <div class="muted">${esc(String(x.answer).slice(0, 90))}</div></div>`).join('');
   return r;
 }
 
-async function rbLoad() {
+async function rbLoad(keepDraft) {
   const id = $('#rbPack').value;
   if (!id) return;
   $('#rbMsg').textContent = '불러오는 중…';
@@ -447,47 +506,85 @@ async function rbLoad() {
       api('/naesin-ko/admin/pending?id=' + encodeURIComponent(id)),
       api('/naesin-ko/pack?id=' + encodeURIComponent(id)),
     ]);
-    RB = { packId: id, pack: pk.pack,
-      pending: (pd.pending || []).filter((p) => p.kind === 'item' && p.item && p.item.format === 'essay'),
-      draft: {} };
-    $('#rbMsg').textContent = `${RB.pending.length}문항 대기`;
+    const samePack = RB.packId === id;
+    RB.packId = id;
+    RB.pack = pk.pack;
+    RB.packIds = new Set((pk.pack.items || []).map((x) => x.id));
+    RB.pending = (pd.pending || []).filter((p) => p.kind === 'item' && p.item && p.item.format === 'essay');
+    /* 저작 중이던 초안은 버리지 않는다 — 브라우저에 남긴 것을 되살린다(불러오기를 잘못 눌러도, 세션이 끊겨도) */
+    if (!(keepDraft && samePack)) {
+      RB.draft = {};
+      try { RB.draft = JSON.parse(localStorage.getItem(rbStore()) || '{}') || {}; } catch (e) { RB.draft = {}; }
+    }
+    const dup = RB.pending.filter((p) => RB.packIds.has(p.item.id)).length;
+    $('#rbMsg').textContent = `${RB.pending.length}문항 대기` + (dup ? ` · ${dup}문항은 이미 팩에 있습니다` : '');
     $('#btnRbSave').disabled = !RB.pending.length;
     rbRender();
   } catch (e) { $('#rbMsg').textContent = e.message; }
 }
 
-async function rbPut(i, det) {
-  const p = RB.pending[i];
-  const it = p.item;
+async function rbPut(det) {
+  if (RB.busy) return;
+  const it = rbItemOf(det);
+  if (!it) { rbRender(); return; }
   const r = rbShowCheck(det, it);
-  if (!r.ok) { $('#rbMsg').textContent = '검산을 통과해야 넣을 수 있어요.'; return; }
+  if (!RB_OK[r.state]) { $('#rbMsg').textContent = '검산을 통과해야 넣을 수 있어요.'; return; }
   const item = rbItem(it);
   /* 문항을 더했으면 counts 도 다시 세야 한다 — 손으로 세지 않고 **병합기와 같은 함수**를 쓴다
      (assemble 이 counts 를 무시하고 다시 센다). 안 그러면 'counts 불일치'로 저장이 막힌다. */
   const merged = Object.assign({}, RB.pack, { items: (RB.pack.items || []).concat([item]) });
   const next = WBKOCHECK.assemble([{ name: RB.packId, json: merged }]).pack;
-  /* 팩에 넣기 전에 팩 전체를 다시 검증한다 — 한 문항 때문에 배포가 막히면 안 된다 */
+  /* 팩에 넣기 전에 팩 전체를 다시 검증한다 — 한 문항 때문에 배포가 막히면 안 된다.
+     업로드 카드와 같은 조건으로 본다(개념어 사전 포함) */
   const chk = WBKOCHECK.checkPack(next, CONCEPTS ? { concepts: CONCEPTS } : {});
   if (chk.errors.length) { $('#rbMsg').textContent = '팩 검증 실패: ' + chk.errors[0]; return; }
+  RB.busy = true;
+  det.querySelectorAll('button').forEach((b) => { b.disabled = true; });
+  $('#rbMsg').textContent = '넣는 중…';
   try {
-    await api('/naesin-ko/admin/pack', { method: 'POST', body: JSON.stringify({ id: RB.packId, pack: next }) });
+    /* 팩 추가와 대기 목록 제거를 **한 요청**으로 맡긴다 — 두 번 나눠 부르면 중간에 실패했을 때
+       문항이 양쪽에 다 있거나 양쪽에 다 없는 상태가 되고, 화면과 서버가 어긋난다(§7[3]).
+       무엇을 뺄지는 id 로 서버가 정한다 — 화면이 걸러 둔 배열을 목록 전체로 올리지 않는다. */
+    await api('/naesin-ko/admin/rubric', { method: 'POST',
+      body: JSON.stringify({ id: RB.packId, pack: next, doneItemId: it.id }) });
     RB.pack = next;
-    RB.pending.splice(i, 1);
+    RB.packIds = new Set((next.items || []).map((x) => x.id));
+    RB.pending = RB.pending.filter((p) => p.item.id !== it.id);
     delete RB.draft[rbKey(it)];
-    await api('/naesin-ko/admin/pending', { method: 'POST',
-      body: JSON.stringify({ id: RB.packId, pending: RB.pending }) });
-    /* 화면 전체를 다시 그리지 않는다 — 그리면 저작 중이던 목록과 방금 뜬 안내가 함께 사라진다.
-       팩 목록·반 성취도는 이 저장으로 바뀌지 않으므로 이 카드만 갱신하면 된다. */
-    rbRender();
-    $('#rbMsg').textContent = `팩에 넣었어요 — 남은 ${RB.pending.length}문항`;
+    rbSave();
+    $('#rbMsg').textContent = `‘${rbPlain(it.stem).slice(0, 18)}…’ 를 팩에 넣었어요 — 남은 ${RB.pending.length}문항`;
     $('#btnRbSave').disabled = !RB.pending.length;
+  } catch (e) {
+    /* 실패해도 화면과 데이터를 반드시 다시 맞춘다 — 여기서 안 그리면 카드가 옛 목록 기준으로 남는다 */
+    $('#rbMsg').textContent = e.message + ' — 저작한 값은 그대로 있습니다. 다시 불러온 뒤 저장하세요.';
+  } finally {
+    RB.busy = false;
+    rbRender();
+  }
+}
+
+/* 이미 팩에 든 문항이 대기 목록에 남은 경우의 퇴로 — 다시 넣을 수는 없다(id 중복) */
+async function rbDrop(det) {
+  if (RB.busy) return;
+  const it = rbItemOf(det);
+  if (!it) { rbRender(); return; }
+  RB.busy = true;
+  try {
+    await api('/naesin-ko/admin/rubric', { method: 'POST',
+      body: JSON.stringify({ id: RB.packId, doneItemId: it.id }) });
+    RB.pending = RB.pending.filter((p) => p.item.id !== it.id);
+    delete RB.draft[rbKey(it)];
+    rbSave();
+    $('#rbMsg').textContent = `대기 목록에서 뺐어요 — 남은 ${RB.pending.length}문항`;
   } catch (e) { $('#rbMsg').textContent = e.message; }
+  finally { RB.busy = false; rbRender(); }
 }
 
 function rbBind() {
-  $('#btnRbLoad').onclick = rbLoad;
+  $('#btnRbLoad').onclick = () => rbLoad(false);
   $('#btnRbSave').onclick = () => {
-    /* 저작한 것은 KV 에만 두지 않는다 — 작업 폴더에 남겨야 다시 만들 때 잃지 않는다 */
+    /* 저작한 것은 KV 에만 두지 않는다 — 작업 폴더에 남겨야 다시 만들 때 잃지 않는다.
+       화면에 보이는 값 그대로 담는다(입력이 곧 초안이라 따로 걷을 것이 없다) */
     const out = { packId: RB.packId, savedAt: new Date().toISOString(),
       rubrics: RB.pending.map((p) => ({ itemId: p.item.id, no: p.item.source && p.item.source.no, rubric: rbBuild(p.item) }))
         .filter((x) => x.rubric.length) };
@@ -496,40 +593,68 @@ function rbBind() {
     a.download = RB.packId + '-rubrics.json';
     a.click();
   };
+  /* 타이핑이 곧 초안이다 — 다시 그리기 전에 걷어 오는 방식은 **다른 카드에 쓰던 값을 잃는다**
+     (실측: 한 카드에서 요소를 추가하면 나란히 펼쳐 둔 카드의 입력이 통째로 초기화됐다) */
+  $('#rbList').addEventListener('input', (e) => {
+    const inp = e.target.closest('[data-f]');
+    if (!inp) return;
+    const det = inp.closest('details.rub');
+    const it = rbItemOf(det);
+    if (!it) return;
+    const d = rbDraftOf(it);
+    const k = Number(inp.getAttribute('data-k'));
+    if (d[k]) { d[k][inp.getAttribute('data-f')] = inp.value; rbSave(); }
+    /* 배지는 늘 자리를 지키는 칸에 그린다 — 없던 배지가 처음 생길 때도 보여야 한다 */
+    const sum = det.querySelector('summary [data-badge]');
+    if (sum && !RB.packIds.has(it.id)) sum.innerHTML = rbBadge(it);
+  });
+  $('#rbList').addEventListener('focusin', (e) => {
+    if (e.target.matches('[data-f="kw"]')) { const d = e.target.closest('details.rub'); if (d) d._lastKw = e.target; }
+  });
   $('#rbList').addEventListener('click', (e) => {
     const det = e.target.closest('details.rub');
     if (!det) return;
+    const it = rbItemOf(det);
+    if (!it) return;
     const tok = e.target.closest('[data-tok]');
     if (tok) {
-      /* 마지막으로 손댄 키워드 칸에 넣는다 — 없으면 첫 칸 */
+      /* 마지막으로 손댄 키워드 칸에 넣는다 — 없으면 첫 칸. 이미 있는 낱말은 다시 넣지 않는다 */
       const inputs = [...det.querySelectorAll('[data-f="kw"]')];
-      const box = inputs.filter((x) => x === document.activeElement)[0] || det._lastKw || inputs[0];
+      const box = inputs.filter((x) => x === document.activeElement)[0]
+        || (det._lastKw && det._lastKw.isConnected ? det._lastKw : null) || inputs[0];
       if (box) {
-        const v = box.value.trim();
-        box.value = v ? v + ', ' + tok.getAttribute('data-tok') : tok.getAttribute('data-tok');
+        const word = tok.getAttribute('data-tok');
+        const has = box.value.split(',').map((x) => x.trim()).filter(Boolean);
+        if (has.indexOf(word) < 0) {
+          box.value = has.concat([word]).join(', ');
+          box.dispatchEvent(new Event('input', { bubbles: true }));
+        }
         det._lastKw = box;
+        box.focus();
       }
       return;
     }
     if (e.target.closest('[data-add]')) {
-      const { it } = rbSync(det);
       rbDraftOf(it).push({ element: '', kw: '', points: '' });
-      rbRender(); document.querySelector(`details.rub[data-i="${det.getAttribute('data-i')}"]`).open = true;
+      rbSave();
+      /* 이 카드의 요소 칸만 다시 그린다 — 목록 전체를 다시 그릴 이유가 없다(다른 카드가 접힌다) */
+      det.querySelector('[data-rows]').innerHTML = rbRowsHtml(rbDraftOf(it));
       return;
     }
     const del = e.target.closest('[data-del]');
     if (del) {
-      const { it } = rbSync(det);
       const d = rbDraftOf(it);
-      if (d.length > 1) d.splice(Number(del.getAttribute('data-del')), 1);
-      rbRender(); document.querySelector(`details.rub[data-i="${det.getAttribute('data-i')}"]`).open = true;
+      const k = Number(del.getAttribute('data-del'));
+      /* 한 줄만 남았으면 지우는 대신 비운다 — 아무 반응 없는 × 는 고장으로 읽힌다 */
+      if (d.length > 1) d.splice(k, 1); else d[0] = { element: '', kw: '', points: '' };
+      rbSave();
+      det.querySelector('[data-rows]').innerHTML = rbRowsHtml(rbDraftOf(it));
+      det._lastKw = null;
       return;
     }
-    if (e.target.closest('[data-check]')) { const { it } = rbSync(det); rbShowCheck(det, it); return; }
-    if (e.target.closest('[data-put]')) { const { i, it } = rbSync(det); rbPut(i, det); return; }
-  });
-  $('#rbList').addEventListener('focusin', (e) => {
-    if (e.target.matches('[data-f="kw"]')) { const d = e.target.closest('details.rub'); if (d) d._lastKw = e.target; }
+    if (e.target.closest('[data-check]')) { $('#rbMsg').textContent = ''; rbShowCheck(det, it); return; }
+    if (e.target.closest('[data-put]')) { rbPut(det); return; }
+    if (e.target.closest('[data-drop]')) { rbDrop(det); return; }
   });
 }
 

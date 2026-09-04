@@ -251,6 +251,80 @@ await t('검수 목록은 관리자만, 배열만, 1MB까지', async () => {
   assert.strictEqual(empty.body.updatedAt, null);
 });
 
+await t('루브릭 반영은 팩 추가와 대기 제거를 한 요청으로 한다 — 서술형 아닌 검수 레코드는 그대로 둔다', async () => {
+  const s = memStore();
+  const item = { id: 'it-essay-1', format: 'essay', stem: '쓰시오.', rubric: [{ element: 'ㄱ', keywords: ['ㄴ'] }] };
+  const withItem = Object.assign({}, PACK, { items: [item] });
+  await call(s, { path: '/api/naesin-ko/admin/pack', method: 'POST', who: ADMIN,
+    getBody: async () => ({ id: PACK.packId, pack: PACK }) });
+  await call(s, { path: '/api/naesin-ko/admin/pending', method: 'POST', who: ADMIN,
+    getBody: async () => ({ id: PACK.packId, pending: [
+      { kind: 'item', item: { id: 'it-essay-1' } },
+      { kind: 'item', item: { id: 'it-essay-2' } },
+      { kind: 'set', why: '좌우 대조 미달' },
+    ] }) });
+  const r = await call(s, { path: '/api/naesin-ko/admin/rubric', method: 'POST', who: ADMIN,
+    getBody: async () => ({ id: PACK.packId, pack: withItem, doneItemId: 'it-essay-1' }) });
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(r.body.removed, 1);
+  const left = (await s.getPending(PACK.packId)).pending;
+  assert.deepStrictEqual(left.map((x) => (x.item && x.item.id) || x.kind), ['it-essay-2', 'set']);
+  assert.strictEqual((await s.getPack(PACK.packId)).pack.items.length, 1);
+});
+
+await t('팩에 없는 문항은 대기 목록에서 빼지 않는다 — 양쪽 어디에도 없는 상태를 만들지 않는다', async () => {
+  const s = memStore();
+  await call(s, { path: '/api/naesin-ko/admin/pack', method: 'POST', who: ADMIN,
+    getBody: async () => ({ id: PACK.packId, pack: PACK }) });
+  await call(s, { path: '/api/naesin-ko/admin/pending', method: 'POST', who: ADMIN,
+    getBody: async () => ({ id: PACK.packId, pending: [{ kind: 'item', item: { id: 'it-ghost' } }] }) });
+  const r = await call(s, { path: '/api/naesin-ko/admin/rubric', method: 'POST', who: ADMIN,
+    getBody: async () => ({ id: PACK.packId, pack: PACK, doneItemId: 'it-ghost' }) });
+  assert.strictEqual(r.status, 400);
+  assert.strictEqual((await s.getPending(PACK.packId)).pending.length, 1);
+});
+
+await t('불러온 뒤 팩이 바뀌었으면 409 — 같이 저작해도 앞 사람 것을 덮지 않는다', async () => {
+  const s = memStore();
+  const A = { id: 'it-a', format: 'essay', rubric: [{ element: 'ㄱ', keywords: ['ㄴ'] }] };
+  const B = { id: 'it-b', format: 'essay', rubric: [{ element: 'ㄷ', keywords: ['ㄹ'] }] };
+  await call(s, { path: '/api/naesin-ko/admin/pack', method: 'POST', who: ADMIN,
+    getBody: async () => ({ id: PACK.packId, pack: PACK }) });
+  /* 두 사람이 같은 팩(문항 0개)을 불러온 뒤 각자 자기 문항만 더해서 보낸다 */
+  const first = await call(s, { path: '/api/naesin-ko/admin/rubric', method: 'POST', who: ADMIN,
+    getBody: async () => ({ id: PACK.packId, pack: Object.assign({}, PACK, { items: [A] }), doneItemId: 'it-a' }) });
+  assert.strictEqual(first.status, 200);
+  const second = await call(s, { path: '/api/naesin-ko/admin/rubric', method: 'POST', who: ADMIN,
+    getBody: async () => ({ id: PACK.packId, pack: Object.assign({}, PACK, { items: [B] }), doneItemId: 'it-b' }) });
+  assert.strictEqual(second.status, 409);
+  assert.deepStrictEqual(second.body.lost, ['items:it-a']);
+  /* 앞 사람 문항이 살아 있다 — 덮어썼다면 여기서 it-b 만 남는다 */
+  assert.deepStrictEqual((await s.getPack(PACK.packId)).pack.items.map((x) => x.id), ['it-a']);
+});
+
+await t('이미 팩에 든 문항은 pack 없이 대기 목록에서만 뺄 수 있다 — 막힌 카드의 퇴로', async () => {
+  const s = memStore();
+  const item = { id: 'it-dup', format: 'essay', rubric: [{ element: 'ㄱ', keywords: ['ㄴ'] }] };
+  await call(s, { path: '/api/naesin-ko/admin/pack', method: 'POST', who: ADMIN,
+    getBody: async () => ({ id: PACK.packId, pack: Object.assign({}, PACK, { items: [item] }) }) });
+  await call(s, { path: '/api/naesin-ko/admin/pending', method: 'POST', who: ADMIN,
+    getBody: async () => ({ id: PACK.packId, pending: [{ kind: 'item', item: { id: 'it-dup' } }] }) });
+  const r = await call(s, { path: '/api/naesin-ko/admin/rubric', method: 'POST', who: ADMIN,
+    getBody: async () => ({ id: PACK.packId, doneItemId: 'it-dup' }) });
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual((await s.getPending(PACK.packId)).pending.length, 0);
+});
+
+await t('루브릭 반영도 관리자만', async () => {
+  const s = memStore();
+  const r = await call(s, { path: '/api/naesin-ko/admin/rubric', method: 'POST',
+    getBody: async () => ({ id: PACK.packId, doneItemId: 'it-a' }) });
+  assert.strictEqual(r.status, 403);
+  const anon = await call(s, { path: '/api/naesin-ko/admin/rubric', method: 'POST', who: null,
+    getBody: async () => ({ id: PACK.packId, doneItemId: 'it-a' }) });
+  assert.strictEqual(anon.status, 401);
+});
+
 await t('몸통이 JSON이 아니면 저장 전에 400', async () => {
   const s = memStore();
   const r = await call(s, { path: '/api/naesin-ko/state', method: 'PUT',
