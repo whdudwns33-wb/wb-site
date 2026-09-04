@@ -17,7 +17,7 @@ const d2 = new Date(2026, 8, 3, 9, 0, 0).getTime();    // 9/3
 const d3 = new Date(2026, 8, 4, 9, 0, 0).getTime();    // 9/4
 const d4 = new Date(2026, 8, 5, 9, 0, 0).getTime();    // 9/5
 const at = (m, d, h, mi) => new Date(2026, m - 1, d, h == null ? 9 : h, mi || 0).getTime();
-const ok = { correct: true, confidence: 'sure' };
+const ok = { correct: true };
 
 /* n개짜리 합성 팩 — planDay 분배 검증용 (픽스처 팩은 8단어뿐이라 부족) */
 function mkPack(n) {
@@ -29,10 +29,12 @@ function reachedState(id, now) {
   const s = E.createState(id, 'word', now);
   return E.recordCriterion(s, ok, now);
 }
-/* 청크 트랙(뜻 세우기)을 통과시켜 둔다 — 재설계 §3.4에서 그 단락 문장 사다리는 청크 트랙이
-   reached 여야 1단계도 열린다. 문장 사다리만 보는 검증들은 이 준비를 깔고 예전 기대를 지킨다. */
+/* 본문 앞의 두 관문을 통과시켜 둔다 — 그 단락 단어(§4.4 v1.3)와 청크 트랙(§3.4).
+   문장 사다리만 보는 검증들은 이 준비를 깔고 예전 기대를 지킨다. */
 function passChunks(states, p, now) {
-  E.dayGroups(p || pack).forEach((g) => {
+  const pk = p || pack;
+  E.dayGroups(pk).forEach((g) => {
+    E.wordsOfDay(pk, g.day).forEach((id) => { states[id] = reachedState(id, now); });
     const s = E.createState(E.chunkId(g.day), 'chunk', now);
     s.stage = 3;
     E.advanceStage(s, true, now, { fromStage: 3 });
@@ -110,42 +112,45 @@ t('정답+확실 — 압축 간격표 1→2→3→5→7일, 상한 유지', () =
   assert.strictEqual(s.due, now + 7 * DAY);
 });
 
-t('정답+찍음 — 간격 동결(step 유지), 하루 뒤 재출제 (§14-1)', () => {
-  const s = E.createState('w', 'word', d1);
-  s.step = 3;
-  E.recordQuiz(s, { correct: true, confidence: 'guess' }, d1);
-  assert.strictEqual(s.step, 3);
-  assert.strictEqual(s.due, d1 + DAY);
-});
-
 t('정답이어도 힌트를 봤으면 간격을 안 올린다', () => {
   const s = E.createState('w', 'word', d1);
   s.step = 2;
-  E.recordQuiz(s, { correct: true, confidence: 'sure', hinted: true }, d1);
+  E.recordQuiz(s, { correct: true, hinted: true }, d1);
   assert.strictEqual(s.step, 2);
   assert.strictEqual(s.due, d1 + DAY);
 });
 
-t('오답+확실 = 과신 오류 — overconfident+1, 2계단 후퇴, 10분 뒤 (§14-1)', () => {
+/* v1.3 — 과신을 학생에게 묻지 않고 기록으로 판정한다: 이미 도달한 단어를 틀리면 그것이 과신이다 */
+t('오답 + 이미 도달한 단어 = 과신 오류 — overconfident+1, 2계단 후퇴, 10분 뒤 (§14-1)', () => {
   const s = E.createState('w', 'word', d1);
+  E.recordCriterion(s, ok, d1);                    // 완전 인출 성공 → 도달
   s.step = 3;
-  E.recordQuiz(s, { correct: false, confidence: 'sure' }, d1);
+  E.recordQuiz(s, { correct: false }, d1);
   assert.strictEqual(s.overconfident, 1);
   assert.strictEqual(s.step, 1);
   assert.strictEqual(s.due, d1 + MIN10);
   assert.strictEqual(s.wrong, 1);
   s.step = 1;
-  E.recordQuiz(s, { correct: false, confidence: 'sure' }, d1);
+  E.recordQuiz(s, { correct: false }, d1);
   assert.strictEqual(s.step, 0, '최소 0에서 멈춘다');
 });
 
-t('오답+애매/찍음 — 1계단 후퇴, 과신 카운트 없음', () => {
+t('오답 + 아직 도달 전 = 1계단 후퇴, 과신 카운트 없음 (배우는 중이다)', () => {
   const s = E.createState('w', 'word', d1);
   s.step = 3;
-  E.recordQuiz(s, { correct: false, confidence: 'unsure' }, d1);
+  E.recordQuiz(s, { correct: false }, d1);
   assert.strictEqual(s.step, 2);
   assert.strictEqual(s.overconfident, 0);
   assert.strictEqual(s.due, d1 + MIN10);
+});
+
+t('자기 평가 값을 넘겨도 무시한다 — 옛 호출 하위 호환 (v1.3)', () => {
+  const a = E.createState('a', 'word', d1); a.step = 3;
+  const b = E.createState('b', 'word', d1); b.step = 3;
+  E.recordQuiz(a, { correct: false }, d1);
+  E.recordQuiz(b, { correct: false }, d1);
+  assert.deepStrictEqual([b.step, b.overconfident], [a.step, a.overconfident],
+    'confidence 가 결과를 바꾸지 않는다');
 });
 
 /* ── 기준 도달과 안정화 (§14-1) ── */
@@ -202,27 +207,28 @@ t('stability 0~3 게이지 · isStable — 도달 전엔 0', () => {
   assert.ok(!E.isStable(E.createState('x', 'word', d1)));
 });
 
-t('완전 인출 실패 — streak 리셋·wrong+1·10분 뒤, 확실이면 과신 집계', () => {
+t('완전 인출 실패 — streak 리셋·wrong+1·10분 뒤, 도달 전이면 과신이 아니다', () => {
   const s = E.createState('w', 'word', d1);
   s.streak = 4; s.step = 3;
-  E.recordCriterion(s, { correct: false, confidence: 'sure' }, d1);
+  E.recordCriterion(s, { correct: false }, d1);
   assert.strictEqual(s.streak, 0);
   assert.strictEqual(s.wrong, 1);
   assert.strictEqual(s.due, d1 + MIN10);
-  assert.strictEqual(s.overconfident, 1);
+  assert.strictEqual(s.overconfident, 0, '아직 한 번도 외운 적 없는 단어를 틀린 것은 배우는 중이다');
   assert.strictEqual(s.reached, false, '실패는 도달이 아니다');
 });
 
-t('E3 안정화 완료 후 오답 — 회전이 깎이고(애매 -1·확실 -2) 다시 편성된다', () => {
+t('E3 안정화 완료 후 오답 — 도달한 단어의 오답은 2회전 후퇴, 다시 편성된다', () => {
   const s = E.createState('w1', 'word', at(9, 1));
   [1, 2, 3, 4].forEach((d) => E.recordCriterion(s, ok, at(9, d)));
   assert.ok(E.isStable(s));
-  E.recordCriterion(s, { correct: false, confidence: 'unsure' }, at(9, 24));
-  assert.strictEqual(s.relearnCount, 2, '애매 오답은 1회전 후퇴');
+  assert.strictEqual(s.relearnCount, 3);
+  E.recordCriterion(s, { correct: false }, at(9, 24));
+  assert.strictEqual(s.relearnCount, 1, '도달한 단어를 틀렸으니 2회전 후퇴');
   assert.strictEqual(s.lastCriterionDate, null, '날짜를 지워 오늘 다시 성공하면 회복으로 센다');
   assert.strictEqual(s.reached, true, '도달 자체는 유지');
-  E.recordQuiz(s, { correct: false, confidence: 'sure' }, at(9, 24, 10));
-  assert.strictEqual(s.relearnCount, 0, '과신 오답은 2회전 후퇴 (판정 퀴즈도 같은 규칙)');
+  E.recordQuiz(s, { correct: false }, at(9, 24, 10));
+  assert.strictEqual(s.relearnCount, 0, '판정 퀴즈도 같은 규칙 — 0 아래로는 안 내려간다');
   assert.ok(!E.isStable(s));
   const EX = { examDate: '2026-09-30', wordDeadlineDays: 7 };
   const p = { words: [{ id: 'w1' }], sentences: [] };
@@ -231,32 +237,32 @@ t('E3 안정화 완료 후 오답 — 회전이 깎이고(애매 -1·확실 -2) 
   E.recordCriterion(s, ok, at(9, 24, 11));
   assert.strictEqual(s.relearnCount, 1, '실패 직후 재성공은 회복 1회전');
   const z = E.createState('z', 'word', d1);
-  E.recordQuiz(z, { correct: false, confidence: 'unsure' }, d1);
+  E.recordQuiz(z, { correct: false }, d1);
   assert.strictEqual(z.relearnCount, 0, '0 아래로 내려가지 않는다');
 });
 
-t('E17 완전 인출 "찍음" — 최초 도달만 허용(철자 재검증), 회전·날짜는 갱신하지 않는다', () => {
+/* v1.3 — '찍음' 자기 신고가 사라졌다. 완전 인출(철자를 통째로 쓰는 자리)은 찍어서 맞힐 여지가
+   거의 없으므로 성공을 그대로 인출 증거로 읽는다. 철자 재검증이 붙는 유일한 길은 진단(4지선다)이다. */
+t('E17 완전 인출 성공은 자기 신고 없이 회전으로 센다 — 재검증은 진단에서만 붙는다', () => {
   const s = E.createState('w', 'word', at(9, 1));
-  E.recordCriterion(s, { correct: true, confidence: 'guess' }, at(9, 1));
+  E.recordCriterion(s, ok, at(9, 1));
   assert.strictEqual(s.reached, true);
-  assert.strictEqual(s.needsSpellCheck, true, '찍어서 맞은 도달은 재검증 대상');
-  assert.strictEqual(s.lastCriterionDate, null);
-  assert.strictEqual(s.relearnCount, 0);
-  assert.strictEqual(s.due, at(9, 1) + DAY, '간격 동결');
-  E.recordCriterion(s, { correct: true, confidence: 'guess' }, at(9, 2));
-  assert.strictEqual(s.relearnCount, 0, '다른 날이어도 찍음은 회전이 아니다');
-  E.recordCriterion(s, ok, at(9, 3));
-  assert.strictEqual(s.needsSpellCheck, false);
-  assert.strictEqual(s.relearnCount, 1, '진짜 인출부터 센다');
+  assert.strictEqual(s.needsSpellCheck, false, '철자 인출로 온 도달은 재검증 대상이 아니다');
+  assert.strictEqual(s.lastCriterionDate, E.localDate(at(9, 1)));
+  E.recordCriterion(s, ok, at(9, 2));
+  assert.strictEqual(s.relearnCount, 1, '다른 날 재성공이 1회전');
+  const d = E.createState('d', 'word', at(9, 1));
+  E.applyDiagnostic({ d: d }, [{ id: 'd', known: true }], at(9, 1));
+  assert.deepStrictEqual([d.reached, d.needsSpellCheck], [true, true], '진단 도달만 재검증을 단다');
 });
 
 t('E8 힌트 본 철자는 완전 인출이 아니다 — recordCriterion(hinted) 는 판정 퀴즈로 처리', () => {
   const s = E.createState('w', 'word', d1);
-  E.recordCriterion(s, { correct: true, confidence: 'sure', hinted: true }, d1);
+  E.recordCriterion(s, { correct: true, hinted: true }, d1);
   assert.strictEqual(s.reached, false, '도달 아님');
   assert.strictEqual(s.due, d1 + DAY, '힌트 정답은 간격 동결');
   assert.strictEqual(s.last, d1);
-  E.recordCriterion(s, { correct: true, confidence: 'sure', hinted: false }, d2);
+  E.recordCriterion(s, { correct: true, hinted: false }, d2);
   assert.strictEqual(s.reached, true);
 });
 
@@ -307,12 +313,13 @@ t('wordSummary — 도달(재검증 끝난 것만)·안정·위험·철자재검
 
 t('E20 위험 표시는 안정화가 끝나면 해제된다 — 과신 1회가 영구 낙인이 아니다', () => {
   const s = E.createState('w', 'word', at(9, 1));
-  E.recordCriterion(s, { correct: false, confidence: 'sure' }, at(9, 1));
+  E.recordCriterion(s, ok, at(9, 1));                  // 한 번 외웠다(도달)
+  E.recordCriterion(s, { correct: false }, at(9, 1));  // 그런데 틀렸다 = 과신(v1.3 기록 판정)
   assert.strictEqual(E.wordSummary({ w: s }).risky, 1);
   [1, 2, 3, 4].forEach((d) => E.recordCriterion(s, ok, at(9, d)));
   assert.ok(E.isStable(s));
   assert.strictEqual(E.wordSummary({ w: s }).risky, 0, '안정화 완료 → 위험 해제');
-  E.recordCriterion(s, { correct: false, confidence: 'sure' }, at(9, 10));
+  E.recordCriterion(s, { correct: false }, at(9, 10));
   assert.strictEqual(E.wordSummary({ w: s }).risky, 1, '다시 틀려 안정화가 깨지면 위험 복귀');
 });
 
@@ -510,7 +517,7 @@ t('E4 철자 재검증 대기 단어는 D-day 와 무관하게 매일 안정화 
   assert.strictEqual(again.words.relearn.length, 7);
   assert.strictEqual(E.planDay(pack, states, EX, at(9, 10, 12), { maxRelearn: 3 }).words.relearn.length, 3, '상한 안에서');
   /* 재검증 실패 뒤엔 여전히 대기 — 오늘 다시 나온다 */
-  E.recordCriterion(states['w-002'], { correct: false, confidence: 'unsure' }, at(9, 10, 12));
+  E.recordCriterion(states['w-002'], { correct: false }, at(9, 10, 12));
   assert.ok(E.planDay(pack, states, EX, at(9, 10, 13)).words.relearn.indexOf('w-002') >= 0);
 });
 
@@ -540,7 +547,7 @@ t('E2 77단어 완주 — D-14 시작·매일 출석·전답이면 D-1 에 77/77
     plan.words.fresh.forEach((id) => {
       states[id] = E.createState(id, 'word', now);
       E.recordQuiz(states[id], ok, now);
-      E.recordCriterion(states[id], { correct: true, confidence: 'sure', hinted: true }, now);
+      E.recordCriterion(states[id], { correct: true, hinted: true }, now);
     });
     plan.words.review.forEach((id) => {
       if (!states[id].reached) E.recordCriterion(states[id], ok, now); else E.recordQuiz(states[id], ok, now);
@@ -560,7 +567,7 @@ t('E1 신규일 철자 실패 단어 — 복습 레인으로 계속 나오고 �
   const p = { words: [{ id: 'w1' }], sentences: [] };
   const s = E.createState('w1', 'word', at(9, 10));
   E.recordQuiz(s, ok, at(9, 10));
-  E.recordCriterion(s, { correct: false, confidence: 'unsure' }, at(9, 10));   // 철자 실패
+  E.recordCriterion(s, { correct: false }, at(9, 10));   // 철자 실패
   const p1 = E.planDay(p, { w1: s }, EX, at(9, 11));
   assert.deepStrictEqual(p1.words, { fresh: [], review: ['w1'], relearn: [] }, '손댄 미도달 단어는 복습');
   E.recordCriterion(s, ok, at(9, 11));   // gen 이 무힌트 철자를 내고 맞힘 → 도달
@@ -587,7 +594,7 @@ t('planDay — due 지난 학습 중 단어는 review, 급한 순', () => {
     w3: E.createState('w3', 'word', d1)
   };
   E.recordQuiz(states.w1, ok, d1);  // due 9/3
-  E.recordQuiz(states.w2, { correct: false, confidence: 'unsure' }, d1); // due +10분
+  E.recordQuiz(states.w2, { correct: false }, d1); // due +10분
   E.recordQuiz(states.w3, ok, d3);  // due 9/5 — 아직
   const plan = E.planDay(p, states, EXAM, d3);         // 9/4
   assert.deepStrictEqual(plan.words.review, ['w2', 'w1'], '만기 오래된 순');
@@ -649,7 +656,10 @@ t('E20 백지 통과 문장 — 안정화 전이고 만기면 6단계 재도전�
 });
 
 t('planDay — 게이트 잠김이면 5·6단계 문장 보류, 병행 모드면 도전 (§4.4)', () => {
-  const states = passChunks({ 'w-001': E.createState('w-001', 'word', d1) }, pack, d1);  // 단어 미도달
+  /* 전역 단어 게이트만 잠근다 — 미도달 단어는 검사 대상(1번 문장)이 아닌 다른 단락(8/2)에서 고른다.
+     같은 단락 단어를 미도달로 두면 단락 단어 게이트(§4.4 v1.3)에 걸려 1번 문장이 아예 안 나온다. */
+  const states = passChunks({}, pack, d1);
+  states['w-002'] = E.createState('w-002', 'word', d1);   // 8/2 단락 단어 — 미도달
   states[E.sentenceId(1)] = E.createState(E.sentenceId(1), 'sentence', d1);
   states[E.sentenceId(1)].stage = 5;
   const locked = E.planDay(pack, states, EXAM, d1);
@@ -669,7 +679,8 @@ t('E19 planDay — 옛 상태의 비정수·범위 밖 단계(4.5·9·x)는 1~6 
   const by = {}; plan.sentences.forEach((x) => { by[x.seq] = x.stage; });
   assert.deepStrictEqual([by[2], by[3], by[4]], [4, 6, 1]);
   /* 4.5 는 5 미만 — 게이트 잠김에도 보류되지 않는다 */
-  const lockedStates = passChunks({ 'w-001': E.createState('w-001', 'word', d1) }, pack, d1);
+  const lockedStates = passChunks({}, pack, d1);
+  lockedStates['w-002'] = E.createState('w-002', 'word', d1);   // 다른 단락 단어 미도달 → 전역 게이트만 잠긴다
   lockedStates[s2.id] = s2; lockedStates[s3.id] = s3;
   const locked = E.planDay(pack, lockedStates, EXAM, d1);
   assert.ok(locked.sentences.some((x) => x.seq === 2 && x.stage === 4));
@@ -756,7 +767,7 @@ t('planRange — 복습·문장 상한은 범위 전체에 한 번(과별 planDa
     const pk = mkRangePack(id, lesson, prefix, n), states = {};
     pk.words.forEach((w) => {
       states[w.id] = E.createState(w.id, 'word', t0);
-      E.recordQuiz(states[w.id], { correct: false, confidence: 'unsure' }, t0);   // 학습 중 + 만기
+      E.recordQuiz(states[w.id], { correct: false }, t0);   // 학습 중 + 만기
     });
     return { packId: id, pack: pk, states };
   }
@@ -799,14 +810,18 @@ t('planRange — 문장은 팩 순서 → seq 순, 상한도 범위 전체에 �
 
 t('planRange — 5·6단계 보류는 그 과의 단어 게이트로 판단(실전 모의만 범위 전체·§4.4)', () => {
   const A = seedEntry('L6', 6), B = seedEntry('L7', 7);
-  [A, B].forEach((e) => passChunks(e.states, e.pack, d1));
-  A.pack.words.forEach((w) => E.recordCriterion(A.states[w.id], ok, d1));   // L6만 단어 완성
+  [A, B].forEach((e) => passChunks(e.states, e.pack, d1));                 // 단락 관문은 양쪽 다 통과
+  /* L7만 전역 단어 게이트를 잠근다 — 1번 문장이 든 단락(8/1)이 아닌 다른 단락 단어를 되돌린다.
+     같은 단락 단어를 되돌리면 단락 단어 게이트에 걸려 1번 문장이 아예 안 나온다(§4.4 v1.3). */
+  B.states['w-002'] = E.createState('w-002', 'word', d1);
   A.states[E.sentenceId(1)].stage = 5;
   B.states[E.sentenceId(1)].stage = 5;
   const r = E.planRange([A, B], EXAM, d2, { maxSentences: 20 });
   assert.ok(r.sentences.some((x) => x.packId === 'L6' && x.seq === 1), 'L6는 단어 완성 → 5단계 도전');
   assert.ok(!r.sentences.some((x) => x.packId === 'L7' && x.seq === 1), 'L7은 잠김 → 5단계 보류');
-  assert.strictEqual(r.perPack.L7.sentences.length, 4);
+  /* L7에 남는 것은 8/1 단락의 2·3번뿐이다 — 1번은 전역 게이트로 보류, 4·5번(8/2)은 그 단락
+     단어(w-002)가 미도달이라 단락 단어 게이트에 걸린다. 두 게이트가 각자 제 자리에서 작동한다. */
+  assert.deepStrictEqual(r.perPack.L7.sentences.map((x) => x.seq), [2, 3]);
   assert.ok(r.note.indexOf('게이트 잠김') >= 0, r.note);
   /* 범위 전체 게이트(실전 모의)는 아직 닫혀 있다 — L7이 남았다 */
   assert.strictEqual(E.gateRange([A, B], EXAM, d2).open, false);
@@ -860,7 +875,16 @@ t('planRange — 빈 과도 perPack 키를 갖고, 잘못된 엔트리·중복 p
   const r = E.planRange([A, B, null, A], EXAM, d1);
   assert.deepStrictEqual(Object.keys(r.perPack), ['L6', 'L7'], '범위 순서 유지');
   assert.deepStrictEqual(r.perPack.L7, { words: { fresh: [], review: [], relearn: [] }, sentences: [] });
-  assert.strictEqual(r.words.fresh.length, 3, '중복 엔트리를 두 번 세지 않는다(미도달 8 ÷ 3일 = 3, 중복이면 6)');
+  /* 앞의 두 단락(8/1·8/2)을 막고 있는 8단어가 신규 바닥이다(§4.4 v1.3 — 고른 분배 3개보다 우선).
+     중복 엔트리를 두 번 셌다면 같은 단어가 두 벌 들어와 16개가 된다. */
+  assert.strictEqual(r.words.fresh.length, 8, '중복 엔트리를 두 번 세지 않는다(중복이면 16)');
+  assert.strictEqual(new Set(r.words.fresh.map((x) => x.id)).size, 8, '같은 단어가 두 번 나오지 않는다');
+  /* 순서는 단락 순 → 난이도 → 교재 순. 픽스처 팩의 난이도로 읽으면:
+       8/1 단락 = slow(기초)·above(기초) → castle(보통)·wave(보통) → seagull(심화)
+       8/2 단락 = keep(기초) → salty(보통) → tide(심화)
+     단락을 넘어가지 않는다 — 8/2의 기초 단어가 8/1의 심화 단어보다 앞서지 않는다. */
+  assert.deepStrictEqual(r.words.fresh.map((x) => x.id),
+    ['w-006', 'w-008', 'w-003', 'w-005', 'w-001', 'w-007', 'w-004', 'w-002']);
   const empty = E.planRange([], EXAM, d1);
   assert.deepStrictEqual(empty.words, { fresh: [], review: [], relearn: [] });
   assert.deepStrictEqual([empty.sentences, empty.perPack, empty.mode], [[], {}, 'exam']);
@@ -893,7 +917,7 @@ t('E-R 2과 범위 완주 — D-14 시작·매일 출석·전답이면 두 과�
          review = 미도달이면 무힌트 철자, 도달이면 재인 / relearn = 무힌트 철자 */
       pp.words.fresh.forEach((id) => {
         E.recordQuiz(e.states[id], ok, now);
-        E.recordCriterion(e.states[id], { correct: true, confidence: 'sure', hinted: true }, now);
+        E.recordCriterion(e.states[id], { correct: true, hinted: true }, now);
       });
       pp.words.review.forEach((id) => {
         if (!e.states[id].reached) E.recordCriterion(e.states[id], ok, now); else E.recordQuiz(e.states[id], ok, now);
@@ -943,7 +967,7 @@ t('E-R 2과 77단어 범위(154) — 자동 산정 상한이 마감을 지킨다
       const pp = plan.perPack[e.packId];
       pp.words.fresh.forEach((id) => {
         E.recordQuiz(e.states[id], ok, now);
-        E.recordCriterion(e.states[id], { correct: true, confidence: 'sure', hinted: true }, now);
+        E.recordCriterion(e.states[id], { correct: true, hinted: true }, now);
       });
       pp.words.review.forEach((id) => {
         if (!e.states[id].reached) E.recordCriterion(e.states[id], ok, now); else E.recordQuiz(e.states[id], ok, now);
@@ -1082,7 +1106,12 @@ t('sentenceSummary — 단계 분포·해석 통과(stage≥2)·암송 완료, �
    단위가 청크 → 줄 → 단락으로 올라간다. */
 
 t('chunkGate — 청크 트랙을 통과해야 그 단락 문장 사다리가 1단계도 열린다 (§3.4)', () => {
+  /* 단락 단어(§4.4 v1.3)는 미리 끝내 둔다 — 여기서 보는 것은 청크 게이트 하나다.
+     단어를 안 끝내면 단락 단어 게이트에 먼저 걸려 청크 게이트가 검증되지 않는다. */
   const states = {};
+  E.dayGroups(pack).forEach((g) => {
+    E.wordsOfDay(pack, g.day).forEach((id) => { states[id] = reachedState(id, d1); });
+  });
   const g0 = E.chunkGate(pack, states, '8/1');
   assert.deepStrictEqual([g0.open, g0.reason, g0.stage, g0.total], [false, 'chunk-gate', 1, 3]);
   const plan = E.planDay(pack, states, null, d1, { maxSentences: 10 });
@@ -1105,11 +1134,14 @@ t('chunkGate — 청크 트랙을 통과해야 그 단락 문장 사다리가 1�
   assert.deepStrictEqual(p2.sentences.map((x) => x.kind + (x.seq || '')),
     ['chunk', 'sentence1', 'sentence2', 'sentence3'], '열린 단락 문장만 사다리에 오른다');
 
-  /* 청크 재료가 없는 팩(옛 팩)은 잠그지 않는다 — 열 방법이 없는 자물쇠는 본문 탭을 통째로 잠근다 */
+  /* 청크 재료가 없는 팩(옛 팩)은 잠그지 않는다 — 열 방법이 없는 자물쇠는 본문 탭을 통째로 잠근다.
+     단어는 여기서도 끝내 둔다(§4.4 v1.3) — 보려는 것은 청크 자물쇠가 없다는 것 하나다. */
   const noCk = JSON.parse(JSON.stringify(pack));
   noCk.sentences.forEach((s) => { s.chunks = []; });
   assert.strictEqual(E.chunkGate(noCk, {}, '8/1').reason, 'no-chunk');
-  assert.deepStrictEqual(E.planDay(noCk, {}, null, d1, { maxSentences: 10 }).sentences.map((x) => x.seq),
+  const wDone = {};
+  noCk.words.forEach((w) => { wDone[w.id] = reachedState(w.id, d1); });
+  assert.deepStrictEqual(E.planDay(noCk, wDone, null, d1, { maxSentences: 10 }).sentences.map((x) => x.seq),
     [1, 2, 3, 4, 5]);
 });
 
@@ -1201,6 +1233,12 @@ t('못 읽는 학생 경로 — 영어를 한 글자도 쓰지 않고 청크 트
   for (let d = 0; d < 8; d++) {
     const now = d1 + d * DAY;
     const plan = E.planDay(pack, states, null, now, { maxSentences: 10, rec: rec });
+    /* 단어 화면(4지선다)은 한글만 고르면 되므로 이 학생도 통과한다 — 그리고 이걸 해야
+       그 단락 단어 게이트(§4.4 v1.3)가 열려 본문에 들어간다. 철자(영어 쓰기)는 손대지 않는다. */
+    plan.words.fresh.concat(plan.words.review).forEach((id) => {
+      if (!states[id]) states[id] = E.createState(id, 'word', now);
+      E.recordQuiz(states[id], { correct: true }, now);
+    });
     plan.sentences.forEach((x) => {
       if (x.kind === 'chunk') {
         if (!states[E.chunkId(x.day)]) states[E.chunkId(x.day)] = E.createState(E.chunkId(x.day), 'chunk', now);
@@ -1247,7 +1285,13 @@ t('passageSummary — 청크·단락 백지·누적·종합 (§3.6)', () => {
 });
 
 t('planDay — 본문 후보는 청크 → 문장 → 단락 관문 → 누적 → 종합 순서다 (§4.E.6)', () => {
+  /* 보려는 것은 다섯 종류의 순서다 — 단락 단어(§4.4 v1.3)는 미리 열어 둔다 */
   const states = {};
+  E.dayGroups(pack).forEach((g) => {
+    E.wordsOfDay(pack, g.day).forEach((id) => {
+      states[id] = E.recordQuiz(E.createState(id, 'word', d1), { correct: true }, d1);
+    });
+  });
   const ck = E.createState(E.chunkId('8/2'), 'chunk', d1);
   ck.stage = 3; E.advanceStage(ck, true, d1, { fromStage: 3 }); states[ck.id] = ck;
   [4, 5].forEach((seq) => {
@@ -1408,7 +1452,7 @@ t('E-P 25문장·5단락 완주 — D-14 시작이면 누적 백지·종합 Chec
     const budget = plan.sentences.length;                 // 오늘 본문 몫 = 하루 시작 상한
     plan.words.fresh.forEach((id) => {
       E.recordQuiz(e.states[id], ok, now);
-      E.recordCriterion(e.states[id], { correct: true, confidence: 'sure', hinted: true }, now);
+      E.recordCriterion(e.states[id], { correct: true, hinted: true }, now);
     });
     plan.words.review.forEach((id) => {
       if (!e.states[id].reached) E.recordCriterion(e.states[id], ok, now); else E.recordQuiz(e.states[id], ok, now);
@@ -1443,9 +1487,85 @@ t('픽스처 팩 — 단어 8·문장 5, 진단→플랜 한 사이클', () => {
   pack.words.forEach((w) => { states[w.id] = E.createState(w.id, 'word', d1); });
   E.applyDiagnostic(states, pack.words.slice(0, 3).map((w) => ({ id: w.id, known: true })), d1);
   const plan = E.planDay(pack, states, EXAM, d1);
-  assert.strictEqual(plan.words.fresh.length, 2, '미도달 5개 ÷ 잔여 4일 = 올림 2');
+  /* 고른 분배로는 5개 ÷ 잔여 4일 = 2개지만, 남은 5개가 두 단락을 다 막고 있어 바닥이 5다
+     (§4.4 v1.3 — 단어가 본문보다 한 걸음 앞서 간다). 상한 10 안이라 그대로 나온다. */
+  assert.strictEqual(plan.words.fresh.length, 5, '두 단락을 막는 5개가 신규 바닥');
   assert.strictEqual(plan.words.relearn.length, 3, '진단 통과 3개는 D-10 이어도 철자 재검증 편성');
   assert.strictEqual(E.wordSummary(states).needsSpellCheck, 3, '진단 통과 3개는 철자 재검증 대기');
+});
+
+/* ── 본문 단어 · 난이도 (§4.4 v1.3) ── */
+
+t('wordsOfDay — 표제어를 문장에서 찾아 단락에 잇는다(옛 팩 폴백)', () => {
+  assert.deepStrictEqual(E.wordsOfDay(pack, '8/1'), ['w-001', 'w-003', 'w-005', 'w-006', 'w-008']);
+  assert.deepStrictEqual(E.wordsOfDay(pack, '8/2'), ['w-002', 'w-004', 'w-007']);
+  assert.deepStrictEqual(E.wordsOfDay(pack, '없는날'), [], '없는 단락은 빈 목록');
+});
+
+t('wordsOfDay — 팩이 wordIds 로 명시하면 그것이 정본이다(추측을 덮어쓴다)', () => {
+  const p = JSON.parse(JSON.stringify(pack));
+  p.sentences.forEach((sen) => { sen.wordIds = sen.dayGroup === '8/1' ? ['w-002'] : ['w-001']; });
+  assert.deepStrictEqual(E.wordsOfDay(p, '8/1'), ['w-002']);
+  assert.deepStrictEqual(E.wordsOfDay(p, '8/2'), ['w-001']);
+});
+
+t('wordsOfDay — 한 단락도 못 이은 단어는 어디에도 안 들어간다(본문을 막지 않는다)', () => {
+  const p = JSON.parse(JSON.stringify(pack));
+  p.words.push({ id: 'w-zzz', headword: 'xylophone', meaningKo: ['실로폰'], sections: ['conversation'] });
+  const all = E.dayGroups(p).reduce((acc, g) => acc.concat(E.wordsOfDay(p, g.day)), []);
+  assert.ok(all.indexOf('w-zzz') < 0);
+});
+
+t('dayWordGate — 그 단락 단어를 한 번씩 학습해야 열린다(도달까지는 요구하지 않는다)', () => {
+  const states = {};
+  const g0 = E.dayWordGate(pack, states, '8/1');
+  assert.deepStrictEqual([g0.open, g0.reason, g0.done, g0.total], [false, 'day-word-gate', 0, 5]);
+  E.wordsOfDay(pack, '8/1').slice(0, 4).forEach((id) => {
+    states[id] = E.recordQuiz(E.createState(id, 'word', d1), { correct: true }, d1);
+  });
+  assert.strictEqual(E.dayWordGate(pack, states, '8/1').open, false, '4/5 는 아직');
+  const last = E.wordsOfDay(pack, '8/1')[4];
+  states[last] = E.recordQuiz(E.createState(last, 'word', d1), { correct: false }, d1);
+  assert.strictEqual(E.dayWordGate(pack, states, '8/1').open, true, '틀려도 학습은 학습 — 뜻은 마주했다');
+  assert.strictEqual(E.dayWordGate(pack, states, '8/2').open, false, '다른 단락은 그대로');
+});
+
+t('dayWordGate — 단어가 안 이어진 단락은 열어 둔다(못 여는 자물쇠를 만들지 않는다)', () => {
+  const p = JSON.parse(JSON.stringify(pack));
+  p.words = [];
+  const g = E.dayWordGate(p, {}, '8/1');
+  assert.deepStrictEqual([g.open, g.reason, g.total], [true, 'no-word', 0]);
+});
+
+t('단락 단어를 안 했으면 그 단락 문장이 안 나온다 — 청크(뜻 세우기)는 그대로 나온다', () => {
+  const plan = E.planDay(pack, {}, null, d1, { maxSentences: 10 });
+  assert.deepStrictEqual(plan.sentences.map((x) => x.kind + (x.seq || '')), ['chunk', 'chunk'],
+    '단어 전이면 본문은 뜻 세우기만 — 영어를 못 읽는 학생의 첫 자리는 막지 않는다');
+});
+
+t('신규 단어 순서 — 단락 순 → 난이도(기초 먼저) → 교재 순', () => {
+  const p = JSON.parse(JSON.stringify(pack));
+  /* 8/1 단락 단어에만 난이도를 준다: w-001 심화, w-003 기초, 나머지는 태그를 떼어 보통으로 */
+  const lv = { 'w-001': 3, 'w-003': 1 };
+  p.words.forEach((w) => { if (lv[w.id]) w.level = lv[w.id]; else delete w.level; });
+  const plan = E.planDay(p, {}, null, d1, { maxNewWords: 5 });
+  assert.deepStrictEqual(plan.words.fresh, ['w-003', 'w-005', 'w-006', 'w-008', 'w-001'],
+    '기초(w-003) 먼저, 심화(w-001) 뒤로 — 단락은 넘어가지 않는다');
+});
+
+t('levelOf — 1·2·3만 인정하고 나머지는 보통(2)으로 읽는다(옛 팩 호환)', () => {
+  assert.deepStrictEqual([1, 2, 3].map((n) => E.levelOf({ level: n })), [1, 2, 3]);
+  [undefined, null, 0, 4, '1', 'easy', {}].forEach((v) => {
+    assert.strictEqual(E.levelOf({ level: v }), 2, JSON.stringify(v));
+  });
+});
+
+t('본문에 안 나오는 단어는 맨 뒤 — 대화문 어휘가 본문 진도를 막지 않는다', () => {
+  const p = JSON.parse(JSON.stringify(pack));
+  p.words.unshift({ id: 'w-conv', headword: 'xylophone', meaningKo: ['실로폰'], sections: ['conversation'] });
+  const plan = E.planDay(p, {}, null, d1, { maxNewWords: 9 });
+  assert.strictEqual(plan.words.fresh[plan.words.fresh.length - 1], 'w-conv',
+    '팩 맨 앞에 있어도 순서는 맨 뒤');
 });
 
 console.log('\n통과 ' + passed + '개 — naesin 암기 엔진 검증 완료');
