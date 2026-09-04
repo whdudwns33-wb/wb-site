@@ -21,6 +21,7 @@
  *   POST /lesson-create { app, auth, staffId?, lesson } → 수업 1건 등록·수정
  *   POST /lesson-create-batch { app, auth, batchKind, lessons } → 한 학생의 여러 수업 또는 같은 수업의 여러 학생 원자적 등록
  *   POST /contact-log { app, auth, sourceTaskId, type, note } → 담당 수업 학생 연락 기록
+ *   POST /staff-attendance { app, auth, action } → 본인 출근·퇴근을 서버 시각으로 최초 1회 기록
  *   POST /weekend-visit { app, auth, action, ... } → 토·일 실제 등·하원 기록
  *   POST /lesson-handoff { app, auth, dataGeneration, action, ... } → 당일 남은 수업 인계
  *   POST /feedback-request { app, auth, ... }     → 직원, 항목별 피드백 제출(제출 즉시 카카오 알림톡 자동 발송 시도)
@@ -93,6 +94,7 @@ import { handleMakeup } from './makeup.js';
 import { handleSessionPack } from './session-pack.js';
 import { handleGuardianOpsSend } from './guardian-ops-send.js';
 import { handleContactLog } from './contact-log.js';
+import { handleStaffAttendance, inspectOwnStaffAttendanceChanges } from './staff-attendance.js';
 import { handleWeekendVisit } from './weekend-visit.js';
 import { handleLessonHandoff } from './lesson-handoff.js';
 import { handleConsultSubmission, handleConsultSubmissionUpload } from './consult-submission.js';
@@ -283,6 +285,17 @@ function upsertStmt(env, table, app, c, now, ownScope, managerTask) {
   const onboardingGuard = table === 'checks' && /^__onboarding__/.test(String(key || ''))
     ? " AND COALESCE(json_extract(checks.data,'$.casVersion'),0)<>1"
     : '';
+  // 오래 열린 구형 직원 화면도 이미 확정된 출퇴근을 덮지 못한다. 최초 출근 또는
+  // 기존 at을 보존한 최초 out 추가만 원자적으로 허용하며 관리자 범위는 이 제한을 받지 않는다.
+  const staffAttendanceGuard = ownScope && table === 'checks' && /^__att__/.test(String(key || ''))
+    ? " AND (" +
+      "(COALESCE(json_extract(checks.data,'$.done'),0)<>1 OR COALESCE(json_extract(checks.data,'$.at'),0)<=0)" +
+      " OR (json_extract(checks.data,'$.done')=1 AND COALESCE(json_extract(checks.data,'$.out'),0)=0" +
+      " AND json_extract(excluded.data,'$.done')=1" +
+      " AND json_extract(excluded.data,'$.at')=json_extract(checks.data,'$.at')" +
+      " AND COALESCE(json_extract(excluded.data,'$.out'),0)>=json_extract(checks.data,'$.at'))" +
+      ")"
+    : '';
   // 검토와 실제 쓰기 사이에 보강 task가 생성되는 경우에도 generic LWW가 덮지 못한다.
   const makeupTaskGuard = table === 'tasks'
     ? " AND COALESCE(CAST(json_extract(tasks.data,'$.lessonInstanceType') AS TEXT),'')<>'makeup'" +
@@ -294,7 +307,8 @@ function upsertStmt(env, table, app, c, now, ownScope, managerTask) {
     'ON CONFLICT(app, ' + idCol + ') DO UPDATE SET ' +
     '  owner=excluded.owner, data=' + updateData + ', ' +
     '  updated_at=excluded.updated_at, srv_at=excluded.srv_at ' +
-    'WHERE excluded.updated_at > ' + table + '.updated_at' + ownGuard + onboardingGuard + makeupTaskGuard
+    'WHERE excluded.updated_at > ' + table + '.updated_at' + ownGuard + onboardingGuard +
+      staffAttendanceGuard + makeupTaskGuard
   ).bind(app, key, c.owner || null, JSON.stringify(c.data), Number(c.updated_at) || 0, now);
 }
 
@@ -532,34 +546,34 @@ async function inspectOwnTaskChanges(env, app, owner, entries) {
 
 async function inspectOwnCheckChanges(env, app, owner, entries, newTaskIds) {
   const checkEntries = entries.filter(entry => entry.table === 'checks');
-  if (!checkEntries.length) return null;
+  if (!checkEntries.length) return { error: null, skip: new Set() };
   const generalTaskIds = [];
 
   for (const entry of checkEntries) {
     const key = String(entry.change.k || '');
     const firstPipe = key.indexOf('|');
     if (firstPipe <= 0 || firstPipe !== key.lastIndexOf('|') || firstPipe === key.length - 1) {
-      return '체크 키 형식을 확인해 주세요';
+      return { error: '체크 키 형식을 확인해 주세요', skip: new Set() };
     }
     const keyTaskId = key.slice(0, firstPipe);
     const keyDate = key.slice(firstPipe + 1);
     const data = entry.change.data;
     if (app === 'consult' && keyTaskId.startsWith(CONSULT_REWARD_PREFIX)) {
-      return '보상 교환 기록은 전용 원장에서만 변경할 수 있습니다';
+      return { error: '보상 교환 기록은 전용 원장에서만 변경할 수 있습니다', skip: new Set() };
     }
     if (!data || typeof data !== 'object' || Array.isArray(data)) {
-      return '체크 데이터 형식을 확인해 주세요';
+      return { error: '체크 데이터 형식을 확인해 주세요', skip: new Set() };
     }
     if (Object.prototype.hasOwnProperty.call(data, 'taskId') && String(data.taskId) !== keyTaskId) {
-      return '체크 데이터의 taskId가 체크 키와 일치하지 않습니다';
+      return { error: '체크 데이터의 taskId가 체크 키와 일치하지 않습니다', skip: new Set() };
     }
     if (Object.prototype.hasOwnProperty.call(data, 'date') && String(data.date) !== keyDate) {
-      return '체크 데이터의 날짜가 체크 키와 일치하지 않습니다';
+      return { error: '체크 데이터의 날짜가 체크 키와 일치하지 않습니다', skip: new Set() };
     }
 
     const special = keyTaskId.match(/^__[A-Za-z]+__(.+)$/);
     if (special) {
-      if (special[1] !== owner) return '다른 담당자의 특수 체크는 저장할 수 없습니다';
+      if (special[1] !== owner) return { error: '다른 담당자의 특수 체크는 저장할 수 없습니다', skip: new Set() };
     } else {
       generalTaskIds.push(keyTaskId);
     }
@@ -575,9 +589,9 @@ async function inspectOwnCheckChanges(env, app, owner, entries, newTaskIds) {
     for (const row of (result.results || [])) allowed.add(String(row.id));
   }
   if (generalTaskIds.some(id => !allowed.has(id))) {
-    return '본인에게 배정된 업무의 체크만 저장할 수 있습니다';
+    return { error: '본인에게 배정된 업무의 체크만 저장할 수 있습니다', skip: new Set() };
   }
-  return null;
+  return await inspectOwnStaffAttendanceChanges(env, app, owner, checkEntries);
 }
 
 async function effectiveStaffDeactivations(env, app, entries) {
@@ -1104,8 +1118,13 @@ async function handleSync(env, app, body, origin) {
     for (const entry of accepted) {
       if (entry.table === 'staff') skipped.add(entry);
     }
-    const checkError = await inspectOwnCheckChanges(env, app, auth.id, accepted, inspected.newTaskIds);
-    if (checkError) return json({ ok: false, error: checkError }, 403, origin);
+    const checkInspection = await inspectOwnCheckChanges(env, app, auth.id, accepted, inspected.newTaskIds);
+    if (checkInspection.error) {
+      const payload = { ok: false, error: checkInspection.error };
+      if (/출퇴근/.test(checkInspection.error)) payload.code = 'STAFF_ATTENDANCE_ADMIN_ONLY';
+      return json(payload, 403, origin);
+    }
+    for (const entry of checkInspection.skip) skipped.add(entry);
   }
   let sealedInspection;
   try { sealedInspection = await inspectSealedOrderChanges(env, app, accepted.filter(entry => !skipped.has(entry))); }
@@ -2258,6 +2277,11 @@ export default {
         const auth = await resolveAuth(env, app, body.auth);
         if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
         return await handleContactLog(env, app, body, okOrigin, auth, json);
+      }
+      if (url.pathname === '/staff-attendance') {
+        const auth = await resolveAuth(env, app, body.auth);
+        if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+        return await handleStaffAttendance(env, app, body, okOrigin, auth, json);
       }
       if (url.pathname === '/weekend-visit') {
         const auth = await resolveAuth(env, app, body.auth);

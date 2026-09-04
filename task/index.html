@@ -2287,6 +2287,34 @@ const meStaff = () => session.isStaffLink ? staffById(session.staffId) : null;
 const attKey = staffId => '__att__' + staffId;
 const attOf = (staffId, date) => state.checks[attKey(staffId) + '|' + date] || null;
 const fmtTime = ms => { const d = new Date(ms); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); };
+let staffAttendanceSaving = false;
+
+async function recordStaffAttendance(action, button) {
+  if (staffAttendanceSaving || !session.isStaffLink || !['clock_in', 'clock_out'].includes(action)) return;
+  const me = currentStaff();
+  const auth = sync.auth();
+  if (!me || !auth) return toast('선생님 개인 인증을 다시 확인해 주세요');
+  staffAttendanceSaving = true;
+  if (button) button.disabled = true;
+  try {
+    const result = await sync.post('/staff-attendance', { app: SYNC_APP, auth: auth, action: action });
+    const recordDate = String(result && result.record && result.record.date || '');
+    const expectedKey = attKey(me.id) + '|' + recordDate;
+    if (!result || !/^\d{4}-\d{2}-\d{2}$/.test(recordDate) || result.key !== expectedKey ||
+        result.owner !== me.id || !result.record || result.record.taskId !== attKey(me.id)) {
+      throw new Error('서버의 출퇴근 저장 결과를 확인하지 못했습니다');
+    }
+    state.checks[expectedKey] = result.record;
+    save();
+    render();
+    toast(action === 'clock_in' ? '출근 체크 완료 — 오늘도 수고하세요!' : '퇴근 체크 완료 — 수고하셨습니다!');
+  } catch (error) {
+    toast('출퇴근 기록을 저장하지 못했습니다 — ' + String(error && error.message || error));
+  } finally {
+    staffAttendanceSaving = false;
+    if (button && button.isConnected) button.disabled = false;
+  }
+}
 
 /** 학생 연락 기록.
  *  원장의 기존 이름 기반 특수 체크와, 교사가 담당 수업용 별도 행에 남긴 contact를 함께 읽는다.
@@ -4258,15 +4286,13 @@ function viewToday() {
       attUi = '<button class="btn btn-sm btn-primary" data-act="attcheck">출근했습니다</button>';
     } else if (!att.out) {
       attUi = '<div class="row" style="gap:8px"><span class="pill">' + fmtTime(att.at) + ' 출근</span>' +
-        '<button class="btn btn-sm btn-navy" data-act="attout">퇴근했습니다</button>' +
-        '<button class="btn btn-sm btn-ghost" data-act="attcheck">취소</button></div>';
+        '<button class="btn btn-sm btn-navy" data-act="attout">퇴근했습니다</button></div>';
     } else {
-      attUi = '<div class="row" style="gap:8px"><span class="pill">' + fmtTime(att.at) + ' ~ ' + fmtTime(att.out) + '</span>' +
-        '<button class="btn btn-sm btn-ghost" data-act="attout">퇴근 취소</button></div>';
+      attUi = '<div class="row" style="gap:8px"><span class="pill">' + fmtTime(att.at) + ' ~ ' + fmtTime(att.out) + '</span></div>';
     }
     h += '<div class="card" style="padding:12px"><div class="between">' +
       '<div class="card-title">🕘 출퇴근</div>' + attUi + '</div>' +
-      '<button class="btn btn-sm btn-ghost mt8" data-act="atteditopen" data-id="' + me.id + '">✏️ 최근 기록 수정 (실수로 안 눌렀을 때)</button></div>';
+      '<div class="hint mt8">저장된 출퇴근 기록의 수정은 관리자에게 요청해 주세요.</div></div>';
 
     if (!rosterDb && !rosterErr) loadRoster();
     h += '<div class="card"><div class="small muted">담당 수업의 연락 기록은 각 수업 카드에서 입력할 수 있습니다. 평가·온라인 프로그램 기록은 관리 화면에서 관리합니다.</div></div>';
@@ -11367,11 +11393,8 @@ function attHistText() {
   return out;
 }
 
-/** 출퇴근 기록 수정 — 급여에 직결되는 시각이라 권한을 좁게 둔다.
- *  본인: 최근 3일(오늘 포함)만 직접 수정. 그 이전은 원장만. 원장은 항상 전부 가능. */
-const daysAgo = date => Math.round((parseYmd(today()) - parseYmd(date)) / 86400000);
-const canEditAtt = (staffId, date) => session.isAdmin ||
-  (session.isStaffLink && session.staffId === staffId && daysAgo(date) >= 0 && daysAgo(date) <= 2);
+/** 출퇴근 기록 수정 — 급여에 직결되므로 원장·관리 담당만 교정한다. */
+const canEditAtt = () => session.isAdmin;
 function msFromDateTime(date, hm) {
   const [h, m] = hm.split(':').map(Number);
   const d = parseYmd(date);
@@ -11380,7 +11403,7 @@ function msFromDateTime(date, hm) {
 }
 function attEditModal(staffId) {
   const s = staffById(staffId);
-  if (!s) return;
+  if (!session.isAdmin || !s) return;
   let rows = '';
   for (let i = 0; i < 14; i++) {
     const d = addDays(today(), -i);
@@ -11396,11 +11419,7 @@ function attEditModal(staffId) {
       '</div>';
   }
   modal('🕘 ' + esc(s.name) + ' 출퇴근 수정',
-    '<div class="hint mb14">' +
-      (session.isAdmin
-        ? '원장은 모든 날짜를 수정할 수 있습니다. 시간을 비우면 그 기록이 지워집니다.'
-        : '최근 3일(오늘 포함)만 직접 고칠 수 있습니다. 그 이전 기록은 원장님께 요청해 주세요.') +
-    '</div>' + rows);
+    '<div class="hint mb14">관리자는 모든 날짜를 수정할 수 있습니다. 시간을 비우면 그 기록이 지워집니다.</div>' + rows);
 }
 
 /** 급여용 출퇴근 내보내기 — 대표 전용. 아카플로우 등 외부 급여 계산과는
@@ -20109,13 +20128,10 @@ document.addEventListener('click', ev => {
       const me = currentStaff(); if (!me) break;
       const a = attOf(me.id, today());
       if (a && a.done) {
-        if (!confirm('출근 체크를 취소할까요?' + (a.out ? ' 퇴근 기록도 함께 지워집니다.' : ''))) return;
-        setCheck(attKey(me.id), today(), { done: false, at: null, out: null });
-      } else {
-        setCheck(attKey(me.id), today(), { done: true, at: now(), out: null, blocked: false });
-        toast('출근 체크 완료 — 오늘도 수고하세요!');
+        toast('이미 저장된 출근 기록은 관리자만 수정할 수 있습니다');
+        break;
       }
-      render();
+      recordStaffAttendance('clock_in', el);
       break;
     }
     case 'attout': {
@@ -20124,18 +20140,15 @@ document.addEventListener('click', ev => {
       const a = attOf(me.id, today());
       if (!a || !a.done) break;
       if (a.out) {
-        if (!confirm('퇴근 체크를 취소할까요?')) return;
-        setCheck(attKey(me.id), today(), { out: null });
-      } else {
-        setCheck(attKey(me.id), today(), { out: now() });
-        toast('퇴근 체크 완료 — 수고하셨습니다!');
+        toast('이미 저장된 퇴근 기록은 관리자만 수정할 수 있습니다');
+        break;
       }
-      render();
+      recordStaffAttendance('clock_out', el);
       break;
     }
     case 'atthist': showText('출근 이력 (최근 14일)', attHistText()); break;
     case 'atteditopen': {
-      if (!session.isAdmin && !(session.isStaffLink && session.staffId === id)) break;
+      if (!session.isAdmin) break;
       attEditModal(id);
       break;
     }
@@ -21611,7 +21624,7 @@ document.addEventListener('change', ev => {
   const el = ev.target.closest('[data-act="attedit-in"],[data-act="attedit-out"]');
   if (!el) return;
   const staffId = el.dataset.staff, date = el.dataset.date;
-  if (!canEditAtt(staffId, date)) { toast('이 날짜는 수정할 수 없습니다 — 원장님께 요청해 주세요'); render(); return; }
+  if (!canEditAtt(staffId, date)) { toast('출퇴근 기록은 관리자만 수정할 수 있습니다'); render(); return; }
   const field = el.dataset.act === 'attedit-in' ? 'at' : 'out';
   const ms = el.value ? msFromDateTime(date, el.value) : null;
   const cur = attOf(staffId, date);
