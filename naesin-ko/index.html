@@ -103,6 +103,9 @@
 
     .q { border: 1px solid var(--line); border-radius: 11px; padding: 13px; margin-bottom: 10px; background: var(--panel); }
     .q .stem { font-weight: 700; margin-bottom: 8px; }
+    /* 부정발문('적절하지 않은 것은?')은 <b>로 표시돼 오는데 발문 전체가 이미 굵어서
+       굵기로는 안 보인다. 발문 오독은 국어 객관식 오답의 큰 몫이라(§11 KPI) 색으로 세운다. */
+    .q .stem b { color: var(--red); text-decoration: underline; text-underline-offset: 3px; }
     .q .quote { background: #FBFAF7; border-left: 3px solid var(--b3); padding: 8px 11px; border-radius: 0 8px 8px 0; margin-bottom: 9px; white-space: pre-line; }
     .q .bogi { border: 1px dashed var(--b2); border-radius: 8px; padding: 9px 11px; margin-bottom: 9px; font-size: 13.5px; background: #FBFAF7; }
     .ch { display: block; width: 100%; text-align: left; padding: 9px 12px; border: 1px solid var(--line); border-radius: 9px; margin-bottom: 5px; }
@@ -118,8 +121,11 @@
     .conf { display: flex; gap: 6px; margin-top: 8px; }
     .conf button { flex: 1; padding: 8px; border-radius: 8px; background: #EFEEE9; font-weight: 700; font-size: 13px; }
 
+    /* 빈칸 입력칸은 **정답 길이만큼**이다. 넓게 두면 뒤 글자를 덮어 문맥이 안 보이고,
+       한 줄에 빈칸이 여럿인 문맥(개관 '주제' 한 줄에 4개)에서 특히 심하다. */
     input.blank { border: none; border-bottom: 2px solid var(--b3); background: transparent; text-align: center;
-      min-width: 90px; font-weight: 700; padding: 2px 6px; }
+      min-width: 4.5ch; font-weight: 700; padding: 2px 4px; margin: 0 3px; }
+    input.blank::placeholder { font-weight: 400; color: var(--soft); font-size: 12px; }
     .cond { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
     .cond span { font-size: 12.5px; padding: 4px 9px; border-radius: 999px; background: #EFEEE9; color: var(--soft); }
     .cond span.ok { background: var(--green-soft); color: var(--green); }
@@ -647,8 +653,11 @@
   /* showNotes: 날개풀이를 붙일지. 기본은 붙이지 않는다 —
      3단계(구절 적용)·4단계(주석 복원)에서 날개풀이가 보이면 그게 곧 정답이라
      힌트 없는 인출이 성립하지 않는다. 1단계 읽기에서만 토글로 연다. */
-  function poemHtml(w, showNotes) {
-    var marks = w.marks || [], notes = showNotes ? (w.lineNotes || []) : [];
+  /* marks 를 밖에서 받을 수 있다 — ㉠ 기호는 **세트 스코프**라서다(§2.2-5).
+     같은 기호가 세트마다 다른 구절을 가리키므로, 세트가 있으면 세트 것을 쓴다.
+     이걸 안 쓰면 '㉠와 ㉡의 공통점을 쓰시오' 같은 문항이 지문에 표시가 없어 풀 수 없다. */
+  function poemHtml(w, showNotes, overrideMarks) {
+    var marks = overrideMarks || w.marks || [], notes = showNotes ? (w.lineNotes || []) : [];
     return (w.text.stanzas || []).map(function (stz) {
       return '<div class="st">' + (stz.lines || []).map(function (ln) {
         var html = esc(ln), added = '';
@@ -719,7 +728,9 @@
       var txt = esc(it.context || '').replace(/□+/g, function (g) {
         seen += 1;
         if (seen !== slot) return g;
-        return '<input class="blank" id="ans" autocomplete="off" placeholder="' +
+        /* 폭을 글자 수에 맞춘다 — 넉넉하게 두 칸만 더 준다 */
+        var n = Math.max(4, (it.hintLen || 2) + 2);
+        return '<input class="blank" id="ans" autocomplete="off" style="width:' + n + 'ch" placeholder="' +
           (it.hintLen ? it.hintLen + '자' : '') + '">';
       });
       if (txt.indexOf('id="ans"') < 0) txt += ' <input class="blank" id="ans" autocomplete="off">';
@@ -1021,8 +1032,19 @@
       return (set.works || []).map(function (ref) {
         var wk = work(ref.workId) || {};
         var body = '';
-        if (ref.text && ref.text.paragraphs) body = ref.text.paragraphs.map(function (p) { return '<p>' + esc(p) + '</p>'; }).join('');
-        else if (wk.text) body = poemHtml(wk);
+        /* 이 세트가 이 작품에 대해 따로 갖고 있는 기호를 쓴다. 없으면 정본의 것으로 떨어진다. */
+        var sm = (set.marks || []).filter(function (mk) { return !mk.workId || mk.workId === ref.workId; });
+        if (ref.text && ref.text.paragraphs) {
+          body = ref.text.paragraphs.map(function (para) {
+            var html = esc(para);
+            sm.forEach(function (mk) {
+              if (para.indexOf(mk.anchorText) >= 0) {
+                html = html.replace(esc(mk.anchorText), '<span class="sym">' + esc(mk.symbol) + '</span><mark>' + esc(mk.anchorText) + '</mark>');
+              }
+            });
+            return '<p>' + html + '</p>';
+          }).join('');
+        } else if (wk.text) body = poemHtml(wk, false, sm.length ? sm : null);
         return '<div class="poem" style="margin-bottom:10px">' +
           '<div class="small muted">' + esc(ref.label || '') + ' ' + esc(wk.title || '') + ' · ' + esc(wk.author || '') + '</div>' +
           (ref.prefaceSummary ? '<div class="small muted" style="margin:6px 0">' + esc(ref.prefaceSummary) + '</div>' : '') +
@@ -1204,7 +1226,10 @@
       fb = '<div class="fb ' + (correct ? 'ok' : 'no') + '">' + (correct ? '정답' : '정답은 ' + it.answer + '번') +
         (per[pick] ? '<div class="small" style="margin-top:6px"><b>' + pick + '번</b> — ' + esc(per[pick]) + '</div>' : '') +
         (!correct && per[it.answer] ? '<div class="small" style="margin-top:4px"><b>' + it.answer + '번</b> — ' + esc(per[it.answer]) + '</div>' : '') +
-        (it.explanation && it.explanation.main ? '<div class="small" style="margin-top:6px">' + esc(it.explanation.main) + '</div>' : '') +
+        /* main 과 정답 선지 해설이 같은 문장인 자료가 많다(지면의 해설이 '앞 산문 + 오답 풀이'
+           구조라 앞 산문이 곧 정답 근거다). 같으면 한 번만 보인다 — 두 번 읽히면 다른 말인 줄 안다. */
+        (it.explanation && it.explanation.main && it.explanation.main !== per[pick] && it.explanation.main !== per[it.answer]
+          ? '<div class="small" style="margin-top:6px">' + esc(it.explanation.main) + '</div>' : '') +
         '</div>';
     }
     if (correct) sess.right += 1;

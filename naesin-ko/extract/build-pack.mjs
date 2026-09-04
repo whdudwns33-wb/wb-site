@@ -197,7 +197,7 @@ export function buildPack(dir, opts) {
   }
 
   /* ── 조각 병합 — 팩 전역 유일 id 를 붙이는 것이 여기 책임이다 ── */
-  const orphans = [], unanchored = [];
+  const orphans = [], unanchored = [], reanchored = [];
   results.forEach((r) => {
     (r.out.patches || []).forEach((p) => {
       const w = findWork(works, p);
@@ -220,8 +220,18 @@ export function buildPack(dir, opts) {
          그래도 못 찾으면 버리지 않고 검수로 넘긴다 — 조용히 지우면 기호가 사라진 걸 아무도 모른다. */
       (p.marks || []).forEach((mk) => {
         const fixed = reanchor(w, mk.anchorText);
-        if (fixed) w.marks.push({ ...mk, anchorText: fixed });
-        else unanchored.push({ workId: w.workId, title: w.title, series: r.series, mark: mk });
+        if (fixed) {
+          /* 고쳐서 붙였다면 두 지면의 표기가 다르다는 뜻이다. 정본은 그대로 두되(원문 보존,
+             pack-schema 원칙 3) **말은 한다** — 같은 시가 자료마다 다르게 조판돼 있다는 사실은
+             검수자가 알아야 하고, 조용히 맞춰 버리면 아무도 모른다. */
+          if (fixed !== mk.anchorText) {
+            reanchored.push({ workId: w.workId, title: w.title, series: r.series,
+              symbol: mk.symbol || '', from: mk.anchorText, to: fixed });
+          }
+          w.marks.push({ ...mk, anchorText: fixed });
+        } else {
+          unanchored.push({ workId: w.workId, title: w.title, series: r.series, mark: mk });
+        }
       });
       /* check 는 대조용이지 값이 아니다 — 어긋나면 경고만 내고 정본을 덮어쓰지 않는다 */
       const chk = p.check && p.check.overview;
@@ -234,6 +244,10 @@ export function buildPack(dir, opts) {
       }
     });
   });
+  if (reanchored.length) {
+    warns.push(`기호 앵커 ${reanchored.length}곳의 띄어쓰기가 자료마다 달라 정본 표기로 맞췄어요 —` +
+      ' 원문은 고치지 않았습니다. 어느 쪽이 맞는지는 검수(review.reanchored)에서 보세요.');
+  }
   unanchored.forEach((u) => {
     warns.push(`${u.title}: ${U.SERIES_LABEL[u.series]}의 기호 '${u.mark.symbol || '?'}' 를 본문에서 못 찾았어요` +
       ` — 앵커 '${String(u.mark.anchorText || '').slice(0, 24)}…'. 검수에서 붙이세요(팩에는 안 넣었습니다).`);
@@ -249,7 +263,31 @@ export function buildPack(dir, opts) {
      학생 화면에 '(라)를 …' 이라고 묻는데 (라)가 한 글자도 안 보이는 문항이 된다.
      검증기는 setId 가 **있을 때만** 참조를 보므로 이걸 못 잡는다(오류 0으로 통과한다). */
   const sets = [], items = [], dropped = [];
-  results.forEach((r) => { (r.out.sets || []).forEach((s) => sets.push(s)); });
+  const byId = {};
+  works.forEach((w) => { byId[w.workId] = w; });
+  results.forEach((r) => {
+    (r.out.sets || []).forEach((set) => {
+      /* 세트가 가진 ㉠ 앵커도 정본 표기로 맞춘다 — 작품 patch 만 맞추면 세트 쪽이 안 맞아
+         '㉠와 ㉡의 공통점을 쓰시오' 문항의 지문에 표시가 안 뜬다(같은 시가 자료마다
+         띄어쓰기가 다르다). 못 맞추면 그 기호만 빼고 검수로 넘긴다. */
+      if (Array.isArray(set.marks) && set.marks.length) {
+        const kept = [];
+        set.marks.forEach((mk) => {
+          const w = byId[mk.workId] || (set.works || []).map((ref) => byId[ref.workId]).filter(Boolean)[0];
+          if (!w) { kept.push(mk); return; }
+          const fixed = reanchor(w, mk.anchorText);
+          if (!fixed) { unanchored.push({ workId: w.workId, title: w.title, series: r.series, setId: set.setId, mark: mk }); return; }
+          if (fixed !== mk.anchorText) {
+            reanchored.push({ workId: w.workId, title: w.title, series: r.series, setId: set.setId,
+              symbol: mk.symbol || '', from: mk.anchorText, to: fixed });
+          }
+          kept.push({ ...mk, anchorText: fixed });
+        });
+        set.marks = kept;
+      }
+      sets.push(set);
+    });
+  });
   const setIds = {};
   sets.forEach((s) => { setIds[s.setId] = true; });
   const workIdSet = {};
@@ -327,7 +365,7 @@ export function buildPack(dir, opts) {
   if (!works.length) errors.push('작품 정본이 없어요 — 이해완성 파일이 폴더에 있어야 합니다.');
 
   const review = {
-    packId, pending, unanchored, dropped,
+    packId, pending, unanchored, reanchored, dropped,
     candidates: results.flatMap((r) => ((r.out.review && r.out.review.candidates) || r.out.candidates || [])
       .map((c) => ({ series: r.series, ...c }))),
     report: results.flatMap((r) => ((r.out.review && r.out.review.report) || r.out.report || [])
