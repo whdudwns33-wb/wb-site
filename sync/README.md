@@ -96,6 +96,7 @@ npx wrangler secret put SOLAPI_KAKAO_TRANSPORT_DROPPED_APPROVED_TEMPLATE_ID
 npx wrangler secret put WB_TRANSPORT_NOTIFY_ENABLED # 두 템플릿 APPROVED·차량 목적 동의 확인 뒤에만 true
 npx wrangler secret put WB_CONSULT_LINK_SEND_ENABLED # 학생 링크 템플릿 승인·연락처 동의 확인 뒤에만 true
 npx wrangler secret put WB_BOOK_ORDER_SAMPLE_ENABLED # 본인 교재문자 샘플 때만 true, 확인 뒤 false
+npx wrangler secret put BOOK_VENDOR_PHONE_SANGHYUNG # 상형총판 전용 수신번호(저장소에 값 기록 금지)
 npx wrangler secret put NAVER_ID        # 네이버 검색 API Client ID (강좌 검색용)
 npx wrangler secret put NAVER_SECRET    # 네이버 검색 API Client Secret
 npx wrangler secret put NAVER_MAPS_ID       # 네이버 지도 API Key ID (Geocoding + Directions 5)
@@ -255,6 +256,10 @@ append-only 저장한다. 승인된 수업삭제의 감사 행은 DB에만 보�
 `/book-order create`만 현재 재원생 ID·이름 해시와 교재·학생 집합을 불변
 원장에 봉인한다. 기존 주문은 오연결 위험 때문에 자동 이관하지 않고 보호자에게
 표시하지 않는다. `BOOK_VENDOR_PHONES`의 유효한 문자 주문처만 봉인할 수 있으며,
+원본 거래처 키가 `상형출판사`인 주문은 선택적으로 `BOOK_VENDOR_PHONE_SANGHYUNG`
+전용 비밀키를 우선 사용한다. 전용 값이 설정됐지만 유효하지 않으면 과거 공용 번호로
+대체 발송하지 않고 차단한다. Solapi 상태조회는 `messageIds`를 같은 query key의 반복값으로
+보내며, 응답의 `messageList`가 객체 또는 배열인 경우를 모두 정규화한다.
 쿠팡 등 온라인 직접 주문은 기존 `manual_online_v1` 경로를 유지하고 보호자 주문
 현황에는 표시하지 않는다. 보호자에는 서버 교재 DB 정본이 없는 현재 단계에서
 임의 교재명을 보내지 않고 `주문 교재`로만 표시한다.

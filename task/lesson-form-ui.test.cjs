@@ -818,14 +818,30 @@ test('feedback interview includes the new condition choices and omits every cate
     assert.ok(html.includes(label), '피드백 선택 화면에 ' + label + ' 버튼이 있어야 한다');
   }
   assert.match(interview, /2\. 오늘 집중·태도는\?/);
-  assert.match(interview, /3\. 잘한 점은\?[\s\S]*FB_PLUS\.map/);
-  assert.match(interview, /4\. 보완할 점은\?[\s\S]*FB_MINUS\.map/);
+  assert.match(interview, /FEEDBACK_SUBJECT_CATALOG\.SUBJECTS/);
+  assert.match(interview, /3·4\. 문장 선택 과목/);
+  assert.match(interview, /3\. 잘한 점은\?[\s\S]*strengthButtons\.map/);
+  assert.match(interview, /4\. 보완할 점은\?[\s\S]*improvementButtons\.map/);
+  assert.match(interview, /data-q="plus" data-v="none"/);
+  assert.match(interview, /data-q="minus" data-v="none"/);
   const actionsStart = html.indexOf("case 'fbq':");
   const actionsEnd = html.indexOf("case 'fbmake':", actionsStart);
   const actions = html.slice(actionsStart, actionsEnd);
-  assert.match(actions, /n === FB_PLUS_NONE_INDEX[\s\S]*fbCtx\.plus = fbCtx\.plus\.includes\(n\) \? \[\] : \[n\]/);
-  assert.match(actions, /fbCtx\.plus\.filter\(x => x !== FB_PLUS_NONE_INDEX\)/,
+  assert.match(actions, /q === 'subject'[\s\S]*fbCtx\.plusSentences = \{\}[\s\S]*fbCtx\.minusSentence = ''/,
+    '문장 선택 과목이 달라지면 숨은 이전 과목 문장도 함께 지워야 한다');
+  assert.match(actions, /v === 'none'[\s\S]*fbCtx\.plus = fbCtx\.plus\.includes\('none'\) \? \[\] : \['none'\]/);
+  assert.match(actions, /fbCtx\.plus\.filter\(x => x !== 'none'\)/,
     '잘한 점의 일반 항목을 고르면 없음 선택은 해제되어야 한다');
+  assert.match(actions, /feedbackPickSubjectSentence\(fbCtx\.feedbackSubject, 'strength', v\)/,
+    '잘한 점 버튼을 새로 고를 때 준비된 문장을 추첨해야 한다');
+  assert.match(actions, /delete fbCtx\.plusSentences\[v\]/,
+    '잘한 점을 해제한 뒤 다시 고르면 새 문장을 추첨할 수 있어야 한다');
+  assert.match(actions, /feedbackPickSubjectSentence\(fbCtx\.feedbackSubject, 'improvement', v\)/,
+    '보완할 점 버튼을 새로 고를 때 준비된 문장을 추첨해야 한다');
+  assert.match(bank, /const prepared = String\(ctx && ctx\.plusSentences/,
+    '한번 추첨한 잘한 점 문장은 미리보기까지 그대로 사용해야 한다');
+  assert.match(bank, /const preparedMinus = String\(ctx && ctx\.minusSentence/,
+    '한번 추첨한 보완 문장은 미리보기까지 그대로 사용해야 한다');
 
   const helpers = Function(bank +
     '; return { plus: FB_PLUS, minus: FB_MINUS, focus: FB_FORMAL_FOCUS, praise: FB_FORMAL_PRAISE, ' +
@@ -901,4 +917,8 @@ test('new lesson form core is loaded before the app script', () => {
   const version = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'version.json'), 'utf8'));
   assert.ok(html.includes('<script src="./lesson-form-core.js?v=' + version.v + '"></script>'),
     'lesson-form-core 의 캐시버스터가 version.json 과 어긋나면 옛 파일이 쓰인다');
+  assert.ok(html.includes('<script src="./feedback-subject-catalog.js?v=' + version.v + '"></script>'),
+    '과목별 피드백 카탈로그의 캐시버스터가 version.json 과 어긋나면 옛 파일이 쓰인다');
+  assert.ok(html.indexOf('./feedback-subject-catalog.js?v=') < html.indexOf('"use strict";'),
+    '과목별 피드백 카탈로그는 앱 본문보다 먼저 로드되어야 한다');
 });
