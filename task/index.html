@@ -410,6 +410,7 @@
   html.person-mobile .transport-config-grid { grid-template-columns: 1fr; }
   html.person-mobile .session-pack-create,
   html.person-mobile .session-pack-grid { grid-template-columns: 1fr; }
+  html.person-mobile .session4-ledger-grid { grid-template-columns: 1fr; }
   html.person-mobile .makeup-grid { grid-template-columns: 1fr; }
   html.person-mobile .schedule-kpis,
   html.person-mobile .ops-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -451,6 +452,7 @@
     html.person-mobile .transport-config-grid,
     html.person-mobile .session-pack-grid,
     html.person-mobile .makeup-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    html.person-mobile .session4-ledger-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     html.person-mobile .session-pack-create { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     html.person-mobile .session-pack-create > .btn { grid-column: 1 / -1; }
     html.person-mobile .schedule-kpis,
@@ -750,6 +752,21 @@
 
   /* ─── 회차제 수업 ─── */
   .session-pack-hero { border-color: #B9DDF0; background: linear-gradient(135deg, #F0F9FF 0%, var(--white) 72%); }
+  .session4-ledger-hero { border-color: #B7DFC9; background: linear-gradient(135deg, #F0FDF4 0%, var(--white) 72%); }
+  .session4-ledger-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(285px,1fr)); gap: 9px; margin-bottom: 12px; }
+  .session4-ledger-card { min-width: 0; margin-bottom: 0; }
+  .session4-ledger-balance { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 7px; margin-top: 12px; }
+  .session4-ledger-balance span { padding: 9px; border-radius: 9px; background: #F0FDF4; color: var(--mid-gray); font-size: 11px; font-weight: 800; text-align: center; }
+  .session4-ledger-balance b { display: block; color: #14755E; font-size: 17px; line-height: 1.25; }
+  .session4-ledger-attendance { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  .session4-ledger-attendance span { padding: 5px 7px; border-radius: 999px; background: var(--light-gray); color: var(--mid-gray); font-size: 11px; font-weight: 800; }
+  .session4-ledger-attendance .is-present { background: #ECFDF5; color: #14755E; }
+  .session4-ledger-attendance .is-late { background: #FFF7ED; color: #B85F00; }
+  .session4-ledger-attendance .is-absent { background: #FEF2F2; color: #D92D20; }
+  .session4-ledger-attendance .is-early { background: #FAF5FF; color: #7E22CE; }
+  .session4-ledger-history { margin-top: 10px; border-top: 1px solid var(--light-gray); }
+  .session4-ledger-history > summary { min-height: 44px; padding-top: 9px; color: var(--deep-blue); font-size: 12px; font-weight: 900; cursor: pointer; }
+  .session4-ledger-cycle { padding: 9px 0; border-top: 1px solid var(--light-gray); }
   .session-pack-create { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(90px, .45fr) minmax(135px, .7fr) minmax(135px, .7fr) auto; gap: 8px; align-items: end; margin-top: 12px; }
   .session-pack-create .field { min-width: 0; margin-bottom: 0; }
   .session-pack-create .in, .session-pack-create .btn { min-height: 44px; }
@@ -850,6 +867,7 @@
     .transport-run-board-head { align-items: stretch; }
     .transport-config-grid { grid-template-columns: 1fr; }
     .session-pack-create, .session-pack-grid { grid-template-columns: 1fr; }
+    .session4-ledger-grid { grid-template-columns: 1fr; }
     .session-pack-actions { display: grid; grid-template-columns: 1fr; }
     .session-pack-actions .btn { width: 100%; }
     .guardian-ops-action, .ops-notice-action { display: grid; grid-template-columns: 1fr; }
@@ -901,6 +919,39 @@
   .student-info-field span { color: var(--navy); font-size: 14px; line-height: 1.55; white-space: pre-wrap; }
   .new-marker { display:inline; margin-left:5px; color:#D92D20; font-size:12px; font-weight:900; line-height:1; vertical-align:middle; }
   .student-info-field .new-marker, .card-title .new-marker { display:inline; color:#D92D20; font-size:12px; line-height:1; white-space:normal; }
+  .student-attendance-calendar { margin-top: 14px; padding: 14px; border: 1px solid var(--line); border-radius: 13px; background: #FFF; }
+  .student-attendance-calendar-head { display: grid; grid-template-columns: 44px minmax(0,1fr) 44px; align-items: center; gap: 8px; }
+  .student-attendance-calendar-title { color: var(--navy); font-size: 15px; font-weight: 900; text-align: center; }
+  .student-attendance-calendar-head .btn { min-width: 44px; min-height: 44px; padding: 8px; }
+  .student-attendance-weekdays, .student-attendance-days { display: grid; grid-template-columns: repeat(7,minmax(0,1fr)); gap: 4px; }
+  .student-attendance-weekdays { margin-top: 12px; color: var(--mid-gray); font-size: 10.5px; font-weight: 900; text-align: center; }
+  .student-attendance-weekdays span { padding: 4px 0; }
+  .student-attendance-day { min-width: 0; min-height: 58px; padding: 5px 3px; border: 1px solid #E5EAEE; border-radius: 8px; background: #F8FAFC; }
+  .student-attendance-day.is-empty { border-color: transparent; background: transparent; }
+  .student-attendance-day.is-today { box-shadow: inset 0 0 0 2px var(--deep-blue); }
+  .student-attendance-day.has-present { border-color: #A9D9C8; background: #ECFDF5; }
+  .student-attendance-day.has-late { border-color: #F4C78B; background: #FFF7ED; }
+  .student-attendance-day.has-absent { border-color: #F4B5B0; background: #FEF2F2; }
+  .student-attendance-day.has-early { border-color: #D8B4E8; background: #FAF5FF; }
+  .student-attendance-day.has-mixed { border-color: #B8C7D3; background: #F1F5F9; }
+  .student-attendance-day-number { display: block; color: var(--navy); font-size: 11px; font-weight: 900; line-height: 1.2; }
+  .student-attendance-marks { display: flex; flex-wrap: wrap; gap: 3px; margin-top: 6px; }
+  .student-attendance-mark { width: 8px; height: 8px; border-radius: 50%; background: #94A3B8; }
+  .student-attendance-mark.is-present { background: #16845B; }
+  .student-attendance-mark.is-late { background: #D97706; }
+  .student-attendance-mark.is-absent { background: #D92D20; }
+  .student-attendance-mark.is-early { background: #7E22CE; }
+  .student-attendance-legend { display: flex; flex-wrap: wrap; gap: 7px 12px; margin-top: 12px; color: var(--mid-gray); font-size: 11px; font-weight: 800; }
+  .student-attendance-legend span { display: inline-flex; align-items: center; gap: 5px; }
+  .student-attendance-list { margin-top: 12px; border-top: 1px solid var(--line); }
+  .student-attendance-list-row { display: grid; grid-template-columns: 54px 38px minmax(0,1fr); gap: 7px; padding: 8px 2px; border-bottom: 1px solid #EEF2F4; color: var(--mid-gray); font-size: 11.5px; line-height: 1.45; }
+  .student-attendance-list-row b { color: var(--navy); }
+  .student-attendance-state { font-weight: 900; }
+  .student-attendance-state.is-present { color: #16845B; }
+  .student-attendance-state.is-late { color: #B85F00; }
+  .student-attendance-state.is-absent { color: #D92D20; }
+  .student-attendance-state.is-early { color: #7E22CE; }
+  .student-attendance-loading { min-height: 90px; display: grid; place-items: center; color: var(--mid-gray); font-size: 12.5px; text-align: center; }
   .admin-directive-card { padding: 12px; border: 1px solid var(--line); border-radius: 11px; background: #FAFCFD; }
   .admin-directive-card + .admin-directive-card { margin-top: 8px; }
   .admin-directive-card.is-important { border-color: #F2B8B0; background: #FFF8F6; }
@@ -1076,12 +1127,12 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-09-04.2"></script>
-<script src="./schedule-board-core.js?v=2026-09-04.2"></script>
-<script src="./asset-core.js?v=2026-09-04.2"></script>
-<script src="./qr-core.js?v=2026-09-04.2"></script>
-<script src="./acaflow-import-core.js?v=2026-09-04.2"></script>
-<script src="./feedback-subject-catalog.js?v=2026-09-04.2"></script>
+<script src="./lesson-form-core.js?v=2026-09-04.3"></script>
+<script src="./schedule-board-core.js?v=2026-09-04.3"></script>
+<script src="./asset-core.js?v=2026-09-04.3"></script>
+<script src="./qr-core.js?v=2026-09-04.3"></script>
+<script src="./acaflow-import-core.js?v=2026-09-04.3"></script>
+<script src="./feedback-subject-catalog.js?v=2026-09-04.3"></script>
 <script>
 "use strict";
 
@@ -1856,6 +1907,7 @@ const transportGuardianStates = new Map();
 let transportGuardianTarget = null;
 let sessionPackRows = [], sessionPackLoaded = false, sessionPackLoading = false, sessionPackError = '';
 let sessionPackRestoreFocus = null;
+let session4LedgerRows = new Map(), session4LedgerLoadedSignature = '', session4LedgerLoading = false, session4LedgerError = '';
 let makeupRows = [], makeupLoaded = false, makeupLoading = false, makeupError = '';
 let makeupRestoreFocus = null, makeupLiveMessage = '';
 let managerInboxLoading = false;
@@ -1993,6 +2045,7 @@ function resetPersonCache(token) {
   transportNotificationStates.clear(); transportGuardianStates.clear(); transportGuardianTarget = null;
   sessionPackRows = []; sessionPackLoaded = false; sessionPackLoading = false; sessionPackError = '';
   sessionPackRestoreFocus = null;
+  session4LedgerRows = new Map(); session4LedgerLoadedSignature = ''; session4LedgerLoading = false; session4LedgerError = '';
   weekendVisitRows = []; weekendVisitMonthlyCounts = []; weekendVisitNextSequences = []; weekendVisitLoadedKey = ''; weekendVisitLoading = false; weekendVisitError = '';
   weekendVisitScopeCache.clear(); weekendVisitScheduleLoadingKeys.clear(); weekendVisitScheduleRetryAt.clear(); weekendVisitScheduleErrors.clear();
   weekendVisitScopeRequestGeneration.clear(); weekendVisitMainRequestKey = ''; weekendVisitMainRequestGeneration = 0;
@@ -4239,7 +4292,7 @@ function viewToday() {
     if (context.recordDate) ensureLessonHandoffDate(context.recordDate);
   });
   if (list.some(isLesson) && !rosterDb && !rosterErr && !rosterLoading) loadRoster();
-  ensureSessionModeData(list);
+  ensureSessionModeData(list, cursor);
   const p = teacherTaskCardProgress(me.id, cursor);
   const receivedHandoffs = lessonHandoffRows(cursor).filter(row => String(row.recipientStaffId) === String(me.id) && row.status !== 'cancelled');
   const handoffDone = receivedHandoffs.filter(row => row.status === 'completed').length;
@@ -4383,7 +4436,7 @@ function taskRow(t, date, editable, isCarry) {
           : '') +
         (recordContext && recordContext.issue && recordContext.visible
           ? '<span class="tag blk">' + esc(recordContext.issue) + '</span>' : '') +
-        sessionModeBadgeHtml(t) +
+        sessionModeBadgeHtml(t, recordDate || date) +
         originTags(t) +
       '</div>';
 
@@ -4536,6 +4589,7 @@ function showTodayLessonBriefing(taskId, lessonDate) {
   }
   modal('학생정보 · 업무지시', lessonWorkInstructionHtml(task, lessonDate) +
     '<section class="lesson-briefing-student">' + studentHtml + '</section>', actions.join(''));
+  if (student) loadStudentAttendance(student.id, today().slice(0, 7));
 }
 
 let lessonBriefingEditor = null;
@@ -9003,10 +9057,12 @@ function sessionModeLessonTask(task) {
   return isSessionLessonTask(task);
 }
 
-function sessionPackForLessonTask(task) {
+function sessionPackForLessonTask(task, referenceDate) {
   if (!sessionModeLessonTask(task)) return null;
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(String(referenceDate || '')) ? String(referenceDate) : '';
   return sessionPackRows.find(pack => pack && pack.status === 'active' &&
-    String(pack.lessonTaskId || '') === String(task.id || '')) || null;
+    String(pack.lessonTaskId || '') === String(task.id || '') &&
+    (!date || ((!pack.validFrom || String(pack.validFrom) <= date) && (!pack.expiresOn || String(pack.expiresOn) >= date)))) || null;
 }
 
 const SESSION_PACK_ATTENDANCE_CUTOFF_MINUTE = 23 * 60 + 50;
@@ -9016,19 +9072,28 @@ const SESSION_PACK_ABSENCE_OPTIONS = [
 ];
 
 function sessionPackAttendanceState(task, date) {
-  const pack = sessionPackForLessonTask(task);
-  if (!pack || date < String(pack.validFrom || '') || date > String(pack.expiresOn || '')) return null;
+  const pack = sessionPackForLessonTask(task, date);
+  const rosterSession4 = typeof taskUsesSession4Billing === 'function' && taskUsesSession4Billing(task, date);
+  if (!pack && !rosterSession4) return null;
   const sourceKey = String(task.id || '') + '|' + String(date || '');
-  const reflected = (pack.usage || []).some(row => row && row.sourceType === 'regular' && row.sourceKey === sourceKey);
+  const reflected = !!pack && (pack.usage || []).some(row => row && row.sourceType === 'regular' && row.sourceKey === sourceKey);
   const current = seoulNowParts();
   const cutoffReached = date < current.date || (date === current.date && current.minute >= SESSION_PACK_ATTENDANCE_CUTOFF_MINUTE);
-  return { pack, reflected, cutoffReached, locked: reflected || cutoffReached };
+  return { pack, reflected, rosterSession4, cutoffReached, locked: reflected || cutoffReached };
 }
 
 function sessionPackAttendanceHintHtml(task, date, check, attendanceState) {
   if (!attendanceState) return '';
   const locked = attendanceState.locked;
-  const absence = check && check.att === 'A'
+  /* 학생 단위 4회제는 P/L/E만 1회로 세고 A는 0회다. 구형 수업별 회차권의
+   * 결석 차감 정책을 그대로 노출하면 두 원장의 기준이 서로 달라 보인다. */
+  if (!attendanceState.pack && attendanceState.rosterSession4) {
+    const rosterMessage = locked
+      ? '출석·지각·조퇴는 1회, 결석은 0회로 당일 23:50에 확정됐습니다. 회차제 결석 보강은 자동 생성하지 않습니다.'
+      : '출석·지각·조퇴는 1회, 결석은 0회로 당일 23:50에 확정됩니다. 그 전까지 출결을 변경할 수 있으며 결석 보강은 자동 생성하지 않습니다.';
+    return '<div class="small muted mt8">' + rosterMessage + '</div>';
+  }
+  const absence = attendanceState.pack && check && check.att === 'A'
     ? '<label class="field mt8"><span class="fl">결석 차감 유형</span><select class="in" data-session-pack-absence data-id="' + esc(task.id) + '" data-date="' + esc(date) + '"' +
       (locked ? ' disabled' : '') + '><option value="">유형 선택</option>' + SESSION_PACK_ABSENCE_OPTIONS.map(item =>
         '<option value="' + item[0] + '"' + (String(check.absenceType || '') === item[0] ? ' selected' : '') + '>' + item[1] + '</option>').join('') +
@@ -9053,11 +9118,23 @@ function sessionPackAlertInfo(pack) {
   return null;
 }
 
-function sessionModeBadgeDescriptor(task) {
+function sessionModeBadgeDescriptor(task, referenceDate) {
   if (!sessionModeLessonTask(task)) return null;
+  if (typeof taskUsesSession4Billing === 'function' && taskUsesSession4Billing(task, referenceDate)) {
+    const summary = session4LedgerRows.get(String(task.studentId || ''));
+    if (summary) {
+      const size = Number(summary.cycleSize) || 4;
+      const count = Math.max(0, Math.min(size, Number(summary.attendanceCount) || 0));
+      return { text: '회차제 · ' + count + '/' + size + '회', cls: 'is-session',
+        title: '학생 단위 4회제 · 출석·지각·조퇴 합산' };
+    }
+    if (session4LedgerLoading) return { text: '회차제 · 회차 확인 중', cls: 'is-session' };
+    if (session4LedgerError) return { text: '회차제 · 회차 확인 필요', cls: 'is-session is-error' };
+    return { text: '회차제 · 4회', cls: 'is-session' };
+  }
   if (!sessionPackLoaded) return { text: '수업 형태 확인 중', cls: '' };
   if (sessionPackError) return { text: '수업 형태 확인 필요', cls: 'is-error' };
-  const pack = sessionPackForLessonTask(task);
+  const pack = sessionPackForLessonTask(task, referenceDate);
   if (!pack) return { text: '월제', cls: 'is-monthly' };
   const remaining = Math.max(0, Number(pack.remainingSessions) || 0);
   const alert = sessionPackAlertInfo(pack);
@@ -9068,19 +9145,33 @@ function sessionModeBadgeDescriptor(task) {
   };
 }
 
-function sessionModeBadgeHtml(task) {
+function sessionModeBadgeHtml(task, referenceDate) {
   if (!session.isAdmin) return '';
-  const badge = sessionModeBadgeDescriptor(task);
+  const badge = sessionModeBadgeDescriptor(task, referenceDate);
   return badge ? '<span class="tag session-mode-badge ' + badge.cls + '"' +
     (badge.title ? ' title="' + esc(badge.title) + '" aria-label="' + esc(badge.text + ' · ' + badge.title) + '"' : '') +
     '>' + esc(badge.text) + '</span>' : '';
 }
 
-function sessionModeBadgesHtml(tasks) {
+function sessionModeBadgesHtml(tasks, referenceDate) {
   const badges = new Map();
   (tasks || []).filter(sessionModeLessonTask).forEach(task => {
-    const descriptor = sessionModeBadgeDescriptor(task);
-    if (descriptor) badges.set(descriptor.text + '|' + descriptor.cls, sessionModeBadgeHtml(task));
+    const descriptor = sessionModeBadgeDescriptor(task, referenceDate);
+    if (descriptor) badges.set(descriptor.text + '|' + descriptor.cls, sessionModeBadgeHtml(task, referenceDate));
+  });
+  return Array.from(badges.values()).join('');
+}
+
+function sessionModeBadgesForEntries(entries) {
+  const badges = new Map();
+  (entries || []).forEach(entry => {
+    const task = entry && entry.task || {};
+    if (!sessionModeLessonTask(task)) return;
+    const issueDate = entry && Array.isArray(entry.dates) && entry.dates.find(date => /^\d{4}-\d{2}-\d{2}$/.test(String(date || '')));
+    const referenceDate = /^\d{4}-\d{2}-\d{2}$/.test(String(entry && entry.date || ''))
+      ? String(entry.date) : issueDate ? String(issueDate) : undefined;
+    const descriptor = sessionModeBadgeDescriptor(task, referenceDate);
+    if (descriptor) badges.set(descriptor.text + '|' + descriptor.cls, sessionModeBadgeHtml(task, referenceDate));
   });
   return Array.from(badges.values()).join('');
 }
@@ -9089,12 +9180,20 @@ function sessionModeBadgesForStudent(studentId, referenceDate) {
   const reference = referenceDate || today();
   return sessionModeBadgesHtml(state.tasks.filter(task => sessionModeLessonTask(task) &&
     String(task.studentId || '') === String(studentId || '') &&
-    (!task.start || task.start <= reference) && (!task.end || task.end >= reference)));
+    (!task.start || task.start <= reference) && (!task.end || task.end >= reference)), reference);
 }
 
-function ensureSessionModeData(tasks) {
-  if (!(tasks || []).some(sessionModeLessonTask) || sessionPackLoaded || sessionPackLoading) return;
-  setTimeout(() => loadSessionPacks(false), 0);
+function ensureSessionModeData(tasks, referenceDate) {
+  const lessons = (tasks || []).filter(sessionModeLessonTask);
+  if (!lessons.length) return;
+  if (!sessionPackLoaded && !sessionPackLoading) setTimeout(() => loadSessionPacks(false), 0);
+  if (session.isAdmin && rosterDb && lessons.some(task =>
+      typeof taskUsesSession4Billing === 'function' && taskUsesSession4Billing(task, referenceDate))) {
+    const signature = session4LedgerSignature(session4LedgerStudents());
+    if (!session4LedgerLoading && session4LedgerLoadedSignature !== signature) {
+      setTimeout(() => loadSession4Ledger(false), 0);
+    }
+  }
 }
 
 function rememberSessionPackFocus(packId, act) {
@@ -9246,13 +9345,145 @@ function sessionPackCard(pack) {
     sessionPackStaffRecordHtml(pack) + adminActions + sessionPackOpsNoticeHtml(pack) + sessionPackHistoryHtml(pack) + '</article>';
 }
 
+function session4LedgerStudents() {
+  const currentMonth = today().slice(0, 7);
+  return ((rosterDb && rosterDb.students) || []).filter(student =>
+    String(student && student.billingMode || 'monthly') === 'session4' && !rosterStudentTransition(student) &&
+    (!String(student && student.start || '') || String(student.start) <= currentMonth) &&
+    (!String(student && student.end || '') || String(student.end) > currentMonth)
+  ).slice().sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'ko') || String(a.id || '').localeCompare(String(b.id || '')));
+}
+
+function session4LedgerSignature(students) {
+  return Number(rosterDb && rosterDb.updatedAt || 0) + '|' + (students || []).map(student => String(student.id || '')).join('|');
+}
+
+async function loadSession4Ledger(force) {
+  if (session4LedgerLoading || !rosterDb) return;
+  const students = session4LedgerStudents();
+  const signature = session4LedgerSignature(students);
+  if (!force && session4LedgerLoadedSignature === signature) return;
+  const auth = sync.auth();
+  if (!auth) {
+    session4LedgerError = '동기화 인증이 필요합니다';
+    session4LedgerLoadedSignature = signature;
+    if (sessionModeRouteVisible()) renderAfterSync();
+    return;
+  }
+  session4LedgerLoading = true;
+  session4LedgerError = '';
+  if (route === 'sessions') renderAfterSync();
+  try {
+    const result = await sync.post('/student-attendance', { app: SYNC_APP, auth: auth, action: 'list' });
+    const allowedIds = new Set(students.map(student => String(student.id || '')));
+    const nextRows = new Map((Array.isArray(result && result.students) ? result.students : [])
+      .filter(row => row && allowedIds.has(String(row.studentId || '')) && String(row.billingMode || '') === 'session4')
+      .map(row => [String(row.studentId), row]));
+    if (session4LedgerSignature(session4LedgerStudents()) === signature) {
+      session4LedgerRows = nextRows;
+      session4LedgerLoadedSignature = signature;
+      session4LedgerError = nextRows.size < students.length
+        ? (students.length - nextRows.size) + '명의 회차 출결을 현재 권한으로 확인할 수 없습니다' : '';
+    }
+  } catch (error) {
+    if (session4LedgerSignature(session4LedgerStudents()) === signature) {
+      session4LedgerRows = new Map();
+      session4LedgerLoadedSignature = signature;
+      session4LedgerError = error && error.message ? error.message : '회차 출결을 불러오지 못했습니다';
+    }
+  }
+  session4LedgerLoading = false;
+  if (sessionModeRouteVisible()) renderAfterSync();
+}
+
+function session4LedgerAttendanceHtml(rows) {
+  const attendance = (Array.isArray(rows) ? rows : []).filter(row =>
+    row && /^\d{4}-\d{2}-\d{2}$/.test(String(row.date || '')) && STUDENT_ATTENDANCE_STATUS[row.status]
+  );
+  if (!attendance.length) return '<div class="small muted mt8">아직 반영된 출결이 없습니다.</div>';
+  return '<div class="session4-ledger-attendance">' + attendance.slice().sort((a, b) => String(a.date || '').localeCompare(String(b.date || ''))).map(row => {
+    const descriptor = STUDENT_ATTENDANCE_STATUS[row.status];
+    return '<span class="is-' + descriptor.cls + '">' + esc(shortDate(String(row.date || ''))) + ' ' + descriptor.label + '</span>';
+  }).join('') + '</div>';
+}
+
+function session4LedgerCycles(summary) {
+  const raw = Array.isArray(summary && summary.cycles) ? summary.cycles
+    : Array.isArray(summary && summary.history) ? summary.history : [];
+  if (raw.length) return raw.map(cycle => ({
+    startDate: String(cycle.startDate || cycle.cycleStartDate || ''),
+    endDate: String(cycle.endDate || cycle.completedDate || cycle.completedAt || ''),
+    attendanceCount: Math.max(0, Number(cycle.attendanceCount != null ? cycle.attendanceCount : cycle.count) || 0),
+    complete: cycle.complete === true || cycle.completed === true || cycle.status === 'complete' || cycle.status === 'completed',
+    attendance: Array.isArray(cycle.attendance) ? cycle.attendance : Array.isArray(cycle.entries) ? cycle.entries : []
+  }));
+  const startDate = String(summary && summary.cycleStartDate || summary && summary.configuredCycleStartDate || '');
+  return [{
+    startDate: startDate,
+    endDate: '',
+    attendanceCount: Math.max(0, Number(summary && summary.attendanceCount) || 0),
+    complete: !!(summary && summary.cycleComplete),
+    attendance: (Array.isArray(summary && summary.attendance) ? summary.attendance : []).filter(row => !startDate || String(row.date || '') >= startDate)
+  }];
+}
+
+function session4LedgerHistoryHtml(summary) {
+  const cycles = session4LedgerCycles(summary);
+  /* 4/4를 마친 직후에도 다음 출석 전까지 마지막 회차가 현재 회차다.
+   * 따라서 마지막 회차는 완료 여부와 관계없이 본문에 두고, 그 이전 완료분만 지난 원장으로 보인다. */
+  const past = cycles.slice(0, -1).filter(cycle => cycle.complete)
+    .sort((a, b) => String(b.startDate).localeCompare(String(a.startDate)));
+  if (!past.length) return '';
+  return '<details class="session4-ledger-history" data-persist-key="session4-history|' + esc(summary.studentId) + '"><summary>완료된 지난 회차 ' +
+    past.length + '개 보기</summary>' + past.map(cycle => '<div class="session4-ledger-cycle"><b>' + esc(cycle.startDate || '시작일 확인 필요') +
+      (cycle.endDate ? ' ~ ' + esc(cycle.endDate) : '') + '</b><div class="small muted">4회 중 ' + Math.min(4, Math.max(0, cycle.attendanceCount)) +
+      '회 출석</div>' + session4LedgerAttendanceHtml(cycle.attendance) + '</div>').join('') + '</details>';
+}
+
+function session4LedgerCardHtml(student) {
+  const summary = session4LedgerRows.get(String(student.id));
+  if (!summary) return '<article class="card session4-ledger-card"><div class="card-title">' + esc(student.name || '학생') + '</div>' +
+    '<div class="card-sub">' + esc(studentSchoolGradeDetailLabel(student) || '학교·학년 미지정') + '</div>' +
+    '<div class="small muted mt8">회차 출결 확인 필요</div></article>';
+  const size = Number(summary.cycleSize) || 4;
+  const count = Math.max(0, Math.min(size, Number(summary.attendanceCount) || 0));
+  const currentStart = String(summary.cycleStartDate || summary.configuredCycleStartDate || student.sessionCycleStartDate || '');
+  const cycles = session4LedgerCycles(summary);
+  const currentCycle = cycles.at(-1) || null;
+  const currentAttendance = currentCycle ? currentCycle.attendance : (summary.attendance || []).filter(row => !currentStart || String(row.date || '') >= currentStart);
+  return '<article class="card session4-ledger-card" data-session4-student="' + esc(student.id) + '"><div class="between"><div><div class="card-title">' +
+    esc(student.name || '학생') + '</div><div class="card-sub">' + esc(studentSchoolGradeDetailLabel(student) || '학교·학년 미지정') +
+    '</div></div><span class="pill ' + (count >= size ? 'ok' : count >= 3 ? 'warn' : '') + '">' + count + '/' + size + '회</span></div>' +
+    '<div class="session4-ledger-balance"><span><b>' + esc(currentStart || '미지정') + '</b>현재 회차 시작일</span><span><b>' + count + '회</b>현재 ' +
+    size + '회 중 출석</span></div>' + session4LedgerAttendanceHtml(currentAttendance) + session4LedgerHistoryHtml(summary) + '</article>';
+}
+
+function session4StudentLedgerHtml() {
+  if (!rosterDb) {
+    if (!rosterLoading && !rosterErr) setTimeout(() => loadRoster(), 0);
+    return '<section class="card session4-ledger-hero"><div class="card-title">회차제 학생 원장</div><div class="card-sub">회차제로 분류된 원생을 확인하는 중입니다.</div></section>';
+  }
+  const students = session4LedgerStudents();
+  const signature = session4LedgerSignature(students);
+  if (!session4LedgerLoading && session4LedgerLoadedSignature !== signature) setTimeout(() => loadSession4Ledger(false), 0);
+  let html = '<section class="card session4-ledger-hero"><div class="between"><div><div class="card-title">회차제 학생 원장</div>' +
+    '<div class="card-sub">학생 정보에서 회차제로 분류된 원생만 표시합니다. 월제 원생은 포함하지 않습니다.</div></div>' +
+    '<button type="button" class="btn btn-sm btn-ghost" data-act="session4ledgerrefresh"' + (session4LedgerLoading ? ' disabled' : '') + '>새로고침</button></div>' +
+    (session4LedgerError ? '<div class="hint mt8" role="alert">' + esc(session4LedgerError) + '</div>' : '') + '</section>';
+  if (!students.length) return html + '<div class="card"><div class="empty">현재 회차제로 분류된 재원생이 없습니다.</div></div>';
+  if (session4LedgerLoading && session4LedgerLoadedSignature !== signature) {
+    return html + '<div class="card"><div class="empty"><b>⏳</b>4회제 학생 출결을 불러오는 중입니다.</div></div>';
+  }
+  return html + '<div class="session4-ledger-grid" aria-live="polite">' + students.map(session4LedgerCardHtml).join('') + '</div>';
+}
+
 function viewSessionPacks() {
   if (!sessionPackLoaded && !sessionPackLoading) setTimeout(() => loadSessionPacks(false), 0);
   const rows = sessionPackRows.slice().sort((a, b) =>
     Number(a.status !== 'active') - Number(b.status !== 'active') ||
     Number(sessionPackIsAttention(b)) - Number(sessionPackIsAttention(a)) ||
     Number(a.remainingSessions) - Number(b.remainingSessions) || String(a.studentName || '').localeCompare(String(b.studentName || ''), 'ko'));
-  let h = '<section class="card session-pack-hero"><div class="between"><div><div class="card-title">회차제 수업</div>' +
+  let h = session4StudentLedgerHtml() + '<section class="card session-pack-hero"><div class="between"><div><div class="card-title">회차제 수업</div>' +
     '<div class="card-sub">보강과 분리된 수업 회차 원장입니다. 지정한 학생·수업만 표시하며 월제 수업은 표시하지 않습니다.</div></div>' +
     '<button class="btn btn-sm btn-ghost" data-act="sprefresh">새로고침</button></div>' +
     '<div class="hint mt8">출석·지각·조퇴 1회, 사전 인정 결석·학원 휴강 0회, 당일 취소·무단결석 1회입니다. 원 결석과 완료 보강은 합쳐 한 번만 차감합니다.</div></section>' +
@@ -9377,6 +9608,14 @@ function makeupCompletionTagHtml(task, date, check) {
 
 function makeupCreateKey(taskId, date) { return String(taskId || '') + '|' + String(date || ''); }
 
+function taskUsesSession4Billing(task, referenceDate) {
+  const student = rosterStudentByStableId(task && task.studentId);
+  const cycleStartDate = String(student && student.sessionCycleStartDate || '');
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(String(referenceDate || '')) ? String(referenceDate) : today();
+  return !!student && String(student.billingMode || 'monthly') === 'session4' &&
+    /^\d{4}-\d{2}-\d{2}$/.test(cycleStartDate) && date >= cycleStartDate;
+}
+
 function makeupRequestHtml(task, date, check) {
   if (!check || check.att !== 'A') return '';
   if (!isMakeupLessonTask(task)) return '';
@@ -9384,6 +9623,11 @@ function makeupRequestHtml(task, date, check) {
   if (linked) return '<div class="row wraprow mt14" style="gap:8px"><button class="btn btn-sm btn-ghost makeup-request" data-go="makeup">보강 · ' +
     esc(MAKEUP_STATUS_LABELS[linked.status] || linked.status) + '</button></div>';
   if (!task.studentId) return '<div class="small muted mt8">결석 출결은 저장됩니다. 보강 자동 검토는 원생 명단의 학생 ID를 이 수업에 연결한 뒤 만들 수 있습니다.</div>';
+  if (taskUsesSession4Billing(task, date)) {
+    return '<div class="row wraprow mt14" style="gap:8px"><button class="btn btn-sm btn-primary makeup-request" data-act="mucreate" data-id="' +
+      esc(task.id) + '" data-date="' + esc(date) + '">보강 검토 요청</button>' +
+      '<span class="small muted">회차제 결석은 자동 생성하지 않습니다. 필요한 경우에만 직접 요청해 주세요.</span></div>';
+  }
   const creating = makeupCreateStates.get(makeupCreateKey(task.id, date));
   if (creating && creating.status === 'pending') {
     return '<div class="row wraprow mt14" style="gap:8px"><button class="btn btn-sm btn-ghost makeup-request" disabled>출결 저장 확인 중 · 보강 자동 생성…</button></div>';
@@ -9724,6 +9968,12 @@ async function createMakeupFromAbsence(taskId, date, button, options) {
     toast('학생 ID가 연결된 수업의 결석 출결을 먼저 기록해 주세요');
     return false;
   }
+  if (automatic && typeof taskUsesSession4Billing === 'function' && taskUsesSession4Billing(task, date)) {
+    makeupCreateStates.delete(sourceKey);
+    toast('결석 저장됨 · 회차제는 보강을 자동 생성하지 않습니다');
+    renderAfterSync();
+    return false;
+  }
   const inFlight = makeupCreateStates.get(sourceKey);
   if (inFlight && inFlight.status === 'pending') return false;
   makeupCreateStates.set(sourceKey, { status: 'pending', expectedUpdatedAt: expectedUpdatedAt, operationId: operationId });
@@ -9753,7 +10003,8 @@ async function createMakeupFromAbsence(taskId, date, button, options) {
       return false;
     }
     const result = await sync.post('/makeup', {
-      app: SYNC_APP, auth: auth, action: 'create_from_absence', sourceTaskId: taskId, sourceDate: date
+      app: SYNC_APP, auth: auth, action: 'create_from_absence', sourceTaskId: taskId, sourceDate: date,
+      creationMode: automatic ? 'automatic' : 'manual'
     });
     replaceMakeup(result.case);
     const currentState = makeupCreateStates.get(sourceKey);
@@ -9766,6 +10017,13 @@ async function createMakeupFromAbsence(taskId, date, button, options) {
   } catch (error) {
     const current = getCheck(taskId, date);
     const currentState = makeupCreateStates.get(sourceKey);
+    const sessionAutomaticBlocked = automatic && String(error && error.code || '') === 'SESSION4_AUTOMATIC_MAKEUP_DISABLED';
+    if (sessionAutomaticBlocked) {
+      makeupCreateStates.delete(sourceKey);
+      toast('결석 저장됨 · 회차제는 보강을 자동 생성하지 않습니다');
+      renderAfterSync();
+      return false;
+    }
     if (currentState && currentState.operationId === operationId) {
       if (current && current.att === 'A') {
         makeupCreateStates.set(sourceKey, { status: error.makeupSyncFailed ? 'sync_failed' : 'create_failed', operationId: operationId });
@@ -10434,7 +10692,7 @@ function scheduleTimelineModal(entries, date) {
       const makeupLesson = isScheduledMakeupTask(task);
       return '<div class="task' + (makeupLesson ? ' is-makeup-lesson' : '') + '"><div class="task-body"><div class="between"><div class="task-t">' + esc(entry.studentName) +
         (displayGrade ? ' <span class="pill">' + esc(displayGrade) + '</span>' : '') + '</div><span class="row" style="gap:5px">' +
-        (makeupLesson ? '<span class="tag makeup-lesson">보강수업</span>' : '') + sessionModeBadgeHtml(task) +
+        (makeupLesson ? '<span class="tag makeup-lesson">보강수업</span>' : '') + sessionModeBadgeHtml(task, date) +
         '<span class="pill ' + att.cls + '">' + esc(att.label) + '</span></span></div>' +
         details.map(row => '<div class="schedule-info-row"><b>' + esc(row[0]) + '</b>' + esc(row[1]) + '</div>').join('') + '</div></div>';
     }).join('');
@@ -10487,13 +10745,13 @@ function scheduleSessionAttendanceRows(session, date) {
   return Array.from(rows.values());
 }
 
-function scheduleSessionRow(session, teacherName, timeText, hideTeacher) {
+function scheduleSessionRow(session, teacherName, timeText, hideTeacher, referenceDate) {
   const names = scheduleSessionNames(session);
   const shown = names.join(', ');
   const tasks = session.entries.map(entry => entry.task || {});
   const subjects = [...new Set(tasks.flatMap(task => [task.subject, task.className]).filter(Boolean))];
   const roles = [...new Set(session.entries.map(entry => entry.role).filter(Boolean))];
-  const modeBadges = sessionModeBadgesHtml(tasks);
+  const modeBadges = sessionModeBadgesHtml(tasks, referenceDate);
   const conflict = session.studentConflict;
   const makeup = tasks.some(isScheduledMakeupTask);
   const search = [teacherName].concat(session.entries.flatMap(entry => [
@@ -10520,7 +10778,7 @@ function scheduleWeekCardsHtml(weekly) {
     const sessions = byDate.get(date) || [];
     const pending = weekly.issues.filter(issue => (issue.dates || []).includes(date));
     const hasConflict = sessions.some(item => item.session.studentConflict);
-    const rows = sessions.map(item => scheduleSessionRow(item.session, item.teacher.teacherName, item.session.label));
+    const rows = sessions.map(item => scheduleSessionRow(item.session, item.teacher.teacherName, item.session.label, date));
     return '<div class="card schedule-day-card' + (date === today() ? ' is-today' : '') +
       (pending.length || hasConflict ? ' is-attention' : '') + '"><div class="schedule-day-head">' +
       '<div class="card-title">' + DOW[dowOf(date)] + '요일</div><div class="card-sub">' + shortDate(date) + '</div>' +
@@ -10556,7 +10814,7 @@ function scheduleTeacherCardsHtml(weekly) {
       .concat(issues.flatMap(issue => [issue.studentName, issue.grade, issue.message])).join(' ');
     const warnings = group.conflictCount + issues.length;
     const rows = group.sessions.map(session => scheduleSessionRow(
-      session, group.teacherName, DOW[dowOf(session.date)] + ' ' + session.label, true
+      session, group.teacherName, DOW[dowOf(session.date)] + ' ' + session.label, true, session.date
     ));
     return '<div class="card schedule-person-card' + (warnings ? ' is-attention' : '') + '" data-schedule-card data-card-search="' + esc(group.teacherName) + '" data-search="' + esc(search) + '">' +
       '<div class="between mb8"><div class="card-title">' + esc(group.teacherName) + ' 선생님</div>' +
@@ -10653,7 +10911,7 @@ function scheduleStudentCardsHtml(weekly) {
     const identityProblem = group.scheduleIdentityProblem;
     const conflictCount = group.scheduleConflictCount;
     const sources = scheduleStudentSources(group);
-    const modeBadges = sessionModeBadgesHtml(taskSources.map(entry => entry.task || {}));
+    const modeBadges = sessionModeBadgesForEntries(taskSources);
     const search = [name, grade, teachers, student.memo || ''].concat(subjects).concat(taskSources.flatMap(entry => {
       const task = entry.task || {};
       return [entry.teacherName, entry.role, task.subject, task.className, task.materials, task.homework,
@@ -11013,7 +11271,8 @@ function viewSchedule() {
   if (!session.isAdmin) return viewToday();
   const core = window.WBScheduleCore;
   if (!core) return '<div class="card"><div class="empty"><b>⚠️</b>수업 현황을 불러오지 못했습니다.<br>새로고침해 주세요.</div></div>';
-  ensureSessionModeData(state.tasks);
+  const sessionModeReferenceDate = scheduleView === 'day' ? cursor : addDays(mondayOf(cursor), 6);
+  ensureSessionModeData(state.tasks, sessionModeReferenceDate);
   if (!rosterDb && !rosterErr) loadRoster();
   if (!managerRequestInboxReady() && !managerInboxLoading && !makeupLoading) {
     setTimeout(() => loadManagerRequestInbox(false), 0);
@@ -16198,7 +16457,7 @@ function loadRoster() {
   const auth = sync.auth();
   if (!auth) {
     rosterErr = session.isStaffLink ? '개인 인증을 먼저 확인해 주세요' : '설정에서 동기화 비밀키를 저장해 주세요';
-    if (route === 'roster' || route === 'schedule' || route === 'books' || route === 'onboarding' || route === 'transport') render();
+    if (route === 'roster' || route === 'schedule' || route === 'books' || route === 'onboarding' || route === 'transport' || route === 'sessions') render();
     return;
   }
   const requestGeneration = rosterLoadGeneration;
@@ -16221,7 +16480,7 @@ function loadRoster() {
     .catch(e => {
       if (requestGeneration !== rosterLoadGeneration) return;
       rosterErr = String(e); rosterLoading = false;
-      if (route === 'roster' || route === 'schedule' || route === 'books' || route === 'onboarding' || route === 'transport') renderAfterSync();
+      if (route === 'roster' || route === 'schedule' || route === 'books' || route === 'onboarding' || route === 'transport' || route === 'sessions') renderAfterSync();
     })
     .finally(() => {
       rosterLoading = false;
@@ -16367,6 +16626,136 @@ function rosterStudentSubjectTeacherText(studentId, referenceDate) {
   return assignments.length ? assignments.map(row => row.subject + ' → ' + row.teacherNames.join('·')).join(' / ') : '담당 수업 미지정';
 }
 
+const STUDENT_ATTENDANCE_STATUS = {
+  P: { label: '출석', cls: 'present' },
+  L: { label: '지각', cls: 'late' },
+  A: { label: '결석', cls: 'absent' },
+  E: { label: '조퇴', cls: 'early' }
+};
+let studentAttendanceRequestSerial = 0;
+
+function studentAttendanceMonthShift(month, delta) {
+  const match = String(month || '').match(/^(\d{4})-(\d{2})$/);
+  const base = match ? new Date(Number(match[1]), Number(match[2]) - 1, 1) : parseYmd(today().slice(0, 7) + '-01');
+  base.setMonth(base.getMonth() + Number(delta || 0));
+  return ymd(base).slice(0, 7);
+}
+
+function studentAttendanceTaskLabel(row) {
+  const task = (state.tasks || []).find(item => String(item.id || '') === String(row && row.taskId || ''));
+  if (!task) return '수업 정보';
+  const teacher = staffById(task.staffId);
+  return [task.subject || task.className || task.lessonRole || '과목 미지정', teacher && teacher.name ? teacher.name + ' 선생님' : '']
+    .filter(Boolean).join(' · ');
+}
+
+function studentAttendancePanelHtml(student) {
+  const month = today().slice(0, 7);
+  return '<section class="student-attendance-calendar" data-student-attendance-calendar data-student-id="' + esc(student.id) +
+    '" data-month="' + esc(month) + '"><div class="student-attendance-loading" role="status">출결 달력을 불러오는 중입니다.</div></section>';
+}
+
+function studentAttendanceCalendarHtml(result, month) {
+  const match = String(month || '').match(/^(\d{4})-(\d{2})$/);
+  const year = match ? Number(match[1]) : Number(today().slice(0, 4));
+  const monthNumber = match ? Number(match[2]) : Number(today().slice(5, 7));
+  const firstDay = new Date(year, monthNumber - 1, 1).getDay();
+  const dayCount = new Date(year, monthNumber, 0).getDate();
+  const rows = (Array.isArray(result && result.attendance) ? result.attendance : []).filter(row =>
+    row && /^\d{4}-\d{2}-\d{2}$/.test(String(row.date || '')) && String(row.date).slice(0, 7) === month && STUDENT_ATTENDANCE_STATUS[row.status]
+  ).slice().sort((a, b) => String(a.date).localeCompare(String(b.date)) || String(a.taskId || '').localeCompare(String(b.taskId || '')));
+  const byDate = new Map();
+  rows.forEach(row => {
+    const date = String(row.date);
+    if (!byDate.has(date)) byDate.set(date, []);
+    byDate.get(date).push(row);
+  });
+  const cells = Array.from({ length: firstDay }, () => '<div class="student-attendance-day is-empty" aria-hidden="true"></div>');
+  for (let day = 1; day <= dayCount; day++) {
+    const date = year + '-' + String(monthNumber).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+    const dayRows = byDate.get(date) || [];
+    const statuses = [...new Set(dayRows.map(row => row.status))];
+    const stateClass = statuses.length > 1 ? ' has-mixed' : statuses.length === 1 ? ' has-' + STUDENT_ATTENDANCE_STATUS[statuses[0]].cls : '';
+    const aria = dayRows.length ? date + ' ' + dayRows.map(row => STUDENT_ATTENDANCE_STATUS[row.status].label).join(', ') : date + ' 출결 기록 없음';
+    cells.push('<div class="student-attendance-day' + stateClass + (date === today() ? ' is-today' : '') + '" aria-label="' + esc(aria) + '">' +
+      '<span class="student-attendance-day-number">' + day + '</span>' +
+      (dayRows.length ? '<span class="student-attendance-marks" aria-hidden="true">' + dayRows.map(row =>
+        '<i class="student-attendance-mark is-' + STUDENT_ATTENDANCE_STATUS[row.status].cls + '"></i>').join('') + '</span>' : '') + '</div>');
+  }
+  const list = rows.length ? rows.slice().reverse().map(row => {
+    const descriptor = STUDENT_ATTENDANCE_STATUS[row.status];
+    return '<div class="student-attendance-list-row"><b>' + esc(String(row.date).slice(5).replace('-', '/')) + '</b>' +
+      '<span class="student-attendance-state is-' + descriptor.cls + '">' + descriptor.label + '</span><span>' +
+      esc(studentAttendanceTaskLabel(row)) + '</span></div>';
+  }).join('') : '<div class="student-attendance-loading">이 달의 출결 기록이 없습니다.</div>';
+  return '<div class="student-attendance-calendar-head"><button type="button" class="btn btn-sm btn-ghost" data-act="studentattendancemonth" data-id="' +
+    esc(result.studentId) + '" data-month="' + esc(month) + '" data-n="-1" aria-label="이전 달">‹</button>' +
+    '<div class="student-attendance-calendar-title">' + year + '년 ' + monthNumber + '월 출결</div>' +
+    '<button type="button" class="btn btn-sm btn-ghost" data-act="studentattendancemonth" data-id="' + esc(result.studentId) +
+    '" data-month="' + esc(month) + '" data-n="1" aria-label="다음 달">›</button></div>' +
+    '<div class="student-attendance-weekdays" aria-hidden="true"><span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span></div>' +
+    '<div class="student-attendance-days">' + cells.join('') + '</div>' +
+    '<div class="student-attendance-legend" aria-label="출결 색상 안내">' + Object.values(STUDENT_ATTENDANCE_STATUS).map(item =>
+      '<span><i class="student-attendance-mark is-' + item.cls + '"></i>' + item.label + '</span>').join('') + '</div>' +
+    '<div class="student-attendance-list" aria-label="월별 출결 상세">' + list + '</div>';
+}
+
+function studentAttendancePanelFor(studentId) {
+  const matching = Array.from(document.querySelectorAll('[data-student-attendance-calendar]'))
+    .filter(element => String(element.dataset.studentId || '') === String(studentId || ''));
+  return matching.find(element => element.closest('#modalHost:not([hidden])')) || matching[0] || null;
+}
+
+function applyStudentCycleSummary(panel, result) {
+  const scope = panel.closest('.roster-transition-detail, .modal-box') || document;
+  const studentId = String(result && result.studentId || '');
+  Array.from(scope.querySelectorAll('[data-student-cycle-start]')).filter(element =>
+    String(element.dataset.studentId || '') === studentId).forEach(element => {
+      element.textContent = String(result.cycleStartDate || element.dataset.fallback || '미지정');
+    });
+  Array.from(scope.querySelectorAll('[data-student-cycle-count]')).filter(element =>
+    String(element.dataset.studentId || '') === studentId).forEach(element => {
+      const size = Number(result.cycleSize) || 4;
+      const count = Math.max(0, Math.min(size, Number(result.attendanceCount) || 0));
+      element.textContent = '현재 ' + size + '회 중 ' + count + '회 출석';
+    });
+}
+
+async function loadStudentAttendance(studentId, month) {
+  const panel = studentAttendancePanelFor(studentId);
+  if (!panel) return false;
+  const selectedMonth = /^\d{4}-\d{2}$/.test(String(month || '')) ? String(month) : today().slice(0, 7);
+  const auth = sync.auth();
+  const requestId = String(++studentAttendanceRequestSerial);
+  panel.dataset.month = selectedMonth;
+  panel.dataset.requestId = requestId;
+  panel.innerHTML = '<div class="student-attendance-loading" role="status">' + esc(selectedMonth) + ' 출결을 불러오는 중입니다.</div>';
+  if (!auth) {
+    panel.innerHTML = '<div class="student-attendance-loading" role="alert">인증을 확인한 뒤 출결 달력을 다시 열어 주세요.</div>';
+    return false;
+  }
+  try {
+    const result = await sync.post('/student-attendance', {
+      app: SYNC_APP, auth: auth, action: 'get', studentId: String(studentId), month: selectedMonth
+    });
+    const current = studentAttendancePanelFor(studentId);
+    if (!current || current.dataset.requestId !== requestId || String(result && result.studentId || '') !== String(studentId)) return false;
+    applyStudentCycleSummary(current, result);
+    current.innerHTML = studentAttendanceCalendarHtml(result, selectedMonth);
+    current.dataset.loaded = 'true';
+    return true;
+  } catch (error) {
+    const current = studentAttendancePanelFor(studentId);
+    if (!current || current.dataset.requestId !== requestId) return false;
+    Array.from((current.closest('.roster-transition-detail, .modal-box') || document).querySelectorAll('[data-student-cycle-count]'))
+      .filter(element => String(element.dataset.studentId || '') === String(studentId)).forEach(element => { element.textContent = '현재 회차 확인 필요'; });
+    current.innerHTML = '<div class="student-attendance-loading" role="alert">출결 달력을 불러오지 못했습니다.<br>' +
+      '<button type="button" class="btn btn-sm btn-ghost mt8" data-act="studentattendanceretry" data-id="' + esc(studentId) +
+      '" data-month="' + esc(selectedMonth) + '">다시 시도</button></div>';
+    return false;
+  }
+}
+
 function rosterStudentLessonsHtml(student) {
   const lessons = rosterStudentLessonTasks(student.id);
   if (!lessons.length) return '<div class="empty"><b>등록된 수업이 없습니다</b>수업 등록 및 변경 탭에서 이 학생의 수업을 등록해 주세요.</div>';
@@ -16413,11 +16802,14 @@ function rosterStudentInfoHtml(student, lessonReferences, taskId) {
       '</b><span>' + esc(billingMode) + '</span></div>' +
     (String(student.billingMode || 'monthly') === 'session4'
       ? '<div class="student-info-field"><b>회차 시작일' + (changed.has('sessionCycleStartDate') ? marker('회차 시작일') : '') +
-        '</b><span>' + esc(student.sessionCycleStartDate || '미지정') + '</span></div>' : '') +
+        '</b><span data-student-cycle-start data-student-id="' + esc(student.id) + '" data-fallback="' + esc(student.sessionCycleStartDate || '미지정') + '">' +
+        esc(student.sessionCycleStartDate || '미지정') + '</span></div>' +
+        '<div class="student-info-field"><b>현재 회차 출석</b><span data-student-cycle-count data-student-id="' + esc(student.id) + '">확인 중…</span></div>' : '') +
     field('과목별 수업 담당', rosterStudentSubjectTeacherText(student.id), true, ['staffId']) + field('재원 기간', period, true, ['start', 'end']) +
     (student.reason ? field('종료 사유', student.reason, true, ['reason']) : '') +
     (student.memo ? field('내부 메모', student.memo, true, ['memo']) : '') +
     (references.length ? field('수업 참고', references.map(item => '· ' + item).join('\n'), true, ['guide', 'steps', 'lessonReferences']) : '') + '</div>' +
+    studentAttendancePanelHtml(student) +
     (typeof studentChangeHistoryHtml === 'function' ? studentChangeHistoryHtml(student.id) : '');
 }
 
@@ -16452,6 +16844,7 @@ function showRosterStudentInfo(studentId) {
   else if (requestTask) actions.push('<button class="btn btn-ghost btn-block mt14" data-act="studentinforequest" data-id="' + esc(requestTask.id) + '" data-student-id="' + esc(student.id) + '">정보수정요청</button>');
   if (pendingStudentChanges(student.id).length) actions.push('<button class="btn btn-primary btn-block mt14" data-act="studentchangeack" data-student-id="' + esc(student.id) + '">수정내용확인</button>');
   modal(student.name + ' 학생 정보', rosterStudentInfoHtml(student, studentLessonReferenceItems(student.id)), actions.join(''));
+  loadStudentAttendance(student.id, today().slice(0, 7));
 }
 
 function showRosterStudentLessons(studentId) {
@@ -17425,7 +17818,7 @@ function viewRoster() {
   const months = rosterMonths();
   const cur = months[0];
   const curActive = activeIn(cur).filter(student => !rosterStudentTransition(student));
-  ensureSessionModeData(state.tasks);
+  ensureSessionModeData(state.tasks, today());
 
   let h = acaflowImport;
 
@@ -19632,6 +20025,10 @@ document.addEventListener('click', ev => {
     case 'tuitionAlertConfirm': confirmTuitionAlert(String(el.dataset.alert || ''), el); break;
 
     /* 회차제 수업 */
+    case 'session4ledgerrefresh':
+      session4LedgerLoadedSignature = '';
+      loadSession4Ledger(true);
+      break;
     case 'sprefresh': sessionPackLoaded = false; loadSessionPacks(true); break;
     case 'spcreate': createSessionPack(el); break;
     case 'spadjust': sessionPackAdjustmentModal(String(el.dataset.pack || ''), Number(el.dataset.rev), Number(el.dataset.delta)); break;
@@ -19643,7 +20040,7 @@ document.addEventListener('click', ev => {
     case 'murefresh': makeupLoaded = false; loadMakeups(true); break;
     case 'mumanualopen': openManualMakeupModal(); break;
     case 'mumanualsubmit': submitManualMakeup(el); break;
-    case 'mucreate': createMakeupFromAbsence(String(id || ''), String(date || ''), el); break;
+    case 'mucreate': createMakeupFromAbsence(String(id || ''), String(date || ''), el, { automatic: false }); break;
     case 'muschedule': {
       makeupDateTimeModal(makeupRows.find(row => row.caseId === String(el.dataset.case || '')), 'schedule');
       break;
@@ -19689,6 +20086,12 @@ document.addEventListener('click', ev => {
       scheduleTimelineModal(entries, date);
       break;
     }
+    case 'studentattendancemonth':
+      loadStudentAttendance(String(id || ''), studentAttendanceMonthShift(String(el.dataset.month || ''), Number(el.dataset.n || 0)));
+      break;
+    case 'studentattendanceretry':
+      loadStudentAttendance(String(id || ''), String(el.dataset.month || ''));
+      break;
     case 'rosterretry': rosterErr = ''; rosterDb = null; loadRoster(); render(); break;
     case 'rosterstudentinfo': showRosterStudentInfo(String(id || '')); break;
     case 'rosterstudentlessons': showRosterStudentLessons(String(id || '')); break;
@@ -20448,6 +20851,8 @@ document.addEventListener('click', ev => {
         toast('결석 출결 저장됨 · 상담 업무는 보강 검토 대상이 아닙니다');
       } else if (next === 'A' && !t.studentId) {
         toast('결석 출결 저장됨 · 학생 ID가 연결되지 않아 보강 검토는 자동 생성되지 않습니다');
+      } else if (next === 'A' && taskUsesSession4Billing(t, date)) {
+        toast('결석 저장됨 · 회차제는 보강을 자동 생성하지 않습니다');
       } else if (next === 'A' && date === today()) {
         toast('결석 출결 저장 중 · 보강 검토를 자동 생성합니다');
         createMakeupFromAbsence(id, date, null, { automatic: true, expectedUpdatedAt: savedCheck.updatedAt });
@@ -21596,6 +22001,11 @@ document.addEventListener('change', async ev => {
 });
 
 document.addEventListener('toggle', ev => {
+  if (ev.target && ev.target.open && ev.target.querySelectorAll) {
+    ev.target.querySelectorAll('[data-student-attendance-calendar]:not([data-loaded="true"])').forEach(panel => {
+      loadStudentAttendance(String(panel.dataset.studentId || ''), String(panel.dataset.month || ''));
+    });
+  }
   if (ev.target && ev.target.matches && ev.target.matches('.lesson-direct-entry')) {
     const wasOpen = lessonDirectEntryOpen;
     lessonDirectEntryOpen = ev.target.open;
@@ -21738,7 +22148,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-09-04.2';
+const APP_VER = '2026-09-04.3';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);

@@ -65,12 +65,14 @@ test('KPI funnel covers remaining 3, 1, 0 and expiry attention', () => {
 });
 
 test('lesson mode badges default to monthly only after the scoped pack list succeeds', () => {
-  const source = block('function sessionPackForLessonTask(task)', 'function sessionModeBadgeHtml(task)');
-  const make = (loaded, error, packs) => new Function(
+  const source = block('function sessionPackForLessonTask(task, referenceDate)', 'function sessionModeBadgeHtml(task, referenceDate)');
+  const make = (loaded, error, packs, rosterSession4 = false, summaries = new Map(), ledgerLoading = false, ledgerError = '') => new Function(
     'sessionPackLoaded', 'sessionPackError', 'sessionPackRows', 'sessionModeLessonTask', 'sessionPackDaysLeft',
+    'taskUsesSession4Billing', 'session4LedgerRows', 'session4LedgerLoading', 'session4LedgerError',
     `${source}\nreturn sessionModeBadgeDescriptor;`
-  )(loaded, error, packs, task => !!task && !task.deleted, expiry => expiry === '2026-08-18' ? 7 : 90);
-  const lesson = { id: 'lesson-1' };
+  )(loaded, error, packs, task => !!task && !task.deleted, expiry => expiry === '2026-08-18' ? 7 : 90,
+    () => rosterSession4, summaries, ledgerLoading, ledgerError);
+  const lesson = { id: 'lesson-1', studentId: 'student-1' };
 
   assert.deepEqual(make(false, '', [])(lesson), { text: '수업 형태 확인 중', cls: '' });
   assert.deepEqual(make(true, 'temporary', [])(lesson), { text: '수업 형태 확인 필요', cls: 'is-error' });
@@ -86,10 +88,36 @@ test('lesson mode badges default to monthly only after the scoped pack list succ
   assert.match(sessionMode.cls, /is-session/);
   assert.match(sessionMode.cls, /is-critical/);
   assert.match(sessionMode.title, /보호자 안내 검토/);
+
+  assert.deepEqual(make(false, 'temporary', [], true)(lesson), { text: '회차제 · 4회', cls: 'is-session' });
+  assert.deepEqual(make(true, '', [], true, new Map([['student-1', { attendanceCount: 3, cycleSize: 4 }]]))(lesson), {
+    text: '회차제 · 3/4회', cls: 'is-session', title: '학생 단위 4회제 · 출석·지각·조퇴 합산'
+  });
+});
+
+test('학생 단위 4회제는 결석 차감 드롭다운 없이 P/L/E 1회·결석 0회와 자동보강 없음만 안내한다', () => {
+  const source = block('function sessionPackAttendanceHintHtml(task, date, check, attendanceState)', 'function sessionPackAlertInfo(pack)');
+  const hint = new Function('SESSION_PACK_ABSENCE_OPTIONS', 'esc', `${source}\nreturn sessionPackAttendanceHintHtml;`)(
+    [['approved_absence', '사전 인정 결석 · 비차감'], ['same_day', '당일 취소 · 1회 차감']],
+    value => String(value == null ? '' : value)
+  );
+  const task = { id: 'lesson-1' };
+  const rosterOnly = hint(task, '2026-09-04', { att: 'A' }, { pack: null, rosterSession4: true, locked: false, reflected: false });
+
+  assert.doesNotMatch(rosterOnly, /data-session-pack-absence|결석 차감 유형|당일 취소/);
+  assert.match(rosterOnly, /출석·지각·조퇴는 1회, 결석은 0회/);
+  assert.match(rosterOnly, /23:50에 확정/);
+  assert.match(rosterOnly, /보강은 자동 생성하지 않습니다/);
+
+  const legacy = hint(task, '2026-09-04', { att: 'A', absenceType: 'same_day' },
+    { pack: { packId: 'pack-1' }, rosterSession4: true, locked: false, reflected: false });
+  assert.match(legacy, /data-session-pack-absence/);
+  assert.match(legacy, /결석 차감 유형/);
+  assert.match(legacy, /당일 취소 · 1회 차감/);
 });
 
 test('monthly and session badges render for administrators only', () => {
-  const source = block('function sessionModeBadgeHtml(task)', 'function sessionModeBadgesHtml(tasks)');
+  const source = block('function sessionModeBadgeHtml(task, referenceDate)', 'function sessionModeBadgesHtml(tasks, referenceDate)');
   const make = isAdmin => new Function('session', 'sessionModeBadgeDescriptor', 'esc',
     `${source}\nreturn sessionModeBadgeHtml;`)(
       { isAdmin }, () => ({ text: '월제', cls: 'is-monthly' }), value => String(value || '')
@@ -101,15 +129,29 @@ test('monthly and session badges render for administrators only', () => {
 
 test('session mode badges apply only to structured session-pack eligible lessons', () => {
   const helpers = block("const isLesson =", '/** 수업 지시서 제목');
-  const source = block('function sessionModeLessonTask(task)', 'function sessionPackForLessonTask(task)');
+  const source = block('function sessionModeLessonTask(task)', 'function sessionPackForLessonTask(task, referenceDate)');
   assert.match(helpers, /const isSessionLessonTask =/);
   assert.match(helpers, /taskKind === 'lesson_instruction'/);
   assert.doesNotMatch(helpers.match(/const isSessionLessonTask[\s\S]*?;\r?\n/)[0], /\[수업\]|컨설팅/);
   assert.match(source, /return isSessionLessonTask\(task\)/);
 });
 
+test('legacy 수업별 회차권도 조회 날짜가 유효기간 안일 때만 과거 화면에 적용한다', () => {
+  const source = block('function sessionPackForLessonTask(task, referenceDate)', 'const SESSION_PACK_ATTENDANCE_CUTOFF_MINUTE');
+  const lesson = { id: 'lesson-1' };
+  const pack = { status: 'active', lessonTaskId: lesson.id, validFrom: '2026-08-01', expiresOn: '2026-08-31' };
+  const find = new Function('sessionModeLessonTask', 'sessionPackRows', `${source}\nreturn sessionPackForLessonTask;`)(
+    task => !!task,
+    [pack]
+  );
+
+  assert.equal(find(lesson, '2026-08-31'), pack);
+  assert.equal(find(lesson, '2026-09-01'), null);
+  assert.equal(find(lesson, 'invalid-date'), pack, '날짜가 없던 구형 호출은 기존 active 조회와 호환한다');
+});
+
 test('session attention makes 3, 1, 0 and expiry states explicit without auto sending', () => {
-  const source = block('function sessionPackAlertInfo(pack)', 'function sessionModeBadgeDescriptor(task)');
+  const source = block('function sessionPackAlertInfo(pack)', 'function sessionModeBadgeDescriptor(task, referenceDate)');
   const alert = new Function('sessionPackDaysLeft', `${source}\nreturn sessionPackAlertInfo;`)(
     expiry => ({ '2026-12-31': 90, '2026-08-18': 7, '2026-08-01': -1 }[expiry])
   );
@@ -144,11 +186,11 @@ test('today and schedule reuse session-pack badges while the own-roster list sho
 
   assert.match(loader, /new Set\(\['today', 'schedule'\]\)/);
   assert.match(loader, /setTimeout\(\(\) => loadSessionPacks\(false\), 0\)/);
-  assert.match(today, /ensureSessionModeData\(list\)/);
-  assert.match(task, /sessionModeBadgeHtml\(t\)/);
-  assert.match(schedule, /sessionModeBadgeHtml\(task\)/);
-  assert.match(schedule, /sessionModeBadgesHtml\(tasks\)/);
-  assert.match(studentCards, /sessionModeBadgesHtml\(taskSources\.map/);
+  assert.match(today, /ensureSessionModeData\(list, cursor\)/);
+  assert.match(task, /sessionModeBadgeHtml\(t, recordDate \|\| date\)/);
+  assert.match(schedule, /sessionModeBadgeHtml\(task, date\)/);
+  assert.match(schedule, /sessionModeBadgesHtml\(tasks, referenceDate\)/);
+  assert.match(studentCards, /sessionModeBadgesForEntries\(taskSources\)/);
   assert.doesNotMatch(roster, /sessionModeBadgesForStudent\(s\.id, today\(\)\)/);
   assert.match(roster, /mineActive\.map[\s\S]*studentSchoolGradeDetailLabel\(s\)/);
 });
