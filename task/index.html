@@ -1008,6 +1008,7 @@
   }
 
   hr.sep { border: none; border-top: 1px solid var(--line); margin: 14px 0; }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
   .hint { font-size: 12.5px; color: var(--mid-gray); line-height: 1.65; }
   .feedback-polish-status, .feedback-final-send-status { min-height: 22px; font-size: 12.5px; font-weight: 700; line-height: 1.55; }
   .feedback-polish-status[data-state="working"], .feedback-final-send-status[data-state="working"] { color: var(--deep-blue); }
@@ -1029,17 +1030,14 @@
   }
   .feedback-record[open] > summary::after, .feedback-teacher-group[open] > summary::after { content: '접기'; }
   .feedback-record-body, .feedback-teacher-group-body { margin-top: 10px; padding-top: 12px; border-top: 1px solid var(--line); }
-  .feedback-weekday-grid { display: grid; grid-template-columns: repeat(7,minmax(0,1fr)); gap: 8px; margin-top: 14px; }
-  .feedback-weekday-button {
-    min-width: 0; min-height: 70px; padding: 9px 7px; border: 1px solid var(--line); border-radius: 11px;
-    background: #FFF; color: var(--navy); font: inherit; text-align: center; cursor: pointer;
+  .feedback-date-nav { margin: 14px 0 8px; }
+  .feedback-date-nav .d { flex: 1 1 auto; text-align: center; }
+  .feedback-date-input {
+    width: min(230px,100%); min-height: 44px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px;
+    background: #FFF; color: var(--navy); font: inherit; font-size: 15px; font-weight: 900; text-align: center;
   }
-  .feedback-weekday-button b, .feedback-weekday-button span { display: block; }
-  .feedback-weekday-button b { font-size: 13px; }
-  .feedback-weekday-button span { margin-top: 5px; color: var(--mid-gray); font-size: 10.5px; font-weight: 800; line-height: 1.45; }
-  .feedback-weekday-button[aria-pressed="true"] { border-color: var(--deep-blue); background: #EAF6FC; box-shadow: inset 0 0 0 1px var(--deep-blue); }
-  .feedback-weekday-button[aria-pressed="true"] span { color: var(--deep-blue); }
-  .feedback-weekday-summary { margin-top: 12px; padding: 11px 12px; border-radius: 10px; background: #F8FBFD; color: var(--navy); font-size: 12.5px; line-height: 1.6; }
+  .feedback-date-today { display: flex; justify-content: center; }
+  .feedback-date-summary { margin-top: 12px; padding: 11px 12px; border-radius: 10px; background: #F8FBFD; color: var(--navy); font-size: 12.5px; line-height: 1.6; }
   .feedback-teacher-group-body > .feedback-record { margin-left: 0; margin-right: 0; }
   .feedback-message-label { margin-bottom: 6px; color: var(--navy); font-size: 12px; font-weight: 900; }
   .feedback-message-text {
@@ -1047,9 +1045,7 @@
     color: var(--navy); font-size: 13px; line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere;
   }
   .feedback-send-reason { overflow-wrap: anywhere; }
-  @media(max-width:720px) {
-    .feedback-weekday-grid { grid-template-columns: repeat(4,minmax(0,1fr)); }
-  }
+  @media(max-width:420px) { .feedback-date-input { width: 100%; font-size: 14px; } }
   .newver {
     position: fixed; left: 0; right: 0; bottom: 0; z-index: 90;
     background: var(--navy); color: #fff; padding: 12px 16px;
@@ -1080,11 +1076,11 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-09-03.6"></script>
-<script src="./schedule-board-core.js?v=2026-09-03.6"></script>
-<script src="./asset-core.js?v=2026-09-03.6"></script>
-<script src="./qr-core.js?v=2026-09-03.6"></script>
-<script src="./acaflow-import-core.js?v=2026-09-03.6"></script>
+<script src="./lesson-form-core.js?v=2026-09-04.1"></script>
+<script src="./schedule-board-core.js?v=2026-09-04.1"></script>
+<script src="./asset-core.js?v=2026-09-04.1"></script>
+<script src="./qr-core.js?v=2026-09-04.1"></script>
+<script src="./acaflow-import-core.js?v=2026-09-04.1"></script>
 <script>
 "use strict";
 
@@ -1958,7 +1954,9 @@ function resetPersonCache(token) {
   lessonPreviewExpectedUpdatedAt = 0; lessonSubmitting = false; lessonDirectEntryOpen = false;
   lessonExistingChangeOpen = false; lessonExistingSearchQuery = '';
   feedbackQueue = []; feedbackQueueLoaded = false; feedbackQueueLoading = false; feedbackQueueError = '';
-  feedbackWeekdayFilter = '';
+  feedbackDateFilter = today(); feedbackDateQueue = []; feedbackDateQueueLoadedDate = '';
+  feedbackDateQueueLoadingDate = ''; feedbackDateQueueError = '';
+  feedbackDateQueueRequestSeq = Number(feedbackDateQueueRequestSeq || 0) + 1;
   ownFeedbackQueue = []; ownFeedbackQueueLoaded = false; ownFeedbackQueueLoading = false; ownFeedbackQueueError = '';
   lessonChangeQueue = []; lessonChangeQueueLoaded = false; lessonChangeQueueLoading = false; lessonChangeQueueError = '';
   ownLessonChangeQueue = []; ownLessonChangeQueueLoaded = false; ownLessonChangeQueueLoading = false; ownLessonChangeQueueError = ''; ownLessonChangeLastLoadedAt = 0;
@@ -3080,12 +3078,14 @@ async function loadWeekendVisitScheduleScope(date, staffId, force) {
       if (isCurrentWeekendVisitScopeRequest(key, generation) &&
           Number(weekendVisitScheduleRetryAt.get(key) || 0) <= Date.now()) {
         weekendVisitScheduleRetryAt.delete(key);
-        if (route === 'week' || route === 'schedule' || route === 'today') loadWeekendVisitScheduleScope(date, staffId);
+        if (route === 'week' || route === 'schedule' || route === 'today' || route === 'feedback') {
+          loadWeekendVisitScheduleScope(date, staffId);
+        }
       }
     }, 15050);
   } finally {
     finishWeekendVisitScopeRequest(key, generation);
-    if (route === 'week' || route === 'schedule' || route === 'today') renderAfterSync();
+    if (route === 'week' || route === 'schedule' || route === 'today' || route === 'feedback') renderAfterSync();
   }
 }
 
@@ -3130,6 +3130,8 @@ function visibleWeekendVisitScopes() {
     dates.forEach(date => add(date, '', false));
   } else if (route === 'board' && session.isAdmin) {
     add(cursor, '', true);
+  } else if (route === 'feedback' && session.isAdmin) {
+    add(feedbackDateFilter, '', false);
   }
   return [...scopes.values()];
 }
@@ -7621,7 +7623,12 @@ let ownFeedbackQueue = [];
 let ownFeedbackQueueLoaded = false;
 let ownFeedbackQueueLoading = false;
 let ownFeedbackQueueError = '';
-let feedbackWeekdayFilter = '';
+let feedbackDateFilter = today();
+let feedbackDateQueue = [];
+let feedbackDateQueueLoadedDate = '';
+let feedbackDateQueueLoadingDate = '';
+let feedbackDateQueueError = '';
+let feedbackDateQueueRequestSeq = 0;
 
 const FEEDBACK_WEEKDAYS = [
   { key: '1', day: 1, label: '월요일' },
@@ -7634,6 +7641,7 @@ const FEEDBACK_WEEKDAYS = [
 ];
 
 const FEEDBACK_STATUS_LABEL = {
+  not_started: ['미발송', 'warn'],
   approval_waiting: ['원장 검토 대기', 'warn'],
   content_approved_send_blocked: ['문구 승인 · 발송 대기', ''],
   sent: ['전달 확인 중 · 솔라피 접수', 'warn'],
@@ -7741,28 +7749,24 @@ function feedbackWeekdayLabel(value) {
   return weekday ? weekday.label : '요일 미확인';
 }
 
-function feedbackWeekdaySummary(rows) {
-  const summaries = FEEDBACK_WEEKDAYS.map(day => ({
-    key: day.key, day: day.day, label: day.label,
-    deliveredCount: 0, pendingCount: 0, unknownCount: 0,
-    failedCount: 0, unsentCount: 0, totalCount: 0
-  }));
-  const byKey = new Map(summaries.map(summary => [summary.key, summary]));
-  (Array.isArray(rows) ? rows : []).forEach(item => {
-    const category = feedbackDeliveryCategory(item);
-    if (category === 'excluded') return;
-    const summary = byKey.get(feedbackWeekdayKey(item.feedbackDate));
-    if (!summary) return;
-    summary.totalCount += 1;
-    summary[category + 'Count'] += 1;
-  });
-  return summaries;
+function feedbackDateKey(value) {
+  const source = String(value || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(source)) return '';
+  const parsed = parseYmd(source);
+  return Number.isFinite(parsed.getTime()) && ymd(parsed) === source ? source : '';
 }
 
-function feedbackFilterByWeekday(rows, weekdayKey) {
-  const key = String(weekdayKey || '');
-  if (!FEEDBACK_WEEKDAYS.some(day => day.key === key)) return [];
-  return (Array.isArray(rows) ? rows : []).filter(item => feedbackWeekdayKey(item && item.feedbackDate) === key);
+function feedbackShiftDate(value, delta) {
+  const date = feedbackDateKey(value);
+  const amount = Number(delta);
+  if (!date || !Number.isInteger(amount) || Math.abs(amount) > 3660) return '';
+  return addDays(date, amount);
+}
+
+function feedbackFilterByDate(rows, date) {
+  const key = feedbackDateKey(date);
+  if (!key) return [];
+  return (Array.isArray(rows) ? rows : []).filter(item => feedbackDateKey(item && item.feedbackDate) === key);
 }
 
 function feedbackTaskForItem(item, taskOverride) {
@@ -7869,6 +7873,62 @@ function feedbackTeacherGroups(rows, lessonTimeFirst) {
     a.owner.localeCompare(b.owner, 'ko'));
 }
 
+function feedbackOccurrenceRequestRank(item) {
+  const category = feedbackDeliveryCategory(item);
+  return ({ delivered: 4, pending: 3, unknown: 3, failed: 2, unsent: 1, excluded: 0 })[category] || 0;
+}
+
+function feedbackPreferredOccurrence(current, candidate) {
+  if (!current) return candidate;
+  if (current.syntheticMissing && !candidate.syntheticMissing) return candidate;
+  if (!current.syntheticMissing && candidate.syntheticMissing) return current;
+  const rankDiff = feedbackOccurrenceRequestRank(candidate) - feedbackOccurrenceRequestRank(current);
+  if (rankDiff) return rankDiff > 0 ? candidate : current;
+  return feedbackUpdatedAt(candidate) > feedbackUpdatedAt(current) ? candidate : current;
+}
+
+function feedbackDateOccurrences(date, queue) {
+  const key = feedbackDateKey(date);
+  if (!key) return [];
+  const occurrences = new Map();
+  (Array.isArray(state.tasks) ? state.tasks : []).forEach(task => {
+    if (!task || !task.id || isBookOrderWorkTask(task) || !isLesson(task) || !teacherTaskCardOccursOn(task, key)) return;
+    const taskId = String(task.id);
+    occurrences.set(taskId, {
+      requestKey: 'not-started|' + taskId + '|' + key,
+      taskId: taskId,
+      feedbackDate: key,
+      owner: String(task.staffId || ''),
+      teacherName: '',
+      studentId: String(task.studentId || ''),
+      studentName: String(task.studentName || ''),
+      status: 'not_started',
+      revision: 0,
+      updatedAt: 0,
+      syntheticMissing: true
+    });
+  });
+  feedbackFilterByDate(queue, key).forEach(item => {
+    if (!item || feedbackDeliveryCategory(item) === 'excluded') return;
+    const taskId = String(item.taskId || '');
+    const occurrenceKey = taskId || ('request|' + String(item.requestKey || ''));
+    if (!occurrenceKey) return;
+    const current = occurrences.get(occurrenceKey);
+    const candidate = Object.assign({}, current || {}, item, {
+      taskId: taskId,
+      feedbackDate: key,
+      owner: String(item.owner || (current && current.owner) || ''),
+      syntheticMissing: false
+    });
+    occurrences.set(occurrenceKey, feedbackPreferredOccurrence(current, candidate));
+  });
+  return Array.from(occurrences.values());
+}
+
+function feedbackDateTeacherGroups(date, queue) {
+  return feedbackTeacherGroups(feedbackDateOccurrences(date, queue), true);
+}
+
 function feedbackStoredMessageHtml(item) {
   const storedMessage = String(item && item.message || '');
   const message = storedMessage.trim() ? storedMessage : '저장된 최종 메시지가 없습니다.';
@@ -7917,6 +7977,44 @@ async function loadFeedbackQueue(force) {
   } finally {
     feedbackQueueLoading = false;
     if (route === 'feedback') render();
+  }
+}
+
+async function loadFeedbackDateQueue(date, force) {
+  const key = feedbackDateKey(date);
+  if (!session.isAdmin || !key || feedbackDateQueueLoadingDate === key ||
+      (!force && feedbackDateQueueLoadedDate === key)) return;
+  const auth = sync.auth();
+  if (!auth) {
+    if (feedbackDateFilter === key) {
+      feedbackDateQueue = []; feedbackDateQueueLoadedDate = key;
+      feedbackDateQueueError = '동기화 인증이 필요합니다';
+      if (route === 'feedback') render();
+    }
+    return;
+  }
+  const requestSeq = ++feedbackDateQueueRequestSeq;
+  feedbackDateQueueLoadingDate = key;
+  if (feedbackDateFilter === key) feedbackDateQueueError = '';
+  if (route === 'feedback' && feedbackDateFilter === key) render();
+  try {
+    const result = await sync.post('/feedback-review', {
+      app: SYNC_APP, auth: auth, action: 'list', feedbackDate: key, limit: 200
+    });
+    if (requestSeq !== feedbackDateQueueRequestSeq || feedbackDateFilter !== key) return;
+    feedbackDateQueue = feedbackFilterByDate(result.requests || [], key);
+    feedbackDateQueueLoadedDate = key;
+    feedbackDateQueueError = '';
+  } catch (error) {
+    if (requestSeq !== feedbackDateQueueRequestSeq || feedbackDateFilter !== key) return;
+    feedbackDateQueue = [];
+    feedbackDateQueueLoadedDate = key;
+    feedbackDateQueueError = String(error && error.message || error);
+  } finally {
+    if (requestSeq === feedbackDateQueueRequestSeq) {
+      feedbackDateQueueLoadingDate = '';
+      if (route === 'feedback') render();
+    }
   }
 }
 
@@ -7969,6 +8067,14 @@ function viewOwnFeedbackRequests() {
 function feedbackQueueCard(item) {
   const task = state.tasks.find(row => row.id === item.taskId);
   const status = feedbackSendState(item).label;
+  if (item && item.syntheticMissing) {
+    return '<details class="card feedback-record" data-persist-key="feedback-admin|' + esc(item.requestKey) + '"><summary><span>' +
+        '<span class="card-title">' + esc(task ? taskDisplayTitle(task) : item.taskId) + '</span>' +
+        '<span class="small muted">수업 ' + esc(item.feedbackDate) + ' (' + esc(feedbackWeekdayLabel(item.feedbackDate)) + ') · ' +
+        esc(feedbackLessonTimeLabel(item, task)) + '</span></span>' +
+        '<span class="pill warn">미발송</span></summary>' +
+      '<div class="feedback-record-body"><div class="hint">아직 작성하거나 발송한 피드백이 없습니다.</div></div></details>';
+  }
   return '<details class="card feedback-record" data-persist-key="feedback-admin|' + esc(item.requestKey) + '"><summary><span>' +
       '<span class="card-title">' + esc(task ? taskDisplayTitle(task) : item.taskId) + '</span>' +
       '<span class="small muted">수업 ' + esc(item.feedbackDate) + ' (' + esc(feedbackWeekdayLabel(item.feedbackDate)) + ') · ' +
@@ -7990,73 +8096,75 @@ function feedbackQueueCard(item) {
 
 function feedbackDeliveryCountsHtml(counts, multiline) {
   const separator = multiline ? '<br>' : ' · ';
+  const sendingCount = Number(counts && counts.pendingCount || 0) + Number(counts && counts.unknownCount || 0);
   return [
-    FEEDBACK_DELIVERY_CATEGORY_LABEL.delivered + ' ' + Number(counts && counts.deliveredCount || 0) + '건',
-    FEEDBACK_DELIVERY_CATEGORY_LABEL.pending + ' ' + Number(counts && counts.pendingCount || 0) + '건',
-    FEEDBACK_DELIVERY_CATEGORY_LABEL.unknown + ' ' + Number(counts && counts.unknownCount || 0) + '건',
-    FEEDBACK_DELIVERY_CATEGORY_LABEL.failed + ' ' + Number(counts && counts.failedCount || 0) + '건',
-    FEEDBACK_DELIVERY_CATEGORY_LABEL.unsent + ' ' + Number(counts && counts.unsentCount || 0) + '건'
+    '오늘 수업 학생 ' + Number(counts && counts.totalCount || 0) + '명',
+    '수신완료 ' + Number(counts && counts.deliveredCount || 0) + '건',
+    '발송중 ' + sendingCount + '건',
+    '발송 실패 ' + Number(counts && counts.failedCount || 0) + '건',
+    '미발송 ' + Number(counts && counts.unsentCount || 0) + '건'
   ].join(separator);
 }
 
 function feedbackTeacherGroupStatusHtml(group) {
   if (group.failedCount) return '<span class="pill bad">발송 실패 ' + group.failedCount + '건</span>';
-  if (group.unknownCount) return '<span class="pill warn">상태 확인 필요 ' + group.unknownCount + '건</span>';
   if (group.unsentCount) return '<span class="pill warn">미발송 ' + group.unsentCount + '건</span>';
-  if (group.pendingCount) return '<span class="pill warn">전달 확인 중 ' + group.pendingCount + '건</span>';
+  const sendingCount = Number(group.pendingCount || 0) + Number(group.unknownCount || 0);
+  if (sendingCount) return '<span class="pill warn">발송중 ' + sendingCount + '건</span>';
   return '<span class="pill">전체 수신 완료</span>';
 }
 
-function feedbackTeacherGroupHtml(group, weekdayKey) {
+function feedbackTeacherGroupHtml(group, feedbackDate) {
   const first = group.rows[0] || {};
   const staff = staffById(group.owner);
   const rawName = String((staff && staff.name) || first.teacherName || group.owner || '담당 선생님').trim();
   const teacherName = /(?:선생님|쌤)$/.test(rawName) ? rawName : rawName + ' 선생님';
   const status = feedbackTeacherGroupStatusHtml(group);
-  return '<details class="card feedback-teacher-group" data-persist-key="feedback-teacher|' + esc(weekdayKey) + '|' + esc(group.owner) + '"><summary><span>' +
+  return '<details class="card feedback-teacher-group" data-persist-key="feedback-teacher|' + esc(feedbackDate) + '|' + esc(group.owner) + '"><summary><span>' +
       '<span class="card-title">' + esc(teacherName) + '</span>' +
       '<span class="small muted">' + feedbackDeliveryCountsHtml(group, false) + '</span></span>' + status + '</summary>' +
     '<div class="feedback-teacher-group-body">' + group.rows.map(feedbackQueueCard).join('') + '</div></details>';
 }
 
-function feedbackWeekdayButtonsHtml(rows) {
-  return '<div class="feedback-weekday-grid" role="group" aria-label="피드백 검토 요일 선택">' + feedbackWeekdaySummary(rows).map(summary =>
-    '<button type="button" class="feedback-weekday-button" data-act="feedbackweekday" data-day="' + esc(summary.key) + '" aria-pressed="' +
-      (feedbackWeekdayFilter === summary.key ? 'true' : 'false') + '"><b>' + esc(summary.label) + '</b><span>' +
-      feedbackDeliveryCountsHtml(summary, true) + '</span></button>'
-  ).join('') + '</div>';
+function feedbackDatePickerHtml() {
+  const date = feedbackDateKey(feedbackDateFilter) || today();
+  return '<div class="datenav feedback-date-nav">' +
+    '<button type="button" class="navbtn" data-act="feedbackdateprev" aria-label="이전 날짜">‹</button>' +
+    '<label class="d"><span class="sr-only">피드백 확인 날짜</span><input class="feedback-date-input" type="date" data-feedback-date value="' +
+      esc(date) + '" aria-label="피드백 확인 날짜"></label>' +
+    '<button type="button" class="navbtn" data-act="feedbackdatenext" aria-label="다음 날짜">›</button></div>' +
+    '<div class="feedback-date-today"><button type="button" class="btn btn-sm btn-ghost" data-act="feedbackdatetoday">오늘</button></div>';
 }
 
 function viewFeedbackReview() {
   if (session.isStaffLink && !session.isAdmin) return viewOwnFeedbackRequests() + viewOwnLessonChangeRequests();
   if (!session.isAdmin) return viewToday();
-  if (!feedbackQueueLoaded && !feedbackQueueLoading) setTimeout(() => loadFeedbackQueue(false), 0);
+  if (!feedbackDateKey(feedbackDateFilter)) feedbackDateFilter = today();
+  if (isWeekendVisitDate(feedbackDateFilter)) ensureWeekendVisitScheduleDates([feedbackDateFilter], '');
+  if (feedbackDateQueueLoadedDate !== feedbackDateFilter && feedbackDateQueueLoadingDate !== feedbackDateFilter) {
+    setTimeout(() => loadFeedbackDateQueue(feedbackDateFilter, false), 0);
+  }
   let h = '<div class="card lesson-review"><div class="card-title">💬 학부모 피드백 발송 현황</div>' +
     '<div class="card-sub">선생님이 제출하면 원장 승인 없이 카카오 알림톡 발송 요청을 접수합니다 — 여기는 그 결과를 확인하는 화면입니다.<br>' +
     '보호자 연락처·발송 동의가 없는 학생은 자동으로 막히고, 등록 후 "다시 발송 시도"로 보낼 수 있습니다.</div>' +
     '<button class="btn btn-sm btn-ghost mt14" data-act="fbrefresh">새로고침</button></div>';
-  if (feedbackQueueLoading) h += '<div class="card"><div class="empty"><b>⏳</b>검토 목록을 불러오는 중입니다.</div></div>';
-  else if (feedbackQueueError) h += '<div class="card alert"><div class="small">불러오기 실패 — ' + esc(feedbackQueueError) + '</div></div>';
-  else {
-    const visibleQueue = feedbackQueue.filter(item => item.status !== 'cancelled');
-    if (!visibleQueue.length) h += '<div class="card"><div class="empty"><b>✅</b>검토할 피드백 문구가 없습니다.</div></div>';
-    else {
-      h += '<div class="card"><div class="card-title">요일별 피드백 현황</div>' +
-        '<div class="card-sub">요일을 선택하면 선생님별 수업을 확인할 수 있습니다. 발송 건수는 학부모 수신 완료 기준입니다.</div>' +
-        feedbackWeekdayButtonsHtml(visibleQueue) + '</div>';
-      if (!feedbackWeekdayFilter) {
-        h += '<div class="card"><div class="empty"><b>📅</b>확인할 요일을 선택해 주세요.</div></div>';
-      } else {
-        const daySummary = feedbackWeekdaySummary(visibleQueue).find(summary => summary.key === feedbackWeekdayFilter);
-        const dayRows = feedbackFilterByWeekday(visibleQueue, feedbackWeekdayFilter);
-        h += '<div class="feedback-weekday-summary"><b>' + esc(daySummary ? daySummary.label : '선택 요일') + '</b> · ' +
-          feedbackDeliveryCountsHtml(daySummary, false) + '</div>';
-        if (!dayRows.length) {
-          h += '<div class="card"><div class="empty"><b>💬</b>선택한 요일의 피드백 기록이 없습니다.</div></div>';
-        } else {
-          h += feedbackTeacherGroups(dayRows, true).map(group => feedbackTeacherGroupHtml(group, feedbackWeekdayFilter)).join('');
-        }
-      }
+  h += '<div class="card"><div class="card-title">날짜별 피드백 현황</div>' +
+    '<div class="card-sub">날짜를 선택하면 그날의 전체 수업 학생과 선생님별 발송 상태를 확인할 수 있습니다.</div>' +
+    feedbackDatePickerHtml() + '</div>';
+  if (feedbackDateQueueLoadingDate === feedbackDateFilter || feedbackDateQueueLoadedDate !== feedbackDateFilter) {
+    h += '<div class="card"><div class="empty"><b>⏳</b>선택 날짜의 피드백 현황을 불러오는 중입니다.</div></div>';
+  } else if (feedbackDateQueueError) {
+    h += '<div class="card alert"><div class="small">불러오기 실패 — ' + esc(feedbackDateQueueError) + '</div></div>';
+  } else {
+    const visibleQueue = feedbackDateQueue.slice();
+    const groups = feedbackDateTeacherGroups(feedbackDateFilter, visibleQueue);
+    const totalStudents = groups.reduce((sum, group) => sum + Number(group.totalCount || 0), 0);
+    h += '<div class="feedback-date-summary"><b>' + esc(label(feedbackDateFilter)) + '</b> · 선생님 ' + groups.length +
+      '명 · 수업 학생 ' + totalStudents + '명</div>';
+    if (!groups.length) {
+      h += '<div class="card"><div class="empty"><b>💬</b>선택 날짜에 등록된 수업 학생이 없습니다.</div></div>';
+    } else {
+      h += groups.map(group => feedbackTeacherGroupHtml(group, feedbackDateFilter)).join('');
     }
   }
   return h;
@@ -8520,7 +8628,7 @@ async function submitFeedbackForReview(button) {
       homeworkText: fbCtx.homeworkText, commentText: fbCtx.commentText,
       plusText: plusText, minusText: minusText
     });
-    feedbackQueueLoaded = false; ownFeedbackQueueLoaded = false;
+    feedbackQueueLoaded = false; ownFeedbackQueueLoaded = false; feedbackDateQueueLoadedDate = '';
     const status = result.request && result.request.status;
     if (status === 'sent') {
       setFeedbackFinalSendStatus('success', '솔라피 발송 요청이 접수됐습니다. 실제 전달 결과는 발송 결과 연동 후 확인할 수 있습니다.', modalBox);
@@ -8561,11 +8669,15 @@ async function reviewFeedbackRequest(action, key, revision) {
     const result = await sync.post('/feedback-review', body);
     const index = feedbackQueue.findIndex(item => item.requestKey === key);
     if (index >= 0) feedbackQueue[index] = result.request;
+    const dateIndex = feedbackDateQueue.findIndex(item => item.requestKey === key);
+    if (dateIndex >= 0) feedbackDateQueue[dateIndex] = result.request;
     render();
     toast(action === 'approve_content' ? '문구를 승인했습니다 · 발송 가능 상태라면 아래 버튼으로 다시 접수할 수 있습니다' : '수정 요청을 남겼습니다');
   } catch (error) {
     toast('피드백 검토 실패 — ' + (error.message || error));
     loadFeedbackQueue(true);
+    feedbackDateQueueLoadedDate = '';
+    loadFeedbackDateQueue(feedbackDateFilter, true);
   }
 }
 
@@ -8578,21 +8690,27 @@ async function sendParentFeedback(key, button) {
   try {
     const res = await sync.post('/parent-feedback-send', { app: SYNC_APP, auth: auth, requestKey: key });
     feedbackQueueLoaded = false;
+    feedbackDateQueueLoadedDate = '';
     if (res.status === 'sent') {
       toast('보호자 알림톡 발송 요청이 접수됐습니다');
       loadFeedbackQueue(true);
+      loadFeedbackDateQueue(feedbackDateFilter, true);
     } else if (res.code === 'ALREADY_SENT') {
       toast('이미 발송된 문구입니다');
       loadFeedbackQueue(true);
+      loadFeedbackDateQueue(feedbackDateFilter, true);
     } else {
       const msg = '⏳ ' + (res.send ? res.send.status : '처리 중') + ' — 잠시 후 새로고침해서 확인해 주세요';
       if (resultBox) resultBox.textContent = msg; else toast(msg);
       if (button) { button.disabled = false; button.textContent = '📱 지금 학부모께 알림톡 접수'; }
+      loadFeedbackDateQueue(feedbackDateFilter, true);
     }
   } catch (error) {
     if (button) { button.disabled = false; button.textContent = '📱 지금 학부모께 알림톡 접수'; }
     if (resultBox) resultBox.textContent = '❌ ' + (error.message || error);
     else toast('발송 실패 — ' + (error.message || error));
+    feedbackDateQueueLoadedDate = '';
+    loadFeedbackDateQueue(feedbackDateFilter, true);
   }
 }
 
@@ -20312,14 +20430,24 @@ document.addEventListener('click', ev => {
     case 'feedbackpolish': polishFeedbackComment(el); break;
     case 'feedbackfinalsend': submitFeedbackForReview(el); break;
     case 'feedbacksubmit': submitFeedbackForReview(el); break;
-    case 'feedbackweekday': {
-      const key = String(el.dataset.day || '');
-      if (!FEEDBACK_WEEKDAYS.some(day => day.key === key)) break;
-      feedbackWeekdayFilter = key;
+    case 'feedbackdateprev':
+      feedbackDateFilter = feedbackShiftDate(feedbackDateFilter, -1) || feedbackDateFilter;
       render();
       break;
-    }
-    case 'fbrefresh': feedbackQueueLoaded = false; loadFeedbackQueue(true); break;
+    case 'feedbackdatenext':
+      feedbackDateFilter = feedbackShiftDate(feedbackDateFilter, 1) || feedbackDateFilter;
+      render();
+      break;
+    case 'feedbackdatetoday':
+      feedbackDateFilter = today();
+      render();
+      break;
+    case 'fbrefresh':
+      feedbackQueueLoaded = false;
+      feedbackDateQueueLoadedDate = '';
+      loadFeedbackQueue(true);
+      loadFeedbackDateQueue(feedbackDateFilter, true);
+      break;
     case 'managerinboxrefresh': loadManagerRequestInbox(true); break;
     case 'guardianrequestresolve': resolveGuardianRequest(el.dataset.request, el.dataset.resolution, Number(el.dataset.rev), el); break;
     case 'fbownrefresh': ownFeedbackQueueLoaded = false; loadOwnFeedbackQueue(true); break;
@@ -20999,6 +21127,18 @@ document.addEventListener('change', ev => {
     teacherLiveRequestDraft.recipientAdminId = String(teacherLiveRequestRecipient.value || '');
     return;
   }
+  const feedbackDateInput = ev.target.closest('[data-feedback-date]');
+  if (feedbackDateInput) {
+    const date = feedbackDateKey(feedbackDateInput.value);
+    if (!date) {
+      feedbackDateInput.value = feedbackDateFilter;
+      toast('확인할 날짜를 다시 선택해 주세요');
+      return;
+    }
+    feedbackDateFilter = date;
+    render();
+    return;
+  }
   if (ev.target.closest('[data-book-catalog-review-confirm]')) syncBookCatalogReviewApproveButton();
 });
 
@@ -21481,7 +21621,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-09-03.6';
+const APP_VER = '2026-09-04.1';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);

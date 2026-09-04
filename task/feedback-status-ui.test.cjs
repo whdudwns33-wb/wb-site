@@ -5,7 +5,7 @@ const path = require('node:path');
 
 const source = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
 
-function feedbackSortHelpers(state = { tasks: [] }) {
+function feedbackSortHelpers(state = { tasks: [] }, overrides = {}) {
   const start = source.indexOf('const FEEDBACK_WEEKDAYS');
   const end = source.indexOf('function feedbackStoredMessageHtml(', start);
   assert.ok(start >= 0 && end > start, 'feedback sort helper block exists');
@@ -15,10 +15,24 @@ function feedbackSortHelpers(state = { tasks: [] }) {
   };
   const ymd = value => [value.getFullYear(), String(value.getMonth() + 1).padStart(2, '0'),
     String(value.getDate()).padStart(2, '0')].join('-');
-  return Function('state', 'parseYmd', 'ymd', source.slice(start, end) +
-    '\nreturn { FEEDBACK_WEEKDAYS, feedbackWeekdayKey, feedbackWeekdaySummary, feedbackFilterByWeekday, ' +
+  const addDays = (value, amount) => {
+    const parsed = parseYmd(value);
+    parsed.setDate(parsed.getDate() + Number(amount || 0));
+    return ymd(parsed);
+  };
+  const isLesson = overrides.isLesson || (task => !!task && !task.deleted && task.taskKind === 'lesson_instruction');
+  const occursOn = overrides.occursOn || ((task, date) =>
+    Array.isArray(task && task.occurrenceDates) && task.occurrenceDates.includes(date));
+  const teacherTaskCardOccursOn = overrides.teacherTaskCardOccursOn || occursOn;
+  const isBookOrderWorkTask = overrides.isBookOrderWorkTask || (() => false);
+  return Function('state', 'parseYmd', 'ymd', 'addDays', 'isLesson', 'occursOn', 'teacherTaskCardOccursOn',
+    'isBookOrderWorkTask', source.slice(start, end) +
+    '\nreturn { FEEDBACK_WEEKDAYS, feedbackWeekdayKey, feedbackDateKey, feedbackShiftDate, ' +
+    'feedbackFilterByDate, feedbackDateOccurrences, feedbackDateTeacherGroups, ' +
     'feedbackLessonStartMinutes, feedbackDeliveryCategory, feedbackDeliveryCounts, ' +
-    'feedbackSortRows, feedbackTeacherGroups };')(state, parseYmd, ymd);
+    'feedbackSortRows, feedbackTeacherGroups };')(
+      state, parseYmd, ymd, addDays, isLesson, occursOn, teacherTaskCardOccursOn, isBookOrderWorkTask
+    );
 }
 
 function feedbackStatusHelpers() {
@@ -40,63 +54,111 @@ test('선생님 피드백 상태는 최신 저장 순으로 정렬한다', () =>
   assert.deepEqual(rows.map(item => item.requestKey), ['old', 'new', 'middle'], '원본 서버 배열은 변경하지 않는다');
 });
 
-test('관리자 피드백은 월요일부터 일요일까지 전달 상태 다섯 가지를 따로 집계한다', () => {
-  const { FEEDBACK_WEEKDAYS, feedbackWeekdayKey, feedbackWeekdaySummary } = feedbackSortHelpers();
+test('피드백 날짜 키와 이동은 정확한 날짜를 보존하고 월·연도 경계를 안전하게 넘긴다', () => {
+  const { FEEDBACK_WEEKDAYS, feedbackWeekdayKey, feedbackDateKey, feedbackShiftDate,
+    feedbackFilterByDate } = feedbackSortHelpers();
   assert.deepEqual(FEEDBACK_WEEKDAYS.map(day => day.label),
     ['월요일', '화요일', '수요일', '목요일', '금요일', '토요일', '일요일']);
   const rows = [
-    { requestKey: 'mon-delivered', feedbackDate: '2026-09-07', status: 'sent', messageDeliveryState: 'delivered' },
-    { requestKey: 'mon-provider', feedbackDate: '2026-09-07', status: 'sent', messageDeliveryState: 'provider_queued' },
-    { requestKey: 'mon-carrier', feedbackDate: '2026-09-07', status: 'sent', messageDeliveryState: 'carrier_processing' },
-    { requestKey: 'mon-unknown', feedbackDate: '2026-09-07', status: 'content_approved_send_blocked', messageDeliveryState: 'unknown' },
-    { requestKey: 'mon-failed', feedbackDate: '2026-09-07', status: 'content_approved_send_blocked', messageDeliveryState: 'failed' },
-    { requestKey: 'mon-unsent', feedbackDate: '2026-09-07', status: 'approval_waiting' },
-    { requestKey: 'mon-cancelled', feedbackDate: '2026-09-07', status: 'cancelled' },
-    { requestKey: 'tue-delivered', feedbackDate: '2026-09-08', status: 'sent', messageDeliveryState: 'delivered' },
-    { requestKey: 'sun-legacy-pending', feedbackDate: '2026-09-13', status: 'sent' },
-    { requestKey: 'invalid-date', feedbackDate: '날짜 없음', status: 'approval_waiting' }
-  ];
-  const summary = feedbackWeekdaySummary(rows);
-  assert.equal(summary.length, 7);
-  assert.deepEqual(summary.map(day => day.label),
-    ['월요일', '화요일', '수요일', '목요일', '금요일', '토요일', '일요일']);
-  const monday = summary.find(day => day.key === feedbackWeekdayKey('2026-09-07'));
-  const tuesday = summary.find(day => day.key === feedbackWeekdayKey('2026-09-08'));
-  const sunday = summary.find(day => day.key === feedbackWeekdayKey('2026-09-13'));
-  assert.deepEqual(
-    {
-      deliveredCount: monday.deliveredCount, pendingCount: monday.pendingCount,
-      unknownCount: monday.unknownCount, failedCount: monday.failedCount,
-      unsentCount: monday.unsentCount, totalCount: monday.totalCount
-    },
-    { deliveredCount: 1, pendingCount: 2, unknownCount: 1, failedCount: 1, unsentCount: 1, totalCount: 6 },
-    '취소된 요청은 요일 집계에 포함하지 않는다'
-  );
-  assert.deepEqual(
-    { deliveredCount: tuesday.deliveredCount, pendingCount: tuesday.pendingCount, totalCount: tuesday.totalCount },
-    { deliveredCount: 1, pendingCount: 0, totalCount: 1 }
-  );
-  assert.deepEqual(
-    { deliveredCount: sunday.deliveredCount, pendingCount: sunday.pendingCount, unsentCount: sunday.unsentCount, totalCount: sunday.totalCount },
-    { deliveredCount: 0, pendingCount: 1, unsentCount: 0, totalCount: 1 },
-    '전달 상태가 없는 예전 sent 기록은 미발송이나 수신 완료로 추측하지 않고 전달 확인 중으로 둔다'
-  );
-  assert.equal(feedbackWeekdayKey('잘못된 날짜'), '', '유효하지 않은 날짜를 임의 요일에 넣으면 안 된다');
-});
-
-test('선택한 요일만 표시하며 필터는 서버 원본 배열을 변경하지 않는다', () => {
-  const { feedbackWeekdayKey, feedbackFilterByWeekday } = feedbackSortHelpers();
-  const rows = [
-    { requestKey: 'mon-a', feedbackDate: '2026-09-07', status: 'sent' },
-    { requestKey: 'tue', feedbackDate: '2026-09-08', status: 'sent' },
-    { requestKey: 'mon-b', feedbackDate: '2026-09-14', status: 'approval_waiting' },
-    { requestKey: 'sun', feedbackDate: '2026-09-13', status: 'sent' }
+    { requestKey: 'first-monday', feedbackDate: '2026-09-07' },
+    { requestKey: 'next-monday', feedbackDate: '2026-09-14' },
+    { requestKey: 'tuesday', feedbackDate: '2026-09-08' },
+    { requestKey: 'invalid', feedbackDate: '날짜 없음' }
   ];
   const originalOrder = rows.map(item => item.requestKey);
-  const mondayKey = feedbackWeekdayKey('2026-09-07');
-  assert.deepEqual(feedbackFilterByWeekday(rows, mondayKey).map(item => item.requestKey), ['mon-a', 'mon-b']);
-  assert.deepEqual(feedbackFilterByWeekday(rows, ''), [], '요일을 고르기 전에는 특정 요일 목록을 만들지 않는다');
+  assert.equal(feedbackDateKey('2026-09-07'), '2026-09-07');
+  assert.equal(feedbackDateKey('2026-02-29'), '', '존재하지 않는 날짜를 자동 보정하면 안 된다');
+  assert.equal(feedbackDateKey('2026-9-7'), '', '화면 날짜 키는 YYYY-MM-DD만 허용한다');
+  assert.equal(feedbackDateKey('잘못된 날짜'), '');
+  assert.equal(feedbackShiftDate('2026-09-30', 1), '2026-10-01');
+  assert.equal(feedbackShiftDate('2026-01-01', -1), '2025-12-31');
+  assert.equal(feedbackShiftDate('2026-02-28', 1), '2026-03-01');
+  assert.equal(feedbackShiftDate('잘못된 날짜', 1), '', '잘못된 기준일을 오늘 등 다른 날짜로 추측하지 않는다');
+  assert.deepEqual(feedbackFilterByDate(rows, '2026-09-07').map(item => item.requestKey), ['first-monday']);
+  assert.deepEqual(feedbackFilterByDate(rows, '2026-09-14').map(item => item.requestKey), ['next-monday'],
+    '같은 요일의 다른 주 피드백을 선택 날짜에 섞으면 안 된다');
+  assert.deepEqual(feedbackFilterByDate(rows, ''), [], '날짜가 없으면 임의 날짜 목록을 만들지 않는다');
   assert.deepEqual(rows.map(item => item.requestKey), originalOrder);
+  assert.equal(feedbackWeekdayKey('2026-09-07'), '1', '요일 키는 해당 날짜의 수업시간 슬롯 판정에 계속 사용한다');
+});
+
+test('선택 날짜의 수업 occurrence와 요청을 taskId 단위로 병합해 미발송까지 빠짐없이 만든다', () => {
+  const date = '2026-09-07';
+  const lesson = id => ({ id, staffId: 'teacher-a', studentId: 'student-' + id,
+    taskKind: 'lesson_instruction', occurrenceDates: [date] });
+  const state = { tasks: [
+    lesson('delivered'), lesson('provider'), lesson('unknown'), lesson('failed'), lesson('no-request'),
+    lesson('waiting'), lesson('revision'), lesson('blocked'), lesson('cancelled-only'),
+    { ...lesson('other-date'), occurrenceDates: ['2026-09-14'] },
+    { id: 'not-a-lesson', staffId: 'teacher-a', studentId: 'student-x', occurrenceDates: [date] },
+    { ...lesson('deleted'), deleted: true }
+  ] };
+  const queue = [
+    { requestKey: 'delivered-new', taskId: 'delivered', owner: 'teacher-a', feedbackDate: date,
+      status: 'sent', messageDeliveryState: 'delivered', updatedAt: 10 },
+    { requestKey: 'delivered-old-failure', taskId: 'delivered', owner: 'teacher-a', feedbackDate: date,
+      status: 'content_approved_send_blocked', messageDeliveryState: 'failed', updatedAt: 20 },
+    { requestKey: 'provider', taskId: 'provider', owner: 'teacher-a', feedbackDate: date,
+      status: 'sent', messageDeliveryState: 'provider_queued' },
+    { requestKey: 'unknown', taskId: 'unknown', owner: 'teacher-a', feedbackDate: date,
+      status: 'sent', messageDeliveryState: 'unknown' },
+    { requestKey: 'failed', taskId: 'failed', owner: 'teacher-a', feedbackDate: date,
+      status: 'content_approved_send_blocked', messageDeliveryState: 'failed' },
+    { requestKey: 'waiting', taskId: 'waiting', owner: 'teacher-a', feedbackDate: date,
+      status: 'approval_waiting' },
+    { requestKey: 'revision', taskId: 'revision', owner: 'teacher-a', feedbackDate: date,
+      status: 'revision_requested' },
+    { requestKey: 'blocked', taskId: 'blocked', owner: 'teacher-a', feedbackDate: date,
+      status: 'content_approved_send_blocked', reviewNote: '연락처 등록 후 다시 시도해 주세요' },
+    { requestKey: 'cancelled', taskId: 'cancelled-only', owner: 'teacher-a', feedbackDate: date,
+      status: 'cancelled' },
+    { requestKey: 'other-week', taskId: 'other-date', owner: 'teacher-a', feedbackDate: '2026-09-14',
+      status: 'sent', messageDeliveryState: 'delivered' },
+    { requestKey: 'orphan-delivered', taskId: 'missing-task', owner: 'teacher-b', feedbackDate: date,
+      status: 'sent', messageDeliveryState: 'delivered' },
+    { requestKey: 'orphan-duplicate', taskId: 'missing-task', owner: 'teacher-b', feedbackDate: date,
+      status: 'approval_waiting' },
+    { requestKey: 'orphan-cancelled', taskId: 'missing-cancelled', owner: 'teacher-b', feedbackDate: date,
+      status: 'cancelled' }
+  ];
+  const { feedbackDateOccurrences, feedbackDateTeacherGroups, feedbackDeliveryCategory } =
+    feedbackSortHelpers(state);
+  const originalQueueOrder = queue.map(item => item.requestKey);
+  const occurrences = feedbackDateOccurrences(date, queue);
+  const byTask = new Map(occurrences.map(item => [item.taskId, item]));
+
+  assert.equal(occurrences.length, 10, '선택일 수업 9건과 task가 사라진 보존 요청 1건을 각각 한 번만 센다');
+  assert.equal(byTask.get('delivered').requestKey, 'delivered-new',
+    '같은 수업일의 복수 요청은 실제 수신 완료를 더 최신 실패 행보다 우선한다');
+  assert.equal(feedbackDeliveryCategory(byTask.get('provider')), 'pending');
+  assert.equal(feedbackDeliveryCategory(byTask.get('unknown')), 'unknown');
+  assert.equal(feedbackDeliveryCategory(byTask.get('failed')), 'failed');
+  for (const taskId of ['no-request', 'waiting', 'revision', 'blocked', 'cancelled-only']) {
+    assert.equal(feedbackDeliveryCategory(byTask.get(taskId)), 'unsent', `${taskId}는 실제 발송 시도가 없는 미발송이다`);
+  }
+  assert.equal(byTask.get('no-request').status, 'not_started', '요청 자체가 없는 대상은 합성 미발송 행으로 만든다');
+  assert.equal(byTask.has('other-date'), false, '같은 요일의 다른 날짜를 섞지 않는다');
+  assert.equal(byTask.has('not-a-lesson'), false);
+  assert.equal(byTask.has('deleted'), false);
+  assert.equal(byTask.has('missing-cancelled'), false, 'task도 없고 취소된 기록뿐이면 별도 occurrence를 만들지 않는다');
+
+  const groups = feedbackDateTeacherGroups(date, queue);
+  const teacherA = groups.find(group => group.owner === 'teacher-a');
+  const teacherB = groups.find(group => group.owner === 'teacher-b');
+  assert.ok(teacherA && teacherB);
+  assert.deepEqual({
+    total: teacherA.totalCount,
+    delivered: teacherA.deliveredCount,
+    inProgress: teacherA.pendingCount + teacherA.unknownCount,
+    failed: teacherA.failedCount,
+    unsent: teacherA.unsentCount
+  }, { total: 9, delivered: 1, inProgress: 2, failed: 1, unsent: 5 });
+  assert.equal(teacherA.totalCount,
+    teacherA.deliveredCount + teacherA.pendingCount + teacherA.unknownCount +
+      teacherA.failedCount + teacherA.unsentCount,
+  '오늘 수업 학생 수는 네 가지 접힘 요약 상태의 합과 같아야 한다');
+  assert.deepEqual({ total: teacherB.totalCount, delivered: teacherB.deliveredCount }, { total: 1, delivered: 1 });
+  assert.deepEqual(queue.map(item => item.requestKey), originalQueueOrder, '병합하면서 서버 요청 배열을 변경하지 않는다');
 });
 
 test('피드백 수업 시작시간은 해당 수업일에 유효한 슬롯의 가장 이른 시각을 사용한다', () => {
@@ -216,7 +278,7 @@ test('선생님과 관리자 상태 카드는 저장 메시지를 접기·펼치
   assert.doesNotMatch(adminCard, /item\.(contentText|plusText|minusText)/);
 });
 
-test('관리자 현황은 요일 선택과 집계를 보여주고 선택 요일의 선생님 그룹만 만든다', () => {
+test('관리자 현황은 선택 날짜의 선생님 그룹을 접어 두고 정확한 다섯 항목을 요약한다', () => {
   const groupStart = source.indexOf('function feedbackDeliveryCountsHtml(');
   const groupEnd = source.indexOf('function viewFeedbackReview(', groupStart);
   const viewStart = groupEnd;
@@ -227,35 +289,58 @@ test('관리자 현황은 요일 선택과 집계를 보여주고 선택 요일�
   assert.match(group, /data-persist-key="feedback-teacher\|/);
   assert.doesNotMatch(group, /<details[^>]*\sopen(?:\s|>)/,
     '선생님 details는 관리자가 직접 열기 전에는 접힌 상태여야 한다');
+  for (const label of ['오늘 수업 학생', '수신완료', '발송중', '발송 실패', '미발송']) {
+    assert.match(group, new RegExp(label));
+  }
+  assert.match(group, /totalCount/);
   assert.match(group, /deliveredCount/);
-  assert.match(group, /pendingCount/);
-  assert.match(group, /unknownCount/);
+  assert.match(group, /pendingCount[\s\S]{0,100}unknownCount|unknownCount[\s\S]{0,100}pendingCount/,
+    '접힌 요약의 발송중은 전달 확인 중과 상태 확인 필요를 한 항목으로 합친다');
   assert.match(group, /failedCount/);
   assert.match(group, /unsentCount/);
-  for (const label of ['수신 완료', '전달 확인 중', '상태 확인 필요', '발송 실패', '미발송']) {
-    assert.match(source, new RegExp(label));
-  }
-  assert.match(source, /let feedbackWeekdayFilter = ''/);
-  assert.match(view, /feedbackWeekdaySummary\(visibleQueue\)/);
-  assert.match(source, /function feedbackWeekdaySummary[\s\S]{0,300}FEEDBACK_WEEKDAYS\.map/);
-  assert.match(source, /data-act="feedbackweekday"/);
-  assert.match(view, /feedbackDeliveryCountsHtml\(daySummary, false\)/);
-  assert.match(view, /feedbackFilterByWeekday\(visibleQueue, feedbackWeekdayFilter\)/);
-  assert.match(group, /function feedbackTeacherGroupHtml\(group,\s*[A-Za-z_$][\w$]*\)/);
-  assert.match(view, /feedbackTeacherGroups\(/);
-  assert.match(view, /feedbackTeacherGroupHtml\(group, feedbackWeekdayFilter\)/);
+  assert.match(source, /let feedbackDateFilter\s*=\s*today\(\)/,
+    '피드백 검토를 처음 열면 KST 오늘 날짜를 선택한다');
+  assert.match(view, /feedbackDatePickerHtml\(/);
+  assert.match(view, /feedbackDateTeacherGroups\(feedbackDateFilter,\s*visibleQueue\)/);
+  assert.match(view, /feedbackTeacherGroupHtml\(group,\s*feedbackDateFilter\)/);
+  assert.doesNotMatch(view, /feedbackWeekdayButtonsHtml|확인할 요일을 선택/,
+    '날짜 대시보드에 예전 요일 단위 진입 화면을 함께 노출하지 않는다');
 });
 
-test('요일 버튼 클릭은 선택 요일을 바꾸고 관리자 피드백 화면을 다시 그린다', () => {
-  const start = source.indexOf("case 'feedbackweekday':");
-  const end = source.indexOf("case '", start + 10);
-  assert.ok(start >= 0 && end > start, 'feedbackweekday click case exists');
-  const handler = source.slice(start, end);
-  assert.match(handler, /feedbackWeekdayFilter\s*=/);
-  assert.match(handler, /el\.dataset\.(?:day|weekday)/);
-  assert.match(handler, /FEEDBACK_WEEKDAYS/,
-    'DOM에서 받은 임의 값을 그대로 쓰지 말고 허용된 월~일 key인지 확인해야 한다');
-  assert.match(handler, /render\(\)/);
+test('날짜 변경 컨트롤은 이전날·날짜 직접 선택·다음날·오늘 이동을 모두 제공한다', () => {
+  const pickerStart = source.indexOf('function feedbackDatePickerHtml(');
+  const pickerEnd = source.indexOf('function viewFeedbackReview(', pickerStart);
+  assert.ok(pickerStart >= 0 && pickerEnd > pickerStart, 'feedback date picker exists');
+  const picker = source.slice(pickerStart, pickerEnd);
+  assert.match(picker, /type="date"/);
+  assert.match(picker, /data-feedback-date/);
+  assert.match(picker, /data-act="feedbackdateprev"/);
+  assert.match(picker, /data-act="feedbackdatenext"/);
+  assert.match(picker, /data-act="feedbackdatetoday"/);
+  assert.match(picker, /이전/);
+  assert.match(picker, /다음/);
+  assert.match(picker, /오늘/);
+
+  for (const action of ['feedbackdateprev', 'feedbackdatenext', 'feedbackdatetoday']) {
+    const start = source.indexOf(`case '${action}':`);
+    const end = source.indexOf("case '", start + 10);
+    assert.ok(start >= 0 && end > start, `${action} click case exists`);
+    const handler = source.slice(start, end);
+    assert.match(handler, /feedbackDateFilter\s*=/);
+    if (action === 'feedbackdatetoday') assert.match(handler, /today\(\)/);
+    else assert.match(handler, /feedbackShiftDate\(/);
+    assert.match(handler, /render\(\)/);
+  }
+
+  const changeStart = source.indexOf("document.addEventListener('change'");
+  const changeEnd = source.indexOf("document.addEventListener('toggle'", changeStart);
+  assert.ok(changeStart >= 0 && changeEnd > changeStart, 'delegated change handler exists');
+  const change = source.slice(changeStart, changeEnd);
+  assert.match(change, /\[data-feedback-date\]/);
+  assert.match(change, /feedbackDateKey\(/,
+    '날짜 input 값은 유효한 YYYY-MM-DD인지 검증한 뒤 상태에 반영한다');
+  assert.match(change, /feedbackDateFilter\s*=/);
+  assert.match(change, /render\(\)/);
 });
 
 test('발송 대기 카드의 재접수 버튼은 항상 보이고 실패 사유가 버튼 아래에 나온다', () => {
