@@ -65,7 +65,7 @@ function mergeMeta(metas) {
 
 /* 작품 id — 한글은 팩 id 문자셋에 못 들어간다. 머리말 좌표에서 기계적으로 만든다.
    '1-1.(2)비린내라뇨!' → 'w-1-1-2'. 좌표가 없으면 순번으로 떨어진다. */
-function workIdFor(workKey, index) {
+export function workIdFor(workKey, index) {
   const m = String(workKey || '').match(/^(\d+)-(\d+)\.\((\d+)\)/);
   if (m) return 'w-' + m[1] + '-' + m[2] + '-' + m[3];
   return 'w-' + String(index + 1).padStart(2, '0');
@@ -79,7 +79,7 @@ function workLines(w) {
     t.paragraphs || [],
   );
 }
-function reanchor(w, anchorText) {
+export function reanchor(w, anchorText) {
   const a = String(anchorText || '');
   if (!a) return null;
   const lines = workLines(w);
@@ -113,6 +113,87 @@ function findWork(works, patch) {
   const title = (patch.title || '').trim();
   if (!title) return null;
   return works.filter((w) => (w.title || '').trim() === title)[0] || null;
+}
+
+/* ── 같은 개념을 가리키는 빈칸 병합 (§2.2-2) ──
+   자료는 같은 핵심어를 여러 자리에서 뚫는다. 이해완성과 요약노트가 같은 표의 같은 칸을
+   각각 뚫고, 이해 전략 절이 본문의 같은 개념을 또 뚫는다. 그대로 두면 학습량이 개념 수가
+   아니라 **지면 수**에 비례한다 — 실측 1단원에서 빈칸 328개, 안정화까지 하루 66개였다.
+
+   두 갈래로 합친다:
+     ① 같은 path + 같은 정답 → 두 자료가 같은 자리를 뚫은 것. 의심의 여지가 없다.
+     ② 같은 정답 (path 는 달라도) → 같은 개념을 다른 문장에서 뚫은 것.
+        **한 글자 정답은 여기서 뺀다** — '원'·'배'·'집' 같은 것은 같은 글자라고 같은 개념이 아니다.
+
+   합치면서 문맥을 버리지 않는다. 나머지 문맥은 alts 로 남겨 회전마다 다른 문장으로 묻는다 —
+   같은 문장을 네 번 채우면 문장을 외우고, 다른 문장에서 꺼내야 개념을 외운다(인출 변이).
+   대표 문맥은 정본에 가까운 것부터 고른다(개관·본문 > 구성·날개풀이 > 전략·출제 Point). */
+const PATH_RANK = (p) => {
+  const x = String(p || '');
+  if (x.startsWith('overview')) return 0;
+  if (x.startsWith('text')) return 1;
+  if (x.startsWith('composition')) return 2;
+  if (x.startsWith('lineNotes')) return 3;
+  return 4;
+};
+const ALT_MAX = 3;          // 대표 1 + 변이 3 = 회전 4번이면 한 바퀴 돈다
+
+export function mergeBlanks(work, opts) {
+  opts = opts || {};
+  const minLen = opts.minLen == null ? 2 : opts.minLen;
+  const groups = new Map();
+  (work.blanks || []).forEach((b, i) => {
+    const ans = (b.answers || []).map((x) => String(x).trim()).join('/');
+    /* 짧은 정답은 정답만으로 묶지 않는다 — 자리가 같을 때만 같은 것으로 본다 */
+    const key = ans.length >= minLen ? 'a|' + ans : 'p|' + b.path + '|' + ans;
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push({ b, i });
+  });
+
+  const out = [];
+  let merged = 0;
+  const log = [];
+  groups.forEach((g) => {
+    if (g.length === 1) { out.push(g[0].b); return; }
+    /* 이해완성 것을 먼저 세운다 — 정본 문맥이 대표가 되게 */
+    g.sort((x, y) => {
+      const r = PATH_RANK(x.b.path) - PATH_RANK(y.b.path);
+      if (r) return r;
+      const s = (x.b.id.includes(':bl-') ? 0 : 1) - (y.b.id.includes(':bl-') ? 0 : 1);
+      return s || (x.i - y.i);
+    });
+    const head = { ...g[0].b };
+    const rest = g.slice(1);
+    /* 변이는 **서로 다른 문장**이어야 뜻이 있다. 자료에는 같은 줄이 잘려 두 번 들어오는
+       경우가 있어(연 요지가 다음 줄로 이어지면서 각각 빈칸이 된다) 글자 비교만으로는 못 거른다.
+       한쪽이 다른 쪽에 통째로 들어 있으면 같은 문장으로 보고 **긴 쪽만** 남긴다. */
+    const key = (t) => String(t || '').replace(/[□\s]/g, '');
+    let pool = rest.map((x) => ({ text: x.b.text, slot: x.b.slot || 0, path: x.b.path, label: x.b.label }));
+    pool = pool.filter((c) => {
+      const k = key(c.text), h = key(head.text);
+      return k && !(h.includes(k) || k.includes(h) && k.length <= h.length);
+    });
+    pool.sort((a, b2) => key(b2.text).length - key(a.text).length);   // 긴 문맥부터
+    const alts = [];
+    pool.forEach((c) => {
+      if (alts.length >= ALT_MAX) return;
+      const k = key(c.text);
+      if (alts.some((a) => key(a.text).includes(k) || k.includes(key(a.text)))) return;
+      alts.push(c);
+    });
+    if (alts.length) head.alts = alts;
+    head.mergedCount = g.length;
+    out.push(head);
+    merged += g.length - 1;
+    log.push({ answers: head.answers, kept: head.id, paths: g.map((x) => x.b.path), n: g.length });
+  });
+
+  /* 원래 순서를 지킨다 — 검수자가 지면 순서로 훑는다 */
+  const pos = new Map();
+  (work.blanks || []).forEach((b, i) => pos.set(b.id, i));
+  out.sort((a, b) => pos.get(a.id) - pos.get(b.id));
+  work.blanks = out;
+  return { merged, log };
 }
 
 export function buildPack(dir, opts) {
@@ -312,7 +393,8 @@ export function buildPack(dir, opts) {
   /* 한 문맥(text)에 □ 무리가 여럿인 빈칸이 흔하다(개관 '특징' 한 줄에 정답 6~7개).
      학생 화면은 □ 무리 하나에만 입력칸을 뚫으므로, **몇 번째 무리인지**를 적어 주지 않으면
      보이는 칸과 채점할 정답이 어긋난다(실측 요약노트 106개 중 47개). 같은 문맥을 공유하는
-     빈칸은 뽑힌 순서가 곧 지면의 왼→오 순서라 그대로 슬롯 번호가 된다. */
+     빈칸은 뽑힌 순서가 곧 지면의 왼→오 순서라 그대로 슬롯 번호가 된다.
+     **병합보다 먼저 해야 한다** — 합치면서 남기는 변이 문맥도 자기 슬롯을 달고 가야 하기 때문이다. */
   works.forEach((w) => {
     const seen = {};
     (w.blanks || []).forEach((b) => {
@@ -324,6 +406,17 @@ export function buildPack(dir, opts) {
       b.slot = seen[k];
     });
   });
+
+  /* 같은 개념을 가리키는 빈칸을 합친다 — 학습량이 개념 수에 비례하게(§2.2-2) */
+  let mergedTotal = 0;
+  const mergeLog = [];
+  works.forEach((w) => {
+    const before = w.blanks.length;
+    const r = mergeBlanks(w);
+    mergedTotal += r.merged;
+    if (r.merged) mergeLog.push({ workId: w.workId, title: w.title, before, after: w.blanks.length, groups: r.log });
+  });
+
 
   /* ── 팩 조립 ── */
   const pack = {
@@ -350,7 +443,8 @@ export function buildPack(dir, opts) {
   report.push(`팩 id ${packId}`);
   report.push('자료 ' + found.length + '개: ' + found.map((f) => U.SERIES_LABEL[f.series]).join(' · '));
   report.push(`작품 ${works.length} · 지문 세트 ${sets.length} · 저장 문항 ${items.length}`);
-  report.push(`개념 단위(빈칸) ${blanks} · 어휘 ${vocab}`);
+  report.push(`개념 단위(빈칸) ${blanks} · 어휘 ${vocab}` +
+    (mergedTotal ? ` (같은 개념 ${mergedTotal}개를 합쳐 ${blanks + mergedTotal} → ${blanks}. 나머지 문맥은 회전 변이로 남김)` : ''));
   report.push('메타: ' + [pack.meta.publisher, pack.meta.grade, pack.meta.semester && pack.meta.semester + '학기',
     pack.meta.unit, pack.meta.revision ? pack.meta.revision + ' 개정' : '개정 연도 없음'].filter(Boolean).join(' · '));
 
@@ -365,7 +459,7 @@ export function buildPack(dir, opts) {
   if (!works.length) errors.push('작품 정본이 없어요 — 이해완성 파일이 폴더에 있어야 합니다.');
 
   const review = {
-    packId, pending, unanchored, reanchored, dropped,
+    packId, pending, unanchored, reanchored, dropped, mergeLog,
     candidates: results.flatMap((r) => ((r.out.review && r.out.review.candidates) || r.out.candidates || [])
       .map((c) => ({ series: r.series, ...c }))),
     report: results.flatMap((r) => ((r.out.review && r.out.review.report) || r.out.report || [])

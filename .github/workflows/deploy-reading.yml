@@ -70,6 +70,8 @@ jobs:
         run: node naesin-ko/extract/build-danwon.test.mjs
       - name: 국어브레인 서술형 공략 추출기 테스트
         run: node naesin-ko/extract/build-seosul.test.mjs
+      - name: 국어브레인 폴더→팩 병합기 테스트
+        run: node naesin-ko/extract/build-pack.test.mjs
       - name: 국어브레인 서버 라우트 테스트
         run: node reading-server/naesin-ko-api.test.mjs
       - name: 교재 코칭 테스트

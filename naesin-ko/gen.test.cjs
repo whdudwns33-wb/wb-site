@@ -178,4 +178,29 @@ t('3단계 미만 작품은 적용 문항을 내지 않는다', () => {
   assert.strictEqual(GEN.dailySetKo(plan, pack, concepts, seeded(1)).apply.length, 0);
 });
 
+t('개념 빈칸은 회전마다 다른 문맥으로 묻는다 — 같은 문장을 반복하면 문장을 외운다', () => {
+  var work = { workId: 'w-a' };
+  var b = { id: 'w-a:bl-001', label: '제재', text: '부모님의 □□', answers: ['구두'], slot: 0,
+    alts: [{ text: '□(보조)에 □□(원관념)', slot: 1, label: '이해 전략' },
+           { text: '벗어두신 □□의 모습', slot: 0, label: '2연' }] };
+  var v0 = GEN.blankItem(work, b, 0), v1 = GEN.blankItem(work, b, 1), v2 = GEN.blankItem(work, b, 2);
+  assert.strictEqual(v0.context, '부모님의 □□');
+  assert.strictEqual(v1.context, '□(보조)에 □□(원관념)');
+  assert.strictEqual(v2.context, '벗어두신 □□의 모습');
+  /* 변이 문맥은 자기 슬롯을 달고 온다 — 안 그러면 엉뚱한 □에 입력칸이 뚫린다 */
+  assert.strictEqual(v1.slot, 1);
+  assert.strictEqual(v0.slot, 0);
+  /* 한 바퀴 돌면 처음으로 — 대표 문맥도 회전에 든다 */
+  assert.strictEqual(GEN.blankItem(work, b, 3).context, '부모님의 □□');
+  assert.strictEqual(v0.variants, 3);
+  /* 정답과 빈칸 id 는 변이와 무관하게 하나다 — 학습 상태가 갈라지면 안 된다 */
+  [v0, v1, v2].forEach(function (v) {
+    assert.strictEqual(v.blankId, 'w-a:bl-001');
+    assert.deepStrictEqual(v.answers, ['구두']);
+  });
+  /* 변이가 없는 빈칸은 늘 같은 문맥이다(옛 팩 호환) */
+  var plain = { id: 'w-a:bl-002', text: '□□가 분다', answers: ['바람'] };
+  assert.strictEqual(GEN.blankItem(work, plain, 7).context, '□□가 분다');
+});
+
 console.log('\n' + passed + '개 검증 통과');

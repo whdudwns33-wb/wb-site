@@ -683,7 +683,9 @@
       if (onlyWork && w.workId !== onlyWork) return;
       (w.blanks || []).forEach(function (b) {
         if (!onlyWork && ids.indexOf(b.id) < 0) return;
-        var it = GEN.blankItem(w, b);
+        /* 회전 수를 넘겨 문맥을 바꾼다 — 같은 문장을 반복해 채우면 문장을 외운다 */
+        var bs = pk().states[E.blankKey(b.id)];
+        var it = GEN.blankItem(w, b, bs ? bs.relearnCount : 0);
         it.answers = ovAnswers('b-' + b.id, b.answers);
         items.push(it);
       });

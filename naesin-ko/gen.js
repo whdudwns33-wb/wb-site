@@ -199,14 +199,21 @@ var WBKOGEN = (function () {
     };
   }
 
-  /* ── 2단계 개념 빈칸 (단답) ── */
-  function blankItem(work, b) {
+  /* ── 2단계 개념 빈칸 (단답) ──
+     같은 개념을 자료가 여러 자리에서 뚫으면 병합기가 하나로 합치고 나머지 문맥을 alts 에 남긴다.
+     회전마다 **다른 문맥**으로 물어야 한다 — 같은 문장을 네 번 채우면 문장을 외우고,
+     다른 문장에서 같은 개념을 꺼내야 개념을 외운다(인출 변이). variant 는 안정화 회전 수다. */
+  function blankItem(work, b, variant) {
+    /* 대표 문맥도 회전에 넣는다 — 대표를 빼면 대표는 한 번만 나오고 변이 하나가 두 번 나온다 */
+    var pool = [b].concat(b.alts || []);
+    var ctx = pool[(variant || 0) % pool.length];
     return {
       id: 'g-bl-' + b.id, gen: true, workId: work.workId, kind: 'blank', blankId: b.id,
-      stem: b.label || '빈칸에 알맞은 말을 쓰세요.',
-      context: b.text, answers: b.answers, hintLen: (b.answers && b.answers[0] || '').length,
+      stem: ctx.label || b.label || '빈칸에 알맞은 말을 쓰세요.',
+      context: ctx.text, answers: b.answers, hintLen: (b.answers && b.answers[0] || '').length,
       /* 한 문맥에 □ 무리가 여럿일 때 이 빈칸이 몇 번째인지. 없으면 첫 무리(옛 팩 호환) */
-      slot: b.slot || 0
+      slot: ctx.slot || 0,
+      variants: pool.length
     };
   }
 
