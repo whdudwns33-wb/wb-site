@@ -502,6 +502,10 @@ async function rbLoad(keepDraft) {
   if (!id) return;
   $('#rbMsg').textContent = '불러오는 중…';
   try {
+    /* 개념어 사전을 먼저 확보한다 — 없으면 저작 경로의 팩 재검증이 업로드 경로보다 헐거워진다 */
+    if (!CONCEPTS) {
+      try { CONCEPTS = await (await fetch('/naesin-ko/concepts.json')).json(); } catch (err) { CONCEPTS = null; }
+    }
     const [pd, pk] = await Promise.all([
       api('/naesin-ko/admin/pending?id=' + encodeURIComponent(id)),
       api('/naesin-ko/pack?id=' + encodeURIComponent(id)),
