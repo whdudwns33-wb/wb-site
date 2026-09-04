@@ -6,6 +6,7 @@
  * "번호를 앱이 정하게 하면 안 된다"는 원칙을 다른 방식으로 지킨다:
  *   · 앱은 거래처 "이름"만 보낸다. 실제 전화번호는 앱이 절대 못 보내고,
  *     서버가 자기만 아는 비밀키(BOOK_VENDOR_PHONES)에서 찾는다.
+ *     상형총판의 원본 키(상형출판사)는 전용 비밀키가 있으면 그 값을 우선한다.
  *   · 문자 내용도 앱이 자유 텍스트로 못 보낸다. 서버가 주문 지시서(taskId)를
  *     D1에서 직접 읽어 정해진 틀로 만든다.
  *   · 코드가 배포돼도 기본은 꺼짐 — WB_BOOK_ORDER_SEND_ENABLED가 'true'여야
@@ -51,6 +52,7 @@ const SAMPLE_VENDOR_NAME = '__BOOK_ORDER_SAMPLE__';
 const SAMPLE_ITEMS = [{ title: '교재 주문 발송 경로 점검 (실제 주문 아님)', qty: '1권' }];
 const REJECTED_RETRY_VERSION = 'BOOK_ORDER_REJECTED_RETRY_V1';
 const MANUAL_PHONE_ORDERED_CODE = 'MANUAL_PHONE_ORDERED';
+const SANGHYUNG_VENDOR_KEY = '상형출판사';
 const ALLOWED_REQUEST_KEYS = new Set(['app', 'auth', 'taskId', 'action']);
 const ALLOWED_AUTH_KEYS = new Set(['mode', 'secret', 'id', 'token']);
 const FORBIDDEN_REQUEST_KEYS = /(?:phone|^to$|^from$|message|recipient|vendor)/i;
@@ -151,6 +153,11 @@ function canOperateBookOrder(auth) {
 
 /** 거래처 전화번호는 앱이 절대 못 정한다 — 서버 비밀키(BOOK_VENDOR_PHONES, JSON)에서만 찾는다 */
 function vendorPhone(env, vendorName) {
+  if (vendorName === SANGHYUNG_VENDOR_KEY && env.BOOK_VENDOR_PHONE_SANGHYUNG !== undefined) {
+    // 전용 값을 잘못 넣었을 때 과거 공용 번호로 조용히 발송하지 않도록 fail-closed 한다.
+    const overridePhone = normalizedDigits(env.BOOK_VENDOR_PHONE_SANGHYUNG);
+    return /^01[016789]\d{7,8}$/.test(overridePhone) ? overridePhone : null;
+  }
   let map;
   try { map = JSON.parse(env.BOOK_VENDOR_PHONES || '{}'); }
   catch (error) { return null; }
@@ -699,19 +706,28 @@ function providerStatusRefreshOutcome(value) {
 
 function providerMessages(payload) {
   const list = payload && payload.messageList;
-  if (!list || typeof list !== 'object' || Array.isArray(list)) return new Map();
+  const values = Array.isArray(list)
+    ? list
+    : list && typeof list === 'object'
+      ? Object.values(list)
+      : [];
   const messages = new Map();
-  for (const value of Object.values(list)) {
+  for (const value of values) {
     const messageId = safeProviderId(value && value.messageId);
-    if (messageId) messages.set(messageId, value);
+    const groupId = safeProviderId(value && value.groupId);
+    const statusCode = safeProviderStatus(value && value.statusCode);
+    if (messageId && statusCode) messages.set(messageId, { messageId, groupId, statusCode });
   }
   return messages;
 }
 
 async function fetchProviderStatuses(config, messageIds) {
   const url = new URL(SOLAPI_LIST_URL);
-  url.searchParams.set('messageIds', JSON.stringify(messageIds));
-  url.searchParams.set('limit', String(messageIds.length));
+  const safeMessageIds = [...new Set((messageIds || []).map(safeProviderId).filter(Boolean))];
+  // Solapi 공식 SDK와 같이 배열은 같은 query key의 반복값으로 보낸다.
+  // JSON 배열 문자열 한 값은 HTTP 200이어도 빈 messageList를 반환할 수 있다.
+  for (const messageId of safeMessageIds) url.searchParams.append('messageIds', messageId);
+  url.searchParams.set('limit', String(safeMessageIds.length));
   const authorization = await buildSolapiAuthorization(config.apiKey, config.apiSecret);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), SOLAPI_TIMEOUT_MS);

@@ -1076,11 +1076,12 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-09-04.1"></script>
-<script src="./schedule-board-core.js?v=2026-09-04.1"></script>
-<script src="./asset-core.js?v=2026-09-04.1"></script>
-<script src="./qr-core.js?v=2026-09-04.1"></script>
-<script src="./acaflow-import-core.js?v=2026-09-04.1"></script>
+<script src="./lesson-form-core.js?v=2026-09-04.2"></script>
+<script src="./schedule-board-core.js?v=2026-09-04.2"></script>
+<script src="./asset-core.js?v=2026-09-04.2"></script>
+<script src="./qr-core.js?v=2026-09-04.2"></script>
+<script src="./acaflow-import-core.js?v=2026-09-04.2"></script>
+<script src="./feedback-subject-catalog.js?v=2026-09-04.2"></script>
 <script>
 "use strict";
 
@@ -5827,13 +5828,21 @@ function buildFormalFeedbackComment(ctx, seedStr, studentName, feedbackDate, stu
   const directSentence = feedbackDirectStudentSentence(direct, studentName);
   const parts = [directSentence || opener];
   if (focus) parts.push(seedPick(FB_FORMAL_FOCUS[focus], seedStr, 102));
-  (ctx && ctx.plus || []).slice(0, 2).forEach((index, offset) => {
-    if (FB_PLUS[index] && FB_PLUS[index][1]) {
-      parts.push(seedPick(FB_FORMAL_PRAISE, seedStr, 104 + offset).replace('{x}', FB_PLUS[index][1]));
+  (ctx && ctx.plus || []).slice(0, 2).forEach((selected, offset) => {
+    if (selected === 'none') return;
+    const prepared = String(ctx && ctx.plusSentences && ctx.plusSentences[selected] || '').trim();
+    if (prepared) parts.push(prepared);
+    // 이미 열린 구버전 화면도 안전하게 미리보기를 마칠 수 있도록 숫자 인덱스만 호환한다.
+    else if (typeof selected === 'number' && FB_PLUS[selected] && FB_PLUS[selected][1]) {
+      parts.push(seedPick(FB_FORMAL_PRAISE, seedStr, 104 + offset).replace('{x}', FB_PLUS[selected][1]));
     }
   });
-  const minus = ctx && ctx.minus != null ? FB_MINUS[ctx.minus] : null;
-  if (minus && minus[1]) parts.push(seedPick(FB_FORMAL_MINUS, seedStr, 107).replace('{y}', minus[1]));
+  const preparedMinus = String(ctx && ctx.minusSentence || '').trim();
+  const legacyMinus = ctx && typeof ctx.minus === 'number' ? FB_MINUS[ctx.minus] : null;
+  if (preparedMinus) parts.push(preparedMinus);
+  else if (legacyMinus && legacyMinus[1]) {
+    parts.push(seedPick(FB_FORMAL_MINUS, seedStr, 107).replace('{y}', legacyMinus[1]));
+  }
   parts.push(feedbackDailyRotatingPick(
     FB_FORMAL_CLOSINGS, studentKey || studentName, feedbackDate, 108, seedStr
   ));
@@ -5880,7 +5889,46 @@ function ctModal(name, taskId, studentId) {
       : '<div class="small muted">아직 기록이 없습니다. 첫 연락을 남겨보세요.</div>'));
 }
 
-let fbCtx = null;   // {id, date, comment, focus, plus:[], minus}
+const FEEDBACK_SUBJECT_CATALOG = window.WBFeedbackSubjectCatalog || null;
+
+function feedbackSentenceSubject(value) {
+  const source = String(value || '').replace(/\s+/g, '');
+  if (!source) return '';
+  if (source === '국어' || /독해/.test(source)) return '국어';
+  if (source === '영어' || /영어/.test(source)) return '영어';
+  if (source === '수학' || /수학/.test(source)) return '수학';
+  if (source === '사회' || /사회/.test(source)) return '사회';
+  if (source === '과학' || /과학/.test(source)) return '과학';
+  return '';
+}
+
+function feedbackSubjectButtons(subject, kind) {
+  return FEEDBACK_SUBJECT_CATALOG
+    ? FEEDBACK_SUBJECT_CATALOG.getButtons(subject, kind)
+    : [];
+}
+
+function feedbackSubjectButton(subject, kind, id) {
+  return feedbackSubjectButtons(subject, kind).find(item => item.id === id) || null;
+}
+
+function feedbackRandomDraw() {
+  try {
+    const values = new Uint32Array(1);
+    crypto.getRandomValues(values);
+    return values[0] / 4294967296;
+  } catch (error) {
+    return Math.random();
+  }
+}
+
+function feedbackPickSubjectSentence(subject, kind, id) {
+  return FEEDBACK_SUBJECT_CATALOG
+    ? FEEDBACK_SUBJECT_CATALOG.pickVariant(subject, kind, id, feedbackRandomDraw)
+    : '';
+}
+
+let fbCtx = null;   // {id,date,comment,focus,feedbackSubject,plus:[],plusSentences:{},minus,minusSentence}
 function captureFeedbackComment() {
   const field = document.querySelector('[data-feedback-comment]');
   if (fbCtx && field) fbCtx.comment = field.value;
@@ -5889,16 +5937,27 @@ function captureFeedbackComment() {
 function fbModal() {
   const chip = (on, act, extra, label) =>
     '<button type="button" class="chip ' + (on ? 'on' : '') + '" data-act="' + act + '" ' + extra + '>' + label + '</button>';
+  const subjects = FEEDBACK_SUBJECT_CATALOG ? FEEDBACK_SUBJECT_CATALOG.SUBJECTS : [];
+  const strengthButtons = feedbackSubjectButtons(fbCtx.feedbackSubject, 'strength');
+  const improvementButtons = feedbackSubjectButtons(fbCtx.feedbackSubject, 'improvement');
+  const subjectHint = fbCtx.feedbackSubject ? '' : '<div class="hint mb14">먼저 국어·영어·수학·사회·과학 중 문장을 고를 과목을 선택해 주세요.</div>';
   modal('피드백 문구 선택',
     '<label class="field"><span class="fl">1. 코멘트(직접작성, 간단히)</span><textarea class="in" rows="2" maxlength="200" data-feedback-comment placeholder="예) ___ (하)는 모습을 보였습니다">' +
       esc(fbCtx.comment || '') + '</textarea></label>' +
     '<div class="fl mb8">2. 오늘 집중·태도는?</div><div class="chips mb14">' +
       FB_FOCUS_CHOICES.map(([v, l]) =>
         chip(fbCtx.focus === v, 'fbq', 'data-q="focus" data-v="' + v + '"', l)).join('') + '</div>' +
+    '<div class="fl mb8">3·4. 문장 선택 과목</div><div class="chips mb14">' +
+      subjects.map(subject => chip(fbCtx.feedbackSubject === subject, 'fbq',
+        'data-q="subject" data-v="' + subject + '"', subject)).join('') + '</div>' + subjectHint +
     '<div class="fl mb8">3. 잘한 점은? (최대 2개, 해당 없으면 "없음")</div><div class="chips mb14">' +
-      FB_PLUS.map((p, i) => chip(fbCtx.plus.includes(i), 'fbq', 'data-q="plus" data-v="' + i + '"', p[0])).join('') + '</div>' +
+      strengthButtons.map(item => chip(fbCtx.plus.includes(item.id), 'fbq',
+        'data-q="plus" data-v="' + item.id + '"', item.label)).join('') +
+      chip(fbCtx.plus.includes('none'), 'fbq', 'data-q="plus" data-v="none"', '없음') + '</div>' +
     '<div class="fl mb8">4. 보완할 점은? (특별히 없으면 "없음")</div><div class="chips mb14">' +
-      FB_MINUS.map((p, i) => chip(fbCtx.minus === i, 'fbq', 'data-q="minus" data-v="' + i + '"', p[0])).join('') + '</div>' +
+      improvementButtons.map(item => chip(fbCtx.minus === item.id, 'fbq',
+        'data-q="minus" data-v="' + item.id + '"', item.label)).join('') +
+      chip(fbCtx.minus === 'none', 'fbq', 'data-q="minus" data-v="none"', '없음') + '</div>' +
     '<div class="hint">직접 작성한 코멘트와 여기서 고른 잘한 점·보완할 점이 학부모 피드백 문구에 반영됩니다. 다음 화면에서 최종 문구를 확인하세요.</div>',
     '<button class="btn btn-primary btn-block mt14" data-act="fbmake">다음 — 미리보기</button>');
 }
@@ -6200,9 +6259,16 @@ function computeFeedbackFields(t, date, fbCtx) {
     [t.subject, t.className].filter(Boolean).join(' · ') || '수업 진행').slice(0, 300);
   const subjectText = feedbackFlatField(t.subject || t.className || '').slice(0, 80);
   const homeworkText = feedbackFlatField(memo.homework || '없음').slice(0, 300) || '없음';
-  const plusText = ((fbCtx && fbCtx.plus) || []).filter(i => FB_PLUS[i] && FB_PLUS[i][1]).map(i => FB_PLUS[i][0]).join(', ');
-  const minusPick = (fbCtx && fbCtx.minus != null) ? FB_MINUS[fbCtx.minus][0] : '';
-  const minusText = minusPick === '없음' ? '' : minusPick;
+  const plusText = ((fbCtx && fbCtx.plus) || []).filter(id => id !== 'none').map(id => {
+    const option = feedbackSubjectButton(fbCtx && fbCtx.feedbackSubject, 'strength', id);
+    return option ? option.label : (typeof id === 'number' && FB_PLUS[id] ? FB_PLUS[id][0] : '');
+  }).filter(Boolean).join(', ');
+  const selectedMinus = fbCtx && fbCtx.minus;
+  const minusOption = selectedMinus && selectedMinus !== 'none'
+    ? feedbackSubjectButton(fbCtx && fbCtx.feedbackSubject, 'improvement', selectedMinus)
+    : null;
+  const minusText = minusOption ? minusOption.label
+    : (typeof selectedMinus === 'number' && FB_MINUS[selectedMinus] ? FB_MINUS[selectedMinus][0] : '');
   const studentKey = String(t.studentId || studentOf(t) || '');
   const seed = studentKey + '|' + t.id + '|' + date;
   const commentText = buildFormalFeedbackComment(fbCtx || {}, seed, studentOf(t), date, studentKey);
@@ -20383,7 +20449,8 @@ document.addEventListener('click', ev => {
     case 'fbtext': {
       const t = task(); if (!t) break;
       fbCtx = { id: id, date: date, comment: lessonMemoValues(getCheck(id, date)).comment,
-        focus: null, plus: [], minus: null };
+        focus: null, feedbackSubject: feedbackSentenceSubject(t.subject || t.className),
+        plus: [], plusSentences: {}, minus: null, minusSentence: '' };
       fbModal();
       break;
     }
@@ -20398,17 +20465,54 @@ document.addEventListener('click', ev => {
       captureFeedbackComment();
       const q = el.dataset.q, v = el.dataset.v;
       if (q === 'focus') fbCtx.focus = (fbCtx.focus === v) ? null : v;
-      else if (q === 'plus') {
-        const n = Number(v);
-        if (n === FB_PLUS_NONE_INDEX) {
-          fbCtx.plus = fbCtx.plus.includes(n) ? [] : [n];
-        } else {
-          const selected = fbCtx.plus.filter(x => x !== FB_PLUS_NONE_INDEX);
-          fbCtx.plus = selected.includes(n) ? selected.filter(x => x !== n)
-            : (selected.length >= 2 ? (toast('잘한 점은 2개까지만'), selected) : selected.concat(n));
+      else if (q === 'subject') {
+        if (fbCtx.feedbackSubject !== v) {
+          const keepPlusNone = fbCtx.plus.includes('none');
+          const keepMinusNone = fbCtx.minus === 'none';
+          fbCtx.feedbackSubject = v;
+          fbCtx.plus = keepPlusNone ? ['none'] : [];
+          fbCtx.plusSentences = {};
+          fbCtx.minus = keepMinusNone ? 'none' : null;
+          fbCtx.minusSentence = '';
         }
       }
-      else if (q === 'minus') fbCtx.minus = (fbCtx.minus === Number(v)) ? null : Number(v);
+      else if (q === 'plus') {
+        if (v === 'none') {
+          fbCtx.plus = fbCtx.plus.includes('none') ? [] : ['none'];
+          fbCtx.plusSentences = {};
+        } else {
+          if (!fbCtx.feedbackSubject) return toast('잘한 점과 보완할 점의 과목을 먼저 선택해 주세요');
+          const selected = fbCtx.plus.filter(x => x !== 'none');
+          if (selected.includes(v)) {
+            fbCtx.plus = selected.filter(x => x !== v);
+            delete fbCtx.plusSentences[v];
+          } else if (selected.length >= 2) {
+            toast('잘한 점은 2개까지만');
+          } else {
+            const sentence = feedbackPickSubjectSentence(fbCtx.feedbackSubject, 'strength', v);
+            if (!sentence) return toast('잘한 점 문장을 불러오지 못했습니다');
+            fbCtx.plus = selected.concat(v);
+            fbCtx.plusSentences[v] = sentence;
+          }
+        }
+      }
+      else if (q === 'minus') {
+        if (v === 'none') {
+          fbCtx.minus = fbCtx.minus === 'none' ? null : 'none';
+          fbCtx.minusSentence = '';
+        } else {
+          if (!fbCtx.feedbackSubject) return toast('잘한 점과 보완할 점의 과목을 먼저 선택해 주세요');
+          if (fbCtx.minus === v) {
+            fbCtx.minus = null;
+            fbCtx.minusSentence = '';
+          } else {
+            const sentence = feedbackPickSubjectSentence(fbCtx.feedbackSubject, 'improvement', v);
+            if (!sentence) return toast('보완할 점 문장을 불러오지 못했습니다');
+            fbCtx.minus = v;
+            fbCtx.minusSentence = sentence;
+          }
+        }
+      }
       fbModal();
       break;
     }
@@ -21621,7 +21725,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-09-04.1';
+const APP_VER = '2026-09-04.2';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);

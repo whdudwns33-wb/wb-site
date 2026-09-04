@@ -214,10 +214,49 @@ test('scheduled status refresh advances the same provider message from queued to
   for (const request of requested) {
     const url = new URL(request.url);
     assert.equal(url.origin + url.pathname, 'https://api.solapi.com/messages/v4/list');
-    assert.deepEqual(JSON.parse(url.searchParams.get('messageIds')), ['MSG_STATUS']);
+    assert.deepEqual(url.searchParams.getAll('messageIds'), ['MSG_STATUS']);
+    assert.equal(url.searchParams.get('messageIds')?.startsWith('['), false);
     assert.equal(request.options.method, 'GET');
     assert.match(request.options.headers.Authorization, /^HMAC-SHA256 /);
   }
+});
+
+test('status refresh repeats messageIds and accepts an array response so queued orders reach delivered', async () => {
+  const db = new TestD1();
+  const now = Date.parse('2026-09-03T03:00:00Z');
+  seedProviderSend(db, 'query-a', '2000', {
+    createdAt: now - 2_000, groupId: 'GROUP_QUERY_A', messageId: 'MSG_QUERY_A'
+  });
+  seedProviderSend(db, 'query-b', '2000', {
+    createdAt: now - 1_000, groupId: 'GROUP_QUERY_B', messageId: 'MSG_QUERY_B'
+  });
+
+  let listFetches = 0;
+  await withFetch(async (url, options) => {
+    listFetches += 1;
+    const parsed = new URL(String(url));
+    const ids = parsed.searchParams.getAll('messageIds');
+    assert.equal(options.method, 'GET');
+    // 과거 JSON 문자열 한 값이면 Solapi가 정상 200과 빈 목록을 줄 수 있던 상황을 재현한다.
+    if (ids.length === 1 && ids[0].startsWith('[')) {
+      return new Response(JSON.stringify({ messageList: [] }), { status: 200 });
+    }
+    assert.deepEqual(ids, ['MSG_QUERY_A', 'MSG_QUERY_B']);
+    return new Response(JSON.stringify({ messageList: [
+      { messageId: 'MSG_QUERY_A', groupId: 'GROUP_QUERY_A', statusCode: '4000' },
+      { messageId: 'MSG_QUERY_B', groupId: 'GROUP_QUERY_B', statusCode: '4000' }
+    ] }), { status: 200, headers: { 'content-type': 'application/json' } });
+  }, async () => {
+    const result = await handleScheduledBookOrderStatusRefresh({ DB: db, ...fullEnvBase }, now);
+    assert.equal(result.ok, true);
+    assert.equal(result.checked, 2);
+    assert.equal(result.updated, 2);
+  });
+
+  assert.equal(listFetches, 1);
+  assert.equal(db.prepare(
+    "SELECT COUNT(*) AS count FROM book_order_sends WHERE provider_status_code='4000'"
+  ).first().count, 2);
 });
 
 test('status refresh records terminal failure but skips phone-completed orders and never sends a message', async () => {
@@ -234,7 +273,7 @@ test('status refresh records terminal failure but skips phone-completed orders a
   await withFetch(async (url, options) => {
     fetches += 1;
     assert.equal(options.method, 'GET');
-    assert.deepEqual(JSON.parse(new URL(url).searchParams.get('messageIds')), ['MSG_FAILED']);
+    assert.deepEqual(new URL(url).searchParams.getAll('messageIds'), ['MSG_FAILED']);
     return new Response(JSON.stringify({ messageList: {
       MSG_FAILED: { messageId: 'MSG_FAILED', groupId: 'GROUP_FAILED', statusCode: '3010' }
     } }), { status: 200, headers: { 'content-type': 'application/json' } });
@@ -331,7 +370,7 @@ test('status refresh is monotonic and CAS prevents a delayed poll from overwriti
     return statement;
   };
   await withFetch(async url => {
-    const ids = JSON.parse(new URL(url).searchParams.get('messageIds'));
+    const ids = new URL(url).searchParams.getAll('messageIds');
     const messageList = {};
     for (const id of ids) messageList[id] = {
       messageId: id,
@@ -908,6 +947,54 @@ test('unknown vendor or vendor missing from the phone allowlist is rejected befo
     const r = await call(db, { auth: admin, taskId: 'order-1' });
     assert.equal(r.status, 409);
     assert.equal(r.body.code, 'VENDOR_PHONE_MISSING');
+  });
+  assert.equal(fetches, 0);
+});
+
+test('the dedicated Sanghyung secret overrides only the raw Sanghyung vendor key', async () => {
+  const sharedPhone = ['010', '1111', '0001'].join('');
+  const dedicatedPhone = ['010', '2222', '0002'].join('');
+  const aliasPhone = ['010', '3333', '0003'].join('');
+
+  const rawDb = new TestD1();
+  seedOrderTask(rawDb, { orderVendor: '상형출판사' });
+  await withFetch(async (url, options) => {
+    assert.equal(JSON.parse(options.body).messages[0].to, dedicatedPhone);
+    return acceptedResponse();
+  }, async () => {
+    const result = await call(rawDb, { auth: admin, taskId: 'order-1' }, {
+      BOOK_VENDOR_PHONES: JSON.stringify({ '상형출판사': sharedPhone }),
+      BOOK_VENDOR_PHONE_SANGHYUNG: dedicatedPhone
+    });
+    assert.equal(result.status, 200);
+  });
+
+  const aliasDb = new TestD1();
+  seedOrderTask(aliasDb, { orderVendor: '상형총판' });
+  await withFetch(async (url, options) => {
+    assert.equal(JSON.parse(options.body).messages[0].to, aliasPhone,
+      '화면용 별칭이나 다른 키에 전용 번호를 적용하면 안 된다');
+    return acceptedResponse();
+  }, async () => {
+    const result = await call(aliasDb, { auth: admin, taskId: 'order-1' }, {
+      BOOK_VENDOR_PHONES: JSON.stringify({ '상형총판': aliasPhone }),
+      BOOK_VENDOR_PHONE_SANGHYUNG: dedicatedPhone
+    });
+    assert.equal(result.status, 200);
+  });
+});
+
+test('an invalid dedicated Sanghyung secret fails closed instead of using the old shared number', async () => {
+  const db = new TestD1();
+  seedOrderTask(db, { orderVendor: '상형출판사' });
+  let fetches = 0;
+  await withFetch(async () => { fetches += 1; return acceptedResponse(); }, async () => {
+    const result = await call(db, { auth: admin, taskId: 'order-1' }, {
+      BOOK_VENDOR_PHONES: JSON.stringify({ '상형출판사': ['010', '1111', '0001'].join('') }),
+      BOOK_VENDOR_PHONE_SANGHYUNG: 'invalid'
+    });
+    assert.equal(result.status, 409);
+    assert.equal(result.body.code, 'VENDOR_PHONE_MISSING');
   });
   assert.equal(fetches, 0);
 });
