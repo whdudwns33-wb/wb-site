@@ -73,6 +73,8 @@ npx wrangler d1 execute wb-sync --remote --file=./migrations/058_weekend_visit_s
 npx wrangler d1 execute wb-sync --remote --file=./migrations/059_weekend_multi_visits.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/060_lesson_handoffs.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/061_consult_reward_processing_guard.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/062_feedback_ai_budget_cache.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/063_student_session_cycles.sql
 
 # 3) 비밀키 등록 — 코드나 wrangler.toml에 적지 않는다
 npx wrangler secret put TASK_ADMIN_SECRET
@@ -250,6 +252,11 @@ append-only 저장한다. 승인된 수업삭제의 감사 행은 DB에만 보�
 `057_teacher_requests_tuition_alerts.sql` → Worker → Pages 순서로 배포한다. 결제 구분과
 회차 시작일은 비공개 roster의 stable studentId에 저장하고, 23:50 KST 확정 출결 중
 출석·지각·조퇴를 모든 과목에서 합산한다. 알림 원장에는 이름이나 연락처를 저장하지 않는다.
+
+학생 단위 회차제 원장은 `063_student_session_cycles.sql` → Worker → Pages 순서로 배포한다.
+설정된 회차 시작일부터 모든 담당 과목의 확정 출석·지각·조퇴를 합쳐 4회 단위의 append-only
+원장으로 저장하며, 결석은 0회이고 자동 보강을 생성하지 않는다. 4회 완료 후에는 다음 확정
+출석일을 새 회차 시작일로 삼는다. 원장에는 이름·연락처를 저장하지 않고 stable studentId만 쓴다.
 
 보호자 교재 주문 현황을 추가하는 배포는 반드시
 `037_book_order_identity_snapshots.sql` → Worker → Pages 순서로 진행한다. 새

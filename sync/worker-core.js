@@ -46,6 +46,7 @@
  *   POST /session-pack { app, auth, action, ... }    → 지정 수업의 회차권·사용 원장
  *   POST /teacher-live-request { app, auth, action, ... } → 담당 선생님→모든 관리자 실시간 요청
  *   POST /tuition-alert { app, auth(admin), action, ... } → 학생 단위 4회제 3회 확정 알림
+ *   POST /student-attendance { app, auth, studentId, month? } → 담당 학생 출결 달력·현재 4회 진행
  *   POST /parent-portal { app, action, ... }         → 보호자 초대·공개 수업·정형 요청함
  *   POST /consult-guardian { app:'consult', action, ... } → 컨설팅 리포트 보호자 읽기·확인
  *   POST /consult-curriculum-image multipart(app:'consult', auth, files[]) → 강의 목차 사진 일시 인식
@@ -83,7 +84,7 @@ import { handleRoster } from './roster.js';
 import { handleStudentChange } from './student-change.js';
 import { handleAdminDirective } from './admin-directive.js';
 import { handleTeacherLiveRequest } from './teacher-live-request.js';
-import { handleTuitionAlert } from './tuition-alert.js';
+import { handleTuitionAlert, handleStudentAttendance } from './tuition-alert.js';
 import { handleBookIssue } from './book-issue.js';
 import { handleBookCatalog } from './completed-book-catalog.js';
 import { handleTransport } from './transport.js';
@@ -592,6 +593,211 @@ async function inspectOwnCheckChanges(env, app, owner, entries, newTaskIds) {
     return { error: '본인에게 배정된 업무의 체크만 저장할 수 있습니다', skip: new Set() };
   }
   return await inspectOwnStaffAttendanceChanges(env, app, owner, checkEntries);
+}
+
+function checkIdentityFromKey(value) {
+  const key = String(value || '');
+  const pipe = key.indexOf('|');
+  if (pipe <= 0 || pipe !== key.lastIndexOf('|') || pipe === key.length - 1) return null;
+  const taskId = key.slice(0, pipe);
+  const date = key.slice(pipe + 1);
+  return SAFE_ID.test(taskId) && validIsoDate(date) ? { key, taskId, date } : null;
+}
+
+function session4AttendanceLockedAt(date, now) {
+  const kst = new Date(Number(now) + 9 * 60 * 60 * 1000).toISOString();
+  const today = kst.slice(0, 10);
+  return date < today || (date === today && kst.slice(11, 19) >= '23:50:00');
+}
+
+function attendanceValue(data) {
+  if (!data || typeof data !== 'object' || Array.isArray(data) ||
+      !Object.prototype.hasOwnProperty.call(data, 'att') || data.att == null) return '';
+  return String(data.att);
+}
+
+function makeupHistoryAllowsSessionLock(value) {
+  let history;
+  try { history = JSON.parse(value || '[]'); } catch (error) { return false; }
+  const first = Array.isArray(history) && history[0] && typeof history[0] === 'object'
+    ? history[0] : null;
+  return !!(first && (first.action === 'create_from_absence' ||
+    (first.action === 'create_manual' && first.reason === 'manual_absence')));
+}
+
+function makeupHistoryHasCompletion(value) {
+  let history;
+  try { history = JSON.parse(value || '[]'); } catch (error) { return false; }
+  const last = Array.isArray(history) && history.length ? history[history.length - 1] : null;
+  return !!(last && typeof last === 'object' && last.action === 'complete');
+}
+
+async function sessionAttendanceEventKeys(env, app, keys) {
+  const found = new Set();
+  for (let offset = 0; offset < keys.length; offset += 80) {
+    const chunk = keys.slice(offset, offset + 80);
+    const result = await env.DB.prepare(
+      'SELECT check_key FROM student_session_attendance_events WHERE app=? AND check_key IN (' +
+        chunk.map(() => '?').join(',') + ')'
+    ).bind(app, ...chunk).all();
+    for (const row of result.results || []) found.add(String(row.check_key));
+  }
+  return found;
+}
+
+async function currentCheckStates(env, app, keys) {
+  const current = new Map();
+  for (let offset = 0; offset < keys.length; offset += 80) {
+    const chunk = keys.slice(offset, offset + 80);
+    const result = await env.DB.prepare(
+      'SELECT k,owner,data,updated_at,srv_at FROM checks WHERE app=? AND k IN (' +
+        chunk.map(() => '?').join(',') + ')'
+    ).bind(app, ...chunk).all();
+    for (const row of result.results || []) {
+      let data;
+      try { data = JSON.parse(row.data || '{}'); } catch (error) { data = null; }
+      current.set(String(row.k), { data, updatedAt: Number(row.updated_at) || 0 });
+    }
+  }
+  return current;
+}
+
+async function changesLockedAttendance(env, app, candidates) {
+  if (!candidates.length) return false;
+  const keys = [...new Set(candidates.map(item => item.identity.key))];
+  const current = await currentCheckStates(env, app, keys);
+  for (const item of candidates) {
+    const incoming = attendanceValue(item.entry.change.data);
+    const stored = current.get(item.identity.key);
+    const previous = stored ? attendanceValue(stored.data) : '';
+    // LWW가 실제로 적용하지 않을 오래된 오프라인 재전송은 전체 sync를 실패시키지 않는다.
+    const actuallyNewer = stored && (Number(item.entry.change.updated_at) || 0) > stored.updatedAt;
+    if ((stored && actuallyNewer && incoming !== previous) ||
+        (!current.has(item.identity.key) && incoming !== '')) return true;
+  }
+  return false;
+}
+
+/**
+ * 구형·오프라인 화면도 23:50 이후 확정된 회차제 출결만큼은 다시 쓰지 못하게 한다.
+ * taskId/studentId/check key의 stable ID 연결로만 판정하고 이름은 전혀 사용하지 않는다.
+ */
+async function inspectLockedSession4AttendanceChanges(env, app, entries, now) {
+  if (app !== 'task') return { locked: false };
+  const candidates = entries.map(entry => ({ entry, identity: entry.table === 'checks'
+    ? checkIdentityFromKey(entry.change && entry.change.k) : null
+  })).filter(item => item.identity && item.entry.change && item.entry.change.data &&
+    typeof item.entry.change.data === 'object' && !Array.isArray(item.entry.change.data));
+  if (!candidates.length) return { locked: false };
+
+  // 원장에 이미 사용 근거가 들어간 check는 이후 학생 설정·보강 상태가 바뀌더라도 정본이다.
+  // 동일 att의 메모 수정과 LWW상 무시될 stale replay만 허용한다.
+  const candidateKeys = [...new Set(candidates.map(item => item.identity.key))];
+  const eventKeys = await sessionAttendanceEventKeys(env, app, candidateKeys);
+  const eventCandidates = candidates.filter(item => eventKeys.has(item.identity.key));
+  if (await changesLockedAttendance(env, app, eventCandidates)) return { locked: true };
+
+  const taskIds = [...new Set(candidates.map(item => item.identity.taskId))];
+  const tasks = new Map();
+  const storedTaskVersions = new Map();
+  const registerTask = (row, data) => {
+    if (!data || String(data.id || '') !== String(row.id || '') ||
+        String(data.staffId || '') !== String(row.owner || '') ||
+        !SAFE_ID.test(String(data.studentId || '')) || !hasStructuredLessonMarker(data)) return;
+    const makeupCaseId = String(data.makeupCaseId || '').trim();
+    const isMakeup = String(data.lessonInstanceType || '') === 'makeup' || !!makeupCaseId;
+    if (isMakeup && (String(data.lessonInstanceType || '') !== 'makeup' ||
+        !SAFE_ID.test(makeupCaseId) || String(row.id) !== 'makeup_lesson_' + makeupCaseId)) return;
+    tasks.set(String(row.id), { owner: String(row.owner || ''), data,
+      kind: isMakeup ? 'makeup' : 'regular', makeupCaseId });
+  };
+  for (let offset = 0; offset < taskIds.length; offset += 80) {
+    const chunk = taskIds.slice(offset, offset + 80);
+    const result = await env.DB.prepare(
+      'SELECT id,owner,data,updated_at,srv_at FROM tasks WHERE app=? AND id IN (' +
+        chunk.map(() => '?').join(',') + ')'
+    ).bind(app, ...chunk).all();
+    for (const row of result.results || []) {
+      storedTaskVersions.set(String(row.id), Number(row.updated_at) || 0);
+      let data;
+      try { data = JSON.parse(row.data || '{}'); } catch (error) { continue; }
+      registerTask(row, data);
+    }
+  }
+
+  // 새 수업 task와 과거 check가 같은 all-scope batch에 들어오면 DB 조회만으로는 task를
+  // 찾을 수 없다. 실제 LWW 결과가 될 batch task를 합쳐 check가 먼저 와도 선검증한다.
+  const incomingTasks = new Map();
+  for (const entry of entries) {
+    if (entry.table !== 'tasks' || !entry.change || !taskIds.includes(String(entry.change.id || ''))) continue;
+    const id = String(entry.change.id || '');
+    const updatedAt = Number(entry.change.updated_at) || 0;
+    const prior = incomingTasks.get(id);
+    if (!prior || updatedAt > prior.updatedAt) incomingTasks.set(id, { entry, updatedAt });
+  }
+  for (const [id, incoming] of incomingTasks) {
+    if (storedTaskVersions.has(id) && incoming.updatedAt <= storedTaskVersions.get(id)) continue;
+    registerTask({ id, owner: incoming.entry.change.owner }, incoming.entry.change.data);
+  }
+
+  const makeupCaseIds = [...new Set([...tasks.values()]
+    .filter(task => task.kind === 'makeup').map(task => task.makeupCaseId))];
+  const makeupCases = new Map();
+  for (let offset = 0; offset < makeupCaseIds.length; offset += 80) {
+    const chunk = makeupCaseIds.slice(offset, offset + 80);
+    const result = await env.DB.prepare(
+      'SELECT case_id,student_id,status,confirmed_start_at,confirmed_end_at,confirmed_staff_id,' +
+      'completed_at,completed_by,history ' +
+      'FROM makeup_cases WHERE app=? AND case_id IN (' + chunk.map(() => '?').join(',') + ')'
+    ).bind(app, ...chunk).all();
+    for (const row of result.results || []) makeupCases.set(String(row.case_id), row);
+  }
+  const lessonCandidates = candidates.filter(item => {
+    const task = tasks.get(item.identity.taskId);
+    if (!task) return false;
+    const date = item.identity.date;
+    if ((task.data.start && date < String(task.data.start)) ||
+        (task.data.end && date > String(task.data.end))) return false;
+    if (task.data.deleted && !validIsoDate(String(task.data.end || ''))) return false;
+    if (task.kind === 'makeup') {
+      const makeup = makeupCases.get(task.makeupCaseId);
+      const status = String(makeup && makeup.status || '');
+      const statusAllowsDate = status === 'confirmed'
+        ? String(makeup.confirmed_start_at || '').slice(0, 10) === date &&
+          String(makeup.confirmed_end_at || '').slice(0, 10) === date
+        : status === 'completed' && Number(makeup.completed_at) > 0 &&
+          SAFE_ID.test(String(makeup.completed_by || '')) && makeupHistoryHasCompletion(makeup.history);
+      return !!(makeup && statusAllowsDate &&
+        String(makeup.student_id || '') === String(task.data.studentId || '') &&
+        String(makeup.confirmed_staff_id || '') === task.owner &&
+        String(task.data.start || '') === date && String(task.data.end || '') === date &&
+        makeupHistoryAllowsSessionLock(makeup.history));
+    }
+    return true;
+  });
+  if (!lessonCandidates.length) return { locked: false };
+
+  const rosterRow = await env.DB.prepare("SELECT data FROM private_rosters WHERE app='task' LIMIT 1").first();
+  let roster;
+  try { roster = JSON.parse(rosterRow && rosterRow.data || '{}'); } catch (error) { roster = null; }
+  const students = roster && roster.roster && Array.isArray(roster.roster.students)
+    ? roster.roster.students : [];
+  const sessionStarts = new Map();
+  for (const student of students) {
+    const studentId = String(student && student.id || '');
+    const start = String(student && student.sessionCycleStartDate || '');
+    if (!SAFE_ID.test(studentId) || student && student.billingMode !== 'session4' || !validIsoDate(start) ||
+        sessionStarts.has(studentId)) continue;
+    sessionStarts.set(studentId, start);
+  }
+
+  const lockedCandidates = lessonCandidates.filter(item => {
+    const task = tasks.get(item.identity.taskId);
+    const start = sessionStarts.get(String(task && task.data.studentId || ''));
+    return start && item.identity.date >= start && session4AttendanceLockedAt(item.identity.date, now);
+  });
+  if (!lockedCandidates.length) return { locked: false };
+  return { locked: await changesLockedAttendance(env, app, lockedCandidates) };
 }
 
 async function effectiveStaffDeactivations(env, app, entries) {
@@ -1126,6 +1332,13 @@ async function handleSync(env, app, body, origin) {
     }
     for (const entry of checkInspection.skip) skipped.add(entry);
   }
+  const attendanceLock = await inspectLockedSession4AttendanceChanges(
+    env, app, accepted.filter(entry => !skipped.has(entry)), now
+  );
+  if (attendanceLock.locked) {
+    return json({ ok: false, code: 'SESSION4_ATTENDANCE_LOCKED',
+      error: '회차제 출결은 수업일 23시 50분에 확정되어 변경할 수 없습니다. 메모는 출결 상태를 유지한 채 저장해 주세요' }, 409, origin);
+  }
   let sealedInspection;
   try { sealedInspection = await inspectSealedOrderChanges(env, app, accepted.filter(entry => !skipped.has(entry))); }
   catch (error) {
@@ -1171,6 +1384,10 @@ async function handleSync(env, app, body, origin) {
       if (isBoardingLockError(error)) return boardingLockResponse(origin);
       if (/BOOK_ORDER_SEALED|BOOK_ORDER_SEND_ACTIVE/.test(String(error && error.message || error))) {
         return json({ ok: false, code: 'BOOK_ORDER_SEALED', error: '봉인된 교재 주문은 전용 주문 화면에서만 변경할 수 있습니다' }, 409, origin);
+      }
+      if (/SESSION4_ATTENDANCE_LOCKED/.test(String(error && error.message || error))) {
+        return json({ ok: false, code: 'SESSION4_ATTENDANCE_LOCKED',
+          error: '회차제 출결은 수업일 23시 50분에 확정되어 변경할 수 없습니다. 메모는 출결 상태를 유지한 채 저장해 주세요' }, 409, origin);
       }
       throw error;
     }
@@ -2354,6 +2571,11 @@ export default {
         const auth = await resolveAuth(env, app, body.auth);
         if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
         return await handleTuitionAlert(env, app, body, okOrigin, auth, json);
+      }
+      if (url.pathname === '/student-attendance') {
+        const auth = await resolveAuth(env, app, body.auth);
+        if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+        return await handleStudentAttendance(env, app, body, okOrigin, auth, json);
       }
       if (url.pathname === '/book-issue') {
         const auth = await resolveAuth(env, app, body.auth);

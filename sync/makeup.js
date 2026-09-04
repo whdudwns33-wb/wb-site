@@ -1178,14 +1178,30 @@ async function createManual(env, app, body, auth, json, origin) {
 }
 
 async function createFromAbsence(env, app, body, auth, json, origin) {
-  exactBody(body, ['sourceTaskId', 'sourceDate']);
+  exactBody(body, ['sourceTaskId', 'sourceDate', 'creationMode']);
   const sourceTaskId = cleanId(body.sourceTaskId, 'sourceTaskId');
   const sourceDate = cleanDate(body.sourceDate, '결석 날짜');
+  const creationMode = body.creationMode == null ? 'automatic' : String(body.creationMode || '');
+  if (!['automatic', 'manual'].includes(creationMode)) {
+    problem('보강 생성 방식을 확인해 주세요', 400, 'MAKEUP_CREATION_MODE_INVALID');
+  }
   const source = await sourceTask(env, app, sourceTaskId, sourceDate);
   const studentId = cleanId(source.task.studentId, 'studentId');
   const sourceTeacherId = cleanId(source.row.owner, '수업 담당자');
   const document = await loadRoster(env, app);
   const student = rosterStudent(document, studentId, sourceDate);
+  // 구형 화면은 creationMode를 보내지 않으므로 automatic으로 닫는다. 회차제 결석은
+  // 해당 학생의 유효한 회차 시작일 이후부터 자동 생성하지 않는다. 시작일 이전 결석은
+  // 당시 월제였던 기존 운영 규칙을 보존하고, 사용자가 보강 버튼을 직접 누른 경우는 허용한다.
+  const cycleStartDate = String(student.sessionCycleStartDate || '');
+  const parsedCycleStart = new Date(cycleStartDate + 'T00:00:00Z');
+  const validCycleStart = ISO_DATE.test(cycleStartDate) && !Number.isNaN(parsedCycleStart.getTime()) &&
+    parsedCycleStart.toISOString().slice(0, 10) === cycleStartDate;
+  if (String(student.billingMode || 'monthly') === 'session4' && validCycleStart &&
+      sourceDate >= cycleStartDate && creationMode !== 'manual') {
+    problem('회차제 학생의 결석 보강은 자동 생성되지 않습니다. 필요하면 보강 버튼에서 직접 생성해 주세요',
+      409, 'SESSION4_AUTOMATIC_MAKEUP_DISABLED');
+  }
   if (auth.scope !== 'all' && sourceTeacherId !== auth.id) {
     return json({ ok: false, error: '담당 학생의 결석 수업만 보강으로 등록할 수 있습니다' }, 403, origin);
   }
@@ -1258,8 +1274,8 @@ async function createFromAbsence(env, app, body, auth, json, origin) {
     return json({ ok: true, idempotent: false, case: publicCase(saved, student, source.task, null, lessonTask),
       ...(lessonTask ? { lessonTask: { ...lessonTask, staffId: sourceTeacherId, deleted: true, updatedAt: now } } : {}) }, 200, origin);
   }
-  const history = [{ action: 'create_from_absence', from: 'none', to: 'review_pending', actorId: actorId(auth),
-    revision: 1, at: now, notificationNeeded: false }];
+  const history = [{ action: 'create_from_absence', creationMode, from: 'none', to: 'review_pending',
+    actorId: actorId(auth), revision: 1, at: now, notificationNeeded: false }];
   const insert = env.DB.prepare(
     'INSERT OR IGNORE INTO makeup_cases(app,case_id,student_id,source_task_id,source_date,source_teacher_id,' +
     'consumption_group_id,status,revision,notification_needed,notification_event_revision,history,created_at,updated_at) ' +

@@ -213,6 +213,50 @@ test('create requires a real A check, stable roster assignment, active source st
   assert.equal(inactive.status, 409);
 });
 
+test('session4 absence skips automatic legacy creation but still allows an explicit manual request', async () => {
+  const db = new TestD1(); seed(db);
+  const document = roster();
+  document.roster.students[0].billingMode = 'session4';
+  document.roster.students[0].sessionCycleStartDate = '2026-08-01';
+  db.prepare("UPDATE private_rosters SET data=? WHERE app='task'").bind(JSON.stringify(document)).run();
+
+  const legacy = await call(db, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  });
+  assert.equal(legacy.status, 409);
+  assert.equal(legacy.body.code, 'SESSION4_AUTOMATIC_MAKEUP_DISABLED');
+  const automatic = await call(db, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10',
+    creationMode: 'automatic'
+  });
+  assert.equal(automatic.status, 409);
+  assert.equal(automatic.body.code, 'SESSION4_AUTOMATIC_MAKEUP_DISABLED');
+  assert.equal(db.database.prepare('SELECT count(*) AS n FROM makeup_cases').get().n, 0);
+
+  const manual = await call(db, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10',
+    creationMode: 'manual'
+  });
+  assert.equal(manual.status, 200);
+  assert.equal(manual.body.case.status, 'review_pending');
+  assert.equal(manual.body.case.history[0].creationMode, 'manual');
+});
+
+test('session4 automatic makeup keeps the prior policy for absences before the configured cycle start', async () => {
+  const db = new TestD1(); seed(db);
+  const document = roster();
+  document.roster.students[0].billingMode = 'session4';
+  document.roster.students[0].sessionCycleStartDate = '2026-08-15';
+  db.prepare("UPDATE private_rosters SET data=? WHERE app='task'").bind(JSON.stringify(document)).run();
+
+  const prior = await call(db, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10',
+    creationMode: 'automatic'
+  });
+  assert.equal(prior.status, 200, JSON.stringify(prior.body));
+  assert.equal(prior.body.case.history[0].creationMode, 'automatic');
+});
+
 test('assigned teacher or administrator can create one confirmed manual makeup on a non-recurring day without changing attendance', async () => {
   const db = new TestD1(); seed(db);
   const request = {
