@@ -18,7 +18,7 @@ if (!Array.isArray(b.students) || !b.students.length) { console.error("백업 �
 
 const extras = {
   ipdb: b.ipdb || [], hsdb: b.hsdb || [], partners: b.partners || [],
-  trends: b.trends || [], adiga: b.adiga || [], lessons: b.lessons || [],
+  trends: b.trends || [], adiga: b.adiga || [], lessons: b.lessons || [], achdb: b.achdb || {},
 };
 extras.stamp = crypto.createHash("sha256").update(JSON.stringify(extras)).digest("hex").slice(0, 12);
 
