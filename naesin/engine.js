@@ -13,6 +13,8 @@ var WBNAESIN = (function () {
   /* 같은 단계에서 이 시간 안에 두 번 진급하지 않는다 — 한 세트(클로즈+배열)가 문항마다
      advanceStage를 부르면 4단계에서 6단계로 건너뛰어 영작(5단계)이 사라진다 */
   var STAGE_GUARD_MS = 60000;
+  var OUTSIDE_DAY = 9999;     // 본문 어느 단락에도 안 나오는 단어의 자리(대화문·시험 대비 어휘)
+  var NEW_BASE = 10;          // 하루 신규 단어의 기본 상한 — 자동 산정도 연습 모드도 이 값에서 출발한다
   /* 시험대비 압축 간격표(§4.1) — 워드브레인의 장기 간격을 마감형으로 재배치 */
   var INTERVAL_DAYS = [0.5, 1, 2, 3, 5, 7];
   var STAGE_MAX = 6;          // 본문 사다리 6단계(§4.2) — 6단계(단락 백지) 통과 = 암송 완료
@@ -85,14 +87,18 @@ var WBNAESIN = (function () {
     return s;
   }
 
-  /* 오답 공통 처리 — 오답+확실은 과신 오류(§14-1): 2계단 후퇴 + 최우선 재출제.
-     안정화 회전도 깎는다(확실이면 2회전) — 안정화가 끝난 단어도 틀리면 다시 편성돼야
+  /* 오답 공통 처리 — 과신 오류(§14-1)는 2계단 후퇴 + 최우선 재출제.
+     '과신'을 학생에게 묻지 않고 기록으로 판정한다(v1.3): 이미 도달한 단어(한 번 완전 인출에
+     성공한 단어)를 틀렸다면 그것이 곧 과신이다. 학생의 자기 신고보다 정확하다 — 중학생,
+     특히 기초가 부족한 학생일수록 자기 평가가 실제 실력과 어긋나고, 빨리 넘기려고
+     아무 버튼이나 누르면 그 값이 그대로 복습 계획에 들어간다.
+     안정화 회전도 같은 폭으로 깎는다 — 안정화가 끝난 단어도 틀리면 다시 편성돼야
      시험 직전 망각이 잡힌다. 날짜 기록을 지워 오늘 다시 성공하면 회복으로 센다. */
-  function fail(s, confidence, now) {
+  function fail(s, now) {
     s.wrong += 1; s.lapses += 1; s.streak = 0;
     s.due = now + MIN10;
     var drop = 1;
-    if (confidence === 'sure') {
+    if (s.reached) {
       s.overconfident += 1;
       s.step = Math.max(0, s.step - 2);
       drop = 2;
@@ -105,13 +111,14 @@ var WBNAESIN = (function () {
     return s;
   }
 
-  /* 일반 판정 퀴즈(4지선다·빈칸 등) — result: {correct, confidence:'sure'|'unsure'|'guess', hinted} */
+  /* 일반 판정 퀴즈(4지선다·빈칸 등) — result: {correct, hinted}.
+     (v1.3에서 result.confidence 는 안 본다 — 학생 자기 평가를 없앴다. 옛 호출이 넘겨도 무시된다.) */
   function recordQuiz(s, result, now) {
     now = ms(now);
     s.last = now;
-    if (!result.correct) return fail(s, result.confidence, now);
-    if (result.confidence === 'guess' || result.hinted) {
-      /* 찍어서 맞음·힌트 보고 맞음 — 인출 증거가 아니므로 간격을 안 올린다(내일 다시) */
+    if (!result.correct) return fail(s, now);
+    if (result.hinted) {
+      /* 힌트 보고 맞음 — 인출 증거가 아니므로 간격을 안 올린다(내일 다시) */
       s.streak = 0;
       s.due = now + DAY;
     } else {
@@ -126,15 +133,8 @@ var WBNAESIN = (function () {
      지남)일 때만 안정화 +1. 같은 날 여러 번 성공해도 1회만(§14-1 successive relearning).
      '찍음'은 회전으로 안 센다 — 최초 도달만 허용하되 철자 재검증을 달아 진짜 인출을 한 번
      더 요구한다. */
-  function criterionSuccess(s, confidence, now) {
+  function criterionSuccess(s, now) {
     var d = localDate(now);
-    if (confidence === 'guess') {
-      s.streak = 0;
-      s.due = now + DAY;
-      if (!s.reached) { s.reached = true; s.reachedAt = now; s.needsSpellCheck = true; }
-      s.lastCriterionAt = now;   // 같은 세션의 재성공이 회전으로 둔갑하지 않게 시각만 남긴다
-      return s;
-    }
     s.streak += 1;
     s.needsSpellCheck = false;   // 철자까지 쳐냈으면 재검증 끝
     if (!s.reached) {
@@ -149,14 +149,16 @@ var WBNAESIN = (function () {
     return s;
   }
 
-  /* 힌트 없는 완전 인출 시도(철자 입력·백지 등) — result: {correct, confidence, hinted}.
-     힌트를 본 철자는 완전 인출이 아니다 — 일반 퀴즈로 처리해 도달로 안 친다. */
+  /* 힌트 없는 완전 인출 시도(철자 입력·백지 등) — result: {correct, hinted}.
+     힌트를 본 철자는 완전 인출이 아니다 — 일반 퀴즈로 처리해 도달로 안 친다.
+     찍어서 맞힐 여지가 거의 없는 자리라(철자를 통째로 써야 한다) 자기 신고 없이도
+     이 성공은 인출 증거로 읽는다. 진단(4지선다)에서 온 도달만 철자 재검증을 달고 온다. */
   function recordCriterion(s, result, now) {
     now = ms(now);
     if (result.hinted) return recordQuiz(s, result, now);
     s.last = now;
-    if (!result.correct) return fail(s, result.confidence, now);
-    return criterionSuccess(s, result.confidence, now);
+    if (!result.correct) return fail(s, now);
+    return criterionSuccess(s, now);
   }
 
   /* 안정도 게이지 0~3칸(§4.1) — 도달 전엔 0 */
@@ -319,8 +321,16 @@ var WBNAESIN = (function () {
     var out = { packId: packId, fresh: [], review: [], relearn: [], rotations: 0, doneN: 0, spellN: 0, total: 0 };
     var wordsArr = (pack && pack.words) || [];
     out.total = wordsArr.length;
+    /* 순서(§4.4 v1.3) — ① 본문에 나오는 단락 순 ② 그 안에서 난이도(기초→심화) ③ 교재 순.
+       단락 우선이 먼저인 이유: 단락 단어를 다 끝내야 그 단락 본문이 열린다. 난이도를 위에
+       두면 전 단락의 기초 단어를 다 훑을 때까지 본문이 한 줄도 안 열려 진도감이 사라진다.
+       본문에 안 나오는 단어(대화문·시험 대비 어휘)는 맨 뒤 — 본문을 막지 않는다.
+       마지막에 *np+pi 로 과를 번갈아 낸다(범위 플랜이 한 과만 몰아 내지 않게). */
+    var dayIdx = wordDayIndex(pack);
     wordsArr.forEach(function (w, idx) {
-      var c = { packId: packId, id: w.id, s: null, rank: idx * np + pi };
+      var di = Object.prototype.hasOwnProperty.call(dayIdx, w.id) ? dayIdx[w.id] : OUTSIDE_DAY;
+      var order = (di * 100 + levelOf(w)) * 10000 + idx;
+      var c = { packId: packId, id: w.id, s: null, dayIdx: di, rank: order * np + pi };
       var s = states[w.id];
       if (!s || s.last == null) { out.fresh.push(c); return; }             // 손도 안 댄 단어
       c.s = s;
@@ -371,14 +381,19 @@ var WBNAESIN = (function () {
       if (remain < 1) { remain = 1; lateDeadline = freshCand.length > 0; }
       aim = Math.max(1, remain - 1);            // 마감 하루 전까지 남은 날
       needNew = Math.ceil(freshCand.length / aim);
-      maxNew = opts.maxNewWords == null ? Math.max(10, needNew) : opts.maxNewWords;
+      /* 다음 단락을 막고 있는 단어는 고른 분배보다 먼저 꺼낸다(§4.4 v1.3). 16단어를 7일에
+         고르게 펴면 하루 3개인데, 첫 단락이 10단어면 나흘째까지 본문 문장이 한 줄도 안 열린다.
+         실측으로 그 나흘이 시험 범위의 꼬리(누적 백지·종합 Check)를 통째로 밀어냈다.
+         바닥은 기본 상한(10)까지만 — 학생 하루치가 이 규칙 때문에 불어나지는 않게. */
+      needNew = Math.max(needNew, Math.min(blockingCount(freshCand), NEW_BASE));
+      maxNew = opts.maxNewWords == null ? Math.max(NEW_BASE, needNew) : opts.maxNewWords;
       capped = needNew > maxNew;
       fresh = freshCand.slice(0, Math.min(maxNew, needNew));
     } else if (ctx.mode === 'after') {
       fresh = [];
     } else {
       /* 연습 모드는 마감이 없다 — 자동 산정할 분모가 없으니 하루 10개 고정 */
-      maxNew = opts.maxNewWords == null ? 10 : opts.maxNewWords;
+      maxNew = opts.maxNewWords == null ? NEW_BASE : opts.maxNewWords;
       fresh = freshCand.slice(0, maxNew);
     }
 
@@ -423,6 +438,33 @@ var WBNAESIN = (function () {
     };
   }
 
+  /* 단어가 본문보다 한 걸음 앞서 가도록, 아직 안 열린 앞의 두 단락 몫을 센다.
+     한 단락만 세면 그 단락 문장을 푸는 동안 다음 단락 단어가 아직이라 본문이 하루씩 쉰다 —
+     실측으로 그 쉬는 날들이 시험 범위의 꼬리(종합 Check)를 시험 뒤로 밀어냈다.
+     두 단락이면 지금 읽는 단락과 다음 단락이 늘 준비돼 있다. 과별로 따로 세어 더한다 —
+     범위 플랜에서 한 과만 앞서 나가지 않게. */
+  var LOOKAHEAD_DAYS = 2;
+  function blockingCount(freshCand) {
+    var daysBy = {}, n = 0;
+    freshCand.forEach(function (c) {
+      if (c.dayIdx == null || c.dayIdx >= OUTSIDE_DAY) return;
+      var k = c.packId == null ? '' : String(c.packId);
+      if (!daysBy[k]) daysBy[k] = {};
+      daysBy[k][c.dayIdx] = true;
+    });
+    var wantBy = {};
+    Object.keys(daysBy).forEach(function (k) {
+      wantBy[k] = Object.keys(daysBy[k]).map(Number).sort(function (a, b) { return a - b; })
+        .slice(0, LOOKAHEAD_DAYS);
+    });
+    freshCand.forEach(function (c) {
+      if (c.dayIdx == null || c.dayIdx >= OUTSIDE_DAY) return;
+      var k = c.packId == null ? '' : String(c.packId);
+      if (wantBy[k] && wantBy[k].indexOf(c.dayIdx) >= 0) n += 1;
+    });
+    return n;
+  }
+
   function byRank(a, b) { return a.rank - b.rank; }
 
   /* ── 본문 트랙: 단락 · 청크 게이트 · 단락 관문 ─────────────────────────────────
@@ -452,6 +494,94 @@ var WBNAESIN = (function () {
     return found;
   }
 
+  /* ── 본문 단어(§4.4 v1.3) ──
+     "단어를 알아야 문장을 안다" — 어느 단어가 어느 단락에 나오는지 알아야 그 순서를 짤 수 있다.
+     팩이 sentences[].wordIds 로 명시하면 그것이 정본이다. 옛 팩(그 필드가 없는 팩)은 표제어를
+     문장에서 찾아 잇는다 — 굴절형(take/took)까지 맞히지는 못하지만, 이어지는 만큼은 순서가
+     교재를 따라간다. 못 이은 단어는 '단락 밖'으로 남아 맨 뒤로 간다(대화문 어휘·시험 대비 어휘). */
+  function normEn(t) { return String(t == null ? '' : t).toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').replace(/\s+/g, ' ').trim(); }
+
+  /* 표제어가 이 문장에 보이는가 — 어절 단위로 본다(cat 이 category 에 걸리면 안 된다).
+     굴절은 어간 앞부분만 맞으면 인정한다(4자 이상일 때만 — 짧은 말은 오탐이 크다). */
+  function headInSentence(head, senWords) {
+    var h = normEn(head).split(' ')[0];
+    if (!h) return false;
+    if (senWords[h]) return true;
+    if (h.length < 4) return false;
+    var stem = h.slice(0, Math.max(4, h.length - 2)), k;
+    for (k in senWords) if (Object.prototype.hasOwnProperty.call(senWords, k) && k.indexOf(stem) === 0) return true;
+    return false;
+  }
+
+  /* 단어 id → 처음 나오는 단락의 순번(0부터). 안 나오면 없음. 팩 하나당 한 번만 만든다. */
+  function wordDayIndex(pack) {
+    var groups = dayGroups(pack), out = {}, explicit = false;
+    groups.forEach(function (g, gi) {
+      g.sentences.forEach(function (sen) {
+        if (!Array.isArray(sen.wordIds)) return;
+        explicit = true;
+        sen.wordIds.forEach(function (id) {
+          if (id != null && !Object.prototype.hasOwnProperty.call(out, id)) out[id] = gi;
+        });
+      });
+    });
+    if (explicit) return out;
+    /* 폴백 — 표제어를 문장에서 찾는다. 단락별로 어절 집합을 한 번 만들어 두고 훑는다. */
+    var perDay = groups.map(function (g) {
+      var set = {};
+      g.sentences.forEach(function (sen) {
+        normEn(sen.en).split(' ').forEach(function (w) { if (w) set[w] = true; });
+      });
+      return set;
+    });
+    ((pack && pack.words) || []).forEach(function (w) {
+      if (!w || w.id == null) return;
+      for (var i = 0; i < perDay.length; i++) {
+        if (headInSentence(w.headword, perDay[i])) { out[w.id] = i; return; }
+      }
+    });
+    return out;
+  }
+
+  /* 그 단락에서 처음 나오는 단어 id들 — 단락 단어 게이트와 학생 화면이 같은 목록을 본다 */
+  function wordsOfDay(pack, day) {
+    var groups = dayGroups(pack), gi = -1;
+    var key = day == null ? '' : String(day);
+    groups.forEach(function (g, i) { if (g.day === key) gi = i; });
+    if (gi < 0) return [];
+    var map = wordDayIndex(pack), out = [];
+    ((pack && pack.words) || []).forEach(function (w) {
+      if (w && w.id != null && map[w.id] === gi) out.push(w.id);
+    });
+    return out;
+  }
+
+  /* 단어 난이도 1 기초 · 2 보통 · 3 심화. 안 달린 팩(옛 팩)은 보통으로 본다 —
+     난이도가 없다고 순서가 뒤집히면 옛 팩의 학습 순서가 이유 없이 바뀐다. */
+  function levelOf(w) {
+    var n = w && w.level;
+    return (n === 1 || n === 2 || n === 3) ? n : 2;
+  }
+
+  /* 단락 단어 게이트(§4.4 v1.3) — 이 단락에 나오는 단어를 한 번씩 외웠어야 이 단락 본문이 열린다.
+     전 단어를 다 끝내야 본문이 열리던 옛 규칙은 기초가 부족한 학생에게 벽이었다(77개).
+     단락 단위면 첫날에도 한 단락을 끝까지 가 볼 수 있다. 단어가 안 이어진 단락은 열어 둔다.
+
+     기준은 '한 번이라도 학습했는가(s.last)'다. '도달'도 '완성'도 아니다 — 이유가 둘이다.
+     ① 도달은 철자 인출이라 영어를 쓸 줄 알아야 한다. 그걸 요구하면 영어를 못 쓰는 학생은
+        본문 탭에 영영 못 들어간다 — 이 기능이 도우려던 바로 그 학생이다(§5 못 읽는 학생 경로).
+     ② 문장을 읽기 시작하는 데 필요한 것은 그 낱말의 뜻을 한 번 마주한 경험이지 완전 인출이
+        아니다. 단어 화면(4지선다)은 한글만으로 통과된다.
+     제대로 외웠는지를 묻는 자리는 전역 게이트(5·6단계·실전 모의, isDone)로 그대로 남는다. */
+  function dayWordGate(pack, states, day) {
+    states = states || {};
+    var ids = wordsOfDay(pack, day), done = 0;
+    ids.forEach(function (id) { var s = states[id]; if (s && s.last != null) done += 1; });
+    var open = done >= ids.length;
+    return { open: open, reason: ids.length ? (open ? 'reached' : 'day-word-gate') : 'no-word',
+      done: done, total: ids.length, day: day == null ? '' : String(day) };
+  }
+
   /* 청크 트랙을 돌릴 재료가 있는 단락인가 — 직독직해 청크(chunks[])가 정본이다 */
   function hasChunks(g) {
     return !!g && g.sentences.some(function (sen) {
@@ -470,6 +600,15 @@ var WBNAESIN = (function () {
     var st = s ? stageOf(s) : 1;
     if (s && s.reached) return { open: true, reason: 'reached', day: g.day, stage: st, total: g.sentences.length };
     return { open: false, reason: 'chunk-gate', day: g.day, stage: st, total: g.sentences.length };
+  }
+
+  /* 이 단락 본문에 들어갈 수 있는가 — 단락 단어 → 뜻 세우기(청크) → 문장 순서다.
+     단어가 먼저다: 모르는 낱말로 이루어진 문장은 외울 수 있는 대상이 아니다. */
+  function passageGate(pack, states, day) {
+    var wg = dayWordGate(pack, states, day);
+    if (!wg.open) return { open: false, reason: 'day-word-gate', word: wg, chunk: null };
+    var cg = chunkGate(pack, states, day);
+    return { open: cg.open, reason: cg.open ? cg.reason : 'chunk-gate', word: wg, chunk: cg };
   }
 
   /* 단락 관문 게이트(§3.4) — 그 단락 문장이 전부 stage >= need 인가.
@@ -508,6 +647,9 @@ var WBNAESIN = (function () {
 
     groups.forEach(function (g) {
       if (!hasChunks(g)) return;
+      /* 청크 트랙은 단어 게이트를 받지 않는다 — 뜻 세우기는 뜻을 주고 하는 일이라 그 자체가
+         어휘 학습이고, 영어를 못 읽는 학생이 첫날 시작하는 자리다. 여기를 막으면 단어를
+         외우는 며칠 동안 본문 탭이 통째로 비어 진도가 뒤로 밀린다(실측 본문 암송 10→6). */
       var s = states[chunkId(g.day)];
       if (s && s.reached) return;
       out.chunk.push({ kind: 'chunk', day: g.day, stage: s ? stageOf(s) : 1 });
@@ -516,7 +658,7 @@ var WBNAESIN = (function () {
     /* 손댄 적 없는 문장(untouched)과 이미 손댄 문장을 따로 모은다 — 아래에서 자리를 짠다 */
     var untouched = [], touched = [];
     groups.forEach(function (g) {
-      if (!chunkGate(pack, states, g.day).open) return;
+      if (!passageGate(pack, states, g.day).open) return;
       g.sentences.forEach(function (sen) {
         var s = states[sentenceId(sen.seq)];
         if (s && s.reached) {
@@ -776,8 +918,12 @@ var WBNAESIN = (function () {
        펴고 상한은 범위 전체에 한 번. 종류를 먼저 묶는 이유: 한 과의 관문이 다른 과의 청크
        (뜻 세우기)보다 앞서면 못 읽는 학생이 두 번째 과에서 다시 막힌다. */
     var senLanes = { chunk: [], pending: [], redo: [], para: [], tail: [] };
-    /* 작업량은 과별로 합치되 누적·종합이 먹는 날수는 과끼리 겹친다(같은 날 L6·L7 누적을
-       나란히 본다) — 그래서 ladder는 합, tailDays는 최대, 자리(tailSlots)는 과 수다. */
+    /* 작업량은 과별로 합치고, 누적·종합이 먹는 날수도 합친다. 예전에는 최대값이었다 —
+       두 과의 누적을 같은 날 나란히 본다고 보았기 때문이다. 단락 단어 게이트(§4.4 v1.3)가
+       들어오면서 과마다 단락이 끝나는 날이 갈라져 그 전제가 깨졌다: 실측으로 L7의 종합
+       Check가 시험 다음 날로 밀렸다. 합으로 떼면 사다리에 주는 날수가 줄어 하루 상한이
+       그만큼 올라가고, 단락이 일찍 끝나 꼬리가 시험 안에 들어온다(16/16 확인).
+       자리(tailSlots)는 그대로 과 수 — 같은 날 두 과의 누적이 함께 나올 수는 있다. */
     var swork = { ladder: 0, tailDays: 0, tailSlots: 0, redoN: 0 };
     list.forEach(function (e, i) {
       var b = passageCandidates(e.pack, e.states, now, ctx.today, gates[i].open, e.rec);
@@ -786,7 +932,7 @@ var WBNAESIN = (function () {
       });
       var w = passageWork(e.pack, e.states, e.rec);
       swork.ladder += w.ladder;
-      swork.tailDays = Math.max(swork.tailDays, w.tailDays);
+      swork.tailDays += w.tailDays;
       if (w.tailDays > 0) swork.tailSlots += 1;
       swork.redoN += b.redo.length;
     });
@@ -982,7 +1128,7 @@ var WBNAESIN = (function () {
       s.cue = 1;                 // 다음 단계는 다시 단서 1(빈칸+첫 글자)에서 시작한다
       return s;
     }
-    return criterionSuccess(s, null, now);
+    return criterionSuccess(s, now);
   }
 
   /* 단서 농도 기록(§3.3) — 단서 단계(문장 사다리 1·3·5)의 유일한 호출 지점이다.
@@ -1039,6 +1185,8 @@ var WBNAESIN = (function () {
     gate: gate, clearWrong: clearWrong, planDay: planDay,
     sentenceSummary: sentenceSummary, passageSummary: passageSummary,
     chunkGate: chunkGate, paraGate: paraGate,
+    wordsOfDay: wordsOfDay, wordDayIndex: wordDayIndex, levelOf: levelOf,
+    dayWordGate: dayWordGate, passageGate: passageGate,
     advanceStage: advanceStage, recordCue: recordCue,
     planRange: planRange, gateRange: gateRange, rangeSummary: rangeSummary
   };

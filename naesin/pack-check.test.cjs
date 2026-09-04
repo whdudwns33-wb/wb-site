@@ -317,4 +317,55 @@ t('없는 섹션의 내용은 검사하지 않는다', () => {
   assert.strictEqual(r.summary.length, 1);
 });
 
+/* ── 본문 단어 · 난이도 (§4.4 v1.3) ── */
+
+t('단어 난이도 — 1·2·3만 통과, 그 밖의 값은 오류', () => {
+  const mk = (level) => ({ words: [{ id: 'w1', headword: 'sea', meaningKo: ['바다'], sections: ['reading'], level: level }] });
+  [1, 2, 3, undefined, null].forEach((v) => {
+    const c = CHECK.collector({});
+    CHECK.checkWords(mk(v), c);
+    assert.deepStrictEqual(c.errors, [], '허용: ' + JSON.stringify(v));
+  });
+  ['1', 0, 4, 2.5, 'easy'].forEach((v) => {
+    const c = CHECK.collector({});
+    CHECK.checkWords(mk(v), c);
+    assert.ok(has(c.errors, 'level 은 1(기초)·2(보통)·3(심화)'), '거부: ' + JSON.stringify(v));
+  });
+});
+
+t('요약에 난이도 분포가 붙는다 — 태그가 없으면 그 사실을 말한다', () => {
+  const c = CHECK.collector({});
+  CHECK.checkWords({ words: [{ id: 'w1', headword: 'sea', meaningKo: ['바다'], sections: ['reading'] }] }, c);
+  assert.ok(c.summary[0].indexOf('난이도 태그 없음') > 0, c.summary[0]);
+  const c2 = CHECK.collector({});
+  CHECK.checkWords({ words: [
+    { id: 'w1', headword: 'sea', meaningKo: ['바다'], sections: ['reading'], level: 1 },
+    { id: 'w2', headword: 'gull', meaningKo: ['갈매기'], sections: ['reading'], level: 3 }
+  ] }, c2);
+  assert.ok(c2.summary[0].indexOf('기초 1/보통 0/심화 1') > 0, c2.summary[0]);
+});
+
+t('문장 wordIds — 없어도 되지만, 있으면 실재하는 단어 id 여야 한다', () => {
+  const p = clone(SAMPLE);
+  p.sentences[0].wordIds = ['w-001', 'w-없음'];
+  const r = CHECK.checkPack(p);
+  assert.ok(has(r.errors, "wordIds[1] 가 words 에 없는 id: \"w-없음\""), JSON.stringify(r.errors));
+  p.sentences[0].wordIds = ['w-001'];
+  assert.deepStrictEqual(CHECK.checkPack(p).errors, [], '실재하는 id 면 통과');
+  delete p.sentences[0].wordIds;
+  assert.deepStrictEqual(CHECK.checkPack(p).errors, [], '없어도 통과 — 앱이 표제어로 추측한다');
+});
+
+t('문장 wordIds — 배열이 아니면 오류', () => {
+  const p = clone(SAMPLE);
+  p.sentences[0].wordIds = 'w-001';
+  assert.ok(has(CHECK.checkPack(p).errors, 'wordIds 는 배열이어야 함'));
+});
+
+t('문장만 따로 검사할 때는 wordIds 를 대조하지 않는다(단어 파일이 아직 없다)', () => {
+  const c = CHECK.collector({});
+  CHECK.checkSentences({ sentences: [{ seq: 1, dayGroup: '8/1', en: 'A', ko: '가', wordIds: ['아무거나'] }] }, c);
+  assert.ok(!has(c.errors, 'words 에 없는 id'), JSON.stringify(c.errors));
+});
+
 console.log('\n통과 ' + n + '개 — 팩 검사 규칙 검증 완료');

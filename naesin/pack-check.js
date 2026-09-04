@@ -84,6 +84,10 @@ var WBPACKCHECK = (function () {
       });
       if (w.example && !(nonEmpty(w.example.en) && nonEmpty(w.example.ko))) c.err(S, at + ' example en/ko 불완전');
       if (w.definition && !(nonEmpty(w.definition.en) && nonEmpty(w.definition.ko))) c.err(S, at + ' definition en/ko 불완전');
+      /* 난이도(§4.4 v1.3) — 없어도 된다(보통으로 읽는다). 있으면 1·2·3 정수만.
+         '2'나 4가 들어오면 엔진이 조용히 보통으로 눌러 읽어 태그가 없는 것과 같아진다. */
+      if (w.level != null && w.level !== 1 && w.level !== 2 && w.level !== 3)
+        c.err(S, at + ' level 은 1(기초)·2(보통)·3(심화) 중 하나여야 함 — 받은 값: ' + JSON.stringify(w.level));
       if (isArr(w.senses)) w.senses.forEach(function (s, j) {
         if (!nonEmpty(s && s.meaningKo)) c.err(S, at + ' senses[' + j + '] meaningKo 없음');
       });
@@ -94,9 +98,14 @@ var WBPACKCHECK = (function () {
           c.warn(S, at + ' 예문에 표제어가 안 보임 — 예문 빈칸이 안 만들어질 수 있음');
       }
     });
+    /* 난이도는 요약 한 줄 안에 같이 적는다 — 줄을 늘리면 스튜디오 검수 화면의 첫 줄이 밀린다 */
+    var lv = { 1: 0, 2: 0, 3: 0 };
+    list.forEach(function (w) { var n = w && w.level; lv[n === 1 || n === 3 ? n : 2] += 1; });
+    var lvNote = lv[1] + lv[3] === 0 ? ' · 난이도 태그 없음(전부 보통)'
+      : ' · 기초 ' + lv[1] + '/보통 ' + lv[2] + '/심화 ' + lv[3];
     c.note('words: ' + list.length + '개 (예문 ' + list.filter(function (w) { return w && w.example; }).length +
       ' · 영영풀이 ' + list.filter(function (w) { return w && w.definition; }).length +
-      ' · 다의어 ' + list.filter(function (w) { return w && isArr(w.senses) && w.senses.length; }).length + ')');
+      ' · 다의어 ' + list.filter(function (w) { return w && isArr(w.senses) && w.senses.length; }).length + ')' + lvNote);
   }
 
   /* ── 본문 문장 ── */
@@ -105,6 +114,12 @@ var WBPACKCHECK = (function () {
     if (!isArr(list)) return;
     var S = 'sentences';
     var groups = {};
+    /* 단어 섹션이 같이 올라온 팩에서만 wordIds 를 대조한다 — 문장만 따로 검사할 때는 건너뛴다 */
+    var wordIds = null;
+    if (isArr(pack.words)) {
+      wordIds = {};
+      pack.words.forEach(function (w) { if (w && w.id != null) wordIds[w.id] = true; });
+    }
     list.forEach(function (s, i) {
       var at = 'sentences[' + i + '](seq ' + (s && s.seq != null ? s.seq : '?') + ')';
       if (!s || typeof s !== 'object') { c.err(S, at + ' 객체가 아님'); return; }
@@ -112,6 +127,15 @@ var WBPACKCHECK = (function () {
       /* dayGroup 은 출판사마다 형식이 다르다(날짜·장 제목 등) — 값을 못 박지 않고 있는지만 본다 */
       if (!nonEmpty(s.dayGroup)) c.err(S, at + ' dayGroup 없음');
       else groups[s.dayGroup] = true;
+      /* wordIds(§4.4 v1.3) — 이 문장에 나오는 단어. 없어도 된다(앱이 표제어로 추측한다).
+         있으면 실재하는 id 여야 한다: 오타 하나가 그 단락의 단어 관문을 영영 못 열게 만든다. */
+      if (s.wordIds != null) {
+        if (!isArr(s.wordIds)) c.err(S, at + ' wordIds 는 배열이어야 함');
+        else if (wordIds) s.wordIds.forEach(function (id, j) {
+          if (!Object.prototype.hasOwnProperty.call(wordIds, id))
+            c.err(S, at + ' wordIds[' + j + '] 가 words 에 없는 id: ' + JSON.stringify(id));
+        });
+      }
       if (!nonEmpty(s.en)) c.err(S, at + ' en 없음');
       if (!nonEmpty(s.ko)) c.err(S, at + ' ko 없음');
 

@@ -220,11 +220,11 @@
     .result.bad { background: var(--red-soft); border-color: var(--red); }
     .result b.mark { font-weight: 800; }
     .result .exp { margin-top: 6px; color: var(--soft); font-size: 13px; }
-    .confrow { display: flex; gap: 8px; margin-top: 14px; }
-    .confrow button { flex: 1; border: 1px solid var(--line); border-radius: 9px; padding: 10px 4px;
-      font-size: 13.5px; font-weight: 700; background: var(--panel); min-height: 44px; }
-    .confrow .cl { font-size: 11px; color: var(--soft); display: block; font-weight: 500; }
     .rnext { margin-top: 14px; }
+    /* 난이도 점 — 기초는 초록, 보통은 회색, 심화는 보라. 글자 대신 점인 이유는 위 주석에 있다 */
+    .lvdot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 5px;
+      vertical-align: middle; background: var(--soft); }
+    .lvdot.l1 { background: #2f9e5e; } .lvdot.l3 { background: #7c5cd6; }
     .diffline { margin: 6px 0; padding: 9px 11px; border-radius: 7px; font-size: 13.5px; background: var(--bg); }
     .diffline.ok { background: var(--green-soft); } .diffline.partial { background: var(--amber-soft); }
     .diffline.missing { background: var(--red-soft); }
@@ -804,6 +804,33 @@
     if (cur < max) { st.stage = cur + 1; st.stageAdvancedAt = now; return; }
     st.stage = max; st.reached = true;
     if (st.reachedAt == null) st.reachedAt = now;
+  }
+
+  /* 단어 난이도(§4.4 v1.3) — 팩이 안 달았으면 '보통'이다. 학생에게는 색과 한 글자로만 보인다:
+     '심화'라고 크게 써 붙이면 아직 안 배운 단어를 미리 어렵게 만든다. */
+  var LEVEL_LABEL = { 1: '기초', 2: '보통', 3: '심화' };
+  function levelNum(w) {
+    if (WBNAESIN.levelOf) { try { return WBNAESIN.levelOf(w); } catch (e) {} }
+    var n = w && w.level;
+    return (n === 1 || n === 2 || n === 3) ? n : 2;
+  }
+
+  /* 이 단락에 나오는 단어 — 엔진이 팩의 wordIds 나 표제어로 잇는다(§4.4 v1.3) */
+  function dayWords(day, pid) {
+    var p = packOf(pid) || pack;
+    if (!WBNAESIN.wordsOfDay) return [];
+    try { return WBNAESIN.wordsOfDay(p, day) || []; } catch (e) { return []; }
+  }
+  /* 단락 단어 게이트 — 그 단락 단어를 한 번씩 학습해야 그 단락 문장이 열린다.
+     기준이 '학습(한 번 마주함)'이라 영어를 못 쓰는 학생도 단어 화면만 돌면 본문에 들어간다. */
+  function dwGate(day, pid) {
+    var p = packOf(pid) || pack;
+    if (WBNAESIN.dayWordGate) {
+      try { var r = WBNAESIN.dayWordGate(p, packDB(pid).states, day); if (r && typeof r === 'object') return r; } catch (e) {}
+    }
+    var ids = dayWords(day, pid), st = packDB(pid).states, done = 0;
+    ids.forEach(function (id) { if (st[id] && st[id].last != null) done += 1; });
+    return { open: done >= ids.length, reason: ids.length ? 'day-word-gate' : 'no-word', done: done, total: ids.length };
   }
 
   /* ── 게이트(§3.4) — 엔진판을 먼저 쓰고, 없으면 같은 판정을 앱이 한다 ── */
@@ -1430,7 +1457,7 @@
         logEvent('task', 'task', task.date, correct === total);
       }
       persist(); render();
-    }, { noConfidence: true });
+    });
   }
   /* 과 전환 — 범위 팩은 부팅 때 전부 받아 두므로 대개 즉시다. 캐시에 없을 때만(옛 기록의
      last, 배정이 방금 바뀐 경우) 서버에서 받아 온다. */
@@ -1494,7 +1521,7 @@
       var known = results.filter(function (r) { return r.known; }).length;
       alert('진단 완료.\n아는 단어 ' + known + '개 / 전체 ' + pack.words.length + '개.\n학습 계획은 남은 ' + (pack.words.length - known) + '개 기준으로 편성됩니다.');
       render();
-    }, { noConfidence: true, silent: true });
+    }, { silent: true });
   }
 
   /* ════════ 단어 암기 (스플릿) ════════ */
@@ -1559,7 +1586,9 @@
       var st = ws[w.id], stb = st ? WBNAESIN.stability(st) : 0;
       var cls = st && st.reached ? (WBNAESIN.isStable(st) ? 's' : 'r') : '';
       listHtml += '<div class="row' + (selWordId === w.id ? ' sel' : '') + '" role="button" tabindex="0" data-w="' + esc(w.id) + '">' +
-        '<span class="tx">' + esc(w.headword) + '<span class="sub">' + esc((w.meaningKo || [])[0] || '') + (st && st.needsSpellCheck ? ' · 철자 확인 대기' : '') + '</span></span>' +
+        '<span class="tx">' + esc(w.headword) +
+        '<span class="sub"><span class="lvdot l' + levelNum(w) + '" title="' + LEVEL_LABEL[levelNum(w)] + '"></span>' +
+        esc((w.meaningKo || [])[0] || '') + (st && st.needsSpellCheck ? ' · 철자 확인 대기' : '') + '</span></span>' +
         '<span class="lvchip ' + cls + '">' + stb + '/3</span></div>';
     });
     if (!shown.length) listHtml += '<p class="muted" style="padding:14px">이 과의 단어는 모두 안정화되었습니다.</p>';
@@ -1574,7 +1603,8 @@
     if (w) {
       var st = ws[w.id];
       workHtml += '<div class="card"><h2>' + esc(w.headword) + ' <small>' + esc(w.pos || '') + '</small>' +
-        '<span class="tag ' + (st && st.reached ? (WBNAESIN.isStable(st) ? 't-green' : 't-ind') : 't-gray') + '" style="margin-left:auto">안정화 ' + (st ? WBNAESIN.stability(st) : 0) + '/3</span></h2>' +
+        '<span class="tag t-gray" style="margin-left:auto">' + LEVEL_LABEL[levelNum(w)] + '</span>' +
+        '<span class="tag ' + (st && st.reached ? (WBNAESIN.isStable(st) ? 't-green' : 't-ind') : 't-gray') + '">안정화 ' + (st ? WBNAESIN.stability(st) : 0) + '/3</span></h2>' +
         '<p style="font-size:15px;margin:0 0 8px"><b>' + esc((w.meaningKo || []).join(', ')) + '</b></p>' +
         (w.example ? '<div class="chunkline">' + esc(w.example.en) + '<span class="ko">' + esc(w.example.ko) + '</span></div>' : '') +
         (w.definition ? '<div class="chunkline">' + esc(w.definition.en) + '<span class="ko">' + esc(w.definition.ko) + '</span></div>' : '') +
@@ -1894,7 +1924,7 @@
     return !!(selPass && selPass.kind === kind && (day == null || selPass.day === day) && (i == null || selPass.i === i));
   }
   function groupRowsHtml(gr, gi, g) {
-    var ck = ckState(gr.day), ckg = ckGate(gr.day);
+    var ck = ckState(gr.day), ckg = ckGate(gr.day), dwg = dwGate(gr.day);
     var ckStage = Math.min(stageNum(ck), CK_MAX), ckDone = !!(ck && ck.reached);
     var nCk = chunkCountOf(gr);
     var h = '<div class="hdr"><span>' + esc(gr.header) + (paraBlankDone(gr) ? ' · 백지 완료' : '') + '</span></div>';
@@ -1905,12 +1935,24 @@
       ckDone ? '듣고 짝 맞추기 · 뜻 인출 · 순서 세우기 통과' : '영어를 쓰지 않고 뜻부터 세웁니다',
       chip(ckDone, ckDone ? '완료' : ckStage + '/3'), null);
 
-    h += '<div class="zonehd">' + ZONE_EN + ' — 문장 사다리 6단</div>';
+    /* 이 단락의 단어 — 문장 앞에 둔다. 단어를 알아야 문장을 안다(§4.4 v1.3).
+       탭하면 단어 탭으로 보낸다 — 잠긴 줄이 어디로 가야 할지도 같이 알려 줘야 한다. */
+    if (dwg.total) {
+      h += '<div class="zonehd">' + ZONE_EN + ' — 먼저 이 단락의 단어</div>';
+      h += lockRow('data-dw="' + esc(gr.day) + '"', false,
+        '이 단락 단어 ' + dwg.total + '개',
+        dwg.open ? '다 봤습니다 — 본문 문장이 열렸어요' : '단어 탭에서 이어서 하기',
+        chip(dwg.open, dwg.done + '/' + dwg.total), null);
+      h += '<div class="zonehd">' + ZONE_EN + ' — 문장 사다리 6단</div>';
+    } else {
+      h += '<div class="zonehd">' + ZONE_EN + ' — 문장 사다리 6단</div>';
+    }
     gr.sentences.forEach(function (s) {
       var st = senState(s.seq);
       var stage = st && st.reached ? 6 : stageNum(st);
       var why = null;
-      if (!ckg.open) why = '먼저 청크 뜻을 익혀요';
+      if (!dwg.open) why = '이 단락 단어 ' + dwg.done + '/' + dwg.total + ' 먼저 보고 와요';
+      else if (!ckg.open) why = '먼저 청크 뜻을 익혀요';
       else if (stage >= 5 && !(st && st.reached) && !g.open) why = '단어 ' + g.done + '/' + g.total + ' 도달 뒤에 열려요';
       h += '<div class="row' + (s.seq === selSeq && !selPass && !selDlg ? ' sel' : '') + (why ? ' lk' : '') + '" role="button" tabindex="0" data-seq="' + s.seq + '">' +
         '<span class="no">' + s.seq + '</span><span class="tx">' + esc(s.en) +
@@ -1989,6 +2031,8 @@
     layoutSplit(listHtml, work);
     $('sRows').onclick = function (e) {
       var t = e.target;
+      var dwr = t.closest('.row[data-dw]');
+      if (dwr) { setTab('words'); return; }        // 단어는 단어 탭이 집이다 — 여기서는 안내만 한다
       var ckr = t.closest('.row[data-ck]');
       if (ckr) { selPass = { kind: 'chunk', day: ckr.getAttribute('data-ck') }; selDlg = null; render(); return; }
       var pgr = t.closest('.row[data-pg]');
@@ -2070,7 +2114,7 @@
         var passed = finished && items.length > 0 && (okN / items.length) >= 0.8;
         trackAdvance(st, passed, CK_MAX, Date.now());
         touchPack(pid); persist(); render();
-      }, { noConfidence: true });
+      });
   }
 
   /* ── 굳히기(단락 관문) 지면 ── */
@@ -2161,7 +2205,7 @@
       function (finished) {
         trackAdvance(pg, finished && okN === items.length, PG_MAX, Date.now());
         touchPack(pid); persist(); render();
-      }, { noConfidence: true });
+      });
   }
 
   /* ── 누적 백지 · 종합 Check 지면 ── */
@@ -2276,7 +2320,7 @@
       if (item.shuffled.join('|') === lines.join('|')) item.shuffled = WBGEN.shuffle(lines, Math.random);
       var allOk = true;
       runQueue([item], '대화문 3단계 · 순서 배열', function (it, ok) { if (!ok) allOk = false; logEvent('dialogue', 'order', d.id, ok); },
-        function (finished) { WBNAESIN.advanceStage(st, finished && allOk, Date.now(), { session: newSession() }); persist(); render(); }, { noConfidence: true });
+        function (finished) { WBNAESIN.advanceStage(st, finished && allOk, Date.now(), { session: newSession() }); persist(); render(); });
       return;
     }
     /* 2단계(대화 완성) — 완료된 대화의 재연습도 이 형식. 통과 = 끝까지 풀고(✕ 중단 아님) 실패 없음 */
@@ -2284,7 +2328,7 @@
     if (!items.length) { advanceAndRefresh(st, true); return; }
     var all = true;
     runQueue(items, '대화문 · 대화 완성', function (it, ok) { if (!ok) all = false; logEvent('dialogue', 'kwblank', d.id, ok); },
-      function (finished) { if (!dlgDone(st)) WBNAESIN.advanceStage(st, finished && all, Date.now(), { session: newSession() }); persist(); render(); }, { noConfidence: true });
+      function (finished) { if (!dlgDone(st)) WBNAESIN.advanceStage(st, finished && all, Date.now(), { session: newSession() }); persist(); render(); });
   }
   function runKeyExpressions() {
     var items = (pack.keyExpressions || []).map(function (k, i) {
@@ -2299,7 +2343,7 @@
     setLast('대화문 · 핵심표현', { t: 'dialogue', id: '__key__' });
     persist();
     /* 엔진 상태가 없는 학습 — 결과는 최근 학습 로그(pd.log)에 남긴다 */
-    runQueue(items, '핵심표현 확인', function (it, ok) { logEvent('key', 'kwblank', it.ref, ok); }, function () { persist(); render(); }, { noConfidence: true });
+    runQueue(items, '핵심표현 확인', function (it, ok) { logEvent('key', 'kwblank', it.ref, ok); }, function () { persist(); render(); });
   }
   /* 진급 세션 id — 엔진의 이중 진급 가드는 session이 없으면 '1분 안 재호출'을 중복으로 본다.
      1단계 읽기 완료 직후 2단계 해석을 1분 안에 통과하는 빠른 학생의 정당한 진급이 먹히지 않게
@@ -2377,7 +2421,7 @@
         return;
       }
       render();
-    }, { noConfidence: true });
+    });
   }
   function trainSentence(seq) { return trainStageRound(seq, 1); }
   function trainStageRound(seq, round) {
@@ -2585,7 +2629,7 @@
         if (finished) packDB(pid).check = { at: new Date().toISOString(), correct: correct, total: total };
         touchPack(pid); persist(); render();
         if (finished) alert('종합 Check 결과 · ' + correct + ' / ' + total);
-      }, { noConfidence: true });
+      });
   }
 
   function startDump() {
@@ -2883,7 +2927,7 @@
         persist();
         /* 개념 확인 결과도 최근 학습 로그에 남긴다 — "기록된다"는 안내와 실제가 같아야 한다 */
         runQueue(items2, '개념 확인 · 패턴 ' + pat.patternNo, function (it, ok) { logEvent('concept', 'kwblank', it.ref, ok); },
-          function () { persist(); render(); }, { noConfidence: true });
+          function () { persist(); render(); });
       } else if (selType === 'mock') {
         if (!rangeGate().open) return;
         runMock();
@@ -2941,12 +2985,12 @@
         }).join('') : '<p class="muted">전 문항 정답입니다.</p>') +
         '<div class="rnext"><button class="btn p big" id="mkDone">닫기</button></div></div>';
       runCustom('실전 모의 · 결과', html, function () { $('mkDone').onclick = function () { closeCustom(); render(); }; });
-    }, { noConfidence: true, mock: true, timeLimit: 600 });
+    }, { mock: true, timeLimit: 600 });
   }
   /* 확신도를 묻지 않는 경로(모의·과제) — 'unsure'로 기록한다. 'sure'로 넣으면 모의에서 한 번
      틀린 단어가 과신 오류(2계단 후퇴·위험 단어)로 잡힌다. */
   function applyMockGrade(item, ok) {
-    gradeItem(item, ok, { confidence: 'unsure' }, Date.now(), null);
+    gradeItem(item, ok, {}, Date.now(), null);
   }
   /* 오답 노트 공통 — 틀리면 클리어 날짜를 비운다(다시 틀리면 처음부터, 계약 0.6).
      항목엔 엔진 상태 객체를 두지 않는다 — clearWrong은 wrongClearDates 배열만 본다. */
@@ -3154,8 +3198,9 @@
     } else if (item.wordId && pd.states[item.wordId]) {
       var ws = pd.states[item.wordId];
       var hinted = item.hinted != null ? !!item.hinted : !!item.hint;   // 힌트 본 철자는 완전 인출이 아니다
-      if (item.type === 'spell') WBNAESIN.recordCriterion(ws, { correct: ok, confidence: meta.confidence, hinted: hinted }, now);
-      else WBNAESIN.recordQuiz(ws, { correct: ok, confidence: meta.confidence, hinted: false }, now);
+      /* 자기 평가가 없어졌다(v1.3) — 과신·찍음 판정은 엔진이 기록으로 한다 */
+      if (item.type === 'spell') WBNAESIN.recordCriterion(ws, { correct: ok, hinted: hinted }, now);
+      else WBNAESIN.recordQuiz(ws, { correct: ok, hinted: false }, now);
     }
     recordGenResult(item, ok, now, pid);
   }
@@ -3299,14 +3344,14 @@
     if (RQ.opts.silent) {
       setTimeout(function () {
         if (RQ !== q0) return;
-        if (RQ.onGrade) RQ.onGrade(item, ok, answerKey, { confidence: 'unsure' });
+        if (RQ.onGrade) RQ.onGrade(item, ok, answerKey, {});
         RQ.i += 1; stepRunner();
       }, 500);
       return;
     }
     /* 모의 모드 — 시험처럼 정답을 보여 주지 않고 즉시 다음 문항으로 */
     if (RQ.opts.mock) {
-      if (RQ.onGrade) RQ.onGrade(item, ok, answerKey, { confidence: 'unsure' });
+      if (RQ.onGrade) RQ.onGrade(item, ok, answerKey, {});
       RQ.i += 1; stepRunner();
       return;
     }
@@ -3316,33 +3361,23 @@
     box.innerHTML = '<b class="mark">' + (ok ? '정답' : '오답') + '</b>' + (resultHtml || '');
     var q = $('rBody').querySelector('.q');
     q.appendChild(box);
-    var needConf = !RQ.opts.noConfidence && !!item.wordId;
-    function next(conf) {
+    /* v1.3 — 문항마다 묻던 자기 평가(확실함/애매함/추측함)를 없앴다. 이유 셋:
+       ① 중학생, 특히 기초가 부족한 학생일수록 자기 평가가 실제 실력과 어긋난다.
+       ② 빨리 넘기려고 아무 버튼이나 누르면 그 값이 그대로 복습 계획에 들어간다.
+       ③ 같은 판단을 기록으로 더 정확하게 할 수 있다 — 이미 외운 단어를 틀리면 그것이 과신이고,
+          찍어서 맞히는 것은 철자 인출(완전 인출) 자리에서 걸러진다. 엔진이 그렇게 읽는다.
+       탭도 문항당 하나씩 줄었다 — 30문항이면 30번이다. */
+    function next() {
       if (RQ !== q0) return;
-      if (RQ.onGrade) RQ.onGrade(item, ok, answerKey, { confidence: conf || 'unsure' });
+      if (RQ.onGrade) RQ.onGrade(item, ok, answerKey, {});
       RQ.i += 1; stepRunner();
     }
-    if (needConf) {
-      var cr = document.createElement('div');
-      cr.className = 'confrow';
-      cr.innerHTML =
-        '<button data-c="sure">확실함<span class="cl">알고 답함</span></button>' +
-        '<button data-c="unsure">애매함<span class="cl">확신 없음</span></button>' +
-        '<button data-c="guess">추측함<span class="cl">찍어서 답함</span></button>';
-      cr.onclick = function (e) { var b = e.target.closest('button'); if (b) next(b.getAttribute('data-c')); };
-      q.appendChild(cr);
-      var note = document.createElement('p');
-      note.className = 'muted'; note.style.marginTop = '6px';
-      note.textContent = '정직하게 선택할수록 복습 계획이 정확해집니다.';
-      q.appendChild(note);
-    } else {
-      var nb = document.createElement('div');
-      nb.className = 'rnext';
-      nb.innerHTML = '<button class="btn p big" id="nextBtn">다음</button>';
-      nb.querySelector('button').onclick = function () { next('unsure'); };
-      q.appendChild(nb);
-      try { nb.querySelector('button').focus({ preventScroll: true }); } catch (e) {}
-    }
+    var nb = document.createElement('div');
+    nb.className = 'rnext';
+    nb.innerHTML = '<button class="btn p big" id="nextBtn">다음</button>';
+    nb.querySelector('button').onclick = function () { next(); };
+    q.appendChild(nb);
+    try { nb.querySelector('button').focus({ preventScroll: true }); } catch (e) {}
     try { box.scrollIntoView({ block: 'nearest' }); } catch (e) {}
   }
   /* 답 입력 <input>에서 Enter = 확인(채점 뒤엔 다음). textarea는 줄바꿈이 필요하니 제외. */
