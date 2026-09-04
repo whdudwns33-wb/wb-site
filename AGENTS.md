@@ -33,7 +33,9 @@ Cloudflare Workers `wb-reading`으로). PR은 스쿼시 머지, 제목에 `(#번
 1. **라이선스 콘텐츠를 저장소에 커밋하지 않는다.** 저장소는 public이다. 이그잼포유 팩,
    교재 코칭 원문(textbook.json), 학생 개인정보는 서버 저장소(KV / 로컬 db)에만 산다.
    원문·팩은 관리 웹 업로드로 들어간다. 시드·테스트 데이터는 자체 창작만
-   (`naesin/pack-sample.json`이 그 예).
+   (`naesin/pack-sample.json`이 그 예). **`docs/`에도 제3자 온라인 식별자를 쓰지 않는다** — 카페·블로그·
+   지식iN의 개인 글 URL·아이디·글번호는 `[출처 Q-nnn]` 키로 적고 대응표는 저장소 밖(원장 드라이브)에 둔다.
+   학원·언론·기관의 공식 자료 링크만 그대로 남긴다.
 2. **하우스 스타일**: vanilla HTML/CSS/JS 정적 PWA, 순수 로직은 `'use strict'` + IIFE
    var 전역 + `module.exports` 가드(브라우저/Node 공용), 외부 의존성 없음, 한국어 주석은
    "왜"를 적는다. 새 로직 모듈에는 반드시 `.test.cjs`/`.test.mjs`를 같이 만든다.
