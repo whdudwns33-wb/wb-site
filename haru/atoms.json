@@ -1,0 +1,1952 @@
+{
+  "treeId": "haru-2028",
+  "version": 1,
+  "decidedAt": "2026-09-04",
+  "source": "WB 자체 제작 — 2022 개정 교육과정 성취기준과 공개된 모집요강의 출제 범위(5-1~6-1)에서 역산한 창작 목록. 기출·복원본·시판 교재와 무관. 스킬 트리(docs/삼육중-출제지형도-스킬트리-v0.md)를 측정 단위로 다대일 투영했다.",
+  "notice": "호남삼육중학교와 제휴·후원 관계 없음. 2027학년도 모집요강(2026-04-24 공고) 기준, 변경될 수 있음.",
+  "notes": [
+    "코어 16은 2026-09-04 원장 확정(기획서 v1.2 §14 D-11 — 재도출 권고안 채택). 국면 ②~④의 좌표 대상.",
+    "std(성취기준 코드)는 2022 개정 원문(별책 5·8·14)과 대조해 채운다 — 초안은 빈 배열. unitRef 가 자리를 잡는다.",
+    "tier 는 변별 구간 배치일 뿐이고 앱 담당 여부는 teach 가 정한다. teach:'paper' 는 paperSource 가 필수(없으면 검증기 오류).",
+    "kind:'habit'(r-oneread) 은 MCQ 관측이 아니라 passages[].oneRead 비율로 잰다.",
+    "skillIds 는 출제지형도의 트리 ID 그대로. 수학 시험 운영 E1~E5 · 국어 K36 · 영어 E35 는 원자가 아니라 pace·mocks[].skills 지표라 여기 없다.",
+    "weight 는 25문항 중 기대 문항 수 — 2 | 1 | 0.5 세 값만(검증 불가한 추정이라 뭉갠다).",
+    "paperSource id 는 자작 드릴(own-*) 이름의 예약이다 — 해당 haru:paperkey 가 KV 에 있어야 배포된다."
+  ],
+  "coreByPhase": {
+    "p1": [
+      "n-frac-basic",
+      "n-dec-place",
+      "k-word-800",
+      "k-hanja-family",
+      "e-vocab-300",
+      "r-oneread"
+    ],
+    "p2": [
+      "k-word-build",
+      "k-poly",
+      "k-fig-id",
+      "k-imagery",
+      "k-dev-pattern",
+      "k-trap",
+      "m-frac-div",
+      "m-ratio-base",
+      "m-pct-inverse",
+      "m-unit-vol",
+      "m-dec-remainder",
+      "m-avg-inverse",
+      "e-vocab-300",
+      "e-3sg-past",
+      "e-form-26",
+      "e-read-skip"
+    ],
+    "p3": "same-as-p2",
+    "p4": "same-as-p2"
+  },
+  "atoms": [
+    {
+      "id": "k-word-build",
+      "subject": "kor",
+      "label": "단일어/합성어/파생어를 가르고 파생어 뜻을 부품으로 조립한다",
+      "skillIds": [
+        "K01",
+        "K02"
+      ],
+      "band": "5-1",
+      "unitRef": "낱말의 짜임 — 2022 개정에서 중학 상향, 시험은 교과서 밖 가능",
+      "std": [],
+      "prereq": [],
+      "confuse": [],
+      "weight": 1,
+      "tier": 2,
+      "teach": "app",
+      "gen": [
+        "mcq-classify"
+      ],
+      "targetSec": 40,
+      "carryTo": "중1 단어의 형성(합성어·파생어)",
+      "kind": "mcq",
+      "note": "2015 개정 [6국04-02] 낱말 확장 방법. 30문항 시절 출제 후기 있음"
+    },
+    {
+      "id": "k-poly",
+      "subject": "kor",
+      "label": "동음이의어·다의어를 구별하고 문맥으로 뜻을 좁힌다",
+      "skillIds": [
+        "K04",
+        "K05"
+      ],
+      "band": "5-1",
+      "unitRef": "국어사전 뜻풀이 번호 · 문맥 의미",
+      "std": [],
+      "prereq": [
+        "k-word-800"
+      ],
+      "confuse": [],
+      "weight": 2,
+      "tier": 2,
+      "teach": "app",
+      "gen": [
+        "mcq-context"
+      ],
+      "targetSec": 45,
+      "carryTo": "중1 어휘의 의미 관계·문맥 의미",
+      "kind": "mcq"
+    },
+    {
+      "id": "k-fig-id",
+      "subject": "kor",
+      "label": "표현법을 식별한다 — 직유·은유·의인·대구·반복·설의·역설",
+      "skillIds": [
+        "K19"
+      ],
+      "band": "5-2",
+      "unitRef": "문학 — 비유적 표현의 효과",
+      "std": [],
+      "prereq": [],
+      "confuse": [],
+      "weight": 2,
+      "tier": 2,
+      "teach": "app",
+      "gen": [
+        "figure-id"
+      ],
+      "targetSec": 45,
+      "carryTo": "중1 비유·상징·운율",
+      "kind": "mcq"
+    },
+    {
+      "id": "k-imagery",
+      "subject": "kor",
+      "label": "시어의 함축적 의미를 문맥과 정서로 좁혀 고른다",
+      "skillIds": [
+        "K21",
+        "K18",
+        "K20"
+      ],
+      "band": "6-1",
+      "unitRef": "문학 — 시의 화자·정서·심상",
+      "std": [],
+      "prereq": [
+        "k-fig-id"
+      ],
+      "confuse": [
+        "k-theme"
+      ],
+      "weight": 2,
+      "tier": 3,
+      "teach": "app",
+      "gen": [
+        "mcq-passage"
+      ],
+      "targetSec": 90,
+      "carryTo": "중1 시의 화자와 정서",
+      "kind": "mcq"
+    },
+    {
+      "id": "k-dev-pattern",
+      "subject": "kor",
+      "label": "글의 전개 방식에 이름을 붙인다 — 정의·예시·비교·대조·분류·인과·과정",
+      "skillIds": [
+        "K30"
+      ],
+      "band": "5-2",
+      "unitRef": "비문학 — 글의 구조",
+      "std": [],
+      "prereq": [
+        "k-main-sentence"
+      ],
+      "confuse": [
+        "k-refer"
+      ],
+      "weight": 2,
+      "tier": 2,
+      "teach": "app",
+      "gen": [
+        "mcq-passage"
+      ],
+      "targetSec": 90,
+      "carryTo": "중1 설명 방법(정의·예시·비교·대조·분류·인과)",
+      "kind": "mcq"
+    },
+    {
+      "id": "k-trap",
+      "subject": "kor",
+      "label": "함정 선택지를 감별한다 — 부분참·단정어(모두·항상·반드시)·무관 진술",
+      "skillIds": [
+        "K37"
+      ],
+      "band": "none",
+      "unitRef": "시험 운영 — 선택지 판별 (지문 종속)",
+      "std": [],
+      "prereq": [
+        "k-main-sentence"
+      ],
+      "confuse": [
+        "k-implicit"
+      ],
+      "weight": 2,
+      "tier": 3,
+      "teach": "app",
+      "gen": [
+        "mcq-passage"
+      ],
+      "targetSec": 90,
+      "carryTo": "중등 국어 선택지 판별",
+      "kind": "mcq"
+    },
+    {
+      "id": "k-word-800",
+      "subject": "kor",
+      "label": "초등 어휘 800을 유의·반의·상하위 관계로 인출한다",
+      "skillIds": [
+        "K06"
+      ],
+      "band": "4-1",
+      "unitRef": "어휘 — 낱말 관계 · 국어사전",
+      "std": [],
+      "prereq": [],
+      "confuse": [],
+      "weight": 1,
+      "tier": 1,
+      "teach": "app",
+      "gen": [
+        "mcq-context",
+        "mcq-classify"
+      ],
+      "targetSec": 30,
+      "carryTo": "중1 어휘 체계",
+      "kind": "mcq",
+      "note": "국면 ① 코어"
+    },
+    {
+      "id": "k-hanja-family",
+      "subject": "kor",
+      "label": "두 글자 한자어를 훈·음으로 풀어 조립 뜻을 만들고 낱말 가족을 묶는다",
+      "skillIds": [
+        "K03"
+      ],
+      "band": "4-2",
+      "unitRef": "어휘 — 한자어",
+      "std": [],
+      "prereq": [],
+      "confuse": [],
+      "weight": 1,
+      "tier": 1,
+      "teach": "app",
+      "gen": [
+        "mcq-classify"
+      ],
+      "targetSec": 40,
+      "carryTo": "중1 한자어 어휘",
+      "kind": "mcq",
+      "note": "국면 ① 코어"
+    },
+    {
+      "id": "k-idiom",
+      "subject": "kor",
+      "label": "관용어·속담·사자성어를 상황에 맞게 고르고 축자 의미와 가른다",
+      "skillIds": [
+        "K07"
+      ],
+      "band": "5-2",
+      "unitRef": "문법 — 고유어와 관용 표현",
+      "std": [],
+      "prereq": [
+        "k-word-800"
+      ],
+      "confuse": [],
+      "weight": 1,
+      "tier": 2,
+      "teach": "app",
+      "gen": [
+        "mcq-context"
+      ],
+      "targetSec": 40,
+      "carryTo": "중1 관용 표현",
+      "kind": "mcq"
+    },
+    {
+      "id": "k-sentence-part",
+      "subject": "kor",
+      "label": "주어·서술어·목적어·보어를 찾고 주술·시간·부정·높임 호응의 어긋남을 고친다",
+      "skillIds": [
+        "K08",
+        "K09",
+        "K13"
+      ],
+      "band": "5-1",
+      "unitRef": "문법 — 문장 성분과 호응 · 시간 표현",
+      "std": [],
+      "prereq": [],
+      "confuse": [],
+      "weight": 1,
+      "tier": 2,
+      "teach": "app",
+      "gen": [
+        "mcq-fix"
+      ],
+      "targetSec": 50,
+      "carryTo": "중1 문장 성분",
+      "kind": "mcq"
+    },
+    {
+      "id": "k-honorific",
+      "subject": "kor",
+      "label": "높임법 세 갈래를 식별하고 과잉 높임을 잡아낸다",
+      "skillIds": [
+        "K12"
+      ],
+      "band": "4-1",
+      "unitRef": "문법 — 높임 표현(3~4학년군)",
+      "std": [],
+      "prereq": [],
+      "confuse": [],
+      "weight": 0.5,
+      "tier": 2,
+      "teach": "app",
+      "gen": [
+        "mcq-fix"
+      ],
+      "targetSec": 40,
+      "carryTo": "중1 높임 표현",
+      "kind": "mcq"
+    },
+    {
+      "id": "k-pos-clause",
+      "subject": "kor",
+      "label": "품사를 식별하고 홑문장/겹문장·이어진문장/안은문장을 가른다",
+      "skillIds": [
+        "K10",
+        "K11"
+      ],
+      "band": "6-1",
+      "unitRef": "문법 — 품사 · 문장의 짜임",
+      "std": [],
+      "prereq": [
+        "k-sentence-part"
+      ],
+      "confuse": [],
+      "weight": 0.5,
+      "tier": 3,
+      "teach": "app",
+      "gen": [
+        "mcq-classify"
+      ],
+      "targetSec": 60,
+      "carryTo": "중1 품사·문장의 짜임",
+      "kind": "mcq"
+    },
+    {
+      "id": "k-spell",
+      "subject": "kor",
+      "label": "헷갈리는 짝(되/돼·안/않)·띄어쓰기·문장부호를 규칙으로 가른다",
+      "skillIds": [
+        "K15",
+        "K16",
+        "K17"
+      ],
+      "band": "5-1",
+      "unitRef": "규범 — 저배점",
+      "std": [],
+      "prereq": [],
+      "confuse": [],
+      "weight": 0.5,
+      "tier": 1,
+      "teach": "app",
+      "gen": [
+        "mcq-classify"
+      ],
+      "targetSec": 25,
+      "carryTo": "중1 한글 맞춤법",
+      "kind": "mcq"
+    },
+    {
+      "id": "k-phon",
+      "subject": "kor",
+      "label": "소리와 표기가 다른 자리(된소리되기·자음동화·구개음화)를 알아본다",
+      "skillIds": [
+        "K14"
+      ],
+      "band": "6-1",
+      "unitRef": "규범 — 음운 변동",
+      "std": [],
+      "prereq": [],
+      "confuse": [],
+      "weight": 0.5,
+      "tier": 3,
+      "teach": "paper",
+      "gen": [],
+      "targetSec": 60,
+      "carryTo": "중1 음운의 변동",
+      "kind": "mcq",
+      "paperSource": "own-drill-kor-phon"
+    },
+    {
+      "id": "k-poem-compare",
+      "subject": "kor",
+      "label": "두 편의 시를 겹쳐 공통 표현법·정서·화자 태도의 차이를 찾는다",
+      "skillIds": [
+        "K22"
+      ],
+      "band": "6-1",
+      "unitRef": "문학 — 시 비교",
+      "std": [],
+      "prereq": [
+        "k-imagery"
+      ],
+      "confuse": [],
+      "weight": 1,
+      "tier": 3,
+      "teach": "paper",
+      "gen": [],
+      "targetSec": 150,
+      "carryTo": "중2 작품 비교 감상",
+      "kind": "mcq",
+      "paperSource": "own-passage-kor-poem2"
+    },
+    {
+      "id": "k-narrative",
+      "subject": "kor",
+      "label": "인물·사건·배경을 정리하고 말과 행동에서 성격·심리를 추론한다",
+      "skillIds": [
+        "K23",
+        "K24"
+      ],
+      "band": "5-2",
+      "unitRef": "문학 — 소설·극",
+      "std": [],
+      "prereq": [],
+      "confuse": [],
+      "weight": 1,
+      "tier": 2,
+      "teach": "app",
+      "gen": [
+        "mcq-passage"
+      ],
+      "targetSec": 90,
+      "carryTo": "중1 소설의 구성 요소",
+      "kind": "mcq"
+    },
+    {
+      "id": "k-pov",
+      "subject": "kor",
+      "label": "서술자가 누구인지, 안에서 보는지 밖에서 보는지 판단한다",
+      "skillIds": [
+        "K25"
+      ],
+      "band": "6-1",
+      "unitRef": "문학 — 시점",
+      "std": [],
+      "prereq": [
+        "k-narrative"
+      ],
+      "confuse": [],
+      "weight": 0.5,
+      "tier": 3,
+      "teach": "app",
+      "gen": [
+        "mcq-passage"
+      ],
+      "targetSec": 90,
+      "carryTo": "중2 소설의 시점",
+      "kind": "mcq"
+    },
+    {
+      "id": "k-classic",
+      "subject": "kor",
+      "label": "고전 산문·시가의 낯선 표기를 옛말·한자어·주석으로 뚫는다",
+      "skillIds": [
+        "K26"
+      ],
+      "band": "6-1",
+      "unitRef": "문학 — 고전 (현대어역·주석은 자체 집필)",
+      "std": [],
+      "prereq": [],
+      "confuse": [],
+      "weight": 1,
+      "tier": 3,
+      "teach": "paper",
+      "gen": [],
+      "targetSec": 150,
+      "carryTo": "중2 고전 문학 읽기",
+      "kind": "mcq",
+      "paperSource": "own-passage-kor-classic"
+    },
+    {
+      "id": "k-theme",
+      "subject": "kor",
+      "label": "작품의 보편적 가치·주제를 뽑고 작가의 의도를 추론한다",
+      "skillIds": [
+        "K27"
+      ],
+      "band": "5-2",
+      "unitRef": "문학 — 주제",
+      "std": [],
+      "prereq": [],
+      "confuse": [],
+      "weight": 1,
+      "tier": 2,
+      "teach": "app",
+      "gen": [
+        "mcq-passage"
+      ],
+      "targetSec": 90,
+      "carryTo": "중1 작품의 주제",
+      "kind": "mcq"
+    },
+    {
+      "id": "k-main-sentence",
+      "subject": "kor",
+      "label": "문단의 중심 문장을 찾고 나머지를 뒷받침 관계로 정리한다",
+      "skillIds": [
+        "K28"
+      ],
+      "band": "5-1",
+      "unitRef": "비문학 — 요약",
+      "std": [],
+      "prereq": [],
+      "confuse": [],
+      "weight": 1,
+      "tier": 1,
+      "teach": "app",
+      "gen": [
+        "mcq-passage"
+      ],
+      "targetSec": 75,
+      "carryTo": "중1 글의 요약",
+      "kind": "mcq"
+    },
+    {
+      "id": "k-refer",
+      "subject": "kor",
+      "label": "지시어·접속어가 가리키는 것과 잇는 관계를 짚는다",
+      "skillIds": [
+        "K29"
+      ],
+      "band": "4-2",
+      "unitRef": "비문학 — 지시·접속 표현(3~4학년군)",
+      "std": [],
+      "prereq": [],
+      "confuse": [],
+      "weight": 1,
+      "tier": 2,
+      "teach": "app",
+      "gen": [
+        "mcq-passage"
+      ],
+      "targetSec": 60,
+      "carryTo": "중1 문장의 연결",
+      "kind": "mcq"
+    },
+    {
+      "id": "k-structure",
+      "subject": "kor",
+      "label": "문단 간 관계를 그려 글 전체 구조를 도식화한다",
+      "skillIds": [
+        "K31"
+      ],
+      "band": "6-1",
+      "unitRef": "비문학 — 글의 구조 도식",
+      "std": [],
+      "prereq": [
+        "k-dev-pattern"
+      ],
+      "confuse": [],
+      "weight": 1,
+      "tier": 3,
+      "teach": "paper",
+      "gen": [],
+      "targetSec": 150,
+      "carryTo": "중2 글의 구조 파악",
+      "kind": "mcq",
+      "paperSource": "own-passage-kor-structure"
+    },
+    {
+      "id": "k-argument",
+      "subject": "kor",
+      "label": "주장과 근거를 분리하고 근거가 주장을 받치는지 판단한다",
+      "skillIds": [
+        "K32"
+      ],
+      "band": "5-2",
+      "unitRef": "비문학 — 주장과 근거",
+      "std": [],
+      "prereq": [
+        "k-main-sentence"
+      ],
+      "confuse": [],
+      "weight": 1,
+      "tier": 2,
+      "teach": "app",
+      "gen": [
+        "mcq-passage"
+      ],
+      "targetSec": 90,
+      "carryTo": "중1 논증 읽기",
+      "kind": "mcq"
+    },
+    {
+      "id": "k-implicit",
+      "subject": "kor",
+      "label": "생략된 내용·함축된 표현을 문맥으로 메운다",
+      "skillIds": [
+        "K33"
+      ],
+      "band": "6-1",
+      "unitRef": "비문학 — 추론",
+      "std": [],
+      "prereq": [
+        "k-refer"
+      ],
+      "confuse": [
+        "k-trap"
+      ],
+      "weight": 1,
+      "tier": 3,
+      "teach": "app",
+      "gen": [
+        "mcq-passage"
+      ],
+      "targetSec": 90,
+      "carryTo": "중2 추론적 읽기",
+      "kind": "mcq"
+    },
+    {
+      "id": "k-compare-data",
+      "subject": "kor",
+      "label": "본문과 <보기>·표·그래프를 대조해 일치/불일치를 판정한다",
+      "skillIds": [
+        "K34"
+      ],
+      "band": "6-1",
+      "unitRef": "비문학 — 자료 대조",
+      "std": [],
+      "prereq": [],
+      "confuse": [],
+      "weight": 1,
+      "tier": 2,
+      "teach": "app",
+      "gen": [
+        "mcq-passage"
+      ],
+      "targetSec": 90,
+      "carryTo": "중1 매체 자료 읽기",
+      "kind": "mcq"
+    },
+    {
+      "id": "k-media",
+      "subject": "kor",
+      "label": "매체 자료의 표현 의도와 정보의 신뢰성을 판단한다",
+      "skillIds": [
+        "K35"
+      ],
+      "band": "6-1",
+      "unitRef": "매체 — 2022 개정 신설",
+      "std": [],
+      "prereq": [],
+      "confuse": [],
+      "weight": 0.5,
+      "tier": 3,
+      "teach": "paper",
+      "gen": [],
+      "targetSec": 120,
+      "carryTo": "중1 매체 읽기",
+      "kind": "mcq",
+      "paperSource": "own-passage-kor-media"
+    },
+    {
+      "id": "r-oneread",
+      "subject": "kor",
+      "label": "지문 한 편을 되돌아가지 않고 한 번에 읽는다 (되감기 0회)",
+      "skillIds": [
+        "K38"
+      ],
+      "band": "none",
+      "unitRef": "독해 습관 — 지문 세션 지표",
+      "std": [],
+      "prereq": [],
+      "confuse": [],
+      "weight": 0.5,
+      "tier": 1,
+      "teach": "app",
+      "gen": [],
+      "targetSec": 0,
+      "carryTo": "어느 중학교에서든 1회독 습관",
+      "kind": "habit",
+      "note": "측정은 MCQ 가 아니라 passages[].oneRead 비율. mastery.js 가 kind:habit 을 따로 다룬다. 국면 ① 코어"
+    },
+    {
+      "id": "m-frac-div",
+      "subject": "math",
+      "label": "(분수)÷(자연수)·(자연수)÷(자연수)를 분수로 계산하고 단위량 문장제를 푼다",
+      "skillIds": [
+        "C1",
+        "C2"
+      ],
+      "band": "6-1",
+      "unitRef": "분수의 나눗셈",
+      "std": [],
+      "prereq": [
+        "n-frac-basic"
+      ],
+      "confuse": [],
+      "weight": 2,
+      "tier": 1,
+      "teach": "app",
+      "gen": [
+        "calc"
+      ],
+      "targetSec": 50,
+      "carryTo": "중1 유리수의 나눗셈",
+      "kind": "mcq"
+    },
+    {
+      "id": "m-ratio-base",
+      "subject": "math",
+      "label": "비로 나타내고 기준량과 비교하는 양을 가른다 · 비율을 분수·소수·백분율로 표현한다",
+      "skillIds": [
+        "C9",
+        "C10"
+      ],
+      "band": "6-1",
+      "unitRef": "비와 비율",
+      "std": [],
+      "prereq": [
+        "n-convert"
+      ],
+      "confuse": [
+        "m-pct-inverse"
+      ],
+      "weight": 2,
+      "tier": 2,
+      "teach": "app",
+      "gen": [
+        "calc",
+        "mcq-classify"
+      ],
+      "targetSec": 60,
+      "carryTo": "중1 정비례·비례식",
+      "kind": "mcq"
+    },
+    {
+      "id": "m-pct-inverse",
+      "subject": "math",
+      "label": "비교하는 양과 비율로 기준량을 역산하고 연속 백분율(할인 후 할인)을 푼다",
+      "skillIds": [
+        "C12",
+        "C13"
+      ],
+      "band": "6-1",
+      "unitRef": "비와 비율 — 활용",
+      "std": [],
+      "prereq": [
+        "m-ratio-base",
+        "m-pct-apply"
+      ],
+      "confuse": [
+        "m-ratio-base"
+      ],
+      "weight": 2,
+      "tier": 3,
+      "teach": "app",
+      "gen": [
+        "calc"
+      ],
+      "targetSec": 90,
+      "carryTo": "중1 일차방정식의 활용(비율)",
+      "kind": "mcq"
+    },
+    {
+      "id": "m-unit-vol",
+      "subject": "math",
+      "label": "부피·넓이 단위를 환산한다 (1 m³ = 1,000,000 cm³)",
+      "skillIds": [
+        "C19"
+      ],
+      "band": "6-1",
+      "unitRef": "직육면체의 겉넓이와 부피 — 단위",
+      "std": [],
+      "prereq": [
+        "n-unit",
+        "m-surface-volume"
+      ],
+      "confuse": [],
+      "weight": 1,
+      "tier": 2,
+      "teach": "app",
+      "gen": [
+        "calc"
+      ],
+      "targetSec": 45,
+      "carryTo": "중1 입체도형 부피의 단위",
+      "kind": "mcq"
+    },
+    {
+      "id": "m-dec-remainder",
+      "subject": "math",
+      "label": "몫과 나머지를 구하고 나머지의 소수점 위치를 맞춘다",
+      "skillIds": [
+        "C7"
+      ],
+      "band": "6-1",
+      "unitRef": "소수의 나눗셈 — 나머지",
+      "std": [],
+      "prereq": [
+        "m-dec-div"
+      ],
+      "confuse": [
+        "m-dec-div"
+      ],
+      "weight": 1,
+      "tier": 3,
+      "teach": "app",
+      "gen": [
+        "calc"
+      ],
+      "targetSec": 75,
+      "carryTo": "중1 유리수 나눗셈·근삿값",
+      "kind": "mcq"
+    },
+    {
+      "id": "m-avg-inverse",
+      "subject": "math",
+      "label": "평균을 구하고 합계·빠진 값·평균 변화를 역산한다",
+      "skillIds": [
+        "B10"
+      ],
+      "band": "5-2",
+      "unitRef": "평균과 가능성",
+      "std": [],
+      "prereq": [
+        "n-mixed"
+      ],
+      "confuse": [],
+      "weight": 1,
+      "tier": 2,
+      "teach": "app",
+      "gen": [
+        "calc"
+      ],
+      "targetSec": 75,
+      "carryTo": "중1 통계 — 평균",
+      "kind": "mcq"
+    },
+    {
+      "id": "n-frac-basic",
+      "subject": "math",
+      "label": "분수 사칙연산을 약분·통분 포함해 즉답한다",
+      "skillIds": [
+        "N1",
+        "A10"
+      ],
+      "band": "5-1",
+      "unitRef": "연산 엔진 — 분수",
+      "std": [],
+      "prereq": [],
+      "confuse": [],
+      "weight": 1,
+      "tier": 1,
+      "teach": "app",
+      "gen": [
+        "calc"
+      ],
+      "targetSec": 40,
+      "carryTo": "중1 유리수의 사칙연산",
+      "kind": "mcq",
+      "note": "국면 ① 코어"
+    },
+    {
+      "id": "n-dec-place",
+      "subject": "math",
+      "label": "소수 사칙연산과 소수점 자리 감각",
+      "skillIds": [
+        "N2"
+      ],
+      "band": "4-2",
+      "unitRef": "연산 엔진 — 소수",
+      "std": [],
+      "prereq": [],
+      "confuse": [],
+      "weight": 1,
+      "tier": 1,
+      "teach": "app",
+      "gen": [
+        "calc"
+      ],
+      "targetSec": 40,
+      "carryTo": "중1 유리수의 사칙연산",
+      "kind": "mcq",
+      "note": "국면 ① 코어"
+    },
+    {
+      "id": "n-convert",
+      "subject": "math",
+      "label": "분수 ↔ 소수 ↔ 백분율을 3방향으로 즉시 변환한다",
+      "skillIds": [
+        "N3"
+      ],
+      "band": "5-2",
+      "unitRef": "연산 엔진 — 변환",
+      "std": [],
+      "prereq": [
+        "n-frac-basic",
+        "n-dec-place"
+      ],
+      "confuse": [],
+      "weight": 1,
+      "tier": 1,
+      "teach": "app",
+      "gen": [
+        "calc"
+      ],
+      "targetSec": 30,
+      "carryTo": "중1 유리수 표현",
+      "kind": "mcq"
+    },
+    {
+      "id": "n-estimate",
+      "subject": "math",
+      "label": "어림·암산으로 답의 크기를 먼저 예측한다",
+      "skillIds": [
+        "N4"
+      ],
+      "band": "4-1",
+      "unitRef": "연산 엔진 — 어림",
+      "std": [],
+      "prereq": [
+        "n-frac-basic",
+        "n-dec-place"
+      ],
+      "confuse": [],
+      "weight": 0.5,
+      "tier": 2,
+      "teach": "app",
+      "gen": [
+        "calc"
+      ],
+      "targetSec": 30,
+      "carryTo": "중1 근삿값",
+      "kind": "mcq"
+    },
+    {
+      "id": "n-unit",
+      "subject": "math",
+      "label": "길이·넓이·부피·들이·시간 단위를 환산한다",
+      "skillIds": [
+        "N5"
+      ],
+      "band": "4-1",
+      "unitRef": "연산 엔진 — 단위",
+      "std": [],
+      "prereq": [
+        "n-dec-place"
+      ],
+      "confuse": [],
+      "weight": 1,
+      "tier": 2,
+      "teach": "app",
+      "gen": [
+        "calc"
+      ],
+      "targetSec": 40,
+      "carryTo": "중1 단위 환산",
+      "kind": "mcq"
+    },
+    {
+      "id": "n-mixed",
+      "subject": "math",
+      "label": "혼합계산 순서를 지키고 역연산으로 □를 구한다",
+      "skillIds": [
+        "N6"
+      ],
+      "band": "5-1",
+      "unitRef": "자연수의 혼합 계산",
+      "std": [],
+      "prereq": [
+        "n-frac-basic",
+        "n-dec-place"
+      ],
+      "confuse": [],
+      "weight": 1,
+      "tier": 2,
+      "teach": "app",
+      "gen": [
+        "calc"
+      ],
+      "targetSec": 50,
+      "carryTo": "중1 정수와 유리수의 혼합 계산",
+      "kind": "mcq"
+    },
+    {
+      "id": "m-divisor-multiple",
+      "subject": "math",
+      "label": "약수·배수를 빠짐없이 나열하고 최대공약수·최소공배수를 구한다",
+      "skillIds": [
+        "A1",
+        "A2"
+      ],
+      "band": "5-1",
+      "unitRef": "약수와 배수",
+      "std": [],
+      "prereq": [],
+      "confuse": [],
+      "weight": 1,
+      "tier": 1,
+      "teach": "app",
+      "gen": [
+        "calc"
+      ],
+      "targetSec": 45,
+      "carryTo": "중1 소인수분해",
+      "kind": "mcq"
+    },
+    {
+      "id": "m-gcd-lcm-word",
+      "subject": "math",
+      "label": "GCD·LCM 문장제 — 똑같이 나누기·타일·동시에 만나는 때·톱니바퀴",
+      "skillIds": [
+        "A3",
+        "A4"
+      ],
+      "band": "5-1",
+      "unitRef": "약수와 배수 — 활용",
+      "std": [],
+      "prereq": [
+        "m-divisor-multiple"
+      ],
+      "confuse": [],
+      "weight": 1,
+      "tier": 2,
+      "teach": "app",
+      "gen": [
+        "calc"
+      ],
+      "targetSec": 90,
+      "carryTo": "중1 최대공약수·최소공배수의 활용",
+      "kind": "mcq"
+    },
+    {
+      "id": "m-remainder-cond",
+      "subject": "math",
+      "label": "나머지 조건이 붙은 수 찾기 · 약수의 개수 세기",
+      "skillIds": [
+        "A5",
+        "A6"
+      ],
+      "band": "5-1",
+      "unitRef": "약수와 배수 — 심화",
+      "std": [],
+      "prereq": [
+        "m-divisor-multiple"
+      ],
+      "confuse": [],
+      "weight": 0.5,
+      "tier": 3,
+      "teach": "paper",
+      "gen": [],
+      "targetSec": 120,
+      "carryTo": "중1 소인수분해의 활용",
+      "kind": "mcq",
+      "paperSource": "own-drill-5-1-u2"
+    },
+    {
+      "id": "m-correspond",
+      "subject": "math",
+      "label": "두 양의 대응 관계를 식으로 세우고 n번째 항을 구한다",
+      "skillIds": [
+        "A7",
+        "A8"
+      ],
+      "band": "5-1",
+      "unitRef": "대응 관계",
+      "std": [],
+      "prereq": [],
+      "confuse": [],
+      "weight": 1,
+      "tier": 2,
+      "teach": "app",
+      "gen": [
+        "calc",
+        "mcq-classify"
+      ],
+      "targetSec": 75,
+      "carryTo": "중1 정비례·반비례",
+      "kind": "mcq"
+    },
+    {
+      "id": "m-pattern-inverse",
+      "subject": "math",
+      "label": "규칙을 역방향으로 풀고 큰 수로 일반화한다",
+      "skillIds": [
+        "A9",
+        "D6"
+      ],
+      "band": "5-1",
+      "unitRef": "규칙 — 심화",
+      "std": [],
+      "prereq": [
+        "m-correspond"
+      ],
+      "confuse": [],
+      "weight": 0.5,
+      "tier": 3,
+      "teach": "paper",
+      "gen": [],
+      "targetSec": 150,
+      "carryTo": "중1 규칙성과 문자식",
+      "kind": "mcq",
+      "paperSource": "own-drill-5-1-u3"
+    },
+    {
+      "id": "m-frac-cond",
+      "subject": "math",
+      "label": "조건을 만족하는 분수 찾기 (분모·분자 조작)",
+      "skillIds": [
+        "A11"
+      ],
+      "band": "5-1",
+      "unitRef": "약분과 통분 — 심화",
+      "std": [],
+      "prereq": [
+        "n-frac-basic"
+      ],
+      "confuse": [],
+      "weight": 0.5,
+      "tier": 3,
+      "teach": "paper",
+      "gen": [],
+      "targetSec": 120,
+      "carryTo": "중1 유리수의 대소",
+      "kind": "mcq",
+      "paperSource": "own-drill-5-1-u4"
+    },
+    {
+      "id": "m-area",
+      "subject": "math",
+      "label": "다각형 넓이 공식을 적용하고 복합도형을 분할·빼기로 구한다",
+      "skillIds": [
+        "A12",
+        "A13"
+      ],
+      "band": "5-1",
+      "unitRef": "다각형의 둘레와 넓이",
+      "std": [],
+      "prereq": [],
+      "confuse": [],
+      "weight": 1,
+      "tier": 2,
+      "teach": "app",
+      "gen": [
+        "calc"
+      ],
+      "targetSec": 75,
+      "carryTo": "중1 평면도형의 넓이",
+      "kind": "mcq"
+    },
+    {
+      "id": "m-area-transform",
+      "subject": "math",
+      "label": "등적변형·넓이 비·변의 길이 역산",
+      "skillIds": [
+        "A14",
+        "A15"
+      ],
+      "band": "5-1",
+      "unitRef": "다각형의 넓이 — 심화",
+      "std": [],
+      "prereq": [
+        "m-area"
+      ],
+      "confuse": [],
+      "weight": 1,
+      "tier": 3,
+      "teach": "paper",
+      "gen": [],
+      "targetSec": 150,
+      "carryTo": "중2 삼각형의 넓이 비",
+      "kind": "mcq",
+      "paperSource": "own-drill-5-1-u6"
+    },
+    {
+      "id": "m-range-round",
+      "subject": "math",
+      "label": "이상·이하·초과·미만과 올림·버림·반올림을 다루고 어림 결과에서 원래 수의 범위를 역산한다",
+      "skillIds": [
+        "B1",
+        "B2"
+      ],
+      "band": "5-2",
+      "unitRef": "수의 범위와 올림·버림·반올림",
+      "std": [],
+      "prereq": [
+        "n-dec-place"
+      ],
+      "confuse": [],
+      "weight": 1,
+      "tier": 2,
+      "teach": "app",
+      "gen": [
+        "calc"
+      ],
+      "targetSec": 60,
+      "carryTo": "중1 근삿값과 오차",
+      "kind": "mcq"
+    },
+    {
+      "id": "m-frac-mul",
+      "subject": "math",
+      "label": "분수의 곱셈(대분수 포함)",
+      "skillIds": [
+        "B3"
+      ],
+      "band": "5-2",
+      "unitRef": "분수의 곱셈",
+      "std": [],
+      "prereq": [
+        "n-frac-basic"
+      ],
+      "confuse": [],
+      "weight": 1,
+      "tier": 1,
+      "teach": "app",
+      "gen": [
+        "calc"
+      ],
+      "targetSec": 40,
+      "carryTo": "중1 유리수의 곱셈",
+      "kind": "mcq"
+    },
+    {
+      "id": "m-chain-ratio",
+      "subject": "math",
+      "label": "\"전체의 ~의 ~\" 연쇄 비율과 여러 단계 남은 양 추적",
+      "skillIds": [
+        "B4"
+      ],
+      "band": "5-2",
+      "unitRef": "분수의 곱셈 — 심화",
+      "std": [],
+      "prereq": [
+        "m-frac-mul"
+      ],
+      "confuse": [
+        "m-pct-inverse"
+      ],
+      "weight": 1,
+      "tier": 3,
+      "teach": "paper",
+      "gen": [],
+      "targetSec": 150,
+      "carryTo": "중1 비율 연쇄 문제",
+      "kind": "mcq",
+      "paperSource": "own-drill-5-2-u2"
+    },
+    {
+      "id": "m-symmetry",
+      "subject": "math",
+      "label": "합동의 대응변·대응각, 선대칭·점대칭 도형의 성질과 완성, 접은 도형의 각·길이",
+      "skillIds": [
+        "B5",
+        "B6",
+        "B7"
+      ],
+      "band": "5-2",
+      "unitRef": "합동과 대칭",
+      "std": [],
+      "prereq": [],
+      "confuse": [],
+      "weight": 1,
+      "tier": 2,
+      "teach": "paper",
+      "gen": [],
+      "targetSec": 120,
+      "carryTo": "중1 도형의 합동·중2 도형의 성질",
+      "kind": "mcq",
+      "paperSource": "own-drill-5-2-u3"
+    },
+    {
+      "id": "m-net",
+      "subject": "math",
+      "label": "직육면체 전개도 ↔ 겨냥도 대응, 전개도 조건 문제(주사위 눈·끈 두르기)",
+      "skillIds": [
+        "B8",
+        "B9"
+      ],
+      "band": "5-2",
+      "unitRef": "직육면체와 정육면체",
+      "std": [],
+      "prereq": [],
+      "confuse": [],
+      "weight": 1,
+      "tier": 2,
+      "teach": "paper",
+      "gen": [],
+      "targetSec": 120,
+      "carryTo": "중1 다면체",
+      "kind": "mcq",
+      "paperSource": "own-drill-5-2-u5"
+    },
+    {
+      "id": "m-prism-count",
+      "subject": "math",
+      "label": "각기둥·각뿔의 면·모서리·꼭짓점을 n에 대한 식으로 나타낸다",
+      "skillIds": [
+        "C3"
+      ],
+      "band": "6-1",
+      "unitRef": "각기둥과 각뿔",
+      "std": [],
+      "prereq": [],
+      "confuse": [],
+      "weight": 1,
+      "tier": 2,
+      "teach": "app",
+      "gen": [
+        "calc"
+      ],
+      "targetSec": 60,
+      "carryTo": "중1 다면체의 구성 요소",
+      "kind": "mcq"
+    },
+    {
+      "id": "m-solid-cut",
+      "subject": "math",
+      "label": "각기둥 전개도 판정 · 잘라낸/붙인 입체의 구성 요소 수와 겉넓이 변화",
+      "skillIds": [
+        "C4",
+        "C5",
+        "C21"
+      ],
+      "band": "6-1",
+      "unitRef": "각기둥과 각뿔 · 겉넓이 — 심화",
+      "std": [],
+      "prereq": [
+        "m-prism-count",
+        "m-surface-volume"
+      ],
+      "confuse": [],
+      "weight": 1,
+      "tier": 3,
+      "teach": "paper",
+      "gen": [],
+      "targetSec": 150,
+      "carryTo": "중1 입체도형의 겉넓이",
+      "kind": "mcq",
+      "paperSource": "own-drill-6-1-u6"
+    },
+    {
+      "id": "m-dec-div",
+      "subject": "math",
+      "label": "(소수)÷(자연수) 계산과 반올림한 몫 · \"최대 몇 개\" 판단",
+      "skillIds": [
+        "C6",
+        "C8"
+      ],
+      "band": "6-1",
+      "unitRef": "소수의 나눗셈",
+      "std": [],
+      "prereq": [
+        "n-dec-place",
+        "m-range-round"
+      ],
+      "confuse": [],
+      "weight": 1,
+      "tier": 1,
+      "teach": "app",
+      "gen": [
+        "calc"
+      ],
+      "targetSec": 50,
+      "carryTo": "중1 유리수의 나눗셈",
+      "kind": "mcq"
+    },
+    {
+      "id": "m-pct-apply",
+      "subject": "math",
+      "label": "백분율 활용 — 할인·인상·이자·득표율",
+      "skillIds": [
+        "C11"
+      ],
+      "band": "6-1",
+      "unitRef": "비와 비율 — 활용",
+      "std": [],
+      "prereq": [
+        "m-ratio-base"
+      ],
+      "confuse": [
+        "m-pct-inverse"
+      ],
+      "weight": 1,
+      "tier": 2,
+      "teach": "app",
+      "gen": [
+        "calc"
+      ],
+      "targetSec": 75,
+      "carryTo": "중1 비율의 활용",
+      "kind": "mcq"
+    },
+    {
+      "id": "m-rate-mix",
+      "subject": "math",
+      "label": "농도·속력 등 비율 응용",
+      "skillIds": [
+        "C14"
+      ],
+      "band": "6-1",
+      "unitRef": "비와 비율 — 심화",
+      "std": [],
+      "prereq": [
+        "m-pct-apply"
+      ],
+      "confuse": [],
+      "weight": 0.5,
+      "tier": 3,
+      "teach": "paper",
+      "gen": [],
+      "targetSec": 150,
+      "carryTo": "중1 일차방정식의 활용(농도·속력)",
+      "kind": "mcq",
+      "paperSource": "own-drill-6-1-u4"
+    },
+    {
+      "id": "m-graph-pct",
+      "subject": "math",
+      "label": "띠그래프·원그래프를 읽고 백분율 ↔ 실제 개수로 환산한다",
+      "skillIds": [
+        "C15",
+        "C16"
+      ],
+      "band": "6-1",
+      "unitRef": "여러 가지 그래프",
+      "std": [],
+      "prereq": [
+        "m-ratio-base"
+      ],
+      "confuse": [],
+      "weight": 1,
+      "tier": 2,
+      "teach": "app",
+      "gen": [
+        "calc"
+      ],
+      "targetSec": 60,
+      "carryTo": "중1 통계 — 상대도수",
+      "kind": "mcq"
+    },
+    {
+      "id": "m-graph-nested",
+      "subject": "math",
+      "label": "두 그래프를 겹쳐 해석한다 (전체의 일부의 일부)",
+      "skillIds": [
+        "C17"
+      ],
+      "band": "6-1",
+      "unitRef": "여러 가지 그래프 — 심화",
+      "std": [],
+      "prereq": [
+        "m-graph-pct"
+      ],
+      "confuse": [],
+      "weight": 0.5,
+      "tier": 3,
+      "teach": "paper",
+      "gen": [],
+      "targetSec": 150,
+      "carryTo": "중1 통계 — 도수분포",
+      "kind": "mcq",
+      "paperSource": "own-drill-6-1-u5"
+    },
+    {
+      "id": "m-surface-volume",
+      "subject": "math",
+      "label": "직육면체의 겉넓이·부피와 쌓기나무 입체의 부피·겉넓이",
+      "skillIds": [
+        "C18",
+        "C20"
+      ],
+      "band": "6-1",
+      "unitRef": "직육면체의 겉넓이와 부피",
+      "std": [],
+      "prereq": [
+        "m-area"
+      ],
+      "confuse": [],
+      "weight": 1,
+      "tier": 1,
+      "teach": "app",
+      "gen": [
+        "calc"
+      ],
+      "targetSec": 60,
+      "carryTo": "중1 입체도형의 겉넓이와 부피",
+      "kind": "mcq"
+    },
+    {
+      "id": "m-water-height",
+      "subject": "math",
+      "label": "물의 높이 변화·잠긴 물체의 부피",
+      "skillIds": [
+        "C22"
+      ],
+      "band": "6-1",
+      "unitRef": "부피 — 심화",
+      "std": [],
+      "prereq": [
+        "m-unit-vol"
+      ],
+      "confuse": [],
+      "weight": 0.5,
+      "tier": 3,
+      "teach": "paper",
+      "gen": [],
+      "targetSec": 150,
+      "carryTo": "중1 부피의 활용",
+      "kind": "mcq",
+      "paperSource": "own-drill-6-1-u6"
+    },
+    {
+      "id": "m-counting",
+      "subject": "math",
+      "label": "수형도·합의 법칙·곱의 법칙으로 가짓수를 세고 조건(이웃·제외·중복)을 다룬다",
+      "skillIds": [
+        "D1",
+        "D2",
+        "D3"
+      ],
+      "band": "none",
+      "unitRef": "교과 밖 사고력 — 가짓수",
+      "std": [],
+      "prereq": [],
+      "confuse": [],
+      "weight": 1,
+      "tier": 3,
+      "teach": "paper",
+      "gen": [],
+      "targetSec": 150,
+      "carryTo": "중2 경우의 수",
+      "kind": "mcq",
+      "paperSource": "own-drill-think-count"
+    },
+    {
+      "id": "m-logic",
+      "subject": "math",
+      "label": "표로 조건을 정리하고 거꾸로 푼다 (역순 추론)",
+      "skillIds": [
+        "D4",
+        "D5"
+      ],
+      "band": "none",
+      "unitRef": "교과 밖 사고력 — 논리",
+      "std": [],
+      "prereq": [
+        "n-mixed"
+      ],
+      "confuse": [],
+      "weight": 0.5,
+      "tier": 2,
+      "teach": "paper",
+      "gen": [],
+      "targetSec": 120,
+      "carryTo": "중1 문제 해결 전략",
+      "kind": "mcq",
+      "paperSource": "own-drill-think-logic"
+    },
+    {
+      "id": "e-vocab-300",
+      "subject": "eng",
+      "label": "핵심 300어를 양방향으로 인출한다 (뜻·철자·빈칸·정의) — 초등 권장 800어의 축",
+      "skillIds": [
+        "E01",
+        "E02",
+        "E08"
+      ],
+      "band": "none",
+      "unitRef": "어휘 — 5~6학년군 300어 + 확장",
+      "std": [],
+      "prereq": [],
+      "confuse": [],
+      "weight": 2,
+      "tier": 1,
+      "teach": "app",
+      "gen": [
+        "vocabMcq",
+        "vocabMcqReverse",
+        "spelling",
+        "exampleCloze",
+        "definitionPick"
+      ],
+      "targetSec": 15,
+      "carryTo": "중1 필수 어휘 1,300",
+      "kind": "mcq",
+      "note": "국면 ①·② 코어. gen 은 naesin/gen.js 포크"
+    },
+    {
+      "id": "e-3sg-past",
+      "subject": "eng",
+      "label": "be동사·일반동사 현재형을 주어에 맞추고(3인칭 단수 -s) 과거형을 만든다(규칙·불규칙 60)",
+      "skillIds": [
+        "E11",
+        "E12"
+      ],
+      "band": "5-1",
+      "unitRef": "문법 — 형태: 시제 기본",
+      "std": [],
+      "prereq": [
+        "e-vocab-300"
+      ],
+      "confuse": [
+        "e-future-prog"
+      ],
+      "weight": 1,
+      "tier": 2,
+      "teach": "app",
+      "gen": [
+        "mcq-form",
+        "cloze"
+      ],
+      "targetSec": 30,
+      "carryTo": "중1 동사의 시제",
+      "kind": "mcq"
+    },
+    {
+      "id": "e-form-26",
+      "subject": "eng",
+      "label": "밑줄 친 곳의 어법 오류를 찾는다 — 수 일치·시제·품사 자리·비교급·대명사 격",
+      "skillIds": [
+        "E26"
+      ],
+      "band": "6-1",
+      "unitRef": "문법 — 어법 프레임 40",
+      "std": [],
+      "prereq": [
+        "e-3sg-past",
+        "e-noun-pron"
+      ],
+      "confuse": [
+        "e-compare-prep-conj"
+      ],
+      "weight": 2,
+      "tier": 2,
+      "teach": "app",
+      "gen": [
+        "mcq-form"
+      ],
+      "targetSec": 40,
+      "carryTo": "중1 어법(밑줄 오류 찾기)",
+      "kind": "mcq"
+    },
+    {
+      "id": "e-read-skip",
+      "subject": "eng",
+      "label": "모르는 단어를 건너뛰고 문맥으로 뜻을 잡거나 몰라도 답을 낸다",
+      "skillIds": [
+        "E31"
+      ],
+      "band": "6-1",
+      "unitRef": "독해 — 전략",
+      "std": [],
+      "prereq": [
+        "e-read-main"
+      ],
+      "confuse": [],
+      "weight": 1,
+      "tier": 3,
+      "teach": "app",
+      "gen": [
+        "mcq-passage"
+      ],
+      "targetSec": 120,
+      "carryTo": "중1 독해 문맥 추론",
+      "kind": "mcq"
+    },
+    {
+      "id": "e-word-parts",
+      "subject": "eng",
+      "label": "어근·접두·접미사로 품사 변형과 처음 보는 낱말 뜻을 추론한다",
+      "skillIds": [
+        "E03",
+        "E04"
+      ],
+      "band": "none",
+      "unitRef": "어휘 — 형태소",
+      "std": [],
+      "prereq": [
+        "e-vocab-300"
+      ],
+      "confuse": [],
+      "weight": 0.5,
+      "tier": 3,
+      "teach": "app",
+      "gen": [
+        "vocabMcq"
+      ],
+      "targetSec": 30,
+      "carryTo": "중1 접사와 파생",
+      "kind": "mcq"
+    },
+    {
+      "id": "e-poly-collo",
+      "subject": "eng",
+      "label": "다의어의 문맥 의미, 연어·구동사 덩어리, 혼동어 짝",
+      "skillIds": [
+        "E05",
+        "E06",
+        "E07"
+      ],
+      "band": "none",
+      "unitRef": "어휘 — 다의어·연어",
+      "std": [],
+      "prereq": [
+        "e-vocab-300"
+      ],
+      "confuse": [],
+      "weight": 1,
+      "tier": 2,
+      "teach": "app",
+      "gen": [
+        "exampleCloze",
+        "vocabMcq"
+      ],
+      "targetSec": 30,
+      "carryTo": "중1 구동사·연어",
+      "kind": "mcq"
+    },
+    {
+      "id": "e-noun-pron",
+      "subject": "eng",
+      "label": "명사의 수·관사와 대명사의 격(인칭·소유·목적·재귀·지시)",
+      "skillIds": [
+        "E09",
+        "E10"
+      ],
+      "band": "5-1",
+      "unitRef": "문법 — 명사·대명사",
+      "std": [],
+      "prereq": [],
+      "confuse": [],
+      "weight": 1,
+      "tier": 2,
+      "teach": "app",
+      "gen": [
+        "mcq-form"
+      ],
+      "targetSec": 30,
+      "carryTo": "중1 명사와 대명사",
+      "kind": "mcq"
+    },
+    {
+      "id": "e-future-prog",
+      "subject": "eng",
+      "label": "미래(will / be going to)와 진행형(현재·과거, -ing 규칙)",
+      "skillIds": [
+        "E13",
+        "E14"
+      ],
+      "band": "5-2",
+      "unitRef": "문법 — 시제 확장",
+      "std": [],
+      "prereq": [
+        "e-3sg-past"
+      ],
+      "confuse": [
+        "e-3sg-past"
+      ],
+      "weight": 1,
+      "tier": 3,
+      "teach": "app",
+      "gen": [
+        "mcq-form",
+        "cloze"
+      ],
+      "targetSec": 35,
+      "carryTo": "중1 진행형·미래",
+      "kind": "mcq"
+    },
+    {
+      "id": "e-modal-adj-adv",
+      "subject": "eng",
+      "label": "조동사(can·may·must·should)와 형용사/부사의 자리",
+      "skillIds": [
+        "E15",
+        "E16"
+      ],
+      "band": "5-2",
+      "unitRef": "문법 — 조동사·형용사·부사",
+      "std": [],
+      "prereq": [
+        "e-3sg-past"
+      ],
+      "confuse": [],
+      "weight": 0.5,
+      "tier": 3,
+      "teach": "app",
+      "gen": [
+        "mcq-form"
+      ],
+      "targetSec": 35,
+      "carryTo": "중1 조동사",
+      "kind": "mcq"
+    },
+    {
+      "id": "e-compare-prep-conj",
+      "subject": "eng",
+      "label": "비교급·최상급, 전치사(시간·장소·방향), 접속사(and/but/or/so/because)",
+      "skillIds": [
+        "E17",
+        "E18",
+        "E19"
+      ],
+      "band": "6-1",
+      "unitRef": "문법 — 비교·전치사·접속사",
+      "std": [],
+      "prereq": [
+        "e-noun-pron"
+      ],
+      "confuse": [],
+      "weight": 1,
+      "tier": 3,
+      "teach": "app",
+      "gen": [
+        "cloze",
+        "mcq-form"
+      ],
+      "targetSec": 35,
+      "carryTo": "중1 비교 표현·접속사",
+      "kind": "mcq"
+    },
+    {
+      "id": "e-sentence-forms",
+      "subject": "eng",
+      "label": "문장 뼈대(S+V+O/C), 의문문·부정문·명령문·제안문, There is/are·비인칭 it",
+      "skillIds": [
+        "E20",
+        "E21",
+        "E22",
+        "E23"
+      ],
+      "band": "5-2",
+      "unitRef": "문법 — 문장",
+      "std": [],
+      "prereq": [
+        "e-3sg-past"
+      ],
+      "confuse": [],
+      "weight": 1,
+      "tier": 2,
+      "teach": "app",
+      "gen": [
+        "mcq-form",
+        "tokenOrder"
+      ],
+      "targetSec": 45,
+      "carryTo": "중1 문장의 종류",
+      "kind": "mcq"
+    },
+    {
+      "id": "e-inf-gerund",
+      "subject": "eng",
+      "label": "to부정사(명사적/부사적)와 동명사를 알아본다 — 중학 범위지만 후기에 출제 언급",
+      "skillIds": [
+        "E24",
+        "E25"
+      ],
+      "band": "none",
+      "unitRef": "문법 — 준동사(초등 권장 밖)",
+      "std": [],
+      "prereq": [
+        "e-sentence-forms"
+      ],
+      "confuse": [],
+      "weight": 0.5,
+      "tier": 3,
+      "teach": "paper",
+      "gen": [],
+      "targetSec": 60,
+      "carryTo": "중1 to부정사·동명사",
+      "kind": "mcq",
+      "paperSource": "own-drill-eng-verbal"
+    },
+    {
+      "id": "e-read-main",
+      "subject": "eng",
+      "label": "직독직해로 끊어 읽고 주제·제목·요지, 세부 정보 일치, 대명사 지시 대상을 찾는다",
+      "skillIds": [
+        "E27",
+        "E28",
+        "E29",
+        "E30"
+      ],
+      "band": "6-1",
+      "unitRef": "독해 — 기본",
+      "std": [],
+      "prereq": [
+        "e-vocab-300",
+        "e-sentence-forms"
+      ],
+      "confuse": [],
+      "weight": 2,
+      "tier": 3,
+      "teach": "app",
+      "gen": [
+        "mcq-passage"
+      ],
+      "targetSec": 120,
+      "carryTo": "중1 독해 — 요지·세부 정보",
+      "kind": "mcq"
+    },
+    {
+      "id": "e-read-flow",
+      "subject": "eng",
+      "label": "연결어로 다음 내용을 예측하고 무관 문장을 찾으며, 대화문·실용문에서 필요한 정보를 뽑는다",
+      "skillIds": [
+        "E32",
+        "E33",
+        "E34"
+      ],
+      "band": "6-1",
+      "unitRef": "독해 — 흐름·실용문",
+      "std": [],
+      "prereq": [
+        "e-read-main"
+      ],
+      "confuse": [],
+      "weight": 1,
+      "tier": 2,
+      "teach": "app",
+      "gen": [
+        "mcq-passage"
+      ],
+      "targetSec": 100,
+      "carryTo": "중1 독해 — 글의 흐름",
+      "kind": "mcq"
+    },
+    {
+      "id": "e-evidence",
+      "subject": "eng",
+      "label": "선택지를 지문의 특정 문장에 대고 근거를 짚는다 (느낌으로 고르지 않는다)",
+      "skillIds": [
+        "E36"
+      ],
+      "band": "none",
+      "unitRef": "시험 운영 — 근거 짚기 (지문 종속)",
+      "std": [],
+      "prereq": [
+        "e-read-main"
+      ],
+      "confuse": [
+        "e-read-skip"
+      ],
+      "weight": 1,
+      "tier": 2,
+      "teach": "app",
+      "gen": [
+        "mcq-passage"
+      ],
+      "targetSec": 100,
+      "carryTo": "중등 영어 선택지 판별",
+      "kind": "mcq"
+    }
+  ]
+}
