@@ -2187,7 +2187,7 @@ function achParse(text,hintGr,hintTerm){
   let t=String(text||"").replace(/\r\n?/g,"\n").replace(/[ 　]/g," ")
     .replace(/[０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0))
     .replace(/[．]/g,".").replace(/[％]/g,"%").replace(/[“”‘’]/g,"");
-  if(t.includes("�"))warn.push("붙여넣기에 깨진 글자가 섞여 있습니다 — 과목명을 확인하세요.");
+  if(/\uFFFD/.test(t))warn.push("붙여넣기에 깨진 글자가 섞여 있습니다 — 과목명을 확인하세요.");
   let lines=t.split("\n").map(l=>l.replace(/[ ]+$/,""));
   if(lines.some(l=>/검색된\s*결과가\s*없습니다/.test(l)))
     warn.push("‘검색된 결과가 없습니다’ — 자유학기(자유학년)라 성적 자료가 없는 학년일 수 있습니다 (중1에서 정상).");
