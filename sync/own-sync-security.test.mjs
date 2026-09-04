@@ -26,6 +26,9 @@ class FakeDB {
   seedTask(data, owner = data.staffId, updatedAt = 100) {
     this.tasks.set(data.id, { owner, data: JSON.stringify(data), updatedAt, srvAt: updatedAt });
   }
+  seedCheck(key, data, owner = 'teacher-1', updatedAt = 100) {
+    this.checks.set(key, { owner, data: JSON.stringify(data), updatedAt, srvAt: updatedAt });
+  }
   task(id) { return JSON.parse(this.tasks.get(id).data); }
   async first(sql, args) {
     if (sql.startsWith('SELECT generation FROM app_data_generations')) {
@@ -36,6 +39,10 @@ class FakeDB {
     }
     if (sql.startsWith('SELECT data FROM staff')) {
       return args[1] === 'teacher-1' ? { data: JSON.stringify(this.staffData) } : null;
+    }
+    if (sql.startsWith('SELECT owner,data,updated_at,srv_at FROM checks')) {
+      const row = this.checks.get(String(args[1]));
+      return row ? { owner: row.owner, data: row.data, updated_at: row.updatedAt, srv_at: row.srvAt } : null;
     }
     throw new Error('Unhandled first SQL: ' + sql);
   }
@@ -112,6 +119,12 @@ class FakeDB {
 
 const auth = { mode: 'person', id: 'teacher-1', token: 'teacher-token' };
 const task = (id, origin, title) => ({ id, staffId: 'teacher-1', origin, title, deleted: false, updatedAt: 100 });
+const kstDate = () => new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+const kstStamp = (date, time) => Date.parse(date + 'T' + time + ':00+09:00');
+const attendance = (date, at, out = null, updatedAt = at) => ({
+  taskId: '__att__teacher-1', date, done: true, note: '', steps: {}, count: 0, blocked: false,
+  at, out, updatedAt
+});
 const change = (data, updatedAt = 200) => ({
   table: 'tasks', id: data.id, owner: 'teacher-1', data, updated_at: updatedAt
 });
@@ -325,20 +338,96 @@ test('task envelope id, staffId, and origin are server-validated', async () => {
 test('staff progress checks still sync normally', async () => {
   const db = new FakeDB();
   db.seedTask(task('staff-1', 'manager', 'assigned task'));
-  let result = await sync(db, [{
+  const result = await sync(db, [{
     table: 'checks', k: 'staff-1|2026-08-04', owner: 'teacher-1',
     data: { taskId: 'staff-1', date: '2026-08-04', done: true, steps: { 'step-1': true }, updatedAt: 200 },
     updated_at: 200
   }]);
   assert.equal(result.status, 200);
   assert.equal(JSON.parse(db.checks.get('staff-1|2026-08-04').data).done, true);
+});
 
-  result = await sync(db, [{
-    table: 'checks', k: '__att__teacher-1|2026-08-04', owner: 'teacher-1',
-    data: { taskId: '__att__teacher-1', date: '2026-08-04', done: true, updatedAt: 300 }, updated_at: 300
-  }]);
+test('staff attendance creation and first clock-out require the dedicated endpoint', async () => {
+  const db = new FakeDB();
+  const date = kstDate();
+  const key = '__att__teacher-1|' + date;
+  const at = kstStamp(date, '09:00');
+  const out = kstStamp(date, '18:00');
+
+  let result = await sync(db, [{ table: 'checks', k: key, owner: 'teacher-1',
+    data: attendance(date, at), updated_at: at }]);
+  assert.equal(result.status, 403);
+  assert.equal(result.body.code, 'STAFF_ATTENDANCE_ADMIN_ONLY');
+  assert.equal(db.checks.has(key), false);
+
+  db.seedCheck(key, attendance(date, at), 'teacher-1', at);
+  result = await sync(db, [{ table: 'checks', k: key, owner: 'teacher-1',
+    data: attendance(date, at, out, out), updated_at: out }]);
+  assert.equal(result.status, 403);
+  assert.equal(result.body.code, 'STAFF_ATTENDANCE_ADMIN_ONLY');
+  assert.equal(JSON.parse(db.checks.get(key).data).out, null);
+});
+
+test('an exact cached attendance replay is accepted as a no-op without changing its revision', async () => {
+  const db = new FakeDB();
+  const date = kstDate();
+  const key = '__att__teacher-1|' + date;
+  const at = kstStamp(date, '09:00');
+  const out = kstStamp(date, '18:00');
+  const stored = attendance(date, at, out, out);
+  db.seedCheck(key, stored, 'teacher-1', out);
+  const replay = { ...stored, updatedAt: out + 60000 };
+  const result = await sync(db, [{ table: 'checks', k: key, owner: 'teacher-1',
+    data: replay, updated_at: replay.updatedAt }]);
   assert.equal(result.status, 200);
-  assert.equal(db.checks.has('__att__teacher-1|2026-08-04'), true);
+  assert.equal(db.batchCalls, 0);
+  assert.equal(db.checks.get(key).updatedAt, out);
+  assert.deepEqual(JSON.parse(db.checks.get(key).data), stored);
+});
+
+test('staff attendance rejects clock-in edits, clock-out cancellation, and completed-record changes', async () => {
+  const date = kstDate();
+  const key = '__att__teacher-1|' + date;
+  const at = kstStamp(date, '09:00');
+  const out = kstStamp(date, '18:00');
+  const cases = [
+    current => ({ ...current, at: at + 60000, updatedAt: out + 1 }),
+    current => ({ ...current, done: false, at: null, out: null, updatedAt: out + 1 }),
+    current => ({ ...current, out: null, updatedAt: out + 1 }),
+    current => ({ ...current, out: out + 60000, updatedAt: out + 60001 })
+  ];
+  for (const mutate of cases) {
+    const db = new FakeDB();
+    const stored = attendance(date, at, out, out);
+    db.seedCheck(key, stored, 'teacher-1', out);
+    const incoming = mutate(stored);
+    const result = await sync(db, [{ table: 'checks', k: key, owner: 'teacher-1',
+      data: incoming, updated_at: incoming.updatedAt }]);
+    assert.equal(result.status, 403);
+    assert.equal(result.body.code, 'STAFF_ATTENDANCE_ADMIN_ONLY');
+    assert.deepEqual(JSON.parse(db.checks.get(key).data), stored);
+  }
+});
+
+test('staff cannot backdate attendance but admin can correct an existing record', async () => {
+  const date = kstDate();
+  const priorDate = new Date(Date.parse(date + 'T00:00:00Z') - 86400000).toISOString().slice(0, 10);
+  const priorAt = kstStamp(priorDate, '09:00');
+  const db = new FakeDB();
+  const priorKey = '__att__teacher-1|' + priorDate;
+  let result = await sync(db, [{ table: 'checks', k: priorKey, owner: 'teacher-1',
+    data: attendance(priorDate, priorAt), updated_at: priorAt }]);
+  assert.equal(result.status, 403);
+
+  const key = '__att__teacher-1|' + date;
+  const at = kstStamp(date, '09:00');
+  const correctedAt = kstStamp(date, '09:15');
+  db.seedCheck(key, attendance(date, at), 'teacher-1', at);
+  result = await sync(db, [{ table: 'checks', k: key, owner: 'teacher-1',
+    data: attendance(date, correctedAt, null, correctedAt), updated_at: correctedAt }], {},
+  { mode: 'admin', secret: 'admin-secret' });
+  assert.equal(result.status, 200);
+  assert.equal(JSON.parse(db.checks.get(key).data).at, correctedAt);
 });
 
 test('generic sync ignores server-authored contact rows instead of overwriting them', async () => {
