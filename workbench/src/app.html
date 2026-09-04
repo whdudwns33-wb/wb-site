@@ -339,6 +339,8 @@ const SEED_PRIV={univs:{},profiles:{}}; /*BUILD:PRIVATE_SEED*/
     for(const r of EX.hsdb||[])if(!heH.has(r.name))db.hsdb.push(r);
     for(const k of ["partners","trends","adiga","lessons"])
       if((EX[k]||[]).length&&!(db[k]||[]).length)db[k]=EX[k];
+    if(EX.achdb&&Object.keys(EX.achdb).length){db.achdb=db.achdb||{};
+      for(const s in EX.achdb)if(!db.achdb[s])db.achdb[s]=EX.achdb[s];}
     db.meta.extrasStamp=EX.stamp;ch=true;}
   if(ch)save();})();
 /* 대량 검색 데이터 — 빌드 시 주입 (공개 소스에는 비어 있음) */
@@ -2150,6 +2152,362 @@ function hsSimBand(p,row){ // 중학 상위% + 고교 행 → 예상 내신 밴�
   return {band:[Math.max(1,Math.min(9,g1+adj)),Math.max(1,Math.min(9,g2+adj))],adj};}
 /* 중학 절대평가 성취도(A~E, 학기별) → 상위% 추정 밴드 — 학교별 A비율 편차를 반영한 근사 */
 const ACH_TERMS=["중1-1","중1-2","중2-1","중2-2","중3-1","중3-2"];
+/* ═══════════ 학교 성취도 분포 (학교알리미 4-나 교과별 학업성취 사항) ═══════════
+   원장이 학교알리미에서 조회한 표를 붙여넣으면 파싱해 db.achdb 에 학교별로 보관하고,
+   중학교 분포가 있으면 절대평가 성취도 → 교내 상위% 추정을 그 학교 기준으로 다시 계산한다.
+   ※ 보안문자(캡차)는 우회하지 않는다 — 조회는 사람이 하고 앱은 붙여넣기만 받는다. */
+const ACH_CORE=["국어","영어","수학","사회","과학"];
+const ACH_OPT=["역사","도덕"];
+const ACH_EXCL=["체육","음악","미술","기술","가정","정보","한문","진로","보건","환경","창의","실험","연극","논술","중국","일본","스페인","프랑스","독일","러시아","베트남","아랍","교양","선택"];
+function achDb(){return db.achdb||(db.achdb={});}
+function achNormSubj(s){
+  let t=String(s||"").replace(/\s/g,"").replace(/[Ⅰ]/g,"1").replace(/[Ⅱ]/g,"2").replace(/\(\s*\d+\s*\)$/,"");
+  const bare=t.replace(/^(공통|통합|기본|일반)/,"");
+  for(const c of ACH_CORE.concat(ACH_OPT))if(bare.startsWith(c))return c;
+  return t;}
+function achIsExcl(s){const t=achNormSubj(s);
+  if(ACH_CORE.includes(t)||ACH_OPT.includes(t))return "";
+  for(const k of ACH_EXCL)if(String(s).includes(k))return "3단계 평정·선택교과 등 모집단이 달라 제외";
+  return "국·영·수·사·과 외 과목이라 제외";}
+/* ── 붙여넣기 파서 ── */
+function achNum(x){const t=String(x==null?"":x).replace(/[%,\s]/g,"");
+  if(t===""||/^[-–·.ㅡ]+$/.test(t))return null;
+  const v=parseFloat(t);return(isFinite(v)&&v>=0&&v<=1000)?v:null;}
+function achBlock(nums){ // 뒤에서부터 합 100±3 인 연속 블록 (5→3→4)
+  for(const L of [5,3,4]){
+    for(let s=nums.length-L;s>=0;s--){
+      const b=nums.slice(s,s+L);
+      if(b.some(v=>v==null||v>100))continue;
+      const sum=b.reduce((a,c)=>a+c,0);
+      if(Math.abs(sum-100)<=3)return{start:s,len:L,blk:b};}}
+  return null;}
+const ACH_META=/^(전체계열|전체학과|전체|전학급|[가-힣]{1,6}계열|[가-힣]{1,6}학과|[가-힣]{1,6}과정|\d+학기|\d+학년|학년|학기|반|교과|계열|학과)$/;
+function achParse(text,hintGr,hintTerm){
+  const warn=[],rows=[],failed=[];
+  let t=String(text||"").replace(/\r\n?/g,"\n").replace(/[ 　]/g," ")
+    .replace(/[０-９]/g,c=>String.fromCharCode(c.charCodeAt(0)-0xFEE0))
+    .replace(/[．]/g,".").replace(/[％]/g,"%").replace(/[“”‘’]/g,"");
+  if(t.includes("�"))warn.push("붙여넣기에 깨진 글자가 섞여 있습니다 — 과목명을 확인하세요.");
+  let lines=t.split("\n").map(l=>l.replace(/[ ]+$/,""));
+  if(lines.some(l=>/검색된\s*결과가\s*없습니다/.test(l)))
+    warn.push("‘검색된 결과가 없습니다’ — 자유학기(자유학년)라 성적 자료가 없는 학년일 수 있습니다 (중1에서 정상).");
+  const NOISE=/^\s*(4-나|교과별\s*학업성취|\(?단위|학교알리미|공시|※|자료기준|인쇄|엑셀|검색된)/;
+  lines=lines.filter(l=>l.trim()!==""||l.includes("\t")).filter(l=>!NOISE.test(l));
+  const dataLines=lines.filter(l=>l.trim()!=="");
+  if(!dataLines.length)return{rows,failed,warn:["읽을 내용이 없습니다."],level:"중"};
+  const tabShare=dataLines.filter(l=>l.includes("\t")).length/dataLines.length;
+  const TSV=tabShare>=0.3;
+  const cut=l=>TSV?l.split("\t").map(c=>c.trim())
+    :(l.trim().split(/\s{2,}/).length>=3?l.trim().split(/\s{2,}/).map(c=>c.trim()):l.trim().split(/\s+/));
+  const single=dataLines.filter(l=>cut(l).filter(Boolean).length===1).length/dataLines.length;
+  const HEADKW=/학년|학기|반|과목|평균|표준편차|성취도|분포|비율|계열|학과|교과|단위수|수강자/;
+  let sawSd=false,sawGye=false,sawHours=false;
+  /* 세로형(한 셀 한 줄) */
+  if(single>0.6){
+    const toks=dataLines.map(l=>l.trim()).filter(Boolean);
+    let cur=null;
+    for(const tk of toks){
+      if(HEADKW.test(tk)&&achNum(tk)==null)continue;
+      if(achNum(tk)==null&&/[가-힣]/.test(tk)&&!ACH_META.test(tk)){cur={subj:tk,nums:[]};rows.push(cur);}
+      else if(cur&&achNum(tk)!=null)cur.nums.push(achNum(tk));}
+    warn.push("셀 단위로 복사돼 학년·학기 정보가 없습니다 — 아래에서 지정한 학년·학기로 저장합니다.");
+    const out=[];
+    for(const r of rows){
+      const b=achBlock(r.nums);
+      if(!b){failed.push({subj:r.subj,raw:r.nums.join(" ")});continue;}
+      const rest=r.nums.slice(0,b.start).concat(r.nums.slice(b.start+b.len));
+      out.push(achMk(hintGr,hintTerm,"",r.subj,rest,b));}
+    return{rows:out,failed,warn,level:"중"};
+  }
+  /* 표 형태 */
+  let carry=[];
+  for(const line of lines){
+    const cells=cut(line);
+    const joined=cells.join(" ");
+    if(/표준편차/.test(joined))sawSd=true;
+    if(/계열|학과/.test(joined))sawGye=true;
+    const nums=cells.map(achNum);
+    const hasNum=nums.some(v=>v!=null);
+    if(!hasNum){if(HEADKW.test(joined))continue;continue;}
+    if(TSV){ // 병합셀 캐리다운 (앞쪽 빈 칸만)
+      for(let i=0;i<cells.length;i++){
+        if(cells[i]===""&&carry[i]!=null&&i<4)cells[i]=carry[i];else if(cells[i]!=="")carry[i]=cells[i];}
+    }
+    // 과목: 한글 포함 & 메타 아닌 마지막 토큰
+    let si=-1;
+    for(let i=cells.length-1;i>=0;i--){
+      const c=cells[i];if(!c)continue;
+      if(!/[가-힣A-Za-z]/.test(c))continue;
+      if(ACH_META.test(c.replace(/\s/g,"")))continue;
+      if(achNum(c)!=null)continue;
+      si=i;break;}
+    if(si<0){failed.push({subj:"(과목 없음)",raw:line.slice(0,60)});continue;}
+    let subj=cells[si];
+    const hm=subj.match(/^(.+?)\(\s*(\d+)\s*\)\s*$/);
+    let hours=null;if(hm){subj=hm[1];hours=+hm[2];sawHours=true;}
+    const after=cells.slice(si+1).map(achNum).filter(v=>v!=null);
+    const pool=after.length>=3?after:cells.map(achNum).filter(v=>v!=null);
+    const b=achBlock(pool);
+    if(!b){failed.push({subj,raw:line.slice(0,60)});continue;}
+    const rest=pool.slice(0,b.start).concat(pool.slice(b.start+b.len));
+    // 학년·학기·계열
+    const gr=cells[0]&&/^\d$/.test(cells[0].trim())?+cells[0].trim():(hintGr||null);
+    const tm=cells[1]&&/^[12]$/.test(cells[1].trim())?+cells[1].trim():(hintTerm||null);
+    let track="";
+    for(const c of cells.slice(0,si))if(c&&ACH_META.test(c.replace(/\s/g,""))&&/계열|학과|과정/.test(c)){track=c;break;}
+    rows.push(achMk(gr,tm,track,subj,rest,b,hours));
+  }
+  const lvl=(sawSd||sawGye||sawHours)?"고":"중";
+  return{rows,failed,warn,level:lvl};}
+function achMk(gr,tm,track,subj,rest,b,hours){
+  const d=b.len===5?b.blk.slice():(b.len===3?[b.blk[0],b.blk[1],b.blk[2],null,null]:b.blk.concat([null,null]).slice(0,5));
+  let avg=null,sd=null;
+  if(rest.length===1)avg=rest[0];
+  else if(rest.length>=2){const a=rest[0],c=rest[1];
+    if(a>=40){avg=a;sd=c<=40?c:null;}else if(c>=40){avg=c;sd=a<=40?a:null;}else{avg=a;sd=c;}}
+  return{gr,tm,track:track||"",subj:String(subj).trim(),norm:achNormSubj(subj),hours:hours||null,
+    avg,sd,d,scale:b.len===3?3:5,excl:achIsExcl(subj),needsReview:b.len===4,use:!achIsExcl(subj)};}
+/* ── 저장·조회 ── */
+function achSave(school,level,rows,meta){
+  if(!school)return;const D=achDb();
+  D[school]={level:level||"중",year:(meta&&meta.year)||"",term:(meta&&meta.term)||"",
+    saved:today(),rows:rows.filter(r=>r.use!==false),raw:(meta&&meta.raw)||""};
+  save();}
+function achFor(school){return school?achDb()[school]||null:null;}
+/* 대체 사다리: 같은 과목 타학기 → 같은 학기 타과목 평균 → 학교 전체 평균 (지역기본값은 쓰지 않음) */
+function achDistFor(rec,subj,gr,tm){
+  const rows=(rec.rows||[]).filter(r=>r.scale===5&&r.d&&r.d.slice(0,5).every(v=>v!=null));
+  const hit=rows.filter(r=>r.norm===subj&&(gr==null||r.gr==gr)&&(tm==null||r.tm==tm));
+  if(hit.length)return{d:hit[0].d,lv:0};
+  const same=rows.filter(r=>r.norm===subj);
+  if(same.length)return{d:achAvgD(same),lv:1};
+  const term=rows.filter(r=>(gr==null||r.gr==gr)&&(tm==null||r.tm==tm)&&ACH_CORE.includes(r.norm));
+  if(term.length)return{d:achAvgD(term),lv:2};
+  const all=rows.filter(r=>ACH_CORE.includes(r.norm));
+  if(all.length)return{d:achAvgD(all),lv:3};
+  return null;}
+function achAvgD(rows){const o=[0,0,0,0,0];
+  for(const r of rows)for(let i=0;i<5;i++)o[i]+=r.d[i];
+  return o.map(v=>v/rows.length);}
+/* ── 보정 계산 (SAB 골격 + 대체 사다리 + 3겹 밴드 팽창) ── */
+const ACH_RHO=0.8, ACH_S=Math.sqrt(1-0.8*0.8), ACH_SIG=0.45, ACH_M=601;
+var _ACHGRID=null;
+function achGrid(){if(_ACHGRID)return _ACHGRID;const g=[];
+  for(let j=0;j<ACH_M;j++)g.push(invNorm((j+0.5)/ACH_M));return _ACHGRID=g;}
+function achCum(d){const v=d.slice(0,5).filter(x=>x!=null&&isFinite(x));
+  if(v.length<2)return null;const s=v.reduce((a,b)=>a+b,0);if(!(s>0))return null;
+  const q=v.map(x=>Math.max(x/s,0.005));const s2=q.reduce((a,b)=>a+b,0);
+  const cum=[0];for(const x of q)cum.push(cum[cum.length-1]+x/s2);
+  cum[cum.length-1]=1;return cum;}
+function achZBand(cum,g,shift){
+  const cl=x=>Math.min(0.999,Math.max(0.001,x));
+  const a=cl(cum[g-1]+shift),b=cl(cum[g]+shift);
+  const lo=invNorm(1-Math.max(a,b)),hi=invNorm(1-Math.min(a,b));
+  return[Math.max(-4,Math.min(lo,hi)),Math.min(4,Math.max(lo,hi))];}
+function achPosterior(obs){
+  const th=achGrid();const lw=new Array(ACH_M);let best=-1e18;
+  for(let j=0;j<ACH_M;j++){const t=th[j];let s=0;
+    for(const o of obs){
+      const p=normCdf((o.hi-ACH_RHO*t)/ACH_S)-normCdf((o.lo-ACH_RHO*t)/ACH_S);
+      s+=o.w*Math.log(Math.max(p,1e-12));}
+    lw[j]=s;if(s>best)best=s;}
+  let tot=0;const w=new Array(ACH_M);
+  for(let j=0;j<ACH_M;j++){w[j]=Math.exp(lw[j]-best);tot+=w[j];}
+  const q=p=>{let c=0;for(let j=0;j<ACH_M;j++){c+=w[j]/tot;if(c>=p)return th[j];}return th[ACH_M-1];};
+  return{q10:q(0.10),q50:q(0.50),q90:q(0.90)};}
+const ACH_LET={A:1,B:2,C:3,D:4,E:5};
+/* recs: [{subj, grade:'A'~'E', gr, tm}] , rec: achFor(school) */
+function achCorrect(recs,rec){
+  if(!rec||!(rec.rows||[]).length)return{ok:false,reason:"NO_DIST"};
+  const used=[],dropped=[];
+  for(const r of recs){
+    const g=ACH_LET[r.grade];if(!g)continue;
+    if(!ACH_CORE.includes(r.subj)&&!ACH_OPT.includes(r.subj)){dropped.push({...r,why:"국·영·수·사·과 외"});continue;}
+    const f=achDistFor(rec,r.subj,r.gr,r.tm);
+    if(!f){dropped.push({...r,why:"이 학교 분포 없음"});continue;}
+    used.push({...r,g,d:f.d,lv:f.lv});}
+  if(!used.length)return{ok:false,reason:"NO_MATCH",dropped};
+  // 한 잣대 게이트 — 대체분포의 A비율이 실측 중앙값과 10%p 이상 다르면 제거
+  const meas=used.filter(u=>u.lv===0).map(u=>u.d[0]).sort((a,b)=>a-b);
+  const medA=meas.length?meas[Math.floor(meas.length/2)]:null;
+  const kept=[];
+  for(const u of used){
+    if(u.lv>0&&medA!=null&&Math.abs(u.d[0]-medA)>10){dropped.push({...u,why:"대체분포 A비율이 10%p 이상 달라 제외"});continue;}
+    kept.push(u);}
+  const subjSet=new Set(kept.map(u=>u.subj));
+  const impW=kept.filter(u=>u.lv>=2).length/Math.max(1,kept.length);
+  if(subjSet.size<4)return{ok:false,reason:"FEW_SUBJ",n:subjSet.size,used:kept,dropped};
+  if(impW>0.30)return{ok:false,reason:"WEAK_DIST",imputeShare:impW,used:kept,dropped};
+  // 가중치: 같은 과목 반복 측정 축소(R=0.6) + 단일 과목 35% 캡
+  const bySubj={};for(const u of kept)(bySubj[u.subj]=bySubj[u.subj]||[]).push(u);
+  const obsBase=[];
+  for(const s in bySubj){const arr=bySubj[s];const k=arr.length;const kEff=1+(k-1)*0.4;
+    for(const u of arr)obsBase.push({u,w:kEff/k});}
+  const total=obsBase.reduce((a,b)=>a+b.w,0);
+  for(const s in bySubj){const sw=obsBase.filter(o=>o.u.subj===s).reduce((a,b)=>a+b.w,0);
+    if(sw>0.35*total){const f=0.35*total/sw;obsBase.forEach(o=>{if(o.u.subj===s)o.w*=f;});}}
+  // 3 시나리오(분포 출처 포락) × 사후분포
+  const n=200;const delta=Math.max(0.05,Math.sqrt(0.25/n));
+  let loT=1e9,hiT=-1e9;
+  for(const sh of [-delta,0,delta]){
+    const obs=[];
+    for(const o of obsBase){const cum=achCum(o.u.d);if(!cum)continue;
+      const zb=achZBand(cum,o.u.g,sh);obs.push({lo:zb[0],hi:zb[1],w:o.w});}
+    if(!obs.length)continue;
+    const p=achPosterior(obs);loT=Math.min(loT,p.q10);hiT=Math.max(hiT,p.q90);}
+  if(loT>hiT)return{ok:false,reason:"CALC",used:kept,dropped};
+  const mid=achPosterior((function(){const o=[];
+    for(const x of obsBase){const c=achCum(x.u.d);if(c){const z=achZBand(c,x.u.g,0);o.push({lo:z[0],hi:z[1],w:x.w});}}
+    return o;})()).q50;
+  loT-=1.2816*ACH_SIG;hiT+=1.2816*ACH_SIG;
+  const lo=Math.max(0.5,Math.floor(100*(1-normCdf(hiT))));
+  const hi=Math.min(99.5,Math.ceil(100*(1-normCdf(loT))));
+  const midPct=Math.round(100*(1-normCdf(mid))*10)/10;
+  const wide=(hi-lo)>45;
+  return{ok:true,lo,hi,mid:midPct,wide,used:kept,dropped,imputeShare:impW,
+    nSubj:subjSet.size,label:achLabel(midPct)};}
+function achLabel(p){return p<20?"상위권":p<40?"중상위권":p<60?"중위권":p<80?"중하위권":"하위권";}
+/* ── 성취도 분포 UI (고교 선택 시뮬레이터 내부) ── */
+function achRecs(){ // view.hsAch(학기별 문자열) → [{subj,grade,gr,tm}] (5글자일 때만 국·영·수·사·과 순서로 해석)
+  const a=view.hsAch||{},out=[];
+  for(const t of ACH_TERMS){
+    const s=(a[t]||"").toUpperCase().replace(/[^A-E]/g,"");
+    if(s.length!==5)continue;
+    const m=t.match(/중(\d)-(\d)/);
+    for(let i=0;i<5;i++)out.push({subj:ACH_CORE[i],grade:s[i],gr:m?+m[1]:null,tm:m?+m[2]:null});}
+  return out;}
+function achResult(){ // {base, corr} — corr 은 학교 분포가 있고 5글자 입력일 때만
+  const base=achEstimate();
+  const rec=achFor(view.achSchool||"");
+  if(!base||!rec||rec.level!=="중")return{base,corr:null,rec};
+  const recs=achRecs();
+  if(!recs.length)return{base,corr:null,rec,note:"NEED5"};
+  return{base,corr:achCorrect(recs,rec),rec};}
+function achDoParse(){
+  const el=document.getElementById("achpaste");if(!el)return;
+  view.achText=el.value;
+  const r=achParse(el.value,view.achGr?+view.achGr:null,view.achTerm?+view.achTerm:null);
+  view.achParsed=r;view.achLevel=r.level;render();}
+function achToggleRow(i){const p=view.achParsed;if(!p||!p.rows[i])return;
+  p.rows[i].use=!p.rows[i].use;render();}
+function achDoSave(){
+  const p=view.achParsed;const school=(document.getElementById("achschool")||{}).value||view.achSchool||"";
+  if(!school.trim()){toast("학교명을 입력하세요");return;}
+  if(!p||!p.rows.length){toast("먼저 붙여넣고 읽기를 누르세요");return;}
+  achSave(school.trim(),view.achLevel||p.level,p.rows,{year:view.achYear||"",term:view.achTerm||"",raw:view.achText||""});
+  view.achSchool=school.trim();view.achParsed=null;view.achText="";
+  render();toast(`${school.trim()} 성취도 분포 저장 — ${p.rows.filter(r=>r.use!==false).length}행`);}
+function achDelete(s){const D=achDb();delete D[s];save();render();toast("삭제했습니다");}
+function achPanelHtml(){
+  const D=achDb();const names=Object.keys(D).sort((a,b)=>a.localeCompare(b,"ko"));
+  const p=view.achParsed;
+  const cur=view.achSchool||"";
+  const savedList=names.length?`<div style="display:flex;gap:5px;flex-wrap:wrap;margin:6px 0">
+    ${names.map(n=>`<span class="bpin" style="${cur===n?"border-color:var(--accent)":""}">
+      <button style="background:none;border:0;color:inherit;cursor:pointer;font:inherit;padding:0"
+        onclick="view.achSchool='${esc(n)}';render()">${esc(n)} <span style="color:var(--ink2)">${esc(D[n].level)}·${D[n].rows.length}행</span></button>
+      <button onclick="achDelete('${esc(n)}')" title="삭제">✕</button></span>`).join("")}</div>`:"";
+  let preview="";
+  if(p){
+    const ok=p.rows.filter(r=>r.use!==false).length;
+    preview=`<div style="margin-top:8px">
+      <p style="font-size:12px;margin-bottom:5px">${p.rows.length}행을 읽었습니다 — 사용 ${ok}행 · 제외 ${p.rows.length-ok}행 · 실패 ${p.failed.length}행
+        <span class="chip ${p.level==="고"?"warn":"acc"}">${p.level==="고"?"고등학교 서식":"중학교 서식"}</span>
+        <button class="btn ghost sm" onclick="view.achLevel='${p.level==="고"?"중":"고"}';render()">서식 바꾸기</button></p>
+      ${p.warn.map(w=>`<div class="note" style="font-size:12px;padding:7px 11px;margin-bottom:5px">${esc(w)}</div>`).join("")}
+      <div class="tablewrap" style="max-height:280px;overflow:auto"><table class="t">
+        <tr><th>사용</th><th>학년·학기</th><th>과목</th><th>평균</th><th>표준편차</th><th>A</th><th>B</th><th>C</th><th>D</th><th>E</th><th>비고</th></tr>
+        ${p.rows.map((r,i)=>`<tr style="${r.use===false?"opacity:.45":""}">
+          <td><input type=checkbox ${r.use!==false?"checked":""} onchange="achToggleRow(${i})"></td>
+          <td>${r.gr||"?"}-${r.tm||"?"}${r.track?" · "+esc(r.track):""}</td>
+          <td><b>${esc(r.subj)}</b>${r.norm!==r.subj?`<span style="color:var(--ink2)"> →${esc(r.norm)}</span>`:""}</td>
+          <td class="mono">${r.avg==null?"":r.avg}</td><td class="mono">${r.sd==null?"":r.sd}</td>
+          ${r.d.map(v=>`<td class="mono">${v==null?"—":v}</td>`).join("")}
+          <td style="font-size:11px;color:var(--ink2)">${r.excl?esc(r.excl):(r.scale===3?"3단계 과목":(r.needsReview?"확인 필요":""))}</td></tr>`).join("")}
+      </table></div>
+      ${p.failed.length?`<details style="margin-top:6px"><summary style="font-size:12px;color:var(--danger)">읽지 못한 ${p.failed.length}행 보기</summary>
+        <div style="font-size:11.5px;color:var(--ink2);margin-top:4px">${p.failed.map(f=>esc(f.subj+" | "+f.raw)).join("<br>")}</div></details>`:""}
+      <button class="btn pri sm" style="margin-top:8px" onclick="achDoSave()">이 내용으로 저장</button></div>`;}
+  return `<details class="acc2" style="margin-top:10px" ${p||cur?"open":""}>
+    <summary>📊 학교 성취도 분포 넣기 (선택) — 학교알리미 ‘4-나 교과별 학업성취 사항’</summary>
+    <p style="font-size:11.5px;color:var(--ink2);margin:6px 0">학교알리미에서 표를 드래그해 그대로 붙여넣으세요. 열 순서가 다르거나 헤더가 섞여도 읽습니다.
+      읽은 뒤 아래 표에서 쓸 행만 남기고 저장하면, 그 학교의 실제 A 비율로 상위% 추정을 다시 계산합니다.
+      <b>보안문자는 사람이 직접 입력해야 합니다</b> — 자동 조회는 하지 않습니다.</p>
+    ${savedList}
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end;margin-bottom:6px">
+      <div class="frow" style="margin:0"><label>학교명</label>
+        <input id="achschool" value="${esc(cur)}" placeholder="예: 광주동명중학교" style="width:190px"></div>
+      <div class="frow" style="margin:0"><label>학년(없으면)</label>
+        <select onchange="view.achGr=this.value" style="width:76px"><option value="">—</option>
+        ${[1,2,3].map(g=>`<option value="${g}" ${String(view.achGr)===String(g)?"selected":""}>${g}학년</option>`).join("")}</select></div>
+      <div class="frow" style="margin:0"><label>학기(없으면)</label>
+        <select onchange="view.achTerm=this.value" style="width:76px"><option value="">—</option>
+        ${[1,2].map(g=>`<option value="${g}" ${String(view.achTerm)===String(g)?"selected":""}>${g}학기</option>`).join("")}</select></div>
+      <div class="frow" style="margin:0"><label>공시 연도</label>
+        <input value="${esc(view.achYear||"")}" placeholder="2026" style="width:76px" onchange="view.achYear=this.value"></div>
+    </div>
+    <textarea id="achpaste" rows="5" placeholder="예)  2  1  1~8  국어  72.4  18.3  24.1  26.5  19.2  11.9"
+      style="width:100%;font-family:ui-monospace,monospace;font-size:12px">${esc(view.achText||"")}</textarea>
+    <button class="btn sm" style="margin-top:6px" onclick="achDoParse()">읽기</button>
+    ${preview}
+    <p style="font-size:11px;color:var(--ink2);margin-top:8px">출처: 학교알리미 4-나. 교과별 학업성취 사항 (원장 직접 조회분).
+      4월 공시는 전 학년도 1·2학기, 9월 공시는 당해 학년도 1학기 자료입니다 — 화면에서 연도·학기를 반드시 확인하세요.</p>
+  </details>`;}
+function achCorrHtml(){
+  const r=achResult();
+  if(!r.base)return"";
+  const rec=r.rec;
+  if(!rec)return `<p style="font-size:11.5px;color:var(--ink2);margin:6px 0 0">○ 보정 미적용 — 학교 분포가 없어 기존 기준표로 계산했습니다. 위 ‘학교 성취도 분포 넣기’에 학교알리미 표를 넣으면 이 학교 기준으로 다시 계산합니다.</p>`;
+  if(rec.level!=="중")return `<p style="font-size:11.5px;color:var(--warn);margin:6px 0 0">저장된 ${esc(view.achSchool)} 자료가 고등학교 서식입니다 — 중학교 분포를 넣어야 상위% 보정이 됩니다.</p>`;
+  const c=r.corr;
+  if(!c)return `<p style="font-size:11.5px;color:var(--warn);margin:6px 0 0">보정하려면 학기별 성취도를 <b>국·영·수·사·과 순서로 5글자</b>(예: AABBA) 입력하세요.</p>`;
+  if(!c.ok){
+    const why={NO_DIST:"학교 분포가 비어 있습니다",NO_MATCH:"입력한 과목과 학교 분포가 맞지 않습니다",
+      FEW_SUBJ:`분포가 확인된 과목이 ${c.n||0}개뿐입니다 (4개 이상 필요)`,
+      WEAK_DIST:`대체분포 비중이 ${Math.round((c.imputeShare||0)*100)}%로 높습니다 (30% 이하 필요)`,CALC:"계산 실패"}[c.reason]||c.reason;
+    return `<p style="font-size:11.5px;color:var(--warn);margin:6px 0 0">⚠️ 보정 미적용 — ${esc(why)}. 기존 기준표 결과를 그대로 씁니다.</p>`;}
+  const bar=(lo,hi,color)=>`<div style="position:relative;height:15px;background:var(--chip);border-radius:8px;overflow:hidden">
+    <div style="position:absolute;left:${lo}%;width:${Math.max(1,hi-lo)}%;top:0;bottom:0;background:${color};opacity:.75"></div></div>`;
+  const usedA=c.used.filter(u=>u.lv===0).length;
+  return `<div class="kcard" style="margin-top:9px;border-left-color:var(--accent)">
+    <div class="ku">${esc(view.achSchool)} 분포 반영 · 국·영·수·사·과 ${c.nSubj}과목 중 실측분포 ${usedA}건${c.imputeShare>0?` · 대체 ${Math.round(c.imputeShare*100)}%`:""}</div>
+    <div style="font-size:11.5px;color:var(--ink2);margin:6px 0 2px">기존 기준표 — 상위 ${r.base.lo}~${r.base.hi}%</div>
+    ${bar(r.base.lo,r.base.hi,"var(--ink2)")}
+    <div style="font-size:11.5px;color:var(--accent-ink);margin:7px 0 2px">이 학교 분포 반영 — <b>상위 ${c.lo}~${c.hi}%</b> <span style="font-size:11px;color:var(--ink2)">(중심 ${c.mid}%)</span></div>
+    ${bar(c.lo,c.hi,"var(--accent)")}
+    ${c.wide?`<div class="note" style="margin-top:8px;font-size:12px">범위가 상위 ${c.lo}~${c.hi}%로 너무 넓어 숫자로 쓰기 어렵습니다.
+      지금 자료로는 <b>‘${esc(c.label)}’</b> 정도까지만 말할 수 있습니다. 학기가 더 쌓이거나 배치고사·전과목 석차가 있으면 훨씬 좁아집니다.</div>`
+      :`<div style="font-size:11.5px;color:var(--ink2);margin-top:6px">기존 기준표(상위 ${r.base.lo}~${r.base.hi}%)와 비교해 이 학교의 실제 성취도 분포를 반영한 결과입니다.</div>`}
+    <details style="margin-top:7px"><summary style="font-size:11.5px;color:var(--ink2)">계산에 쓴 근거 보기</summary>
+      <div class="tablewrap" style="margin-top:5px"><table class="t">
+        <tr><th>과목</th><th>학생</th><th>학교 A~E (%)</th><th>출처</th></tr>
+        ${c.used.map(u=>`<tr><td>${esc(u.subj)}${u.gr?` <span style="color:var(--ink2)">${u.gr}-${u.tm}</span>`:""}</td>
+          <td><b>${esc(u.grade)}</b></td><td class="mono" style="font-size:11.5px">${u.d.map(v=>Math.round(v*10)/10).join(" / ")}</td>
+          <td style="font-size:11px;color:var(--ink2)">${["실측","같은 과목 타학기","같은 학기 평균","학교 전체 평균"][u.lv]}</td></tr>`).join("")}
+        ${c.dropped.map(d=>`<tr style="opacity:.5"><td>${esc(d.subj||"")}</td><td>${esc(d.grade||"")}</td><td colspan=2 style="font-size:11px">제외 — ${esc(d.why||"")}</td></tr>`).join("")}
+      </table></div></details>
+    <p style="font-size:11px;color:var(--warn);margin-top:7px">⚠️ 이 보정은 아직 실제 석차 결과로 검증(캘리브레이션)되지 않았습니다 — 범위를 안전하게 넓게 잡았습니다.
+      절대평가 성취도는 학교가 시험 난이도와 지필:수행 비율을 정하므로 같은 A라도 학교마다 의미가 다릅니다. 배치고사·전과목 석차가 있으면 그쪽을 우선하세요.
+      이 값은 <b>그 중학교 안에서의 위치</b>이며 고교 내신 등급과 1:1로 대응하지 않습니다.</p>
+  </div>`;}
+function achHsHtml(name){ /* 저장된 고교 성취도 공시 요약 — 모델 없이 사실만 */
+  const rec=achFor(name);if(!rec||rec.level!=="고")return"";
+  const rows=(rec.rows||[]).filter(r=>ACH_CORE.includes(r.norm)&&r.avg!=null);
+  if(!rows.length)return"";
+  const avg=rows.reduce((a,r)=>a+r.avg,0)/rows.length;
+  const sds=rows.filter(r=>r.sd!=null).map(r=>r.sd);
+  const sd=sds.length?sds.reduce((a,b)=>a+b,0)/sds.length:null;
+  const aPct=rows.filter(r=>r.d&&r.d[0]!=null).map(r=>r.d[0]);
+  const aAvg=aPct.length?aPct.reduce((a,b)=>a+b,0)/aPct.length:null;
+  return `<div style="font-size:11.5px;margin-top:4px;color:var(--accent-ink)">📊 공시 성취도 — 국·영·수·사·과 평균 <b>${avg.toFixed(1)}</b>${sd!=null?` · 표준편차 ${sd.toFixed(1)}`:""}${aAvg!=null?` · A ${aAvg.toFixed(0)}%`:""}
+    <span style="color:var(--ink2)">(${rows.length}과목)</span></div>`;}
+function achEff(){ /* 시뮬레이터가 쓸 값 — 보정이 되면 밴드 폭과 무관하게 보정값을 쓴다.
+  (밴드가 넓을 때 고정표로 되돌리면 "더 정확해서"가 아니라 "더 좁아서" 쓰는 것이 되어 과신을 부른다) */
+  const r=achResult();
+  if(r.corr&&r.corr.ok)
+    return{lo:r.corr.lo,hi:r.corr.hi,mid:r.corr.mid,n:r.base?r.base.n:0,avg:r.base?r.base.avg:0,
+      corrected:true,wide:r.corr.wide,label:r.corr.label};
+  return r.base?Object.assign({},r.base,{corrected:false}):null;}
 function achEstimate(){
   const a=view.hsAch||{};const map={A:5,B:4,C:3,D:2,E:1};const vals=[];
   for(const t of ACH_TERMS){const s=(a[t]||"").toUpperCase().replace(/[^A-E]/g,"");
@@ -2168,7 +2526,7 @@ function renderHsSim(){
   let p=parseFloat(view.hsP);
   const rank=parseFloat(view.hsRank),tot=parseFloat(view.hsTot);
   if(!isNaN(rank)&&!isNaN(tot)&&tot>0)p=rank/tot*100;
-  const ach=achEstimate();
+  const ach=achEff();
   const usingAch=isNaN(p)&&!!ach;
   if(usingAch)p=ach.mid;
   const field=view.hsField||"전체";
@@ -2213,6 +2571,7 @@ function renderHsSim(){
           <div class="ku">${esc(ty)}${row.level?` · 내신경쟁 ${esc(row.level)}`:""}${adj?` · 보정 ${adj>0?"+":""}${adj.toFixed(1)}`:""}</div>
           <div class="km">예상 내신 <span class="mono">${band[0].toFixed(1)}~${band[1].toFixed(1)}</span>등급</div>
           ${row.met&&row.met[0]>0?`<div style="font-size:11.5px;margin-top:5px">🎓 ${hsMetHtml(row.met,true)}</div>`:""}
+          ${achHsHtml(row.name)}
           ${mini("적정",pick3("적정"))}${mini("소신",pick3("소신"))}
           ${isHonam?`<div style="font-size:11.5px;color:var(--accent-ink);margin-top:6px">📍 지역인재 자격 — 가능권에 ${ji}건</div>`
             :`<div style="font-size:11.5px;color:var(--ink2);margin-top:6px">지역인재 비대상 지역</div>`}
@@ -2223,6 +2582,8 @@ function renderHsSim(){
       <button class="btn sm" style="margin-left:auto" onclick="copyHsSim()">📋 상담용 요약 복사</button>
       <button class="btn sm pri" onclick="hsSimReport()">📄 학부모 리포트 (파일)</button></h2>
       <div class="bcols" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">${colsH}</div>
+      ${usingAch&&ach&&ach.corrected&&ach.wide?`<div class="note" style="margin-top:8px;font-size:12px">⚠️ 성취도 추정 범위가 상위 ${ach.lo}~${ach.hi}%로 넓습니다 — 아래 학교별 예상 내신도 그만큼 불확실합니다.
+        이 학교는 A 비율이 높아 성취도만으로 교내 위치를 좁히기 어렵습니다. 배치고사·전과목 석차가 있으면 그쪽을 우선하세요.</div>`:""}
       <p style="font-size:11.5px;color:var(--warn);margin:8px 0 0">⚠️ 예상 내신은 학교 유형·경쟁 강도 기반 <b>시뮬레이션</b>입니다(자사·특목은 오차 큼). 진학률의 "기타"에는 재수 준비가 포함되어 <b>정시 강세 학교일수록 진학률이 낮게 보일 수 있습니다</b>. 통학·분위기·프로그램은 상담에서 확정하세요.</p></div>`;
   }
   $("#main").innerHTML=`
@@ -2245,9 +2606,13 @@ function renderHsSim(){
             onchange="view.hsAch=view.hsAch||{};view.hsAch['${t}']=this.value;render()"></div>`).join("")}
       </div>
       ${ach?`<p style="font-size:12px;margin:8px 0 0"><span class="chip acc">성취도 평균 ${ach.avg} (${ach.n}과목)</span>
-        <span class="chip ${usingAch?"warn":""}">상위 ${ach.lo}~${ach.hi}% 추정${usingAch?` — 중앙 ${ach.mid}%로 시뮬 적용 중`:" (상위% 직접 입력이 우선)"}</span></p>
+        <span class="chip ${usingAch?"warn":""}">상위 ${ach.lo}~${ach.hi}% 추정${usingAch?` — 중앙 ${ach.mid}%로 시뮬 적용 중`:" (상위% 직접 입력이 우선)"}</span>
+        ${ach.corrected?`<span class="chip acc">✅ ${esc(view.achSchool||"")} 분포 보정</span>`:""}
+        ${ach.corrected&&ach.wide?`<span class="chip danger">범위 넓음 — 이 자료로는 ‘${esc(ach.label)}’까지만</span>`:""}</p>
       <p style="font-size:11px;color:var(--ink2);margin:4px 0 0">⚠️ 절대평가 성취도는 학교별 A 비율 편차가 커서 상위% 환산이 원리적으로 근사치입니다 — 반드시 밴드로만 해석하고, 배치고사·전과목 석차가 있으면 그쪽을 우선하세요.</p>`:""}
-    </details></div>
+        ${achPanelHtml()}
+    ${achCorrHtml()}
+  </details></div>
   <div class="sec"><h2>2️⃣ 후보 고교 (최대 3곳)</h2><div class="card">
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
       ${picks.map(n=>`<span class="bpin">${esc(n)}<button onclick="view.hsPicks=view.hsPicks.filter(x=>x!=='${esc(n)}');render()">✕</button></span>`).join("")||`<span style="color:var(--ink2);font-size:12.5px">전국 고교 ${hsRows.length.toLocaleString()}곳에서 검색해 추가하세요</span>`}</div>
@@ -2275,7 +2640,7 @@ function hsSimReport(){
   let p=parseFloat(view.hsP);
   const rank=parseFloat(view.hsRank),tot=parseFloat(view.hsTot);
   if(!isNaN(rank)&&!isNaN(tot)&&tot>0)p=rank/tot*100;
-  const ach=achEstimate();
+  const ach=achEff();
   const usingAch=isNaN(p)&&!!ach;
   if(usingAch)p=ach.mid;
   if(isNaN(p)||!(view.hsPicks||[]).length){toast("성적과 후보 고교를 먼저 입력하세요");return;}
@@ -2305,7 +2670,10 @@ function hsSimReport(){
 **WB 웩슬러브레인센터** · ${today()} · 담당: 원장
 
 ## 1. 학생 성적 기준
-${usingAch?`- 중학 절대평가 성취도 평균 **${ach.avg}** (${ach.n}과목 입력) → 상위 **${ach.lo}~${ach.hi}%** 추정 (분석은 중앙값 ${ach.mid}% 적용)`
+${usingAch?`- 중학 절대평가 성취도 평균 **${ach.avg}** (${ach.n}과목 입력) → 상위 **${ach.lo}~${ach.hi}%** 추정 (분석은 중앙값 ${ach.mid}% 적용)
+${ach.corrected?`- 성취도 환산 근거: **${view.achSchool}**의 학교알리미 공시 성취도 분포(4-나 교과별 학업성취 사항)를 반영했습니다.
+  절대평가 성취도는 학교가 시험 난이도와 지필:수행 비율을 정하므로 같은 A라도 학교마다 의미가 다릅니다 — 그래서 재학 중학교의 실제 분포로 환산했습니다.${ach.wide?`
+- ⚠️ 다만 이 중학교는 A 비율이 높아 성취도만으로 교내 위치를 좁히기 어렵습니다. 추정 범위가 상위 ${ach.lo}~${ach.hi}%로 넓어, **‘${ach.label}’ 수준**까지만 말씀드릴 수 있습니다. 배치고사나 전과목 석차가 있으면 그 자료를 우선합니다.`:""}`:`- 성취도 환산은 일반 기준표에 따른 근사치입니다 — 학교별 A 비율 편차가 반영되지 않았습니다.`}`
 :`- 중학교 성적: 상위 **${p.toFixed(1)}%**`}
 - 희망 계열: **${field}**
 
