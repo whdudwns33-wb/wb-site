@@ -55,7 +55,7 @@ Cloudflare Workers `wb-reading`으로). PR은 스쿼시 머지, 제목에 `(#번
 - 학생: `/` 진로독서 · `/vocab/` 워드브레인 · `/naesin/` 내신브레인(영어) · `/naesin-ko/` 국어브레인
 - 관리: `/admin/` 진로독서(+교재 코칭 원문 업로드) · `/admin/naesin-admin.html` 내신브레인
   (팩 업로드·시험 등록·반 성취도) · `/admin/naesin-ko-admin.html` 국어브레인
-  (팩 업로드·시험 등록·과제 배정·학교 오버레이·서술형 검토)
+  (팩 업로드·시험 등록·과제 배정·학교 오버레이·서술형 검토·서술형 루브릭 저작)
 - 베이스: `https://wb-reading.whdudwns33.workers.dev`
 
 ## 진행 중인 큰 작업: 내신브레인

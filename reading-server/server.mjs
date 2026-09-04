@@ -89,6 +89,9 @@ const naesinKoStore = {
   putPack: (id, rec) => { naesinKoRoot().packs[id] = rec; persist(); },
   getPackIds: () => naesinKoRoot().packIds || null,
   putPackIds: (ids) => { naesinKoRoot().packIds = ids; persist(); },
+  /* 검수 대기 목록 — 팩과 다른 자리다. 학생에게 갈 것과 안 갈 것을 저장 계층에서부터 가른다. */
+  getPending: (id) => (naesinKoRoot().pendings || {})[id] || null,
+  putPending: (id, rec) => { const r = naesinKoRoot(); r.pendings = r.pendings || {}; r.pendings[id] = rec; persist(); },
   getState: (c) => naesinKoRoot().states[c] || null,
   putState: (c, rec) => { naesinKoRoot().states[c] = rec; persist(); },
   getSummary: (c) => naesinKoRoot().summaries[c] || null,

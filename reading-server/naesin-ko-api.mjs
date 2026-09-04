@@ -21,6 +21,7 @@ const SUMMARY_MAX_BYTES = 8_192;    // 관리 화면 요약 1건 최대 (8KB)
 const REVIEW_MAX_BYTES = 16_384;    // 서술형 제출 1건 최대 (16KB)
 const OVERLAY_MAX_BYTES = 262_144;  // 학교 오버레이 1건 최대
 const PACK_MAX_BYTES = 4_194_304;   // 팩 1건 최대 (4MB)
+const PENDING_MAX_BYTES = 1_048_576; // 검수 대기 목록 1팩 최대 (1MB) — 팩에 안 들어가는 초안이라 따로 산다
 const REVIEW_LIST_MAX = 300;        // 학생 1명이 쌓아 두는 서술형 제출 상한
 const PACK_ID_RE = /^[A-Za-z0-9-]{3,60}$/;
 const CODE_RE = /^[A-Za-z0-9-]{3,20}$/;
@@ -52,7 +53,7 @@ export function naesinKoSummary(code, stu, sumRec) {
 
 /* ── 라우터 ──
    ctx = { path, method, who, query, getBody, store }
-   store: getPack/putPack, getPackIds/putPackIds, getState/putState,
+   store: getPack/putPack, getPackIds/putPackIds, getPending/putPending, getState/putState,
           getSummary/putSummary/listSummaryCodes,
           getReviews/putReviews, getOverlay/putOverlay,
           getExam/putExam, getTask/putTask, getStudent
@@ -183,6 +184,28 @@ export async function handleNaesinKo(ctx) {
   }
   if (p === '/api/naesin-ko/admin/packs' && method === 'GET') {
     return j(200, { packs: (await store.getPackIds()) || [], time: nowIso() });
+  }
+
+  /* ── 검수 대기 목록 ──
+     추출기가 팩에 못 넣은 것들(루브릭 없는 서술형이 대부분)이 여기 산다. **팩과 다른 키**다 —
+     같이 두면 학생에게 배달되고, 학생 화면에 뜨면 안 되는 초안이기 때문이다(§7[3] 검수 게이트).
+     관리 화면이 루브릭을 저작해 팩으로 옮기면 여기서 빠진다. */
+  if (p === '/api/naesin-ko/admin/pending' && method === 'POST') {
+    const b = await body();
+    if (!b) return j(400, { error: '올바른 JSON이 아니에요.' });
+    const id = String(b.id || '').trim();
+    if (!PACK_ID_RE.test(id)) return j(400, { error: '팩 id는 영문/숫자/하이픈 3~60자' });
+    if (!Array.isArray(b.pending)) return j(400, { error: 'pending 배열이 필요해요.' });
+    if (size(b.pending) > PENDING_MAX_BYTES) return j(413, { error: '검수 목록이 너무 커요 (1MB 이내).' });
+    const rec = { pending: b.pending, updatedAt: nowIso() };
+    await store.putPending(id, rec);
+    return j(200, { ok: true, id, count: b.pending.length, updatedAt: rec.updatedAt });
+  }
+  if (p === '/api/naesin-ko/admin/pending' && method === 'GET') {
+    const id = String((ctx.query && ctx.query.get('id')) || '').trim();
+    if (!PACK_ID_RE.test(id)) return j(400, { error: '팩 id가 필요해요.' });
+    const rec = await store.getPending(id);
+    return j(200, { pending: (rec && rec.pending) || [], updatedAt: (rec && rec.updatedAt) || null });
   }
 
   /* 시험 배정 — scope가 'default'면 반 공통, 학생 코드면 그 학생만.

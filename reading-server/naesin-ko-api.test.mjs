@@ -9,7 +9,7 @@ const t = async (name, fn) => { await fn(); passed += 1; console.log('  ✓ ' + 
 
 /* 메모리 어댑터 (worker KV·로컬 파일 어댑터와 동일 계약) */
 function memStore() {
-  const packs = {}, states = {}, summaries = {}, reviews = {}, overlays = {}, exams = {}, tasks = {};
+  const packs = {}, states = {}, summaries = {}, reviews = {}, overlays = {}, exams = {}, tasks = {}, pendings = {};
   let packIds = null;
   const students = { 'st-1': { code: 'st-1', name: '김지우', cls: '중2 A반' }, 'st-2': { code: 'st-2', name: '박서준', cls: '중2 A반' } };
   return {
@@ -30,8 +30,10 @@ function memStore() {
     putExam: (s, rec) => { exams[s] = rec; },
     getTask: (s) => tasks[s] || null,
     putTask: (s, rec) => { tasks[s] = rec; },
+    getPending: (id) => pendings[id] || null,
+    putPending: (id, rec) => { pendings[id] = rec; },
     getStudent: (c) => students[c] || null,
-    _raw: { packs, states, summaries, reviews, overlays, exams },
+    _raw: { packs, states, summaries, reviews, overlays, exams, pendings },
   };
 }
 const STU = { code: 'st-1', admin: false };
@@ -209,6 +211,44 @@ await t('수업 과제는 유형이 하나 이상이어야 하고 없는 팩은 
   const ghost = await call(s, { path: '/api/naesin-ko/admin/task', method: 'POST', who: ADMIN,
     getBody: async () => ({ date: '2026-12-01', title: '오늘 과제', typeKeys: ['구절 적용'], packId: 'ghost' }) });
   assert.strictEqual(ghost.status, 400);
+});
+
+await t('검수 대기 목록은 팩과 다른 키에 산다 — 학생 라우트로 새지 않는다(§7[3])', async () => {
+  const s = memStore();
+  const row = { itemId: 'w-1:it-1', stem: '화자의 태도를 쓰시오.', model: ['모범답안'] };
+  const put = await call(s, { path: '/api/naesin-ko/admin/pending', method: 'POST', who: ADMIN,
+    getBody: async () => ({ id: PACK.packId, pending: [row] }) });
+  assert.strictEqual(put.status, 200);
+  assert.strictEqual(put.body.count, 1);
+  const got = await call(s, { path: '/api/naesin-ko/admin/pending', method: 'GET', who: ADMIN,
+    query: new URLSearchParams({ id: PACK.packId }) });
+  assert.deepStrictEqual(got.body.pending, [row]);
+  /* 검수본을 넣어도 팩은 그대로다 — 초안이 학생 /pack 응답에 섞이면 안 된다 */
+  assert.strictEqual(await s.getPack(PACK.packId), null);
+});
+
+await t('검수 목록은 관리자만, 배열만, 1MB까지', async () => {
+  const s = memStore();
+  const asStudent = await call(s, { path: '/api/naesin-ko/admin/pending', method: 'GET',
+    query: new URLSearchParams({ id: PACK.packId }) });
+  assert.strictEqual(asStudent.status, 403);
+  const noAuth = await call(s, { path: '/api/naesin-ko/admin/pending', method: 'GET', who: null,
+    query: new URLSearchParams({ id: PACK.packId }) });
+  assert.strictEqual(noAuth.status, 401);
+  const badId = await call(s, { path: '/api/naesin-ko/admin/pending', method: 'POST', who: ADMIN,
+    getBody: async () => ({ id: '나쁜 아이디', pending: [] }) });
+  assert.strictEqual(badId.status, 400);
+  const notArray = await call(s, { path: '/api/naesin-ko/admin/pending', method: 'POST', who: ADMIN,
+    getBody: async () => ({ id: PACK.packId, pending: { itemId: 'x' } }) });
+  assert.strictEqual(notArray.status, 400);
+  const huge = await call(s, { path: '/api/naesin-ko/admin/pending', method: 'POST', who: ADMIN,
+    getBody: async () => ({ id: PACK.packId, pending: [{ stem: 'ㄱ'.repeat(1100000) }] }) });
+  assert.strictEqual(huge.status, 413);
+  /* 거절된 요청은 아무것도 남기지 않는다 */
+  const empty = await call(s, { path: '/api/naesin-ko/admin/pending', method: 'GET', who: ADMIN,
+    query: new URLSearchParams({ id: PACK.packId }) });
+  assert.deepStrictEqual(empty.body.pending, []);
+  assert.strictEqual(empty.body.updatedAt, null);
 });
 
 await t('몸통이 JSON이 아니면 저장 전에 400', async () => {

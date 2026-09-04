@@ -158,6 +158,9 @@ function naesinKoStore(env) {
     putPack: (id, rec) => env.DB.put('naesinko:pack:' + id, JSON.stringify(rec)),
     getPackIds: () => env.DB.get('naesinko:packs', 'json'),
     putPackIds: (ids) => env.DB.put('naesinko:packs', JSON.stringify(ids)),
+    /* 검수 대기 목록 — 팩과 다른 키다. 학생에게 갈 것과 안 갈 것을 저장 계층에서부터 가른다. */
+    getPending: (id) => env.DB.get('naesinko:pending:' + id, 'json'),
+    putPending: (id, rec) => env.DB.put('naesinko:pending:' + id, JSON.stringify(rec)),
     getState: (c) => env.DB.get('naesinko:state:' + c, 'json'),
     putState: (c, rec) => env.DB.put('naesinko:state:' + c, JSON.stringify(rec)),
     getSummary: (c) => env.DB.get('naesinko:summary:' + c, 'json'),
