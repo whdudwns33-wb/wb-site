@@ -12,7 +12,7 @@ WB 독해력학원·웩슬러브레인센터의 원내 학습 웹앱 모음. 어
 | `naesin/` | 내신브레인 — 영어 내신 시험대비 앱. **상세: `naesin/README.md`** |
 | `reading-server/` | Cloudflare Worker(운영) + Node 로컬 서버 + 관리 웹(`public/`) + dist 조립 |
 | `shared/` | 공용 모듈 (voice.js TTS, qr.js) |
-| `docs/` | 기획서 모음 — 내신: `docs/영어내신-학습웹앱-기획서-v1.md` (v1.2) |
+| `docs/` | 기획서 모음 — 내신: `docs/영어내신-학습웹앱-기획서-v1.md` (v1.2) · 삼육중 대비(기획 단계, 코드 없음): `docs/삼육중-*.md` 4종 |
 | `vocab-age/` | 어휘 나이 진단 (유일한 공개 페이지) |
 
 ## 명령
