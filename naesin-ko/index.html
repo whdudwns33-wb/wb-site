@@ -656,16 +656,21 @@
   /* marks 를 밖에서 받을 수 있다 — ㉠ 기호는 **세트 스코프**라서다(§2.2-5).
      같은 기호가 세트마다 다른 구절을 가리키므로, 세트가 있으면 세트 것을 쓴다.
      이걸 안 쓰면 '㉠와 ㉡의 공통점을 쓰시오' 같은 문항이 지문에 표시가 없어 풀 수 없다. */
+  /* 구절에 기호를 얹는다 — 지문 본문과 발췌 문단이 같은 규칙을 쓰게 한 군데로 모은다 */
+  function markUp(line, marks) {
+    var html = esc(line);
+    (marks || []).forEach(function (mk) {
+      if (mk.anchorText && line.indexOf(mk.anchorText) >= 0) {
+        html = html.replace(esc(mk.anchorText), '<span class="sym">' + esc(mk.symbol) + '</span><mark>' + esc(mk.anchorText) + '</mark>');
+      }
+    });
+    return html;
+  }
   function poemHtml(w, showNotes, overrideMarks) {
     var marks = overrideMarks || w.marks || [], notes = showNotes ? (w.lineNotes || []) : [];
     return (w.text.stanzas || []).map(function (stz) {
       return '<div class="st">' + (stz.lines || []).map(function (ln) {
-        var html = esc(ln), added = '';
-        marks.forEach(function (mk) {
-          if (ln.indexOf(mk.anchorText) >= 0) {
-            html = html.replace(esc(mk.anchorText), '<span class="sym">' + esc(mk.symbol) + '</span><mark>' + esc(mk.anchorText) + '</mark>');
-          }
-        });
+        var html = markUp(ln, marks), added = '';
         notes.forEach(function (nt) {
           if (ln.indexOf(nt.anchor) >= 0) added += '<span class="note">↳ ' + esc(nt.note) + '</span>';
         });
@@ -1036,16 +1041,13 @@
         var body = '';
         /* 이 세트가 이 작품에 대해 따로 갖고 있는 기호를 쓴다. 없으면 정본의 것으로 떨어진다. */
         var sm = (set.marks || []).filter(function (mk) { return !mk.workId || mk.workId === ref.workId; });
-        if (ref.text && ref.text.paragraphs) {
-          body = ref.text.paragraphs.map(function (para) {
-            var html = esc(para);
-            sm.forEach(function (mk) {
-              if (para.indexOf(mk.anchorText) >= 0) {
-                html = html.replace(esc(mk.anchorText), '<span class="sym">' + esc(mk.symbol) + '</span><mark>' + esc(mk.anchorText) + '</mark>');
-              }
-            });
-            return '<p>' + html + '</p>';
-          }).join('');
+        /* 발췌 본문은 산문(문단)일 수도 시(연·행)일 수도 있다 — 시조 발췌가 실제로 그렇다.
+           연·행 쪽을 안 그리면 지문이 통째로 빈 채 문항만 뜬다. */
+        var refText = ref.text || null;
+        if (refText && refText.paragraphs) {
+          body = refText.paragraphs.map(function (para) { return '<p>' + markUp(para, sm) + '</p>'; }).join('');
+        } else if (refText && refText.stanzas) {
+          body = poemHtml({ text: refText }, false, sm.length ? sm : null);
         } else if (wk.text) body = poemHtml(wk, false, sm.length ? sm : null);
         return '<div class="poem" style="margin-bottom:10px">' +
           '<div class="small muted">' + esc(ref.label || '') + ' ' + esc(wk.title || '') + ' · ' + esc(wk.author || '') + '</div>' +

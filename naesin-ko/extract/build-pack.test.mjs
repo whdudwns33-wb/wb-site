@@ -7,7 +7,7 @@
  *   ③ 팩 전역 유일 id
  * 실제 지면은 저장소에 못 들어오므로(CLAUDE.md 절대 규칙 1) 자체 창작 값으로 만든다. */
 import assert from 'node:assert';
-import { mergeBlanks, reanchor, workIdFor } from './build-pack.mjs';
+import { mergeBlanks, reanchor, workIdFor, resolveSets } from './build-pack.mjs';
 
 let passed = 0;
 const t = (name, fn) => { fn(); passed += 1; console.log('  ✓ ' + name); };
@@ -127,6 +127,70 @@ t('작품 id 는 머리말 좌표에서 기계적으로 나온다 — 한글은 
   assert.strictEqual(workIdFor('2-3.(1)어떤 시', 5), 'w-2-3-1');
   assert.strictEqual(workIdFor('좌표 없는 제목', 4), 'w-05');
   assert.ok(/^[A-Za-z0-9-]+$/.test(workIdFor('1-1.(2)비린내라뇨!', 0)));
+});
+
+
+/* ── 지문 세트 살리기 ──
+   추출기는 자기 파일만 본다. 폴더 전체를 보는 병합기만 할 수 있는 일을 여기서 건다. */
+const res = (series, out) => [{ series, out }];
+const pendSet = (setId, works, why) => ({ kind: 'set', setId, why: why || 'workId 를 못 찾은 작품이 있다', works });
+
+t('제목은 있는데 이해완성이 없는 작품 — 정본 없는 작품으로 세우고 지문은 발췌로 담는다', () => {
+  const works = [{ workId: 'w-1-1-1', title: '저녁 노을', hasCanon: true, text: { stanzas: [{ no: 1, lines: ['가'] }] } }];
+  const results = res('danwon', { sets: [], review: {
+    pending: [pendSet('s-01', [{ label: '(가)', title: '저녁 노을' }, { label: '(나)', title: '산버들 가리어', author: '홍랑' }])],
+    candidates: [{ kind: 'setText', setId: 's-01', label: '(나)', title: '산버들 가리어', author: '홍랑',
+      lines: ['첫 행', '둘째 행', '셋째 행'] }] } });
+  const r = resolveSets(results, works);
+  assert.strictEqual(r.added.length, 1);
+  assert.strictEqual(r.added[0].title, '산버들 가리어');
+  const stub = works.filter((w) => w.workId === r.added[0].workId)[0];
+  assert.strictEqual(stub.hasCanon, false, '정본이 없다는 사실을 숨기면 안 된다');
+  assert.deepStrictEqual(stub.blanks, []);
+  /* 세트가 살아났고, 정본 없는 작품의 지문은 세트가 들고 있다 */
+  const set = results[0].out.sets[0];
+  assert.strictEqual(set.setId, 's-01');
+  const ref = set.works.filter((w) => w.workId === stub.workId)[0];
+  assert.strictEqual(ref.kind, 'excerpt', 'full 이면 정본에서 가져다 쓰는데 정본이 없어 화면이 빈다');
+  assert.deepStrictEqual(ref.text.stanzas[0].lines, ['첫 행', '둘째 행', '셋째 행']);
+  /* 정본이 있는 쪽은 그대로 full 이다 — 본문을 두 번 담지 않는다 */
+  assert.strictEqual(set.works.filter((w) => w.workId === 'w-1-1-1')[0].kind, 'full');
+  assert.strictEqual(results[0].out.review.pending.length, 0);
+});
+
+t('제목 없는 발췌는 그 자료의 발췌 작품이 하나뿐일 때만 귀속한다 — 아니면 추론하지 않는다', () => {
+  const mk = (titles) => res('seosul', { sets: [], review: {
+    pending: [
+      pendSet('s-01', titles.map((t2, i) => ({ label: '', title: t2, kind: 'excerpt',
+        text: { paragraphs: ['본문 ' + i] } }))),
+      pendSet('s-02', [{ label: '', title: '', kind: 'excerpt', text: { paragraphs: ['제목 없는 발췌'] } }],
+        '제목·작가가 지면에 인쇄돼 있지 않다'),
+    ], candidates: [] } });
+
+  /* 후보가 하나 → 귀속하고 검수 표시를 남긴다 */
+  const one = mk(['축구공과 응원 봉']);
+  const w1 = [];
+  const r1 = resolveSets(one, w1);
+  assert.strictEqual(r1.inferred.length, 1);
+  assert.strictEqual(r1.inferred[0].title, '축구공과 응원 봉');
+  assert.strictEqual(one[0].out.sets.length, 2, '제목 없는 세트도 살아나야 한다');
+
+  /* 후보가 둘 → 추론하지 않고 그대로 검수로 */
+  const two = mk(['축구공과 응원 봉', '다른 소설']);
+  const w2 = [];
+  const r2 = resolveSets(two, w2);
+  assert.strictEqual(r2.inferred.length, 0, '후보가 여럿이면 찍지 않는다');
+  assert.strictEqual(two[0].out.sets.length, 1);
+  assert.ok(r2.stillPending.some((p) => p.setId === 's-02'));
+});
+
+t('본문이 없는 발췌는 못 살린다 — 지문 없는 지문 세트를 만드느니 검수로 넘긴다', () => {
+  const results = res('danwon', { sets: [], review: {
+    pending: [pendSet('s-01', [{ label: '(가)', title: '없는 작품', kind: 'excerpt' }])], candidates: [] } });
+  const works = [];
+  const r = resolveSets(results, works);
+  assert.deepStrictEqual(results[0].out.sets, []);
+  assert.ok(r.stillPending.some((p) => p.setId === 's-01'));
 });
 
 console.log(`\nOK — ${passed}개 통과. 병합기는 자료 하나만 봐서는 못 하는 것을 한다.`);

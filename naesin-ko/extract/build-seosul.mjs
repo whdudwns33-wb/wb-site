@@ -400,12 +400,15 @@ export function buildSeosul(doc, opts) {
       return ref;
     });
     setOf[g.no] = { marks };
+    /* 세트를 못 내더라도 문항에는 **세트 번호를 달아 둔다.** 병합기가 폴더 전체를 보고
+       세트를 살릴 수 있고(정본 없는 작품 세우기 등), 그때 이 번호가 있어야 문항이 이어진다.
+       세트가 끝내 안 살아나면 병합기가 이 번호로 '지문 없는 문항'을 알아보고 팩에서 뺀다. */
+    setOf[g.no].setId = setId;
     const missingText = refs.some((r) => r.kind === 'excerpt' && !(r.text.paragraphs || []).length);
     if (refs.length && refs.every((r) => r.workId) && !missingText) {
       const s = { setId, works: refs };
       if (marks.length) s.marks = marks.map((m) => ({ symbol: m.symbol, workId: m.workId, anchorText: m.anchorText }));
       sets.push(s);
-      setOf[g.no].setId = setId;
       const uniq = refs.map((r) => r.workId).filter((v, i, a) => a.indexOf(v) === i);
       if (uniq.length === 1) setOf[g.no].workId = uniq[0];
     } else {

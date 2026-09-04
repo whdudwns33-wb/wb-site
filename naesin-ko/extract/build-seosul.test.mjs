@@ -287,7 +287,9 @@ t('제목·작가를 못 찾거나 workId 를 못 받은 세트는 팩에 내지
   const bare = buildSeosul(doc, { scope: 'u1' });          // --work 를 안 준 경우
   assert.deepStrictEqual(bare.sets, []);
   assert.strictEqual(bare.review.pending.filter((p) => p.kind === 'set').length, 2);
-  bare.items.forEach((x) => assert.strictEqual(x.setId, undefined, x.id));
+  /* 문항은 세트 번호를 달고 나간다 — 병합기가 세트를 살리면 그 번호로 다시 이어지고,
+     끝내 못 살리면 병합기가 이 번호로 '지문 없는 문항'을 알아보고 팩에서 뺀다. */
+  assert.ok(bare.items.some((x) => x.setId), '보류된 세트의 문항이 세트 번호를 잃었습니다');
   /* 검수에서 옮길 수 있게 본문을 pending 에 통째로 남긴다 */
   const ps = bare.review.pending.filter((p) => p.kind === 'set');
   assert.ok(ps.some((p) => (p.works[0].text || {}).paragraphs), JSON.stringify(ps[0]));

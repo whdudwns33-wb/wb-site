@@ -258,9 +258,18 @@ t('workId 를 못 받은 세트는 팩에 내지 않는다 — 반쪽만 담으�
   const pend = half.review.pending.filter((p) => p.kind === 'set');
   assert.strictEqual(pend.length, 1);
   assert.strictEqual(pend[0].setId, 's-dj-t1-01');
-  /* 세트를 못 냈으면 문항도 그 세트를 가리키면 안 된다(없는 setId 참조는 오류다) */
-  half.items.forEach((i) => assert.notStrictEqual(i.setId, 's-dj-t1-01'));
-  assert.strictEqual(half.items.filter((i) => i.id === 'dj-t1-001')[0].setId, undefined);
+  /* 검수에서 옮길 수 있게 본문을 후보로 남긴다 */
+  assert.ok((half.review.candidates || []).some((c) => c.kind === 'setText' && c.setId === 's-dj-t1-01'));
+});
+
+t('세트를 못 내도 문항에는 세트 번호를 달아 둔다 — 병합기가 그 번호로 다시 잇는다', () => {
+  /* 추출기는 자기 파일만 본다. 폴더 전체를 보는 병합기는 정본 없는 작품을 세워 세트를 살릴 수
+     있고, 그때 이 번호가 없으면 문항이 영영 지문을 못 찾는다. 끝내 못 살리면 병합기가
+     이 번호로 '지문 없는 문항'을 알아보고 팩에서 뺀다 — 그 불변식은 병합기가 지킨다. */
+  const half = buildDanwon(doc, { scope: 't1', workIds: { '유리 새': 'w-yurisae' } });
+  const orphan = half.items.filter((i) => i.setId === 's-dj-t1-01');
+  assert.ok(orphan.length, '보류된 세트의 문항이 세트 번호를 잃었습니다');
+  assert.strictEqual(half.items.filter((i) => i.id === 'dj-t1-001')[0].setId, 's-dj-t1-01');
 });
 
 t('머리말에서 교과서 좌표를 읽어 둔다 — 여러 자료를 합칠 때 서로를 채운다', () => {

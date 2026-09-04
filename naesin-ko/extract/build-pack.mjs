@@ -196,6 +196,119 @@ export function mergeBlanks(work, opts) {
   return { merged, log };
 }
 
+/* ── 지문 세트 살리기 ──
+   추출기는 자기 파일만 본다. 그래서 "이 지문이 어느 작품인가"를 못 정하면 세트를 통째로
+   검수로 내리고, 그 세트를 가리키던 문항도 함께 빠진다(실측 16문항). 그런데 폴더 전체를 보는
+   병합기에는 답이 있는 경우가 많다 — 여기서 세 가지를 해결한다.
+
+   ① 제목은 있는데 그 작품의 이해완성이 폴더에 없다 (시조 '산버들…', 소설 '축구공과…').
+      → **정본 없는 작품(hasCanon:false)** 을 만들어 세우고 지문은 발췌로 담는다.
+         hasCanon:false 는 '개념 단위가 없다'는 뜻이고 실제로 그렇다 — 거짓말이 아니다.
+   ② 제목이 아예 인쇄돼 있지 않은 발췌.
+      → 그 자료에서 **제목 있는 발췌 작품이 정확히 하나뿐일 때만** 그것으로 본다.
+         인쇄물이 제목을 맨 앞에 한 번만 찍기 때문이다. 후보가 둘 이상이면 추론하지 않는다.
+         추론한 것은 review.inferred 에 남겨 검수에서 확인하게 한다.
+   ③ 세트가 살아나면 그 세트를 가리키던 문항도 함께 돌아온다.
+
+   못 살리는 것은 그대로 검수로 간다. 지문 없는 문항을 팩에 내는 일은 없다. */
+
+const SLUG = (n) => 'w-ex-' + String(n).padStart(2, '0');
+
+function textFromLines(lines, prose) {
+  const xs = (lines || []).map((x) => String(x)).filter((x) => x.trim());
+  if (!xs.length) return null;
+  return prose ? { paragraphs: xs } : { stanzas: [{ no: 1, lines: xs }] };
+}
+
+export function resolveSets(results, works, opts) {
+  opts = opts || {};
+  const byTitle = {};
+  works.forEach((w) => { if (w.title) byTitle[w.title.trim()] = w; });
+  const added = [], inferred = [], stillPending = [];
+  let exN = 0;
+
+  results.forEach((r) => {
+    const review = r.out.review || {};
+    const pend = (review.pending || []).filter((p) => p.kind === 'set');
+    if (!pend.length) return;
+    /* 이 자료의 setText 후보 — 단원집중은 세트 본문을 pending 에 안 담고 후보로만 낸다 */
+    const texts = {};
+    (review.candidates || []).filter((c) => c.kind === 'setText').forEach((c) => {
+      texts[c.setId + '|' + (c.label || '')] = c;
+    });
+    /* ② 규칙의 근거: 이 자료에서 제목이 있는 발췌 작품의 목록 */
+    const titledExcerpts = new Set();
+    pend.forEach((p) => (p.works || []).forEach((w) => {
+      if (w.kind === 'excerpt' && w.title) titledExcerpts.add(w.title.trim());
+    }));
+    Object.keys(texts).forEach((k) => {
+      const c = texts[k];
+      if ((c.kind2 === 'excerpt' || c.prose) && c.title) titledExcerpts.add(c.title.trim());
+    });
+    const soleExcerpt = titledExcerpts.size === 1 ? [...titledExcerpts][0] : null;
+
+    pend.forEach((p) => {
+      const refs = [];
+      let ok = true;
+      (p.works || []).forEach((w) => {
+        const cand = texts[p.setId + '|' + (w.label || '')] || {};
+        let title = (w.title || cand.title || '').trim();
+        let byInference = false;
+        if (!title && soleExcerpt) { title = soleExcerpt; byInference = true; }
+        if (!title) { ok = false; return; }
+
+        let work = byTitle[title];
+        if (!work) {
+          /* 정본이 없는 작품을 세운다 — 이 팩에서는 지문으로만 쓰인다 */
+          exN += 1;
+          work = {
+            workId: SLUG(exN), title, author: (w.author || cand.author || '').trim(),
+            kind: (w.kind === 'excerpt' || cand.kind2 === 'excerpt') ? 'novel' : 'poem',
+            hasCanon: false, isExternal: false, unitPath: '',
+            overview: { genre: [], material: '', tone: [], theme: '', features: [] },
+            composition: [], text: { stanzas: [] }, lineNotes: [], marks: [],
+            keywords: [], rhetoric: [], features: [], vocab: [],
+            checklist: [], examPoints: [], appreciationPoints: [], blanks: [], notes: [],
+          };
+          works.push(work); byTitle[title] = work;
+          added.push({ workId: work.workId, title, series: r.series, why: '이 작품의 이해완성이 폴더에 없어 지문 전용 작품으로 세웠습니다(정본 없음)' });
+        } else if (!work.author) {
+          /* 같은 작품의 발췌가 여러 번 실리는데 작가는 맨 앞 한 번만 인쇄된다 —
+             먼저 만난 조각에 작가가 없었으면 뒤에서 채운다(제목 표시줄이 '작품 ·' 로 끝나지 않게). */
+          const a = (w.author || cand.author || '').trim();
+          if (a) work.author = a;
+        }
+        let kind = w.kind || cand.kind2 || 'full';
+        /* **정본이 없는 작품은 세트가 본문을 가져야 한다.** kind:'full' 은 '작품 정본에서 가져다
+           쓴다'는 뜻인데 정본이 없으면 화면이 텅 빈다 — 검증기는 이걸 못 잡는다(full 은 text 를
+           요구하지 않는다). 그래서 발췌로 바꾸고 지면에서 뽑은 본문을 싣는다. */
+        if (!work.hasCanon) kind = 'excerpt';
+        const ref = { label: w.label || '', workId: work.workId, kind };
+        const body = (w.text && (w.text.paragraphs || w.text.stanzas)) ? w.text
+          : textFromLines(cand.body || cand.lines, kind === 'excerpt' && (w.kind === 'excerpt' || cand.kind2 === 'excerpt'));
+        if (ref.kind === 'excerpt') {
+          if (!body) { ok = false; return; }         // 발췌인데 본문이 없으면 못 낸다
+          ref.text = body;
+        }
+        const pre = w.prefaceSummary || cand.preface;
+        if (pre) ref.prefaceSummary = pre;
+        if (byInference) {
+          inferred.push({ setId: p.setId, label: ref.label, workId: work.workId, title,
+            why: '제목이 지면에 없어 이 자료의 유일한 발췌 작품으로 보았습니다 — 검수에서 확인하세요' });
+        }
+        refs.push(ref);
+      });
+      if (!ok || !refs.length) { stillPending.push(p); return; }
+      const set = { setId: p.setId, works: refs };
+      if (p.marks) set.marks = p.marks;
+      r.out.sets = (r.out.sets || []).concat([set]);
+    });
+    /* 살린 세트는 pending 에서 뺀다 */
+    review.pending = (review.pending || []).filter((p) => p.kind !== 'set' || stillPending.includes(p));
+  });
+  return { added, inferred, stillPending };
+}
+
 export function buildPack(dir, opts) {
   opts = opts || {};
   const packId = opts.packId || path.basename(dir.replace(/\/+$/, ''));
@@ -338,6 +451,18 @@ export function buildPack(dir, opts) {
       ' 그 작품의 이해완성 파일이 폴더에 없거나 제목 표기가 달라요.');
   });
 
+  /* 추출기가 '어느 작품인지 몰라' 내린 세트를 폴더 전체를 보고 살린다 —
+     세트가 살아야 그 세트를 가리키던 문항도 돌아온다 */
+  const solved = resolveSets(results, works);
+  if (solved.added.length) {
+    solved.added.forEach((a) => warns.push(
+      `'${a.title}' 을 지문 전용 작품(${a.workId})으로 세웠습니다 — 이 작품의 이해완성이 폴더에 없어` +
+      ' 개념 단위(빈칸)는 없습니다. 이해완성을 넣으면 정본이 붙습니다.'));
+  }
+  solved.inferred.forEach((x) => warns.push(
+    `${x.setId}${x.label ? ' ' + x.label : ''} 의 제목이 지면에 없어 '${x.title}' 로 보았습니다 —` +
+    ' 이 자료의 발췌 작품이 그것 하나뿐이라서예요. 검수(review.inferred)에서 확인하세요.'));
+
   /* ── 지문 세트·문항 ──
      **지문 없이 나가는 문항을 막는 게 여기 책임이다.** 추출기는 지문 세트가 미심쩍으면
      그 세트만 검수로 내리는데, 그 세트를 가리키던 문항은 그대로 남아 팩에 실린다 —
@@ -460,6 +585,7 @@ export function buildPack(dir, opts) {
 
   const review = {
     packId, pending, unanchored, reanchored, dropped, mergeLog,
+    stubWorks: solved.added, inferred: solved.inferred,
     candidates: results.flatMap((r) => ((r.out.review && r.out.review.candidates) || r.out.candidates || [])
       .map((c) => ({ series: r.series, ...c }))),
     report: results.flatMap((r) => ((r.out.review && r.out.review.report) || r.out.report || [])
