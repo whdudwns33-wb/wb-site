@@ -46,7 +46,8 @@ test('확정됐지만 생성 task가 없는 레거시 보강은 확정 일시를
   const healthy = actions({ caseId: 'mu-a', revision: 3, status: 'confirmed', hasLessonTask: true });
   assert.match(missing, /data-act="murestoreschedule"[^>]*>보강생성/);
   assert.doesNotMatch(missing, />생성완료</);
-  assert.match(healthy, /disabled>생성완료/);
+  assert.match(healthy, /data-act="mureschedule"[^>]*>보강 수정/);
+  assert.equal((healthy.match(/<button/g) || []).length, 3, '확정 카드도 세 동작을 유지한다');
 
   const modal = block('function makeupDateTimeModal(', 'function makeupNoMakeupModal(');
   assert.match(modal, /mode === 'restore'/);

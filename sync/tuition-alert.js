@@ -182,6 +182,8 @@ function attendanceEvidence(row, students, earliestDate, sourceDate) {
     String(row.makeup_case_id || '') === String(task.makeupCaseId || '') &&
     String(row.makeup_student_id || '') === studentId &&
     ['confirmed', 'completed'].includes(String(row.makeup_status || ''));
+  const makeupAssigneeMatches = makeupIdentity &&
+    String(row.makeup_confirmed_staff_id || '') === String(row.task_owner || '');
   const regularIdentity = !isMakeup && lessonTask(task, taskId, row.task_owner);
   const weekendPolicy = weekendAttendancePolicyOn(task, date);
   const exactActualVisit = validDate(date) && [0, 6].includes(new Date(date + 'T00:00:00Z').getUTCDay()) &&
@@ -200,7 +202,12 @@ function attendanceEvidence(row, students, earliestDate, sourceDate) {
   return {
     studentId, cycleStartDate: student.cycleStartDate, taskId, date,
     status: String(check.att), checkKey: taskId + '|' + date,
-    sessionQualifies: regularIdentity || (makeupIdentity && makeupOriginAllowsSession(row.makeup_history))
+    sessionQualifies: regularIdentity ||
+      (makeupAssigneeMatches && makeupOriginAllowsSession(row.makeup_history)),
+    makeupAssigneeMismatch: !!(makeupIdentity && !makeupAssigneeMatches),
+    directAttested: !!(makeupAssigneeMatches && row.direct_attestation_case_id &&
+      String(row.direct_attestation_case_id) === String(row.makeup_case_id || '')),
+    sourceKind: 'check'
   };
 }
 
@@ -220,7 +227,8 @@ async function qualifyingRows(env, earliestDate, sourceDate) {
     "SELECT check_row.k AS check_key,check_row.owner AS check_owner,check_row.data AS check_data," +
       "task.id AS task_id,task.owner AS task_owner,task.data AS task_data," +
       "makeup.case_id AS makeup_case_id,makeup.student_id AS makeup_student_id," +
-      "makeup.status AS makeup_status,makeup.history AS makeup_history," +
+      "makeup.status AS makeup_status,makeup.confirmed_staff_id AS makeup_confirmed_staff_id," +
+      "makeup.history AS makeup_history,direct_attestation.case_id AS direct_attestation_case_id," +
       "actual_visit.visit_id AS actual_visit_id " +
     "FROM checks AS check_row JOIN tasks AS task " +
       "ON task.app=check_row.app AND task.id=CAST(json_extract(check_row.data,'$.taskId') AS TEXT) " +
@@ -231,6 +239,15 @@ async function qualifyingRows(env, earliestDate, sourceDate) {
       "AND actual_visit.status<>'cancelled' " +
     "LEFT JOIN makeup_cases AS makeup ON makeup.app=task.app " +
       "AND makeup.case_id=CAST(json_extract(task.data,'$.makeupCaseId') AS TEXT) " +
+    "LEFT JOIN makeup_direct_completion_attestations AS direct_attestation " +
+      "ON direct_attestation.app=check_row.app AND direct_attestation.case_id=makeup.case_id " +
+      "AND direct_attestation.lesson_task_id=task.id AND direct_attestation.check_key=check_row.k " +
+      "AND direct_attestation.student_id=makeup.student_id AND direct_attestation.staff_id=task.owner " +
+      "AND direct_attestation.attendance_date=CAST(json_extract(check_row.data,'$.date') AS TEXT) " +
+      "AND direct_attestation.attendance_status=CAST(json_extract(check_row.data,'$.att') AS TEXT) " +
+      "AND makeup.status='completed' AND makeup.revision=direct_attestation.case_revision+1 " +
+      "AND makeup.confirmed_staff_id=direct_attestation.staff_id " +
+      "AND makeup.completed_by=direct_attestation.staff_id " +
     "WHERE check_row.app='task' AND json_valid(check_row.data) AND json_valid(task.data) " +
       "AND json_extract(check_row.data,'$.att') IN ('P','L','A','E') " +
       "AND json_extract(check_row.data,'$.date') BETWEEN ? AND ? " +
@@ -686,10 +703,11 @@ async function exactStudentTasks(env, studentId, entries) {
         const caseId = String(task.makeupCaseId || '');
         if (!SAFE_ID.test(caseId) || item.taskId !== 'makeup_lesson_' + caseId) return false;
         const makeup = await env.DB.prepare(
-          "SELECT case_id,student_id,status,history FROM makeup_cases " +
+          "SELECT case_id,student_id,status,confirmed_staff_id,history FROM makeup_cases " +
           "WHERE app='task' AND case_id=? LIMIT 1"
         ).bind(caseId).first();
         if (!makeup || String(makeup.student_id || '') !== studentId ||
+            String(makeup.confirmed_staff_id || '') !== String(row.owner || '') ||
             !['confirmed', 'completed'].includes(String(makeup.status || '')) ||
             !makeupOriginAllowsSession(makeup.history)) return false;
       } else if (!lessonTask(task, item.taskId, String(row.owner || ''))) {
@@ -809,9 +827,7 @@ function exactActiveAlertState(state, generation, trigger) {
  * 관리자가 확인한 전체 과거 구간을 새 append-only 세대로 적재한다. 이전 세대는 삭제하지 않으며,
  * expectedGeneration + supersedes_event_count를 함께 사용해 Cron과의 동시 쓰기를 fail-closed 처리한다.
  */
-export async function reconcileStudentSessionLedger(env, value) {
-  const input = reconciliationInput(value);
-  if (input.error) return { ok: false, code: input.error };
+async function reconcileStudentSessionLedgerInput(env, input) {
   const roster = await loadRoster(env, input.sourceCutoffDate, true);
   if (roster.error) return { ok: false, code: roster.error };
   const student = roster.students.get(input.studentId);
@@ -961,12 +977,78 @@ export async function reconcileStudentSessionLedger(env, value) {
     eventCount: saved.cycles.reduce((count, cycle) => count + cycle.entries.length, 0) };
 }
 
+export async function reconcileStudentSessionLedger(env, value) {
+  const input = reconciliationInput(value);
+  if (input.error) return { ok: false, code: input.error };
+  return reconcileStudentSessionLedgerInput(env, input);
+}
+
+/**
+ * 직접 완료 증빙은 이미 저장된 최신 회차보다 과거 날짜일 수 있다. append-only 세대에
+ * 중간 삽입하지 않고 현재 정본과 검증된 direct 증빙만 새 정정 세대로 재구성한다.
+ */
+async function reconcileOutOfOrderDirectCompletion(env, student, evidence, sourceDate, cutoff) {
+  const state = await ensureInitialLedgerState(env, student, cutoff);
+  if (state.storage !== 'generation' || !state.generation) return null;
+  const currentCheckEvidence = new Set(evidence.map(item => item.taskId + '\u001f' + item.date));
+  const authoritative = state.cycles.flatMap(cycle => cycle.entries).map(item => ({
+    studentId: student.studentId, taskId: item.taskId, date: item.date, status: item.status,
+    checkKey: item.checkKey || item.taskId + '|' + item.date,
+    sourceKind: item.sourceKind === 'check' ? 'check' : 'admin_attested'
+  }));
+  const existing = new Set(authoritative.map(item => item.taskId + '\u001f' + item.date));
+  const lastDate = authoritative.at(-1)?.date || '';
+  const missingDirect = evidence.filter(item => {
+    const identity = item.taskId + '\u001f' + item.date;
+    return item.directAttested && !existing.has(identity) &&
+      ((state.sourceCutoffDate && item.date <= state.sourceCutoffDate) || (lastDate && item.date < lastDate));
+  });
+  if (!missingDirect.length) return null;
+  // 064의 세대 규칙상 cutoff 이하는 attested, 이후만 exact check provenance를 쓸 수 있다.
+  // 필요한 direct 날짜까지만 cutoff를 전진시켜 그 뒤의 기존 check provenance는 그대로 둔다.
+  const directCutoff = missingDirect.reduce((latest, item) => item.date > latest ? item.date : latest, '');
+  const sourceCutoffDate = state.sourceCutoffDate && state.sourceCutoffDate > directCutoff
+    ? state.sourceCutoffDate : directCutoff;
+
+  // 관리자 정정 cutoff 이하는 그 세대를 보존한다. 이후의 raw 정본과 server-only direct
+  // 증빙만 더해 기존 관리자의 수동 정정을 되돌리지 않는다.
+  const candidates = authoritative.concat(evidence.filter(item =>
+    item.directAttested || !state.sourceCutoffDate || item.date > state.sourceCutoffDate
+  ));
+  const entries = sortedUniqueEvidence(candidates)
+    .filter(item => item.date <= sourceDate)
+    .map(item => ({
+      studentId: student.studentId, taskId: item.taskId, date: item.date, status: item.status,
+      checkKey: item.checkKey || item.taskId + '|' + item.date,
+      sourceKind: item.date > sourceCutoffDate &&
+        currentCheckEvidence.has(item.taskId + '\u001f' + item.date) ? 'check' : 'admin_attested'
+    }));
+  const priorEventCount = authoritative.length;
+  const priorCycleCount = state.cycles.length;
+  const result = await reconcileStudentSessionLedgerInput(env, {
+    studentId: student.studentId,
+    configuredStartDate: student.cycleStartDate,
+    sourceCutoffDate,
+    entries,
+    reasonCode: 'makeup_direct_completion_backfill',
+    actor: 'system:makeup_direct_completion',
+    expectedGeneration: state.generation.generation,
+    now: cutoff
+  });
+  return {
+    ...result,
+    addedEvents: result.ok ? Math.max(0, Number(result.eventCount || 0) - priorEventCount) : 0,
+    addedCycles: result.ok ? Math.max(0, Number(result.cycleCount || 0) - priorCycleCount) : 0
+  };
+}
+
 /** roster의 현재 session4 설정을 기준으로 0/4 회차와 최종 P/L/E 사용 근거를 일반 backfill한다. */
 export async function syncStudentSessionLedgers(env, scheduledTime) {
   const cutoff = Number(scheduledTime) || Date.now();
   const sourceDate = finalizedAttendanceDateAt(cutoff);
   const summary = { ok: true, sourceDate, eligibleStudents: 0, createdCycles: 0,
-    createdEvents: 0, idempotent: 0, skipped: 0 };
+    createdEvents: 0, idempotent: 0, skipped: 0, makeupAssigneeMismatches: 0,
+    reconciliations: 0, reconciliationsPending: 0 };
   const roster = await loadRoster(env, sourceDate, true);
   if (roster.error) return { ...summary, ok: false, code: roster.error };
   const students = roster.students;
@@ -979,14 +1061,40 @@ export async function syncStudentSessionLedgers(env, scheduledTime) {
   catch (error) { return { ...summary, ok: false, code: 'STUDENT_SESSION_ATTENDANCE_READ_FAILED' }; }
   const byStudent = new Map();
   for (const row of rows) {
-    const item = qualifyingEvidence(row, students, sourceDate);
+    const studentId = (() => {
+      try { return String(JSON.parse(row.task_data || '{}').studentId || ''); }
+      catch (error) { return ''; }
+    })();
+    const student = students.get(studentId);
+    const evidence = student
+      ? attendanceEvidence(row, students, student.cycleStartDate, sourceDate) : null;
+    if (evidence && evidence.makeupAssigneeMismatch) summary.makeupAssigneeMismatches++;
+    const item = evidence && evidence.sessionQualifies && QUALIFYING_ATTENDANCE.has(evidence.status)
+      ? evidence : null;
     if (!item) { summary.skipped++; continue; }
     if (!byStudent.has(item.studentId)) byStudent.set(item.studentId, []);
     byStudent.get(item.studentId).push(item);
   }
   try {
     for (const student of students.values()) {
-      const saved = await appendLedgerEvidence(env, student, byStudent.get(student.studentId) || [], cutoff);
+      const evidence = byStudent.get(student.studentId) || [];
+      const reconciliation = await reconcileOutOfOrderDirectCompletion(
+        env, student, evidence, sourceDate, cutoff
+      );
+      if (reconciliation) {
+        if (reconciliation.ok) {
+          summary.reconciliations++;
+          summary.createdCycles += reconciliation.addedCycles;
+          summary.createdEvents += reconciliation.addedEvents;
+        } else {
+          // direct attestation은 append-only outbox로 남으므로 동시 정정/Cron 충돌은
+          // 다음 실행에서 재시도한다. 성공한 보강 완료 자체를 사후 실패로 되돌리지 않는다.
+          summary.reconciliationsPending++;
+          summary.skipped++;
+        }
+        continue;
+      }
+      const saved = await appendLedgerEvidence(env, student, evidence, cutoff);
       summary.createdCycles += saved.cycles;
       summary.createdEvents += saved.events;
       summary.idempotent += saved.idempotent;

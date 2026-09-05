@@ -10,8 +10,9 @@ const ACTIVE_STATUSES = new Set(['review_pending', 'reviewed', 'awaiting_parent'
 const STATUSES = new Set(['review_pending', 'reviewed', 'awaiting_parent', 'confirmed', 'completed', 'cancelled']);
 const ACTIONS = new Set([
   'list', 'create_from_absence', 'create_manual', 'review', 'propose', 'confirm', 'schedule', 'restore_schedule', 'complete',
-  'reconcile_attendance', 'no_makeup', 'cancel'
+  'reschedule', 'reconcile_attendance', 'no_makeup', 'cancel'
 ]);
+const COMPLETED_ATTENDANCE = new Set(['P', 'L', 'E']);
 const MANUAL_REASON_CODES = new Set([
   'manual_absence', 'manual_exam', 'manual_other'
 ]);
@@ -195,6 +196,14 @@ function cleanManualReason(value) {
   const reason = String(value || '').trim();
   if (!MANUAL_REASON_CODES.has(reason)) problem('보강 유형을 선택해 주세요');
   return reason;
+}
+
+function cleanCompletedAttendance(value) {
+  const attendance = String(value || '').trim();
+  if (!COMPLETED_ATTENDANCE.has(attendance)) {
+    problem('실제 보강 출결은 출석·지각·조퇴 중 하나여야 합니다', 400, 'MAKEUP_ATTENDANCE_INVALID');
+  }
+  return attendance;
 }
 
 function caseCreationOrigin(row) {
@@ -454,6 +463,12 @@ const MAKEUP_LESSON_NO_RECORDS_SQL = [
   'NOT EXISTS (SELECT 1 FROM student_change_events record WHERE record.app=tasks.app AND record.task_id=tasks.id)',
   'NOT EXISTS (SELECT 1 FROM session_packs record WHERE record.app=tasks.app AND record.lesson_task_id=tasks.id)',
   'NOT EXISTS (SELECT 1 FROM session_pack_transfer_guards record WHERE record.app=tasks.app AND record.lesson_task_id=tasks.id)',
+  'NOT EXISTS (SELECT 1 FROM student_session_attendance_events record ' +
+    'WHERE record.app=tasks.app AND record.lesson_task_id=tasks.id)',
+  'NOT EXISTS (SELECT 1 FROM student_session_ledger_events record ' +
+    'WHERE record.app=tasks.app AND record.lesson_task_id=tasks.id)',
+  'NOT EXISTS (SELECT 1 FROM makeup_direct_completion_attestations record ' +
+    'WHERE record.app=tasks.app AND record.lesson_task_id=tasks.id)',
   'NOT EXISTS (SELECT 1 FROM weekend_actual_visits record WHERE record.app=tasks.app AND record.lesson_task_id=tasks.id)',
   'NOT EXISTS (SELECT 1 FROM teacher_live_requests record WHERE record.app=tasks.app AND record.lesson_task_id=tasks.id)',
   'NOT EXISTS (SELECT 1 FROM tuition_generation_alerts record WHERE record.app=tasks.app AND record.trigger_task_id=tasks.id)',
@@ -625,6 +640,85 @@ async function makeupLessonHasRecords(env, app, id) {
   return !!(row && Number(row.has_records) === 1);
 }
 
+function confirmedMakeupRange(row) {
+  return kstRange(String(row.confirmed_start_at || '').slice(0, 10),
+    String(row.confirmed_start_at || '').slice(11, 16), String(row.confirmed_end_at || '').slice(11, 16));
+}
+
+async function scheduledCompletionAttendance(env, app, row, staffId) {
+  const range = confirmedMakeupRange(row);
+  const taskId = makeupLessonId(String(row.case_id));
+  const taskRow = await env.DB.prepare('SELECT owner,data,updated_at FROM tasks WHERE app=? AND id=? LIMIT 1')
+    .bind(app, taskId).first();
+  const task = taskRow && parseJson(taskRow.data);
+  if (!taskRow) problem('보강수업 화면이 없어 먼저 복구해야 합니다', 409, 'MAKEUP_LESSON_MISSING');
+  assertMakeupLessonIdentity(taskRow, task, row, staffId);
+  if (task.deleted || String(task.start || '') !== range.date || String(task.end || '') !== range.date) {
+    problem('확정 보강 날짜와 생성된 보강수업 날짜가 일치하지 않습니다. 먼저 보강 일정을 복구해 주세요',
+      409, 'MAKEUP_ATTENDANCE_DATE_MISMATCH');
+  }
+  const checkKey = taskId + '|' + range.date;
+  const checkRow = await env.DB.prepare(
+    'SELECT owner,data,updated_at FROM checks WHERE app=? AND k=? LIMIT 1'
+  ).bind(app, checkKey).first();
+  const check = checkRow && parseJson(checkRow.data);
+  const identityMatches = !!(checkRow && String(checkRow.owner || '') === staffId && check &&
+    String(check.taskId || '') === taskId && String(check.date || '') === range.date);
+  if (identityMatches && String(check.att || '') === 'A') {
+    problem('보강수업 출결이 결석으로 저장되어 있어 완료할 수 없습니다', 409, 'MAKEUP_ATTENDANCE_ABSENT');
+  }
+  if (!identityMatches || !COMPLETED_ATTENDANCE.has(String(check.att || ''))) {
+    problem('보강 담당 선생님이 해당 보강수업에서 출석·지각·조퇴 출결을 먼저 저장해 주세요',
+      409, 'MAKEUP_ATTENDANCE_REQUIRED');
+  }
+  return { taskRow, task, checkRow, check, checkKey };
+}
+
+function scheduledCompletionAttendanceGuardStatement(env, app, row, staffId) {
+  const range = confirmedMakeupRange(row);
+  const taskId = makeupLessonId(String(row.case_id));
+  return env.DB.prepare(
+    'UPDATE makeup_cases SET updated_at=updated_at WHERE app=? AND case_id=? AND revision=? AND status=? AND EXISTS (' +
+      'SELECT 1 FROM tasks lesson JOIN checks attendance ON attendance.app=lesson.app AND attendance.k=lesson.id||? ' +
+      'WHERE lesson.app=? AND lesson.id=? AND lesson.owner=? AND json_valid(lesson.data)=1 ' +
+      "AND json_extract(lesson.data,'$.id')=lesson.id AND json_extract(lesson.data,'$.staffId')=lesson.owner " +
+      "AND COALESCE(json_extract(lesson.data,'$.deleted'),0)=0 " +
+      "AND json_extract(lesson.data,'$.lessonInstanceType')='makeup' " +
+      "AND json_extract(lesson.data,'$.makeupCaseId')=? " +
+      "AND json_extract(lesson.data,'$.studentId')=? " +
+      "AND json_extract(lesson.data,'$.start')=? AND json_extract(lesson.data,'$.end')=? " +
+      'AND attendance.owner=? AND json_valid(attendance.data)=1 ' +
+      "AND json_extract(attendance.data,'$.taskId')=lesson.id " +
+      "AND json_extract(attendance.data,'$.date')=? " +
+      "AND json_extract(attendance.data,'$.att') IN ('P','L','E'))"
+  ).bind(app, row.case_id, Number(row.revision), row.status, '|' + range.date,
+    app, taskId, staffId, String(row.case_id), String(row.student_id), range.date, range.date,
+    staffId, range.date);
+}
+
+async function prepareMakeupLessonReschedule(env, app, row, source, student, staffId, range, now) {
+  const taskId = makeupLessonId(String(row.case_id));
+  const taskRow = await env.DB.prepare('SELECT owner,data,updated_at FROM tasks WHERE app=? AND id=? LIMIT 1')
+    .bind(app, taskId).first();
+  const current = taskRow && parseJson(taskRow.data);
+  if (!taskRow) problem('생성된 보강수업이 없어 먼저 복구해야 합니다', 409, 'MAKEUP_LESSON_MISSING');
+  const priorStaffId = cleanId(row.confirmed_staff_id, '기존 보강 담당자');
+  assertMakeupLessonIdentity(taskRow, current, row, priorStaffId);
+  if (await makeupLessonHasRecords(env, app, taskId)) {
+    problem('출결·메모·피드백 등 수업 기록이 생긴 보강은 담당자나 일정을 변경할 수 없습니다',
+      409, 'MAKEUP_LESSON_HAS_RECORDS');
+  }
+  const task = makeupLessonTask(row, source, student, staffId, range, now, current);
+  return {
+    task,
+    statement: env.DB.prepare(
+      'UPDATE tasks SET owner=?,data=?,updated_at=?,srv_at=? WHERE app=? AND id=? AND owner=? AND data=? AND updated_at=? AND ' +
+      MAKEUP_LESSON_NO_RECORDS_SQL
+    ).bind(staffId, JSON.stringify(task), now, now, app, taskId, taskRow.owner, taskRow.data,
+      Number(taskRow.updated_at))
+  };
+}
+
 async function prepareMakeupLessonDelete(env, app, row, staffId, now) {
   const id = makeupLessonId(String(row.case_id));
   const dbRow = await env.DB.prepare('SELECT owner,data,updated_at FROM tasks WHERE app=? AND id=? LIMIT 1')
@@ -686,12 +780,23 @@ function sourceIdentityGuardStatement(env, app, row, sourceRow) {
     sourceRow.owner, sourceRow.data, Number(sourceRow.updated_at));
 }
 
+function activeStaffGuardStatement(env, app, row, staffId) {
+  return env.DB.prepare(
+    'UPDATE makeup_cases SET updated_at=updated_at WHERE app=? AND case_id=? AND revision=? AND status=? ' +
+    'AND EXISTS (SELECT 1 FROM staff teacher WHERE teacher.app=? AND teacher.id=? ' +
+    "AND json_valid(teacher.data)=1 AND COALESCE(json_extract(teacher.data,'$.deleted'),0)=0)"
+  ).bind(app, row.case_id, Number(row.revision), row.status, app, staffId);
+}
+
 function mapAtomicMakeupError(error) {
   if (isTaskWriteCasConflict(error)) {
     problem('다른 기기에서 보강 또는 보강 수업을 먼저 변경했습니다', 409, 'REVISION_CONFLICT');
   }
   if (/UNIQUE constraint failed: tasks\.app, tasks\.id/.test(String(error && error.message || error))) {
     problem('보강 수업 식별자가 기존 수업과 충돌합니다', 409, 'MAKEUP_LESSON_IDENTITY_MISMATCH');
+  }
+  if (/UNIQUE constraint failed: checks\.app, checks\.k/.test(String(error && error.message || error))) {
+    problem('같은 보강수업 날짜에 출결 기록이 이미 있습니다', 409, 'MAKEUP_ATTENDANCE_EXISTS');
   }
   completionBatchError(error);
 }
@@ -705,6 +810,38 @@ async function saveTransition(env, app, row, next, event, json, origin, now = Da
   }
   if (!result.meta || Number(result.meta.changes || 0) !== 1) return conflictResponse(env, app, row.case_id, json, origin);
   return env.DB.prepare('SELECT * FROM makeup_cases WHERE app=? AND case_id=? LIMIT 1').bind(app, row.case_id).first();
+}
+
+async function saveProposal(env, app, row, next, event, sourceIdentity, staffId, range,
+  json, origin, now) {
+  const statements = [
+    sourceIdentityGuardStatement(env, app, row, sourceIdentity),
+    await casGuard(env, app, 'makeup_propose_source', row, now),
+    activeStaffGuardStatement(env, app, row, staffId),
+    await casGuard(env, app, 'makeup_propose_staff', row, now),
+    regularConflictGuardStatement(env, app, row, String(row.student_id), staffId, range),
+    await casGuard(env, app, 'makeup_propose_conflict', row, now),
+    transitionStatement(env, app, row, next, event, now),
+    await casGuard(env, app, 'makeup_propose_case', row, now)
+  ];
+  let results;
+  try {
+    results = await env.DB.batch(statements);
+  } catch (error) {
+    if (isTaskWriteCasConflict(error)) {
+      if (!await activeStaff(env, app, staffId)) {
+        problem('제안된 보강 담당 선생님이 더 이상 활성 상태가 아닙니다', 409, 'STAFF_INACTIVE');
+      }
+      await assertNoConflict(env, app, String(row.case_id), String(row.student_id), staffId, range);
+    }
+    mapAtomicMakeupError(error);
+  }
+  if (!Array.isArray(results) || results.length !== statements.length ||
+      results.some(result => Number(result && result.meta && result.meta.changes || 0) !== 1)) {
+    return conflictResponse(env, app, row.case_id, json, origin);
+  }
+  return env.DB.prepare('SELECT * FROM makeup_cases WHERE app=? AND case_id=? LIMIT 1')
+    .bind(app, row.case_id).first();
 }
 
 async function activeSessionPack(env, app, row) {
@@ -748,6 +885,8 @@ async function saveSchedule(env, app, row, next, event, source, sourceIdentity, 
   const statements = [
     sourceIdentityGuardStatement(env, app, row, sourceIdentity),
     await casGuard(env, app, 'makeup_schedule_source', row, now),
+    activeStaffGuardStatement(env, app, row, staffId),
+    await casGuard(env, app, 'makeup_schedule_staff', row, now),
     regularConflictGuardStatement(env, app, row, String(row.student_id), staffId, range),
     await casGuard(env, app, 'makeup_schedule_conflict', row, now)
   ];
@@ -771,6 +910,48 @@ async function saveSchedule(env, app, row, next, event, source, sourceIdentity, 
     results = await env.DB.batch(statements);
   } catch (error) {
     if (isTaskWriteCasConflict(error)) {
+      if (!await activeStaff(env, app, staffId)) {
+        problem('보강 담당 선생님이 더 이상 활성 상태가 아닙니다', 409, 'STAFF_INACTIVE');
+      }
+      await assertNoConflict(env, app, String(row.case_id), String(row.student_id), staffId, range);
+    }
+    mapAtomicMakeupError(error);
+  }
+  if (!Array.isArray(results) || results.length !== statements.length ||
+      results.some(result => Number(result && result.meta && result.meta.changes || 0) !== 1)) {
+    return conflictResponse(env, app, row.case_id, json, origin);
+  }
+  return env.DB.prepare('SELECT * FROM makeup_cases WHERE app=? AND case_id=? LIMIT 1')
+    .bind(app, row.case_id).first();
+}
+
+async function saveReschedule(env, app, row, next, event, source, sourceIdentity, student, staffId, range,
+  json, origin, now) {
+  const taskWrite = await prepareMakeupLessonReschedule(env, app, row, source, student, staffId, range, now);
+  const statements = [
+    sourceIdentityGuardStatement(env, app, row, sourceIdentity),
+    await casGuard(env, app, 'makeup_reschedule_source', row, now),
+    activeStaffGuardStatement(env, app, row, staffId),
+    await casGuard(env, app, 'makeup_reschedule_staff', row, now),
+    regularConflictGuardStatement(env, app, row, String(row.student_id), staffId, range),
+    await casGuard(env, app, 'makeup_reschedule_conflict', row, now),
+    transitionStatement(env, app, row, next, event, now),
+    await casGuard(env, app, 'makeup_reschedule_case', row, now),
+    taskWrite.statement,
+    await casGuard(env, app, 'makeup_reschedule_task', row, now)
+  ];
+  let results;
+  try {
+    results = await env.DB.batch(statements);
+  } catch (error) {
+    if (isTaskWriteCasConflict(error)) {
+      if (await makeupLessonHasRecords(env, app, makeupLessonId(String(row.case_id)))) {
+        problem('출결·메모·피드백 등 수업 기록이 생긴 보강은 담당자나 일정을 변경할 수 없습니다',
+          409, 'MAKEUP_LESSON_HAS_RECORDS');
+      }
+      if (!await activeStaff(env, app, staffId)) {
+        problem('보강 담당 선생님이 더 이상 활성 상태가 아닙니다', 409, 'STAFF_INACTIVE');
+      }
       await assertNoConflict(env, app, String(row.case_id), String(row.student_id), staffId, range);
     }
     mapAtomicMakeupError(error);
@@ -865,8 +1046,38 @@ async function completionImpact(env, app, row, document, currentSourceTeacherId)
   };
 }
 
+function directCompletionCheckStatement(env, app, row, staffId, range, attendanceStatus, now) {
+  const taskId = makeupLessonId(String(row.case_id));
+  const data = {
+    taskId,
+    date: range.date,
+    att: attendanceStatus,
+    note: '',
+    steps: {},
+    updatedAt: now,
+    source: 'makeup_direct_completion_v1'
+  };
+  return env.DB.prepare(
+    'INSERT INTO checks(app,k,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)'
+  ).bind(app, taskId + '|' + range.date, staffId, JSON.stringify(data), now, now);
+}
+
+function directCompletionAttestationStatement(env, app, row, completionRow, staffId, range,
+  attendanceStatus, actor, now) {
+  const taskId = makeupLessonId(String(row.case_id));
+  return env.DB.prepare(
+    'INSERT INTO makeup_direct_completion_attestations(' +
+      'app,case_id,case_revision,lesson_task_id,check_key,student_id,staff_id,attendance_date,' +
+      'start_time,end_time,attendance_status,actor_id,provenance,created_at) ' +
+      'VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+  ).bind(app, row.case_id, Number(completionRow.revision), taskId, taskId + '|' + range.date,
+    row.student_id, staffId, range.date, range.startTime, range.endTime, attendanceStatus,
+    actor, 'makeup_direct_completion_v1', now);
+}
+
 async function saveCompletion(env, app, row, next, event, document, source, student, staffId, range,
-  direct, currentSourceTeacherId, sourceIdentity, json, origin, now, forcedImpact = null) {
+  direct, currentSourceTeacherId, sourceIdentity, json, origin, now, forcedImpact = null,
+  directAttendanceStatus = '') {
   const taskWrite = await prepareMakeupLessonWrite(env, app, row, source, student, staffId, range, now, true);
   const planned = forcedImpact ? { impact: forcedImpact } :
     await completionImpact(env, app, row, document, currentSourceTeacherId);
@@ -874,6 +1085,8 @@ async function saveCompletion(env, app, row, next, event, document, source, stud
   const statements = [];
   statements.push(sourceIdentityGuardStatement(env, app, row, sourceIdentity));
   statements.push(await casGuard(env, app, 'makeup_complete_source', row, now));
+  statements.push(activeStaffGuardStatement(env, app, row, staffId));
+  statements.push(await casGuard(env, app, 'makeup_complete_staff', row, now));
   statements.push(regularConflictGuardStatement(env, app, row, String(row.student_id), staffId, range));
   statements.push(await casGuard(env, app, 'makeup_complete_conflict', row, now));
   let completionRow = row;
@@ -914,13 +1127,20 @@ async function saveCompletion(env, app, row, next, event, document, source, stud
     };
     statements.push(transitionStatement(env, app, scheduleBase, scheduledNext, scheduledEvent, now));
     statements.push(await casGuard(env, app, 'makeup_direct_schedule', scheduleBase, now));
+    completionRow = transitionSnapshot(scheduleBase, scheduledNext, scheduledEvent, now);
+    completionNext = { ...completionRow, status: 'completed', completed_at: now, completed_by: staffId };
     if (taskWrite.statement) {
       statements.push(taskWrite.statement);
       statements.push(await casGuard(env, app, 'makeup_direct_task', row, now));
     }
-    completionRow = transitionSnapshot(scheduleBase, scheduledNext, scheduledEvent, now);
-    completionNext = { ...completionRow, status: 'completed', completed_at: now, completed_by: staffId };
+    statements.push(directCompletionAttestationStatement(env, app, row, completionRow, staffId, range,
+      cleanCompletedAttendance(directAttendanceStatus), event.actorId, now));
+    statements.push(directCompletionCheckStatement(env, app, row, staffId, range,
+      cleanCompletedAttendance(directAttendanceStatus), now));
+    statements.push(await casGuard(env, app, 'makeup_direct_attendance', row, now));
   } else {
+    statements.push(scheduledCompletionAttendanceGuardStatement(env, app, row, staffId));
+    statements.push(await casGuard(env, app, 'makeup_complete_attendance', row, now));
     statements.push(transitionStatement(env, app, row, completionNext,
       { ...event, sessionPackImpact: impact }, now));
     statements.push(await casGuard(env, app, 'makeup_complete_case', row, now));
@@ -950,12 +1170,16 @@ async function saveCompletion(env, app, row, next, event, document, source, stud
     results = await env.DB.batch(statements);
   } catch (error) {
     if (isTaskWriteCasConflict(error)) {
+      if (!direct) await scheduledCompletionAttendance(env, app, row, staffId);
+      if (!await activeStaff(env, app, staffId)) {
+        problem('보강 담당 선생님이 더 이상 활성 상태가 아닙니다', 409, 'STAFF_INACTIVE');
+      }
       await assertNoConflict(env, app, String(row.case_id), String(row.student_id), staffId, range);
     }
     if (!forcedImpact && /SESSION_PACK_IDENTITY_MISMATCH/.test(String(error && error.message || error))) {
       const mismatch = { status: 'not_applicable', reason: 'pack_identity_mismatch', refreshNeeded: false };
       return saveCompletion(env, app, row, next, event, document, source, student, staffId, range,
-        direct, currentSourceTeacherId, sourceIdentity, json, origin, now, mismatch);
+        direct, currentSourceTeacherId, sourceIdentity, json, origin, now, mismatch, directAttendanceStatus);
     }
     mapAtomicMakeupError(error);
   }
@@ -982,6 +1206,22 @@ async function taskRowsByIds(env, app, ids) {
   return rows;
 }
 
+async function historicalRevocationRows(env, app, staffId) {
+  // 화면 목록의 limit/status/date 필터와 별도로 모든 과거 실제 담당을 조회한다. 화면 목록에
+  // 먼저 LIMIT을 적용하면 오래된 재배정 task가 이전 담당자의 태블릿에 영구 잔존한다.
+  // json_each로 정확한 stable ID만 대조하며, 응답에는 아래 최소 식별자만 사용한다.
+  const result = await env.DB.prepare(
+    'SELECT m.case_id,m.student_id,m.source_task_id,m.source_date,m.source_teacher_id,m.status,' +
+    'm.proposed_staff_id,m.confirmed_staff_id,m.updated_at FROM makeup_cases AS m ' +
+    'WHERE m.app=? AND EXISTS (' +
+    "SELECT 1 FROM json_each(m.history) AS event WHERE json_extract(event.value,'$.action') IN (" +
+    "'create_manual','propose','schedule','reschedule','schedule_for_completion','complete') " +
+    "AND (json_extract(event.value,'$.staffId')=? OR json_extract(event.value,'$.previousStaffId')=?)) " +
+    'ORDER BY m.updated_at DESC,m.case_id ASC'
+  ).bind(app, staffId, staffId).all();
+  return result.results || [];
+}
+
 async function listCases(env, app, body, auth, json, origin) {
   exactBody(body, ['status', 'studentId', 'fromDate', 'toDate', 'limit']);
   const clauses = ['app=?'];
@@ -1000,7 +1240,10 @@ async function listCases(env, app, body, auth, json, origin) {
   const document = await loadRoster(env, app);
   const students = new Map(document.roster.students.map(student => [student.id, student]));
   const candidates = result.results || [];
-  const taskIds = [...new Set(candidates.map(row => String(row.source_task_id)))];
+  const revocationCandidates = auth.scope === 'own' && SAFE_ID.test(String(auth.id || ''))
+    ? await historicalRevocationRows(env, app, String(auth.id)) : [];
+  const taskIds = [...new Set(candidates.concat(revocationCandidates)
+    .map(row => String(row.source_task_id)))];
   const tasks = new Map();
   const lessonTasks = new Map();
   const currentOwners = new Map();
@@ -1024,23 +1267,36 @@ async function listCases(env, app, body, auth, json, origin) {
       lessonTasks.set(String(row.case_id), lessonTask);
     }
   }
-  const visible = candidates.filter(row => {
+  const normalVisibility = row => {
     const student = students.get(String(row.student_id));
     const taskId = String(row.source_task_id);
     const task = tasks.get(taskId);
     if (!student || !task || String(task.studentId || '') !== String(row.student_id)) return false;
-    return auth.scope === 'all' || (auth.scope === 'own' &&
-      [currentOwners.get(taskId), row.proposed_staff_id, row.confirmed_staff_id]
-        .some(staffId => String(staffId || '') === String(auth.id || '')));
-  });
+    const visibleStaffIds = [currentOwners.get(taskId), row.source_teacher_id, row.confirmed_staff_id];
+    // proposed 담당자는 보호자 응답 대기 중에만 전체 case를 본다. 확정/재배정 뒤 남은
+    // 감사용 proposed_staff_id가 과거 담당자에게 학생 정보를 영구 노출하지 않게 한다.
+    if (String(row.status || '') === 'awaiting_parent') visibleStaffIds.push(row.proposed_staff_id);
+    return auth.scope === 'all' || (auth.scope === 'own' && visibleStaffIds
+      .some(staffId => String(staffId || '') === String(auth.id || '')));
+  };
+  const visible = candidates.filter(normalVisibility);
+  // 중간 과거 담당자에게 학생 표시 정보와 history를 다시 노출하지 않는다. 태블릿에서
+  // deterministic server-generated 보강 task만 폐기할 수 있는 stable 식별자만 전달한다.
+  const revocations = auth.scope === 'own' ? revocationCandidates.filter(row =>
+    !normalVisibility(row)
+  ).map(row => ({
+    caseId: String(row.case_id), lessonTaskId: makeupLessonId(String(row.case_id)),
+    sourceTaskId: String(row.source_task_id), sourceDate: String(row.source_date),
+    studentId: String(row.student_id)
+  })) : [];
   const responses = await latestParentResponses(env, app);
   return json({ ok: true, cases: visible.map(row => publicCase(row, students.get(String(row.student_id)),
     tasks.get(String(row.source_task_id)), responses.get(String(row.case_id)),
-    lessonTasks.get(String(row.case_id)))) }, 200, origin);
+    lessonTasks.get(String(row.case_id)))), revocations }, 200, origin);
 }
 
 async function manualExistingResponse(env, app, existing, student, source, sourceTaskId, studentId,
-  sourceTeacherId, reason, range, json, origin) {
+  sourceTeacherId, staffId, reason, range, json, origin) {
   if (!isManualCase(existing)) {
     problem('같은 원 수업과 날짜에 결석 보강 기록이 이미 있습니다', 409, 'ABSENCE_MAKEUP_EXISTS');
   }
@@ -1051,7 +1307,7 @@ async function manualExistingResponse(env, app, existing, student, source, sourc
   const manual = manualCreation(existing);
   const exact = String(manual && manual.reason || '') === reason &&
     String(existing.source_teacher_id || '') === sourceTeacherId &&
-    String(existing.confirmed_staff_id || '') === sourceTeacherId &&
+    String(existing.confirmed_staff_id || '') === staffId &&
     String(existing.confirmed_start_at || '') === range.startAt &&
     String(existing.confirmed_end_at || '') === range.endAt;
   if (!exact) {
@@ -1062,13 +1318,13 @@ async function manualExistingResponse(env, app, existing, student, source, sourc
     .bind(app, makeupLessonId(String(existing.case_id))).first();
   const lessonTask = lessonRow && parseJson(lessonRow.data);
   if (!lessonRow) problem('기존 보강 수업이 누락되어 복구가 필요합니다', 409, 'MAKEUP_LESSON_MISSING');
-  assertMakeupLessonIdentity(lessonRow, lessonTask, existing, sourceTeacherId);
+  assertMakeupLessonIdentity(lessonRow, lessonTask, existing, staffId);
   return json({ ok: true, idempotent: true,
     case: publicCase(existing, student, source.task, null, lessonTask), lessonTask }, 200, origin);
 }
 
 async function createManual(env, app, body, auth, json, origin) {
-  exactBody(body, ['studentId', 'sourceTaskId', 'reason', 'date', 'startTime', 'endTime']);
+  exactBody(body, ['studentId', 'sourceTaskId', 'reason', 'date', 'startTime', 'endTime', 'staffId']);
   const studentId = cleanId(body.studentId, 'studentId');
   const sourceTaskId = cleanId(body.sourceTaskId, 'sourceTaskId');
   const reason = cleanManualReason(body.reason);
@@ -1077,27 +1333,36 @@ async function createManual(env, app, body, auth, json, origin) {
   assertSlotNotEnded(range, now);
   const source = await manualSourceTask(env, app, sourceTaskId, studentId, range.date);
   const sourceTeacherId = cleanId(source.row.owner, '수업 담당자');
+  const staffId = body.staffId == null || String(body.staffId || '').trim() === ''
+    ? sourceTeacherId : cleanId(body.staffId, '보강 담당자');
   if (auth.scope === 'own' && String(auth.id || '') !== sourceTeacherId) {
     return json({ ok: false, error: '본인이 담당하는 학생의 수업만 보강으로 생성할 수 있습니다' }, 403, origin);
+  }
+  if (auth.scope === 'own' && String(auth.id || '') !== staffId) {
+    return json({ ok: false, code: 'MAKEUP_ASSIGNEE_FORBIDDEN',
+      error: '선생님은 본인을 담당자로 지정한 보강만 생성할 수 있습니다' }, 403, origin);
   }
   const document = await loadRoster(env, app);
   const student = rosterStudent(document, studentId, range.date);
   if (!await activeStaff(env, app, sourceTeacherId)) {
     problem('원 수업 담당 선생님이 비활성 상태입니다', 409, 'STAFF_INACTIVE');
   }
+  if (!await activeStaff(env, app, staffId)) {
+    problem('활성 보강 담당 선생님을 선택해 주세요', 409, 'STAFF_INACTIVE');
+  }
   const ids = await digestIds(app, sourceTaskId, range.date);
   const existing = await env.DB.prepare('SELECT * FROM makeup_cases WHERE app=? AND case_id=? LIMIT 1')
     .bind(app, ids.caseId).first();
   if (existing) {
     return manualExistingResponse(env, app, existing, student, source, sourceTaskId, studentId,
-      sourceTeacherId, reason, range, json, origin);
+      sourceTeacherId, staffId, reason, range, json, origin);
   }
-  await assertNoConflict(env, app, ids.caseId, studentId, sourceTeacherId, range);
+  await assertNoConflict(env, app, ids.caseId, studentId, staffId, range);
   const history = [{
     action: 'create_manual', from: 'none', to: 'confirmed', actorId: actorId(auth),
     actorScope: String(auth.scope || ''),
     reason, date: range.date, startTime: range.startTime, endTime: range.endTime,
-    staffId: sourceTeacherId, revision: 1, at: now, notificationNeeded: false
+    staffId, revision: 1, at: now, notificationNeeded: false
   }];
   const row = {
     app, case_id: ids.caseId, student_id: studentId, source_task_id: sourceTaskId,
@@ -1105,13 +1370,13 @@ async function createManual(env, app, body, auth, json, origin) {
     consumption_group_id: ids.consumptionGroupId, status: 'confirmed', revision: 1,
     proposed_start_at: null, proposed_end_at: null, proposed_staff_id: null,
     confirmed_start_at: range.startAt, confirmed_end_at: range.endAt,
-    confirmed_staff_id: sourceTeacherId, completed_at: null, completed_by: null,
+    confirmed_staff_id: staffId, completed_at: null, completed_by: null,
     cancelled_at: null, cancelled_by: null, reason: null,
     notification_needed: 0, notification_event: null, notification_event_revision: 0,
     history: JSON.stringify(history), created_at: now, updated_at: now
   };
   const taskWrite = await prepareMakeupLessonWrite(
-    env, app, row, source.task, student, sourceTeacherId, range, now
+    env, app, row, source.task, student, staffId, range, now
   );
   // source/staff/roster 조건은 INSERT 시점의 운영 정본으로 다시 검사한다. 사전 검증 뒤
   // 담당 변경·퇴원 등이 생기면 바로 다음 CAS guard가 전체 batch를 롤백한다.
@@ -1122,6 +1387,9 @@ async function createManual(env, app, body, auth, json, origin) {
     "SELECT ?,?,?,?,?,?,?,'confirmed',1,?,?,?,0,0,?,?,? WHERE EXISTS (" +
       'SELECT 1 FROM tasks source WHERE source.app=? AND source.id=? AND source.owner=? ' +
       'AND source.data=? AND source.updated_at=?) AND EXISTS (' +
+      'SELECT 1 FROM staff source_teacher WHERE source_teacher.app=? AND source_teacher.id=? ' +
+      "AND json_valid(source_teacher.data)=1 AND COALESCE(json_extract(source_teacher.data,'$.deleted'),0)=0) " +
+      'AND EXISTS (' +
       'SELECT 1 FROM staff teacher WHERE teacher.app=? AND teacher.id=? AND json_valid(teacher.data)=1 ' +
       "AND COALESCE(json_extract(teacher.data,'$.deleted'),0)=0) AND EXISTS (" +
       "SELECT 1 FROM private_rosters roster, json_each(roster.data,'$.roster.students') student " +
@@ -1130,15 +1398,16 @@ async function createManual(env, app, body, auth, json, origin) {
       "AND (COALESCE(json_extract(student.value,'$.start'),'')='' OR json_extract(student.value,'$.start')<=?) " +
       "AND (COALESCE(json_extract(student.value,'$.end'),'')='' OR ?<json_extract(student.value,'$.end')))"
   ).bind(app, ids.caseId, studentId, sourceTaskId, range.date, sourceTeacherId, ids.consumptionGroupId,
-    range.startAt, range.endAt, sourceTeacherId, JSON.stringify(history), now, now,
+    range.startAt, range.endAt, staffId, JSON.stringify(history), now, now,
     app, sourceTaskId, source.row.owner, source.row.data, Number(source.row.updated_at),
-    app, sourceTeacherId, app, studentId, range.date.slice(0, 7), range.date.slice(0, 7));
+    app, sourceTeacherId, app, staffId, app, studentId,
+    range.date.slice(0, 7), range.date.slice(0, 7));
   const statements = [
     insert,
     await taskWriteCasGuardStatement(env, app, 'makeup_create_manual_case', ids.caseId + '\n' + now, now),
     sourceIdentityGuardStatement(env, app, row, source.row),
     await casGuard(env, app, 'makeup_create_manual_source', row, now),
-    regularConflictGuardStatement(env, app, row, studentId, sourceTeacherId, range),
+    regularConflictGuardStatement(env, app, row, studentId, staffId, range),
     await casGuard(env, app, 'makeup_create_manual_conflict', row, now),
     taskWrite.statement,
     await casGuard(env, app, 'makeup_create_manual_task', row, now)
@@ -1152,13 +1421,14 @@ async function createManual(env, app, body, auth, json, origin) {
         .bind(app, ids.caseId).first();
       if (raced) {
         return manualExistingResponse(env, app, raced, student, source, sourceTaskId, studentId,
-          sourceTeacherId, reason, range, json, origin);
+          sourceTeacherId, staffId, reason, range, json, origin);
       }
       // 가능한 경우 구체적인 운영 충돌을 먼저 돌려주고, 정본 변경이면 CAS 충돌로 닫는다.
-      await assertNoConflict(env, app, ids.caseId, studentId, sourceTeacherId, range);
+      await assertNoConflict(env, app, ids.caseId, studentId, staffId, range);
       const freshSource = await manualSourceTask(env, app, sourceTaskId, studentId, range.date);
       rosterStudent(await loadRoster(env, app), studentId, range.date);
-      if (!await activeStaff(env, app, String(freshSource.row.owner || ''))) {
+      if (!await activeStaff(env, app, String(freshSource.row.owner || '')) ||
+          !await activeStaff(env, app, staffId)) {
         problem('원 수업 담당 선생님이 비활성 상태입니다', 409, 'STAFF_INACTIVE');
       }
     }
@@ -1172,7 +1442,7 @@ async function createManual(env, app, body, auth, json, origin) {
   const lessonRow = await env.DB.prepare('SELECT owner,data FROM tasks WHERE app=? AND id=? LIMIT 1')
     .bind(app, makeupLessonId(ids.caseId)).first();
   const lessonTask = lessonRow && parseJson(lessonRow.data);
-  assertMakeupLessonIdentity(lessonRow, lessonTask, saved, sourceTeacherId);
+  assertMakeupLessonIdentity(lessonRow, lessonTask, saved, staffId);
   return json({ ok: true, idempotent: false,
     case: publicCase(saved, student, source.task, null, lessonTask), lessonTask }, 200, origin);
 }
@@ -1205,7 +1475,9 @@ async function createFromAbsence(env, app, body, auth, json, origin) {
   if (auth.scope !== 'all' && sourceTeacherId !== auth.id) {
     return json({ ok: false, error: '담당 학생의 결석 수업만 보강으로 등록할 수 있습니다' }, 403, origin);
   }
-  if (!await activeStaff(env, app, sourceTeacherId)) return json({ ok: false, error: '원 수업 담당자가 비활성 상태입니다' }, 409, origin);
+  if (!await activeStaff(env, app, sourceTeacherId)) {
+    problem('원 수업 담당자가 비활성 상태입니다', 409, 'STAFF_INACTIVE');
+  }
   await assertAbsent(env, app, sourceTaskId, sourceDate, sourceTeacherId);
   const ids = await digestIds(app, sourceTaskId, sourceDate);
   const now = Date.now();
@@ -1248,6 +1520,8 @@ async function createFromAbsence(env, app, body, auth, json, origin) {
     const statements = [
       sourceIdentityGuardStatement(env, app, existing, source.row),
       await casGuard(env, app, 'makeup_reopen_source', existing, now),
+      activeStaffGuardStatement(env, app, existing, sourceTeacherId),
+      await casGuard(env, app, 'makeup_reopen_staff', existing, now),
       env.DB.prepare(
         "UPDATE makeup_cases SET updated_at=updated_at WHERE app=? AND case_id=? AND revision=? AND status='cancelled' " +
         "AND EXISTS (SELECT 1 FROM checks WHERE checks.app=? AND checks.k=? AND checks.owner=? " +
@@ -1267,7 +1541,12 @@ async function createFromAbsence(env, app, body, auth, json, origin) {
     }
     try { await env.DB.batch(statements); }
     catch (error) {
-      if (isTaskWriteCasConflict(error)) await assertAbsent(env, app, sourceTaskId, sourceDate, sourceTeacherId);
+      if (isTaskWriteCasConflict(error)) {
+        if (!await activeStaff(env, app, sourceTeacherId)) {
+          problem('원 수업 담당자가 더 이상 활성 상태가 아닙니다', 409, 'STAFF_INACTIVE');
+        }
+        await assertAbsent(env, app, sourceTaskId, sourceDate, sourceTeacherId);
+      }
       mapAtomicMakeupError(error);
     }
     const saved = await loadCase(env, app, ids.caseId);
@@ -1285,9 +1564,13 @@ async function createFromAbsence(env, app, body, auth, json, origin) {
       'AND attendance.owner=source.owner AND json_valid(attendance.data)=1 ' +
       "AND json_extract(attendance.data,'$.att')='A' " +
       "AND (json_extract(attendance.data,'$.taskId') IS NULL OR json_extract(attendance.data,'$.taskId')=source.id) " +
-      "AND (json_extract(attendance.data,'$.date') IS NULL OR json_extract(attendance.data,'$.date')=?))"
+      "AND (json_extract(attendance.data,'$.date') IS NULL OR json_extract(attendance.data,'$.date')=?)) " +
+      'AND EXISTS (SELECT 1 FROM staff source_teacher WHERE source_teacher.app=? ' +
+      'AND source_teacher.id=? AND json_valid(source_teacher.data)=1 ' +
+      "AND COALESCE(json_extract(source_teacher.data,'$.deleted'),0)=0)"
   ).bind(app, ids.caseId, studentId, sourceTaskId, sourceDate, sourceTeacherId, ids.consumptionGroupId,
-    JSON.stringify(history), now, now, '|' + sourceDate, app, sourceTaskId, sourceTeacherId, source.row.data, sourceDate);
+    JSON.stringify(history), now, now, '|' + sourceDate, app, sourceTaskId, sourceTeacherId,
+    source.row.data, sourceDate, app, sourceTeacherId);
   try {
     await env.DB.batch([
       insert,
@@ -1307,6 +1590,9 @@ async function createFromAbsence(env, app, body, auth, json, origin) {
           problem('보강 기록의 원 수업 정체성이 다릅니다', 409, 'MAKEUP_IDENTITY_MISMATCH');
         }
         return json({ ok: true, idempotent: true, case: publicCase(raced, student, source.task) }, 200, origin);
+      }
+      if (!await activeStaff(env, app, sourceTeacherId)) {
+        problem('원 수업 담당자가 더 이상 활성 상태가 아닙니다', 409, 'STAFF_INACTIVE');
       }
       await assertAbsent(env, app, sourceTaskId, sourceDate, sourceTeacherId);
       await sourceTask(env, app, sourceTaskId, sourceDate);
@@ -1427,14 +1713,17 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
     if (action === 'create_manual') return await createManual(env, app, body, auth, json, origin);
     if (action === 'reconcile_attendance') return await reconcileAttendance(env, app, body, auth, json, origin);
 
-    const administrative = new Set(['review', 'propose', 'confirm', 'schedule', 'restore_schedule', 'no_makeup', 'cancel']);
+    const administrative = new Set([
+      'review', 'propose', 'confirm', 'schedule', 'reschedule', 'restore_schedule', 'no_makeup', 'cancel'
+    ]);
     if (administrative.has(action) && auth.scope !== 'all') {
       return json({ ok: false, error: '원장·관리 담당만 보강을 검토하거나 확정할 수 있습니다' }, 403, origin);
     }
     exactBody(body, action === 'review' ? ['caseId', 'revision', 'decision', 'reason'] :
       action === 'propose' ? ['caseId', 'revision', 'date', 'startTime', 'endTime', 'staffId'] :
-      action === 'schedule' ? ['caseId', 'revision', 'date', 'startTime', 'endTime'] :
-      action === 'complete' ? ['caseId', 'revision', 'date', 'startTime', 'endTime'] :
+      action === 'schedule' ? ['caseId', 'revision', 'date', 'startTime', 'endTime', 'staffId'] :
+      action === 'reschedule' ? ['caseId', 'revision', 'date', 'startTime', 'endTime', 'staffId'] :
+      action === 'complete' ? ['caseId', 'revision', 'date', 'startTime', 'endTime', 'staffId', 'attendanceStatus'] :
       (action === 'cancel' || action === 'no_makeup') ? ['caseId', 'revision', 'reason'] :
       ['caseId', 'revision']);
     const caseId = cleanId(body.caseId, 'caseId');
@@ -1451,7 +1740,9 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
     let student = rosterStudent(document, String(row.student_id), String(row.source_date));
     const next = { ...row };
     let event;
+    let proposalSave = null;
     let scheduledSave = null;
+    let rescheduledSave = null;
     let completion = null;
     let cancellation = false;
 
@@ -1487,6 +1778,8 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
         results = await env.DB.batch([
           sourceIdentityGuardStatement(env, app, row, sourceIdentity),
           await casGuard(env, app, 'makeup_restore_source', row, requestNow, restoreAttempt),
+          activeStaffGuardStatement(env, app, row, staffId),
+          await casGuard(env, app, 'makeup_restore_staff', row, requestNow, restoreAttempt),
           regularConflictGuardStatement(env, app, row, String(row.student_id), staffId, range),
           await casGuard(env, app, 'makeup_restore_conflict', row, requestNow, restoreAttempt),
           taskWrite.statement,
@@ -1494,11 +1787,14 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
         ]);
       } catch (error) {
         if (isTaskWriteCasConflict(error)) {
+          if (!await activeStaff(env, app, staffId)) {
+            problem('확정된 보강 담당 선생님이 더 이상 활성 상태가 아닙니다', 409, 'STAFF_INACTIVE');
+          }
           await assertNoConflict(env, app, caseId, String(row.student_id), staffId, range);
         }
         mapAtomicMakeupError(error);
       }
-      if (!Array.isArray(results) || results.length !== 6 ||
+      if (!Array.isArray(results) || results.length !== 8 ||
           results.some(result => Number(result && result.meta && result.meta.changes || 0) !== 1)) {
         return conflictResponse(env, app, caseId, json, origin);
       }
@@ -1529,6 +1825,7 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
       next.notification_event = 'proposal'; next.notification_event_revision = revision + 1;
       event = { action, from: row.status, to: next.status, actorId: actorId(auth), date: range.date,
         startTime: range.startTime, endTime: range.endTime, staffId, notificationNeeded: true };
+      proposalSave = { staffId, range };
     } else if (action === 'confirm') {
       if (row.status !== 'awaiting_parent' || !row.proposed_start_at || !row.proposed_end_at || !row.proposed_staff_id) {
         problem('일정 제안 상태에서만 확정할 수 있습니다', 409, 'INVALID_TRANSITION');
@@ -1554,9 +1851,11 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
       }
       const range = kstRange(body.date, body.startTime, body.endTime);
       assertSlotNotEnded(range, requestNow);
-      const staffId = currentSourceTeacherId;
+      // staffId를 보내지 않는 구형 화면은 원 수업 담당자로 확정한다.
+      const staffId = body.staffId == null || String(body.staffId || '').trim() === ''
+        ? currentSourceTeacherId : cleanId(body.staffId, '보강 담당자');
       student = rosterStudent(document, String(row.student_id), range.date);
-      if (!await activeStaff(env, app, staffId)) problem('원 수업 담당 선생님이 비활성 상태입니다', 409, 'STAFF_INACTIVE');
+      if (!await activeStaff(env, app, staffId)) problem('활성 보강 담당 선생님을 선택해 주세요', 409, 'STAFF_INACTIVE');
       await assertNoConflict(env, app, caseId, String(row.student_id), staffId, range);
       next.status = 'confirmed';
       next.confirmed_start_at = range.startAt;
@@ -1570,10 +1869,41 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
         startTime: range.startTime, endTime: range.endTime, staffId, notificationNeeded: false
       };
       scheduledSave = { staffId, range };
+    } else if (action === 'reschedule') {
+      if (row.status !== 'confirmed' || !row.confirmed_start_at || !row.confirmed_end_at || !row.confirmed_staff_id) {
+        problem('이미 생성된 보강만 일정과 담당자를 변경할 수 있습니다', 409, 'INVALID_TRANSITION');
+      }
+      const range = kstRange(body.date, body.startTime, body.endTime);
+      assertSlotNotEnded(range, requestNow);
+      const staffId = cleanId(body.staffId, '보강 담당자');
+      student = rosterStudent(document, String(row.student_id), range.date);
+      if (!await activeStaff(env, app, staffId)) {
+        problem('활성 보강 담당 선생님을 선택해 주세요', 409, 'STAFF_INACTIVE');
+      }
+      await assertNoConflict(env, app, caseId, String(row.student_id), staffId, range);
+      const previous = scheduleView('confirmed', row);
+      next.confirmed_start_at = range.startAt;
+      next.confirmed_end_at = range.endAt;
+      next.confirmed_staff_id = staffId;
+      next.notification_needed = 0;
+      next.notification_event = null;
+      next.notification_event_revision = 0;
+      event = {
+        action, from: row.status, to: next.status, actorId: actorId(auth),
+        previousDate: previous.date, previousStartTime: previous.startTime,
+        previousEndTime: previous.endTime, previousStaffId: previous.staffId,
+        date: range.date, startTime: range.startTime, endTime: range.endTime, staffId,
+        notificationNeeded: false
+      };
+      rescheduledSave = { staffId, range };
     } else if (action === 'complete') {
       const direct = row.status !== 'confirmed';
       if (direct && !['review_pending', 'reviewed', 'awaiting_parent'].includes(String(row.status))) {
         problem('일정 미생성 또는 확정 상태의 보강만 완료할 수 있습니다', 409, 'INVALID_TRANSITION');
+      }
+      if (direct && auth.scope !== 'all') {
+        return json({ ok: false, code: 'MAKEUP_COMPLETE_FORBIDDEN',
+          error: '일정 없이 완료하는 보강은 원장·관리 담당만 처리할 수 있습니다' }, 403, origin);
       }
       const supplied = [body.date, body.startTime, body.endTime].map(value => String(value || '').trim());
       if (supplied.some(Boolean) && !supplied.every(Boolean)) {
@@ -1582,14 +1912,36 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
       if (direct && !supplied.every(Boolean)) {
         problem('일정 없이 완료할 때는 실제 보강 날짜·시작시간·종료시간이 필요합니다');
       }
+      const confirmedRange = direct ? null : confirmedMakeupRange(row);
+      if (!direct && supplied.every(Boolean) && supplied[0] !== confirmedRange.date) {
+        problem('예약 보강의 날짜는 완료 단계에서 바꿀 수 없습니다. 출결·메모를 입력하기 전에 보강 수정에서 날짜를 변경해 주세요',
+          409, 'MAKEUP_COMPLETION_DATE_MISMATCH');
+      }
       const range = supplied.every(Boolean)
         ? kstRange(supplied[0], supplied[1], supplied[2])
-        : kstRange(String(row.confirmed_start_at || '').slice(0, 10),
-          String(row.confirmed_start_at || '').slice(11, 16), String(row.confirmed_end_at || '').slice(11, 16));
-      if (requestNow < Date.parse(range.endAt) - COMPLETE_EARLY_MS) {
+        : confirmedRange;
+      if (direct && requestNow < Date.parse(range.endAt)) {
+        problem('일정 없이 완료하는 보강은 실제 종료시간이 지난 뒤 처리할 수 있습니다',
+          409, 'MAKEUP_NOT_ENDED');
+      }
+      if (!direct && requestNow < Date.parse(range.endAt) - COMPLETE_EARLY_MS) {
         problem('보강 종료 5분 전부터 완료할 수 있습니다', 409, 'MAKEUP_NOT_ENDED');
       }
-      const staffId = direct ? currentSourceTeacherId : cleanId(row.confirmed_staff_id, '보강 담당자');
+      const legacyDefaults = [];
+      const staffId = direct
+        ? (body.staffId == null || String(body.staffId || '').trim() === ''
+          ? (legacyDefaults.push('staffId'), currentSourceTeacherId)
+          : cleanId(body.staffId, '실제 보강 담당자'))
+        : cleanId(row.confirmed_staff_id, '보강 담당자');
+      if (!direct && body.staffId != null && String(body.staffId || '').trim() !== '' &&
+          cleanId(body.staffId, '보강 담당자') !== staffId) {
+        problem('완료 담당자는 생성된 보강의 확정 담당자와 같아야 합니다', 409, 'MAKEUP_COMPLETE_ASSIGNEE');
+      }
+      const directAttendanceStatus = direct
+        ? (body.attendanceStatus == null || String(body.attendanceStatus || '').trim() === ''
+          ? (legacyDefaults.push('attendanceStatus'), 'P')
+          : cleanCompletedAttendance(body.attendanceStatus))
+        : '';
       if (auth.scope !== 'all' && (!auth.id || String(auth.id) !== staffId)) {
         return json({ ok: false, code: 'MAKEUP_COMPLETE_FORBIDDEN',
           error: '보강 담당 선생님의 개인 인증 또는 관리자 인증으로만 완료할 수 있습니다' }, 403, origin);
@@ -1598,6 +1950,7 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
       if (!await activeStaff(env, app, staffId)) {
         problem('확정된 보강 담당 선생님이 비활성 상태입니다', 409, 'STAFF_INACTIVE');
       }
+      if (!direct) await scheduledCompletionAttendance(env, app, row, staffId);
       next.status = 'completed';
       next.completed_at = requestNow;
       // DB trigger는 완료 수업의 담당자를 completed_by로 강제하고, 실제 조작자는 history에 별도로 남긴다.
@@ -1605,10 +1958,12 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
       next.notification_needed = 0;
       event = {
         action, from: row.status, to: next.status, actorId: actorId(auth), date: range.date,
-        startTime: range.startTime, endTime: range.endTime, staffId, direct, notificationNeeded: false
+        startTime: range.startTime, endTime: range.endTime, staffId, direct,
+        ...(direct ? { attendanceStatus: directAttendanceStatus } : {}),
+        ...(legacyDefaults.length ? { legacyDefaults } : {}), notificationNeeded: false
       };
       completion = await saveCompletion(env, app, row, next, event, document, source, student, staffId, range,
-        direct, currentSourceTeacherId, sourceIdentity, json, origin, requestNow);
+        direct, currentSourceTeacherId, sourceIdentity, json, origin, requestNow, null, directAttendanceStatus);
     } else {
       if (!ACTIVE_STATUSES.has(String(row.status))) {
         problem('현재 상태에서는 보강을 취소할 수 없습니다', 409, 'INVALID_TRANSITION');
@@ -1633,6 +1988,12 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
     }
 
     const saved = completion ? (completion instanceof Response ? completion : completion.saved)
+      : proposalSave
+        ? await saveProposal(env, app, row, next, event, sourceIdentity, proposalSave.staffId,
+          proposalSave.range, json, origin, requestNow)
+      : rescheduledSave
+        ? await saveReschedule(env, app, row, next, event, source, sourceIdentity, student,
+          rescheduledSave.staffId, rescheduledSave.range, json, origin, requestNow)
       : scheduledSave
         ? await saveSchedule(env, app, row, next, event, source, sourceIdentity, student, scheduledSave.staffId,
           scheduledSave.range, json, origin, requestNow)
