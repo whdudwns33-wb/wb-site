@@ -473,15 +473,18 @@ function isLegacyLessonTask(task) {
 }
 
 async function findAssignmentRows(env, app, staffId, candidate) {
+  const wanted = assignmentIdentityText(staffId, candidate);
   const direct = parseTaskRow(await env.DB.prepare(
     'SELECT data,updated_at FROM tasks WHERE app=? AND id=? AND owner=? LIMIT 1'
   ).bind(app, candidate.id, staffId).first());
-  if (direct) return [direct];
+  // 수업 ID는 최초 배정값에서 만든 값이라 이후 배정을 제자리 수정한 행이 같은 ID를
+  // 점유할 수 있다. ID만 같은 과거 행을 현재 배정의 중복으로 오인하지 않는다.
+  if (direct && isLessonIntake(direct.task) &&
+      assignmentIdentityText(staffId, direct.task) === wanted) return [direct];
 
   const listed = await env.DB.prepare(
     'SELECT data,updated_at FROM tasks WHERE app=? AND owner=?'
   ).bind(app, staffId).all();
-  const wanted = assignmentIdentityText(staffId, candidate);
   return (listed && Array.isArray(listed.results) ? listed.results : [])
     .map(parseTaskRow)
     .filter(Boolean)

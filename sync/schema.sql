@@ -1675,15 +1675,17 @@ CREATE INDEX IF NOT EXISTS idx_makeup_student
   ON makeup_cases(app, student_id, updated_at);
 CREATE INDEX IF NOT EXISTS idx_makeup_staff_time
   ON makeup_cases(app, confirmed_staff_id, confirmed_start_at, confirmed_end_at);
+CREATE INDEX IF NOT EXISTS idx_makeup_student_time
+  ON makeup_cases(app, student_id, confirmed_start_at, confirmed_end_at);
 
 CREATE TRIGGER IF NOT EXISTS trg_makeup_confirmed_time_insert
 BEFORE INSERT ON makeup_cases
-WHEN NEW.status = 'confirmed' AND EXISTS (
+WHEN NEW.status IN ('confirmed','completed') AND EXISTS (
   SELECT 1 FROM makeup_cases AS other
-  WHERE other.app = NEW.app AND other.status = 'confirmed' AND other.case_id <> NEW.case_id
+  WHERE other.app = NEW.app AND other.status IN ('confirmed','completed') AND other.case_id <> NEW.case_id
     AND other.confirmed_start_at < NEW.confirmed_end_at
     AND NEW.confirmed_start_at < other.confirmed_end_at
-    AND (other.student_id = NEW.student_id OR other.confirmed_staff_id = NEW.confirmed_staff_id)
+    AND other.student_id = NEW.student_id
 )
 BEGIN
   SELECT RAISE(ABORT, 'MAKEUP_TIME_CONFLICT');
@@ -1691,12 +1693,12 @@ END;
 
 CREATE TRIGGER IF NOT EXISTS trg_makeup_confirmed_time_update
 BEFORE UPDATE OF status,confirmed_start_at,confirmed_end_at,confirmed_staff_id,student_id ON makeup_cases
-WHEN NEW.status = 'confirmed' AND EXISTS (
+WHEN NEW.status IN ('confirmed','completed') AND EXISTS (
   SELECT 1 FROM makeup_cases AS other
-  WHERE other.app = NEW.app AND other.status = 'confirmed' AND other.case_id <> NEW.case_id
+  WHERE other.app = NEW.app AND other.status IN ('confirmed','completed') AND other.case_id <> NEW.case_id
     AND other.confirmed_start_at < NEW.confirmed_end_at
     AND NEW.confirmed_start_at < other.confirmed_end_at
-    AND (other.student_id = NEW.student_id OR other.confirmed_staff_id = NEW.confirmed_staff_id)
+    AND other.student_id = NEW.student_id
 )
 BEGIN
   SELECT RAISE(ABORT, 'MAKEUP_TIME_CONFLICT');
