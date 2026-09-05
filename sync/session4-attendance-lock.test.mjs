@@ -252,6 +252,45 @@ test('a ledger event permanently locks att across billing changes while same-att
     'lesson-ledger|' + PAST_DATE), /SESSION4_ATTENDANCE_LOCKED/);
 });
 
+test('an admin-attested generation event locks a missing raw check against stale device recreation', async t => {
+  const db = new TestD1(); t.after(() => db.close()); seedAuth(db);
+  const studentId = 'student-attested';
+  const taskId = 'lesson-attested';
+  const configured = '2026-08-01';
+  saveRoster(db, [student(studentId, 'monthly')]);
+  saveTask(db, taskId, studentId);
+  db.sqlite.prepare(
+    'INSERT INTO student_session_ledger_generations ' +
+    '(app,student_id,configured_start_date,generation,source_cutoff_date,kind,' +
+      'supersedes_generation,supersedes_event_count,reason_code,actor,created_at) ' +
+    "VALUES('task',?,?,1,?,'system_backfill',NULL,0,'initial_backfill','system',1)"
+  ).run(studentId, configured, configured);
+  db.sqlite.prepare(
+    'INSERT INTO student_session_ledger_generations ' +
+    '(app,student_id,configured_start_date,generation,source_cutoff_date,kind,' +
+      'supersedes_generation,supersedes_event_count,reason_code,actor,created_at) ' +
+    "VALUES('task',?,?,2,?,'admin_reconciliation',1,0," +
+      "'attendance_date_correction','admin:test',2)"
+  ).run(studentId, configured, PAST_DATE);
+  db.sqlite.prepare(
+    'INSERT INTO student_session_ledger_cycles ' +
+    '(app,student_id,configured_start_date,generation,cycle_number,cycle_start_date,created_at) ' +
+    "VALUES('task',?,?,2,1,?,2)"
+  ).run(studentId, configured, configured);
+  db.sqlite.prepare(
+    'INSERT INTO student_session_ledger_events ' +
+    '(app,student_id,configured_start_date,generation,cycle_number,session_number,' +
+      'lesson_task_id,attendance_date,attendance_status,source_kind,check_key,created_at) ' +
+    "VALUES('task',?,?,2,1,1,?,?,'P','admin_attested',?,2)"
+  ).run(studentId, configured, taskId, PAST_DATE, taskId + '|' + PAST_DATE);
+
+  const replay = await sync(db, [change(taskId, PAST_DATE, 'P', 3)]);
+  assert.equal(replay.status, 409, JSON.stringify(replay.body));
+  assert.equal(replay.body.code, 'SESSION4_ATTENDANCE_LOCKED');
+  assert.equal(db.sqlite.prepare("SELECT COUNT(*) count FROM checks WHERE app='task' AND k=?")
+    .get(taskId + '|' + PAST_DATE).count, 0);
+});
+
 test('confirmed absence makeup is locked at cutoff and stays locked after it enters the ledger', async t => {
   const db = new TestD1(); t.after(() => db.close()); seedAuth(db);
   const caseId = 'case_absence_lock';
