@@ -299,13 +299,14 @@ test('confirmed absence makeup is locked at cutoff and stays locked after it ent
   saveMakeupCase(db, caseId, 'student-makeup', PAST_DATE);
   saveTask(db, taskId, 'student-makeup', {
     lessonInstanceType: 'makeup', makeupCaseId: caseId, repeat: 'once',
+    makeupSourceTaskId: 'source_' + caseId, makeupSourceDate: PAST_DATE,
     start: PAST_DATE, end: PAST_DATE
   });
   saveExistingCheck(db, taskId, PAST_DATE, 'P');
   saveRoster(db, [student('student-makeup')]);
 
   const beforeLedger = await sync(db, [change(taskId, PAST_DATE, 'A', 2)]);
-  assert.equal(beforeLedger.status, 409);
+  assert.equal(beforeLedger.status, 409, JSON.stringify(beforeLedger.body));
   assert.equal(beforeLedger.body.code, 'SESSION4_ATTENDANCE_LOCKED');
   assert.throws(() => db.sqlite.prepare(
     "UPDATE checks SET data=? WHERE app='task' AND k=?"
@@ -322,28 +323,98 @@ test('confirmed absence makeup is locked at cutoff and stays locked after it ent
   assert.equal(afterLedger.body.code, 'SESSION4_ATTENDANCE_LOCKED');
 });
 
-test('completed absence makeup locks its authoritative actual day even when the confirmed day differs', async t => {
+test('completed makeup freezes its canonical check identity and attendance across a sync race', async t => {
+  const db = new TestD1(); t.after(() => db.close()); seedAuth(db);
+  const caseId = 'case_completed_race';
+  const taskId = 'makeup_lesson_' + caseId;
+  const key = taskId + '|' + PAST_DATE;
+  saveRoster(db, [student('student-completed-race', 'monthly')]);
+  saveMakeupCase(db, caseId, 'student-completed-race', PAST_DATE, {
+    history: [{ action: 'create_from_absence', revision: 1 }]
+  });
+  saveTask(db, taskId, 'student-completed-race', {
+    lessonInstanceType: 'makeup', makeupCaseId: caseId, repeat: 'once',
+    makeupSourceTaskId: 'source_' + caseId, makeupSourceDate: PAST_DATE,
+    start: PAST_DATE, end: PAST_DATE
+  });
+  saveExistingCheck(db, taskId, PAST_DATE, 'P', 'before completion');
+
+  db.beforeBatch = () => db.sqlite.prepare(
+    "UPDATE makeup_cases SET status='completed',revision=2,completed_at=2,completed_by=?," +
+      'history=?,updated_at=2 WHERE app=\'task\' AND case_id=?'
+  ).run(TEACHER, JSON.stringify([
+    { action: 'create_from_absence', revision: 1 },
+    { action: 'complete', from: 'confirmed', to: 'completed', staffId: TEACHER,
+      date: PAST_DATE, revision: 2 }
+  ]), caseId);
+  const raced = await sync(db, [change(taskId, PAST_DATE, 'A', 2)]);
+  assert.equal(raced.status, 409, JSON.stringify(raced.body));
+  assert.equal(raced.body.code, 'MAKEUP_COMPLETED_ATTENDANCE_LOCKED');
+  assert.equal(JSON.parse(db.sqlite.prepare("SELECT data FROM checks WHERE app='task' AND k=?")
+    .get(key).data).att, 'P');
+
+  const memo = await sync(db, [change(taskId, PAST_DATE, 'P', 3, 'after completion')]);
+  assert.equal(memo.status, 200, JSON.stringify(memo.body));
+  const stored = JSON.parse(db.sqlite.prepare("SELECT data FROM checks WHERE app='task' AND k=?")
+    .get(key).data);
+  assert.equal(stored.att, 'P');
+  assert.equal(stored.note, 'after completion');
+
+  const current = { ...stored };
+  const corruptions = [
+    { ...current, taskId: 'different-task' },
+    { ...current, date: '2026-08-21' },
+    { ...current, att: 'L' },
+    { note: 'core fields missing' }
+  ];
+  for (const data of corruptions) {
+    assert.throws(() => db.sqlite.prepare(
+      "UPDATE checks SET data=? WHERE app='task' AND k=?"
+    ).run(JSON.stringify(data), key), /MAKEUP_COMPLETED_ATTENDANCE_LOCKED/);
+  }
+  assert.throws(() => db.sqlite.prepare(
+    "UPDATE checks SET owner='different-teacher' WHERE app='task' AND k=?"
+  ).run(key), /MAKEUP_COMPLETED_ATTENDANCE_LOCKED/);
+  assert.throws(() => db.sqlite.prepare(
+    "UPDATE checks SET k=? WHERE app='task' AND k=?"
+  ).run(taskId + '|2026-08-21', key), /MAKEUP_COMPLETED_ATTENDANCE_LOCKED/);
+  assert.throws(() => db.sqlite.prepare(
+    "UPDATE checks SET app='other' WHERE app='task' AND k=?"
+  ).run(key), /MAKEUP_COMPLETED_ATTENDANCE_LOCKED/);
+  assert.throws(() => db.sqlite.prepare(
+    "UPDATE checks SET data='{' WHERE app='task' AND k=?"
+  ).run(key), /MAKEUP_COMPLETED_ATTENDANCE_LOCKED/);
+});
+
+test('completed absence makeup keeps its canonical confirmed day locked', async t => {
   const db = new TestD1(); t.after(() => db.close()); seedAuth(db);
   const caseId = 'case_actual_day';
   const taskId = 'makeup_lesson_' + caseId;
   saveRoster(db, [student('student-actual', 'monthly')]);
   saveMakeupCase(db, caseId, 'student-actual', PAST_DATE, {
-    status: 'completed', confirmedDate: '2026-08-19'
+    status: 'completed', confirmedDate: PAST_DATE,
+    history: [
+      { action: 'create_from_absence', revision: 1 },
+      { action: 'complete', from: 'confirmed', to: 'completed', staffId: TEACHER,
+        date: PAST_DATE, revision: 1 }
+    ]
   });
   saveTask(db, taskId, 'student-actual', {
     lessonInstanceType: 'makeup', makeupCaseId: caseId, repeat: 'once',
+    makeupSourceTaskId: 'source_' + caseId, makeupSourceDate: PAST_DATE,
     start: PAST_DATE, end: PAST_DATE
   });
   saveExistingCheck(db, taskId, PAST_DATE, 'P');
   saveRoster(db, [student('student-actual')]);
 
   const changed = await sync(db, [change(taskId, PAST_DATE, 'A', 2)]);
-  assert.equal(changed.status, 409);
-  assert.equal(changed.body.code, 'SESSION4_ATTENDANCE_LOCKED');
+  assert.equal(changed.status, 200, JSON.stringify(changed.body));
+  assert.equal(JSON.parse(db.sqlite.prepare("SELECT data FROM checks WHERE app='task' AND k=?")
+    .get(taskId + '|' + PAST_DATE).data).att, 'P');
   assert.throws(() => db.sqlite.prepare(
     "UPDATE checks SET data=? WHERE app='task' AND k=?"
   ).run(JSON.stringify({ taskId, date: PAST_DATE, att: 'A' }), taskId + '|' + PAST_DATE),
-  /SESSION4_ATTENDANCE_LOCKED/);
+  /MAKEUP_COMPLETED_ATTENDANCE_LOCKED|SESSION4_ATTENDANCE_LOCKED/);
   const ledger = await syncStudentSessionLedgers(
     { DB: db }, Date.parse(PAST_DATE + 'T23:50:00+09:00')
   );

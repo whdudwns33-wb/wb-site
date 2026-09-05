@@ -595,6 +595,190 @@ async function inspectOwnCheckChanges(env, app, owner, entries, newTaskIds) {
   return await inspectOwnStaffAttendanceChanges(env, app, owner, checkEntries);
 }
 
+function historyProvesRevokedMakeupAssignment(value, formerStaffId, date, currentRevision) {
+  let history;
+  try { history = JSON.parse(value || '[]'); } catch (error) { return false; }
+  if (!Array.isArray(history)) return false;
+  return history.some(event => event && typeof event === 'object' &&
+    event.action === 'reschedule' &&
+    String(event.previousStaffId || '') === formerStaffId &&
+    String(event.previousDate || '') === date &&
+    SAFE_ID.test(String(event.staffId || '')) && validIsoDate(String(event.date || '')) &&
+    Number.isInteger(Number(event.revision)) && Number(event.revision) >= 1 &&
+    Number(event.revision) <= Number(currentRevision));
+}
+
+/**
+ * 담당자 또는 날짜를 재배정한 뒤 오프라인 화면이 과거 출결을 재전송할 수 있다.
+ * 이 행은 전체 동기화를 막는 대신 개별 폐기한다. 단순 task id 추측으로 우회할 수 없도록
+ * 현재 서버 task와 서버 전용 makeup_cases 이력에서 실제 과거 담당·날짜와 새 담당·날짜를 모두 증명한다.
+ */
+async function inspectMakeupCheckChanges(env, app, entries) {
+  const skip = new Set();
+  if (app !== 'task') return { error: null, skip };
+  const checkEntries = entries.filter(entry => entry.table === 'checks' && entry.change);
+  if (!checkEntries.length) return { error: null, skip };
+
+  const candidates = [];
+  for (const entry of checkEntries) {
+    const rawKey = String(entry.change.k || '');
+    const identity = checkIdentityFromKey(rawKey);
+    if (!identity) {
+      if (rawKey.startsWith('makeup_lesson_')) {
+        return { error: '보강 출결 키의 업무·날짜 형식을 확인해 주세요', skip };
+      }
+      continue;
+    }
+    candidates.push({ entry, identity });
+  }
+  if (!candidates.length) return { error: null, skip };
+
+  const currentChecks = await currentCheckStates(env, app,
+    [...new Set(candidates.map(candidate => candidate.identity.key))]);
+
+  const taskIds = [...new Set(candidates.map(item => item.identity.taskId))];
+  const tasks = new Map();
+  for (let offset = 0; offset < taskIds.length; offset += 80) {
+    const chunk = taskIds.slice(offset, offset + 80);
+    const result = await env.DB.prepare(
+      'SELECT id,owner,data FROM tasks WHERE app=? AND id IN (' + chunk.map(() => '?').join(',') + ')'
+    ).bind(app, ...chunk).all();
+    for (const row of result.results || []) {
+      let data;
+      try { data = JSON.parse(row.data || '{}'); } catch (error) { data = null; }
+      const caseId = String(data && data.makeupCaseId || '');
+      const id = String(row.id || '');
+      const currentOwner = String(row.owner || '');
+      const reserved = id.startsWith('makeup_lesson_') || isScheduledMakeupTaskData(data);
+      if (!reserved) continue;
+      const valid = !!(data && SAFE_ID.test(currentOwner) && SAFE_ID.test(caseId) &&
+        id === 'makeup_lesson_' + caseId && String(data.id || '') === id &&
+        String(data.staffId || '') === currentOwner && String(data.lessonInstanceType || '') === 'makeup' &&
+        hasStructuredLessonMarker(data) && data.repeat === 'once' &&
+        SAFE_ID.test(String(data.studentId || '')) && SAFE_ID.test(String(data.makeupSourceTaskId || '')) &&
+        validIsoDate(String(data.makeupSourceDate || '')) && validIsoDate(String(data.start || '')) &&
+        String(data.start) === String(data.end));
+      tasks.set(id, { row, data, caseId, valid });
+    }
+  }
+
+  for (const candidate of candidates) {
+    if (candidate.identity.taskId.startsWith('makeup_lesson_') && !tasks.has(candidate.identity.taskId)) {
+      return { error: '서버에서 확인할 수 없는 보강 출결은 저장할 수 없습니다', skip };
+    }
+  }
+  const makeupCandidates = candidates.filter(candidate => tasks.has(candidate.identity.taskId));
+  if (!makeupCandidates.length) return { error: null, skip };
+  if (makeupCandidates.some(candidate => !tasks.get(candidate.identity.taskId).valid)) {
+    return { error: '보강 수업의 서버 식별자가 일치하지 않아 출결을 저장할 수 없습니다', skip };
+  }
+
+  const caseIds = [...new Set(makeupCandidates.map(candidate => tasks.get(candidate.identity.taskId).caseId))];
+  const cases = new Map();
+  for (let offset = 0; offset < caseIds.length; offset += 80) {
+    const chunk = caseIds.slice(offset, offset + 80);
+    const result = await env.DB.prepare(
+      'SELECT case_id,student_id,source_task_id,source_date,status,revision,' +
+      'confirmed_start_at,confirmed_end_at,confirmed_staff_id,completed_at,completed_by,' +
+      'cancelled_at,cancelled_by,history ' +
+      'FROM makeup_cases WHERE app=? AND case_id IN (' + chunk.map(() => '?').join(',') + ')'
+    ).bind(app, ...chunk).all();
+    for (const row of result.results || []) cases.set(String(row.case_id), row);
+  }
+
+  for (const candidate of makeupCandidates) {
+    const task = tasks.get(candidate.identity.taskId);
+    const makeup = task && cases.get(task.caseId);
+    if (!task || !makeup) {
+      return { error: '보강 원장을 확인할 수 없어 출결을 저장할 수 없습니다', skip };
+    }
+    const currentOwner = String(task.row.owner || '');
+    const status = String(makeup.status || '');
+    const taskDate = String(task.data.start || '');
+    const historyCompleted = status !== 'completed' || makeupHistoryHasCompletion(makeup.history);
+    const statusDateMatches = (
+      String(makeup.confirmed_start_at || '').slice(0, 10) === taskDate &&
+      String(makeup.confirmed_end_at || '').slice(0, 10) === taskDate
+    );
+    if (String(makeup.confirmed_staff_id || '') !== currentOwner ||
+        String(makeup.student_id || '') !== String(task.data.studentId || '') ||
+        String(makeup.source_task_id || '') !== String(task.data.makeupSourceTaskId || '') ||
+        String(makeup.source_date || '') !== String(task.data.makeupSourceDate || '')) {
+      return { error: '보강 수업과 보강 원장의 담당자·날짜 식별자가 일치하지 않습니다', skip };
+    }
+    const change = candidate.entry.change;
+    const data = change.data;
+    if (!data || typeof data !== 'object' || Array.isArray(data) ||
+        (Object.prototype.hasOwnProperty.call(data, 'taskId') &&
+          String(data.taskId) !== candidate.identity.taskId) ||
+        (Object.prototype.hasOwnProperty.call(data, 'date') &&
+          String(data.date) !== candidate.identity.date)) {
+      return { error: '보강 출결 데이터의 업무·날짜 식별자가 일치하지 않습니다', skip };
+    }
+    const incomingOwner = String(change.owner || '');
+    const incomingExactIdentity = Object.prototype.hasOwnProperty.call(data, 'taskId') &&
+      Object.prototype.hasOwnProperty.call(data, 'date') &&
+      String(data.taskId || '') === candidate.identity.taskId &&
+      String(data.date || '') === candidate.identity.date;
+    if (SAFE_ID.test(incomingOwner) &&
+        (incomingOwner !== currentOwner || candidate.identity.date !== taskDate) &&
+        ['confirmed', 'completed', 'cancelled'].includes(status) &&
+        historyProvesRevokedMakeupAssignment(makeup.history, incomingOwner, candidate.identity.date,
+          Number(makeup.revision))) {
+      skip.add(candidate.entry);
+      continue;
+    }
+    if (status === 'cancelled' && incomingOwner === currentOwner &&
+        candidate.identity.date === taskDate && task.data.deleted === true && statusDateMatches &&
+        makeup.completed_at == null && !String(makeup.completed_by || '') &&
+        Number(makeup.cancelled_at) > 0 && SAFE_ID.test(String(makeup.cancelled_by || '')) &&
+        makeupHistoryHasCanonicalCancellation(makeup.history, Number(makeup.revision)) &&
+        !currentChecks.has(candidate.identity.key)) {
+      // cancel 직전 오프라인 화면에서 만들어진 check는 이미 폐기된 수업을 되살리지 않는다.
+      // 구형 payload의 taskId/date 생략은 key로 정확히 확정하되 저장하지 않고 행만 폐기한다.
+      skip.add(candidate.entry);
+      continue;
+    }
+    const completionIdentityMatches = status !== 'completed' || (
+      Number(makeup.completed_at) > 0 && String(makeup.completed_by || '') === currentOwner
+    );
+    if (status === 'completed' && incomingOwner === currentOwner && candidate.identity.date === taskDate) {
+      const current = currentChecks.get(candidate.identity.key);
+      const currentExactIdentity = !!(current && current.owner === currentOwner && current.data &&
+        typeof current.data === 'object' && !Array.isArray(current.data) &&
+        String(current.data.taskId || '') === candidate.identity.taskId &&
+        String(current.data.date || '') === candidate.identity.date &&
+        ['P', 'L', 'E'].includes(attendanceValue(current.data)));
+      if (!currentExactIdentity || !historyCompleted || !statusDateMatches || !completionIdentityMatches) {
+        return { error: '완료된 보강 출결의 서버 정본을 확인할 수 없습니다', skip };
+      }
+      if (task.data.deleted === true) {
+        // 종료 시간이 지난 후 숨겨진 단발 보강은 더 이상 편집 대상이 아니다.
+        // 완료 시점의 서버 출결은 유지하고 늦게 올라온 모든 캐시 행만 폐기한다.
+        skip.add(candidate.entry);
+        continue;
+      }
+      if (!incomingExactIdentity) {
+        // 구형 캐시는 taskId/date를 생략했을 수 있다. 정본을 덮어쓰지 않고
+        // 개별 폐기해 같은 batch의 일반 메모·업무는 계속 동기화한다.
+        skip.add(candidate.entry);
+        continue;
+      }
+      if (!['P', 'L', 'E'].includes(attendanceValue(data)) ||
+          attendanceValue(data) !== attendanceValue(current.data)) {
+        // 완료 후 늦게 도착한 다른/빈 출결은 메모 저장 batch를 poison하지 않고 폐기한다.
+        skip.add(candidate.entry);
+        continue;
+      }
+      continue;
+    }
+    if (incomingOwner === currentOwner && candidate.identity.date === taskDate && !task.data.deleted &&
+        status === 'confirmed' && statusDateMatches) continue;
+    return { error: '현재 보강 담당자의 해당 보강일 출결만 저장할 수 있습니다', skip };
+  }
+  return { error: null, skip };
+}
+
 function checkIdentityFromKey(value) {
   const key = String(value || '');
   const pipe = key.indexOf('|');
@@ -630,6 +814,15 @@ function makeupHistoryHasCompletion(value) {
   try { history = JSON.parse(value || '[]'); } catch (error) { return false; }
   const last = Array.isArray(history) && history.length ? history[history.length - 1] : null;
   return !!(last && typeof last === 'object' && last.action === 'complete');
+}
+
+function makeupHistoryHasCanonicalCancellation(value, revision) {
+  let history;
+  try { history = JSON.parse(value || '[]'); } catch (error) { return false; }
+  const last = Array.isArray(history) && history.length ? history[history.length - 1] : null;
+  return !!(last && typeof last === 'object' &&
+    ['cancel', 'no_makeup', 'reconcile_attendance'].includes(String(last.action || '')) &&
+    String(last.to || '') === 'cancelled' && Number(last.revision) === Number(revision));
 }
 
 async function sessionAttendanceEventKeys(env, app, keys) {
@@ -672,7 +865,10 @@ async function currentCheckStates(env, app, keys) {
     for (const row of result.results || []) {
       let data;
       try { data = JSON.parse(row.data || '{}'); } catch (error) { data = null; }
-      current.set(String(row.k), { data, updatedAt: Number(row.updated_at) || 0 });
+      current.set(String(row.k), {
+        owner: String(row.owner || ''), data,
+        updatedAt: Number(row.updated_at) || 0, srvAt: Number(row.srv_at) || 0
+      });
     }
   }
   return current;
@@ -1333,6 +1529,12 @@ async function handleSync(env, app, body, origin) {
     return json({ ok: false, code: 'MAKEUP_ENDPOINT_REQUIRED', error: makeupInspection.error }, 409, origin);
   }
   for (const entry of makeupInspection.skip) skipped.add(entry);
+  const makeupCheckInspection = await inspectMakeupCheckChanges(env, app, accepted);
+  if (makeupCheckInspection.error) {
+    return json({ ok: false, code: 'MAKEUP_CHECK_IDENTITY_MISMATCH',
+      error: makeupCheckInspection.error }, 403, origin);
+  }
+  for (const entry of makeupCheckInspection.skip) skipped.add(entry);
   if (auth.scope === 'own') {
     const inspected = await inspectOwnTaskChanges(env, app, auth.id, accepted.filter(entry => !skipped.has(entry)));
     if (inspected.error) return json({ ok: false, error: inspected.error }, 403, origin);
@@ -1340,7 +1542,9 @@ async function handleSync(env, app, body, origin) {
     for (const entry of accepted) {
       if (entry.table === 'staff') skipped.add(entry);
     }
-    const checkInspection = await inspectOwnCheckChanges(env, app, auth.id, accepted, inspected.newTaskIds);
+    const checkInspection = await inspectOwnCheckChanges(
+      env, app, auth.id, accepted.filter(entry => !skipped.has(entry)), inspected.newTaskIds
+    );
     if (checkInspection.error) {
       const payload = { ok: false, error: checkInspection.error };
       if (/출퇴근/.test(checkInspection.error)) payload.code = 'STAFF_ATTENDANCE_ADMIN_ONLY';
@@ -1404,6 +1608,10 @@ async function handleSync(env, app, body, origin) {
       if (/SESSION4_ATTENDANCE_LOCKED/.test(String(error && error.message || error))) {
         return json({ ok: false, code: 'SESSION4_ATTENDANCE_LOCKED',
           error: '회차제 출결은 수업일 23시 50분에 확정되어 변경할 수 없습니다. 메모는 출결 상태를 유지한 채 저장해 주세요' }, 409, origin);
+      }
+      if (/MAKEUP_COMPLETED_ATTENDANCE_LOCKED/.test(String(error && error.message || error))) {
+        return json({ ok: false, code: 'MAKEUP_COMPLETED_ATTENDANCE_LOCKED',
+          error: '완료된 보강의 출결·업무·날짜 식별자는 변경할 수 없습니다. 메모는 출결 상태를 유지한 채 저장해 주세요' }, 409, origin);
       }
       throw error;
     }

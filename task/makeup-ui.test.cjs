@@ -207,18 +207,51 @@ test('KPI counts only the simplified needed, scheduled, today, delayed, and comp
   assert.doesNotMatch(output, /보호자 응답 대기|알림 필요/);
 });
 
+test('makeup assignee choices use stable staff ids and keep original and actual teachers separate', () => {
+  const helpers = block('function makeupStaffOptionsHtml(selectedStaffId)', 'function makeupCaseForSource');
+  const api = new Function('lessonRegistrationStaffList', 'esc', 'staffById',
+    `${helpers}\nreturn { makeupStaffOptionsHtml, makeupOriginalStaffId, makeupDefaultStaffId, makeupActualStaffId, makeupProposedStaffId };`)(
+      () => [{ id: 'staff-101', name: '가교사' }, { id: 'staff-202', name: '나교사' }],
+      value => String(value || ''),
+      id => ({ id, name: id === 'staff-101' ? '가교사' : '나교사' })
+    );
+  const options = api.makeupStaffOptionsHtml('staff-202');
+  assert.match(options, /value="staff-101"/);
+  assert.match(options, /value="staff-202" selected/);
+  assert.doesNotMatch(options, /value="가교사"|value="나교사"/);
+
+  const row = {
+    sourceTeacherId: 'staff-101', currentTeacherId: 'staff-202', proposedStaffId: 'staff-101',
+    confirmedStaffId: 'staff-202', completedStaffId: 'staff-303'
+  };
+  assert.equal(api.makeupOriginalStaffId(row), 'staff-101');
+  assert.equal(api.makeupDefaultStaffId(row), 'staff-202');
+  assert.equal(api.makeupActualStaffId(row), 'staff-303');
+  assert.equal(api.makeupProposedStaffId(row), 'staff-101');
+  assert.equal(api.makeupActualStaffId({ proposedStaffId: 'staff-101' }), '', 'a proposal is not an actual assignment');
+
+  const card = block('function makeupCard(row)', 'function makeupKpis(rows)');
+  assert.match(card, /원 수업 담당 ·/);
+  assert.match(card, /보강 담당 ·/);
+  assert.match(card, /제안 담당 ·/);
+  assert.match(card, /sourceStaffId !== actualStaffId/);
+  assert.match(card, />대체 담당</);
+  assert.match(card, />대체 담당 제안</);
+});
+
 test('active admin card has three actions and staff can only complete their own case', () => {
   const actions = block('function makeupActions(row)', 'function makeupCard(row)');
 
   for (const [act, label] of [['muschedule', '보강생성'], ['mucompleteopen', '보강완료'], ['munone', '보강없음']]) {
     assert.match(actions, new RegExp(`data-act="${act}"[\\s\\S]*?>${label}<`));
   }
-  assert.match(actions, /row\.status === 'confirmed'[\s\S]*?disabled>생성완료/);
+  assert.match(actions, /row\.status === 'confirmed'[\s\S]*?data-act="mureschedule"[\s\S]*?>보강 수정</);
   assert.match(actions, /if \(session\.isAdmin\)/);
-  assert.match(actions, /row\.status === 'confirmed' \? row\.confirmedStaffId : \(row\.currentTeacherId \|\| row\.sourceTeacherId\)/);
+  assert.match(actions, /const assignedStaffId = row\.confirmedStaffId/);
+  assert.match(actions, /row\.status === 'confirmed' && session\.isStaffLink/);
   const staffBranch = actions.slice(actions.indexOf('const own'));
   assert.match(staffBranch, /data-act="mucompleteopen"/);
-  assert.doesNotMatch(staffBranch, /data-act="muschedule"|data-act="munone"/);
+  assert.doesNotMatch(staffBranch, /data-act="muschedule"|data-act="mureschedule"|data-act="munone"/);
   for (const oldAction of ['mureviewrequired', 'mupropose', 'muconfirm', 'mucancel']) {
     assert.doesNotMatch(actions, new RegExp(oldAction));
   }
@@ -231,15 +264,68 @@ test('schedule, completion, and no-makeup modals use the three-action API contra
   assert.match(source, /id="muDate" type="date"/);
   assert.match(source, /id="muStart" type="time"/);
   assert.match(source, /id="muEnd" type="time"/);
-  assert.match(source, /원 수업 담당 선생님이 자동 배정됩니다/);
-  assert.doesNotMatch(source, /id="muStaff"|담당 선생님<\/label><select/);
+  assert.match(source, /원 수업 담당 선생님/);
+  assert.match(source, /id="muStaff"/);
+  assert.match(source, /makeupStaffOptionsHtml\(assignedStaffId\)/);
   assert.match(source, /scheduled \? row\.confirmedDate/);
-  assert.match(source, /실제 보강 일시가 다르면 수정해 주세요/);
-  assert.match(source, /action: 'schedule'[\s\S]*?\.\.\.slot/);
+  assert.match(source, /날짜 변경은 출결·메모를 입력하기 전에 보강 수정에서 처리해 주세요/);
+  assert.match(source, /mode === 'restore' \|\| scheduledCompletion/);
+  assert.match(source, /action: 'schedule'[\s\S]*?\.\.\.slot, staffId: staffId/);
+  assert.match(source, /action: 'reschedule'[\s\S]*?\.\.\.slot, staffId: staffId/);
   assert.match(source, /action: 'complete'[\s\S]*?\.\.\.slot/);
+  assert.match(source, /payload\.attendanceStatus = attendanceStatus/);
   assert.match(source, /action: 'no_makeup'[\s\S]*?reason: reason/);
   assert.match(source, /slot\.date < today\(\)/);
   assert.match(source, /endAt > Date\.now\(\)/);
+  assert.match(source, /서버에 출석·지각·조퇴가 없으면 완료되지 않고 정확한 사유가 표시됩니다/);
+  assert.match(source, /makeupModalErrorHtml\(\)/);
+});
+
+test('scheduled completion syncs first and lets the server judge P/L/E while direct completion seals attendance', async () => {
+  const source = block('async function submitMakeupComplete(button)', 'async function submitMakeupNoMakeup');
+  const makeSubmit = ({ row, session, elements, calls, settleSync = async () => {} }) => new Function(
+    'makeupRows', 'makeupCanComplete', 'makeupDateTimeInput', 'showMakeupModalError',
+    'MAKEUP_COMPLETION_ATTENDANCE_OPTIONS', 'session', '$', 'makeupActiveStaff', 'mutateMakeup',
+    'clearMakeupModalError', 'settleSync', `${source}\nreturn submitMakeupComplete;`)(
+      [row], () => true, () => ({ date: '2020-01-01', startTime: '10:00', endTime: '10:50' }),
+      message => { calls.push({ error: message }); return false; }, [['P', '출석'], ['L', '지각'], ['E', '조퇴']], session,
+      id => elements[id.slice(1)] || null, id => id === 'staff-2' ? { id } : null,
+      async payload => { calls.push({ payload }); }, () => { calls.push({ clear: true }); },
+      async () => { calls.push({ settle: true }); await settleSync(); }
+    );
+
+  const scheduledCalls = [];
+  await makeSubmit({
+    row: { caseId: 'mu-1', revision: 2, status: 'confirmed', confirmedDate: '2020-01-02' },
+    session: { isAdmin: false }, elements: {}, calls: scheduledCalls
+  })({ dataset: { case: 'mu-1', rev: '2' }, disabled: false, isConnected: true });
+  assert.deepEqual(scheduledCalls, [
+    { clear: true }, { settle: true },
+    { payload: { action: 'complete', caseId: 'mu-1', revision: 2, date: '2020-01-01', startTime: '10:00', endTime: '10:50' } }
+  ]);
+
+  const syncFailureCalls = [];
+  await makeSubmit({
+    row: { caseId: 'mu-sync', revision: 1, status: 'confirmed', confirmedDate: '2020-01-02' },
+    session: { isAdmin: true }, elements: {}, calls: syncFailureCalls,
+    settleSync: async () => { throw new Error('SYNC_FAILED'); }
+  })({ dataset: { case: 'mu-sync', rev: '1' }, disabled: false, isConnected: true });
+  assert.deepEqual(syncFailureCalls, [
+    { clear: true }, { settle: true },
+    { error: '보강 출결을 서버에 동기화하지 못했습니다. 연결을 확인한 뒤 다시 시도해 주세요' }
+  ]);
+
+  const directCalls = [];
+  await makeSubmit({
+    row: { caseId: 'mu-2', revision: 4, status: 'reviewed' },
+    session: { isAdmin: true },
+    elements: { muStaff: { value: 'staff-2' }, muAttendanceStatus: { value: 'L' } }, calls: directCalls
+  })({ dataset: { case: 'mu-2', rev: '4' } });
+  assert.deepEqual(directCalls, [{ payload: {
+    action: 'complete', caseId: 'mu-2', revision: 4,
+    date: '2020-01-01', startTime: '10:00', endTime: '10:50',
+    staffId: 'staff-2', attendanceStatus: 'L'
+  } }]);
 });
 
 test('completed and no-makeup cards leave active grid and remain in a collapsed archive', () => {
@@ -263,15 +349,17 @@ test('source absence shows makeup completion and list loads the full server limi
   const load = block('async function loadMakeups(force)', 'function makeupReasonSelect');
 
   assert.match(helper, /check\.att !== 'A'/);
-  assert.match(helper, /linked\.status === 'completed'/);
+  assert.match(helper, /linked\.status !== 'completed'/);
   assert.match(helper, /보강완료/);
+  assert.match(helper, /makeupActualStaffId\(linked\)/);
+  assert.match(helper, /makeupTeacherLabel/);
   assert.match(row, /makeupCompletionTagHtml\(t, date, c\)/);
   assert.match(load, /action: 'list', limit: 500/);
   assert.match(load, /\['makeup', 'today', 'week', 'schedule'\]\.includes\(route\)/);
 });
 
-test('schedule response applies the authoritative generated lesson task immediately', () => {
-  const mutation = block('async function mutateMakeup', 'async function createMakeupFromAbsence');
+test('schedule response applies the authoritative generated lesson task and completion invalidates every related view', () => {
+  const mutation = block('async function refreshMakeupCompletionViews', 'async function createMakeupFromAbsence');
 
   assert.match(mutation, /result\.lessonTask && result\.lessonTask\.id/);
   assert.match(mutation, /state\.tasks\.findIndex/);
@@ -279,6 +367,31 @@ test('schedule response applies the authoritative generated lesson task immediat
   assert.match(mutation, /state\.tasks\[taskIndex\] = result\.lessonTask/);
   assert.match(mutation, /payload\.action === 'schedule'/);
   assert.match(mutation, /await sync\.run\(\)/);
+  assert.match(mutation, /payload\.action === 'complete'[^\n]*refreshMakeupCompletionViews\(\)/);
+  assert.match(mutation, /await settleSync\(\)/);
+  assert.match(mutation, /sessionPackLoaded = false/);
+  assert.match(mutation, /await loadSessionPacks\(true\)/);
+  assert.match(mutation, /session4LedgerLoadedSignature = ''/);
+  assert.match(mutation, /await loadSession4Ledger\(true\)/);
+});
+
+test('completion refresh waits for task sync and reloads both session ledgers in order', async () => {
+  const helper = block('async function refreshMakeupCompletionViews()', 'async function mutateMakeup');
+  const calls = [];
+  const api = new Function('settleSync', 'loadSessionPacks', 'loadSession4Ledger',
+    `let sessionPackLoading = false, sessionPackLoaded = true, sessionPackError = '';
+     let session4LedgerLoading = false, session4LedgerLoadedSignature = 'old', session4LedgerError = '';
+     const session = { isAdmin: true }; const rosterDb = { students: [] };
+     ${helper}
+     return { run: refreshMakeupCompletionViews, state: () => ({ sessionPackLoaded, session4LedgerLoadedSignature }) };`)(
+      async () => { calls.push('sync'); },
+      async force => { assert.equal(force, true); calls.push('packs'); },
+      async force => { assert.equal(force, true); calls.push('ledger'); }
+    );
+
+  assert.equal(await api.run(), true);
+  assert.deepEqual(calls, ['sync', 'packs', 'ledger']);
+  assert.deepEqual(api.state(), { sessionPackLoaded: false, session4LedgerLoadedSignature: '' });
 });
 
 test('makeup lessons have text and color distinction on teacher cards and every manager schedule view', () => {
@@ -312,6 +425,7 @@ test('conflicts reload safely and completion refreshes session-pack impact', () 
   assert.match(mutations, /pack_identity_mismatch/);
   assert.match(mutations, /await loadSessionPacks\(true\)/);
   assert.match(mutations, /Number\(impact\.delta\) === 1/);
+  assert.match(mutations, /완료는 저장됨 · 최신 화면은 새로고침해 주세요/);
 });
 
 test('mobile layouts keep one column and 44px makeup actions', () => {
@@ -324,7 +438,7 @@ test('mobile layouts keep one column and 44px makeup actions', () => {
 test('click routing covers only the simplified makeup transitions', () => {
   const click = block("case 'murefresh':", '/* 날짜 */');
   for (const action of ['murefresh', 'mucreate', 'muschedule', 'muschedulesubmit', 'mucompleteopen',
-    'mucompletesubmit', 'munone', 'munonesubmit']) {
+    'mureschedule', 'mureschedulesubmit', 'mucompletesubmit', 'munone', 'munonesubmit']) {
     assert.match(click, new RegExp(`case '${action}'`));
   }
   for (const oldAction of ['mureviewrequired', 'mureviewnot', 'mupropose', 'muconfirm', 'mucancel', 'mucomplete']) {

@@ -28,7 +28,15 @@ CREATE TABLE weekend_actual_visits(
 CREATE TABLE makeup_cases(
   app TEXT NOT NULL,case_id TEXT NOT NULL,student_id TEXT NOT NULL,status TEXT NOT NULL,
   confirmed_start_at TEXT,confirmed_end_at TEXT,confirmed_staff_id TEXT,
-  completed_at INTEGER,completed_by TEXT,history TEXT NOT NULL,PRIMARY KEY(app,case_id)
+  completed_at INTEGER,completed_by TEXT,revision INTEGER NOT NULL DEFAULT 1,
+  history TEXT NOT NULL,PRIMARY KEY(app,case_id)
+);
+CREATE TABLE makeup_direct_completion_attestations(
+  app TEXT NOT NULL,case_id TEXT NOT NULL,case_revision INTEGER NOT NULL,
+  lesson_task_id TEXT NOT NULL,check_key TEXT NOT NULL,student_id TEXT NOT NULL,
+  staff_id TEXT NOT NULL,attendance_date TEXT NOT NULL,start_time TEXT NOT NULL,
+  end_time TEXT NOT NULL,attendance_status TEXT NOT NULL,actor_id TEXT NOT NULL,
+  provenance TEXT NOT NULL,created_at INTEGER NOT NULL,PRIMARY KEY(app,case_id),UNIQUE(app,check_key)
 );
 CREATE TABLE tuition_generation_alerts(
   app TEXT NOT NULL CHECK(app='task'),
@@ -145,6 +153,27 @@ function seedWeekendVisit(db, taskId, studentId, date, status = 'completed', suf
   db.database.prepare(
     'INSERT INTO weekend_actual_visits(app,visit_id,student_id,lesson_task_id,visit_date,status) VALUES(?,?,?,?,?,?)'
   ).run('task', 'visit-' + taskId + '-' + date + suffix, studentId, taskId, date, status);
+}
+
+function seedDirectCompletedMakeup(db, caseId, date, reason = 'manual_absence') {
+  const taskId = 'makeup_lesson_' + caseId;
+  db.database.prepare(
+    'INSERT INTO makeup_cases(app,case_id,student_id,status,confirmed_start_at,confirmed_end_at,' +
+      'confirmed_staff_id,completed_at,completed_by,revision,history) VALUES(?,?,?,?,?,?,?,?,?,?,?)'
+  ).run('task', caseId, 'student-a', 'completed', date + 'T18:00:00+09:00',
+    date + 'T19:00:00+09:00', 'teacher-a', CUTOFF, 'teacher-a', 3,
+    JSON.stringify([{ action: 'create_manual', reason }, { action: 'schedule_for_completion' },
+      { action: 'complete' }]));
+  seedTask(db, taskId, 'student-a', 'teacher-a', {
+    lessonInstanceType: 'makeup', makeupCaseId: caseId, repeat: 'once', start: date, end: date
+  });
+  db.database.prepare(
+    'INSERT INTO makeup_direct_completion_attestations(app,case_id,case_revision,lesson_task_id,' +
+      'check_key,student_id,staff_id,attendance_date,start_time,end_time,attendance_status,' +
+      'actor_id,provenance,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+  ).run('task', caseId, 2, taskId, taskId + '|' + date, 'student-a', 'teacher-a', date,
+    '18:00', '19:00', 'P', 'director', 'makeup_direct_completion_v1', CUTOFF);
+  seedCheck(db, taskId, date, 'P', { source: 'makeup_direct_completion_v1' });
 }
 
 function response(body, status = 200) { return { body, status }; }
@@ -481,8 +510,9 @@ test('completed absence makeup counts once while exam/other makeup stays out of 
   ]) {
     const caseId = 'mu_' + suffix;
     const taskId = 'makeup_lesson_' + caseId;
-    db.database.prepare('INSERT INTO makeup_cases(app,case_id,student_id,status,history) VALUES(?,?,?,?,?)')
-      .run('task', caseId, 'student-a', 'completed', JSON.stringify([first]));
+    db.database.prepare(
+      'INSERT INTO makeup_cases(app,case_id,student_id,status,confirmed_staff_id,history) VALUES(?,?,?,?,?,?)'
+    ).run('task', caseId, 'student-a', 'completed', 'teacher-a', JSON.stringify([first]));
     seedTask(db, taskId, 'student-a', 'teacher-a', {
       lessonInstanceType: 'makeup', makeupCaseId: caseId, repeat: 'once', start: date, end: date
     });
@@ -509,11 +539,41 @@ test('completed absence makeup counts once while exam/other makeup stays out of 
     'makeup_lesson_mu_absence|2026-08-12', CUTOFF), /STUDENT_SESSION_ATTENDANCE_SOURCE/);
 });
 
+test('makeup assignee mismatch stays visible in the calendar but is diagnosed and skipped by the ledger', async () => {
+  const db = new TestD1(true, true);
+  seedRoster(db, [rosterStudent('student-a', '담당불일치')]);
+  db.database.prepare(
+    'INSERT INTO makeup_cases(app,case_id,student_id,status,confirmed_staff_id,history) VALUES(?,?,?,?,?,?)'
+  ).run('task', 'mu_mismatch', 'student-a', 'completed', 'teacher-b', JSON.stringify([
+    { action: 'create_manual', reason: 'manual_absence' }
+  ]));
+  seedTask(db, 'makeup_lesson_mu_mismatch', 'student-a', 'teacher-a', {
+    lessonInstanceType: 'makeup', makeupCaseId: 'mu_mismatch', repeat: 'once',
+    start: '2026-08-10', end: '2026-08-10'
+  });
+  seedCheck(db, 'makeup_lesson_mu_mismatch', '2026-08-10', 'P');
+
+  const synced = await syncStudentSessionLedgers({ DB: db }, CUTOFF);
+  assert.equal(synced.ok, true);
+  assert.equal(synced.createdEvents, 0);
+  assert.equal(synced.makeupAssigneeMismatches, 1);
+  assert.equal(db.database.prepare('SELECT COUNT(*) count FROM student_session_ledger_events').get().count, 0);
+
+  const calendar = await attendanceApi(db, {
+    studentId: 'student-a', month: '2026-08'
+  });
+  assert.deepEqual(calendar.body.attendance, [
+    { date: '2026-08-10', status: 'P', taskId: 'makeup_lesson_mu_mismatch' }
+  ]);
+  assert.equal(calendar.body.attendanceCount, 0);
+});
+
 test('confirmed absence makeup is finalized on its attendance date before a delayed complete action', async () => {
   const db = new TestD1();
   seedRoster(db, [rosterStudent('student-a', '지연완료')]);
-  db.database.prepare('INSERT INTO makeup_cases(app,case_id,student_id,status,history) VALUES(?,?,?,?,?)')
-    .run('task', 'mu_delayed', 'student-a', 'confirmed', JSON.stringify([
+  db.database.prepare(
+    'INSERT INTO makeup_cases(app,case_id,student_id,status,confirmed_staff_id,history) VALUES(?,?,?,?,?,?)'
+  ).run('task', 'mu_delayed', 'student-a', 'confirmed', 'teacher-a', JSON.stringify([
       { action: 'create_manual', reason: 'manual_absence' }
     ]));
   seedTask(db, 'makeup_lesson_mu_delayed', 'student-a', 'teacher-a', {
@@ -581,6 +641,111 @@ test('generation ledger is preferred after migration and starts cycle two only o
     complete: view.body.cycleComplete }, { start: '2026-08-17', count: 1, complete: false });
 });
 
+test('past direct absence remains attested after a same-att memo update and rebuilds once while exam stays at zero', async () => {
+  const db = new TestD1(true, true);
+  const now = Date.parse('2026-09-05T14:50:00Z');
+  seedRoster(db, [rosterStudent('student-a', '과거보강학생')]);
+  seedTask(db, 'lesson-a', 'student-a');
+  seedCheck(db, 'lesson-a', '2026-08-25', 'P');
+  seedCheck(db, 'lesson-a', '2026-08-30', 'L');
+  const initial = await syncStudentSessionLedgers({ DB: db }, now);
+  assert.equal(initial.createdEvents, 2);
+
+  seedDirectCompletedMakeup(db, 'mu_direct_absence', '2026-08-20', 'manual_absence');
+  seedDirectCompletedMakeup(db, 'mu_direct_exam', '2026-08-15', 'manual_exam');
+  const directKey = 'makeup_lesson_mu_direct_absence|2026-08-20';
+  const directCheck = JSON.parse(db.database.prepare('SELECT data FROM checks WHERE app=? AND k=?')
+    .get('task', directKey).data);
+  delete directCheck.source;
+  directCheck.note = '같은 출결 상태에서 저장한 자체 작성 메모';
+  db.database.prepare('UPDATE checks SET data=?,updated_at=updated_at+1,srv_at=srv_at+1 WHERE app=? AND k=?')
+    .run(JSON.stringify(directCheck), 'task', directKey);
+  assert.equal(Object.prototype.hasOwnProperty.call(JSON.parse(db.database.prepare(
+    'SELECT data FROM checks WHERE app=? AND k=?').get('task', directKey).data), 'source'), false);
+  const reconciled = await syncStudentSessionLedgers({ DB: db }, now);
+  assert.equal(reconciled.ok, true);
+  assert.equal(reconciled.reconciliations, 1);
+  assert.equal(reconciled.reconciliationsPending, 0);
+  assert.equal(reconciled.createdEvents, 1);
+  assert.deepEqual(db.database.prepare(
+    'SELECT generation,source_cutoff_date,kind,reason_code,actor FROM student_session_ledger_generations ' +
+      'ORDER BY generation'
+  ).all().map(row => ({ ...row })), [
+    { generation: 1, source_cutoff_date: '2026-08-01', kind: 'system_backfill',
+      reason_code: 'initial_backfill', actor: 'system' },
+    { generation: 2, source_cutoff_date: '2026-08-20', kind: 'admin_reconciliation',
+      reason_code: 'makeup_direct_completion_backfill', actor: 'system:makeup_direct_completion' }
+  ]);
+  assert.deepEqual(db.database.prepare(
+    'SELECT lesson_task_id,attendance_date,attendance_status,source_kind FROM student_session_ledger_events ' +
+      'WHERE generation=2 ORDER BY cycle_number,session_number'
+  ).all().map(row => ({ ...row })), [
+    { lesson_task_id: 'makeup_lesson_mu_direct_absence', attendance_date: '2026-08-20',
+      attendance_status: 'P', source_kind: 'admin_attested' },
+    { lesson_task_id: 'lesson-a', attendance_date: '2026-08-25',
+      attendance_status: 'P', source_kind: 'check' },
+    { lesson_task_id: 'lesson-a', attendance_date: '2026-08-30',
+      attendance_status: 'L', source_kind: 'check' }
+  ]);
+  assert.equal(db.database.prepare(
+    "SELECT COUNT(*) count FROM student_session_ledger_events WHERE lesson_task_id='makeup_lesson_mu_direct_exam'"
+  ).get().count, 0);
+
+  const retry = await syncStudentSessionLedgers({ DB: db }, now);
+  assert.equal(retry.reconciliations, 0);
+  assert.equal(retry.createdEvents, 0);
+  assert.equal(db.database.prepare(
+    "SELECT COUNT(*) count FROM student_session_ledger_events WHERE generation=2 " +
+      "AND lesson_task_id='makeup_lesson_mu_direct_absence'"
+  ).get().count, 1);
+
+  const alerts = await handleScheduledTuitionAlerts({ DB: db }, now);
+  assert.equal(alerts.qualifyingAttendances, 3);
+  assert.equal(alerts.created, 0);
+  assert.equal(alerts.idempotent, 1);
+  assert.deepEqual({ ...db.database.prepare(
+    'SELECT cycle_start_date,trigger_date FROM tuition_generation_alerts'
+  ).get() }, { cycle_start_date: '2026-08-01', trigger_date: '2026-08-30' });
+});
+
+test('past direct completion attestation survives a reconciliation CAS race and retries on the next sync', async () => {
+  const db = new TestD1(true, true);
+  const now = Date.parse('2026-09-05T14:50:00Z');
+  seedRoster(db, [rosterStudent('student-a', '경합보강학생')]);
+  seedTask(db, 'lesson-a', 'student-a');
+  seedCheck(db, 'lesson-a', '2026-08-30', 'P');
+  assert.equal((await syncStudentSessionLedgers({ DB: db }, now)).createdEvents, 1);
+  seedDirectCompletedMakeup(db, 'mu_direct_race', '2026-08-20');
+
+  let injected = false;
+  db.beforeExecute = sql => {
+    if (injected || !sql.startsWith('INSERT INTO student_session_ledger_generations')) return;
+    injected = true;
+    db.database.prepare(
+      'INSERT INTO student_session_ledger_generations(app,student_id,configured_start_date,generation,' +
+        'source_cutoff_date,kind,supersedes_generation,supersedes_event_count,reason_code,actor,created_at) ' +
+        "VALUES('task',?,?,?,?,'admin_reconciliation',?,?,?,?,?)"
+    ).run('student-a', '2026-08-01', 2, '2026-08-20', 1, 1,
+      'competing_reconciliation', 'manager:race', now);
+  };
+  const pending = await syncStudentSessionLedgers({ DB: db }, now);
+  db.beforeExecute = null;
+  assert.equal(injected, true);
+  assert.equal(pending.ok, true);
+  assert.equal(pending.reconciliations, 0);
+  assert.equal(pending.reconciliationsPending, 1);
+  assert.equal(db.database.prepare('SELECT MAX(generation) generation FROM student_session_ledger_generations')
+    .get().generation, 1);
+
+  const retried = await syncStudentSessionLedgers({ DB: db }, now);
+  assert.equal(retried.reconciliations, 1);
+  assert.equal(retried.createdEvents, 1);
+  assert.equal(db.database.prepare(
+    "SELECT COUNT(*) count FROM student_session_ledger_events WHERE generation=2 " +
+      "AND lesson_task_id='makeup_lesson_mu_direct_race'"
+  ).get().count, 1);
+});
+
 test('admin reconciliation supersedes the historical calendar and later checks append to only the latest generation', async () => {
   const db = new TestD1(true, true);
   const now = Date.parse('2026-09-05T14:50:00Z');
@@ -589,8 +754,9 @@ test('admin reconciliation supersedes the historical calendar and later checks a
   seedTask(db, 'lesson-a', 'student-a', 'teacher-a', { start: '2026-08-22' });
   seedTask(db, 'lesson-old', 'student-a');
   seedCheck(db, 'lesson-old', '2026-08-02', 'P'); // 회차 시작 전 달력 기록은 유지
-  db.database.prepare('INSERT INTO makeup_cases(app,case_id,student_id,status,history) VALUES(?,?,?,?,?)')
-    .run('task', 'mu_exam_calendar', 'student-a', 'completed', JSON.stringify([
+  db.database.prepare(
+    'INSERT INTO makeup_cases(app,case_id,student_id,status,confirmed_staff_id,history) VALUES(?,?,?,?,?,?)'
+  ).run('task', 'mu_exam_calendar', 'student-a', 'completed', 'teacher-a', JSON.stringify([
       { action: 'create_manual', reason: 'manual_exam' }
     ]));
   seedTask(db, 'makeup_lesson_mu_exam_calendar', 'student-a', 'teacher-a', {
@@ -894,8 +1060,9 @@ test('admin attestation accepts only regular lessons or exact qualifying absence
   for (const [caseId, reason] of [
     ['mu_exam', 'manual_exam'], ['mu_other', 'manual_other'], ['mu_absence', 'manual_absence']
   ]) {
-    db.database.prepare('INSERT INTO makeup_cases(app,case_id,student_id,status,history) VALUES(?,?,?,?,?)')
-      .run('task', caseId, 'student-a', 'completed', JSON.stringify([
+    db.database.prepare(
+      'INSERT INTO makeup_cases(app,case_id,student_id,status,confirmed_staff_id,history) VALUES(?,?,?,?,?,?)'
+    ).run('task', caseId, 'student-a', 'completed', 'teacher-a', JSON.stringify([
         { action: 'create_manual', reason }
       ]));
     seedTask(db, 'makeup_lesson_' + caseId, 'student-a', 'teacher-a', {

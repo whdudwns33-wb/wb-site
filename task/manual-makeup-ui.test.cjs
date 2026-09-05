@@ -39,8 +39,9 @@ test('수동 보강은 원생을 먼저 고르고 권한 범위의 현재 정규
   assert.match(lessonSource, /String\(task\.start\) <= reference/);
   assert.match(lessonSource, /String\(task\.end\) >= reference/);
   assert.ok(modal.indexOf('id="muManualStudent"') < modal.indexOf('id="muManualSourceTask"'));
-  assert.match(modal, /id="muManualSourceTask" disabled/);
+  assert.match(modal, /id="muManualSourceTask" data-manual-makeup-source disabled/);
   assert.match(change, /updateManualMakeupLessonSelect\(String\(manualMakeupStudent\.value \|\| ''\)\)/);
+  assert.match(change, /updateManualMakeupStaffSelect\(String\(manualMakeupSource\.value \|\| ''\)\)/);
   assert.doesNotMatch(change.slice(0, change.indexOf('const teacherLiveRequestLesson')), /render\(/,
     '원생을 고를 때 모달이나 전체 화면을 다시 그리지 않는다');
 });
@@ -85,6 +86,7 @@ test('수동 보강 모달은 고정 사유와 날짜·시작·종료 입력을 
     assert.match(reasons, new RegExp(`\\['${code}', '${label}'\\]`));
   }
   assert.match(modal, /id="muManualReason"/);
+  assert.match(modal, /manualMakeupStaffFieldHtml\(\)/);
   assert.match(modal, /id="muManualDate" type="date"/);
   assert.match(modal, /id="muManualStart" type="time"/);
   assert.match(modal, /id="muManualEnd" type="time"/);
@@ -94,22 +96,35 @@ test('수동 보강 모달은 고정 사유와 날짜·시작·종료 입력을 
   assert.doesNotMatch(modal, /<textarea|prompt\s*\(/i);
 });
 
+test('수업무관 보강은 관리자만 실제 담당을 고르고 선생님은 본인 stable staffId로 고정한다', () => {
+  const helper = block('function updateManualMakeupStaffSelect(sourceTaskId)', 'function openManualMakeupModal()');
+  assert.match(helper, /if \(!session\.isAdmin\)/);
+  assert.match(helper, /field\.value = String\(session\.staffId \|\| ''\)/);
+  assert.match(helper, /makeupStaffOptionsHtml\(defaultStaffId\)/);
+  assert.match(helper, /실제 보강 담당 선생님/);
+  assert.match(helper, /id="muManualStaff" disabled/);
+  assert.match(helper, /type="hidden" value="' \+ esc\(session\.staffId \|\| ''\)/);
+  assert.match(helper, /다른 선생님 배정은 관리자에게 요청해 주세요/);
+});
+
 test('확인은 create_manual의 정확한 식별자·사유·일시만 전송한다', async () => {
   const source = block('async function submitManualMakeup(button)', 'function makeupCanComplete');
   const elements = {
     muManualStudent: { value: 'student-8' }, muManualSourceTask: { value: 'lesson-3' },
     muManualReason: { value: 'manual_exam' }, muManualDate: { value: '2026-09-06' },
-    muManualStart: { value: '14:00' }, muManualEnd: { value: '14:50' }
+    muManualStart: { value: '14:00' }, muManualEnd: { value: '14:50' },
+    muManualStaff: { value: 'staff-1' }
   };
   const calls = [];
   const submit = new Function('$', 'session', 'manualMakeupSourceLessons', 'MANUAL_MAKEUP_REASON_LABELS',
-    'today', 'toast', 'mutateMakeup', `${source}\nreturn submitManualMakeup;`)(
+    'today', 'showMakeupModalError', 'makeupActiveStaff', 'mutateMakeup', `${source}\nreturn submitManualMakeup;`)(
       id => elements[id.slice(1)] || null,
       { isAdmin: false, isStaffLink: true, staffId: 'staff-1' },
       studentId => studentId === 'student-8' ? [{ id: 'lesson-3' }] : [],
       { manual_exam: '시험보강' },
       () => '2026-09-03',
-      message => calls.push({ toast: message }),
+      message => calls.push({ error: message }),
+      staffId => staffId === 'staff-1' ? { id: staffId } : null,
       async (payload, button, successText, focusAct, closeOnSuccess) => {
         calls.push({ payload, button, successText, focusAct, closeOnSuccess });
       }
@@ -120,7 +135,7 @@ test('확인은 create_manual의 정확한 식별자·사유·일시만 전송�
   assert.deepEqual(calls, [{
     payload: {
       action: 'create_manual', studentId: 'student-8', sourceTaskId: 'lesson-3',
-      reason: 'manual_exam', date: '2026-09-06', startTime: '14:00', endTime: '14:50'
+      reason: 'manual_exam', date: '2026-09-06', startTime: '14:00', endTime: '14:50', staffId: 'staff-1'
     },
     button,
     successText: '보강수업을 생성했습니다',
