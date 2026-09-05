@@ -736,6 +736,63 @@ test('admin transfers the exact lesson while preserving history and leaving lega
   assert.deepEqual(db.studentChangeEvents.at(-1).audienceStaffIds.sort(), ['teacher-1', 'teacher-2']);
 });
 
+test('teacher transfer ignores a stale deterministic target id occupied by a different assignment', async () => {
+  const db = new FakeDB();
+  const source = await buildLessonTask(assignedLesson(), 'teacher-1', 'manager', 100);
+  seed(db, source);
+
+  const targetCandidate = await buildLessonTask(assignedLesson(), 'teacher-2', 'manager', 101);
+  const staleOccupant = await buildLessonTask(assignedLesson({
+    subject: '클리닉', className: '', lessonRole: '클리닉'
+  }), 'teacher-2', 'manager', 102);
+  staleOccupant.id = targetCandidate.id;
+  staleOccupant.groupId = 'stale-target-assignment';
+  staleOccupant.steps = staleOccupant.steps.map((step, index) => ({
+    ...step, id: staleOccupant.id + '-step-' + (index + 1)
+  }));
+  seed(db, staleOccupant);
+
+  const transferred = await call(db, {
+    staffId: 'teacher-2', sourceTaskId: source.id,
+    expectedUpdatedAt: source.updatedAt, lesson: assignedLesson()
+  }, { scope: 'all', role: 'admin' });
+
+  assert.equal(transferred.response.status, 200);
+  assert.equal(transferred.data.updated, true);
+  assert.equal(transferred.data.task.id, source.id);
+  assert.equal(transferred.data.task.staffId, 'teacher-2');
+  assert.equal(db.tasks.get(source.id).owner, 'teacher-2');
+  const untouched = JSON.parse(db.tasks.get(targetCandidate.id).data);
+  assert.equal(untouched.subject, '클리닉');
+  assert.equal(untouched.id, targetCandidate.id);
+  assert.equal(db.tasks.size, 2);
+});
+
+test('new lesson insert fails closed when a different assignment occupies its deterministic id', async () => {
+  const db = new FakeDB();
+  const candidate = await buildLessonTask(assignedLesson(), 'teacher-1', 'manager', 100);
+  const staleOccupant = await buildLessonTask(assignedLesson({
+    subject: '클리닉', className: '', lessonRole: '클리닉'
+  }), 'teacher-1', 'manager', 101);
+  staleOccupant.id = candidate.id;
+  staleOccupant.groupId = 'stale-existing-assignment';
+  staleOccupant.steps = staleOccupant.steps.map((step, index) => ({
+    ...step, id: staleOccupant.id + '-step-' + (index + 1)
+  }));
+  seed(db, staleOccupant);
+
+  const created = await call(db, {
+    staffId: 'teacher-1', lesson: assignedLesson()
+  }, { scope: 'all', role: 'admin' });
+
+  assert.equal(created.response.status, 409);
+  assert.equal(created.data.code, 'lesson_revision_conflict');
+  assert.equal(created.data.created, undefined);
+  const persisted = JSON.parse(db.tasks.get(candidate.id).data);
+  assert.equal(persisted.subject, '클리닉');
+  assert.equal(db.tasks.size, 1);
+});
+
 test('teacher transfer never rewrites legacy aggregate roster assignment', async () => {
   const db = new FakeDB();
   const first = await call(db, {

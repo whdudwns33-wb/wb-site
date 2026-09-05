@@ -155,7 +155,7 @@ function overlap(start, end, otherStart, otherEnd) {
   return start < otherEnd && otherStart < end;
 }
 
-async function assertNoConflict(env, app, currentCaseId, studentId, staffId, range) {
+async function assertNoConflict(env, app, currentCaseId, studentId, range) {
   const tasks = await env.DB.prepare('SELECT id,owner,data FROM tasks WHERE app=?').bind(app).all();
   for (const row of tasks.results || []) {
     const task = parseJson(row.data);
@@ -177,13 +177,11 @@ async function assertNoConflict(env, app, currentCaseId, studentId, staffId, ran
     }
   }
   const conflicts = await env.DB.prepare(
-    "SELECT case_id,student_id,confirmed_staff_id FROM makeup_cases WHERE app=? AND status='confirmed' " +
-    'AND case_id<>? AND confirmed_start_at<? AND confirmed_end_at>? AND (student_id=? OR confirmed_staff_id=?) LIMIT 1'
-  ).bind(app, currentCaseId, range.endAt, range.startAt, studentId, staffId).first();
+    "SELECT case_id FROM makeup_cases WHERE app=? AND status IN ('confirmed','completed') " +
+    'AND case_id<>? AND confirmed_start_at<? AND confirmed_end_at>? AND student_id=? LIMIT 1'
+  ).bind(app, currentCaseId, range.endAt, range.startAt, studentId).first();
   if (conflicts) {
-    problem(String(conflicts.student_id) === studentId ? '학생의 확정 보강과 시간이 겹칩니다' :
-      '담당 선생님의 확정 보강과 시간이 겹칩니다', 409,
-    String(conflicts.student_id) === studentId ? 'STUDENT_MAKEUP_CONFLICT' : 'STAFF_MAKEUP_CONFLICT');
+    problem('학생의 확정·완료 보강과 시간이 겹칩니다', 409, 'STUDENT_MAKEUP_CONFLICT');
   }
 }
 
@@ -435,7 +433,7 @@ function transitionStatement(env, app, row, next, event, now) {
 function mapTransitionError(error) {
   const message = String(error && error.message || error);
   if (/MAKEUP_TIME_CONFLICT/.test(message)) {
-    problem('다른 확정 보강과 학생 또는 담당 선생님의 시간이 겹칩니다', 409, 'MAKEUP_TIME_CONFLICT');
+    problem('학생의 다른 확정·완료 보강과 시간이 겹칩니다', 409, 'MAKEUP_TIME_CONFLICT');
   }
   if (/PARENT_DECLINED/.test(message)) {
     problem('학부모가 참석 불가로 응답했습니다. 새 일정을 제안해 주세요', 409, 'PARENT_DECLINED');
@@ -742,7 +740,7 @@ async function casGuard(env, app, operation, row, now, attemptIdentity = '') {
     [String(row.case_id), String(row.revision), String(now), String(attemptIdentity || '')].join('\n'), now);
 }
 
-function regularConflictGuardStatement(env, app, row, studentId, staffId, range) {
+function regularConflictGuardStatement(env, app, row, studentId, range) {
   const day = weekday(range.date);
   return env.DB.prepare(
     'UPDATE makeup_cases SET updated_at=updated_at WHERE app=? AND case_id=? AND revision=? AND status=? AND NOT EXISTS (' +
@@ -763,12 +761,13 @@ function regularConflictGuardStatement(env, app, row, studentId, staffId, range)
         "AND (COALESCE(json_extract(slot.value,'$.validTo'),json_extract(slot.value,'$.endDate'),'')='' OR COALESCE(json_extract(slot.value,'$.validTo'),json_extract(slot.value,'$.endDate'))>=?) " +
         "AND EXISTS (SELECT 1 FROM json_each(json_extract(slot.value,'$.days')) sd WHERE sd.value=?) " +
         "AND json_extract(slot.value,'$.startTime')<? AND json_extract(slot.value,'$.endTime')>?))" +
-    ") AND NOT EXISTS (SELECT 1 FROM makeup_cases other WHERE other.app=? AND other.status='confirmed' " +
+    ") AND NOT EXISTS (SELECT 1 FROM makeup_cases other WHERE other.app=? " +
+      "AND other.status IN ('confirmed','completed') " +
       'AND other.case_id<>? AND other.confirmed_start_at<? AND other.confirmed_end_at>? ' +
-      'AND (other.student_id=? OR other.confirmed_staff_id=?))'
+      'AND other.student_id=?)'
   ).bind(app, row.case_id, Number(row.revision), row.status, app, studentId,
     range.date, range.date, range.date, day, day, range.date, range.date, day, range.endTime, range.startTime,
-    app, row.case_id, range.endAt, range.startAt, studentId, staffId);
+    app, row.case_id, range.endAt, range.startAt, studentId);
 }
 
 function sourceIdentityGuardStatement(env, app, row, sourceRow) {
@@ -819,7 +818,7 @@ async function saveProposal(env, app, row, next, event, sourceIdentity, staffId,
     await casGuard(env, app, 'makeup_propose_source', row, now),
     activeStaffGuardStatement(env, app, row, staffId),
     await casGuard(env, app, 'makeup_propose_staff', row, now),
-    regularConflictGuardStatement(env, app, row, String(row.student_id), staffId, range),
+    regularConflictGuardStatement(env, app, row, String(row.student_id), range),
     await casGuard(env, app, 'makeup_propose_conflict', row, now),
     transitionStatement(env, app, row, next, event, now),
     await casGuard(env, app, 'makeup_propose_case', row, now)
@@ -832,7 +831,7 @@ async function saveProposal(env, app, row, next, event, sourceIdentity, staffId,
       if (!await activeStaff(env, app, staffId)) {
         problem('제안된 보강 담당 선생님이 더 이상 활성 상태가 아닙니다', 409, 'STAFF_INACTIVE');
       }
-      await assertNoConflict(env, app, String(row.case_id), String(row.student_id), staffId, range);
+      await assertNoConflict(env, app, String(row.case_id), String(row.student_id), range);
     }
     mapAtomicMakeupError(error);
   }
@@ -887,7 +886,7 @@ async function saveSchedule(env, app, row, next, event, source, sourceIdentity, 
     await casGuard(env, app, 'makeup_schedule_source', row, now),
     activeStaffGuardStatement(env, app, row, staffId),
     await casGuard(env, app, 'makeup_schedule_staff', row, now),
-    regularConflictGuardStatement(env, app, row, String(row.student_id), staffId, range),
+    regularConflictGuardStatement(env, app, row, String(row.student_id), range),
     await casGuard(env, app, 'makeup_schedule_conflict', row, now)
   ];
   let scheduleBase = row;
@@ -913,7 +912,7 @@ async function saveSchedule(env, app, row, next, event, source, sourceIdentity, 
       if (!await activeStaff(env, app, staffId)) {
         problem('보강 담당 선생님이 더 이상 활성 상태가 아닙니다', 409, 'STAFF_INACTIVE');
       }
-      await assertNoConflict(env, app, String(row.case_id), String(row.student_id), staffId, range);
+      await assertNoConflict(env, app, String(row.case_id), String(row.student_id), range);
     }
     mapAtomicMakeupError(error);
   }
@@ -933,7 +932,7 @@ async function saveReschedule(env, app, row, next, event, source, sourceIdentity
     await casGuard(env, app, 'makeup_reschedule_source', row, now),
     activeStaffGuardStatement(env, app, row, staffId),
     await casGuard(env, app, 'makeup_reschedule_staff', row, now),
-    regularConflictGuardStatement(env, app, row, String(row.student_id), staffId, range),
+    regularConflictGuardStatement(env, app, row, String(row.student_id), range),
     await casGuard(env, app, 'makeup_reschedule_conflict', row, now),
     transitionStatement(env, app, row, next, event, now),
     await casGuard(env, app, 'makeup_reschedule_case', row, now),
@@ -952,7 +951,7 @@ async function saveReschedule(env, app, row, next, event, source, sourceIdentity
       if (!await activeStaff(env, app, staffId)) {
         problem('보강 담당 선생님이 더 이상 활성 상태가 아닙니다', 409, 'STAFF_INACTIVE');
       }
-      await assertNoConflict(env, app, String(row.case_id), String(row.student_id), staffId, range);
+      await assertNoConflict(env, app, String(row.case_id), String(row.student_id), range);
     }
     mapAtomicMakeupError(error);
   }
@@ -1087,7 +1086,7 @@ async function saveCompletion(env, app, row, next, event, document, source, stud
   statements.push(await casGuard(env, app, 'makeup_complete_source', row, now));
   statements.push(activeStaffGuardStatement(env, app, row, staffId));
   statements.push(await casGuard(env, app, 'makeup_complete_staff', row, now));
-  statements.push(regularConflictGuardStatement(env, app, row, String(row.student_id), staffId, range));
+  statements.push(regularConflictGuardStatement(env, app, row, String(row.student_id), range));
   statements.push(await casGuard(env, app, 'makeup_complete_conflict', row, now));
   let completionRow = row;
   let completionNext = next;
@@ -1174,7 +1173,7 @@ async function saveCompletion(env, app, row, next, event, document, source, stud
       if (!await activeStaff(env, app, staffId)) {
         problem('보강 담당 선생님이 더 이상 활성 상태가 아닙니다', 409, 'STAFF_INACTIVE');
       }
-      await assertNoConflict(env, app, String(row.case_id), String(row.student_id), staffId, range);
+      await assertNoConflict(env, app, String(row.case_id), String(row.student_id), range);
     }
     if (!forcedImpact && /SESSION_PACK_IDENTITY_MISMATCH/.test(String(error && error.message || error))) {
       const mismatch = { status: 'not_applicable', reason: 'pack_identity_mismatch', refreshNeeded: false };
@@ -1357,7 +1356,7 @@ async function createManual(env, app, body, auth, json, origin) {
     return manualExistingResponse(env, app, existing, student, source, sourceTaskId, studentId,
       sourceTeacherId, staffId, reason, range, json, origin);
   }
-  await assertNoConflict(env, app, ids.caseId, studentId, staffId, range);
+  await assertNoConflict(env, app, ids.caseId, studentId, range);
   const history = [{
     action: 'create_manual', from: 'none', to: 'confirmed', actorId: actorId(auth),
     actorScope: String(auth.scope || ''),
@@ -1407,7 +1406,7 @@ async function createManual(env, app, body, auth, json, origin) {
     await taskWriteCasGuardStatement(env, app, 'makeup_create_manual_case', ids.caseId + '\n' + now, now),
     sourceIdentityGuardStatement(env, app, row, source.row),
     await casGuard(env, app, 'makeup_create_manual_source', row, now),
-    regularConflictGuardStatement(env, app, row, studentId, staffId, range),
+    regularConflictGuardStatement(env, app, row, studentId, range),
     await casGuard(env, app, 'makeup_create_manual_conflict', row, now),
     taskWrite.statement,
     await casGuard(env, app, 'makeup_create_manual_task', row, now)
@@ -1424,7 +1423,7 @@ async function createManual(env, app, body, auth, json, origin) {
           sourceTeacherId, staffId, reason, range, json, origin);
       }
       // 가능한 경우 구체적인 운영 충돌을 먼저 돌려주고, 정본 변경이면 CAS 충돌로 닫는다.
-      await assertNoConflict(env, app, ids.caseId, studentId, staffId, range);
+      await assertNoConflict(env, app, ids.caseId, studentId, range);
       const freshSource = await manualSourceTask(env, app, sourceTaskId, studentId, range.date);
       rosterStudent(await loadRoster(env, app), studentId, range.date);
       if (!await activeStaff(env, app, String(freshSource.row.owner || '')) ||
@@ -1770,7 +1769,7 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
         }
       }
       if (!await activeStaff(env, app, staffId)) problem('확정된 보강 담당 선생님이 비활성 상태입니다', 409, 'STAFF_INACTIVE');
-      await assertNoConflict(env, app, caseId, String(row.student_id), staffId, range);
+      await assertNoConflict(env, app, caseId, String(row.student_id), range);
       const taskWrite = await prepareMakeupLessonWrite(env, app, row, source, student, staffId, range, requestNow);
       const restoreAttempt = existingRow ? String(existingRow.updated_at || '') + '\n' + String(existingRow.data || '') : 'new';
       let results;
@@ -1780,7 +1779,7 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
           await casGuard(env, app, 'makeup_restore_source', row, requestNow, restoreAttempt),
           activeStaffGuardStatement(env, app, row, staffId),
           await casGuard(env, app, 'makeup_restore_staff', row, requestNow, restoreAttempt),
-          regularConflictGuardStatement(env, app, row, String(row.student_id), staffId, range),
+          regularConflictGuardStatement(env, app, row, String(row.student_id), range),
           await casGuard(env, app, 'makeup_restore_conflict', row, requestNow, restoreAttempt),
           taskWrite.statement,
           await casGuard(env, app, 'makeup_restore_task', row, requestNow, restoreAttempt)
@@ -1790,7 +1789,7 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
           if (!await activeStaff(env, app, staffId)) {
             problem('확정된 보강 담당 선생님이 더 이상 활성 상태가 아닙니다', 409, 'STAFF_INACTIVE');
           }
-          await assertNoConflict(env, app, caseId, String(row.student_id), staffId, range);
+          await assertNoConflict(env, app, caseId, String(row.student_id), range);
         }
         mapAtomicMakeupError(error);
       }
@@ -1819,7 +1818,7 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
       const staffId = cleanId(body.staffId, 'staffId');
       rosterStudent(document, String(row.student_id), range.date);
       if (!await activeStaff(env, app, staffId)) problem('활성 담당 선생님을 선택해 주세요', 409, 'STAFF_INACTIVE');
-      await assertNoConflict(env, app, caseId, String(row.student_id), staffId, range);
+      await assertNoConflict(env, app, caseId, String(row.student_id), range);
       next.status = 'awaiting_parent'; next.proposed_start_at = range.startAt; next.proposed_end_at = range.endAt;
       next.proposed_staff_id = staffId; next.notification_needed = 1;
       next.notification_event = 'proposal'; next.notification_event_revision = revision + 1;
@@ -1839,7 +1838,7 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
       assertSlotNotEnded(range, requestNow);
       student = rosterStudent(document, String(row.student_id), range.date);
       if (!await activeStaff(env, app, String(row.proposed_staff_id))) problem('제안된 담당 선생님이 비활성 상태입니다', 409, 'STAFF_INACTIVE');
-      await assertNoConflict(env, app, caseId, String(row.student_id), String(row.proposed_staff_id), range);
+      await assertNoConflict(env, app, caseId, String(row.student_id), range);
       next.status = 'confirmed'; next.confirmed_start_at = row.proposed_start_at; next.confirmed_end_at = row.proposed_end_at;
       next.confirmed_staff_id = row.proposed_staff_id; next.notification_needed = 1;
       next.notification_event = 'confirmed'; next.notification_event_revision = revision + 1;
@@ -1856,7 +1855,7 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
         ? currentSourceTeacherId : cleanId(body.staffId, '보강 담당자');
       student = rosterStudent(document, String(row.student_id), range.date);
       if (!await activeStaff(env, app, staffId)) problem('활성 보강 담당 선생님을 선택해 주세요', 409, 'STAFF_INACTIVE');
-      await assertNoConflict(env, app, caseId, String(row.student_id), staffId, range);
+      await assertNoConflict(env, app, caseId, String(row.student_id), range);
       next.status = 'confirmed';
       next.confirmed_start_at = range.startAt;
       next.confirmed_end_at = range.endAt;
@@ -1880,7 +1879,7 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
       if (!await activeStaff(env, app, staffId)) {
         problem('활성 보강 담당 선생님을 선택해 주세요', 409, 'STAFF_INACTIVE');
       }
-      await assertNoConflict(env, app, caseId, String(row.student_id), staffId, range);
+      await assertNoConflict(env, app, caseId, String(row.student_id), range);
       const previous = scheduleView('confirmed', row);
       next.confirmed_start_at = range.startAt;
       next.confirmed_end_at = range.endAt;
@@ -1950,6 +1949,7 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
       if (!await activeStaff(env, app, staffId)) {
         problem('확정된 보강 담당 선생님이 비활성 상태입니다', 409, 'STAFF_INACTIVE');
       }
+      await assertNoConflict(env, app, caseId, String(row.student_id), range);
       if (!direct) await scheduledCompletionAttendance(env, app, row, staffId);
       next.status = 'completed';
       next.completed_at = requestNow;

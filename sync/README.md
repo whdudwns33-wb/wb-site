@@ -77,6 +77,7 @@ npx wrangler d1 execute wb-sync --remote --file=./migrations/062_feedback_ai_bud
 npx wrangler d1 execute wb-sync --remote --file=./migrations/063_student_session_cycles.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/064_student_session_ledger_generations.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/065_makeup_assignee_integrity.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/066_makeup_student_overlap_only.sql
 
 # 3) 비밀키 등록 — 코드나 wrangler.toml에 적지 않는다
 npx wrangler secret put TASK_ADMIN_SECRET
@@ -552,8 +553,9 @@ KST 오늘 본인 노선으로 제한된다. 전체 관리 권한은 오늘 기�
 ### `/makeup` — 전 학생 공통 보강 원장
 
 결석 출결 한 건에서 보강 검토를 만들고 `review_pending → reviewed → awaiting_parent →
-confirmed → completed`로 관리한다. 모든 변경은 `revision` CAS이며, 학생·담당 선생님·정규 수업과
-확정 보강의 시간 겹침을 서버에서 다시 검사한다. 담당 선생님은 자기 학생의 검토 요청과 자기 담당
+confirmed → completed`로 관리한다. 모든 변경은 `revision` CAS이며, 같은 학생의 정규 수업·
+확정·완료 보강과 시간이 겹치는지 서버에서 다시 검사한다. 한 선생님이 다른 학생의 정규 수업이나
+보강을 동시에 담당하는 것은 허용한다. 담당 선생님은 자기 학생의 검토 요청과 자기 담당
 보강 완료만 할 수 있고, 원장·허용된 관리 담당만 검토·일정 제안·확정·취소를 할 수 있다.
 
 ```jsonc
