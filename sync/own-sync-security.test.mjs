@@ -53,6 +53,9 @@ class FakeDB {
     if (sql.startsWith('SELECT check_key FROM student_session_attendance_events')) {
       return { results: [] };
     }
+    if (sql.startsWith('SELECT check_key FROM student_session_ledger_events')) {
+      return { results: [] };
+    }
     if (sql.startsWith('SELECT id,owner,data,updated_at,srv_at FROM tasks WHERE app=? AND id IN')) {
       const ids = new Set(args.slice(1).map(String));
       return { results: [...this.tasks.entries()]

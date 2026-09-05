@@ -636,11 +636,27 @@ async function sessionAttendanceEventKeys(env, app, keys) {
   const found = new Set();
   for (let offset = 0; offset < keys.length; offset += 80) {
     const chunk = keys.slice(offset, offset + 80);
-    const result = await env.DB.prepare(
-      'SELECT check_key FROM student_session_attendance_events WHERE app=? AND check_key IN (' +
-        chunk.map(() => '?').join(',') + ')'
-    ).bind(app, ...chunk).all();
-    for (const row of result.results || []) found.add(String(row.check_key));
+    for (const table of ['student_session_attendance_events', 'student_session_ledger_events']) {
+      let result;
+      try {
+        result = await env.DB.prepare(
+          'SELECT check_key FROM ' + table + ' WHERE app=? AND check_key IN (' +
+            chunk.map(() => '?').join(',') + ')'
+        ).bind(app, ...chunk).all();
+      } catch (error) {
+        // A Worker can briefly overlap the migration during a staged rollout. Keep the
+        // legacy ledger usable until the additive generation table exists, but surface
+        // every other database failure instead of weakening the permanent lock.
+        if (table === 'student_session_ledger_events' &&
+            /no such table.*student_session_ledger_events/i.test(String(error && error.message || error))) {
+          continue;
+        }
+        throw error;
+      }
+      for (const row of result.results || []) {
+        if (row.check_key != null) found.add(String(row.check_key));
+      }
+    }
   }
   return found;
 }

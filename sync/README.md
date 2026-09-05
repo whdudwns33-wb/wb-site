@@ -75,6 +75,7 @@ npx wrangler d1 execute wb-sync --remote --file=./migrations/060_lesson_handoffs
 npx wrangler d1 execute wb-sync --remote --file=./migrations/061_consult_reward_processing_guard.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/062_feedback_ai_budget_cache.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/063_student_session_cycles.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/064_student_session_ledger_generations.sql
 
 # 3) 비밀키 등록 — 코드나 wrangler.toml에 적지 않는다
 npx wrangler secret put TASK_ADMIN_SECRET
@@ -257,6 +258,13 @@ append-only 저장한다. 승인된 수업삭제의 감사 행은 DB에만 보�
 설정된 회차 시작일부터 모든 담당 과목의 확정 출석·지각·조퇴를 합쳐 4회 단위의 append-only
 원장으로 저장하며, 결석은 0회이고 자동 보강을 생성하지 않는다. 4회 완료 후에는 다음 확정
 출석일을 새 회차 시작일로 삼는다. 원장에는 이름·연락처를 저장하지 않고 stable studentId만 쓴다.
+
+과거 회차 출석일을 정정할 때는 `064_student_session_ledger_generations.sql` → Worker → 정정 세대
+등록 → Pages 순서를 지킨다. 기존 원장을 수정·삭제하지 않고 새 append-only 세대에 관리자 확인
+출석을 기록하며, 화면·회차 계산·3회 수강료 알림은 최신 세대만 사용한다. 정정 기준일까지의
+회차 산입 raw 출결은 최신 세대가 대체하고, 결석·비산입 보강은 달력에 보존한다. 그 이후 확정
+출결은 같은 세대에 계속 누적한다. 수강료 알림도 append-only 상태 이력으로 최신 회차와 함께
+교정하므로 정정에서 사라진 회차의 알림을 다시 표시하거나 확인하지 않는다.
 
 보호자 교재 주문 현황을 추가하는 배포는 반드시
 `037_book_order_identity_snapshots.sql` → Worker → Pages 순서로 진행한다. 새

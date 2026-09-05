@@ -5,12 +5,15 @@ import fs from 'node:fs';
 
 import {
   handleScheduledTuitionAlerts, handleTuitionAlert, handleStudentAttendance, sessionCycles,
-  syncStudentSessionLedgers
+  syncStudentSessionLedgers, reconcileStudentSessionLedger
 } from './tuition-alert.js';
 
 const source = fs.readFileSync(new URL('./tuition-alert.js', import.meta.url), 'utf8');
 const workerSource = fs.readFileSync(new URL('./worker-core.js', import.meta.url), 'utf8');
 const ledgerMigration = fs.readFileSync(new URL('./migrations/063_student_session_cycles.sql', import.meta.url), 'utf8');
+const generationMigration = fs.readFileSync(
+  new URL('./migrations/064_student_session_ledger_generations.sql', import.meta.url), 'utf8'
+);
 const CUTOFF = Date.parse('2026-08-28T14:50:00Z'); // 2026-08-28 23:50 KST
 
 const tables = `
@@ -56,23 +59,32 @@ CREATE TRIGGER tuition_generation_confirmations_no_delete BEFORE DELETE ON tuiti
 `;
 
 class Statement {
-  constructor(database, sql) { this.database = database; this.sql = sql; this.args = []; }
+  constructor(database, sql, beforeExecute) {
+    this.database = database; this.sql = sql; this.beforeExecute = beforeExecute; this.args = [];
+  }
   bind(...args) { this.args = args; return this; }
-  first() { return this.database.prepare(this.sql).get(...this.args) || null; }
-  all() { return { results: this.database.prepare(this.sql).all(...this.args) }; }
+  before() { if (this.beforeExecute) this.beforeExecute(this.sql, this.args); }
+  first() { this.before(); return this.database.prepare(this.sql).get(...this.args) || null; }
+  all() { this.before(); return { results: this.database.prepare(this.sql).all(...this.args) }; }
   run() {
+    this.before();
     const result = this.database.prepare(this.sql).run(...this.args);
     return { meta: { changes: Number(result.changes || 0) } };
   }
 }
 
 class TestD1 {
-  constructor(withAlertTables = true) {
+  constructor(withAlertTables = true, withGenerationTables = false) {
     this.database = new DatabaseSync(':memory:');
     this.database.exec(withAlertTables ? tables : tables.slice(0, tables.indexOf('CREATE TABLE tuition_generation_alerts')));
     this.database.exec(ledgerMigration);
+    if (withGenerationTables) this.database.exec(generationMigration);
   }
-  prepare(sql) { return new Statement(this.database, sql); }
+  prepare(sql) {
+    return new Statement(this.database, sql, (statementSql, args) => {
+      if (this.beforeExecute) this.beforeExecute(statementSql, args);
+    });
+  }
   batch(statements) {
     this.database.exec('BEGIN IMMEDIATE');
     try {
@@ -141,9 +153,9 @@ async function api(db, body, auth = { scope: 'all' }) {
   return await handleTuitionAlert({ DB: db }, 'task', { app: 'task', auth: {}, ...body }, '', auth, response);
 }
 
-async function attendanceApi(db, body, auth = { scope: 'all' }) {
+async function attendanceApi(db, body, auth = { scope: 'all' }, now = CUTOFF) {
   const original = Date.now;
-  Date.now = () => CUTOFF;
+  Date.now = () => now;
   try {
     return await handleStudentAttendance(
       { DB: db }, 'task', { app: 'task', auth: {}, ...body }, '', auth, response
@@ -542,6 +554,377 @@ test('confirmed absence makeup is finalized on its attendance date before a dela
   const completedLater = await syncStudentSessionLedgers({ DB: db }, CUTOFF);
   assert.equal(completedLater.createdEvents, 0);
   assert.equal(db.database.prepare('SELECT COUNT(*) count FROM student_session_attendance_events').get().count, 2);
+});
+
+test('generation ledger is preferred after migration and starts cycle two only on attendance five', async () => {
+  const db = new TestD1(true, true);
+  seedRoster(db, [rosterStudent('student-a', '회차학생')]);
+  seedTask(db, 'lesson-a', 'student-a');
+  for (const date of ['2026-08-01', '2026-08-05', '2026-08-09', '2026-08-13']) {
+    seedCheck(db, 'lesson-a', date, 'P');
+  }
+
+  const first = await syncStudentSessionLedgers({ DB: db }, CUTOFF);
+  assert.equal(first.createdEvents, 4);
+  assert.equal(db.database.prepare('SELECT COUNT(*) count FROM student_session_attendance_events').get().count, 0);
+  assert.equal(db.database.prepare('SELECT COUNT(*) count FROM student_session_ledger_events').get().count, 4);
+  let view = await attendanceApi(db, { studentId: 'student-a', month: '2026-08' });
+  assert.deepEqual({ start: view.body.cycleStartDate, count: view.body.attendanceCount,
+    complete: view.body.cycleComplete }, { start: '2026-08-01', count: 4, complete: true });
+
+  seedCheck(db, 'lesson-a', '2026-08-17', 'P');
+  const second = await syncStudentSessionLedgers({ DB: db }, CUTOFF);
+  assert.equal(second.createdCycles, 1);
+  assert.equal(second.createdEvents, 1);
+  view = await attendanceApi(db, { studentId: 'student-a', month: '2026-08' });
+  assert.deepEqual({ start: view.body.cycleStartDate, count: view.body.attendanceCount,
+    complete: view.body.cycleComplete }, { start: '2026-08-17', count: 1, complete: false });
+});
+
+test('admin reconciliation supersedes the historical calendar and later checks append to only the latest generation', async () => {
+  const db = new TestD1(true, true);
+  const now = Date.parse('2026-09-05T14:50:00Z');
+  seedRoster(db, [rosterStudent('student-a', '정정학생', { sessionCycleStartDate: '2026-08-09' })]);
+  // 운영 이관 task의 현재 start보다 앞선 실제 출석도 관리자 증빙 정정에는 포함할 수 있다.
+  seedTask(db, 'lesson-a', 'student-a', 'teacher-a', { start: '2026-08-22' });
+  seedTask(db, 'lesson-old', 'student-a');
+  seedCheck(db, 'lesson-old', '2026-08-02', 'P'); // 회차 시작 전 달력 기록은 유지
+  db.database.prepare('INSERT INTO makeup_cases(app,case_id,student_id,status,history) VALUES(?,?,?,?,?)')
+    .run('task', 'mu_exam_calendar', 'student-a', 'completed', JSON.stringify([
+      { action: 'create_manual', reason: 'manual_exam' }
+    ]));
+  seedTask(db, 'makeup_lesson_mu_exam_calendar', 'student-a', 'teacher-a', {
+    lessonInstanceType: 'makeup', makeupCaseId: 'mu_exam_calendar', repeat: 'once',
+    start: '2026-08-24', end: '2026-08-24'
+  });
+  seedCheck(db, 'makeup_lesson_mu_exam_calendar', '2026-08-24', 'P');
+  for (const [date, status] of [
+    ['2026-08-09', 'P'], ['2026-08-16', 'P'], ['2026-08-23', 'A'], ['2026-08-30', 'P']
+  ]) seedCheck(db, 'lesson-a', date, status);
+  assert.equal((await syncStudentSessionLedgers({ DB: db }, now)).createdEvents, 1);
+
+  const reconciled = await reconcileStudentSessionLedger({ DB: db }, {
+    studentId: 'student-a', configuredStartDate: '2026-08-09',
+    sourceCutoffDate: '2026-08-30', expectedGeneration: 1,
+    reasonCode: 'verified_attendance_dates', actor: 'manager:director', now,
+    entries: ['2026-08-09', '2026-08-16', '2026-08-22', '2026-08-29'].map(date => ({
+      taskId: 'lesson-a', date, status: 'P'
+    }))
+  });
+  assert.equal(reconciled.ok, true);
+  assert.equal(reconciled.generation, 2);
+  assert.equal(reconciled.eventCount, 4);
+  assert.deepEqual(db.database.prepare(
+    'SELECT generation,COUNT(*) count FROM student_session_ledger_events GROUP BY generation ORDER BY generation'
+  ).all().map(row => ({ ...row })), [
+    { generation: 1, count: 1 }, { generation: 2, count: 4 }
+  ]);
+
+  let august = await attendanceApi(db, { studentId: 'student-a', month: '2026-08' }, { scope: 'all' }, now);
+  assert.deepEqual(august.body.attendance.map(item => [item.date, item.status]), [
+    ['2026-08-02', 'P'], ['2026-08-09', 'P'], ['2026-08-16', 'P'], ['2026-08-22', 'P'],
+    ['2026-08-23', 'A'], ['2026-08-24', 'P'], ['2026-08-29', 'P']
+  ]);
+  assert.deepEqual({ start: august.body.cycleStartDate, count: august.body.attendanceCount,
+    complete: august.body.cycleComplete }, { start: '2026-08-09', count: 4, complete: true });
+
+  seedCheck(db, 'lesson-a', '2026-09-01', 'A');
+  seedCheck(db, 'lesson-a', '2026-09-02', 'P');
+  const tentative = await attendanceApi(db, { studentId: 'student-a', month: '2026-09' },
+    { scope: 'all' }, Date.parse('2026-09-02T14:49:00Z'));
+  assert.deepEqual(tentative.body.attendance.map(item => [item.date, item.status]), [
+    ['2026-09-01', 'A'], ['2026-09-02', 'P']
+  ]);
+  const appended = await syncStudentSessionLedgers({ DB: db }, now);
+  assert.equal(appended.createdEvents, 1);
+  assert.equal(db.database.prepare(
+    'SELECT COUNT(*) count FROM student_session_ledger_events WHERE generation=1'
+  ).get().count, 1);
+  const september = await attendanceApi(db, { studentId: 'student-a', month: '2026-09' }, { scope: 'all' }, now);
+  assert.deepEqual(september.body.attendance.map(item => [item.date, item.status]), [
+    ['2026-09-01', 'A'], ['2026-09-02', 'P']
+  ]);
+  assert.deepEqual({ start: september.body.cycleStartDate, count: september.body.attendanceCount,
+    complete: september.body.cycleComplete }, { start: '2026-09-02', count: 1, complete: false });
+
+  const alerts = await handleScheduledTuitionAlerts({ DB: db }, now);
+  assert.equal(alerts.qualifyingAttendances, 5);
+  const alert = db.database.prepare(
+    'SELECT cycle_start_date,trigger_date FROM tuition_generation_alerts ORDER BY created_at LIMIT 1'
+  ).get();
+  assert.deepEqual({ ...alert }, { cycle_start_date: '2026-08-09', trigger_date: '2026-08-22' });
+});
+
+test('admin reconciliation validates task ownership and generation CAS without changing prior audit rows', async () => {
+  const db = new TestD1(true, true);
+  const now = Date.parse('2026-09-05T14:50:00Z');
+  seedRoster(db, [rosterStudent('student-a', '정정학생'), rosterStudent('student-b', '다른학생')]);
+  seedTask(db, 'lesson-a', 'student-a');
+  seedTask(db, 'lesson-b', 'student-b');
+  for (const date of ['2026-08-01', '2026-08-08', '2026-08-15']) {
+    seedCheck(db, 'lesson-a', date, 'P');
+  }
+  assert.equal((await handleScheduledTuitionAlerts({ DB: db }, now)).created, 1);
+
+  const wrongTask = await reconcileStudentSessionLedger({ DB: db }, {
+    studentId: 'student-a', configuredStartDate: '2026-08-01', sourceCutoffDate: '2026-08-30',
+    expectedGeneration: 1, reasonCode: 'verified_attendance_dates', actor: 'manager:director', now,
+    entries: [{ taskId: 'lesson-b', date: '2026-08-09', status: 'P' }]
+  });
+  assert.equal(wrongTask.code, 'STUDENT_SESSION_RECONCILIATION_TASK');
+  const stale = await reconcileStudentSessionLedger({ DB: db }, {
+    studentId: 'student-a', configuredStartDate: '2026-08-01', sourceCutoffDate: '2026-08-30',
+    expectedGeneration: 2, reasonCode: 'verified_attendance_dates', actor: 'manager:director', now,
+    entries: [{ taskId: 'lesson-a', date: '2026-08-09', status: 'P' }]
+  });
+  assert.equal(stale.code, 'STUDENT_SESSION_RECONCILIATION_CONFLICT');
+  const changedTrigger = await reconcileStudentSessionLedger({ DB: db }, {
+    studentId: 'student-a', configuredStartDate: '2026-08-01', sourceCutoffDate: '2026-08-30',
+    expectedGeneration: 1, reasonCode: 'verified_attendance_dates', actor: 'manager:director', now,
+    entries: ['2026-08-01', '2026-08-08', '2026-08-16'].map(date => ({
+      taskId: 'lesson-a', date, status: 'P'
+    }))
+  });
+  assert.equal(changedTrigger.ok, true);
+  assert.equal(db.database.prepare(
+    'SELECT COUNT(*) count FROM student_session_ledger_generations WHERE student_id=?'
+  ).get('student-a').count, 2);
+  assert.equal(db.database.prepare(
+    'SELECT COUNT(*) count FROM student_session_ledger_events WHERE student_id=?'
+  ).get('student-a').count, 6); // 세대 1도 감사 기록으로 유지
+  assert.equal(db.database.prepare(
+    'SELECT COUNT(*) count FROM tuition_generation_alerts WHERE student_id=?'
+  ).get('student-a').count, 1);
+  const listed = await api(db, { action: 'list' });
+  assert.equal(listed.body.alerts[0].triggerDate, '2026-08-16');
+});
+
+test('ledger read retries when cycle and event counts change during a same-generation read', async () => {
+  const db = new TestD1(true, true);
+  seedRoster(db, [rosterStudent('student-a', '동시조회학생')]);
+  seedTask(db, 'lesson-a', 'student-a');
+  for (const date of ['2026-08-01', '2026-08-05', '2026-08-09', '2026-08-13']) {
+    seedCheck(db, 'lesson-a', date, 'P');
+  }
+  await syncStudentSessionLedgers({ DB: db }, CUTOFF);
+  seedCheck(db, 'lesson-a', '2026-08-17', 'P');
+
+  let injected = false;
+  let markerReads = 0;
+  db.beforeExecute = sql => {
+    if (sql.includes('FROM student_session_ledger_generations AS ledger')) markerReads++;
+    if (injected || !sql.startsWith('SELECT cycle_number,cycle_start_date,created_at FROM student_session_ledger_cycles')) {
+      return;
+    }
+    injected = true;
+    db.database.prepare(
+      'INSERT INTO student_session_ledger_cycles(app,student_id,configured_start_date,generation,' +
+        'cycle_number,cycle_start_date,created_at) VALUES(?,?,?,?,?,?,?)'
+    ).run('task', 'student-a', '2026-08-01', 1, 2, '2026-08-17', CUTOFF);
+    db.database.prepare(
+      'INSERT INTO student_session_ledger_events(app,student_id,configured_start_date,generation,' +
+        'cycle_number,session_number,lesson_task_id,attendance_date,attendance_status,source_kind,' +
+        'check_key,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)'
+    ).run('task', 'student-a', '2026-08-01', 1, 2, 1, 'lesson-a', '2026-08-17', 'P',
+      'check', 'lesson-a|2026-08-17', CUTOFF);
+  };
+  const view = await attendanceApi(db, { studentId: 'student-a', month: '2026-08' });
+  db.beforeExecute = null;
+  assert.equal(injected, true);
+  assert.ok(markerReads >= 4);
+  assert.deepEqual({ start: view.body.cycleStartDate, count: view.body.attendanceCount },
+    { start: '2026-08-17', count: 1 });
+});
+
+test('reconciliation suppresses a disappeared cycle even after roster mode changes and blocks stale confirmation', async () => {
+  const db = new TestD1(true, true);
+  const now = Date.parse('2026-09-05T14:50:00Z');
+  seedRoster(db, [rosterStudent('student-a', '알림정정학생')]);
+  seedTask(db, 'lesson-a', 'student-a');
+  const dates = ['2026-08-01', '2026-08-05', '2026-08-09', '2026-08-13',
+    '2026-08-17', '2026-08-21', '2026-08-25'];
+  for (const date of dates) seedCheck(db, 'lesson-a', date, 'P');
+  assert.equal((await handleScheduledTuitionAlerts({ DB: db }, now)).created, 2);
+
+  const corrected = await reconcileStudentSessionLedger({ DB: db }, {
+    studentId: 'student-a', configuredStartDate: '2026-08-01', sourceCutoffDate: '2026-08-30',
+    expectedGeneration: 1, reasonCode: 'verified_attendance_dates', actor: 'manager:director', now,
+    entries: dates.slice(0, 4).map(date => ({ taskId: 'lesson-a', date, status: 'P' }))
+  });
+  assert.equal(corrected.ok, true);
+  assert.deepEqual(db.database.prepare(
+    'SELECT cycle_start_date,effective_status FROM tuition_generation_alert_states ' +
+      'WHERE ledger_generation=2 ORDER BY cycle_start_date'
+  ).all().map(row => ({ ...row })), [
+    { cycle_start_date: '2026-08-01', effective_status: 'active' },
+    { cycle_start_date: '2026-08-17', effective_status: 'suppressed' }
+  ]);
+  let listed = await api(db, { action: 'list' });
+  assert.deepEqual(listed.body.alerts.map(item => item.cycleStartDate), ['2026-08-01']);
+
+  seedRoster(db, [rosterStudent('student-a', '알림정정학생', {
+    billingMode: 'monthly', sessionCycleStartDate: ''
+  })]);
+  listed = await api(db, { action: 'list' });
+  assert.deepEqual(listed.body.alerts.map(item => item.cycleStartDate), ['2026-08-01']);
+  const suppressedId = db.database.prepare(
+    "SELECT alert_id FROM tuition_generation_alerts WHERE cycle_start_date='2026-08-17'"
+  ).get().alert_id;
+  const denied = await api(db, { action: 'confirm', alertId: suppressedId });
+  assert.equal(denied.status, 409);
+  assert.equal(denied.body.code, 'TUITION_ALERT_NOT_EFFECTIVE');
+});
+
+test('a delayed Cron reactivates a suppressed cycle by logical sequence instead of its older clock', async () => {
+  const db = new TestD1(true, true);
+  const reconciliationTime = Date.parse('2026-09-05T14:50:00Z');
+  const delayedCronTime = Date.parse('2026-09-02T14:50:00Z');
+  seedRoster(db, [rosterStudent('student-a', '지연크론학생')]);
+  seedTask(db, 'lesson-a', 'student-a');
+  const originalDates = ['2026-08-01', '2026-08-05', '2026-08-09', '2026-08-13',
+    '2026-08-17', '2026-08-21', '2026-08-25'];
+  for (const date of originalDates) seedCheck(db, 'lesson-a', date, 'P');
+  assert.equal((await handleScheduledTuitionAlerts({ DB: db }, reconciliationTime)).created, 2);
+
+  const corrected = await reconcileStudentSessionLedger({ DB: db }, {
+    studentId: 'student-a', configuredStartDate: '2026-08-01', sourceCutoffDate: '2026-08-30',
+    expectedGeneration: 1, reasonCode: 'verified_attendance_dates', actor: 'manager:director',
+    now: reconciliationTime,
+    entries: originalDates.slice(0, 6).map(date => ({ taskId: 'lesson-a', date, status: 'P' }))
+  });
+  assert.equal(corrected.ok, true);
+  const secondAlertId = db.database.prepare(
+    "SELECT alert_id FROM tuition_generation_alerts WHERE cycle_start_date='2026-08-17'"
+  ).get().alert_id;
+
+  seedCheck(db, 'lesson-a', '2026-09-02', 'P');
+  const delayed = await handleScheduledTuitionAlerts({ DB: db }, delayedCronTime);
+  assert.equal(delayed.ok, true);
+  const states = db.database.prepare(
+    'SELECT state_revision,state_sequence,effective_status,created_at ' +
+      'FROM tuition_generation_alert_states WHERE alert_id=? AND ledger_generation=2 ' +
+      'ORDER BY state_revision'
+  ).all(secondAlertId).map(row => ({ ...row }));
+  assert.deepEqual(states, [
+    { state_revision: 1, state_sequence: 2, effective_status: 'suppressed',
+      created_at: reconciliationTime },
+    { state_revision: 2, state_sequence: 3, effective_status: 'active',
+      created_at: delayedCronTime }
+  ]);
+
+  const listed = await api(db, { action: 'list' });
+  const second = listed.body.alerts.find(item => item.alertId === secondAlertId);
+  assert.equal(second.triggerDate, '2026-09-02');
+  const confirmed = await api(db, { action: 'confirm', alertId: secondAlertId });
+  assert.equal(confirmed.status, 200);
+  assert.equal(confirmed.body.ok, true);
+});
+
+test('an alert state from an older ledger generation is hidden and cannot be confirmed', async () => {
+  const db = new TestD1(true, true);
+  const now = Date.parse('2026-09-05T14:50:00Z');
+  seedRoster(db, [rosterStudent('student-a', '구세대알림학생')]);
+  seedTask(db, 'lesson-a', 'student-a');
+  const dates = ['2026-08-01', '2026-08-08', '2026-08-15'];
+  for (const date of dates) seedCheck(db, 'lesson-a', date, 'P');
+  assert.equal((await handleScheduledTuitionAlerts({ DB: db }, now)).created, 1);
+
+  // 정정 세대와 알림 상태가 서로 다른 요청으로 노출되는 극단적인 race를 재현한다.
+  // 소비 경로는 gen1 active 상태가 남아 있어도 현재 원장이 gen2이면 fail-closed 해야 한다.
+  db.database.prepare(
+    'INSERT INTO student_session_ledger_generations(app,student_id,configured_start_date,generation,' +
+      'source_cutoff_date,kind,supersedes_generation,supersedes_event_count,reason_code,actor,created_at) ' +
+      "VALUES('task',?,?,?,?,'admin_reconciliation',?,?,?,?,?)"
+  ).run('student-a', '2026-08-01', 2, '2026-08-30', 1, 3,
+    'test_stale_alert_state', 'manager:test', now + 1);
+  db.database.prepare(
+    'INSERT INTO student_session_ledger_cycles(app,student_id,configured_start_date,generation,' +
+      "cycle_number,cycle_start_date,created_at) VALUES('task',?,?,?,?,?,?)"
+  ).run('student-a', '2026-08-01', 2, 1, '2026-08-01', now + 1);
+  for (const [index, date] of dates.entries()) {
+    db.database.prepare(
+      'INSERT INTO student_session_ledger_events(app,student_id,configured_start_date,generation,' +
+        'cycle_number,session_number,lesson_task_id,attendance_date,attendance_status,source_kind,' +
+        "check_key,created_at) VALUES('task',?,?,?,?,?,?,?,?,?,?,?)"
+    ).run('student-a', '2026-08-01', 2, 1, index + 1, 'lesson-a', date, 'P',
+      'admin_attested', 'lesson-a|' + date, now + 1);
+  }
+
+  const alertId = db.database.prepare(
+    "SELECT alert_id FROM tuition_generation_alerts WHERE student_id='student-a'"
+  ).get().alert_id;
+  const listed = await api(db, { action: 'list' });
+  assert.deepEqual(listed.body.alerts, []);
+  const denied = await api(db, { action: 'confirm', alertId });
+  assert.equal(denied.status, 409);
+  assert.equal(denied.body.code, 'TUITION_ALERT_NOT_EFFECTIVE');
+});
+
+test('reconciliation batch rolls back generation, events, base alert and state together', async () => {
+  const db = new TestD1(true, true);
+  const now = Date.parse('2026-09-05T14:50:00Z');
+  seedRoster(db, [rosterStudent('student-a', '원자성학생')]);
+  seedTask(db, 'lesson-a', 'student-a');
+  await syncStudentSessionLedgers({ DB: db }, now);
+  db.database.exec(`
+    CREATE TRIGGER test_alert_state_abort
+    BEFORE INSERT ON tuition_generation_alert_states
+    WHEN NEW.ledger_generation=2
+    BEGIN SELECT RAISE(ABORT,'TEST_ALERT_STATE_ABORT'); END;
+  `);
+  const failed = await reconcileStudentSessionLedger({ DB: db }, {
+    studentId: 'student-a', configuredStartDate: '2026-08-01', sourceCutoffDate: '2026-08-30',
+    expectedGeneration: 1, reasonCode: 'verified_attendance_dates', actor: 'manager:director', now,
+    entries: ['2026-08-01', '2026-08-08', '2026-08-15'].map(date => ({
+      taskId: 'lesson-a', date, status: 'P'
+    }))
+  });
+  assert.equal(failed.code, 'STUDENT_SESSION_RECONCILIATION_CONFLICT');
+  assert.equal(db.database.prepare('SELECT COUNT(*) count FROM student_session_ledger_generations').get().count, 1);
+  assert.equal(db.database.prepare('SELECT COUNT(*) count FROM student_session_ledger_events').get().count, 0);
+  assert.equal(db.database.prepare('SELECT COUNT(*) count FROM tuition_generation_alerts').get().count, 0);
+  assert.equal(db.database.prepare('SELECT COUNT(*) count FROM tuition_generation_alert_states').get().count, 0);
+});
+
+test('admin attestation accepts only regular lessons or exact qualifying absence makeups', async () => {
+  const db = new TestD1(true, true);
+  const now = Date.parse('2026-09-05T14:50:00Z');
+  seedRoster(db, [rosterStudent('student-a', '보강검증학생')]);
+  seedTask(db, 'lesson-a', 'student-a', 'teacher-a', { start: '2026-08-22' });
+  for (const [caseId, reason] of [
+    ['mu_exam', 'manual_exam'], ['mu_other', 'manual_other'], ['mu_absence', 'manual_absence']
+  ]) {
+    db.database.prepare('INSERT INTO makeup_cases(app,case_id,student_id,status,history) VALUES(?,?,?,?,?)')
+      .run('task', caseId, 'student-a', 'completed', JSON.stringify([
+        { action: 'create_manual', reason }
+      ]));
+    seedTask(db, 'makeup_lesson_' + caseId, 'student-a', 'teacher-a', {
+      lessonInstanceType: 'makeup', makeupCaseId: caseId, repeat: 'once',
+      start: '2026-08-20', end: '2026-08-20'
+    });
+  }
+  seedTask(db, 'makeup_lesson_mu_missing', 'student-a', 'teacher-a', {
+    lessonInstanceType: 'makeup', makeupCaseId: 'mu_missing', repeat: 'once',
+    start: '2026-08-20', end: '2026-08-20'
+  });
+  await syncStudentSessionLedgers({ DB: db }, now);
+  for (const taskId of ['makeup_lesson_mu_exam', 'makeup_lesson_mu_other', 'makeup_lesson_mu_missing']) {
+    const rejected = await reconcileStudentSessionLedger({ DB: db }, {
+      studentId: 'student-a', configuredStartDate: '2026-08-01', sourceCutoffDate: '2026-08-30',
+      expectedGeneration: 1, reasonCode: 'verified_attendance_dates', actor: 'manager:director', now,
+      entries: [{ taskId, date: '2026-08-09', status: 'P' }]
+    });
+    assert.equal(rejected.code, 'STUDENT_SESSION_RECONCILIATION_TASK');
+  }
+  const accepted = await reconcileStudentSessionLedger({ DB: db }, {
+    studentId: 'student-a', configuredStartDate: '2026-08-01', sourceCutoffDate: '2026-08-30',
+    expectedGeneration: 1, reasonCode: 'verified_attendance_dates', actor: 'manager:director', now,
+    entries: [
+      { taskId: 'lesson-a', date: '2026-08-09', status: 'P' },
+      { taskId: 'makeup_lesson_mu_absence', date: '2026-08-16', status: 'P' }
+    ]
+  });
+  assert.equal(accepted.ok, true);
 });
 
 test('database guards reject monthly ledgers and keep cycle/event history append-only', async () => {
