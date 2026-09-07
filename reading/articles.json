@@ -1,5 +1,5 @@
 {
-  "version": "2026-09-02.2",
+  "version": "2026-09-07.1",
   "articles": [
     {
       "id": "nuri-space",
@@ -35508,6 +35508,3776 @@
           ]
         }
       }
+    },
+    {
+      "id": "hangang-otter",
+      "category": "environment",
+      "careers": [
+        "env",
+        "bio",
+        "edu"
+      ],
+      "publishedAt": "2026-09-07",
+      "status": "draft",
+      "sources": [
+        {
+          "title": "기후에너지환경부 국립생물자원관 보도자료 — 수달의 귀환, 한강에 수달 27마리가 산다 (2026.9.3)",
+          "url": "https://www.mcee.go.kr/home/web/board/read.do?menuId=10598&boardMasterId=939&boardId=1888180"
+        },
+        {
+          "title": "환경부 국립생물자원관 보도자료 — 수달 서식 최적지, 수질 좋고 인위적인 요소 적어야 (멸종위기 야생생물 I급 수달 서식지 모형 분석, 2017.8.4)",
+          "url": "https://www.me.go.kr/home/web/board/read.do?menuId=&boardId=807800&boardMasterId=1"
+        }
+      ],
+      "levels": {
+        "L1": {
+          "title": "돌아온 수달",
+          "minutes": 3,
+          "paragraphs": [
+            [
+              "한강에 수달이 살아요. ",
+              "수달은 물가에서 ",
+              "물고기를 잡아먹는 동물이에요. ",
+              "사라질 위험이 커서 ",
+              "나라가 지키고 있어요."
+            ],
+            [
+              "연구하는 사람들이 ",
+              "수달의 똥을 모았어요. ",
+              "똥에는 몸의 정보가 남아 있어요. ",
+              "그 정보를 살펴 ",
+              "수달을 한 마리씩 구별했어요. ",
+              "그렇게 스물일곱 마리를 찾아냈어요. ",
+              "성내천에서는 다섯 마리나 살고 있었어요."
+            ],
+            [
+              "예전에는 강가를 딱딱하게 고쳐서 ",
+              "수달이 살 자리가 줄었어요. ",
+              "지금은 강가에 ",
+              "풀과 흙을 되살리고 있어요. ",
+              "그래서 수달이 다시 돌아왔어요. ",
+              "우리도 강가를 ",
+              "깨끗하게 지켜 주면 좋겠어요."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "수달",
+              "easy": "물가에 살면서 물고기를 잡아먹는 동물이에요.",
+              "hanja": null
+            },
+            {
+              "word": "위험",
+              "easy": "다치거나 나빠질 수 있는 상태예요.",
+              "hanja": null
+            },
+            {
+              "word": "구별",
+              "easy": "서로 다른 것을 갈라서 알아보는 일이에요.",
+              "hanja": null
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글은 무엇을 알려 주나요?",
+              "choices": [
+                "수달을 집에서 기르는 방법",
+                "한강에 수달이 다시 늘어난 일",
+                "강에서 헤엄치는 방법",
+                "똥을 치우는 방법"
+              ],
+              "answer": 1,
+              "explain": "한강에 수달이 살고, 그 수가 다시 늘었다는 이야기예요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "사람들은 수달을 어떻게 세었나요?",
+              "choices": [
+                "똥에 남은 몸의 정보를 살폈어요",
+                "수달을 모두 잡아서 세었어요",
+                "수달의 울음소리를 들었어요",
+                "강물의 깊이를 재었어요"
+              ],
+              "answer": 0,
+              "explain": "똥에 남은 몸의 정보를 살펴 한 마리씩 구별했다고 했어요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「구별했어요」는 무슨 뜻인가요?",
+              "choices": [
+                "한곳에 모아 두었어요",
+                "서로 다른 것을 갈라서 알아보았어요",
+                "크기를 재었어요",
+                "이름을 지어 주었어요"
+              ],
+              "answer": 1,
+              "explain": "구별은 서로 다른 것을 갈라서 알아보는 일이에요.",
+              "evidencePara": 1
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "수달이 한강에 다시 돌아온 까닭으로 알맞은 것은?",
+              "choices": [
+                "강물이 더 깊어졌기 때문이에요",
+                "사람들이 물고기를 나누어 주었기 때문이에요",
+                "강가에 풀과 흙을 되살렸기 때문이에요",
+                "강가를 더 딱딱하게 고쳤기 때문이에요"
+              ],
+              "answer": 2,
+              "explain": "강가가 딱딱해져 살 자리가 줄었는데, 지금은 풀과 흙을 되살려서 수달이 돌아왔어요.",
+              "evidencePara": 2
+            },
+            {
+              "type": "apply",
+              "q": "수달이 한강에 오래 살게 하려면 우리는 무엇을 하면 좋을까요?",
+              "choices": [
+                "강가를 깨끗하게 지켜요",
+                "강가를 딱딱하게 덮어요",
+                "수달을 집으로 데려와요",
+                "강가의 풀을 모두 뽑아요"
+              ],
+              "answer": 0,
+              "explain": "강가를 되살리고 깨끗하게 지키는 일이 수달에게 도움이 돼요.",
+              "evidencePara": 2
+            }
+          ]
+        },
+        "L2": {
+          "title": "똥으로 센 스물일곱",
+          "minutes": 4,
+          "paragraphs": [
+            [
+              "한강에 수달이 산다. ",
+              "수달은 물가에서 물고기를 잡아먹는 동물이고, ",
+              "우리나라에서는 멸종위기 야생생물 1급으로 보호받는다. ",
+              "사람이 가장 많이 모여 사는 ",
+              "도시의 강에 ",
+              "이런 동물이 산다는 사실이 ",
+              "다시 확인됐다."
+            ],
+            [
+              "국립생물자원관은 올해 1월부터 4월까지 ",
+              "한강에서 수달의 분변, ",
+              "곧 똥을 모았다. ",
+              "가양대교에서 고덕교에 이르는 ",
+              "27개 지점에서 ",
+              "분변 시료 106점을 채취했다. ",
+              "똥에 섞인 유전자를 분석하면 ",
+              "수달을 한 마리씩 구별할 수 있다. ",
+              "그렇게 세어 보니 ",
+              "모두 27마리였다. ",
+              "서울시가 2022년에 한 조사에서 확인된 15마리보다 ",
+              "약 80퍼센트 늘어난 수다."
+            ],
+            [
+              "더 눈에 띄는 것은 ",
+              "27마리가 모두 서로 혈연관계였다는 점이다. ",
+              "부모와 자식으로 이루어진 ",
+              "다섯 가족도 확인됐다. ",
+              "이 가족들은 ",
+              "성내천과 잠실대교 등 ",
+              "한강 동부에 주로 살고 있었다. ",
+              "수달이 가장 많이 확인된 곳은 ",
+              "다섯 마리가 사는 성내천이었다."
+            ],
+            [
+              "한강의 수달이 ",
+              "처음부터 많았던 것은 아니다. ",
+              "1960~70년대에 강가를 콘크리트로 곧게 다듬는 개발사업이 이어지면서 ",
+              "살 곳이 크게 줄었다. ",
+              "2000년대 이후 ",
+              "한강의 자연성을 되살리는 사업으로 ",
+              "물가에 생태공간이 생기자 ",
+              "수달도 돌아왔다. ",
+              "2017년에 4마리가 처음 확인된 뒤, ",
+              "지금은 서식 범위가 훨씬 넓어졌다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "멸종위기",
+              "easy": "어떤 생물이 아주 사라질 위험에 놓인 상태",
+              "hanja": "滅(꺼질 멸)+種(씨 종)"
+            },
+            {
+              "word": "분변",
+              "easy": "동물의 똥",
+              "hanja": "糞(똥 분)"
+            },
+            {
+              "word": "유전자",
+              "easy": "부모에게서 자식으로 이어지는 몸의 정보",
+              "hanja": "遺(남길 유)+傳(전할 전)+子(아들 자)"
+            },
+            {
+              "word": "혈연관계",
+              "easy": "피로 이어진 사이, 곧 한 핏줄인 관계",
+              "hanja": "血(피 혈)+緣(인연 연)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 알맞은 것은?",
+              "choices": [
+                "서울시가 한강에 새 다리를 놓았다",
+                "유전자 분석으로 한강에 수달 27마리가 사는 것이 확인됐다",
+                "수달을 기르는 방법이 새로 나왔다",
+                "한강의 물고기가 크게 줄었다"
+              ],
+              "answer": 1,
+              "explain": "분변의 유전자를 분석해 한강 수달 27마리를 확인했다는 것이 중심이다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "이번 조사에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "가양대교에서 고덕교에 이르는 27개 지점에서 분변 시료 106점을 채취했다",
+                "한강 전체 106개 지점을 조사했다",
+                "수달 27마리를 잡아서 조사했다",
+                "2022년에 모은 자료를 그대로 다시 썼다"
+              ],
+              "answer": 0,
+              "explain": "27개 지점에서 분변 시료 106점을 채취했다고 밝혔다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "확인된 수달 27마리의 관계로 알맞은 것은?",
+              "choices": [
+                "서로 아무 관계가 없었다",
+                "모두 암컷이었다",
+                "모두 서로 혈연관계였고 다섯 가족이 확인됐다",
+                "모두 한 가족이었다"
+              ],
+              "answer": 2,
+              "explain": "27마리가 모두 서로 혈연관계였고, 부모와 자식으로 이루어진 다섯 가족이 확인됐다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "vocab",
+              "q": "「분변」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "동물의 똥",
+                "동물의 발자국",
+                "동물의 털",
+                "동물이 사는 굴"
+              ],
+              "answer": 0,
+              "explain": "분변은 동물의 똥을 가리키는 말이다.",
+              "evidencePara": 1
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "수달을 한 마리도 잡지 않고 마릿수를 셀 수 있었던 까닭은?",
+              "choices": [
+                "수달이 사람을 잘 따르기 때문이다",
+                "똥에 섞인 유전자로 수달을 한 마리씩 구별할 수 있기 때문이다",
+                "수달이 늘 같은 다리 밑에만 있기 때문이다",
+                "수달의 울음소리가 저마다 다르기 때문이다"
+              ],
+              "answer": 1,
+              "explain": "똥에 섞인 유전자를 분석하면 개체를 하나씩 구별할 수 있다고 했다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "apply",
+              "q": "이 글을 근거로 한강에 수달이 더 늘게 하려면 무엇을 해야 할까?",
+              "choices": [
+                "물가의 생태공간을 더 늘린다",
+                "강가를 콘크리트로 다시 곧게 다듬는다",
+                "지류를 모두 막아 둔다",
+                "수달을 다른 강으로 옮겨 놓는다"
+              ],
+              "answer": 0,
+              "explain": "물가에 생태공간이 생기자 수달이 돌아왔다고 했으니, 그 공간을 늘리는 것이 알맞다.",
+              "evidencePara": 3
+            }
+          ],
+          "en": [
+            "Otters live in the Han River. An otter is an animal that catches fish by the water. In Korea it is a Class I endangered wild species. Scientists have confirmed again that this animal lives in a city river.",
+            "The National Institute of Biological Resources collected otter droppings. They worked in the Han River from January to April. They took 106 samples from 27 places along the river. The places run from Gayang Bridge to Godeok Bridge. Genes in the droppings can tell one otter from another. In this way they counted 27 otters in all. In 2022 the city of Seoul found only 15. That is about 80 percent more than before.",
+            "All 27 otters were related to each other. Five families of parents and children were found. These families live mostly in the east of the Han River. They were found near Seongnaecheon and Jamsil Bridge. Seongnaecheon had the most otters, with five.",
+            "There were not always many otters in the Han River. In the 1960s and 1970s, the banks were made straight with concrete. The otters lost much of their home. After the year 2000, work began to make the river natural again. Green space came back to the waterside, and so did the otters. In 2017 only four otters were found. Now they live in a much wider area."
+          ],
+          "envocab": [
+            {
+              "word": "otter",
+              "ko": "수달 (명사)",
+              "base": "otter [ˈɑːtər]"
+            },
+            {
+              "word": "endangered",
+              "ko": "멸종위기의 (형용사)",
+              "base": "endanger [ɪnˈdeɪndʒər]"
+            },
+            {
+              "word": "droppings",
+              "ko": "(동물의) 똥 (명사, 복수)",
+              "base": "dropping [ˈdrɑːpɪŋ]"
+            },
+            {
+              "word": "samples",
+              "ko": "시료, 표본 (명사 sample의 복수)",
+              "base": "sample [ˈsæmpl]"
+            },
+            {
+              "word": "related",
+              "ko": "혈연으로 이어진 (형용사)",
+              "base": "relate [rɪˈleɪt]"
+            }
+          ],
+          "enseg": [
+            [
+              "Otters live in the Han River. ",
+              "An otter is an animal that catches fish by the water. ",
+              "In Korea it is a Class I endangered wild species. ",
+              "Scientists have confirmed again that this animal lives in a city river."
+            ],
+            [
+              "The National Institute of Biological Resources collected otter droppings. ",
+              "They worked in the Han River from January to April. ",
+              "They took 106 samples from 27 places along the river. ",
+              "The places run from Gayang Bridge to Godeok Bridge. ",
+              "Genes in the droppings can tell one otter from another. ",
+              "In this way they counted 27 otters in all. ",
+              "In 2022 the city of Seoul found only 15. ",
+              "That is about 80 percent more than before."
+            ],
+            [
+              "All 27 otters were related to each other. ",
+              "Five families of parents and children were found. ",
+              "These families live mostly in the east of the Han River. ",
+              "They were found near Seongnaecheon and Jamsil Bridge. ",
+              "Seongnaecheon had the most otters, with five."
+            ],
+            [
+              "There were not always many otters in the Han River. ",
+              "In the 1960s and 1970s, the banks were made straight with concrete. ",
+              "The otters lost much of their home. ",
+              "After the year 2000, work began to make the river natural again. ",
+              "Green space came back to the waterside,",
+              " and so did the otters. In 2017 only four otters were found. ",
+              "Now they live in a much wider area."
+            ]
+          ]
+        },
+        "L3": {
+          "title": "분변이 남긴 이름표",
+          "minutes": 5,
+          "paragraphs": [
+            [
+              "도시의 강에 최상위 포식자가 ",
+              "돌아오는 일은 흔치 않다. ",
+              "한강에서 그 일이 일어나고 있다. ",
+              "기후에너지환경부 소속 국립생물자원관은 ",
+              "올해 1월부터 4월까지 ",
+              "한강에서 채취한 수달의 분변을 유전자 분석해, ",
+              "한강에 수달 27마리가 서식하고 있음을 ",
+              "확인했다고 밝혔다. ",
+              "수달은 멸종위기 야생생물 1급이다."
+            ],
+            [
+              "조사 방법은 동물을 잡지 않는다. ",
+              "연구진은 가양대교에서 고덕교에 이르는 27개 지점, ",
+              "곧 본류 13곳과 지류 14곳에서 ",
+              "분변 시료 106점을 모았다. ",
+              "분변에는 그 개체의 유전정보가 남아 있어서, ",
+              "이를 분석하면 ",
+              "몇 마리가 사는지를 ",
+              "개체 단위로 셀 수 있다. ",
+              "그렇게 확인된 27마리는 ",
+              "서울시가 2022년에 수행한 조사의 15마리보다 ",
+              "약 80퍼센트 늘어난 수치다."
+            ],
+            [
+              "구성도 드러났다. ",
+              "본류에 21마리, 지류에 6마리가 살았고 ",
+              "성별로는 암컷 16마리, ",
+              "수컷 11마리였다. ",
+              "27마리는 모두 서로 혈연관계였으며, ",
+              "부모와 자식으로 이루어진 다섯 가족이 확인됐다. ",
+              "이 가족들은 성내천과 잠실대교 등 ",
+              "한강 동부에 주로 분포했다. ",
+              "가장 많이 확인된 곳은 성내천으로 5마리, ",
+              "이어 한강대교 4마리, ",
+              "양재천과 잠실대교와 중랑천이 각각 3마리였다."
+            ],
+            [
+              "이 숫자에는 반세기가 담겨 있다. ",
+              "1960~70년대 콘크리트 직강화 개발사업으로 ",
+              "한강에서 수달의 서식공간은 크게 줄었다. ",
+              "2000년대 이후 ",
+              "한강 자연성 회복 사업이 이어지며 ",
+              "수변 생태공간이 조성되자 ",
+              "서식공간은 다시 넓어졌다. ",
+              "2016년 탄천에서 수달이 목격된 뒤 ",
+              "2017년에 4마리가 처음 확인됐고, ",
+              "지금은 본류의 강서지역까지, ",
+              "지류로는 북쪽 중랑천과 남쪽 안양천까지 ",
+              "범위가 넓어졌다."
+            ],
+            [
+              "이번 조사는 국립생물자원관이 ",
+              "2007년부터 이어 온 야생동물 실태조사 사업의 일환이다. ",
+              "유호 국립생물자원관장은 ",
+              "한강 수달의 지속적인 증가를 ",
+              "한강 생태계가 회복되고 있다는 신호로 보았다. ",
+              "도시의 강이 얼마나 건강한지는 ",
+              "물빛이나 산책로가 아니라, ",
+              "그 강이 어떤 동물을 ",
+              "먹여 살릴 수 있는가로 드러난다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "포식자",
+              "easy": "다른 동물을 잡아먹고 사는 동물",
+              "hanja": "捕(잡을 포)+食(먹을 식)+者(놈 자)"
+            },
+            {
+              "word": "분변",
+              "easy": "동물의 똥",
+              "hanja": "糞(똥 분)"
+            },
+            {
+              "word": "개체",
+              "easy": "하나하나 따로 살아가는 낱낱의 생물",
+              "hanja": "個(낱 개)+體(몸 체)"
+            },
+            {
+              "word": "직강화",
+              "easy": "굽이진 물길을 곧게 펴는 일",
+              "hanja": "直(곧을 직)+江(강 강)+化(될 화)"
+            },
+            {
+              "word": "일환",
+              "easy": "여러 부분으로 이루어진 일 가운데 한 부분",
+              "hanja": "一(한 일)+環(고리 환)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 알맞은 것은?",
+              "choices": [
+                "한강 수달의 분변을 유전자 분석해 27마리가 서식함을 확인했다",
+                "한강에 놓인 다리를 모두 조사했다",
+                "수달이 즐겨 먹는 먹이를 알아냈다",
+                "서울에 새 지류를 만들기로 했다"
+              ],
+              "answer": 0,
+              "explain": "분변의 유전자 분석으로 개체 수를 확인한 조사가 글의 중심이다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "조사 결과로 알맞은 것은?",
+              "choices": [
+                "본류 6마리, 지류 21마리였다",
+                "본류 21마리, 지류 6마리였고 암컷 16마리, 수컷 11마리였다",
+                "암컷 11마리, 수컷 16마리였다",
+                "본류에서만 확인됐다"
+              ],
+              "answer": 1,
+              "explain": "본류 21마리와 지류 6마리, 암컷 16마리와 수컷 11마리로 나타났다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "detail",
+              "q": "한강 수달의 서식 범위 변화로 알맞은 것은?",
+              "choices": [
+                "2016년에 이미 27마리가 확인됐다",
+                "지류에서는 한 번도 확인된 적이 없다",
+                "2017년 4마리가 처음 확인됐고 지금은 중랑천과 안양천까지 넓어졌다",
+                "범위가 해마다 줄어들고 있다"
+              ],
+              "answer": 2,
+              "explain": "2016년 탄천 목격, 2017년 4마리 확인을 거쳐 지금은 중랑천과 안양천까지 넓어졌다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "vocab",
+              "q": "「일환」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "처음으로 시작하는 일",
+                "여러 부분으로 이루어진 일 가운데 한 부분",
+                "한 번으로 끝나는 일",
+                "혼자서만 맡는 일"
+              ],
+              "answer": 1,
+              "explain": "일환은 큰 일을 이루는 여러 부분 가운데 하나를 뜻한다.",
+              "evidencePara": 4
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "동물을 잡지 않고도 개체 수를 셀 수 있었던 까닭으로 글에서 찾을 수 있는 것은?",
+              "choices": [
+                "조사 지점을 본류와 지류로 나누었기 때문이다",
+                "수달이 정해진 지점에만 나타나기 때문이다",
+                "다섯 가족이 함께 살고 있었기 때문이다",
+                "분변에 그 개체의 유전정보가 남아 있기 때문이다"
+              ],
+              "answer": 3,
+              "explain": "분변에 남은 유전정보를 분석해 개체 단위로 셀 수 있었다고 했다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "critical",
+              "q": "이 글의 흐름으로 볼 때 27마리라는 숫자를 「회복의 신호」로 읽을 수 있는 까닭은?",
+              "choices": [
+                "직강화로 줄었던 서식공간이 자연성 회복 사업 뒤 다시 넓어졌고, 개체 수와 범위가 함께 늘었기 때문이다",
+                "조사 지점이 27개였기 때문이다",
+                "암컷이 수컷보다 많았기 때문이다",
+                "분변 시료를 106점이나 모았기 때문이다"
+              ],
+              "answer": 0,
+              "explain": "서식공간의 축소와 회복, 개체 수와 범위의 증가를 함께 놓고 보아야 나오는 판단이다.",
+              "evidencePara": 3
+            }
+          ],
+          "en": [
+            "It is not common for a top predator to return to a city river. That is what is happening in the Han River. The National Institute of Biological Resources, under the Ministry of Climate, Energy and Environment, announced that genetic analysis of otter droppings collected in the river between January and April this year confirmed 27 otters living there. The otter is a Class I endangered wild species.",
+            "The survey method does not catch the animals. Researchers gathered 106 droppings samples at 27 points between Gayang Bridge and Godeok Bridge, 13 on the main stream and 14 on tributaries. Droppings carry the genetic information of the individual that left them, so an analysis can count the population animal by animal. The 27 otters confirmed this way are about 80 percent more than the 15 found in a survey by the Seoul city government in 2022.",
+            "The make-up of the population also emerged. Twenty-one otters lived on the main stream and six on tributaries, and by sex there were 16 females and 11 males. All 27 were related to one another, and five families of parents and offspring were identified. These families were found mainly in the eastern Han River, around Seongnaecheon and Jamsil Bridge. The largest number was at Seongnaecheon with five, followed by four at Hangang Bridge and three each at Yangjaecheon, Jamsil Bridge and Jungnangcheon.",
+            "Half a century sits inside these numbers. Concrete channelization projects in the 1960s and 1970s sharply reduced the space otters had to live in on the Han River. From the 2000s, work to restore the river's natural character created ecological space along the waterside, and that space widened again. After an otter was seen at Tancheon in 2016, four were confirmed in 2017, and today the range reaches Gangseo on the main stream and stretches to Jungnangcheon in the north and Anyangcheon in the south.",
+            "This survey is part of the wildlife status survey programme the institute has run since 2007. Yoo Ho, head of the institute, read the steady increase of Han River otters as a sign that the river's ecosystem is recovering. How healthy a city river is shows not in the colour of its water or in its walking paths, but in the animals it can feed."
+          ],
+          "envocab": [
+            {
+              "word": "predator",
+              "ko": "포식자 (명사)",
+              "base": "predator [ˈpredətər]"
+            },
+            {
+              "word": "droppings",
+              "ko": "분변, 똥 (명사, 복수)",
+              "base": "dropping [ˈdrɑːpɪŋ]"
+            },
+            {
+              "word": "genetic",
+              "ko": "유전의 (형용사)",
+              "base": "gene [dʒiːn]"
+            },
+            {
+              "word": "tributaries",
+              "ko": "지류 (명사 tributary의 복수)",
+              "base": "tributary [ˈtrɪbjəteri]"
+            },
+            {
+              "word": "channelization",
+              "ko": "직강화 (명사)",
+              "base": "channel [ˈtʃænl]"
+            },
+            {
+              "word": "restore",
+              "ko": "되살리다 (동사)",
+              "base": "restore [rɪˈstɔːr]"
+            }
+          ],
+          "enseg": [
+            [
+              "It is not common for a top predator to return to a city river. ",
+              "That is what is happening in the Han River. ",
+              "The National Institute of Biological Resources, under the Ministry of Climate, ",
+              "Energy and Environment, ",
+              "announced that genetic analysis of otter droppings collected in the river between January and April this year confirmed 27 otters living there. ",
+              "The otter is a Class I endangered wild species."
+            ],
+            [
+              "The survey method does not catch the animals. ",
+              "Researchers gathered 106 droppings samples at 27 points between Gayang Bridge and Godeok Bridge, ",
+              "13 on the main stream and 14 on tributaries. ",
+              "Droppings carry the genetic information of the individual that left them,",
+              " so an analysis can count the population animal by animal. ",
+              "The 27 otters confirmed this way are about 80 percent more than the 15 found in a survey by the Seoul city government in 2022."
+            ],
+            [
+              "The make-up of the population also emerged. Twenty-one otters lived on the main stream",
+              " and six on tributaries, and by sex there were 16 females and 11 males. ",
+              "All 27 were related to one another, and five families of parents",
+              " and offspring were identified. These families were found mainly in the eastern Han River, ",
+              "around Seongnaecheon and Jamsil Bridge. The largest number was at Seongnaecheon with five, ",
+              "followed by four at Hangang Bridge and three each at Yangjaecheon, ",
+              "Jamsil Bridge and Jungnangcheon."
+            ],
+            [
+              "Half a century sits inside these numbers. ",
+              "Concrete channelization projects in the 1960s and 1970s sharply reduced the space otters had to live in on the Han River. ",
+              "From the 2000s, ",
+              "work to restore the river's natural character created ecological space along the waterside,",
+              " and that space widened again. After an otter was seen at Tancheon in 2016, ",
+              "four were confirmed in 2017,",
+              " and today the range reaches Gangseo on the main stream",
+              " and stretches to Jungnangcheon in the north",
+              " and Anyangcheon in the south."
+            ],
+            [
+              "This survey is part of the wildlife status survey programme the institute has run since 2007. ",
+              "Yoo Ho, head of the institute, ",
+              "read the steady increase of Han River otters as a sign that the river's ecosystem is recovering. ",
+              "How healthy a city river is shows not in the colour of its water or in its walking paths,",
+              " but in the animals it can feed."
+            ]
+          ]
+        },
+        "L4": {
+          "title": "강이 먹여 살리는 것",
+          "minutes": 6,
+          "paragraphs": [
+            [
+              "도시를 흐르는 강의 건강을 ",
+              "재는 방법은 여러 가지다. ",
+              "수질 항목을 측정할 수도 있고, ",
+              "수변에 심은 나무를 셀 수도 있다. ",
+              "그러나 가장 까다롭고 그만큼 정직한 지표는 ",
+              "그 강이 어떤 동물을 먹여 살리는가다. ",
+              "먹이사슬 위쪽에 있는 동물은 ",
+              "아래쪽이 모두 갖추어져야 살아남기 때문이다. ",
+              "그 자리에 수달이 있다. ",
+              "멸종위기 야생생물 1급인 이 동물이 한강에 ",
+              "27마리 살고 있다는 사실이 확인됐다."
+            ],
+            [
+              "기후에너지환경부 소속 국립생물자원관은 ",
+              "올해 1월부터 4월까지 ",
+              "한강에서 채취한 수달 분변 시료를 ",
+              "유전자 분석해 이 숫자를 얻었다. ",
+              "가양대교에서 고덕교에 이르는 27개 지점, ",
+              "본류 13곳과 지류 14곳에서 모은 분변시료는 ",
+              "모두 106점이었다. ",
+              "동물을 잡거나 표지를 붙이지 않고도 ",
+              "배설물에 남은 유전정보만으로 ",
+              "개체를 하나하나 구별해 내는 방식이다. ",
+              "결과는 본류 21마리, 지류 6마리였고 ",
+              "성별로는 암컷 16마리와 수컷 11마리였다. ",
+              "서울시가 2022년에 수행한 조사에서 확인된 15마리와 견주면 ",
+              "약 80퍼센트 늘었다."
+            ],
+            [
+              "숫자보다 눈길을 끄는 것은 ",
+              "그 27마리의 관계다. ",
+              "개별 유전정보가 확인된 27마리는 ",
+              "모두 서로 혈연관계였고, ",
+              "부모와 자식으로 이루어진 ",
+              "다섯 가족이 함께 살고 있었다. ",
+              "이 가족들은 성내천과 잠실대교 등 ",
+              "한강 동부에 주로 분포했다. ",
+              "가장 많이 확인된 곳은 성내천으로 5마리였고, ",
+              "한강대교가 4마리, ",
+              "양재천과 잠실대교와 중랑천이 각각 3마리였다. ",
+              "개체 수만 세었다면 ",
+              "알 수 없었을 사실이다. ",
+              "한강의 수달은 흩어진 개체가 아니라 ",
+              "대를 이어 번식하는 무리로 ",
+              "자리 잡았다는 뜻이기 때문이다."
+            ],
+            [
+              "이 무리가 하루아침에 생긴 것은 아니다. ",
+              "1960~70년대 콘크리트 직강화 개발사업으로 ",
+              "한강에서 수달의 서식공간은 크게 줄었다. ",
+              "강가를 곧게 펴고 딱딱하게 덮는 일은 ",
+              "물길을 다루기에는 편했지만, ",
+              "굴을 파고 몸을 숨길 자리를 함께 없앴다. ",
+              "2000년대 이후 한강 자연성 회복 사업이 진행되며 ",
+              "수변 생태공간이 조성되자 ",
+              "서식공간은 다시 넓어졌다. ",
+              "2016년 탄천에서 수달이 목격된 뒤 ",
+              "2017년에 4마리가 처음 확인됐고, ",
+              "지금은 본류로는 강서지역까지, ",
+              "지류로는 북쪽 중랑천과 남쪽 안양천까지 ",
+              "범위를 넓혔다."
+            ],
+            [
+              "이번 조사는 국립생물자원관이 ",
+              "2007년부터 이어 온 야생동물 실태조사 사업의 일환이다. ",
+              "유호 국립생물자원관장은 ",
+              "한강 수달의 지속적인 증가를 ",
+              "한강 생태계가 회복되고 있다는 ",
+              "긍정적 신호로 보았다. ",
+              "다만 회복은 완료가 아니다. ",
+              "27마리가 모두 혈연으로 이어져 있다는 사실은 ",
+              "한 무리가 넓게 퍼진 결과로 읽을 수도 있고, ",
+              "바깥에서 새로 들어온 개체가 ",
+              "아직 확인되지 않았다는 뜻으로 읽을 수도 있다. ",
+              "한 해의 숫자가 아니라 ",
+              "여러 해에 걸친 흐름을 ",
+              "계속 재야 하는 까닭이 여기에 있다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "지표",
+              "easy": "어떤 상태를 가늠하게 해 주는 잣대",
+              "hanja": "指(가리킬 지)+標(표할 표)"
+            },
+            {
+              "word": "배설물",
+              "easy": "몸 밖으로 내보낸 똥이나 오줌",
+              "hanja": "排(밀칠 배)+泄(샐 설)+物(물건 물)"
+            },
+            {
+              "word": "수변",
+              "easy": "물가, 물이 닿는 가장자리",
+              "hanja": "水(물 수)+邊(가 변)"
+            },
+            {
+              "word": "번식",
+              "easy": "생물이 새끼를 낳아 수를 늘리는 일",
+              "hanja": "繁(번성할 번)+殖(불릴 식)"
+            },
+            {
+              "word": "혈연",
+              "easy": "같은 핏줄로 이어진 사이",
+              "hanja": "血(피 혈)+緣(인연 연)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "글쓴이가 강의 건강을 재는 지표로 수달을 든 까닭은?",
+              "choices": [
+                "먹이사슬 위쪽 동물이라 아래쪽이 모두 갖추어져야 살아남기 때문이다",
+                "수달이 사람의 눈에 가장 잘 띄기 때문이다",
+                "수달이 한강에서만 사는 동물이기 때문이다",
+                "수달의 배설물이 가장 구하기 쉽기 때문이다"
+              ],
+              "answer": 0,
+              "explain": "먹이사슬 위쪽 동물은 아래쪽이 모두 갖추어져야 살아남는다는 것이 근거다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "이번 조사의 방법에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "수달을 잡아 표지를 붙인 뒤 풀어 주었다",
+                "동물을 잡거나 표지를 붙이지 않고 배설물의 유전정보로 개체를 구별했다",
+                "무인 카메라 영상으로 27마리를 세었다",
+                "주민들의 목격담을 모아 수를 헤아렸다"
+              ],
+              "answer": 1,
+              "explain": "잡거나 표지를 붙이지 않고 배설물에 남은 유전정보만으로 개체를 구별했다고 했다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "수달이 가장 많이 확인된 곳과 그 수로 알맞은 것은?",
+              "choices": [
+                "한강대교 5마리",
+                "잠실대교 4마리",
+                "성내천 5마리",
+                "중랑천 4마리"
+              ],
+              "answer": 2,
+              "explain": "성내천이 5마리로 가장 많았고, 한강대교가 4마리로 그다음이었다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "vocab",
+              "q": "「수변」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "물가, 물이 닿는 가장자리",
+                "물의 깊이",
+                "물이 흐르는 빠르기",
+                "물속 바닥"
+              ],
+              "answer": 0,
+              "explain": "수변은 물가, 곧 물이 닿는 가장자리를 뜻한다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "critical",
+              "q": "글쓴이가 마지막 문단에서 「회복은 완료가 아니다」라고 한 까닭으로 가장 알맞은 것은?",
+              "choices": [
+                "조사 지점이 27개뿐이어서 표본이 적기 때문이다",
+                "암컷과 수컷의 수가 서로 다르기 때문이다",
+                "분변 시료가 106점밖에 되지 않기 때문이다",
+                "27마리가 모두 혈연으로 이어져 있다는 사실을 두 가지로 읽을 수 있어 여러 해의 흐름을 더 재야 하기 때문이다"
+              ],
+              "answer": 3,
+              "explain": "한 무리가 넓게 퍼진 결과일 수도, 바깥에서 들어온 개체가 아직 없다는 뜻일 수도 있다고 했다.",
+              "evidencePara": 4
+            }
+          ],
+          "challenge": [
+            {
+              "type": "critical",
+              "q": "이 글의 논지에 비추어 가장 조심해서 다루어야 할 해석은?",
+              "choices": [
+                "개체 수가 27마리로 늘었으니 한강 수달 보전은 이제 마무리해도 된다",
+                "직강화 개발사업은 수달의 서식공간을 줄였다",
+                "배설물의 유전정보로 개체를 구별할 수 있다",
+                "다섯 가족이 한강 동부에 주로 분포한다"
+              ],
+              "answer": 0,
+              "explain": "글은 회복이 완료가 아니며 여러 해의 흐름을 계속 재야 한다고 못 박는다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "apply",
+              "q": "이 글의 방식으로 다른 도시 하천의 생태 회복을 확인한다면 가장 알맞은 순서는?",
+              "choices": [
+                "먹이사슬 위쪽 동물을 다른 곳에서 데려와 먼저 풀어 놓는다",
+                "수변 생태공간을 되살린 뒤 배설물의 유전정보로 개체와 혈연관계를 여러 해에 걸쳐 잰다",
+                "강가를 곧게 펴서 물길을 다루기 쉽게 만든다",
+                "목격담이 많은 지점만 골라 한 해만 조사한다"
+              ],
+              "answer": 1,
+              "explain": "수변 공간을 되살리고, 개체와 관계를 여러 해에 걸쳐 재는 것이 이 글이 보여 준 순서다.",
+              "evidencePara": 3
+            }
+          ],
+          "en": [
+            "There are many ways to measure the health of a river running through a city. You can test water quality, or count the trees planted along the banks. But the hardest and most honest indicator is which animals the river can feed. An animal high in the food chain survives only when everything below it is in place. The otter stands in that position, and 27 of them, a Class I endangered wild species, have now been confirmed living in the Han River.",
+            "The National Institute of Biological Resources, under the Ministry of Climate, Energy and Environment, reached that figure through genetic analysis of otter droppings collected in the Han River from January to April this year. A total of 106 samples came from 27 points between Gayang Bridge and Godeok Bridge, 13 on the main stream and 14 on tributaries. The method identifies individuals one by one from the genetic information left in excrement, without catching the animals or tagging them. The result was 21 otters on the main stream and six on tributaries, 16 females and 11 males. Against the 15 confirmed in a 2022 survey by the Seoul city government, that is an increase of about 80 percent.",
+            "More striking than the number is the relationship among the 27. Every individual identified was related to the others, and five families of parents and offspring were living together. These families were distributed mainly in the eastern Han River, around Seongnaecheon and Jamsil Bridge. The largest count was five at Seongnaecheon, then four at Hangang Bridge and three each at Yangjaecheon, Jamsil Bridge and Jungnangcheon. Counting heads alone would never have shown this. It means the otters of the Han River are not scattered individuals but a group that has settled in and breeds one generation after another.",
+            "This group did not appear overnight. Concrete channelization projects in the 1960s and 1970s sharply reduced the space otters had on the Han River. Straightening the banks and covering them with hard surfaces made the water easier to manage, but it also removed the places where an animal could dig a burrow and hide. From the 2000s, work to restore the river's natural character created ecological space along the waterside, and the living space widened again. After an otter was seen at Tancheon in 2016, four were confirmed in 2017, and today the range extends to Gangseo on the main stream, and among the tributaries to Jungnangcheon in the north and Anyangcheon in the south.",
+            "This survey is part of the wildlife status survey programme the institute has run since 2007. Yoo Ho, head of the institute, read the steady increase of Han River otters as a positive sign that the river's ecosystem is recovering. Recovery, though, is not completion. That all 27 share kinship can be read as one group spreading widely, and it can also be read as meaning that no newcomer from outside has yet been confirmed. That is why a single year's number is not enough, and the trend has to be measured across many years."
+          ],
+          "envocab": [
+            {
+              "word": "indicator",
+              "ko": "지표 (명사)",
+              "base": "indicate [ˈɪndɪkeɪt]"
+            },
+            {
+              "word": "excrement",
+              "ko": "배설물 (명사)",
+              "base": "excrement [ˈekskrəmənt]"
+            },
+            {
+              "word": "waterside",
+              "ko": "수변, 물가 (명사)",
+              "base": "waterside [ˈwɔːtərsaɪd]"
+            },
+            {
+              "word": "breeds",
+              "ko": "번식하다 (동사 breed의 3인칭 단수)",
+              "base": "breed [briːd]"
+            },
+            {
+              "word": "kinship",
+              "ko": "혈연관계 (명사)",
+              "base": "kin [kɪn]"
+            },
+            {
+              "word": "channelization",
+              "ko": "직강화 (명사)",
+              "base": "channel [ˈtʃænl]"
+            }
+          ],
+          "enseg": [
+            [
+              "There are many ways to measure the health of a river running through a city. ",
+              "You can test water quality, or count the trees planted along the banks. ",
+              "But the hardest and most honest indicator is which animals the river can feed. ",
+              "An animal high in the food chain survives only when everything below it is in place. ",
+              "The otter stands in that position, and 27 of them, ",
+              "a Class I endangered wild species, ",
+              "have now been confirmed living in the Han River."
+            ],
+            [
+              "The National Institute of Biological Resources, under the Ministry of Climate, ",
+              "Energy and Environment, ",
+              "reached that figure through genetic analysis of otter droppings collected in the Han River from January to April this year. ",
+              "A total of 106 samples came from 27 points between Gayang Bridge and Godeok Bridge, ",
+              "13 on the main stream and 14 on tributaries. ",
+              "The method identifies individuals one by one from the genetic information left in excrement,",
+              " without catching the animals or tagging them. ",
+              "The result was 21 otters on the main stream and six on tributaries, ",
+              "16 females and 11 males. ",
+              "Against the 15 confirmed in a 2022 survey by the Seoul city government, ",
+              "that is an increase of about 80 percent."
+            ],
+            [
+              "More striking than the number is the relationship among the 27. ",
+              "Every individual identified was related to the others, and five families of parents",
+              " and offspring were living together. ",
+              "These families were distributed mainly in the eastern Han River, ",
+              "around Seongnaecheon and Jamsil Bridge. The largest count was five at Seongnaecheon,",
+              " then four at Hangang Bridge and three each at Yangjaecheon, ",
+              "Jamsil Bridge and Jungnangcheon. Counting heads alone would never have shown this. ",
+              "It means the otters of the Han River are not scattered individuals",
+              " but a group that has settled in",
+              " and breeds one generation after another."
+            ],
+            [
+              "This group did not appear overnight. ",
+              "Concrete channelization projects in the 1960s and 1970s sharply reduced the space otters had on the Han River. ",
+              "Straightening the banks",
+              " and covering them with hard surfaces made the water easier to manage,",
+              " but it also removed the places where an animal could dig a burrow and hide. ",
+              "From the 2000s, ",
+              "work to restore the river's natural character created ecological space along the waterside,",
+              " and the living space widened again. ",
+              "After an otter was seen at Tancheon in 2016, four were confirmed in 2017,",
+              " and today the range extends to Gangseo on the main stream,",
+              " and among the tributaries to Jungnangcheon in the north",
+              " and Anyangcheon in the south."
+            ],
+            [
+              "This survey is part of the wildlife status survey programme the institute has run since 2007. ",
+              "Yoo Ho, head of the institute, ",
+              "read the steady increase of Han River otters as a positive sign that the river's ecosystem is recovering. ",
+              "Recovery, though, is not completion. ",
+              "That all 27 share kinship can be read as one group spreading widely,",
+              " and it can also be read as meaning that no newcomer from outside has yet been confirmed. ",
+              "That is why a single year's number is not enough,",
+              " and the trend has to be measured across many years."
+            ]
+          ]
+        }
+      },
+      "issue": true
+    },
+    {
+      "id": "ramesseum-shelter",
+      "category": "humanities",
+      "careers": [
+        "art",
+        "eng",
+        "edu"
+      ],
+      "publishedAt": "2026-09-07",
+      "status": "draft",
+      "sources": [
+        {
+          "title": "국가유산청 보도자료 — (국영문 동시배포) 이집트 최초, 라메세움 신전 탑문 복원을 위한 가설덧집 준공 (2026.9.4, 준공식 9.3)",
+          "url": "https://www.khs.go.kr/newsBbz/selectNewsBbzView.do?newsItemId=155706329&sectionId=b_sec_1&mn=NS_01_02"
+        },
+        {
+          "title": "국가유산청 보도자료 — 이집트 라메세움 신전 탑문 복원 중 람세스 2세 이름 새겨진 상형문자 발견 (2026.4.9)",
+          "url": "https://www.khs.go.kr/newsBbz/selectNewsBbzView.do?newsItemId=155706025&sectionId=b_sec_1&mn=NS_01_02"
+        }
+      ],
+      "levels": {
+        "L1": {
+          "title": "지붕을 먼저 세워요",
+          "minutes": 3,
+          "paragraphs": [
+            [
+              "이집트에 아주 오래된 신전이 있어요. ",
+              "이름은 라메세움이에요. ",
+              "삼천 년이 넘은 돌 건물이에요. ",
+              "오랜 세월 ",
+              "바람과 모래에 깎였어요. ",
+              "신전 앞의 큰 문이 위태로워졌어요."
+            ],
+            [
+              "우리나라 사람들이 ",
+              "이 문을 고치러 갔어요. ",
+              "그런데 바로 ",
+              "돌을 내리지 않았어요. ",
+              "먼저 유적 위에 ",
+              "커다란 지붕집을 세웠어요. ",
+              "이것을 가설덧집이라고 해요. ",
+              "뜨거운 햇빛과 비를 막아 줘요. ",
+              "안에 큰 기계도 놓을 수 있어요."
+            ],
+            [
+              "덧집은 구월 삼일에 ",
+              "다 지었어요. ",
+              "이제 돌을 하나씩 내려요. ",
+              "내리기 전에 ",
+              "자리를 재고 적어요. ",
+              "그래야 다시 제자리에 ",
+              "놓을 수 있어요. ",
+              "그래서 몇 해가 더 걸려요."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "신전",
+              "easy": "신을 모시려고 지은 아주 큰 집이에요."
+            },
+            {
+              "word": "유적",
+              "easy": "옛사람이 남긴 건물이나 그 자리예요."
+            },
+            {
+              "word": "가설덧집",
+              "easy": "유적을 지키려고 위에 임시로 세운 큰 지붕집이에요."
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글은 무엇을 알려 주나요?",
+              "choices": [
+                "이집트로 여행 가는 방법",
+                "오래된 신전을 고치기 전에 지붕집을 먼저 세운 일",
+                "돌을 굴리는 놀이",
+                "사막에 사는 동물"
+              ],
+              "answer": 1,
+              "explain": "돌을 내리기 전에 유적 위에 가설덧집을 먼저 세웠다는 이야기예요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "가설덧집은 무슨 일을 해 주나요?",
+              "choices": [
+                "뜨거운 햇빛과 비를 막아 줘요",
+                "돌을 저절로 붙여 줘요",
+                "신전을 새로 지어 줘요",
+                "모래를 모두 치워 줘요"
+              ],
+              "answer": 0,
+              "explain": "덧집은 햇빛과 비를 막아 주고, 안에 큰 기계도 놓을 수 있어요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「유적」은 무엇인가요?",
+              "choices": [
+                "새로 지은 아파트",
+                "옛사람이 남긴 건물이나 그 자리",
+                "바다에 사는 물고기",
+                "글씨를 쓰는 종이"
+              ],
+              "answer": 1,
+              "explain": "옛사람이 남겨 놓은 건물이나 그 자리를 유적이라고 해요.",
+              "evidencePara": 1
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "돌을 내리기 전에 자리를 재고 적는 까닭은 무엇일까요?",
+              "choices": [
+                "돌이 너무 무거워서",
+                "다시 제자리에 놓으려고",
+                "돌을 팔려고",
+                "사진이 예뻐서"
+              ],
+              "answer": 1,
+              "explain": "적어 두어야 나중에 돌을 제자리에 다시 놓을 수 있어요.",
+              "evidencePara": 2
+            },
+            {
+              "type": "apply",
+              "q": "오래된 블록 성을 옮겼다가 다시 쌓으려고 해요. 이 글대로 하면 먼저 할 일은?",
+              "choices": [
+                "성을 얼른 무너뜨려요",
+                "블록이 어디에 있었는지 그려 두어요",
+                "새 블록을 사요",
+                "그냥 두어요"
+              ],
+              "answer": 1,
+              "explain": "내리기 전에 자리를 적어 두어야 다시 제자리에 놓을 수 있어요.",
+              "evidencePara": 2
+            }
+          ]
+        },
+        "L2": {
+          "title": "돌을 내리기 전에",
+          "minutes": 4,
+          "paragraphs": [
+            [
+              "이집트 룩소르에는 ",
+              "라메세움이라는 신전이 있다. ",
+              "3천 년도 더 전에 ",
+              "파라오 람세스 2세를 위해 지은 건물이고, ",
+              "유네스코 세계유산인 ",
+              "고대 테베와 네크로폴리스를 이루는 유적이다. ",
+              "오랜 세월 바람에 깎이고 ",
+              "낮과 밤의 큰 온도 차를 견디는 동안 ",
+              "돌이 약해졌다. ",
+              "지진 걱정도 있다. ",
+              "신전 앞을 막아선 큰 문인 탑문이 ",
+              "특히 위태로웠다."
+            ],
+            [
+              "국가유산청과 한국전통문화대학교는 ",
+              "이집트 유물최고위원회와 함께 ",
+              "이 탑문을 고치기로 했다. ",
+              "2023년에 시작해 ",
+              "2027년까지 이어지는 사업이다. ",
+              "그런데 공사를 맡고서도 ",
+              "바로 돌을 내리지는 않았다. ",
+              "먼저 유적 위에 ",
+              "커다란 임시 지붕을 세웠다. ",
+              "이것을 가설덧집이라고 한다."
+            ],
+            [
+              "가설덧집은 비와 햇빛과 바람에서 ",
+              "유적을 지켜 준다. ",
+              "안에 크레인을 놓을 수 있어서 ",
+              "무거운 돌도 안전하게 다룰 수 있다. ",
+              "가로 42미터, 세로 26미터에 ",
+              "기둥 높이는 21미터다. ",
+              "이집트에서 유산을 고치려고 ",
+              "이만한 덧집을 세운 것은 처음이다. ",
+              "준공식은 9월 3일에 열렸다."
+            ],
+            [
+              "이제부터 돌을 한 켜씩 내린다. ",
+              "내리기 전에 돌마다 ",
+              "모양과 자리를 재고 적어 둔다. ",
+              "이것을 기록화라고 한다. ",
+              "기록이 없으면 ",
+              "내려놓은 돌을 다시 올릴 수 없다. ",
+              "두 나라는 2027년까지 ",
+              "해체와 기록화, 돌 보존 처리를 ",
+              "함께 해 나갈 계획이다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "탑문",
+              "easy": "신전 앞을 막아선 커다란 문",
+              "hanja": "塔(탑 탑)+門(문 문)"
+            },
+            {
+              "word": "가설덧집",
+              "easy": "유적을 지키려고 그 위에 임시로 세운 보호 건물",
+              "hanja": "假(거짓 가)+設(베풀 설)"
+            },
+            {
+              "word": "해체",
+              "easy": "짜여 있던 것을 하나하나 뜯어 내리는 일",
+              "hanja": "解(풀 해)+體(몸 체)"
+            },
+            {
+              "word": "기록화",
+              "easy": "모양과 자리를 재어 글과 그림으로 남기는 일",
+              "hanja": "記(기록할 기)+錄(적을 록)+化(될 화)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 알맞은 것은?",
+              "choices": [
+                "이집트의 신전은 고칠 수 없다",
+                "탑문을 고치려고 먼저 가설덧집을 세우고, 기록하며 돌을 내린다",
+                "크레인은 무거운 돌을 들 수 없다",
+                "라메세움은 최근에 새로 지은 건물이다"
+              ],
+              "answer": 1,
+              "explain": "덧집을 먼저 세우고, 기록을 남기며 한 켜씩 해체하는 것이 이 사업의 차례다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "가설덧집을 먼저 세운 까닭으로 알맞은 것은?",
+              "choices": [
+                "관광객을 더 부르려고",
+                "신전을 더 크게 보이게 하려고",
+                "비와 햇빛과 바람에서 유적을 지키고, 안에 크레인을 놓으려고",
+                "돌을 다른 나라로 옮기려고"
+              ],
+              "answer": 2,
+              "explain": "덧집은 유적을 지켜 주고, 안에 크레인을 놓아 무거운 돌을 안전하게 다루게 해 준다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "detail",
+              "q": "가설덧집의 크기로 알맞은 것은?",
+              "choices": [
+                "가로 42미터, 세로 26미터에 기둥 높이 21미터",
+                "가로 26미터, 세로 42미터에 기둥 높이 42미터",
+                "가로 4미터, 세로 2미터에 기둥 높이 2미터",
+                "글에 나와 있지 않다"
+              ],
+              "answer": 0,
+              "explain": "가로 42미터, 세로 26미터이고 기둥 높이는 21미터라고 했다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "vocab",
+              "q": "「기록화」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "돌을 새로 깎아 만드는 일",
+                "돌마다 모양과 자리를 재어 적어 두는 일",
+                "돌에 색을 칠하는 일",
+                "돌을 깨끗이 씻는 일"
+              ],
+              "answer": 1,
+              "explain": "내리기 전에 돌마다 모양과 자리를 재고 적어 두는 일을 기록화라고 한다.",
+              "evidencePara": 3
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "공사를 맡고서도 바로 돌을 내리지 않은 까닭으로 가장 알맞은 것은?",
+              "choices": [
+                "돌이 너무 가벼워서",
+                "일할 사람이 없어서",
+                "유적을 지키고 안전하게 일할 자리를 먼저 만들어야 해서",
+                "이집트가 공사를 반대해서"
+              ],
+              "answer": 2,
+              "explain": "덧집이 있어야 유적이 보호되고 크레인을 놓아 안전하게 일할 수 있다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "apply",
+              "q": "학교의 낡은 나무 정자를 뜯어 고쳐 세우려고 한다. 이 글을 따르면 알맞은 차례는?",
+              "choices": [
+                "나무를 먼저 다 떼어 내고 나중에 자리를 적는다",
+                "지붕을 씌워 비를 막고, 자리를 재어 적은 뒤 하나씩 떼어 낸다",
+                "새 정자를 사고 낡은 것은 버린다",
+                "비 오는 날을 골라 떼어 낸다"
+              ],
+              "answer": 1,
+              "explain": "보호할 자리를 먼저 만들고 기록을 남긴 뒤 해체하는 것이 이 글이 보여 준 차례다.",
+              "evidencePara": 3
+            }
+          ],
+          "en": [
+            "There is a very old temple in Luxor, Egypt. Its name is the Ramesseum. It was built more than three thousand years ago for Pharaoh Ramesses II. It is part of a World Heritage Site called Ancient Thebes with its Necropolis. Wind has worn the stone for a very long time. The days are hot and the nights are cold. The stone grew weak, and earthquakes are a worry too. The big gate in front, called the pylon, was in danger.",
+            "The Korea Heritage Service decided to repair this pylon. It works with Korea National University of Heritage. They also work with Egypt's Supreme Council of Antiquities. The work began in 2023 and will last until 2027. But they did not take the stones down at once. First they built a huge roof over the ruins. This roof is called a temporary protective shelter.",
+            "The shelter keeps rain, sun and wind away from the ruins. A crane can stand inside it. So heavy stones can be moved safely. The shelter is 42 metres wide and 26 metres long. Its columns are 21 metres high. No shelter this big had ever been built in Egypt for heritage work. The opening ceremony was held on 3 September.",
+            "Now the stones come down, one layer at a time. Before a stone comes down, its shape and place are measured. Everything is written down. This work is called recording. Without the record, the stones cannot go back up. Until 2027 the two countries will take the pylon apart. They will also record it and treat the stone."
+          ],
+          "envocab": [
+            {
+              "word": "temple",
+              "ko": "신전 (명사)",
+              "base": "temple [ˈtempl]"
+            },
+            {
+              "word": "ruins",
+              "ko": "유적 (명사 ruin의 복수)",
+              "base": "ruin [ˈruːɪn]"
+            },
+            {
+              "word": "pylon",
+              "ko": "탑문 (명사)",
+              "base": "pylon [ˈpaɪlɑːn]"
+            },
+            {
+              "word": "shelter",
+              "ko": "보호 시설, 덧집 (명사)",
+              "base": "shelter [ˈʃeltər]"
+            },
+            {
+              "word": "crane",
+              "ko": "크레인, 기중기 (명사)",
+              "base": "crane [kreɪn]"
+            },
+            {
+              "word": "measured",
+              "ko": "재어진 (동사 measure)",
+              "base": "measure [ˈmeʒər]"
+            }
+          ],
+          "enseg": [
+            [
+              "There is a very old temple in Luxor, Egypt. ",
+              "Its name is the Ramesseum. ",
+              "It was built more than three thousand years ago for Pharaoh Ramesses II. ",
+              "It is part of a World Heritage Site called Ancient Thebes with its Necropolis. ",
+              "Wind has worn the stone for a very long time. The days are hot",
+              " and the nights are cold. The stone grew weak, ",
+              "and earthquakes are a worry too. ",
+              "The big gate in front, called the pylon, was in danger."
+            ],
+            [
+              "The Korea Heritage Service decided to repair this pylon. ",
+              "It works with Korea National University of Heritage. ",
+              "They also work with Egypt's Supreme Council of Antiquities. ",
+              "The work began in 2023",
+              " and will last until 2027. ",
+              "But they did not take the stones down at once. ",
+              "First they built a huge roof over the ruins. ",
+              "This roof is called a temporary protective shelter."
+            ],
+            [
+              "The shelter keeps rain, sun",
+              " and wind away from the ruins. ",
+              "A crane can stand inside it. ",
+              "So heavy stones can be moved safely. ",
+              "The shelter is 42 metres wide and 26 metres long. ",
+              "Its columns are 21 metres high. ",
+              "No shelter this big had ever been built in Egypt for heritage work. ",
+              "The opening ceremony was held on 3 September."
+            ],
+            [
+              "Now the stones come down, ",
+              "one layer at a time. ",
+              "Before a stone comes down, its shape and place are measured. Everything is written down. ",
+              "This work is called recording. Without the record, ",
+              "the stones cannot go back up. ",
+              "Until 2027 the two countries will take the pylon apart. ",
+              "They will also record it and treat the stone."
+            ]
+          ]
+        },
+        "L3": {
+          "title": "덧집부터 세우는 까닭",
+          "minutes": 5,
+          "paragraphs": [
+            [
+              "이집트 룩소르의 라메세움은 ",
+              "제19왕조 파라오 람세스 2세의 장제신전이다. ",
+              "유네스코 세계유산 ",
+              "고대 테베와 네크로폴리스를 이루는 핵심 유적이지만, ",
+              "오랜 자연풍화와 큰 일교차, ",
+              "지진 위험이 겹치면서 ",
+              "구조가 흔들려 왔다. ",
+              "신전 앞을 막아선 탑문은 ",
+              "손을 대지 않으면 ",
+              "더 버티기 어려운 상태였다."
+            ],
+            [
+              "국가유산청과 한국전통문화대학교는 2023년부터 ",
+              "이집트 유물최고위원회와 함께 ",
+              "이 탑문을 해체하고 복원하는 ",
+              "국제개발협력 사업을 벌여 왔다. ",
+              "2027년까지 이어지는 5년 사업이다. ",
+              "그런데 3년 가까이 지나도록 ",
+              "탑문의 돌은 제자리에 그대로 있었다. ",
+              "그동안 한 일은 발굴과 조사, ",
+              "그리고 준비였다."
+            ],
+            [
+              "준비의 마지막이 가설덧집이다. ",
+              "가설덧집은 유적을 외부 환경 변화로부터 보호하고, ",
+              "내부에 크레인을 설치해 ",
+              "석조 구조물을 해체하고 복원하는 작업의 ",
+              "안전성과 효율성을 높이는 임시 보호시설이다. ",
+              "가로 42미터, 세로 26미터, ",
+              "연면적 1,092제곱미터에 기둥 높이는 21미터이고, ",
+              "현지 기후와 유적 경관, ",
+              "입지 여건을 함께 따져 설계했다. ",
+              "이집트에서 문화유산 복원을 위해 ",
+              "이만한 규모의 가설 보호시설을 세운 것은 처음이다. ",
+              "준공식은 현지 시간 ",
+              "9월 3일 오전 9시에 열렸다."
+            ],
+            [
+              "덧집을 준비하는 동안의 ",
+              "발굴도 헛되지 않았다. ",
+              "기초 터파기에서 유구가 드러나 ",
+              "탑문 북측면을 조사하게 되었고, ",
+              "2025년 11월에는 ",
+              "기초석에서 람세스 2세의 카르투슈가 확인되었다. ",
+              "카르투슈는 파라오의 이름을 감싼 타원형 윤곽이어서 ",
+              "그 형태로 시대를 가를 수 있다. ",
+              "지성소에서 나온 적은 있어도 ",
+              "탑문에서 나온 것은 처음이었다."
+            ],
+            [
+              "이제부터가 본 공사다. ",
+              "2027년까지 탑문을 해체하면서 ",
+              "부재를 하나하나 기록하고 ",
+              "석재를 보존 처리한다. ",
+              "여기서 기록은 복원에 딸린 절차가 아니라 ",
+              "복원의 조건이다. ",
+              "어느 돌이 어느 자리에 ",
+              "어떤 방향으로 놓여 있었는지 남기지 않으면, ",
+              "내려놓은 돌은 되올릴 근거를 잃는다. ",
+              "두 기관은 이집트 실무진에게 ",
+              "부재 실측과 3차원 스캐닝 기술을 ",
+              "가르치는 일도 함께하고 있다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "장제신전",
+              "easy": "죽은 왕의 넋을 기리는 제사를 지내려고 지은 신전",
+              "hanja": "葬(장사지낼 장)+祭(제사 제)+神(귀신 신)+殿(전각 전)"
+            },
+            {
+              "word": "일교차",
+              "easy": "하루 사이 가장 높은 기온과 가장 낮은 기온의 차이",
+              "hanja": "日(날 일)+較(견줄 교)+差(다를 차)"
+            },
+            {
+              "word": "가설덧집",
+              "easy": "유적을 보호하고 작업 공간을 만들려고 임시로 세우는 시설",
+              "hanja": "假(거짓 가)+設(베풀 설)"
+            },
+            {
+              "word": "유구",
+              "easy": "땅에 남아 있는 옛 건물이나 시설의 자취",
+              "hanja": "遺(남길 유)+構(얽을 구)"
+            },
+            {
+              "word": "부재",
+              "easy": "건물을 이루는 낱낱의 재료",
+              "hanja": "部(떼 부)+材(재목 재)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글이 말하려는 바로 가장 알맞은 것은?",
+              "choices": [
+                "가설덧집은 유적을 가리므로 세우지 말아야 한다",
+                "복원은 손대기 전에 조건을 만들고 기록을 남기는 데서 시작된다",
+                "라메세움의 복원은 이미 끝났다",
+                "발굴은 복원과 관계가 없는 일이다"
+              ],
+              "answer": 1,
+              "explain": "글은 덧집이라는 조건을 갖추는 일과 기록을 복원의 출발점이자 조건으로 본다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "detail",
+              "q": "가설덧집에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "유적 옆에 영구히 남기려고 지은 건물이다",
+                "발굴한 유물을 보관하는 창고다",
+                "유적을 외부 환경 변화로부터 보호하고 내부에 크레인을 설치하는 임시 보호시설이다",
+                "관람객이 쉬어 가는 쉼터다"
+              ],
+              "answer": 2,
+              "explain": "외부 환경에서 유적을 지키고 크레인을 들여 해체·복원의 안전성과 효율성을 높이는 임시 시설이다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "detail",
+              "q": "탑문 북측면 조사에서 확인된 것으로 알맞은 것은?",
+              "choices": [
+                "2025년 11월 기초석에서 나온 람세스 2세의 카르투슈",
+                "람세스 2세의 무덤",
+                "프랑스 조사단이 남긴 기록물",
+                "나일강의 옛 물길 지도"
+              ],
+              "answer": 0,
+              "explain": "기초 터파기에서 유구가 드러나 조사가 이어졌고, 2025년 11월 기초석에서 카르투슈가 확인되었다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "vocab",
+              "q": "「유구」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "땅에 남아 있는 옛 건물이나 시설의 자취",
+                "오랫동안 변하지 않는 성질",
+                "돌을 다듬는 연장",
+                "신전을 지키는 사람"
+              ],
+              "answer": 0,
+              "explain": "터파기 과정에서 드러난 옛 시설의 자취를 유구라고 한다.",
+              "evidencePara": 3
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "5년 사업인데 3년 가까이 탑문의 돌이 제자리에 있었던 까닭으로 가장 알맞은 것은?",
+              "choices": [
+                "예산이 끊겼기 때문에",
+                "이집트가 허가를 내주지 않았기 때문에",
+                "발굴과 조사로 근거를 모으고 덧집까지 세워야 해체를 시작할 수 있기 때문에",
+                "돌이 너무 단단해 연장이 들지 않았기 때문에"
+              ],
+              "answer": 2,
+              "explain": "그동안 한 일은 발굴과 조사, 그리고 덧집이라는 준비였다고 글이 밝힌다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "critical",
+              "q": "이 글에 따를 때 기록을 남기지 않고 탑문을 해체하면 생길 가장 큰 문제는?",
+              "choices": [
+                "돌의 무게가 늘어난다",
+                "내려놓은 돌을 되올릴 근거가 사라진다",
+                "덧집이 무너진다",
+                "발굴이 중단된다"
+              ],
+              "answer": 1,
+              "explain": "어느 돌이 어느 자리에 어떤 방향으로 있었는지 남기지 않으면 되올릴 근거를 잃는다.",
+              "evidencePara": 4
+            }
+          ],
+          "en": [
+            "The Ramesseum in Luxor, Egypt is the mortuary temple of Ramesses II, a pharaoh of the Nineteenth Dynasty. It stands at the centre of the World Heritage Site known as Ancient Thebes with its Necropolis, yet long natural weathering, a wide daily temperature range and the risk of earthquakes have loosened its structure. The pylon guarding the front of the temple could not have held much longer untouched.",
+            "Since 2023 the Korea Heritage Service and Korea National University of Heritage have worked with Egypt's Supreme Council of Antiquities to dismantle and restore that pylon. It is a five-year project running to 2027. Yet for almost three years the stones of the pylon stayed where they were. What was done in that time was excavation, survey and preparation.",
+            "The last of the preparation was the shelter. A temporary protective shelter guards a site from changes in the outside environment and houses a crane inside, so that dismantling and rebuilding a stone structure is safer and more efficient. It measures 42 metres by 26 metres, covers 1,092 square metres and stands on columns 21 metres high, and the local climate, the setting of the site and the ground conditions were all weighed in its design. No shelter of this size had ever been built in Egypt for heritage restoration. The ceremony was held at nine in the morning, local time, on 3 September.",
+            "The digging done for the shelter was not wasted either. Remains appeared while the foundations were being cut, which led to an excavation on the north side of the pylon, and in November 2025 a cartouche of Ramesses II was found in a foundation stone. A cartouche is the oval outline drawn around a pharaoh's name, so its shape alone can date what it is carved on. Cartouches had been found in the sanctuary before, but never on the pylon.",
+            "Now the real work begins. Until 2027 the pylon will be taken apart while every block is recorded and every stone conserved. Recording here is not a step attached to restoration; it is the condition for it. If no record says which stone sat where and which way it faced, a stone once lowered has lost the evidence that would raise it again. The two institutions are also teaching Egyptian staff how to measure blocks and how to make three-dimensional scans."
+          ],
+          "envocab": [
+            {
+              "word": "mortuary",
+              "ko": "장제의, 장례의 (형용사)",
+              "base": "mortuary [ˈmɔːrtʃueri]"
+            },
+            {
+              "word": "weathering",
+              "ko": "풍화 (명사)",
+              "base": "weather [ˈweðər]"
+            },
+            {
+              "word": "dismantle",
+              "ko": "해체하다 (동사)",
+              "base": "dismantle [dɪsˈmæntl]"
+            },
+            {
+              "word": "excavation",
+              "ko": "발굴 (명사)",
+              "base": "excavate [ˈekskəveɪt]"
+            },
+            {
+              "word": "cartouche",
+              "ko": "카르투슈 (명사)",
+              "base": "cartouche [kɑːrˈtuːʃ]"
+            },
+            {
+              "word": "sanctuary",
+              "ko": "지성소 (명사)",
+              "base": "sanctuary [ˈsæŋktʃueri]"
+            }
+          ],
+          "enseg": [
+            [
+              "The Ramesseum in Luxor, Egypt is the mortuary temple of Ramesses II, ",
+              "a pharaoh of the Nineteenth Dynasty. ",
+              "It stands at the centre of the World Heritage Site known as Ancient Thebes with its Necropolis, yet long natural weathering, ",
+              "a wide daily temperature range",
+              " and the risk of earthquakes have loosened its structure. ",
+              "The pylon guarding the front of the temple could not have held much longer untouched."
+            ],
+            [
+              "Since 2023 the Korea Heritage Service",
+              " and Korea National University of Heritage have worked with Egypt's Supreme Council of Antiquities to dismantle and restore that pylon. ",
+              "It is a five-year project running to 2027. ",
+              "Yet for almost three years the stones of the pylon stayed where they were. ",
+              "What was done in that time was excavation, survey and preparation."
+            ],
+            [
+              "The last of the preparation was the shelter. ",
+              "A temporary protective shelter guards a site from changes in the outside environment",
+              " and houses a crane inside, so that dismantling",
+              " and rebuilding a stone structure is safer and more efficient. ",
+              "It measures 42 metres by 26 metres, covers 1,092 square metres",
+              " and stands on columns 21 metres high, and the local climate, ",
+              "the setting of the site",
+              " and the ground conditions were all weighed in its design. ",
+              "No shelter of this size had ever been built in Egypt for heritage restoration. ",
+              "The ceremony was held at nine in the morning, local time, on 3 September."
+            ],
+            [
+              "The digging done for the shelter was not wasted either. Remains appeared",
+              " while the foundations were being cut, ",
+              "which led to an excavation on the north side of the pylon, ",
+              "and in November 2025 a cartouche of Ramesses II was found in a foundation stone. ",
+              "A cartouche is the oval outline drawn around a pharaoh's name, ",
+              "so its shape alone can date what it is carved on. ",
+              "Cartouches had been found in the sanctuary before, ",
+              "but never on the pylon."
+            ],
+            [
+              "Now the real work begins. ",
+              "Until 2027 the pylon will be taken apart",
+              " while every block is recorded and every stone conserved. ",
+              "Recording here is not a step attached to restoration; ",
+              "it is the condition for it. ",
+              "If no record says which stone sat where",
+              " and which way it faced, ",
+              "a stone once lowered has lost the evidence that would raise it again. ",
+              "The two institutions are also teaching Egyptian staff how to measure blocks",
+              " and how to make three-dimensional scans."
+            ]
+          ]
+        },
+        "L4": {
+          "title": "가장 먼저 서는 것",
+          "minutes": 6,
+          "paragraphs": [
+            [
+              "문화유산을 고치는 일은 ",
+              "대개 고치는 장면부터 떠오른다. ",
+              "무너진 돌을 다시 쌓고 ",
+              "갈라진 틈을 메우는 손이다. ",
+              "그러나 현장에서 가장 먼저 서는 것은 ",
+              "사람이 아니라 지붕이다. ",
+              "2026년 9월 3일 이집트 룩소르의 라메세움에서 ",
+              "준공식이 열린 것도 신전이 아니라 ",
+              "신전을 덮은 임시 건물이었다."
+            ],
+            [
+              "라메세움은 고대 이집트 ",
+              "제19왕조 파라오 람세스 2세의 장제신전으로, ",
+              "유네스코 세계유산 고대 테베와 네크로폴리스를 이루는 핵심 유적이다. ",
+              "오랜 자연풍화에 사막의 큰 일교차와 ",
+              "지진 위험이 겹치면서 ",
+              "구조적 안정성 확보와 ",
+              "보존환경 개선이 오래된 과제로 남아 있었다. ",
+              "국가유산청과 한국전통문화대학교는 2023년부터 ",
+              "이집트 유물최고위원회와 함께 ",
+              "신전 탑문을 해체하고 복원하는 ",
+              "국제개발협력 사업을 5년 계획으로 추진해 왔다."
+            ],
+            [
+              "가설덧집은 유적을 외부 환경 변화로부터 ",
+              "보호하는 동시에, ",
+              "내부에 크레인을 설치해 ",
+              "석조 구조물의 해체와 복원 작업의 ",
+              "안전성과 효율성을 높이는 임시 보호시설이다. ",
+              "가로 42미터, 세로 26미터, ",
+              "연면적 1,092제곱미터에 기둥 높이는 21미터이며, ",
+              "현지 기후와 유적 경관, ",
+              "입지 여건을 종합해 설계했다. ",
+              "이집트에서 문화유산 복원을 위해 ",
+              "이만한 규모의 가설 보호시설이 들어선 것은 처음이다. ",
+              "보존이란 손대는 일이기 전에 ",
+              "손댈 수 있는 조건을 만드는 일이라는 뜻이다."
+            ],
+            [
+              "준비 자체가 성과를 내기도 했다. ",
+              "덧집 기초 터파기에서 유구가 드러나 ",
+              "탑문 북측면 발굴조사가 이어졌고, ",
+              "2025년 6월에는 ",
+              "20세기 초 나일강 범람을 막으려 쌓은 석축이, ",
+              "같은 해 11월에는 ",
+              "기초석에서 람세스 2세의 카르투슈가 확인되었다. ",
+              "카르투슈는 파라오의 이름을 감싼 타원형 윤곽이라 ",
+              "형태만으로도 시대를 가를 수 있다. ",
+              "지성소에서는 나온 적이 있으나 ",
+              "탑문에서 확인된 것은 처음이어서, ",
+              "신전 안 건물들이 ",
+              "세워진 순서를 밝힐 단서로 평가되었다."
+            ],
+            [
+              "2027년까지 남은 일은 ",
+              "해체와 부재 기록화, 석재 보존처리다. ",
+              "기록화는 복원에 딸린 절차가 아니라 ",
+              "복원의 조건이다. ",
+              "어느 부재가 어느 자리에 ",
+              "어떤 방향으로 놓여 있었는지 남지 않으면, ",
+              "내려놓은 돌은 되올릴 근거를 잃는다. ",
+              "5년이 걸리는 까닭도 여기에 있다. ",
+              "두 기관은 이집트 실무진에게 ",
+              "부재 실측과 3차원 스캐닝을 교육하며 ",
+              "현지 역량도 함께 기른다. ",
+              "아스완 하이댐 건설로 수몰 위기에 놓였던 ",
+              "누비아 유적을 구하려 ",
+              "국제적 노력이 모인 일이 ",
+              "세계유산협약이 태어난 계기였다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "보존환경",
+              "easy": "유산이 놓인 자리의 온도·습도·빛 같은 둘레 조건",
+              "hanja": "保(지킬 보)+存(있을 존)+環(고리 환)+境(지경 경)"
+            },
+            {
+              "word": "연면적",
+              "easy": "건물의 각 층 바닥 면적을 모두 더한 넓이",
+              "hanja": "延(늘일 연)+面(낯 면)+積(쌓을 적)"
+            },
+            {
+              "word": "지성소",
+              "easy": "신전 가장 안쪽에 있는 가장 거룩한 방",
+              "hanja": "至(이를 지)+聖(성인 성)+所(바 소)"
+            },
+            {
+              "word": "부재",
+              "easy": "건물을 이루는 낱낱의 재료",
+              "hanja": "部(떼 부)+材(재목 재)"
+            },
+            {
+              "word": "기록화",
+              "easy": "모양과 자리, 상태를 재어 자료로 남기는 일",
+              "hanja": "記(기록할 기)+錄(적을 록)+化(될 화)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글이 말하는 보존의 성격으로 가장 알맞은 것은?",
+              "choices": [
+                "무너진 곳을 빨리 메우는 손기술이다",
+                "손대는 일이기 전에 손댈 수 있는 조건을 만드는 일이다",
+                "유물을 다른 나라로 옮겨 보관하는 일이다",
+                "사라진 옛 모습을 상상으로 채우는 일이다"
+              ],
+              "answer": 1,
+              "explain": "글은 덧집을 예로 들어 보존이 조건을 만드는 일에서 시작한다고 밝힌다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "detail",
+              "q": "가설덧집의 규모로 알맞은 것은?",
+              "choices": [
+                "가로 42미터, 세로 26미터, 연면적 1,092제곱미터, 기둥 높이 21미터",
+                "가로 21미터, 세로 42미터, 연면적 26제곱미터",
+                "가로 26미터, 세로 21미터, 기둥 높이 42미터",
+                "글에 규모가 제시되지 않았다"
+              ],
+              "answer": 0,
+              "explain": "가로 42미터, 세로 26미터, 연면적 1,092제곱미터, 기둥 높이 21미터라고 했다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "detail",
+              "q": "덧집 기초 터파기에 이어진 발굴에서 확인된 것이 아닌 것은?",
+              "choices": [
+                "20세기 초 나일강 범람을 막으려 쌓은 석축",
+                "기초석에 새겨진 람세스 2세의 카르투슈",
+                "탑문 북측면에서 드러난 유구",
+                "람세스 2세의 미라"
+              ],
+              "answer": 3,
+              "explain": "석축과 카르투슈, 유구가 확인되었을 뿐 미라에 대한 언급은 없다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "vocab",
+              "q": "「지성소」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "신전 가장 안쪽에 있는 가장 거룩한 방",
+                "신전 앞을 막아선 커다란 문",
+                "돌을 쌓아 만든 둑",
+                "유적을 덮은 임시 지붕"
+              ],
+              "answer": 0,
+              "explain": "지성소는 신전의 가장 안쪽에 자리한 최고의 성소를 가리킨다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "critical",
+              "q": "첫 문단에서 「가장 먼저 서는 것은 사람이 아니라 지붕이다」라고 쓴 까닭으로 가장 알맞은 것은?",
+              "choices": [
+                "지붕이 신전보다 아름답기 때문에",
+                "사람 없이 기계로만 일하기 때문에",
+                "보존이 고치는 장면보다 그 일을 가능하게 하는 준비에서 시작됨을 보이려고",
+                "준공식이 신전 안에서 열리지 않았기 때문에"
+              ],
+              "answer": 2,
+              "explain": "준공식의 주인공이 신전이 아니라 신전을 덮은 임시 건물이었다는 사실이 뒤이어 제시된다.",
+              "evidencePara": 0
+            }
+          ],
+          "challenge": [
+            {
+              "type": "critical",
+              "q": "이 글의 논지에 비추어 가장 조심해서 다루어야 할 해석은?",
+              "choices": [
+                "덧집이 준공되었으니 라메세움 탑문의 복원은 끝났다",
+                "덧집은 해체와 복원 작업을 위한 임시 보호시설이다",
+                "기초석에서 나온 카르투슈는 건물이 세워진 순서를 밝힐 단서가 된다",
+                "기록이 없으면 내려놓은 돌을 되올릴 근거가 사라진다"
+              ],
+              "answer": 0,
+              "explain": "덧집 준공은 본격적인 해체·복원의 출발점이다. 해체와 기록화, 석재 보존처리는 2027년까지 남아 있다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "apply",
+              "q": "이 글의 방식대로 국제 협력 보존 사업을 설계한다면 알맞은 순서는?",
+              "choices": [
+                "해체부터 서둘러 마치고 기록은 나중에 정리한다",
+                "완성된 모습을 먼저 그려 두고 그대로 맞춘다",
+                "조사로 근거를 모으고 보호 시설을 세운 뒤, 기록하며 해체하고 현지 인력을 함께 기른다",
+                "부재를 모두 국내로 옮겨 처리한 뒤 되돌려 보낸다"
+              ],
+              "answer": 2,
+              "explain": "조사·준비, 기록을 남기는 해체, 현지 역량 강화가 이 사업이 밟아 온 순서다.",
+              "evidencePara": 4
+            }
+          ],
+          "en": [
+            "Repairing a heritage site is usually pictured as the repair itself: hands stacking fallen stone and filling a crack. On site, though, the first thing to go up is not a person but a roof. The completion ceremony held at the Ramesseum in Luxor, Egypt on 3 September 2026 was not for the temple but for the temporary building that now covers it.",
+            "The Ramesseum is the mortuary temple of Ramesses II, a pharaoh of the Nineteenth Dynasty of ancient Egypt, and a core part of the World Heritage Site Ancient Thebes with its Necropolis. Long natural weathering, the wide daily temperature range of the desert and the risk of earthquakes left structural stability and the conservation environment as standing problems. Since 2023 the Korea Heritage Service and Korea National University of Heritage have run a five-year development cooperation project with Egypt's Supreme Council of Antiquities to dismantle and restore the temple's pylon.",
+            "A temporary protective shelter guards a site from changes in the outside environment while housing a crane inside, so that taking a stone structure apart and putting it back together is safer and more efficient. This one is 42 metres by 26 metres, covers a floor area of 1,092 square metres and rests on columns 21 metres high, designed around the local climate, the setting of the ruins and the conditions of the ground. Nothing of this scale had been built in Egypt for heritage restoration before. Conservation, in other words, is making the conditions for the work before it is the work itself.",
+            "The preparation produced findings of its own. Remains emerged as the shelter's foundations were cut, which led to an excavation on the north face of the pylon. In June 2025 a stone embankment raised in the early twentieth century against Nile floods came to light, and in November a cartouche of Ramesses II was found in a foundation stone. A cartouche is the oval outline enclosing a pharaoh's name, so its form alone can place it in time. Cartouches had been found in the sanctuary before, but this was the first on the pylon, and it was read as a clue to the order in which the buildings of the temple went up.",
+            "What remains until 2027 is dismantling, recording every block and conserving every stone. Recording is not a step attached to restoration; it is the condition for it. If nothing records which block sat where and which way it faced, a stone once lowered has lost the evidence that would raise it again. That is also why five years are needed. The two institutions are training Egyptian staff to measure blocks and to make three-dimensional scans, building local capacity alongside the work. It was an international effort to save the Nubian monuments from the waters of the Aswan High Dam that gave rise to the World Heritage Convention."
+          ],
+          "envocab": [
+            {
+              "word": "mortuary",
+              "ko": "장제의, 장례의 (형용사)",
+              "base": "mortuary [ˈmɔːrtʃueri]"
+            },
+            {
+              "word": "weathering",
+              "ko": "풍화 (명사)",
+              "base": "weather [ˈweðər]"
+            },
+            {
+              "word": "dismantle",
+              "ko": "해체하다 (동사)",
+              "base": "dismantle [dɪsˈmæntl]"
+            },
+            {
+              "word": "embankment",
+              "ko": "둑, 석축 (명사)",
+              "base": "embankment [ɪmˈbæŋkmənt]"
+            },
+            {
+              "word": "cartouche",
+              "ko": "카르투슈 (명사)",
+              "base": "cartouche [kɑːrˈtuːʃ]"
+            },
+            {
+              "word": "conserving",
+              "ko": "보존 처리하는 (동사 conserve)",
+              "base": "conserve [kənˈsɜːrv]"
+            }
+          ],
+          "enseg": [
+            [
+              "Repairing a heritage site is usually pictured as the repair itself: hands stacking fallen stone and filling a crack. On site, though, ",
+              "the first thing to go up is not a person but a roof. ",
+              "The completion ceremony held at the Ramesseum in Luxor, Egypt on 3 September 2026 was not for the temple",
+              " but for the temporary building that now covers it."
+            ],
+            [
+              "The Ramesseum is the mortuary temple of Ramesses II, ",
+              "a pharaoh of the Nineteenth Dynasty of ancient Egypt, ",
+              "and a core part of the World Heritage Site Ancient Thebes with its Necropolis. Long natural weathering, ",
+              "the wide daily temperature range of the desert",
+              " and the risk of earthquakes left structural stability",
+              " and the conservation environment as standing problems. ",
+              "Since 2023 the Korea Heritage Service",
+              " and Korea National University of Heritage have run a five-year development cooperation project with Egypt's Supreme Council of Antiquities to dismantle",
+              " and restore the temple's pylon."
+            ],
+            [
+              "A temporary protective shelter guards a site from changes in the outside environment",
+              " while housing a crane inside, ",
+              "so that taking a stone structure apart",
+              " and putting it back together is safer and more efficient. ",
+              "This one is 42 metres by 26 metres, ",
+              "covers a floor area of 1,092 square metres",
+              " and rests on columns 21 metres high, ",
+              "designed around the local climate, ",
+              "the setting of the ruins",
+              " and the conditions of the ground. ",
+              "Nothing of this scale had been built in Egypt for heritage restoration before. Conservation, in other words, ",
+              "is making the conditions for the work before it is the work itself."
+            ],
+            [
+              "The preparation produced findings of its own. ",
+              "Remains emerged as the shelter's foundations were cut, ",
+              "which led to an excavation on the north face of the pylon. ",
+              "In June 2025 a stone embankment raised in the early twentieth century against Nile floods came to light, ",
+              "and in November a cartouche of Ramesses II was found in a foundation stone. ",
+              "A cartouche is the oval outline enclosing a pharaoh's name, ",
+              "so its form alone can place it in time. ",
+              "Cartouches had been found in the sanctuary before, ",
+              "but this was the first on the pylon, ",
+              "and it was read as a clue to the order in which the buildings of the temple went up."
+            ],
+            [
+              "What remains until 2027 is dismantling, recording every block and conserving every stone. ",
+              "Recording is not a step attached to restoration; ",
+              "it is the condition for it. ",
+              "If nothing records which block sat where",
+              " and which way it faced, ",
+              "a stone once lowered has lost the evidence that would raise it again. ",
+              "That is also why five years are needed. ",
+              "The two institutions are training Egyptian staff to measure blocks",
+              " and to make three-dimensional scans, ",
+              "building local capacity alongside the work. ",
+              "It was an international effort to save the Nubian monuments from the waters of the Aswan High Dam that gave rise to the World Heritage Convention."
+            ]
+          ]
+        }
+      },
+      "issue": true
+    },
+    {
+      "id": "tb-genome",
+      "category": "science",
+      "careers": [
+        "med",
+        "bio",
+        "it"
+      ],
+      "publishedAt": "2026-09-07",
+      "status": "draft",
+      "sources": [
+        {
+          "title": "질병관리청 보도참고자료 — 보이지 않던 결핵 감염고리까지 찾아냅니다 (2026.9.4, 세균분석과)",
+          "url": "https://www.kdca.go.kr/bbs/kdca/42/312490/artclView.do"
+        },
+        {
+          "title": "질병관리청 보도자료 — 2025년 결핵역학조사로 추가 결핵환자 233명 조기발견 (2026.5.10, 결핵정책과)",
+          "url": "https://www.kdca.go.kr/bbs/kdca/42/310992/artclView.do"
+        }
+      ],
+      "levels": {
+        "L1": {
+          "title": "균에도 무늬가 있어요",
+          "minutes": 3,
+          "paragraphs": [
+            [
+              "우리 둘레에는 ",
+              "아주 작은 균이 살아요. ",
+              "어떤 균은 ",
+              "사람을 아프게 해요. ",
+              "결핵을 일으키는 균도 그래요. ",
+              "이 균이 어디에서 왔는지 ",
+              "알면 좋아요. ",
+              "그래야 다음 사람을 지킬 수 있어요."
+            ],
+            [
+              "사람마다 손끝 무늬가 다르지요. ",
+              "균에도 저마다 무늬가 있어요. ",
+              "그 무늬는 ",
+              "아주 긴 글자로 되어 있어요. ",
+              "이제는 그 글자를 끝까지 다 읽어요. ",
+              "두 균의 글자가 꼭 닮았으면 ",
+              "한곳에서 온 균이에요."
+            ],
+            [
+              "예전에는 같은 자리에 있었는지만 살폈어요. ",
+              "이제는 글자를 견주어 볼 수 있어요. ",
+              "우리도 도울 일이 있어요. ",
+              "기침이 오래 가면 ",
+              "어른께 말해요. ",
+              "함께 검사를 받자고 하면 ",
+              "같이 가요."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "균",
+              "easy": "눈에 보이지 않을 만큼 아주 작은 생물이에요.",
+              "hanja": null
+            },
+            {
+              "word": "결핵",
+              "easy": "기침이 오래 나는 병이에요. 약을 꾸준히 먹으면 나아요.",
+              "hanja": null
+            },
+            {
+              "word": "검사",
+              "easy": "몸에 이상이 없는지 자세히 살펴보는 일이에요.",
+              "hanja": null
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글이 알려 주는 것은 무엇인가요?",
+              "choices": [
+                "균을 없애는 약을 만드는 방법",
+                "균의 글자를 읽어 어디에서 온 균인지 알아본다는 것",
+                "기침을 참는 방법",
+                "병원을 찾아가는 길"
+              ],
+              "answer": 1,
+              "explain": "균마다 다른 글자를 끝까지 읽어 서로 닮았는지 보는 이야기예요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "두 균이 한곳에서 왔다고 보려면 무엇이 닮아야 하나요?",
+              "choices": [
+                "균의 색깔",
+                "균이 사는 자리",
+                "균의 크기",
+                "균의 글자"
+              ],
+              "answer": 3,
+              "explain": "두 균의 글자가 꼭 닮았으면 한곳에서 온 균이라고 했어요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「검사」는 무엇인가요?",
+              "choices": [
+                "몸에 이상이 없는지 살펴보는 일",
+                "약을 짓는 일",
+                "글자를 쓰는 일",
+                "자리를 옮기는 일"
+              ],
+              "answer": 0,
+              "explain": "검사는 몸에 이상이 없는지 자세히 살펴보는 일이에요.",
+              "evidencePara": 2
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "예전에는 왜 어디에서 온 균인지 알기 어려웠을까요?",
+              "choices": [
+                "균이 너무 컸기 때문에",
+                "글자는 읽지 않고 같은 자리에 있었는지만 살폈기 때문에",
+                "사람이 적었기 때문에",
+                "글자가 없었기 때문에"
+              ],
+              "answer": 1,
+              "explain": "예전에는 같은 자리에 있었는지만 살폈다고 했어요. 이제는 글자를 견주어 봐요.",
+              "evidencePara": 2
+            },
+            {
+              "type": "apply",
+              "q": "기침이 오래 갈 때 내가 할 수 있는 일은 무엇인가요?",
+              "choices": [
+                "혼자 참고 지낸다",
+                "친구에게만 살짝 말한다",
+                "어른께 말하고 함께 검사를 받으러 간다",
+                "아무에게도 말하지 않는다"
+              ],
+              "answer": 2,
+              "explain": "기침이 오래 가면 어른께 말하고, 검사를 받자고 하면 같이 가면 돼요.",
+              "evidencePara": 2
+            }
+          ]
+        },
+        "L2": {
+          "title": "같은 균일까",
+          "minutes": 4,
+          "paragraphs": [
+            [
+              "결핵은 공기로 옮는 병이다. ",
+              "한 사람이 결핵에 걸리면 ",
+              "가까이 지낸 사람들도 ",
+              "검사를 받는다. ",
+              "이 과정을 역학조사라고 한다. ",
+              "질병관리청은 지난해 ",
+              "접촉자 10만 124명을 조사해 ",
+              "결핵 환자 233명을 일찍 찾아냈다. ",
+              "일찍 찾을수록 치료도 빠르고 ",
+              "다음 전파도 막을 수 있다."
+            ],
+            [
+              "그런데 어려운 경우가 있다. ",
+              "두 환자가 서로 만난 적이 없으면 ",
+              "고리가 끊긴다. ",
+              "같은 시기에 같은 곳에 ",
+              "있었다는 사실이 없으니 ",
+              "누구에게서 옮았는지 짐작할 근거가 없다. ",
+              "지금까지의 조사는 ",
+              "여기서 멈추곤 했다."
+            ],
+            [
+              "그래서 균 자체를 읽기로 했다. ",
+              "결핵균 안에는 ",
+              "약 440만 개의 글자로 적힌 ",
+              "유전 정보가 있다. ",
+              "지금까지는 그 가운데 일부만 견주었다. ",
+              "이제는 처음부터 끝까지 모두 읽는다. ",
+              "두 사람에게서 나온 균의 글자가 ",
+              "얼마나 닮았는지 따지는 것이다."
+            ],
+            [
+              "글자가 거의 같으면 ",
+              "한 뿌리에서 퍼진 균으로 ",
+              "볼 수 있다. ",
+              "서로 모르는 사이라도 ",
+              "균이 이어 준 길이 드러난다. ",
+              "정황으로 짐작하던 일을 ",
+              "이제는 증거로 확인하게 된 셈이다. ",
+              "질병관리청은 이 방법을 ",
+              "감염 경로가 밝혀지지 않은 ",
+              "사례에도 쓸 계획이다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "역학조사",
+              "easy": "감염병이 어떻게 퍼졌는지 따라가며 살피는 일",
+              "hanja": "疫(전염병 역)+學(배울 학)+調(고를 조)+査(조사할 사)"
+            },
+            {
+              "word": "접촉자",
+              "easy": "환자와 가까이 지내 검사가 필요한 사람",
+              "hanja": "接(이을 접)+觸(닿을 촉)+者(놈 자)"
+            },
+            {
+              "word": "유전",
+              "easy": "부모에게서 자손에게 성질이 전해지는 일",
+              "hanja": "遺(남길 유)+傳(전할 전)"
+            },
+            {
+              "word": "정황",
+              "easy": "어떤 일이 일어난 둘레의 사정",
+              "hanja": "情(뜻 정)+況(상황 황)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 알맞은 것은?",
+              "choices": [
+                "결핵은 치료할 수 없는 병이다",
+                "균의 글자를 끝까지 읽어 같은 곳에서 퍼진 균인지 가려낸다",
+                "역학조사는 이제 필요 없다",
+                "접촉자는 검사를 받지 않아도 된다"
+              ],
+              "answer": 1,
+              "explain": "만난 사실이 없어도 균의 글자를 견주어 전파를 가려내게 되었다는 것이 중심이다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "detail",
+              "q": "지난해 역학조사에서 확인된 숫자로 알맞은 것은?",
+              "choices": [
+                "접촉자 233명, 환자 10만 명",
+                "접촉자 1만 명, 환자 44명",
+                "접촉자 10만 124명, 조기 발견 환자 233명",
+                "접촉자 440만 명, 환자 20명"
+              ],
+              "answer": 2,
+              "explain": "접촉자 10만 124명을 조사해 결핵 환자 233명을 일찍 찾아냈다고 했다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "결핵균 안에 있는 유전 정보의 글자 수는?",
+              "choices": [
+                "약 440만 개",
+                "약 233개",
+                "약 20개",
+                "약 1만 개"
+              ],
+              "answer": 0,
+              "explain": "결핵균 안에는 약 440만 개의 글자로 적힌 유전 정보가 있다고 했다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "vocab",
+              "q": "「역학조사」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "약을 새로 만드는 일",
+                "감염병이 어떻게 퍼졌는지 따라가며 살피는 일",
+                "병원을 새로 짓는 일",
+                "환자의 이름을 알리는 일"
+              ],
+              "answer": 1,
+              "explain": "환자와 가까이 지낸 사람을 찾아 검사하며 퍼진 길을 살피는 일이다.",
+              "evidencePara": 0
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "「정황으로 짐작하던 일을 이제는 증거로 확인한다」는 말의 뜻으로 가장 알맞은 것은?",
+              "choices": [
+                "같은 자리에 있었다는 사실만으로 판단하지 않고 균 자체를 견준다는 뜻",
+                "조사를 그만둔다는 뜻",
+                "환자를 더 늘린다는 뜻",
+                "검사를 줄인다는 뜻"
+              ],
+              "answer": 0,
+              "explain": "만난 정황 대신 균의 글자가 얼마나 닮았는지를 근거로 삼게 되었다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "apply",
+              "q": "두 환자가 서로 만난 적이 없을 때 이 글의 방법으로 할 수 있는 일은?",
+              "choices": [
+                "두 사람은 관계가 없다고 결론짓는다",
+                "두 사람의 균의 글자를 읽어 얼마나 닮았는지 견준다",
+                "같은 동네인지만 확인한다",
+                "조사를 멈춘다"
+              ],
+              "answer": 1,
+              "explain": "만난 사실이 없어도 균의 글자를 견주면 이어진 길이 드러난다고 했다.",
+              "evidencePara": 2
+            }
+          ],
+          "en": [
+            "The illness called tuberculosis moves through the air. When one person gets it, people close to them are tested. This work is called contact tracing. Last year Korea's disease agency checked 100,124 contacts. It found 233 more patients early. Early finding means faster care and less spread.",
+            "But some cases are hard. If two patients never met, the chain breaks. There is no shared time and no shared place. So no one can guess who passed the germ on. Until now, the search often stopped here.",
+            "So scientists decided to read the germ itself. Inside a TB germ there are about 4.4 million letters. These letters hold its genetic information. Before, only a small part was compared. Now the whole thing is read from start to end. Then the two germs are checked for how alike they are.",
+            "If the letters are almost the same, the germs share one root. A path appears even between two people who never met. Guessing has turned into evidence. Korea's disease agency will use this method for unclear cases too."
+          ],
+          "envocab": [
+            {
+              "word": "tuberculosis",
+              "ko": "결핵 (명사)",
+              "base": "tuberculosis [tuːˌbɜːrkjəˈloʊsɪs]"
+            },
+            {
+              "word": "germ",
+              "ko": "세균, 균 (명사)",
+              "base": "germ [dʒɜːrm]"
+            },
+            {
+              "word": "contact",
+              "ko": "접촉, 접촉자 (명사)",
+              "base": "contact [ˈkɑːntækt]"
+            },
+            {
+              "word": "genetic",
+              "ko": "유전의 (형용사)",
+              "base": "gene [dʒiːn]"
+            },
+            {
+              "word": "compared",
+              "ko": "비교되었다 (동사 compare의 과거분사)",
+              "base": "compare [kəmˈper]"
+            },
+            {
+              "word": "evidence",
+              "ko": "증거 (명사)",
+              "base": "evidence [ˈevɪdəns]"
+            }
+          ],
+          "enseg": [
+            [
+              "The illness called tuberculosis moves through the air. ",
+              "When one person gets it, ",
+              "people close to them are tested. ",
+              "This work is called contact tracing. ",
+              "Last year Korea's disease agency checked 100,124 contacts. ",
+              "It found 233 more patients early. ",
+              "Early finding means faster care and less spread."
+            ],
+            [
+              "But some cases are hard. ",
+              "If two patients never met, the chain breaks. ",
+              "There is no shared time and no shared place. ",
+              "So no one can guess",
+              " who passed the germ on. ",
+              "Until now, the search often stopped here."
+            ],
+            [
+              "So scientists decided to read the germ itself. ",
+              "Inside a TB germ there are about 4.4 million letters. ",
+              "These letters hold its genetic information. ",
+              "Before, only a small part was compared. ",
+              "Now the whole thing is read from start to end. ",
+              "Then the two germs are checked",
+              " for how alike they are."
+            ],
+            [
+              "If the letters are almost the same, ",
+              "the germs share one root. ",
+              "A path appears even between two people",
+              " who never met. ",
+              "Guessing has turned into evidence. ",
+              "Korea's disease agency will use this method",
+              " for unclear cases too."
+            ]
+          ]
+        },
+        "L3": {
+          "title": "정황에서 증거로",
+          "minutes": 5,
+          "paragraphs": [
+            [
+              "감염병을 조사할 때 가장 어려운 물음은 ",
+              "누가 누구에게서 옮았는가이다. ",
+              "오랫동안 답은 시간과 장소에서 찾았다. ",
+              "같은 시기에 같은 공간에 있었다면 ",
+              "옮았을 것이라고 추정하는 방식이다. ",
+              "이 추정은 ",
+              "접촉이 확인될 때만 힘을 낸다. ",
+              "서로 만난 적이 없어 보이는 ",
+              "두 환자 사이는 빈칸으로 남았다."
+            ],
+            [
+              "접촉이라는 단서는 실제로 강력하다. ",
+              "질병관리청이 2025년 ",
+              "결핵 환자의 접촉자 10만 124명을 역학조사한 결과 ",
+              "추가 환자 233명을 조기에 발견했다. ",
+              "접촉자의 결핵 발생률은 ",
+              "10만 명당 232.7명으로 ",
+              "일반 인구의 33.5명보다 ",
+              "약 일곱 배 높았다. ",
+              "가까이 지냈다는 사실 하나만으로도 ",
+              "이만큼 찾아낼 수 있다는 뜻이다. ",
+              "문제는 그 사실이 확인되지 않는 경우다."
+            ],
+            [
+              "그래서 질병관리청은 2026년 9월 ",
+              "결핵균 유전형 분석체계를 ",
+              "전장유전체분석 기반으로 개편한다고 밝혔다. ",
+              "지금까지는 ",
+              "결핵균 유전정보의 일부만 비교했다. ",
+              "전장유전체분석은 결핵균의 ",
+              "약 440만 개 염기서열 전체를 읽어 ",
+              "두 환자에게서 나온 균이 ",
+              "서로 얼마나 유사한지를 따진다."
+            ],
+            [
+              "증거의 성격이 달라지는 지점이다. ",
+              "사람의 기억과 동선 대신 ",
+              "균이 몸에 지니고 다닌 기록을 ",
+              "읽기 때문이다. ",
+              "기존 분석으로는 구분하기 어려웠던 ",
+              "미세한 차이까지 드러난다. ",
+              "접촉 사실이 확인되지 않은 환자 사이에서도 ",
+              "전파 연관성을 가려낼 수 있다는 뜻이다. ",
+              "질병관리청은 감염경로가 불분명한 내성결핵 사례에도 ",
+              "이 방법을 적용할 계획이다."
+            ],
+            [
+              "다만 유전체 분석이 역학조사를 대신하지는 않는다. ",
+              "균이 닮았다는 사실은 ",
+              "관련이 있다고 말해 줄 뿐이다. ",
+              "어디에서 어떻게 옮았는지까지 말해 주지는 않는다. ",
+              "질병관리청도 분석 결과를 ",
+              "역학조사와 연계해 쓰겠다고 밝혔다. ",
+              "지난해 새로 발생한 결핵 환자는 ",
+              "약 1만 7천 명이고 ",
+              "정부는 2027년까지 발생률을 ",
+              "인구 10만 명당 20명 아래로 ",
+              "낮추려 한다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "역학조사",
+              "easy": "감염병이 어떻게 퍼졌는지 따라가며 살피는 일",
+              "hanja": "疫(전염병 역)+學(배울 학)+調(고를 조)+査(조사할 사)"
+            },
+            {
+              "word": "추정",
+              "easy": "드러난 사정으로 미루어 그러할 것이라고 짐작하는 일",
+              "hanja": "推(밀 추)+定(정할 정)"
+            },
+            {
+              "word": "염기서열",
+              "easy": "유전 정보를 이루는 네 글자가 늘어선 차례",
+              "hanja": "鹽(소금 염)+基(터 기)+序(차례 서)+列(벌일 렬)"
+            },
+            {
+              "word": "유사",
+              "easy": "서로 비슷함",
+              "hanja": "類(무리 류)+似(닮을 사)"
+            },
+            {
+              "word": "내성",
+              "easy": "약이 잘 듣지 않게 견디는 성질",
+              "hanja": "耐(견딜 내)+性(성품 성)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글이 말하는 가장 큰 변화는?",
+              "choices": [
+                "결핵 환자가 갑자기 늘었다는 것",
+                "역학조사를 더 이상 하지 않게 되었다는 것",
+                "전파를 판정하는 근거가 정황에서 균의 유전체로 옮겨 왔다는 것",
+                "치료 기간이 짧아졌다는 것"
+              ],
+              "answer": 2,
+              "explain": "같은 시기 같은 공간이라는 정황 대신 균이 얼마나 유사한지를 근거로 삼게 되었다는 것이 중심이다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "detail",
+              "q": "2025년 결핵 역학조사 결과로 알맞은 것은?",
+              "choices": [
+                "접촉자 10만 124명 가운데 추가 환자 233명을 조기에 발견했다",
+                "접촉자 233명 가운데 환자 10만 명을 발견했다",
+                "접촉자에게서는 환자가 나오지 않았다",
+                "일반 인구보다 발생률이 낮았다"
+              ],
+              "answer": 0,
+              "explain": "접촉자 10만 124명을 역학조사해 추가 환자 233명을 조기에 발견했다고 했다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "전장유전체분석에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "결핵균 유전정보의 일부만 비교한다",
+                "결핵균의 약 440만 개 염기서열 전체를 읽는다",
+                "환자의 동선만 비교한다",
+                "접촉자 수를 세는 방법이다"
+              ],
+              "answer": 1,
+              "explain": "전장유전체분석은 결핵균의 약 440만 개 염기서열 전체를 읽어 유사한 정도를 따진다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "vocab",
+              "q": "「추정」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "숫자를 정확히 세는 일",
+                "드러난 사정으로 미루어 그러할 것이라고 짐작하는 일",
+                "기록을 그대로 옮기는 일",
+                "실험으로 증명하는 일"
+              ],
+              "answer": 1,
+              "explain": "같은 시기 같은 공간에 있었다면 옮았을 것이라고 미루어 짐작하는 것이 추정이다.",
+              "evidencePara": 0
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "접촉자 발생률이 일반 인구보다 약 일곱 배 높다는 사실이 이 글에서 하는 구실은?",
+              "choices": [
+                "접촉이라는 단서가 실제로 강력함을 보여 준다",
+                "역학조사가 쓸모없음을 보여 준다",
+                "결핵이 늘고 있음을 보여 준다",
+                "유전체 분석이 필요 없음을 보여 준다"
+              ],
+              "answer": 0,
+              "explain": "함께 지냈다는 사실 하나로도 많은 환자를 찾아낸다는 점을 뒷받침한다. 문제는 그 사실이 없는 경우다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "critical",
+              "q": "이 글의 관점에서 가장 조심해야 할 판단은?",
+              "choices": [
+                "균의 유전체가 유사하면 관련이 있을 수 있다",
+                "전장유전체분석은 미세한 차이까지 구분한다",
+                "균이 닮았으니 누가 누구에게 어디서 옮겼는지도 정해진다",
+                "역학조사와 유전체 분석을 함께 쓴다"
+              ],
+              "answer": 2,
+              "explain": "글은 유전체가 관련성만 말해 줄 뿐 어디에서 어떻게 옮았는지까지는 말해 주지 않는다고 못 박는다.",
+              "evidencePara": 4
+            }
+          ],
+          "en": [
+            "The hardest question in an outbreak is a simple one: who caught it from whom? For a long time the answer came from time and place. If two people were in the same space at the same time, transmission was assumed. That reasoning works only when contact can be confirmed. Between two patients who seem never to have met, the answer stayed blank.",
+            "Contact is in fact a powerful clue. In 2025 the Korea Disease Control and Prevention Agency traced 100,124 contacts of TB patients and found 233 additional patients early. Among contacts the TB rate was 232.7 per 100,000, about seven times the 33.5 per 100,000 seen in the general population. Simply having lived close to a patient brings that many cases to light. The trouble comes when no such contact is on record.",
+            "So in September 2026 the agency announced that it would rebuild its TB genotyping system around whole genome sequencing. Until now only part of the germ's genetic information was compared. Whole genome sequencing reads all of the roughly 4.4 million base pairs in the tuberculosis bacterium and measures how similar the germs from two patients are.",
+            "This is where the nature of the evidence changes. Instead of memories and movements, investigators read the record the germ carried in the body. Tiny differences that older methods could not tell apart now show up. Links can be traced even between patients whose contact was never recorded. The agency plans to apply the method to drug-resistant TB cases of unknown origin.",
+            "Genomes do not replace field investigation, however. That two germs resemble each other says they are related; it does not say where or how. The agency itself said the results would be used together with epidemiological investigation. About 17,000 people newly developed TB in Korea last year, and the government aims to cut the rate below 20 per 100,000 by 2027."
+          ],
+          "envocab": [
+            {
+              "word": "outbreak",
+              "ko": "발생, 유행 (명사)",
+              "base": "outbreak [ˈaʊtbreɪk]"
+            },
+            {
+              "word": "transmission",
+              "ko": "전파 (명사)",
+              "base": "transmit [trænsˈmɪt]"
+            },
+            {
+              "word": "sequencing",
+              "ko": "염기서열 분석 (명사)",
+              "base": "sequence [ˈsiːkwəns]"
+            },
+            {
+              "word": "resemble",
+              "ko": "닮다 (동사)",
+              "base": "resemble [rɪˈzembl]"
+            },
+            {
+              "word": "epidemiological",
+              "ko": "역학의 (형용사)",
+              "base": "epidemiology [ˌepɪˌdiːmiˈɑːlədʒi]"
+            },
+            {
+              "word": "drug-resistant",
+              "ko": "약제 내성의 (형용사)",
+              "base": "resist [rɪˈzɪst]"
+            }
+          ],
+          "enseg": [
+            [
+              "The hardest question",
+              " in an outbreak is a simple one: ",
+              "who caught it from whom? ",
+              "For a long time the answer came from time and place. ",
+              "If two people were",
+              " in the same space at the same time, ",
+              "transmission was assumed. ",
+              "That reasoning works only when contact can be confirmed. ",
+              "Between two patients who seem never",
+              " to have met, the answer stayed blank."
+            ],
+            [
+              "Contact is in fact a powerful clue. ",
+              "In 2025 the Korea Disease Control",
+              " and Prevention Agency traced 100,124 contacts",
+              " of TB patients and found 233 additional patients early. ",
+              "Among contacts the TB rate was 232.7 per 100,000, ",
+              "about seven times the 33.5 per 100,000 seen",
+              " in the general population. ",
+              "Simply having lived close to a patient brings",
+              " that many cases to light. ",
+              "The trouble comes",
+              " when no such contact is on record."
+            ],
+            [
+              "So in September 2026 the agency announced",
+              " that it would rebuild its TB genotyping system around whole genome sequencing. ",
+              "Until now only part",
+              " of the germ's genetic information was compared. ",
+              "Whole genome sequencing reads all",
+              " of the roughly 4.4 million base pairs",
+              " in the tuberculosis bacterium",
+              " and measures how similar the germs from two patients are."
+            ],
+            [
+              "This is where the nature of the evidence changes. ",
+              "Instead of memories and movements, ",
+              "investigators read the record the germ carried",
+              " in the body. ",
+              "Tiny differences that older methods could not tell apart now show up. ",
+              "Links can be traced even between patients",
+              " whose contact was never recorded. ",
+              "The agency plans to apply the method",
+              " to drug-resistant TB cases of unknown origin."
+            ],
+            [
+              "Genomes do not replace field investigation, however. ",
+              "That two germs resemble each other says they are related; ",
+              "it does not say where or how. ",
+              "The agency itself said the results would be used together with epidemiological investigation. ",
+              "About 17,000 people newly developed TB",
+              " in Korea last year, ",
+              "and the government aims",
+              " to cut the rate below 20 per 100,000 by 2027."
+            ]
+          ]
+        },
+        "L4": {
+          "title": "증거의 자리가 바뀐다",
+          "minutes": 6,
+          "paragraphs": [
+            [
+              "감염병 역학이 던지는 근본 물음은 단순하다. ",
+              "두 환자의 균이 같은 유행에 속하는가이다. ",
+              "전통적인 답은 시간과 공간의 겹침에서 나왔다. ",
+              "같은 시기에 같은 자리에 있었다면 ",
+              "전파가 있었으리라고 추정하는 것이다. ",
+              "이 추론은 정황에 기댄다. ",
+              "접촉이 관찰되지 않으면 ",
+              "곧바로 무너진다."
+            ],
+            [
+              "정황이 약한 증거라는 뜻은 아니다. ",
+              "질병관리청이 2025년 결핵 환자의 가족과 집단시설 접촉자 ",
+              "10만 124명을 역학조사한 결과 ",
+              "추가 환자 233명이 조기에 발견되었다. ",
+              "접촉자의 결핵 발생률은 ",
+              "10만 명당 232.7명으로 ",
+              "일반 인구의 33.5명에 견주어 ",
+              "약 일곱 배 높았다. ",
+              "함께 지냈다는 사실 하나가 ",
+              "이만큼의 환자를 앞당겨 찾아낸다. ",
+              "다만 그 사실이 기록되지 않은 환자에게는 ",
+              "이 단서를 댈 수 없다."
+            ],
+            [
+              "2026년 9월 4일 질병관리청은 결핵균 유전형 분석체계를 ",
+              "전장유전체분석 기반으로 개편한다고 발표했다. ",
+              "지금까지 쓰던 방법은 결핵균 유전정보의 일부를 견주어 ",
+              "환자 간 감염 관련성을 확인하는 방식이었다. ",
+              "전장유전체분석은 결핵균의 ",
+              "약 440만 개 염기서열 전체를 읽어 ",
+              "두 환자의 균이 ",
+              "서로 얼마나 유사한지를 재는 방법이다. ",
+              "기존 분석으로는 구분하기 어려웠던 ",
+              "미세한 유전적 차이까지 드러난다."
+            ],
+            [
+              "바뀌는 것은 기술만이 아니라 증거의 자리다. ",
+              "조사관은 이제 사람의 기억과 동선 대신 ",
+              "균이 지니고 다닌 기록을 읽는다. ",
+              "접촉 사실이 확인되지 않아 ",
+              "역학조사만으로는 이어 붙이기 어려웠던 ",
+              "환자 사이의 전파 연관성이 여기서 드러난다. ",
+              "질병관리청은 감염경로가 불분명한 내성결핵 사례에도 ",
+              "이 방법을 적용하고 ",
+              "축적되는 유전체 정보로 ",
+              "국내 결핵균의 확산 양상과 ",
+              "내성결핵 유행 추이를 이어서 분석할 계획이다."
+            ],
+            [
+              "그러나 새 증거에도 읽는 법이 필요하다. ",
+              "두 균이 닮았다는 사실은 ",
+              "관련이 있다고 말할 뿐 ",
+              "누가 먼저였는지도 어디에서 만났는지도 ",
+              "스스로 말하지 않는다. ",
+              "질병관리청이 분석 결과를 ",
+              "역학조사와 연계해 쓰겠다고 밝힌 까닭이 ",
+              "여기에 있다. ",
+              "유전체는 조사를 대신하는 것이 아니라 ",
+              "어디를 더 살펴야 하는지 좁혀 준다. ",
+              "지난해 새로 발생한 결핵 환자는 ",
+              "약 1만 7천 명이었고 ",
+              "정부는 2027년까지 발생률을 ",
+              "인구 10만 명당 20명 아래로 ",
+              "낮추는 것을 목표로 삼고 있다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "정황",
+              "easy": "어떤 일이 일어난 둘레의 사정",
+              "hanja": "情(뜻 정)+況(상황 황)"
+            },
+            {
+              "word": "전장유전체분석",
+              "easy": "세균의 유전 정보를 처음부터 끝까지 모두 읽어 견주는 방법",
+              "hanja": "全(온전 전)+遺(남길 유)+傳(전할 전)+體(몸 체)"
+            },
+            {
+              "word": "염기서열",
+              "easy": "유전 정보를 이루는 네 글자가 늘어선 차례",
+              "hanja": "鹽(소금 염)+基(터 기)+序(차례 서)+列(벌일 렬)"
+            },
+            {
+              "word": "연관성",
+              "easy": "둘 사이에 서로 이어진 관계가 있는 정도",
+              "hanja": "關(관계할 관)+聯(잇달 련)+性(성품 성)"
+            },
+            {
+              "word": "내성",
+              "easy": "약이 잘 듣지 않게 견디는 성질",
+              "hanja": "耐(견딜 내)+性(성품 성)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글이 말하는 핵심 변화로 가장 알맞은 것은?",
+              "choices": [
+                "결핵 치료제가 새로 개발되었다는 것",
+                "증거의 자리가 사람의 정황에서 균이 남긴 기록으로 옮겨 왔다는 것",
+                "역학조사를 없애기로 했다는 것",
+                "접촉자 조사가 실패했다는 것"
+              ],
+              "answer": 1,
+              "explain": "기술만 바뀐 것이 아니라 무엇을 증거로 삼는가가 바뀌었다는 것이 글의 축이다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "detail",
+              "q": "2026년 9월 4일 질병관리청이 발표한 내용으로 알맞은 것은?",
+              "choices": [
+                "결핵균 유전형 분석체계를 전장유전체분석 기반으로 개편한다",
+                "결핵 역학조사를 중단한다",
+                "접촉자 검사를 유료로 바꾼다",
+                "결핵 발생률 목표를 없앤다"
+              ],
+              "answer": 0,
+              "explain": "유전정보의 일부를 견주던 방식을 전체 염기서열을 읽는 방식으로 개편한다고 발표했다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "detail",
+              "q": "2025년 접촉자 역학조사의 수치로 알맞은 것은?",
+              "choices": [
+                "접촉자 233명, 추가 환자 10만 124명",
+                "접촉자 10만 124명, 추가 환자 233명",
+                "접촉자 440만 명, 추가 환자 33명",
+                "접촉자 1만 7천 명, 추가 환자 20명"
+              ],
+              "answer": 1,
+              "explain": "가족과 집단시설 접촉자 10만 124명을 조사해 추가 환자 233명을 조기에 찾았다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「정황」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "실험으로 얻은 수치",
+                "어떤 일이 일어난 둘레의 사정",
+                "법으로 정한 절차",
+                "병의 증상"
+              ],
+              "answer": 1,
+              "explain": "같은 시기에 같은 자리에 있었다는 사정이 곧 정황이다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "critical",
+              "q": "글쓴이가 마지막 문단에서 「새 증거에도 읽는 법이 필요하다」고 한 까닭은?",
+              "choices": [
+                "유전체 분석이 틀렸기 때문에",
+                "역학조사를 그만두자고 제안하려고",
+                "결핵이 사라졌다고 알리려고",
+                "닮았다는 사실이 방향과 장소까지 말해 주지는 않기 때문에"
+              ],
+              "answer": 3,
+              "explain": "관련성은 말해 주지만 누가 먼저인지도 어디에서 만났는지도 스스로 말하지 않는다고 했다.",
+              "evidencePara": 4
+            }
+          ],
+          "challenge": [
+            {
+              "type": "critical",
+              "q": "이 글의 논지에 비추어 가장 신중하게 다루어야 할 해석은?",
+              "choices": [
+                "접촉자의 결핵 발생률이 일반 인구보다 높았다",
+                "두 환자의 균이 유사하니 한 사람이 다른 사람에게 옮긴 것이 확정된다",
+                "전장유전체분석은 미세한 유전적 차이를 구분한다",
+                "분석 결과를 역학조사와 함께 쓴다"
+              ],
+              "answer": 1,
+              "explain": "글은 유사성이 관련을 말할 뿐 전파의 방향과 장소는 말하지 않는다고 분명히 한다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "apply",
+              "q": "감염경로가 밝혀지지 않은 내성결핵 사례를 이 글의 방식으로 다룬다면 알맞은 순서는?",
+              "choices": [
+                "접촉 기록이 없으므로 조사를 종결한다",
+                "환자에게 동선을 다시 말하게 하는 것으로 끝낸다",
+                "균의 염기서열을 읽어 유사한 균을 찾고, 그 결과를 역학조사와 이어 붙여 확인한다",
+                "유전체 결과만으로 전파 경로를 확정한다"
+              ],
+              "answer": 2,
+              "explain": "유전체는 어디를 더 살펴야 하는지 좁혀 주고, 확인은 역학조사와 연계해 이루어진다.",
+              "evidencePara": 4
+            }
+          ],
+          "en": [
+            "The fundamental question of infectious disease epidemiology is a plain one: do two patients' bacteria belong to the same chain of spread? The traditional answer came from overlaps in time and space. If two people were in the same place at the same time, transmission was presumed. That inference leans on circumstance, and where no contact is observed it collapses at once.",
+            "This does not make circumstance weak evidence. In 2025 the Korea Disease Control and Prevention Agency traced 100,124 household and congregate-setting contacts of TB patients, and 233 additional patients were found early. The TB rate among contacts was 232.7 per 100,000, roughly seven times the 33.5 per 100,000 in the general population. The single fact of having shared a space brings that many cases forward. But for a patient whose contacts were never recorded, the clue cannot be offered at all.",
+            "On 4 September 2026 the agency announced that it would rebuild its TB genotyping system on whole genome sequencing. The method used until now compared part of the bacterium's genetic information to check whether infections in two patients were related. Whole genome sequencing reads all of the roughly 4.4 million base pairs and measures how similar two patients' bacteria are. Small genetic differences that the older analysis could not separate become visible.",
+            "What changes is not only the technique but where the evidence sits. Investigators now read the record the bacterium carried, rather than a person's memory and movements. Links between patients that epidemiology alone could not join, because no contact was on record, surface here. The agency will apply the method to drug-resistant TB of unclear origin, and use the accumulating genomic data to follow how the bacterium spreads and how resistant strains trend.",
+            "New evidence still needs reading, though. That two bacteria resemble each other says they are related; it does not say who came first, or where the two met. That is why the agency said the results would be linked to epidemiological investigation. A genome does not replace the fieldwork; it narrows down where to look next. About 17,000 people newly developed TB in Korea last year, and the government aims to bring the rate below 20 per 100,000 by 2027."
+          ],
+          "envocab": [
+            {
+              "word": "epidemiology",
+              "ko": "역학 (명사)",
+              "base": "epidemiology [ˌepɪˌdiːmiˈɑːlədʒi]"
+            },
+            {
+              "word": "presumed",
+              "ko": "추정되었다 (동사 presume의 과거분사)",
+              "base": "presume [prɪˈzuːm]"
+            },
+            {
+              "word": "circumstance",
+              "ko": "정황, 사정 (명사)",
+              "base": "circumstance [ˈsɜːrkəmstæns]"
+            },
+            {
+              "word": "congregate",
+              "ko": "집단으로 모이는 (형용사)",
+              "base": "congregate [ˈkɑːŋɡrɪɡeɪt]"
+            },
+            {
+              "word": "genotyping",
+              "ko": "유전형 분석 (명사)",
+              "base": "genotype [ˈdʒiːnətaɪp]"
+            },
+            {
+              "word": "accumulating",
+              "ko": "축적되는 (동사 accumulate의 분사)",
+              "base": "accumulate [əˈkjuːmjəleɪt]"
+            }
+          ],
+          "enseg": [
+            [
+              "The fundamental question",
+              " of infectious disease epidemiology is a plain one: ",
+              "do two patients' bacteria belong",
+              " to the same chain of spread? ",
+              "The traditional answer came from overlaps",
+              " in time and space. ",
+              "If two people were",
+              " in the same place at the same time, ",
+              "transmission was presumed. ",
+              "That inference leans on circumstance, ",
+              "and where no contact is observed it collapses at once."
+            ],
+            [
+              "This does not make circumstance weak evidence. ",
+              "In 2025 the Korea Disease Control",
+              " and Prevention Agency traced 100,124 household",
+              " and congregate-setting contacts of TB patients, ",
+              "and 233 additional patients were found early. ",
+              "The TB rate among contacts was 232.7 per 100,000, ",
+              "roughly seven times the 33.5 per 100,000",
+              " in the general population. ",
+              "The single fact of having shared a space brings",
+              " that many cases forward. ",
+              "But for a patient whose contacts were never recorded, ",
+              "the clue cannot be offered at all."
+            ],
+            [
+              "On 4 September 2026 the agency announced",
+              " that it would rebuild its TB genotyping system",
+              " on whole genome sequencing. ",
+              "The method used until now compared part",
+              " of the bacterium's genetic information",
+              " to check whether infections in two patients were related. ",
+              "Whole genome sequencing reads all",
+              " of the roughly 4.4 million base pairs",
+              " and measures how similar two patients' bacteria are. ",
+              "Small genetic differences",
+              " that the older analysis could not separate become visible."
+            ],
+            [
+              "What changes is not only the technique",
+              " but where the evidence sits. ",
+              "Investigators now read the record the bacterium carried, ",
+              "rather than a person's memory and movements. ",
+              "Links between patients that epidemiology alone could not join, ",
+              "because no contact was on record, surface here. ",
+              "The agency will apply the method",
+              " to drug-resistant TB of unclear origin, ",
+              "and use the accumulating genomic data",
+              " to follow how the bacterium spreads",
+              " and how resistant strains trend."
+            ],
+            [
+              "New evidence still needs reading, though. ",
+              "That two bacteria resemble each other says they are related; ",
+              "it does not say who came first, ",
+              "or where the two met. ",
+              "That is why the agency said the results would be linked",
+              " to epidemiological investigation. ",
+              "A genome does not replace the fieldwork; ",
+              "it narrows down where to look next. ",
+              "About 17,000 people newly developed TB",
+              " in Korea last year, ",
+              "and the government aims",
+              " to bring the rate below 20 per 100,000 by 2027."
+            ]
+          ]
+        }
+      },
+      "issue": true
+    },
+    {
+      "id": "offshore-wind-siting",
+      "category": "society",
+      "careers": [
+        "biz",
+        "law",
+        "env"
+      ],
+      "publishedAt": "2026-09-07",
+      "status": "draft",
+      "sources": [
+        {
+          "title": "기후에너지환경부 보도자료 — 해상풍력 패러다임 바뀐다… 정부 주도 계획입지 본격시동 (제1회 해상풍력발전위원회, 2026.9.2)",
+          "url": "https://www.mcee.go.kr/home/web/board/read.do?menuId=10598&boardMasterId=939&boardId=1888090"
+        },
+        {
+          "title": "해양수산부 보도자료 — 「해상풍력 보급 촉진 및 산업 육성에 관한 특별법」 제정안 국무회의 의결 (관계부처 합동, 2025.3.18)",
+          "url": "https://www.mof.go.kr/doc/ko/selectDoc.do?docSeq=60953&bbsSeq=10&menuSeq=971"
+        }
+      ],
+      "levels": {
+        "L1": {
+          "title": "어디에 세울까",
+          "minutes": 3,
+          "paragraphs": [
+            [
+              "바다에 아주 큰 바람개비를 세워요. ",
+              "이것을 풍력발전기라고 해요. ",
+              "바람이 불면 ",
+              "날개가 돌아요. ",
+              "그러면 전기가 만들어져요. ",
+              "그런데 세우기 전에 ",
+              "정할 일이 있어요. ",
+              "어디에 세울지 먼저 정해야 해요."
+            ],
+            [
+              "예전에는 발전 회사가 ",
+              "자리를 골랐어요. ",
+              "이제는 정부가 먼저 알아봐요. ",
+              "바람이 잘 부는지 살펴요. ",
+              "물고기를 잡는 곳인지도 살펴요. ",
+              "배가 다니는 길인지도 살펴요. ",
+              "그렇게 고른 곳을 예비지구라고 해요."
+            ],
+            [
+              "자리를 정할 때는 ",
+              "이야기가 필요해요. ",
+              "그 바다에서 일하는 어민이 있어요. ",
+              "가까이 사는 주민도 있어요. ",
+              "그래서 여럿이 모여 ",
+              "함께 이야기해요. ",
+              "우리 동네에 ",
+              "무엇이 새로 들어설 때도 그래요. ",
+              "어떤 이야기가 오갔는지 찾아보아요."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "풍력발전기",
+              "easy": "바람의 힘으로 전기를 만드는 큰 기계예요."
+            },
+            {
+              "word": "예비지구",
+              "easy": "정부가 미리 골라 둔 후보 자리예요."
+            },
+            {
+              "word": "어민",
+              "easy": "바다에서 물고기를 잡으며 사는 사람이에요."
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글은 무엇을 알려 주나요?",
+              "choices": [
+                "물고기를 잡는 방법",
+                "바다에 풍력발전기를 세울 자리를 누가 정하는지",
+                "배를 타고 여행하는 방법",
+                "바람개비를 만드는 재료"
+              ],
+              "answer": 1,
+              "explain": "세울 자리를 누가 정하는지가 이 글의 이야기예요.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "이제는 누가 자리를 먼저 알아보나요?",
+              "choices": [
+                "발전 회사",
+                "정부",
+                "배를 모는 사람",
+                "물고기"
+              ],
+              "answer": 1,
+              "explain": "예전에는 발전 회사가 골랐지만 이제는 정부가 먼저 알아봐요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「예비지구」는 무엇인가요?",
+              "choices": [
+                "바람개비의 이름",
+                "배가 쉬는 곳",
+                "정부가 미리 골라 둔 후보 자리",
+                "물고기를 기르는 곳"
+              ],
+              "answer": 2,
+              "explain": "정부가 여러 가지를 살펴 미리 고른 곳을 예비지구라고 해요.",
+              "evidencePara": 1
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "정부가 바람 말고도 여러 가지를 살펴보는 까닭은 무엇일까요?",
+              "choices": [
+                "바람개비가 무겁기 때문이에요",
+                "바다가 넓기 때문이에요",
+                "한 바다를 여러 사람이 함께 쓰기 때문이에요",
+                "배가 빠르기 때문이에요"
+              ],
+              "answer": 2,
+              "explain": "물고기 잡는 곳도 있고 배가 다니는 길도 있어요. 어민과 주민도 있어요. 그래서 함께 살펴봐요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "apply",
+              "q": "우리 동네에 무엇이 새로 들어설 때 우리가 해 볼 수 있는 일은?",
+              "choices": [
+                "아무것도 하지 않아요",
+                "어떤 이야기가 오갔는지 찾아보아요",
+                "혼자서 정해요",
+                "다른 사람이 말하지 못하게 해요"
+              ],
+              "answer": 1,
+              "explain": "자리를 정할 때는 이야기가 필요하다고 했어요. 우리 동네 일도 어떤 이야기가 오갔는지 찾아볼 수 있어요.",
+              "evidencePara": 2
+            }
+          ]
+        },
+        "L2": {
+          "title": "자리를 누가 고르나",
+          "minutes": 4,
+          "paragraphs": [
+            [
+              "바다에 풍력발전기를 세우려면 ",
+              "먼저 어디에 세울지를 정해야 한다. ",
+              "지금까지는 발전 회사가 그 자리를 골랐다. ",
+              "회사가 바람을 재고 ",
+              "자리를 찾은 다음, ",
+              "주민들과 이야기하고 허가도 직접 받았다."
+            ],
+            [
+              "2026년 9월 2일, ",
+              "정부는 이 순서를 바꾸기로 했다. ",
+              "이제는 정부가 먼저 자리를 찾는다. ",
+              "바람, 환경, ",
+              "물고기를 잡는 곳, 배가 다니는 길, ",
+              "군사 훈련 구역을 함께 살펴 ",
+              "알맞은 곳을 고른다. ",
+              "이렇게 미리 골라 둔 후보 자리를 ",
+              "예비지구라고 한다. ",
+              "정부는 2031년까지 ",
+              "25기가와트 규모를 예비지구로 정할 계획이다."
+            ],
+            [
+              "자리를 정하는 방법이 바뀌면 ",
+              "여러 가지가 달라진다. ",
+              "회사는 자리를 찾는 대신 ",
+              "짓고 운영하는 일에 집중한다. ",
+              "어민과 주민은 ",
+              "지방정부가 여는 민관협의회에서 ",
+              "처음부터 의견을 낸다. ",
+              "여러 갈래로 나뉘어 있던 허가도 ",
+              "한꺼번에 처리된다."
+            ],
+            [
+              "하지만 아직 남은 일이 많다. ",
+              "첫 예비지구는 ",
+              "올해 안에 정해질 예정이고, ",
+              "여기서 전기가 나오는 것은 ",
+              "빨라야 2033년이다. ",
+              "정부가 자리를 골라 준다고 해서 ",
+              "모두가 곧바로 찬성하는 것은 아니다. ",
+              "무엇을 함께 정해야 하는지는 ",
+              "그대로 남아 있다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "풍력발전기",
+              "easy": "바람의 힘으로 전기를 만드는 기계",
+              "hanja": "風(바람 풍)+力(힘 력)"
+            },
+            {
+              "word": "예비지구",
+              "easy": "정부가 미리 골라 둔 후보 자리",
+              "hanja": "豫(미리 예)+備(갖출 비)+區(구분할 구)"
+            },
+            {
+              "word": "민관협의회",
+              "easy": "주민과 정부가 함께 모여 의논하는 모임",
+              "hanja": "民(백성 민)+官(벼슬 관)+協(화합할 협)+議(의논할 의)+會(모일 회)"
+            },
+            {
+              "word": "허가",
+              "easy": "해도 좋다고 공식으로 인정해 주는 일",
+              "hanja": "許(허락할 허)+可(옳을 가)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 알맞은 것은?",
+              "choices": [
+                "바다에 부는 바람의 세기",
+                "발전기를 세울 자리를 고르는 순서가 바뀌었다",
+                "물고기를 기르는 방법",
+                "배가 다니는 길을 넓히는 일"
+              ],
+              "answer": 1,
+              "explain": "회사가 먼저 고르던 자리를 이제 정부가 먼저 고르게 되었다는 것이 중심이다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "정부가 자리를 고를 때 함께 살피는 것으로 글에 나온 것은?",
+              "choices": [
+                "바람, 환경, 물고기를 잡는 곳, 배가 다니는 길, 군사 훈련 구역",
+                "바닷물의 색과 깊이만",
+                "섬의 개수와 이름",
+                "해수욕장의 넓이"
+              ],
+              "answer": 0,
+              "explain": "글은 이 다섯 가지를 함께 살펴 알맞은 곳을 고른다고 했다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "정부가 2031년까지 예비지구로 정하려는 규모는?",
+              "choices": [
+                "3.1기가와트",
+                "10기가와트",
+                "25기가와트",
+                "45기가와트"
+              ],
+              "answer": 2,
+              "explain": "정부는 2031년까지 25기가와트 규모를 예비지구로 정할 계획이라고 했다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「민관협의회」에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "발전기를 만드는 공장",
+                "주민과 정부가 함께 모여 의논하는 모임",
+                "배를 검사하는 기관",
+                "전기 요금을 정하는 곳"
+              ],
+              "answer": 1,
+              "explain": "지방정부가 여는 자리로, 어민과 주민이 처음부터 의견을 낸다고 했다.",
+              "evidencePara": 2
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "회사가 「짓고 운영하는 일에 집중」할 수 있게 된 까닭은?",
+              "choices": [
+                "회사가 더 커졌기 때문에",
+                "자리를 찾는 일을 정부가 맡았기 때문에",
+                "전기가 더 비싸졌기 때문에",
+                "바람이 더 세졌기 때문에"
+              ],
+              "answer": 1,
+              "explain": "자리를 찾고 주민과 이야기하던 일을 정부와 지방정부가 맡게 되어, 회사에게는 짓고 운영하는 일이 남았다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "apply",
+              "q": "글 전체를 볼 때, 글쓴이가 마지막 문단에서 말하려는 것은?",
+              "choices": [
+                "제도가 바뀌어도 함께 정할 일은 남아 있다",
+                "새 제도는 실패할 것이다",
+                "새 제도 덕분에 모든 문제가 풀렸다",
+                "발전기를 세우지 말아야 한다"
+              ],
+              "answer": 0,
+              "explain": "첫 예비지구도 아직 정해지지 않았고, 무엇을 함께 정할지도 그대로 남아 있다고 했다.",
+              "evidencePara": 3
+            }
+          ],
+          "en": [
+            "People want to build wind turbines at sea. First they must choose a place. Until now the power company chose it. The company measured the wind and found a spot. Then it talked to local people and got the permits.",
+            "On 2 September 2026 the government changed this order. Now the government looks for the place first. It checks the wind and the sea environment. It also checks fishing grounds, ship routes and military zones. Then it picks a good spot. A chosen area like this is called a preliminary zone. The government plans 25 gigawatts of these zones by 2031.",
+            "A new way of choosing places changes many things. The company no longer hunts for a site. It builds and runs the wind farm instead. Fishers and residents join a local council from the start. The many permits are also handled all at once.",
+            "But much is still unknown. The first zone will be chosen this year. Power may come from it in 2033 at the earliest. A choice by the government does not mean everyone agrees. People still have to decide what to agree on."
+          ],
+          "envocab": [
+            {
+              "word": "turbines",
+              "ko": "풍력발전기 (명사 turbine의 복수)",
+              "base": "turbine [ˈtɜːrbaɪn]"
+            },
+            {
+              "word": "permits",
+              "ko": "허가 (명사 permit의 복수)",
+              "base": "permit [ˈpɜːrmɪt]"
+            },
+            {
+              "word": "preliminary",
+              "ko": "예비의 (형용사)",
+              "base": "preliminary [prɪˈlɪmɪneri]"
+            },
+            {
+              "word": "gigawatts",
+              "ko": "기가와트 (명사 gigawatt의 복수)",
+              "base": "gigawatt [ˈɡɪɡəwɑːt]"
+            },
+            {
+              "word": "residents",
+              "ko": "주민 (명사 resident의 복수)",
+              "base": "resident [ˈrezɪdənt]"
+            },
+            {
+              "word": "council",
+              "ko": "협의회 (명사)",
+              "base": "council [ˈkaʊnsl]"
+            }
+          ],
+          "enseg": [
+            [
+              "People want to build wind turbines at sea. ",
+              "First they must choose a place. ",
+              "Until now the power company chose it. ",
+              "The company measured the wind",
+              " and found a spot. ",
+              "Then it talked to local people",
+              " and got the permits."
+            ],
+            [
+              "On 2 September 2026 the government changed this order. ",
+              "Now the government looks for the place first. ",
+              "It checks the wind",
+              " and the sea environment. ",
+              "It also checks fishing grounds, ship routes",
+              " and military zones. ",
+              "Then it picks a good spot. ",
+              "A chosen area like this is called a preliminary zone. ",
+              "The government plans 25 gigawatts of these zones by 2031."
+            ],
+            [
+              "A new way of choosing places changes many things. ",
+              "The company no longer hunts for a site. ",
+              "It builds",
+              " and runs the wind farm instead. ",
+              "Fishers",
+              " and residents join a local council from the start. ",
+              "The many permits are also handled all at once."
+            ],
+            [
+              "But much is still unknown. ",
+              "The first zone will be chosen this year. ",
+              "Power may come from it in 2033 at the earliest. ",
+              "A choice by the government does not mean everyone agrees. ",
+              "People still have to decide what to agree on."
+            ]
+          ]
+        },
+        "L3": {
+          "title": "순서를 바꾼 회의",
+          "minutes": 5,
+          "paragraphs": [
+            [
+              "바다에 풍력발전기를 세우려면 ",
+              "먼저 어디에 세울지를 정해야 한다. ",
+              "지금까지는 사업자가 그 자리를 골랐다. ",
+              "사업자가 바람을 재고 ",
+              "입지를 찾은 뒤, ",
+              "주민 협의와 인허가까지 직접 맡아 왔다. ",
+              "2026년 9월 2일 열린 ",
+              "제1회 해상풍력발전위원회는 ",
+              "이 순서를 바꾸는 방안을 의결했다."
+            ],
+            [
+              "새 방식은 계획입지라고 부른다. ",
+              "정부가 바람과 환경, 어업활동, 해상교통, ",
+              "군사작전 정보를 모아 ",
+              "알맞은 자리를 먼저 찾는다. ",
+              "그다음 지방정부와 함께 주민 수용성을 확보하고, ",
+              "마지막에 사업자를 고른다. ",
+              "예비지구를 정하고, ",
+              "기본설계를 세우면서 민관협의회를 운영하고, ",
+              "발전지구를 정한 뒤 사업자를 선정하는 순서다."
+            ],
+            [
+              "자리를 찾는 근거는 해상풍력 입지정보망이다. ",
+              "바다에 관한 정보 301가지와 ",
+              "규제를 모아 놓은 체계로, ",
+              "여기서 알맞은 곳을 분석한다. ",
+              "정부는 2031년까지 25기가와트 규모를 ",
+              "예비지구로 지정할 계획이라고 밝혔다. ",
+              "사업자가 정해지면 ",
+              "42개 인허가가 한꺼번에 처리되어 ",
+              "사업 기간이 줄어들 것으로 정부는 기대한다."
+            ],
+            [
+              "어민과 주민이 이야기하는 자리도 달라진다. ",
+              "예전에는 사업자가 찾아와 설명하고 설득했다. ",
+              "이제는 지방정부가 이끄는 민관협의회에서 ",
+              "사업 초기부터 의견을 나눈다. ",
+              "정부는 주민이익공유와 ",
+              "어민 상생방안도 함께 마련하기로 했다."
+            ],
+            [
+              "아직 지켜볼 것이 있다. ",
+              "첫 예비지구는 ",
+              "올해 안에 지정될 예정이고, ",
+              "계획입지로 세운 발전기에서 ",
+              "전기가 나오는 것은 빨라야 2033년이다. ",
+              "정부가 자리를 정해 준다고 해서 ",
+              "협의가 저절로 끝나지는 않는다. ",
+              "협의가 이루어지는 자리가 바뀌었을 뿐, ",
+              "무엇을 합의할지는 그대로 남아 있다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "계획입지",
+              "easy": "정부가 미리 자리를 정해 두고 사업자를 고르는 방식",
+              "hanja": "計(셀 계)+劃(그을 획)+立(설 립)+地(땅 지)"
+            },
+            {
+              "word": "예비지구",
+              "easy": "정부가 후보로 먼저 지정해 두는 바다 구역",
+              "hanja": "豫(미리 예)+備(갖출 비)+區(구분할 구)"
+            },
+            {
+              "word": "수용성",
+              "easy": "주민이 그 사업을 받아들일 수 있는 정도",
+              "hanja": "受(받을 수)+容(얼굴 용)+性(성품 성)"
+            },
+            {
+              "word": "인허가",
+              "easy": "사업을 해도 좋다고 공식으로 인정해 주는 절차",
+              "hanja": "認(알 인)+許(허락할 허)+可(옳을 가)"
+            },
+            {
+              "word": "상생",
+              "easy": "서로 손해 보지 않고 함께 살아가는 일",
+              "hanja": "相(서로 상)+生(날 생)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글이 다루는 변화의 핵심은?",
+              "choices": [
+                "발전기의 크기가 커졌다",
+                "전기 요금이 내려갔다",
+                "바다에 세울 자리를 정하는 주체가 사업자에서 정부로 옮겨 갔다",
+                "어업이 금지되었다"
+              ],
+              "answer": 2,
+              "explain": "입지를 고르던 쪽이 사업자에서 정부로 바뀐 것이 계획입지의 핵심이다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "계획입지에서 사업자를 고르는 시점은 언제인가?",
+              "choices": [
+                "입지를 찾기 전에 먼저 고른다",
+                "주민 수용성을 확보한 뒤에 고른다",
+                "착공한 다음에 고른다",
+                "예비지구와 동시에 고른다"
+              ],
+              "answer": 1,
+              "explain": "정부가 자리를 찾고 지방정부와 함께 수용성을 확보한 뒤 마지막에 사업자를 고른다고 했다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "해상풍력 입지정보망에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "바다에 관한 정보 301가지와 규제를 모아 놓은 체계이다",
+                "어민이 직접 만든 지도이다",
+                "발전기를 파는 시장이다",
+                "전기를 저장하는 장치이다"
+              ],
+              "answer": 0,
+              "explain": "입지정보망은 바다 정보 301가지와 규제를 모아 알맞은 곳을 분석하는 체계라고 했다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "vocab",
+              "q": "「수용성」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "바다에 담을 수 있는 물의 양",
+                "주민이 그 사업을 받아들일 수 있는 정도",
+                "발전기가 견디는 바람의 세기",
+                "전기를 보낼 수 있는 거리"
+              ],
+              "answer": 1,
+              "explain": "수용성은 주민이 그 사업을 받아들일 수 있는 정도를 뜻한다.",
+              "evidencePara": 1
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "사업 기간이 줄어들 것으로 정부가 기대하는 까닭을 글에서 찾으면?",
+              "choices": [
+                "발전기를 더 빨리 만들 수 있어서",
+                "사업자가 따로 입지를 찾지 않아도 되고, 42개 인허가가 한꺼번에 처리되어서",
+                "바다의 바람이 세져서",
+                "주민이 반대하지 않기로 해서"
+              ],
+              "answer": 1,
+              "explain": "입지 발굴과 주민 협의를 정부·지방정부가 맡고, 인허가도 한꺼번에 처리되기 때문이다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "critical",
+              "q": "마지막 문단의 「협의가 이루어지는 자리가 바뀌었을 뿐」이라는 말이 뜻하는 것은?",
+              "choices": [
+                "협의가 필요 없어졌다",
+                "협의의 주체와 장소가 달라졌을 뿐, 합의할 내용은 그대로 남아 있다",
+                "협의를 정부가 대신해 준다",
+                "협의가 반드시 실패한다"
+              ],
+              "answer": 1,
+              "explain": "사업자 대신 지방정부가 이끄는 민관협의회로 자리가 옮겨 갔지만, 무엇을 합의할지는 남아 있다고 했다.",
+              "evidencePara": 4
+            }
+          ],
+          "en": [
+            "To build a wind turbine at sea, someone must first decide where it will stand. Until now that choice belonged to the developer. A developer measured the wind, found a site, and then handled the talks with residents and the permits alone. On 2 September 2026 the first Offshore Wind Power Committee agreed to change that order.",
+            "The new method is called planned siting. The government gathers information on wind, the environment, fishing activity, sea traffic and military operations, and picks suitable areas first. It then works with local government to secure public acceptance, and only after that selects a developer. Preliminary zones are designated, a basic design is drawn up while a public-private council meets, generation zones are designated, and finally a developer is chosen.",
+            "The basis for the choice is the offshore wind siting information network. It brings together 301 kinds of marine information along with regulations, and suitable areas are analysed from it. The government said it plans to designate preliminary zones totalling 25 gigawatts by 2031. Once a developer is selected, 42 permits are processed together, which the government expects will shorten the project.",
+            "Where fishers and residents speak also changes. In the past a developer came to explain and to persuade. Now opinions are exchanged from the early stages in a public-private council led by the local government. The government also plans to prepare profit sharing for residents and measures to work alongside fishers.",
+            "Some things remain to be seen. The first preliminary zone is due this year, and electricity from a planned-siting turbine will arrive in 2033 at the earliest. A site chosen by the government does not end the discussion by itself. The place where the talking happens has moved; what has to be agreed remains."
+          ],
+          "envocab": [
+            {
+              "word": "developer",
+              "ko": "사업자, 개발자 (명사)",
+              "base": "develop [dɪˈveləp]"
+            },
+            {
+              "word": "siting",
+              "ko": "입지 선정 (명사)",
+              "base": "site [saɪt]"
+            },
+            {
+              "word": "designated",
+              "ko": "지정된 (동사 designate)",
+              "base": "designate [ˈdezɪɡneɪt]"
+            },
+            {
+              "word": "acceptance",
+              "ko": "수용, 받아들임 (명사)",
+              "base": "accept [əkˈsept]"
+            },
+            {
+              "word": "regulations",
+              "ko": "규제 (명사 regulation의 복수)",
+              "base": "regulate [ˈreɡjuleɪt]"
+            },
+            {
+              "word": "persuade",
+              "ko": "설득하다 (동사)",
+              "base": "persuade [pərˈsweɪd]"
+            }
+          ],
+          "enseg": [
+            [
+              "To build a wind turbine at sea, ",
+              "someone must first decide",
+              " where it will stand. ",
+              "Until now that choice belonged to the developer. ",
+              "A developer measured the wind, ",
+              "found a site, ",
+              "and then handled the talks with residents",
+              " and the permits alone. ",
+              "On 2 September 2026 the first Offshore Wind Power Committee agreed",
+              " to change that order."
+            ],
+            [
+              "The new method is called planned siting. ",
+              "The government gathers information on wind, the environment, fishing activity, sea traffic",
+              " and military operations, ",
+              "and picks suitable areas first. ",
+              "It then works with local government to secure public acceptance, ",
+              "and only after that selects a developer. ",
+              "Preliminary zones are designated, ",
+              "a basic design is drawn up",
+              " while a public-private council meets, ",
+              "generation zones are designated, ",
+              "and finally a developer is chosen."
+            ],
+            [
+              "The basis for the choice is the offshore wind siting information network. ",
+              "It brings together 301 kinds of marine information along with regulations, ",
+              "and suitable areas are analysed from it. ",
+              "The government said it plans",
+              " to designate preliminary zones totalling 25 gigawatts by 2031. ",
+              "Once a developer is selected, ",
+              "42 permits are processed together, ",
+              "which the government expects will shorten the project."
+            ],
+            [
+              "Where fishers",
+              " and residents speak also changes. ",
+              "In the past a developer came to explain",
+              " and to persuade. ",
+              "Now opinions are exchanged from the early stages",
+              " in a public-private council led by the local government. ",
+              "The government also plans to prepare profit sharing for residents",
+              " and measures to work alongside fishers."
+            ],
+            [
+              "Some things remain to be seen. ",
+              "The first preliminary zone is due this year, ",
+              "and electricity from a planned-siting turbine will arrive",
+              " in 2033 at the earliest. ",
+              "A site chosen by the government does not end the discussion by itself. ",
+              "The place",
+              " where the talking happens has moved; ",
+              "what has to be agreed remains."
+            ]
+          ]
+        },
+        "L4": {
+          "title": "자리를 정하는 순서",
+          "minutes": 6,
+          "paragraphs": [
+            [
+              "바다에 발전기를 세우려면 ",
+              "먼저 어디에 세울지를 정해야 한다. ",
+              "지금까지 그 자리를 고른 쪽은 사업자였다. ",
+              "개별 사업자가 풍황을 재어 입지를 발굴하고, ",
+              "주민 협의와 인허가까지 직접 밟아 왔다. ",
+              "2026년 9월 2일, ",
+              "정부는 이 순서를 바꾸는 방안을 ",
+              "첫 회의 안건으로 올렸다. ",
+              "국무총리가 주재한 제1회 해상풍력발전위원회다. ",
+              "함께 위촉된 민간위원 열두 명은 ",
+              "에너지와 환경, 수산업, 해상교통, 전력계통, ",
+              "갈등조정 분야에서 왔다."
+            ],
+            [
+              "새 방식의 이름은 계획입지다. ",
+              "정부가 풍황과 환경, 어업활동, 해상교통, ",
+              "군사작전 정보를 종합해 ",
+              "적합한 입지를 먼저 발굴하고, ",
+              "지방정부와 함께 주민 수용성을 확보한 뒤 ",
+              "사업자를 선정한다. ",
+              "절차는 여섯 단계로 짜였다. ",
+              "예비지구 지정, 기본설계 수립과 민관협의회 운영, ",
+              "발전지구 지정, 사업자 선정, ",
+              "실시계획 승인, 착공과 준공이다. ",
+              "자리를 고르는 일과 ",
+              "사업을 맡는 일이 갈라진 것이 핵심이다."
+            ],
+            [
+              "판단에 쓰는 자료도 함께 갖췄다. ",
+              "해상풍력 입지정보망은 바다에 관한 정보 301가지와 ",
+              "규제를 모아 놓은 체계로, ",
+              "여기서 최적 입지를 분석해 낸다. ",
+              "정부는 2031년까지 25기가와트 규모를 ",
+              "예비지구로 지정하겠다고 밝혔다. ",
+              "누적 보급 전망치는 ",
+              "2030년 3.1기가와트, 2035년 25기가와트, ",
+              "2040년 45기가와트다."
+            ],
+            [
+              "바뀌는 것은 시간과 협의의 자리다. ",
+              "사업자가 정해진 뒤에는 ",
+              "해상풍력법에 따라 42개 인허가가 한꺼번에 처리된다. ",
+              "정부는 이 방식이 사업 기간과 위험을 ",
+              "크게 줄여 줄 것으로 기대한다고 밝혔다. ",
+              "발전지구 경쟁입찰의 상한가도 기존보다 낮춰 운영할 방침이다. ",
+              "주민과 어업인의 협의는 ",
+              "지방정부가 이끄는 민관협의회로 옮겨 가고, ",
+              "주민이익공유와 어민 상생방안을 함께 마련하기로 했다. ",
+              "2025년 국무회의를 통과한 해상풍력특별법은 ",
+              "배타적경제수역의 점용료와 사용료를 ",
+              "수산발전기금으로 쓰도록 정했다."
+            ],
+            [
+              "다만 지금 확인된 것은 계획이다. ",
+              "첫 예비지구는 연내 지정될 예정이고, ",
+              "계획입지로 세운 발전기에서 ",
+              "전기가 나오는 것은 빨라야 2033년이다. ",
+              "정부가 자리를 골라 주면 ",
+              "협의가 수월해질지, ",
+              "협의할 자리만 옮겨 가는 것인지는 ",
+              "민관협의회가 실제로 어떻게 돌아가느냐에 달려 있다. ",
+              "예비지구가 발전지구까지 이어질지도 지켜볼 일이다. ",
+              "제도는 바뀌었고, 결과는 아직 나오지 않았다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "계획입지",
+              "easy": "정부가 입지를 미리 정해 두고 그 뒤에 사업자를 선정하는 방식",
+              "hanja": "計(셀 계)+劃(그을 획)+立(설 립)+地(땅 지)"
+            },
+            {
+              "word": "풍황",
+              "easy": "어느 곳에 바람이 얼마나 어떻게 부는지의 사정",
+              "hanja": "風(바람 풍)+況(상황 황)"
+            },
+            {
+              "word": "수용성",
+              "easy": "주민이 그 사업을 받아들일 수 있는 정도",
+              "hanja": "受(받을 수)+容(얼굴 용)+性(성품 성)"
+            },
+            {
+              "word": "인허가",
+              "easy": "사업을 해도 좋다고 공식으로 인정해 주는 절차",
+              "hanja": "認(알 인)+許(허락할 허)+可(옳을 가)"
+            },
+            {
+              "word": "예비지구",
+              "easy": "정부가 후보로 먼저 지정해 두는 바다 구역",
+              "hanja": "豫(미리 예)+備(갖출 비)+區(구분할 구)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글이 설명하는 제도 변화의 핵심은?",
+              "choices": [
+                "발전기의 성능이 좋아진 것",
+                "자리를 고르는 일과 사업을 맡는 일이 분리된 것",
+                "전기 요금 체계가 바뀐 것",
+                "어업 면허가 없어진 것"
+              ],
+              "answer": 1,
+              "explain": "글은 입지 선정과 사업 수행이 갈라진 것을 계획입지의 핵심으로 짚는다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "계획입지의 여섯 단계 가운데 사업자 선정 바로 앞에 오는 것은?",
+              "choices": [
+                "예비지구 지정",
+                "실시계획 승인",
+                "착공과 준공",
+                "발전지구 지정"
+              ],
+              "answer": 3,
+              "explain": "예비지구 지정, 기본설계 수립, 발전지구 지정, 사업자 선정, 실시계획 승인, 착공·준공 순서다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "글에 제시된 누적 보급 전망치로 알맞은 것은?",
+              "choices": [
+                "2030년 3.1기가와트, 2035년 25기가와트, 2040년 45기가와트",
+                "2030년 25기가와트, 2040년 45기가와트",
+                "2031년 45기가와트",
+                "2033년 25기가와트"
+              ],
+              "answer": 0,
+              "explain": "전망치는 2030년 3.1, 2035년 25, 2040년 45기가와트로 제시되었다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "vocab",
+              "q": "「풍황」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "바람이 만든 파도의 높이",
+                "어느 곳에 바람이 얼마나 어떻게 부는지의 사정",
+                "바람으로 만든 전기의 양",
+                "풍력발전기의 대수"
+              ],
+              "answer": 1,
+              "explain": "풍황은 그 자리의 바람이 어떤 상태인지를 가리킨다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "critical",
+              "q": "글쓴이가 마지막 문단을 덧붙인 까닭으로 가장 알맞은 것은?",
+              "choices": [
+                "제도가 실패할 것이라고 단정하려고",
+                "해상풍력이 필요 없다고 주장하려고",
+                "지금까지 확인된 것은 계획이며 결과는 아직 나오지 않았음을 짚으려고",
+                "민간위원의 자격을 문제 삼으려고"
+              ],
+              "answer": 2,
+              "explain": "글은 제도의 성패를 단정하지 않고, 확인된 것과 지켜볼 것을 나누어 적는다.",
+              "evidencePara": 4
+            }
+          ],
+          "challenge": [
+            {
+              "type": "critical",
+              "q": "이 글의 서술에 비추어 가장 신중하게 다루어야 할 해석은?",
+              "choices": [
+                "정부가 입지를 먼저 발굴한다",
+                "42개 인허가가 한꺼번에 처리된다",
+                "정부가 자리를 정해 주므로 주민 협의는 이제 끝난 문제다",
+                "첫 예비지구는 연내 지정될 예정이다"
+              ],
+              "answer": 2,
+              "explain": "글은 협의가 민관협의회로 옮겨 갔을 뿐이며, 그 운영을 지켜봐야 한다고 못 박는다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "apply",
+              "q": "이 글의 관점에서 계획입지가 실제로 어떻게 작동하는지 확인하려면 무엇을 보아야 하는가?",
+              "choices": [
+                "발전기의 날개 길이",
+                "민관협의회의 운영 방식과 예비지구가 발전지구로 이어지는지 여부",
+                "바다의 수온 변화",
+                "전기 요금 고지서"
+              ],
+              "answer": 1,
+              "explain": "글은 협의의 자리가 실제로 어떻게 돌아가는지, 예비지구가 발전지구까지 이어지는지를 관건으로 든다.",
+              "evidencePara": 4
+            }
+          ],
+          "en": [
+            "Before a turbine can go up at sea, someone has to decide where it will stand. Until now that decision belonged to the developer. Individual companies measured wind conditions, found a site, and carried the talks with residents and the permits themselves. On 2 September 2026 the government put a plan to reverse that order on the agenda of a first meeting: the inaugural Offshore Wind Power Committee, chaired by the prime minister. Twelve private-sector members were appointed alongside, drawn from energy and the environment, fisheries, maritime traffic, the power grid and conflict mediation.",
+            "The new arrangement is called planned siting. The government combines information on wind conditions, the environment, fishing activity, maritime traffic and military operations to identify suitable sites first, secures public acceptance together with local government, and only then selects a developer. The procedure runs to six stages: designation of a preliminary zone; a basic design drawn up while a public-private council meets; designation of a generation zone; selection of a developer; approval of an implementation plan; and construction and completion. What matters is that choosing the place and running the project have been separated.",
+            "The evidence behind the choice has been assembled as well. The offshore wind siting information network gathers 301 kinds of marine information along with regulations, and optimal sites are analysed from it. The government said it will designate preliminary zones amounting to 25 gigawatts by 2031. Its cumulative deployment outlook is 3.1 gigawatts in 2030, 25 gigawatts in 2035 and 45 gigawatts in 2040.",
+            "What changes is time, and the room where the talking happens. Once a developer has been selected, 42 permits are handled at once under the offshore wind act. The government said it expects this to cut project time and risk sharply. The ceiling price in the competitive auction for a generation zone will also be set lower than before. Talks with residents and fishers move to a public-private council led by the local government, and profit sharing for residents and measures to work alongside fishers are to be prepared with them. The special act passed by the cabinet in 2025 directs occupancy and usage fees in the exclusive economic zone into the fisheries development fund.",
+            "For now, though, what has been confirmed is a plan. The first preliminary zone is due to be designated within the year, and electricity from a turbine built through planned siting will arrive in 2033 at the earliest. Whether a site chosen by the government makes agreement easier, or simply moves the room in which agreement must be reached, depends on how the public-private councils actually work. Whether preliminary zones become generation zones is also still to be watched. The system has changed; the results are not in yet."
+          ],
+          "envocab": [
+            {
+              "word": "siting",
+              "ko": "입지 선정 (명사)",
+              "base": "site [saɪt]"
+            },
+            {
+              "word": "designation",
+              "ko": "지정 (명사)",
+              "base": "designate [ˈdezɪɡneɪt]"
+            },
+            {
+              "word": "cumulative",
+              "ko": "누적의 (형용사)",
+              "base": "cumulate [ˈkjuːmjəleɪt]"
+            },
+            {
+              "word": "ceiling",
+              "ko": "상한 (명사)",
+              "base": "ceiling [ˈsiːlɪŋ]"
+            },
+            {
+              "word": "mediation",
+              "ko": "조정, 중재 (명사)",
+              "base": "mediate [ˈmiːdieɪt]"
+            },
+            {
+              "word": "occupancy",
+              "ko": "점용, 차지하여 씀 (명사)",
+              "base": "occupy [ˈɑːkjupaɪ]"
+            }
+          ],
+          "enseg": [
+            [
+              "Before a turbine can go up at sea, ",
+              "someone has to decide",
+              " where it will stand. ",
+              "Until now that decision belonged to the developer. ",
+              "Individual companies measured wind conditions, ",
+              "found a site, ",
+              "and carried the talks with residents",
+              " and the permits themselves. ",
+              "On 2 September 2026 the government put a plan",
+              " to reverse that order on the agenda of a first meeting: ",
+              "the inaugural Offshore Wind Power Committee, ",
+              "chaired by the prime minister. ",
+              "Twelve private-sector members were appointed alongside, ",
+              "drawn from energy",
+              " and the environment, fisheries, maritime traffic, ",
+              "the power grid",
+              " and conflict mediation."
+            ],
+            [
+              "The new arrangement is called planned siting. ",
+              "The government combines information on wind conditions, the environment, fishing activity, maritime traffic",
+              " and military operations to identify suitable sites first, ",
+              "secures public acceptance together with local government, ",
+              "and only then selects a developer. ",
+              "The procedure runs to six stages: ",
+              "designation of a preliminary zone; ",
+              "a basic design drawn up",
+              " while a public-private council meets; ",
+              "designation of a generation zone; ",
+              "selection of a developer; ",
+              "approval of an implementation plan;",
+              " and construction and completion. ",
+              "What matters is that choosing the place",
+              " and running the project have been separated."
+            ],
+            [
+              "The evidence behind the choice has been assembled as well. ",
+              "The offshore wind siting information network gathers 301 kinds",
+              " of marine information along with regulations, ",
+              "and optimal sites are analysed from it. ",
+              "The government said it will designate preliminary zones amounting",
+              " to 25 gigawatts by 2031. ",
+              "Its cumulative deployment outlook is 3.1 gigawatts in 2030, ",
+              "25 gigawatts in 2035",
+              " and 45 gigawatts in 2040."
+            ],
+            [
+              "What changes is time, ",
+              "and the room",
+              " where the talking happens. ",
+              "Once a developer has been selected, ",
+              "42 permits are handled at once under the offshore wind act. ",
+              "The government said it expects this to cut project time",
+              " and risk sharply. ",
+              "The ceiling price in the competitive auction",
+              " for a generation zone will also be set lower than before. ",
+              "Talks with residents",
+              " and fishers move to a public-private council led by the local government, ",
+              "and profit sharing for residents",
+              " and measures to work alongside fishers are to be prepared with them. ",
+              "The special act passed by the cabinet in 2025 directs occupancy",
+              " and usage fees in the exclusive economic zone",
+              " into the fisheries development fund."
+            ],
+            [
+              "For now, though, ",
+              "what has been confirmed is a plan. ",
+              "The first preliminary zone is due to be designated within the year, ",
+              "and electricity from a turbine built",
+              " through planned siting will arrive in 2033 at the earliest. ",
+              "Whether a site chosen by the government makes agreement easier, ",
+              "or simply moves the room in",
+              " which agreement must be reached, ",
+              "depends on how the public-private councils actually work. ",
+              "Whether preliminary zones become generation zones is also still to be watched. ",
+              "The system has changed; ",
+              "the results are not in yet."
+            ]
+          ]
+        }
+      },
+      "issue": true
     }
   ],
   "diagnostics": {
