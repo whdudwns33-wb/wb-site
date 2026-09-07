@@ -30,8 +30,8 @@ test('관리자 기본 정보 목록과 선생님 내 학생 목록의 이름이
 
 test('학생 정보 팝업은 학교·연락처·등록일을 포함하고 모든 값을 escape한다', () => {
   const code = block('function rosterStudentTransition(', 'function showRosterStudentInfo(');
-  const render = new Function('today', 'esc', 'state', 'isLesson', 'staffById', 'staffStudentCompactLabel', `${code}\nreturn rosterStudentInfoHtml;`)(
-    () => '2026-08-18', escapeHtml, { tasks: [] }, () => true, () => null,
+  const render = new Function('today', 'esc', 'state', 'isLesson', 'isRegularLessonTask', 'staffById', 'staffStudentCompactLabel', `${code}\nreturn rosterStudentInfoHtml;`)(
+    () => '2026-08-18', escapeHtml, { tasks: [] }, () => true, () => true, () => null,
     student => [student && student.name, student && student.grade].filter(Boolean).join(' ')
   );
   const attack = '<img src=x onerror=alert(1)>';
@@ -129,6 +129,7 @@ test('재원생 목록은 수업 미지정 학생을 가나다순으로 먼저 �
   const view = block('function viewRoster()', '/* ── 직원 관리');
   assert.match(view, /<summary><b>재원생 ' \+ managed\.length \+ '명 · 기본 정보 수정/);
   assert.match(view, /const hasAssignedLesson = student =>/);
+  assert.match(view, /hasAssignedLesson = student =>[\s\S]{0,140}isRegularLessonTask\(task\)/);
   assert.match(view, /Number\(hasAssignedLesson\(a\)\) - Number\(hasAssignedLesson\(b\)\)/);
   assert.match(view, /localeCompare\(String\(b\.name \|\| ''\), 'ko'\)/);
   assert.match(view, /!assigned \? '<span class="tag warn">수업 미지정<\/span>/);
@@ -168,11 +169,12 @@ test('학생별 수업 참고는 stable studentId로 모으고 같은 내용은 
       { label: '교재 진도 확인' }, { label: '오답 확인' }
     ] },
     { id: 'lesson-deleted', studentId: 'student-safe', guide: '삭제된 참고', refs: [], deleted: true },
-    { id: 'lesson-other', studentId: 'student-other', guide: '다른 학생 참고', refs: [] }
+    { id: 'lesson-other', studentId: 'student-other', guide: '다른 학생 참고', refs: [] },
+    { id: 'makeup-a', studentId: 'student-safe', guide: '보강 투영 참고', refs: [{ label: '보강 투영 단계' }], lessonInstanceType: 'makeup', makeupCaseId: 'mu-a' }
   ];
-  const collect = new Function('state', 'isLesson', 'lessonReferenceSteps',
+  const collect = new Function('state', 'isLesson', 'isRegularLessonTask', 'lessonReferenceSteps',
     `${code}\nreturn studentLessonReferenceItems;`)(
-      { tasks }, () => true, task => task.refs || []
+      { tasks }, () => true, task => !task.deleted && task.lessonInstanceType !== 'makeup' && !task.makeupCaseId, task => task.refs || []
     );
   assert.deepEqual(collect('student-safe'), [
     '숙제 루틴: 매일', '학생 특징: 꼼꼼함', '교재 진도 확인', '지금 목표: 독해', '오답 확인'
@@ -187,13 +189,14 @@ test('관리자는 학생 정보 아래에서 stable studentId의 기존 수업�
     { id: 'lesson-eng', studentId: 'student-safe', subject: '영어', staffId: 'teacher-b', scheduleText: '금 19:00-19:50', lessonFormVersion: 1 },
     { id: 'lesson-deleted', studentId: 'student-safe', subject: '국어', staffId: 'teacher-a', deleted: true, lessonFormVersion: 1 },
     { id: 'lesson-other', studentId: 'student-other', subject: '과학', staffId: 'teacher-a', lessonFormVersion: 1 },
-    { id: 'general-task', studentId: 'student-safe', subject: '사회', staffId: 'teacher-a' }
+    { id: 'general-task', studentId: 'student-safe', subject: '사회', staffId: 'teacher-a' },
+    { id: 'makeup-a', studentId: 'student-safe', subject: '수학', staffId: 'teacher-a', lessonFormVersion: 1, lessonInstanceType: 'makeup', makeupCaseId: 'mu-a' }
   ];
   const staff = { 'teacher-a': { name: '김남기' }, 'teacher-b': { name: '김혜지' } };
-  const helpers = new Function('state', 'isLesson', 'staffById', 'lessonAssignmentScheduleText', 'lessonHoursValue', 'canEditLessonTask', 'esc',
+  const helpers = new Function('state', 'isLesson', 'isRegularLessonTask', 'staffById', 'lessonAssignmentScheduleText', 'lessonHoursValue', 'canEditLessonTask', 'esc',
     'weekendFlexibleSettingsSummary', 'taskHasWeekendSchedule', 'isFlexibleWeekendLesson', 'session',
     `${code}\nreturn { rosterStudentLessonTasks, rosterStudentLessonsHtml };`)(
-      { tasks }, task => !!task.lessonFormVersion, id => staff[id] || null,
+      { tasks }, task => !!task.lessonFormVersion, task => !!task.lessonFormVersion && !task.deleted && task.lessonInstanceType !== 'makeup' && !task.makeupCaseId, id => staff[id] || null,
       (slots, fallback) => (slots || []).map(slot => slot.days.join('·') + ' ' + slot.startTime + '-' + slot.endTime + ' · ' + (slot.lessonHours || fallback || '')).join(' / '),
       value => value || '', task => !!task.lessonFormVersion, escapeHtml,
       () => '정기 시간표', task => (task.scheduleSlots || []).some(slot => (slot.days || []).some(day => day === 0 || day === 6)),
@@ -207,7 +210,7 @@ test('관리자는 학생 정보 아래에서 stable studentId의 기존 수업�
   assert.match(rendered, /2T/);
   assert.match(rendered, /1·3 18:00-19:50/);
   assert.match(rendered, /data-act="lessonedit" data-id="lesson-math">이 수업 정보 수정/);
-  assert.doesNotMatch(rendered, /lesson-deleted|lesson-other|general-task/);
+  assert.doesNotMatch(rendered, /lesson-deleted|lesson-other|general-task|makeup-a/);
 
   const popup = block('function showRosterStudentInfo(', 'let studentInfoRequestContext');
   assert.ok(popup.indexOf('>기본 정보 수정</button>') < popup.indexOf('>수업 정보 확인 및 수정</button>'));
@@ -224,12 +227,14 @@ test('학생 공통 담당 대신 활성 수업의 과목별 task.staffId를 묶
     { id: 'math-a', studentId: 'student-safe', subject: '수학', staffId: 'teacher-a', start: '2026-08-01', lessonFormVersion: 1 },
     { id: 'math-old', studentId: 'student-safe', subject: '수학', staffId: 'teacher-old', end: '2026-07-31', lessonFormVersion: 1 },
     { id: 'english-b', studentId: 'student-safe', subject: '영어', staffId: 'teacher-b', start: '2026-08-01', lessonFormVersion: 1 },
-    { id: 'other', studentId: 'other', subject: '국어', staffId: 'teacher-a', lessonFormVersion: 1 }
+    { id: 'other', studentId: 'other', subject: '국어', staffId: 'teacher-a', lessonFormVersion: 1 },
+    { id: 'makeup-a', studentId: 'student-safe', subject: '과학', staffId: 'teacher-makeup', lessonFormVersion: 1, lessonInstanceType: 'makeup', makeupCaseId: 'mu-a' }
   ];
   const staff = { 'teacher-a': { name: '김덕재' }, 'teacher-b': { name: '서윤지' }, 'teacher-old': { name: '이전담당' } };
-  const helpers = new Function('state', 'isLesson', 'staffById', 'today',
+  const helpers = new Function('state', 'isLesson', 'isRegularLessonTask', 'staffById', 'today',
     `${code}\nreturn { rosterStudentSubjectTeacherAssignments, rosterStudentSubjectTeacherText };`)(
-      { tasks }, task => !!task.lessonFormVersion, id => staff[id] || null, () => '2026-08-27'
+      { tasks }, task => !!task.lessonFormVersion, task => !!task.lessonFormVersion && !task.deleted && task.lessonInstanceType !== 'makeup' && !task.makeupCaseId,
+      id => staff[id] || null, () => '2026-08-27'
     );
   assert.equal(helpers.rosterStudentSubjectTeacherText('student-safe'), '수학 → 김덕재 선생님 / 영어 → 서윤지 선생님');
   assert.deepEqual(helpers.rosterStudentSubjectTeacherAssignments('student-safe').flatMap(row => row.staffIds), ['teacher-a', 'teacher-b']);

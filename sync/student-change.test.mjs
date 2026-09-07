@@ -15,9 +15,24 @@ class Statement {
   run() { const result = this.database.prepare(this.sql).run(...this.args); return { meta: { changes: Number(result.changes || 0) } }; }
 }
 class TestD1 {
-  constructor() { this.database = new DatabaseSync(':memory:'); this.database.exec(schema); }
+  constructor() { this.database = new DatabaseSync(':memory:'); this.database.exec(schema); this.beforeBatch = null; }
   prepare(sql) { return new Statement(this.database, sql); }
-  batch(statements) { return statements.map(statement => statement.run()); }
+  batch(statements) {
+    if (this.beforeBatch) {
+      const beforeBatch = this.beforeBatch;
+      this.beforeBatch = null;
+      beforeBatch(this.database);
+    }
+    this.database.exec('BEGIN IMMEDIATE');
+    try {
+      const results = statements.map(statement => statement.run());
+      this.database.exec('COMMIT');
+      return results;
+    } catch (error) {
+      this.database.exec('ROLLBACK');
+      throw error;
+    }
+  }
 }
 
 const admin = { mode: 'admin', secret: 'director-secret' };
@@ -261,6 +276,30 @@ test('teacher change refuses an exact target assignment even when its stored ass
     .bind(submit.body.request.requestKey).first().status, 'approval_waiting');
 });
 
+test('teacher change ignores a target teacher makeup instance of the same regular assignment', async () => {
+  const db = new TestD1(); seed(db);
+  const source = JSON.parse(db.prepare("SELECT data FROM tasks WHERE app='task' AND id='lesson-a'").first().data);
+  const makeup = {
+    ...source, id: 'makeup_lesson_mu_teacher_change', staffId: 'teacher-b',
+    lessonInstanceType: 'makeup', makeupCaseId: 'mu_teacher_change',
+    start: '2026-08-30', end: '2026-08-30', repeat: 'once'
+  };
+  const now = Date.now();
+  db.prepare("INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES('task',?,'teacher-b',?,?,?)")
+    .bind(makeup.id, JSON.stringify(makeup), now, now).run();
+  const submit = await call(db, '/lesson-change-request', {
+    auth: person('teacher-a'), action: 'submit', taskId: 'lesson-a',
+    changes: { operation: 'teacher_assignment', effectiveDate: '2026-08-24' }
+  });
+  const approve = await call(db, '/lesson-change-review', {
+    auth: admin, action: 'approve', requestKey: submit.body.request.requestKey, revision: 1,
+    selectedStaffId: 'teacher-b'
+  });
+  assert.equal(approve.status, 200, JSON.stringify(approve.body));
+  assert.equal(db.prepare("SELECT owner FROM tasks WHERE app='task' AND id='lesson-a'").first().owner, 'teacher-b');
+  assert.equal(db.prepare("SELECT owner FROM tasks WHERE app='task' AND id=?").bind(makeup.id).first().owner, 'teacher-b');
+});
+
 test('teacher change still allows the target teacher to keep another subject for the same student', async () => {
   const db = new TestD1(); seed(db);
   const source = JSON.parse(db.prepare("SELECT data FROM tasks WHERE app='task' AND id='lesson-a'").first().data);
@@ -306,6 +345,12 @@ test('teacher change fails closed when a target teacher lesson row has a forged 
 
 test('withdrawal moves the student to roster history and hides every linked lesson while keeping rows', async () => {
   const db = new TestD1(); seed(db);
+  const now = Date.now();
+  db.prepare(
+    'INSERT INTO makeup_cases(app,case_id,student_id,source_task_id,source_date,source_teacher_id,' +
+    'consumption_group_id,status,revision,history,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)'
+  ).bind('task', 'mu_withdrawal_pending', 'student-a', 'lesson-a', '2026-08-20', 'teacher-a',
+    'mc_withdrawal_pending', 'review_pending', 1, '[]', now, now).run();
   const withdrawal = await call(db, '/lesson-change-request', {
     auth: person('teacher-a'), action: 'submit', taskId: 'lesson-a',
     changes: { operation: 'withdrawal', effectiveDate: '2026-08-25' }, note: '퇴원'
@@ -332,6 +377,10 @@ test('withdrawal moves the student to roster history and hides every linked less
     "SELECT audience_staff_ids FROM student_change_events WHERE event_type='withdrawal'"
   ).first();
   assert.deepEqual(JSON.parse(withdrawalEvent.audience_staff_ids), ['teacher-a']);
+  const makeupCase = db.prepare("SELECT status,reason,history FROM makeup_cases WHERE case_id='mu_withdrawal_pending'").first();
+  assert.equal(makeupCase.status, 'cancelled');
+  assert.equal(makeupCase.reason, 'student_inactive');
+  assert.equal(JSON.parse(makeupCase.history).at(-1).lifecycleAction, 'withdrawal');
   assert.equal(db.prepare("SELECT COUNT(*) AS count FROM tasks WHERE app='task'").first().count, 4,
     '수업 행은 삭제하지 않고 이력으로 보존한다');
 });
@@ -350,6 +399,81 @@ test('approved lesson deletion is hidden from screens but remains in private sto
   assert.equal(db.prepare("SELECT COUNT(*) AS count FROM student_change_events WHERE event_type='lesson_delete'").first().count, 1);
   const visible = await call(db, '/student-change', { auth: admin, action: 'list' });
   assert.equal(visible.body.events.some(event => event.eventType === 'lesson_delete'), false);
+});
+
+test('approved lesson deletion cancels its active makeup and preserves linked generated-lesson records', async () => {
+  const db = new TestD1(); seed(db);
+  const caseId = 'mu_delete_lifecycle';
+  const lessonTaskId = 'makeup_lesson_' + caseId;
+  const now = Date.now();
+  db.prepare(
+    'INSERT INTO makeup_cases(app,case_id,student_id,source_task_id,source_date,source_teacher_id,' +
+    'consumption_group_id,status,revision,confirmed_start_at,confirmed_end_at,confirmed_staff_id,' +
+    'history,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+  ).bind('task', caseId, 'student-a', 'lesson-a', '2026-08-20', 'teacher-a',
+    'mc_delete_lifecycle', 'confirmed', 1, '2026-09-10T16:00:00+09:00',
+    '2026-09-10T16:50:00+09:00', 'teacher-a',
+    JSON.stringify([{ action: 'schedule', revision: 1, at: now }]), now, now).run();
+  const generated = {
+    id: lessonTaskId, staffId: 'teacher-a', studentId: 'student-a', studentName: '학생A',
+    taskKind: 'lesson_instruction', lessonFormVersion: 1, title: '[수업] 보강', steps: [],
+    repeat: 'once', days: [4], start: '2026-09-10', end: '2026-09-10', deleted: false,
+    lessonInstanceType: 'makeup', makeupCaseId: caseId, makeupSourceTaskId: 'lesson-a',
+    makeupSourceDate: '2026-08-20', createdAt: now, updatedAt: now
+  };
+  db.prepare("INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES('task',?,'teacher-a',?,?,?)")
+    .bind(lessonTaskId, JSON.stringify(generated), now, now).run();
+  db.prepare("INSERT INTO checks(app,k,owner,data,updated_at,srv_at) VALUES('task',?,'teacher-a',?,?,?)")
+    .bind(lessonTaskId + '|2026-09-10',
+      JSON.stringify({ taskId: lessonTaskId, date: '2026-09-10', att: 'P', note: '보존 기록' }), now, now).run();
+
+  const deletion = await call(db, '/lesson-change-request', {
+    auth: person('teacher-a'), action: 'submit', taskId: 'lesson-a',
+    changes: { operation: 'lesson_delete', effectiveDate: '2026-08-26' }, note: '수업 종료'
+  });
+  const approval = await call(db, '/lesson-change-review', {
+    auth: admin, action: 'approve', requestKey: deletion.body.request.requestKey, revision: 1
+  });
+  assert.equal(approval.status, 200);
+  const makeupCase = db.prepare('SELECT * FROM makeup_cases WHERE app=? AND case_id=?')
+    .bind('task', caseId).first();
+  assert.equal(makeupCase.status, 'cancelled');
+  assert.equal(makeupCase.reason, 'already_resolved');
+  assert.equal(JSON.parse(makeupCase.history).at(-1).lifecycleAction, 'lesson_delete');
+  const hiddenGenerated = JSON.parse(db.prepare('SELECT data FROM tasks WHERE app=? AND id=?')
+    .bind('task', lessonTaskId).first().data);
+  assert.equal(hiddenGenerated.deleted, true);
+  assert.equal(hiddenGenerated.makeupCancelledReason, 'lesson_delete');
+  assert.equal(db.prepare('SELECT COUNT(*) count FROM checks WHERE app=? AND k=?')
+    .bind('task', lessonTaskId + '|2026-09-10').first().count, 1);
+  assert.equal(db.prepare("SELECT COUNT(*) count FROM makeup_cases WHERE app='task' AND status='confirmed'").first().count, 0);
+});
+
+test('a makeup case created after cleanup selection rolls back lesson deletion approval', async () => {
+  const db = new TestD1(); seed(db);
+  const deletion = await call(db, '/lesson-change-request', {
+    auth: person('teacher-a'), action: 'submit', taskId: 'lesson-a',
+    changes: { operation: 'lesson_delete', effectiveDate: '2026-08-26' }, note: '수업 종료'
+  });
+  assert.equal(deletion.status, 200);
+  db.beforeBatch = database => {
+    const now = Date.now();
+    database.prepare(
+      'INSERT INTO makeup_cases(app,case_id,student_id,source_task_id,source_date,source_teacher_id,' +
+      'consumption_group_id,status,revision,history,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)'
+    ).run('task', 'mu_delete_scope_race', 'student-a', 'lesson-a', '2026-08-20', 'teacher-a',
+      'mc_delete_scope_race', 'review_pending', 1, '[]', now, now);
+  };
+  const approval = await call(db, '/lesson-change-review', {
+    auth: admin, action: 'approve', requestKey: deletion.body.request.requestKey, revision: 1
+  });
+  assert.equal(approval.status, 409);
+  assert.equal(JSON.parse(db.prepare("SELECT data FROM tasks WHERE id='lesson-a'").first().data).deleted, false);
+  assert.equal(db.prepare("SELECT status FROM makeup_cases WHERE case_id='mu_delete_scope_race'").first().status,
+    'review_pending');
+  assert.equal(db.prepare('SELECT status FROM lesson_change_requests WHERE request_key=?')
+    .bind(deletion.body.request.requestKey).first().status, 'approval_waiting');
+  assert.equal(db.prepare("SELECT COUNT(*) count FROM student_change_events WHERE event_type='lesson_delete'").first().count, 0);
 });
 
 test('leave uses the same approval flow and records a separate leave roster state', async () => {

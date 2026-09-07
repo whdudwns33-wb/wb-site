@@ -37,3 +37,13 @@
   Cache-Control: public, max-age=604800
 /hanja.json
   Cache-Control: public, max-age=604800
+
+# 세 앱과 관리 웹의 화면·코드는 항상 최신이어야 한다 — 배포본(dist)에 실리는 _headers 는 이 파일 하나다.
+# naesin/_headers·vocab/_headers 는 dist 에 실리지 않으니 규칙은 여기에만 둔다.
+# noindex·CSP 등 보안 헤더는 맨 위 /* 가 이미 전 경로에 붙인다(여기 다시 적으면 값이 겹쳐 붙는다).
+/naesin/*
+  Cache-Control: no-store
+/vocab/*
+  Cache-Control: no-store
+/admin/*
+  Cache-Control: no-store

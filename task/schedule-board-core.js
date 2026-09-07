@@ -257,6 +257,12 @@
     const slot = entry.slot || {};
     const clean = value => String(value || '').normalize('NFKC').trim().toLocaleLowerCase('ko');
     const parts = [task.subject, task.className, entry.role || slot.lessonRole || task.lessonRole].map(clean);
+    const makeupCaseId = clean(task.makeupCaseId);
+    if (task.lessonInstanceType === 'makeup' || makeupCaseId) {
+      // 같은 교사·시간이어도 정규반과 보강은 서로 다른 수업 카드다. 보강 건 ID를
+      // 포함해야 서로 다른 학생의 보강까지 하나의 정규 그룹으로 합쳐지지 않는다.
+      parts.push('makeup:' + (makeupCaseId || clean(task.id) || 'unspecified'));
+    }
     return parts.some(Boolean) ? parts.join('|') : 'unspecified';
   }
 

@@ -478,7 +478,7 @@ test('driver list is scoped to own route and emits only safe student fields', as
   assert.equal(Object.hasOwn(result.body.routes[0], 'plan'), false);
   assert.equal(Object.hasOwn(result.body.routes[0].stops[0], 'address'), false);
   const serialized = JSON.stringify(result.body);
-  assert.doesNotMatch(serialized, /SECRET|GUARDIAN SECRET|010\d|010-|공개 학원 주소|공개 정류장 주소|"address"|"memo"/i);
+  assert.doesNotMatch(serialized, /SECRET|GUARDIAN SECRET|(?<!\d)010(?:\d|-)|공개 학원 주소|공개 정류장 주소|"address"|"memo"/i);
   const adminView = await call(db, { auth: admin, action: 'list', date: today });
   assert.equal(Object.hasOwn(adminView.body.routes[0].students[0], 'guardianPhone'), false);
   assert.equal(Object.hasOwn(adminView.body.routes[0].students[0], 'callReady'), false);

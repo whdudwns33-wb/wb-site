@@ -37,9 +37,10 @@ directory = "../parent"
 binding = "ASSETS"
 run_worker_first = true
 
-# Cloudflare Cron은 UTC 기준이다. 11:00 UTC = 20:00 KST, 14:50 UTC = 23:50 KST.
+# Cloudflare Cron은 UTC 기준이다. 교재 문자와 학부모 피드백 상태는 10분마다 재확인한다.
+# 11:00 UTC = 20:00 KST, 14:50 UTC = 23:50 KST.
 [triggers]
-crons = ["0 11 * * *", "50 14 * * *"]
+crons = ["0 11 * * *", "50 14 * * *", "*/10 * * * *"]
 
 [[d1_databases]]
 binding = "DB"
@@ -59,5 +60,6 @@ binding = "AI"
 #   npx wrangler secret put TASK_MANAGER_STAFF_IDS
 #   npx wrangler secret put SOLAPI_KAKAO_DIRECTOR_REPORT_TEMPLATE_ID
 #   npx wrangler secret put SOLAPI_KAKAO_FEEDBACK_TEMPLATE_ID_V2
+#   npx wrangler secret put WB_PARENT_FEEDBACK_AI_CACHE_SECRET
 #   npx wrangler secret put SOLAPI_KAKAO_CONSULT_LINK_APPROVED_TEMPLATE_ID
 #   npx wrangler secret put WB_CONSULT_LINK_SEND_ENABLED

@@ -257,6 +257,7 @@ test('existing lesson search finds editable tasks by teacher or student name and
   const tasks = [
     { id: 'lesson-a', studentId: 'student-a', studentName: 'Legacy Alpha', staffId: 'teacher-a', subject: '수학', scheduleText: '월 18:00-19:50', lessonFormVersion: 1 },
     { id: 'lesson-b', studentId: 'student-b', studentName: 'Student Beta', staffId: 'teacher-b', subject: '영어', scheduleText: '화 19:00-20:00', lessonFormVersion: 1 },
+    { id: 'makeup-a', studentId: 'student-a', studentName: 'Student Alpha', staffId: 'teacher-a', subject: '수학', lessonFormVersion: 1, lessonInstanceType: 'makeup', makeupCaseId: 'mu-a' },
     { id: 'deleted', studentId: 'student-a', staffId: 'teacher-a', deleted: true, lessonFormVersion: 1 },
     { id: 'general', studentId: 'student-a', staffId: 'teacher-a' }
   ];
@@ -266,10 +267,11 @@ test('existing lesson search finds editable tasks by teacher or student name and
     { id: 'student-same-name', name: 'Student Alpha', school: 'Other School', grade: 'G3' }
   ];
   const staff = { 'teacher-a': { name: 'Teacher One' }, 'teacher-b': { name: 'Teacher Two' } };
-  const helpers = new Function('session', 'rosterDb', 'state', 'isLesson', 'canEditLessonTask', 'staffById', 'studentOf',
+  const helpers = new Function('session', 'rosterDb', 'state', 'isLesson', 'isRegularLessonTask', 'canEditLessonTask', 'staffById', 'studentOf',
     'lessonAssignmentScheduleText', 'esc', studentLabelHelperSource() + html.slice(start, end) +
     '\nreturn { lessonExistingChangeRows, lessonExistingChangeResultsHtml };')(
-      { isAdmin: true }, { students }, { tasks }, task => !!task.lessonFormVersion, task => !!task.lessonFormVersion,
+      { isAdmin: true }, { students }, { tasks }, task => !!task.lessonFormVersion,
+      task => !!task.lessonFormVersion && !task.deleted && task.lessonInstanceType !== 'makeup' && !task.makeupCaseId, task => !!task.lessonFormVersion,
       id => staff[id] || null, task => task.studentName || '', () => '', value => String(value || '').replace(/&/g, '&amp;').replace(/</g, '&lt;')
     );
   assert.deepEqual(helpers.lessonExistingChangeRows('Teacher One').map(row => row.task.id), ['lesson-a']);
@@ -281,6 +283,7 @@ test('existing lesson search finds editable tasks by teacher or student name and
   assert.match(rendered, /Teacher One 선생님/);
   assert.match(rendered, /data-act="lessonedit" data-id="lesson-a"/);
   assert.doesNotMatch(rendered, /Other School|deleted|general/);
+  assert.doesNotMatch(rendered, /makeup-a/);
   const helperSource = html.slice(start, end);
   assert.match(helperSource, /students\.find\(item => String\(item\.id\) === String\(task\.studentId \|\| ''\)\)/);
   assert.doesNotMatch(helperSource, /students\.find\([^\n]*name/);
@@ -498,8 +501,9 @@ test('parent feedback is enabled for all students without enabling the other gua
   assert.match(html, /if \(res\.status === 'sent'\)/);
   assert.match(html, /보호자 알림톡 발송 요청이 접수됐습니다/);
   assert.match(html, /접수 여부 확인 필요/);
-  assert.match(html, /if \(note\.startsWith\('접수 여부 확인 필요'\)\) return '⚠ 접수 여부 확인 — '/);
-  assert.match(html, /if \(note\.startsWith\('카카오 발송이 거절되었습니다'\)\) return '발송 거절 — '/);
+  assert.match(html, /const category = feedbackDeliveryCategory\(item\)/);
+  assert.match(html, /if \(category === 'unknown'\) return '⚠ 상태 확인 필요 — '/);
+  assert.match(html, /if \(category === 'failed'\) return '발송 실패 — '/);
   assert.match(html, /item\.status === 'content_approved_send_blocked'[\s\S]{0,260}data-act="fbsend"/);
   assert.doesNotMatch(html, /sendState\.retry/);
   assert.doesNotMatch(html, /승인 없이 바로 카카오 알림톡이 나갑니다|학부모 피드백 문자/);
@@ -695,12 +699,13 @@ test('feedback final v2 variable fields update context and rebuild the readonly 
   const lengthEnd = html.indexOf('function syncFeedbackFinalFieldFromInput(', lengthStart);
   const lengthLogic = html.slice(lengthStart, lengthEnd);
   assert.match(lengthLogic, /const sendValid = hasRequiredFields[\s\S]*commentText\.length <= limit/);
-  assert.match(lengthLogic, /const polishValid = hasRequiredFields && commentText\.length <= FEEDBACK_COMMENT_MAX_CHARS &&[\s\S]*feedbackPolishBudgetReady\(t, limit\)/);
   assert.doesNotMatch(lengthLogic, /finalButton\.disabled/,
     '최종 전송 버튼은 검증 실패 중에도 눌러서 정확한 이유를 확인할 수 있어야 한다');
   assert.match(lengthLogic, /refreshFeedbackFinalSendStatus\(t, scope\)/);
-  assert.match(lengthLogic, /polishButton\.disabled = !!fbCtx\.polishPending \|\| !polishValid/,
-    '코멘트가 현재 알림톡 예산을 넘어도 600자 이하면 AI로 줄이기를 시도할 수 있어야 한다');
+  assert.match(lengthLogic, /polishButton\.disabled = !!fbCtx\.polishPending/,
+    'AI 다듬기 버튼은 진행 중일 때만 중복 클릭을 막아야 한다');
+  assert.doesNotMatch(lengthLogic, /polishButton\.disabled[\s\S]*!polishValid/,
+    '입력 문제는 비활성 버튼이 아니라 클릭 뒤 지속 안내로 설명해야 한다');
   const budgetStart = html.indexOf('const FEEDBACK_AI_MIN_BODY_CHARS');
   const budgetEnd = html.indexOf('function updateFeedbackPreviewLength(', budgetStart);
   const budgetApi = Function("const feedbackStudentSubject = () => '민우는'; const studentOf = () => '김민우';\n" +
@@ -721,6 +726,11 @@ test('feedback AI polish updates only the send comment and exact fixed-template 
   assert.match(polish, /sync\.post\('\/feedback-polish'/);
   assert.match(polish, /commentText: sourceComment/);
   assert.match(polish, /subjectText: context\.subjectText/);
+  assert.match(polish, /const stopWithReason = message =>/);
+  assert.match(polish, /missing\.join\('\u00b7'\).*AI로 다듬을 수 없습니다/,
+    '빈칸이 있으면 버튼 아래에 누락 항목을 정확히 표시해야 한다');
+  assert.match(polish, /sourceComment\.length > FEEDBACK_COMMENT_MAX_CHARS/);
+  assert.match(polish, /feedbackPolishBudgetReady\(task, localBudget\)/);
   assert.match(polish, /latestCommentField[\s\S]*syncFeedbackFinalFieldFromInput\(latestCommentField\)[\s\S]*sourceComment/,
     'AI 다듬기는 클릭 직전 DOM의 최신 코멘트를 사용해야 한다');
   assert.doesNotMatch(polish, /otherNotes|guardian|phone|studentName/);
@@ -729,6 +739,12 @@ test('feedback AI polish updates only the send comment and exact fixed-template 
   assert.match(polish, /setFeedbackPolishStatus\('working'/);
   assert.match(polish, /setFeedbackPolishStatus\('success'/);
   assert.match(polish, /setFeedbackPolishStatus\('error'/);
+  assert.match(polish, /result\.source \|\| ''\) === 'fallback'/,
+    '비용 한도나 안전 검증 fallback은 기존 코멘트를 덮어쓰지 않아야 한다');
+  assert.match(polish, /feedbackPolishFallbackText\(result\.fallbackReason\)/,
+    'fallback 이유는 버튼 아래 지속 안내로 표시해야 한다');
+  assert.match(polish, /result\.source \|\| ''\) === 'cache'/,
+    '캐시 재사용은 새 AI 호출과 구분해 안내해야 한다');
   assert.match(polish, /feedbackPolishErrorText\(error\)/,
     'AI 실패 사유는 사라지는 토스트만 쓰지 않고 지속 상태에 안전하게 표시해야 한다');
   assert.match(polish, /feedbackPolishHasArtifacts\(/,
@@ -802,14 +818,30 @@ test('feedback interview includes the new condition choices and omits every cate
     assert.ok(html.includes(label), '피드백 선택 화면에 ' + label + ' 버튼이 있어야 한다');
   }
   assert.match(interview, /2\. 오늘 집중·태도는\?/);
-  assert.match(interview, /3\. 잘한 점은\?[\s\S]*FB_PLUS\.map/);
-  assert.match(interview, /4\. 보완할 점은\?[\s\S]*FB_MINUS\.map/);
+  assert.match(interview, /FEEDBACK_SUBJECT_CATALOG\.SUBJECTS/);
+  assert.match(interview, /3·4\. 문장 선택 과목/);
+  assert.match(interview, /3\. 잘한 점은\?[\s\S]*strengthButtons\.map/);
+  assert.match(interview, /4\. 보완할 점은\?[\s\S]*improvementButtons\.map/);
+  assert.match(interview, /data-q="plus" data-v="none"/);
+  assert.match(interview, /data-q="minus" data-v="none"/);
   const actionsStart = html.indexOf("case 'fbq':");
   const actionsEnd = html.indexOf("case 'fbmake':", actionsStart);
   const actions = html.slice(actionsStart, actionsEnd);
-  assert.match(actions, /n === FB_PLUS_NONE_INDEX[\s\S]*fbCtx\.plus = fbCtx\.plus\.includes\(n\) \? \[\] : \[n\]/);
-  assert.match(actions, /fbCtx\.plus\.filter\(x => x !== FB_PLUS_NONE_INDEX\)/,
+  assert.match(actions, /q === 'subject'[\s\S]*fbCtx\.plusSentences = \{\}[\s\S]*fbCtx\.minusSentence = ''/,
+    '문장 선택 과목이 달라지면 숨은 이전 과목 문장도 함께 지워야 한다');
+  assert.match(actions, /v === 'none'[\s\S]*fbCtx\.plus = fbCtx\.plus\.includes\('none'\) \? \[\] : \['none'\]/);
+  assert.match(actions, /fbCtx\.plus\.filter\(x => x !== 'none'\)/,
     '잘한 점의 일반 항목을 고르면 없음 선택은 해제되어야 한다');
+  assert.match(actions, /feedbackPickSubjectSentence\(fbCtx\.feedbackSubject, 'strength', v\)/,
+    '잘한 점 버튼을 새로 고를 때 준비된 문장을 추첨해야 한다');
+  assert.match(actions, /delete fbCtx\.plusSentences\[v\]/,
+    '잘한 점을 해제한 뒤 다시 고르면 새 문장을 추첨할 수 있어야 한다');
+  assert.match(actions, /feedbackPickSubjectSentence\(fbCtx\.feedbackSubject, 'improvement', v\)/,
+    '보완할 점 버튼을 새로 고를 때 준비된 문장을 추첨해야 한다');
+  assert.match(bank, /const prepared = String\(ctx && ctx\.plusSentences/,
+    '한번 추첨한 잘한 점 문장은 미리보기까지 그대로 사용해야 한다');
+  assert.match(bank, /const preparedMinus = String\(ctx && ctx\.minusSentence/,
+    '한번 추첨한 보완 문장은 미리보기까지 그대로 사용해야 한다');
 
   const helpers = Function(bank +
     '; return { plus: FB_PLUS, minus: FB_MINUS, focus: FB_FORMAL_FOCUS, praise: FB_FORMAL_PRAISE, ' +
@@ -885,4 +917,8 @@ test('new lesson form core is loaded before the app script', () => {
   const version = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'version.json'), 'utf8'));
   assert.ok(html.includes('<script src="./lesson-form-core.js?v=' + version.v + '"></script>'),
     'lesson-form-core 의 캐시버스터가 version.json 과 어긋나면 옛 파일이 쓰인다');
+  assert.ok(html.includes('<script src="./feedback-subject-catalog.js?v=' + version.v + '"></script>'),
+    '과목별 피드백 카탈로그의 캐시버스터가 version.json 과 어긋나면 옛 파일이 쓰인다');
+  assert.ok(html.indexOf('./feedback-subject-catalog.js?v=') < html.indexOf('"use strict";'),
+    '과목별 피드백 카탈로그는 앱 본문보다 먼저 로드되어야 한다');
 });

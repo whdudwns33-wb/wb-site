@@ -4,7 +4,11 @@ import { DatabaseSync } from 'node:sqlite';
 import fs from 'node:fs';
 
 import worker from './worker-core.js';
-import { handleScheduledBookOrders, isRetryCronWindow } from './book-order-send.js';
+import {
+  handleScheduledBookOrders,
+  handleScheduledBookOrderStatusRefresh,
+  isRetryCronWindow
+} from './book-order-send.js';
 
 const schema = fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8');
 const migration = fs.readFileSync(new URL('./migrations/013_book_order_sends.sql', import.meta.url), 'utf8');
@@ -132,6 +136,20 @@ function seedMappedSend(db, taskId, sendId, status, itemCount = 1) {
   ).bind(taskId, sendId, now).run();
 }
 
+function seedProviderSend(db, sendId, statusCode, options = {}) {
+  const now = Number(options.createdAt) || Date.now() - 1000;
+  db.prepare(
+    'INSERT INTO book_order_sends ' +
+    '(app,send_id,idempotency_key,task_id,vendor_name,item_count,message_hash,status,' +
+    'provider_group_id,provider_message_id,provider_status_code,safe_error_code,created_at,updated_at) ' +
+    "VALUES ('task',?,?,?,?,1,?,?,?,?,?,?,?,?)"
+  ).bind(
+    sendId, 'key_' + sendId, 'batch_' + sendId, '천재출판사', 'b'.repeat(64), options.status || 'accepted',
+    options.groupId || 'GROUP_' + sendId, options.messageId || 'MSG_' + sendId, statusCode,
+    options.safeErrorCode || null, now, now
+  ).run();
+}
+
 test('schema and migration are additive, and the send ledger itself stores no phone or message body', () => {
   for (const sql of [schema, migration]) {
     const match = sql.match(/CREATE TABLE IF NOT EXISTS book_order_sends\s*\([\s\S]*?\);/);
@@ -142,10 +160,17 @@ test('schema and migration are additive, and the send ledger itself stores no ph
 });
 
 test('20:00 KST book cron remains configured with the 23:50 session cutoff cron', () => {
-  assert.match(wrangler, /\[triggers\][\s\S]*crons\s*=\s*\["0 11 \* \* \*", "50 14 \* \* \*"\]/);
+  assert.match(wrangler, /\[triggers\][\s\S]*crons\s*=\s*\["0 11 \* \* \*", "50 14 \* \* \*", "\*\/10 \* \* \* \*"\]/);
+  assert.equal((wrangler.match(/"\*\/10 \* \* \* \*"/g) || []).length, 1,
+    '교재와 피드백 상태조회는 별도 중복 cron이 아니라 동일한 10분 cron을 공유한다');
   assert.match(entry, /async scheduled\(controller, env, ctx\)/);
   assert.match(entry, /controller\.cron === BOOK_ORDER_CRON/);
   assert.match(entry, /handleScheduledBookOrders\(env, controller\.scheduledTime\)/);
+  assert.match(entry, /controller\.cron === BOOK_ORDER_STATUS_CRON/);
+  assert.match(entry, /handleScheduledBookOrderStatusRefresh\(env, controller\.scheduledTime\)/);
+  assert.match(entry,
+    /controller\.cron === BOOK_ORDER_STATUS_CRON[\s\S]*?ctx\.waitUntil\(Promise\.all\(\[\s*handleScheduledBookOrderStatusRefresh\(env, controller\.scheduledTime\),\s*handleScheduledParentFeedbackStatusRefresh\(env, controller\.scheduledTime\)\s*\]\)\)/,
+    '같은 10분 cron 분기에서 교재와 피드백 상태조회를 Promise.all로 함께 실행해야 한다');
   assert.match(batchMigration, /CREATE TABLE IF NOT EXISTS book_order_batch_items/);
   assert.doesNotMatch(batchMigration, /phone|message_body|DROP TABLE|DELETE FROM/i);
   for (const sql of [schema, lockMigration]) {
@@ -156,6 +181,209 @@ test('20:00 KST book cron remains configured with the 23:50 session cutoff cron'
     assert.match(definition[0], /lease_until\s+INTEGER NOT NULL/);
     assert.doesNotMatch(definition[0], /phone|message_body|DROP TABLE/i);
   }
+});
+
+test('scheduled status refresh advances the same provider message from queued to carrier to delivered', async () => {
+  const db = new TestD1();
+  const now = Date.parse('2026-09-02T03:00:00Z');
+  seedProviderSend(db, 'status-progress', '2000', {
+    createdAt: now - 60_000, groupId: 'GROUP_STATUS', messageId: 'MSG_STATUS'
+  });
+  const requested = [];
+  await withFetch(async (url, options) => {
+    requested.push({ url: String(url), options });
+    const statusCode = requested.length === 1 ? '3000' : '4000';
+    return new Response(JSON.stringify({ messageList: {
+      MSG_STATUS: { messageId: 'MSG_STATUS', groupId: 'GROUP_STATUS', statusCode }
+    } }), { status: 200, headers: { 'content-type': 'application/json' } });
+  }, async () => {
+    const carrier = await handleScheduledBookOrderStatusRefresh({ DB: db, ...fullEnvBase }, now);
+    assert.equal(carrier.ok, true);
+    assert.equal(carrier.checked, 1);
+    assert.equal(carrier.updated, 1);
+    let row = db.prepare("SELECT status,provider_status_code,safe_error_code FROM book_order_sends WHERE send_id='status-progress'").first();
+    assert.deepEqual({ ...row }, { status: 'accepted', provider_status_code: '3000', safe_error_code: null });
+
+    const delivered = await handleScheduledBookOrderStatusRefresh({ DB: db, ...fullEnvBase }, now + 10 * 60_000);
+    assert.equal(delivered.ok, true);
+    assert.equal(delivered.updated, 1);
+    row = db.prepare("SELECT status,provider_status_code,safe_error_code FROM book_order_sends WHERE send_id='status-progress'").first();
+    assert.deepEqual({ ...row }, { status: 'accepted', provider_status_code: '4000', safe_error_code: null });
+  });
+  assert.equal(requested.length, 2);
+  for (const request of requested) {
+    const url = new URL(request.url);
+    assert.equal(url.origin + url.pathname, 'https://api.solapi.com/messages/v4/list');
+    assert.deepEqual(url.searchParams.getAll('messageIds'), ['MSG_STATUS']);
+    assert.equal(url.searchParams.get('messageIds')?.startsWith('['), false);
+    assert.equal(request.options.method, 'GET');
+    assert.match(request.options.headers.Authorization, /^HMAC-SHA256 /);
+  }
+});
+
+test('status refresh repeats messageIds and accepts an array response so queued orders reach delivered', async () => {
+  const db = new TestD1();
+  const now = Date.parse('2026-09-03T03:00:00Z');
+  seedProviderSend(db, 'query-a', '2000', {
+    createdAt: now - 2_000, groupId: 'GROUP_QUERY_A', messageId: 'MSG_QUERY_A'
+  });
+  seedProviderSend(db, 'query-b', '2000', {
+    createdAt: now - 1_000, groupId: 'GROUP_QUERY_B', messageId: 'MSG_QUERY_B'
+  });
+
+  let listFetches = 0;
+  await withFetch(async (url, options) => {
+    listFetches += 1;
+    const parsed = new URL(String(url));
+    const ids = parsed.searchParams.getAll('messageIds');
+    assert.equal(options.method, 'GET');
+    // 과거 JSON 문자열 한 값이면 Solapi가 정상 200과 빈 목록을 줄 수 있던 상황을 재현한다.
+    if (ids.length === 1 && ids[0].startsWith('[')) {
+      return new Response(JSON.stringify({ messageList: [] }), { status: 200 });
+    }
+    assert.deepEqual(ids, ['MSG_QUERY_A', 'MSG_QUERY_B']);
+    return new Response(JSON.stringify({ messageList: [
+      { messageId: 'MSG_QUERY_A', groupId: 'GROUP_QUERY_A', statusCode: '4000' },
+      { messageId: 'MSG_QUERY_B', groupId: 'GROUP_QUERY_B', statusCode: '4000' }
+    ] }), { status: 200, headers: { 'content-type': 'application/json' } });
+  }, async () => {
+    const result = await handleScheduledBookOrderStatusRefresh({ DB: db, ...fullEnvBase }, now);
+    assert.equal(result.ok, true);
+    assert.equal(result.checked, 2);
+    assert.equal(result.updated, 2);
+  });
+
+  assert.equal(listFetches, 1);
+  assert.equal(db.prepare(
+    "SELECT COUNT(*) AS count FROM book_order_sends WHERE provider_status_code='4000'"
+  ).first().count, 2);
+});
+
+test('status refresh records terminal failure but skips phone-completed orders and never sends a message', async () => {
+  const db = new TestD1();
+  const now = Date.parse('2026-09-02T03:00:00Z');
+  seedProviderSend(db, 'status-failed', '3000', {
+    createdAt: now - 60_000, groupId: 'GROUP_FAILED', messageId: 'MSG_FAILED'
+  });
+  seedProviderSend(db, 'status-phone', '2000', {
+    createdAt: now - 60_000, groupId: 'GROUP_PHONE', messageId: 'MSG_PHONE',
+    safeErrorCode: 'MANUAL_PHONE_ORDERED'
+  });
+  let fetches = 0;
+  await withFetch(async (url, options) => {
+    fetches += 1;
+    assert.equal(options.method, 'GET');
+    assert.deepEqual(new URL(url).searchParams.getAll('messageIds'), ['MSG_FAILED']);
+    return new Response(JSON.stringify({ messageList: {
+      MSG_FAILED: { messageId: 'MSG_FAILED', groupId: 'GROUP_FAILED', statusCode: '3010' }
+    } }), { status: 200, headers: { 'content-type': 'application/json' } });
+  }, async () => {
+    const result = await handleScheduledBookOrderStatusRefresh({ DB: db, ...fullEnvBase }, now);
+    assert.equal(result.ok, true);
+    assert.equal(result.checked, 1);
+    assert.equal(result.updated, 1);
+  });
+  assert.equal(fetches, 1);
+  assert.deepEqual(
+    { ...db.prepare("SELECT status,provider_status_code,safe_error_code FROM book_order_sends WHERE send_id='status-failed'").first() },
+    { status: 'rejected', provider_status_code: '3010', safe_error_code: 'SOLAPI_STATUS_3010' }
+  );
+  assert.deepEqual(
+    { ...db.prepare("SELECT status,provider_status_code,safe_error_code FROM book_order_sends WHERE send_id='status-phone'").first() },
+    { status: 'accepted', provider_status_code: '2000', safe_error_code: 'MANUAL_PHONE_ORDERED' }
+  );
+});
+
+test('stale queued or carrier states become non-retriable confirmation-needed outcomes', async () => {
+  const db = new TestD1();
+  const now = Date.parse('2026-09-02T03:00:00Z');
+  seedProviderSend(db, 'stale-queued', '2000', {
+    createdAt: now - 24 * 60 * 60 * 1000, messageId: 'MSG_STALE_QUEUED'
+  });
+  seedProviderSend(db, 'stale-carrier', '3000', {
+    createdAt: now - 72 * 60 * 60 * 1000, groupId: 'GROUP_STALE_CARRIER', messageId: 'MSG_STALE_CARRIER'
+  });
+  seedProviderSend(db, 'stale-but-delivered', '2000', {
+    createdAt: now - 24 * 60 * 60 * 1000, groupId: 'GROUP_STALE_DELIVERED', messageId: 'MSG_STALE_DELIVERED'
+  });
+  let fetches = 0;
+  await withFetch(async () => {
+    fetches += 1;
+    return new Response(JSON.stringify({ messageList: {
+      MSG_STALE_CARRIER: {
+        messageId: 'MSG_STALE_CARRIER', groupId: 'GROUP_STALE_CARRIER', statusCode: '3000'
+      },
+      MSG_STALE_DELIVERED: {
+        messageId: 'MSG_STALE_DELIVERED', groupId: 'GROUP_STALE_DELIVERED', statusCode: '4000'
+      }
+    } }), { status: 200 });
+  }, async () => {
+    const result = await handleScheduledBookOrderStatusRefresh({ DB: db, ...fullEnvBase }, now);
+    assert.equal(result.ok, true);
+    assert.equal(result.checked, 3);
+    assert.equal(result.updated, 3);
+  });
+  assert.equal(fetches, 1);
+  assert.deepEqual({ ...db.prepare(
+    "SELECT status,provider_status_code,safe_error_code FROM book_order_sends WHERE send_id='stale-queued'"
+  ).first() }, { status: 'unknown', provider_status_code: '2000', safe_error_code: 'SOLAPI_STATUS_STALE_2000' });
+  assert.deepEqual({ ...db.prepare(
+    "SELECT status,provider_status_code,safe_error_code FROM book_order_sends WHERE send_id='stale-carrier'"
+  ).first() }, { status: 'unknown', provider_status_code: '3000', safe_error_code: 'SOLAPI_STATUS_STALE_3000' });
+  assert.deepEqual({ ...db.prepare(
+    "SELECT status,provider_status_code,safe_error_code FROM book_order_sends WHERE send_id='stale-but-delivered'"
+  ).first() }, { status: 'accepted', provider_status_code: '4000', safe_error_code: null });
+});
+
+test('status refresh is monotonic and CAS prevents a delayed poll from overwriting newer state', async () => {
+  const db = new TestD1();
+  const now = Date.parse('2026-09-02T03:00:00Z');
+  seedProviderSend(db, 'no-regression', '3000', {
+    createdAt: now - 60_000, groupId: 'GROUP_NO_REGRESSION', messageId: 'MSG_NO_REGRESSION'
+  });
+  await withFetch(async () => new Response(JSON.stringify({ messageList: {
+    MSG_NO_REGRESSION: { messageId: 'MSG_NO_REGRESSION', groupId: 'GROUP_NO_REGRESSION', statusCode: '2000' }
+  } }), { status: 200 }), async () => {
+    const result = await handleScheduledBookOrderStatusRefresh({ DB: db, ...fullEnvBase }, now);
+    assert.equal(result.checked, 1);
+    assert.equal(result.updated, 0);
+  });
+  assert.equal(db.prepare("SELECT provider_status_code FROM book_order_sends WHERE send_id='no-regression'").first().provider_status_code, '3000');
+
+  seedProviderSend(db, 'cas-race', '2000', {
+    createdAt: now - 60_000, groupId: 'GROUP_CAS', messageId: 'MSG_CAS'
+  });
+  const originalPrepare = db.prepare.bind(db);
+  let raced = false;
+  db.prepare = sql => {
+    const statement = originalPrepare(sql);
+    if (!raced && String(sql).startsWith('UPDATE book_order_sends SET status=?')) {
+      const originalRun = statement.run.bind(statement);
+      statement.run = () => {
+        raced = true;
+        db.database.prepare(
+          "UPDATE book_order_sends SET provider_status_code='3000',updated_at=updated_at+1 WHERE send_id='cas-race'"
+        ).run();
+        return originalRun();
+      };
+    }
+    return statement;
+  };
+  await withFetch(async url => {
+    const ids = new URL(url).searchParams.getAll('messageIds');
+    const messageList = {};
+    for (const id of ids) messageList[id] = {
+      messageId: id,
+      groupId: id === 'MSG_CAS' ? 'GROUP_CAS' : 'GROUP_NO_REGRESSION',
+      statusCode: id === 'MSG_CAS' ? '4000' : '3000'
+    };
+    return new Response(JSON.stringify({ messageList }), { status: 200 });
+  }, async () => {
+    const result = await handleScheduledBookOrderStatusRefresh({ DB: db, ...fullEnvBase }, now + 10 * 60_000);
+    assert.equal(raced, true);
+    assert.equal(result.updated, 0);
+  });
+  assert.equal(db.prepare("SELECT provider_status_code FROM book_order_sends WHERE send_id='cas-race'").first().provider_status_code, '3000');
 });
 
 test('client cannot specify phone, recipient, or message — request is rejected before any fetch', async () => {
@@ -327,6 +555,22 @@ test('rejected-only retry groups each vendor once and excludes accepted or unkno
   assert.equal(again.body.idempotent, true);
   assert.deepEqual(again.body.results, []);
   assert.equal(payloads.length, 2, 'accepted mapping 뒤 반복 호출은 provider를 다시 부르지 않는다');
+});
+
+test('전화로 주문 완료한 배치는 후속 상태가 거절로 바뀌어도 재발송하지 않는다', async () => {
+  const db = new TestD1();
+  seedOrderTask(db, { id: 'phone-completed', orderDelivery: 'scheduled_batch_v1' });
+  seedMappedSend(db, 'phone-completed', 'phone-completed-send', 'rejected');
+  db.prepare("UPDATE book_order_sends SET safe_error_code='MANUAL_PHONE_ORDERED' WHERE send_id='phone-completed-send'").run();
+  let fetches = 0;
+  await withNow(Date.parse('2026-09-03T00:00:00Z'), () =>
+    withFetch(async () => { fetches += 1; return acceptedResponse(); }, async () => {
+      const result = await call(db, { auth: admin, action: 'retry-rejected' });
+      assert.equal(result.status, 200);
+      assert.equal(result.body.idempotent, true);
+      assert.deepEqual(result.body.results, []);
+    }));
+  assert.equal(fetches, 0);
 });
 
 test('retry processes up to the daily chunk limit and leaves overflow rejected for the next day', async () => {
@@ -703,6 +947,54 @@ test('unknown vendor or vendor missing from the phone allowlist is rejected befo
     const r = await call(db, { auth: admin, taskId: 'order-1' });
     assert.equal(r.status, 409);
     assert.equal(r.body.code, 'VENDOR_PHONE_MISSING');
+  });
+  assert.equal(fetches, 0);
+});
+
+test('the dedicated Sanghyung secret overrides only the raw Sanghyung vendor key', async () => {
+  const sharedPhone = ['010', '1111', '0001'].join('');
+  const dedicatedPhone = ['010', '2222', '0002'].join('');
+  const aliasPhone = ['010', '3333', '0003'].join('');
+
+  const rawDb = new TestD1();
+  seedOrderTask(rawDb, { orderVendor: '상형출판사' });
+  await withFetch(async (url, options) => {
+    assert.equal(JSON.parse(options.body).messages[0].to, dedicatedPhone);
+    return acceptedResponse();
+  }, async () => {
+    const result = await call(rawDb, { auth: admin, taskId: 'order-1' }, {
+      BOOK_VENDOR_PHONES: JSON.stringify({ '상형출판사': sharedPhone }),
+      BOOK_VENDOR_PHONE_SANGHYUNG: dedicatedPhone
+    });
+    assert.equal(result.status, 200);
+  });
+
+  const aliasDb = new TestD1();
+  seedOrderTask(aliasDb, { orderVendor: '상형총판' });
+  await withFetch(async (url, options) => {
+    assert.equal(JSON.parse(options.body).messages[0].to, aliasPhone,
+      '화면용 별칭이나 다른 키에 전용 번호를 적용하면 안 된다');
+    return acceptedResponse();
+  }, async () => {
+    const result = await call(aliasDb, { auth: admin, taskId: 'order-1' }, {
+      BOOK_VENDOR_PHONES: JSON.stringify({ '상형총판': aliasPhone }),
+      BOOK_VENDOR_PHONE_SANGHYUNG: dedicatedPhone
+    });
+    assert.equal(result.status, 200);
+  });
+});
+
+test('an invalid dedicated Sanghyung secret fails closed instead of using the old shared number', async () => {
+  const db = new TestD1();
+  seedOrderTask(db, { orderVendor: '상형출판사' });
+  let fetches = 0;
+  await withFetch(async () => { fetches += 1; return acceptedResponse(); }, async () => {
+    const result = await call(db, { auth: admin, taskId: 'order-1' }, {
+      BOOK_VENDOR_PHONES: JSON.stringify({ '상형출판사': ['010', '1111', '0001'].join('') }),
+      BOOK_VENDOR_PHONE_SANGHYUNG: 'invalid'
+    });
+    assert.equal(result.status, 409);
+    assert.equal(result.body.code, 'VENDOR_PHONE_MISSING');
   });
   assert.equal(fetches, 0);
 });

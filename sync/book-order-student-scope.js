@@ -11,6 +11,7 @@ function kstDate(now) {
 
 function isLessonTask(task) {
   if (!task || typeof task !== 'object' || Array.isArray(task)) return false;
+  if (String(task.lessonInstanceType || '') === 'makeup' || String(task.makeupCaseId || '').trim()) return false;
   const lessonFormVersion = Number(task.lessonFormVersion);
   const intakeVersion = Number(task.intakeVersion);
   return task.taskKind === 'lesson_instruction' ||
@@ -91,6 +92,8 @@ export function ownBookStudentWriteGuard(auth, app, studentIds, now = Date.now()
           "AND CAST(json_extract(lesson.data,'$.studentId') AS TEXT)=CAST(selected.value AS TEXT) " +
           "AND COALESCE(json_extract(lesson.data,'$.deleted'),0)=0 " +
           "AND json_type(lesson.data)='object' " +
+          "AND COALESCE(CAST(json_extract(lesson.data,'$.lessonInstanceType') AS TEXT),'')<>'makeup' " +
+          "AND COALESCE(CAST(json_extract(lesson.data,'$.makeupCaseId') AS TEXT),'')='' " +
           "AND (json_extract(lesson.data,'$.taskKind')='lesson_instruction' " +
             "OR CAST(COALESCE(json_extract(lesson.data,'$.lessonFormVersion'),0) AS INTEGER)>=1 " +
             "OR CAST(COALESCE(json_extract(lesson.data,'$.intakeVersion'),0) AS INTEGER)>=1) " +

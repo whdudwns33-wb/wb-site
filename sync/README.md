@@ -73,6 +73,11 @@ npx wrangler d1 execute wb-sync --remote --file=./migrations/058_weekend_visit_s
 npx wrangler d1 execute wb-sync --remote --file=./migrations/059_weekend_multi_visits.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/060_lesson_handoffs.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/061_consult_reward_processing_guard.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/062_feedback_ai_budget_cache.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/063_student_session_cycles.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/064_student_session_ledger_generations.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/065_makeup_assignee_integrity.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/066_makeup_student_overlap_only.sql
 
 # 3) 비밀키 등록 — 코드나 wrangler.toml에 적지 않는다
 npx wrangler secret put TASK_ADMIN_SECRET
@@ -96,6 +101,7 @@ npx wrangler secret put SOLAPI_KAKAO_TRANSPORT_DROPPED_APPROVED_TEMPLATE_ID
 npx wrangler secret put WB_TRANSPORT_NOTIFY_ENABLED # 두 템플릿 APPROVED·차량 목적 동의 확인 뒤에만 true
 npx wrangler secret put WB_CONSULT_LINK_SEND_ENABLED # 학생 링크 템플릿 승인·연락처 동의 확인 뒤에만 true
 npx wrangler secret put WB_BOOK_ORDER_SAMPLE_ENABLED # 본인 교재문자 샘플 때만 true, 확인 뒤 false
+npx wrangler secret put BOOK_VENDOR_PHONE_SANGHYUNG # 상형총판 전용 수신번호(저장소에 값 기록 금지)
 npx wrangler secret put NAVER_ID        # 네이버 검색 API Client ID (강좌 검색용)
 npx wrangler secret put NAVER_SECRET    # 네이버 검색 API Client Secret
 npx wrangler secret put NAVER_MAPS_ID       # 네이버 지도 API Key ID (Geocoding + Directions 5)
@@ -250,11 +256,34 @@ append-only 저장한다. 승인된 수업삭제의 감사 행은 DB에만 보�
 회차 시작일은 비공개 roster의 stable studentId에 저장하고, 23:50 KST 확정 출결 중
 출석·지각·조퇴를 모든 과목에서 합산한다. 알림 원장에는 이름이나 연락처를 저장하지 않는다.
 
+학생 단위 회차제 원장은 `063_student_session_cycles.sql` → Worker → Pages 순서로 배포한다.
+설정된 회차 시작일부터 모든 담당 과목의 확정 출석·지각·조퇴를 합쳐 4회 단위의 append-only
+원장으로 저장하며, 결석은 0회이고 자동 보강을 생성하지 않는다. 4회 완료 후에는 다음 확정
+출석일을 새 회차 시작일로 삼는다. 원장에는 이름·연락처를 저장하지 않고 stable studentId만 쓴다.
+
+과거 회차 출석일을 정정할 때는 `064_student_session_ledger_generations.sql` →
+`065_makeup_assignee_integrity.sql` → Worker → 정정 세대
+등록 → Pages 순서를 지킨다. 기존 원장을 수정·삭제하지 않고 새 append-only 세대에 관리자 확인
+출석을 기록하며, 화면·회차 계산·3회 수강료 알림은 최신 세대만 사용한다. 정정 기준일까지의
+회차 산입 raw 출결은 최신 세대가 대체하고, 결석·비산입 보강은 달력에 보존한다. 그 이후 확정
+출결은 같은 세대에 계속 누적한다. 수강료 알림도 append-only 상태 이력으로 최신 회차와 함께
+교정하므로 정정에서 사라진 회차의 알림을 다시 표시하거나 확인하지 않는다. 065는 실제 보강
+담당자(`makeup_cases.confirmed_staff_id`)와 생성된 보강 task의 owner가 일치하는 출결만 최신
+회차 원장 근거로 허용한다. 일정 없이 끝난 결석보강을 관리자가 과거 날짜로 직접 완료하면
+server-only append-only 증빙과 P/L/E 출결을 한 transaction에 기록한다. 이미 더 최신 출결이
+원장에 있으면 이 증빙을 durable outbox로 삼아 다음 원장 동기화가 새 정정 세대를 만들며,
+시험·기타 보강은 계속 0회로 유지한다. 담당자가 바뀐 보강의 과거 담당자에게는 전체 학생
+정보 대신 로컬 보강 task 폐기에 필요한 최소 revocation 식별자만 반환한다.
+
 보호자 교재 주문 현황을 추가하는 배포는 반드시
 `037_book_order_identity_snapshots.sql` → Worker → Pages 순서로 진행한다. 새
 `/book-order create`만 현재 재원생 ID·이름 해시와 교재·학생 집합을 불변
 원장에 봉인한다. 기존 주문은 오연결 위험 때문에 자동 이관하지 않고 보호자에게
 표시하지 않는다. `BOOK_VENDOR_PHONES`의 유효한 문자 주문처만 봉인할 수 있으며,
+원본 거래처 키가 `상형출판사`인 주문은 선택적으로 `BOOK_VENDOR_PHONE_SANGHYUNG`
+전용 비밀키를 우선 사용한다. 전용 값이 설정됐지만 유효하지 않으면 과거 공용 번호로
+대체 발송하지 않고 차단한다. Solapi 상태조회는 `messageIds`를 같은 query key의 반복값으로
+보내며, 응답의 `messageList`가 객체 또는 배열인 경우를 모두 정규화한다.
 쿠팡 등 온라인 직접 주문은 기존 `manual_online_v1` 경로를 유지하고 보호자 주문
 현황에는 표시하지 않는다. 보호자에는 서버 교재 DB 정본이 없는 현재 단계에서
 임의 교재명을 보내지 않고 `주문 교재`로만 표시한다.
@@ -429,6 +458,14 @@ KST 날짜·거래처·주문 집합으로 멱등 처리해 같은 날 반복 �
 재시도한다. 거래처 문자가 2,000바이트를 넘으면 주문 task 경계로 나누며,
 하루 30통 한도 밖의 거절 주문은 기존 `rejected` 매핑을 유지해 다음날 이어서 처리한다.
 
+발송 직후의 Solapi `2000`은 최종 성공이 아니다. Worker는 진행 중인 같은
+`provider_message_id`만 10분마다 조회해 `2000`(문자 접수·발송 대기),
+`3000`(통신사 전달 중), `4000`(문자 수신 완료)을 구분한다. 숫자 코드는 UI에
+직접 노출하지 않으며 `4000` 또는 명시적인 수동 주문 완료만 수령 가능 상태로
+본다. 2000이 24시간, 3000이 72시간을 넘으면 자동 재발송하지 않고 결과 확인
+필요 상태로 닫는다. 전화로 대신 주문한 장부에는 `MANUAL_PHONE_ORDERED`를
+기록하며 상태 조회와 확정 거절 재시도에서 모두 제외한다.
+
 ```jsonc
 { "app":"task", "auth":{...}, "action":"retry-rejected" }
 ```
@@ -516,8 +553,9 @@ KST 오늘 본인 노선으로 제한된다. 전체 관리 권한은 오늘 기�
 ### `/makeup` — 전 학생 공통 보강 원장
 
 결석 출결 한 건에서 보강 검토를 만들고 `review_pending → reviewed → awaiting_parent →
-confirmed → completed`로 관리한다. 모든 변경은 `revision` CAS이며, 학생·담당 선생님·정규 수업과
-확정 보강의 시간 겹침을 서버에서 다시 검사한다. 담당 선생님은 자기 학생의 검토 요청과 자기 담당
+confirmed → completed`로 관리한다. 모든 변경은 `revision` CAS이며, 같은 학생의 정규 수업·
+확정·완료 보강과 시간이 겹치는지 서버에서 다시 검사한다. 한 선생님이 다른 학생의 정규 수업이나
+보강을 동시에 담당하는 것은 허용한다. 담당 선생님은 자기 학생의 검토 요청과 자기 담당
 보강 완료만 할 수 있고, 원장·허용된 관리 담당만 검토·일정 제안·확정·취소를 할 수 있다.
 
 ```jsonc

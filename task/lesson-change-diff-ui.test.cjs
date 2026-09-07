@@ -57,12 +57,17 @@ test('관리자 변경 검토는 수업 등록 및 변경 탭에 있고 승인 �
   assert.match(card, /<b>요청 사유<\/b><br>/);
 });
 
-test('취소된 피드백은 관리자 검토와 선생님 발송 상태의 활성 목록에서 숨긴다', () => {
+test('취소된 피드백은 선생님 활성 목록에서 숨기고 관리자 날짜 현황에서는 현재 수업을 미발송으로 복원한다', () => {
   const ownFeedbackView = source.slice(source.indexOf('function viewOwnFeedbackRequests()'), source.indexOf('function feedbackQueueCard('));
   const feedbackView = source.slice(source.indexOf('function viewFeedbackReview()'), source.indexOf('/* ── 수업 정보 변경 요청'));
+  const occurrences = source.slice(source.indexOf('function feedbackDateOccurrences('), source.indexOf('function feedbackDateTeacherGroups('));
   assert.match(ownFeedbackView, /ownFeedbackQueue\.filter\(item => item\.status !== 'cancelled'\)/);
   assert.match(ownFeedbackView, /feedbackSortRows\(visibleOwnQueue, false\)\.map\(ownFeedbackCard\)/);
-  assert.match(feedbackView, /feedbackQueue\.filter\(item => item\.status !== 'cancelled'\)/);
+  assert.match(feedbackView, /feedbackDateTeacherGroups\(feedbackDateFilter,\s*visibleQueue\)/);
+  assert.match(occurrences, /feedbackDeliveryCategory\(item\) === 'excluded'/,
+    '취소 기록 자체는 관리자 날짜 현황의 별도 피드백 행으로 표시하지 않는다');
+  assert.match(occurrences, /status:\s*'not_started'/,
+    '현재 수업이 남아 있으면 취소 기록 대신 다시 미발송 대상으로 표시한다');
 });
 
 test('승인된 담당자 변경·휴원·퇴원·수업삭제는 기존 선생님 로컬 수업에서 제거한다', () => {
