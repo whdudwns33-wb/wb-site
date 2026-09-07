@@ -17,6 +17,8 @@ const COMPLETED_ATTENDANCE = new Set(['P', 'L', 'E']);
 const MANUAL_REASON_CODES = new Set([
   'manual_absence', 'manual_exam', 'manual_other'
 ]);
+const MANUAL_SOURCE_MODES = new Set(['linked', 'unrelated']);
+const UNRELATED_SOURCE_PREFIX = 'manual_unrelated_';
 const REASON_CODES = new Set([
   'policy_ineligible', 'already_resolved', 'parent_declined',
   'schedule_unavailable', 'student_inactive', 'other'
@@ -197,6 +199,12 @@ function cleanManualReason(value) {
   return reason;
 }
 
+function cleanManualSourceMode(value) {
+  const mode = value == null || String(value || '').trim() === '' ? 'linked' : String(value || '').trim();
+  if (!MANUAL_SOURCE_MODES.has(mode)) problem('원 수업 연결 방식을 확인해 주세요');
+  return mode;
+}
+
 function cleanCompletedAttendance(value) {
   const attendance = String(value || '').trim();
   if (!COMPLETED_ATTENDANCE.has(attendance)) {
@@ -216,6 +224,36 @@ function caseCreationOrigin(row) {
 function manualCreation(row) {
   if (caseCreationOrigin(row) !== 'manual') return null;
   return parseHistory(row && row.history)[0];
+}
+
+function manualSourceMode(row) {
+  const manual = manualCreation(row);
+  return manual && String(manual.sourceMode || '') === 'unrelated' ? 'unrelated' : 'linked';
+}
+
+function unrelatedRequestId(row) {
+  const manual = manualCreation(row);
+  return manual && manualSourceMode(row) === 'unrelated' ? String(manual.requestId || '') : '';
+}
+
+function unrelatedSourceTaskId(requestId) {
+  const value = cleanId(requestId, '수업무관 보강 요청 ID');
+  const id = UNRELATED_SOURCE_PREFIX + value;
+  if (!SAFE_ID.test(id)) problem('수업무관 보강 요청 ID가 너무 깁니다');
+  return id;
+}
+
+function unrelatedSourceTask(row) {
+  return {
+    id: String(row && row.source_task_id || ''), staffId: String(row && row.source_teacher_id || ''),
+    studentId: String(row && row.student_id || ''), subject: '', className: '', lessonRole: '보강',
+    priority: 'normal', steps: MAKEUP_STEP_LABELS
+  };
+}
+
+// 수업무관 보강은 임의 정규수업의 내용이나 생명주기에 기대지 않는 독립 원장이다.
+function sourceForCase(row, task) {
+  return manualSourceMode(row) === 'unrelated' ? unrelatedSourceTask(row) : task;
 }
 
 function isManualCase(row) {
@@ -263,6 +301,7 @@ function publicCase(row, student, task, parentResponse, lessonTask) {
     sourceTeacherId: String(row.source_teacher_id),
     creationType,
     manualReason: manual ? String(manual.reason || '') : '',
+    sourceMode: manualSourceMode(row),
     createdBy: manual ? String(manual.actorId || '') : '',
     createdScope: manual ? String(manual.actorScope || '') : '',
     currentTeacherId: String(task && task.staffId || row.source_teacher_id),
@@ -367,6 +406,17 @@ async function manualSourceTask(env, app, sourceTaskId, studentId, targetDate) {
   return { row, task };
 }
 
+async function teacherOwnsStudentAtDate(env, app, staffId, studentId, targetDate) {
+  const result = await env.DB.prepare('SELECT owner,data FROM tasks WHERE app=? AND owner=?')
+    .bind(app, staffId).all();
+  return (result.results || []).some(row => {
+    const task = parseJson(row.data);
+    return isLesson(task) && String(task.lessonInstanceType || '') !== 'makeup' && !task.makeupCaseId &&
+      String(task.staffId || '') === String(row.owner || '') && String(task.studentId || '') === studentId &&
+      (!task.start || String(task.start) <= targetDate) && (!task.end || String(task.end) >= targetDate);
+  });
+}
+
 async function assertAbsent(env, app, sourceTaskId, sourceDate, owner) {
   const key = sourceTaskId + '|' + sourceDate;
   const row = await env.DB.prepare('SELECT owner,data FROM checks WHERE app=? AND k=? LIMIT 1').bind(app, key).first();
@@ -387,6 +437,14 @@ async function assertCaseIdentity(env, app, row) {
   const ids = await digestIds(app, String(row.source_task_id), String(row.source_date));
   if (ids.caseId !== String(row.case_id) || ids.consumptionGroupId !== String(row.consumption_group_id)) {
     problem('보강 기록의 원 수업 식별자가 일치하지 않습니다', 409, 'MAKEUP_IDENTITY_MISMATCH');
+  }
+  if (manualSourceMode(row) === 'unrelated') {
+    const requestId = unrelatedRequestId(row);
+    if (!requestId || unrelatedSourceTaskId(requestId) !== String(row.source_task_id) ||
+        !SAFE_ID.test(String(row.source_teacher_id || ''))) {
+      problem('수업무관 보강의 독립 식별자가 일치하지 않습니다', 409, 'MAKEUP_IDENTITY_MISMATCH');
+    }
+    return { task: unrelatedSourceTask(row), identity: null };
   }
   const taskRow = await env.DB.prepare('SELECT owner,data,updated_at FROM tasks WHERE app=? AND id=? LIMIT 1')
     .bind(app, row.source_task_id).first();
@@ -774,6 +832,13 @@ function regularConflictGuardStatement(env, app, row, studentId, range) {
 }
 
 function sourceIdentityGuardStatement(env, app, row, sourceRow) {
+  if (manualSourceMode(row) === 'unrelated') {
+    return env.DB.prepare(
+      'UPDATE makeup_cases SET updated_at=updated_at WHERE app=? AND case_id=? AND revision=? AND status=? ' +
+      'AND source_task_id=? AND source_teacher_id=? AND student_id=?'
+    ).bind(app, row.case_id, Number(row.revision), row.status, row.source_task_id,
+      row.source_teacher_id, row.student_id);
+  }
   return env.DB.prepare(
     'UPDATE makeup_cases SET updated_at=updated_at WHERE app=? AND case_id=? AND revision=? AND status=? ' +
     'AND EXISTS (SELECT 1 FROM tasks source WHERE source.app=? AND source.id=? AND source.owner=? ' +
@@ -1264,7 +1329,8 @@ async function listCases(env, app, body, auth, json, origin) {
   for (const row of candidates) {
     const lessonRow = lessonRows.get(makeupLessonId(String(row.case_id)));
     const lessonTask = lessonRow && parseJson(lessonRow.data);
-    const expectedStaffId = String(row.confirmed_staff_id || currentOwners.get(String(row.source_task_id)) || '');
+    const expectedStaffId = String(row.confirmed_staff_id ||
+      (manualSourceMode(row) === 'unrelated' ? row.source_teacher_id : currentOwners.get(String(row.source_task_id))) || '');
     if (lessonTask && makeupLessonIdentityMatches(lessonRow, lessonTask, row, expectedStaffId)) {
       lessonTasks.set(String(row.case_id), lessonTask);
     }
@@ -1273,8 +1339,9 @@ async function listCases(env, app, body, auth, json, origin) {
     const student = students.get(String(row.student_id));
     const taskId = String(row.source_task_id);
     const task = tasks.get(taskId);
-    if (!student || !task || String(task.studentId || '') !== String(row.student_id)) return false;
-    const visibleStaffIds = [currentOwners.get(taskId), row.source_teacher_id, row.confirmed_staff_id];
+    const unrelated = manualSourceMode(row) === 'unrelated';
+    if (!student || (!unrelated && (!task || String(task.studentId || '') !== String(row.student_id)))) return false;
+    const visibleStaffIds = [unrelated ? null : currentOwners.get(taskId), row.source_teacher_id, row.confirmed_staff_id];
     // proposed 담당자는 보호자 응답 대기 중에만 전체 case를 본다. 확정/재배정 뒤 남은
     // 감사용 proposed_staff_id가 과거 담당자에게 학생 정보를 영구 노출하지 않게 한다.
     if (String(row.status || '') === 'awaiting_parent') visibleStaffIds.push(row.proposed_staff_id);
@@ -1293,12 +1360,33 @@ async function listCases(env, app, body, auth, json, origin) {
   })) : [];
   const responses = await latestParentResponses(env, app);
   return json({ ok: true, cases: visible.map(row => publicCase(row, students.get(String(row.student_id)),
-    tasks.get(String(row.source_task_id)), responses.get(String(row.case_id)),
+    sourceForCase(row, tasks.get(String(row.source_task_id))), responses.get(String(row.case_id)),
     lessonTasks.get(String(row.case_id)))), revocations }, 200, origin);
 }
 
+function unrelatedCreationAuthorizationGuardStatement(env, app, row, auth, studentId, date) {
+  if (auth.scope === 'all') {
+    return env.DB.prepare(
+      'UPDATE makeup_cases SET updated_at=updated_at WHERE app=? AND case_id=? AND revision=? AND status=?'
+    ).bind(app, row.case_id, Number(row.revision), row.status);
+  }
+  return env.DB.prepare(
+    'UPDATE makeup_cases SET updated_at=updated_at WHERE app=? AND case_id=? AND revision=? AND status=? ' +
+    'AND EXISTS (SELECT 1 FROM tasks source WHERE source.app=? AND source.owner=? ' +
+      "AND json_valid(source.data)=1 AND COALESCE(json_extract(source.data,'$.deleted'),0)=0 " +
+      "AND (json_extract(source.data,'$.taskKind')='lesson_instruction' OR " +
+        "json_extract(source.data,'$.lessonFormVersion') IS NOT NULL OR json_extract(source.data,'$.intakeVersion') IS NOT NULL) " +
+      "AND COALESCE(json_extract(source.data,'$.lessonInstanceType'),'')<>'makeup' " +
+      "AND COALESCE(json_extract(source.data,'$.makeupCaseId'),'')='' " +
+      "AND json_extract(source.data,'$.staffId')=source.owner AND json_extract(source.data,'$.studentId')=? " +
+      "AND (COALESCE(json_extract(source.data,'$.start'),'')='' OR json_extract(source.data,'$.start')<=?) " +
+      "AND (COALESCE(json_extract(source.data,'$.end'),'')='' OR json_extract(source.data,'$.end')>=?))"
+  ).bind(app, row.case_id, Number(row.revision), row.status, app, String(auth.id || ''),
+    studentId, date, date);
+}
+
 async function manualExistingResponse(env, app, existing, student, source, sourceTaskId, studentId,
-  sourceTeacherId, staffId, reason, range, json, origin) {
+  sourceTeacherId, staffId, reason, sourceMode, range, json, origin) {
   if (!isManualCase(existing)) {
     problem('같은 원 수업과 날짜에 결석 보강 기록이 이미 있습니다', 409, 'ABSENCE_MAKEUP_EXISTS');
   }
@@ -1308,6 +1396,7 @@ async function manualExistingResponse(env, app, existing, student, source, sourc
   }
   const manual = manualCreation(existing);
   const exact = String(manual && manual.reason || '') === reason &&
+    manualSourceMode(existing) === sourceMode &&
     String(existing.source_teacher_id || '') === sourceTeacherId &&
     String(existing.confirmed_staff_id || '') === staffId &&
     String(existing.confirmed_start_at || '') === range.startAt &&
@@ -1322,23 +1411,46 @@ async function manualExistingResponse(env, app, existing, student, source, sourc
   if (!lessonRow) problem('기존 보강 수업이 누락되어 복구가 필요합니다', 409, 'MAKEUP_LESSON_MISSING');
   assertMakeupLessonIdentity(lessonRow, lessonTask, existing, staffId);
   return json({ ok: true, idempotent: true,
-    case: publicCase(existing, student, source.task, null, lessonTask), lessonTask }, 200, origin);
+    case: publicCase(existing, student, sourceForCase(existing, source.task), null, lessonTask), lessonTask }, 200, origin);
 }
 
 async function createManual(env, app, body, auth, json, origin) {
-  exactBody(body, ['studentId', 'sourceTaskId', 'reason', 'date', 'startTime', 'endTime', 'staffId']);
+  exactBody(body, ['studentId', 'sourceTaskId', 'sourceMode', 'requestId', 'reason', 'date', 'startTime', 'endTime', 'staffId']);
   const studentId = cleanId(body.studentId, 'studentId');
-  const sourceTaskId = cleanId(body.sourceTaskId, 'sourceTaskId');
+  const sourceMode = cleanManualSourceMode(body.sourceMode);
   const reason = cleanManualReason(body.reason);
+  if (sourceMode === 'unrelated' && reason === 'manual_absence') {
+    problem('결석보강은 회차 차감의 근거가 되는 원 수업을 선택해 주세요', 400, 'MANUAL_SOURCE_REQUIRED');
+  }
   const range = kstRange(body.date, body.startTime, body.endTime);
   const now = Date.now();
   assertSlotNotEnded(range, now);
-  const source = await manualSourceTask(env, app, sourceTaskId, studentId, range.date);
-  const sourceTeacherId = cleanId(source.row.owner, '수업 담당자');
-  const staffId = body.staffId == null || String(body.staffId || '').trim() === ''
-    ? sourceTeacherId : cleanId(body.staffId, '보강 담당자');
-  if (auth.scope === 'own' && String(auth.id || '') !== sourceTeacherId) {
-    return json({ ok: false, error: '본인이 담당하는 학생의 수업만 보강으로 생성할 수 있습니다' }, 403, origin);
+  let sourceTaskId;
+  let source;
+  let sourceTeacherId;
+  let staffId;
+  let requestId = '';
+  if (sourceMode === 'unrelated') {
+    requestId = cleanId(body.requestId, '수업무관 보강 요청 ID');
+    sourceTaskId = unrelatedSourceTaskId(requestId);
+    staffId = body.staffId == null || String(body.staffId || '').trim() === ''
+      ? cleanId(auth.id, '보강 담당자') : cleanId(body.staffId, '보강 담당자');
+    sourceTeacherId = staffId;
+    source = { row: null, task: unrelatedSourceTask({
+      source_task_id: sourceTaskId, source_teacher_id: sourceTeacherId, student_id: studentId
+    }) };
+  } else {
+    if (body.requestId != null || body.sourceTaskId == null) {
+      problem('원 수업 연결 정보를 확인해 주세요');
+    }
+    sourceTaskId = cleanId(body.sourceTaskId, 'sourceTaskId');
+    source = await manualSourceTask(env, app, sourceTaskId, studentId, range.date);
+    sourceTeacherId = cleanId(source.row.owner, '수업 담당자');
+    staffId = body.staffId == null || String(body.staffId || '').trim() === ''
+      ? sourceTeacherId : cleanId(body.staffId, '보강 담당자');
+    if (auth.scope === 'own' && String(auth.id || '') !== sourceTeacherId) {
+      return json({ ok: false, error: '본인이 담당하는 학생의 수업만 보강으로 생성할 수 있습니다' }, 403, origin);
+    }
   }
   if (auth.scope === 'own' && String(auth.id || '') !== staffId) {
     return json({ ok: false, code: 'MAKEUP_ASSIGNEE_FORBIDDEN',
@@ -1357,13 +1469,19 @@ async function createManual(env, app, body, auth, json, origin) {
     .bind(app, ids.caseId).first();
   if (existing) {
     return manualExistingResponse(env, app, existing, student, source, sourceTaskId, studentId,
-      sourceTeacherId, staffId, reason, range, json, origin);
+      sourceTeacherId, staffId, reason, sourceMode, range, json, origin);
+  }
+  if (sourceMode === 'unrelated' && auth.scope === 'own' &&
+      !await teacherOwnsStudentAtDate(env, app, String(auth.id || ''), studentId, range.date)) {
+    return json({ ok: false, code: 'STUDENT_SCOPE_FORBIDDEN',
+      error: '본인이 담당하는 재원생만 수업무관 보강으로 생성할 수 있습니다' }, 403, origin);
   }
   await assertNoConflict(env, app, ids.caseId, studentId, range);
   const history = [{
     action: 'create_manual', from: 'none', to: 'confirmed', actorId: actorId(auth),
     actorScope: String(auth.scope || ''),
-    reason, date: range.date, startTime: range.startTime, endTime: range.endTime,
+    reason, sourceMode, ...(requestId ? { requestId } : {}),
+    date: range.date, startTime: range.startTime, endTime: range.endTime,
     staffId, revision: 1, at: now, notificationNeeded: false
   }];
   const row = {
@@ -1378,17 +1496,19 @@ async function createManual(env, app, body, auth, json, origin) {
     history: JSON.stringify(history), created_at: now, updated_at: now
   };
   const taskWrite = await prepareMakeupLessonWrite(
-    env, app, row, source.task, student, staffId, range, now
+    env, app, row, sourceForCase(row, source.task), student, staffId, range, now
   );
   // source/staff/roster 조건은 INSERT 시점의 운영 정본으로 다시 검사한다. 사전 검증 뒤
   // 담당 변경·퇴원 등이 생기면 바로 다음 CAS guard가 전체 batch를 롤백한다.
-  const insert = env.DB.prepare(
+  const insertPrefix =
     'INSERT OR IGNORE INTO makeup_cases(app,case_id,student_id,source_task_id,source_date,source_teacher_id,' +
     'consumption_group_id,status,revision,confirmed_start_at,confirmed_end_at,confirmed_staff_id,' +
     'notification_needed,notification_event_revision,history,created_at,updated_at) ' +
-    "SELECT ?,?,?,?,?,?,?,'confirmed',1,?,?,?,0,0,?,?,? WHERE EXISTS (" +
+    "SELECT ?,?,?,?,?,?,?,'confirmed',1,?,?,?,0,0,?,?,? WHERE ";
+  const sourceCondition = sourceMode === 'unrelated' ? '1=1' : "EXISTS (" +
       'SELECT 1 FROM tasks source WHERE source.app=? AND source.id=? AND source.owner=? ' +
-      'AND source.data=? AND source.updated_at=?) AND EXISTS (' +
+      'AND source.data=? AND source.updated_at=?)';
+  const insert = env.DB.prepare(insertPrefix + sourceCondition + ' AND EXISTS (' +
       'SELECT 1 FROM staff source_teacher WHERE source_teacher.app=? AND source_teacher.id=? ' +
       "AND json_valid(source_teacher.data)=1 AND COALESCE(json_extract(source_teacher.data,'$.deleted'),0)=0) " +
       'AND EXISTS (' +
@@ -1401,7 +1521,8 @@ async function createManual(env, app, body, auth, json, origin) {
       "AND (COALESCE(json_extract(student.value,'$.end'),'')='' OR ?<json_extract(student.value,'$.end')))"
   ).bind(app, ids.caseId, studentId, sourceTaskId, range.date, sourceTeacherId, ids.consumptionGroupId,
     range.startAt, range.endAt, staffId, JSON.stringify(history), now, now,
-    app, sourceTaskId, source.row.owner, source.row.data, Number(source.row.updated_at),
+    ...(sourceMode === 'unrelated' ? [] :
+      [app, sourceTaskId, source.row.owner, source.row.data, Number(source.row.updated_at)]),
     app, sourceTeacherId, app, staffId, app, studentId,
     range.date.slice(0, 7), range.date.slice(0, 7));
   const statements = [
@@ -1409,11 +1530,15 @@ async function createManual(env, app, body, auth, json, origin) {
     await taskWriteCasGuardStatement(env, app, 'makeup_create_manual_case', ids.caseId + '\n' + now, now),
     sourceIdentityGuardStatement(env, app, row, source.row),
     await casGuard(env, app, 'makeup_create_manual_source', row, now),
-    regularConflictGuardStatement(env, app, row, studentId, range),
+  ];
+  if (sourceMode === 'unrelated') {
+    statements.push(unrelatedCreationAuthorizationGuardStatement(env, app, row, auth, studentId, range.date),
+      await casGuard(env, app, 'makeup_create_manual_scope', row, now));
+  }
+  statements.push(regularConflictGuardStatement(env, app, row, studentId, range),
     await casGuard(env, app, 'makeup_create_manual_conflict', row, now),
     taskWrite.statement,
-    await casGuard(env, app, 'makeup_create_manual_task', row, now)
-  ];
+    await casGuard(env, app, 'makeup_create_manual_task', row, now));
   let results;
   try {
     results = await env.DB.batch(statements);
@@ -1423,14 +1548,18 @@ async function createManual(env, app, body, auth, json, origin) {
         .bind(app, ids.caseId).first();
       if (raced) {
         return manualExistingResponse(env, app, raced, student, source, sourceTaskId, studentId,
-          sourceTeacherId, staffId, reason, range, json, origin);
+          sourceTeacherId, staffId, reason, sourceMode, range, json, origin);
       }
       // 가능한 경우 구체적인 운영 충돌을 먼저 돌려주고, 정본 변경이면 CAS 충돌로 닫는다.
       await assertNoConflict(env, app, ids.caseId, studentId, range);
-      const freshSource = await manualSourceTask(env, app, sourceTaskId, studentId, range.date);
       rosterStudent(await loadRoster(env, app), studentId, range.date);
-      if (!await activeStaff(env, app, String(freshSource.row.owner || '')) ||
-          !await activeStaff(env, app, staffId)) {
+      if (sourceMode === 'unrelated' && auth.scope === 'own' &&
+          !await teacherOwnsStudentAtDate(env, app, String(auth.id || ''), studentId, range.date)) {
+        problem('담당 원생 연결이 변경되었습니다', 409, 'STUDENT_SCOPE_FORBIDDEN');
+      }
+      const freshSourceTeacherId = sourceMode === 'unrelated' ? staffId :
+        String((await manualSourceTask(env, app, sourceTaskId, studentId, range.date)).row.owner || '');
+      if (!await activeStaff(env, app, freshSourceTeacherId) || !await activeStaff(env, app, staffId)) {
         problem('원 수업 담당 선생님이 비활성 상태입니다', 409, 'STAFF_INACTIVE');
       }
     }
@@ -1446,7 +1575,7 @@ async function createManual(env, app, body, auth, json, origin) {
   const lessonTask = lessonRow && parseJson(lessonRow.data);
   assertMakeupLessonIdentity(lessonRow, lessonTask, saved, staffId);
   return json({ ok: true, idempotent: false,
-    case: publicCase(saved, student, source.task, null, lessonTask), lessonTask }, 200, origin);
+    case: publicCase(saved, student, sourceForCase(saved, source.task), null, lessonTask), lessonTask }, 200, origin);
 }
 
 async function createFromAbsence(env, app, body, auth, json, origin) {
@@ -1633,7 +1762,8 @@ async function reconcileAttendance(env, app, body, auth, json, origin) {
       .bind(app, makeupLessonId(ids.caseId)).first();
     const lessonTask = lessonRow && parseJson(lessonRow.data);
     return json({ ok: true, idempotent: true,
-      case: publicCase(row, student, source.task, null, lessonTask), ...(lessonTask ? { lessonTask } : {}) }, 200, origin);
+      case: publicCase(row, student, sourceForCase(row, source.task), null, lessonTask),
+      ...(lessonTask ? { lessonTask } : {}) }, 200, origin);
   }
   const key = sourceTaskId + '|' + sourceDate;
   const checkRow = await env.DB.prepare('SELECT owner,data FROM checks WHERE app=? AND k=? LIMIT 1').bind(app, key).first();
@@ -1733,9 +1863,10 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
     const row = await loadCase(env, app, caseId);
     if (Number(row.revision) !== revision) return conflictResponse(env, app, caseId, json, origin);
     const sourceSnapshot = await assertCaseIdentity(env, app, row);
-    const source = sourceSnapshot.task;
+    const rawSource = sourceSnapshot.task;
+    const source = sourceForCase(row, rawSource);
     const sourceIdentity = sourceSnapshot.identity;
-    const currentSourceTeacherId = cleanId(source.staffId, '현재 원 수업 담당자');
+    const currentSourceTeacherId = cleanId(rawSource.staffId, '현재 원 수업 담당자');
     const latestResponse = await latestParentResponse(env, app, row);
     const requestNow = Date.now();
     const document = await loadRoster(env, app);
@@ -2008,7 +2139,8 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
     const lessonTaskRow = await env.DB.prepare('SELECT data FROM tasks WHERE app=? AND id=? LIMIT 1')
       .bind(app, makeupLessonId(String(row.case_id))).first();
     const lessonTask = lessonTaskRow && parseJson(lessonTaskRow.data);
-    return json({ ok: true, case: publicCase(saved, student, task && parseJson(task.data), latestResponse, lessonTask),
+    return json({ ok: true, case: publicCase(saved, student,
+      sourceForCase(saved, task && parseJson(task.data)), latestResponse, lessonTask),
       ...(lessonTask ? { lessonTask } : {}),
       ...(completion && completion.impact ? { sessionPackImpact: completion.impact } : {}) }, 200, origin);
   } catch (error) {

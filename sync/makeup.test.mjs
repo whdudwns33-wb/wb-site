@@ -341,6 +341,101 @@ test('assigned teacher or administrator can create one confirmed manual makeup o
   assert.equal(changed.body.code, 'MANUAL_MAKEUP_CONFLICT');
 });
 
+test('수업무관 직접 보강은 담당 수업을 권한 근거로만 쓰고 과목 정보를 복사하지 않는다', async () => {
+  const db = new TestD1(); seed(db);
+  const request = {
+    action: 'create_manual', studentId: 'student-a', sourceMode: 'unrelated', requestId: 'request-a',
+    reason: 'manual_exam',
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00'
+  };
+  const created = await call(db, own('teacher-a'), request);
+  assert.equal(created.status, 200, JSON.stringify(created.body));
+  assert.equal(created.body.case.sourceMode, 'unrelated');
+  assert.equal(created.body.case.subject, '');
+  assert.equal(created.body.case.className, '');
+  assert.equal(created.body.case.history[0].sourceMode, 'unrelated');
+  assert.equal(created.body.case.history[0].requestId, 'request-a');
+  assert.equal(created.body.case.sourceTaskId, 'manual_unrelated_request-a');
+  assert.equal(created.body.lessonTask.subject, '');
+  assert.equal(created.body.lessonTask.className, '');
+  assert.match(created.body.lessonTask.title, /보강/);
+  assert.doesNotMatch(created.body.lessonTask.title, /영어|테스트반/);
+
+  const listed = await call(db, own('teacher-a'), { action: 'list' });
+  assert.equal(listed.status, 200);
+  assert.equal(listed.body.cases[0].sourceMode, 'unrelated');
+  assert.equal(listed.body.cases[0].subject, '');
+
+  db.prepare("UPDATE tasks SET data=json_set(data,'$.deleted',1) WHERE app='task' AND id='lesson-a'").run();
+  const independent = await call(db, own('teacher-a'), { action: 'list' });
+  assert.equal(independent.status, 200);
+  assert.equal(independent.body.cases.length, 1, '근거로 삼은 임의 정규수업 삭제와 독립적이어야 한다');
+
+  const retry = await call(db, own('teacher-a'), request);
+  assert.equal(retry.status, 200);
+  assert.equal(retry.body.idempotent, true);
+  assert.equal(db.database.prepare('SELECT count(*) AS n FROM makeup_cases').get().n, 1);
+
+  db.prepare("DELETE FROM tasks WHERE app='task' AND id='lesson-a'").run();
+  const rescheduled = await call(db, all, {
+    action: 'reschedule', caseId: created.body.case.caseId, revision: created.body.case.revision,
+    date: '2026-08-13', startTime: '20:00', endTime: '21:00', staffId: 'teacher-a'
+  });
+  assert.equal(rescheduled.status, 200, JSON.stringify(rescheduled.body));
+  assert.equal(rescheduled.body.case.sourceMode, 'unrelated');
+  assert.equal(rescheduled.body.lessonTask.start, '2026-08-13');
+
+  const absenceDb = new TestD1(); seed(absenceDb);
+  const blockedAbsence = await call(absenceDb, own('teacher-a'), { ...request, reason: 'manual_absence' });
+  assert.equal(blockedAbsence.status, 400);
+  assert.equal(blockedAbsence.body.code, 'MANUAL_SOURCE_REQUIRED');
+  assert.equal(absenceDb.database.prepare('SELECT count(*) AS n FROM makeup_cases').get().n, 0);
+
+  const badMode = await call(absenceDb, own('teacher-a'), { ...request, sourceMode: 'free_text' });
+  assert.equal(badMode.status, 400);
+});
+
+test('관리자는 정규수업 없는 재원생에게 같은 날짜의 수업무관 보강을 여러 번 독립 생성한다', async () => {
+  const db = new TestD1(); seed(db);
+  const document = roster();
+  document.roster.students.push({
+    id: 'student-c', name: '다학생', grade: '초3', teacher: '', subject: '',
+    start: '2026-01', end: '', reason: '', teacherIds: []
+  });
+  db.prepare("UPDATE private_rosters SET data=? WHERE app='task'").bind(JSON.stringify(document)).run();
+  const base = {
+    action: 'create_manual', studentId: 'student-c', sourceMode: 'unrelated', reason: 'manual_other',
+    date: '2026-08-12', staffId: 'teacher-a'
+  };
+  const first = await call(db, all, {
+    ...base, requestId: 'regularless-a', startTime: '14:00', endTime: '14:50'
+  });
+  const second = await call(db, all, {
+    ...base, requestId: 'regularless-b', startTime: '15:00', endTime: '15:50'
+  });
+  assert.equal(first.status, 200, JSON.stringify(first.body));
+  assert.equal(second.status, 200, JSON.stringify(second.body));
+  assert.notEqual(first.body.case.caseId, second.body.case.caseId);
+  assert.equal(db.database.prepare('SELECT count(*) AS n FROM makeup_cases').get().n, 2);
+
+  const adminList = await call(db, all, { action: 'list', studentId: 'student-c' });
+  assert.equal(adminList.status, 200);
+  assert.equal(adminList.body.cases.length, 2);
+  assert.ok(adminList.body.cases.every(item => item.sourceMode === 'unrelated' &&
+    item.subject === '' && item.currentTeacherId === 'teacher-a'));
+
+  const teacherList = await call(db, own('teacher-a'), { action: 'list', studentId: 'student-c' });
+  assert.equal(teacherList.status, 200);
+  assert.equal(teacherList.body.cases.length, 2, '실제 보강 담당자는 정규수업이 없어도 생성된 보강을 본다');
+
+  const denied = await call(db, own('teacher-b'), {
+    ...base, requestId: 'teacher-denied', staffId: 'teacher-b',
+    startTime: '16:00', endTime: '16:50'
+  });
+  assert.equal(denied.status, 403);
+  assert.equal(denied.body.code, 'STUDENT_SCOPE_FORBIDDEN');
+});
+
 test('manual makeup lets an administrator choose another active teacher but own scope can only choose itself', async () => {
   const db = new TestD1(); seed(db);
   const request = {
