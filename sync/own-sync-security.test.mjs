@@ -83,6 +83,9 @@ class FakeDB {
     throw new Error('Unhandled first SQL: ' + sql);
   }
   async all(sql, args) {
+    if (sql.startsWith('SELECT task_id FROM task_revocations')) {
+      return { results: [] };
+    }
     if (sql.startsWith('SELECT student_id,revision FROM student_schedule_revisions')) {
       this.scheduleRevisionReads += 1;
       const ids = new Set(args.slice(1).map(String));
