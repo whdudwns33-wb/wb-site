@@ -10,7 +10,8 @@
  *
  * 엔드포인트
  *   GET  /health
- *   POST /sync    { app, auth, since, changes[] } → { ok, now, changes[] }
+ *   POST /sync    { app, auth, since, changes[], capabilities?, taskRevocationCursor? }
+ *                 → { ok, now, changes[], taskRevocations? }
  *   POST /token     { app, auth(admin), staffId } → { ok, token }   구형 개인 링크 호환
  *   POST /bootstrap { app, auth(admin), staffId } → { ok, code }    1회용 링크 발급
  *   POST /exchange  { app, staffId, code }        → { ok, token }   1회 교환
@@ -113,6 +114,7 @@ import { handleConsultLinkSend } from './consult-link-send.js';
 const APPS = ['task', 'consult'];
 const MAX_CHANGES = 500;     // 요청당 상한 — D1 배치 한계와 악의적 대량 전송을 함께 막는다
 const MAX_PULL = 2000;       // 응답당 상한. 초과하면 more:true로 알리고 다음 요청에서 이어받는다
+const MAX_TASK_REVOCATION_PULL = 500; // 일반 델타 커서와 분리해 삭제 표식을 빠짐없이 페이징한다
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const SAFE_REWARD_REQUEST_ID = /^[A-Za-z0-9_-]{8,128}$/;
 const CONSULT_REWARD_PREFIX = '__rewardtx__';
@@ -1511,6 +1513,88 @@ async function handleConsultReward(env, app, body, origin, auth) {
   return json({ ok: false, error: '다른 원장 기기에서 교환 상태가 먼저 변경되었습니다' }, 409, origin);
 }
 
+function syncEntryTaskId(entry) {
+  if (!entry || !entry.change) return '';
+  if (entry.table === 'tasks') {
+    const id = String(entry.change.id || '');
+    return SAFE_ID.test(id) ? id : '';
+  }
+  if (entry.table !== 'checks') return '';
+  const key = String(entry.change.k || '');
+  const pipe = key.indexOf('|');
+  if (pipe <= 0 || pipe !== key.lastIndexOf('|')) return '';
+  const id = key.slice(0, pipe);
+  return SAFE_ID.test(id) ? id : '';
+}
+
+/**
+ * 삭제 전 탭이 보낸 task/check는 검증 단계에서 오류로 만들지 않고 개별 폐기한다.
+ * DB trigger도 같은 정책을 강제하지만, 이 prefilter가 구형 개인 화면의 반복 403을 막는다.
+ */
+async function revokedSyncEntries(env, app, dataGeneration, entries) {
+  if (app !== 'task' || !entries.length) return new Set();
+  const byTaskId = new Map();
+  for (const entry of entries) {
+    const taskId = syncEntryTaskId(entry);
+    if (!taskId) continue;
+    if (!byTaskId.has(taskId)) byTaskId.set(taskId, []);
+    byTaskId.get(taskId).push(entry);
+  }
+  const taskIds = [...byTaskId.keys()];
+  if (!taskIds.length) return new Set();
+  const revokedIds = new Set();
+  for (let offset = 0; offset < taskIds.length; offset += 80) {
+    const chunk = taskIds.slice(offset, offset + 80);
+    const result = await env.DB.prepare(
+      'SELECT task_id FROM task_revocations WHERE app=? AND data_generation=? AND task_id IN (' +
+        chunk.map(() => '?').join(',') + ')'
+    ).bind(app, dataGeneration, ...chunk).all();
+    for (const row of result.results || []) revokedIds.add(String(row.task_id || ''));
+  }
+  const skipped = new Set();
+  for (const taskId of revokedIds) {
+    for (const entry of byTaskId.get(taskId) || []) skipped.add(entry);
+  }
+  return skipped;
+}
+
+function taskRevocationCapability(body, app) {
+  return app === 'task' && !!(body && body.capabilities &&
+    typeof body.capabilities === 'object' && !Array.isArray(body.capabilities) &&
+    body.capabilities.taskRevocations === 1);
+}
+
+function taskRevocationCursor(body) {
+  if (body.taskRevocationCursor == null || body.taskRevocationCursor === '') return 0;
+  const cursor = Number(body.taskRevocationCursor);
+  return Number.isSafeInteger(cursor) && cursor >= 0 ? cursor : null;
+}
+
+async function pullTaskRevocations(env, app, dataGeneration, auth, cursor) {
+  const own = auth.scope === 'own';
+  const sql = 'SELECT revocation_seq,task_id,former_owner,revoked_at FROM task_revocations ' +
+    'WHERE app=? AND data_generation=? AND revocation_seq>?' + (own ? ' AND former_owner=?' : '') +
+    ' ORDER BY revocation_seq LIMIT ' + (MAX_TASK_REVOCATION_PULL + 1);
+  const statement = own
+    ? env.DB.prepare(sql).bind(app, dataGeneration, cursor, String(auth.id || ''))
+    : env.DB.prepare(sql).bind(app, dataGeneration, cursor);
+  const result = await statement.all();
+  const rows = result.results || [];
+  const more = rows.length > MAX_TASK_REVOCATION_PULL;
+  if (more) rows.length = MAX_TASK_REVOCATION_PULL;
+  const nextCursor = rows.length ? Number(rows[rows.length - 1].revocation_seq) : cursor;
+  return {
+    version: 1,
+    cursor: nextCursor,
+    more,
+    rows: rows.map(row => ({
+      taskId: String(row.task_id || ''),
+      formerOwner: String(row.former_owner || ''),
+      revokedAt: Number(row.revoked_at) || 0
+    }))
+  };
+}
+
 async function handleSync(env, app, body, origin) {
   const auth = await resolveAuth(env, app, body.auth);
   if (!auth) return json({ ok: false, error: '인증 실패' }, 401, origin);
@@ -1534,6 +1618,13 @@ async function handleSync(env, app, body, origin) {
       dataGeneration,
       error: '운영 데이터가 새 세대로 전환되었습니다. 기기 캐시를 비운 뒤 다시 동기화합니다'
     }, 409, origin);
+  }
+
+  const wantsTaskRevocations = taskRevocationCapability(body, app);
+  const requestedTaskRevocationCursor = wantsTaskRevocations ? taskRevocationCursor(body) : 0;
+  if (wantsTaskRevocations && requestedTaskRevocationCursor == null) {
+    return json({ ok: false, code: 'INVALID_TASK_REVOCATION_CURSOR',
+      error: '삭제 동기 기준을 다시 확인해 주세요' }, 400, origin);
   }
 
   const now = Date.now();
@@ -1593,13 +1684,17 @@ async function handleSync(env, app, body, origin) {
     accepted.push({ table: t, change: c });
   }
   if (forbidden) return json({ ok: false, error: '개인 링크에서는 본인 업무만 저장할 수 있습니다' }, 403, origin);
-  let skipped = new Set();
-  const makeupInspection = await inspectScheduledMakeupTaskChanges(env, app, accepted);
+  let skipped = await revokedSyncEntries(env, app, dataGeneration, accepted);
+  const makeupInspection = await inspectScheduledMakeupTaskChanges(
+    env, app, accepted.filter(entry => !skipped.has(entry))
+  );
   if (makeupInspection.error) {
     return json({ ok: false, code: 'MAKEUP_ENDPOINT_REQUIRED', error: makeupInspection.error }, 409, origin);
   }
   for (const entry of makeupInspection.skip) skipped.add(entry);
-  const makeupCheckInspection = await inspectMakeupCheckChanges(env, app, accepted);
+  const makeupCheckInspection = await inspectMakeupCheckChanges(
+    env, app, accepted.filter(entry => !skipped.has(entry))
+  );
   if (makeupCheckInspection.error) {
     return json({ ok: false, code: 'MAKEUP_CHECK_IDENTITY_MISMATCH',
       error: makeupCheckInspection.error }, 403, origin);
@@ -1641,7 +1736,9 @@ async function handleSync(env, app, body, origin) {
     return json({ ok: false, code: 'BOOK_ORDER_SEALED', error: sealedInspection.error }, 409, origin);
   }
   for (const entry of sealedInspection.skip) skipped.add(entry);
-  if (app === 'task' && await hasUnsafeGenericScheduledOrder(env, app, accepted)) {
+  if (app === 'task' && await hasUnsafeGenericScheduledOrder(
+    env, app, accepted.filter(entry => !skipped.has(entry))
+  )) {
     return json({ ok: false, code: 'BOOK_ORDER_CREATE_REQUIRED',
       error: '자동 발송 교재 주문은 전용 주문 화면에서 등록해 주세요' }, 409, origin);
   }
@@ -1758,7 +1855,13 @@ async function handleSync(env, app, body, origin) {
   // more일 때는 받은 것 중 가장 오래된 srv_at까지만 확정해야 빠지는 행이 없다
   const nextSince = more ? Math.max(since, ...out.map(r => r.srv_at)) : now;
   const authRole = auth.role === 'manager' ? 'manager' : (auth.scope === 'all' ? 'admin' : 'staff');
-  return json({ ok: true, now: nextSince, more: more, changes: out, authRole, dataGeneration }, 200, origin);
+  const payload = { ok: true, now: nextSince, more: more, changes: out, authRole, dataGeneration };
+  if (wantsTaskRevocations) {
+    payload.taskRevocations = await pullTaskRevocations(
+      env, app, dataGeneration, auth, requestedTaskRevocationCursor
+    );
+  }
+  return json(payload, 200, origin);
 }
 
 async function handleToken(env, app, body, origin) {

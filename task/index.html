@@ -1128,12 +1128,12 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-09-07.3"></script>
-<script src="./schedule-board-core.js?v=2026-09-07.3"></script>
-<script src="./asset-core.js?v=2026-09-07.3"></script>
-<script src="./qr-core.js?v=2026-09-07.3"></script>
-<script src="./acaflow-import-core.js?v=2026-09-07.3"></script>
-<script src="./feedback-subject-catalog.js?v=2026-09-07.3"></script>
+<script src="./lesson-form-core.js?v=2026-09-07.4"></script>
+<script src="./schedule-board-core.js?v=2026-09-07.4"></script>
+<script src="./asset-core.js?v=2026-09-07.4"></script>
+<script src="./qr-core.js?v=2026-09-07.4"></script>
+<script src="./acaflow-import-core.js?v=2026-09-07.4"></script>
+<script src="./feedback-subject-catalog.js?v=2026-09-07.4"></script>
 <script>
 "use strict";
 
@@ -1159,7 +1159,8 @@ function blankState() {
     staff: [],
     tasks: [],
     checks: {},
-    settings: { adminPin: '', syncUrl: '', syncSecret: '', centerName: 'WB 웩슬러브레인센터', dataGeneration: 0 }
+    settings: { adminPin: '', syncUrl: '', syncSecret: '', centerName: 'WB 웩슬러브레인센터',
+      dataGeneration: 0, taskRevocationCursor: 0 }
   };
 }
 
@@ -1541,6 +1542,103 @@ function hasSensitiveManagerCache(previousRole) {
     state.settings.managerCacheSensitive === true;
 }
 
+function checkReferencesRevokedTask(key, record, taskId) {
+  const id = String(taskId || '');
+  if (!id || !record || typeof record !== 'object') return false;
+  const rawKey = String(key || '');
+  const firstPipe = rawKey.indexOf('|');
+  const keyTaskId = firstPipe > 0 ? rawKey.slice(0, firstPipe) : '';
+  const contact = record.contact && typeof record.contact === 'object' ? record.contact : null;
+  return keyTaskId === id || String(record.taskId || '') === id ||
+    String(record.lessonTaskId || '') === id || String(record.sourceTaskId || '') === id ||
+    String(record.makeupSourceTaskId || '') === id || String(contact && contact.sourceTaskId || '') === id;
+}
+
+function clearRevokedTaskEditors(taskIds) {
+  if (!taskIds || !taskIds.size) return false;
+  const uses = (value, fields) => !!(value && fields.some(field => taskIds.has(String(value[field] || ''))));
+  let close = false;
+  if (uses(eForm, ['id'])) { eForm = null; close = true; }
+  if (uses(lcForm, ['taskId'])) { lcForm = null; close = true; }
+  if (uses(fbCtx, ['id', 'taskId'])) { fbCtx = null; close = true; }
+  if (uses(lessonDraft, ['_sourceTaskId', 'taskId'])) { lessonDraft = null; close = true; }
+  if (uses(lessonPreviewTask, ['id', 'taskId'])) { lessonPreviewTask = null; lessonPreviewPayload = null; close = true; }
+  if (uses(studentInfoRequestContext, ['taskId'])) { studentInfoRequestContext = null; close = true; }
+  if (uses(weekendFlexibleEditor, ['taskId'])) { weekendFlexibleEditor = null; weekendFlexibleSaving = false; close = true; }
+  if (uses(lessonBriefingEditor, ['taskId'])) { lessonBriefingEditor = null; lessonBriefingSaving = false; close = true; }
+  if (uses(lessonHandoffDraft, ['taskId', 'lessonTaskId'])) { lessonHandoffDraft = null; close = true; }
+  taskIds.forEach(taskId => {
+    openPanels.delete(taskId);
+    for (const map of [makeupCreateStates, makeupAttendanceReconcileStates, guardianLessonPublications,
+      guardianPublicationDrafts, studentSelfChecks, lessonHandoffMemoDrafts, lessonHandoffSourceDrafts]) {
+      [...map.keys()].forEach(key => {
+        const value = map.get(key);
+        if (String(key) === taskId || String(key).startsWith(taskId + '|') ||
+            (value && (String(value.taskId || '') === taskId || String(value.lessonTaskId || '') === taskId ||
+              String(value.sourceTaskId || '') === taskId))) map.delete(key);
+      });
+    }
+  });
+  if (close && typeof closeModal === 'function') closeModal();
+  return close;
+}
+
+/**
+ * 서버의 물리 삭제 표식은 로컬 시각보다 우선한다. 수업 내용 대신 opaque taskId와
+ * 이전 담당자만 내려오므로, 같은 id가 새 담당자에게 유효하게 존재하면 건드리지 않는다.
+ */
+function applyTaskRevocationPage(page, auth, accessRole) {
+  const previousCursor = Number(state.settings.taskRevocationCursor) || 0;
+  if (page == null) return { cursor: previousCursor, more: false, removed: 0, taskIds: new Set() };
+  if (!page || Number(page.version) !== 1 || !Number.isSafeInteger(Number(page.cursor)) ||
+      Number(page.cursor) < previousCursor || typeof page.more !== 'boolean' || !Array.isArray(page.rows)) {
+    throw new Error('TASK_REVOCATION_RESPONSE_INVALID');
+  }
+  const cursor = Number(page.cursor);
+  if (page.more && cursor <= previousCursor) throw new Error('TASK_REVOCATION_CURSOR_STALLED');
+  const allScope = !!(auth && auth.mode === 'admin') || accessRole === 'manager';
+  const removedTaskIds = new Set();
+  let removed = 0;
+  const rows = page.rows.map(row => {
+    const taskId = String(row && row.taskId || '');
+    const formerOwner = String(row && row.formerOwner || '');
+    if (!/^[A-Za-z0-9_-]{1,128}$/.test(taskId) ||
+        (formerOwner && !/^[A-Za-z0-9_-]{1,128}$/.test(formerOwner)) ||
+        !Number.isSafeInteger(Number(row && row.revokedAt)) || Number(row.revokedAt) <= 0) {
+      throw new Error('TASK_REVOCATION_ROW_INVALID');
+    }
+    return { taskId, formerOwner };
+  });
+
+  rows.forEach(row => {
+    const taskId = row.taskId;
+    const formerOwner = row.formerOwner;
+    if (!allScope && (!auth || auth.mode !== 'person' || String(auth.id || '') !== formerOwner)) return;
+
+    const sameId = (state.tasks || []).filter(task => String(task && task.id || '') === taskId);
+    const exactOwner = sameId.filter(task => String(task && task.staffId || '') === formerOwner);
+    // taskId가 현재 다른 담당자의 활성 수업으로 존재하면 과거 담당자 표식으로 지우지 않는다.
+    if (sameId.length && !exactOwner.length) return;
+    const keepOtherOwner = sameId.some(task => String(task && task.staffId || '') !== formerOwner);
+    if (exactOwner.length) {
+      state.tasks = state.tasks.filter(task => !(String(task && task.id || '') === taskId &&
+        String(task && task.staffId || '') === formerOwner));
+      removed += exactOwner.length;
+    }
+    if (!keepOtherOwner) {
+      Object.keys(state.checks || {}).forEach(key => {
+        if (!checkReferencesRevokedTask(key, state.checks[key], taskId)) return;
+        delete state.checks[key];
+        removed += 1;
+      });
+    }
+    removedTaskIds.add(taskId);
+  });
+
+  clearRevokedTaskEditors(removedTaskIds);
+  return { cursor, more: page.more, removed, taskIds: removedTaskIds };
+}
+
 const sync = {
   busy: false, dirty: false, last: null, timer: null, loud: false, err: '', personVerified: false, accessRole: '',
 
@@ -1666,6 +1764,8 @@ const sync = {
         const d = await this.post('/sync', {
           app: SYNC_APP, auth: auth,
           dataGeneration: Number(state.settings.dataGeneration) || 0,
+          capabilities: { taskRevocations: 1 },
+          taskRevocationCursor: Number(state.settings.taskRevocationCursor) || 0,
           since: Number(state.settings.pullAt) || 0,
           changes: batch
         });
@@ -1694,13 +1794,16 @@ const sync = {
         refreshBookOrders = refreshBookOrders || (d.changes || []).some(change => change && change.table === 'tasks' &&
           change.data && ['scheduled_batch_v1', 'manual_online_v1', 'bound_print_v1', 'internal_book_v1'].includes(change.data.orderDelivery));
         applied += this.apply(d.changes);
+        const revoked = applyTaskRevocationPage(d.taskRevocations, auth, responseAccessRole);
+        applied += revoked.removed;
+        state.settings.taskRevocationCursor = revoked.cursor;
         state.settings.pullAt = d.now;
         if (batchReconcileCount) {
           reconcileOutstanding = Math.max(0, reconcileOutstanding - batchReconcileCount);
           if (!reconcileOutstanding) state.settings.onboardingCasReconcileVersion = 1;
         }
         queueOnboardingReconcile(auth.mode === 'admin' || responseAccessRole === 'manager');
-        again = !!d.more || pending.length > 0;
+        again = !!d.more || revoked.more || pending.length > 0;
       }
       // 요청 도중에 바뀐 것은 updatedAt이 t0보다 크므로 다음 회차에 올라간다
       state.settings.pushAt = t0;
@@ -1733,6 +1836,7 @@ const sync = {
         state.checks = {};
         state.settings.pullAt = 0;
         state.settings.pushAt = 0;
+        state.settings.taskRevocationCursor = 0;
         state.settings.dataGeneration = Number(e.dataGeneration);
         save();
         this.dirty = false;
@@ -22621,7 +22725,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-09-07.3';
+const APP_VER = '2026-09-07.4';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);

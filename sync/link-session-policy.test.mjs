@@ -49,6 +49,12 @@ class TestD1 {
         updated_at INTEGER NOT NULL, srv_at INTEGER NOT NULL,
         PRIMARY KEY (app, k)
       );
+      CREATE TABLE task_revocations (
+        revocation_seq INTEGER PRIMARY KEY AUTOINCREMENT,
+        app TEXT NOT NULL, data_generation INTEGER NOT NULL,
+        task_id TEXT NOT NULL, former_owner TEXT NOT NULL, revoked_at INTEGER NOT NULL,
+        UNIQUE(app,data_generation,task_id,former_owner)
+      );
       CREATE TABLE tokens (
         app TEXT NOT NULL, token TEXT NOT NULL, staff_id TEXT NOT NULL,
         created_at INTEGER NOT NULL, revoked INTEGER NOT NULL DEFAULT 0,
