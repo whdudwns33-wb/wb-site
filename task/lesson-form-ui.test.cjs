@@ -511,7 +511,7 @@ test('parent feedback is enabled for all students without enabling the other gua
   assert.doesNotMatch(html, /api\.solapi\.com|SOLAPI_SECRET|recipientPhone|phoneNumber/);
 });
 
-test('feedback v2 preview uses the fixed approved template and keeps send fields from lesson records', () => {
+test('feedback v2/v3 preview uses the fixed approved templates and keeps send fields from lesson records', () => {
   const computeStart = html.indexOf('function computeFeedbackFields(');
   const previewStart = html.indexOf('function showFeedbackPreview(', computeStart);
   const previewEnd = html.indexOf('function todayStaffList(', previewStart);
@@ -522,25 +522,32 @@ test('feedback v2 preview uses the fixed approved template and keeps send fields
   const submit = html.slice(submitStart, submitEnd);
   assert.match(compute, /lessonMemoValues\(c\)/);
   assert.match(compute, /memo\.contentProgress[\s\S]*doneSteps\.length[\s\S]*taskCardDetail\(t\)/);
+  assert.match(compute, /noticeText = feedbackFlatField\(memo\.guardianNotice \|\| ''\)/);
   assert.doesNotMatch(preview, /id="fldContent"|<label class="fl">오늘 배운 내용<\/label>/);
-  assert.match(preview, /templateVersion: templateVersion,[\s\S]*contentText: feedbackFlatField/);
-  assert.match(preview, /baseCommentText: String\(fields\.baseCommentText \|\| initialCommentText\)/);
-  assert.match(preview, /templateVersion === 'v2' \? ' readonly'/);
-  for (const field of ['subjectText', 'contentText', 'homeworkText', 'commentText']) {
+  assert.match(preview, /const normalizedFields = structuredTemplate \? feedbackStructuredFields\(fields\) : null/);
+  assert.match(preview, /contentText: structuredTemplate \? normalizedFields\.contentText/);
+  assert.match(preview, /commentText: initialCommentText,[\s\S]*noticeText: structuredTemplate \? normalizedFields\.noticeText/);
+  assert.match(preview, /baseCommentText: structuredTemplate[\s\S]*feedbackCommentField\(fields\.baseCommentText \|\| initialCommentText\)/);
+  assert.match(preview, /structuredTemplate \? ' readonly'/);
+  for (const field of ['subjectText', 'contentText', 'homeworkText', 'commentText', 'noticeText']) {
     assert.match(preview, new RegExp('data-feedback-final-field="' + field + '"'),
       field + ' 최종 발송 변수를 직접 수정할 수 있어야 한다');
   }
   assert.match(preview, /승인 템플릿과[^']*발송 변수로 만든 최종 미리보기입니다/);
-  assert.match(preview, /아래 네 항목만 실제 알림톡 변수로 전송됩니다/);
+  assert.match(preview, /아래 다섯 항목만 실제 알림톡 변수로 전송됩니다/);
+  assert.match(preview, /안내사항이 비어 있으면 V2, 입력하면 V3가 자동 선택됩니다/);
   assert.match(preview, /data-act="feedbackpolish">코멘트만 AI 다듬기/);
   assert.match(preview, /data-act="feedbackfinalsend">최종 전송/);
-  assert.match(submit, /const contentText = String\(fbCtx\.contentText \|\| ''\)\.trim\(\)/);
+  assert.match(submit, /Object\.assign\(fbCtx, feedbackStructuredFields\(fbCtx\)\)/,
+    '최종 전송 직전에도 화면과 같은 정규화를 적용해야 한다');
+  assert.match(submit, /const contentText = templateVersion === 'v1'/);
   assert.match(submit, /templateVersion: templateVersion/);
   assert.match(submit, /homeworkText: fbCtx\.homeworkText, commentText: fbCtx\.commentText/);
+  assert.match(submit, /noticeText: fbCtx\.noticeText/);
   assert.doesNotMatch(submit, /#fldContent/);
 });
 
-test('feedback v2 has 100+ formal base sentences and renders the requested fixed template', () => {
+test('feedback v2/v3 has 100+ formal base sentences and renders the requested fixed templates', () => {
   assert.ok(html.includes('placeholder="예) ___ (하)는 모습을 보였습니다"'));
   const bankStart = html.indexOf('const FB_FORMAL_OPENERS');
   const bankEnd = html.indexOf('/** 학생이 보는 교재', bankStart);
@@ -575,6 +582,39 @@ test('feedback v2 has 100+ formal base sentences and renders the requested fixed
     '- 과제 : 어휘 10개 복습\n\n' +
     '- 코멘트 : 근거를 찾아 설명했습니다.\n\n' +
     '문의 사항이 있으시면 학원으로 연락부탁드립니다. 감사합니다.');
+
+  const templateV3Start = html.indexOf('function feedbackV3Message(');
+  const templateV3FunctionEnd = html.indexOf('\n}', templateV3Start) + 2;
+  const renderTemplateV3 = Function(
+    "const studentOf = task => task.studentName; const feedbackDateLabel = () => '2026년 9월 1일';\n" +
+    html.slice(templateV3Start, templateV3FunctionEnd) + '; return feedbackV3Message;'
+  )();
+  assert.equal(renderTemplateV3({ studentName: '테스트학생' }, '2026-09-01', {
+    subjectText: '국어', contentText: '비문학 중심 내용 찾기', homeworkText: '어휘 10개 복습',
+    commentText: '근거를 찾아 설명했습니다.', noticeText: '다음 주 휴원입니다.'
+  }), '안녕하세요, WB 웩슬러브레인센터(독해력학원) 입니다.\n\n' +
+    '테스트학생 학생의 오늘 수업 피드백을 정리해 보내드립니다.\n\n' +
+    '- 일시 : 2026년 9월 1일\n\n' +
+    '- 과목 : 국어\n\n' +
+    '- 수업내용 · 진도 : 비문학 중심 내용 찾기\n\n' +
+    '- 과제 : 어휘 10개 복습\n\n' +
+    '- 코멘트 : 근거를 찾아 설명했습니다.\n\n' +
+    '- 안내사항 : 다음 주 휴원입니다.\n\n\n' +
+    '문의 사항이 있으시면 학원으로 연락부탁드립니다. 감사합니다.');
+  const versionStart = html.indexOf('function feedbackTemplateVersion(');
+  const versionEnd = html.indexOf('\n}', versionStart) + 2;
+  const normalizeStart = html.indexOf('function stripFeedbackFormatControls(');
+  const normalizeEnd = html.indexOf('function setFeedbackPolishStatus(', normalizeStart);
+  const versionApi = Function(html.slice(normalizeStart, normalizeEnd) + '\n' + html.slice(versionStart, versionEnd) +
+    '; return { choose: feedbackTemplateVersion, flat: feedbackFlatField };')();
+  const chooseVersion = versionApi.choose;
+  assert.equal(chooseVersion({ templateVersion: 'v2', noticeText: '' }), 'v2');
+  assert.equal(chooseVersion({ templateVersion: 'v2', noticeText: '안내' }), 'v3');
+  assert.equal(chooseVersion({ templateVersion: 'v3', noticeText: '   ' }), 'v2');
+  assert.equal(chooseVersion({ templateVersion: 'v3', noticeText: '\u200b\u200e\u202e\u2066\ufeff' }), 'v2',
+    '보이지 않는 zero-width·bidi 형식 문자만으로 V3가 선택되면 안 된다');
+  assert.equal(versionApi.flat('안\u202e\u200b내'), '안내', '표시 방향·zero-width 제어문자는 피드백 변수에서 제거해야 한다');
+  assert.equal(chooseVersion({ templateVersion: 'v1', noticeText: '과거 이력' }), 'v1');
   assert.match(html, /const studentKey = String\(t\.studentId \|\| studentOf\(t\) \|\| ''\)/);
   assert.match(html, /buildFormalFeedbackComment\(fbCtx \|\| \{\}, seed, studentOf\(t\), date, studentKey\)/);
   const helpers = Function("const seedPick = (rows, seed, slot) => rows[Math.abs(slot) % rows.length];\n" + bank +
@@ -680,17 +720,22 @@ test('feedback v2 has 100+ formal base sentences and renders the requested fixed
     '원문에 없는 수업 행위를 만드는 연결 문장을 무조건 삽입하면 안 된다');
 });
 
-test('feedback final v2 variable fields update context and rebuild the readonly approved-template preview', () => {
+test('feedback final v2/v3 variable fields update context and rebuild the readonly approved-template preview', () => {
   const helperStart = html.indexOf('function syncFeedbackFinalFieldFromInput(');
   assert.ok(helperStart >= 0, '최종 문구 수동 편집 동기화 함수가 필요하다');
   const helperEnd = html.indexOf('\nfunction ', helperStart + 10);
   const helper = html.slice(helperStart, helperEnd);
   assert.match(helper, /data-feedback-final-field|dataset\.feedbackFinalField/);
   assert.match(helper, /fbCtx\[(?:field|fieldName|key)\]/);
-  assert.match(helper, /feedbackV2Message\(/);
+  assert.match(helper, /feedbackStructuredMessage\(/);
+  assert.match(helper, /noticeText/);
+  assert.match(helper, /fbCtx\.templateVersion = feedbackTemplateVersion\(fbCtx\)/,
+    '안내사항 입력·삭제 즉시 V3와 V2를 자동 전환해야 한다');
   assert.match(helper, /#mText|feedbackPreview/);
   assert.match(helper, /baseCommentText/,
     '코멘트를 직접 고친 뒤 AI 다듬기를 누르면 수동 수정본을 기준으로 해야 한다');
+  assert.match(helper, /key === 'commentText'[\s\S]*feedbackCommentField\(field\.value\) : feedbackFlatField\(field\.value\)/,
+    '코멘트 문단은 보존하고 나머지 최종 변수는 서버와 같은 한 줄 형식으로 맞춰야 한다');
   assert.match(helper, /status\.dataset\.state === 'error'/);
   assert.match(helper, /발송 내용을 직접 수정했습니다/,
     '길이 오류 뒤 수업내용·과제를 고치면 이전 빨간 오류를 지워야 한다');
@@ -699,6 +744,8 @@ test('feedback final v2 variable fields update context and rebuild the readonly 
   const lengthEnd = html.indexOf('function syncFeedbackFinalFieldFromInput(', lengthStart);
   const lengthLogic = html.slice(lengthStart, lengthEnd);
   assert.match(lengthLogic, /const sendValid = hasRequiredFields[\s\S]*commentText\.length <= limit/);
+  assert.match(lengthLogic, /feedbackStructuredMessage\(t, fbCtx\.date, fbCtx\)/);
+  assert.match(lengthLogic, /안내사항.*\/300자/);
   assert.doesNotMatch(lengthLogic, /finalButton\.disabled/,
     '최종 전송 버튼은 검증 실패 중에도 눌러서 정확한 이유를 확인할 수 있어야 한다');
   assert.match(lengthLogic, /refreshFeedbackFinalSendStatus\(t, scope\)/);
@@ -714,6 +761,90 @@ test('feedback final v2 variable fields update context and rebuild the readonly 
   assert.equal(budgetApi.ready({}, 0), false, '코멘트 예산이 0이면 AI 다듬기를 활성화하면 안 된다');
   assert.equal(budgetApi.ready({}, minimumBudget - 1), false);
   assert.equal(budgetApi.ready({}, minimumBudget), true, '이름 도입문+공백+AI 본문 20자가 모두 들어갈 예산이 필요하다');
+});
+
+test('feedback v3 notice consumes the same 900-character budget used by preview and AI polish', () => {
+  const start = html.indexOf('function feedbackV2Message(');
+  const end = html.indexOf('function feedbackPolishMinimumBudget(', start);
+  const normalizeStart = html.indexOf('function stripFeedbackFormatControls(');
+  const normalizeEnd = html.indexOf('function setFeedbackPolishStatus(', normalizeStart);
+  const api = Function('studentOf', 'feedbackDateLabel', html.slice(normalizeStart, normalizeEnd) + '\n' + html.slice(start, end) +
+    '; return { budget: feedbackCommentBudget, message: feedbackStructuredMessage };')(
+    task => task.studentName, () => '2026년 9월 1일'
+  );
+  const task = { studentName: '테스트학생' };
+  const common = { subjectText: '수학', contentText: '가'.repeat(250), homeworkText: '나'.repeat(200), commentText: '' };
+  const v2Budget = api.budget(task, '2026-09-01', { ...common, noticeText: '' });
+  const notice = '다음 수업 준비물을 챙겨 주세요.';
+  const v3Budget = api.budget(task, '2026-09-01', { ...common, noticeText: notice });
+  assert.equal(v2Budget - v3Budget,
+    api.message(task, '2026-09-01', { ...common, noticeText: notice }).length -
+      api.message(task, '2026-09-01', { ...common, noticeText: '' }).length,
+    '안내사항과 V3 고정문구가 늘린 글자 수만큼 AI 코멘트 예산도 줄어야 한다');
+  assert.match(html, /feedback-polish'[\s\S]{0,300}templateVersion: feedbackTemplateVersion\(context\), noticeText: context\.noticeText/);
+});
+
+test('feedback final editor normalizes one-line variables while preserving safe comment paragraphs', () => {
+  const normalizeStart = html.indexOf('function stripFeedbackFormatControls(');
+  const normalizeEnd = html.indexOf('function setFeedbackPolishStatus(', normalizeStart);
+  const messageStart = html.indexOf('function feedbackV2Message(');
+  const messageEnd = html.indexOf('function feedbackPolishMinimumBudget(', messageStart);
+  const api = Function('studentOf', 'feedbackDateLabel',
+    html.slice(normalizeStart, normalizeEnd) + '\n' + html.slice(messageStart, messageEnd) +
+    '; return { fields: feedbackStructuredFields, message: feedbackStructuredMessage };')(
+    task => task.studentName, () => '2026년 9월 1일'
+  );
+  const fields = api.fields({
+    subjectText: ' 수학\n심화 ',
+    contentText: '개념 확인\r\n응용\u007f 풀이',
+    homeworkText: '교재 10쪽\n교재 11쪽',
+    commentText: '첫 문단\r\n둘째\u202e 문단\n\u200b마무리',
+    noticeText: ''
+  });
+  assert.equal(fields.subjectText, '수학 심화');
+  assert.equal(fields.contentText, '개념 확인 응용 풀이');
+  assert.equal(fields.homeworkText, '교재 10쪽 교재 11쪽');
+  assert.equal(fields.commentText, '첫 문단\n둘째 문단\n마무리',
+    '코멘트는 CRLF와 보이지 않는 방향 제어문자만 정리하고 의도한 문단은 보존해야 한다');
+  const message = api.message({ studentName: '테스트학생' }, '2026-09-01', fields);
+  assert.match(message, /- 수업내용 · 진도 : 개념 확인 응용 풀이\n\n- 과제 : 교재 10쪽 교재 11쪽/);
+  assert.match(message, /- 코멘트 : 첫 문단\n둘째 문단\n마무리\n\n문의/);
+  assert.doesNotMatch(message, /[\u007f\u200b\u202e\r]/);
+});
+
+test('legacy v1 revision reopen preserves its stored body and never upgrades it to a structured template', () => {
+  const start = html.indexOf('function showFeedbackPreview(');
+  const end = html.indexOf('function todayStaffList(', start);
+  let rendered = null;
+  const api = Function(
+    'feedbackTemplateVersion', 'isStructuredFeedbackTemplate', 'feedbackFlatField', 'currentStaff', 'studentOf',
+    'parentFeedbackEnabledFor', 'feedbackStructuredMessage', 'feedbackText', 'esc', 'modal', 'updateFeedbackPreviewLength',
+    'feedbackStructuredFields', 'feedbackCommentField', 'FEEDBACK_COMMENT_MAX_CHARS',
+    'let fbCtx = null;\n' + html.slice(start, end) +
+      '\nreturn { open: showFeedbackPreview, context: () => fbCtx };'
+  )(
+    fields => fields && fields.templateVersion === 'v1' ? 'v1' : 'v2',
+    version => version === 'v2' || version === 'v3',
+    value => String(value == null ? '' : value).trim(),
+    () => ({ name: '담당' }), task => task.studentName, () => true,
+    () => { throw new Error('legacy body must not be rebuilt'); },
+    () => { throw new Error('stored legacy body must win'); },
+    value => String(value == null ? '' : value),
+    (title, body, footer) => { rendered = { title, body, footer }; },
+    () => {},
+    () => { throw new Error('legacy v1 must not normalize structured fields'); },
+    () => { throw new Error('legacy v1 must not normalize structured comments'); },
+    600
+  );
+  const storedBody = '과거 V1 본문\n줄바꿈도 그대로 유지';
+  api.open({ id: 'lesson-old', studentName: '과거학생' }, '2026-08-01', {
+    templateVersion: 'v1', contentText: '기존 내용', plusText: '기존 장점', minusText: '기존 보완'
+  }, storedBody);
+  assert.equal(api.context().templateVersion, 'v1');
+  assert.ok(rendered.body.includes(storedBody));
+  const previewTag = rendered.body.match(/<textarea[^>]*id="mText"[^>]*>/)[0];
+  assert.doesNotMatch(previewTag, /readonly/);
+  assert.match(rendered.footer, /최종 전송/);
 });
 
 test('feedback AI polish updates only the send comment and exact fixed-template preview before a separate final send', () => {
@@ -749,7 +880,7 @@ test('feedback AI polish updates only the send comment and exact fixed-template 
     'AI 실패 사유는 사라지는 토스트만 쓰지 않고 지속 상태에 안전하게 표시해야 한다');
   assert.match(polish, /feedbackPolishHasArtifacts\(/,
     'AI 결과를 평탄화하거나 화면에 넣기 전에 코드 흔적을 클라이언트에서도 차단해야 한다');
-  assert.ok(polish.indexOf('feedbackPolishHasArtifacts') < polish.indexOf('feedbackFlatField(rawCommentText)'),
+  assert.ok(polish.indexOf('feedbackPolishHasArtifacts') < polish.indexOf('feedbackCommentField(rawCommentText)'),
     '코드 흔적 검사는 줄바꿈·기호를 지우기 전에 실행해야 한다');
   assert.match(polish, /data-feedback-final-field="commentText"|querySelector\('\[data-feedback-final-field="commentText"\]'\)/,
     'AI 성공 결과는 수동 코멘트 입력칸에도 반영해야 한다');
@@ -762,7 +893,8 @@ test('feedback AI polish updates only the send comment and exact fixed-template 
   assert.match(polish, /modalBox\.querySelector\('#mText'\)/,
     'AI 결과가 다른 팝업의 공용 텍스트 상자를 덮어쓰면 안 된다');
   assert.match(polish, /preview\.value = nextMessage/);
-  assert.match(polish, /feedbackV2Message\(task, context\.date/);
+  assert.match(polish, /feedbackStructuredMessage\(task, context\.date/);
+  assert.match(polish, /templateVersion: feedbackTemplateVersion\(context\), noticeText: context\.noticeText/);
   assert.match(polish, /FEEDBACK_ALIMTALK_MAX_CHARS/);
   assert.match(submit, /feedbackFinalSendBlockReason\(task, templateVersion, message\)/);
   assert.match(html, /if \(fbCtx\.polishPending\) return 'AI 다듬기가 아직 진행 중입니다\.'/);
@@ -882,6 +1014,7 @@ test('teacher-only other notes never enter parent feedback text or send fields',
   assert.match(feedback, /memo\.contentProgress\.trim\(\)/);
   assert.match(feedback, /memo\.homework\.trim\(\)/);
   assert.match(feedback, /memo\.comment\.trim\(\)/);
+  assert.match(feedback, /memo\.guardianNotice \|\| ''/);
   assert.doesNotMatch(feedback, /memo\.otherNotes|otherNotes\.trim/);
   assert.match(html, /선생님 내부 공유 · 학부모 미발송/);
 });
@@ -900,7 +1033,8 @@ test('feedback interview owns the direct comment as question one and preserves i
   const actionsStart = html.indexOf("case 'fbtext':");
   const actionsEnd = html.indexOf("case 'feedbacksubmit':", actionsStart);
   const actions = html.slice(actionsStart, actionsEnd);
-  assert.match(actions, /comment: lessonMemoValues\(getCheck\(id, date\)\)\.comment/);
+  assert.match(actions, /const savedLessonMemo = lessonMemoValues\(getCheck\(id, date\)\)/);
+  assert.match(actions, /comment: savedLessonMemo\.comment, noticeText: savedLessonMemo\.guardianNotice/);
   assert.match(actions, /case 'fbq':[\s\S]*captureFeedbackComment\(\)/);
   assert.match(actions, /case 'fbmake':[\s\S]*lessonMemo\.comment = String\(fbCtx\.comment \|\| ''\)/);
   assert.match(actions, /setCheck\(fbCtx\.id, fbCtx\.date, \{ lessonMemo: lessonMemo, note: lessonMemoText\(lessonMemo\) \}\)/);

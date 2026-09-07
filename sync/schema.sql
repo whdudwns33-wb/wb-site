@@ -96,8 +96,9 @@ INSERT OR IGNORE INTO app_data_generations(app, generation, updated_at) VALUES
 -- 원장 지시(2026-08)로 별도 승인 클릭 없이 제출 즉시 카카오 알림톡 실발송을 시도한다.
 -- status는 그 시도 결과다 — 'sent'는 성공, 'content_approved_send_blocked'는 "아직 안 나감"
 -- (보호자 연락처·동의 미등록, 발송 스위치 꺼짐, 카카오 반려 등 — 사유는 review_note에 남는다).
--- v1의 teacher_name/content_text/plus_text/minus_text와 v2의 subject_text/homework_text/
--- comment_text는 알림톡 템플릿 변수에 그대로 들어가는 항목별 값이다(parent-feedback-send.js).
+-- v1의 teacher_name/content_text/plus_text/minus_text, v2의 subject_text/homework_text/
+-- comment_text, v3의 notice_text는 알림톡 템플릿 변수에 그대로 들어가는
+-- 항목별 값이다(parent-feedback-send.js).
 -- body/body_hash는 화면 미리보기와 실제 변수 렌더링이 일치하는지 검증하고 이력을 보존한다.
 CREATE TABLE IF NOT EXISTS feedback_requests (
   app              TEXT    NOT NULL,
@@ -116,6 +117,7 @@ CREATE TABLE IF NOT EXISTS feedback_requests (
   subject_text     TEXT,
   homework_text    TEXT,
   comment_text     TEXT,
+  notice_text      TEXT,
   plus_text        TEXT,
   minus_text       TEXT,
   revision         INTEGER NOT NULL DEFAULT 1,
