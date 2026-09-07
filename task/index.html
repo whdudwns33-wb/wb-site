@@ -1128,12 +1128,12 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-09-07.1"></script>
-<script src="./schedule-board-core.js?v=2026-09-07.1"></script>
-<script src="./asset-core.js?v=2026-09-07.1"></script>
-<script src="./qr-core.js?v=2026-09-07.1"></script>
-<script src="./acaflow-import-core.js?v=2026-09-07.1"></script>
-<script src="./feedback-subject-catalog.js?v=2026-09-07.1"></script>
+<script src="./lesson-form-core.js?v=2026-09-07.2"></script>
+<script src="./schedule-board-core.js?v=2026-09-07.2"></script>
+<script src="./asset-core.js?v=2026-09-07.2"></script>
+<script src="./qr-core.js?v=2026-09-07.2"></script>
+<script src="./acaflow-import-core.js?v=2026-09-07.2"></script>
+<script src="./feedback-subject-catalog.js?v=2026-09-07.2"></script>
 <script>
 "use strict";
 
@@ -1506,6 +1506,9 @@ function anyGuardianContactEnabled() {
 }
 const CONTACT_CHECK_PREFIX = '__contact__';
 const isContactCheckKey = key => String(key || '').split('|')[0].startsWith(CONTACT_CHECK_PREFIX);
+/* 요일 분리 담당 변경 중 서버에서 이동된 과거 check의 옛 키는 다시 올리지 않는다.
+ * 새 키 정본을 받기 전이거나 로컬이 더 최신이면 원본을 보존한 채 전송만 보류한다. */
+const studentChangeMovedCheckKeys = new Set();
 
 /** 이 체크가 누구 것인지 — 서버가 학생별로 나눠 담는 기준이 된다.
  *  '__st__S1|2026-08-02' → S1,  '<taskId>|날짜' → 그 업무의 담당자 */
@@ -1565,6 +1568,7 @@ const sync = {
     Object.keys(state.checks || {}).forEach(k => {
       const c = state.checks[k];
       if (isContactCheckKey(k)) return; // 서버 검증 정본은 generic LWW로 다시 올리지 않는다.
+      if (typeof studentChangeMovedCheckKeys !== 'undefined' && studentChangeMovedCheckKeys.has(k)) return; // 담당 분리 전 옛 키는 서버 정본과 충돌하지 않게 보류한다.
       if (c && (c.updatedAt || 0) > since) out.push({ table: 'checks', k: k, owner: ownerOfCheck(k), data: c, updated_at: c.updatedAt || 0 });
     });
     return out;
@@ -15917,6 +15921,7 @@ let rosterDb = null, rosterErr = '', rosterLoading = false, privateBookStudents 
 let rosterLoadGeneration = 0, rosterReloadAfterCurrent = false;
 let rosterStudentSelectionScope = 'lesson_students';
 let studentChangeEvents = [], studentChangeLoaded = false, studentChangeLoading = false, studentChangeError = '';
+let studentChangeCheckMoveConflictCount = 0;
 let acaflowImportFileName = '', acaflowImportRows = [], acaflowImportPreview = null;
 let acaflowImportSelection = new Set(), acaflowImportError = '', acaflowImportBusy = false;
 let acaflowStudentLinks = new Map();
@@ -15947,6 +15952,51 @@ function studentChangedFieldSet(studentId, taskId) {
   pendingStudentChanges(studentId, taskId).forEach(event => (event.changedFields || []).forEach(field => fields.add(String(field))));
   return fields;
 }
+function studentChangeEffectiveDaysText(value) {
+  const labels = ['일', '월', '화', '수', '목', '금', '토'];
+  const rank = { 1: 0, 2: 1, 3: 2, 4: 3, 5: 4, 6: 5, 0: 6 };
+  const days = [...new Set((Array.isArray(value) ? value : []).map(Number)
+    .filter(day => Number.isInteger(day) && day >= 0 && day <= 6))]
+    .sort((left, right) => rank[left] - rank[right]);
+  return days.length ? ' · 적용 요일 ' + days.map(day => labels[day]).join('·') : '';
+}
+function reconcileStudentChangeCheckKeyMoves(events) {
+  const blocked = new Set();
+  let removed = 0, conflicts = 0, waiting = 0;
+  (Array.isArray(events) ? events : []).forEach(event => {
+    const moves = event && event.details && Array.isArray(event.details.checkKeyMoves)
+      ? event.details.checkKeyMoves : [];
+    moves.forEach(move => {
+      const oldKey = String(move && move.oldKey || '');
+      const newKey = String(move && move.newKey || '');
+      if (!/^[A-Za-z0-9_-]{1,160}\|\d{4}-\d{2}-\d{2}$/.test(oldKey) ||
+          !/^[A-Za-z0-9_-]{1,160}\|\d{4}-\d{2}-\d{2}$/.test(newKey) || oldKey === newKey) return;
+      const current = (state.checks || {})[oldKey];
+      if (!current) return;
+      blocked.add(oldKey);
+      const snapshotAt = Number(move && move.oldUpdatedAt);
+      const canonical = (state.checks || {})[newKey];
+      const expectedTaskId = newKey.slice(0, newKey.indexOf('|'));
+      const expectedDate = newKey.slice(newKey.indexOf('|') + 1);
+      const canonicalReady = !!(canonical && String(canonical.taskId || '') === expectedTaskId &&
+        String(canonical.date || '') === expectedDate);
+      if (!Number.isSafeInteger(snapshotAt) || snapshotAt < 0 || Number(current.updatedAt || 0) > snapshotAt) {
+        conflicts += 1;
+        return;
+      }
+      if (!canonicalReady) {
+        waiting += 1;
+        return;
+      }
+      delete state.checks[oldKey];
+      blocked.delete(oldKey);
+      removed += 1;
+    });
+  });
+  studentChangeMovedCheckKeys.clear();
+  blocked.forEach(key => studentChangeMovedCheckKeys.add(key));
+  return { removed, conflicts, waiting };
+}
 function studentChangeHistoryHtml(studentId) {
   const historyLabel = event => event && event.eventType === 'student_information' && event.details && event.details.operation === 'return'
     ? '복귀' : ({ teacher_assignment: '담당 선생님 변경', withdrawal: '퇴원', leave: '휴원' }[event && event.eventType] || '');
@@ -15958,7 +16008,8 @@ function studentChangeHistoryHtml(studentId) {
       const eventLabel = historyLabel(event);
       const text = event.eventType === 'teacher_assignment'
         ? esc((event.effectiveDate ? event.effectiveDate + '부터 · ' : '') +
-          (detail.beforeStaffName || '이전 담당') + ' → ' + (detail.afterStaffName || '변경 담당'))
+          (detail.beforeStaffName || '이전 담당') + ' → ' + (detail.afterStaffName || '변경 담당') +
+          studentChangeEffectiveDaysText(detail.effectiveDays))
         : eventLabel === '복귀'
           ? esc((event.effectiveDate || detail.effectiveDate || '') + ' · 복귀 · ' +
             [detail.afterStaffName, (detail.subjects || []).join('·'), detail.scheduleText].filter(Boolean).join(' · '))
@@ -15981,6 +16032,17 @@ async function loadStudentChanges(force) {
     const nextEvents = Array.isArray(result.events) ? result.events : [];
     if (JSON.stringify(nextEvents) !== previousEventsSignature || previousError) shouldRender = true;
     studentChangeEvents = nextEvents;
+    if (typeof reconcileStudentChangeCheckKeyMoves === 'function') {
+      const movedChecks = reconcileStudentChangeCheckKeyMoves(studentChangeEvents);
+      if (movedChecks.removed) {
+        save();
+        shouldRender = true;
+      }
+      if (movedChecks.conflicts > studentChangeCheckMoveConflictCount) {
+        toast('담당 변경 직전 작성된 오프라인 수업 기록 ' + movedChecks.conflicts + '건을 보존했습니다. 동기화 후 관리자에게 확인해 주세요');
+      }
+      studentChangeCheckMoveConflictCount = movedChecks.conflicts;
+    }
     if (session.isStaffLink && !session.isAdmin) {
       const latestAssignments = new Map();
       studentChangeEvents.forEach(event => {
@@ -22531,7 +22593,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-09-07.1';
+const APP_VER = '2026-09-07.2';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);

@@ -85,17 +85,48 @@ function seed(db) {
 
 function seedStudentChangeEvent(db, {
   eventId, studentId = 'student-a', taskId = 'lesson-a', eventType = 'work_instruction',
-  audienceStaffIds = ['teacher-a'], changedAt = Date.now(), requiresAck = true
+  audienceStaffIds = ['teacher-a'], changedAt = Date.now(), requiresAck = true,
+  changedFields = ['guide'], details = {}
 }) {
   db.prepare(
     'INSERT INTO student_change_events ' +
     '(app,event_id,student_id,task_id,event_type,changed_fields,details,audience_staff_ids,effective_date,' +
       'requires_ack,request_key,request_revision,changed_at,changed_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
   ).bind(
-    'task', eventId, studentId, taskId, eventType, JSON.stringify(['guide']), JSON.stringify({}),
+    'task', eventId, studentId, taskId, eventType, JSON.stringify(changedFields), JSON.stringify(details),
     JSON.stringify(audienceStaffIds), null, requiresAck ? 1 : 0, null, null, changedAt, 'director'
   ).run();
 }
+
+test('요일 분리로 이동된 옛 check 키는 관리자·오프라인 재전송으로 다시 생성되지 않는다', async () => {
+  const db = new TestD1(); seed(db);
+  db.prepare("DELETE FROM checks WHERE app='task' AND k='lesson-a|2026-08-20'").run();
+  seedStudentChangeEvent(db, {
+    eventId: 'sce_weekday_split_guard_001', requiresAck: false,
+    changedFields: ['scheduleSlots'],
+    details: {
+      operation: 'weekday_schedule_split', splitFromTaskId: 'lesson-a',
+      checkKeyMoves: [{
+        oldKey: 'lesson-a|2026-08-20', newKey: 'lesson-friday|2026-08-20', oldUpdatedAt: 100
+      }]
+    }
+  });
+  db.prepare(
+    "INSERT INTO lesson_check_key_redirects(app,old_key,new_key,old_updated_at,created_at,created_by) VALUES('task',?,?,?,?,?)"
+  ).bind('lesson-a|2026-08-20', 'lesson-friday|2026-08-20', 100, Date.now(), 'director').run();
+  const result = await call(db, '/sync', {
+    auth: admin, since: Date.now(), changes: [
+      { table: 'checks', k: 'lesson-a|2026-08-20', owner: 'teacher-a',
+        data: { taskId: 'lesson-a', date: '2026-08-20', note: '오프라인 재전송', updatedAt: 9999 }, updated_at: 9999 },
+      { table: 'checks', k: 'lesson-b|2026-08-21', owner: 'teacher-a',
+        data: { taskId: 'lesson-b', date: '2026-08-21', note: '정상 기록', updatedAt: 10000 }, updated_at: 10000 }
+    ]
+  });
+  assert.equal(result.status, 200);
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM checks WHERE app='task' AND k='lesson-a|2026-08-20'").first().count, 0);
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM checks WHERE app='task' AND k='lesson-b|2026-08-21'").first().count, 1,
+    '같은 묶음의 정상 check는 함께 저장한다');
+});
 
 function seedStudentChangeAcknowledgement(db, { acknowledgementId, eventId, actorKey, acknowledgedAt }) {
   db.prepare(
