@@ -1,5 +1,5 @@
 {
-  "version": "2026-09-07.1",
+  "version": "2026-09-07.2",
   "articles": [
     {
       "id": "nuri-space",
@@ -35518,7 +35518,7 @@
         "edu"
       ],
       "publishedAt": "2026-09-07",
-      "status": "draft",
+      "status": "published",
       "sources": [
         {
           "title": "기후에너지환경부 국립생물자원관 보도자료 — 수달의 귀환, 한강에 수달 27마리가 산다 (2026.9.3)",
@@ -36449,7 +36449,7 @@
         "edu"
       ],
       "publishedAt": "2026-09-07",
-      "status": "draft",
+      "status": "published",
       "sources": [
         {
           "title": "국가유산청 보도자료 — (국영문 동시배포) 이집트 최초, 라메세움 신전 탑문 복원을 위한 가설덧집 준공 (2026.9.4, 준공식 9.3)",
@@ -37393,7 +37393,7 @@
         "it"
       ],
       "publishedAt": "2026-09-07",
-      "status": "draft",
+      "status": "published",
       "sources": [
         {
           "title": "질병관리청 보도참고자료 — 보이지 않던 결핵 감염고리까지 찾아냅니다 (2026.9.4, 세균분석과)",
@@ -37812,11 +37812,9 @@
               "어디에서 어떻게 옮았는지까지 말해 주지는 않는다. ",
               "질병관리청도 분석 결과를 ",
               "역학조사와 연계해 쓰겠다고 밝혔다. ",
-              "지난해 새로 발생한 결핵 환자는 ",
-              "약 1만 7천 명이고 ",
-              "정부는 2027년까지 발생률을 ",
-              "인구 10만 명당 20명 아래로 ",
-              "낮추려 한다."
+              "접촉자에게서 잠복결핵감염을 찾아 ",
+              "치료하면 발병을 ",
+              "90퍼센트까지 막을 수 있다."
             ]
           ],
           "vocab": [
@@ -37933,7 +37931,7 @@
             "Contact is in fact a powerful clue. In 2025 the Korea Disease Control and Prevention Agency traced 100,124 contacts of TB patients and found 233 additional patients early. Among contacts the TB rate was 232.7 per 100,000, about seven times the 33.5 per 100,000 seen in the general population. Simply having lived close to a patient brings that many cases to light. The trouble comes when no such contact is on record.",
             "So in September 2026 the agency announced that it would rebuild its TB genotyping system around whole genome sequencing. Until now only part of the germ's genetic information was compared. Whole genome sequencing reads all of the roughly 4.4 million base pairs in the tuberculosis bacterium and measures how similar the germs from two patients are.",
             "This is where the nature of the evidence changes. Instead of memories and movements, investigators read the record the germ carried in the body. Tiny differences that older methods could not tell apart now show up. Links can be traced even between patients whose contact was never recorded. The agency plans to apply the method to drug-resistant TB cases of unknown origin.",
-            "Genomes do not replace field investigation, however. That two germs resemble each other says they are related; it does not say where or how. The agency itself said the results would be used together with epidemiological investigation. About 17,000 people newly developed TB in Korea last year, and the government aims to cut the rate below 20 per 100,000 by 2027."
+            "Genomes do not replace field investigation, however. That two germs resemble each other says they are related; it does not say where or how. The agency itself said the results would be used together with epidemiological investigation. When latent infection is found in a contact and treated, up to 90 percent of cases can be prevented."
           ],
           "envocab": [
             {
@@ -38019,10 +38017,8 @@
               "That two germs resemble each other says they are related; ",
               "it does not say where or how. ",
               "The agency itself said the results would be used together with epidemiological investigation. ",
-              "About 17,000 people newly developed TB",
-              " in Korea last year, ",
-              "and the government aims",
-              " to cut the rate below 20 per 100,000 by 2027."
+              "When latent infection is found in a contact and treated, ",
+              "up to 90 percent of cases can be prevented."
             ]
           ]
         },
@@ -38090,11 +38086,10 @@
               "여기에 있다. ",
               "유전체는 조사를 대신하는 것이 아니라 ",
               "어디를 더 살펴야 하는지 좁혀 준다. ",
-              "지난해 새로 발생한 결핵 환자는 ",
-              "약 1만 7천 명이었고 ",
-              "정부는 2027년까지 발생률을 ",
-              "인구 10만 명당 20명 아래로 ",
-              "낮추는 것을 목표로 삼고 있다."
+              "접촉자에게서 잠복결핵감염을 찾아내 ",
+              "치료하면 발병을 90퍼센트까지 ",
+              "막을 수 있으니, ",
+              "좁히는 일이 곧 막는 일이다."
             ]
           ],
           "vocab": [
@@ -38224,7 +38219,7 @@
             "This does not make circumstance weak evidence. In 2025 the Korea Disease Control and Prevention Agency traced 100,124 household and congregate-setting contacts of TB patients, and 233 additional patients were found early. The TB rate among contacts was 232.7 per 100,000, roughly seven times the 33.5 per 100,000 in the general population. The single fact of having shared a space brings that many cases forward. But for a patient whose contacts were never recorded, the clue cannot be offered at all.",
             "On 4 September 2026 the agency announced that it would rebuild its TB genotyping system on whole genome sequencing. The method used until now compared part of the bacterium's genetic information to check whether infections in two patients were related. Whole genome sequencing reads all of the roughly 4.4 million base pairs and measures how similar two patients' bacteria are. Small genetic differences that the older analysis could not separate become visible.",
             "What changes is not only the technique but where the evidence sits. Investigators now read the record the bacterium carried, rather than a person's memory and movements. Links between patients that epidemiology alone could not join, because no contact was on record, surface here. The agency will apply the method to drug-resistant TB of unclear origin, and use the accumulating genomic data to follow how the bacterium spreads and how resistant strains trend.",
-            "New evidence still needs reading, though. That two bacteria resemble each other says they are related; it does not say who came first, or where the two met. That is why the agency said the results would be linked to epidemiological investigation. A genome does not replace the fieldwork; it narrows down where to look next. About 17,000 people newly developed TB in Korea last year, and the government aims to bring the rate below 20 per 100,000 by 2027."
+            "New evidence still needs reading, though. That two bacteria resemble each other says they are related; it does not say who came first, or where the two met. That is why the agency said the results would be linked to epidemiological investigation. A genome does not replace the fieldwork; it narrows down where to look next. When latent infection is found in a contact and treated, up to 90 percent of cases can be prevented, so narrowing the search is itself prevention."
           ],
           "envocab": [
             {
@@ -38321,10 +38316,9 @@
               " to epidemiological investigation. ",
               "A genome does not replace the fieldwork; ",
               "it narrows down where to look next. ",
-              "About 17,000 people newly developed TB",
-              " in Korea last year, ",
-              "and the government aims",
-              " to bring the rate below 20 per 100,000 by 2027."
+              "When latent infection is found in a contact and treated, ",
+              "up to 90 percent of cases can be prevented, ",
+              "so narrowing the search is itself prevention."
             ]
           ]
         }
@@ -38340,7 +38334,7 @@
         "env"
       ],
       "publishedAt": "2026-09-07",
-      "status": "draft",
+      "status": "published",
       "sources": [
         {
           "title": "기후에너지환경부 보도자료 — 해상풍력 패러다임 바뀐다… 정부 주도 계획입지 본격시동 (제1회 해상풍력발전위원회, 2026.9.2)",
