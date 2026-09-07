@@ -8,6 +8,7 @@ import { allocateNewStudentId } from './roster.js';
 
 const schema = fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8');
 const migration = fs.readFileSync(new URL('./migrations/019_private_roster.sql', import.meta.url), 'utf8');
+const overlapMigration = fs.readFileSync(new URL('./migrations/069_student_lesson_time_overlap.sql', import.meta.url), 'utf8');
 const source = fs.readFileSync(new URL('./roster.js', import.meta.url), 'utf8');
 
 class D1Statement {
@@ -110,15 +111,37 @@ function seedAuth(db) {
   }
 }
 
+const fixtureLessonCounts = new WeakMap();
 function seedLesson(db, id, staffId, studentId, overrides = {}) {
   const now = Date.now();
+  const fixtureIndex = fixtureLessonCounts.get(db) || 0;
+  fixtureLessonCounts.set(db, fixtureIndex + 1);
+  const fixtureDay = fixtureIndex % 7;
+  const fixtureHour = 8 + Math.floor(fixtureIndex / 7);
+  const fixtureStart = String(fixtureHour).padStart(2, '0') + ':00';
+  const fixtureEnd = String(fixtureHour + 1).padStart(2, '0') + ':00';
   const task = {
     id, staffId, studentId, taskKind: 'lesson_instruction', title: '[수업] 테스트',
     lessonFormVersion: 1, intakeVersion: 1,
+    repeat: 'days', days: [fixtureDay], scheduleStatus: 'confirmed',
+    scheduleSlots: [{ days: [fixtureDay], startTime: fixtureStart, endTime: fixtureEnd }],
     start: '2026-01-01', end: '', deleted: false, ...overrides
   };
   db.prepare('INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
       .bind('task', id, overrides.owner || staffId, JSON.stringify(task), now, now).run();
+}
+
+function seedPreMigrationUnconfirmedLesson(db, id, staffId, studentId, overrides = {}) {
+  db.database.exec(
+    'DROP TRIGGER IF EXISTS trg_regular_lesson_time_insert;' +
+    'DROP TRIGGER IF EXISTS trg_regular_lesson_time_update;'
+  );
+  try {
+    seedLesson(db, id, staffId, studentId, overrides);
+  } finally {
+    // 운영 불변식 도입 전 남은 손상 row만 재현하고, 이어지는 동작은 최신 트리거로 검증한다.
+    db.database.exec(overlapMigration);
+  }
 }
 
 function seedTransitionEvent(db, eventId, studentId, eventType, effectiveDate, audienceStaffIds) {
@@ -521,7 +544,8 @@ test('direct leave only retires lessons that still reach the effective date and 
   const db = new TestD1(); seedAuth(db); await replace(db);
   seedLesson(db, 'lesson-direct-current', 'teacher-a', 'student-a', { start: '2026-08-01', end: '' });
   seedLesson(db, 'lesson-direct-ended', 'teacher-b', 'student-a', { start: '2026-01-01', end: '2026-08-19' });
-  seedLesson(db, 'lesson-direct-bad-end', 'teacher-b', 'student-a', { start: '2026-01-01', end: '종료일오류' });
+  seedPreMigrationUnconfirmedLesson(db, 'lesson-direct-bad-end', 'teacher-b', 'student-a',
+    { start: '2026-01-01', end: '종료일오류' });
   const initial = await call(db, { auth: admin, action: 'get' });
   const leave = await call(db, {
     auth: admin, action: 'student_transition', expectedUpdatedAt: initial.body.updatedAt,

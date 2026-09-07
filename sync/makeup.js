@@ -1,6 +1,7 @@
 import { validateRosterDocument } from './roster.js';
 import { verifySessionPackIdentity } from './session-pack.js';
 import { isTaskWriteCasConflict, taskWriteCasGuardStatement } from './task-write-cas.js';
+import { studentScheduleConflictPayload } from './student-schedule-conflict.js';
 
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -441,6 +442,8 @@ function mapTransitionError(error) {
   if (/MAKEUP_COMPLETE_ASSIGNEE/.test(message)) {
     problem('확정된 담당 선생님의 개인 인증으로만 보강을 완료할 수 있습니다', 403, 'MAKEUP_COMPLETE_FORBIDDEN');
   }
+  const schedulePayload = studentScheduleConflictPayload(error);
+  if (schedulePayload) problem(schedulePayload.error, 409, schedulePayload.code);
   throw error;
 }
 

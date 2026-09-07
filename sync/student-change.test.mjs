@@ -6,6 +6,7 @@ import worker from './worker-core.js';
 
 const schema = fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8');
 const migration = fs.readFileSync(new URL('./migrations/045_student_change_history.sql', import.meta.url), 'utf8');
+const overlapMigration = fs.readFileSync(new URL('./migrations/069_student_lesson_time_overlap.sql', import.meta.url), 'utf8');
 
 class Statement {
   constructor(database, sql) { this.database = database; this.sql = sql; this.args = []; }
@@ -45,6 +46,20 @@ async function call(db, path, body) {
   return { status: response.status, body: await response.json() };
 }
 
+function insertPreMigrationTask(db, task, owner, now = Date.now()) {
+  db.database.exec(
+    'DROP TRIGGER IF EXISTS trg_regular_lesson_time_insert;' +
+    'DROP TRIGGER IF EXISTS trg_regular_lesson_time_update;'
+  );
+  try {
+    db.prepare('INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
+      .bind('task', task.id, owner, JSON.stringify(task), now, now).run();
+  } finally {
+    // 마이그레이션 이전의 손상·중복 row만 재현하며, API 동작은 최신 불변식으로 검증한다.
+    db.database.exec(overlapMigration);
+  }
+}
+
 function seed(db) {
   const now = Date.now();
   for (const [id, name] of [['teacher-a', '가선생'], ['teacher-b', '나선생'], ['teacher-c', '옛선생']]) {
@@ -66,6 +81,8 @@ function seed(db) {
     taskKind: 'lesson_instruction', lessonFormVersion: 1,
     title: '[수업] 학생A (중1) — 영어', detail: '교재', guide: '업무지시', steps: [], target: 0,
     unit: '회', time: '18:00', repeat: 'days', days: [1, 3], start: '2026-08-01', end: '',
+    scheduleStatus: 'confirmed',
+    scheduleSlots: [{ days: [1, 3], startTime: '18:00', endTime: '19:00' }],
     createdAt: now, updatedAt: now, deleted: false, origin: 'admin'
   };
   db.prepare("INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES('task','lesson-a','teacher-a',?,?,?)")
@@ -73,14 +90,14 @@ function seed(db) {
   const history = { taskId: 'lesson-a', date: '2026-08-20', att: 'L', note: '담당 변경 전 메모', updatedAt: now - 1000 };
   db.prepare("INSERT INTO checks(app,k,owner,data,updated_at,srv_at) VALUES('task','lesson-a|2026-08-20','teacher-a',?,?,?)")
     .bind(JSON.stringify(history), history.updatedAt, history.updatedAt).run();
-  const second = { ...task, id: 'lesson-b', title: '[수업] 학생A (중1) — 수학', subject: '수학', days: [2, 4] };
+  const second = { ...task, id: 'lesson-b', title: '[수업] 학생A (중1) — 수학', subject: '수학', days: [2, 4],
+    scheduleSlots: [{ days: [2, 4], startTime: '18:00', endTime: '19:00' }] };
   db.prepare("INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES('task','lesson-b','teacher-a',?,?,?)")
     .bind(JSON.stringify(second), now, now).run();
-  for (const [id, end] of [['lesson-ended-c', '2026-08-01'], ['lesson-malformed-c', '종료일오류']]) {
-    const oldLesson = { ...task, id, staffId: 'teacher-c', end };
-    db.prepare("INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES('task',?,'teacher-c',?,?,?)")
-      .bind(id, JSON.stringify(oldLesson), now, now).run();
-  }
+  const endedLesson = { ...task, id: 'lesson-ended-c', staffId: 'teacher-c', end: '2026-08-01' };
+  db.prepare("INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES('task',?,'teacher-c',?,?,?)")
+    .bind(endedLesson.id, JSON.stringify(endedLesson), now, now).run();
+
 }
 
 function seedStudentChangeEvent(db, {
@@ -254,7 +271,7 @@ test('teacher change is admin-selected, recorded by stable student id, and ackno
   const eventRow = db.prepare("SELECT changed_fields,audience_staff_ids FROM student_change_events WHERE app='task' AND student_id='student-a'").first();
   assert.deepEqual(JSON.parse(eventRow.changed_fields), ['staffId']);
   assert.deepEqual(JSON.parse(eventRow.audience_staff_ids).sort(), ['teacher-a', 'teacher-b'],
-    '종료됐거나 종료일이 잘못된 옛 수업 담당자는 변경 알림 대상이 아니다');
+    '이미 종료된 옛 수업 담당자는 변경 알림 대상이 아니다');
   const newTeacherSync = await call(db, '/sync', { auth: person('teacher-b'), since: 0, changes: [] });
   assert.equal(newTeacherSync.status, 200);
   assert.ok(newTeacherSync.body.changes.some(change => change.table === 'tasks' && change.key === 'lesson-a'));
@@ -290,8 +307,7 @@ test('teacher change refuses an exact target assignment even when its stored ass
     ...source, id: 'lesson-target-duplicate', staffId: 'teacher-b'
   };
   const now = Date.now();
-  db.prepare("INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES('task',?,'teacher-b',?,?,?)")
-    .bind(duplicate.id, JSON.stringify(duplicate), now, now).run();
+  insertPreMigrationTask(db, duplicate, 'teacher-b', now);
   const submit = await call(db, '/lesson-change-request', {
     auth: person('teacher-a'), action: 'submit', taskId: 'lesson-a',
     changes: { operation: 'teacher_assignment', effectiveDate: '2026-08-24' }
@@ -331,12 +347,13 @@ test('teacher change ignores a target teacher makeup instance of the same regula
   assert.equal(db.prepare("SELECT owner FROM tasks WHERE app='task' AND id=?").bind(makeup.id).first().owner, 'teacher-b');
 });
 
-test('teacher change still allows the target teacher to keep another subject for the same student', async () => {
+test('teacher change still allows the target teacher to keep another subject at a nonoverlapping time', async () => {
   const db = new TestD1(); seed(db);
   const source = JSON.parse(db.prepare("SELECT data FROM tasks WHERE app='task' AND id='lesson-a'").first().data);
   const otherSubject = {
     ...source, id: 'lesson-target-other-subject', staffId: 'teacher-b',
-    subject: '수학', className: '', lessonRole: '수학'
+    subject: '수학', className: '', lessonRole: '수학', days: [5],
+    scheduleSlots: [{ days: [5], startTime: '20:00', endTime: '21:00' }]
   };
   const now = Date.now();
   db.prepare("INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES('task',?,'teacher-b',?,?,?)")
@@ -359,8 +376,7 @@ test('teacher change fails closed when a target teacher lesson row has a forged 
   const source = JSON.parse(db.prepare("SELECT data FROM tasks WHERE app='task' AND id='lesson-a'").first().data);
   const corrupt = { ...source, id: 'lesson-target-corrupt', staffId: 'teacher-a' };
   const now = Date.now();
-  db.prepare("INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES('task',?,'teacher-b',?,?,?)")
-    .bind(corrupt.id, JSON.stringify(corrupt), now, now).run();
+  insertPreMigrationTask(db, corrupt, 'teacher-b', now);
   const submit = await call(db, '/lesson-change-request', {
     auth: person('teacher-a'), action: 'submit', taskId: 'lesson-a',
     changes: { operation: 'teacher_assignment', effectiveDate: '2026-08-24' }
@@ -377,6 +393,10 @@ test('teacher change fails closed when a target teacher lesson row has a forged 
 test('withdrawal moves the student to roster history and hides every linked lesson while keeping rows', async () => {
   const db = new TestD1(); seed(db);
   const now = Date.now();
+  const sourceTask = JSON.parse(db.prepare("SELECT data FROM tasks WHERE app='task' AND id='lesson-a'").first().data);
+  insertPreMigrationTask(db, {
+    ...sourceTask, id: 'lesson-malformed-c', staffId: 'teacher-c', end: '종료일오류'
+  }, 'teacher-c', now);
   db.prepare(
     'INSERT INTO makeup_cases(app,case_id,student_id,source_task_id,source_date,source_teacher_id,' +
     'consumption_group_id,status,revision,history,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)'
@@ -402,7 +422,7 @@ test('withdrawal moves the student to roster history and hides every linked less
   }
   for (const id of ['lesson-ended-c', 'lesson-malformed-c']) {
     const task = JSON.parse(db.prepare('SELECT data FROM tasks WHERE id=?').bind(id).first().data);
-    assert.equal(task.deleted, false, '적용일 전에 이미 끝났거나 종료일이 잘못된 수업은 다시 전환하지 않는다');
+    assert.equal(task.deleted, false, '적용일 전에 이미 끝났거나 종료일이 손상된 수업은 다시 전환하지 않는다');
   }
   const withdrawalEvent = db.prepare(
     "SELECT audience_staff_ids FROM student_change_events WHERE event_type='withdrawal'"

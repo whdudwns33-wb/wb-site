@@ -1,6 +1,10 @@
 import { buildLessonTask } from './lesson-create.js';
 import { lessonStudentIdsForStaff } from './book-order-student-scope.js';
 import { isTaskWriteCasConflict, taskWriteCasGuardStatement } from './task-write-cas.js';
+import {
+  assertStudentLessonScheduleAvailable,
+  studentScheduleConflictPayload
+} from './student-schedule-conflict.js';
 
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const MAX_NAME = 40;
@@ -362,6 +366,12 @@ export async function handleLessonAssignmentReview(env, app, body, origin, auth,
       [requestKey, revision, studentId, roster.updatedAt, now].join('\n'), now));
   }
   if (taskStatement) {
+    try { await assertStudentLessonScheduleAvailable(env, app, task); }
+    catch (error) {
+      const payload = studentScheduleConflictPayload(error);
+      if (payload) return json(payload, 409, origin);
+      throw error;
+    }
     statements.push(taskStatement);
     if (taskStatementNeedsGuard) {
       statements.push(await taskWriteCasGuardStatement(env, app, 'lesson_assignment_task',
@@ -378,6 +388,8 @@ export async function handleLessonAssignmentReview(env, app, body, origin, auth,
     if (isTaskWriteCasConflict(error)) {
       return json({ ok: false, error: '명단·수업 또는 요청 상태가 바뀌었습니다. 새로고침 후 다시 승인해 주세요' }, 409, origin);
     }
+    const payload = studentScheduleConflictPayload(error);
+    if (payload) return json(payload, 409, origin);
     throw error;
   }
   if (applied.some(result => Number(result.meta && result.meta.changes || 0) !== 1)) {

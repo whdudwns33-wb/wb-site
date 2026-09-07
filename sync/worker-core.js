@@ -98,6 +98,7 @@ import { handleContactLog } from './contact-log.js';
 import { handleStaffAttendance, inspectOwnStaffAttendanceChanges } from './staff-attendance.js';
 import { handleWeekendVisit } from './weekend-visit.js';
 import { handleLessonHandoff } from './lesson-handoff.js';
+import { studentScheduleConflictPayload } from './student-schedule-conflict.js';
 import { handleConsultSubmission, handleConsultSubmissionUpload } from './consult-submission.js';
 import { handleConsultGuardian } from './consult-guardian.js';
 import { handleConsultResults, handleConsultResultUpload } from './consult-results.js';
@@ -1613,6 +1614,8 @@ async function handleSync(env, app, body, origin) {
         return json({ ok: false, code: 'MAKEUP_COMPLETED_ATTENDANCE_LOCKED',
           error: '완료된 보강의 출결·업무·날짜 식별자는 변경할 수 없습니다. 메모는 출결 상태를 유지한 채 저장해 주세요' }, 409, origin);
       }
+      const schedulePayload = studentScheduleConflictPayload(error);
+      if (schedulePayload) return json(schedulePayload, 409, origin);
       throw error;
     }
   }
@@ -2986,6 +2989,8 @@ export default {
       return json({ ok: false, error: '없는 경로' }, 404, okOrigin);
     } catch (e) {
       if (isRewardProcessingLockError(e)) return rewardProcessingLockResponse(okOrigin);
+      const schedulePayload = studentScheduleConflictPayload(e);
+      if (schedulePayload) return json(schedulePayload, 409, okOrigin);
       if (url.pathname === '/feedback-polish') {
         return json({ ok: false, code: 'FEEDBACK_STORAGE_BUSY',
           error: '피드백 저장소를 확인하지 못했습니다. 잠시 뒤 다시 시도해 주세요. 기존 문구는 그대로 유지됩니다' },

@@ -49,11 +49,14 @@ class FakeDB {
     this.scopeTasks = [
       { id: 'scope-lesson-a', owner: 'teacher-1', data: JSON.stringify({ id: 'scope-lesson-a',
         staffId: 'teacher-1', studentId: 'student-a', taskKind: 'lesson_instruction', start: '2020-01-01',
-        end: '', deleted: false }) },
+        end: '', deleted: false, repeat: 'days', days: [2], scheduleStatus: 'confirmed',
+        scheduleSlots: [{ days: [2], startTime: '08:00', endTime: '09:00', validFrom: '2020-01-01' }] }) },
       { id: 'scope-lesson-b', owner: 'teacher-2', data: JSON.stringify({ id: 'scope-lesson-b',
         staffId: 'teacher-2', studentId: 'student-b', taskKind: 'lesson_instruction', start: '2020-01-01',
-        end: '', deleted: false }) }
+        end: '', deleted: false, repeat: 'days', days: [2], scheduleStatus: 'confirmed',
+        scheduleSlots: [{ days: [2], startTime: '08:00', endTime: '09:00', validFrom: '2020-01-01' }] }) }
     ];
+    this.makeups = [];
     this.checks = new Map();
     this.failBatchAt = -1;
     this.beforeBatch = null;
@@ -99,6 +102,13 @@ class FakeDB {
         throw new Error('unexpected first SQL: ' + sql);
       },
       async all() {
+        if (sql === 'SELECT id,owner,data FROM tasks WHERE app=?') {
+          const stored = [...db.tasks.entries()].map(([id, row]) => ({ id, owner: row.owner, data: row.data }));
+          return { results: db.scopeTasks.concat(stored) };
+        }
+        if (sql.startsWith('SELECT case_id,student_id,status,confirmed_start_at,confirmed_end_at FROM makeup_cases')) {
+          return { results: db.makeups.slice() };
+        }
         if (sql.startsWith('SELECT id,owner,data FROM tasks')) {
           const owner = String(this.args[1]);
           const stored = [...db.tasks.entries()].map(([id, row]) => ({ id, owner: row.owner, data: row.data }));
@@ -589,7 +599,9 @@ test('admin lesson correction notifies only the exact lesson owner for a multi-s
     id: 'scope-student-a-other-subject', owner: 'teacher-2',
     data: JSON.stringify({
       id: 'scope-student-a-other-subject', staffId: 'teacher-2', studentId: 'student-a',
-      subject: '수학', taskKind: 'lesson_instruction', start: '2020-01-01', end: '', deleted: false
+      subject: '수학', taskKind: 'lesson_instruction', start: '2020-01-01', end: '', deleted: false,
+      repeat: 'days', days: [2], scheduleStatus: 'confirmed',
+      scheduleSlots: [{ days: [2], startTime: '10:00', endTime: '11:00', validFrom: '2020-01-01' }]
     })
   });
   const corrected = await call(db, {
@@ -743,7 +755,8 @@ test('teacher transfer ignores a stale deterministic target id occupied by a dif
 
   const targetCandidate = await buildLessonTask(assignedLesson(), 'teacher-2', 'manager', 101);
   const staleOccupant = await buildLessonTask(assignedLesson({
-    subject: '클리닉', className: '', lessonRole: '클리닉'
+    subject: '클리닉', className: '', lessonRole: '클리닉',
+    scheduleSlots: [{ days: [2], startTime: '10:00', endTime: '11:00', lessonHours: '1T' }]
   }), 'teacher-2', 'manager', 102);
   staleOccupant.id = targetCandidate.id;
   staleOccupant.groupId = 'stale-target-assignment';
@@ -799,7 +812,8 @@ test('teacher transfer never rewrites legacy aggregate roster assignment', async
     staffId: 'teacher-1', lesson: assignedLesson()
   }, { scope: 'all', role: 'admin' });
   const second = await call(db, {
-    staffId: 'teacher-1', lesson: assignedLesson({ subject: '영어', lessonRole: '영어' })
+    staffId: 'teacher-1', lesson: assignedLesson({ subject: '영어', lessonRole: '영어',
+      scheduleSlots: [{ days: [2], startTime: '10:00', endTime: '11:00', lessonHours: '1T' }] })
   }, { scope: 'all', role: 'admin' });
   assert.equal(second.response.status, 200);
 
@@ -1171,10 +1185,67 @@ test('batch validation failure creates no lesson and rejects mixed students or d
   assert.equal(db.tasks.size, 0);
 });
 
+test('server rejects a same-student regular overlap across different teachers and subjects', async () => {
+  const db = new FakeDB();
+  const current = await buildLessonTask(assignedLesson({ subject: '수학', className: '', lessonRole: '수학' }),
+    'teacher-1', 'manager', 100);
+  seed(db, current);
+  const response = await call(db, {
+    staffId: 'teacher-2',
+    lesson: assignedLesson({ subject: '영어', className: '', lessonRole: '영어' })
+  }, { scope: 'all', role: 'manager' });
+  assert.equal(response.response.status, 409);
+  assert.equal(response.data.code, 'STUDENT_SCHEDULE_CONFLICT');
+  assert.equal(db.tasks.size, 1);
+});
+
+test('server rejects a regular lesson that overlaps a confirmed makeup for the same student', async () => {
+  const db = new FakeDB();
+  db.makeups.push({
+    case_id: 'mu-1', student_id: 'student-a', status: 'confirmed',
+    confirmed_start_at: '2026-08-09T12:30:00+09:00',
+    confirmed_end_at: '2026-08-09T13:30:00+09:00'
+  });
+  const response = await call(db, {
+    staffId: 'teacher-2', lesson: assignedLesson({ subject: '영어', className: '', lessonRole: '영어' })
+  }, { scope: 'all', role: 'manager' });
+  assert.equal(response.response.status, 409);
+  assert.equal(response.data.code, 'STUDENT_MAKEUP_CONFLICT');
+  assert.equal(db.tasks.size, 0);
+});
+
+test('multi-lesson batch rejects two overlapping lessons for the same student before any write', async () => {
+  const db = new FakeDB();
+  const response = await callBatch(db, [
+    { staffId: 'teacher-1', lesson: assignedLesson({ subject: '수학', className: '', lessonRole: '수학' }) },
+    { staffId: 'teacher-2', lesson: assignedLesson({ subject: '영어', className: '', lessonRole: '영어' }) }
+  ]);
+  assert.equal(response.response.status, 409);
+  assert.equal(response.data.code, 'STUDENT_SCHEDULE_CONFLICT');
+  assert.equal(db.tasks.size, 0);
+  assert.equal(db.privateRoster.roster.students[0].subjects, undefined);
+});
+
+test('overlapping candidate fails closed while the existing same-student schedule is unconfirmed', async () => {
+  const db = new FakeDB();
+  db.scopeTasks.push({ id: 'legacy-unknown', owner: 'teacher-1', data: JSON.stringify({
+    id: 'legacy-unknown', staffId: 'teacher-1', studentId: 'student-a', taskKind: 'lesson_instruction',
+    deleted: false, repeat: 'once', start: '2026-08-10', end: '', scheduleStatus: 'needs_review',
+    scheduleText: '월요일 오후', scheduleSlots: []
+  }) });
+  const response = await call(db, {
+    staffId: 'teacher-2', lesson: assignedLesson({ subject: '영어', className: '', lessonRole: '영어' })
+  }, { scope: 'all', role: 'manager' });
+  assert.equal(response.response.status, 409);
+  assert.equal(response.data.code, 'SCHEDULE_UNCONFIRMED');
+  assert.equal(db.tasks.size, 0);
+});
+
 test('batch database failure rolls every lesson back and an exact retry is idempotent', async () => {
   const lessons = [
     { staffId: 'teacher-1', lesson: assignedLesson({ subject: '수학', className: '', lessonRole: '수학' }) },
-    { staffId: 'teacher-2', lesson: assignedLesson({ subject: '영어', className: '', lessonRole: '영어' }) }
+    { staffId: 'teacher-2', lesson: assignedLesson({ subject: '영어', className: '', lessonRole: '영어',
+      scheduleSlots: [{ days: [2], startTime: '10:00', endTime: '11:00', lessonHours: '1T' }] }) }
   ];
   const failingDb = new FakeDB();
   failingDb.failBatchAt = 1;
@@ -1204,7 +1275,8 @@ test('a roster CAS race aborts the batch before any lesson can be partially comm
   };
   const result = await callBatch(db, [
     { staffId: 'teacher-1', lesson: assignedLesson({ subject: '수학', className: '', lessonRole: '수학' }) },
-    { staffId: 'teacher-2', lesson: assignedLesson({ subject: '영어', className: '', lessonRole: '영어' }) }
+    { staffId: 'teacher-2', lesson: assignedLesson({ subject: '영어', className: '', lessonRole: '영어',
+      scheduleSlots: [{ days: [2], startTime: '10:00', endTime: '11:00', lessonHours: '1T' }] }) }
   ]);
   assert.equal(result.response.status, 409);
   assert.match(result.data.error, /원생 명단/);

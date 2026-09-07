@@ -69,6 +69,9 @@ function seed(db) {
     title: '[수업] 예시학생 (중2) — 수학', detail: '쎈 2-2, 82쪽', guide: '학생 특징: ...',
     steps: [], target: 0, unit: '회', time: '18:00', priority: 'normal',
     repeat: 'days', days: [1, 3, 5], start: '2026-08-02', end: '', carry: true,
+    scheduleStatus: 'confirmed', scheduleSlots: [
+      { days: [1, 3, 5], startTime: '18:00', endTime: '19:00', validFrom: '2026-08-02' }
+    ],
     createdAt: now, updatedAt: now, deleted: false
   };
   db.prepare("INSERT INTO tasks (app,id,owner,data,updated_at,srv_at) VALUES ('task','task-1','S-kim',?,?,?)")
@@ -151,7 +154,8 @@ test('approved lesson-field changes notify only that task owner for a multi-subj
   const source = JSON.parse(db.prepare("SELECT data FROM tasks WHERE app='task' AND id='task-1'").first().data);
   const otherSubject = {
     ...source, id: 'task-other-subject', staffId: 'S-other',
-    title: '[수업] 예시학생 (중2) — 영어', subject: '영어'
+    title: '[수업] 예시학생 (중2) — 영어', subject: '영어', days: [2], time: '20:00',
+    scheduleSlots: [{ days: [2], startTime: '20:00', endTime: '21:00', validFrom: '2026-08-02' }]
   };
   db.prepare("INSERT INTO tasks (app,id,owner,data,updated_at,srv_at) VALUES ('task',?,'S-other',?,?,?)")
     .bind(otherSubject.id, JSON.stringify(otherSubject), source.updatedAt, source.updatedAt).run();

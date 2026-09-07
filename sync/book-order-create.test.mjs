@@ -64,7 +64,9 @@ function seed(db) {
     db.prepare('INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
       .bind('task', id, staffId, JSON.stringify({ id, staffId, studentId, taskKind: 'lesson_instruction',
         lessonFormVersion: 1, intakeVersion: 1,
-        title: '[수업] 테스트', start: '2026-01-01', end: '', deleted: false }), now, now).run();
+        title: '[수업] 테스트', repeat: 'days', days: [1], scheduleStatus: 'confirmed',
+        scheduleSlots: [{ days: [1], startTime: '10:00', endTime: '11:00' }],
+        start: '2026-01-01', end: '', deleted: false }), now, now).run();
   }
 }
 
@@ -154,7 +156,9 @@ test('teacher order scope is the union of active lesson studentIds, not roster t
   const now = Date.now();
   const crossLesson = { id: 'lesson-a-b', staffId: 'teacher-a', studentId: 'student-b',
     taskKind: 'lesson_instruction', lessonFormVersion: 1, intakeVersion: 1,
-    title: '[수업] 교차 담당', start: '2026-01-01', end: '', deleted: false };
+    title: '[수업] 교차 담당', repeat: 'days', days: [2], scheduleStatus: 'confirmed',
+    scheduleSlots: [{ days: [2], startTime: '10:00', endTime: '11:00' }],
+    start: '2026-01-01', end: '', deleted: false };
   db.prepare('INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
     .bind('task', crossLesson.id, 'teacher-a', JSON.stringify(crossLesson), now, now).run();
 
@@ -1085,7 +1089,9 @@ test('cancelling one item releases only its student identity while sibling verif
   db.prepare('INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
     .bind('task', 'lesson-a-b', 'teacher-a', JSON.stringify({ id: 'lesson-a-b', staffId: 'teacher-a',
       studentId: 'student-b', taskKind: 'lesson_instruction', lessonFormVersion: 1, intakeVersion: 1,
-      title: '[수업] 추가', start: '2026-01-01', end: '', deleted: false }), now, now).run();
+      title: '[수업] 추가', repeat: 'days', days: [2], scheduleStatus: 'confirmed',
+      scheduleSlots: [{ days: [2], startTime: '10:00', endTime: '11:00' }],
+      start: '2026-01-01', end: '', deleted: false }), now, now).run();
   const body = createBody('ord_roster_partial');
   body.items = [
     { bookId: 'BK01', title: '취소 학생 교재', studentIds: ['student-a'], unitPrice: 15000 },
