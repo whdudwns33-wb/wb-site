@@ -7,6 +7,10 @@ import {
   assertStudentLessonScheduleAvailable,
   studentScheduleConflictPayload
 } from './student-schedule-conflict.js';
+import {
+  readStudentScheduleRevisionSnapshot,
+  studentScheduleRevisionCasStatements
+} from './student-schedule-revision.js';
 
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const NEW_STUDENT_ID = /^[1-9]\d{7}$/;
@@ -669,7 +673,12 @@ export async function handleRoster(env, app, body, origin, auth, json) {
     const actorRole = auth.role === 'manager' ? 'manager' : 'admin';
     const audienceStaffIds = operation === 'leave' || operation === 'withdrawal'
       ? [] : await lessonStaffIdsForStudent(env, app, studentId, now);
-    const statements = [];
+    const scheduleRevision = await readStudentScheduleRevisionSnapshot(env, app, [studentId]);
+    const statements = await studentScheduleRevisionCasStatements(env, app, scheduleRevision, {
+      operation: 'roster_transition_schedule',
+      source: [studentId, operation, expectedUpdatedAt, effectiveDate].join('\n'),
+      updatedAt: now
+    });
     const requiredIndexes = [];
     let responseTask = null;
     let eventType = operation;

@@ -12,12 +12,18 @@ const overlapMigration = fs.readFileSync(new URL('./migrations/069_student_lesso
 const source = fs.readFileSync(new URL('./roster.js', import.meta.url), 'utf8');
 
 class D1Statement {
-  constructor(database, sql) { this.database = database; this.sql = sql; this.args = []; }
+  constructor(owner, sql) { this.owner = owner; this.sql = sql; this.args = []; }
   bind(...args) { this.args = args; return this; }
-  first() { return this.database.prepare(this.sql).get(...this.args) || null; }
-  all() { return { results: this.database.prepare(this.sql).all(...this.args) }; }
+  first() {
+    this.owner.readStatements.push({ sql: this.sql, args: [...this.args] });
+    return this.owner.database.prepare(this.sql).get(...this.args) || null;
+  }
+  all() {
+    this.owner.readStatements.push({ sql: this.sql, args: [...this.args] });
+    return { results: this.owner.database.prepare(this.sql).all(...this.args) };
+  }
   run() {
-    const result = this.database.prepare(this.sql).run(...this.args);
+    const result = this.owner.database.prepare(this.sql).run(...this.args);
     return { meta: { changes: Number(result.changes || 0) } };
   }
 }
@@ -27,9 +33,14 @@ class TestD1 {
     this.database = new DatabaseSync(':memory:');
     this.database.exec(schema);
     this.beforeBatch = null;
+    this.readStatements = [];
+    this.batchStatements = [];
   }
-  prepare(sql) { return new D1Statement(this.database, sql); }
+  prepare(sql) { return new D1Statement(this, sql); }
   batch(statements) {
+    this.batchStatements.push(statements.map(statement => ({
+      sql: statement.sql, args: [...statement.args]
+    })));
     if (this.beforeBatch) {
       const beforeBatch = this.beforeBatch;
       this.beforeBatch = null;
@@ -493,6 +504,16 @@ test('admin directly moves a student to leave and returns them with a newly assi
   assert.equal(leave.body.student.end, '2026-09');
   assert.match(leave.body.student.reason, /^휴원 2026-08-20/);
   assert.equal(JSON.parse(db.prepare("SELECT data FROM tasks WHERE app='task' AND id='old-lesson-a'").first().data).deleted, true);
+  assert.equal(db.prepare(
+    "SELECT revision FROM student_schedule_revisions WHERE app='task' AND student_id='student-a'"
+  ).first().revision, 1);
+  const revisionRead = db.readStatements.find(statement =>
+    statement.sql.startsWith('SELECT student_id,revision FROM student_schedule_revisions'));
+  assert.deepEqual(revisionRead.args, ['task', 'student-a']);
+  const leaveBatch = db.batchStatements.at(-1);
+  assert.match(leaveBatch[0].sql, /^INSERT OR IGNORE INTO student_schedule_revisions/);
+  assert.match(leaveBatch[1].sql, /^UPDATE student_schedule_revisions SET revision=revision\+1/);
+  assert.match(leaveBatch[2].sql, /^INSERT INTO task_write_cas_guards/);
   const leaveEvent = db.prepare("SELECT event_type,details FROM student_change_events WHERE app='task' AND student_id='student-a' ORDER BY changed_at DESC LIMIT 1").first();
   assert.equal(leaveEvent.event_type, 'leave');
   assert.equal(JSON.parse(leaveEvent.details).direct, true);
@@ -536,6 +557,9 @@ test('admin directly moves a student to leave and returns them with a newly assi
   assert.equal(JSON.parse(returnEvent.details).operation, 'return');
   assert.equal(JSON.parse(returnEvent.details).lessonHours, '');
   assert.equal(JSON.parse(returnEvent.details).scheduleText, '월·수 16:00-17:00 · 1.5T / 금 18:00-18:50 · 1T');
+  assert.equal(db.prepare(
+    "SELECT revision FROM student_schedule_revisions WHERE app='task' AND student_id='student-a'"
+  ).first().revision, 2);
   const teacherView = await call(db, { auth: person('teacher-b', 'token-b'), action: 'get' });
   assert.deepEqual(teacherView.body.roster.students.map(student => student.id), ['student-a']);
 });
@@ -719,6 +743,44 @@ test('a lesson CAS race aborts the whole direct transition without changing rost
   assert.equal(JSON.parse(db.prepare("SELECT data FROM tasks WHERE id='lesson-direct-race'").first().data).deleted, false);
   assert.equal(db.prepare("SELECT COUNT(*) AS count FROM student_change_events WHERE student_id='student-a'").first().count, 0);
   assert.equal(db.prepare("SELECT COUNT(*) AS count FROM task_write_cas_guards").first().count, 0);
+});
+
+test('a stale student schedule revision aborts a direct transition and preserves every domain row', async () => {
+  const db = new TestD1(); seedAuth(db); await replace(db);
+  seedLesson(db, 'lesson-schedule-revision-race', 'teacher-a', 'student-a', {
+    start: '2026-08-01', end: ''
+  });
+  const initial = await call(db, { auth: admin, action: 'get' });
+  db.beforeBatch = database => database.prepare(
+    'INSERT INTO student_schedule_revisions(app,student_id,revision,updated_at) VALUES(?,?,?,?)'
+  ).run('task', 'student-a', 1, Date.now());
+
+  const leave = await call(db, {
+    auth: admin, action: 'student_transition', expectedUpdatedAt: initial.body.updatedAt,
+    studentId: 'student-a', operation: 'leave', effectiveDate: '2026-08-20'
+  });
+  assert.equal(leave.status, 409);
+  assert.equal(leave.body.code, 'ROSTER_REVISION_CONFLICT');
+  const student = JSON.parse(db.prepare("SELECT data FROM private_rosters WHERE app='task'").first().data)
+    .roster.students.find(item => item.id === 'student-a');
+  assert.equal(student.reason, '');
+  assert.equal(JSON.parse(db.prepare(
+    "SELECT data FROM tasks WHERE app='task' AND id='lesson-schedule-revision-race'"
+  ).first().data).deleted, false);
+  assert.equal(db.prepare(
+    "SELECT COUNT(*) AS count FROM student_change_events WHERE app='task' AND student_id='student-a'"
+  ).first().count, 0);
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM task_write_cas_guards").first().count, 0);
+  assert.equal(db.prepare(
+    "SELECT revision FROM student_schedule_revisions WHERE app='task' AND student_id='student-a'"
+  ).first().revision, 1, 'batch 밖에서 먼저 저장된 revision만 남아야 합니다');
+  const revisionRead = db.readStatements.find(statement =>
+    statement.sql.startsWith('SELECT student_id,revision FROM student_schedule_revisions'));
+  assert.deepEqual(revisionRead.args, ['task', 'student-a']);
+  const transitionBatch = db.batchStatements.at(-1);
+  assert.match(transitionBatch[0].sql, /^INSERT OR IGNORE INTO student_schedule_revisions/);
+  assert.match(transitionBatch[1].sql, /^UPDATE student_schedule_revisions SET revision=revision\+1/);
+  assert.match(transitionBatch[2].sql, /^INSERT INTO task_write_cas_guards/);
 });
 
 test('unassigned students may omit school, grade, subjects, and teachers before lesson placement', async () => {

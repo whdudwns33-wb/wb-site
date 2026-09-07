@@ -4,17 +4,60 @@ import test from 'node:test';
 import { DatabaseSync } from 'node:sqlite';
 
 const schema = fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8');
-const migration = fs.readFileSync(
+const migration069 = fs.readFileSync(
   new URL('./migrations/069_student_lesson_time_overlap.sql', import.meta.url), 'utf8'
 );
+const migration070 = fs.readFileSync(
+  new URL('./migrations/070_remove_heavy_student_schedule_triggers.sql', import.meta.url), 'utf8'
+);
 
-function database(freshSchema = false) {
+const legacyOverlapObjects = [
+  'active_regular_lesson_tasks_v1',
+  'active_regular_lesson_slots_v1',
+  'trg_regular_lesson_time_insert',
+  'trg_regular_lesson_time_update',
+  'trg_makeup_regular_time_insert',
+  'trg_makeup_regular_time_update'
+];
+const scheduleRevisionTriggers = [
+  'trg_makeup_schedule_revision_insert',
+  'trg_makeup_schedule_revision_update'
+];
+
+function overlapObjects(db) {
+  return db.prepare(
+    "SELECT type,name FROM sqlite_master WHERE name IN (" +
+    legacyOverlapObjects.map(() => '?').join(',') + ') ORDER BY name'
+  ).all(...legacyOverlapObjects);
+}
+
+function databaseBefore070() {
   const db = new DatabaseSync(':memory:');
-  assert.ok(schema.includes(migration), 'schema.sql은 069 migration과 같은 SQL을 포함해야 합니다');
-  db.exec(freshSchema ? schema : schema.replace(migration, ''));
-  if (!freshSchema) db.exec(migration);
+  db.exec(schema);
+  db.exec(`
+    DROP TRIGGER trg_makeup_schedule_revision_insert;
+    DROP TRIGGER trg_makeup_schedule_revision_update;
+    DROP TABLE student_schedule_revisions;
+  `);
+  db.exec(migration069);
+  return db;
+}
+
+function database() {
+  const db = databaseBefore070();
   // Wrangler가 재시도해도 기존 트리거 의미나 설치 결과가 달라지지 않아야 한다.
-  db.exec(migration);
+  db.exec(migration069);
+  return db;
+}
+
+function finalDatabase(kind = 'fresh') {
+  if (kind === 'fresh') {
+    const db = new DatabaseSync(':memory:');
+    db.exec(schema);
+    return db;
+  }
+  const db = databaseBefore070();
+  db.exec(migration070);
   return db;
 }
 
@@ -77,15 +120,158 @@ function insertMakeup(db, caseId, overrides = {}) {
   );
 }
 
-test('069 migration은 기존 DB 업그레이드와 신규 schema에 동일한 view·trigger를 설치한다', () => {
-  for (const db of [database(), database(true)]) {
-    const objects = db.prepare(
-      "SELECT type,name FROM sqlite_master WHERE name IN (" +
-      "'active_regular_lesson_tasks_v1','active_regular_lesson_slots_v1'," +
-      "'trg_regular_lesson_time_insert','trg_regular_lesson_time_update'," +
-      "'trg_makeup_regular_time_insert','trg_makeup_regular_time_update') ORDER BY name"
-    ).all();
-    assert.equal(objects.length, 6);
+test('069 migration은 역사 보존 상태로 여섯 view·trigger를 계속 설치한다', () => {
+  const db = database();
+  assert.equal(overlapObjects(db).length, 6);
+  db.close();
+});
+
+test('070 업그레이드와 신규 schema는 무거운 여섯 객체 없이 같은 revision 원장을 만든다', () => {
+  assert.ok(!schema.includes('CREATE VIEW IF NOT EXISTS active_regular_lesson_tasks_v1'));
+  assert.ok(!schema.includes('CREATE VIEW IF NOT EXISTS active_regular_lesson_slots_v1'));
+  assert.ok(!schema.includes('CREATE TRIGGER IF NOT EXISTS trg_regular_lesson_time_insert'));
+  assert.ok(!schema.includes('CREATE TRIGGER IF NOT EXISTS trg_regular_lesson_time_update'));
+  assert.ok(!schema.includes('CREATE TRIGGER IF NOT EXISTS trg_makeup_regular_time_insert'));
+  assert.ok(!schema.includes('CREATE TRIGGER IF NOT EXISTS trg_makeup_regular_time_update'));
+
+  const fresh = finalDatabase('fresh');
+  const upgraded = finalDatabase('upgraded');
+  for (const db of [fresh, upgraded]) {
+    assert.deepEqual(overlapObjects(db), []);
+    const revisionTriggers = db.prepare(
+      "SELECT name FROM sqlite_master WHERE type='trigger' AND name IN (?,?) ORDER BY name"
+    ).all(...scheduleRevisionTriggers);
+    assert.deepEqual(revisionTriggers.map(row => row.name), [...scheduleRevisionTriggers].sort());
+    const columns = db.prepare('PRAGMA table_info(student_schedule_revisions)').all();
+    assert.deepEqual(columns.map(column => column.name), [
+      'app', 'student_id', 'revision', 'updated_at'
+    ]);
+    assert.deepEqual(columns.filter(column => column.pk > 0).map(column => [column.name, column.pk]), [
+      ['app', 1], ['student_id', 2]
+    ]);
+    assert.equal(columns.find(column => column.name === 'revision').dflt_value, '0');
+    const tableSql = db.prepare(
+      "SELECT sql FROM sqlite_master WHERE type='table' AND name='student_schedule_revisions'"
+    ).get().sql;
+    assert.doesNotMatch(tableSql, /(?:name|phone|contact|school|grade)/i);
+  }
+
+  const freshSql = fresh.prepare(
+    "SELECT sql FROM sqlite_master WHERE type='table' AND name='student_schedule_revisions'"
+  ).get().sql.replace(/\s+/g, ' ').trim();
+  const upgradedSql = upgraded.prepare(
+    "SELECT sql FROM sqlite_master WHERE type='table' AND name='student_schedule_revisions'"
+  ).get().sql.replace(/\s+/g, ' ').trim();
+  assert.equal(upgradedSql, freshSql);
+  for (const triggerName of scheduleRevisionTriggers) {
+    const freshTriggerSql = fresh.prepare(
+      "SELECT sql FROM sqlite_master WHERE type='trigger' AND name=?"
+    ).get(triggerName).sql.replace(/\s+/g, ' ').trim();
+    const upgradedTriggerSql = upgraded.prepare(
+      "SELECT sql FROM sqlite_master WHERE type='trigger' AND name=?"
+    ).get(triggerName).sql.replace(/\s+/g, ' ').trim();
+    assert.equal(upgradedTriggerSql, freshTriggerSql);
+  }
+  fresh.close();
+  upgraded.close();
+});
+
+test('070 migration은 종속 순서대로 안전하게 재실행되고 기존 revision 행을 보존한다', () => {
+  const triggerDropPositions = [
+    'trg_regular_lesson_time_insert',
+    'trg_regular_lesson_time_update',
+    'trg_makeup_regular_time_insert',
+    'trg_makeup_regular_time_update'
+  ].map(name => migration070.indexOf('DROP TRIGGER IF EXISTS ' + name));
+  const slotViewDrop = migration070.indexOf('DROP VIEW IF EXISTS active_regular_lesson_slots_v1');
+  const taskViewDrop = migration070.indexOf('DROP VIEW IF EXISTS active_regular_lesson_tasks_v1');
+  assert.ok(triggerDropPositions.every(position => position >= 0 && position < slotViewDrop));
+  assert.ok(slotViewDrop < taskViewDrop);
+
+  const db = databaseBefore070();
+  db.exec(migration070);
+  db.prepare(
+    'INSERT INTO student_schedule_revisions(app,student_id,revision,updated_at) VALUES(?,?,?,?)'
+  ).run('task', 'student-a', 7, 1234);
+  db.exec(migration070);
+  assert.deepEqual(overlapObjects(db), []);
+  const row = db.prepare(
+    "SELECT app,student_id,revision,updated_at FROM student_schedule_revisions WHERE app='task' AND student_id='student-a'"
+  ).get();
+  assert.deepEqual({ ...row }, {
+    app: 'task', student_id: 'student-a', revision: 7, updated_at: 1234
+  });
+  db.close();
+});
+
+test('경량 보강 trigger는 활성 일정 변경 학생만 정확히 한 번씩 revision을 올린다', () => {
+  for (const kind of ['fresh', 'upgraded']) {
+    const db = finalDatabase(kind);
+    insertMakeup(db, 'inactive', {
+      studentId: 'student-inactive', status: 'reviewed', sourceTaskId: 'source-inactive'
+    });
+    assert.equal(db.prepare(
+      "SELECT count(*) AS count FROM student_schedule_revisions WHERE student_id='student-inactive'"
+    ).get().count, 0);
+
+    insertMakeup(db, 'active');
+    let row = db.prepare(
+      "SELECT revision,updated_at FROM student_schedule_revisions WHERE app='task' AND student_id='student-a'"
+    ).get();
+    assert.deepEqual({ ...row }, { revision: 1, updated_at: 1 });
+
+    // 담당자와 일반 updated_at만 바꾸는 것은 학생의 시간 점유를 바꾸지 않는다.
+    db.prepare(
+      "UPDATE makeup_cases SET confirmed_staff_id='teacher-b',updated_at=11 " +
+      "WHERE app='task' AND case_id='active'"
+    ).run();
+    row = db.prepare(
+      "SELECT revision,updated_at FROM student_schedule_revisions WHERE app='task' AND student_id='student-a'"
+    ).get();
+    assert.deepEqual({ ...row }, { revision: 1, updated_at: 1 });
+
+    // 같은 학생의 시간이 바뀌면 한 번만 증가한다.
+    db.prepare(
+      "UPDATE makeup_cases SET confirmed_end_at='2026-09-09T11:30:00+09:00',updated_at=12 " +
+      "WHERE app='task' AND case_id='active'"
+    ).run();
+    row = db.prepare(
+      "SELECT revision,updated_at FROM student_schedule_revisions WHERE app='task' AND student_id='student-a'"
+    ).get();
+    assert.deepEqual({ ...row }, { revision: 2, updated_at: 12 });
+
+    // 활성 보강의 학생을 바꾸면 이전 학생과 새 학생을 각각 한 번 무효화한다.
+    db.prepare(
+      "UPDATE makeup_cases SET student_id='student-b',updated_at=13 " +
+      "WHERE app='task' AND case_id='active'"
+    ).run();
+    const rows = db.prepare(
+      "SELECT student_id,revision,updated_at FROM student_schedule_revisions " +
+      "WHERE app='task' ORDER BY student_id"
+    ).all().map(item => ({ ...item }));
+    assert.deepEqual(rows, [
+      { student_id: 'student-a', revision: 3, updated_at: 13 },
+      { student_id: 'student-b', revision: 1, updated_at: 13 }
+    ]);
+
+    // 활성 상태에서 빠져도 같은 학생은 한 번만 증가한다.
+    db.prepare(
+      "UPDATE makeup_cases SET status='reviewed',updated_at=14 " +
+      "WHERE app='task' AND case_id='active'"
+    ).run();
+    row = db.prepare(
+      "SELECT revision,updated_at FROM student_schedule_revisions WHERE app='task' AND student_id='student-b'"
+    ).get();
+    assert.deepEqual({ ...row }, { revision: 2, updated_at: 14 });
+
+    // 비활성 보강끼리의 시간 변경은 revision을 만들지 않는다.
+    db.prepare(
+      "UPDATE makeup_cases SET confirmed_end_at='2026-09-09T12:00:00+09:00',updated_at=15 " +
+      "WHERE app='task' AND case_id='inactive'"
+    ).run();
+    assert.equal(db.prepare(
+      "SELECT count(*) AS count FROM student_schedule_revisions WHERE student_id='student-inactive'"
+    ).get().count, 0);
     db.close();
   }
 });
@@ -392,18 +578,26 @@ test('0 버전이나 제목 접두어만 있는 일반 task는 DB의 구조화 �
 });
 
 test('migration 066의 같은 학생 보강↔보강 차단과 다른 학생 허용 의미를 유지한다', () => {
-  const db = database();
-  insertMakeup(db, 'makeup-a');
-  assert.throws(() => insertMakeup(db, 'makeup-b', {
-    staffId: 'teacher-b', sourceTaskId: 'source-b'
-  }), /MAKEUP_TIME_CONFLICT/);
-  insertMakeup(db, 'makeup-other-student', {
-    studentId: 'student-b', staffId: 'teacher-a', sourceTaskId: 'source-other'
-  });
-  insertMakeup(db, 'makeup-touch', {
-    staffId: 'teacher-b', sourceTaskId: 'source-touch',
-    startAt: '2026-09-09T11:00:00+09:00',
-    endAt: '2026-09-09T12:00:00+09:00'
-  });
-  db.close();
+  for (const kind of ['fresh', 'upgraded']) {
+    const db = finalDatabase(kind);
+    const triggers = db.prepare(
+      "SELECT name FROM sqlite_master WHERE type='trigger' AND name IN (" +
+      "'trg_makeup_confirmed_time_insert','trg_makeup_confirmed_time_update') ORDER BY name"
+    ).all();
+    assert.equal(triggers.length, 2, kind + ' 설치에서 066 trigger를 유지해야 합니다');
+
+    insertMakeup(db, 'makeup-a');
+    assert.throws(() => insertMakeup(db, 'makeup-b', {
+      staffId: 'teacher-b', sourceTaskId: 'source-b'
+    }), /MAKEUP_TIME_CONFLICT/);
+    insertMakeup(db, 'makeup-other-student', {
+      studentId: 'student-b', staffId: 'teacher-a', sourceTaskId: 'source-other'
+    });
+    insertMakeup(db, 'makeup-touch', {
+      staffId: 'teacher-b', sourceTaskId: 'source-touch',
+      startAt: '2026-09-09T11:00:00+09:00',
+      endAt: '2026-09-09T12:00:00+09:00'
+    });
+    db.close();
+  }
 });

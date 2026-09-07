@@ -16,13 +16,41 @@ class FakeDB {
     this.tasks = new Map();
     this.checks = new Map();
     this.makeupCases = new Map();
+    this.scheduleRevisions = new Map();
     this.batchCalls = 0;
+    this.scheduleRevisionReads = 0;
+    this.scheduleRevisionGuardRuns = 0;
+    this.previousChanges = 0;
+    this.lastBatchSql = [];
+    this.beforeBatch = null;
     this.staffData = staffData;
   }
   prepare(sql) { return new Statement(this, sql); }
   async batch(statements) {
     this.batchCalls += 1;
-    return Promise.all(statements.map(statement => statement.run()));
+    this.lastBatchSql = statements.map(statement => statement.sql);
+    if (this.beforeBatch) {
+      const beforeBatch = this.beforeBatch;
+      this.beforeBatch = null;
+      await beforeBatch(this);
+    }
+    const snapshot = {
+      tasks: structuredClone(this.tasks), checks: structuredClone(this.checks),
+      scheduleRevisions: structuredClone(this.scheduleRevisions),
+      previousChanges: this.previousChanges
+    };
+    try {
+      const results = [];
+      // D1 batch는 순서대로 실행되며 changes()는 바로 앞 문장의 결과를 본다.
+      for (const statement of statements) results.push(await statement.run());
+      return results;
+    } catch (error) {
+      this.tasks = snapshot.tasks;
+      this.checks = snapshot.checks;
+      this.scheduleRevisions = snapshot.scheduleRevisions;
+      this.previousChanges = snapshot.previousChanges;
+      throw error;
+    }
   }
   seedTask(data, owner = data.staffId, updatedAt = 100) {
     this.tasks.set(data.id, { owner, data: JSON.stringify(data), updatedAt, srvAt: updatedAt });
@@ -55,6 +83,13 @@ class FakeDB {
     throw new Error('Unhandled first SQL: ' + sql);
   }
   async all(sql, args) {
+    if (sql.startsWith('SELECT student_id,revision FROM student_schedule_revisions')) {
+      this.scheduleRevisionReads += 1;
+      const ids = new Set(args.slice(1).map(String));
+      return { results: [...this.scheduleRevisions.entries()]
+        .filter(([studentId]) => ids.has(studentId))
+        .map(([student_id, row]) => ({ student_id, revision: row.revision })) };
+    }
     if (sql.startsWith('SELECT DISTINCT snapshot.task_id,task.data FROM book_order_student_snapshots')) {
       return { results: [] };
     }
@@ -130,6 +165,31 @@ class FakeDB {
     throw new Error('Unhandled all SQL: ' + sql);
   }
   async run(sql, args) {
+    const result = changes => {
+      this.previousChanges = changes;
+      return { meta: { changes } };
+    };
+    if (sql.startsWith('INSERT OR IGNORE INTO student_schedule_revisions')) {
+      const [app, studentId, updatedAt] = args;
+      if (app !== 'task') throw new Error('unexpected revision app');
+      if (this.scheduleRevisions.has(String(studentId))) return result(0);
+      this.scheduleRevisions.set(String(studentId), { revision: 0, updatedAt });
+      return result(1);
+    }
+    if (sql.startsWith('UPDATE student_schedule_revisions SET revision=revision+1')) {
+      const [updatedAt, app, studentId, expectedRevision] = args;
+      if (app !== 'task') throw new Error('unexpected revision app');
+      const row = this.scheduleRevisions.get(String(studentId));
+      if (!row || Number(row.revision) !== Number(expectedRevision)) return result(0);
+      row.revision += 1;
+      row.updatedAt = updatedAt;
+      return result(1);
+    }
+    if (sql.startsWith('INSERT INTO task_write_cas_guards')) {
+      this.scheduleRevisionGuardRuns += 1;
+      if (this.previousChanges !== 1) throw new Error('TASK_WRITE_CAS_CONFLICT');
+      return result(1);
+    }
     const match = sql.match(/^INSERT INTO (staff|tasks|checks)/);
     if (!match) throw new Error('Unhandled run SQL: ' + sql);
     const table = match[1];
@@ -138,20 +198,28 @@ class FakeDB {
     const current = target.get(key);
     if (!current) {
       target.set(key, { owner, data, updatedAt, srvAt });
-      return { meta: { changes: 1 } };
+      return result(1);
     }
     const currentData = JSON.parse(current.data);
     const guarded = current.owner === owner && (table !== 'tasks' || currentData.origin === 'staff');
     if (guarded && Number(updatedAt) > Number(current.updatedAt)) {
       target.set(key, { owner, data, updatedAt, srvAt });
-      return { meta: { changes: 1 } };
+      return result(1);
     }
-    return { meta: { changes: 0 } };
+    return result(0);
   }
 }
 
 const auth = { mode: 'person', id: 'teacher-1', token: 'teacher-token' };
 const task = (id, origin, title) => ({ id, staffId: 'teacher-1', origin, title, deleted: false, updatedAt: 100 });
+const regularLesson = (id = 'lesson-1', overrides = {}) => ({
+  ...task(id, 'staff', '[수업] 정규 수업'),
+  taskKind: 'lesson_instruction', lessonFormVersion: 1, intakeVersion: 1,
+  intakeSource: 'teacher_9_field_form', studentId: 'student-a',
+  start: '2026-09-01', end: '2026-12-31', repeat: 'days', scheduleStatus: 'confirmed',
+  scheduleSlots: [{ days: [1], startTime: '15:00', endTime: '15:50' }],
+  ...overrides
+});
 const kstDate = () => new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
 const kstStamp = (date, time) => Date.parse(date + 'T' + time + ':00+09:00');
 const attendance = (date, at, out = null, updatedAt = at) => ({
@@ -373,6 +441,125 @@ test('generic own sync cannot mint or mutate lesson authorization and permits on
   const converted = await sync(db, [change({ ...plain, studentId: 'student-a', updatedAt: 400 }, 400)]);
   assert.equal(converted.status, 403);
   assert.deepEqual(db.task(plain.id), plain);
+});
+
+test('all-scope generic sync cannot create a regular lesson and directs every role to the lesson endpoint', async () => {
+  const identities = [
+    { requestAuth: { mode: 'admin', secret: 'admin-secret' }, env: {} },
+    { requestAuth: auth, env: { TASK_MANAGER_STAFF_IDS: 'teacher-1' } }
+  ];
+  for (const identity of identities) {
+    const db = new FakeDB();
+    const lesson = regularLesson();
+    const result = await sync(db, [change(lesson, 200)], identity.env, identity.requestAuth);
+    assert.equal(result.status, 409);
+    assert.equal(result.body.code, 'LESSON_SCHEDULE_ENDPOINT_REQUIRED');
+    assert.equal(db.scheduleRevisionReads, 1, '시간축 검사 전에 stable student revision을 읽는다');
+    assert.equal(db.batchCalls, 0);
+    assert.equal(db.tasks.size, 0);
+  }
+});
+
+test('all-scope generic sync rejects every regular-lesson time-axis and classification mutation', async () => {
+  const mutations = [
+    lesson => { lesson.studentId = 'student-b'; },
+    lesson => { lesson.deleted = true; },
+    lesson => { lesson.start = '2026-09-08'; },
+    lesson => { lesson.startDate = '2026-09-01'; },
+    lesson => { lesson.end = '2027-01-31'; },
+    lesson => { lesson.endDate = '2026-12-31'; },
+    lesson => { lesson.repeat = 'once'; },
+    lesson => { lesson.scheduleStatus = 'needs_review'; },
+    lesson => { lesson.scheduleSlots = [{ days: [1], startTime: '16:00', endTime: '16:50' }]; },
+    lesson => { lesson.taskKind = 'lesson_instruction_v2'; },
+    lesson => { lesson.lessonFormVersion = 2; },
+    lesson => { lesson.intakeVersion = 2; },
+    lesson => { lesson.intakeSource = 'other'; },
+    lesson => { lesson.lessonInstanceType = 'regular'; },
+    lesson => { lesson.makeupCaseId = ''; }
+  ];
+  for (let index = 0; index < mutations.length; index += 1) {
+    const db = new FakeDB();
+    const before = regularLesson('lesson-' + index);
+    db.seedTask(before);
+    const incoming = structuredClone(before);
+    mutations[index](incoming);
+    incoming.updatedAt = 200;
+    const result = await sync(db, [change(incoming, 200)], {},
+      { mode: 'admin', secret: 'admin-secret' });
+    assert.equal(result.status, 409, 'mutation ' + index + ': ' + JSON.stringify(result.body));
+    assert.equal(result.body.code, 'LESSON_SCHEDULE_ENDPOINT_REQUIRED');
+    assert.equal(db.scheduleRevisionReads, 1);
+    assert.equal(db.batchCalls, 0);
+    assert.deepEqual(db.task(before.id), before);
+  }
+});
+
+test('all-scope generic sync allows non-time lesson edits and ignores stale schedule changes', async () => {
+  const adminAuth = { mode: 'admin', secret: 'admin-secret' };
+  const db = new FakeDB();
+  const before = regularLesson('lesson-note');
+  db.seedTask(before, before.staffId, 100);
+
+  const edited = { ...before, title: '[수업] 제목 수정', note: '수업 메모 수정', updatedAt: 200 };
+  const editedResult = await sync(db, [change(edited, 200)], {}, adminAuth);
+  assert.equal(editedResult.status, 200, JSON.stringify(editedResult.body));
+  assert.equal(db.task(before.id).note, '수업 메모 수정');
+  assert.equal(db.scheduleRevisionReads, 1);
+  assert.equal(db.scheduleRevisionGuardRuns, 1);
+  assert.equal(db.scheduleRevisions.get('student-a').revision, 1);
+  const revisionInsert = db.lastBatchSql.findIndex(sql =>
+    sql.startsWith('INSERT OR IGNORE INTO student_schedule_revisions'));
+  const revisionUpdate = db.lastBatchSql.findIndex(sql =>
+    sql.startsWith('UPDATE student_schedule_revisions SET revision=revision+1'));
+  const revisionGuard = db.lastBatchSql.findIndex(sql =>
+    sql.startsWith('INSERT INTO task_write_cas_guards'));
+  const taskWrite = db.lastBatchSql.findIndex(sql => sql.startsWith('INSERT INTO tasks'));
+  assert.ok(revisionInsert >= 0 && revisionInsert < revisionUpdate);
+  assert.ok(revisionUpdate < revisionGuard && revisionGuard < taskWrite,
+    'revision CAS와 changes() guard가 실제 task write보다 앞서야 한다');
+
+  const current = db.task(before.id);
+  db.tasks.get(before.id).updatedAt = 500;
+  const stale = structuredClone(current);
+  stale.scheduleSlots = [{ days: [1], startTime: '19:00', endTime: '19:50' }];
+  stale.updatedAt = 400;
+  const staleResult = await sync(db, [change(stale, 400)], {}, adminAuth);
+  assert.equal(staleResult.status, 200, JSON.stringify(staleResult.body));
+  assert.deepEqual(db.task(before.id).scheduleSlots, current.scheduleSlots);
+  assert.equal(db.scheduleRevisionGuardRuns, 2);
+  assert.equal(db.scheduleRevisions.get('student-a').revision, 2);
+});
+
+test('all-scope same-signature lesson edit rolls back when its schedule revision races', async () => {
+  const db = new FakeDB();
+  const before = regularLesson('lesson-race');
+  db.seedTask(before);
+  db.beforeBatch = current => {
+    current.scheduleRevisions.set('student-a', { revision: 1, updatedAt: 150 });
+  };
+  const edited = { ...before, note: '경합 중인 메모', updatedAt: 200 };
+  const result = await sync(db, [change(edited, 200)], {},
+    { mode: 'admin', secret: 'admin-secret' });
+  assert.equal(result.status, 409);
+  assert.equal(result.body.code, 'SYNC_SCHEDULE_REVISION_CONFLICT');
+  assert.equal(db.scheduleRevisionGuardRuns, 1);
+  assert.equal(db.scheduleRevisions.get('student-a').revision, 1,
+    '실패한 batch의 revision UPDATE는 롤백하고 동시 변경 revision은 보존한다');
+  assert.deepEqual(db.task(before.id), before);
+});
+
+test('all-scope generic sync rejects a same-batch conversion from a general task into a lesson', async () => {
+  const db = new FakeDB();
+  const plain = task('same-batch-task', 'staff', '일반 업무');
+  const lesson = regularLesson(plain.id, { updatedAt: 300 });
+  const result = await sync(db, [change(plain, 200), change(lesson, 300)], {},
+    { mode: 'admin', secret: 'admin-secret' });
+  assert.equal(result.status, 409);
+  assert.equal(result.body.code, 'LESSON_SCHEDULE_ENDPOINT_REQUIRED');
+  assert.equal(db.scheduleRevisionReads, 1);
+  assert.equal(db.batchCalls, 0);
+  assert.equal(db.tasks.size, 0);
 });
 
 test('generic sync skips every stale server-authored makeup copy but cannot mint a makeup task', async () => {

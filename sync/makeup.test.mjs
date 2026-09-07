@@ -1828,7 +1828,7 @@ test('legacy restore atomically rejects a regular lesson inserted after its init
     action: 'restore_schedule', caseId: reviewed.caseId, revision: proposed.body.case.revision
   });
   assert.equal(blocked.status, 409);
-  assert.equal(blocked.body.code, 'STUDENT_MAKEUP_CONFLICT');
+  assert.equal(blocked.body.code, 'STUDENT_SCHEDULE_CONFLICT');
   assert.equal(db.database.prepare("SELECT count(*) AS n FROM tasks WHERE id LIKE 'makeup_lesson_%'").get().n, 0);
 });
 

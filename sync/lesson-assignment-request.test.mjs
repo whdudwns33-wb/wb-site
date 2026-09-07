@@ -15,6 +15,7 @@ class DB {
     this.beforeBatch = null;
     this.lastChanges = null;
     this.makeups = [];
+    this.scheduleRevisions = new Map();
     this.roster = { roster: { updated: '2026-08-20', students: [{
       id: 'student-1', name: '학생', school: 'WB초', grade: '초4', subject: '수학', subjects: ['수학'],
       teacher: '', teacherIds: [], start: '2026-08', end: '', phoneMother: '010-0000-1234'
@@ -31,6 +32,11 @@ class DB {
         throw new Error('first ' + sql);
       },
       async all() {
+        if (sql.startsWith('SELECT student_id,revision FROM student_schedule_revisions')) {
+          return { results: this.args.slice(1).filter(id => db.scheduleRevisions.has(String(id))).map(id => ({
+            student_id: String(id), revision: db.scheduleRevisions.get(String(id)).revision
+          })) };
+        }
         if (sql === 'SELECT id,owner,data FROM tasks WHERE app=?') {
           return { results: [...db.tasks.entries()].map(([id, row]) => ({ id, owner: row.owner, data: row.data })) };
         }
@@ -47,6 +53,22 @@ class DB {
         return { results: values };
       },
       async run() {
+        if (sql.startsWith('INSERT OR IGNORE INTO student_schedule_revisions')) {
+          const [, studentId, updatedAt] = this.args;
+          if (db.scheduleRevisions.has(String(studentId))) return { meta: { changes: 0 } };
+          db.scheduleRevisions.set(String(studentId), { revision: 0, updatedAt });
+          return { meta: { changes: 1 } };
+        }
+        if (sql.startsWith('UPDATE student_schedule_revisions SET revision=revision+1')) {
+          const [updatedAt, , studentId, expectedRevision] = this.args;
+          const current = db.scheduleRevisions.get(String(studentId));
+          if (!current || current.revision !== expectedRevision) return { meta: { changes: 0 } };
+          db.scheduleRevisions.set(String(studentId), {
+            revision: current.revision + 1,
+            updatedAt
+          });
+          return { meta: { changes: 1 } };
+        }
         if (sql.startsWith('INSERT INTO lesson_assignment_requests')) {
           const missing = sql.includes("NULL,1,'approval_waiting'");
           const [app,key,staffId,name,grade] = this.args;
@@ -120,6 +142,9 @@ class DB {
     const tasksSnapshot = new Map([...this.tasks].map(([key, value]) => [key, JSON.parse(JSON.stringify(value))]));
     const rosterSnapshot = JSON.parse(JSON.stringify(this.roster));
     const rosterAtSnapshot = this.rosterAt;
+    const scheduleRevisionsSnapshot = new Map([...this.scheduleRevisions].map(([key, value]) =>
+      [key, { ...value }]));
+    const lastChangesSnapshot = this.lastChanges;
     const results = [];
     try {
       for (const statement of statements) {
@@ -133,6 +158,8 @@ class DB {
       this.tasks = tasksSnapshot;
       this.roster = rosterSnapshot;
       this.rosterAt = rosterAtSnapshot;
+      this.scheduleRevisions = scheduleRevisionsSnapshot;
+      this.lastChanges = lastChangesSnapshot;
       throw error;
     }
   }
@@ -220,6 +247,8 @@ test('modern approval assigns the stable student and creates the requested lesso
   assert.deepEqual(approved.task.scheduleSlots.map(slot => slot.lessonHours), ['2T', '1T']);
   assert.deepEqual(db.roster.roster.students[0].teacherIds, [], '승인은 legacy main-teacher 목록을 쓰지 않는다');
   assert.equal(db.tasks.size, 1);
+  assert.equal(db.scheduleRevisions.get('student-1').revision, 1,
+    '승인 batch 안에서 학생 일정 revision도 함께 증가한다');
 });
 
 test('assignment approval stays pending when another teacher already has an overlapping lesson for that student', async () => {
@@ -287,6 +316,28 @@ test('a request CAS race rolls back roster and lesson writes in assignment appro
   assert.equal(db.tasks.size, 0);
   assert.deepEqual(db.roster.roster.students[0].subjects, ['수학']);
   assert.equal(db.rosterAt, 10);
+});
+
+test('a stale student schedule revision keeps assignment approval pending and rolls back its writes', async () => {
+  const db = new DB();
+  const submitted = await body(await handleLessonAssignmentRequest(
+    { DB: db }, 'task', { ...request, action: 'submit' }, '*', own, json
+  ));
+  const requestKey = submitted.request.requestKey;
+  db.beforeBatch = database => {
+    database.scheduleRevisions.set('student-1', { revision: 1, updatedAt: 999 });
+  };
+  const reviewed = await handleLessonAssignmentReview({ DB: db }, 'task', {
+    action: 'approve', requestKey, revision: 1, studentId: 'student-1'
+  }, '*', all, json);
+  assert.equal(reviewed.status, 409);
+  assert.match((await body(reviewed)).error, /명단·수업 또는 요청 상태/);
+  assert.equal(db.rows.get(requestKey).status, 'approval_waiting');
+  assert.equal(db.tasks.size, 0, 'stale 일정 snapshot 뒤의 수업 INSERT를 남기지 않는다');
+  assert.deepEqual(db.roster.roster.students[0].subjects, ['수학']);
+  assert.equal(db.rosterAt, 10);
+  assert.deepEqual(db.scheduleRevisions.get('student-1'), { revision: 1, updatedAt: 999 },
+    '경쟁 요청이 올린 revision은 rollback하지 않는다');
 });
 
 test('missing-roster request stores school but never creates a student automatically', async () => {

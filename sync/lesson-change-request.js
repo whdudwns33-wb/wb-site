@@ -29,6 +29,10 @@ import {
   assertStudentLessonScheduleAvailable,
   studentScheduleConflictPayload
 } from './student-schedule-conflict.js';
+import {
+  readStudentScheduleRevisionSnapshot,
+  studentScheduleRevisionCasStatements
+} from './student-schedule-revision.js';
 
 const LESSON_CHANGE_FIELDS = ['days', 'time', 'repeat', 'detail', 'guide', 'target', 'unit'];
 const REQUEST_OPERATIONS = new Set([
@@ -398,7 +402,7 @@ export async function handleLessonChangeReview(env, app, body, origin, auth, jso
     if (operation === 'teacher_assignment' && String(changes.effectiveDate || '') > kstDate(now)) {
       return json({ ok: false, error: '담당 선생님 변경은 변경 시작일 당일 또는 이후에 승인해 주세요' }, 409, origin);
     }
-    if (operation !== 'lesson_fields' && !SAFE_ID.test(studentId)) {
+    if (!SAFE_ID.test(studentId)) {
       return json({ ok: false, error: 'stable studentId 연결을 확인한 뒤 승인해 주세요' }, 409, origin);
     }
 
@@ -412,7 +416,16 @@ export async function handleLessonChangeReview(env, app, body, origin, auth, jso
       }
     }
 
-    const statements = [];
+    const scheduleRevision = operation !== 'information_request' && SAFE_ID.test(studentId)
+      ? await readStudentScheduleRevisionSnapshot(env, app, [studentId])
+      : null;
+    const statements = scheduleRevision
+      ? await studentScheduleRevisionCasStatements(env, app, scheduleRevision, {
+        operation: 'lesson_change_schedule',
+        source: [requestKey, expectedRevision, operation].join('\n'),
+        updatedAt: now
+      })
+      : [];
     const requiredChangeIndexes = [];
     const actorRole = auth.role === 'manager' ? 'manager' : 'admin';
     let eventType = 'work_instruction';
@@ -541,6 +554,9 @@ export async function handleLessonChangeReview(env, app, body, origin, auth, jso
       ).bind(selectedStaffId, JSON.stringify(merged), updatedAt, updatedAt, app, current.task_id,
         taskRow.owner, taskRow.updated_at, app, current.task_id, selectedStaffId,
         studentId, JSON.stringify(targetAssignmentSnapshot)));
+      statements.push(await taskWriteCasGuardStatement(env, app, 'lesson_change_teacher_task',
+        [requestKey, expectedRevision, current.task_id, taskRow.owner, selectedStaffId,
+          taskRow.updated_at, updatedAt].join('\n'), updatedAt));
       statements.push(...packTransfer.statements);
       statements.push(lessonCheckOwnerTransferStatement(
         env, app, current.task_id, String(taskRow.owner || ''), selectedStaffId, updatedAt
