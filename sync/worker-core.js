@@ -99,6 +99,11 @@ import { handleStaffAttendance, inspectOwnStaffAttendanceChanges } from './staff
 import { handleWeekendVisit } from './weekend-visit.js';
 import { handleLessonHandoff } from './lesson-handoff.js';
 import { studentScheduleConflictPayload } from './student-schedule-conflict.js';
+import { isTaskWriteCasConflict } from './task-write-cas.js';
+import {
+  readStudentScheduleRevisionSnapshot,
+  studentScheduleRevisionCasStatements
+} from './student-schedule-revision.js';
 import { handleConsultSubmission, handleConsultSubmissionUpload } from './consult-submission.js';
 import { handleConsultGuardian } from './consult-guardian.js';
 import { handleConsultResults, handleConsultResultUpload } from './consult-results.js';
@@ -373,6 +378,70 @@ function isProtectedLessonTaskData(data) {
 function isScheduledMakeupTaskData(data) {
   return !!(data && typeof data === 'object' && !Array.isArray(data) &&
     (String(data.lessonInstanceType || '') === 'makeup' || String(data.makeupCaseId || '').trim()));
+}
+
+const LESSON_SCHEDULE_SIGNATURE_KEYS = [
+  'studentId', 'deleted', 'start', 'startDate', 'end', 'endDate', 'repeat', 'scheduleStatus',
+  'scheduleSlots', 'taskKind', 'lessonFormVersion', 'intakeVersion', 'intakeSource',
+  'lessonInstanceType', 'makeupCaseId'
+];
+
+function isRegularLessonTaskData(data) {
+  return !!(data && typeof data === 'object' && !Array.isArray(data) &&
+    !isScheduledMakeupTaskData(data) &&
+    (hasStructuredLessonMarker(data) || data.intakeSource === 'teacher_9_field_form'));
+}
+
+function lessonScheduleSignature(data) {
+  // 누락과 null/false는 DB json_extract trigger에서도 서로 다른 변경이다. 키 존재 여부까지
+  // 서명에 넣어 generic LWW가 전용 수업 API의 시간축을 우회하지 못하게 한다.
+  return JSON.stringify(LESSON_SCHEDULE_SIGNATURE_KEYS.map(key =>
+    Object.prototype.hasOwnProperty.call(data || {}, key)
+      ? [true, canonicalJson(data[key])]
+      : [false]));
+}
+
+async function inspectAllScopeLessonScheduleChanges(env, app, entries) {
+  if (app !== 'task') return { blocked: false };
+  const taskEntries = entries.filter(entry => entry.table === 'tasks' && entry.change);
+  if (!taskEntries.length) return { blocked: false };
+
+  const ids = [...new Set(taskEntries.map(entry => String(entry.change.id || '')).filter(Boolean))];
+  const currentById = new Map();
+  for (let offset = 0; offset < ids.length; offset += 80) {
+    const chunk = ids.slice(offset, offset + 80);
+    const placeholders = chunk.map(() => '?').join(',');
+    const result = await env.DB.prepare(
+      'SELECT id,owner,data,updated_at,srv_at FROM tasks WHERE app=? AND id IN (' + placeholders + ')'
+    ).bind(app, ...chunk).all();
+    for (const row of result.results || []) {
+      let data = null;
+      try { data = JSON.parse(row.data); } catch (error) { data = null; }
+      currentById.set(String(row.id), { data, updatedAt: Number(row.updated_at) || 0 });
+    }
+  }
+
+  // 실제 upsert 순서와 같은 LWW 가상 상태를 따라간다. 오래된 오프라인 변경이나 같은
+  // timestamp의 후속 행은 쓰이지 않으므로 정상 동기화를 불필요하게 막지 않는다.
+  for (const entry of taskEntries) {
+    const change = entry.change;
+    const id = String(change.id || '');
+    const incoming = change.data;
+    const incomingUpdatedAt = Number(change.updated_at) || 0;
+    const current = currentById.get(id);
+    if (current && incomingUpdatedAt <= current.updatedAt) continue;
+
+    const currentData = current && current.data;
+    const currentLesson = isRegularLessonTaskData(currentData);
+    const incomingLesson = isRegularLessonTaskData(incoming);
+    if ((!current && incomingLesson) ||
+        ((currentLesson || incomingLesson) &&
+          lessonScheduleSignature(currentData) !== lessonScheduleSignature(incoming))) {
+      return { blocked: true };
+    }
+    currentById.set(id, { data: incoming, updatedAt: incomingUpdatedAt });
+  }
+  return { blocked: false };
 }
 
 /**
@@ -1576,6 +1645,26 @@ async function handleSync(env, app, body, origin) {
     return json({ ok: false, code: 'BOOK_ORDER_CREATE_REQUIRED',
       error: '자동 발송 교재 주문은 전용 주문 화면에서 등록해 주세요' }, 409, origin);
   }
+  let genericScheduleRevision = null;
+  if (auth.scope === 'all') {
+    const genericScheduleStudentIds = accepted.filter(entry => !skipped.has(entry) &&
+      entry.table === 'tasks' && isRegularLessonTaskData(entry.change && entry.change.data))
+      .map(entry => String(entry.change.data.studentId || '')).filter(id => SAFE_ID.test(id));
+    if (genericScheduleStudentIds.length) {
+      // revision을 먼저 읽고 그 다음 현재 task 서명을 검사해야, 둘 사이에 들어온
+      // 전용 수업 저장을 아래 batch CAS가 감지할 수 있다.
+      genericScheduleRevision = await readStudentScheduleRevisionSnapshot(
+        env, app, genericScheduleStudentIds
+      );
+    }
+    const lessonScheduleInspection = await inspectAllScopeLessonScheduleChanges(
+      env, app, accepted.filter(entry => !skipped.has(entry))
+    );
+    if (lessonScheduleInspection.blocked) {
+      return json({ ok: false, code: 'LESSON_SCHEDULE_ENDPOINT_REQUIRED',
+        error: '수업 등록·시간표 변경은 전용 수업 등록 및 변경 화면에서 처리해 주세요' }, 409, origin);
+    }
+  }
   const writeEntries = foldStaffEntries(accepted.filter(entry => !skipped.has(entry)));
   const rewardStaffConflicts = await consultRewardStaffConflicts(env, app, writeEntries);
   if (rewardStaffConflicts.length) {
@@ -1591,12 +1680,23 @@ async function handleSync(env, app, body, origin) {
       error: '탑승 후 미하차 학생을 담당하는 기사는 삭제하거나 비활성화할 수 없습니다. 차량 화면에서 하차·인계 또는 사유 있는 상태 초기화를 먼저 완료해 주세요'
     }, 409, origin);
   }
-  const stmts = writeEntries
+  const genericScheduleGuards = genericScheduleRevision
+    ? await studentScheduleRevisionCasStatements(env, app, genericScheduleRevision, {
+      operation: 'generic_sync_schedule',
+      source: String(now),
+      updatedAt: now
+    })
+    : [];
+  const stmts = genericScheduleGuards.concat(writeEntries
     .map(entry => upsertStmt(env, entry.table, app, entry.change, now, auth.scope === 'own',
-      auth.role === 'manager' && entry.table === 'tasks'));
+      auth.role === 'manager' && entry.table === 'tasks')));
   if (stmts.length) {
     try { await env.DB.batch(stmts); }
     catch (error) {
+      if (isTaskWriteCasConflict(error) && genericScheduleRevision) {
+        return json({ ok: false, code: 'SYNC_SCHEDULE_REVISION_CONFLICT',
+          error: '수업 정보가 다른 작업에서 먼저 변경되었습니다. 새로고침 후 다시 저장해 주세요' }, 409, origin);
+      }
       if (isRewardProcessingLockError(error)) {
         const racedConflicts = await consultRewardStaffConflicts(env, app, writeEntries);
         return rewardProcessingLockResponse(origin,

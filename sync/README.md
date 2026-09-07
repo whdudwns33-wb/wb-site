@@ -81,6 +81,11 @@ npx wrangler d1 execute wb-sync --remote --file=./migrations/066_makeup_student_
 npx wrangler d1 execute wb-sync --remote --file=./migrations/067_feedback_template_v3.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/068_lesson_check_key_redirects.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/069_student_lesson_time_overlap.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/070_remove_heavy_student_schedule_triggers.sql
+
+> `070`은 이미 적용된 `069` 이력을 되돌리지 않고, 그 migration이 만든 JSON 전개 view·trigger만
+> 제거한 뒤 학생별 일정 revision 원장과 경량 보강 revision trigger를 설치한다. 운영 DB에는 반드시
+> `069` 다음 순서로 적용하고, 신규 설치에는 같은 최종 상태를 담은 `schema.sql`을 사용한다.
 
 # 3) 비밀키 등록 — 코드나 wrangler.toml에 적지 않는다
 npx wrangler secret put TASK_ADMIN_SECRET
