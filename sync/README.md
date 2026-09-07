@@ -78,6 +78,7 @@ npx wrangler d1 execute wb-sync --remote --file=./migrations/063_student_session
 npx wrangler d1 execute wb-sync --remote --file=./migrations/064_student_session_ledger_generations.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/065_makeup_assignee_integrity.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/066_makeup_student_overlap_only.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/067_feedback_template_v3.sql
 
 # 3) 비밀키 등록 — 코드나 wrangler.toml에 적지 않는다
 npx wrangler secret put TASK_ADMIN_SECRET
@@ -88,7 +89,9 @@ npx wrangler secret put SOLAPI_KAKAO_CONSULT_LINK_APPROVED_TEMPLATE_ID # 승인�
 npx wrangler secret put SOLAPI_KAKAO_API_KEY        # 카카오 알림톡 전용 API 키
 npx wrangler secret put SOLAPI_KAKAO_API_SECRET     # 카카오 알림톡 전용 API 시크릿
 npx wrangler secret put SOLAPI_KAKAO_PF_ID          # 연동된 카카오 채널 ID
-npx wrangler secret put SOLAPI_KAKAO_TEMPLATE_ID    # 승인된 학부모 수업 피드백 템플릿 ID
+npx wrangler secret put SOLAPI_KAKAO_TEMPLATE_ID    # 승인된 학부모 수업 피드백 V1 템플릿 ID
+npx wrangler secret put SOLAPI_KAKAO_FEEDBACK_TEMPLATE_ID_V2 # 승인된 학부모 수업 피드백 V2 템플릿 ID
+npx wrangler secret put SOLAPI_KAKAO_FEEDBACK_TEMPLATE_ID_V3 # 승인된 학부모 수업 피드백 V3 템플릿 ID
 npx wrangler secret put SOLAPI_SENDER_NUMBER        # Solapi에 등록된 발신번호
 npx wrangler secret put WB_PARENT_FEEDBACK_SEND_ENABLED # 승인·연락처 점검 뒤에만 true
 npx wrangler secret put SOLAPI_KAKAO_MAKEUP_PROPOSAL_APPROVED_TEMPLATE_ID

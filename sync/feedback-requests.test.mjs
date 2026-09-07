@@ -11,6 +11,7 @@ const migration = fs.readFileSync(new URL('./migrations/010_feedback_requests.sq
 const migration017 = fs.readFileSync(new URL('./migrations/017_feedback_structured_fields.sql', import.meta.url), 'utf8');
 const migration021 = fs.readFileSync(new URL('./migrations/021_parent_feedback_student_ids.sql', import.meta.url), 'utf8');
 const migration051 = fs.readFileSync(new URL('./migrations/051_feedback_template_v2.sql', import.meta.url), 'utf8');
+const migration067 = fs.readFileSync(new URL('./migrations/067_feedback_template_v3.sql', import.meta.url), 'utf8');
 
 class D1Statement {
   constructor(database, sql) { this.database = database; this.sql = sql; this.args = []; }
@@ -82,6 +83,9 @@ test('schema and migrations are additive and restrict states', () => {
     assert.match(migration051, new RegExp('ALTER TABLE feedback_requests ADD COLUMN ' + column));
     assert.match(schema, new RegExp(column + '\\s+TEXT'));
   }
+  assert.doesNotMatch(migration067, /DROP TABLE|DELETE FROM|UPDATE feedback_requests/i);
+  assert.match(migration067, /ALTER TABLE feedback_requests ADD COLUMN notice_text/);
+  assert.match(schema, /notice_text\s+TEXT/);
 });
 
 test('v2 submission accepts only the exact fixed template and stores its structured variables', async () => {
@@ -159,6 +163,115 @@ test('v2 submission uses an optional client subject and only legacy requests fal
     auth, ...identityV2, message, ...structured, subjectText: '과'.repeat(81)
   });
   assert.equal(result.status, 413);
+});
+
+test('v3 submission preserves the approved blank lines and stores all seven template variables', async () => {
+  const db = new TestD1();
+  seedStaff(db, 'teacher-a', '김남기'); seedToken(db, 'token-a', 'teacher-a');
+  seedTask(db, 'task-v3', 'teacher-a', { subject: '국어' });
+  const identityV3 = {
+    taskId: 'task-v3', feedbackDate: '2026-09-07', feedbackType: 'class_feedback', templateVersion: 'v3'
+  };
+  const structured = {
+    subjectText: '국어', contentText: '비문학 지문의 중심 내용 찾기', homeworkText: '어휘 10개 복습',
+    commentText: '근거를 찾아 차분하게 설명했습니다.', noticeText: '다음 수업에 교재를 준비해 주세요.',
+    plusText: '', minusText: ''
+  };
+  const message = '안녕하세요, WB 웩슬러브레인센터(독해력학원) 입니다.\n\n' +
+    '테스트학생 학생의 오늘 수업 피드백을 정리해 보내드립니다.\n\n' +
+    '- 일시 : 2026년 9월 7일\n\n- 과목 : ' + structured.subjectText + '\n\n' +
+    '- 수업내용 · 진도 : ' + structured.contentText + '\n\n' +
+    '- 과제 : ' + structured.homeworkText + '\n\n- 코멘트 : ' + structured.commentText + '\n\n' +
+    '- 안내사항 : ' + structured.noticeText + '\n\n\n' +
+    '문의 사항이 있으시면 학원으로 연락부탁드립니다. 감사합니다.';
+  const auth = person('teacher-a', 'token-a');
+  let result = await call(db, '/feedback-request', { auth, ...identityV3, message, ...structured });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.request.templateVersion, 'v3');
+  assert.equal(result.body.request.noticeText, structured.noticeText);
+  const stored = db.prepare('SELECT notice_text FROM feedback_requests WHERE request_key=?')
+    .bind(result.body.request.requestKey).first();
+  assert.equal(stored.notice_text, structured.noticeText);
+
+  result = await call(db, '/feedback-request', {
+    auth, ...identityV3, message: message.replace('\n\n\n문의', '\n\n문의'), ...structured
+  });
+  assert.equal(result.status, 409);
+  assert.equal(result.body.code, 'FEEDBACK_TEMPLATE_MISMATCH', '안내사항 뒤 빈 줄 두 개도 검수 본문의 일부다');
+});
+
+test('v3 comment and exact preview remove format controls consistently before storage and hashing', async () => {
+  const db = new TestD1();
+  seedStaff(db, 'teacher-a', '김남기'); seedToken(db, 'token-a', 'teacher-a');
+  seedTask(db, 'task-v3-format', 'teacher-a', { subject: '국어' });
+  const rawComment = '근\u00AD거를 찾아 차\u200B분하게 설명했습니다.';
+  const cleanComment = '근거를 찾아 차분하게 설명했습니다.';
+  const noticeText = '다음 수업에 교재를 준비해 주세요.';
+  const message = '안녕하세요, WB 웩슬러브레인센터(독해력학원) 입니다.\n\n' +
+    '테스트학생 학생의 오늘 수업 피드백을 정리해 보내드립니다.\n\n' +
+    '- 일시 : 2026년 9월 11일\n\n- 과목 : 국어\n\n' +
+    '- 수업내용 · 진도 : 지문 풀이\n\n- 과제 : 복습\n\n' +
+    '- 코멘트 : ' + rawComment + '\n\n- 안내사항 : ' + noticeText + '\n\n\n' +
+    '문의 사항이 있으시면 학원으로 연락부탁드립니다. 감사합니다.';
+  const request = {
+    auth: person('teacher-a', 'token-a'), taskId: 'task-v3-format', feedbackDate: '2026-09-11',
+    feedbackType: 'class_feedback', templateVersion: 'v3', subjectText: '국어', contentText: '지문 풀이',
+    homeworkText: '복습', commentText: rawComment, noticeText, plusText: '', minusText: ''
+  };
+  let result = await call(db, '/feedback-request', { ...request, message });
+  assert.equal(result.status, 200, JSON.stringify(result.body));
+  assert.equal(result.body.request.commentText, cleanComment);
+  assert.ok(!/[\u00ad\u200b]/i.test(result.body.request.message));
+  const stored = db.prepare('SELECT body,comment_text FROM feedback_requests WHERE request_key=?')
+    .bind(result.body.request.requestKey).first();
+  assert.equal(stored.comment_text, cleanComment);
+  assert.ok(!/[\u00ad\u200b]/i.test(stored.body));
+
+  result = await call(db, '/feedback-request', {
+    ...request, feedbackDate: '2026-09-12',
+    message: message.replace('2026년 9월 11일', '2026년 9월 12일').replace('차\u200B분하게', '다르게')
+  });
+  assert.equal(result.status, 409);
+  assert.equal(result.body.code, 'FEEDBACK_TEMPLATE_MISMATCH');
+});
+
+test('v3 requires noticeText, v2 rejects non-empty noticeText, and unknown template versions fail closed', async () => {
+  const db = new TestD1();
+  seedStaff(db, 'teacher-a', '김남기'); seedToken(db, 'token-a', 'teacher-a');
+  seedTask(db, 'task-template-policy', 'teacher-a', { subject: '국어' });
+  const auth = person('teacher-a', 'token-a');
+  const structured = {
+    subjectText: '국어', contentText: '지문 풀이', homeworkText: '복습', commentText: '잘 참여했습니다.',
+    plusText: '', minusText: ''
+  };
+  let result = await call(db, '/feedback-request', {
+    auth, taskId: 'task-template-policy', feedbackDate: '2026-09-07', feedbackType: 'class_feedback',
+    templateVersion: 'v3', message: '임의 문구', ...structured, noticeText: ''
+  });
+  assert.equal(result.status, 400);
+  assert.match(result.body.error, /안내사항/);
+
+  result = await call(db, '/feedback-request', {
+    auth, taskId: 'task-template-policy', feedbackDate: '2026-09-10', feedbackType: 'class_feedback',
+    templateVersion: 'v3', message: '임의 문구', ...structured,
+    noticeText: '\u00AD\u061C\u180E\u200B\u200F\u202A\u202E\u2060\u2066\u2069\uFEFF'
+  });
+  assert.equal(result.status, 400);
+  assert.match(result.body.error, /안내사항/, '보이지 않는 Unicode 제어문자만으로 안내사항을 채울 수 없다');
+
+  result = await call(db, '/feedback-request', {
+    auth, taskId: 'task-template-policy', feedbackDate: '2026-09-08', feedbackType: 'class_feedback',
+    templateVersion: 'v2', message: '임의 문구', ...structured, noticeText: '준비물 안내'
+  });
+  assert.equal(result.status, 409);
+  assert.equal(result.body.code, 'FEEDBACK_TEMPLATE_NOTICE_VERSION_MISMATCH');
+
+  result = await call(db, '/feedback-request', {
+    auth, taskId: 'task-template-policy', feedbackDate: '2026-09-09', feedbackType: 'class_feedback',
+    templateVersion: 'v4', message: '임의 문구', ...structured
+  });
+  assert.equal(result.status, 400);
+  assert.match(result.body.error, /templateVersion/);
 });
 
 test('feedback submission delegates all real sending to the dedicated send module', () => {

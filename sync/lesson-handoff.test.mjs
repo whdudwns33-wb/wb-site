@@ -16,7 +16,7 @@ const id = 'lh_' + 'a'.repeat(32);
 const visitId = 'wv_' + 'a'.repeat(32);
 const at = (time, day = date) => Date.parse(day + 'T' + time + ':00+09:00');
 const json = (body, status = 200) => new Response(JSON.stringify(body), { status });
-const blankMemo = () => ({ contentProgress: '', homework: '', comment: '', otherNotes: '' });
+const blankMemo = () => ({ contentProgress: '', homework: '', comment: '', otherNotes: '', guardianNotice: '' });
 
 class Statement {
   constructor(db, sql) { this.db = db; this.sql = sql; this.args = []; }
@@ -75,7 +75,8 @@ class D1Database {
   }
   check(changes = {}, checkDate = date) {
     const data = { taskId: 'lesson-a', date: checkDate, att: 'L', done: false,
-      lessonMemo: { contentProgress: '원 교사 진도', homework: '원 교사 과제', comment: '원 코멘트', otherNotes: '원 내부 메모' },
+      lessonMemo: { contentProgress: '원 교사 진도', homework: '원 교사 과제', comment: '원 코멘트',
+        otherNotes: '원 내부 메모', guardianNotice: '원 보호자 안내사항' },
       privateField: 'check-private-marker', ...changes };
     this.sqlite.prepare('INSERT OR REPLACE INTO checks (app,k,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
       .run('task', data.taskId + '|' + checkDate, 'teacher-a', JSON.stringify(data), 1, 1);
@@ -156,9 +157,11 @@ test('full handoff freezes source memo and keeps teacher-specific receiver memo 
   const created = await createOk(db);
   assert.equal(created.status, 'pending'); assert.equal(created.revision, 1);
   assert.equal(created.sourceMemo.contentProgress, '원 교사 진도');
+  assert.equal(created.sourceMemo.guardianNotice, '원 보호자 안내사항');
   assert.deepEqual(created.memo, blankMemo()); assert.equal(created.visit.visitId, visitId);
   await acceptOk(db);
-  const memo = { contentProgress: '후반 진도', homework: '후반 과제', comment: '수신 교사 코멘트', otherNotes: '인계 내부 메모' };
+  const memo = { contentProgress: '후반 진도', homework: '후반 과제', comment: '수신 교사 코멘트',
+    otherNotes: '인계 내부 메모', guardianNotice: '수신 교사 안내사항' };
   const saved = await call(db, { action: 'save', handoffId: id, revision: 2, dataGeneration: 0, memo }, recipient, at('15:20'));
   assert.equal(saved.status, 200); assert.deepEqual(saved.body.handoff.memo, memo);
   const finished = await call(db, { action: 'complete', handoffId: id, revision: 3, dataGeneration: 0,

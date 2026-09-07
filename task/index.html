@@ -175,6 +175,7 @@
   .lesson-memo-field { display: block; min-width: 0; }
   .lesson-memo-field .fl { display: block; color: var(--mid-gray); font-size: 12.5px; font-weight: 700; }
   .lesson-memo-private { display: block; margin-top: 2px; color: #9E3629; font-size: 11px; font-weight: 700; }
+  .lesson-memo-public { display: block; margin-top: 2px; color: var(--deep-blue); font-size: 11px; font-weight: 700; }
   .lesson-memo-editor .lesson-memo-field textarea.note,
   .lesson-memo-editor:focus-within .lesson-memo-field textarea.note { height: 44px; min-height: 44px; margin-top: 5px; overflow-y: hidden; border-style: dashed; border-color: var(--line); background: var(--ivory); outline: none; }
   .lesson-memo-editor .lesson-memo-field textarea.note:focus { height: 132px; min-height: 132px; overflow-y: auto; border-style: solid; border-color: var(--blue); background: var(--white); outline: 2px solid rgba(30,157,214,.12); }
@@ -1127,12 +1128,12 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-09-05.3"></script>
-<script src="./schedule-board-core.js?v=2026-09-05.3"></script>
-<script src="./asset-core.js?v=2026-09-05.3"></script>
-<script src="./qr-core.js?v=2026-09-05.3"></script>
-<script src="./acaflow-import-core.js?v=2026-09-05.3"></script>
-<script src="./feedback-subject-catalog.js?v=2026-09-05.3"></script>
+<script src="./lesson-form-core.js?v=2026-09-07.1"></script>
+<script src="./schedule-board-core.js?v=2026-09-07.1"></script>
+<script src="./asset-core.js?v=2026-09-07.1"></script>
+<script src="./qr-core.js?v=2026-09-07.1"></script>
+<script src="./acaflow-import-core.js?v=2026-09-07.1"></script>
+<script src="./feedback-subject-catalog.js?v=2026-09-07.1"></script>
 <script>
 "use strict";
 
@@ -3673,7 +3674,7 @@ function isCurrentLessonHandoffContext(context) {
 function lessonHandoffMemoValues(value) {
   const memo = value && typeof value === 'object' ? value : {};
   const values = {};
-  ['contentProgress', 'homework', 'otherNotes', 'comment'].forEach(key => { values[key] = String(memo[key] || ''); });
+  ['contentProgress', 'homework', 'guardianNotice', 'otherNotes', 'comment'].forEach(key => { values[key] = String(memo[key] || ''); });
   return values;
 }
 
@@ -4467,6 +4468,7 @@ function taskRow(t, date, editable, isCarry) {
 const LESSON_MEMO_FIELDS = [
   { key: 'contentProgress', label: '수업내용 · 진도', placeholder: '오늘 수업한 내용과 실제 진도를 입력하세요' },
   { key: 'homework', label: '과제', placeholder: '학생에게 안내한 과제를 입력하세요' },
+  { key: 'guardianNotice', label: '안내사항', placeholder: '학부모에게 전달할 안내사항을 입력하세요 (선택)' },
   { key: 'otherNotes', label: '기타 · 특이사항', placeholder: '그 밖의 특이사항을 입력하세요' }
 ];
 
@@ -4502,11 +4504,15 @@ function taskMemoEditorHtml(t, date, c, editable) {
     }
     return '<div class="memo-editor lesson-memo-editor"><div class="lesson-memo-grid">' + LESSON_MEMO_FIELDS.map(field =>
       '<label class="lesson-memo-field"><span class="fl">' + esc(field.label) + '</span>' +
+      (field.key === 'guardianNotice' ? '<span class="lesson-memo-public">학부모 공개 · 피드백 발송용</span>' : '') +
       (field.key === 'otherNotes' ? '<span class="lesson-memo-private">선생님 내부 공유 · 학부모 미발송</span>' : '') +
       '<textarea class="note" data-lesson-memo-field="' +
-      field.key + '" data-id="' + t.id + '" data-date="' + date + '" rows="1" enterkeyhint="enter" placeholder="' + esc(field.placeholder) + '">' +
+      field.key + '" data-id="' + t.id + '" data-date="' + date + '" rows="1" enterkeyhint="enter"' +
+      (field.key === 'guardianNotice' ? ' maxlength="300" aria-describedby="lesson-notice-limit-' + esc(t.id) + '-' + esc(date) + '"' : '') +
+      ' placeholder="' + esc(field.placeholder) + '">' +
       esc(values[field.key]) + '</textarea></label>').join('') + '</div><button type="button" class="btn btn-primary btn-block memo-save" data-act="notesave" data-id="' +
-      t.id + '" data-date="' + date + '">수업 메모 저장</button></div>';
+      t.id + '" data-date="' + date + '">수업 메모 저장</button>' +
+      '<div class="small muted mt8" id="lesson-notice-limit-' + esc(t.id) + '-' + esc(date) + '">안내사항은 최대 300자까지 저장됩니다.</div></div>';
   }
   return editable
     ? '<div class="memo-editor"><textarea class="note" data-act="note" data-id="' + t.id + '" data-date="' + date + '" rows="1" enterkeyhint="enter" placeholder="메모 · 막힌 이유나 특이사항을 남기세요">' +
@@ -6008,7 +6014,7 @@ function feedbackPickSubjectSentence(subject, kind, id) {
     : '';
 }
 
-let fbCtx = null;   // {id,date,comment,focus,feedbackSubject,plus:[],plusSentences:{},minus,minusSentence}
+let fbCtx = null;   // {id,date,comment,noticeText,focus,feedbackSubject,plus:[],plusSentences:{},minus,minusSentence}
 function captureFeedbackComment() {
   const field = document.querySelector('[data-feedback-comment]');
   if (fbCtx && field) fbCtx.comment = field.value;
@@ -6118,8 +6124,20 @@ function feedbackText(t, date, genComment) {
   return parts.join('\n\n');
 }
 
+function stripFeedbackFormatControls(value) {
+  // 화면에는 보이지 않지만 템플릿 선택을 바꾸거나 양방향 표시를 속일 수 있는 형식 제어문자는 제거한다.
+  return String(value == null ? '' : value)
+    .replace(/[\u00ad\u061c\u180e\u200b-\u200f\u202a-\u202e\u2060\u2066-\u2069\ufeff]/g, '');
+}
+
 function feedbackFlatField(value) {
-  return String(value == null ? '' : value).replace(/[\r\n\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim();
+  return stripFeedbackFormatControls(value)
+    .replace(/[\r\n\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+/** 코멘트는 문단을 쓸 수 있으므로 서버의 본문 정규화와 같이 CRLF만 LF로 맞추고 줄바꿈은 보존한다. */
+function feedbackCommentField(value) {
+  return stripFeedbackFormatControls(value).replace(/\r\n?/g, '\n').trim();
 }
 
 function setFeedbackPolishStatus(state, message, root) {
@@ -6205,12 +6223,50 @@ function feedbackV2Message(t, date, fields) {
     '문의 사항이 있으시면 학원으로 연락부탁드립니다. 감사합니다.';
 }
 
+function feedbackV3Message(t, date, fields) {
+  return '안녕하세요, WB 웩슬러브레인센터(독해력학원) 입니다.\n\n' +
+    studentOf(t) + ' 학생의 오늘 수업 피드백을 정리해 보내드립니다.\n\n' +
+    '- 일시 : ' + feedbackDateLabel(date) + '\n\n' +
+    '- 과목 : ' + fields.subjectText + '\n\n' +
+    '- 수업내용 · 진도 : ' + fields.contentText + '\n\n' +
+    '- 과제 : ' + fields.homeworkText + '\n\n' +
+    '- 코멘트 : ' + fields.commentText + '\n\n' +
+    '- 안내사항 : ' + fields.noticeText + '\n\n\n' +
+    '문의 사항이 있으시면 학원으로 연락부탁드립니다. 감사합니다.';
+}
+
+function feedbackTemplateVersion(fields) {
+  if (fields && fields.templateVersion === 'v1') return 'v1';
+  return feedbackFlatField(fields && fields.noticeText).trim() ? 'v3' : 'v2';
+}
+
+function isStructuredFeedbackTemplate(templateVersion) {
+  return templateVersion === 'v2' || templateVersion === 'v3';
+}
+
+function feedbackStructuredMessage(t, date, fields) {
+  const normalized = feedbackStructuredFields(fields);
+  return feedbackTemplateVersion(normalized) === 'v3'
+    ? feedbackV3Message(t, date, normalized) : feedbackV2Message(t, date, normalized);
+}
+
 const FEEDBACK_ALIMTALK_MAX_CHARS = 900;
 const FEEDBACK_COMMENT_MAX_CHARS = 600;
 const FEEDBACK_AI_MIN_BODY_CHARS = 20;
 
+function feedbackStructuredFields(fields) {
+  const source = fields || {};
+  return {
+    subjectText: feedbackFlatField(source.subjectText).slice(0, 80),
+    contentText: feedbackFlatField(source.contentText).slice(0, 300),
+    homeworkText: feedbackFlatField(source.homeworkText).slice(0, 300),
+    commentText: feedbackCommentField(source.commentText).slice(0, FEEDBACK_COMMENT_MAX_CHARS),
+    noticeText: feedbackFlatField(source.noticeText).slice(0, 300)
+  };
+}
+
 function feedbackCommentBudget(t, date, fields) {
-  const emptyComment = feedbackV2Message(t, date, { ...fields, commentText: '' });
+  const emptyComment = feedbackStructuredMessage(t, date, { ...fields, commentText: '' });
   return Math.max(0, Math.min(FEEDBACK_COMMENT_MAX_CHARS,
     FEEDBACK_ALIMTALK_MAX_CHARS - emptyComment.length));
 }
@@ -6232,15 +6288,16 @@ function feedbackFinalSendBlockReason(t, templateVersion, message) {
     return 'studentId가 연결되지 않아 전송할 수 없습니다. 원생 명단에서 학생을 다시 연결해 주세요.';
   }
   if (!parentFeedbackEnabledFor(t.studentId)) return '이 학생은 학부모 피드백 전달 허용 대상이 아닙니다.';
-  if (templateVersion === 'v2') {
+  if (isStructuredFeedbackTemplate(templateVersion)) {
     const missing = [];
     if (!String(fbCtx.subjectText || '').trim()) missing.push('과목');
     if (!String(fbCtx.contentText || '').trim()) missing.push('수업내용 · 진도');
     if (!String(fbCtx.homeworkText || '').trim()) missing.push('과제');
     if (!String(fbCtx.commentText || '').trim()) missing.push('코멘트');
+    if (templateVersion === 'v3' && !String(fbCtx.noticeText || '').trim()) missing.push('안내사항');
     if (missing.length) return missing.join('·') + ' 빈칸이 있어 전송할 수 없습니다.';
     if (String(message || '').length > FEEDBACK_ALIMTALK_MAX_CHARS) {
-      return '전체 문구가 900자를 초과했습니다. 수업내용·과제 또는 코멘트를 줄여 주세요.';
+      return '전체 문구가 900자를 초과했습니다. 수업내용·과제·코멘트 또는 안내사항을 줄여 주세요.';
     }
     if (String(fbCtx.commentText || '').length > feedbackCommentBudget(t, fbCtx.date, fbCtx)) {
       return '코멘트가 현재 알림톡 글자 수 한도를 초과했습니다.';
@@ -6258,9 +6315,10 @@ function feedbackFinalSendBlockReason(t, templateVersion, message) {
 
 function refreshFeedbackFinalSendStatus(t, root) {
   if (!fbCtx) return;
-  const templateVersion = fbCtx.templateVersion === 'v1' ? 'v1' : 'v2';
-  const message = templateVersion === 'v2'
-    ? (t ? feedbackV2Message(t, fbCtx.date, fbCtx) : '')
+  const templateVersion = feedbackTemplateVersion(fbCtx);
+  fbCtx.templateVersion = templateVersion;
+  const message = isStructuredFeedbackTemplate(templateVersion)
+    ? (t ? feedbackStructuredMessage(t, fbCtx.date, fbCtx) : '')
     : String(((root && root.querySelector && root.querySelector('#mText')) || {}).value || '').trim();
   const reason = feedbackFinalSendBlockReason(t, templateVersion, message);
   setFeedbackFinalSendStatus(reason ? 'error' : 'success',
@@ -6271,22 +6329,27 @@ function updateFeedbackPreviewLength(t, root) {
   const scope = root && typeof root.querySelector === 'function' ? root : document;
   const target = scope.querySelector('#feedbackPreviewLength');
   if (!fbCtx) return;
-  if (fbCtx.templateVersion !== 'v2') {
+  fbCtx.templateVersion = feedbackTemplateVersion(fbCtx);
+  if (!isStructuredFeedbackTemplate(fbCtx.templateVersion)) {
     refreshFeedbackFinalSendStatus(t, scope);
     return;
   }
   if (!target) return;
-  const message = feedbackV2Message(t, fbCtx.date, fbCtx);
+  const message = feedbackStructuredMessage(t, fbCtx.date, fbCtx);
   const limit = feedbackCommentBudget(t, fbCtx.date, fbCtx);
-  const contentText = String(fbCtx.contentText || '').trim();
-  const homeworkText = String(fbCtx.homeworkText || '').trim();
-  const commentText = String(fbCtx.commentText || '').trim();
-  const subjectText = String(fbCtx.subjectText || '').trim();
-  const hasRequiredFields = !!subjectText && !!contentText && !!homeworkText && !!commentText;
+  const normalized = feedbackStructuredFields(fbCtx);
+  const contentText = normalized.contentText;
+  const homeworkText = normalized.homeworkText;
+  const commentText = normalized.commentText;
+  const subjectText = normalized.subjectText;
+  const noticeText = normalized.noticeText;
+  const hasRequiredFields = !!subjectText && !!contentText && !!homeworkText && !!commentText &&
+    (fbCtx.templateVersion !== 'v3' || !!noticeText);
   const sendValid = hasRequiredFields && commentText.length <= limit &&
     message.length <= FEEDBACK_ALIMTALK_MAX_CHARS;
-  target.textContent = '코멘트 ' + commentText.length + '/' + limit + '자 · 전체 ' +
-    message.length + '/' + FEEDBACK_ALIMTALK_MAX_CHARS + '자';
+  target.textContent = (fbCtx.templateVersion === 'v3' ? '안내사항 ' + noticeText.length + '/300자 · ' : '') +
+    '코멘트 ' + commentText.length + '/' + limit + '자 · 전체 ' +
+    message.length + '/' + FEEDBACK_ALIMTALK_MAX_CHARS + '자 · ' + fbCtx.templateVersion.toUpperCase();
   target.className = 'small mt8 ' + (sendValid ? 'muted' : 'bad');
   const polishButton = scope.querySelector('[data-act="feedbackpolish"]');
   if (polishButton) polishButton.disabled = !!fbCtx.polishPending;
@@ -6295,9 +6358,9 @@ function updateFeedbackPreviewLength(t, root) {
 
 function syncFeedbackFinalFieldFromInput(target) {
   const field = target && target.closest && target.closest('[data-feedback-final-field]');
-  if (!field || !fbCtx || fbCtx.templateVersion !== 'v2') return false;
+  if (!field || !fbCtx || !isStructuredFeedbackTemplate(fbCtx.templateVersion)) return false;
   const key = String(field.dataset.feedbackFinalField || '');
-  if (!['subjectText', 'contentText', 'homeworkText', 'commentText'].includes(key)) return false;
+  if (!['subjectText', 'contentText', 'homeworkText', 'commentText', 'noticeText'].includes(key)) return false;
   const task = state.tasks.find(row => row.id === fbCtx.id);
   if (!task) return true;
   if (fbCtx.polishPending) {
@@ -6306,7 +6369,8 @@ function syncFeedbackFinalFieldFromInput(target) {
   }
   const modalBox = field.closest('.modal-box');
   const maxChars = key === 'commentText' ? FEEDBACK_COMMENT_MAX_CHARS : (key === 'subjectText' ? 80 : 300);
-  const nextValue = feedbackFlatField(field.value).slice(0, maxChars);
+  const nextValue = (key === 'commentText'
+    ? feedbackCommentField(field.value) : feedbackFlatField(field.value)).slice(0, maxChars);
   fbCtx[key] = nextValue;
   if (key === 'commentText') {
     fbCtx.baseCommentText = nextValue;
@@ -6321,13 +6385,14 @@ function syncFeedbackFinalFieldFromInput(target) {
       : '발송 내용을 직접 수정했습니다. 다시 확인한 뒤 AI 다듬기를 눌러 주세요.', modalBox);
   }
   fbCtx.polishSeq = Number(fbCtx.polishSeq || 0) + 1;
+  fbCtx.templateVersion = feedbackTemplateVersion(fbCtx);
   const preview = modalBox && modalBox.querySelector('#mText');
-  if (preview) preview.value = feedbackV2Message(task, fbCtx.date, fbCtx);
+  if (preview) preview.value = feedbackStructuredMessage(task, fbCtx.date, fbCtx);
   updateFeedbackPreviewLength(task, modalBox);
   return true;
 }
 
-/** 새 알림톡 v2의 과목/수업내용/과제/코멘트 변수값이다.
+/** 새 알림톡 v2/v3의 과목/수업내용/과제/코멘트/안내사항 변수값이다.
  *  수업내용·진도와 과제는 저장된 수업 메모를 우선하고, 코멘트는 직접 작성 내용과
  *  인터뷰 선택값을 100개 이상의 격식체 기본 문장에서 학생·수업·날짜별로 조합한다. */
 function computeFeedbackFields(t, date, fbCtx) {
@@ -6339,6 +6404,7 @@ function computeFeedbackFields(t, date, fbCtx) {
     [t.subject, t.className].filter(Boolean).join(' · ') || '수업 진행').slice(0, 300);
   const subjectText = feedbackFlatField(t.subject || t.className || '').slice(0, 80);
   const homeworkText = feedbackFlatField(memo.homework || '없음').slice(0, 300) || '없음';
+  const noticeText = feedbackFlatField(memo.guardianNotice || '').slice(0, 300);
   const plusText = ((fbCtx && fbCtx.plus) || []).filter(id => id !== 'none').map(id => {
     const option = feedbackSubjectButton(fbCtx && fbCtx.feedbackSubject, 'strength', id);
     return option ? option.label : (typeof id === 'number' && FB_PLUS[id] ? FB_PLUS[id][0] : '');
@@ -6352,42 +6418,49 @@ function computeFeedbackFields(t, date, fbCtx) {
   const studentKey = String(t.studentId || studentOf(t) || '');
   const seed = studentKey + '|' + t.id + '|' + date;
   const commentText = buildFormalFeedbackComment(fbCtx || {}, seed, studentOf(t), date, studentKey);
-  return { subjectText, contentText, homeworkText, commentText, plusText, minusText };
+  return { subjectText, contentText, homeworkText, commentText, noticeText, plusText, minusText };
 }
 
 /** 실제 발송(카카오 알림톡) 미리보기 + 발송 버튼.
- *  v2는 승인 템플릿과 같은 고정 틀을 읽기 전용으로 보여 주어 미리보기와 실제 발송이 어긋나지 않게 한다.
+ *  v2/v3는 승인 템플릿과 같은 고정 틀을 읽기 전용으로 보여 주어 미리보기와 실제 발송이 어긋나지 않게 한다.
  *  과거 v1 수정 요청은 예전 필드와 본문을 그대로 열어 기존 이력을 보존한다. */
 function showFeedbackPreview(t, date, fields, letterText) {
-  const templateVersion = fields.templateVersion === 'v1' ? 'v1' : 'v2';
+  const templateVersion = feedbackTemplateVersion(fields);
+  const structuredTemplate = isStructuredFeedbackTemplate(templateVersion);
   const previousContext = fbCtx && fbCtx.id === t.id && fbCtx.date === date ? fbCtx : null;
-  const initialCommentText = String(fields.commentText || '').trim();
+  const normalizedFields = structuredTemplate ? feedbackStructuredFields(fields) : null;
+  const initialCommentText = structuredTemplate
+    ? normalizedFields.commentText : String(fields.commentText || '').trim();
   fbCtx = {
     id: t.id, date: date, templateVersion: templateVersion,
-    subjectText: feedbackFlatField(fields.subjectText),
-    contentText: feedbackFlatField(fields.contentText).slice(0, 300),
-    homeworkText: feedbackFlatField(fields.homeworkText).slice(0, 300),
+    subjectText: structuredTemplate ? normalizedFields.subjectText : feedbackFlatField(fields.subjectText),
+    contentText: structuredTemplate ? normalizedFields.contentText : feedbackFlatField(fields.contentText).slice(0, 300),
+    homeworkText: structuredTemplate ? normalizedFields.homeworkText : feedbackFlatField(fields.homeworkText).slice(0, 300),
     commentText: initialCommentText,
-    baseCommentText: String(fields.baseCommentText || initialCommentText).trim(),
+    noticeText: structuredTemplate ? normalizedFields.noticeText : '',
+    baseCommentText: structuredTemplate
+      ? feedbackCommentField(fields.baseCommentText || initialCommentText).slice(0, FEEDBACK_COMMENT_MAX_CHARS)
+      : String(fields.baseCommentText || initialCommentText).trim(),
     plusText: feedbackFlatField(fields.plusText), minusText: feedbackFlatField(fields.minusText),
     polishSeq: Number(previousContext && previousContext.polishSeq || 0), polishPending: false
   };
   const teacher = (currentStaff() || {}).name || '';
   const student = studentOf(t);
   const guardianDeliveryEnabled = parentFeedbackEnabledFor(t && t.studentId);
-  if (letterText == null) letterText = templateVersion === 'v2'
-    ? feedbackV2Message(t, date, fbCtx) : feedbackText(t, date);
+  if (letterText == null || structuredTemplate) letterText = structuredTemplate
+    ? feedbackStructuredMessage(t, date, fbCtx) : feedbackText(t, date);
   const legacyFields = templateVersion === 'v1'
     ? '<div class="field"><label class="fl">잘한 점</label><input class="in" id="fldPlus" value="' + esc(fbCtx.plusText) + '"></div>' +
       '<div class="field"><label class="fl">다음에 더 신경 쓸 점</label><input class="in" id="fldMinus" value="' + esc(fbCtx.minusText) + '"></div>'
     : '';
-  const finalFieldEditor = templateVersion === 'v2'
+  const finalFieldEditor = structuredTemplate
     ? '<div class="card mt14"><div class="card-title mb8">최종 발송 내용 직접 수정</div>' +
-      '<div class="small muted mb8">승인된 고정 문구는 유지되고, 아래 네 항목만 실제 알림톡 변수로 전송됩니다.</div>' +
+      '<div class="small muted mb8">승인된 고정 문구는 유지되고, 아래 다섯 항목만 실제 알림톡 변수로 전송됩니다. 안내사항이 비어 있으면 V2, 입력하면 V3가 자동 선택됩니다.</div>' +
       '<label class="field"><span class="fl">과목</span><input class="in" maxlength="80" data-feedback-final-field="subjectText" value="' + esc(fbCtx.subjectText) + '"></label>' +
       '<label class="field"><span class="fl">수업내용 · 진도</span><textarea class="in" rows="2" maxlength="300" data-feedback-final-field="contentText">' + esc(fbCtx.contentText) + '</textarea></label>' +
       '<label class="field"><span class="fl">과제</span><textarea class="in" rows="2" maxlength="300" data-feedback-final-field="homeworkText">' + esc(fbCtx.homeworkText) + '</textarea></label>' +
-      '<label class="field"><span class="fl">코멘트</span><textarea class="in" rows="5" maxlength="600" data-feedback-final-field="commentText">' + esc(fbCtx.commentText) + '</textarea></label></div>'
+      '<label class="field"><span class="fl">코멘트</span><textarea class="in" rows="5" maxlength="600" data-feedback-final-field="commentText">' + esc(fbCtx.commentText) + '</textarea></label>' +
+      '<label class="field"><span class="fl">안내사항 (선택)</span><textarea class="in" rows="3" maxlength="300" data-feedback-final-field="noticeText">' + esc(fbCtx.noticeText) + '</textarea></label></div>'
     : '';
   modal('수업 피드백 문구 — ' + esc(student) + ' 학생',
     '<div class="small muted mb8">' + esc(teacher) + ' 선생님 수업 기록을 바탕으로 만든 문구입니다.</div>' +
@@ -6396,12 +6469,12 @@ function showFeedbackPreview(t, date, fields, letterText) {
       ? '<div class="hint mt14"><b>전체 원생 학부모 피드백 사용 중</b> — 아래 발송 버튼을 누르면 저장된 보호자 연락처로 실제 알림톡 발송을 시도합니다.</div>'
       : '<div class="hint mt14"><b>학부모 피드백 전달 대상 아님</b> — 버튼을 누르면 전송할 수 없는 정확한 이유가 아래에 표시됩니다.</div>') +
     finalFieldEditor +
-    '<textarea class="in" rows="12" id="mText" style="margin-top:10px"' + (templateVersion === 'v2' ? ' readonly' : '') + '>' + esc(letterText) + '</textarea>' +
-    (templateVersion === 'v2' ? '<div class="small muted mt8" id="feedbackPreviewLength"></div>' : '') +
-    '<div class="small muted mt8">' + (templateVersion === 'v2'
+    '<textarea class="in" rows="12" id="mText" style="margin-top:10px"' + (structuredTemplate ? ' readonly' : '') + '>' + esc(letterText) + '</textarea>' +
+    (structuredTemplate ? '<div class="small muted mt8" id="feedbackPreviewLength"></div>' : '') +
+    '<div class="small muted mt8">' + (structuredTemplate
       ? '승인 템플릿과 위의 수정 가능한 발송 변수로 만든 최종 미리보기입니다.'
       : '과거 템플릿 수정 요청입니다. 저장된 수업내용·진도와 선택 항목을 확인해 주세요.') + '</div>',
-    (templateVersion === 'v2'
+    (structuredTemplate
       ? '<button class="btn btn-navy btn-block mt14" data-act="feedbackpolish">코멘트만 AI 다듬기</button>' +
         '<div class="feedback-polish-status mt8" id="feedbackPolishStatus" data-state="idle" role="status" aria-live="polite"></div>' : '') +
     '<button class="btn btn-ghost btn-block mt8" data-act="copytext">복사하기</button>' +
@@ -8613,7 +8686,7 @@ async function reviewLessonChange(action, key, revision) {
  *  성공한 결과도 최종 전송을 누르기 전에는 저장하거나 발송하지 않는다. */
 async function polishFeedbackComment(button) {
   const context = fbCtx;
-  if (!context || context.templateVersion !== 'v2') return;
+  if (!context || !isStructuredFeedbackTemplate(context.templateVersion)) return;
   const modalBox = button && button.closest('.modal-box');
   if (!modalBox) return toast('피드백 화면을 다시 열어 주세요');
   const stopWithReason = message => {
@@ -8630,7 +8703,10 @@ async function polishFeedbackComment(button) {
   if (!auth) return stopWithReason('동기화 인증이 필요합니다.');
   const latestCommentField = modalBox.querySelector('[data-feedback-final-field="commentText"]');
   if (latestCommentField) syncFeedbackFinalFieldFromInput(latestCommentField);
-  const sourceComment = feedbackFlatField(latestCommentField ? latestCommentField.value : context.commentText);
+  Object.assign(context, feedbackStructuredFields(context));
+  const sourceComment = feedbackCommentField(latestCommentField ? latestCommentField.value : context.commentText)
+    .slice(0, FEEDBACK_COMMENT_MAX_CHARS);
+  context.commentText = sourceComment;
   const missing = [];
   if (!String(context.subjectText || '').trim()) missing.push('과목');
   if (!String(context.contentText || '').trim()) missing.push('수업내용 · 진도');
@@ -8658,6 +8734,7 @@ async function polishFeedbackComment(button) {
     const result = await sync.post('/feedback-polish', {
       app: SYNC_APP, auth,
       taskId: context.id, feedbackDate: context.date,
+      templateVersion: feedbackTemplateVersion(context), noticeText: context.noticeText,
       subjectText: context.subjectText,
       contentText: context.contentText, homeworkText: context.homeworkText,
       commentText: sourceComment
@@ -8673,14 +8750,14 @@ async function polishFeedbackComment(button) {
     if (feedbackPolishHasArtifacts(rawCommentText)) {
       throw new Error('AI 결과에 코드 또는 불필요한 기호가 포함되어 적용하지 않았습니다');
     }
-    const commentText = feedbackFlatField(rawCommentText);
+    const commentText = feedbackCommentField(rawCommentText);
     const maxChars = Number(result && result.maxChars);
     const localLimit = feedbackCommentBudget(task, context.date, context);
     if (!commentText || !Number.isInteger(maxChars) || maxChars < 1 || maxChars !== localLimit ||
         commentText.length > maxChars || commentText.length > FEEDBACK_COMMENT_MAX_CHARS) {
       throw new Error('AI 결과의 글자 수를 확인하지 못했습니다');
     }
-    const nextMessage = feedbackV2Message(task, context.date, { ...context, commentText });
+    const nextMessage = feedbackStructuredMessage(task, context.date, { ...context, commentText });
     if (nextMessage.length > FEEDBACK_ALIMTALK_MAX_CHARS) {
       throw new Error('다듬은 문구가 알림톡 글자 수를 넘었습니다');
     }
@@ -8733,11 +8810,14 @@ async function submitFeedbackForReview(button) {
     return;
   }
   const task = state.tasks.find(row => row.id === fbCtx.id);
-  const templateVersion = fbCtx.templateVersion === 'v1' ? 'v1' : 'v2';
-  const message = templateVersion === 'v2'
-    ? (task ? feedbackV2Message(task, fbCtx.date, fbCtx) : '')
+  if (fbCtx.templateVersion !== 'v1') Object.assign(fbCtx, feedbackStructuredFields(fbCtx));
+  const templateVersion = feedbackTemplateVersion(fbCtx);
+  fbCtx.templateVersion = templateVersion;
+  const message = isStructuredFeedbackTemplate(templateVersion)
+    ? (task ? feedbackStructuredMessage(task, fbCtx.date, fbCtx) : '')
     : String(((modalBox && modalBox.querySelector('#mText')) || {}).value || '').trim();
-  const contentText = String(fbCtx.contentText || '').trim();
+  const contentText = templateVersion === 'v1'
+    ? String(fbCtx.contentText || '').trim() : fbCtx.contentText;
   const plusText = templateVersion === 'v1'
     ? String(((modalBox && modalBox.querySelector('#fldPlus')) || {}).value || '').trim()
     : String(fbCtx.plusText || '').trim();
@@ -8772,6 +8852,7 @@ async function submitFeedbackForReview(button) {
       feedbackDate: fbCtx.date, feedbackType: 'class_feedback', templateVersion: templateVersion,
       message: message, contentText: contentText, subjectText: fbCtx.subjectText,
       homeworkText: fbCtx.homeworkText, commentText: fbCtx.commentText,
+      noticeText: fbCtx.noticeText,
       plusText: plusText, minusText: minusText
     });
     feedbackQueueLoaded = false; ownFeedbackQueueLoaded = false; feedbackDateQueueLoadedDate = '';
@@ -20604,6 +20685,11 @@ document.addEventListener('click', ev => {
       const editor = el.closest('.memo-editor');
       const lessonFields = editor && Array.from(editor.querySelectorAll('[data-lesson-memo-field]'));
       if (lessonFields && lessonFields.length) {
+        const guardianNoticeField = lessonFields.find(field => field.dataset.lessonMemoField === 'guardianNotice');
+        if (guardianNoticeField && String(guardianNoticeField.value || '').length > 300) {
+          guardianNoticeField.focus();
+          return toast('안내사항은 300자까지 입력할 수 있습니다');
+        }
         const lessonMemo = lessonMemoValues(getCheck(id, date));
         LESSON_MEMO_FIELDS.forEach(field => { lessonMemo[field.key] = ''; });
         lessonFields.forEach(field => {
@@ -21156,7 +21242,8 @@ document.addEventListener('click', ev => {
     }
     case 'fbtext': {
       const t = task(); if (!t) break;
-      fbCtx = { id: id, date: date, comment: lessonMemoValues(getCheck(id, date)).comment,
+      const savedLessonMemo = lessonMemoValues(getCheck(id, date));
+      fbCtx = { id: id, date: date, comment: savedLessonMemo.comment, noticeText: savedLessonMemo.guardianNotice,
         focus: null, feedbackSubject: feedbackSentenceSubject(t.subject || t.className),
         plus: [], plusSentences: {}, minus: null, minusSentence: '' };
       fbModal();
@@ -21236,7 +21323,7 @@ document.addEventListener('click', ev => {
       lessonMemo.comment = String(fbCtx.comment || '');
       setCheck(fbCtx.id, fbCtx.date, { lessonMemo: lessonMemo, note: lessonMemoText(lessonMemo) });
       const fields = computeFeedbackFields(t, fbCtx.date, fbCtx);
-      showFeedbackPreview(t, fbCtx.date, fields, feedbackV2Message(t, fbCtx.date, fields));
+      showFeedbackPreview(t, fbCtx.date, fields, feedbackStructuredMessage(t, fbCtx.date, fields));
       break;
     }
     case 'feedbackpolish': polishFeedbackComment(el); break;
@@ -21270,7 +21357,8 @@ document.addEventListener('click', ev => {
       showFeedbackPreview(t, item.feedbackDate, {
         templateVersion: item.templateVersion,
         subjectText: item.subjectText, contentText: item.contentText, homeworkText: item.homeworkText,
-        commentText: item.commentText, plusText: item.plusText, minusText: item.minusText
+        commentText: item.commentText, noticeText: item.noticeText,
+        plusText: item.plusText, minusText: item.minusText
       }, item.message || undefined);
       break;
     }
@@ -22443,7 +22531,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-09-05.3';
+const APP_VER = '2026-09-07.1';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);

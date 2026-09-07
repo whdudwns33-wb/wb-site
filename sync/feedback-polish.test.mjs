@@ -477,6 +477,51 @@ test('요청 과목은 글자수 예산과 익명 수업 문맥에 반영되고 
   assert.equal(calls, 0);
 });
 
+test('V3 안내사항은 900자 코멘트 예산과 비식별 캐시에 반영하되 AI 입력에는 보내지 않는다', async () => {
+  const noticeText = '다음 수업 일정은 별도 안내드리겠습니다.';
+  const contentText = '수업내용'.repeat(35);
+  const homeworkText = '과제내용'.repeat(35);
+  const response = '__WB_STUDENT__는 오늘 3개 문제를 차분하게 확인했습니다. 풀이 과정에도 성실하게 참여했습니다.';
+  const v2 = await call(seededDb(), validBody({ templateVersion: 'v2', contentText, homeworkText }), {
+    AI: { run: async () => ({ response }) }
+  });
+  const db = seededDb();
+  let captured = '';
+  const v3 = await call(db, validBody({ templateVersion: 'v3', noticeText, contentText, homeworkText }), {
+    AI: { run: async (name, input) => {
+      captured = aiInputText(input);
+      return { response };
+    } }
+  });
+  assert.equal(v2.status, 200);
+  assert.equal(v3.status, 200);
+  assert.equal(v2.body.maxChars - v3.body.maxChars,
+    '- 안내사항 : \n\n\n'.length + noticeText.length);
+  assert.ok(!captured.includes(noticeText), '안내사항 평문은 Workers AI에 전달하면 안 된다');
+  const stored = JSON.stringify(db.database.prepare('SELECT * FROM feedback_polish_cache').all());
+  assert.ok(!stored.includes(noticeText), '안내사항 평문은 AI 캐시에 저장하면 안 된다');
+});
+
+test('AI 다듬기는 V2/V3 안내사항 조합과 안내사항 길이를 fail-closed 검증한다', async () => {
+  let calls = 0;
+  const AI = { run: async () => {
+    calls += 1;
+    return { response: RICH_COMMENT };
+  } };
+  for (const [overrides, expectedStatus] of [
+    [{ templateVersion: 'v3', noticeText: '' }, 400],
+    [{ templateVersion: 'v3',
+      noticeText: '\u00AD\u061C\u180E\u200B\u200F\u202A\u202E\u2060\u2066\u2069\uFEFF' }, 400],
+    [{ templateVersion: 'v2', noticeText: '안내 문구' }, 400],
+    [{ templateVersion: 'v4', noticeText: '안내 문구' }, 400],
+    [{ templateVersion: 'v3', noticeText: '가'.repeat(301) }, 413]
+  ]) {
+    const result = await call(seededDb(), validBody(overrides), { AI });
+    assert.equal(result.status, expectedStatus, JSON.stringify(result.body));
+  }
+  assert.equal(calls, 0);
+});
+
 test('피드백 조회 D1 오류는 원문을 숨기고 기존 문구 보존용 안전 코드로 바꾼다', async () => {
   const DB = { prepare(sql) {
     assert.match(sql, /SELECT owner,data FROM tasks/);

@@ -18,7 +18,8 @@ const FEEDBACK_AI_TARGET_MAX_CHARS = 300;
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const SAFE_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const ALLOWED_KEYS = new Set([
-  'app', 'auth', 'taskId', 'feedbackDate', 'subjectText', 'contentText', 'homeworkText', 'commentText'
+  'app', 'auth', 'taskId', 'feedbackDate', 'templateVersion', 'subjectText', 'contentText', 'homeworkText',
+  'commentText', 'noticeText'
 ]);
 const MAX_SOURCE_COMMENT = MAX_PARENT_FEEDBACK_COMMENT_CHARS;
 const MAX_FEEDBACK_FIELD = 300;
@@ -38,7 +39,8 @@ const FEEDBACK_RESPONSE_FORMAT = Object.freeze({
 
 function oneLine(value) {
   return String(value == null ? '' : value).normalize('NFKC')
-    .replace(/[\r\n\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim();
+    .replace(/[\r\n\u0000-\u001f\u007f\u00ad\u061c\u180e\u200b-\u200f\u202a-\u202e\u2060\u2066-\u2069\ufeff]/gi, ' ')
+    .replace(/\s+/g, ' ').trim();
 }
 
 function validDate(value) {
@@ -862,11 +864,20 @@ export async function handleFeedbackPolish(env, app, body, origin, auth, json) {
   const feedbackDate = String(body.feedbackDate || '');
   const hasSubjectText = Object.hasOwn(body, 'subjectText');
   const requestedSubjectText = hasSubjectText ? oneLine(body.subjectText) : '';
+  const requestedTemplateVersion = oneLine(body.templateVersion).toLowerCase();
   const contentText = oneLine(body.contentText);
   const homeworkText = oneLine(body.homeworkText);
   const source = oneLine(body.commentText);
+  const noticeText = oneLine(body.noticeText);
+  const templateVersion = requestedTemplateVersion || (noticeText ? 'v3' : 'v2');
   if (!SAFE_ID.test(taskId) || !validDate(feedbackDate) || !contentText || !homeworkText || !source) {
     return json({ ok: false, error: '수업·날짜·피드백 내용을 확인해 주세요' }, 400, origin);
+  }
+  if (templateVersion !== 'v2' && templateVersion !== 'v3') {
+    return json({ ok: false, error: '피드백 템플릿 버전을 확인해 주세요' }, 400, origin);
+  }
+  if ((templateVersion === 'v3' && !noticeText) || (templateVersion === 'v2' && noticeText)) {
+    return json({ ok: false, error: '안내사항과 피드백 템플릿 버전을 확인해 주세요' }, 400, origin);
   }
   if (hasSubjectText && !requestedSubjectText) {
     return json({ ok: false, error: '과목을 확인해 주세요' }, 400, origin);
@@ -875,6 +886,7 @@ export async function handleFeedbackPolish(env, app, body, origin, auth, json) {
     return json({ ok: false, error: '과목은 ' + MAX_SUBJECT_FIELD + '자까지 입력할 수 있습니다' }, 413, origin);
   }
   if (contentText.length > MAX_FEEDBACK_FIELD || homeworkText.length > MAX_FEEDBACK_FIELD ||
+      noticeText.length > MAX_FEEDBACK_FIELD ||
       source.length > MAX_SOURCE_COMMENT) {
     return json({ ok: false, error: 'AI 다듬기 문구가 허용 길이를 넘었습니다' }, 413, origin);
   }
@@ -912,11 +924,13 @@ export async function handleFeedbackPolish(env, app, body, origin, auth, json) {
       error: '연락처·이메일·링크가 포함된 피드백 내용은 AI로 다듬지 않습니다' }, 422, origin);
   }
   const maxChars = parentFeedbackV2CommentBudget({
+    templateVersion,
     studentName,
     dateText: feedbackDateText(feedbackDate),
     subjectText,
     contentText,
-    homeworkText
+    homeworkText,
+    noticeText
   });
   if (maxChars < MIN_COMMENT_BUDGET) {
     return json({ ok: false, code: 'FEEDBACK_LENGTH_LIMIT',
@@ -966,6 +980,11 @@ export async function handleFeedbackPolish(env, app, body, origin, auth, json) {
     homeworkText: maskOtherNames(targetMaskedContext.homeworkText),
     commentText: maskOtherNames(targetMaskedContext.commentText)
   };
+  // V3 안내사항은 AI 입력에 보내지 않는다. 다만 최종 900자 예산과 요청 원문이 달라지므로
+  // HMAC 캐시 식별자에는 포함해 서로 다른 요청 결과가 섞이지 않게 한다(평문은 저장하지 않는다).
+  const cacheContext = templateVersion === 'v3'
+    ? { ...maskedContext, templateVersion, noticeText }
+    : maskedContext;
   const residualNames = targetNameGroups.exact.concat(targetNameGroups.contextual);
   const residualContext = feedbackContextText(maskedContext).split(STUDENT_MARKER).join('');
   if (residualNames.some(name => hasResidualStudentName(residualContext, name))) {
@@ -983,7 +1002,7 @@ export async function handleFeedbackPolish(env, app, body, origin, auth, json) {
   let cacheKey;
   try {
     cacheKey = await feedbackPolishCacheKey(
-      env.WB_PARENT_FEEDBACK_AI_CACHE_SECRET, maskedContext, aiMaxChars,
+      env.WB_PARENT_FEEDBACK_AI_CACHE_SECRET, cacheContext, aiMaxChars,
       taskId + '|' + feedbackDate);
   } catch (error) {
     cacheKey = '';

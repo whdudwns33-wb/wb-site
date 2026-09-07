@@ -2055,6 +2055,7 @@ const FEEDBACK_STATUSES = new Set([
 ]);
 const SAFE_FEEDBACK_PART = /^[A-Za-z0-9_-]{1,64}$/;
 const SAFE_FEEDBACK_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const FEEDBACK_TEMPLATE_VERSIONS = new Set(['v1', 'v2', 'v3']);
 const MAX_FEEDBACK_BODY = 5000;
 const MAX_REVIEW_NOTE = 1000;
 const MAX_FEEDBACK_FIELD = 300;   // 알림톡 항목별 변수 하나당 상한 — 900자 총합 체크는 발송 시점에 다시 한다
@@ -2081,8 +2082,15 @@ async function activeStaffName(env, app, staffId) {
   }
 }
 
+function stripFeedbackFormatControls(value) {
+  return String(value == null ? '' : value)
+    .replace(/[\u00ad\u061c\u180e\u200b-\u200f\u202a-\u202e\u2060\u2066-\u2069\ufeff]/gi, '');
+}
+
 function normalizeFeedbackField(value) {
-  return String(value == null ? '' : value).replace(/[\r\n\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim();
+  return stripFeedbackFormatControls(value)
+    .replace(/[\r\n\u0000-\u001f\u007f]/g, ' ')
+    .replace(/\s+/g, ' ').trim();
 }
 
 function validIsoDate(value) {
@@ -2093,7 +2101,13 @@ function validIsoDate(value) {
 }
 
 function normalizeFeedbackBody(value) {
-  return String(value == null ? '' : value).replace(/\r\n?/g, '\n').trim();
+  return stripFeedbackFormatControls(value).replace(/\r\n?/g, '\n').trim();
+}
+
+/** parent-feedback-send.js의 cleanField와 같은 발송시점 정규화다. 저장된 기존 행에
+ * format control이 남아 있어도 화면 상태 hash와 실제 발송 hash가 어긋나지 않게 한다. */
+function feedbackStoredSendField(value) {
+  return stripFeedbackFormatControls(value).trim();
 }
 
 function feedbackDateLabel(value) {
@@ -2113,6 +2127,20 @@ function feedbackV2Body(studentName, date, subjectText, contentText, homeworkTex
     '문의 사항이 있으시면 학원으로 연락부탁드립니다. 감사합니다.';
 }
 
+/** 승인된 v3는 안내사항 뒤에 빈 줄을 두 줄 둔다. 줄바꿈도 카카오 검수 본문의
+ * 일부이므로 클라이언트 미리보기와 이 함수가 한 문자라도 다르면 제출을 거부한다. */
+function feedbackV3Body(studentName, date, subjectText, contentText, homeworkText, commentText, noticeText) {
+  return '안녕하세요, WB 웩슬러브레인센터(독해력학원) 입니다.\n\n' +
+    studentName + ' 학생의 오늘 수업 피드백을 정리해 보내드립니다.\n\n' +
+    '- 일시 : ' + feedbackDateLabel(date) + '\n\n' +
+    '- 과목 : ' + subjectText + '\n\n' +
+    '- 수업내용 · 진도 : ' + contentText + '\n\n' +
+    '- 과제 : ' + homeworkText + '\n\n' +
+    '- 코멘트 : ' + commentText + '\n\n' +
+    '- 안내사항 : ' + noticeText + '\n\n\n' +
+    '문의 사항이 있으시면 학원으로 연락부탁드립니다. 감사합니다.';
+}
+
 function feedbackIdentity(body) {
   const taskId = String(body.taskId || '');
   const feedbackDate = String(body.feedbackDate || '');
@@ -2121,7 +2149,9 @@ function feedbackIdentity(body) {
   if (!SAFE_ID.test(taskId)) return { error: '올바른 taskId가 필요합니다' };
   if (!validIsoDate(feedbackDate)) return { error: 'feedbackDate는 YYYY-MM-DD 형식이어야 합니다' };
   if (!SAFE_FEEDBACK_PART.test(feedbackType)) return { error: '올바른 feedbackType이 필요합니다' };
-  if (!SAFE_FEEDBACK_PART.test(templateVersion)) return { error: '올바른 templateVersion이 필요합니다' };
+  if (!SAFE_FEEDBACK_PART.test(templateVersion) || !FEEDBACK_TEMPLATE_VERSIONS.has(templateVersion)) {
+    return { error: '올바른 templateVersion이 필요합니다' };
+  }
   return { taskId, feedbackDate, feedbackType, templateVersion };
 }
 
@@ -2147,22 +2177,25 @@ const FEEDBACK_WITH_LATEST_SEND_SELECT =
 
 async function feedbackView(row) {
   if (!row) return null;
-  const templateVersion = String(row.template_version || '') === 'v2' ? 'v2' : 'v1';
-  const fields = templateVersion === 'v2' ? {
+  const storedTemplateVersion = String(row.template_version || '');
+  const templateVersion = storedTemplateVersion === 'v2' || storedTemplateVersion === 'v3'
+    ? storedTemplateVersion : 'v1';
+  const fields = templateVersion === 'v2' || templateVersion === 'v3' ? {
     templateVersion,
-    studentName: String(row.student_name || '').trim(),
+    studentName: feedbackStoredSendField(row.student_name),
     dateText: feedbackDateLabel(row.feedback_date),
-    subjectText: String(row.subject_text || '').trim(),
-    contentText: String(row.content_text || '').trim(),
-    homeworkText: String(row.homework_text || '').trim(),
-    commentText: String(row.comment_text || '').trim()
+    subjectText: feedbackStoredSendField(row.subject_text),
+    contentText: feedbackStoredSendField(row.content_text),
+    homeworkText: feedbackStoredSendField(row.homework_text),
+    commentText: feedbackStoredSendField(row.comment_text),
+    ...(templateVersion === 'v3' ? { noticeText: feedbackStoredSendField(row.notice_text) } : {})
   } : {
     templateVersion,
-    teacherName: String(row.teacher_name || '').trim(),
-    studentName: String(row.student_name || '').trim(),
-    contentText: String(row.content_text || '').trim(),
-    plusText: String(row.plus_text || '').trim(),
-    minusText: String(row.minus_text || '').trim()
+    teacherName: feedbackStoredSendField(row.teacher_name),
+    studentName: feedbackStoredSendField(row.student_name),
+    contentText: feedbackStoredSendField(row.content_text),
+    plusText: feedbackStoredSendField(row.plus_text),
+    minusText: feedbackStoredSendField(row.minus_text)
   };
   const currentMessageHash = await sha256Hex(JSON.stringify(fields));
   const messageDeliveryState = currentMessageHash === String(row.send_message_hash || '')
@@ -2174,17 +2207,18 @@ async function feedbackView(row) {
     feedbackDate: row.feedback_date,
     feedbackType: row.feedback_type,
     templateVersion: row.template_version,
-    message: row.body,
+    message: normalizeFeedbackBody(row.body),
     bodyHash: row.body_hash,
-    teacherName: row.teacher_name || '',
+    teacherName: feedbackStoredSendField(row.teacher_name),
     studentId: row.student_id || '',
-    studentName: row.student_name || '',
-    contentText: row.content_text || '',
-    subjectText: row.subject_text || '',
-    homeworkText: row.homework_text || '',
-    commentText: row.comment_text || '',
-    plusText: row.plus_text || '',
-    minusText: row.minus_text || '',
+    studentName: feedbackStoredSendField(row.student_name),
+    contentText: feedbackStoredSendField(row.content_text),
+    subjectText: feedbackStoredSendField(row.subject_text),
+    homeworkText: feedbackStoredSendField(row.homework_text),
+    commentText: feedbackStoredSendField(row.comment_text),
+    noticeText: feedbackStoredSendField(row.notice_text),
+    plusText: feedbackStoredSendField(row.plus_text),
+    minusText: feedbackStoredSendField(row.minus_text),
     revision: Number(row.revision),
     status: row.status,
     messageDeliveryState,
@@ -2307,31 +2341,44 @@ async function handleFeedbackRequest(env, app, body, origin) {
   const plusText = normalizeFeedbackField(body.plusText);
   const minusText = normalizeFeedbackField(body.minusText);
   const templateV2 = identity.templateVersion === 'v2';
+  const templateV3 = identity.templateVersion === 'v3';
+  const structuredTemplate = templateV2 || templateV3;
   const hasSubjectText = Object.hasOwn(body, 'subjectText');
-  const subjectText = templateV2
+  const subjectText = structuredTemplate
     ? normalizeFeedbackField(hasSubjectText
       ? body.subjectText : checked.taskData.subject || checked.taskData.className || '') : '';
-  const homeworkText = templateV2 ? normalizeFeedbackField(body.homeworkText) : '';
-  const commentText = templateV2 ? normalizeFeedbackBody(body.commentText) : '';
-  if (!contentText || (!templateV2 && (!plusText || !minusText))) {
-    return json({ ok: false, error: templateV2
+  const homeworkText = structuredTemplate ? normalizeFeedbackField(body.homeworkText) : '';
+  const commentText = structuredTemplate ? normalizeFeedbackBody(body.commentText) : '';
+  const noticeText = templateV3 ? normalizeFeedbackField(body.noticeText) : '';
+  if (!contentText || (!structuredTemplate && (!plusText || !minusText))) {
+    return json({ ok: false, error: structuredTemplate
       ? '수업내용·진도를 확인해 주세요'
       : '오늘 배운 내용·잘한 점·보완할 점을 모두 골라 주세요' }, 400, origin);
   }
   if (contentText.length > MAX_FEEDBACK_FIELD || plusText.length > MAX_FEEDBACK_FIELD || minusText.length > MAX_FEEDBACK_FIELD) {
     return json({ ok: false, error: '항목별 문구는 각각 ' + MAX_FEEDBACK_FIELD + '자까지 입력할 수 있습니다' }, 413, origin);
   }
-  if (templateV2 && (!subjectText || !homeworkText || !commentText)) {
-    return json({ ok: false, error: '과목·수업내용·과제·코멘트를 모두 확인해 주세요' }, 400, origin);
+  if (structuredTemplate && (!subjectText || !homeworkText || !commentText || (templateV3 && !noticeText))) {
+    return json({ ok: false, error: templateV3
+      ? '과목·수업내용·과제·코멘트·안내사항을 모두 확인해 주세요'
+      : '과목·수업내용·과제·코멘트를 모두 확인해 주세요' }, 400, origin);
   }
-  if (templateV2 && (subjectText.length > MAX_FEEDBACK_SUBJECT || homeworkText.length > MAX_FEEDBACK_FIELD ||
-      commentText.length > MAX_FEEDBACK_COMMENT)) {
+  if (templateV2 && Object.hasOwn(body, 'noticeText') && normalizeFeedbackField(body.noticeText)) {
+    return json({ ok: false, code: 'FEEDBACK_TEMPLATE_NOTICE_VERSION_MISMATCH',
+      error: '안내사항이 있는 피드백은 v3 템플릿으로 보내 주세요' }, 409, origin);
+  }
+  if (structuredTemplate && (subjectText.length > MAX_FEEDBACK_SUBJECT || homeworkText.length > MAX_FEEDBACK_FIELD ||
+      commentText.length > MAX_FEEDBACK_COMMENT || noticeText.length > MAX_FEEDBACK_FIELD)) {
     return json({ ok: false, error: '과목은 ' + MAX_FEEDBACK_SUBJECT + '자, 과제는 ' + MAX_FEEDBACK_FIELD +
-      '자, 코멘트는 ' + MAX_FEEDBACK_COMMENT + '자까지 입력할 수 있습니다' }, 413, origin);
+      '자, 코멘트는 ' + MAX_FEEDBACK_COMMENT + '자, 안내사항은 ' + MAX_FEEDBACK_FIELD +
+      '자까지 입력할 수 있습니다' }, 413, origin);
   }
-  if (templateV2 && message !== feedbackV2Body(
-    studentName, identity.feedbackDate, subjectText, contentText, homeworkText, commentText
-  )) {
+  const approvedTemplateBody = templateV3
+    ? feedbackV3Body(studentName, identity.feedbackDate, subjectText, contentText, homeworkText, commentText, noticeText)
+    : templateV2
+      ? feedbackV2Body(studentName, identity.feedbackDate, subjectText, contentText, homeworkText, commentText)
+      : null;
+  if (approvedTemplateBody != null && message !== approvedTemplateBody) {
     return json({
       ok: false,
       code: 'FEEDBACK_TEMPLATE_MISMATCH',
@@ -2345,18 +2392,19 @@ async function handleFeedbackRequest(env, app, body, origin) {
     row.teacher_name === teacherName && row.student_id === studentId && row.student_name === studentName &&
     row.content_text === contentText && String(row.subject_text || '') === subjectText &&
     String(row.homework_text || '') === homeworkText && String(row.comment_text || '') === commentText &&
+    String(row.notice_text || '') === noticeText &&
     row.plus_text === plusText && row.minus_text === minusText;
 
   if (!current) {
     const insertResult = await env.DB.prepare(
       'INSERT OR IGNORE INTO feedback_requests ' +
       '(app,request_key,task_id,owner,feedback_date,feedback_type,template_version,body,body_hash,' +
-      'teacher_name,student_id,student_name,content_text,subject_text,homework_text,comment_text,plus_text,minus_text,' +
+      'teacher_name,student_id,student_name,content_text,subject_text,homework_text,comment_text,notice_text,plus_text,minus_text,' +
       'revision,status,created_at,updated_at,reviewed_at,reviewed_by,review_note) ' +
-      "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,'approval_waiting',?,?,NULL,NULL,NULL)"
+      "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,'approval_waiting',?,?,NULL,NULL,NULL)"
     ).bind('task', requestKey, identity.taskId, owner, identity.feedbackDate, identity.feedbackType,
       identity.templateVersion, message, bodyHash, teacherName, studentId, studentName, contentText,
-      subjectText, homeworkText, commentText, plusText, minusText,
+      subjectText, homeworkText, commentText, noticeText, plusText, minusText,
       now, now).run();
     current = await findFeedbackRequest(env, identity);
     if (!current) return json({ ok: false, error: '피드백 요청을 저장하지 못했습니다' }, 500, origin);
@@ -2396,12 +2444,12 @@ async function handleFeedbackRequest(env, app, body, origin) {
 
   const result = await env.DB.prepare(
     "UPDATE feedback_requests SET owner=?, body=?, body_hash=?, teacher_name=?, student_id=?, student_name=?, " +
-    "content_text=?, subject_text=?, homework_text=?, comment_text=?, plus_text=?, minus_text=?, " +
+    "content_text=?, subject_text=?, homework_text=?, comment_text=?, notice_text=?, plus_text=?, minus_text=?, " +
     "revision=revision+1, status='approval_waiting', " +
     'updated_at=?, reviewed_at=NULL, reviewed_by=NULL, review_note=NULL ' +
     'WHERE app=? AND request_key=? AND revision=?'
   ).bind(owner, message, bodyHash, teacherName, studentId, studentName, contentText,
-    subjectText, homeworkText, commentText, plusText, minusText,
+    subjectText, homeworkText, commentText, noticeText, plusText, minusText,
     now, 'task', current.request_key, Number(current.revision)).run();
   if (Number(result && result.meta && result.meta.changes || 0) !== 1) {
     return json({ ok: false, error: '다른 변경이 먼저 저장되었습니다. 새로고침 후 다시 시도해 주세요' }, 409, origin);
