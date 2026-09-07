@@ -50,7 +50,10 @@ function seedTask(db, id, owner, overrides = {}) {
   const data = {
     id, staffId: owner, taskKind: 'lesson_instruction', lessonFormVersion: 2,
     title: '[정규] 테스트학생(중2) — 국어 독해',
-    studentId: 'student-test', studentName: '테스트학생', deleted: false, ...overrides
+    studentId: 'student-test', studentName: '테스트학생', deleted: false,
+    repeat: 'days', days: [1], start: '2026-01-01', end: '', scheduleStatus: 'confirmed',
+    scheduleSlots: [{ days: [1], startTime: '10:00', endTime: '11:00' }],
+    ...overrides
   };
   db.prepare('INSERT INTO tasks (app,id,owner,data,updated_at,srv_at) VALUES (?,?,?,?,?,?)')
     .bind('task', id, owner, JSON.stringify(data), now, now).run();
@@ -472,7 +475,9 @@ test('teacher list is own-scope and exposes review status and note', async () =>
   seedStaff(db, 'teacher-a', '김남기'); seedToken(db, 'token-a', 'teacher-a');
   seedStaff(db, 'teacher-b', '박선생'); seedToken(db, 'token-b', 'teacher-b');
   seedTask(db, 'task-a', 'teacher-a');
-  seedTask(db, 'task-b', 'teacher-b');
+  seedTask(db, 'task-b', 'teacher-b', {
+    days: [2], scheduleSlots: [{ days: [2], startTime: '10:00', endTime: '11:00' }]
+  });
 
   let own = await call(db, '/feedback-request', { auth: person('teacher-a', 'token-a'), ...identity, message: 'teacher a feedback', ...fields() });
   const ownKey = own.body.request.requestKey;

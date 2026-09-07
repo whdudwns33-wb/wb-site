@@ -338,11 +338,20 @@ test('stable student ids keep same-name students separate', () => {
 
 test('duplicate same-student entries in one group session do not warn', () => {
   const session = core.timelineRows([
-    timelineEntry('김선생', '학생A', 900, 960, '중1'),
-    timelineEntry('김선생', '학생A', 900, 960, '중1')
+    timelineEntry('김선생', '학생A', 900, 960, '중1', { task: { id: 'same-task', subject: '수학' } }),
+    timelineEntry('김선생', '학생A', 900, 960, '중1', { task: { id: 'same-task', subject: '수학' } })
   ])[0].sessions[0];
   assert.equal(session.entries.length, 2);
   assert.equal(session.studentConflict, false);
+});
+
+test('distinct duplicate lesson tasks for one student still warn', () => {
+  const session = core.timelineRows([
+    timelineEntry('김선생', '학생A', 900, 960, '중1', { task: { id: 'task-a', subject: '수학' } }),
+    timelineEntry('김선생', '학생A', 900, 960, '중1', { task: { id: 'task-b', subject: '수학' } })
+  ])[0].sessions[0];
+  assert.equal(session.entries.length, 2);
+  assert.equal(session.studentConflict, true);
 });
 
 test('one student in different overlapping classes still warns under the same teacher', () => {

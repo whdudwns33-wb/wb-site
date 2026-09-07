@@ -14,6 +14,7 @@ class DB {
     this.rosterAt = 10;
     this.beforeBatch = null;
     this.lastChanges = null;
+    this.makeups = [];
     this.roster = { roster: { updated: '2026-08-20', students: [{
       id: 'student-1', name: '학생', school: 'WB초', grade: '초4', subject: '수학', subjects: ['수학'],
       teacher: '', teacherIds: [], start: '2026-08', end: '', phoneMother: '010-0000-1234'
@@ -30,6 +31,12 @@ class DB {
         throw new Error('first ' + sql);
       },
       async all() {
+        if (sql === 'SELECT id,owner,data FROM tasks WHERE app=?') {
+          return { results: [...db.tasks.entries()].map(([id, row]) => ({ id, owner: row.owner, data: row.data })) };
+        }
+        if (sql.startsWith('SELECT case_id,student_id,status,confirmed_start_at,confirmed_end_at FROM makeup_cases')) {
+          return { results: db.makeups.slice() };
+        }
         if (sql.startsWith('SELECT id,owner,data FROM tasks')) {
           const owner = String(this.args[1]);
           return { results: [...db.tasks.entries()].filter(([, row]) => row.owner === owner)
@@ -212,6 +219,27 @@ test('modern approval assigns the stable student and creates the requested lesso
   assert.deepEqual(approved.task.scheduleSlots[0].days, [1,3]);
   assert.deepEqual(approved.task.scheduleSlots.map(slot => slot.lessonHours), ['2T', '1T']);
   assert.deepEqual(db.roster.roster.students[0].teacherIds, [], '승인은 legacy main-teacher 목록을 쓰지 않는다');
+  assert.equal(db.tasks.size, 1);
+});
+
+test('assignment approval stays pending when another teacher already has an overlapping lesson for that student', async () => {
+  const db = new DB();
+  db.tasks.set('existing-other-teacher', {
+    app: 'task', owner: 'teacher-other', updated_at: 1,
+    data: JSON.stringify({
+      id: 'existing-other-teacher', staffId: 'teacher-other', studentId: 'student-1',
+      taskKind: 'lesson_instruction', lessonFormVersion: 1, deleted: false,
+      repeat: 'days', days: [1], start: '2026-08-01', end: '', scheduleStatus: 'confirmed',
+      scheduleSlots: [{ days: [1], startTime: '16:30', endTime: '17:30', validFrom: '2026-08-01' }]
+    })
+  });
+  const submitted = await body(await handleLessonAssignmentRequest({ DB: db }, 'task', request, '*', own, json));
+  const approval = await handleLessonAssignmentReview({ DB: db }, 'task', {
+    action: 'approve', requestKey: submitted.request.requestKey, revision: 1, studentId: 'student-1'
+  }, '*', all, json);
+  assert.equal(approval.status, 409);
+  assert.equal((await body(approval)).code, 'STUDENT_SCHEDULE_CONFLICT');
+  assert.equal(db.rows.get(submitted.request.requestKey).status, 'approval_waiting');
   assert.equal(db.tasks.size, 1);
 });
 

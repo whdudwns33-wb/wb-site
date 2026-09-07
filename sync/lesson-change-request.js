@@ -25,6 +25,10 @@ import {
 } from './session-pack-transfer.js';
 import { isTaskWriteCasConflict, taskWriteCasGuardStatement } from './task-write-cas.js';
 import { isMakeupLifecycleConflict, prepareMakeupLifecycleCleanup } from './makeup-lifecycle.js';
+import {
+  assertStudentLessonScheduleAvailable,
+  studentScheduleConflictPayload
+} from './student-schedule-conflict.js';
 
 const LESSON_CHANGE_FIELDS = ['days', 'time', 'repeat', 'detail', 'guide', 'target', 'unit'];
 const REQUEST_OPERATIONS = new Set([
@@ -438,6 +442,12 @@ export async function handleLessonChangeReview(env, app, body, origin, auth, jso
       };
       const updatedAt = Math.max(now, Number(taskRow.updated_at || 0) + 1);
       const merged = Object.assign({}, taskData, patch, { updatedAt, lastEditBy: actorRole });
+      try { await assertStudentLessonScheduleAvailable(env, app, merged); }
+      catch (error) {
+        const payload = studentScheduleConflictPayload(error);
+        if (payload) return json(payload, 409, origin);
+        throw error;
+      }
       requiredChangeIndexes.push(statements.length);
       statements.push(env.DB.prepare(
         'UPDATE tasks SET data=?, updated_at=?, srv_at=? WHERE app=? AND id=? AND owner=? AND updated_at=?'
@@ -492,6 +502,12 @@ export async function handleLessonChangeReview(env, app, body, origin, auth, jso
         updatedAt,
         lastEditBy: actorRole
       });
+      try { await assertStudentLessonScheduleAvailable(env, app, merged); }
+      catch (error) {
+        const payload = studentScheduleConflictPayload(error);
+        if (payload) return json(payload, 409, origin);
+        throw error;
+      }
       let packTransfer;
       try {
         packTransfer = await lessonSessionPackTransferStatements(env, app, {
@@ -647,6 +663,8 @@ export async function handleLessonChangeReview(env, app, body, origin, auth, jso
       if (isTaskWriteCasConflict(error)) {
         return json({ ok: false, error: '다른 변경이 먼저 저장되었습니다. 새로고침 후 다시 검토해 주세요' }, 409, origin);
       }
+      const payload = studentScheduleConflictPayload(error);
+      if (payload) return json(payload, 409, origin);
       throw error;
     }
     const reqChanged = Number(applied[requestUpdateIndex] && applied[requestUpdateIndex].meta && applied[requestUpdateIndex].meta.changes || 0);

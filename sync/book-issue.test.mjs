@@ -52,14 +52,17 @@ function seed(db) {
   }
   db.prepare('INSERT INTO private_rosters(app,data,updated_at) VALUES(?,?,?)')
     .bind('task', JSON.stringify(roster()), now).run();
-  for (const [id, staffId, studentId] of [
-    ['lesson-a', 'teacher-a', 'student-a'], ['lesson-b', 'teacher-b', 'student-b'],
-    ['lesson-kim-a', KIM_NAMGI_STAFF_ID, 'student-a']
+  for (const [id, staffId, studentId, days, startTime, endTime] of [
+    ['lesson-a', 'teacher-a', 'student-a', [1], '10:00', '11:00'],
+    ['lesson-b', 'teacher-b', 'student-b', [1], '10:00', '11:00'],
+    ['lesson-kim-a', KIM_NAMGI_STAFF_ID, 'student-a', [2], '10:00', '11:00']
   ]) {
     db.prepare('INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
       .bind('task', id, staffId, JSON.stringify({ id, staffId, studentId, taskKind: 'lesson_instruction',
         lessonFormVersion: 1, intakeVersion: 1,
-        title: '[수업] 테스트', start: '2026-01-01', end: '', deleted: false }), now, now).run();
+        title: '[수업] 테스트', repeat: 'days', days, scheduleStatus: 'confirmed',
+        scheduleSlots: [{ days, startTime, endTime }],
+        start: '2026-01-01', end: '', deleted: false }), now, now).run();
   }
 }
 

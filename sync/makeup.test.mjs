@@ -1828,7 +1828,7 @@ test('legacy restore atomically rejects a regular lesson inserted after its init
     action: 'restore_schedule', caseId: reviewed.caseId, revision: proposed.body.case.revision
   });
   assert.equal(blocked.status, 409);
-  assert.equal(blocked.body.code, 'STUDENT_SCHEDULE_CONFLICT');
+  assert.equal(blocked.body.code, 'STUDENT_MAKEUP_CONFLICT');
   assert.equal(db.database.prepare("SELECT count(*) AS n FROM tasks WHERE id LIKE 'makeup_lesson_%'").get().n, 0);
 });
 
@@ -1883,12 +1883,16 @@ test('list bulk-loads source and generated lessons in bounded chunks', async () 
   const db = new TestD1(); seed(db);
   for (let index = 0; index < 161; index++) {
     const taskId = 'bulk-' + index;
-    insertTask(db, lesson(taskId, 'student-a', 'teacher-a', [1], '18:00', '19:00'));
-    const digest = await sha256('task\n' + taskId + '\n2026-08-10');
+    const start = new Date(Date.UTC(2026, 0, 6 + index * 7)).toISOString().slice(0, 10);
+    insertTask(db, lesson(taskId, 'student-a', 'teacher-a', [2], '18:00', '19:00', {
+      repeat: 'once', start,
+      scheduleSlots: [{ days: [2], startTime: '18:00', endTime: '19:00', validFrom: start }]
+    }));
+    const digest = await sha256('task\n' + taskId + '\n' + start);
     db.prepare('INSERT INTO makeup_cases(app,case_id,student_id,source_task_id,source_date,source_teacher_id,' +
       'consumption_group_id,status,revision,notification_needed,notification_event_revision,history,created_at,updated_at) ' +
       "VALUES(?,?,?,?,?,?,?,'review_pending',1,0,0,'[]',1,1)")
-      .bind('task', 'mu_' + digest.slice(0, 48), 'student-a', taskId, '2026-08-10', 'teacher-a',
+      .bind('task', 'mu_' + digest.slice(0, 48), 'student-a', taskId, start, 'teacher-a',
         'mc_' + digest.slice(0, 48)).run();
   }
   db.taskBulkReads = 0;

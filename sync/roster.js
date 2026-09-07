@@ -3,6 +3,10 @@ import { buildLessonTask } from './lesson-create.js';
 import { bookOrderStudentIdsForAuth } from './book-order-student-scope.js';
 import { isTaskWriteCasConflict, taskWriteCasGuardStatement } from './task-write-cas.js';
 import { isMakeupLifecycleConflict, prepareMakeupLifecycleCleanup } from './makeup-lifecycle.js';
+import {
+  assertStudentLessonScheduleAvailable,
+  studentScheduleConflictPayload
+} from './student-schedule-conflict.js';
 
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const NEW_STUDENT_ID = /^[1-9]\d{7}$/;
@@ -758,6 +762,12 @@ export async function handleRoster(env, app, body, origin, auth, json) {
       } catch (error) {
         return json({ ok: false, error: String(error && error.message || error) }, Number(error && error.status) || 400, origin);
       }
+      try { await assertStudentLessonScheduleAvailable(env, app, lesson); }
+      catch (error) {
+        const payload = studentScheduleConflictPayload(error);
+        if (payload) return json(payload, 409, origin);
+        throw error;
+      }
       const oldTask = await env.DB.prepare('SELECT owner,data,updated_at FROM tasks WHERE app=? AND id=? LIMIT 1')
         .bind(app, lesson.id).first();
       if (oldTask) {
@@ -829,6 +839,8 @@ export async function handleRoster(env, app, body, origin, auth, json) {
       if (isActiveBookOrderConflictError(error)) return json({ ok: false, code: 'ACTIVE_BOOK_ORDER_CONFLICT', error: '미완료 교재 주문이 있어 지금 변경할 수 없습니다' }, 409, origin);
       if (isTaskWriteCasConflict(error)) return json({ ok: false, code: 'ROSTER_REVISION_CONFLICT',
         error: '다른 변경이 먼저 저장되었습니다. 새로고침 후 다시 처리해 주세요' }, 409, origin);
+      const payload = studentScheduleConflictPayload(error);
+      if (payload) return json(payload, 409, origin);
       throw error;
     }
     if (!requiredIndexes.every(index => Number(applied[index] && applied[index].meta && applied[index].meta.changes || 0) === 1)) {

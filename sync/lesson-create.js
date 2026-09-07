@@ -6,6 +6,10 @@ import {
   lessonSessionPackTransferStatements
 } from './session-pack-transfer.js';
 import { isTaskWriteCasConflict, taskWriteCasGuardStatement } from './task-write-cas.js';
+import {
+  assertStudentLessonScheduleAvailable,
+  studentScheduleConflictPayload
+} from './student-schedule-conflict.js';
 
 const LESSON_TEXT_LIMITS = {
   studentName: 80,
@@ -523,6 +527,13 @@ function revisionConflict(json, origin, current, message) {
   }, 409, origin);
 }
 
+function scheduleConflictResponse(json, origin, error, prefix = '') {
+  const payload = studentScheduleConflictPayload(error);
+  if (!payload) return null;
+  if (prefix) payload.error = prefix + payload.error;
+  return json(payload, 409, origin);
+}
+
 function correctedTask(candidate, current, serverNow, actorRole) {
   const currentUpdatedAt = Number(current.updatedAt) || 0;
   const updatedAt = Math.max(Number(serverNow) || 0, currentUpdatedAt + 1);
@@ -700,6 +711,13 @@ export async function handleLessonCreate(env, app, body, origin, auth, json) {
     }
 
     const corrected = correctedTask(task, current, Date.now(), taskOrigin);
+    try {
+      await assertStudentLessonScheduleAvailable(env, app, corrected);
+    } catch (error) {
+      const response = scheduleConflictResponse(json, origin, error);
+      if (response) return response;
+      throw error;
+    }
     const databaseUpdatedAt = Number.isFinite(row.updatedAt) ? row.updatedAt : Number(current.updatedAt);
     let result;
     if (teacherTransferred) {
@@ -747,16 +765,24 @@ export async function handleLessonCreate(env, app, body, origin, auth, json) {
           return json({ ok: false, code: 'session_pack_transfer_conflict',
             error: '회차권 또는 수업 담당자가 먼저 변경되었습니다. 최신 내용을 확인해 주세요' }, 409, origin);
         }
+        const response = scheduleConflictResponse(json, origin, error);
+        if (response) return response;
         throw error;
       }
       result = applied[0];
     } else {
-      result = await env.DB.prepare(
-        'UPDATE tasks SET data=?,updated_at=?,srv_at=? WHERE app=? AND id=? AND owner=? AND updated_at=?'
-      ).bind(
-        JSON.stringify(corrected), corrected.updatedAt, corrected.updatedAt,
-        app, current.id, staffId, databaseUpdatedAt
-      ).run();
+      try {
+        result = await env.DB.prepare(
+          'UPDATE tasks SET data=?,updated_at=?,srv_at=? WHERE app=? AND id=? AND owner=? AND updated_at=?'
+        ).bind(
+          JSON.stringify(corrected), corrected.updatedAt, corrected.updatedAt,
+          app, current.id, staffId, databaseUpdatedAt
+        ).run();
+      } catch (error) {
+        const response = scheduleConflictResponse(json, origin, error);
+        if (response) return response;
+        throw error;
+      }
     }
     const changes = Number(result && result.meta && result.meta.changes || 0);
     if (changes !== 1) {
@@ -797,9 +823,23 @@ export async function handleLessonCreate(env, app, body, origin, auth, json) {
     }, 200, origin);
   }
 
-  const result = await env.DB.prepare(
-    'INSERT OR IGNORE INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)'
-  ).bind(app, task.id, staffId, JSON.stringify(task), task.updatedAt, task.updatedAt).run();
+  try {
+    await assertStudentLessonScheduleAvailable(env, app, task);
+  } catch (error) {
+    const response = scheduleConflictResponse(json, origin, error);
+    if (response) return response;
+    throw error;
+  }
+  let result;
+  try {
+    result = await env.DB.prepare(
+      'INSERT OR IGNORE INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)'
+    ).bind(app, task.id, staffId, JSON.stringify(task), task.updatedAt, task.updatedAt).run();
+  } catch (error) {
+    const response = scheduleConflictResponse(json, origin, error);
+    if (response) return response;
+    throw error;
+  }
   const changes = Number(result && result.meta && result.meta.changes || 0);
   if (changes !== 1) {
     const raced = parseTaskRow(await env.DB.prepare(
@@ -937,6 +977,15 @@ export async function handleLessonCreateBatch(env, app, body, origin, auth, json
   }
 
   const created = planned.filter(item => item.created);
+  if (created.length) {
+    try {
+      await assertStudentLessonScheduleAvailable(env, app, created.map(item => item.task));
+    } catch (error) {
+      const response = scheduleConflictResponse(json, origin, error);
+      if (response) return response;
+      throw error;
+    }
+  }
   const rosterPlan = await planBatchRosterLinks(env, app, planned, serverNow);
   if (rosterPlan.error) return json({ ok: false, error: rosterPlan.error }, rosterPlan.status, origin);
   if (created.length || rosterPlan.changed) {
@@ -964,6 +1013,8 @@ export async function handleLessonCreateBatch(env, app, body, origin, auth, json
       if (isTaskWriteCasConflict(error)) {
         return json({ ok: false, error: '원생 명단이 다른 작업에서 변경되었습니다. 새로고침 후 다시 등록해 주세요' }, 409, origin);
       }
+      const response = scheduleConflictResponse(json, origin, error);
+      if (response) return response;
       return json({ ok: false, error: '수업 일괄 저장 중 다른 등록과 충돌했습니다. 새로고침 후 다시 확인해 주세요' }, 409, origin);
     }
   }
