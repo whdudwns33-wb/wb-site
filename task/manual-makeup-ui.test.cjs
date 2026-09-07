@@ -40,6 +40,7 @@ test('수동 보강은 원생을 먼저 고르고 권한 범위의 현재 정규
   assert.match(lessonSource, /String\(task\.end\) >= reference/);
   assert.ok(modal.indexOf('id="muManualStudent"') < modal.indexOf('id="muManualSourceTask"'));
   assert.match(modal, /id="muManualSourceTask" data-manual-makeup-source disabled/);
+  assert.match(html, /<option value="' \+ MANUAL_MAKEUP_UNRELATED \+ '">수업무관<\/option>/);
   assert.match(change, /updateManualMakeupLessonSelect\(String\(manualMakeupStudent\.value \|\| ''\)\)/);
   assert.match(change, /updateManualMakeupStaffSelect\(String\(manualMakeupSource\.value \|\| ''\)\)/);
   assert.doesNotMatch(change.slice(0, change.indexOf('const teacherLiveRequestLesson')), /render\(/,
@@ -64,16 +65,17 @@ test('관리자는 모든 담당 수업을, 선생님은 자신의 stable staffI
   assert.deepEqual(make({ isAdmin: false, isStaffLink: true, staffId: 'staff-2' })('student-1').map(task => task.id), ['other']);
 });
 
-test('관리자도 선택 가능한 현재 정규수업이 있는 원생만 후보로 본다', () => {
+test('관리자는 모든 재원생을, 선생님은 담당 정규수업이 있는 원생만 후보로 본다', () => {
   const source = block('function manualMakeupStudents()', 'function manualMakeupSourceLessons(studentId)');
-  const students = new Function('manualMakeupSourceLessons', 'studentLinkCandidates', 'today',
+  const students = session => new Function('manualMakeupSourceLessons', 'studentLinkCandidates', 'today', 'session',
     `${source}\nreturn manualMakeupStudents;`)(
       () => [{ studentId: 'student-1' }],
       () => [{ id: 'student-1', name: '연결원생' }, { id: 'student-2', name: '수업없는원생' }],
-      () => '2026-09-03'
+      () => '2026-09-03', session
     );
 
-  assert.deepEqual(students().map(student => student.id), ['student-1']);
+  assert.deepEqual(students({ isAdmin: true })().map(student => student.id), ['student-1', 'student-2']);
+  assert.deepEqual(students({ isAdmin: false })().map(student => student.id), ['student-1']);
 });
 
 test('수동 보강 모달은 고정 사유와 날짜·시작·종료 입력을 제공한다', () => {
@@ -117,11 +119,13 @@ test('확인은 create_manual의 정확한 식별자·사유·일시만 전송�
   };
   const calls = [];
   const submit = new Function('$', 'session', 'manualMakeupSourceLessons', 'MANUAL_MAKEUP_REASON_LABELS',
+    'MANUAL_MAKEUP_UNRELATED',
     'today', 'showMakeupModalError', 'makeupActiveStaff', 'mutateMakeup', `${source}\nreturn submitManualMakeup;`)(
       id => elements[id.slice(1)] || null,
       { isAdmin: false, isStaffLink: true, staffId: 'staff-1' },
       studentId => studentId === 'student-8' ? [{ id: 'lesson-3' }] : [],
       { manual_exam: '시험보강' },
+      '__unrelated__',
       () => '2026-09-03',
       message => calls.push({ error: message }),
       staffId => staffId === 'staff-1' ? { id: staffId } : null,
@@ -135,6 +139,7 @@ test('확인은 create_manual의 정확한 식별자·사유·일시만 전송�
   assert.deepEqual(calls, [{
     payload: {
       action: 'create_manual', studentId: 'student-8', sourceTaskId: 'lesson-3',
+      sourceMode: 'linked',
       reason: 'manual_exam', date: '2026-09-06', startTime: '14:00', endTime: '14:50', staffId: 'staff-1'
     },
     button,
@@ -144,6 +149,57 @@ test('확인은 create_manual의 정확한 식별자·사유·일시만 전송�
   }]);
 });
 
+test('수업무관 선택은 현재 담당 수업을 권한 근거로만 보내고 결석보강은 차단한다', async () => {
+  const source = block('async function submitManualMakeup(button)', 'function makeupCanComplete');
+  const elements = {
+    muManualStudent: { value: 'student-8' }, muManualSourceTask: { value: '__unrelated__' },
+    muManualReason: { value: 'manual_exam' }, muManualDate: { value: '2026-09-06' },
+    muManualStart: { value: '14:00' }, muManualEnd: { value: '14:50' },
+    muManualStaff: { value: 'staff-1' }
+  };
+  const calls = [];
+  const submit = new Function('$', 'session', 'manualMakeupSourceLessons', 'MANUAL_MAKEUP_REASON_LABELS',
+    'MANUAL_MAKEUP_UNRELATED', 'manualMakeupRequestId', 'today', 'showMakeupModalError', 'makeupActiveStaff', 'mutateMakeup',
+    `${source}\nreturn submitManualMakeup;`)(
+      id => elements[id.slice(1)] || null,
+      { isAdmin: false, isStaffLink: true, staffId: 'staff-1' },
+      () => [{ id: 'lesson-3', staffId: 'staff-1' }],
+      { manual_absence: '결석보강', manual_exam: '시험보강' }, '__unrelated__', 'request-8',
+      () => '2026-09-03', message => calls.push({ error: message }),
+      staffId => staffId === 'staff-1' ? { id: staffId } : null,
+      async payload => calls.push({ payload })
+    );
+
+  await submit({});
+  assert.deepEqual(calls, [{ payload: {
+    action: 'create_manual', studentId: 'student-8', sourceMode: 'unrelated', requestId: 'request-8',
+    reason: 'manual_exam', date: '2026-09-06', startTime: '14:00', endTime: '14:50', staffId: 'staff-1'
+  } }]);
+
+  calls.length = 0;
+  elements.muManualReason.value = 'manual_absence';
+  await submit({});
+  assert.deepEqual(calls, [{ error: '결석보강은 회차 차감의 근거가 되는 원 수업을 선택해 주세요' }]);
+});
+
+test('원 수업이 없는 원생도 수업무관 선택지는 활성화된다', () => {
+  const optionsSource = block('function manualMakeupLessonOptionsHtml(studentId)', 'function updateManualMakeupLessonSelect');
+  const options = new Function('manualMakeupSourceLessons', 'MANUAL_MAKEUP_UNRELATED', 'esc',
+    `${optionsSource}\nreturn manualMakeupLessonOptionsHtml;`)(() => [], '__unrelated__', String);
+  assert.match(options('student-no-lesson'), /value="__unrelated__">수업무관/);
+
+  const update = block('function updateManualMakeupLessonSelect(studentId)', 'function updateManualMakeupStaffSelect');
+  assert.match(update, /select\.disabled = !studentId/);
+  assert.doesNotMatch(update, /select\.disabled = !studentId \|\| !lessons\.length/);
+});
+
+test('수업무관을 선택하면 결석보강을 즉시 비활성화하고 기존 선택은 시험보강으로 바꾼다', () => {
+  const update = block('function updateManualMakeupStaffSelect(sourceTaskId)', 'function manualMakeupStaffFieldHtml');
+  assert.match(update, /absenceOption\.disabled = unrelated/);
+  assert.match(update, /reasonField\.value === 'manual_absence'/);
+  assert.match(update, /reasonField\.value = 'manual_exam'/);
+});
+
 test('수동 생성 카드에는 결석 원 수업 표현 대신 생성 사유를 표시한다', () => {
   const card = block('function makeupCard(row)', 'function makeupKpis(rows)');
 
@@ -151,6 +207,8 @@ test('수동 생성 카드에는 결석 원 수업 표현 대신 생성 사유�
   assert.match(card, /MANUAL_MAKEUP_REASON_LABELS\[row\.manualReason\]/);
   assert.match(card, /직접 생성 ·/);
   assert.match(card, /: '원 수업 ' \+ esc\(row\.sourceDate\)/);
+  assert.match(card, /row\.sourceMode === 'unrelated'/);
+  assert.match(card, /원 수업 · 수업무관/);
 });
 
 test('수동 보강은 정규수업 결석 카드의 연결·완료 상태를 가로채지 않는다', () => {
