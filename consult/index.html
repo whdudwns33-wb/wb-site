@@ -1986,7 +1986,9 @@ const sync = {
   },
 
   async exchangeBootstrap(staffId, code) {
-    return await this.post('/exchange', { app: SYNC_APP, staffId: staffId, code: code });
+    const body = { app: SYNC_APP, code: code };
+    if (staffId) body.staffId = staffId;
+    return await this.post('/exchange', body);
   },
 
   async loginAdmin(loginId, password) {
@@ -2183,8 +2185,8 @@ async function waitForSyncIdle(timeoutMs) {
 
 async function connectStudentLink(allowEmbeddedExchange) {
   const code = pendingStudentCode;
-  const staffId = session.staffId;
-  if (!staffId || !code || studentConnectBusy) return;
+  let staffId = session.staffId;
+  if (!code || studentConnectBusy) return;
   studentConnectBusy = true;
   studentConnectError = '';
   render();
@@ -2193,7 +2195,7 @@ async function connectStudentLink(allowEmbeddedExchange) {
       studentConnectError = '기존 동기화가 아직 끝나지 않았습니다. 잠시 후 같은 링크로 다시 시도해 주세요.';
       return;
     }
-    const sameStudentConnected = !!state.settings.myToken && !!staffById(staffId) && studentCacheScopedTo(staffId);
+    const sameStudentConnected = !!staffId && !!state.settings.myToken && !!staffById(staffId) && studentCacheScopedTo(staffId);
     if (sameStudentConnected) {
       sync.err = '';
       await sync.run(true);
@@ -2219,6 +2221,18 @@ async function connectStudentLink(allowEmbeddedExchange) {
       return;
     }
     const d = await sync.exchangeBootstrap(staffId, code);
+    const resolvedStaffId = String((d && d.staffId) || staffId || '');
+    if (!/^[A-Za-z0-9_-]{1,128}$/.test(resolvedStaffId) || (staffId && d.staffId && resolvedStaffId !== staffId)) {
+      const invalid = new Error('학생 연결 정보를 확인할 수 없습니다');
+      invalid.status = 422;
+      throw invalid;
+    }
+    if (!staffId) {
+      const next = new URL(location.href);
+      next.searchParams.set('u', resolvedStaffId);
+      history.replaceState(null, '', next.pathname + next.search + next.hash);
+      staffId = resolvedStaffId;
+    }
     pendingStudentCode = '';
     const stored = resetStudentLinkCache(d.token);
     clearStudentCodeHash();
@@ -2386,7 +2400,7 @@ function render() {
   renderTabs();
   const v = $('#view');
 
-  if (session.isStaffLink && (pendingStudentCode || studentConnectError || sessionStorage.getItem(STUDENT_LINK_BLOCK_KEY))) {
+  if (pendingStudentCode || (session.isStaffLink && (studentConnectError || sessionStorage.getItem(STUDENT_LINK_BLOCK_KEY)))) {
     v.innerHTML = viewStudentLinkConnect();
     return;
   }
@@ -13884,7 +13898,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-09-08.3';
+const APP_VER = '2026-09-08.4';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)

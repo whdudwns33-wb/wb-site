@@ -73,7 +73,7 @@ test('학생 번호는 본인 토큰으로 필수 등록하고 원문은 브라�
   const guide = between('function studentPhoneSettingsCard()', '\nfunction studentSetupReminder');
   const actions = between("    case 'studentphoneretry':", "    case 'linkcontactsretry':");
 
-  const pendingAt = render.indexOf('pendingStudentCode || studentConnectError');
+  const pendingAt = render.indexOf('if (pendingStudentCode ||');
   const missingStudentAt = render.indexOf('!staffById(session.staffId)');
   const phoneGateAt = render.indexOf('!studentPhoneReady()');
   const routeAt = render.indexOf('const map =');
@@ -149,7 +149,9 @@ test('새 학생 링크는 fragment 1회코드를 교환하고 기존 query 토�
   const reset = between('function resetStudentLinkCache(token) {', '\n\n/** 링크에 담겨 온 것들을 흡수한다.');
   const connect = between('async function connectStudentLink(allowEmbeddedExchange) {', '\n/* ══════════════════════════════════════════════════════\n   6. 렌더 헬퍼');
 
-  assert.match(exchange, /this\.post\('\/exchange', \{ app: SYNC_APP, staffId: staffId, code: code \}\)/);
+  assert.match(exchange, /const body = \{ app: SYNC_APP, code: code \}/);
+  assert.match(exchange, /if \(staffId\) body\.staffId = staffId/);
+  assert.match(exchange, /this\.post\('\/exchange', body\)/);
   assert.match(absorb, /q\.get\('t'\)/);
   assert.match(absorb, /q\.delete\('t'\); touched = true/);
   assert.match(absorb, /studentCacheScopedTo\(session\.staffId\)/);
@@ -167,6 +169,10 @@ test('새 학생 링크는 fragment 1회코드를 교환하고 기존 query 토�
   assert.match(connect, /isEmbeddedStudentBrowser\(navigator\.userAgent\) && !allowEmbeddedExchange/);
   assert.match(connect, /studentConnectNeedsApproval = true/);
   assert.match(connect, /await sync\.exchangeBootstrap\(staffId, code\)/);
+  assert.match(connect, /const resolvedStaffId = String\(\(d && d\.staffId\) \|\| staffId \|\| ''\)/);
+  assert.match(connect, /next\.searchParams\.set\('u', resolvedStaffId\)/);
+  assert.ok(connect.indexOf("next.searchParams.set('u', resolvedStaffId)") < connect.indexOf('resetStudentLinkCache(d.token)'),
+    'code-only links must restore ?u before storing the exchanged token');
   assert.match(connect, /resetStudentLinkCache\(d\.token\)/);
   assert.match(connect, /clearStudentCodeHash\(\)/);
   assert.match(connect, /const terminal = \[400, 401, 403, 404, 409, 410, 422\]/);
@@ -177,6 +183,9 @@ test('새 학생 링크는 fragment 1회코드를 교환하고 기존 query 토�
   assert.doesNotMatch(connect, /go\('guide'\)|pendingStudentWelcome/);
   assert.match(html, /async run\(duringStudentConnect\)[\s\S]*?studentConnectBusy && !duringStudentConnect/);
   assert.match(html, /if \(pendingStudentCode\) \{\s*connectStudentLink\(\);\s*\} else if \(sync\.enabled\(\) && !studentConnectError\)/);
+  const render = between('function render() {', '\nfunction renderTabs()');
+  assert.match(render, /if \(pendingStudentCode \|\| \(session\.isStaffLink/,
+    'a code-only fragment must render its connection screen before ?u exists');
 });
 
 test('라우팅은 #/화면만 읽고 #c 1회코드를 화면 이름으로 오인하지 않는다', () => {

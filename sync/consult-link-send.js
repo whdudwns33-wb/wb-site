@@ -20,9 +20,9 @@ export const SOLAPI_TIMEOUT_MS = 8000;
 const MAX_PROVIDER_RESPONSE_BYTES = 64 * 1024;
 export const CONSULT_LINK_GLOBAL_DAILY_LIMIT = 150;
 export const CONSULT_LINK_TEMPLATE_BUTTON_URL =
-  'https://whdudwns33-wb.github.io/wb-site/consult/?u=#{학생ID}#c=#{연결코드}';
+  'https://whdudwns33-wb.github.io/wb-site/consult/#c=#{연결코드}';
 export const CONSULT_LINK_TEMPLATE_VARIABLE_KEYS = Object.freeze([
-  '#{학생명}', '#{학생ID}', '#{연결코드}'
+  '#{학생명}', '#{연결코드}'
 ]);
 
 class PublicError extends Error {
@@ -486,7 +486,6 @@ async function sendLink(
 
   const variables = {
     '#{학생명}': student.name,
-    '#{학생ID}': student.id,
     '#{연결코드}': String(issued.code)
   };
   if (Object.keys(variables).length !== CONSULT_LINK_TEMPLATE_VARIABLE_KEYS.length ||
