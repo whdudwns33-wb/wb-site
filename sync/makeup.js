@@ -148,6 +148,7 @@ function kstRange(dateValue, startValue, endValue) {
   return { date, startTime, endTime, startAt, endAt };
 }
 
+// 지난 보강의 직접 등록·수정은 허용하되, 학부모에게 참석을 묻는 제안 흐름은 종료된 일정을 차단한다.
 function assertSlotNotEnded(range, now) {
   if (Date.parse(range.endAt) <= now) {
     problem('이미 종료된 보강 일정은 제안하거나 확정할 수 없습니다', 409, 'MAKEUP_SLOT_ENDED');
@@ -1424,7 +1425,6 @@ async function createManual(env, app, body, auth, json, origin) {
   }
   const range = kstRange(body.date, body.startTime, body.endTime);
   const now = Date.now();
-  assertSlotNotEnded(range, now);
   let sourceTaskId;
   let source;
   let sourceTeacherId;
@@ -1983,7 +1983,6 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
         problem('일정이 아직 생성되지 않은 보강만 생성할 수 있습니다', 409, 'INVALID_TRANSITION');
       }
       const range = kstRange(body.date, body.startTime, body.endTime);
-      assertSlotNotEnded(range, requestNow);
       // staffId를 보내지 않는 구형 화면은 원 수업 담당자로 확정한다.
       const staffId = body.staffId == null || String(body.staffId || '').trim() === ''
         ? currentSourceTeacherId : cleanId(body.staffId, '보강 담당자');
@@ -2007,7 +2006,6 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
         problem('이미 생성된 보강만 일정과 담당자를 변경할 수 있습니다', 409, 'INVALID_TRANSITION');
       }
       const range = kstRange(body.date, body.startTime, body.endTime);
-      assertSlotNotEnded(range, requestNow);
       const staffId = cleanId(body.staffId, '보강 담당자');
       student = rosterStudent(document, String(row.student_id), range.date);
       if (!await activeStaff(env, app, staffId)) {
