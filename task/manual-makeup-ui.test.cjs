@@ -12,6 +12,30 @@ function block(from, to) {
   return html.slice(start, end);
 }
 
+function manualMakeupSubmitHarness(options = {}) {
+  const values = {
+    muManualStudent: 'student-8', muManualSourceTask: 'lesson-3', muManualReason: 'manual_exam',
+    muManualDate: '2026-08-14', muManualStart: '14:00', muManualEnd: '14:50', muManualStaff: 'staff-1',
+    ...options.values
+  };
+  const calls = [];
+  const bindings = {
+    $: id => ({ value: values[id.slice(1)] }),
+    session: options.session || { isAdmin: false, isStaffLink: true, staffId: 'staff-1' },
+    manualMakeupSourceLessons: () => options.lessons || [{ id: 'lesson-3', staffId: 'staff-1' }],
+    MANUAL_MAKEUP_REASON_LABELS: { manual_absence: '결석보강', manual_exam: '시험보강', manual_other: '기타보강' },
+    MANUAL_MAKEUP_UNRELATED: '__unrelated__',
+    manualMakeupRequestId: 'request-8',
+    today: () => '2026-09-08',
+    showMakeupModalError: error => calls.push({ error }),
+    makeupActiveStaff: id => ['staff-1', 'staff-2'].includes(id) ? { id } : null,
+    mutateMakeup: async payload => calls.push({ payload })
+  };
+  const source = block('async function submitManualMakeup(button)', 'function makeupCanComplete');
+  const submit = new Function(...Object.keys(bindings), `${source}\nreturn submitManualMakeup;`)(...Object.values(bindings));
+  return { submit, calls };
+}
+
 test('관리자와 개인 인증 선생님 보강 탭에 수업무관 보강생성 진입점을 표시한다', () => {
   const view = block('function viewMakeups()', 'async function refreshMakeupsAfterConflict');
 
@@ -90,12 +114,57 @@ test('수동 보강 모달은 고정 사유와 날짜·시작·종료 입력을 
   assert.match(modal, /id="muManualReason"/);
   assert.match(modal, /manualMakeupStaffFieldHtml\(\)/);
   assert.match(modal, /id="muManualDate" type="date"/);
+  assert.doesNotMatch(modal, /id="muManualDate"[^>]*\bmin=/, '지난 달 보강 날짜도 선택할 수 있다');
   assert.match(modal, /id="muManualStart" type="time"/);
   assert.match(modal, /id="muManualEnd" type="time"/);
   assert.match(modal, /원 수업의 출결은 바꾸지 않습니다/);
   assert.match(modal, /결석보강만 회차를 1회 차감/);
   assert.match(modal, /시험보강·기타보강은 회차를 추가 차감하지 않습니다/);
   assert.doesNotMatch(modal, /<textarea|prompt\s*\(/i);
+});
+
+test('관리자와 선생님은 지난 8월 날짜로 연결·수업무관 보강 생성 요청을 보낸다', async () => {
+  for (const session of [{ isAdmin: true }, { isAdmin: false, isStaffLink: true, staffId: 'staff-1' }]) {
+    for (const sourceMode of ['linked', 'unrelated']) {
+      const api = manualMakeupSubmitHarness({ session, values: {
+        muManualSourceTask: sourceMode === 'linked' ? 'lesson-3' : '__unrelated__'
+      } });
+      await api.submit({});
+      assert.deepEqual(api.calls, [{ payload: {
+        action: 'create_manual', studentId: 'student-8', sourceMode,
+        ...(sourceMode === 'linked' ? { sourceTaskId: 'lesson-3' } : { requestId: 'request-8' }),
+        reason: 'manual_exam', date: '2026-08-14', startTime: '14:00', endTime: '14:50', staffId: 'staff-1'
+      } }]);
+    }
+  }
+});
+
+test('지난 날짜 수동 생성도 누락된 일시와 종료가 시작보다 이르거나 같은 시간은 차단한다', async () => {
+  for (const values of [
+    { muManualDate: '' }, { muManualStart: '' }, { muManualEnd: '' },
+    { muManualEnd: '14:00' }, { muManualEnd: '13:50' }
+  ]) {
+    const api = manualMakeupSubmitHarness({ values });
+    await api.submit({});
+    assert.deepEqual(api.calls, [{ error: '날짜·시작시간·종료시간을 모두 확인해 주세요' }]);
+  }
+});
+
+test('지난 날짜 수동 생성도 인증·원 수업·담당자 권한을 유지한다', async () => {
+  for (const session of [{}, { isStaffLink: true }, { staffId: 'staff-1' }]) {
+    const api = manualMakeupSubmitHarness({ session });
+    await api.submit({});
+    assert.deepEqual(api.calls, []);
+  }
+  for (const [options, error] of [
+    [{ lessons: [] }, '현재 배정된 원 수업을 선택해 주세요'],
+    [{ values: { muManualStaff: 'staff-2' } }, '선생님은 다른 선생님에게 보강을 직접 배정할 수 없습니다'],
+    [{ values: { muManualStaff: 'inactive-staff' } }, '활성 보강 담당 선생님을 선택해 주세요']
+  ]) {
+    const api = manualMakeupSubmitHarness(options);
+    await api.submit({});
+    assert.deepEqual(api.calls, [{ error }]);
+  }
 });
 
 test('수업무관 보강은 관리자만 실제 담당을 고르고 선생님은 본인 stable staffId로 고정한다', () => {

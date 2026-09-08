@@ -56,7 +56,7 @@ function conflict(code = 'LESSON_SCHEDULE_ENDPOINT_REQUIRED') {
 }
 
 function runtime(options = {}) {
-  const storage = new Map();
+  const storage = options.storage || new Map();
   const writes = [];
   const calls = [];
   const events = new Map();
@@ -107,7 +107,7 @@ function runtime(options = {}) {
     const esc = value => String(value).replace(/[&<>"']/g, character => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
     })[character]);
-    const stats = { renders: 0, reloads: 0, resets: 0, notices: [], authRejections: 0 };
+    const stats = { renders: 0, reloads: 0, resets: 0, notices: [], authRejections: 0, closedModals: 0 };
     let personAccessProblem = null, ownLessonChangeLastLoadedAt = 1000, bookIssueLoaded = true, route = 'today';
     const onboardingServerConfirmedAt = new Map(), studentChangeMovedCheckKeys = new Set();
     const ownerOfCheck = () => __scopeId || 'staff-a';
@@ -118,7 +118,8 @@ function runtime(options = {}) {
     const render = () => { stats.renders++; };
     const renderAfterSync = render;
     const toast = message => stats.notices.push(message);
-    const modal = (title, body) => { stats.modal = { title, body }; };
+    const modal = (title, body, footer) => { stats.modal = { title, body, footer }; };
+    const closeModal = () => { stats.closedModals++; stats.modal = null; };
     const save = () => localStorage.setItem(LS_KEY, JSON.stringify(state));
     const loadOwnLessonChangeQueue = async () => {};
     const loadBookIssues = async () => {};
@@ -463,4 +464,153 @@ test('archive access stays scoped to the authenticated person and escapes the di
   assert.doesNotMatch(app.get('stats.modal.body'), /<img/);
   app.set('sync.personVerified = false;');
   assert.deepEqual(app.json('visibleSyncRecoveryArchives()'), []);
+});
+
+test('confirming recovery hides its notice while preserving archive bytes and a working history entry', async () => {
+  const app = runtime();
+  assert.equal(await app.recover(), true);
+  const archiveKeys = [...app.storage.keys()].filter(key => key.startsWith('wb-task-sync-recovery:v1:'));
+  const before = archiveKeys.map(key => app.storage.get(key));
+  assert.equal(app.elements.get('#syncRecoveryNotice').hidden, false);
+  assert.equal(app.elements.get('#syncRecoveryHistory').hidden, false);
+  assert.match(html, /<footer[^>]*id="syncRecoveryHistory"[^>]*>[\s\S]*?data-act="viewsyncrecovery"[\s\S]*?<\/footer>/);
+  assert.match(html, /case 'acksyncrecovery': acknowledgeSyncRecoveryArchives\(\); break;/);
+  app.set('showSyncRecoveryArchives();');
+  assert.match(app.get('stats.modal.footer'), /data-act="acksyncrecovery"[^>]*>확인 완료/);
+  assert.match(app.get('stats.modal.body'), /보존할 창작 메모/);
+  app.set('acknowledgeSyncRecoveryArchives();');
+  assert.equal(app.elements.get('#syncRecoveryNotice').hidden, true);
+  assert.equal(app.elements.get('#syncRecoveryNotice').innerHTML, '');
+  assert.equal(app.elements.get('#syncRecoveryHistory').hidden, false);
+  assert.equal(app.get('stats.modal'), null);
+  assert.equal(app.get('syncRecoveryReviewContext'), null);
+  assert.deepEqual(archiveKeys.map(key => app.storage.get(key)), before);
+  assert.deepEqual(app.json('Array.from(syncRecoveryAcknowledgedIds())'), app.archives().map(record => record.id));
+  app.set('showSyncRecoveryArchives();');
+  assert.match(app.get('stats.modal.body'), /보존할 창작 메모/);
+  assert.match(app.get('stats.modal.body'), /확인 완료/);
+  assert.match(app.get('stats.modal.footer'), /모두 확인한 보존 기록/);
+  assert.doesNotMatch(app.get('stats.modal.footer'), /data-act="acksyncrecovery"/);
+});
+
+test('confirmed recovery remains quiet across repeated rendering, another click and a fresh runtime', async () => {
+  const app = runtime();
+  assert.equal(await app.recover(), true);
+  app.set('showSyncRecoveryArchives(); acknowledgeSyncRecoveryArchives();');
+  const stored = [...app.storage.entries()];
+  const writes = app.writes.length;
+  app.set('acknowledgeSyncRecoveryArchives(); renderSyncRecoveryNotice(); renderSyncRecoveryNotice();');
+  assert.equal(app.elements.get('#syncRecoveryNotice').hidden, true);
+  assert.equal(app.get('stats.closedModals'), 1);
+  assert.equal(app.writes.length, writes);
+  assert.deepEqual([...app.storage.entries()], stored);
+  const reloaded = runtime({ storage: app.storage, state: app.json('state') });
+  reloaded.set('renderSyncRecoveryNotice(); showSyncRecoveryArchives();');
+  assert.equal(reloaded.elements.get('#syncRecoveryNotice').hidden, true);
+  assert.equal(reloaded.elements.get('#syncRecoveryHistory').hidden, false);
+  assert.match(reloaded.get('stats.modal.body'), /보존할 창작 메모/);
+  assert.match(reloaded.get('stats.modal.footer'), /모두 확인한 보존 기록/);
+  assert.deepEqual(reloaded.archives(), app.archives());
+});
+
+test('a new archive arriving while the review is open keeps its own notice after confirmation', async () => {
+  const app = runtime();
+  assert.equal(await app.recover(), true);
+  app.set('showSyncRecoveryArchives();');
+  const reviewed = app.json('syncRecoveryReviewContext.recordIds');
+  const added = app.json(`WBSyncRecoveryCore.saveArchive(localStorage, WBSyncRecoveryCore.buildArchive({
+    scopeId: 'admin', accessRole: 'admin', dataGeneration: 7, createdAt: 1800000000000,
+    error: { status: 409, code: 'REVISION_CONFLICT' },
+    changes: [{ table: 'checks', k: 'lesson-a|2026-09-08', owner: 'staff-a',
+      data: { note: '확인 창을 연 뒤 생긴 새 창작 메모', updatedAt: 1100 } }]
+  })).record`);
+  app.set('renderSyncRecoveryNotice(); acknowledgeSyncRecoveryArchives();');
+  assert.deepEqual(app.json('Array.from(syncRecoveryAcknowledgedIds())'), reviewed);
+  assert.equal(app.elements.get('#syncRecoveryNotice').hidden, false);
+  assert.match(app.elements.get('#syncRecoveryNotice').innerHTML, /보존된 미전송 내용 확인/);
+  assert.equal(app.archives().length, 2);
+  app.set('showSyncRecoveryArchives();');
+  assert.deepEqual(app.json('syncRecoveryReviewContext.recordIds'), [added.id]);
+  assert.match(app.get('stats.modal.body'), /확인 창을 연 뒤 생긴 새 창작 메모/);
+  assert.match(app.get('stats.modal.body'), /확인 완료/);
+  assert.match(app.get('stats.modal.body'), /확인 필요/);
+  app.set('acknowledgeSyncRecoveryArchives();');
+  assert.equal(app.elements.get('#syncRecoveryNotice').hidden, true);
+  assert.equal(app.elements.get('#syncRecoveryHistory').hidden, false);
+  assert.equal(app.archives().length, 2);
+});
+
+test('confirming preserved records does not hide or clear an active sync problem', async () => {
+  const app = runtime();
+  assert.equal(await app.recover(), true);
+  app.set(`sync.problem = { code: 'NETWORK_ERROR', message: '새로운 연결 문제' };
+    sync.err = '새로운 연결 문제'; renderSyncRecoveryNotice();
+    showSyncRecoveryArchives(); acknowledgeSyncRecoveryArchives();`);
+  assert.equal(app.elements.get('#syncRecoveryNotice').hidden, false);
+  assert.match(app.elements.get('#syncRecoveryNotice').innerHTML, /새로운 연결 문제/);
+  assert.match(app.elements.get('#syncRecoveryNotice').innerHTML, /data-act="retryauthcheck"/);
+  assert.doesNotMatch(app.elements.get('#syncRecoveryNotice').innerHTML, /data-act="viewsyncrecovery"/);
+  assert.equal(app.get('sync.problem.code'), 'NETWORK_ERROR');
+  assert.equal(app.get('sync.err'), '새로운 연결 문제');
+  assert.equal(app.elements.get('#syncRecoveryHistory').hidden, false);
+});
+
+test('auth, owner and generation changes cannot confirm a previously opened review', async () => {
+  for (const change of ["state.settings.myToken = 'replacement-token';", 'sync.personVerified = false;',
+    "__scopeId = 'staff-b';", 'state.settings.dataGeneration = 8;']) {
+    const app = runtime({ personId: 'staff-a', accessRole: 'staff', verified: true,
+      post: () => canonicalPage({ authRole: 'staff' }) });
+    assert.equal(await app.recover(), true);
+    app.set('showSyncRecoveryArchives();');
+    const before = [...app.storage.entries()];
+    app.set(change + ' acknowledgeSyncRecoveryArchives();');
+    assert.deepEqual([...app.storage.entries()], before, change);
+    assert.equal(app.get('stats.closedModals'), 0, change);
+    assert.match(app.get('stats.notices[stats.notices.length - 1]'), /현재 연결에서.*다시 열어/, change);
+    assert.deepEqual(app.json("WBSyncRecoveryCore.readAcknowledgements(localStorage, 'person:staff-a').recordIds"), [], change);
+  }
+});
+
+test('confirmation storage failures retain the notice, modal and original records with an error', async () => {
+  for (const mode of ['quota', 'silent', 'readback']) {
+    let failAck = false;
+    const app = runtime({
+      failWrite: key => failAck && mode === 'quota' && key.startsWith('wb-task-sync-recovery-ack:v1:'),
+      failRead: key => failAck && mode === 'readback' && key.startsWith('wb-task-sync-recovery-ack:v1:')
+    });
+    assert.equal(await app.recover(), true);
+    app.set('showSyncRecoveryArchives();');
+    const archives = app.archives();
+    failAck = true;
+    if (mode === 'silent') app.set('localStorage.setItem = () => {};');
+    app.set('acknowledgeSyncRecoveryArchives();');
+    assert.equal(app.elements.get('#syncRecoveryNotice').hidden, false, mode);
+    assert.equal(app.get('stats.closedModals'), 0, mode);
+    assert.ok(app.get('stats.modal'), mode);
+    assert.match(app.elements.get('#syncRecoveryAckError').textContent, /확인 상태를 저장하지 못했습니다/, mode);
+    assert.match(app.get('stats.notices[stats.notices.length - 1]'), /안내와 보존 기록은 유지/, mode);
+    assert.deepEqual(app.archives(), archives, mode);
+    failAck = false;
+    assert.deepEqual(app.json('Array.from(syncRecoveryAcknowledgedIds())'), [], mode);
+    app.set('renderSyncRecoveryNotice();');
+    assert.equal(app.elements.get('#syncRecoveryNotice').hidden, false, mode);
+  }
+});
+
+test('unreadable or corrupt saved confirmations restore the recovery notice while retaining history', async () => {
+  for (const mode of ['read', 'corrupt']) {
+    let failAck = false;
+    const app = runtime({ failRead: key => failAck && key.startsWith('wb-task-sync-recovery-ack:v1:') });
+    assert.equal(await app.recover(), true);
+    app.set('showSyncRecoveryArchives(); acknowledgeSyncRecoveryArchives();');
+    assert.equal(app.elements.get('#syncRecoveryNotice').hidden, true);
+    const archives = app.archives();
+    if (mode === 'read') failAck = true;
+    else app.storage.set([...app.storage.keys()].find(key => key.startsWith('wb-task-sync-recovery-ack:v1:')), '{broken');
+    app.set('renderSyncRecoveryNotice(); showSyncRecoveryArchives();');
+    assert.equal(app.elements.get('#syncRecoveryNotice').hidden, false, mode);
+    assert.equal(app.elements.get('#syncRecoveryHistory').hidden, false, mode);
+    assert.match(app.get('stats.modal.footer'), /data-act="acksyncrecovery"/);
+    assert.deepEqual(app.archives(), archives, mode);
+  }
 });

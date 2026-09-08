@@ -3,6 +3,7 @@ var WBSyncRecoveryCore = (function () {
 
   var VERSION = 1;
   var PREFIX = 'wb-task-sync-recovery:v1:';
+  var ACK_PREFIX = 'wb-task-sync-recovery-ack:v1:';
   var SCOPE_RE = /^(?:admin|person:[A-Za-z0-9_-]{1,128})$/;
   var ID_RE = /^recovery-[a-z0-9-]+$/;
   var ERROR_TEXT = {
@@ -28,6 +29,11 @@ var WBSyncRecoveryCore = (function () {
     ARCHIVE_STORAGE_FAILED: '미전송 기록을 기기에 보존할 공간이 부족합니다. 기존 데이터는 유지했습니다.',
     ARCHIVE_STORAGE_UNAVAILABLE: '브라우저가 기록 보관을 허용하지 않아 복구를 중단했습니다. 기존 데이터는 유지했습니다.',
     ARCHIVE_VERIFY_FAILED: '미전송 기록의 보관을 확인하지 못해 복구를 중단했습니다. 기존 데이터는 유지했습니다.',
+    ARCHIVE_ACK_CORRUPT: '복구 기록의 확인 상태를 안전하게 읽지 못했습니다. 보관 기록은 그대로 유지합니다.',
+    ARCHIVE_ACK_STORAGE_FAILED: '확인 완료 상태를 저장하지 못했습니다. 저장 공간과 브라우저 설정을 확인해 주세요.',
+    ARCHIVE_ACK_STORAGE_UNAVAILABLE: '확인 완료 상태를 읽지 못했습니다. 보관 기록을 다시 확인해 주세요.',
+    ARCHIVE_ACK_VERIFY_FAILED: '확인 완료 상태의 저장을 검증하지 못했습니다. 보관 기록을 다시 확인해 주세요.',
+    ARCHIVE_ACK_RECORD_INVALID: '확인할 보관 기록이 바뀌었습니다. 기록 목록을 다시 열어 주세요.',
     DATA_GENERATION_MISMATCH: '운영 데이터가 새로 바뀌었습니다. 최신 데이터를 다시 받아야 합니다.',
     AUTH_REQUIRED: '개인 연결을 다시 확인해 주세요.',
     SESSION_EXPIRED: '개인 연결이 만료되었습니다. 새 개인 링크로 다시 연결해 주세요.',
@@ -48,6 +54,16 @@ var WBSyncRecoveryCore = (function () {
   function archiveKey(scopeId, id) {
     if (typeof id !== 'string' || !ID_RE.test(id)) fail('ARCHIVE_ID_INVALID');
     return scopePrefix(scopeId) + id;
+  }
+
+  function acknowledgementPrefix(scopeId) {
+    scopePrefix(scopeId);
+    return ACK_PREFIX + encodeURIComponent(scopeId) + ':';
+  }
+
+  function acknowledgementKey(scopeId, id) {
+    archiveKey(scopeId, id);
+    return acknowledgementPrefix(scopeId) + id;
   }
 
   function isCredentialKey(key) {
@@ -238,6 +254,91 @@ var WBSyncRecoveryCore = (function () {
     } catch (error) { return storageFailure('ARCHIVE_STORAGE_FAILED'); }
   }
 
+  function acknowledgementFailure(code) {
+    return { ok: false, recordIds: [], code: code,
+      error: ERROR_TEXT[code] || ERROR_TEXT.ARCHIVE_ACK_STORAGE_UNAVAILABLE };
+  }
+
+  function acknowledgementEntries(storage, scopeId) {
+    var prefix = acknowledgementPrefix(scopeId);
+    if (!storage || typeof storage.getItem !== 'function' || typeof storage.key !== 'function' ||
+        !Number.isSafeInteger(storage.length) || storage.length < 0) fail('ARCHIVE_ACK_STORAGE_UNAVAILABLE');
+    var keys = [];
+    for (var i = 0; i < storage.length; i++) {
+      var key = storage.key(i);
+      if (typeof key === 'string' && key.indexOf(prefix) === 0 && keys.indexOf(key) === -1) keys.push(key);
+    }
+    return keys.map(function (key) {
+      var raw = storage.getItem(key);
+      var marker;
+      try { marker = JSON.parse(raw); } catch (error) { fail('ARCHIVE_ACK_CORRUPT'); }
+      if (!marker || typeof marker !== 'object' || Array.isArray(marker) || marker.version !== VERSION ||
+          marker.scopeId !== scopeId || typeof marker.recordId !== 'string' || !ID_RE.test(marker.recordId) ||
+          Object.keys(marker).sort().join(',') !== 'recordId,scopeId,version' ||
+          acknowledgementKey(scopeId, marker.recordId) !== key) fail('ARCHIVE_ACK_CORRUPT');
+      return { key: key, raw: raw, recordId: marker.recordId };
+    });
+  }
+
+  function readAcknowledgements(storage, scopeId) {
+    try {
+      var archives = readArchives(storage, scopeId);
+      if (!archives.ok) return acknowledgementFailure(archives.code);
+      var entries = acknowledgementEntries(storage, scopeId);
+      var ids = entries.map(function (entry) { return entry.recordId; });
+      return { ok: true, recordIds: archives.records.filter(function (record) {
+        return ids.indexOf(record.id) !== -1;
+      }).map(function (record) { return record.id; }) };
+    } catch (error) { return acknowledgementFailure(error && error.code || 'ARCHIVE_ACK_STORAGE_UNAVAILABLE'); }
+  }
+
+  function acknowledgeArchives(storage, scopeId, recordIds) {
+    var attempted = [];
+    try {
+      var archives = readArchives(storage, scopeId);
+      if (!archives.ok) return acknowledgementFailure(archives.code);
+      var entries = acknowledgementEntries(storage, scopeId);
+      if (!Array.isArray(recordIds)) fail('ARCHIVE_ACK_RECORD_INVALID');
+      var ids = [];
+      recordIds.forEach(function (id) {
+        if (typeof id !== 'string' || !ID_RE.test(id) || !archives.records.some(function (record) {
+          return record.id === id;
+        })) fail('ARCHIVE_ACK_RECORD_INVALID');
+        if (ids.indexOf(id) === -1) ids.push(id);
+      });
+      var targets = ids.map(function (id) {
+        var key = archiveKey(scopeId, id);
+        var raw = storage.getItem(key);
+        if (!validRecord(JSON.parse(raw), scopeId, key)) fail('ARCHIVE_ACK_RECORD_INVALID');
+        var existing = entries.filter(function (entry) { return entry.recordId === id; })[0];
+        return { archiveKey: key, archiveRaw: raw, key: acknowledgementKey(scopeId, id),
+          raw: existing ? existing.raw : JSON.stringify({ version: VERSION, scopeId: scopeId, recordId: id }),
+          existing: !!existing };
+      });
+      targets.forEach(function (target) {
+        if (storage.getItem(target.archiveKey) !== target.archiveRaw) fail('ARCHIVE_ACK_VERIFY_FAILED');
+        if (!target.existing) {
+          attempted.push(target.key);
+          // 기록별 확인을 따로 저장해야 다른 탭에서 새로 생긴 보관본의 알림이 사라지지 않는다.
+          storage.setItem(target.key, target.raw);
+        }
+        if (storage.getItem(target.key) !== target.raw) fail('ARCHIVE_ACK_VERIFY_FAILED');
+      });
+      targets.forEach(function (target) {
+        if (storage.getItem(target.key) !== target.raw || storage.getItem(target.archiveKey) !== target.archiveRaw) {
+          fail('ARCHIVE_ACK_VERIFY_FAILED');
+        }
+      });
+      return { ok: true, recordIds: ids };
+    } catch (error) {
+      // 일부만 저장된 실패가 다음 새로고침에서 확인 완료로 보이지 않도록 새 표식만 되돌린다.
+      attempted.forEach(function (key) {
+        try { storage.removeItem(key); } catch (rollbackError) { /* 보관 원본에는 손대지 않는다. */ }
+      });
+      return acknowledgementFailure(error && error.code || 'ARCHIVE_ACK_STORAGE_FAILED');
+    }
+  }
+
   function displayRows(record) {
     var changes = sanitize(record && Array.isArray(record.changes) ? record.changes : []);
     return changes.map(function (change) {
@@ -259,6 +360,13 @@ var WBSyncRecoveryCore = (function () {
     if (!read.ok) return read;
     var removed = 0;
     try {
+      var acknowledgements = acknowledgementEntries(storage, scopeId);
+      for (var j = 0; j < acknowledgements.length; j++) {
+        var acknowledgement = acknowledgements[j];
+        if (storage.getItem(acknowledgement.key) !== acknowledgement.raw) return storageFailure('ARCHIVE_CLEAR_FAILED');
+        storage.removeItem(acknowledgement.key);
+        if (storage.getItem(acknowledgement.key) !== null) return storageFailure('ARCHIVE_CLEAR_FAILED');
+      }
       for (var i = 0; i < read.records.length; i++) {
         var record = read.records[i];
         var key = archiveKey(scopeId, record.id);
@@ -275,6 +383,8 @@ var WBSyncRecoveryCore = (function () {
 
   return { buildArchive: buildArchive, saveArchive: saveArchive, readArchives: readArchives,
     clearArchives: clearArchives, archiveKey: archiveKey, isRecoverableError: isRecoverableError,
+    acknowledgeArchives: acknowledgeArchives, readAcknowledgements: readAcknowledgements,
+    acknowledgementKey: acknowledgementKey,
     errorText: errorText, displayRows: displayRows };
 })();
 
