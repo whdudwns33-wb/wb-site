@@ -22,6 +22,7 @@ test('학생 연락처는 서버에만 두고 준비된 학생은 바로 보내�
 
   assert.match(contacts, /rows: new Map\(\)/);
   assert.match(contacts, /phoneMasked: String\(row\.phoneMasked \|\| ''\)/);
+  assert.match(contacts, /phoneOwner: \['student', 'mother'\]\.includes\(row\.phoneOwner\)/);
   assert.doesNotMatch(contacts, /localStorage|LS_KEY|state\.(?:staff|settings)|\bsave\(/,
     '카카오 연락처 캐시는 wb_consult_v1 또는 동기화 state에 저장하지 않는다');
   assert.doesNotMatch(state + add, /phoneMasked|phone|contact|consent/i);
@@ -40,30 +41,34 @@ test('학생 연락처는 서버에만 두고 준비된 학생은 바로 보내�
   assert.match(panel, /const sendDisabled = unavailable \|\| anyBusy/);
 });
 
-test('학생 번호는 최초 한 번만 동의받아 저장하고 보호자 번호와 분리한다', () => {
+test('학생·엄마 번호를 구분해 동의받아 저장하고 보호자 열람 번호와 분리한다', () => {
   const modal = between('function consultLinkContactModal(staffId', '\nasync function saveConsultLinkContact');
   const save = between('async function saveConsultLinkContact(staffId', '\nfunction consultLinkSendMessage');
 
-  assert.match(modal, /학생 본인의 휴대전화 번호/);
-  assert.match(modal, /한 번 등록하면 다음 발송부터 자동으로 사용합니다/);
-  assert.match(modal, /phoneMasked[\s\S]*현재 학생 번호:/);
-  assert.match(modal, /변경하려면 아래에 전체 번호를 다시 입력/);
+  assert.match(modal, /학생 휴대폰이 없으면 엄마 번호로 표시해 등록합니다/);
+  assert.match(modal, /consultLinkPhoneOwnerOptions\(contact/);
+  assert.match(modal, /현재 ['"] \+ consultLinkPhoneLabel\(contact\)/);
+  assert.match(modal, /변경하려면 종류와 전체 번호를 다시 입력/);
   assert.match(modal, /id="consultLinkConsent"/);
-  assert.match(modal, /보호자 번호는 ‘보호자 공유’에서 별도로 관리합니다/);
+  assert.match(modal, /엄마 번호를 선택해도 ‘보호자 공유’의 열람 초대 번호와는 별도로 관리합니다/);
   assert.match(modal, /data-send="1"/);
   assert.match(modal, /동의하고 바로 보내기/);
   assert.match(save, /\^01\[016789\]\\d\{7,8\}\$/);
   assert.match(save, /if \(!clear && !consent\) return toast\('발송 동의를 확인해 주세요'\)/);
   assert.match(modal, /발송 중지·번호 삭제/);
   assert.match(save, /const phone = clear \? ''/);
+  assert.match(save, /name="consultLinkPhoneOwner"\]:checked/);
   assert.match(save, /const consent = clear \? false/);
-  assert.match(save, /sync\.post\('\/consult-link-send', \{\s*app: SYNC_APP, auth: sync\.auth\(\), action: 'set', staffId: staffId, phone: phone,\s*consent: consent, expectedUpdatedAt: Number\(expectedUpdatedAt\) \|\| 0\s*\}\)/);
+  assert.match(save, /sync\.post\('\/consult-link-send', \{\s*app: SYNC_APP, auth: sync\.auth\(\), action: 'set', staffId: staffId, phone: phone,\s*phoneOwner: phoneOwner, consent: consent, expectedUpdatedAt: Number\(expectedUpdatedAt\) \|\| 0\s*\}\)/);
+  assert.match(save, /savedForSend = consultLinkContactReady\(row\)/);
   assert.match(save, /if \(savedForSend && sendAfterSave\) await sendConsultStudentLink\(staffId\)/);
 });
 
 test('학생 번호는 본인 토큰으로 필수 등록하고 원문은 브라우저 상태에 남기지 않는다', () => {
   const render = between('function render() {', '\nfunction renderTabs()');
+  const contactHelpers = between('function consultLinkContactRow(row)', '\n/* 학생 번호 원문');
   const phone = between('const studentPhoneUi =', '\nasync function loadConsultLinkContacts');
+  const ownerHelpers = between('function consultLinkPhoneLabel(contact)', '\nfunction consultLinkPhoneOwnerOptions');
   const reset = between('function resetStudentLinkCache(token) {', '\n\nfunction studentCacheScopedTo');
   const guide = between('function studentPhoneSettingsCard()', '\nfunction studentSetupReminder');
   const actions = between("    case 'studentphoneretry':", "    case 'linkcontactsretry':");
@@ -79,23 +84,34 @@ test('학생 번호는 본인 토큰으로 필수 등록하고 원문은 브라�
 
   assert.match(phone, /staffId: '', contact: null/);
   assert.match(phone, /contact\.staffId === student\.id/);
+  assert.match(contactHelpers, /엄마 번호/);
+  assert.match(contactHelpers, /학생 휴대폰이 없는 경우/);
+  assert.match(contactHelpers, /phoneOwner === 'mother'/);
+  assert.match(contactHelpers, /: 'unknown'/);
+  assert.match(phone, /consultLinkContactReady\(contact\)/);
   assert.match(phone, /action: 'self_get'/);
   assert.match(phone, /action: 'self_set'/);
   assert.match(phone, /\^01\[016789\]\\d\{7,8\}\$/);
   assert.match(phone, /if \(!consent\) return toast/);
   assert.match(phone, /번호는 이 기기·플래너 백업에 저장하지 않고 컨설팅 서버에서만 관리/);
-  assert.match(phone, /보호자 번호와는 별도로 관리/);
+  assert.match(phone, /보호자 열람 초대 번호와는 별도로 관리/);
   assert.doesNotMatch(phone, /localStorage|LS_KEY|state\.(?:staff|settings)|\bsave\(/,
     '학생 연락처 원문과 마스킹 상태를 wb_consult_v1 또는 동기화 state에 저장하지 않는다');
 
   const selfSetAt = phone.indexOf("sync.post('/consult-link-send', {", phone.indexOf('async function saveStudentPhone'));
   const selfSetRequest = phone.slice(selfSetAt, phone.indexOf('});', selfSetAt) + 3);
-  assert.match(selfSetRequest, /app: SYNC_APP, auth: auth, action: 'self_set', phone: phone, consent: true/);
+  assert.match(selfSetRequest, /app: SYNC_APP, auth: auth, action: 'self_set', phone: phone, phoneOwner: phoneOwner, consent: true/);
   assert.doesNotMatch(selfSetRequest, /staffId/);
   assert.match(reset, /clearStudentPhoneUi\(\)/);
   assert.match(guide, /phoneMasked/);
   assert.match(guide, /data-act="studentphoneopen"/);
   assert.match(actions, /studentphoneretry[\s\S]*studentphoneopen[\s\S]*studentphonesave/);
+
+  const ownerApi = new Function(ownerHelpers + ';return {label:consultLinkPhoneLabel,ready:consultLinkContactReady};')();
+  assert.equal(ownerApi.label({ phoneOwner: 'mother' }), '엄마 번호');
+  assert.equal(ownerApi.label({ phoneOwner: 'unknown' }), '번호 구분 필요');
+  assert.equal(ownerApi.ready({ phoneMasked: '010****5678', consent: true, phoneOwner: 'unknown' }), false);
+  assert.equal(ownerApi.ready({ phoneMasked: '010****5678', consent: true, phoneOwner: 'mother' }), true);
 });
 
 test('개인 링크 발송은 먼저 consult 동기화를 확인하고 수신번호나 문구를 요청에 싣지 않는다', () => {
@@ -109,6 +125,7 @@ test('개인 링크 발송은 먼저 consult 동기화를 확인하고 수신번
   assert.match(send, /consultLinkContactsUi\.busy = 'send:' \+ staffId/);
   assert.match(send, /finally[\s\S]*consultLinkContactsUi\.busy = ''/);
   assert.match(send, /return consultLinkContactModal\(staffId, true\)/);
+  assert.match(send, /!consultLinkContactReady\(contact\)/);
 });
 
 test('솔라피 결과는 접수와 완료를 구분하고 모호한 결과의 중복 발송을 경고한다', () => {
