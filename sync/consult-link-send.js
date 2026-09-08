@@ -6,6 +6,8 @@
  *   { app:'consult', auth, action:'list' }
  *   { app:'consult', auth, action:'set', staffId, phone, consent, expectedUpdatedAt }
  *   { app:'consult', auth, action:'send', staffId }
+ *   { app:'consult', auth(person), action:'self_get' }
+ *   { app:'consult', auth(person), action:'self_set', phone, consent, expectedUpdatedAt }
  */
 
 import { buildSolapiAuthorization, kstDateFromMs } from './director-report-send.js';
@@ -580,14 +582,35 @@ export async function handleConsultLinkSend(
 ) {
   try {
     if (app !== 'consult') fail('APP_INVALID', '컨설팅 앱에서만 사용할 수 있습니다', 400);
-    if (!auth || auth.scope !== 'all') {
-      fail('FORBIDDEN', '원장 로그인에서만 학생 링크를 관리할 수 있습니다', 403);
-    }
     const action = String(body && body.action || '');
     if (action === 'list') exactBody(body, []);
     else if (action === 'set') exactBody(body, ['staffId', 'phone', 'consent', 'expectedUpdatedAt']);
     else if (action === 'send') exactBody(body, ['staffId']);
-    else fail('ACTION_INVALID', 'action은 list, set, send 중 하나여야 합니다', 400);
+    else if (action === 'self_get') exactBody(body, []);
+    else if (action === 'self_set') exactBody(body, ['phone', 'consent', 'expectedUpdatedAt']);
+    else fail('ACTION_INVALID', 'action은 list, set, send, self_get, self_set 중 하나여야 합니다', 400);
+
+    const self = action === 'self_get' || action === 'self_set';
+    if (!auth || (self ? auth.scope !== 'own' : auth.scope !== 'all')) {
+      fail('FORBIDDEN', self
+        ? '학생 본인만 연락처를 등록할 수 있습니다'
+        : '원장 로그인에서만 학생 링크를 관리할 수 있습니다', 403);
+    }
+
+    if (action === 'self_get') {
+      const student = await activeStudent(env, auth.id);
+      return json({ ok: true, contact: publicContact(await contactRow(env, student.id), student) },
+        200, origin);
+    }
+    if (action === 'self_set') {
+      if (body.consent !== true) {
+        fail('CONSENT_REQUIRED', '휴대전화 번호 등록 및 발송 동의가 필요합니다', 400);
+      }
+      return await setContact(env, {
+        staffId: auth.id, phone: body.phone, consent: body.consent,
+        expectedUpdatedAt: body.expectedUpdatedAt
+      }, auth, origin, json);
+    }
 
     if (action === 'list') return await listContacts(env, origin, json);
     if (action === 'set') return await setContact(env, body, auth, origin, json);

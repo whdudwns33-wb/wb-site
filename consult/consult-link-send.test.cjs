@@ -61,6 +61,43 @@ test('학생 번호는 최초 한 번만 동의받아 저장하고 보호자 번
   assert.match(save, /if \(savedForSend && sendAfterSave\) await sendConsultStudentLink\(staffId\)/);
 });
 
+test('학생 번호는 본인 토큰으로 필수 등록하고 원문은 브라우저 상태에 남기지 않는다', () => {
+  const render = between('function render() {', '\nfunction renderTabs()');
+  const phone = between('const studentPhoneUi =', '\nasync function loadConsultLinkContacts');
+  const reset = between('function resetStudentLinkCache(token) {', '\n\nfunction studentCacheScopedTo');
+  const guide = between('function studentPhoneSettingsCard()', '\nfunction studentSetupReminder');
+  const actions = between("    case 'studentphoneretry':", "    case 'linkcontactsretry':");
+
+  const pendingAt = render.indexOf('pendingStudentCode || studentConnectError');
+  const missingStudentAt = render.indexOf('!staffById(session.staffId)');
+  const phoneGateAt = render.indexOf('!studentPhoneReady()');
+  const routeAt = render.indexOf('const map =');
+  assert.ok(pendingAt >= 0 && pendingAt < missingStudentAt && missingStudentAt < phoneGateAt && phoneGateAt < routeAt);
+  assert.match(render, /session\.isStaffLink && !isManager\(\) && !studentPhoneReady\(\)/);
+  assert.match(render, /viewStudentPhoneGate\(currentStaff\(\)\)/);
+  assert.match(render, /!studentPhoneUi\.loaded && !studentPhoneUi\.loading[\s\S]*loadStudentPhone\(\)/);
+
+  assert.match(phone, /staffId: '', contact: null/);
+  assert.match(phone, /contact\.staffId === student\.id/);
+  assert.match(phone, /action: 'self_get'/);
+  assert.match(phone, /action: 'self_set'/);
+  assert.match(phone, /\^01\[016789\]\\d\{7,8\}\$/);
+  assert.match(phone, /if \(!consent\) return toast/);
+  assert.match(phone, /번호는 이 기기·플래너 백업에 저장하지 않고 컨설팅 서버에서만 관리/);
+  assert.match(phone, /보호자 번호와는 별도로 관리/);
+  assert.doesNotMatch(phone, /localStorage|LS_KEY|state\.(?:staff|settings)|\bsave\(/,
+    '학생 연락처 원문과 마스킹 상태를 wb_consult_v1 또는 동기화 state에 저장하지 않는다');
+
+  const selfSetAt = phone.indexOf("sync.post('/consult-link-send', {", phone.indexOf('async function saveStudentPhone'));
+  const selfSetRequest = phone.slice(selfSetAt, phone.indexOf('});', selfSetAt) + 3);
+  assert.match(selfSetRequest, /app: SYNC_APP, auth: auth, action: 'self_set', phone: phone, consent: true/);
+  assert.doesNotMatch(selfSetRequest, /staffId/);
+  assert.match(reset, /clearStudentPhoneUi\(\)/);
+  assert.match(guide, /phoneMasked/);
+  assert.match(guide, /data-act="studentphoneopen"/);
+  assert.match(actions, /studentphoneretry[\s\S]*studentphoneopen[\s\S]*studentphonesave/);
+});
+
 test('개인 링크 발송은 먼저 consult 동기화를 확인하고 수신번호나 문구를 요청에 싣지 않는다', () => {
   const send = between('async function sendConsultStudentLink(staffId) {', '\nfunction viewStaffAdmin()');
   const postAt = send.indexOf("sync.post('/consult-link-send'");

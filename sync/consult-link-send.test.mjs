@@ -58,6 +58,7 @@ class TestD1 {
 
 const authBody = { mode: 'admin', secret: 'test-secret' };
 const resolvedAdmin = { scope: 'all', role: 'admin' };
+const own = id => ({ scope: 'own', id });
 const json = (body, status = 200) => new Response(JSON.stringify(body), {
   status, headers: { 'content-type': 'application/json' }
 });
@@ -83,15 +84,98 @@ function seedStudent(db, id, name, extra = {}) {
 }
 
 async function call(db, body, options = {}) {
+  const requestAuth = options.auth && options.auth.scope === 'own'
+    ? { mode: 'person', id: options.auth.id, token: 'student-token' }
+    : authBody;
   const response = await handleConsultLinkSend(
     env(db, options.env), options.app || 'consult',
-    { app: options.app || 'consult', auth: authBody, ...body }, '*',
+    { app: options.app || 'consult', auth: requestAuth, ...body }, '*',
     options.auth || resolvedAdmin, json,
     options.issue || (async () => ({ code: 'a'.repeat(48), expiresAt: Date.now() + 86400000 })),
     options.revoke || (async () => true)
   );
   return { status: response.status, body: await response.json() };
 }
+
+test('student self_get/set register only the active authenticated student and never expose raw phone', async () => {
+  const db = new TestD1();
+  seedStudent(db, 'student-a', '김학생');
+  seedStudent(db, 'student-b', '이학생');
+
+  let result = await call(db, { action: 'self_get' }, { auth: own('student-a') });
+  assert.equal(result.status, 200);
+  assert.deepEqual(result.body.contact, {
+    staffId: 'student-a', studentName: '김학생', phoneRegistered: false,
+    consent: false, updatedAt: 0
+  });
+
+  result = await call(db, {
+    action: 'self_set', phone: '010-1234-5678', consent: true, expectedUpdatedAt: 0
+  }, { auth: own('student-a') });
+  assert.equal(result.status, 200, JSON.stringify(result.body));
+  assert.equal(result.body.contact.phoneMasked, '010****5678');
+  assert.equal(JSON.stringify(result.body).includes('01012345678'), false);
+  const stored = db.prepare(
+    "SELECT staff_id,phone,consent,updated_by FROM consult_link_contacts WHERE app='consult'"
+  ).first();
+  assert.equal(stored.staff_id, 'student-a');
+  assert.equal(stored.phone, '01012345678');
+  assert.equal(stored.consent, 1);
+  assert.equal(stored.updated_by, 'student-a');
+
+  result = await call(db, { action: 'self_get' }, { auth: own('student-a') });
+  assert.equal(result.body.contact.phoneMasked, '010****5678');
+  assert.equal(JSON.stringify(result.body).includes('01012345678'), false);
+  assert.equal(db.prepare(
+    "SELECT COUNT(*) AS count FROM consult_link_contacts WHERE staff_id='student-b'"
+  ).first().count, 0);
+});
+
+test('student self contact rejects target injection, invalid or optional registration, and inactive students', async () => {
+  const db = new TestD1();
+  seedStudent(db, 'student-a', '김학생');
+  seedStudent(db, 'student-b', '이학생');
+
+  let result = await call(db, {
+    action: 'self_set', staffId: 'student-b', phone: '01012345678', consent: true,
+    expectedUpdatedAt: 0
+  }, { auth: own('student-a') });
+  assert.equal(result.status, 400);
+  assert.equal(result.body.code, 'REQUEST_FIELD_FORBIDDEN');
+  result = await call(db, { action: 'self_get', staffId: 'student-b' }, {
+    auth: own('student-a')
+  });
+  assert.equal(result.status, 400);
+  assert.equal(result.body.code, 'REQUEST_FIELD_FORBIDDEN');
+
+  result = await call(db, {
+    action: 'self_set', phone: '01012', consent: true, expectedUpdatedAt: 0
+  }, { auth: own('student-a') });
+  assert.equal(result.status, 400);
+  assert.equal(result.body.code, 'PHONE_INVALID');
+
+  result = await call(db, {
+    action: 'self_set', phone: '', consent: true, expectedUpdatedAt: 0
+  }, { auth: own('student-a') });
+  assert.equal(result.status, 400);
+  assert.equal(result.body.code, 'PHONE_REQUIRED');
+
+  result = await call(db, {
+    action: 'self_set', phone: '01012345678', consent: false, expectedUpdatedAt: 0
+  }, { auth: own('student-a') });
+  assert.equal(result.status, 400);
+  assert.equal(result.body.code, 'CONSENT_REQUIRED');
+  assert.equal(db.prepare('SELECT COUNT(*) AS count FROM consult_link_contacts').first().count, 0);
+
+  result = await call(db, { action: 'self_get' }, { auth: own('missing-student') });
+  assert.equal(result.status, 409);
+  assert.equal(result.body.code, 'STUDENT_NOT_ACTIVE');
+  result = await call(db, {
+    action: 'self_set', phone: '01012345678', consent: true, expectedUpdatedAt: 0
+  }, { auth: own('missing-student') });
+  assert.equal(result.status, 409);
+  assert.equal(result.body.code, 'STUDENT_NOT_ACTIVE');
+});
 
 async function register(db, staffId = 'student-a', phone = '010-1234-5678') {
   const result = await call(db, {
