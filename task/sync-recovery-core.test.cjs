@@ -201,6 +201,218 @@ test('clearing detects storage refusal and preserves malformed archive targets',
   assert.equal(storage.getItem(key), '{}');
 });
 
+test('acknowledgements persist across a reload without changing or removing archive bytes', () => {
+  const storage = memoryStorage();
+  const record = makeRecord();
+  recovery.saveArchive(storage, record);
+  const key = recovery.archiveKey(record.scopeId, record.id);
+  const before = storage.getItem(key);
+  assert.deepEqual(recovery.readAcknowledgements(storage, record.scopeId), { ok: true, recordIds: [] });
+  assert.deepEqual(recovery.acknowledgeArchives(storage, record.scopeId, [record.id]),
+    { ok: true, recordIds: [record.id] });
+  const reloadedStorage = Object.assign({}, storage);
+  Object.defineProperty(reloadedStorage, 'length', { get: () => storage.length });
+  assert.deepEqual(recovery.readAcknowledgements(reloadedStorage, record.scopeId),
+    { ok: true, recordIds: [record.id] });
+  assert.deepEqual(recovery.readArchives(reloadedStorage, record.scopeId).records, [record]);
+  assert.equal(storage.getItem(key), before);
+  assert.equal(storage.length, 2);
+});
+
+test('acknowledging the same record is idempotent even when further writes are unavailable', () => {
+  const storage = memoryStorage();
+  const record = makeRecord();
+  recovery.saveArchive(storage, record);
+  recovery.acknowledgeArchives(storage, record.scopeId, [record.id]);
+  const raw = storage.getItem(recovery.acknowledgementKey(record.scopeId, record.id));
+  storage.setItem = () => { throw new Error('QuotaExceededError'); };
+  assert.deepEqual(recovery.acknowledgeArchives(storage, record.scopeId, [record.id, record.id]),
+    { ok: true, recordIds: [record.id] });
+  assert.equal(storage.getItem(recovery.acknowledgementKey(record.scopeId, record.id)), raw);
+  assert.equal(storage.length, 2);
+});
+
+test('new archives remain unacknowledged regardless of their timestamp or concurrent creation', () => {
+  const storage = memoryStorage();
+  const first = makeRecord();
+  const second = makeRecord({ dataGeneration: 4, createdAt: first.createdAt - 1 });
+  const concurrent = makeRecord({ dataGeneration: 5, createdAt: first.createdAt });
+  recovery.saveArchive(storage, first);
+  const originalSet = storage.setItem;
+  storage.setItem = (key, value) => {
+    originalSet(key, value);
+    if (key === recovery.acknowledgementKey(first.scopeId, first.id)) {
+      originalSet(recovery.archiveKey(concurrent.scopeId, concurrent.id), JSON.stringify(concurrent));
+    }
+  };
+  assert.equal(recovery.acknowledgeArchives(storage, first.scopeId, [first.id]).ok, true);
+  assert.equal(recovery.saveArchive(storage, second).ok, true);
+  const acknowledged = recovery.readAcknowledgements(storage, first.scopeId);
+  assert.deepEqual(acknowledged, { ok: true, recordIds: [first.id] });
+  const pending = recovery.readArchives(storage, first.scopeId).records
+    .filter(record => !acknowledged.recordIds.includes(record.id));
+  assert.deepEqual(pending.map(record => record.id), [concurrent.id, second.id]);
+});
+
+test('acknowledgements remain isolated between teachers and admin', () => {
+  const storage = memoryStorage();
+  const first = makeRecord();
+  const other = makeRecord({ scopeId: 'person:other_teacher' });
+  const admin = makeRecord({ scopeId: 'admin', accessRole: 'admin' });
+  [first, other, admin].forEach(record => recovery.saveArchive(storage, record));
+  assert.equal(recovery.acknowledgeArchives(storage, first.scopeId, [other.id]).ok, false);
+  assert.equal(recovery.acknowledgeArchives(storage, first.scopeId, [first.id]).ok, true);
+  assert.deepEqual(recovery.readAcknowledgements(storage, first.scopeId).recordIds, [first.id]);
+  assert.deepEqual(recovery.readAcknowledgements(storage, other.scopeId).recordIds, []);
+  assert.deepEqual(recovery.readAcknowledgements(storage, admin.scopeId).recordIds, []);
+});
+
+test('invalid, missing and mixed record IDs are rejected before any acknowledgement writes', () => {
+  const storage = memoryStorage();
+  const record = makeRecord();
+  recovery.saveArchive(storage, record);
+  const before = storage.getItem(recovery.archiveKey(record.scopeId, record.id));
+  [null, record.id, ['../bad'], [record.id, 'recovery-missing'], [record.id, 42]].forEach(ids => {
+    const result = recovery.acknowledgeArchives(storage, record.scopeId, ids);
+    assert.equal(result.ok, false);
+    assert.equal(result.code, 'ARCHIVE_ACK_RECORD_INVALID');
+    assert.deepEqual(result.recordIds, []);
+    assert.equal(storage.length, 1);
+  });
+  assert.equal(storage.getItem(recovery.archiveKey(record.scopeId, record.id)), before);
+});
+
+test('quota failure rolls back only new acknowledgement markers and retains all archives', () => {
+  const storage = memoryStorage();
+  const first = makeRecord();
+  const second = makeRecord({ dataGeneration: 4 });
+  const third = makeRecord({ dataGeneration: 5 });
+  [first, second, third].forEach(record => recovery.saveArchive(storage, record));
+  recovery.acknowledgeArchives(storage, first.scopeId, [first.id]);
+  const originals = [first, second, third].map(record => storage.getItem(recovery.archiveKey(record.scopeId, record.id)));
+  const originalSet = storage.setItem;
+  storage.setItem = (key, value) => {
+    if (key === recovery.acknowledgementKey(third.scopeId, third.id)) throw new Error('QuotaExceededError');
+    originalSet(key, value);
+  };
+  const result = recovery.acknowledgeArchives(storage, first.scopeId, [first.id, second.id, third.id]);
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.recordIds, []);
+  assert.deepEqual(recovery.readAcknowledgements(storage, first.scopeId).recordIds, [first.id]);
+  assert.deepEqual([first, second, third].map(record => storage.getItem(recovery.archiveKey(record.scopeId, record.id))), originals);
+});
+
+test('silent, corrupt and unreadable acknowledgement writes never report confirmation', () => {
+  ['silent', 'corrupt', 'unreadable'].forEach(mode => {
+    const storage = memoryStorage();
+    const record = makeRecord();
+    recovery.saveArchive(storage, record);
+    const key = recovery.acknowledgementKey(record.scopeId, record.id);
+    const originalSet = storage.setItem;
+    const originalGet = storage.getItem;
+    let didWrite = false;
+    storage.setItem = (target, value) => {
+      didWrite = true;
+      if (mode !== 'silent') originalSet(target, mode === 'corrupt' ? '{broken' : value);
+    };
+    storage.getItem = target => {
+      if (mode === 'unreadable' && didWrite && target === key) throw new Error('SecurityError');
+      return originalGet(target);
+    };
+    assert.equal(recovery.acknowledgeArchives(storage, record.scopeId, [record.id]).ok, false, mode);
+    storage.getItem = originalGet;
+    assert.deepEqual(recovery.readAcknowledgements(storage, record.scopeId).recordIds, [], mode);
+    assert.deepEqual(recovery.readArchives(storage, record.scopeId).records, [record], mode);
+  });
+});
+
+test('corrupt or inaccessible acknowledgement reads fail closed without modifying stored records', () => {
+  const record = makeRecord();
+  [null, {}, { version: 1, scopeId: 'person:other_teacher', recordId: record.id },
+    { version: 1, scopeId: record.scopeId, recordId: 'recovery-missing' },
+    { version: 1, scopeId: record.scopeId, recordId: record.id, ignored: true }].forEach(marker => {
+    const storage = memoryStorage();
+    recovery.saveArchive(storage, record);
+    const key = recovery.acknowledgementKey(record.scopeId, record.id);
+    storage.setItem(key, JSON.stringify(marker));
+    const result = recovery.readAcknowledgements(storage, record.scopeId);
+    assert.equal(result.ok, false);
+    assert.equal(result.code, 'ARCHIVE_ACK_CORRUPT');
+    assert.deepEqual(result.recordIds, []);
+    assert.equal(recovery.acknowledgeArchives(storage, record.scopeId, [record.id]).ok, false);
+    assert.equal(storage.getItem(key), JSON.stringify(marker));
+    assert.deepEqual(recovery.readArchives(storage, record.scopeId).records, [record]);
+  });
+  const disabled = { get length() { throw new Error('SecurityError'); } };
+  assert.equal(recovery.readAcknowledgements(disabled, record.scopeId).ok, false);
+  assert.equal(recovery.acknowledgeArchives(disabled, record.scopeId, [record.id]).ok, false);
+});
+
+test('acknowledgement reads reject damaged archive contents and ignore valid orphan markers', () => {
+  const storage = memoryStorage();
+  const record = makeRecord();
+  recovery.saveArchive(storage, record);
+  recovery.acknowledgeArchives(storage, record.scopeId, [record.id]);
+  const key = recovery.archiveKey(record.scopeId, record.id);
+  storage.setItem(key, '{broken');
+  assert.equal(recovery.readAcknowledgements(storage, record.scopeId).ok, false);
+  storage.removeItem(key);
+  assert.deepEqual(recovery.readAcknowledgements(storage, record.scopeId), { ok: true, recordIds: [] });
+});
+
+test('archive changes during acknowledgement verification leave the record pending', () => {
+  const storage = memoryStorage();
+  const record = makeRecord();
+  recovery.saveArchive(storage, record);
+  const key = recovery.archiveKey(record.scopeId, record.id);
+  const originalSet = storage.setItem;
+  storage.setItem = (target, value) => {
+    originalSet(target, value);
+    if (target === recovery.acknowledgementKey(record.scopeId, record.id)) {
+      const changed = JSON.parse(storage.getItem(key));
+      changed.error.code = 'STALE_REVISION';
+      originalSet(key, JSON.stringify(changed));
+    }
+  };
+  assert.equal(recovery.acknowledgeArchives(storage, record.scopeId, [record.id]).code, 'ARCHIVE_ACK_VERIFY_FAILED');
+  assert.deepEqual(recovery.readAcknowledgements(storage, record.scopeId).recordIds, []);
+  assert.equal(recovery.readArchives(storage, record.scopeId).records.length, 1);
+});
+
+test('clearing a rejected scope removes its archives and orphan acknowledgements only', () => {
+  const storage = memoryStorage();
+  const first = makeRecord();
+  const orphan = makeRecord({ dataGeneration: 4 });
+  const other = makeRecord({ scopeId: 'person:teacher_example_extra' });
+  const admin = makeRecord({ scopeId: 'admin', accessRole: 'admin' });
+  [first, orphan, other, admin].forEach(record => {
+    recovery.saveArchive(storage, record);
+    recovery.acknowledgeArchives(storage, record.scopeId, [record.id]);
+  });
+  storage.removeItem(recovery.archiveKey(orphan.scopeId, orphan.id));
+  storage.setItem('wb-task-state', 'preserved');
+  assert.deepEqual(recovery.clearArchives(storage, first.scopeId), { ok: true, removed: 1 });
+  [first, orphan].forEach(record => assert.equal(storage.getItem(recovery.acknowledgementKey(record.scopeId, record.id)), null));
+  [other, admin].forEach(record => {
+    assert.deepEqual(recovery.readArchives(storage, record.scopeId).records, [record]);
+    assert.deepEqual(recovery.readAcknowledgements(storage, record.scopeId).recordIds, [record.id]);
+  });
+  assert.equal(storage.getItem('wb-task-state'), 'preserved');
+  assert.equal(storage.length, 5);
+});
+
+test('acknowledgement removal refusal aborts archive clearing and preserves the archive', () => {
+  const storage = memoryStorage();
+  const record = makeRecord();
+  recovery.saveArchive(storage, record);
+  recovery.acknowledgeArchives(storage, record.scopeId, [record.id]);
+  const archiveRaw = storage.getItem(recovery.archiveKey(record.scopeId, record.id));
+  storage.removeItem = () => {};
+  assert.equal(recovery.clearArchives(storage, record.scopeId).code, 'ARCHIVE_CLEAR_FAILED');
+  assert.equal(storage.getItem(recovery.archiveKey(record.scopeId, record.id)), archiveRaw);
+  assert.deepEqual(recovery.readAcknowledgements(storage, record.scopeId).recordIds, [record.id]);
+});
+
 test('only ordinary HTTP 409 conflicts are recoverable by archive and refetch', () => {
   ['LESSON_SCHEDULE_ENDPOINT_REQUIRED', 'MAKEUP_ENDPOINT_REQUIRED', 'BOOK_ORDER_SEALED',
     'BOOK_ORDER_CREATE_REQUIRED', 'SESSION4_ATTENDANCE_LOCKED', '', 'FUTURE_CONFLICT'].forEach(code => {

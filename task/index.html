@@ -1125,17 +1125,18 @@
 
 <section class="wrap" id="syncRecoveryNotice" aria-live="polite" hidden></section>
 <main class="wrap" id="view"></main>
+<footer class="wrap" id="syncRecoveryHistory" hidden><button class="btn btn-sm btn-ghost" data-act="viewsyncrecovery">보존 기록 보기</button></footer>
 
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-09-08.1"></script>
-<script src="./schedule-board-core.js?v=2026-09-08.1"></script>
-<script src="./asset-core.js?v=2026-09-08.1"></script>
-<script src="./qr-core.js?v=2026-09-08.1"></script>
-<script src="./acaflow-import-core.js?v=2026-09-08.1"></script>
-<script src="./feedback-subject-catalog.js?v=2026-09-08.1"></script>
-<script src="./sync-recovery-core.js?v=2026-09-08.1"></script>
+<script src="./lesson-form-core.js?v=2026-09-08.2"></script>
+<script src="./schedule-board-core.js?v=2026-09-08.2"></script>
+<script src="./asset-core.js?v=2026-09-08.2"></script>
+<script src="./qr-core.js?v=2026-09-08.2"></script>
+<script src="./acaflow-import-core.js?v=2026-09-08.2"></script>
+<script src="./feedback-subject-catalog.js?v=2026-09-08.2"></script>
+<script src="./sync-recovery-core.js?v=2026-09-08.2"></script>
 <script>
 "use strict";
 
@@ -2131,15 +2132,28 @@ function visibleSyncRecoveryArchives() {
     (record.accessRole !== 'manager' || session.isManager));
 }
 
+let syncRecoveryReviewContext = null;
+function syncRecoveryAcknowledgedIds() {
+  const core = window.WBSyncRecoveryCore;
+  if (!core || !core.readAcknowledgements) return new Set();
+  const read = core.readAcknowledgements(localStorage, syncRecoveryScope());
+  // 확인 저장소를 읽지 못하면 미확인으로 남겨 기록을 놓치지 않게 한다.
+  return new Set(read.ok ? read.recordIds : []);
+}
+
 function renderSyncRecoveryNotice() {
   const host = $('#syncRecoveryNotice');
   if (!host) return;
   const archives = visibleSyncRecoveryArchives();
+  const acknowledged = syncRecoveryAcknowledgedIds();
+  const pending = archives.filter(record => !acknowledged.has(record.id));
+  const history = $('#syncRecoveryHistory');
+  if (history) history.hidden = !archives.length || sync.recovering;
   let html = '';
   if (sync.recovering) html = '<b>미전송 내용을 보존하고 최신 자료를 불러오는 중입니다.</b><br>완료되면 수업 화면이 열립니다.';
   else if (sync.problem) html = '<b>동기화를 완료하지 못했습니다.</b><br>' + esc(sync.problem.message) +
     '<button class="btn btn-sm btn-ghost mt8" data-act="retryauthcheck">다시 확인</button>';
-  if (archives.length) html += '<div class="mt8">서버 반영 여부를 확인할 내용이 이 기기에 보존되어 있습니다. ' +
+  if (pending.length) html += '<div class="mt8">서버 반영 여부를 확인할 내용이 이 기기에 보존되어 있습니다. ' +
     '<button class="btn btn-sm btn-ghost" data-act="viewsyncrecovery">보존된 미전송 내용 확인</button></div>';
   const content = html ? '<div class="card" style="border:2px solid var(--amber);margin-top:12px">' + html + '</div>' : '';
   if (host.innerHTML !== content) host.innerHTML = content;
@@ -2150,10 +2164,18 @@ function showSyncRecoveryArchives() {
   const core = window.WBSyncRecoveryCore;
   const archives = visibleSyncRecoveryArchives();
   if (!core || !archives.length) return;
+  const acknowledged = syncRecoveryAcknowledgedIds();
+  const pending = archives.filter(record => !acknowledged.has(record.id));
+  // 창을 연 뒤 들어온 새 기록까지 확인 처리하지 않도록 당시의 정확한 ID만 담는다.
+  syncRecoveryReviewContext = { scopeId: syncRecoveryScope(), dataGeneration: Number(state.settings.dataGeneration),
+    auth: sync.auth(), accessRole: sync.accessRole,
+    recordIds: pending.map(record => record.id) };
   const body = '<div class="hint mb14">충돌 전 기기에 있던 내용입니다. 이미 서버에 반영된 내용도 포함될 수 있습니다. ' +
-    '최신 수업과 비교한 뒤 필요한 메모는 복사해서 원래 입력칸에 저장해 주세요. 이 보존본은 자동 전송되지 않습니다.</div>' +
+    '최신 수업과 비교한 뒤 필요한 메모는 복사해서 원래 입력칸에 저장해 주세요. 이 보존본은 자동 전송되지 않습니다.<br>' +
+    '확인 완료는 안내만 숨기며, 기록은 화면 아래의 보존 기록 보기에서 다시 열 수 있습니다.</div>' +
     archives.map(record => '<details class="card"><summary>' + esc(new Date(record.createdAt).toLocaleString('ko-KR')) +
-      ' · ' + record.changes.length + '건</summary><div class="small muted mt8">' + esc(core.errorText(record.error)) + '</div>' +
+      ' · ' + record.changes.length + '건 · ' + (acknowledged.has(record.id) ? '확인 완료' : '확인 필요') +
+      '</summary><div class="small muted mt8">' + esc(core.errorText(record.error)) + '</div>' +
       core.displayRows(record).filter(row => session.isAdmin || row.owner === session.staffId).map(row => {
         const saved = JSON.parse(row.details);
         const data = saved.data || {};
@@ -2169,7 +2191,32 @@ function showSyncRecoveryArchives() {
           fields.map(([name, value]) => '<div class="mt8"><b>' + esc(name) + '</b><div style="white-space:pre-wrap;user-select:text">' + esc(value) + '</div></div>').join('') +
           '<details class="mt8"><summary>추가 보존 정보</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;user-select:text">' + esc(row.details) + '</pre></details></details>';
       }).join('') + '</details>').join('');
-  modal('이 기기에 보존된 미전송 내용', body, '');
+  modal('이 기기에 보존된 미전송 내용', body, pending.length
+    ? '<div id="syncRecoveryAckError" class="hint" role="alert"></div><button class="btn btn-primary btn-block" data-act="acksyncrecovery">확인 완료</button>'
+    : '<div class="hint">모두 확인한 보존 기록입니다. 원본 기록은 계속 보관됩니다.</div>');
+}
+
+function acknowledgeSyncRecoveryArchives() {
+  const core = window.WBSyncRecoveryCore;
+  const context = syncRecoveryReviewContext;
+  const visible = new Set(visibleSyncRecoveryArchives().map(record => record.id));
+  if (!core || !core.acknowledgeArchives || !context || context.scopeId !== syncRecoveryScope() ||
+      !syncRecoveryAuthMatches(context.auth) || context.accessRole !== sync.accessRole ||
+      context.dataGeneration !== Number(state.settings.dataGeneration) || !context.recordIds.length ||
+      context.recordIds.some(id => !visible.has(id))) {
+    return toast('현재 연결에서 보존 기록을 다시 열어 확인해 주세요');
+  }
+  const result = core.acknowledgeArchives(localStorage, context.scopeId, context.recordIds);
+  if (!result.ok) {
+    const message = '확인 상태를 저장하지 못했습니다. 안내와 보존 기록은 유지됩니다. 저장 공간을 확인한 뒤 다시 시도해 주세요.';
+    const error = $('#syncRecoveryAckError');
+    if (error) error.textContent = message;
+    return toast(message);
+  }
+  syncRecoveryReviewContext = null;
+  closeModal();
+  renderSyncRecoveryNotice();
+  toast('확인했습니다. 기록은 화면 아래의 보존 기록 보기에서 다시 볼 수 있습니다');
 }
 
 let syncRenderPending = false;
@@ -10796,10 +10843,10 @@ function openManualMakeupModal() {
     '<div class="field"><label class="fl" for="muManualReason">3. 보강 유형</label><select class="in" id="muManualReason">' +
       '<option value="">유형을 선택하세요</option>' + MANUAL_MAKEUP_REASON_OPTIONS.map(item => '<option value="' + item[0] + '">' + item[1] + '</option>').join('') + '</select></div>' +
     manualMakeupStaffFieldHtml() +
-    '<div class="field"><label class="fl" for="muManualDate">5. 보강 날짜</label><input class="in" id="muManualDate" type="date" min="' + esc(today()) + '"></div>' +
+    '<div class="field"><label class="fl" for="muManualDate">5. 보강 날짜</label><input class="in" id="muManualDate" type="date"></div>' +
     '<div class="grid2"><div class="field"><label class="fl" for="muManualStart">시작시간</label><input class="in" id="muManualStart" type="time"></div>' +
       '<div class="field"><label class="fl" for="muManualEnd">종료시간</label><input class="in" id="muManualEnd" type="time"></div></div>' +
-    '<div class="makeup-reason-guide">원 수업의 출결은 바꾸지 않습니다. 결석보강만 회차를 1회 차감하며, 시험보강·기타보강은 회차를 추가 차감하지 않습니다.</div>' +
+    '<div class="makeup-reason-guide">지난 날짜도 선택할 수 있습니다. 생성만으로 출석·보강완료가 처리되지는 않습니다.<br>원 수업의 출결은 바꾸지 않습니다. 결석보강만 회차를 1회 차감하며, 시험보강·기타보강은 회차를 추가 차감하지 않습니다.</div>' +
     makeupModalErrorHtml(),
     '<button class="btn btn-primary btn-block mt14" data-act="mumanualsubmit"' + (students.length ? '' : ' disabled') + '>확인</button>');
 }
@@ -10829,7 +10876,6 @@ async function submitManualMakeup(button) {
   if (!date || !startTime || !endTime || startTime >= endTime) {
     return showMakeupModalError('날짜·시작시간·종료시간을 모두 확인해 주세요');
   }
-  if (date < today()) return showMakeupModalError('오늘보다 이전 날짜에는 보강수업을 생성할 수 없습니다');
   const sourceFields = sourceMode === 'unrelated'
     ? { sourceMode: sourceMode, requestId: manualMakeupRequestId }
     : { sourceMode: sourceMode, sourceTaskId: String(sourceTask.id) };
@@ -10903,7 +10949,7 @@ function makeupDateTimeModal(row, mode) {
     : rescheduling
       ? '출결·메모·피드백 기록이 생기기 전까지만 담당 선생님과 일시를 수정할 수 있습니다.'
       : mode === 'schedule'
-        ? '확인하면 선택한 선생님의 해당 날짜·시간에 보강수업이 생성됩니다.'
+        ? '지난 날짜도 선택할 수 있습니다. 확인하면 선택한 선생님의 해당 날짜·시간에 보강수업이 생성됩니다. 출석·보강완료는 따로 기록해 주세요.'
         : directCompletion ? ''
           : '날짜 변경은 출결·메모를 입력하기 전에 보강 수정에서 처리해 주세요. 완료할 때는 실제 시작·종료시간만 수정할 수 있습니다.';
   const submitAction = mode === 'restore' ? 'murestoreschedulesubmit' : mode === 'schedule' ? 'muschedulesubmit' :
@@ -10912,7 +10958,6 @@ function makeupDateTimeModal(row, mode) {
     '<div class="makeup-schedule"><b>원 수업 담당 선생님</b><br>' +
       esc(makeupTeacherLabel(originalStaffId, '원 수업 담당 확인 필요')) + '</div>' + staffField +
     '<div class="field"><label class="fl" for="muDate">보강 날짜</label><input class="in" id="muDate" type="date" value="' + esc(date) + '"' +
-      ((mode === 'schedule' || rescheduling) ? ' min="' + esc(today()) + '"' : '') +
       (directCompletion ? ' max="' + esc(today()) + '"' : '') + ((mode === 'restore' || scheduledCompletion) ? ' disabled' : '') + '></div>' +
     '<div class="grid2"><div class="field"><label class="fl" for="muStart">시작시간</label><input class="in" id="muStart" type="time" value="' + esc(startTime) + '"' + (mode === 'restore' ? ' disabled' : '') + '></div>' +
     '<div class="field"><label class="fl" for="muEnd">종료시간</label><input class="in" id="muEnd" type="time" value="' + esc(endTime) + '"' + (mode === 'restore' ? ' disabled' : '') + '></div></div>' +
@@ -10943,7 +10988,6 @@ async function submitMakeupSchedule(button) {
   if (!session.isAdmin) return;
   const slot = makeupDateTimeInput();
   if (!slot) return;
-  if (slot.date < today()) return showMakeupModalError('오늘보다 이전 날짜에는 보강수업을 생성할 수 없습니다');
   const staffId = String(($('#muStaff') || {}).value || '');
   if (!makeupActiveStaff(staffId)) return showMakeupModalError('활성 보강 담당 선생님을 선택해 주세요');
   await mutateMakeup({ action: 'schedule', caseId: button.dataset.case, revision: Number(button.dataset.rev), ...slot, staffId: staffId },
@@ -10956,7 +11000,6 @@ async function submitMakeupReschedule(button) {
   if (!row || row.status !== 'confirmed') return showMakeupModalError('확정된 보강 일정을 다시 확인해 주세요');
   const slot = makeupDateTimeInput();
   if (!slot) return;
-  if (slot.date < today()) return showMakeupModalError('오늘보다 이전 날짜로 보강수업을 수정할 수 없습니다');
   const staffId = String(($('#muStaff') || {}).value || '');
   if (!makeupActiveStaff(staffId)) return showMakeupModalError('활성 보강 담당 선생님을 선택해 주세요');
   await mutateMakeup({ action: 'reschedule', caseId: button.dataset.case, revision: Number(button.dataset.rev), ...slot, staffId: staffId },
@@ -19942,7 +19985,7 @@ function viewSettings() {
    ══════════════════════════════════════════════════════ */
 let modalReturnFocus = null;
 function setModalBackgroundInert(value) {
-  document.querySelectorAll('.topbar, .tabs, #view').forEach(element => { element.inert = value; });
+  document.querySelectorAll('.topbar, .tabs, #view, #syncRecoveryNotice, #syncRecoveryHistory').forEach(element => { element.inert = value; });
 }
 function modal(title, bodyHtml, footHtml) {
   const host = $('#modalHost');
@@ -20461,6 +20504,45 @@ function manageTasks(staffId) {
       : '<div class="empty">지시된 업무가 없습니다.</div>');
 }
 
+const lessonStopSubmitting = new Set();
+async function stopRegularLessonTask(taskId, button) {
+  if (!session.isAdmin) return toast('정규수업 중단은 관리자에게 요청해 주세요');
+  const task = state.tasks.find(row => row.id === taskId);
+  if (!task || !isRegularLessonTask(task) || isScheduledMakeupTask(task)) return toast('중단할 정규수업을 다시 확인해 주세요');
+  if (lessonStopSubmitting.has(taskId)) return;
+  const auth = sync.auth();
+  if (!auth) return toast('관리자 연결을 먼저 확인해 주세요');
+  if (!confirm(taskDisplayTitle(task) + '\n이 수업을 중단할까요? 기존 출결·메모는 보존됩니다.')) return;
+  const expected = { taskId: task.id, studentId: String(task.studentId || ''), staffId: String(task.staffId || ''),
+    expectedUpdatedAt: Number(task.updatedAt) };
+  const generation = Number(state.settings.dataGeneration) || 0;
+  lessonStopSubmitting.add(taskId);
+  const label = button && button.textContent;
+  if (button) { button.disabled = true; button.textContent = '중단 확인 중…'; }
+  try {
+    // 일반 동기화는 시간표 변경을 거부한다. 서버의 CAS가 성공한 뒤에만 화면에서 숨긴다.
+    const result = await sync.post('/lesson-stop', { app: SYNC_APP, auth, ...expected });
+    if (!syncRecoveryAuthMatches(auth) || !session.isAdmin || generation !== (Number(state.settings.dataGeneration) || 0)) return;
+    const stopped = result && result.task;
+    if (!stopped || stopped.id !== expected.taskId || stopped.studentId !== expected.studentId ||
+        stopped.staffId !== expected.staffId || stopped.deleted !== true ||
+        !Number.isSafeInteger(stopped.updatedAt) || stopped.updatedAt <= 0) {
+      throw new Error('서버의 수업 중단 결과를 확인하지 못했습니다. 다시 조회해 주세요.');
+    }
+    state.tasks = state.tasks.map(row => row.id === expected.taskId ? stopped : row);
+    if (eForm && eForm.id === expected.taskId) eForm = null;
+    save(); closeModal(); render(); queueSync();
+    toast('수업 중단이 서버에 반영되었습니다. 기존 출결·메모는 보존됩니다');
+  } catch (error) {
+    if (!(error && error.personAuthHandled)) {
+      toast('수업 중단 실패 — ' + String(error && error.message || error));
+    }
+  } finally {
+    lessonStopSubmitting.delete(taskId);
+    if (button && button.isConnected) { button.disabled = false; button.textContent = label; }
+  }
+}
+
 /* ── 업무 수정 ── */
 let eForm = null;
 
@@ -20807,6 +20889,7 @@ document.addEventListener('click', ev => {
     case 'retryexistingauth': retryExistingPersonAuth(el); break;
     case 'retryauthcheck': startSyncSession(); break;
     case 'viewsyncrecovery': showSyncRecoveryArchives(); break;
+    case 'acksyncrecovery': acknowledgeSyncRecoveryArchives(); break;
 
     /* 잠금 */
     case 'setpin': {
@@ -22152,6 +22235,7 @@ document.addEventListener('click', ev => {
       const t = state.tasks.find(x => x.id === eForm.id);
       if (!t) break;
       if (isScheduledMakeupTask(t)) { closeModal(); return toast('보강수업은 보강 탭에서만 처리할 수 있습니다'); }
+      if (isRegularLessonTask(t)) { stopRegularLessonTask(t.id, el); break; }
       if (!canEditTask(t)) { closeModal(); return toast('원장님이 내린 지시는 중단할 수 없습니다'); }
       if (!confirm('이 업무를 중단할까요? 지난 기록은 유지됩니다.')) return;
       t.deleted = true; t.updatedAt = now();
@@ -22181,6 +22265,8 @@ document.addEventListener('click', ev => {
     case 'deltask': {
       const t = task();
       if (isScheduledMakeupTask(t)) return toast('보강수업은 보강 탭에서만 처리할 수 있습니다');
+      if (isRegularLessonTask(t)) { stopRegularLessonTask(t.id, el); break; }
+      if (t && !canEditTask(t)) return toast('원장님이 내린 지시는 중단할 수 없습니다');
       if (!t || !confirm('이 지시를 중단할까요? 지난 기록은 유지됩니다.')) return;
       t.deleted = true; t.updatedAt = now();
       save(); queueSync(); closeModal(); render(); toast('중단했습니다');
@@ -23015,7 +23101,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-09-08.1';
+const APP_VER = '2026-09-08.2';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);

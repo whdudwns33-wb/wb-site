@@ -68,6 +68,7 @@ import { handleLessonCreate, handleLessonCreateBatch } from './lesson-create.js'
 import { handleLessonAssignmentRequest, handleLessonAssignmentReview } from './lesson-assignment-request.js';
 import { handleDirectorReportSend } from './director-report-send.js';
 import { handleLessonChangeRequest, handleLessonChangeReview } from './lesson-change-request.js';
+import { handleLessonStop } from './lesson-stop.js';
 import { handleBookOrderSend } from './book-order-send.js';
 import { handleBookOrderCreate } from './book-order-create.js';
 import { handleBookAddRequest, handleBookAddReview } from './book-add-request.js';
@@ -3206,6 +3207,11 @@ export default {
           staffId => issueBootstrap(env, 'consult', staffId, BOOTSTRAP_TTL_MS),
           (staffId, code) => revokeIssuedBootstrap(env, 'consult', staffId, code)
         );
+      }
+      if (url.pathname === '/lesson-stop') {
+        const auth = await resolveAuth(env, app, body.auth);
+        if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+        return await handleLessonStop(env, app, body, okOrigin, auth, json);
       }
       if (url.pathname === '/lesson-change-request') {
         const auth = await resolveAuth(env, app, body.auth);
