@@ -2025,10 +2025,20 @@ async function handleBootstrap(env, app, body, origin) {
 }
 
 async function handleExchange(env, app, body, origin) {
-  const staffId = String(body.staffId || '');
+  let staffId = String(body.staffId || '');
   const code = String(body.code || '');
-  if (!SAFE_ID.test(staffId) || !SAFE_BOOTSTRAP_CODE.test(code)) {
+  if (!SAFE_BOOTSTRAP_CODE.test(code) || (staffId ? !SAFE_ID.test(staffId) : app !== 'consult')) {
     return json({ ok: false, code: 'LINK_INVALID', error: '올바른 개인 링크가 필요합니다' }, 400, origin);
+  }
+  const codeHash = tokenStorageValue(await sha256Hex(code));
+  if (!staffId) {
+    const codeRow = await env.DB.prepare(
+      'SELECT staff_id FROM bootstrap_codes WHERE app=? AND code_hash=? AND staff_id<>? LIMIT 1'
+    ).bind(app, codeHash, ADMIN_DEVICE_ID).first();
+    staffId = String(codeRow && codeRow.staff_id || '');
+    if (!SAFE_ID.test(staffId)) {
+      return json({ ok: false, code: 'LINK_INVALID', error: '올바르지 않은 개인 링크입니다' }, 410, origin);
+    }
   }
   const adminDevice = app === 'consult' && staffId === ADMIN_DEVICE_ID;
   const activeSessionLimit = adminDevice ? MAX_ACTIVE_ADMIN_SESSIONS : MAX_ACTIVE_PERSON_SESSIONS;
@@ -2036,7 +2046,6 @@ async function handleExchange(env, app, body, origin) {
     return json({ ok: false, code: 'LINK_INVALID', error: '접근할 수 없는 개인 링크입니다' }, 401, origin);
   }
 
-  const codeHash = tokenStorageValue(await sha256Hex(code));
   const consumedAt = Date.now();
   const markerBytes = new Uint32Array(1);
   crypto.getRandomValues(markerBytes);
@@ -2089,7 +2098,7 @@ async function handleExchange(env, app, body, origin) {
     }
     return json({ ok: false, code: 'LINK_USED', error: '다른 화면에서 먼저 사용된 개인 링크입니다' }, 409, origin);
   }
-  return json({ ok: true, token, expiresAt: consumedAt + TOKEN_TTL_MS,
+  return json({ ok: true, token, staffId, expiresAt: consumedAt + TOKEN_TTL_MS,
     activeSessionLimit }, 200, origin);
 }
 

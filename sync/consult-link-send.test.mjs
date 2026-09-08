@@ -258,7 +258,8 @@ test('migration is additive, consult-only, privacy separated, and routed with th
   assert.match(wrangler, /SOLAPI_KAKAO_CONSULT_LINK_APPROVED_TEMPLATE_ID/);
   assert.match(wrangler, /WB_CONSULT_LINK_SEND_ENABLED/);
   assert.equal(CONSULT_LINK_TEMPLATE_BUTTON_URL,
-    'https://whdudwns33-wb.github.io/wb-site/consult/?u=#{학생ID}#c=#{연결코드}');
+    'https://whdudwns33-wb.github.io/wb-site/consult/#c=#{연결코드}');
+  assert.equal(CONSULT_LINK_TEMPLATE_BUTTON_URL.replace('#{연결코드}', 'b'.repeat(48)).length, 99);
   assert.match(moduleSource, /SOLAPI_TIMEOUT_MS = 8000/);
   assert.doesNotMatch(moduleSource, /student_identity_hash|identityHash/);
   assert.doesNotMatch(migration, /\bphone\b[\s\S]{0,40}consult_link_sends/i);
@@ -378,9 +379,8 @@ test('send creates one ATA dispatch with exact server variables and returns no p
   assert.equal(message.text, undefined);
   assert.equal(message.kakaoOptions.disableSms, true);
   assert.deepEqual(Object.keys(message.kakaoOptions.variables).sort(),
-    ['#{연결코드}', '#{학생ID}', '#{학생명}'].sort());
+    ['#{연결코드}', '#{학생명}'].sort());
   assert.equal(message.kakaoOptions.variables['#{학생명}'], '김학생');
-  assert.equal(message.kakaoOptions.variables['#{학생ID}'], 'student-a');
   assert.equal(message.kakaoOptions.variables['#{연결코드}'], 'b'.repeat(48));
   assert.equal(requestPayload.strict, true);
   assert.equal(requestPayload.allowDuplicates, false);

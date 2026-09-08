@@ -157,6 +157,13 @@ npx wrangler secret put NAVER_SECRET    # 네이버 검색 API Client Secret
 npx wrangler secret put NAVER_MAPS_ID       # 네이버 지도 API Key ID (Geocoding + Directions 5)
 npx wrangler secret put NAVER_MAPS_SECRET   # 네이버 지도 API Key (Geocoding + Directions 5)
 
+consult 학생 링크 알림톡 템플릿은 버튼 URL을
+`https://whdudwns33-wb.github.io/wb-site/consult/#c=#{연결코드}`로 승인받아 사용한다.
+학생 ID는 일회용 코드 교환 때 서버가 확인하며, 치환 뒤 URL은 99자로 유지한다.
+모바일·PC 링크를 같게 넣고 외부 브라우저 열기(`targetOut`)를 사용한다.
+기존 템플릿에서 전환할 때는 `WB_CONSULT_LINK_SEND_ENABLED=false`로 발송을 멈추고
+Worker와 consult Pages를 배포한 뒤, 새 승인 템플릿 ID를 등록하고 발송을 다시 켠다.
+
 # 4) 보호자·직원 Worker 배포 후, 별도 origin의 학생 Worker 배포
 npx wrangler deploy
 npx wrangler deploy --config wrangler.student.toml
