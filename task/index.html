@@ -1123,17 +1123,19 @@
 
 <nav class="tabs"><div class="wrap" id="tabs"></div></nav>
 
+<section class="wrap" id="syncRecoveryNotice" aria-live="polite" hidden></section>
 <main class="wrap" id="view"></main>
 
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-09-07.4"></script>
-<script src="./schedule-board-core.js?v=2026-09-07.4"></script>
-<script src="./asset-core.js?v=2026-09-07.4"></script>
-<script src="./qr-core.js?v=2026-09-07.4"></script>
-<script src="./acaflow-import-core.js?v=2026-09-07.4"></script>
-<script src="./feedback-subject-catalog.js?v=2026-09-07.4"></script>
+<script src="./lesson-form-core.js?v=2026-09-08.1"></script>
+<script src="./schedule-board-core.js?v=2026-09-08.1"></script>
+<script src="./asset-core.js?v=2026-09-08.1"></script>
+<script src="./qr-core.js?v=2026-09-08.1"></script>
+<script src="./acaflow-import-core.js?v=2026-09-08.1"></script>
+<script src="./feedback-subject-catalog.js?v=2026-09-08.1"></script>
+<script src="./sync-recovery-core.js?v=2026-09-08.1"></script>
 <script>
 "use strict";
 
@@ -1641,6 +1643,7 @@ function applyTaskRevocationPage(page, auth, accessRole) {
 
 const sync = {
   busy: false, dirty: false, last: null, timer: null, loud: false, err: '', personVerified: false, accessRole: '',
+  problem: null, recovering: false,
 
   /** 원장은 비밀키로, 학생은 개인 링크에 담겨 온 토큰으로 접속한다 */
   auth() {
@@ -1657,14 +1660,19 @@ const sync = {
    *  저장 지점마다 표시를 남기지 않아도 변경분을 정확히 골라낼 수 있다. */
   collect(since) {
     const out = [];
+    const isCanonical = (table, key, data) => ((state.settings || {}).syncRecoveryBaseline || []).some(row =>
+      row.table === table && row.key === key && JSON.stringify(row.data) === JSON.stringify(data));
     (state.staff || []).forEach(s => {
+      if (isCanonical('staff', s.id, s)) return;
       if ((s.updatedAt || 0) > since) out.push({ table: 'staff', id: s.id, owner: s.id, data: s, updated_at: s.updatedAt || 0 });
     });
     (state.tasks || []).forEach(t => {
+      if (isCanonical('tasks', t.id, t)) return;
       if ((t.updatedAt || 0) > since) out.push({ table: 'tasks', id: t.id, owner: t.staffId || null, data: t, updated_at: t.updatedAt || 0 });
     });
     Object.keys(state.checks || {}).forEach(k => {
       const c = state.checks[k];
+      if (isCanonical('checks', k, c)) return;
       if (isContactCheckKey(k)) return; // 서버 검증 정본은 generic LWW로 다시 올리지 않는다.
       if (typeof studentChangeMovedCheckKeys !== 'undefined' && studentChangeMovedCheckKeys.has(k)) return; // 담당 분리 전 옛 키는 서버 정본과 충돌하지 않게 보류한다.
       if (c && (c.updatedAt || 0) > since) out.push({ table: 'checks', k: k, owner: ownerOfCheck(k), data: c, updated_at: c.updatedAt || 0 });
@@ -1706,26 +1714,40 @@ const sync = {
   },
 
   async post(path, body) {
-    const res = await fetch(SYNC_URL + path, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
-    });
-    const d = await res.json().catch(() => null);
-    if (!d || d.ok !== true) {
-      const error = new Error((d && (d.error || d.message)) || ('HTTP ' + res.status));
-      error.status = res.status;
-      error.code = String(d && (d.code || d.errorCode || d.reason) || '');
-      error.current = d && d.current || null;
-      error.dataGeneration = d && d.dataGeneration;
-      error.apiResponse = !!d;
-      const personRequest = body && body.auth && body.auth.mode === 'person';
-      if (path !== '/sync' && session.isStaffLink && personRequest &&
-          (res.status === 401 || res.status === 403)) {
-        handlePersonAuthRejection(error, false);
+    // 인증을 겸하는 동기화만 제한한다. 발송·AI 처리의 제한 시간은 각 기능이 관리한다.
+    const controller = path === '/sync' ? new AbortController() : null;
+    const timeout = controller ? setTimeout(() => controller.abort(), 20000) : null;
+    try {
+      const res = await fetch(SYNC_URL + path, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body), ...(controller ? { signal: controller.signal } : {})
+      });
+      const d = await res.json().catch(() => null);
+      if (!d || d.ok !== true) {
+        const error = new Error((d && (d.error || d.message)) || ('HTTP ' + res.status));
+        error.status = res.status;
+        error.code = String(d && (d.code || d.errorCode || d.reason) || '');
+        error.current = d && d.current || null;
+        error.dataGeneration = d && d.dataGeneration;
+        error.apiResponse = !!d;
+        const personRequest = body && body.auth && body.auth.mode === 'person';
+        if (path !== '/sync' && session.isStaffLink && personRequest &&
+            (res.status === 401 || res.status === 403)) {
+          handlePersonAuthRejection(error, false);
+        }
+        throw error;
+      }
+      return d;
+    } catch (error) {
+      if (controller && controller.signal.aborted) {
+        const timedOut = new Error('서버 응답 시간이 초과되었습니다');
+        timedOut.code = 'SYNC_TIMEOUT';
+        throw timedOut;
       }
       throw error;
+    } finally {
+      if (timeout !== null) clearTimeout(timeout);
     }
-    return d;
   },
 
   async run() {
@@ -1739,7 +1761,11 @@ const sync = {
     const previousAccessRole = this.accessRole;
     let nextAccessRole = '';
     this.busy = true; paintStatus();
+    let recoveryOriginal = [];
+    const recoveryContext = { generation: Number(state.settings.dataGeneration) || 0,
+      role: this.accessRole || (state.settings.managerCacheSensitive ? 'manager' : 'staff') };
     try {
+      recoveryOriginal = syncRecoveryLocalChanges();
       const t0 = now();
       const needsAccessRender = session.isStaffLink && !this.personVerified;
       let applied = 0;
@@ -1811,6 +1837,7 @@ const sync = {
       else delete state.settings.managerCacheSensitive;
       save();
       this.last = now(); this.dirty = false; this.err = '';
+      this.problem = null;
       this.accessRole = auth.mode === 'person' ? nextAccessRole : '';
       if (session.isStaffLink) {
         this.personVerified = true;
@@ -1828,7 +1855,7 @@ const sync = {
       else if (applied || needsAccessRender || accessRoleChanged) renderAfterSync();
       return true;
     } catch (e) {
-      console.warn('sync', e);
+      console.warn('sync failed', String(e && e.code || 'SYNC_FAILED'));
       if (e && e.code === 'DATA_GENERATION_MISMATCH' && Number.isSafeInteger(Number(e.dataGeneration))) {
         resetLessonHandoffs();
         state.staff = [];
@@ -1845,6 +1872,21 @@ const sync = {
         return false;
       }
       this.dirty = true; this.err = String(e && e.message || e);
+      this.problem = syncRecoveryProblem(e);
+      if (window.WBSyncRecoveryCore && window.WBSyncRecoveryCore.isRecoverableError(e) &&
+          !isTaskEditorActive() && $('#modalHost').hidden) {
+        try {
+          return await recoverSyncConflict(auth, e, recoveryOriginal, recoveryContext);
+        } catch (recoveryError) {
+          this.err = window.WBSyncRecoveryCore.errorText(recoveryError);
+          this.problem = syncRecoveryProblem(recoveryError);
+          if (Number(recoveryError && recoveryError.status) === 401 || Number(recoveryError && recoveryError.status) === 403) {
+            if (session.isStaffLink) handlePersonAuthRejection(recoveryError, nextAccessRole === 'manager');
+          }
+          renderAfterSync();
+          return false;
+        }
+      }
       if (session.isStaffLink) {
         const problem = classifyPersonLinkError(e, 'session');
         const authRejected = Number(e && e.status) === 401 || Number(e && e.status) === 403 ||
@@ -1853,6 +1895,7 @@ const sync = {
           handlePersonAuthRejection(e, nextAccessRole === 'manager', problem);
         }
       }
+      renderAfterSync();
       if (this.loud) toast('동기화 실패 — ' + this.err);
       return false;
     } finally {
@@ -1889,6 +1932,244 @@ function queueSync() {
   sync.dirty = true;
   clearTimeout(sync.timer);
   sync.timer = setTimeout(() => sync.run(), 1200);
+}
+
+function syncRecoveryScope() {
+  return session.isStaffLink ? 'person:' + session.staffId : 'admin';
+}
+
+function syncRecoveryProblem(error) {
+  const core = window.WBSyncRecoveryCore;
+  return {
+    code: String(error && error.code || ''),
+    message: core ? core.errorText(error) : '서버 연결을 완료하지 못했습니다. 잠시 후 다시 확인해 주세요.'
+  };
+}
+
+function syncRecoveryIsCanonical(table, key, data) {
+  return (state.settings.syncRecoveryBaseline || []).some(row => row.table === table &&
+    row.key === key && JSON.stringify(row.data) === JSON.stringify(data));
+}
+
+/** 전송 필터가 제외한 기록도 보존한다. 연결 정보가 있는 settings는 복사하지 않는다. */
+function syncRecoveryLocalChanges() {
+  const since = Number(state.settings.pushAt) || 0;
+  const rows = [];
+  for (const table of ['staff', 'tasks']) {
+    for (const data of state[table] || []) {
+      if (Number(data.updatedAt) > since && !syncRecoveryIsCanonical(table, data.id, data)) {
+        rows.push({ table, id: data.id, owner: table === 'staff' ? data.id : data.staffId || null,
+          data, updated_at: data.updatedAt });
+      }
+    }
+  }
+  for (const [key, data] of Object.entries(state.checks || {})) {
+    if (data && Number(data.updatedAt) > since && !syncRecoveryIsCanonical('checks', key, data)) {
+      rows.push({ table: 'checks', k: key, owner: ownerOfCheck(key), data, updated_at: data.updatedAt });
+    }
+  }
+  return JSON.parse(JSON.stringify(rows));
+}
+
+function syncRecoveryAuthMatches(auth) {
+  const current = sync.auth();
+  return !!current && JSON.stringify(current) === JSON.stringify(auth);
+}
+
+/** 인증된 읽기 전용 스냅샷을 끝까지 검증한 뒤에만 캐시를 교체한다. */
+async function recoverSyncConflict(auth, error, originalChanges, context) {
+  const core = window.WBSyncRecoveryCore;
+  if (!core) throw new Error('복구 기능을 불러오지 못했습니다. 새로고침해 주세요.');
+  const generation = Number(state.settings.dataGeneration) || 0;
+  const currentRole = sync.accessRole || (state.settings.managerCacheSensitive ? 'manager' : 'staff');
+  if (!syncRecoveryAuthMatches(auth) || (context && (context.generation !== generation ||
+      (context.role === 'manager' && currentRole !== 'manager')))) {
+    throw Object.assign(new Error('접속 정보가 바뀌었습니다'), { code: 'SYNC_RECOVERY_AUTH_CHANGED' });
+  }
+  const previousRole = context ? context.role : currentRole;
+  const archiveRole = auth.mode === 'admin' ? 'admin' : previousRole;
+  const changes = originalChanges.concat(syncRecoveryLocalChanges());
+  const preserve = pending => {
+    if (!pending.length) return;
+    const unique = [...new Map(pending.map(row => [JSON.stringify(row), row])).values()];
+    const record = core.buildArchive({ scopeId: syncRecoveryScope(), accessRole: archiveRole,
+      dataGeneration: generation, changes: unique, createdAt: now(), error });
+    const saved = core.saveArchive(localStorage, record);
+    if (!saved.ok) {
+      const failure = new Error(saved.error || '미전송 내용을 기기에 보존하지 못했습니다');
+      failure.code = saved.code;
+      throw failure;
+    }
+  };
+  preserve(changes);
+  const storageBefore = localStorage.getItem(LS_KEY);
+  sync.recovering = true;
+  let externalChange = false;
+  const storageChanged = event => { if (event.key === LS_KEY || event.key === null) externalChange = true; };
+  window.addEventListener('storage', storageChanged);
+  $('#view').inert = true;
+  $('#tabs').inert = true;
+  renderSyncRecoveryNotice();
+  const tables = { staff: new Map(), tasks: new Map(), checks: new Map() };
+  const revocations = [];
+  let recoveryPull = {}, revocationCursor = 0, accessRole = '', complete = false;
+  let snapshotAt = null;
+  try {
+    for (let page = 0; page < 100; page++) {
+      const response = await sync.post('/sync', {
+        app: SYNC_APP, auth, dataGeneration: generation, changes: [], since: 0,
+        recoveryPull, capabilities: { taskRevocations: 1 }, taskRevocationCursor: revocationCursor
+      });
+      if (!syncRecoveryAuthMatches(auth) || Number(state.settings.dataGeneration) !== generation) {
+        throw Object.assign(new Error('접속 정보가 바뀌었습니다. 현재 화면에서 다시 확인해 주세요.'), { code: 'SYNC_RECOVERY_AUTH_CHANGED' });
+      }
+      const role = response.authRole;
+      if ((auth.mode === 'person' && !['staff', 'manager'].includes(role)) ||
+          (auth.mode === 'admin' && role !== 'admin') || (accessRole && accessRole !== role)) {
+        throw Object.assign(new Error('개인 권한을 확인하지 못했습니다'), { status: 403, code: 'AUTH_REQUIRED' });
+      }
+      if (auth.mode === 'person' && previousRole === 'manager' && role !== 'manager') {
+        resetPersonCache(auth.token);
+        location.reload();
+        return false;
+      }
+      accessRole = role;
+      const next = response.recoveryPull;
+      const revoked = response.taskRevocations;
+      if (!next || typeof next.complete !== 'boolean' || !next.cursors ||
+          !Number.isSafeInteger(next.snapshotAt) || next.snapshotAt <= 0 ||
+          (snapshotAt !== null && snapshotAt !== next.snapshotAt) ||
+          Number(response.dataGeneration) !== generation || !Array.isArray(response.changes) ||
+          !revoked || revoked.version !== 1 || !Array.isArray(revoked.rows) ||
+          !Number.isSafeInteger(revoked.cursor) || revoked.cursor < revocationCursor ||
+          typeof revoked.more !== 'boolean' || (revoked.more && revoked.cursor <= revocationCursor)) {
+        throw Object.assign(new Error('서버의 전체 자료를 확인하지 못했습니다'), { code: 'SYNC_RECOVERY_INVALID_RESPONSE' });
+      }
+      for (const table of ['staff', 'tasks', 'checks']) {
+        if (typeof next.cursors[table] !== 'string') throw new Error('SYNC_RECOVERY_INVALID_RESPONSE');
+      }
+      if (!next.complete && JSON.stringify(next.cursors) === JSON.stringify(recoveryPull.cursors)) {
+        throw Object.assign(new Error('전체 자료 조회가 진행되지 않았습니다'), { code: 'SYNC_RECOVERY_STALLED' });
+      }
+      for (const row of response.changes) {
+        if (!row || !Object.hasOwn(tables, row.table) || typeof row.key !== 'string' || !row.key ||
+            !row.data || typeof row.data !== 'object' || Array.isArray(row.data) ||
+            (row.table !== 'checks' && row.data.id !== row.key) ||
+            (accessRole === 'staff' && row.owner !== auth.id)) {
+          throw Object.assign(new Error('서버 자료의 범위를 확인하지 못했습니다'), { code: 'SYNC_RECOVERY_INVALID_RESPONSE' });
+        }
+        tables[row.table].set(row.key, row.data);
+      }
+      for (const row of revoked.rows) {
+        if (!row || !/^[A-Za-z0-9_-]{1,128}$/.test(row.taskId) ||
+            (row.formerOwner !== '' && !/^[A-Za-z0-9_-]{1,128}$/.test(row.formerOwner)) ||
+            !Number.isSafeInteger(row.revokedAt) || row.revokedAt <= 0) {
+          throw Object.assign(new Error('삭제된 수업 정보를 확인하지 못했습니다'), { code: 'SYNC_RECOVERY_INVALID_RESPONSE' });
+        }
+        revocations.push(row);
+      }
+      snapshotAt = next.snapshotAt;
+      recoveryPull = next;
+      revocationCursor = revoked.cursor;
+      if (next.complete && !revoked.more) { complete = true; break; }
+    }
+    if (!complete) throw Object.assign(new Error('전체 자료 조회가 끝나지 않았습니다'), { code: 'SYNC_RECOVERY_INCOMPLETE' });
+    if (!syncRecoveryAuthMatches(auth) || externalChange ||
+        (localStorage.getItem(LS_KEY) !== storageBefore && !syncRecoveryLocalChanges().length)) {
+      throw Object.assign(new Error('다른 화면에서 내용이 바뀌었습니다. 다시 확인해 주세요.'), { code: 'SYNC_RECOVERY_LOCAL_CHANGED' });
+    }
+    // 조회 중 작성·저장된 내용까지 먼저 보존한다. 보존 실패 시 현재 캐시는 건드리지 않는다.
+    preserve(changes.concat(syncRecoveryLocalChanges()));
+    for (const row of revocations) {
+      if (accessRole === 'staff' && row.formerOwner !== auth.id) continue;
+      const task = tables.tasks.get(row.taskId);
+      if (task && String(task.staffId || '') !== row.formerOwner) continue;
+      tables.tasks.delete(row.taskId);
+      for (const [key, record] of tables.checks) {
+        if (checkReferencesRevokedTask(key, record, row.taskId)) tables.checks.delete(key);
+      }
+    }
+    const replacement = Object.assign({}, state, {
+      staff: [...tables.staff.values()], tasks: [...tables.tasks.values()], checks: Object.fromEntries(tables.checks),
+      settings: Object.assign({}, state.settings, {
+        pullAt: snapshotAt, pushAt: now(), taskRevocationCursor: revocationCursor,
+        onboardingCasReconcileVersion: 1, syncRecoveryBaseline: []
+      })
+    });
+    if (accessRole === 'manager') replacement.settings.managerCacheSensitive = true;
+    else delete replacement.settings.managerCacheSensitive;
+    // 기기 시각보다 미래로 저장된 서버 행도 다음 동기화에서 다시 업로드하지 않는다.
+    for (const table of ['staff', 'tasks', 'checks']) {
+      for (const [key, data] of tables[table]) {
+        if (Number(data.updatedAt) >= replacement.settings.pushAt) replacement.settings.syncRecoveryBaseline.push({ table, key, data: JSON.parse(JSON.stringify(data)) });
+      }
+    }
+    const serialized = JSON.stringify(replacement);
+    localStorage.setItem(LS_KEY, serialized);
+    if (localStorage.getItem(LS_KEY) !== serialized) throw Object.assign(new Error('복구 결과를 기기에 저장하지 못했습니다'), { code: 'SYNC_RECOVERY_STORAGE_FAILED' });
+    state = replacement;
+    sync.personVerified = auth.mode === 'person';
+    sync.accessRole = auth.mode === 'person' ? accessRole : '';
+    personAccessProblem = null;
+    sync.last = now(); sync.dirty = false; sync.err = ''; sync.problem = null;
+    return true;
+  } finally {
+    window.removeEventListener('storage', storageChanged);
+    sync.recovering = false;
+    $('#view').inert = false;
+    $('#tabs').inert = false;
+    renderAfterSync();
+    renderSyncRecoveryNotice();
+  }
+}
+
+function visibleSyncRecoveryArchives() {
+  if (!window.WBSyncRecoveryCore || (session.isStaffLink ? !hasVerifiedPersonAuth() : !session.isAdmin)) return [];
+  const result = window.WBSyncRecoveryCore.readArchives(localStorage, syncRecoveryScope());
+  if (!result.ok) return [];
+  return result.records.filter(record => record.dataGeneration === Number(state.settings.dataGeneration) &&
+    (record.accessRole !== 'manager' || session.isManager));
+}
+
+function renderSyncRecoveryNotice() {
+  const host = $('#syncRecoveryNotice');
+  if (!host) return;
+  const archives = visibleSyncRecoveryArchives();
+  let html = '';
+  if (sync.recovering) html = '<b>미전송 내용을 보존하고 최신 자료를 불러오는 중입니다.</b><br>완료되면 수업 화면이 열립니다.';
+  else if (sync.problem) html = '<b>동기화를 완료하지 못했습니다.</b><br>' + esc(sync.problem.message) +
+    '<button class="btn btn-sm btn-ghost mt8" data-act="retryauthcheck">다시 확인</button>';
+  if (archives.length) html += '<div class="mt8">서버 반영 여부를 확인할 내용이 이 기기에 보존되어 있습니다. ' +
+    '<button class="btn btn-sm btn-ghost" data-act="viewsyncrecovery">보존된 미전송 내용 확인</button></div>';
+  const content = html ? '<div class="card" style="border:2px solid var(--amber);margin-top:12px">' + html + '</div>' : '';
+  if (host.innerHTML !== content) host.innerHTML = content;
+  host.hidden = !html;
+}
+
+function showSyncRecoveryArchives() {
+  const core = window.WBSyncRecoveryCore;
+  const archives = visibleSyncRecoveryArchives();
+  if (!core || !archives.length) return;
+  const body = '<div class="hint mb14">충돌 전 기기에 있던 내용입니다. 이미 서버에 반영된 내용도 포함될 수 있습니다. ' +
+    '최신 수업과 비교한 뒤 필요한 메모는 복사해서 원래 입력칸에 저장해 주세요. 이 보존본은 자동 전송되지 않습니다.</div>' +
+    archives.map(record => '<details class="card"><summary>' + esc(new Date(record.createdAt).toLocaleString('ko-KR')) +
+      ' · ' + record.changes.length + '건</summary><div class="small muted mt8">' + esc(core.errorText(record.error)) + '</div>' +
+      core.displayRows(record).filter(row => session.isAdmin || row.owner === session.staffId).map(row => {
+        const saved = JSON.parse(row.details);
+        const data = saved.data || {};
+        const task = state.tasks.find(item => item.id === String(row.key).split('|')[0]);
+        const title = row.table === 'checks' ? (task && task.title || '수업·업무 기록') + ' · ' + (data.date || String(row.key).split('|')[1] || '') : row.title;
+        const fields = [
+          ['출결', data.attendance], ['메모', data.note], ['코멘트', data.comment],
+          ...Object.entries(data.lessonMemo || {}).map(([key, value]) => [
+            ({ contentProgress: '수업내용 · 진도', homework: '과제', guardianNotice: '안내사항', otherNotes: '기타 · 특이사항', comment: '코멘트' })[key] || key, value
+          ])
+        ].filter(([, value]) => value !== undefined && value !== null && String(value).trim());
+        return '<details class="mt14"><summary>' + esc(title || row.label || '보존 기록') + '</summary>' +
+          fields.map(([name, value]) => '<div class="mt8"><b>' + esc(name) + '</b><div style="white-space:pre-wrap;user-select:text">' + esc(value) + '</div></div>').join('') +
+          '<details class="mt8"><summary>추가 보존 정보</summary><pre style="white-space:pre-wrap;overflow-wrap:anywhere;font:inherit;user-select:text">' + esc(row.details) + '</pre></details></details>';
+      }).join('') + '</details>').join('');
+  modal('이 기기에 보존된 미전송 내용', body, '');
 }
 
 let syncRenderPending = false;
@@ -2093,6 +2374,8 @@ let linkExchangeBusy = false;
 /** 관리 권한이 끝날 때 전체 캐시를 버린다. token을 넘기면 본인 범위 재동기화에만 보존한다. */
 function resetPersonCache(token) {
   const keepToken = String(token || '');
+  if (window.WBSyncRecoveryCore) window.WBSyncRecoveryCore.clearArchives(localStorage, syncRecoveryScope());
+  sync.problem = null;
   resetLessonHandoffs();
   clearTimeout(sync.timer); sync.timer = null; sync.dirty = false;
   sync.accessRole = ''; sync.personVerified = false;
@@ -2318,6 +2601,9 @@ function viewPersonAccess() {
   }
 
   if (hasStoredPersonToken() && !personAccessProblem) {
+    if (sync.problem) return '<div class="card link-gate"><div class="card-title">연결 확인을 완료하지 못했습니다</div>' +
+      '<div class="card-sub">' + esc(sync.problem.message) + '</div>' +
+      '<button class="btn btn-primary btn-block mt14" data-act="retryexistingauth">이 기기의 기존 연결 다시 확인</button></div>';
     return '<div class="card link-gate"><div class="empty"><b>⏳</b>이 브라우저의 개인 인증을 확인하는 중입니다.<br>확인이 끝난 뒤 업무를 표시합니다.</div>' +
       '<button class="btn btn-primary btn-block" data-act="retryexistingauth">이 기기의 기존 연결 다시 확인</button></div>';
   }
@@ -2723,6 +3009,7 @@ function paintStatus() {
   else if (sync.enabled() && sync.dirty) text += ' · 대기';
   el.innerHTML = '<i></i><span>' + esc(text) + '</span>';
   el.classList.toggle('off', !on);
+  renderSyncRecoveryNotice();
 }
 
 function currentStaff() {
@@ -2783,6 +3070,7 @@ function replaceView(root, html) {
    7. 뷰
    ══════════════════════════════════════════════════════ */
 function render() {
+  if (sync.recovering) { renderSyncRecoveryNotice(); return; }
   syncRenderPending = false;
   lessonHandoffVisibleDates.clear();
   paintStatus();
@@ -19971,7 +20259,7 @@ async function retryExistingPersonAuth(button) {
     render();
     return true;
   }
-  if (hasStoredPersonToken()) toast('서버에 연결하지 못했습니다 — 인터넷을 확인하고 다시 눌러 주세요');
+  if (hasStoredPersonToken()) toast(sync.problem ? sync.problem.message : '서버에 연결하지 못했습니다 — 인터넷을 확인하고 다시 눌러 주세요');
   else toast('기존 연결이 만료되었거나 해지되었습니다 — 새 QR 또는 링크가 필요합니다');
   if (button && document.contains(button)) { button.disabled = false; button.textContent = '이 기기의 기존 연결 다시 확인'; }
   return false;
@@ -20488,6 +20776,7 @@ function applyAssignments(input, preConfirmed) {
    10. 이벤트
    ══════════════════════════════════════════════════════ */
 document.addEventListener('click', ev => {
+  if (sync.recovering) return;
   if (adminDirectiveSoundEnabled()) ensureAdminDirectiveAudio();
   const goEl = ev.target.closest('[data-go]');
   if (goEl) { go(goEl.dataset.go); return; }
@@ -20517,6 +20806,7 @@ document.addEventListener('click', ev => {
     case 'useexistingauth': useExistingPersonAuth(); break;
     case 'retryexistingauth': retryExistingPersonAuth(el); break;
     case 'retryauthcheck': startSyncSession(); break;
+    case 'viewsyncrecovery': showSyncRecoveryArchives(); break;
 
     /* 잠금 */
     case 'setpin': {
@@ -22725,7 +23015,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-09-07.4';
+const APP_VER = '2026-09-08.1';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
