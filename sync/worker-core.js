@@ -10,8 +10,8 @@
  *
  * 엔드포인트
  *   GET  /health
- *   POST /sync    { app, auth, since, changes[], capabilities?, taskRevocationCursor? }
- *                 → { ok, now, changes[], taskRevocations? }
+ *   POST /sync    { app, auth, since, changes[], capabilities?, taskRevocationCursor?, recoveryPull? }
+ *                 → { ok, now, changes[], taskRevocations?, recoveryPull? }
  *   POST /token     { app, auth(admin), staffId } → { ok, token }   구형 개인 링크 호환
  *   POST /bootstrap { app, auth(admin), staffId } → { ok, code }    1회용 링크 발급
  *   POST /exchange  { app, staffId, code }        → { ok, token }   1회 교환
@@ -1595,6 +1595,59 @@ async function pullTaskRevocations(env, app, dataGeneration, auth, cursor) {
   };
 }
 
+function syncRecoveryPosition(value, now) {
+  if (!value || typeof value !== 'object' || Array.isArray(value) ||
+      Object.keys(value).some(key => !['snapshotAt', 'cursors', 'complete'].includes(key))) return null;
+  if (value.complete !== undefined && typeof value.complete !== 'boolean') return null;
+  const source = value.cursors === undefined ? {} : value.cursors;
+  if (!source || typeof source !== 'object' || Array.isArray(source) ||
+      Object.keys(source).some(key => !['staff', 'tasks', 'checks'].includes(key))) return null;
+  const cursors = {};
+  for (const table of ['staff', 'tasks', 'checks']) {
+    const cursor = source[table] === undefined ? '' : source[table];
+    if (typeof cursor !== 'string' || cursor.length > 1024 || /[\u0000-\u001f\u007f]/.test(cursor)) return null;
+    cursors[table] = cursor;
+  }
+  // 같은 밀리초의 새 저장도 복구 다음 델타에 포함되도록 직전 밀리초를 경계로 둔다.
+  const snapshotAt = value.snapshotAt === undefined ? Math.max(0, now - 1) : value.snapshotAt;
+  if (!Number.isSafeInteger(snapshotAt) || snapshotAt < 0 || snapshotAt > now ||
+      (value.snapshotAt === undefined && Object.values(cursors).some(Boolean))) return null;
+  return { snapshotAt, cursors };
+}
+
+async function pullSyncRecovery(env, app, auth, position) {
+  const changes = [];
+  const cursors = { ...position.cursors };
+  let complete = true;
+  for (const table of ['staff', 'tasks', 'checks']) {
+    const idCol = table === 'checks' ? 'k' : 'id';
+    // 테이블별 키를 이어 받아야 같은 srv_at이 2000개를 넘거나 테이블별 시각이 달라도 빠지지 않는다.
+    const sql = 'SELECT ' + idCol + ' AS key, owner, data, updated_at, srv_at FROM ' + table +
+      ' WHERE app=? AND srv_at<=? AND ' + idCol + '>?' +
+      (auth.scope === 'own' ? ' AND owner=?' : '') +
+      ' ORDER BY ' + idCol + ' LIMIT ' + (MAX_PULL + 1);
+    const args = [app, position.snapshotAt, cursors[table]];
+    if (auth.scope === 'own') args.push(auth.id);
+    const result = await env.DB.prepare(sql).bind(...args).all();
+    const rows = result.results || [];
+    if (rows.length > MAX_PULL) {
+      complete = false;
+      rows.length = MAX_PULL;
+    }
+    for (const row of rows) {
+      const data = JSON.parse(row.data);
+      if (table === 'checks' && app === 'consult' &&
+          String(row.key || '').startsWith(CONSULT_REWARD_PREFIX) && data) {
+        delete data.claimActorHash;
+      }
+      changes.push({ table, key: row.key, owner: row.owner, data,
+        updated_at: row.updated_at, srv_at: row.srv_at });
+    }
+    if (rows.length) cursors[table] = String(rows[rows.length - 1].key);
+  }
+  return { changes, recoveryPull: { snapshotAt: position.snapshotAt, cursors, complete } };
+}
+
 async function handleSync(env, app, body, origin) {
   const auth = await resolveAuth(env, app, body.auth);
   if (!auth) return json({ ok: false, error: '인증 실패' }, 401, origin);
@@ -1628,6 +1681,27 @@ async function handleSync(env, app, body, origin) {
   }
 
   const now = Date.now();
+  if (Object.prototype.hasOwnProperty.call(body, 'recoveryPull')) {
+    if (!Array.isArray(body.changes) || body.changes.length) {
+      return json({ ok: false, code: 'RECOVERY_PULL_READ_ONLY',
+        error: '복구 조회에는 저장할 변경을 함께 보낼 수 없습니다' }, 400, origin);
+    }
+    const position = syncRecoveryPosition(body.recoveryPull, now);
+    if (!position) {
+      return json({ ok: false, code: 'INVALID_RECOVERY_PULL',
+        error: '복구 조회 기준을 다시 확인해 주세요' }, 400, origin);
+    }
+    const recovered = await pullSyncRecovery(env, app, auth, position);
+    const authRole = auth.role === 'manager' ? 'manager' : (auth.scope === 'all' ? 'admin' : 'staff');
+    const payload = { ok: true, now: position.snapshotAt, more: !recovered.recoveryPull.complete,
+      changes: recovered.changes, recoveryPull: recovered.recoveryPull, authRole, dataGeneration };
+    if (wantsTaskRevocations) {
+      payload.taskRevocations = await pullTaskRevocations(
+        env, app, dataGeneration, auth, requestedTaskRevocationCursor
+      );
+    }
+    return json(payload, 200, origin);
+  }
   const since = Number(body.since) || 0;
   const changes = Array.isArray(body.changes) ? body.changes : [];
   if (changes.length > MAX_CHANGES) {
