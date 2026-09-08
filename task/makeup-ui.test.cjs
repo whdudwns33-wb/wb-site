@@ -12,6 +12,27 @@ function block(from, to) {
   return html.slice(start, end);
 }
 
+function makeupScheduleSubmitHarness(options = {}) {
+  const values = {
+    muDate: '2026-08-14', muStart: '14:00', muEnd: '14:50', muStaff: 'staff-1', ...options.values
+  };
+  const calls = [];
+  const bindings = {
+    $: id => ({ value: values[id.slice(1)] }),
+    session: options.session || { isAdmin: true },
+    today: () => '2026-09-08',
+    showMakeupModalError: error => calls.push({ error }),
+    makeupActiveStaff: id => id === 'staff-1' ? { id } : null,
+    makeupRows: options.rows || [{ caseId: 'makeup-8', status: 'confirmed' }],
+    mutateMakeup: async payload => calls.push({ payload })
+  };
+  const source = block('function makeupDateTimeInput()', 'async function restoreMakeupSchedule');
+  const api = new Function(...Object.keys(bindings), `${source}\nreturn {
+    schedule: submitMakeupSchedule, reschedule: submitMakeupReschedule
+  };`)(...Object.values(bindings));
+  return { ...api, calls };
+}
+
 test('admin and personal staff keep a dedicated makeup route', () => {
   const render = block('function render() {', 'function renderTabs()');
   const tabs = block('function renderTabs()', '/* ── 링크로 들어온 지시서 확인');
@@ -275,10 +296,116 @@ test('schedule, completion, and no-makeup modals use the three-action API contra
   assert.match(source, /action: 'complete'[\s\S]*?\.\.\.slot/);
   assert.match(source, /payload\.attendanceStatus = attendanceStatus/);
   assert.match(source, /action: 'no_makeup'[\s\S]*?reason: reason/);
-  assert.match(source, /slot\.date < today\(\)/);
+  assert.doesNotMatch(source, /slot\.date < today\(\)/, 'past dates remain available for scheduling and rescheduling');
   assert.match(source, /endAt > Date\.now\(\)/);
   assert.match(source, /서버에 출석·지각·조퇴가 없으면 완료되지 않고 정확한 사유가 표시됩니다/);
   assert.match(source, /makeupModalErrorHtml\(\)/);
+});
+
+test('schedule and reschedule submit August dates unchanged while today is in September', async () => {
+  for (const action of ['schedule', 'reschedule']) {
+    const api = makeupScheduleSubmitHarness();
+    await api[action]({ dataset: { case: 'makeup-8', rev: '7' } });
+    assert.deepEqual(api.calls, [{ payload: {
+      action, caseId: 'makeup-8', revision: 7,
+      date: '2026-08-14', startTime: '14:00', endTime: '14:50', staffId: 'staff-1'
+    } }]);
+  }
+});
+
+test('past schedule dates still require complete time fields, a later end time, and an active assignee', async () => {
+  for (const action of ['schedule', 'reschedule']) {
+    for (const values of [
+      { muDate: '' }, { muStart: '' }, { muEnd: '' }, { muEnd: '14:00' }, { muEnd: '13:50' }
+    ]) {
+      const api = makeupScheduleSubmitHarness({ values });
+      await api[action]({ dataset: { case: 'makeup-8', rev: '7' } });
+      assert.deepEqual(api.calls, [{ error: '날짜·시작시간·종료시간을 모두 확인해 주세요' }]);
+    }
+    const api = makeupScheduleSubmitHarness({ values: { muStaff: 'inactive-staff' } });
+    await api[action]({ dataset: { case: 'makeup-8', rev: '7' } });
+    assert.deepEqual(api.calls, [{ error: '활성 보강 담당 선생님을 선택해 주세요' }]);
+  }
+});
+
+test('past scheduling stays admin-only and rescheduling still requires a confirmed case', async () => {
+  for (const action of ['schedule', 'reschedule']) {
+    for (const session of [{}, { isAdmin: false, isStaffLink: true, staffId: 'staff-1' }]) {
+      const api = makeupScheduleSubmitHarness({ session });
+      await api[action]({ dataset: { case: 'makeup-8', rev: '7' } });
+      assert.deepEqual(api.calls, []);
+    }
+  }
+  for (const rows of [[], [{ caseId: 'makeup-8', status: 'reviewed' }], [{ caseId: 'makeup-8', status: 'completed' }]]) {
+    const api = makeupScheduleSubmitHarness({ rows });
+    await api.reschedule({ dataset: { case: 'makeup-8', rev: '7' } });
+    assert.deepEqual(api.calls, [{ error: '확정된 보강 일정을 다시 확인해 주세요' }]);
+  }
+});
+
+test('rendered schedule dates have no minimum and direct completion retains the today maximum', () => {
+  const modalSource = block('function makeupCanComplete(row)', 'function makeupLessonTaskForCase') +
+    block('function makeupDateTimeModal(row, mode)', 'function makeupNoMakeupModal');
+  const bindings = {
+    session: { isAdmin: true }, today: () => '2026-09-08', esc: String,
+    makeupOriginalStaffId: () => 'staff-1', makeupDefaultStaffId: () => 'staff-1',
+    makeupStaffOptionsHtml: () => '<option value="staff-1">선생님</option>',
+    makeupTeacherLabel: () => '선생님', staffStudentCompactLabelById: () => '테스트 원생',
+    MAKEUP_COMPLETION_ATTENDANCE_OPTIONS: [['P', '출석'], ['L', '지각'], ['E', '조퇴']],
+    makeupScheduledAttendance: () => ({ value: 'P' }), makeupAttendanceLabel: () => '출석',
+    makeupModalErrorHtml: () => '',
+    modal: (title, body) => { rendered = body; }
+  };
+  let rendered;
+  const open = new Function(...Object.keys(bindings), `${modalSource}\nreturn makeupDateTimeModal;`)(...Object.values(bindings));
+  const pending = { caseId: 'makeup-8', revision: 7, status: 'reviewed', studentId: 'student-8' };
+  const scheduled = { ...pending, status: 'confirmed', confirmedDate: '2026-08-14',
+    confirmedStartTime: '14:00', confirmedEndTime: '14:50', confirmedStaffId: 'staff-1' };
+  const dateInput = () => {
+    const input = rendered.match(/<input\b[^>]*id="muDate"[^>]*>/);
+    assert.ok(input, 'the modal renders its date control');
+    return input[0];
+  };
+
+  open(pending, 'schedule');
+  assert.doesNotMatch(dateInput(), /\bmin=|\bdisabled\b/);
+  open(scheduled, 'reschedule');
+  assert.match(dateInput(), /value="2026-08-14"/);
+  assert.doesNotMatch(dateInput(), /\bmin=|\bdisabled\b/);
+  open(pending, 'complete');
+  assert.match(dateInput(), /max="2026-09-08"/);
+  open(scheduled, 'complete');
+  assert.match(dateInput(), /value="2026-08-14"[^>]*\bdisabled\b/);
+  open(scheduled, 'restore');
+  assert.match(dateInput(), /value="2026-08-14"[^>]*\bdisabled\b/);
+
+  bindings.session.isAdmin = false;
+  bindings.session.isStaffLink = true;
+  bindings.session.staffId = 'staff-2';
+  for (const mode of ['schedule', 'reschedule', 'restore', 'complete']) {
+    rendered = undefined;
+    open(scheduled, mode);
+    assert.equal(rendered, undefined, `${mode} cannot bypass the existing authority check`);
+  }
+});
+
+test('allowing past schedules does not allow completion before the lesson ends', async () => {
+  const source = block('async function submitMakeupComplete(button)', 'async function submitMakeupNoMakeup');
+  for (const date of ['2026-09-08', '2026-09-09']) {
+    for (const status of ['reviewed', 'confirmed']) {
+      const calls = [];
+      const bindings = {
+        makeupRows: [{ caseId: 'makeup-8', status }], makeupCanComplete: () => true,
+        makeupDateTimeInput: () => ({ date, startTime: '14:00', endTime: '14:50' }),
+        showMakeupModalError: error => calls.push({ error }),
+        Date: { parse: Date.parse, now: () => Date.parse('2026-09-08T12:00:00+09:00') },
+        mutateMakeup: async payload => calls.push({ payload })
+      };
+      const submit = new Function(...Object.keys(bindings), `${source}\nreturn submitMakeupComplete;`)(...Object.values(bindings));
+      await submit({ dataset: { case: 'makeup-8', rev: '7' } });
+      assert.deepEqual(calls, [{ error: '아직 종료되지 않은 시간은 보강완료로 저장할 수 없습니다' }]);
+    }
+  }
 });
 
 test('scheduled completion syncs first and lets the server judge P/L/E while direct completion seals attendance', async () => {
