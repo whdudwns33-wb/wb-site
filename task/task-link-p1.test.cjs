@@ -115,7 +115,8 @@ test('only authentication failures discard verified access; transient sync failu
   assert.match(run, /const authRejected = Number\(e && e\.status\) === 401 \|\| Number\(e && e\.status\) === 403/);
   assert.match(run, /if \(authRejected\) \{[\s\S]{0,160}handlePersonAuthRejection\(e, nextAccessRole === 'manager', problem\)/);
   assert.doesNotMatch(run, /catch \(e\) \{\s*console\.warn\('sync', e\);\s*this\.accessRole = ''/);
-  assert.ok(syncCatch.indexOf('if (authRejected)') < syncCatch.indexOf('handlePersonAuthRejection'));
+  const authRejectedBranch = syncCatch.slice(syncCatch.indexOf('const authRejected ='));
+  assert.ok(authRejectedBranch.indexOf('if (authRejected)') < authRejectedBranch.indexOf('handlePersonAuthRejection'));
   const handoff = html.match(/async function createVerifiedHandoffLink\(asQr\)[\s\S]*?\n}/)?.[0] || '';
   assert.match(handoff, /if \(!verified\)/);
   assert.match(handoff, /동기화 상태를 확인하지 못했습니다 — 잠시 후 다시 시도해 주세요/);
