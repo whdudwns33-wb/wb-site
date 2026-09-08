@@ -2652,7 +2652,7 @@ function studentPhoneSettingsCard() {
   const contact = studentPhoneUi.contact;
   if (!studentPhoneReady() || !contact) return '';
   return '<div class="card"><div class="between"><div><div class="card-title">📱 학생 연락처</div>' +
-    '<div class="card-sub">현재 번호 ' + esc(contact.phoneMasked) + ' · 보호자 번호와 별도</div></div>' +
+    '<div class="card-sub">' + consultLinkPhoneLabel(contact) + ' ' + esc(contact.phoneMasked) + ' · 보호자 열람 초대 번호와 별도</div></div>' +
     '<button class="btn btn-sm btn-ghost" data-act="studentphoneopen">번호 수정</button></div></div>';
 }
 
@@ -9745,9 +9745,28 @@ function consultLinkContactRow(row) {
   return {
     staffId: staffId,
     phoneMasked: String(row.phoneMasked || ''),
+    phoneOwner: ['student', 'mother'].includes(row.phoneOwner) ? row.phoneOwner : 'unknown',
     consent: row.consent === true,
     updatedAt: Number(row.updatedAt) || 0
   };
+}
+
+function consultLinkPhoneLabel(contact) {
+  return contact && contact.phoneOwner === 'mother' ? '엄마 번호'
+    : contact && contact.phoneOwner === 'student' ? '학생 번호' : '번호 구분 필요';
+}
+
+function consultLinkContactReady(contact) {
+  return !!(contact && contact.phoneMasked && contact.consent && ['student', 'mother'].includes(contact.phoneOwner));
+}
+
+function consultLinkPhoneOwnerOptions(contact, name, labelId) {
+  const owner = contact && ['student', 'mother'].includes(contact.phoneOwner) ? contact.phoneOwner : '';
+  return '<div class="field"><div class="fl" id="' + labelId + '">누구의 번호인가요?</div>' +
+    '<div class="material-types" role="radiogroup" aria-labelledby="' + labelId + '" aria-required="true">' +
+      '<label class="material-type-option"><input type="radio" name="' + name + '" value="student"' + (owner === 'student' ? ' checked' : '') + '><span><b>학생 번호</b><br>학생 본인 휴대전화</span></label>' +
+      '<label class="material-type-option"><input type="radio" name="' + name + '" value="mother"' + (owner === 'mother' ? ' checked' : '') + '><span><b>엄마 번호</b><br>학생 휴대폰이 없는 경우</span></label>' +
+    '</div></div>';
 }
 
 /* 학생 번호 원문은 입력→서버 전송에만 쓰고, 화면 메모리에는 마스킹 상태만 둔다. */
@@ -9768,7 +9787,7 @@ function studentPhoneReady() {
   const student = currentStaff();
   const contact = studentPhoneUi.contact;
   return !!(studentPhoneUi.loaded && student && contact && contact.staffId === student.id &&
-    contact.phoneMasked && contact.consent);
+    consultLinkContactReady(contact));
 }
 
 async function loadStudentPhone(force) {
@@ -9806,12 +9825,13 @@ async function loadStudentPhone(force) {
 function studentPhoneForm() {
   const contact = studentPhoneUi.contact;
   return (contact && contact.phoneMasked
-      ? '<div class="hint mb14">현재 학생 번호: <b>' + esc(contact.phoneMasked) + '</b><br>변경하려면 전체 번호를 다시 입력해 주세요.</div>' : '') +
-    '<div class="field"><label class="fl" for="studentPhone">학생 본인 휴대전화 번호</label>' +
+      ? '<div class="hint mb14">현재 ' + consultLinkPhoneLabel(contact) + ': <b>' + esc(contact.phoneMasked) + '</b><br>변경하려면 번호 종류와 전체 번호를 다시 입력해 주세요.</div>' : '') +
+    consultLinkPhoneOwnerOptions(contact, 'studentPhoneOwner', 'studentPhoneOwnerLabel') +
+    '<div class="field"><label class="fl" for="studentPhone">휴대전화 번호</label>' +
       '<input class="in" id="studentPhone" type="tel" inputmode="tel" autocomplete="tel" maxlength="15" placeholder="01012345678"></div>' +
     '<label class="material-type-option"><input type="checkbox" id="studentPhoneConsent">' +
-      '<span>학생용 앱 연결 링크와 관련 안내를 이 번호로 받는 것에 동의합니다.</span></label>' +
-    '<div class="submission-privacy mt14">🔒 번호는 이 기기·플래너 백업에 저장하지 않고 컨설팅 서버에서만 관리하며, 화면에는 일부만 표시합니다.<br>보호자 번호와는 별도로 관리합니다.</div>';
+      '<span>학생 번호는 본인이, 엄마 번호는 엄마에게 등록과 안내 수신 동의를 확인했습니다.</span></label>' +
+    '<div class="submission-privacy mt14">🔒 번호는 이 기기·플래너 백업에 저장하지 않고 컨설팅 서버에서만 관리하며, 화면에는 종류와 일부 번호만 표시합니다.<br>엄마 번호를 선택하면 학생용 앱 연결 링크도 엄마 번호로 전송되며, 보호자 열람 초대 번호와는 별도로 관리합니다.</div>';
 }
 
 function viewStudentPhoneGate(student) {
@@ -9824,7 +9844,7 @@ function viewStudentPhoneGate(student) {
       '<button class="btn btn-primary btn-block" data-act="studentphoneretry">다시 확인</button></div>';
   }
   return '<div class="card mt14"><div class="card-title">📱 학생 연락처를 등록해 주세요</div>' +
-    '<div class="card-sub mb14"><b>' + esc(student.name) + '</b> 학생이 플래너를 사용하려면 본인 휴대전화 번호를 한 번 등록해야 합니다.</div>' +
+    '<div class="card-sub mb14"><b>' + esc(student.name) + '</b> 학생이 플래너를 사용하려면 연락받을 휴대전화 번호를 한 번 등록해야 합니다. 학생 휴대폰이 없으면 엄마 번호를 선택해 주세요.</div>' +
     studentPhoneForm() +
     '<button class="btn btn-primary btn-block mt14" data-act="studentphonesave">등록하고 오늘 할 일 보기</button></div>';
 }
@@ -9840,8 +9860,10 @@ async function saveStudentPhone(button) {
   if (!session.isStaffLink || isManager() || studentPhoneUi.saving) return;
   const student = currentStaff();
   const phone = String((($('#studentPhone') || {}).value) || '').replace(/[\s()-]/g, '');
+  const phoneOwner = String(((document.querySelector('input[name="studentPhoneOwner"]:checked') || {}).value) || '');
   const consent = !!(($('#studentPhoneConsent') || {}).checked);
-  if (!/^01[016789]\d{7,8}$/.test(phone)) return toast('올바른 학생 휴대전화 번호를 입력해 주세요');
+  if (!['student', 'mother'].includes(phoneOwner)) return toast('학생 번호인지 엄마 번호인지 선택해 주세요');
+  if (!/^01[016789]\d{7,8}$/.test(phone)) return toast('올바른 휴대전화 번호를 입력해 주세요');
   if (!consent) return toast('휴대전화 번호 등록과 안내 수신 동의를 확인해 주세요');
   const auth = sync.auth();
   if (!student || !auth) return toast('학생 연결 정보를 확인해 주세요');
@@ -9849,12 +9871,12 @@ async function saveStudentPhone(button) {
   if (button) button.disabled = true;
   try {
     const data = await sync.post('/consult-link-send', {
-      app: SYNC_APP, auth: auth, action: 'self_set', phone: phone, consent: true,
+      app: SYNC_APP, auth: auth, action: 'self_set', phone: phone, phoneOwner: phoneOwner, consent: true,
       expectedUpdatedAt: Number(button && button.dataset.v || (studentPhoneUi.contact || {}).updatedAt) || 0
     });
     if (!currentStaff() || currentStaff().id !== student.id) return;
     const contact = consultLinkContactRow(Object.assign({ staffId: student.id }, data.contact || {}));
-    if (!contact || !contact.phoneMasked || !contact.consent) throw new Error('등록 결과를 확인하지 못했습니다');
+    if (!consultLinkContactReady(contact)) throw new Error('등록 결과를 확인하지 못했습니다');
     studentPhoneUi.staffId = student.id;
     studentPhoneUi.contact = contact;
     studentPhoneUi.loaded = true;
@@ -9914,22 +9936,23 @@ function consultLinkStudentPanel(student) {
   const contact = consultLinkContactsUi.rows.get(student.id) || null;
   const unavailable = !consultLinkContactsUi.loaded || !!consultLinkContactsUi.error;
   const phone = contact && contact.phoneMasked;
-  const ready = !!(phone && contact.consent);
+  const ready = consultLinkContactReady(contact);
   const sendBusy = consultLinkContactsUi.busy === 'send:' + student.id;
   const anyBusy = !!consultLinkContactsUi.busy;
   const status = consultLinkContactsUi.error ? '카카오 상태 확인 실패'
     : !consultLinkContactsUi.loaded ? '카카오 상태 확인 중…'
-    : ready ? '학생 연락처 ' + phone + ' · 카카오 발송 준비됨'
-    : phone ? '학생 연락처 ' + phone + ' · 동의 확인 필요'
+    : ready ? consultLinkPhoneLabel(contact) + ' ' + phone + ' · 카카오 발송 준비됨'
+    : phone ? consultLinkPhoneLabel(contact) + ' ' + phone + (contact.consent ? ' · 번호 종류를 선택해 주세요' : ' · 동의 확인 필요')
     : '학생 연락처 없음 · 처음 한 번만 등록하세요';
   const sendDisabled = unavailable || anyBusy;
   return '<div class="small muted mb8">' + esc(status) + '</div>' +
     '<div class="row wraprow" style="gap:8px">' +
-      (ready ? '<button class="btn btn-sm btn-ghost" data-act="linkcontactopen" data-id="' + esc(student.id) + '"' +
+      (phone ? '<button class="btn btn-sm btn-ghost" data-act="linkcontactopen" data-id="' + esc(student.id) + '"' +
         (unavailable || anyBusy ? ' disabled' : '') + '>학생 연락처 수정</button>' : '') +
       '<button class="btn btn-sm btn-navy" data-act="linksend" data-id="' + esc(student.id) + '"' +
         (sendDisabled ? ' disabled' : '') + '>' + (sendBusy ? '발송 접수 중…' : ready
-          ? '카톡으로 학생용 링크 보내기' : phone ? '동의 확인하고 보내기' : '학생 번호 등록하고 보내기') + '</button>' +
+          ? '카톡으로 학생용 링크 보내기' : phone && contact.consent ? '번호 구분하고 보내기'
+            : phone ? '동의 확인하고 보내기' : '학생 번호 등록하고 보내기') + '</button>' +
     '</div>';
 }
 
@@ -9940,13 +9963,14 @@ function consultLinkContactModal(staffId, sendAfterSave) {
   const contact = consultLinkContactsUi.rows.get(staffId) || null;
   const masked = contact && contact.phoneMasked;
   modal('학생 연락처 ' + (masked ? '수정' : '등록'),
-    '<div class="card-sub mb14"><b>' + esc(student.name) + '</b> 학생 본인의 휴대전화 번호입니다. 한 번 등록하면 다음 발송부터 자동으로 사용합니다.</div>' +
-    (masked ? '<div class="hint mb14">현재 학생 번호: <b>' + esc(masked) + '</b><br>번호를 변경하려면 아래에 전체 번호를 다시 입력해 주세요.</div>' : '') +
-    '<div class="field"><label class="fl" for="consultLinkPhone">학생 본인 휴대전화 번호</label>' +
+    '<div class="card-sub mb14"><b>' + esc(student.name) + '</b> 학생의 플래너 연락처입니다. 학생 휴대폰이 없으면 엄마 번호로 표시해 등록합니다.</div>' +
+    (masked ? '<div class="hint mb14">현재 ' + consultLinkPhoneLabel(contact) + ': <b>' + esc(masked) + '</b><br>번호를 변경하려면 종류와 전체 번호를 다시 입력해 주세요.</div>' : '') +
+    consultLinkPhoneOwnerOptions(contact, 'consultLinkPhoneOwner', 'consultLinkPhoneOwnerLabel') +
+    '<div class="field"><label class="fl" for="consultLinkPhone">휴대전화 번호</label>' +
       '<input class="in" id="consultLinkPhone" type="tel" inputmode="tel" autocomplete="tel" maxlength="15" placeholder="01012345678"></div>' +
     '<label class="material-type-option"><input type="checkbox" id="consultLinkConsent">' +
-      '<span>이 번호로 학생용 앱 연결 링크를 카카오 알림톡으로 보내는 것에 동의를 확인했습니다.</span></label>' +
-    '<div class="submission-privacy mt14">🔒 번호는 이 기기나 백업에 저장하지 않고 서버에서만 관리합니다.<br>보호자 번호는 ‘보호자 공유’에서 별도로 관리합니다.</div>',
+      '<span>학생 번호는 학생에게, 엄마 번호는 엄마에게 앱 연결 링크와 안내 수신 동의를 확인했습니다.</span></label>' +
+    '<div class="submission-privacy mt14">🔒 번호는 이 기기나 백업에 저장하지 않고 서버에서만 관리합니다.<br>엄마 번호를 선택해도 ‘보호자 공유’의 열람 초대 번호와는 별도로 관리합니다.</div>',
     '<button class="btn btn-primary" data-act="linkcontactsave" data-id="' + esc(staffId) + '" data-v="' +
       (contact ? contact.updatedAt : 0) + '"' + (sendAfterSave ? ' data-send="1"' : '') + '>' +
       (sendAfterSave ? '동의하고 바로 보내기' : '동의 확인 후 저장') + '</button>' +
@@ -9960,7 +9984,10 @@ async function saveConsultLinkContact(staffId, expectedUpdatedAt, button, clear,
   const student = staffById(staffId);
   if (!student || student.deleted || student.owner || student.manager) return toast('학생을 다시 선택해 주세요');
   const phone = clear ? '' : String((($('#consultLinkPhone') || {}).value) || '').replace(/[\s()-]/g, '');
+  const selectedPhoneOwner = String(((document.querySelector('input[name="consultLinkPhoneOwner"]:checked') || {}).value) || '');
+  const phoneOwner = clear && !['student', 'mother'].includes(selectedPhoneOwner) ? 'student' : selectedPhoneOwner;
   const consent = clear ? false : !!(($('#consultLinkConsent') || {}).checked);
+  if (!clear && !['student', 'mother'].includes(phoneOwner)) return toast('학생 번호인지 엄마 번호인지 선택해 주세요');
   if (!clear && !/^01[016789]\d{7,8}$/.test(phone)) return toast('올바른 휴대폰 번호를 입력해 주세요');
   if (!clear && !consent) return toast('발송 동의를 확인해 주세요');
   if (clear && !confirm('카카오 발송 동의를 철회하고 저장된 번호를 삭제할까요?')) return;
@@ -9972,12 +9999,12 @@ async function saveConsultLinkContact(staffId, expectedUpdatedAt, button, clear,
   try {
     const data = await sync.post('/consult-link-send', {
       app: SYNC_APP, auth: sync.auth(), action: 'set', staffId: staffId, phone: phone,
-      consent: consent, expectedUpdatedAt: Number(expectedUpdatedAt) || 0
+      phoneOwner: phoneOwner, consent: consent, expectedUpdatedAt: Number(expectedUpdatedAt) || 0
     });
     const row = consultLinkContactRow(Object.assign({ staffId: staffId }, data.contact || {}));
     if (row && row.phoneMasked) consultLinkContactsUi.rows.set(staffId, row);
     else consultLinkContactsUi.loaded = false;
-    savedForSend = !!(row && row.phoneMasked && row.consent);
+    savedForSend = consultLinkContactReady(row);
     closeModal();
     toast(clear ? '카카오 발송을 중지하고 번호를 삭제했습니다'
       : sendAfterSave ? '학생 연락처를 저장했습니다 · 개인 링크를 발송합니다'
@@ -10022,7 +10049,7 @@ async function sendConsultStudentLink(staffId) {
   const student = staffById(staffId);
   const contact = consultLinkContactsUi.rows.get(staffId);
   if (!student || student.deleted || student.owner || student.manager) return toast('학생을 다시 선택해 주세요');
-  if (!contact || !contact.phoneMasked || !contact.consent) return consultLinkContactModal(staffId, true);
+  if (!consultLinkContactReady(contact)) return consultLinkContactModal(staffId, true);
   if (!sync.auth()) return toast('로그인과 동기화 연결이 필요합니다');
   if (sync.busy) return toast('동기화가 끝난 뒤 다시 눌러 주세요');
   consultLinkContactsUi.busy = 'send:' + staffId;
@@ -13857,7 +13884,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-09-08.1';
+const APP_VER = '2026-09-08.3';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)

@@ -114,6 +114,7 @@ npx wrangler d1 execute wb-sync --remote --file=./migrations/068_lesson_check_ke
 npx wrangler d1 execute wb-sync --remote --file=./migrations/069_student_lesson_time_overlap.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/070_remove_heavy_student_schedule_triggers.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/071_task_revocations.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/072_consult_link_phone_owner.sql
 
 > `070`은 이미 적용된 `069` 이력을 되돌리지 않고, 그 migration이 만든 JSON 전개 view·trigger만
 > 제거한 뒤 학생별 일정 revision 원장과 경량 보강 revision trigger를 설치한다. 운영 DB에는 반드시
@@ -122,6 +123,9 @@ npx wrangler d1 execute wb-sync --remote --file=./migrations/071_task_revocation
 > `071`은 물리 삭제된 수업이 오래 열린 태블릿 캐시에서 되살아나는 일을 막는다. 학생 정보나
 > 수업 내용 대신 현재 데이터 세대의 opaque task ID와 이전 담당자 ID만 append-only로 기록한다.
 > 운영 DB 전체 백업과 복원 시험을 마친 뒤 `071` → 직원 Worker → task Pages 순서로 배포한다.
+
+> `072`는 consult 학생용 연락처에 학생 번호·엄마 번호 구분을 추가한다. 기존 번호는 추측하지
+> 않고 `unknown`으로 유지하며, 새 consult 화면에서 종류와 전체 번호를 한 번 다시 확인한다.
 
 # 3) 비밀키 등록 — 코드나 wrangler.toml에 적지 않는다
 npx wrangler secret put TASK_ADMIN_SECRET

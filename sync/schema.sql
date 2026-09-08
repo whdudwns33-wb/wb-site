@@ -3783,6 +3783,8 @@ CREATE TABLE IF NOT EXISTS consult_link_contacts (
   staff_id     TEXT NOT NULL CHECK (length(staff_id) BETWEEN 1 AND 128),
   student_name TEXT NOT NULL CHECK (length(student_name) BETWEEN 1 AND 40),
   phone        TEXT,
+  phone_owner  TEXT NOT NULL DEFAULT 'unknown'
+    CHECK (phone_owner IN ('unknown','student','mother')),
   consent      INTEGER NOT NULL DEFAULT 0 CHECK (consent IN (0,1)),
   updated_at   INTEGER NOT NULL CHECK (updated_at > 0),
   updated_by   TEXT NOT NULL CHECK (length(updated_by) BETWEEN 1 AND 128),
