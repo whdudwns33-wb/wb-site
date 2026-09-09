@@ -7,7 +7,10 @@ import { DatabaseSync } from 'node:sqlite';
 import { handleApi } from './desk-api.mjs';
 import worker from './worker.mjs';
 
-const migration = fs.readFileSync(new URL('./migrations/001_desk.sql', import.meta.url), 'utf8');
+// 마이그레이션은 전부 순서대로 — 운영 배포가 매번 그렇게 적용한다(desk/README.md).
+const migrationDir = new URL('./migrations/', import.meta.url);
+const migration = fs.readdirSync(migrationDir).filter(n => n.endsWith('.sql')).sort()
+  .map(n => fs.readFileSync(new URL(n, migrationDir), 'utf8')).join('\n');
 const DAY = 24 * 60 * 60 * 1000;
 const BASE = 'https://desk.test';
 const PASSWORD = 'desk-password-1';
@@ -95,8 +98,8 @@ test('마이그레이션은 멱등이고 표·인덱스·트리거를 만든다'
   const db = new TestD1();
   const names = db.database.prepare("SELECT type||':'||name AS n FROM sqlite_master WHERE name LIKE 'desk_%' OR name LIKE 'idx_desk%' OR name LIKE 'trg_desk%' ORDER BY n")
     .all().map(row => row.n);
-  for (const name of ['table:desk_admin', 'table:desk_staff', 'table:desk_codes', 'table:desk_tokens', 'table:desk_docs',
-    'table:desk_requests', 'table:desk_request_events', 'index:idx_desk_docs_updated',
+  for (const name of ['table:desk_admin', 'table:desk_staff', 'table:desk_codes', 'table:desk_tokens', 'table:desk_docs', 'table:desk_documents',
+    'table:desk_requests', 'table:desk_request_events', 'index:idx_desk_docs_updated', 'index:idx_desk_documents_updated',
     'index:idx_desk_requests_assignee_status', 'index:idx_desk_requests_owner',
     'trigger:trg_desk_requests_update_guard', 'trigger:trg_desk_requests_no_delete',
     'trigger:trg_desk_request_events_no_update', 'trigger:trg_desk_request_events_no_delete']) {
@@ -406,4 +409,102 @@ test('worker.mjs: /api/* 는 handleApi, 나머지는 ASSETS 로', async () => {
   assert.equal(await page.text(), 'asset');
   await worker.fetch(new Request(BASE + '/lib/runbook-ui.js'), env, {});
   assert.deepEqual(served, ['/', '/lib/runbook-ui.js']);
+});
+
+/* ── 기획서 v1.1 — 배정 카드·템플릿·앱 목적지·매뉴얼 ── */
+
+async function docOf(env, token, c, id) {
+  const res = await call(env, 'GET', '/api/docs', { token });
+  const hit = res.body.docs.find(d => d.c === c && d.id === id);
+  return hit ? hit.data : null;
+}
+
+test('docs cards: 직원도 쓰고, 만든 사람·완료자·증빙 by 는 토큰 신원, 막힘엔 사유, 프로그램·대상·기한·PII 검증, 삭제는 원장만', async () => {
+  const env = envFor();
+  const adminToken = await setupAdmin(env);
+  const a = await makeStaff(env, adminToken, '직원 A');
+  const base = { program: 'classcard', target: { type: 'text', label: '중2A반' }, what: '이번 주 세트 배정', where: '클래스카드 → 중2A반', due: '2026-09-09' };
+  const made = await putDoc(env, adminToken, 'cards', 'c1', Object.assign({ createdBy: 'hacker', byOwner: false, doneAt: 5 }, base));
+  assert.equal(made.status, 200, JSON.stringify(made.body));
+  const got = await docOf(env, a.token, 'cards', 'c1');
+  assert.deepEqual([got.status, got.createdBy, got.byOwner, typeof got.createdAt, got.doneAt], ['todo', 'admin', true, 'number', undefined]);
+
+  assert.equal((await putDoc(env, a.token, 'cards', 'c1', Object.assign({}, got, { status: 'doing' }))).status, 200);
+  assert.equal((await putDoc(env, a.token, 'cards', 'c1', Object.assign({}, got, { status: 'blocked' }))).body.code, 'INVALID');
+  assert.equal((await putDoc(env, a.token, 'cards', 'c1', Object.assign({}, got, { status: 'blocked', blockedReason: '반이 아직 없음' }))).status, 200);
+  assert.equal((await docOf(env, a.token, 'cards', 'c1')).blockedReason, '반이 아직 없음');
+  const done = await putDoc(env, a.token, 'cards', 'c1', Object.assign({}, got, { status: 'done', evidence: { kind: 'check', by: 'someone', note: '반 3개 완료' }, createdBy: 'x' }));
+  assert.equal(done.status, 200, JSON.stringify(done.body));
+  const after = await docOf(env, a.token, 'cards', 'c1');
+  assert.deepEqual([after.status, after.evidence.kind, after.evidence.by, after.evidence.note, after.doneBy, after.createdBy, after.byOwner, after.blockedReason],
+    ['done', 'check', a.id, '반 3개 완료', a.id, 'admin', true, undefined]);
+  assert.ok(after.doneAt > 0 && after.evidence.at > 0);
+  // 완료된 카드를 다시 저장해도 완료 시각·완료자는 처음 값
+  await putDoc(env, adminToken, 'cards', 'c1', Object.assign({}, after, { note: '원장 메모' }));
+  const kept = await docOf(env, a.token, 'cards', 'c1');
+  assert.deepEqual([kept.doneAt, kept.doneBy, kept.note], [after.doneAt, a.id, '원장 메모']);
+
+  assert.equal((await putDoc(env, a.token, 'cards', 'c2', Object.assign({}, base, { program: 'naver' }))).body.code, 'INVALID');
+  assert.equal((await putDoc(env, a.token, 'cards', 'c2', Object.assign({}, base, { target: { type: 'student' } }))).body.code, 'INVALID');
+  assert.equal((await putDoc(env, a.token, 'cards', 'c2', Object.assign({}, base, { target: { type: 'text', label: '' } }))).body.code, 'INVALID');
+  assert.equal((await putDoc(env, a.token, 'cards', 'c2', Object.assign({}, base, { note: '엄마 010-0000-0000' }))).body.code, 'PII');
+  assert.equal((await putDoc(env, a.token, 'cards', 'c2', Object.assign({}, base, { due: '2026-9-9' }))).body.code, 'INVALID');
+  assert.equal((await putDoc(env, a.token, 'cards', 'c2', Object.assign({}, base, { status: 'maybe' }))).body.code, 'INVALID');
+  assert.equal((await putDoc(env, a.token, 'cards', 'c2', Object.assign({}, base, { what: '' }))).body.code, 'INVALID');
+  assert.equal((await putDoc(env, a.token, 'cards', 'c2', Object.assign({}, base, { evidence: { kind: 'photo' } }))).body.code, 'INVALID');
+  assert.equal((await putDoc(env, a.token, 'cards', 'c3', { program: 'studyforce', target: { type: 'student', id: 'stu_a' }, what: '수행 확인' })).status, 200);
+  assert.equal((await docOf(env, a.token, 'cards', 'c3')).byOwner, false);
+  assert.equal((await call(env, 'POST', '/api/docs', { token: a.token, body: { changes: [{ c: 'cards', id: 'c3', deleted: true }] } })).status, 403);
+  assert.equal((await call(env, 'POST', '/api/docs', { token: adminToken, body: { changes: [{ c: 'cards', id: 'c3', deleted: true }] } })).status, 200);
+});
+
+test('docs apps·plans·manuals: 원장만, 직원은 앱 자료 범위의 status·note 만, https·요일·범위·링크 검증', async () => {
+  const env = envFor();
+  const adminToken = await setupAdmin(env);
+  const a = await makeStaff(env, adminToken, '직원 A');
+
+  assert.equal((await putDoc(env, a.token, 'apps', 'app1', { name: '국어 내신 앱' })).status, 403);
+  assert.equal((await putDoc(env, adminToken, 'apps', 'app1', { name: '국어 내신 앱', adminUrl: 'http://insecure' })).body.code, 'INVALID');
+  assert.equal((await putDoc(env, adminToken, 'apps', 'app1', { name: '' })).body.code, 'INVALID');
+  const app = await putDoc(env, adminToken, 'apps', 'app1', { name: '국어 내신 앱', adminUrl: 'https://example.invalid/admin/', format: '팩 JSON' });
+  assert.equal(app.status, 200, JSON.stringify(app.body));
+  assert.deepEqual(await docOf(env, a.token, 'apps', 'app1'), { name: '국어 내신 앱', adminUrl: 'https://example.invalid/admin/', format: '팩 JSON', active: true });
+
+  const rec = { kind: 'recurring', program: 'studyforce', days: [5, 1, 2, 3, 3, 4], target: { type: 'each' }, what: '수행 확인' };
+  assert.equal((await putDoc(env, a.token, 'plans', 'pl1', rec)).status, 403);
+  assert.equal((await putDoc(env, adminToken, 'plans', 'pl1', Object.assign({}, rec, { days: [7] }))).body.code, 'INVALID');
+  assert.equal((await putDoc(env, adminToken, 'plans', 'pl1', Object.assign({}, rec, { days: [] }))).body.code, 'INVALID');
+  assert.equal((await putDoc(env, adminToken, 'plans', 'pl1', Object.assign({}, rec, { target: { type: 'student' } }))).body.code, 'INVALID');
+  assert.equal((await putDoc(env, adminToken, 'plans', 'pl1', Object.assign({}, rec, { kind: 'weekly' }))).body.code, 'INVALID');
+  assert.equal((await putDoc(env, adminToken, 'plans', 'pl1', Object.assign({}, rec, { program: 'exam4you', target: { type: 'app', id: 'app1' } }))).status, 200);
+  assert.equal((await putDoc(env, adminToken, 'plans', 'pl1', rec)).status, 200);
+  const saved = await docOf(env, a.token, 'plans', 'pl1');
+  assert.deepEqual([saved.days, saved.active, saved.target], [[1, 2, 3, 4, 5], true, { type: 'each' }]);
+
+  const range = { kind: 'apprange', appId: 'app1', subject: '국어', grade: '중2', unit: '3단원', material: '기출 3개년' };
+  assert.equal((await putDoc(env, a.token, 'plans', 'r1', range)).status, 403);
+  assert.equal((await putDoc(env, adminToken, 'plans', 'r1', range)).status, 200);
+  const r1 = await docOf(env, a.token, 'plans', 'r1');
+  assert.deepEqual([r1.status, r1.source], ['need', 'exam4you']);
+  assert.equal((await putDoc(env, a.token, 'plans', 'r1', Object.assign({}, r1, { status: 'buying', note: '9/10 구매 예정' }))).status, 200);
+  assert.equal((await docOf(env, a.token, 'plans', 'r1')).status, 'buying');
+  assert.equal((await putDoc(env, a.token, 'plans', 'r1', Object.assign({}, r1, { status: 'have', unit: '4단원' }))).status, 403);
+  assert.equal((await putDoc(env, adminToken, 'plans', 'r1', Object.assign({}, r1, { status: 'nope' }))).body.code, 'INVALID');
+  assert.equal((await putDoc(env, adminToken, 'plans', 'r2', Object.assign({}, range, { unit: '' }))).body.code, 'INVALID');
+  assert.equal((await putDoc(env, adminToken, 'plans', 'r2', Object.assign({}, range, { source: 'naver' }))).body.code, 'INVALID');
+
+  const man = { scope: 'classcard', task: 'assign', title: '세트 배정', purpose: '반에 이번 주 세트를 넣는다',
+    steps: ['반을 연다', { text: '세트를 고른다', note: '주차 확인' }], cautions: ['학생 이름을 카드에 적지 않는다'],
+    links: [{ label: '클래스카드', url: 'https://www.classcard.net/Login' }] };
+  assert.equal((await putDoc(env, a.token, 'manuals', 'm1', man)).status, 403);
+  const m = await putDoc(env, adminToken, 'manuals', 'm1', man);
+  assert.equal(m.status, 200, JSON.stringify(m.body));
+  const m1 = await docOf(env, a.token, 'manuals', 'm1');
+  assert.deepEqual([m1.steps, m1.version, m1.links, m1.cautions], [[{ text: '반을 연다' }, { text: '세트를 고른다', note: '주차 확인' }], 1, man.links, man.cautions]);
+  assert.equal((await putDoc(env, adminToken, 'manuals', 'm2', Object.assign({}, man, { links: [{ label: 'x', url: 'http://x' }] }))).body.code, 'INVALID');
+  assert.equal((await putDoc(env, adminToken, 'manuals', 'm2', Object.assign({}, man, { scope: 'kakao' }))).body.code, 'INVALID');
+  assert.equal((await putDoc(env, adminToken, 'manuals', 'm2', Object.assign({}, man, { steps: ['전화 010-0000-0000'] }))).body.code, 'PII');
+  assert.equal((await putDoc(env, adminToken, 'manuals', 'm2', Object.assign({}, man, { title: '' }))).body.code, 'INVALID');
+  assert.equal((await putDoc(env, adminToken, 'manuals', 'm2', Object.assign({}, man, { scope: 'app', appId: 'bad id' }))).body.code, 'INVALID');
+  assert.equal((await putDoc(env, adminToken, 'manuals', 'm2', Object.assign({}, man, { scope: 'app', appId: 'app1', task: 'upload' }))).status, 200);
 });
