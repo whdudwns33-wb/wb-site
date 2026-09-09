@@ -6,7 +6,7 @@ const vm = require('node:vm');
 
 const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
 const start = html.indexOf('function checkReferencesRevokedTask');
-const end = html.indexOf('const sync = {', start);
+const end = html.indexOf('// 출근 로그인은 기존 기기 연결과 별개다.', start);
 assert.ok(start > 0 && end > start, 'task revocation helpers must remain extractable');
 const helpers = html.slice(start, end);
 
