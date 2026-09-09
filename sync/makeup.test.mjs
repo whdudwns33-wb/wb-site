@@ -15,6 +15,9 @@ const assigneeIntegrityMigration = fs.readFileSync(
 const studentOverlapMigration = fs.readFileSync(
   new URL('./migrations/066_makeup_student_overlap_only.sql', import.meta.url), 'utf8'
 );
+const completionLinksMigration = fs.readFileSync(
+  new URL('./migrations/074_makeup_completion_links.sql', import.meta.url), 'utf8'
+);
 
 class Statement {
   constructor(db, sql) { this.db = db; this.sql = sql; this.args = []; }
@@ -33,6 +36,7 @@ class TestD1 {
     this.database.exec(taskWriteCasMigration);
     this.database.exec(assigneeIntegrityMigration);
     this.database.exec(studentOverlapMigration);
+    this.database.exec(completionLinksMigration);
     this.beforeBatch = null;
     this.failGuardianReads = false;
     this.taskBulkReads = 0;

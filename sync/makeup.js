@@ -12,6 +12,7 @@ const STATUSES = new Set(['review_pending', 'reviewed', 'awaiting_parent', 'conf
 const ACTIONS = new Set([
   'list', 'create_from_absence', 'create_manual', 'review', 'propose', 'confirm', 'schedule', 'restore_schedule', 'complete',
   'reschedule', 'reconcile_attendance', 'no_makeup', 'cancel'
+  , 'link_candidates', 'link_completed'
 ]);
 const COMPLETED_ATTENDANCE = new Set(['P', 'L', 'E']);
 const MANUAL_REASON_CODES = new Set([
@@ -295,6 +296,7 @@ function publicCase(row, student, task, parentResponse, lessonTask) {
   const history = parseHistory(row.history);
   const creationType = caseCreationOrigin(row);
   const manual = creationType === 'manual' ? history[0] : null;
+  const linked = history.slice().reverse().find(item => item && item.action === 'link_completed');
   return {
     caseId: String(row.case_id), studentId: String(row.student_id),
     studentName: student ? String(student.name || '') : '', grade: student ? String(student.grade || '') : '',
@@ -316,6 +318,12 @@ function publicCase(row, student, task, parentResponse, lessonTask) {
     confirmedStaffId: confirmed.staffId,
     completedDate: completed.date, completedStartTime: completed.startTime, completedEndTime: completed.endTime,
     completedStaffId: completed.staffId,
+    resolvedByCompletion: !!linked,
+    linkedCompletedCaseId: linked ? String(linked.completedCaseId || '') : '',
+    linkedCompletionDate: linked ? String(linked.date || '') : '',
+    linkedCompletionStartTime: linked ? String(linked.startTime || '') : '',
+    linkedCompletionEndTime: linked ? String(linked.endTime || '') : '',
+    linkedCompletionStaffId: linked ? String(linked.staffId || '') : '',
     completedAt: row.completed_at == null ? null : Number(row.completed_at),
     cancelledAt: row.cancelled_at == null ? null : Number(row.cancelled_at),
     reason: row.reason || '', notificationNeeded: Number(row.notification_needed) === 1,
@@ -1365,6 +1373,111 @@ async function listCases(env, app, body, auth, json, origin) {
     lessonTasks.get(String(row.case_id)))), revocations }, 200, origin);
 }
 
+// 완료된 수업을 기존 미처리 보강에 연결한다. 출결·회차 원장은 다시 쓰지 않고,
+// 연결 원장만 남겨 같은 완료 보강을 두 번 사용할 수 없게 한다.
+function linkHistory(row) {
+  return parseHistory(row.history).find(item => item && item.action === 'link_completed');
+}
+
+async function linkCandidates(env, app, body, auth, json, origin) {
+  exactBody(body, ['caseId', 'revision']);
+  const caseId = cleanId(body.caseId, 'caseId');
+  const revision = expectedRevision(body);
+  const row = await loadCase(env, app, caseId);
+  if (Number(row.revision) !== revision) return conflictResponse(env, app, caseId, json, origin);
+  if (!ACTIVE_STATUSES.has(String(row.status))) problem('아직 처리할 수 있는 보강건이 아닙니다', 409, 'INVALID_TRANSITION');
+  const document = await loadRoster(env, app);
+  const student = rosterStudent(document, String(row.student_id), String(row.source_date));
+  const sourceSnapshot = await assertCaseIdentity(env, app, row);
+  const source = sourceForCase(row, sourceSnapshot.task);
+  const visibility = auth.scope === 'all' || String(auth.id || '') === String(row.source_teacher_id) ||
+    String(auth.id || '') === String(row.confirmed_staff_id || '');
+  if (!visibility) return json({ ok: false, error: '담당 보강만 연결할 수 있습니다' }, 403, origin);
+  const result = await env.DB.prepare(
+    "SELECT * FROM makeup_cases WHERE app=? AND student_id=? AND status='completed' ORDER BY updated_at DESC LIMIT 100"
+  ).bind(app, row.student_id).all();
+  const candidates = [];
+  for (const candidate of result.results || []) {
+    if (String(candidate.case_id) === caseId || linkHistory(candidate)) continue;
+    const history = parseHistory(candidate.history);
+    if (!history[0] || history[0].action !== 'create_manual') continue;
+    const completion = history.slice().reverse().find(item => item && item.action === 'complete');
+    if (!completion || !COMPLETED_ATTENDANCE.has(String(completion.attendanceStatus || 'P'))) continue;
+    const candidateStaff = String(candidate.completed_by || candidate.confirmed_staff_id || '');
+    if (auth.scope !== 'all' && candidateStaff !== String(auth.id || '')) continue;
+    const taskRow = await env.DB.prepare('SELECT data FROM tasks WHERE app=? AND id=? LIMIT 1')
+      .bind(app, makeupLessonId(String(candidate.case_id))).first();
+    const lessonTask = taskRow && parseJson(taskRow.data);
+    candidates.push(publicCase(candidate, student, source, null, lessonTask));
+  }
+  return json({ ok: true, case: publicCase(row, student, source, null, null), candidates }, 200, origin);
+}
+
+async function linkCompleted(env, app, body, auth, json, origin) {
+  exactBody(body, ['caseId', 'revision', 'completedCaseId', 'completedRevision']);
+  const caseId = cleanId(body.caseId, 'caseId');
+  const completedCaseId = cleanId(body.completedCaseId, '완료 보강 ID');
+  if (caseId === completedCaseId) problem('같은 보강은 연결할 수 없습니다');
+  const revision = expectedRevision(body);
+  const completedRevision = Number(body.completedRevision);
+  if (!Number.isInteger(completedRevision) || completedRevision < 1) problem('완료 보강 revision을 확인해 주세요');
+  const row = await loadCase(env, app, caseId);
+  const completed = await loadCase(env, app, completedCaseId);
+  if (Number(row.revision) !== revision || Number(completed.revision) !== completedRevision) {
+    return conflictResponse(env, app, caseId, json, origin);
+  }
+  if (!ACTIVE_STATUSES.has(String(row.status))) problem('아직 처리할 수 있는 보강건이 아닙니다', 409, 'INVALID_TRANSITION');
+  if (String(completed.status) !== 'completed') problem('완료된 보강만 연결할 수 있습니다', 409, 'LINK_SOURCE_NOT_COMPLETED');
+  if (String(row.student_id) !== String(completed.student_id)) problem('같은 학생의 보강만 연결할 수 있습니다', 409, 'LINK_STUDENT_MISMATCH');
+  if (linkHistory(completed)) problem('이미 다른 보강에 연결된 기록입니다', 409, 'LINK_ALREADY_USED');
+  const completedHistory = parseHistory(completed.history);
+  if (!completedHistory[0] || completedHistory[0].action !== 'create_manual') {
+    problem('직접 완료한 보강만 연결할 수 있습니다', 409, 'LINK_SOURCE_NOT_MANUAL');
+  }
+  const sourceSnapshot = await assertCaseIdentity(env, app, row);
+  const document = await loadRoster(env, app);
+  const student = rosterStudent(document, String(row.student_id), String(row.source_date));
+  const allowed = auth.scope === 'all' || [row.source_teacher_id, row.confirmed_staff_id,
+    completed.source_teacher_id, completed.confirmed_staff_id].some(id => String(id || '') === String(auth.id || ''));
+  if (!allowed) return json({ ok: false, error: '담당 보강만 연결할 수 있습니다' }, 403, origin);
+  const completion = completedHistory.slice().reverse().find(item => item && item.action === 'complete');
+  const completedView = completedScheduleView(completed);
+  const completionTaskId = makeupLessonId(completedCaseId);
+  const completionDate = String(completedView.date || '');
+  const completionCheck = completionDate && await env.DB.prepare(
+    'SELECT owner,data FROM checks WHERE app=? AND k=? LIMIT 1'
+  ).bind(app, completionTaskId + '|' + completionDate).first();
+  const completionCheckData = completionCheck && parseJson(completionCheck.data);
+  if (!completionCheck || String(completionCheckData && completionCheckData.taskId || '') !== completionTaskId ||
+      !COMPLETED_ATTENDANCE.has(String(completionCheckData && completionCheckData.att || ''))) {
+    problem('완료 보강의 출결 기록을 확인할 수 없어 연결할 수 없습니다', 409, 'LINK_ATTENDANCE_MISSING');
+  }
+  const now = Date.now();
+  const event = { action: 'link_completed', from: row.status, to: 'cancelled', actorId: actorId(auth),
+    completedCaseId, completedRevision, date: completedView.date, startTime: completedView.startTime,
+    endTime: completedView.endTime, staffId: completedView.staffId, reason: 'already_resolved' };
+  const next = { ...row, status: 'cancelled', cancelled_at: now, cancelled_by: actorId(auth),
+    reason: 'already_resolved', notification_needed: 0, notification_event: null, notification_event_revision: 0 };
+  const snapshot = transitionSnapshot(row, next, event, now);
+  const linkJson = JSON.stringify({ app, pending_case_id: caseId, completed_case_id: completedCaseId,
+    student_id: row.student_id, created_at: now, created_by: actorId(auth) });
+  const statements = [
+    env.DB.prepare('INSERT INTO makeup_completion_links(app,pending_case_id,completed_case_id,student_id,created_at,created_by) VALUES(?,?,?,?,?,?)')
+      .bind(app, caseId, completedCaseId, row.student_id, now, actorId(auth)),
+    env.DB.prepare('UPDATE makeup_cases SET status=?,revision=?,cancelled_at=?,cancelled_by=?,reason=?,notification_needed=?,notification_event=?,notification_event_revision=?,history=?,updated_at=? WHERE app=? AND case_id=? AND revision=? AND status=?')
+      .bind(snapshot.status, snapshot.revision, snapshot.cancelled_at, snapshot.cancelled_by, snapshot.reason, 0, null, 0, snapshot.history, now, app, caseId, revision, row.status)
+  ];
+  let results;
+  try { results = await env.DB.batch(statements); }
+  catch (error) { return conflictResponse(env, app, caseId, json, origin); }
+  if (!results || results.some(item => Number(item?.meta?.changes || 0) !== 1)) return conflictResponse(env, app, caseId, json, origin);
+  const saved = await loadCase(env, app, caseId);
+  const savedCompleted = await loadCase(env, app, completedCaseId);
+  return json({ ok: true, case: publicCase(saved, student, sourceForCase(saved, sourceSnapshot.task), null, null),
+    completedCase: publicCase(savedCompleted, student, sourceForCase(savedCompleted, sourceSnapshot.task), null, null),
+    link: parseJson(linkJson) }, 200, origin);
+}
+
 function unrelatedCreationAuthorizationGuardStatement(env, app, row, auth, studentId, date) {
   if (auth.scope === 'all') {
     return env.DB.prepare(
@@ -1841,6 +1954,8 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
 
   try {
     if (action === 'list') return await listCases(env, app, body, auth, json, origin);
+    if (action === 'link_candidates') return await linkCandidates(env, app, body, auth, json, origin);
+    if (action === 'link_completed') return await linkCompleted(env, app, body, auth, json, origin);
     if (action === 'create_from_absence') return await createFromAbsence(env, app, body, auth, json, origin);
     if (action === 'create_manual') return await createManual(env, app, body, auth, json, origin);
     if (action === 'reconcile_attendance') return await reconcileAttendance(env, app, body, auth, json, origin);
