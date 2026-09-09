@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- WB 프로그램데스크 홈 화면 아이콘 — 잉크 바탕에 호박색 데스크 마크. 텍스트·개인정보 없음. -->
+  <rect width="128" height="128" rx="28" fill="#1E3A3F"/>
+  <rect x="24" y="46" width="80" height="10" rx="3" fill="#D9822B"/>
+  <rect x="30" y="56" width="8" height="30" rx="2" fill="#D9822B"/>
+  <rect x="90" y="56" width="8" height="30" rx="2" fill="#D9822B"/>
+  <rect x="44" y="30" width="40" height="10" rx="3" fill="#F2F5F4"/>
+  <circle cx="64" cy="72" r="6" fill="#F2F5F4"/>
+</svg>
