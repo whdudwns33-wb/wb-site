@@ -1,0 +1,18 @@
+# WB 프로그램데스크 — 별도 워커 wb-desk (https://wb-desk.whdudwns33.workers.dev)
+# 학원 업무지시서·진로독서와 무관한 별도 사업용 앱이라 워커·D1 을 따로 둔다.
+name = "wb-desk"
+main = "worker.mjs"
+compatibility_date = "2026-08-01"
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+# 정적 파일은 워커를 거치지 않고 바로 나간다. /api/* 만 워커가 받는다(worker.mjs → desk-api.mjs).
+run_worker_first = ["/api/*"]
+
+# D1 — 배포 워크플로우가 `wrangler d1 create wb-desk` 로 얻은 실제 id 로 __DESK_D1_ID__ 를 치환한 뒤
+# `wrangler d1 migrations apply` 대신 migrations/*.sql 을 순서대로 `wrangler d1 execute --file` 로 전부 적용한다(멱등).
+[[d1_databases]]
+binding = "DB"
+database_name = "wb-desk"
+database_id = "__DESK_D1_ID__"
