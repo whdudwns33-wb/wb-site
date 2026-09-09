@@ -21,7 +21,8 @@
    *  - consult/index.html LEADERS_EYE_URL·METAMATH_CENTER_URL·METAMATH_STUDENT_URL·
    *    CLASSCARD_ANDROID_APP_URL·CLASSCARD_IOS_APP_URL·STUDYFORCE_URL·NELT_EXAM_URL
    *  - task/index.html 학생 포털 미리보기의 클래스카드 로그인 상수
-   *  - 이그잼포유·족보닷컴·넬트 기관 페이지는 저장소에 상수가 없어 공식 홈으로 둔다 — (가정).
+   *  - 이그잼포유·족보닷컴·넬트는 2026-09-09 공식 사이트를 확인해 적었다(www 없는 exam4you.com이 정본,
+   *    zocbo.com이 족보닷컴, nelt.co.kr이 NELT 접수·결과 사이트). 넬트 학생 응시 페이지는 consult 상수 그대로.
    * 키 이름은 구현 계약 §2에 고정되어 있다(팩·서버·UI가 같은 문자열을 쓴다). */
   const LINKS = Object.freeze({
     studyforce_admin: Object.freeze({
@@ -49,24 +50,28 @@
       url: 'https://new.mmath.co.kr/Pages/Student/Login/login.cshtml?f_next='
     }),
     nelt_org: Object.freeze({
-      /* (가정) 기관(학원) 관리 화면 경로는 미확인 — consult의 NELT_EXAM_URL(/st/)과 같은 호스트의
-         공식 홈으로 둔다. 원장이 A.12-7에서 확정하면 이 한 줄만 바꾼다. */
-      label: '넬트 기관 페이지', program: 'nelt',
-      url: 'https://www.netutor.co.kr/'
+      /* NELT 공식 사이트 — 테스트 접수·결과 조회(기관 로그인). 학원이 응시를 잡는 자리. */
+      label: '넬트 접수·결과', program: 'nelt',
+      url: 'https://www.nelt.co.kr/'
+    }),
+    nelt_student: Object.freeze({
+      /* 학생 응시 페이지(NE Tutor) — consult/index.html NELT_EXAM_URL과 같은 주소. */
+      label: '넬트 학생 응시', program: 'nelt',
+      url: 'https://www.netutor.co.kr/st/'
     }),
     leaders_eye: Object.freeze({
       label: '리더스아이', program: 'leaders_eye',
       url: 'https://www.eyestudent.com/login'
     }),
     exam4you: Object.freeze({
-      /* (가정) 공식 홈. 구매·다운로드는 직원 계정으로 외부 사이트에서 한다. */
+      /* 공식 홈(www는 여기로 302). 구매·다운로드는 직원 계정으로 외부 사이트에서 한다. */
       label: '이그잼포유', program: 'exam4you',
-      url: 'https://www.exam4you.com/'
+      url: 'https://exam4you.com/'
     }),
     jokbo: Object.freeze({
-      /* (가정) 공식 홈. 구매 단위·형식은 A.12-11에서 확정. */
+      /* 족보닷컴 공식 홈(교육지대). 구매 단위·형식은 A.12-11에서 확정. */
       label: '족보닷컴', program: 'jokbo',
-      url: 'https://www.jokbo.com/'
+      url: 'https://www.zocbo.com/'
     })
   });
 

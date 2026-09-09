@@ -1,0 +1,110 @@
+name: Deploy wb-sync worker
+
+# 동기화 백엔드(sync/)를 버튼 한 번으로 배포한다 — 원장은 Actions 탭에서 [Run workflow]만 누른다.
+# 순서는 README·PORTAL_RELEASE_RUNBOOK과 같다: 테스트 → D1 마이그레이션 → 보호자·직원 Worker →
+# 학생 Worker → 상태 확인. 머지 전에 PR 브랜치를 골라 실행하면 "D1 → Worker → task Pages" 순서가
+# 그대로 지켜진다(task Pages는 main 머지가 곧 배포).
+#
+# 자동 실행을 두지 않는 이유: 마이그레이션은 한 번만 적용해야 하고, 학생·보호자 데이터가 있는
+# Worker라 사람이 시점을 고르는 편이 안전하다. 배포 워크플로우와 같은 CLOUDFLARE_API_TOKEN을 쓴다.
+on:
+  workflow_dispatch:
+    inputs:
+      migrations:
+        description: '적용할 D1 마이그레이션 파일명 (쉼표로 구분, sync/migrations/ 기준). 비우면 건너뜀'
+        type: string
+        default: '073_ops_requests.sql'
+      deploy_student:
+        description: '학생 전용 Worker(wrangler.student.toml)도 함께 배포'
+        type: boolean
+        default: true
+
+permissions: {}
+
+env:
+  # deploy-reading.yml 과 같은 버전으로 고정한다 (캐시 키가 이 값을 문다)
+  WRANGLER: wrangler@4.129.0
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sync
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: 동기화 백엔드 테스트 (전부 통과해야 배포)
+        run: node --test *.test.mjs
+
+      - name: wrangler 캐시
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm/_npx
+          key: npx-${{ runner.os }}-${{ env.WRANGLER }}
+
+      - name: 워커 번들 검증 (dry-run — 자격증명 없이 돈다)
+        run: |
+          npx --yes --prefer-offline $WRANGLER deploy --dry-run --outdir=/tmp/wb-sync-bundle
+          if grep -rl 'node:' /tmp/wb-sync-bundle/*.js 2>/dev/null | head -1 | grep -q .; then
+            echo "::error::워커 번들에 node: 내장 모듈이 남아 있습니다 — Cloudflare 에서 로드되지 않습니다"
+            grep -o 'node:[a-z]*' /tmp/wb-sync-bundle/*.js | sort -u
+            exit 1
+          fi
+
+      - name: 토큰 확인
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::error::CLOUDFLARE_API_TOKEN 시크릿이 없습니다. Settings → Secrets and variables → Actions 에 추가하세요 (D1 편집 + Workers 스크립트 편집 권한)."
+            exit 1
+          fi
+
+      # 파일마다 한 번씩 실행한다. 새 표·인덱스는 IF NOT EXISTS 라 두 번 돌아도 안전하지만,
+      # 이미 적용한 파일을 다시 넣지 않는 것이 원칙이다(README 2-b).
+      - name: D1 마이그레이션 적용
+        if: ${{ inputs.migrations != '' }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          MIGRATIONS: ${{ inputs.migrations }}
+        run: |
+          set -euo pipefail
+          IFS=',' read -ra files <<< "$MIGRATIONS"
+          for raw in "${files[@]}"; do
+            f=$(echo "$raw" | xargs)
+            [ -z "$f" ] && continue
+            case "$f" in *..*|*/*) echo "::error::파일명만 적습니다: $f"; exit 1;; esac
+            if [ ! -f "migrations/$f" ]; then echo "::error::sync/migrations/$f 가 없습니다"; exit 1; fi
+            echo "== migrations/$f"
+            npx --yes --prefer-offline $WRANGLER d1 execute wb-sync --remote --file="./migrations/$f" -y
+          done
+
+      - name: 보호자·직원 Worker 배포
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes --prefer-offline $WRANGLER deploy
+
+      - name: 학생 전용 Worker 배포
+        if: ${{ inputs.deploy_student }}
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes --prefer-offline $WRANGLER deploy --config wrangler.student.toml
+
+      # 런북 그대로: 둘 중 하나라도 200이 아니면 실패로 남겨 화면 배포를 멈추게 한다.
+      - name: 상태 확인
+        run: |
+          set -euo pipefail
+          curl -fsS https://wb-sync.whdudwns33.workers.dev/health
+          echo
+          if [ "${{ inputs.deploy_student }}" = "true" ]; then
+            curl -fsS https://wb-student.whdudwns33.workers.dev/health
+            echo
+          fi
+          echo "배포 완료 — 이제 task Pages(main 머지)를 진행해도 됩니다."

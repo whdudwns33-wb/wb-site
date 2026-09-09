@@ -8,7 +8,7 @@ const links = require('./external-links.js');
 /* 계약 §2에 고정된 키 — 팩·서버·UI가 같은 문자열을 쓴다. 하나라도 바뀌면 팩 검증이 깨진다. */
 const CONTRACT_KEYS = [
   'studyforce_admin', 'classcard_teacher', 'classcard_app_android', 'classcard_app_ios',
-  'metamath_center', 'metamath_student', 'nelt_org', 'leaders_eye', 'exam4you', 'jokbo'
+  'metamath_center', 'metamath_student', 'nelt_org', 'nelt_student', 'leaders_eye', 'exam4you', 'jokbo'
 ];
 
 test('every contract key exists and no extra key sneaks in', () => {
@@ -52,8 +52,15 @@ test('urls match the constants that consult and task already ship', () => {
   assert.equal(links.LINKS.classcard_app_ios.url, constant('CLASSCARD_IOS_APP_URL'));
   assert.equal(links.LINKS.leaders_eye.url, constant('LEADERS_EYE_URL'));
   assert.ok(task.includes('href="' + links.LINKS.classcard_teacher.url + '"'), 'task student portal uses the same classcard login');
-  /* 넬트는 기관 페이지가 (가정)이라 호스트만 같으면 된다. */
-  assert.equal(new URL(links.LINKS.nelt_org.url).hostname, new URL(constant('NELT_EXAM_URL')).hostname);
+  assert.equal(links.LINKS.nelt_student.url, constant('NELT_EXAM_URL'));
+});
+
+/* 2026-09-09 확인한 공식 주소 — 바뀌면 여기와 위 표를 같이 고친다. */
+test('exam4you, zocbo and nelt point at the verified official hosts', () => {
+  assert.equal(links.LINKS.exam4you.url, 'https://exam4you.com/');
+  assert.equal(links.LINKS.jokbo.url, 'https://www.zocbo.com/');
+  assert.equal(links.LINKS.nelt_org.url, 'https://www.nelt.co.kr/');
+  assert.ok(!links.isApprovedLink('https://www.jokbo.com/'), 'the old guessed host is no longer approved');
 });
 
 test('hosts() is the sorted unique host list', () => {

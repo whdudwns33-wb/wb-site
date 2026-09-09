@@ -426,10 +426,15 @@ Content-Type: text/plain;charset=utf-8
 없습니다. 신규 학생 D0 항목에 "온라인 프로그램 계정 발급과 첫 과제 배정 확인"(`program_account`)이 추가되어 S2의 기준일이 됩니다.
 연락 완료의 `/contact-log` 연동과 포털 공개는 Phase 1~2.
 
-### 8-4. 배포 순서
+### 8-4. 배포 순서 — 버튼 두 번
 
-1. 운영 D1에 `sync/migrations/073_ops_requests.sql` 적용 → 2. Worker 배포(`sync/`) → 3. task Pages(`version.json` 2026-09-09.1).
-자산·수행 탭은 백엔드 변경이 없어 3만으로 동작하고, 요청함만 1·2가 선행입니다.
+1. GitHub **Actions → "Deploy wb-sync worker" → Run workflow**. 브랜치를 고르고(머지 전이면 PR 브랜치) 실행하면 동기화 백엔드
+   테스트 → D1 마이그레이션(기본값 `073_ops_requests.sql`) → 보호자·직원 Worker → 학생 Worker → 상태 확인까지 한 번에 돕니다.
+   저장소 시크릿 `CLOUDFLARE_API_TOKEN`(D1 편집 + Workers 편집 권한)·`CLOUDFLARE_ACCOUNT_ID`가 있어야 합니다.
+2. PR **머지** → task Pages가 main을 그대로 서비스합니다(`version.json` 2026-09-09.1로 새로고침 안내가 뜹니다).
+
+자산·수행 탭은 백엔드 변경이 없어 2만으로 동작하고, 요청함만 1이 선행입니다. 순서를 바꿔 머지를 먼저 하면 1이 끝날 때까지
+요청함 카드에 "동기화 연결 필요" 힌트만 뜹니다.
 
 ---
 
