@@ -38,6 +38,9 @@
     };
   }
   function canWrite(h) { return !!(h && h.session && h.session.isAdmin); }
+  /* 승인·반려는 원장만. 호스트가 session.canApprove를 주지 않으면(업무지시서 앱) isAdmin과 같다 —
+     프로그램데스크에서는 직원도 isAdmin(쓰기 가능)이지만 canApprove=false 라 승인 버튼이 사라진다. */
+  function canApprove(h) { return canWrite(h) && !(h.session && h.session.canApprove === false); }
   function actorId(h) {
     return h.session.isStaffLink && h.session.staffId ? String(h.session.staffId) : 'admin';
   }
@@ -169,7 +172,7 @@
         (admin ? '<button class="btn btn-sm btn-primary" data-act="lg-approve" data-id="' + h.esc(needId) + '">승인 → 지시서 발행</button>' : '') +
       '</div>';
     });
-    if (!admin) html += '<div class="hint">승인·반려는 원장·관리 담당 화면에서만 됩니다.</div>';
+    if (!admin) html += '<div class="hint">승인·반려는 원장만 할 수 있습니다.</div>';
     return html + '</div>';
   }
 
@@ -409,7 +412,7 @@
         ' · 배정·제공 ' + (cnt.assigned + cnt.provided) + ' · 반려·회수 ' + (cnt.rejected + cnt.revoked) + '</div>' +
       (admin ? '' : '<div class="hint" style="margin-top:8px">개인 링크에서는 읽기만 됩니다. 승인·등록·배정은 원장·관리 담당 화면에서 합니다.</div>') +
     '</div>';
-    html += pendingCard(h, all, ns, admin);
+    html += pendingCard(h, all, ns, canApprove(h));
     html += needsCard(h, all, ns, admin);
     html += sleepingCard(h, all, ns);
     html += catalogCard(h, all, admin);
@@ -568,7 +571,7 @@
 
       /* 승인·반려 */
       case 'lg-approve': {
-        if (needAdmin()) return;
+        if (needAdmin() || !canApprove(h)) return;
         const all = assets(h);
         const list = all.filter(a => a.status === 'requested' && (a.links.needId || '') === id);
         if (!list.length) return;
@@ -579,7 +582,7 @@
         return;
       }
       case 'lg-approve-go': {
-        if (needAdmin()) return;
+        if (needAdmin() || !canApprove(h)) return;
         const all = assets(h);
         const list = all.filter(a => a.status === 'requested' && (a.links.needId || '') === id);
         if (!list.length) { h.closeModal(); return; }
@@ -594,9 +597,9 @@
         h.applyAssignments(sheet, true);
         return;
       }
-      case 'lg-reject': if (needAdmin()) return; if (asset()) rejectModal(h, id); return;
+      case 'lg-reject': if (needAdmin() || !canApprove(h)) return; if (asset()) rejectModal(h, id); return;
       case 'lg-reject-go': {
-        if (needAdmin()) return;
+        if (needAdmin() || !canApprove(h)) return;
         const a = asset();
         if (!a) { h.closeModal(); return; }
         apply(h, a, 'reject', { note: readNote(h, 'lg-m-note') });

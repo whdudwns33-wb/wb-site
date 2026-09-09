@@ -5,7 +5,7 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 const OPS = new Set(['create', 'item', 'package', 'classroom', 'date', 'cancel', 'restore']);
 const ITEMS = new Set([
   'registration', 'guardian', 'schedule', 'arrival', 'emergency', 'system', 'payment', 'materials', 'privacy',
-  'attendance', 'orientation', 'teacher', 'program_account', 'first_note',
+  'attendance', 'orientation', 'teacher', 'first_note',
   'first_feedback', 'next_schedule', 'urgent_adjust',
   'week_attendance', 'week_learning', 'week_parent', 'week_admin',
   'fortnight_fit', 'fortnight_adjust', 'fortnight_parent',

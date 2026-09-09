@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const core = require('./runbook-core.js');
-const links = require('../shared/external-links.js');
+const links = require('../../shared/external-links.js');
 const pack = JSON.parse(fs.readFileSync(path.join(__dirname, 'runbook-pack.json'), 'utf8'));
 
 /* index.html이 이 파일을 실제로 load하는지는 통합 담당의 훅 테스트가 본다. 여기서는 로직만. */
@@ -100,11 +100,12 @@ test('titleFor / slotIdOf / isRunbookTask agree on the [R-…] prefix', () => {
   assert.equal(core.stripSlotPrefix('[R-2030-SF]   스터디포스 수행 확인'), '스터디포스 수행 확인');
 });
 
-test('slot id regex matches what index.html runbookFieldsOf accepts', () => {
-  const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
-  const m = html.match(/function runbookFieldsOf[\s\S]*?\/(\^R-[^/]+)\/\.test/);
-  if (!m) return; // 통합 전이면 비교할 대상이 없다 — 이 파일은 index.html에 의존하지 않는다
-  assert.equal(String(core.SLOT_ID_RE), '/' + m[1] + '/');
+/* 슬롯 id 형식 — 프로그램데스크 런타임(applyAssignments)이 같은 정규식으로 통과시킨다. */
+test('slot id regex accepts R-… ids only', () => {
+  assert.ok(core.SLOT_ID_RE.test('R-2030-SF'));
+  assert.ok(core.SLOT_ID_RE.test('R-Q-NELT'));
+  assert.ok(!core.SLOT_ID_RE.test('r-2030'));
+  assert.ok(!core.SLOT_ID_RE.test('R-'));
 });
 
 test('adoptLegacySlotTitle promotes title-only tasks once', () => {

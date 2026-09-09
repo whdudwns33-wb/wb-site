@@ -9,7 +9,7 @@ const path = require('node:path');
 
 const src = fs.readFileSync(path.join(__dirname, 'runbook-ui.js'), 'utf8');
 const core = require('./runbook-core.js');
-const links = require('../shared/external-links.js');
+const links = require('../../shared/external-links.js');
 const ui = require('./runbook-ui.js');
 
 /* ── 정적 검사 ── */
