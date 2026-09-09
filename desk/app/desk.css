@@ -214,6 +214,47 @@ select.in { appearance: auto; }
 table { border-collapse: collapse; font-size: 13px; }
 details > summary { cursor: pointer; }
 
+/* ── 탭 두 줄(프로그램 방 / 그 밖) · 방 · 카드 · 매트릭스 (기획서 v1.1) ── */
+.tabs .wrap.rows { display: block; overflow: visible; }
+.tabrow { display: flex; gap: 0; overflow-x: auto; scrollbar-width: none; }
+.tabrow::-webkit-scrollbar { display: none; }
+.tabrow.sub { border-top: 1px dashed var(--soft); }
+.tabrow.sub .tab { font-size: 12px; min-height: 36px; padding: 7px 10px; }
+.room-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.room-title { font-size: 20px; font-weight: 700; color: var(--ink); line-height: 1.3; }
+.room-title small { display: block; font-size: 12px; font-weight: 400; color: var(--muted); }
+.acard { border: 1px solid var(--line); border-left: 4px solid var(--warn); border-radius: 6px; padding: 10px 12px; margin-bottom: 8px; background: var(--surface); }
+.acard.doing { border-left-color: var(--accent); }
+.acard.done { border-left-color: var(--good); opacity: .75; }
+.acard.blocked { border-left-color: var(--bad); background: var(--bad-bg); }
+.acard.late { border-left-color: var(--bad); }
+.acard-what { font-size: 14px; font-weight: 700; color: var(--text); line-height: 1.45; word-break: keep-all; }
+.acard.done .acard-what { text-decoration: line-through; color: var(--muted); }
+.acard-to { font-size: 13px; color: var(--ink); margin-top: 2px; }
+.acard-where { font-size: 12px; color: var(--muted); margin-top: 2px; white-space: pre-wrap; }
+.acard .meta { margin-top: 6px; }
+.acard .acts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.mxwrap { overflow-x: auto; }
+.mx { width: 100%; border-collapse: collapse; font-size: 12px; }
+.mx th, .mx td { border-bottom: 1px solid var(--soft); padding: 6px 4px; text-align: center; white-space: nowrap; vertical-align: middle; }
+.mx th { color: var(--muted); font-weight: 700; font-size: 11px; }
+.mx th:first-child, .mx td:first-child { text-align: left; position: sticky; left: 0; background: var(--surface); z-index: 1; }
+.mx td.off { color: var(--line); }
+.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--line); vertical-align: middle; }
+.dot.todo { background: var(--warn); } .dot.doing { background: var(--accent); } .dot.done { background: var(--good); } .dot.blocked, .dot.late { background: var(--bad); }
+.dot.need { background: var(--bad); } .dot.buying { background: var(--warn); } .dot.uploading { background: var(--accent); } .dot.have { background: var(--good); }
+.mstep { display: flex; gap: 8px; padding: 7px 0; border-bottom: 1px dashed var(--soft); font-size: 13px; line-height: 1.55; }
+.mstep:last-child { border-bottom: none; }
+.mstep b { color: var(--ink); min-width: 22px; flex-shrink: 0; }
+.mstep small { display: block; color: var(--muted); font-size: 12px; }
+.days { display: flex; flex-wrap: wrap; gap: 4px; }
+.days label { display: inline-flex; align-items: center; gap: 4px; padding: 6px 9px; border: 1px solid var(--line); border-radius: 6px; font-size: 12px; min-height: 32px; }
+.days input { width: 16px; height: 16px; accent-color: var(--accent); }
+.rowline { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--soft); font-size: 13px; }
+.rowline:last-child { border-bottom: none; }
+.rowline .grow { flex: 1; min-width: 0; }
+.rowline select.in { width: auto; padding: 6px 8px; font-size: 12px; }
+
 @media (max-width: 480px) {
   .grid2 { grid-template-columns: 1fr; }
   .kv { grid-template-columns: 72px 1fr; }

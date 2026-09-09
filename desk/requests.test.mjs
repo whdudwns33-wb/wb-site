@@ -6,7 +6,8 @@ import test from 'node:test';
 import { DatabaseSync } from 'node:sqlite';
 import { handleRequests } from './requests.mjs';
 
-const migration = fs.readFileSync(new URL('./migrations/001_desk.sql', import.meta.url), 'utf8');
+const migrationDir = new URL('./migrations/', import.meta.url);
+const migration = fs.readdirSync(migrationDir).filter(n => n.endsWith('.sql')).sort().map(n => fs.readFileSync(new URL(n, migrationDir), 'utf8')).join('\n');
 
 class Statement {
   constructor(database, sql) { this.database = database; this.sql = sql; this.args = []; }

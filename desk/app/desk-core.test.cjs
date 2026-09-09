@@ -388,12 +388,12 @@ test('briefText: one paragraph with done/pending/blocked and no student identifi
 /* ── 라우트 ── */
 
 test('routeOf / inviteLink', () => {
-  assert.deepEqual(C.routeOf('#/students'), { route: 'students', code: '' });
-  assert.deepEqual(C.routeOf('#/students/extra?x'), { route: 'students', code: '' });
-  assert.deepEqual(C.routeOf('#c=AbC-123_x'), { route: 'today', code: 'AbC-123_x' });
-  assert.deepEqual(C.routeOf('#/nope'), { route: 'today', code: '' });
-  assert.deepEqual(C.routeOf(''), { route: 'today', code: '' });
-  assert.deepEqual(C.routeOf('#c=<script>'), { route: 'today', code: '' });
+  assert.deepEqual(C.routeOf('#/students'), { route: 'students', room: '', code: '' });
+  assert.deepEqual(C.routeOf('#/students/extra?x'), { route: 'students', room: '', code: '' });
+  assert.deepEqual(C.routeOf('#c=AbC-123_x'), { route: 'today', room: '', code: 'AbC-123_x' });
+  assert.deepEqual(C.routeOf('#/nope'), { route: 'today', room: '', code: '' });
+  assert.deepEqual(C.routeOf(''), { route: 'today', room: '', code: '' });
+  assert.deepEqual(C.routeOf('#c=<script>'), { route: 'today', room: '', code: '' });
   assert.equal(C.inviteLink('https://wb-desk.example', '/index.html', 'abc'), 'https://wb-desk.example/#c=abc');
   assert.equal(C.inviteLink('https://wb-desk.example', '/', 'abc'), 'https://wb-desk.example/#c=abc');
 });
@@ -414,4 +414,129 @@ test('seedPerfsets derives program setup from student records without overriding
   const again = C.seedPerfsets([students[1]], r.checks, {});
   assert.ok(!again.checks['__perfset__stu_a|all'], '학생이 사라지면 파생 행도 사라진다');
   assert.ok(again.checks['__perfset__stu_b|all']);
+});
+
+/* ── 배정 카드·템플릿·앱·매뉴얼 (기획서 v1.1) ── */
+
+test('routeOf: 프로그램 방(#/p/<room>)·매뉴얼·매트릭스·모르는 방은 today', () => {
+  assert.deepEqual(C.routeOf('#/p/classcard'), { route: 'room', room: 'classcard', code: '' });
+  assert.deepEqual(C.routeOf('#/p/nope'), { route: 'today', room: '', code: '' });
+  assert.equal(C.routeOf('#/manuals').route, 'manuals');
+  assert.equal(C.routeOf('#/matrix').route, 'matrix');
+  assert.equal(C.routeOf('#/room').route, 'today');
+  assert.deepEqual(C.routeOf('#c=abcd'), { route: 'today', room: '', code: 'abcd' });
+  assert.deepEqual(C.ROOMS, ['studyforce', 'classcard', 'metamath', 'nelt', 'exam4you', 'jokbo']);
+});
+
+const STUDENTS = [
+  { id: 'st1', name: '학생A', grade: '중2', status: 'active', programs: { studyforce: { active: true }, classcard: { active: false } } },
+  { id: 'st2', name: '학생B', status: 'active', programs: { studyforce: { active: true } } },
+  { id: 'st3', name: '학생C', status: 'ended', programs: { studyforce: { active: true } } },
+  { id: 'st4', name: '학생D', status: 'active', deleted: true, programs: { studyforce: { active: true } } }
+];
+const APPS = [{ id: 'app1', name: '국어 내신 앱', active: true }, { id: 'app2', name: '옛 앱', active: false }];
+
+test('deriveCards: 요일·대상 4종·비활성 앱·종료 학생·기간·중복(삭제된 id 포함)·결정적 id', () => {
+  const plans = [
+    { id: 'pl1', kind: 'recurring', program: 'studyforce', days: [1, 2, 3, 4, 5], target: { type: 'each' }, what: '오늘 수행 확인', where: '관리자 수행 화면' },
+    { id: 'pl2', kind: 'recurring', program: 'classcard', days: [1], target: { type: 'text', label: '중2A반' }, what: '주간 세트 배정' },
+    { id: 'pl3', kind: 'recurring', program: 'exam4you', days: [3], target: { type: 'app', id: 'app1' }, what: '중2 국어 3단원 기출', manualId: 'm-up' },
+    { id: 'pl4', kind: 'recurring', program: 'exam4you', days: [3], target: { type: 'app', id: 'app2' }, what: '비활성 앱' },
+    { id: 'pl5', kind: 'recurring', program: 'nelt', days: [3], target: { type: 'student', id: 'st3' }, what: '종료 학생' },
+    { id: 'pl6', kind: 'recurring', program: 'metamath', days: [3], target: { type: 'student', id: 'st1' }, what: '꺼진 템플릿', active: false },
+    { id: 'pl7', kind: 'recurring', program: 'metamath', days: [3], target: { type: 'student', id: 'st1' }, what: '기간 밖', start: '2026-09-10' },
+    { id: 'pl8', kind: 'apprange', appId: 'app1', unit: '3단원' },
+    { id: 'pl9', kind: 'recurring', program: 'studyforce', days: [3], target: { type: 'each' }, what: '지난 템플릿', end: '2026-09-08' }
+  ];
+  const r = C.deriveCards(plans, STUDENTS, APPS, [], D, 1000);
+  assert.deepEqual(r.cards.map(c => c.id).sort(), ['p:pl1:2026-09-09:st1', 'p:pl1:2026-09-09:st2', 'p:pl3:2026-09-09:app1']);
+  assert.deepEqual(r.cards.find(c => c.id === 'p:pl1:2026-09-09:st1'),
+    { id: 'p:pl1:2026-09-09:st1', program: 'studyforce', target: { type: 'student', id: 'st1' }, what: '오늘 수행 확인', status: 'todo', due: D, source: 'plan:pl1', createdAt: 1000, where: '관리자 수행 화면' });
+  assert.equal(r.cards.find(c => c.id === 'p:pl3:2026-09-09:app1').manualId, 'm-up');
+  const again = C.deriveCards(plans, STUDENTS, APPS, r.cards.slice(0, 2), D, 2000, ['p:pl3:2026-09-09:app1']);
+  assert.deepEqual([again.cards.length, again.skipped], [0, 3], '있는 카드·서버가 아는(지운) id 는 다시 만들지 않는다');
+  const mon = C.deriveCards(plans, STUDENTS, APPS, [], '2026-09-07', 0);
+  const text = mon.cards.find(c => c.program === 'classcard');
+  assert.deepEqual([text.id, text.target], ['p:pl2:2026-09-07:중2a반', { type: 'text', label: '중2A반' }]);
+  assert.equal(C.planCardId('pl1', D, ''), 'p:pl1:2026-09-09:-');
+});
+
+const CARDS = [
+  { id: 'c1', program: 'studyforce', target: { type: 'student', id: 'st1' }, what: 'a', status: 'todo', due: D, createdAt: 5 },
+  { id: 'c2', program: 'studyforce', target: { type: 'student', id: 'st1' }, what: 'b', status: 'doing', due: '2026-09-08' },
+  { id: 'c3', program: 'classcard', target: { type: 'text', label: '중2A' }, what: 'c', status: 'blocked', blockedReason: 'x', due: D },
+  { id: 'c4', program: 'metamath', target: { type: 'student', id: 'st2' }, what: 'd', status: 'done', due: D, doneAt: new Date(2026, 8, 9, 10).getTime() },
+  { id: 'c5', program: 'nelt', target: { type: 'student', id: 'st2' }, what: 'e', status: 'done', due: '2026-09-01', doneAt: new Date(2026, 8, 1, 10).getTime() },
+  { id: 'c6', program: 'exam4you', target: { type: 'app', id: 'app1' }, what: 'f', status: 'todo', due: '2026-09-10' },
+  { id: 'c7', program: 'jokbo', target: { type: 'text', label: 'x' }, what: 'g', status: 'todo' },
+  { id: 'c8', program: 'studyforce', target: { type: 'student', id: 'st1' }, what: 'h', status: 'todo', due: D, deleted: true }
+];
+
+test('cardsOn: 막힘 → 지연 → 오늘 → 기한 없음, 오늘 완료만, 미래·삭제·옛 완료 제외', () => {
+  const on = C.cardsOn(CARDS, D);
+  assert.deepEqual(on.open.map(c => c.id), ['c3', 'c2', 'c1', 'c7']);
+  assert.deepEqual(on.done.map(c => c.id), ['c4']);
+  assert.deepEqual([C.cardLate(CARDS[1], D), C.cardLate(CARDS[0], D), C.cardLate(CARDS[4], D)], [true, false, false]);
+  const g = C.groupByRoom(on.open);
+  assert.deepEqual(Object.keys(g), C.ROOMS);
+  assert.deepEqual([g.studyforce.map(c => c.id), g.classcard.map(c => c.id), g.jokbo.map(c => c.id), g.nelt], [['c2', 'c1'], ['c3'], ['c7'], []]);
+});
+
+test('matrixOf: 이용 중 학생 × 방, 칸 = 구독 + 마지막 카드 · coverageOf: 앱 × 범위 상태 건수', () => {
+  const m = C.matrixOf(STUDENTS, CARDS, D);
+  assert.deepEqual(m.map(r => r.id), ['st1', 'st2']);
+  assert.deepEqual(m[0].cells.studyforce, { sub: true, status: 'todo', due: D, late: false, what: 'a' });
+  assert.deepEqual(m[0].cells.classcard, { sub: false, status: '', due: '', late: false, what: '' });
+  assert.deepEqual([m[0].cells.exam4you.sub, m[1].cells.metamath.status, m[1].cells.nelt.status], [null, 'done', 'done']);
+  const cov = C.coverageOf(APPS, [
+    { id: 'r1', kind: 'apprange', appId: 'app1', subject: '국어', grade: '중2', unit: '3단원', status: 'need' },
+    { id: 'r2', kind: 'apprange', appId: 'app1', subject: '국어', grade: '중2', unit: '1단원', status: 'have' },
+    { id: 'r3', kind: 'apprange', appId: 'app9', unit: '없는 앱', status: 'need' },
+    { id: 'pl', kind: 'recurring', program: 'nelt', days: [1], target: { type: 'each' }, what: 'x' }
+  ]);
+  assert.deepEqual(cov.map(c => [c.app.id, c.total, c.counts]), [['app1', 2, { need: 1, buying: 0, uploading: 0, have: 1 }], ['app2', 0, { need: 0, buying: 0, uploading: 0, have: 0 }]]);
+  assert.deepEqual(cov[0].rows.map(r => r.unit), ['1단원', '3단원']);
+});
+
+test('manualFor·manualsFor: manualId 우선, 앱 카드는 app 범위, 방은 assign 우선', () => {
+  const manuals = [
+    { id: 'm1', scope: 'classcard', task: 'check', title: '결과 확인' },
+    { id: 'm2', scope: 'classcard', task: 'assign', title: '세트 배정' },
+    { id: 'm3', scope: 'app', task: 'upload', title: '앱 업로드', appId: 'app1' },
+    { id: 'm4', scope: 'app', task: 'upload', title: '다른 앱', appId: 'app2' },
+    { id: 'm5', scope: 'exam4you', task: 'download', title: '다운로드', deleted: true }
+  ];
+  assert.equal(C.manualFor(manuals, { program: 'classcard', target: { type: 'text', label: 'x' } }).id, 'm2');
+  assert.equal(C.manualFor(manuals, { program: 'classcard', target: { type: 'text', label: 'x' }, manualId: 'm1' }).id, 'm1');
+  assert.equal(C.manualFor(manuals, { program: 'exam4you', target: { type: 'app', id: 'app1' } }).id, 'm3');
+  assert.equal(C.manualFor(manuals, { program: 'exam4you', target: { type: 'student', id: 'st1' } }), null);
+  assert.deepEqual(C.manualsFor(manuals, 'classcard').map(m => m.id), ['m2', 'm1']);
+  assert.deepEqual(C.manualsFor(manuals, 'app', 'app2').map(m => m.id), ['m4']);
+});
+
+test('validateCard·validateRecurring·validateRange·validateApp·validateManual', () => {
+  assert.equal(C.validateCard({ program: 'kakao' }).error, '프로그램을 고르세요');
+  assert.equal(C.validateCard({ program: 'classcard', targetType: 'student', targetId: '' }).error, '학생을 고르세요');
+  assert.equal(C.validateCard({ program: 'classcard', targetType: 'text', targetLabel: '중2A', what: '' }).error, '무엇을을(를) 입력하세요');
+  assert.ok(/개인정보/.test(C.validateCard({ program: 'classcard', targetType: 'text', targetLabel: '중2A', what: '엄마 010-0000-0000' }).error));
+  assert.equal(C.validateCard({ program: 'classcard', targetType: 'text', targetLabel: '중2A', what: '세트', due: '2026-9-9' }).error, '기한은 YYYY-MM-DD 형식입니다');
+  assert.deepEqual(C.validateCard({ program: 'exam4you', targetType: 'app', targetId: 'app1', what: '3단원 기출', where: '관리 웹', due: D, note: '', manualId: 'm3' }),
+    { value: { program: 'exam4you', target: { type: 'app', id: 'app1' }, what: '3단원 기출', status: 'todo', source: 'order', where: '관리 웹', due: D, manualId: 'm3' }, error: '' });
+
+  assert.equal(C.validateRecurring({ program: 'nelt', days: [] }).error, '요일을 하나 이상 고르세요');
+  assert.deepEqual(C.validateRecurring({ program: 'studyforce', days: ['5', 1, 1, 9], targetType: 'each', what: '수행 확인', where: '', start: '' }),
+    { value: { kind: 'recurring', program: 'studyforce', days: [1, 5], target: { type: 'each' }, what: '수행 확인', active: true }, error: '' });
+  assert.equal(C.validateRecurring({ program: 'studyforce', days: [1], targetType: 'app', targetId: '' }).error, '앱을 고르세요');
+
+  assert.equal(C.validateRange({ appId: '' }).error, '앱을 고르세요');
+  assert.deepEqual(C.validateRange({ appId: 'app1', unit: ' 3단원 ', subject: '국어', grade: '중2', status: '', source: 'jokbo' }),
+    { value: { kind: 'apprange', appId: 'app1', unit: '3단원', status: 'need', source: 'jokbo', subject: '국어', grade: '중2' }, error: '' });
+
+  assert.equal(C.validateApp({ name: '앱', adminUrl: 'http://x' }).error, '관리 웹 주소는 https:// 로 시작해야 합니다');
+  assert.deepEqual(C.validateApp({ name: '국어 내신 앱', adminUrl: 'https://example.invalid/admin/' }), { value: { name: '국어 내신 앱', active: true, adminUrl: 'https://example.invalid/admin/' }, error: '' });
+
+  const man = C.validateManual({ scope: 'classcard', task: 'assign', title: '세트 배정', purpose: '', stepsText: '반을 연다\n\n세트를 고른다 ', cautionsText: '이름 금지', linksText: '클래스카드 | https://www.classcard.net/Login' });
+  assert.deepEqual(man, { value: { scope: 'classcard', task: 'assign', title: '세트 배정', steps: [{ text: '반을 연다' }, { text: '세트를 고른다' }], cautions: ['이름 금지'], links: [{ label: '클래스카드', url: 'https://www.classcard.net/Login' }], version: 1 }, error: '' });
+  assert.ok(/형식/.test(C.validateManual({ scope: 'classcard', task: 'a', title: 't', linksText: 'x http://x' }).error));
+  assert.equal(C.validateManual({ scope: 'x', task: 'a', title: 't' }).error, '어느 방의 매뉴얼인지 고르세요');
 });

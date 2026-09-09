@@ -18,7 +18,11 @@ const TOKEN_KEY = 'desk.token';
 const SYNC_APP = 'desk';                 // runbook-ui가 sync.post body에 붙이는 앱 이름(런타임이 떼어낸다)
 const POLL_MS = 60000;
 const FLUSH_MS = 300;
-const TABS = [['today', '오늘'], ['requests', '요청함'], ['students', '학생'], ['assets', '자산'], ['perf', '수행'], ['contacts', '연락'], ['admin', '관리']];
+/* 기획서 v1.1 — 1차 메뉴는 프로그램 방 6개(원장 표현: 세션). 두 번째 줄이 명단·요청·자산·수행·연락·매뉴얼·현황·관리. */
+const TABS_ROOMS = [['today', '오늘']].concat(DC.ROOMS.map(k => ['p/' + k, DC.ROOM_LABEL[k]]));
+const TABS_MORE = [['students', '학생'], ['requests', '요청함'], ['assets', '자산'], ['perf', '수행'], ['contacts', '연락'], ['manuals', '매뉴얼'], ['matrix', '현황'], ['admin', '관리']];
+const OWNER_ROUTES = ['matrix', 'admin'];
+const MANUAL_TASKS = [['assign', '배정'], ['check', '확인'], ['download', '다운로드'], ['upload', '앱 업로드'], ['account', '계정'], ['followup', '후속 연락'], ['other', '기타']];
 
 /* ── 계약 전역(§4) ────────────────────────────────── */
 
@@ -28,12 +32,15 @@ let rosterDb = null;                     // {students:[{id,name,grade,start,end}
 let rosterErr = '';
 let rosterLoading = false;
 let route = 'login';
+let room = '';                           // route === 'room' 일 때의 프로그램 키
 let cursor = DC.ymdOf(new Date());
+let derivedFor = '';                     // 오늘 카드를 템플릿에서 마지막으로 만든 날짜
 
 /* 화면 상태 — 재렌더(폴링 도착 포함)에도 살아남아야 하므로 DOM이 아니라 여기 둔다. */
 const ui = {
   staffPick: '', panels: {}, stuQ: '', stuStatus: 'all', stuOpen: '', phoneShown: {},
-  reqFilter: 'open', reqErr: '', ctQ: '', linkBusy: false
+  reqFilter: 'open', reqErr: '', ctQ: '', linkBusy: false,
+  doneOpen: {}, matrixView: 'students', manualScope: ''
 };
 const boot = { health: null, err: '', busy: false };
 
@@ -46,7 +53,7 @@ let flushing = false;
 let pollTimer = null;
 let modalReturnFocus = null;
 
-function emptyState() { return { staff: [], tasks: [], checks: {}, students: [], contacts: [], settings: {}, meta: {}, base: {} }; }
+function emptyState() { return { staff: [], tasks: [], checks: {}, students: [], contacts: [], cards: [], plans: [], apps: [], manuals: [], settings: {}, meta: {}, base: {} }; }
 
 /* ── 기본 헬퍼(§4) ────────────────────────────────── */
 
@@ -311,6 +318,7 @@ function applyDocs(docs, serverNow, force) {
 async function loadAll() {
   const res = await api('/api/docs');
   applyDocs(res.docs, res.now);
+  ensureTodayCards();
 }
 async function reloadAll() {
   await loadAll();
@@ -321,8 +329,9 @@ async function poll() {
   try {
     const res = await api('/api/docs?since=' + Math.max(0, lastSync - 1));
     const n = applyDocs(res.docs, res.now);
+    const made = ensureTodayCards();
     syncErr = '';
-    if (n && !typingInView()) render(); else patchSyncBar();
+    if ((n || made) && !typingInView()) render(); else patchSyncBar();
     if (outbox.size()) scheduleFlush(0);
   } catch (e) {
     if (e.code !== 'AUTH') { syncErr = e.message; patchSyncBar(); }
@@ -356,12 +365,18 @@ async function afterAuth() {
   boot.err = '';
   await loadAll();
   startPolling();
-  const r = DC.routeOf(location.hash);
-  route = r.route === 'login' ? 'today' : r.route;
-  if (route === 'admin' && !session.canApprove) route = 'today';
-  if (location.hash !== '#/' + route) history.replaceState(null, '', '#/' + route);
+  applyRoute(DC.routeOf(location.hash));
   render();
 }
+/** 라우트 반영 — 방(#/p/<k>)은 route='room'+room, 원장 전용 화면은 직원이면 오늘로. */
+function applyRoute(r) {
+  route = r.route === 'login' ? 'today' : r.route;
+  room = r.route === 'room' ? String(r.room || '') : '';
+  if (OWNER_ROUTES.includes(route) && !session.canApprove) route = 'today';
+  const h = hashOf(route, room);
+  if (location.hash !== h) history.replaceState(null, '', h);
+}
+function hashOf(r, k) { return r === 'room' ? '#/p/' + k : '#/' + r; }
 
 async function linkExchange(code) {
   if (ui.linkBusy) return;
@@ -475,16 +490,17 @@ async function doLogout() {
 /* ── 라우터·렌더 ──────────────────────────────────── */
 
 function go(r) {
-  const target = DC.ROUTES.includes(r) ? r : 'today';
-  if (location.hash === '#/' + target) { onHash(); return; }
-  location.hash = '#/' + target;
+  const key = String(r || '');
+  const target = key.startsWith('p/') && DC.ROOMS.includes(key.slice(2)) ? '#/' + key
+    : '#/' + (DC.ROUTES.includes(key) && key !== 'room' ? key : 'today');
+  if (location.hash === target) { onHash(); return; }
+  location.hash = target;
 }
 function onHash() {
   const r = DC.routeOf(location.hash);
   if (r.code) { linkExchange(r.code); return; }
   if (!session) { route = 'login'; render(); return; }
-  route = r.route === 'login' ? 'today' : r.route;
-  if (route === 'admin' && !session.canApprove) route = 'today';
+  applyRoute(r);
   render();
 }
 function renderAfterSync() { render(); }
@@ -507,6 +523,9 @@ function render() {
       h = syncBanner();
       switch (route) {
         case 'today': h += viewToday(); break;
+        case 'room': h += viewRoom(room); break;
+        case 'manuals': h += viewManuals(); break;
+        case 'matrix': h += session.canApprove ? viewMatrix() : viewToday(); break;
         case 'requests': h += viewRequests(); break;
         case 'students': h += viewStudents(); break;
         case 'assets': h += WBLedgerUI.view(); break;
@@ -529,14 +548,21 @@ function updateTabs() {
   if (!wrap || !session) return;
   const me = session.staffId;
   const openReq = WBRunbookUI.requests().filter(r => WBRunbookCore.isOpenRequest(r) && (r.assigneeId === me || (session.canApprove && !r.assigneeId))).length;
+  const open = DC.cardsOn(state.cards, today()).open;
+  const byRoom = DC.groupByRoom(open);
   const badges = {
+    today: open.length,
     requests: openReq,
     assets: session.canApprove ? WBLedgerUI.alertCount() : 0,
     perf: WBPerfPanel.alertCount()
   };
-  wrap.innerHTML = TABS.filter(t => t[0] !== 'admin' || session.canApprove).map(t =>
-    '<a class="tab' + (route === t[0] ? ' on' : '') + '" href="#/' + t[0] + '" data-go="' + t[0] + '">' + esc(t[1]) +
-    (badges[t[0]] ? '<span class="badge">' + badges[t[0]] + '</span>' : '') + '</a>').join('');
+  const hot = {};   // 막힘·지연이 있는 방은 빨간 배지
+  DC.ROOMS.forEach(k => { badges['p/' + k] = byRoom[k].length; hot['p/' + k] = byRoom[k].some(c => c.status === 'blocked' || DC.cardLate(c, today())); });
+  const isOn = t => route === 'room' ? t[0] === 'p/' + room : t[0] === route;
+  const tab = t => '<a class="tab' + (isOn(t) ? ' on' : '') + '" href="#/' + t[0] + '" data-go="' + t[0] + '">' + esc(t[1]) +
+    (badges[t[0]] ? '<span class="badge' + ((t[0] === 'today' || t[0].startsWith('p/')) && !hot[t[0]] ? ' soft' : '') + '">' + badges[t[0]] + '</span>' : '') + '</a>';
+  wrap.innerHTML = '<div class="tabrow">' + TABS_ROOMS.map(tab).join('') + '</div>' +
+    '<div class="tabrow sub">' + TABS_MORE.filter(t => !OWNER_ROUTES.includes(t[0]) || session.canApprove).map(tab).join('') + '</div>';
 }
 
 function syncBannerInner() {
@@ -601,6 +627,7 @@ function staffChips(me) {
 function viewToday() {
   const me = currentStaff();
   let h = datebar();
+  h += cardsBlock('', cursor);      // 기획서 v1.1 — 배정 카드가 먼저, 런북(정기 점검)은 그 아래
   if (session.canApprove) h += staffChips(me);
   if (!me) {
     return h + '<div class="empty"><b>직원이 없습니다</b>관리 탭에서 직원을 등록하고 개인 링크를 보내세요.</div>';
@@ -1002,6 +1029,7 @@ function viewAdmin() {
       '<button class="btn btn-sm btn-danger" data-act="dk-staff-revoke" data-id="' + esc(s.id) + '">기기 연결 해제</button></div></div></div>';
   }).join('') : '<div class="empty"><b>직원이 없습니다</b>[＋ 직원]으로 등록하세요.</div>';
   h += '</div>';
+  h += appsSection() + templatesSection();
   h += datebar() + WBRunbookUI.boardCard(cursor);
   h += '<div class="card"><div class="card-title">설정</div>' +
     '<dl class="kv mt8"><dt>조직 이름</dt><dd>' + esc(state.settings.orgName || '—') + '</dd>' +
@@ -1129,6 +1157,523 @@ async function copyText(text) {
   toast(ok ? '복사했습니다' : '복사되지 않았습니다 — 길게 눌러 직접 복사하세요');
 }
 
+/* ── 기획서 v1.1: 프로그램 방·배정 카드·템플릿·앱 목적지·매뉴얼·현황 ──────────
+ * 카드의 정본은 서버 cards 컬렉션. 반복 템플릿(plans.recurring)은 이 기기가 보는 오늘의 카드를 만든다(id 가 결정적이라 멱등).
+ * 직원은 카드 상태·증빙·메모와 앱 자료 범위의 진행만 바꾸고, 템플릿·앱·매뉴얼은 원장이 만든다 — 서버가 같은 규칙으로 거절한다. */
+
+function liveCards() { return state.cards.filter(c => c && !c.deleted); }
+function cardById(id) { return state.cards.find(c => c && String(c.id) === String(id)) || null; }
+function liveApps() { return state.apps.filter(a => a && !a.deleted); }
+function appById(id) { return state.apps.find(a => a && String(a.id) === String(id)) || null; }
+function livePlans() { return state.plans.filter(p => p && !p.deleted); }
+function planById(id) { return state.plans.find(p => p && String(p.id) === String(id)) || null; }
+function manualById(id) { return state.manuals.find(m => m && String(m.id) === String(id)) || null; }
+function roomLabel(k) { return DC.ROOM_LABEL[k] || String(k || ''); }
+function roomLinks(k) { const L = WBExternalLinks; return L.keys().filter(key => L.programOf(key) === k).map(key => L.linkFor(key)).filter(Boolean); }
+function taskLabel(t) { const hit = MANUAL_TASKS.find(x => x[0] === t); return hit ? hit[1] : String(t || ''); }
+function activeStudents() { return students().filter(s => String(s.status || 'active') !== 'ended').sort((a, b) => String(a.name).localeCompare(String(b.name), 'ko')); }
+
+/** 새 문서 또는 전체 덮어쓰기 — 메모리 즉시 반영 + 변경 큐. */
+function addDoc(collection, id, data) {
+  const row = Object.assign({}, data, { id: String(id) });
+  const list = state[collection];
+  const i = list.findIndex(x => x && String(x.id) === String(id));
+  if (i >= 0) list[i] = row; else list.push(row);
+  queueChange(collection, String(id), row);
+  return row;
+}
+function removeDoc(collection, id) {
+  const list = state[collection];
+  const i = list.findIndex(x => x && String(x.id) === String(id));
+  if (i >= 0) list.splice(i, 1);
+  queueChange(collection, String(id), {}, true);
+}
+/** 카드 상태 전이는 여기 한 곳. 완료면 증빙(체크)·완료 시각을 채우고, 되돌리면 지운다. */
+function saveCard(id, patch) {
+  const cur = cardById(id);
+  if (!cur) return null;
+  const next = Object.assign({}, cur, patch);
+  if (next.status !== 'blocked') delete next.blockedReason;
+  if (next.status === 'done') {
+    if (!next.doneAt) next.doneAt = now();
+    if (!next.evidence) next.evidence = { kind: 'check', at: now() };
+  } else {
+    delete next.doneAt; delete next.doneBy;
+    if (next.evidence && next.evidence.kind === 'check') delete next.evidence;
+  }
+  return addDoc('cards', id, next);
+}
+function knownCardIds() { return Object.keys(state.meta).filter(k => k.startsWith('cards|')).map(k => k.slice(6)); }
+/** 오늘 카드를 템플릿에서 만든다. 어느 기기가 먼저 열어도 같은 id 라 서버엔 하나만 남는다. 만든 수를 돌려준다. */
+function ensureTodayCards() {
+  if (!session) return 0;
+  const day = today();
+  const r = DC.deriveCards(state.plans, state.students, state.apps, state.cards, day, now(), knownCardIds());
+  r.cards.forEach(c => addDoc('cards', c.id, c));
+  derivedFor = day;
+  return r.cards.length;
+}
+
+function targetText(t) {
+  if (!t) return '';
+  if (t.type === 'student') { const s = studentById(t.id); return s ? String(s.name) + (s.grade ? ' · ' + String(s.grade) : '') : '(삭제된 학생)'; }
+  if (t.type === 'app') { const a = appById(t.id); return a ? '앱 · ' + String(a.name) : '(삭제된 앱)'; }
+  return String(t.label || '');
+}
+function planTargetText(t) {
+  if (!t) return '';
+  if (t.type === 'each') return '구독 학생 각각';
+  if (t.type === 'student') return studentName(t.id);
+  if (t.type === 'app') { const a = appById(t.id); return a ? '앱 ' + String(a.name) : '(삭제된 앱)'; }
+  return String(t.label || '');
+}
+function sourceText(s) { const v = String(s || ''); return v.startsWith('plan:') ? '템플릿' : v.startsWith('request:') ? '요청함' : '지시'; }
+function daysText(days) {
+  const d = (Array.isArray(days) ? days : []).map(Number).sort((a, b) => a - b);
+  if (d.length === 7) return '매일';
+  if (d.join(',') === '1,2,3,4,5') return '월~금';
+  return d.map(n => DC.DOW[n]).join('');
+}
+function roomHint(k) {
+  return {
+    studyforce: '과제 배정 · 매일 수행 확인 · 미수행 후속', classcard: '반별 세트 배정 · 학습 결과 확인', metamath: '교실홈 문제지 제작·배정',
+    nelt: '응시 등록·안내 · 결과 단계 입력', exam4you: '자료 검색·구매·다운로드 → 학생 전달 · 학습 앱 자료 충당', jokbo: '자료 검색·구매·다운로드 → 학생 전달 · 학습 앱 자료 충당'
+  }[k] || '';
+}
+
+/* ── 카드 ── */
+
+function cardItem(c, date) {
+  const late = DC.cardLate(c, date);
+  const st = String(c.status || 'todo');
+  const m = DC.manualFor(state.manuals, c);
+  const app = c.target && c.target.type === 'app' ? appById(c.target.id) : null;
+  const link = roomLinks(c.program)[0];
+  const ids = ' data-id="' + esc(c.id) + '"';
+  let h = '<div class="acard ' + st + (late ? ' late' : '') + '" data-card="' + esc(c.id) + '">' +
+    '<div class="acard-what">' + esc(c.what) + '</div>' +
+    '<div class="acard-to">→ ' + esc(targetText(c.target)) + '</div>' +
+    (c.where ? '<div class="acard-where">어디에: ' + esc(c.where) + '</div>' : '') +
+    '<div class="meta">' +
+      (route !== 'room' ? '<span class="tag cls">' + esc(roomLabel(c.program)) + '</span>' : '') +
+      (c.due ? '<span class="tag' + (late ? ' blk' : ' time') + '">' + (late ? '지연 · ' : '') + esc(DC.shortDate(c.due)) + '</span>' : '') +
+      '<span class="tag ' + (st === 'done' ? 'ok' : st === 'blocked' ? 'blk' : st === 'doing' ? 'doing' : '') + '">' + esc(DC.CARD_STATUS_LABEL[st] || st) + '</span>' +
+      '<span class="tag">' + esc(sourceText(c.source)) + (c.byOwner ? ' · 원장' : '') + '</span>' +
+      (st === 'done' && c.doneAt ? '<span class="tag ok">✓ ' + esc(fmtAt(c.doneAt)) + (c.doneBy ? ' ' + esc(staffName(c.doneBy)) : '') + '</span>' : '') +
+    '</div>' +
+    (st === 'blocked' && c.blockedReason ? '<div class="small mt8" style="color:var(--bad)">막힘: ' + esc(c.blockedReason) + '</div>' : '') +
+    (c.note ? '<div class="small muted mt8">' + esc(c.note) + '</div>' : '') +
+    '<div class="acts">';
+  if (st === 'done') h += '<button class="btn btn-sm btn-ghost" data-act="dk-card-status" data-v="todo"' + ids + '>완료 취소</button>';
+  else {
+    if (st !== 'doing') h += '<button class="btn btn-sm btn-navy" data-act="dk-card-status" data-v="doing"' + ids + '>시작</button>';
+    h += '<button class="btn btn-sm btn-primary" data-act="dk-card-status" data-v="done"' + ids + '>✓ 완료</button>';
+    h += st === 'blocked'
+      ? '<button class="btn btn-sm btn-danger" data-act="dk-card-status" data-v="todo"' + ids + '>막힘 해제</button>'
+      : '<button class="btn btn-sm btn-warn" data-act="dk-card-block"' + ids + '>🚧 막힘</button>';
+  }
+  if (m) h += '<button class="btn btn-sm btn-ghost" data-act="dk-manual-open" data-id="' + esc(m.id) + '">📖 방법</button>';
+  if (link) h += '<a class="btn btn-sm btn-ghost" href="' + esc(link.url) + '" target="_blank" rel="noopener noreferrer">↗ ' + esc(link.label) + '</a>';
+  if (app && app.adminUrl) h += '<a class="btn btn-sm btn-ghost" href="' + esc(app.adminUrl) + '" target="_blank" rel="noopener noreferrer">↗ ' + esc(app.name) + ' 관리</a>';
+  h += '<button class="btn btn-sm btn-ghost" data-act="dk-card-note"' + ids + '>메모</button>';
+  if (session.canApprove) h += '<button class="btn btn-sm btn-ghost" data-act="dk-card-del"' + ids + '>삭제</button>';
+  return h + '</div></div>';
+}
+
+/** 카드 묶음 — roomKey 가 비면 전체(방별 소제목), 있으면 그 방만. */
+function cardsBlock(roomKey, date) {
+  const on = DC.cardsOn(state.cards, date);
+  const open = roomKey ? on.open.filter(c => c.program === roomKey) : on.open;
+  const done = roomKey ? on.done.filter(c => c.program === roomKey) : on.done;
+  const late = open.filter(c => DC.cardLate(c, date)).length;
+  const blocked = open.filter(c => c.status === 'blocked').length;
+  let h = '<div class="card"><div class="between mb8"><div class="card-title">' + (roomKey ? '이 방의 카드' : '오늘 카드') + ' <span class="muted small">' + open.length + '</span></div>' +
+    '<div class="row wraprow" style="gap:4px">' + (late ? '<span class="pill bad">지연 ' + late + '</span>' : '') + (blocked ? '<span class="pill bad">막힘 ' + blocked + '</span>' : '') +
+    (done.length ? '<span class="pill ok">완료 ' + done.length + '</span>' : '') + '</div></div>';
+  if (session.canApprove) h += '<div class="row wraprow mb8" style="gap:6px"><button class="btn btn-sm btn-primary" data-act="dk-card-new" data-room="' + esc(roomKey || '') + '">＋ 지시(카드)</button></div>';
+  if (!open.length) {
+    h += '<div class="empty"><b>비어 있음</b>' + (roomKey ? '이 방에 열린 카드가 없습니다.' : '열린 카드가 없습니다.') +
+      (session.canApprove ? '<br>[＋ 지시]로 한 장 만들거나, 반복 템플릿을 만들면 매일 아침 카드가 생깁니다.' : '') + '</div>';
+  } else if (roomKey) {
+    h += open.map(c => cardItem(c, date)).join('');
+  } else {
+    const g = DC.groupByRoom(open);
+    DC.ROOMS.forEach(k => { if (g[k].length) h += '<div class="sect">' + esc(roomLabel(k)) + ' ' + g[k].length + '</div>' + g[k].map(c => cardItem(c, date)).join(''); });
+  }
+  if (done.length) h += '<details><summary class="sect">완료 ' + done.length + '</summary>' + done.map(c => cardItem(c, date)).join('') + '</details>';
+  return h + '</div>';
+}
+
+function openCardNote(id) {
+  const c = cardById(id); if (!c) return;
+  modal('카드 메모', '<div class="field"><label class="fl" for="dk-cn-note">메모 (학생 이름·연락처 금지, 300자)</label><textarea class="in" id="dk-cn-note" rows="3" maxlength="300">' + esc(c.note || '') + '</textarea></div>',
+    '<button class="btn btn-primary btn-block mt8" data-act="dk-card-note-save" data-id="' + esc(id) + '">저장</button>');
+}
+function saveCardNote(id) {
+  const note = val('dk-cn-note');
+  if (DC.hasPII(note)) return toast('메모에 전화번호·이메일을 넣을 수 없습니다');
+  saveCard(id, { note: note });
+  closeModal(); render();
+}
+function openCardBlock(id) {
+  const c = cardById(id); if (!c) return;
+  modal('막힘 — 이유 한 줄', '<div class="card-sub mb8">' + esc(c.what) + '</div><div class="field"><label class="fl" for="dk-cb-reason">사유 (200자)</label><textarea class="in" id="dk-cb-reason" rows="2" maxlength="200">' + esc(c.blockedReason || '') + '</textarea></div>',
+    '<button class="btn btn-danger btn-block mt8" data-act="dk-card-block-save" data-id="' + esc(id) + '">막힘으로 표시</button>');
+}
+function saveCardBlock(id) {
+  const reason = val('dk-cb-reason');
+  if (!reason) return toast('사유를 한 줄 적어 주세요');
+  if (DC.hasPII(reason)) return toast('사유에 전화번호·이메일을 넣을 수 없습니다');
+  saveCard(id, { status: 'blocked', blockedReason: reason });
+  closeModal(); render(); toast('막힘으로 표시했습니다 — 원장 화면에 바로 뜹니다');
+}
+
+/* 공용 선택 상자 */
+function optionsHtml(pairs, selected) { return pairs.map(p => '<option value="' + esc(p[0]) + '"' + (String(p[0]) === String(selected) ? ' selected' : '') + '>' + esc(p[1]) + '</option>').join(''); }
+function roomOptions(selected) { return optionsHtml(DC.ROOMS.map(k => [k, roomLabel(k)]), selected); }
+function studentOptions(selected) { return optionsHtml([['', '— 학생 —']].concat(activeStudents().map(s => [s.id, String(s.name) + (s.grade ? ' (' + s.grade + ')' : '')])), selected); }
+function appOptions(selected) { return optionsHtml([['', '— 앱 —']].concat(liveApps().filter(a => a.active !== false).map(a => [a.id, a.name])), selected); }
+function manualOptions(scope, selected) {
+  const list = DC.manualsFor(state.manuals, scope).concat(scope === 'exam4you' || scope === 'jokbo' ? DC.manualsFor(state.manuals, 'app') : []);
+  return optionsHtml([['', '자동(방의 기본 매뉴얼)']].concat(list.map(m => [m.id, taskLabel(m.task) + ' · ' + m.title])), selected);
+}
+function targetFields(prefix, kinds, t) {
+  const type = t && t.type ? t.type : kinds[0][0];
+  return '<div class="field"><label class="fl" for="' + prefix + '-ttype">대상</label><select class="in" id="' + prefix + '-ttype" data-act="' + prefix + '-ttype">' + optionsHtml(kinds, type) + '</select></div>' +
+    '<div class="field" id="' + prefix + '-w-student"' + (type === 'student' ? '' : ' hidden') + '><label class="fl" for="' + prefix + '-student">학생</label><select class="in" id="' + prefix + '-student">' + studentOptions(t && t.id) + '</select></div>' +
+    '<div class="field" id="' + prefix + '-w-app"' + (type === 'app' ? '' : ' hidden') + '><label class="fl" for="' + prefix + '-app">학원 학습 앱</label><select class="in" id="' + prefix + '-app">' + appOptions(t && t.id) + '</select>' +
+      (liveApps().length ? '' : '<div class="hint">관리 탭에서 앱을 먼저 등록하세요.</div>') + '</div>' +
+    '<div class="field" id="' + prefix + '-w-text"' + (type === 'text' ? '' : ' hidden') + '><label class="fl" for="' + prefix + '-label">반·기타 (글로)</label><input class="in" id="' + prefix + '-label" maxlength="60" placeholder="예: 중2A반" value="' + esc(t && t.label || '') + '"></div>';
+}
+function readTarget(prefix) {
+  const type = val(prefix + '-ttype');
+  return { targetType: type, targetId: type === 'student' ? val(prefix + '-student') : type === 'app' ? val(prefix + '-app') : '', targetLabel: val(prefix + '-label') };
+}
+function toggleTargetFields(prefix) {
+  const type = val(prefix + '-ttype');
+  ['student', 'app', 'text'].forEach(k => { const el = $('#' + prefix + '-w-' + k); if (el) el.hidden = type !== k; });
+}
+
+function openCardForm(roomKey) {
+  const k = DC.ROOMS.includes(roomKey) ? roomKey : (DC.ROOMS.includes(room) ? room : 'studyforce');
+  modal('지시 — 카드 한 장',
+    '<div class="field"><label class="fl" for="dk-cf-program">프로그램(방)</label><select class="in" id="dk-cf-program" data-act="dk-cf-program">' + roomOptions(k) + '</select></div>' +
+    targetFields('dk-cf', [['student', '학생 한 명'], ['app', '학원 학습 앱'], ['text', '반·기타(글로)']], null) +
+    '<div class="field"><label class="fl" for="dk-cf-what">무엇을</label><input class="in" id="dk-cf-what" maxlength="120" placeholder="예: 2학기 중간 교과서 변형 3~4과"></div>' +
+    '<div class="field"><label class="fl" for="dk-cf-where">어디에</label><input class="in" id="dk-cf-where" maxlength="120" placeholder="예: 클래스카드 → 중2A반 / 학생 폴더"></div>' +
+    '<div class="grid2"><div class="field"><label class="fl" for="dk-cf-due">기한</label><input class="in" id="dk-cf-due" type="date" value="' + esc(today()) + '"></div>' +
+    '<div class="field"><label class="fl" for="dk-cf-manual">방법(매뉴얼)</label><select class="in" id="dk-cf-manual">' + manualOptions(k, '') + '</select></div></div>' +
+    '<div class="field"><label class="fl" for="dk-cf-note">메모 (학생 이름·연락처 금지)</label><textarea class="in" id="dk-cf-note" rows="2" maxlength="300"></textarea></div>',
+    '<button class="btn btn-primary btn-block mt8" data-act="dk-card-save">카드 만들기</button>');
+}
+function saveCardForm() {
+  const t = readTarget('dk-cf');
+  const v = DC.validateCard(Object.assign({ program: val('dk-cf-program'), what: val('dk-cf-what'), where: val('dk-cf-where'), due: val('dk-cf-due'), note: val('dk-cf-note'), manualId: val('dk-cf-manual'), source: 'order' }, t));
+  if (v.error) return toast(v.error);
+  addDoc('cards', 'o:' + uid(), Object.assign({}, v.value, { createdAt: now() }));
+  closeModal(); render(); toast('카드를 만들었습니다');
+}
+
+/* ── 방 ── */
+
+function viewRoom(k) {
+  if (!DC.ROOMS.includes(k)) return viewToday();
+  const links = roomLinks(k);
+  let h = '<div class="room-head"><div class="room-title">' + esc(roomLabel(k)) + '<small>' + esc(roomHint(k)) + '</small></div>' +
+    '<div class="row wraprow" style="gap:6px">' + links.map(l => '<a class="btn btn-sm btn-navy" href="' + esc(l.url) + '" target="_blank" rel="noopener noreferrer">↗ ' + esc(l.label) + '</a>').join('') + '</div></div>';
+  h += cardsBlock(k, today());
+  if (k === 'exam4you' || k === 'jokbo') h += rangesBlock(k);
+  h += manualsBlock(k);
+  h += roomStatusBlock(k);
+  if (session.canApprove) h += templatesSection(k);
+  return h;
+}
+
+function rangesBlock(k) {
+  const cov = DC.coverageOf(state.apps, state.plans);
+  let h = '<div class="card"><div class="between mb8"><div class="card-title">앱 자료 범위 <span class="muted small">이 출처에서 채울 것</span></div>' +
+    (session.canApprove ? '<button class="btn btn-sm btn-ghost" data-act="dk-range-new" data-room="' + esc(k) + '">＋ 범위</button>' : '') + '</div>';
+  let any = false;
+  cov.forEach(c => {
+    const rows = c.rows.filter(r => r.source === k);
+    if (!rows.length) return;
+    any = true;
+    h += '<div class="sect">' + esc(c.app.name) + ' ' + rows.length + '</div>' + rows.map(rangeRow).join('');
+  });
+  if (!any) {
+    h += '<div class="hint">' + (liveApps().length ? '이 출처로 채울 범위가 없습니다.' : '관리 탭에서 학원 학습 앱을 먼저 등록하세요.') +
+      (session.canApprove ? ' [＋ 범위]로 과목·학년·단원·자료 종류를 한 줄씩 넣으면 직원이 진행 상태를 옮깁니다.' : '') + '</div>';
+  }
+  return h + '</div>';
+}
+function rangeRow(r) {
+  return '<div class="rowline"><div class="grow"><span class="dot ' + esc(r.status) + '"></span> <b>' + esc([r.subject, r.grade, r.unit].filter(Boolean).join(' · ')) + '</b>' +
+    (r.material ? ' <span class="muted small">' + esc(r.material) + '</span>' : '') + (r.note ? '<div class="small muted">' + esc(r.note) + '</div>' : '') + '</div>' +
+    '<select class="in" data-act="dk-range-status" data-id="' + esc(r.id) + '" aria-label="진행 상태">' + optionsHtml(DC.RANGE_STATUS.map(s => [s, DC.RANGE_STATUS_LABEL[s]]), r.status) + '</select>' +
+    (session.canApprove ? '<button class="btn btn-sm btn-ghost" data-act="dk-range-edit" data-id="' + esc(r.id) + '">편집</button>' : '') + '</div>';
+}
+function setRangeStatus(id, status) {
+  const p = planById(id);
+  if (!p || !DC.RANGE_STATUS.includes(status)) return;
+  addDoc('plans', id, Object.assign({}, p, { status: status }));
+  toast('진행 상태: ' + DC.RANGE_STATUS_LABEL[status]);
+}
+
+function manualsBlock(k) {
+  const list = DC.manualsFor(state.manuals, k).concat(k === 'exam4you' || k === 'jokbo' ? DC.manualsFor(state.manuals, 'app') : []);
+  let h = '<div class="card"><div class="between mb8"><div class="card-title">매뉴얼</div>' +
+    (session.canApprove ? '<button class="btn btn-sm btn-ghost" data-act="dk-manual-new" data-scope="' + esc(k) + '">＋ 매뉴얼</button>' : '') + '</div>';
+  h += list.length ? list.map(manualRow).join('')
+    : '<div class="hint">아직 매뉴얼이 없습니다.' + (session.canApprove ? ' 매뉴얼 탭의 [기본 매뉴얼 불러오기]로 초안을 넣고 고치세요.' : '') + '</div>';
+  return h + '</div>';
+}
+function manualRow(m) {
+  return '<div class="rowline"><div class="grow"><span class="tag">' + esc(taskLabel(m.task)) + '</span> <b>' + esc(m.title) + '</b>' +
+    (m.scope === 'app' && m.appId ? ' <span class="muted small">' + esc((appById(m.appId) || {}).name || '') + '</span>' : '') +
+    (m.purpose ? '<div class="small muted">' + esc(m.purpose) + '</div>' : '') + '</div>' +
+    '<button class="btn btn-sm btn-ghost" data-act="dk-manual-open" data-id="' + esc(m.id) + '">보기</button></div>';
+}
+
+function roomStatusBlock(k) {
+  const mx = DC.matrixOf(state.students, state.cards, today());
+  const isSub = DC.PROGRAMS.includes(k);
+  const rows = isSub ? mx.filter(r => r.cells[k].sub) : mx.filter(r => r.cells[k].status);
+  let h = '<div class="card"><div class="card-title">현황 <span class="muted small">' + (isSub ? '구독 학생 ' : '카드가 있는 학생 ') + rows.length + '</span></div>';
+  if (!rows.length) {
+    return h + '<div class="hint mt8">' + (isSub ? '이 프로그램을 구독 중인 학생이 없습니다. 학생 탭에서 구독을 켜세요.' : '아직 이 방에서 학생 카드가 없습니다.') + '</div></div>';
+  }
+  h += '<div class="mxwrap mt8"><table class="mx"><thead><tr><th>학생</th><th>마지막 카드</th><th>상태</th><th>기한</th></tr></thead><tbody>' + rows.map(r => {
+    const c = r.cells[k];
+    return '<tr><td>' + esc(r.name) + (r.grade ? ' <span class="muted">' + esc(r.grade) + '</span>' : '') + '</td><td>' + esc(c.what || '—') + '</td><td>' +
+      (c.status ? '<span class="dot ' + (c.late ? 'late' : esc(c.status)) + '"></span> ' + esc(DC.CARD_STATUS_LABEL[c.status] || c.status) + (c.late ? ' (지연)' : '') : '<span class="muted">—</span>') +
+      '</td><td>' + esc(c.due ? DC.shortDate(c.due) : '') + '</td></tr>';
+  }).join('') + '</tbody></table></div>';
+  return h + '</div>';
+}
+
+/* ── 템플릿(원장) ── */
+
+function templatesSection(k) {
+  const list = livePlans().filter(p => p.kind === 'recurring' && (!k || p.program === k));
+  let h = '<div class="card"><div class="between mb8"><div class="card-title">반복 템플릿 <span class="muted small">' + list.length + '</span></div>' +
+    '<button class="btn btn-sm btn-ghost" data-act="dk-plan-new" data-room="' + esc(k || '') + '">＋ 템플릿</button></div>' +
+    '<div class="card-sub mb8">요일마다 대상별 카드를 자동으로 만듭니다. 예: 스터디포스 · 월~금 · 구독 학생 각각 · "오늘 수행 확인".</div>';
+  h += list.length ? list.map(p => '<div class="rowline"><div class="grow"><b>' + esc(p.what) + '</b> <span class="muted small">' + esc(roomLabel(p.program)) + ' · ' + esc(daysText(p.days)) + ' · ' + esc(planTargetText(p.target)) + '</span>' +
+    (p.where ? '<div class="small muted">어디에: ' + esc(p.where) + '</div>' : '') + '</div>' +
+    '<span class="pill' + (p.active !== false ? ' ok' : '') + '">' + (p.active !== false ? '켜짐' : '꺼짐') + '</span>' +
+    '<button class="btn btn-sm btn-ghost" data-act="dk-plan-edit" data-id="' + esc(p.id) + '">편집</button></div>').join('')
+    : '<div class="hint">템플릿이 없습니다.</div>';
+  return h + '</div>';
+}
+function openPlanForm(id, roomKey) {
+  const p = id ? planById(id) : null;
+  const k = p ? p.program : (DC.ROOMS.includes(roomKey) ? roomKey : (DC.ROOMS.includes(room) ? room : 'studyforce'));
+  const days = p && Array.isArray(p.days) ? p.days.map(Number) : [1, 2, 3, 4, 5];
+  modal(p ? '템플릿 편집' : '반복 템플릿',
+    '<div class="field"><label class="fl" for="dk-pf-program">프로그램(방)</label><select class="in" id="dk-pf-program">' + roomOptions(k) + '</select></div>' +
+    '<div class="field"><div class="fl">요일</div><div class="days">' + DC.DOW.map((d, i) => '<label><input type="checkbox" name="dk-pf-day" value="' + i + '"' + (days.includes(i) ? ' checked' : '') + '>' + esc(d) + '</label>').join('') + '</div></div>' +
+    targetFields('dk-pf', DC.PLAN_TARGETS.map(t => [t, DC.PLAN_TARGET_LABEL[t]]), p ? p.target : { type: 'each' }) +
+    '<div class="field"><label class="fl" for="dk-pf-what">무엇을</label><input class="in" id="dk-pf-what" maxlength="120" value="' + esc(p ? p.what : '') + '" placeholder="예: 오늘 수행 확인"></div>' +
+    '<div class="field"><label class="fl" for="dk-pf-where">어디에</label><input class="in" id="dk-pf-where" maxlength="120" value="' + esc(p ? p.where || '' : '') + '"></div>' +
+    '<div class="field"><label class="fl" for="dk-pf-manual">방법(매뉴얼)</label><select class="in" id="dk-pf-manual">' + manualOptions(k, p ? p.manualId : '') + '</select></div>' +
+    '<div class="grid2"><div class="field"><label class="fl" for="dk-pf-start">시작(선택)</label><input class="in" id="dk-pf-start" type="date" value="' + esc(p ? p.start || '' : '') + '"></div>' +
+    '<div class="field"><label class="fl" for="dk-pf-end">끝(선택)</label><input class="in" id="dk-pf-end" type="date" value="' + esc(p ? p.end || '' : '') + '"></div></div>' +
+    '<label class="check"><input type="checkbox" id="dk-pf-active"' + (!p || p.active !== false ? ' checked' : '') + '> 켜짐 (끄면 카드를 만들지 않습니다)</label>',
+    '<div class="row wraprow mt8" style="gap:6px"><button class="btn btn-primary" data-act="dk-plan-save" data-id="' + esc(id || '') + '">저장</button>' +
+    (p ? '<button class="btn btn-danger" data-act="dk-plan-del" data-id="' + esc(id) + '">삭제</button>' : '') + '</div>');
+}
+function savePlanForm(id) {
+  const days = Array.from(document.querySelectorAll('input[name="dk-pf-day"]:checked')).map(el => Number(el.value));
+  const v = DC.validateRecurring(Object.assign({ program: val('dk-pf-program'), days: days, what: val('dk-pf-what'), where: val('dk-pf-where'), manualId: val('dk-pf-manual'),
+    start: val('dk-pf-start'), end: val('dk-pf-end'), active: checked('dk-pf-active') }, readTarget('dk-pf')));
+  if (v.error) return toast(v.error);
+  addDoc('plans', id || 'pl:' + uid(), v.value);
+  closeModal();
+  const made = ensureTodayCards();
+  render(); toast(made ? '템플릿 저장 — 오늘 카드 ' + made + '장을 만들었습니다' : '템플릿을 저장했습니다');
+}
+
+function openRangeForm(id, roomKey) {
+  const r = id ? planById(id) : null;
+  if (!liveApps().length) return toast('관리 탭에서 학원 학습 앱을 먼저 등록하세요');
+  const source = r ? r.source : (roomKey === 'jokbo' ? 'jokbo' : 'exam4you');
+  modal(r ? '앱 자료 범위 편집' : '앱 자료 범위',
+    '<div class="field"><label class="fl" for="dk-rf-app">앱</label><select class="in" id="dk-rf-app">' + appOptions(r ? r.appId : '') + '</select></div>' +
+    '<div class="grid2"><div class="field"><label class="fl" for="dk-rf-subject">과목</label><input class="in" id="dk-rf-subject" maxlength="40" value="' + esc(r ? r.subject || '' : '') + '" placeholder="국어"></div>' +
+    '<div class="field"><label class="fl" for="dk-rf-grade">학년</label><input class="in" id="dk-rf-grade" maxlength="10" value="' + esc(r ? r.grade || '' : '') + '" placeholder="중2"></div></div>' +
+    '<div class="field"><label class="fl" for="dk-rf-unit">범위(단원·영역)</label><input class="in" id="dk-rf-unit" maxlength="80" value="' + esc(r ? r.unit : '') + '" placeholder="3단원 / 비문학 독해"></div>' +
+    '<div class="grid2"><div class="field"><label class="fl" for="dk-rf-material">자료 종류</label><input class="in" id="dk-rf-material" maxlength="40" value="' + esc(r ? r.material || '' : '') + '" placeholder="기출 3개년"></div>' +
+    '<div class="field"><label class="fl" for="dk-rf-source">출처</label><select class="in" id="dk-rf-source">' + optionsHtml([['exam4you', '이그잼포유'], ['jokbo', '족보닷컴'], ['other', '기타']], source) + '</select></div></div>' +
+    '<div class="grid2"><div class="field"><label class="fl" for="dk-rf-status">상태</label><select class="in" id="dk-rf-status">' + optionsHtml(DC.RANGE_STATUS.map(s => [s, DC.RANGE_STATUS_LABEL[s]]), r ? r.status : 'need') + '</select></div></div>' +
+    '<div class="field"><label class="fl" for="dk-rf-note">메모</label><textarea class="in" id="dk-rf-note" rows="2" maxlength="300">' + esc(r ? r.note || '' : '') + '</textarea></div>',
+    '<div class="row wraprow mt8" style="gap:6px"><button class="btn btn-primary" data-act="dk-range-save" data-id="' + esc(id || '') + '">저장</button>' +
+    (r ? '<button class="btn btn-danger" data-act="dk-plan-del" data-id="' + esc(id) + '">삭제</button>' : '') + '</div>');
+}
+function saveRangeForm(id) {
+  const v = DC.validateRange({ appId: val('dk-rf-app'), subject: val('dk-rf-subject'), grade: val('dk-rf-grade'), unit: val('dk-rf-unit'), material: val('dk-rf-material'), source: val('dk-rf-source'), status: val('dk-rf-status'), note: val('dk-rf-note') });
+  if (v.error) return toast(v.error);
+  addDoc('plans', id || 'r:' + uid(), v.value);
+  closeModal(); render(); toast('범위를 저장했습니다');
+}
+function deletePlan(id) {
+  const p = planById(id); if (!p) return;
+  if (!confirm((p.kind === 'apprange' ? '이 범위' : '이 템플릿') + '을 지울까요? 이미 만들어진 카드는 남습니다.')) return;
+  removeDoc('plans', id);
+  closeModal(); render(); toast('지웠습니다');
+}
+
+/* ── 앱 목적지(원장) ── */
+
+function appsSection() {
+  const list = liveApps();
+  const cov = DC.coverageOf(list, state.plans);
+  let h = '<div class="card"><div class="between mb8"><div class="card-title">학원 학습 앱 (자료 목적지) <span class="muted small">' + list.length + '</span></div>' +
+    '<button class="btn btn-sm btn-primary" data-act="dk-app-new">＋ 앱</button></div>' +
+    '<div class="card-sub mb8">삼육중 입시 준비 앱·국어 내신 앱처럼 이그잼포유·족보닷컴 자료를 채워 넣을 앱입니다. 등록하면 방에서 "앱 자료 범위"와 앱 대상 카드를 쓸 수 있습니다.</div>';
+  h += list.length ? cov.map(c => '<div class="rowline"><div class="grow"><b>' + esc(c.app.name) + '</b>' + (c.app.active === false ? ' <span class="pill">비활성</span>' : '') +
+    (c.app.format ? ' <span class="muted small">' + esc(c.app.format) + '</span>' : '') +
+    '<div class="small muted">범위 ' + c.total + ' · 있음 ' + c.counts.have + ' · 구매 대기 ' + c.counts.buying + ' · 업로드 대기 ' + c.counts.uploading + ' · 없음 ' + c.counts.need + '</div></div>' +
+    (c.app.adminUrl ? '<a class="btn btn-sm btn-ghost" href="' + esc(c.app.adminUrl) + '" target="_blank" rel="noopener noreferrer">↗ 관리</a>' : '') +
+    '<button class="btn btn-sm btn-ghost" data-act="dk-app-edit" data-id="' + esc(c.app.id) + '">편집</button></div>').join('')
+    : '<div class="hint">등록된 앱이 없습니다.</div>';
+  return h + '</div>';
+}
+function openAppForm(id) {
+  const a = id ? appById(id) : null;
+  modal(a ? '앱 편집' : '학원 학습 앱 등록',
+    '<div class="field"><label class="fl" for="dk-af-name">앱 이름</label><input class="in" id="dk-af-name" maxlength="40" value="' + esc(a ? a.name : '') + '" placeholder="국어 내신 앱"></div>' +
+    '<div class="field"><label class="fl" for="dk-af-url">관리 웹 주소 (https, 원내 전용)</label><input class="in" id="dk-af-url" maxlength="200" value="' + esc(a ? a.adminUrl || '' : '') + '" placeholder="https://"></div>' +
+    '<div class="field"><label class="fl" for="dk-af-format">자료 형식·업로드 절차 한 줄</label><input class="in" id="dk-af-format" maxlength="80" value="' + esc(a ? a.format || '' : '') + '" placeholder="예: PDF → 팩 JSON → 관리 웹 업로드"></div>' +
+    '<div class="field"><label class="fl" for="dk-af-note">메모</label><textarea class="in" id="dk-af-note" rows="2" maxlength="300">' + esc(a ? a.note || '' : '') + '</textarea></div>' +
+    '<label class="check"><input type="checkbox" id="dk-af-active"' + (!a || a.active !== false ? ' checked' : '') + '> 사용 중</label>',
+    '<div class="row wraprow mt8" style="gap:6px"><button class="btn btn-primary" data-act="dk-app-save" data-id="' + esc(id || '') + '">저장</button>' +
+    (a ? '<button class="btn btn-danger" data-act="dk-app-del" data-id="' + esc(id) + '">삭제</button>' : '') + '</div>');
+}
+function saveAppForm(id) {
+  const v = DC.validateApp({ name: val('dk-af-name'), adminUrl: val('dk-af-url'), format: val('dk-af-format'), note: val('dk-af-note'), active: checked('dk-af-active') });
+  if (v.error) return toast(v.error);
+  addDoc('apps', id || 'app:' + uid(), v.value);
+  closeModal(); render(); toast('앱을 저장했습니다');
+}
+function deleteApp(id) {
+  const a = appById(id); if (!a) return;
+  if (!confirm('"' + a.name + '" 앱을 지울까요? 그 앱의 자료 범위·카드는 남습니다.')) return;
+  removeDoc('apps', id);
+  closeModal(); render(); toast('지웠습니다');
+}
+
+/* ── 매뉴얼 ── */
+
+function viewManuals() {
+  const scopes = DC.ROOMS.map(k => [k, roomLabel(k)]).concat([['app', '학습 앱 업로드']]);
+  const sel = ui.manualScope;
+  const seedMissing = typeof WBManualSeed !== 'undefined' ? WBManualSeed.SEED.filter(s => !manualById(s.id)).length : 0;
+  let h = '<div class="card"><div class="between mb8"><div class="card-title">매뉴얼 <span class="muted small">' + liveManualsCount() + '</span></div>' +
+    (session.canApprove ? '<div class="row" style="gap:6px"><button class="btn btn-sm btn-primary" data-act="dk-manual-new" data-scope="' + esc(sel || 'studyforce') + '">＋ 매뉴얼</button>' +
+      (seedMissing ? '<button class="btn btn-sm btn-ghost" data-act="dk-manual-seed">기본 매뉴얼 불러오기 ' + seedMissing + '</button>' : '') + '</div>' : '') + '</div>' +
+    '<div class="card-sub mb8">카드의 [📖 방법]이 여는 내용입니다. ' + (session.canApprove ? '원장이 여기서 고칩니다 — 실제 화면의 버튼 위치·주의점을 채워 넣으세요.' : '다른 점이 있으면 요청함(기타)으로 올려 주세요.') + '</div>' +
+    '<div class="chips">' + [['', '전체']].concat(scopes).map(s => '<button class="chip' + (sel === s[0] ? ' on' : '') + '" data-act="dk-manual-scope" data-v="' + esc(s[0]) + '">' + esc(s[1]) +
+      ' <span class="muted">' + (s[0] ? DC.manualsFor(state.manuals, s[0]).length : liveManualsCount()) + '</span></button>').join('') + '</div></div>';
+  const groups = sel ? [sel] : scopes.map(s => s[0]);
+  let any = false;
+  groups.forEach(k => {
+    const list = DC.manualsFor(state.manuals, k);
+    if (!list.length) return;
+    any = true;
+    h += '<div class="card"><div class="sect" style="margin-top:0">' + esc(k === 'app' ? '학습 앱 업로드' : roomLabel(k)) + '</div>' + list.map(manualRow).join('') + '</div>';
+  });
+  if (!any) h += '<div class="card"><div class="empty"><b>비어 있음</b>' + (session.canApprove ? '[기본 매뉴얼 불러오기]로 초안 ' + seedMissing + '개를 넣고 시작하세요.' : '아직 매뉴얼이 없습니다.') + '</div></div>';
+  return h;
+}
+function liveManualsCount() { return state.manuals.filter(m => m && !m.deleted).length; }
+function seedManuals() {
+  if (typeof WBManualSeed === 'undefined') return toast('씨앗 파일이 없습니다');
+  const L = WBExternalLinks;
+  let n = 0;
+  WBManualSeed.SEED.forEach(s => {
+    if (manualById(s.id)) return;
+    const links = (s.linkKeys || []).map(k => L.linkFor(k)).filter(Boolean).map(l => ({ label: l.label, url: l.url }));
+    const doc = { scope: s.scope, task: s.task, title: s.title, purpose: s.purpose, steps: s.steps.map(t => ({ text: t })), cautions: s.cautions.slice(), links: links, version: 1, lastCheckedAt: today() };
+    addDoc('manuals', s.id, doc);
+    n++;
+  });
+  render(); toast(n ? '기본 매뉴얼 ' + n + '개를 넣었습니다 — 실제 화면에 맞게 고쳐 주세요' : '이미 전부 있습니다');
+}
+function openManual(id) {
+  const m = manualById(id); if (!m) return;
+  const scopeName = m.scope === 'app' ? '학습 앱 업로드' + (m.appId && appById(m.appId) ? ' · ' + appById(m.appId).name : '') : roomLabel(m.scope);
+  let body = '<div class="card-sub mb8">' + esc(scopeName) + ' · ' + esc(taskLabel(m.task)) + (m.lastCheckedAt ? ' · 마지막 확인 ' + esc(m.lastCheckedAt) : '') + ' · v' + esc(m.version || 1) + '</div>' +
+    (m.purpose ? '<div class="guide mb8"><b>목적</b>' + esc(m.purpose) + '</div>' : '');
+  body += (m.steps || []).length ? (m.steps || []).map((s, i) => '<div class="mstep"><b>' + (i + 1) + '.</b><span>' + esc(s.text) + (s.note ? '<small>' + esc(s.note) + '</small>' : '') + '</span></div>').join('') : '<div class="hint">단계가 없습니다.</div>';
+  if ((m.cautions || []).length) body += '<div class="sect">주의</div>' + m.cautions.map(c => '<div class="small" style="color:var(--bad)">⚠ ' + esc(c) + '</div>').join('');
+  if ((m.links || []).length) body += '<div class="row wraprow mt8" style="gap:6px">' + m.links.map(l => '<a class="btn btn-sm btn-navy" href="' + esc(l.url) + '" target="_blank" rel="noopener noreferrer">↗ ' + esc(l.label) + '</a>').join('') + '</div>';
+  const foot = session.canApprove
+    ? '<div class="row wraprow mt14" style="gap:6px"><button class="btn btn-ghost" data-act="dk-manual-edit" data-id="' + esc(id) + '">편집</button></div>'
+    : '<div class="hint mt14">이 매뉴얼이 실제 화면과 다르면 요청함(기타)에 "매뉴얼 다름: ' + esc(m.title) + '"으로 올려 주세요.</div>';
+  modal(m.title, body, foot);
+}
+function openManualForm(id, scope) {
+  const m = id ? manualById(id) : null;
+  const sc = m ? m.scope : (DC.MANUAL_SCOPES.includes(scope) ? scope : 'studyforce');
+  const lines = arr => (arr || []).map(x => typeof x === 'string' ? x : (x.text || '') + (x.note ? ' — ' + x.note : '')).join('\n');
+  modal(m ? '매뉴얼 편집' : '매뉴얼',
+    '<div class="grid2"><div class="field"><label class="fl" for="dk-mf-scope">어느 방</label><select class="in" id="dk-mf-scope" data-act="dk-mf-scope">' + optionsHtml(DC.ROOMS.map(k => [k, roomLabel(k)]).concat([['app', '학습 앱 업로드']]), sc) + '</select></div>' +
+    '<div class="field"><label class="fl" for="dk-mf-task">작업 종류</label><select class="in" id="dk-mf-task">' + optionsHtml(MANUAL_TASKS, m ? m.task : 'assign') + '</select></div></div>' +
+    '<div class="field" id="dk-mf-w-app"' + (sc === 'app' ? '' : ' hidden') + '><label class="fl" for="dk-mf-app">앱(비우면 모든 앱 공통)</label><select class="in" id="dk-mf-app">' + appOptions(m ? m.appId : '') + '</select></div>' +
+    '<div class="field"><label class="fl" for="dk-mf-title">제목</label><input class="in" id="dk-mf-title" maxlength="80" value="' + esc(m ? m.title : '') + '"></div>' +
+    '<div class="field"><label class="fl" for="dk-mf-purpose">목적 한 줄</label><input class="in" id="dk-mf-purpose" maxlength="300" value="' + esc(m ? m.purpose || '' : '') + '"></div>' +
+    '<div class="field"><label class="fl" for="dk-mf-steps">단계 — 한 줄에 하나 (어느 화면에서 무엇을 누르나)</label><textarea class="in" id="dk-mf-steps" rows="7">' + esc(lines(m ? m.steps : [])) + '</textarea></div>' +
+    '<div class="field"><label class="fl" for="dk-mf-cautions">주의점 — 한 줄에 하나</label><textarea class="in" id="dk-mf-cautions" rows="3">' + esc(((m ? m.cautions : []) || []).join('\n')) + '</textarea></div>' +
+    '<div class="field"><label class="fl" for="dk-mf-links">링크 — "이름 | https://주소" 한 줄에 하나</label><textarea class="in" id="dk-mf-links" rows="2">' + esc(((m ? m.links : []) || []).map(l => l.label + ' | ' + l.url).join('\n')) + '</textarea></div>' +
+    '<div class="field"><label class="fl" for="dk-mf-checked">마지막 확인일</label><input class="in" id="dk-mf-checked" type="date" value="' + esc(m ? m.lastCheckedAt || today() : today()) + '"></div>',
+    '<div class="row wraprow mt8" style="gap:6px"><button class="btn btn-primary" data-act="dk-manual-save" data-id="' + esc(id || '') + '">저장</button>' +
+    (m ? '<button class="btn btn-danger" data-act="dk-manual-del" data-id="' + esc(id) + '">삭제</button>' : '') + '</div>');
+}
+function saveManualForm(id) {
+  const prev = id ? manualById(id) : null;
+  const v = DC.validateManual({ scope: val('dk-mf-scope'), appId: val('dk-mf-app'), task: val('dk-mf-task'), title: val('dk-mf-title'), purpose: val('dk-mf-purpose'),
+    stepsText: val('dk-mf-steps'), cautionsText: val('dk-mf-cautions'), linksText: val('dk-mf-links'), lastCheckedAt: val('dk-mf-checked'), version: prev ? (Number(prev.version) || 1) + 1 : 1 });
+  if (v.error) return toast(v.error);
+  addDoc('manuals', id || 'm:' + uid(), v.value);
+  closeModal(); render(); toast('매뉴얼을 저장했습니다');
+}
+function deleteManual(id) {
+  const m = manualById(id); if (!m) return;
+  if (!confirm('"' + m.title + '" 매뉴얼을 지울까요?')) return;
+  removeDoc('manuals', id);
+  closeModal(); render(); toast('지웠습니다');
+}
+
+/* ── 현황(원장) ── */
+
+function viewMatrix() {
+  const v = ui.matrixView;
+  let h = '<div class="card"><div class="between mb8"><div class="card-title">현황</div></div><div class="chips">' +
+    [['students', '학생 × 프로그램'], ['apps', '앱 × 자료 범위']].map(x => '<button class="chip' + (v === x[0] ? ' on' : '') + '" data-act="dk-matrix-view" data-v="' + x[0] + '">' + x[1] + '</button>').join('') + '</div></div>';
+  if (v === 'apps') {
+    const cov = DC.coverageOf(state.apps, state.plans);
+    if (!cov.length) return h + '<div class="card"><div class="empty"><b>앱이 없습니다</b>관리 탭에서 학원 학습 앱을 등록하세요.</div></div>';
+    cov.forEach(c => {
+      h += '<div class="card"><div class="between mb8"><div class="card-title">' + esc(c.app.name) + ' <span class="muted small">' + c.total + '</span></div><div class="row wraprow" style="gap:4px">' +
+        '<span class="pill ok">있음 ' + c.counts.have + '</span><span class="pill">업로드 대기 ' + c.counts.uploading + '</span><span class="pill warn">구매 대기 ' + c.counts.buying + '</span><span class="pill bad">없음 ' + c.counts.need + '</span></div></div>';
+      h += c.rows.length ? c.rows.map(rangeRow).join('') : '<div class="hint">범위가 없습니다. 이그잼포유·족보닷컴 방의 [＋ 범위]로 넣으세요.</div>';
+      h += '</div>';
+    });
+    return h;
+  }
+  const mx = DC.matrixOf(state.students, state.cards, today());
+  if (!mx.length) return h + '<div class="card"><div class="empty"><b>학생이 없습니다</b>학생 탭에서 등록하세요.</div></div>';
+  h += '<div class="card"><div class="card-sub mb8">칸 = 마지막 카드. ● 대기 · 진행 · 완료 · 막힘/지연. — 는 구독 안 함.</div><div class="mxwrap"><table class="mx"><thead><tr><th>학생</th>' +
+    DC.ROOMS.map(k => '<th>' + esc(roomLabel(k)) + '</th>').join('') + '</tr></thead><tbody>' + mx.map(r => '<tr><td>' + esc(r.name) + (r.grade ? ' <span class="muted">' + esc(r.grade) + '</span>' : '') + '</td>' +
+    DC.ROOMS.map(k => {
+      const c = r.cells[k];
+      if (c.sub === false) return '<td class="off">—</td>';
+      if (!c.status) return '<td><span class="muted">·</span></td>';
+      return '<td title="' + esc(c.what) + '"><span class="dot ' + (c.late ? 'late' : esc(c.status)) + '"></span> ' + esc(c.late ? '지연' : DC.CARD_STATUS_LABEL[c.status] || c.status) + '</td>';
+    }).join('') + '</tr>').join('') + '</tbody></table></div></div>';
+  return h;
+}
+
 /* ── 이벤트 ───────────────────────────────────────── */
 
 function onClick(ev) {
@@ -1223,6 +1768,43 @@ function onClick(ev) {
     case 'dk-pw-change': openPasswordForm(); return;
     case 'dk-pw-save': changePassword(el); return;
     case 'dk-export': exportJson(el); return;
+    /* 기획서 v1.1 — 카드·템플릿·앱·매뉴얼·현황 */
+    case 'dk-card-new': if (session.canApprove) openCardForm(String(el.dataset.room || '')); return;
+    case 'dk-card-save': saveCardForm(); return;
+    case 'dk-card-status': {
+      const v = String(el.dataset.v || 'todo');
+      if (!DC.CARD_STATUS.includes(v) || !cardById(id)) return;
+      saveCard(id, { status: v });
+      render(); if (v === 'done') toast('완료 — 원장 화면에 반영됩니다'); return;
+    }
+    case 'dk-card-block': openCardBlock(id); return;
+    case 'dk-card-block-save': saveCardBlock(id); return;
+    case 'dk-card-note': openCardNote(id); return;
+    case 'dk-card-note-save': saveCardNote(id); return;
+    case 'dk-card-del': {
+      const c = cardById(id); if (!c || !session.canApprove) return;
+      if (!confirm('"' + c.what + '" 카드를 지울까요?')) return;
+      removeDoc('cards', id); render(); return;
+    }
+    case 'dk-manual-open': openManual(id); return;
+    case 'dk-manual-new': if (session.canApprove) openManualForm('', String(el.dataset.scope || '')); return;
+    case 'dk-manual-edit': if (session.canApprove) openManualForm(id, ''); return;
+    case 'dk-manual-save': saveManualForm(id); return;
+    case 'dk-manual-del': deleteManual(id); return;
+    case 'dk-manual-seed': if (session.canApprove) seedManuals(); return;
+    case 'dk-manual-scope': ui.manualScope = String(el.dataset.v || ''); render(); return;
+    case 'dk-plan-new': if (session.canApprove) openPlanForm('', String(el.dataset.room || '')); return;
+    case 'dk-plan-edit': if (session.canApprove) openPlanForm(id, ''); return;
+    case 'dk-plan-save': savePlanForm(id); return;
+    case 'dk-plan-del': deletePlan(id); return;
+    case 'dk-range-new': if (session.canApprove) openRangeForm('', String(el.dataset.room || '')); return;
+    case 'dk-range-edit': if (session.canApprove) openRangeForm(id, ''); return;
+    case 'dk-range-save': saveRangeForm(id); return;
+    case 'dk-app-new': if (session.canApprove) openAppForm(''); return;
+    case 'dk-app-edit': if (session.canApprove) openAppForm(id); return;
+    case 'dk-app-save': saveAppForm(id); return;
+    case 'dk-app-del': deleteApp(id); return;
+    case 'dk-matrix-view': ui.matrixView = String(el.dataset.v || 'students'); render(); return;
     default: return;
   }
 }
@@ -1230,6 +1812,11 @@ function onClick(ev) {
 function onChange(ev) {
   const el = ev.target.closest ? ev.target.closest('[data-act^="dk-"]') : null;
   if (!el) return;
+  const act = String(el.dataset.act || '');
+  if (act === 'dk-range-status') { setRangeStatus(String(el.dataset.id || ''), String(el.value || '')); render(); return; }
+  if (act === 'dk-cf-ttype' || act === 'dk-pf-ttype') { toggleTargetFields(act.slice(0, 5)); return; }
+  if (act === 'dk-cf-program') { const sel = $('#dk-cf-manual'); if (sel) sel.innerHTML = manualOptions(String(el.value || ''), ''); return; }
+  if (act === 'dk-mf-scope') { const w = $('#dk-mf-w-app'); if (w) w.hidden = String(el.value || '') !== 'app'; return; }
   if (el.dataset.act === 'dk-note') {
     const t = taskById(el.dataset.id);
     if (!t) return;
