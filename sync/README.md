@@ -115,6 +115,8 @@ npx wrangler d1 execute wb-sync --remote --file=./migrations/069_student_lesson_
 npx wrangler d1 execute wb-sync --remote --file=./migrations/070_remove_heavy_student_schedule_triggers.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/071_task_revocations.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/072_consult_link_phone_owner.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/073_staff_work_login.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/074_makeup_completion_links.sql
 
 > `070`은 이미 적용된 `069` 이력을 되돌리지 않고, 그 migration이 만든 JSON 전개 view·trigger만
 > 제거한 뒤 학생별 일정 revision 원장과 경량 보강 revision trigger를 설치한다. 운영 DB에는 반드시
