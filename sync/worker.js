@@ -1,4 +1,5 @@
 import curriculumWorker from './curriculum-fix.js';
+import { guardWrappedStaffWorkRequest } from './worker-core.js';
 import { handleScheduledBookOrders, handleScheduledBookOrderStatusRefresh } from './book-order-send.js';
 import { handleScheduledParentFeedbackStatusRefresh } from './parent-feedback-send.js';
 import { handleScheduledSessionPackAttendance } from './session-pack.js';
@@ -24,6 +25,10 @@ export function cleanupCurriculum(text) {
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    if (url.pathname === '/search' || url.pathname === '/curriculum') {
+      const denied = await guardWrappedStaffWorkRequest(request, env);
+      if (denied) return denied;
+    }
     const response = await curriculumWorker.fetch(request, env, ctx);
     if (url.pathname !== '/curriculum' || request.method !== 'POST') return response;
 
