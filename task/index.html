@@ -1130,13 +1130,16 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-09-08.2"></script>
-<script src="./schedule-board-core.js?v=2026-09-08.2"></script>
-<script src="./asset-core.js?v=2026-09-08.2"></script>
-<script src="./qr-core.js?v=2026-09-08.2"></script>
-<script src="./acaflow-import-core.js?v=2026-09-08.2"></script>
-<script src="./feedback-subject-catalog.js?v=2026-09-08.2"></script>
-<script src="./sync-recovery-core.js?v=2026-09-08.2"></script>
+<script src="./lesson-form-core.js?v=2026-09-09.1"></script>
+<script src="./schedule-board-core.js?v=2026-09-09.1"></script>
+<script src="./asset-core.js?v=2026-09-09.1"></script>
+<script src="./qr-core.js?v=2026-09-09.1"></script>
+<script src="./acaflow-import-core.js?v=2026-09-09.1"></script>
+<script src="./feedback-subject-catalog.js?v=2026-09-09.1"></script>
+<script src="./sync-recovery-core.js?v=2026-09-09.1"></script>
+<script src="../shared/external-links.js?v=2026-09-09.1"></script>
+<script src="./runbook-core.js?v=2026-09-09.1"></script>
+<script src="./runbook-ui.js?v=2026-09-09.1"></script>
 <script>
 "use strict";
 
@@ -1291,6 +1294,42 @@ function setCheck(taskId, date, patch) {
       원장 화면 전용이다. 직원에게 필요한 기기 정보는 업무지시서로 내려간다.
    ══════════════════════════════════════════════════════ */
 const AC = () => window.WBAssetCore;
+
+/* ══════════════════════════════════════════════════════
+   3-2. 자산 원장(B)·수행 관제(C) — 탭을 열 때만 내려받는 패널
+   ── index.html이 이미 1.4MB를 넘어(README 7-4 조건 3) 원장·관리 담당만 쓰는 화면은
+      매 접속마다 싣지 않는다. 코어 → UI 순서로 직렬 로드한다(UI가 코어를 전제한다).
+   ══════════════════════════════════════════════════════ */
+const lazyPanelLoads = {};
+const lazyPanelFailed = {};
+function loadScriptOnce(src) {
+  if (lazyPanelLoads[src]) return lazyPanelLoads[src];
+  lazyPanelLoads[src] = new Promise((resolve, reject) => {
+    const el = document.createElement('script');
+    el.src = src + '?v=' + APP_VER;
+    el.onload = () => resolve(src);
+    el.onerror = () => { delete lazyPanelLoads[src]; reject(new Error(src + ' 로드 실패')); };
+    document.head.appendChild(el);
+  });
+  return lazyPanelLoads[src];
+}
+function lazyPanel(globalName, scripts, title, view) {
+  if (window[globalName]) return view();
+  if (lazyPanelFailed[globalName]) {
+    return '<div class="card mt14"><div class="card-title">' + esc(title) + ' 화면을 불러오지 못했습니다</div>' +
+      '<div class="card-sub">네트워크를 확인하고 새로고침해 주세요. 계속 같으면 원장님께 알려주세요.</div></div>';
+  }
+  if (!lazyPanelLoads['__' + globalName]) {
+    lazyPanelLoads['__' + globalName] = scripts.reduce((chain, src) => chain.then(() => loadScriptOnce(src)), Promise.resolve())
+      .then(() => { if (!window[globalName]) throw new Error(globalName + ' 전역이 없습니다'); renderAfterSync(); })
+      .catch(error => { console.warn('lazy panel', error); lazyPanelFailed[globalName] = true; renderAfterSync(); });
+  }
+  return '<section class="card mt14"><div class="empty"><b>⏳</b>' + esc(title) + ' 화면을 불러오는 중…</div></section>';
+}
+function viewLedger() { return lazyPanel('WBLedgerUI', ['./ledger-core.js', './ledger-ui.js'], '자산 원장', () => window.WBLedgerUI.view()); }
+function viewPerf() { return lazyPanel('WBPerfPanel', ['./perf-core.js', './perf-panel.js'], '수행 관제', () => window.WBPerfPanel.view()); }
+function ledgerAlertCount() { return window.WBLedgerUI ? (Number(window.WBLedgerUI.alertCount()) || 0) : 0; }
+function perfAlertCount() { return window.WBPerfPanel ? (Number(window.WBPerfPanel.alertCount()) || 0) : 0; }
 
 function allAssets() {
   const core = AC();
@@ -1477,7 +1516,9 @@ function alertsToday() {
     const c = getCheck(t.id, d);
     if (c && c.blocked) { blocked++; return; }
     if (isDone(t.id, d)) return;
-    if (t.time && t.time < hm) overdue++;
+    // 런북 슬롯은 예정 시각 + 여유(window)까지는 지연이 아니다 — 20:30 점검을 20:31에 빨갛게 만들지 않기 위해서다
+    const limit = window.WBRunbookCore && WBRunbookCore.isRunbookTask(t) ? WBRunbookCore.dueLimit(t) : t.time;
+    if (limit && limit < hm) overdue++;
   }));
   return { blocked: blocked, overdue: overdue, total: blocked + overdue };
 }
@@ -1526,6 +1567,10 @@ function ownerOfCheck(key) {
   /* 신규 학생 적응 기록은 stable studentId로 묶인다. 이를 직원 id로 오인하면
      개인 링크에 다른 학생 기록이 섞일 수 있으므로 관리자 범위에만 둔다. */
   if (/^__onboarding__/.test(tid)) return null;
+  /* 자산 원장(__lic__·__licev__·__licneed__)과 수행 기록(__perfset__·__perfday__)은 자산 id·학생 id·
+     프로그램 키로 묶인다. 직원 id로 오인하면 개인 링크 조회 분할이 어긋나므로 관리자 범위(owner null)에만
+     둔다. 조치(__act__<staffId>)는 담당 직원 소유라 아래 일반 규칙을 그대로 따른다. */
+  if (/^__lic(?:ev|need)?__/.test(tid) || /^__perf(?:set|day)__/.test(tid)) return null;
   const m = tid.match(/^__[a-zA-Z]+__(.+)$/);
   if (m) return m[1];
   const t = (state.tasks || []).find(x => x.id === tid);
@@ -2984,6 +3029,8 @@ function opRisk(name) {
 
 let opTarget = null;   // 지금 열려 있는 온라인 프로그램 모달의 학생
 function opModal(name) {
+  // 수행 탭(__perfset__)으로 옮긴 학생은 주간 횟수를 손으로 넣지 않는다 — 같은 값이 두 곳에 생기지 않게
+  if (window.WBPerfPanel && WBPerfPanel.legacyOpModal(name)) return;
   opTarget = name;
   const mon = mondayOf(today()), last = addDays(mon, -7);
   const progs = opProgs(name), cur = opCnt(name, mon), prev = opCnt(name, last);
@@ -3149,7 +3196,7 @@ function render() {
     if (!allowed.includes(route)) route = 'today';
   }
 
-  const map = { schedule: viewSchedule, onboarding: viewOnboarding, today: viewToday, week: viewWeek, write: viewWrite, lesson: viewLessonEntry, feedback: viewFeedbackReview, makeup: viewMakeups, sessions: viewSessionPacks, board: viewBoard, staff: viewStaffAdmin, settings: viewSettings, books: viewBooks, transport: viewTransport, roster: viewRoster, devices: viewDevices };
+  const map = { schedule: viewSchedule, onboarding: viewOnboarding, today: viewToday, week: viewWeek, write: viewWrite, lesson: viewLessonEntry, feedback: viewFeedbackReview, makeup: viewMakeups, sessions: viewSessionPacks, board: viewBoard, staff: viewStaffAdmin, settings: viewSettings, books: viewBooks, transport: viewTransport, roster: viewRoster, devices: viewDevices, ledger: viewLedger, perf: viewPerf };
   replaceView(v, (map[route] || viewToday)());
   if (route === 'schedule') requestAnimationFrame(() => {
     scheduleFocusTimeline();
@@ -3178,7 +3225,7 @@ function renderTabs() {
     ? [['today', '오늘 할 일'], ['week', '주간 플래너'], ['lesson', '수업 등록'], ['feedback', '피드백 상태'], ['makeup', '보강', makeupAttentionCount()], ['sessions', '회차', sessionPackAttentionCount()], ['books', '교재'], ['transport', '차량'], ['roster', '원생']]
     : session.isAdmin
       ? [['schedule', '현황판', managerRequestInboxCount()], ['onboarding', '신규 학생', onboardingAttentionCount()], ['today', '오늘'], ['week', '주간 플래너'], ['write', '지시서 작성'],
-         ['lesson', '수업 등록 및 변경'], ['feedback', '피드백 검토'], ['makeup', '보강', makeupAttentionCount()], ['sessions', '회차', sessionPackAttentionCount()], ['board', '직원 현황', a.total], ['staff', '직원 관리'], ['books', '교재'], ['transport', '차량'], ['roster', '원생'], ['devices', '기기', deviceAlertCount()], ['settings', '설정']]
+         ['lesson', '수업 등록 및 변경'], ['feedback', '피드백 검토'], ['makeup', '보강', makeupAttentionCount()], ['sessions', '회차', sessionPackAttentionCount()], ['board', '직원 현황', a.total], ['staff', '직원 관리'], ['books', '교재'], ['transport', '차량'], ['roster', '원생'], ['devices', '기기', deviceAlertCount()], ['ledger', '자산', ledgerAlertCount()], ['perf', '수행', perfAlertCount()], ['settings', '설정']]
       : [];
   $('#tabs').innerHTML = tabs.map(([k, t, n]) =>
     '<button class="tab ' + (route === k ? 'on' : '') + '" data-go="' + k + '">' + t +
@@ -4796,6 +4843,9 @@ function viewToday() {
     h += '<div class="card"><div class="small muted">담당 수업의 연락 기록은 각 수업 카드에서 입력할 수 있습니다. 평가·온라인 프로그램 기록은 관리 화면에서 관리합니다.</div></div>';
   }
 
+  // 런북 슬롯 안내 + 운영 요청함(제안 A). 직원 본인 화면과 원장이 그 직원을 보는 화면 모두에 뜬다.
+  if (window.WBRunbookUI) h += WBRunbookUI.todayBlocks(me, cursor);
+
   if (session.isStaffLink && !session.isAdmin && me.id === session.staffId && cursor === today()) {
     h += teacherReceivedAdminDirectiveHtml(me.id);
     h += teacherLiveRequestComposerHtml(me, cursor);
@@ -5586,7 +5636,8 @@ function taskPanel(t, date, c, editable) {
       const on = !!(c && c.steps && c.steps[s.id]);
       return '<div class="step ' + (on ? 'on' : '') + '">' +
         '<button class="sbox" ' + (editable ? 'data-act="step" data-id="' + t.id + '" data-date="' + date + '" data-step="' + s.id + '"' : 'disabled') + '>✓</button>' +
-        '<span>' + (i + 1) + '. ' + esc(s.label) + '</span></div>';
+        '<span>' + (i + 1) + '. ' + esc(s.label) + '</span>' +
+        (window.WBRunbookUI ? WBRunbookUI.stepExt(s) : '') + '</div>';
     }).join('') + (lesson ? '</div></details>' : '</div>');
   }
 
@@ -12414,6 +12465,8 @@ function viewBoard() {
     '<div class="bar"><i style="width:' + pct + '%"></i></div></div></div>' +
     '<hr class="sep"><button class="btn btn-navy btn-block" data-act="brief">📊 오늘 마감 브리핑 만들기</button>' +
     '<button class="btn btn-ghost btn-block" data-act="atthist" style="margin-top:8px">🕘 출근 이력 (최근 14일)</button></div>';
+  // 런북 완료율·정시율·요청 소요·결과 타임라인(제안 A) — 직원 평가 근거는 이 카드 하나다
+  if (window.WBRunbookUI) h += WBRunbookUI.boardCard(cursor);
 
   if (mine.length) {
     h += '<div class="sect">내 업무 — 대표</div>' + mine.map(s => staffCard(s)).join('');
@@ -20198,6 +20251,9 @@ function briefText(date) {
   }));
   if (mineLines.length) txt += '─────────\n🙋 내 업무 ' + mineLines.length + '건\n' + mineLines.join('\n') + '\n';
 
+  // 프로그램·자료 운영 절(제안 A) — 22:40 일일 회수(코워크)가 이 문단을 가져간다
+  if (window.WBRunbookUI) txt += WBRunbookUI.briefSection(date);
+
   return txt;
 }
 
@@ -20804,6 +20860,18 @@ function aiModal() {
     '<button class="btn btn-primary btn-block mt14" data-act="aiapply">등록하기</button>');
 }
 
+/** 런북 팩에서 온 지시서만 갖는 필드 — 슬롯 id·팩 버전·지연 여유(분). 형식이 어긋나면 조용히 버린다. */
+function runbookFieldsOf(a) {
+  const out = {};
+  const slot = String(a && a.runbookSlotId || '');
+  if (!/^R-[A-Z0-9]+(?:-[A-Z0-9]+)*$/.test(slot)) return out;
+  out.runbookSlotId = slot;
+  if (a.runbookPackVersion) out.runbookPackVersion = String(a.runbookPackVersion).slice(0, 40);
+  const win = Number(a.window);
+  if (Number.isFinite(win) && win > 0) out.window = Math.min(600, Math.round(win));
+  return out;
+}
+
 function applyAssignments(input, preConfirmed) {
   let data = input;
   if (typeof input === 'string') {
@@ -20827,9 +20895,13 @@ function applyAssignments(input, preConfirmed) {
   list.forEach(a => {
     const s = staffByName(a.staff);
     if (!s) { skipped++; return; }
-    const steps = (a.steps || []).map(x => ({
-      id: uid(), label: typeof x === 'string' ? x : String(x.label || '')
-    })).filter(x => x.label);
+    const steps = (a.steps || []).map(x => {
+      const step = { id: uid(), label: typeof x === 'string' ? x : String(x.label || '') };
+      // 런북 단계의 외부 링크는 승인된 공식 링크 '키'만 받는다 — 임의 URL을 지시서에 실을 수 없게
+      const ext = x && typeof x === 'object' ? String(x.ext || '') : '';
+      if (ext && window.WBExternalLinks && window.WBExternalLinks.linkFor(ext)) step.ext = ext;
+      return step;
+    }).filter(x => x.label);
     state.tasks.push({
       id: uid(), groupId: 'ai-' + now(), staffId: s.id,
       title: String(a.title || '').trim() || '(제목 없음)',
@@ -20845,6 +20917,7 @@ function applyAssignments(input, preConfirmed) {
       start: /^\d{4}-\d{2}-\d{2}$/.test(a.start || '') ? a.start : today(),
       end: /^\d{4}-\d{2}-\d{2}$/.test(a.end || '') ? a.end : '',
       carry: a.carry !== false,
+      ...runbookFieldsOf(a),
       createdAt: now(), updatedAt: now(), deleted: false
     });
     added++;
@@ -23101,7 +23174,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-09-08.2';
+const APP_VER = '2026-09-09.1';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
