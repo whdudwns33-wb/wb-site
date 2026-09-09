@@ -344,7 +344,7 @@ const SEED_PRIV={univs:{},profiles:{}}; /*BUILD:PRIVATE_SEED*/
     db.meta.extrasStamp=EX.stamp;ch=true;}
   if(ch)save();})();
 /* 대량 검색 데이터 — 빌드 시 주입 (공개 소스에는 비어 있음) */
-const BULK={ip:[],hs:[]}; /*BUILD:BULK_DATA*/
+const BULK={ip:[],hs:[],ach:null}; /*BUILD:BULK_DATA*/
 function allIpRows(){
   const a=(db.ipdb||[]).map(r=>({...r,region:r.region||"",pct:r.pct||"",bulk:false}));
   const b=(BULK.ip||[]).map(r=>({univ:r[0],major:r[1],track:r[2],year:String(r[3]),cut50:r[4],cut70:r[5],rate:r[6],region:r[7]||"",pct:r[8]||"",source:"어디가 발표",bulk:true}));
@@ -2273,12 +2273,25 @@ function achSave(school,level,rows,meta){
   D[school]={level:level||"중",year:(meta&&meta.year)||"",term:(meta&&meta.term)||"",
     saved:today(),rows:rows.filter(r=>r.use!==false),raw:(meta&&meta.raw)||""};
   save();}
-function achFor(school){return school?achDb()[school]||null:null;}
+var _ACHB=null;
+function achBulkIdx(){ /* BULK.ach → 학교명별 rec (지연 구축·캐시) */
+  if(_ACHB)return _ACHB;
+  _ACHB={};const A=BULK.ach;if(!A||!A.s)return _ACHB;
+  for(const r of A.r){
+    const nm=A.s[r[0]];
+    const o=_ACHB[nm]||(_ACHB[nm]={level:r[1]?"고":"중",year:"",term:"",saved:"",bulk:true,rows:[]});
+    o.rows.push({gr:r[3],tm:r[4],track:"",subj:A.j[r[5]],norm:A.j[r[5]],hours:null,
+      avg:r[6],sd:null,d:[r[7],r[8],r[9],r[10],r[11]],scale:5,excl:"",use:true,year:2000+r[2]});}
+  return _ACHB;}
+function achBulkCount(){const A=BULK.ach;return A&&A.s?A.s.length:0;}
+/* 원장이 직접 넣은 자료가 내장 데이터보다 우선한다 */
+function achFor(school){if(!school)return null;return achDb()[school]||achBulkIdx()[school]||null;}
 /* 대체 사다리: 같은 과목 타학기 → 같은 학기 타과목 평균 → 학교 전체 평균 (지역기본값은 쓰지 않음) */
 function achDistFor(rec,subj,gr,tm){
   const rows=(rec.rows||[]).filter(r=>r.scale===5&&r.d&&r.d.slice(0,5).every(v=>v!=null));
-  const hit=rows.filter(r=>r.norm===subj&&(gr==null||r.gr==gr)&&(tm==null||r.tm==tm));
-  if(hit.length)return{d:hit[0].d,lv:0};
+  const hit=rows.filter(r=>r.norm===subj&&(gr==null||r.gr==gr)&&(tm==null||r.tm==tm))
+    .sort((a,b)=>(b.year||0)-(a.year||0));
+  if(hit.length)return{d:hit[0].d,lv:0,year:hit[0].year};
   const same=rows.filter(r=>r.norm===subj);
   if(same.length)return{d:achAvgD(same),lv:1};
   const term=rows.filter(r=>(gr==null||r.gr==gr)&&(tm==null||r.tm==tm)&&ACH_CORE.includes(r.norm));
@@ -2325,7 +2338,7 @@ function achCorrect(recs,rec){
     if(!ACH_CORE.includes(r.subj)&&!ACH_OPT.includes(r.subj)){dropped.push({...r,why:"국·영·수·사·과 외"});continue;}
     const f=achDistFor(rec,r.subj,r.gr,r.tm);
     if(!f){dropped.push({...r,why:"이 학교 분포 없음"});continue;}
-    used.push({...r,g,d:f.d,lv:f.lv});}
+    used.push({...r,g,d:f.d,lv:f.lv,dyear:f.year||null});}
   if(!used.length)return{ok:false,reason:"NO_MATCH",dropped};
   // 한 잣대 게이트 — 대체분포의 A비율이 실측 중앙값과 10%p 이상 다르면 제거
   const meas=used.filter(u=>u.lv===0).map(u=>u.d[0]).sort((a,b)=>a-b);
@@ -2430,13 +2443,16 @@ function achPanelHtml(){
       <button class="btn pri sm" style="margin-top:8px" onclick="achDoSave()">이 내용으로 저장</button></div>`;}
   return `<details class="acc2" style="margin-top:10px" ${p||cur?"open":""}>
     <summary>📊 학교 성취도 분포 넣기 (선택) — 학교알리미 ‘4-나 교과별 학업성취 사항’</summary>
+    ${achBulkCount()?`<div class="note" style="font-size:12px;margin:6px 0"><b>내장 데이터 ${achBulkCount()}개교</b> — 학교알리미 공시(2023~2025학년도)를 이미 담고 있습니다.
+      해당 학교는 <b>학교명만 입력하면</b> 붙여넣기 없이 바로 보정됩니다. 없는 학교만 아래로 넣으세요.</div>`:""}
     <p style="font-size:11.5px;color:var(--ink2);margin:6px 0">학교알리미에서 표를 드래그해 그대로 붙여넣으세요. 열 순서가 다르거나 헤더가 섞여도 읽습니다.
       읽은 뒤 아래 표에서 쓸 행만 남기고 저장하면, 그 학교의 실제 A 비율로 상위% 추정을 다시 계산합니다.
       <b>보안문자는 사람이 직접 입력해야 합니다</b> — 자동 조회는 하지 않습니다.</p>
     ${savedList}
     <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end;margin-bottom:6px">
       <div class="frow" style="margin:0"><label>학교명</label>
-        <input id="achschool" value="${esc(cur)}" placeholder="예: 광주동명중학교" style="width:190px"></div>
+        <input id="achschool" value="${esc(cur)}" placeholder="예: 고실중학교" style="width:190px"
+          onchange="view.achSchool=this.value.trim();render()"></div>
       <div class="frow" style="margin:0"><label>학년(없으면)</label>
         <select onchange="view.achGr=this.value" style="width:76px"><option value="">—</option>
         ${[1,2,3].map(g=>`<option value="${g}" ${String(view.achGr)===String(g)?"selected":""}>${g}학년</option>`).join("")}</select></div>
@@ -2470,7 +2486,8 @@ function achCorrHtml(){
     <div style="position:absolute;left:${lo}%;width:${Math.max(1,hi-lo)}%;top:0;bottom:0;background:${color};opacity:.75"></div></div>`;
   const usedA=c.used.filter(u=>u.lv===0).length;
   return `<div class="kcard" style="margin-top:9px;border-left-color:var(--accent)">
-    <div class="ku">${esc(view.achSchool)} 분포 반영 · 국·영·수·사·과 ${c.nSubj}과목 중 실측분포 ${usedA}건${c.imputeShare>0?` · 대체 ${Math.round(c.imputeShare*100)}%`:""}</div>
+    <div class="ku">${esc(view.achSchool)} 분포 반영 · 국·영·수·사·과 ${c.nSubj}과목 중 실측분포 ${usedA}건${c.imputeShare>0?` · 대체 ${Math.round(c.imputeShare*100)}%`:""}
+      ${rec.bulk?`<span class="chip acc" style="font-size:10px">내장 공시자료</span>`:`<span class="chip" style="font-size:10px">직접 입력분</span>`}</div>
     <div style="font-size:11.5px;color:var(--ink2);margin:6px 0 2px">기존 기준표 — 상위 ${r.base.lo}~${r.base.hi}%</div>
     ${bar(r.base.lo,r.base.hi,"var(--ink2)")}
     <div style="font-size:11.5px;color:var(--accent-ink);margin:7px 0 2px">이 학교 분포 반영 — <b>상위 ${c.lo}~${c.hi}%</b> <span style="font-size:11px;color:var(--ink2)">(중심 ${c.mid}%)</span></div>
@@ -2483,7 +2500,7 @@ function achCorrHtml(){
         <tr><th>과목</th><th>학생</th><th>학교 A~E (%)</th><th>출처</th></tr>
         ${c.used.map(u=>`<tr><td>${esc(u.subj)}${u.gr?` <span style="color:var(--ink2)">${u.gr}-${u.tm}</span>`:""}</td>
           <td><b>${esc(u.grade)}</b></td><td class="mono" style="font-size:11.5px">${u.d.map(v=>Math.round(v*10)/10).join(" / ")}</td>
-          <td style="font-size:11px;color:var(--ink2)">${["실측","같은 과목 타학기","같은 학기 평균","학교 전체 평균"][u.lv]}</td></tr>`).join("")}
+          <td style="font-size:11px;color:var(--ink2)">${["실측","같은 과목 타학기","같은 학기 평균","학교 전체 평균"][u.lv]}${u.dyear?` · ${u.dyear}학년도`:""}</td></tr>`).join("")}
         ${c.dropped.map(d=>`<tr style="opacity:.5"><td>${esc(d.subj||"")}</td><td>${esc(d.grade||"")}</td><td colspan=2 style="font-size:11px">제외 — ${esc(d.why||"")}</td></tr>`).join("")}
       </table></div></details>
     <p style="font-size:11px;color:var(--warn);margin-top:7px">⚠️ 이 보정은 아직 실제 석차 결과로 검증(캘리브레이션)되지 않았습니다 — 범위를 안전하게 넓게 잡았습니다.
@@ -3466,8 +3483,8 @@ async function loadBulk(){
     const pt=await crypto.subtle.decrypt({name:"AES-GCM",iv:b64(env.i)},key,b64(env.c));
     const out=await new Response(new Response(pt).body.pipeThrough(new DecompressionStream("gzip"))).arrayBuffer();
     const data=JSON.parse(new TextDecoder().decode(out));
-    BULK.ip=data.ip||[];BULK.hs=data.hs||[];
-    _IPG=null;_MKM=null;window.__bulkStatus="done";
+    BULK.ip=data.ip||[];BULK.hs=data.hs||[];BULK.ach=data.ach||null;
+    _IPG=null;_MKM=null;_ACHB=null;window.__bulkStatus="done";
     toast(`입시 데이터 로드 완료 — 입결 ${BULK.ip.length.toLocaleString()}건 · 학교 ${BULK.hs.length.toLocaleString()}곳`);
     render();
   }catch(e){
