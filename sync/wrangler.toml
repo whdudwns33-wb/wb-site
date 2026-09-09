@@ -21,6 +21,8 @@ WB_BOOK_CATALOG_WEB_SEARCH_ENABLED = "true"
 # 최종 수업 피드백의 코멘트 변수만 교사 확인 전 일시적으로 다듬는다.
 # 저장·발송은 기존 /feedback-request의 명시적 최종 전송 버튼만 수행한다.
 WB_PARENT_FEEDBACK_AI_ENABLED = "true"
+# 개인 기기 인증에 더해 출근 로그인을 사용한다. 실제 적용 직원은 비공개 profile에서 지정한다.
+WB_STAFF_WORK_LOGIN_ENABLED = "true"
 # 선별 테스트가 필요할 때 값은 저장소에 쓰지 않고 다음 secret으로 stable studentId만 등록한다.
 # npx wrangler secret put WB_GUARDIAN_CONTACT_STUDENT_IDS --config sync/wrangler.toml
 # 수업 피드백 실제 발송 스위치도 secret으로만 관리한다.
@@ -64,3 +66,4 @@ binding = "AI"
 #   npx wrangler secret put WB_PARENT_FEEDBACK_AI_CACHE_SECRET
 #   npx wrangler secret put SOLAPI_KAKAO_CONSULT_LINK_APPROVED_TEMPLATE_ID
 #   npx wrangler secret put WB_CONSULT_LINK_SEND_ENABLED
+#   npx wrangler secret put WB_STAFF_PIN_PEPPER --config sync/wrangler.toml

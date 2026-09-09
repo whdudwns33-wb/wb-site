@@ -98,6 +98,7 @@ import { handleSessionPack } from './session-pack.js';
 import { handleGuardianOpsSend } from './guardian-ops-send.js';
 import { handleContactLog } from './contact-log.js';
 import { handleStaffAttendance, inspectOwnStaffAttendanceChanges } from './staff-attendance.js';
+import { guardStaffWorkAccess, handleStaffWorkSession, handleStaffProfile, staffWorkLoginEnabled } from './staff-work-login.js';
 import { handleWeekendVisit } from './weekend-visit.js';
 import { handleLessonHandoff } from './lesson-handoff.js';
 import { studentScheduleConflictPayload } from './student-schedule-conflict.js';
@@ -274,6 +275,25 @@ async function resolveAuth(env, app, auth) {
     return { scope: 'own', id: id };
   }
   return null;
+}
+
+// /search와 /curriculum은 바깥 wrapper가 먼저 처리하므로 같은 근무 인증을 진입점에서 재사용한다.
+export async function guardWrappedStaffWorkRequest(request, env) {
+  if (!staffWorkLoginEnabled(env) || request.method !== 'POST') return null;
+  const origin = request.headers.get('Origin') || '';
+  const okOrigin = origin || '*';
+  try {
+    const body = await request.clone().json();
+    if (!body || typeof body.app !== 'string') return json({ ok: false, error: 'app은 task 또는 consult 문자열이어야 합니다' }, 400, okOrigin);
+    if (body.app !== 'task' || !body.auth || body.auth.mode !== 'person') return null;
+    const allowed = (env.ALLOW_ORIGIN || '').split(',').map(value => value.trim()).filter(Boolean);
+    if (allowed.length && !allowed.includes(origin)) return json({ ok: false, error: '허용되지 않은 출처' }, 403, '*');
+    const auth = await resolveAuth(env, 'task', body.auth);
+    if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+    return await guardStaffWorkAccess(env, body, auth, new URL(request.url).pathname, okOrigin, json);
+  } catch {
+    return json({ ok: false, code: 'STAFF_WORK_UNAVAILABLE', error: '출퇴근 로그인 연결을 확인하지 못했습니다. 잠시 후 다시 시도해 주세요' }, 503, okOrigin);
+  }
 }
 
 /** 들어온 변경을 테이블별 upsert 문으로. updated_at이 더 최신일 때만 덮는다 (LWW) */
@@ -3022,11 +3042,25 @@ export default {
     let body;
     try { body = await request.json(); }
     catch (e) { return json({ ok: false, error: '본문을 읽을 수 없습니다' }, 400, okOrigin); }
+    if (!body || typeof body !== 'object' || Array.isArray(body)) return json({ ok: false, error: '요청 본문은 객체여야 합니다' }, 400, okOrigin);
 
     const app = String(body.app || '');
-    if (!APPS.includes(app)) return json({ ok: false, error: 'app은 task 또는 consult' }, 400, okOrigin);
+    if (typeof body.app !== 'string' || !APPS.includes(app)) return json({ ok: false, error: 'app은 task 또는 consult' }, 400, okOrigin);
 
     try {
+      if (url.pathname === '/staff-work-session' || url.pathname === '/staff-profile') {
+        const auth = await resolveAuth(env, app, body.auth);
+        if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+        return url.pathname === '/staff-work-session'
+          ? await handleStaffWorkSession(env, app, body, okOrigin, auth, json)
+          : await handleStaffProfile(env, app, body, okOrigin, auth, json);
+      }
+      if (app === 'task' && body.auth && body.auth.mode === 'person' && staffWorkLoginEnabled(env)) {
+        const auth = await resolveAuth(env, app, body.auth);
+        if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+        const denied = await guardStaffWorkAccess(env, body, auth, url.pathname, okOrigin, json);
+        if (denied) return denied;
+      }
       if (url.pathname === '/sync')   return await handleSync(env, app, body, okOrigin);
       if (url.pathname === '/consult-reward') {
         const auth = await resolveAuth(env, app, body.auth);
