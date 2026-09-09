@@ -327,9 +327,9 @@
     return !!(ex && ex.st === 'unknown');
   }
 
-  /* 주간 요약. ratio는 min(daysDone, target)/target 인데, unknown(스탬프 없음·명시 unknown)과
-     아직 오지 않은 대상일은 분모(target)에서 뺀다 — 직원이 안 본 날 때문에 학생 수행률이
-     깎이면 지표가 직원 입력량을 재게 된다. rawRatio는 뺀 것 없는 원식(주말 마감용). */
+  /* 주간 요약. ratio는 min(daysDone, target)/target 꼴인데, unknown(스탬프 없음·명시 unknown)·
+     아직 오지 않은 대상일·결석은 분모에 넣지 않는다 — 직원이 안 본 날 때문에 학생 수행률이
+     깎이면 지표가 직원 입력량을 재게 된다. rawRatio는 뺀 것 없는 원식(주말 마감·보호자 카톡 n/목표). */
   function weekSummary(ctx, studentId, monday, opts) {
     const pw = Number(opts && opts.partialWeight) || 0;
     const todayYmd = validYmd(ctx && ctx.today) ? ctx.today : '';
@@ -353,13 +353,17 @@
         else if (st === 'not_completed') c.notDone++;
         else c.unknown++;
       });
+      /* 합계는 카운트만 먼저 더한다 — daysDone·target을 c에 붙인 뒤 더하면 두 번 세게 된다 */
+      Object.keys(total).forEach(k => { if (k in c) total[k] += c[k]; });
       const target = targetOf(ps, prog);
       const daysDone = c.completed + pw * c.partial;
-      const eff = Math.max(0, target - c.unknown - c.pending);
+      /* 분모는 "지금까지 실제로 본 기회" = min(target, 확인된 대상일). unknown·미래·결석은 기회가 아니다.
+         target보다 대상일이 많은 학생(목표 2·대상일 5)도 이렇게 해야 주중에 0으로 떨어지지 않는다. */
+      const known = c.completed + c.partial + c.notDone;
+      const eff = Math.min(target, known);
       const ratio = eff ? Math.min(daysDone, eff) / eff : null;
       const rawRatio = Math.min(daysDone, target) / target;
       progs[prog] = Object.assign(c, { target: target, daysDone: daysDone, ratio: ratio, rawRatio: rawRatio });
-      Object.keys(total).forEach(k => { if (k in c) total[k] += c[k]; });
       total.target += target;
       total.daysDone += daysDone;
       if (ratio != null) ratios.push(ratio);

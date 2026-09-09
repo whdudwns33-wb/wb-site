@@ -467,7 +467,9 @@
 
   /* ── 운영 요청 ─────────────────────────────────────── */
 
-  /** 역할별 전이 규칙. 서버(sync/ops-request.js)와 같은 표여야 한다 — 화면이 보여 준 버튼을 서버가 거부하면 안 된다.
+  /** 역할별 전이 규칙. 서버(sync/ops-request.js의 TRANSITIONS)와 같은 표여야 한다 — 화면이 보여 준 버튼을
+   *  서버가 거부하면 안 되고, 서버가 받는 버튼을 화면이 숨겨도 안 된다. done은 accepted·in_progress·blocked
+   *  어디서든 된다(접수만 하고 바로 끝내는 짧은 요청이 대부분이라 start를 강제하지 않는다).
    *  ctx = { role:'admin'|'staff', isOwner, isAssignee }. 반환 {ok, status, reason}. */
   function nextStatus(status, action, ctx) {
     const cur = str(status), act = str(action);
@@ -486,7 +488,7 @@
         if (cur !== 'accepted') return fail('invalid_transition');
         return handler ? { ok: true, status: 'in_progress', reason: '' } : fail('forbidden');
       case 'done':
-        if (cur !== 'in_progress') return fail('invalid_transition');
+        if (!['accepted', 'in_progress', 'blocked'].includes(cur)) return fail('invalid_transition');
         return handler ? { ok: true, status: 'done', reason: '' } : fail('forbidden');
       case 'block':
         if (cur === 'blocked') return fail('invalid_transition');
@@ -530,18 +532,24 @@
     return ymd <= str(req.neededBy);
   }
 
+  /* 서버(validTargetRef)와 같은 규칙: 'SF-'로 시작하면 반드시 SF-000, 아니면 SAFE_ID. SAFE_ID는 숫자·하이픈을
+     허용해 전화번호 꼴도 통과시키므로 개인정보 패턴을 한 번 더 거른다. */
   function targetRefOk(ref) {
     const v = str(ref);
-    return !v || SF_CODE.test(v) || SAFE_ID.test(v);
+    if (!v) return true;
+    if (/^sf-/i.test(v)) return SF_CODE.test(v);
+    if (!SAFE_ID.test(v)) return false;
+    return sanitizeNote(v, 128).ok;
   }
 
-  /** 요청 폼 입력 → {ok, errors:[{field, reason}], value}. 이름·전화가 들어올 자리를 아예 두지 않는다. */
+  /** 요청 폼 입력 → {ok, errors:[{field, reason}], value}. 이름·전화가 들어올 자리를 아예 두지 않는다.
+   *  detail은 서버가 1~300자 한 줄을 요구한다(OPS_DETAIL) — 여기서 먼저 막아 왕복을 줄인다. */
   function validateRequest(input) {
     const i = isObj(input) ? input : {};
     const errors = [];
     const value = {
       reqType: str(i.reqType), program: str(i.program) || 'none', targetRef: str(i.targetRef),
-      neededBy: str(i.neededBy), detail: String(i.detail == null ? '' : i.detail).trim(),
+      neededBy: str(i.neededBy), detail: String(i.detail == null ? '' : i.detail).replace(/\s+/g, ' ').trim(),
       via: str(i.via) || 'app', assigneeId: str(i.assigneeId)
     };
     if (!REQ_TYPES.includes(value.reqType)) errors.push({ field: 'reqType', reason: '종류를 고르세요' });
@@ -552,7 +560,7 @@
     if (!validYmd(value.neededBy)) errors.push({ field: 'neededBy', reason: '필요일을 고르세요' });
     const s = sanitizeNote(value.detail, NOTE_MAX);
     if (!s.ok) errors.push({ field: 'detail', reason: SANITIZE_REASON[s.reason] || s.reason });
-    else if (value.reqType === 'other' && !value.detail) errors.push({ field: 'detail', reason: '기타 요청은 내용 한 줄이 필요합니다' });
+    else if (!value.detail) errors.push({ field: 'detail', reason: '요청 내용 한 줄을 적어 주세요' });
     if (!['app', 'kakao'].includes(value.via)) errors.push({ field: 'via', reason: '경로는 앱 또는 카톡' });
     if (value.assigneeId && !SAFE_ID.test(value.assigneeId)) errors.push({ field: 'assigneeId', reason: '담당 id 형식 오류' });
     return { ok: !errors.length, errors: errors, value: value };
