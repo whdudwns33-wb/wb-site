@@ -897,6 +897,49 @@
   .modal[hidden] { display: none; }
   .modal-box { background: var(--white); border-radius: 16px; padding: 20px; width: 100%; max-width: 460px; min-height: 0; max-height: calc(100vh - 32px); max-height: calc(100dvh - 32px); overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-y; }
   .modal-box [data-act="closemodal"] { min-width: 44px; min-height: 44px; }
+  .modal-box:has(.att-history) { max-width: 960px; }
+  .att-history-filters { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 12px; margin-bottom: 14px; }
+  .att-history-filters label { display: grid; gap: 5px; font-size: 13px; font-weight: 700; }
+  .att-history-filters .att-history-all { display: flex; align-items: center; min-height: 44px; gap: 7px; }
+  .att-history-filters .att-history-all input { width: 19px; height: 19px; }
+  .att-history-date { display: flex; align-items: center; gap: 5px; }
+  .att-history-date input { width: 158px; }
+  .att-history-date button { min-width: 44px; min-height: 44px; }
+  .att-history-filters select { min-width: 150px; }
+  .att-history-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 12px 0; }
+  .att-history-stat { padding: 11px 12px; border: 1px solid var(--line); border-radius: 12px; background: #f6f8fb; color: #596779; }
+  .att-history-stat strong { display: block; font-size: 23px; line-height: 1.25; font-variant-numeric: tabular-nums; }
+  .att-history-stat span { display: block; font-size: 12px; margin-top: 3px; }
+  .att-history-stat.complete { background: #edf8f3; color: #176844; border-color: #cce9dc; }
+  .att-history-stat.missing_out { background: #fff6e6; color: #915c08; border-color: #f1dfb7; }
+  .att-history-stat.invalid { background: #fff0f0; color: #a92d36; border-color: #f3d3d7; }
+  .att-history-table-wrap { max-height: 52vh; max-height: 52dvh; overflow: auto; border: 1px solid var(--line); border-radius: 12px; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y; }
+  .att-history-table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 14px; text-align: left; }
+  .att-history-table th { position: sticky; top: 0; z-index: 1; padding: 12px 10px; background: #edf2f7; color: #526174; font-size: 12px; white-space: nowrap; }
+  .att-history-table td { padding: 12px 10px; border-top: 1px solid #e9edf2; vertical-align: middle; }
+  .att-history-table tbody tr:nth-child(even) { background: #fafbfd; }
+  .att-history-table .att-history-person { font-weight: 750; min-width: 70px; overflow-wrap: anywhere; }
+  .att-history-table .att-history-time { font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .att-history-table .att-history-day { white-space: nowrap; color: #617084; font-size: 12px; }
+  .att-history-status { display: inline-block; border-radius: 6px; padding: 5px 7px; font-weight: 700; font-size: 12px; line-height: 1.35; background: #eef1f5; color: #657181; white-space: nowrap; }
+  .att-history-status.complete { background: #e5f4ed; color: #176844; }
+  .att-history-status.missing_out { background: #fff0d4; color: #915c08; }
+  .att-history-status.invalid { background: #fde7e9; color: #a92d36; }
+  .att-history-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  @media (max-width: 560px) {
+    .att-history-summary { grid-template-columns: repeat(2, 1fr); }
+    .att-history-filters { gap: 9px; }
+    .att-history-table thead { display: none; }
+    .att-history-table, .att-history-table tbody { display: block; }
+    .att-history-table tr { display: grid; grid-template-columns: 1fr 1fr; padding: 10px; gap: 8px 12px; border-top: 1px solid var(--line); }
+    .att-history-table tr:first-child { border-top: 0; }
+    .att-history-table td { display: block; padding: 0; border: 0; }
+    .att-history-table td[data-label]::before { content: attr(data-label); display: block; color: #758191; font-size: 11px; font-weight: 400; margin-bottom: 3px; }
+    .att-history-table .att-history-person { font-size: 16px; }
+    .att-history-table .att-history-day { text-align: right; align-self: center; }
+    .att-history-table .att-history-person { grid-column: 1; grid-row: 1; }
+    .att-history-table .att-history-day { grid-column: 2; grid-row: 1; }
+  }
   .student-info-name { display: inline-flex; align-items: center; min-height: 44px; margin: -8px 0; padding: 8px 2px; border: 0; background: transparent; color: var(--deep-blue); font: inherit; font-weight: 900; text-align: left; text-decoration: underline dotted; text-underline-offset: 3px; cursor: pointer; }
   .student-info-name:hover { color: var(--navy); text-decoration-style: solid; }
   .student-info-name:focus-visible { outline: 3px solid var(--deep-blue); outline-offset: 2px; border-radius: 5px; }
@@ -1131,14 +1174,15 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-09-09.1"></script>
-<script src="./schedule-board-core.js?v=2026-09-09.1"></script>
-<script src="./asset-core.js?v=2026-09-09.1"></script>
-<script src="./qr-core.js?v=2026-09-09.1"></script>
-<script src="./acaflow-import-core.js?v=2026-09-09.1"></script>
-<script src="./feedback-subject-catalog.js?v=2026-09-09.1"></script>
-<script src="./sync-recovery-core.js?v=2026-09-09.1"></script>
-<script src="./staff-work-session-core.js?v=2026-09-09.1"></script>
+<script src="./lesson-form-core.js?v=2026-09-09.2"></script>
+<script src="./schedule-board-core.js?v=2026-09-09.2"></script>
+<script src="./asset-core.js?v=2026-09-09.2"></script>
+<script src="./qr-core.js?v=2026-09-09.2"></script>
+<script src="./acaflow-import-core.js?v=2026-09-09.2"></script>
+<script src="./feedback-subject-catalog.js?v=2026-09-09.2"></script>
+<script src="./sync-recovery-core.js?v=2026-09-09.2"></script>
+<script src="./staff-work-session-core.js?v=2026-09-09.2"></script>
+<script src="./staff-attendance-history-core.js?v=2026-09-09.2"></script>
 <script>
 "use strict";
 
@@ -12618,7 +12662,7 @@ function viewBoard() {
     '<div class="card-sub mb8">직원 ' + list.length + '명 · 지시 ' + all.total + '건 중 ' + all.done + '건 완료</div>' +
     '<div class="bar"><i style="width:' + pct + '%"></i></div></div></div>' +
     '<hr class="sep"><button class="btn btn-navy btn-block" data-act="brief">📊 오늘 마감 브리핑 만들기</button>' +
-    '<button class="btn btn-ghost btn-block" data-act="atthist" style="margin-top:8px">🕘 출근 이력 (최근 14일)</button></div>';
+    '<button class="btn btn-ghost btn-block" data-act="atthist" style="margin-top:8px">🕘 전체 출퇴근 이력 (최근 14일)</button></div>';
 
   if (mine.length) {
     h += '<div class="sect">내 업무 — 대표</div>' + mine.map(s => staffCard(s)).join('');
@@ -12689,6 +12733,84 @@ function attHistText() {
   }
   return out;
 }
+
+/* 조회 필터만 바꾸므로 입력/출퇴근 기록은 수정하지 않고, 팝업 전체 재렌더도 하지 않는다. */
+let attendanceHistoryDates = [];
+function attendanceHistoryRows() {
+  if (!session.isAdmin || !window.WBStaffAttendanceHistoryCore) return [];
+  const all = !!($('#attHistoryAll') || {}).checked;
+  const selectedDate = String(($('#attHistoryDate') || {}).value || '');
+  const dates = all ? attendanceHistoryDates : attendanceHistoryDates.filter(date => date === selectedDate);
+  return window.WBStaffAttendanceHistoryCore.buildRows({ staff: liveStaff(), checks: state.checks,
+    dates, staffId: String(($('#attHistoryStaff') || {}).value || '') });
+}
+function attendanceHistoryResultsHtml(rows) {
+  const totals = window.WBStaffAttendanceHistoryCore.summary(rows);
+  const tiles = [[totals.complete, '출퇴근 완료', 'complete'], [totals.missingOut, '퇴근 미기록', 'missing_out'],
+    [totals.noRecord, '기록 없음', 'no_record'], [totals.invalid, '시간 확인 필요', 'invalid']];
+  const summary = '<div class="att-history-summary">' + tiles.map(([count, label, status]) =>
+    '<div class="att-history-stat ' + status + '"><strong>' + count + '<small style="font-size:12px;margin-left:3px">건</small></strong><span>' + label + '</span></div>').join('') + '</div>';
+  if (!rows.length) return summary + '<div class="hint">선택한 조건에 해당하는 직원이 없습니다.</div>';
+  return summary + '<div class="small muted mb8">조회 ' + rows.length + '건 · 날짜 최신순 · 시간은 24시간 기준</div>' +
+    '<div class="att-history-table-wrap" tabindex="0" aria-label="출퇴근 기록 표, 스크롤하여 더 보기"><table class="att-history-table" aria-label="선생님별 출퇴근 기록">' +
+    '<thead><tr><th scope="col">날짜</th><th scope="col">선생님</th><th scope="col">출근</th><th scope="col">퇴근</th><th scope="col">근무시간</th><th scope="col">상태</th></tr></thead><tbody>' +
+    rows.map(row => '<tr><td class="att-history-day">' + esc(shortDate(row.date)) + ' (' + esc(DOW[dowOf(row.date)]) + ')</td>' +
+      '<td class="att-history-person">' + esc(row.name) + '</td><td class="att-history-time" data-label="출근">' + esc(row.clockIn || '—') + '</td>' +
+      '<td class="att-history-time" data-label="퇴근">' + esc(row.clockOut || '—') + '</td><td data-label="근무시간">' + esc(row.duration || '—') + '</td>' +
+      '<td data-label="상태"><span class="att-history-status ' + (['complete', 'missing_out', 'no_record'].includes(row.status) ? row.status : 'invalid') + '">' + esc(row.label) + '</span></td></tr>').join('') +
+    '</tbody></table></div>';
+}
+function renderAttendanceHistoryResults() {
+  const target = $('#attHistoryResults');
+  if (!session.isAdmin || !target) return;
+  const all = !!$('#attHistoryAll').checked;
+  let date = $('#attHistoryDate').value;
+  if (!attendanceHistoryDates.includes(date)) {
+    date = attendanceHistoryDates[0];
+    $('#attHistoryDate').value = date;
+  }
+  $('#attHistoryDate').disabled = all;
+  $('#attHistoryPrev').disabled = all || date <= attendanceHistoryDates[attendanceHistoryDates.length - 1];
+  $('#attHistoryNext').disabled = all || date >= attendanceHistoryDates[0];
+  target.innerHTML = attendanceHistoryResultsHtml(attendanceHistoryRows());
+}
+function openAttendanceHistory() {
+  if (!session.isAdmin) return;
+  if (!window.WBStaffAttendanceHistoryCore) return toast('출퇴근 조회 화면을 불러오지 못했습니다. 새로고침해 주세요');
+  const currentDate = seoulNowParts().date;
+  attendanceHistoryDates = Array.from({ length: 14 }, (_, index) => addDays(currentDate, -index));
+  modal('전체 출퇴근 이력', '<section class="att-history">' +
+    '<div class="card-sub mb14">오늘 기록부터 확인하고, 날짜나 선생님을 선택해 지난 기록을 볼 수 있습니다.</div>' +
+    '<div class="att-history-filters"><label for="attHistoryDate">날짜<div class="att-history-date">' +
+    '<button id="attHistoryPrev" class="btn btn-sm btn-ghost" data-act="atthistdate" data-delta="-1" aria-label="이전 날짜">‹</button>' +
+    '<input id="attHistoryDate" class="in" type="date" min="' + attendanceHistoryDates[13] + '" max="' + attendanceHistoryDates[0] + '" value="' + attendanceHistoryDates[0] + '">' +
+    '<button id="attHistoryNext" class="btn btn-sm btn-ghost" data-act="atthistdate" data-delta="1" aria-label="다음 날짜">›</button></div></label>' +
+    '<label for="attHistoryStaff">선생님<select id="attHistoryStaff" class="in"><option value="">전체 선생님</option>' +
+    liveStaff().map(staff => '<option value="' + esc(staff.id) + '">' + esc(staff.name) + '</option>').join('') + '</select></label>' +
+    '<label class="att-history-all"><input id="attHistoryAll" type="checkbox">전체 14일 보기</label></div>' +
+    '<div class="hint">기록 없음은 결근을 뜻하지 않습니다. 근무시간은 출근~퇴근의 단순 차이이며 휴게시간은 별도로 빼지 않습니다.</div>' +
+    '<div id="attHistoryResults" aria-live="polite"></div>' +
+    '<div class="att-history-actions"><button class="btn btn-ghost" data-act="atthistcopy">조회 결과 복사</button>' +
+    '<button class="btn btn-primary" data-act="payrollmodal">월별 급여용 CSV 내보내기</button></div></section>');
+  renderAttendanceHistoryResults();
+}
+function shiftAttendanceHistoryDate(delta) {
+  if (!session.isAdmin || !$('#attHistoryDate') || $('#attHistoryAll').checked || ![-1, 1].includes(delta)) return;
+  const next = addDays($('#attHistoryDate').value, delta);
+  if (!attendanceHistoryDates.includes(next)) return;
+  $('#attHistoryDate').value = next;
+  renderAttendanceHistoryResults();
+}
+function copyAttendanceHistory() {
+  if (!session.isAdmin || !$('#attHistoryResults')) return;
+  const rows = attendanceHistoryRows();
+  if (!rows.length) return toast('복사할 조회 결과가 없습니다');
+  copy('날짜\t선생님\t출근\t퇴근\t근무시간\t상태\n' + rows.map(row =>
+    [row.date, row.name, row.clockIn || '—', row.clockOut || '—', row.duration || '—', row.label].join('\t')).join('\n'), '조회 결과를 복사했습니다');
+}
+document.addEventListener('change', event => {
+  if (['attHistoryDate', 'attHistoryStaff', 'attHistoryAll'].includes(event.target.id)) renderAttendanceHistoryResults();
+});
 
 /** 출퇴근 기록 수정 — 급여에 직결되므로 원장·관리 담당만 교정한다. */
 const canEditAtt = () => session.isAdmin;
@@ -19189,7 +19311,7 @@ function viewStaffAdmin() {
     '<button class="btn btn-primary" data-act="addstaff">추가</button></div>' +
     (list.length > 1 ? '<button class="btn btn-ghost btn-block mt14" data-act="alllinks">전체 링크 한 번에 복사</button>' : '') +
     '<button class="btn btn-ghost btn-block mt8" data-act="payrollmodal">📅 급여용 출퇴근 내보내기</button>' +
-    '<button class="btn btn-ghost btn-block mt8" data-act="atthist">🕘 전체 출근 이력 (최근 14일)</button>' +
+    '<button class="btn btn-ghost btn-block mt8" data-act="atthist">🕘 전체 출퇴근 이력 (최근 14일)</button>' +
     (session.isManager && hasVerifiedPersonAuth()
       ? '<div class="hint mt14"><b>이 관리 권한을 다른 태블릿에 연결</b><br>직원 목록에서 다시 고르지 않고, 현재 확인된 내 관리 담당 계정을 그대로 연결합니다.</div>' +
         '<button class="btn btn-ghost btn-block mt8" data-act="retryexistingauth">🔄 이 기기의 기존 연결 상태 확인</button>' +
@@ -21773,7 +21895,9 @@ document.addEventListener('click', ev => {
       recordStaffAttendance('clock_out', el);
       break;
     }
-    case 'atthist': showText('출근 이력 (최근 14일)', attHistText()); break;
+    case 'atthist': openAttendanceHistory(); break;
+    case 'atthistdate': shiftAttendanceHistoryDate(Number(el.dataset.delta)); break;
+    case 'atthistcopy': copyAttendanceHistory(); break;
     case 'atteditopen': {
       if (!session.isAdmin) break;
       attEditModal(id);
@@ -23389,7 +23513,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-09-09.1';
+const APP_VER = '2026-09-09.2';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
