@@ -1,7 +1,7 @@
 // WB 프로그램데스크 API(/api/*). 표준 Request/Response 만 쓴다 — Cloudflare Worker 와 Node 22(테스트·dev-server)
 // 양쪽에서 같은 코드가 돈다. node: 모듈은 절대 import 하지 않는다(워커 번들 불가).
 // 인증: 원장 비밀번호(PBKDF2) → Bearer 토큰, 직원은 1회용 링크 코드 → Bearer 토큰. 토큰은 sha256 만 저장한다.
-// 문서(desk_docs)는 컬렉션별 규칙 함수가 검사하고, 전화번호는 students.guardian.phone 에만 허용한다.
+// 문서(desk_documents)는 컬렉션별 규칙 함수가 검사하고, 전화번호는 students.guardian.phone 에만 허용한다.
 import { handleRequests, exportRequests, hasPii } from './requests.mjs';
 
 const APP_NAME = 'wb-desk';
@@ -20,7 +20,18 @@ const LAST_SEEN_WRITE_GAP_MS = 60 * 1000;
 const STAFF_ID = /^[A-Za-z0-9_-]{3,64}$/;
 const LINK_CODE = /^[a-f0-9]{48}$/i;
 const DOC_ID = /^[A-Za-z0-9_|.:@-]{1,160}$/;
-const COLLECTIONS = new Set(['students', 'tasks', 'checks', 'contacts', 'settings']);
+const COLLECTIONS = new Set(['students', 'tasks', 'checks', 'contacts', 'settings', 'cards', 'plans', 'apps', 'manuals']);
+// 기획서 v1.1 — 프로그램 방 6개. students.programs 의 4개(구독)와 달리 자료 출처 2곳(이그잼포유·족보닷컴)이 더 있다.
+const ROOMS = new Set(['studyforce', 'classcard', 'metamath', 'nelt', 'exam4you', 'jokbo']);
+const CARD_STATUS = new Set(['todo', 'doing', 'done', 'blocked']);
+const CARD_TARGETS = new Set(['student', 'app', 'text']);
+const EVIDENCE_KINDS = new Set(['check', 'capture', 'file']);
+const PLAN_KINDS = new Set(['recurring', 'apprange']);
+const PLAN_TARGETS = new Set(['each', 'student', 'app', 'text']);
+const RANGE_STATUS = new Set(['need', 'buying', 'uploading', 'have']);
+const RANGE_SOURCES = new Set(['exam4you', 'jokbo', 'other']);
+const MANUAL_SCOPES = new Set(['studyforce', 'classcard', 'metamath', 'nelt', 'exam4you', 'jokbo', 'app']);
+const HTTPS_URL = /^https:\/\/[^\s"'<>]{1,200}$/;
 const MAX_CHANGES = 200;
 const MAX_DOC_BYTES = 64 * 1024;
 const MAX_TASK_BYTES = 16 * 1024;
@@ -522,7 +533,204 @@ function ruleSettings(data, ctx) {
   return { data: out };
 }
 
-const RULES = { students: ruleStudents, tasks: ruleTasks, checks: ruleChecks, contacts: ruleContacts, settings: ruleSettings };
+/* ── 기획서 v1.1 — 배정 카드·템플릿·앱 목적지·매뉴얼 ──────────────────────
+ * 카드는 직원·원장 모두 쓴다(직원은 상태·증빙·메모를 바꾸며 일한다). 템플릿·앱·매뉴얼은 원장의 것이라 원장만 쓰되,
+ * 앱 자료 범위(apprange)의 status·note 만은 직원이 갱신한다 — 구매·업로드를 실제로 하는 사람이 직원이기 때문. */
+
+function ruleCards(data, ctx) {
+  const out = Object.assign({}, data);
+  if (!ROOMS.has(out.program)) return bad('INVALID', 'program 은 프로그램 방 6개 중 하나여야 합니다');
+  if (!isPlainObject(out.target)) return bad('INVALID', 'target 은 객체여야 합니다');
+  const target = { type: out.target.type };
+  if (!CARD_TARGETS.has(target.type)) return bad('INVALID', 'target.type 은 student/app/text 중 하나여야 합니다');
+  if (target.type === 'text') {
+    target.label = typeof out.target.label === 'string' ? out.target.label.trim() : '';
+    if (!target.label || target.label.length > 60) return bad('INVALID', 'target.label 은 1~60자여야 합니다');
+  } else {
+    if (typeof out.target.id !== 'string' || !DOC_ID.test(out.target.id)) return bad('INVALID', 'target.id 가 필요합니다');
+    target.id = out.target.id;
+  }
+  out.target = target;
+  if (typeof out.what !== 'string' || !out.what.trim() || out.what.trim().length > 120) return bad('INVALID', '무엇을(what)은 1~120자로 적어 주세요');
+  out.what = out.what.trim();
+  const err = textField(out, 'where', 120, '어디에') || textField(out, 'note', 300, '메모') || textField(out, 'blockedReason', 200, '막힘 사유') ||
+    textField(out, 'source', 80, 'source') || textField(out, 'manualId', 160, 'manualId');
+  if (err) return err;
+  if (absent(out.due)) delete out.due;
+  else if (typeof out.due !== 'string' || !YMD.test(out.due)) return bad('INVALID', 'due 는 YYYY-MM-DD 형식이어야 합니다');
+  if (absent(out.status)) out.status = 'todo';
+  if (!CARD_STATUS.has(out.status)) return bad('INVALID', 'status 는 todo/doing/done/blocked 중 하나여야 합니다');
+  if (out.status === 'blocked' && !out.blockedReason) return bad('INVALID', '막힘에는 사유(blockedReason)를 한 줄 적어야 합니다');
+  if (out.status !== 'blocked') delete out.blockedReason;
+  if (absent(out.evidence)) delete out.evidence;
+  else {
+    if (!isPlainObject(out.evidence) || !EVIDENCE_KINDS.has(out.evidence.kind)) return bad('INVALID', 'evidence.kind 는 check/capture/file 중 하나여야 합니다');
+    // 증빙을 남긴 사람은 토큰의 신원으로 고정한다.
+    const ev = { kind: out.evidence.kind, at: Number(out.evidence.at) > 0 ? Number(out.evidence.at) : Date.now(), by: ctx.auth.staffId };
+    if (!absent(out.evidence.note)) {
+      if (typeof out.evidence.note !== 'string' || out.evidence.note.length > 300) return bad('INVALID', 'evidence.note 는 300자까지입니다');
+      ev.note = out.evidence.note.trim();
+    }
+    out.evidence = ev;
+  }
+  const prev = ctx.exists && isPlainObject(ctx.previous) ? ctx.previous : null;
+  // 만든 사람·시각은 첫 쓰기의 토큰 신원으로 고정한다 — 클라이언트 값을 믿지 않는다.
+  out.createdAt = prev && Number(prev.createdAt) > 0 ? Number(prev.createdAt) : Date.now();
+  out.createdBy = prev && typeof prev.createdBy === 'string' ? prev.createdBy : ctx.auth.staffId;
+  out.byOwner = prev ? !!prev.byOwner : ctx.auth.role === 'admin';
+  if (out.status === 'done') {
+    const wasDone = !!(prev && prev.status === 'done');
+    out.doneAt = wasDone && Number(prev.doneAt) > 0 ? Number(prev.doneAt) : (Number(out.doneAt) > 0 ? Number(out.doneAt) : Date.now());
+    out.doneBy = wasDone && typeof prev.doneBy === 'string' ? prev.doneBy : ctx.auth.staffId;
+  } else { delete out.doneAt; delete out.doneBy; }
+  const pii = findPii(out, '', null);
+  if (pii) return bad('PII', pii + ' 에 전화번호·이메일·주민번호를 적을 수 없습니다');
+  return { data: out };
+}
+
+function ruleApps(data, ctx) {
+  if (ctx.auth.role !== 'admin') return bad('FORBIDDEN', '앱 목적지는 원장만 등록·수정합니다', 403);
+  const out = Object.assign({}, data);
+  const name = cleanName(out.name, 40);
+  if (!name) return bad('INVALID', '앱 이름은 1~40자로 입력해 주세요');
+  out.name = name;
+  const err = textField(out, 'format', 80, '자료 형식') || textField(out, 'note', 300, '메모') || textField(out, 'adminUrl', 200, '관리 웹 주소');
+  if (err) return err;
+  if (out.adminUrl && !HTTPS_URL.test(out.adminUrl)) return bad('INVALID', '관리 웹 주소는 https:// 로 시작해야 합니다');
+  out.active = absent(out.active) ? true : !!out.active;
+  const pii = findPii(out, '', null);
+  if (pii) return bad('PII', pii + ' 에 전화번호·이메일·주민번호를 적을 수 없습니다');
+  return { data: out };
+}
+
+function planTarget(raw) {
+  if (!isPlainObject(raw)) return bad('INVALID', 'target 은 객체여야 합니다');
+  const t = { type: raw.type };
+  if (!PLAN_TARGETS.has(t.type)) return bad('INVALID', 'target.type 은 each/student/app/text 중 하나여야 합니다');
+  if (t.type === 'student' || t.type === 'app') {
+    if (typeof raw.id !== 'string' || !DOC_ID.test(raw.id)) return bad('INVALID', 'target.id 가 필요합니다');
+    t.id = raw.id;
+  } else if (t.type === 'text') {
+    t.label = typeof raw.label === 'string' ? raw.label.trim() : '';
+    if (!t.label || t.label.length > 60) return bad('INVALID', 'target.label 은 1~60자여야 합니다');
+  }
+  return { target: t };
+}
+
+function stripForCompare(plan) {
+  const copy = Object.assign({}, plan);
+  delete copy.status; delete copy.note;
+  return JSON.stringify(copy, Object.keys(copy).sort());
+}
+
+function rulePlans(data, ctx) {
+  const out = Object.assign({}, data);
+  if (!PLAN_KINDS.has(out.kind)) return bad('INVALID', 'kind 는 recurring/apprange 중 하나여야 합니다');
+  let err = null;
+  if (out.kind === 'recurring') {
+    if (!ROOMS.has(out.program)) return bad('INVALID', 'program 은 프로그램 방 6개 중 하나여야 합니다');
+    if (!Array.isArray(out.days) || !out.days.length || out.days.length > 7) return bad('INVALID', 'days 는 요일(0~6) 1~7개 배열이어야 합니다');
+    const days = [];
+    for (const d of out.days) {
+      const n = Number(d);
+      if (!Number.isInteger(n) || n < 0 || n > 6) return bad('INVALID', 'days 의 값은 0(일)~6(토)이어야 합니다');
+      if (!days.includes(n)) days.push(n);
+    }
+    out.days = days.sort((a, b) => a - b);
+    const t = planTarget(out.target);
+    if (t.code) return t;
+    out.target = t.target;
+    if (typeof out.what !== 'string' || !out.what.trim() || out.what.trim().length > 120) return bad('INVALID', '무엇을(what)은 1~120자로 적어 주세요');
+    out.what = out.what.trim();
+    err = textField(out, 'where', 120, '어디에') || textField(out, 'manualId', 160, 'manualId') || textField(out, 'note', 300, '메모');
+    if (err) return err;
+    for (const key of ['start', 'end']) {
+      if (absent(out[key])) delete out[key];
+      else if (typeof out[key] !== 'string' || !YMD.test(out[key])) return bad('INVALID', key + ' 는 YYYY-MM-DD 형식이어야 합니다');
+    }
+    out.active = absent(out.active) ? true : !!out.active;
+  } else {
+    if (typeof out.appId !== 'string' || !DOC_ID.test(out.appId)) return bad('INVALID', 'appId 가 필요합니다');
+    if (typeof out.unit !== 'string' || !out.unit.trim() || out.unit.trim().length > 80) return bad('INVALID', '범위(unit)는 1~80자로 적어 주세요');
+    out.unit = out.unit.trim();
+    err = textField(out, 'subject', 40, '과목') || textField(out, 'grade', 10, '학년') || textField(out, 'material', 40, '자료 종류') ||
+      textField(out, 'note', 300, '메모');
+    if (err) return err;
+    if (absent(out.status)) out.status = 'need';
+    if (!RANGE_STATUS.has(out.status)) return bad('INVALID', 'status 는 need/buying/uploading/have 중 하나여야 합니다');
+    if (absent(out.source)) out.source = 'exam4you';
+    if (!RANGE_SOURCES.has(out.source)) return bad('INVALID', 'source 는 exam4you/jokbo/other 중 하나여야 합니다');
+  }
+  if (ctx.auth.role !== 'admin') {
+    // 직원은 앱 자료 범위의 진행(status)·메모만 옮길 수 있다. 그 밖의 템플릿 변경은 원장 몫.
+    const prev = ctx.exists && isPlainObject(ctx.previous) ? ctx.previous : null;
+    const allowed = out.kind === 'apprange' && prev && prev.kind === 'apprange' && stripForCompare(prev) === stripForCompare(out);
+    if (!allowed) return bad('FORBIDDEN', '템플릿은 원장만 만들고 고칩니다 (직원은 앱 자료 범위의 진행 상태만)', 403);
+  }
+  const pii = findPii(out, '', null);
+  if (pii) return bad('PII', pii + ' 에 전화번호·이메일·주민번호를 적을 수 없습니다');
+  return { data: out };
+}
+
+function ruleManuals(data, ctx) {
+  if (ctx.auth.role !== 'admin') return bad('FORBIDDEN', '매뉴얼은 원장만 고칩니다 — 다른 점은 요청함(기타)으로 올려 주세요', 403);
+  const out = Object.assign({}, data);
+  if (!MANUAL_SCOPES.has(out.scope)) return bad('INVALID', 'scope 는 프로그램 방 6개 또는 app 이어야 합니다');
+  if (absent(out.appId)) delete out.appId;
+  else if (typeof out.appId !== 'string' || !DOC_ID.test(out.appId)) return bad('INVALID', 'appId 형식이 올바르지 않습니다');
+  if (typeof out.task !== 'string' || !out.task.trim() || out.task.trim().length > 40) return bad('INVALID', '작업 종류(task)는 1~40자여야 합니다');
+  out.task = out.task.trim();
+  if (typeof out.title !== 'string' || !out.title.trim() || out.title.trim().length > 80) return bad('INVALID', '제목은 1~80자여야 합니다');
+  out.title = out.title.trim();
+  const err = textField(out, 'purpose', 300, '목적');
+  if (err) return err;
+  const steps = [];
+  if (!absent(out.steps)) {
+    if (!Array.isArray(out.steps) || out.steps.length > 40) return bad('INVALID', 'steps 는 40개까지의 배열이어야 합니다');
+    for (const s of out.steps) {
+      const text = typeof s === 'string' ? s.trim() : (isPlainObject(s) && typeof s.text === 'string' ? s.text.trim() : '');
+      if (!text || text.length > 300) return bad('INVALID', '단계는 각 1~300자여야 합니다');
+      const step = { text };
+      if (isPlainObject(s) && typeof s.note === 'string' && s.note.trim()) {
+        if (s.note.length > 300) return bad('INVALID', '단계 메모는 300자까지입니다');
+        step.note = s.note.trim();
+      }
+      steps.push(step);
+    }
+  }
+  out.steps = steps;
+  const cautions = [];
+  if (!absent(out.cautions)) {
+    if (!Array.isArray(out.cautions) || out.cautions.length > 20) return bad('INVALID', 'cautions 는 20개까지의 배열이어야 합니다');
+    for (const c of out.cautions) {
+      if (typeof c !== 'string' || !c.trim() || c.length > 300) return bad('INVALID', '주의점은 각 1~300자여야 합니다');
+      cautions.push(c.trim());
+    }
+  }
+  out.cautions = cautions;
+  const links = [];
+  if (!absent(out.links)) {
+    if (!Array.isArray(out.links) || out.links.length > 10) return bad('INVALID', 'links 는 10개까지의 배열이어야 합니다');
+    for (const l of out.links) {
+      if (!isPlainObject(l) || typeof l.url !== 'string' || !HTTPS_URL.test(l.url.trim())) return bad('INVALID', '링크는 https:// 주소여야 합니다');
+      const label = typeof l.label === 'string' ? l.label.trim() : '';
+      if (!label || label.length > 40) return bad('INVALID', '링크 이름은 1~40자여야 합니다');
+      links.push({ label, url: l.url.trim() });
+    }
+  }
+  out.links = links;
+  if (absent(out.lastCheckedAt)) delete out.lastCheckedAt;
+  else if (typeof out.lastCheckedAt !== 'string' || !YMD.test(out.lastCheckedAt)) return bad('INVALID', 'lastCheckedAt 은 YYYY-MM-DD 형식이어야 합니다');
+  out.version = Number.isInteger(Number(out.version)) && Number(out.version) > 0 ? Number(out.version) : 1;
+  const pii = findPii(out, '', null);
+  if (pii) return bad('PII', pii + ' 에 전화번호·이메일·주민번호를 적을 수 없습니다');
+  return { data: out };
+}
+
+const RULES = {
+  students: ruleStudents, tasks: ruleTasks, checks: ruleChecks, contacts: ruleContacts, settings: ruleSettings,
+  cards: ruleCards, plans: rulePlans, apps: ruleApps, manuals: ruleManuals
+};
 
 function docView(row) {
   return {
@@ -545,7 +753,7 @@ async function readDocs(env, url) {
   const where = since === null ? '' : ' WHERE updated_at>?';
   const bindings = since === null ? [] : [since];
   const rows = await env.DB.prepare(
-    'SELECT collection,id,data,updated_at,updated_by,deleted FROM desk_docs' + where + ' ORDER BY updated_at, collection, id'
+    'SELECT collection,id,data,updated_at,updated_by,deleted FROM desk_documents' + where + ' ORDER BY updated_at, collection, id'
   ).bind(...bindings).all();
   // 직원 명단은 desk_staff 가 정본이지만 클라이언트는 문서 하나로 받는 편이 단순하다 — staff 문서로 함께 내려준다.
   const staffRows = await env.DB.prepare(
@@ -570,7 +778,7 @@ async function applyChange(env, auth, change) {
   // 삭제는 컬렉션을 가리지 않고 원장만 — 직원 기기의 실수·오작동이 명단을 지우지 못하게.
   if (wantDelete && auth.role !== 'admin') return reject('FORBIDDEN', '삭제는 원장만 할 수 있습니다', 403);
   if (c === 'settings' && auth.role !== 'admin') return reject('FORBIDDEN', '설정은 원장만 바꿀 수 있습니다', 403);
-  const row = await env.DB.prepare('SELECT data,updated_at,updated_by,deleted FROM desk_docs WHERE collection=? AND id=? LIMIT 1')
+  const row = await env.DB.prepare('SELECT data,updated_at,updated_by,deleted FROM desk_documents WHERE collection=? AND id=? LIMIT 1')
     .bind(c, id).first();
   const currentAt = row ? Number(row.updated_at) : 0;
   if (!absent(change.expectedUpdatedAt)) {
@@ -591,7 +799,7 @@ async function applyChange(env, auth, change) {
   // 같은 ms 안에 두 번 써도 updated_at 이 커져야 since= 동기화와 CAS 가 순서를 잃지 않는다.
   const updatedAt = Math.max(Date.now(), currentAt + 1);
   await env.DB.prepare(
-    'INSERT INTO desk_docs(collection,id,data,updated_at,updated_by,deleted) VALUES(?,?,?,?,?,?) ' +
+    'INSERT INTO desk_documents(collection,id,data,updated_at,updated_by,deleted) VALUES(?,?,?,?,?,?) ' +
     'ON CONFLICT(collection,id) DO UPDATE SET data=excluded.data,updated_at=excluded.updated_at,' +
     'updated_by=excluded.updated_by,deleted=excluded.deleted'
   ).bind(c, id, JSON.stringify(data), updatedAt, auth.staffId, wantDelete ? 1 : 0).run();
@@ -616,7 +824,7 @@ async function writeDocs(env, auth, body) {
 }
 
 async function exportAll(env) {
-  const rows = await env.DB.prepare('SELECT collection,id,data,updated_at,updated_by,deleted FROM desk_docs ORDER BY collection, id').all();
+  const rows = await env.DB.prepare('SELECT collection,id,data,updated_at,updated_by,deleted FROM desk_documents ORDER BY collection, id').all();
   const staff = await env.DB.prepare('SELECT id,name,role,active,created_at,updated_at FROM desk_staff ORDER BY id').all();
   const ledger = await exportRequests(env);
   const now = Date.now();
