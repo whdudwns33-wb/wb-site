@@ -32,6 +32,32 @@ CREATE TABLE IF NOT EXISTS staff_work_sessions (
 CREATE INDEX IF NOT EXISTS idx_staff_work_sessions_staff_day
   ON staff_work_sessions(app,staff_id,work_date,revoked);
 
+-- 선생님 태블릿에서 관리 담당자가 점검할 때만 쓰는 짧은 관리자 세션.
+-- 개인 링크 토큰·직원 PIN과 분리하고 원문 토큰은 저장하지 않는다.
+CREATE TABLE IF NOT EXISTS manager_inspection_sessions (
+  app TEXT NOT NULL CHECK (app='task'),
+  token_hash TEXT NOT NULL,
+  manager_staff_id TEXT NOT NULL,
+  source_staff_id TEXT NOT NULL,
+  device_hash TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL,
+  revoked INTEGER NOT NULL DEFAULT 0 CHECK (revoked IN (0,1)),
+  PRIMARY KEY(app,token_hash)
+);
+CREATE INDEX IF NOT EXISTS idx_manager_inspection_sessions_device
+  ON manager_inspection_sessions(app,device_hash,revoked,expires_at);
+
+CREATE TABLE IF NOT EXISTS manager_inspection_attempts (
+  app TEXT NOT NULL CHECK (app='task'),
+  device_hash TEXT NOT NULL,
+  failed_attempts INTEGER NOT NULL DEFAULT 0,
+  locked_until INTEGER NOT NULL DEFAULT 0,
+  attempt_revision INTEGER NOT NULL DEFAULT 0,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY(app,device_hash)
+);
+
 --
 -- 설계 원칙
 --  1) 학생·직원별로 분할한다. 한 사람이 자기 데이터를 저장할 때 남의 데이터를 건드리지 않는다.
