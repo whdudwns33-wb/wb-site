@@ -42,7 +42,7 @@ test('자산·수행 탭은 원장·관리 담당 목록에만 있고 직원 개
 test('자산 원장·수행 기록 키는 직원 소유로 오인하지 않는다', () => {
   const fn = html.match(/function ownerOfCheck\(key\) \{[\s\S]*?\n\}/);
   assert.ok(fn, 'ownerOfCheck');
-  const guard = fn[0].indexOf('/^__lic(?:ev|need)?__/.test(tid) || /^__perf(?:set|day)__/.test(tid)');
+  const guard = fn[0].indexOf('/^__lic(?:ev|need)?__/.test(tid) || /^__perf(?:set|day)__/.test(tid) || /^__audit__/.test(tid)');
   assert.ok(guard > 0, '예외 분기');
   assert.ok(guard < fn[0].indexOf('__[a-zA-Z]+__'), '일반 접두 규칙보다 먼저 걸러야 한다');
   assert.ok(!fn[0].includes('/^__act__'), '조치(__act__<staffId>)는 담당 직원 소유라 예외 정규식에 넣지 않는다');

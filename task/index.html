@@ -1567,10 +1567,10 @@ function ownerOfCheck(key) {
   /* 신규 학생 적응 기록은 stable studentId로 묶인다. 이를 직원 id로 오인하면
      개인 링크에 다른 학생 기록이 섞일 수 있으므로 관리자 범위에만 둔다. */
   if (/^__onboarding__/.test(tid)) return null;
-  /* 자산 원장(__lic__·__licev__·__licneed__)과 수행 기록(__perfset__·__perfday__)은 자산 id·학생 id·
+  /* 자산 원장(__lic__·__licev__·__licneed__)·수행 기록(__perfset__·__perfday__)·원장 대조 증적(__audit__<taskId>)은 자산 id·학생 id·
      프로그램 키로 묶인다. 직원 id로 오인하면 개인 링크 조회 분할이 어긋나므로 관리자 범위(owner null)에만
      둔다. 조치(__act__<staffId>)는 담당 직원 소유라 아래 일반 규칙을 그대로 따른다. */
-  if (/^__lic(?:ev|need)?__/.test(tid) || /^__perf(?:set|day)__/.test(tid)) return null;
+  if (/^__lic(?:ev|need)?__/.test(tid) || /^__perf(?:set|day)__/.test(tid) || /^__audit__/.test(tid)) return null;
   const m = tid.match(/^__[a-zA-Z]+__(.+)$/);
   if (m) return m[1];
   const t = (state.tasks || []).find(x => x.id === tid);
