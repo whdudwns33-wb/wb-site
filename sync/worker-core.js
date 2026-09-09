@@ -98,7 +98,10 @@ import { handleSessionPack } from './session-pack.js';
 import { handleGuardianOpsSend } from './guardian-ops-send.js';
 import { handleContactLog } from './contact-log.js';
 import { handleStaffAttendance, inspectOwnStaffAttendanceChanges } from './staff-attendance.js';
-import { guardStaffWorkAccess, handleStaffWorkSession, handleStaffProfile, staffWorkLoginEnabled } from './staff-work-login.js';
+import {
+  guardStaffWorkAccess, handleStaffWorkSession, handleStaffProfile, staffWorkLoginEnabled,
+  resolveManagerInspectionAuth, handleManagerInspectionSession
+} from './staff-work-login.js';
 import { handleWeekendVisit } from './weekend-visit.js';
 import { handleLessonHandoff } from './lesson-handoff.js';
 import { studentScheduleConflictPayload } from './student-schedule-conflict.js';
@@ -257,6 +260,9 @@ async function resolveAuth(env, app, auth) {
       ? { scope: 'all', device: true,
         rewardActorHash: await consultRewardActorHash('admin_device', tokenHash) }
       : null;
+  }
+  if (auth.mode === 'manager_inspection') {
+    return await resolveManagerInspectionAuth(env, app, auth, taskManagerIds(env));
   }
   if (auth.mode === 'person') {
     const id = String(auth.id || '');
@@ -3054,6 +3060,18 @@ export default {
         return url.pathname === '/staff-work-session'
           ? await handleStaffWorkSession(env, app, body, okOrigin, auth, json)
           : await handleStaffProfile(env, app, body, okOrigin, auth, json);
+      }
+      if (url.pathname === '/manager-inspection-session') {
+        const auth = await resolveAuth(env, app, body.auth);
+        if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+        // 로그인은 현재 태블릿의 선생님 bearer로, 종료는 발급된 점검 세션으로 인증한다.
+        if (body.action === 'login' && (!body.auth || body.auth.mode !== 'person')) {
+          return json({ ok: false, error: '선생님 개인 인증이 필요합니다' }, 403, okOrigin);
+        }
+        const sourceAuth = auth;
+        return await handleManagerInspectionSession(
+          env, app, body, okOrigin, sourceAuth, json, taskManagerIds(env)
+        );
       }
       if (app === 'task' && body.auth && body.auth.mode === 'person' && staffWorkLoginEnabled(env)) {
         const auth = await resolveAuth(env, app, body.auth);

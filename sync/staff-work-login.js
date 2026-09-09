@@ -5,6 +5,7 @@ const PIN_RE = /^\d{4}$/;
 const TOKEN_RE = /^[a-f0-9]{64}$/;
 const PIN_ITERATIONS = 100000;
 const LOCK_MS = 5 * 60 * 1000;
+const MANAGER_INSPECTION_TTL_MS = 8 * 60 * 60 * 1000;
 const textEncoder = new TextEncoder();
 
 export function staffWorkLoginEnabled(env) {
@@ -52,6 +53,98 @@ async function readGeneration(env) {
   const row = await env.DB.prepare('SELECT generation FROM app_data_generations WHERE app=? LIMIT 1').bind('task').first();
   if (!row || !Number.isSafeInteger(Number(row.generation)) || Number(row.generation) < 0) throw new Error('STAFF_WORK_GENERATION_UNAVAILABLE');
   return Number(row.generation);
+}
+
+/** 선생님 링크에서 발급한 관리자 점검 세션을 해석한다. 원문 토큰은 D1에 저장하지 않는다. */
+export async function resolveManagerInspectionAuth(env, app, auth, managerIds) {
+  if (app !== 'task' || !auth || auth.mode !== 'manager_inspection') return null;
+  const token = String(auth.token || ''), managerId = String(auth.managerId || '');
+  if (!TOKEN_RE.test(token) || !SAFE_ID.test(managerId) || !managerIds.has(managerId)) return null;
+  const tokenHash = await hash(token);
+  const row = await env.DB.prepare(
+    'SELECT manager_staff_id,source_staff_id,device_hash,expires_at FROM manager_inspection_sessions ' +
+    'WHERE app=? AND token_hash=? AND manager_staff_id=? AND revoked=0 AND expires_at>? LIMIT 1'
+  ).bind('task', tokenHash, managerId, Date.now()).first();
+  if (!row) return null;
+  const staff = await env.DB.prepare('SELECT data FROM staff WHERE app=? AND id=? LIMIT 1')
+    .bind('task', managerId).first();
+  if (!staff) return null;
+  let data;
+  try { data = JSON.parse(staff.data); } catch (_) { return null; }
+  if (!data || data.deleted) return null;
+  return { scope: 'all', id: managerId, role: 'manager', inspection: true,
+    sourceStaffId: String(row.source_staff_id || ''), expiresAt: Number(row.expires_at) || 0 };
+}
+
+/** 개인 링크의 bearer와 관리 담당자 PIN을 함께 확인해 8시간짜리 점검 세션을 만든다. */
+export async function handleManagerInspectionSession(env, app, body, origin, auth, json, managerIds) {
+  if (app !== 'task') return fail(json, origin, 'MANAGER_INSPECTION_APP_REQUIRED', '업무지시서에서만 사용할 수 있습니다', 400);
+  const action = String(body.action || '');
+  if (!['login', 'logout'].includes(action)) return fail(json, origin, 'MANAGER_INSPECTION_ACTION_INVALID', '요청 종류를 확인해 주세요', 400);
+  try {
+    if (action === 'logout') {
+      if (!auth || !auth.inspection || auth.scope !== 'all') return fail(json, origin, 'MANAGER_INSPECTION_REQUIRED', '관리자 점검 세션이 필요합니다', 401);
+      const token = String(body.auth && body.auth.token || '');
+      if (!TOKEN_RE.test(token)) return fail(json, origin, 'MANAGER_INSPECTION_REQUIRED', '관리자 점검 세션이 필요합니다', 401);
+      await env.DB.prepare('UPDATE manager_inspection_sessions SET revoked=1 WHERE app=? AND token_hash=?')
+        .bind('task', await hash(token)).run();
+      return json({ ok: true, active: false }, 200, origin);
+    }
+    if (!auth || auth.scope !== 'own') return fail(json, origin, 'MANAGER_INSPECTION_SOURCE_REQUIRED', '선생님 개인 링크에서만 관리자 로그인을 시작할 수 있습니다', 403);
+    const pin = String(body.pin || '');
+    if (!PIN_RE.test(pin)) return fail(json, origin, 'MANAGER_INSPECTION_PIN_INVALID', '관리자 비밀번호 숫자 4자리를 입력해 주세요', 400);
+    if (typeof env.WB_STAFF_PIN_PEPPER !== 'string' || env.WB_STAFF_PIN_PEPPER.length < 32) return unavailable(json, origin);
+    const sourceToken = String(body.auth && body.auth.token || '');
+    if (!sourceToken || sourceToken.length > 256) return fail(json, origin, 'MANAGER_INSPECTION_SOURCE_REQUIRED', '선생님 개인 인증을 다시 확인해 주세요', 401);
+    const deviceHash = await hash(sourceToken);
+    const now = Date.now();
+    await env.DB.prepare('INSERT OR IGNORE INTO manager_inspection_attempts(app,device_hash,updated_at) VALUES(?,?,?)')
+      .bind('task', deviceHash, now).run();
+    const attempt = await env.DB.prepare('UPDATE manager_inspection_attempts SET ' +
+      'failed_attempts=CASE WHEN locked_until>0 AND locked_until<=? THEN 1 ELSE failed_attempts+1 END,' +
+      'locked_until=CASE WHEN locked_until>0 AND locked_until<=? THEN 0 WHEN failed_attempts+1>=5 THEN ? ELSE 0 END,' +
+      'attempt_revision=attempt_revision+1,updated_at=? WHERE app=? AND device_hash=? AND locked_until<=? ' +
+      'AND (failed_attempts<5 OR locked_until>0) RETURNING failed_attempts,locked_until,attempt_revision')
+      .bind(now, now, now + LOCK_MS, now, 'task', deviceHash, now).first();
+    if (!attempt) return fail(json, origin, 'MANAGER_INSPECTION_PIN_LOCKED', '관리자 비밀번호 입력을 여러 번 시도했습니다. 5분 후 다시 시도해 주세요', 429);
+
+    const ids = [...managerIds].filter(id => SAFE_ID.test(id));
+    if (!ids.length) return unavailable(json, origin);
+    const placeholders = ids.map(() => '?').join(',');
+    const profiles = await env.DB.prepare(
+      'SELECT staff_id,phone,pin_salt,pin_hash,pin_iterations FROM staff_private_profiles ' +
+      'WHERE app=? AND login_enabled=1 AND staff_id IN (' + placeholders + ')'
+    ).bind('task', ...ids).all();
+    let matched = null;
+    for (const profile of (profiles.results || [])) {
+      if (!configured(profile)) continue;
+      const candidate = await deriveStaffPinHash(pin, profile.pin_salt, env.WB_STAFF_PIN_PEPPER, Number(profile.pin_iterations));
+      if (safeEqual(candidate, profile.pin_hash)) { matched = profile; break; }
+    }
+    if (!matched) return fail(json, origin,
+      Number(attempt.failed_attempts) >= 5 ? 'MANAGER_INSPECTION_PIN_LOCKED' : 'MANAGER_INSPECTION_PIN_INCORRECT',
+      Number(attempt.failed_attempts) >= 5 ? '관리자 비밀번호가 일치하지 않습니다. 5분 후 다시 시도해 주세요' : '관리자 비밀번호가 일치하지 않습니다',
+      Number(attempt.failed_attempts) >= 5 ? 429 : 400);
+    await env.DB.prepare('UPDATE manager_inspection_attempts SET failed_attempts=0,locked_until=0,updated_at=? ' +
+      'WHERE app=? AND device_hash=? AND attempt_revision=?')
+      .bind(now, 'task', deviceHash, attempt.attempt_revision).run();
+    const managerId = String(matched.staff_id);
+    const staff = await env.DB.prepare('SELECT data FROM staff WHERE app=? AND id=? LIMIT 1').bind('task', managerId).first();
+    let staffData = null;
+    try { staffData = staff && JSON.parse(staff.data); } catch (_) { /* 아래에서 미설정으로 처리한다 */ }
+    if (!staffData || staffData.deleted) return unavailable(json, origin);
+    const token = randomHex();
+    const expiresAt = now + MANAGER_INSPECTION_TTL_MS;
+    await env.DB.prepare('UPDATE manager_inspection_sessions SET revoked=1 WHERE app=? AND device_hash=? AND revoked=0')
+      .bind('task', deviceHash).run();
+    await env.DB.prepare('INSERT INTO manager_inspection_sessions(app,token_hash,manager_staff_id,source_staff_id,device_hash,created_at,expires_at,revoked) VALUES(?,?,?,?,?,?,?,0)')
+      .bind('task', await hash(token), managerId, auth.id, deviceHash, now, expiresAt).run();
+    return json({ ok: true, active: true, managerSession: token, managerId,
+      managerName: String(staffData.name || ''), expiresAt }, 200, origin);
+  } catch (error) {
+    if (/no such table.*manager_inspection/i.test(String(error && error.message || error))) return unavailable(json, origin);
+    return unavailable(json, origin);
+  }
 }
 async function readAttendance(env, staffId, date) {
   const key = staffAttendanceKey(staffId, date);
