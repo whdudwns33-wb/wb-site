@@ -1,0 +1,103 @@
+/* WB 프로그램데스크 — 기본 매뉴얼 씨앗 (기획서 v1.1 §4)
+ *
+ * 왜 파일로 두나: 매뉴얼 본문은 원장이 앱 안에서 고치고 서버(D1)에만 산다. 이 파일은 "처음 한 번" 불러오는 초안일 뿐이다 —
+ * 절차(무엇을·어떤 순서로·무엇을 기록하는지)만 적고, 각 사이트의 버튼 위치·화면 이름은 적지 않는다(원장·직원이 실제 화면을
+ * 보고 채운다). 학생 이름·연락처·계정 정보는 어디에도 없다. 링크는 정본 목록(external-links.js)의 키로만 가리킨다.
+ * 자체 창작 텍스트라 저장소에 둘 수 있다(절대 규칙 1).
+ */
+(function (root) {
+  'use strict';
+  const SEED = Object.freeze([
+    { id: 'seed:studyforce:check', scope: 'studyforce', task: 'check', title: '오늘 수행 확인',
+      purpose: '구독 학생이 오늘 학습을 했는지 보고, 미수행을 앱에 남긴다. 매일 저녁 한 번.',
+      steps: ['스터디포스 관리자 페이지에 로그인한다', '오늘 날짜의 학생별 수행 현황을 연다', '앱의 오늘 카드(수행 확인)와 명단을 대조하며 학생마다 수행·미수행을 확인한다',
+        '미수행 학생은 앱 수행 탭에서 미수행으로 표시하고, 필요하면 조치(연락)를 남긴다', '카드를 완료로 넘긴다'],
+      cautions: ['카드 메모에 학생 이름·전화번호를 적지 않는다 — 연락은 연락 기록 탭에만', '화면이 열리지 않으면 막힘으로 표시하고 사유를 한 줄 적는다'],
+      linkKeys: ['studyforce_admin'] },
+    { id: 'seed:studyforce:assign', scope: 'studyforce', task: 'assign', title: '과제 배정',
+      purpose: '원장이 정한 이번 주 과제를 학생별로 배정한다.',
+      steps: ['카드의 "무엇을"(과제)과 "어디에"(학생·반)를 확인한다', '관리자 페이지에서 해당 학생을 찾는다', '과제를 배정하고 시작·마감일을 맞춘다', '배정 결과 화면에서 빠진 학생이 없는지 확인한다', '카드를 완료로 넘긴다'],
+      cautions: ['카드에 없는 과제를 임의로 넣지 않는다 — 궁금하면 요청함(기타)으로 원장에게 묻는다'],
+      linkKeys: ['studyforce_admin'] },
+    { id: 'seed:studyforce:account', scope: 'studyforce', task: 'account', title: '계정 발급',
+      purpose: '신규 구독 학생의 계정을 만들고 앱 명단의 계정 상태를 맞춘다.',
+      steps: ['요청함의 계정 발급 요청 또는 오늘 카드를 확인한다', '관리자 페이지에서 학생 계정을 만든다', '앱 학생 카드의 프로그램 항목을 "발급됨"으로 바꾼다',
+        '로그인 안내는 원장이 정한 경로로 보호자에게 전달하고 연락 기록 탭에 남긴다', '카드(또는 요청)를 완료로 넘긴다'],
+      cautions: ['비밀번호를 앱·카톡·메모 어디에도 적지 않는다'],
+      linkKeys: ['studyforce_admin'] },
+    { id: 'seed:studyforce:followup', scope: 'studyforce', task: 'followup', title: '미수행 후속 연락',
+      purpose: '연속 미수행 학생의 보호자에게 안내하고 결과를 기록한다.',
+      steps: ['수행 탭에서 미수행 신호를 확인한다', '원장이 정한 기준(연속 미수행 일수)에 해당하는지 본다', '보호자에게 원장이 정한 문구로 안내한다', '연락 기록 탭에 결과(연락됨·부재중)를 남긴다', '카드를 완료로 넘긴다'],
+      cautions: ['연락 문구는 원장 문구를 따르고, 학생 간 비교는 하지 않는다'],
+      linkKeys: [] },
+
+    { id: 'seed:classcard:assign', scope: 'classcard', task: 'assign', title: '세트 배정',
+      purpose: '반마다 이번 주 세트를 넣는다. 보통 주 1회.',
+      steps: ['카드의 반("어디에")과 세트("무엇을")를 확인한다', '클래스카드 교사 페이지에 로그인한다', '해당 반을 열고 이번 주 세트를 배정한다', '반 학생에게 세트가 보이는지 확인한다', '누락 반이 있으면 메모에 남기고 카드를 완료로 넘긴다'],
+      cautions: ['세트 이름이 주차와 맞는지 한 번 더 본다'],
+      linkKeys: ['classcard_teacher'] },
+    { id: 'seed:classcard:check', scope: 'classcard', task: 'check', title: '학습 결과 확인',
+      purpose: '반별 학습 완료율을 보고 낮은 학생을 앱에 표시한다.',
+      steps: ['반별 학습 결과 화면을 연다', '완료율이 낮은 학생을 앱 수행 탭에 표시한다', '결과를 내보내기(export)할 수 있으면 파일로 저장해 원장이 정한 위치에 둔다', '카드를 완료로 넘긴다'],
+      cautions: ['내보낸 파일에는 학생 이름이 있다 — 외부 공유·카톡 전송 금지'],
+      linkKeys: ['classcard_teacher'] },
+    { id: 'seed:classcard:account', scope: 'classcard', task: 'account', title: '반에 학생 등록',
+      purpose: '신규 학생을 반에 넣고 앱 명단을 맞춘다.',
+      steps: ['신규 학생 요청 또는 카드를 확인한다', '해당 반에 학생을 추가한다(방법은 원장 확인)', '앱 학생 카드의 프로그램 항목을 갱신한다', '카드를 완료로 넘긴다'],
+      cautions: [],
+      linkKeys: ['classcard_teacher', 'classcard_app_android', 'classcard_app_ios'] },
+
+    { id: 'seed:metamath:assign', scope: 'metamath', task: 'assign', title: '문제지 제작·배정',
+      purpose: '원장이 준 단원·건수대로 문제지를 만들어 학생별로 배정한다. 보통 수요일.',
+      steps: ['카드의 "무엇을"(단원·건수)을 확인한다', '메타수학 교실홈에 로그인한다', '카드대로 문제지를 만든다', '학생별로 배정한다', '배정 화면에서 빠진 학생이 없는지 확인한다', '카드를 완료로 넘긴다'],
+      cautions: ['단원이 카드와 다르면 임의로 바꾸지 말고 요청함(기타)으로 원장에게 묻는다'],
+      linkKeys: ['metamath_center'] },
+    { id: 'seed:metamath:account', scope: 'metamath', task: 'account', title: '계정 발급',
+      purpose: '신규 학생의 교실홈 계정을 만들고 앱 명단을 맞춘다.',
+      steps: ['요청함의 계정 발급 요청 또는 카드를 확인한다', '교실홈에서 학생 계정을 만든다', '앱 학생 카드의 프로그램 항목을 "발급됨"으로 바꾼다', '학생홈 안내는 원장이 정한 경로로 전달한다', '카드를 완료로 넘긴다'],
+      cautions: ['비밀번호를 앱·카톡·메모 어디에도 적지 않는다'],
+      linkKeys: ['metamath_center', 'metamath_student'] },
+
+    { id: 'seed:nelt:assign', scope: 'nelt', task: 'assign', title: '응시 등록·안내',
+      purpose: '응시 대상 반·학생을 등록하고 응시 페이지를 안내한다.',
+      steps: ['카드의 응시 대상(반·학생)을 확인한다', '넬트 접수 사이트에서 응시를 등록한다', '학생 응시 페이지 안내를 원장이 정한 경로로 전달한다', '응시 완료 반 수를 확인해 메모에 남긴다', '카드를 완료로 넘긴다'],
+      cautions: [],
+      linkKeys: ['nelt_org', 'nelt_student'] },
+    { id: 'seed:nelt:check', scope: 'nelt', task: 'check', title: '결과 확인·단계 입력',
+      purpose: '응시 결과를 보고 원장이 정한 표에 단계를 옮긴다.',
+      steps: ['접수·결과 사이트에서 결과를 조회한다', '학생별 결과 단계를 원장이 정한 표에 옮긴다', '단계 변경이 필요한 학생은 요청함(기타)으로 원장에게 올린다', '카드를 완료로 넘긴다'],
+      cautions: ['결과 화면을 캡처해 외부로 보내지 않는다'],
+      linkKeys: ['nelt_org'] },
+
+    { id: 'seed:exam4you:download', scope: 'exam4you', task: 'download', title: '자료 검색·구매·다운로드',
+      purpose: '카드의 범위에 맞는 자료를 찾아 원장 승인 뒤 구매·다운로드한다.',
+      steps: ['카드의 범위(학교·학년·교과서·단원)를 확인한다', '이그잼포유에서 검색한다', '후보를 골라 자산 탭에 구매 요청을 올린다(원장 승인 필요)', '승인되면 직원 계정으로 구매·다운로드한다',
+        '파일을 원장이 정한 폴더에 저장한다', '자산 원장에 구매 기록을 남긴다', '카드를 완료로 넘긴다'],
+      cautions: ['자료 파일을 앱·카톡·저장소에 올리지 않는다', '정답이 필요한 자료는 교사용 포함 여부를 확인한다'],
+      linkKeys: ['exam4you'] },
+    { id: 'seed:exam4you:assign', scope: 'exam4you', task: 'assign', title: '학생에게 자료 전달',
+      purpose: '받은 자료를 정해진 학생에게 전달하고 기록한다.',
+      steps: ['카드의 학생과 자료를 확인한다', '원장이 정한 전달 경로(폴더·출력·앱)로 전달한다', '자산 원장에 제공 기록을 남긴다', '카드를 완료로 넘긴다'],
+      cautions: ['카드에 적힌 학생 외에는 전달하지 않는다'],
+      linkKeys: [] },
+    { id: 'seed:jokbo:download', scope: 'jokbo', task: 'download', title: '자료 검색·구매·다운로드',
+      purpose: '카드의 범위에 맞는 자료를 찾아 원장 승인 뒤 구매·다운로드한다.',
+      steps: ['카드의 범위(학교·학년·교과서·단원)를 확인한다', '족보닷컴에서 검색한다', '후보를 골라 자산 탭에 구매 요청을 올린다(원장 승인 필요)', '승인되면 직원 계정으로 구매·다운로드한다',
+        '파일을 원장이 정한 폴더에 저장한다', '자산 원장에 구매 기록을 남긴다', '카드를 완료로 넘긴다'],
+      cautions: ['자료 파일을 앱·카톡·저장소에 올리지 않는다'],
+      linkKeys: ['jokbo'] },
+    { id: 'seed:jokbo:assign', scope: 'jokbo', task: 'assign', title: '학생에게 자료 전달',
+      purpose: '받은 자료를 정해진 학생에게 전달하고 기록한다.',
+      steps: ['카드의 학생과 자료를 확인한다', '원장이 정한 전달 경로(폴더·출력·앱)로 전달한다', '자산 원장에 제공 기록을 남긴다', '카드를 완료로 넘긴다'],
+      cautions: ['카드에 적힌 학생 외에는 전달하지 않는다'],
+      linkKeys: [] },
+
+    { id: 'seed:app:upload', scope: 'app', task: 'upload', title: '학습 앱에 자료 올리기',
+      purpose: '학원 학습 앱(삼육중 입시 준비·국어 내신 등)에 필요한 자료를 그 앱의 형식으로 올린다.',
+      steps: ['카드의 앱과 범위(과목·학년·단원·자료 종류)를 확인한다', '앱 목적지에 적힌 자료 형식·절차를 본다', '받은 자료를 그 형식으로 변환한다', '앱의 관리 웹에 로그인해 업로드한다',
+        '업로드 결과를 확인한다(오류면 카드를 막힘으로)', '방의 "앱 자료 범위"에서 그 범위를 "있음"으로 바꾼다', '카드를 완료로 넘긴다'],
+      cautions: ['라이선스 자료 원본은 그 앱의 서버에만 둔다 — 저장소·카톡·개인 드라이브 금지', '형식이 맞지 않으면 억지로 올리지 말고 요청함(기타)으로 원장에게 묻는다'],
+      linkKeys: [] }
+  ]);
+  root.WBManualSeed = Object.freeze({ SEED: SEED });
+})(typeof globalThis !== 'undefined' ? globalThis : this);
