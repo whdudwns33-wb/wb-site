@@ -28,8 +28,21 @@
   const CONTACT_RESULT_LABEL = Object.freeze({ reached: '연락됨', no_answer: '부재중', note: '메모' });
   const REPEATS = Object.freeze(['once', 'daily', 'weekday', 'days']);
   const TASK_STATUS_LABEL = Object.freeze({ todo: '미착수', doing: '진행중', done: '완료', blocked: '막힘' });
-  const ROUTES = Object.freeze(['login', 'today', 'requests', 'students', 'assets', 'perf', 'contacts', 'admin']);
+  const ROUTES = Object.freeze(['login', 'today', 'room', 'requests', 'students', 'assets', 'perf', 'contacts', 'manuals', 'matrix', 'admin']);
   const DOW = Object.freeze(['일', '월', '화', '수', '목', '금', '토']);
+  /* 기획서 v1.1 — 프로그램 방 6개(원장 표현: 세션). 구독 4개 + 자료 출처 2곳. 방 = 카드 큐의 창 + 매뉴얼 + 사이트 열기 + 현황. */
+  const ROOMS = Object.freeze(['studyforce', 'classcard', 'metamath', 'nelt', 'exam4you', 'jokbo']);
+  const ROOM_LABEL = Object.freeze({ studyforce: '스터디포스', classcard: '클래스카드', metamath: '메타수학', nelt: '넬트', exam4you: '이그잼포유', jokbo: '족보닷컴' });
+  const CARD_STATUS = Object.freeze(['todo', 'doing', 'done', 'blocked']);
+  const CARD_STATUS_LABEL = Object.freeze({ todo: '대기', doing: '진행', done: '완료', blocked: '막힘' });
+  const CARD_TARGETS = Object.freeze(['student', 'app', 'text']);
+  const PLAN_TARGETS = Object.freeze(['each', 'student', 'app', 'text']);
+  const PLAN_TARGET_LABEL = Object.freeze({ each: '구독 학생 각각', student: '학생 한 명', app: '학원 학습 앱', text: '반·기타(글로)' });
+  const RANGE_STATUS = Object.freeze(['need', 'buying', 'uploading', 'have']);
+  const RANGE_STATUS_LABEL = Object.freeze({ need: '없음', buying: '구매 대기', uploading: '업로드 대기', have: '있음' });
+  const RANGE_SOURCES = Object.freeze(['exam4you', 'jokbo', 'other']);
+  const MANUAL_SCOPES = Object.freeze(['studyforce', 'classcard', 'metamath', 'nelt', 'exam4you', 'jokbo', 'app']);
+  const HTTPS_RE = /^https:\/\/[^\s"'<>]{1,200}$/;
   const NOTE_MAX = 300;
   const CONTACT_NOTE_MAX = 200;
   const DOC_ID_RE = /^[A-Za-z0-9_|.:@-]{1,160}$/;   // 서버 §3.4와 같은 문서 id 규칙
@@ -374,6 +387,10 @@
       checks: Object.assign({}, isObj(L.checks) ? L.checks : {}),
       students: (Array.isArray(L.students) ? L.students : []).slice(),
       contacts: (Array.isArray(L.contacts) ? L.contacts : []).slice(),
+      cards: (Array.isArray(L.cards) ? L.cards : []).slice(),
+      plans: (Array.isArray(L.plans) ? L.plans : []).slice(),
+      apps: (Array.isArray(L.apps) ? L.apps : []).slice(),
+      manuals: (Array.isArray(L.manuals) ? L.manuals : []).slice(),
       settings: Object.assign({}, isObj(L.settings) ? L.settings : {}),
       meta: Object.assign({}, isObj(L.meta) ? L.meta : {}),
       base: Object.assign({}, isObj(L.base) ? L.base : {})
@@ -394,6 +411,10 @@
         case 'tasks': upsert(out.tasks, d.id, data, del || data.deleted === true); break;
         case 'students': upsert(out.students, d.id, data, del); break;
         case 'contacts': upsert(out.contacts, d.id, data, del); break;
+        case 'cards': upsert(out.cards, d.id, data, del); break;
+        case 'plans': upsert(out.plans, d.id, data, del); break;
+        case 'apps': upsert(out.apps, d.id, data, del); break;
+        case 'manuals': upsert(out.manuals, d.id, data, del); break;
         case 'staff': upsert(out.staff, d.id, data, del); break;
         case 'settings': out.settings = del ? {} : Object.assign({}, data); break;
         default: return;
@@ -643,15 +664,284 @@
     return txt;
   }
 
+  /* ── 배정 카드·템플릿·앱 목적지·매뉴얼 (기획서 v1.1 §1.4·§1.8·§3) ──────────
+   * 카드 = 한 대상 × 한 프로그램 × 한 배정. 템플릿(recurring)이 매일 아침 카드를 만들고, 원장 지시는 카드를 직접 만든다.
+   * 카드 id 는 템플릿·날짜·대상으로 결정적이라 어느 기기가 몇 번 만들어도 같은 카드 하나다(서버 CAS 0 과 함께 중복을 막는다). */
+
+  function live(list) { return (Array.isArray(list) ? list : []).filter(x => isObj(x) && !x.deleted); }
+
+  function planCardId(planId, ymd, targetId) {
+    return 'p:' + str(planId) + ':' + str(ymd) + ':' + (str(targetId) || '-');
+  }
+
+  function planActiveOn(plan, ymd) {
+    if (!isObj(plan) || plan.kind !== 'recurring' || plan.active === false) return false;
+    if (!Array.isArray(plan.days) || !plan.days.map(Number).includes(dowOf(ymd))) return false;
+    if (str(plan.start) && ymd < str(plan.start)) return false;
+    if (str(plan.end) && ymd > str(plan.end)) return false;
+    return true;
+  }
+
+  /** 템플릿의 대상을 오늘 실제 대상 목록으로 편다. each = 그 프로그램을 구독 중(active)인 이용 중 학생 전원. */
+  function planTargetsFor(plan, students, apps) {
+    const t = isObj(plan.target) ? plan.target : {};
+    if (t.type === 'each') {
+      return live(students).filter(s => str(s.status || 'active') === 'active')
+        .filter(s => !PROGRAMS.includes(plan.program) || (isObj(s.programs) && isObj(s.programs[plan.program]) && s.programs[plan.program].active === true))
+        .map(s => ({ type: 'student', id: str(s.id) }));
+    }
+    if (t.type === 'student') {
+      const s = live(students).find(x => str(x.id) === str(t.id));
+      return s && str(s.status || 'active') !== 'ended' ? [{ type: 'student', id: str(s.id) }] : [];
+    }
+    if (t.type === 'app') {
+      const a = live(apps).find(x => str(x.id) === str(t.id));
+      return a && a.active !== false ? [{ type: 'app', id: str(a.id) }] : [];
+    }
+    if (t.type === 'text') return [{ type: 'text', label: str(t.label) }];
+    return [];
+  }
+
+  /**
+   * 오늘(ymd) 만들어야 할 카드 — 활성 템플릿 × 오늘 요일 × 대상. 이미 있는 id(삭제된 것 포함)는 건너뛴다.
+   * 돌려주는 카드는 서버 규칙(ruleCards)이 받는 모양이다. createdBy 는 서버가 토큰 신원으로 덮는다.
+   */
+  function deriveCards(plans, students, apps, cards, ymd, nowMs, knownIds) {
+    // knownIds: 서버가 아는 카드 id(삭제된 것 포함) — 원장이 지운 카드를 아침마다 되살리지 않게 하려는 것.
+    const have = new Set((Array.isArray(cards) ? cards : []).filter(isObj).map(c => str(c.id)).concat((Array.isArray(knownIds) ? knownIds : []).map(String)));
+    const out = [];
+    let skipped = 0;
+    (Array.isArray(plans) ? plans : []).forEach(plan => {
+      if (!planActiveOn(plan, ymd) || !ROOMS.includes(plan.program)) return;
+      planTargetsFor(plan, students, apps).forEach(target => {
+        const id = planCardId(plan.id, ymd, target.type === 'text' ? slugOf(target.label) : target.id);
+        if (have.has(id)) { skipped++; return; }
+        have.add(id);
+        const card = { id: id, program: plan.program, target: target, what: str(plan.what), status: 'todo', due: ymd, source: 'plan:' + str(plan.id), createdAt: Number(nowMs) || 0 };
+        if (str(plan.where)) card.where = str(plan.where);
+        if (str(plan.manualId)) card.manualId = str(plan.manualId);
+        out.push(card);
+      });
+    });
+    return { cards: out, skipped: skipped };
+  }
+  function slugOf(text) { return str(text).toLowerCase().replace(/[^a-z0-9가-힣]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'x'; }
+
+  function cardLate(card, ymd) { return !!(isObj(card) && card.status !== 'done' && str(card.due) && str(card.due) < str(ymd)); }
+
+  /** 오늘 화면의 카드: 열린 것(기한 없음·오늘·지난 미완료) + 오늘 완료한 것. 막힘 → 지연 → 오늘 → 완료 순. */
+  function cardsOn(cards, ymd) {
+    const day = str(ymd);
+    const open = [], done = [];
+    live(cards).forEach(c => {
+      if (c.status === 'done') { if (doneYmd(c) === day || str(c.due) === day) done.push(c); return; }
+      if (!str(c.due) || str(c.due) <= day) open.push(c);
+    });
+    const rank = c => (c.status === 'blocked' ? 0 : cardLate(c, day) ? 1 : c.status === 'doing' ? 2 : 3);
+    const dueKey = c => str(c.due) || '9999-99-99';   // 기한 없는 카드는 뒤로
+    open.sort((a, b) => rank(a) - rank(b) || dueKey(a).localeCompare(dueKey(b)) || str(a.program).localeCompare(str(b.program)) || str(a.what).localeCompare(str(b.what)));
+    done.sort((a, b) => (Number(b.doneAt) || 0) - (Number(a.doneAt) || 0));
+    return { open: open, done: done };
+  }
+  function doneYmd(card) {
+    const n = Number(card && card.doneAt);
+    return n > 0 ? ymdOf(new Date(n)) : '';
+  }
+
+  /** 방별 묶음 — ROOMS 순서의 {program: [cards]}. 모르는 프로그램은 버린다. */
+  function groupByRoom(cards) {
+    const out = {};
+    ROOMS.forEach(k => { out[k] = []; });
+    (Array.isArray(cards) ? cards : []).forEach(c => { if (isObj(c) && out[c.program]) out[c.program].push(c); });
+    return out;
+  }
+
+  /** 원장 매트릭스 — 이용 중 학생 × 방. 칸 = 구독 여부 + 마지막 카드(기한 최신)의 상태. */
+  function matrixOf(students, cards, ymd) {
+    const byKey = {};
+    live(cards).forEach(c => {
+      if (!isObj(c.target) || c.target.type !== 'student' || !ROOMS.includes(c.program)) return;
+      const key = str(c.target.id) + '|' + c.program;
+      const cur = byKey[key];
+      const newer = !cur || str(c.due) > str(cur.due) || (str(c.due) === str(cur.due) && (Number(c.createdAt) || 0) > (Number(cur.createdAt) || 0));
+      if (newer) byKey[key] = c;
+    });
+    return live(students).filter(s => str(s.status || 'active') !== 'ended').map(s => {
+      const cells = {};
+      ROOMS.forEach(p => {
+        const sub = PROGRAMS.includes(p) ? !!(isObj(s.programs) && isObj(s.programs[p]) && s.programs[p].active === true) : null;
+        const last = byKey[str(s.id) + '|' + p] || null;
+        cells[p] = { sub: sub, status: last ? str(last.status) : '', due: last ? str(last.due) : '', late: last ? cardLate(last, ymd) : false, what: last ? str(last.what) : '' };
+      });
+      return { id: str(s.id), name: str(s.name), grade: str(s.grade), cells: cells };
+    });
+  }
+
+  /** 앱 × 범위 커버리지 — 앱마다 범위 행과 상태별 건수. */
+  function coverageOf(apps, plans) {
+    const ranges = live(plans).filter(p => p.kind === 'apprange');
+    return live(apps).map(app => {
+      const rows = ranges.filter(r => str(r.appId) === str(app.id))
+        .sort((a, b) => str(a.subject).localeCompare(str(b.subject)) || str(a.grade).localeCompare(str(b.grade)) || str(a.unit).localeCompare(str(b.unit)));
+      const counts = { need: 0, buying: 0, uploading: 0, have: 0 };
+      rows.forEach(r => { if (counts[r.status] != null) counts[r.status]++; });
+      return { app: app, rows: rows, counts: counts, total: rows.length };
+    });
+  }
+
+  /** 카드에 붙는 매뉴얼 — manualId 가 있으면 그것, 없으면 같은 방의 첫 항목(작업 종류 'assign' 우선). */
+  function manualFor(manuals, card) {
+    const list = live(manuals);
+    if (isObj(card) && str(card.manualId)) {
+      const hit = list.find(m => str(m.id) === str(card.manualId));
+      if (hit) return hit;
+    }
+    const scope = isObj(card) && isObj(card.target) && card.target.type === 'app' ? 'app' : (isObj(card) ? str(card.program) : '');
+    const same = list.filter(m => str(m.scope) === scope && (scope !== 'app' || !str(m.appId) || str(m.appId) === str(card.target.id)));
+    return same.find(m => m.task === 'assign') || same[0] || null;
+  }
+  function manualsFor(manuals, scope, appId) {
+    return live(manuals).filter(m => str(m.scope) === str(scope) && (str(scope) !== 'app' || !str(appId) || !str(m.appId) || str(m.appId) === str(appId)))
+      .sort((a, b) => str(a.task).localeCompare(str(b.task)) || str(a.title).localeCompare(str(b.title)));
+  }
+
+  function lengthErr(label, v, min, max) {
+    const s = str(v);
+    if (s.length < min) return label + '을(를) 입력하세요';
+    if (s.length > max) return label + '은(는) ' + max + '자까지입니다';
+    return '';
+  }
+  function piiErr(values) {
+    for (const v of values) if (hasPII(v)) return '학생 이름 외의 개인정보(전화번호·이메일)는 적을 수 없습니다';
+    return '';
+  }
+
+  /** 지시 폼 → 카드 데이터. {value, error} */
+  function validateCard(input) {
+    const i = isObj(input) ? input : {};
+    if (!ROOMS.includes(i.program)) return { value: null, error: '프로그램을 고르세요' };
+    const tt = str(i.targetType);
+    if (!CARD_TARGETS.includes(tt)) return { value: null, error: '대상 종류를 고르세요' };
+    const target = { type: tt };
+    if (tt === 'text') {
+      const e = lengthErr('대상', i.targetLabel, 1, 60);
+      if (e) return { value: null, error: e };
+      target.label = str(i.targetLabel);
+    } else {
+      if (!DOC_ID_RE.test(str(i.targetId))) return { value: null, error: tt === 'app' ? '앱을 고르세요' : '학생을 고르세요' };
+      target.id = str(i.targetId);
+    }
+    let e = lengthErr('무엇을', i.what, 1, 120) || (str(i.where).length > 120 ? '어디에는 120자까지입니다' : '') || (str(i.note).length > 300 ? '메모는 300자까지입니다' : '');
+    if (e) return { value: null, error: e };
+    if (str(i.due) && !validYmd(str(i.due))) return { value: null, error: '기한은 YYYY-MM-DD 형식입니다' };
+    e = piiErr([i.what, i.where, i.note, i.targetLabel]);
+    if (e) return { value: null, error: e };
+    const value = { program: i.program, target: target, what: str(i.what), status: 'todo', source: str(i.source) || 'order' };
+    if (str(i.where)) value.where = str(i.where);
+    if (str(i.due)) value.due = str(i.due);
+    if (str(i.note)) value.note = str(i.note);
+    if (str(i.manualId)) value.manualId = str(i.manualId);
+    return { value: value, error: '' };
+  }
+
+  /** 반복 템플릿 폼 → plan(recurring). days 는 [0..6] 배열. */
+  function validateRecurring(input) {
+    const i = isObj(input) ? input : {};
+    if (!ROOMS.includes(i.program)) return { value: null, error: '프로그램을 고르세요' };
+    const days = (Array.isArray(i.days) ? i.days : []).map(Number).filter(n => Number.isInteger(n) && n >= 0 && n <= 6);
+    if (!days.length) return { value: null, error: '요일을 하나 이상 고르세요' };
+    const tt = str(i.targetType);
+    if (!PLAN_TARGETS.includes(tt)) return { value: null, error: '대상 종류를 고르세요' };
+    const target = { type: tt };
+    if (tt === 'student' || tt === 'app') {
+      if (!DOC_ID_RE.test(str(i.targetId))) return { value: null, error: tt === 'app' ? '앱을 고르세요' : '학생을 고르세요' };
+      target.id = str(i.targetId);
+    } else if (tt === 'text') {
+      const e = lengthErr('대상', i.targetLabel, 1, 60);
+      if (e) return { value: null, error: e };
+      target.label = str(i.targetLabel);
+    }
+    let e = lengthErr('무엇을', i.what, 1, 120) || (str(i.where).length > 120 ? '어디에는 120자까지입니다' : '');
+    if (e) return { value: null, error: e };
+    for (const k of ['start', 'end']) if (str(i[k]) && !validYmd(str(i[k]))) return { value: null, error: (k === 'start' ? '시작' : '끝') + '은 YYYY-MM-DD 형식입니다' };
+    e = piiErr([i.what, i.where, i.targetLabel, i.note]);
+    if (e) return { value: null, error: e };
+    const value = { kind: 'recurring', program: i.program, days: Array.from(new Set(days)).sort((a, b) => a - b), target: target, what: str(i.what), active: i.active !== false };
+    ['where', 'manualId', 'start', 'end', 'note'].forEach(k => { if (str(i[k])) value[k] = str(i[k]); });
+    return { value: value, error: '' };
+  }
+
+  /** 앱 자료 범위 폼 → plan(apprange). */
+  function validateRange(input) {
+    const i = isObj(input) ? input : {};
+    if (!DOC_ID_RE.test(str(i.appId))) return { value: null, error: '앱을 고르세요' };
+    let e = lengthErr('범위', i.unit, 1, 80) || (str(i.subject).length > 40 ? '과목은 40자까지입니다' : '') || (str(i.grade).length > 10 ? '학년은 10자까지입니다' : '') ||
+      (str(i.material).length > 40 ? '자료 종류는 40자까지입니다' : '') || (str(i.note).length > 300 ? '메모는 300자까지입니다' : '');
+    if (e) return { value: null, error: e };
+    const status = str(i.status) || 'need';
+    if (!RANGE_STATUS.includes(status)) return { value: null, error: '상태가 올바르지 않습니다' };
+    const source = str(i.source) || 'exam4you';
+    if (!RANGE_SOURCES.includes(source)) return { value: null, error: '출처가 올바르지 않습니다' };
+    e = piiErr([i.unit, i.subject, i.grade, i.material, i.note]);
+    if (e) return { value: null, error: e };
+    const value = { kind: 'apprange', appId: str(i.appId), unit: str(i.unit), status: status, source: source };
+    ['subject', 'grade', 'material', 'note'].forEach(k => { if (str(i[k])) value[k] = str(i[k]); });
+    return { value: value, error: '' };
+  }
+
+  function validateApp(input) {
+    const i = isObj(input) ? input : {};
+    let e = lengthErr('앱 이름', i.name, 1, 40) || (str(i.format).length > 80 ? '자료 형식은 80자까지입니다' : '') || (str(i.note).length > 300 ? '메모는 300자까지입니다' : '');
+    if (e) return { value: null, error: e };
+    if (str(i.adminUrl) && !HTTPS_RE.test(str(i.adminUrl))) return { value: null, error: '관리 웹 주소는 https:// 로 시작해야 합니다' };
+    e = piiErr([i.name, i.format, i.note]);
+    if (e) return { value: null, error: e };
+    const value = { name: str(i.name), active: i.active !== false };
+    ['adminUrl', 'format', 'note'].forEach(k => { if (str(i[k])) value[k] = str(i[k]); });
+    return { value: value, error: '' };
+  }
+
+  /** 매뉴얼 폼 → manual. steps·cautions 는 줄 단위 텍스트, links 는 "이름 | 주소(https)" 줄. */
+  function validateManual(input) {
+    const i = isObj(input) ? input : {};
+    if (!MANUAL_SCOPES.includes(i.scope)) return { value: null, error: '어느 방의 매뉴얼인지 고르세요' };
+    let e = lengthErr('작업 종류', i.task, 1, 40) || lengthErr('제목', i.title, 1, 80) || (str(i.purpose).length > 300 ? '목적은 300자까지입니다' : '');
+    if (e) return { value: null, error: e };
+    const lines = text => String(text == null ? '' : text).split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    const steps = lines(i.stepsText);
+    if (steps.length > 40) return { value: null, error: '단계는 40개까지입니다' };
+    if (steps.some(s => s.length > 300)) return { value: null, error: '단계는 각 300자까지입니다' };
+    const cautions = lines(i.cautionsText);
+    if (cautions.length > 20) return { value: null, error: '주의점은 20개까지입니다' };
+    if (cautions.some(s => s.length > 300)) return { value: null, error: '주의점은 각 300자까지입니다' };
+    const links = [];
+    for (const line of lines(i.linksText)) {
+      const m = line.match(/^(.+?)\s*\|\s*(https:\/\/\S+)$/);
+      if (!m || m[1].trim().length > 40 || !HTTPS_RE.test(m[2])) return { value: null, error: '링크는 "이름 | 주소" 형식으로 한 줄에 하나씩, 주소는 https 로 시작해야 합니다' };
+      links.push({ label: m[1].trim(), url: m[2] });
+    }
+    if (links.length > 10) return { value: null, error: '링크는 10개까지입니다' };
+    if (str(i.lastCheckedAt) && !validYmd(str(i.lastCheckedAt))) return { value: null, error: '마지막 확인일은 YYYY-MM-DD 형식입니다' };
+    e = piiErr([i.title, i.purpose, i.stepsText, i.cautionsText]);
+    if (e) return { value: null, error: e };
+    const value = { scope: i.scope, task: str(i.task), title: str(i.title), steps: steps.map(t => ({ text: t })), cautions: cautions, links: links, version: Number(i.version) > 0 ? Number(i.version) : 1 };
+    if (str(i.purpose)) value.purpose = str(i.purpose);
+    if (str(i.appId) && i.scope === 'app') value.appId = str(i.appId);
+    if (str(i.lastCheckedAt)) value.lastCheckedAt = str(i.lastCheckedAt);
+    return { value: value, error: '' };
+  }
+
   /* ── 라우트 ────────────────────────────────────────── */
 
-  /** '#/students' → {route:'students', code:''} · '#c=abc' → {route:'today', code:'abc'} · 모르면 today */
+  /** '#/students' → {route:'students', code:''} · '#/p/classcard' → {route:'room', room:'classcard'} · '#c=abc' → 코드 · 모르면 today */
   function routeOf(hash) {
     const h = String(hash || '').replace(/^#/, '');
     const m = h.match(/^c=([A-Za-z0-9_-]{4,200})$/);
-    if (m) return { route: 'today', code: m[1] };
-    const r = h.replace(/^\/+/, '').split(/[/?]/)[0];
-    return { route: ROUTES.includes(r) ? r : 'today', code: '' };
+    if (m) return { route: 'today', room: '', code: m[1] };
+    const parts = h.replace(/^\/+/, '').split(/[/?]/);
+    if (parts[0] === 'p') return ROOMS.includes(parts[1]) ? { route: 'room', room: parts[1], code: '' } : { route: 'today', room: '', code: '' };
+    const r = parts[0];
+    return { route: ROUTES.includes(r) && r !== 'room' ? r : 'today', room: '', code: '' };
   }
 
   /** 직원 초대 링크 — 앱 주소 + '#c=' + 코드. index.html로 열렸어도 디렉터리 주소로 정리한다. */
@@ -674,6 +964,12 @@
     studentsToRoster: studentsToRoster, seedPerfsets: seedPerfsets, searchStudents: searchStudents,
     docKey: docKey, mergeDocs: mergeDocs, revertDoc: revertDoc, createOutbox: createOutbox, slug: slug,
     normalizePhone: normalizePhone, maskPhone: maskPhone, validateStudent: validateStudent, validateContact: validateContact,
-    alertsToday: alertsToday, briefText: briefText, routeOf: routeOf, inviteLink: inviteLink
+    alertsToday: alertsToday, briefText: briefText, routeOf: routeOf, inviteLink: inviteLink,
+    ROOMS: ROOMS, ROOM_LABEL: ROOM_LABEL, CARD_STATUS: CARD_STATUS, CARD_STATUS_LABEL: CARD_STATUS_LABEL, CARD_TARGETS: CARD_TARGETS,
+    PLAN_TARGETS: PLAN_TARGETS, PLAN_TARGET_LABEL: PLAN_TARGET_LABEL, RANGE_STATUS: RANGE_STATUS, RANGE_STATUS_LABEL: RANGE_STATUS_LABEL,
+    RANGE_SOURCES: RANGE_SOURCES, MANUAL_SCOPES: MANUAL_SCOPES,
+    planCardId: planCardId, planActiveOn: planActiveOn, planTargetsFor: planTargetsFor, deriveCards: deriveCards, cardLate: cardLate,
+    cardsOn: cardsOn, groupByRoom: groupByRoom, matrixOf: matrixOf, coverageOf: coverageOf, manualFor: manualFor, manualsFor: manualsFor,
+    validateCard: validateCard, validateRecurring: validateRecurring, validateRange: validateRange, validateApp: validateApp, validateManual: validateManual
   };
 });
