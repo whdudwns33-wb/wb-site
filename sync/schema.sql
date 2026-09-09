@@ -155,6 +155,20 @@ BEGIN
   SELECT RAISE(ABORT, 'TASK_REVOCATION_APPEND_ONLY');
 END;
 
+-- 완료한 수업을 별도 결석 보강에 연결한 이력. 출결·회차 원장은 재기록하지 않는다.
+CREATE TABLE IF NOT EXISTS makeup_completion_links (
+  app TEXT NOT NULL CHECK (app='task'),
+  pending_case_id TEXT NOT NULL,
+  completed_case_id TEXT NOT NULL,
+  student_id TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  created_by TEXT NOT NULL,
+  PRIMARY KEY (app,pending_case_id),
+  UNIQUE (app,completed_case_id)
+);
+CREATE INDEX IF NOT EXISTS idx_makeup_completion_links_student
+  ON makeup_completion_links(app,student_id,created_at);
+
 CREATE TRIGGER IF NOT EXISTS trg_task_revocations_no_delete
 BEFORE DELETE ON task_revocations
 BEGIN
