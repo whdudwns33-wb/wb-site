@@ -1,0 +1,14 @@
+{
+  "name": "WB 프로그램데스크",
+  "short_name": "프로그램데스크",
+  "description": "학생·구독 명단, 직원 런북과 요청함, 자료 원장, 수행 확인 — 원내 직원 전용",
+  "lang": "ko-KR",
+  "start_url": "./#/today",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F2F5F4",
+  "theme_color": "#1E3A3F",
+  "icons": [
+    { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
