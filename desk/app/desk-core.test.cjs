@@ -238,6 +238,24 @@ test('mergeDocs applies server docs per collection, honors pending keys, drops d
   assert.equal(r.local.meta['students|s1'], 300);
   assert.ok(!r.local.tasks.some(t => t.id === 't9'));
   assert.equal(local.tasks[0].title, 'old', 'input untouched');
+  assert.deepEqual(r.local.base['tasks|t1'], { title: 'new' }, 'base keeps the last server value');
+  assert.equal(r.local.base['students|s2'], null, 'deleted → null base');
+  assert.ok(!('checks|p|d' in r.local.base), 'pending docs do not touch base');
+});
+
+test('revertDoc: base value when known, delete document when the server never had it', () => {
+  const local = { base: { 'students|s1': { name: '서버값' } }, meta: { 'students|s1': 300, 'students|new': 0 } };
+  assert.deepEqual(C.revertDoc(local, 'students|s1'), { c: 'students', id: 's1', data: { name: '서버값' }, updatedAt: 300, deleted: false });
+  assert.deepEqual(C.revertDoc(local, 'students|new'), { c: 'students', id: 'new', data: {}, updatedAt: 0, deleted: true });
+  assert.deepEqual(C.revertDoc(local, 'checks|a|b'), { c: 'checks', id: 'a|b', data: {}, updatedAt: 0, deleted: true }, 'id may contain |');
+  assert.equal(C.revertDoc(local, 'nokey'), null);
+});
+
+test('slug: lowercase alnum of the requested length, deterministic with a fixed rand', () => {
+  assert.match(C.slug(12), /^[a-z0-9]{12}$/);
+  assert.equal(C.slug(4, () => 0), 'aaaa');
+  assert.equal(C.slug(3, () => 0.999), '999');
+  assert.ok(/^[A-Za-z0-9_-]{1,64}$/.test('stu_' + C.slug(12)), 'fits the requests targetRef rule');
 });
 
 test('outbox: coalesces per key, ack removes settled entries only, splits ok/stale/failed', () => {
@@ -378,4 +396,22 @@ test('routeOf / inviteLink', () => {
   assert.deepEqual(C.routeOf('#c=<script>'), { route: 'today', code: '' });
   assert.equal(C.inviteLink('https://wb-desk.example', '/index.html', 'abc'), 'https://wb-desk.example/#c=abc');
   assert.equal(C.inviteLink('https://wb-desk.example', '/', 'abc'), 'https://wb-desk.example/#c=abc');
+});
+
+test('seedPerfsets derives program setup from student records without overriding saved rows', () => {
+  const students = [
+    { id: 'stu_a', name: '학생A', status: 'active', programs: { studyforce: { active: true }, classcard: { active: false }, metamath: { active: true } } },
+    { id: 'stu_b', name: '학생B', status: 'active', programs: { classcard: { active: true } } },
+    { id: 'stu_c', name: '학생C', status: 'ended', programs: { studyforce: { active: true } } },
+    { id: 'stu_d', name: '학생D', status: 'active', programs: {} }
+  ];
+  const saved = { '__perfset__stu_b|all': { studentId: 'stu_b', progs: ['studyforce'], dueDays: { studyforce: [1, 3] }, target: null, from: 'bulk' } };
+  const r = C.seedPerfsets(students, saved, { perfsetKey: id => '__perfset__' + id + '|all', dueDays: [1, 2, 3, 4, 5] });
+  assert.deepEqual(r.checks['__perfset__stu_a|all'].progs, ['studyforce'], '메타수학은 수행 판정 대상이 아니다');
+  assert.equal(r.checks['__perfset__stu_a|all'].from, 'students');
+  assert.deepEqual(r.checks['__perfset__stu_b|all'].progs, ['studyforce'], '사람이 저장한 행은 학생 문서가 덮지 않는다');
+  assert.ok(!r.checks['__perfset__stu_c|all'] && !r.checks['__perfset__stu_d|all']);
+  const again = C.seedPerfsets([students[1]], r.checks, {});
+  assert.ok(!again.checks['__perfset__stu_a|all'], '학생이 사라지면 파생 행도 사라진다');
+  assert.ok(again.checks['__perfset__stu_b|all']);
 });

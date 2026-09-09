@@ -48,6 +48,14 @@
   function str(v) { return v == null ? '' : String(v).trim(); }
   function isObj(v) { return !!v && typeof v === 'object' && !Array.isArray(v); }
   function pad2(n) { return String(n).padStart(2, '0'); }
+  /** 문서 id용 소문자·숫자 슬러그. rand()는 [0,1) — 테스트가 고정값을 넣는다. */
+  function slug(n, rand) {
+    const r = typeof rand === 'function' ? rand : Math.random;
+    const chars = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    let out = '';
+    for (let i = 0; i < (n > 0 ? n : 12); i++) out += chars[Math.floor(r() * chars.length) % chars.length];
+    return out;
+  }
   function hasPII(text) {
     const t = String(text == null ? '' : text);
     return PHONE_RE.test(t) || EMAIL_RE.test(t) || RRN_RE.test(t);
@@ -285,6 +293,36 @@
    * end = 'ended'면 그 달(프로그램 until 최댓값이 있으면 그 달, 없으면 이번 달), 'paused'는 이번 달로 두어
    * 수행 판정(end > 이번 달 조건)에서 빠지게 한다.
    */
+  /* 수행 패널은 학생마다 __perfset__ 행(이용 프로그램·대상 요일)이 있어야 신호판에 올린다. 그 값은 학생 문서의
+     programs.*.active 와 같은 정보라 두 번 적게 하지 않는다 — 서버 행이 없으면 학생 문서에서 메모리 위에 만든다
+     (from:'students', 서버에 보내지 않음). 사람이 수행 화면에서 저장하면 그 행이 이긴다. */
+  function seedPerfsets(students, checks, opts) {
+    const o = isObj(opts) ? opts : {};
+    const perfProgs = Array.isArray(o.progs) && o.progs.length ? o.progs : ['studyforce', 'classcard'];
+    const dueDays = Array.isArray(o.dueDays) && o.dueDays.length ? o.dueDays : [1, 2, 3, 4, 5];
+    const keyOf = typeof o.perfsetKey === 'function' ? o.perfsetKey : (id => '__perfset__' + id + '|all');
+    const out = Object.assign({}, isObj(checks) ? checks : {});
+    let seeded = 0, dropped = 0;
+    const seen = new Set();
+    (Array.isArray(students) ? students : []).forEach(st => {
+      if (!isObj(st) || !str(st.id) || st.deleted) return;
+      const key = keyOf(str(st.id));
+      seen.add(key);
+      const cur = out[key];
+      if (cur && cur.from !== 'students') return;            // 사람이 저장한 행은 건드리지 않는다
+      const progs = isObj(st.programs) ? perfProgs.filter(k => isObj(st.programs[k]) && st.programs[k].active === true) : [];
+      if (!progs.length || str(st.status) === 'ended') { if (cur) { delete out[key]; dropped++; } return; }
+      const dd = {};
+      progs.forEach(k => { dd[k] = dueDays.slice(); });
+      out[key] = { studentId: str(st.id), progs: progs, dueDays: dd, target: null, from: 'students' };
+      seeded++;
+    });
+    Object.keys(out).forEach(key => {
+      if (out[key] && out[key].from === 'students' && !seen.has(key)) { delete out[key]; dropped++; }
+    });
+    return { checks: out, seeded: seeded, dropped: dropped };
+  }
+
   function studentsToRoster(students, todayYm) {
     const month = validYm(todayYm) ? String(todayYm) : ymOf(ymdOf(new Date()));
     return (Array.isArray(students) ? students : []).filter(s => isObj(s) && str(s.id) && !s.deleted).map(s => {
@@ -325,7 +363,8 @@
   /**
    * 서버 문서를 로컬 state에 반영한다. pendingKeys(아직 안 보낸 'c|id')는 건드리지 않는다 — 내 변경이
    * 다른 기기의 옛 값에 덮이면 안 된다. updatedAt이 이미 아는 값보다 오래된 문서도 무시한다.
-   * local = {staff, tasks, checks, students, contacts, settings, meta:{'c|id': updatedAt}} → {local, changed, skipped}
+   * base['c|id']에는 서버가 마지막으로 준 data(삭제면 null)를 남긴다 — 서버가 거절한 내 변경을 되돌릴 때 쓴다.
+   * local = {staff, tasks, checks, students, contacts, settings, meta:{'c|id': updatedAt}, base} → {local, changed, skipped}
    */
   function mergeDocs(local, docs, pendingKeys) {
     const L = isObj(local) ? local : {};
@@ -336,7 +375,8 @@
       students: (Array.isArray(L.students) ? L.students : []).slice(),
       contacts: (Array.isArray(L.contacts) ? L.contacts : []).slice(),
       settings: Object.assign({}, isObj(L.settings) ? L.settings : {}),
-      meta: Object.assign({}, isObj(L.meta) ? L.meta : {})
+      meta: Object.assign({}, isObj(L.meta) ? L.meta : {}),
+      base: Object.assign({}, isObj(L.base) ? L.base : {})
     };
     const pend = new Set((Array.isArray(pendingKeys) ? pendingKeys : []).map(String));
     let changed = 0, skipped = 0;
@@ -359,9 +399,22 @@
         default: return;
       }
       out.meta[key] = at || prev || 0;
+      out.base[key] = del ? null : Object.assign({}, data);
       changed++;
     });
     return { local: out, changed: changed, skipped: skipped };
+  }
+
+  /** 서버가 거절한 로컬 변경을 되돌리는 문서 — base에 있으면 그 값, 없으면(서버가 모르는 문서) 삭제 문서. */
+  function revertDoc(local, key) {
+    const k = String(key || '');
+    const i = k.indexOf('|');
+    if (i < 0) return null;
+    const c = k.slice(0, i), id = k.slice(i + 1);
+    const base = isObj(local) && isObj(local.base) ? local.base[k] : undefined;
+    const at = isObj(local) && isObj(local.meta) ? Number(local.meta[k]) || 0 : 0;
+    if (base) return { c: c, id: id, data: base, updatedAt: at, deleted: false };
+    return { c: c, id: id, data: {}, updatedAt: at, deleted: true };
   }
 
   /**
@@ -618,8 +671,8 @@
     occursOn: occursOn, tasksFor: tasksFor, checkKey: checkKey, taskSteps: taskSteps, taskProgress: taskProgress,
     isDone: isDone, statusOf: statusOf, autoDone: autoDone, carriedTasks: carriedTasks,
     parseAssignments: parseAssignments, applyAssignmentsPure: applyAssignmentsPure,
-    studentsToRoster: studentsToRoster, searchStudents: searchStudents,
-    docKey: docKey, mergeDocs: mergeDocs, createOutbox: createOutbox,
+    studentsToRoster: studentsToRoster, seedPerfsets: seedPerfsets, searchStudents: searchStudents,
+    docKey: docKey, mergeDocs: mergeDocs, revertDoc: revertDoc, createOutbox: createOutbox, slug: slug,
     normalizePhone: normalizePhone, maskPhone: maskPhone, validateStudent: validateStudent, validateContact: validateContact,
     alertsToday: alertsToday, briefText: briefText, routeOf: routeOf, inviteLink: inviteLink
   };

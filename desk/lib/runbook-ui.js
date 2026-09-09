@@ -58,7 +58,9 @@
   }
   function q(sel) { return typeof document !== 'undefined' ? document.querySelector(sel) : null; }
   function val(id) { const el = q('#' + id); return el ? String(el.value || '') : ''; }
-  function isAdmin() { return !!(session && session.isAdmin); }
+  /* '원장' 판정. 업무지시서 앱은 isAdmin 하나지만, 프로그램데스크는 직원도 isAdmin(운영자)이라
+     canApprove 로 원장을 가른다 — 발행·담당 지정·대조 완료·운영 카드는 원장만. */
+  function isAdmin() { return !!(session && session.isAdmin && session.canApprove !== false); }
   function myId() { return session && session.isStaffLink ? String(session.staffId || '') : ''; }
   /* 서버가 list 응답에 viewerId를 준다(관리 담당은 자기 id, 비밀키 원장은 'admin'). 그 전에는 링크의 staffId. */
   function viewerId() { return st.viewerId || myId(); }

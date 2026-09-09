@@ -87,6 +87,8 @@ function resolveStatic(pathname) {
   }
   const name = clean.slice(1);
   if (APP_FILES.has(name)) return path.join(APP, name);
+  // 런북 팩은 runbook-ui 가 문서 기준 './runbook-pack.json' 으로 읽는다(빌드는 dist 루트에도 복사)
+  if (name === 'runbook-pack.json') return path.join(LIB, 'runbook-pack.json');
   if (name.startsWith('lib/')) {
     const libName = name.slice(4);
     if (!/^[A-Za-z0-9_.-]+$/.test(libName) || libName.endsWith('.test.cjs')) return null;

@@ -148,6 +148,11 @@ select.in { appearance: auto; }
 .tag.add { background: var(--good-bg); color: var(--good); }
 .tag.edit { background: var(--warn-bg); color: var(--warn); }
 .tag.cls { background: var(--ink-bg); color: var(--ink); }
+/* 계약 §6 어휘의 단독 형태 — 패널이 tag 없이 붙여도 같은 뜻으로 보이게 */
+.blk:not(.tag) { color: var(--bad); font-weight: 700; }
+.cls:not(.tag) { color: var(--ink); font-weight: 700; }
+.carry:not(.tag) { color: var(--bad); }
+.add:not(.tag) { color: var(--good); }
 .tag.stv, .stv { font-variant-numeric: tabular-nums; }
 .tag.null, .null { opacity: .55; }
 .tag.b, .b { font-weight: 700; }
