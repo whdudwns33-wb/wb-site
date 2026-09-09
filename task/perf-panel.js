@@ -327,14 +327,16 @@
     } else if (admin && a.st === 'blocked') {
       buttons = btn('다시 열기', 'open') + btn('완료', 'done', a.type === 'contact' ? 'reached' : '', 'btn-primary');
     }
+    /* 배정 조치는 관리자 화면 공식 링크를 카드에 같이 둔다 — 링크만 열 뿐 계정·화면은 저장하지 않는다 */
+    const extra = a.type === 'assign' && a.st === 'open' ? progLink(core, ev.prog) : '';
     return '<div class="task"><div class="task-body"><div class="task-t">' + priorityPill(a.priority) + ' <span class="tag">' + G.esc(TYPE_LABEL[a.type] || a.type) + '</span> ' +
       '<b>' + G.esc(studentName(a.studentId)) + '</b>' + (a.st !== 'open' ? ' <span class="pill ' + (a.st === 'blocked' ? 'bad' : '') + '">' + ST_LABEL[a.st] + '</span>' : '') +
       (a.result ? ' <span class="pill warn">' + G.esc(a.result === 'no_answer' ? '부재중' : a.result === 'reached' ? '연락됨' : a.result) + '</span>' : '') + '</div>' +
       '<div class="meta">' + G.esc(basis) + '</div>' +
-      (a.note ? '<div class="small mt14" style="margin-top:6px">' + G.esc(a.note) + '</div>' : '') +
+      (a.note ? '<div class="small" style="margin-top:6px">' + G.esc(a.note) + '</div>' : '') +
       '<div class="meta muted">열림 ' + G.esc(a.openedDate) + ' ' + hm(a.openedAt) + ' · ' + G.esc(G.staffName(a.staffId)) +
         (a.hist.length > 1 ? ' · 이력 ' + a.hist.length : '') + '</div>' +
-      (buttons || (a.type === 'assign' && admin ? '' : '') ? '<div class="row mt14" style="flex-wrap:wrap;gap:6px">' + buttons + (a.type === 'assign' ? progLink(core, ev.prog) : '') + '</div>' : '') +
+      (buttons || extra ? '<div class="row mt14" style="flex-wrap:wrap;gap:6px">' + buttons + extra + '</div>' : '') +
       '</div></div>';
   }
   function queueCard(core, cx, actions) {
