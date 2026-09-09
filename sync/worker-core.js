@@ -86,6 +86,7 @@ import { handleRoster } from './roster.js';
 import { handleStudentChange } from './student-change.js';
 import { handleAdminDirective } from './admin-directive.js';
 import { handleTeacherLiveRequest } from './teacher-live-request.js';
+import { handleOpsRequest } from './ops-request.js';
 import { handleTuitionAlert, handleStudentAttendance } from './tuition-alert.js';
 import { handleBookIssue } from './book-issue.js';
 import { handleBookCatalog } from './completed-book-catalog.js';
@@ -3128,6 +3129,11 @@ export default {
         const auth = await resolveAuth(env, app, body.auth);
         if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
         return await handleTeacherLiveRequest(env, app, body, okOrigin, auth, json);
+      }
+      if (url.pathname === '/ops-request') {
+        const auth = await resolveAuth(env, app, body.auth);
+        if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+        return await handleOpsRequest(env, app, body, okOrigin, auth, json);
       }
       if (url.pathname === '/tuition-alert') {
         const auth = await resolveAuth(env, app, body.auth);

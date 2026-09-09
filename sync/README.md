@@ -115,6 +115,7 @@ npx wrangler d1 execute wb-sync --remote --file=./migrations/069_student_lesson_
 npx wrangler d1 execute wb-sync --remote --file=./migrations/070_remove_heavy_student_schedule_triggers.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/071_task_revocations.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/072_consult_link_phone_owner.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/073_ops_requests.sql
 
 > `070`은 이미 적용된 `069` 이력을 되돌리지 않고, 그 migration이 만든 JSON 전개 view·trigger만
 > 제거한 뒤 학생별 일정 revision 원장과 경량 보강 revision trigger를 설치한다. 운영 DB에는 반드시
@@ -805,6 +806,42 @@ scope v3의 자기 체크는 KST 오늘의 `published + student_visible=1` 공�
 목록·시각·처리자를 검증한다. 충돌하면 409와 최신 `current`를 반환하므로 화면이 최신 상태를
 반영한 뒤 사용자가 다시 시도한다. 이 경로를 한 번 거친 `casVersion:1` 행은 예전 generic
 `/sync` LWW 요청으로 덮어쓸 수 없다.
+
+### `/ops-request` — 프로그램·자료 운영 요청 원장
+
+계정 발급·배정·문제지·후속 같은 운영 요청을 `tasks`가 아닌 D1 `ops_requests`에 두어 완료율·
+브리핑 집계에 섞이지 않게 하고, 요청→접수→완료 소요를 요청 단위로 센다(기획 제안 A, Phase 1).
+`app`은 `task`만. 역할은 서버가 판정한다 — `scope:'all'`(원장·관리 담당)은 admin, 개인 링크는 staff.
+staff는 `create`와 자기가 올렸거나 자기에게 배정된 요청 조회·처리만 하고, admin은 전체 조회·
+`assign`·모든 전이를 한다. 학생은 `targetRef`에 `SF-000` 또는 stable studentId(`SAFE_ID`)로만 적는다.
+
+```jsonc
+{ "app":"task", "auth":{...}, "action":"list" }
+→ { "ok":true, "role":"staff", "viewerId":"S1", "requests":[ { "id":"opr_...", "reqType":"account",
+    "program":"studyforce", "targetRef":"SF-012", "ownerId":"S1", "assigneeId":null, "via":"app",
+    "neededBy":"2026-09-15", "detail":"...", "status":"requested", "resultNote":null, "resultUrl":null,
+    "createdAt":0, "acceptedAt":null, "doneAt":null, "updatedAt":0 } ] }
+{ "app":"task", "auth":{...}, "action":"create", "reqType":"account", "program":"studyforce",
+  "targetRef":"SF-012", "neededBy":"2026-09-15", "detail":"계정 4개 발급",
+  "via":"kakao", "assigneeId":"S2", "id":"opr_..." }   // via·assigneeId는 admin만, id는 재시도용 선택
+{ "app":"task", "auth":{...}, "action":"accept", "id":"opr_...", "expectedUpdatedAt":1785651000000,
+  "resultNote":"...", "resultUrl":"https://...", "assigneeId":"S2" }   // 전이. action:'transition', transition:'accept' 도 같다
+```
+
+`reqType`은 `account|assignment|worksheet|followup|other`, `program`은
+`studyforce|classcard|metamath|nelt|exam4you|jokbo|none`, `via`는 staff가 올리면 항상 `app`.
+전이: `assign`(admin, requested/accepted/in_progress/blocked에서 담당만 바꿈) · `accept`(requested→accepted)
+· `start`(accepted→in_progress) · `done`(accepted|in_progress|blocked→done, `resultUrl`은 여기서만 https)
+· `block`(requested|accepted|in_progress→blocked, `resultNote`가 사유) · `unblock`(blocked→in_progress)
+· `cancel`(requested→cancelled, owner 또는 admin). accept~unblock은 assignee 또는 admin.
+`ownerId`·종류·본문은 만든 뒤 바뀌지 않으며(trigger) 모든 전이는 `ops_request_events`에 append-only로 남는다.
+
+모든 전이는 `expectedUpdatedAt` CAS다 — 다르면 409 `OPS_STALE`와 최신 `current`를 돌려주고, 허용되지
+않는 상태에서 누르면 409 `OPS_TRANSITION`, 권한이 없으면 403 `OPS_FORBIDDEN`. `detail`·`resultNote`·
+`targetRef`에 전화번호·이메일·주민번호 패턴이 있으면 400 `OPS_PII`로 거부하고 어디에도 저장하지 않는다
+(실명은 정규식으로 못 가르므로 교육·리뷰 규칙). 그 외 400: `OPS_INVALID`(어휘·날짜·ID), `OPS_TARGET`,
+`OPS_DETAIL`(1~300자 한 줄), `OPS_URL`, `OPS_ASSIGNEE`(재직 직원만). 테이블이 없으면 503
+`OPS_REQUEST_NOT_READY`. 배포 순서는 `073_ops_requests.sql` → 직원 Worker → task Pages.
 
 ### `/search` — 강좌명으로 강좌 페이지 찾기 (네이버 웹문서 검색)
 ```jsonc
