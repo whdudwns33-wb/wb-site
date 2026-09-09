@@ -1122,6 +1122,7 @@
 </header>
 
 <nav class="tabs"><div class="wrap" id="tabs"></div></nav>
+<section class="wrap" id="staffWorkControls" hidden></section>
 
 <section class="wrap" id="syncRecoveryNotice" aria-live="polite" hidden></section>
 <main class="wrap" id="view"></main>
@@ -1130,13 +1131,14 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-09-08.2"></script>
-<script src="./schedule-board-core.js?v=2026-09-08.2"></script>
-<script src="./asset-core.js?v=2026-09-08.2"></script>
-<script src="./qr-core.js?v=2026-09-08.2"></script>
-<script src="./acaflow-import-core.js?v=2026-09-08.2"></script>
-<script src="./feedback-subject-catalog.js?v=2026-09-08.2"></script>
-<script src="./sync-recovery-core.js?v=2026-09-08.2"></script>
+<script src="./lesson-form-core.js?v=2026-09-09.1"></script>
+<script src="./schedule-board-core.js?v=2026-09-09.1"></script>
+<script src="./asset-core.js?v=2026-09-09.1"></script>
+<script src="./qr-core.js?v=2026-09-09.1"></script>
+<script src="./acaflow-import-core.js?v=2026-09-09.1"></script>
+<script src="./feedback-subject-catalog.js?v=2026-09-09.1"></script>
+<script src="./sync-recovery-core.js?v=2026-09-09.1"></script>
+<script src="./staff-work-session-core.js?v=2026-09-09.1"></script>
 <script>
 "use strict";
 
@@ -1642,15 +1644,168 @@ function applyTaskRevocationPage(page, auth, accessRole) {
   return { cursor, more: page.more, removed, taskIds: removedTaskIds };
 }
 
+// 출근 로그인은 기존 기기 연결과 별개다. PIN은 저장하지 않고 일일 세션만 탭에 보관한다.
+const staffWork = { checked: false, required: false, active: false, configured: false, workDate: '',
+  expiresAt: 0, staffName: '', token: '', identity: null, busy: false, error: '', clockedOut: false, serial: 0 };
+let staffWorkStatusPromise = null;
+const staffWorkCore = window.WBStaffWorkSessionCore;
+function staffWorkTokenKey() { return 'wb_staff_work_session_v1_' + SAFE_SCOPE_ID; }
+function staffWorkToken() {
+  if (!staffWork.token && !staffWork.checked) {
+    try { staffWork.token = sessionStorage.getItem(staffWorkTokenKey()) || ''; } catch (_) {}
+  }
+  return staffWork.token;
+}
+function setStaffWorkToken(token) {
+  staffWork.token = String(token || '');
+  try {
+    if (staffWork.token) sessionStorage.setItem(staffWorkTokenKey(), staffWork.token);
+    else sessionStorage.removeItem(staffWorkTokenKey());
+  } catch (_) { /* 저장소 사용 불가 시 현재 탭 메모리에서만 인증을 유지한다. */ }
+}
+function shouldGateStaffWork() {
+  if (!session.isStaffLink || pendingBootstrapCode || !state.settings.myToken || personAccessProblem) return false;
+  return !staffWorkCore || !staffWorkCore.sameIdentity(staffWork.identity, sync.auth()) ||
+    !staffWorkCore.isActive(staffWork, seoulNowParts().date, Date.now());
+}
+function lockStaffWork(message) {
+  staffWork.serial++; staffWorkStatusPromise = null;
+  staffWork.checked = true; staffWork.required = true; staffWork.active = false;
+  staffWork.error = String(message || '출근 로그인이 필요합니다. 비밀번호를 입력해 주세요.');
+  setStaffWorkToken('');
+  sync.problem = null;
+  // 입력 중인 폼과 메모는 DOM/기존 초안에 남겨 둔 채 가린다. 잠금을 출근 취소나 데이터 삭제로 해석하지 않는다.
+  $('#modalHost').hidden = true;
+  setModalBackgroundInert(false);
+  render();
+}
+function applyStaffWorkResponse(result, auth) {
+  staffWorkCore.validateStatus(result, auth.id);
+  const attendance = staffWorkCore.attendance(result.attendance, auth.id);
+  if (!staffWorkCore.sameIdentity(auth, sync.auth())) throw new Error('기기 연결이 변경되었습니다. 다시 확인해 주세요');
+  if (result.workSession && (!result.active || !Number.isFinite(Number(result.expiresAt)) || Number(result.expiresAt) <= Date.now())) {
+    throw new Error('출근 로그인 세션을 확인하지 못했습니다');
+  }
+  if (result.workSession) setStaffWorkToken(result.workSession);
+  else if (!result.active) setStaffWorkToken('');
+  Object.assign(staffWork, { checked: true, required: result.required, active: result.active,
+    configured: result.configured, workDate: result.workDate, staffName: String(result.staffName || ''),
+    expiresAt: Number(result.expiresAt) || 0, clockedOut: !!result.clockedOut, identity: auth, error: '' });
+  if (attendance) { state.checks[attendance.key] = attendance.record; save(); }
+  // 운영 권한은 status가 아닌 기존 /sync 권한 확인 경로에서만 활성화한다.
+}
+async function ensureStaffWorkStatus(force) {
+  const auth = sync.auth();
+  if (!auth || auth.mode !== 'person' || pendingBootstrapCode) return true;
+  if (force && staffWork.busy) return false;
+  if (staffWorkStatusPromise) return staffWorkStatusPromise;
+  if (!force && staffWorkCore && staffWorkCore.sameIdentity(staffWork.identity, auth) && staffWork.checked) return !shouldGateStaffWork();
+  const serial = ++staffWork.serial;
+  staffWorkStatusPromise = (async () => {
+    try {
+      const result = await sync.post('/staff-work-session', { app: SYNC_APP, auth, action: 'status' });
+      if (serial !== staffWork.serial) return !shouldGateStaffWork();
+      applyStaffWorkResponse(result, auth);
+      return !shouldGateStaffWork();
+    } catch (error) {
+      if (serial === staffWork.serial && (!staffWorkCore || staffWorkCore.sameIdentity(auth, sync.auth()))) {
+        staffWork.active = false; staffWork.checked = false;
+        staffWork.error = String(error && error.message || '출근 로그인 상태를 확인하지 못했습니다');
+      }
+      return false;
+    } finally { if (serial === staffWork.serial) { staffWorkStatusPromise = null; render(); } }
+  })();
+  return staffWorkStatusPromise;
+}
+function viewStaffWorkLogin() {
+  const title = staffWork.staffName ? staffWork.staffName + ' 선생님 · 출근 로그인' : '출근 로그인';
+  const ready = staffWork.checked && staffWork.required && staffWork.configured;
+  return '<div class="card link-gate"><div class="card-title">' + esc(title) + '</div>' +
+    '<div class="card-sub">출근하고 로그인하면 서버 시각으로 출근이 기록됩니다. 화면을 닫거나 다시 여는 것만으로 출퇴근 시간은 바뀌지 않습니다.</div>' +
+    (staffWork.error ? '<div class="hint mt14" role="alert">' + esc(staffWork.error) + '</div>' : '') +
+    (ready ? '<label class="field mt14"><span class="fl">개인 비밀번호 4자리</span><input class="in" id="staffWorkPin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="off" placeholder="비밀번호 4자리"></label>' +
+      '<button class="btn btn-primary btn-block" data-act="staffworklogin"' + (staffWork.busy ? ' disabled' : '') + '>출근하고 로그인</button>' +
+      (staffWork.clockedOut ? '<div class="hint mt14">오늘 퇴근 기록이 있습니다. 다시 근무해야 한다면 관리자에게 기록 확인을 요청해 주세요.</div>' : '') +
+      '<div class="hint mt14">비밀번호를 잊었으면 관리자에게 재설정을 요청해 주세요.</div>' :
+      '<div class="hint mt14">' + (staffWork.checked ? '개인 비밀번호가 아직 설정되지 않았습니다. 관리자에게 연락해 주세요.' : '출근 로그인 상태를 확인하고 있습니다.') + '</div>') +
+    '<button class="btn btn-ghost btn-block mt14" data-act="staffworkretry"' + (staffWork.busy ? ' disabled' : '') + '>연결 상태 다시 확인</button></div>';
+}
+async function loginStaffWork(button) {
+  if (staffWork.busy) return;
+  const field = $('#staffWorkPin'), pin = String(field && field.value || '');
+  if (!staffWorkCore || !staffWorkCore.validPin(pin)) return toast('비밀번호 숫자 4자리를 입력해 주세요');
+  const auth = sync.auth();
+  if (!auth || auth.mode !== 'person') return toast('개인 기기 연결을 먼저 확인해 주세요');
+  staffWork.busy = true; staffWork.error = ''; if (button) button.disabled = true;
+  const serial = ++staffWork.serial; staffWorkStatusPromise = null;
+  if (field) field.value = '';
+  try {
+    const result = await sync.post('/staff-work-session', { app: SYNC_APP, auth, action: 'login', pin });
+    if (serial !== staffWork.serial) return;
+    applyStaffWorkResponse(result, auth);
+    if (result.required && (!result.active || !result.workSession)) throw new Error('출근 로그인 결과를 확인하지 못했습니다');
+    await startSyncSession();
+    if (!shouldGateStaffWork()) toast('출근 로그인 완료 — 기존 출근 시간은 유지됩니다');
+  } catch (error) {
+    if (serial === staffWork.serial) staffWork.error = String(error && error.message || '출근 로그인에 실패했습니다');
+  } finally { staffWork.busy = false; render(); }
+}
+function saveWorkLogoutMemos() {
+  if ([...lessonHandoffMemoDrafts.values()].some(draft => draft.dirty)) throw new Error('인계받은 수업의 작성 중인 메모를 먼저 저장해 주세요');
+  document.querySelectorAll('[data-lesson-memo-field]').forEach(field => captureLessonHandoffInput(field));
+  const rows = [...lessonHandoffSourceDrafts.entries()];
+  rows.forEach(([key, draft]) => {
+    if (String(draft.memo.guardianNotice || '').length > 300) throw new Error('안내사항을 300자 이내로 수정한 뒤 퇴근해 주세요');
+    const split = key.lastIndexOf('|'), id = key.slice(0, split), date = key.slice(split + 1);
+    if (JSON.stringify(draft.memo) === JSON.stringify(lessonMemoValues(getCheck(id, date)))) {
+      lessonHandoffSourceDrafts.delete(key); return;
+    }
+    if (!state.tasks.some(task => task.id === id && task.staffId === session.staffId && !task.deleted)) throw new Error('작성 중인 메모의 수업을 다시 확인해 주세요');
+    setCheck(id, date, { lessonMemo: draft.memo, note: lessonMemoText(draft.memo) });
+    lessonHandoffSourceDrafts.delete(key);
+  });
+  flushReportInputs();
+}
+async function logoutStaffWork(button) {
+  if (staffWork.busy || !staffWork.required || shouldGateStaffWork()) return;
+  if (!$('#modalHost').hidden) return toast('열린 입력 화면의 저장을 완료하고 닫은 뒤 퇴근해 주세요');
+  if (fbCtx && fbCtx.polishPending) return toast('AI 다듬기가 끝난 뒤 퇴근해 주세요');
+  if (!confirm('작성 중인 수업 메모와 미전송 변경을 저장한 뒤 퇴근하고 로그아웃할까요?')) return;
+  staffWork.busy = true; if (button) button.disabled = true;
+  const serial = ++staffWork.serial; staffWorkStatusPromise = null;
+  $('#view').inert = true; $('#tabs').inert = true;
+  try {
+    saveWorkLogoutMemos();
+    clearTimeout(sync.timer);
+    const recoverySequence = Number(sync.recoverySequence) || 0;
+    for (let i = 0; sync.busy && i < 100; i++) await new Promise(resolve => setTimeout(resolve, 100));
+    if (sync.busy || !(await sync.run()) || sync.err || (Number(sync.recoverySequence) || 0) !== recoverySequence ||
+        sync.collect(Number(state.settings.pushAt) || 0).length) {
+      throw new Error('미전송 내용을 서버에 저장하지 못했습니다. 인터넷 연결과 보존 안내를 확인한 뒤 다시 퇴근해 주세요');
+    }
+    const auth = sync.auth();
+    const result = await sync.post('/staff-work-session', { app: SYNC_APP, auth, action: 'logout' });
+    if (serial !== staffWork.serial) return;
+    applyStaffWorkResponse(result, auth);
+    if (result.active || !result.clockedOut || !result.attendance || !result.attendance.record.out) throw new Error('퇴근 저장 결과를 확인하지 못했습니다. 연결 상태를 다시 확인해 주세요');
+    setStaffWorkToken('');
+    staffWork.active = false;
+    toast('퇴근이 기록되었습니다. 수고하셨습니다!');
+  } catch (error) {
+    toast(String(error && error.message || '퇴근 저장에 실패했습니다'));
+  } finally { staffWork.busy = false; $('#view').inert = false; $('#tabs').inert = false; render(); }
+}
+
 const sync = {
   busy: false, dirty: false, last: null, timer: null, loud: false, err: '', personVerified: false, accessRole: '',
-  problem: null, recovering: false,
+  problem: null, recovering: false, recoverySequence: 0,
 
   /** 원장은 비밀키로, 학생은 개인 링크에 담겨 온 토큰으로 접속한다 */
   auth() {
     if (session.isStaffLink) {
       const t = state.settings.myToken || '';
-      return t ? { mode: 'person', id: session.staffId, token: t } : null;
+      const workSession = staffWorkToken();
+      return t ? { mode: 'person', id: session.staffId, token: t, ...(workSession ? { workSession } : {}) } : null;
     }
     const k = state.settings.syncSecret || '';
     return k ? { mode: 'admin', secret: k } : null;
@@ -1715,8 +1870,13 @@ const sync = {
   },
 
   async post(path, body) {
+    if (body && body.auth && body.auth.mode === 'person' && !['/staff-work-session', '/exchange'].includes(path) && shouldGateStaffWork()) {
+      const error = new Error('출근 로그인이 필요합니다. 비밀번호를 입력해 주세요');
+      error.status = 409; error.code = 'STAFF_WORK_LOGIN_REQUIRED';
+      throw error;
+    }
     // 인증을 겸하는 동기화만 제한한다. 발송·AI 처리의 제한 시간은 각 기능이 관리한다.
-    const controller = path === '/sync' ? new AbortController() : null;
+    const controller = ['/sync', '/staff-work-session', '/staff-profile'].includes(path) ? new AbortController() : null;
     const timeout = controller ? setTimeout(() => controller.abort(), 20000) : null;
     try {
       const res = await fetch(SYNC_URL + path, {
@@ -1732,11 +1892,22 @@ const sync = {
         error.dataGeneration = d && d.dataGeneration;
         error.apiResponse = !!d;
         const personRequest = body && body.auth && body.auth.mode === 'person';
+        if (personRequest && staffWorkCore && staffWorkCore.isLoginRequired(error)) {
+          lockStaffWork(error.message);
+          throw error;
+        }
         if (path !== '/sync' && session.isStaffLink && personRequest &&
             (res.status === 401 || res.status === 403)) {
           handlePersonAuthRejection(error, false);
         }
         throw error;
+      }
+      if (body && body.auth && body.auth.mode === 'person' && path !== '/staff-work-session' &&
+          (shouldGateStaffWork() || !staffWorkCore.sameIdentity(body.auth, this.auth()) ||
+            String(body.auth.workSession || '') !== String((this.auth() || {}).workSession || ''))) {
+        const stale = new Error('로그인 상태가 변경되었습니다. 다시 확인해 주세요');
+        stale.code = 'STAFF_WORK_LOGIN_REQUIRED'; stale.status = 409;
+        throw stale;
       }
       return d;
     } catch (error) {
@@ -1752,6 +1923,7 @@ const sync = {
   },
 
   async run() {
+    if (!(await ensureStaffWorkStatus(false))) return false;
     const auth = this.auth();
     if (!auth) {
       if (session.isStaffLink && hasSensitiveManagerCache('')) resetPersonCache('');
@@ -1857,6 +2029,9 @@ const sync = {
       return true;
     } catch (e) {
       console.warn('sync failed', String(e && e.code || 'SYNC_FAILED'));
+      if (staffWorkCore && staffWorkCore.isLoginRequired(e)) {
+        this.err = e.message; lockStaffWork(e.message); return false;
+      }
       if (e && e.code === 'DATA_GENERATION_MISMATCH' && Number.isSafeInteger(Number(e.dataGeneration))) {
         resetLessonHandoffs();
         state.staff = [];
@@ -2113,6 +2288,7 @@ async function recoverSyncConflict(auth, error, originalChanges, context) {
     sync.accessRole = auth.mode === 'person' ? accessRole : '';
     personAccessProblem = null;
     sync.last = now(); sync.dirty = false; sync.err = ''; sync.problem = null;
+    sync.recoverySequence = (Number(sync.recoverySequence) || 0) + 1;
     return true;
   } finally {
     window.removeEventListener('storage', storageChanged);
@@ -2144,6 +2320,11 @@ function syncRecoveryAcknowledgedIds() {
 function renderSyncRecoveryNotice() {
   const host = $('#syncRecoveryNotice');
   if (!host) return;
+  if (shouldGateStaffWork()) {
+    host.hidden = true;
+    const history = $('#syncRecoveryHistory'); if (history) history.hidden = true;
+    return;
+  }
   const archives = visibleSyncRecoveryArchives();
   const acknowledged = syncRecoveryAcknowledgedIds();
   const pending = archives.filter(record => !acknowledged.has(record.id));
@@ -2225,6 +2406,7 @@ function isTaskEditorActive() {
   return !!(el && el.matches('input, textarea, select, [contenteditable="true"]'));
 }
 function renderAfterSync() {
+  if (staffWork.busy && !shouldGateStaffWork()) { syncRenderPending = true; return; }
   if (isTaskEditorActive()) { syncRenderPending = true; return; }
   syncRenderPending = false;
   render();
@@ -2421,6 +2603,11 @@ let linkExchangeBusy = false;
 /** 관리 권한이 끝날 때 전체 캐시를 버린다. token을 넘기면 본인 범위 재동기화에만 보존한다. */
 function resetPersonCache(token) {
   const keepToken = String(token || '');
+  if (!keepToken || (staffWork.identity && staffWork.identity.token !== keepToken)) {
+    staffWork.serial++; staffWorkStatusPromise = null;
+    setStaffWorkToken('');
+    Object.assign(staffWork, { checked: false, required: false, active: false, identity: null, staffName: '', error: '' });
+  }
   if (window.WBSyncRecoveryCore) window.WBSyncRecoveryCore.clearArchives(localStorage, syncRecoveryScope());
   sync.problem = null;
   resetLessonHandoffs();
@@ -2543,7 +2730,7 @@ function isKakaoInAppBrowser(ua) {
 
 const IS_KAKAO_IN_APP = isKakaoInAppBrowser(navigator.userAgent);
 const hasStoredPersonToken = () => !!String(state.settings.myToken || '');
-const hasVerifiedPersonAuth = () => session.isStaffLink && sync.personVerified && !!sync.auth() && sync.auth().mode === 'person';
+const hasVerifiedPersonAuth = () => session.isStaffLink && !shouldGateStaffWork() && sync.personVerified && !!sync.auth() && sync.auth().mode === 'person';
 
 function currentBootstrapLink() {
   if (!session.staffId || !pendingBootstrapCode) return '';
@@ -3046,6 +3233,7 @@ function paintStatus() {
   if (session.isStaffLink && !session.isAdmin) {
     if (pendingBootstrapCode) text = IS_KAKAO_IN_APP ? '외부 브라우저 연결 필요' : '기기 연결 대기';
     else if (personAccessProblem) text = '개인 인증 확인 필요';
+    else if (shouldGateStaffWork()) text = '출근 로그인 필요';
     else if (!sync.personVerified) text = '개인 인증 확인 중';
     else { text = me ? me.name + ' 선생님 · 개인 업무' : '대상을 찾을 수 없음'; on = !!me; }
   }
@@ -3056,6 +3244,13 @@ function paintStatus() {
   else if (sync.enabled() && sync.dirty) text += ' · 대기';
   el.innerHTML = '<i></i><span>' + esc(text) + '</span>';
   el.classList.toggle('off', !on);
+  const workControls = $('#staffWorkControls');
+  if (workControls) {
+    const show = session.isStaffLink && !session.isAdmin && staffWork.required && !shouldGateStaffWork();
+    workControls.hidden = !show;
+    if (show) workControls.innerHTML = '<div class="between mt8"><span class="small muted">출근 로그인 중 · 화면 종료는 퇴근이 아닙니다</span>' +
+      '<button class="btn btn-sm btn-navy" data-act="staffworklogout"' + (staffWork.busy ? ' disabled' : '') + '>퇴근하고 로그아웃</button></div>';
+  }
   renderSyncRecoveryNotice();
 }
 
@@ -3117,12 +3312,19 @@ function replaceView(root, html) {
    7. 뷰
    ══════════════════════════════════════════════════════ */
 function render() {
-  if (sync.recovering) { renderSyncRecoveryNotice(); return; }
+  if (sync.recovering && !shouldGateStaffWork()) { renderSyncRecoveryNotice(); return; }
   syncRenderPending = false;
   lessonHandoffVisibleDates.clear();
   paintStatus();
   renderTabs();
   const v = $('#view');
+
+  if (shouldGateStaffWork()) {
+    $('#modalHost').hidden = true;
+    setModalBackgroundInert(false);
+    replaceView(v, viewStaffWorkLogin());
+    return;
+  }
 
   if (shouldGatePersonAccess()) {
     replaceView(v, viewPersonAccess());
@@ -3172,7 +3374,7 @@ function render() {
 
 function renderTabs() {
   const a = alertsToday();
-  const tabs = session.isStaffLink && shouldGatePersonAccess()
+  const tabs = session.isStaffLink && (shouldGatePersonAccess() || shouldGateStaffWork())
     ? []
     : session.isStaffLink && !session.isAdmin
     ? [['today', '오늘 할 일'], ['week', '주간 플래너'], ['lesson', '수업 등록'], ['feedback', '피드백 상태'], ['makeup', '보강', makeupAttentionCount()], ['sessions', '회차', sessionPackAttentionCount()], ['books', '교재'], ['transport', '차량'], ['roster', '원생']]
@@ -4780,7 +4982,10 @@ function viewToday() {
   if (session.isStaffLink && me.id === session.staffId && cursor === today()) {
     const att = attOf(me.id, cursor);
     let attUi;
-    if (!att || !att.done) {
+    if (!session.isAdmin && staffWork.required) {
+      attUi = '<div class="row" style="gap:8px">' + (att && att.done ? '<span class="pill">' + fmtTime(att.at) + ' 출근</span>' : '') +
+        '<button class="btn btn-sm btn-navy" data-act="staffworklogout"' + (staffWork.busy ? ' disabled' : '') + '>퇴근하고 로그아웃</button></div>';
+    } else if (!att || !att.done) {
       attUi = '<button class="btn btn-sm btn-primary" data-act="attcheck">출근했습니다</button>';
     } else if (!att.out) {
       attUi = '<div class="row" style="gap:8px"><span class="pill">' + fmtTime(att.at) + ' 출근</span>' +
@@ -18911,6 +19116,70 @@ function viewRoster() {
 }
 
 /* ── 직원 관리 ── */
+let staffPrivateProfileEditor = null;
+let staffPrivateProfileSequence = 0;
+async function openStaffPrivateProfile(staffId) {
+  if (!session.isAdmin) return toast('관리자만 직원 연락처를 확인할 수 있습니다');
+  const auth = sync.auth();
+  if (!auth) return toast('운영 관리 인증을 먼저 확인해 주세요');
+  staffPrivateProfileEditor = null;
+  const sequence = ++staffPrivateProfileSequence;
+  modal('직원 연락처 · 로그인 관리', '<div class="hint">직원 정보를 확인하고 있습니다.</div>');
+  try {
+    const result = await sync.post('/staff-profile', { app: SYNC_APP, auth, action: 'list' });
+    if (sequence !== staffPrivateProfileSequence || !session.isAdmin || !staffWorkCore.sameIdentity(auth, sync.auth())) return;
+    const profile = (result.profiles || []).find(row => String(row.staffId) === String(staffId));
+    if (!profile) throw new Error('직원 정보를 찾지 못했습니다');
+    staffPrivateProfileEditor = { ...profile, auth };
+    showStaffPrivateProfileEditor();
+  } catch (error) {
+    if (sequence === staffPrivateProfileSequence && session.isAdmin && staffWorkCore.sameIdentity(auth, sync.auth())) {
+      modal('직원 정보 확인 실패', '<div class="hint" role="alert">' + esc(error.message || error) + '</div>');
+    }
+  }
+}
+function showStaffPrivateProfileEditor(message) {
+  const profile = staffPrivateProfileEditor;
+  if (!profile || !session.isAdmin || !staffWorkCore.sameIdentity(profile.auth, sync.auth())) return;
+  modal(profile.staffName + ' 선생님 · 연락처 / 로그인',
+    '<label class="field"><span class="fl">휴대폰 번호</span><input class="in" id="staffProfilePhone" type="tel" inputmode="tel" autocomplete="off" value="' + esc(profile.phone || '') + '"></label>' +
+    '<label class="field"><span><input id="staffProfileLoginEnabled" type="checkbox"' + (profile.loginEnabled ? ' checked' : '') + '> 출근 로그인 사용</span></label>' +
+    '<div class="hint">관리 권한이 있는 선생님은 이 설정과 무관하게 기존 접속·출퇴근 방식을 유지합니다. 연락처 변경만으로 비밀번호는 바뀌지 않습니다.</div>' +
+    '<button class="btn btn-primary btn-block mt14" data-act="staffprofilesave">직원 정보 저장</button>' +
+    '<hr class="sep"><div class="card-title">개인 비밀번호 ' + (profile.configured ? '재설정' : '설정') + '</div>' +
+    '<label class="field mt14"><span class="fl">새 비밀번호 숫자 4자리</span><input class="in" id="staffProfileNewPin" type="password" inputmode="numeric" maxlength="4" autocomplete="new-password" placeholder="숫자 4자리"></label>' +
+    '<button class="btn btn-ghost btn-block" data-act="staffprofileresetpin">비밀번호 재설정</button>' +
+    '<div class="hint mt14">기존 비밀번호는 조회할 수 없습니다. 재설정하면 해당 선생님의 출근 로그인 세션은 잠기지만 기기 연결과 출퇴근 기록은 유지됩니다.</div>' +
+    (message ? '<div class="hint mt14" role="status">' + esc(message) + '</div>' : ''));
+}
+async function saveStaffPrivateProfile(action, button) {
+  const profile = staffPrivateProfileEditor;
+  if (!profile || !session.isAdmin || !staffWorkCore.sameIdentity(profile.auth, sync.auth())) return toast('관리 인증을 다시 확인해 주세요');
+  const sequence = staffPrivateProfileSequence;
+  const payload = { app: SYNC_APP, auth: sync.auth(), action, staffId: profile.staffId, expectedRevision: profile.revision };
+  if (action === 'reset_pin') {
+    const field = $('#staffProfileNewPin');
+    payload.pin = String(field && field.value || '');
+    if (!staffWorkCore.validPin(payload.pin)) return toast('새 비밀번호 숫자 4자리를 입력해 주세요');
+    if (!confirm(profile.staffName + ' 선생님의 비밀번호를 재설정할까요? 출퇴근 기록과 기존 기기 연결은 유지됩니다.')) return;
+    if (field) field.value = '';
+  } else {
+    payload.phone = String(($('#staffProfilePhone') || {}).value || '').trim();
+    payload.loginEnabled = !!($('#staffProfileLoginEnabled') || {}).checked;
+  }
+  if (button) button.disabled = true;
+  try {
+    await sync.post('/staff-profile', payload);
+    if (sequence !== staffPrivateProfileSequence || !session.isAdmin || !staffWorkCore.sameIdentity(payload.auth, sync.auth())) return;
+    const result = await sync.post('/staff-profile', { app: SYNC_APP, auth: sync.auth(), action: 'list' });
+    if (sequence !== staffPrivateProfileSequence || !session.isAdmin || !staffWorkCore.sameIdentity(payload.auth, sync.auth())) return;
+    const updated = (result.profiles || []).find(row => String(row.staffId) === String(profile.staffId));
+    if (!updated) throw new Error('저장 후 직원 정보를 확인하지 못했습니다');
+    staffPrivateProfileEditor = { ...updated, auth: sync.auth() };
+    showStaffPrivateProfileEditor(action === 'reset_pin' ? '비밀번호를 재설정했습니다.' : '직원 정보를 저장했습니다.');
+  } catch (error) { toast('저장하지 못했습니다 — ' + String(error.message || error)); }
+  finally { if (button && button.isConnected) button.disabled = false; }
+}
 function viewStaffAdmin() {
   const list = liveStaff();
   return '<div class="card">' +
@@ -18948,6 +19217,7 @@ function viewStaffAdmin() {
           '<button class="btn btn-sm btn-ghost" data-act="togglemanager" data-id="' + s.id + '">' +
             (s.manager ? '관리 담당 해제' : '관리 담당으로 지정') + '</button>' +
           '<button class="btn btn-sm btn-ghost" data-act="atteditopen" data-id="' + s.id + '">🕘 출퇴근 수정</button>' +
+          '<button class="btn btn-sm btn-ghost" data-act="staffprofile" data-id="' + s.id + '">연락처 · 로그인 관리</button>' +
         '</div></div>').join('')
     : '<div class="card"><div class="empty"><b>👤</b>아직 등록된 직원이 없습니다.</div></div>');
 }
@@ -19985,9 +20255,10 @@ function viewSettings() {
    ══════════════════════════════════════════════════════ */
 let modalReturnFocus = null;
 function setModalBackgroundInert(value) {
-  document.querySelectorAll('.topbar, .tabs, #view, #syncRecoveryNotice, #syncRecoveryHistory').forEach(element => { element.inert = value; });
+  document.querySelectorAll('.topbar, .tabs, #view, #staffWorkControls, #syncRecoveryNotice, #syncRecoveryHistory').forEach(element => { element.inert = value; });
 }
 function modal(title, bodyHtml, footHtml) {
+  if (shouldGateStaffWork()) return;
   const host = $('#modalHost');
   if (host.hidden) modalReturnFocus = document.activeElement;
   host.innerHTML =
@@ -20005,6 +20276,8 @@ function closeModal() {
   host.hidden = true;
   host.innerHTML = '';
   bookCatalogReviewTarget = null;
+  staffPrivateProfileEditor = null;
+  staffPrivateProfileSequence++;
   setModalBackgroundInert(false);
   const target = modalReturnFocus;
   modalReturnFocus = null;
@@ -20859,6 +21132,7 @@ function applyAssignments(input, preConfirmed) {
    ══════════════════════════════════════════════════════ */
 document.addEventListener('click', ev => {
   if (sync.recovering) return;
+  if (shouldGateStaffWork() && !ev.target.closest('[data-act="staffworklogin"],[data-act="staffworkretry"]')) return;
   if (adminDirectiveSoundEnabled()) ensureAdminDirectiveAudio();
   const goEl = ev.target.closest('[data-go]');
   if (goEl) { go(goEl.dataset.go); return; }
@@ -20875,6 +21149,13 @@ document.addEventListener('click', ev => {
   const task = () => state.tasks.find(x => x.id === id);
 
   switch (act) {
+
+    case 'staffworklogin': loginStaffWork(el); break;
+    case 'staffworklogout': logoutStaffWork(el); break;
+    case 'staffworkretry': ensureStaffWorkStatus(true).then(ok => { if (ok) startSyncSession(); }); break;
+    case 'staffprofile': openStaffPrivateProfile(id); break;
+    case 'staffprofilesave': saveStaffPrivateProfile('update', el); break;
+    case 'staffprofileresetpin': saveStaffPrivateProfile('reset_pin', el); break;
 
     /* 개인 링크 기기 연결 */
     case 'connectdevice': connectPendingDevice(); break;
@@ -23008,6 +23289,7 @@ document.addEventListener('keydown', ev => {
   if (ev.key !== 'Enter') return;
   const t = ev.target;
   if (t.id === 'pin')   document.querySelector('[data-act="setpin"],[data-act="login"]')?.click();
+  if (t.id === 'staffWorkPin') document.querySelector('[data-act="staffworklogin"]')?.click();
   if (t.id === 'sName') document.querySelector('[data-act="addstaff"]')?.click();
   if (t.matches('[data-transport-driver-name]')) document.querySelector('[data-act="transportdriveradd"]')?.click();
   if (t.id === 'qAdd')  document.querySelector('[data-act="qadd"]')?.click();
@@ -23016,6 +23298,7 @@ document.addEventListener('keydown', ev => {
 /* 복귀 시 최신화 */
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible') return;
+  if (session.isStaffLink && shouldGateStaffWork()) { render(); ensureStaffWorkStatus(true).then(ok => { if (ok) startSyncSession(); }); return; }
   if (!cursorPinned && cursor !== today()) { cursor = today(); render(); }
   const auth = sync.auth();
   if (auth && (session.isAdmin || session.isStaffLink) && typeof refreshVisibleWeekendVisitScopes === 'function') {
@@ -23086,6 +23369,11 @@ async function startSyncSession() {
 startSyncSession();
 setInterval(() => {
   const auth = sync.auth();
+  if (session.isStaffLink && shouldGateStaffWork()) {
+    // 잠긴 동안의 폴링은 입력 중인 비밀번호를 다시 그려 지우지 않는다.
+    if (!$('#staffWorkPin')) render();
+    return;
+  }
   if (document.visibilityState === 'visible' && auth && (session.isAdmin || session.isStaffLink)) {
     if (typeof refreshVisibleWeekendVisitScopes === 'function') refreshVisibleWeekendVisitScopes(true);
     if (typeof refreshVisibleLessonHandoffs === 'function') refreshVisibleLessonHandoffs(true, true);
@@ -23101,7 +23389,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-09-08.2';
+const APP_VER = '2026-09-09.1';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);

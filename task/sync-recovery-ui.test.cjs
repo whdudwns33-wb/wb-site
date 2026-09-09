@@ -114,6 +114,11 @@ function runtime(options = {}) {
     const isContactCheckKey = key => key.startsWith('__contact__');
     const onboardingReconcileChanges = () => [];
     const paintStatus = () => {};
+    const shouldGateStaffWork = () => false;
+    const ensureStaffWorkStatus = async () => true;
+    const staffWorkToken = () => '';
+    const staffWorkCore = { isLoginRequired: error => error && error.code === 'STAFF_WORK_LOGIN_REQUIRED' };
+    const lockStaffWork = () => { throw new Error('unexpected daily work lock in recovery test'); };
     const isTaskEditorActive = () => false;
     const render = () => { stats.renders++; };
     const renderAfterSync = render;
