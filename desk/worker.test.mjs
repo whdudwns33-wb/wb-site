@@ -267,13 +267,16 @@ test('docs students: 정상 저장, PII 거부, LWW, STALE+current, since=, 삭�
   const fresh = await putDoc(env, a.token, 'students', 'stu_a', student({ memo: 'A 가 고침' }), { expectedUpdatedAt: secondAt });
   assert.equal(fresh.status, 200);
   const thirdAt = fresh.body.results[0].updatedAt;
+  // 여기부터 쓰기는 시계를 thirdAt 에 고정한다 — since= 검사가 실제 시계 속도에 흔들리면 안 된다
+  // (CI 러너는 로컬보다 빨라 stu_new 가 2ms 뒤에 만들어지면 since=fixed+1 에 섞여 들어왔다).
+  const fixed = thirdAt;
   const missing = await putDoc(env, a.token, 'students', 'stu_new', student(), { expectedUpdatedAt: 5 });
   assert.equal(missing.body.results[0].code, 'STALE');
   assert.equal(missing.body.results[0].current, null);
-  assert.equal((await putDoc(env, a.token, 'students', 'stu_new', student(), { expectedUpdatedAt: 0 })).status, 200);
+  const created = await atNow(fixed, () => putDoc(env, a.token, 'students', 'stu_new', student(), { expectedUpdatedAt: 0 }));
+  assert.deepEqual([created.status, created.body.results[0].updatedAt], [200, fixed]);
 
   // 같은 ms 안의 연속 쓰기도 updatedAt 이 커진다
-  const fixed = thirdAt;
   const same1 = await atNow(fixed, () => putDoc(env, a.token, 'students', 'stu_a', student({ memo: '1' })));
   const same2 = await atNow(fixed, () => putDoc(env, a.token, 'students', 'stu_a', student({ memo: '2' })));
   assert.deepEqual([same1.body.results[0].updatedAt, same2.body.results[0].updatedAt], [fixed + 1, fixed + 2]);
@@ -293,9 +296,9 @@ test('docs students: 정상 저장, PII 거부, LWW, STALE+current, since=, 삭�
   // 삭제는 원장만. 삭제된 행은 내용을 비운 채 남아 since= 로 전파된다
   const staffDelete = await call(env, 'POST', '/api/docs', { token: a.token, body: { changes: [{ c: 'students', id: 'stu_b', deleted: true }] } });
   assert.deepEqual([staffDelete.status, staffDelete.body.results[0].code], [403, 'FORBIDDEN']);
-  const adminDelete = await call(env, 'POST', '/api/docs', { token: adminToken, body: { changes: [{ c: 'students', id: 'stu_b', deleted: true }] } });
-  assert.equal(adminDelete.status, 200);
-  const afterDelete = await call(env, 'GET', '/api/docs?since=' + (adminDelete.body.results[0].updatedAt - 1), { token: a.token });
+  const adminDelete = await atNow(fixed + 10, () => call(env, 'POST', '/api/docs', { token: adminToken, body: { changes: [{ c: 'students', id: 'stu_b', deleted: true }] } }));
+  assert.deepEqual([adminDelete.status, adminDelete.body.results[0].updatedAt], [200, fixed + 10]);
+  const afterDelete = await call(env, 'GET', '/api/docs?since=' + (fixed + 9), { token: a.token });
   assert.deepEqual(afterDelete.body.docs.map(d => [d.id, d.deleted, d.data]), [['stu_b', true, {}]]);
 });
 
