@@ -1174,15 +1174,15 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-09-09.3"></script>
-<script src="./schedule-board-core.js?v=2026-09-09.3"></script>
-<script src="./asset-core.js?v=2026-09-09.3"></script>
-<script src="./qr-core.js?v=2026-09-09.3"></script>
-<script src="./acaflow-import-core.js?v=2026-09-09.3"></script>
-<script src="./feedback-subject-catalog.js?v=2026-09-09.3"></script>
-<script src="./sync-recovery-core.js?v=2026-09-09.3"></script>
-<script src="./staff-work-session-core.js?v=2026-09-09.3"></script>
-<script src="./staff-attendance-history-core.js?v=2026-09-09.3"></script>
+<script src="./lesson-form-core.js?v=2026-09-09.4"></script>
+<script src="./schedule-board-core.js?v=2026-09-09.4"></script>
+<script src="./asset-core.js?v=2026-09-09.4"></script>
+<script src="./qr-core.js?v=2026-09-09.4"></script>
+<script src="./acaflow-import-core.js?v=2026-09-09.4"></script>
+<script src="./feedback-subject-catalog.js?v=2026-09-09.4"></script>
+<script src="./sync-recovery-core.js?v=2026-09-09.4"></script>
+<script src="./staff-work-session-core.js?v=2026-09-09.4"></script>
+<script src="./staff-attendance-history-core.js?v=2026-09-09.4"></script>
 <script>
 "use strict";
 
@@ -1214,6 +1214,53 @@ function blankState() {
 }
 
 let state = blankState();
+
+// 선생님 태블릿에서만 유지되는 관리자 점검 세션. 원래 개인 링크 토큰과
+// 분리해 두어 점검을 끝내도 선생님 연결·출퇴근 기록은 건드리지 않는다.
+const MANAGER_INSPECTION_KEY = 'wb_manager_inspection_v1_' + SAFE_SCOPE_ID;
+const managerInspection = { token: '', managerId: '', managerName: '', expiresAt: 0, busy: false, error: '' };
+function restoreManagerInspection() {
+  if (!HAS_PERSON_SCOPE) return;
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(MANAGER_INSPECTION_KEY) || 'null');
+    if (saved && typeof saved === 'object' && /^[a-f0-9]{64}$/.test(String(saved.token || '')) &&
+        Number(saved.expiresAt) > Date.now()) {
+      managerInspection.token = String(saved.token);
+      managerInspection.managerId = String(saved.managerId || '');
+      managerInspection.managerName = String(saved.managerName || '');
+      managerInspection.expiresAt = Number(saved.expiresAt);
+    } else sessionStorage.removeItem(MANAGER_INSPECTION_KEY);
+  } catch (_) { /* 세션 저장소를 쓸 수 없는 환경에서는 현재 탭 메모리만 사용한다. */ }
+}
+function managerInspectionActive() {
+  if (!managerInspection.token || Number(managerInspection.expiresAt) <= Date.now()) return false;
+  return true;
+}
+function managerInspectionAuth() {
+  return managerInspectionActive()
+    ? { mode: 'manager_inspection', managerId: managerInspection.managerId, token: managerInspection.token }
+    : null;
+}
+function saveManagerInspection() {
+  try {
+    if (managerInspectionActive()) sessionStorage.setItem(MANAGER_INSPECTION_KEY, JSON.stringify({
+      token: managerInspection.token, managerId: managerInspection.managerId,
+      managerName: managerInspection.managerName, expiresAt: managerInspection.expiresAt
+    }));
+    else sessionStorage.removeItem(MANAGER_INSPECTION_KEY);
+  } catch (_) { /* 현재 탭 메모리 인증은 계속 유지한다. */ }
+}
+function clearManagerInspection() {
+  managerInspection.token = ''; managerInspection.managerId = ''; managerInspection.managerName = '';
+  managerInspection.expiresAt = 0; managerInspection.error = ''; managerInspection.busy = false;
+  saveManagerInspection();
+  sync.accessRole = ''; sync.personVerified = false;
+  delete state.settings.managerCacheSensitive;
+  state.staff = []; state.tasks = []; state.checks = {};
+  state.settings.pullAt = 0; state.settings.pushAt = 0; state.settings.taskRevocationCursor = 0;
+  save();
+}
+restoreManagerInspection();
 
 function load() {
   try {
@@ -1708,6 +1755,7 @@ function setStaffWorkToken(token) {
   } catch (_) { /* 저장소 사용 불가 시 현재 탭 메모리에서만 인증을 유지한다. */ }
 }
 function shouldGateStaffWork() {
+  if (typeof managerInspectionActive === 'function' && managerInspectionActive()) return false;
   if (!session.isStaffLink || pendingBootstrapCode || !state.settings.myToken || personAccessProblem) return false;
   return !staffWorkCore || !staffWorkCore.sameIdentity(staffWork.identity, sync.auth()) ||
     !staffWorkCore.isActive(staffWork, seoulNowParts().date, Date.now());
@@ -1772,7 +1820,65 @@ function viewStaffWorkLogin() {
       (staffWork.clockedOut ? '<div class="hint mt14">오늘 퇴근 기록이 있습니다. 다시 근무해야 한다면 관리자에게 기록 확인을 요청해 주세요.</div>' : '') +
       '<div class="hint mt14">비밀번호를 잊었으면 관리자에게 재설정을 요청해 주세요.</div>' :
       '<div class="hint mt14">' + (staffWork.checked ? '개인 비밀번호가 아직 설정되지 않았습니다. 관리자에게 연락해 주세요.' : '출근 로그인 상태를 확인하고 있습니다.') + '</div>') +
+    '<button class="btn btn-ghost btn-block mt14" data-act="managerinspectopen"' + (typeof managerInspection !== 'undefined' && managerInspection.busy ? ' disabled' : '') + '>관리자 로그인</button>' +
     '<button class="btn btn-ghost btn-block mt14" data-act="staffworkretry"' + (staffWork.busy ? ' disabled' : '') + '>연결 상태 다시 확인</button></div>';
+}
+function openManagerInspectionModal() {
+  const host = $('#modalHost');
+  if (!host) return;
+  if (host.hidden) modalReturnFocus = document.activeElement;
+  host.innerHTML = '<div class="modal-box"><div class="between mb14"><div class="card-title" id="modalTitle">관리자 로그인</div>' +
+    '<button class="btn btn-sm btn-ghost" data-act="closemodal">닫기</button></div>' +
+    '<div class="card-sub mb14">김남기 선생님 또는 김혜지 선생님의 개인 비밀번호 4자리를 입력하면 이 태블릿에서 관리자 화면을 점검할 수 있습니다. 선생님 출퇴근 기록은 변경되지 않습니다.</div>' +
+    (managerInspection.error ? '<div class="hint mt14" role="alert">' + esc(managerInspection.error) + '</div>' : '') +
+    '<label class="field"><span class="fl">관리자 비밀번호 4자리</span><input class="in" id="managerInspectionPin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="off" placeholder="비밀번호 4자리"></label>' +
+    '<button class="btn btn-primary btn-block mt14" data-act="managerinspectsubmit"' + (managerInspection.busy ? ' disabled' : '') + '>관리자 화면 열기</button>' +
+    '<div class="hint mt14">점검 세션은 8시간 후 자동 만료되며, 상단의 점검 종료 버튼으로 즉시 닫을 수 있습니다.</div></div>';
+  host.hidden = false;
+  setModalBackgroundInert(true);
+  requestAnimationFrame(() => $('#managerInspectionPin')?.focus());
+}
+async function submitManagerInspection(button) {
+  if (managerInspection.busy) return;
+  const field = $('#managerInspectionPin'), pin = String(field && field.value || '');
+  if (!/^\d{4}$/.test(pin)) return toast('관리자 비밀번호 숫자 4자리를 입력해 주세요');
+  const sourceAuth = state.settings.myToken ? { mode: 'person', id: session.staffId, token: state.settings.myToken } : null;
+  if (!sourceAuth) return toast('선생님 개인 링크 연결을 먼저 확인해 주세요');
+  managerInspection.busy = true; managerInspection.error = ''; if (button) button.disabled = true;
+  try {
+    const result = await sync.post('/manager-inspection-session', {
+      app: SYNC_APP, auth: sourceAuth, action: 'login', pin
+    });
+    if (!result || !result.active || !/^[a-f0-9]{64}$/.test(String(result.managerSession || ''))) {
+      throw new Error('관리자 점검 세션을 확인하지 못했습니다');
+    }
+    managerInspection.token = String(result.managerSession);
+    managerInspection.managerId = String(result.managerId || '');
+    managerInspection.managerName = String(result.managerName || '관리자');
+    managerInspection.expiresAt = Number(result.expiresAt) || 0;
+    saveManagerInspection();
+    closeModal();
+    state.staff = []; state.tasks = []; state.checks = {};
+    state.settings.pullAt = 0; state.settings.pushAt = 0; state.settings.taskRevocationCursor = 0;
+    sync.accessRole = ''; sync.personVerified = false;
+    save();
+    render();
+    await startSyncSession();
+    toast(managerInspection.managerName + ' 관리자 화면을 열었습니다');
+  } catch (error) {
+    managerInspection.error = String(error && error.message || '관리자 로그인에 실패했습니다');
+    openManagerInspectionModal();
+  } finally { managerInspection.busy = false; render(); }
+}
+async function logoutManagerInspection(button) {
+  if (managerInspection.busy || !managerInspectionActive()) return;
+  managerInspection.busy = true; if (button) button.disabled = true;
+  const auth = managerInspectionAuth();
+  try {
+    if (auth) await sync.post('/manager-inspection-session', { app: SYNC_APP, auth, action: 'logout' });
+  } catch (_) { /* 서버가 이미 만료·폐기한 경우에도 로컬 점검 세션은 닫는다. */ }
+  clearManagerInspection();
+  location.reload();
 }
 async function loginStaffWork(button) {
   if (staffWork.busy) return;
@@ -1846,6 +1952,8 @@ const sync = {
 
   /** 원장은 비밀키로, 학생은 개인 링크에 담겨 온 토큰으로 접속한다 */
   auth() {
+    const inspection = typeof managerInspectionAuth === 'function' ? managerInspectionAuth() : null;
+    if (inspection) return inspection;
     if (session.isStaffLink) {
       const t = state.settings.myToken || '';
       const workSession = staffWorkToken();
@@ -1914,7 +2022,7 @@ const sync = {
   },
 
   async post(path, body) {
-    if (body && body.auth && body.auth.mode === 'person' && !['/staff-work-session', '/exchange'].includes(path) && shouldGateStaffWork()) {
+    if (body && body.auth && body.auth.mode === 'person' && !['/staff-work-session', '/manager-inspection-session', '/exchange'].includes(path) && shouldGateStaffWork()) {
       const error = new Error('출근 로그인이 필요합니다. 비밀번호를 입력해 주세요');
       error.status = 409; error.code = 'STAFF_WORK_LOGIN_REQUIRED';
       throw error;
@@ -1946,7 +2054,7 @@ const sync = {
         }
         throw error;
       }
-      if (body && body.auth && body.auth.mode === 'person' && path !== '/staff-work-session' &&
+      if (body && body.auth && body.auth.mode === 'person' && !['/staff-work-session', '/manager-inspection-session'].includes(path) &&
           (shouldGateStaffWork() || !staffWorkCore.sameIdentity(body.auth, this.auth()) ||
             String(body.auth.workSession || '') !== String((this.auth() || {}).workSession || ''))) {
         const stale = new Error('로그인 상태가 변경되었습니다. 다시 확인해 주세요');
@@ -2000,6 +2108,7 @@ const sync = {
         else state.settings.onboardingCasReconcileVersion = 1;
       };
       queueOnboardingReconcile(auth.mode === 'admin' || session.isManager);
+      if (auth.mode === 'manager_inspection') queueOnboardingReconcile(true);
       let guard = 0, again = true;
       while (again && guard++ < 60) {
         const batch = pending.splice(0, 400);
@@ -2021,7 +2130,8 @@ const sync = {
           roleError.status = 403; roleError.code = 'AUTH_REQUIRED';
           throw roleError;
         }
-        const responseAccessRole = auth.mode === 'person' ? d.authRole : '';
+        const responseAccessRole = auth.mode === 'person' ? d.authRole :
+          (auth.mode === 'manager_inspection' ? 'manager' : '');
         const managerCacheDowngraded = responseAccessRole === 'staff' &&
           (hasSensitiveManagerCache(previousAccessRole) || nextAccessRole === 'manager');
         const scopedCacheUpgraded = responseAccessRole === 'manager' &&
@@ -2050,12 +2160,12 @@ const sync = {
       }
       // 요청 도중에 바뀐 것은 updatedAt이 t0보다 크므로 다음 회차에 올라간다
       state.settings.pushAt = t0;
-      if (auth.mode === 'person' && nextAccessRole === 'manager') state.settings.managerCacheSensitive = true;
+      if ((auth.mode === 'person' || auth.mode === 'manager_inspection') && nextAccessRole === 'manager') state.settings.managerCacheSensitive = true;
       else delete state.settings.managerCacheSensitive;
       save();
       this.last = now(); this.dirty = false; this.err = '';
       this.problem = null;
-      this.accessRole = auth.mode === 'person' ? nextAccessRole : '';
+      this.accessRole = auth.mode === 'person' || auth.mode === 'manager_inspection' ? nextAccessRole : '';
       if (session.isStaffLink) {
         this.personVerified = true;
         personAccessProblem = null;
@@ -2466,13 +2576,15 @@ const session = {
   get staffId() { return SAFE_SCOPE_ID; },
   get isStaffLink() { return !!this.staffId; },
   get isManager() {
+    if (typeof managerInspectionActive === 'function' && managerInspectionActive()) return true;
     const auth = this.isStaffLink && sync.auth();
     return !!(auth && auth.mode === 'person' && auth.id === this.staffId &&
       sync.personVerified && sync.accessRole === 'manager');
   },
-  get isAdmin() { return this.isManager || (!this.isStaffLink && sessionStorage.getItem('wb_admin') === '1'); },
+  get isAdmin() { return this.isManager || (typeof managerInspectionActive === 'function' && managerInspectionActive()) || (!this.isStaffLink && sessionStorage.getItem('wb_admin') === '1'); },
   unlock() { sessionStorage.setItem('wb_admin', '1'); },
   lock() {
+    if (managerInspectionActive()) { clearManagerInspection(); return true; }
     sessionStorage.removeItem('wb_admin');
     sync.accessRole = '';
     resetLessonHandoffs();
@@ -3281,6 +3393,7 @@ function paintStatus() {
     else if (!sync.personVerified) text = '개인 인증 확인 중';
     else { text = me ? me.name + ' 선생님 · 개인 업무' : '대상을 찾을 수 없음'; on = !!me; }
   }
+  else if (managerInspectionActive()) { text = (managerInspection.managerName || '관리자') + ' · 관리자 점검 모드'; on = true; }
   else if (session.isManager) { text = ((meStaff() || {}).name || '관리 담당') + ' · 관리 담당 모드'; on = true; }
   else if (session.isAdmin) { text = '원장 모드'; on = true; }
   else { text = '잠김'; }
@@ -3290,9 +3403,11 @@ function paintStatus() {
   el.classList.toggle('off', !on);
   const workControls = $('#staffWorkControls');
   if (workControls) {
-    const show = session.isStaffLink && !session.isAdmin && staffWork.required && !shouldGateStaffWork();
+    const show = managerInspectionActive() || (session.isStaffLink && !session.isAdmin && staffWork.required && !shouldGateStaffWork());
     workControls.hidden = !show;
-    if (show) workControls.innerHTML = '<div class="between mt8"><span class="small muted">출근 로그인 중 · 화면 종료는 퇴근이 아닙니다</span>' +
+    if (managerInspectionActive()) workControls.innerHTML = '<div class="between mt8"><span class="small muted">관리자 점검 모드 · 읽기·수정 화면 확인 가능</span>' +
+      '<button class="btn btn-sm btn-navy" data-act="managerinspectlogout"' + (managerInspection.busy ? ' disabled' : '') + '>점검 종료</button></div>';
+    else if (show) workControls.innerHTML = '<div class="between mt8"><span class="small muted">출근 로그인 중 · 화면 종료는 퇴근이 아닙니다</span>' +
       '<button class="btn btn-sm btn-navy" data-act="staffworklogout"' + (staffWork.busy ? ' disabled' : '') + '>퇴근하고 로그아웃</button></div>';
   }
   renderSyncRecoveryNotice();
@@ -21298,7 +21413,7 @@ function applyAssignments(input, preConfirmed) {
    ══════════════════════════════════════════════════════ */
 document.addEventListener('click', ev => {
   if (sync.recovering) return;
-  if (shouldGateStaffWork() && !ev.target.closest('[data-act="staffworklogin"],[data-act="staffworkretry"]')) return;
+  if (shouldGateStaffWork() && !ev.target.closest('[data-act="staffworklogin"],[data-act="staffworkretry"],[data-act^="managerinspect"],[data-act="closemodal"]')) return;
   if (adminDirectiveSoundEnabled()) ensureAdminDirectiveAudio();
   const goEl = ev.target.closest('[data-go]');
   if (goEl) { go(goEl.dataset.go); return; }
@@ -21319,6 +21434,9 @@ document.addEventListener('click', ev => {
     case 'staffworklogin': loginStaffWork(el); break;
     case 'staffworklogout': logoutStaffWork(el); break;
     case 'staffworkretry': ensureStaffWorkStatus(true).then(ok => { if (ok) startSyncSession(); }); break;
+    case 'managerinspectopen': openManagerInspectionModal(); break;
+    case 'managerinspectsubmit': submitManagerInspection(el); break;
+    case 'managerinspectlogout': logoutManagerInspection(el); break;
     case 'staffprofile': openStaffPrivateProfile(id); break;
     case 'staffprofilesave': saveStaffPrivateProfile('update', el); break;
     case 'staffprofileresetpin': saveStaffPrivateProfile('reset_pin', el); break;
@@ -23465,6 +23583,7 @@ document.addEventListener('keydown', ev => {
   const t = ev.target;
   if (t.id === 'pin')   document.querySelector('[data-act="setpin"],[data-act="login"]')?.click();
   if (t.id === 'staffWorkPin') document.querySelector('[data-act="staffworklogin"]')?.click();
+  if (t.id === 'managerInspectionPin') document.querySelector('[data-act="managerinspectsubmit"]')?.click();
   if (t.id === 'sName') document.querySelector('[data-act="addstaff"]')?.click();
   if (t.matches('[data-transport-driver-name]')) document.querySelector('[data-act="transportdriveradd"]')?.click();
   if (t.id === 'qAdd')  document.querySelector('[data-act="qadd"]')?.click();
@@ -23564,7 +23683,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-09-09.3';
+const APP_VER = '2026-09-09.4';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
