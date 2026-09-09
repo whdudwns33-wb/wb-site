@@ -3,7 +3,10 @@ import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import worker from './worker.js';
-import { deriveStaffPinHash, guardStaffWorkAccess, handleStaffProfile, handleStaffWorkSession } from './staff-work-login.js';
+import {
+  deriveStaffPinHash, guardStaffWorkAccess, handleStaffProfile, handleStaffWorkSession,
+  handleManagerInspectionSession, resolveManagerInspectionAuth
+} from './staff-work-login.js';
 
 class Statement {
   constructor(db, sql) { this.db = db; this.sql = sql; this.args = []; }
@@ -21,6 +24,7 @@ class TestD1 {
       CREATE TABLE app_data_generations(app TEXT PRIMARY KEY,generation INTEGER);
       INSERT INTO app_data_generations VALUES('task',2);`);
     this.db.exec(readFileSync(new URL('./migrations/073_staff_work_login.sql', import.meta.url), 'utf8'));
+    this.db.exec(readFileSync(new URL('./migrations/075_manager_inspection_sessions.sql', import.meta.url), 'utf8'));
     for (const id of ['teacher-a', 'teacher-b', 'manager-a']) {
       this.db.prepare('INSERT INTO staff VALUES(?,?,?)').run('task', id, JSON.stringify({ id, name: id }));
       this.db.prepare('INSERT INTO tokens VALUES(?,?,?,?,0)').run('task', 'device-' + id, id, Date.now());
@@ -116,6 +120,32 @@ test('manager/admin and non-enrolled teacher retain previous flow and feature fl
   env.WB_STAFF_WORK_LOGIN_ENABLED = 'true';
   assert.equal((await gate(env)).status, 503);
   assert.equal((await call(env, 'status')).status, 503);
+});
+
+test('manager inspection authenticates either manager PIN without exposing the teacher device bearer', async () => {
+  const env = await fixture();
+  const sourceAuth = { id: 'teacher-a', scope: 'own' };
+  const loginInput = { app: 'task', auth: { mode: 'person', id: 'teacher-a', token: 'device-teacher-a' }, action: 'login', pin };
+  const loginResponse = await handleManagerInspectionSession(env, 'task', loginInput, '*', sourceAuth, json, new Set(['manager-a']));
+  assert.equal(loginResponse.status, 200);
+  const logged = await loginResponse.json();
+  assert.equal(logged.active, true);
+  assert.match(logged.managerSession, /^[a-f0-9]{64}$/);
+  assert.equal(JSON.stringify(logged).includes('device-teacher-a'), false);
+  assert.equal(JSON.stringify(logged).includes(pin), false);
+  const inspectionAuth = await resolveManagerInspectionAuth(env, 'task', {
+    mode: 'manager_inspection', managerId: 'manager-a', token: logged.managerSession
+  }, new Set(['manager-a']));
+  assert.equal(inspectionAuth.scope, 'all');
+  assert.equal(inspectionAuth.role, 'manager');
+  assert.equal(inspectionAuth.inspection, true);
+  const logoutResponse = await handleManagerInspectionSession(env, 'task', {
+    app: 'task', auth: { mode: 'manager_inspection', managerId: 'manager-a', token: logged.managerSession }, action: 'logout'
+  }, '*', inspectionAuth, json, new Set(['manager-a']));
+  assert.equal(logoutResponse.status, 200);
+  assert.equal(await resolveManagerInspectionAuth(env, 'task', {
+    mode: 'manager_inspection', managerId: 'manager-a', token: logged.managerSession
+  }, new Set(['manager-a'])), null);
 });
 
 test('five parallel bad attempts reserve only five verification slots then unlock after five minutes', async () => {
@@ -241,4 +271,13 @@ test('073 migration is additive, idempotent, and mirrored in the canonical schem
   db.db.exec(migration);
   assert.equal(db.db.prepare('SELECT COUNT(*) n FROM tokens').get().n, 3);
   assert.equal(db.db.prepare('SELECT COUNT(*) n FROM staff_work_sessions').get().n, 0);
+});
+
+test('075 migration is additive and mirrored in the canonical schema', () => {
+  const migration = readFileSync(new URL('./migrations/075_manager_inspection_sessions.sql', import.meta.url), 'utf8').replace(/\r\n/g, '\n').trim();
+  const schema = readFileSync(new URL('./schema.sql', import.meta.url), 'utf8').replace(/\r\n/g, '\n');
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS manager_inspection_sessions/);
+  assert.match(schema, /CREATE TABLE IF NOT EXISTS manager_inspection_attempts/);
+  assert.match(schema, /idx_manager_inspection_sessions_device/);
+  assert.doesNotMatch(migration, /\b(?:DELETE|DROP|UPDATE)\b/i);
 });
