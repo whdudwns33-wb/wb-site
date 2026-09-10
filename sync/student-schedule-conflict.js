@@ -112,6 +112,8 @@ function conflictError(code) {
 }
 
 function regularPairConflict(leftTask, rightTask) {
+  // 한 선생님이 같은 시간에 여러 학생을 함께 지도할 수 있으므로 staffId·owner는
+  // 충돌 키가 아니다. 충돌은 오직 stable studentId의 실제 시간 점유만 판정한다.
   const left = scheduleForTask(leftTask);
   const right = scheduleForTask(rightTask);
   if (!intersectWindow(left.window, right.window)) return '';
