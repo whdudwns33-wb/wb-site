@@ -137,7 +137,3 @@ export function projectNextStudentLesson(value, date) {
 }
 
 export { clockMinute, validDate };
-
-if (typeof module !== 'undefined') module.exports = {
-  lessonOccurrencesOnDate, findNextStudentLesson, projectNextStudentLesson, clockMinute, validDate
-};
