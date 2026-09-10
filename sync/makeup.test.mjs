@@ -18,6 +18,9 @@ const studentOverlapMigration = fs.readFileSync(
 const completionLinksMigration = fs.readFileSync(
   new URL('./migrations/074_makeup_completion_links.sql', import.meta.url), 'utf8'
 );
+const absenceRetryMigration = fs.readFileSync(
+  new URL('./migrations/076_makeup_absence_retry.sql', import.meta.url), 'utf8'
+);
 
 class Statement {
   constructor(db, sql) { this.db = db; this.sql = sql; this.args = []; }
@@ -37,6 +40,7 @@ class TestD1 {
     this.database.exec(assigneeIntegrityMigration);
     this.database.exec(studentOverlapMigration);
     this.database.exec(completionLinksMigration);
+    this.database.exec(absenceRetryMigration);
     this.beforeBatch = null;
     this.failGuardianReads = false;
     this.taskBulkReads = 0;
@@ -1762,6 +1766,71 @@ test('reschedule is blocked before and during the atomic write when lesson recor
     assert.equal(db.database.prepare('SELECT owner FROM tasks WHERE id=?')
       .get('makeup_lesson_' + created.body.case.caseId).owner, 'teacher-a');
   }
+});
+
+test('an absent makeup can be rescheduled as a retry while preserving the original absence audit', async () => {
+  const db = new TestD1(); seed(db);
+  const created = await call(db, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  });
+  const scheduled = await callAt(db, all, {
+    action: 'schedule', caseId: created.body.case.caseId, revision: created.body.case.revision,
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00'
+  }, '2026-08-11T12:00:00+09:00');
+  const caseId = scheduled.body.case.caseId;
+  makeupAttendance(db, caseId, 'teacher-a', '2026-08-12', 'A');
+  const retried = await callAt(db, all, {
+    action: 'reschedule_after_absence', caseId, revision: scheduled.body.case.revision,
+    date: '2026-08-14', startTime: '19:00', endTime: '20:00', staffId: 'teacher-b'
+  }, '2026-08-13T12:00:00+09:00');
+  assert.equal(retried.status, 200, JSON.stringify(retried.body));
+  assert.equal(retried.body.case.confirmedDate, '2026-08-14');
+  assert.equal(retried.body.case.confirmedStaffId, 'teacher-b');
+  assert.equal(retried.body.case.history.at(-1).action, 'reschedule_after_absence');
+  assert.equal(retried.body.case.history.at(-1).previousAttendance, 'A');
+  const audit = db.database.prepare(
+    'SELECT previous_date,previous_start_time,previous_end_time,previous_staff_id,attendance_status ' +
+    'FROM makeup_absence_retries WHERE app=? AND case_id=?'
+  ).get('task', caseId);
+  assert.deepEqual({ ...audit }, {
+    previous_date: '2026-08-12', previous_start_time: '20:00', previous_end_time: '21:00',
+    previous_staff_id: 'teacher-a', attendance_status: 'A'
+  });
+  assert.equal(db.database.prepare('SELECT count(*) AS n FROM checks WHERE k=?').get(
+    'makeup_lesson_' + caseId + '|2026-08-12').n, 1);
+  assert.equal(JSON.parse(db.database.prepare('SELECT data FROM tasks WHERE id=?').get(
+    'makeup_lesson_' + caseId).data).start, '2026-08-14');
+
+  makeupAttendance(db, caseId, 'teacher-b', '2026-08-14', 'P');
+  const completed = await callAt(db, own('teacher-b'), {
+    action: 'complete', caseId, revision: retried.body.case.revision
+  }, '2026-08-14T20:00:00+09:00');
+  assert.equal(completed.status, 200, JSON.stringify(completed.body));
+  assert.equal(completed.body.case.status, 'completed');
+});
+
+test('absence retry remains blocked when the makeup has another operational record', async () => {
+  const db = new TestD1(); seed(db);
+  const created = await call(db, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  });
+  const scheduled = await callAt(db, all, {
+    action: 'schedule', caseId: created.body.case.caseId, revision: created.body.case.revision,
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00'
+  }, '2026-08-11T12:00:00+09:00');
+  const caseId = scheduled.body.case.caseId;
+  const taskId = 'makeup_lesson_' + caseId;
+  makeupAttendance(db, caseId, 'teacher-a', '2026-08-12', 'A');
+  db.prepare('INSERT INTO feedback_requests(app,request_key,task_id,owner,feedback_date,feedback_type,template_version,' +
+    'body,body_hash,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)')
+    .bind('task', 'feedback-retry', taskId, 'teacher-a', '2026-08-12', 'lesson', 'v2', '{}', 'hash',
+      'approval_waiting', 2, 2).run();
+  const blocked = await callAt(db, all, {
+    action: 'reschedule_after_absence', caseId, revision: scheduled.body.case.revision,
+    date: '2026-08-14', startTime: '19:00', endTime: '20:00', staffId: 'teacher-b'
+  }, '2026-08-13T12:00:00+09:00');
+  assert.equal(blocked.status, 409);
+  assert.equal(blocked.body.code, 'MAKEUP_LESSON_HAS_RECORDS');
 });
 
 test('065 rejects latest-ledger evidence when the makeup case assignee differs from task owner', async () => {
