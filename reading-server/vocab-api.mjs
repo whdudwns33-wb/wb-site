@@ -471,26 +471,30 @@ export async function handleVocab(ctx) {
     if (prev && (prev.status === 'pending' || prev.status === 'rejected')) {
       return j(200, { ok: true, status: prev.status });
     }
+    const context = b.context ? String(b.context).slice(0, 300) : '';
+    const queue = (draft, model) => store.putGloss(key, {
+      key, word, draft: draft || null, context,
+      requestedBy: who.code, grade: b.grade ? String(b.grade).slice(0, 20) : '',
+      at: nowIso(), status: 'pending', approved: null, model: model || null,
+    });
+    /* AI 초안은 거들 뿐이다 — 키가 없거나 생성이 실패해도 낱말은 검수함에 올린다.
+       그래야 강사가 뜻을 직접 채우거나 밖에서 만든 초안을 올릴 수 있다.
+       (구독으로 운영할 때의 기본 경로: tools/gloss-drafts.mjs) */
+    if (!ctx.ai.apiKey && !ctx.ai.gloss) { await queue(null); return j(200, { ok: true, status: 'pending', drafted: false }); }
     const quota = (await store.getGlossQuota(who.code)) || { day: '', n: 0 };
     if (quota.day !== dayKey()) { quota.day = dayKey(); quota.n = 0; }
-    if (quota.n >= GLOSS_DAILY_MAX) return j(200, { ok: false, reason: 'quota' });
+    if (quota.n >= GLOSS_DAILY_MAX) { await queue(null); return j(200, { ok: true, status: 'pending', drafted: false, reason: 'quota' }); }
     const generate = ctx.ai.gloss || aiGloss;
     const out = await generate({
-      word,
-      context: b.context ? String(b.context).slice(0, 300) : undefined,
+      word, context: context || undefined,
       grade: b.grade ? String(b.grade).slice(0, 20) : undefined,
       apiKey: ctx.ai.apiKey, model: ctx.ai.model,
     });
-    if (!out.ok) return j(200, { ok: false, reason: out.reason });
+    if (!out.ok) { await queue(null); return j(200, { ok: true, status: 'pending', drafted: false, reason: out.reason }); }
     quota.n += 1;
     await store.putGlossQuota(who.code, quota);
-    await store.putGloss(key, {
-      key, word, draft: out.gloss,
-      context: b.context ? String(b.context).slice(0, 300) : '',
-      requestedBy: who.code, at: nowIso(), status: 'pending',
-      approved: null, model: out.model || null,
-    });
-    return j(200, { ok: true, status: 'pending' });
+    await queue(out.gloss, out.model);
+    return j(200, { ok: true, status: 'pending', drafted: true });
   }
   /* 검수 결과 확인 (AI 재호출 없음) — 학생 앱이 부팅 시 담아 둔 낱말의 승인을 반영 */
   if (p === '/api/vocab/gloss/check' && method === 'POST' && !who.admin) {
@@ -589,6 +593,41 @@ export async function handleVocab(ctx) {
     const items = await store.listGlosses();
     items.sort((a, b) => (a.status === 'pending') === (b.status === 'pending') ? (a.at < b.at ? 1 : -1) : (a.status === 'pending' ? -1 : 1));
     return j(200, { items, time: nowIso() });
+  }
+  /* 초안 채워 넣기 — API 대신 구독(Claude Code 등)으로 만든 뜻풀이를 올리는 경로.
+     승인이 아니다. 올린 뒤에도 강사가 검수함에서 확인하고 승인해야 학생에게 나간다. */
+  if (p === '/api/vocab/admin/gloss/draft' && method === 'POST') {
+    const b = await ctx.getBody();
+    const list = Array.isArray(b.items) ? b.items.slice(0, 100) : [];
+    if (!list.length) return j(400, { error: '올릴 초안이 없어요.' });
+    const done = [], skipped = [];
+    for (const it of list) {
+      const rec = it && it.key && await store.getGloss(glossKey(it.key));
+      if (!rec) { skipped.push({ key: it && it.key, why: 'not-found' }); continue; }
+      if (rec.status !== 'pending') { skipped.push({ key: rec.key, why: rec.status }); continue; }
+      const d = it.draft || {};
+      if (d.valid === false) {
+        rec.draft = { valid: false, word: String(d.word || rec.word).trim().slice(0, 40),
+                      note: String(d.note || '').trim().slice(0, 200) };
+      } else {
+        const easy = String(d.easy || '').trim().slice(0, 200);
+        if (easy.length < 2) { skipped.push({ key: rec.key, why: 'no-easy' }); continue; }
+        rec.draft = {
+          valid: true,
+          word: String(d.word || rec.word).trim().slice(0, 40),
+          type: ['hanja', 'native', 'english'].includes(d.type) ? d.type : 'native',
+          easy,
+          hanja: d.hanja ? String(d.hanja).trim().slice(0, 120) : null,
+          example: d.example ? String(d.example).trim().slice(0, 200) : null,
+          note: String(d.note || '').trim().slice(0, 200),
+        };
+      }
+      rec.draftedAt = nowIso();
+      rec.model = it.model ? String(it.model).slice(0, 60) : (rec.model || null);
+      await store.putGloss(rec.key, rec);
+      done.push(rec.key);
+    }
+    return j(200, { ok: true, drafted: done, skipped });
   }
   if (p === '/api/vocab/admin/gloss' && method === 'POST') {
     const { key, action, word, easy, hanja, example, type } = await ctx.getBody();

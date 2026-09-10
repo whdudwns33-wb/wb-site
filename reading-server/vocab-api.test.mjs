@@ -446,8 +446,11 @@ await t('하루 생성 상한 — 캐시 적중은 세지 않는다', async () =
     assert.strictEqual(r.body.status, 'pending', i + '번째는 통과해야 한다');
   }
   const over = await call(store, { path: '/api/vocab/gloss', method: 'POST', getBody: async () => ({ word: '넘침' }), ai });
-  assert.strictEqual(over.body.ok, false);
+  assert.strictEqual(over.body.status, 'pending', '상한을 넘어도 낱말은 검수함에 올라간다');
+  assert.strictEqual(over.body.drafted, false, '다만 초안은 안 만든다');
   assert.strictEqual(over.body.reason, 'quota');
+  assert.ok(store._raw.glosses['넘침'], '검수함 기록은 남는다');
+  assert.strictEqual(store._raw.glosses['넘침'].draft, null);
   assert.strictEqual(calls.length, 20, '상한을 넘으면 AI를 부르지 않는다');
   const cached = await call(store, { path: '/api/vocab/gloss', method: 'POST', getBody: async () => ({ word: '낱말3' }), ai });
   assert.strictEqual(cached.body.status, 'pending', '이미 있는 낱말은 상한과 무관');
@@ -502,15 +505,63 @@ await t('뜻풀이 권한·입력 검증, 백업 덤프에 포함', async () => 
   assert.strictEqual((await call(store, { path: '/api/vocab/gloss', method: 'POST', getBody: async () => ({ word: '' }), ai })).status, 400);
   assert.strictEqual((await call(store, { path: '/api/vocab/gloss', method: 'POST', getBody: async () => ({ word: 'x'.repeat(31) }), ai })).status, 400);
   assert.strictEqual((await call(store, { path: '/api/vocab/admin/gloss', method: 'GET' })).status, 403, '학생은 검수함 못 봄');
-  const nokey = await call(store, { path: '/api/vocab/gloss', method: 'POST', getBody: async () => ({ word: '연구자' }), ai: { apiKey: null } });
-  assert.strictEqual(nokey.body.ok, false);
-  assert.strictEqual(nokey.body.reason, 'no-key');
+  const nokey = await call(store, { path: '/api/vocab/gloss', method: 'POST', getBody: async () => ({ word: '열쇠없음' }), ai: { apiKey: null } });
+  assert.strictEqual(nokey.body.status, 'pending', 'API 키가 없어도 검수함에는 올라간다');
+  assert.strictEqual(nokey.body.drafted, false);
+  assert.strictEqual(store._raw.glosses['열쇠없음'].draft, null, '초안 없이 대기');
   await call(store, { path: '/api/vocab/gloss', method: 'POST', getBody: async () => ({ word: '연구자' }), ai });
   const miss = await call(store, { path: '/api/vocab/admin/gloss', method: 'POST', who: { code: 'a1', admin: true },
     getBody: async () => ({ key: '없는낱말', action: 'approve', easy: '뜻' }) });
   assert.strictEqual(miss.status, 404);
   const dump = await dumpVocab(store);
   assert.ok(dump.glosses['연구자'], '백업에 뜻풀이가 들어간다');
+});
+
+/* ── API 없이 운영: 밖에서 만든 초안을 올리는 경로 ── */
+await t('AI 없이도 낱말이 검수함에 쌓이고, 밖에서 만든 초안을 올릴 수 있다', async () => {
+  const store = memStore();
+  const noAi = { apiKey: null };
+  await call(store, { path: '/api/vocab/gloss', method: 'POST', getBody: async () => ({ word: '연구자들', context: '연구자들이 십 년 넘게 연구했다.' }), ai: noAi });
+  await call(store, { path: '/api/vocab/gloss', method: 'POST', getBody: async () => ({ word: '스스' }), ai: noAi });
+  const admin = { code: 'a1', admin: true };
+
+  const list = await call(store, { path: '/api/vocab/admin/gloss', method: 'GET', who: admin });
+  assert.strictEqual(list.body.items.length, 2);
+  assert.ok(list.body.items.every(i => i.draft === null), '초안 없이 대기 중');
+  assert.strictEqual(list.body.items.find(i => i.key === '연구자들').context, '연구자들이 십 년 넘게 연구했다.', '문맥은 남아 있다');
+
+  const up = await call(store, { path: '/api/vocab/admin/gloss/draft', method: 'POST', who: admin,
+    getBody: async () => ({ items: [
+      { key: '연구자들', draft: { valid: true, word: '연구자', type: 'hanja', easy: '어떤 것을 깊이 파고들어 밝히는 사람', hanja: '硏(갈 연)+究(궁구할 구)+者(놈 자)' } },
+      { key: '스스', draft: { valid: false, word: '스스로', note: '조사를 잘못 뗀 조각이에요' } },
+      { key: '없는낱말', draft: { valid: true, word: 'x', easy: '뜻' } },
+      { key: '연구자들', draft: { valid: true, word: '연구자', easy: '' } },
+    ] }) });
+  assert.deepStrictEqual(up.body.drafted, ['연구자들', '스스']);
+  assert.deepStrictEqual(up.body.skipped.map(x => x.why), ['not-found', 'no-easy']);
+  assert.strictEqual(store._raw.glosses['연구자들'].draft.easy, '어떤 것을 깊이 파고들어 밝히는 사람');
+  assert.strictEqual(store._raw.glosses['스스'].draft.valid, false);
+  assert.strictEqual(store._raw.glosses['연구자들'].status, 'pending', '초안 업로드는 승인이 아니다');
+
+  /* 올린 초안으로 승인하면 학생에게 나간다 */
+  await call(store, { path: '/api/vocab/admin/gloss', method: 'POST', who: admin,
+    getBody: async () => ({ key: '연구자들', action: 'approve' }) });
+  const chk = await call(store, { path: '/api/vocab/gloss/check', method: 'POST', getBody: async () => ({ words: ['연구자들'] }), ai: noAi });
+  assert.strictEqual(chk.body.items[0].status, 'approved');
+  assert.strictEqual(chk.body.items[0].gloss.word, '연구자');
+  assert.strictEqual(chk.body.items[0].gloss.hanja, '硏(갈 연)+究(궁구할 구)+者(놈 자)');
+});
+
+await t('초안 업로드 권한·입력 검증', async () => {
+  const store = memStore();
+  assert.strictEqual((await call(store, { path: '/api/vocab/admin/gloss/draft', method: 'POST', getBody: async () => ({ items: [] }) })).status, 403, '학생은 못 올림');
+  const admin = { code: 'a1', admin: true };
+  assert.strictEqual((await call(store, { path: '/api/vocab/admin/gloss/draft', method: 'POST', who: admin, getBody: async () => ({ items: [] }) })).status, 400);
+  await call(store, { path: '/api/vocab/gloss', method: 'POST', getBody: async () => ({ word: '승인됨' }), ai: { apiKey: null } });
+  await call(store, { path: '/api/vocab/admin/gloss', method: 'POST', who: admin, getBody: async () => ({ key: '승인됨', action: 'approve', easy: '이미 승인된 뜻' }) });
+  const up = await call(store, { path: '/api/vocab/admin/gloss/draft', method: 'POST', who: admin,
+    getBody: async () => ({ items: [{ key: '승인됨', draft: { valid: true, word: '승인됨', easy: '덮어쓰기 시도' } }] }) });
+  assert.deepStrictEqual(up.body.skipped.map(x => x.why), ['approved'], '이미 승인된 건 덮어쓰지 않는다');
 });
 
 console.log('\n통과 ' + passed + '개 — vocab-api 서버 라우트 검증 완료');
