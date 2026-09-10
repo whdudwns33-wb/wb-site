@@ -136,8 +136,9 @@ test('manager inspection authenticates either manager PIN without exposing the t
   const inspectionAuth = await resolveManagerInspectionAuth(env, 'task', {
     mode: 'manager_inspection', managerId: 'manager-a', token: logged.managerSession
   }, new Set(['manager-a']));
-  assert.equal(inspectionAuth.scope, 'all');
-  assert.equal(inspectionAuth.role, 'manager');
+  assert.equal(inspectionAuth.scope, 'own');
+  assert.equal(inspectionAuth.id, 'teacher-a');
+  assert.equal(inspectionAuth.role, 'teacher');
   assert.equal(inspectionAuth.inspection, true);
   const logoutResponse = await handleManagerInspectionSession(env, 'task', {
     app: 'task', auth: { mode: 'manager_inspection', managerId: 'manager-a', token: logged.managerSession }, action: 'logout'
