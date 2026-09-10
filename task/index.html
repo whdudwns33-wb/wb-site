@@ -1832,7 +1832,7 @@ function openManagerInspectionModal() {
     '<div class="card-sub mb14">김남기 선생님 또는 김혜지 선생님의 개인 비밀번호 4자리를 입력하면 이 태블릿에서 관리자 화면을 점검할 수 있습니다. 선생님 출퇴근 기록은 변경되지 않습니다.</div>' +
     (managerInspection.error ? '<div class="hint mt14" role="alert">' + esc(managerInspection.error) + '</div>' : '') +
     '<label class="field"><span class="fl">관리자 비밀번호 4자리</span><input class="in" id="managerInspectionPin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="off" placeholder="비밀번호 4자리"></label>' +
-    '<button class="btn btn-primary btn-block mt14" data-act="managerinspectsubmit"' + (managerInspection.busy ? ' disabled' : '') + '>관리자 화면 열기</button>' +
+    '<button class="btn btn-primary btn-block mt14" data-act="managerinspectsubmit"' + (managerInspection.busy ? ' disabled' : '') + '>' + (managerInspection.busy ? '관리자 인증 확인 중…' : '관리자 화면 열기') + '</button>' +
     '<div class="hint mt14">점검 세션은 8시간 후 자동 만료되며, 상단의 점검 종료 버튼으로 즉시 닫을 수 있습니다.</div></div>';
   host.hidden = false;
   setModalBackgroundInert(true);
@@ -1863,12 +1863,19 @@ async function submitManagerInspection(button) {
     sync.accessRole = ''; sync.personVerified = false;
     save();
     render();
-    await startSyncSession();
+    const verified = await startSyncSession();
+    if (!verified) throw new Error(sync.err || '관리자 화면 자료를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요');
     toast(managerInspection.managerName + ' 관리자 화면을 열었습니다');
   } catch (error) {
     managerInspection.error = String(error && error.message || '관리자 로그인에 실패했습니다');
     openManagerInspectionModal();
-  } finally { managerInspection.busy = false; render(); }
+  } finally {
+    managerInspection.busy = false;
+    // 인증 실패 시 render()가 직원 로그인 게이트로 모달을 닫아 버리지 않도록
+    // 오류 모달을 마지막에 다시 그린다. 사용자가 정확한 원인을 확인할 수 있어야 한다.
+    if (managerInspection.error && !managerInspectionActive()) openManagerInspectionModal();
+    else render();
+  }
 }
 async function logoutManagerInspection(button) {
   if (managerInspection.busy || !managerInspectionActive()) return;
@@ -2028,7 +2035,7 @@ const sync = {
       throw error;
     }
     // 인증을 겸하는 동기화만 제한한다. 발송·AI 처리의 제한 시간은 각 기능이 관리한다.
-    const controller = ['/sync', '/staff-work-session', '/staff-profile'].includes(path) ? new AbortController() : null;
+    const controller = ['/sync', '/staff-work-session', '/staff-profile', '/manager-inspection-session'].includes(path) ? new AbortController() : null;
     const timeout = controller ? setTimeout(() => controller.abort(), 20000) : null;
     try {
       const res = await fetch(SYNC_URL + path, {
