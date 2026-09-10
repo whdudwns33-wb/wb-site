@@ -830,12 +830,12 @@
   .makeup-archive-grid { margin-top: 10px; }
   .task.is-makeup-lesson { margin-right: -8px; margin-left: -8px; padding-right: 8px; padding-left: 8px; border-left: 4px solid #7C3AED; border-radius: 10px; background: #F7F3FF; }
   .tag.makeup-lesson { border-color: #C4B5FD; background: #EDE9FE; color: #5B21B6; }
-  .schedule-list-row.is-makeup { margin-right: -6px; margin-left: -6px; padding-right: 6px; padding-left: 6px; border-radius: 8px; background: #F7F3FF; }
+  .schedule-list-row.is-makeup { margin-right: -6px; margin-left: -6px; padding-right: 6px; padding-left: 6px; border-left: 4px solid #A21CAF; border-radius: 8px; background: #FDF4FF; }
   .schedule-list-row.is-makeup.is-conflict { background: #FFF5F3; }
-  .schedule-legend-dot.makeup { border-color: #7C3AED; background: #EDE9FE; }
-  .schedule-timeline-block.is-makeup { border-color: #8B5CF6; background: #EDE9FE; color: #4C1D95; }
-  .schedule-timeline-block.is-makeup.is-current { border-color: #6D28D9; background: #6D28D9; color: var(--white); box-shadow: 0 3px 10px rgba(109,40,217,.28); }
-  .schedule-timeline-block.is-makeup.is-ended { border-color: #C4B5FD; background: #F5F3FF; color: #6D28D9; }
+  .schedule-legend-dot.makeup { border-color: #86198F; background: #D946EF; }
+  .schedule-timeline-block.is-makeup { border: 2px solid #A21CAF; background: linear-gradient(135deg, #F5D0FE 0%, #E879F9 100%); color: #581C87; box-shadow: 0 0 0 2px rgba(162,28,175,.18), 0 3px 10px rgba(162,28,175,.28); }
+  .schedule-timeline-block.is-makeup.is-current { border: 2px solid #86198F; background: #A21CAF; color: var(--white); box-shadow: 0 0 0 2px rgba(162,28,175,.2), 0 3px 12px rgba(162,28,175,.4); }
+  .schedule-timeline-block.is-makeup.is-ended { border: 2px solid #A855F7; background: #F3E8FF; color: #6D28D9; box-shadow: 0 0 0 1px rgba(168,85,247,.16); }
   .schedule-timeline-block.is-makeup.is-conflict { border-color: var(--coral); background: #FFF1EF; color: #9E3629; }
   @media (max-width: 720px) {
     .onboarding-board-row { grid-template-columns: 1fr; gap: 6px; padding: 12px 14px; }
@@ -1178,15 +1178,15 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-09-10.2"></script>
-<script src="./schedule-board-core.js?v=2026-09-10.2"></script>
-<script src="./asset-core.js?v=2026-09-10.2"></script>
-<script src="./qr-core.js?v=2026-09-10.2"></script>
-<script src="./acaflow-import-core.js?v=2026-09-10.2"></script>
-<script src="./feedback-subject-catalog.js?v=2026-09-10.2"></script>
-<script src="./sync-recovery-core.js?v=2026-09-10.2"></script>
-<script src="./staff-work-session-core.js?v=2026-09-10.2"></script>
-<script src="./staff-attendance-history-core.js?v=2026-09-10.2"></script>
+<script src="./lesson-form-core.js?v=2026-09-10.3"></script>
+<script src="./schedule-board-core.js?v=2026-09-10.3"></script>
+<script src="./asset-core.js?v=2026-09-10.3"></script>
+<script src="./qr-core.js?v=2026-09-10.3"></script>
+<script src="./acaflow-import-core.js?v=2026-09-10.3"></script>
+<script src="./feedback-subject-catalog.js?v=2026-09-10.3"></script>
+<script src="./sync-recovery-core.js?v=2026-09-10.3"></script>
+<script src="./staff-work-session-core.js?v=2026-09-10.3"></script>
+<script src="./staff-attendance-history-core.js?v=2026-09-10.3"></script>
 <script>
 "use strict";
 
@@ -11379,17 +11379,23 @@ function makeupDateTimeModal(row, mode) {
   const rescheduling = mode === 'reschedule';
   const directCompletion = mode === 'complete' && !scheduled;
   const scheduledCompletion = mode === 'complete' && scheduled;
+  const inspection = typeof managerInspectionActive === 'function' && managerInspectionActive();
   if (rescheduling && (!session.isAdmin || row.status !== 'confirmed')) return;
-  if (directCompletion && !session.isAdmin) return;
+  if (directCompletion && !session.isAdmin && !inspection) return;
   const date = scheduled ? row.confirmedDate : (mode === 'complete' ? today() : '');
   const startTime = scheduled ? row.confirmedStartTime : '';
   const endTime = scheduled ? row.confirmedEndTime : '';
   const originalStaffId = makeupOriginalStaffId(row);
   const assignedStaffId = scheduled ? String(row.confirmedStaffId || '') : makeupDefaultStaffId(row);
   const title = mode === 'schedule' || mode === 'restore' ? '보강생성' : rescheduling ? '보강 수정' : '보강완료';
+  const inspectionStaffId = inspection ? String(session.staffId || '') : '';
   const staffField = (mode === 'schedule' || rescheduling || directCompletion)
-    ? '<label class="field"><span class="fl">실제 보강 담당 선생님</span><select class="in" id="muStaff">' +
-        makeupStaffOptionsHtml(assignedStaffId) + '</select></label>'
+    ? (directCompletion && inspection
+      ? '<div class="makeup-schedule"><b>실제 보강 담당 선생님</b><br>' +
+          esc(makeupTeacherLabel(inspectionStaffId, '점검 중인 선생님')) +
+          '</div><input id="muStaff" type="hidden" value="' + esc(inspectionStaffId) + '">'
+      : '<label class="field"><span class="fl">실제 보강 담당 선생님</span><select class="in" id="muStaff">' +
+          makeupStaffOptionsHtml(assignedStaffId) + '</select></label>')
     : '<div class="makeup-schedule"><b>실제 보강 담당 선생님</b><br>' +
         esc(makeupTeacherLabel(assignedStaffId, '담당 확인 필요')) + '</div>';
   let attendanceField = '';
@@ -23783,7 +23789,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-09-10.2';
+const APP_VER = '2026-09-10.3';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
