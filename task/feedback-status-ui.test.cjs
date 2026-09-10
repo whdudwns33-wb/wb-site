@@ -179,6 +179,51 @@ test('연결된 정규수업과 보강은 학생별 같은 수업 피드백 한 
   assert.equal(occurrences[0].messageDeliveryState, 'delivered');
 });
 
+test('결석 수업은 미발송이 아니라 발송 제외로 집계하고 보강 예정은 별도 표시한다', () => {
+  const date = '2026-09-07';
+  const regular = { id: 'regular-absent', staffId: 'teacher-a', studentId: 'student-a',
+    taskKind: 'lesson_instruction', occurrenceDates: [date] };
+  const makeup = { id: 'makeup-absent', staffId: 'teacher-a', studentId: 'student-a',
+    taskKind: 'lesson_instruction', lessonInstanceType: 'makeup', makeupSourceTaskId: 'regular-absent',
+    start: '2026-09-14', occurrenceDates: ['2026-09-14'] };
+  const state = { tasks: [regular, makeup], checks: { ['regular-absent|' + date]: { att: 'A' } } };
+  const { feedbackDateOccurrences, feedbackDeliveryCategory, feedbackDeliveryCounts } = feedbackSortHelpers(state);
+  const occurrences = feedbackDateOccurrences(date, []);
+  assert.equal(occurrences.length, 1);
+  assert.equal(feedbackDeliveryCategory(occurrences[0]), 'makeup_pending');
+  assert.deepEqual(feedbackDeliveryCounts(occurrences), {
+    deliveredCount: 0, pendingCount: 0, unknownCount: 0, failedCount: 0,
+    unsentCount: 0, absentExcludedCount: 0, makeupPendingCount: 1, totalCount: 1
+  });
+
+  const completedState = { tasks: [regular, makeup], checks: {
+    ['regular-absent|' + date]: { att: 'A' },
+    ['makeup-absent|2026-09-14']: { att: 'P' }
+  } };
+  const completedHelpers = feedbackSortHelpers(completedState);
+  const completed = completedHelpers.feedbackDateOccurrences(date, []);
+  assert.equal(completed.length, 1);
+  assert.equal(completed[0].displayTaskId, 'regular-absent', '다른 날짜의 보강은 원 수업 날짜 occurrence를 대체하지 않는다');
+  assert.equal(completedHelpers.feedbackDeliveryCategory(completed[0]), 'absent_excluded');
+});
+
+test('같은 날짜에 결석 원 수업과 출석 보강이 함께 있으면 출석 보강을 대표로 선택한다', () => {
+  const date = '2026-09-07';
+  const regular = { id: 'regular-same-day', staffId: 'teacher-a', studentId: 'student-a',
+    taskKind: 'lesson_instruction', occurrenceDates: [date] };
+  const makeup = { id: 'makeup-same-day', staffId: 'teacher-a', studentId: 'student-a',
+    taskKind: 'lesson_instruction', lessonInstanceType: 'makeup', makeupSourceTaskId: 'regular-same-day',
+    start: date, occurrenceDates: [date] };
+  const state = { tasks: [regular, makeup], checks: {
+    ['regular-same-day|' + date]: { att: 'A' },
+    ['makeup-same-day|' + date]: { att: 'P' }
+  } };
+  const helpers = feedbackSortHelpers(state);
+  const [occurrence] = helpers.feedbackDateOccurrences(date, []);
+  assert.equal(occurrence.displayTaskId, 'makeup-same-day');
+  assert.equal(helpers.feedbackDeliveryCategory(occurrence), 'unsent');
+});
+
 test('피드백 수업 시작시간은 해당 수업일에 유효한 슬롯의 가장 이른 시각을 사용한다', () => {
   const { feedbackLessonStartMinutes } = feedbackSortHelpers();
   const mondayFeedback = { feedbackDate: '2026-09-07' };
@@ -365,7 +410,7 @@ test('발송 대기 카드의 재접수 버튼은 항상 보이고 실패 사유
   const start = source.indexOf('function feedbackQueueCard(');
   const end = source.indexOf('function feedbackTeacherGroupHtml(', start);
   const card = source.slice(start, end);
-  assert.match(card, /item\.status === 'content_approved_send_blocked'[\s\S]{0,260}data-act="fbsend"/);
+  assert.match(card, /item\.status === 'content_approved_send_blocked'[\s\S]{0,520}data-act="fbsend"/);
   assert.doesNotMatch(card, /sendState\.retry|disabled/);
   assert.ok(card.indexOf('다시 솔라피 발송 접수') < card.indexOf('feedbackReasonHtml(item, false)'),
     '실패 사유 영역은 재접수 버튼 아래에 있어야 한다');
