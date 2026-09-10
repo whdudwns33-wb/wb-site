@@ -13,13 +13,15 @@ function block(from, to) {
   return source.slice(start, end);
 }
 
-test('수업진행에는 같은 학생의 다음 수업을 접어서 확인하는 읽기 전용 패널이 있다', () => {
+test('수업진행을 접은 상태에서 일정 메타 옆에 다음 수업 요약이 표시된다', () => {
+  const row = block('function taskRow(t, date, editable, isCarry)', 'const LESSON_MEMO_FIELDS');
   const panel = block('function taskPanel(t, date, c, editable)', '/** 수업 출결 표시용 */');
-  assert.match(panel, /studentNextLessonHtml\(t, date\)/);
-  assert.match(source, /student-next-lesson/);
-  assert.match(source, /data-persist-key="next-lesson\|/);
-  assert.match(source, /다음 수업 확인/);
-  assert.match(source, /담당:/);
+  assert.match(row, /lesson-meta/);
+  assert.match(row, /studentNextLessonCompactHtml\(t, date\)/);
+  assert.match(source, /function studentNextLessonCompactHtml\(task, date\)/);
+  assert.doesNotMatch(panel, /studentNextLessonHtml\(t, date\)/);
+  assert.match(source, /다음 수업/);
+  assert.match(source, /teacherName \+ ' 선생님'/);
 });
 
 test('다음 수업 조회는 taskId·stable studentId·날짜만 보내며 응답을 최소 필드로 검증한다', () => {
@@ -32,9 +34,9 @@ test('다음 수업 조회는 taskId·stable studentId·날짜만 보내며 응�
   assert.doesNotMatch(loader, /studentName\s*:|note\s*:|attendance\s*:/);
 });
 
-test('다음 수업 패널은 details 열림 상태에서 자동 조회되고 다시 렌더링되어도 유지된다', () => {
-  const toggle = block("document.addEventListener('toggle'", "document.addEventListener('change'",);
-  assert.match(toggle, /lesson-next-lesson-details/);
-  assert.match(toggle, /loadStudentNextLesson\(/);
-  assert.match(toggle, /ev\.target\.open/);
+test('다음 수업 요약은 오늘 화면 렌더 뒤 자동 조회되고 폭이 부족하면 한 덩어리로 내려간다', () => {
+  assert.match(source, /function queueTodayNextLessonLoads\(\)/);
+  assert.match(source, /if \(route === 'today'\) requestAnimationFrame\(queueTodayNextLessonLoads\)/);
+  assert.match(source, /\.lesson-next-compact \{ flex: 0 0 auto/);
+  assert.match(source, /\.lesson-next-compact \{ flex-basis: 100%;/);
 });

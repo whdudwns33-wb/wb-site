@@ -272,7 +272,7 @@ test('active admin card has one processing action plus no-makeup and staff can o
   assert.match(actions, /if \(session\.isAdmin\)/);
   assert.match(actions, /const assignedStaffId = row\.confirmedStaffId/);
   assert.match(actions, /row\.status === 'confirmed' && session\.isStaffLink/);
-  const staffBranch = actions.slice(actions.indexOf('const own'), actions.indexOf('\n}\n\nfunction openMakeupAdminProcessModal'));
+  const staffBranch = actions.slice(actions.indexOf('const own'), actions.indexOf('function openMakeupAdminProcessModal'));
   assert.match(staffBranch, /data-act="muprocessopen"/);
   assert.doesNotMatch(staffBranch, /data-act="muschedule"|data-act="mureschedule"|data-act="munone"/);
   for (const oldAction of ['mureviewrequired', 'mupropose', 'muconfirm', 'mucancel']) {

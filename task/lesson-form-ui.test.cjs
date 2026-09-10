@@ -235,6 +235,22 @@ test('lesson card metadata renders each grouped weekday-time-hours schedule', ()
   assert.match(html, /groupedScheduleSlotsForDisplay\(task && task\.scheduleSlots, task && task\.lessonHours\)/);
 });
 
+test('collapsed lesson cards show the next lesson summary beside schedule metadata and today no longer has punch buttons', () => {
+  const rowStart = html.indexOf('function taskRow(t, date, editable, isCarry)');
+  const rowEnd = html.indexOf('const LESSON_MEMO_FIELDS', rowStart);
+  const row = html.slice(rowStart, rowEnd);
+  assert.match(row, /lesson-meta/);
+  assert.match(row, /studentNextLessonCompactHtml\(t, date\)/);
+  assert.match(html, /function studentNextLessonCompactHtml\(task, date\)/);
+  const panelStart = html.indexOf('function taskPanel(t, date, c, editable)');
+  const panelEnd = html.indexOf('function lessonMemoValues', panelStart);
+  assert.doesNotMatch(html.slice(panelStart, panelEnd), /studentNextLessonHtml\(t, date\)/);
+  const todayStart = html.indexOf('function viewToday()');
+  const todayEnd = html.indexOf('function taskRow(', todayStart);
+  const today = html.slice(todayStart, todayEnd);
+  assert.doesNotMatch(today, /🕘 출퇴근|data-act="attcheck"|data-act="attout"/);
+});
+
 test('admin lesson registration and existing changes are separate collapsed panels with a blank default', () => {
   const viewStart = html.indexOf('function viewLessonEntry()');
   const viewEnd = html.indexOf('function lessonInputPayload()', viewStart);
