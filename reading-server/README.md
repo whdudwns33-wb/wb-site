@@ -13,7 +13,7 @@ ADMIN_PIN=원하는PIN node reading-server/server.mjs   # 기본 포트 8890
 | `/` | 학생 앱 (reading/ 폴더를 그대로 서빙 — 같은 주소라 연동이 자동 활성화) |
 | `/vocab/` | **워드브레인** (어휘 기억 앱, vocab/ 폴더) — 같은 오리진이라 진로독서 어휘장·학생 토큰이 자동 공유 |
 | `/admin` | 강사 관리 웹 (PIN 로그인) — 현황판·학생 상세·백업·학부모 링크 |
-| `/admin/vocab-review.html` | **워드브레인 AI 연상 검수함** (PIN 로그인) — 승인/반려 + 학생별 어휘 현황 |
+| `/admin/vocab-review.html` | **AI 검수함 — 뜻풀이 · 연상** (PIN 로그인) — 승인/반려 + 학생별 어휘 현황 |
 | `/review.html` | 지문 검수 뷰어 + **발행/초안 원클릭 전환** (PIN 로그인) |
 | `/parent.html?t=…` | 학부모 주간 리포트 (학생별 열람 토큰, 로그인 불필요, 읽기 전용) |
 | `/api/health` | 상태 확인 |
@@ -25,6 +25,28 @@ ADMIN_PIN=원하는PIN node reading-server/server.mjs   # 기본 포트 8890
 - 학생 API: `GET /api/vocab/pull` / `PUT /api/vocab/state` (400KB 제한) / `POST /api/vocab/mnemonic {word,meaning,type}` — AI 연상 3안 생성(같은 단어는 캐시, 승인되면 승인본만 반환).
 - 관리 API(PIN): `GET·POST /api/vocab/admin/review` (승인 시 cue·scene 확정 — 이후 학생들에게 재사용) / `GET /api/vocab/admin/overview`.
 - AI 연상은 `ANTHROPIC_API_KEY` 시크릿 필요(모델 기본 `claude-opus-5`, `VOCAB_AI_MODEL`로 변경). 키가 없으면 해당 기능만 "미설정" 안내로 동작.
+
+### 뜻풀이 — API 키 없이도 돌아간다
+
+진로독서에서 학생이 밑줄 없이 담아 온 낱말(`POST /api/vocab/gloss`)은 **키가 없어도 검수함에 쌓인다.**
+초안만 비어 있을 뿐이고, 강사가 검수함에서 직접 채우거나 밖에서 만든 초안을 올리면 된다.
+
+| 운영 방식 | 필요한 것 | 흐름 |
+|---|---|---|
+| **API 자동 초안** | `ANTHROPIC_API_KEY` | 담김 → AI 초안 자동 생성 → 검수함에서 승인 |
+| **구독으로 직접**(키 없음) | 없음 | 담김 → 검수함에 대기 → `tools/gloss-drafts.mjs`로 내려받아 초안 작성 → 올리기 → 승인 |
+
+```sh
+export WB_BASE=https://<서버 주소>  WB_ADMIN_PIN=<관리자 PIN>
+node tools/gloss-drafts.mjs pull > gloss.json   # 초안 없는 대기 낱말
+node tools/gloss-drafts.mjs prompt              # 초안 작성용 지시문
+#   ↑ 지시문 + gloss.json 을 Claude Code 등에 주고 draft 를 채운다
+node tools/gloss-drafts.mjs push < gloss.json   # 초안 올리기 (승인 아님)
+```
+
+어느 쪽이든 **승인해야 학생에게 뜻이 나간다.** 검수 전 초안은 서버가 학생 응답에 담지 않는다 —
+어긋난 연상은 그냥 안 외워지지만 어긋난 뜻은 그대로 외워지기 때문.
+`POST /api/vocab/admin/gloss/draft`(강사 전용)는 초안만 채우고, 이미 승인된 항목은 덮어쓰지 않는다.
 - **밤 9시 물주기 푸시**: 페이로드 없는 Web Push(암호화 불필요·무의존성). `node reading-server/gen-vapid.mjs`로 키 생성 → `VAPID_PUBLIC_KEY`·`VAPID_PRIVATE_JWK` 시크릿 등록. 학생이 리포트 탭에서 "밤 9시 알림 켜기" → 21:00 KST 크론이 **물 줄 단어가 있는 구독자에게만** 발송(404/410이면 구독 자동 정리). 키가 없으면 알림 카드만 비활성.
 - 승인 반영 루프: 학생이 고른 연상이 검수 전(pending)이면 앱이 접속 때마다 `mnemonic/check`로 확인 — 승인되면 승인본으로 교체, 반려되면 제거(재생성 가능).
 
