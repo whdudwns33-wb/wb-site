@@ -36,7 +36,9 @@ test('다음 수업 조회는 taskId·stable studentId·날짜만 보내며 응�
 
 test('다음 수업 요약은 오늘 화면 렌더 뒤 자동 조회되고 폭이 부족하면 한 덩어리로 내려간다', () => {
   assert.match(source, /function queueTodayNextLessonLoads\(\)/);
-  assert.match(source, /if \(route === 'today'\) requestAnimationFrame\(queueTodayNextLessonLoads\)/);
+  assert.match(source, /if \(route === 'today'\) \{[\s\S]{0,140}requestAnimationFrame\(queueTodayNextLessonLoads\)/);
+  assert.match(source, /function arrangeLessonNextMeta\(\)/);
+  assert.match(source, /lesson-next-below/);
   assert.match(source, /\.lesson-next-compact \{ flex: 0 0 auto/);
   assert.match(source, /\.lesson-next-compact \{ flex-basis: 100%;/);
 });
