@@ -175,7 +175,7 @@
   .tag.carry{ background: #FEF2F2; color: var(--coral); }
   .tag.add  { background: #ECFDF5; color: var(--green); }
   .tag.edit { background: #FFF7ED; color: var(--amber); }
-  /* 현재 출결을 다음 수업보다 먼저 배치해 출결이 다음 일정에 딸린 정보처럼
+  /* 출결 상태를 다음 수업보다 먼저 배치해 출결이 다음 일정에 딸린 정보처럼
      보이지 않게 한다. 다음 수업은 폭이 부족하면 한 덩어리로 아래 줄로 이동한다. */
   .lesson-next-compact { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 5px; max-width: 100%; min-height: 26px; padding: 3px 9px; border: 1px solid #D8B8EA; border-radius: 7px; background: #FBF4FF; color: #6D3A86; font-size: 11px; font-weight: 700; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .lesson-meta.lesson-next-below .lesson-next-compact { flex-basis: 100%; }
@@ -5244,7 +5244,7 @@ function taskRow(t, date, editable, isCarry) {
   const hasDetail = steps.length || t.guide || t.target;
   const timeDisplay = String(t.time || '').trim();
   const lessonAttendanceTag = lesson && c && c.att && ATT_LABEL[c.att]
-    ? '<span class="tag lesson-attendance-tag ' + ATT_LABEL[c.att][1] + '">현재 출결 · ' + ATT_LABEL[c.att][0] + '</span>' : '';
+    ? '<span class="tag lesson-attendance-tag ' + ATT_LABEL[c.att][1] + '">' + ATT_LABEL[c.att][0] + '</span>' : '';
   const firstClassDate = lessonRegistrationIsoDate(t.firstClassDate);
   const lessonFirstClassTag = lesson && firstClassDate && String(date) === firstClassDate
     ? '<span class="tag lesson-first-class-tag">첫 수업</span>' : '';

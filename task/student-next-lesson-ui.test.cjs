@@ -18,8 +18,9 @@ test('수업진행을 접은 상태에서 일정 메타 옆에 다음 수업 요
   const panel = block('function taskPanel(t, date, c, editable)', '/** 수업 출결 표시용 */');
   assert.match(row, /lesson-meta/);
   assert.ok(row.indexOf('lessonAttendanceTag') < row.indexOf('studentNextLessonCompactHtml(t, date)'),
-    '현재 출결이 다음 수업 요약보다 먼저 표시되어야 한다');
-  assert.match(row, /현재 출결 ·/);
+    '출결 태그가 다음 수업 요약보다 먼저 표시되어야 한다');
+  assert.match(row, /ATT_LABEL\[c\.att\]\[0\]/);
+  assert.doesNotMatch(row, /현재 출결 ·/);
   assert.match(row, /studentNextLessonCompactHtml\(t, date\)/);
   assert.match(source, /function studentNextLessonCompactHtml\(task, date\)/);
   assert.doesNotMatch(panel, /studentNextLessonHtml\(t, date\)/);
