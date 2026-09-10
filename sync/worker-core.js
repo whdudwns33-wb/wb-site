@@ -117,6 +117,7 @@ import { handleConsultGuardian } from './consult-guardian.js';
 import { handleConsultResults, handleConsultResultUpload } from './consult-results.js';
 import { handleConsultCurriculumImage, isConsultDirectorOrManager } from './consult-curriculum-image.js';
 import { handleConsultLinkSend } from './consult-link-send.js';
+import { applyTestStaffNextDayAttendance } from './test-staff-attendance.js';
 
 const APPS = ['task', 'consult'];
 const MAX_CHANGES = 500;     // 요청당 상한 — D1 배치 한계와 악의적 대량 전송을 함께 막는다
@@ -1730,6 +1731,10 @@ async function handleSync(env, app, body, origin) {
       );
     }
     return json(payload, 200, origin);
+  }
+  if (app === 'task') {
+    try { await applyTestStaffNextDayAttendance(env, app, now); }
+    catch (error) { console.error('test-staff attendance', error); }
   }
   const since = Number(body.since) || 0;
   const changes = Array.isArray(body.changes) ? body.changes : [];
