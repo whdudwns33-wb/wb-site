@@ -2,6 +2,7 @@ import { validateRosterDocument } from './roster.js';
 import { verifySessionPackIdentity } from './session-pack.js';
 import { isTaskWriteCasConflict, taskWriteCasGuardStatement } from './task-write-cas.js';
 import { studentScheduleConflictPayload } from './student-schedule-conflict.js';
+import { isTestStaffId } from './test-staff-attendance.js';
 
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -1778,6 +1779,9 @@ async function createManual(env, app, body, auth, json, origin) {
     if (auth.scope === 'own' && String(auth.id || '') !== sourceTeacherId) {
       return json({ ok: false, error: '본인이 담당하는 학생의 수업만 보강으로 생성할 수 있습니다' }, 403, origin);
     }
+    if (await isTestStaffId(env, app, sourceTeacherId)) {
+      problem('테스트쌤 수업은 보강을 생성하지 않도록 설정되어 있습니다', 409, 'TEST_STAFF_MAKEUP_DISABLED');
+    }
   }
   if (auth.scope === 'own' && String(auth.id || '') !== staffId) {
     return json({ ok: false, code: 'MAKEUP_ASSIGNEE_FORBIDDEN',
@@ -1932,6 +1936,10 @@ async function createFromAbsence(env, app, body, auth, json, origin) {
   }
   if (auth.scope !== 'all' && sourceTeacherId !== auth.id) {
     return json({ ok: false, error: '담당 학생의 결석 수업만 보강으로 등록할 수 있습니다' }, 403, origin);
+  }
+  if (await isTestStaffId(env, app, sourceTeacherId)) {
+    return json({ ok: true, idempotent: true, skipped: true, code: 'TEST_STAFF_MAKEUP_DISABLED',
+      reason: '테스트쌤 수업은 보강을 생성하지 않습니다' }, 200, origin);
   }
   if (!await activeStaff(env, app, sourceTeacherId)) {
     problem('원 수업 담당자가 비활성 상태입니다', 409, 'STAFF_INACTIVE');

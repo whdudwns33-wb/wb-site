@@ -10688,6 +10688,12 @@ function makeupCaseForSource(taskId, date) {
     row.sourceTaskId === taskId && row.sourceDate === date) || null;
 }
 
+/* 테스트쌤은 보강을 만들지 않고 다음날 미입력 출결을 출석으로 정리한다. */
+function isTestTeacherTask(task) {
+  const staff = task && staffById(task.staffId);
+  return String(staff && staff.name || '').trim() === '테스트쌤';
+}
+
 function makeupCompletionTagHtml(task, date, check) {
   if (!task || isScheduledMakeupTask(task) || !check || check.att !== 'A') return '';
   const linked = makeupCaseForSource(task.id, date);
@@ -10710,6 +10716,9 @@ function taskUsesSession4Billing(task, referenceDate) {
 function makeupRequestHtml(task, date, check) {
   if (!check || check.att !== 'A') return '';
   if (!isMakeupLessonTask(task)) return '';
+  if (isTestTeacherTask(task)) {
+    return '<div class="small muted mt8">테스트쌤 수업은 보강을 생성하지 않습니다. 다음날 출석으로 자동 처리됩니다.</div>';
+  }
   const linked = makeupCaseForSource(task.id, date);
   if (linked) return '<div class="row wraprow mt14" style="gap:8px"><button class="btn btn-sm btn-ghost makeup-request" data-go="makeup">보강 · ' +
     esc(MAKEUP_STATUS_LABELS[linked.status] || linked.status) + '</button></div>';
@@ -11246,6 +11255,13 @@ async function createMakeupFromAbsence(taskId, date, button, options) {
       app: SYNC_APP, auth: auth, action: 'create_from_absence', sourceTaskId: taskId, sourceDate: date,
       creationMode: automatic ? 'automatic' : 'manual'
     });
+    if (result && result.skipped && result.code === 'TEST_STAFF_MAKEUP_DISABLED') {
+      makeupCreateStates.delete(sourceKey);
+      makeupLiveMessage = '테스트쌤 수업은 보강을 생성하지 않습니다.';
+      toast('테스트쌤 수업은 보강을 생성하지 않습니다');
+      renderAfterSync();
+      return false;
+    }
     replaceMakeup(result.case);
     const currentState = makeupCreateStates.get(sourceKey);
     if (currentState && currentState.operationId === operationId) makeupCreateStates.delete(sourceKey);
@@ -22584,6 +22600,8 @@ document.addEventListener('click', ev => {
       if (next !== 'A') makeupCreateStates.delete(sourceKey);
       if (shouldReconcileMakeup) {
         toast('출석으로 정정 중 · 연결된 보강건을 확인합니다');
+      } else if (next === 'A' && isTestTeacherTask(t)) {
+        toast('테스트쌤 수업은 보강을 생성하지 않습니다 · 다음날 출석으로 자동 처리됩니다');
       } else if (next === 'A' && isScheduledMakeupTask(t)) {
         toast('보강수업 결석으로 저장했습니다 · 추가 보강은 자동 생성하지 않습니다');
       } else if (next === 'A' && !isMakeupLessonTask(t)) {
