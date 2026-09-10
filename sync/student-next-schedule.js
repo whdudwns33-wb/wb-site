@@ -100,7 +100,7 @@ export function findNextStudentLesson(tasks, currentTaskId, date, teacherNames =
 
   const candidates = [];
   for (const task of Array.isArray(tasks) ? tasks : []) {
-    if (!isLessonTask(task) || String(task.id || '') === String(current.id || '') ||
+    if (!isLessonTask(task) ||
         String(task.studentId || '') !== String(current.studentId || '')) continue;
     const occurrences = lessonOccurrencesOnDate(task, date);
     for (const slot of occurrences) {

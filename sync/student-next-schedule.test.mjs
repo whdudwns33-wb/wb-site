@@ -43,6 +43,19 @@ test('findNextStudentLesson matches stable studentId across teachers and picks t
   assert.equal(next.teacherName, '김혜지');
 });
 
+test('a later slot in the same lesson is also available as the next schedule', () => {
+  const task = {
+    id: 'two-slots', studentId: 'student-1', staffId: 'teacher-a', subject: '국어',
+    taskKind: 'lesson_instruction', start: '2026-09-01', scheduleSlots: [
+      { days: [4], startTime: '12:00', endTime: '13:20', lessonHours: '1.5T' },
+      { days: [4], startTime: '14:00', endTime: '15:20', lessonHours: '1.5T' }
+    ]
+  };
+  const next = findNextStudentLesson([task], task.id, day, { 'teacher-a': '담당' });
+  assert.equal(next.taskId, task.id);
+  assert.equal(next.startTime, '14:00');
+});
+
 test('legacy name-only rows and makeup rows are fail-closed', () => {
   const tasks = [
     { id: 'current', studentId: 'student-1', taskKind: 'lesson_instruction', start: day,
