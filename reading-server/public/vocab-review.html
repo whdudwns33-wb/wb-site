@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>워드브레인 연상 검수함</title>
+<title>AI 검수함 — 뜻풀이 · 연상</title>
 <meta name="robots" content="noindex, nofollow">
 <style>
   * { box-sizing: border-box; }
@@ -56,8 +56,8 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>워드브레인 — AI 연상 검수함</h1>
-  <p class="sub">학생 요청으로 AI가 만든 연상 후보를 검수합니다. 승인한 연상은 그 단어의 공식 연상이 되어 이후 학생들에게 재사용돼요. <a href="/admin">← 관리 웹</a></p>
+  <h1>AI 검수함 — 뜻풀이 · 연상</h1>
+  <p class="sub">학생 요청으로 AI가 만든 초안을 검수합니다. 승인한 내용은 그 낱말의 공식본이 되어 이후 학생들에게 재사용돼요. <a href="/admin">← 관리 웹</a></p>
 
   <div id="login" class="card">
     <label>관리자 PIN</label>
@@ -88,7 +88,12 @@
     <h2>최근 배정 <span class="muted" id="asCount"></span></h2>
     <div class="card" id="asList"><span class="muted">아직 배정한 단어가 없습니다.</span></div>
 
-    <h2>검수 대기 <span id="pendingCount" class="chip st-pending">0</span>
+    <h2>뜻풀이 검수 <span id="glossCount" class="chip st-pending">0</span>
+      <button id="btnGlossAll" style="float:right;font-size:.76rem;padding:5px 12px;">전체 보기</button></h2>
+    <p class="muted" style="margin:0 0 8px">진로독서에서 학생이 밑줄 없이 담아 온 낱말이에요. <b>승인해야 학생 어휘장에 뜻이 들어갑니다</b> — 승인 전에는 학생 화면에 뜻이 나가지 않아요.</p>
+    <div id="glossList"></div>
+
+    <h2>연상 검수 대기 <span id="pendingCount" class="chip st-pending">0</span>
       <button id="btnAll" style="float:right;font-size:.76rem;padding:5px 12px;">전체 보기</button></h2>
     <div id="list"></div>
 
@@ -136,6 +141,11 @@
     } catch (e) { $('#loginErr').textContent = '서버에 연결할 수 없습니다.'; }
   }
 
+  $('#btnGlossAll').addEventListener('click', function () {
+    showAllGloss = !showAllGloss;
+    $('#btnGlossAll').textContent = showAllGloss ? '대기만 보기' : '전체 보기';
+    renderGloss();
+  });
   $('#btnAll').addEventListener('click', function () {
     showAll = !showAll;
     $('#btnAll').textContent = showAll ? '대기만 보기' : '전체 보기';
@@ -192,6 +202,64 @@
       b.addEventListener('click', async function () {
         try {
           await api('/api/vocab/admin/review', { method: 'POST', body: JSON.stringify({ key: b.closest('.card').dataset.key, action: 'reject' }) });
+          msg('반려했습니다'); refresh();
+        } catch (e) { msg(e.message); }
+      });
+    });
+  }
+
+  /* ── 뜻풀이 검수 ── */
+  var glosses = [], showAllGloss = false;
+  function renderGloss() {
+    var list = glosses.filter(function (it) { return showAllGloss || it.status === 'pending'; });
+    $('#glossCount').textContent = glosses.filter(function (it) { return it.status === 'pending'; }).length;
+    if (!list.length) { $('#glossList').innerHTML = '<div class="card muted">검수할 뜻풀이가 없습니다.</div>'; return; }
+    $('#glossList').innerHTML = list.map(function (it) {
+      var d = it.draft || {};
+      /* AI가 "온전한 낱말이 아니다"라고 본 경우 — 학생 앱의 조사 제거가 잘라 낸 조각 */
+      var warn = d.valid === false
+        ? '<div style="background:#FDF2E9;border:1px solid #EBD7BE;border-radius:10px;padding:10px 12px;margin:8px 0;">⚠️ AI 판정: 온전한 낱말이 아니에요' +
+          (d.word && d.word !== it.word ? ' — 바른 형태는 <b>' + esc(d.word) + '</b>' : '') +
+          (d.note ? '<br><span class="muted">' + esc(d.note) + '</span>' : '') + '</div>'
+        : '';
+      var appr = it.approved
+        ? '<p class="muted">승인본: <b>' + esc(it.approved.word) + '</b> — ' + esc(it.approved.easy) + '</p>' : '';
+      return '<div class="card" data-key="' + esc(it.key) + '">' +
+        '<b style="font-size:1.05rem;color:#1B3A5C;">' + esc(it.word) + '</b>' +
+        (d.type ? '<span class="chip t-' + esc(d.type) + '">' + typeLabel(d.type) + '</span>' : '') +
+        '<span class="chip st-' + esc(it.status) + '">' + stLabel(it.status) + '</span>' +
+        '<div class="muted">요청: ' + esc(it.requestedBy || '') + ' · ' + esc((it.at || '').slice(0, 10)) + '</div>' +
+        (it.context ? '<div class="muted" style="margin-top:6px;">글에서: “' + esc(it.context) + '”</div>' : '') +
+        warn + appr +
+        '<label>낱말 (사전에 실리는 형태로)</label><input class="gWord" value="' + esc(d.word || it.word) + '">' +
+        '<label>뜻 — 학생이 바로 알아들을 한 문장</label><textarea class="gEasy">' + esc(d.easy || '') + '</textarea>' +
+        '<label>한자 분해 (없으면 비워 두세요)</label><input class="gHanja" value="' + esc(d.hanja || '') + '">' +
+        '<label>예문</label><input class="gEx" value="' + esc(d.example || '') + '">' +
+        '<div class="row"><button class="primary bGAppr">승인 — 학생 어휘장에 보내기</button>' +
+        '<button class="danger bGRej">반려 (학생에게 안 나감)</button></div>' +
+        '</div>';
+    }).join('');
+
+    document.querySelectorAll('.bGAppr').forEach(function (b) {
+      b.addEventListener('click', async function () {
+        var card = b.closest('.card');
+        var word = card.querySelector('.gWord').value.trim();
+        var easy = card.querySelector('.gEasy').value.trim();
+        if (!word || easy.length < 2) { msg('낱말과 뜻을 채워 주세요'); return; }
+        try {
+          await api('/api/vocab/admin/gloss', { method: 'POST', body: JSON.stringify({
+            key: card.dataset.key, action: 'approve', word: word, easy: easy,
+            hanja: card.querySelector('.gHanja').value.trim(),
+            example: card.querySelector('.gEx').value.trim(),
+          }) });
+          msg('승인했습니다 — 학생 앱이 다음에 열릴 때 들어갑니다'); refresh();
+        } catch (e) { msg(e.message); }
+      });
+    });
+    document.querySelectorAll('.bGRej').forEach(function (b) {
+      b.addEventListener('click', async function () {
+        try {
+          await api('/api/vocab/admin/gloss', { method: 'POST', body: JSON.stringify({ key: b.closest('.card').dataset.key, action: 'reject' }) });
           msg('반려했습니다'); refresh();
         } catch (e) { msg(e.message); }
       });
@@ -269,6 +337,8 @@
 
   async function refresh() {
     try {
+      var gl = await api('/api/vocab/admin/gloss').catch(function () { return { items: [] }; });
+      glosses = gl.items || []; renderGloss();
       var rv = await api('/api/vocab/admin/review');
       items = rv.items || [];
       renderList();

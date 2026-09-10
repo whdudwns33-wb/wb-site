@@ -109,6 +109,18 @@ function vocabStore(env) {
       }
       return out;
     },
+    getGloss: (k) => env.DB.get('vocab:gloss:' + k, 'json'),
+    putGloss: (k, rec) => env.DB.put('vocab:gloss:' + k, JSON.stringify(rec)),
+    listGlosses: async () => {
+      const out = [];
+      for (const k of await kvListAll(env, 'vocab:gloss:')) {
+        const v = await env.DB.get(k, 'json');
+        if (v) out.push(v);
+      }
+      return out;
+    },
+    getGlossQuota: (c) => env.DB.get('vocab:glossq:' + c, 'json'),
+    putGlossQuota: (c, rec) => env.DB.put('vocab:glossq:' + c, JSON.stringify(rec)),
     getPush: (c) => env.DB.get('vocab:push:' + c, 'json'),
     putPush: (c, rec) => env.DB.put('vocab:push:' + c, JSON.stringify(rec)),
     delPush: (c) => env.DB.delete('vocab:push:' + c),

@@ -81,6 +81,92 @@ export async function aiMnemonic({ word, meaning, type, hanja, interests, apiKey
   return { ok: true, candidates, model: d.model };
 }
 
+/* ── AI 뜻풀이 (진로독서에서 밑줄 없이 담아 온 낱말) ──
+   밑줄 낱말은 지문 데이터에 뜻이 붙어 있지만, 학생이 직접 담은 낱말에는 없다.
+   AI가 초안을 만들고 강사가 승인해야 학생에게 나간다.
+
+   연상(mnemonic)과 달리 pending 초안을 학생에게 내보내지 않는다 — 어긋난 연상은
+   그냥 안 외워지지만, 어긋난 뜻은 그대로 외워진다. 검수 전 뜻은 학생 화면에 없다. */
+const GLOSS_SYSTEM = `너는 WB 독해력학원의 어휘 뜻풀이 작가다. 학생이 글을 읽다가 몰라서 담아 온 낱말에, 그 아이가 바로 알아들을 뜻풀이를 붙인다.
+
+먼저 판정한다 — 온전한 낱말인가?
+학생 앱은 어절에서 조사를 떼어 내며 낱말을 뽑는다. 그 과정에서 "스스"(스스로에서 '로'를 잘못 뗌), "나르"(나르는)처럼 잘린 조각이 올 수 있다. 이런 조각이면 valid를 false로 하고 word에 바른 형태를 적는다.
+온전하면 valid는 true이고, word에는 사전에 실리는 형태를 적는다 — 용언은 기본형("나르는"→"나르다"), 체언은 조사를 뗀 형태("연구자들이"→"연구자").
+사람 이름·지명·상표처럼 뜻풀이가 필요 없는 고유명사도 valid를 false로 하고 note에 이유를 적는다.
+
+뜻풀이 규칙:
+- easy는 한 문장, 40자 이내. 그 학년이 이미 아는 말로만 쓴다.
+- 뜻풀이 안에 그 낱말보다 어려운 말을 쓰지 않는다. (X: "관측 — 천체를 관찰하여 측정함")
+- 문맥 문장이 주어지면, 여러 뜻 중 그 문맥에 맞는 뜻 하나만 쓴다.
+- example은 학생 눈높이의 짧은 예문 하나. 문맥 문장을 그대로 베끼지 않는다.
+- type: 한자로 쓰는 한자어면 hanja, 영어면 english, 그 밖은 native.
+- type이 hanja면 hanja에 "觀(볼 관)+測(잴 측)" 형식으로 분해를 적는다. 확실하지 않으면 null.
+
+출력은 JSON 하나만: {"valid":true,"word":"...","type":"hanja|native|english","easy":"...","hanja":"...|null","example":"...|null","note":""}
+JSON 밖에 다른 텍스트를 쓰지 않는다.`;
+
+export function parseGloss(text) {
+  if (!text) return null;
+  let t = String(text).trim();
+  const fence = t.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (fence) t = fence[1].trim();
+  const a = t.indexOf('{'), b = t.lastIndexOf('}');
+  if (a < 0 || b <= a) return null;
+  try {
+    const d = JSON.parse(t.slice(a, b + 1));
+    if (typeof d.valid !== 'boolean') return null;
+    const word = typeof d.word === 'string' ? d.word.trim().slice(0, 40) : '';
+    if (!word) return null;
+    if (!d.valid) return { valid: false, word, note: (typeof d.note === 'string' ? d.note : '').trim().slice(0, 200) };
+    if (!['hanja', 'native', 'english'].includes(d.type)) return null;
+    const easy = typeof d.easy === 'string' ? d.easy.trim().slice(0, 200) : '';
+    if (easy.length < 2) return null;
+    return {
+      valid: true, word, type: d.type, easy,
+      hanja: typeof d.hanja === 'string' && d.hanja.trim() ? d.hanja.trim().slice(0, 120) : null,
+      example: typeof d.example === 'string' && d.example.trim() ? d.example.trim().slice(0, 200) : null,
+      note: (typeof d.note === 'string' ? d.note : '').trim().slice(0, 200),
+    };
+  } catch (e) { return null; }
+}
+
+export async function aiGloss({ word, context, grade, apiKey, model }) {
+  if (!apiKey) return { ok: false, reason: 'no-key' };
+  const user = [
+    '학생이 담은 낱말: ' + word,
+    context ? '그 낱말이 나온 문장: ' + context : null,
+    grade ? '학생 학년: ' + grade : null,
+  ].filter(Boolean).join('\n');
+  let r;
+  try {
+    r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-beta': 'server-side-fallback-2026-07-01',
+      },
+      body: JSON.stringify({
+        /* Opus 5는 thinking이 기본으로 켜지고 그 토큰도 max_tokens에 들어간다 —
+           짧은 JSON이지만 잘리지 않게 넉넉히 잡는다 */
+        model: model || 'claude-opus-5',
+        max_tokens: 4000,
+        fallbacks: 'default',
+        system: GLOSS_SYSTEM,
+        messages: [{ role: 'user', content: user }],
+      }),
+    });
+  } catch (e) { return { ok: false, reason: 'network' }; }
+  if (!r.ok) return { ok: false, reason: 'api-' + r.status };
+  const d = await r.json();
+  if (d.stop_reason === 'refusal') return { ok: false, reason: 'refused' };
+  const text = (d.content || []).filter(b => b.type === 'text').map(b => b.text).join('');
+  const gloss = parseGloss(text);
+  if (!gloss) return { ok: false, reason: 'parse' };
+  return { ok: true, gloss, model: d.model };
+}
+
 /* ── 문장 짓기 판정 (산출 훈련) ── */
 const SENT_SYSTEM = `너는 초등 고학년~중학생의 어휘 사용을 봐 주는 다정한 국어·영어 선생님이다.
 학생이 방금 배운 낱말로 만든 문장이 그 낱말을 "뜻에 맞게, 자연스럽게" 썼는지 판정한다.
@@ -228,6 +314,11 @@ export function vocabSummary(stateRec) {
 }
 
 const mnemoKey = (word) => String(word || '').trim().toLowerCase().replace(/\s+/g, '-').slice(0, 60);
+const glossKey = mnemoKey;
+/* AI 호출은 돈이 든다. 클라이언트 상한(하루 15개)은 우회할 수 있으므로 서버에서도 막는다.
+   캐시 적중은 세지 않는다 — 같은 낱말은 학원 전체가 한 번만 생성한다. */
+const GLOSS_DAILY_MAX = 20;
+const dayKey = () => new Date().toISOString().slice(0, 10);
 
 /* ── 밤 9시 물주기 푸시 (페이로드 없는 Web Push — VAPID 서명만, 암호화·의존성 불필요) ── */
 function b64u(buf) {
@@ -292,6 +383,8 @@ export async function sendNightPushes({ store, push, fetchFn }) {
        getState(code), putState(code, rec),
        listStateCodes(), getStudent(code),
        getMnemo(key), putMnemo(key, rec), listMnemos(),
+       getGloss(key), putGloss(key, rec), listGlosses(),
+       getGlossQuota(code), putGlossQuota(code, rec),
        getPush(code), putPush(code, rec), delPush(code), listPushCodes(),
        getAssign(code), putAssign(code, rec), listAssignCodes(),
      },
@@ -359,6 +452,59 @@ export async function handleVocab(ctx) {
         word,
         status: rec ? rec.status : 'none',
         approved: rec && rec.status === 'approved' ? rec.approved : undefined,
+      });
+    }
+    return j(200, { items });
+  }
+
+  /* 뜻풀이 요청 — 진로독서에서 담아 온 낱말. 승인된 뜻만 학생에게 나간다. */
+  if (p === '/api/vocab/gloss' && method === 'POST' && !who.admin) {
+    const b = await ctx.getBody();
+    const word = String(b.word || '').trim();
+    if (!word || word.length > 30) return j(400, { error: '낱말이 필요해요 (30자 이내).' });
+    const key = glossKey(word);
+    const prev = await store.getGloss(key);
+    if (prev && prev.status === 'approved' && prev.approved) {
+      return j(200, { ok: true, status: 'approved', gloss: prev.approved });
+    }
+    /* 검수 전에는 초안을 내보내지 않는다 — 어긋난 뜻은 그대로 외워진다 */
+    if (prev && (prev.status === 'pending' || prev.status === 'rejected')) {
+      return j(200, { ok: true, status: prev.status });
+    }
+    const quota = (await store.getGlossQuota(who.code)) || { day: '', n: 0 };
+    if (quota.day !== dayKey()) { quota.day = dayKey(); quota.n = 0; }
+    if (quota.n >= GLOSS_DAILY_MAX) return j(200, { ok: false, reason: 'quota' });
+    const generate = ctx.ai.gloss || aiGloss;
+    const out = await generate({
+      word,
+      context: b.context ? String(b.context).slice(0, 300) : undefined,
+      grade: b.grade ? String(b.grade).slice(0, 20) : undefined,
+      apiKey: ctx.ai.apiKey, model: ctx.ai.model,
+    });
+    if (!out.ok) return j(200, { ok: false, reason: out.reason });
+    quota.n += 1;
+    await store.putGlossQuota(who.code, quota);
+    await store.putGloss(key, {
+      key, word, draft: out.gloss,
+      context: b.context ? String(b.context).slice(0, 300) : '',
+      requestedBy: who.code, at: nowIso(), status: 'pending',
+      approved: null, model: out.model || null,
+    });
+    return j(200, { ok: true, status: 'pending' });
+  }
+  /* 검수 결과 확인 (AI 재호출 없음) — 학생 앱이 부팅 시 담아 둔 낱말의 승인을 반영 */
+  if (p === '/api/vocab/gloss/check' && method === 'POST' && !who.admin) {
+    const b = await ctx.getBody();
+    const words = (Array.isArray(b.words) ? b.words : []).slice(0, 50);
+    const items = [];
+    for (const wRaw of words) {
+      const word = String(wRaw || '').trim();
+      if (!word) continue;
+      const rec = await store.getGloss(glossKey(word));
+      items.push({
+        word,
+        status: rec ? rec.status : 'none',
+        gloss: rec && rec.status === 'approved' ? rec.approved : undefined,
       });
     }
     return j(200, { items });
@@ -439,6 +585,37 @@ export async function handleVocab(ctx) {
     await store.putMnemo(rec.key, rec);
     return j(200, { ok: true, item: rec });
   }
+  if (p === '/api/vocab/admin/gloss' && method === 'GET') {
+    const items = await store.listGlosses();
+    items.sort((a, b) => (a.status === 'pending') === (b.status === 'pending') ? (a.at < b.at ? 1 : -1) : (a.status === 'pending' ? -1 : 1));
+    return j(200, { items, time: nowIso() });
+  }
+  if (p === '/api/vocab/admin/gloss' && method === 'POST') {
+    const { key, action, word, easy, hanja, example, type } = await ctx.getBody();
+    const rec = key && await store.getGloss(glossKey(key));
+    if (!rec) return j(404, { error: '검수 항목 없음' });
+    if (action === 'approve') {
+      /* 강사가 고친 값이 오면 그것을, 없으면 초안을 그대로 승인한다 */
+      const d = rec.draft || {};
+      const finalWord = String(word || d.word || rec.word).trim().slice(0, 40);
+      const finalEasy = String(easy || d.easy || '').trim().slice(0, 200);
+      if (!finalWord || finalEasy.length < 2) return j(400, { error: '승인할 낱말과 뜻이 필요해요.' });
+      const t = ['hanja', 'native', 'english'].includes(type) ? type : (d.type || 'native');
+      rec.status = 'approved';
+      rec.approved = {
+        word: finalWord, easy: finalEasy, type: t,
+        hanja: (hanja !== undefined ? hanja : d.hanja) ? String(hanja !== undefined ? hanja : d.hanja).trim().slice(0, 120) : null,
+        example: (example !== undefined ? example : d.example) ? String(example !== undefined ? example : d.example).trim().slice(0, 200) : null,
+      };
+      rec.decidedAt = nowIso();
+    } else if (action === 'reject') {
+      rec.status = 'rejected';
+      rec.approved = null;
+      rec.decidedAt = nowIso();
+    } else return j(400, { error: 'action은 approve/reject' });
+    await store.putGloss(rec.key, rec);
+    return j(200, { ok: true, item: rec });
+  }
   if (p === '/api/vocab/admin/assign' && method === 'POST') {
     const b = await ctx.getBody();
     const codes = (Array.isArray(b.codes) ? b.codes : []).map(c => String(c || '').trim()).filter(Boolean).slice(0, 200);
@@ -492,7 +669,9 @@ export async function dumpVocab(store) {
   for (const code of await store.listStateCodes()) states[code] = await store.getState(code);
   const mnemos = {};
   for (const m of await store.listMnemos()) mnemos[m.key] = m;
+  const glosses = {};
+  for (const g of await store.listGlosses()) glosses[g.key] = g;
   const assigns = {};
   for (const code of await store.listAssignCodes()) assigns[code] = await store.getAssign(code);
-  return { states, mnemos, assigns };
+  return { states, mnemos, glosses, assigns };
 }

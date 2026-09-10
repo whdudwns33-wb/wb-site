@@ -768,7 +768,7 @@ function vLibrary(){
     const gIl=g.filter(r=>r.il).length;
     const tried=g.length;
     body=vs.length?`<div class="vlist">${vs.map((v,i)=>`<button class="grow ${sess['vopen'+i]?'open':''}" data-act="vocab-toggle" data-i="${i}">
-      <span class="t">${v.lang==='en'?'<span class="lang-en-tag">EN</span>':''}<b>${esc(v.word)}</b>${v.hanja?` <span class="tag muted">${esc(v.hanja)}</span>`:''}${hjWordTag(v.hanja)}
+      <span class="t">${v.lang==='en'?'<span class="lang-en-tag">EN</span>':''}<b>${esc(v.word)}</b>${v.raw&&v.raw!==v.word?` <span class="tag muted">${esc(v.raw)}</span>`:''}${v.hanja?` <span class="tag muted">${esc(v.hanja)}</span>`:''}${hjWordTag(v.hanja)}
       <small class="meaning">${esc(v.easy)}</small></span><span class="go">${sess['vopen'+i]?'−':'뜻'}</span></button>`).join('')}</div>
       <button class="btn sm" data-act="vocab-review">복습 퀴즈 (5개)</button>`
       :(asked.length
@@ -781,7 +781,7 @@ function vLibrary(){
           <span class="tag ask-tag">${asked.length}개</span></div>
         <p class="sub" style="margin-top:5px">글에서 담아 둔 낱말이에요. 뜻은 선생님과 함께 볼게요.</p>
         <div class="vlist">${asked.map((v,i)=>`<button class="grow ${sess['aopen'+i]?'open':''}" data-act="asked-toggle" data-i="${i}">
-          <span class="t"><b>${esc(v.word)}</b>${v.raw&&v.raw!==v.word?` <span class="tag muted">${esc(v.raw)}</span>`:''}
+          <span class="t"><b>${esc(v.word)}</b>${v.raw&&v.raw!==v.word?` <span class="tag muted">${esc(v.raw)}</span>`:''}${glossBadge(v)}
           <small class="meaning">${sess['aopen'+i]&&v.context?'“'+esc(v.context)+'”':(v.addedAt||'')+' 담음'}</small></span>
           <span class="go">${sess['aopen'+i]?'−':'글'}</span></button>`).join('')}</div></div>`;
     }
@@ -1643,6 +1643,62 @@ function aloudClose(){
   const bar=document.getElementById('aloudBar');if(bar)bar.remove();
   ALOUD={rec:null,stream:null,chunks:[],url:null,timer:null,t0:0};
 }
+/* ── 담아 둔 낱말의 뜻 (AI 초안 → 강사 검수 → 학생) ──
+   승인된 뜻만 내려온다. 검수 전 초안은 서버가 보내 주지 않는다 —
+   어긋난 연상은 그냥 안 외워지지만 어긋난 뜻은 그대로 외워지기 때문. */
+async function glossRequest(v){
+  if(!SYNC.avail||!SYNC.auth||!v)return;
+  try{
+    const j=await syncApi('/vocab/gloss',{method:'POST',body:JSON.stringify({
+      word:v.word,context:v.context||'',grade:(S.profile&&S.profile.grade)||''})});
+    if(j.status==='approved'&&j.gloss){glossApply(v.word,j.gloss);save();}
+    else if(j.status){v.glossStatus=j.status;save();}
+    else if(j.ok===false){v.glossStatus=j.reason==='quota'?'quota':'none';save();}
+  }catch(e){}
+}
+/* 검수 상태를 아이 말로 — "선생님이 보고 있다"는 것만 알면 된다 */
+function glossBadge(v){
+  if(!v||!v.needsGloss)return '';
+  if(v.glossStatus==='pending')return ' <span class="tag ask-tag">선생님 확인 중</span>';
+  if(v.glossStatus==='rejected')return ' <span class="tag muted">수업에서 볼게요</span>';
+  return '';
+}
+function glossApply(word,g){
+  const v=S.vocab.find(x=>x.word===word&&x.needsGloss);
+  if(!v||!g||!g.easy)return false;
+  v.easy=g.easy;
+  v.hanja=g.hanja||null;
+  if(g.example)v.example=g.example;
+  /* 강사가 바로잡은 표준형을 표제어로 올린다 — "나르"로 담았어도 "나르다"가 된다.
+     본문에서 눌렀던 형태는 raw에 남아 있어 어휘장에 함께 보인다.
+     단, 같은 낱말이 이미 어휘장에 있으면 이름을 바꾸지 않는다(중복 방지). */
+  if(g.word&&g.word!==v.word){
+    if(S.vocab.some(x=>x!==v&&x.word===g.word&&(x.lang==='en')===(v.lang==='en')))v.base=g.word;
+    else{v.raw=v.raw||v.word;v.word=g.word;}
+  }
+  v.needsGloss=false;
+  v.glossStatus='approved';
+  v.last=dkey();              /* 오늘부터 복습 간격을 센다 */
+  return true;
+}
+/* 부팅 시 담아 둔 낱말의 승인을 한 번에 회수 — AI를 다시 부르지 않는 경로 */
+async function glossCheck(){
+  if(!SYNC.avail||!SYNC.auth)return;
+  const pend=S.vocab.filter(v=>v.needsGloss).slice(0,50);
+  if(!pend.length)return;
+  try{
+    const j=await syncApi('/vocab/gloss/check',{method:'POST',
+      body:JSON.stringify({words:pend.map(v=>v.word)})});
+    let changed=false;
+    for(const it of (j.items||[])){
+      if(it.status==='approved'&&it.gloss){if(glossApply(it.word,it.gloss))changed=true;}
+      else{const v=S.vocab.find(x=>x.word===it.word&&x.needsGloss);
+        if(v&&v.glossStatus!==it.status){v.glossStatus=it.status;changed=true;}}
+    }
+    if(changed)save();
+  }catch(e){}
+}
+
 /* ───────────────────────── 낱말 담기 (밑줄 없는 낱말) ─────────────────────────
    밑줄 낱말은 지문 1편에 4개뿐인데 본문 어절은 130개쯤 된다. 나머지를 아이가
    몰라도 우리는 알 방법이 없었다. 그래서 아무 낱말이나 담을 수 있게 한다.
@@ -1749,9 +1805,13 @@ function pickSave(){
     context:String(PICK.context||'').slice(0,120),articleId:view.id||null,
     addedAt:dkey(),ok:0,miss:0,box:0,last:dkey(),why:'asked'});
   save();
-  PICK.msg='✓ 담았어요 — 뜻은 선생님과 함께 볼게요';
+  const saved=S.vocab[S.vocab.length-1];
+  PICK.msg=(SYNC.avail&&SYNC.auth)
+    ? '✓ 담았어요 — 선생님이 뜻을 확인해 주면 어휘장에 들어와요'
+    : '✓ 담았어요 — 뜻은 선생님과 함께 볼게요';
   pickRender();
   announce(word+' 담았어요');
+  glossRequest(saved).then(()=>{if(view.name==='library')render();});
 }
 /* 담기 모드에서만 본문 탭을 가로챈다 — 읽는 중 오탭으로 시트가 열리지 않게 */
 document.addEventListener('click',e=>{
@@ -2235,6 +2295,7 @@ window.addEventListener('appinstalled',()=>{
   await gradesReady;
   await syncHealth();
   if(SYNC.avail&&SYNC.auth)await syncPull();
+  await glossCheck();
   view={name:S.profile?'home':'onboard'};
   render();
 })();
