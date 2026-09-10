@@ -2147,7 +2147,11 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
       if (direct && !['review_pending', 'reviewed', 'awaiting_parent'].includes(String(row.status))) {
         problem('일정 미생성 또는 확정 상태의 보강만 완료할 수 있습니다', 409, 'INVALID_TRANSITION');
       }
-      if (direct && auth.scope !== 'all') {
+      /* 관리자 점검 세션은 원래 태블릿의 선생님 범위만 읽고 쓰지만,
+       * 관리자가 이미 진행된 일정 없는 보강을 그 태블릿에서 정리할 수 있게
+       * 직접 완료 기록만 허용한다. 이후 staffId 검증은 그대로 적용해 범위를
+       * 점검 대상 선생님 밖으로 넓히지 않는다. */
+      if (direct && auth.scope !== 'all' && auth.inspection !== true) {
         return json({ ok: false, code: 'MAKEUP_COMPLETE_FORBIDDEN',
           error: '일정 없이 완료하는 보강은 원장·관리 담당만 처리할 수 있습니다' }, 403, origin);
       }
