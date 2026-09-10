@@ -87,6 +87,18 @@ function dateValue(value) {
   return text;
 }
 
+function optionalDateValue(value) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) throw new Error('첫 수업 날짜를 확인해 주세요');
+  const [year, month, day] = text.split('-').map(Number);
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  if (parsed.getUTCFullYear() !== year || parsed.getUTCMonth() !== month - 1 || parsed.getUTCDate() !== day) {
+    throw new Error('첫 수업 날짜를 확인해 주세요');
+  }
+  return text;
+}
+
 function normalizeWords(value) {
   return String(value || '').normalize('NFKC').toLowerCase().replace(/[‐‑‒–—―−~～]/g, '-').replace(/\s+/g, ' ').trim();
 }
@@ -202,7 +214,8 @@ function contentIdentityText(input, slots, scheduleStatus, scheduleReviewReason)
     studentTraits: input.studentTraits,
     goal: input.goal,
     parentRequest: input.parentRequest,
-    start: input.start
+    start: input.start,
+    firstClassDate: input.firstClassDate
   };
   if (input.studentId) content.studentId = input.studentId;
   if (input.adminRequest !== '없음') content.adminRequest = input.adminRequest;
@@ -245,6 +258,7 @@ export async function buildLessonTask(raw, staffId, origin, serverNow) {
   if (!input.subject && !input.className) throw new Error('과목 또는 반을 입력해 주세요');
   if (input.lessonHours && !LESSON_HOURS.has(input.lessonHours)) throw new Error('수업시수는 1T, 1.5T, 2T, 2.5T, 3T, 3.5T, 4T, 4.5T, 5T, 6T 중에서 선택해 주세요');
   input.start = dateValue(raw.start);
+  input.firstClassDate = optionalDateValue(raw.firstClassDate);
   input.lessonRole = textValue(raw.lessonRole || input.className || input.subject, 120, true);
 
   const requestedStatus = String(raw.scheduleStatus || '');
@@ -295,6 +309,7 @@ export async function buildLessonTask(raw, staffId, origin, serverNow) {
     repeat: slots.length ? 'days' : 'once',
     days,
     start: input.start,
+    firstClassDate: input.firstClassDate,
     end: '',
     carry: false,
     origin,
@@ -833,7 +848,7 @@ export async function handleLessonCreate(env, app, body, origin, auth, json) {
     if (auth.scope === 'all' && SAFE_ID_RE.test(String(corrected.studentId || ''))) {
       const tracked = [
         'studentName', 'grade', 'subject', 'className', 'lessonHours', 'scheduleText', 'scheduleSlots', 'start',
-        'materials', 'onlineProgram', 'homework', 'studentTraits', 'goal', 'parentRequest', 'adminRequest', 'guide'
+        'firstClassDate', 'materials', 'onlineProgram', 'homework', 'studentTraits', 'goal', 'parentRequest', 'adminRequest', 'guide'
       ];
       const changedFields = tracked.filter(key => JSON.stringify(current[key] || '') !== JSON.stringify(corrected[key] || ''));
       if (changedFields.length) {
@@ -995,6 +1010,7 @@ export async function handleLessonCreateBatch(env, app, body, origin, auth, json
         parentRequest: task.parentRequest,
         adminRequest: task.adminRequest,
         start: task.start,
+        firstClassDate: task.firstClassDate,
         end: task.end
       });
       if (!sharedTemplateKey) sharedTemplateKey = templateKey;
