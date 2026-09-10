@@ -11348,7 +11348,8 @@ function makeupCanComplete(row) {
   /* 관리자 점검 모드는 선생님 화면을 유지하지만, 관리자가 그 태블릿에서
    * 일정 없는 완료 기록을 보완할 수 있어야 한다. 데이터 범위는 여전히
    * 점검 중인 선생님으로 제한되며, 일반 관리자 권한 전체를 열지 않는다. */
-  if (session.isAdmin || (typeof managerInspectionActive === 'function' && managerInspectionActive())) return true;
+  if (session.isAdmin || (typeof managerInspectionActive === 'function' && managerInspectionActive() &&
+      !row.confirmedDate && !row.proposedDate)) return true;
   return row.status === 'confirmed' && session.isStaffLink &&
     String(row.confirmedStaffId || '') === String(session.staffId || '');
 }

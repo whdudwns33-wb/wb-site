@@ -10,7 +10,7 @@ test('관리자 점검 모드에서 일정 없는 보강의 직접 완료 입력
   const end = source.indexOf('function makeupLessonTaskForCase', start);
   assert.ok(start >= 0 && end > start);
   const block = source.slice(start, end);
-  assert.match(block, /session\.isAdmin\s*\|\|\s*\(typeof managerInspectionActive === 'function'\s*&&\s*managerInspectionActive\(\)\)/);
+  assert.match(block, /session\.isAdmin\s*\|\|\s*\(typeof managerInspectionActive === 'function'\s*&&\s*managerInspectionActive\(\)\s*&&\s*!row\.confirmedDate\s*&&\s*!row\.proposedDate\)/);
   assert.match(source, /showDirectCompletion\s*&&\s*\(session\.isAdmin\s*\|\|\s*\(typeof managerInspectionActive === 'function'\s*&&\s*managerInspectionActive\(\)\)\)/);
   assert.match(source, /mudirectcompleteopen/);
 });
