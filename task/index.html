@@ -226,6 +226,10 @@
   .lesson-progress-details > summary::after, .previous-memos > summary::after { content: '펼치기'; color: var(--mid-gray); font-size: 11px; }
   .lesson-progress-details[open] > summary::after, .previous-memos[open] > summary::after { content: '접기'; }
   .lesson-progress-details-body { padding-top: 8px; }
+  .lesson-next-lesson-body { padding: 8px 0 2px; }
+  .lesson-next-lesson-result { padding: 10px 12px; border: 1px solid #B9D8E7; border-radius: 10px; background: #F5FBFE; color: var(--navy); font-size: 12.5px; line-height: 1.6; }
+  .lesson-next-lesson-result b { color: var(--deep-blue); }
+  .lesson-next-lesson-result .muted { color: var(--mid-gray); font-size: 11.5px; }
   .previous-memos-body { display: grid; gap: 8px; padding-top: 8px; }
   .lesson-briefing-instructions { margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
   .guide { background: #F0F9FF; border: 1px solid #D5EBF7; border-radius: 8px; padding: 10px 12px; font-size: 13px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; }
@@ -1174,15 +1178,15 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-09-09.5"></script>
-<script src="./schedule-board-core.js?v=2026-09-09.5"></script>
-<script src="./asset-core.js?v=2026-09-09.5"></script>
-<script src="./qr-core.js?v=2026-09-09.5"></script>
-<script src="./acaflow-import-core.js?v=2026-09-09.5"></script>
-<script src="./feedback-subject-catalog.js?v=2026-09-09.5"></script>
-<script src="./sync-recovery-core.js?v=2026-09-09.5"></script>
-<script src="./staff-work-session-core.js?v=2026-09-09.5"></script>
-<script src="./staff-attendance-history-core.js?v=2026-09-09.5"></script>
+<script src="./lesson-form-core.js?v=2026-09-10.1"></script>
+<script src="./schedule-board-core.js?v=2026-09-10.1"></script>
+<script src="./asset-core.js?v=2026-09-10.1"></script>
+<script src="./qr-core.js?v=2026-09-10.1"></script>
+<script src="./acaflow-import-core.js?v=2026-09-10.1"></script>
+<script src="./feedback-subject-catalog.js?v=2026-09-10.1"></script>
+<script src="./sync-recovery-core.js?v=2026-09-10.1"></script>
+<script src="./staff-work-session-core.js?v=2026-09-10.1"></script>
+<script src="./staff-attendance-history-core.js?v=2026-09-10.1"></script>
 <script>
 "use strict";
 
@@ -2725,6 +2729,9 @@ const makeupAttendanceReconcileStates = new Map(); // sourceTaskId|sourceDate ->
 let guardianOpsSendStates = new Map(); // eventType|sourceId|revision -> 관리자 화면의 미리보기/접수 상태
 const openPanels = new Set();     // 펼쳐진 업무 패널
 const persistentDetailsState = new Map(); // 재렌더링 뒤에도 사용자가 직접 정한 details 열림/닫힘 상태 유지
+const nextStudentLessonRows = new Map(); // taskId|날짜 -> 최소 다음 수업 정보 또는 null
+const nextStudentLessonLoading = new Set();
+const nextStudentLessonErrors = new Map();
 let weekendVisitRows = [], weekendVisitMonthlyCounts = [], weekendVisitNextSequences = [], weekendVisitLoadedKey = '', weekendVisitLoading = false, weekendVisitError = '';
 const weekendVisitScopeCache = new Map();
 const WEEKEND_VISIT_SCOPE_TTL_MS = 15000;
@@ -5913,6 +5920,79 @@ function acaflowLessonSummary(t, date) {
   return lines.join('\n');
 }
 
+function nextStudentLessonKey(taskId, date) { return String(taskId || '') + '|' + String(date || ''); }
+
+function normalizeNextStudentLessonResult(value, task, date) {
+  if (value == null) return null;
+  if (!value || String(value.studentId || '') !== String(task.studentId || '') ||
+      String(value.lessonDate || date) !== String(date) ||
+      !/^[A-Za-z0-9_-]{1,128}$/.test(String(value.taskId || ''))) {
+    throw new Error('다음 수업 응답을 확인할 수 없습니다');
+  }
+  return {
+    taskId: String(value.taskId), studentId: String(value.studentId), lessonDate: String(date),
+    subject: String(value.subject || '').trim(), className: String(value.className || '').trim(),
+    startTime: String(value.startTime || '').trim(), endTime: String(value.endTime || '').trim(),
+    lessonHours: String(value.lessonHours || '').trim(), teacherName: String(value.teacherName || '').trim(),
+    lessonInstanceType: String(value.lessonInstanceType || '') === 'makeup' ? 'makeup' : 'regular'
+  };
+}
+
+async function loadStudentNextLesson(taskId, date, force) {
+  const task = state.tasks.find(row => String(row.id || '') === String(taskId || '') && !row.deleted);
+  const key = nextStudentLessonKey(taskId, date);
+  if (!task || !isLesson(task) || !task.studentId || nextStudentLessonLoading.has(key) ||
+      (nextStudentLessonRows.has(key) && !force)) return;
+  const auth = sync.auth();
+  if (!auth) return;
+  nextStudentLessonLoading.add(key);
+  nextStudentLessonErrors.delete(key);
+  if (route === 'today') renderAfterSync();
+  try {
+    const result = await sync.post('/student-next-lesson', {
+      app: SYNC_APP, auth, taskId: String(task.id), studentId: String(task.studentId), lessonDate: String(date)
+    });
+    if (!result || result.ok !== true || !Object.prototype.hasOwnProperty.call(result, 'next')) {
+      throw new Error('다음 수업 응답을 확인할 수 없습니다');
+    }
+    nextStudentLessonRows.set(key, normalizeNextStudentLessonResult(result.next, task, date));
+  } catch (error) {
+    if (error && error.personAuthHandled) return;
+    nextStudentLessonErrors.set(key, String(error && error.message || '다음 수업을 불러오지 못했습니다'));
+  } finally {
+    nextStudentLessonLoading.delete(key);
+    if (route === 'today') renderAfterSync();
+  }
+}
+
+function studentNextLessonHtml(task, date) {
+  const key = nextStudentLessonKey(task.id, date);
+  const row = nextStudentLessonRows.get(key);
+  const loading = nextStudentLessonLoading.has(key);
+  const error = nextStudentLessonErrors.get(key) || '';
+  let body;
+  if (loading) body = '<div class="lesson-next-lesson-result" role="status">다음 수업을 확인하는 중입니다…</div>';
+  else if (error) body = '<div class="lesson-next-lesson-result" role="alert"><b>확인하지 못했습니다</b><br>' + esc(error) +
+    '<button type="button" class="btn btn-sm btn-ghost mt8" data-act="nextlessonload" data-id="' + esc(task.id) +
+    '" data-date="' + esc(date) + '" data-force="1">다시 확인</button></div>';
+  else if (!nextStudentLessonRows.has(key)) body = '<div class="lesson-next-lesson-result"><span class="muted">현재 수업 이후 일정만 표시합니다.</span>' +
+    '<button type="button" class="btn btn-sm btn-primary mt8" data-act="nextlessonload" data-id="' + esc(task.id) +
+    '" data-date="' + esc(date) + '">다음 수업 확인</button></div>';
+  else if (!row) body = '<div class="lesson-next-lesson-result"><b>오늘 예정된 다음 수업이 없습니다.</b><br><span class="muted">다른 과목 수업이 등록되면 이곳에 표시됩니다.</span></div>';
+  else {
+    const subject = [row.subject, row.className].filter((value, index, values) => value && values.indexOf(value) === index).join(' · ') || '과목 미지정';
+    const time = row.startTime + (row.endTime ? '–' + row.endTime : '');
+    body = '<div class="lesson-next-lesson-result"><b>' + esc(subject) + '</b> · ' + esc(time) +
+      (row.lessonHours ? ' · ' + esc(row.lessonHours) : '') +
+      (row.teacherName ? '<br><span class="muted">담당: ' + esc(row.teacherName) + ' 선생님</span>' : '') +
+      (row.lessonInstanceType === 'makeup' ? '<br><span class="muted">보강수업</span>' : '') +
+      '<button type="button" class="btn btn-sm btn-ghost mt8" data-act="nextlessonload" data-id="' + esc(task.id) +
+      '" data-date="' + esc(date) + '" data-force="1">새로 확인</button></div>';
+  }
+  return '<details class="lesson-progress-section lesson-progress-details lesson-next-lesson-details" data-persist-key="next-lesson|' +
+    esc(task.id) + '|' + esc(date) + '"><summary>다음 수업 안내</summary><div class="lesson-next-lesson-body">' + body + '</div></details>';
+}
+
 function taskPanel(t, date, c, editable) {
   const recordContext = arguments.length > 4 ? arguments[4] : null;
   const lesson = isLesson(t);
@@ -5946,6 +6026,8 @@ function taskPanel(t, date, c, editable) {
       makeupAttendanceReconcileHintHtml(t.id, date) +
       (isScheduledMakeupTask(t) ? '' : makeupRequestHtml(t, date, c)) + '</section>';
   }
+
+  if (lesson && (session.isStaffLink || session.isAdmin) && t.studentId) h += studentNextLessonHtml(t, date);
 
   if (lesson) h += lessonHandoffSourcePanelHtml(t, date, c, editable, recordContext);
 
@@ -21439,6 +21521,8 @@ document.addEventListener('click', ev => {
 
   switch (act) {
 
+    case 'nextlessonload': loadStudentNextLesson(id, date, el.dataset.force === '1'); break;
+
     case 'staffworklogin': loginStaffWork(el); break;
     case 'staffworklogout': logoutStaffWork(el); break;
     case 'staffworkretry': ensureStaffWorkStatus(true).then(ok => { if (ok) startSyncSession(); }); break;
@@ -23553,6 +23637,10 @@ document.addEventListener('toggle', ev => {
   if (ev.target && ev.target.matches && ev.target.matches('.lesson-existing-change')) {
     lessonExistingChangeOpen = ev.target.open;
   }
+  if (ev.target && ev.target.matches && ev.target.matches('.lesson-next-lesson-details') && ev.target.open) {
+    const summary = ev.target.querySelector('[data-act="nextlessonload"]');
+    if (summary) loadStudentNextLesson(summary.dataset.id, summary.dataset.date, false);
+  }
 }, true);
 
 document.addEventListener('change', ev => {
@@ -23691,7 +23779,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-09-09.5';
+const APP_VER = '2026-09-10.1';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
