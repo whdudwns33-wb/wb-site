@@ -72,8 +72,16 @@ export async function resolveManagerInspectionAuth(env, app, auth, managerIds) {
   let data;
   try { data = JSON.parse(staff.data); } catch (_) { return null; }
   if (!data || data.deleted) return null;
-  return { scope: 'all', id: managerId, role: 'manager', inspection: true,
-    sourceStaffId: String(row.source_staff_id || ''), expiresAt: Number(row.expires_at) || 0 };
+  const sourceStaffId = String(row.source_staff_id || '');
+  if (!SAFE_ID.test(sourceStaffId)) return null;
+  const sourceStaff = await env.DB.prepare('SELECT data FROM staff WHERE app=? AND id=? LIMIT 1')
+    .bind('task', sourceStaffId).first();
+  let sourceData;
+  try { sourceData = sourceStaff && JSON.parse(sourceStaff.data); } catch (_) { sourceData = null; }
+  if (!sourceData || sourceData.deleted) return null;
+  // 관리자 PIN은 인증에만 쓰고, 점검 세션의 데이터 범위는 원래 태블릿의 선생님으로 유지한다.
+  return { scope: 'own', id: sourceStaffId, role: 'teacher', inspection: true,
+    managerId, sourceStaffId, expiresAt: Number(row.expires_at) || 0 };
 }
 
 /** 개인 링크의 bearer와 관리 담당자 PIN을 함께 확인해 8시간짜리 점검 세션을 만든다. */
@@ -83,7 +91,7 @@ export async function handleManagerInspectionSession(env, app, body, origin, aut
   if (!['login', 'logout'].includes(action)) return fail(json, origin, 'MANAGER_INSPECTION_ACTION_INVALID', '요청 종류를 확인해 주세요', 400);
   try {
     if (action === 'logout') {
-      if (!auth || !auth.inspection || auth.scope !== 'all') return fail(json, origin, 'MANAGER_INSPECTION_REQUIRED', '관리자 점검 세션이 필요합니다', 401);
+      if (!auth || !auth.inspection || !['own', 'all'].includes(auth.scope)) return fail(json, origin, 'MANAGER_INSPECTION_REQUIRED', '관리자 점검 세션이 필요합니다', 401);
       const token = String(body.auth && body.auth.token || '');
       if (!TOKEN_RE.test(token)) return fail(json, origin, 'MANAGER_INSPECTION_REQUIRED', '관리자 점검 세션이 필요합니다', 401);
       await env.DB.prepare('UPDATE manager_inspection_sessions SET revoked=1 WHERE app=? AND token_hash=?')
