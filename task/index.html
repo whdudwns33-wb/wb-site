@@ -7241,6 +7241,9 @@ function feedbackFinalSendBlockReason(t, templateVersion, message) {
   if (!fbCtx) return '피드백 화면을 다시 열어 주세요.';
   if (fbCtx.polishPending) return 'AI 다듬기가 아직 진행 중입니다.';
   if (!t) return '해당 수업 정보를 찾을 수 없습니다.';
+  const attendanceCategory = feedbackAttendanceCategory({ taskId: t.id, feedbackDate: fbCtx.date });
+  if (attendanceCategory === 'makeup_pending') return '원 수업이 결석 처리되어 보강 예정입니다. 보강 후 보강수업에서 피드백을 작성해 주세요.';
+  if (attendanceCategory === 'absent_excluded') return '결석으로 확정된 수업은 학부모 피드백을 발송할 수 없습니다.';
   if (!/^[A-Za-z0-9_-]{1,128}$/.test(String(t.studentId || ''))) {
     return 'studentId가 연결되지 않아 전송할 수 없습니다. 원생 명단에서 학생을 다시 연결해 주세요.';
   }
@@ -8828,6 +8831,8 @@ const FEEDBACK_WEEKDAYS = [
 
 const FEEDBACK_STATUS_LABEL = {
   not_started: ['미발송', 'warn'],
+  absent_excluded: ['발송 제외 · 결석', ''],
+  makeup_pending: ['보강 예정 · 발송 대기', 'warn'],
   approval_waiting: ['원장 검토 대기', 'warn'],
   content_approved_send_blocked: ['문구 승인 · 발송 대기', ''],
   sent: ['전달 확인 중 · 솔라피 접수', 'warn'],
@@ -8848,8 +8853,38 @@ const FEEDBACK_DELIVERY_CATEGORY_LABEL = {
   pending: '전달 확인 중',
   unknown: '상태 확인 필요',
   failed: '발송 실패',
-  unsent: '미발송'
+  unsent: '미발송',
+  absent_excluded: '발송 제외 · 결석',
+  makeup_pending: '보강 예정 · 발송 대기'
 };
+
+/* 출결을 피드백 상태에 반영한다. 결석은 피드백 누락이 아니므로 미발송으로
+ * 세지 않는다. 결석에서 연결된 보강이 아직 출석 처리되지 않았다면 원 수업은
+ * '보강 예정'으로 남기고, 보강을 출석 처리한 뒤 그 보강에서 피드백을 작성한다. */
+function feedbackAttendanceCategory(item) {
+  const taskId = String(item && (item.displayTaskId || item.taskId) || '');
+  const date = String(item && item.feedbackDate || '');
+  if (!taskId || !date || typeof state !== 'object') return '';
+  const task = (Array.isArray(state.tasks) ? state.tasks : [])
+    .find(row => row && String(row.id || '') === taskId && !row.deleted);
+  const checks = state && state.checks && typeof state.checks === 'object' ? state.checks : {};
+  const check = checks[taskId + '|' + date];
+  const attendance = String(check && check.att || '');
+  if (['P', 'L', 'E'].includes(attendance)) return 'eligible';
+  if (attendance !== 'A') return '';
+  if (task && !(task.lessonInstanceType === 'makeup' || task.makeupCaseId || task.makeupSourceTaskId)) {
+    const linkedMakeup = (Array.isArray(state.tasks) ? state.tasks : []).find(makeup => {
+      if (!makeup || makeup.deleted || makeup.lessonInstanceType !== 'makeup' ||
+          String(makeup.makeupSourceTaskId || '') !== taskId) return false;
+      const makeupDate = String(makeup.start || makeup.makeupDate || '');
+      if (!makeupDate) return false;
+      const makeupCheck = checks[String(makeup.id || '') + '|' + makeupDate];
+      return !['P', 'L', 'E'].includes(String(makeupCheck && makeupCheck.att || ''));
+    });
+    if (linkedMakeup) return 'makeup_pending';
+  }
+  return 'absent_excluded';
+}
 
 /** 요청 상태와 실제 전달 상태를 섞지 않는다. 전달 결과가 있으면 요청 행보다 우선한다. */
 function feedbackDeliveryCategory(item) {
@@ -8866,19 +8901,23 @@ function feedbackDeliveryCategory(item) {
       note.startsWith('카카오 발송 결과가 실패로 확인되었습니다')) return 'failed';
   // 예전 sent 행은 솔라피 접수까지만 확인된 기록이다. 수신 완료로 추측하지 않는다.
   if (item.status === 'sent') return 'pending';
+  const attendanceCategory = feedbackAttendanceCategory(item);
+  if (attendanceCategory === 'makeup_pending' || attendanceCategory === 'absent_excluded') return attendanceCategory;
   return 'unsent';
 }
 
 function feedbackDeliveryCounts(rows) {
   const counts = {
     deliveredCount: 0, pendingCount: 0, unknownCount: 0,
-    failedCount: 0, unsentCount: 0, totalCount: 0
+    failedCount: 0, unsentCount: 0, absentExcludedCount: 0, makeupPendingCount: 0, totalCount: 0
   };
   (Array.isArray(rows) ? rows : []).forEach(item => {
     const category = feedbackDeliveryCategory(item);
     if (category === 'excluded') return;
     counts.totalCount += 1;
-    counts[category + 'Count'] += 1;
+    if (category === 'absent_excluded') counts.absentExcludedCount += 1;
+    else if (category === 'makeup_pending') counts.makeupPendingCount += 1;
+    else counts[category + 'Count'] += 1;
   });
   return counts;
 }
@@ -8887,6 +8926,8 @@ function feedbackSendState(item) {
   const delivery = String(item && item.messageDeliveryState || '');
   if (FEEDBACK_DELIVERY_LABEL[delivery]) return { label: FEEDBACK_DELIVERY_LABEL[delivery] };
   const category = feedbackDeliveryCategory(item);
+  if (category === 'makeup_pending') return { label: FEEDBACK_STATUS_LABEL.makeup_pending };
+  if (category === 'absent_excluded') return { label: FEEDBACK_STATUS_LABEL.absent_excluded };
   if (category === 'unknown') return { label: FEEDBACK_DELIVERY_LABEL.unknown };
   if (category === 'failed') return { label: FEEDBACK_DELIVERY_LABEL.failed };
   return { label: FEEDBACK_STATUS_LABEL[item && item.status] || [item && item.status || '', ''] };
@@ -8898,6 +8939,8 @@ function feedbackReviewPrefix(item, ownCard) {
   if (category === 'pending') return '전달 확인 중 — ';
   if (category === 'unknown') return '⚠ 상태 확인 필요 — ';
   if (category === 'failed') return '발송 실패 — ';
+  if (category === 'makeup_pending') return '보강 예정 · 발송 대기 — ';
+  if (category === 'absent_excluded') return '발송 제외 · 결석 — ';
   if (item && item.status === 'revision_requested') {
     return ownCard ? '<b>원장 수정 요청</b><br>' : '수정 요청: ';
   }
@@ -9008,7 +9051,8 @@ function feedbackLessonTimeLabel(item, taskOverride) {
 
 function feedbackDeliverySortRank(item) {
   const category = feedbackDeliveryCategory(item);
-  return ({ failed: 0, unknown: 1, unsent: 2, pending: 3, delivered: 4, excluded: 5 })[category] ?? 5;
+  return ({ failed: 0, unknown: 1, unsent: 2, pending: 3, delivered: 4,
+    makeup_pending: 5, absent_excluded: 6, excluded: 7 })[category] ?? 7;
 }
 
 function feedbackNeedsAttention(item) {
@@ -9061,7 +9105,8 @@ function feedbackTeacherGroups(rows, lessonTimeFirst) {
 
 function feedbackOccurrenceRequestRank(item) {
   const category = feedbackDeliveryCategory(item);
-  return ({ delivered: 4, pending: 3, unknown: 3, failed: 2, unsent: 1, excluded: 0 })[category] || 0;
+  return ({ delivered: 4, pending: 3, unknown: 3, failed: 2, unsent: 1,
+    makeup_pending: 0, absent_excluded: 0, excluded: 0 })[category] || 0;
 }
 
 /* 결석 보강은 원 정규수업 ID를 보존한다. 피드백 현황에서도 그 연결을 따라가야
@@ -9101,9 +9146,22 @@ function feedbackPreferredOccurrence(current, candidate) {
   if (!current) return candidate;
   if (current.syntheticMissing && !candidate.syntheticMissing) return candidate;
   if (!current.syntheticMissing && candidate.syntheticMissing) return current;
+  /* 원 수업이 결석이어도 연결 보강을 실제 출석했다면 보강 occurrence를
+   * 대표로 선택해 피드백을 보낼 수 있어야 한다. 이미 수신 완료된 요청은
+   * 출결이 뒤늦게 바뀌어도 기존 발송 결과를 우선 보존한다. */
+  const currentRank = feedbackOccurrenceRequestRank(current);
+  const candidateRank = feedbackOccurrenceRequestRank(candidate);
+  if (currentRank !== candidateRank) return candidateRank > currentRank ? candidate : current;
+  const currentAttendance = feedbackAttendanceCategory(current);
+  const candidateAttendance = feedbackAttendanceCategory(candidate);
+  if (currentAttendance !== candidateAttendance) {
+    const rank = value => ({ eligible: 2, makeup_pending: 1, '': 1, absent_excluded: 0 })[value] ?? 1;
+    const currentAttendanceRank = rank(currentAttendance), candidateAttendanceRank = rank(candidateAttendance);
+    if (currentAttendanceRank !== candidateAttendanceRank) {
+      return candidateAttendanceRank > currentAttendanceRank ? candidate : current;
+    }
+  }
   if (current.isMakeup !== candidate.isMakeup) return current.isMakeup ? candidate : current;
-  const rankDiff = feedbackOccurrenceRequestRank(candidate) - feedbackOccurrenceRequestRank(current);
-  if (rankDiff) return rankDiff > 0 ? candidate : current;
   return feedbackUpdatedAt(candidate) > feedbackUpdatedAt(current) ? candidate : current;
 }
 
@@ -9173,6 +9231,10 @@ function feedbackStoredMessageHtml(item) {
         ? '상태 확인 필요 · 전송한 최종 메시지'
         : category === 'failed'
           ? '발송 실패 · 전송을 시도한 최종 메시지'
+          : category === 'makeup_pending'
+            ? '보강 예정 · 발송 대기 메시지'
+            : category === 'absent_excluded'
+              ? '발송 제외 · 결석 처리된 수업'
           : category === 'excluded'
             ? '취소된 최종 메시지'
             : '미발송 · 저장된 최종 메시지';
@@ -9298,13 +9360,21 @@ function viewOwnFeedbackRequests() {
 function feedbackQueueCard(item) {
   const task = state.tasks.find(row => row.id === (item.displayTaskId || item.taskId));
   const status = feedbackSendState(item).label;
+  const deliveryCategory = feedbackDeliveryCategory(item);
   if (item && item.syntheticMissing) {
+    const absentStatus = deliveryCategory === 'absent_excluded' || deliveryCategory === 'makeup_pending';
     return '<details class="card feedback-record" data-persist-key="feedback-admin|' + esc(item.requestKey) + '"><summary><span>' +
         '<span class="card-title">' + esc(task ? taskDisplayTitle(task) : item.taskId) + '</span>' +
         '<span class="small muted">수업 ' + esc(item.feedbackDate) + ' (' + esc(feedbackWeekdayLabel(item.feedbackDate)) + ') · ' +
         esc(feedbackLessonTimeLabel(item, task)) + '</span></span>' +
-        '<span class="pill warn">미발송</span></summary>' +
-      '<div class="feedback-record-body"><div class="hint">아직 작성하거나 발송한 피드백이 없습니다.</div></div></details>';
+        '<span class="pill ' + (absentStatus === 'makeup_pending' ? 'warn' : '') + '">' +
+          esc(status[0] || '미발송') + '</span></summary>' +
+      '<div class="feedback-record-body"><div class="hint">' +
+        (deliveryCategory === 'makeup_pending'
+          ? '원 수업은 결석 처리되었고 연결된 보강이 아직 출석 완료되지 않았습니다. 보강 후 보강수업 피드백을 작성해 주세요.'
+          : deliveryCategory === 'absent_excluded'
+            ? '결석으로 확정되어 보호자 피드백 발송 대상에서 제외되었습니다.'
+            : '아직 작성하거나 발송한 피드백이 없습니다.') + '</div></div></details>';
   }
   return '<details class="card feedback-record" data-persist-key="feedback-admin|' + esc(item.requestKey) + '"><summary><span>' +
       '<span class="card-title">' + esc(task ? taskDisplayTitle(task) : item.taskId) + '</span>' +
@@ -9314,15 +9384,21 @@ function feedbackQueueCard(item) {
       ' · 수정본 ' + esc(item.revision) + '</span></span>' +
       '<span class="pill ' + status[1] + '">' + esc(status[0]) + '</span></summary>' +
     '<div class="feedback-record-body">' + feedbackStoredMessageHtml(item) +
-    (item.status === 'approval_waiting'
+    (item.status === 'approval_waiting' && !['absent_excluded', 'makeup_pending'].includes(deliveryCategory)
       ? '<div class="row wraprow mt14">' +
           '<button class="btn btn-sm btn-primary" data-act="fbreviewapprove" data-key="' + esc(item.requestKey) + '" data-rev="' + esc(item.revision) + '">문구 승인</button>' +
           '<button class="btn btn-sm btn-warn" data-act="fbreviewrevise" data-key="' + esc(item.requestKey) + '" data-rev="' + esc(item.revision) + '">수정 요청</button></div>'
       : '') +
     (item.status === 'content_approved_send_blocked' &&
+      !['absent_excluded', 'makeup_pending'].includes(deliveryCategory) &&
       !['delivered', 'provider_queued', 'carrier_processing'].includes(String(item.messageDeliveryState || ''))
       ? '<div class="row wraprow mt14"><button class="btn btn-sm btn-primary" data-act="fbsend" data-key="' + esc(item.requestKey) + '">📱 다시 솔라피 발송 접수</button></div>'
-      : '') + feedbackReasonHtml(item, false) + '</div></details>';
+      : '') +
+    (deliveryCategory === 'makeup_pending'
+      ? '<div class="hint mt8">원 수업은 결석 처리되었고 연결된 보강이 아직 출석 완료되지 않았습니다. 보강 후 보강수업 피드백을 작성해 주세요.</div>'
+      : deliveryCategory === 'absent_excluded'
+        ? '<div class="hint mt8">결석으로 확정되어 보호자 피드백 발송 대상에서 제외되었습니다.</div>'
+        : '') + feedbackReasonHtml(item, false) + '</div></details>';
 }
 
 function feedbackDeliveryCountsHtml(counts, multiline) {
@@ -9333,7 +9409,9 @@ function feedbackDeliveryCountsHtml(counts, multiline) {
     '수신완료 ' + Number(counts && counts.deliveredCount || 0) + '건',
     '발송중 ' + sendingCount + '건',
     '발송 실패 ' + Number(counts && counts.failedCount || 0) + '건',
-    '미발송 ' + Number(counts && counts.unsentCount || 0) + '건'
+    '미발송 ' + Number(counts && counts.unsentCount || 0) + '건',
+    '발송 제외 ' + Number(counts && counts.absentExcludedCount || 0) + '건',
+    '보강 예정 ' + Number(counts && counts.makeupPendingCount || 0) + '건'
   ].join(separator);
 }
 
@@ -9342,6 +9420,8 @@ function feedbackTeacherGroupStatusHtml(group) {
   if (group.unsentCount) return '<span class="pill warn">미발송 ' + group.unsentCount + '건</span>';
   const sendingCount = Number(group.pendingCount || 0) + Number(group.unknownCount || 0);
   if (sendingCount) return '<span class="pill warn">발송중 ' + sendingCount + '건</span>';
+  if (group.makeupPendingCount) return '<span class="pill warn">보강 예정 ' + group.makeupPendingCount + '건</span>';
+  if (group.absentExcludedCount) return '<span class="pill">결석 제외 ' + group.absentExcludedCount + '건</span>';
   return '<span class="pill">전체 수신 완료</span>';
 }
 
