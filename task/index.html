@@ -126,6 +126,7 @@
   .datenav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; gap: 8px; }
   .datenav .d { font-size: 17px; font-weight: 900; }
   .datenav .d em { font-style: normal; font-size: 13px; font-weight: 700; color: var(--blue); margin-left: 6px; }
+  .datenav .today-reset { margin-left: 8px; vertical-align: middle; white-space: nowrap; }
   .navbtn { width: 38px; height: 38px; border-radius: 10px; background: var(--white); border: 1px solid var(--line); font-size: 16px; font-weight: 900; color: var(--mid-gray); }
   .today-date-picker { margin: -4px 0 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--white); }
   .today-date-picker > summary { cursor: pointer; padding: 9px 12px; color: var(--navy); font-size: 13px; font-weight: 800; }
@@ -5153,12 +5154,12 @@ function viewToday() {
 
   h += '<div class="datenav">' +
     '<button class="navbtn" data-act="day" data-n="-1">‹</button>' +
-    '<div class="d">' + label(cursor) + (rel ? '<em>' + rel + '</em>' : '') + '</div>' +
+    '<div class="d">' + label(cursor) + (rel ? '<em>' + rel + '</em>' : '') +
+      (cursor !== today() ? '<button class="btn btn-sm btn-ghost today-reset" type="button" data-act="todaydate">오늘로</button>' : '') + '</div>' +
     '<button class="navbtn" data-act="day" data-n="1">›</button></div>';
   h += '<details class="today-date-picker" data-persist-key="today-date-picker"><summary>날짜 선택</summary>' +
     '<div class="today-date-picker-body"><label class="field"><span class="fl">확인할 날짜</span>' +
-    '<input class="in" type="date" data-today-date value="' + esc(cursor) + '"></label>' +
-    '<button class="btn btn-ghost" type="button" data-act="todaydate">오늘로</button></div></details>';
+    '<input class="in" type="date" data-today-date value="' + esc(cursor) + '"></label></div></details>';
 
   const counts = { todo: 0, doing: 0, done: 0, blocked: 0 };
   list.forEach(t => counts[teacherTaskCardStatus(t, cursor)]++);
