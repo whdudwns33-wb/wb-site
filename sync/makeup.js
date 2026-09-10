@@ -11,7 +11,7 @@ const ACTIVE_STATUSES = new Set(['review_pending', 'reviewed', 'awaiting_parent'
 const STATUSES = new Set(['review_pending', 'reviewed', 'awaiting_parent', 'confirmed', 'completed', 'cancelled']);
 const ACTIONS = new Set([
   'list', 'create_from_absence', 'create_manual', 'review', 'propose', 'confirm', 'schedule', 'restore_schedule', 'complete',
-  'reschedule', 'reconcile_attendance', 'no_makeup', 'cancel'
+  'reschedule', 'reschedule_after_absence', 'reconcile_attendance', 'no_makeup', 'cancel'
   , 'link_candidates', 'link_completed'
 ]);
 const COMPLETED_ATTENDANCE = new Set(['P', 'L', 'E']);
@@ -531,7 +531,7 @@ const MAKEUP_STEP_LABELS = [
 // 일회성 보강 task의 날짜를 바꾸거나 숨기기 전에, 그 task를 정본으로 삼는 모든 운영 기록을 확인한다.
 // LIKE는 task id의 '_'를 와일드카드로 해석하므로 checks 키는 substr로 비교한다.
 const MAKEUP_LESSON_NO_RECORDS_SQL = [
-  "NOT EXISTS (SELECT 1 FROM checks record WHERE record.app=tasks.app AND substr(record.k,1,length(tasks.id)+1)=tasks.id||'|')",
+  "NOT EXISTS (SELECT 1 FROM checks record WHERE record.app=tasks.app AND substr(record.k,1,length(tasks.id)+1)=tasks.id||'|' AND NOT EXISTS (SELECT 1 FROM makeup_absence_retries retry WHERE retry.app=record.app AND retry.lesson_task_id=tasks.id AND retry.check_key=record.k))",
   'NOT EXISTS (SELECT 1 FROM feedback_requests record WHERE record.app=tasks.app AND record.task_id=tasks.id)',
   'NOT EXISTS (SELECT 1 FROM lesson_change_requests record WHERE record.app=tasks.app AND record.task_id=tasks.id)',
   'NOT EXISTS (SELECT 1 FROM student_change_events record WHERE record.app=tasks.app AND record.task_id=tasks.id)',
@@ -543,6 +543,27 @@ const MAKEUP_LESSON_NO_RECORDS_SQL = [
     'WHERE record.app=tasks.app AND record.lesson_task_id=tasks.id)',
   'NOT EXISTS (SELECT 1 FROM makeup_direct_completion_attestations record ' +
     'WHERE record.app=tasks.app AND record.lesson_task_id=tasks.id)',
+  'NOT EXISTS (SELECT 1 FROM weekend_actual_visits record WHERE record.app=tasks.app AND record.lesson_task_id=tasks.id)',
+  'NOT EXISTS (SELECT 1 FROM teacher_live_requests record WHERE record.app=tasks.app AND record.lesson_task_id=tasks.id)',
+  'NOT EXISTS (SELECT 1 FROM tuition_generation_alerts record WHERE record.app=tasks.app AND record.trigger_task_id=tasks.id)',
+  'NOT EXISTS (SELECT 1 FROM lesson_handoffs record WHERE record.app=tasks.app AND record.lesson_task_id=tasks.id)',
+  'NOT EXISTS (SELECT 1 FROM guardian_lesson_publications record WHERE record.app=tasks.app AND record.source_task_id=tasks.id)',
+  'NOT EXISTS (SELECT 1 FROM student_lesson_self_checks record JOIN guardian_lesson_publications publication ' +
+    'ON publication.app=record.app AND publication.publication_id=record.publication_id ' +
+  'WHERE publication.app=tasks.app AND publication.source_task_id=tasks.id)'
+].join(' AND ');
+
+// 재보강 재생성 전에는 출결 A 한 건 외의 기록이 없어야 한다. A 출결은
+// makeup_absence_retries에 append-only로 보관한 뒤 일정 검증에서만 제외한다.
+const MAKEUP_LESSON_NO_NON_ATTENDANCE_RECORDS_SQL = [
+  'NOT EXISTS (SELECT 1 FROM feedback_requests record WHERE record.app=tasks.app AND record.task_id=tasks.id)',
+  'NOT EXISTS (SELECT 1 FROM lesson_change_requests record WHERE record.app=tasks.app AND record.task_id=tasks.id)',
+  'NOT EXISTS (SELECT 1 FROM student_change_events record WHERE record.app=tasks.app AND record.task_id=tasks.id)',
+  'NOT EXISTS (SELECT 1 FROM session_packs record WHERE record.app=tasks.app AND record.lesson_task_id=tasks.id)',
+  'NOT EXISTS (SELECT 1 FROM session_pack_transfer_guards record WHERE record.app=tasks.app AND record.lesson_task_id=tasks.id)',
+  'NOT EXISTS (SELECT 1 FROM student_session_attendance_events record WHERE record.app=tasks.app AND record.lesson_task_id=tasks.id)',
+  'NOT EXISTS (SELECT 1 FROM student_session_ledger_events record WHERE record.app=tasks.app AND record.lesson_task_id=tasks.id)',
+  'NOT EXISTS (SELECT 1 FROM makeup_direct_completion_attestations record WHERE record.app=tasks.app AND record.lesson_task_id=tasks.id)',
   'NOT EXISTS (SELECT 1 FROM weekend_actual_visits record WHERE record.app=tasks.app AND record.lesson_task_id=tasks.id)',
   'NOT EXISTS (SELECT 1 FROM teacher_live_requests record WHERE record.app=tasks.app AND record.lesson_task_id=tasks.id)',
   'NOT EXISTS (SELECT 1 FROM tuition_generation_alerts record WHERE record.app=tasks.app AND record.trigger_task_id=tasks.id)',
@@ -714,6 +735,43 @@ async function makeupLessonHasRecords(env, app, id) {
   return !!(row && Number(row.has_records) === 1);
 }
 
+async function makeupAbsenceRetryContext(env, app, row, taskRow, task) {
+  const taskId = makeupLessonId(String(row.case_id));
+  const previousDate = String(row.confirmed_start_at || '').slice(0, 10);
+  const previousStartTime = String(row.confirmed_start_at || '').slice(11, 16);
+  const previousEndTime = String(row.confirmed_end_at || '').slice(11, 16);
+  const previousStaffId = cleanId(row.confirmed_staff_id, '기존 보강 담당자');
+  const checks = await env.DB.prepare(
+    'SELECT k,owner,data FROM checks record WHERE record.app=? AND ' +
+      "substr(record.k,1,length(?)+1)=?||'|' AND NOT EXISTS (" +
+      'SELECT 1 FROM makeup_absence_retries retry WHERE retry.app=record.app AND retry.lesson_task_id=? AND retry.check_key=record.k)'
+  ).bind(app, taskId, taskId, taskId).all();
+  const rows = Array.isArray(checks.results) ? checks.results : [];
+  const matching = rows.filter(item => {
+    const data = parseJson(item.data);
+    return String(item.owner || '') === previousStaffId && data &&
+      String(data.taskId || '') === taskId && String(data.date || '') === previousDate &&
+      String(data.att || '') === 'A';
+  });
+  if (matching.length !== 1 || rows.length !== 1) {
+    problem(matching.length === 1
+      ? '보강 결석 출결 외에 다른 기록이 있어 재보강 일정을 만들 수 없습니다'
+      : '보강 수업의 결석(A) 출결을 먼저 확인해 주세요',
+    409, matching.length === 1 ? 'MAKEUP_LESSON_HAS_RECORDS' : 'MAKEUP_RETRY_ABSENCE_REQUIRED');
+  }
+  const otherRecords = await env.DB.prepare(
+    'SELECT CASE WHEN ' + MAKEUP_LESSON_NO_NON_ATTENDANCE_RECORDS_SQL + ' THEN 0 ELSE 1 END AS has_records ' +
+      'FROM tasks WHERE app=? AND id=? LIMIT 1'
+  ).bind(app, taskId).first();
+  if (otherRecords && Number(otherRecords.has_records) === 1) {
+    problem('출결·메모·피드백 등 다른 수업 기록이 있어 재보강 일정을 만들 수 없습니다',
+      409, 'MAKEUP_LESSON_HAS_RECORDS');
+  }
+  return {
+    checkKey: String(matching[0].k), previousDate, previousStartTime, previousEndTime, previousStaffId
+  };
+}
+
 function confirmedMakeupRange(row) {
   return kstRange(String(row.confirmed_start_at || '').slice(0, 10),
     String(row.confirmed_start_at || '').slice(11, 16), String(row.confirmed_end_at || '').slice(11, 16));
@@ -791,6 +849,32 @@ async function prepareMakeupLessonReschedule(env, app, row, source, student, sta
     ).bind(staffId, JSON.stringify(task), now, now, app, taskId, taskRow.owner, taskRow.data,
       Number(taskRow.updated_at))
   };
+}
+
+async function prepareMakeupLessonRescheduleAfterAbsence(env, app, row, source, student, staffId, range, now, createdBy) {
+  const taskId = makeupLessonId(String(row.case_id));
+  const taskRow = await env.DB.prepare('SELECT owner,data,updated_at FROM tasks WHERE app=? AND id=? LIMIT 1')
+    .bind(app, taskId).first();
+  const current = taskRow && parseJson(taskRow.data);
+  if (!taskRow) problem('생성된 보강수업이 없어 먼저 복구해야 합니다', 409, 'MAKEUP_LESSON_MISSING');
+  const priorStaffId = cleanId(row.confirmed_staff_id, '기존 보강 담당자');
+  assertMakeupLessonIdentity(taskRow, current, row, priorStaffId);
+  const retry = await makeupAbsenceRetryContext(env, app, row, taskRow, current);
+  const task = makeupLessonTask(row, source, student, staffId, range, now, current);
+  const retryRevision = Number(row.revision) + 1;
+  const retryEvent = env.DB.prepare(
+    'INSERT INTO makeup_absence_retries(app,case_id,revision,lesson_task_id,check_key,' +
+      'previous_date,previous_start_time,previous_end_time,previous_staff_id,attendance_status,created_at,created_by) ' +
+      'VALUES(?,?,?,?,?,?,?,?,?,?,?,?)'
+  ).bind(app, row.case_id, retryRevision, taskId, retry.checkKey, retry.previousDate,
+    retry.previousStartTime, retry.previousEndTime, retry.previousStaffId, 'A', now, String(createdBy || staffId));
+  const statement = env.DB.prepare(
+    'UPDATE tasks SET owner=?,data=?,updated_at=?,srv_at=? WHERE app=? AND id=? AND owner=? AND data=? AND updated_at=? AND ' +
+      'EXISTS (SELECT 1 FROM makeup_absence_retries retry WHERE retry.app=? AND retry.case_id=? AND retry.revision=? AND retry.lesson_task_id=tasks.id) AND ' +
+      MAKEUP_LESSON_NO_RECORDS_SQL
+  ).bind(staffId, JSON.stringify(task), now, now, app, taskId, taskRow.owner, taskRow.data,
+    Number(taskRow.updated_at), app, row.case_id, retryRevision);
+  return { task, retryEvent, statement, retry, retryRevision };
 }
 
 async function prepareMakeupLessonDelete(env, app, row, staffId, now) {
@@ -1035,6 +1119,42 @@ async function saveReschedule(env, app, row, next, event, source, sourceIdentity
         problem('보강 담당 선생님이 더 이상 활성 상태가 아닙니다', 409, 'STAFF_INACTIVE');
       }
       await assertNoConflict(env, app, String(row.case_id), String(row.student_id), range);
+    }
+    mapAtomicMakeupError(error);
+  }
+  if (!Array.isArray(results) || results.length !== statements.length ||
+      results.some(result => Number(result && result.meta && result.meta.changes || 0) !== 1)) {
+    return conflictResponse(env, app, row.case_id, json, origin);
+  }
+  return env.DB.prepare('SELECT * FROM makeup_cases WHERE app=? AND case_id=? LIMIT 1')
+    .bind(app, row.case_id).first();
+}
+
+async function saveRescheduleAfterAbsence(env, app, row, next, event, source, sourceIdentity, student, staffId, range,
+  json, origin, now, createdBy) {
+  const taskWrite = await prepareMakeupLessonRescheduleAfterAbsence(
+    env, app, row, source, student, staffId, range, now, createdBy
+  );
+  const statements = [
+    sourceIdentityGuardStatement(env, app, row, sourceIdentity),
+    await casGuard(env, app, 'makeup_retry_source', row, now),
+    activeStaffGuardStatement(env, app, row, staffId),
+    await casGuard(env, app, 'makeup_retry_staff', row, now),
+    regularConflictGuardStatement(env, app, row, String(row.student_id), range),
+    await casGuard(env, app, 'makeup_retry_conflict', row, now),
+    taskWrite.retryEvent,
+    await casGuard(env, app, 'makeup_retry_event', row, now),
+    transitionStatement(env, app, row, next, event, now),
+    await casGuard(env, app, 'makeup_retry_case', row, now),
+    taskWrite.statement,
+    await casGuard(env, app, 'makeup_retry_task', row, now)
+  ];
+  let results;
+  try {
+    results = await env.DB.batch(statements);
+  } catch (error) {
+    if (isTaskWriteCasConflict(error)) {
+      await makeupAbsenceRetryContext(env, app, row, null, null);
     }
     mapAtomicMakeupError(error);
   }
@@ -2055,7 +2175,8 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
     if (action === 'reconcile_attendance') return await reconcileAttendance(env, app, body, auth, json, origin);
 
     const administrative = new Set([
-      'review', 'propose', 'confirm', 'schedule', 'reschedule', 'restore_schedule', 'no_makeup', 'cancel'
+      'review', 'propose', 'confirm', 'schedule', 'reschedule', 'reschedule_after_absence',
+      'restore_schedule', 'no_makeup', 'cancel'
     ]);
     if (administrative.has(action) && auth.scope !== 'all') {
       return json({ ok: false, error: '원장·관리 담당만 보강을 검토하거나 확정할 수 있습니다' }, 403, origin);
@@ -2063,7 +2184,8 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
     exactBody(body, action === 'review' ? ['caseId', 'revision', 'decision', 'reason'] :
       action === 'propose' ? ['caseId', 'revision', 'date', 'startTime', 'endTime', 'staffId'] :
       action === 'schedule' ? ['caseId', 'revision', 'date', 'startTime', 'endTime', 'staffId'] :
-      action === 'reschedule' ? ['caseId', 'revision', 'date', 'startTime', 'endTime', 'staffId'] :
+      (action === 'reschedule' || action === 'reschedule_after_absence')
+        ? ['caseId', 'revision', 'date', 'startTime', 'endTime', 'staffId'] :
       action === 'complete' ? ['caseId', 'revision', 'date', 'startTime', 'endTime', 'staffId', 'attendanceStatus'] :
       (action === 'cancel' || action === 'no_makeup') ? ['caseId', 'revision', 'reason'] :
       ['caseId', 'revision']);
@@ -2085,6 +2207,7 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
     let proposalSave = null;
     let scheduledSave = null;
     let rescheduledSave = null;
+    let rescheduledAfterAbsenceSave = null;
     let completion = null;
     let cancellation = false;
 
@@ -2236,6 +2359,35 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
         notificationNeeded: false
       };
       rescheduledSave = { staffId, range };
+    } else if (action === 'reschedule_after_absence') {
+      if (row.status !== 'confirmed' || !row.confirmed_start_at || !row.confirmed_end_at || !row.confirmed_staff_id) {
+        problem('결석 기록이 있는 확정 보강만 재보강 일정으로 바꿀 수 있습니다', 409, 'INVALID_TRANSITION');
+      }
+      const range = kstRange(body.date, body.startTime, body.endTime);
+      const staffId = cleanId(body.staffId, '보강 담당자');
+      student = rosterStudent(document, String(row.student_id), range.date);
+      const previous = scheduleView('confirmed', row);
+      if (range.date === previous.date) {
+        problem('결석한 보강과 다른 날짜를 선택해 새 보강을 생성해 주세요', 409, 'MAKEUP_RETRY_DATE_REQUIRED');
+      }
+      if (!await activeStaff(env, app, staffId)) {
+        problem('활성 보강 담당 선생님을 선택해 주세요', 409, 'STAFF_INACTIVE');
+      }
+      await assertNoConflict(env, app, caseId, String(row.student_id), range);
+      next.confirmed_start_at = range.startAt;
+      next.confirmed_end_at = range.endAt;
+      next.confirmed_staff_id = staffId;
+      next.notification_needed = 0;
+      next.notification_event = null;
+      next.notification_event_revision = 0;
+      event = {
+        action, from: next.status, to: next.status, actorId: actorId(auth),
+        previousDate: previous.date, previousStartTime: previous.startTime,
+        previousEndTime: previous.endTime, previousStaffId: previous.staffId,
+        previousAttendance: 'A', date: range.date, startTime: range.startTime, endTime: range.endTime,
+        staffId, notificationNeeded: false
+      };
+      rescheduledAfterAbsenceSave = { staffId, range };
     } else if (action === 'complete') {
       const direct = row.status !== 'confirmed';
       if (direct && !['review_pending', 'reviewed', 'awaiting_parent'].includes(String(row.status))) {
@@ -2345,6 +2497,10 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
       : rescheduledSave
         ? await saveReschedule(env, app, row, next, event, source, sourceIdentity, student,
           rescheduledSave.staffId, rescheduledSave.range, json, origin, requestNow)
+      : rescheduledAfterAbsenceSave
+        ? await saveRescheduleAfterAbsence(env, app, row, next, event, source, sourceIdentity, student,
+          rescheduledAfterAbsenceSave.staffId, rescheduledAfterAbsenceSave.range,
+          json, origin, requestNow, actorId(auth))
       : scheduledSave
         ? await saveSchedule(env, app, row, next, event, source, sourceIdentity, student, scheduledSave.staffId,
           scheduledSave.range, json, origin, requestNow)

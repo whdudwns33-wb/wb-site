@@ -269,6 +269,7 @@ test('active admin card has one processing action plus no-makeup and staff can o
   assert.match(actions, /function openMakeupAdminProcessModal\(button\)/);
   assert.match(actions, /data-act="muschedule"[\s\S]*?>보강 일정 생성</);
   assert.match(actions, /data-act="mureschedule"[\s\S]*?>담당자·일정 수정</);
+  assert.match(actions, /data-act="muretryafteropen"[\s\S]*?>결석 후 재보강 일정 생성</);
   assert.match(actions, /if \(session\.isAdmin\)/);
   assert.match(actions, /const assignedStaffId = row\.confirmedStaffId/);
   assert.match(actions, /row\.status === 'confirmed' && session\.isStaffLink/);
@@ -290,11 +291,13 @@ test('schedule, completion, and no-makeup modals use the three-action API contra
   assert.match(source, /원 수업 담당 선생님/);
   assert.match(source, /id="muStaff"/);
   assert.match(source, /makeupStaffOptionsHtml\(assignedStaffId\)/);
-  assert.match(source, /scheduled \? row\.confirmedDate/);
+  assert.match(source, /scheduled && !retrying \? row\.confirmedDate/);
   assert.match(source, /날짜 변경은 출결·메모를 입력하기 전에 보강 수정에서 처리해 주세요/);
   assert.match(source, /mode === 'restore' \|\| scheduledCompletion/);
   assert.match(source, /action: 'schedule'[\s\S]*?\.\.\.slot, staffId: staffId/);
   assert.match(source, /action: 'reschedule'[\s\S]*?\.\.\.slot, staffId: staffId/);
+  assert.match(source, /action: 'reschedule_after_absence'[\s\S]*?\.\.\.slot, staffId: staffId/);
+  assert.match(source, /결석 후 재보강/);
   assert.match(source, /action: 'complete'[\s\S]*?\.\.\.slot/);
   assert.match(source, /payload\.attendanceStatus = attendanceStatus/);
   assert.match(source, /action: 'no_makeup'[\s\S]*?reason: reason/);
@@ -567,7 +570,8 @@ test('mobile layouts keep one column and 44px makeup actions', () => {
 test('click routing covers only the simplified makeup transitions', () => {
   const click = block("case 'murefresh':", '/* 날짜 */');
   for (const action of ['murefresh', 'mucreate', 'muschedule', 'muschedulesubmit', 'mucompleteopen',
-    'mureschedule', 'mureschedulesubmit', 'mucompletesubmit', 'munone', 'munonesubmit']) {
+    'mureschedule', 'mureschedulesubmit', 'muretryafteropen', 'muretryaftersubmit',
+    'mucompletesubmit', 'munone', 'munonesubmit']) {
     assert.match(click, new RegExp(`case '${action}'`));
   }
   for (const oldAction of ['mureviewrequired', 'mureviewnot', 'mupropose', 'muconfirm', 'mucancel', 'mucomplete']) {
