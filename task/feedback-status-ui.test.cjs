@@ -224,6 +224,20 @@ test('같은 날짜에 결석 원 수업과 출석 보강이 함께 있으면 �
   assert.equal(helpers.feedbackDeliveryCategory(occurrence), 'unsent');
 });
 
+test('결석 원 수업과 아직 출결하지 않은 당일 보강은 보강 예정으로 표시한다', () => {
+  const date = '2026-09-07';
+  const regular = { id: 'regular-pending', staffId: 'teacher-a', studentId: 'student-a',
+    taskKind: 'lesson_instruction', occurrenceDates: [date] };
+  const makeup = { id: 'makeup-pending', staffId: 'teacher-a', studentId: 'student-a',
+    taskKind: 'lesson_instruction', lessonInstanceType: 'makeup', makeupSourceTaskId: 'regular-pending',
+    makeupSourceDate: date, start: date, occurrenceDates: [date] };
+  const state = { tasks: [regular, makeup], checks: { ['regular-pending|' + date]: { att: 'A' } } };
+  const helpers = feedbackSortHelpers(state);
+  const [occurrence] = helpers.feedbackDateOccurrences(date, []);
+  assert.equal(occurrence.displayTaskId, 'regular-pending', '보강 출결 전에는 원 수업 행을 대표로 유지한다');
+  assert.equal(helpers.feedbackDeliveryCategory(occurrence), 'makeup_pending');
+});
+
 test('피드백 수업 시작시간은 해당 수업일에 유효한 슬롯의 가장 이른 시각을 사용한다', () => {
   const { feedbackLessonStartMinutes } = feedbackSortHelpers();
   const mondayFeedback = { feedbackDate: '2026-09-07' };
