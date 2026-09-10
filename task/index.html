@@ -159,6 +159,8 @@
   .task.done .task-t { color: var(--mid-gray); text-decoration: line-through; }
   .task-d { font-size: 13px; color: var(--mid-gray); margin-top: 3px; white-space: pre-wrap; word-break: break-word; }
   .meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; align-items: center; }
+  .lesson-meta { row-gap: 5px; }
+  .lesson-schedule-meta { display: inline-flex; flex: 0 1 auto; flex-wrap: wrap; gap: 6px; min-width: 0; }
   .tag { font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 6px; background: var(--light-gray); color: var(--mid-gray); }
   .tag.time { background: #EAF6FC; color: var(--deep-blue); }
   .tag.high { background: #FEF2F2; color: var(--coral); }
@@ -168,6 +170,12 @@
   .tag.carry{ background: #FEF2F2; color: var(--coral); }
   .tag.add  { background: #ECFDF5; color: var(--green); }
   .tag.edit { background: #FFF7ED; color: var(--amber); }
+  /* 다음 수업은 요일·시간·시수 태그 옆에 놓되, 폭이 부족하면 한 덩어리로 아래 줄로 이동한다. */
+  .lesson-next-compact { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 5px; max-width: 100%; min-height: 26px; padding: 3px 9px; border: 1px solid #D8B8EA; border-radius: 7px; background: #FBF4FF; color: #6D3A86; font-size: 11px; font-weight: 700; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lesson-next-compact b { color: #7A3FA1; font-weight: 900; }
+  .lesson-next-compact button { color: inherit; font: inherit; text-align: left; }
+  .lesson-next-compact.is-loading { color: #7A3FA1; }
+  .lesson-next-compact.is-empty { border-color: #D8E0E6; background: #F7F9FA; color: var(--mid-gray); }
   .note { margin-top: 8px; width: 100%; font-size: 13px; line-height: 1.6; padding: 10px 12px; border: 1px dashed var(--line); border-radius: 8px; background: var(--ivory); white-space: pre-wrap; overflow-wrap: anywhere; }
   textarea.note { display: block; min-height: 44px; resize: vertical; transition: height .18s ease, min-height .18s ease, border-color .18s ease, background .18s ease; }
   .memo-editor:focus-within textarea.note { min-height: 132px; border-style: solid; border-color: var(--blue); background: var(--white); outline: 2px solid rgba(30,157,214,.12); }
@@ -384,6 +392,7 @@
     .schedule-week-grid .schedule-day-head .schedule-person-meta { margin-bottom: 0; }
   }
   @media (max-width: 600px) {
+    .lesson-next-compact { flex-basis: 100%; width: max-content; max-width: 100%; }
     .schedule-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .schedule-card-grid { grid-template-columns: 1fr; }
     .schedule-list-row { grid-template-columns: 76px minmax(0, 1fr); }
@@ -1178,15 +1187,15 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-09-10.5"></script>
-<script src="./schedule-board-core.js?v=2026-09-10.5"></script>
-<script src="./asset-core.js?v=2026-09-10.5"></script>
-<script src="./qr-core.js?v=2026-09-10.5"></script>
-<script src="./acaflow-import-core.js?v=2026-09-10.5"></script>
-<script src="./feedback-subject-catalog.js?v=2026-09-10.5"></script>
-<script src="./sync-recovery-core.js?v=2026-09-10.5"></script>
-<script src="./staff-work-session-core.js?v=2026-09-10.5"></script>
-<script src="./staff-attendance-history-core.js?v=2026-09-10.5"></script>
+<script src="./lesson-form-core.js?v=2026-09-10.6"></script>
+<script src="./schedule-board-core.js?v=2026-09-10.6"></script>
+<script src="./asset-core.js?v=2026-09-10.6"></script>
+<script src="./qr-core.js?v=2026-09-10.6"></script>
+<script src="./acaflow-import-core.js?v=2026-09-10.6"></script>
+<script src="./feedback-subject-catalog.js?v=2026-09-10.6"></script>
+<script src="./sync-recovery-core.js?v=2026-09-10.6"></script>
+<script src="./staff-work-session-core.js?v=2026-09-10.6"></script>
+<script src="./staff-attendance-history-core.js?v=2026-09-10.6"></script>
 <script>
 "use strict";
 
@@ -1457,10 +1466,11 @@ function lessonReferenceSteps(t) {
 
 function lessonScheduleMetaHtml(task) {
   const slots = groupedScheduleSlotsForDisplay(task && task.scheduleSlots, task && task.lessonHours);
-  if (slots.length) return slots.map(slot => '<span class="tag time">' + esc(lessonScheduleSlotLabel(slot)) + '</span>').join('');
-  return (task && task.time ? '<span class="tag time">' + esc(task.time) + '</span>' : '') +
+  if (slots.length) return '<span class="lesson-schedule-meta">' + slots.map(slot => '<span class="tag time">' + esc(lessonScheduleSlotLabel(slot)) + '</span>').join('') + '</span>';
+  return '<span class="lesson-schedule-meta">' +
+    (task && task.time ? '<span class="tag time">' + esc(task.time) + '</span>' : '') +
     (lessonHoursValue(task && task.lessonHours) ? '<span class="tag time">' + esc(lessonHoursValue(task.lessonHours)) + '</span>' : '') +
-    '<span class="tag">' + esc(repeatLabel(task || {})) + '</span>';
+    '<span class="tag">' + esc(repeatLabel(task || {})) + '</span></span>';
 }
 
 function taskCardDetail(t) {
@@ -3544,6 +3554,7 @@ function render() {
   if (route === 'transport') requestAnimationFrame(restoreTransportFocus);
   if (route === 'makeup') requestAnimationFrame(restoreMakeupFocus);
   if (route === 'sessions') requestAnimationFrame(restoreSessionPackFocus);
+  if (route === 'today') requestAnimationFrame(queueTodayNextLessonLoads);
 }
 
 function renderTabs() {
@@ -5154,23 +5165,6 @@ function viewToday() {
   if (session.isStaffLink && me.id === session.staffId) h += adminDirectiveSoundPromptHtml();
 
   if (session.isStaffLink && me.id === session.staffId && cursor === today()) {
-    const att = attOf(me.id, cursor);
-    let attUi;
-    if (!session.isAdmin && staffWork.required) {
-      attUi = '<div class="row" style="gap:8px">' + (att && att.done ? '<span class="pill">' + fmtTime(att.at) + ' 출근</span>' : '') +
-        '<button class="btn btn-sm btn-navy" data-act="staffworklogout"' + (staffWork.busy ? ' disabled' : '') + '>퇴근하고 로그아웃</button></div>';
-    } else if (!att || !att.done) {
-      attUi = '<button class="btn btn-sm btn-primary" data-act="attcheck">출근했습니다</button>';
-    } else if (!att.out) {
-      attUi = '<div class="row" style="gap:8px"><span class="pill">' + fmtTime(att.at) + ' 출근</span>' +
-        '<button class="btn btn-sm btn-navy" data-act="attout">퇴근했습니다</button></div>';
-    } else {
-      attUi = '<div class="row" style="gap:8px"><span class="pill">' + fmtTime(att.at) + ' ~ ' + fmtTime(att.out) + '</span></div>';
-    }
-    h += '<div class="card" style="padding:12px"><div class="between">' +
-      '<div class="card-title">🕘 출퇴근</div>' + attUi + '</div>' +
-      '<div class="hint mt8">저장된 출퇴근 기록의 수정은 관리자에게 요청해 주세요.</div></div>';
-
     if (!rosterDb && !rosterErr) loadRoster();
     h += '<div class="card"><div class="small muted">담당 수업의 연락 기록은 각 수업 카드에서 입력할 수 있습니다. 평가·온라인 프로그램 기록은 관리 화면에서 관리합니다.</div></div>';
   }
@@ -5242,11 +5236,12 @@ function taskRow(t, date, editable, isCarry) {
     '<div class="task-body">' +
       '<div class="task-t">' + esc(taskDisplayTitle(t)) + '</div>' +
       (detail ? '<div class="task-d">' + esc(detail) + '</div>' : '') +
-      '<div class="meta">' +
+      '<div class="meta' + (lesson ? ' lesson-meta' : '') + '">' +
         (isCarry ? '<span class="tag carry">⚠ ' + shortDate(date) + ' 미완료</span>' : '') +
         (lesson ? lessonScheduleMetaHtml(t) :
           (timeDisplay ? '<span class="tag time">' + esc(timeDisplay) + '</span>' : '') +
           (!isCarry ? '<span class="tag">' + esc(repeatLabel(t)) + '</span>' : '')) +
+        (lesson && (session.isStaffLink || session.isAdmin) && t.studentId ? studentNextLessonCompactHtml(t, date) : '') +
         (makeupLesson ? '<span class="tag makeup-lesson">보강수업</span>' : '') +
         (t.priority === 'high' ? '<span class="tag high">중요</span>' : '') +
         (st === 'blocked' ? '<span class="tag blk">막힘</span>' : '') +
@@ -5965,6 +5960,32 @@ async function loadStudentNextLesson(taskId, date, force) {
   }
 }
 
+function queueTodayNextLessonLoads() {
+  if (!(session.isStaffLink || session.isAdmin)) return;
+  const me = currentStaff();
+  if (!me) return;
+  teacherTaskCardsFor(me.id, cursor).filter(isLesson).forEach(task => {
+    if (task.studentId) loadStudentNextLesson(task.id, cursor, false);
+  });
+}
+
+function studentNextLessonCompactHtml(task, date) {
+  const key = nextStudentLessonKey(task.id, date);
+  const row = nextStudentLessonRows.get(key);
+  const loading = nextStudentLessonLoading.has(key);
+  const error = nextStudentLessonErrors.get(key) || '';
+  const attrs = ' data-act="nextlessonload" data-id="' + esc(task.id) + '" data-date="' + esc(date) + '" data-force="1"';
+  if (loading) return '<span class="lesson-next-compact is-loading" role="status"><b>다음 수업</b> 확인 중…</span>';
+  if (error) return '<button type="button" class="lesson-next-compact"' + attrs + ' title="' + esc(error) + '"><b>다음 수업</b> 다시 확인</button>';
+  if (!nextStudentLessonRows.has(key)) return '<button type="button" class="lesson-next-compact"' + attrs + '><b>다음 수업</b> 확인</button>';
+  if (!row) return '<span class="lesson-next-compact is-empty"><b>다음 수업</b> 없음</span>';
+  const subject = row.subject || row.className || '과목 미지정';
+  const time = [row.startTime, row.endTime].filter(Boolean).join('–') || '시간 미지정';
+  const teacher = row.teacherName ? row.teacherName + ' 선생님' : '담당 미지정';
+  return '<span class="lesson-next-compact" title="' + esc(subject + ' · ' + time + ' · ' + teacher) + '"><b>다음</b><span>' +
+    esc(subject) + '</span><span>' + esc(time) + '</span><span>' + esc(teacher) + '</span></span>';
+}
+
 function studentNextLessonHtml(task, date) {
   const key = nextStudentLessonKey(task.id, date);
   const row = nextStudentLessonRows.get(key);
@@ -6026,8 +6047,6 @@ function taskPanel(t, date, c, editable) {
       makeupAttendanceReconcileHintHtml(t.id, date) +
       (isScheduledMakeupTask(t) ? '' : makeupRequestHtml(t, date, c)) + '</section>';
   }
-
-  if (lesson && (session.isStaffLink || session.isAdmin) && t.studentId) h += studentNextLessonHtml(t, date);
 
   if (lesson) h += lessonHandoffSourcePanelHtml(t, date, c, editable, recordContext);
 
@@ -23818,7 +23837,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-09-10.5';
+const APP_VER = '2026-09-10.6';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);

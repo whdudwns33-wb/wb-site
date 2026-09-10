@@ -12,14 +12,12 @@ function block(from, to) {
   return source.slice(start, end);
 }
 
-test('teacher card permits initial clock-in and clock-out without edit or cancellation controls', () => {
+test('today teacher screen no longer renders the legacy punch card or punch buttons', () => {
   const card = block(
     'if (session.isStaffLink && me.id === session.staffId && cursor === today()) {',
     'if (!rosterDb && !rosterErr) loadRoster();'
   );
-  assert.match(card, /data-act="attcheck">출근했습니다/);
-  assert.match(card, /data-act="attout">퇴근했습니다/);
-  assert.match(card, /저장된 출퇴근 기록의 수정은 관리자에게 요청해 주세요/);
+  assert.doesNotMatch(card, /data-act="attcheck"|data-act="attout"|🕘 출퇴근/);
   assert.doesNotMatch(card, />취소</);
   assert.doesNotMatch(card, /퇴근 취소|atteditopen|최근 기록 수정/);
 });
