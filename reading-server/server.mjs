@@ -24,6 +24,8 @@ const db = getDb();
 /* 워드브레인 저장소 어댑터 — db.vocab만 사용 (분리 가능한 격리) */
 const vocabPushMap = () => (db.vocab.push = db.vocab.push || {});
 const vocabAssignMap = () => (db.vocab.assigns = db.vocab.assigns || {});
+const vocabGlossMap = () => (db.vocab.glosses = db.vocab.glosses || {});
+const vocabGlossQMap = () => (db.vocab.glossq = db.vocab.glossq || {});
 const vocabStore = {
   getState: (c) => db.vocab.states[c] || null,
   putState: (c, rec) => { db.vocab.states[c] = rec; persist(); },
@@ -32,6 +34,11 @@ const vocabStore = {
   getMnemo: (k) => db.vocab.mnemos[k] || null,
   putMnemo: (k, rec) => { db.vocab.mnemos[k] = rec; persist(); },
   listMnemos: () => Object.values(db.vocab.mnemos),
+  getGloss: (k) => vocabGlossMap()[k] || null,
+  putGloss: (k, rec) => { vocabGlossMap()[k] = rec; persist(); },
+  listGlosses: () => Object.values(vocabGlossMap()),
+  getGlossQuota: (c) => vocabGlossQMap()[c] || null,
+  putGlossQuota: (c, rec) => { vocabGlossQMap()[c] = rec; persist(); },
   getPush: (c) => vocabPushMap()[c] || null,
   putPush: (c, rec) => { vocabPushMap()[c] = rec; persist(); },
   delPush: (c) => { delete vocabPushMap()[c]; persist(); },

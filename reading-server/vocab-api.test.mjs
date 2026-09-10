@@ -1,14 +1,14 @@
 'use strict';
 /* 워드브레인 서버 라우트 검증 (node reading-server/vocab-api.test.mjs) */
 import assert from 'node:assert';
-import { handleVocab, parseCandidates, parseVerdict, parseWordList, parseHanjaSpec, vocabSummary, dumpVocab, vapidJwt, sendNightPushes } from './vocab-api.mjs';
+import { handleVocab, parseCandidates, parseVerdict, parseGloss, parseWordList, parseHanjaSpec, vocabSummary, dumpVocab, vapidJwt, sendNightPushes } from './vocab-api.mjs';
 
 let passed = 0;
 const t = async (name, fn) => { await fn(); passed += 1; console.log('  ✓ ' + name); };
 
 /* 메모리 어댑터 (worker KV·로컬 파일 어댑터와 동일 계약) */
 function memStore() {
-  const states = {}, mnemos = {}, push = {}, assigns = {};
+  const states = {}, mnemos = {}, push = {}, assigns = {}, glosses = {}, glossq = {};
   const students = { s1: { code: 's1', name: '김지우', cls: '월수반' }, s2: { code: 's2', name: '박서준', cls: '월수반' } };
   return {
     getState: (c) => states[c] || null,
@@ -18,6 +18,11 @@ function memStore() {
     getMnemo: (k) => mnemos[k] || null,
     putMnemo: (k, rec) => { mnemos[k] = rec; },
     listMnemos: () => Object.values(mnemos),
+    getGloss: (k) => glosses[k] || null,
+    putGloss: (k, rec) => { glosses[k] = rec; },
+    listGlosses: () => Object.values(glosses),
+    getGlossQuota: (c) => glossq[c] || null,
+    putGlossQuota: (c, rec) => { glossq[c] = rec; },
     getPush: (c) => push[c] || null,
     putPush: (c, rec) => { push[c] = rec; },
     delPush: (c) => { delete push[c]; },
@@ -25,7 +30,7 @@ function memStore() {
     getAssign: (c) => assigns[c] || null,
     putAssign: (c, rec) => { assigns[c] = rec; },
     listAssignCodes: () => Object.keys(assigns),
-    _raw: { states, mnemos, push, assigns },
+    _raw: { states, mnemos, push, assigns, glosses, glossq },
   };
 }
 const call = (store, over) => handleVocab({
@@ -386,6 +391,126 @@ await t('배정 — 학생 미선택·빈 단어·과다 배정 거절', async (
   assert.strictEqual((await mk({ codes: ['s1'], text: many })).status, 400, '100개 초과 거절');
   const student = await call(store, { path: '/api/vocab/admin/assign', method: 'POST', getBody: async () => ({ codes: ['s1'], text: 'x | y' }) });
   assert.strictEqual(student.status, 403, '학생은 배정 못 함');
+});
+
+/* ── AI 뜻풀이 (진로독서에서 담아 온 낱말) ── */
+const okGloss = { valid: true, word: '연구자', type: 'hanja', easy: '어떤 것을 깊이 파고들어 밝히는 사람',
+                  hanja: '硏(갈 연)+究(궁구할 구)+者(놈 자)', example: '연구자들이 새 약을 만들었다.', note: '' };
+const glossAi = (calls) => async ({ word }) => { calls.push(word); return { ok: true, gloss: { ...okGloss }, model: 'claude-opus-5' }; };
+
+await t('뜻풀이 응답 파싱 — 잘린 조각·고유명사는 valid:false, 잡음은 거절', async () => {
+  const good = parseGloss('```json\n' + JSON.stringify(okGloss) + '\n```');
+  assert.strictEqual(good.valid, true);
+  assert.strictEqual(good.word, '연구자');
+  assert.strictEqual(good.type, 'hanja');
+  const frag = parseGloss(JSON.stringify({ valid: false, word: '스스로', note: '잘린 조각이에요' }));
+  assert.strictEqual(frag.valid, false);
+  assert.strictEqual(frag.word, '스스로', '바른 형태를 돌려준다');
+  assert.strictEqual(parseGloss('그냥 말로 설명할게요'), null);
+  assert.strictEqual(parseGloss(JSON.stringify({ valid: true, word: 'x', type: '몰라', easy: '뜻' })), null, '어종이 이상하면 거절');
+  assert.strictEqual(parseGloss(JSON.stringify({ valid: true, word: 'x', type: 'native', easy: '' })), null, '뜻이 비면 거절');
+});
+
+await t('뜻풀이 요청 → pending 저장. 검수 전 초안은 학생에게 내보내지 않는다', async () => {
+  const store = memStore(); const calls = [];
+  const r = await call(store, { path: '/api/vocab/gloss', method: 'POST',
+    getBody: async () => ({ word: '연구자', context: '연구자들이 십 년 넘게 연구했다.' }),
+    ai: { apiKey: 'k', gloss: glossAi(calls) } });
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(r.body.status, 'pending');
+  assert.strictEqual(r.body.gloss, undefined, '검수 전 뜻이 새어 나가면 안 된다');
+  assert.strictEqual(r.body.draft, undefined);
+  assert.strictEqual(calls.length, 1);
+  const rec = store._raw.glosses['연구자'];
+  assert.strictEqual(rec.status, 'pending');
+  assert.strictEqual(rec.draft.easy, okGloss.easy, '초안은 서버에 남는다');
+  assert.strictEqual(rec.requestedBy, 's1');
+});
+
+await t('같은 낱말은 학원 전체가 한 번만 생성 — 두 번째부터 AI를 다시 부르지 않는다', async () => {
+  const store = memStore(); const calls = [];
+  const ai = { apiKey: 'k', gloss: glossAi(calls) };
+  await call(store, { path: '/api/vocab/gloss', method: 'POST', getBody: async () => ({ word: '연구자' }), ai });
+  await call(store, { path: '/api/vocab/gloss', method: 'POST', getBody: async () => ({ word: '연구자' }), ai });
+  const other = await call(store, { path: '/api/vocab/gloss', method: 'POST',
+    who: { code: 's2', admin: false }, getBody: async () => ({ word: '연구자' }), ai });
+  assert.strictEqual(calls.length, 1, 'AI 호출은 한 번뿐');
+  assert.strictEqual(other.body.status, 'pending');
+});
+
+await t('하루 생성 상한 — 캐시 적중은 세지 않는다', async () => {
+  const store = memStore(); const calls = [];
+  const ai = { apiKey: 'k', gloss: glossAi(calls) };
+  for (let i = 0; i < 20; i++) {
+    const r = await call(store, { path: '/api/vocab/gloss', method: 'POST', getBody: async () => ({ word: '낱말' + i }), ai });
+    assert.strictEqual(r.body.status, 'pending', i + '번째는 통과해야 한다');
+  }
+  const over = await call(store, { path: '/api/vocab/gloss', method: 'POST', getBody: async () => ({ word: '넘침' }), ai });
+  assert.strictEqual(over.body.ok, false);
+  assert.strictEqual(over.body.reason, 'quota');
+  assert.strictEqual(calls.length, 20, '상한을 넘으면 AI를 부르지 않는다');
+  const cached = await call(store, { path: '/api/vocab/gloss', method: 'POST', getBody: async () => ({ word: '낱말3' }), ai });
+  assert.strictEqual(cached.body.status, 'pending', '이미 있는 낱말은 상한과 무관');
+  const other = await call(store, { path: '/api/vocab/gloss', method: 'POST',
+    who: { code: 's2', admin: false }, getBody: async () => ({ word: '다른학생' }), ai });
+  assert.strictEqual(other.body.status, 'pending', '상한은 학생별');
+});
+
+await t('승인해야 학생에게 뜻이 나간다 — check는 AI를 부르지 않는다', async () => {
+  const store = memStore(); const calls = [];
+  const ai = { apiKey: 'k', gloss: glossAi(calls) };
+  await call(store, { path: '/api/vocab/gloss', method: 'POST', getBody: async () => ({ word: '연구자' }), ai });
+
+  const before = await call(store, { path: '/api/vocab/gloss/check', method: 'POST', getBody: async () => ({ words: ['연구자', '없는말'] }), ai });
+  assert.deepStrictEqual(before.body.items.map(i => i.status), ['pending', 'none']);
+  assert.strictEqual(before.body.items[0].gloss, undefined);
+
+  const admin = { code: 'a1', admin: true };
+  const list = await call(store, { path: '/api/vocab/admin/gloss', method: 'GET', who: admin });
+  assert.strictEqual(list.body.items.length, 1);
+  assert.strictEqual(list.body.items[0].draft.easy, okGloss.easy, '강사는 초안을 본다');
+
+  const ap = await call(store, { path: '/api/vocab/admin/gloss', method: 'POST', who: admin,
+    getBody: async () => ({ key: '연구자', action: 'approve', easy: '무언가를 깊이 파고드는 사람' }) });
+  assert.strictEqual(ap.status, 200);
+
+  const after = await call(store, { path: '/api/vocab/gloss/check', method: 'POST', getBody: async () => ({ words: ['연구자'] }), ai });
+  assert.strictEqual(after.body.items[0].status, 'approved');
+  assert.strictEqual(after.body.items[0].gloss.easy, '무언가를 깊이 파고드는 사람', '강사가 고친 뜻이 나간다');
+  assert.strictEqual(after.body.items[0].gloss.hanja, okGloss.hanja, '안 고친 값은 초안 그대로');
+  assert.strictEqual(calls.length, 1, 'check는 AI를 부르지 않는다');
+
+  const direct = await call(store, { path: '/api/vocab/gloss', method: 'POST', getBody: async () => ({ word: '연구자' }), ai });
+  assert.strictEqual(direct.body.status, 'approved');
+  assert.strictEqual(direct.body.gloss.easy, '무언가를 깊이 파고드는 사람');
+});
+
+await t('반려하면 다시 생성하지 않는다 (AI 호출 반복 차단)', async () => {
+  const store = memStore(); const calls = [];
+  const ai = { apiKey: 'k', gloss: glossAi(calls) };
+  await call(store, { path: '/api/vocab/gloss', method: 'POST', getBody: async () => ({ word: '스스' }), ai });
+  await call(store, { path: '/api/vocab/admin/gloss', method: 'POST', who: { code: 'a1', admin: true },
+    getBody: async () => ({ key: '스스', action: 'reject' }) });
+  const again = await call(store, { path: '/api/vocab/gloss', method: 'POST', getBody: async () => ({ word: '스스' }), ai });
+  assert.strictEqual(again.body.status, 'rejected');
+  assert.strictEqual(calls.length, 1);
+});
+
+await t('뜻풀이 권한·입력 검증, 백업 덤프에 포함', async () => {
+  const store = memStore();
+  const ai = { apiKey: 'k', gloss: glossAi([]) };
+  assert.strictEqual((await call(store, { path: '/api/vocab/gloss', method: 'POST', getBody: async () => ({ word: '' }), ai })).status, 400);
+  assert.strictEqual((await call(store, { path: '/api/vocab/gloss', method: 'POST', getBody: async () => ({ word: 'x'.repeat(31) }), ai })).status, 400);
+  assert.strictEqual((await call(store, { path: '/api/vocab/admin/gloss', method: 'GET' })).status, 403, '학생은 검수함 못 봄');
+  const nokey = await call(store, { path: '/api/vocab/gloss', method: 'POST', getBody: async () => ({ word: '연구자' }), ai: { apiKey: null } });
+  assert.strictEqual(nokey.body.ok, false);
+  assert.strictEqual(nokey.body.reason, 'no-key');
+  await call(store, { path: '/api/vocab/gloss', method: 'POST', getBody: async () => ({ word: '연구자' }), ai });
+  const miss = await call(store, { path: '/api/vocab/admin/gloss', method: 'POST', who: { code: 'a1', admin: true },
+    getBody: async () => ({ key: '없는낱말', action: 'approve', easy: '뜻' }) });
+  assert.strictEqual(miss.status, 404);
+  const dump = await dumpVocab(store);
+  assert.ok(dump.glosses['연구자'], '백업에 뜻풀이가 들어간다');
 });
 
 console.log('\n통과 ' + passed + '개 — vocab-api 서버 라우트 검증 완료');
