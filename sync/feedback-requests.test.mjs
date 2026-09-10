@@ -131,6 +131,44 @@ test('v2 submission accepts only the exact fixed template and stores its structu
   assert.equal(result.body.code, 'FEEDBACK_TEMPLATE_MISMATCH', '승인 템플릿의 빈 줄 하나가 빠져도 거부해야 한다');
 });
 
+test('a linked makeup and its regular lesson share one feedback request', async () => {
+  const db = new TestD1();
+  seedStaff(db, 'teacher-a', '김남기'); seedToken(db, 'token-a', 'teacher-a');
+  seedTask(db, 'task-a', 'teacher-a', { subject: '수학' });
+  seedTask(db, 'makeup-task', 'teacher-a', {
+    subject: '수학', lessonInstanceType: 'makeup', makeupSourceTaskId: 'task-a',
+    title: '[수업] 테스트학생(중2) — 수학 독해'
+  });
+  const auth = person('teacher-a', 'token-a');
+  const identityV2 = {
+    feedbackDate: '2026-09-10', feedbackType: 'class_feedback', templateVersion: 'v2'
+  };
+  const structured = {
+    subjectText: '수학', contentText: '같은 교재의 오답 풀이', homeworkText: '교재 12쪽 복습',
+    commentText: '풀이 과정을 차분하게 정리했습니다.', plusText: '', minusText: ''
+  };
+  const message = '안녕하세요, WB 웩슬러브레인센터(독해력학원) 입니다.\n\n' +
+    '테스트학생 학생의 오늘 수업 피드백을 정리해 보내드립니다.\n\n' +
+    '- 일시 : 2026년 9월 10일\n\n- 과목 : 수학\n\n' +
+    '- 수업내용 · 진도 : ' + structured.contentText + '\n\n' +
+    '- 과제 : ' + structured.homeworkText + '\n\n- 코멘트 : ' + structured.commentText + '\n\n' +
+    '문의 사항이 있으시면 학원으로 연락부탁드립니다. 감사합니다.';
+
+  const makeupResult = await call(db, '/feedback-request', {
+    auth, taskId: 'makeup-task', ...identityV2, message, ...structured
+  });
+  assert.equal(makeupResult.status, 200, JSON.stringify(makeupResult.body));
+  assert.equal(makeupResult.body.request.taskId, 'task-a');
+
+  const regularResult = await call(db, '/feedback-request', {
+    auth, taskId: 'task-a', ...identityV2, message, ...structured
+  });
+  assert.equal(regularResult.status, 200, JSON.stringify(regularResult.body));
+  assert.equal(regularResult.body.idempotent, true);
+  assert.equal(regularResult.body.request.requestKey, makeupResult.body.request.requestKey);
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM feedback_requests WHERE app='task'").first().count, 1);
+});
+
 test('v2 submission uses an optional client subject and only legacy requests fall back to the task subject', async () => {
   const db = new TestD1();
   seedStaff(db, 'teacher-a', '김남기'); seedToken(db, 'token-a', 'teacher-a');

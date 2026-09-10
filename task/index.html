@@ -9064,10 +9064,44 @@ function feedbackOccurrenceRequestRank(item) {
   return ({ delivered: 4, pending: 3, unknown: 3, failed: 2, unsent: 1, excluded: 0 })[category] || 0;
 }
 
+/* 결석 보강은 원 정규수업 ID를 보존한다. 피드백 현황에서도 그 연결을 따라가야
+ * 같은 학생·같은 수업의 정규수업과 보강을 한 건으로 보여줄 수 있다. */
+function feedbackCanonicalTask(task) {
+  if (!task || !task.id) return task || null;
+  const sourceId = String(task.lessonInstanceType === 'makeup' ? task.makeupSourceTaskId || '' : '');
+  if (!sourceId) return task;
+  return state.tasks.find(row => row && String(row.id || '') === sourceId && !row.deleted) || task;
+}
+
+function feedbackOccurrenceIsMakeup(task) {
+  return !!(task && !task.deleted && (task.lessonInstanceType === 'makeup' ||
+    task.makeupCaseId || task.makeupSourceTaskId));
+}
+
+function feedbackCollapseRequestRows(rows) {
+  const groups = new Map();
+  (Array.isArray(rows) ? rows : []).forEach(item => {
+    const itemTask = state.tasks.find(row => row && String(row.id || '') === String(item && item.taskId || ''));
+    const canonicalTask = feedbackCanonicalTask(itemTask);
+    const taskId = String(canonicalTask && canonicalTask.id || item && item.taskId || '');
+    const key = taskId || ('request|' + String(item && item.requestKey || ''));
+    if (!key) return;
+    const candidate = Object.assign({}, item, {
+      taskId,
+      displayTaskId: String(item && item.taskId || taskId),
+      isMakeup: !!(itemTask && feedbackOccurrenceIsMakeup(itemTask)),
+      syntheticMissing: false
+    });
+    groups.set(key, feedbackPreferredOccurrence(groups.get(key), candidate));
+  });
+  return Array.from(groups.values());
+}
+
 function feedbackPreferredOccurrence(current, candidate) {
   if (!current) return candidate;
   if (current.syntheticMissing && !candidate.syntheticMissing) return candidate;
   if (!current.syntheticMissing && candidate.syntheticMissing) return current;
+  if (current.isMakeup !== candidate.isMakeup) return current.isMakeup ? candidate : current;
   const rankDiff = feedbackOccurrenceRequestRank(candidate) - feedbackOccurrenceRequestRank(current);
   if (rankDiff) return rankDiff > 0 ? candidate : current;
   return feedbackUpdatedAt(candidate) > feedbackUpdatedAt(current) ? candidate : current;
@@ -9079,32 +9113,41 @@ function feedbackDateOccurrences(date, queue) {
   const occurrences = new Map();
   (Array.isArray(state.tasks) ? state.tasks : []).forEach(task => {
     if (!task || !task.id || isBookOrderWorkTask(task) || !isLesson(task) || !teacherTaskCardOccursOn(task, key)) return;
-    const taskId = String(task.id);
-    occurrences.set(taskId, {
+    const canonicalTask = feedbackCanonicalTask(task);
+    const taskId = String(canonicalTask && canonicalTask.id || task.id);
+    const current = occurrences.get(taskId);
+    const candidate = {
       requestKey: 'not-started|' + taskId + '|' + key,
       taskId: taskId,
+      displayTaskId: String(task.id),
       feedbackDate: key,
-      owner: String(task.staffId || ''),
+      owner: String(canonicalTask && canonicalTask.staffId || task.staffId || ''),
       teacherName: '',
-      studentId: String(task.studentId || ''),
-      studentName: String(task.studentName || ''),
+      studentId: String(canonicalTask && canonicalTask.studentId || task.studentId || ''),
+      studentName: String(canonicalTask && canonicalTask.studentName || task.studentName || ''),
       status: 'not_started',
       revision: 0,
       updatedAt: 0,
-      syntheticMissing: true
-    });
+      syntheticMissing: true,
+      isMakeup: feedbackOccurrenceIsMakeup(task)
+    };
+    occurrences.set(taskId, feedbackPreferredOccurrence(current, candidate));
   });
   feedbackFilterByDate(queue, key).forEach(item => {
     if (!item || feedbackDeliveryCategory(item) === 'excluded') return;
-    const taskId = String(item.taskId || '');
+    const itemTask = state.tasks.find(row => row && String(row.id || '') === String(item.taskId || ''));
+    const canonicalTask = feedbackCanonicalTask(itemTask);
+    const taskId = String(canonicalTask && canonicalTask.id || item.taskId || '');
     const occurrenceKey = taskId || ('request|' + String(item.requestKey || ''));
     if (!occurrenceKey) return;
     const current = occurrences.get(occurrenceKey);
     const candidate = Object.assign({}, current || {}, item, {
       taskId: taskId,
+      displayTaskId: String(item.displayTaskId || item.taskId || (current && current.displayTaskId) || taskId),
       feedbackDate: key,
       owner: String(item.owner || (current && current.owner) || ''),
-      syntheticMissing: false
+      syntheticMissing: false,
+      isMakeup: !!(itemTask && feedbackOccurrenceIsMakeup(itemTask))
     });
     occurrences.set(occurrenceKey, feedbackPreferredOccurrence(current, candidate));
   });
@@ -9224,7 +9267,7 @@ async function loadOwnFeedbackQueue(force) {
 }
 
 function ownFeedbackCard(item) {
-  const task = state.tasks.find(row => row.id === item.taskId);
+  const task = state.tasks.find(row => row.id === (item.displayTaskId || item.taskId));
   const status = feedbackSendState(item).label;
   return '<details class="card feedback-record" data-persist-key="feedback-own|' + esc(item.requestKey) + '"><summary><span>' +
       '<span class="card-title">' + esc(task ? taskDisplayTitle(task) : item.taskId) + '</span>' +
@@ -9245,13 +9288,15 @@ function viewOwnFeedbackRequests() {
     '<button class="btn btn-sm btn-ghost mt14" data-act="fbownrefresh">새로고침</button></div>';
   if (ownFeedbackQueueLoading) return h + '<div class="card"><div class="empty"><b>⏳</b>검토 상태를 불러오는 중입니다.</div></div>';
   if (ownFeedbackQueueError) return h + '<div class="card alert"><div class="small">불러오기 실패 — ' + esc(ownFeedbackQueueError) + '</div></div>';
-  const visibleOwnQueue = ownFeedbackQueue.filter(item => item.status !== 'cancelled');
+  const visibleOwnQueue = feedbackCollapseRequestRows(
+    ownFeedbackQueue.filter(item => item.status !== 'cancelled')
+  );
   if (!visibleOwnQueue.length) return h + '<div class="card"><div class="empty"><b>💬</b>아직 요청한 피드백 문구가 없습니다.</div></div>';
   return h + feedbackSortRows(visibleOwnQueue, false).map(ownFeedbackCard).join('');
 }
 
 function feedbackQueueCard(item) {
-  const task = state.tasks.find(row => row.id === item.taskId);
+  const task = state.tasks.find(row => row.id === (item.displayTaskId || item.taskId));
   const status = feedbackSendState(item).label;
   if (item && item.syntheticMissing) {
     return '<details class="card feedback-record" data-persist-key="feedback-admin|' + esc(item.requestKey) + '"><summary><span>' +

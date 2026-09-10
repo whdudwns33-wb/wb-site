@@ -82,7 +82,7 @@ test('피드백 날짜 키와 이동은 정확한 날짜를 보존하고 월·�
   assert.equal(feedbackWeekdayKey('2026-09-07'), '1', '요일 키는 해당 날짜의 수업시간 슬롯 판정에 계속 사용한다');
 });
 
-test('선택 날짜의 수업 occurrence와 요청을 taskId 단위로 병합해 미발송까지 빠짐없이 만든다', () => {
+test('선택 날짜의 수업 occurrence와 요청을 수업 단위로 병합해 미발송까지 빠짐없이 만든다', () => {
   const date = '2026-09-07';
   const lesson = id => ({ id, staffId: 'teacher-a', studentId: 'student-' + id,
     taskKind: 'lesson_instruction', occurrenceDates: [date] });
@@ -159,6 +159,24 @@ test('선택 날짜의 수업 occurrence와 요청을 taskId 단위로 병합해
   '오늘 수업 학생 수는 네 가지 접힘 요약 상태의 합과 같아야 한다');
   assert.deepEqual({ total: teacherB.totalCount, delivered: teacherB.deliveredCount }, { total: 1, delivered: 1 });
   assert.deepEqual(queue.map(item => item.requestKey), originalQueueOrder, '병합하면서 서버 요청 배열을 변경하지 않는다');
+});
+
+test('연결된 정규수업과 보강은 학생별 같은 수업 피드백 한 건으로 묶는다', () => {
+  const date = '2026-09-07';
+  const regular = { id: 'regular-a', staffId: 'teacher-a', studentId: 'student-a',
+    taskKind: 'lesson_instruction', occurrenceDates: [date] };
+  const makeup = { id: 'makeup-a', staffId: 'teacher-a', studentId: 'student-a',
+    taskKind: 'lesson_instruction', lessonInstanceType: 'makeup', makeupSourceTaskId: 'regular-a',
+    occurrenceDates: [date] };
+  const state = { tasks: [regular, makeup] };
+  const queue = [{ requestKey: 'feedback-makeup', taskId: 'makeup-a', owner: 'teacher-a',
+    feedbackDate: date, status: 'sent', messageDeliveryState: 'delivered', updatedAt: 20 }];
+  const { feedbackDateOccurrences } = feedbackSortHelpers(state);
+  const occurrences = feedbackDateOccurrences(date, queue);
+  assert.equal(occurrences.length, 1);
+  assert.equal(occurrences[0].taskId, 'regular-a');
+  assert.equal(occurrences[0].displayTaskId, 'makeup-a');
+  assert.equal(occurrences[0].messageDeliveryState, 'delivered');
 });
 
 test('피드백 수업 시작시간은 해당 수업일에 유효한 슬롯의 가장 이른 시각을 사용한다', () => {
