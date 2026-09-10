@@ -113,7 +113,7 @@ export async function handleManagerInspectionSession(env, app, body, origin, aut
     const placeholders = ids.map(() => '?').join(',');
     const profiles = await env.DB.prepare(
       'SELECT staff_id,phone,pin_salt,pin_hash,pin_iterations FROM staff_private_profiles ' +
-      'WHERE app=? AND login_enabled=1 AND staff_id IN (' + placeholders + ')'
+      'WHERE app=? AND staff_id IN (' + placeholders + ')'
     ).bind('task', ...ids).all();
     let matched = null;
     for (const profile of (profiles.results || [])) {

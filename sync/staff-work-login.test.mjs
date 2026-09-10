@@ -148,6 +148,17 @@ test('manager inspection authenticates either manager PIN without exposing the t
   }, new Set(['manager-a'])), null);
 });
 
+test('manager inspection does not require the manager to be enrolled in teacher attendance login', async () => {
+  const env = await fixture();
+  env.DB.db.prepare('UPDATE staff_private_profiles SET login_enabled=0 WHERE staff_id=?').run('manager-a');
+  const sourceAuth = { id: 'teacher-a', scope: 'own' };
+  const response = await handleManagerInspectionSession(env, 'task', {
+    app: 'task', auth: { mode: 'person', id: 'teacher-a', token: 'device-teacher-a' }, action: 'login', pin
+  }, '*', sourceAuth, json, new Set(['manager-a']));
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).active, true);
+});
+
 test('five parallel bad attempts reserve only five verification slots then unlock after five minutes', async () => {
   const env = await fixture();
   await withNow(now, async () => {
