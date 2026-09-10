@@ -2159,6 +2159,31 @@ test('manager inspection can record an unscheduled completion only for the inspe
   assert.equal(completed.body.case.completedStaffId, 'teacher-a');
 });
 
+test('manager inspection can close an already completed unscheduled makeup without inventing a date or time', async () => {
+  const db = new TestD1(); seed(db);
+  const created = await call(db, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  });
+  const inspection = { scope: 'own', id: 'teacher-a', role: 'teacher', inspection: true, managerId: 'manager-a' };
+  const completed = await callAt(db, inspection, {
+    action: 'complete', caseId: created.body.case.caseId, revision: created.body.case.revision,
+    staffId: 'teacher-a', attendanceStatus: 'P'
+  }, '2026-08-12T12:00:00+09:00');
+  assert.equal(completed.status, 200, JSON.stringify(completed.body));
+  assert.equal(completed.body.case.status, 'completed');
+  assert.equal(completed.body.case.completedDate, null);
+  assert.equal(completed.body.case.completedStartTime, null);
+  assert.equal(completed.body.case.completedEndTime, null);
+  assert.equal(completed.body.case.completedStaffId, 'teacher-a');
+  assert.equal(completed.body.case.history.at(-1).timeUnrecorded, true);
+  assert.equal(db.database.prepare(
+    "SELECT count(*) AS n FROM tasks WHERE id=?"
+  ).get('makeup_lesson_' + created.body.case.caseId).n, 0);
+  assert.equal(db.database.prepare(
+    "SELECT count(*) AS n FROM checks WHERE k LIKE ?"
+  ).get('makeup_lesson_' + created.body.case.caseId + '|%').n, 0);
+});
+
 test('list bulk-loads source and generated lessons in bounded chunks', async () => {
   const db = new TestD1(); seed(db);
   for (let index = 0; index < 161; index++) {

@@ -25,3 +25,18 @@ test('관리자 점검 모드의 직접 완료 전송은 manager_inspection을 �
   assert.ok(start >= 0);
   assert.match(source.slice(start - 120, start + 180), /managerInspectionActive\(\)/);
 });
+
+test('일정 없는 직접 완료는 날짜·시간을 비워 둔 상태로 전송할 수 있다', () => {
+  const start = source.indexOf('function makeupDateTimeInput');
+  const end = source.indexOf('async function submitMakeupSchedule', start);
+  assert.ok(start >= 0 && end > start);
+  const block = source.slice(start, end);
+  assert.match(block, /allowEmpty/);
+  const submitStart = source.indexOf('async function submitMakeupComplete');
+  const submitEnd = source.indexOf('async function submitMakeupNoMakeup', submitStart);
+  assert.match(source.slice(submitStart, submitEnd), /allowEmpty: row\.status !== 'confirmed'/);
+  assert.match(source.slice(submitStart, submitEnd), /timeUnrecorded/);
+  const modalStart = source.indexOf('function makeupDateTimeModal');
+  const modalEnd = source.indexOf('function makeupNoMakeupModal', modalStart);
+  assert.match(source.slice(modalStart, modalEnd), /날짜·시작시간·종료시간을 비워 두면/);
+});

@@ -279,6 +279,9 @@ function completedScheduleView(row) {
   }
   const history = parseHistory(row.history);
   const completion = history.slice().reverse().find(item => item && item.action === 'complete');
+  if (completion && completion.timeUnrecorded === true) {
+    return { date: null, startTime: null, endTime: null, staffId: String(completion.staffId || row.completed_by || '') || null };
+  }
   if (completion && ISO_DATE.test(String(completion.date || '')) &&
       HHMM.test(String(completion.startTime || '')) && HHMM.test(String(completion.endTime || ''))) {
     return {
@@ -291,9 +294,12 @@ function completedScheduleView(row) {
 
 function publicCase(row, student, task, parentResponse, lessonTask) {
   const proposed = scheduleView('proposed', row);
-  const confirmed = scheduleView('confirmed', row);
-  const completed = completedScheduleView(row);
   const history = parseHistory(row.history);
+  const unrecorded = history.some(item => item && item.action === 'complete' && item.timeUnrecorded === true);
+  const confirmed = unrecorded
+    ? { date: null, startTime: null, endTime: null, staffId: null }
+    : scheduleView('confirmed', row);
+  const completed = completedScheduleView(row);
   const creationType = caseCreationOrigin(row);
   const manual = creationType === 'manual' ? history[0] : null;
   const linked = history.slice().reverse().find(item => item && item.action === 'link_completed');
@@ -1136,6 +1142,94 @@ function directCompletionCheckStatement(env, app, row, staffId, range, attendanc
   return env.DB.prepare(
     'INSERT INTO checks(app,k,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)'
   ).bind(app, taskId + '|' + range.date, staffId, JSON.stringify(data), now, now);
+}
+
+// 날짜·시간을 입력하지 않고 이미 끝난 보강을 정리할 때도 makeup_cases의
+// 기존 확정 일시 제약과 완료 담당자 트리거는 유지해야 한다. 이 값은 내부
+// 무결성용 자리표시자일 뿐이며 history의 timeUnrecorded 표식으로 화면에는
+// 노출하지 않는다.
+async function unrecordedCompletionRange(row) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(
+    String(row && row.case_id || '')
+  ));
+  const hex = Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+  const minute = parseInt(hex.slice(0, 6), 16) % (23 * 60 + 59);
+  const startHour = Math.floor(minute / 60);
+  const startMinute = minute % 60;
+  const endMinute = minute + 1;
+  const startTime = String(startHour).padStart(2, '0') + ':' + String(startMinute).padStart(2, '0');
+  const endTime = String(Math.floor(endMinute / 60)).padStart(2, '0') + ':' + String(endMinute % 60).padStart(2, '0');
+  return kstRange(String(row.source_date), startTime, endTime);
+}
+
+async function saveUnrecordedCompletion(env, app, row, next, event, document, source, student,
+  staffId, currentSourceTeacherId, sourceIdentity, json, origin, now, forcedImpact = null,
+  directAttendanceStatus = '') {
+  const planned = forcedImpact ? { impact: forcedImpact } :
+    await completionImpact(env, app, row, document, currentSourceTeacherId);
+  const impact = planned.impact;
+  const statements = [
+    sourceIdentityGuardStatement(env, app, row, sourceIdentity),
+    await casGuard(env, app, 'makeup_complete_unrecorded_source', row, now),
+    activeStaffGuardStatement(env, app, row, staffId),
+    await casGuard(env, app, 'makeup_complete_unrecorded_staff', row, now)
+  ];
+  let scheduleBase = row;
+  if (row.status === 'awaiting_parent') {
+    const supersededNext = {
+      ...row, status: 'reviewed', notification_needed: 0,
+      notification_event: null, notification_event_revision: 0
+    };
+    const supersededEvent = {
+      action: 'supersede_parent_process_for_completion', from: row.status, to: 'reviewed',
+      actorId: event.actorId, notificationNeeded: false
+    };
+    statements.push(transitionStatement(env, app, row, supersededNext, supersededEvent, now));
+    statements.push(await casGuard(env, app, 'makeup_unrecorded_supersede', row, now));
+    scheduleBase = transitionSnapshot(row, supersededNext, supersededEvent, now);
+  }
+  const range = await unrecordedCompletionRange(row);
+  const scheduledNext = {
+    ...scheduleBase, status: 'confirmed', confirmed_start_at: range.startAt,
+    confirmed_end_at: range.endAt, confirmed_staff_id: staffId,
+    notification_needed: 0, notification_event: null, notification_event_revision: 0
+  };
+  const scheduledEvent = {
+    action: 'schedule_for_completion', from: scheduleBase.status, to: 'confirmed', actorId: event.actorId,
+    date: null, startTime: null, endTime: null, staffId, timeUnrecorded: true, notificationNeeded: false
+  };
+  statements.push(transitionStatement(env, app, scheduleBase, scheduledNext, scheduledEvent, now));
+  statements.push(await casGuard(env, app, 'makeup_unrecorded_schedule', scheduleBase, now));
+  const completionRow = transitionSnapshot(scheduleBase, scheduledNext, scheduledEvent, now);
+  const completionNext = { ...completionRow, status: 'completed', completed_at: now, completed_by: staffId };
+  statements.push(transitionStatement(env, app, completionRow, completionNext,
+    { ...event, from: 'confirmed', sessionPackImpact: impact, timeUnrecorded: true }, now));
+  statements.push(await casGuard(env, app, 'makeup_unrecorded_complete', completionRow, now));
+  if (planned.pack) {
+    statements.push(env.DB.prepare(
+      'INSERT INTO session_pack_usage(app,entry_id,pack_id,expected_revision,source_type,source_ref,source_date,' +
+      'attendance_event,delta,consumption_group_id,reason_code,actor_id,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)'
+    ).bind(app, 'su_' + crypto.randomUUID().replace(/-/g, ''), planned.pack.pack_id,
+      Number(planned.pack.revision), 'makeup', row.case_id, row.source_date, 'makeup_completed', impact.delta,
+      row.consumption_group_id, 'makeup_atomic_v1', String(staffId), now));
+  }
+  let results;
+  try { results = await env.DB.batch(statements); }
+  catch (error) {
+    if (!forcedImpact && /SESSION_PACK_IDENTITY_MISMATCH/.test(String(error && error.message || error))) {
+      const mismatch = { status: 'not_applicable', reason: 'pack_identity_mismatch', refreshNeeded: false };
+      return saveUnrecordedCompletion(env, app, row, next, event, document, source, student, staffId,
+        currentSourceTeacherId, sourceIdentity, json, origin, now, mismatch, directAttendanceStatus);
+    }
+    mapAtomicMakeupError(error);
+  }
+  if (!Array.isArray(results) || results.length !== statements.length ||
+      results.some(result => Number(result && result.meta && result.meta.changes || 0) !== 1)) {
+    return conflictResponse(env, app, row.case_id, json, origin);
+  }
+  const saved = await env.DB.prepare('SELECT * FROM makeup_cases WHERE app=? AND case_id=? LIMIT 1')
+    .bind(app, row.case_id).first();
+  return { saved, impact };
 }
 
 function directCompletionAttestationStatement(env, app, row, completionRow, staffId, range,
@@ -2159,18 +2253,16 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
       if (supplied.some(Boolean) && !supplied.every(Boolean)) {
         problem('실제 보강 날짜·시작시간·종료시간을 모두 입력해 주세요');
       }
-      if (direct && !supplied.every(Boolean)) {
-        problem('일정 없이 완료할 때는 실제 보강 날짜·시작시간·종료시간이 필요합니다');
-      }
+      const timeUnrecorded = direct && !supplied.some(Boolean);
       const confirmedRange = direct ? null : confirmedMakeupRange(row);
       if (!direct && supplied.every(Boolean) && supplied[0] !== confirmedRange.date) {
         problem('예약 보강의 날짜는 완료 단계에서 바꿀 수 없습니다. 출결·메모를 입력하기 전에 보강 수정에서 날짜를 변경해 주세요',
           409, 'MAKEUP_COMPLETION_DATE_MISMATCH');
       }
-      const range = supplied.every(Boolean)
+      const range = timeUnrecorded ? null : (supplied.every(Boolean)
         ? kstRange(supplied[0], supplied[1], supplied[2])
-        : confirmedRange;
-      if (direct && requestNow < Date.parse(range.endAt)) {
+        : confirmedRange);
+      if (direct && !timeUnrecorded && requestNow < Date.parse(range.endAt)) {
         problem('일정 없이 완료하는 보강은 실제 종료시간이 지난 뒤 처리할 수 있습니다',
           409, 'MAKEUP_NOT_ENDED');
       }
@@ -2196,11 +2288,11 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
         return json({ ok: false, code: 'MAKEUP_COMPLETE_FORBIDDEN',
           error: '보강 담당 선생님의 개인 인증 또는 관리자 인증으로만 완료할 수 있습니다' }, 403, origin);
       }
-      student = rosterStudent(document, String(row.student_id), range.date);
+      student = rosterStudent(document, String(row.student_id), timeUnrecorded ? String(row.source_date) : range.date);
       if (!await activeStaff(env, app, staffId)) {
         problem('확정된 보강 담당 선생님이 비활성 상태입니다', 409, 'STAFF_INACTIVE');
       }
-      await assertNoConflict(env, app, caseId, String(row.student_id), range);
+      if (!timeUnrecorded) await assertNoConflict(env, app, caseId, String(row.student_id), range);
       if (!direct) await scheduledCompletionAttendance(env, app, row, staffId);
       next.status = 'completed';
       next.completed_at = requestNow;
@@ -2208,13 +2300,21 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
       next.completed_by = staffId;
       next.notification_needed = 0;
       event = {
-        action, from: row.status, to: next.status, actorId: actorId(auth), date: range.date,
-        startTime: range.startTime, endTime: range.endTime, staffId, direct,
+        action, from: row.status, to: next.status, actorId: actorId(auth),
+        date: timeUnrecorded ? null : range.date,
+        startTime: timeUnrecorded ? null : range.startTime,
+        endTime: timeUnrecorded ? null : range.endTime, staffId, direct,
         ...(direct ? { attendanceStatus: directAttendanceStatus } : {}),
         ...(legacyDefaults.length ? { legacyDefaults } : {}), notificationNeeded: false
       };
-      completion = await saveCompletion(env, app, row, next, event, document, source, student, staffId, range,
-        direct, currentSourceTeacherId, sourceIdentity, json, origin, requestNow, null, directAttendanceStatus);
+      if (timeUnrecorded) {
+        event = { ...event, date: null, startTime: null, endTime: null, timeUnrecorded: true };
+        completion = await saveUnrecordedCompletion(env, app, row, next, event, document, source, student,
+          staffId, currentSourceTeacherId, sourceIdentity, json, origin, requestNow, null, directAttendanceStatus);
+      } else {
+        completion = await saveCompletion(env, app, row, next, event, document, source, student, staffId, range,
+          direct, currentSourceTeacherId, sourceIdentity, json, origin, requestNow, null, directAttendanceStatus);
+      }
     } else {
       if (!ACTIVE_STATUSES.has(String(row.status))) {
         problem('현재 상태에서는 보강을 취소할 수 없습니다', 409, 'INVALID_TRANSITION');
