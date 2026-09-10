@@ -8871,6 +8871,12 @@ function feedbackAttendanceCategory(item) {
   const check = checks[taskId + '|' + date];
   const attendance = String(check && check.att || '');
   if (['P', 'L', 'E'].includes(attendance)) return 'eligible';
+  if (task && (task.lessonInstanceType === 'makeup' || task.makeupCaseId || task.makeupSourceTaskId)) {
+    const sourceId = String(task.makeupSourceTaskId || '');
+    const sourceDate = String(task.makeupSourceDate || '');
+    const sourceCheck = sourceId && sourceDate ? checks[sourceId + '|' + sourceDate] : null;
+    if (String(sourceCheck && sourceCheck.att || '') === 'A') return 'makeup_pending';
+  }
   if (attendance !== 'A') return '';
   if (task && !(task.lessonInstanceType === 'makeup' || task.makeupCaseId || task.makeupSourceTaskId)) {
     const linkedMakeup = (Array.isArray(state.tasks) ? state.tasks : []).find(makeup => {
