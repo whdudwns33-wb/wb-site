@@ -172,6 +172,7 @@
   .tag.edit { background: #FFF7ED; color: var(--amber); }
   /* 다음 수업은 요일·시간·시수 태그 옆에 놓되, 폭이 부족하면 한 덩어리로 아래 줄로 이동한다. */
   .lesson-next-compact { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 5px; max-width: 100%; min-height: 26px; padding: 3px 9px; border: 1px solid #D8B8EA; border-radius: 7px; background: #FBF4FF; color: #6D3A86; font-size: 11px; font-weight: 700; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .lesson-meta.lesson-next-below .lesson-next-compact { flex-basis: 100%; }
   .lesson-next-compact b { color: #7A3FA1; font-weight: 900; }
   .lesson-next-compact button { color: inherit; font: inherit; text-align: left; }
   .lesson-next-compact.is-loading { color: #7A3FA1; }
@@ -1187,15 +1188,15 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-09-10.6"></script>
-<script src="./schedule-board-core.js?v=2026-09-10.6"></script>
-<script src="./asset-core.js?v=2026-09-10.6"></script>
-<script src="./qr-core.js?v=2026-09-10.6"></script>
-<script src="./acaflow-import-core.js?v=2026-09-10.6"></script>
-<script src="./feedback-subject-catalog.js?v=2026-09-10.6"></script>
-<script src="./sync-recovery-core.js?v=2026-09-10.6"></script>
-<script src="./staff-work-session-core.js?v=2026-09-10.6"></script>
-<script src="./staff-attendance-history-core.js?v=2026-09-10.6"></script>
+<script src="./lesson-form-core.js?v=2026-09-10.7"></script>
+<script src="./schedule-board-core.js?v=2026-09-10.7"></script>
+<script src="./asset-core.js?v=2026-09-10.7"></script>
+<script src="./qr-core.js?v=2026-09-10.7"></script>
+<script src="./acaflow-import-core.js?v=2026-09-10.7"></script>
+<script src="./feedback-subject-catalog.js?v=2026-09-10.7"></script>
+<script src="./sync-recovery-core.js?v=2026-09-10.7"></script>
+<script src="./staff-work-session-core.js?v=2026-09-10.7"></script>
+<script src="./staff-attendance-history-core.js?v=2026-09-10.7"></script>
 <script>
 "use strict";
 
@@ -3554,7 +3555,10 @@ function render() {
   if (route === 'transport') requestAnimationFrame(restoreTransportFocus);
   if (route === 'makeup') requestAnimationFrame(restoreMakeupFocus);
   if (route === 'sessions') requestAnimationFrame(restoreSessionPackFocus);
-  if (route === 'today') requestAnimationFrame(queueTodayNextLessonLoads);
+  if (route === 'today') {
+    requestAnimationFrame(arrangeLessonNextMeta);
+    requestAnimationFrame(queueTodayNextLessonLoads);
+  }
 }
 
 function renderTabs() {
@@ -5985,6 +5989,22 @@ function studentNextLessonCompactHtml(task, date) {
   return '<span class="lesson-next-compact" title="' + esc(subject + ' · ' + time + ' · ' + teacher) + '"><b>다음</b><span>' +
     esc(subject) + '</span><span>' + esc(time) + '</span><span>' + esc(teacher) + '</span></span>';
 }
+
+function arrangeLessonNextMeta() {
+  document.querySelectorAll('.lesson-meta').forEach(meta => {
+    const schedule = meta.querySelector('.lesson-schedule-meta');
+    const next = meta.querySelector('.lesson-next-compact');
+    if (!schedule || !next) return;
+    const scheduleBox = schedule.getBoundingClientRect();
+    const nextBox = next.getBoundingClientRect();
+    const scheduleWrapped = scheduleBox.height > nextBox.height + 4;
+    const nextWrapped = nextBox.top > scheduleBox.top + 4;
+    meta.classList.toggle('lesson-next-below', scheduleWrapped || nextWrapped);
+  });
+}
+if (typeof window !== 'undefined') window.addEventListener('resize', () => {
+  if (route === 'today') requestAnimationFrame(arrangeLessonNextMeta);
+});
 
 function studentNextLessonHtml(task, date) {
   const key = nextStudentLessonKey(task.id, date);
@@ -23837,7 +23857,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-09-10.6';
+const APP_VER = '2026-09-10.7';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
