@@ -231,6 +231,8 @@ async function openDetail(code){
   const reads=Object.entries(st.readings||{}).sort((x,y)=>y[1].date<x[1].date?-1:1).slice(0,8);
   const reports=(st.reports||[]).slice().reverse();
   const redbook=(st.redbook||[]).slice(-5).reverse();
+  /* 밑줄 없이 담은 낱말 — 학생 기록이 통째로 동기화되므로 서버 변경 없이 여기서 뽑아 쓴다 */
+  const asked=(st.vocab||[]).filter(v=>v&&v.needsGloss).slice().reverse();
   const sp=st.speed||[];
   const speedLine=sp.length>=2?`최근 <b>${sp[sp.length-1].cpm}자/분</b> (첫 기록 대비 ${sp[sp.length-1].cpm-sp[0].cpm>=0?'+':''}${sp[sp.length-1].cpm-sp[0].cpm})`:sp.length===1?`${sp[0].cpm}자/분 (1회 측정)`:'측정 전';
   const stu=j.student||{};
@@ -254,6 +256,12 @@ async function openDetail(code){
       ${reads.map(([id,r])=>{const q=(st.quiz||{})[id];
         return `<div class="rline"><span>${esc(titleOf(id,r.level))}${q?` <span class="tag ${q.correct/q.total>=0.75?'ok':'warn'}">${q.correct}/${q.total}</span>`:''}</span><small>${esc(r.date)}</small></div>`;}).join('')||'<p class="muted">아직 없음</p>'}
     </div>
+    ${asked.length?`<div class="dlg-sec"><h3>선생님께 물어볼 낱말 (${asked.length})</h3>
+      <p class="muted" style="font-size:12.5px;margin:0 0 8px">학생이 글에서 직접 담은 낱말이에요. 밑줄이 없어 뜻이 붙지 않았으니 수업에서 함께 봐 주세요.</p>
+      ${asked.map(v=>`<div class="rline" style="display:block"><b>${esc(v.word)}</b>${v.raw&&v.raw!==v.word?` <span class="muted">(본문: ${esc(v.raw)})</span>`:''}
+        <small>${esc(v.addedAt||'')}${v.articleId?' · '+esc(titleOf(v.articleId,s.appLevel||s.level)):''}</small>
+        ${v.context?`<details><summary>글에서 보기</summary><pre>${esc(v.context)}</pre></details>`:''}</div>`).join('')}
+    </div>`:''}
     <div class="dlg-sec"><h3>탐구보고서 (${reports.length})</h3>
       ${reports.map(r=>`<div class="rline" style="display:block"><b>${esc(r.title||'제목 없음')}</b> <small>${esc(r.done||'')}</small>
         <details><summary>내용 보기</summary><pre>${esc(stuReportText(r))}</pre></details></div>`).join('')||'<p class="muted">아직 없음</p>'}
