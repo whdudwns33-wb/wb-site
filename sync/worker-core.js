@@ -2534,6 +2534,15 @@ function feedbackIdentity(body) {
   return { taskId, feedbackDate, feedbackType, templateVersion };
 }
 
+/* 결석 보강은 서버가 원 정규수업의 stable taskId를 기록한다. 피드백의 정체성도
+ * 그 연결을 따라가야 같은 학생·같은 수업의 정규수업과 보강이 이중 발송되지 않는다.
+ * 수업무관 보강에는 원 수업이 없으므로 기존 taskId를 그대로 사용한다. */
+function feedbackCanonicalTaskId(taskData, taskId) {
+  const sourceTaskId = taskData && taskData.lessonInstanceType === 'makeup'
+    ? String(taskData.makeupSourceTaskId || '') : '';
+  return SAFE_ID.test(sourceTaskId) ? sourceTaskId : taskId;
+}
+
 async function feedbackRequestKey(identity) {
   const raw = [identity.taskId, identity.feedbackDate, identity.feedbackType, identity.templateVersion].join('\u001f');
   return 'fbr_' + (await sha256Hex(raw)).slice(0, 48);
@@ -2634,12 +2643,19 @@ async function taskForFeedback(env, identity, auth, origin) {
   return { task, taskData };
 }
 
-async function findFeedbackRequest(env, identity) {
+async function findFeedbackRequest(env, identity, owner) {
   return await env.DB.prepare(
     FEEDBACK_WITH_LATEST_SEND_SELECT +
-    'WHERE f.app=? AND f.task_id=? AND f.feedback_date=? ' +
-    'AND f.feedback_type=? AND f.template_version=? LIMIT 1'
-  ).bind('task', identity.taskId, identity.feedbackDate, identity.feedbackType, identity.templateVersion).first();
+    'WHERE f.app=? AND f.owner=? AND f.feedback_date=? AND f.feedback_type=? AND f.template_version=? ' +
+    'AND (f.task_id=? OR EXISTS (' +
+      "SELECT 1 FROM tasks makeup WHERE makeup.app=f.app AND makeup.id=f.task_id " +
+      "AND json_valid(makeup.data)=1 AND json_extract(makeup.data,'$.lessonInstanceType')='makeup' " +
+      "AND json_extract(makeup.data,'$.makeupSourceTaskId')=?" +
+    ')) ORDER BY CASE WHEN f.status=\'sent\' OR s.status=\'sent\' OR s.provider_status_code=\'4000\' THEN 0 ' +
+      "WHEN s.status IN ('reserved','dispatching','accepted','unknown') THEN 1 ELSE 2 END, " +
+      'CASE WHEN f.task_id=? THEN 0 ELSE 1 END, f.updated_at DESC LIMIT 1'
+  ).bind('task', owner, identity.feedbackDate, identity.feedbackType, identity.templateVersion,
+    identity.taskId, identity.taskId, identity.taskId).first();
 }
 
 async function findFeedbackRequestByKey(env, app, requestKey) {
@@ -2669,14 +2685,18 @@ async function handleFeedbackRequest(env, app, body, origin) {
     ).bind('task', auth.id).all();
     return json({ ok: true, requests: await Promise.all((result.results || []).map(feedbackView)) }, 200, origin);
   }
-  const identity = feedbackIdentity(body);
+  let identity = feedbackIdentity(body);
   if (identity.error) return json({ ok: false, error: identity.error }, 400, origin);
   const checked = await taskForFeedback(env, identity, auth, origin);
   if (checked.response) return checked.response;
 
+  const submittedTaskId = identity.taskId;
+  const canonicalTaskId = feedbackCanonicalTaskId(checked.taskData, submittedTaskId);
+  if (canonicalTaskId !== submittedTaskId) identity = { ...identity, taskId: canonicalTaskId };
+
   const owner = String(checked.task.owner);
   const now = Date.now();
-  let current = await findFeedbackRequest(env, identity);
+  let current = await findFeedbackRequest(env, identity, owner);
 
   if (action === 'cancel') {
     if (!current) return json({ ok: false, error: '취소할 피드백 요청을 찾을 수 없습니다' }, 404, origin);
@@ -2785,7 +2805,7 @@ async function handleFeedbackRequest(env, app, body, origin) {
       identity.templateVersion, message, bodyHash, teacherName, studentId, studentName, contentText,
       subjectText, homeworkText, commentText, noticeText, plusText, minusText,
       now, now).run();
-    current = await findFeedbackRequest(env, identity);
+    current = await findFeedbackRequest(env, identity, owner);
     if (!current) return json({ ok: false, error: '피드백 요청을 저장하지 못했습니다' }, 500, origin);
     const freshInsert = Number(insertResult && insertResult.meta && insertResult.meta.changes || 0) === 1;
     if (freshInsert) {
