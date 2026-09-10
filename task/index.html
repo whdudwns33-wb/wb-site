@@ -11345,7 +11345,10 @@ async function submitManualMakeup(button) {
 
 function makeupCanComplete(row) {
   if (!row || ['completed', 'cancelled'].includes(row.status)) return false;
-  if (session.isAdmin) return true;
+  /* 관리자 점검 모드는 선생님 화면을 유지하지만, 관리자가 그 태블릿에서
+   * 일정 없는 완료 기록을 보완할 수 있어야 한다. 데이터 범위는 여전히
+   * 점검 중인 선생님으로 제한되며, 일반 관리자 권한 전체를 열지 않는다. */
+  if (session.isAdmin || (typeof managerInspectionActive === 'function' && managerInspectionActive())) return true;
   return row.status === 'confirmed' && session.isStaffLink &&
     String(row.confirmedStaffId || '') === String(session.staffId || '');
 }
@@ -11491,7 +11494,7 @@ async function submitMakeupComplete(button) {
       return showMakeupModalError('보강 출결을 서버에 동기화하지 못했습니다. 연결을 확인한 뒤 다시 시도해 주세요');
     }
   } else {
-    if (!session.isAdmin) return showMakeupModalError('일정 없이 완료한 보강은 관리자만 기록할 수 있습니다');
+    if (!session.isAdmin && !(typeof managerInspectionActive === 'function' && managerInspectionActive())) return showMakeupModalError('일정 없이 완료한 보강은 관리자만 기록할 수 있습니다');
     const staffId = String(($('#muStaff') || {}).value || '');
     const attendanceStatus = String(($('#muAttendanceStatus') || {}).value || '');
     if (!makeupActiveStaff(staffId)) return showMakeupModalError('실제 보강 담당 선생님을 선택해 주세요');
@@ -11536,7 +11539,7 @@ async function openMakeupLinkModal(button, showDirectCompletion) {
       (options || '<div class="empty">연결 가능한 완료 보강이 없습니다.</div>') + makeupModalErrorHtml(),
       (options ? '<button class="btn btn-primary btn-block mt14" data-act="mulinksubmit" data-case="' + esc(row.caseId) +
         '" data-rev="' + Number(row.revision) + '">이미 완료한 보강 연결</button>' : '') +
-      (showDirectCompletion && session.isAdmin ? '<button class="btn btn-ghost btn-block mt8" data-act="mudirectcompleteopen" data-case="' +
+      (showDirectCompletion && (session.isAdmin || (typeof managerInspectionActive === 'function' && managerInspectionActive())) ? '<button class="btn btn-ghost btn-block mt8" data-act="mudirectcompleteopen" data-case="' +
         esc(row.caseId) + '">새로 완료 기록 입력</button>' : ''));
   } catch (error) { toast('연결 후보를 불러오지 못했습니다 — ' + (error.message || error)); }
   finally { if (button.isConnected) button.disabled = false; }
