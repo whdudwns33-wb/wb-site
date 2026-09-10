@@ -4,6 +4,7 @@ import { handleScheduledBookOrders, handleScheduledBookOrderStatusRefresh } from
 import { handleScheduledParentFeedbackStatusRefresh } from './parent-feedback-send.js';
 import { handleScheduledSessionPackAttendance } from './session-pack.js';
 import { handleScheduledTuitionAlerts } from './tuition-alert.js';
+import { applyTestStaffNextDayAttendance } from './test-staff-attendance.js';
 
 const BOOK_ORDER_CRON = '0 11 * * *';
 const BOOK_ORDER_STATUS_CRON = '*/10 * * * *';
@@ -48,6 +49,7 @@ export default {
         handleScheduledBookOrderStatusRefresh(env, controller.scheduledTime),
         handleScheduledParentFeedbackStatusRefresh(env, controller.scheduledTime)
       ]));
+      ctx.waitUntil(applyTestStaffNextDayAttendance(env, 'task', controller.scheduledTime));
       return;
     }
     if (controller.cron === SESSION_PACK_ATTENDANCE_CRON) {
