@@ -48,6 +48,7 @@
  *   POST /teacher-live-request { app, auth, action, ... } → 담당 선생님→모든 관리자 실시간 요청
  *   POST /tuition-alert { app, auth(admin), action, ... } → 학생 단위 4회제 3회 확정 알림
  *   POST /student-attendance { app, auth, studentId, month? } → 담당 학생 출결 달력·현재 4회 진행
+ *   POST /student-next-lesson { app, auth, taskId, lessonDate } → 같은 학생의 해당 날짜 다음 수업 1건(최소 정보)
  *   POST /parent-portal { app, action, ... }         → 보호자 초대·공개 수업·정형 요청함
  *   POST /consult-guardian { app:'consult', action, ... } → 컨설팅 리포트 보호자 읽기·확인
  *   POST /consult-curriculum-image multipart(app:'consult', auth, files[]) → 강의 목차 사진 일시 인식
@@ -104,6 +105,7 @@ import {
 } from './staff-work-login.js';
 import { handleWeekendVisit } from './weekend-visit.js';
 import { handleLessonHandoff } from './lesson-handoff.js';
+import { findNextStudentLesson, projectNextStudentLesson, validDate } from './student-next-schedule.js';
 import { studentScheduleConflictPayload } from './student-schedule-conflict.js';
 import { isTaskWriteCasConflict } from './task-write-cas.js';
 import {
@@ -2273,6 +2275,62 @@ async function handleRevoke(env, app, body, origin) {
   return json({ ok: true }, 200, origin);
 }
 
+/**
+ * 선생님이 현재 수업 뒤에 이어지는 같은 학생의 수업을 안내할 때 사용하는
+ * 읽기 전용 조회다. 개인 링크의 동기화 범위는 본인 업무로 유지하되, 이 API는
+ * 현재 수업을 소유한 교사임을 확인한 뒤 대상 학생의 일정만 최소 필드로
+ * 계산한다. 다른 학생·메모·출결·업무지시는 응답에 포함하지 않는다.
+ */
+async function handleStudentNextLesson(env, app, body, origin, auth, json) {
+  if (app !== 'task') return json({ ok: false, error: '다음 수업 안내는 task 앱에서만 사용할 수 있습니다' }, 400, origin);
+  const taskId = String(body.taskId || '').trim();
+  const lessonDate = String(body.lessonDate || '').trim();
+  if (!SAFE_ID.test(taskId) || !validDate(lessonDate)) {
+    return json({ ok: false, error: '올바른 taskId와 lessonDate가 필요합니다' }, 400, origin);
+  }
+  const currentRow = await env.DB.prepare('SELECT id,owner,data FROM tasks WHERE app=? AND id=? LIMIT 1')
+    .bind(app, taskId).first();
+  if (!currentRow) return json({ ok: false, error: '수업을 찾을 수 없습니다' }, 404, origin);
+  if (auth.scope === 'own' && String(currentRow.owner || '') !== String(auth.id || '')) {
+    return json({ ok: false, error: '본인 담당 수업만 다음 수업을 확인할 수 있습니다' }, 403, origin);
+  }
+  let current;
+  try { current = JSON.parse(currentRow.data || '{}'); } catch (error) { current = null; }
+  if (!current || current.deleted || String(current.id || taskId) !== taskId ||
+      !SAFE_ID.test(String(current.studentId || ''))) {
+    return json({ ok: false, error: '이 수업에 연결된 stable studentId를 확인할 수 없습니다' }, 409, origin);
+  }
+  if (body.studentId != null && String(body.studentId || '') !== String(current.studentId)) {
+    return json({ ok: false, error: '수업과 학생 연결이 변경되었습니다. 새로고침 후 다시 시도해 주세요' }, 409, origin);
+  }
+
+  const taskResult = await env.DB.prepare('SELECT id,owner,data FROM tasks WHERE app=?').bind(app).all();
+  const tasks = [];
+  for (const row of taskResult.results || []) {
+    try {
+      const data = JSON.parse(row.data || '{}');
+      if (data && typeof data === 'object' && !Array.isArray(data)) {
+        if (!data.id) data.id = String(row.id || '');
+        if (!data.staffId) data.staffId = String(row.owner || '');
+        tasks.push(data);
+      }
+    } catch (error) { /* 손상된 행은 다음 수업 후보에서 제외한다 */ }
+  }
+  const staffResult = await env.DB.prepare('SELECT id,data FROM staff WHERE app=?').bind(app).all();
+  const teacherNames = {};
+  for (const row of staffResult.results || []) {
+    try {
+      const data = JSON.parse(row.data || '{}');
+      if (data && !data.deleted && String(data.name || '').trim()) {
+        teacherNames[String(row.id || data.id || '')] = String(data.name).replace(/\s+/g, ' ').trim().slice(0, 80);
+      }
+    } catch (error) { /* 손상된 직원 행은 이름 없이 표시한다 */ }
+  }
+  const next = findNextStudentLesson(tasks, taskId, lessonDate, teacherNames);
+  return json({ ok: true, lessonDate, currentTaskId: taskId, studentId: String(current.studentId),
+    next: projectNextStudentLesson(next, lessonDate) }, 200, origin);
+}
+
 function authoritativeStaffRecord(row) {
   if (!row) return null;
   let data = null;
@@ -3190,6 +3248,11 @@ export default {
         const auth = await resolveAuth(env, app, body.auth);
         if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
         return await handleStudentAttendance(env, app, body, okOrigin, auth, json);
+      }
+      if (url.pathname === '/student-next-lesson') {
+        const auth = await resolveAuth(env, app, body.auth);
+        if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+        return await handleStudentNextLesson(env, app, body, okOrigin, auth, json);
       }
       if (url.pathname === '/book-issue') {
         const auth = await resolveAuth(env, app, body.auth);
