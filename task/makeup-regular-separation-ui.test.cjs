@@ -44,15 +44,15 @@ test('확정됐지만 생성 task가 없는 레거시 보강은 확정 일시를
   );
   const missing = actions({ caseId: 'mu-a', revision: 3, status: 'confirmed', hasLessonTask: false });
   const healthy = actions({ caseId: 'mu-a', revision: 3, status: 'confirmed', hasLessonTask: true });
-  assert.match(missing, /data-act="murestoreschedule"[^>]*>보강생성/);
-  assert.doesNotMatch(missing, />생성완료</);
-  assert.match(healthy, /data-act="mureschedule"[^>]*>보강 수정/);
-  assert.equal((healthy.match(/<button/g) || []).length, 3, '확정 카드도 세 동작을 유지한다');
+  assert.match(missing, /data-act="muprocessadminopen"[^>]*>보강 처리/);
+  assert.match(healthy, /data-act="muprocessadminopen"[^>]*>보강 처리/);
+  assert.equal((healthy.match(/<button/g) || []).length, 2, '관리자 카드는 처리 창과 보강없음만 노출한다');
 
   const modal = block('function makeupDateTimeModal(', 'function makeupNoMakeupModal(');
   assert.match(modal, /mode === 'restore'/);
   assert.match(modal, /확정된 일시는 유지하고 누락된 보강수업 화면만 다시 생성합니다/);
   assert.match(modal, /murestoreschedulesubmit/);
   assert.match(source, /action: 'restore_schedule', caseId: button\.dataset\.case, revision: Number\(button\.dataset\.rev\)/);
+  assert.match(source, /function openMakeupAdminProcessModal\(button\)/);
   assert.match(source, /case 'murestoreschedule':[\s\S]{0,180}makeupDateTimeModal\([\s\S]{0,100}'restore'\)/);
 });

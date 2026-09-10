@@ -52,6 +52,10 @@ test('같은 studentId의 정규수업은 담당자·과목과 무관하게 실�
   assert.doesNotThrow(() => assertStudentScheduleSnapshot([
     lesson({ id: 'other-day', scheduleSlots: [{ days: [2], startTime: '16:30', endTime: '17:30' }] })
   ], [stored(current)], []), '요일이 다르면 허용한다');
+  assert.doesNotThrow(() => assertStudentScheduleSnapshot([
+    lesson({ id: 'same-teacher-other-student', staffId: 'teacher-old', studentId: 'student-b',
+      scheduleSlots: [{ days: [1], startTime: '16:30', endTime: '17:30' }] })
+  ], [stored(current)], []), '같은 선생님의 여러 학생 동시 수업은 허용한다');
 });
 
 test('정규수업 시간 겹침은 수업 및 slot 적용 기간이 실제로 겹칠 때만 차단한다', () => {

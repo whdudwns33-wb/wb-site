@@ -260,17 +260,19 @@ test('makeup assignee choices use stable staff ids and keep original and actual 
   assert.match(card, />대체 담당 제안</);
 });
 
-test('active admin card has three actions and staff can only process their own case', () => {
+test('active admin card has one processing action plus no-makeup and staff can only process their own case', () => {
   const actions = block('function makeupActions(row)', 'function makeupCard(row)');
 
-  for (const [act, label] of [['muschedule', '보강생성'], ['muprocessopen', '보강 처리'], ['munone', '보강없음']]) {
+  for (const [act, label] of [['muprocessadminopen', '보강 처리'], ['munone', '보강없음']]) {
     assert.match(actions, new RegExp(`data-act="${act}"[\\s\\S]*?>${label}<`));
   }
-  assert.match(actions, /row\.status === 'confirmed'[\s\S]*?data-act="mureschedule"[\s\S]*?>보강 수정</);
+  assert.match(actions, /function openMakeupAdminProcessModal\(button\)/);
+  assert.match(actions, /data-act="muschedule"[\s\S]*?>보강 일정 생성</);
+  assert.match(actions, /data-act="mureschedule"[\s\S]*?>담당자·일정 수정</);
   assert.match(actions, /if \(session\.isAdmin\)/);
   assert.match(actions, /const assignedStaffId = row\.confirmedStaffId/);
   assert.match(actions, /row\.status === 'confirmed' && session\.isStaffLink/);
-  const staffBranch = actions.slice(actions.indexOf('const own'));
+  const staffBranch = actions.slice(actions.indexOf('const own'), actions.indexOf('\n}\n\nfunction openMakeupAdminProcessModal'));
   assert.match(staffBranch, /data-act="muprocessopen"/);
   assert.doesNotMatch(staffBranch, /data-act="muschedule"|data-act="mureschedule"|data-act="munone"/);
   for (const oldAction of ['mureviewrequired', 'mupropose', 'muconfirm', 'mucancel']) {

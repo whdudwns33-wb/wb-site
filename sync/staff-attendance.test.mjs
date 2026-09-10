@@ -74,10 +74,25 @@ test('teacher clock-in and clock-out use immutable server timestamps', async () 
   assert.equal(clockOut.body.record.at, clockInAt);
   assert.equal(clockOut.body.record.out, clockOutAt);
 
-  const repeatedOut = await atNow(clockOutAt + 60000, () => call(db, 'clock_out'));
+  const secondInAt = clockOutAt + 3600000;
+  const secondIn = await atNow(secondInAt, () => call(db, 'clock_in'));
+  assert.equal(secondIn.status, 200);
+  assert.equal(secondIn.body.record.at, clockInAt);
+  assert.equal(secondIn.body.record.out, null);
+  assert.equal(secondIn.body.record.sessions.length, 2);
+
+  const secondOutAt = secondInAt + 1800000;
+  const secondOut = await atNow(secondOutAt, () => call(db, 'clock_out'));
+  assert.equal(secondOut.status, 200);
+  assert.equal(secondOut.body.record.at, clockInAt);
+  assert.equal(secondOut.body.record.out, secondOutAt);
+  assert.equal(secondOut.body.record.sessions[0].out, clockOutAt);
+  assert.equal(secondOut.body.record.sessions[1].out, secondOutAt);
+
+  const repeatedOut = await atNow(secondOutAt + 60000, () => call(db, 'clock_out'));
   assert.equal(repeatedOut.status, 200);
   assert.equal(repeatedOut.body.idempotent, true);
-  assert.equal(repeatedOut.body.record.out, clockOutAt);
+  assert.equal(repeatedOut.body.record.out, secondOutAt);
 });
 
 test('clock-out requires clock-in and root admin without a personal staff id cannot create a punch', async () => {
