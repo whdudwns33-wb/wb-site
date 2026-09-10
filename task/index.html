@@ -1238,7 +1238,7 @@ function managerInspectionActive() {
 }
 function managerInspectionAuth() {
   return managerInspectionActive()
-    ? { mode: 'manager_inspection', managerId: managerInspection.managerId, token: managerInspection.token }
+    ? { mode: 'manager_inspection', id: SAFE_SCOPE_ID, managerId: managerInspection.managerId, token: managerInspection.token }
     : null;
 }
 function saveManagerInspection() {
@@ -1709,7 +1709,7 @@ function applyTaskRevocationPage(page, auth, accessRole) {
   rows.forEach(row => {
     const taskId = row.taskId;
     const formerOwner = row.formerOwner;
-    if (!allScope && (!auth || auth.mode !== 'person' || String(auth.id || '') !== formerOwner)) return;
+    if (!allScope && (!auth || !['person', 'manager_inspection'].includes(auth.mode) || String(auth.id || '') !== formerOwner)) return;
 
     const sameId = (state.tasks || []).filter(task => String(task && task.id || '') === taskId);
     const exactOwner = sameId.filter(task => String(task && task.staffId || '') === formerOwner);
@@ -1826,13 +1826,15 @@ function viewStaffWorkLogin() {
 function openManagerInspectionModal() {
   const host = $('#modalHost');
   if (!host) return;
+  const target = currentStaff();
+  const targetName = target && target.name ? target.name + ' 선생님' : '현재 선생님';
   if (host.hidden) modalReturnFocus = document.activeElement;
   host.innerHTML = '<div class="modal-box"><div class="between mb14"><div class="card-title" id="modalTitle">관리자 로그인</div>' +
     '<button class="btn btn-sm btn-ghost" data-act="closemodal">닫기</button></div>' +
-    '<div class="card-sub mb14">김남기 선생님 또는 김혜지 선생님의 개인 비밀번호 4자리를 입력하면 이 태블릿에서 관리자 화면을 점검할 수 있습니다. 선생님 출퇴근 기록은 변경되지 않습니다.</div>' +
+    '<div class="card-sub mb14">김남기 선생님 또는 김혜지 선생님의 개인 비밀번호 4자리를 입력하면 ' + esc(targetName) + ' 화면을 점검할 수 있습니다. 선생님 출퇴근 기록은 변경되지 않습니다.</div>' +
     (managerInspection.error ? '<div class="hint mt14" role="alert">' + esc(managerInspection.error) + '</div>' : '') +
     '<label class="field"><span class="fl">관리자 비밀번호 4자리</span><input class="in" id="managerInspectionPin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="off" placeholder="비밀번호 4자리"></label>' +
-    '<button class="btn btn-primary btn-block mt14" data-act="managerinspectsubmit"' + (managerInspection.busy ? ' disabled' : '') + '>' + (managerInspection.busy ? '관리자 인증 확인 중…' : '관리자 화면 열기') + '</button>' +
+    '<button class="btn btn-primary btn-block mt14" data-act="managerinspectsubmit"' + (managerInspection.busy ? ' disabled' : '') + '>' + (managerInspection.busy ? '관리자 인증 확인 중…' : '선생님 화면 점검 시작') + '</button>' +
     '<div class="hint mt14">점검 세션은 8시간 후 자동 만료되며, 상단의 점검 종료 버튼으로 즉시 닫을 수 있습니다.</div></div>';
   host.hidden = false;
   setModalBackgroundInert(true);
@@ -2115,7 +2117,6 @@ const sync = {
         else state.settings.onboardingCasReconcileVersion = 1;
       };
       queueOnboardingReconcile(auth.mode === 'admin' || session.isManager);
-      if (auth.mode === 'manager_inspection') queueOnboardingReconcile(true);
       let guard = 0, again = true;
       while (again && guard++ < 60) {
         const batch = pending.splice(0, 400);
@@ -2138,7 +2139,7 @@ const sync = {
           throw roleError;
         }
         const responseAccessRole = auth.mode === 'person' ? d.authRole :
-          (auth.mode === 'manager_inspection' ? 'manager' : '');
+          (auth.mode === 'manager_inspection' ? (d.authRole === 'staff' ? 'staff' : '') : '');
         const managerCacheDowngraded = responseAccessRole === 'staff' &&
           (hasSensitiveManagerCache(previousAccessRole) || nextAccessRole === 'manager');
         const scopedCacheUpgraded = responseAccessRole === 'manager' &&
@@ -2167,7 +2168,7 @@ const sync = {
       }
       // 요청 도중에 바뀐 것은 updatedAt이 t0보다 크므로 다음 회차에 올라간다
       state.settings.pushAt = t0;
-      if ((auth.mode === 'person' || auth.mode === 'manager_inspection') && nextAccessRole === 'manager') state.settings.managerCacheSensitive = true;
+      if (auth.mode === 'person' && nextAccessRole === 'manager') state.settings.managerCacheSensitive = true;
       else delete state.settings.managerCacheSensitive;
       save();
       this.last = now(); this.dirty = false; this.err = '';
@@ -2583,12 +2584,11 @@ const session = {
   get staffId() { return SAFE_SCOPE_ID; },
   get isStaffLink() { return !!this.staffId; },
   get isManager() {
-    if (typeof managerInspectionActive === 'function' && managerInspectionActive()) return true;
     const auth = this.isStaffLink && sync.auth();
     return !!(auth && auth.mode === 'person' && auth.id === this.staffId &&
       sync.personVerified && sync.accessRole === 'manager');
   },
-  get isAdmin() { return this.isManager || (typeof managerInspectionActive === 'function' && managerInspectionActive()) || (!this.isStaffLink && sessionStorage.getItem('wb_admin') === '1'); },
+  get isAdmin() { return this.isManager || (!this.isStaffLink && sessionStorage.getItem('wb_admin') === '1'); },
   unlock() { sessionStorage.setItem('wb_admin', '1'); },
   lock() {
     if (managerInspectionActive()) { clearManagerInspection(); return true; }
@@ -3393,14 +3393,15 @@ function paintStatus() {
   const el = $('#whoami');
   const me = currentStaff();
   let text, on = false;
-  if (session.isStaffLink && !session.isAdmin) {
+  if (managerInspectionActive()) {
+    text = (managerInspection.managerName || '관리자') + ' · ' + ((me || {}).name || '선생님') + ' 화면 점검'; on = true;
+  } else if (session.isStaffLink && !session.isAdmin) {
     if (pendingBootstrapCode) text = IS_KAKAO_IN_APP ? '외부 브라우저 연결 필요' : '기기 연결 대기';
     else if (personAccessProblem) text = '개인 인증 확인 필요';
     else if (shouldGateStaffWork()) text = '출근 로그인 필요';
     else if (!sync.personVerified) text = '개인 인증 확인 중';
     else { text = me ? me.name + ' 선생님 · 개인 업무' : '대상을 찾을 수 없음'; on = !!me; }
   }
-  else if (managerInspectionActive()) { text = (managerInspection.managerName || '관리자') + ' · 관리자 점검 모드'; on = true; }
   else if (session.isManager) { text = ((meStaff() || {}).name || '관리 담당') + ' · 관리 담당 모드'; on = true; }
   else if (session.isAdmin) { text = '원장 모드'; on = true; }
   else { text = '잠김'; }
