@@ -30,16 +30,45 @@ function timestampMatchesDate(value, date) {
   return !!stamp && staffAttendanceDate(stamp) === date;
 }
 
-function activeAttendance(data, date) {
-  return !!data && data.done === true && timestampMatchesDate(data.at, date);
+function attendanceSessions(data) {
+  const raw = data && Array.isArray(data.sessions) ? data.sessions : [];
+  const sessions = raw.map(item => ({
+    in: finiteTimestamp(item && (item.in != null ? item.in : item.at)),
+    out: finiteTimestamp(item && (item.out != null ? item.out : 0)) || null
+  })).filter(item => item.in > 0);
+  // 예전 단일 출퇴근 레코드도 새 누적 형식으로 읽는다.
+  if (!sessions.length && data) {
+    const at = finiteTimestamp(data.at);
+    if (at) sessions.push({ in: at, out: finiteTimestamp(data.out) || null });
+  }
+  return sessions;
 }
 
-function completedAttendance(data, date) {
-  if (!activeAttendance(data, date)) return false;
-  if (data.out == null || data.out === '') return false;
-  const out = finiteTimestamp(data.out);
-  return !!out && out >= finiteTimestamp(data.at) && timestampMatchesDate(out, date);
+function hasOpenSession(data, date) {
+  return !!data && data.done === true && timestampMatchesDate(data.at, date) &&
+    attendanceSessions(data).some(item => timestampMatchesDate(item.in, date) && !item.out);
 }
+
+function activeAttendance(data, date) { return hasOpenSession(data, date); }
+
+function completedAttendance(data, date) {
+  if (!data || data.done !== true || !timestampMatchesDate(data.at, date)) return false;
+  const out = finiteTimestamp(data.out);
+  return !!out && timestampMatchesDate(out, date) &&
+    !attendanceSessions(data).some(item => !item.out);
+}
+
+function summaryForSessions(data, sessions, updatedAt) {
+  const valid = sessions.filter(item => item && item.in > 0);
+  const firstIn = valid.reduce((value, item) => Math.min(value, item.in), Infinity);
+  const open = valid.some(item => !item.out);
+  const lastOut = valid.filter(item => item.out).reduce((value, item) => Math.max(value, item.out), 0);
+  return { ...data, sessions: valid, done: true, at: Number.isFinite(firstIn) ? firstIn : null,
+    out: open ? null : (lastOut || null), updatedAt };
+}
+
+export function staffAttendanceHasOpenSession(data, date) { return hasOpenSession(data, date); }
+export function staffAttendanceClockedOut(data, date) { return completedAttendance(data, date); }
 
 function canonical(value) {
   if (Array.isArray(value)) return value.map(canonical);
@@ -120,7 +149,7 @@ function resultPayload(row, key, idempotent) {
   };
 }
 
-/** 선생님은 서버 시각으로 최초 출근과 최초 퇴근만 기록한다. 관리자 교정은 기존 관리 화면에서 한다. */
+/** 서버 시각으로 여러 출퇴근 세션을 누적한다. at/out은 최초 출근·최종 퇴근 요약이다. */
 export async function handleStaffAttendance(env, app, body, origin, auth, json) {
   if (app !== 'task') return json({ ok: false, error: '업무지시서에서만 사용할 수 있습니다' }, 400, origin);
   const action = String(body.action || '');
@@ -147,7 +176,11 @@ export async function handleStaffAttendance(env, app, body, origin, auth, json) 
       return json(resultPayload(current, key, true), 200, origin);
     }
     const updatedAt = Math.max(requestTime, Number(current && current.updated_at || 0) + 1);
-    const record = {
+    const prior = attendanceSessions(current && current.parsed);
+    if (prior.some(item => !item.out)) {
+      return json(resultPayload(current, key, true), 200, origin);
+    }
+    const record = summaryForSessions(current && current.parsed || {
       taskId: STAFF_ATTENDANCE_PREFIX + staffId,
       date,
       done: true,
@@ -155,10 +188,8 @@ export async function handleStaffAttendance(env, app, body, origin, auth, json) 
       steps: {},
       count: 0,
       blocked: false,
-      at: requestTime,
-      out: null,
-      updatedAt
-    };
+      sessions: []
+    }, [...prior, { in: requestTime, out: null }], updatedAt);
     if (current) {
       await env.DB.prepare(
         'UPDATE checks SET owner=?,data=?,updated_at=?,srv_at=? ' +
@@ -179,23 +210,27 @@ export async function handleStaffAttendance(env, app, body, origin, auth, json) 
   }
 
   if (!current || !activeAttendance(current.parsed, date)) {
+    if (current && completedAttendance(current.parsed, date)) {
+      return json(resultPayload(current, key, true), 200, origin);
+    }
     return json({ ok: false, code: 'STAFF_ATTENDANCE_CLOCK_IN_REQUIRED',
       error: '먼저 출근을 기록해 주세요' }, 409, origin);
   }
   if (completedAttendance(current.parsed, date)) {
     return json(resultPayload(current, key, true), 200, origin);
   }
-  const clockInAt = finiteTimestamp(current.parsed.at);
-  const clockOutAt = Math.max(requestTime, clockInAt);
+  const clockOutAt = requestTime;
   const updatedAt = Math.max(requestTime, Number(current.updated_at) + 1);
-  const record = { ...current.parsed, done: true, at: clockInAt, out: clockOutAt, updatedAt };
+  const sessions = attendanceSessions(current.parsed);
+  const openIndex = [...sessions].map((item, index) => ({ item, index })).reverse().find(row => !row.item.out);
+  if (!openIndex) return json(resultPayload(current, key, true), 200, origin);
+  sessions[openIndex.index] = { ...sessions[openIndex.index], out: clockOutAt };
+  const record = summaryForSessions(current.parsed, sessions, updatedAt);
   await env.DB.prepare(
     'UPDATE checks SET data=?,updated_at=?,srv_at=? ' +
-    'WHERE app=? AND k=? AND owner=? AND updated_at=? ' +
-    "AND json_extract(data,'$.done')=1 AND COALESCE(json_extract(data,'$.at'),0)=? " +
-    "AND COALESCE(json_extract(data,'$.out'),0)=0"
+    'WHERE app=? AND k=? AND owner=? AND updated_at=?'
   ).bind(JSON.stringify(record), updatedAt, updatedAt,
-    app, key, staffId, Number(current.updated_at) || 0, clockInAt).run();
+    app, key, staffId, Number(current.updated_at) || 0).run();
   const latest = await readAttendance(env, app, key);
   if (latest && String(latest.owner || '') === staffId && completedAttendance(latest.parsed, date)) {
     return json(resultPayload(latest, key, finiteTimestamp(latest.parsed.out) !== clockOutAt), 200, origin);

@@ -1,4 +1,5 @@
-import { handleStaffAttendance, staffAttendanceDate, staffAttendanceKey } from './staff-attendance.js';
+import { handleStaffAttendance, staffAttendanceDate, staffAttendanceKey,
+  staffAttendanceHasOpenSession } from './staff-attendance.js';
 
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const PIN_RE = /^\d{4}$/;
@@ -163,7 +164,14 @@ async function readAttendance(env, staffId, date) {
   if (!record) throw new Error('STAFF_WORK_ATTENDANCE_INVALID');
   return { key, owner: staffId, record, updatedAt: Number(row.updated_at) };
 }
-function clockedOut(attendance) { return !!(attendance && attendance.record.done && Number(attendance.record.out) > 0); }
+function clockedOut(attendance) {
+  return !!(attendance && attendance.record && attendance.record.done &&
+    Number(attendance.record.out) > 0 && !staffAttendanceHasOpenSession(attendance.record, attendance.record.date));
+}
+function hasOpenSession(attendance) {
+  return !!(attendance && attendance.record && attendance.record.done &&
+    staffAttendanceHasOpenSession(attendance.record, attendance.record.date));
+}
 async function sessionRow(env, body, auth, profile, now, includeRevoked = false) {
   const raw = String(body.auth && body.auth.workSession || '');
   if (!TOKEN_RE.test(raw)) return null;
@@ -189,7 +197,7 @@ export async function guardStaffWorkAccess(env, body, auth, pathname, origin, js
     const now = Date.now();
     const session = await sessionRow(env, body, auth, profile, now);
     const attendance = session && await readAttendance(env, auth.id, staffAttendanceDate(now));
-    if (!session || !attendance || !attendance.record.done || clockedOut(attendance)) {
+    if (!session || !attendance || !attendance.record.done || !hasOpenSession(attendance)) {
       return fail(json, origin, 'STAFF_WORK_LOGIN_REQUIRED', '개인 비밀번호로 출근 로그인을 해 주세요');
     }
     return null;
@@ -226,13 +234,11 @@ export async function handleStaffWorkSession(env, app, body, origin, auth, json)
       const response = await handleStaffAttendance(env, app, { action: 'clock_out' }, origin, auth, json);
       if (!response.ok) return response;
       const attendance = await response.json();
-      await env.DB.prepare('UPDATE staff_work_sessions SET revoked=1 WHERE app=? AND staff_id=? AND work_date=?')
-        .bind('task', auth.id, date).run();
+      await env.DB.prepare('UPDATE staff_work_sessions SET revoked=1 WHERE app=? AND token_hash=? AND staff_id=? AND work_date=?')
+        .bind('task', await hash(String(body.auth && body.auth.workSession || '')), auth.id, date).run();
       return json({ ...base, active: false, clockedOut: true, attendance, workSession: '' }, 200, origin);
     }
 
-    if (base.clockedOut) return fail(json, origin, 'STAFF_WORK_ALREADY_CLOCKED_OUT',
-      '오늘 퇴근이 이미 기록되었습니다. 관리자에게 기록 확인을 요청해 주세요');
     if (!base.configured) return fail(json, origin, 'STAFF_WORK_PIN_NOT_CONFIGURED', '개인 비밀번호가 등록되지 않았습니다. 관리자에게 문의해 주세요');
     if (typeof env.WB_STAFF_PIN_PEPPER !== 'string' || env.WB_STAFF_PIN_PEPPER.length < 32) return unavailable(json, origin);
     if (!PIN_RE.test(String(body.pin || ''))) return fail(json, origin, 'STAFF_WORK_PIN_INVALID', '개인 비밀번호 숫자 4자리를 입력해 주세요', 400);
@@ -262,7 +268,7 @@ export async function handleStaffWorkSession(env, app, body, origin, auth, json)
     const response = await handleStaffAttendance(env, app, { action: 'clock_in' }, origin, auth, json);
     if (!response.ok) return response;
     const attendance = await response.json();
-    if (clockedOut(attendance)) return fail(json, origin, 'STAFF_WORK_ALREADY_CLOCKED_OUT', '오늘 퇴근이 이미 기록되었습니다');
+    if (!hasOpenSession(attendance)) return fail(json, origin, 'STAFF_WORK_LOGIN_REQUIRED', '출근 기록을 확인하지 못했습니다. 다시 시도해 주세요');
     const token = randomHex();
     const expiresAt = Date.parse(date + 'T00:00:00+09:00') + 24 * 60 * 60 * 1000;
     if (Date.now() >= expiresAt) return fail(json, origin, 'STAFF_WORK_LOGIN_REQUIRED', '날짜가 변경되었습니다. 다시 로그인해 주세요');

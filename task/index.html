@@ -1178,15 +1178,15 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-09-10.4"></script>
-<script src="./schedule-board-core.js?v=2026-09-10.4"></script>
-<script src="./asset-core.js?v=2026-09-10.4"></script>
-<script src="./qr-core.js?v=2026-09-10.4"></script>
-<script src="./acaflow-import-core.js?v=2026-09-10.4"></script>
-<script src="./feedback-subject-catalog.js?v=2026-09-10.4"></script>
-<script src="./sync-recovery-core.js?v=2026-09-10.4"></script>
-<script src="./staff-work-session-core.js?v=2026-09-10.4"></script>
-<script src="./staff-attendance-history-core.js?v=2026-09-10.4"></script>
+<script src="./lesson-form-core.js?v=2026-09-10.5"></script>
+<script src="./schedule-board-core.js?v=2026-09-10.5"></script>
+<script src="./asset-core.js?v=2026-09-10.5"></script>
+<script src="./qr-core.js?v=2026-09-10.5"></script>
+<script src="./acaflow-import-core.js?v=2026-09-10.5"></script>
+<script src="./feedback-subject-catalog.js?v=2026-09-10.5"></script>
+<script src="./sync-recovery-core.js?v=2026-09-10.5"></script>
+<script src="./staff-work-session-core.js?v=2026-09-10.5"></script>
+<script src="./staff-attendance-history-core.js?v=2026-09-10.5"></script>
 <script>
 "use strict";
 
@@ -1821,7 +1821,7 @@ function viewStaffWorkLogin() {
     (staffWork.error ? '<div class="hint mt14" role="alert">' + esc(staffWork.error) + '</div>' : '') +
     (ready ? '<label class="field mt14"><span class="fl">개인 비밀번호 4자리</span><input class="in" id="staffWorkPin" type="password" inputmode="numeric" pattern="[0-9]{4}" maxlength="4" autocomplete="off" placeholder="비밀번호 4자리"></label>' +
       '<button class="btn btn-primary btn-block" data-act="staffworklogin"' + (staffWork.busy ? ' disabled' : '') + '>출근하고 로그인</button>' +
-      (staffWork.clockedOut ? '<div class="hint mt14">오늘 퇴근 기록이 있습니다. 다시 근무해야 한다면 관리자에게 기록 확인을 요청해 주세요.</div>' : '') +
+      (staffWork.clockedOut ? '<div class="hint mt14">오늘 이전 퇴근 기록이 있습니다. 다시 출근하면 최초 출근과 최종 퇴근 시각으로 누적됩니다.</div>' : '') +
       '<div class="hint mt14">비밀번호를 잊었으면 관리자에게 재설정을 요청해 주세요.</div>' :
       '<div class="hint mt14">' + (staffWork.checked ? '개인 비밀번호가 아직 설정되지 않았습니다. 관리자에게 연락해 주세요.' : '출근 로그인 상태를 확인하고 있습니다.') + '</div>') +
     '<button class="btn btn-ghost btn-block mt14" data-act="managerinspectopen"' + (typeof managerInspection !== 'undefined' && managerInspection.busy ? ' disabled' : '') + '>관리자 로그인</button>' +
@@ -1950,7 +1950,7 @@ async function logoutStaffWork(button) {
     const result = await sync.post('/staff-work-session', { app: SYNC_APP, auth, action: 'logout' });
     if (serial !== staffWork.serial) return;
     applyStaffWorkResponse(result, auth);
-    if (result.active || !result.clockedOut || !result.attendance || !result.attendance.record.out) throw new Error('퇴근 저장 결과를 확인하지 못했습니다. 연결 상태를 다시 확인해 주세요');
+    if (result.active || !result.attendance || !result.attendance.record || !result.attendance.record.out) throw new Error('퇴근 저장 결과를 확인하지 못했습니다. 연결 상태를 다시 확인해 주세요');
     setStaffWorkToken('');
     staffWork.active = false;
     toast('퇴근이 기록되었습니다. 수고하셨습니다!');
@@ -10913,12 +10913,9 @@ function makeupActions(row) {
   if (!row || ['completed', 'cancelled'].includes(row.status)) return '';
   const key = ' data-makeup-action data-case="' + esc(row.caseId) + '" data-rev="' + Number(row.revision) + '"';
   if (session.isAdmin) {
-    return (row.status === 'confirmed' && row.hasLessonTask === false
-      ? '<button class="btn btn-sm btn-primary" data-act="murestoreschedule"' + key + '>보강생성</button>'
-      : row.status === 'confirmed'
-      ? '<button class="btn btn-sm btn-primary" data-act="mureschedule"' + key + '>보강 수정</button>'
-      : '<button class="btn btn-sm btn-primary" data-act="muschedule"' + key + '>보강생성</button>') +
-      '<button class="btn btn-sm btn-navy" data-act="mucompleteopen"' + key + '>보강완료</button>' +
+    // 관리자는 카드마다 세부 동작을 여러 개 노출하지 않고 하나의 처리 창에서
+    // 생성·완료·일정 수정·없음을 선택한다. 기존 API와 감사 이력은 그대로 사용한다.
+    return '<button class="btn btn-sm btn-primary" data-act="muprocessadminopen"' + key + '>보강 처리</button>' +
       '<button class="btn btn-sm btn-ghost" data-act="munone"' + key + '>보강없음</button>';
   }
   const assignedStaffId = row.confirmedStaffId;
@@ -10929,6 +10926,27 @@ function makeupActions(row) {
   const linkable = (session.isStaffLink || session.isAdmin) && !row.confirmedDate && !row.proposedDate;
   return (own || linkable || session.isAdmin)
     ? '<button class="btn btn-sm btn-primary" data-act="muprocessopen"' + key + '>보강 처리</button>' : '';
+}
+
+function openMakeupAdminProcessModal(button) {
+  if (!session.isAdmin) return;
+  const row = makeupRows.find(item => item.caseId === String(button.dataset.case || ''));
+  if (!row || ['completed', 'cancelled'].includes(row.status)) return;
+  const key = ' data-case="' + esc(row.caseId) + '" data-rev="' + Number(row.revision) + '"';
+  const scheduled = !!(row.confirmedDate && row.confirmedStartTime && row.confirmedEndTime);
+  let body = '<div class="hint">학생·원 수업·보강 담당을 확인한 뒤 필요한 처리 하나만 선택하세요. 같은 학생의 시간 중복만 차단하고, 선생님 간 시간 겹침은 허용합니다.</div>' + makeupScheduleHtml(row);
+  let actions = '';
+  if (row.status === 'confirmed' && row.hasLessonTask === false) {
+    actions += '<button class="btn btn-primary btn-block mt14" data-act="murestoreschedule"' + key + '>누락된 보강수업 생성</button>';
+  } else if (scheduled) {
+    actions += '<button class="btn btn-primary btn-block mt14" data-act="mucompleteopen"' + key + '>보강완료</button>' +
+      '<button class="btn btn-ghost btn-block mt8" data-act="mureschedule"' + key + '>담당자·일정 수정</button>';
+  } else {
+    actions += '<button class="btn btn-primary btn-block mt14" data-act="muschedule"' + key + '>보강 일정 생성</button>' +
+      '<button class="btn btn-ghost btn-block mt8" data-act="mulinkraw"' + key + '>이미 완료한 보강 연결·기록</button>';
+  }
+  actions += '<button class="btn btn-ghost btn-block mt8" data-act="munone"' + key + '>보강없음</button>';
+  modal('보강 처리 — ' + esc(staffStudentCompactLabelById(row.studentId, row.studentName || '학생', row.grade)), body, actions);
 }
 
 function makeupCard(row) {
@@ -21655,6 +21673,7 @@ document.addEventListener('click', ev => {
       break;
     }
     case 'mureschedulesubmit': submitMakeupReschedule(el); break;
+    case 'muprocessadminopen': openMakeupAdminProcessModal(el); break;
     case 'murestoreschedule': {
       makeupDateTimeModal(makeupRows.find(row => row.caseId === String(el.dataset.case || '')), 'restore');
       break;
@@ -21667,6 +21686,7 @@ document.addEventListener('click', ev => {
     case 'mucompletesubmit': submitMakeupComplete(el); break;
     case 'muprocessopen': openMakeupProcessModal(el); break;
     case 'mulinkopen': openMakeupProcessModal(el); break;
+    case 'mulinkraw': openMakeupLinkModal(el, true); break;
     case 'mulinksubmit': submitMakeupLink(el); break;
     case 'mudirectcompleteopen': {
       makeupDateTimeModal(makeupRows.find(row => row.caseId === String(el.dataset.case || '')), 'complete');
@@ -23677,7 +23697,12 @@ document.addEventListener('change', ev => {
   const cur = attOf(staffId, date);
   const newAt = field === 'at' ? ms : (cur ? cur.at : null);
   const newOut = field === 'out' ? ms : (cur ? cur.out : null);
-  setCheck(attKey(staffId), date, { [field]: ms, done: !!(newAt || newOut) });
+  // 관리자의 교정은 최초·최종 요약과 누적 세션을 함께 맞춘다. 이후 선생님이
+  // 다시 출근해도 교정된 시각을 기준으로 새 세션이 안전하게 이어진다.
+  setCheck(attKey(staffId), date, {
+    at: newAt, out: newOut, sessions: newAt ? [{ in: newAt, out: newOut || null }] : [],
+    done: !!(newAt || newOut)
+  });
   toast('저장했습니다');
 });
 
@@ -23793,7 +23818,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-09-10.4';
+const APP_VER = '2026-09-10.5';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
