@@ -311,6 +311,17 @@ test('server builds an owned lesson with stable assignment and audit fields', as
   assert.equal(task.createdAt, 1234);
 });
 
+test('first class date is optional on the server and validated when supplied', async () => {
+  const withoutDate = await buildLessonTask(validLesson(), 'teacher-1', 'staff', 1234);
+  assert.equal(withoutDate.firstClassDate, '');
+  const withDate = await buildLessonTask(validLesson({ firstClassDate: '2026-08-11' }), 'teacher-1', 'staff', 1234);
+  assert.equal(withDate.firstClassDate, '2026-08-11');
+  await assert.rejects(
+    () => buildLessonTask(validLesson({ firstClassDate: '2026-02-30' }), 'teacher-1', 'staff', 1234),
+    /첫 수업 날짜/
+  );
+});
+
 test('assignment identity includes grade and ignores schedule, start, and lesson details', async () => {
   const first = await buildLessonTask(validLesson(), 'teacher-1', 'staff', 1);
   const corrected = await buildLessonTask(validLesson({

@@ -127,6 +127,11 @@
   .datenav .d { font-size: 17px; font-weight: 900; }
   .datenav .d em { font-style: normal; font-size: 13px; font-weight: 700; color: var(--blue); margin-left: 6px; }
   .navbtn { width: 38px; height: 38px; border-radius: 10px; background: var(--white); border: 1px solid var(--line); font-size: 16px; font-weight: 900; color: var(--mid-gray); }
+  .today-date-picker { margin: -4px 0 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--white); }
+  .today-date-picker > summary { cursor: pointer; padding: 9px 12px; color: var(--navy); font-size: 13px; font-weight: 800; }
+  .today-date-picker-body { display: flex; align-items: end; gap: 8px; padding: 0 12px 12px; }
+  .today-date-picker-body .field { flex: 1; margin: 0; }
+  .today-date-picker-body .btn { flex: 0 0 auto; min-height: 42px; }
 
   /* ─── 진행률 ─── */
   .prog { display: flex; align-items: center; gap: 14px; }
@@ -179,6 +184,7 @@
   .lesson-next-compact.is-loading { color: #7A3FA1; }
   .lesson-next-compact.is-empty { border-color: #D8E0E6; background: #F7F9FA; color: var(--mid-gray); }
   .lesson-attendance-tag { border: 1px solid rgba(30,157,214,.18); font-weight: 900; }
+  .lesson-first-class-tag { background: #FFF4CC; color: #8A5A00; border: 1px solid #F2D27A; font-weight: 900; }
   .note { margin-top: 8px; width: 100%; font-size: 13px; line-height: 1.6; padding: 10px 12px; border: 1px dashed var(--line); border-radius: 8px; background: var(--ivory); white-space: pre-wrap; overflow-wrap: anywhere; }
   textarea.note { display: block; min-height: 44px; resize: vertical; transition: height .18s ease, min-height .18s ease, border-color .18s ease, background .18s ease; }
   .memo-editor:focus-within textarea.note { min-height: 132px; border-style: solid; border-color: var(--blue); background: var(--white); outline: 2px solid rgba(30,157,214,.12); }
@@ -5149,6 +5155,10 @@ function viewToday() {
     '<button class="navbtn" data-act="day" data-n="-1">‹</button>' +
     '<div class="d">' + label(cursor) + (rel ? '<em>' + rel + '</em>' : '') + '</div>' +
     '<button class="navbtn" data-act="day" data-n="1">›</button></div>';
+  h += '<details class="today-date-picker" data-persist-key="today-date-picker"><summary>날짜 선택</summary>' +
+    '<div class="today-date-picker-body"><label class="field"><span class="fl">확인할 날짜</span>' +
+    '<input class="in" type="date" data-today-date value="' + esc(cursor) + '"></label>' +
+    '<button class="btn btn-ghost" type="button" data-act="todaydate">오늘로</button></div></details>';
 
   const counts = { todo: 0, doing: 0, done: 0, blocked: 0 };
   list.forEach(t => counts[teacherTaskCardStatus(t, cursor)]++);
@@ -5235,6 +5245,9 @@ function taskRow(t, date, editable, isCarry) {
   const timeDisplay = String(t.time || '').trim();
   const lessonAttendanceTag = lesson && c && c.att && ATT_LABEL[c.att]
     ? '<span class="tag lesson-attendance-tag ' + ATT_LABEL[c.att][1] + '">현재 출결 · ' + ATT_LABEL[c.att][0] + '</span>' : '';
+  const firstClassDate = lessonRegistrationIsoDate(t.firstClassDate);
+  const lessonFirstClassTag = lesson && firstClassDate && String(date) === firstClassDate
+    ? '<span class="tag lesson-first-class-tag">첫 수업</span>' : '';
   const open = openPanels.has(t.id + '|' + date);
   const showFinalBox = session.isAdmin || !usesStandardLessonDisplay(t);
   const canEditRecord = editable && (!lesson || !!(recordContext && recordContext.inputEnabled && recordDate));
@@ -5249,6 +5262,7 @@ function taskRow(t, date, editable, isCarry) {
         (lesson ? lessonScheduleMetaHtml(t) :
           (timeDisplay ? '<span class="tag time">' + esc(timeDisplay) + '</span>' : '') +
           (!isCarry ? '<span class="tag">' + esc(repeatLabel(t)) + '</span>' : '')) +
+        lessonFirstClassTag +
         lessonAttendanceTag +
         (lesson && (session.isStaffLink || session.isAdmin) && t.studentId ? studentNextLessonCompactHtml(t, date) : '') +
         (makeupLesson ? '<span class="tag makeup-lesson">보강수업</span>' : '') +
@@ -7538,7 +7552,8 @@ function newLessonBatchEntry(startDate) {
   return {
     staffId: '', subject: '', className: '', scheduleText: '',
     scheduleSlots: [{ days: [], startTime: '', endTime: '', lessonHours: '' }],
-    start: lessonRegistrationIsoDate(startDate) || today()
+    start: lessonRegistrationIsoDate(startDate) || today(),
+    firstClassDate: ''
   };
 }
 
@@ -7580,7 +7595,7 @@ function newLessonDraft() {
     lessonHours: '',
     scheduleText: '', scheduleSlots: [{ days: [], startTime: '', endTime: '', lessonHours: '' }],
     materials: '', onlineProgram: '', homework: '', studentTraits: '',
-    goal: '', parentRequest: '', adminRequest: '', start: today(), lessonEntries: []
+    goal: '', parentRequest: '', adminRequest: '', start: today(), firstClassDate: '', lessonEntries: []
   };
 }
 
@@ -7691,7 +7706,7 @@ function lessonBatchEntries(draft) {
   if (!session.isAdmin || draft._sourceTaskId) return [];
   if (!Array.isArray(draft.lessonEntries) || !draft.lessonEntries.length) {
     const legacy = newLessonBatchEntry();
-    for (const key of ['staffId', 'subject', 'className', 'scheduleText', 'start']) legacy[key] = draft[key] || legacy[key];
+    for (const key of ['staffId', 'subject', 'className', 'scheduleText', 'start', 'firstClassDate']) legacy[key] = draft[key] || legacy[key];
     legacy.scheduleSlots = Array.isArray(draft.scheduleSlots) && draft.scheduleSlots.length
       ? draft.scheduleSlots.map(slot => ({ days: (slot.days || []).slice(), startTime: slot.startTime || '', endTime: slot.endTime || '',
           lessonHours: lessonHoursValue(slot.lessonHours) || lessonHoursValue(draft.lessonHours) }))
@@ -8137,6 +8152,7 @@ function lessonDraftFromTask(t) {
     materials: t.materials || '', onlineProgram: t.onlineProgram || (t.onlinePrograms || []).join(', '),
     homework: t.homework || '', studentTraits: t.studentTraits || '', goal: t.goal || '',
     parentRequest: t.parentRequest || '', adminRequest: t.adminRequest || '없음', start: t.start || today(),
+    firstClassDate: lessonRegistrationIsoDate(t.firstClassDate),
     _sourceTaskId: t.id, _sourceUpdatedAt: Number(t.updatedAt || 0)
   };
 }
@@ -8204,9 +8220,11 @@ function lessonBatchEntryHtml(entry, index, count) {
     '<div class="sect">4. 수업 요일·시간·시수</div><div class="hint mb8">확정 시간마다 요일·시작·종료·수업시수를 입력해 주세요. 시간대가 다르면 행을 추가할 수 있습니다.</div>' +
       (entry.scheduleSlots || []).map((slot, slotIndex) => lessonBatchSlotHtml(slot, index, slotIndex)).join('') +
       '<button class="btn btn-sm btn-ghost mb14" data-act="lessonbatchslotadd" data-i="' + index + '">＋ 다른 시간대 추가</button>' +
-    '<div class="field"><label class="fl">적용 시작일</label><input class="in" type="date" data-lesson-batch-field="start" data-i="' + index + '"' +
+    '<div class="grid2"><label class="field"><span class="fl">적용 시작일</span><input class="in" type="date" data-lesson-batch-field="start" data-i="' + index + '"' +
       (firstClassDate ? ' min="' + esc(firstClassDate) + '"' : '') + ' value="' + esc(entry.start || today()) + '">' +
-      (firstClassDate ? '<div class="hint mt8">원생 첫 수업 시작일 ' + esc(firstClassDate) + '보다 빠르게 등록할 수 없습니다.</div>' : '') + '</div></div>';
+      (firstClassDate ? '<div class="hint mt8">원생 첫 수업 시작일 ' + esc(firstClassDate) + '보다 빠르게 등록할 수 없습니다.</div>' : '') + '</label>' +
+      '<label class="field"><span class="fl">첫 수업 날짜 (선택)</span><input class="in" type="date" data-lesson-batch-field="firstClassDate" data-i="' + index + '" value="' + esc(entry.firstClassDate || '') + '">' +
+      '<div class="hint mt8">비워도 수업을 생성할 수 있습니다.</div></label></div></div>';
 }
 
 function lessonBatchRegistrationHtml() {
@@ -8266,9 +8284,11 @@ function lessonStudentBatchRegistrationHtml() {
     '<div class="sect">4. 수업 요일·시간·시수</div><div class="hint mb8">선택한 모든 학생에게 같은 확정 시간표가 적용됩니다. 시간대가 다르면 행을 추가할 수 있습니다.</div>' +
       (draft.scheduleSlots || []).map(lessonSlotHtml).join('') +
       '<button class="btn btn-sm btn-ghost mb14" data-act="lessonslotadd">＋ 다른 시간대 추가</button>' +
-    '<label class="field"><span class="fl">적용 시작일</span><input class="in" type="date" data-lesson-field="start"' +
+    '<div class="grid2"><label class="field"><span class="fl">적용 시작일</span><input class="in" type="date" data-lesson-field="start"' +
       (firstClassDateMinimum ? ' min="' + esc(firstClassDateMinimum) + '"' : '') + ' value="' + esc(draft.start || today()) + '">' +
       (firstClassDateMinimum ? '<div class="hint mt8">선택 학생 중 가장 늦은 첫 수업 시작일 ' + esc(firstClassDateMinimum) + '보다 빠르게 등록할 수 없습니다.</div>' : '') + '</label>' +
+    '<label class="field"><span class="fl">첫 수업 날짜 (선택)</span><input class="in" type="date" data-lesson-field="firstClassDate" value="' + esc(draft.firstClassDate || '') + '">' +
+      '<div class="hint mt8">비워도 수업을 생성할 수 있습니다.</div></label></div>' +
     '<button class="btn btn-primary btn-block mt14" data-act="lessonpreview"' + (selectedIds.size ? '' : ' disabled') + '>선택 ' + selectedIds.size + '명 · 수업 일괄 등록 미리보기</button>';
 }
 
@@ -8372,7 +8392,9 @@ function viewLessonEntry() {
         '<div class="hint mb8">확정 시간마다 요일·시작·종료·수업시수를 입력해 주세요. 표시용 문장은 확정 시간표에서 자동으로 만들어집니다.</div>' +
         (draft.scheduleSlots || []).map(lessonSlotHtml).join('') +
         '<button class="btn btn-sm btn-ghost mb14" data-act="lessonslotadd">＋ 다른 시간대 추가</button>' +
-      '<div class="field"><label class="fl">적용 시작일</label><input class="in" type="date" data-lesson-field="start" value="' + esc(draft.start || today()) + '"></div>' +
+      '<div class="grid2"><label class="field"><span class="fl">적용 시작일</span><input class="in" type="date" data-lesson-field="start" value="' + esc(draft.start || today()) + '"></label>' +
+      '<label class="field"><span class="fl">첫 수업 날짜 (선택)</span><input class="in" type="date" data-lesson-field="firstClassDate" value="' + esc(draft.firstClassDate || '') + '">' +
+        '<div class="hint mt8">비워도 수업을 생성할 수 있습니다.</div></label></div>' +
       '<button class="btn btn-primary btn-block mt14" data-act="lessonpreview">' + (draft._sourceTaskId ? '수정 내용 미리보기' : '등록 내용 미리보기') + '</button>'));
   const formPanel = '<div class="lesson-form-panel">' + formBody + '</div>';
   if (personal) {
@@ -8472,7 +8494,7 @@ function lessonPreviewPayloadFromTask(taskBody, validation) {
     scheduleText: taskBody.scheduleText, scheduleSlots: taskBody.scheduleSlots,
     scheduleStatus: taskBody.scheduleStatus,
     scheduleReviewReason: validation.warnings.map(item => item.message).join(' / '),
-    start: taskBody.start || today(), materials: taskBody.materials,
+    start: taskBody.start || today(), firstClassDate: taskBody.firstClassDate || '', materials: taskBody.materials,
     onlineProgram: taskBody.onlineProgram, homework: taskBody.homework,
     studentTraits: taskBody.studentTraits, goal: taskBody.goal, parentRequest: taskBody.parentRequest,
     adminRequest: taskBody.adminRequest
@@ -8485,7 +8507,7 @@ function lessonBatchInputPayload(entry, student) {
     subject: entry.subject || '', className: '', lessonRole: entry.subject || '', lessonHours: '',
     scheduleText: '', scheduleSlots: (entry.scheduleSlots || []).filter(slot =>
       (slot.days || []).length || slot.startTime || slot.endTime || slot.lessonHours),
-    scheduleStatus: '', scheduleReviewReason: '', start: entry.start || today(),
+    scheduleStatus: '', scheduleReviewReason: '', start: entry.start || today(), firstClassDate: entry.firstClassDate || '',
     materials: '없음', onlineProgram: '없음', homework: '없음', studentTraits: '없음',
     goal: '없음', parentRequest: '없음', adminRequest: '없음'
   };
@@ -8592,7 +8614,8 @@ function previewLessonBatchRegistration(core, draft, selected) {
       return '<div class="card mt14"><b>수업 ' + (index + 1) + ' · ' + esc(item.taskBody.subject) + '</b>' +
         '<div class="small mt8"><b>담당</b> ' + esc((teacher && teacher.name) || '확인 필요') + ' 선생님</div>' +
         '<div class="small mt8"><b>요일·시간·시수</b> ' + previewValue(slotSummary || item.taskBody.scheduleText) + '</div>' +
-        '<div class="small mt8"><b>적용 시작일</b> ' + esc(item.taskBody.start || '') + '</div></div>';
+        '<div class="small mt8"><b>적용 시작일</b> ' + esc(item.taskBody.start || '') + '</div>' +
+        '<div class="small mt8"><b>첫 수업 날짜</b> ' + esc(item.taskBody.firstClassDate || '미입력') + '</div></div>';
     }).join(''),
     '<button class="btn btn-primary btn-block mt14" data-act="lessonbatchsave">수업 ' + previews.length + '건 한 번에 등록</button>' +
     '<button class="btn btn-ghost btn-block" style="margin-top:8px" data-act="closemodal">다시 수정</button>');
@@ -8647,7 +8670,8 @@ function previewLessonRegistration() {
       '<b>1. 학생</b><br>' + previewValue(staffStudentCompactLabel(selected, taskBody.studentName, taskBody.grade)) + '<br><br>' +
       '<b>2. 수업 과목</b><br>' + previewValue(taskBody.subject) + '<br><br>' +
       '<b>3. 담당 선생님</b><br>' + esc((teacher && teacher.name) || '본인') + ' 선생님<br><br>' +
-      '<b>4. 수업 요일·시간·시수</b><br>' + previewValue(taskBody.scheduleText) + '</div>' +
+      '<b>4. 수업 요일·시간·시수</b><br>' + previewValue(taskBody.scheduleText) + '<br><br>' +
+      '<b>첫 수업 날짜</b><br>' + previewValue(taskBody.firstClassDate || '미입력') + '</div>' +
     '<div class="card ' + (review ? 'lesson-review' : 'lesson-confirmed') + ' mt14"><b>' +
       (review ? '⚠️ 시간 확인 필요' : '✅ 현황판 시간 확정') + '</b><div class="small muted">' +
       (review ? esc(lessonPreviewPayload.scheduleReviewReason || '요일·시작·종료 확인 필요') : esc(slotSummary)) + '</div></div>',
@@ -21770,6 +21794,7 @@ document.addEventListener('click', ev => {
 
     /* 날짜 */
     case 'day':  cursor = addDays(cursor, Number(el.dataset.n)); cursorPinned = (cursor !== today()); render(); break;
+    case 'todaydate': cursor = today(); cursorPinned = false; render(); break;
     case 'week': cursor = addDays(cursor, Number(el.dataset.n) * 7); cursorPinned = (mondayOf(cursor) !== mondayOf(today())); render(); break;
     case 'scheduleview': {
       if (!session.isAdmin || !SCHEDULE_VIEWS.some(item => item[0] === el.dataset.v)) break;
@@ -23370,6 +23395,19 @@ document.addEventListener('change', ev => {
   const teacherLiveRequestRecipient = ev.target.closest('[data-teacher-live-request-recipient]');
   if (teacherLiveRequestRecipient) {
     teacherLiveRequestDraft.recipientAdminId = String(teacherLiveRequestRecipient.value || '');
+    return;
+  }
+  const todayDateInput = ev.target.closest('[data-today-date]');
+  if (todayDateInput) {
+    const value = String(todayDateInput.value || '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      todayDateInput.value = cursor;
+      toast('날짜를 다시 선택해 주세요');
+      return;
+    }
+    cursor = value;
+    cursorPinned = cursor !== today();
+    render();
     return;
   }
   const feedbackDateInput = ev.target.closest('[data-feedback-date]');
