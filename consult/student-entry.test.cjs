@@ -238,8 +238,10 @@ test('the Leaders Eye student card points to the teacher instead of printing cre
 
   for (const card of [first, second]) {
     // 저장소가 public이라 기관 ID·공용 비밀번호를 화면에 박으면 그대로 공개된다.
-    assert.doesNotMatch(card, /wbbrain/, 'the agency id must not be rendered');
-    assert.doesNotMatch(card, /Student PW/, 'the shared password must not be rendered');
+    // 값 자체를 여기 적으면 검사가 다시 노출 지점이 된다 — 라벨과 형태로만 막는다.
+    assert.doesNotMatch(card, /Agency ID/, 'the agency id must not be rendered');
+    assert.doesNotMatch(card, /Student (?:ID|PW)/, 'login fields must not be rendered');
+    assert.doesNotMatch(card, /<strong>\s*\d{4}\s*<\/strong>/, 'no shared passcode may be printed');
     assert.match(card, /담당 선생님께 문의/);
     assert.match(card, /1주일마다 자동으로 레벨이 조정됩니다/);
     assert.match(card, /오늘 미기록/);
@@ -258,6 +260,6 @@ test('Leaders Eye login values stay out of persisted task and settings records',
   const taskSave = between("case 'learnsave':", "\n    /* 학사관리 · 시험대비 자료 요청 */");
   const persistence = blankState + '\n' + taskSave;
 
-  assert.doesNotMatch(persistence, /wbbrain|0000/);
+  assert.doesNotMatch(persistence, /Agency ID|Student PW|<strong>\s*\d{4}\s*<\/strong>/);
   assert.doesNotMatch(persistence, /\b(?:agencyId|studentId|studentPw|studentPassword|leadersEyePassword)\s*:/i);
 });
