@@ -40,7 +40,7 @@ let derivedFor = '';                     // 오늘 카드를 템플릿에서 마
 const ui = {
   staffPick: '', panels: {}, stuQ: '', stuStatus: 'all', stuOpen: '', phoneShown: {},
   reqFilter: 'open', reqErr: '', ctQ: '', linkBusy: false,
-  doneOpen: {}, matrixView: 'students', manualScope: '', manualPhotos: []
+  doneOpen: {}, matrixView: 'students', manualScope: '', manualPhotos: [], captures: {}
 };
 const boot = { health: null, err: '', busy: false };
 
@@ -1413,6 +1413,7 @@ function viewRoom(k) {
   let h = '<div class="room-head"><div class="room-title">' + esc(roomLabel(k)) + '<small>' + esc(roomHint(k)) + '</small></div>' +
     '<div class="row wraprow" style="gap:6px">' + links.map(l => '<a class="btn btn-sm btn-navy" href="' + esc(l.url) + '" target="_blank" rel="noopener noreferrer">↗ ' + esc(l.label) + '</a>').join('') + '</div></div>';
   h += cardsBlock(k, today());
+  if (DC.PROGRAMS.includes(k)) h += captureBlock(k);
   if (k === 'exam4you' || k === 'jokbo') h += rangesBlock(k);
   h += manualsBlock(k);
   h += roomStatusBlock(k);
@@ -1421,6 +1422,112 @@ function viewRoom(k) {
     h += templatesSection(k);
   }
   return h;
+}
+
+/* ── 표 캡처(크롬 확장) → 수행 스탬프 (기획서 v1.1 §5, C안 단계적) ──
+ * 확장이 보낸 표는 서버(desk_captures)에 있고 여기선 목록만 캐시한다. 원장이 규칙(plans.capture)을 한 번 정하면
+ * 누구든 [반영]으로 수행 코어의 일일 문서(__perfday__)에 스탬프·예외를 쓰고, 수행 패널이 조치 카드를 만든다. */
+
+function captureRule(k) { return livePlans().find(p => p.kind === 'capture' && p.program === k) || null; }
+async function loadCaptures(k, force) {
+  const slot = ui.captures[k] || (ui.captures[k] = { list: [], at: 0, busy: false, err: '' });
+  if (slot.busy || (!force && now() - slot.at < 60000)) return;
+  slot.busy = true;
+  try { const r = await api('/api/captures?program=' + encodeURIComponent(k) + '&limit=10'); slot.list = r.captures || []; slot.at = now(); slot.err = ''; }
+  catch (e) { slot.err = e.message; slot.at = now(); }
+  finally { slot.busy = false; if (route === 'room' && room === k && !typingInView()) render(); }
+}
+function captureBlock(k) {
+  const slot = ui.captures[k] || { list: [], at: 0, busy: false, err: '' };
+  if (!slot.at && !slot.busy) loadCaptures(k);
+  const rule = captureRule(k);
+  let h = '<div class="card"><div class="between mb8"><div class="card-title">캡처 <span class="muted small">크롬 확장이 보낸 표</span></div><div class="row" style="gap:6px">' +
+    '<button class="btn btn-sm btn-ghost" data-act="dk-cap-refresh" data-room="' + esc(k) + '">새로고침</button><button class="btn btn-sm btn-ghost" data-act="dk-ext-guide">확장 설치</button></div></div>';
+  h += rule
+    ? '<div class="card-sub mb8">규칙: 이름 ' + (rule.nameCol + 1) + '열 · 상태 ' + (rule.statusCol + 1) + '열' + (rule.gradeCol >= 0 ? ' · 학년 ' + (rule.gradeCol + 1) + '열' : '') + ' · 완료 = ' + esc(rule.doneValues.join(', ')) +
+      (rule.partialValues.length ? ' · 부분 = ' + esc(rule.partialValues.join(', ')) : '') + (session.canApprove ? ' <button class="btn btn-sm btn-ghost" data-act="dk-cap-rule" data-room="' + esc(k) + '">규칙 편집</button>' : '') + '</div>'
+    : '<div class="card-sub mb8">' + (session.canApprove ? '캡처가 오면 [보기] → [이 표로 규칙 만들기]로 이름 열·상태 열·완료 값을 한 번 정하세요. 그 뒤엔 [반영] 한 번으로 수행 스탬프가 찍힙니다.' : '원장이 규칙을 만들면 [반영]으로 수행 스탬프를 찍을 수 있습니다.') + '</div>';
+  if (slot.err) h += '<div class="banner bad">' + esc(slot.err) + '</div>';
+  h += slot.list.length ? slot.list.map(c => '<div class="rowline"><div class="grow"><b>' + esc(fmtAt(c.capturedAt)) + '</b> <span class="muted small">' + esc(c.title || c.host) + ' · ' + c.rowCount + '행 · ' + esc(staffName(c.createdBy)) + '</span>' +
+      (c.appliedAt ? '<div class="small" style="color:var(--good)">반영 ' + esc(fmtAt(c.appliedAt)) + ' ' + esc(staffName(c.appliedBy)) + '</div>' : '') + '</div>' +
+      '<button class="btn btn-sm btn-ghost" data-act="dk-cap-view" data-id="' + esc(c.id) + '" data-room="' + esc(k) + '">보기</button>' +
+      (rule ? '<button class="btn btn-sm ' + (c.appliedAt ? 'btn-ghost' : 'btn-primary') + '" data-act="dk-cap-apply" data-id="' + esc(c.id) + '" data-room="' + esc(k) + '">' + (c.appliedAt ? '다시 반영' : '반영') + '</button>' : '') + '</div>').join('')
+    : (slot.at ? '<div class="hint">아직 캡처가 없습니다. 직원 PC 크롬에서 확장 아이콘 → [이 화면에서 표 고르기].</div>' : '<div class="hint">불러오는 중…</div>');
+  return h + '</div>';
+}
+async function fetchCapture(id) { const r = await api('/api/captures/' + encodeURIComponent(id)); return r.capture; }
+async function openCaptureView(id, k) {
+  try {
+    const c = await fetchCapture(id);
+    const head = '<tr>' + c.header.map((x, i) => '<th>' + (i + 1) + '. ' + esc(x) + '</th>').join('') + '</tr>';
+    const body = c.rows.slice(0, 20).map(r => '<tr>' + c.header.map((x, i) => '<td>' + esc(r[i] || '') + '</td>').join('') + '</tr>').join('');
+    modal('캡처 · ' + (c.title || c.host),
+      '<div class="card-sub mb8">' + esc(fmtAt(c.capturedAt)) + ' · ' + c.rowCount + '행' + (c.rows.length > 20 ? ' (앞 20행만)' : '') + ' · ' + esc(staffName(c.createdBy)) + '</div><div class="mxwrap"><table class="mx">' + head + body + '</table></div>',
+      session.canApprove ? '<div class="row wraprow mt14" style="gap:6px"><button class="btn btn-primary" data-act="dk-cap-rule" data-room="' + esc(k) + '" data-id="' + esc(id) + '">이 표로 규칙 만들기</button>' +
+        '<button class="btn btn-danger" data-act="dk-cap-del" data-id="' + esc(id) + '" data-room="' + esc(k) + '">삭제</button></div>' : '');
+  } catch (e) { toast('캡처를 불러오지 못했습니다 — ' + e.message); }
+}
+async function openCaptureRule(k, captureId) {
+  const rule = captureRule(k);
+  let header = [];
+  if (captureId) { try { header = (await fetchCapture(captureId)).header || []; } catch (e) { /* 목록의 최근 것으로 */ } }
+  if (!header.length) { const latest = ui.captures[k] && ui.captures[k].list[0]; if (latest) header = latest.header || []; }
+  const colOptions = sel => optionsHtml([['', '— 열 —']].concat(header.map((x, i) => [String(i), (i + 1) + '. ' + x])), sel == null || Number(sel) < 0 ? '' : String(sel));
+  modal('캡처 규칙 · ' + roomLabel(k),
+    '<div class="card-sub mb8">표의 어느 열이 이름·상태인지, 어떤 값을 완료로 볼지 한 번만 정합니다. 표에 없는 구독 학생은 "모름"으로 남아 조용히 완료로 잡히지 않습니다.</div>' +
+    '<div class="field"><label class="fl" for="dk-cr-name">이름 열</label><select class="in" id="dk-cr-name">' + colOptions(rule ? rule.nameCol : (header.length ? 0 : null)) + '</select></div>' +
+    '<div class="field"><label class="fl" for="dk-cr-status">상태 열</label><select class="in" id="dk-cr-status">' + colOptions(rule ? rule.statusCol : null) + '</select></div>' +
+    '<div class="field"><label class="fl" for="dk-cr-grade">학년 열 (동명이인 구분용, 선택)</label><select class="in" id="dk-cr-grade">' + colOptions(rule ? rule.gradeCol : null) + '</select></div>' +
+    '<div class="field"><label class="fl" for="dk-cr-done">완료로 볼 값 (콤마로 여러 개)</label><input class="in" id="dk-cr-done" value="' + esc(rule ? rule.doneValues.join(', ') : '') + '" placeholder="완료, O, 100%"></div>' +
+    '<div class="field"><label class="fl" for="dk-cr-partial">부분으로 볼 값 (선택)</label><input class="in" id="dk-cr-partial" value="' + esc(rule ? rule.partialValues.join(', ') : '') + '" placeholder="진행중, 50%"></div>' +
+    (header.length ? '' : '<div class="hint">아직 캡처가 없어 열 이름을 못 보여 줍니다. 캡처가 온 뒤 [보기] → [이 표로 규칙 만들기]가 편합니다.</div>'),
+    '<button class="btn btn-primary btn-block mt8" data-act="dk-cap-rule-save" data-room="' + esc(k) + '">저장</button>');
+}
+function saveCaptureRule(k) {
+  const v = DC.validateCaptureRule({ program: k, nameCol: val('dk-cr-name'), statusCol: val('dk-cr-status'), gradeCol: val('dk-cr-grade'), doneText: val('dk-cr-done'), partialText: val('dk-cr-partial') });
+  if (v.error) return toast(v.error);
+  addDoc('plans', 'cap:' + k, v.value);
+  closeModal(); render(); toast('규칙을 저장했습니다 — 이제 캡처마다 [반영]을 누르면 됩니다');
+}
+async function applyCaptureUI(id, k) {
+  const rule = captureRule(k);
+  if (!rule) return toast('원장이 규칙을 먼저 만들어야 합니다');
+  try {
+    const c = await fetchCapture(id);
+    const day = DC.ymdOf(new Date(Number(c.capturedAt) || now()));
+    const r = DC.applyCapture(c, rule, state.students, session.staffId, now());
+    setCheck(WBPerfCore.perfdayTaskId(k), day, { stamp: r.stamp, ex: r.ex, done: true });
+    let acts = 0;
+    try { acts = Number(WBPerfPanel.planFor(day)) || 0; } catch (e) { /* 수행 패널이 없어도 스탬프는 남는다 */ }
+    try { await api('/api/captures/' + encodeURIComponent(id) + '/applied', {}); } catch (e) { /* 표시 실패는 무해 */ }
+    const slot = ui.captures[k];
+    if (slot) { const row = slot.list.find(x => x.id === id); if (row) { row.appliedAt = now(); row.appliedBy = session.staffId; } }
+    const n = r.counts;
+    const exRows = r.matched.filter(m => m.st !== 'completed');
+    modal('반영 결과 · ' + esc(roomLabel(k)) + ' · ' + esc(DC.shortDate(day)),
+      '<div class="row wraprow mb8" style="gap:4px"><span class="pill ok">완료 ' + n.done + '</span><span class="pill warn">부분 ' + n.partial + '</span><span class="pill bad">미수행 ' + n.notDone + '</span>' +
+        '<span class="pill">모름 ' + n.unknown + '</span><span class="pill">표에 없음 ' + n.missing + '</span></div>' +
+      (exRows.length ? '<div class="sect">예외</div>' + exRows.map(m => '<div class="small">' + esc(m.name) + ' — ' + esc(m.cell || '(빈 칸)') + '</div>').join('') : '') +
+      (r.missing.length ? '<div class="sect">표에 없는 구독 학생 (모름)</div><div class="small">' + esc(r.missing.map(m => m.name).join(', ')) + '</div>' : '') +
+      (r.unmatched.length ? '<div class="sect">명단에 없는 이름</div><div class="small muted">' + esc(r.unmatched.slice(0, 30).join(', ')) + (r.unmatched.length > 30 ? ' …' : '') + '</div>' : '') +
+      (r.ambiguous.length ? '<div class="sect">동명이인 — 규칙에 학년 열을 지정하세요</div><div class="small" style="color:var(--bad)">' + esc(r.ambiguous.join(', ')) + '</div>' : '') +
+      '<div class="hint mt8">수행 탭에 ' + esc(DC.shortDate(day)) + ' 스탬프가 찍혔고 조치 ' + acts + '건이 생겼습니다.</div>');
+    render();
+  } catch (e) { toast('반영 실패 — ' + e.message); }
+}
+async function deleteCaptureUI(id, k) {
+  if (!confirm('이 캡처를 지울까요?')) return;
+  try { await fetch('/api/captures/' + encodeURIComponent(id), { method: 'DELETE', headers: { Authorization: 'Bearer ' + getToken() } }); } catch (e) { /* 목록 새로고침으로 확인 */ }
+  closeModal();
+  loadCaptures(k, true);
+}
+function openExtGuide() {
+  modal('크롬 확장 설치 (직원 PC, 한 번)',
+    '<div class="mstep"><b>1.</b><span><a href="./ext.html" target="_blank" rel="noopener">확장 프로그램 내려받기</a> — zip 을 풀어 폴더로 둡니다.</span></div>' +
+    '<div class="mstep"><b>2.</b><span>크롬 주소창에 chrome://extensions → 오른쪽 위 <b>개발자 모드</b> 켜기 → <b>압축해제된 확장 프로그램을 로드합니다</b> → 그 폴더 선택.</span></div>' +
+    '<div class="mstep"><b>3.</b><span>확장 아이콘(퍼즐 → 고정) → 원장에게 받은 <b>개인 링크</b>를 붙여 넣고 [연결].</span></div>' +
+    '<div class="mstep"><b>4.</b><span>스터디포스 등 관리자 화면에서 아이콘 → [이 화면에서 표 고르기] → 표 클릭. 이 방의 [캡처]에 도착합니다.</span></div>' +
+    '<div class="hint mt8">확장은 클릭한 표만 읽고 아이디·비밀번호를 저장하지 않습니다. 표 안의 전화번호·이메일은 서버가 가립니다.</div>');
 }
 
 /* ── 시험 템플릿(원장) — 학교·학년·시험일·자료 목록 → 시험 leadDays 전에 학생별 자료 카드 ── */
@@ -2004,6 +2111,13 @@ function onClick(ev) {
     case 'dk-app-del': deleteApp(id); return;
     case 'dk-matrix-view': ui.matrixView = String(el.dataset.v || 'students'); render(); return;
     case 'dk-req-card': requestToCard(id); return;
+    case 'dk-cap-refresh': loadCaptures(String(el.dataset.room || room), true); return;
+    case 'dk-ext-guide': openExtGuide(); return;
+    case 'dk-cap-view': openCaptureView(id, String(el.dataset.room || room)); return;
+    case 'dk-cap-rule': if (session.canApprove) openCaptureRule(String(el.dataset.room || room), id); return;
+    case 'dk-cap-rule-save': saveCaptureRule(String(el.dataset.room || room)); return;
+    case 'dk-cap-apply': applyCaptureUI(id, String(el.dataset.room || room)); return;
+    case 'dk-cap-del': if (session.canApprove) deleteCaptureUI(id, String(el.dataset.room || room)); return;
     case 'dk-exam-new': if (session.canApprove) openExamForm(''); return;
     case 'dk-exam-edit': if (session.canApprove) openExamForm(id); return;
     case 'dk-exam-save': saveExamForm(id); return;

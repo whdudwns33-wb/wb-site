@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>WB 프로그램데스크 캡처</title>
+<style>
+  body { width: 320px; margin: 0; padding: 14px; font: 14px/1.5 'Apple SD Gothic Neo', 'Malgun Gothic', system-ui, sans-serif; color: #1B2628; background: #F2F5F4; }
+  h1 { font-size: 15px; margin: 0 0 10px; color: #1E3A3F; }
+  .card { background: #fff; border: 1px solid #D7DEDC; border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; }
+  label { display: block; font-size: 12px; font-weight: 700; color: #5F6F72; margin: 6px 0 3px; }
+  input, select { width: 100%; box-sizing: border-box; padding: 8px 9px; border: 1px solid #D7DEDC; border-radius: 6px; font: inherit; }
+  button { width: 100%; padding: 10px; border: none; border-radius: 6px; font: inherit; font-weight: 700; cursor: pointer; margin-top: 8px; }
+  .primary { background: #D9822B; color: #fff; }
+  .ghost { background: #E6EDEC; color: #1E3A3F; }
+  .ok { color: #2E7D5B; font-weight: 700; }
+  .bad { color: #B3261E; }
+  .hint { font-size: 12px; color: #5F6F72; margin-top: 6px; }
+  details summary { font-size: 12px; color: #5F6F72; cursor: pointer; }
+</style>
+</head>
+<body>
+<h1>WB 프로그램데스크 캡처</h1>
+<div class="card" id="conn">
+  <div id="status" class="hint">확인 중…</div>
+  <div id="linkBox" hidden>
+    <label for="link">데스크에서 받은 개인 링크(또는 코드)</label>
+    <input id="link" placeholder="https://…/#c=…" autocomplete="off">
+    <button class="primary" id="connect">연결</button>
+    <div class="hint">원장이 데스크 관리 탭에서 [링크 발급]한 것을 붙여 넣습니다. 7일 안에 한 번만 쓸 수 있습니다.</div>
+  </div>
+</div>
+<div class="card" id="pickBox" hidden>
+  <label for="program">어느 프로그램의 표인가</label>
+  <select id="program">
+    <option value="studyforce">스터디포스</option>
+    <option value="classcard">클래스카드</option>
+    <option value="metamath">메타수학</option>
+    <option value="nelt">넬트</option>
+  </select>
+  <button class="primary" id="pick">이 화면에서 표 고르기</button>
+  <div class="hint">누르면 화면의 표에 점선이 생깁니다. 보낼 표를 클릭하세요. 표 안의 전화번호·이메일은 서버가 가립니다.</div>
+  <button class="ghost" id="disconnect">연결 끊기</button>
+</div>
+<details><summary>데스크 주소 바꾸기</summary>
+  <label for="base">주소</label><input id="base" placeholder="https://wb-desk.whdudwns33.workers.dev"><button class="ghost" id="saveBase">주소 저장</button>
+</details>
+<script src="popup.js"></script>
+</body>
+</html>
