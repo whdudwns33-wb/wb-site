@@ -152,6 +152,11 @@
   /* ─── 업무 항목 ─── */
   .task { display: flex; gap: 12px; align-items: flex-start; padding: 14px 4px; border-bottom: 1px solid var(--light-gray); }
   .task:last-child { border-bottom: none; }
+  /* 학생·업무 카드가 많은 태블릿에서는 보이는 영역만 레이아웃·페인트한다.
+     DOM과 입력 상태는 그대로 유지하므로 접기·작성 기능에는 영향을 주지 않는다. */
+  #view .task, #view .lesson-slot, #view .book-entry, #view .book-order-row,
+  #view .book-order-history-row, #view .feedback-record, #view .feedback-teacher-group,
+  #view .staffcard { content-visibility: auto; contain-intrinsic-size: 0 86px; }
   .task.isblocked { background: #FFF9F8; border-radius: 10px; padding-left: 10px; padding-right: 10px; }
   .box {
     width: 26px; height: 26px; border-radius: 8px; flex-shrink: 0; margin-top: 1px;
@@ -1201,15 +1206,15 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-09-11.2"></script>
-<script src="./schedule-board-core.js?v=2026-09-11.2"></script>
-<script src="./asset-core.js?v=2026-09-11.2"></script>
-<script src="./qr-core.js?v=2026-09-11.2"></script>
-<script src="./acaflow-import-core.js?v=2026-09-11.2"></script>
-<script src="./feedback-subject-catalog.js?v=2026-09-11.2"></script>
-<script src="./sync-recovery-core.js?v=2026-09-11.2"></script>
-<script src="./staff-work-session-core.js?v=2026-09-11.2"></script>
-<script src="./staff-attendance-history-core.js?v=2026-09-11.2"></script>
+<script src="./lesson-form-core.js?v=2026-09-11.3"></script>
+<script src="./schedule-board-core.js?v=2026-09-11.3"></script>
+<script src="./asset-core.js?v=2026-09-11.3"></script>
+<script src="./qr-core.js?v=2026-09-11.3"></script>
+<script src="./acaflow-import-core.js?v=2026-09-11.3"></script>
+<script src="./feedback-subject-catalog.js?v=2026-09-11.3"></script>
+<script src="./sync-recovery-core.js?v=2026-09-11.3"></script>
+<script src="./staff-work-session-core.js?v=2026-09-11.3"></script>
+<script src="./staff-attendance-history-core.js?v=2026-09-11.3"></script>
 <script>
 "use strict";
 
@@ -1342,21 +1347,29 @@ const staffByName = n => liveStaff().find(s => s.name === String(n || '').trim()
 // 오늘·주간·직원 관리 화면은 같은 수업 목록을 여러 번 조회한다. 저장 시 무효화하는
 // 가벼운 인덱스를 사용해 staffId/studentId 기준 필터를 반복하지 않도록 한다.
 let taskQueryIndex = null;
-function invalidateTaskQueryIndex() { taskQueryIndex = null; }
+let taskDayQueryCache = null;
+let alertsTodayCache = null;
+function invalidateTaskQueryIndex() {
+  taskQueryIndex = null;
+  taskDayQueryCache = null;
+  alertsTodayCache = null;
+}
 function getTaskQueryIndex() {
   const source = state.tasks || [];
   if (taskQueryIndex && taskQueryIndex.source === source) return taskQueryIndex;
-  const byStaff = new Map(), byStudent = new Map();
+  const byId = new Map(), byStaff = new Map(), byStudent = new Map();
   source.forEach(task => {
     if (!task) return;
+    if (task.id) byId.set(String(task.id), task);
     const staffKey = String(task.staffId || '');
     const studentKey = String(task.studentId || '');
     if (staffKey) { if (!byStaff.has(staffKey)) byStaff.set(staffKey, []); byStaff.get(staffKey).push(task); }
     if (studentKey) { if (!byStudent.has(studentKey)) byStudent.set(studentKey, []); byStudent.get(studentKey).push(task); }
   });
-  taskQueryIndex = { source, byStaff, byStudent };
+  taskQueryIndex = { source, byId, byStaff, byStudent };
   return taskQueryIndex;
 }
+function taskById(taskId) { return getTaskQueryIndex().byId.get(String(taskId || '')) || null; }
 function tasksForStaff(staffId) { return getTaskQueryIndex().byStaff.get(String(staffId || '')) || []; }
 function tasksForStudent(studentId) { return getTaskQueryIndex().byStudent.get(String(studentId || '')) || []; }
 
@@ -1409,8 +1422,25 @@ function firstClassTaskOnDate(task, date) {
 }
 
 function tasksFor(staffId, date) {
-  return state.tasks
-    .filter(t => t.staffId === staffId && occursOn(t, date) && !isBookOrderWorkTask(t))
+  // 하루 화면에서 같은 직원·날짜를 여러 번 읽으므로 정렬 결과를 재사용한다.
+  // 독립 테스트·구형 캐시 복구 경로에서는 색인이 아직 준비되지 않을 수 있어
+  // 기존 배열 조회를 안전한 폴백으로 남긴다.
+  const indexed = typeof tasksForStaff === 'function';
+  const sourceArray = indexed ? getTaskQueryIndex().source : (state.tasks || []);
+  if (indexed) {
+    if (!taskDayQueryCache || taskDayQueryCache.source !== sourceArray) taskDayQueryCache = { source: sourceArray, rows: new Map() };
+    const key = String(staffId || '') + '|' + String(date || '');
+    if (taskDayQueryCache.rows.has(key)) return taskDayQueryCache.rows.get(key);
+    const rows = tasksForStaff(staffId)
+      .filter(t => occursOn(t, date) && !isBookOrderWorkTask(t))
+      .sort((a, b) => Number(firstClassTaskOnDate(b, date)) - Number(firstClassTaskOnDate(a, date))
+                   || (a.time || '99:99').localeCompare(b.time || '99:99')
+                   || (b.priority === 'high') - (a.priority === 'high')
+                   || (a.createdAt || 0) - (b.createdAt || 0));
+    taskDayQueryCache.rows.set(key, rows);
+    return rows;
+  }
+  return sourceArray.filter(t => t.staffId === staffId && occursOn(t, date) && !isBookOrderWorkTask(t))
     .sort((a, b) => Number(firstClassTaskOnDate(b, date)) - Number(firstClassTaskOnDate(a, date))
                  || (a.time || '99:99').localeCompare(b.time || '99:99')
                  || (b.priority === 'high') - (a.priority === 'high')
@@ -1421,7 +1451,7 @@ const ckey = (taskId, date) => taskId + '|' + date;
 const getCheck = (taskId, date) => state.checks[ckey(taskId, date)] || null;
 function isDone(taskId, date) {
   const c = getCheck(taskId, date);
-  const task = state.tasks.find(row => row.id === taskId);
+  const task = typeof taskById === 'function' ? taskById(taskId) : state.tasks.find(row => row.id === taskId);
   const steps = taskSteps(task, c);
   if (usesStandardLessonDisplay(task) && steps.length === LESSON_OPERATIONAL_STEP_LABELS.length) {
     return steps.every(step => c && c.steps && c.steps[step.id]);
@@ -1629,7 +1659,8 @@ function staffAdded(anchor) {
 
 /** 원장이 바로 봐야 할 것: 막힘 + 예정 시각이 지난 미완료 */
 function alertsToday() {
-  const d = today(), hm = nowHM();
+  const d = today(), hm = nowHM(), cacheKey = d + '|' + hm;
+  if (alertsTodayCache && alertsTodayCache.key === cacheKey) return alertsTodayCache.value;
   let blocked = 0, overdue = 0;
   liveStaff().forEach(s => tasksFor(s.id, d).forEach(t => {
     const c = getCheck(t.id, d);
@@ -1637,7 +1668,9 @@ function alertsToday() {
     if (isDone(t.id, d)) return;
     if (t.time && t.time < hm) overdue++;
   }));
-  return { blocked: blocked, overdue: overdue, total: blocked + overdue };
+  const value = { blocked: blocked, overdue: overdue, total: blocked + overdue };
+  alertsTodayCache = { key: cacheKey, value: value };
+  return value;
 }
 
 /* ══════════════════════════════════════════════════════
@@ -2050,19 +2083,22 @@ const sync = {
       return baseline !== undefined && JSON.stringify(baseline) === JSON.stringify(data);
     };
     (state.staff || []).forEach(s => {
+      if ((s.updatedAt || 0) <= since) return;
       if (isCanonical('staff', s.id, s)) return;
-      if ((s.updatedAt || 0) > since) out.push({ table: 'staff', id: s.id, owner: s.id, data: s, updated_at: s.updatedAt || 0 });
+      out.push({ table: 'staff', id: s.id, owner: s.id, data: s, updated_at: s.updatedAt || 0 });
     });
     (state.tasks || []).forEach(t => {
+      if ((t.updatedAt || 0) <= since) return;
       if (isCanonical('tasks', t.id, t)) return;
-      if ((t.updatedAt || 0) > since) out.push({ table: 'tasks', id: t.id, owner: t.staffId || null, data: t, updated_at: t.updatedAt || 0 });
+      out.push({ table: 'tasks', id: t.id, owner: t.staffId || null, data: t, updated_at: t.updatedAt || 0 });
     });
     Object.keys(state.checks || {}).forEach(k => {
       const c = state.checks[k];
+      if (!c || (c.updatedAt || 0) <= since) return;
       if (isCanonical('checks', k, c)) return;
       if (isContactCheckKey(k)) return; // 서버 검증 정본은 generic LWW로 다시 올리지 않는다.
       if (typeof studentChangeMovedCheckKeys !== 'undefined' && studentChangeMovedCheckKeys.has(k)) return; // 담당 분리 전 옛 키는 서버 정본과 충돌하지 않게 보류한다.
-      if (c && (c.updatedAt || 0) > since) out.push({ table: 'checks', k: k, owner: ownerOfCheck(k), data: c, updated_at: c.updatedAt || 0 });
+      out.push({ table: 'checks', k: k, owner: ownerOfCheck(k), data: c, updated_at: c.updatedAt || 0 });
     });
     return out;
   },
@@ -24346,7 +24382,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-09-11.2';
+const APP_VER = '2026-09-11.3';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
