@@ -1337,6 +1337,13 @@ const teamStaff = () => liveStaff().filter(s => !s.owner);
 const owners = () => liveStaff().filter(s => s.owner);
 const staffById = id => state.staff.find(s => s.id === id);
 const staffByName = n => liveStaff().find(s => s.name === String(n || '').trim());
+const STAFF_WORK_ROLE = Object.freeze({ teacher: '수업 담당', driverFacility: '차량·시설 담당' });
+function staffWorkRole(staff) {
+  return staff && String(staff.workRole || '') === 'driver_facility' ? 'driver_facility' : 'teacher';
+}
+function isDriverFacilityStaff() {
+  return !!(session.isStaffLink && !session.isAdmin && staffWorkRole(staffById(session.staffId)) === 'driver_facility');
+}
 
 function plannedOccursOn(task, date) {
   if (task.deleted) return false;
@@ -3550,13 +3557,18 @@ function render() {
 
   // 일반 직원 개인 링크만 본인 업무 화면으로 제한한다.
   if (session.isStaffLink && !session.isAdmin) {
-    const allowed = ['today', 'week', 'lesson', 'feedback', 'books', 'transport', 'roster'];
-    allowed.push('sessions');
-    allowed.push('makeup');
-    if (!allowed.includes(route)) route = 'today';
+    if (isDriverFacilityStaff()) {
+      const allowed = ['driver_transport', 'facility'];
+      if (!allowed.includes(route)) route = 'driver_transport';
+    } else {
+      const allowed = ['today', 'week', 'lesson', 'feedback', 'books', 'transport', 'roster'];
+      allowed.push('sessions');
+      allowed.push('makeup');
+      if (!allowed.includes(route)) route = 'today';
+    }
   }
 
-  const map = { schedule: viewSchedule, onboarding: viewOnboarding, today: viewToday, week: viewWeek, write: viewWrite, lesson: viewLessonEntry, feedback: viewFeedbackReview, makeup: viewMakeups, sessions: viewSessionPacks, board: viewBoard, staff: viewStaffAdmin, settings: viewSettings, books: viewBooks, transport: viewTransport, roster: viewRoster, devices: viewDevices };
+  const map = { schedule: viewSchedule, onboarding: viewOnboarding, today: viewToday, week: viewWeek, write: viewWrite, lesson: viewLessonEntry, feedback: viewFeedbackReview, makeup: viewMakeups, sessions: viewSessionPacks, board: viewBoard, staff: viewStaffAdmin, settings: viewSettings, books: viewBooks, transport: viewTransport, roster: viewRoster, devices: viewDevices, driver_transport: viewDriverTransport, facility: viewFacility };
   replaceView(v, (map[route] || viewToday)());
   if (route === 'schedule') requestAnimationFrame(() => {
     scheduleFocusTimeline();
@@ -3586,7 +3598,9 @@ function renderTabs() {
   const tabs = session.isStaffLink && (shouldGatePersonAccess() || shouldGateStaffWork())
     ? []
     : session.isStaffLink && !session.isAdmin
-    ? [['today', '오늘 할 일'], ['week', '주간 플래너'], ['lesson', '수업 등록'], ['feedback', '피드백 상태'], ['makeup', '보강', makeupAttentionCount()], ['sessions', '회차', sessionPackAttentionCount()], ['books', '교재'], ['transport', '차량'], ['roster', '원생']]
+    ? (isDriverFacilityStaff()
+      ? [['driver_transport', '오늘 운행'], ['facility', '청소시설업무']]
+      : [['today', '오늘 할 일'], ['week', '주간 플래너'], ['lesson', '수업 등록'], ['feedback', '피드백 상태'], ['makeup', '보강', makeupAttentionCount()], ['sessions', '회차', sessionPackAttentionCount()], ['books', '교재'], ['transport', '차량'], ['roster', '원생']])
     : session.isAdmin
       ? [['schedule', '현황판', managerRequestInboxCount()], ['onboarding', '신규 학생', onboardingAttentionCount()], ['today', '오늘'], ['week', '주간 플래너'], ['write', '지시서 작성'],
          ['lesson', '수업 등록 및 변경'], ['feedback', '피드백 검토'], ['makeup', '보강', makeupAttentionCount()], ['sessions', '회차', sessionPackAttentionCount()], ['board', '직원 현황', a.total], ['staff', '직원 관리'], ['books', '교재'], ['transport', '차량'], ['roster', '원생'], ['devices', '기기', deviceAlertCount()], ['settings', '설정']]
@@ -17271,6 +17285,8 @@ function mutateTransportConfig(kind, action, id, routeId, direction) {
 }
 
 function viewTransport() {
+  const driverMode = isDriverFacilityStaff();
+  if (driverMode) transportDate = today();
   if (!transportData || transportLoadedDate !== transportDate) {
     if (!transportLoading && !transportError) loadTransport(transportDate, false);
     if (transportError) return '<section class="card alert"><div class="card-title">차량 운행을 불러오지 못했습니다</div><div class="card-sub">' + esc(transportError) + '</div>' +
@@ -17278,19 +17294,25 @@ function viewTransport() {
     return '<section class="card"><div class="empty"><b>🚐</b>차량 운행을 불러오는 중…</div></section>';
   }
   if (session.isAdmin && !rosterDb && !rosterLoading && !rosterErr) loadRoster();
-  const rows = transportProjectedRows();
-  const routes = transportRoutes();
-  const unmatched = transportUnmatchedStates();
+  const allRows = transportProjectedRows();
+  const routes = transportRoutes().filter(routeRow => !driverMode ||
+    String(routeRow.driverId || routeRow.driver_id || (routeRow.driver && routeRow.driver.id) || '') === String(session.staffId));
+  const routeIds = new Set(routes.map(routeRow => String(routeRow.id || routeRow.routeId || '')));
+  const rows = driverMode ? allRows.filter(row => routeIds.has(String(row.routeId || ''))) : allRows;
+  const unmatched = transportUnmatchedStates().filter(row => !driverMode || routeIds.has(String(row.routeId || row.route_id || '')));
   const unmatchedBoarded = unmatched.filter(row => normalizeTransportStatus(row.status) === 'boarded').length;
   const scheduled = rows.filter(row => row.status === 'scheduled').length;
   const boarded = rows.filter(row => row.status === 'boarded').length + unmatchedBoarded;
   const completed = rows.filter(row => row.status === 'dropped' || row.status === 'absent').length;
-  let h = '<section class="card transport-hero"><div class="between"><div><div class="card-title">차량 운행</div>' +
-    '<div class="card-sub">등·하원 차량의 탑승부터 하차·인계까지 확인합니다. 주소는 표시하지 않으며, 연락처는 동의가 확인된 오늘 본인 노선에서만 확인할 수 있습니다.</div></div>' +
-    '<button class="btn btn-sm btn-ghost" data-act="transportrefresh">새로고침</button></div>' +
-    '<div class="transport-datebar"><button class="btn btn-sm btn-ghost" data-act="transportday" data-n="-1" aria-label="이전 날짜">←</button>' +
+  const dateBar = driverMode
+    ? '<strong>' + esc(label(transportDate)) + '</strong>'
+    : '<button class="btn btn-sm btn-ghost" data-act="transportday" data-n="-1" aria-label="이전 날짜">←</button>' +
       '<strong>' + esc(label(transportDate)) + '</strong><div class="row" style="gap:5px"><button class="btn btn-sm btn-ghost" data-act="transporttoday">오늘</button>' +
-      '<button class="btn btn-sm btn-ghost" data-act="transportday" data-n="1" aria-label="다음 날짜">→</button></div></div></section>' +
+      '<button class="btn btn-sm btn-ghost" data-act="transportday" data-n="1" aria-label="다음 날짜">→</button></div>';
+  let h = '<section class="card transport-hero"><div class="between"><div><div class="card-title">' + (driverMode ? '오늘 운행' : '차량 운행') + '</div>' +
+    '<div class="card-sub">' + (driverMode ? '오늘 배정된 노선과 탑승·하차 상태를 확인합니다.' : '등·하원 차량의 탑승부터 하차·인계까지 확인합니다. 주소는 표시하지 않으며, 연락처는 동의가 확인된 오늘 본인 노선에서만 확인할 수 있습니다.') + '</div></div>' +
+    '<button class="btn btn-sm btn-ghost" data-act="transportrefresh">새로고침</button></div>' +
+    '<div class="transport-datebar">' + dateBar + '</div></section>' +
     '<div class="ops-kpis" aria-label="차량 운행 요약"><div class="ops-kpi"><b>' + routes.length + '</b><span>운행 노선</span></div>' +
       '<div class="ops-kpi"><b>' + scheduled + '</b><span>탑승 예정</span></div><div class="ops-kpi' + (boarded ? ' is-alert' : '') + '"><b>' + boarded + '</b><span>탑승 중 · 최우선</span></div>' +
       '<div class="ops-kpi"><b>' + completed + '</b><span>완료·미탑승</span></div></div>';
@@ -17324,6 +17346,20 @@ function viewTransport() {
   if (!routes.length) h += '<section class="card"><div class="empty"><b>🚐</b>이 날짜에 운행하는 노선이 없습니다.</div></section>';
   if (session.isAdmin) h += transportConfigRowHtml(ensureTransportDraft(), transportHasRiders());
   return h;
+}
+
+function viewDriverTransport() {
+  return viewTransport();
+}
+
+function viewFacility() {
+  const items = ['청소 구역', '청소 완료', '시설 이상 신고', '관리자 요청사항'];
+  return '<section class="card"><div class="card-title">청소시설업무</div>' +
+    '<div class="card-sub">기본 업무 항목입니다. 세부 내용과 체크 기능은 운영 방식에 맞춰 순차적으로 추가합니다.</div>' +
+    '<div class="stack mt14">' + items.map(item =>
+      '<details class="card" data-persist-key="driver-facility-' + esc(item) + '"><summary><b>' + esc(item) + '</b></summary>' +
+      '<div class="hint mt8">세부 항목을 준비 중입니다.</div></details>').join('') +
+    '</div></section>';
 }
 
 /* ── 원생 현황 (월별 실적) ──
@@ -19945,7 +19981,8 @@ function viewStaffAdmin() {
         '<div class="row"><div class="ava">' + esc(initials(s.name)) + '</div>' +
         '<div><div class="card-title">' + esc(s.name) +
           (s.owner ? ' <span class="tag add">대표</span>' : '') +
-          (s.manager ? ' <span class="tag edit">관리 담당</span>' : '') + '</div>' +
+          (s.manager ? ' <span class="tag edit">관리 담당</span>' : '') +
+          (staffWorkRole(s) === 'driver_facility' ? ' <span class="tag time">차량·시설</span>' : '') + '</div>' +
         '<div class="small muted">지시 ' + state.tasks.filter(t => t.staffId === s.id && !t.deleted && !isBookOrderWorkTask(t)).length + '건' +
           (s.owner ? ' · 직원 통계에서 제외' : '') +
           (s.manager ? ' · 관리 담당 표시 · 운영 권한은 서버에서 별도 승인 · 급여 집계 포함' : '') + '</div></div></div>' +
@@ -19960,6 +19997,8 @@ function viewStaffAdmin() {
             (s.owner ? '대표 해제' : '대표로 지정') + '</button>' +
           '<button class="btn btn-sm btn-ghost" data-act="togglemanager" data-id="' + s.id + '">' +
             (s.manager ? '관리 담당 해제' : '관리 담당으로 지정') + '</button>' +
+          '<button class="btn btn-sm btn-ghost" data-act="toggleworkrole" data-id="' + s.id + '">' +
+            (staffWorkRole(s) === 'driver_facility' ? '수업 담당으로 지정' : '차량·시설 담당으로 지정') + '</button>' +
           '<button class="btn btn-sm btn-ghost" data-act="atteditopen" data-id="' + s.id + '">🕘 출퇴근 수정</button>' +
           '<button class="btn btn-sm btn-ghost" data-act="staffprofile" data-id="' + s.id + '">연락처 · 로그인 관리</button>' +
         '</div></div>').join('')
@@ -22368,7 +22407,7 @@ document.addEventListener('click', ev => {
     case 'addstaff': {
       const name = ($('#sName').value || '').trim();
       if (!name) return toast('이름을 입력해 주세요');
-      state.staff.push({ id: uid(), name: name, createdAt: now(), updatedAt: now(), deleted: false });
+      state.staff.push({ id: uid(), name: name, workRole: 'teacher', createdAt: now(), updatedAt: now(), deleted: false });
       save(); queueSync(); render(); toast(name + ' 등록 완료');
       break;
     }
@@ -22412,6 +22451,16 @@ document.addEventListener('click', ev => {
       toast(s.manager
         ? s.name + ' — 관리 담당으로 표시했습니다. 운영 권한은 서버 승인 대상에게만 열립니다'
         : s.name + ' — 관리 담당 표시 해제');
+      break;
+    }
+    case 'toggleworkrole': {
+      if (!session.isAdmin) break;
+      const s = staffById(id);
+      if (!s) break;
+      const nextRole = staffWorkRole(s) === 'driver_facility' ? 'teacher' : 'driver_facility';
+      s.workRole = nextRole; s.updatedAt = now();
+      save(); queueSync(); render();
+      toast(s.name + ' — ' + STAFF_WORK_ROLE[nextRole === 'driver_facility' ? 'driverFacility' : 'teacher'] + '으로 지정했습니다');
       break;
     }
     case 'weekendflexsettings': openWeekendFlexibleSettings(String(id || '')); break;
