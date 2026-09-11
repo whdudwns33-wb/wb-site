@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 
-const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8').replace(/\r\n/g, '\n');
 
 function block(startText, endText) {
   const start = html.indexOf(startText);
@@ -43,4 +43,22 @@ test('백그라운드 탭에서는 45초 전체 동기화를 실행하지 않고
   assert.match(source, /}, 45000\)/);
   const visibility = block("document.addEventListener('visibilitychange'", 'let syncLoopStarted = false;');
   assert.match(visibility, /sync\.run\(\)/);
+});
+
+test('정적 탭에서는 15초 실시간 업무 조회를 건너뛰고 업무 탭은 기존 주기를 유지한다', () => {
+  const source = block('startSyncSession();', '/* ── 새 버전 감지');
+  assert.match(source, /const liveRoute = typeof route === 'undefined'/);
+  assert.match(source, /\['today', 'week', 'lesson', 'feedback', 'makeup', 'sessions', 'schedule', 'board', 'staff'\]/);
+  assert.match(source, /liveRoute && auth && \(session\.isAdmin \|\| session\.isStaffLink\)/);
+  assert.match(source, /}, 15000\);/);
+});
+
+test('같은 화면 마크업이면 전체 DOM 교체를 건너뛰고 수업 조회 색인은 저장 때 무효화한다', () => {
+  const replace = block('function replaceView(root, html)', 'function render()');
+  assert.match(replace, /renderMarkupFingerprint\(html\)/);
+  assert.match(replace, /root\.dataset\.renderFingerprint === fingerprint/);
+  assert.match(replace, /root\.dataset\.renderFingerprint = fingerprint/);
+  assert.match(html, /function tasksForStaff\(staffId\)/);
+  assert.match(html, /function tasksForStudent\(studentId\)/);
+  assert.match(block('function save()', 'function ymd'), /invalidateTaskQueryIndex\(\)/);
 });

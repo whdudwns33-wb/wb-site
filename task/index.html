@@ -1201,15 +1201,15 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-09-11.1"></script>
-<script src="./schedule-board-core.js?v=2026-09-11.1"></script>
-<script src="./asset-core.js?v=2026-09-11.1"></script>
-<script src="./qr-core.js?v=2026-09-11.1"></script>
-<script src="./acaflow-import-core.js?v=2026-09-11.1"></script>
-<script src="./feedback-subject-catalog.js?v=2026-09-11.1"></script>
-<script src="./sync-recovery-core.js?v=2026-09-11.1"></script>
-<script src="./staff-work-session-core.js?v=2026-09-11.1"></script>
-<script src="./staff-attendance-history-core.js?v=2026-09-11.1"></script>
+<script src="./lesson-form-core.js?v=2026-09-11.2"></script>
+<script src="./schedule-board-core.js?v=2026-09-11.2"></script>
+<script src="./asset-core.js?v=2026-09-11.2"></script>
+<script src="./qr-core.js?v=2026-09-11.2"></script>
+<script src="./acaflow-import-core.js?v=2026-09-11.2"></script>
+<script src="./feedback-subject-catalog.js?v=2026-09-11.2"></script>
+<script src="./sync-recovery-core.js?v=2026-09-11.2"></script>
+<script src="./staff-work-session-core.js?v=2026-09-11.2"></script>
+<script src="./staff-attendance-history-core.js?v=2026-09-11.2"></script>
 <script>
 "use strict";
 
@@ -1301,6 +1301,7 @@ function load() {
 }
 
 function save() {
+  invalidateTaskQueryIndex();
   try { localStorage.setItem(LS_KEY, JSON.stringify(state)); }
   catch (e) { toast('저장 공간이 부족합니다'); }
 }
@@ -1337,6 +1338,28 @@ const teamStaff = () => liveStaff().filter(s => !s.owner);
 const owners = () => liveStaff().filter(s => s.owner);
 const staffById = id => state.staff.find(s => s.id === id);
 const staffByName = n => liveStaff().find(s => s.name === String(n || '').trim());
+
+// 오늘·주간·직원 관리 화면은 같은 수업 목록을 여러 번 조회한다. 저장 시 무효화하는
+// 가벼운 인덱스를 사용해 staffId/studentId 기준 필터를 반복하지 않도록 한다.
+let taskQueryIndex = null;
+function invalidateTaskQueryIndex() { taskQueryIndex = null; }
+function getTaskQueryIndex() {
+  const source = state.tasks || [];
+  if (taskQueryIndex && taskQueryIndex.source === source) return taskQueryIndex;
+  const byStaff = new Map(), byStudent = new Map();
+  source.forEach(task => {
+    if (!task) return;
+    const staffKey = String(task.staffId || '');
+    const studentKey = String(task.studentId || '');
+    if (staffKey) { if (!byStaff.has(staffKey)) byStaff.set(staffKey, []); byStaff.get(staffKey).push(task); }
+    if (studentKey) { if (!byStudent.has(studentKey)) byStudent.set(studentKey, []); byStudent.get(studentKey).push(task); }
+  });
+  taskQueryIndex = { source, byStaff, byStudent };
+  return taskQueryIndex;
+}
+function tasksForStaff(staffId) { return getTaskQueryIndex().byStaff.get(String(staffId || '')) || []; }
+function tasksForStudent(studentId) { return getTaskQueryIndex().byStudent.get(String(studentId || '')) || []; }
+
 const STAFF_WORK_ROLE = Object.freeze({ teacher: '수업 담당', driverFacility: '차량·시설 담당' });
 function staffWorkRole(staff) {
   return staff && String(staff.workRole || '') === 'driver_facility' ? 'driver_facility' : 'teacher';
@@ -3533,10 +3556,25 @@ function restorePersistentDetails(root) {
 }
 
 function replaceView(root, html) {
+  const fingerprint = renderMarkupFingerprint(html);
+  if (root.dataset.renderedRoute === route && root.dataset.renderFingerprint === fingerprint) return false;
   capturePersistentDetails(root);
   root.innerHTML = html;
   root.dataset.renderedRoute = route;
+  root.dataset.renderFingerprint = fingerprint;
   restorePersistentDetails(root);
+  return true;
+}
+
+function renderMarkupFingerprint(value) {
+  // 전체 HTML을 다시 파싱하지 않고 같은 화면인지 빠르게 판별한다.
+  let hash = 2166136261;
+  const text = String(value || '');
+  for (let index = 0; index < text.length; index++) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return text.length + ':' + (hash >>> 0).toString(16);
 }
 
 /* ══════════════════════════════════════════════════════
@@ -3875,7 +3913,7 @@ function teacherTaskCardOccursOn(task, date) {
 }
 
 function teacherTaskCardsFor(staffId, date) {
-  return state.tasks.filter(task => task && task.staffId === staffId && teacherTaskCardOccursOn(task, date))
+  return tasksForStaff(staffId).filter(task => task && teacherTaskCardOccursOn(task, date))
     .sort((a, b) => (a.time || '99:99').localeCompare(b.time || '99:99') ||
     (b.priority === 'high') - (a.priority === 'high') || (a.createdAt || 0) - (b.createdAt || 0));
 }
@@ -10423,7 +10461,7 @@ function sessionModeBadgesForEntries(entries) {
 
 function sessionModeBadgesForStudent(studentId, referenceDate) {
   const reference = referenceDate || today();
-  return sessionModeBadgesHtml(state.tasks.filter(task => sessionModeLessonTask(task) &&
+  return sessionModeBadgesHtml(tasksForStudent(studentId).filter(task => sessionModeLessonTask(task) &&
     String(task.studentId || '') === String(studentId || '') &&
     (!task.start || task.start <= reference) && (!task.end || task.end >= reference)), reference);
 }
@@ -10489,7 +10527,7 @@ async function loadSessionPacks(force) {
 }
 
 function sessionPackLessonOptions() {
-  return state.tasks.filter(task => task.studentId && isSessionLessonTask(task) && !isScheduledMakeupTask(task))
+  return (state.tasks || []).filter(task => task.studentId && isSessionLessonTask(task) && !isScheduledMakeupTask(task))
     .sort((a, b) => String(a.studentName || '').localeCompare(String(b.studentName || ''), 'ko') ||
       String(a.subject || a.className || '').localeCompare(String(b.subject || b.className || ''), 'ko'));
 }
@@ -20047,7 +20085,7 @@ function viewStaffAdmin() {
           (s.owner ? ' <span class="tag add">대표</span>' : '') +
           (s.manager ? ' <span class="tag edit">관리 담당</span>' : '') +
           (staffWorkRole(s) === 'driver_facility' ? ' <span class="tag time">차량·시설</span>' : '') + '</div>' +
-        '<div class="small muted">지시 ' + state.tasks.filter(t => t.staffId === s.id && !t.deleted && !isBookOrderWorkTask(t)).length + '건' +
+        '<div class="small muted">지시 ' + tasksForStaff(s.id).filter(t => !t.deleted && !isBookOrderWorkTask(t)).length + '건' +
           (s.owner ? ' · 직원 통계에서 제외' : '') +
           (s.manager ? ' · 관리 담당 표시 · 운영 권한은 서버에서 별도 승인 · 급여 집계 포함' : '') + '</div></div></div>' +
         '<button class="btn btn-sm btn-danger" data-act="delstaff" data-id="' + s.id + '">삭제</button></div>' +
@@ -21603,7 +21641,7 @@ async function submitDirectorReport(button) {
 
 function manageTasks(staffId) {
   const s = staffById(staffId);
-  const list = state.tasks.filter(t => t.staffId === staffId && !t.deleted && !isBookOrderWorkTask(t) &&
+  const list = tasksForStaff(staffId).filter(t => !t.deleted && !isBookOrderWorkTask(t) &&
     !isScheduledMakeupTask(t))
     .sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   modal((s ? s.name : '') + ' 지시 목록',
@@ -24289,7 +24327,11 @@ setInterval(() => {
     if (!$('#staffWorkPin')) render();
     return;
   }
-  if (document.visibilityState === 'visible' && auth && (session.isAdmin || session.isStaffLink)) {
+  // 교재·원생·설정처럼 정적인 탭에서는 실시간 업무 목록을 매번 조회하지 않는다.
+  // 탭을 다시 열면 화면 로더가 즉시 조회하고, visible 복귀 이벤트도 최신화를 보장한다.
+  const liveRoute = typeof route === 'undefined' ||
+    ['today', 'week', 'lesson', 'feedback', 'makeup', 'sessions', 'schedule', 'board', 'staff'].includes(route);
+  if (document.visibilityState === 'visible' && liveRoute && auth && (session.isAdmin || session.isStaffLink)) {
     if (typeof refreshVisibleWeekendVisitScopes === 'function') refreshVisibleWeekendVisitScopes(true);
     if (typeof refreshVisibleLessonHandoffs === 'function') refreshVisibleLessonHandoffs(true, true);
     loadAdminDirectives(true, true);
@@ -24304,7 +24346,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-09-11.1';
+const APP_VER = '2026-09-11.2';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
