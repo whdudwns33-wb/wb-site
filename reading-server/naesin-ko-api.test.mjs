@@ -325,6 +325,45 @@ await t('루브릭 반영도 관리자만', async () => {
   assert.strictEqual(anon.status, 401);
 });
 
+await t('루브릭 없는 서술형은 서버가 막는다 — 게이트가 화면에만 있으면 API 직통으로 뚫린다', async () => {
+  const s = memStore();
+  const noRubric = Object.assign({}, PACK, { items: [{ id: 'it-1', format: 'essay', stem: '쓰시오.' }] });
+  const r = await call(s, { path: '/api/naesin-ko/admin/pack', method: 'POST', who: ADMIN,
+    getBody: async () => ({ id: PACK.packId, pack: noRubric }) });
+  assert.strictEqual(r.status, 400);
+  assert.match(r.body.error, /rubric/);
+  assert.strictEqual(await s.getPack(PACK.packId), null);
+  /* 요소만 있고 키워드가 없는 것도 같다 — 채점기가 아무것도 못 찾는다 */
+  const noKw = Object.assign({}, PACK, { items: [{ id: 'it-1', format: 'essay', rubric: [{ element: 'ㄱ', keywords: [] }] }] });
+  assert.strictEqual((await call(s, { path: '/api/naesin-ko/admin/pack', method: 'POST', who: ADMIN,
+    getBody: async () => ({ id: PACK.packId, pack: noKw }) })).status, 400);
+  /* 제대로 된 것은 지나간다 */
+  const ok = Object.assign({}, PACK, { items: [{ id: 'it-1', format: 'essay', rubric: [{ element: 'ㄱ', keywords: ['ㄴ'] }] }] });
+  assert.strictEqual((await call(s, { path: '/api/naesin-ko/admin/pack', method: 'POST', who: ADMIN,
+    getBody: async () => ({ id: PACK.packId, pack: ok }) })).status, 200);
+});
+
+await t('문항 id가 겹치는 팩도 서버가 막는다 — 학생 기록이 한 칸에 섞인다', async () => {
+  const s = memStore();
+  const dup = Object.assign({}, PACK, { items: [
+    { id: 'it-1', format: 'mc5' }, { id: 'it-1', format: 'ox' }] });
+  const r = await call(s, { path: '/api/naesin-ko/admin/pack', method: 'POST', who: ADMIN,
+    getBody: async () => ({ id: PACK.packId, pack: dup }) });
+  assert.strictEqual(r.status, 400);
+  assert.match(r.body.error, /겹/);
+});
+
+await t('루브릭 반영 경로도 같은 게이트를 지난다', async () => {
+  const s = memStore();
+  await call(s, { path: '/api/naesin-ko/admin/pack', method: 'POST', who: ADMIN,
+    getBody: async () => ({ id: PACK.packId, pack: PACK }) });
+  const empty = Object.assign({}, PACK, { items: [{ id: 'it-x', format: 'essay', rubric: [] }] });
+  const r = await call(s, { path: '/api/naesin-ko/admin/rubric', method: 'POST', who: ADMIN,
+    getBody: async () => ({ id: PACK.packId, pack: empty, doneItemId: 'it-x' }) });
+  assert.strictEqual(r.status, 400);
+  assert.deepStrictEqual((await s.getPack(PACK.packId)).pack.items, undefined);
+});
+
 await t('몸통이 JSON이 아니면 저장 전에 400', async () => {
   const s = memStore();
   const r = await call(s, { path: '/api/naesin-ko/state', method: 'PUT',

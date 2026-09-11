@@ -31,6 +31,38 @@ const EXAM_PACKS_MAX = 20;
 const VERDICTS = ['pass', 'hold', 'fail'];
 
 const nowIso = () => new Date().toISOString();
+/* ── 서버가 지키는 짧은 목록 ──
+   전체 검증은 관리 웹이 `naesin-ko/pack-check.js` 로 한다(규칙은 거기 하나다). 서버는 그 모듈을
+   못 부른다 — 이 파일은 Cloudflare Worker 와 공용이라 node:module·createRequire 를 쓸 수 없고,
+   같은 규칙을 두 곳에 옮겨 적으면 반드시 갈라진다. 그래서 서버는 **적게** 지킨다:
+   화면을 거치지 않고 API 를 직접 불러도 **학생에게 닿는 순간 망가지는 것**만 막는다.
+   목록을 늘리고 싶으면 먼저 물어라 — 이건 검증기의 사본이 아니라 마지막 방어선이다. */
+const packBlockers = (pack) => {
+  const out = [];
+  const items = (pack && pack.items) || [];
+  const seen = new Set();
+  items.forEach((it, i) => {
+    const at = 'items[' + i + ']' + (it && it.id ? '(' + it.id + ')' : '');
+    if (!it || typeof it !== 'object') { out.push(at + ' 문항이 객체가 아니에요.'); return; }
+    if (it.id) {
+      if (seen.has(it.id)) out.push(at + ' 문항 id가 겹쳐요 — 학생 기록이 한 칸에 섞입니다.');
+      seen.add(it.id);
+    }
+    /* 서술형은 루브릭이 채점의 전부다. 비어 있으면 학생이 무엇을 써도 통과가 안 나와
+       사다리 5단계가 끝나지 않는다(§4.1·§7[3]) — 조용한 미완성이라 더 위험하다. */
+    if (it.format === 'essay') {
+      const rubric = it.rubric || [];
+      if (!rubric.length) { out.push(at + ' 서술형인데 rubric이 없어요 — 검수에서 저작해야 합니다(§7[3]).'); return; }
+      rubric.forEach((r, k) => {
+        if (!r || !String(r.element || '').trim() || !((r.keywords || []).length)) {
+          out.push(at + '.rubric[' + k + '] element·keywords가 둘 다 있어야 해요.');
+        }
+      });
+    }
+  });
+  return out;
+};
+
 /* 새 팩이 지금 팩에 있던 것을 잃어버리는가 — works·sets·items 의 id 집합으로 본다 */
 const idsOf = (pack, key) => ((pack && pack[key]) || []).map((x) => x && (x.id || x.workId || x.setId)).filter(Boolean);
 const missingIds = (curPack, nextPack) => ['works', 'sets', 'items'].flatMap((k) => {
@@ -182,6 +214,8 @@ export async function handleNaesinKo(ctx) {
     /* id와 pack.packId가 다르면 거절 — 다른 팩을 덮어쓰는 사고의 마지막 방어선 */
     if (pack.packId !== id) return j(400, { error: 'pack.packId가 id와 달라요.' });
     if (size(pack) > PACK_MAX_BYTES) return j(413, { error: '팩이 너무 커요 (4MB 이내).' });
+    const bad = packBlockers(pack);
+    if (bad.length) return j(400, { error: '배포를 막는 문항이 있어요: ' + bad[0], blockers: bad.slice(0, 5) });
     const rec = { pack, updatedAt: nowIso() };
     await store.putPack(id, rec);
     const ids = (await store.getPackIds()) || [];
@@ -243,6 +277,8 @@ export async function handleNaesinKo(ctx) {
       if (lost.length) {
         return j(409, { error: '불러온 뒤 팩이 바뀌었어요 — 다시 불러오고 저작하세요.', lost: lost.slice(0, 5) });
       }
+      const bad = packBlockers(pack);
+      if (bad.length) return j(400, { error: '배포를 막는 문항이 있어요: ' + bad[0], blockers: bad.slice(0, 5) });
       rec = { pack, updatedAt: nowIso() };
     }
     /* 팩에 없는 문항을 대기 목록에서 빼지 않는다 — 그게 '양쪽 어디에도 없는' 상태를 만드는 길이다.
