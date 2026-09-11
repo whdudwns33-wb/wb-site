@@ -269,13 +269,14 @@ test('수업무관을 선택하면 결석보강을 즉시 비활성화하고 기
   assert.match(update, /reasonField\.value = 'manual_exam'/);
 });
 
-test('수동 생성 카드에는 결석 원 수업 표현 대신 생성 사유를 표시한다', () => {
+test('수동 생성 카드에는 생성 사유와 연결된 원수업 날짜를 함께 표시한다', () => {
   const card = block('function makeupCard(row)', 'function makeupKpis(rows)');
 
   assert.match(card, /row\.creationType === 'manual'/);
   assert.match(card, /MANUAL_MAKEUP_REASON_LABELS\[row\.manualReason\]/);
   assert.match(card, /직접 생성 ·/);
-  assert.match(card, /: '원 수업 ' \+ esc\(row\.sourceDate\)/);
+  assert.match(card, /sourceDateTag/);
+  assert.match(card, /row\.sourceDate/);
   assert.match(card, /row\.sourceMode === 'unrelated'/);
   assert.match(card, /원 수업 · 수업무관/);
 });
