@@ -788,11 +788,37 @@ function requestCard(r) {
     (r.detail ? '<div class="task-d">' + esc(r.detail) + '</div>' : '') +
     (r.resultNote ? '<div class="small muted mt8">' + (r.status === 'blocked' ? '사유: ' : '결과: ') + esc(r.resultNote) + '</div>' : '') +
     (r.resultUrl && L.isApprovedLink(r.resultUrl) ? '<a class="btn btn-sm btn-ghost mt8" href="' + esc(r.resultUrl) + '" target="_blank" rel="noopener noreferrer">↗ 결과 링크</a>' : '') +
-    ((actions.length || link) ? '<div class="row wraprow mt8" style="gap:6px">' + actions.map(a =>
+    ((actions.length || link || requestCardable(r)) ? '<div class="row wraprow mt8" style="gap:6px">' + actions.map(a =>
       '<button class="btn btn-sm ' + (a === 'done' ? 'btn-primary' : a === 'block' ? 'btn-danger' : a === 'cancel' ? 'btn-ghost' : 'btn-navy') +
       '" data-act="rb-req-act" data-id="' + esc(r.id) + '" data-action="' + esc(a) + '">' + esc(C.REQ_ACTION_LABEL[a] || a) + '</button>').join('') +
-      (link ? '<a class="btn btn-sm btn-ghost" href="' + esc(link.url) + '" target="_blank" rel="noopener noreferrer">↗ ' + esc(link.label) + '</a>' : '') + '</div>' : '') +
+      (link ? '<a class="btn btn-sm btn-ghost" href="' + esc(link.url) + '" target="_blank" rel="noopener noreferrer">↗ ' + esc(link.label) + '</a>' : '') +
+      requestCardButton(r) + '</div>' : '') +
     '</div></div>';
+}
+
+/* 요청 → 배정 카드 (기획서 v1.1 §1.4 — 요청함이 카드의 씨앗). 카드 id 가 요청 id 로 정해져 두 번 만들 수 없다. */
+const REQ_TO_TASK = { assignment: 'assign', worksheet: 'assign', account: 'account', followup: 'followup' };
+function requestCardable(r) { return WBRunbookCore.isOpenRequest(r) && DC.ROOMS.includes(r.program) && !!REQ_TO_TASK[r.reqType]; }
+function requestCardButton(r) {
+  if (!requestCardable(r)) return '';
+  const existing = cardById('q:' + r.id);
+  return existing
+    ? '<a class="btn btn-sm btn-ghost" href="#/p/' + esc(r.program) + '" data-go="p/' + esc(r.program) + '">카드 보기 · ' + esc(DC.CARD_STATUS_LABEL[existing.status] || existing.status) + '</a>'
+    : '<button class="btn btn-sm btn-navy" data-act="dk-req-card" data-id="' + esc(r.id) + '">카드로</button>';
+}
+function requestToCard(id) {
+  const r = WBRunbookUI.requests().find(x => String(x.id) === String(id));
+  if (!r || !requestCardable(r)) return toast('카드로 만들 수 없는 요청입니다');
+  if (cardById('q:' + r.id)) return toast('이미 카드가 있습니다');
+  const C = WBRunbookCore;
+  const ref = String(r.targetRef || '');
+  const target = studentById(ref) ? { type: 'student', id: ref } : { type: 'text', label: ref || '(대상 없음)' };
+  const manual = DC.manualsFor(state.manuals, r.program).find(m => m.task === REQ_TO_TASK[r.reqType]);
+  const what = (String(C.REQ_TYPE_LABEL[r.reqType] || r.reqType) + (r.detail ? ' — ' + String(r.detail) : '')).slice(0, 120);
+  const v = DC.validateCard({ program: r.program, targetType: target.type, targetId: target.id || '', targetLabel: target.label || '', what: what, due: r.neededBy || '', manualId: manual ? manual.id : '', source: 'request:' + r.id });
+  if (v.error) return toast(v.error);
+  addDoc('cards', 'q:' + r.id, Object.assign({}, v.value, { createdAt: now() }));
+  render(); toast('카드를 만들었습니다 — ' + roomLabel(r.program) + ' 방에서 처리합니다');
 }
 
 function fmtAt(ms) {
@@ -850,6 +876,7 @@ function studentDetail(s, progs) {
   const shown = !!ui.phoneShown[s.id];
   const recent = state.contacts.filter(c => c && String(c.studentId) === String(s.id)).sort((a, b) => (Number(b.at) || 0) - (Number(a.at) || 0)).slice(0, 3);
   let h = '<div class="stu-detail">';
+  if (s.school) h += '<div class="small muted">학교: ' + esc(s.school) + '</div>';
   h += '<div class="sect" style="margin-top:4px">프로그램</div>' + DC.PROGRAMS.map(k => {
     const p = progs[k] && typeof progs[k] === 'object' ? progs[k] : {};
     return '<div class="prog-row"><span><b>' + esc(DC.PROGRAM_LABEL[k]) + '</b>' + (p.plan ? ' <span class="muted">' + esc(p.plan) + '</span>' : '') +
@@ -905,6 +932,7 @@ function studentForm(s) {
   return '<div class="grid2">' +
     '<div class="field"><label class="fl" for="dk-f-name">이름 *</label><input class="in" id="dk-f-name" maxlength="40" value="' + esc(v.name || '') + '"></div>' +
     '<div class="field"><label class="fl" for="dk-f-grade">학년</label><input class="in" id="dk-f-grade" maxlength="10" placeholder="중2" value="' + esc(v.grade || '') + '"></div>' +
+    '<div class="field"><label class="fl" for="dk-f-school">학교 (시험 템플릿이 학교·학년으로 대상을 고릅니다)</label><input class="in" id="dk-f-school" maxlength="40" list="dk-schools" placeholder="OO중" value="' + esc(v.school || '') + '">' + schoolDatalist() + '</div>' +
     '<div class="field"><label class="fl" for="dk-f-code">외부 코드</label><input class="in" id="dk-f-code" maxlength="20" placeholder="SF-012" value="' + esc(v.code || '') + '"></div>' +
     '<div class="field"><label class="fl" for="dk-f-status">상태</label><select class="in" id="dk-f-status">' + opt(DC.STUDENT_STATUS, DC.STUDENT_STATUS_LABEL, v.status || 'active') + '</select></div>' +
     '<div class="field"><label class="fl" for="dk-f-since">시작 월</label><input class="in" id="dk-f-since" type="month" value="' + esc(v.since || '') + '"></div></div>' +
@@ -935,7 +963,7 @@ function readStudentForm() {
     programs[k] = { active: checked('dk-f-' + k + '-active'), plan: val('dk-f-' + k + '-plan'), account: val('dk-f-' + k + '-account'), since: val('dk-f-' + k + '-since'), until: val('dk-f-' + k + '-until') };
   });
   return {
-    name: val('dk-f-name'), grade: val('dk-f-grade'), code: val('dk-f-code'), status: val('dk-f-status'), since: val('dk-f-since'), memo: val('dk-f-memo'),
+    name: val('dk-f-name'), grade: val('dk-f-grade'), school: val('dk-f-school'), code: val('dk-f-code'), status: val('dk-f-status'), since: val('dk-f-since'), memo: val('dk-f-memo'),
     programs: programs, guardian: { relation: val('dk-f-g-rel'), phone: val('dk-f-g-phone'), consent: checked('dk-f-g-consent') }
   };
 }
@@ -1029,7 +1057,7 @@ function viewAdmin() {
       '<button class="btn btn-sm btn-danger" data-act="dk-staff-revoke" data-id="' + esc(s.id) + '">기기 연결 해제</button></div></div></div>';
   }).join('') : '<div class="empty"><b>직원이 없습니다</b>[＋ 직원]으로 등록하세요.</div>';
   h += '</div>';
-  h += appsSection() + templatesSection();
+  h += appsSection() + examsSection('') + templatesSection();
   h += datebar() + WBRunbookUI.boardCard(cursor);
   h += '<div class="card"><div class="card-title">설정</div>' +
     '<dl class="kv mt8"><dt>조직 이름</dt><dd>' + esc(state.settings.orgName || '—') + '</dd>' +
@@ -1245,6 +1273,7 @@ function roomHint(k) {
 
 function cardItem(c, date) {
   const late = DC.cardLate(c, date);
+  const dLeft = DC.daysUntil(c, date);
   const st = String(c.status || 'todo');
   const m = DC.manualFor(state.manuals, c);
   const app = c.target && c.target.type === 'app' ? appById(c.target.id) : null;
@@ -1256,7 +1285,7 @@ function cardItem(c, date) {
     (c.where ? '<div class="acard-where">어디에: ' + esc(c.where) + '</div>' : '') +
     '<div class="meta">' +
       (route !== 'room' ? '<span class="tag cls">' + esc(roomLabel(c.program)) + '</span>' : '') +
-      (c.due ? '<span class="tag' + (late ? ' blk' : ' time') + '">' + (late ? '지연 · ' : '') + esc(DC.shortDate(c.due)) + '</span>' : '') +
+      (c.due ? '<span class="tag' + (late ? ' blk' : ' time') + '">' + (late ? '지연 · ' : '') + esc(DC.shortDate(c.due)) + (dLeft ? ' · D-' + dLeft : '') + '</span>' : '') +
       '<span class="tag ' + (st === 'done' ? 'ok' : st === 'blocked' ? 'blk' : st === 'doing' ? 'doing' : '') + '">' + esc(DC.CARD_STATUS_LABEL[st] || st) + '</span>' +
       '<span class="tag">' + esc(sourceText(c.source)) + (c.byOwner ? ' · 원장' : '') + '</span>' +
       (st === 'done' && c.doneAt ? '<span class="tag ok">✓ ' + esc(fmtAt(c.doneAt)) + (c.doneBy ? ' ' + esc(staffName(c.doneBy)) : '') + '</span>' : '') +
@@ -1285,6 +1314,7 @@ function cardsBlock(roomKey, date) {
   const on = DC.cardsOn(state.cards, date);
   const open = roomKey ? on.open.filter(c => c.program === roomKey) : on.open;
   const done = roomKey ? on.done.filter(c => c.program === roomKey) : on.done;
+  const upcoming = roomKey ? on.upcoming.filter(c => c.program === roomKey) : on.upcoming;
   const late = open.filter(c => DC.cardLate(c, date)).length;
   const blocked = open.filter(c => c.status === 'blocked').length;
   let h = '<div class="card"><div class="between mb8"><div class="card-title">' + (roomKey ? '이 방의 카드' : '오늘 카드') + ' <span class="muted small">' + open.length + '</span></div>' +
@@ -1300,6 +1330,7 @@ function cardsBlock(roomKey, date) {
     const g = DC.groupByRoom(open);
     DC.ROOMS.forEach(k => { if (g[k].length) h += '<div class="sect">' + esc(roomLabel(k)) + ' ' + g[k].length + '</div>' + g[k].map(c => cardItem(c, date)).join(''); });
   }
+  if (upcoming.length) h += '<details' + (roomKey ? ' open' : '') + '><summary class="sect">예정 ' + upcoming.length + ' <span class="muted" style="text-transform:none;letter-spacing:0">기한이 뒤인 카드 — 미리 해도 됩니다</span></summary>' + upcoming.map(c => cardItem(c, date)).join('') + '</details>';
   if (done.length) h += '<details><summary class="sect">완료 ' + done.length + '</summary>' + done.map(c => cardItem(c, date)).join('') + '</details>';
   return h + '</div>';
 }
@@ -1385,8 +1416,63 @@ function viewRoom(k) {
   if (k === 'exam4you' || k === 'jokbo') h += rangesBlock(k);
   h += manualsBlock(k);
   h += roomStatusBlock(k);
-  if (session.canApprove) h += templatesSection(k);
+  if (session.canApprove) {
+    if (k === 'exam4you' || k === 'jokbo') h += examsSection(k);
+    h += templatesSection(k);
+  }
   return h;
+}
+
+/* ── 시험 템플릿(원장) — 학교·학년·시험일·자료 목록 → 시험 leadDays 전에 학생별 자료 카드 ── */
+
+function schoolDatalist() {
+  const names = Array.from(new Set(students().map(s => String(s.school || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'ko'));
+  return '<datalist id="dk-schools">' + names.map(n => '<option value="' + esc(n) + '">').join('') + '</datalist>';
+}
+function examsSection(k) {
+  const list = livePlans().filter(p => p.kind === 'exam' && (!k || (p.materials || []).some(m => m.source === k)))
+    .sort((a, b) => String(a.examDate).localeCompare(String(b.examDate)));
+  let h = '<div class="card"><div class="between mb8"><div class="card-title">시험 템플릿 <span class="muted small">' + list.length + '</span></div>' +
+    '<button class="btn btn-sm btn-ghost" data-act="dk-exam-new">＋ 시험</button></div>' +
+    '<div class="card-sub mb8">학교·학년·시험일과 자료 목록을 적어 두면, 시험 ' + DC.EXAM_LEAD_DEFAULT + '일 전부터 그 학교·학년 학생마다 자료 카드가 자동으로 생깁니다(기한은 시험 ' + DC.EXAM_DUE_BEFORE_DEFAULT + '일 전).</div>';
+  h += list.length ? list.map(p => {
+    const d = DC.daysUntil({ due: p.examDate }, today());
+    return '<div class="rowline"><div class="grow"><b>' + esc([p.school, p.grade, p.subject, p.examName].filter(Boolean).join(' · ')) + '</b> <span class="muted small">' + esc(DC.shortDate(p.examDate)) +
+      (d != null ? ' · D-' + d : (p.examDate < today() ? ' · 지남' : ' · 오늘')) + ' · 자료 ' + (p.materials || []).length + '</span>' +
+      (p.scope ? '<div class="small muted">범위: ' + esc(p.scope) + '</div>' : '') + '</div>' +
+      '<span class="pill' + (p.active !== false ? ' ok' : '') + '">' + (p.active !== false ? '켜짐' : '꺼짐') + '</span>' +
+      '<button class="btn btn-sm btn-ghost" data-act="dk-exam-edit" data-id="' + esc(p.id) + '">편집</button></div>';
+  }).join('') : '<div class="hint">시험 템플릿이 없습니다.</div>';
+  return h + '</div>';
+}
+function openExamForm(id) {
+  const p = id ? planById(id) : null;
+  const srcLabel = s => (s === 'jokbo' ? '족보닷컴' : '이그잼포유');
+  const materials = p ? (p.materials || []).map(m => [srcLabel(m.source), m.what, m.where || ''].join(' | ')).join('\n') : '';
+  modal(p ? '시험 템플릿 편집' : '시험 템플릿',
+    '<div class="grid2"><div class="field"><label class="fl" for="dk-ef-school">학교 *</label><input class="in" id="dk-ef-school" maxlength="40" list="dk-schools" value="' + esc(p ? p.school : '') + '" placeholder="OO중">' + schoolDatalist() + '</div>' +
+    '<div class="field"><label class="fl" for="dk-ef-grade">학년 (비우면 그 학교 전체)</label><input class="in" id="dk-ef-grade" maxlength="10" value="' + esc(p ? p.grade || '' : '') + '" placeholder="중2"></div>' +
+    '<div class="field"><label class="fl" for="dk-ef-subject">과목</label><input class="in" id="dk-ef-subject" maxlength="40" value="' + esc(p ? p.subject || '' : '') + '" placeholder="영어"></div>' +
+    '<div class="field"><label class="fl" for="dk-ef-textbook">교과서</label><input class="in" id="dk-ef-textbook" maxlength="40" value="' + esc(p ? p.textbook || '' : '') + '" placeholder="천재(이)"></div>' +
+    '<div class="field"><label class="fl" for="dk-ef-exam">시험 이름</label><input class="in" id="dk-ef-exam" maxlength="40" value="' + esc(p ? p.examName || '' : '') + '" placeholder="2학기 중간"></div>' +
+    '<div class="field"><label class="fl" for="dk-ef-date">시험일 *</label><input class="in" id="dk-ef-date" type="date" value="' + esc(p ? p.examDate : '') + '"></div></div>' +
+    '<div class="field"><label class="fl" for="dk-ef-scope">시험 범위</label><input class="in" id="dk-ef-scope" maxlength="120" value="' + esc(p ? p.scope || '' : '') + '" placeholder="3~4과"></div>' +
+    '<div class="grid2"><div class="field"><label class="fl" for="dk-ef-lead">며칠 전부터 카드 (1~90)</label><input class="in" id="dk-ef-lead" type="number" min="1" max="90" value="' + esc(p ? p.leadDays : DC.EXAM_LEAD_DEFAULT) + '"></div>' +
+    '<div class="field"><label class="fl" for="dk-ef-before">전달 기한 = 시험 며칠 전</label><input class="in" id="dk-ef-before" type="number" min="0" max="60" value="' + esc(p ? p.dueDaysBefore : DC.EXAM_DUE_BEFORE_DEFAULT) + '"></div></div>' +
+    '<div class="field"><label class="fl" for="dk-ef-materials">자료 — 한 줄에 하나: 출처 | 무엇을 | 어디에</label><textarea class="in" id="dk-ef-materials" rows="5" placeholder="이그잼포유 | 교과서 변형 3~4과 | 학생 폴더\n족보닷컴 | 기출 3개년 | 출력해 전달">' + esc(materials) + '</textarea></div>' +
+    '<div class="field"><label class="fl" for="dk-ef-note">메모</label><input class="in" id="dk-ef-note" maxlength="300" value="' + esc(p ? p.note || '' : '') + '"></div>' +
+    '<label class="check"><input type="checkbox" id="dk-ef-active"' + (!p || p.active !== false ? ' checked' : '') + '> 켜짐</label>',
+    '<div class="row wraprow mt8" style="gap:6px"><button class="btn btn-primary" data-act="dk-exam-save" data-id="' + esc(id || '') + '">저장</button>' +
+    (p ? '<button class="btn btn-danger" data-act="dk-plan-del" data-id="' + esc(id) + '">삭제</button>' : '') + '</div>');
+}
+function saveExamForm(id) {
+  const v = DC.validateExam({ school: val('dk-ef-school'), grade: val('dk-ef-grade'), subject: val('dk-ef-subject'), textbook: val('dk-ef-textbook'), examName: val('dk-ef-exam'), examDate: val('dk-ef-date'),
+    scope: val('dk-ef-scope'), leadDays: val('dk-ef-lead'), dueDaysBefore: val('dk-ef-before'), materialsText: val('dk-ef-materials'), note: val('dk-ef-note'), active: checked('dk-ef-active') });
+  if (v.error) return toast(v.error);
+  addDoc('plans', id || 'ex:' + uid(), v.value);
+  closeModal();
+  const made = ensureTodayCards();
+  render(); toast(made ? '시험 템플릿 저장 — 자료 카드 ' + made + '장을 만들었습니다' : '시험 템플릿을 저장했습니다' + (DC.daysUntil({ due: v.value.examDate }, today()) > v.value.leadDays ? ' — 시험 ' + v.value.leadDays + '일 전에 카드가 생깁니다' : ''));
 }
 
 function rangesBlock(k) {
@@ -1517,7 +1603,7 @@ function saveRangeForm(id) {
 }
 function deletePlan(id) {
   const p = planById(id); if (!p) return;
-  if (!confirm((p.kind === 'apprange' ? '이 범위' : '이 템플릿') + '을 지울까요? 이미 만들어진 카드는 남습니다.')) return;
+  if (!confirm((p.kind === 'apprange' ? '이 범위' : p.kind === 'exam' ? '이 시험 템플릿' : '이 템플릿') + '을 지울까요? 이미 만들어진 카드는 남습니다.')) return;
   removeDoc('plans', id);
   closeModal(); render(); toast('지웠습니다');
 }
@@ -1586,6 +1672,13 @@ function viewManuals() {
   return h;
 }
 function liveManualsCount() { return state.manuals.filter(m => m && !m.deleted).length; }
+function minutesText(m) {
+  if (m == null) return '—';
+  const n = Number(m);
+  if (n < 60) return n + '분';
+  if (n < 60 * 24) return Math.floor(n / 60) + '시간 ' + (n % 60) + '분';
+  return Math.floor(n / 1440) + '일 ' + Math.floor((n % 1440) / 60) + '시간';
+}
 function seedManuals() {
   if (typeof WBManualSeed === 'undefined') return toast('씨앗 파일이 없습니다');
   const L = WBExternalLinks;
@@ -1649,7 +1742,23 @@ function deleteManual(id) {
 function viewMatrix() {
   const v = ui.matrixView;
   let h = '<div class="card"><div class="between mb8"><div class="card-title">현황</div></div><div class="chips">' +
-    [['students', '학생 × 프로그램'], ['apps', '앱 × 자료 범위']].map(x => '<button class="chip' + (v === x[0] ? ' on' : '') + '" data-act="dk-matrix-view" data-v="' + x[0] + '">' + x[1] + '</button>').join('') + '</div></div>';
+    [['students', '학생 × 프로그램'], ['apps', '앱 × 자료 범위'], ['staff', '직원 처리']].map(x => '<button class="chip' + (v === x[0] ? ' on' : '') + '" data-act="dk-matrix-view" data-v="' + x[0] + '">' + x[1] + '</button>').join('') + '</div></div>';
+  if (v === 'staff') {
+    const on = DC.cardsOn(state.cards, today());
+    const late = on.open.filter(c => DC.cardLate(c, today())).length;
+    const blocked = on.open.filter(c => c.status === 'blocked').length;
+    h += '<div class="card"><div class="row wraprow mb8" style="gap:4px"><span class="pill">열림 ' + on.open.length + '</span><span class="pill">예정 ' + on.upcoming.length + '</span>' +
+      (late ? '<span class="pill bad">지연 ' + late + '</span>' : '') + (blocked ? '<span class="pill bad">막힘 ' + blocked + '</span>' : '') + '<span class="pill ok">오늘 완료 ' + on.done.length + '</span></div>';
+    [[7, '최근 7일'], [30, '최근 30일']].forEach(w => {
+      const rows = DC.staffStats(state.cards, today(), w[0]);
+      h += '<div class="sect">' + w[1] + '</div>';
+      h += rows.length ? '<div class="mxwrap"><table class="mx"><thead><tr><th>직원</th><th>완료</th><th>기한 넘김</th><th>처리 시간(중앙값)</th><th>평균</th></tr></thead><tbody>' + rows.map(r =>
+        '<tr><td>' + esc(staffName(r.staffId)) + '</td><td>' + r.done + '</td><td>' + (r.lateDone ? '<span style="color:var(--bad)">' + r.lateDone + '</span>' : '0') + '</td><td>' + minutesText(r.medianMinutes) + '</td><td>' + minutesText(r.avgMinutes) + '</td></tr>').join('') +
+        '</tbody></table></div>' : '<div class="hint">완료한 카드가 없습니다.</div>';
+    });
+    h += '<div class="hint mt8">처리 시간 = 카드가 만들어진 뒤 완료까지. 템플릿 카드는 그날 앱을 처음 연 시각부터 잽니다.</div></div>';
+    return h;
+  }
   if (v === 'apps') {
     const cov = DC.coverageOf(state.apps, state.plans);
     if (!cov.length) return h + '<div class="card"><div class="empty"><b>앱이 없습니다</b>관리 탭에서 학원 학습 앱을 등록하세요.</div></div>';
@@ -1805,6 +1914,10 @@ function onClick(ev) {
     case 'dk-app-save': saveAppForm(id); return;
     case 'dk-app-del': deleteApp(id); return;
     case 'dk-matrix-view': ui.matrixView = String(el.dataset.v || 'students'); render(); return;
+    case 'dk-req-card': requestToCard(id); return;
+    case 'dk-exam-new': if (session.canApprove) openExamForm(''); return;
+    case 'dk-exam-edit': if (session.canApprove) openExamForm(id); return;
+    case 'dk-exam-save': saveExamForm(id); return;
     default: return;
   }
 }
