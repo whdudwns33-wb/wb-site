@@ -339,7 +339,7 @@
       errors.push({ field: 'lessonHours', message: '수업시수는 1T, 1.5T, 2T, 2.5T, 3T, 3.5T, 4T, 4.5T, 5T, 6T 중에서 선택해 주세요' });
     }
     if (!validIsoDate(input.firstClassDate)) {
-      errors.push({ field: 'firstClassDate', message: '첫 수업 날짜를 확인해 주세요' });
+      errors.push({ field: 'firstClassDate', message: '과목별 첫 수업일을 확인해 주세요' });
     }
     const schedule = resolveSchedule(input);
     if (input.scheduleSlots.length && schedule.issues.some(issue => issue.code === 'invalid_slot')) {

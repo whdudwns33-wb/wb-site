@@ -185,7 +185,8 @@
   .lesson-next-compact.is-loading { color: #7A3FA1; }
   .lesson-next-compact.is-empty { border-color: #D8E0E6; background: #F7F9FA; color: var(--mid-gray); }
   .lesson-attendance-tag { border: 1px solid rgba(30,157,214,.18); font-weight: 900; }
-  .lesson-first-class-tag { background: #FFF4CC; color: #8A5A00; border: 1px solid #F2D27A; font-weight: 900; }
+  .lesson-first-class-tag { background: #D7263D; color: #fff; border: 1px solid #A9192C; font-weight: 900; box-shadow: 0 0 0 2px rgba(215,38,61,.16); }
+  .task.is-first-class { border-left: 6px solid #D7263D; background: #FFF0F2; box-shadow: 0 2px 8px rgba(215,38,61,.18); }
   .note { margin-top: 8px; width: 100%; font-size: 13px; line-height: 1.6; padding: 10px 12px; border: 1px dashed var(--line); border-radius: 8px; background: var(--ivory); white-space: pre-wrap; overflow-wrap: anywhere; }
   textarea.note { display: block; min-height: 44px; resize: vertical; transition: height .18s ease, min-height .18s ease, border-color .18s ease, background .18s ease; }
   .memo-editor:focus-within textarea.note { min-height: 132px; border-style: solid; border-color: var(--blue); background: var(--white); outline: 2px solid rgba(30,157,214,.12); }
@@ -847,6 +848,9 @@
   .makeup-archive { margin-top: 12px; }
   .makeup-archive > summary { min-height: 44px; display: flex; align-items: center; color: var(--deep-blue); font-size: 13px; font-weight: 900; cursor: pointer; }
   .makeup-archive-grid { margin-top: 10px; }
+  .makeup-recovery { border-color: #F6D6A6; background: #FFFBF3; }
+  .makeup-recovery-row { padding: 10px 0; border-top: 1px solid #F3E2C8; gap: 12px; }
+  .makeup-recovery-row:first-child { border-top: 0; }
   .task.is-makeup-lesson { margin-right: -8px; margin-left: -8px; padding-right: 8px; padding-left: 8px; border-left: 4px solid #7C3AED; border-radius: 10px; background: #F7F3FF; }
   .tag.makeup-lesson { border-color: #C4B5FD; background: #EDE9FE; color: #5B21B6; }
   .schedule-list-row.is-makeup { margin-right: -6px; margin-left: -6px; padding-right: 6px; padding-left: 6px; border-left: 4px solid #A21CAF; border-radius: 8px; background: #FDF4FF; }
@@ -1368,10 +1372,17 @@ function isBookOrderWorkTask(task) {
   return !!task && /^\[주문\]\s*/.test(String(task.title || ''));
 }
 
+function firstClassTaskOnDate(task, date) {
+  if (!task || task.deleted || !/^\[(수업|컨설팅)\]/.test(String(task.title || ''))) return false;
+  const firstDate = String(task.firstClassDate || '');
+  return /^\d{4}-\d{2}-\d{2}$/.test(firstDate) && firstDate === String(date || '');
+}
+
 function tasksFor(staffId, date) {
   return state.tasks
     .filter(t => t.staffId === staffId && occursOn(t, date) && !isBookOrderWorkTask(t))
-    .sort((a, b) => (a.time || '99:99').localeCompare(b.time || '99:99')
+    .sort((a, b) => Number(firstClassTaskOnDate(b, date)) - Number(firstClassTaskOnDate(a, date))
+                 || (a.time || '99:99').localeCompare(b.time || '99:99')
                  || (b.priority === 'high') - (a.priority === 'high')
                  || (a.createdAt || 0) - (b.createdAt || 0));
 }
@@ -5247,13 +5258,14 @@ function taskRow(t, date, editable, isCarry) {
   const lessonAttendanceTag = lesson && c && c.att && ATT_LABEL[c.att]
     ? '<span class="tag lesson-attendance-tag ' + ATT_LABEL[c.att][1] + '">' + ATT_LABEL[c.att][0] + '</span>' : '';
   const firstClassDate = lessonRegistrationIsoDate(t.firstClassDate);
-  const lessonFirstClassTag = lesson && firstClassDate && String(date) === firstClassDate
-    ? '<span class="tag lesson-first-class-tag">첫 수업</span>' : '';
+  const isFirstClass = !!(lesson && firstClassDate && String(date) === firstClassDate);
+  const lessonFirstClassTag = isFirstClass
+    ? '<span class="tag lesson-first-class-tag">첫수업</span>' : '';
   const open = openPanels.has(t.id + '|' + date);
   const showFinalBox = session.isAdmin || !usesStandardLessonDisplay(t);
   const canEditRecord = editable && (!lesson || !!(recordContext && recordContext.inputEnabled && recordDate));
 
-  let h = '<div class="task ' + st + (st === 'blocked' ? ' isblocked' : '') + (makeupLesson ? ' is-makeup-lesson' : '') + '" data-task="' + t.id + '">' +
+  let h = '<div class="task ' + st + (st === 'blocked' ? ' isblocked' : '') + (makeupLesson ? ' is-makeup-lesson' : '') + (isFirstClass ? ' is-first-class' : '') + '" data-task="' + t.id + '">' +
     (showFinalBox ? '<button class="box" ' + (canEditRecord ? 'data-act="toggle" data-id="' + t.id + '" data-date="' + (lesson ? recordDate : date) + '"' : 'disabled') + '>✓</button>' : '') +
     '<div class="task-body">' +
       '<div class="task-t">' + esc(taskDisplayTitle(t)) + '</div>' +
@@ -5473,8 +5485,8 @@ function lessonBriefingEditorHtml(student, task) {
         (selectedSubjects.has(subject) ? ' checked' : '') + '> ' + esc(subject) + '</label>').join('') + '</div></div>' +
     '<div class="guide"><b>과목별 수업 담당</b>' + esc(subjectTeachers) +
       '<div class="small mt8">담당 선생님은 학생 공통 정보가 아니라 각 수업에서 변경합니다.</div></div>' +
-    '<div class="grid2"><label class="field"><span class="fl">신규 등록일</span><input class="in" type="date" data-lesson-briefing-student="registrationDate" value="' + esc(student.registrationDate || '') + '"></label>' +
-    '<label class="field"><span class="fl">첫 수업 시작일</span><input class="in" type="date" data-lesson-briefing-student="firstClassDate" value="' + esc(student.firstClassDate || '') + '"></label></div>' +
+    '<div class="grid2"><label class="field"><span class="fl">신규등록일</span><input class="in" type="date" data-lesson-briefing-student="registrationDate" value="' + esc(student.registrationDate || '') + '"></label>' +
+    '<label class="field"><span class="fl">첫 등원일</span><input class="in" type="date" data-lesson-briefing-student="firstClassDate" value="' + esc(student.firstClassDate || '') + '"></label></div>' +
     '<div class="grid2"><label class="field"><span class="fl">결제 구분</span><select class="in" data-lesson-briefing-student="billingMode" data-roster-billing-mode onchange="updateRosterBillingFields(this)">' +
       '<option value="monthly"' + (billingMode === 'monthly' ? ' selected' : '') + '>월결제</option>' +
       '<option value="session4"' + (billingMode === 'session4' ? ' selected' : '') + '>회차제 · 4회</option></select></label>' +
@@ -7730,8 +7742,8 @@ function lessonRosterInformationHtml() {
     '<div class="grid2"><label class="field"><span class="fl">연락처(본인)</span><input class="in" type="tel" inputmode="tel" data-lesson-roster-field="phoneSelf" maxlength="30" value="' + esc(info.phoneSelf) + '"></label>' +
     '<label class="field"><span class="fl">연락처(부)</span><input class="in" type="tel" inputmode="tel" data-lesson-roster-field="phoneFather" maxlength="30" value="' + esc(info.phoneFather) + '"></label></div>' +
     '<label class="field"><span class="fl">연락처(모)</span><input class="in" type="tel" inputmode="tel" data-lesson-roster-field="phoneMother" maxlength="30" value="' + esc(info.phoneMother) + '"></label>' +
-    '<div class="grid2"><label class="field"><span class="fl">신규 등록일</span><input class="in" type="date" data-lesson-roster-field="registrationDate" value="' + esc(info.registrationDate) + '"></label>' +
-    '<label class="field"><span class="fl">첫 수업 시작일</span><input class="in" type="date" data-lesson-roster-field="firstClassDate" value="' + esc(info.firstClassDate) + '"></label></div>' +
+    '<div class="grid2"><label class="field"><span class="fl">신규등록일</span><input class="in" type="date" data-lesson-roster-field="registrationDate" value="' + esc(info.registrationDate) + '"></label>' +
+    '<label class="field"><span class="fl">첫 등원일</span><input class="in" type="date" data-lesson-roster-field="firstClassDate" value="' + esc(info.firstClassDate) + '"></label></div>' +
     '<div class="grid2"><label class="field"><span class="fl">결제 구분</span><select class="in" data-lesson-roster-field="billingMode" data-roster-billing-mode onchange="updateRosterBillingFields(this)">' +
       '<option value="monthly"' + (info.billingMode === 'monthly' ? ' selected' : '') + '>월결제</option>' +
       '<option value="session4"' + (info.billingMode === 'session4' ? ' selected' : '') + '>회차제 · 4회</option></select></label>' +
@@ -7927,7 +7939,7 @@ async function submitLessonAssignmentRequest(button) {
   }
   if (!draft.startDate) return toast('수업 시작일을 선택해 주세요');
   if (lessonStartBeforeFirstClassDate(draft.startDate, selected)) {
-    return toast('수업 시작일은 원생 첫 수업 시작일 ' + lessonStudentFirstClassDate(selected) + ' 이후여야 합니다');
+    return toast('수업 시작일은 원생 첫 등원일 ' + lessonStudentFirstClassDate(selected) + ' 이후여야 합니다');
   }
   if (!String(draft.reason || '').trim()) return toast('수업 등록 요청 사유를 입력해 주세요');
   const auth = sync.auth();
@@ -8076,7 +8088,7 @@ function lessonAssignmentRequestHtml() {
     '<button class="btn btn-sm btn-ghost mb14" data-act="lessonassignmentslotadd">＋ 다른 시간대 추가</button>' +
     '<label class="field"><span class="fl">수업 시작일</span><input class="in" type="date" data-assignment-start' +
       (selectedFirstClassDate ? ' min="' + esc(selectedFirstClassDate) + '"' : '') + ' value="' + esc(draft.startDate || today()) + '">' +
-      (selectedFirstClassDate ? '<div class="hint mt8">원생 첫 수업 시작일 ' + esc(selectedFirstClassDate) + '보다 빠르게 요청할 수 없습니다.</div>' : '') + '</label>' +
+      (selectedFirstClassDate ? '<div class="hint mt8">원생 첫 등원일 ' + esc(selectedFirstClassDate) + '보다 빠르게 요청할 수 없습니다.</div>' : '') + '</label>' +
     '<label class="field"><span class="fl">수업 등록 요청 사유</span><textarea class="in" rows="3" maxlength="500" data-assignment-reason placeholder="이 학생의 수업 등록이 필요한 이유를 적어 주세요">' + esc(draft.reason || '') + '</textarea></label>' +
     '<div class="hint mb14">승인되면 이 과목의 수업이 요청한 선생님에게 생성됩니다. 연락처 원문은 이 화면에 표시되지 않습니다.</div>' +
     '<button class="btn btn-primary btn-block" data-act="lessonassignmentrequest">원장님께 학생 수업 등록 요청</button>' : '';
@@ -8226,8 +8238,8 @@ function lessonBatchEntryHtml(entry, index, count) {
       '<button class="btn btn-sm btn-ghost mb14" data-act="lessonbatchslotadd" data-i="' + index + '">＋ 다른 시간대 추가</button>' +
     '<div class="grid2"><label class="field"><span class="fl">적용 시작일</span><input class="in" type="date" data-lesson-batch-field="start" data-i="' + index + '"' +
       (firstClassDate ? ' min="' + esc(firstClassDate) + '"' : '') + ' value="' + esc(entry.start || today()) + '">' +
-      (firstClassDate ? '<div class="hint mt8">원생 첫 수업 시작일 ' + esc(firstClassDate) + '보다 빠르게 등록할 수 없습니다.</div>' : '') + '</label>' +
-      '<label class="field"><span class="fl">첫 수업 날짜 (선택)</span><input class="in" type="date" data-lesson-batch-field="firstClassDate" data-i="' + index + '" value="' + esc(entry.firstClassDate || '') + '">' +
+      (firstClassDate ? '<div class="hint mt8">원생 첫 등원일 ' + esc(firstClassDate) + '보다 빠르게 등록할 수 없습니다.</div>' : '') + '</label>' +
+      '<label class="field"><span class="fl">과목별 첫 수업일 (선택)</span><input class="in" type="date" data-lesson-batch-field="firstClassDate" data-i="' + index + '" value="' + esc(entry.firstClassDate || '') + '">' +
       '<div class="hint mt8">비워도 수업을 생성할 수 있습니다.</div></label></div></div>';
 }
 
@@ -8290,8 +8302,8 @@ function lessonStudentBatchRegistrationHtml() {
       '<button class="btn btn-sm btn-ghost mb14" data-act="lessonslotadd">＋ 다른 시간대 추가</button>' +
     '<div class="grid2"><label class="field"><span class="fl">적용 시작일</span><input class="in" type="date" data-lesson-field="start"' +
       (firstClassDateMinimum ? ' min="' + esc(firstClassDateMinimum) + '"' : '') + ' value="' + esc(draft.start || today()) + '">' +
-      (firstClassDateMinimum ? '<div class="hint mt8">선택 학생 중 가장 늦은 첫 수업 시작일 ' + esc(firstClassDateMinimum) + '보다 빠르게 등록할 수 없습니다.</div>' : '') + '</label>' +
-    '<label class="field"><span class="fl">첫 수업 날짜 (선택)</span><input class="in" type="date" data-lesson-field="firstClassDate" value="' + esc(draft.firstClassDate || '') + '">' +
+      (firstClassDateMinimum ? '<div class="hint mt8">선택 학생 중 가장 늦은 첫 등원일 ' + esc(firstClassDateMinimum) + '보다 빠르게 등록할 수 없습니다.</div>' : '') + '</label>' +
+    '<label class="field"><span class="fl">과목별 첫 수업일 (선택)</span><input class="in" type="date" data-lesson-field="firstClassDate" value="' + esc(draft.firstClassDate || '') + '">' +
       '<div class="hint mt8">비워도 수업을 생성할 수 있습니다.</div></label></div>' +
     '<button class="btn btn-primary btn-block mt14" data-act="lessonpreview"' + (selectedIds.size ? '' : ' disabled') + '>선택 ' + selectedIds.size + '명 · 수업 일괄 등록 미리보기</button>';
 }
@@ -8397,7 +8409,7 @@ function viewLessonEntry() {
         (draft.scheduleSlots || []).map(lessonSlotHtml).join('') +
         '<button class="btn btn-sm btn-ghost mb14" data-act="lessonslotadd">＋ 다른 시간대 추가</button>' +
       '<div class="grid2"><label class="field"><span class="fl">적용 시작일</span><input class="in" type="date" data-lesson-field="start" value="' + esc(draft.start || today()) + '"></label>' +
-      '<label class="field"><span class="fl">첫 수업 날짜 (선택)</span><input class="in" type="date" data-lesson-field="firstClassDate" value="' + esc(draft.firstClassDate || '') + '">' +
+      '<label class="field"><span class="fl">과목별 첫 수업일 (선택)</span><input class="in" type="date" data-lesson-field="firstClassDate" value="' + esc(draft.firstClassDate || '') + '">' +
         '<div class="hint mt8">비워도 수업을 생성할 수 있습니다.</div></label></div>' +
       '<button class="btn btn-primary btn-block mt14" data-act="lessonpreview">' + (draft._sourceTaskId ? '수정 내용 미리보기' : '등록 내용 미리보기') + '</button>'));
   const formPanel = '<div class="lesson-form-panel">' + formBody + '</div>';
@@ -8530,7 +8542,7 @@ function previewLessonStudentBatchRegistration(core, draft) {
   const students = lessonFormStudents().filter(student => selectedIds.has(String(student.id)));
   if (!students.length || students.length > 50) return toast('일괄 등록할 학생은 1명 이상 50명 이하로 선택해 주세요');
   if (lessonStartBeforeFirstClassDate(draft.start, students)) {
-    return toast('적용 시작일은 선택 학생의 첫 수업 시작일 ' + lessonFirstClassDateMinimum(students) + ' 이후여야 합니다');
+    return toast('적용 시작일은 선택 학생의 첫 등원일 ' + lessonFirstClassDateMinimum(students) + ' 이후여야 합니다');
   }
   if (!ROSTER_SUBJECT_OPTIONS.includes(String(draft.subject || ''))) return toast('공통 수업 과목을 한 개 선택해 주세요');
   if (!String(draft.staffId || '')) return toast('이번 수업 담당 선생님을 선택해 주세요');
@@ -8575,7 +8587,7 @@ function previewLessonBatchRegistration(core, draft, selected) {
     if (!ROSTER_SUBJECT_OPTIONS.includes(String(entries[index].subject || ''))) return toast('수업 ' + (index + 1) + '의 과목을 선택해 주세요');
     if (!String(entries[index].staffId || '')) return toast('수업 ' + (index + 1) + '의 담당 선생님을 선택해 주세요');
     if (lessonStartBeforeFirstClassDate(entries[index].start, effectiveStudent)) {
-      return toast('수업 ' + (index + 1) + '의 적용 시작일은 첫 수업 시작일 ' + lessonStudentFirstClassDate(effectiveStudent) + ' 이후여야 합니다');
+      return toast('수업 ' + (index + 1) + '의 적용 시작일은 첫 등원일 ' + lessonStudentFirstClassDate(effectiveStudent) + ' 이후여야 합니다');
     }
   }
   try { lessonPreviewRosterStudent = lessonRosterStudentPayload(selected, draft, entries); }
@@ -8619,7 +8631,7 @@ function previewLessonBatchRegistration(core, draft, selected) {
         '<div class="small mt8"><b>담당</b> ' + esc((teacher && teacher.name) || '확인 필요') + ' 선생님</div>' +
         '<div class="small mt8"><b>요일·시간·시수</b> ' + previewValue(slotSummary || item.taskBody.scheduleText) + '</div>' +
         '<div class="small mt8"><b>적용 시작일</b> ' + esc(item.taskBody.start || '') + '</div>' +
-        '<div class="small mt8"><b>첫 수업 날짜</b> ' + esc(item.taskBody.firstClassDate || '미입력') + '</div></div>';
+        '<div class="small mt8"><b>과목별 첫 수업일</b> ' + esc(item.taskBody.firstClassDate || '미입력') + '</div></div>';
     }).join(''),
     '<button class="btn btn-primary btn-block mt14" data-act="lessonbatchsave">수업 ' + previews.length + '건 한 번에 등록</button>' +
     '<button class="btn btn-ghost btn-block" style="margin-top:8px" data-act="closemodal">다시 수정</button>');
@@ -8675,7 +8687,7 @@ function previewLessonRegistration() {
       '<b>2. 수업 과목</b><br>' + previewValue(taskBody.subject) + '<br><br>' +
       '<b>3. 담당 선생님</b><br>' + esc((teacher && teacher.name) || '본인') + ' 선생님<br><br>' +
       '<b>4. 수업 요일·시간·시수</b><br>' + previewValue(taskBody.scheduleText) + '<br><br>' +
-      '<b>첫 수업 날짜</b><br>' + previewValue(taskBody.firstClassDate || '미입력') + '</div>' +
+      '<b>과목별 첫 수업일</b><br>' + previewValue(taskBody.firstClassDate || '미입력') + '</div>' +
     '<div class="card ' + (review ? 'lesson-review' : 'lesson-confirmed') + ' mt14"><b>' +
       (review ? '⚠️ 시간 확인 필요' : '✅ 현황판 시간 확정') + '</b><div class="small muted">' +
       (review ? esc(lessonPreviewPayload.scheduleReviewReason || '요일·시작·종료 확인 필요') : esc(slotSummary)) + '</div></div>',
@@ -10853,11 +10865,11 @@ function makeupRequestHtml(task, date, check) {
   const linked = makeupCaseForSource(task.id, date);
   if (linked) return '<div class="row wraprow mt14" style="gap:8px"><button class="btn btn-sm btn-ghost makeup-request" data-go="makeup">보강 · ' +
     esc(MAKEUP_STATUS_LABELS[linked.status] || linked.status) + '</button></div>';
-  if (!task.studentId) return '<div class="small muted mt8">결석 출결은 저장됩니다. 보강 자동 검토는 원생 명단의 학생 ID를 이 수업에 연결한 뒤 만들 수 있습니다.</div>';
+  if (!task.studentId) return '<div class="small muted mt8">결석 출결은 저장됩니다. 학생 ID를 이 수업에 연결하면 보강 필요를 만들 수 있습니다.</div>';
   if (taskUsesSession4Billing(task, date)) {
     return '<div class="row wraprow mt14" style="gap:8px"><button class="btn btn-sm btn-primary makeup-request" data-act="mucreate" data-id="' +
-      esc(task.id) + '" data-date="' + esc(date) + '">보강 검토 요청</button>' +
-      '<span class="small muted">회차제 결석은 자동 생성하지 않습니다. 필요한 경우에만 직접 요청해 주세요.</span></div>';
+      esc(task.id) + '" data-date="' + esc(date) + '">보강 필요 생성</button>' +
+      '<span class="small muted">회차제 결석은 자동 생성하지 않습니다. 필요한 경우에만 직접 생성해 주세요.</span></div>';
   }
   const creating = makeupCreateStates.get(makeupCreateKey(task.id, date));
   if (creating && creating.status === 'pending') {
@@ -10866,16 +10878,16 @@ function makeupRequestHtml(task, date, check) {
   if (creating && creating.status === 'sync_failed') {
     return '<div class="row wraprow mt14" style="gap:8px"><button class="btn btn-sm btn-primary makeup-request" data-act="mucreate" data-id="' +
       esc(task.id) + '" data-date="' + esc(date) + '">동기화 후 다시 시도</button>' +
-      '<span class="small muted">출결은 이 기기에 저장됨 · 서버 동기화 후 보강 검토를 만듭니다.</span></div>';
+      '<span class="small muted">출결은 이 기기에 저장됨 · 서버 동기화 후 보강 필요를 만듭니다.</span></div>';
   }
   if (creating && creating.status === 'create_failed') {
     return '<div class="row wraprow mt14" style="gap:8px"><button class="btn btn-sm btn-primary makeup-request" data-act="mucreate" data-id="' +
-      esc(task.id) + '" data-date="' + esc(date) + '">보강 검토 다시 시도</button>' +
-      '<span class="small muted">출결 저장됨 · 보강 검토 생성 실패</span></div>';
+      esc(task.id) + '" data-date="' + esc(date) + '">보강 필요 다시 생성</button>' +
+      '<span class="small muted">출결 저장됨 · 보강 필요 생성 실패</span></div>';
   }
   return '<div class="row wraprow mt14" style="gap:8px"><button class="btn btn-sm btn-primary makeup-request" data-act="mucreate" data-id="' +
-    esc(task.id) + '" data-date="' + esc(date) + '">보강 검토 요청</button>' +
-    '<span class="small muted">결석 출결을 서버에 저장한 뒤 요청됩니다.</span></div>';
+    esc(task.id) + '" data-date="' + esc(date) + '">보강 필요 생성</button>' +
+    '<span class="small muted">결석 출결을 서버에 저장한 뒤 생성됩니다.</span></div>';
 }
 
 function makeupIsDelayed(row, date) {
@@ -11199,6 +11211,45 @@ function makeupCard(row) {
     (actions ? '<div class="makeup-actions">' + actions + '</div>' : '') + '</article>';
 }
 
+/* 자동 생성이 도입되기 전에 저장된 과거 결석 중 보강 원장이 없는 건만 복구한다.
+ * 서버 목록이 최신으로 로드된 뒤에만 계산하여 잠깐의 로딩 상태를 중복 건으로 오인하지 않는다. */
+function makeupMissingAbsenceRows() {
+  if (!makeupLoaded) return [];
+  const taskById = new Map((state.tasks || []).map(task => [String(task.id || ''), task]));
+  const existing = new Set((makeupRows || []).map(row => String(row.sourceTaskId || '') + '|' + String(row.sourceDate || '')));
+  const rows = [];
+  Object.entries(state.checks || {}).forEach(([key, check]) => {
+    if (!check || String(check.att || '') !== 'A') return;
+    const split = key.lastIndexOf('|');
+    if (split <= 0) return;
+    const taskId = key.slice(0, split), date = String(check.date || key.slice(split + 1));
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date > today() || existing.has(taskId + '|' + date)) return;
+    const task = taskById.get(taskId);
+    if (!task || !isRegularLessonTask(task) || !String(task.studentId || '') || isTestTeacherTask(task)) return;
+    rows.push({ task, date, check });
+  });
+  return rows.sort((a, b) => String(b.date).localeCompare(String(a.date)) ||
+    String(a.task.time || '99:99').localeCompare(String(b.task.time || '99:99'))).slice(0, 100);
+}
+
+function makeupRecoveryHtml(rows) {
+  if (!rows.length) return '';
+  return '<section class="card makeup-recovery" aria-labelledby="makeup-recovery-title"><div class="between"><div>' +
+    '<div class="card-title" id="makeup-recovery-title">결석보강 누락 확인</div>' +
+    '<div class="card-sub">자동 생성되지 않은 기존 결석입니다. 원 수업 정보를 확인한 뒤 한 번만 생성하세요.</div></div>' +
+    '<span class="pill warn">' + rows.length + '건</span></div>' +
+    '<div class="makeup-recovery-list mt14">' + rows.map(row => {
+      const task = row.task;
+      const teacher = staffById(String(task.staffId || ''));
+      const source = [task.subject || task.className || '수업', task.time || '시간 미입력'].join(' · ');
+      return '<div class="between makeup-recovery-row"><div><b>' +
+        esc(staffStudentCompactLabelById(task.studentId, task.studentName || studentOf(task), task.grade)) +
+        '</b><div class="small muted">' + esc(row.date + ' · ' + source + ' · ' + ((teacher && teacher.name) || '담당 확인 필요') + ' 선생님') +
+        '</div></div><button class="btn btn-sm btn-primary" data-act="murecover" data-id="' + esc(task.id) +
+        '" data-date="' + esc(row.date) + '">누락 보강 생성</button></div>';
+    }).join('') + '</div></section>';
+}
+
 function makeupKpis(rows) {
   const counts = makeupKpiCounts(rows, today());
   return '<div class="ops-kpis makeup-kpis" aria-label="보강 현황 요약">' +
@@ -11219,6 +11270,7 @@ function viewMakeups() {
   const active = rows.filter(row => !['completed', 'cancelled'].includes(row.status));
   const archived = rows.filter(row => ['completed', 'cancelled'].includes(row.status))
     .sort((a, b) => Number(b.updatedAt || b.completedAt || b.cancelledAt || 0) - Number(a.updatedAt || a.completedAt || a.cancelledAt || 0));
+  const missingAbsences = makeupMissingAbsenceRows();
   let h = '<section class="card makeup-hero"><div class="between"><div><div class="card-title">보강 관리</div>' +
     '<div class="card-sub">결석으로 생성된 보강 건과 관리자·선생님이 직접 생성한 보강을 생성·완료·없음 세 가지 동작으로 처리합니다.</div></div>' +
     '<button class="btn btn-sm btn-ghost" data-act="murefresh">새로고침</button></div>' +
@@ -11230,6 +11282,7 @@ function viewMakeups() {
   if (makeupError) h += '<div class="card alert" role="alert"><div class="card-title">보강 현황을 불러오지 못했습니다</div><div class="small">' + esc(makeupError) + '</div>' +
     '<button class="btn btn-sm btn-ghost mt14" data-act="murefresh" autofocus>다시 시도</button></div>';
   h += makeupKpis(rows);
+  h += makeupRecoveryHtml(missingAbsences);
   if (!rows.length) return h + '<div class="card"><div class="empty"><b>🗓️</b>등록된 보강 건이 없습니다.<br><span class="muted">위 보강생성(수업무관) 버튼을 사용하거나 수업 카드에서 결석을 기록해 주세요.</span></div></div>';
   h += active.length
     ? '<div class="makeup-grid" aria-live="polite">' + active.map(makeupCard).join('') + '</div>'
@@ -11360,7 +11413,7 @@ async function createMakeupFromAbsence(taskId, date, button, options) {
   if (!auth) {
     makeupCreateStates.set(sourceKey, { status: 'sync_failed', operationId: operationId });
     if (automatic) {
-      toast('출결은 이 기기에 저장됨 · 동기화 인증 후 보강 검토를 다시 시도해 주세요');
+      toast('출결은 이 기기에 저장됨 · 동기화 인증 후 보강 필요 생성을 다시 시도해 주세요');
       renderAfterSync();
       return false;
     }
@@ -11396,9 +11449,9 @@ async function createMakeupFromAbsence(taskId, date, button, options) {
     replaceMakeup(result.case);
     const currentState = makeupCreateStates.get(sourceKey);
     if (currentState && currentState.operationId === operationId) makeupCreateStates.delete(sourceKey);
-    makeupLiveMessage = (result.idempotent ? '기존' : '새') + ' 보강 검토 건을 확인했습니다.';
+    makeupLiveMessage = (result.idempotent ? '기존' : '새') + ' 보강 필요 건을 확인했습니다.';
     if (button && button.isConnected) { button.textContent = '보강 요청됨'; button.disabled = true; }
-    toast(result.idempotent ? '이미 등록된 보강 검토 건입니다' : (automatic ? '결석 출결 저장됨 · 보강 검토가 자동 생성되었습니다' : '보강 검토를 요청했습니다'));
+    toast(result.idempotent ? '이미 등록된 보강 필요 건입니다' : (automatic ? '결석 출결 저장됨 · 보강 필요가 자동 생성되었습니다' : '보강 필요를 생성했습니다'));
     renderAfterSync();
     return true;
   } catch (error) {
@@ -11419,13 +11472,32 @@ async function createMakeupFromAbsence(taskId, date, button, options) {
       }
     }
     toast(error.makeupSyncFailed
-      ? '출결은 이 기기에 저장됨 · 서버 동기화 후 보강 검토를 다시 시도해 주세요'
-      : '출결 저장됨 · 보강 검토 생성 실패 — 다시 시도해 주세요');
+      ? '출결은 이 기기에 저장됨 · 서버 동기화 후 보강 필요 생성을 다시 시도해 주세요'
+      : '출결 저장됨 · 보강 필요 생성 실패 — 다시 시도해 주세요');
     if (Number(error && error.status) === 409) await refreshMakeupsAfterConflict(error, '', '');
-    if (button && button.isConnected) { button.disabled = false; button.textContent = '보강 검토 요청'; }
+    if (button && button.isConnected) { button.disabled = false; button.textContent = '보강 필요 생성'; }
     renderAfterSync();
     return false;
   }
+}
+
+async function recoverMissingMakeup(button) {
+  const taskId = String(button && button.dataset && button.dataset.id || '');
+  const date = String(button && button.dataset && button.dataset.date || '');
+  const task = state.tasks.find(row => String(row.id || '') === taskId);
+  const check = getCheck(taskId, date);
+  if (!task || !isRegularLessonTask(task) || !check || check.att !== 'A' || !task.studentId) {
+    return toast('결석 원 수업과 학생 연결을 다시 확인해 주세요');
+  }
+  if (makeupRows.some(row => String(row.sourceTaskId || '') === taskId && String(row.sourceDate || '') === date)) {
+    return toast('이미 보강 원장이 있는 결석입니다');
+  }
+  const studentLabel = staffStudentCompactLabelById(task.studentId, task.studentName || studentOf(task), task.grade);
+  const subjectLabel = task.subject || task.className || '수업';
+  if (!confirm(studentLabel + ' · ' + date + ' · ' + subjectLabel + ' 결석을 보강 필요로 생성할까요?')) return;
+  await createMakeupFromAbsence(taskId, date, button, {
+    automatic: false, expectedUpdatedAt: Number(check.updatedAt || 0)
+  });
 }
 
 function manualMakeupStudents() {
@@ -18532,8 +18604,8 @@ function rosterStudentInfoHtml(student, lessonReferences, taskId) {
     field('연락처(부)', student.phoneFather, false, ['phoneFather']) +
     field('연락처(모)', student.phoneMother, false, ['phoneMother']) +
     field('등록과목', student.subject, false, ['subject', 'subjects']) +
-    field('신규 등록일', student.registrationDate, false, ['registrationDate']) +
-    field('첫 수업 시작일', student.firstClassDate, false, ['firstClassDate']) +
+    field('신규등록일', student.registrationDate, false, ['registrationDate']) +
+    field('첫 등원일', student.firstClassDate, false, ['firstClassDate']) +
     '<div class="student-info-field"><b>결제 구분' + (changed.has('billingMode') ? marker('결제 구분') : '') +
       '</b><span>' + esc(billingMode) + '</span></div>' +
     (String(student.billingMode || 'monthly') === 'session4'
@@ -18652,7 +18724,7 @@ function rosterStudentEditorHtml(student, assignment) {
   const legacySubject = String(student.subject || '').trim() && !selectedSubjects.size
     ? '<div class="small muted mt8">기존 과목 입력: ' + esc(student.subject) + ' · 저장하려면 아래 목록에서 등록과목을 선택해 주세요.</div>' : '';
   return '<div class="hint mb14"><b>' + (isCreate ? (isNew ? '신규 원생 정보 등록' : '기존 원생 명단 보완') : '원생 기본 정보 수정') + '</b><br>' +
-    (isCreate ? '이름만 입력하면 내부 연결용 studentId를 서버가 8자리 숫자로 자동 발급합니다. 학교·학년·날짜·연락처·과목은 나중에 입력할 수 있습니다. 담당 선생님은 수업을 등록할 때 과목별로 지정합니다. 신규 학생 30일 관리는 첫 수업 시작일을 입력한 뒤 시작합니다.' :
+    (isCreate ? '이름만 입력하면 내부 연결용 studentId를 서버가 8자리 숫자로 자동 발급합니다. 학교·학년·날짜·연락처·과목은 나중에 입력할 수 있습니다. 담당 선생님은 수업을 등록할 때 과목별로 지정합니다. 신규 학생 30일 관리는 첫 등원일을 입력한 뒤 시작합니다.' :
       '학교·연락처·등록과목과 재원 정보를 수정할 수 있습니다.') + '</div>' +
     '<div class="grid2"><label class="field"><span class="fl">이름 · 필수</span><input class="in" data-rse-name maxlength="40" required aria-required="true" value="' + esc(student.name || '') + '"></label>' +
     '<label class="field"><span class="fl">학교 (선택)</span><input class="in" data-rse-school maxlength="80" value="' + esc(student.school || '') + '"></label></div>' +
@@ -18664,8 +18736,8 @@ function rosterStudentEditorHtml(student, assignment) {
       '<label class="chip"><input type="checkbox" data-rse-subject value="' + esc(subject) + '"' + (selectedSubjects.has(subject) ? ' checked' : '') + '> ' + esc(subject) + '</label>').join('') + '</div>' + legacySubject + '</div>' +
     (student._editing ? '<div class="guide"><b>과목별 수업 담당</b>' + esc(rosterStudentSubjectTeacherText(student.id)) +
       '<div class="small mt8">담당 변경은 학생 정보의 수업 정보 확인 및 수정에서 각 수업별로 처리합니다.</div></div>' : '') +
-    '<div class="grid2"><label class="field"><span class="fl">신규 등록일 (선택)</span><input class="in" type="date" data-rse-registration-date value="' + esc(student.registrationDate || '') + '"></label>' +
-    '<label class="field"><span class="fl">첫 수업 시작일 (선택)</span><input class="in" type="date" data-rse-first-class-date value="' + esc(student.firstClassDate || '') + '"></label></div>' +
+    '<div class="grid2"><label class="field"><span class="fl">신규등록일 (선택)</span><input class="in" type="date" data-rse-registration-date value="' + esc(student.registrationDate || '') + '"></label>' +
+    '<label class="field"><span class="fl">첫 등원일 (선택)</span><input class="in" type="date" data-rse-first-class-date value="' + esc(student.firstClassDate || '') + '"></label></div>' +
     '<div class="grid2"><label class="field"><span class="fl">결제 구분</span><select class="in" data-rse-billing-mode onchange="updateRosterBillingFields(this)">' +
       '<option value="monthly"' + (billingMode === 'monthly' ? ' selected' : '') + '>월결제</option>' +
       '<option value="session4"' + (billingMode === 'session4' ? ' selected' : '') + '>회차제 · 4회</option></select></label>' +
@@ -21900,6 +21972,7 @@ document.addEventListener('click', ev => {
     case 'mumanualopen': openManualMakeupModal(); break;
     case 'mumanualsubmit': submitManualMakeup(el); break;
     case 'mucreate': createMakeupFromAbsence(String(id || ''), String(date || ''), el, { automatic: false }); break;
+    case 'murecover': recoverMissingMakeup(el); break;
     case 'muschedule': {
       makeupDateTimeModal(makeupRows.find(row => row.caseId === String(el.dataset.case || '')), 'schedule');
       break;
@@ -22736,16 +22809,14 @@ document.addEventListener('click', ev => {
       } else if (next === 'A' && isScheduledMakeupTask(t)) {
         toast('보강수업 결석으로 저장했습니다 · 추가 보강은 자동 생성하지 않습니다');
       } else if (next === 'A' && !isMakeupLessonTask(t)) {
-        toast('결석 출결 저장됨 · 상담 업무는 보강 검토 대상이 아닙니다');
+        toast('결석 출결 저장됨 · 상담 업무는 보강 대상이 아닙니다');
       } else if (next === 'A' && !t.studentId) {
-        toast('결석 출결 저장됨 · 학생 ID가 연결되지 않아 보강 검토는 자동 생성되지 않습니다');
+        toast('결석 출결 저장됨 · 학생 ID가 연결되지 않아 보강 필요는 자동 생성되지 않습니다');
       } else if (next === 'A' && taskUsesSession4Billing(t, date)) {
         toast('결석 저장됨 · 회차제는 보강을 자동 생성하지 않습니다');
-      } else if (next === 'A' && date === today()) {
-        toast('결석 출결 저장 중 · 보강 검토를 자동 생성합니다');
-        createMakeupFromAbsence(id, date, null, { automatic: true, expectedUpdatedAt: savedCheck.updatedAt });
       } else if (next === 'A') {
-        toast('결석 — 메모에 사유와 보강 계획을 남겨주세요');
+        toast('결석 출결 저장 중 · 보강 필요를 자동 생성합니다');
+        createMakeupFromAbsence(id, date, null, { automatic: true, expectedUpdatedAt: savedCheck.updatedAt });
       } else {
         toast(attendanceLabel + '으로 저장했습니다');
       }

@@ -34,7 +34,7 @@ function validFirstClassDate(value) {
 function assertStartAfterFirstClassDate(student, startDate) {
   const firstClassDate = validFirstClassDate(student && student.firstClassDate);
   if (firstClassDate && String(startDate || '') < firstClassDate) {
-    throw new Error('수업 시작일은 원생 첫 수업 시작일 ' + firstClassDate + ' 이후여야 합니다');
+    throw new Error('수업 시작일은 원생 첫 등원일 ' + firstClassDate + ' 이후여야 합니다');
   }
 }
 
