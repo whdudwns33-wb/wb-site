@@ -26,7 +26,8 @@ const ROOMS = new Set(['studyforce', 'classcard', 'metamath', 'nelt', 'exam4you'
 const CARD_STATUS = new Set(['todo', 'doing', 'done', 'blocked']);
 const CARD_TARGETS = new Set(['student', 'app', 'text']);
 const EVIDENCE_KINDS = new Set(['check', 'capture', 'file']);
-const PLAN_KINDS = new Set(['recurring', 'apprange']);
+const PLAN_KINDS = new Set(['recurring', 'apprange', 'exam']);
+const EXAM_SOURCES = new Set(['exam4you', 'jokbo']);
 const PLAN_TARGETS = new Set(['each', 'student', 'app', 'text']);
 const RANGE_STATUS = new Set(['need', 'buying', 'uploading', 'have']);
 const RANGE_SOURCES = new Set(['exam4you', 'jokbo', 'other']);
@@ -419,7 +420,7 @@ function ruleStudents(data, ctx) {
   const name = cleanName(out.name, 40);
   if (!name) return bad('INVALID', '학생 이름은 1~40자로 입력해 주세요');
   out.name = name;
-  let err = textField(out, 'grade', 10, '학년') || textField(out, 'code', 20, '외부 코드') || textField(out, 'memo', 300, '메모');
+  let err = textField(out, 'grade', 10, '학년') || textField(out, 'school', 40, '학교') || textField(out, 'code', 20, '외부 코드') || textField(out, 'memo', 300, '메모');
   if (err) return err;
   if (absent(out.status)) out.status = 'active';
   if (!STUDENT_STATUS.has(out.status)) return bad('INVALID', 'status 는 active/paused/ended 중 하나여야 합니다');
@@ -625,9 +626,35 @@ function stripForCompare(plan) {
 
 function rulePlans(data, ctx) {
   const out = Object.assign({}, data);
-  if (!PLAN_KINDS.has(out.kind)) return bad('INVALID', 'kind 는 recurring/apprange 중 하나여야 합니다');
+  if (!PLAN_KINDS.has(out.kind)) return bad('INVALID', 'kind 는 recurring/apprange/exam 중 하나여야 합니다');
   let err = null;
-  if (out.kind === 'recurring') {
+  if (out.kind === 'exam') {
+    // 시험 템플릿 — 학교(·학년)로 학생을 고르고, 시험일 leadDays 전부터 자료별 카드를 만든다(파생은 클라이언트 desk-core.deriveCards).
+    if (typeof out.school !== 'string' || !out.school.trim() || out.school.trim().length > 40) return bad('INVALID', '학교는 1~40자로 적어 주세요');
+    out.school = out.school.trim();
+    err = textField(out, 'grade', 10, '학년') || textField(out, 'subject', 40, '과목') || textField(out, 'textbook', 40, '교과서') ||
+      textField(out, 'examName', 40, '시험 이름') || textField(out, 'scope', 120, '시험 범위') || textField(out, 'note', 300, '메모');
+    if (err) return err;
+    if (typeof out.examDate !== 'string' || !YMD.test(out.examDate)) return bad('INVALID', 'examDate 는 YYYY-MM-DD 형식이어야 합니다');
+    out.leadDays = absent(out.leadDays) ? 21 : Number(out.leadDays);
+    out.dueDaysBefore = absent(out.dueDaysBefore) ? 7 : Number(out.dueDaysBefore);
+    if (!Number.isInteger(out.leadDays) || out.leadDays < 1 || out.leadDays > 90) return bad('INVALID', 'leadDays 는 1~90 이어야 합니다');
+    if (!Number.isInteger(out.dueDaysBefore) || out.dueDaysBefore < 0 || out.dueDaysBefore >= out.leadDays) return bad('INVALID', 'dueDaysBefore 는 0 이상, leadDays 보다 작아야 합니다');
+    if (!Array.isArray(out.materials) || !out.materials.length || out.materials.length > 20) return bad('INVALID', 'materials 는 1~20개의 배열이어야 합니다');
+    const materials = [];
+    for (const m of out.materials) {
+      if (!isPlainObject(m) || !EXAM_SOURCES.has(m.source)) return bad('INVALID', 'materials[].source 는 exam4you/jokbo 중 하나여야 합니다');
+      if (typeof m.what !== 'string' || !m.what.trim() || m.what.trim().length > 120) return bad('INVALID', 'materials[].what 은 1~120자여야 합니다');
+      const row = { source: m.source, what: m.what.trim() };
+      if (!absent(m.where)) {
+        if (typeof m.where !== 'string' || m.where.length > 120) return bad('INVALID', 'materials[].where 는 120자까지입니다');
+        if (m.where.trim()) row.where = m.where.trim();
+      }
+      materials.push(row);
+    }
+    out.materials = materials;
+    out.active = absent(out.active) ? true : !!out.active;
+  } else if (out.kind === 'recurring') {
     if (!ROOMS.has(out.program)) return bad('INVALID', 'program 은 프로그램 방 6개 중 하나여야 합니다');
     if (!Array.isArray(out.days) || !out.days.length || out.days.length > 7) return bad('INVALID', 'days 는 요일(0~6) 1~7개 배열이어야 합니다');
     const days = [];
