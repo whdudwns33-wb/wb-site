@@ -209,7 +209,7 @@ test('teacher requests and later approval cannot predate the latest roster first
     ...request, startDate:'2026-09-04'
   }, '*', own, json);
   assert.equal(early.status, 400);
-  assert.match((await body(early)).error, /첫 수업 시작일 2026-09-05 이후/);
+  assert.match((await body(early)).error, /첫 등원일 2026-09-05 이후/);
   assert.equal(db.rows.size, 0);
 
   db.roster.roster.students[0].firstClassDate = '2026-08-20';
@@ -222,7 +222,7 @@ test('teacher requests and later approval cannot predate the latest roster first
     action:'approve', requestKey:submitted.request.requestKey, revision:1, studentId:'student-1'
   }, '*', all, json);
   assert.equal(approval.status, 409);
-  assert.match((await body(approval)).error, /첫 수업 시작일 2026-09-05 이후/);
+  assert.match((await body(approval)).error, /첫 등원일 2026-09-05 이후/);
   assert.equal(db.tasks.size, 0);
   assert.equal(db.rows.get(submitted.request.requestKey).status, 'approval_waiting');
 });

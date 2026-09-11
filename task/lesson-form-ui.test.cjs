@@ -194,7 +194,7 @@ test('new lesson starts follow the student first class date without rewriting ex
   const editEnd = html.indexOf('function lessonTextField(', editStart);
   assert.match(html.slice(editStart, editEnd), /start: t\.start \|\| today\(\)/);
   assert.match(html.slice(editStart, editEnd), /firstClassDate: lessonRegistrationIsoDate\(t\.firstClassDate\)/);
-  assert.match(html, /첫 수업 날짜 \(선택\)/);
+  assert.match(html, /과목별 첫 수업일 \(선택\)/);
 });
 
 test('direct lesson registration puts lesson hours inside every confirmed-time row', () => {

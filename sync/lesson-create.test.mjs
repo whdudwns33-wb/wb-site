@@ -318,7 +318,7 @@ test('first class date is optional on the server and validated when supplied', a
   assert.equal(withDate.firstClassDate, '2026-08-11');
   await assert.rejects(
     () => buildLessonTask(validLesson({ firstClassDate: '2026-02-30' }), 'teacher-1', 'staff', 1234),
-    /첫 수업 날짜/
+    /과목별 첫 수업일/
   );
 });
 
@@ -531,7 +531,7 @@ test('new lessons cannot start before the roster first class date while existing
     staffId: 'teacher-1', lesson: assignedLesson({ start: '2026-08-29' })
   }, { scope: 'all', role: 'admin' });
   assert.equal(early.response.status, 409);
-  assert.match(early.data.error, /첫 수업 시작일 2026-09-05 이후/);
+  assert.match(early.data.error, /첫 등원일 2026-09-05 이후/);
   assert.equal(db.tasks.size, 0);
 
   const exact = await call(db, {
@@ -565,7 +565,7 @@ test('new lessons cannot start before the roster first class date while existing
     lesson: assignedLesson({ studentId: 'student-b', start: '2026-08-29' })
   }, { scope: 'all', role: 'admin' });
   assert.equal(reassignedTooEarly.response.status, 409);
-  assert.match(reassignedTooEarly.data.error, /첫 수업 시작일 2026-09-05 이후/);
+  assert.match(reassignedTooEarly.data.error, /첫 등원일 2026-09-05 이후/);
   assert.equal(JSON.parse(reassignmentDb.tasks.get(source.id).data).studentId, 'student-a');
 });
 
@@ -1142,7 +1142,7 @@ test('multi-student registration uses a common start no earlier than every selec
     lessonFor('student-b', '나학생', '초5', '2026-09-04')
   ]);
   assert.equal(early.response.status, 409);
-  assert.match(early.data.error, /첫 수업 시작일 2026-09-05 이후/);
+  assert.match(early.data.error, /첫 등원일 2026-09-05 이후/);
   assert.equal(db.tasks.size, 0);
 
   const valid = await callStudentBatch(db, [
