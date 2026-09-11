@@ -472,10 +472,12 @@ const CARDS = [
   { id: 'c8', program: 'studyforce', target: { type: 'student', id: 'st1' }, what: 'h', status: 'todo', due: D, deleted: true }
 ];
 
-test('cardsOn: 막힘 → 지연 → 오늘 → 기한 없음, 오늘 완료만, 미래·삭제·옛 완료 제외', () => {
+test('cardsOn: 막힘 → 지연 → 오늘 → 기한 없음, 예정은 따로, 오늘 완료만, 삭제·옛 완료 제외 · daysUntil', () => {
   const on = C.cardsOn(CARDS, D);
   assert.deepEqual(on.open.map(c => c.id), ['c3', 'c2', 'c1', 'c7']);
+  assert.deepEqual(on.upcoming.map(c => c.id), ['c6']);
   assert.deepEqual(on.done.map(c => c.id), ['c4']);
+  assert.deepEqual([C.daysUntil(CARDS[5], D), C.daysUntil(CARDS[0], D), C.daysUntil(CARDS[1], D), C.daysUntil({ due: '2026-09-30' }, D), C.daysUntil({}, D)], [1, null, null, 21, null]);
   assert.deepEqual([C.cardLate(CARDS[1], D), C.cardLate(CARDS[0], D), C.cardLate(CARDS[4], D)], [true, false, false]);
   const g = C.groupByRoom(on.open);
   assert.deepEqual(Object.keys(g), C.ROOMS);
@@ -496,6 +498,67 @@ test('matrixOf: 이용 중 학생 × 방, 칸 = 구독 + 마지막 카드 · cov
   ]);
   assert.deepEqual(cov.map(c => [c.app.id, c.total, c.counts]), [['app1', 2, { need: 1, buying: 0, uploading: 0, have: 1 }], ['app2', 0, { need: 0, buying: 0, uploading: 0, have: 0 }]]);
   assert.deepEqual(cov[0].rows.map(r => r.unit), ['1단원', '3단원']);
+});
+
+test('deriveCards(exam): 시험 leadDays 전부터 학교·학년이 맞는 학생 × 자료마다 한 번, 창 밖·꺼짐·학교 불일치 제외', () => {
+  const students = [
+    { id: 's1', name: '학생A', grade: '중2', school: 'OO중', status: 'active' },
+    { id: 's2', name: '학생B', grade: '중2', school: 'OO 중', status: 'active' },     // 공백 차이는 같은 학교
+    { id: 's3', name: '학생C', grade: '중3', school: 'OO중', status: 'active' },      // 학년 다름
+    { id: 's4', name: '학생D', grade: '중2', school: 'XX중', status: 'active' },      // 학교 다름
+    { id: 's5', name: '학생E', grade: '중2', school: 'OO중', status: 'ended' }
+  ];
+  const exam = { id: 'ex1', kind: 'exam', school: 'OO중', grade: '중2', subject: '영어', examName: '2학기 중간', examDate: '2026-09-30', scope: '3~4과', leadDays: 21, dueDaysBefore: 7,
+    materials: [{ source: 'exam4you', what: '교과서 변형 3~4과', where: '학생 폴더' }, { source: 'jokbo', what: '기출 3개년' }, { source: 'other', what: '무시' }] };
+  const r = C.deriveCards([exam], students, [], [], D, 7);   // D = 9/9 = 시험 21일 전 → 창이 열리는 첫날
+  assert.deepEqual(r.cards.map(c => c.id).sort(), ['p:ex1:m0:s1', 'p:ex1:m0:s2', 'p:ex1:m1:s1', 'p:ex1:m1:s2']);
+  const first = r.cards.find(c => c.id === 'p:ex1:m0:s1');
+  assert.deepEqual(first, { id: 'p:ex1:m0:s1', program: 'exam4you', target: { type: 'student', id: 's1' }, what: '교과서 변형 3~4과', status: 'todo', due: '2026-09-23', source: 'plan:ex1', createdAt: 7,
+    note: 'OO중 · 중2 · 영어 · 2학기 중간 · 2026-09-30 · 3~4과', where: '학생 폴더' });
+  assert.equal(r.cards.find(c => c.id === 'p:ex1:m1:s2').program, 'jokbo');
+  assert.deepEqual([C.deriveCards([exam], students, [], [], '2026-09-08', 0).cards.length, C.deriveCards([exam], students, [], [], '2026-10-01', 0).cards.length,
+    C.deriveCards([Object.assign({}, exam, { active: false })], students, [], [], D, 0).cards.length], [0, 0, 0]);
+  const again = C.deriveCards([exam], students, [], r.cards, '2026-09-10', 0);
+  assert.deepEqual([again.cards.length, again.skipped], [0, 4], '다음 날엔 같은 카드를 다시 만들지 않는다');
+  const anyGrade = C.deriveCards([Object.assign({}, exam, { grade: '' })], students, [], [], D, 0);
+  assert.equal(anyGrade.cards.length, 6, '학년을 비우면 그 학교 이용 중 학생 전체');
+});
+
+test('staffStats: 기간 안 완료 건수·기한 넘김·처리 시간(중앙값·평균), doneBy 별', () => {
+  const t = (y, m, d, h) => new Date(y, m - 1, d, h).getTime();
+  const cards = [
+    { id: 'a', program: 'nelt', target: { type: 'text', label: 'x' }, what: 'a', status: 'done', due: '2026-09-08', doneBy: 'st1', createdAt: t(2026, 9, 8, 9), doneAt: t(2026, 9, 8, 10) },    // 60분
+    { id: 'b', program: 'nelt', target: { type: 'text', label: 'x' }, what: 'b', status: 'done', due: '2026-09-07', doneBy: 'st1', createdAt: t(2026, 9, 9, 9), doneAt: t(2026, 9, 9, 12) },    // 180분, 기한 넘김
+    { id: 'c', program: 'nelt', target: { type: 'text', label: 'x' }, what: 'c', status: 'done', doneBy: 'st1', createdAt: t(2026, 9, 9, 9), doneAt: t(2026, 9, 9, 9, 0) },                   // 0분
+    { id: 'd', program: 'nelt', target: { type: 'text', label: 'x' }, what: 'd', status: 'done', doneBy: 'st2', createdAt: 0, doneAt: t(2026, 9, 9, 9) },                                     // 시간 없음
+    { id: 'e', program: 'nelt', target: { type: 'text', label: 'x' }, what: 'e', status: 'done', doneBy: 'st2', createdAt: t(2026, 8, 1, 9), doneAt: t(2026, 8, 1, 10) },                    // 기간 밖
+    { id: 'f', program: 'nelt', target: { type: 'text', label: 'x' }, what: 'f', status: 'todo', due: D }
+  ];
+  const rows = C.staffStats(cards, D, 7);
+  assert.deepEqual(rows, [
+    { staffId: 'st1', done: 3, lateDone: 1, timed: 3, avgMinutes: 80, medianMinutes: 60 },
+    { staffId: 'st2', done: 1, lateDone: 0, timed: 0, avgMinutes: null, medianMinutes: null }
+  ]);
+  assert.equal(C.staffStats(cards, D, 30).find(r => r.staffId === 'st2').done, 1, '8/1 완료는 30일 창 밖');
+  assert.equal(C.staffStats(cards, D, 60).find(r => r.staffId === 'st2').done, 2, '60일 창엔 들어온다');
+});
+
+test('validateExam: 필수·범위·자료 줄 파싱·PII · validateStudent school', () => {
+  assert.equal(C.validateExam({ school: '' }).error, '학교을(를) 입력하세요');
+  assert.equal(C.validateExam({ school: 'OO중', examDate: '2026-9-30' }).error, '시험일은 YYYY-MM-DD 형식입니다');
+  assert.equal(C.validateExam({ school: 'OO중', examDate: '2026-09-30', materialsText: '' }).error, '자료를 한 줄 이상 적으세요 (출처 | 무엇을 | 어디에)');
+  assert.ok(/시작해야/.test(C.validateExam({ school: 'OO중', examDate: '2026-09-30', materialsText: '네이버 | 자료' }).error));
+  assert.ok(/앞설 수 없습니다/.test(C.validateExam({ school: 'OO중', examDate: '2026-09-30', leadDays: '7', dueDaysBefore: '7', materialsText: '이그잼포유 | 자료' }).error));
+  assert.deepEqual(C.validateExam({ school: ' OO중 ', grade: '중2', subject: '영어', examName: '2학기 중간', examDate: '2026-09-30', scope: '3~4과', leadDays: '', dueDaysBefore: '',
+    materialsText: '이그잼포유 | 교과서 변형 3~4과 | 학생 폴더\n\n족보닷컴 | 기출 3개년\nJokbo | 변형 문제' }), {
+    value: { kind: 'exam', school: 'OO중', examDate: '2026-09-30', leadDays: 21, dueDaysBefore: 7, active: true,
+      materials: [{ source: 'exam4you', what: '교과서 변형 3~4과', where: '학생 폴더' }, { source: 'jokbo', what: '기출 3개년' }, { source: 'jokbo', what: '변형 문제' }],
+      grade: '중2', subject: '영어', examName: '2학기 중간', scope: '3~4과' }, error: '' });
+  assert.ok(/개인정보/.test(C.validateExam({ school: 'OO중', examDate: '2026-09-30', materialsText: '이그잼포유 | 자료 | 010-0000-0000' }).error));
+  const st = C.validateStudent({ name: '학생A', grade: '중2', school: ' OO중 ', programs: {}, guardian: {} });
+  assert.equal(st.value.school, 'OO중');
+  assert.ok(C.validateStudent({ name: '학생A', school: '학교 010-0000-0000', programs: {}, guardian: {} }).errors.some(e => e.field === 'school'));
+  assert.deepEqual(C.searchStudents([{ id: '1', name: '학생A', school: 'OO중' }, { id: '2', name: '학생B', school: 'XX중' }], 'OO', 'all').map(s => s.id), ['1']);
 });
 
 test('manualFor·manualsFor: manualId 우선, 앱 카드는 app 범위, 방은 assign 우선', () => {

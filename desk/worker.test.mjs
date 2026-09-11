@@ -508,3 +508,28 @@ test('docs apps·plans·manuals: 원장만, 직원은 앱 자료 범위의 statu
   assert.equal((await putDoc(env, adminToken, 'manuals', 'm2', Object.assign({}, man, { scope: 'app', appId: 'bad id' }))).body.code, 'INVALID');
   assert.equal((await putDoc(env, adminToken, 'manuals', 'm2', Object.assign({}, man, { scope: 'app', appId: 'app1', task: 'upload' }))).status, 200);
 });
+
+test('docs plans(exam)·students.school: 시험 템플릿 규칙(학교·시험일·기간·자료 출처)과 학생 학교 칸', async () => {
+  const env = envFor();
+  const adminToken = await setupAdmin(env);
+  const a = await makeStaff(env, adminToken, '직원 A');
+  const exam = { kind: 'exam', school: ' OO중 ', grade: '중2', subject: '영어', examName: '2학기 중간', examDate: '2026-09-30', scope: '3~4과',
+    materials: [{ source: 'exam4you', what: '교과서 변형 3~4과', where: '학생 폴더' }, { source: 'jokbo', what: '기출 3개년', where: '' }] };
+  assert.equal((await putDoc(env, a.token, 'plans', 'ex1', exam)).status, 403);
+  const saved = await putDoc(env, adminToken, 'plans', 'ex1', exam);
+  assert.equal(saved.status, 200, JSON.stringify(saved.body));
+  const doc = await docOf(env, a.token, 'plans', 'ex1');
+  assert.deepEqual([doc.school, doc.leadDays, doc.dueDaysBefore, doc.active, doc.materials], ['OO중', 21, 7, true, [{ source: 'exam4you', what: '교과서 변형 3~4과', where: '학생 폴더' }, { source: 'jokbo', what: '기출 3개년' }]]);
+  assert.equal((await putDoc(env, adminToken, 'plans', 'ex2', Object.assign({}, exam, { school: '' }))).body.code, 'INVALID');
+  assert.equal((await putDoc(env, adminToken, 'plans', 'ex2', Object.assign({}, exam, { examDate: '2026-9-30' }))).body.code, 'INVALID');
+  assert.equal((await putDoc(env, adminToken, 'plans', 'ex2', Object.assign({}, exam, { leadDays: 7, dueDaysBefore: 7 }))).body.code, 'INVALID');
+  assert.equal((await putDoc(env, adminToken, 'plans', 'ex2', Object.assign({}, exam, { materials: [] }))).body.code, 'INVALID');
+  assert.equal((await putDoc(env, adminToken, 'plans', 'ex2', Object.assign({}, exam, { materials: [{ source: 'other', what: 'x' }] }))).body.code, 'INVALID');
+  assert.equal((await putDoc(env, adminToken, 'plans', 'ex2', Object.assign({}, exam, { scope: '연락 010-0000-0000' }))).body.code, 'PII');
+  // 직원은 exam 템플릿의 status·note 변경도 못 한다(apprange 만 허용)
+  assert.equal((await putDoc(env, a.token, 'plans', 'ex1', Object.assign({}, doc, { note: '직원 메모' }))).status, 403);
+  const stu = await putDoc(env, a.token, 'students', 'stu_s', { name: '학생A', grade: '중2', school: ' OO중 ' });
+  assert.equal(stu.status, 200, JSON.stringify(stu.body));
+  assert.equal((await docOf(env, a.token, 'students', 'stu_s')).school, 'OO중');
+  assert.equal((await putDoc(env, a.token, 'students', 'stu_s', { name: '학생A', school: 'x'.repeat(41) })).body.code, 'INVALID');
+});

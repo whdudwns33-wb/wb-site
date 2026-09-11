@@ -42,6 +42,9 @@
   const RANGE_STATUS_LABEL = Object.freeze({ need: '없음', buying: '구매 대기', uploading: '업로드 대기', have: '있음' });
   const RANGE_SOURCES = Object.freeze(['exam4you', 'jokbo', 'other']);
   const MANUAL_SCOPES = Object.freeze(['studyforce', 'classcard', 'metamath', 'nelt', 'exam4you', 'jokbo', 'app']);
+  const EXAM_SOURCES = Object.freeze(['exam4you', 'jokbo']);   // 시험 자료가 나오는 방
+  const EXAM_LEAD_DEFAULT = 21;                                 // 시험 3주 전에 카드가 생긴다
+  const EXAM_DUE_BEFORE_DEFAULT = 7;                            // 시험 1주 전까지 전달
   const HTTPS_RE = /^https:\/\/[^\s"'<>]{1,200}$/;
   const NOTE_MAX = 300;
   const CONTACT_NOTE_MAX = 200;
@@ -358,7 +361,7 @@
     const st = str(status);
     return (Array.isArray(students) ? students : []).filter(s => isObj(s) && !s.deleted)
       .filter(s => !st || st === 'all' || str(s.status || 'active') === st)
-      .filter(s => !needle || [s.name, s.code, s.grade].some(v => normName(v).toLowerCase().includes(needle)))
+      .filter(s => !needle || [s.name, s.code, s.grade, s.school].some(v => normName(v).toLowerCase().includes(needle)))
       .sort((a, b) => str(a.name).localeCompare(str(b.name), 'ko') || str(a.id).localeCompare(str(b.id)));
   }
 
@@ -527,6 +530,10 @@
     if (grade.length > 10) errors.push({ field: 'grade', reason: '학년은 10자 이내' });
     else if (hasPII(grade)) errors.push({ field: 'grade', reason: '학년에 전화번호를 넣을 수 없습니다' });
     value.grade = grade;
+    const school = str(s.school);   // 시험 템플릿이 학교·학년으로 대상을 고른다
+    if (school.length > 40) errors.push({ field: 'school', reason: '학교는 40자 이내' });
+    else if (hasPII(school)) errors.push({ field: 'school', reason: '학교에 전화번호를 넣을 수 없습니다' });
+    if (school) value.school = school;
     const code = str(s.code);
     if (code.length > 20) errors.push({ field: 'code', reason: '코드는 20자 이내' });
     else if (hasPII(code)) errors.push({ field: 'code', reason: '코드에 전화번호를 넣을 수 없습니다' });
@@ -712,6 +719,30 @@
     const out = [];
     let skipped = 0;
     (Array.isArray(plans) ? plans : []).forEach(plan => {
+      if (isObj(plan) && plan.kind === 'exam') {
+        // 시험 템플릿: 시험일 leadDays 전부터 시험일까지 창이 열리고, 학교·학년이 맞는 이용 중 학생 × 자료마다 카드 하나(날짜와 무관한 id 라 한 번만).
+        if (plan.active === false || !validYmd(str(plan.examDate)) || !str(plan.school)) return;
+        const lead = Number(plan.leadDays) > 0 ? Number(plan.leadDays) : EXAM_LEAD_DEFAULT;
+        const before = Number(plan.dueDaysBefore) >= 0 ? Number(plan.dueDaysBefore) : EXAM_DUE_BEFORE_DEFAULT;
+        const from = addDays(str(plan.examDate), -lead);
+        if (ymd < from || ymd > str(plan.examDate)) return;
+        const due = addDays(str(plan.examDate), -before);
+        const context = [plan.school, plan.grade, plan.subject, plan.examName, plan.examDate, plan.scope].map(str).filter(Boolean).join(' · ');
+        const targets = live(students).filter(s => str(s.status || 'active') === 'active' && normName(s.school) === normName(plan.school) &&
+          (!str(plan.grade) || normName(s.grade) === normName(plan.grade)));
+        (Array.isArray(plan.materials) ? plan.materials : []).forEach((m, i) => {
+          if (!isObj(m) || !EXAM_SOURCES.includes(m.source) || !str(m.what)) return;
+          targets.forEach(s => {
+            const id = 'p:' + str(plan.id) + ':m' + i + ':' + str(s.id);
+            if (have.has(id)) { skipped++; return; }
+            have.add(id);
+            const card = { id: id, program: m.source, target: { type: 'student', id: str(s.id) }, what: str(m.what), status: 'todo', due: due, source: 'plan:' + str(plan.id), createdAt: Number(nowMs) || 0, note: context.slice(0, 300) };
+            if (str(m.where)) card.where = str(m.where);
+            out.push(card);
+          });
+        });
+        return;
+      }
       if (!planActiveOn(plan, ymd) || !ROOMS.includes(plan.program)) return;
       planTargetsFor(plan, students, apps).forEach(target => {
         const id = planCardId(plan.id, ymd, target.type === 'text' ? slugOf(target.label) : target.id);
@@ -729,19 +760,87 @@
 
   function cardLate(card, ymd) { return !!(isObj(card) && card.status !== 'done' && str(card.due) && str(card.due) < str(ymd)); }
 
-  /** 오늘 화면의 카드: 열린 것(기한 없음·오늘·지난 미완료) + 오늘 완료한 것. 막힘 → 지연 → 오늘 → 완료 순. */
+  /** 오늘 화면의 카드: 열린 것(기한 없음·오늘·지난 미완료) + 예정(기한이 뒤) + 오늘 완료한 것. 열린 것은 막힘 → 지연 → 진행 → 대기 순. */
   function cardsOn(cards, ymd) {
     const day = str(ymd);
-    const open = [], done = [];
+    const open = [], upcoming = [], done = [];
     live(cards).forEach(c => {
       if (c.status === 'done') { if (doneYmd(c) === day || str(c.due) === day) done.push(c); return; }
-      if (!str(c.due) || str(c.due) <= day) open.push(c);
+      if (!str(c.due) || str(c.due) <= day) open.push(c); else upcoming.push(c);
     });
     const rank = c => (c.status === 'blocked' ? 0 : cardLate(c, day) ? 1 : c.status === 'doing' ? 2 : 3);
     const dueKey = c => str(c.due) || '9999-99-99';   // 기한 없는 카드는 뒤로
-    open.sort((a, b) => rank(a) - rank(b) || dueKey(a).localeCompare(dueKey(b)) || str(a.program).localeCompare(str(b.program)) || str(a.what).localeCompare(str(b.what)));
+    const tie = (a, b) => dueKey(a).localeCompare(dueKey(b)) || str(a.program).localeCompare(str(b.program)) || str(a.what).localeCompare(str(b.what));
+    open.sort((a, b) => rank(a) - rank(b) || tie(a, b));
+    upcoming.sort(tie);
     done.sort((a, b) => (Number(b.doneAt) || 0) - (Number(a.doneAt) || 0));
-    return { open: open, done: done };
+    return { open: open, upcoming: upcoming, done: done };
+  }
+  /** 기한까지 남은 날 — 예정 카드의 D-n. 기한이 없거나 지났으면 null. */
+  function daysUntil(card, ymd) {
+    const a = parseYmd(str(ymd)), b = parseYmd(str(card && card.due));
+    if (!a || !b || b <= a) return null;
+    return Math.round((b - a) / 86400000);
+  }
+
+  /** 직원별 처리 지표 — 최근 days 일 동안 완료한 카드: 건수·기한 넘긴 완료·처리 시간(만든 뒤 완료까지, 분). doneBy 가 토큰 신원이라 믿을 수 있다. */
+  function staffStats(cards, ymd, days) {
+    const n = Number(days) > 0 ? Number(days) : 7;
+    const from = addDays(str(ymd), -(n - 1));
+    const by = {};
+    live(cards).forEach(c => {
+      if (c.status !== 'done') return;
+      const d = doneYmd(c);
+      if (!d || d < from || d > str(ymd)) return;
+      const id = str(c.doneBy) || '?';
+      const r = by[id] || (by[id] = { staffId: id, done: 0, lateDone: 0, minutes: [] });
+      r.done++;
+      if (str(c.due) && d > str(c.due)) r.lateDone++;
+      const created = Number(c.createdAt), doneAt = Number(c.doneAt);
+      if (created > 0 && doneAt >= created) r.minutes.push(Math.round((doneAt - created) / 60000));
+    });
+    return Object.keys(by).map(k => {
+      const r = by[k];
+      const m = r.minutes.slice().sort((a, b) => a - b);
+      return { staffId: r.staffId, done: r.done, lateDone: r.lateDone, timed: m.length,
+        avgMinutes: m.length ? Math.round(m.reduce((a, b) => a + b, 0) / m.length) : null, medianMinutes: m.length ? m[Math.floor((m.length - 1) / 2)] : null };
+    }).sort((a, b) => b.done - a.done || a.staffId.localeCompare(b.staffId));
+  }
+
+  /** 시험 템플릿 폼 → plan(exam). materialsText 는 "출처 | 무엇을 | 어디에" 줄(출처: 이그잼포유/족보닷컴). */
+  function validateExam(input) {
+    const i = isObj(input) ? input : {};
+    let e = lengthErr('학교', i.school, 1, 40) || (str(i.grade).length > 10 ? '학년은 10자까지입니다' : '') || (str(i.subject).length > 40 ? '과목은 40자까지입니다' : '') ||
+      (str(i.textbook).length > 40 ? '교과서는 40자까지입니다' : '') || (str(i.examName).length > 40 ? '시험 이름은 40자까지입니다' : '') || (str(i.scope).length > 120 ? '시험 범위는 120자까지입니다' : '') ||
+      (str(i.note).length > 300 ? '메모는 300자까지입니다' : '');
+    if (e) return { value: null, error: e };
+    if (!validYmd(str(i.examDate))) return { value: null, error: '시험일은 YYYY-MM-DD 형식입니다' };
+    const lead = str(i.leadDays) === '' ? EXAM_LEAD_DEFAULT : Number(i.leadDays);
+    const before = str(i.dueDaysBefore) === '' ? EXAM_DUE_BEFORE_DEFAULT : Number(i.dueDaysBefore);
+    if (!Number.isInteger(lead) || lead < 1 || lead > 90) return { value: null, error: '몇 일 전부터(1~90)를 확인하세요' };
+    if (!Number.isInteger(before) || before < 0 || before > 60 || before >= lead) return { value: null, error: '전달 기한(시험 몇 일 전, 0~60)은 시작보다 앞설 수 없습니다' };
+    const materials = [];
+    const lines = String(i.materialsText == null ? '' : i.materialsText).split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    if (!lines.length) return { value: null, error: '자료를 한 줄 이상 적으세요 (출처 | 무엇을 | 어디에)' };
+    if (lines.length > 20) return { value: null, error: '자료는 20줄까지입니다' };
+    for (const line of lines) {
+      const parts = line.split('|').map(s => s.trim());
+      const src = parts[0].toLowerCase();
+      const source = /이그잼|exam4you/.test(src) ? 'exam4you' : /족보|jokbo/.test(src) ? 'jokbo' : '';
+      if (!source) return { value: null, error: '자료 줄은 "이그잼포유 | 무엇을 | 어디에" 또는 "족보닷컴 | …"으로 시작해야 합니다' };
+      const what = str(parts[1]);
+      if (!what || what.length > 120) return { value: null, error: '자료의 "무엇을"은 1~120자여야 합니다' };
+      const where = str(parts[2]);
+      if (where.length > 120) return { value: null, error: '자료의 "어디에"는 120자까지입니다' };
+      const m = { source: source, what: what };
+      if (where) m.where = where;
+      materials.push(m);
+    }
+    e = piiErr([i.school, i.grade, i.subject, i.textbook, i.examName, i.scope, i.materialsText, i.note]);
+    if (e) return { value: null, error: e };
+    const value = { kind: 'exam', school: str(i.school), examDate: str(i.examDate), leadDays: lead, dueDaysBefore: before, materials: materials, active: i.active !== false };
+    ['grade', 'subject', 'textbook', 'examName', 'scope', 'note'].forEach(k => { if (str(i[k])) value[k] = str(i[k]); });
+    return { value: value, error: '' };
   }
   function doneYmd(card) {
     const n = Number(card && card.doneAt);
@@ -967,9 +1066,12 @@
     alertsToday: alertsToday, briefText: briefText, routeOf: routeOf, inviteLink: inviteLink,
     ROOMS: ROOMS, ROOM_LABEL: ROOM_LABEL, CARD_STATUS: CARD_STATUS, CARD_STATUS_LABEL: CARD_STATUS_LABEL, CARD_TARGETS: CARD_TARGETS,
     PLAN_TARGETS: PLAN_TARGETS, PLAN_TARGET_LABEL: PLAN_TARGET_LABEL, RANGE_STATUS: RANGE_STATUS, RANGE_STATUS_LABEL: RANGE_STATUS_LABEL,
-    RANGE_SOURCES: RANGE_SOURCES, MANUAL_SCOPES: MANUAL_SCOPES,
+    RANGE_SOURCES: RANGE_SOURCES, MANUAL_SCOPES: MANUAL_SCOPES, EXAM_SOURCES: EXAM_SOURCES,
+    EXAM_LEAD_DEFAULT: EXAM_LEAD_DEFAULT, EXAM_DUE_BEFORE_DEFAULT: EXAM_DUE_BEFORE_DEFAULT,
     planCardId: planCardId, planActiveOn: planActiveOn, planTargetsFor: planTargetsFor, deriveCards: deriveCards, cardLate: cardLate,
-    cardsOn: cardsOn, groupByRoom: groupByRoom, matrixOf: matrixOf, coverageOf: coverageOf, manualFor: manualFor, manualsFor: manualsFor,
-    validateCard: validateCard, validateRecurring: validateRecurring, validateRange: validateRange, validateApp: validateApp, validateManual: validateManual
+    cardsOn: cardsOn, daysUntil: daysUntil, groupByRoom: groupByRoom, matrixOf: matrixOf, coverageOf: coverageOf, staffStats: staffStats,
+    manualFor: manualFor, manualsFor: manualsFor,
+    validateCard: validateCard, validateRecurring: validateRecurring, validateRange: validateRange, validateApp: validateApp, validateManual: validateManual,
+    validateExam: validateExam
   };
 });
