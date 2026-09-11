@@ -5571,12 +5571,14 @@ function assignedLearningTaskForDate(staffId, sourceKey, date) {
     task.kind !== LEARNING_DAILY_LOG_KIND && learningTaskDate(task) === date) || null;
 }
 
+/* 로그인 정보를 화면에 박아 두지 않는다. 이 저장소는 public이라 여기 적으면
+   기관 ID와 공용 비밀번호가 그대로 공개되고, Student ID가 학생 실명이라
+   이름 하나만 맞히면 남의 계정으로 들어갈 수 있게 된다.
+   비밀번호는 선생님이 직접 안내한다. */
 function leadersEyeAccountGuide(me) {
   if (!me) return '';
   return '<div class="guide mt14 mb14"><b>리더스아이 로그인 정보</b><br>' +
-    'Agency ID: <strong>wbbrain</strong><br>' +
-    'Student ID: <strong>' + esc(me.name) + '</strong><br>' +
-    'Student PW: <strong>0000</strong><br>' +
+    '<span class="small">아이디와 비밀번호는 담당 선생님께 문의하세요.</span><br>' +
     '<span class="small muted">레벨 안내: 학습 결과에 따라 1주일마다 자동으로 레벨이 조정됩니다.</span></div>';
 }
 

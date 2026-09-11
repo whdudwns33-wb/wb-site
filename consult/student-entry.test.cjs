@@ -230,23 +230,25 @@ test('the usage guide explains connection scope and the complete daily closing o
     'the guide must preserve the exact daily closing sequence');
 });
 
-test('the Leaders Eye student card renders shared login guidance with the current student name', () => {
+test('the Leaders Eye student card points to the teacher instead of printing credentials', () => {
   const state = { tasks: [], checks: {}, settings: {} };
   const before = JSON.stringify(state);
   const first = renderLearningSourceCard('김민준', state);
   const second = renderLearningSourceCard('이서연', state);
 
   for (const card of [first, second]) {
-    assert.match(card, /Agency ID[\s\S]*?wbbrain/);
-    assert.match(card, /Student PW[\s\S]*?0000/);
+    // 저장소가 public이라 기관 ID·공용 비밀번호를 화면에 박으면 그대로 공개된다.
+    assert.doesNotMatch(card, /wbbrain/, 'the agency id must not be rendered');
+    assert.doesNotMatch(card, /Student PW/, 'the shared password must not be rendered');
+    assert.match(card, /담당 선생님께 문의/);
     assert.match(card, /1주일마다 자동으로 레벨이 조정됩니다/);
     assert.match(card, /오늘 미기록/);
     assert.match(card, /data-act="learningdailyopen"[\s\S]*?오늘 학습 완료 기록/);
     assert.match(card, /회차나 별도 과제 배정은 필요하지 않습니다/);
   }
-  assert.match(first, /Student ID[\s\S]*?김민준/);
+  // 학생 실명이 로그인 아이디였으므로, 카드가 이름을 노출하지 않는 것도 함께 지킨다.
+  assert.doesNotMatch(first, /Student ID/);
   assert.doesNotMatch(first, /이서연/);
-  assert.match(second, /Student ID[\s\S]*?이서연/);
   assert.doesNotMatch(second, /김민준/);
   assert.equal(JSON.stringify(state), before, 'rendering login guidance must not persist credentials');
 });

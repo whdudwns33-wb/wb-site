@@ -1,7 +1,7 @@
 'use strict';
 /* WB 진로독서 백엔드 — 학생 동기화 API + 관리 웹 + 학생 앱 서빙 (Node 22 무의존성)
    실행: node reading-server/server.mjs   (기본 http://localhost:8890)
-   환경: PORT, ADMIN_PIN(기본 wb-admin-2026 — 운영 시 반드시 변경), DATA_DIR */
+   환경: PORT, ADMIN_PIN(필수 — 없으면 뜨지 않는다), DATA_DIR */
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -22,7 +22,14 @@ const AGE_DIR = path.join(ROOT, '..', 'vocab-age'); // 어휘 나이 진단(로�
 const NAESIN_DIR = path.join(ROOT, '..', 'naesin');    // 내신브레인 앱 정적 파일
 const PUB_DIR = path.join(ROOT, 'public');             // 관리 웹
 const PORT = +(process.env.PORT || 8890);
-const ADMIN_PIN = process.env.ADMIN_PIN || 'wb-admin-2026';
+/* 관리 PIN은 기본값을 두지 않는다. 저장소가 public이라 기본값을 적어 두면 그게 곧
+   공개된 관리자 비밀번호가 된다 — 이 PIN 하나로 학생 기록 전체가 열린다.
+   빠뜨린 채 뜨는 것보다 뜨지 않는 편이 안전하므로 없으면 즉시 종료한다. */
+const ADMIN_PIN = process.env.ADMIN_PIN || '';
+if (!ADMIN_PIN) {
+  console.error('ADMIN_PIN 환경변수가 필요합니다. 예: ADMIN_PIN=<임의의 긴 문자열> node reading-server/server.mjs');
+  process.exit(1);
+}
 const TOKEN_TTL = 1000 * 60 * 60 * 24 * 30;            // 30일
 
 load();
@@ -746,5 +753,4 @@ setInterval(async () => {
 server.listen(PORT, () => {
   console.log(`WB 진로독서 서버 http://localhost:${PORT}`);
   console.log(`  학생 앱: /   워드브레인: /vocab/   관리 웹: /admin   연상 검수함: /admin/vocab-review.html`);
-  if (ADMIN_PIN === 'wb-admin-2026') console.log('  ⚠ 기본 ADMIN_PIN 사용 중 — 운영 배포 전 반드시 ADMIN_PIN 환경변수로 변경하세요.');
 });
