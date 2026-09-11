@@ -62,3 +62,26 @@ test('같은 화면 마크업이면 전체 DOM 교체를 건너뛰고 수업 조
   assert.match(html, /function tasksForStudent\(studentId\)/);
   assert.match(block('function save()', 'function ymd'), /invalidateTaskQueryIndex\(\)/);
 });
+
+test('긴 목록은 브라우저가 보이는 카드부터 레이아웃하도록 content-visibility를 사용한다', () => {
+  assert.match(html, /#view \.task, #view \.lesson-slot, #view \.book-entry/);
+  assert.match(html, /content-visibility:\s*auto/);
+  assert.match(html, /contain-intrinsic-size:\s*0 86px/);
+});
+
+test('업무·출결 조회는 staffId/studentId 색인을 사용하고 완료되지 않은 변경만 baseline을 비교한다', () => {
+  const domain = block('function tasksFor(staffId, date)', 'const ckey =');
+  assert.match(domain, /tasksForStaff\(staffId\)/);
+  assert.match(html, /const byId = new Map\(\), byStaff = new Map\(\), byStudent = new Map\(\)/);
+  const collect = block('collect(since) {', '  /** 받은 변경을 반영한다');
+  assert.match(collect, /if \(\(s\.updatedAt \|\| 0\) <= since\) return;/);
+  assert.match(collect, /if \(!c \|\| \(c\.updatedAt \|\| 0\) <= since\) return;/);
+});
+
+test('같은 날짜 업무 목록과 오늘 현황 배지는 한 번 계산한 결과를 재사용한다', () => {
+  const domain = block('function tasksFor(staffId, date)', 'const ckey =');
+  assert.match(domain, /taskDayQueryCache/);
+  assert.match(domain, /taskDayQueryCache\.rows\.has\(key\)/);
+  assert.match(block('function alertsToday()', '/\* ══════════════════════════════════════════════════════'), /alertsTodayCache/);
+  assert.match(block('function invalidateTaskQueryIndex()', 'const STAFF_WORK_ROLE'), /taskDayQueryCache = null/);
+});
