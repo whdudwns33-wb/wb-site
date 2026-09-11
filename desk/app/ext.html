@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>WB 프로그램데스크 캡처 — 크롬 확장 설치</title>
+<link rel="stylesheet" href="./desk.css?v=dev">
+<style>
+  .wrap { max-width: 640px; }
+  ol.steps { padding-left: 20px; line-height: 1.8; }
+  code { background: var(--ink-bg); padding: 1px 5px; border-radius: 4px; font-size: 13px; }
+</style>
+</head>
+<body>
+<header class="topbar"><div class="wrap"><div class="brand">WB 프로그램데스크 <small>크롬 확장 설치</small></div></div></header>
+<main class="wrap" style="padding-top:14px">
+  <div class="card">
+    <div class="card-title">직원 PC 크롬에 한 번만 설치합니다</div>
+    <div class="card-sub mb8">확장은 직원이 로그인한 화면에서 <b>클릭한 표 하나</b>만 읽어 데스크로 보냅니다. 아이디·비밀번호를 저장하지 않고, 자동으로 도는 것도 없습니다. 표 안의 전화번호·이메일은 서버가 가립니다.</div>
+    <button class="btn btn-primary" id="dl">확장 프로그램 내려받기 (zip)</button>
+    <div class="hint mt8" id="msg"></div>
+  </div>
+  <div class="card">
+    <div class="card-title">설치</div>
+    <ol class="steps">
+      <li>내려받은 <code>wb-desk-capture.zip</code>의 압축을 풀어 폴더로 둡니다 (지우지 마세요 — 크롬이 그 폴더를 계속 씁니다).</li>
+      <li>크롬 주소창에 <code>chrome://extensions</code> 를 입력합니다.</li>
+      <li>오른쪽 위 <b>개발자 모드</b>를 켭니다.</li>
+      <li><b>압축해제된 확장 프로그램을 로드합니다</b> → 압축을 푼 폴더를 고릅니다.</li>
+      <li>주소창 옆 퍼즐 아이콘 → <b>WB 프로그램데스크 캡처</b>를 고정합니다.</li>
+    </ol>
+  </div>
+  <div class="card">
+    <div class="card-title">연결과 사용</div>
+    <ol class="steps">
+      <li>원장이 데스크 <b>관리</b> 탭에서 발급한 <b>개인 링크</b>를 받습니다 (7일 안에 한 번만).</li>
+      <li>확장 아이콘 → 링크를 붙여 넣고 <b>[연결]</b>.</li>
+      <li>스터디포스·클래스카드·메타수학·넬트 관리자 화면에서 아이콘 → <b>[이 화면에서 표 고르기]</b> → 보낼 표를 클릭합니다.</li>
+      <li>데스크의 그 프로그램 방 <b>[캡처]</b>에 도착합니다. 원장이 규칙(이름 열·상태 열·완료 값)을 한 번 정해 두면 <b>[반영]</b>으로 수행 스탬프가 찍힙니다.</li>
+    </ol>
+    <div class="hint">확장을 새 버전으로 바꿀 때는 zip 을 다시 받아 폴더 내용을 덮어쓰고 <code>chrome://extensions</code>에서 새로고침을 누릅니다.</div>
+  </div>
+</main>
+<script src="./ext.js?v=dev"></script>
+</body>
+</html>

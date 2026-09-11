@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "WB 프로그램데스크 캡처",
+  "version": "0.1.0",
+  "description": "지금 보고 있는 화면의 표를 골라 WB 프로그램데스크로 보냅니다. 아이디·비밀번호는 저장하지 않습니다.",
+  "permissions": ["activeTab", "scripting", "storage"],
+  "host_permissions": ["https://wb-desk.whdudwns33.workers.dev/*"],
+  "action": { "default_popup": "popup.html", "default_title": "데스크로 표 보내기" },
+  "background": { "service_worker": "background.js" }
+}

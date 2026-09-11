@@ -50,31 +50,40 @@ async function main() {
   copied.push('runbook-pack.json');
   await copyFile(path.join(SHARED, 'external-links.js'), path.join(DIST, 'lib', 'external-links.js'));
   copied.push('lib/external-links.js');
+  /* 크롬 확장(desk-ext/)은 dist/ext/ 로 — ext.html 이 이 파일들을 zip 으로 묶어 내려준다. 확장 자체엔 학생 정보가 없다. */
+  const EXT = path.join(here, '..', 'desk-ext');
+  for (const name of await listFiles(EXT)) {
+    await copyFile(path.join(EXT, name), path.join(DIST, 'ext', name));
+    copied.push('ext/' + name);
+  }
 
-  /* index.html 스탬프 — src/href="./…?v=dev" 만 건드린다(외부 서체 링크 등은 그대로). */
-  const indexPath = path.join(DIST, 'index.html');
-  let html = await fs.readFile(indexPath, 'utf8');
+  /* HTML 스탬프 — src/href="./…?v=dev" 만 건드린다(외부 서체 링크 등은 그대로). index.html 과 확장 설치 페이지 ext.html. */
   const stamped = [];
-  const missing = [];
-  html = html.replace(/(src|href)="(\.\/[^"?]+)\?v=dev"/g, (m, attr, rel) => {
-    const file = path.join(DIST, rel.replace(/^\.\//, ''));
-    let buf;
-    /* replace 콜백은 async가 될 수 없어 여기만 동기 읽기다 */
-    try { buf = readFileSync(file); } catch (e) { missing.push(rel); return m; }
-    const v = hashOf(buf);
-    stamped.push(rel + ' → ' + v);
-    return attr + '="' + rel + '?v=' + v + '"';
-  });
-  if (missing.length) throw new Error('index.html이 참조하는 파일이 dist에 없습니다: ' + missing.join(', '));
-  await fs.writeFile(indexPath, html);
+  async function stampHtml(name, minCount) {
+    const htmlPath = path.join(DIST, name);
+    let html = await fs.readFile(htmlPath, 'utf8');
+    const missing = [];
+    html = html.replace(/(src|href)="(\.\/[^"?]+)\?v=dev"/g, (m, attr, rel) => {
+      const file = path.join(DIST, rel.replace(/^\.\//, ''));
+      let buf;
+      /* replace 콜백은 async가 될 수 없어 여기만 동기 읽기다 */
+      try { buf = readFileSync(file); } catch (e) { missing.push(rel); return m; }
+      const v = hashOf(buf);
+      stamped.push(rel + ' → ' + v);
+      return attr + '="' + rel + '?v=' + v + '"';
+    });
+    if (missing.length) throw new Error(name + '이 참조하는 파일이 dist에 없습니다: ' + missing.join(', '));
+    await fs.writeFile(htmlPath, html);
+    /* 자체 확인 — 스탬프가 실제로 붙었는지 다시 읽어 본다 */
+    const check = await fs.readFile(htmlPath, 'utf8');
+    if (/\?v=dev"/.test(check)) throw new Error(name + '에 ?v=dev 참조가 남아 있습니다');
+    const n = (check.match(/\?v=[0-9a-f]{10}"/g) || []).length;
+    if (n < minCount) throw new Error(name + '의 스탬프된 자산이 너무 적습니다: ' + n);
+  }
+  await stampHtml('index.html', 10);
+  await stampHtml('ext.html', 2);
 
-  /* 자체 확인 — 스탬프가 실제로 붙었는지 다시 읽어 본다 */
-  const check = await fs.readFile(indexPath, 'utf8');
-  if (/\?v=dev"/.test(check)) throw new Error('?v=dev 참조가 남아 있습니다');
-  const n = (check.match(/\?v=[0-9a-f]{10}"/g) || []).length;
-  if (n < 10) throw new Error('스탬프된 자산이 너무 적습니다: ' + n);
-
-  console.log('dist 조립 완료 — ' + copied.length + '개 파일, 스탬프 ' + n + '개');
+  console.log('dist 조립 완료 — ' + copied.length + '개 파일, 스탬프 ' + stamped.length + '개');
   stamped.forEach(s => console.log('  ' + s));
 }
 

@@ -542,6 +542,55 @@ async function rawCall(env, method, path, options = {}) {
   return handleApi(new Request(BASE + path, { method, headers, body: options.body === undefined ? undefined : JSON.stringify(options.body) }), env, {});
 }
 
+test('captures: 만들기(PII 가림·검증)·목록·단건·반영 표시·삭제 권한·보관 30건·크롬 확장 CORS·capture 규칙', async () => {
+  const env = envFor();
+  const adminToken = await setupAdmin(env);
+  const a = await makeStaff(env, adminToken, '직원 A');
+  const body = { program: 'studyforce', page: { host: 'https://hol.sfcenter.co.kr/x', title: '수행 현황' }, header: ['이름', '학년', '수행'],
+    rows: [['학생A', '중2', '완료'], ['학생B', '중2', '010-0000-0000'], ['', '', ''], ['학생C']] };
+  assert.equal((await call(env, 'POST', '/api/captures', { body })).status, 401);
+  assert.equal((await call(env, 'POST', '/api/captures', { token: a.token, body: Object.assign({}, body, { program: 'exam4you' }) })).body.code, 'INVALID');
+  assert.equal((await call(env, 'POST', '/api/captures', { token: a.token, body: Object.assign({}, body, { header: [] }) })).body.code, 'INVALID');
+  assert.equal((await call(env, 'POST', '/api/captures', { token: a.token, body: Object.assign({}, body, { rows: 'x' }) })).body.code, 'INVALID');
+  const made = await call(env, 'POST', '/api/captures', { token: a.token, body });
+  assert.equal(made.status, 200, JSON.stringify(made.body));
+  assert.deepEqual([made.body.rowCount, made.body.scrubbed, /^c_[0-9a-f]{24}$/.test(made.body.id)], [3, 1, true]);
+  const list = await call(env, 'GET', '/api/captures?program=studyforce', { token: adminToken });
+  const c0 = list.body.captures[0];
+  assert.deepEqual([list.body.captures.length, c0.host, c0.title, c0.header, c0.rowCount, c0.createdBy, c0.rows, c0.appliedAt], [1, 'hol.sfcenter.co.kr', '수행 현황', ['이름', '학년', '수행'], 3, a.id, undefined, null]);
+  const one = await call(env, 'GET', '/api/captures/' + made.body.id, { token: a.token });
+  assert.deepEqual(one.body.capture.rows, [['학생A', '중2', '완료'], ['학생B', '중2', '(가림)'], ['학생C']]);
+  assert.equal((await call(env, 'GET', '/api/captures?program=kakao', { token: a.token })).body.code, 'INVALID');
+  assert.equal((await call(env, 'GET', '/api/captures/c_000000000000000000000000', { token: a.token })).status, 404);
+  const applied = await call(env, 'POST', '/api/captures/' + made.body.id + '/applied', { token: a.token, body: {} });
+  assert.deepEqual([applied.status, applied.body.appliedBy], [200, a.id]);
+  assert.equal((await call(env, 'GET', '/api/captures', { token: a.token })).body.captures[0].appliedBy, a.id);
+  assert.equal((await call(env, 'POST', '/api/captures/c_000000000000000000000000/applied', { token: a.token, body: {} })).status, 404);
+  for (let i = 0; i < 32; i++) await call(env, 'POST', '/api/captures', { token: a.token, body: Object.assign({}, body, { capturedAt: 1000 + i }) });
+  assert.equal((await call(env, 'GET', '/api/captures?program=studyforce&limit=30', { token: a.token })).body.captures.length, 30, '프로그램당 30건만 남는다');
+  const latest = (await call(env, 'GET', '/api/captures?program=studyforce', { token: a.token })).body.captures[0].id;
+  assert.equal((await call(env, 'DELETE', '/api/captures/' + latest, { token: a.token })).status, 403);
+  assert.equal((await call(env, 'DELETE', '/api/captures/' + latest, { token: adminToken })).body.deleted, 1);
+
+  const ext = 'chrome-extension://' + 'a'.repeat(32);
+  const pre = await handleApi(new Request(BASE + '/api/captures', { method: 'OPTIONS', headers: { origin: ext } }), env, {});
+  assert.deepEqual([pre.status, pre.headers.get('access-control-allow-origin'), pre.headers.get('access-control-allow-headers')], [204, ext, 'authorization, content-type']);
+  assert.equal((await handleApi(new Request(BASE + '/api/captures', { method: 'OPTIONS', headers: { origin: 'https://evil.example' } }), env, {})).status, 405);
+  assert.equal((await handleApi(new Request(BASE + '/api/health', { headers: { origin: ext } }), env, {})).headers.get('access-control-allow-origin'), ext);
+  assert.equal((await handleApi(new Request(BASE + '/api/health', { headers: { origin: 'https://evil.example' } }), env, {})).headers.get('access-control-allow-origin'), null);
+  assert.equal((await handleApi(new Request(BASE + '/api/health'), env, {})).headers.get('access-control-allow-origin'), null);
+
+  const rule = { kind: 'capture', program: 'studyforce', nameCol: 0, statusCol: 2, gradeCol: 1, doneValues: ['완료', ' O '], partialValues: [] };
+  assert.equal((await putDoc(env, a.token, 'plans', 'cap:studyforce', rule)).status, 403);
+  assert.equal((await putDoc(env, adminToken, 'plans', 'cap:studyforce', rule)).status, 200);
+  const saved = await docOf(env, a.token, 'plans', 'cap:studyforce');
+  assert.deepEqual([saved.basis, saved.doneValues, saved.active], ['report', ['완료', 'O'], true]);
+  assert.equal((await putDoc(env, adminToken, 'plans', 'cap:x', Object.assign({}, rule, { statusCol: 0 }))).body.code, 'INVALID');
+  assert.equal((await putDoc(env, adminToken, 'plans', 'cap:x', Object.assign({}, rule, { doneValues: [] }))).body.code, 'INVALID');
+  assert.equal((await putDoc(env, adminToken, 'plans', 'cap:x', Object.assign({}, rule, { program: 'exam4you' }))).body.code, 'INVALID');
+  assert.equal((await putDoc(env, adminToken, 'plans', 'cap:x', Object.assign({}, rule, { gradeCol: 40 }))).body.code, 'INVALID');
+});
+
 test('files: 원장만 올리고 지운다, 직원은 본다, base64·mime·크기 검증, 매뉴얼 photos 규칙', async () => {
   const env = envFor();
   const adminToken = await setupAdmin(env);

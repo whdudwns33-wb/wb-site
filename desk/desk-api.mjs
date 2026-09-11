@@ -26,8 +26,16 @@ const ROOMS = new Set(['studyforce', 'classcard', 'metamath', 'nelt', 'exam4you'
 const CARD_STATUS = new Set(['todo', 'doing', 'done', 'blocked']);
 const CARD_TARGETS = new Set(['student', 'app', 'text']);
 const EVIDENCE_KINDS = new Set(['check', 'capture', 'file']);
-const PLAN_KINDS = new Set(['recurring', 'apprange', 'exam']);
+const PLAN_KINDS = new Set(['recurring', 'apprange', 'exam', 'capture']);
 const EXAM_SOURCES = new Set(['exam4you', 'jokbo']);
+// 표 캡처(크롬 확장): 구독 프로그램 4개의 관리자 화면 표. 본문 512KB, 500행 × 40칸, 칸 200자. 프로그램당 최근 30건.
+const MAX_CAPTURE_BODY = 512 * 1024;
+const MAX_CAPTURE_ROWS = 500;
+const MAX_CAPTURE_COLS = 40;
+const MAX_CAPTURE_CELL = 200;
+const CAPTURE_KEEP = 30;
+const CAPTURE_ID = /^[A-Za-z0-9_-]{8,64}$/;
+const EXT_ORIGIN = /^chrome-extension:\/\/[a-p]{32}$/;   // 크롬 확장 origin 만 CORS 로 받는다(캡처·링크 교환용)
 const PLAN_TARGETS = new Set(['each', 'student', 'app', 'text']);
 const RANGE_STATUS = new Set(['need', 'buying', 'uploading', 'have']);
 const RANGE_SOURCES = new Set(['exam4you', 'jokbo', 'other']);
@@ -661,6 +669,32 @@ function rulePlans(data, ctx) {
     }
     out.materials = materials;
     out.active = absent(out.active) ? true : !!out.active;
+  } else if (out.kind === 'capture') {
+    // 표 캡처 규칙 — 어느 열이 이름·상태(·학년)이고 어떤 값을 완료·부분으로 볼지. 프로그램당 하나(id cap:<program>).
+    if (!PROGRAM_KEYS.has(out.program)) return bad('INVALID', 'program 은 구독 프로그램 4개 중 하나여야 합니다');
+    for (const key of ['nameCol', 'statusCol']) {
+      const n = Number(out[key]);
+      if (!Number.isInteger(n) || n < 0 || n >= MAX_CAPTURE_COLS) return bad('INVALID', key + ' 은 0~39 열 번호여야 합니다');
+      out[key] = n;
+    }
+    if (out.nameCol === out.statusCol) return bad('INVALID', '이름 열과 상태 열은 달라야 합니다');
+    const g = absent(out.gradeCol) ? -1 : Number(out.gradeCol);
+    if (!Number.isInteger(g) || g < -1 || g >= MAX_CAPTURE_COLS) return bad('INVALID', 'gradeCol 은 -1 또는 0~39 여야 합니다');
+    out.gradeCol = g;
+    for (const [key, min, max] of [['doneValues', 1, 20], ['partialValues', 0, 20]]) {
+      if (absent(out[key])) out[key] = [];
+      if (!Array.isArray(out[key]) || out[key].length < min || out[key].length > max) return bad('INVALID', key + ' 는 ' + min + '~' + max + '개의 배열이어야 합니다');
+      const vals = [];
+      for (const v of out[key]) {
+        if (typeof v !== 'string' || !v.trim() || v.length > 40) return bad('INVALID', key + ' 의 값은 각 1~40자여야 합니다');
+        vals.push(v.trim());
+      }
+      out[key] = vals;
+    }
+    out.basis = 'report';
+    out.active = absent(out.active) ? true : !!out.active;
+    err = textField(out, 'note', 300, '메모');
+    if (err) return err;
   } else if (out.kind === 'recurring') {
     if (!ROOMS.has(out.program)) return bad('INVALID', 'program 은 프로그램 방 6개 중 하나여야 합니다');
     if (!Array.isArray(out.days) || !out.days.length || out.days.length > 7) return bad('INVALID', 'days 는 요일(0~6) 1~7개 배열이어야 합니다');
@@ -954,6 +988,99 @@ async function deleteFile(env, auth, id) {
   return json({ ok: true, deleted: Number(r && r.meta && r.meta.changes) || 0 });
 }
 
+/* ── 표 캡처(크롬 확장) ─────────────────────────────────────────────────
+ * 확장은 직원 본인의 로그인 세션 안에서 클릭한 표만 보낸다. 서버는 칸마다 전화·이메일·주민번호 패턴을 가리고(PII 규칙 그대로),
+ * 프로그램당 최근 30건만 남긴다. 규칙(plans.capture)으로 수행 스탬프에 옮기는 일은 클라이언트(desk-core.applyCapture)가 한다. */
+
+function randomId(prefix) {
+  const bytes = new Uint8Array(12);
+  crypto.getRandomValues(bytes);
+  return prefix + Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function scrubCell(value) {
+  const s = (value == null ? '' : String(value)).replace(/\s+/g, ' ').trim().slice(0, MAX_CAPTURE_CELL);
+  return hasPii(s) ? '(가림)' : s;
+}
+
+async function createCapture(env, auth, request) {
+  const read = await readLimitedJson(request, MAX_CAPTURE_BODY);
+  if (read.error) return read.error;
+  const b = read.body;
+  if (!PROGRAM_KEYS.has(b.program)) return fail('INVALID', 'program 은 스터디포스·클래스카드·메타수학·넬트 중 하나여야 합니다');
+  if (!Array.isArray(b.header) || !b.header.length || b.header.length > MAX_CAPTURE_COLS) return fail('INVALID', 'header 는 1~' + MAX_CAPTURE_COLS + '칸 배열이어야 합니다');
+  if (!Array.isArray(b.rows) || b.rows.length > MAX_CAPTURE_ROWS) return fail('INVALID', 'rows 는 ' + MAX_CAPTURE_ROWS + '행까지의 배열이어야 합니다');
+  const header = b.header.map(scrubCell);
+  let scrubbed = 0;
+  const rows = b.rows.map(r => (Array.isArray(r) ? r : []).slice(0, MAX_CAPTURE_COLS).map(v => { const s = scrubCell(v); if (s === '(가림)') scrubbed++; return s; }))
+    .filter(r => r.some(Boolean));
+  const page = isPlainObject(b.page) ? b.page : {};
+  const host = String(page.host || '').replace(/^https?:\/\//, '').split('/')[0].slice(0, 120);
+  const title = scrubCell(page.title).slice(0, 120);
+  const capturedAt = Number(b.capturedAt) > 0 ? Number(b.capturedAt) : Date.now();
+  const id = randomId('c_');
+  await env.DB.prepare('INSERT INTO desk_captures(id,program,host,title,header,rows,row_count,captured_at,created_by) VALUES(?,?,?,?,?,?,?,?,?)')
+    .bind(id, b.program, host, title, JSON.stringify(header), JSON.stringify(rows), rows.length, capturedAt, auth.staffId).run();
+  await env.DB.prepare('DELETE FROM desk_captures WHERE program=? AND id NOT IN (SELECT id FROM desk_captures WHERE program=? ORDER BY captured_at DESC, id DESC LIMIT ?)')
+    .bind(b.program, b.program, CAPTURE_KEEP).run();
+  return json({ ok: true, id, program: b.program, rowCount: rows.length, scrubbed });
+}
+
+function captureView(row, withRows) {
+  const out = {
+    id: String(row.id), program: String(row.program), host: String(row.host || ''), title: String(row.title || ''),
+    header: parseJson(row.header) || [], rowCount: Number(row.row_count) || 0, capturedAt: Number(row.captured_at) || 0,
+    createdBy: String(row.created_by || ''), appliedAt: row.applied_at == null ? null : Number(row.applied_at), appliedBy: row.applied_by == null ? null : String(row.applied_by)
+  };
+  if (withRows) out.rows = parseJson(row.rows) || [];
+  return out;
+}
+
+async function listCaptures(env, url) {
+  const program = url.searchParams.get('program') || '';
+  if (program && !PROGRAM_KEYS.has(program)) return fail('INVALID', '모르는 프로그램입니다');
+  const limit = Math.min(CAPTURE_KEEP, Math.max(1, Number(url.searchParams.get('limit')) || 10));
+  const where = program ? ' WHERE program=?' : '';
+  const bindings = program ? [program, limit] : [limit];
+  const rows = await env.DB.prepare('SELECT id,program,host,title,header,row_count,captured_at,created_by,applied_at,applied_by FROM desk_captures' + where + ' ORDER BY captured_at DESC, id DESC LIMIT ?')
+    .bind(...bindings).all();
+  return json({ ok: true, now: Date.now(), captures: (rows.results || []).map(r => captureView(r, false)) });
+}
+
+async function getCapture(env, id) {
+  if (!CAPTURE_ID.test(id)) return fail('INVALID', '캡처 id 형식이 올바르지 않습니다');
+  const row = await env.DB.prepare('SELECT * FROM desk_captures WHERE id=? LIMIT 1').bind(id).first();
+  if (!row) return fail('NOT_FOUND', '캡처가 없습니다', 404);
+  return json({ ok: true, capture: captureView(row, true) });
+}
+
+async function markCaptureApplied(env, auth, id) {
+  if (!CAPTURE_ID.test(id)) return fail('INVALID', '캡처 id 형식이 올바르지 않습니다');
+  const now = Date.now();
+  const r = await env.DB.prepare('UPDATE desk_captures SET applied_at=?, applied_by=? WHERE id=?').bind(now, auth.staffId, id).run();
+  if (!(Number(r && r.meta && r.meta.changes) > 0)) return fail('NOT_FOUND', '캡처가 없습니다', 404);
+  return json({ ok: true, appliedAt: now, appliedBy: auth.staffId });
+}
+
+async function deleteCapture(env, auth, id) {
+  if (auth.role !== 'admin') return fail('FORBIDDEN', '캡처 삭제는 원장만 할 수 있습니다', 403);
+  if (!CAPTURE_ID.test(id)) return fail('INVALID', '캡처 id 형식이 올바르지 않습니다');
+  const r = await env.DB.prepare('DELETE FROM desk_captures WHERE id=?').bind(id).run();
+  return json({ ok: true, deleted: Number(r && r.meta && r.meta.changes) || 0 });
+}
+
+/* 크롬 확장 origin 에만 CORS 를 연다 — 브라우저 확장의 fetch 는 origin 이 chrome-extension://<id> 다. 웹 출처는 그대로 막힌다. */
+function corsFor(request) {
+  const origin = request.headers.get('origin') || '';
+  return EXT_ORIGIN.test(origin) ? origin : '';
+}
+function withCors(response, origin) {
+  if (!origin) return response;
+  response.headers.set('Access-Control-Allow-Origin', origin);
+  response.headers.append('Vary', 'Origin');
+  return response;
+}
+
 /* ── 라우터 ─────────────────────────────────────────────────────────── */
 
 function methodNotAllowed() {
@@ -961,6 +1088,16 @@ function methodNotAllowed() {
 }
 
 export async function handleApi(request, env, ctx) {
+  const extOrigin = corsFor(request);
+  if (String(request.method || '').toUpperCase() === 'OPTIONS') {
+    if (!extOrigin) return fail('METHOD', '허용되지 않는 메서드입니다', 405);
+    return new Response(null, { status: 204, headers: { 'Access-Control-Allow-Origin': extOrigin, 'Access-Control-Allow-Methods': 'GET, POST, DELETE',
+      'Access-Control-Allow-Headers': 'authorization, content-type', 'Access-Control-Max-Age': '600', 'Vary': 'Origin' } });
+  }
+  return withCors(await handleApiInner(request, env, ctx), extOrigin);
+}
+
+async function handleApiInner(request, env, ctx) {
   const url = new URL(request.url);
   const path = url.pathname.replace(/\/+$/, '') || '/';
   const method = String(request.method || 'GET').toUpperCase();
@@ -991,6 +1128,21 @@ export async function handleApi(request, env, ctx) {
       if (method === 'GET') return readDocs(env, url);
       if (method === 'POST') return writeDocs(env, auth, await readJson(request));
       return methodNotAllowed();
+    }
+    if (path === '/api/captures') {
+      if (method === 'GET') return listCaptures(env, url);
+      if (method === 'POST') return createCapture(env, auth, request);
+      return methodNotAllowed();
+    }
+    if (path.startsWith('/api/captures/')) {
+      const rest = path.slice('/api/captures/'.length).split('/');
+      if (rest.length === 2 && rest[1] === 'applied') return method === 'POST' ? markCaptureApplied(env, auth, rest[0]) : methodNotAllowed();
+      if (rest.length === 1) {
+        if (method === 'GET') return getCapture(env, rest[0]);
+        if (method === 'DELETE') return deleteCapture(env, auth, rest[0]);
+        return methodNotAllowed();
+      }
+      return fail('NOT_FOUND', '없는 API 경로입니다', 404);
     }
     if (path === '/api/files') return method === 'POST' ? uploadFile(env, auth, request) : methodNotAllowed();
     if (path.startsWith('/api/files/')) {
