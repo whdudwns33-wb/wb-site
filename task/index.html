@@ -1201,15 +1201,15 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-09-10.7"></script>
-<script src="./schedule-board-core.js?v=2026-09-10.7"></script>
-<script src="./asset-core.js?v=2026-09-10.7"></script>
-<script src="./qr-core.js?v=2026-09-10.7"></script>
-<script src="./acaflow-import-core.js?v=2026-09-10.7"></script>
-<script src="./feedback-subject-catalog.js?v=2026-09-10.7"></script>
-<script src="./sync-recovery-core.js?v=2026-09-10.7"></script>
-<script src="./staff-work-session-core.js?v=2026-09-10.7"></script>
-<script src="./staff-attendance-history-core.js?v=2026-09-10.7"></script>
+<script src="./lesson-form-core.js?v=2026-09-11.1"></script>
+<script src="./schedule-board-core.js?v=2026-09-11.1"></script>
+<script src="./asset-core.js?v=2026-09-11.1"></script>
+<script src="./qr-core.js?v=2026-09-11.1"></script>
+<script src="./acaflow-import-core.js?v=2026-09-11.1"></script>
+<script src="./feedback-subject-catalog.js?v=2026-09-11.1"></script>
+<script src="./sync-recovery-core.js?v=2026-09-11.1"></script>
+<script src="./staff-work-session-core.js?v=2026-09-11.1"></script>
+<script src="./staff-attendance-history-core.js?v=2026-09-11.1"></script>
 <script>
 "use strict";
 
@@ -2019,8 +2019,13 @@ const sync = {
    *  저장 지점마다 표시를 남기지 않아도 변경분을 정확히 골라낼 수 있다. */
   collect(since) {
     const out = [];
-    const isCanonical = (table, key, data) => ((state.settings || {}).syncRecoveryBaseline || []).some(row =>
-      row.table === table && row.key === key && JSON.stringify(row.data) === JSON.stringify(data));
+    // baseline을 레코드마다 선형 검색하지 않아 관리자 기기의 대형 캐시에서도 동기화 비용을 일정하게 유지한다.
+    const canonical = new Map(((state.settings || {}).syncRecoveryBaseline || []).map(row =>
+      [String(row.table || '') + '|' + String(row.key || ''), row.data]));
+    const isCanonical = (table, key, data) => {
+      const baseline = canonical.get(String(table) + '|' + String(key));
+      return baseline !== undefined && JSON.stringify(baseline) === JSON.stringify(data);
+    };
     (state.staff || []).forEach(s => {
       if (isCanonical('staff', s.id, s)) return;
       if ((s.updatedAt || 0) > since) out.push({ table: 'staff', id: s.id, owner: s.id, data: s, updated_at: s.updatedAt || 0 });
@@ -2326,25 +2331,29 @@ function syncRecoveryProblem(error) {
   };
 }
 
-function syncRecoveryIsCanonical(table, key, data) {
-  return (state.settings.syncRecoveryBaseline || []).some(row => row.table === table &&
-    row.key === key && JSON.stringify(row.data) === JSON.stringify(data));
+function syncRecoveryIsCanonical(table, key, data, baseline) {
+  const rows = baseline || new Map((state.settings.syncRecoveryBaseline || []).map(row =>
+    [String(row.table || '') + '|' + String(row.key || ''), row.data]));
+  const saved = rows.get(String(table) + '|' + String(key));
+  return saved !== undefined && JSON.stringify(saved) === JSON.stringify(data);
 }
 
 /** 전송 필터가 제외한 기록도 보존한다. 연결 정보가 있는 settings는 복사하지 않는다. */
 function syncRecoveryLocalChanges() {
   const since = Number(state.settings.pushAt) || 0;
+  const baseline = new Map((state.settings.syncRecoveryBaseline || []).map(row =>
+    [String(row.table || '') + '|' + String(row.key || ''), row.data]));
   const rows = [];
   for (const table of ['staff', 'tasks']) {
     for (const data of state[table] || []) {
-      if (Number(data.updatedAt) > since && !syncRecoveryIsCanonical(table, data.id, data)) {
+      if (Number(data.updatedAt) > since && !syncRecoveryIsCanonical(table, data.id, data, baseline)) {
         rows.push({ table, id: data.id, owner: table === 'staff' ? data.id : data.staffId || null,
           data, updated_at: data.updatedAt });
       }
     }
   }
   for (const [key, data] of Object.entries(state.checks || {})) {
-    if (data && Number(data.updatedAt) > since && !syncRecoveryIsCanonical('checks', key, data)) {
+    if (data && Number(data.updatedAt) > since && !syncRecoveryIsCanonical('checks', key, data, baseline)) {
       rows.push({ table: 'checks', k: key, owner: ownerOfCheck(key), data, updated_at: data.updatedAt });
     }
   }
@@ -2605,6 +2614,7 @@ function acknowledgeSyncRecoveryArchives() {
 }
 
 let syncRenderPending = false;
+let syncRenderFrame = 0;
 function isTaskEditorActive() {
   const el = document.activeElement;
   return !!(el && el.matches('input, textarea, select, [contenteditable="true"]'));
@@ -2613,7 +2623,16 @@ function renderAfterSync() {
   if (staffWork.busy && !shouldGateStaffWork()) { syncRenderPending = true; return; }
   if (isTaskEditorActive()) { syncRenderPending = true; return; }
   syncRenderPending = false;
-  render();
+  // 주기 동기화가 짧은 시간에 여러 응답을 받아도 한 프레임에 한 번만 전체 화면을 다시 그린다.
+  if (syncRenderFrame) return;
+  const enqueue = typeof requestAnimationFrame === 'function' ? requestAnimationFrame : setTimeout;
+  syncRenderFrame = enqueue(() => {
+    syncRenderFrame = 0;
+    if (staffWork.busy && !shouldGateStaffWork()) { syncRenderPending = true; return; }
+    if (isTaskEditorActive()) { syncRenderPending = true; return; }
+    syncRenderPending = false;
+    render();
+  }, 0);
 }
 document.addEventListener('focusout', () => setTimeout(() => {
   if (syncRenderPending && !isTaskEditorActive()) renderAfterSync();
@@ -4016,12 +4035,18 @@ async function loadWeekendVisitScheduleScope(date, staffId, force) {
   const auth = sync.auth();
   if (!auth) return;
   const generation = beginWeekendVisitScopeRequest(key);
+  let scopeChanged = false;
   try {
     const result = await sync.post('/weekend-visit', {
       app: SYNC_APP, auth: auth, action: 'list', visitDate: date, staffId: staffId || ''
     });
     if (!isCurrentWeekendVisitScopeRequest(key, generation)) return;
+    const previous = freshWeekendVisitScope(key);
     rememberWeekendVisitScope(date, staffId, result);
+    const next = freshWeekendVisitScope(key);
+    scopeChanged = !previous || !next || JSON.stringify(previous.rows || []) !== JSON.stringify(next.rows || []) ||
+      JSON.stringify(previous.monthlyCounts || []) !== JSON.stringify(next.monthlyCounts || []) ||
+      JSON.stringify(previous.nextVisitSequences || []) !== JSON.stringify(next.nextVisitSequences || []);
   } catch (error) {
     if (!isCurrentWeekendVisitScopeRequest(key, generation)) return;
     weekendVisitScheduleErrors.set(key, String(error && error.message || error || '불러오기 실패'));
@@ -4037,7 +4062,7 @@ async function loadWeekendVisitScheduleScope(date, staffId, force) {
     }, 15050);
   } finally {
     finishWeekendVisitScopeRequest(key, generation);
-    if (route === 'week' || route === 'schedule' || route === 'today' || route === 'feedback') renderAfterSync();
+    if (scopeChanged && (route === 'week' || route === 'schedule' || route === 'today' || route === 'feedback')) renderAfterSync();
   }
 }
 
@@ -4094,7 +4119,6 @@ function refreshVisibleWeekendVisitScopes(force) {
     if (scope.main) loadWeekendVisits(scope.date, scope.staffId, !!force);
     else loadWeekendVisitScheduleScope(scope.date, scope.staffId, !!force);
   });
-  if (force && scopes.length) renderAfterSync();
 }
 
 async function loadWeekendVisits(date, staffId, force) {
@@ -4117,12 +4141,18 @@ async function loadWeekendVisits(date, staffId, force) {
   weekendVisitMainRequestGeneration = generation;
   weekendVisitLoading = true;
   weekendVisitError = '';
+  let scopeChanged = false;
   try {
     const result = await sync.post('/weekend-visit', {
       app: SYNC_APP, auth: auth, action: 'list', visitDate: date, staffId: staffId || ''
     });
     if (!isCurrentWeekendVisitScopeRequest(key, generation)) return;
+    const previous = freshWeekendVisitScope(key);
     rememberWeekendVisitScope(date, staffId, result);
+    const next = freshWeekendVisitScope(key);
+    scopeChanged = !previous || !next || JSON.stringify(previous.rows || []) !== JSON.stringify(next.rows || []) ||
+      JSON.stringify(previous.monthlyCounts || []) !== JSON.stringify(next.monthlyCounts || []) ||
+      JSON.stringify(previous.nextVisitSequences || []) !== JSON.stringify(next.nextVisitSequences || []);
     if (weekendVisitMainRequestKey === key && weekendVisitMainRequestGeneration === generation) {
       weekendVisitRows = result.visits || [];
       weekendVisitMonthlyCounts = result.monthlyCounts || [];
@@ -4138,7 +4168,7 @@ async function loadWeekendVisits(date, staffId, force) {
   } finally {
     finishWeekendVisitScopeRequest(key, generation);
     if (weekendVisitMainRequestKey === key && weekendVisitMainRequestGeneration === generation) weekendVisitLoading = false;
-    if ((route === 'today' || route === 'board') && cursor === date) renderAfterSync();
+    if (scopeChanged && (route === 'today' || route === 'board') && cursor === date) renderAfterSync();
   }
 }
 
@@ -4576,6 +4606,7 @@ async function loadLessonHandoffs(date, force, allowPopup) {
   const serial = ++lessonHandoffSerial;
   lessonHandoffRequests.set(key, serial);
   const isCurrent = () => isCurrentLessonHandoffContext(context) && lessonHandoffRequests.get(key) === serial;
+  let scopeChanged = false;
   const request = { serial: serial, promise: null };
   request.promise = (async () => {
     try {
@@ -4588,6 +4619,10 @@ async function loadLessonHandoffs(date, force, allowPopup) {
       const scope = { rows: rows, recipients: (Array.isArray(result.recipients) ? result.recipients : [])
         .filter(row => row && row.staffId).map(row => ({ staffId: String(row.staffId), name: String(row.name || '선생님') })),
         fetchedAt: Date.now(), error: '' };
+      const previous = lessonHandoffScopes.get(key);
+      scopeChanged = !previous || previous.error !== scope.error ||
+        JSON.stringify(previous.rows || []) !== JSON.stringify(scope.rows) ||
+        JSON.stringify(previous.recipients || []) !== JSON.stringify(scope.recipients);
       lessonHandoffScopes.set(key, scope);
       return scope;
     } catch (error) {
@@ -4597,12 +4632,13 @@ async function loadLessonHandoffs(date, force, allowPopup) {
       }
       const scope = Object.assign({ rows: [], recipients: [] }, cached || {},
         { fetchedAt: Date.now(), error: String(error && error.message || '인계 목록을 불러오지 못했습니다') });
+      scopeChanged = !cached || cached.error !== scope.error;
       lessonHandoffScopes.set(key, scope);
       return scope;
     } finally {
       if (lessonHandoffLoads.get(key) === request) lessonHandoffLoads.delete(key);
       if (isCurrent()) {
-        if (lessonHandoffVisibleDates.has(key)) renderAfterSync();
+        if (scopeChanged && lessonHandoffVisibleDates.has(key)) renderAfterSync();
         if (allowPopup) showPendingLessonHandoffPopup();
       }
     }
@@ -17750,21 +17786,31 @@ async function loadTeacherLiveRequests(force, allowPopup) {
   }
   const auth = sync.auth();
   if (!auth) return;
+  const wasLoaded = teacherLiveRequestLoaded;
+  const previousSignature = JSON.stringify(teacherLiveRequestRows);
+  const previousError = teacherLiveRequestError;
+  let shouldRender = !wasLoaded;
   teacherLiveRequestLoading = true; teacherLiveRequestError = '';
   try {
     const result = await sync.post('/teacher-live-request', {
       app: SYNC_APP, auth: auth, action: 'list'
     });
-    teacherLiveRequestViewerAdminId = String(result.viewerAdminId || '');
-    teacherLiveRequestRows = (result.requests || []).map(row =>
-      normalizeTeacherLiveRequest(row, teacherLiveRequestViewerAdminId)).filter(Boolean);
+    const nextViewerAdminId = String(result.viewerAdminId || '');
+    const nextRows = (result.requests || []).map(row =>
+      normalizeTeacherLiveRequest(row, nextViewerAdminId)).filter(Boolean);
+    if (nextViewerAdminId !== teacherLiveRequestViewerAdminId || JSON.stringify(nextRows) !== previousSignature || previousError) shouldRender = true;
+    teacherLiveRequestViewerAdminId = nextViewerAdminId;
+    teacherLiveRequestRows = nextRows;
     teacherLiveRequestLoaded = true;
   } catch (error) {
-    if (!(error && error.personAuthHandled)) teacherLiveRequestError = '실시간 선생님 요청을 불러오지 못했습니다.';
+    if (!(error && error.personAuthHandled)) {
+      teacherLiveRequestError = '실시간 선생님 요청을 불러오지 못했습니다.';
+      if (teacherLiveRequestError !== previousError) shouldRender = true;
+    }
     teacherLiveRequestLoaded = true;
   } finally {
     teacherLiveRequestLoading = false;
-    renderAfterSync();
+    if (shouldRender) renderAfterSync();
     if (allowPopup) showPendingTeacherLiveRequestPopup();
   }
 }
@@ -17878,17 +17924,26 @@ async function loadTuitionAlerts(force, allowPopup) {
   }
   const auth = sync.auth();
   if (!auth) return;
+  const wasLoaded = tuitionAlertsLoaded;
+  const previousSignature = JSON.stringify(tuitionAlertRows);
+  const previousError = tuitionAlertsError;
+  let shouldRender = !wasLoaded;
   tuitionAlertsLoading = true; tuitionAlertsError = '';
   try {
     const result = await sync.post('/tuition-alert', { app: SYNC_APP, auth: auth, action: 'list' });
-    tuitionAlertRows = (result.alerts || []).map(normalizeTuitionAlert).filter(Boolean);
+    const nextRows = (result.alerts || []).map(normalizeTuitionAlert).filter(Boolean);
+    if (JSON.stringify(nextRows) !== previousSignature || previousError) shouldRender = true;
+    tuitionAlertRows = nextRows;
     tuitionAlertsLoaded = true;
   } catch (error) {
-    if (!(error && error.personAuthHandled)) tuitionAlertsError = '수강료 생성 알림을 불러오지 못했습니다.';
+    if (!(error && error.personAuthHandled)) {
+      tuitionAlertsError = '수강료 생성 알림을 불러오지 못했습니다.';
+      if (tuitionAlertsError !== previousError) shouldRender = true;
+    }
     tuitionAlertsLoaded = true;
   } finally {
     tuitionAlertsLoading = false;
-    renderAfterSync();
+    if (shouldRender) renderAfterSync();
     if (allowPopup) showPendingTuitionAlertPopup();
   }
 }
@@ -17976,6 +18031,10 @@ async function loadAdminDirectives(force, allowPopup) {
     if (allowPopup) showPendingAdminDirectivePopup();
     return;
   }
+  const previousManageSignature = JSON.stringify(adminDirectiveManageRows);
+  const previousOwnSignature = JSON.stringify(adminDirectiveOwnRows);
+  const previousError = adminDirectiveError;
+  let shouldRender = (!adminDirectiveManageLoaded && needManage) || (!adminDirectiveOwnLoaded && needOwn);
   adminDirectiveLoading = true; adminDirectiveError = '';
   try {
     const results = await Promise.all([
@@ -17983,21 +18042,26 @@ async function loadAdminDirectives(force, allowPopup) {
       needOwn ? sync.post('/admin-directive', { app: SYNC_APP, auth: auth, action: 'list', view: 'own' }) : null
     ]);
     if (results[0]) {
-      adminDirectiveManageRows = (results[0].revisions || []).map(normalizeAdminDirective).filter(Boolean);
+      const nextRows = (results[0].revisions || []).map(normalizeAdminDirective).filter(Boolean);
+      if (JSON.stringify(nextRows) !== previousManageSignature || previousError) shouldRender = true;
+      adminDirectiveManageRows = nextRows;
       adminDirectiveManageLoaded = true;
     }
     if (results[1]) {
-      adminDirectiveOwnRows = (results[1].revisions || []).map(normalizeAdminDirective).filter(Boolean);
+      const nextRows = (results[1].revisions || []).map(normalizeAdminDirective).filter(Boolean);
+      if (JSON.stringify(nextRows) !== previousOwnSignature || previousError) shouldRender = true;
+      adminDirectiveOwnRows = nextRows;
       adminDirectiveOwnLoaded = true;
     }
   } catch (error) {
     if (error && error.personAuthHandled) return;
     adminDirectiveError = String(error && error.message || error);
+    if (adminDirectiveError !== previousError) shouldRender = true;
     if (needManage) adminDirectiveManageLoaded = true;
     if (needOwn) adminDirectiveOwnLoaded = true;
   } finally {
     adminDirectiveLoading = false;
-    renderAfterSync();
+    if (shouldRender) renderAfterSync();
     if (allowPopup) showPendingAdminDirectivePopup();
   }
 }
@@ -24183,7 +24247,11 @@ let syncLoopStarted = false;
 function ensureSyncLoopStarted() {
   if (syncLoopStarted || !sync.enabled()) return;
   syncLoopStarted = true;
-  setInterval(() => sync.run(), 45000);
+  // 백그라운드 탭에서는 동기화·렌더링을 계속 돌리지 않는다. 다시 보이는 순간
+  // visibilitychange가 즉시 최신 상태를 확인하므로 데이터 지연 없이 배터리와 CPU를 아낀다.
+  setInterval(() => {
+    if (document.visibilityState === 'visible') sync.run();
+  }, 45000);
 }
 
 async function startSyncSession() {
@@ -24236,7 +24304,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-09-10.7';
+const APP_VER = '2026-09-11.1';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
