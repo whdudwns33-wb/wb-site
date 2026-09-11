@@ -52,14 +52,17 @@ function seed(db) {
   }
   db.prepare('INSERT INTO private_rosters(app,data,updated_at) VALUES(?,?,?)')
     .bind('task', JSON.stringify(roster()), now).run();
-  for (const [id, staffId, studentId] of [
-    ['lesson-a', 'teacher-a', 'student-a'], ['lesson-b', 'teacher-b', 'student-b'],
-    ['lesson-kim-a', KIM_NAMGI_STAFF_ID, 'student-a']
+  for (const [id, staffId, studentId, days, startTime, endTime] of [
+    ['lesson-a', 'teacher-a', 'student-a', [1], '10:00', '11:00'],
+    ['lesson-b', 'teacher-b', 'student-b', [1], '10:00', '11:00'],
+    ['lesson-kim-a', KIM_NAMGI_STAFF_ID, 'student-a', [2], '10:00', '11:00']
   ]) {
     db.prepare('INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
       .bind('task', id, staffId, JSON.stringify({ id, staffId, studentId, taskKind: 'lesson_instruction',
         lessonFormVersion: 1, intakeVersion: 1,
-        title: '[수업] 테스트', start: '2026-01-01', end: '', deleted: false }), now, now).run();
+        title: '[수업] 테스트', repeat: 'days', days, scheduleStatus: 'confirmed',
+        scheduleSlots: [{ days, startTime, endTime }],
+        start: '2026-01-01', end: '', deleted: false }), now, now).run();
   }
 }
 
@@ -293,6 +296,88 @@ test('new order moves through accepted, teacher received, student handed, and ad
   assert.ok(completed.body.orders[0].teacherReceivedAt);
   assert.ok(completed.body.orders[0].studentHandedAt);
   assert.ok(completed.body.orders[0].academyRegisteredAt);
+});
+
+test('book order list separates Solapi progress without exposing numeric provider codes', async () => {
+  const db = new TestD1(); seed(db);
+  const now = Date.now();
+  const cases = [
+    ['queued-order', '2000', null, 'provider_queued', 'order_check', false],
+    ['carrier-order', '3000', null, 'carrier_processing', 'order_check', false],
+    ['delivered-order', '4000', null, 'delivered', 'ordered', true],
+    ['phone-order', '2000', 'MANUAL_PHONE_ORDERED', 'phone_ordered', 'ordered', true]
+  ];
+  for (const [taskId, providerCode, safeCode] of cases) {
+    const task = {
+      id: taskId, staffId: 'teacher-a', title: '[주문] ' + taskId, deleted: false,
+      orderDelivery: 'scheduled_batch_v1', orderVendor: '테스트총판',
+      orderItems: [{ bookId: 'BK01', title: '새 교재', qty: '1권', studentIds: ['student-a'] }],
+      origin: 'staff', createdAt: now, updatedAt: now
+    };
+    db.prepare('INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
+      .bind('task', taskId, 'teacher-a', JSON.stringify(task), now, now).run();
+    db.prepare('INSERT INTO book_order_sends(app,send_id,idempotency_key,task_id,vendor_name,item_count,message_hash,status,' +
+      'provider_status_code,safe_error_code,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)')
+      .bind('task', 'send-' + taskId, 'key-' + taskId, taskId, '테스트총판', 1,
+        taskId.padEnd(64, 'a').slice(0, 64), 'accepted', providerCode, safeCode, now, now).run();
+  }
+
+  const listed = await call(db, { auth: person('teacher-a', 'token-a'), action: 'list' });
+  assert.equal(listed.status, 200);
+  for (const [taskId, , , deliveryState, stage, completed] of cases) {
+    const row = listed.body.orders.find(item => item.taskId === taskId);
+    assert.ok(row, taskId);
+    assert.equal(row.messageDeliveryState, deliveryState, taskId);
+    assert.equal(row.stage, stage, taskId);
+    assert.equal(!!row.orderCompletedAt, completed, taskId);
+    assert.equal(Object.prototype.hasOwnProperty.call(row, 'providerStatusCode'), false, taskId);
+  }
+  const blocked = await call(db, { auth: person('teacher-a', 'token-a'), action: 'order_transition',
+    taskId: 'queued-order', itemIndex: 0, next: 'receive', revision: 0 });
+  assert.equal(blocked.status, 409);
+  assert.equal(blocked.body.code, 'ORDER_NOT_ACCEPTED');
+
+  db.prepare("UPDATE book_order_sends SET status='unknown',safe_error_code='SOLAPI_STATUS_STALE_2000' WHERE task_id='queued-order'").run();
+  const stale = await call(db, { auth: person('teacher-a', 'token-a'), action: 'list' });
+  const staleOrder = stale.body.orders.find(item => item.taskId === 'queued-order');
+  assert.equal(staleOrder.messageDeliveryState, 'unknown');
+  assert.equal(staleOrder.stage, 'order_check');
+
+  db.prepare("UPDATE book_order_sends SET status='rejected' WHERE task_id='phone-order'").run();
+  const manualOverride = await call(db, { auth: person('teacher-a', 'token-a'), action: 'list' });
+  const phoneOrder = manualOverride.body.orders.find(item => item.taskId === 'phone-order');
+  assert.equal(phoneOrder.messageDeliveryState, 'phone_ordered');
+  assert.equal(phoneOrder.stage, 'ordered');
+
+  db.prepare('INSERT INTO book_order_fulfillments(app,task_id,item_index,book_id,student_ids,status,revision,' +
+    'teacher_received_at,teacher_received_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)')
+    .bind('task', 'queued-order', 0, 'BK01', JSON.stringify(['student-a']), 'teacher_received', 1,
+      now, 'teacher-a', now, now).run();
+  const historical = await call(db, { auth: person('teacher-a', 'token-a'), action: 'list' });
+  const historicalQueued = historical.body.orders.find(item => item.taskId === 'queued-order');
+  assert.equal(historicalQueued.stage, 'teacher_received');
+  assert.equal(historicalQueued.orderCompletedAt, now);
+  const continued = await call(db, { auth: person('teacher-a', 'token-a'), action: 'order_transition',
+    taskId: 'queued-order', itemIndex: 0, next: 'hand', revision: 1 });
+  assert.equal(continued.status, 200);
+  assert.equal(continued.body.status, 'student_handed');
+
+  const onlineTask = {
+    id: 'online-failed', staffId: 'teacher-a', title: '[주문] 온라인 주문', deleted: false,
+    orderDelivery: 'manual_online_v1', orderVendor: '쿠팡',
+    orderItems: [{ bookId: 'BK01', title: '온라인 교재', qty: '1권', studentIds: ['student-a'] }],
+    origin: 'staff', createdAt: now, updatedAt: now
+  };
+  db.prepare('INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
+    .bind('task', onlineTask.id, 'teacher-a', JSON.stringify(onlineTask), now, now).run();
+  db.prepare('INSERT INTO book_order_sends(app,send_id,idempotency_key,task_id,vendor_name,item_count,message_hash,status,' +
+    'provider_status_code,safe_error_code,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)')
+    .bind('task', 'send-online-failed', 'key-online-failed', onlineTask.id, '쿠팡', 1,
+      'f'.repeat(64), 'rejected', 'MANUAL_ONLINE_FAILED', 'MANUAL_ONLINE_FAILED', now, now).run();
+  const onlineFailed = await call(db, { auth: person('teacher-a', 'token-a'), action: 'list' });
+  const onlineRow = onlineFailed.body.orders.find(item => item.taskId === onlineTask.id);
+  assert.equal(onlineRow.stage, 'order_failed');
+  assert.equal(onlineRow.messageDeliveryState, '');
 });
 
 test('legacy order price migration is additive, contains no student data, and is append-only', () => {
@@ -576,6 +661,30 @@ test('a matching immutable correction becomes the displayed and idempotent effec
   const oldValue = await call(db, { auth: admin, action: 'order_price_set', taskId: task.id, itemIndex: 0, unitPrice: 16000 });
   assert.equal(oldValue.status, 409);
   assert.equal(oldValue.body.code, 'ORDER_PRICE_ALREADY_SET');
+});
+
+test('an immutable correction overrides the legacy price embedded in the order JSON', async () => {
+  const db = new TestD1(); seed(db);
+  const now = Date.now();
+  const task = { id: 'json-corrected-price', title: '[주문] 100발 100중 영어 3-2 중간고사', deleted: false,
+    orderDelivery: 'scheduled_batch_v1', orderVendor: '테스트총판',
+    orderItems: [{ bookId: 'BK01', title: '100발 100중 영어 3-2 중간고사', qty: '1권',
+      studentIds: ['student-a'], unitPrice: 14400 }],
+    origin: 'staff', createdAt: now, updatedAt: now };
+  db.prepare('INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
+    .bind('task', task.id, KIM_NAMGI_STAFF_ID, JSON.stringify(task), now, now).run();
+  db.prepare('INSERT INTO book_order_sends(app,send_id,idempotency_key,task_id,vendor_name,item_count,message_hash,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)')
+    .bind('task', 'send-json-corrected', 'key-json-corrected', task.id, '테스트총판', 1, 'g'.repeat(64), 'accepted', now, now).run();
+  db.prepare('INSERT INTO book_order_fulfillments(app,task_id,item_index,book_id,student_ids,status,revision,teacher_received_at,teacher_received_by,student_handed_at,student_handed_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)')
+    .bind('task', task.id, 0, 'BK01', JSON.stringify(['student-a']), 'student_handed', 2,
+      now - 1000, KIM_NAMGI_STAFF_ID, now, KIM_NAMGI_STAFF_ID, now - 1000, now).run();
+  db.prepare('INSERT INTO book_order_item_price_corrections(app,task_id,item_index,previous_unit_price,corrected_unit_price,reason_code,created_at,created_by) VALUES(?,?,?,?,?,?,?,?)')
+    .bind('task', task.id, 0, 14400, 16000, 'director_amount_correction', now, 'director').run();
+
+  const listed = await call(db, { auth: admin, action: 'list' });
+  const row = listed.body.orders.find(item => item.taskId === task.id);
+  assert.equal(row.unitPrice, 16000);
+  assert.equal(row.priceCorrectedAt, now);
 });
 
 test('one-time price accepts Kim Namgi student-handed legacy books and rejects other orders', async () => {

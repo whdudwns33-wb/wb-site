@@ -11,12 +11,18 @@ WB_STUDENT_PORTAL_BASE_URL = "https://wb-student.whdudwns33.workers.dev/"
 # 연락처는 보관하되 보호자 대상 발송·웹앱 접근·응답은 운영에서 일괄 중지한다.
 # 선생님의 숙제·준비물 입력은 내부 수업 기록과 학생 앱 공개용으로 계속 저장한다.
 WB_GUARDIAN_CONTACT_ENABLED = "false"
+# 기존 보호자 웹앱·공지·운영 알림은 계속 중지한 채, 수업 피드백만 전체 학생에게
+# 허용한다. guardian_contacts_by_student 행이 없는 학생만 비공개 roster의 모→부
+# 연락처를 보완 수신번호로 사용한다.
+WB_PARENT_FEEDBACK_ALL_STUDENTS_ENABLED = "true"
 # 아카등록 완료된 최초 고유 일반 교재만 Grok web_search로 검증한다.
 # true가 아니거나 AI binding을 사용할 수 없으면 주문 입력값을 그대로 카탈로그에 보존한다.
 WB_BOOK_CATALOG_WEB_SEARCH_ENABLED = "true"
 # 최종 수업 피드백의 코멘트 변수만 교사 확인 전 일시적으로 다듬는다.
 # 저장·발송은 기존 /feedback-request의 명시적 최종 전송 버튼만 수행한다.
 WB_PARENT_FEEDBACK_AI_ENABLED = "true"
+# 개인 기기 인증에 더해 출근 로그인을 사용한다. 실제 적용 직원은 비공개 profile에서 지정한다.
+WB_STAFF_WORK_LOGIN_ENABLED = "true"
 # 선별 테스트가 필요할 때 값은 저장소에 쓰지 않고 다음 secret으로 stable studentId만 등록한다.
 # npx wrangler secret put WB_GUARDIAN_CONTACT_STUDENT_IDS --config sync/wrangler.toml
 # 수업 피드백 실제 발송 스위치도 secret으로만 관리한다.
@@ -33,9 +39,10 @@ directory = "../parent"
 binding = "ASSETS"
 run_worker_first = true
 
-# Cloudflare Cron은 UTC 기준이다. 11:00 UTC = 20:00 KST, 14:50 UTC = 23:50 KST.
+# Cloudflare Cron은 UTC 기준이다. 교재 문자와 학부모 피드백 상태는 10분마다 재확인한다.
+# 11:00 UTC = 20:00 KST, 14:50 UTC = 23:50 KST.
 [triggers]
-crons = ["0 11 * * *", "50 14 * * *"]
+crons = ["0 11 * * *", "50 14 * * *", "*/10 * * * *"]
 
 [[d1_databases]]
 binding = "DB"
@@ -55,5 +62,8 @@ binding = "AI"
 #   npx wrangler secret put TASK_MANAGER_STAFF_IDS
 #   npx wrangler secret put SOLAPI_KAKAO_DIRECTOR_REPORT_TEMPLATE_ID
 #   npx wrangler secret put SOLAPI_KAKAO_FEEDBACK_TEMPLATE_ID_V2
+#   npx wrangler secret put SOLAPI_KAKAO_FEEDBACK_TEMPLATE_ID_V3
+#   npx wrangler secret put WB_PARENT_FEEDBACK_AI_CACHE_SECRET
 #   npx wrangler secret put SOLAPI_KAKAO_CONSULT_LINK_APPROVED_TEMPLATE_ID
 #   npx wrangler secret put WB_CONSULT_LINK_SEND_ENABLED
+#   npx wrangler secret put WB_STAFF_PIN_PEPPER --config sync/wrangler.toml

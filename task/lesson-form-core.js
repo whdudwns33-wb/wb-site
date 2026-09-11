@@ -58,6 +58,7 @@
       goal: text(source.goal),
       parentRequest: text(source.parentRequest),
       adminRequest: text(source.adminRequest) || '없음',
+      firstClassDate: text(source.firstClassDate),
       start: text(source.start),
       end: text(source.end)
     };
@@ -66,6 +67,17 @@
   function hasValue(value) {
     if (Array.isArray(value)) return value.length > 0;
     return text(value).length > 0;
+  }
+
+  function validIsoDate(value) {
+    const valueText = text(value);
+    if (!valueText) return true;
+    if (!ISO_DATE_RE.test(valueText)) return false;
+    const parts = valueText.split('-').map(Number);
+    const parsed = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
+    return parsed.getUTCFullYear() === parts[0] &&
+      parsed.getUTCMonth() === parts[1] - 1 &&
+      parsed.getUTCDate() === parts[2];
   }
 
   function parseClockMinute(value) {
@@ -326,6 +338,9 @@
     if (input.lessonHours && !LESSON_HOURS.includes(input.lessonHours)) {
       errors.push({ field: 'lessonHours', message: '수업시수는 1T, 1.5T, 2T, 2.5T, 3T, 3.5T, 4T, 4.5T, 5T, 6T 중에서 선택해 주세요' });
     }
+    if (!validIsoDate(input.firstClassDate)) {
+      errors.push({ field: 'firstClassDate', message: '과목별 첫 수업일을 확인해 주세요' });
+    }
     const schedule = resolveSchedule(input);
     if (input.scheduleSlots.length && schedule.issues.some(issue => issue.code === 'invalid_slot')) {
       errors.push({ field: 'schedule', message: schedule.issues.find(issue => issue.code === 'invalid_slot').message });
@@ -469,6 +484,7 @@
       goal: input.goal,
       parentRequest: input.parentRequest,
       adminRequest: input.adminRequest,
+      firstClassDate: input.firstClassDate,
       title: '[수업] ' + input.studentName + ' (' + input.grade + ') — ' + subjectClassLabel(input),
       detail: detail,
       guide: guide,
@@ -486,6 +502,7 @@
       start: text(opts.start || input.start),
       end: text(opts.end || input.end),
       carry: true,
+      firstClassDate: input.firstClassDate,
       deleted: false
     };
   }

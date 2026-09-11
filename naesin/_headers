@@ -1,0 +1,4 @@
+# 이 파일은 배포에 쓰이지 않는다 — 실제 규칙은 reading/_headers 한 곳에 있다.
+# (build-dist.mjs 가 reading/_headers 만 dist 루트에 싣고, 거기 /naesin/* 규칙이 Cache-Control: no-store 를,
+#  /* 공통 규칙이 CSP·noindex 등 보안 헤더를 준다.)
+# 규칙을 고치려면 reading/_headers 를 고치고 node reading-server/dist-cache.test.mjs 로 확인한다.

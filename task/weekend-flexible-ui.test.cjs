@@ -72,6 +72,8 @@ test('teacher weekend panel has one flexible check-in chooser filtered by allowe
   const candidates = block('function weekendFlexibleLessonCandidates(', 'function weekendVisitRosterStudent(');
   assert.match(candidates, /String\(task\.staffId/);
   assert.match(candidates, /String\(task\.studentId/);
+  assert.match(candidates, /!isScheduledMakeupTask\(task\)/,
+    'generated makeup lessons must not be offered as flexible weekend visits');
   assert.match(candidates, /flexibleWeekendAllowedOn\(task, date\)/);
   const allowedOn = block('function flexibleWeekendAllowedOn(', 'function hasFlexibleWeekendOccurrence(');
   assert.match(allowedOn, /isFlexibleWeekendLesson\(task, date\)/);
@@ -106,6 +108,29 @@ test('teacher weekend panel has one flexible check-in chooser filtered by allowe
   assert.match(actions, /submitWeekendVisit\([\s\S]*action:\s*'check_in'/);
   assert.match(actions, /lessonTaskId/);
   assert.match(actions, /studentId/);
+});
+
+test('scheduled makeup lessons stay out of both regular and flexible weekend check-in candidates', () => {
+  const candidatesSource = block('function weekendLessonCandidates(', 'function weekendVisitRosterStudent(');
+  const tasks = [
+    { id: 'regular', staffId: 'teacher-a', studentId: 'student-a', studentName: '가학생' },
+    { id: 'makeup-regular', staffId: 'teacher-a', studentId: 'student-b', studentName: '나학생',
+      lessonInstanceType: 'makeup', makeupCaseId: 'mu-a' },
+    { id: 'flexible', staffId: 'teacher-a', studentId: 'student-c', studentName: '다학생', flexible: true },
+    { id: 'makeup-flexible', staffId: 'teacher-a', studentId: 'student-d', studentName: '라학생', flexible: true,
+      lessonInstanceType: 'makeup', makeupCaseId: 'mu-b' }
+  ];
+  const api = new Function('state', 'isLesson', 'isScheduledMakeupTask', 'isFlexibleWeekendLesson',
+    'taskHasWeekendSchedule', 'flexibleWeekendAllowedOn', 'studentOf',
+    `${candidatesSource}\nreturn { weekendLessonCandidates, weekendFlexibleLessonCandidates };`)(
+      { tasks }, () => true,
+      task => task.lessonInstanceType === 'makeup' || !!task.makeupCaseId,
+      task => !!task.flexible, () => true, task => !!task.flexible,
+      task => task.studentName || ''
+    );
+
+  assert.deepEqual(api.weekendLessonCandidates('teacher-a', '2026-09-05').map(task => task.id), ['regular']);
+  assert.deepEqual(api.weekendFlexibleLessonCandidates('teacher-a', '2026-09-05').map(task => task.id), ['flexible']);
 });
 
 test('a flexible lesson becomes a today task only for its exact non-cancelled visit date', () => {

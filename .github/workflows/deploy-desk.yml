@@ -1,0 +1,116 @@
+name: Deploy wb-desk worker
+
+# WB 프로그램데스크(desk/) — 별도 사업용 앱. 새 워커 wb-desk + 새 D1 wb-desk.
+# main 에 desk/ 나 공유 모듈이 바뀌어 올라오면 자동으로 테스트 → 빌드 → D1 → 배포 → 상태 확인까지 한다.
+# D1 은 첫 실행에서 만들고, 이후에는 이름으로 id 를 찾아 wrangler.toml 의 자리표시에 넣는다 —
+# 저장소에 id 를 적어 두지 않아도 되고 원장은 아무것도 설정하지 않는다.
+# 마이그레이션은 전부 IF NOT EXISTS 라 매번 전체를 순서대로 적용해도 안전하다(desk/README.md 규칙).
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'desk/**'
+      - 'shared/external-links.js'
+      - '.github/workflows/deploy-desk.yml'
+  workflow_dispatch:
+
+permissions: {}
+
+env:
+  WRANGLER: wrangler@4.129.0
+  D1_NAME: wb-desk
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: desk
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: 순수 로직·서버 테스트 (전부 통과해야 배포)
+        run: |
+          node --test lib/*.test.cjs app/*.test.cjs
+          node --test *.test.mjs
+          node --test ../shared/external-links.test.cjs
+
+      - name: 정적 파일 조립 (dist/)
+        run: node build.mjs
+
+      - name: wrangler 캐시
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm/_npx
+          key: npx-${{ runner.os }}-${{ env.WRANGLER }}
+
+      - name: 토큰 확인
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::error::CLOUDFLARE_API_TOKEN 시크릿이 없습니다. Settings → Secrets and variables → Actions 에 추가하세요 (D1 편집 + Workers 편집 권한)."
+            exit 1
+          fi
+
+      # 이름으로 찾고 없으면 만든다. id 는 wrangler.toml 의 __DESK_D1_ID__ 자리에 넣는다(저장소 파일은 그대로).
+      - name: D1 데이터베이스 준비
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          id=$(npx --yes --prefer-offline $WRANGLER d1 list --json | node -e '
+            let s=""; process.stdin.on("data",d=>s+=d).on("end",()=>{
+              const rows=JSON.parse(s); const hit=rows.find(r=>r.name===process.env.D1_NAME);
+              process.stdout.write(hit ? (hit.uuid||hit.id||"") : "");
+            });')
+          if [ -z "$id" ]; then
+            echo "D1 $D1_NAME 이 없어 새로 만듭니다"
+            npx --yes --prefer-offline $WRANGLER d1 create "$D1_NAME" >/dev/null
+            id=$(npx --yes --prefer-offline $WRANGLER d1 list --json | node -e '
+              let s=""; process.stdin.on("data",d=>s+=d).on("end",()=>{
+                const rows=JSON.parse(s); const hit=rows.find(r=>r.name===process.env.D1_NAME);
+                process.stdout.write(hit ? (hit.uuid||hit.id||"") : "");
+              });')
+          fi
+          if [ -z "$id" ]; then echo "::error::D1 id 를 얻지 못했습니다"; exit 1; fi
+          sed -i "s/__DESK_D1_ID__/$id/" wrangler.toml
+          grep -q "$id" wrangler.toml
+          echo "D1 $D1_NAME 준비됨"
+
+      - name: D1 마이그레이션 적용 (전부 멱등)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          for f in $(ls migrations/*.sql | sort); do
+            echo "== $f"
+            npx --yes --prefer-offline $WRANGLER d1 execute "$D1_NAME" --remote --file="$f" -y
+          done
+
+      - name: 워커 번들 검증 (dry-run)
+        run: |
+          npx --yes --prefer-offline $WRANGLER deploy --dry-run --outdir=/tmp/wb-desk-bundle
+          if grep -rl 'node:' /tmp/wb-desk-bundle/*.js 2>/dev/null | head -1 | grep -q .; then
+            echo "::error::워커 번들에 node: 내장 모듈이 남아 있습니다"
+            exit 1
+          fi
+
+      - name: 배포
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes --prefer-offline $WRANGLER deploy
+
+      - name: 상태 확인
+        run: |
+          set -euo pipefail
+          sleep 5
+          curl -fsS https://wb-desk.whdudwns33.workers.dev/api/health
+          echo
+          echo "배포 완료 — https://wb-desk.whdudwns33.workers.dev/ 에서 관리자 비밀번호를 만들면 시작됩니다."

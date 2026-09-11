@@ -259,6 +259,22 @@ test('builds a deterministic task body with current task-app compatibility field
   assert.equal(Object.prototype.hasOwnProperty.call(first, 'updatedAt'), false);
 });
 
+test('first class date is optional and is preserved when supplied', () => {
+  const withoutDate = core.buildLessonTaskBody(validInput(), { staffId: 'teacher-1', start: '2026-08-04' });
+  assert.equal(withoutDate.firstClassDate, '');
+  const withDate = core.buildLessonTaskBody(validInput({ firstClassDate: '2026-08-11' }), {
+    staffId: 'teacher-1', start: '2026-08-04'
+  });
+  assert.equal(withDate.firstClassDate, '2026-08-11');
+  assert.throws(
+    () => core.buildLessonTaskBody(validInput({ firstClassDate: '2026-02-30' }), {
+      staffId: 'teacher-1', start: '2026-08-04'
+    }),
+    error => error && error.code === 'LESSON_FORM_INVALID' &&
+      error.validationErrors.some(item => item.field === 'firstClassDate')
+  );
+});
+
 test('invalid forms fail before a task body can be created', () => {
   assert.throws(
     () => core.buildLessonTaskBody(validInput({ studentTraits: '' })),

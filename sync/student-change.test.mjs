@@ -6,6 +6,7 @@ import worker from './worker-core.js';
 
 const schema = fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8');
 const migration = fs.readFileSync(new URL('./migrations/045_student_change_history.sql', import.meta.url), 'utf8');
+const overlapMigration = fs.readFileSync(new URL('./migrations/069_student_lesson_time_overlap.sql', import.meta.url), 'utf8');
 
 class Statement {
   constructor(database, sql) { this.database = database; this.sql = sql; this.args = []; }
@@ -15,9 +16,24 @@ class Statement {
   run() { const result = this.database.prepare(this.sql).run(...this.args); return { meta: { changes: Number(result.changes || 0) } }; }
 }
 class TestD1 {
-  constructor() { this.database = new DatabaseSync(':memory:'); this.database.exec(schema); }
+  constructor() { this.database = new DatabaseSync(':memory:'); this.database.exec(schema); this.beforeBatch = null; }
   prepare(sql) { return new Statement(this.database, sql); }
-  batch(statements) { return statements.map(statement => statement.run()); }
+  batch(statements) {
+    if (this.beforeBatch) {
+      const beforeBatch = this.beforeBatch;
+      this.beforeBatch = null;
+      beforeBatch(this.database);
+    }
+    this.database.exec('BEGIN IMMEDIATE');
+    try {
+      const results = statements.map(statement => statement.run());
+      this.database.exec('COMMIT');
+      return results;
+    } catch (error) {
+      this.database.exec('ROLLBACK');
+      throw error;
+    }
+  }
 }
 
 const admin = { mode: 'admin', secret: 'director-secret' };
@@ -28,6 +44,20 @@ async function call(db, path, body) {
     body: JSON.stringify({ app: 'task', ...body })
   }), { DB: db, TASK_ADMIN_SECRET: 'director-secret', CONSULT_ADMIN_SECRET: 'consult-secret' });
   return { status: response.status, body: await response.json() };
+}
+
+function insertPreMigrationTask(db, task, owner, now = Date.now()) {
+  db.database.exec(
+    'DROP TRIGGER IF EXISTS trg_regular_lesson_time_insert;' +
+    'DROP TRIGGER IF EXISTS trg_regular_lesson_time_update;'
+  );
+  try {
+    db.prepare('INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
+      .bind('task', task.id, owner, JSON.stringify(task), now, now).run();
+  } finally {
+    // 마이그레이션 이전의 손상·중복 row만 재현하며, API 동작은 최신 불변식으로 검증한다.
+    db.database.exec(overlapMigration);
+  }
 }
 
 function seed(db) {
@@ -51,6 +81,8 @@ function seed(db) {
     taskKind: 'lesson_instruction', lessonFormVersion: 1,
     title: '[수업] 학생A (중1) — 영어', detail: '교재', guide: '업무지시', steps: [], target: 0,
     unit: '회', time: '18:00', repeat: 'days', days: [1, 3], start: '2026-08-01', end: '',
+    scheduleStatus: 'confirmed',
+    scheduleSlots: [{ days: [1, 3], startTime: '18:00', endTime: '19:00' }],
     createdAt: now, updatedAt: now, deleted: false, origin: 'admin'
   };
   db.prepare("INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES('task','lesson-a','teacher-a',?,?,?)")
@@ -58,29 +90,60 @@ function seed(db) {
   const history = { taskId: 'lesson-a', date: '2026-08-20', att: 'L', note: '담당 변경 전 메모', updatedAt: now - 1000 };
   db.prepare("INSERT INTO checks(app,k,owner,data,updated_at,srv_at) VALUES('task','lesson-a|2026-08-20','teacher-a',?,?,?)")
     .bind(JSON.stringify(history), history.updatedAt, history.updatedAt).run();
-  const second = { ...task, id: 'lesson-b', title: '[수업] 학생A (중1) — 수학', subject: '수학', days: [2, 4] };
+  const second = { ...task, id: 'lesson-b', title: '[수업] 학생A (중1) — 수학', subject: '수학', days: [2, 4],
+    scheduleSlots: [{ days: [2, 4], startTime: '18:00', endTime: '19:00' }] };
   db.prepare("INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES('task','lesson-b','teacher-a',?,?,?)")
     .bind(JSON.stringify(second), now, now).run();
-  for (const [id, end] of [['lesson-ended-c', '2026-08-01'], ['lesson-malformed-c', '종료일오류']]) {
-    const oldLesson = { ...task, id, staffId: 'teacher-c', end };
-    db.prepare("INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES('task',?,'teacher-c',?,?,?)")
-      .bind(id, JSON.stringify(oldLesson), now, now).run();
-  }
+  const endedLesson = { ...task, id: 'lesson-ended-c', staffId: 'teacher-c', end: '2026-08-01' };
+  db.prepare("INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES('task',?,'teacher-c',?,?,?)")
+    .bind(endedLesson.id, JSON.stringify(endedLesson), now, now).run();
+
 }
 
 function seedStudentChangeEvent(db, {
   eventId, studentId = 'student-a', taskId = 'lesson-a', eventType = 'work_instruction',
-  audienceStaffIds = ['teacher-a'], changedAt = Date.now(), requiresAck = true
+  audienceStaffIds = ['teacher-a'], changedAt = Date.now(), requiresAck = true,
+  changedFields = ['guide'], details = {}
 }) {
   db.prepare(
     'INSERT INTO student_change_events ' +
     '(app,event_id,student_id,task_id,event_type,changed_fields,details,audience_staff_ids,effective_date,' +
       'requires_ack,request_key,request_revision,changed_at,changed_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
   ).bind(
-    'task', eventId, studentId, taskId, eventType, JSON.stringify(['guide']), JSON.stringify({}),
+    'task', eventId, studentId, taskId, eventType, JSON.stringify(changedFields), JSON.stringify(details),
     JSON.stringify(audienceStaffIds), null, requiresAck ? 1 : 0, null, null, changedAt, 'director'
   ).run();
 }
+
+test('요일 분리로 이동된 옛 check 키는 관리자·오프라인 재전송으로 다시 생성되지 않는다', async () => {
+  const db = new TestD1(); seed(db);
+  db.prepare("DELETE FROM checks WHERE app='task' AND k='lesson-a|2026-08-20'").run();
+  seedStudentChangeEvent(db, {
+    eventId: 'sce_weekday_split_guard_001', requiresAck: false,
+    changedFields: ['scheduleSlots'],
+    details: {
+      operation: 'weekday_schedule_split', splitFromTaskId: 'lesson-a',
+      checkKeyMoves: [{
+        oldKey: 'lesson-a|2026-08-20', newKey: 'lesson-friday|2026-08-20', oldUpdatedAt: 100
+      }]
+    }
+  });
+  db.prepare(
+    "INSERT INTO lesson_check_key_redirects(app,old_key,new_key,old_updated_at,created_at,created_by) VALUES('task',?,?,?,?,?)"
+  ).bind('lesson-a|2026-08-20', 'lesson-friday|2026-08-20', 100, Date.now(), 'director').run();
+  const result = await call(db, '/sync', {
+    auth: admin, since: Date.now(), changes: [
+      { table: 'checks', k: 'lesson-a|2026-08-20', owner: 'teacher-a',
+        data: { taskId: 'lesson-a', date: '2026-08-20', note: '오프라인 재전송', updatedAt: 9999 }, updated_at: 9999 },
+      { table: 'checks', k: 'lesson-b|2026-08-21', owner: 'teacher-a',
+        data: { taskId: 'lesson-b', date: '2026-08-21', note: '정상 기록', updatedAt: 10000 }, updated_at: 10000 }
+    ]
+  });
+  assert.equal(result.status, 200);
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM checks WHERE app='task' AND k='lesson-a|2026-08-20'").first().count, 0);
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM checks WHERE app='task' AND k='lesson-b|2026-08-21'").first().count, 1,
+    '같은 묶음의 정상 check는 함께 저장한다');
+});
 
 function seedStudentChangeAcknowledgement(db, { acknowledgementId, eventId, actorKey, acknowledgedAt }) {
   db.prepare(
@@ -208,7 +271,7 @@ test('teacher change is admin-selected, recorded by stable student id, and ackno
   const eventRow = db.prepare("SELECT changed_fields,audience_staff_ids FROM student_change_events WHERE app='task' AND student_id='student-a'").first();
   assert.deepEqual(JSON.parse(eventRow.changed_fields), ['staffId']);
   assert.deepEqual(JSON.parse(eventRow.audience_staff_ids).sort(), ['teacher-a', 'teacher-b'],
-    '종료됐거나 종료일이 잘못된 옛 수업 담당자는 변경 알림 대상이 아니다');
+    '이미 종료된 옛 수업 담당자는 변경 알림 대상이 아니다');
   const newTeacherSync = await call(db, '/sync', { auth: person('teacher-b'), since: 0, changes: [] });
   assert.equal(newTeacherSync.status, 200);
   assert.ok(newTeacherSync.body.changes.some(change => change.table === 'tasks' && change.key === 'lesson-a'));
@@ -244,8 +307,7 @@ test('teacher change refuses an exact target assignment even when its stored ass
     ...source, id: 'lesson-target-duplicate', staffId: 'teacher-b'
   };
   const now = Date.now();
-  db.prepare("INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES('task',?,'teacher-b',?,?,?)")
-    .bind(duplicate.id, JSON.stringify(duplicate), now, now).run();
+  insertPreMigrationTask(db, duplicate, 'teacher-b', now);
   const submit = await call(db, '/lesson-change-request', {
     auth: person('teacher-a'), action: 'submit', taskId: 'lesson-a',
     changes: { operation: 'teacher_assignment', effectiveDate: '2026-08-24' }
@@ -261,12 +323,37 @@ test('teacher change refuses an exact target assignment even when its stored ass
     .bind(submit.body.request.requestKey).first().status, 'approval_waiting');
 });
 
-test('teacher change still allows the target teacher to keep another subject for the same student', async () => {
+test('teacher change ignores a target teacher makeup instance of the same regular assignment', async () => {
+  const db = new TestD1(); seed(db);
+  const source = JSON.parse(db.prepare("SELECT data FROM tasks WHERE app='task' AND id='lesson-a'").first().data);
+  const makeup = {
+    ...source, id: 'makeup_lesson_mu_teacher_change', staffId: 'teacher-b',
+    lessonInstanceType: 'makeup', makeupCaseId: 'mu_teacher_change',
+    start: '2026-08-30', end: '2026-08-30', repeat: 'once'
+  };
+  const now = Date.now();
+  db.prepare("INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES('task',?,'teacher-b',?,?,?)")
+    .bind(makeup.id, JSON.stringify(makeup), now, now).run();
+  const submit = await call(db, '/lesson-change-request', {
+    auth: person('teacher-a'), action: 'submit', taskId: 'lesson-a',
+    changes: { operation: 'teacher_assignment', effectiveDate: '2026-08-24' }
+  });
+  const approve = await call(db, '/lesson-change-review', {
+    auth: admin, action: 'approve', requestKey: submit.body.request.requestKey, revision: 1,
+    selectedStaffId: 'teacher-b'
+  });
+  assert.equal(approve.status, 200, JSON.stringify(approve.body));
+  assert.equal(db.prepare("SELECT owner FROM tasks WHERE app='task' AND id='lesson-a'").first().owner, 'teacher-b');
+  assert.equal(db.prepare("SELECT owner FROM tasks WHERE app='task' AND id=?").bind(makeup.id).first().owner, 'teacher-b');
+});
+
+test('teacher change still allows the target teacher to keep another subject at a nonoverlapping time', async () => {
   const db = new TestD1(); seed(db);
   const source = JSON.parse(db.prepare("SELECT data FROM tasks WHERE app='task' AND id='lesson-a'").first().data);
   const otherSubject = {
     ...source, id: 'lesson-target-other-subject', staffId: 'teacher-b',
-    subject: '수학', className: '', lessonRole: '수학'
+    subject: '수학', className: '', lessonRole: '수학', days: [5],
+    scheduleSlots: [{ days: [5], startTime: '20:00', endTime: '21:00' }]
   };
   const now = Date.now();
   db.prepare("INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES('task',?,'teacher-b',?,?,?)")
@@ -289,8 +376,7 @@ test('teacher change fails closed when a target teacher lesson row has a forged 
   const source = JSON.parse(db.prepare("SELECT data FROM tasks WHERE app='task' AND id='lesson-a'").first().data);
   const corrupt = { ...source, id: 'lesson-target-corrupt', staffId: 'teacher-a' };
   const now = Date.now();
-  db.prepare("INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES('task',?,'teacher-b',?,?,?)")
-    .bind(corrupt.id, JSON.stringify(corrupt), now, now).run();
+  insertPreMigrationTask(db, corrupt, 'teacher-b', now);
   const submit = await call(db, '/lesson-change-request', {
     auth: person('teacher-a'), action: 'submit', taskId: 'lesson-a',
     changes: { operation: 'teacher_assignment', effectiveDate: '2026-08-24' }
@@ -306,6 +392,16 @@ test('teacher change fails closed when a target teacher lesson row has a forged 
 
 test('withdrawal moves the student to roster history and hides every linked lesson while keeping rows', async () => {
   const db = new TestD1(); seed(db);
+  const now = Date.now();
+  const sourceTask = JSON.parse(db.prepare("SELECT data FROM tasks WHERE app='task' AND id='lesson-a'").first().data);
+  insertPreMigrationTask(db, {
+    ...sourceTask, id: 'lesson-malformed-c', staffId: 'teacher-c', end: '종료일오류'
+  }, 'teacher-c', now);
+  db.prepare(
+    'INSERT INTO makeup_cases(app,case_id,student_id,source_task_id,source_date,source_teacher_id,' +
+    'consumption_group_id,status,revision,history,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)'
+  ).bind('task', 'mu_withdrawal_pending', 'student-a', 'lesson-a', '2026-08-20', 'teacher-a',
+    'mc_withdrawal_pending', 'review_pending', 1, '[]', now, now).run();
   const withdrawal = await call(db, '/lesson-change-request', {
     auth: person('teacher-a'), action: 'submit', taskId: 'lesson-a',
     changes: { operation: 'withdrawal', effectiveDate: '2026-08-25' }, note: '퇴원'
@@ -326,12 +422,16 @@ test('withdrawal moves the student to roster history and hides every linked less
   }
   for (const id of ['lesson-ended-c', 'lesson-malformed-c']) {
     const task = JSON.parse(db.prepare('SELECT data FROM tasks WHERE id=?').bind(id).first().data);
-    assert.equal(task.deleted, false, '적용일 전에 이미 끝났거나 종료일이 잘못된 수업은 다시 전환하지 않는다');
+    assert.equal(task.deleted, false, '적용일 전에 이미 끝났거나 종료일이 손상된 수업은 다시 전환하지 않는다');
   }
   const withdrawalEvent = db.prepare(
     "SELECT audience_staff_ids FROM student_change_events WHERE event_type='withdrawal'"
   ).first();
   assert.deepEqual(JSON.parse(withdrawalEvent.audience_staff_ids), ['teacher-a']);
+  const makeupCase = db.prepare("SELECT status,reason,history FROM makeup_cases WHERE case_id='mu_withdrawal_pending'").first();
+  assert.equal(makeupCase.status, 'cancelled');
+  assert.equal(makeupCase.reason, 'student_inactive');
+  assert.equal(JSON.parse(makeupCase.history).at(-1).lifecycleAction, 'withdrawal');
   assert.equal(db.prepare("SELECT COUNT(*) AS count FROM tasks WHERE app='task'").first().count, 4,
     '수업 행은 삭제하지 않고 이력으로 보존한다');
 });
@@ -350,6 +450,81 @@ test('approved lesson deletion is hidden from screens but remains in private sto
   assert.equal(db.prepare("SELECT COUNT(*) AS count FROM student_change_events WHERE event_type='lesson_delete'").first().count, 1);
   const visible = await call(db, '/student-change', { auth: admin, action: 'list' });
   assert.equal(visible.body.events.some(event => event.eventType === 'lesson_delete'), false);
+});
+
+test('approved lesson deletion cancels its active makeup and preserves linked generated-lesson records', async () => {
+  const db = new TestD1(); seed(db);
+  const caseId = 'mu_delete_lifecycle';
+  const lessonTaskId = 'makeup_lesson_' + caseId;
+  const now = Date.now();
+  db.prepare(
+    'INSERT INTO makeup_cases(app,case_id,student_id,source_task_id,source_date,source_teacher_id,' +
+    'consumption_group_id,status,revision,confirmed_start_at,confirmed_end_at,confirmed_staff_id,' +
+    'history,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+  ).bind('task', caseId, 'student-a', 'lesson-a', '2026-08-20', 'teacher-a',
+    'mc_delete_lifecycle', 'confirmed', 1, '2026-09-10T16:00:00+09:00',
+    '2026-09-10T16:50:00+09:00', 'teacher-a',
+    JSON.stringify([{ action: 'schedule', revision: 1, at: now }]), now, now).run();
+  const generated = {
+    id: lessonTaskId, staffId: 'teacher-a', studentId: 'student-a', studentName: '학생A',
+    taskKind: 'lesson_instruction', lessonFormVersion: 1, title: '[수업] 보강', steps: [],
+    repeat: 'once', days: [4], start: '2026-09-10', end: '2026-09-10', deleted: false,
+    lessonInstanceType: 'makeup', makeupCaseId: caseId, makeupSourceTaskId: 'lesson-a',
+    makeupSourceDate: '2026-08-20', createdAt: now, updatedAt: now
+  };
+  db.prepare("INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES('task',?,'teacher-a',?,?,?)")
+    .bind(lessonTaskId, JSON.stringify(generated), now, now).run();
+  db.prepare("INSERT INTO checks(app,k,owner,data,updated_at,srv_at) VALUES('task',?,'teacher-a',?,?,?)")
+    .bind(lessonTaskId + '|2026-09-10',
+      JSON.stringify({ taskId: lessonTaskId, date: '2026-09-10', att: 'P', note: '보존 기록' }), now, now).run();
+
+  const deletion = await call(db, '/lesson-change-request', {
+    auth: person('teacher-a'), action: 'submit', taskId: 'lesson-a',
+    changes: { operation: 'lesson_delete', effectiveDate: '2026-08-26' }, note: '수업 종료'
+  });
+  const approval = await call(db, '/lesson-change-review', {
+    auth: admin, action: 'approve', requestKey: deletion.body.request.requestKey, revision: 1
+  });
+  assert.equal(approval.status, 200);
+  const makeupCase = db.prepare('SELECT * FROM makeup_cases WHERE app=? AND case_id=?')
+    .bind('task', caseId).first();
+  assert.equal(makeupCase.status, 'cancelled');
+  assert.equal(makeupCase.reason, 'already_resolved');
+  assert.equal(JSON.parse(makeupCase.history).at(-1).lifecycleAction, 'lesson_delete');
+  const hiddenGenerated = JSON.parse(db.prepare('SELECT data FROM tasks WHERE app=? AND id=?')
+    .bind('task', lessonTaskId).first().data);
+  assert.equal(hiddenGenerated.deleted, true);
+  assert.equal(hiddenGenerated.makeupCancelledReason, 'lesson_delete');
+  assert.equal(db.prepare('SELECT COUNT(*) count FROM checks WHERE app=? AND k=?')
+    .bind('task', lessonTaskId + '|2026-09-10').first().count, 1);
+  assert.equal(db.prepare("SELECT COUNT(*) count FROM makeup_cases WHERE app='task' AND status='confirmed'").first().count, 0);
+});
+
+test('a makeup case created after cleanup selection rolls back lesson deletion approval', async () => {
+  const db = new TestD1(); seed(db);
+  const deletion = await call(db, '/lesson-change-request', {
+    auth: person('teacher-a'), action: 'submit', taskId: 'lesson-a',
+    changes: { operation: 'lesson_delete', effectiveDate: '2026-08-26' }, note: '수업 종료'
+  });
+  assert.equal(deletion.status, 200);
+  db.beforeBatch = database => {
+    const now = Date.now();
+    database.prepare(
+      'INSERT INTO makeup_cases(app,case_id,student_id,source_task_id,source_date,source_teacher_id,' +
+      'consumption_group_id,status,revision,history,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)'
+    ).run('task', 'mu_delete_scope_race', 'student-a', 'lesson-a', '2026-08-20', 'teacher-a',
+      'mc_delete_scope_race', 'review_pending', 1, '[]', now, now);
+  };
+  const approval = await call(db, '/lesson-change-review', {
+    auth: admin, action: 'approve', requestKey: deletion.body.request.requestKey, revision: 1
+  });
+  assert.equal(approval.status, 409);
+  assert.equal(JSON.parse(db.prepare("SELECT data FROM tasks WHERE id='lesson-a'").first().data).deleted, false);
+  assert.equal(db.prepare("SELECT status FROM makeup_cases WHERE case_id='mu_delete_scope_race'").first().status,
+    'review_pending');
+  assert.equal(db.prepare('SELECT status FROM lesson_change_requests WHERE request_key=?')
+    .bind(deletion.body.request.requestKey).first().status, 'approval_waiting');
+  assert.equal(db.prepare("SELECT COUNT(*) count FROM student_change_events WHERE event_type='lesson_delete'").first().count, 0);
 });
 
 test('leave uses the same approval flow and records a separate leave roster state', async () => {

@@ -8,9 +8,10 @@
  * 나중에 등록한 경우 등)을 원장이 수동으로 재시도할 때만 쓴다.
  *
  * book-order-send.js와 같은 안전장치를 따른다:
- *   · 전화번호는 서버가 guardian_contacts(원장이 직접 입력한 보호자 연락처)에서만 찾는다 —
+ *   · 기본 수신번호는 guardian_contacts(원장이 직접 입력한 보호자 연락처)에서 찾는다.
+ *     다만 전용 전체학생 플래그가 켜지고 행 자체가 없을 때만 roster의 모→부 번호를 보완 사용한다.
  *     앱도, 자동발송 호출부도 전화번호를 직접 넘기지 않는다.
- *   · 발송 동의(consent)가 켜진 학생에게만 나간다.
+ *   · guardian_contacts 행이 있으면 동의·전화번호 규칙을 그대로 적용하며 roster로 우회하지 않는다.
  *   · 코드가 배포돼도 기본은 꺼짐 — WB_PARENT_FEEDBACK_SEND_ENABLED가 'true'여야 나간다.
  *   · 카카오 알림톡 전용 키(SOLAPI_KAKAO_API_KEY/SECRET)를 따로 써서, 교재주문·원장리포트가
  *     쓰는 기존 SOLAPI_API_KEY와 완전히 분리한다 — 문제가 생겨도 서로 영향이 없다.
@@ -21,12 +22,28 @@
  *     (막혔던 건을 원장이 수동으로 다시 시도할 때)
  */
 
-import { guardianDeliveryAllowed } from './guardian-delivery-policy.js';
+import {
+  parentFeedbackAllStudentsEnabled,
+  parentFeedbackDeliveryAllowed
+} from './guardian-delivery-policy.js';
 
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const SOLAPI_SEND_URL = 'https://api.solapi.com/messages/v4/send-many/detail';
+const SOLAPI_LIST_URL = 'https://api.solapi.com/messages/v4/list';
 const SOLAPI_TIMEOUT_MS = 8000;
 const MAX_PROVIDER_RESPONSE_BYTES = 64 * 1024;
+const MAX_STATUS_RESPONSE_BYTES = 128 * 1024;
+const STATUS_REFRESH_LIMIT = 200;
+const STATUS_REFRESH_CHUNK_SIZE = 20;
+const STATUS_RECOVERY_LIMIT = 20;
+const STATUS_RECOVERY_PAGE_SIZE = 20;
+const STATUS_RECOVERY_MAX_PAGES = 8;
+const STATUS_RECOVERY_SUBREQUEST_LIMIT = 20;
+const STATUS_RECOVERY_WINDOW_BEFORE_MS = 30 * 1000;
+const STATUS_RECOVERY_WINDOW_AFTER_MS = 5 * 60 * 1000;
+const STATUS_RECOVERY_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const QUEUED_STATUS_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+const CARRIER_STATUS_MAX_AGE_MS = 72 * 60 * 60 * 1000;
 const GLOBAL_DAILY_LIMIT = 150;
 const ALLOWED_REQUEST_KEYS = new Set(['app', 'auth', 'requestKey']);
 const ALLOWED_AUTH_KEYS = new Set(['mode', 'secret', 'id', 'token']);
@@ -42,9 +59,15 @@ const TEMPLATE_FIXED_TEXT =
   '▪ 오늘 배운 내용: \n▪ 잘한 점: \n▪ 다음에 더 신경 쓸 점: \n\n' +
   '숫자로 비교하지 않고, 그날 그 아이만 보고 남긴 기록입니다.\n문의사항은 학원으로 연락 주세요. 감사합니다.';
 const TEMPLATE_V2_FIXED_TEXT =
-  '안녕하세요, WB 웩슬러브레인센터(독해력학원) 입니다.\n' +
-  ' 학생의 오늘 수업 피드백을 정리해 보내드립니다.\n' +
-  '- 일시 : \n- 과목 : \n- 수업내용 · 진도 : \n- 과제 : \n- 코멘트 : \n\n' +
+  '안녕하세요, WB 웩슬러브레인센터(독해력학원) 입니다.\n\n' +
+  ' 학생의 오늘 수업 피드백을 정리해 보내드립니다.\n\n' +
+  '- 일시 : \n\n- 과목 : \n\n- 수업내용 · 진도 : \n\n- 과제 : \n\n- 코멘트 : \n\n' +
+  '문의 사항이 있으시면 학원으로 연락부탁드립니다. 감사합니다.';
+const TEMPLATE_V3_FIXED_TEXT =
+  '안녕하세요, WB 웩슬러브레인센터(독해력학원) 입니다.\n\n' +
+  ' 학생의 오늘 수업 피드백을 정리해 보내드립니다.\n\n' +
+  '- 일시 : \n\n- 과목 : \n\n- 수업내용 · 진도 : \n\n- 과제 : \n\n- 코멘트 : \n\n' +
+  '- 안내사항 : \n\n\n' +
   '문의 사항이 있으시면 학원으로 연락부탁드립니다. 감사합니다.';
 export const MAX_PARENT_FEEDBACK_ALIMTALK_CHARS = 900;
 export const MAX_PARENT_FEEDBACK_COMMENT_CHARS = 600;
@@ -104,9 +127,11 @@ function validateRequestShape(body) {
  *  카카오 알림톡 전용 키(SOLAPI_KAKAO_*)를 쓴다 — 교재주문·원장리포트가 쓰는
  *  기존 SOLAPI_API_KEY/SECRET과는 별개다. */
 function sendConfiguration(env, studentId, templateVersion) {
-  const templateIdValue = templateVersion === 'v2'
-    ? env.SOLAPI_KAKAO_FEEDBACK_TEMPLATE_ID_V2 : env.SOLAPI_KAKAO_TEMPLATE_ID;
-  if (!guardianDeliveryAllowed(env, studentId) || !safeEqual(env.WB_PARENT_FEEDBACK_SEND_ENABLED, 'true') ||
+  const templateIdValue = templateVersion === 'v3'
+    ? env.SOLAPI_KAKAO_FEEDBACK_TEMPLATE_ID_V3
+    : templateVersion === 'v2'
+      ? env.SOLAPI_KAKAO_FEEDBACK_TEMPLATE_ID_V2 : env.SOLAPI_KAKAO_TEMPLATE_ID;
+  if (!parentFeedbackDeliveryAllowed(env, studentId) || !safeEqual(env.WB_PARENT_FEEDBACK_SEND_ENABLED, 'true') ||
       !env.SOLAPI_KAKAO_API_KEY || !env.SOLAPI_KAKAO_API_SECRET ||
       !env.SOLAPI_KAKAO_PF_ID || !templateIdValue || !env.SOLAPI_SENDER_NUMBER) {
     return null;
@@ -124,6 +149,22 @@ function sendConfiguration(env, studentId, templateVersion) {
   };
 }
 
+/** 이미 접수된 발송 결과 조회는 이후 발송 스위치가 꺼져도 계속되어야 한다. */
+function statusConfiguration(env) {
+  if (!env.SOLAPI_KAKAO_API_KEY || !env.SOLAPI_KAKAO_API_SECRET) return null;
+  const apiKey = String(env.SOLAPI_KAKAO_API_KEY).trim();
+  const apiSecret = String(env.SOLAPI_KAKAO_API_SECRET).trim();
+  return apiKey && apiSecret ? {
+    apiKey,
+    apiSecret,
+    templateIds: {
+      v1: safeProviderId(env.SOLAPI_KAKAO_TEMPLATE_ID),
+      v2: safeProviderId(env.SOLAPI_KAKAO_FEEDBACK_TEMPLATE_ID_V2),
+      v3: safeProviderId(env.SOLAPI_KAKAO_FEEDBACK_TEMPLATE_ID_V3)
+    }
+  } : null;
+}
+
 /** t.studentName이 없으면 client의 studentOf(t)와 똑같은 규칙으로 제목에서 뽑는다.
  *  worker-core.js도 feedback_requests.student_name을 저장할 때 이 함수를 그대로 써서,
  *  여기서 발송할 때 찾는 이름과 항상 똑같게 맞춘다(어긋나면 보호자 조회가 실패한다). */
@@ -134,18 +175,31 @@ export function resolveStudentName(taskData) {
   return title.replace(/^\[[^\]]+\]\s*/, '').split('—')[0].replace(/\([^)]*\)/g, '').trim();
 }
 
-async function guardianPhone(env, app, studentId, studentName) {
+async function guardianPhone(env, app, studentId, studentName, rosterStudent) {
   const row = await env.DB.prepare(
     'SELECT student_name, phone, consent FROM guardian_contacts_by_student WHERE app=? AND student_id=? LIMIT 1'
   ).bind(app, studentId).first();
-  if (!row) return { error: 'GUARDIAN_NOT_REGISTERED' };
-  if (normalizedRosterText(row.student_name) !== normalizedRosterText(studentName)) {
-    return { error: 'GUARDIAN_IDENTITY_MISMATCH' };
+  if (row) {
+    if (normalizedRosterText(row.student_name) !== normalizedRosterText(studentName)) {
+      return { error: 'GUARDIAN_IDENTITY_MISMATCH' };
+    }
+    const phone = normalizedDigits(row.phone);
+    if (!/^01[016789]\d{7,8}$/.test(phone)) return { error: 'GUARDIAN_PHONE_MISSING' };
+    if (!Number(row.consent)) return { error: 'GUARDIAN_CONSENT_MISSING' };
+    return { phone };
   }
-  const phone = normalizedDigits(row.phone);
-  if (!/^01[016789]\d{7,8}$/.test(phone)) return { error: 'GUARDIAN_PHONE_MISSING' };
-  if (!Number(row.consent)) return { error: 'GUARDIAN_CONSENT_MISSING' };
-  return { phone };
+
+  // 전체 학생 피드백 전용 gate가 켜진 경우에만, 별도 보호자 연락처 행이 전혀 없는
+  // 학생을 현재 비공개 roster의 모→부 연락처 순서로 보완한다. 빈 행이나 동의 off 행은
+  // 명시적인 운영 선택이므로 roster 번호로 우회하지 않는다.
+  if (!parentFeedbackAllStudentsEnabled(env) || !rosterStudent ||
+      String(rosterStudent.id || '') !== studentId ||
+      normalizedRosterText(rosterStudent.name) !== normalizedRosterText(studentName)) {
+    return { error: 'GUARDIAN_NOT_REGISTERED' };
+  }
+  const phone = [rosterStudent.phoneMother, rosterStudent.phoneFather]
+    .map(normalizedDigits).find(value => /^01[016789]\d{7,8}$/.test(value));
+  return phone ? { phone } : { error: 'GUARDIAN_PHONE_MISSING' };
 }
 
 function normalizedRosterText(value) {
@@ -186,16 +240,28 @@ async function verifyFeedbackStudent(env, app, studentId, studentName, owner, ta
   if (!lesson || String(task.id || '') !== String(taskId) ||
       String(taskRow.owner || '') !== String(owner) || String(task.staffId || '') !== String(owner) ||
       String(task.studentId || '') !== studentId) return { error: 'STUDENT_OWNER_MISMATCH' };
-  return { studentId };
+  return { studentId, student };
 }
 
 /** 항목별 변수 값을 다듬는다 — 앞뒤 공백 제거, 지나치게 길면 잘라내지 않고 거부하도록
  *  상위에서 900자 합산 체크를 한다. 여기서는 최소한의 정규화만 한다. */
 function cleanField(value) {
-  return String(value == null ? '' : value).trim();
+  return String(value == null ? '' : value)
+    .replace(/[\u00ad\u061c\u180e\u200b-\u200f\u202a-\u202e\u2060\u2066-\u2069\ufeff]/gi, '')
+    .trim();
+}
+
+function feedbackTemplateVersion(value) {
+  const version = cleanField(value);
+  return version === 'v2' || version === 'v3' ? version : 'v1';
 }
 
 function totalAlimtalkLength(fields) {
+  if (fields.templateVersion === 'v3') {
+    return TEMPLATE_V3_FIXED_TEXT.length + fields.studentName.length + fields.dateText.length +
+      fields.subjectText.length + fields.contentText.length + fields.homeworkText.length +
+      fields.commentText.length + fields.noticeText.length;
+  }
   if (fields.templateVersion === 'v2') {
     return TEMPLATE_V2_FIXED_TEXT.length + fields.studentName.length + fields.dateText.length +
       fields.subjectText.length + fields.contentText.length + fields.homeworkText.length + fields.commentText.length;
@@ -208,14 +274,16 @@ function totalAlimtalkLength(fields) {
  *  실제 글자 수를 계산한다. AI 다듬기와 실발송이 같은 900자 상한을 공유한다. */
 export function parentFeedbackV2CommentBudget(fields) {
   const safe = fields || {};
+  const templateVersion = safe.templateVersion === 'v3' || String(safe.noticeText || '').trim() ? 'v3' : 'v2';
   const used = totalAlimtalkLength({
-    templateVersion: 'v2',
+    templateVersion,
     studentName: String(safe.studentName || ''),
     dateText: String(safe.dateText || ''),
     subjectText: String(safe.subjectText || ''),
     contentText: String(safe.contentText || ''),
     homeworkText: String(safe.homeworkText || ''),
-    commentText: ''
+    commentText: '',
+    noticeText: templateVersion === 'v3' ? String(safe.noticeText || '') : ''
   });
   return Math.max(0, Math.min(MAX_PARENT_FEEDBACK_COMMENT_CHARS,
     MAX_PARENT_FEEDBACK_ALIMTALK_CHARS - used));
@@ -233,6 +301,20 @@ function safeProviderId(value) {
 function safeProviderStatus(value) {
   const text = String(value || '');
   return /^\d{1,16}$/.test(text) ? text : null;
+}
+
+/** 공급자 원본 코드·식별자는 API에 내보내지 않고 화면용 안전 enum만 만든다. */
+export function feedbackMessageDeliveryState(send) {
+  if (!send) return '';
+  const joined = Object.prototype.hasOwnProperty.call(send, 'send_status');
+  const status = String(joined ? send.send_status || '' : send.status || '');
+  const code = String(joined ? send.send_provider_status_code || '' : send.provider_status_code || '');
+  if (status === 'rejected') return 'failed';
+  if (status === 'reserved' || status === 'dispatching' || status === 'unknown') return 'unknown';
+  if (code === '2000') return 'provider_queued';
+  if (code === '3000') return 'carrier_processing';
+  if (code === '4000') return 'delivered';
+  return status === 'accepted' ? 'unknown' : '';
 }
 
 function providerOutcome(response, payload) {
@@ -297,8 +379,29 @@ async function findByIdempotency(env, app, idempotencyKey) {
 async function findUncertainByFeedbackRequest(env, app, requestKey) {
   return await env.DB.prepare(
     "SELECT * FROM parent_feedback_sends WHERE app=? AND feedback_request_key=? " +
-    "AND status IN ('reserved','dispatching','unknown') ORDER BY updated_at DESC LIMIT 1"
+    "AND status IN ('reserved','dispatching','accepted','unknown') " +
+    'ORDER BY created_at DESC,send_id DESC LIMIT 1'
   ).bind(app, requestKey).first();
+}
+
+/** 같은 수업·날짜를 v2와 v3로 두 번 보내지 않는다. 단순 미발송·취소 요청과
+ * 거절로 확정된 발송은 실제 전달 가능성이 없으므로 새 템플릿 발송을 막지 않는다. */
+const CROSS_TEMPLATE_SEND_RISK_FILTER =
+  'other.app=? AND other.task_id=? AND other.feedback_date=? AND other.feedback_type=? ' +
+  'AND other.template_version<>? AND (' +
+    "other.status='sent' OR EXISTS (SELECT 1 FROM parent_feedback_sends other_send " +
+      'WHERE other_send.app=other.app AND other_send.feedback_request_key=other.request_key ' +
+      "AND other_send.status IN ('reserved','dispatching','accepted','unknown')))";
+
+function crossTemplateRiskBinds(app, current) {
+  return [app, current.task_id, current.feedback_date, current.feedback_type, current.template_version];
+}
+
+async function findCrossTemplateSendRisk(env, app, current) {
+  return await env.DB.prepare(
+    'SELECT other.request_key FROM feedback_requests other WHERE ' +
+    CROSS_TEMPLATE_SEND_RISK_FILTER + ' LIMIT 1'
+  ).bind(...crossTemplateRiskBinds(app, current)).first();
 }
 
 async function updateLedger(env, app, sendId, status, provider, safeErrorCode, now) {
@@ -339,18 +442,28 @@ export async function attemptParentFeedbackSend(env, app, current) {
   const contentText = cleanField(current.content_text);
   const plusText = cleanField(current.plus_text);
   const minusText = cleanField(current.minus_text);
-  const templateVersion = cleanField(current.template_version) === 'v2' ? 'v2' : 'v1';
+  const templateVersion = feedbackTemplateVersion(current.template_version);
   const subjectText = cleanField(current.subject_text);
   const homeworkText = cleanField(current.homework_text);
   const commentText = cleanField(current.comment_text);
+  const noticeText = cleanField(current.notice_text);
   const dateText = feedbackDateText(current.feedback_date);
-  const requiredFieldsReady = templateVersion === 'v2'
-    ? subjectText && contentText && homeworkText && commentText && dateText
+  const requiredFieldsReady = templateVersion === 'v2' || templateVersion === 'v3'
+    ? subjectText && contentText && homeworkText && commentText && dateText &&
+      (templateVersion !== 'v3' || noticeText)
     : contentText && plusText && minusText;
   if (!teacherName || !studentName || !requiredFieldsReady) {
     await markFeedbackOutcome(env, app, current.request_key, Number(current.revision),
       'content_approved_send_blocked', '항목이 모두 채워지지 않아 발송하지 못했습니다', now0);
     return { ok: false, code: 'FIELDS_INCOMPLETE', status: 'content_approved_send_blocked' };
+  }
+
+  const crossTemplateRisk = await findCrossTemplateSendRisk(env, app, current);
+  if (crossTemplateRisk) {
+    const note = '같은 수업의 다른 피드백 템플릿 발송 이력이 있어 중복 발송을 막았습니다 — 기존 발송 상태를 확인해 주세요';
+    await markFeedbackOutcome(env, app, current.request_key, Number(current.revision),
+      'content_approved_send_blocked', note, now0);
+    return { ok: false, code: 'CROSS_TEMPLATE_SEND_CONFLICT', status: 'content_approved_send_blocked' };
   }
 
   const config = sendConfiguration(env, studentId, templateVersion);
@@ -372,7 +485,9 @@ export async function attemptParentFeedbackSend(env, app, current) {
     return { ok: false, code: verifiedStudent.error, status: 'content_approved_send_blocked' };
   }
 
-  const guardian = await guardianPhone(env, app, verifiedStudent.studentId, studentName);
+  const guardian = await guardianPhone(
+    env, app, verifiedStudent.studentId, studentName, verifiedStudent.student
+  );
   if (guardian.error) {
     const note = guardian.error === 'GUARDIAN_CONSENT_MISSING'
       ? '보호자의 발송 동의가 켜져 있지 않아 발송하지 못했습니다'
@@ -384,8 +499,11 @@ export async function attemptParentFeedbackSend(env, app, current) {
     return { ok: false, code: guardian.error, status: 'content_approved_send_blocked' };
   }
 
-  const fields = templateVersion === 'v2'
-    ? { templateVersion, studentName, dateText, subjectText, contentText, homeworkText, commentText }
+  const fields = templateVersion === 'v2' || templateVersion === 'v3'
+    ? {
+      templateVersion, studentName, dateText, subjectText, contentText, homeworkText, commentText,
+      ...(templateVersion === 'v3' ? { noticeText } : {})
+    }
     : { templateVersion, teacherName, studentName, contentText, plusText, minusText };
   if (totalAlimtalkLength(fields) > MAX_PARENT_FEEDBACK_ALIMTALK_CHARS) {
     await markFeedbackOutcome(env, app, current.request_key, Number(current.revision),
@@ -407,28 +525,33 @@ export async function attemptParentFeedbackSend(env, app, current) {
     "SELECT ?,?,?,?,?,?,?,'dispatching',?,?,? " +
     'WHERE (SELECT COUNT(*) FROM parent_feedback_sends WHERE app=? AND created_at > ?) < ' + GLOBAL_DAILY_LIMIT + ' ' +
     "AND NOT EXISTS (SELECT 1 FROM parent_feedback_sends WHERE app=? AND feedback_request_key=? " +
-    "AND status IN ('reserved','dispatching','unknown'))"
+    "AND status IN ('reserved','dispatching','accepted','unknown')) " +
+    'AND NOT EXISTS (SELECT 1 FROM feedback_requests other WHERE ' + CROSS_TEMPLATE_SEND_RISK_FILTER + ')'
   ).bind(
     app, sendId, idempotencyKey, current.request_key, verifiedStudent.studentId, studentName, variablesHash,
     now, now, now,
     app, now - 24 * 60 * 60 * 1000,
-    app, current.request_key
+    app, current.request_key,
+    ...crossTemplateRiskBinds(app, current)
   ).run();
 
   if (Number(inserted && inserted.meta && inserted.meta.changes || 0) !== 1) {
     const existing = await findByIdempotency(env, app, idempotencyKey);
     if (existing) {
-      if (existing.status === 'accepted') {
+      const existingDelivery = feedbackMessageDeliveryState(existing);
+      const existingAccepted = existingDelivery === 'provider_queued' ||
+        existingDelivery === 'carrier_processing' || existingDelivery === 'delivered';
+      if (existingAccepted) {
         await markFeedbackOutcome(env, app, current.request_key, Number(current.revision), 'sent', null, Date.now());
-      } else if (existing.status === 'unknown') {
+      } else if (existing.status === 'unknown' || existing.status === 'accepted') {
         await markFeedbackOutcome(env, app, current.request_key, Number(current.revision),
           'content_approved_send_blocked', unknownSendNote(existing.safe_error_code), Date.now());
       }
       return {
-        ok: existing.status === 'accepted',
+        ok: existingAccepted,
         idempotent: true,
         code: existing.safe_error_code || undefined,
-        status: existing.status
+        status: existingAccepted ? existing.status : existing.status === 'accepted' ? 'unknown' : existing.status
       };
     }
     // 서로 다른 번호·본문·revision의 동시 요청은 멱등키가 달라질 수 있다. 위 INSERT의
@@ -436,10 +559,25 @@ export async function attemptParentFeedbackSend(env, app, current) {
     // 실제 불확실 행을 다시 읽어 공급자 호출 없이 멈춘다.
     const uncertain = await findUncertainByFeedbackRequest(env, app, current.request_key);
     if (uncertain) {
+      const uncertainDelivery = feedbackMessageDeliveryState(uncertain);
+      const uncertainAccepted = uncertainDelivery === 'provider_queued' ||
+        uncertainDelivery === 'carrier_processing' || uncertainDelivery === 'delivered';
+      if (uncertainAccepted && String(uncertain.message_hash || '') === variablesHash) {
+        await markFeedbackOutcome(env, app, current.request_key, Number(current.revision), 'sent', null, Date.now());
+        return { ok: true, idempotent: true, code: 'PRIOR_SEND_ACCEPTED', status: 'sent' };
+      }
       const code = 'PRIOR_SEND_UNCERTAIN';
       await markFeedbackOutcome(env, app, current.request_key, Number(current.revision),
         'content_approved_send_blocked', unknownSendNote(code), now0);
       return { ok: false, idempotent: true, code, status: 'unknown' };
+    }
+    // 예비 조회 뒤 동시 제출로 다른 버전이 먼저 dispatching을 예약했을 수 있다.
+    // INSERT의 NOT EXISTS가 원자적으로 한 건만 이기게 하고, 진 쪽은 중복 위험으로 명확히 닫는다.
+    if (await findCrossTemplateSendRisk(env, app, current)) {
+      const note = '같은 수업의 다른 피드백 템플릿 발송 이력이 있어 중복 발송을 막았습니다 — 기존 발송 상태를 확인해 주세요';
+      await markFeedbackOutcome(env, app, current.request_key, Number(current.revision),
+        'content_approved_send_blocked', note, now0);
+      return { ok: false, code: 'CROSS_TEMPLATE_SEND_CONFLICT', status: 'content_approved_send_blocked' };
     }
     await markFeedbackOutcome(env, app, current.request_key, Number(current.revision),
       'content_approved_send_blocked', '오늘 발송 한도에 도달해 발송하지 못했습니다', now0);
@@ -460,7 +598,11 @@ export async function attemptParentFeedbackSend(env, app, current) {
           to: guardian.phone, from: config.sender, type: 'ATA',
           kakaoOptions: {
             pfId: config.pfId, templateId: config.templateId, disableSms: true,
-            variables: templateVersion === 'v2' ? {
+            variables: templateVersion === 'v3' ? {
+              '#{학생명}': studentName, '#{일시}': dateText, '#{과목}': subjectText,
+              '#{수업내용진도}': contentText, '#{과제}': homeworkText, '#{코멘트}': commentText,
+              '#{안내사항}': noticeText
+            } : templateVersion === 'v2' ? {
               '#{학생명}': studentName, '#{일시}': dateText, '#{과목}': subjectText,
               '#{수업내용진도}': contentText, '#{과제}': homeworkText, '#{코멘트}': commentText
             } : {
@@ -528,6 +670,424 @@ export async function attemptParentFeedbackSend(env, app, current) {
   };
 }
 
+function providerStatusRefreshOutcome(value) {
+  const statusCode = safeProviderStatus(value);
+  if (!statusCode) return null;
+  if (statusCode === '2000' || statusCode === '3000' || statusCode === '4000') {
+    return { status: 'accepted', statusCode, errorCode: null };
+  }
+  return { status: 'rejected', statusCode, errorCode: 'SOLAPI_STATUS_' + statusCode };
+}
+
+/** Solapi 목록 응답에서 전화번호·본문 등은 즉시 버리고 정합화에 필요한 값만 남긴다. */
+function providerMessages(payload) {
+  const list = payload && payload.messageList;
+  const values = Array.isArray(list)
+    ? list
+    : list && typeof list === 'object'
+      ? Object.values(list)
+      : [];
+  return values.map(value => {
+    let customFields = value && value.customFields;
+    if (typeof customFields === 'string') {
+      try { customFields = JSON.parse(customFields); } catch (error) { customFields = null; }
+    }
+    const messageId = safeProviderId(value && value.messageId);
+    const groupId = safeProviderId(value && value.groupId);
+    const statusCode = safeProviderStatus(value && value.statusCode);
+    const wbSendId = safeProviderId(customFields && customFields.wbSendId);
+    return messageId && statusCode ? { messageId, groupId, statusCode, wbSendId } : null;
+  }).filter(Boolean);
+}
+
+async function fetchProviderMessagePage(config, params) {
+  const url = new URL(SOLAPI_LIST_URL);
+  for (const [key, value] of Object.entries(params || {})) {
+    if (Array.isArray(value)) {
+      // Solapi 공식 SDK는 배열을 JSON 문자열 한 개가 아니라 같은 query key의
+      // 반복값으로 직렬화한다. JSON 문자열은 정상 200 응답이어도 빈 목록이 올 수 있다.
+      for (const item of value) {
+        if (item != null && item !== '') url.searchParams.append(key, String(item));
+      }
+    } else if (value != null && value !== '') {
+      url.searchParams.set(key, String(value));
+    }
+  }
+  const authorization = await buildSolapiAuthorization(config.apiKey, config.apiSecret);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), SOLAPI_TIMEOUT_MS);
+  let response;
+  let raw;
+  try {
+    response = await fetch(url.toString(), {
+      method: 'GET', headers: { Authorization: authorization }, signal: controller.signal
+    });
+    raw = await response.text();
+  } catch (error) {
+    return null;
+  } finally {
+    clearTimeout(timeout);
+  }
+  if (!response.ok || new TextEncoder().encode(raw || '').byteLength > MAX_STATUS_RESPONSE_BYTES) return null;
+  try {
+    const payload = raw ? JSON.parse(raw) : {};
+    return {
+      messages: providerMessages(payload),
+      nextKey: safeProviderId(payload && payload.nextKey)
+    };
+  } catch (error) { return null; }
+}
+
+async function fetchProviderStatuses(config, messageIds) {
+  const page = await fetchProviderMessagePage(config, {
+    messageIds, limit: messageIds.length
+  });
+  if (!page) return null;
+  return new Map(page.messages.map(message => [message.messageId, message]));
+}
+
+async function recoverProviderMessage(config, row, now, budget) {
+  const createdAt = Number(row.created_at || 0);
+  if (!createdAt) return null;
+  const endAt = Math.max(createdAt + 1000,
+    Math.min(createdAt + STATUS_RECOVERY_WINDOW_AFTER_MS, Number(now) || Date.now()));
+  const templateVersion = feedbackTemplateVersion(row.template_version);
+  const templateId = config.templateIds && config.templateIds[templateVersion];
+  const baseParams = {
+    startDate: new Date(createdAt - STATUS_RECOVERY_WINDOW_BEFORE_MS).toISOString(),
+    endDate: new Date(endAt).toISOString(),
+    dateType: 'CREATED', type: 'ATA', limit: STATUS_RECOVERY_PAGE_SIZE,
+    ...(templateId ? { criteria: 'kakaoTemplateId', cond: 'eq', value: templateId } : {})
+  };
+  const matches = [];
+  let startKey = null;
+  for (let pageIndex = 0; pageIndex < STATUS_RECOVERY_MAX_PAGES; pageIndex++) {
+    if (!budget || budget.remaining < 1) return { matches, complete: false, budgetExhausted: true };
+    budget.remaining -= 1;
+    const page = await fetchProviderMessagePage(config, {
+      ...baseParams, ...(startKey ? { startKey } : {})
+    });
+    if (!page) return null;
+    matches.push(...page.messages.filter(message => message.wbSendId === String(row.send_id)));
+    if (!page.nextKey) return { matches, complete: true };
+    startKey = page.nextKey;
+  }
+  return { matches, complete: false };
+}
+
+function feedbackVariablesForRow(row) {
+  const templateVersion = feedbackTemplateVersion(row.template_version);
+  const studentName = cleanField(row.feedback_student_name);
+  const contentText = cleanField(row.content_text);
+  if (templateVersion === 'v2' || templateVersion === 'v3') {
+    return {
+      templateVersion,
+      studentName,
+      dateText: feedbackDateText(row.feedback_date),
+      subjectText: cleanField(row.subject_text),
+      contentText,
+      homeworkText: cleanField(row.homework_text),
+      commentText: cleanField(row.comment_text),
+      ...(templateVersion === 'v3' ? { noticeText: cleanField(row.notice_text) } : {})
+    };
+  }
+  return {
+    templateVersion,
+    teacherName: cleanField(row.teacher_name),
+    studentName,
+    contentText,
+    plusText: cleanField(row.plus_text),
+    minusText: cleanField(row.minus_text)
+  };
+}
+
+async function effectiveFeedbackSend(env, row, variablesHash) {
+  return await env.DB.prepare(
+    'SELECT send_id,status,provider_group_id,provider_message_id,provider_status_code,' +
+    'safe_error_code,updated_at,message_hash FROM parent_feedback_sends ' +
+    'WHERE app=? AND feedback_request_key=? AND message_hash=? ORDER BY ' +
+    "CASE WHEN status='accepted' AND provider_status_code='4000' THEN 0 " +
+    "WHEN status='accepted' AND provider_status_code='3000' THEN 1 " +
+    "WHEN status='accepted' AND provider_status_code='2000' THEN 2 " +
+    "WHEN status IN ('reserved','dispatching','unknown') THEN 3 ELSE 4 END," +
+    'created_at DESC,send_id DESC LIMIT 1'
+  ).bind(row.app, row.feedback_request_key, variablesHash).first();
+}
+
+async function reconcileFeedbackRequest(env, row, now) {
+  const variablesHash = await sha256Hex(JSON.stringify(feedbackVariablesForRow(row)));
+  const send = await effectiveFeedbackSend(env, row, variablesHash);
+  if (!send) return 0;
+  const delivery = feedbackMessageDeliveryState(send);
+  let status;
+  let note = null;
+  if (delivery === 'delivered' || delivery === 'carrier_processing' || delivery === 'provider_queued') {
+    status = 'sent';
+  } else if (delivery === 'failed') {
+    status = 'content_approved_send_blocked';
+    note = '카카오 발송 결과가 실패로 확인되었습니다';
+  } else if (delivery === 'unknown') {
+    status = 'content_approved_send_blocked';
+    note = '발송 결과를 자동으로 확인하지 못했습니다 — 관리자 확인 전 재발송 금지';
+  } else {
+    return 0;
+  }
+  if (String(row.feedback_status) === status && String(row.feedback_review_note || '') === String(note || '')) return 0;
+  const refreshedAt = Math.max(Number(now) || Date.now(), Number(row.feedback_updated_at || 0) + 1);
+  const changed = await env.DB.prepare(
+    'UPDATE feedback_requests SET status=?,review_note=?,updated_at=? ' +
+    'WHERE app=? AND request_key=? AND revision=? AND body_hash=? AND status=? AND updated_at=? ' +
+    'AND review_note IS ? AND status<>\'cancelled\' AND EXISTS (' +
+      'SELECT 1 FROM parent_feedback_sends s WHERE s.app=? AND s.send_id=? AND s.message_hash=? ' +
+      'AND s.status=? AND s.provider_group_id IS ? AND s.provider_message_id IS ? ' +
+      'AND s.provider_status_code IS ? AND s.safe_error_code IS ? AND s.updated_at=?)'
+  ).bind(status, note, refreshedAt, row.app, row.feedback_request_key, Number(row.feedback_revision),
+    row.feedback_body_hash, row.feedback_status, row.feedback_updated_at, row.feedback_review_note,
+    row.app, send.send_id, variablesHash, send.status, send.provider_group_id, send.provider_message_id,
+    send.provider_status_code, send.safe_error_code, send.updated_at).run();
+  return Number(changed && changed.meta && changed.meta.changes || 0);
+}
+
+async function updateProviderStatusCas(env, row, status, provider, safeErrorCode, now) {
+  const groupId = provider && provider.groupId || row.provider_group_id || null;
+  const messageId = provider && provider.messageId || row.provider_message_id || null;
+  const statusCode = provider && provider.statusCode || row.provider_status_code || null;
+  const refreshedAt = Math.max(Number(now) || Date.now(), Number(row.updated_at || 0) + 1);
+  const changed = await env.DB.prepare(
+    'UPDATE parent_feedback_sends SET status=?,provider_group_id=?,provider_message_id=?,' +
+    'provider_status_code=?,safe_error_code=?,updated_at=? ' +
+    'WHERE app=? AND send_id=? AND status=? AND provider_group_id IS ? AND provider_message_id IS ? ' +
+    'AND provider_status_code IS ? AND safe_error_code IS ? AND updated_at=?'
+  ).bind(status, groupId, messageId, statusCode, safeErrorCode || null, refreshedAt,
+    row.app, row.send_id, row.status, row.provider_group_id, row.provider_message_id,
+    row.provider_status_code, row.safe_error_code, row.updated_at).run();
+  const changes = Number(changed && changed.meta && changed.meta.changes || 0);
+  return {
+    changes,
+    row: changes ? {
+      ...row, status, provider_group_id: groupId, provider_message_id: messageId,
+      provider_status_code: statusCode, safe_error_code: safeErrorCode || null, updated_at: refreshedAt
+    } : row
+  };
+}
+
+async function touchProviderStatusCas(env, row, now) {
+  const refreshedAt = Math.max(Number(now) || Date.now(), Number(row.updated_at || 0) + 1);
+  const changed = await env.DB.prepare(
+    'UPDATE parent_feedback_sends SET updated_at=? WHERE app=? AND send_id=? AND status=? ' +
+    'AND provider_group_id IS ? AND provider_message_id IS ? AND provider_status_code IS ? ' +
+    'AND safe_error_code IS ? AND updated_at=?'
+  ).bind(refreshedAt, row.app, row.send_id, row.status, row.provider_group_id,
+    row.provider_message_id, row.provider_status_code, row.safe_error_code, row.updated_at).run();
+  return Number(changed && changed.meta && changed.meta.changes || 0);
+}
+
+function providerStatusRank(statusCode) {
+  return statusCode === '2000' ? 1 : statusCode === '3000' ? 2 : statusCode === '4000' ? 3 : 0;
+}
+
+async function applyProviderStatus(env, row, message, now) {
+  if (!message || (row.provider_message_id && String(row.provider_message_id) !== message.messageId)) {
+    return { checked: 0, updated: 0, requestUpdated: 0 };
+  }
+  if (row.provider_group_id && message.groupId && String(row.provider_group_id) !== message.groupId) {
+    return { checked: 0, updated: 0, requestUpdated: 0 };
+  }
+  const outcome = providerStatusRefreshOutcome(message.statusCode);
+  if (!outcome) return { checked: 0, updated: 0, requestUpdated: 0 };
+  const currentRank = providerStatusRank(String(row.provider_status_code || ''));
+  const nextRank = providerStatusRank(outcome.statusCode);
+  const age = Math.max(0, Number(now) - Number(row.created_at || 0));
+  if (currentRank && nextRank && nextRank < currentRank) {
+    if (currentRank === 2 && age >= CARRIER_STATUS_MAX_AGE_MS) {
+      const marked = await markStatusUnknown(env, row, 'SOLAPI_STATUS_STALE_3000', now);
+      return { checked: 1, updated: marked.updated, requestUpdated: marked.requestUpdated };
+    }
+    return { checked: 1, updated: 0, requestUpdated: await reconcileFeedbackRequest(env, row, now) };
+  }
+  let status = outcome.status;
+  let statusCode = outcome.statusCode;
+  let errorCode = outcome.errorCode;
+  if ((statusCode === '2000' && age >= QUEUED_STATUS_MAX_AGE_MS) ||
+      (statusCode === '3000' && age >= CARRIER_STATUS_MAX_AGE_MS)) {
+    status = 'unknown';
+    errorCode = 'SOLAPI_STATUS_STALE_' + statusCode;
+  }
+  const provider = {
+    groupId: message.groupId || row.provider_group_id || null,
+    messageId: message.messageId,
+    statusCode
+  };
+  const same = String(row.status) === status && String(row.provider_status_code || '') === statusCode &&
+    String(row.provider_message_id || '') === String(provider.messageId || '') &&
+    String(row.provider_group_id || '') === String(provider.groupId || '') &&
+    String(row.safe_error_code || '') === String(errorCode || '');
+  let updatedRow = row;
+  let updated = 0;
+  if (!same) {
+    const result = await updateProviderStatusCas(env, row, status, provider, errorCode, now);
+    updated = result.changes;
+    if (!updated) return { checked: 1, updated: 0, requestUpdated: 0 };
+    updatedRow = result.row;
+  }
+  const requestUpdated = await reconcileFeedbackRequest(env, updatedRow, now);
+  return { checked: 1, updated, requestUpdated };
+}
+
+async function markStatusUnknown(env, row, code, now) {
+  const provider = {
+    groupId: row.provider_group_id || null,
+    messageId: row.provider_message_id || null,
+    statusCode: row.provider_status_code || null
+  };
+  const result = await updateProviderStatusCas(env, row, 'unknown', provider, code, now);
+  if (!result.changes) return { updated: 0, requestUpdated: 0 };
+  return {
+    updated: result.changes,
+    requestUpdated: await reconcileFeedbackRequest(env, result.row, now)
+  };
+}
+
+/**
+ * 10분마다 Solapi의 실제 처리 결과를 확인한다. POST 응답 직후 Worker가 중단돼
+ * dispatching으로 남은 행도 customFields.wbSendId를 좁은 시간대에서 정확히 찾아 복구한다.
+ * 조회 결과가 불분명할 때는 절대 재발송하지 않고 fail-closed 상태로 남긴다.
+ */
+export async function handleScheduledParentFeedbackStatusRefresh(env, scheduledTime) {
+  const now = Number(scheduledTime) || Date.now();
+  const config = statusConfiguration(env);
+  if (!config) {
+    return { ok: false, code: 'SOLAPI_STATUS_DISABLED', checked: 0, updated: 0, requestUpdated: 0 };
+  }
+  let result;
+  try {
+    result = await env.DB.prepare(
+      'SELECT s.*,f.request_key AS feedback_request_key,f.feedback_date,f.template_version,' +
+      'f.teacher_name,f.student_name AS feedback_student_name,f.content_text,f.subject_text,' +
+       'f.homework_text,f.comment_text,f.notice_text,f.plus_text,f.minus_text,f.revision AS feedback_revision,' +
+      'f.body_hash AS feedback_body_hash,f.status AS feedback_status,f.review_note AS feedback_review_note,' +
+      'f.updated_at AS feedback_updated_at ' +
+      'FROM parent_feedback_sends s JOIN feedback_requests f ' +
+      'ON f.app=s.app AND f.request_key=s.feedback_request_key ' +
+      "WHERE s.app='task' AND (" +
+      "(s.status='accepted' AND (s.provider_status_code IN ('2000','3000') OR " +
+        "s.provider_status_code IS NULL OR s.provider_status_code NOT IN ('2000','3000','4000'))) OR " +
+      "s.status='dispatching' OR (s.status='unknown' AND COALESCE(s.safe_error_code,'') " +
+        "NOT IN ('SOLAPI_STATUS_RECOVERY_NOT_FOUND','SOLAPI_STATUS_MULTIPLE_MATCHES'," +
+          "'SOLAPI_STATUS_CONFIRMED_NOT_FOUND') " +
+        "AND COALESCE(s.safe_error_code,'') NOT LIKE 'SOLAPI_STATUS_STALE_%') OR (" +
+      "s.send_id=(SELECT effective.send_id FROM parent_feedback_sends effective " +
+        "WHERE effective.app=s.app AND effective.feedback_request_key=s.feedback_request_key ORDER BY " +
+        "CASE WHEN effective.status='accepted' AND effective.provider_status_code='4000' THEN 0 " +
+        "WHEN effective.status='accepted' AND effective.provider_status_code='3000' THEN 1 " +
+        "WHEN effective.status='accepted' AND effective.provider_status_code='2000' THEN 2 " +
+        "WHEN effective.status IN ('reserved','dispatching','unknown') THEN 3 ELSE 4 END," +
+        "effective.created_at DESC,effective.send_id DESC LIMIT 1) AND (" +
+        "(s.status='accepted' AND s.provider_status_code='4000' AND " +
+          "(f.status<>'sent' OR f.review_note IS NOT NULL)) OR " +
+        "(s.status='rejected' AND (f.status<>'content_approved_send_blocked' OR " +
+          "COALESCE(f.review_note,'')<>'카카오 발송 결과가 실패로 확인되었습니다')) OR " +
+        "(s.status='unknown' AND (COALESCE(s.safe_error_code,'') IN " +
+          "('SOLAPI_STATUS_RECOVERY_NOT_FOUND','SOLAPI_STATUS_MULTIPLE_MATCHES'," +
+            "'SOLAPI_STATUS_CONFIRMED_NOT_FOUND') OR " +
+          "COALESCE(s.safe_error_code,'') LIKE 'SOLAPI_STATUS_STALE_%') AND " +
+          "(f.status<>'content_approved_send_blocked' OR COALESCE(f.review_note,'')<>" +
+          "'발송 결과를 자동으로 확인하지 못했습니다 — 관리자 확인 전 재발송 금지')))))" +
+      " ORDER BY CASE WHEN s.status IN ('dispatching') OR " +
+        "(s.status='accepted' AND COALESCE(s.provider_status_code,'')<>'4000') OR " +
+        "(s.status='unknown' AND COALESCE(s.safe_error_code,'') NOT IN " +
+          "('SOLAPI_STATUS_RECOVERY_NOT_FOUND','SOLAPI_STATUS_MULTIPLE_MATCHES'," +
+            "'SOLAPI_STATUS_CONFIRMED_NOT_FOUND') " +
+          "AND COALESCE(s.safe_error_code,'') NOT LIKE 'SOLAPI_STATUS_STALE_%') THEN 0 ELSE 1 END," +
+      's.updated_at,s.created_at,s.send_id LIMIT ?'
+    ).bind(STATUS_REFRESH_LIMIT).all();
+  } catch (error) {
+    return { ok: false, code: 'PARENT_FEEDBACK_STATUS_DB', checked: 0, updated: 0, requestUpdated: 0 };
+  }
+  const rows = result.results || [];
+  const terminalUnknown = row => row.status === 'unknown' && (
+    ['SOLAPI_STATUS_RECOVERY_NOT_FOUND', 'SOLAPI_STATUS_MULTIPLE_MATCHES',
+      'SOLAPI_STATUS_CONFIRMED_NOT_FOUND']
+      .includes(String(row.safe_error_code || '')) || String(row.safe_error_code || '').startsWith('SOLAPI_STATUS_STALE_')
+  );
+  const completed = rows.filter(row =>
+    (row.status === 'accepted' && row.provider_status_code === '4000') || row.status === 'rejected' || terminalUnknown(row));
+  const active = rows.filter(row => !completed.includes(row));
+  const known = active.filter(row => safeProviderId(row.provider_message_id));
+  const recoverable = active.filter(row => !safeProviderId(row.provider_message_id)).slice(0, STATUS_RECOVERY_LIMIT);
+  let checked = 0;
+  let updated = 0;
+  let requestUpdated = 0;
+  let providerErrors = 0;
+  const recoveryBudget = { remaining: STATUS_RECOVERY_SUBREQUEST_LIMIT };
+
+  for (const row of completed) {
+    checked += 1;
+    requestUpdated += await reconcileFeedbackRequest(env, row, now);
+  }
+
+  for (let start = 0; start < known.length; start += STATUS_REFRESH_CHUNK_SIZE) {
+    const chunk = known.slice(start, start + STATUS_REFRESH_CHUNK_SIZE);
+    const messages = await fetchProviderStatuses(config, chunk.map(row => String(row.provider_message_id)));
+    if (!messages) { providerErrors += 1; continue; }
+    for (const row of chunk) {
+      const message = messages.get(String(row.provider_message_id));
+      if (message) {
+        const applied = await applyProviderStatus(env, row, message, now);
+        checked += applied.checked; updated += applied.updated; requestUpdated += applied.requestUpdated;
+        continue;
+      }
+      checked += 1;
+      const age = Math.max(0, now - Number(row.created_at || 0));
+      const currentCode = String(row.provider_status_code || '');
+      const stale = (currentCode === '2000' && age >= QUEUED_STATUS_MAX_AGE_MS) ||
+        (currentCode === '3000' && age >= CARRIER_STATUS_MAX_AGE_MS) ||
+        (!currentCode && age >= STATUS_RECOVERY_MAX_AGE_MS);
+      if (stale) {
+        // 잘못된 JSON-array query로 과거에 NOT_FOUND가 된 행은 수정된 query로
+        // 딱 한 번 더 확인한다. 또 없을 때만 새 terminal 코드로 닫아 무한 재조회를 막는다.
+        const missingCode = row.status === 'unknown' &&
+          String(row.safe_error_code || '') === 'SOLAPI_STATUS_NOT_FOUND'
+          ? 'SOLAPI_STATUS_CONFIRMED_NOT_FOUND'
+          : 'SOLAPI_STATUS_NOT_FOUND';
+        const marked = await markStatusUnknown(env, row, missingCode, now);
+        updated += marked.updated; requestUpdated += marked.requestUpdated;
+      }
+    }
+  }
+
+  for (const row of recoverable) {
+    const recovery = await recoverProviderMessage(config, row, now, recoveryBudget);
+    if (!recovery) { providerErrors += 1; continue; }
+    checked += 1;
+    if (!recovery.complete) {
+      providerErrors += 1;
+      updated += await touchProviderStatusCas(env, row, now);
+      continue;
+    }
+    const matches = recovery.matches;
+    if (matches.length === 1) {
+      const applied = await applyProviderStatus(env, row, matches[0], now);
+      updated += applied.updated; requestUpdated += applied.requestUpdated;
+      continue;
+    }
+    const age = Math.max(0, now - Number(row.created_at || 0));
+    if (matches.length > 1 || age >= STATUS_RECOVERY_MAX_AGE_MS) {
+      const code = matches.length > 1 ? 'SOLAPI_STATUS_MULTIPLE_MATCHES' : 'SOLAPI_STATUS_RECOVERY_NOT_FOUND';
+      const marked = await markStatusUnknown(env, row, code, now);
+      updated += marked.updated; requestUpdated += marked.requestUpdated;
+    } else {
+      updated += await touchProviderStatusCas(env, row, now);
+    }
+  }
+
+  return {
+    ok: providerErrors === 0,
+    ...(providerErrors ? { code: 'SOLAPI_STATUS_PARTIAL' } : {}),
+    checked, updated, requestUpdated, providerErrors
+  };
+}
+
 const RETRY_ERROR_TEXT = {
   ALREADY_SENT: '이미 발송된 문구입니다',
   CANCELLED: '취소된 요청은 발송할 수 없습니다',
@@ -542,6 +1102,7 @@ const RETRY_ERROR_TEXT = {
   STUDENT_IDENTITY_MISMATCH: '현재 원생 명단과 지시서의 학생 이름이 일치하지 않습니다',
   STUDENT_OWNER_MISMATCH: '현재 원생 명단의 담당자와 지시서 담당자가 일치하지 않습니다',
   MESSAGE_TOO_LONG: '문구가 알림톡 글자수 상한(900자)을 넘었습니다',
+  CROSS_TEMPLATE_SEND_CONFLICT: '같은 수업의 다른 피드백 템플릿 발송 상태를 먼저 확인해 주세요',
   DAILY_SEND_LIMIT: '오늘 발송 한도에 도달했습니다',
   SEND_STATE_CONFLICT: '발송 상태를 확인해 주세요',
   SOLAPI_TIMEOUT: '카카오 발송 시도 중 응답이 없었습니다 — 다시 보내지 말고 발송 내역을 확인해 주세요',
@@ -563,6 +1124,7 @@ const RETRY_HTTP_STATUS = {
   STUDENT_IDENTITY_MISMATCH: 409,
   STUDENT_OWNER_MISMATCH: 403,
   MESSAGE_TOO_LONG: 413,
+  CROSS_TEMPLATE_SEND_CONFLICT: 409,
   DAILY_SEND_LIMIT: 429,
   SEND_STATE_CONFLICT: 409,
   PRIOR_SEND_UNCERTAIN: 202

@@ -287,6 +287,25 @@ test('same-time lessons with different class identities stay separate and warn',
   assert.ok(row.sessions.every(session => session.teacherConflict));
 });
 
+test('same-time makeup lessons stay separate from regular classes and from other makeup cases', () => {
+  const row = core.timelineRows([
+    timelineEntry('김선생', '학생A', 900, 960, '중1', {
+      task: { id: 'lesson-a', subject: '수학', className: '대수' }, role: '개념'
+    }),
+    timelineEntry('김선생', '학생B', 900, 960, '중1', {
+      task: { id: 'makeup-a', subject: '수학', className: '대수', lessonInstanceType: 'makeup', makeupCaseId: 'mu-a' },
+      role: '개념'
+    }),
+    timelineEntry('김선생', '학생C', 900, 960, '중1', {
+      task: { id: 'makeup-b', subject: '수학', className: '대수', lessonInstanceType: 'makeup', makeupCaseId: 'mu-b' },
+      role: '개념'
+    })
+  ])[0];
+  assert.equal(row.sessions.length, 3);
+  assert.equal(new Set(row.sessions.map(session => session.lessonIdentity)).size, 3);
+  assert.ok(row.sessions.every(session => session.teacherConflict));
+});
+
 test('timeline flags one student booked with overlapping teachers', () => {
   const rows = core.timelineRows([
     timelineEntry('김선생', '학생A', 900, 960, '중1'),
@@ -319,11 +338,20 @@ test('stable student ids keep same-name students separate', () => {
 
 test('duplicate same-student entries in one group session do not warn', () => {
   const session = core.timelineRows([
-    timelineEntry('김선생', '학생A', 900, 960, '중1'),
-    timelineEntry('김선생', '학생A', 900, 960, '중1')
+    timelineEntry('김선생', '학생A', 900, 960, '중1', { task: { id: 'same-task', subject: '수학' } }),
+    timelineEntry('김선생', '학생A', 900, 960, '중1', { task: { id: 'same-task', subject: '수학' } })
   ])[0].sessions[0];
   assert.equal(session.entries.length, 2);
   assert.equal(session.studentConflict, false);
+});
+
+test('distinct duplicate lesson tasks for one student still warn', () => {
+  const session = core.timelineRows([
+    timelineEntry('김선생', '학생A', 900, 960, '중1', { task: { id: 'task-a', subject: '수학' } }),
+    timelineEntry('김선생', '학생A', 900, 960, '중1', { task: { id: 'task-b', subject: '수학' } })
+  ])[0].sessions[0];
+  assert.equal(session.entries.length, 2);
+  assert.equal(session.studentConflict, true);
 });
 
 test('one student in different overlapping classes still warns under the same teacher', () => {

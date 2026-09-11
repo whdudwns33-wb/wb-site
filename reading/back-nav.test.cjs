@@ -56,6 +56,30 @@ t('진로독서 — 첫 화면은 기록을 쌓지 않고 얹는다', () => {
   assert.ok(/navSet\(view,true\);/.test(READING), '첫 화면이 replace 가 아니다');
 });
 
+t('진로독서 — 뒤로 가기가 어휘 카드를 먼저 닫는다', () => {
+  /* 어휘 카드는 「닫기」 단추로만 닫혔다. 안드로이드 뒤로 가기를 누르면 카드는
+     그대로 남고 화면만 되돌아가, 읽던 글에서 튕겨 나갔다. 워드브레인과 같은
+     차례가 되어야 한다 — 오버레이부터 닫고, 그다음이 화면이다. */
+  assert.ok(/function openSheet\(\)/.test(READING), 'openSheet 가 없다');
+  assert.ok(/history\.pushState\(\{wb:Object\.assign\(\{\},view,\{sheet:1\}\)\}/.test(READING),
+    '어휘 카드가 뒤로 가기용 기록을 쌓지 않는다');
+  const h = READING.slice(READING.indexOf("addEventListener('popstate'"));
+  const body = h.slice(0, h.indexOf('});'));
+  assert.ok(body.indexOf('closeSheet(true)') >= 0, 'popstate 가 어휘 카드를 닫지 않는다');
+  assert.ok(body.indexOf('closeSheet(true)') < body.indexOf('go(st.name'),
+    '카드 닫기가 화면 되돌리기보다 앞서지 않는다');
+});
+
+t('진로독서 — ✕(닫기)로 닫아도 기록이 헛돌지 않는다', () => {
+  assert.ok(/function closeSheet\(fromPop\)/.test(READING), 'closeSheet 가 호출 출처를 구분하지 않는다');
+  assert.ok(/if\(!fromPop\)\{try\{history\.replaceState\(\{wb:view\}/.test(READING),
+    '단추로 닫을 때 카드 기록을 지금 화면 기록으로 바꾸지 않는다');
+});
+
+t('진로독서 — Esc 로도 어휘 카드가 닫힌다', () => {
+  assert.ok(/e\.key==='Escape'&&sheetOpen\(\)/.test(READING), 'Esc 처리가 없다');
+});
+
 t('두 앱 모두 기록을 못 써도 죽지 않는다', () => {
   /* 사생활 보호 모드 등에서 pushState 가 막히는 브라우저가 있다.
      거기서 예외가 새면 화면 이동 자체가 멈춘다 — 앱이 통째로 먹통이 된다. */

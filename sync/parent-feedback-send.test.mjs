@@ -1,16 +1,23 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { DatabaseSync } from 'node:sqlite';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 
 import worker from './worker-core.js';
-import { attemptParentFeedbackSend } from './parent-feedback-send.js';
+import {
+  attemptParentFeedbackSend,
+  feedbackMessageDeliveryState,
+  handleScheduledParentFeedbackStatusRefresh,
+  parentFeedbackV2CommentBudget
+} from './parent-feedback-send.js';
 
 const schema = fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8');
 const migration016 = fs.readFileSync(new URL('./migrations/016_parent_feedback_send.sql', import.meta.url), 'utf8');
 const migration017 = fs.readFileSync(new URL('./migrations/017_feedback_structured_fields.sql', import.meta.url), 'utf8');
 const migration021 = fs.readFileSync(new URL('./migrations/021_parent_feedback_student_ids.sql', import.meta.url), 'utf8');
 const migration051 = fs.readFileSync(new URL('./migrations/051_feedback_template_v2.sql', import.meta.url), 'utf8');
+const migration067 = fs.readFileSync(new URL('./migrations/067_feedback_template_v3.sql', import.meta.url), 'utf8');
 
 class D1Statement {
   constructor(database, sql) { this.database = database; this.sql = sql; this.args = []; }
@@ -40,6 +47,7 @@ const fullEnvBase = {
   SOLAPI_KAKAO_PF_ID: 'PF_TEST_0001',
   SOLAPI_KAKAO_TEMPLATE_ID: 'TPL_TEST_0001',
   SOLAPI_KAKAO_FEEDBACK_TEMPLATE_ID_V2: 'TPL_TEST_V2_0001',
+  SOLAPI_KAKAO_FEEDBACK_TEMPLATE_ID_V3: 'TPL_TEST_V3_0001',
   SOLAPI_SENDER_NUMBER: '0212345678'
 };
 
@@ -93,6 +101,7 @@ function seedFeedback(db, overrides = {}) {
     teacherName: '김남기', studentName: '테스트학생', contentText: '독해 지문 3개 풀이',
     subjectText: '국어', homeworkText: '어휘 10개 복습',
     commentText: '근거를 찾아 설명하는 태도가 인상적이었습니다.',
+    noticeText: '다음 수업에 교재를 준비해 주세요.',
     plusText: '오답을 스스로 설명함', minusText: '어휘',
     ...overrides.fields
   };
@@ -102,7 +111,8 @@ function seedFeedback(db, overrides = {}) {
         updated: '2026-08-09', baseline: '2026-08',
         students: [{
           id: studentId, name: fields.studentName, grade: '중2', teacher: '김남기', subject: '국어',
-          start: '2026-08', end: '', reason: '', teacherIds: ['S-kim']
+          start: '2026-08', end: '', reason: '', teacherIds: ['S-kim'],
+          ...overrides.rosterFields
         }]
       },
       bookStudents: []
@@ -115,14 +125,35 @@ function seedFeedback(db, overrides = {}) {
   db.prepare(
     'INSERT INTO feedback_requests (app,request_key,task_id,owner,feedback_date,feedback_type,template_version,' +
     'body,body_hash,teacher_name,student_id,student_name,content_text,subject_text,homework_text,comment_text,' +
-    'plus_text,minus_text,revision,status,created_at,updated_at) ' +
-    'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,?)'
+    'notice_text,plus_text,minus_text,revision,status,created_at,updated_at) ' +
+    'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,?)'
   ).bind('task', requestKey, task.id, 'S-kim', '2026-08-09', 'class_feedback', templateVersion,
     '오늘 테스트학생 수업 잘 마쳤습니다.', 'x'.repeat(64),
     fields.teacherName, studentId || null, fields.studentName, fields.contentText,
-    fields.subjectText, fields.homeworkText, fields.commentText, fields.plusText, fields.minusText,
+    fields.subjectText, fields.homeworkText, fields.commentText, fields.noticeText, fields.plusText, fields.minusText,
     overrides.status || 'content_approved_send_blocked', now, now).run();
   return { requestKey, taskId: task.id, studentId, studentName: fields.studentName };
+}
+
+function seedSiblingFeedbackVersion(db, sourceRequestKey, {
+  requestKey = 'fbr_sibling00000000000000000000000000000000000000',
+  templateVersion = 'v2', status = 'content_approved_send_blocked', noticeText = ''
+} = {}) {
+  const sourceRow = db.prepare('SELECT * FROM feedback_requests WHERE app=? AND request_key=?')
+    .bind('task', sourceRequestKey).first();
+  const now = Date.now();
+  db.prepare(
+    'INSERT INTO feedback_requests (app,request_key,task_id,owner,feedback_date,feedback_type,template_version,' +
+    'body,body_hash,teacher_name,student_id,student_name,content_text,subject_text,homework_text,comment_text,' +
+    'notice_text,plus_text,minus_text,revision,status,created_at,updated_at) ' +
+    'VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,?)'
+  ).bind(
+    'task', requestKey, sourceRow.task_id, sourceRow.owner, sourceRow.feedback_date, sourceRow.feedback_type,
+    templateVersion, sourceRow.body, sourceRow.body_hash, sourceRow.teacher_name, sourceRow.student_id,
+    sourceRow.student_name, sourceRow.content_text, sourceRow.subject_text, sourceRow.homework_text,
+    sourceRow.comment_text, noticeText, sourceRow.plus_text, sourceRow.minus_text, status, now, now
+  ).run();
+  return requestKey;
 }
 
 function registerGuardian(db, studentName, { studentId = 'student-test', phone = '01012345678', consent = 1 } = {}) {
@@ -131,6 +162,72 @@ function registerGuardian(db, studentName, { studentId = 'student-test', phone =
     'INSERT INTO guardian_contacts_by_student ' +
     '(app,student_id,student_name,phone,consent,updated_at,updated_by) VALUES (?,?,?,?,?,?,?)'
   ).bind('task', studentId, studentName, phone, consent, now, 'director').run();
+}
+
+function seedFeedbackSend(db, requestKey, {
+  sendId = 'pfs_status_test', status = 'dispatching', statusCode = null,
+  groupId = null, messageId = null, safeErrorCode = null,
+  messageHash = 'm'.repeat(64), createdAt = Date.now() - 60_000, updatedAt = createdAt
+} = {}) {
+  db.prepare(
+    'INSERT INTO parent_feedback_sends ' +
+    '(app,send_id,idempotency_key,feedback_request_key,student_id,student_name,message_hash,status,' +
+    'provider_group_id,provider_message_id,provider_status_code,safe_error_code,' +
+    'created_at,dispatch_started_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+  ).bind(
+    'task', sendId, ('idem_' + sendId).padEnd(64, 'x'), requestKey,
+    'student-test', '테스트학생', messageHash, status,
+    groupId, messageId, statusCode, safeErrorCode,
+    createdAt, createdAt, updatedAt
+  ).run();
+  return sendId;
+}
+
+function v2FeedbackMessageHash(fields = {}) {
+  const variables = {
+    templateVersion: 'v2',
+    studentName: '테스트학생',
+    dateText: '2026년 8월 9일',
+    subjectText: '국어',
+    contentText: '독해 지문 3개 풀이',
+    homeworkText: '어휘 10개 복습',
+    commentText: '근거를 찾아 설명하는 태도가 인상적이었습니다.',
+    ...fields
+  };
+  return createHash('sha256').update(JSON.stringify(variables)).digest('hex');
+}
+
+function v3FeedbackMessageHash(fields = {}) {
+  const variables = {
+    templateVersion: 'v3',
+    studentName: '테스트학생',
+    dateText: '2026년 8월 9일',
+    subjectText: '국어',
+    contentText: '독해 지문 3개 풀이',
+    homeworkText: '어휘 10개 복습',
+    commentText: '근거를 찾아 설명하는 태도가 인상적이었습니다.',
+    noticeText: '다음 수업에 교재를 준비해 주세요.',
+    ...fields
+  };
+  return createHash('sha256').update(JSON.stringify(variables)).digest('hex');
+}
+
+async function listFeedbackForDirector(db) {
+  const response = await worker.fetch(new Request('https://worker.example/feedback-review', {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ app: 'task', auth: admin, action: 'list', limit: 100 })
+  }), { DB: db, ...fullEnvBase });
+  return { status: response.status, body: await response.json() };
+}
+
+async function listFeedbackForTeacher(db) {
+  const response = await worker.fetch(new Request('https://worker.example/feedback-request', {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      app: 'task', auth: person('S-kim', 'tok-kim'), action: 'list', limit: 100
+    })
+  }), { DB: db, ...fullEnvBase });
+  return { status: response.status, body: await response.json() };
 }
 
 test('schema and migrations use stable student ids, and the send ledger itself stores no phone or message body', () => {
@@ -147,6 +244,9 @@ test('schema and migrations use stable student ids, and the send ledger itself s
   assert.match(migration021, /ALTER TABLE parent_feedback_sends ADD COLUMN student_id/);
   assert.doesNotMatch(migration051, /DROP TABLE|DELETE FROM|UPDATE feedback_requests/i);
   assert.match(migration051, /ALTER TABLE feedback_requests ADD COLUMN comment_text/);
+  assert.doesNotMatch(migration067, /DROP TABLE|DELETE FROM|UPDATE feedback_requests/i);
+  assert.match(migration067, /ALTER TABLE feedback_requests ADD COLUMN notice_text/);
+  assert.match(schema, /notice_text\s+TEXT/);
 });
 
 test('client cannot specify phone, recipient, message, or studentName — request rejected before any fetch', async () => {
@@ -205,6 +305,86 @@ test('global guardian pause permits only an exact stable studentId allowlist mat
     assert.equal(r.body.status, 'sent');
   });
   assert.equal(fetches, 1);
+});
+
+test('feedback-only all-students gate falls back to the private roster mother phone before father', async () => {
+  const db = new TestD1();
+  const { requestKey } = seedFeedback(db, { rosterFields: {
+    phoneMother: '010-2222-3333', phoneFather: '010-4444-5555'
+  } });
+  let recipient = '';
+  await withFetch(async (url, init) => {
+    recipient = JSON.parse(init.body).messages[0].to;
+    return acceptedResponse();
+  }, async () => {
+    const result = await call(db, { auth: admin, requestKey }, {
+      WB_GUARDIAN_CONTACT_ENABLED: 'false',
+      WB_GUARDIAN_CONTACT_STUDENT_IDS: '',
+      WB_PARENT_FEEDBACK_ALL_STUDENTS_ENABLED: 'true'
+    });
+    assert.equal(result.status, 200);
+    assert.equal(result.body.status, 'sent');
+  });
+  assert.equal(recipient, '01022223333');
+  assert.equal(db.prepare('SELECT COUNT(*) AS count FROM guardian_contacts_by_student').first().count, 0,
+    'roster fallback은 별도 보호자 연락처 행을 만들지 않는다');
+});
+
+test('roster fallback uses father only when no valid mother mobile exists and never uses student phone', async () => {
+  for (const [rosterFields, expectedCode, expectedRecipient] of [
+    [{ phoneMother: '', phoneFather: '010-4444-5555' }, '', '01044445555'],
+    [{ phoneMother: '062-123-4567', phoneFather: '010-6666-7777' }, '', '01066667777'],
+    [{ phoneSelf: '010-8888-9999', phoneMother: '', phoneFather: '' }, 'GUARDIAN_PHONE_MISSING', '']
+  ]) {
+    const db = new TestD1();
+    const { requestKey } = seedFeedback(db, { rosterFields });
+    let recipient = '';
+    let fetches = 0;
+    await withFetch(async (url, init) => {
+      fetches += 1;
+      recipient = JSON.parse(init.body).messages[0].to;
+      return acceptedResponse();
+    }, async () => {
+      const result = await call(db, { auth: admin, requestKey }, {
+        WB_GUARDIAN_CONTACT_ENABLED: 'false',
+        WB_GUARDIAN_CONTACT_STUDENT_IDS: '',
+        WB_PARENT_FEEDBACK_ALL_STUDENTS_ENABLED: 'true'
+      });
+      assert.equal(result.body.code || '', expectedCode);
+    });
+    assert.equal(recipient, expectedRecipient);
+    assert.equal(fetches, expectedRecipient ? 1 : 0);
+  }
+});
+
+test('an existing guardian row always overrides roster fallback and preserves its phone and consent rules', async () => {
+  for (const [contact, expectedCode, expectedRecipient] of [
+    [{ phone: '01011112222', consent: 0 }, 'GUARDIAN_CONSENT_MISSING', ''],
+    [{ phone: '', consent: 1 }, 'GUARDIAN_PHONE_MISSING', ''],
+    [{ phone: '01077778888', consent: 1 }, '', '01077778888']
+  ]) {
+    const db = new TestD1();
+    const { requestKey } = seedFeedback(db, { rosterFields: {
+      phoneMother: '01022223333', phoneFather: '01044445555'
+    } });
+    registerGuardian(db, '테스트학생', contact);
+    let recipient = '';
+    let fetches = 0;
+    await withFetch(async (url, init) => {
+      fetches += 1;
+      recipient = JSON.parse(init.body).messages[0].to;
+      return acceptedResponse();
+    }, async () => {
+      const result = await call(db, { auth: admin, requestKey }, {
+        WB_GUARDIAN_CONTACT_ENABLED: 'false',
+        WB_GUARDIAN_CONTACT_STUDENT_IDS: '',
+        WB_PARENT_FEEDBACK_ALL_STUDENTS_ENABLED: 'true'
+      });
+      assert.equal(result.body.code || '', expectedCode);
+    });
+    assert.equal(recipient, expectedRecipient);
+    assert.equal(fetches, expectedRecipient ? 1 : 0);
+  }
 });
 
 test('only the director can trigger a manual retry, not the submitting teacher', async () => {
@@ -369,7 +549,10 @@ test('happy path: registered+consented guardian → sends a Kakao AlimTalk with 
 
 test('v2 sends the requested six variables through its separate approved template id', async () => {
   const db = new TestD1();
-  const { requestKey } = seedFeedback(db, { templateVersion: 'v2' });
+  const requestedSubject = '국어 독해 · 비문학';
+  const { requestKey } = seedFeedback(db, {
+    templateVersion: 'v2', fields: { subjectText: requestedSubject }
+  });
   registerGuardian(db, '테스트학생');
   let sentMessage = null;
   await withFetch(async (url, init) => {
@@ -382,10 +565,81 @@ test('v2 sends the requested six variables through its separate approved templat
   });
   assert.equal(sentMessage.kakaoOptions.templateId, 'TPL_TEST_V2_0001');
   assert.deepEqual(sentMessage.kakaoOptions.variables, {
-    '#{학생명}': '테스트학생', '#{일시}': '2026년 8월 9일', '#{과목}': '국어',
+    '#{학생명}': '테스트학생', '#{일시}': '2026년 8월 9일', '#{과목}': requestedSubject,
     '#{수업내용진도}': '독해 지문 3개 풀이', '#{과제}': '어휘 10개 복습',
     '#{코멘트}': '근거를 찾아 설명하는 태도가 인상적이었습니다.'
   });
+});
+
+test('v3 sends seven variables including notice through its own approved template id', async () => {
+  const db = new TestD1();
+  const { requestKey } = seedFeedback(db, { templateVersion: 'v3' });
+  registerGuardian(db, '테스트학생');
+  let sentMessage = null;
+  await withFetch(async (url, init) => {
+    sentMessage = JSON.parse(init.body).messages[0];
+    return acceptedResponse();
+  }, async () => {
+    const result = await call(db, { auth: admin, requestKey });
+    assert.equal(result.status, 200);
+    assert.equal(result.body.status, 'sent');
+  });
+  assert.equal(sentMessage.kakaoOptions.templateId, 'TPL_TEST_V3_0001');
+  assert.deepEqual(sentMessage.kakaoOptions.variables, {
+    '#{학생명}': '테스트학생', '#{일시}': '2026년 8월 9일', '#{과목}': '국어',
+    '#{수업내용진도}': '독해 지문 3개 풀이', '#{과제}': '어휘 10개 복습',
+    '#{코멘트}': '근거를 찾아 설명하는 태도가 인상적이었습니다.',
+    '#{안내사항}': '다음 수업에 교재를 준비해 주세요.'
+  });
+});
+
+test('v3 requires notice, its template secret, and the full seven-variable text to fit under 900 characters', async () => {
+  for (const scenario of [
+    { fields: { noticeText: '' }, env: {}, code: 'FIELDS_INCOMPLETE' },
+    { fields: { noticeText: '\u00AD\u061C\u180E\u200B\u200F\u202A\u202E\u2060\u2066\u2069\uFEFF' },
+      env: {}, code: 'FIELDS_INCOMPLETE' },
+    { fields: {}, env: { SOLAPI_KAKAO_FEEDBACK_TEMPLATE_ID_V3: '' }, code: 'SEND_DISABLED' },
+    { fields: { noticeText: '안'.repeat(800) }, env: {}, code: 'MESSAGE_TOO_LONG' }
+  ]) {
+    const db = new TestD1();
+    const { requestKey } = seedFeedback(db, { templateVersion: 'v3', fields: scenario.fields });
+    registerGuardian(db, '테스트학생');
+    let fetches = 0;
+    await withFetch(async () => { fetches += 1; return acceptedResponse(); }, async () => {
+      const result = await call(db, { auth: admin, requestKey }, scenario.env);
+      assert.equal(result.body.code, scenario.code);
+    });
+    assert.equal(fetches, 0);
+  }
+});
+
+test('v2 comment budget counts every approved-template blank line', () => {
+  const fields = {
+    studentName: '가'.repeat(40), dateText: '나'.repeat(20), subjectText: '다'.repeat(80),
+    contentText: '라'.repeat(250), homeworkText: '마'.repeat(250), commentText: ''
+  };
+  const fixedText = '안녕하세요, WB 웩슬러브레인센터(독해력학원) 입니다.\n\n' +
+    ' 학생의 오늘 수업 피드백을 정리해 보내드립니다.\n\n' +
+    '- 일시 : \n\n- 과목 : \n\n- 수업내용 · 진도 : \n\n- 과제 : \n\n- 코멘트 : \n\n' +
+    '문의 사항이 있으시면 학원으로 연락부탁드립니다. 감사합니다.';
+  const used = fixedText.length + fields.studentName.length + fields.dateText.length +
+    fields.subjectText.length + fields.contentText.length + fields.homeworkText.length;
+  assert.equal(parentFeedbackV2CommentBudget(fields), Math.max(0, Math.min(600, 900 - used)));
+});
+
+test('v3 comment budget includes notice text and its two trailing blank lines', () => {
+  const fields = {
+    templateVersion: 'v3', studentName: '가'.repeat(20), dateText: '나'.repeat(12), subjectText: '다'.repeat(20),
+    contentText: '라'.repeat(120), homeworkText: '마'.repeat(100), noticeText: '바'.repeat(80), commentText: ''
+  };
+  const fixedText = '안녕하세요, WB 웩슬러브레인센터(독해력학원) 입니다.\n\n' +
+    ' 학생의 오늘 수업 피드백을 정리해 보내드립니다.\n\n' +
+    '- 일시 : \n\n- 과목 : \n\n- 수업내용 · 진도 : \n\n- 과제 : \n\n- 코멘트 : \n\n' +
+    '- 안내사항 : \n\n\n' +
+    '문의 사항이 있으시면 학원으로 연락부탁드립니다. 감사합니다.';
+  const used = fixedText.length + fields.studentName.length + fields.dateText.length + fields.subjectText.length +
+    fields.contentText.length + fields.homeworkText.length + fields.noticeText.length;
+  assert.equal(parentFeedbackV2CommentBudget(fields), Math.max(0, Math.min(600, 900 - used)));
 });
 
 test('resending the same content is idempotent — no second fetch', async () => {
@@ -405,6 +659,67 @@ test('resending the same content is idempotent — no second fetch', async () =>
     assert.equal(again.body.code, 'ALREADY_SENT');
   });
   assert.equal(fetches, 1, '이미 보낸 건은 다시 발송하지 않는다');
+});
+
+test('a sent or possibly-sent sibling template blocks v2/v3 cross-version duplicates', async () => {
+  const riskyCases = [
+    { requestStatus: 'sent', sendStatus: null },
+    { requestStatus: 'content_approved_send_blocked', sendStatus: 'reserved' },
+    { requestStatus: 'content_approved_send_blocked', sendStatus: 'dispatching' },
+    { requestStatus: 'content_approved_send_blocked', sendStatus: 'accepted' },
+    { requestStatus: 'content_approved_send_blocked', sendStatus: 'unknown' }
+  ];
+  for (const [index, risk] of riskyCases.entries()) {
+    const db = new TestD1();
+    const { requestKey } = seedFeedback(db, { templateVersion: 'v3' });
+    const siblingKey = seedSiblingFeedbackVersion(db, requestKey, {
+      requestKey: 'fbr_risky_sibling_' + index, templateVersion: 'v2', status: risk.requestStatus
+    });
+    if (risk.sendStatus) {
+      seedFeedbackSend(db, siblingKey, {
+        sendId: 'pfs_cross_risk_' + index, status: risk.sendStatus,
+        statusCode: risk.sendStatus === 'accepted' ? '2000' : null
+      });
+    }
+    registerGuardian(db, '테스트학생');
+    let fetches = 0;
+    await withFetch(async () => { fetches += 1; return acceptedResponse(); }, async () => {
+      const result = await call(db, { auth: admin, requestKey });
+      assert.equal(result.status, 409, risk.sendStatus || risk.requestStatus);
+      assert.equal(result.body.code, 'CROSS_TEMPLATE_SEND_CONFLICT');
+    });
+    assert.equal(fetches, 0);
+    assert.equal(db.prepare('SELECT COUNT(*) AS count FROM parent_feedback_sends WHERE feedback_request_key=?')
+      .bind(requestKey).first().count, 0, '새 버전의 발송 예약도 만들지 않는다');
+  }
+});
+
+test('cancelled, never-sent, and definitely rejected sibling templates do not block a safe version switch', async () => {
+  const safeCases = [
+    { requestStatus: 'cancelled', sendStatus: null },
+    { requestStatus: 'content_approved_send_blocked', sendStatus: null },
+    { requestStatus: 'content_approved_send_blocked', sendStatus: 'rejected' }
+  ];
+  for (const [index, safe] of safeCases.entries()) {
+    const db = new TestD1();
+    const { requestKey } = seedFeedback(db, { templateVersion: 'v3' });
+    const siblingKey = seedSiblingFeedbackVersion(db, requestKey, {
+      requestKey: 'fbr_safe_sibling_' + index, templateVersion: 'v2', status: safe.requestStatus
+    });
+    if (safe.sendStatus) {
+      seedFeedbackSend(db, siblingKey, {
+        sendId: 'pfs_cross_safe_' + index, status: safe.sendStatus, statusCode: '9999'
+      });
+    }
+    registerGuardian(db, '테스트학생');
+    let fetches = 0;
+    await withFetch(async () => { fetches += 1; return acceptedResponse(index + 1); }, async () => {
+      const result = await call(db, { auth: admin, requestKey });
+      assert.equal(result.status, 200, safe.sendStatus || safe.requestStatus);
+      assert.equal(result.body.status, 'sent');
+    });
+    assert.equal(fetches, 1);
+  }
 });
 
 test('rejected provider response keeps feedback_requests blocked, not marked sent', async () => {
@@ -692,6 +1007,523 @@ test('provider HTTP errors retain only a safe code; 4xx is rejected and 5xx is u
     ).bind(requestKey).first();
     assert.equal(ledger.status, expectedLedger);
   }
+});
+
+test('feedback delivery status is reduced to safe enums without exposing provider codes', () => {
+  assert.equal(feedbackMessageDeliveryState({ status: 'accepted', provider_status_code: '2000' }), 'provider_queued');
+  assert.equal(feedbackMessageDeliveryState({ status: 'accepted', provider_status_code: '3000' }), 'carrier_processing');
+  assert.equal(feedbackMessageDeliveryState({ status: 'accepted', provider_status_code: '4000' }), 'delivered');
+  assert.equal(feedbackMessageDeliveryState({ status: 'rejected', provider_status_code: '4010' }), 'failed');
+  assert.equal(feedbackMessageDeliveryState({ status: 'dispatching' }), 'unknown');
+  assert.equal(feedbackMessageDeliveryState({ status: 'unknown' }), 'unknown');
+  for (const state of ['provider_queued', 'carrier_processing', 'delivered', 'failed', 'unknown']) {
+    assert.doesNotMatch(state, /\d{4}|provider_message|provider_group/i);
+  }
+});
+
+test('scheduled reconciliation hashes v3 noticeText and marks its delivered request sent', async () => {
+  const db = new TestD1();
+  const now = Date.now();
+  const { requestKey } = seedFeedback(db, {
+    templateVersion: 'v3', status: 'content_approved_send_blocked',
+    fields: { commentText: '근\u200B거를 찾아 설명하는 태도가 인상적이었습니다.' }
+  });
+  seedFeedbackSend(db, requestKey, {
+    sendId: 'pfs_v3_delivered', status: 'accepted', statusCode: '4000',
+    groupId: 'GROUP_V3', messageId: 'MSG_V3', messageHash: v3FeedbackMessageHash(),
+    createdAt: now - 2_000, updatedAt: now - 1_000
+  });
+  let fetches = 0;
+  const result = await withFetch(async () => { fetches += 1; return acceptedResponse(); }, () =>
+    handleScheduledParentFeedbackStatusRefresh({ DB: db, ...fullEnvBase }, now));
+  assert.equal(result.ok, true);
+  assert.equal(fetches, 0, '이미 4000으로 확정된 행은 솔라피를 다시 조회하지 않는다');
+  const request = db.prepare('SELECT status,review_note FROM feedback_requests WHERE request_key=?')
+    .bind(requestKey).first();
+  assert.equal(request.status, 'sent');
+  assert.equal(request.review_note, null);
+  const listed = await listFeedbackForDirector(db);
+  assert.equal(listed.status, 200);
+  const feedback = listed.body.requests.find(item => item.requestKey === requestKey);
+  assert.equal(feedback.commentText, '근거를 찾아 설명하는 태도가 인상적이었습니다.');
+  assert.equal(feedback.messageDeliveryState, 'delivered',
+    '조회 hash도 발송/reconcile과 같은 format-control 정규화를 사용해야 한다');
+});
+
+test('scheduled status refresh serializes multiple messageIds as repeated query params', async () => {
+  const db = new TestD1();
+  const now = Date.now();
+  const { requestKey } = seedFeedback(db, { templateVersion: 'v2', status: 'sent' });
+  const messageHash = v2FeedbackMessageHash();
+  seedFeedbackSend(db, requestKey, {
+    sendId: 'pfs_query_a', status: 'accepted', statusCode: '2000',
+    groupId: 'GROUP_QUERY_A', messageId: 'MSG_QUERY_A', messageHash,
+    createdAt: now - 2_000, updatedAt: now - 2_000
+  });
+  seedFeedbackSend(db, requestKey, {
+    sendId: 'pfs_query_b', status: 'accepted', statusCode: '2000',
+    groupId: 'GROUP_QUERY_B', messageId: 'MSG_QUERY_B', messageHash,
+    createdAt: now - 1_000, updatedAt: now - 1_000
+  });
+
+  let listFetches = 0;
+  const refreshed = await withFetch(async (url, init = {}) => {
+    const parsed = new URL(String(url));
+    listFetches += 1;
+    assert.equal(parsed.pathname, '/messages/v4/list');
+    assert.equal(String(init.method || 'GET').toUpperCase(), 'GET');
+    assert.deepEqual(parsed.searchParams.getAll('messageIds'), ['MSG_QUERY_A', 'MSG_QUERY_B']);
+    assert.equal(parsed.searchParams.get('messageIds')?.startsWith('['), false,
+      '복수 ID를 JSON 배열 문자열 한 값으로 보내면 안 된다');
+    return new Response(JSON.stringify({
+      messageList: {
+        MSG_QUERY_A: { messageId: 'MSG_QUERY_A', groupId: 'GROUP_QUERY_A', statusCode: '4000' },
+        MSG_QUERY_B: { messageId: 'MSG_QUERY_B', groupId: 'GROUP_QUERY_B', statusCode: '4000' }
+      }
+    }), { status: 200, headers: { 'content-type': 'application/json' } });
+  }, () => handleScheduledParentFeedbackStatusRefresh({ DB: db, ...fullEnvBase }, now));
+
+  assert.equal(listFetches, 1);
+  assert.equal(refreshed.updated, 2, JSON.stringify(refreshed));
+  assert.equal(db.prepare(
+    "SELECT COUNT(*) AS count FROM parent_feedback_sends WHERE provider_status_code='4000'"
+  ).first().count, 2);
+});
+
+test('corrected lookup heals a legacy SOLAPI_STATUS_NOT_FOUND row to delivered without resending', async () => {
+  const db = new TestD1();
+  const now = Date.now();
+  const { requestKey } = seedFeedback(db, { templateVersion: 'v2' });
+  const sendId = seedFeedbackSend(db, requestKey, {
+    sendId: 'pfs_legacy_not_found', status: 'unknown', statusCode: '2000',
+    groupId: 'GROUP_LEGACY', messageId: 'MSG_LEGACY',
+    safeErrorCode: 'SOLAPI_STATUS_NOT_FOUND', messageHash: v2FeedbackMessageHash(),
+    createdAt: now - 2 * 24 * 60 * 60_000, updatedAt: now - 60_000
+  });
+
+  let listFetches = 0;
+  const refreshed = await withFetch(async (url, init = {}) => {
+    const parsed = new URL(String(url));
+    listFetches += 1;
+    assert.equal(parsed.pathname, '/messages/v4/list');
+    assert.equal(String(init.method || 'GET').toUpperCase(), 'GET', '상태 복구 중 재발송 POST를 하면 안 된다');
+    assert.deepEqual(parsed.searchParams.getAll('messageIds'), ['MSG_LEGACY']);
+    return new Response(JSON.stringify({
+      messageList: {
+        MSG_LEGACY: { messageId: 'MSG_LEGACY', groupId: 'GROUP_LEGACY', statusCode: '4000' }
+      }
+    }), { status: 200, headers: { 'content-type': 'application/json' } });
+  }, () => handleScheduledParentFeedbackStatusRefresh({ DB: db, ...fullEnvBase }, now));
+
+  assert.equal(listFetches, 1);
+  assert.equal(refreshed.updated, 1, JSON.stringify(refreshed));
+  assert.deepEqual({ ...db.prepare(
+    'SELECT status,provider_status_code,safe_error_code FROM parent_feedback_sends WHERE send_id=?'
+  ).bind(sendId).first() }, {
+    status: 'accepted', provider_status_code: '4000', safe_error_code: null
+  });
+  assert.deepEqual({ ...db.prepare(
+    'SELECT status,review_note FROM feedback_requests WHERE request_key=?'
+  ).bind(requestKey).first() }, { status: 'sent', review_note: null });
+});
+
+test('legacy SOLAPI_STATUS_NOT_FOUND becomes terminal after one corrected lookup still finds no message', async () => {
+  const db = new TestD1();
+  const now = Date.now();
+  const { requestKey } = seedFeedback(db, { templateVersion: 'v2' });
+  const sendId = seedFeedbackSend(db, requestKey, {
+    sendId: 'pfs_legacy_still_missing', status: 'unknown', statusCode: '2000',
+    groupId: 'GROUP_MISSING', messageId: 'MSG_MISSING',
+    safeErrorCode: 'SOLAPI_STATUS_NOT_FOUND', messageHash: v2FeedbackMessageHash(),
+    createdAt: now - 2 * 24 * 60 * 60_000, updatedAt: now - 60_000
+  });
+
+  let listFetches = 0;
+  const first = await withFetch(async (url, init = {}) => {
+    listFetches += 1;
+    assert.equal(new URL(String(url)).pathname, '/messages/v4/list');
+    assert.equal(String(init.method || 'GET').toUpperCase(), 'GET');
+    return new Response(JSON.stringify({ messageList: {} }), {
+      status: 200, headers: { 'content-type': 'application/json' }
+    });
+  }, () => handleScheduledParentFeedbackStatusRefresh({ DB: db, ...fullEnvBase }, now));
+
+  assert.equal(first.updated, 1, JSON.stringify(first));
+  assert.deepEqual({ ...db.prepare(
+    'SELECT status,provider_status_code,safe_error_code FROM parent_feedback_sends WHERE send_id=?'
+  ).bind(sendId).first() }, {
+    status: 'unknown', provider_status_code: '2000',
+    safe_error_code: 'SOLAPI_STATUS_CONFIRMED_NOT_FOUND'
+  });
+
+  const second = await withFetch(async () => {
+    listFetches += 1;
+    throw new Error('확정 누락은 이후 cron에서 반복 조회하면 안 된다');
+  }, () => handleScheduledParentFeedbackStatusRefresh({ DB: db, ...fullEnvBase }, now + 10 * 60_000));
+  assert.equal(second.ok, true, JSON.stringify(second));
+  assert.equal(second.checked, 0);
+  assert.equal(listFetches, 1, '수정된 형식으로 딱 한 번만 재조회해야 한다');
+});
+
+test('scheduled status refresh recovers a delivered orphan by exact customFields wbSendId and blocks every repeat send', async () => {
+  const db = new TestD1();
+  const now = Date.now();
+  const { requestKey } = seedFeedback(db, { templateVersion: 'v2' });
+  registerGuardian(db, '테스트학생');
+  await withFetch(async () => acceptedResponse(77), async () => {
+    const initiallyAccepted = await call(db, { auth: admin, requestKey });
+    assert.equal(initiallyAccepted.status, 200);
+  });
+  const acceptedLedger = db.prepare(
+    'SELECT send_id FROM parent_feedback_sends WHERE feedback_request_key=?'
+  ).bind(requestKey).first();
+  const sendId = acceptedLedger.send_id;
+  db.prepare(
+    "UPDATE parent_feedback_sends SET status='dispatching',provider_group_id=NULL," +
+    'provider_message_id=NULL,provider_status_code=NULL,safe_error_code=NULL,' +
+    'created_at=?,dispatch_started_at=?,updated_at=? WHERE send_id=?'
+  ).bind(now - 60_000, now - 60_000, now - 60_000, sendId).run();
+  db.prepare(
+    "UPDATE feedback_requests SET status='content_approved_send_blocked'," +
+    "review_note='접수 여부 확인 필요 — 확인 전 재발송 금지' WHERE request_key=?"
+  ).bind(requestKey).run();
+
+  let listFetches = 0;
+  let sendFetches = 0;
+  await withFetch(async (url, init = {}) => {
+    const parsed = new URL(String(url));
+    if (parsed.pathname === '/messages/v4/list') {
+      listFetches += 1;
+      assert.equal(String(init.method || 'GET').toUpperCase(), 'GET');
+      assert.ok(parsed.searchParams.get('startDate'), 'orphan lookup must use a bounded start date');
+      assert.ok(parsed.searchParams.get('endDate'), 'orphan lookup must use a bounded end date');
+      assert.equal(parsed.searchParams.get('dateType'), 'CREATED');
+      assert.equal(parsed.searchParams.get('type'), 'ATA');
+      return new Response(JSON.stringify({
+        messageList: {
+          MSG_RECOVERED: {
+            messageId: 'MSG_RECOVERED', groupId: 'GROUP_RECOVERED', type: 'ATA', statusCode: '4000',
+            dateCreated: new Date(now - 59_000).toISOString(),
+            customFields: { wbSendId: sendId },
+            kakaoOptions: { templateId: 'TPL_TEST_V2_0001' }
+          }
+        },
+        limit: 20, startKey: null
+      }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }
+    sendFetches += 1;
+    throw new Error('recovered feedback must never be sent again');
+  }, async () => {
+    const refreshed = await handleScheduledParentFeedbackStatusRefresh({ DB: db, ...fullEnvBase }, now);
+    assert.equal(refreshed.ok, true, JSON.stringify(refreshed));
+
+    const ledger = db.prepare(
+      'SELECT status,provider_group_id,provider_message_id,provider_status_code,safe_error_code ' +
+      'FROM parent_feedback_sends WHERE send_id=?'
+    ).bind(sendId).first();
+    assert.deepEqual({ ...ledger }, {
+      status: 'accepted', provider_group_id: 'GROUP_RECOVERED', provider_message_id: 'MSG_RECOVERED',
+      provider_status_code: '4000', safe_error_code: null
+    });
+    const request = db.prepare(
+      'SELECT status,review_note FROM feedback_requests WHERE request_key=?'
+    ).bind(requestKey).first();
+    assert.deepEqual({ ...request }, { status: 'sent', review_note: null });
+
+    const repeated = await call(db, { auth: admin, requestKey });
+    assert.equal(repeated.status, 200);
+    assert.equal(repeated.body.code, 'ALREADY_SENT');
+    assert.equal(repeated.body.idempotent, true);
+  });
+
+  assert.equal(listFetches, 1);
+  assert.equal(sendFetches, 0, '상태 복구 뒤 반복 클릭은 공급자 발송 API를 다시 호출하면 안 된다');
+  assert.equal(db.prepare(
+    'SELECT COUNT(*) AS count FROM parent_feedback_sends WHERE feedback_request_key=?'
+  ).bind(requestKey).first().count, 1, '복구는 기존 원장 한 건을 갱신하고 재발송 원장을 만들지 않는다');
+});
+
+test('orphan recovery fails closed when customFields wbSendId differs and a repeat click still cannot resend', async () => {
+  const db = new TestD1();
+  const now = Date.now();
+  const { requestKey } = seedFeedback(db, { templateVersion: 'v2' });
+  registerGuardian(db, '테스트학생');
+  const sendId = seedFeedbackSend(db, requestKey, {
+    sendId: 'pfs_orphan_mismatch', createdAt: now - 60_000, updatedAt: now - 60_000
+  });
+  let sendFetches = 0;
+
+  await withFetch(async (url) => {
+    const parsed = new URL(String(url));
+    if (parsed.pathname === '/messages/v4/list') {
+      return new Response(JSON.stringify({
+        messageList: {
+          MSG_OTHER: {
+            messageId: 'MSG_OTHER', groupId: 'GROUP_OTHER', type: 'ATA', statusCode: '4000',
+            dateCreated: new Date(now - 59_000).toISOString(),
+            customFields: { wbSendId: 'pfs_someone_else' },
+            kakaoOptions: { templateId: 'TPL_TEST_V2_0001' }
+          }
+        }, limit: 20, startKey: null
+      }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }
+    sendFetches += 1;
+    return acceptedResponse();
+  }, async () => {
+    await handleScheduledParentFeedbackStatusRefresh({ DB: db, ...fullEnvBase }, now);
+    const ledger = db.prepare(
+      'SELECT status,provider_message_id,provider_status_code FROM parent_feedback_sends WHERE send_id=?'
+    ).bind(sendId).first();
+    assert.deepEqual({ ...ledger }, { status: 'dispatching', provider_message_id: null, provider_status_code: null });
+
+    const repeated = await call(db, { auth: admin, requestKey });
+    assert.equal(repeated.status, 202);
+    assert.equal(repeated.body.code, 'PRIOR_SEND_UNCERTAIN');
+  });
+
+  assert.equal(sendFetches, 0);
+  assert.equal(db.prepare(
+    'SELECT COUNT(*) AS count FROM parent_feedback_sends WHERE feedback_request_key=?'
+  ).bind(requestKey).first().count, 1);
+});
+
+test('director and teacher feedback lists expose only a safe delivery state and never raw Solapi values', async () => {
+  const db = new TestD1();
+  const { requestKey } = seedFeedback(db, { templateVersion: 'v2', status: 'sent' });
+  seedFeedbackSend(db, requestKey, {
+    sendId: 'pfs_private_provider_values', status: 'accepted', statusCode: '4000',
+    groupId: 'GROUP_MUST_NOT_LEAK', messageId: 'MSG_MUST_NOT_LEAK',
+    messageHash: v2FeedbackMessageHash()
+  });
+
+  for (const listed of [await listFeedbackForDirector(db), await listFeedbackForTeacher(db)]) {
+    assert.equal(listed.status, 200);
+    assert.equal(listed.body.requests.length, 1);
+    assert.equal(listed.body.requests[0].messageDeliveryState, 'delivered');
+    const serialized = JSON.stringify(listed.body);
+    assert.doesNotMatch(serialized, /GROUP_MUST_NOT_LEAK|MSG_MUST_NOT_LEAK|\b4000\b/);
+    assert.doesNotMatch(serialized, /provider(?:Group|Message|Status|_group|_message|_status)/i);
+  }
+});
+
+test('a delivered attempt outranks later rejected or unknown attempts in both feedback list APIs', async () => {
+  for (const later of [
+    { status: 'rejected', statusCode: '4010', safeErrorCode: 'SOLAPI_STATUS_4010' },
+    { status: 'unknown', statusCode: null, safeErrorCode: 'SOLAPI_STATUS_NOT_FOUND' }
+  ]) {
+    const db = new TestD1();
+    const now = Date.now();
+    const { requestKey } = seedFeedback(db, { templateVersion: 'v2', status: 'sent' });
+    const messageHash = v2FeedbackMessageHash();
+    seedFeedbackSend(db, requestKey, {
+      sendId: 'pfs_delivered_first', status: 'accepted', statusCode: '4000',
+      groupId: 'GROUP_DELIVERED', messageId: 'MSG_DELIVERED', messageHash,
+      createdAt: now - 2_000, updatedAt: now - 2_000
+    });
+    seedFeedbackSend(db, requestKey, {
+      sendId: 'pfs_later_' + later.status, ...later,
+      groupId: 'GROUP_LATER', messageId: 'MSG_LATER', messageHash,
+      createdAt: now - 1_000, updatedAt: now - 1_000
+    });
+
+    for (const listed of [await listFeedbackForDirector(db), await listFeedbackForTeacher(db)]) {
+      assert.equal(listed.status, 200);
+      assert.equal(listed.body.requests[0].messageDeliveryState, 'delivered',
+        `더 최신 ${later.status} 행이 과거의 실제 수신완료를 덮으면 안 된다`);
+    }
+  }
+});
+
+test('a terminal ledger update self-heals its feedback request on the next cron after one CAS miss', async () => {
+  for (const scenario of [
+    { providerCode: '4000', ledgerStatus: 'accepted', beforeStatus: 'content_approved_send_blocked', afterStatus: 'sent', afterNote: null },
+    {
+      providerCode: '4010', ledgerStatus: 'rejected', beforeStatus: 'sent',
+      afterStatus: 'content_approved_send_blocked', afterNote: '카카오 발송 결과가 실패로 확인되었습니다'
+    }
+  ]) {
+    const db = new TestD1();
+    const { requestKey } = seedFeedback(db, { templateVersion: 'v2' });
+    registerGuardian(db, '테스트학생');
+    await withFetch(async () => acceptedResponse(91), async () => {
+      const sent = await call(db, { auth: admin, requestKey });
+      assert.equal(sent.status, 200);
+    });
+    const ledger = db.prepare(
+      'SELECT send_id,provider_group_id,provider_message_id,created_at FROM parent_feedback_sends WHERE feedback_request_key=?'
+    ).bind(requestKey).first();
+    const now = Math.max(Date.now(), Number(ledger.created_at)) + 60_000;
+    db.prepare(
+      'UPDATE feedback_requests SET status=?,review_note=?,updated_at=? WHERE request_key=?'
+    ).bind(scenario.beforeStatus, scenario.beforeStatus === 'sent' ? null : '이전 상태', now - 10_000, requestKey).run();
+
+    const originalPrepare = db.prepare.bind(db);
+    let failOneRequestUpdate = true;
+    db.prepare = sql => {
+      const statement = originalPrepare(sql);
+      if (failOneRequestUpdate && /^UPDATE feedback_requests SET status=\?,review_note=\?,updated_at=\?/.test(String(sql))) {
+        statement.run = () => {
+          failOneRequestUpdate = false;
+          return { meta: { changes: 0 } };
+        };
+      }
+      return statement;
+    };
+
+    try {
+      const first = await withFetch(async (url) => {
+        assert.equal(new URL(String(url)).pathname, '/messages/v4/list');
+        return new Response(JSON.stringify({
+          messageList: {
+            [ledger.provider_message_id]: {
+              messageId: ledger.provider_message_id,
+              groupId: ledger.provider_group_id,
+              statusCode: scenario.providerCode
+            }
+          }
+        }), { status: 200, headers: { 'content-type': 'application/json' } });
+      }, () => handleScheduledParentFeedbackStatusRefresh({ DB: db, ...fullEnvBase }, now));
+      assert.equal(first.updated, 1);
+      assert.equal(first.requestUpdated, 0, '첫 cron의 feedback_requests CAS 실패를 재발송으로 보완하면 안 된다');
+      assert.equal(originalPrepare(
+        'SELECT status FROM parent_feedback_sends WHERE send_id=?'
+      ).bind(ledger.send_id).first().status, scenario.ledgerStatus);
+      assert.equal(originalPrepare(
+        'SELECT status FROM feedback_requests WHERE request_key=?'
+      ).bind(requestKey).first().status, scenario.beforeStatus);
+
+      const second = await withFetch(async () => {
+        throw new Error('terminal ledger self-heal must not query or resend through Solapi');
+      }, () => handleScheduledParentFeedbackStatusRefresh({ DB: db, ...fullEnvBase }, now + 10 * 60_000));
+      assert.equal(second.ok, true, JSON.stringify(second));
+      assert.equal(second.requestUpdated, 1);
+      const healed = originalPrepare(
+        'SELECT status,review_note FROM feedback_requests WHERE request_key=?'
+      ).bind(requestKey).first();
+      assert.deepEqual({ ...healed }, { status: scenario.afterStatus, review_note: scenario.afterNote });
+    } finally {
+      db.prepare = originalPrepare;
+    }
+  }
+});
+
+test('orphan recovery follows nextKey pages with a bounded template query until the exact wbSendId is found', async () => {
+  const db = new TestD1();
+  const { requestKey } = seedFeedback(db, { templateVersion: 'v2' });
+  registerGuardian(db, '테스트학생');
+  await withFetch(async () => acceptedResponse(92), async () => {
+    const sent = await call(db, { auth: admin, requestKey });
+    assert.equal(sent.status, 200);
+  });
+  const accepted = db.prepare(
+    'SELECT send_id,created_at FROM parent_feedback_sends WHERE feedback_request_key=?'
+  ).bind(requestKey).first();
+  const now = Math.max(Date.now(), Number(accepted.created_at)) + 120_000;
+  db.prepare(
+    "UPDATE parent_feedback_sends SET status='dispatching',provider_group_id=NULL,provider_message_id=NULL," +
+    'provider_status_code=NULL,safe_error_code=NULL,created_at=?,dispatch_started_at=?,updated_at=? WHERE send_id=?'
+  ).bind(now - 60_000, now - 60_000, now - 60_000, accepted.send_id).run();
+  db.prepare(
+    "UPDATE feedback_requests SET status='content_approved_send_blocked',review_note='이전 상태',updated_at=? " +
+    'WHERE request_key=?'
+  ).bind(now - 30_000, requestKey).run();
+
+  const pageQueries = [];
+  const result = await withFetch(async (url, init = {}) => {
+    const parsed = new URL(String(url));
+    assert.equal(parsed.pathname, '/messages/v4/list');
+    assert.equal(String(init.method || 'GET').toUpperCase(), 'GET');
+    const query = Object.fromEntries(parsed.searchParams.entries());
+    pageQueries.push(query);
+    for (const [key, value] of Object.entries({
+      limit: '20', dateType: 'CREATED', type: 'ATA',
+      criteria: 'kakaoTemplateId', cond: 'eq', value: 'TPL_TEST_V2_0001'
+    })) assert.equal(query[key], value, `모든 복구 페이지가 ${key} 조건을 유지해야 한다`);
+    assert.ok(query.startDate);
+    assert.ok(query.endDate);
+
+    if (pageQueries.length === 1) {
+      assert.equal(query.startKey, undefined);
+      return new Response(JSON.stringify({
+        messageList: {
+          MSG_OTHER: {
+            messageId: 'MSG_OTHER', groupId: 'GROUP_OTHER', statusCode: '4000',
+            customFields: { wbSendId: 'pfs_not_the_target' }
+          }
+        },
+        nextKey: 'PAGE_TWO'
+      }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }
+    assert.equal(pageQueries.length, 2, '일치 항목을 찾은 뒤 불필요한 추가 페이지를 요청하면 안 된다');
+    assert.equal(query.startKey, 'PAGE_TWO');
+    return new Response(JSON.stringify({
+      messageList: {
+        MSG_EXACT: {
+          messageId: 'MSG_EXACT', groupId: 'GROUP_EXACT', statusCode: '4000',
+          customFields: { wbSendId: accepted.send_id }
+        }
+      }
+    }), { status: 200, headers: { 'content-type': 'application/json' } });
+  }, () => handleScheduledParentFeedbackStatusRefresh({ DB: db, ...fullEnvBase }, now));
+
+  assert.equal(result.ok, true, JSON.stringify(result));
+  assert.equal(pageQueries.length, 2);
+  assert.deepEqual({ ...db.prepare(
+    'SELECT status,provider_message_id,provider_status_code FROM parent_feedback_sends WHERE send_id=?'
+  ).bind(accepted.send_id).first() }, {
+    status: 'accepted', provider_message_id: 'MSG_EXACT', provider_status_code: '4000'
+  });
+  assert.equal(db.prepare(
+    'SELECT status FROM feedback_requests WHERE request_key=?'
+  ).bind(requestKey).first().status, 'sent');
+});
+
+test('v3 orphan recovery narrows the Solapi lookup with the v3 approved template id', async () => {
+  const db = new TestD1();
+  const { requestKey } = seedFeedback(db, { templateVersion: 'v3' });
+  const now = Date.now();
+  seedFeedbackSend(db, requestKey, {
+    sendId: 'pfs_v3_orphan', status: 'dispatching', messageHash: v3FeedbackMessageHash(),
+    createdAt: now - 30_000, updatedAt: now - 30_000
+  });
+  const result = await withFetch(async (url) => {
+    const parsed = new URL(String(url));
+    assert.equal(parsed.searchParams.get('criteria'), 'kakaoTemplateId');
+    assert.equal(parsed.searchParams.get('value'), 'TPL_TEST_V3_0001');
+    return new Response(JSON.stringify({
+      messageList: {
+        MSG_V3_EXACT: {
+          messageId: 'MSG_V3_EXACT', groupId: 'GROUP_V3_EXACT', statusCode: '4000',
+          customFields: { wbSendId: 'pfs_v3_orphan' }
+        }
+      }
+    }), { status: 200, headers: { 'content-type': 'application/json' } });
+  }, () => handleScheduledParentFeedbackStatusRefresh({ DB: db, ...fullEnvBase }, now));
+  assert.equal(result.ok, true);
+  assert.equal(db.prepare('SELECT status FROM feedback_requests WHERE request_key=?')
+    .bind(requestKey).first().status, 'sent');
+});
+
+test('an accepted ledger row with no provider code blocks a new provider POST', async () => {
+  const db = new TestD1();
+  const { requestKey } = seedFeedback(db, { templateVersion: 'v2' });
+  registerGuardian(db, '테스트학생');
+  seedFeedbackSend(db, requestKey, {
+    sendId: 'pfs_accepted_without_code', status: 'accepted', statusCode: null,
+    groupId: 'GROUP_WITHOUT_CODE', messageId: 'MSG_WITHOUT_CODE',
+    messageHash: v2FeedbackMessageHash()
+  });
+  let fetches = 0;
+  const repeated = await withFetch(async () => {
+    fetches += 1;
+    return acceptedResponse(93);
+  }, () => call(db, { auth: admin, requestKey }));
+  assert.equal(repeated.status, 202);
+  assert.equal(repeated.body.code, 'PRIOR_SEND_UNCERTAIN');
+  assert.equal(fetches, 0, '공급자 코드가 비어 있어도 accepted 원장이 있으면 새 POST를 보내면 안 된다');
+  assert.equal(db.prepare(
+    'SELECT COUNT(*) AS count FROM parent_feedback_sends WHERE feedback_request_key=?'
+  ).bind(requestKey).first().count, 1);
 });
 
 test('consult app cannot use this feature', async () => {

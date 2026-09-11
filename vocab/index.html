@@ -479,6 +479,9 @@
       VSYNC.avail = !!(j && j.ok);
       VSYNC.ai = !!(j && j.ai);
     } catch (e) { VSYNC.avail = false; VSYNC.ai = false; }
+    /* 서버가 있는지는 첫 그리기 뒤에야 알게 된다. 미연동 경고는 그 답에 달려 있으니
+       여기서 한 번 다시 그린다 — 안 그리면 배너가 영영 안 뜬다. */
+    if (VSYNC.avail && !vsyncAuth() && curView === 'garden') renderGarden();
     if (!vsyncOn()) return;
     try {
       var res = await vsyncApi('/pull');
@@ -1065,6 +1068,11 @@
     var today = WBSRS.todayPlanted(db.states, t);
     var hour = new Date(t).getHours();
     var html = '';
+    /* 미연동 경고 — 심은 단어가 이 브라우저 하나에만 있다. 기기를 바꾸거나
+       브라우저가 저장소를 비우면 되살릴 길이 없다. 연동은 진로독서에서 한다. */
+    if (VSYNC.avail && !vsyncAuth()) {
+      html += '<div class="night-banner" style="background:var(--coral);"><div style="flex:1"><b>이 기기에만 저장되고 있어요</b><br><span style="font-size:.82rem;">학생 코드를 넣으면 심은 단어가 학원 서버에도 저장돼요. 휴대폰을 바꿔도 정원이 그대로 남아요.</span></div><a class="btn" href="/">코드 넣기</a></div>';
+    }
     if ((hour >= 21 || hour < 5) && today.length > 0) {
       html += '<div class="night-banner"><div style="flex:1"><b>자기 전 3분 물주기</b><br><span style="font-size:.82rem;">오늘 심은 ' + today.length + '개, 깜빡이로 한 번 더 보고 자요 — 자는 동안 기억이 굳어요.</span></div><button class="btn" id="btnNight">시작</button></div>';
     }
@@ -1240,6 +1248,29 @@
     { word: 'orbit', easy: '궤도 — 위성이 지구 둘레를 도는 길', lang: 'en' },
     { word: '드넓다', easy: '활짝 트여 아주 넓다' }
   ];
+  /* ── 어려움 단계 ──
+     초2 학생이 "영어 단어가 너무 어렵다"고 했다. 그럴 만했다 — 예전 135개는
+     전부 중등 이상(observe·persuade·연역·귀납)이었고 학년 구분이 아예 없었다.
+     이제 낱말마다 L1~L4 가 붙어 있고, 자기 단계 이하만 나온다.
+     기본값은 진로독서에 넣어 둔 학년을 따라간다. 손으로 바꿀 수도 있다. */
+  var LEVELS = ['L1', 'L2', 'L3', 'L4'];
+  var LEVEL_LABEL = { L1: '7세~초2', L2: '초3~6', L3: '중1~3', L4: '고1~3' };
+  function readingLevel() {
+    try {
+      var s = JSON.parse(localStorage.getItem('wbr.v1') || 'null');
+      var lv = s && s.profile && s.profile.level;
+      return LEVELS.indexOf(lv) >= 0 ? lv : null;
+    } catch (e) { return null; }
+  }
+  function myLevel() {
+    var set = db.settings && db.settings.level;
+    if (LEVELS.indexOf(set) >= 0) return set;
+    return readingLevel() || 'L3';      /* 진로독서를 안 쓰면 중등 기준 */
+  }
+  /* 자기 단계 «이하» 를 다 준다 — 위 단계만 주면 쓸 낱말이 너무 적다 */
+  function inMyLevel(w) { return LEVELS.indexOf(w.level || 'L3') <= LEVELS.indexOf(myLevel()); }
+  function levelPool() { return WB_WORDS.filter(inMyLevel); }
+
   function readingVocabRaw() {
     try {
       var raw = localStorage.getItem('wbr.v1');
@@ -1261,7 +1292,7 @@
   function renderPlantMenu() {
     var el = $('#view-plant');
     var counts = { all: 0, hanja: 0, native: 0, english: 0 };
-    WB_WORDS.forEach(function (w) { if (!db.states[w.id]) { counts.all++; counts[w.type]++; } });
+    levelPool().forEach(function (w) { if (!db.states[w.id]) { counts.all++; counts[w.type]++; } });
     var inbox = getInbox();
     var assignHtml = ASSIGNMENTS.map(function (a) {
       var ws = assignedWords(a);
@@ -1299,14 +1330,39 @@
       english: pickBtn('english', '영어', '찰떡 발음 연상 + 어원 뿌리 (남은 ' + counts.english + ')', 'A', 'var(--coral-soft)'),
     };
     var order = curType ? [curType].concat(TYPE_ORDER.filter(function (k) { return k !== curType; })) : TYPE_ORDER;
+    /* 어려움 단계 고르개 — 진로독서 학년을 기본으로 잡되, 너무 어렵거나 쉬우면 바꾼다 */
+    var lv = myLevel(), auto = readingLevel();
+    var levelHtml = '<div class="card" style="margin-bottom:14px;">' +
+      '<b>어려움</b> <span class="muted" style="font-size:.84rem;">' +
+      (db.settings && db.settings.level ? '직접 고른 단계'
+        : auto ? '진로독서 학년(' + LEVEL_LABEL[auto] + ')에 맞춰 뒀어요' : '기본값') + '</span>' +
+      '<div class="pick-grid" style="grid-template-columns:repeat(4,1fr);gap:6px;margin-top:9px;">' +
+      LEVELS.map(function (k) {
+        var n = WB_WORDS.filter(function (w) { return (w.level || 'L3') === k; }).length;
+        return '<button class="btn' + (k === lv ? ' primary' : '') + '" data-level="' + k + '"' +
+          ' style="padding:9px 4px;font-size:.82rem;line-height:1.3;">' + LEVEL_LABEL[k] +
+          '<br><span style="font-size:.72rem;opacity:.8;">+' + n + '개</span></button>';
+      }).join('') + '</div>' +
+      '<p class="muted" style="margin:8px 0 0;font-size:.8rem;">고른 단계까지 모두 나와요 — 지금 ' +
+      levelPool().length + '개 중에서 골라 심어요. 어려우면 왼쪽으로 낮추세요.</p></div>';
+
     el.innerHTML = '<h2 class="sec">새로 심기 — 한 번에 5개</h2>' +
       '<p class="muted" style="margin-top:-6px;">작업기억이 넘치지 않는 양이에요. 어종마다 외우는 방법이 달라요.</p>' +
-      assignHtml + inboxHtml +
+      levelHtml + assignHtml + inboxHtml +
       '<div class="pick-grid">' +
       order.map(function (k) { return picks[k]; }).join('') +
       pickBtn('all', '골고루 5개', '세 어종을 섞어서 (남은 ' + counts.all + ')', '🌈', 'var(--card-2)') +
       '</div>' +
       '<p class="demo-note">📬 씨앗 도착함: 진로독서 앱 어휘장에 모은 단어가 자동으로 이곳에 도착해요.' + (inbox.length ? '' : ' 지금은 비어 있어요 — 리포트 탭 데모 도구의 "샘플 씨앗 받기"로 체험할 수 있어요.') + '</p>';
+    el.querySelectorAll('[data-level]').forEach(function (b) {
+      b.addEventListener('click', function () {
+        db.settings = db.settings || {};
+        db.settings.level = b.dataset.level;
+        save();
+        renderPlantMenu();
+        toast(LEVEL_LABEL[b.dataset.level] + ' 단계로 맞췄어요 — 고를 수 있는 낱말 ' + levelPool().length + '개');
+      });
+    });
     el.querySelectorAll('[data-assign]').forEach(function (b) {
       b.addEventListener('click', function () {
         var a = ASSIGNMENTS.filter(function (x) { return x.id === b.dataset.assign; })[0];
@@ -1335,8 +1391,14 @@
 
   /* ── 심기 세션 ── */
   function startPlantSession(type) {
-    var pool = WB_WORDS.filter(function (w) { return !db.states[w.id] && !w.source && (type === 'all' || w.type === type); });
-    if (!pool.length) { toast('이 어종은 모두 심었어요!'); return; }
+    var pool = levelPool().filter(function (w) { return !db.states[w.id] && !w.source && (type === 'all' || w.type === type); });
+    if (!pool.length) {
+      /* 단계 밖에 남아 있는데 안 보여 주면 «다 심었다»가 거짓말이 된다 */
+      var beyond = WB_WORDS.filter(function (w) { return !db.states[w.id] && !w.source && (type === 'all' || w.type === type); }).length;
+      toast(beyond ? '이 단계에서는 다 심었어요 — 더 어려운 단계를 열면 ' + beyond + '개가 더 있어요'
+                   : '이 어종은 모두 심었어요!');
+      return;
+    }
     runPlantSession(shuffle(pool).slice(0, 5));
   }
   function runPlantSession(batch, assignId) {
@@ -1411,25 +1473,44 @@
   }
 
   /* ── 물 주기 / 플래시카드 세션 ── */
+  /* 오답 선지를 길어 오는 우물.
+     전 학년에서 뽑으면 초2 가 「happy」 문제의 오답으로 「귀납」을 보게 된다.
+     한눈에 아닌 선지는 문제 구실을 못 한다. 그래서 내 단계 이하에서 고르되,
+     어종별로 너무 적으면(선지 4개를 못 채우면) 그때만 전체로 넓힌다.
+     심어 둔 낱말(custom·선생님 배정 포함)은 단계와 무관하게 항상 넣는다 —
+     그건 이 학생이 실제로 기르는 낱말이라 헷갈릴 만한 짝이다. */
   function poolWords() {
-    return Object.keys(WORDS).map(function (k) { return WORDS[k]; });
+    var all = Object.keys(WORDS).map(function (k) { return WORDS[k]; });
+    var mine = all.filter(function (w) { return inMyLevel(w) || db.states[w.id] || w.source; });
+    var byType = {};
+    mine.forEach(function (w) { byType[w.type] = (byType[w.type] || 0) + 1; });
+    var thin = all.some(function (w) { return (byType[w.type] || 0) < 6; });
+    return thin ? all : mine;
   }
 
   /* 물 주기 = 문제 풀이(객관적 판정) / 플래시카드 = 뒤집고 자기 채점 */
   function startReview(mode, type) {
     var t = now();
-    var queue = WBSRS.dueList(statesOfType(type), t).map(function (s) { return s.id; });
+    /* 낱말표에 없는 id 는 걸러 낸다. statesOfType/activeStates 는 어종을 고르지 않으면
+       (전체) id 를 확인하지 않아서, words.js 에서 빠진 낱말이나 진로독서에서 넘어온
+       낱말의 상태가 그대로 큐에 들어왔다. 그러면 WORDS[id] 가 undefined 라
+       TYPE[w.type] 에서 세션이 통째로 죽는다 — 학생은 이유도 모른 채 튕긴다. */
+    var known = function (id) { return !!WORDS[id]; };
+    var queue = WBSRS.dueList(statesOfType(type), t).map(function (s) { return s.id; }).filter(known);
     var practice = false;
+    /* 만기 단어가 없어도 돌려 볼 수 있게 한다 — 예전에는 물 주기가 그냥 막혀서,
+       "더 풀고 싶다"는 학생이 갈 곳이 자기 채점 플래시카드뿐이었다.
+       연습은 exposure 로만 기록되어 기억 간격을 건드리지 않는다. */
     if (!queue.length) {
-      if (mode === 'flash') {
-        practice = true;
-        queue = shuffle(activeStates(type).map(function (s) { return s.id; })).slice(0, 8);
-        if (!queue.length) { toast('아직 심은 단어가 없어요'); return; }
-      } else { toast('지금은 물 줄 단어가 없어요 — 완벽!'); return; }
+      practice = true;
+      queue = shuffle(activeStates(type).map(function (s) { return s.id; }).filter(known)).slice(0, 8);
+      if (!queue.length) { toast('아직 심은 단어가 없어요'); return; }
     }
     var total = queue.length, done = 0, good = 0, failedOnce = {};
     var lab = type ? TYPE[type].label + ' ' : '';
-    var title = mode === 'flash' ? (practice ? '플래시카드 · 가벼운 연습' : lab + '플래시카드') : lab + '물 주기';
+    var title = practice
+      ? (mode === 'flash' ? '플래시카드 · 가벼운 연습' : '실전 문제 · 가벼운 연습')
+      : (mode === 'flash' ? lab + '플래시카드' : lab + '물 주기');
     var body = openOverlay(title);
     var pool = poolWords();
 
@@ -1608,7 +1689,11 @@
     el.innerHTML = '<h2 class="sec">훈련 모드</h2>' +
       '<p class="muted" style="margin-top:-6px;">어떤 정원을 훈련할까요?</p>' + scope +
       '<div class="pick-grid">' +
-      pickBtn2('flash', '클래식 플래시카드', due ? '물 줄 단어 ' + due + '개 — 뒤집고 스스로 채점 (간격 정식 반영)' : '만기 단어가 없으면 가벼운 연습으로', '🃏') +
+      /* 실전 문제를 맨 앞에 둔다. 출제 엔진(quiz.js)은 진작 있었는데 메뉴에서
+         갈 길이 없어, 학생이 채점받을 수 있는 곳이 자기 채점 플래시카드뿐이었다.
+         "알았어!"를 누르는 것과 4지선다를 맞히는 것은 전혀 다른 일이다. */
+      pickBtn2('quiz', '실전 문제', due ? '물 줄 단어 ' + due + '개 — 뜻 고르기·예문 빈칸·한자 조립·철자·듣고 고르기로 진짜 채점 (간격 정식 반영)' : '만기 단어가 없으면 가벼운 연습으로', '📝') +
+      pickBtn2('flash', '클래식 플래시카드', due ? '물 줄 단어 ' + due + '개 — 뒤집고 스스로 채점. 아는지 헷갈리면 실전 문제로 확인해요 (간격 정식 반영)' : '만기 단어가 없으면 가벼운 연습으로', '🃏') +
       pickBtn2('blink', '노출 깜빡이', '단어→뜻이 리듬대로 자동 재생 + 발음. 채점 없음 — 워밍업·자기 전용 (오늘 ' + todayN + '개 · 시듦 ' + withered + '개)', '⚡') +
       pickBtn2('speed', '스피드 리콜 깜빡이', '제한시간 안에 뜻 떠올리기 — 아는 단어를 "즉시 아는 단어"로 (가능 ' + speedable + '개)', '⏱️') +
       pickBtn2('sentence', '문장 짓기', vsyncOn()
@@ -1626,7 +1711,8 @@
     el.querySelectorAll('.pick').forEach(function (b) {
       b.addEventListener('click', function () {
         var m = b.dataset.t;
-        if (m === 'flash') startReview('flash', ty);
+        if (m === 'quiz') startReview('review', ty);
+        else if (m === 'flash') startReview('flash', ty);
         else if (m === 'blink') startBlinkSetup(ty);
         else if (m === 'sentence') startSentence(ty);
         else if (m === 'talk') startTalk(ty);

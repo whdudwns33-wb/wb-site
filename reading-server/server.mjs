@@ -7,9 +7,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { load, persist, getDb, listBackups, getBackup, snapshotNow } from './store.mjs';
+import { load, persist, getDb, listBackups, getBackup, snapshotNow, naesinSnapshot } from './store.mjs';
 import { handleVocab, sendNightPushes, vocabSummary } from './vocab-api.mjs';
-import { bookIndex, cleanWords, coachingCard, confirmAllPlan, findBook, readyToConfirm, validProgress, withOverlay } from './textbook.mjs';
+import { handleNaesin, isReservedCode, dropReservedRows, naesinBodyLimit } from './naesin-api.mjs';
+import { handleStudio } from './naesin-studio.mjs';
+import { bookIndex, cleanWords, coachingCard, confirmAllPlan, findBook, readyToConfirm, sourceSummary, validProgress, withOverlay } from './textbook.mjs';
 import { parseRoster } from './roster.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
@@ -17,6 +19,7 @@ const APP_DIR = path.join(ROOT, '..', 'reading');      // 학생 앱 정적 파�
 const VOCAB_DIR = path.join(ROOT, '..', 'vocab');      // 워드브레인 앱 정적 파일
 const SHARED_DIR = path.join(ROOT, '..', 'shared');    // 두 앱이 함께 쓰는 파일(voice.js)
 const AGE_DIR = path.join(ROOT, '..', 'vocab-age'); // 어휘 나이 진단(로그인 없이 열리는 공개 페이지)
+const NAESIN_DIR = path.join(ROOT, '..', 'naesin');    // 내신브레인 앱 정적 파일
 const PUB_DIR = path.join(ROOT, 'public');             // 관리 웹
 const PORT = +(process.env.PORT || 8890);
 const ADMIN_PIN = process.env.ADMIN_PIN || 'wb-admin-2026';
@@ -50,6 +53,74 @@ const vocabStore = {
   getArena: (k) => (db.vocab.arena || {})[k] || null,
   putArena: (k, rec) => { db.vocab.arena = db.vocab.arena || {}; db.vocab.arena[k] = rec; persist(); },
 };
+/* 내신 저장소 어댑터 — db.naesin만 사용 (vocab과 같은 분리 가능한 격리).
+   옛 db.json에는 naesin 칸이 없으므로 첫 접근 때 만들어 준다 — store.mjs를 고치지 않기 위해. */
+const naesinRoot = () => {
+  db.naesin = db.naesin || { packs: {}, packIds: [], states: {}, exams: {} };
+  db.naesin.tasks = db.naesin.tasks || {};
+  db.naesin.results = db.naesin.results || {};
+  db.naesin.reports = db.naesin.reports || {};
+  db.naesin.jobs = db.naesin.jobs || {};
+  db.naesin.jobSrc = db.naesin.jobSrc || {};
+  db.naesin.live = db.naesin.live || {};
+  db.naesin.votes = db.naesin.votes || {};
+  return db.naesin;
+};
+const naesinStore = {
+  getPack: (id) => naesinRoot().packs[id] || null,
+  putPack: (id, rec) => { naesinRoot().packs[id] = rec; persist(); },
+  deletePack: (id) => { delete naesinRoot().packs[id]; persist(); },
+  getPackIds: () => naesinRoot().packIds || null,
+  putPackIds: (ids) => { naesinRoot().packIds = ids; persist(); },
+  getState: (c) => naesinRoot().states[c] || null,
+  putState: (c, rec) => { naesinRoot().states[c] = rec; persist(); },
+  listStateCodes: () => Object.keys(naesinRoot().states),
+  getExam: (s) => naesinRoot().exams[s] || null,
+  putExam: (s, rec) => { naesinRoot().exams[s] = rec; persist(); },
+  deleteExam: (s) => { delete naesinRoot().exams[s]; persist(); },
+  listExamScopes: () => Object.keys(naesinRoot().exams),
+  getTask: (s) => naesinRoot().tasks[s] || null,
+  putTask: (s, rec) => { naesinRoot().tasks[s] = rec; persist(); },
+  /* 문항 신고 — 팩별 배열. 학생이 올리고 강사가 처리한다(팩 정오표의 원천) */
+  getReports: (id) => naesinRoot().reports[id] || null,
+  putReports: (id, list) => { naesinRoot().reports[id] = list; persist(); },
+  /* 팩 제작 AI 추출의 하루 사용 장부(기획서 §13-8) — 학생용 AI 한도와 따로 센다 */
+  getAiUse: () => naesinRoot().aiUse || null,
+  putAiUse: (rec) => { naesinRoot().aiUse = rec; persist(); },
+  /* 수업 라이브 세션 — 지금 이 단계·투사 문제. 4시간 뒤 만료 판정은 읽는 쪽(naesin-live)이 한다 */
+  getLive: (s) => naesinRoot().live[s] || null,
+  putLive: (s, rec) => { naesinRoot().live[s] = rec; persist(); },
+  deleteLive: (s) => { delete naesinRoot().live[s]; delete naesinRoot().votes[s]; persist(); },
+  getVotes: (s) => naesinRoot().votes[s] || null,
+  putVotes: (s, rec) => { naesinRoot().votes[s] = rec; persist(); },
+  /* 팩 제작 작업 — 초안·검수 상태. 원천 텍스트는 구매 자료라 따로 두고(jobSrc)
+     목록 조회가 매번 수 MB를 읽지 않게 한다. 작업을 지우면 원천도 함께 지운다. */
+  getJob: (id) => naesinRoot().jobs[id] || null,
+  putJob: (id, rec) => { naesinRoot().jobs[id] = rec; persist(); },
+  deleteJob: (id) => { delete naesinRoot().jobs[id]; persist(); },
+  listJobs: () => Object.values(naesinRoot().jobs),
+  getJobSrc: (id) => naesinRoot().jobSrc[id] || null,
+  putJobSrc: (id, rec) => { naesinRoot().jobSrc[id] = rec; persist(); },
+  deleteJobSrc: (id) => { delete naesinRoot().jobSrc[id]; persist(); },
+  /* 시험 결과 — db.naesin.results[코드][시험일] (워커의 naesin:result:<코드>:<시험일> 과 같은 것).
+     학생 칸이 비면 지운다: 퇴원 확인(저장 파일에 코드가 남지 않는가)이 빈 껍데기에 걸리지 않게. */
+  getResult: (c, d) => (naesinRoot().results[c] || {})[d] || null,
+  putResult: (c, d, rec) => { const R = naesinRoot().results; (R[c] = R[c] || {})[d] = rec; persist(); },
+  deleteResult: (c, d) => {
+    const R = naesinRoot().results;
+    if (R[c]) { delete R[c][d]; if (!Object.keys(R[c]).length) delete R[c]; }
+    persist();
+  },
+  listResults: () => {
+    const out = [];
+    for (const [code, byDate] of Object.entries(naesinRoot().results)) {
+      for (const [examDate, rec] of Object.entries(byDate || {})) if (rec) out.push({ ...rec, code, examDate });
+    }
+    return out;
+  },
+  getStudent: (c) => db.students[c] || null,
+};
+
 const VOCAB_PUSH_ENV = {
   publicKey: process.env.VAPID_PUBLIC_KEY || '',
   privateJwk: process.env.VAPID_PRIVATE_JWK || '',
@@ -59,13 +130,32 @@ const VOCAB_PUSH_ENV = {
 /* ── 유틸 ── */
 const json = (res, code, obj) => {
   const body = JSON.stringify(obj);
-  res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+  /* nosniff — 워커와 같은 헤더. API JSON 을 브라우저가 HTML 로 추측 렌더하는 길을 막는다. */
+  res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
   res.end(body);
 };
-const readBody = (req) => new Promise((resolve, reject) => {
-  let buf = ''; let n = 0;
-  req.on('data', (c) => { n += c.length; if (n > 2_000_000) { reject(new Error('too large')); req.destroy(); return; } buf += c; });
-  req.on('end', () => { try { resolve(buf ? JSON.parse(buf) : {}); } catch (e) { reject(e); } });
+/* 요청 몸통 상한 — 라우트별. 팩 업로드(4.5MB)·교재 원문(워커 계약 5MB)만 크고 나머지는 2MB 그대로.
+   초과하면 413 JSON 으로 답한다: 전에는 소켓을 끊어(destroy) 클라이언트가 빈 응답·연결 오류만 봤다.
+   남은 몸통은 resume() 으로 흘려보내야 응답이 정상으로 나간다 — 안 읽고 응답하면 큰 몸통은 RST 로 끝난다. */
+const BODY_LIMIT_DEFAULT = 2_000_000;
+const BODY_LIMIT_TEXTBOOK = 5_500_000;
+const bodyLimit = (p) => (p.startsWith('/api/naesin/') ? naesinBodyLimit(p) : p === '/api/admin/textbook-src' ? BODY_LIMIT_TEXTBOOK : BODY_LIMIT_DEFAULT);
+const tooLarge = () => { const e = new Error('too large'); e.status = 413; return e; };
+const readBody = (req, limit = BODY_LIMIT_DEFAULT) => new Promise((resolve, reject) => {
+  /* 조각을 Buffer 로 모아 한 번에 디코딩한다 — 조각마다 문자열로 바꾸면 조각 경계에 걸린 한글(3바이트)이 깨진다.
+     큰 팩(한글 본문 수 MB)이 그 경계를 수십 번 지난다. 상한도 바이트로 잰다. */
+  const chunks = []; let n = 0; let over = false;
+  req.on('data', (c) => {
+    if (over) return;
+    n += c.length;
+    if (n > limit) { over = true; chunks.length = 0; req.resume(); return; }
+    chunks.push(c);
+  });
+  req.on('end', () => {
+    if (over) { reject(tooLarge()); return; }
+    const buf = Buffer.concat(chunks).toString('utf8');
+    try { resolve(buf ? JSON.parse(buf) : {}); } catch (e) { reject(e); }
+  });
   req.on('error', reject);
 });
 const PEND_TTL = 30 * 60 * 1000;   /* 연동 요청 30분 */
@@ -138,9 +228,13 @@ function titleMap() {
 let TB_CACHE = { t: 0, data: null };
 function textbookRaw() {
   if (TB_CACHE.data && Date.now() - TB_CACHE.t < 60_000) return TB_CACHE.data;
-  try {
-    TB_CACHE = { t: Date.now(), data: JSON.parse(fs.readFileSync(path.join(APP_DIR, 'textbook.json'), 'utf8')) };
-  } catch (e) { TB_CACHE = { t: Date.now(), data: TB_CACHE.data || { books: [] } }; }
+  /* 원문은 관리 웹 업로드분(db.textbookSrc)이 정본 — 공개 저장소에서 파일을 뺐다(2026-09).
+     로컬 파일(reading/textbook.json)은 개발 편의용 폴백이며 gitignore 대상이다. */
+  let data = (db.textbookSrc && db.textbookSrc.src) || null;
+  if (!data) {
+    try { data = JSON.parse(fs.readFileSync(path.join(APP_DIR, 'textbook.json'), 'utf8')); } catch (e) {}
+  }
+  TB_CACHE = { t: Date.now(), data: data || TB_CACHE.data || { books: [] } };
   return TB_CACHE.data;
 }
 /* 강사 검수 결과를 덧씌운 교재 — 화면에 나가는 것은 언제나 이쪽이다 */
@@ -268,6 +362,25 @@ const server = http.createServer(async (req, res) => {
         return json(res, out.status, out.body);
       }
 
+      /* 내신 (/api/naesin/*) — 인증만 공유, 저장·라우트는 격리 (vocab 선례).
+         json()이 모든 응답에 no-store를 붙인다 — 기획서 §10-3. */
+      if (p.startsWith('/api/naesin/')) {
+        /* content-length 가 오면 읽기 전에 거른다(워커와 동일) — 없으면(chunked) readBody 의 스트림 상한이 잡는다 */
+        if (Number(req.headers['content-length'] || 0) > naesinBodyLimit(p)) { req.resume(); return json(res, 413, { error: '요청이 너무 커서 받을 수 없어요.' }); }
+        const ctx = {
+          path: p, method: req.method, who, query: url.searchParams,
+          getBody: () => readBody(req, naesinBodyLimit(p)), store: naesinStore,
+        };
+        /* 팩 제작 스튜디오가 먼저 본다 — 자기 경로가 아니면 null 을 돌려 다음 라우터로 넘긴다 */
+        const st = await handleStudio({
+          ...ctx,
+          ai: { apiKey: process.env.ANTHROPIC_API_KEY || '', model: process.env.NAESIN_AI_MODEL || '', env: process.env },
+        });
+        if (st) return json(res, st.status, st.body);
+        const out = await handleNaesin(ctx);
+        return json(res, out.status, out.body);
+      }
+
       /* 학생 API */
       if (p === '/api/pull' && req.method === 'GET' && !who.admin) {
         const st = db.states[who.code] || null;
@@ -328,6 +441,8 @@ const server = http.createServer(async (req, res) => {
         const { code, name, grade, cls, level } = await readBody(req);
         const c = String(code || '').trim();
         if (!/^[A-Za-z0-9-]{3,20}$/.test(c)) return json(res, 400, { error: '학생 코드는 영문/숫자 3~20자' });
+        /* 'default' 는 내신 반 공통 배정의 scope 키 — 학생 코드로 쓰면 개별 배정과 한 키를 두고 싸운다 */
+        if (isReservedCode(c)) return json(res, 400, { error: "'default'는 반 공통 배정에 쓰는 예약어라 학생 코드로 쓸 수 없어요." });
         if (!name) return json(res, 400, { error: '이름 필요' });
         /* 기존 값을 펼쳐서 덮어쓴다 — 통째로 새로 만들면 학부모 토큰·교재 진도가 조용히 지워진다 */
         const prev = db.students[c] || {};
@@ -338,7 +453,7 @@ const server = http.createServer(async (req, res) => {
       /* 반 하나를 등록하려면 폼을 사람 수만큼 채워야 했다 — 명단을 그대로 붙여넣게 한다 */
       if (p === '/api/admin/students/bulk' && req.method === 'POST') {
         const { text, cls, grade, level, prefix, dryRun } = await readBody(req);
-        const { rows, errors } = parseRoster(text, { cls, grade, level, prefix, existing: Object.keys(db.students) });
+        const { rows, errors } = dropReservedRows(parseRoster(text, { cls, grade, level, prefix, existing: Object.keys(db.students) }));
         if (dryRun) return json(res, 200, { rows, errors, dryRun: true });
         let created = 0, updated = 0;
         for (const r of rows) {
@@ -380,6 +495,21 @@ const server = http.createServer(async (req, res) => {
       /* 교재 진도 — 강사가 「초1 6강」을 지정하면 학부모 리포트에 그 주 코칭이 실린다 */
       if (p === '/api/admin/textbook' && req.method === 'GET') {
         return json(res, 200, { books: bookIndex(textbook()) });
+      }
+      /* 교재 원문(코칭) — 서버 저장소 이전분 관리 (워커와 동일 계약) */
+      if (p === '/api/admin/textbook-src' && req.method === 'GET') {
+        if (!db.textbookSrc) return json(res, 200, { exists: false });
+        const sum = sourceSummary(db.textbookSrc.src);
+        return json(res, 200, { exists: true, updatedAt: db.textbookSrc.updatedAt || null, version: (db.textbookSrc.src && db.textbookSrc.src.version) || null, books: sum.books });
+      }
+      if (p === '/api/admin/textbook-src' && req.method === 'PUT') {
+        const src = await readBody(req, bodyLimit(p));
+        const sum = sourceSummary(src);
+        if (sum.errors.length) return json(res, 400, { error: '원문 검증 실패', details: sum.errors.slice(0, 10) });
+        db.textbookSrc = { src, updatedAt: nowIso() };
+        TB_CACHE = { t: 0, data: null };
+        persist();
+        return json(res, 200, { ok: true, updatedAt: db.textbookSrc.updatedAt, version: src.version || null, books: sum.books });
       }
       if (p === '/api/admin/book' && req.method === 'POST') {
         const { code, bookId, lesson } = await readBody(req);
@@ -436,7 +566,10 @@ const server = http.createServer(async (req, res) => {
           if (!snap) return json(res, 404, { error: '해당 날짜의 스냅샷이 없습니다.' });
           return json(res, 200, snap);
         }
-        return json(res, 200, { service: 'wb-reading', savedAt: nowIso(), students: db.students, states: db.states, vocab: db.vocab, textbook: db.textbook || {}, pubmap: db.pubmap || {} });
+        /* 워커 fullDump 와 같은 모양 — 내신은 팩 본문 없이(packIds 만), 교재 원문(textbookSrc)은 포함.
+           팩은 라이선스 원문이라 백업 파일로 흩어지지 않게 한다(store.naesinSnapshot). */
+        return json(res, 200, { service: 'wb-reading', savedAt: nowIso(), students: db.students, states: db.states, vocab: db.vocab,
+          textbook: db.textbook || {}, pubmap: db.pubmap || {}, naesin: naesinSnapshot(db.naesin), textbookSrc: db.textbookSrc || {} });
       }
       if (p === '/api/admin/backups' && req.method === 'GET') {
         return json(res, 200, { backups: listBackups() });
@@ -469,6 +602,19 @@ const server = http.createServer(async (req, res) => {
         drop(db.states, c);
         drop(db.vocab.states, c);
         drop(db.vocab.push || {}, c);
+        /* 내신브레인 — 학습 기록·이 학생만의 시험 배정·시험 결과(워커와 동일).
+           반 공통·팩은 학생 것이 아니라 둔다. 결과가 남으면 같은 코드의 새 학생에게
+           앞 학생 점수가 보이고 원내 성과 분석에도 계속 섞인다. */
+        drop(naesinRoot().states, c);
+        drop(naesinRoot().exams, c);
+        drop(naesinRoot().results, c);
+        /* 문항 신고는 팩 정오표라 남긴다 — 학생이 떠나도 그 문항의 오류는 그대로다.
+           다만 누가 올렸는지는 지운다(퇴원생 식별 정보를 팩 자료에 남길 이유가 없다). 워커와 동일. */
+        for (const [pid, list] of Object.entries(naesinRoot().reports)) {
+          if (!Array.isArray(list) || !list.some((r) => r && r.code === c)) continue;
+          naesinRoot().reports[pid] = list.map((r) => (r && r.code === c ? { ...r, code: '' } : r));
+          removed += 1;
+        }
         /* 기기 토큰은 토큰 값이 키라 코드로 못 찾는다 — 훑어서 이 학생 것만 */
         for (const [t, rec] of Object.entries(db.tokens)) if (rec && rec.code === c) drop(db.tokens, t);
         /* 승인 대기 줄에 남으면 지운 학생이 계속 뜬다 */
@@ -506,6 +652,11 @@ const server = http.createServer(async (req, res) => {
     if (p === '/admin/qr.js') return serveFile(res, SHARED_DIR, 'qr.js');
     if (p === '/admin' || p === '/admin/') return serveFile(res, PUB_DIR, 'admin.html');
     if (p.startsWith('/admin/')) return serveFile(res, PUB_DIR, p.slice('/admin/'.length));
+
+    /* 내신브레인 앱 — 팩 콘텐츠는 여기 없다(/api/naesin/pack, KV·db 전용) */
+    if (p === '/naesin/voice.js') return serveFile(res, SHARED_DIR, 'voice.js');
+    if (p === '/naesin' || p === '/naesin/') return serveFile(res, NAESIN_DIR, 'index.html');
+    if (p.startsWith('/naesin/')) return serveFile(res, NAESIN_DIR, p.slice('/naesin/'.length));
 
     /* 워드브레인 앱 */
     if (p === '/voice.js' || p === '/vocab/voice.js') return serveFile(res, SHARED_DIR, 'voice.js');
@@ -572,6 +723,8 @@ const server = http.createServer(async (req, res) => {
     /* 학생 앱 */
     return serveFile(res, APP_DIR, p === '/' ? 'index.html' : p.slice(1));
   } catch (e) {
+    /* readBody 의 상한 초과는 서버 오류가 아니다 — 413 으로 답하고 남은 몸통은 흘려보낸다 */
+    if (e && e.status === 413) { req.resume(); return json(res, 413, { error: '요청이 너무 커서 받을 수 없어요.' }); }
     json(res, 500, { error: '서버 오류', detail: String(e.message || e) });
   }
 });

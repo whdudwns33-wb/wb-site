@@ -54,4 +54,5 @@ test('모든 교재 주문 업무는 현황판과 직원 지시 관리에서도 
   assert.match(staffAdded, /isBookOrderWorkTask\(t\)/);
   assert.match(staffAdmin, /!isBookOrderWorkTask\(t\)/);
   assert.match(manage, /!isBookOrderWorkTask\(t\)/);
+  assert.match(manage, /!isScheduledMakeupTask\(t\)/);
 });

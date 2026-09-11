@@ -1,6 +1,14 @@
 import { buildLessonTask } from './lesson-create.js';
 import { lessonStudentIdsForStaff } from './book-order-student-scope.js';
 import { isTaskWriteCasConflict, taskWriteCasGuardStatement } from './task-write-cas.js';
+import {
+  assertStudentLessonScheduleAvailable,
+  studentScheduleConflictPayload
+} from './student-schedule-conflict.js';
+import {
+  readStudentScheduleRevisionSnapshot,
+  studentScheduleRevisionCasStatements
+} from './student-schedule-revision.js';
 
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const MAX_NAME = 40;
@@ -26,7 +34,7 @@ function validFirstClassDate(value) {
 function assertStartAfterFirstClassDate(student, startDate) {
   const firstClassDate = validFirstClassDate(student && student.firstClassDate);
   if (firstClassDate && String(startDate || '') < firstClassDate) {
-    throw new Error('수업 시작일은 원생 첫 수업 시작일 ' + firstClassDate + ' 이후여야 합니다');
+    throw new Error('수업 시작일은 원생 첫 등원일 ' + firstClassDate + ' 이후여야 합니다');
   }
 }
 
@@ -353,7 +361,22 @@ export async function handleLessonAssignmentReview(env, app, body, origin, auth,
     }
   }
 
-  const statements = [];
+  let scheduleGuards = [];
+  if (taskStatement) {
+    const scheduleRevision = await readStudentScheduleRevisionSnapshot(env, app, [String(task.studentId)]);
+    try { await assertStudentLessonScheduleAvailable(env, app, task); }
+    catch (error) {
+      const payload = studentScheduleConflictPayload(error);
+      if (payload) return json(payload, 409, origin);
+      throw error;
+    }
+    scheduleGuards = await studentScheduleRevisionCasStatements(env, app, scheduleRevision, {
+      operation: 'lesson_assignment_schedule',
+      source: [requestKey, revision, task.id].join('\n'),
+      updatedAt: task.updatedAt
+    });
+  }
+  const statements = [...scheduleGuards];
   if (details) {
     roster.document.roster.updated = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date(now));
     statements.push(env.DB.prepare('UPDATE private_rosters SET data=?,updated_at=? WHERE app=? AND updated_at=?')
@@ -363,10 +386,9 @@ export async function handleLessonAssignmentReview(env, app, body, origin, auth,
   }
   if (taskStatement) {
     statements.push(taskStatement);
-    if (taskStatementNeedsGuard) {
-      statements.push(await taskWriteCasGuardStatement(env, app, 'lesson_assignment_task',
-        [requestKey, revision, task.id, String(current.staff_id), task.updatedAt].join('\n'), task.updatedAt));
-    }
+    statements.push(await taskWriteCasGuardStatement(env, app, 'lesson_assignment_task',
+      [requestKey, revision, task.id, String(current.staff_id), task.updatedAt,
+        taskStatementNeedsGuard ? 'restore' : 'insert'].join('\n'), task.updatedAt));
   }
   statements.push(env.DB.prepare("UPDATE lesson_assignment_requests SET status='approved', student_id=?, updated_at=?, reviewed_at=?, reviewed_by=?, review_note=NULL WHERE app=? AND request_key=? AND revision=? AND status='approval_waiting'")
     .bind(studentId, now, now, reviewer, app, requestKey, revision));
@@ -378,9 +400,11 @@ export async function handleLessonAssignmentReview(env, app, body, origin, auth,
     if (isTaskWriteCasConflict(error)) {
       return json({ ok: false, error: '명단·수업 또는 요청 상태가 바뀌었습니다. 새로고침 후 다시 승인해 주세요' }, 409, origin);
     }
+    const payload = studentScheduleConflictPayload(error);
+    if (payload) return json(payload, 409, origin);
     throw error;
   }
-  if (applied.some(result => Number(result.meta && result.meta.changes || 0) !== 1)) {
+  if (!Array.isArray(applied) || applied.length !== statements.length) {
     return json({ ok: false, error: '명단·수업 또는 요청 상태가 바뀌었습니다. 새로고침 후 다시 승인해 주세요' }, 409, origin);
   }
   current = await requestRow(env, app, requestKey);

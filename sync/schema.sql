@@ -1,4 +1,63 @@
 -- WB 동기화 백엔드 (Cloudflare D1)
+
+-- 연락처와 짧은 PIN 검증정보는 generic staff sync에 절대 포함하지 않는다.
+CREATE TABLE IF NOT EXISTS staff_private_profiles (
+  app TEXT NOT NULL CHECK (app='task'),
+  staff_id TEXT NOT NULL,
+  phone TEXT NOT NULL DEFAULT '',
+  login_enabled INTEGER NOT NULL DEFAULT 0 CHECK (login_enabled IN (0,1)),
+  pin_salt TEXT NOT NULL DEFAULT '',
+  pin_hash TEXT NOT NULL DEFAULT '',
+  pin_iterations INTEGER NOT NULL DEFAULT 100000,
+  credential_revision INTEGER NOT NULL DEFAULT 1,
+  failed_attempts INTEGER NOT NULL DEFAULT 0,
+  locked_until INTEGER NOT NULL DEFAULT 0,
+  attempt_revision INTEGER NOT NULL DEFAULT 0,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY(app,staff_id)
+);
+CREATE TABLE IF NOT EXISTS staff_work_sessions (
+  app TEXT NOT NULL CHECK (app='task'),
+  token_hash TEXT NOT NULL,
+  staff_id TEXT NOT NULL,
+  device_hash TEXT NOT NULL,
+  work_date TEXT NOT NULL,
+  credential_revision INTEGER NOT NULL,
+  data_generation INTEGER NOT NULL,
+  created_at INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL,
+  revoked INTEGER NOT NULL DEFAULT 0 CHECK (revoked IN (0,1)),
+  PRIMARY KEY(app,token_hash)
+);
+CREATE INDEX IF NOT EXISTS idx_staff_work_sessions_staff_day
+  ON staff_work_sessions(app,staff_id,work_date,revoked);
+
+-- 선생님 태블릿에서 관리 담당자가 점검할 때만 쓰는 짧은 관리자 세션.
+-- 개인 링크 토큰·직원 PIN과 분리하고 원문 토큰은 저장하지 않는다.
+CREATE TABLE IF NOT EXISTS manager_inspection_sessions (
+  app TEXT NOT NULL CHECK (app='task'),
+  token_hash TEXT NOT NULL,
+  manager_staff_id TEXT NOT NULL,
+  source_staff_id TEXT NOT NULL,
+  device_hash TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL,
+  revoked INTEGER NOT NULL DEFAULT 0 CHECK (revoked IN (0,1)),
+  PRIMARY KEY(app,token_hash)
+);
+CREATE INDEX IF NOT EXISTS idx_manager_inspection_sessions_device
+  ON manager_inspection_sessions(app,device_hash,revoked,expires_at);
+
+CREATE TABLE IF NOT EXISTS manager_inspection_attempts (
+  app TEXT NOT NULL CHECK (app='task'),
+  device_hash TEXT NOT NULL,
+  failed_attempts INTEGER NOT NULL DEFAULT 0,
+  locked_until INTEGER NOT NULL DEFAULT 0,
+  attempt_revision INTEGER NOT NULL DEFAULT 0,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY(app,device_hash)
+);
+
 --
 -- 설계 원칙
 --  1) 학생·직원별로 분할한다. 한 사람이 자기 데이터를 저장할 때 남의 데이터를 건드리지 않는다.
@@ -92,12 +151,127 @@ INSERT OR IGNORE INTO app_data_generations(app, generation, updated_at) VALUES
   ('task', 0, 0),
   ('consult', 0, 0);
 
+-- 물리 삭제된 task가 오래 열린 태블릿 캐시에서 다시 살아나지 않게 한다.
+-- 학생 정보·수업 내용은 저장하지 않고, 캐시 정리에 필요한 taskId와 예전 담당자만 남긴다.
+CREATE TABLE IF NOT EXISTS task_revocations (
+  revocation_seq  INTEGER PRIMARY KEY AUTOINCREMENT,
+  app             TEXT    NOT NULL CHECK (app = 'task'),
+  data_generation INTEGER NOT NULL CHECK (data_generation >= 0),
+  task_id         TEXT    NOT NULL CHECK (
+    length(task_id) BETWEEN 1 AND 128 AND task_id NOT GLOB '*[^A-Za-z0-9_-]*'
+  ),
+  former_owner    TEXT    NOT NULL CHECK (
+    former_owner = '' OR (
+      length(former_owner) BETWEEN 1 AND 128 AND former_owner NOT GLOB '*[^A-Za-z0-9_-]*'
+    )
+  ),
+  revoked_at      INTEGER NOT NULL CHECK (revoked_at > 0),
+  UNIQUE (app, data_generation, task_id, former_owner)
+);
+
+CREATE INDEX IF NOT EXISTS idx_task_revocations_generation_seq
+  ON task_revocations(app, data_generation, revocation_seq);
+
+CREATE INDEX IF NOT EXISTS idx_task_revocations_owner_seq
+  ON task_revocations(app, data_generation, former_owner, revocation_seq);
+
+CREATE TRIGGER IF NOT EXISTS trg_task_revocations_no_update
+BEFORE UPDATE ON task_revocations
+BEGIN
+  SELECT RAISE(ABORT, 'TASK_REVOCATION_APPEND_ONLY');
+END;
+
+-- 완료한 수업을 별도 결석 보강에 연결한 이력. 출결·회차 원장은 재기록하지 않는다.
+CREATE TABLE IF NOT EXISTS makeup_completion_links (
+  app TEXT NOT NULL CHECK (app='task'),
+  pending_case_id TEXT NOT NULL,
+  completed_case_id TEXT NOT NULL,
+  student_id TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  created_by TEXT NOT NULL,
+  PRIMARY KEY (app,pending_case_id),
+  UNIQUE (app,completed_case_id)
+);
+CREATE INDEX IF NOT EXISTS idx_makeup_completion_links_student
+  ON makeup_completion_links(app,student_id,created_at);
+
+CREATE TRIGGER IF NOT EXISTS trg_task_revocations_no_delete
+BEFORE DELETE ON task_revocations
+BEGIN
+  SELECT RAISE(ABORT, 'TASK_REVOCATION_APPEND_ONLY');
+END;
+
+-- task 물리 삭제와 표식 생성은 하나의 SQLite transaction에서 같이 성립한다.
+CREATE TRIGGER IF NOT EXISTS trg_tasks_capture_revocation_delete
+AFTER DELETE ON tasks
+WHEN OLD.app = 'task'
+BEGIN
+  INSERT INTO task_revocations(app, data_generation, task_id, former_owner, revoked_at)
+  SELECT OLD.app, generation, OLD.id, COALESCE(OLD.owner, ''),
+    max(OLD.updated_at, OLD.srv_at, CAST(strftime('%s', 'now') AS INTEGER) * 1000)
+  FROM app_data_generations
+  WHERE app = OLD.app
+  ON CONFLICT(app, data_generation, task_id, former_owner) DO NOTHING;
+END;
+
+-- 구형 브라우저가 삭제 전 task/check를 다시 올려도 해당 행만 무시한다.
+CREATE TRIGGER IF NOT EXISTS trg_tasks_ignore_revoked_insert
+BEFORE INSERT ON tasks
+WHEN NEW.app = 'task' AND EXISTS (
+  SELECT 1 FROM task_revocations AS revocation
+  JOIN app_data_generations AS generation
+    ON generation.app = revocation.app AND generation.generation = revocation.data_generation
+  WHERE revocation.app = NEW.app AND revocation.task_id = NEW.id
+)
+BEGIN
+  SELECT RAISE(IGNORE);
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_tasks_ignore_revoked_update
+BEFORE UPDATE ON tasks
+WHEN NEW.app = 'task' AND EXISTS (
+  SELECT 1 FROM task_revocations AS revocation
+  JOIN app_data_generations AS generation
+    ON generation.app = revocation.app AND generation.generation = revocation.data_generation
+  WHERE revocation.app = NEW.app AND revocation.task_id = NEW.id
+)
+BEGIN
+  SELECT RAISE(IGNORE);
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_checks_ignore_revoked_task_insert
+BEFORE INSERT ON checks
+WHEN NEW.app = 'task' AND instr(NEW.k, '|') > 1 AND EXISTS (
+  SELECT 1 FROM task_revocations AS revocation
+  JOIN app_data_generations AS generation
+    ON generation.app = revocation.app AND generation.generation = revocation.data_generation
+  WHERE revocation.app = NEW.app
+    AND revocation.task_id = substr(NEW.k, 1, instr(NEW.k, '|') - 1)
+)
+BEGIN
+  SELECT RAISE(IGNORE);
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_checks_ignore_revoked_task_update
+BEFORE UPDATE ON checks
+WHEN NEW.app = 'task' AND instr(NEW.k, '|') > 1 AND EXISTS (
+  SELECT 1 FROM task_revocations AS revocation
+  JOIN app_data_generations AS generation
+    ON generation.app = revocation.app AND generation.generation = revocation.data_generation
+  WHERE revocation.app = NEW.app
+    AND revocation.task_id = substr(NEW.k, 1, instr(NEW.k, '|') - 1)
+)
+BEGIN
+  SELECT RAISE(IGNORE);
+END;
+
 -- 학부모 피드백 문구의 검토 요청 원장.
 -- 원장 지시(2026-08)로 별도 승인 클릭 없이 제출 즉시 카카오 알림톡 실발송을 시도한다.
 -- status는 그 시도 결과다 — 'sent'는 성공, 'content_approved_send_blocked'는 "아직 안 나감"
 -- (보호자 연락처·동의 미등록, 발송 스위치 꺼짐, 카카오 반려 등 — 사유는 review_note에 남는다).
--- v1의 teacher_name/content_text/plus_text/minus_text와 v2의 subject_text/homework_text/
--- comment_text는 알림톡 템플릿 변수에 그대로 들어가는 항목별 값이다(parent-feedback-send.js).
+-- v1의 teacher_name/content_text/plus_text/minus_text, v2의 subject_text/homework_text/
+-- comment_text, v3의 notice_text는 알림톡 템플릿 변수에 그대로 들어가는
+-- 항목별 값이다(parent-feedback-send.js).
 -- body/body_hash는 화면 미리보기와 실제 변수 렌더링이 일치하는지 검증하고 이력을 보존한다.
 CREATE TABLE IF NOT EXISTS feedback_requests (
   app              TEXT    NOT NULL,
@@ -116,6 +290,7 @@ CREATE TABLE IF NOT EXISTS feedback_requests (
   subject_text     TEXT,
   homework_text    TEXT,
   comment_text     TEXT,
+  notice_text      TEXT,
   plus_text        TEXT,
   minus_text       TEXT,
   revision         INTEGER NOT NULL DEFAULT 1,
@@ -275,6 +450,50 @@ CREATE TRIGGER IF NOT EXISTS trg_student_change_ack_no_delete
 BEFORE DELETE ON student_change_acknowledgements
 BEGIN
   SELECT RAISE(ABORT, 'STUDENT_CHANGE_ACK_APPEND_ONLY');
+END;
+
+-- 요일별 담당 분리로 새 taskId에 이동한 과거 수업 check의 옛 키를 영구 봉인한다.
+-- 키와 시각만 저장하며 학생 이름·연락처·수업 메모는 저장하지 않는다.
+CREATE TABLE IF NOT EXISTS lesson_check_key_redirects (
+  app            TEXT    NOT NULL CHECK (app = 'task'),
+  old_key        TEXT    NOT NULL CHECK (length(old_key) BETWEEN 12 AND 180 AND old_key LIKE '%|____-__-__'),
+  new_key        TEXT    NOT NULL CHECK (length(new_key) BETWEEN 12 AND 180 AND new_key LIKE '%|____-__-__'),
+  old_updated_at INTEGER NOT NULL CHECK (old_updated_at >= 0),
+  created_at     INTEGER NOT NULL CHECK (created_at > 0),
+  created_by     TEXT    NOT NULL CHECK (length(created_by) BETWEEN 1 AND 128),
+  PRIMARY KEY (app, old_key),
+  UNIQUE (app, new_key),
+  CHECK (old_key <> new_key)
+);
+CREATE INDEX IF NOT EXISTS idx_lesson_check_key_redirects_new
+  ON lesson_check_key_redirects(app, new_key);
+CREATE TRIGGER IF NOT EXISTS trg_lesson_check_key_redirects_no_update
+BEFORE UPDATE ON lesson_check_key_redirects
+BEGIN
+  SELECT RAISE(ABORT, 'LESSON_CHECK_REDIRECT_APPEND_ONLY');
+END;
+CREATE TRIGGER IF NOT EXISTS trg_lesson_check_key_redirects_no_delete
+BEFORE DELETE ON lesson_check_key_redirects
+BEGIN
+  SELECT RAISE(ABORT, 'LESSON_CHECK_REDIRECT_APPEND_ONLY');
+END;
+CREATE TRIGGER IF NOT EXISTS trg_checks_ignore_moved_lesson_key_insert
+BEFORE INSERT ON checks
+WHEN NEW.app = 'task' AND EXISTS (
+  SELECT 1 FROM lesson_check_key_redirects redirect
+  WHERE redirect.app = NEW.app AND redirect.old_key = NEW.k
+)
+BEGIN
+  SELECT RAISE(IGNORE);
+END;
+CREATE TRIGGER IF NOT EXISTS trg_checks_reject_moved_lesson_key_update
+BEFORE UPDATE OF k ON checks
+WHEN NEW.app = 'task' AND EXISTS (
+  SELECT 1 FROM lesson_check_key_redirects redirect
+  WHERE redirect.app = NEW.app AND redirect.old_key = NEW.k
+)
+BEGIN
+  SELECT RAISE(ABORT, 'LESSON_CHECK_KEY_MOVED');
 END;
 
 -- 다중 문장 D1 batch의 optimistic UPDATE가 0건일 때 후속 쓰기가 부분 커밋되지 않게 한다.
@@ -1675,15 +1894,45 @@ CREATE INDEX IF NOT EXISTS idx_makeup_student
   ON makeup_cases(app, student_id, updated_at);
 CREATE INDEX IF NOT EXISTS idx_makeup_staff_time
   ON makeup_cases(app, confirmed_staff_id, confirmed_start_at, confirmed_end_at);
+CREATE INDEX IF NOT EXISTS idx_makeup_student_time
+  ON makeup_cases(app, student_id, confirmed_start_at, confirmed_end_at);
+
+-- 보강 수업 자체가 결석된 뒤 새 일정을 잡을 때의 append-only 감사 원장.
+-- 기존 결석 출결은 지우지 않고 재보강으로 일정이 이동된 정확한 출결 키만
+-- 이후 일정 기록 검증에서 제외한다.
+CREATE TABLE IF NOT EXISTS makeup_absence_retries (
+  app                 TEXT NOT NULL CHECK (app = 'task'),
+  case_id             TEXT NOT NULL,
+  revision            INTEGER NOT NULL CHECK (revision >= 1),
+  lesson_task_id      TEXT NOT NULL,
+  check_key           TEXT NOT NULL,
+  previous_date       TEXT NOT NULL CHECK (
+    length(previous_date) = 10 AND strftime('%Y-%m-%d', previous_date) = previous_date
+  ),
+  previous_start_time TEXT NOT NULL CHECK (
+    length(previous_start_time) = 5 AND previous_start_time GLOB '[0-2][0-9]:[0-5][0-9]' AND previous_start_time < '24:00'
+  ),
+  previous_end_time   TEXT NOT NULL CHECK (
+    length(previous_end_time) = 5 AND previous_end_time GLOB '[0-2][0-9]:[0-5][0-9]' AND previous_end_time < '24:00'
+  ),
+  previous_staff_id   TEXT NOT NULL,
+  attendance_status   TEXT NOT NULL CHECK (attendance_status = 'A'),
+  created_at          INTEGER NOT NULL,
+  created_by          TEXT NOT NULL,
+  PRIMARY KEY (app, case_id, revision),
+  UNIQUE (app, case_id, lesson_task_id, check_key)
+);
+CREATE INDEX IF NOT EXISTS idx_makeup_absence_retries_check
+  ON makeup_absence_retries(app, lesson_task_id, check_key);
 
 CREATE TRIGGER IF NOT EXISTS trg_makeup_confirmed_time_insert
 BEFORE INSERT ON makeup_cases
-WHEN NEW.status = 'confirmed' AND EXISTS (
+WHEN NEW.status IN ('confirmed','completed') AND EXISTS (
   SELECT 1 FROM makeup_cases AS other
-  WHERE other.app = NEW.app AND other.status = 'confirmed' AND other.case_id <> NEW.case_id
+  WHERE other.app = NEW.app AND other.status IN ('confirmed','completed') AND other.case_id <> NEW.case_id
     AND other.confirmed_start_at < NEW.confirmed_end_at
     AND NEW.confirmed_start_at < other.confirmed_end_at
-    AND (other.student_id = NEW.student_id OR other.confirmed_staff_id = NEW.confirmed_staff_id)
+    AND other.student_id = NEW.student_id
 )
 BEGIN
   SELECT RAISE(ABORT, 'MAKEUP_TIME_CONFLICT');
@@ -1691,17 +1940,66 @@ END;
 
 CREATE TRIGGER IF NOT EXISTS trg_makeup_confirmed_time_update
 BEFORE UPDATE OF status,confirmed_start_at,confirmed_end_at,confirmed_staff_id,student_id ON makeup_cases
-WHEN NEW.status = 'confirmed' AND EXISTS (
+WHEN NEW.status IN ('confirmed','completed') AND EXISTS (
   SELECT 1 FROM makeup_cases AS other
-  WHERE other.app = NEW.app AND other.status = 'confirmed' AND other.case_id <> NEW.case_id
+  WHERE other.app = NEW.app AND other.status IN ('confirmed','completed') AND other.case_id <> NEW.case_id
     AND other.confirmed_start_at < NEW.confirmed_end_at
     AND NEW.confirmed_start_at < other.confirmed_end_at
-    AND (other.student_id = NEW.student_id OR other.confirmed_staff_id = NEW.confirmed_staff_id)
+    AND other.student_id = NEW.student_id
 )
 BEGIN
   SELECT RAISE(ABORT, 'MAKEUP_TIME_CONFLICT');
 END;
 
+-- 학생 일정 충돌 쓰기를 학생별로 직렬화하기 위한 CAS revision 원장이다.
+-- 이름·학교·학년·연락처 같은 개인정보는 저장하지 않는다.
+CREATE TABLE IF NOT EXISTS student_schedule_revisions (
+  app        TEXT    NOT NULL CHECK (app = 'task'),
+  student_id TEXT    NOT NULL,
+  revision   INTEGER NOT NULL DEFAULT 0 CHECK (revision >= 0),
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY (app, student_id)
+);
+
+-- 보강이 실제 일정에 들어올 때만 해당 학생의 일정 revision을 한 번 올린다.
+CREATE TRIGGER IF NOT EXISTS trg_makeup_schedule_revision_insert
+AFTER INSERT ON makeup_cases
+WHEN NEW.status IN ('confirmed', 'completed')
+BEGIN
+  INSERT INTO student_schedule_revisions(app, student_id, revision, updated_at)
+  VALUES(NEW.app, NEW.student_id, 1, NEW.updated_at)
+  ON CONFLICT(app, student_id) DO UPDATE SET
+    revision = student_schedule_revisions.revision + 1,
+    updated_at = excluded.updated_at;
+END;
+
+-- 활성 보강의 학생·상태·시간이 바뀌면 이전/새 학생 캐시를 모두 무효화한다.
+-- 학생이 같으면 두 번째 INSERT를 생략해 한 변경당 한 번만 증가시킨다.
+CREATE TRIGGER IF NOT EXISTS trg_makeup_schedule_revision_update
+AFTER UPDATE OF student_id, status, confirmed_start_at, confirmed_end_at ON makeup_cases
+WHEN (
+  OLD.student_id IS NOT NEW.student_id
+  OR OLD.status IS NOT NEW.status
+  OR OLD.confirmed_start_at IS NOT NEW.confirmed_start_at
+  OR OLD.confirmed_end_at IS NOT NEW.confirmed_end_at
+) AND (
+  OLD.status IN ('confirmed', 'completed')
+  OR NEW.status IN ('confirmed', 'completed')
+)
+BEGIN
+  INSERT INTO student_schedule_revisions(app, student_id, revision, updated_at)
+  VALUES(OLD.app, OLD.student_id, 1, NEW.updated_at)
+  ON CONFLICT(app, student_id) DO UPDATE SET
+    revision = student_schedule_revisions.revision + 1,
+    updated_at = excluded.updated_at;
+
+  INSERT INTO student_schedule_revisions(app, student_id, revision, updated_at)
+  SELECT NEW.app, NEW.student_id, 1, NEW.updated_at
+  WHERE NEW.app IS NOT OLD.app OR NEW.student_id IS NOT OLD.student_id
+  ON CONFLICT(app, student_id) DO UPDATE SET
+    revision = student_schedule_revisions.revision + 1,
+    updated_at = excluded.updated_at;
+END;
 -- API 실수나 직접 쓰기로도 원장/타 담당자가 완료자로 기록될 수 없다.
 CREATE TRIGGER IF NOT EXISTS trg_makeup_complete_assignee
 BEFORE UPDATE OF status,completed_by ON makeup_cases
@@ -3586,6 +3884,8 @@ CREATE TABLE IF NOT EXISTS consult_link_contacts (
   staff_id     TEXT NOT NULL CHECK (length(staff_id) BETWEEN 1 AND 128),
   student_name TEXT NOT NULL CHECK (length(student_name) BETWEEN 1 AND 40),
   phone        TEXT,
+  phone_owner  TEXT NOT NULL DEFAULT 'unknown'
+    CHECK (phone_owner IN ('unknown','student','mother')),
   consent      INTEGER NOT NULL DEFAULT 0 CHECK (consent IN (0,1)),
   updated_at   INTEGER NOT NULL CHECK (updated_at > 0),
   updated_by   TEXT NOT NULL CHECK (length(updated_by) BETWEEN 1 AND 128),
@@ -3822,6 +4122,402 @@ BEGIN
   SELECT RAISE(ABORT, 'TUITION_CONFIRMATION_APPEND_ONLY');
 END;
 
+-- 학생 단위 4회제 원장. 이름·연락처 없이 stable studentId와 최종 P/L/E 근거만 보존한다.
+CREATE TABLE IF NOT EXISTS student_session_cycles (
+  app TEXT NOT NULL CHECK (app = 'task'),
+  student_id TEXT NOT NULL CHECK (length(student_id) BETWEEN 1 AND 160),
+  configured_start_date TEXT NOT NULL CHECK (
+    length(configured_start_date) = 10 AND strftime('%Y-%m-%d', configured_start_date) = configured_start_date
+  ),
+  cycle_number INTEGER NOT NULL CHECK (cycle_number >= 1),
+  cycle_start_date TEXT NOT NULL CHECK (
+    length(cycle_start_date) = 10 AND strftime('%Y-%m-%d', cycle_start_date) = cycle_start_date
+  ),
+  created_at INTEGER NOT NULL CHECK (created_at > 0),
+  PRIMARY KEY (app, student_id, configured_start_date, cycle_number)
+);
+CREATE INDEX IF NOT EXISTS idx_student_session_cycles_current
+  ON student_session_cycles(app, student_id, configured_start_date, cycle_number DESC);
+
+CREATE TABLE IF NOT EXISTS student_session_attendance_events (
+  app TEXT NOT NULL CHECK (app = 'task'),
+  student_id TEXT NOT NULL CHECK (length(student_id) BETWEEN 1 AND 160),
+  configured_start_date TEXT NOT NULL CHECK (
+    length(configured_start_date) = 10 AND strftime('%Y-%m-%d', configured_start_date) = configured_start_date
+  ),
+  cycle_number INTEGER NOT NULL CHECK (cycle_number >= 1),
+  session_number INTEGER NOT NULL CHECK (session_number BETWEEN 1 AND 4),
+  lesson_task_id TEXT NOT NULL CHECK (length(lesson_task_id) BETWEEN 1 AND 160),
+  attendance_date TEXT NOT NULL CHECK (
+    length(attendance_date) = 10 AND strftime('%Y-%m-%d', attendance_date) = attendance_date
+  ),
+  attendance_status TEXT NOT NULL CHECK (attendance_status IN ('P','L','E')),
+  check_key TEXT NOT NULL CHECK (length(check_key) BETWEEN 3 AND 180),
+  created_at INTEGER NOT NULL CHECK (created_at > 0),
+  PRIMARY KEY (app, student_id, configured_start_date, lesson_task_id, attendance_date),
+  UNIQUE (app, student_id, configured_start_date, cycle_number, session_number),
+  FOREIGN KEY (app, student_id, configured_start_date, cycle_number)
+    REFERENCES student_session_cycles(app, student_id, configured_start_date, cycle_number)
+);
+CREATE INDEX IF NOT EXISTS idx_student_session_attendance_cycle
+  ON student_session_attendance_events(app, student_id, configured_start_date, cycle_number, session_number);
+
+CREATE TRIGGER IF NOT EXISTS trg_student_session_cycle_eligible
+BEFORE INSERT ON student_session_cycles
+WHEN NOT EXISTS (
+  SELECT 1 FROM private_rosters AS roster, json_each(roster.data, '$.roster.students') AS student
+  WHERE roster.app = NEW.app AND json_valid(roster.data)
+    AND json_extract(student.value, '$.id') = NEW.student_id
+    AND json_extract(student.value, '$.billingMode') = 'session4'
+    AND json_extract(student.value, '$.sessionCycleStartDate') = NEW.configured_start_date
+)
+BEGIN SELECT RAISE(ABORT, 'STUDENT_SESSION_NOT_ELIGIBLE'); END;
+
+CREATE TRIGGER IF NOT EXISTS trg_student_session_cycle_sequence
+BEFORE INSERT ON student_session_cycles
+WHEN (NEW.cycle_number = 1 AND NEW.cycle_start_date <> NEW.configured_start_date)
+  OR (NEW.cycle_number > 1 AND NOT EXISTS (
+    SELECT 1 FROM student_session_cycles AS previous
+    WHERE previous.app = NEW.app AND previous.student_id = NEW.student_id
+      AND previous.configured_start_date = NEW.configured_start_date
+      AND previous.cycle_number = NEW.cycle_number - 1
+      AND (SELECT COUNT(*) FROM student_session_attendance_events AS event
+        WHERE event.app = previous.app AND event.student_id = previous.student_id
+          AND event.configured_start_date = previous.configured_start_date
+          AND event.cycle_number = previous.cycle_number) = 4
+  ))
+BEGIN SELECT RAISE(ABORT, 'STUDENT_SESSION_CYCLE_SEQUENCE'); END;
+
+CREATE TRIGGER IF NOT EXISTS trg_student_session_event_eligible
+BEFORE INSERT ON student_session_attendance_events
+WHEN NOT EXISTS (
+  SELECT 1 FROM private_rosters AS roster, json_each(roster.data, '$.roster.students') AS student
+  WHERE roster.app = NEW.app AND json_valid(roster.data)
+    AND json_extract(student.value, '$.id') = NEW.student_id
+    AND json_extract(student.value, '$.billingMode') = 'session4'
+    AND json_extract(student.value, '$.sessionCycleStartDate') = NEW.configured_start_date
+)
+BEGIN SELECT RAISE(ABORT, 'STUDENT_SESSION_NOT_ELIGIBLE'); END;
+
+CREATE TRIGGER IF NOT EXISTS trg_student_session_event_source
+BEFORE INSERT ON student_session_attendance_events
+WHEN NEW.check_key <> NEW.lesson_task_id || '|' || NEW.attendance_date OR NOT EXISTS (
+  SELECT 1 FROM tasks AS task JOIN checks AS attendance
+    ON attendance.app = task.app AND attendance.k = NEW.check_key
+  WHERE task.app = NEW.app AND task.id = NEW.lesson_task_id AND task.owner = attendance.owner
+    AND json_valid(task.data) AND json_type(task.data) = 'object'
+    AND json_valid(attendance.data) AND json_type(attendance.data) = 'object'
+    AND json_extract(task.data, '$.id') = NEW.lesson_task_id
+    AND json_extract(task.data, '$.studentId') = NEW.student_id
+    AND json_extract(task.data, '$.staffId') = task.owner
+    AND (COALESCE(json_extract(task.data, '$.deleted'), 0) = 0 OR (
+      COALESCE(json_extract(task.data, '$.deleted'), 0) = 1
+      AND strftime('%Y-%m-%d', CAST(json_extract(task.data, '$.end') AS TEXT)) =
+        CAST(json_extract(task.data, '$.end') AS TEXT)
+      AND NEW.attendance_date <= CAST(json_extract(task.data, '$.end') AS TEXT)
+    ))
+    AND ((COALESCE(json_extract(task.data, '$.lessonInstanceType'), '') <> 'makeup'
+      AND COALESCE(json_extract(task.data, '$.makeupCaseId'), '') = '') OR EXISTS (
+      SELECT 1 FROM makeup_cases AS makeup
+      WHERE makeup.app = task.app AND makeup.case_id = json_extract(task.data, '$.makeupCaseId')
+        AND task.id = 'makeup_lesson_' || makeup.case_id
+        AND makeup.student_id = NEW.student_id AND makeup.status IN ('confirmed','completed')
+        AND json_extract(task.data, '$.lessonInstanceType') = 'makeup'
+        AND json_extract(task.data, '$.start') = NEW.attendance_date
+        AND json_extract(task.data, '$.end') = NEW.attendance_date
+        AND (json_extract(makeup.history, '$[0].action') = 'create_from_absence'
+          OR (json_extract(makeup.history, '$[0].action') = 'create_manual'
+            AND json_extract(makeup.history, '$[0].reason') = 'manual_absence'))
+    ))
+    AND json_extract(attendance.data, '$.taskId') = NEW.lesson_task_id
+    AND json_extract(attendance.data, '$.date') = NEW.attendance_date
+    AND json_extract(attendance.data, '$.att') = NEW.attendance_status
+    AND NEW.attendance_status IN ('P','L','E')
+)
+BEGIN SELECT RAISE(ABORT, 'STUDENT_SESSION_ATTENDANCE_SOURCE'); END;
+
+CREATE TRIGGER IF NOT EXISTS trg_student_session_event_sequence
+BEFORE INSERT ON student_session_attendance_events
+WHEN NOT EXISTS (
+  SELECT 1 FROM student_session_cycles AS cycle
+  WHERE cycle.app = NEW.app AND cycle.student_id = NEW.student_id
+    AND cycle.configured_start_date = NEW.configured_start_date AND cycle.cycle_number = NEW.cycle_number
+    AND NEW.attendance_date >= cycle.cycle_start_date
+    AND (cycle.cycle_number = 1 OR NEW.session_number <> 1 OR NEW.attendance_date = cycle.cycle_start_date)
+    AND NEW.session_number = 1 + (SELECT COUNT(*) FROM student_session_attendance_events AS prior
+      WHERE prior.app = cycle.app AND prior.student_id = cycle.student_id
+        AND prior.configured_start_date = cycle.configured_start_date
+        AND prior.cycle_number = cycle.cycle_number)
+)
+BEGIN SELECT RAISE(ABORT, 'STUDENT_SESSION_EVENT_SEQUENCE'); END;
+
+CREATE TRIGGER IF NOT EXISTS trg_student_session_cycles_no_update
+BEFORE UPDATE ON student_session_cycles
+BEGIN SELECT RAISE(ABORT, 'STUDENT_SESSION_CYCLE_APPEND_ONLY'); END;
+CREATE TRIGGER IF NOT EXISTS trg_student_session_cycles_no_delete
+BEFORE DELETE ON student_session_cycles
+BEGIN SELECT RAISE(ABORT, 'STUDENT_SESSION_CYCLE_APPEND_ONLY'); END;
+CREATE TRIGGER IF NOT EXISTS trg_student_session_events_no_update
+BEFORE UPDATE ON student_session_attendance_events
+BEGIN SELECT RAISE(ABORT, 'STUDENT_SESSION_EVENT_APPEND_ONLY'); END;
+CREATE TRIGGER IF NOT EXISTS trg_student_session_events_no_delete
+BEFORE DELETE ON student_session_attendance_events
+BEGIN SELECT RAISE(ABORT, 'STUDENT_SESSION_EVENT_APPEND_ONLY'); END;
+
+
+-- 한 번 회차 원장의 사용 근거가 된 check는 학생의 현재 결제 방식·회차 시작일·보강
+-- 상태가 바뀌어도 영구 정본이다. generic LWW의 stale 재전송과 동일 att 메모 수정만 허용한다.
+CREATE TRIGGER IF NOT EXISTS trg_session4_event_check_att_lock_insert
+BEFORE INSERT ON checks
+WHEN NEW.app = 'task'
+  AND json_valid(NEW.data)
+  AND EXISTS (
+    SELECT 1 FROM student_session_attendance_events AS event
+    WHERE event.app = NEW.app AND event.check_key = NEW.k
+  )
+  AND (
+    NOT EXISTS (
+      SELECT 1 FROM checks AS current WHERE current.app = NEW.app AND current.k = NEW.k
+    )
+    OR EXISTS (
+      SELECT 1 FROM checks AS current
+      WHERE current.app = NEW.app AND current.k = NEW.k
+        AND NEW.updated_at > current.updated_at
+        AND (
+          NOT json_valid(current.data)
+          OR CAST(json_extract(current.data, '$.att') AS TEXT)
+            IS NOT CAST(json_extract(NEW.data, '$.att') AS TEXT)
+        )
+    )
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'SESSION4_ATTENDANCE_LOCKED');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_session4_event_check_att_lock_update
+BEFORE UPDATE OF data ON checks
+WHEN OLD.app = 'task'
+  AND json_valid(OLD.data) AND json_valid(NEW.data)
+  AND CAST(json_extract(OLD.data, '$.att') AS TEXT)
+    IS NOT CAST(json_extract(NEW.data, '$.att') AS TEXT)
+  AND EXISTS (
+    SELECT 1 FROM student_session_attendance_events AS event
+    WHERE event.app = OLD.app AND event.check_key = OLD.k
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'SESSION4_ATTENDANCE_LOCKED');
+END;
+
+
+-- 회차제 출결은 수업일 KST 23:50에 확정된다. generic /sync의 INSERT ... ON CONFLICT도
+-- BEFORE INSERT를 먼저 거치므로, 기존 att와 같은 재전송만 통과시키고 신규·변경은 막는다.
+CREATE TRIGGER IF NOT EXISTS trg_session4_check_att_lock_insert
+BEFORE INSERT ON checks
+WHEN NEW.app = 'task'
+  AND json_valid(NEW.data)
+  AND instr(NEW.k, '|') > 1
+  AND instr(substr(NEW.k, instr(NEW.k, '|') + 1), '|') = 0
+  AND strftime('%Y-%m-%d', substr(NEW.k, instr(NEW.k, '|') + 1)) =
+    substr(NEW.k, instr(NEW.k, '|') + 1)
+  AND (
+    substr(NEW.k, instr(NEW.k, '|') + 1) < date('now', '+9 hours')
+    OR (
+      substr(NEW.k, instr(NEW.k, '|') + 1) = date('now', '+9 hours')
+      AND time('now', '+9 hours') >= '23:50:00'
+    )
+  )
+  AND COALESCE(CAST(json_extract(NEW.data, '$.att') AS TEXT), '') <> ''
+  AND EXISTS (
+    SELECT 1
+    FROM tasks AS task, private_rosters AS roster,
+      json_each(roster.data, '$.roster.students') AS student
+    WHERE task.app = NEW.app
+      AND roster.app = NEW.app
+      AND json_valid(task.data) AND json_type(task.data) = 'object'
+      AND json_valid(roster.data)
+      AND task.id = substr(NEW.k, 1, instr(NEW.k, '|') - 1)
+      AND json_extract(task.data, '$.id') = task.id
+      AND json_extract(task.data, '$.staffId') = task.owner
+      AND (
+        json_extract(task.data, '$.taskKind') = 'lesson_instruction'
+        OR COALESCE(json_extract(task.data, '$.lessonFormVersion'), 0) >= 1
+        OR COALESCE(json_extract(task.data, '$.intakeVersion'), 0) >= 1
+      )
+      AND (
+        (
+          COALESCE(CAST(json_extract(task.data, '$.lessonInstanceType') AS TEXT), '') <> 'makeup'
+          AND COALESCE(CAST(json_extract(task.data, '$.makeupCaseId') AS TEXT), '') = ''
+        )
+        OR (
+          json_extract(task.data, '$.lessonInstanceType') = 'makeup'
+          AND task.id = 'makeup_lesson_' || CAST(json_extract(task.data, '$.makeupCaseId') AS TEXT)
+          AND json_extract(task.data, '$.start') = substr(NEW.k, instr(NEW.k, '|') + 1)
+          AND json_extract(task.data, '$.end') = substr(NEW.k, instr(NEW.k, '|') + 1)
+          AND EXISTS (
+            SELECT 1 FROM makeup_cases AS makeup
+            WHERE makeup.app = task.app
+              AND makeup.case_id = json_extract(task.data, '$.makeupCaseId')
+              AND makeup.student_id = json_extract(task.data, '$.studentId')
+              AND makeup.confirmed_staff_id = task.owner
+              AND (
+                (
+                  makeup.status = 'confirmed'
+                  AND substr(makeup.confirmed_start_at, 1, 10) = substr(NEW.k, instr(NEW.k, '|') + 1)
+                  AND substr(makeup.confirmed_end_at, 1, 10) = substr(NEW.k, instr(NEW.k, '|') + 1)
+                )
+                OR (
+                  makeup.status = 'completed'
+                  AND makeup.completed_at IS NOT NULL AND makeup.completed_by IS NOT NULL
+                  AND json_extract(makeup.history,
+                    '$[' || (json_array_length(makeup.history) - 1) || '].action') = 'complete'
+                )
+              )
+              AND (
+                json_extract(makeup.history, '$[0].action') = 'create_from_absence'
+                OR (
+                  json_extract(makeup.history, '$[0].action') = 'create_manual'
+                  AND json_extract(makeup.history, '$[0].reason') = 'manual_absence'
+                )
+              )
+          )
+        )
+      )
+      AND (
+        COALESCE(json_extract(task.data, '$.deleted'), 0) = 0
+        OR strftime('%Y-%m-%d', CAST(json_extract(task.data, '$.end') AS TEXT)) =
+          CAST(json_extract(task.data, '$.end') AS TEXT)
+      )
+      AND (
+        COALESCE(CAST(json_extract(task.data, '$.start') AS TEXT), '') = ''
+        OR substr(NEW.k, instr(NEW.k, '|') + 1) >= CAST(json_extract(task.data, '$.start') AS TEXT)
+      )
+      AND (
+        COALESCE(CAST(json_extract(task.data, '$.end') AS TEXT), '') = ''
+        OR substr(NEW.k, instr(NEW.k, '|') + 1) <= CAST(json_extract(task.data, '$.end') AS TEXT)
+      )
+      AND json_extract(student.value, '$.id') = json_extract(task.data, '$.studentId')
+      AND json_extract(student.value, '$.billingMode') = 'session4'
+      AND strftime('%Y-%m-%d', CAST(json_extract(student.value, '$.sessionCycleStartDate') AS TEXT)) =
+        CAST(json_extract(student.value, '$.sessionCycleStartDate') AS TEXT)
+      AND substr(NEW.k, instr(NEW.k, '|') + 1) >=
+        CAST(json_extract(student.value, '$.sessionCycleStartDate') AS TEXT)
+  )
+  AND (
+    NOT EXISTS (
+      SELECT 1 FROM checks AS current WHERE current.app = NEW.app AND current.k = NEW.k
+    )
+    OR EXISTS (
+      SELECT 1 FROM checks AS current
+      WHERE current.app = NEW.app AND current.k = NEW.k
+        AND NEW.updated_at > current.updated_at
+        AND (
+          NOT json_valid(current.data)
+          OR CAST(json_extract(current.data, '$.att') AS TEXT)
+            IS NOT CAST(json_extract(NEW.data, '$.att') AS TEXT)
+        )
+    )
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'SESSION4_ATTENDANCE_LOCKED');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_session4_check_att_lock_update
+BEFORE UPDATE OF data ON checks
+WHEN OLD.app = 'task'
+  AND json_valid(OLD.data) AND json_valid(NEW.data)
+  AND CAST(json_extract(OLD.data, '$.att') AS TEXT)
+    IS NOT CAST(json_extract(NEW.data, '$.att') AS TEXT)
+  AND instr(OLD.k, '|') > 1
+  AND instr(substr(OLD.k, instr(OLD.k, '|') + 1), '|') = 0
+  AND strftime('%Y-%m-%d', substr(OLD.k, instr(OLD.k, '|') + 1)) =
+    substr(OLD.k, instr(OLD.k, '|') + 1)
+  AND (
+    substr(OLD.k, instr(OLD.k, '|') + 1) < date('now', '+9 hours')
+    OR (
+      substr(OLD.k, instr(OLD.k, '|') + 1) = date('now', '+9 hours')
+      AND time('now', '+9 hours') >= '23:50:00'
+    )
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM tasks AS task, private_rosters AS roster,
+      json_each(roster.data, '$.roster.students') AS student
+    WHERE task.app = OLD.app
+      AND roster.app = OLD.app
+      AND json_valid(task.data) AND json_type(task.data) = 'object'
+      AND json_valid(roster.data)
+      AND task.id = substr(OLD.k, 1, instr(OLD.k, '|') - 1)
+      AND json_extract(task.data, '$.id') = task.id
+      AND json_extract(task.data, '$.staffId') = task.owner
+      AND (
+        json_extract(task.data, '$.taskKind') = 'lesson_instruction'
+        OR COALESCE(json_extract(task.data, '$.lessonFormVersion'), 0) >= 1
+        OR COALESCE(json_extract(task.data, '$.intakeVersion'), 0) >= 1
+      )
+      AND (
+        (
+          COALESCE(CAST(json_extract(task.data, '$.lessonInstanceType') AS TEXT), '') <> 'makeup'
+          AND COALESCE(CAST(json_extract(task.data, '$.makeupCaseId') AS TEXT), '') = ''
+        )
+        OR (
+          json_extract(task.data, '$.lessonInstanceType') = 'makeup'
+          AND task.id = 'makeup_lesson_' || CAST(json_extract(task.data, '$.makeupCaseId') AS TEXT)
+          AND json_extract(task.data, '$.start') = substr(OLD.k, instr(OLD.k, '|') + 1)
+          AND json_extract(task.data, '$.end') = substr(OLD.k, instr(OLD.k, '|') + 1)
+          AND EXISTS (
+            SELECT 1 FROM makeup_cases AS makeup
+            WHERE makeup.app = task.app
+              AND makeup.case_id = json_extract(task.data, '$.makeupCaseId')
+              AND makeup.student_id = json_extract(task.data, '$.studentId')
+              AND makeup.confirmed_staff_id = task.owner
+              AND (
+                (
+                  makeup.status = 'confirmed'
+                  AND substr(makeup.confirmed_start_at, 1, 10) = substr(OLD.k, instr(OLD.k, '|') + 1)
+                  AND substr(makeup.confirmed_end_at, 1, 10) = substr(OLD.k, instr(OLD.k, '|') + 1)
+                )
+                OR (
+                  makeup.status = 'completed'
+                  AND makeup.completed_at IS NOT NULL AND makeup.completed_by IS NOT NULL
+                  AND json_extract(makeup.history,
+                    '$[' || (json_array_length(makeup.history) - 1) || '].action') = 'complete'
+                )
+              )
+              AND (
+                json_extract(makeup.history, '$[0].action') = 'create_from_absence'
+                OR (
+                  json_extract(makeup.history, '$[0].action') = 'create_manual'
+                  AND json_extract(makeup.history, '$[0].reason') = 'manual_absence'
+                )
+              )
+          )
+        )
+      )
+      AND (
+        COALESCE(json_extract(task.data, '$.deleted'), 0) = 0
+        OR strftime('%Y-%m-%d', CAST(json_extract(task.data, '$.end') AS TEXT)) =
+          CAST(json_extract(task.data, '$.end') AS TEXT)
+      )
+      AND (
+        COALESCE(CAST(json_extract(task.data, '$.start') AS TEXT), '') = ''
+        OR substr(OLD.k, instr(OLD.k, '|') + 1) >= CAST(json_extract(task.data, '$.start') AS TEXT)
+      )
+      AND (
+        COALESCE(CAST(json_extract(task.data, '$.end') AS TEXT), '') = ''
+        OR substr(OLD.k, instr(OLD.k, '|') + 1) <= CAST(json_extract(task.data, '$.end') AS TEXT)
+      )
+      AND json_extract(student.value, '$.id') = json_extract(task.data, '$.studentId')
+      AND json_extract(student.value, '$.billingMode') = 'session4'
+      AND strftime('%Y-%m-%d', CAST(json_extract(student.value, '$.sessionCycleStartDate') AS TEXT)) =
+        CAST(json_extract(student.value, '$.sessionCycleStartDate') AS TEXT)
+      AND substr(OLD.k, instr(OLD.k, '|') + 1) >=
+        CAST(json_extract(student.value, '$.sessionCycleStartDate') AS TEXT)
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'SESSION4_ATTENDANCE_LOCKED');
+END;
+
+
 -- 당일 남은 수업 인계. 정규 tasks/checks/session_packs는 변경하지 않는다.
 CREATE TABLE IF NOT EXISTS lesson_handoffs (
   app                   TEXT NOT NULL CHECK (app = 'task'),
@@ -4000,4 +4696,1181 @@ WHEN OLD.app = 'consult'
   )
 BEGIN
   SELECT RAISE(ABORT, 'REWARD_PROCESSING_LOCK');
+END;
+
+-- 학부모 피드백 AI 다듬기의 호출 상한과 개인정보 비노출 결과 캐시.
+-- 캐시 키는 Worker secret으로 HMAC 처리하며 원문·학생명·학생/수업 ID를 저장하지 않는다.
+CREATE TABLE IF NOT EXISTS feedback_polish_daily_usage (
+  app           TEXT    NOT NULL CHECK (app = 'task'),
+  usage_day_utc TEXT    NOT NULL CHECK (
+    length(usage_day_utc) = 10
+    AND strftime('%Y-%m-%d', usage_day_utc) = usage_day_utc
+  ),
+  ai_calls      INTEGER NOT NULL CHECK (ai_calls BETWEEN 1 AND 150),
+  updated_at    INTEGER NOT NULL CHECK (updated_at > 0),
+  PRIMARY KEY (app, usage_day_utc)
+);
+
+CREATE TABLE IF NOT EXISTS feedback_polish_cache (
+  app            TEXT    NOT NULL CHECK (app = 'task'),
+  cache_key      TEXT    NOT NULL CHECK (
+    length(cache_key) = 64 AND cache_key NOT GLOB '*[^0-9a-f]*'
+  ),
+  prompt_version TEXT    NOT NULL CHECK (length(prompt_version) BETWEEN 1 AND 32),
+  state          TEXT    NOT NULL CHECK (state IN ('pending', 'ready', 'failed')),
+  result_text    TEXT,
+  failure_reason TEXT,
+  claim_token    TEXT,
+  lease_until    INTEGER,
+  max_chars      INTEGER NOT NULL CHECK (max_chars BETWEEN 20 AND 600),
+  created_at     INTEGER NOT NULL CHECK (created_at > 0),
+  updated_at     INTEGER NOT NULL CHECK (updated_at >= created_at),
+  expires_at     INTEGER NOT NULL CHECK (expires_at > created_at),
+  PRIMARY KEY (app, cache_key),
+  CHECK (
+    (state = 'pending'
+      AND result_text IS NULL
+      AND failure_reason IS NULL
+      AND claim_token IS NOT NULL
+      AND length(claim_token) = 64
+      AND claim_token NOT GLOB '*[^0-9a-f]*'
+      AND lease_until IS NOT NULL
+      AND lease_until > created_at)
+    OR
+    (state = 'ready'
+      AND result_text IS NOT NULL
+      AND length(result_text) BETWEEN 20 AND max_chars
+      AND failure_reason IS NULL
+      AND claim_token IS NULL
+      AND lease_until IS NULL)
+    OR
+    (state = 'failed'
+      AND result_text IS NULL
+      AND failure_reason IN ('busy', 'ai_failed', 'ai_invalid')
+      AND claim_token IS NULL
+      AND lease_until IS NULL)
+  )
+);
+
+CREATE INDEX IF NOT EXISTS idx_feedback_polish_cache_expiry
+  ON feedback_polish_cache(app, expires_at);
+
+-- 회차 원장 정정은 기존 063 원장을 수정하지 않고 새 세대를 append-only로 쌓는다.
+-- 이름·연락처는 저장하지 않으며 stable studentId와 출결 근거만 보존한다.
+
+CREATE TABLE IF NOT EXISTS student_session_ledger_generations (
+  app                      TEXT    NOT NULL CHECK (app = 'task'),
+  student_id               TEXT    NOT NULL CHECK (length(student_id) BETWEEN 1 AND 160),
+  configured_start_date    TEXT    NOT NULL CHECK (
+    length(configured_start_date) = 10
+    AND strftime('%Y-%m-%d', configured_start_date) = configured_start_date
+  ),
+  generation               INTEGER NOT NULL CHECK (generation >= 1),
+  source_cutoff_date       TEXT    NOT NULL CHECK (
+    length(source_cutoff_date) = 10
+    AND strftime('%Y-%m-%d', source_cutoff_date) = source_cutoff_date
+  ),
+  kind                     TEXT    NOT NULL CHECK (kind IN ('system_backfill','admin_reconciliation')),
+  supersedes_generation    INTEGER,
+  supersedes_event_count   INTEGER NOT NULL CHECK (supersedes_event_count >= 0),
+  reason_code              TEXT    NOT NULL CHECK (length(reason_code) BETWEEN 1 AND 80),
+  actor                    TEXT    NOT NULL CHECK (length(actor) BETWEEN 1 AND 160),
+  created_at               INTEGER NOT NULL CHECK (created_at > 0),
+  PRIMARY KEY (app, student_id, configured_start_date, generation),
+  FOREIGN KEY (app, student_id, configured_start_date, supersedes_generation)
+    REFERENCES student_session_ledger_generations(
+      app, student_id, configured_start_date, generation
+    ),
+  CHECK (
+    (generation = 1 AND supersedes_generation IS NULL AND supersedes_event_count = 0)
+    OR
+    (generation > 1 AND supersedes_generation IS NOT NULL
+      AND supersedes_generation = generation - 1)
+  )
+);
+
+CREATE INDEX IF NOT EXISTS idx_student_session_ledger_generations_latest
+  ON student_session_ledger_generations(
+    app, student_id, configured_start_date, generation DESC
+  );
+
+CREATE TABLE IF NOT EXISTS student_session_ledger_cycles (
+  app                      TEXT    NOT NULL CHECK (app = 'task'),
+  student_id               TEXT    NOT NULL CHECK (length(student_id) BETWEEN 1 AND 160),
+  configured_start_date    TEXT    NOT NULL CHECK (
+    length(configured_start_date) = 10
+    AND strftime('%Y-%m-%d', configured_start_date) = configured_start_date
+  ),
+  generation               INTEGER NOT NULL CHECK (generation >= 1),
+  cycle_number             INTEGER NOT NULL CHECK (cycle_number >= 1),
+  cycle_start_date         TEXT    NOT NULL CHECK (
+    length(cycle_start_date) = 10
+    AND strftime('%Y-%m-%d', cycle_start_date) = cycle_start_date
+  ),
+  created_at               INTEGER NOT NULL CHECK (created_at > 0),
+  PRIMARY KEY (
+    app, student_id, configured_start_date, generation, cycle_number
+  ),
+  FOREIGN KEY (app, student_id, configured_start_date, generation)
+    REFERENCES student_session_ledger_generations(
+      app, student_id, configured_start_date, generation
+    )
+);
+
+CREATE INDEX IF NOT EXISTS idx_student_session_ledger_cycles_latest
+  ON student_session_ledger_cycles(
+    app, student_id, configured_start_date, generation DESC, cycle_number DESC
+  );
+
+CREATE TABLE IF NOT EXISTS student_session_ledger_events (
+  app                      TEXT    NOT NULL CHECK (app = 'task'),
+  student_id               TEXT    NOT NULL CHECK (length(student_id) BETWEEN 1 AND 160),
+  configured_start_date    TEXT    NOT NULL CHECK (
+    length(configured_start_date) = 10
+    AND strftime('%Y-%m-%d', configured_start_date) = configured_start_date
+  ),
+  generation               INTEGER NOT NULL CHECK (generation >= 1),
+  cycle_number             INTEGER NOT NULL CHECK (cycle_number >= 1),
+  session_number           INTEGER NOT NULL CHECK (session_number BETWEEN 1 AND 4),
+  lesson_task_id           TEXT    NOT NULL CHECK (length(lesson_task_id) BETWEEN 1 AND 160),
+  attendance_date          TEXT    NOT NULL CHECK (
+    length(attendance_date) = 10
+    AND strftime('%Y-%m-%d', attendance_date) = attendance_date
+  ),
+  attendance_status        TEXT    NOT NULL CHECK (attendance_status IN ('P','L','E')),
+  source_kind              TEXT    NOT NULL CHECK (source_kind IN ('check','admin_attested')),
+  check_key                TEXT    NOT NULL CHECK (length(check_key) BETWEEN 3 AND 180),
+  created_at               INTEGER NOT NULL CHECK (created_at > 0),
+  PRIMARY KEY (
+    app, student_id, configured_start_date, generation, cycle_number, session_number
+  ),
+  UNIQUE (
+    app, student_id, configured_start_date, generation, lesson_task_id, attendance_date
+  ),
+  FOREIGN KEY (
+    app, student_id, configured_start_date, generation, cycle_number
+  ) REFERENCES student_session_ledger_cycles(
+    app, student_id, configured_start_date, generation, cycle_number
+  )
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_student_session_ledger_events_source
+  ON student_session_ledger_events(
+    app, student_id, configured_start_date, generation, check_key
+  );
+
+CREATE INDEX IF NOT EXISTS idx_student_session_ledger_events_cycle
+  ON student_session_ledger_events(
+    app, student_id, configured_start_date, generation DESC, cycle_number, session_number
+  );
+
+-- 063의 모든 정본을 세대 1로 복사한다. WHERE NOT EXISTS 덕분에 이후 세대가 생긴 뒤
+-- 이 파일을 다시 실행해도 superseded 세대에 INSERT trigger가 발동하지 않는다.
+INSERT INTO student_session_ledger_generations(
+  app, student_id, configured_start_date, generation, source_cutoff_date, kind,
+  supersedes_generation, supersedes_event_count, reason_code, actor, created_at
+)
+SELECT cycle.app,
+  cycle.student_id,
+  cycle.configured_start_date,
+  1,
+  CASE
+    WHEN MAX(event.attendance_date) IS NOT NULL
+      AND MAX(event.attendance_date) > cycle.configured_start_date
+      THEN MAX(event.attendance_date)
+    ELSE cycle.configured_start_date
+  END,
+  'system_backfill',
+  NULL,
+  0,
+  'legacy_063_migration',
+  'system:migration:064',
+  MIN(cycle.created_at)
+FROM student_session_cycles AS cycle
+LEFT JOIN student_session_attendance_events AS event
+  ON event.app = cycle.app
+  AND event.student_id = cycle.student_id
+  AND event.configured_start_date = cycle.configured_start_date
+WHERE NOT EXISTS (
+  SELECT 1
+  FROM student_session_ledger_generations AS existing
+  WHERE existing.app = cycle.app
+    AND existing.student_id = cycle.student_id
+    AND existing.configured_start_date = cycle.configured_start_date
+    AND existing.generation = 1
+)
+GROUP BY cycle.app, cycle.student_id, cycle.configured_start_date;
+
+INSERT INTO student_session_ledger_cycles(
+  app, student_id, configured_start_date, generation,
+  cycle_number, cycle_start_date, created_at
+)
+SELECT legacy.app,
+  legacy.student_id,
+  legacy.configured_start_date,
+  1,
+  legacy.cycle_number,
+  legacy.cycle_start_date,
+  legacy.created_at
+FROM student_session_cycles AS legacy
+WHERE NOT EXISTS (
+  SELECT 1
+  FROM student_session_ledger_cycles AS existing
+  WHERE existing.app = legacy.app
+    AND existing.student_id = legacy.student_id
+    AND existing.configured_start_date = legacy.configured_start_date
+    AND existing.generation = 1
+    AND existing.cycle_number = legacy.cycle_number
+)
+AND NOT EXISTS (
+  SELECT 1
+  FROM student_session_ledger_generations AS newer
+  WHERE newer.app = legacy.app
+    AND newer.student_id = legacy.student_id
+    AND newer.configured_start_date = legacy.configured_start_date
+    AND newer.generation > 1
+);
+
+INSERT INTO student_session_ledger_events(
+  app, student_id, configured_start_date, generation, cycle_number, session_number,
+  lesson_task_id, attendance_date, attendance_status, source_kind, check_key, created_at
+)
+SELECT legacy.app,
+  legacy.student_id,
+  legacy.configured_start_date,
+  1,
+  legacy.cycle_number,
+  legacy.session_number,
+  legacy.lesson_task_id,
+  legacy.attendance_date,
+  legacy.attendance_status,
+  'check',
+  legacy.check_key,
+  legacy.created_at
+FROM student_session_attendance_events AS legacy
+WHERE NOT EXISTS (
+  SELECT 1
+  FROM student_session_ledger_events AS existing
+  WHERE existing.app = legacy.app
+    AND existing.student_id = legacy.student_id
+    AND existing.configured_start_date = legacy.configured_start_date
+    AND existing.generation = 1
+    AND existing.cycle_number = legacy.cycle_number
+    AND existing.session_number = legacy.session_number
+)
+AND NOT EXISTS (
+  SELECT 1
+  FROM student_session_ledger_generations AS newer
+  WHERE newer.app = legacy.app
+    AND newer.student_id = legacy.student_id
+    AND newer.configured_start_date = legacy.configured_start_date
+    AND newer.generation > 1
+);
+
+-- 세대 생성은 바로 직전의 최신 세대와 그 이벤트 수를 정확히 알고 있을 때만 성공한다.
+-- append-only 이벤트 수가 CAS 역할을 하므로 동시에 시작된 정정 중 하나만 확정된다.
+CREATE TRIGGER IF NOT EXISTS trg_student_session_ledger_generation_sequence
+BEFORE INSERT ON student_session_ledger_generations
+WHEN (
+  NEW.generation = 1
+  AND EXISTS (
+    SELECT 1 FROM student_session_ledger_generations AS existing
+    WHERE existing.app = NEW.app
+      AND existing.student_id = NEW.student_id
+      AND existing.configured_start_date = NEW.configured_start_date
+  )
+) OR (
+  NEW.generation > 1
+  AND (
+    NOT EXISTS (
+      SELECT 1 FROM student_session_ledger_generations AS previous
+      WHERE previous.app = NEW.app
+        AND previous.student_id = NEW.student_id
+        AND previous.configured_start_date = NEW.configured_start_date
+    )
+    OR NEW.supersedes_generation <> (
+      SELECT MAX(previous.generation)
+      FROM student_session_ledger_generations AS previous
+      WHERE previous.app = NEW.app
+        AND previous.student_id = NEW.student_id
+        AND previous.configured_start_date = NEW.configured_start_date
+    )
+    OR NEW.generation <> NEW.supersedes_generation + 1
+    OR NEW.supersedes_event_count <> (
+      SELECT COUNT(*)
+      FROM student_session_ledger_events AS previous_event
+      WHERE previous_event.app = NEW.app
+        AND previous_event.student_id = NEW.student_id
+        AND previous_event.configured_start_date = NEW.configured_start_date
+        AND previous_event.generation = NEW.supersedes_generation
+    )
+  )
+)
+BEGIN
+  SELECT RAISE(ABORT, 'STUDENT_SESSION_LEDGER_GENERATION_CONFLICT');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_student_session_ledger_cycle_current
+BEFORE INSERT ON student_session_ledger_cycles
+WHEN NEW.generation <> COALESCE((
+  SELECT MAX(current.generation)
+  FROM student_session_ledger_generations AS current
+  WHERE current.app = NEW.app
+    AND current.student_id = NEW.student_id
+    AND current.configured_start_date = NEW.configured_start_date
+), 0)
+OR (NEW.cycle_number = 1 AND NEW.cycle_start_date <> NEW.configured_start_date)
+OR (
+  NEW.cycle_number > 1
+  AND NOT EXISTS (
+    SELECT 1
+    FROM student_session_ledger_cycles AS previous
+    JOIN student_session_ledger_events AS final_event
+      ON final_event.app = previous.app
+      AND final_event.student_id = previous.student_id
+      AND final_event.configured_start_date = previous.configured_start_date
+      AND final_event.generation = previous.generation
+      AND final_event.cycle_number = previous.cycle_number
+      AND final_event.session_number = 4
+    WHERE previous.app = NEW.app
+      AND previous.student_id = NEW.student_id
+      AND previous.configured_start_date = NEW.configured_start_date
+      AND previous.generation = NEW.generation
+      AND previous.cycle_number = NEW.cycle_number - 1
+      AND NEW.cycle_start_date >= final_event.attendance_date
+      AND 4 = (
+        SELECT COUNT(*)
+        FROM student_session_ledger_events AS previous_event
+        WHERE previous_event.app = previous.app
+          AND previous_event.student_id = previous.student_id
+          AND previous_event.configured_start_date = previous.configured_start_date
+          AND previous_event.generation = previous.generation
+          AND previous_event.cycle_number = previous.cycle_number
+      )
+  )
+)
+BEGIN
+  SELECT RAISE(ABORT, 'STUDENT_SESSION_LEDGER_CYCLE_SEQUENCE');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_student_session_ledger_event_current
+BEFORE INSERT ON student_session_ledger_events
+WHEN NEW.generation <> COALESCE((
+  SELECT MAX(current.generation)
+  FROM student_session_ledger_generations AS current
+  WHERE current.app = NEW.app
+    AND current.student_id = NEW.student_id
+    AND current.configured_start_date = NEW.configured_start_date
+), 0)
+OR NOT EXISTS (
+  SELECT 1
+  FROM student_session_ledger_generations AS current
+  WHERE current.app = NEW.app
+    AND current.student_id = NEW.student_id
+    AND current.configured_start_date = NEW.configured_start_date
+    AND current.generation = NEW.generation
+    AND (
+      (current.kind = 'system_backfill' AND NEW.source_kind = 'check')
+      OR
+      (
+        current.kind = 'admin_reconciliation'
+        AND (
+          (NEW.source_kind = 'admin_attested'
+            AND NEW.attendance_date <= current.source_cutoff_date)
+          OR
+          (NEW.source_kind = 'check'
+            AND NEW.attendance_date > current.source_cutoff_date)
+        )
+      )
+    )
+)
+OR NOT EXISTS (
+  SELECT 1
+  FROM student_session_ledger_cycles AS cycle
+  WHERE cycle.app = NEW.app
+    AND cycle.student_id = NEW.student_id
+    AND cycle.configured_start_date = NEW.configured_start_date
+    AND cycle.generation = NEW.generation
+    AND cycle.cycle_number = NEW.cycle_number
+    AND NEW.attendance_date >= cycle.cycle_start_date
+    AND (
+      NEW.cycle_number = 1
+      OR NEW.session_number <> 1
+      OR NEW.attendance_date = cycle.cycle_start_date
+    )
+)
+OR (
+  NEW.session_number > 1
+  AND NOT EXISTS (
+    SELECT 1
+    FROM student_session_ledger_events AS previous
+    WHERE previous.app = NEW.app
+      AND previous.student_id = NEW.student_id
+      AND previous.configured_start_date = NEW.configured_start_date
+      AND previous.generation = NEW.generation
+      AND previous.cycle_number = NEW.cycle_number
+      AND previous.session_number = NEW.session_number - 1
+      AND NEW.attendance_date >= previous.attendance_date
+  )
+)
+OR NEW.session_number <> 1 + (
+  SELECT COUNT(*)
+  FROM student_session_ledger_events AS prior
+  WHERE prior.app = NEW.app
+    AND prior.student_id = NEW.student_id
+    AND prior.configured_start_date = NEW.configured_start_date
+    AND prior.generation = NEW.generation
+    AND prior.cycle_number = NEW.cycle_number
+)
+BEGIN
+  SELECT RAISE(ABORT, 'STUDENT_SESSION_LEDGER_EVENT_SEQUENCE');
+END;
+
+-- admin_attested도 실제 수업 task의 stable studentId를 반드시 가리킨다. 다만 관리자가
+-- 과거 출석을 증빙하여 정정하는 경우 raw check 행이 없어도 허용한다.
+CREATE TRIGGER IF NOT EXISTS trg_student_session_ledger_event_source
+BEFORE INSERT ON student_session_ledger_events
+WHEN NEW.check_key <> NEW.lesson_task_id || '|' || NEW.attendance_date
+OR NOT EXISTS (
+  SELECT 1
+  FROM tasks AS task
+  WHERE task.app = NEW.app
+    AND task.id = NEW.lesson_task_id
+    AND json_valid(task.data)
+    AND json_type(task.data) = 'object'
+    AND json_extract(task.data, '$.id') = NEW.lesson_task_id
+    AND json_extract(task.data, '$.studentId') = NEW.student_id
+    AND json_extract(task.data, '$.staffId') = task.owner
+    AND (
+      json_extract(task.data, '$.taskKind') = 'lesson_instruction'
+      OR COALESCE(json_extract(task.data, '$.lessonFormVersion'), 0) >= 1
+      OR COALESCE(json_extract(task.data, '$.intakeVersion'), 0) >= 1
+    )
+    AND (
+      (
+        COALESCE(CAST(json_extract(task.data, '$.lessonInstanceType') AS TEXT), '') <> 'makeup'
+        AND COALESCE(CAST(json_extract(task.data, '$.makeupCaseId') AS TEXT), '') = ''
+      )
+      OR EXISTS (
+        SELECT 1
+        FROM makeup_cases AS makeup
+        WHERE makeup.app = task.app
+          AND makeup.case_id = CAST(json_extract(task.data, '$.makeupCaseId') AS TEXT)
+          AND task.id = 'makeup_lesson_' || makeup.case_id
+          AND makeup.student_id = NEW.student_id
+          AND makeup.status IN ('confirmed','completed')
+          AND json_extract(task.data, '$.lessonInstanceType') = 'makeup'
+          AND (
+            json_extract(makeup.history, '$[0].action') = 'create_from_absence'
+            OR (
+              json_extract(makeup.history, '$[0].action') = 'create_manual'
+              AND json_extract(makeup.history, '$[0].reason') = 'manual_absence'
+            )
+          )
+      )
+    )
+)
+OR (
+  NEW.source_kind = 'check'
+  AND NOT EXISTS (
+    SELECT 1
+    FROM tasks AS task
+    JOIN checks AS attendance
+      ON attendance.app = task.app
+      AND attendance.k = NEW.check_key
+      AND attendance.owner = task.owner
+    WHERE task.app = NEW.app
+      AND task.id = NEW.lesson_task_id
+      AND json_valid(attendance.data)
+      AND json_type(attendance.data) = 'object'
+      AND json_extract(attendance.data, '$.taskId') = NEW.lesson_task_id
+      AND json_extract(attendance.data, '$.date') = NEW.attendance_date
+      AND json_extract(attendance.data, '$.att') = NEW.attendance_status
+  )
+)
+BEGIN
+  SELECT RAISE(ABORT, 'STUDENT_SESSION_LEDGER_EVENT_SOURCE');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_student_session_ledger_generations_no_update
+BEFORE UPDATE ON student_session_ledger_generations
+BEGIN
+  SELECT RAISE(ABORT, 'STUDENT_SESSION_LEDGER_GENERATION_APPEND_ONLY');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_student_session_ledger_generations_no_delete
+BEFORE DELETE ON student_session_ledger_generations
+BEGIN
+  SELECT RAISE(ABORT, 'STUDENT_SESSION_LEDGER_GENERATION_APPEND_ONLY');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_student_session_ledger_cycles_no_update
+BEFORE UPDATE ON student_session_ledger_cycles
+BEGIN
+  SELECT RAISE(ABORT, 'STUDENT_SESSION_LEDGER_CYCLE_APPEND_ONLY');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_student_session_ledger_cycles_no_delete
+BEFORE DELETE ON student_session_ledger_cycles
+BEGIN
+  SELECT RAISE(ABORT, 'STUDENT_SESSION_LEDGER_CYCLE_APPEND_ONLY');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_student_session_ledger_events_no_update
+BEFORE UPDATE ON student_session_ledger_events
+BEGIN
+  SELECT RAISE(ABORT, 'STUDENT_SESSION_LEDGER_EVENT_APPEND_ONLY');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_student_session_ledger_events_no_delete
+BEFORE DELETE ON student_session_ledger_events
+BEGIN
+  SELECT RAISE(ABORT, 'STUDENT_SESSION_LEDGER_EVENT_APPEND_ONLY');
+END;
+
+-- admin_attested가 raw check 없이 먼저 만들어져도 이후 stale 태블릿 업로드가 정본을
+-- 바꾸지 못한다. 같은 출결 상태의 메모 갱신과 generic LWW stale no-op는 계속 허용한다.
+CREATE TRIGGER IF NOT EXISTS trg_session4_generation_event_check_att_lock_insert
+BEFORE INSERT ON checks
+WHEN NEW.app = 'task'
+  AND json_valid(NEW.data)
+  AND EXISTS (
+    SELECT 1 FROM student_session_ledger_events AS event
+    WHERE event.app = NEW.app AND event.check_key = NEW.k
+  )
+  AND (
+    NOT EXISTS (
+      SELECT 1 FROM checks AS current WHERE current.app = NEW.app AND current.k = NEW.k
+    )
+    OR EXISTS (
+      SELECT 1 FROM checks AS current
+      WHERE current.app = NEW.app AND current.k = NEW.k
+        AND NEW.updated_at > current.updated_at
+        AND (
+          NOT json_valid(current.data)
+          OR CAST(json_extract(current.data, '$.att') AS TEXT)
+            IS NOT CAST(json_extract(NEW.data, '$.att') AS TEXT)
+        )
+    )
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'SESSION4_ATTENDANCE_LOCKED');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_session4_generation_event_check_att_lock_update
+BEFORE UPDATE OF data ON checks
+WHEN OLD.app = 'task'
+  AND json_valid(OLD.data) AND json_valid(NEW.data)
+  AND CAST(json_extract(OLD.data, '$.att') AS TEXT)
+    IS NOT CAST(json_extract(NEW.data, '$.att') AS TEXT)
+  AND EXISTS (
+    SELECT 1 FROM student_session_ledger_events AS event
+    WHERE event.app = OLD.app AND event.check_key = OLD.k
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'SESSION4_ATTENDANCE_LOCKED');
+END;
+
+-- 기존 수강료 알림은 지우지 않고, 회차 원장의 각 세대에서 유효한지 별도 상태로 남긴다.
+-- 상태가 없는 057 알림은 Worker가 legacy active로 읽어 이전 배포와 호환한다.
+CREATE TABLE IF NOT EXISTS tuition_generation_alert_states (
+  app                      TEXT    NOT NULL CHECK (app = 'task'),
+  alert_id                 TEXT    NOT NULL CHECK (
+    length(alert_id) = 56
+    AND alert_id GLOB 'tga_[0-9a-f]*'
+    AND substr(alert_id,5) NOT GLOB '*[^0-9a-f]*'
+  ),
+  student_id               TEXT    NOT NULL CHECK (length(student_id) BETWEEN 1 AND 128),
+  configured_start_date    TEXT    NOT NULL CHECK (
+    length(configured_start_date) = 10
+    AND strftime('%Y-%m-%d', configured_start_date) = configured_start_date
+  ),
+  ledger_generation        INTEGER NOT NULL CHECK (ledger_generation >= 1),
+  state_revision           INTEGER NOT NULL CHECK (state_revision >= 1),
+  state_sequence           INTEGER NOT NULL CHECK (state_sequence >= 1),
+  cycle_start_date         TEXT    NOT NULL CHECK (
+    length(cycle_start_date) = 10
+    AND strftime('%Y-%m-%d', cycle_start_date) = cycle_start_date
+  ),
+  effective_status         TEXT    NOT NULL CHECK (effective_status IN ('active','suppressed')),
+  trigger_task_id          TEXT,
+  trigger_date             TEXT,
+  reason_code              TEXT    NOT NULL CHECK (length(reason_code) BETWEEN 1 AND 80),
+  actor                    TEXT    NOT NULL CHECK (length(actor) BETWEEN 1 AND 160),
+  created_at               INTEGER NOT NULL CHECK (created_at > 0),
+  PRIMARY KEY (
+    app, alert_id, configured_start_date, ledger_generation, state_revision
+  ),
+  UNIQUE (app, alert_id, state_sequence),
+  FOREIGN KEY (app, alert_id)
+    REFERENCES tuition_generation_alerts(app, alert_id),
+  FOREIGN KEY (app, student_id, configured_start_date, ledger_generation)
+    REFERENCES student_session_ledger_generations(
+      app, student_id, configured_start_date, generation
+    ),
+  CHECK (
+    (
+      effective_status = 'active'
+      AND trigger_task_id IS NOT NULL
+      AND length(trigger_task_id) BETWEEN 1 AND 128
+      AND trigger_date IS NOT NULL
+      AND length(trigger_date) = 10
+      AND strftime('%Y-%m-%d', trigger_date) = trigger_date
+    )
+    OR
+    (
+      effective_status = 'suppressed'
+      AND trigger_task_id IS NULL
+      AND trigger_date IS NULL
+    )
+  )
+);
+
+CREATE INDEX IF NOT EXISTS idx_tuition_generation_alert_states_latest
+  ON tuition_generation_alert_states(
+    app, alert_id, configured_start_date,
+    ledger_generation DESC, state_revision DESC
+  );
+
+CREATE INDEX IF NOT EXISTS idx_tuition_generation_alert_states_global
+  ON tuition_generation_alert_states(app, alert_id, state_sequence DESC);
+
+CREATE INDEX IF NOT EXISTS idx_tuition_generation_alert_states_student
+  ON tuition_generation_alert_states(
+    app, student_id, configured_start_date, ledger_generation DESC,
+    effective_status, cycle_start_date, state_revision DESC
+  );
+
+-- alert의 원래 학생·회차와 같고 현재 최신 원장 세대에 대한 상태만 추가할 수 있다.
+CREATE TRIGGER IF NOT EXISTS trg_tuition_generation_alert_state_identity
+BEFORE INSERT ON tuition_generation_alert_states
+WHEN NEW.ledger_generation <> COALESCE((
+  SELECT MAX(current.generation)
+  FROM student_session_ledger_generations AS current
+  WHERE current.app = NEW.app
+    AND current.student_id = NEW.student_id
+    AND current.configured_start_date = NEW.configured_start_date
+), 0)
+OR NEW.state_revision <> 1 + COALESCE((
+  SELECT MAX(existing.state_revision)
+  FROM tuition_generation_alert_states AS existing
+  WHERE existing.app = NEW.app
+    AND existing.alert_id = NEW.alert_id
+    AND existing.configured_start_date = NEW.configured_start_date
+    AND existing.ledger_generation = NEW.ledger_generation
+), 0)
+OR NEW.state_sequence <> 1 + COALESCE((
+  SELECT MAX(existing.state_sequence)
+  FROM tuition_generation_alert_states AS existing
+  WHERE existing.app = NEW.app
+    AND existing.alert_id = NEW.alert_id
+), 0)
+OR NOT EXISTS (
+  SELECT 1
+  FROM tuition_generation_alerts AS alert
+  WHERE alert.app = NEW.app
+    AND alert.alert_id = NEW.alert_id
+    AND alert.student_id = NEW.student_id
+    AND alert.cycle_start_date = NEW.cycle_start_date
+)
+BEGIN
+  SELECT RAISE(ABORT, 'TUITION_ALERT_STATE_IDENTITY');
+END;
+
+-- active는 최신 원장의 정확한 3회차 근거와 일치해야 한다. suppressed는 그 회차가
+-- 사라졌거나 아직 3회에 도달하지 않은 정정 세대에서만 허용한다.
+CREATE TRIGGER IF NOT EXISTS trg_tuition_generation_alert_state_effective
+BEFORE INSERT ON tuition_generation_alert_states
+WHEN (
+  NEW.effective_status = 'active'
+  AND NOT EXISTS (
+    SELECT 1
+    FROM student_session_ledger_cycles AS cycle
+    JOIN student_session_ledger_events AS event
+      ON event.app = cycle.app
+      AND event.student_id = cycle.student_id
+      AND event.configured_start_date = cycle.configured_start_date
+      AND event.generation = cycle.generation
+      AND event.cycle_number = cycle.cycle_number
+    WHERE cycle.app = NEW.app
+      AND cycle.student_id = NEW.student_id
+      AND cycle.configured_start_date = NEW.configured_start_date
+      AND cycle.generation = NEW.ledger_generation
+      AND cycle.cycle_start_date = NEW.cycle_start_date
+      AND event.session_number = 3
+      AND event.lesson_task_id = NEW.trigger_task_id
+      AND event.attendance_date = NEW.trigger_date
+  )
+)
+OR (
+  NEW.effective_status = 'suppressed'
+  AND 3 <= (
+    SELECT COUNT(*)
+    FROM student_session_ledger_cycles AS cycle
+    JOIN student_session_ledger_events AS event
+      ON event.app = cycle.app
+      AND event.student_id = cycle.student_id
+      AND event.configured_start_date = cycle.configured_start_date
+      AND event.generation = cycle.generation
+      AND event.cycle_number = cycle.cycle_number
+    WHERE cycle.app = NEW.app
+      AND cycle.student_id = NEW.student_id
+      AND cycle.configured_start_date = NEW.configured_start_date
+      AND cycle.generation = NEW.ledger_generation
+      AND cycle.cycle_start_date = NEW.cycle_start_date
+  )
+)
+BEGIN
+  SELECT RAISE(ABORT, 'TUITION_ALERT_STATE_EFFECTIVE');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_tuition_generation_alert_states_no_update
+BEFORE UPDATE ON tuition_generation_alert_states
+BEGIN
+  SELECT RAISE(ABORT, 'TUITION_ALERT_STATE_APPEND_ONLY');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_tuition_generation_alert_states_no_delete
+BEFORE DELETE ON tuition_generation_alert_states
+BEGIN
+  SELECT RAISE(ABORT, 'TUITION_ALERT_STATE_APPEND_ONLY');
+END;
+
+-- 상태 원장이 있는 알림은 모든 configured namespace를 통틀어 가장 최근 상태가 active이고
+-- 그 원장의 최신 세대일 때만 확인한다. 상태가 전혀 없는 057 legacy 알림은 그대로 허용한다.
+CREATE TRIGGER IF NOT EXISTS trg_tuition_generation_confirmation_effective
+BEFORE INSERT ON tuition_generation_alert_confirmations
+WHEN EXISTS (
+  SELECT 1
+  FROM tuition_generation_alert_states AS state
+  WHERE state.app = NEW.app
+    AND state.alert_id = NEW.alert_id
+)
+AND NOT EXISTS (
+  SELECT 1
+  FROM (
+    SELECT latest.student_id,
+      latest.configured_start_date,
+      latest.ledger_generation,
+      latest.effective_status
+    FROM tuition_generation_alert_states AS latest
+    WHERE latest.app = NEW.app
+      AND latest.alert_id = NEW.alert_id
+    ORDER BY latest.state_sequence DESC
+    LIMIT 1
+  ) AS effective
+  WHERE effective.effective_status = 'active'
+    AND effective.ledger_generation = (
+      SELECT MAX(current.generation)
+      FROM student_session_ledger_generations AS current
+      WHERE current.app = NEW.app
+        AND current.student_id = effective.student_id
+        AND current.configured_start_date = effective.configured_start_date
+    )
+)
+BEGIN
+  SELECT RAISE(ABORT, 'TUITION_ALERT_SUPPRESSED');
+END;
+
+-- 065: 실제 보강 담당자와 생성된 보강 task owner가 다르면 최신 회차 원장 근거로
+-- 사용할 수 없다. 064 정본은 위에 그대로 보존하고 additive migration과 같은 방식으로
+-- source trigger만 교체한다.
+DROP TRIGGER IF EXISTS trg_student_session_ledger_event_source;
+
+CREATE TRIGGER trg_student_session_ledger_event_source
+BEFORE INSERT ON student_session_ledger_events
+WHEN NEW.check_key <> NEW.lesson_task_id || '|' || NEW.attendance_date
+OR NOT EXISTS (
+  SELECT 1
+  FROM tasks AS task
+  WHERE task.app = NEW.app
+    AND task.id = NEW.lesson_task_id
+    AND json_valid(task.data)
+    AND json_type(task.data) = 'object'
+    AND json_extract(task.data, '$.id') = NEW.lesson_task_id
+    AND json_extract(task.data, '$.studentId') = NEW.student_id
+    AND json_extract(task.data, '$.staffId') = task.owner
+    AND (
+      json_extract(task.data, '$.taskKind') = 'lesson_instruction'
+      OR COALESCE(json_extract(task.data, '$.lessonFormVersion'), 0) >= 1
+      OR COALESCE(json_extract(task.data, '$.intakeVersion'), 0) >= 1
+    )
+    AND (
+      (
+        COALESCE(CAST(json_extract(task.data, '$.lessonInstanceType') AS TEXT), '') <> 'makeup'
+        AND COALESCE(CAST(json_extract(task.data, '$.makeupCaseId') AS TEXT), '') = ''
+      )
+      OR EXISTS (
+        SELECT 1
+        FROM makeup_cases AS makeup
+        WHERE makeup.app = task.app
+          AND makeup.case_id = CAST(json_extract(task.data, '$.makeupCaseId') AS TEXT)
+          AND task.id = 'makeup_lesson_' || makeup.case_id
+          AND makeup.student_id = NEW.student_id
+          AND makeup.confirmed_staff_id = task.owner
+          AND makeup.status IN ('confirmed','completed')
+          AND json_extract(task.data, '$.lessonInstanceType') = 'makeup'
+          AND (
+            json_extract(makeup.history, '$[0].action') = 'create_from_absence'
+            OR (
+              json_extract(makeup.history, '$[0].action') = 'create_manual'
+              AND json_extract(makeup.history, '$[0].reason') = 'manual_absence'
+            )
+          )
+      )
+    )
+)
+OR (
+  NEW.source_kind = 'check'
+  AND NOT EXISTS (
+    SELECT 1
+    FROM tasks AS task
+    JOIN checks AS attendance
+      ON attendance.app = task.app
+      AND attendance.k = NEW.check_key
+      AND attendance.owner = task.owner
+    WHERE task.app = NEW.app
+      AND task.id = NEW.lesson_task_id
+      AND json_valid(attendance.data)
+      AND json_type(attendance.data) = 'object'
+      AND json_extract(attendance.data, '$.taskId') = NEW.lesson_task_id
+      AND json_extract(attendance.data, '$.date') = NEW.attendance_date
+      AND json_extract(attendance.data, '$.att') = NEW.attendance_status
+  )
+)
+BEGIN
+  SELECT RAISE(ABORT, 'STUDENT_SESSION_LEDGER_EVENT_SOURCE');
+END;
+
+-- 일정 없이 이미 끝난 보강을 관리자가 직접 완료할 때만 과거 회차제 출결 한 건을
+-- 만들 수 있도록 서버 전용 증빙을 남긴다. generic /sync에는 이 테이블 쓰기 경로가 없고,
+-- check.data의 source 문자열만 흉내 내서는 아래 잠금 예외를 통과할 수 없다.
+CREATE TABLE IF NOT EXISTS makeup_direct_completion_attestations (
+  app               TEXT    NOT NULL CHECK (app = 'task'),
+  case_id           TEXT    NOT NULL CHECK (length(case_id) BETWEEN 1 AND 128),
+  case_revision     INTEGER NOT NULL CHECK (case_revision >= 2),
+  lesson_task_id    TEXT    NOT NULL CHECK (length(lesson_task_id) BETWEEN 1 AND 160),
+  check_key         TEXT    NOT NULL CHECK (length(check_key) BETWEEN 3 AND 180),
+  student_id        TEXT    NOT NULL CHECK (length(student_id) BETWEEN 1 AND 160),
+  staff_id          TEXT    NOT NULL CHECK (length(staff_id) BETWEEN 1 AND 128),
+  attendance_date   TEXT    NOT NULL CHECK (
+    length(attendance_date) = 10 AND strftime('%Y-%m-%d', attendance_date) = attendance_date
+  ),
+  start_time        TEXT    NOT NULL CHECK (
+    length(start_time) = 5 AND start_time GLOB '[0-2][0-9]:[0-5][0-9]' AND start_time < '24:00'
+  ),
+  end_time          TEXT    NOT NULL CHECK (
+    length(end_time) = 5 AND end_time GLOB '[0-2][0-9]:[0-5][0-9]' AND end_time < '24:00'
+  ),
+  attendance_status TEXT    NOT NULL CHECK (attendance_status IN ('P','L','E')),
+  actor_id          TEXT    NOT NULL CHECK (length(actor_id) BETWEEN 1 AND 128),
+  provenance        TEXT    NOT NULL CHECK (provenance = 'makeup_direct_completion_v1'),
+  created_at        INTEGER NOT NULL CHECK (created_at > 0),
+  PRIMARY KEY (app, case_id),
+  UNIQUE (app, check_key),
+  FOREIGN KEY (app, case_id) REFERENCES makeup_cases(app, case_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_makeup_direct_completion_attestations_task
+ON makeup_direct_completion_attestations(app, lesson_task_id);
+
+CREATE TRIGGER IF NOT EXISTS trg_makeup_direct_completion_attestation_identity
+BEFORE INSERT ON makeup_direct_completion_attestations
+WHEN NEW.lesson_task_id <> 'makeup_lesson_' || NEW.case_id
+OR NEW.check_key <> NEW.lesson_task_id || '|' || NEW.attendance_date
+OR NEW.start_time >= NEW.end_time
+OR EXISTS (
+  SELECT 1 FROM checks AS current WHERE current.app = NEW.app AND current.k = NEW.check_key
+)
+OR NOT EXISTS (
+  SELECT 1
+  FROM makeup_cases AS makeup
+  JOIN tasks AS task
+    ON task.app = makeup.app AND task.id = NEW.lesson_task_id
+  WHERE makeup.app = NEW.app
+    AND makeup.case_id = NEW.case_id
+    AND makeup.student_id = NEW.student_id
+    AND makeup.status = 'confirmed'
+    AND makeup.revision = NEW.case_revision
+    AND makeup.completed_at IS NULL AND makeup.completed_by IS NULL
+    AND makeup.confirmed_staff_id = NEW.staff_id
+    AND substr(makeup.confirmed_start_at, 1, 10) = NEW.attendance_date
+    AND substr(makeup.confirmed_end_at, 1, 10) = NEW.attendance_date
+    AND substr(makeup.confirmed_start_at, 12, 5) = NEW.start_time
+    AND substr(makeup.confirmed_end_at, 12, 5) = NEW.end_time
+    AND makeup.updated_at = NEW.created_at
+    AND json_valid(makeup.history) AND json_type(makeup.history) = 'array'
+    AND json_array_length(makeup.history) > 0
+    AND json_extract(makeup.history,
+      '$[' || (json_array_length(makeup.history) - 1) || '].action') = 'schedule_for_completion'
+    AND json_extract(makeup.history,
+      '$[' || (json_array_length(makeup.history) - 1) || '].actorId') = NEW.actor_id
+    AND json_extract(makeup.history,
+      '$[' || (json_array_length(makeup.history) - 1) || '].staffId') = NEW.staff_id
+    AND json_extract(makeup.history,
+      '$[' || (json_array_length(makeup.history) - 1) || '].date') = NEW.attendance_date
+    AND json_extract(makeup.history,
+      '$[' || (json_array_length(makeup.history) - 1) || '].startTime') = NEW.start_time
+    AND json_extract(makeup.history,
+      '$[' || (json_array_length(makeup.history) - 1) || '].endTime') = NEW.end_time
+    AND task.owner = NEW.staff_id
+    AND task.updated_at = NEW.created_at
+    AND json_valid(task.data) AND json_type(task.data) = 'object'
+    AND json_extract(task.data, '$.id') = NEW.lesson_task_id
+    AND json_extract(task.data, '$.staffId') = task.owner
+    AND json_extract(task.data, '$.studentId') = NEW.student_id
+    AND json_extract(task.data, '$.lessonInstanceType') = 'makeup'
+    AND json_extract(task.data, '$.makeupCaseId') = NEW.case_id
+    AND json_extract(task.data, '$.start') = NEW.attendance_date
+    AND json_extract(task.data, '$.end') = NEW.attendance_date
+    AND EXISTS (
+      SELECT 1 FROM json_each(task.data, '$.scheduleSlots') AS slot
+      WHERE json_extract(slot.value, '$.startTime') = NEW.start_time
+        AND json_extract(slot.value, '$.endTime') = NEW.end_time
+        AND json_extract(slot.value, '$.validFrom') = NEW.attendance_date
+        AND json_extract(slot.value, '$.validTo') = NEW.attendance_date
+    )
+)
+BEGIN
+  SELECT RAISE(ABORT, 'MAKEUP_DIRECT_ATTESTATION_INVALID');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_makeup_direct_completion_attestations_no_update
+BEFORE UPDATE ON makeup_direct_completion_attestations
+BEGIN
+  SELECT RAISE(ABORT, 'MAKEUP_DIRECT_ATTESTATION_APPEND_ONLY');
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_makeup_direct_completion_attestations_no_delete
+BEFORE DELETE ON makeup_direct_completion_attestations
+BEGIN
+  SELECT RAISE(ABORT, 'MAKEUP_DIRECT_ATTESTATION_APPEND_ONLY');
+END;
+
+-- 063의 일반 과거 출결 잠금은 그대로 유지하되, 위 증빙과 현재 confirmed case/task/check가
+-- 한 치도 다르지 않은 직접완료 INSERT만 예외로 둔다. UPDATE 잠금은 교체하지 않는다.
+DROP TRIGGER IF EXISTS trg_session4_check_att_lock_insert;
+
+CREATE TRIGGER trg_session4_check_att_lock_insert
+BEFORE INSERT ON checks
+WHEN NEW.app = 'task'
+  AND json_valid(NEW.data)
+  AND instr(NEW.k, '|') > 1
+  AND instr(substr(NEW.k, instr(NEW.k, '|') + 1), '|') = 0
+  AND strftime('%Y-%m-%d', substr(NEW.k, instr(NEW.k, '|') + 1)) =
+    substr(NEW.k, instr(NEW.k, '|') + 1)
+  AND (
+    substr(NEW.k, instr(NEW.k, '|') + 1) < date('now', '+9 hours')
+    OR (
+      substr(NEW.k, instr(NEW.k, '|') + 1) = date('now', '+9 hours')
+      AND time('now', '+9 hours') >= '23:50:00'
+    )
+  )
+  AND COALESCE(CAST(json_extract(NEW.data, '$.att') AS TEXT), '') <> ''
+  AND EXISTS (
+    SELECT 1
+    FROM tasks AS task, private_rosters AS roster,
+      json_each(roster.data, '$.roster.students') AS student
+    WHERE task.app = NEW.app
+      AND roster.app = NEW.app
+      AND json_valid(task.data) AND json_type(task.data) = 'object'
+      AND json_valid(roster.data)
+      AND task.id = substr(NEW.k, 1, instr(NEW.k, '|') - 1)
+      AND json_extract(task.data, '$.id') = task.id
+      AND json_extract(task.data, '$.staffId') = task.owner
+      AND (
+        json_extract(task.data, '$.taskKind') = 'lesson_instruction'
+        OR COALESCE(json_extract(task.data, '$.lessonFormVersion'), 0) >= 1
+        OR COALESCE(json_extract(task.data, '$.intakeVersion'), 0) >= 1
+      )
+      AND (
+        (
+          COALESCE(CAST(json_extract(task.data, '$.lessonInstanceType') AS TEXT), '') <> 'makeup'
+          AND COALESCE(CAST(json_extract(task.data, '$.makeupCaseId') AS TEXT), '') = ''
+        )
+        OR (
+          json_extract(task.data, '$.lessonInstanceType') = 'makeup'
+          AND task.id = 'makeup_lesson_' || CAST(json_extract(task.data, '$.makeupCaseId') AS TEXT)
+          AND json_extract(task.data, '$.start') = substr(NEW.k, instr(NEW.k, '|') + 1)
+          AND json_extract(task.data, '$.end') = substr(NEW.k, instr(NEW.k, '|') + 1)
+          AND EXISTS (
+            SELECT 1 FROM makeup_cases AS makeup
+            WHERE makeup.app = task.app
+              AND makeup.case_id = json_extract(task.data, '$.makeupCaseId')
+              AND makeup.student_id = json_extract(task.data, '$.studentId')
+              AND makeup.confirmed_staff_id = task.owner
+              AND (
+                (
+                  makeup.status = 'confirmed'
+                  AND substr(makeup.confirmed_start_at, 1, 10) = substr(NEW.k, instr(NEW.k, '|') + 1)
+                  AND substr(makeup.confirmed_end_at, 1, 10) = substr(NEW.k, instr(NEW.k, '|') + 1)
+                )
+                OR (
+                  makeup.status = 'completed'
+                  AND makeup.completed_at IS NOT NULL AND makeup.completed_by IS NOT NULL
+                  AND json_extract(makeup.history,
+                    '$[' || (json_array_length(makeup.history) - 1) || '].action') = 'complete'
+                )
+              )
+              AND (
+                json_extract(makeup.history, '$[0].action') = 'create_from_absence'
+                OR (
+                  json_extract(makeup.history, '$[0].action') = 'create_manual'
+                  AND json_extract(makeup.history, '$[0].reason') = 'manual_absence'
+                )
+              )
+          )
+        )
+      )
+      AND (
+        COALESCE(json_extract(task.data, '$.deleted'), 0) = 0
+        OR strftime('%Y-%m-%d', CAST(json_extract(task.data, '$.end') AS TEXT)) =
+          CAST(json_extract(task.data, '$.end') AS TEXT)
+      )
+      AND (
+        COALESCE(CAST(json_extract(task.data, '$.start') AS TEXT), '') = ''
+        OR substr(NEW.k, instr(NEW.k, '|') + 1) >= CAST(json_extract(task.data, '$.start') AS TEXT)
+      )
+      AND (
+        COALESCE(CAST(json_extract(task.data, '$.end') AS TEXT), '') = ''
+        OR substr(NEW.k, instr(NEW.k, '|') + 1) <= CAST(json_extract(task.data, '$.end') AS TEXT)
+      )
+      AND json_extract(student.value, '$.id') = json_extract(task.data, '$.studentId')
+      AND json_extract(student.value, '$.billingMode') = 'session4'
+      AND strftime('%Y-%m-%d', CAST(json_extract(student.value, '$.sessionCycleStartDate') AS TEXT)) =
+        CAST(json_extract(student.value, '$.sessionCycleStartDate') AS TEXT)
+      AND substr(NEW.k, instr(NEW.k, '|') + 1) >=
+        CAST(json_extract(student.value, '$.sessionCycleStartDate') AS TEXT)
+  )
+  AND NOT EXISTS (
+    SELECT 1
+    FROM makeup_direct_completion_attestations AS attestation
+    JOIN makeup_cases AS makeup
+      ON makeup.app = attestation.app AND makeup.case_id = attestation.case_id
+    JOIN tasks AS task
+      ON task.app = attestation.app AND task.id = attestation.lesson_task_id
+    WHERE attestation.app = NEW.app
+      AND attestation.check_key = NEW.k
+      AND attestation.lesson_task_id = substr(NEW.k, 1, instr(NEW.k, '|') - 1)
+      AND attestation.attendance_date = substr(NEW.k, instr(NEW.k, '|') + 1)
+      AND attestation.staff_id = NEW.owner
+      AND attestation.attendance_status = CAST(json_extract(NEW.data, '$.att') AS TEXT)
+      AND attestation.provenance = CAST(json_extract(NEW.data, '$.source') AS TEXT)
+      AND attestation.lesson_task_id = CAST(json_extract(NEW.data, '$.taskId') AS TEXT)
+      AND attestation.attendance_date = CAST(json_extract(NEW.data, '$.date') AS TEXT)
+      AND attestation.created_at = NEW.updated_at
+      AND attestation.created_at = NEW.srv_at
+      AND attestation.case_revision = makeup.revision
+      AND makeup.status = 'confirmed'
+      AND makeup.student_id = attestation.student_id
+      AND makeup.confirmed_staff_id = attestation.staff_id
+      AND makeup.updated_at = attestation.created_at
+      AND substr(makeup.confirmed_start_at, 1, 10) = attestation.attendance_date
+      AND substr(makeup.confirmed_end_at, 1, 10) = attestation.attendance_date
+      AND substr(makeup.confirmed_start_at, 12, 5) = attestation.start_time
+      AND substr(makeup.confirmed_end_at, 12, 5) = attestation.end_time
+      AND json_extract(makeup.history,
+        '$[' || (json_array_length(makeup.history) - 1) || '].action') = 'schedule_for_completion'
+      AND json_extract(makeup.history,
+        '$[' || (json_array_length(makeup.history) - 1) || '].actorId') = attestation.actor_id
+      AND task.owner = attestation.staff_id
+      AND task.updated_at = attestation.created_at
+      AND json_valid(task.data) AND json_type(task.data) = 'object'
+      AND json_extract(task.data, '$.id') = attestation.lesson_task_id
+      AND json_extract(task.data, '$.staffId') = task.owner
+      AND json_extract(task.data, '$.studentId') = attestation.student_id
+      AND json_extract(task.data, '$.lessonInstanceType') = 'makeup'
+      AND json_extract(task.data, '$.makeupCaseId') = attestation.case_id
+      AND json_extract(task.data, '$.start') = attestation.attendance_date
+      AND json_extract(task.data, '$.end') = attestation.attendance_date
+  )
+  AND (
+    NOT EXISTS (
+      SELECT 1 FROM checks AS current WHERE current.app = NEW.app AND current.k = NEW.k
+    )
+    OR EXISTS (
+      SELECT 1 FROM checks AS current
+      WHERE current.app = NEW.app AND current.k = NEW.k
+        AND NEW.updated_at > current.updated_at
+        AND (
+          NOT json_valid(current.data)
+          OR CAST(json_extract(current.data, '$.att') AS TEXT)
+            IS NOT CAST(json_extract(NEW.data, '$.att') AS TEXT)
+        )
+    )
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'SESSION4_ATTENDANCE_LOCKED');
+END;
+
+-- 완료 원장이 가리키는 출결은 서버 정본이다. 완료 직전 generic sync 사전검사와
+-- 완료 트랜잭션 사이의 race도 DB가 막도록 핵심 식별자와 출결을 불변화한다.
+-- note/steps/source 같은 비출결 필드는 동일한 정본 식별자·출결을 유지하면 계속 수정할 수 있다.
+CREATE TRIGGER IF NOT EXISTS trg_makeup_completed_check_identity_lock
+BEFORE UPDATE ON checks
+WHEN EXISTS (
+  SELECT 1
+  FROM tasks AS task
+  JOIN makeup_cases AS makeup
+    ON makeup.app = task.app
+   AND makeup.case_id = CAST(json_extract(task.data, '$.makeupCaseId') AS TEXT)
+  WHERE OLD.app = 'task'
+    AND task.app = OLD.app
+    AND task.id = substr(OLD.k, 1, instr(OLD.k, '|') - 1)
+    AND OLD.k = task.id || '|' || CAST(json_extract(task.data, '$.start') AS TEXT)
+    AND OLD.owner = task.owner
+    AND json_valid(OLD.data) AND json_type(OLD.data) = 'object'
+    AND CAST(json_extract(OLD.data, '$.taskId') AS TEXT) = task.id
+    AND CAST(json_extract(OLD.data, '$.date') AS TEXT) = CAST(json_extract(task.data, '$.start') AS TEXT)
+    AND CAST(json_extract(OLD.data, '$.att') AS TEXT) IN ('P','L','E')
+    AND json_valid(task.data) AND json_type(task.data) = 'object'
+    AND CAST(json_extract(task.data, '$.id') AS TEXT) = task.id
+    AND CAST(json_extract(task.data, '$.staffId') AS TEXT) = task.owner
+    AND CAST(json_extract(task.data, '$.lessonInstanceType') AS TEXT) = 'makeup'
+    AND task.id = 'makeup_lesson_' || CAST(json_extract(task.data, '$.makeupCaseId') AS TEXT)
+    AND (
+      CAST(json_extract(task.data, '$.taskKind') AS TEXT) = 'lesson_instruction'
+      OR COALESCE(CAST(json_extract(task.data, '$.lessonFormVersion') AS INTEGER), 0) >= 1
+      OR COALESCE(CAST(json_extract(task.data, '$.intakeVersion') AS INTEGER), 0) >= 1
+    )
+    AND CAST(json_extract(task.data, '$.repeat') AS TEXT) = 'once'
+    AND strftime('%Y-%m-%d', CAST(json_extract(task.data, '$.start') AS TEXT)) =
+      CAST(json_extract(task.data, '$.start') AS TEXT)
+    AND CAST(json_extract(task.data, '$.end') AS TEXT) = CAST(json_extract(task.data, '$.start') AS TEXT)
+    AND makeup.status = 'completed'
+    AND makeup.student_id = CAST(json_extract(task.data, '$.studentId') AS TEXT)
+    AND makeup.source_task_id = CAST(json_extract(task.data, '$.makeupSourceTaskId') AS TEXT)
+    AND makeup.source_date = CAST(json_extract(task.data, '$.makeupSourceDate') AS TEXT)
+    AND makeup.confirmed_staff_id = task.owner
+    AND substr(makeup.confirmed_start_at, 1, 10) = CAST(json_extract(task.data, '$.start') AS TEXT)
+    AND substr(makeup.confirmed_end_at, 1, 10) = CAST(json_extract(task.data, '$.start') AS TEXT)
+    AND makeup.completed_at IS NOT NULL
+    AND makeup.completed_by = task.owner
+    AND json_valid(makeup.history) AND json_type(makeup.history) = 'array'
+    AND json_array_length(makeup.history) > 0
+    AND json_extract(makeup.history,
+      '$[' || (json_array_length(makeup.history) - 1) || '].action') = 'complete'
+    AND CAST(json_extract(makeup.history,
+      '$[' || (json_array_length(makeup.history) - 1) || '].revision') AS INTEGER) = makeup.revision
+)
+AND (
+  NEW.app IS NOT OLD.app
+  OR NEW.k IS NOT OLD.k
+  OR NEW.owner IS NOT OLD.owner
+  OR NOT json_valid(NEW.data)
+  OR CASE WHEN json_valid(NEW.data)
+      THEN CAST(json_extract(NEW.data, '$.taskId') AS TEXT) ELSE NULL END
+    IS NOT CASE WHEN json_valid(OLD.data)
+      THEN CAST(json_extract(OLD.data, '$.taskId') AS TEXT) ELSE NULL END
+  OR CASE WHEN json_valid(NEW.data)
+      THEN CAST(json_extract(NEW.data, '$.date') AS TEXT) ELSE NULL END
+    IS NOT CASE WHEN json_valid(OLD.data)
+      THEN CAST(json_extract(OLD.data, '$.date') AS TEXT) ELSE NULL END
+  OR CASE WHEN json_valid(NEW.data)
+      THEN CAST(json_extract(NEW.data, '$.att') AS TEXT) ELSE NULL END
+    IS NOT CASE WHEN json_valid(OLD.data)
+      THEN CAST(json_extract(OLD.data, '$.att') AS TEXT) ELSE NULL END
+)
+BEGIN
+  SELECT RAISE(ABORT, 'MAKEUP_COMPLETED_ATTENDANCE_LOCKED');
 END;

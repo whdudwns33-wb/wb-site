@@ -7,9 +7,8 @@ directory = "./dist"
 binding = "ASSETS"
 # 자산은 기본적으로 워커를 거치지 않고 바로 서빙된다. 워커가 손대야 하는 것만 여기 적는다.
 #  · articles.json — 발행 오버라이드(pubmap)를 얹어야 한다.
-#  · textbook.json — 코칭 원문. 워커가 404로 막아야 하는데, 여기 없으면 그 막음이
-#    실행되지 않아 주소만 알면 20강 전체를 그대로 내려받을 수 있다.
-#    (워커 내부의 env.ASSETS.fetch()는 이 설정과 무관하게 원본을 읽는다)
+#  · textbook.json — 코칭 원문은 이제 자산에 없다(KV textbook-src로 이전, 2026-09).
+#    목록에 남겨 두는 것은 과거 캐시·직접 요청이 와도 워커의 404 응답을 타게 하기 위해서다.
 run_worker_first = ["/articles.json", "/articles-L1.json", "/articles-L2.json", "/articles-L3.json", "/articles-L4.json", "/hanja.json", "/version.json", "/textbook.json"]
 
 # KV 네임스페이스 — 배포 시 `wrangler kv namespace create DB`로 생성된 id로 교체
