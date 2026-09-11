@@ -5,7 +5,7 @@ const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const HANDOFF_ID = /^lh_[a-f0-9]{32}$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const CLOCK_RE = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
-const MEMO_KEYS = ['contentProgress', 'homework', 'comment', 'otherNotes'];
+const MEMO_KEYS = ['contentProgress', 'homework', 'comment', 'otherNotes', 'guardianNotice'];
 const CUTOFF_MINUTE = 23 * 60 + 50;
 
 function parseJson(value) {

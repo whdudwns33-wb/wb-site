@@ -15,33 +15,111 @@ class FakeDB {
   constructor(staffData = { deleted: false }) {
     this.tasks = new Map();
     this.checks = new Map();
+    this.makeupCases = new Map();
+    this.scheduleRevisions = new Map();
     this.batchCalls = 0;
+    this.scheduleRevisionReads = 0;
+    this.scheduleRevisionGuardRuns = 0;
+    this.previousChanges = 0;
+    this.lastBatchSql = [];
+    this.beforeBatch = null;
     this.staffData = staffData;
   }
   prepare(sql) { return new Statement(this, sql); }
   async batch(statements) {
     this.batchCalls += 1;
-    return Promise.all(statements.map(statement => statement.run()));
+    this.lastBatchSql = statements.map(statement => statement.sql);
+    if (this.beforeBatch) {
+      const beforeBatch = this.beforeBatch;
+      this.beforeBatch = null;
+      await beforeBatch(this);
+    }
+    const snapshot = {
+      tasks: structuredClone(this.tasks), checks: structuredClone(this.checks),
+      scheduleRevisions: structuredClone(this.scheduleRevisions),
+      previousChanges: this.previousChanges
+    };
+    try {
+      const results = [];
+      // D1 batch는 순서대로 실행되며 changes()는 바로 앞 문장의 결과를 본다.
+      for (const statement of statements) results.push(await statement.run());
+      return results;
+    } catch (error) {
+      this.tasks = snapshot.tasks;
+      this.checks = snapshot.checks;
+      this.scheduleRevisions = snapshot.scheduleRevisions;
+      this.previousChanges = snapshot.previousChanges;
+      throw error;
+    }
   }
   seedTask(data, owner = data.staffId, updatedAt = 100) {
     this.tasks.set(data.id, { owner, data: JSON.stringify(data), updatedAt, srvAt: updatedAt });
   }
+  seedCheck(key, data, owner = 'teacher-1', updatedAt = 100) {
+    this.checks.set(key, { owner, data: JSON.stringify(data), updatedAt, srvAt: updatedAt });
+  }
+  seedMakeupCase(data) { this.makeupCases.set(String(data.case_id), { ...data }); }
   task(id) { return JSON.parse(this.tasks.get(id).data); }
   async first(sql, args) {
     if (sql.startsWith('SELECT generation FROM app_data_generations')) {
       return { generation: 0 };
     }
     if (sql.startsWith('SELECT staff_id FROM tokens')) {
-      return args[2] === 'teacher-token' ? { staff_id: 'teacher-1' } : null;
+      if (args[2] === 'teacher-token') return { staff_id: 'teacher-1' };
+      if (args[2] === 'teacher-2-token') return { staff_id: 'teacher-2' };
+      return null;
     }
     if (sql.startsWith('SELECT data FROM staff')) {
-      return args[1] === 'teacher-1' ? { data: JSON.stringify(this.staffData) } : null;
+      return ['teacher-1', 'teacher-2'].includes(String(args[1]))
+        ? { data: JSON.stringify(this.staffData) } : null;
+    }
+    if (sql.startsWith('SELECT data FROM private_rosters')) {
+      return { data: JSON.stringify({ roster: { students: [] } }) };
+    }
+    if (sql.startsWith('SELECT owner,data,updated_at,srv_at FROM checks')) {
+      const row = this.checks.get(String(args[1]));
+      return row ? { owner: row.owner, data: row.data, updated_at: row.updatedAt, srv_at: row.srvAt } : null;
     }
     throw new Error('Unhandled first SQL: ' + sql);
   }
   async all(sql, args) {
+    if (sql.startsWith('SELECT task_id FROM task_revocations')) {
+      return { results: [] };
+    }
+    if (sql.startsWith('SELECT student_id,revision FROM student_schedule_revisions')) {
+      this.scheduleRevisionReads += 1;
+      const ids = new Set(args.slice(1).map(String));
+      return { results: [...this.scheduleRevisions.entries()]
+        .filter(([studentId]) => ids.has(studentId))
+        .map(([student_id, row]) => ({ student_id, revision: row.revision })) };
+    }
     if (sql.startsWith('SELECT DISTINCT snapshot.task_id,task.data FROM book_order_student_snapshots')) {
       return { results: [] };
+    }
+    if (sql.startsWith('SELECT check_key FROM student_session_attendance_events')) {
+      return { results: [] };
+    }
+    if (sql.startsWith('SELECT check_key FROM student_session_ledger_events')) {
+      return { results: [] };
+    }
+    if (sql.startsWith('SELECT id,owner,data,updated_at,srv_at FROM tasks WHERE app=? AND id IN')) {
+      const ids = new Set(args.slice(1).map(String));
+      return { results: [...this.tasks.entries()]
+        .filter(([id]) => ids.has(id))
+        .map(([id, row]) => ({ id, owner: row.owner, data: row.data,
+          updated_at: row.updatedAt, srv_at: row.srvAt })) };
+    }
+    if (sql.startsWith('SELECT id,owner,data FROM tasks WHERE app=? AND id IN')) {
+      const ids = new Set(args.slice(1).map(String));
+      return { results: [...this.tasks.entries()]
+        .filter(([id]) => ids.has(id))
+        .map(([id, row]) => ({ id, owner: row.owner, data: row.data })) };
+    }
+    if (sql.startsWith('SELECT id,data FROM tasks WHERE app=? AND id IN')) {
+      const ids = new Set(args.slice(1).map(String));
+      return { results: [...this.tasks.entries()]
+        .filter(([id]) => ids.has(id))
+        .map(([id, row]) => ({ id, data: row.data })) };
     }
     if (sql.startsWith('SELECT id,data FROM tasks WHERE app=? AND owner=?')) {
       const owner = args[1];
@@ -63,6 +141,19 @@ class FakeDB {
         .filter(([id, row]) => ids.has(id) && row.owner === owner)
         .map(([id]) => ({ id })) };
     }
+    if (sql.startsWith('SELECT k,owner,data,updated_at,srv_at FROM checks WHERE app=? AND k IN')) {
+      const keys = new Set(args.slice(1).map(String));
+      return { results: [...this.checks.entries()]
+        .filter(([key]) => keys.has(key))
+        .map(([k, row]) => ({ k, owner: row.owner, data: row.data,
+          updated_at: row.updatedAt, srv_at: row.srvAt })) };
+    }
+    if (sql.includes('FROM makeup_cases WHERE app=? AND case_id IN')) {
+      const ids = new Set(args.slice(1).map(String));
+      return { results: [...this.makeupCases.entries()]
+        .filter(([id]) => ids.has(id))
+        .map(([, row]) => ({ ...row })) };
+    }
     const pull = sql.match(/^SELECT (id|k) AS key, owner, data, updated_at, srv_at FROM (staff|tasks|checks)/);
     if (pull) {
       const table = pull[2];
@@ -77,6 +168,31 @@ class FakeDB {
     throw new Error('Unhandled all SQL: ' + sql);
   }
   async run(sql, args) {
+    const result = changes => {
+      this.previousChanges = changes;
+      return { meta: { changes } };
+    };
+    if (sql.startsWith('INSERT OR IGNORE INTO student_schedule_revisions')) {
+      const [app, studentId, updatedAt] = args;
+      if (app !== 'task') throw new Error('unexpected revision app');
+      if (this.scheduleRevisions.has(String(studentId))) return result(0);
+      this.scheduleRevisions.set(String(studentId), { revision: 0, updatedAt });
+      return result(1);
+    }
+    if (sql.startsWith('UPDATE student_schedule_revisions SET revision=revision+1')) {
+      const [updatedAt, app, studentId, expectedRevision] = args;
+      if (app !== 'task') throw new Error('unexpected revision app');
+      const row = this.scheduleRevisions.get(String(studentId));
+      if (!row || Number(row.revision) !== Number(expectedRevision)) return result(0);
+      row.revision += 1;
+      row.updatedAt = updatedAt;
+      return result(1);
+    }
+    if (sql.startsWith('INSERT INTO task_write_cas_guards')) {
+      this.scheduleRevisionGuardRuns += 1;
+      if (this.previousChanges !== 1) throw new Error('TASK_WRITE_CAS_CONFLICT');
+      return result(1);
+    }
     const match = sql.match(/^INSERT INTO (staff|tasks|checks)/);
     if (!match) throw new Error('Unhandled run SQL: ' + sql);
     const table = match[1];
@@ -85,28 +201,121 @@ class FakeDB {
     const current = target.get(key);
     if (!current) {
       target.set(key, { owner, data, updatedAt, srvAt });
-      return { meta: { changes: 1 } };
+      return result(1);
     }
     const currentData = JSON.parse(current.data);
     const guarded = current.owner === owner && (table !== 'tasks' || currentData.origin === 'staff');
     if (guarded && Number(updatedAt) > Number(current.updatedAt)) {
       target.set(key, { owner, data, updatedAt, srvAt });
-      return { meta: { changes: 1 } };
+      return result(1);
     }
-    return { meta: { changes: 0 } };
+    return result(0);
   }
 }
 
 const auth = { mode: 'person', id: 'teacher-1', token: 'teacher-token' };
 const task = (id, origin, title) => ({ id, staffId: 'teacher-1', origin, title, deleted: false, updatedAt: 100 });
+const regularLesson = (id = 'lesson-1', overrides = {}) => ({
+  ...task(id, 'staff', '[수업] 정규 수업'),
+  taskKind: 'lesson_instruction', lessonFormVersion: 1, intakeVersion: 1,
+  intakeSource: 'teacher_9_field_form', studentId: 'student-a',
+  start: '2026-09-01', end: '2026-12-31', repeat: 'days', scheduleStatus: 'confirmed',
+  scheduleSlots: [{ days: [1], startTime: '15:00', endTime: '15:50' }],
+  ...overrides
+});
+const kstDate = () => new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+const kstStamp = (date, time) => Date.parse(date + 'T' + time + ':00+09:00');
+const attendance = (date, at, out = null, updatedAt = at) => ({
+  taskId: '__att__teacher-1', date, done: true, note: '', steps: {}, count: 0, blocked: false,
+  at, out, updatedAt
+});
 const change = (data, updatedAt = 200) => ({
   table: 'tasks', id: data.id, owner: 'teacher-1', data, updated_at: updatedAt
 });
 
-async function sync(db, changes, envOverrides = {}, requestAuth = auth) {
+function seedReassignedMakeup(db, overrides = {}) {
+  const caseId = overrides.caseId || 'mu_reassigned';
+  const taskId = 'makeup_lesson_' + caseId;
+  const priorDate = overrides.priorDate || '2026-09-06';
+  const currentDate = overrides.currentDate || '2026-09-07';
+  const sourceDate = overrides.sourceDate || '2026-09-01';
+  const sourceTaskId = overrides.sourceTaskId || 'source-lesson';
+  const currentOwner = overrides.currentOwner || 'teacher-2';
+  const formerOwner = overrides.formerOwner || 'teacher-1';
+  const taskData = {
+    id: taskId, staffId: currentOwner, origin: 'makeup', title: '[수업] 보강', deleted: false,
+    taskKind: 'lesson_instruction', lessonFormVersion: 1, studentId: 'student-a',
+    lessonInstanceType: 'makeup', makeupCaseId: caseId, makeupSourceTaskId: sourceTaskId,
+    makeupSourceDate: sourceDate, repeat: 'once', start: currentDate, end: currentDate
+  };
+  Object.assign(taskData, overrides.taskData || {});
+  db.seedTask(taskData, currentOwner);
+  const history = overrides.history || [
+    { action: 'schedule', staffId: formerOwner, date: priorDate, startTime: '13:00', endTime: '13:50', revision: 2 },
+    { action: 'reschedule', previousStaffId: formerOwner, previousDate: priorDate,
+      previousStartTime: '13:00', previousEndTime: '13:50', staffId: currentOwner,
+      date: currentDate, startTime: '14:00', endTime: '14:50', revision: 3 }
+  ];
+  db.seedMakeupCase({
+    case_id: caseId, student_id: 'student-a', source_task_id: sourceTaskId, source_date: sourceDate,
+    status: 'confirmed', revision: 3, confirmed_staff_id: currentOwner,
+    confirmed_start_at: currentDate + 'T14:00:00+09:00',
+    confirmed_end_at: currentDate + 'T14:50:00+09:00', history: JSON.stringify(history)
+  });
+  return { caseId, taskId, priorDate, currentDate };
+}
+
+function cancelCanonicalMakeup(db, action = 'no_makeup') {
+  const makeup = seedReassignedMakeup(db, {
+    caseId: 'mu_cancelled_' + action,
+    currentOwner: 'teacher-1', formerOwner: 'teacher-1'
+  });
+  const taskRow = db.tasks.get(makeup.taskId);
+  const taskData = JSON.parse(taskRow.data);
+  taskData.deleted = true;
+  taskRow.data = JSON.stringify(taskData);
+  const row = db.makeupCases.get(makeup.caseId);
+  const history = JSON.parse(row.history);
+  history.push({ action, from: 'confirmed', to: 'cancelled', actorId: 'director', revision: 4 });
+  Object.assign(row, {
+    status: 'cancelled', revision: 4, completed_at: null, completed_by: null,
+    cancelled_at: 400, cancelled_by: 'director', history: JSON.stringify(history)
+  });
+  return makeup;
+}
+
+function completeCanonicalMakeup(db, options = {}) {
+  const makeup = seedReassignedMakeup(db, {
+    caseId: options.caseId || 'mu_completed',
+    currentOwner: 'teacher-1', formerOwner: 'teacher-1'
+  });
+  const row = db.makeupCases.get(makeup.caseId);
+  const history = JSON.parse(row.history);
+  history.push({ action: 'complete', from: 'confirmed', to: 'completed', staffId: 'teacher-1',
+    date: makeup.currentDate, actorId: 'teacher-1', revision: 4 });
+  Object.assign(row, {
+    status: 'completed', revision: 4, completed_at: 400, completed_by: 'teacher-1',
+    history: JSON.stringify(history)
+  });
+  if (options.deleted) {
+    const taskRow = db.tasks.get(makeup.taskId);
+    const taskData = JSON.parse(taskRow.data);
+    taskData.deleted = true;
+    taskRow.data = JSON.stringify(taskData);
+  }
+  if (options.check !== false) {
+    db.seedCheck(makeup.taskId + '|' + makeup.currentDate, {
+      taskId: makeup.taskId, date: makeup.currentDate, done: true,
+      att: options.serverAtt || 'P', note: 'server note', updatedAt: 200
+    }, options.serverOwner || 'teacher-1', 200);
+  }
+  return makeup;
+}
+
+async function sync(db, changes, envOverrides = {}, requestAuth = auth, since = 0) {
   const response = await worker.fetch(new Request('https://worker.example/sync', {
     method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ app: 'task', auth: requestAuth, since: 0, changes })
+    body: JSON.stringify({ app: 'task', auth: requestAuth, since, changes })
   }), { DB: db, TASK_ADMIN_SECRET: 'admin-secret', CONSULT_ADMIN_SECRET: 'consult-secret', ...envOverrides });
   return { status: response.status, body: await response.json() };
 }
@@ -237,6 +446,182 @@ test('generic own sync cannot mint or mutate lesson authorization and permits on
   assert.deepEqual(db.task(plain.id), plain);
 });
 
+test('all-scope generic sync cannot create a regular lesson and directs every role to the lesson endpoint', async () => {
+  const identities = [
+    { requestAuth: { mode: 'admin', secret: 'admin-secret' }, env: {} },
+    { requestAuth: auth, env: { TASK_MANAGER_STAFF_IDS: 'teacher-1' } }
+  ];
+  for (const identity of identities) {
+    const db = new FakeDB();
+    const lesson = regularLesson();
+    const result = await sync(db, [change(lesson, 200)], identity.env, identity.requestAuth);
+    assert.equal(result.status, 409);
+    assert.equal(result.body.code, 'LESSON_SCHEDULE_ENDPOINT_REQUIRED');
+    assert.equal(db.scheduleRevisionReads, 1, '시간축 검사 전에 stable student revision을 읽는다');
+    assert.equal(db.batchCalls, 0);
+    assert.equal(db.tasks.size, 0);
+  }
+});
+
+test('all-scope generic sync rejects every regular-lesson time-axis and classification mutation', async () => {
+  const mutations = [
+    lesson => { lesson.studentId = 'student-b'; },
+    lesson => { lesson.deleted = true; },
+    lesson => { lesson.start = '2026-09-08'; },
+    lesson => { lesson.startDate = '2026-09-01'; },
+    lesson => { lesson.end = '2027-01-31'; },
+    lesson => { lesson.endDate = '2026-12-31'; },
+    lesson => { lesson.repeat = 'once'; },
+    lesson => { lesson.scheduleStatus = 'needs_review'; },
+    lesson => { lesson.scheduleSlots = [{ days: [1], startTime: '16:00', endTime: '16:50' }]; },
+    lesson => { lesson.taskKind = 'lesson_instruction_v2'; },
+    lesson => { lesson.lessonFormVersion = 2; },
+    lesson => { lesson.intakeVersion = 2; },
+    lesson => { lesson.intakeSource = 'other'; },
+    lesson => { lesson.lessonInstanceType = 'regular'; },
+    lesson => { lesson.makeupCaseId = ''; }
+  ];
+  for (let index = 0; index < mutations.length; index += 1) {
+    const db = new FakeDB();
+    const before = regularLesson('lesson-' + index);
+    db.seedTask(before);
+    const incoming = structuredClone(before);
+    mutations[index](incoming);
+    incoming.updatedAt = 200;
+    const result = await sync(db, [change(incoming, 200)], {},
+      { mode: 'admin', secret: 'admin-secret' });
+    assert.equal(result.status, 409, 'mutation ' + index + ': ' + JSON.stringify(result.body));
+    assert.equal(result.body.code, 'LESSON_SCHEDULE_ENDPOINT_REQUIRED');
+    assert.equal(db.scheduleRevisionReads, 1);
+    assert.equal(db.batchCalls, 0);
+    assert.deepEqual(db.task(before.id), before);
+  }
+});
+
+test('all-scope generic sync allows non-time lesson edits and ignores stale schedule changes', async () => {
+  const adminAuth = { mode: 'admin', secret: 'admin-secret' };
+  const db = new FakeDB();
+  const before = regularLesson('lesson-note');
+  db.seedTask(before, before.staffId, 100);
+
+  const edited = { ...before, title: '[수업] 제목 수정', note: '수업 메모 수정', updatedAt: 200 };
+  const editedResult = await sync(db, [change(edited, 200)], {}, adminAuth);
+  assert.equal(editedResult.status, 200, JSON.stringify(editedResult.body));
+  assert.equal(db.task(before.id).note, '수업 메모 수정');
+  assert.equal(db.scheduleRevisionReads, 1);
+  assert.equal(db.scheduleRevisionGuardRuns, 1);
+  assert.equal(db.scheduleRevisions.get('student-a').revision, 1);
+  const revisionInsert = db.lastBatchSql.findIndex(sql =>
+    sql.startsWith('INSERT OR IGNORE INTO student_schedule_revisions'));
+  const revisionUpdate = db.lastBatchSql.findIndex(sql =>
+    sql.startsWith('UPDATE student_schedule_revisions SET revision=revision+1'));
+  const revisionGuard = db.lastBatchSql.findIndex(sql =>
+    sql.startsWith('INSERT INTO task_write_cas_guards'));
+  const taskWrite = db.lastBatchSql.findIndex(sql => sql.startsWith('INSERT INTO tasks'));
+  assert.ok(revisionInsert >= 0 && revisionInsert < revisionUpdate);
+  assert.ok(revisionUpdate < revisionGuard && revisionGuard < taskWrite,
+    'revision CAS와 changes() guard가 실제 task write보다 앞서야 한다');
+
+  const current = db.task(before.id);
+  db.tasks.get(before.id).updatedAt = 500;
+  const stale = structuredClone(current);
+  stale.scheduleSlots = [{ days: [1], startTime: '19:00', endTime: '19:50' }];
+  stale.updatedAt = 400;
+  const staleResult = await sync(db, [change(stale, 400)], {}, adminAuth);
+  assert.equal(staleResult.status, 200, JSON.stringify(staleResult.body));
+  assert.deepEqual(db.task(before.id).scheduleSlots, current.scheduleSlots);
+  assert.equal(db.scheduleRevisionGuardRuns, 2);
+  assert.equal(db.scheduleRevisions.get('student-a').revision, 2);
+});
+
+test('all-scope same-signature lesson edit rolls back when its schedule revision races', async () => {
+  const db = new FakeDB();
+  const before = regularLesson('lesson-race');
+  db.seedTask(before);
+  db.beforeBatch = current => {
+    current.scheduleRevisions.set('student-a', { revision: 1, updatedAt: 150 });
+  };
+  const edited = { ...before, note: '경합 중인 메모', updatedAt: 200 };
+  const result = await sync(db, [change(edited, 200)], {},
+    { mode: 'admin', secret: 'admin-secret' });
+  assert.equal(result.status, 409);
+  assert.equal(result.body.code, 'SYNC_SCHEDULE_REVISION_CONFLICT');
+  assert.equal(db.scheduleRevisionGuardRuns, 1);
+  assert.equal(db.scheduleRevisions.get('student-a').revision, 1,
+    '실패한 batch의 revision UPDATE는 롤백하고 동시 변경 revision은 보존한다');
+  assert.deepEqual(db.task(before.id), before);
+});
+
+test('all-scope generic sync rejects a same-batch conversion from a general task into a lesson', async () => {
+  const db = new FakeDB();
+  const plain = task('same-batch-task', 'staff', '일반 업무');
+  const lesson = regularLesson(plain.id, { updatedAt: 300 });
+  const result = await sync(db, [change(plain, 200), change(lesson, 300)], {},
+    { mode: 'admin', secret: 'admin-secret' });
+  assert.equal(result.status, 409);
+  assert.equal(result.body.code, 'LESSON_SCHEDULE_ENDPOINT_REQUIRED');
+  assert.equal(db.scheduleRevisionReads, 1);
+  assert.equal(db.batchCalls, 0);
+  assert.equal(db.tasks.size, 0);
+});
+
+test('generic sync skips every stale server-authored makeup copy but cannot mint a makeup task', async () => {
+  const adminAuth = { mode: 'admin', secret: 'admin-secret' };
+  const db = new FakeDB();
+  const makeup = {
+    ...task('makeup_mu_a', 'admin', '[수업] 보강 수업'),
+    taskKind: 'lesson_instruction', lessonFormVersion: 2, studentId: 'student-a',
+    lessonInstanceType: 'makeup', makeupCaseId: 'mu_a', makeupSourceTaskId: 'lesson-a'
+  };
+  db.seedTask(makeup);
+
+  const replay = await sync(db, [change({ ...makeup }, 999)], {}, adminAuth);
+  assert.equal(replay.status, 200);
+  assert.equal(db.batchCalls, 0, '서버 정본의 동일 재전송은 쓰지 않는다');
+  assert.equal(replay.body.changes.filter(item => item.table === 'tasks' && item.key === makeup.id).length, 1,
+    'forced 정본과 일반 pull은 같은 task를 중복 반환하지 않는다');
+
+  for (const mutated of [
+    { ...makeup, title: '[수업] 임의 수정', updatedAt: 999 },
+    { ...makeup, deleted: true, updatedAt: 1, lessonRevision: 1 },
+    { id: makeup.id, staffId: makeup.staffId, origin: makeup.origin, title: '일반 업무로 위장', deleted: true, updatedAt: 999 }
+  ]) {
+    const result = await sync(db, [change(mutated, 999)], {}, adminAuth);
+    assert.equal(result.status, 200);
+    assert.equal(db.batchCalls, 0, '서버에 존재하는 보강 task의 stale copy는 쓰지 않는다');
+    assert.deepEqual(db.task(makeup.id), makeup);
+  }
+
+  const ownStale = await sync(db, [change({ ...makeup, title: '오래된 개인기기 사본', updatedAt: 1,
+    lessonRevision: 1 }, 1)]);
+  assert.equal(ownStale.status, 200);
+  assert.deepEqual(db.task(makeup.id), makeup);
+  const ownNewerMutation = await sync(db, [change({ ...makeup, title: '서버보다 최신으로 보이는 변조 사본',
+    updatedAt: 9999, lessonRevision: 999 }, 9999)], {}, auth, 500);
+  assert.equal(ownNewerMutation.status, 200);
+  assert.equal(db.batchCalls, 0);
+  assert.deepEqual(db.task(makeup.id), makeup);
+  const canonical = ownNewerMutation.body.changes.filter(item => item.table === 'tasks' && item.key === makeup.id);
+  assert.equal(canonical.length, 1);
+  assert.equal(canonical[0].authoritative, true);
+  assert.deepEqual(canonical[0].data, makeup);
+
+  const forged = { ...makeup, id: 'makeup_mu_forged', makeupCaseId: 'mu_forged' };
+  const created = await sync(db, [{ table: 'tasks', id: forged.id, owner: forged.staffId,
+    data: forged, updated_at: 999 }], {}, adminAuth);
+  assert.equal(created.status, 409);
+  assert.equal(created.body.code, 'MAKEUP_ENDPOINT_REQUIRED');
+  assert.equal(db.tasks.has(forged.id), false);
+
+  const regular = task('regular-existing', 'staff', '일반 업무');
+  db.seedTask(regular);
+  const converted = await sync(db, [change({ ...regular, lessonInstanceType: 'makeup',
+    makeupCaseId: 'mu_convert', updatedAt: 999 }, 999)], {}, adminAuth);
+  assert.equal(converted.status, 409);
+  assert.equal(converted.body.code, 'MAKEUP_ENDPOINT_REQUIRED');
+  assert.deepEqual(db.task(regular.id), regular);
+});
+
 test('task envelope id, staffId, and origin are server-validated', async () => {
   const cases = [
     { ...task('task-1', 'staff', 'x'), id: 'inner-other' },
@@ -255,20 +640,96 @@ test('task envelope id, staffId, and origin are server-validated', async () => {
 test('staff progress checks still sync normally', async () => {
   const db = new FakeDB();
   db.seedTask(task('staff-1', 'manager', 'assigned task'));
-  let result = await sync(db, [{
+  const result = await sync(db, [{
     table: 'checks', k: 'staff-1|2026-08-04', owner: 'teacher-1',
     data: { taskId: 'staff-1', date: '2026-08-04', done: true, steps: { 'step-1': true }, updatedAt: 200 },
     updated_at: 200
   }]);
   assert.equal(result.status, 200);
   assert.equal(JSON.parse(db.checks.get('staff-1|2026-08-04').data).done, true);
+});
 
-  result = await sync(db, [{
-    table: 'checks', k: '__att__teacher-1|2026-08-04', owner: 'teacher-1',
-    data: { taskId: '__att__teacher-1', date: '2026-08-04', done: true, updatedAt: 300 }, updated_at: 300
-  }]);
+test('staff attendance creation and first clock-out require the dedicated endpoint', async () => {
+  const db = new FakeDB();
+  const date = kstDate();
+  const key = '__att__teacher-1|' + date;
+  const at = kstStamp(date, '09:00');
+  const out = kstStamp(date, '18:00');
+
+  let result = await sync(db, [{ table: 'checks', k: key, owner: 'teacher-1',
+    data: attendance(date, at), updated_at: at }]);
+  assert.equal(result.status, 403);
+  assert.equal(result.body.code, 'STAFF_ATTENDANCE_ADMIN_ONLY');
+  assert.equal(db.checks.has(key), false);
+
+  db.seedCheck(key, attendance(date, at), 'teacher-1', at);
+  result = await sync(db, [{ table: 'checks', k: key, owner: 'teacher-1',
+    data: attendance(date, at, out, out), updated_at: out }]);
+  assert.equal(result.status, 403);
+  assert.equal(result.body.code, 'STAFF_ATTENDANCE_ADMIN_ONLY');
+  assert.equal(JSON.parse(db.checks.get(key).data).out, null);
+});
+
+test('an exact cached attendance replay is accepted as a no-op without changing its revision', async () => {
+  const db = new FakeDB();
+  const date = kstDate();
+  const key = '__att__teacher-1|' + date;
+  const at = kstStamp(date, '09:00');
+  const out = kstStamp(date, '18:00');
+  const stored = attendance(date, at, out, out);
+  db.seedCheck(key, stored, 'teacher-1', out);
+  const replay = { ...stored, updatedAt: out + 60000 };
+  const result = await sync(db, [{ table: 'checks', k: key, owner: 'teacher-1',
+    data: replay, updated_at: replay.updatedAt }]);
   assert.equal(result.status, 200);
-  assert.equal(db.checks.has('__att__teacher-1|2026-08-04'), true);
+  assert.equal(db.batchCalls, 0);
+  assert.equal(db.checks.get(key).updatedAt, out);
+  assert.deepEqual(JSON.parse(db.checks.get(key).data), stored);
+});
+
+test('staff attendance rejects clock-in edits, clock-out cancellation, and completed-record changes', async () => {
+  const date = kstDate();
+  const key = '__att__teacher-1|' + date;
+  const at = kstStamp(date, '09:00');
+  const out = kstStamp(date, '18:00');
+  const cases = [
+    current => ({ ...current, at: at + 60000, updatedAt: out + 1 }),
+    current => ({ ...current, done: false, at: null, out: null, updatedAt: out + 1 }),
+    current => ({ ...current, out: null, updatedAt: out + 1 }),
+    current => ({ ...current, out: out + 60000, updatedAt: out + 60001 })
+  ];
+  for (const mutate of cases) {
+    const db = new FakeDB();
+    const stored = attendance(date, at, out, out);
+    db.seedCheck(key, stored, 'teacher-1', out);
+    const incoming = mutate(stored);
+    const result = await sync(db, [{ table: 'checks', k: key, owner: 'teacher-1',
+      data: incoming, updated_at: incoming.updatedAt }]);
+    assert.equal(result.status, 403);
+    assert.equal(result.body.code, 'STAFF_ATTENDANCE_ADMIN_ONLY');
+    assert.deepEqual(JSON.parse(db.checks.get(key).data), stored);
+  }
+});
+
+test('staff cannot backdate attendance but admin can correct an existing record', async () => {
+  const date = kstDate();
+  const priorDate = new Date(Date.parse(date + 'T00:00:00Z') - 86400000).toISOString().slice(0, 10);
+  const priorAt = kstStamp(priorDate, '09:00');
+  const db = new FakeDB();
+  const priorKey = '__att__teacher-1|' + priorDate;
+  let result = await sync(db, [{ table: 'checks', k: priorKey, owner: 'teacher-1',
+    data: attendance(priorDate, priorAt), updated_at: priorAt }]);
+  assert.equal(result.status, 403);
+
+  const key = '__att__teacher-1|' + date;
+  const at = kstStamp(date, '09:00');
+  const correctedAt = kstStamp(date, '09:15');
+  db.seedCheck(key, attendance(date, at), 'teacher-1', at);
+  result = await sync(db, [{ table: 'checks', k: key, owner: 'teacher-1',
+    data: attendance(date, correctedAt, null, correctedAt), updated_at: correctedAt }], {},
+  { mode: 'admin', secret: 'admin-secret' });
+  assert.equal(result.status, 200);
+  assert.equal(JSON.parse(db.checks.get(key).data).at, correctedAt);
 });
 
 test('generic sync ignores server-authored contact rows instead of overwriting them', async () => {
@@ -307,6 +768,373 @@ test('own sync rejects checks for another task or embedded special owner', async
     assert.equal(result.status, 403);
     assert.equal(db.checks.size, 0);
   }
+});
+
+test('former makeup assignee stale check is skipped while an ordinary same-batch change still syncs', async () => {
+  const db = new FakeDB();
+  const makeup = seedReassignedMakeup(db);
+  db.seedTask(task('ordinary-task', 'manager', '일반 업무'));
+  const staleTask = { ...db.task(makeup.taskId), staffId: 'teacher-1',
+    start: makeup.priorDate, end: makeup.priorDate, updatedAt: 250 };
+
+  const result = await sync(db, [
+    { table: 'tasks', id: makeup.taskId, owner: 'teacher-1', data: staleTask, updated_at: 250 },
+    { table: 'checks', k: makeup.taskId + '|' + makeup.priorDate, owner: 'teacher-1',
+      data: { taskId: makeup.taskId, date: makeup.priorDate, done: true, att: 'P', updatedAt: 300 },
+      updated_at: 300 },
+    { table: 'checks', k: 'ordinary-task|2026-09-06', owner: 'teacher-1',
+      data: { taskId: 'ordinary-task', date: '2026-09-06', done: true, updatedAt: 301 },
+      updated_at: 301 }
+  ]);
+
+  assert.equal(result.status, 200);
+  assert.equal(db.checks.has(makeup.taskId + '|' + makeup.priorDate), false,
+    '철회된 과거 담당자의 오프라인 출결은 서버에 쓰지 않는다');
+  assert.equal(db.checks.has('ordinary-task|2026-09-06'), true,
+    '같은 batch의 정상 업무 체크는 poison되지 않고 저장한다');
+  assert.equal(result.body.changes.some(item => item.key === makeup.taskId), false,
+    '과거 담당자에게 현재 담당 보강 task나 학생 정보를 반환하지 않는다');
+});
+
+test('same assignee date-only reschedule drops the exact stale date without poisoning the batch', async () => {
+  const db = new FakeDB();
+  const makeup = seedReassignedMakeup(db, { currentOwner: 'teacher-1', formerOwner: 'teacher-1' });
+  db.seedTask(task('ordinary-task', 'manager', '일반 업무'));
+  const result = await sync(db, [
+    { table: 'checks', k: makeup.taskId + '|' + makeup.priorDate, owner: 'teacher-1',
+      data: { taskId: makeup.taskId, date: makeup.priorDate, done: true, att: 'P' }, updated_at: 300 },
+    { table: 'checks', k: 'ordinary-task|2026-09-06', owner: 'teacher-1',
+      data: { taskId: 'ordinary-task', date: '2026-09-06', done: true }, updated_at: 301 }
+  ]);
+
+  assert.equal(result.status, 200);
+  assert.equal(db.checks.has(makeup.taskId + '|' + makeup.priorDate), false);
+  assert.equal(db.checks.has('ordinary-task|2026-09-06'), true);
+});
+
+test('same assignee stale-date quarantine requires the exact prior assignment history', async () => {
+  for (const mutate of [
+    context => { context.attemptDate = '2026-09-05'; },
+    context => {
+      const row = context.db.makeupCases.get(context.makeup.caseId);
+      const history = JSON.parse(row.history);
+      history[1].previousDate = '2026-09-04';
+      row.history = JSON.stringify(history);
+    }
+  ]) {
+    const db = new FakeDB();
+    const makeup = seedReassignedMakeup(db, { currentOwner: 'teacher-1', formerOwner: 'teacher-1' });
+    db.seedTask(task('ordinary-task', 'manager', '일반 업무'));
+    const context = { db, makeup, attemptDate: makeup.priorDate };
+    mutate(context);
+    const result = await sync(db, [
+      { table: 'checks', k: makeup.taskId + '|' + context.attemptDate, owner: 'teacher-1',
+        data: { taskId: makeup.taskId, date: context.attemptDate, done: true, att: 'P' }, updated_at: 300 },
+      { table: 'checks', k: 'ordinary-task|2026-09-06', owner: 'teacher-1',
+        data: { taskId: 'ordinary-task', date: '2026-09-06', done: true }, updated_at: 301 }
+    ]);
+    assert.equal(result.status, 403);
+    assert.equal(db.batchCalls, 0);
+    assert.equal(db.checks.size, 0);
+  }
+});
+
+test('all-scope makeup check validation fails closed for unrelated, forged, or wrong-date identities', async () => {
+  for (const mutate of [
+    context => {
+      const row = context.db.makeupCases.get(context.makeup.caseId);
+      row.history = JSON.stringify([{ action: 'reschedule', previousStaffId: 'teacher-9',
+        previousDate: context.makeup.priorDate, staffId: 'teacher-2', revision: 3 }]);
+    },
+    context => {
+      const row = context.db.makeupCases.get(context.makeup.caseId);
+      row.source_task_id = 'different-source-lesson';
+    },
+    context => { context.attemptDate = '2026-09-05'; },
+    context => { context.attemptDate = '2099-09-05'; context.attemptOwner = 'teacher-2'; },
+    context => { context.attemptDate = context.makeup.currentDate; context.attemptOwner = 'teacher-9'; }
+  ]) {
+    const db = new FakeDB();
+    const makeup = seedReassignedMakeup(db);
+    db.seedTask(task('ordinary-task', 'manager', '일반 업무'));
+    const context = { db, makeup, attemptDate: makeup.priorDate, attemptOwner: 'teacher-1' };
+    mutate(context);
+    const result = await sync(db, [
+      { table: 'checks', k: makeup.taskId + '|' + context.attemptDate, owner: context.attemptOwner,
+        data: { taskId: makeup.taskId, date: context.attemptDate, done: true, att: 'P' }, updated_at: 300 },
+      { table: 'checks', k: 'ordinary-task|2026-09-06', owner: 'teacher-1',
+        data: { taskId: 'ordinary-task', date: '2026-09-06', done: true }, updated_at: 301 }
+    ], {}, { mode: 'admin', secret: 'admin-secret' });
+    assert.equal(result.status, 403);
+    assert.equal(db.batchCalls, 0, '위조가 섞인 batch는 정상 변경까지 원자적으로 거부한다');
+    assert.equal(db.checks.size, 0);
+  }
+});
+
+test('all-scope stale admin makeup check is skipped without poisoning an ordinary same-batch check', async () => {
+  const db = new FakeDB();
+  const makeup = seedReassignedMakeup(db);
+  db.seedTask(task('ordinary-task', 'manager', '일반 업무'));
+  const staleTask = { ...db.task(makeup.taskId), staffId: 'teacher-1',
+    start: makeup.priorDate, end: makeup.priorDate, updatedAt: 250 };
+  const result = await sync(db, [
+    { table: 'tasks', id: makeup.taskId, owner: 'teacher-1', data: staleTask, updated_at: 250 },
+    { table: 'checks', k: makeup.taskId + '|' + makeup.priorDate, owner: 'teacher-1',
+      data: { taskId: makeup.taskId, date: makeup.priorDate, done: true, att: 'P' }, updated_at: 300 },
+    { table: 'checks', k: 'ordinary-task|2026-09-06', owner: 'teacher-1',
+      data: { taskId: 'ordinary-task', date: '2026-09-06', done: true }, updated_at: 301 }
+  ], {}, { mode: 'admin', secret: 'admin-secret' });
+
+  assert.equal(result.status, 200);
+  assert.equal(db.checks.has(makeup.taskId + '|' + makeup.priorDate), false);
+  assert.equal(db.checks.has('ordinary-task|2026-09-06'), true);
+});
+
+test('every superseded assignee/date remains quarantined after repeated reschedules and completion', async () => {
+  const db = new FakeDB();
+  const history = [
+    { action: 'schedule', staffId: 'teacher-1', date: '2026-09-05', revision: 2 },
+    { action: 'reschedule', previousStaffId: 'teacher-1', previousDate: '2026-09-05',
+      staffId: 'teacher-2', date: '2026-09-06', revision: 3 },
+    { action: 'reschedule', previousStaffId: 'teacher-2', previousDate: '2026-09-06',
+      staffId: 'teacher-3', date: '2026-09-07', revision: 4 },
+    { action: 'complete', staffId: 'teacher-3', date: '2026-09-07', revision: 5 }
+  ];
+  const makeup = seedReassignedMakeup(db, {
+    currentOwner: 'teacher-3', formerOwner: 'teacher-1', priorDate: '2026-09-05',
+    currentDate: '2026-09-07', history
+  });
+  Object.assign(db.makeupCases.get(makeup.caseId), {
+    status: 'completed', revision: 5, completed_at: 500, completed_by: 'teacher-3'
+  });
+  db.seedTask(task('ordinary-task', 'manager', '일반 업무'));
+
+  const result = await sync(db, [
+    { table: 'checks', k: makeup.taskId + '|2026-09-05', owner: 'teacher-1',
+      data: { taskId: makeup.taskId, date: '2026-09-05', done: true, att: 'P' }, updated_at: 300 },
+    { table: 'checks', k: makeup.taskId + '|2026-09-06', owner: 'teacher-2',
+      data: { taskId: makeup.taskId, date: '2026-09-06', done: true, att: 'L' }, updated_at: 301 },
+    { table: 'checks', k: 'ordinary-task|2026-09-06', owner: 'teacher-1',
+      data: { taskId: 'ordinary-task', date: '2026-09-06', done: true }, updated_at: 302 }
+  ], {}, { mode: 'admin', secret: 'admin-secret' });
+
+  assert.equal(result.status, 200);
+  assert.equal(db.checks.has(makeup.taskId + '|2026-09-05'), false);
+  assert.equal(db.checks.has(makeup.taskId + '|2026-09-06'), false);
+  assert.equal(db.checks.has('ordinary-task|2026-09-06'), true);
+});
+
+test('current makeup assignee can sync the canonical task check normally', async () => {
+  const db = new FakeDB();
+  const makeup = seedReassignedMakeup(db);
+  const result = await sync(db, [{
+    table: 'checks', k: makeup.taskId + '|' + makeup.currentDate, owner: 'teacher-2',
+    data: { taskId: makeup.taskId, date: makeup.currentDate, done: true, att: 'P', updatedAt: 400 },
+    updated_at: 400
+  }], {}, { mode: 'person', id: 'teacher-2', token: 'teacher-2-token' });
+
+  assert.equal(result.status, 200);
+  assert.equal(db.checks.has(makeup.taskId + '|' + makeup.currentDate), true);
+  assert.equal(JSON.parse(db.checks.get(makeup.taskId + '|' + makeup.currentDate).data).att, 'P');
+});
+
+test('cancelled canonical makeup drops the exact offline check for every supported cancellation action', async () => {
+  for (const action of ['cancel', 'no_makeup', 'reconcile_attendance']) {
+    const db = new FakeDB();
+    const makeup = cancelCanonicalMakeup(db, action);
+    db.seedTask(task('ordinary-task', 'manager', '일반 업무'));
+    const result = await sync(db, [
+      { table: 'checks', k: makeup.taskId + '|' + makeup.currentDate, owner: 'teacher-1',
+        data: { taskId: makeup.taskId, date: makeup.currentDate, done: true, att: 'P' },
+        updated_at: 500 },
+      { table: 'checks', k: 'ordinary-task|2026-09-06', owner: 'teacher-1',
+        data: { taskId: 'ordinary-task', date: '2026-09-06', done: true }, updated_at: 501 }
+    ]);
+
+    assert.equal(result.status, 200, action + ': ' + JSON.stringify(result.body));
+    assert.equal(db.checks.has(makeup.taskId + '|' + makeup.currentDate), false);
+    assert.equal(db.checks.has('ordinary-task|2026-09-06'), true);
+  }
+});
+
+test('cancelled makeup quarantine fails closed for a forged tombstone, history, identity, or existing record', async () => {
+  const cases = [
+    context => {
+      const taskRow = context.db.tasks.get(context.makeup.taskId);
+      const data = JSON.parse(taskRow.data); data.deleted = false; taskRow.data = JSON.stringify(data);
+    },
+    context => {
+      const row = context.db.makeupCases.get(context.makeup.caseId);
+      const history = JSON.parse(row.history); history.at(-1).action = 'forged';
+      row.history = JSON.stringify(history);
+    },
+    context => { context.owner = 'teacher-9'; },
+    context => { context.date = '2026-09-09'; },
+    context => {
+      context.db.seedCheck(context.makeup.taskId + '|' + context.makeup.currentDate, {
+        taskId: context.makeup.taskId, date: context.makeup.currentDate, att: 'P'
+      }, 'teacher-1', 200);
+    }
+  ];
+  for (const mutate of cases) {
+    const db = new FakeDB();
+    const makeup = cancelCanonicalMakeup(db);
+    db.seedTask(task('ordinary-task', 'manager', '일반 업무'));
+    const context = { db, makeup, owner: 'teacher-1', date: makeup.currentDate };
+    mutate(context);
+    const result = await sync(db, [
+      { table: 'checks', k: makeup.taskId + '|' + context.date, owner: context.owner,
+        data: { taskId: makeup.taskId, date: context.date, done: true, att: 'P' }, updated_at: 500 },
+      { table: 'checks', k: 'ordinary-task|2026-09-06', owner: 'teacher-1',
+        data: { taskId: 'ordinary-task', date: '2026-09-06', done: true }, updated_at: 501 }
+    ], {}, { mode: 'admin', secret: 'admin-secret' });
+
+    assert.equal(result.status, 403, JSON.stringify(result.body));
+    assert.equal(db.batchCalls, 0);
+    assert.equal(db.checks.has('ordinary-task|2026-09-06'), false);
+  }
+});
+
+test('completed active makeup permits only exact same-att memo updates', async () => {
+  const db = new FakeDB();
+  const makeup = completeCanonicalMakeup(db);
+  const key = makeup.taskId + '|' + makeup.currentDate;
+  const result = await sync(db, [{
+    table: 'checks', k: key, owner: 'teacher-1', updated_at: 300,
+    data: { taskId: makeup.taskId, date: makeup.currentDate, done: true,
+      att: 'P', note: 'updated note', updatedAt: 300 }
+  }]);
+
+  assert.equal(result.status, 200, JSON.stringify(result.body));
+  assert.equal(JSON.parse(db.checks.get(key).data).att, 'P');
+  assert.equal(JSON.parse(db.checks.get(key).data).note, 'updated note');
+});
+
+test('completed active makeup drops different or blank attendance without poisoning the batch', async () => {
+  for (const incomingAtt of ['A', '']) {
+    const db = new FakeDB();
+    const makeup = completeCanonicalMakeup(db, { caseId: 'mu_completed_' + (incomingAtt || 'blank') });
+    const key = makeup.taskId + '|' + makeup.currentDate;
+    db.seedTask(task('ordinary-task', 'manager', '일반 업무'));
+    const incoming = { taskId: makeup.taskId, date: makeup.currentDate, done: true, updatedAt: 300 };
+    if (incomingAtt) incoming.att = incomingAtt;
+    const result = await sync(db, [
+      { table: 'checks', k: key, owner: 'teacher-1', data: incoming, updated_at: 300 },
+      { table: 'checks', k: 'ordinary-task|2026-09-06', owner: 'teacher-1',
+        data: { taskId: 'ordinary-task', date: '2026-09-06', done: true }, updated_at: 301 }
+    ]);
+
+    assert.equal(result.status, 200, JSON.stringify(result.body));
+    assert.equal(JSON.parse(db.checks.get(key).data).att, 'P');
+    assert.equal(JSON.parse(db.checks.get(key).data).note, 'server note');
+    assert.equal(db.checks.has('ordinary-task|2026-09-06'), true);
+  }
+});
+
+test('completed active makeup requires an exact canonical server attendance identity', async () => {
+  const cases = [
+    context => { context.db.checks.delete(context.key); },
+    context => {
+      const row = context.db.checks.get(context.key);
+      row.data = JSON.stringify({ taskId: context.makeup.taskId, date: '2026-09-09', att: 'P' });
+    },
+    context => { context.db.checks.get(context.key).owner = 'teacher-2'; }
+  ];
+  for (let index = 0; index < cases.length; index += 1) {
+    const db = new FakeDB();
+    const makeup = completeCanonicalMakeup(db, { caseId: 'mu_completed_invalid_' + index });
+    const key = makeup.taskId + '|' + makeup.currentDate;
+    const context = { db, makeup, key,
+      incoming: { taskId: makeup.taskId, date: makeup.currentDate, att: 'P', note: 'new' } };
+    cases[index](context);
+    const result = await sync(db, [{ table: 'checks', k: key, owner: 'teacher-1',
+      data: context.incoming, updated_at: 300 }]);
+    assert.equal(result.status, 403, JSON.stringify(result.body));
+    assert.equal(db.batchCalls, 0);
+  }
+});
+
+test('legacy cancelled and completed makeup checks with an omitted embedded identity are quarantined per row', async () => {
+  for (const status of ['cancelled', 'completed']) {
+    for (const omitted of ['taskId', 'date']) {
+      const db = new FakeDB();
+      const makeup = status === 'cancelled'
+        ? cancelCanonicalMakeup(db)
+        : completeCanonicalMakeup(db, { caseId: 'mu_completed_legacy_' + omitted });
+      const key = makeup.taskId + '|' + makeup.currentDate;
+      db.seedTask(task('ordinary-task', 'manager', '일반 업무'));
+      const data = { taskId: makeup.taskId, date: makeup.currentDate, att: 'P', note: 'legacy row' };
+      delete data[omitted];
+      const result = await sync(db, [
+        { table: 'checks', k: key, owner: 'teacher-1', data, updated_at: 300 },
+        { table: 'checks', k: 'ordinary-task|2026-09-06', owner: 'teacher-1',
+          data: { taskId: 'ordinary-task', date: '2026-09-06', done: true }, updated_at: 301 }
+      ]);
+
+      assert.equal(result.status, 200, status + '/' + omitted + ': ' + JSON.stringify(result.body));
+      if (status === 'cancelled') assert.equal(db.checks.has(key), false);
+      else {
+        assert.equal(JSON.parse(db.checks.get(key).data).att, 'P');
+        assert.equal(JSON.parse(db.checks.get(key).data).note, 'server note');
+      }
+      assert.equal(db.checks.has('ordinary-task|2026-09-06'), true);
+    }
+  }
+});
+
+test('legacy quarantine still rejects an explicitly conflicting makeup task or date identity', async () => {
+  for (const status of ['cancelled', 'completed']) {
+    for (const conflicting of ['taskId', 'date']) {
+      const db = new FakeDB();
+      const makeup = status === 'cancelled'
+        ? cancelCanonicalMakeup(db)
+        : completeCanonicalMakeup(db, { caseId: 'mu_completed_conflict_' + conflicting });
+      const data = { taskId: makeup.taskId, date: makeup.currentDate, att: 'P' };
+      data[conflicting] = conflicting === 'taskId' ? 'different-task' : '2026-09-09';
+      const result = await sync(db, [{
+        table: 'checks', k: makeup.taskId + '|' + makeup.currentDate,
+        owner: 'teacher-1', data, updated_at: 300
+      }]);
+      assert.equal(result.status, 403, status + '/' + conflicting);
+      assert.equal(db.batchCalls, 0);
+    }
+  }
+});
+
+test('completed hidden makeup drops all exact-key offline rows while preserving canonical attendance', async () => {
+  for (const incomingAtt of ['P', 'A']) {
+    const db = new FakeDB();
+    const makeup = completeCanonicalMakeup(db, {
+      caseId: 'mu_completed_deleted_' + incomingAtt, deleted: true
+    });
+    const key = makeup.taskId + '|' + makeup.currentDate;
+    db.seedTask(task('ordinary-task', 'manager', '일반 업무'));
+    const result = await sync(db, [
+      { table: 'checks', k: key, owner: 'teacher-1',
+        data: { taskId: makeup.taskId, date: makeup.currentDate, att: incomingAtt,
+          note: 'offline note' }, updated_at: 300 },
+      { table: 'checks', k: 'ordinary-task|2026-09-06', owner: 'teacher-1',
+        data: { taskId: 'ordinary-task', date: '2026-09-06', done: true }, updated_at: 301 }
+    ]);
+
+    assert.equal(result.status, 200, JSON.stringify(result.body));
+    assert.equal(JSON.parse(db.checks.get(key).data).att, 'P');
+    assert.equal(JSON.parse(db.checks.get(key).data).note, 'server note');
+    assert.equal(db.checks.has('ordinary-task|2026-09-06'), true);
+  }
+});
+
+test('all-scope admin can sync a check only for the current canonical makeup assignee and date', async () => {
+  const db = new FakeDB();
+  const makeup = seedReassignedMakeup(db);
+  const result = await sync(db, [{
+    table: 'checks', k: makeup.taskId + '|' + makeup.currentDate, owner: 'teacher-2',
+    data: { taskId: makeup.taskId, date: makeup.currentDate, done: true, att: 'L', updatedAt: 410 },
+    updated_at: 410
+  }], {}, { mode: 'admin', secret: 'admin-secret' });
+
+  assert.equal(result.status, 200);
+  assert.equal(JSON.parse(db.checks.get(makeup.taskId + '|' + makeup.currentDate).data).att, 'L');
 });
 
 test('check data taskId and date must match its key', async () => {

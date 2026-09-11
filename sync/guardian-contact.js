@@ -1,4 +1,7 @@
-import { guardianDeliveryAllowed, guardianDeliveryStudentIds } from './guardian-delivery-policy.js';
+import {
+  guardianDeliveryStudentIds,
+  parentFeedbackDeliveryAllowed
+} from './guardian-delivery-policy.js';
 
 /**
  * 보호자 연락처·발송 동의 원장 — 학부모 피드백 실제 발송(parent-feedback-send.js)이
@@ -125,7 +128,7 @@ export async function handleGuardianContact(env, app, body, origin, auth, json) 
     phone = rawPhone;
   }
   const consent = body.consent ? 1 : 0;
-  if (consent && !guardianDeliveryAllowed(env, studentId)) {
+  if (consent && !parentFeedbackDeliveryAllowed(env, studentId)) {
     return json({ ok: false, code: 'GUARDIAN_DELIVERY_NOT_ALLOWED',
       error: '이 학생은 학부모 전달 테스트 대상이 아닙니다' }, 403, origin);
   }

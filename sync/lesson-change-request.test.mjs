@@ -9,12 +9,18 @@ const schema = fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8')
 const migration = fs.readFileSync(new URL('./migrations/012_lesson_change_requests.sql', import.meta.url), 'utf8');
 
 class D1Statement {
-  constructor(database, sql) { this.database = database; this.sql = sql; this.args = []; }
+  constructor(owner, sql) { this.owner = owner; this.sql = sql; this.args = []; }
   bind(...args) { this.args = args; return this; }
-  first() { return this.database.prepare(this.sql).get(...this.args) || null; }
-  all() { return { results: this.database.prepare(this.sql).all(...this.args) }; }
+  first() {
+    this.owner.readStatements.push({ sql: this.sql, args: [...this.args] });
+    return this.owner.database.prepare(this.sql).get(...this.args) || null;
+  }
+  all() {
+    this.owner.readStatements.push({ sql: this.sql, args: [...this.args] });
+    return { results: this.owner.database.prepare(this.sql).all(...this.args) };
+  }
   run() {
-    const result = this.database.prepare(this.sql).run(...this.args);
+    const result = this.owner.database.prepare(this.sql).run(...this.args);
     return { meta: { changes: Number(result.changes || 0) } };
   }
 }
@@ -24,9 +30,14 @@ class TestD1 {
     this.database = new DatabaseSync(':memory:');
     this.database.exec(schema);
     this.beforeBatch = null;
+    this.readStatements = [];
+    this.batchStatements = [];
   }
-  prepare(sql) { return new D1Statement(this.database, sql); }
+  prepare(sql) { return new D1Statement(this, sql); }
   batch(statements) {
+    this.batchStatements.push(statements.map(statement => ({
+      sql: statement.sql, args: [...statement.args]
+    })));
     if (this.beforeBatch) {
       const beforeBatch = this.beforeBatch;
       this.beforeBatch = null;
@@ -69,6 +80,9 @@ function seed(db) {
     title: '[수업] 예시학생 (중2) — 수학', detail: '쎈 2-2, 82쪽', guide: '학생 특징: ...',
     steps: [], target: 0, unit: '회', time: '18:00', priority: 'normal',
     repeat: 'days', days: [1, 3, 5], start: '2026-08-02', end: '', carry: true,
+    scheduleStatus: 'confirmed', scheduleSlots: [
+      { days: [1, 3, 5], startTime: '18:00', endTime: '19:00', validFrom: '2026-08-02' }
+    ],
     createdAt: now, updatedAt: now, deleted: false
   };
   db.prepare("INSERT INTO tasks (app,id,owner,data,updated_at,srv_at) VALUES ('task','task-1','S-kim',?,?,?)")
@@ -138,6 +152,16 @@ test('director sees the pending request and approving it writes into the live ta
   assert.equal(applied.days.join(','), '2,4');
   assert.equal(applied.time, '19:30');
   assert.equal(applied.title, '[수업] 예시학생 (중2) — 수학', '화이트리스트 밖 필드는 보존된다');
+  assert.deepEqual({ ...db.prepare(
+    "SELECT student_id,revision FROM student_schedule_revisions WHERE app='task' AND student_id='student-1'"
+  ).first() }, { student_id: 'student-1', revision: 1 });
+  const revisionRead = db.readStatements.find(statement =>
+    statement.sql.startsWith('SELECT student_id,revision FROM student_schedule_revisions'));
+  assert.deepEqual(revisionRead.args, ['task', 'student-1']);
+  const approvalBatch = db.batchStatements.at(-1);
+  assert.match(approvalBatch[0].sql, /^INSERT OR IGNORE INTO student_schedule_revisions/);
+  assert.match(approvalBatch[1].sql, /^UPDATE student_schedule_revisions SET revision=revision\+1/);
+  assert.match(approvalBatch[2].sql, /^INSERT INTO task_write_cas_guards/);
 
   const again = await call(db, '/lesson-change-review', { auth: admin, action: 'approve', requestKey, revision: 1 });
   assert.equal(again.body.idempotent, true, '이미 승인된 요청을 다시 승인해도 안전하다');
@@ -146,12 +170,34 @@ test('director sees the pending request and approving it writes into the live ta
   assert.deepEqual(archived.body.requests[0].changes, { days: [2, 4], time: '19:30' });
 });
 
+test('a legacy name-only lesson cannot receive schedule changes until it is linked by studentId', async () => {
+  const db = new TestD1(); seed(db);
+  const submit = await call(db, '/lesson-change-request', {
+    auth: person('S-kim', 'tok-kim'), action: 'submit', taskId: 'task-1', changes: { time: '19:30' }
+  });
+  const taskRow = db.prepare("SELECT data FROM tasks WHERE app='task' AND id='task-1'").first();
+  const legacyTask = JSON.parse(taskRow.data);
+  delete legacyTask.studentId;
+  db.prepare("UPDATE tasks SET data=? WHERE app='task' AND id='task-1'")
+    .bind(JSON.stringify(legacyTask)).run();
+
+  const approve = await call(db, '/lesson-change-review', {
+    auth: admin, action: 'approve', requestKey: submit.body.request.requestKey, revision: 1
+  });
+
+  assert.equal(approve.status, 409);
+  assert.match(approve.body.error, /stable studentId/);
+  const persisted = JSON.parse(db.prepare("SELECT data FROM tasks WHERE app='task' AND id='task-1'").first().data);
+  assert.equal(persisted.time, '18:00');
+});
+
 test('approved lesson-field changes notify only that task owner for a multi-subject student', async () => {
   const db = new TestD1(); seed(db);
   const source = JSON.parse(db.prepare("SELECT data FROM tasks WHERE app='task' AND id='task-1'").first().data);
   const otherSubject = {
     ...source, id: 'task-other-subject', staffId: 'S-other',
-    title: '[수업] 예시학생 (중2) — 영어', subject: '영어'
+    title: '[수업] 예시학생 (중2) — 영어', subject: '영어', days: [2], time: '20:00',
+    scheduleSlots: [{ days: [2], startTime: '20:00', endTime: '21:00', validFrom: '2026-08-02' }]
   };
   db.prepare("INSERT INTO tasks (app,id,owner,data,updated_at,srv_at) VALUES ('task',?,'S-other',?,?,?)")
     .bind(otherSubject.id, JSON.stringify(otherSubject), source.updatedAt, source.updatedAt).run();
@@ -196,6 +242,39 @@ test('a request CAS race rolls back the earlier lesson and change-event writes',
   assert.equal(db.prepare("SELECT COUNT(*) AS count FROM student_change_events WHERE request_key=?")
     .bind(requestKey).first().count, 0);
   assert.equal(db.prepare("SELECT COUNT(*) AS count FROM task_write_cas_guards").first().count, 0);
+});
+
+test('a stale student schedule revision aborts approval without changing its task, event, or request', async () => {
+  const db = new TestD1(); seed(db);
+  const submit = await call(db, '/lesson-change-request', {
+    auth: person('S-kim', 'tok-kim'), action: 'submit', taskId: 'task-1', changes: { time: '19:30' }
+  });
+  const requestKey = submit.body.request.requestKey;
+  db.beforeBatch = database => database.prepare(
+    'INSERT INTO student_schedule_revisions(app,student_id,revision,updated_at) VALUES(?,?,?,?)'
+  ).run('task', 'student-1', 1, Date.now());
+
+  const approve = await call(db, '/lesson-change-review', {
+    auth: admin, action: 'approve', requestKey, revision: 1
+  });
+  assert.equal(approve.status, 409);
+  assert.match(approve.body.error, /다른 변경/);
+  const task = JSON.parse(db.prepare("SELECT data FROM tasks WHERE app='task' AND id='task-1'").first().data);
+  assert.equal(task.time, '18:00');
+  assert.deepEqual({ ...db.prepare(
+    "SELECT revision,status FROM lesson_change_requests WHERE app='task' AND request_key=?"
+  ).bind(requestKey).first() }, { revision: 1, status: 'approval_waiting' });
+  assert.equal(db.prepare(
+    "SELECT COUNT(*) AS count FROM student_change_events WHERE app='task' AND request_key=?"
+  ).bind(requestKey).first().count, 0);
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM task_write_cas_guards").first().count, 0);
+  assert.equal(db.prepare(
+    "SELECT revision FROM student_schedule_revisions WHERE app='task' AND student_id='student-1'"
+  ).first().revision, 1, 'batch 밖에서 먼저 저장된 revision만 남아야 합니다');
+  const approvalBatch = db.batchStatements.at(-1);
+  assert.match(approvalBatch[0].sql, /^INSERT OR IGNORE INTO student_schedule_revisions/);
+  assert.match(approvalBatch[1].sql, /^UPDATE student_schedule_revisions SET revision=revision\+1/);
+  assert.match(approvalBatch[2].sql, /^INSERT INTO task_write_cas_guards/);
 });
 
 test('a future teacher-change start date stays pending until that KST date', async () => {

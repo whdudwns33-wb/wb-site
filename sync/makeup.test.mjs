@@ -8,6 +8,19 @@ const schema = fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8')
 const migration = fs.readFileSync(new URL('./migrations/025_makeup.sql', import.meta.url), 'utf8');
 const sessionMigration = fs.readFileSync(new URL('./migrations/026_session_packs.sql', import.meta.url), 'utf8');
 const portalMigration = fs.readFileSync(new URL('./migrations/027_parent_portal.sql', import.meta.url), 'utf8');
+const taskWriteCasMigration = fs.readFileSync(new URL('./migrations/055_task_write_cas_guards.sql', import.meta.url), 'utf8');
+const assigneeIntegrityMigration = fs.readFileSync(
+  new URL('./migrations/065_makeup_assignee_integrity.sql', import.meta.url), 'utf8'
+);
+const studentOverlapMigration = fs.readFileSync(
+  new URL('./migrations/066_makeup_student_overlap_only.sql', import.meta.url), 'utf8'
+);
+const completionLinksMigration = fs.readFileSync(
+  new URL('./migrations/074_makeup_completion_links.sql', import.meta.url), 'utf8'
+);
+const absenceRetryMigration = fs.readFileSync(
+  new URL('./migrations/076_makeup_absence_retry.sql', import.meta.url), 'utf8'
+);
 
 class Statement {
   constructor(db, sql) { this.db = db; this.sql = sql; this.args = []; }
@@ -23,10 +36,17 @@ class TestD1 {
     this.database.exec(schema);
     this.database.exec(migration);
     this.database.exec(sessionMigration);
+    this.database.exec(taskWriteCasMigration);
+    this.database.exec(assigneeIntegrityMigration);
+    this.database.exec(studentOverlapMigration);
+    this.database.exec(completionLinksMigration);
+    this.database.exec(absenceRetryMigration);
     this.beforeBatch = null;
     this.failGuardianReads = false;
+    this.taskBulkReads = 0;
   }
   prepare(sql) {
+    if (/SELECT id,owner,data,updated_at FROM tasks WHERE app=\? AND id IN/i.test(sql)) this.taskBulkReads++;
     if (this.failGuardianReads && /FROM guardian_portal_responses/i.test(sql) &&
         (this.failGuardianReads !== 'current' || /revision=\?/.test(sql))) {
       throw new Error('guardian response query failed');
@@ -107,6 +127,13 @@ function absence(db, taskId, owner, date) {
     .bind('task', taskId + '|' + date, owner, JSON.stringify({ taskId, date, att: 'A' }), 1, 1).run();
 }
 
+function makeupAttendance(db, caseId, owner, date, att = 'P') {
+  const taskId = 'makeup_lesson_' + String(caseId);
+  db.prepare('INSERT INTO checks(app,k,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
+    .bind('task', taskId + '|' + date, owner,
+      JSON.stringify({ taskId, date, att, note: '', steps: {}, updatedAt: 2 }), 2, 2).run();
+}
+
 function seed(db) {
   for (const id of ['teacher-a', 'teacher-b', 'teacher-inactive']) {
     const deleted = id === 'teacher-inactive';
@@ -176,12 +203,44 @@ test('migration is additive and stores stable IDs, not names or contact fields',
   assert.match(sessionMigration, /trg_session_pack_makeup_usage_guard/);
   assert.match(sessionMigration, /MAKEUP_REVISION_CONFLICT/);
   assert.match(sessionMigration, /SESSION_PACK_IDENTITY_MISMATCH/);
+  assert.match(assigneeIntegrityMigration, /makeup\.confirmed_staff_id = task\.owner/);
+  assert.match(assigneeIntegrityMigration, /CREATE TABLE IF NOT EXISTS makeup_direct_completion_attestations/);
+  assert.match(assigneeIntegrityMigration, /trg_makeup_direct_completion_attestation_identity/);
+  assert.match(assigneeIntegrityMigration, /trg_makeup_completed_check_identity_lock/);
+  assert.match(studentOverlapMigration, /other\.student_id = NEW\.student_id/);
+  assert.match(studentOverlapMigration, /NEW\.status IN \('confirmed','completed'\)/);
+  assert.match(studentOverlapMigration, /other\.status IN \('confirmed','completed'\)/);
+  assert.doesNotMatch(studentOverlapMigration,
+    /other\.confirmed_staff_id = NEW\.confirmed_staff_id/);
+  assert.doesNotMatch(assigneeIntegrityMigration, /DROP TABLE|DELETE FROM/i);
   assert.doesNotMatch(migration, /DROP TABLE|DELETE FROM/i);
   const table = migration.slice(migration.indexOf('CREATE TABLE'), migration.indexOf(');') + 2);
   assert.doesNotMatch(table, /student_name|phone|guardian|contact|memo/i);
   for (const status of ['review_pending', 'reviewed', 'awaiting_parent', 'confirmed', 'completed', 'cancelled']) {
     assert.ok(table.includes("'" + status + "'"));
   }
+});
+
+test('066 replaces the legacy staff-time trigger and remains rerunnable', () => {
+  const database = new DatabaseSync(':memory:');
+  database.exec(migration);
+  database.exec(studentOverlapMigration);
+  database.exec(studentOverlapMigration);
+  const insert = database.prepare(
+    'INSERT INTO makeup_cases(app,case_id,student_id,source_task_id,source_date,source_teacher_id,' +
+    'consumption_group_id,status,revision,confirmed_start_at,confirmed_end_at,confirmed_staff_id,' +
+    'history,created_at,updated_at) VALUES(?,?,?,?,?,?,?,\'confirmed\',1,?,?,?,\'[]\',1,1)'
+  );
+  const add = (caseId, studentId, sourceTaskId, sourceDate, staffId, startTime, endTime) => insert.run(
+    'task', caseId, studentId, sourceTaskId, sourceDate, staffId, 'group-' + caseId,
+    sourceDate + 'T' + startTime + ':00+09:00', sourceDate + 'T' + endTime + ':00+09:00', staffId
+  );
+  add('case-a', 'student-a', 'lesson-a', '2026-08-12', 'teacher-a', '20:00', '21:00');
+  assert.doesNotThrow(() =>
+    add('case-b', 'student-b', 'lesson-b', '2026-08-12', 'teacher-a', '20:30', '21:30'));
+  assert.throws(() =>
+    add('case-a-2', 'student-a', 'lesson-a-2', '2026-08-12', 'teacher-b', '20:45', '21:15'),
+  /MAKEUP_TIME_CONFLICT/);
 });
 
 test('create requires a real A check, stable roster assignment, active source staff, and deduplicates source lesson/date', async () => {
@@ -209,6 +268,498 @@ test('create requires a real A check, stable roster assignment, active source st
   assert.equal(inactive.status, 409);
 });
 
+test('session4 absence skips automatic legacy creation but still allows an explicit manual request', async () => {
+  const db = new TestD1(); seed(db);
+  const document = roster();
+  document.roster.students[0].billingMode = 'session4';
+  document.roster.students[0].sessionCycleStartDate = '2026-08-01';
+  db.prepare("UPDATE private_rosters SET data=? WHERE app='task'").bind(JSON.stringify(document)).run();
+
+  const legacy = await call(db, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  });
+  assert.equal(legacy.status, 409);
+  assert.equal(legacy.body.code, 'SESSION4_AUTOMATIC_MAKEUP_DISABLED');
+  const automatic = await call(db, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10',
+    creationMode: 'automatic'
+  });
+  assert.equal(automatic.status, 409);
+  assert.equal(automatic.body.code, 'SESSION4_AUTOMATIC_MAKEUP_DISABLED');
+  assert.equal(db.database.prepare('SELECT count(*) AS n FROM makeup_cases').get().n, 0);
+
+  const manual = await call(db, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10',
+    creationMode: 'manual'
+  });
+  assert.equal(manual.status, 200);
+  assert.equal(manual.body.case.status, 'review_pending');
+  assert.equal(manual.body.case.history[0].creationMode, 'manual');
+});
+
+test('session4 automatic makeup keeps the prior policy for absences before the configured cycle start', async () => {
+  const db = new TestD1(); seed(db);
+  const document = roster();
+  document.roster.students[0].billingMode = 'session4';
+  document.roster.students[0].sessionCycleStartDate = '2026-08-15';
+  db.prepare("UPDATE private_rosters SET data=? WHERE app='task'").bind(JSON.stringify(document)).run();
+
+  const prior = await call(db, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10',
+    creationMode: 'automatic'
+  });
+  assert.equal(prior.status, 200, JSON.stringify(prior.body));
+  assert.equal(prior.body.case.history[0].creationMode, 'automatic');
+});
+
+test('assigned teacher or administrator can create one confirmed manual makeup on a non-recurring day without changing attendance', async () => {
+  const db = new TestD1(); seed(db);
+  const request = {
+    action: 'create_manual', studentId: 'student-a', sourceTaskId: 'lesson-a', reason: 'manual_exam',
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00'
+  };
+  const denied = await call(db, own('teacher-b'), request);
+  assert.equal(denied.status, 403);
+  const created = await call(db, own('teacher-a'), request);
+  assert.equal(created.status, 200);
+  assert.equal(created.body.idempotent, false);
+  assert.equal(created.body.case.status, 'confirmed');
+  assert.equal(created.body.case.creationType, 'manual');
+  assert.equal(created.body.case.manualReason, 'manual_exam');
+  assert.equal(created.body.case.createdBy, 'teacher-a');
+  assert.equal(created.body.case.createdScope, 'own');
+  assert.equal(created.body.case.confirmedStaffId, 'teacher-a');
+  assert.equal(created.body.lessonTask.lessonInstanceType, 'makeup');
+  assert.equal(created.body.lessonTask.start, '2026-08-12');
+  assert.equal(created.body.lessonTask.makeupCaseId, created.body.case.caseId);
+  assert.equal(db.database.prepare("SELECT count(*) AS n FROM checks WHERE app='task'").get().n, 2);
+  const adminList = await call(db, manager('director'), { action: 'list' });
+  assert.equal(adminList.body.cases.length, 1);
+  assert.equal(adminList.body.cases[0].createdBy, 'teacher-a');
+  assert.equal(adminList.body.cases[0].createdScope, 'own');
+
+  const retry = await call(db, manager('director'), request);
+  assert.equal(retry.status, 200);
+  assert.equal(retry.body.idempotent, true);
+  assert.equal(db.database.prepare('SELECT count(*) AS n FROM makeup_cases').get().n, 1);
+  assert.equal(db.database.prepare("SELECT count(*) AS n FROM tasks WHERE json_extract(data,'$.lessonInstanceType')='makeup'").get().n, 1);
+
+  const changed = await call(db, manager('director'), { ...request, startTime: '20:30', endTime: '21:30' });
+  assert.equal(changed.status, 409);
+  assert.equal(changed.body.code, 'MANUAL_MAKEUP_CONFLICT');
+});
+
+test('September can register and retry an August manual makeup in either source mode without recording attendance or usage', async () => {
+  const now = '2026-09-08T12:00:00+09:00';
+  for (const sourceMode of ['linked', 'unrelated']) {
+    const db = new TestD1(); seed(db); await insertPack(db);
+    const document = roster();
+    document.roster.students[0].billingMode = 'session4';
+    document.roster.students[0].sessionCycleStartDate = '2026-08-01';
+    db.prepare("UPDATE private_rosters SET data=? WHERE app='task'").bind(JSON.stringify(document)).run();
+    const request = {
+      action: 'create_manual', studentId: 'student-a', sourceMode, reason: 'manual_exam',
+      ...(sourceMode === 'linked' ? { sourceTaskId: 'lesson-a' } : { requestId: 'past-august' }),
+      date: '2026-08-12', startTime: '20:00', endTime: '21:00', staffId: 'teacher-a'
+    };
+    const denied = await callAt(db, own('teacher-b'), request, now);
+    assert.equal(denied.status, 403, sourceMode);
+    const created = await callAt(db, own('teacher-a'), request, now);
+    assert.equal(created.status, 200, JSON.stringify(created.body));
+    assert.equal(created.body.idempotent, false);
+    assert.equal(created.body.case.status, 'confirmed');
+    assert.equal(created.body.case.confirmedDate, '2026-08-12');
+    assert.equal(created.body.case.createdAt, Date.parse(now));
+    assert.equal(created.body.lessonTask.start, '2026-08-12');
+    assert.equal(created.body.lessonTask.end, '2026-08-12');
+    const retry = await callAt(db, all, request, '2026-10-01T12:00:00+09:00');
+    assert.equal(retry.status, 200, JSON.stringify(retry.body));
+    assert.equal(retry.body.idempotent, true);
+    assert.equal(retry.body.case.caseId, created.body.case.caseId);
+    assert.equal(db.database.prepare('SELECT count(*) AS n FROM makeup_cases').get().n, 1);
+    assert.equal(db.database.prepare("SELECT count(*) AS n FROM tasks WHERE id LIKE 'makeup_lesson_%'").get().n, 1);
+    assert.equal(db.database.prepare('SELECT count(*) AS n FROM checks').get().n, 2);
+    assert.equal(db.database.prepare('SELECT count(*) AS n FROM session_pack_usage').get().n, 0);
+    const completion = await callAt(db, all, {
+      action: 'complete', caseId: created.body.case.caseId, revision: created.body.case.revision
+    }, now);
+    assert.equal(completion.status, 409);
+    assert.equal(completion.body.code, 'MAKEUP_ATTENDANCE_REQUIRED');
+  }
+});
+
+test('수업무관 직접 보강은 담당 수업을 권한 근거로만 쓰고 과목 정보를 복사하지 않는다', async () => {
+  const db = new TestD1(); seed(db);
+  const request = {
+    action: 'create_manual', studentId: 'student-a', sourceMode: 'unrelated', requestId: 'request-a',
+    reason: 'manual_exam',
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00'
+  };
+  const created = await call(db, own('teacher-a'), request);
+  assert.equal(created.status, 200, JSON.stringify(created.body));
+  assert.equal(created.body.case.sourceMode, 'unrelated');
+  assert.equal(created.body.case.subject, '');
+  assert.equal(created.body.case.className, '');
+  assert.equal(created.body.case.history[0].sourceMode, 'unrelated');
+  assert.equal(created.body.case.history[0].requestId, 'request-a');
+  assert.equal(created.body.case.sourceTaskId, 'manual_unrelated_request-a');
+  assert.equal(created.body.lessonTask.subject, '');
+  assert.equal(created.body.lessonTask.className, '');
+  assert.match(created.body.lessonTask.title, /보강/);
+  assert.doesNotMatch(created.body.lessonTask.title, /영어|테스트반/);
+
+  const listed = await call(db, own('teacher-a'), { action: 'list' });
+  assert.equal(listed.status, 200);
+  assert.equal(listed.body.cases[0].sourceMode, 'unrelated');
+  assert.equal(listed.body.cases[0].subject, '');
+
+  db.prepare("UPDATE tasks SET data=json_set(data,'$.deleted',1) WHERE app='task' AND id='lesson-a'").run();
+  const independent = await call(db, own('teacher-a'), { action: 'list' });
+  assert.equal(independent.status, 200);
+  assert.equal(independent.body.cases.length, 1, '근거로 삼은 임의 정규수업 삭제와 독립적이어야 한다');
+
+  const retry = await call(db, own('teacher-a'), request);
+  assert.equal(retry.status, 200);
+  assert.equal(retry.body.idempotent, true);
+  assert.equal(db.database.prepare('SELECT count(*) AS n FROM makeup_cases').get().n, 1);
+
+  db.prepare("DELETE FROM tasks WHERE app='task' AND id='lesson-a'").run();
+  const rescheduled = await call(db, all, {
+    action: 'reschedule', caseId: created.body.case.caseId, revision: created.body.case.revision,
+    date: '2026-08-13', startTime: '20:00', endTime: '21:00', staffId: 'teacher-a'
+  });
+  assert.equal(rescheduled.status, 200, JSON.stringify(rescheduled.body));
+  assert.equal(rescheduled.body.case.sourceMode, 'unrelated');
+  assert.equal(rescheduled.body.lessonTask.start, '2026-08-13');
+
+  const absenceDb = new TestD1(); seed(absenceDb);
+  const blockedAbsence = await call(absenceDb, own('teacher-a'), { ...request, reason: 'manual_absence' });
+  assert.equal(blockedAbsence.status, 400);
+  assert.equal(blockedAbsence.body.code, 'MANUAL_SOURCE_REQUIRED');
+  assert.equal(absenceDb.database.prepare('SELECT count(*) AS n FROM makeup_cases').get().n, 0);
+
+  const badMode = await call(absenceDb, own('teacher-a'), { ...request, sourceMode: 'free_text' });
+  assert.equal(badMode.status, 400);
+});
+
+test('관리자는 정규수업 없는 재원생에게 같은 날짜의 수업무관 보강을 여러 번 독립 생성한다', async () => {
+  const db = new TestD1(); seed(db);
+  const document = roster();
+  document.roster.students.push({
+    id: 'student-c', name: '다학생', grade: '초3', teacher: '', subject: '',
+    start: '2026-01', end: '', reason: '', teacherIds: []
+  });
+  db.prepare("UPDATE private_rosters SET data=? WHERE app='task'").bind(JSON.stringify(document)).run();
+  const base = {
+    action: 'create_manual', studentId: 'student-c', sourceMode: 'unrelated', reason: 'manual_other',
+    date: '2026-08-12', staffId: 'teacher-a'
+  };
+  const first = await call(db, all, {
+    ...base, requestId: 'regularless-a', startTime: '14:00', endTime: '14:50'
+  });
+  const second = await call(db, all, {
+    ...base, requestId: 'regularless-b', startTime: '15:00', endTime: '15:50'
+  });
+  assert.equal(first.status, 200, JSON.stringify(first.body));
+  assert.equal(second.status, 200, JSON.stringify(second.body));
+  assert.notEqual(first.body.case.caseId, second.body.case.caseId);
+  assert.equal(db.database.prepare('SELECT count(*) AS n FROM makeup_cases').get().n, 2);
+
+  const adminList = await call(db, all, { action: 'list', studentId: 'student-c' });
+  assert.equal(adminList.status, 200);
+  assert.equal(adminList.body.cases.length, 2);
+  assert.ok(adminList.body.cases.every(item => item.sourceMode === 'unrelated' &&
+    item.subject === '' && item.currentTeacherId === 'teacher-a'));
+
+  const teacherList = await call(db, own('teacher-a'), { action: 'list', studentId: 'student-c' });
+  assert.equal(teacherList.status, 200);
+  assert.equal(teacherList.body.cases.length, 2, '실제 보강 담당자는 정규수업이 없어도 생성된 보강을 본다');
+
+  const denied = await call(db, own('teacher-b'), {
+    ...base, requestId: 'teacher-denied', staffId: 'teacher-b',
+    startTime: '16:00', endTime: '16:50'
+  });
+  assert.equal(denied.status, 403);
+  assert.equal(denied.body.code, 'STUDENT_SCOPE_FORBIDDEN');
+});
+
+test('manual makeup lets an administrator choose another active teacher but own scope can only choose itself', async () => {
+  const db = new TestD1(); seed(db);
+  const request = {
+    action: 'create_manual', studentId: 'student-a', sourceTaskId: 'lesson-a', reason: 'manual_exam',
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00', staffId: 'teacher-b'
+  };
+  const forbidden = await call(db, own('teacher-a'), request);
+  assert.equal(forbidden.status, 403);
+  assert.equal(forbidden.body.code, 'MAKEUP_ASSIGNEE_FORBIDDEN');
+  assert.equal(db.database.prepare('SELECT count(*) AS n FROM makeup_cases').get().n, 0);
+
+  const created = await call(db, all, request);
+  assert.equal(created.status, 200, JSON.stringify(created.body));
+  assert.equal(created.body.case.sourceTeacherId, 'teacher-a');
+  assert.equal(created.body.case.confirmedStaffId, 'teacher-b');
+  const task = db.database.prepare('SELECT owner,data FROM tasks WHERE id=?')
+    .get('makeup_lesson_' + created.body.case.caseId);
+  assert.equal(task.owner, 'teacher-b');
+  assert.equal(JSON.parse(task.data).staffId, 'teacher-b');
+
+  const inactiveDb = new TestD1(); seed(inactiveDb);
+  const inactive = await call(inactiveDb, all, { ...request, staffId: 'teacher-inactive' });
+  assert.equal(inactive.status, 409);
+  assert.equal(inactive.body.code, 'STAFF_INACTIVE');
+
+  const raceDb = new TestD1(); seed(raceDb);
+  raceDb.beforeBatch = () => raceDb.prepare("UPDATE staff SET data=? WHERE app='task' AND id='teacher-b'")
+    .bind(JSON.stringify({ id: 'teacher-b', deleted: true })).run();
+  const raced = await call(raceDb, all, request);
+  assert.equal(raced.status, 409);
+  assert.equal(raced.body.code, 'STAFF_INACTIVE');
+  assert.equal(raceDb.database.prepare('SELECT count(*) AS n FROM makeup_cases').get().n, 0);
+  assert.equal(raceDb.database.prepare("SELECT count(*) AS n FROM tasks WHERE id LIKE 'makeup_lesson_%'").get().n, 0);
+
+  const sourceRaceDb = new TestD1(); seed(sourceRaceDb);
+  sourceRaceDb.beforeBatch = () => sourceRaceDb.prepare(
+    "UPDATE staff SET data=? WHERE app='task' AND id='teacher-a'"
+  ).bind(JSON.stringify({ id: 'teacher-a', deleted: true })).run();
+  const sourceRaced = await call(sourceRaceDb, all, request);
+  assert.equal(sourceRaced.status, 409);
+  assert.equal(sourceRaced.body.code, 'STAFF_INACTIVE');
+  assert.equal(sourceRaceDb.database.prepare('SELECT count(*) AS n FROM makeup_cases').get().n, 0);
+  assert.equal(sourceRaceDb.database.prepare("SELECT count(*) AS n FROM tasks WHERE id LIKE 'makeup_lesson_%'").get().n, 0);
+});
+
+test('manual makeup validates type, stable student/source identity, active lesson range, roster, and staff', async () => {
+  const db = new TestD1(); seed(db);
+  const base = {
+    action: 'create_manual', studentId: 'student-a', sourceTaskId: 'lesson-a', reason: 'manual_absence',
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00'
+  };
+  assert.equal((await call(db, all, { ...base, reason: '임의 사유' })).status, 400);
+  const mismatch = await call(db, all, { ...base, studentId: 'student-b' });
+  assert.equal(mismatch.status, 409);
+  assert.equal(mismatch.body.code, 'LESSON_STUDENT_MISMATCH');
+  const finiteRow = db.database.prepare("SELECT data FROM tasks WHERE app='task' AND id='lesson-a'").get();
+  const finiteTask = JSON.parse(finiteRow.data);
+  finiteTask.end = '2026-12-31';
+  db.prepare("UPDATE tasks SET data=? WHERE app='task' AND id='lesson-a'").bind(JSON.stringify(finiteTask)).run();
+  const inactiveRange = await call(db, all, { ...base, date: '2027-01-06' });
+  assert.equal(inactiveRange.status, 409);
+  assert.equal(inactiveRange.body.code, 'LESSON_INACTIVE');
+
+  const rosterDoc = roster();
+  rosterDoc.roster.students[0].end = '2026-08';
+  db.prepare("UPDATE private_rosters SET data=? WHERE app='task'").bind(JSON.stringify(rosterDoc)).run();
+  const inactiveStudent = await call(db, all, base);
+  assert.equal(inactiveStudent.status, 409);
+  assert.equal(inactiveStudent.body.code, 'STUDENT_INACTIVE');
+
+  const staffDb = new TestD1(); seed(staffDb);
+  staffDb.prepare("UPDATE staff SET data=? WHERE app='task' AND id='teacher-a'")
+    .bind(JSON.stringify({ id: 'teacher-a', deleted: true })).run();
+  const inactiveStaff = await call(staffDb, all, base);
+  assert.equal(inactiveStaff.status, 409);
+  assert.equal(inactiveStaff.body.code, 'STAFF_INACTIVE');
+});
+
+test('manual makeup allows teacher regular and makeup overlaps but blocks the same student overlaps', async () => {
+  const teacherOverlap = new TestD1(); seed(teacherOverlap);
+  insertTask(teacherOverlap, lesson('teacher-overlap', 'student-b', 'teacher-a', [3], '20:30', '21:30'));
+  const request = {
+    action: 'create_manual', studentId: 'student-a', sourceTaskId: 'lesson-a', reason: 'manual_exam',
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00'
+  };
+  assert.equal((await call(teacherOverlap, all, request)).status, 200);
+
+  const studentOverlap = new TestD1(); seed(studentOverlap);
+  insertTask(studentOverlap, lesson('student-overlap', 'student-a', 'teacher-b', [3], '20:30', '21:30'));
+  const blockedStudent = await call(studentOverlap, all, request);
+  assert.equal(blockedStudent.status, 409);
+  assert.equal(blockedStudent.body.code, 'STUDENT_SCHEDULE_CONFLICT');
+
+  const makeupOverlap = new TestD1(); seed(makeupOverlap);
+  insertTask(makeupOverlap, lesson('lesson-b-by-a', 'student-b', 'teacher-a', [2], '17:00', '18:00'));
+  assert.equal((await call(makeupOverlap, all, request)).status, 200);
+  const allowedStaff = await call(makeupOverlap, all, {
+    ...request, studentId: 'student-b', sourceTaskId: 'lesson-b-by-a', reason: 'manual_other'
+  });
+  assert.equal(allowedStaff.status, 200, JSON.stringify(allowedStaff.body));
+  insertTask(makeupOverlap, lesson('lesson-a-extra', 'student-a', 'teacher-b', [4], '17:00', '18:00'));
+  const blockedStudentMakeup = await call(makeupOverlap, all, {
+    ...request, sourceTaskId: 'lesson-a-extra', staffId: 'teacher-b', reason: 'manual_other'
+  });
+  assert.equal(blockedStudentMakeup.status, 409);
+  assert.equal(blockedStudentMakeup.body.code, 'STUDENT_MAKEUP_CONFLICT');
+  assert.equal(makeupOverlap.database.prepare('SELECT count(*) AS n FROM makeup_cases').get().n, 2);
+});
+
+test('manual creation atomically rolls back case and task when source, roster, staff, or conflicts change', async () => {
+  const request = {
+    action: 'create_manual', studentId: 'student-a', sourceTaskId: 'lesson-a', reason: 'manual_exam',
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00'
+  };
+  const transferDb = new TestD1(); seed(transferDb);
+  transferDb.beforeBatch = () => {
+    const row = transferDb.database.prepare("SELECT data FROM tasks WHERE app='task' AND id='lesson-a'").get();
+    const task = JSON.parse(row.data);
+    task.staffId = 'teacher-b';
+    transferDb.database.prepare(
+      "UPDATE tasks SET owner='teacher-b',data=?,updated_at=updated_at+1 WHERE app='task' AND id='lesson-a'"
+    ).run(JSON.stringify(task));
+  };
+  const transferred = await call(transferDb, own('teacher-a'), request);
+  assert.equal(transferred.status, 409);
+  assert.equal(transferred.body.code, 'REVISION_CONFLICT');
+  assert.equal(transferDb.database.prepare('SELECT count(*) AS n FROM makeup_cases').get().n, 0);
+  assert.equal(transferDb.database.prepare("SELECT count(*) AS n FROM tasks WHERE json_extract(data,'$.lessonInstanceType')='makeup'").get().n, 0);
+
+  const conflictDb = new TestD1(); seed(conflictDb);
+  conflictDb.beforeBatch = () => {
+    const task = lesson('late-conflict', 'student-a', 'teacher-b', [3], '20:30', '21:30');
+    conflictDb.database.prepare('INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
+      .run('task', task.id, task.staffId, JSON.stringify(task), 2, 2);
+  };
+  const conflicted = await call(conflictDb, all, request);
+  assert.equal(conflicted.status, 409);
+  assert.equal(conflicted.body.code, 'STUDENT_SCHEDULE_CONFLICT');
+  assert.equal(conflictDb.database.prepare('SELECT count(*) AS n FROM makeup_cases').get().n, 0);
+  assert.equal(conflictDb.database.prepare("SELECT count(*) AS n FROM tasks WHERE json_extract(data,'$.lessonInstanceType')='makeup'").get().n, 0);
+
+  const rosterDb = new TestD1(); seed(rosterDb);
+  rosterDb.beforeBatch = () => {
+    const row = rosterDb.database.prepare("SELECT data FROM private_rosters WHERE app='task'").get();
+    const document = JSON.parse(row.data);
+    document.roster.students.find(student => student.id === 'student-a').end = '2026-08';
+    rosterDb.database.prepare("UPDATE private_rosters SET data=?,updated_at=updated_at+1 WHERE app='task'")
+      .run(JSON.stringify(document));
+  };
+  const rosterChanged = await call(rosterDb, all, request);
+  assert.equal(rosterChanged.status, 409);
+  assert.equal(rosterChanged.body.code, 'STUDENT_INACTIVE');
+  assert.equal(rosterDb.database.prepare('SELECT count(*) AS n FROM makeup_cases').get().n, 0);
+
+  const staffDb = new TestD1(); seed(staffDb);
+  staffDb.beforeBatch = () => {
+    staffDb.database.prepare("UPDATE staff SET data=? WHERE app='task' AND id='teacher-a'")
+      .run(JSON.stringify({ id: 'teacher-a', name: 'teacher-a', deleted: true }));
+  };
+  const staffChanged = await call(staffDb, all, request);
+  assert.equal(staffChanged.status, 409);
+  assert.equal(staffChanged.body.code, 'STAFF_INACTIVE');
+  assert.equal(staffDb.database.prepare('SELECT count(*) AS n FROM makeup_cases').get().n, 0);
+
+  const makeupDb = new TestD1(); seed(makeupDb);
+  insertTask(makeupDb, lesson('lesson-b-by-a', 'student-b', 'teacher-a', [2], '17:00', '18:00'));
+  makeupDb.beforeBatch = () => {
+    const now = Date.now();
+    makeupDb.database.prepare(
+      'INSERT INTO makeup_cases(app,case_id,student_id,source_task_id,source_date,source_teacher_id,' +
+      'consumption_group_id,status,revision,confirmed_start_at,confirmed_end_at,confirmed_staff_id,' +
+      'history,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+    ).run('task', 'mu_' + 'b'.repeat(48), 'student-a', 'lesson-b-by-a', '2026-08-12', 'teacher-a',
+      'mc_' + 'b'.repeat(48), 'confirmed', 1, '2026-08-12T20:30:00+09:00',
+      '2026-08-12T21:30:00+09:00', 'teacher-a',
+      JSON.stringify([{ action: 'create_from_absence', actorId: 'teacher-a', at: now }]), now, now);
+  };
+  const makeupChanged = await call(makeupDb, all, request);
+  assert.equal(makeupChanged.status, 409);
+  assert.equal(makeupChanged.body.code, 'MAKEUP_TIME_CONFLICT');
+  assert.equal(makeupDb.database.prepare('SELECT count(*) AS n FROM makeup_cases').get().n, 1);
+  assert.equal(makeupDb.database.prepare("SELECT count(*) AS n FROM tasks WHERE json_extract(data,'$.lessonInstanceType')='makeup'").get().n, 0);
+});
+
+test('exam/other manual makeup completion never changes a session pack and attendance reconciliation cannot cancel it', async () => {
+  const db = new TestD1(); seed(db);
+  await insertPack(db);
+  const request = {
+    action: 'create_manual', studentId: 'student-a', sourceTaskId: 'lesson-a', reason: 'manual_other',
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00'
+  };
+  const created = await call(db, all, request);
+  assert.equal(created.status, 200);
+  const reconciled = await call(db, own('teacher-a'), {
+    action: 'reconcile_attendance', sourceTaskId: 'lesson-a', sourceDate: '2026-08-12'
+  });
+  assert.equal(reconciled.status, 200);
+  assert.equal(reconciled.body.idempotent, true);
+  assert.equal(reconciled.body.case.status, 'confirmed');
+  assert.equal(db.database.prepare("SELECT count(*) AS n FROM checks WHERE k='lesson-a|2026-08-12'").get().n, 0);
+  makeupAttendance(db, created.body.case.caseId, 'teacher-a', '2026-08-12');
+
+  const completed = await callAt(db, all, {
+    action: 'complete', caseId: created.body.case.caseId, revision: created.body.case.revision
+  }, '2026-08-12T21:01:00+09:00');
+  assert.equal(completed.status, 200);
+  assert.deepEqual(completed.body.sessionPackImpact,
+    { status: 'not_applicable', reason: 'manual_no_charge', refreshNeeded: false });
+  assert.equal(db.database.prepare('SELECT count(*) AS n FROM session_pack_usage').get().n, 0);
+  assert.equal(db.database.prepare("SELECT revision FROM session_packs WHERE pack_id='pack-a'").get().revision, 1);
+});
+
+test('manual absence makeup applies the normal session-pack consumption policy without requiring an A check', async () => {
+  const db = new TestD1(); seed(db);
+  await insertPack(db);
+  const created = await call(db, own('teacher-a'), {
+    action: 'create_manual', studentId: 'student-a', sourceTaskId: 'lesson-a', reason: 'manual_absence',
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00'
+  });
+  assert.equal(created.status, 200);
+  assert.equal(db.database.prepare("SELECT count(*) AS n FROM checks WHERE k='lesson-a|2026-08-12'").get().n, 0);
+  makeupAttendance(db, created.body.case.caseId, 'teacher-a', '2026-08-12', 'L');
+  const completed = await callAt(db, own('teacher-a'), {
+    action: 'complete', caseId: created.body.case.caseId, revision: created.body.case.revision
+  }, '2026-08-12T21:01:00+09:00');
+  assert.equal(completed.status, 200);
+  assert.equal(completed.body.sessionPackImpact.status, 'recorded');
+  assert.equal(completed.body.sessionPackImpact.delta, 1);
+  assert.equal(db.database.prepare('SELECT count(*) AS n FROM session_pack_usage').get().n, 1);
+  assert.equal(db.database.prepare("SELECT revision FROM session_packs WHERE pack_id='pack-a'").get().revision, 2);
+});
+
+test('unknown or invalid first creation events are exposed as unknown/manual and never charge a session pack', async () => {
+  for (const [index, history] of [
+    [],
+    [{ action: 'unexpected_origin', actorId: 'teacher-a' }],
+    [{ action: 'create_manual', reason: 'tampered_type', actorId: 'teacher-a', actorScope: 'own' }]
+  ].entries()) {
+    const db = new TestD1(); seed(db);
+    await insertPack(db);
+    const created = await call(db, own('teacher-a'), {
+      action: 'create_manual', studentId: 'student-a', sourceTaskId: 'lesson-a', reason: 'manual_absence',
+      date: '2026-08-12', startTime: '20:00', endTime: '21:00'
+    });
+    assert.equal(created.status, 200);
+    db.prepare("UPDATE makeup_cases SET history=? WHERE app='task' AND case_id=?")
+      .bind(JSON.stringify(history), created.body.case.caseId).run();
+    const listed = await call(db, all, { action: 'list' });
+    assert.equal(listed.body.cases[0].creationType, index === 2 ? 'manual' : 'unknown');
+    makeupAttendance(db, created.body.case.caseId, 'teacher-a', '2026-08-12', 'E');
+    const completed = await callAt(db, own('teacher-a'), {
+      action: 'complete', caseId: created.body.case.caseId, revision: created.body.case.revision
+    }, '2026-08-12T21:01:00+09:00');
+    assert.equal(completed.status, 200);
+    assert.equal(completed.body.sessionPackImpact.status, 'not_applicable');
+    assert.equal(completed.body.sessionPackImpact.reason,
+      index === 2 ? 'manual_no_charge' : 'unknown_origin_no_charge');
+    assert.equal(db.database.prepare('SELECT count(*) AS n FROM session_pack_usage').get().n, 0);
+    assert.equal(db.database.prepare("SELECT revision FROM session_packs WHERE pack_id='pack-a'").get().revision, 1);
+  }
+});
+
+test('absence creation fails closed when the same source/date belongs to a manual makeup', async () => {
+  const db = new TestD1(); seed(db);
+  const created = await call(db, all, {
+    action: 'create_manual', studentId: 'student-a', sourceTaskId: 'lesson-a', reason: 'manual_absence',
+    date: '2026-08-17', startTime: '20:00', endTime: '21:00'
+  });
+  assert.equal(created.status, 200);
+  absence(db, 'lesson-a', 'teacher-a', '2026-08-17');
+  const collision = await call(db, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-17'
+  });
+  assert.equal(collision.status, 409);
+  assert.equal(collision.body.code, 'MANUAL_MAKEUP_EXISTS');
+});
+
 test('own list is roster scoped and only all scope can review, propose, confirm, or cancel', async () => {
   const db = new TestD1(); seed(db);
   await call(db, own('teacher-a'), { action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10' });
@@ -222,7 +773,7 @@ test('own list is roster scoped and only all scope can review, propose, confirm,
   assert.equal((await call(db, all, { action: 'list' })).body.cases.length, 2);
 });
 
-test('own list follows the source lesson current owner after teacher transfer and fails closed on identity mismatch', async () => {
+test('own list remains visible to the historical and current source teachers after transfer and fails closed on mismatch', async () => {
   const db = new TestD1(); seed(db);
   await call(db, own('teacher-a'), { action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10' });
   const row = db.database.prepare("SELECT data FROM tasks WHERE app='task' AND id='lesson-a'").get();
@@ -231,13 +782,61 @@ test('own list follows the source lesson current owner after teacher transfer an
   db.prepare("UPDATE tasks SET owner='teacher-b',data=? WHERE app='task' AND id='lesson-a'")
     .bind(JSON.stringify(task)).run();
 
-  assert.deepEqual((await call(db, own('teacher-a'), { action: 'list' })).body.cases, []);
+  assert.deepEqual((await call(db, own('teacher-a'), { action: 'list' })).body.cases.map(item => item.studentId),
+    ['student-a']);
   assert.deepEqual((await call(db, own('teacher-b'), { action: 'list' })).body.cases.map(item => item.studentId), ['student-a']);
 
   task.staffId = 'teacher-a';
   db.prepare("UPDATE tasks SET data=? WHERE app='task' AND id='lesson-a'").bind(JSON.stringify(task)).run();
   assert.deepEqual((await call(db, own('teacher-b'), { action: 'list' })).body.cases, []);
   assert.deepEqual((await call(db, all, { action: 'list' })).body.cases, []);
+});
+
+test('own list gives a prior proposed assignee only a minimal revocation after repeated reassignment', async () => {
+  const db = new TestD1(); seed(db);
+  db.prepare('INSERT INTO staff(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
+    .bind('task', 'teacher-c', 'teacher-c', JSON.stringify({ id: 'teacher-c', deleted: false }), 1, 1).run();
+  const reviewed = await createAndReview(db);
+  const scheduled = await proposeAndConfirm(db, reviewed, 'teacher-b');
+  const reassigned = await callAt(db, all, {
+    action: 'reschedule', caseId: reviewed.caseId, revision: scheduled.revision,
+    date: '2026-08-13', startTime: '20:00', endTime: '21:00', staffId: 'teacher-c'
+  }, '2026-08-11T12:05:00+09:00');
+  assert.equal(reassigned.status, 200);
+  const priorAssignee = await call(db, own('teacher-b'), { action: 'list' });
+  assert.equal(priorAssignee.status, 200);
+  assert.equal(priorAssignee.body.cases.length, 0);
+  assert.deepEqual(priorAssignee.body.revocations, [{
+    caseId: reviewed.caseId,
+    lessonTaskId: 'makeup_lesson_' + reviewed.caseId,
+    sourceTaskId: 'lesson-a', sourceDate: '2026-08-10', studentId: 'student-a'
+  }]);
+  assert.equal(JSON.stringify(priorAssignee.body).includes('history'), false);
+  assert.equal(JSON.stringify(priorAssignee.body).includes('studentName'), false);
+});
+
+test('own list returns every historical revocation independently of the visible-case limit', async () => {
+  const db = new TestD1(); seed(db);
+  const total = 510;
+  for (let index = 0; index < total; index++) {
+    const caseId = 'mu_history_' + String(index).padStart(4, '0');
+    const sourceTaskId = 'old_source_' + String(index).padStart(4, '0');
+    db.prepare('INSERT INTO makeup_cases(app,case_id,student_id,source_task_id,source_date,source_teacher_id,' +
+      'consumption_group_id,status,revision,notification_needed,notification_event_revision,history,created_at,updated_at) ' +
+      "VALUES(?,?,?,?,?,?,?,'reviewed',1,0,0,?,?,?)")
+      .bind('task', caseId, 'student-a', sourceTaskId, '2026-08-10', 'teacher-a',
+        'mc_history_' + String(index).padStart(4, '0'),
+        JSON.stringify([{ action: 'schedule', staffId: 'teacher-b' }]), index + 1, index + 1).run();
+  }
+
+  const listed = await call(db, own('teacher-b'), { action: 'list', limit: 1, status: 'confirmed' });
+  assert.equal(listed.status, 200);
+  assert.deepEqual(listed.body.cases, []);
+  assert.equal(listed.body.revocations.length, total);
+  assert.equal(new Set(listed.body.revocations.map(item => item.caseId)).size, total);
+  assert.deepEqual(Object.keys(listed.body.revocations[0]).sort(),
+    ['caseId', 'lessonTaskId', 'sourceDate', 'sourceTaskId', 'studentId'].sort());
+  assert.equal(JSON.stringify(listed.body.revocations).includes('"history":'), false);
 });
 
 test('state machine uses CAS and emits parent-notification markers for proposal and confirmation', async () => {
@@ -273,12 +872,14 @@ test('state machine uses CAS and emits parent-notification markers for proposal 
   ).bind(Date.now(), reviewed.caseId).run(), /MAKEUP_COMPLETE_ASSIGNEE/);
   const assignedList = await call(db, own('teacher-b'), { action: 'list' });
   assert.deepEqual(assignedList.body.cases.map(item => item.caseId), [reviewed.caseId]);
+  makeupAttendance(db, reviewed.caseId, 'teacher-b', '2026-08-12');
   const wrongTeacher = await callAt(db, own('teacher-a'), { action: 'complete', caseId: reviewed.caseId,
     revision: confirmed.body.case.revision }, '2026-08-12T20:55:00+09:00');
   assert.equal(wrongTeacher.status, 403);
   const rootAdmin = await callAt(db, all, { action: 'complete', caseId: reviewed.caseId,
-    revision: confirmed.body.case.revision }, '2026-08-12T20:55:00+09:00');
-  assert.equal(rootAdmin.status, 403);
+    revision: confirmed.body.case.revision }, '2026-08-12T20:54:59+09:00');
+  assert.equal(rootAdmin.status, 409);
+  assert.equal(rootAdmin.body.code, 'MAKEUP_NOT_ENDED');
   const tooEarly = await callAt(db, manager('teacher-b'), { action: 'complete', caseId: reviewed.caseId,
     revision: confirmed.body.case.revision }, '2026-08-12T20:54:59+09:00');
   assert.equal(tooEarly.status, 409);
@@ -292,6 +893,1387 @@ test('state machine uses CAS and emits parent-notification markers for proposal 
     { status: 'not_applicable', reason: 'no_active_pack', refreshNeeded: false });
   assert.deepEqual(completed.body.case.history.map(item => item.action),
     ['create_from_absence', 'review', 'propose', 'confirm', 'complete']);
+});
+
+test('proposal atomically rejects target-teacher deactivation after its initial availability check', async () => {
+  const db = new TestD1(); seed(db);
+  const reviewed = await createAndReview(db);
+  db.beforeBatch = () => db.prepare("UPDATE staff SET data=? WHERE app='task' AND id='teacher-b'")
+    .bind(JSON.stringify({ id: 'teacher-b', deleted: true })).run();
+  const result = await callAt(db, all, {
+    action: 'propose', caseId: reviewed.caseId, revision: reviewed.revision,
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00', staffId: 'teacher-b'
+  }, '2026-08-11T12:00:00+09:00');
+  assert.equal(result.status, 409);
+  assert.equal(result.body.code, 'STAFF_INACTIVE');
+  const current = db.database.prepare('SELECT status,revision,history FROM makeup_cases WHERE case_id=?')
+    .get(reviewed.caseId);
+  assert.equal(current.status, 'reviewed');
+  assert.equal(current.revision, reviewed.revision);
+  assert.equal(JSON.parse(current.history).some(item => item.action === 'propose'), false);
+});
+
+test('create atomically rejects an A-to-P correction that wins after its initial absence check', async () => {
+  const db = new TestD1(); seed(db);
+  db.beforeBatch = () => db.prepare("UPDATE checks SET data=? WHERE k='lesson-a|2026-08-10'")
+    .bind(JSON.stringify({ taskId: 'lesson-a', date: '2026-08-10', att: 'P' })).run();
+  const result = await call(db, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  });
+  assert.equal(result.status, 409);
+  assert.equal(result.body.code, 'ABSENCE_REQUIRED');
+  assert.equal(db.database.prepare('SELECT count(*) AS n FROM makeup_cases').get().n, 0);
+});
+
+test('schedule immediately confirms with the source teacher and atomically creates one makeup lesson task', async () => {
+  const db = new TestD1(); seed(db);
+  const created = await call(db, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  });
+  const row = created.body.case;
+  const forbidden = await callAt(db, own('teacher-a'), {
+    action: 'schedule', caseId: row.caseId, revision: row.revision,
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00'
+  }, '2026-08-11T12:00:00+09:00');
+  assert.equal(forbidden.status, 403);
+  const scheduled = await callAt(db, all, {
+    action: 'schedule', caseId: row.caseId, revision: row.revision,
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00'
+  }, '2026-08-11T12:00:00+09:00');
+  assert.equal(scheduled.status, 200);
+  assert.equal(scheduled.body.case.status, 'confirmed');
+  assert.equal(scheduled.body.case.confirmedStaffId, 'teacher-a');
+  assert.equal(scheduled.body.case.notificationNeeded, false);
+  assert.deepEqual(scheduled.body.case.history.map(item => item.action), ['create_from_absence', 'schedule']);
+  assert.equal(scheduled.body.lessonTask.id, 'makeup_lesson_' + row.caseId);
+  assert.equal(scheduled.body.lessonTask.deleted, false);
+
+  const taskId = 'makeup_lesson_' + row.caseId;
+  const stored = db.database.prepare("SELECT owner,data FROM tasks WHERE app='task' AND id=?").get(taskId);
+  assert.equal(stored.owner, 'teacher-a');
+  const task = JSON.parse(stored.data);
+  assert.equal(task.lessonInstanceType, 'makeup');
+  assert.equal(task.makeupCaseId, row.caseId);
+  assert.equal(task.makeupSourceTaskId, 'lesson-a');
+  assert.equal(task.makeupSourceDate, '2026-08-10');
+  assert.equal(task.studentId, 'student-a');
+  assert.equal(task.repeat, 'once');
+  assert.equal(task.start, '2026-08-12');
+  assert.equal(task.end, '2026-08-12');
+  assert.deepEqual(task.scheduleSlots.map(slot => [slot.days, slot.startTime, slot.endTime]),
+    [[[3], '20:00', '21:00']]);
+  assert.match(task.title, /^\[수업\]/);
+
+  absence(db, taskId, 'teacher-a', '2026-08-12');
+  const recursive = await call(db, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: taskId, sourceDate: '2026-08-12'
+  });
+  assert.equal(recursive.status, 404);
+  assert.equal(recursive.body.code, 'LESSON_MISSING');
+});
+
+test('September can schedule, reschedule, and restore an August makeup while preserving revision locking', async () => {
+  const db = new TestD1(); seed(db);
+  const now = '2026-09-08T12:00:00+09:00';
+  const created = await callAt(db, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  }, now);
+  const scheduled = await callAt(db, all, {
+    action: 'schedule', caseId: created.body.case.caseId, revision: created.body.case.revision,
+    date: '2026-08-13', startTime: '20:00', endTime: '21:00'
+  }, now);
+  assert.equal(scheduled.status, 200, JSON.stringify(scheduled.body));
+  assert.equal(scheduled.body.case.status, 'confirmed');
+  assert.equal(scheduled.body.lessonTask.start, '2026-08-13');
+  const change = {
+    action: 'reschedule', caseId: scheduled.body.case.caseId, revision: scheduled.body.case.revision,
+    date: '2026-08-12', startTime: '19:00', endTime: '20:00', staffId: 'teacher-b'
+  };
+  assert.equal((await callAt(db, own('teacher-a'), change, now)).status, 403);
+  const rescheduled = await callAt(db, all, change, now);
+  assert.equal(rescheduled.status, 200, JSON.stringify(rescheduled.body));
+  assert.equal(rescheduled.body.case.confirmedDate, '2026-08-12');
+  assert.equal(rescheduled.body.case.confirmedStaffId, 'teacher-b');
+  assert.equal(rescheduled.body.case.history.at(-1).previousDate, '2026-08-13');
+  assert.equal(rescheduled.body.lessonTask.start, '2026-08-12');
+  assert.equal(rescheduled.body.lessonTask.staffId, 'teacher-b');
+  const stale = await callAt(db, all, change, now);
+  assert.equal(stale.status, 409);
+  assert.equal(stale.body.code, 'REVISION_CONFLICT');
+  db.prepare("UPDATE tasks SET data=json_set(data,'$.deleted',1),updated_at=updated_at+1 WHERE app='task' AND id=?")
+    .bind(rescheduled.body.lessonTask.id).run();
+  const restoreRequest = {
+    action: 'restore_schedule', caseId: rescheduled.body.case.caseId, revision: rescheduled.body.case.revision
+  };
+  const restored = await callAt(db, all, restoreRequest, now);
+  assert.equal(restored.status, 200, JSON.stringify(restored.body));
+  assert.equal(restored.body.lessonTask.start, '2026-08-12');
+  assert.equal(restored.body.lessonTask.staffId, 'teacher-b');
+  assert.equal(restored.body.case.revision, rescheduled.body.case.revision);
+  assert.equal((await callAt(db, all, restoreRequest, now)).body.idempotent, true);
+  assert.equal(db.database.prepare('SELECT count(*) AS n FROM checks').get().n, 2);
+});
+
+test('backdated direct makeup flows retain exact date and time validation', async () => {
+  const now = '2026-09-08T12:00:00+09:00';
+  const invalidRanges = [
+    { date: '2026-08-32' }, { date: '2026-02-29' }, { date: '2026-8-12' },
+    { startTime: '24:00' }, { endTime: '21:60' }, { startTime: '21:00' },
+    { startTime: '22:00' }, { endTime: '' }
+  ];
+  for (const action of ['create_manual', 'schedule', 'reschedule']) {
+    const db = new TestD1(); seed(db);
+    let request = {
+      action, date: '2026-08-12', startTime: '20:00', endTime: '21:00', staffId: 'teacher-a'
+    };
+    if (action === 'create_manual') {
+      request = { ...request, studentId: 'student-a', sourceTaskId: 'lesson-a', reason: 'manual_exam' };
+    } else {
+      const created = await callAt(db, own('teacher-a'), {
+        action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+      }, now);
+      let row = created.body.case;
+      if (action === 'reschedule') {
+        const scheduled = await callAt(db, all, {
+          ...request, action: 'schedule', caseId: row.caseId, revision: row.revision
+        }, now);
+        assert.equal(scheduled.status, 200, JSON.stringify(scheduled.body));
+        row = scheduled.body.case;
+      }
+      request = { ...request, caseId: row.caseId, revision: row.revision };
+    }
+    for (const invalid of invalidRanges) {
+      const rejected = await callAt(db, all, { ...request, ...invalid }, now);
+      assert.equal(rejected.status, 400, action + ': ' + JSON.stringify(rejected.body));
+    }
+  }
+});
+
+test('backdated direct makeup flows still reject the same student regular, confirmed makeup, and completed makeup overlaps', async () => {
+  const now = '2026-09-08T12:00:00+09:00';
+  for (const action of ['create_manual', 'schedule', 'reschedule']) {
+    for (const conflict of ['regular', 'confirmed', 'completed']) {
+      const db = new TestD1(); seed(db);
+      if (conflict === 'regular') {
+        insertTask(db, lesson('august-overlap', 'student-a', 'teacher-b', [3], '20:30', '21:30'));
+      } else {
+        const existing = await callAt(db, all, {
+          action: 'create_manual', studentId: 'student-a', sourceMode: 'unrelated', requestId: 'past-existing',
+          reason: 'manual_exam', date: '2026-08-12', startTime: '20:30', endTime: '21:30', staffId: 'teacher-b'
+        }, now);
+        assert.equal(existing.status, 200, JSON.stringify(existing.body));
+        if (conflict === 'completed') {
+          makeupAttendance(db, existing.body.case.caseId, 'teacher-b', '2026-08-12');
+          const completed = await callAt(db, all, {
+            action: 'complete', caseId: existing.body.case.caseId, revision: existing.body.case.revision
+          }, now);
+          assert.equal(completed.status, 200, JSON.stringify(completed.body));
+        }
+      }
+      let request = {
+        action, date: '2026-08-12', startTime: '20:00', endTime: '21:00', staffId: 'teacher-a'
+      };
+      if (action === 'create_manual') {
+        request = { ...request, studentId: 'student-a', sourceTaskId: 'lesson-a', reason: 'manual_exam' };
+      } else {
+        const created = await callAt(db, own('teacher-a'), {
+          action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+        }, now);
+        let row = created.body.case;
+        if (action === 'reschedule') {
+          const scheduled = await callAt(db, all, {
+            ...request, action: 'schedule', caseId: row.caseId, revision: row.revision, date: '2026-08-13'
+          }, now);
+          assert.equal(scheduled.status, 200, JSON.stringify(scheduled.body));
+          row = scheduled.body.case;
+        }
+        request = { ...request, caseId: row.caseId, revision: row.revision };
+      }
+      const before = db.database.prepare('SELECT case_id,status,revision,confirmed_start_at FROM makeup_cases ORDER BY case_id').all();
+      const rejected = await callAt(db, all, request, now);
+      assert.equal(rejected.status, 409, action + '/' + conflict + ': ' + JSON.stringify(rejected.body));
+      assert.equal(rejected.body.code, conflict === 'regular' ? 'STUDENT_SCHEDULE_CONFLICT' : 'STUDENT_MAKEUP_CONFLICT');
+      assert.deepEqual(db.database.prepare('SELECT case_id,status,revision,confirmed_start_at FROM makeup_cases ORDER BY case_id').all(), before);
+    }
+  }
+});
+
+test('schedule CAS failure rolls back its generated task', async () => {
+  const db = new TestD1(); seed(db);
+  const created = await call(db, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  });
+  const row = created.body.case;
+  db.beforeBatch = () => db.prepare(
+    "UPDATE makeup_cases SET revision=revision+1,updated_at=updated_at+1 WHERE app='task' AND case_id=?"
+  ).bind(row.caseId).run();
+  const result = await callAt(db, all, {
+    action: 'schedule', caseId: row.caseId, revision: row.revision,
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00'
+  }, '2026-08-11T12:00:00+09:00');
+  assert.equal(result.status, 409);
+  assert.equal(result.body.code, 'REVISION_CONFLICT');
+  assert.equal(db.database.prepare("SELECT count(*) AS n FROM tasks WHERE id LIKE 'makeup_lesson_%'").get().n, 0);
+});
+
+test('schedule atomically rejects a regular lesson inserted after its initial conflict check', async () => {
+  const db = new TestD1(); seed(db);
+  const created = await call(db, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  });
+  db.beforeBatch = () => insertTask(db,
+    lesson('lesson-race', 'student-a', 'teacher-b', [3], '20:30', '21:30'));
+  const result = await callAt(db, all, {
+    action: 'schedule', caseId: created.body.case.caseId, revision: created.body.case.revision,
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00'
+  }, '2026-08-11T12:00:00+09:00');
+  assert.equal(result.status, 409);
+  assert.equal(result.body.code, 'STUDENT_SCHEDULE_CONFLICT');
+  assert.equal(db.database.prepare("SELECT count(*) AS n FROM tasks WHERE id LIKE 'makeup_lesson_%'").get().n, 0);
+  assert.equal(db.database.prepare('SELECT status FROM makeup_cases WHERE case_id=?')
+    .get(created.body.case.caseId).status, 'review_pending');
+});
+
+test('teacher-only regular overlap is allowed for schedule, restore, and direct completion', async () => {
+  const scheduleDb = new TestD1(); seed(scheduleDb);
+  const scheduleCase = await call(scheduleDb, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  });
+  scheduleDb.beforeBatch = () => insertTask(scheduleDb,
+    lesson('teacher-overlap-schedule', 'student-b', 'teacher-a', [3], '20:30', '21:30'));
+  const scheduled = await callAt(scheduleDb, all, {
+    action: 'schedule', caseId: scheduleCase.body.case.caseId, revision: scheduleCase.body.case.revision,
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00'
+  }, '2026-08-11T12:00:00+09:00');
+  assert.equal(scheduled.status, 200);
+
+  const restoreDb = new TestD1(); seed(restoreDb);
+  insertTask(restoreDb, lesson('teacher-overlap-restore', 'student-b', 'teacher-a', [3], '20:30', '21:30'));
+  const restoreCase = await createAndReview(restoreDb);
+  const proposed = await callAt(restoreDb, all, {
+    action: 'propose', caseId: restoreCase.caseId, revision: restoreCase.revision,
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00', staffId: 'teacher-a'
+  }, '2026-08-11T12:00:00+09:00');
+  assert.equal(proposed.status, 200);
+  restoreDb.prepare("UPDATE makeup_cases SET status='confirmed',confirmed_start_at=proposed_start_at," +
+    "confirmed_end_at=proposed_end_at,confirmed_staff_id=proposed_staff_id WHERE case_id=?")
+    .bind(restoreCase.caseId).run();
+  const restored = await call(restoreDb, all, {
+    action: 'restore_schedule', caseId: restoreCase.caseId, revision: proposed.body.case.revision
+  });
+  assert.equal(restored.status, 200);
+
+  const completeDb = new TestD1(); seed(completeDb);
+  insertTask(completeDb, lesson('teacher-overlap-complete', 'student-b', 'teacher-a', [2], '10:30', '11:30'));
+  const completeCase = await call(completeDb, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  });
+  const completed = await callAt(completeDb, all, {
+    action: 'complete', caseId: completeCase.body.case.caseId, revision: completeCase.body.case.revision,
+    date: '2026-08-11', startTime: '10:00', endTime: '11:00',
+    staffId: 'teacher-a', attendanceStatus: 'P'
+  }, '2026-08-11T12:00:00+09:00');
+  assert.equal(completed.status, 200);
+});
+
+test('direct completion still rejects the student regular lesson overlap', async () => {
+  const db = new TestD1(); seed(db);
+  insertTask(db, lesson('student-overlap-complete', 'student-a', 'teacher-b', [2], '10:30', '11:30'));
+  const created = await call(db, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  });
+  const blocked = await callAt(db, all, {
+    action: 'complete', caseId: created.body.case.caseId, revision: created.body.case.revision,
+    date: '2026-08-11', startTime: '10:00', endTime: '11:00',
+    staffId: 'teacher-a', attendanceStatus: 'P'
+  }, '2026-08-11T12:00:00+09:00');
+  assert.equal(blocked.status, 409);
+  assert.equal(blocked.body.code, 'STUDENT_SCHEDULE_CONFLICT');
+});
+
+test('schedule atomically rejects a source-teacher transfer after authorization', async () => {
+  const db = new TestD1(); seed(db);
+  const created = await call(db, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  });
+  db.beforeBatch = () => {
+    const row = db.database.prepare("SELECT data FROM tasks WHERE id='lesson-a'").get();
+    db.prepare("UPDATE tasks SET owner='teacher-b',data=?,updated_at=updated_at+1 WHERE id='lesson-a'")
+      .bind(JSON.stringify({ ...JSON.parse(row.data), staffId: 'teacher-b' })).run();
+  };
+  const result = await callAt(db, all, {
+    action: 'schedule', caseId: created.body.case.caseId, revision: created.body.case.revision,
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00'
+  }, '2026-08-11T12:00:00+09:00');
+  assert.equal(result.status, 409);
+  assert.equal(db.database.prepare("SELECT count(*) AS n FROM tasks WHERE id LIKE 'makeup_lesson_%'").get().n, 0);
+});
+
+test('generated makeup lesson copies the source-date slot hours and rejects ambiguous hours', async () => {
+  const db = new TestD1(); seed(db);
+  const sourceRow = db.database.prepare("SELECT data FROM tasks WHERE id='lesson-a'").get();
+  const source = JSON.parse(sourceRow.data);
+  source.lessonHours = '';
+  source.scheduleSlots = [{ days: [1], startTime: '18:00', endTime: '19:50', lessonHours: '2T' }];
+  db.prepare("UPDATE tasks SET data=?,updated_at=2,srv_at=2 WHERE id='lesson-a'").bind(JSON.stringify(source)).run();
+  const created = await call(db, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  });
+  const scheduled = await callAt(db, all, {
+    action: 'schedule', caseId: created.body.case.caseId, revision: created.body.case.revision,
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00'
+  }, '2026-08-11T12:00:00+09:00');
+  assert.equal(scheduled.status, 200);
+  assert.equal(scheduled.body.lessonTask.lessonHours, '2T');
+  assert.equal(scheduled.body.lessonTask.scheduleSlots[0].lessonHours, '2T');
+
+  const ambiguousDb = new TestD1(); seed(ambiguousDb);
+  const ambiguousRow = ambiguousDb.database.prepare("SELECT data FROM tasks WHERE id='lesson-a'").get();
+  const ambiguous = JSON.parse(ambiguousRow.data);
+  ambiguous.lessonHours = '';
+  ambiguous.scheduleSlots = [
+    { days: [1], startTime: '18:00', endTime: '18:50', lessonHours: '1T' },
+    { days: [1], startTime: '19:00', endTime: '20:50', lessonHours: '2T' }
+  ];
+  ambiguousDb.prepare("UPDATE tasks SET data=?,updated_at=2,srv_at=2 WHERE id='lesson-a'")
+    .bind(JSON.stringify(ambiguous)).run();
+  const ambiguousCreated = await call(ambiguousDb, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  });
+  const rejected = await callAt(ambiguousDb, all, {
+    action: 'schedule', caseId: ambiguousCreated.body.case.caseId, revision: ambiguousCreated.body.case.revision,
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00'
+  }, '2026-08-11T12:00:00+09:00');
+  assert.equal(rejected.status, 409);
+  assert.equal(rejected.body.code, 'MAKEUP_LESSON_HOURS_AMBIGUOUS');
+});
+
+test('one complete action records an unscheduled past makeup, creates its lesson, and lets an administrator act', async () => {
+  const db = new TestD1(); seed(db); await insertPack(db);
+  const created = await call(db, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  });
+  const row = created.body.case;
+  const teacherForbidden = await callAt(db, own('teacher-a'), {
+    action: 'complete', caseId: row.caseId, revision: row.revision,
+    date: '2026-08-11', startTime: '10:00', endTime: '11:00',
+    staffId: 'teacher-a', attendanceStatus: 'P'
+  }, '2026-08-11T12:00:00+09:00');
+  assert.equal(teacherForbidden.status, 403);
+  const invalidAttendance = await callAt(db, all, {
+    action: 'complete', caseId: row.caseId, revision: row.revision,
+    date: '2026-08-11', startTime: '10:00', endTime: '11:00',
+    staffId: 'teacher-a', attendanceStatus: 'A'
+  }, '2026-08-11T12:00:00+09:00');
+  assert.equal(invalidAttendance.status, 400);
+  assert.equal(invalidAttendance.body.code, 'MAKEUP_ATTENDANCE_INVALID');
+  const notPast = await callAt(db, all, {
+    action: 'complete', caseId: row.caseId, revision: row.revision,
+    date: '2026-08-11', startTime: '11:00', endTime: '12:01',
+    staffId: 'teacher-a', attendanceStatus: 'P'
+  }, '2026-08-11T12:00:00+09:00');
+  assert.equal(notPast.status, 409);
+  assert.equal(notPast.body.code, 'MAKEUP_NOT_ENDED');
+  const completed = await callAt(db, all, {
+    action: 'complete', caseId: row.caseId, revision: row.revision,
+    date: '2026-08-11', startTime: '10:00', endTime: '11:00',
+    staffId: 'teacher-a', attendanceStatus: 'P'
+  }, '2026-08-11T12:00:00+09:00');
+  assert.equal(completed.status, 200);
+  assert.equal(completed.body.case.status, 'completed');
+  assert.equal(completed.body.case.revision, 3);
+  assert.equal(completed.body.case.completedDate, '2026-08-11');
+  assert.equal(completed.body.case.completedStartTime, '10:00');
+  assert.equal(completed.body.case.completedEndTime, '11:00');
+  assert.equal(completed.body.case.completedStaffId, 'teacher-a');
+  assert.deepEqual(completed.body.case.history.map(item => item.action),
+    ['create_from_absence', 'schedule_for_completion', 'complete']);
+  assert.equal(completed.body.case.history.at(-1).actorId, 'director');
+  assert.deepEqual(completed.body.sessionPackImpact,
+    { status: 'recorded', packId: 'pack-a', delta: 1, packRevision: 2, refreshNeeded: true });
+  const task = JSON.parse(db.database.prepare(
+    "SELECT data FROM tasks WHERE app='task' AND id=?"
+  ).get('makeup_lesson_' + row.caseId).data);
+  assert.equal(task.start, '2026-08-11');
+  assert.equal(task.scheduleSlots[0].startTime, '10:00');
+  const attendance = JSON.parse(db.database.prepare(
+    "SELECT data FROM checks WHERE app='task' AND k=?"
+  ).get('makeup_lesson_' + row.caseId + '|2026-08-11').data);
+  assert.equal(attendance.att, 'P');
+});
+
+test('absence creation atomically rejects source-teacher deactivation after its initial check', async () => {
+  const db = new TestD1(); seed(db);
+  db.beforeBatch = () => db.prepare("UPDATE staff SET data=? WHERE app='task' AND id='teacher-a'")
+    .bind(JSON.stringify({ id: 'teacher-a', deleted: true })).run();
+  const result = await call(db, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  });
+  assert.equal(result.status, 409);
+  assert.equal(result.body.code, 'STAFF_INACTIVE');
+  assert.equal(db.database.prepare('SELECT count(*) AS n FROM makeup_cases').get().n, 0);
+});
+
+test('legacy administrator direct completion safely defaults assignee and attendance and records both defaults', async () => {
+  const db = new TestD1(); seed(db);
+  const created = await call(db, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  });
+  const completed = await callAt(db, all, {
+    action: 'complete', caseId: created.body.case.caseId, revision: created.body.case.revision,
+    date: '2026-08-11', startTime: '10:00', endTime: '11:00'
+  }, '2026-08-11T12:00:00+09:00');
+  assert.equal(completed.status, 200);
+  assert.equal(completed.body.case.completedStaffId, 'teacher-a');
+  assert.deepEqual(completed.body.case.history.at(-1).legacyDefaults, ['staffId', 'attendanceStatus']);
+  const taskId = 'makeup_lesson_' + created.body.case.caseId;
+  const check = JSON.parse(db.database.prepare(
+    "SELECT data FROM checks WHERE app='task' AND k=?"
+  ).get(taskId + '|2026-08-11').data);
+  assert.equal(check.att, 'P');
+});
+
+test('direct completion can attest a past session4 absence makeup without opening generic past attendance writes', async () => {
+  const db = new TestD1(); seed(db); await insertPack(db);
+  const document = roster();
+  document.roster.students[0].billingMode = 'session4';
+  document.roster.students[0].sessionCycleStartDate = '2026-08-01';
+  db.prepare("UPDATE private_rosters SET data=?,updated_at=2 WHERE app='task'")
+    .bind(JSON.stringify(document)).run();
+  const created = await call(db, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10',
+    creationMode: 'manual'
+  });
+  assert.equal(created.status, 200);
+  const pendingTaskId = 'makeup_lesson_' + created.body.case.caseId;
+  assert.throws(() => db.prepare(
+    'INSERT INTO makeup_direct_completion_attestations(' +
+      'app,case_id,case_revision,lesson_task_id,check_key,student_id,staff_id,attendance_date,' +
+      'start_time,end_time,attendance_status,actor_id,provenance,created_at) ' +
+      'VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+  ).bind('task', created.body.case.caseId, created.body.case.revision, pendingTaskId,
+    pendingTaskId + '|2026-08-11', 'student-a', 'teacher-a', '2026-08-11', '10:00', '11:00',
+    'P', 'director', 'makeup_direct_completion_v1', Date.parse('2026-08-11T12:00:00+09:00')).run(),
+  /MAKEUP_DIRECT_ATTESTATION_INVALID/);
+
+  const completed = await callAt(db, all, {
+    action: 'complete', caseId: created.body.case.caseId, revision: created.body.case.revision,
+    date: '2026-08-11', startTime: '10:00', endTime: '11:00',
+    staffId: 'teacher-a', attendanceStatus: 'P'
+  }, '2026-08-11T12:00:00+09:00');
+  assert.equal(completed.status, 200);
+  assert.equal(completed.body.case.status, 'completed');
+  const taskId = pendingTaskId;
+  const checkKey = taskId + '|2026-08-11';
+  assert.equal(JSON.parse(db.database.prepare(
+    "SELECT data FROM checks WHERE app='task' AND k=?"
+  ).get(checkKey).data).att, 'P');
+  const attestation = db.database.prepare(
+    "SELECT * FROM makeup_direct_completion_attestations WHERE app='task' AND case_id=?"
+  ).get(created.body.case.caseId);
+  assert.equal(attestation.lesson_task_id, taskId);
+  assert.equal(attestation.attendance_status, 'P');
+  assert.throws(() => db.prepare(
+    "UPDATE makeup_direct_completion_attestations SET attendance_status='L' WHERE app='task' AND case_id=?"
+  ).bind(created.body.case.caseId).run(), /MAKEUP_DIRECT_ATTESTATION_APPEND_ONLY/);
+
+  assert.throws(() => db.prepare(
+    'INSERT INTO checks(app,k,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)'
+  ).bind('task', 'lesson-a|2026-08-03', 'teacher-a', JSON.stringify({
+    taskId: 'lesson-a', date: '2026-08-03', att: 'P', source: 'makeup_direct_completion_v1'
+  }), 99, 99).run(), /SESSION4_ATTENDANCE_LOCKED/);
+});
+
+test('direct complete closes a legacy awaiting-parent case even when its old proposal was declined', async () => {
+  const db = new TestD1(); db.database.exec(portalMigration); seed(db);
+  const reviewed = await createAndReview(db);
+  const proposed = await callAt(db, all, {
+    action: 'propose', caseId: reviewed.caseId, revision: reviewed.revision,
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00', staffId: 'teacher-b'
+  }, '2026-08-11T12:00:00+09:00');
+  db.prepare(
+    'INSERT INTO guardian_portal_responses(app,response_id,student_id,object_type,object_id,revision,response,created_at) ' +
+    'VALUES(?,?,?,?,?,?,?,?)'
+  ).bind('task', 'legacy-decline', 'student-a', 'makeup', reviewed.caseId,
+    proposed.body.case.revision, 'decline', 10).run();
+  const completed = await callAt(db, all, {
+    action: 'complete', caseId: reviewed.caseId, revision: proposed.body.case.revision,
+    date: '2026-08-11', startTime: '10:00', endTime: '11:00',
+    staffId: 'teacher-a', attendanceStatus: 'L'
+  }, '2026-08-11T12:00:00+09:00');
+  assert.equal(completed.status, 200);
+  assert.equal(completed.body.case.status, 'completed');
+  assert.deepEqual(completed.body.case.history.map(item => item.action), [
+    'create_from_absence', 'review', 'propose', 'supersede_parent_process_for_completion',
+    'schedule_for_completion', 'complete'
+  ]);
+  assert.equal(completed.body.lessonTask.staffId, 'teacher-a');
+  assert.equal(completed.body.case.completedDate, '2026-08-11');
+});
+
+test('schedule supersedes a legacy declined parent proposal before confirming the new simple schedule', async () => {
+  const db = new TestD1(); db.database.exec(portalMigration); seed(db);
+  const reviewed = await createAndReview(db);
+  const proposed = await callAt(db, all, {
+    action: 'propose', caseId: reviewed.caseId, revision: reviewed.revision,
+    date: '2026-08-12', startTime: '19:00', endTime: '20:00', staffId: 'teacher-b'
+  }, '2026-08-11T12:00:00+09:00');
+  db.prepare(
+    'INSERT INTO guardian_portal_responses(app,response_id,student_id,object_type,object_id,revision,response,created_at) ' +
+    'VALUES(?,?,?,?,?,?,?,?)'
+  ).bind('task', 'legacy-schedule-decline', 'student-a', 'makeup', reviewed.caseId,
+    proposed.body.case.revision, 'decline', 10).run();
+  const scheduled = await callAt(db, all, {
+    action: 'schedule', caseId: reviewed.caseId, revision: proposed.body.case.revision,
+    date: '2026-08-13', startTime: '20:00', endTime: '21:00'
+  }, '2026-08-11T12:05:00+09:00');
+  assert.equal(scheduled.status, 200);
+  assert.equal(scheduled.body.case.status, 'confirmed');
+  assert.equal(scheduled.body.case.confirmedStaffId, 'teacher-a');
+  assert.equal(scheduled.body.case.notificationNeeded, false);
+  assert.deepEqual(scheduled.body.case.history.slice(-2).map(item => item.action),
+    ['supersede_parent_process_for_schedule', 'schedule']);
+});
+
+test('scheduled completion requires P/L/E on the exact generated lesson and rejects absence', async () => {
+  const db = new TestD1(); seed(db);
+  const created = await call(db, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  });
+  const scheduled = await callAt(db, all, {
+    action: 'schedule', caseId: created.body.case.caseId, revision: created.body.case.revision,
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00'
+  }, '2026-08-11T12:00:00+09:00');
+  const missing = await callAt(db, own('teacher-a'), {
+    action: 'complete', caseId: scheduled.body.case.caseId, revision: scheduled.body.case.revision
+  }, '2026-08-12T21:00:00+09:00');
+  assert.equal(missing.status, 409);
+  assert.equal(missing.body.code, 'MAKEUP_ATTENDANCE_REQUIRED');
+
+  makeupAttendance(db, created.body.case.caseId, 'teacher-a', '2026-08-12', 'A');
+  const absent = await callAt(db, own('teacher-a'), {
+    action: 'complete', caseId: scheduled.body.case.caseId, revision: scheduled.body.case.revision
+  }, '2026-08-12T21:00:00+09:00');
+  assert.equal(absent.status, 409);
+  assert.equal(absent.body.code, 'MAKEUP_ATTENDANCE_ABSENT');
+
+  const taskId = 'makeup_lesson_' + created.body.case.caseId;
+  db.prepare("UPDATE checks SET data=?,updated_at=3,srv_at=3 WHERE app='task' AND k=?")
+    .bind(JSON.stringify({ taskId, date: '2026-08-12', att: 'L' }), taskId + '|2026-08-12').run();
+  const completed = await callAt(db, own('teacher-a'), {
+    action: 'complete', caseId: scheduled.body.case.caseId, revision: scheduled.body.case.revision,
+    date: '2026-08-12', startTime: '19:00', endTime: '20:00'
+  }, '2026-08-12T21:00:00+09:00');
+  assert.equal(completed.status, 200, JSON.stringify(completed.body));
+  assert.equal(completed.body.case.completedDate, '2026-08-12');
+  assert.equal(completed.body.case.completedStartTime, '19:00');
+  assert.equal(completed.body.lessonTask.start, '2026-08-12');
+  assert.equal(completed.body.lessonTask.scheduleSlots[0].startTime, '20:00');
+});
+
+test('schedule lets an administrator assign another active teacher while preserving legacy default', async () => {
+  const db = new TestD1(); seed(db);
+  const created = await call(db, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  });
+  const scheduled = await callAt(db, all, {
+    action: 'schedule', caseId: created.body.case.caseId, revision: created.body.case.revision,
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00', staffId: 'teacher-b'
+  }, '2026-08-11T12:00:00+09:00');
+  assert.equal(scheduled.status, 200, JSON.stringify(scheduled.body));
+  assert.equal(scheduled.body.case.sourceTeacherId, 'teacher-a');
+  assert.equal(scheduled.body.case.confirmedStaffId, 'teacher-b');
+  const task = db.database.prepare('SELECT owner,data FROM tasks WHERE id=?')
+    .get('makeup_lesson_' + created.body.case.caseId);
+  assert.equal(task.owner, 'teacher-b');
+  assert.equal(JSON.parse(task.data).staffId, 'teacher-b');
+
+  const inactiveDb = new TestD1(); seed(inactiveDb);
+  const inactiveCase = await call(inactiveDb, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  });
+  const inactive = await callAt(inactiveDb, all, {
+    action: 'schedule', caseId: inactiveCase.body.case.caseId, revision: inactiveCase.body.case.revision,
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00', staffId: 'teacher-inactive'
+  }, '2026-08-11T12:00:00+09:00');
+  assert.equal(inactive.status, 409);
+  assert.equal(inactive.body.code, 'STAFF_INACTIVE');
+});
+
+test('scheduled completion rejects a wrong attendance owner and a date different from its confirmed lesson', async () => {
+  const db = new TestD1(); seed(db);
+  const created = await call(db, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  });
+  const scheduled = await callAt(db, all, {
+    action: 'schedule', caseId: created.body.case.caseId, revision: created.body.case.revision,
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00'
+  }, '2026-08-11T12:00:00+09:00');
+  makeupAttendance(db, created.body.case.caseId, 'teacher-b', '2026-08-12');
+  const wrongOwner = await callAt(db, all, {
+    action: 'complete', caseId: scheduled.body.case.caseId, revision: scheduled.body.case.revision
+  }, '2026-08-12T21:00:00+09:00');
+  assert.equal(wrongOwner.status, 409);
+  assert.equal(wrongOwner.body.code, 'MAKEUP_ATTENDANCE_REQUIRED');
+
+  const taskId = 'makeup_lesson_' + created.body.case.caseId;
+  db.prepare('UPDATE checks SET owner=?,data=?,updated_at=3,srv_at=3 WHERE app=? AND k=?')
+    .bind('teacher-a', JSON.stringify({ taskId, date: '2026-08-12', att: 'P' }),
+      'task', taskId + '|2026-08-12').run();
+  const differentDate = await callAt(db, all, {
+    action: 'complete', caseId: scheduled.body.case.caseId, revision: scheduled.body.case.revision,
+    date: '2026-08-13', startTime: '20:00', endTime: '21:00'
+  }, '2026-08-13T21:00:00+09:00');
+  assert.equal(differentDate.status, 409);
+  assert.equal(differentDate.body.code, 'MAKEUP_COMPLETION_DATE_MISMATCH');
+  assert.equal(db.database.prepare('SELECT status FROM makeup_cases WHERE case_id=?')
+    .get(created.body.case.caseId).status, 'confirmed');
+
+  const changedTimes = await callAt(db, all, {
+    action: 'complete', caseId: scheduled.body.case.caseId, revision: scheduled.body.case.revision,
+    date: '2026-08-12', startTime: '19:00', endTime: '20:00'
+  }, '2026-08-12T21:00:00+09:00');
+  assert.equal(changedTimes.status, 200, JSON.stringify(changedTimes.body));
+  assert.equal(changedTimes.body.case.completedDate, '2026-08-12');
+  assert.equal(changedTimes.body.case.completedStartTime, '19:00');
+  assert.equal(changedTimes.body.lessonTask.start, '2026-08-12');
+  assert.equal(db.database.prepare('SELECT status FROM makeup_cases WHERE case_id=?')
+    .get(created.body.case.caseId).status, 'completed');
+});
+
+test('administrator can atomically reschedule and reassign a record-free confirmed makeup', async () => {
+  const db = new TestD1(); seed(db);
+  const created = await call(db, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  });
+  const scheduled = await callAt(db, all, {
+    action: 'schedule', caseId: created.body.case.caseId, revision: created.body.case.revision,
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00'
+  }, '2026-08-11T12:00:00+09:00');
+  const forbidden = await callAt(db, own('teacher-a'), {
+    action: 'reschedule', caseId: scheduled.body.case.caseId, revision: scheduled.body.case.revision,
+    date: '2026-08-13', startTime: '19:00', endTime: '20:00', staffId: 'teacher-b'
+  }, '2026-08-11T12:01:00+09:00');
+  assert.equal(forbidden.status, 403);
+
+  const changed = await callAt(db, all, {
+    action: 'reschedule', caseId: scheduled.body.case.caseId, revision: scheduled.body.case.revision,
+    date: '2026-08-13', startTime: '19:00', endTime: '20:00', staffId: 'teacher-b'
+  }, '2026-08-11T12:01:00+09:00');
+  assert.equal(changed.status, 200, JSON.stringify(changed.body));
+  assert.equal(changed.body.case.confirmedStaffId, 'teacher-b');
+  assert.equal(changed.body.case.confirmedDate, '2026-08-13');
+  assert.equal(changed.body.case.history.at(-1).previousStaffId, 'teacher-a');
+  assert.equal(changed.body.case.history.at(-1).staffId, 'teacher-b');
+  const taskRow = db.database.prepare('SELECT owner,data FROM tasks WHERE id=?')
+    .get('makeup_lesson_' + created.body.case.caseId);
+  assert.equal(taskRow.owner, 'teacher-b');
+  assert.equal(JSON.parse(taskRow.data).staffId, 'teacher-b');
+  assert.equal(JSON.parse(taskRow.data).start, '2026-08-13');
+
+  makeupAttendance(db, created.body.case.caseId, 'teacher-b', '2026-08-13', 'E');
+  const completed = await callAt(db, own('teacher-b'), {
+    action: 'complete', caseId: changed.body.case.caseId, revision: changed.body.case.revision
+  }, '2026-08-13T20:00:00+09:00');
+  assert.equal(completed.status, 200, JSON.stringify(completed.body));
+  assert.equal(completed.body.case.completedStaffId, 'teacher-b');
+});
+
+test('schedule and reschedule allow the assigned teacher to run overlapping makeups for different students', async () => {
+  const db = new TestD1(); seed(db);
+  const existing = await callAt(db, all, {
+    action: 'create_manual', studentId: 'student-b', sourceTaskId: 'lesson-b', reason: 'manual_exam',
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00', staffId: 'teacher-b'
+  }, '2026-08-11T12:00:00+09:00');
+  assert.equal(existing.status, 200, JSON.stringify(existing.body));
+
+  const created = await call(db, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  });
+  const scheduled = await callAt(db, all, {
+    action: 'schedule', caseId: created.body.case.caseId, revision: created.body.case.revision,
+    date: '2026-08-12', startTime: '20:30', endTime: '21:30', staffId: 'teacher-b'
+  }, '2026-08-11T12:01:00+09:00');
+  assert.equal(scheduled.status, 200, JSON.stringify(scheduled.body));
+
+  const rescheduled = await callAt(db, all, {
+    action: 'reschedule', caseId: scheduled.body.case.caseId, revision: scheduled.body.case.revision,
+    date: '2026-08-12', startTime: '20:45', endTime: '21:45', staffId: 'teacher-b'
+  }, '2026-08-11T12:02:00+09:00');
+  assert.equal(rescheduled.status, 200, JSON.stringify(rescheduled.body));
+  assert.equal(rescheduled.body.case.confirmedStaffId, 'teacher-b');
+  assert.equal(rescheduled.body.case.confirmedStartTime, '20:45');
+  assert.equal(db.database.prepare("SELECT count(*) AS n FROM makeup_cases WHERE status='confirmed'").get().n, 2);
+});
+
+test('direct completion is blocked by the same student confirmed or completed makeup without partial writes', async () => {
+  for (const priorStatus of ['confirmed', 'completed']) {
+    const db = new TestD1(); seed(db);
+    insertTask(db, lesson('lesson-a-extra', 'student-a', 'teacher-a', [4], '18:00', '19:00'));
+    absence(db, 'lesson-a-extra', 'teacher-a', '2026-08-13');
+    const prior = await callAt(db, all, {
+      action: 'create_manual', studentId: 'student-a', sourceTaskId: 'lesson-a', reason: 'manual_exam',
+      date: '2026-08-12', startTime: '20:00', endTime: '21:00', staffId: 'teacher-a'
+    }, '2026-08-11T12:00:00+09:00');
+    assert.equal(prior.status, 200, priorStatus);
+    if (priorStatus === 'completed') {
+      makeupAttendance(db, prior.body.case.caseId, 'teacher-a', '2026-08-12');
+      const completed = await callAt(db, own('teacher-a'), {
+        action: 'complete', caseId: prior.body.case.caseId, revision: prior.body.case.revision
+      }, '2026-08-12T21:00:00+09:00');
+      assert.equal(completed.status, 200, JSON.stringify(completed.body));
+    }
+
+    const candidate = await createAndReview(db, 'lesson-a-extra', '2026-08-13');
+    const blocked = await callAt(db, all, {
+      action: 'complete', caseId: candidate.caseId, revision: candidate.revision,
+      date: '2026-08-12', startTime: '20:30', endTime: '21:30',
+      staffId: 'teacher-a', attendanceStatus: 'P'
+    }, '2026-08-12T21:30:00+09:00');
+    assert.equal(blocked.status, 409, priorStatus);
+    assert.equal(blocked.body.code, 'STUDENT_MAKEUP_CONFLICT', priorStatus);
+    assert.equal(db.database.prepare('SELECT status FROM makeup_cases WHERE case_id=?')
+      .get(candidate.caseId).status, 'reviewed');
+    assert.equal(db.database.prepare('SELECT count(*) AS n FROM tasks WHERE id=?')
+      .get('makeup_lesson_' + candidate.caseId).n, 0);
+    assert.equal(db.database.prepare('SELECT count(*) AS n FROM checks WHERE k=?')
+      .get('makeup_lesson_' + candidate.caseId + '|2026-08-12').n, 0);
+  }
+});
+
+test('concurrent direct completions for one student are rejected atomically after the preflight read', async () => {
+  const db = new TestD1(); seed(db);
+  insertTask(db, lesson('lesson-a-extra', 'student-a', 'teacher-a', [4], '18:00', '19:00'));
+  absence(db, 'lesson-a-extra', 'teacher-a', '2026-08-13');
+  const candidate = await createAndReview(db);
+  const competitor = await createAndReview(db, 'lesson-a-extra', '2026-08-13');
+  db.beforeBatch = () => {
+    db.database.prepare(
+      "UPDATE makeup_cases SET status='confirmed',revision=revision+1," +
+      "confirmed_start_at='2026-08-12T20:00:00+09:00',confirmed_end_at='2026-08-12T21:00:00+09:00'," +
+      "confirmed_staff_id='teacher-a' WHERE app='task' AND case_id=?"
+    ).run(competitor.caseId);
+    db.database.prepare(
+      "UPDATE makeup_cases SET status='completed',revision=revision+1,completed_at=1,completed_by='teacher-a' " +
+      "WHERE app='task' AND case_id=?"
+    ).run(competitor.caseId);
+  };
+  const blocked = await callAt(db, all, {
+    action: 'complete', caseId: candidate.caseId, revision: candidate.revision,
+    date: '2026-08-12', startTime: '20:30', endTime: '21:30',
+    staffId: 'teacher-a', attendanceStatus: 'P'
+  }, '2026-08-12T21:30:00+09:00');
+  assert.equal(blocked.status, 409, JSON.stringify(blocked.body));
+  assert.equal(blocked.body.code, 'STUDENT_MAKEUP_CONFLICT');
+  assert.equal(db.database.prepare('SELECT status FROM makeup_cases WHERE case_id=?')
+    .get(candidate.caseId).status, 'reviewed');
+  assert.equal(db.database.prepare('SELECT status FROM makeup_cases WHERE case_id=?')
+    .get(competitor.caseId).status, 'completed');
+  assert.equal(db.database.prepare('SELECT count(*) AS n FROM tasks WHERE id=?')
+    .get('makeup_lesson_' + candidate.caseId).n, 0);
+  assert.equal(db.database.prepare('SELECT count(*) AS n FROM checks WHERE k=?')
+    .get('makeup_lesson_' + candidate.caseId + '|2026-08-12').n, 0);
+});
+
+test('a new confirmed makeup is blocked by the same student completed makeup', async () => {
+  const db = new TestD1(); seed(db);
+  insertTask(db, lesson('lesson-a-extra', 'student-a', 'teacher-a', [4], '18:00', '19:00'));
+  absence(db, 'lesson-a-extra', 'teacher-a', '2026-08-13');
+  const prior = await callAt(db, all, {
+    action: 'create_manual', studentId: 'student-a', sourceTaskId: 'lesson-a', reason: 'manual_exam',
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00', staffId: 'teacher-a'
+  }, '2026-08-11T12:00:00+09:00');
+  makeupAttendance(db, prior.body.case.caseId, 'teacher-a', '2026-08-12');
+  const completed = await callAt(db, own('teacher-a'), {
+    action: 'complete', caseId: prior.body.case.caseId, revision: prior.body.case.revision
+  }, '2026-08-12T21:00:00+09:00');
+  assert.equal(completed.status, 200, JSON.stringify(completed.body));
+
+  const candidate = await createAndReview(db, 'lesson-a-extra', '2026-08-13');
+  const blocked = await callAt(db, all, {
+    action: 'schedule', caseId: candidate.caseId, revision: candidate.revision,
+    date: '2026-08-12', startTime: '20:30', endTime: '21:30', staffId: 'teacher-b'
+  }, '2026-08-11T12:01:00+09:00');
+  assert.equal(blocked.status, 409);
+  assert.equal(blocked.body.code, 'STUDENT_MAKEUP_CONFLICT');
+});
+
+test('restore and direct completion allow one teacher overlap for different students', async () => {
+  const restoreDb = new TestD1(); seed(restoreDb);
+  const otherRestore = await callAt(restoreDb, all, {
+    action: 'create_manual', studentId: 'student-b', sourceTaskId: 'lesson-b', reason: 'manual_exam',
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00', staffId: 'teacher-a'
+  }, '2026-08-11T12:00:00+09:00');
+  assert.equal(otherRestore.status, 200);
+  const created = await call(restoreDb, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  });
+  const scheduled = await callAt(restoreDb, all, {
+    action: 'schedule', caseId: created.body.case.caseId, revision: created.body.case.revision,
+    date: '2026-08-12', startTime: '20:30', endTime: '21:30', staffId: 'teacher-a'
+  }, '2026-08-11T12:01:00+09:00');
+  const taskId = 'makeup_lesson_' + created.body.case.caseId;
+  const taskRow = restoreDb.database.prepare('SELECT data FROM tasks WHERE id=?').get(taskId);
+  const tombstone = { ...JSON.parse(taskRow.data), deleted: true };
+  restoreDb.prepare('UPDATE tasks SET data=?,updated_at=updated_at+1 WHERE id=?')
+    .bind(JSON.stringify(tombstone), taskId).run();
+  const restored = await callAt(restoreDb, all, {
+    action: 'restore_schedule', caseId: scheduled.body.case.caseId, revision: scheduled.body.case.revision
+  }, '2026-08-11T12:02:00+09:00');
+  assert.equal(restored.status, 200, JSON.stringify(restored.body));
+
+  const directDb = new TestD1(); seed(directDb);
+  const otherDirect = await callAt(directDb, all, {
+    action: 'create_manual', studentId: 'student-b', sourceTaskId: 'lesson-b', reason: 'manual_exam',
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00', staffId: 'teacher-a'
+  }, '2026-08-11T12:00:00+09:00');
+  assert.equal(otherDirect.status, 200);
+  const directCase = await createAndReview(directDb);
+  const direct = await callAt(directDb, all, {
+    action: 'complete', caseId: directCase.caseId, revision: directCase.revision,
+    date: '2026-08-12', startTime: '20:30', endTime: '21:30',
+    staffId: 'teacher-a', attendanceStatus: 'P'
+  }, '2026-08-12T21:30:00+09:00');
+  assert.equal(direct.status, 200, JSON.stringify(direct.body));
+});
+
+test('reschedule is blocked before and during the atomic write when lesson records exist', async () => {
+  for (const raced of [false, true]) {
+    const db = new TestD1(); seed(db);
+    const created = await call(db, own('teacher-a'), {
+      action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+    });
+    const scheduled = await callAt(db, all, {
+      action: 'schedule', caseId: created.body.case.caseId, revision: created.body.case.revision,
+      date: '2026-08-12', startTime: '20:00', endTime: '21:00'
+    }, '2026-08-11T12:00:00+09:00');
+    if (raced) {
+      db.beforeBatch = () => makeupAttendance(db, created.body.case.caseId, 'teacher-a', '2026-08-12');
+    } else {
+      makeupAttendance(db, created.body.case.caseId, 'teacher-a', '2026-08-12');
+    }
+    const blocked = await callAt(db, all, {
+      action: 'reschedule', caseId: scheduled.body.case.caseId, revision: scheduled.body.case.revision,
+      date: '2026-08-13', startTime: '19:00', endTime: '20:00', staffId: 'teacher-b'
+    }, '2026-08-11T12:01:00+09:00');
+    assert.equal(blocked.status, 409, String(raced));
+    assert.equal(blocked.body.code, 'MAKEUP_LESSON_HAS_RECORDS', String(raced));
+    const row = db.database.prepare('SELECT confirmed_staff_id,confirmed_start_at,revision FROM makeup_cases WHERE case_id=?')
+      .get(created.body.case.caseId);
+    assert.equal(row.confirmed_staff_id, 'teacher-a');
+    assert.equal(row.confirmed_start_at, '2026-08-12T20:00:00+09:00');
+    assert.equal(row.revision, scheduled.body.case.revision);
+    assert.equal(db.database.prepare('SELECT owner FROM tasks WHERE id=?')
+      .get('makeup_lesson_' + created.body.case.caseId).owner, 'teacher-a');
+  }
+});
+
+test('an absent makeup can be rescheduled as a retry while preserving the original absence audit', async () => {
+  const db = new TestD1(); seed(db);
+  const created = await call(db, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  });
+  const scheduled = await callAt(db, all, {
+    action: 'schedule', caseId: created.body.case.caseId, revision: created.body.case.revision,
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00'
+  }, '2026-08-11T12:00:00+09:00');
+  const caseId = scheduled.body.case.caseId;
+  makeupAttendance(db, caseId, 'teacher-a', '2026-08-12', 'A');
+  const retried = await callAt(db, all, {
+    action: 'reschedule_after_absence', caseId, revision: scheduled.body.case.revision,
+    date: '2026-08-14', startTime: '19:00', endTime: '20:00', staffId: 'teacher-b'
+  }, '2026-08-13T12:00:00+09:00');
+  assert.equal(retried.status, 200, JSON.stringify(retried.body));
+  assert.equal(retried.body.case.confirmedDate, '2026-08-14');
+  assert.equal(retried.body.case.confirmedStaffId, 'teacher-b');
+  assert.equal(retried.body.case.history.at(-1).action, 'reschedule_after_absence');
+  assert.equal(retried.body.case.history.at(-1).previousAttendance, 'A');
+  const audit = db.database.prepare(
+    'SELECT previous_date,previous_start_time,previous_end_time,previous_staff_id,attendance_status ' +
+    'FROM makeup_absence_retries WHERE app=? AND case_id=?'
+  ).get('task', caseId);
+  assert.deepEqual({ ...audit }, {
+    previous_date: '2026-08-12', previous_start_time: '20:00', previous_end_time: '21:00',
+    previous_staff_id: 'teacher-a', attendance_status: 'A'
+  });
+  assert.equal(db.database.prepare('SELECT count(*) AS n FROM checks WHERE k=?').get(
+    'makeup_lesson_' + caseId + '|2026-08-12').n, 1);
+  assert.equal(JSON.parse(db.database.prepare('SELECT data FROM tasks WHERE id=?').get(
+    'makeup_lesson_' + caseId).data).start, '2026-08-14');
+
+  makeupAttendance(db, caseId, 'teacher-b', '2026-08-14', 'P');
+  const completed = await callAt(db, own('teacher-b'), {
+    action: 'complete', caseId, revision: retried.body.case.revision
+  }, '2026-08-14T20:00:00+09:00');
+  assert.equal(completed.status, 200, JSON.stringify(completed.body));
+  assert.equal(completed.body.case.status, 'completed');
+});
+
+test('absence retry remains blocked when the makeup has another operational record', async () => {
+  const db = new TestD1(); seed(db);
+  const created = await call(db, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  });
+  const scheduled = await callAt(db, all, {
+    action: 'schedule', caseId: created.body.case.caseId, revision: created.body.case.revision,
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00'
+  }, '2026-08-11T12:00:00+09:00');
+  const caseId = scheduled.body.case.caseId;
+  const taskId = 'makeup_lesson_' + caseId;
+  makeupAttendance(db, caseId, 'teacher-a', '2026-08-12', 'A');
+  db.prepare('INSERT INTO feedback_requests(app,request_key,task_id,owner,feedback_date,feedback_type,template_version,' +
+    'body,body_hash,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)')
+    .bind('task', 'feedback-retry', taskId, 'teacher-a', '2026-08-12', 'lesson', 'v2', '{}', 'hash',
+      'approval_waiting', 2, 2).run();
+  const blocked = await callAt(db, all, {
+    action: 'reschedule_after_absence', caseId, revision: scheduled.body.case.revision,
+    date: '2026-08-14', startTime: '19:00', endTime: '20:00', staffId: 'teacher-b'
+  }, '2026-08-13T12:00:00+09:00');
+  assert.equal(blocked.status, 409);
+  assert.equal(blocked.body.code, 'MAKEUP_LESSON_HAS_RECORDS');
+});
+
+test('065 rejects latest-ledger evidence when the makeup case assignee differs from task owner', async () => {
+  const db = new TestD1(); seed(db);
+  const created = await call(db, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  });
+  const scheduled = await callAt(db, all, {
+    action: 'schedule', caseId: created.body.case.caseId, revision: created.body.case.revision,
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00'
+  }, '2026-08-11T12:00:00+09:00');
+  assert.equal(scheduled.status, 200);
+  makeupAttendance(db, created.body.case.caseId, 'teacher-a', '2026-08-12');
+  db.prepare(
+    'INSERT INTO student_session_ledger_generations(app,student_id,configured_start_date,generation,' +
+    'source_cutoff_date,kind,supersedes_generation,supersedes_event_count,reason_code,actor,created_at) ' +
+    "VALUES('task','student-a','2026-08-01',1,'2026-08-12','system_backfill',NULL,0,'fixture','system:test',1)"
+  ).run();
+  db.prepare(
+    'INSERT INTO student_session_ledger_cycles(app,student_id,configured_start_date,generation,cycle_number,' +
+    "cycle_start_date,created_at) VALUES('task','student-a','2026-08-01',1,1,'2026-08-01',1)"
+  ).run();
+  db.prepare("UPDATE makeup_cases SET confirmed_staff_id='teacher-b' WHERE case_id=?")
+    .bind(created.body.case.caseId).run();
+  const taskId = 'makeup_lesson_' + created.body.case.caseId;
+  assert.throws(() => db.prepare(
+    'INSERT INTO student_session_ledger_events(app,student_id,configured_start_date,generation,cycle_number,' +
+    'session_number,lesson_task_id,attendance_date,attendance_status,source_kind,check_key,created_at) ' +
+    "VALUES('task','student-a','2026-08-01',1,1,1,?,'2026-08-12','P','check',?,2)"
+  ).bind(taskId, taskId + '|2026-08-12').run(), /STUDENT_SESSION_LEDGER_EVENT_SOURCE/);
+
+  db.prepare("UPDATE makeup_cases SET confirmed_staff_id='teacher-a' WHERE case_id=?")
+    .bind(created.body.case.caseId).run();
+  db.prepare(
+    'INSERT INTO student_session_ledger_events(app,student_id,configured_start_date,generation,cycle_number,' +
+    'session_number,lesson_task_id,attendance_date,attendance_status,source_kind,check_key,created_at) ' +
+    "VALUES('task','student-a','2026-08-01',1,1,1,?,'2026-08-12','P','check',?,2)"
+  ).bind(taskId, taskId + '|2026-08-12').run();
+  assert.equal(db.database.prepare('SELECT count(*) AS n FROM student_session_ledger_events').get().n, 1);
+});
+
+test('no_makeup keeps a history record, needs no free-text reason, and remains administrator-only', async () => {
+  const db = new TestD1(); seed(db);
+  const created = await call(db, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  });
+  const row = created.body.case;
+  const forbidden = await call(db, own('teacher-a'), {
+    action: 'no_makeup', caseId: row.caseId, revision: row.revision
+  });
+  assert.equal(forbidden.status, 403);
+  const cancelled = await call(db, all, {
+    action: 'no_makeup', caseId: row.caseId, revision: row.revision
+  });
+  assert.equal(cancelled.status, 200);
+  assert.equal(cancelled.body.case.status, 'cancelled');
+  assert.equal(cancelled.body.case.reason, 'policy_ineligible');
+  assert.equal(cancelled.body.case.notificationNeeded, false);
+  assert.equal(cancelled.body.case.history.at(-1).action, 'no_makeup');
+
+  const scheduledDb = new TestD1(); seed(scheduledDb);
+  const scheduledCreated = await call(scheduledDb, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  });
+  const scheduled = await callAt(scheduledDb, all, {
+    action: 'schedule', caseId: scheduledCreated.body.case.caseId, revision: scheduledCreated.body.case.revision,
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00'
+  }, '2026-08-11T12:00:00+09:00');
+  const taskId = 'makeup_lesson_' + scheduled.body.case.caseId;
+  const removed = await call(scheduledDb, all, {
+    action: 'no_makeup', caseId: scheduled.body.case.caseId, revision: scheduled.body.case.revision
+  });
+  assert.equal(removed.status, 200);
+  assert.equal(removed.body.lessonTask.deleted, true);
+  assert.equal(JSON.parse(scheduledDb.database.prepare('SELECT data FROM tasks WHERE id=?').get(taskId).data).deleted, true);
+
+  const protectedDb = new TestD1(); seed(protectedDb);
+  const protectedCreated = await call(protectedDb, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  });
+  const protectedScheduled = await callAt(protectedDb, all, {
+    action: 'schedule', caseId: protectedCreated.body.case.caseId, revision: protectedCreated.body.case.revision,
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00'
+  }, '2026-08-11T12:00:00+09:00');
+  const protectedTaskId = 'makeup_lesson_' + protectedScheduled.body.case.caseId;
+  protectedDb.prepare('INSERT INTO checks(app,k,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
+    .bind('task', protectedTaskId + '|2026-08-12', 'teacher-a',
+      JSON.stringify({ taskId: protectedTaskId, date: '2026-08-12', att: 'P' }), 2, 2).run();
+  const blocked = await call(protectedDb, all, {
+    action: 'no_makeup', caseId: protectedScheduled.body.case.caseId,
+    revision: protectedScheduled.body.case.revision
+  });
+  assert.equal(blocked.status, 409);
+  assert.equal(blocked.body.code, 'MAKEUP_LESSON_HAS_RECORDS');
+  assert.equal(protectedDb.database.prepare('SELECT status FROM makeup_cases WHERE case_id=?')
+    .get(protectedScheduled.body.case.caseId).status, 'confirmed');
+  assert.equal(JSON.parse(protectedDb.database.prepare('SELECT data FROM tasks WHERE id=?').get(protectedTaskId).data).deleted,
+    false);
+
+  const legacyDb = new TestD1(); seed(legacyDb);
+  const legacyReviewed = await createAndReview(legacyDb);
+  const legacyProposed = await callAt(legacyDb, all, {
+    action: 'propose', caseId: legacyReviewed.caseId, revision: legacyReviewed.revision,
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00', staffId: 'teacher-b'
+  }, '2026-08-11T12:00:00+09:00');
+  assert.equal(legacyProposed.body.case.notificationNeeded, true);
+  const legacyRemoved = await call(legacyDb, all, {
+    action: 'no_makeup', caseId: legacyReviewed.caseId, revision: legacyProposed.body.case.revision
+  });
+  assert.equal(legacyRemoved.status, 200);
+  assert.equal(legacyRemoved.body.case.notificationNeeded, false);
+  assert.equal(legacyRemoved.body.case.notificationEvent, null);
+  assert.equal(legacyRemoved.body.case.notificationEventRevision, 0);
+
+  const raceDb = new TestD1(); seed(raceDb);
+  const raceCreated = await call(raceDb, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  });
+  const raceScheduled = await callAt(raceDb, all, {
+    action: 'schedule', caseId: raceCreated.body.case.caseId, revision: raceCreated.body.case.revision,
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00'
+  }, '2026-08-11T12:00:00+09:00');
+  const raceTaskId = 'makeup_lesson_' + raceCreated.body.case.caseId;
+  raceDb.beforeBatch = () => raceDb.prepare(
+    'INSERT INTO checks(app,k,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)'
+  ).bind('task', raceTaskId + '|2026-08-12', 'teacher-a',
+    JSON.stringify({ taskId: raceTaskId, date: '2026-08-12', att: 'P' }), 3, 3).run();
+  const raced = await call(raceDb, all, {
+    action: 'no_makeup', caseId: raceCreated.body.case.caseId, revision: raceScheduled.body.case.revision
+  });
+  assert.equal(raced.status, 409);
+  assert.equal(raced.body.code, 'MAKEUP_LESSON_HAS_RECORDS');
+  assert.equal(raceDb.database.prepare('SELECT status FROM makeup_cases WHERE case_id=?')
+    .get(raceCreated.body.case.caseId).status, 'confirmed');
+
+  const publicDb = new TestD1(); seed(publicDb);
+  const publicCreated = await call(publicDb, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  });
+  const publicScheduled = await callAt(publicDb, all, {
+    action: 'schedule', caseId: publicCreated.body.case.caseId, revision: publicCreated.body.case.revision,
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00'
+  }, '2026-08-11T12:00:00+09:00');
+  const publicTaskId = 'makeup_lesson_' + publicCreated.body.case.caseId;
+  publicDb.prepare('INSERT INTO guardian_lesson_publications(app,publication_id,source_task_id,task_owner,student_id,' +
+    'student_identity_hash,task_identity_hash,lesson_date,status,public_homework,public_readiness,revision,updated_at,updated_by) ' +
+    'VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)').bind('task', 'publication-makeup', publicTaskId, 'teacher-a', 'student-a',
+    'a'.repeat(64), 'b'.repeat(64), '2026-08-12', 'published', '숙제', '', 1, 2, 'teacher-a').run();
+  const publicBlocked = await call(publicDb, all, {
+    action: 'no_makeup', caseId: publicCreated.body.case.caseId, revision: publicScheduled.body.case.revision
+  });
+  assert.equal(publicBlocked.status, 409);
+  assert.equal(publicBlocked.body.code, 'MAKEUP_LESSON_HAS_RECORDS');
+});
+
+test('attendance P correction cancels its active makeup and hides the corrected history', async () => {
+  const db = new TestD1(); seed(db);
+  const created = await call(db, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  });
+  const scheduled = await callAt(db, all, {
+    action: 'schedule', caseId: created.body.case.caseId, revision: created.body.case.revision,
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00'
+  }, '2026-08-11T12:00:00+09:00');
+  db.prepare("UPDATE checks SET data=? WHERE k='lesson-a|2026-08-10'")
+    .bind(JSON.stringify({ taskId: 'lesson-a', date: '2026-08-10', att: 'P' })).run();
+  const reconciled = await call(db, own('teacher-a'), {
+    action: 'reconcile_attendance', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  });
+  assert.equal(reconciled.status, 200);
+  assert.equal(reconciled.body.case.status, 'cancelled');
+  assert.equal(reconciled.body.case.reason, 'already_resolved');
+  assert.equal(reconciled.body.case.hiddenByAttendanceCorrection, true);
+  assert.equal(reconciled.body.lessonTask.deleted, true);
+  assert.equal(reconciled.body.case.history.at(-1).action, 'reconcile_attendance');
+  assert.equal(scheduled.body.case.hiddenByAttendanceCorrection, false);
+
+  db.prepare("UPDATE checks SET data=? WHERE k='lesson-a|2026-08-10'")
+    .bind(JSON.stringify({ taskId: 'lesson-a', date: '2026-08-10', att: 'L' })).run();
+  const rejected = await call(db, own('teacher-a'), {
+    action: 'reconcile_attendance', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  });
+  assert.equal(rejected.status, 409);
+  assert.equal(rejected.body.code, 'ATTENDANCE_CORRECTION_REQUIRED');
+
+  db.prepare("UPDATE checks SET data=? WHERE k='lesson-a|2026-08-10'")
+    .bind(JSON.stringify({ taskId: 'lesson-a', date: '2026-08-10', att: 'A' })).run();
+  const reopened = await call(db, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  });
+  assert.equal(reopened.status, 200);
+  assert.equal(reopened.body.idempotent, false);
+  assert.equal(reopened.body.case.status, 'review_pending');
+  assert.equal(reopened.body.case.hiddenByAttendanceCorrection, false);
+  assert.equal(reopened.body.case.history.at(-1).action, 'reopen_after_attendance_correction');
+  assert.equal(reopened.body.lessonTask.deleted, true);
+  const backdated = await callAt(db, all, {
+    action: 'schedule', caseId: reopened.body.case.caseId, revision: reopened.body.case.revision,
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00'
+  }, '2026-09-08T12:00:00+09:00');
+  assert.equal(backdated.status, 200, JSON.stringify(backdated.body));
+  assert.equal(backdated.body.case.confirmedDate, '2026-08-12');
+  assert.equal(backdated.body.lessonTask.deleted, false);
+  const manuallyCancelled = await call(db, all, {
+    action: 'no_makeup', caseId: backdated.body.case.caseId, revision: backdated.body.case.revision
+  });
+  assert.equal(manuallyCancelled.status, 200);
+  assert.equal(manuallyCancelled.body.case.hiddenByAttendanceCorrection, false);
+  const notReopened = await call(db, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  });
+  assert.equal(notReopened.status, 200);
+  assert.equal(notReopened.body.idempotent, true);
+  assert.equal(notReopened.body.case.status, 'cancelled');
+  assert.equal(notReopened.body.case.hiddenByAttendanceCorrection, false);
+});
+
+test('attendance reconciliation cannot race a missing-task restore into an orphan active lesson', async () => {
+  const db = new TestD1(); seed(db);
+  const created = await call(db, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  });
+  db.prepare("UPDATE checks SET data=? WHERE k='lesson-a|2026-08-10'")
+    .bind(JSON.stringify({ taskId: 'lesson-a', date: '2026-08-10', att: 'P' })).run();
+  const taskId = 'makeup_lesson_' + created.body.case.caseId;
+  db.beforeBatch = () => insertTask(db, lesson(taskId, 'student-a', 'teacher-a', [3], '20:00', '21:00', {
+    repeat: 'once', start: '2026-08-12', end: '2026-08-12', lessonInstanceType: 'makeup',
+    makeupCaseId: created.body.case.caseId, makeupSourceTaskId: 'lesson-a', makeupSourceDate: '2026-08-10'
+  }));
+  const raced = await call(db, own('teacher-a'), {
+    action: 'reconcile_attendance', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  });
+  assert.equal(raced.status, 409);
+  assert.equal(raced.body.code, 'REVISION_CONFLICT');
+  assert.equal(db.database.prepare('SELECT status FROM makeup_cases WHERE case_id=?').get(created.body.case.caseId).status,
+    'review_pending');
+  assert.equal(JSON.parse(db.database.prepare('SELECT data FROM tasks WHERE id=?').get(taskId).data).deleted, false);
+});
+
+test('attendance reconciliation atomically rejects a source-teacher transfer', async () => {
+  const db = new TestD1(); seed(db);
+  const created = await call(db, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  });
+  db.prepare("UPDATE checks SET data=? WHERE k='lesson-a|2026-08-10'")
+    .bind(JSON.stringify({ taskId: 'lesson-a', date: '2026-08-10', att: 'P' })).run();
+  db.beforeBatch = () => {
+    const row = db.database.prepare("SELECT data FROM tasks WHERE id='lesson-a'").get();
+    db.prepare("UPDATE tasks SET owner='teacher-b',data=?,updated_at=updated_at+1 WHERE id='lesson-a'")
+      .bind(JSON.stringify({ ...JSON.parse(row.data), staffId: 'teacher-b' })).run();
+  };
+  const result = await call(db, own('teacher-a'), {
+    action: 'reconcile_attendance', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  });
+  assert.equal(result.status, 409);
+  assert.equal(db.database.prepare('SELECT status FROM makeup_cases WHERE case_id=?').get(created.body.case.caseId).status,
+    'review_pending');
+});
+
+test('legacy confirmed case exposes missing lesson and restores its deterministic task idempotently', async () => {
+  const db = new TestD1(); seed(db);
+  const reviewed = await createAndReview(db);
+  const proposed = await callAt(db, all, {
+    action: 'propose', caseId: reviewed.caseId, revision: reviewed.revision,
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00', staffId: 'teacher-b'
+  }, '2026-08-11T12:00:00+09:00');
+  db.prepare("UPDATE makeup_cases SET status='confirmed',confirmed_start_at=proposed_start_at," +
+    "confirmed_end_at=proposed_end_at,confirmed_staff_id=proposed_staff_id WHERE case_id=?")
+    .bind(reviewed.caseId).run();
+  const listed = await call(db, all, { action: 'list' });
+  assert.equal(listed.body.cases[0].hasLessonTask, false);
+  const restored = await call(db, all, {
+    action: 'restore_schedule', caseId: reviewed.caseId, revision: proposed.body.case.revision
+  });
+  assert.equal(restored.status, 200);
+  assert.equal(restored.body.case.hasLessonTask, true);
+  assert.equal(restored.body.case.revision, proposed.body.case.revision);
+  assert.equal(restored.body.lessonTask.staffId, 'teacher-b');
+  const retry = await call(db, all, {
+    action: 'restore_schedule', caseId: reviewed.caseId, revision: proposed.body.case.revision
+  });
+  assert.equal(retry.status, 200);
+  assert.equal(retry.body.idempotent, true);
+
+  const taskId = 'makeup_lesson_' + reviewed.caseId;
+  const taskRow = db.database.prepare('SELECT data FROM tasks WHERE id=?').get(taskId);
+  db.prepare('UPDATE tasks SET data=?,updated_at=updated_at+1,srv_at=srv_at+1 WHERE id=?')
+    .bind(JSON.stringify({ ...JSON.parse(taskRow.data), deleted: true }), taskId).run();
+  const revived = await call(db, all, {
+    action: 'restore_schedule', caseId: reviewed.caseId, revision: proposed.body.case.revision
+  });
+  assert.equal(revived.status, 200);
+  assert.equal(revived.body.idempotent, false);
+  assert.equal(revived.body.lessonTask.deleted, false);
+  assert.equal(revived.body.case.hasLessonTask, true);
+
+  const revivedRow = db.database.prepare('SELECT data FROM tasks WHERE id=?').get(taskId);
+  db.prepare('UPDATE tasks SET data=?,updated_at=updated_at+1,srv_at=srv_at+1 WHERE id=?')
+    .bind(JSON.stringify({ ...JSON.parse(revivedRow.data), deleted: true }), taskId).run();
+  db.prepare('INSERT INTO checks(app,k,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
+    .bind('task', taskId + '|2026-08-12', 'teacher-b',
+      JSON.stringify({ taskId, date: '2026-08-12', att: 'P' }), 3, 3).run();
+  const blocked = await call(db, all, {
+    action: 'restore_schedule', caseId: reviewed.caseId, revision: proposed.body.case.revision
+  });
+  assert.equal(blocked.status, 409);
+  assert.equal(blocked.body.code, 'MAKEUP_LESSON_HAS_RECORDS');
+  const blockedRow = db.database.prepare('SELECT data FROM tasks WHERE id=?').get(taskId);
+  db.prepare('UPDATE tasks SET data=?,updated_at=updated_at+1,srv_at=srv_at+1 WHERE id=?')
+    .bind(JSON.stringify({ ...JSON.parse(blockedRow.data), deleted: false, makeupSourceDate: '2026-08-09' }), taskId).run();
+  const collisionList = await call(db, all, { action: 'list' });
+  assert.equal(collisionList.body.cases[0].hasLessonTask, false);
+});
+
+test('legacy restore atomically rejects a regular lesson inserted after its initial check', async () => {
+  const db = new TestD1(); seed(db);
+  const reviewed = await createAndReview(db);
+  const proposed = await callAt(db, all, {
+    action: 'propose', caseId: reviewed.caseId, revision: reviewed.revision,
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00', staffId: 'teacher-b'
+  }, '2026-08-11T12:00:00+09:00');
+  db.prepare("UPDATE makeup_cases SET status='confirmed',confirmed_start_at=proposed_start_at," +
+    "confirmed_end_at=proposed_end_at,confirmed_staff_id=proposed_staff_id WHERE case_id=?")
+    .bind(reviewed.caseId).run();
+  db.beforeBatch = () => insertTask(db,
+    lesson('restore-race', 'student-a', 'teacher-a', [3], '20:30', '21:30'));
+  const blocked = await call(db, all, {
+    action: 'restore_schedule', caseId: reviewed.caseId, revision: proposed.body.case.revision
+  });
+  assert.equal(blocked.status, 409);
+  assert.equal(blocked.body.code, 'STUDENT_SCHEDULE_CONFLICT');
+  assert.equal(db.database.prepare("SELECT count(*) AS n FROM tasks WHERE id LIKE 'makeup_lesson_%'").get().n, 0);
+});
+
+test('legacy restore atomically rejects a confirmed teacher deactivated after its initial check', async () => {
+  const db = new TestD1(); seed(db);
+  const reviewed = await createAndReview(db);
+  const proposed = await callAt(db, all, {
+    action: 'propose', caseId: reviewed.caseId, revision: reviewed.revision,
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00', staffId: 'teacher-b'
+  }, '2026-08-11T12:00:00+09:00');
+  db.prepare("UPDATE makeup_cases SET status='confirmed',confirmed_start_at=proposed_start_at," +
+    "confirmed_end_at=proposed_end_at,confirmed_staff_id=proposed_staff_id WHERE case_id=?")
+    .bind(reviewed.caseId).run();
+  db.beforeBatch = () => db.prepare("UPDATE staff SET data=? WHERE app='task' AND id='teacher-b'")
+    .bind(JSON.stringify({ id: 'teacher-b', deleted: true })).run();
+  const blocked = await call(db, all, {
+    action: 'restore_schedule', caseId: reviewed.caseId, revision: proposed.body.case.revision
+  });
+  assert.equal(blocked.status, 409);
+  assert.equal(blocked.body.code, 'STAFF_INACTIVE');
+  assert.equal(db.database.prepare("SELECT count(*) AS n FROM tasks WHERE id LIKE 'makeup_lesson_%'").get().n, 0);
+});
+
+test('unconfirmed direct completion is admin-only and follows the current source owner while retaining history', async () => {
+  const db = new TestD1(); seed(db);
+  const created = await call(db, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  });
+  const original = db.database.prepare("SELECT data FROM tasks WHERE id='lesson-a'").get();
+  const transferred = { ...JSON.parse(original.data), staffId: 'teacher-b' };
+  db.prepare("UPDATE tasks SET owner='teacher-b',data=?,updated_at=2,srv_at=2 WHERE id='lesson-a'")
+    .bind(JSON.stringify(transferred)).run();
+  const listed = await call(db, own('teacher-b'), { action: 'list' });
+  assert.equal(listed.body.cases[0].sourceTeacherId, 'teacher-a');
+  assert.equal(listed.body.cases[0].currentTeacherId, 'teacher-b');
+  const forbidden = await callAt(db, own('teacher-b'), {
+    action: 'complete', caseId: created.body.case.caseId, revision: created.body.case.revision,
+    date: '2026-08-11', startTime: '10:00', endTime: '11:00',
+    staffId: 'teacher-b', attendanceStatus: 'P'
+  }, '2026-08-11T12:00:00+09:00');
+  assert.equal(forbidden.status, 403);
+  const completed = await callAt(db, all, {
+    action: 'complete', caseId: created.body.case.caseId, revision: created.body.case.revision,
+    date: '2026-08-11', startTime: '10:00', endTime: '11:00',
+    staffId: 'teacher-b', attendanceStatus: 'P'
+  }, '2026-08-11T12:00:00+09:00');
+  assert.equal(completed.status, 200);
+  assert.equal(completed.body.lessonTask.staffId, 'teacher-b');
+});
+
+test('manager inspection can record an unscheduled completion only for the inspected teacher scope', async () => {
+  const db = new TestD1(); seed(db);
+  const created = await call(db, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  });
+  const inspection = { scope: 'own', id: 'teacher-a', role: 'teacher', inspection: true, managerId: 'manager-a' };
+  const completed = await callAt(db, inspection, {
+    action: 'complete', caseId: created.body.case.caseId, revision: created.body.case.revision,
+    date: '2026-08-11', startTime: '10:00', endTime: '11:00',
+    staffId: 'teacher-a', attendanceStatus: 'P'
+  }, '2026-08-11T12:00:00+09:00');
+  assert.equal(completed.status, 200, JSON.stringify(completed.body));
+  assert.equal(completed.body.case.status, 'completed');
+  assert.equal(completed.body.case.completedStaffId, 'teacher-a');
+});
+
+test('manager inspection can close an already completed unscheduled makeup without inventing a date or time', async () => {
+  const db = new TestD1(); seed(db);
+  const created = await call(db, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  });
+  const inspection = { scope: 'own', id: 'teacher-a', role: 'teacher', inspection: true, managerId: 'manager-a' };
+  const completed = await callAt(db, inspection, {
+    action: 'complete', caseId: created.body.case.caseId, revision: created.body.case.revision,
+    staffId: 'teacher-a', attendanceStatus: 'P'
+  }, '2026-08-12T12:00:00+09:00');
+  assert.equal(completed.status, 200, JSON.stringify(completed.body));
+  assert.equal(completed.body.case.status, 'completed');
+  assert.equal(completed.body.case.completedDate, null);
+  assert.equal(completed.body.case.completedStartTime, null);
+  assert.equal(completed.body.case.completedEndTime, null);
+  assert.equal(completed.body.case.completedStaffId, 'teacher-a');
+  assert.equal(completed.body.case.history.at(-1).timeUnrecorded, true);
+  assert.equal(db.database.prepare(
+    "SELECT count(*) AS n FROM tasks WHERE id=?"
+  ).get('makeup_lesson_' + created.body.case.caseId).n, 0);
+  assert.equal(db.database.prepare(
+    "SELECT count(*) AS n FROM checks WHERE k LIKE ?"
+  ).get('makeup_lesson_' + created.body.case.caseId + '|%').n, 0);
+});
+
+test('list bulk-loads source and generated lessons in bounded chunks', async () => {
+  const db = new TestD1(); seed(db);
+  for (let index = 0; index < 161; index++) {
+    const taskId = 'bulk-' + index;
+    const start = new Date(Date.UTC(2026, 0, 6 + index * 7)).toISOString().slice(0, 10);
+    insertTask(db, lesson(taskId, 'student-a', 'teacher-a', [2], '18:00', '19:00', {
+      repeat: 'once', start,
+      scheduleSlots: [{ days: [2], startTime: '18:00', endTime: '19:00', validFrom: start }]
+    }));
+    const digest = await sha256('task\n' + taskId + '\n' + start);
+    db.prepare('INSERT INTO makeup_cases(app,case_id,student_id,source_task_id,source_date,source_teacher_id,' +
+      'consumption_group_id,status,revision,notification_needed,notification_event_revision,history,created_at,updated_at) ' +
+      "VALUES(?,?,?,?,?,?,?,'review_pending',1,0,0,'[]',1,1)")
+      .bind('task', 'mu_' + digest.slice(0, 48), 'student-a', taskId, start, 'teacher-a',
+        'mc_' + digest.slice(0, 48)).run();
+  }
+  db.taskBulkReads = 0;
+  const listed = await call(db, all, { action: 'list', limit: 200 });
+  assert.equal(listed.status, 200);
+  assert.equal(listed.body.cases.length, 161);
+  assert.equal(db.taskBulkReads, 6);
 });
 
 test('latest parent response is visible and a same-revision decline blocks confirmation', async () => {
@@ -366,6 +2348,7 @@ test('complete atomically appends a delta-one active-pack usage and a retry cann
   const db = new TestD1(); seed(db); await insertPack(db);
   const reviewed = await createAndReview(db);
   const confirmed = await proposeAndConfirm(db, reviewed);
+  makeupAttendance(db, confirmed.caseId, 'teacher-b', '2026-08-12');
   const completed = await callAt(db, manager('teacher-b'), { action: 'complete', caseId: confirmed.caseId,
     revision: confirmed.revision }, '2026-08-12T20:55:00+09:00');
   assert.equal(completed.status, 200);
@@ -401,6 +2384,7 @@ test('complete appends delta zero when the original absence already consumed the
   const reviewed = await createAndReview(db);
   insertUsage(db, 'pack-a', 1, 'lesson-a|2026-08-10', '2026-08-10', 1, reviewed.consumptionGroupId);
   const confirmed = await proposeAndConfirm(db, reviewed);
+  makeupAttendance(db, confirmed.caseId, 'teacher-b', '2026-08-12', 'L');
   const completed = await callAt(db, own('teacher-b'), { action: 'complete', caseId: confirmed.caseId,
     revision: confirmed.revision }, '2026-08-12T20:55:00+09:00');
   assert.equal(completed.status, 200);
@@ -420,6 +2404,7 @@ test('complete preserves the makeup but skips automatic usage when the active pa
     const db = new TestD1(); seed(db); await insertPack(db);
     const reviewed = await createAndReview(db);
     const confirmed = await proposeAndConfirm(db, reviewed);
+    makeupAttendance(db, confirmed.caseId, 'teacher-b', '2026-08-12', 'E');
     if (mismatch === 'assignment_key') {
       const row = db.database.prepare("SELECT data FROM tasks WHERE app='task' AND id='lesson-a'").get();
       const task = JSON.parse(row.data);
@@ -446,11 +2431,12 @@ test('complete preserves the makeup but skips automatic usage when the active pa
   }
 });
 
-test('transaction-time assignment or task teacher identity races complete without charging the stale pack', async () => {
+test('transaction-time source assignment or teacher races block completion without charging the stale pack', async () => {
   for (const race of ['assignment_key', 'task_teacher_transfer']) {
     const db = new TestD1(); seed(db); await insertPack(db);
     const reviewed = await createAndReview(db);
     const confirmed = await proposeAndConfirm(db, reviewed);
+    makeupAttendance(db, confirmed.caseId, 'teacher-b', '2026-08-12');
     db.beforeBatch = () => {
       if (race === 'assignment_key') {
         const row = db.database.prepare("SELECT data FROM tasks WHERE app='task' AND id='lesson-a'").get();
@@ -468,18 +2454,9 @@ test('transaction-time assignment or task teacher identity races complete withou
 
     const completed = await callAt(db, manager('teacher-b'), { action: 'complete', caseId: confirmed.caseId,
       revision: confirmed.revision }, '2026-08-12T20:55:00+09:00');
-    assert.equal(completed.status, 200, race);
-    assert.equal(completed.body.case.status, 'completed', race);
-    assert.deepEqual(completed.body.sessionPackImpact,
-      { status: 'not_applicable', reason: 'pack_identity_mismatch', refreshNeeded: false }, race);
-    assert.deepEqual(completed.body.case.history.at(-1).sessionPackImpact,
-      { status: 'not_applicable', reason: 'pack_identity_mismatch', refreshNeeded: false }, race);
-    const storedHistory = JSON.parse(db.database.prepare(
-      "SELECT history FROM makeup_cases WHERE app='task' AND case_id=?"
-    ).get(confirmed.caseId).history);
-    assert.deepEqual(storedHistory.at(-1).sessionPackImpact,
-      { status: 'not_applicable', reason: 'pack_identity_mismatch', refreshNeeded: false }, race);
-    assert.equal(JSON.stringify(completed.body).includes('"status":"recorded"'), false, race);
+    assert.equal(completed.status, 409, race);
+    assert.equal(db.database.prepare("SELECT status FROM makeup_cases WHERE case_id=?").get(confirmed.caseId).status,
+      'confirmed', race);
     assert.equal(db.database.prepare("SELECT count(*) AS n FROM session_pack_usage WHERE pack_id='pack-a'").get().n,
       0, race);
     assert.equal(db.database.prepare("SELECT revision FROM session_packs WHERE pack_id='pack-a'").get().revision,
@@ -492,6 +2469,7 @@ test('makeup CAS, pack revision, and balance failures roll back both complete an
     const db = new TestD1(); seed(db); await insertPack(db, { totalSessions: 1 });
     const reviewed = await createAndReview(db);
     const confirmed = await proposeAndConfirm(db, reviewed);
+    makeupAttendance(db, confirmed.caseId, 'teacher-b', '2026-08-12');
     if (failure === 'makeup_revision') {
       db.beforeBatch = () => db.prepare(
         "UPDATE makeup_cases SET revision=revision+1,updated_at=updated_at+1 WHERE app='task' AND case_id=?"
@@ -521,6 +2499,7 @@ test('active pack outside the source date is explicitly not applicable', async (
   await insertPack(db, { validFrom: '2026-08-11', expiresOn: '2026-08-31' });
   const reviewed = await createAndReview(db);
   const confirmed = await proposeAndConfirm(db, reviewed);
+  makeupAttendance(db, confirmed.caseId, 'teacher-b', '2026-08-12');
   const completed = await callAt(db, own('teacher-b'), { action: 'complete', caseId: confirmed.caseId,
     revision: confirmed.revision }, '2026-08-12T20:55:00+09:00');
   assert.equal(completed.status, 200);
@@ -542,10 +2521,9 @@ test('confirm maps a database-time parent decline race to PARENT_DECLINED', asyn
   assert.equal(result.body.code, 'PARENT_DECLINED');
 });
 
-test('proposal validates KST date/time, active roster/staff, and regular student/teacher conflicts', async () => {
+test('proposal validates KST date/time, active roster/staff, and regular student conflicts', async () => {
   const db = new TestD1(); seed(db);
   insertTask(db, lesson('student-conflict', 'student-a', 'teacher-a', [3], '16:00', '17:00'));
-  insertTask(db, lesson('teacher-conflict', 'student-b', 'teacher-b', [3], '18:00', '19:00'));
   const reviewed = await createAndReview(db);
   const invalidIso = await call(db, all, { action: 'propose', caseId: reviewed.caseId, revision: reviewed.revision,
     date: '2026-02-30', startTime: '16:30', endTime: '17:30', staffId: 'teacher-b' });
@@ -554,10 +2532,6 @@ test('proposal validates KST date/time, active roster/staff, and regular student
     date: '2026-08-12', startTime: '16:30', endTime: '17:30', staffId: 'teacher-b' });
   assert.equal(studentConflict.status, 409);
   assert.equal(studentConflict.body.code, 'STUDENT_SCHEDULE_CONFLICT');
-  const staffConflict = await call(db, all, { action: 'propose', caseId: reviewed.caseId, revision: reviewed.revision,
-    date: '2026-08-12', startTime: '18:30', endTime: '19:30', staffId: 'teacher-b' });
-  assert.equal(staffConflict.status, 409);
-  assert.equal(staffConflict.body.code, 'STAFF_SCHEDULE_CONFLICT');
   const inactiveStaff = await call(db, all, { action: 'propose', caseId: reviewed.caseId, revision: reviewed.revision,
     date: '2026-08-12', startTime: '20:00', endTime: '21:00', staffId: 'teacher-inactive' });
   assert.equal(inactiveStaff.status, 409);
@@ -571,7 +2545,7 @@ test('proposal validates KST date/time, active roster/staff, and regular student
   assert.equal(inactiveStudent.body.code, 'STUDENT_INACTIVE');
 });
 
-test('confirmed makeup conflicts are rechecked and cancel needs a reason', async () => {
+test('confirmed makeup allows one teacher to overlap students but still blocks one student overlap', async () => {
   const db = new TestD1(); seed(db);
   const caseB = await createAndReview(db, 'lesson-b', '2026-08-11', own('teacher-b'));
   const proposedB = await call(db, all, { action: 'propose', caseId: caseB.caseId, revision: caseB.revision,
@@ -579,25 +2553,40 @@ test('confirmed makeup conflicts are rechecked and cancel needs a reason', async
   const confirmedB = await call(db, all, { action: 'confirm', caseId: caseB.caseId, revision: proposedB.body.case.revision });
   assert.equal(confirmedB.status, 200);
   const caseA = await createAndReview(db);
-  const conflict = await call(db, all, { action: 'propose', caseId: caseA.caseId, revision: caseA.revision,
+  const allowed = await call(db, all, { action: 'propose', caseId: caseA.caseId, revision: caseA.revision,
     date: '2026-08-12', startTime: '20:30', endTime: '21:30', staffId: 'teacher-b' });
-  assert.equal(conflict.status, 409);
-  assert.equal(conflict.body.code, 'STAFF_MAKEUP_CONFLICT');
-  const noReason = await call(db, all, { action: 'cancel', caseId: caseA.caseId, revision: caseA.revision, reason: '' });
+  assert.equal(allowed.status, 200, JSON.stringify(allowed.body));
+  const confirmedA = await call(db, all, { action: 'confirm', caseId: caseA.caseId,
+    revision: allowed.body.case.revision });
+  assert.equal(confirmedA.status, 200, JSON.stringify(confirmedA.body));
+
+  insertTask(db, lesson('lesson-a-extra', 'student-a', 'teacher-a', [4], '18:00', '19:00'));
+  absence(db, 'lesson-a-extra', 'teacher-a', '2026-08-13');
+  const secondCaseA = await createAndReview(db, 'lesson-a-extra', '2026-08-13');
+  const studentConflict = await call(db, all, { action: 'propose', caseId: secondCaseA.caseId,
+    revision: secondCaseA.revision, date: '2026-08-12', startTime: '20:45', endTime: '21:15',
+    staffId: 'teacher-a' });
+  assert.equal(studentConflict.status, 409);
+  assert.equal(studentConflict.body.code, 'STUDENT_MAKEUP_CONFLICT');
+  const noReason = await call(db, all, { action: 'cancel', caseId: caseA.caseId,
+    revision: confirmedA.body.case.revision, reason: '' });
   assert.equal(noReason.status, 400);
   const sensitiveFreeText = await call(db, all, { action: 'cancel', caseId: caseA.caseId,
-    revision: caseA.revision, reason: '건강 관련 상세 사유' });
+    revision: confirmedA.body.case.revision, reason: '건강 관련 상세 사유' });
   assert.equal(sensitiveFreeText.status, 400);
   const coded = await call(db, all, { action: 'cancel', caseId: caseA.caseId,
-    revision: caseA.revision, reason: 'schedule_unavailable' });
+    revision: confirmedA.body.case.revision, reason: 'schedule_unavailable' });
   assert.equal(coded.status, 200);
 });
 
-test('database trigger closes the concurrent-confirmation race between different cases', async () => {
+test('database trigger allows one teacher overlap and closes the same-student confirmation race', async () => {
   const db = new TestD1(); seed(db);
   const caseA = await createAndReview(db);
   const caseB = await createAndReview(db, 'lesson-b', '2026-08-11', own('teacher-b'));
-  for (const item of [caseA, caseB]) {
+  insertTask(db, lesson('lesson-a-extra', 'student-a', 'teacher-a', [4], '18:00', '19:00'));
+  absence(db, 'lesson-a-extra', 'teacher-a', '2026-08-13');
+  const secondCaseA = await createAndReview(db, 'lesson-a-extra', '2026-08-13');
+  for (const item of [caseA, caseB, secondCaseA]) {
     const proposed = await call(db, all, { action: 'propose', caseId: item.caseId, revision: item.revision,
       date: '2026-08-12', startTime: '20:00', endTime: '21:00', staffId: 'teacher-b' });
     assert.equal(proposed.status, 200);
@@ -605,7 +2594,44 @@ test('database trigger closes the concurrent-confirmation race between different
   const sql = "UPDATE makeup_cases SET status='confirmed',confirmed_start_at=proposed_start_at," +
     "confirmed_end_at=proposed_end_at,confirmed_staff_id=proposed_staff_id WHERE app='task' AND case_id=?";
   db.prepare(sql).bind(caseA.caseId).run();
-  assert.throws(() => db.prepare(sql).bind(caseB.caseId).run(), /MAKEUP_TIME_CONFLICT/);
+  assert.doesNotThrow(() => db.prepare(sql).bind(caseB.caseId).run());
+  assert.throws(() => db.prepare(sql).bind(secondCaseA.caseId).run(), /MAKEUP_TIME_CONFLICT/);
+});
+
+test('database trigger blocks a completion race into another completed same-student slot', async () => {
+  const db = new TestD1(); seed(db);
+  insertTask(db, lesson('lesson-a-extra', 'student-a', 'teacher-a', [4], '18:00', '19:00'));
+  absence(db, 'lesson-a-extra', 'teacher-a', '2026-08-13');
+  const first = await createAndReview(db);
+  const second = await createAndReview(db, 'lesson-a-extra', '2026-08-13');
+  const proposedFirst = await call(db, all, {
+    action: 'propose', caseId: first.caseId, revision: first.revision,
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00', staffId: 'teacher-a'
+  });
+  const proposedSecond = await call(db, all, {
+    action: 'propose', caseId: second.caseId, revision: second.revision,
+    date: '2026-08-12', startTime: '22:00', endTime: '23:00', staffId: 'teacher-a'
+  });
+  assert.equal(proposedFirst.status, 200);
+  assert.equal(proposedSecond.status, 200);
+  const confirmSql = "UPDATE makeup_cases SET status='confirmed',confirmed_start_at=proposed_start_at," +
+    "confirmed_end_at=proposed_end_at,confirmed_staff_id=proposed_staff_id WHERE app='task' AND case_id=?";
+  db.prepare(confirmSql).bind(first.caseId).run();
+  db.prepare("UPDATE makeup_cases SET status='completed',completed_at=1,completed_by='teacher-a' " +
+    "WHERE app='task' AND case_id=?").bind(first.caseId).run();
+  db.prepare(confirmSql).bind(second.caseId).run();
+
+  assert.throws(() => db.prepare(
+    "UPDATE makeup_cases SET status='completed',confirmed_start_at='2026-08-12T20:30:00+09:00'," +
+    "confirmed_end_at='2026-08-12T21:30:00+09:00',completed_at=2,completed_by='teacher-a' " +
+    "WHERE app='task' AND case_id=?"
+  ).bind(second.caseId).run(), /MAKEUP_TIME_CONFLICT/);
+  const unchanged = db.database.prepare(
+    'SELECT status,confirmed_start_at,completed_at FROM makeup_cases WHERE case_id=?'
+  ).get(second.caseId);
+  assert.equal(unchanged.status, 'confirmed');
+  assert.equal(unchanged.confirmed_start_at, '2026-08-12T22:00:00+09:00');
+  assert.equal(unchanged.completed_at, null);
 });
 
 test('unknown and PII-shaped fields are rejected and never stored', async () => {

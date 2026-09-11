@@ -11,6 +11,7 @@ const migration = fs.readFileSync(new URL('./migrations/010_feedback_requests.sq
 const migration017 = fs.readFileSync(new URL('./migrations/017_feedback_structured_fields.sql', import.meta.url), 'utf8');
 const migration021 = fs.readFileSync(new URL('./migrations/021_parent_feedback_student_ids.sql', import.meta.url), 'utf8');
 const migration051 = fs.readFileSync(new URL('./migrations/051_feedback_template_v2.sql', import.meta.url), 'utf8');
+const migration067 = fs.readFileSync(new URL('./migrations/067_feedback_template_v3.sql', import.meta.url), 'utf8');
 
 class D1Statement {
   constructor(database, sql) { this.database = database; this.sql = sql; this.args = []; }
@@ -49,7 +50,10 @@ function seedTask(db, id, owner, overrides = {}) {
   const data = {
     id, staffId: owner, taskKind: 'lesson_instruction', lessonFormVersion: 2,
     title: '[정규] 테스트학생(중2) — 국어 독해',
-    studentId: 'student-test', studentName: '테스트학생', deleted: false, ...overrides
+    studentId: 'student-test', studentName: '테스트학생', deleted: false,
+    repeat: 'days', days: [1], start: '2026-01-01', end: '', scheduleStatus: 'confirmed',
+    scheduleSlots: [{ days: [1], startTime: '10:00', endTime: '11:00' }],
+    ...overrides
   };
   db.prepare('INSERT INTO tasks (app,id,owner,data,updated_at,srv_at) VALUES (?,?,?,?,?,?)')
     .bind('task', id, owner, JSON.stringify(data), now, now).run();
@@ -82,6 +86,9 @@ test('schema and migrations are additive and restrict states', () => {
     assert.match(migration051, new RegExp('ALTER TABLE feedback_requests ADD COLUMN ' + column));
     assert.match(schema, new RegExp(column + '\\s+TEXT'));
   }
+  assert.doesNotMatch(migration067, /DROP TABLE|DELETE FROM|UPDATE feedback_requests/i);
+  assert.match(migration067, /ALTER TABLE feedback_requests ADD COLUMN notice_text/);
+  assert.match(schema, /notice_text\s+TEXT/);
 });
 
 test('v2 submission accepts only the exact fixed template and stores its structured variables', async () => {
@@ -95,11 +102,11 @@ test('v2 submission accepts only the exact fixed template and stores its structu
     contentText: '비문학 지문의 중심 내용 찾기', homeworkText: '어휘 10개 복습',
     commentText: '근거를 찾아 자신의 생각을 설명하는 태도가 인상적이었습니다.', plusText: '', minusText: ''
   };
-  const message = '안녕하세요, WB 웩슬러브레인센터(독해력학원) 입니다.\n' +
-    '테스트학생 학생의 오늘 수업 피드백을 정리해 보내드립니다.\n' +
-    '- 일시 : 2026년 8월 27일\n- 과목 : 국어\n' +
-    '- 수업내용 · 진도 : ' + structured.contentText + '\n' +
-    '- 과제 : ' + structured.homeworkText + '\n- 코멘트 : ' + structured.commentText + '\n\n' +
+  const message = '안녕하세요, WB 웩슬러브레인센터(독해력학원) 입니다.\n\n' +
+    '테스트학생 학생의 오늘 수업 피드백을 정리해 보내드립니다.\n\n' +
+    '- 일시 : 2026년 8월 27일\n\n- 과목 : 국어\n\n' +
+    '- 수업내용 · 진도 : ' + structured.contentText + '\n\n' +
+    '- 과제 : ' + structured.homeworkText + '\n\n- 코멘트 : ' + structured.commentText + '\n\n' +
     '문의 사항이 있으시면 학원으로 연락부탁드립니다. 감사합니다.';
   const auth = person('teacher-a', 'token-a');
   let result = await call(db, '/feedback-request', { auth, ...identityV2, message, ...structured });
@@ -114,6 +121,198 @@ test('v2 submission accepts only the exact fixed template and stores its structu
   });
   assert.equal(result.status, 409);
   assert.equal(result.body.code, 'FEEDBACK_TEMPLATE_MISMATCH');
+
+  result = await call(db, '/feedback-request', {
+    auth, ...identityV2,
+    message: message.replace('입니다.\n\n테스트학생', '입니다.\n테스트학생'),
+    ...structured
+  });
+  assert.equal(result.status, 409);
+  assert.equal(result.body.code, 'FEEDBACK_TEMPLATE_MISMATCH', '승인 템플릿의 빈 줄 하나가 빠져도 거부해야 한다');
+});
+
+test('a linked makeup and its regular lesson share one feedback request', async () => {
+  const db = new TestD1();
+  seedStaff(db, 'teacher-a', '김남기'); seedToken(db, 'token-a', 'teacher-a');
+  seedTask(db, 'task-a', 'teacher-a', { subject: '수학' });
+  seedTask(db, 'makeup-task', 'teacher-a', {
+    subject: '수학', lessonInstanceType: 'makeup', makeupSourceTaskId: 'task-a',
+    title: '[수업] 테스트학생(중2) — 수학 독해'
+  });
+  const auth = person('teacher-a', 'token-a');
+  const identityV2 = {
+    feedbackDate: '2026-09-10', feedbackType: 'class_feedback', templateVersion: 'v2'
+  };
+  const structured = {
+    subjectText: '수학', contentText: '같은 교재의 오답 풀이', homeworkText: '교재 12쪽 복습',
+    commentText: '풀이 과정을 차분하게 정리했습니다.', plusText: '', minusText: ''
+  };
+  const message = '안녕하세요, WB 웩슬러브레인센터(독해력학원) 입니다.\n\n' +
+    '테스트학생 학생의 오늘 수업 피드백을 정리해 보내드립니다.\n\n' +
+    '- 일시 : 2026년 9월 10일\n\n- 과목 : 수학\n\n' +
+    '- 수업내용 · 진도 : ' + structured.contentText + '\n\n' +
+    '- 과제 : ' + structured.homeworkText + '\n\n- 코멘트 : ' + structured.commentText + '\n\n' +
+    '문의 사항이 있으시면 학원으로 연락부탁드립니다. 감사합니다.';
+
+  const makeupResult = await call(db, '/feedback-request', {
+    auth, taskId: 'makeup-task', ...identityV2, message, ...structured
+  });
+  assert.equal(makeupResult.status, 200, JSON.stringify(makeupResult.body));
+  assert.equal(makeupResult.body.request.taskId, 'task-a');
+
+  const regularResult = await call(db, '/feedback-request', {
+    auth, taskId: 'task-a', ...identityV2, message, ...structured
+  });
+  assert.equal(regularResult.status, 200, JSON.stringify(regularResult.body));
+  assert.equal(regularResult.body.idempotent, true);
+  assert.equal(regularResult.body.request.requestKey, makeupResult.body.request.requestKey);
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM feedback_requests WHERE app='task'").first().count, 1);
+});
+
+test('v2 submission uses an optional client subject and only legacy requests fall back to the task subject', async () => {
+  const db = new TestD1();
+  seedStaff(db, 'teacher-a', '김남기'); seedToken(db, 'token-a', 'teacher-a');
+  seedTask(db, 'task-v2-custom', 'teacher-a', { subject: '국어' });
+  const identityV2 = {
+    taskId: 'task-v2-custom', feedbackDate: '2026-08-28',
+    feedbackType: 'class_feedback', templateVersion: 'v2'
+  };
+  const auth = person('teacher-a', 'token-a');
+  const structured = {
+    subjectText: '국어 독해 · 비문학', contentText: '비문학 지문의 중심 내용 찾기',
+    homeworkText: '어휘 10개 복습', commentText: '근거를 찾아 차분하게 설명했습니다.',
+    plusText: '', minusText: ''
+  };
+  const message = '안녕하세요, WB 웩슬러브레인센터(독해력학원) 입니다.\n\n' +
+    '테스트학생 학생의 오늘 수업 피드백을 정리해 보내드립니다.\n\n' +
+    '- 일시 : 2026년 8월 28일\n\n- 과목 : ' + structured.subjectText + '\n\n' +
+    '- 수업내용 · 진도 : ' + structured.contentText + '\n\n' +
+    '- 과제 : ' + structured.homeworkText + '\n\n- 코멘트 : ' + structured.commentText + '\n\n' +
+    '문의 사항이 있으시면 학원으로 연락부탁드립니다. 감사합니다.';
+  let result = await call(db, '/feedback-request', { auth, ...identityV2, message, ...structured });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.request.subjectText, structured.subjectText);
+  assert.equal(db.prepare('SELECT subject_text FROM feedback_requests WHERE request_key=?')
+    .bind(result.body.request.requestKey).first().subject_text, structured.subjectText);
+
+  result = await call(db, '/feedback-request', {
+    auth, ...identityV2, message, ...structured, subjectText: ''
+  });
+  assert.equal(result.status, 400, '명시적으로 빈 과목은 수업 과목으로 조용히 대체하면 안 된다');
+
+  result = await call(db, '/feedback-request', {
+    auth, ...identityV2, message, ...structured, subjectText: '과'.repeat(81)
+  });
+  assert.equal(result.status, 413);
+});
+
+test('v3 submission preserves the approved blank lines and stores all seven template variables', async () => {
+  const db = new TestD1();
+  seedStaff(db, 'teacher-a', '김남기'); seedToken(db, 'token-a', 'teacher-a');
+  seedTask(db, 'task-v3', 'teacher-a', { subject: '국어' });
+  const identityV3 = {
+    taskId: 'task-v3', feedbackDate: '2026-09-07', feedbackType: 'class_feedback', templateVersion: 'v3'
+  };
+  const structured = {
+    subjectText: '국어', contentText: '비문학 지문의 중심 내용 찾기', homeworkText: '어휘 10개 복습',
+    commentText: '근거를 찾아 차분하게 설명했습니다.', noticeText: '다음 수업에 교재를 준비해 주세요.',
+    plusText: '', minusText: ''
+  };
+  const message = '안녕하세요, WB 웩슬러브레인센터(독해력학원) 입니다.\n\n' +
+    '테스트학생 학생의 오늘 수업 피드백을 정리해 보내드립니다.\n\n' +
+    '- 일시 : 2026년 9월 7일\n\n- 과목 : ' + structured.subjectText + '\n\n' +
+    '- 수업내용 · 진도 : ' + structured.contentText + '\n\n' +
+    '- 과제 : ' + structured.homeworkText + '\n\n- 코멘트 : ' + structured.commentText + '\n\n' +
+    '- 안내사항 : ' + structured.noticeText + '\n\n\n' +
+    '문의 사항이 있으시면 학원으로 연락부탁드립니다. 감사합니다.';
+  const auth = person('teacher-a', 'token-a');
+  let result = await call(db, '/feedback-request', { auth, ...identityV3, message, ...structured });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.request.templateVersion, 'v3');
+  assert.equal(result.body.request.noticeText, structured.noticeText);
+  const stored = db.prepare('SELECT notice_text FROM feedback_requests WHERE request_key=?')
+    .bind(result.body.request.requestKey).first();
+  assert.equal(stored.notice_text, structured.noticeText);
+
+  result = await call(db, '/feedback-request', {
+    auth, ...identityV3, message: message.replace('\n\n\n문의', '\n\n문의'), ...structured
+  });
+  assert.equal(result.status, 409);
+  assert.equal(result.body.code, 'FEEDBACK_TEMPLATE_MISMATCH', '안내사항 뒤 빈 줄 두 개도 검수 본문의 일부다');
+});
+
+test('v3 comment and exact preview remove format controls consistently before storage and hashing', async () => {
+  const db = new TestD1();
+  seedStaff(db, 'teacher-a', '김남기'); seedToken(db, 'token-a', 'teacher-a');
+  seedTask(db, 'task-v3-format', 'teacher-a', { subject: '국어' });
+  const rawComment = '근\u00AD거를 찾아 차\u200B분하게 설명했습니다.';
+  const cleanComment = '근거를 찾아 차분하게 설명했습니다.';
+  const noticeText = '다음 수업에 교재를 준비해 주세요.';
+  const message = '안녕하세요, WB 웩슬러브레인센터(독해력학원) 입니다.\n\n' +
+    '테스트학생 학생의 오늘 수업 피드백을 정리해 보내드립니다.\n\n' +
+    '- 일시 : 2026년 9월 11일\n\n- 과목 : 국어\n\n' +
+    '- 수업내용 · 진도 : 지문 풀이\n\n- 과제 : 복습\n\n' +
+    '- 코멘트 : ' + rawComment + '\n\n- 안내사항 : ' + noticeText + '\n\n\n' +
+    '문의 사항이 있으시면 학원으로 연락부탁드립니다. 감사합니다.';
+  const request = {
+    auth: person('teacher-a', 'token-a'), taskId: 'task-v3-format', feedbackDate: '2026-09-11',
+    feedbackType: 'class_feedback', templateVersion: 'v3', subjectText: '국어', contentText: '지문 풀이',
+    homeworkText: '복습', commentText: rawComment, noticeText, plusText: '', minusText: ''
+  };
+  let result = await call(db, '/feedback-request', { ...request, message });
+  assert.equal(result.status, 200, JSON.stringify(result.body));
+  assert.equal(result.body.request.commentText, cleanComment);
+  assert.ok(!/[\u00ad\u200b]/i.test(result.body.request.message));
+  const stored = db.prepare('SELECT body,comment_text FROM feedback_requests WHERE request_key=?')
+    .bind(result.body.request.requestKey).first();
+  assert.equal(stored.comment_text, cleanComment);
+  assert.ok(!/[\u00ad\u200b]/i.test(stored.body));
+
+  result = await call(db, '/feedback-request', {
+    ...request, feedbackDate: '2026-09-12',
+    message: message.replace('2026년 9월 11일', '2026년 9월 12일').replace('차\u200B분하게', '다르게')
+  });
+  assert.equal(result.status, 409);
+  assert.equal(result.body.code, 'FEEDBACK_TEMPLATE_MISMATCH');
+});
+
+test('v3 requires noticeText, v2 rejects non-empty noticeText, and unknown template versions fail closed', async () => {
+  const db = new TestD1();
+  seedStaff(db, 'teacher-a', '김남기'); seedToken(db, 'token-a', 'teacher-a');
+  seedTask(db, 'task-template-policy', 'teacher-a', { subject: '국어' });
+  const auth = person('teacher-a', 'token-a');
+  const structured = {
+    subjectText: '국어', contentText: '지문 풀이', homeworkText: '복습', commentText: '잘 참여했습니다.',
+    plusText: '', minusText: ''
+  };
+  let result = await call(db, '/feedback-request', {
+    auth, taskId: 'task-template-policy', feedbackDate: '2026-09-07', feedbackType: 'class_feedback',
+    templateVersion: 'v3', message: '임의 문구', ...structured, noticeText: ''
+  });
+  assert.equal(result.status, 400);
+  assert.match(result.body.error, /안내사항/);
+
+  result = await call(db, '/feedback-request', {
+    auth, taskId: 'task-template-policy', feedbackDate: '2026-09-10', feedbackType: 'class_feedback',
+    templateVersion: 'v3', message: '임의 문구', ...structured,
+    noticeText: '\u00AD\u061C\u180E\u200B\u200F\u202A\u202E\u2060\u2066\u2069\uFEFF'
+  });
+  assert.equal(result.status, 400);
+  assert.match(result.body.error, /안내사항/, '보이지 않는 Unicode 제어문자만으로 안내사항을 채울 수 없다');
+
+  result = await call(db, '/feedback-request', {
+    auth, taskId: 'task-template-policy', feedbackDate: '2026-09-08', feedbackType: 'class_feedback',
+    templateVersion: 'v2', message: '임의 문구', ...structured, noticeText: '준비물 안내'
+  });
+  assert.equal(result.status, 409);
+  assert.equal(result.body.code, 'FEEDBACK_TEMPLATE_NOTICE_VERSION_MISMATCH');
+
+  result = await call(db, '/feedback-request', {
+    auth, taskId: 'task-template-policy', feedbackDate: '2026-09-09', feedbackType: 'class_feedback',
+    templateVersion: 'v4', message: '임의 문구', ...structured
+  });
+  assert.equal(result.status, 400);
+  assert.match(result.body.error, /templateVersion/);
 });
 
 test('feedback submission delegates all real sending to the dedicated send module', () => {
@@ -314,7 +513,9 @@ test('teacher list is own-scope and exposes review status and note', async () =>
   seedStaff(db, 'teacher-a', '김남기'); seedToken(db, 'token-a', 'teacher-a');
   seedStaff(db, 'teacher-b', '박선생'); seedToken(db, 'token-b', 'teacher-b');
   seedTask(db, 'task-a', 'teacher-a');
-  seedTask(db, 'task-b', 'teacher-b');
+  seedTask(db, 'task-b', 'teacher-b', {
+    days: [2], scheduleSlots: [{ days: [2], startTime: '10:00', endTime: '11:00' }]
+  });
 
   let own = await call(db, '/feedback-request', { auth: person('teacher-a', 'token-a'), ...identity, message: 'teacher a feedback', ...fields() });
   const ownKey = own.body.request.requestKey;

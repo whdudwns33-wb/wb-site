@@ -9,11 +9,34 @@ let passed = 0;
 function t(name, fn) { fn(); passed += 1; console.log('  ✓ ' + name); }
 
 /* ── 단어 데이터 ── */
-t('단어 135개 — 어종별 45개씩 균형', () => {
-  assert.strictEqual(WB_WORDS.length, 135);
+t('단어 207개 — 어종별 69개씩 균형', () => {
+  assert.strictEqual(WB_WORDS.length, 207);
   const by = { hanja: 0, native: 0, english: 0 };
   WB_WORDS.forEach((w) => { by[w.type] += 1; });
-  assert.deepStrictEqual(by, { hanja: 45, native: 45, english: 45 });
+  assert.deepStrictEqual(by, { hanja: 69, native: 69, english: 69 });
+});
+
+/* 초2 학생이 "영어 단어가 너무 어렵다"고 한 뒤에 붙인 눈금이다.
+   예전 135개는 전부 중등 이상이라, 학년으로 걸러 봐야 초저학년 몫이 0개였다.
+   L1 이 비면 그 상태로 되돌아간다 — 여기서 막는다. */
+t('낱말마다 학년대가 있고, 저학년도 어종마다 쓸 만큼 있다', () => {
+  const LV = ['L1', 'L2', 'L3', 'L4'];
+  WB_WORDS.forEach((w) => assert.ok(LV.includes(w.level), w.id + ' 학년대 없음/이상: ' + w.level));
+  const n = (lv, ty) => WB_WORDS.filter((w) => w.level === lv && w.type === ty).length;
+  ['hanja', 'native', 'english'].forEach((ty) => {
+    assert.ok(n('L1', ty) >= 10, `L1 ${ty} 가 ${n('L1', ty)}개뿐 — 초저학년이 심을 게 없다`);
+    /* 앱은 «내 단계 이하»를 다 준다. 초3~6 이 실제로 고를 수 있는 총량을 본다 */
+    const upToL2 = n('L1', ty) + n('L2', ty);
+    assert.ok(upToL2 >= 20, `L2 까지 ${ty} 가 ${upToL2}개뿐 — 초등 고학년이 고를 게 없다`);
+  });
+});
+
+t('저학년 영어에 중등 학술 동사가 섞이지 않았다', () => {
+  /* 이게 정확히 초2 학생이 만난 문제다 */
+  const HARD = ['persuade', 'obvious', 'accurate', 'analyze', 'obtain', 'estimate',
+    'recognize', 'insist', 'conclude', 'complex', 'attempt', 'examine'];
+  WB_WORDS.filter((w) => w.type === 'english' && (w.level === 'L1' || w.level === 'L2'))
+    .forEach((w) => assert.ok(!HARD.includes(w.word), `${w.word} 가 ${w.level} 에 있다 — 초등에게 너무 어렵다`));
 });
 
 t('id 중복 없음, 공통 필드 존재', () => {

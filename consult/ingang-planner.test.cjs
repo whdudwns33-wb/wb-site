@@ -450,7 +450,7 @@ test('weekly lecture schedule uses the seven-day time-axis calendar with a mobil
 
 test('lecture tab keeps the time calendar visible while course management stays separate', () => {
   const helpers = between('function ingCourseStatusLabel(', '\n\nfunction ingAttentionCard(');
-  const view = between('function viewIngang()', '\nfunction ingAddModal()');
+  const view = between('function viewIngang()', '\nfunction ingAddModal(');
   const detail = between('function ingCourseDetailHtml(', '\n\nfunction ingCourseCardHtml(');
   const api = Function(helpers + '\nreturn { ingCourseStatusLabel, ingCourseFilterMatch };')();
   const active = { completed:false, paused:false, overdue:0, stalled:false, status:'active', attention:0 };
@@ -589,7 +589,7 @@ test('five official course sites have safe direct links and smart-paste fallback
   assert.equal(matches('엘리하이', 'https://mjr.mbest.co.kr/course/1'), true);
   assert.equal(matches('엘리하이', 'https://junior.mbest.co.kr/course/1'), true);
   assert.equal(matches('기타', 'https://example.com/course/1'), true);
-  const modal = between('function ingAddModal()', '\nfunction ingShowParsePreview(');
+  const modal = between('function ingAddModal(', '\nfunction ingShowParsePreview(');
   assert.match(modal, /target="_blank" rel="noopener noreferrer"/);
   assert.match(modal, /사이트 열기 → 로그인 → 강좌 상세의 강의목차 전체 복사/);
   assert.match(modal, /id="ingImages" type="file" accept="image\/\*" multiple/);
@@ -649,7 +649,7 @@ test('director-only lecture mutations are guarded and student checks stay self-s
 
 test('lecture courses persist a study subject for planner colors while legacy names are inferred', () => {
   const helpers = between('function ingCourseSubjectKey(', '\nfunction ingCourseItems(');
-  const addModal = between('function ingAddModal()', '\n\nlet ingPasteSeq');
+  const addModal = between('function ingAddModal(', '\n\nlet ingPasteSeq');
   const assignModal = between('function ingAssignModal(', '\n\nfunction ingScheduleFromForm(');
   const save = between("case 'ingsave':", "case 'ingdel':");
   const apply = between("case 'ingdo':", "case 'ingcatchup':");

@@ -121,6 +121,24 @@ test('selective mode exposes the allowlist and accepts consent only for an exact
   assert.equal(denied.body.code, 'GUARDIAN_DELIVERY_NOT_ALLOWED');
 });
 
+test('feedback-only all-students gate permits consent without enabling the shared guardian gate', async () => {
+  const db = new TestD1(); seedStaff(db);
+  const env = {
+    WB_GUARDIAN_CONTACT_ENABLED: 'false',
+    WB_GUARDIAN_CONTACT_STUDENT_IDS: '',
+    WB_PARENT_FEEDBACK_ALL_STUDENTS_ENABLED: 'true'
+  };
+  const saved = await call(db, {
+    auth: admin, action: 'set', studentId: 'student-test', phone: '01012345678', consent: true
+  }, env);
+  assert.equal(saved.status, 200);
+  assert.equal(saved.body.contact.consent, true);
+
+  const list = await call(db, { auth: admin, action: 'list' }, env);
+  assert.deepEqual(list.body.deliveryEnabledStudentIds, [],
+    '피드백 전용 gate가 기존 보호자 기능 allowlist로 노출되면 안 된다');
+});
+
 test('contact import atomically creates and reuses one Acaflow student-number link', async () => {
   const db = new TestD1(); seedStaff(db);
   const set = await call(db, {

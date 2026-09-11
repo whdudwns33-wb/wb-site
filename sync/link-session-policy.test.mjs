@@ -49,6 +49,12 @@ class TestD1 {
         updated_at INTEGER NOT NULL, srv_at INTEGER NOT NULL,
         PRIMARY KEY (app, k)
       );
+      CREATE TABLE task_revocations (
+        revocation_seq INTEGER PRIMARY KEY AUTOINCREMENT,
+        app TEXT NOT NULL, data_generation INTEGER NOT NULL,
+        task_id TEXT NOT NULL, former_owner TEXT NOT NULL, revoked_at INTEGER NOT NULL,
+        UNIQUE(app,data_generation,task_id,former_owner)
+      );
       CREATE TABLE tokens (
         app TEXT NOT NULL, token TEXT NOT NULL, staff_id TEXT NOT NULL,
         created_at INTEGER NOT NULL, revoked INTEGER NOT NULL DEFAULT 0,
@@ -400,6 +406,65 @@ test('exchange failures return stable machine-readable link codes', async () => 
   assert.equal(malformed.body.code, 'LINK_INVALID');
 });
 
+test('consult can exchange a bootstrap code without a staff id', async () => {
+  const db = new TestD1();
+  const now = Date.now();
+  db.database.prepare(
+    'INSERT INTO staff(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)'
+  ).run('consult', 'student-a', 'student-a', JSON.stringify({
+    id: 'student-a', name: '학생', deleted: false
+  }), now, now);
+  const issued = await postApp(db, 'consult', '/bootstrap', {
+    auth: { mode: 'admin', secret: 'consult-secret' }, staffId: 'student-a'
+  });
+
+  const connected = await postApp(db, 'consult', '/exchange', { code: issued.body.code });
+
+  assert.equal(connected.status, 200);
+  assert.equal(connected.body.staffId, 'student-a');
+  assert.equal((await postApp(db, 'consult', '/sync', {
+    auth: { mode: 'person', id: connected.body.staffId, token: connected.body.token },
+    since: now, changes: []
+  })).status, 200);
+});
+
+test('task still rejects an exchange without a staff id and leaves the code usable', async () => {
+  const db = new TestD1();
+  db.seedStaff();
+  const issued = await bootstrap(db);
+
+  const missingStaff = await post(db, '/exchange', { code: issued.body.code });
+
+  assert.equal(missingStaff.status, 400);
+  assert.equal(missingStaff.body.code, 'LINK_INVALID');
+  assert.equal((await exchange(db, issued.body.code)).status, 200);
+});
+
+test('code-only consult exchange keeps invalid and used link responses', async () => {
+  const db = new TestD1();
+  const now = Date.now();
+  db.database.prepare(
+    'INSERT INTO staff(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)'
+  ).run('consult', 'student-a', 'student-a', JSON.stringify({
+    id: 'student-a', name: '학생', deleted: false
+  }), now, now);
+
+  const unknown = await postApp(db, 'consult', '/exchange', { code: '4'.repeat(48) });
+  const malformed = await postApp(db, 'consult', '/exchange', { code: 'not-a-code' });
+  const issued = await postApp(db, 'consult', '/bootstrap', {
+    auth: { mode: 'admin', secret: 'consult-secret' }, staffId: 'student-a'
+  });
+  assert.equal((await postApp(db, 'consult', '/exchange', { code: issued.body.code })).status, 200);
+  const reused = await postApp(db, 'consult', '/exchange', { code: issued.body.code });
+
+  assert.equal(unknown.status, 410);
+  assert.equal(unknown.body.code, 'LINK_INVALID');
+  assert.equal(malformed.status, 400);
+  assert.equal(malformed.body.code, 'LINK_INVALID');
+  assert.equal(reused.status, 410);
+  assert.equal(reused.body.code, 'LINK_USED');
+});
+
 test('a deleted staff member cannot use an otherwise active bearer', async () => {
   const db = new TestD1();
   db.seedStaff();
@@ -439,6 +504,10 @@ test('consult admin can connect one new device with a ten-minute one-time link',
   assert.equal(issued.status, 200);
   assert.match(issued.body.code, /^[a-f0-9]{48}$/);
   assert.ok(issued.body.expiresAt <= Date.now() + 10 * 60 * 1000);
+
+  const codeOnly = await post(db, '/exchange', { app: 'consult', code: issued.body.code });
+  assert.equal(codeOnly.status, 410);
+  assert.equal(codeOnly.body.code, 'LINK_INVALID');
 
   const connected = await post(db, '/exchange', {
     app: 'consult', staffId: '__admin__', code: issued.body.code

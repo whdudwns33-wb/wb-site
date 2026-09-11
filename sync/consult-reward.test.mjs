@@ -502,7 +502,7 @@ test('D1 reward guard atomically blocks direct staff update/delete and releases 
   assert.equal(storedStaff(db), null);
 });
 
-test('strict payload, consult-only routing, and normal consult/task sync remain compatible', async () => {
+test('strict payload, consult-only routing, and authenticated task attendance routing remain compatible', async () => {
   const db = new TestD1();
   seedStudent(db);
   seedToken(db, 'student-token', STUDENT_ID);
@@ -532,12 +532,15 @@ test('strict payload, consult-only routing, and normal consult/task sync remain 
   const taskDb = new TestD1();
   seedStaff(taskDb, 'teacher-a', {}, 'task');
   seedToken(taskDb, 'teacher-token', 'teacher-a', 'task');
-  const taskKey = '__att__teacher-a|2026-09-01';
-  result = await post(taskDb, '/sync', {
-    auth: { mode: 'person', id: 'teacher-a', token: 'teacher-token' }, since: 0,
-    changes: [{ table: 'checks', k: taskKey, owner: 'teacher-a',
-      data: { taskId: '__att__teacher-a', date: '2026-09-01', done: true }, updated_at: Date.now() }]
+  result = await post(taskDb, '/staff-attendance', {
+    auth: { mode: 'person', id: 'teacher-a', token: 'teacher-token' }, action: 'clock_in'
   }, 'task');
   assert.equal(result.status, 200);
-  assert.equal(JSON.parse(checkRow(taskDb, taskKey, 'task').data).done, true);
+  assert.equal(result.body.owner, 'teacher-a');
+  assert.equal(JSON.parse(checkRow(taskDb, result.body.key, 'task').data).done, true);
+
+  const denied = await post(taskDb, '/staff-attendance', {
+    auth: { mode: 'person', id: 'teacher-a', token: 'wrong-token' }, action: 'clock_out'
+  }, 'task');
+  assert.equal(denied.status, 401);
 });

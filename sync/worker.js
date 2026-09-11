@@ -1,9 +1,13 @@
 import curriculumWorker from './curriculum-fix.js';
-import { handleScheduledBookOrders } from './book-order-send.js';
+import { guardWrappedStaffWorkRequest } from './worker-core.js';
+import { handleScheduledBookOrders, handleScheduledBookOrderStatusRefresh } from './book-order-send.js';
+import { handleScheduledParentFeedbackStatusRefresh } from './parent-feedback-send.js';
 import { handleScheduledSessionPackAttendance } from './session-pack.js';
 import { handleScheduledTuitionAlerts } from './tuition-alert.js';
+import { applyTestStaffNextDayAttendance } from './test-staff-attendance.js';
 
 const BOOK_ORDER_CRON = '0 11 * * *';
+const BOOK_ORDER_STATUS_CRON = '*/10 * * * *';
 const SESSION_PACK_ATTENDANCE_CRON = '50 14 * * *';
 
 export function cleanupCurriculum(text) {
@@ -22,6 +26,10 @@ export function cleanupCurriculum(text) {
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
+    if (url.pathname === '/search' || url.pathname === '/curriculum') {
+      const denied = await guardWrappedStaffWorkRequest(request, env);
+      if (denied) return denied;
+    }
     const response = await curriculumWorker.fetch(request, env, ctx);
     if (url.pathname !== '/curriculum' || request.method !== 'POST') return response;
 
@@ -36,6 +44,14 @@ export default {
   },
 
   async scheduled(controller, env, ctx) {
+    if (controller.cron === BOOK_ORDER_STATUS_CRON) {
+      ctx.waitUntil(Promise.all([
+        handleScheduledBookOrderStatusRefresh(env, controller.scheduledTime),
+        handleScheduledParentFeedbackStatusRefresh(env, controller.scheduledTime)
+      ]));
+      ctx.waitUntil(applyTestStaffNextDayAttendance(env, 'task', controller.scheduledTime));
+      return;
+    }
     if (controller.cron === SESSION_PACK_ATTENDANCE_CRON) {
       ctx.waitUntil(Promise.all([
         handleScheduledSessionPackAttendance(env, controller.scheduledTime),

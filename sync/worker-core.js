@@ -10,7 +10,8 @@
  *
  * 엔드포인트
  *   GET  /health
- *   POST /sync    { app, auth, since, changes[] } → { ok, now, changes[] }
+ *   POST /sync    { app, auth, since, changes[], capabilities?, taskRevocationCursor?, recoveryPull? }
+ *                 → { ok, now, changes[], taskRevocations?, recoveryPull? }
  *   POST /token     { app, auth(admin), staffId } → { ok, token }   구형 개인 링크 호환
  *   POST /bootstrap { app, auth(admin), staffId } → { ok, code }    1회용 링크 발급
  *   POST /exchange  { app, staffId, code }        → { ok, token }   1회 교환
@@ -21,6 +22,7 @@
  *   POST /lesson-create { app, auth, staffId?, lesson } → 수업 1건 등록·수정
  *   POST /lesson-create-batch { app, auth, batchKind, lessons } → 한 학생의 여러 수업 또는 같은 수업의 여러 학생 원자적 등록
  *   POST /contact-log { app, auth, sourceTaskId, type, note } → 담당 수업 학생 연락 기록
+ *   POST /staff-attendance { app, auth, action } → 본인 출근·퇴근을 서버 시각으로 최초 1회 기록
  *   POST /weekend-visit { app, auth, action, ... } → 토·일 실제 등·하원 기록
  *   POST /lesson-handoff { app, auth, dataGeneration, action, ... } → 당일 남은 수업 인계
  *   POST /feedback-request { app, auth, ... }     → 직원, 항목별 피드백 제출(제출 즉시 카카오 알림톡 자동 발송 시도)
@@ -45,6 +47,8 @@
  *   POST /session-pack { app, auth, action, ... }    → 지정 수업의 회차권·사용 원장
  *   POST /teacher-live-request { app, auth, action, ... } → 담당 선생님→모든 관리자 실시간 요청
  *   POST /tuition-alert { app, auth(admin), action, ... } → 학생 단위 4회제 3회 확정 알림
+ *   POST /student-attendance { app, auth, studentId, month? } → 담당 학생 출결 달력·현재 4회 진행
+ *   POST /student-next-lesson { app, auth, taskId, lessonDate } → 같은 학생의 해당 날짜 다음 수업 1건(최소 정보)
  *   POST /parent-portal { app, action, ... }         → 보호자 초대·공개 수업·정형 요청함
  *   POST /consult-guardian { app:'consult', action, ... } → 컨설팅 리포트 보호자 읽기·확인
  *   POST /consult-curriculum-image multipart(app:'consult', auth, files[]) → 강의 목차 사진 일시 인식
@@ -65,6 +69,7 @@ import { handleLessonCreate, handleLessonCreateBatch } from './lesson-create.js'
 import { handleLessonAssignmentRequest, handleLessonAssignmentReview } from './lesson-assignment-request.js';
 import { handleDirectorReportSend } from './director-report-send.js';
 import { handleLessonChangeRequest, handleLessonChangeReview } from './lesson-change-request.js';
+import { handleLessonStop } from './lesson-stop.js';
 import { handleBookOrderSend } from './book-order-send.js';
 import { handleBookOrderCreate } from './book-order-create.js';
 import { handleBookAddRequest, handleBookAddReview } from './book-add-request.js';
@@ -74,6 +79,7 @@ import {
   handleParentFeedbackSend,
   attemptParentFeedbackSend,
   resolveStudentName,
+  feedbackMessageDeliveryState,
   MAX_PARENT_FEEDBACK_COMMENT_CHARS
 } from './parent-feedback-send.js';
 import { handleFeedbackPolish } from './feedback-polish.js';
@@ -81,7 +87,7 @@ import { handleRoster } from './roster.js';
 import { handleStudentChange } from './student-change.js';
 import { handleAdminDirective } from './admin-directive.js';
 import { handleTeacherLiveRequest } from './teacher-live-request.js';
-import { handleTuitionAlert } from './tuition-alert.js';
+import { handleTuitionAlert, handleStudentAttendance } from './tuition-alert.js';
 import { handleBookIssue } from './book-issue.js';
 import { handleBookCatalog } from './completed-book-catalog.js';
 import { handleTransport } from './transport.js';
@@ -92,17 +98,31 @@ import { handleMakeup } from './makeup.js';
 import { handleSessionPack } from './session-pack.js';
 import { handleGuardianOpsSend } from './guardian-ops-send.js';
 import { handleContactLog } from './contact-log.js';
+import { handleStaffAttendance, inspectOwnStaffAttendanceChanges } from './staff-attendance.js';
+import {
+  guardStaffWorkAccess, handleStaffWorkSession, handleStaffProfile, staffWorkLoginEnabled,
+  resolveManagerInspectionAuth, handleManagerInspectionSession
+} from './staff-work-login.js';
 import { handleWeekendVisit } from './weekend-visit.js';
 import { handleLessonHandoff } from './lesson-handoff.js';
+import { findNextStudentLesson, projectNextStudentLesson, validDate } from './student-next-schedule.js';
+import { studentScheduleConflictPayload } from './student-schedule-conflict.js';
+import { isTaskWriteCasConflict } from './task-write-cas.js';
+import {
+  readStudentScheduleRevisionSnapshot,
+  studentScheduleRevisionCasStatements
+} from './student-schedule-revision.js';
 import { handleConsultSubmission, handleConsultSubmissionUpload } from './consult-submission.js';
 import { handleConsultGuardian } from './consult-guardian.js';
 import { handleConsultResults, handleConsultResultUpload } from './consult-results.js';
 import { handleConsultCurriculumImage, isConsultDirectorOrManager } from './consult-curriculum-image.js';
 import { handleConsultLinkSend } from './consult-link-send.js';
+import { applyTestStaffNextDayAttendance } from './test-staff-attendance.js';
 
 const APPS = ['task', 'consult'];
 const MAX_CHANGES = 500;     // 요청당 상한 — D1 배치 한계와 악의적 대량 전송을 함께 막는다
 const MAX_PULL = 2000;       // 응답당 상한. 초과하면 more:true로 알리고 다음 요청에서 이어받는다
+const MAX_TASK_REVOCATION_PULL = 500; // 일반 델타 커서와 분리해 삭제 표식을 빠짐없이 페이징한다
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const SAFE_REWARD_REQUEST_ID = /^[A-Za-z0-9_-]{8,128}$/;
 const CONSULT_REWARD_PREFIX = '__rewardtx__';
@@ -244,6 +264,9 @@ async function resolveAuth(env, app, auth) {
         rewardActorHash: await consultRewardActorHash('admin_device', tokenHash) }
       : null;
   }
+  if (auth.mode === 'manager_inspection') {
+    return await resolveManagerInspectionAuth(env, app, auth, taskManagerIds(env));
+  }
   if (auth.mode === 'person') {
     const id = String(auth.id || '');
     const token = String(auth.token || '');
@@ -261,6 +284,25 @@ async function resolveAuth(env, app, auth) {
     return { scope: 'own', id: id };
   }
   return null;
+}
+
+// /search와 /curriculum은 바깥 wrapper가 먼저 처리하므로 같은 근무 인증을 진입점에서 재사용한다.
+export async function guardWrappedStaffWorkRequest(request, env) {
+  if (!staffWorkLoginEnabled(env) || request.method !== 'POST') return null;
+  const origin = request.headers.get('Origin') || '';
+  const okOrigin = origin || '*';
+  try {
+    const body = await request.clone().json();
+    if (!body || typeof body.app !== 'string') return json({ ok: false, error: 'app은 task 또는 consult 문자열이어야 합니다' }, 400, okOrigin);
+    if (body.app !== 'task' || !body.auth || body.auth.mode !== 'person') return null;
+    const allowed = (env.ALLOW_ORIGIN || '').split(',').map(value => value.trim()).filter(Boolean);
+    if (allowed.length && !allowed.includes(origin)) return json({ ok: false, error: '허용되지 않은 출처' }, 403, '*');
+    const auth = await resolveAuth(env, 'task', body.auth);
+    if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+    return await guardStaffWorkAccess(env, body, auth, new URL(request.url).pathname, okOrigin, json);
+  } catch {
+    return json({ ok: false, code: 'STAFF_WORK_UNAVAILABLE', error: '출퇴근 로그인 연결을 확인하지 못했습니다. 잠시 후 다시 시도해 주세요' }, 503, okOrigin);
+  }
 }
 
 /** 들어온 변경을 테이블별 upsert 문으로. updated_at이 더 최신일 때만 덮는다 (LWW) */
@@ -282,13 +324,30 @@ function upsertStmt(env, table, app, c, now, ownScope, managerTask) {
   const onboardingGuard = table === 'checks' && /^__onboarding__/.test(String(key || ''))
     ? " AND COALESCE(json_extract(checks.data,'$.casVersion'),0)<>1"
     : '';
+  // 오래 열린 구형 직원 화면도 이미 확정된 출퇴근을 덮지 못한다. 최초 출근 또는
+  // 기존 at을 보존한 최초 out 추가만 원자적으로 허용하며 관리자 범위는 이 제한을 받지 않는다.
+  const staffAttendanceGuard = ownScope && table === 'checks' && /^__att__/.test(String(key || ''))
+    ? " AND (" +
+      "(COALESCE(json_extract(checks.data,'$.done'),0)<>1 OR COALESCE(json_extract(checks.data,'$.at'),0)<=0)" +
+      " OR (json_extract(checks.data,'$.done')=1 AND COALESCE(json_extract(checks.data,'$.out'),0)=0" +
+      " AND json_extract(excluded.data,'$.done')=1" +
+      " AND json_extract(excluded.data,'$.at')=json_extract(checks.data,'$.at')" +
+      " AND COALESCE(json_extract(excluded.data,'$.out'),0)>=json_extract(checks.data,'$.at'))" +
+      ")"
+    : '';
+  // 검토와 실제 쓰기 사이에 보강 task가 생성되는 경우에도 generic LWW가 덮지 못한다.
+  const makeupTaskGuard = table === 'tasks'
+    ? " AND COALESCE(CAST(json_extract(tasks.data,'$.lessonInstanceType') AS TEXT),'')<>'makeup'" +
+      " AND COALESCE(CAST(json_extract(tasks.data,'$.makeupCaseId') AS TEXT),'')=''"
+    : '';
   return env.DB.prepare(
     'INSERT INTO ' + table + ' (app, ' + idCol + ', owner, data, updated_at, srv_at) ' +
     'VALUES (?, ?, ?, ' + insertData + ', ?, ?) ' +
     'ON CONFLICT(app, ' + idCol + ') DO UPDATE SET ' +
     '  owner=excluded.owner, data=' + updateData + ', ' +
     '  updated_at=excluded.updated_at, srv_at=excluded.srv_at ' +
-    'WHERE excluded.updated_at > ' + table + '.updated_at' + ownGuard + onboardingGuard
+    'WHERE excluded.updated_at > ' + table + '.updated_at' + ownGuard + onboardingGuard +
+      staffAttendanceGuard + makeupTaskGuard
   ).bind(app, key, c.owner || null, JSON.stringify(c.data), Number(c.updated_at) || 0, now);
 }
 
@@ -346,6 +405,119 @@ function isProtectedLessonTaskData(data) {
     Object.prototype.hasOwnProperty.call(data, 'intakeVersion') ||
     String(data.studentId || '').trim() !== '' ||
     /^\s*\[(?:수업|컨설팅)\]/.test(String(data.title || ''));
+}
+
+function isScheduledMakeupTaskData(data) {
+  return !!(data && typeof data === 'object' && !Array.isArray(data) &&
+    (String(data.lessonInstanceType || '') === 'makeup' || String(data.makeupCaseId || '').trim()));
+}
+
+const LESSON_SCHEDULE_SIGNATURE_KEYS = [
+  'studentId', 'deleted', 'start', 'startDate', 'end', 'endDate', 'repeat', 'scheduleStatus',
+  'scheduleSlots', 'taskKind', 'lessonFormVersion', 'intakeVersion', 'intakeSource',
+  'lessonInstanceType', 'makeupCaseId'
+];
+
+function isRegularLessonTaskData(data) {
+  return !!(data && typeof data === 'object' && !Array.isArray(data) &&
+    !isScheduledMakeupTaskData(data) &&
+    (hasStructuredLessonMarker(data) || data.intakeSource === 'teacher_9_field_form'));
+}
+
+function lessonScheduleSignature(data) {
+  // 누락과 null/false는 DB json_extract trigger에서도 서로 다른 변경이다. 키 존재 여부까지
+  // 서명에 넣어 generic LWW가 전용 수업 API의 시간축을 우회하지 못하게 한다.
+  return JSON.stringify(LESSON_SCHEDULE_SIGNATURE_KEYS.map(key =>
+    Object.prototype.hasOwnProperty.call(data || {}, key)
+      ? [true, canonicalJson(data[key])]
+      : [false]));
+}
+
+async function inspectAllScopeLessonScheduleChanges(env, app, entries) {
+  if (app !== 'task') return { blocked: false };
+  const taskEntries = entries.filter(entry => entry.table === 'tasks' && entry.change);
+  if (!taskEntries.length) return { blocked: false };
+
+  const ids = [...new Set(taskEntries.map(entry => String(entry.change.id || '')).filter(Boolean))];
+  const currentById = new Map();
+  for (let offset = 0; offset < ids.length; offset += 80) {
+    const chunk = ids.slice(offset, offset + 80);
+    const placeholders = chunk.map(() => '?').join(',');
+    const result = await env.DB.prepare(
+      'SELECT id,owner,data,updated_at,srv_at FROM tasks WHERE app=? AND id IN (' + placeholders + ')'
+    ).bind(app, ...chunk).all();
+    for (const row of result.results || []) {
+      let data = null;
+      try { data = JSON.parse(row.data); } catch (error) { data = null; }
+      currentById.set(String(row.id), { data, updatedAt: Number(row.updated_at) || 0 });
+    }
+  }
+
+  // 실제 upsert 순서와 같은 LWW 가상 상태를 따라간다. 오래된 오프라인 변경이나 같은
+  // timestamp의 후속 행은 쓰이지 않으므로 정상 동기화를 불필요하게 막지 않는다.
+  for (const entry of taskEntries) {
+    const change = entry.change;
+    const id = String(change.id || '');
+    const incoming = change.data;
+    const incomingUpdatedAt = Number(change.updated_at) || 0;
+    const current = currentById.get(id);
+    if (current && incomingUpdatedAt <= current.updatedAt) continue;
+
+    const currentData = current && current.data;
+    const currentLesson = isRegularLessonTaskData(currentData);
+    const incomingLesson = isRegularLessonTaskData(incoming);
+    if ((!current && incomingLesson) ||
+        ((currentLesson || incomingLesson) &&
+          lessonScheduleSignature(currentData) !== lessonScheduleSignature(incoming))) {
+      return { blocked: true };
+    }
+    currentById.set(id, { data: incoming, updatedAt: incomingUpdatedAt });
+  }
+  return { blocked: false };
+}
+
+/**
+ * 보강 수업 task는 makeup_cases의 서버 투영본이다. 서버 행이 이미 있으면 로컬 사본의
+ * 시각·revision·내용과 무관하게 무시하고, 이 sync 응답의 pull 정본으로 교체하게 한다.
+ */
+async function inspectScheduledMakeupTaskChanges(env, app, entries) {
+  if (app !== 'task') return { skip: new Set(), forced: [] };
+  const taskEntries = entries.filter(entry => entry.table === 'tasks' && entry.change);
+  if (!taskEntries.length) return { skip: new Set(), forced: [] };
+
+  const ids = [...new Set(taskEntries.map(entry => String(entry.change.id || '')).filter(Boolean))];
+  const currentById = new Map();
+  for (let offset = 0; offset < ids.length; offset += 80) {
+    const chunk = ids.slice(offset, offset + 80);
+    const placeholders = chunk.map(() => '?').join(',');
+    const result = await env.DB.prepare(
+      'SELECT id,owner,data,updated_at,srv_at FROM tasks WHERE app=? AND id IN (' + placeholders + ')'
+    ).bind(app, ...chunk).all();
+    for (const row of result.results || []) currentById.set(String(row.id), row);
+  }
+
+  const skip = new Set();
+  const forcedById = new Map();
+  for (const entry of taskEntries) {
+    const stored = currentById.get(String(entry.change.id || ''));
+    let current = null;
+    try { current = stored == null ? null : JSON.parse(stored.data); } catch (error) { current = null; }
+    if (isScheduledMakeupTaskData(current)) {
+      skip.add(entry);
+      if (!forcedById.has(String(entry.change.id || ''))) {
+        const row = stored;
+        forcedById.set(String(entry.change.id || ''), {
+          table: 'tasks', key: String(entry.change.id || ''), owner: row.owner, data: current,
+          updated_at: row.updated_at, srv_at: row.srv_at, authoritative: true
+        });
+      }
+      continue;
+    }
+    if (isScheduledMakeupTaskData(entry.change.data)) {
+      return { error: '보강수업은 보강 탭의 생성·완료·없음 기능으로만 변경할 수 있습니다' };
+    }
+  }
+  return { skip, forced: [...forcedById.values()] };
 }
 
 async function inspectSealedOrderChanges(env, app, entries) {
@@ -477,34 +649,34 @@ async function inspectOwnTaskChanges(env, app, owner, entries) {
 
 async function inspectOwnCheckChanges(env, app, owner, entries, newTaskIds) {
   const checkEntries = entries.filter(entry => entry.table === 'checks');
-  if (!checkEntries.length) return null;
+  if (!checkEntries.length) return { error: null, skip: new Set() };
   const generalTaskIds = [];
 
   for (const entry of checkEntries) {
     const key = String(entry.change.k || '');
     const firstPipe = key.indexOf('|');
     if (firstPipe <= 0 || firstPipe !== key.lastIndexOf('|') || firstPipe === key.length - 1) {
-      return '체크 키 형식을 확인해 주세요';
+      return { error: '체크 키 형식을 확인해 주세요', skip: new Set() };
     }
     const keyTaskId = key.slice(0, firstPipe);
     const keyDate = key.slice(firstPipe + 1);
     const data = entry.change.data;
     if (app === 'consult' && keyTaskId.startsWith(CONSULT_REWARD_PREFIX)) {
-      return '보상 교환 기록은 전용 원장에서만 변경할 수 있습니다';
+      return { error: '보상 교환 기록은 전용 원장에서만 변경할 수 있습니다', skip: new Set() };
     }
     if (!data || typeof data !== 'object' || Array.isArray(data)) {
-      return '체크 데이터 형식을 확인해 주세요';
+      return { error: '체크 데이터 형식을 확인해 주세요', skip: new Set() };
     }
     if (Object.prototype.hasOwnProperty.call(data, 'taskId') && String(data.taskId) !== keyTaskId) {
-      return '체크 데이터의 taskId가 체크 키와 일치하지 않습니다';
+      return { error: '체크 데이터의 taskId가 체크 키와 일치하지 않습니다', skip: new Set() };
     }
     if (Object.prototype.hasOwnProperty.call(data, 'date') && String(data.date) !== keyDate) {
-      return '체크 데이터의 날짜가 체크 키와 일치하지 않습니다';
+      return { error: '체크 데이터의 날짜가 체크 키와 일치하지 않습니다', skip: new Set() };
     }
 
     const special = keyTaskId.match(/^__[A-Za-z]+__(.+)$/);
     if (special) {
-      if (special[1] !== owner) return '다른 담당자의 특수 체크는 저장할 수 없습니다';
+      if (special[1] !== owner) return { error: '다른 담당자의 특수 체크는 저장할 수 없습니다', skip: new Set() };
     } else {
       generalTaskIds.push(keyTaskId);
     }
@@ -520,9 +692,426 @@ async function inspectOwnCheckChanges(env, app, owner, entries, newTaskIds) {
     for (const row of (result.results || [])) allowed.add(String(row.id));
   }
   if (generalTaskIds.some(id => !allowed.has(id))) {
-    return '본인에게 배정된 업무의 체크만 저장할 수 있습니다';
+    return { error: '본인에게 배정된 업무의 체크만 저장할 수 있습니다', skip: new Set() };
   }
-  return null;
+  return await inspectOwnStaffAttendanceChanges(env, app, owner, checkEntries);
+}
+
+function historyProvesRevokedMakeupAssignment(value, formerStaffId, date, currentRevision) {
+  let history;
+  try { history = JSON.parse(value || '[]'); } catch (error) { return false; }
+  if (!Array.isArray(history)) return false;
+  return history.some(event => event && typeof event === 'object' &&
+    event.action === 'reschedule' &&
+    String(event.previousStaffId || '') === formerStaffId &&
+    String(event.previousDate || '') === date &&
+    SAFE_ID.test(String(event.staffId || '')) && validIsoDate(String(event.date || '')) &&
+    Number.isInteger(Number(event.revision)) && Number(event.revision) >= 1 &&
+    Number(event.revision) <= Number(currentRevision));
+}
+
+/**
+ * 담당자 또는 날짜를 재배정한 뒤 오프라인 화면이 과거 출결을 재전송할 수 있다.
+ * 이 행은 전체 동기화를 막는 대신 개별 폐기한다. 단순 task id 추측으로 우회할 수 없도록
+ * 현재 서버 task와 서버 전용 makeup_cases 이력에서 실제 과거 담당·날짜와 새 담당·날짜를 모두 증명한다.
+ */
+async function inspectMakeupCheckChanges(env, app, entries) {
+  const skip = new Set();
+  if (app !== 'task') return { error: null, skip };
+  const checkEntries = entries.filter(entry => entry.table === 'checks' && entry.change);
+  if (!checkEntries.length) return { error: null, skip };
+
+  const candidates = [];
+  for (const entry of checkEntries) {
+    const rawKey = String(entry.change.k || '');
+    const identity = checkIdentityFromKey(rawKey);
+    if (!identity) {
+      if (rawKey.startsWith('makeup_lesson_')) {
+        return { error: '보강 출결 키의 업무·날짜 형식을 확인해 주세요', skip };
+      }
+      continue;
+    }
+    candidates.push({ entry, identity });
+  }
+  if (!candidates.length) return { error: null, skip };
+
+  const currentChecks = await currentCheckStates(env, app,
+    [...new Set(candidates.map(candidate => candidate.identity.key))]);
+
+  const taskIds = [...new Set(candidates.map(item => item.identity.taskId))];
+  const tasks = new Map();
+  for (let offset = 0; offset < taskIds.length; offset += 80) {
+    const chunk = taskIds.slice(offset, offset + 80);
+    const result = await env.DB.prepare(
+      'SELECT id,owner,data FROM tasks WHERE app=? AND id IN (' + chunk.map(() => '?').join(',') + ')'
+    ).bind(app, ...chunk).all();
+    for (const row of result.results || []) {
+      let data;
+      try { data = JSON.parse(row.data || '{}'); } catch (error) { data = null; }
+      const caseId = String(data && data.makeupCaseId || '');
+      const id = String(row.id || '');
+      const currentOwner = String(row.owner || '');
+      const reserved = id.startsWith('makeup_lesson_') || isScheduledMakeupTaskData(data);
+      if (!reserved) continue;
+      const valid = !!(data && SAFE_ID.test(currentOwner) && SAFE_ID.test(caseId) &&
+        id === 'makeup_lesson_' + caseId && String(data.id || '') === id &&
+        String(data.staffId || '') === currentOwner && String(data.lessonInstanceType || '') === 'makeup' &&
+        hasStructuredLessonMarker(data) && data.repeat === 'once' &&
+        SAFE_ID.test(String(data.studentId || '')) && SAFE_ID.test(String(data.makeupSourceTaskId || '')) &&
+        validIsoDate(String(data.makeupSourceDate || '')) && validIsoDate(String(data.start || '')) &&
+        String(data.start) === String(data.end));
+      tasks.set(id, { row, data, caseId, valid });
+    }
+  }
+
+  for (const candidate of candidates) {
+    if (candidate.identity.taskId.startsWith('makeup_lesson_') && !tasks.has(candidate.identity.taskId)) {
+      return { error: '서버에서 확인할 수 없는 보강 출결은 저장할 수 없습니다', skip };
+    }
+  }
+  const makeupCandidates = candidates.filter(candidate => tasks.has(candidate.identity.taskId));
+  if (!makeupCandidates.length) return { error: null, skip };
+  if (makeupCandidates.some(candidate => !tasks.get(candidate.identity.taskId).valid)) {
+    return { error: '보강 수업의 서버 식별자가 일치하지 않아 출결을 저장할 수 없습니다', skip };
+  }
+
+  const caseIds = [...new Set(makeupCandidates.map(candidate => tasks.get(candidate.identity.taskId).caseId))];
+  const cases = new Map();
+  for (let offset = 0; offset < caseIds.length; offset += 80) {
+    const chunk = caseIds.slice(offset, offset + 80);
+    const result = await env.DB.prepare(
+      'SELECT case_id,student_id,source_task_id,source_date,status,revision,' +
+      'confirmed_start_at,confirmed_end_at,confirmed_staff_id,completed_at,completed_by,' +
+      'cancelled_at,cancelled_by,history ' +
+      'FROM makeup_cases WHERE app=? AND case_id IN (' + chunk.map(() => '?').join(',') + ')'
+    ).bind(app, ...chunk).all();
+    for (const row of result.results || []) cases.set(String(row.case_id), row);
+  }
+
+  for (const candidate of makeupCandidates) {
+    const task = tasks.get(candidate.identity.taskId);
+    const makeup = task && cases.get(task.caseId);
+    if (!task || !makeup) {
+      return { error: '보강 원장을 확인할 수 없어 출결을 저장할 수 없습니다', skip };
+    }
+    const currentOwner = String(task.row.owner || '');
+    const status = String(makeup.status || '');
+    const taskDate = String(task.data.start || '');
+    const historyCompleted = status !== 'completed' || makeupHistoryHasCompletion(makeup.history);
+    const statusDateMatches = (
+      String(makeup.confirmed_start_at || '').slice(0, 10) === taskDate &&
+      String(makeup.confirmed_end_at || '').slice(0, 10) === taskDate
+    );
+    if (String(makeup.confirmed_staff_id || '') !== currentOwner ||
+        String(makeup.student_id || '') !== String(task.data.studentId || '') ||
+        String(makeup.source_task_id || '') !== String(task.data.makeupSourceTaskId || '') ||
+        String(makeup.source_date || '') !== String(task.data.makeupSourceDate || '')) {
+      return { error: '보강 수업과 보강 원장의 담당자·날짜 식별자가 일치하지 않습니다', skip };
+    }
+    const change = candidate.entry.change;
+    const data = change.data;
+    if (!data || typeof data !== 'object' || Array.isArray(data) ||
+        (Object.prototype.hasOwnProperty.call(data, 'taskId') &&
+          String(data.taskId) !== candidate.identity.taskId) ||
+        (Object.prototype.hasOwnProperty.call(data, 'date') &&
+          String(data.date) !== candidate.identity.date)) {
+      return { error: '보강 출결 데이터의 업무·날짜 식별자가 일치하지 않습니다', skip };
+    }
+    const incomingOwner = String(change.owner || '');
+    const incomingExactIdentity = Object.prototype.hasOwnProperty.call(data, 'taskId') &&
+      Object.prototype.hasOwnProperty.call(data, 'date') &&
+      String(data.taskId || '') === candidate.identity.taskId &&
+      String(data.date || '') === candidate.identity.date;
+    if (SAFE_ID.test(incomingOwner) &&
+        (incomingOwner !== currentOwner || candidate.identity.date !== taskDate) &&
+        ['confirmed', 'completed', 'cancelled'].includes(status) &&
+        historyProvesRevokedMakeupAssignment(makeup.history, incomingOwner, candidate.identity.date,
+          Number(makeup.revision))) {
+      skip.add(candidate.entry);
+      continue;
+    }
+    if (status === 'cancelled' && incomingOwner === currentOwner &&
+        candidate.identity.date === taskDate && task.data.deleted === true && statusDateMatches &&
+        makeup.completed_at == null && !String(makeup.completed_by || '') &&
+        Number(makeup.cancelled_at) > 0 && SAFE_ID.test(String(makeup.cancelled_by || '')) &&
+        makeupHistoryHasCanonicalCancellation(makeup.history, Number(makeup.revision)) &&
+        !currentChecks.has(candidate.identity.key)) {
+      // cancel 직전 오프라인 화면에서 만들어진 check는 이미 폐기된 수업을 되살리지 않는다.
+      // 구형 payload의 taskId/date 생략은 key로 정확히 확정하되 저장하지 않고 행만 폐기한다.
+      skip.add(candidate.entry);
+      continue;
+    }
+    const completionIdentityMatches = status !== 'completed' || (
+      Number(makeup.completed_at) > 0 && String(makeup.completed_by || '') === currentOwner
+    );
+    if (status === 'completed' && incomingOwner === currentOwner && candidate.identity.date === taskDate) {
+      const current = currentChecks.get(candidate.identity.key);
+      const currentExactIdentity = !!(current && current.owner === currentOwner && current.data &&
+        typeof current.data === 'object' && !Array.isArray(current.data) &&
+        String(current.data.taskId || '') === candidate.identity.taskId &&
+        String(current.data.date || '') === candidate.identity.date &&
+        ['P', 'L', 'E'].includes(attendanceValue(current.data)));
+      if (!currentExactIdentity || !historyCompleted || !statusDateMatches || !completionIdentityMatches) {
+        return { error: '완료된 보강 출결의 서버 정본을 확인할 수 없습니다', skip };
+      }
+      if (task.data.deleted === true) {
+        // 종료 시간이 지난 후 숨겨진 단발 보강은 더 이상 편집 대상이 아니다.
+        // 완료 시점의 서버 출결은 유지하고 늦게 올라온 모든 캐시 행만 폐기한다.
+        skip.add(candidate.entry);
+        continue;
+      }
+      if (!incomingExactIdentity) {
+        // 구형 캐시는 taskId/date를 생략했을 수 있다. 정본을 덮어쓰지 않고
+        // 개별 폐기해 같은 batch의 일반 메모·업무는 계속 동기화한다.
+        skip.add(candidate.entry);
+        continue;
+      }
+      if (!['P', 'L', 'E'].includes(attendanceValue(data)) ||
+          attendanceValue(data) !== attendanceValue(current.data)) {
+        // 완료 후 늦게 도착한 다른/빈 출결은 메모 저장 batch를 poison하지 않고 폐기한다.
+        skip.add(candidate.entry);
+        continue;
+      }
+      continue;
+    }
+    if (incomingOwner === currentOwner && candidate.identity.date === taskDate && !task.data.deleted &&
+        status === 'confirmed' && statusDateMatches) continue;
+    return { error: '현재 보강 담당자의 해당 보강일 출결만 저장할 수 있습니다', skip };
+  }
+  return { error: null, skip };
+}
+
+function checkIdentityFromKey(value) {
+  const key = String(value || '');
+  const pipe = key.indexOf('|');
+  if (pipe <= 0 || pipe !== key.lastIndexOf('|') || pipe === key.length - 1) return null;
+  const taskId = key.slice(0, pipe);
+  const date = key.slice(pipe + 1);
+  return SAFE_ID.test(taskId) && validIsoDate(date) ? { key, taskId, date } : null;
+}
+
+function session4AttendanceLockedAt(date, now) {
+  const kst = new Date(Number(now) + 9 * 60 * 60 * 1000).toISOString();
+  const today = kst.slice(0, 10);
+  return date < today || (date === today && kst.slice(11, 19) >= '23:50:00');
+}
+
+function attendanceValue(data) {
+  if (!data || typeof data !== 'object' || Array.isArray(data) ||
+      !Object.prototype.hasOwnProperty.call(data, 'att') || data.att == null) return '';
+  return String(data.att);
+}
+
+function makeupHistoryAllowsSessionLock(value) {
+  let history;
+  try { history = JSON.parse(value || '[]'); } catch (error) { return false; }
+  const first = Array.isArray(history) && history[0] && typeof history[0] === 'object'
+    ? history[0] : null;
+  return !!(first && (first.action === 'create_from_absence' ||
+    (first.action === 'create_manual' && first.reason === 'manual_absence')));
+}
+
+function makeupHistoryHasCompletion(value) {
+  let history;
+  try { history = JSON.parse(value || '[]'); } catch (error) { return false; }
+  const last = Array.isArray(history) && history.length ? history[history.length - 1] : null;
+  return !!(last && typeof last === 'object' && last.action === 'complete');
+}
+
+function makeupHistoryHasCanonicalCancellation(value, revision) {
+  let history;
+  try { history = JSON.parse(value || '[]'); } catch (error) { return false; }
+  const last = Array.isArray(history) && history.length ? history[history.length - 1] : null;
+  return !!(last && typeof last === 'object' &&
+    ['cancel', 'no_makeup', 'reconcile_attendance'].includes(String(last.action || '')) &&
+    String(last.to || '') === 'cancelled' && Number(last.revision) === Number(revision));
+}
+
+async function sessionAttendanceEventKeys(env, app, keys) {
+  const found = new Set();
+  for (let offset = 0; offset < keys.length; offset += 80) {
+    const chunk = keys.slice(offset, offset + 80);
+    for (const table of ['student_session_attendance_events', 'student_session_ledger_events']) {
+      let result;
+      try {
+        result = await env.DB.prepare(
+          'SELECT check_key FROM ' + table + ' WHERE app=? AND check_key IN (' +
+            chunk.map(() => '?').join(',') + ')'
+        ).bind(app, ...chunk).all();
+      } catch (error) {
+        // A Worker can briefly overlap the migration during a staged rollout. Keep the
+        // legacy ledger usable until the additive generation table exists, but surface
+        // every other database failure instead of weakening the permanent lock.
+        if (table === 'student_session_ledger_events' &&
+            /no such table.*student_session_ledger_events/i.test(String(error && error.message || error))) {
+          continue;
+        }
+        throw error;
+      }
+      for (const row of result.results || []) {
+        if (row.check_key != null) found.add(String(row.check_key));
+      }
+    }
+  }
+  return found;
+}
+
+async function currentCheckStates(env, app, keys) {
+  const current = new Map();
+  for (let offset = 0; offset < keys.length; offset += 80) {
+    const chunk = keys.slice(offset, offset + 80);
+    const result = await env.DB.prepare(
+      'SELECT k,owner,data,updated_at,srv_at FROM checks WHERE app=? AND k IN (' +
+        chunk.map(() => '?').join(',') + ')'
+    ).bind(app, ...chunk).all();
+    for (const row of result.results || []) {
+      let data;
+      try { data = JSON.parse(row.data || '{}'); } catch (error) { data = null; }
+      current.set(String(row.k), {
+        owner: String(row.owner || ''), data,
+        updatedAt: Number(row.updated_at) || 0, srvAt: Number(row.srv_at) || 0
+      });
+    }
+  }
+  return current;
+}
+
+async function changesLockedAttendance(env, app, candidates) {
+  if (!candidates.length) return false;
+  const keys = [...new Set(candidates.map(item => item.identity.key))];
+  const current = await currentCheckStates(env, app, keys);
+  for (const item of candidates) {
+    const incoming = attendanceValue(item.entry.change.data);
+    const stored = current.get(item.identity.key);
+    const previous = stored ? attendanceValue(stored.data) : '';
+    // LWW가 실제로 적용하지 않을 오래된 오프라인 재전송은 전체 sync를 실패시키지 않는다.
+    const actuallyNewer = stored && (Number(item.entry.change.updated_at) || 0) > stored.updatedAt;
+    if ((stored && actuallyNewer && incoming !== previous) ||
+        (!current.has(item.identity.key) && incoming !== '')) return true;
+  }
+  return false;
+}
+
+/**
+ * 구형·오프라인 화면도 23:50 이후 확정된 회차제 출결만큼은 다시 쓰지 못하게 한다.
+ * taskId/studentId/check key의 stable ID 연결로만 판정하고 이름은 전혀 사용하지 않는다.
+ */
+async function inspectLockedSession4AttendanceChanges(env, app, entries, now) {
+  if (app !== 'task') return { locked: false };
+  const candidates = entries.map(entry => ({ entry, identity: entry.table === 'checks'
+    ? checkIdentityFromKey(entry.change && entry.change.k) : null
+  })).filter(item => item.identity && item.entry.change && item.entry.change.data &&
+    typeof item.entry.change.data === 'object' && !Array.isArray(item.entry.change.data));
+  if (!candidates.length) return { locked: false };
+
+  // 원장에 이미 사용 근거가 들어간 check는 이후 학생 설정·보강 상태가 바뀌더라도 정본이다.
+  // 동일 att의 메모 수정과 LWW상 무시될 stale replay만 허용한다.
+  const candidateKeys = [...new Set(candidates.map(item => item.identity.key))];
+  const eventKeys = await sessionAttendanceEventKeys(env, app, candidateKeys);
+  const eventCandidates = candidates.filter(item => eventKeys.has(item.identity.key));
+  if (await changesLockedAttendance(env, app, eventCandidates)) return { locked: true };
+
+  const taskIds = [...new Set(candidates.map(item => item.identity.taskId))];
+  const tasks = new Map();
+  const storedTaskVersions = new Map();
+  const registerTask = (row, data) => {
+    if (!data || String(data.id || '') !== String(row.id || '') ||
+        String(data.staffId || '') !== String(row.owner || '') ||
+        !SAFE_ID.test(String(data.studentId || '')) || !hasStructuredLessonMarker(data)) return;
+    const makeupCaseId = String(data.makeupCaseId || '').trim();
+    const isMakeup = String(data.lessonInstanceType || '') === 'makeup' || !!makeupCaseId;
+    if (isMakeup && (String(data.lessonInstanceType || '') !== 'makeup' ||
+        !SAFE_ID.test(makeupCaseId) || String(row.id) !== 'makeup_lesson_' + makeupCaseId)) return;
+    tasks.set(String(row.id), { owner: String(row.owner || ''), data,
+      kind: isMakeup ? 'makeup' : 'regular', makeupCaseId });
+  };
+  for (let offset = 0; offset < taskIds.length; offset += 80) {
+    const chunk = taskIds.slice(offset, offset + 80);
+    const result = await env.DB.prepare(
+      'SELECT id,owner,data,updated_at,srv_at FROM tasks WHERE app=? AND id IN (' +
+        chunk.map(() => '?').join(',') + ')'
+    ).bind(app, ...chunk).all();
+    for (const row of result.results || []) {
+      storedTaskVersions.set(String(row.id), Number(row.updated_at) || 0);
+      let data;
+      try { data = JSON.parse(row.data || '{}'); } catch (error) { continue; }
+      registerTask(row, data);
+    }
+  }
+
+  // 새 수업 task와 과거 check가 같은 all-scope batch에 들어오면 DB 조회만으로는 task를
+  // 찾을 수 없다. 실제 LWW 결과가 될 batch task를 합쳐 check가 먼저 와도 선검증한다.
+  const incomingTasks = new Map();
+  for (const entry of entries) {
+    if (entry.table !== 'tasks' || !entry.change || !taskIds.includes(String(entry.change.id || ''))) continue;
+    const id = String(entry.change.id || '');
+    const updatedAt = Number(entry.change.updated_at) || 0;
+    const prior = incomingTasks.get(id);
+    if (!prior || updatedAt > prior.updatedAt) incomingTasks.set(id, { entry, updatedAt });
+  }
+  for (const [id, incoming] of incomingTasks) {
+    if (storedTaskVersions.has(id) && incoming.updatedAt <= storedTaskVersions.get(id)) continue;
+    registerTask({ id, owner: incoming.entry.change.owner }, incoming.entry.change.data);
+  }
+
+  const makeupCaseIds = [...new Set([...tasks.values()]
+    .filter(task => task.kind === 'makeup').map(task => task.makeupCaseId))];
+  const makeupCases = new Map();
+  for (let offset = 0; offset < makeupCaseIds.length; offset += 80) {
+    const chunk = makeupCaseIds.slice(offset, offset + 80);
+    const result = await env.DB.prepare(
+      'SELECT case_id,student_id,status,confirmed_start_at,confirmed_end_at,confirmed_staff_id,' +
+      'completed_at,completed_by,history ' +
+      'FROM makeup_cases WHERE app=? AND case_id IN (' + chunk.map(() => '?').join(',') + ')'
+    ).bind(app, ...chunk).all();
+    for (const row of result.results || []) makeupCases.set(String(row.case_id), row);
+  }
+  const lessonCandidates = candidates.filter(item => {
+    const task = tasks.get(item.identity.taskId);
+    if (!task) return false;
+    const date = item.identity.date;
+    if ((task.data.start && date < String(task.data.start)) ||
+        (task.data.end && date > String(task.data.end))) return false;
+    if (task.data.deleted && !validIsoDate(String(task.data.end || ''))) return false;
+    if (task.kind === 'makeup') {
+      const makeup = makeupCases.get(task.makeupCaseId);
+      const status = String(makeup && makeup.status || '');
+      const statusAllowsDate = status === 'confirmed'
+        ? String(makeup.confirmed_start_at || '').slice(0, 10) === date &&
+          String(makeup.confirmed_end_at || '').slice(0, 10) === date
+        : status === 'completed' && Number(makeup.completed_at) > 0 &&
+          SAFE_ID.test(String(makeup.completed_by || '')) && makeupHistoryHasCompletion(makeup.history);
+      return !!(makeup && statusAllowsDate &&
+        String(makeup.student_id || '') === String(task.data.studentId || '') &&
+        String(makeup.confirmed_staff_id || '') === task.owner &&
+        String(task.data.start || '') === date && String(task.data.end || '') === date &&
+        makeupHistoryAllowsSessionLock(makeup.history));
+    }
+    return true;
+  });
+  if (!lessonCandidates.length) return { locked: false };
+
+  const rosterRow = await env.DB.prepare("SELECT data FROM private_rosters WHERE app='task' LIMIT 1").first();
+  let roster;
+  try { roster = JSON.parse(rosterRow && rosterRow.data || '{}'); } catch (error) { roster = null; }
+  const students = roster && roster.roster && Array.isArray(roster.roster.students)
+    ? roster.roster.students : [];
+  const sessionStarts = new Map();
+  for (const student of students) {
+    const studentId = String(student && student.id || '');
+    const start = String(student && student.sessionCycleStartDate || '');
+    if (!SAFE_ID.test(studentId) || student && student.billingMode !== 'session4' || !validIsoDate(start) ||
+        sessionStarts.has(studentId)) continue;
+    sessionStarts.set(studentId, start);
+  }
+
+  const lockedCandidates = lessonCandidates.filter(item => {
+    const task = tasks.get(item.identity.taskId);
+    const start = sessionStarts.get(String(task && task.data.studentId || ''));
+    return start && item.identity.date >= start && session4AttendanceLockedAt(item.identity.date, now);
+  });
+  if (!lockedCandidates.length) return { locked: false };
+  return { locked: await changesLockedAttendance(env, app, lockedCandidates) };
 }
 
 async function effectiveStaffDeactivations(env, app, entries) {
@@ -954,6 +1543,141 @@ async function handleConsultReward(env, app, body, origin, auth) {
   return json({ ok: false, error: '다른 원장 기기에서 교환 상태가 먼저 변경되었습니다' }, 409, origin);
 }
 
+function syncEntryTaskId(entry) {
+  if (!entry || !entry.change) return '';
+  if (entry.table === 'tasks') {
+    const id = String(entry.change.id || '');
+    return SAFE_ID.test(id) ? id : '';
+  }
+  if (entry.table !== 'checks') return '';
+  const key = String(entry.change.k || '');
+  const pipe = key.indexOf('|');
+  if (pipe <= 0 || pipe !== key.lastIndexOf('|')) return '';
+  const id = key.slice(0, pipe);
+  return SAFE_ID.test(id) ? id : '';
+}
+
+/**
+ * 삭제 전 탭이 보낸 task/check는 검증 단계에서 오류로 만들지 않고 개별 폐기한다.
+ * DB trigger도 같은 정책을 강제하지만, 이 prefilter가 구형 개인 화면의 반복 403을 막는다.
+ */
+async function revokedSyncEntries(env, app, dataGeneration, entries) {
+  if (app !== 'task' || !entries.length) return new Set();
+  const byTaskId = new Map();
+  for (const entry of entries) {
+    const taskId = syncEntryTaskId(entry);
+    if (!taskId) continue;
+    if (!byTaskId.has(taskId)) byTaskId.set(taskId, []);
+    byTaskId.get(taskId).push(entry);
+  }
+  const taskIds = [...byTaskId.keys()];
+  if (!taskIds.length) return new Set();
+  const revokedIds = new Set();
+  for (let offset = 0; offset < taskIds.length; offset += 80) {
+    const chunk = taskIds.slice(offset, offset + 80);
+    const result = await env.DB.prepare(
+      'SELECT task_id FROM task_revocations WHERE app=? AND data_generation=? AND task_id IN (' +
+        chunk.map(() => '?').join(',') + ')'
+    ).bind(app, dataGeneration, ...chunk).all();
+    for (const row of result.results || []) revokedIds.add(String(row.task_id || ''));
+  }
+  const skipped = new Set();
+  for (const taskId of revokedIds) {
+    for (const entry of byTaskId.get(taskId) || []) skipped.add(entry);
+  }
+  return skipped;
+}
+
+function taskRevocationCapability(body, app) {
+  return app === 'task' && !!(body && body.capabilities &&
+    typeof body.capabilities === 'object' && !Array.isArray(body.capabilities) &&
+    body.capabilities.taskRevocations === 1);
+}
+
+function taskRevocationCursor(body) {
+  if (body.taskRevocationCursor == null || body.taskRevocationCursor === '') return 0;
+  const cursor = Number(body.taskRevocationCursor);
+  return Number.isSafeInteger(cursor) && cursor >= 0 ? cursor : null;
+}
+
+async function pullTaskRevocations(env, app, dataGeneration, auth, cursor) {
+  const own = auth.scope === 'own';
+  const sql = 'SELECT revocation_seq,task_id,former_owner,revoked_at FROM task_revocations ' +
+    'WHERE app=? AND data_generation=? AND revocation_seq>?' + (own ? ' AND former_owner=?' : '') +
+    ' ORDER BY revocation_seq LIMIT ' + (MAX_TASK_REVOCATION_PULL + 1);
+  const statement = own
+    ? env.DB.prepare(sql).bind(app, dataGeneration, cursor, String(auth.id || ''))
+    : env.DB.prepare(sql).bind(app, dataGeneration, cursor);
+  const result = await statement.all();
+  const rows = result.results || [];
+  const more = rows.length > MAX_TASK_REVOCATION_PULL;
+  if (more) rows.length = MAX_TASK_REVOCATION_PULL;
+  const nextCursor = rows.length ? Number(rows[rows.length - 1].revocation_seq) : cursor;
+  return {
+    version: 1,
+    cursor: nextCursor,
+    more,
+    rows: rows.map(row => ({
+      taskId: String(row.task_id || ''),
+      formerOwner: String(row.former_owner || ''),
+      revokedAt: Number(row.revoked_at) || 0
+    }))
+  };
+}
+
+function syncRecoveryPosition(value, now) {
+  if (!value || typeof value !== 'object' || Array.isArray(value) ||
+      Object.keys(value).some(key => !['snapshotAt', 'cursors', 'complete'].includes(key))) return null;
+  if (value.complete !== undefined && typeof value.complete !== 'boolean') return null;
+  const source = value.cursors === undefined ? {} : value.cursors;
+  if (!source || typeof source !== 'object' || Array.isArray(source) ||
+      Object.keys(source).some(key => !['staff', 'tasks', 'checks'].includes(key))) return null;
+  const cursors = {};
+  for (const table of ['staff', 'tasks', 'checks']) {
+    const cursor = source[table] === undefined ? '' : source[table];
+    if (typeof cursor !== 'string' || cursor.length > 1024 || /[\u0000-\u001f\u007f]/.test(cursor)) return null;
+    cursors[table] = cursor;
+  }
+  // 같은 밀리초의 새 저장도 복구 다음 델타에 포함되도록 직전 밀리초를 경계로 둔다.
+  const snapshotAt = value.snapshotAt === undefined ? Math.max(0, now - 1) : value.snapshotAt;
+  if (!Number.isSafeInteger(snapshotAt) || snapshotAt < 0 || snapshotAt > now ||
+      (value.snapshotAt === undefined && Object.values(cursors).some(Boolean))) return null;
+  return { snapshotAt, cursors };
+}
+
+async function pullSyncRecovery(env, app, auth, position) {
+  const changes = [];
+  const cursors = { ...position.cursors };
+  let complete = true;
+  for (const table of ['staff', 'tasks', 'checks']) {
+    const idCol = table === 'checks' ? 'k' : 'id';
+    // 테이블별 키를 이어 받아야 같은 srv_at이 2000개를 넘거나 테이블별 시각이 달라도 빠지지 않는다.
+    const sql = 'SELECT ' + idCol + ' AS key, owner, data, updated_at, srv_at FROM ' + table +
+      ' WHERE app=? AND srv_at<=? AND ' + idCol + '>?' +
+      (auth.scope === 'own' ? ' AND owner=?' : '') +
+      ' ORDER BY ' + idCol + ' LIMIT ' + (MAX_PULL + 1);
+    const args = [app, position.snapshotAt, cursors[table]];
+    if (auth.scope === 'own') args.push(auth.id);
+    const result = await env.DB.prepare(sql).bind(...args).all();
+    const rows = result.results || [];
+    if (rows.length > MAX_PULL) {
+      complete = false;
+      rows.length = MAX_PULL;
+    }
+    for (const row of rows) {
+      const data = JSON.parse(row.data);
+      if (table === 'checks' && app === 'consult' &&
+          String(row.key || '').startsWith(CONSULT_REWARD_PREFIX) && data) {
+        delete data.claimActorHash;
+      }
+      changes.push({ table, key: row.key, owner: row.owner, data,
+        updated_at: row.updated_at, srv_at: row.srv_at });
+    }
+    if (rows.length) cursors[table] = String(rows[rows.length - 1].key);
+  }
+  return { changes, recoveryPull: { snapshotAt: position.snapshotAt, cursors, complete } };
+}
+
 async function handleSync(env, app, body, origin) {
   const auth = await resolveAuth(env, app, body.auth);
   if (!auth) return json({ ok: false, error: '인증 실패' }, 401, origin);
@@ -979,7 +1703,39 @@ async function handleSync(env, app, body, origin) {
     }, 409, origin);
   }
 
+  const wantsTaskRevocations = taskRevocationCapability(body, app);
+  const requestedTaskRevocationCursor = wantsTaskRevocations ? taskRevocationCursor(body) : 0;
+  if (wantsTaskRevocations && requestedTaskRevocationCursor == null) {
+    return json({ ok: false, code: 'INVALID_TASK_REVOCATION_CURSOR',
+      error: '삭제 동기 기준을 다시 확인해 주세요' }, 400, origin);
+  }
+
   const now = Date.now();
+  if (Object.prototype.hasOwnProperty.call(body, 'recoveryPull')) {
+    if (!Array.isArray(body.changes) || body.changes.length) {
+      return json({ ok: false, code: 'RECOVERY_PULL_READ_ONLY',
+        error: '복구 조회에는 저장할 변경을 함께 보낼 수 없습니다' }, 400, origin);
+    }
+    const position = syncRecoveryPosition(body.recoveryPull, now);
+    if (!position) {
+      return json({ ok: false, code: 'INVALID_RECOVERY_PULL',
+        error: '복구 조회 기준을 다시 확인해 주세요' }, 400, origin);
+    }
+    const recovered = await pullSyncRecovery(env, app, auth, position);
+    const authRole = auth.role === 'manager' ? 'manager' : (auth.scope === 'all' ? 'admin' : 'staff');
+    const payload = { ok: true, now: position.snapshotAt, more: !recovered.recoveryPull.complete,
+      changes: recovered.changes, recoveryPull: recovered.recoveryPull, authRole, dataGeneration };
+    if (wantsTaskRevocations) {
+      payload.taskRevocations = await pullTaskRevocations(
+        env, app, dataGeneration, auth, requestedTaskRevocationCursor
+      );
+    }
+    return json(payload, 200, origin);
+  }
+  if (app === 'task') {
+    try { await applyTestStaffNextDayAttendance(env, app, now); }
+    catch (error) { console.error('test-staff attendance', error); }
+  }
   const since = Number(body.since) || 0;
   const changes = Array.isArray(body.changes) ? body.changes : [];
   if (changes.length > MAX_CHANGES) {
@@ -1036,19 +1792,48 @@ async function handleSync(env, app, body, origin) {
     accepted.push({ table: t, change: c });
   }
   if (forbidden) return json({ ok: false, error: '개인 링크에서는 본인 업무만 저장할 수 있습니다' }, 403, origin);
-  let skipped = new Set();
+  let skipped = await revokedSyncEntries(env, app, dataGeneration, accepted);
+  const makeupInspection = await inspectScheduledMakeupTaskChanges(
+    env, app, accepted.filter(entry => !skipped.has(entry))
+  );
+  if (makeupInspection.error) {
+    return json({ ok: false, code: 'MAKEUP_ENDPOINT_REQUIRED', error: makeupInspection.error }, 409, origin);
+  }
+  for (const entry of makeupInspection.skip) skipped.add(entry);
+  const makeupCheckInspection = await inspectMakeupCheckChanges(
+    env, app, accepted.filter(entry => !skipped.has(entry))
+  );
+  if (makeupCheckInspection.error) {
+    return json({ ok: false, code: 'MAKEUP_CHECK_IDENTITY_MISMATCH',
+      error: makeupCheckInspection.error }, 403, origin);
+  }
+  for (const entry of makeupCheckInspection.skip) skipped.add(entry);
   if (auth.scope === 'own') {
-    const inspected = await inspectOwnTaskChanges(env, app, auth.id, accepted);
+    const inspected = await inspectOwnTaskChanges(env, app, auth.id, accepted.filter(entry => !skipped.has(entry)));
     if (inspected.error) return json({ ok: false, error: inspected.error }, 403, origin);
-    skipped = inspected.skip;
+    for (const entry of inspected.skip) skipped.add(entry);
     for (const entry of accepted) {
       if (entry.table === 'staff') skipped.add(entry);
     }
-    const checkError = await inspectOwnCheckChanges(env, app, auth.id, accepted, inspected.newTaskIds);
-    if (checkError) return json({ ok: false, error: checkError }, 403, origin);
+    const checkInspection = await inspectOwnCheckChanges(
+      env, app, auth.id, accepted.filter(entry => !skipped.has(entry)), inspected.newTaskIds
+    );
+    if (checkInspection.error) {
+      const payload = { ok: false, error: checkInspection.error };
+      if (/출퇴근/.test(checkInspection.error)) payload.code = 'STAFF_ATTENDANCE_ADMIN_ONLY';
+      return json(payload, 403, origin);
+    }
+    for (const entry of checkInspection.skip) skipped.add(entry);
+  }
+  const attendanceLock = await inspectLockedSession4AttendanceChanges(
+    env, app, accepted.filter(entry => !skipped.has(entry)), now
+  );
+  if (attendanceLock.locked) {
+    return json({ ok: false, code: 'SESSION4_ATTENDANCE_LOCKED',
+      error: '회차제 출결은 수업일 23시 50분에 확정되어 변경할 수 없습니다. 메모는 출결 상태를 유지한 채 저장해 주세요' }, 409, origin);
   }
   let sealedInspection;
-  try { sealedInspection = await inspectSealedOrderChanges(env, app, accepted); }
+  try { sealedInspection = await inspectSealedOrderChanges(env, app, accepted.filter(entry => !skipped.has(entry))); }
   catch (error) {
     if (/no such table.*book_order_student_snapshots/i.test(String(error && error.message || error))) {
       return json({ ok: false, code: 'ORDER_LEDGER_NOT_READY', error: '교재 주문 원장을 준비하고 있습니다' }, 503, origin);
@@ -1059,9 +1844,31 @@ async function handleSync(env, app, body, origin) {
     return json({ ok: false, code: 'BOOK_ORDER_SEALED', error: sealedInspection.error }, 409, origin);
   }
   for (const entry of sealedInspection.skip) skipped.add(entry);
-  if (app === 'task' && await hasUnsafeGenericScheduledOrder(env, app, accepted)) {
+  if (app === 'task' && await hasUnsafeGenericScheduledOrder(
+    env, app, accepted.filter(entry => !skipped.has(entry))
+  )) {
     return json({ ok: false, code: 'BOOK_ORDER_CREATE_REQUIRED',
       error: '자동 발송 교재 주문은 전용 주문 화면에서 등록해 주세요' }, 409, origin);
+  }
+  let genericScheduleRevision = null;
+  if (auth.scope === 'all') {
+    const genericScheduleStudentIds = accepted.filter(entry => !skipped.has(entry) &&
+      entry.table === 'tasks' && isRegularLessonTaskData(entry.change && entry.change.data))
+      .map(entry => String(entry.change.data.studentId || '')).filter(id => SAFE_ID.test(id));
+    if (genericScheduleStudentIds.length) {
+      // revision을 먼저 읽고 그 다음 현재 task 서명을 검사해야, 둘 사이에 들어온
+      // 전용 수업 저장을 아래 batch CAS가 감지할 수 있다.
+      genericScheduleRevision = await readStudentScheduleRevisionSnapshot(
+        env, app, genericScheduleStudentIds
+      );
+    }
+    const lessonScheduleInspection = await inspectAllScopeLessonScheduleChanges(
+      env, app, accepted.filter(entry => !skipped.has(entry))
+    );
+    if (lessonScheduleInspection.blocked) {
+      return json({ ok: false, code: 'LESSON_SCHEDULE_ENDPOINT_REQUIRED',
+        error: '수업 등록·시간표 변경은 전용 수업 등록 및 변경 화면에서 처리해 주세요' }, 409, origin);
+    }
   }
   const writeEntries = foldStaffEntries(accepted.filter(entry => !skipped.has(entry)));
   const rewardStaffConflicts = await consultRewardStaffConflicts(env, app, writeEntries);
@@ -1078,12 +1885,23 @@ async function handleSync(env, app, body, origin) {
       error: '탑승 후 미하차 학생을 담당하는 기사는 삭제하거나 비활성화할 수 없습니다. 차량 화면에서 하차·인계 또는 사유 있는 상태 초기화를 먼저 완료해 주세요'
     }, 409, origin);
   }
-  const stmts = writeEntries
+  const genericScheduleGuards = genericScheduleRevision
+    ? await studentScheduleRevisionCasStatements(env, app, genericScheduleRevision, {
+      operation: 'generic_sync_schedule',
+      source: String(now),
+      updatedAt: now
+    })
+    : [];
+  const stmts = genericScheduleGuards.concat(writeEntries
     .map(entry => upsertStmt(env, entry.table, app, entry.change, now, auth.scope === 'own',
-      auth.role === 'manager' && entry.table === 'tasks'));
+      auth.role === 'manager' && entry.table === 'tasks')));
   if (stmts.length) {
     try { await env.DB.batch(stmts); }
     catch (error) {
+      if (isTaskWriteCasConflict(error) && genericScheduleRevision) {
+        return json({ ok: false, code: 'SYNC_SCHEDULE_REVISION_CONFLICT',
+          error: '수업 정보가 다른 작업에서 먼저 변경되었습니다. 새로고침 후 다시 저장해 주세요' }, 409, origin);
+      }
       if (isRewardProcessingLockError(error)) {
         const racedConflicts = await consultRewardStaffConflicts(env, app, writeEntries);
         return rewardProcessingLockResponse(origin,
@@ -1093,6 +1911,16 @@ async function handleSync(env, app, body, origin) {
       if (/BOOK_ORDER_SEALED|BOOK_ORDER_SEND_ACTIVE/.test(String(error && error.message || error))) {
         return json({ ok: false, code: 'BOOK_ORDER_SEALED', error: '봉인된 교재 주문은 전용 주문 화면에서만 변경할 수 있습니다' }, 409, origin);
       }
+      if (/SESSION4_ATTENDANCE_LOCKED/.test(String(error && error.message || error))) {
+        return json({ ok: false, code: 'SESSION4_ATTENDANCE_LOCKED',
+          error: '회차제 출결은 수업일 23시 50분에 확정되어 변경할 수 없습니다. 메모는 출결 상태를 유지한 채 저장해 주세요' }, 409, origin);
+      }
+      if (/MAKEUP_COMPLETED_ATTENDANCE_LOCKED/.test(String(error && error.message || error))) {
+        return json({ ok: false, code: 'MAKEUP_COMPLETED_ATTENDANCE_LOCKED',
+          error: '완료된 보강의 출결·업무·날짜 식별자는 변경할 수 없습니다. 메모는 출결 상태를 유지한 채 저장해 주세요' }, 409, origin);
+      }
+      const schedulePayload = studentScheduleConflictPayload(error);
+      if (schedulePayload) return json(schedulePayload, 409, origin);
       throw error;
     }
   }
@@ -1102,10 +1930,13 @@ async function handleSync(env, app, body, origin) {
   const forced = auth.scope === 'all'
     ? await canonicalOnboardingChanges(env, app, attemptedOnboardingKeys)
     : [];
-  const forcedKeys = new Set(forced.map(change => change.key));
+  const makeupForced = (makeupInspection.forced || []).filter(change =>
+    auth.scope === 'all' || String(change.owner || '') === String(auth.id || ''));
+  const forcedRows = forced.concat(makeupForced);
+  const forcedKeys = new Set(forcedRows.map(change => change.table + '\n' + change.key));
 
   // ── 내려받기 (since 이후)
-  const out = forced.slice();
+  const out = forcedRows.slice();
   let more = false;
   for (const t of ['staff', 'tasks', 'checks']) {
     const idCol = t === 'checks' ? 'k' : 'id';
@@ -1119,7 +1950,7 @@ async function handleSync(env, app, body, origin) {
     const rows = (res.results || []);
     if (rows.length > MAX_PULL) { more = true; rows.length = MAX_PULL; }
     for (const r of rows) {
-      if (t === 'checks' && forcedKeys.has(String(r.key))) continue;
+      if (forcedKeys.has(t + '\n' + String(r.key))) continue;
       const data = JSON.parse(r.data);
       // 선점 actor 해시는 서버 CAS 검증용이다. 읽기 동기화 응답에도 내보내지 않는다.
       if (t === 'checks' && app === 'consult' && String(r.key || '').startsWith(CONSULT_REWARD_PREFIX) && data) {
@@ -1132,7 +1963,13 @@ async function handleSync(env, app, body, origin) {
   // more일 때는 받은 것 중 가장 오래된 srv_at까지만 확정해야 빠지는 행이 없다
   const nextSince = more ? Math.max(since, ...out.map(r => r.srv_at)) : now;
   const authRole = auth.role === 'manager' ? 'manager' : (auth.scope === 'all' ? 'admin' : 'staff');
-  return json({ ok: true, now: nextSince, more: more, changes: out, authRole, dataGeneration }, 200, origin);
+  const payload = { ok: true, now: nextSince, more: more, changes: out, authRole, dataGeneration };
+  if (wantsTaskRevocations) {
+    payload.taskRevocations = await pullTaskRevocations(
+      env, app, dataGeneration, auth, requestedTaskRevocationCursor
+    );
+  }
+  return json(payload, 200, origin);
 }
 
 async function handleToken(env, app, body, origin) {
@@ -1221,10 +2058,20 @@ async function handleBootstrap(env, app, body, origin) {
 }
 
 async function handleExchange(env, app, body, origin) {
-  const staffId = String(body.staffId || '');
+  let staffId = String(body.staffId || '');
   const code = String(body.code || '');
-  if (!SAFE_ID.test(staffId) || !SAFE_BOOTSTRAP_CODE.test(code)) {
+  if (!SAFE_BOOTSTRAP_CODE.test(code) || (staffId ? !SAFE_ID.test(staffId) : app !== 'consult')) {
     return json({ ok: false, code: 'LINK_INVALID', error: '올바른 개인 링크가 필요합니다' }, 400, origin);
+  }
+  const codeHash = tokenStorageValue(await sha256Hex(code));
+  if (!staffId) {
+    const codeRow = await env.DB.prepare(
+      'SELECT staff_id FROM bootstrap_codes WHERE app=? AND code_hash=? AND staff_id<>? LIMIT 1'
+    ).bind(app, codeHash, ADMIN_DEVICE_ID).first();
+    staffId = String(codeRow && codeRow.staff_id || '');
+    if (!SAFE_ID.test(staffId)) {
+      return json({ ok: false, code: 'LINK_INVALID', error: '올바르지 않은 개인 링크입니다' }, 410, origin);
+    }
   }
   const adminDevice = app === 'consult' && staffId === ADMIN_DEVICE_ID;
   const activeSessionLimit = adminDevice ? MAX_ACTIVE_ADMIN_SESSIONS : MAX_ACTIVE_PERSON_SESSIONS;
@@ -1232,7 +2079,6 @@ async function handleExchange(env, app, body, origin) {
     return json({ ok: false, code: 'LINK_INVALID', error: '접근할 수 없는 개인 링크입니다' }, 401, origin);
   }
 
-  const codeHash = tokenStorageValue(await sha256Hex(code));
   const consumedAt = Date.now();
   const markerBytes = new Uint32Array(1);
   crypto.getRandomValues(markerBytes);
@@ -1285,7 +2131,7 @@ async function handleExchange(env, app, body, origin) {
     }
     return json({ ok: false, code: 'LINK_USED', error: '다른 화면에서 먼저 사용된 개인 링크입니다' }, 409, origin);
   }
-  return json({ ok: true, token, expiresAt: consumedAt + TOKEN_TTL_MS,
+  return json({ ok: true, token, staffId, expiresAt: consumedAt + TOKEN_TTL_MS,
     activeSessionLimit }, 200, origin);
 }
 
@@ -1434,6 +2280,62 @@ async function handleRevoke(env, app, body, origin) {
   return json({ ok: true }, 200, origin);
 }
 
+/**
+ * 선생님이 현재 수업 뒤에 이어지는 같은 학생의 수업을 안내할 때 사용하는
+ * 읽기 전용 조회다. 개인 링크의 동기화 범위는 본인 업무로 유지하되, 이 API는
+ * 현재 수업을 소유한 교사임을 확인한 뒤 대상 학생의 일정만 최소 필드로
+ * 계산한다. 다른 학생·메모·출결·업무지시는 응답에 포함하지 않는다.
+ */
+async function handleStudentNextLesson(env, app, body, origin, auth, json) {
+  if (app !== 'task') return json({ ok: false, error: '다음 수업 안내는 task 앱에서만 사용할 수 있습니다' }, 400, origin);
+  const taskId = String(body.taskId || '').trim();
+  const lessonDate = String(body.lessonDate || '').trim();
+  if (!SAFE_ID.test(taskId) || !validDate(lessonDate)) {
+    return json({ ok: false, error: '올바른 taskId와 lessonDate가 필요합니다' }, 400, origin);
+  }
+  const currentRow = await env.DB.prepare('SELECT id,owner,data FROM tasks WHERE app=? AND id=? LIMIT 1')
+    .bind(app, taskId).first();
+  if (!currentRow) return json({ ok: false, error: '수업을 찾을 수 없습니다' }, 404, origin);
+  if (auth.scope === 'own' && String(currentRow.owner || '') !== String(auth.id || '')) {
+    return json({ ok: false, error: '본인 담당 수업만 다음 수업을 확인할 수 있습니다' }, 403, origin);
+  }
+  let current;
+  try { current = JSON.parse(currentRow.data || '{}'); } catch (error) { current = null; }
+  if (!current || current.deleted || String(current.id || taskId) !== taskId ||
+      !SAFE_ID.test(String(current.studentId || ''))) {
+    return json({ ok: false, error: '이 수업에 연결된 stable studentId를 확인할 수 없습니다' }, 409, origin);
+  }
+  if (body.studentId != null && String(body.studentId || '') !== String(current.studentId)) {
+    return json({ ok: false, error: '수업과 학생 연결이 변경되었습니다. 새로고침 후 다시 시도해 주세요' }, 409, origin);
+  }
+
+  const taskResult = await env.DB.prepare('SELECT id,owner,data FROM tasks WHERE app=?').bind(app).all();
+  const tasks = [];
+  for (const row of taskResult.results || []) {
+    try {
+      const data = JSON.parse(row.data || '{}');
+      if (data && typeof data === 'object' && !Array.isArray(data)) {
+        if (!data.id) data.id = String(row.id || '');
+        if (!data.staffId) data.staffId = String(row.owner || '');
+        tasks.push(data);
+      }
+    } catch (error) { /* 손상된 행은 다음 수업 후보에서 제외한다 */ }
+  }
+  const staffResult = await env.DB.prepare('SELECT id,data FROM staff WHERE app=?').bind(app).all();
+  const teacherNames = {};
+  for (const row of staffResult.results || []) {
+    try {
+      const data = JSON.parse(row.data || '{}');
+      if (data && !data.deleted && String(data.name || '').trim()) {
+        teacherNames[String(row.id || data.id || '')] = String(data.name).replace(/\s+/g, ' ').trim().slice(0, 80);
+      }
+    } catch (error) { /* 손상된 직원 행은 이름 없이 표시한다 */ }
+  }
+  const next = findNextStudentLesson(tasks, taskId, lessonDate, teacherNames);
+  return json({ ok: true, lessonDate, currentTaskId: taskId, studentId: String(current.studentId),
+    next: projectNextStudentLesson(next, lessonDate) }, 200, origin);
+}
+
 function authoritativeStaffRecord(row) {
   if (!row) return null;
   let data = null;
@@ -1532,9 +2434,11 @@ const FEEDBACK_STATUSES = new Set([
 ]);
 const SAFE_FEEDBACK_PART = /^[A-Za-z0-9_-]{1,64}$/;
 const SAFE_FEEDBACK_DATE = /^\d{4}-\d{2}-\d{2}$/;
+const FEEDBACK_TEMPLATE_VERSIONS = new Set(['v1', 'v2', 'v3']);
 const MAX_FEEDBACK_BODY = 5000;
 const MAX_REVIEW_NOTE = 1000;
 const MAX_FEEDBACK_FIELD = 300;   // 알림톡 항목별 변수 하나당 상한 — 900자 총합 체크는 발송 시점에 다시 한다
+const MAX_FEEDBACK_SUBJECT = 80;
 const MAX_FEEDBACK_COMMENT = MAX_PARENT_FEEDBACK_COMMENT_CHARS;
 const MAX_STUDENT_NAME = 40;
 
@@ -1557,8 +2461,15 @@ async function activeStaffName(env, app, staffId) {
   }
 }
 
+function stripFeedbackFormatControls(value) {
+  return String(value == null ? '' : value)
+    .replace(/[\u00ad\u061c\u180e\u200b-\u200f\u202a-\u202e\u2060\u2066-\u2069\ufeff]/gi, '');
+}
+
 function normalizeFeedbackField(value) {
-  return String(value == null ? '' : value).replace(/[\r\n\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim();
+  return stripFeedbackFormatControls(value)
+    .replace(/[\r\n\u0000-\u001f\u007f]/g, ' ')
+    .replace(/\s+/g, ' ').trim();
 }
 
 function validIsoDate(value) {
@@ -1569,7 +2480,13 @@ function validIsoDate(value) {
 }
 
 function normalizeFeedbackBody(value) {
-  return String(value == null ? '' : value).replace(/\r\n?/g, '\n').trim();
+  return stripFeedbackFormatControls(value).replace(/\r\n?/g, '\n').trim();
+}
+
+/** parent-feedback-send.js의 cleanField와 같은 발송시점 정규화다. 저장된 기존 행에
+ * format control이 남아 있어도 화면 상태 hash와 실제 발송 hash가 어긋나지 않게 한다. */
+function feedbackStoredSendField(value) {
+  return stripFeedbackFormatControls(value).trim();
 }
 
 function feedbackDateLabel(value) {
@@ -1579,13 +2496,27 @@ function feedbackDateLabel(value) {
 
 /** 클라이언트 미리보기와 카카오 승인 템플릿이 반드시 같은 본문인지 서버에서 다시 확인한다. */
 function feedbackV2Body(studentName, date, subjectText, contentText, homeworkText, commentText) {
-  return '안녕하세요, WB 웩슬러브레인센터(독해력학원) 입니다.\n' +
-    studentName + ' 학생의 오늘 수업 피드백을 정리해 보내드립니다.\n' +
-    '- 일시 : ' + feedbackDateLabel(date) + '\n' +
-    '- 과목 : ' + subjectText + '\n' +
-    '- 수업내용 · 진도 : ' + contentText + '\n' +
-    '- 과제 : ' + homeworkText + '\n' +
+  return '안녕하세요, WB 웩슬러브레인센터(독해력학원) 입니다.\n\n' +
+    studentName + ' 학생의 오늘 수업 피드백을 정리해 보내드립니다.\n\n' +
+    '- 일시 : ' + feedbackDateLabel(date) + '\n\n' +
+    '- 과목 : ' + subjectText + '\n\n' +
+    '- 수업내용 · 진도 : ' + contentText + '\n\n' +
+    '- 과제 : ' + homeworkText + '\n\n' +
     '- 코멘트 : ' + commentText + '\n\n' +
+    '문의 사항이 있으시면 학원으로 연락부탁드립니다. 감사합니다.';
+}
+
+/** 승인된 v3는 안내사항 뒤에 빈 줄을 두 줄 둔다. 줄바꿈도 카카오 검수 본문의
+ * 일부이므로 클라이언트 미리보기와 이 함수가 한 문자라도 다르면 제출을 거부한다. */
+function feedbackV3Body(studentName, date, subjectText, contentText, homeworkText, commentText, noticeText) {
+  return '안녕하세요, WB 웩슬러브레인센터(독해력학원) 입니다.\n\n' +
+    studentName + ' 학생의 오늘 수업 피드백을 정리해 보내드립니다.\n\n' +
+    '- 일시 : ' + feedbackDateLabel(date) + '\n\n' +
+    '- 과목 : ' + subjectText + '\n\n' +
+    '- 수업내용 · 진도 : ' + contentText + '\n\n' +
+    '- 과제 : ' + homeworkText + '\n\n' +
+    '- 코멘트 : ' + commentText + '\n\n' +
+    '- 안내사항 : ' + noticeText + '\n\n\n' +
     '문의 사항이 있으시면 학원으로 연락부탁드립니다. 감사합니다.';
 }
 
@@ -1597,8 +2528,19 @@ function feedbackIdentity(body) {
   if (!SAFE_ID.test(taskId)) return { error: '올바른 taskId가 필요합니다' };
   if (!validIsoDate(feedbackDate)) return { error: 'feedbackDate는 YYYY-MM-DD 형식이어야 합니다' };
   if (!SAFE_FEEDBACK_PART.test(feedbackType)) return { error: '올바른 feedbackType이 필요합니다' };
-  if (!SAFE_FEEDBACK_PART.test(templateVersion)) return { error: '올바른 templateVersion이 필요합니다' };
+  if (!SAFE_FEEDBACK_PART.test(templateVersion) || !FEEDBACK_TEMPLATE_VERSIONS.has(templateVersion)) {
+    return { error: '올바른 templateVersion이 필요합니다' };
+  }
   return { taskId, feedbackDate, feedbackType, templateVersion };
+}
+
+/* 결석 보강은 서버가 원 정규수업의 stable taskId를 기록한다. 피드백의 정체성도
+ * 그 연결을 따라가야 같은 학생·같은 수업의 정규수업과 보강이 이중 발송되지 않는다.
+ * 수업무관 보강에는 원 수업이 없으므로 기존 taskId를 그대로 사용한다. */
+function feedbackCanonicalTaskId(taskData, taskId) {
+  const sourceTaskId = taskData && taskData.lessonInstanceType === 'makeup'
+    ? String(taskData.makeupSourceTaskId || '') : '';
+  return SAFE_ID.test(sourceTaskId) ? sourceTaskId : taskId;
 }
 
 async function feedbackRequestKey(identity) {
@@ -1606,8 +2548,46 @@ async function feedbackRequestKey(identity) {
   return 'fbr_' + (await sha256Hex(raw)).slice(0, 48);
 }
 
-function feedbackView(row) {
+const FEEDBACK_WITH_LATEST_SEND_SELECT =
+  'SELECT f.*,s.status AS send_status,s.provider_status_code AS send_provider_status_code,' +
+  's.message_hash AS send_message_hash ' +
+  'FROM feedback_requests f LEFT JOIN parent_feedback_sends s ON s.app=f.app AND s.send_id=(' +
+    'SELECT latest.send_id FROM parent_feedback_sends latest ' +
+    'WHERE latest.app=f.app AND latest.feedback_request_key=f.request_key AND latest.message_hash=(' +
+      'SELECT newest.message_hash FROM parent_feedback_sends newest ' +
+      'WHERE newest.app=f.app AND newest.feedback_request_key=f.request_key ' +
+      'ORDER BY newest.created_at DESC,newest.send_id DESC LIMIT 1) ' +
+    "ORDER BY CASE WHEN latest.status='accepted' AND latest.provider_status_code='4000' THEN 0 " +
+    "WHEN latest.status='accepted' AND latest.provider_status_code='3000' THEN 1 " +
+    "WHEN latest.status='accepted' AND latest.provider_status_code='2000' THEN 2 " +
+    "WHEN latest.status IN ('reserved','dispatching','unknown') THEN 3 ELSE 4 END," +
+    'latest.created_at DESC,latest.send_id DESC LIMIT 1) ';
+
+async function feedbackView(row) {
   if (!row) return null;
+  const storedTemplateVersion = String(row.template_version || '');
+  const templateVersion = storedTemplateVersion === 'v2' || storedTemplateVersion === 'v3'
+    ? storedTemplateVersion : 'v1';
+  const fields = templateVersion === 'v2' || templateVersion === 'v3' ? {
+    templateVersion,
+    studentName: feedbackStoredSendField(row.student_name),
+    dateText: feedbackDateLabel(row.feedback_date),
+    subjectText: feedbackStoredSendField(row.subject_text),
+    contentText: feedbackStoredSendField(row.content_text),
+    homeworkText: feedbackStoredSendField(row.homework_text),
+    commentText: feedbackStoredSendField(row.comment_text),
+    ...(templateVersion === 'v3' ? { noticeText: feedbackStoredSendField(row.notice_text) } : {})
+  } : {
+    templateVersion,
+    teacherName: feedbackStoredSendField(row.teacher_name),
+    studentName: feedbackStoredSendField(row.student_name),
+    contentText: feedbackStoredSendField(row.content_text),
+    plusText: feedbackStoredSendField(row.plus_text),
+    minusText: feedbackStoredSendField(row.minus_text)
+  };
+  const currentMessageHash = await sha256Hex(JSON.stringify(fields));
+  const messageDeliveryState = currentMessageHash === String(row.send_message_hash || '')
+    ? feedbackMessageDeliveryState(row) : '';
   return {
     requestKey: row.request_key,
     taskId: row.task_id,
@@ -1615,19 +2595,21 @@ function feedbackView(row) {
     feedbackDate: row.feedback_date,
     feedbackType: row.feedback_type,
     templateVersion: row.template_version,
-    message: row.body,
+    message: normalizeFeedbackBody(row.body),
     bodyHash: row.body_hash,
-    teacherName: row.teacher_name || '',
+    teacherName: feedbackStoredSendField(row.teacher_name),
     studentId: row.student_id || '',
-    studentName: row.student_name || '',
-    contentText: row.content_text || '',
-    subjectText: row.subject_text || '',
-    homeworkText: row.homework_text || '',
-    commentText: row.comment_text || '',
-    plusText: row.plus_text || '',
-    minusText: row.minus_text || '',
+    studentName: feedbackStoredSendField(row.student_name),
+    contentText: feedbackStoredSendField(row.content_text),
+    subjectText: feedbackStoredSendField(row.subject_text),
+    homeworkText: feedbackStoredSendField(row.homework_text),
+    commentText: feedbackStoredSendField(row.comment_text),
+    noticeText: feedbackStoredSendField(row.notice_text),
+    plusText: feedbackStoredSendField(row.plus_text),
+    minusText: feedbackStoredSendField(row.minus_text),
     revision: Number(row.revision),
     status: row.status,
+    messageDeliveryState,
     createdAt: Number(row.created_at),
     updatedAt: Number(row.updated_at),
     reviewedAt: row.reviewed_at == null ? null : Number(row.reviewed_at),
@@ -1661,11 +2643,25 @@ async function taskForFeedback(env, identity, auth, origin) {
   return { task, taskData };
 }
 
-async function findFeedbackRequest(env, identity) {
+async function findFeedbackRequest(env, identity, owner) {
   return await env.DB.prepare(
-    'SELECT * FROM feedback_requests WHERE app=? AND task_id=? AND feedback_date=? ' +
-    'AND feedback_type=? AND template_version=? LIMIT 1'
-  ).bind('task', identity.taskId, identity.feedbackDate, identity.feedbackType, identity.templateVersion).first();
+    FEEDBACK_WITH_LATEST_SEND_SELECT +
+    'WHERE f.app=? AND f.owner=? AND f.feedback_date=? AND f.feedback_type=? AND f.template_version=? ' +
+    'AND (f.task_id=? OR EXISTS (' +
+      "SELECT 1 FROM tasks makeup WHERE makeup.app=f.app AND makeup.id=f.task_id " +
+      "AND json_valid(makeup.data)=1 AND json_extract(makeup.data,'$.lessonInstanceType')='makeup' " +
+      "AND json_extract(makeup.data,'$.makeupSourceTaskId')=?" +
+    ')) ORDER BY CASE WHEN f.status=\'sent\' OR s.status=\'sent\' OR s.provider_status_code=\'4000\' THEN 0 ' +
+      "WHEN s.status IN ('reserved','dispatching','accepted','unknown') THEN 1 ELSE 2 END, " +
+      'CASE WHEN f.task_id=? THEN 0 ELSE 1 END, f.updated_at DESC LIMIT 1'
+  ).bind('task', owner, identity.feedbackDate, identity.feedbackType, identity.templateVersion,
+    identity.taskId, identity.taskId, identity.taskId).first();
+}
+
+async function findFeedbackRequestByKey(env, app, requestKey) {
+  return await env.DB.prepare(
+    FEEDBACK_WITH_LATEST_SEND_SELECT + 'WHERE f.app=? AND f.request_key=? LIMIT 1'
+  ).bind(app, requestKey).first();
 }
 
 async function handleFeedbackRequest(env, app, body, origin) {
@@ -1683,25 +2679,29 @@ async function handleFeedbackRequest(env, app, body, origin) {
     }
     const limit = Math.max(1, Math.min(200, Number(body.limit) || 100));
     const result = await env.DB.prepare(
-      "SELECT * FROM feedback_requests WHERE app=? AND owner=? ORDER BY CASE status " +
+      FEEDBACK_WITH_LATEST_SEND_SELECT + "WHERE f.app=? AND f.owner=? ORDER BY CASE f.status " +
       "WHEN 'revision_requested' THEN 0 WHEN 'approval_waiting' THEN 1 " +
-      "WHEN 'content_approved_send_blocked' THEN 2 WHEN 'sent' THEN 3 WHEN 'cancelled' THEN 4 ELSE 5 END, updated_at DESC LIMIT " + limit
+      "WHEN 'content_approved_send_blocked' THEN 2 WHEN 'sent' THEN 3 WHEN 'cancelled' THEN 4 ELSE 5 END, f.updated_at DESC LIMIT " + limit
     ).bind('task', auth.id).all();
-    return json({ ok: true, requests: (result.results || []).map(feedbackView) }, 200, origin);
+    return json({ ok: true, requests: await Promise.all((result.results || []).map(feedbackView)) }, 200, origin);
   }
-  const identity = feedbackIdentity(body);
+  let identity = feedbackIdentity(body);
   if (identity.error) return json({ ok: false, error: identity.error }, 400, origin);
   const checked = await taskForFeedback(env, identity, auth, origin);
   if (checked.response) return checked.response;
 
+  const submittedTaskId = identity.taskId;
+  const canonicalTaskId = feedbackCanonicalTaskId(checked.taskData, submittedTaskId);
+  if (canonicalTaskId !== submittedTaskId) identity = { ...identity, taskId: canonicalTaskId };
+
   const owner = String(checked.task.owner);
   const now = Date.now();
-  let current = await findFeedbackRequest(env, identity);
+  let current = await findFeedbackRequest(env, identity, owner);
 
   if (action === 'cancel') {
     if (!current) return json({ ok: false, error: '취소할 피드백 요청을 찾을 수 없습니다' }, 404, origin);
     if (current.status === 'cancelled') {
-      return json({ ok: true, idempotent: true, request: feedbackView(current) }, 200, origin);
+      return json({ ok: true, idempotent: true, request: await feedbackView(current) }, 200, origin);
     }
     const result = await env.DB.prepare(
       "UPDATE feedback_requests SET owner=?, status='cancelled', revision=revision+1, updated_at=?, " +
@@ -1710,9 +2710,8 @@ async function handleFeedbackRequest(env, app, body, origin) {
     if (Number(result && result.meta && result.meta.changes || 0) !== 1) {
       return json({ ok: false, error: '다른 변경이 먼저 저장되었습니다. 새로고침 후 다시 시도해 주세요' }, 409, origin);
     }
-    current = await env.DB.prepare('SELECT * FROM feedback_requests WHERE app=? AND request_key=? LIMIT 1')
-      .bind('task', current.request_key).first();
-    return json({ ok: true, idempotent: false, request: feedbackView(current) }, 200, origin);
+    current = await findFeedbackRequestByKey(env, 'task', current.request_key);
+    return json({ ok: true, idempotent: false, request: await feedbackView(current) }, 200, origin);
   }
 
   const message = normalizeFeedbackBody(body.message);
@@ -1741,29 +2740,44 @@ async function handleFeedbackRequest(env, app, body, origin) {
   const plusText = normalizeFeedbackField(body.plusText);
   const minusText = normalizeFeedbackField(body.minusText);
   const templateV2 = identity.templateVersion === 'v2';
-  const subjectText = templateV2
-    ? normalizeFeedbackField(checked.taskData.subject || checked.taskData.className || '') : '';
-  const homeworkText = templateV2 ? normalizeFeedbackField(body.homeworkText) : '';
-  const commentText = templateV2 ? normalizeFeedbackBody(body.commentText) : '';
-  if (!contentText || (!templateV2 && (!plusText || !minusText))) {
-    return json({ ok: false, error: templateV2
+  const templateV3 = identity.templateVersion === 'v3';
+  const structuredTemplate = templateV2 || templateV3;
+  const hasSubjectText = Object.hasOwn(body, 'subjectText');
+  const subjectText = structuredTemplate
+    ? normalizeFeedbackField(hasSubjectText
+      ? body.subjectText : checked.taskData.subject || checked.taskData.className || '') : '';
+  const homeworkText = structuredTemplate ? normalizeFeedbackField(body.homeworkText) : '';
+  const commentText = structuredTemplate ? normalizeFeedbackBody(body.commentText) : '';
+  const noticeText = templateV3 ? normalizeFeedbackField(body.noticeText) : '';
+  if (!contentText || (!structuredTemplate && (!plusText || !minusText))) {
+    return json({ ok: false, error: structuredTemplate
       ? '수업내용·진도를 확인해 주세요'
       : '오늘 배운 내용·잘한 점·보완할 점을 모두 골라 주세요' }, 400, origin);
   }
   if (contentText.length > MAX_FEEDBACK_FIELD || plusText.length > MAX_FEEDBACK_FIELD || minusText.length > MAX_FEEDBACK_FIELD) {
     return json({ ok: false, error: '항목별 문구는 각각 ' + MAX_FEEDBACK_FIELD + '자까지 입력할 수 있습니다' }, 413, origin);
   }
-  if (templateV2 && (!subjectText || !homeworkText || !commentText)) {
-    return json({ ok: false, error: '과목·수업내용·과제·코멘트를 모두 확인해 주세요' }, 400, origin);
+  if (structuredTemplate && (!subjectText || !homeworkText || !commentText || (templateV3 && !noticeText))) {
+    return json({ ok: false, error: templateV3
+      ? '과목·수업내용·과제·코멘트·안내사항을 모두 확인해 주세요'
+      : '과목·수업내용·과제·코멘트를 모두 확인해 주세요' }, 400, origin);
   }
-  if (templateV2 && (subjectText.length > 80 || homeworkText.length > MAX_FEEDBACK_FIELD ||
-      commentText.length > MAX_FEEDBACK_COMMENT)) {
-    return json({ ok: false, error: '과목은 80자, 과제는 ' + MAX_FEEDBACK_FIELD +
-      '자, 코멘트는 ' + MAX_FEEDBACK_COMMENT + '자까지 입력할 수 있습니다' }, 413, origin);
+  if (templateV2 && Object.hasOwn(body, 'noticeText') && normalizeFeedbackField(body.noticeText)) {
+    return json({ ok: false, code: 'FEEDBACK_TEMPLATE_NOTICE_VERSION_MISMATCH',
+      error: '안내사항이 있는 피드백은 v3 템플릿으로 보내 주세요' }, 409, origin);
   }
-  if (templateV2 && message !== feedbackV2Body(
-    studentName, identity.feedbackDate, subjectText, contentText, homeworkText, commentText
-  )) {
+  if (structuredTemplate && (subjectText.length > MAX_FEEDBACK_SUBJECT || homeworkText.length > MAX_FEEDBACK_FIELD ||
+      commentText.length > MAX_FEEDBACK_COMMENT || noticeText.length > MAX_FEEDBACK_FIELD)) {
+    return json({ ok: false, error: '과목은 ' + MAX_FEEDBACK_SUBJECT + '자, 과제는 ' + MAX_FEEDBACK_FIELD +
+      '자, 코멘트는 ' + MAX_FEEDBACK_COMMENT + '자, 안내사항은 ' + MAX_FEEDBACK_FIELD +
+      '자까지 입력할 수 있습니다' }, 413, origin);
+  }
+  const approvedTemplateBody = templateV3
+    ? feedbackV3Body(studentName, identity.feedbackDate, subjectText, contentText, homeworkText, commentText, noticeText)
+    : templateV2
+      ? feedbackV2Body(studentName, identity.feedbackDate, subjectText, contentText, homeworkText, commentText)
+      : null;
+  if (approvedTemplateBody != null && message !== approvedTemplateBody) {
     return json({
       ok: false,
       code: 'FEEDBACK_TEMPLATE_MISMATCH',
@@ -1777,29 +2791,39 @@ async function handleFeedbackRequest(env, app, body, origin) {
     row.teacher_name === teacherName && row.student_id === studentId && row.student_name === studentName &&
     row.content_text === contentText && String(row.subject_text || '') === subjectText &&
     String(row.homework_text || '') === homeworkText && String(row.comment_text || '') === commentText &&
+    String(row.notice_text || '') === noticeText &&
     row.plus_text === plusText && row.minus_text === minusText;
 
   if (!current) {
     const insertResult = await env.DB.prepare(
       'INSERT OR IGNORE INTO feedback_requests ' +
       '(app,request_key,task_id,owner,feedback_date,feedback_type,template_version,body,body_hash,' +
-      'teacher_name,student_id,student_name,content_text,subject_text,homework_text,comment_text,plus_text,minus_text,' +
+      'teacher_name,student_id,student_name,content_text,subject_text,homework_text,comment_text,notice_text,plus_text,minus_text,' +
       'revision,status,created_at,updated_at,reviewed_at,reviewed_by,review_note) ' +
-      "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,'approval_waiting',?,?,NULL,NULL,NULL)"
+      "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,'approval_waiting',?,?,NULL,NULL,NULL)"
     ).bind('task', requestKey, identity.taskId, owner, identity.feedbackDate, identity.feedbackType,
       identity.templateVersion, message, bodyHash, teacherName, studentId, studentName, contentText,
-      subjectText, homeworkText, commentText, plusText, minusText,
+      subjectText, homeworkText, commentText, noticeText, plusText, minusText,
       now, now).run();
-    current = await findFeedbackRequest(env, identity);
+    current = await findFeedbackRequest(env, identity, owner);
     if (!current) return json({ ok: false, error: '피드백 요청을 저장하지 못했습니다' }, 500, origin);
     const freshInsert = Number(insertResult && insertResult.meta && insertResult.meta.changes || 0) === 1;
     if (freshInsert) {
       current = await attemptSendAndReload(env, app, current);
-      return json({ ok: true, idempotent: false, request: feedbackView(current) }, 200, origin);
+      return json({ ok: true, idempotent: false, request: await feedbackView(current) }, 200, origin);
     }
     if (sameFields(current)) {
-      return json({ ok: true, idempotent: true, request: feedbackView(current) }, 200, origin);
+      return json({ ok: true, idempotent: true, request: await feedbackView(current) }, 200, origin);
     }
+  }
+
+  if (current.status === 'sent' && !sameFields(current)) {
+    return json({
+      ok: false,
+      code: 'FEEDBACK_ALREADY_SENT',
+      error: '이미 발송된 피드백은 내용을 바꾸어 다시 보낼 수 없습니다',
+      request: await feedbackView(current)
+    }, 409, origin);
   }
 
   if (sameFields(current) && current.status === 'revision_requested') {
@@ -1807,32 +2831,31 @@ async function handleFeedbackRequest(env, app, body, origin) {
       ok: false,
       code: 'REVISION_UNCHANGED',
       error: '수정 요청을 반영해 문구를 변경한 뒤 다시 제출해 주세요',
-      request: feedbackView(current)
+      request: await feedbackView(current)
     }, 409, origin);
   }
 
   if (sameFields(current) && current.status !== 'cancelled') {
     // 내용은 그대로다 — 다만 이전에 막혀서 못 나갔을 수 있으니(보호자 등록 등) 재시도는 해본다.
     current = await attemptSendAndReload(env, app, current);
-    return json({ ok: true, idempotent: true, request: feedbackView(current) }, 200, origin);
+    return json({ ok: true, idempotent: true, request: await feedbackView(current) }, 200, origin);
   }
 
   const result = await env.DB.prepare(
     "UPDATE feedback_requests SET owner=?, body=?, body_hash=?, teacher_name=?, student_id=?, student_name=?, " +
-    "content_text=?, subject_text=?, homework_text=?, comment_text=?, plus_text=?, minus_text=?, " +
+    "content_text=?, subject_text=?, homework_text=?, comment_text=?, notice_text=?, plus_text=?, minus_text=?, " +
     "revision=revision+1, status='approval_waiting', " +
     'updated_at=?, reviewed_at=NULL, reviewed_by=NULL, review_note=NULL ' +
     'WHERE app=? AND request_key=? AND revision=?'
   ).bind(owner, message, bodyHash, teacherName, studentId, studentName, contentText,
-    subjectText, homeworkText, commentText, plusText, minusText,
+    subjectText, homeworkText, commentText, noticeText, plusText, minusText,
     now, 'task', current.request_key, Number(current.revision)).run();
   if (Number(result && result.meta && result.meta.changes || 0) !== 1) {
     return json({ ok: false, error: '다른 변경이 먼저 저장되었습니다. 새로고침 후 다시 시도해 주세요' }, 409, origin);
   }
-  current = await env.DB.prepare('SELECT * FROM feedback_requests WHERE app=? AND request_key=? LIMIT 1')
-    .bind('task', current.request_key).first();
+  current = await findFeedbackRequestByKey(env, 'task', current.request_key);
   current = await attemptSendAndReload(env, app, current);
-  return json({ ok: true, idempotent: false, request: feedbackView(current) }, 200, origin);
+  return json({ ok: true, idempotent: false, request: await feedbackView(current) }, 200, origin);
 }
 
 /** 제출 즉시 카카오 알림톡 발송을 시도하고, 상태가 바뀐 최신 행을 다시 읽어 돌려준다.
@@ -1840,8 +2863,7 @@ async function handleFeedbackRequest(env, app, body, origin) {
  *  상태·사유를 review_note에 남기므로, 여기서는 그 결과를 그대로 반영한 최신 행만 반환한다. */
 async function attemptSendAndReload(env, app, current) {
   await attemptParentFeedbackSend(env, app, current);
-  return await env.DB.prepare('SELECT * FROM feedback_requests WHERE app=? AND request_key=? LIMIT 1')
-    .bind(app, current.request_key).first();
+  return await findFeedbackRequestByKey(env, app, current.request_key);
 }
 
 async function handleFeedbackReview(env, app, body, origin) {
@@ -1853,31 +2875,31 @@ async function handleFeedbackReview(env, app, body, origin) {
 
   const action = String(body.action || 'list');
   if (action === 'list') {
-    const clauses = ['app=?'];
+    const clauses = ['f.app=?'];
     const binds = ['task'];
     if (body.status != null && body.status !== '') {
       const status = String(body.status);
       if (!FEEDBACK_STATUSES.has(status)) return json({ ok: false, error: '올바른 status가 필요합니다' }, 400, origin);
-      clauses.push('status=?'); binds.push(status);
+      clauses.push('f.status=?'); binds.push(status);
     }
     if (body.owner != null && body.owner !== '') {
       const owner = String(body.owner);
       if (!SAFE_ID.test(owner)) return json({ ok: false, error: '올바른 owner가 필요합니다' }, 400, origin);
-      clauses.push('owner=?'); binds.push(owner);
+      clauses.push('f.owner=?'); binds.push(owner);
     }
     if (body.feedbackDate != null && body.feedbackDate !== '') {
       const feedbackDate = String(body.feedbackDate);
       if (!validIsoDate(feedbackDate)) return json({ ok: false, error: 'feedbackDate는 YYYY-MM-DD 형식이어야 합니다' }, 400, origin);
-      clauses.push('feedback_date=?'); binds.push(feedbackDate);
+      clauses.push('f.feedback_date=?'); binds.push(feedbackDate);
     }
     const limit = Math.max(1, Math.min(200, Number(body.limit) || 100));
     const statement = env.DB.prepare(
-      'SELECT * FROM feedback_requests WHERE ' + clauses.join(' AND ') +
-      " ORDER BY CASE status WHEN 'approval_waiting' THEN 0 WHEN 'revision_requested' THEN 1 " +
-      "WHEN 'content_approved_send_blocked' THEN 2 WHEN 'sent' THEN 3 WHEN 'cancelled' THEN 4 ELSE 5 END, updated_at DESC LIMIT " + limit
+      FEEDBACK_WITH_LATEST_SEND_SELECT + 'WHERE ' + clauses.join(' AND ') +
+      " ORDER BY CASE f.status WHEN 'approval_waiting' THEN 0 WHEN 'revision_requested' THEN 1 " +
+      "WHEN 'content_approved_send_blocked' THEN 2 WHEN 'sent' THEN 3 WHEN 'cancelled' THEN 4 ELSE 5 END, f.updated_at DESC LIMIT " + limit
     ).bind(...binds);
     const result = await statement.all();
-    return json({ ok: true, requests: (result.results || []).map(feedbackView) }, 200, origin);
+    return json({ ok: true, requests: await Promise.all((result.results || []).map(feedbackView)) }, 200, origin);
   }
 
   if (action !== 'approve_content' && action !== 'request_revision') {
@@ -1891,8 +2913,7 @@ async function handleFeedbackReview(env, app, body, origin) {
   if (!Number.isInteger(expectedRevision) || expectedRevision < 1) {
     return json({ ok: false, error: '현재 revision이 필요합니다' }, 400, origin);
   }
-  let current = await env.DB.prepare('SELECT * FROM feedback_requests WHERE app=? AND request_key=? LIMIT 1')
-    .bind('task', requestKey).first();
+  let current = await findFeedbackRequestByKey(env, 'task', requestKey);
   if (!current) return json({ ok: false, error: '피드백 요청을 찾을 수 없습니다' }, 404, origin);
   if (Number(current.revision) !== expectedRevision) {
     return json({ ok: false, error: '문구가 변경되었습니다. 새로고침 후 다시 검토해 주세요' }, 409, origin);
@@ -1902,7 +2923,7 @@ async function handleFeedbackReview(env, app, body, origin) {
   const now = Date.now();
   if (action === 'approve_content') {
     if (current.status === 'content_approved_send_blocked') {
-      return json({ ok: true, idempotent: true, request: feedbackView(current) }, 200, origin);
+      return json({ ok: true, idempotent: true, request: await feedbackView(current) }, 200, origin);
     }
     if (current.status !== 'approval_waiting') {
       return json({ ok: false, error: '수정된 문구가 다시 제출된 뒤 승인할 수 있습니다' }, 409, origin);
@@ -1919,7 +2940,7 @@ async function handleFeedbackReview(env, app, body, origin) {
     if (!note) return json({ ok: false, error: '수정 요청 내용을 입력해 주세요' }, 400, origin);
     if (note.length > MAX_REVIEW_NOTE) return json({ ok: false, error: '수정 요청은 ' + MAX_REVIEW_NOTE + '자까지 입력할 수 있습니다' }, 413, origin);
     if (current.status === 'revision_requested' && String(current.review_note || '') === note) {
-      return json({ ok: true, idempotent: true, request: feedbackView(current) }, 200, origin);
+      return json({ ok: true, idempotent: true, request: await feedbackView(current) }, 200, origin);
     }
     const result = await env.DB.prepare(
       "UPDATE feedback_requests SET status='revision_requested', updated_at=?, reviewed_at=?, " +
@@ -1929,9 +2950,8 @@ async function handleFeedbackReview(env, app, body, origin) {
       return json({ ok: false, error: '다른 변경이 먼저 저장되었습니다. 새로고침 후 다시 검토해 주세요' }, 409, origin);
     }
   }
-  current = await env.DB.prepare('SELECT * FROM feedback_requests WHERE app=? AND request_key=? LIMIT 1')
-    .bind('task', requestKey).first();
-  return json({ ok: true, idempotent: false, request: feedbackView(current) }, 200, origin);
+  current = await findFeedbackRequestByKey(env, 'task', requestKey);
+  return json({ ok: true, idempotent: false, request: await feedbackView(current) }, 200, origin);
 }
 
 
@@ -2111,11 +3131,37 @@ export default {
     let body;
     try { body = await request.json(); }
     catch (e) { return json({ ok: false, error: '본문을 읽을 수 없습니다' }, 400, okOrigin); }
+    if (!body || typeof body !== 'object' || Array.isArray(body)) return json({ ok: false, error: '요청 본문은 객체여야 합니다' }, 400, okOrigin);
 
     const app = String(body.app || '');
-    if (!APPS.includes(app)) return json({ ok: false, error: 'app은 task 또는 consult' }, 400, okOrigin);
+    if (typeof body.app !== 'string' || !APPS.includes(app)) return json({ ok: false, error: 'app은 task 또는 consult' }, 400, okOrigin);
 
     try {
+      if (url.pathname === '/staff-work-session' || url.pathname === '/staff-profile') {
+        const auth = await resolveAuth(env, app, body.auth);
+        if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+        return url.pathname === '/staff-work-session'
+          ? await handleStaffWorkSession(env, app, body, okOrigin, auth, json)
+          : await handleStaffProfile(env, app, body, okOrigin, auth, json);
+      }
+      if (url.pathname === '/manager-inspection-session') {
+        const auth = await resolveAuth(env, app, body.auth);
+        if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+        // 로그인은 현재 태블릿의 선생님 bearer로, 종료는 발급된 점검 세션으로 인증한다.
+        if (body.action === 'login' && (!body.auth || body.auth.mode !== 'person')) {
+          return json({ ok: false, error: '선생님 개인 인증이 필요합니다' }, 403, okOrigin);
+        }
+        const sourceAuth = auth;
+        return await handleManagerInspectionSession(
+          env, app, body, okOrigin, sourceAuth, json, taskManagerIds(env)
+        );
+      }
+      if (app === 'task' && body.auth && body.auth.mode === 'person' && staffWorkLoginEnabled(env)) {
+        const auth = await resolveAuth(env, app, body.auth);
+        if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+        const denied = await guardStaffWorkAccess(env, body, auth, url.pathname, okOrigin, json);
+        if (denied) return denied;
+      }
       if (url.pathname === '/sync')   return await handleSync(env, app, body, okOrigin);
       if (url.pathname === '/consult-reward') {
         const auth = await resolveAuth(env, app, body.auth);
@@ -2145,6 +3191,11 @@ export default {
         const auth = await resolveAuth(env, app, body.auth);
         if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
         return await handleContactLog(env, app, body, okOrigin, auth, json);
+      }
+      if (url.pathname === '/staff-attendance') {
+        const auth = await resolveAuth(env, app, body.auth);
+        if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+        return await handleStaffAttendance(env, app, body, okOrigin, auth, json);
       }
       if (url.pathname === '/weekend-visit') {
         const auth = await resolveAuth(env, app, body.auth);
@@ -2217,6 +3268,16 @@ export default {
         const auth = await resolveAuth(env, app, body.auth);
         if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
         return await handleTuitionAlert(env, app, body, okOrigin, auth, json);
+      }
+      if (url.pathname === '/student-attendance') {
+        const auth = await resolveAuth(env, app, body.auth);
+        if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+        return await handleStudentAttendance(env, app, body, okOrigin, auth, json);
+      }
+      if (url.pathname === '/student-next-lesson') {
+        const auth = await resolveAuth(env, app, body.auth);
+        if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+        return await handleStudentNextLesson(env, app, body, okOrigin, auth, json);
       }
       if (url.pathname === '/book-issue') {
         const auth = await resolveAuth(env, app, body.auth);
@@ -2296,6 +3357,11 @@ export default {
           (staffId, code) => revokeIssuedBootstrap(env, 'consult', staffId, code)
         );
       }
+      if (url.pathname === '/lesson-stop') {
+        const auth = await resolveAuth(env, app, body.auth);
+        if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+        return await handleLessonStop(env, app, body, okOrigin, auth, json);
+      }
       if (url.pathname === '/lesson-change-request') {
         const auth = await resolveAuth(env, app, body.auth);
         if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
@@ -2355,6 +3421,13 @@ export default {
       return json({ ok: false, error: '없는 경로' }, 404, okOrigin);
     } catch (e) {
       if (isRewardProcessingLockError(e)) return rewardProcessingLockResponse(okOrigin);
+      const schedulePayload = studentScheduleConflictPayload(e);
+      if (schedulePayload) return json(schedulePayload, 409, okOrigin);
+      if (url.pathname === '/feedback-polish') {
+        return json({ ok: false, code: 'FEEDBACK_STORAGE_BUSY',
+          error: '피드백 저장소를 확인하지 못했습니다. 잠시 뒤 다시 시도해 주세요. 기존 문구는 그대로 유지됩니다' },
+        503, okOrigin);
+      }
       return json({ ok: false, error: String(e && e.message || e) }, 500, okOrigin);
     }
   }

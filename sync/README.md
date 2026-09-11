@@ -2,6 +2,37 @@
 
 학생 100명 이상을 감당하기 위해 기존 Apps Script 동기화를 대체한다.
 
+## 개인 기기 동기화 충돌 복구 (2026-09-08)
+
+- `/sync`의 409 저장 충돌은 인증 만료와 구분한다. task 화면은 미전송 내용을
+  현재 기기·계정·데이터 세대별로 보존하고, `changes: []`, `recoveryPull: {}`로
+  인증된 읽기 전용 조회를 시작한다. 반환된 `recoveryPull`과 삭제 커서를 이어 보내
+  모든 페이지를 확인한 뒤 로컬 동기화 캐시를 교체한다. 운영 데이터에는 쓰지 않는다.
+- 키 기반 테이블별 페이지로 같은 시각의 대량 행도 누락 없이 순회한다. 완전한 DB
+  트랜잭션 스냅샷은 아니며, 조회 중 변경은 이후 일반 델타 동기화로 이어 받는다.
+- 보존본은 **보존된 미전송 내용 확인**에서 최신 수업과 비교해 필요한 내용만 옮긴다.
+  자동 재전송하지 않으며 인증정보는 포함하지 않는다. 검증된 같은 계정/권한만
+  표시하고, 개인 연결 해제·권한 강등 시 민감 캐시와 함께 제거한다.
+- 보존 기록 창의 **확인 완료**는 당시 표시된 기록의 안내만 숨긴다. 원본은 그대로
+  두며 화면 아래 **보존 기록 보기**에서 다시 연다. 확인 상태는 같은 기기에 남고,
+  이후 새 기록이 생기면 다시 안내한다. 확인은 서버 재전송이나 수정 반영을 뜻하지 않는다.
+- 보존 저장 실패, 불완전 응답, 다른 탭의 변경이 감지되면 캐시 교체를 중단한다.
+  인증 실패와 데이터 세대 변경에 대한 기존 보호는 유지한다. `/sync` 응답은
+  20초 후 시간 초과로 표시하여 인증 확인 화면에서 무한 대기하지 않는다.
+- 새 마이그레이션은 없다. Worker를 먼저 배포하고 task Pages를 배포한다.
+
+## 보강 지난 날짜 및 수업 중단 (2026-09-08)
+
+- 직접 보강 생성·일정 변경은 지난 날짜도 허용한다. 날짜 형식, 시간 순서, 권한,
+  학생의 수업 중복, 회차 규칙은 유지한다. 생성만으로 출석·보강완료하지 않으며,
+  아직 종료되지 않은 보강을 완료할 수 없다. 구형 보호자 제안·확인 흐름의 종료 일시 제한은 유지한다.
+- 지시 목록에서 정규수업 **중단**은 `/lesson-stop`에 taskId·studentId·staffId와
+  expectedUpdatedAt을 보내 원장/관리 담당 권한으로 처리한다. 일반 업무 동기화로
+  중단하지 않으며 서버 성공 뒤에만 화면을 숨긴다. 수업·출결·메모는 물리 삭제하지 않는다.
+- 중단은 학생 시간표 revision과 수업 본문 CAS를 한 batch로 묶어 기록하고,
+  `lesson_delete` 감사 이력을 남긴다. 연결된 진행 중 보강이 있으면 먼저 완료/보강없음
+  처리를 안내하며 임의 취소하지 않는다. 새 마이그레이션은 없다.
+
 ## 왜 바꾸나
 
 | | 기존 (Apps Script + 시트) | 여기 (Workers + D1) |
@@ -73,6 +104,35 @@ npx wrangler d1 execute wb-sync --remote --file=./migrations/058_weekend_visit_s
 npx wrangler d1 execute wb-sync --remote --file=./migrations/059_weekend_multi_visits.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/060_lesson_handoffs.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/061_consult_reward_processing_guard.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/062_feedback_ai_budget_cache.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/063_student_session_cycles.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/064_student_session_ledger_generations.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/065_makeup_assignee_integrity.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/066_makeup_student_overlap_only.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/067_feedback_template_v3.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/068_lesson_check_key_redirects.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/069_student_lesson_time_overlap.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/070_remove_heavy_student_schedule_triggers.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/071_task_revocations.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/072_consult_link_phone_owner.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/073_staff_work_login.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/074_makeup_completion_links.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/075_manager_inspection_sessions.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/076_makeup_absence_retry.sql
+
+> `076`은 보강 수업 자체가 결석된 뒤 새 일정을 잡는 재보강 경로를 추가한다. 기존 결석
+> 출결과 원래 보강 일정은 append-only 이력으로 보존하고, 재보강 일정만 새로 저장한다.
+
+> `070`은 이미 적용된 `069` 이력을 되돌리지 않고, 그 migration이 만든 JSON 전개 view·trigger만
+> 제거한 뒤 학생별 일정 revision 원장과 경량 보강 revision trigger를 설치한다. 운영 DB에는 반드시
+> `069` 다음 순서로 적용하고, 신규 설치에는 같은 최종 상태를 담은 `schema.sql`을 사용한다.
+
+> `071`은 물리 삭제된 수업이 오래 열린 태블릿 캐시에서 되살아나는 일을 막는다. 학생 정보나
+> 수업 내용 대신 현재 데이터 세대의 opaque task ID와 이전 담당자 ID만 append-only로 기록한다.
+> 운영 DB 전체 백업과 복원 시험을 마친 뒤 `071` → 직원 Worker → task Pages 순서로 배포한다.
+
+> `072`는 consult 학생용 연락처에 학생 번호·엄마 번호 구분을 추가한다. 기존 번호는 추측하지
+> 않고 `unknown`으로 유지하며, 새 consult 화면에서 종류와 전체 번호를 한 번 다시 확인한다.
 
 # 3) 비밀키 등록 — 코드나 wrangler.toml에 적지 않는다
 npx wrangler secret put TASK_ADMIN_SECRET
@@ -83,7 +143,9 @@ npx wrangler secret put SOLAPI_KAKAO_CONSULT_LINK_APPROVED_TEMPLATE_ID # 승인�
 npx wrangler secret put SOLAPI_KAKAO_API_KEY        # 카카오 알림톡 전용 API 키
 npx wrangler secret put SOLAPI_KAKAO_API_SECRET     # 카카오 알림톡 전용 API 시크릿
 npx wrangler secret put SOLAPI_KAKAO_PF_ID          # 연동된 카카오 채널 ID
-npx wrangler secret put SOLAPI_KAKAO_TEMPLATE_ID    # 승인된 학부모 수업 피드백 템플릿 ID
+npx wrangler secret put SOLAPI_KAKAO_TEMPLATE_ID    # 승인된 학부모 수업 피드백 V1 템플릿 ID
+npx wrangler secret put SOLAPI_KAKAO_FEEDBACK_TEMPLATE_ID_V2 # 승인된 학부모 수업 피드백 V2 템플릿 ID
+npx wrangler secret put SOLAPI_KAKAO_FEEDBACK_TEMPLATE_ID_V3 # 승인된 학부모 수업 피드백 V3 템플릿 ID
 npx wrangler secret put SOLAPI_SENDER_NUMBER        # Solapi에 등록된 발신번호
 npx wrangler secret put WB_PARENT_FEEDBACK_SEND_ENABLED # 승인·연락처 점검 뒤에만 true
 npx wrangler secret put SOLAPI_KAKAO_MAKEUP_PROPOSAL_APPROVED_TEMPLATE_ID
@@ -96,10 +158,18 @@ npx wrangler secret put SOLAPI_KAKAO_TRANSPORT_DROPPED_APPROVED_TEMPLATE_ID
 npx wrangler secret put WB_TRANSPORT_NOTIFY_ENABLED # 두 템플릿 APPROVED·차량 목적 동의 확인 뒤에만 true
 npx wrangler secret put WB_CONSULT_LINK_SEND_ENABLED # 학생 링크 템플릿 승인·연락처 동의 확인 뒤에만 true
 npx wrangler secret put WB_BOOK_ORDER_SAMPLE_ENABLED # 본인 교재문자 샘플 때만 true, 확인 뒤 false
+npx wrangler secret put BOOK_VENDOR_PHONE_SANGHYUNG # 상형총판 전용 수신번호(저장소에 값 기록 금지)
 npx wrangler secret put NAVER_ID        # 네이버 검색 API Client ID (강좌 검색용)
 npx wrangler secret put NAVER_SECRET    # 네이버 검색 API Client Secret
 npx wrangler secret put NAVER_MAPS_ID       # 네이버 지도 API Key ID (Geocoding + Directions 5)
 npx wrangler secret put NAVER_MAPS_SECRET   # 네이버 지도 API Key (Geocoding + Directions 5)
+
+consult 학생 링크 알림톡 템플릿은 버튼 URL을
+`https://whdudwns33-wb.github.io/wb-site/consult/#c=#{연결코드}`로 승인받아 사용한다.
+학생 ID는 일회용 코드 교환 때 서버가 확인하며, 치환 뒤 URL은 99자로 유지한다.
+모바일·PC 링크를 같게 넣고 외부 브라우저 열기(`targetOut`)를 사용한다.
+기존 템플릿에서 전환할 때는 `WB_CONSULT_LINK_SEND_ENABLED=false`로 발송을 멈추고
+Worker와 consult Pages를 배포한 뒤, 새 승인 템플릿 ID를 등록하고 발송을 다시 켠다.
 
 # 4) 보호자·직원 Worker 배포 후, 별도 origin의 학생 Worker 배포
 npx wrangler deploy
@@ -204,6 +274,9 @@ DB 트리거로 차단한다. 기존 주문 task와 학생 연결 봉인 데이�
 보관한다. 대상 주문·담당 stable ID·교재명·현재 단계·기존 금액이 모두 일치하지 않으면 정정 행은
 생성되지 않으므로 배포를 중단하고 대상 상태를 다시 확인한다.
 
+`077_book_order_amount_correction_100ball_3_2.sql`은 학생배부 완료된 `100발100중 영어 3-2 중간고사`
+주문의 14,400원 금액을 원 주문과 연결정보를 건드리지 않고 16,000원 정정 원장에 기록한다.
+
 토·일 실제 등·하원 기록 기능은 `050_weekend_actual_visits.sql`과
 `058_weekend_visit_source_date.sql`, `059_weekend_multi_visits.sql`을 운영 D1에 순서대로 먼저 적용한 뒤 Worker, task Pages
 순서로 배포한다. 실제 방문일(`visit_date`)과 원래 수업 카드 날짜(`source_date`)를 분리하며,
@@ -250,11 +323,34 @@ append-only 저장한다. 승인된 수업삭제의 감사 행은 DB에만 보�
 회차 시작일은 비공개 roster의 stable studentId에 저장하고, 23:50 KST 확정 출결 중
 출석·지각·조퇴를 모든 과목에서 합산한다. 알림 원장에는 이름이나 연락처를 저장하지 않는다.
 
+학생 단위 회차제 원장은 `063_student_session_cycles.sql` → Worker → Pages 순서로 배포한다.
+설정된 회차 시작일부터 모든 담당 과목의 확정 출석·지각·조퇴를 합쳐 4회 단위의 append-only
+원장으로 저장하며, 결석은 0회이고 자동 보강을 생성하지 않는다. 4회 완료 후에는 다음 확정
+출석일을 새 회차 시작일로 삼는다. 원장에는 이름·연락처를 저장하지 않고 stable studentId만 쓴다.
+
+과거 회차 출석일을 정정할 때는 `064_student_session_ledger_generations.sql` →
+`065_makeup_assignee_integrity.sql` → Worker → 정정 세대
+등록 → Pages 순서를 지킨다. 기존 원장을 수정·삭제하지 않고 새 append-only 세대에 관리자 확인
+출석을 기록하며, 화면·회차 계산·3회 수강료 알림은 최신 세대만 사용한다. 정정 기준일까지의
+회차 산입 raw 출결은 최신 세대가 대체하고, 결석·비산입 보강은 달력에 보존한다. 그 이후 확정
+출결은 같은 세대에 계속 누적한다. 수강료 알림도 append-only 상태 이력으로 최신 회차와 함께
+교정하므로 정정에서 사라진 회차의 알림을 다시 표시하거나 확인하지 않는다. 065는 실제 보강
+담당자(`makeup_cases.confirmed_staff_id`)와 생성된 보강 task의 owner가 일치하는 출결만 최신
+회차 원장 근거로 허용한다. 일정 없이 끝난 결석보강을 관리자가 과거 날짜로 직접 완료하면
+server-only append-only 증빙과 P/L/E 출결을 한 transaction에 기록한다. 이미 더 최신 출결이
+원장에 있으면 이 증빙을 durable outbox로 삼아 다음 원장 동기화가 새 정정 세대를 만들며,
+시험·기타 보강은 계속 0회로 유지한다. 담당자가 바뀐 보강의 과거 담당자에게는 전체 학생
+정보 대신 로컬 보강 task 폐기에 필요한 최소 revocation 식별자만 반환한다.
+
 보호자 교재 주문 현황을 추가하는 배포는 반드시
 `037_book_order_identity_snapshots.sql` → Worker → Pages 순서로 진행한다. 새
 `/book-order create`만 현재 재원생 ID·이름 해시와 교재·학생 집합을 불변
 원장에 봉인한다. 기존 주문은 오연결 위험 때문에 자동 이관하지 않고 보호자에게
 표시하지 않는다. `BOOK_VENDOR_PHONES`의 유효한 문자 주문처만 봉인할 수 있으며,
+원본 거래처 키가 `상형출판사`인 주문은 선택적으로 `BOOK_VENDOR_PHONE_SANGHYUNG`
+전용 비밀키를 우선 사용한다. 전용 값이 설정됐지만 유효하지 않으면 과거 공용 번호로
+대체 발송하지 않고 차단한다. Solapi 상태조회는 `messageIds`를 같은 query key의 반복값으로
+보내며, 응답의 `messageList`가 객체 또는 배열인 경우를 모두 정규화한다.
 쿠팡 등 온라인 직접 주문은 기존 `manual_online_v1` 경로를 유지하고 보호자 주문
 현황에는 표시하지 않는다. 보호자에는 서버 교재 DB 정본이 없는 현재 단계에서
 임의 교재명을 보내지 않고 `주문 교재`로만 표시한다.
@@ -429,6 +525,14 @@ KST 날짜·거래처·주문 집합으로 멱등 처리해 같은 날 반복 �
 재시도한다. 거래처 문자가 2,000바이트를 넘으면 주문 task 경계로 나누며,
 하루 30통 한도 밖의 거절 주문은 기존 `rejected` 매핑을 유지해 다음날 이어서 처리한다.
 
+발송 직후의 Solapi `2000`은 최종 성공이 아니다. Worker는 진행 중인 같은
+`provider_message_id`만 10분마다 조회해 `2000`(문자 접수·발송 대기),
+`3000`(통신사 전달 중), `4000`(문자 수신 완료)을 구분한다. 숫자 코드는 UI에
+직접 노출하지 않으며 `4000` 또는 명시적인 수동 주문 완료만 수령 가능 상태로
+본다. 2000이 24시간, 3000이 72시간을 넘으면 자동 재발송하지 않고 결과 확인
+필요 상태로 닫는다. 전화로 대신 주문한 장부에는 `MANUAL_PHONE_ORDERED`를
+기록하며 상태 조회와 확정 거절 재시도에서 모두 제외한다.
+
 ```jsonc
 { "app":"task", "auth":{...}, "action":"retry-rejected" }
 ```
@@ -516,8 +620,9 @@ KST 오늘 본인 노선으로 제한된다. 전체 관리 권한은 오늘 기�
 ### `/makeup` — 전 학생 공통 보강 원장
 
 결석 출결 한 건에서 보강 검토를 만들고 `review_pending → reviewed → awaiting_parent →
-confirmed → completed`로 관리한다. 모든 변경은 `revision` CAS이며, 학생·담당 선생님·정규 수업과
-확정 보강의 시간 겹침을 서버에서 다시 검사한다. 담당 선생님은 자기 학생의 검토 요청과 자기 담당
+confirmed → completed`로 관리한다. 모든 변경은 `revision` CAS이며, 같은 학생의 정규 수업·
+확정·완료 보강과 시간이 겹치는지 서버에서 다시 검사한다. 한 선생님이 다른 학생의 정규 수업이나
+보강을 동시에 담당하는 것은 허용한다. 담당 선생님은 자기 학생의 검토 요청과 자기 담당
 보강 완료만 할 수 있고, 원장·허용된 관리 담당만 검토·일정 제안·확정·취소를 할 수 있다.
 
 ```jsonc

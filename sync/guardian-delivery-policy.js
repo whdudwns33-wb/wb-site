@@ -20,6 +20,16 @@ export function guardianDeliveryAllowed(env, studentId) {
   return !!target && guardianDeliveryStudentIds(env).includes(target);
 }
 
+/** 학부모 수업 피드백에만 적용하는 전체 학생 gate다. 기존 보호자 웹앱·공지·운영
+ * 알림의 전역 gate와 의도적으로 분리하며, 명시적인 소문자 true만 활성화한다. */
+export function parentFeedbackAllStudentsEnabled(env) {
+  return text(env && env.WB_PARENT_FEEDBACK_ALL_STUDENTS_ENABLED) === 'true';
+}
+
+export function parentFeedbackDeliveryAllowed(env, studentId) {
+  return parentFeedbackAllStudentsEnabled(env) || guardianDeliveryAllowed(env, studentId);
+}
+
 export function guardianDeliveryAvailable(env) {
   return guardianDeliveryGloballyEnabled(env) || guardianDeliveryStudentIds(env).length > 0;
 }
