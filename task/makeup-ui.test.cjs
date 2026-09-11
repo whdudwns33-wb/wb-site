@@ -571,6 +571,7 @@ test('completion refresh waits for task sync and reloads both session ledgers in
 
 test('makeup lessons have text and color distinction on teacher cards and every manager schedule view', () => {
   const row = block('function taskRow(', 'const LESSON_MEMO_FIELDS');
+  const makeupCard = block('function makeupCard(row)', 'function makeupMissingAbsenceRows');
   const timeline = block('function scheduleTimelineHtml', 'function scheduleTimelineModal');
   const modal = block('function scheduleTimelineModal', 'function scheduleSimpleRow');
   const simple = block('function scheduleSimpleRow', 'function scheduleRowsHtml');
@@ -579,6 +580,10 @@ test('makeup lessons have text and color distinction on teacher cards and every 
 
   assert.match(row, /is-makeup-lesson/);
   assert.match(row, /makeup-lesson">보강수업/);
+  assert.match(row, /makeupSourceDate/);
+  assert.match(row, /원수업일/);
+  assert.match(makeupCard, /row\.sourceDate/);
+  assert.match(makeupCard, /sourceDateTag/);
   assert.match(timeline, /schedule-legend-dot makeup/);
   assert.match(timeline, /isScheduledMakeupTask\(entry\.task\)/);
   assert.match(timeline, /'is-makeup'/);
