@@ -7,6 +7,7 @@
 |---|---|
 | `app.html` | **앱 원본 (공개, 개인정보 0).** 기능 수정은 전부 이 파일에서 (단일 HTML, 의존성 없음) |
 | `wrapper-template.html` | 비밀번호 입력 화면 + WebCrypto 복호화 로직 |
+| `check-password.mjs` | **빌드 전 필수** — 백업을 실제로 복호화해 비밀번호가 맞는지 확인 |
 | `build.mjs` | seed·bulk 주입 → AES-256-GCM 암호화 → `../index.html` 생성 + 복호화 자가검증 |
 | `private-seed.json` | **gitignored.** 학생 시드 — `../backup/private-seed.enc.json` 에서 복원 |
 | `bulk-data.json` | **gitignored.** 입결 5개년+전국고교 — `../backup/bulk-data.enc.json` 에서 복원 |
@@ -26,7 +27,9 @@ git checkout claude/agent-performance-optimization-rj8ql6   # 워크벤치 소�
 ```bash
 # 1) workbench/src/app.html 수정
 # 2) 빌드 (비밀번호는 원장에게 확인, 저장소·코드에 절대 적지 않는다)
+WB_PASSWORD='<비밀번호>' node workbench/src/check-password.mjs  # 먼저 이게 ✓ 여야 한다
 WB_PASSWORD='<비밀번호>' node workbench/src/build.mjs   # "복호화 검증: 일치 ✓" 확인
+# ⚠ build.mjs 의 "일치 ✓" 는 비밀번호가 틀려도 뜬다 — 진짜 검증은 check-password.mjs 뿐이다.
 # 3) 실명 검사 (공개 파일에 학생 실명 0건이어야 함 — 통과 못 하면 커밋 금지)
 grep -c "한수빈\|박세윤\|조유빈\|강준서\|마윤서\|김아린\|강현서\|김태련\|고현준\|오수아\|남혁준\|윤시현" workbench/src/app.html  # → 0
 # 4) 소스 커밋: 작업 브랜치에 app.html + index.html
