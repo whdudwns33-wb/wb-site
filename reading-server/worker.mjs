@@ -321,7 +321,11 @@ function parentSummary(stu, st, titles, vst, book) {
 export default {
   async scheduled(event, env, ctx) {
     /* 12:00 UTC(21:00 KST) = 밤 9시 물주기 푸시 / 그 외(18:00 UTC) = 일일 백업 */
-    if (event.cron === '0 12 * * *') ctx.waitUntil(sendNightPushes({ store: vocabStore(env), push: vocabPushEnv(env) }));
+    if (event.cron === '0 12 * * *') ctx.waitUntil(sendNightPushes({
+      store: vocabStore(env), push: vocabPushEnv(env),
+      /* 내신 몫도 함께 본다(§12 Phase 2) — 워드브레인이 비어도 시험 범위가 남았으면 부른다 */
+      naesin: naesinStore(env),
+    }));
     else ctx.waitUntil(snapshotBackup(env));
   },
 

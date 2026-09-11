@@ -738,8 +738,8 @@ setInterval(async () => {
   if (lastPushDay === day) return;
   lastPushDay = day;
   try {
-    const r = await sendNightPushes({ store: vocabStore, push: VOCAB_PUSH_ENV });
-    if (r.sent || r.removed) console.log('[push] 밤 9시 물주기 알림:', JSON.stringify(r));
+    const r = await sendNightPushes({ store: vocabStore, push: VOCAB_PUSH_ENV, naesin: naesinStore });
+    if (r.sent || r.removed) console.log('[push] 밤 9시 알림(워드브레인+내신):', JSON.stringify(r));
   } catch (e) { console.error('[push] 발송 실패:', e.message); }
 }, 60000).unref();
 
