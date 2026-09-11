@@ -90,11 +90,11 @@ function dateValue(value) {
 function optionalDateValue(value) {
   const text = String(value || '').trim();
   if (!text) return '';
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) throw new Error('첫 수업 날짜를 확인해 주세요');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) throw new Error('과목별 첫 수업일을 확인해 주세요');
   const [year, month, day] = text.split('-').map(Number);
   const parsed = new Date(Date.UTC(year, month - 1, day));
   if (parsed.getUTCFullYear() !== year || parsed.getUTCMonth() !== month - 1 || parsed.getUTCDate() !== day) {
-    throw new Error('첫 수업 날짜를 확인해 주세요');
+    throw new Error('과목별 첫 수업일을 확인해 주세요');
   }
   return text;
 }
@@ -410,7 +410,7 @@ async function validateLessonStudentAccess(env, app, task, auth, options = {}) {
   }
   const firstClassDate = validRosterFirstClassDate(student.firstClassDate);
   if (options.enforceFirstClassDate && firstClassDate && String(task.start || '') < firstClassDate) {
-    return { status: 409, error: '수업 적용 시작일은 원생 첫 수업 시작일 ' + firstClassDate + ' 이후여야 합니다' };
+    return { status: 409, error: '수업 적용 시작일은 원생 첫 등원일 ' + firstClassDate + ' 이후여야 합니다' };
   }
   return null;
 }

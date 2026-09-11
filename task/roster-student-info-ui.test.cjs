@@ -44,7 +44,7 @@ test('학생 정보 팝업은 학교·연락처·등록일을 포함하고 모�
   assert.doesNotMatch(html, /<img\b/i);
   assert.match(html, /&lt;img src=x onerror=alert\(1\)&gt;/);
   for (const label of ['학교', '학년', '연락처\\(본인\\)', '연락처\\(부\\)', '연락처\\(모\\)',
-    '등록과목', '신규 등록일', '첫 수업 시작일', '과목별 수업 담당', '재원 기간', '내부 메모', '수업 참고']) {
+    '등록과목', '신규등록일', '첫 등원일', '과목별 수업 담당', '재원 기간', '내부 메모', '수업 참고']) {
     assert.match(html, new RegExp(label));
   }
 });
@@ -82,7 +82,7 @@ test('관리자 신규 원생 추가와 고정 등록과목 중복 선택을 제
   assert.match(editor, /if \(!student\.name\) return toast\('이름을 입력해 주세요'\)/);
   assert.match(editor, /registrationDate\.slice\(0, 7\) \|\| today\(\)\.slice\(0, 7\)/);
   assert.doesNotMatch(editor, /isNew && \(!registrationDate \|\| !firstClassDate\)/);
-  for (const label of ['이름 · 필수', '학교 (선택)', '학년 (선택)', '신규 등록일 (선택)', '첫 수업 시작일 (선택)']) {
+  for (const label of ['이름 · 필수', '학교 (선택)', '학년 (선택)', '신규등록일 (선택)', '첫 등원일 (선택)']) {
     assert.match(editor, new RegExp(label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   }
   const mineList = view.slice(view.indexOf('if (myName)'), view.indexOf('if (session.isStaffLink && !session.isAdmin)'));

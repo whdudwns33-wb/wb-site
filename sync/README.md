@@ -274,6 +274,9 @@ DB 트리거로 차단한다. 기존 주문 task와 학생 연결 봉인 데이�
 보관한다. 대상 주문·담당 stable ID·교재명·현재 단계·기존 금액이 모두 일치하지 않으면 정정 행은
 생성되지 않으므로 배포를 중단하고 대상 상태를 다시 확인한다.
 
+`077_book_order_amount_correction_100ball_3_2.sql`은 학생배부 완료된 `100발100중 영어 3-2 중간고사`
+주문의 14,400원 금액을 원 주문과 연결정보를 건드리지 않고 16,000원 정정 원장에 기록한다.
+
 토·일 실제 등·하원 기록 기능은 `050_weekend_actual_visits.sql`과
 `058_weekend_visit_source_date.sql`, `059_weekend_multi_visits.sql`을 운영 D1에 순서대로 먼저 적용한 뒤 Worker, task Pages
 순서로 배포한다. 실제 방문일(`visit_date`)과 원래 수업 카드 날짜(`source_date`)를 분리하며,

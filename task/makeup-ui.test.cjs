@@ -57,8 +57,21 @@ test('today absence still creates one stable case after sync and today loads mak
   assert.match(request, /makeupCaseForSource\(task\.id, date\)/);
   assert.ok(create.indexOf('await settleSync()') < create.indexOf("sync.post('/makeup'"));
   assert.match(create, /action: 'create_from_absence', sourceTaskId: taskId, sourceDate: date/);
-  assert.match(click, /next === 'A' && date === today\(\)/);
+  assert.match(click, /next === 'A'\) \{/);
+  assert.doesNotMatch(click, /next === 'A' && date === today\(\)/);
   assert.match(click, /automatic: true, expectedUpdatedAt: savedCheck\.updatedAt/);
+});
+
+test('older absences without a case stay visible as an explicit one-tap recovery list', () => {
+  const recovery = block('function makeupMissingAbsenceRows()', 'function makeupKpis');
+  const view = block('function viewMakeups()', 'async function refreshMakeupsAfterConflict');
+  const click = block("case 'murecover':", "case 'muprocessopen':");
+  assert.match(recovery, /if \(!makeupLoaded\) return \[\]/);
+  assert.match(recovery, /existing\.has\(taskId \+ '\\|' \+ date\)/);
+  assert.match(recovery, /isRegularLessonTask\(task\)/);
+  assert.match(recovery, /slice\(0, 100\)/);
+  assert.match(view, /makeupRecoveryHtml\(missingAbsences\)/);
+  assert.match(click, /recoverMissingMakeup\(el\)/);
 });
 
 test('generated makeup lessons are never allowed to recursively create another makeup', () => {
