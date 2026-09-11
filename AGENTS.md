@@ -12,8 +12,11 @@
 `workbench/src/README.md`의 절차를 그대로 따른다. 요약:
 1. 작업 브랜치 체크아웃 → `workbench/backup/README.md`의 복원 명령 2개로 gitignored 비공개 파일
    (`private-seed.json`, `bulk-data.json`) 복원. 복호화 키 = 워크벤치 접속 비밀번호 (원장에게 확인).
-2. `workbench/src/app.html` 수정 → `WB_PASSWORD='...' node workbench/src/build.mjs`
-   → 출력의 "복호화 검증: 일치 ✓" 확인.
+2. `workbench/src/app.html` 수정 → **`WB_PASSWORD='...' node workbench/src/check-password.mjs` 먼저 통과시킨 뒤**
+   `WB_PASSWORD='...' node workbench/src/build.mjs` → 출력의 "복호화 검증: 일치 ✓" 확인.
+   ⚠ build.mjs 의 "일치 ✓" 는 **비밀번호가 틀려도 뜬다** — 넘겨준 값으로 암호화하고 같은 값으로 되읽기 때문.
+   틀린 값으로 배포하면 원장이 기존 비밀번호로 못 여는 앱이 올라간다. check-password.mjs 는 백업을 실제로
+   복호화해 보므로 이것만이 진짜 검증이다.
 3. 배포는 main에 index.html + bulk.enc.json (worktree 사용 권장), 배포 후 라이브 URL 해시 대조.
    **⚠ 두 파일은 반드시 함께 배포** — 암호화 키가 빌드마다 바뀌어 짝이 어긋나면 전 기기에서
    대량 데이터 로드가 실패한다(2026-09-02 실제 사고). 라이브 해시는 index.html과 bulk.enc.json
