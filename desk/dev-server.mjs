@@ -16,7 +16,8 @@ const DB_FILE = path.join(DATA_DIR, 'desk.sqlite');
 /* ── D1 대역 (worker.test.mjs 의 TestD1 과 같은 표면) ───────────────────── */
 class Statement {
   constructor(database, sql) { this.database = database; this.sql = sql; this.args = []; }
-  bind(...args) { this.args = args; return this; }
+  // D1 은 BLOB 에 ArrayBuffer 를 받는다(문서 형식). node:sqlite 는 Uint8Array 만 받으므로 대역이 바꿔 준다.
+  bind(...args) { this.args = args.map(a => (a instanceof ArrayBuffer ? new Uint8Array(a) : a)); return this; }
   async first() { return this.database.prepare(this.sql).get(...this.args) || null; }
   async all() { return { results: this.database.prepare(this.sql).all(...this.args) }; }
   async run() {

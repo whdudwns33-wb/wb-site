@@ -40,7 +40,7 @@ let derivedFor = '';                     // 오늘 카드를 템플릿에서 마
 const ui = {
   staffPick: '', panels: {}, stuQ: '', stuStatus: 'all', stuOpen: '', phoneShown: {},
   reqFilter: 'open', reqErr: '', ctQ: '', linkBusy: false,
-  doneOpen: {}, matrixView: 'students', manualScope: ''
+  doneOpen: {}, matrixView: 'students', manualScope: '', manualPhotos: []
 };
 const boot = { health: null, err: '', busy: false };
 
@@ -1692,22 +1692,107 @@ function seedManuals() {
   });
   render(); toast(n ? '기본 매뉴얼 ' + n + '개를 넣었습니다 — 실제 화면에 맞게 고쳐 주세요' : '이미 전부 있습니다');
 }
+/* 매뉴얼 사진 — 서버(D1)에만 있고 <img src> 로 바로 못 받는다(Bearer). fetch 로 받아 blob URL 로 그린다. */
+const photoUrls = {};
+async function photoSrc(id) {
+  if (photoUrls[id]) return photoUrls[id];
+  const res = await fetch('/api/files/' + encodeURIComponent(id), { headers: { Authorization: 'Bearer ' + getToken() }, cache: 'no-store' });
+  if (!res.ok) throw new Error('사진 없음');
+  const url = URL.createObjectURL(await res.blob());
+  photoUrls[id] = url;
+  return url;
+}
+function hydratePhotos(root) {
+  (root || document).querySelectorAll('img[data-photo]:not([src])').forEach(img => {
+    photoSrc(String(img.dataset.photo)).then(src => { img.src = src; }).catch(() => { img.alt = '사진을 불러오지 못했습니다'; img.classList.add('missing'); });
+  });
+}
+/** 폰 사진은 3~6MB 라 그대로 못 올린다 — 긴 변 maxSide 로 줄여 JPEG 로. 400KB 를 넘으면 품질을 낮춰 한 번 더. */
+function resizeImage(file, maxSide, quality) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, maxSide / Math.max(img.naturalWidth || 1, img.naturalHeight || 1));
+      const w = Math.max(1, Math.round((img.naturalWidth || 1) * scale)), h = Math.max(1, Math.round((img.naturalHeight || 1) * scale));
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      URL.revokeObjectURL(url);
+      const dataUrl = canvas.toDataURL('image/jpeg', quality);
+      resolve({ mime: 'image/jpeg', data: dataUrl.slice(dataUrl.indexOf(',') + 1) });
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('이미지를 읽지 못했습니다')); };
+    img.src = url;
+  });
+}
+async function uploadPhotoFile(file) {
+  let out = await resizeImage(file, 1000, 0.82);
+  if (out.data.length > 400 * 1024 * 4 / 3) out = await resizeImage(file, 800, 0.6);
+  const r = await api('/api/files', { kind: 'manual', mime: out.mime, data: out.data });
+  return String(r.id);
+}
+async function addManualPhotos(input) {
+  const files = Array.from(input && input.files ? input.files : []);
+  if (!files.length) return;
+  if (ui.manualPhotos.length + files.length > 12) return toast('사진은 12장까지입니다');
+  toast('사진 올리는 중…');
+  for (const f of files) {
+    try { const id = await uploadPhotoFile(f); ui.manualPhotos.push({ id: id, caption: '' }); }
+    catch (e) { toast('사진 실패 — ' + e.message); }
+  }
+  input.value = '';
+  const host = $('#dk-mf-photos');
+  if (host) { host.innerHTML = manualPhotosHtml(); hydratePhotos(host); }
+  toast('사진 ' + ui.manualPhotos.length + '장');
+}
+async function removeManualPhoto(idx) {
+  const p = ui.manualPhotos[idx];
+  if (!p) return;
+  ui.manualPhotos.splice(idx, 1);
+  try { await fetch('/api/files/' + encodeURIComponent(p.id), { method: 'DELETE', headers: { Authorization: 'Bearer ' + getToken() } }); } catch (e) { /* 남아도 무해 */ }
+  const host = $('#dk-mf-photos');
+  if (host) { host.innerHTML = manualPhotosHtml(); hydratePhotos(host); }
+}
+function manualPhotosHtml() {
+  if (!ui.manualPhotos.length) return '<div class="hint">사진이 없습니다. 실제 화면을 찍거나 캡처해 올리면 직원이 [📖 방법]에서 봅니다.</div>';
+  return '<div class="mphotos">' + ui.manualPhotos.map((p, i) => '<div class="mphoto"><img data-photo="' + esc(p.id) + '" alt="매뉴얼 사진 ' + (i + 1) + '">' +
+    '<input class="in" data-photo-cap="' + i + '" maxlength="80" placeholder="설명 또는 단계 번호" value="' + esc(p.caption || '') + '" aria-label="사진 설명">' +
+    '<button class="btn btn-sm btn-ghost" data-act="dk-mf-photo-del" data-idx="' + i + '">지우기</button></div>').join('') + '</div>';
+}
+function readManualPhotos() {
+  return ui.manualPhotos.map((p, i) => {
+    const el = document.querySelector('[data-photo-cap="' + i + '"]');
+    const caption = el ? String(el.value || '').trim().slice(0, 80) : String(p.caption || '');
+    return caption ? { id: p.id, caption: caption } : { id: p.id };
+  });
+}
+
 function openManual(id) {
   const m = manualById(id); if (!m) return;
   const scopeName = m.scope === 'app' ? '학습 앱 업로드' + (m.appId && appById(m.appId) ? ' · ' + appById(m.appId).name : '') : roomLabel(m.scope);
   let body = '<div class="card-sub mb8">' + esc(scopeName) + ' · ' + esc(taskLabel(m.task)) + (m.lastCheckedAt ? ' · 마지막 확인 ' + esc(m.lastCheckedAt) : '') + ' · v' + esc(m.version || 1) + '</div>' +
     (m.purpose ? '<div class="guide mb8"><b>목적</b>' + esc(m.purpose) + '</div>' : '');
-  body += (m.steps || []).length ? (m.steps || []).map((s, i) => '<div class="mstep"><b>' + (i + 1) + '.</b><span>' + esc(s.text) + (s.note ? '<small>' + esc(s.note) + '</small>' : '') + '</span></div>').join('') : '<div class="hint">단계가 없습니다.</div>';
+  /* 설명이 숫자면 그 단계 바로 아래에, 아니면 맨 끝 사진 모음에 */
+  const photos = Array.isArray(m.photos) ? m.photos : [];
+  const byStep = {}, rest = [];
+  photos.forEach(p => { const n = Number(p.caption); if (Number.isInteger(n) && n > 0) (byStep[n] = byStep[n] || []).push(p); else rest.push(p); });
+  const photoHtml = (p, big) => '<div class="mphoto' + (big ? ' big' : '') + '"><img data-photo="' + esc(p.id) + '" alt="' + esc(p.caption || '매뉴얼 사진') + '">' + (p.caption && !Number.isInteger(Number(p.caption)) ? '<small>' + esc(p.caption) + '</small>' : '') + '</div>';
+  body += (m.steps || []).length ? (m.steps || []).map((s, i) => '<div class="mstep"><b>' + (i + 1) + '.</b><span>' + esc(s.text) + (s.note ? '<small>' + esc(s.note) + '</small>' : '') +
+    (byStep[i + 1] ? byStep[i + 1].map(p => photoHtml(p, true)).join('') : '') + '</span></div>').join('') : '<div class="hint">단계가 없습니다.</div>';
+  if (rest.length) body += '<div class="sect">사진</div><div class="mphotos">' + rest.map(p => photoHtml(p, false)).join('') + '</div>';
   if ((m.cautions || []).length) body += '<div class="sect">주의</div>' + m.cautions.map(c => '<div class="small" style="color:var(--bad)">⚠ ' + esc(c) + '</div>').join('');
   if ((m.links || []).length) body += '<div class="row wraprow mt8" style="gap:6px">' + m.links.map(l => '<a class="btn btn-sm btn-navy" href="' + esc(l.url) + '" target="_blank" rel="noopener noreferrer">↗ ' + esc(l.label) + '</a>').join('') + '</div>';
   const foot = session.canApprove
     ? '<div class="row wraprow mt14" style="gap:6px"><button class="btn btn-ghost" data-act="dk-manual-edit" data-id="' + esc(id) + '">편집</button></div>'
     : '<div class="hint mt14">이 매뉴얼이 실제 화면과 다르면 요청함(기타)에 "매뉴얼 다름: ' + esc(m.title) + '"으로 올려 주세요.</div>';
   modal(m.title, body, foot);
+  hydratePhotos($('#modalHost'));
 }
 function openManualForm(id, scope) {
   const m = id ? manualById(id) : null;
   const sc = m ? m.scope : (DC.MANUAL_SCOPES.includes(scope) ? scope : 'studyforce');
+  ui.manualPhotos = (m && Array.isArray(m.photos) ? m.photos : []).map(p => ({ id: String(p.id), caption: String(p.caption || '') }));
   const lines = arr => (arr || []).map(x => typeof x === 'string' ? x : (x.text || '') + (x.note ? ' — ' + x.note : '')).join('\n');
   modal(m ? '매뉴얼 편집' : '매뉴얼',
     '<div class="grid2"><div class="field"><label class="fl" for="dk-mf-scope">어느 방</label><select class="in" id="dk-mf-scope" data-act="dk-mf-scope">' + optionsHtml(DC.ROOMS.map(k => [k, roomLabel(k)]).concat([['app', '학습 앱 업로드']]), sc) + '</select></div>' +
@@ -1718,6 +1803,8 @@ function openManualForm(id, scope) {
     '<div class="field"><label class="fl" for="dk-mf-steps">단계 — 한 줄에 하나 (어느 화면에서 무엇을 누르나)</label><textarea class="in" id="dk-mf-steps" rows="7">' + esc(lines(m ? m.steps : [])) + '</textarea></div>' +
     '<div class="field"><label class="fl" for="dk-mf-cautions">주의점 — 한 줄에 하나</label><textarea class="in" id="dk-mf-cautions" rows="3">' + esc(((m ? m.cautions : []) || []).join('\n')) + '</textarea></div>' +
     '<div class="field"><label class="fl" for="dk-mf-links">링크 — "이름 | https://주소" 한 줄에 하나</label><textarea class="in" id="dk-mf-links" rows="2">' + esc(((m ? m.links : []) || []).map(l => l.label + ' | ' + l.url).join('\n')) + '</textarea></div>' +
+    '<div class="field"><div class="fl">사진 (실제 화면 — 폰으로 찍거나 캡처, 12장까지, 앱이 줄여서 올립니다)</div><div id="dk-mf-photos">' + manualPhotosHtml() + '</div>' +
+      '<label class="btn btn-sm btn-ghost mt8" for="dk-mf-photo-add">＋ 사진 추가</label><input type="file" id="dk-mf-photo-add" accept="image/*" multiple data-act="dk-mf-photo-add" class="sr-only"></div>' +
     '<div class="field"><label class="fl" for="dk-mf-checked">마지막 확인일</label><input class="in" id="dk-mf-checked" type="date" value="' + esc(m ? m.lastCheckedAt || today() : today()) + '"></div>',
     '<div class="row wraprow mt8" style="gap:6px"><button class="btn btn-primary" data-act="dk-manual-save" data-id="' + esc(id || '') + '">저장</button>' +
     (m ? '<button class="btn btn-danger" data-act="dk-manual-del" data-id="' + esc(id) + '">삭제</button>' : '') + '</div>');
@@ -1727,6 +1814,7 @@ function saveManualForm(id) {
   const v = DC.validateManual({ scope: val('dk-mf-scope'), appId: val('dk-mf-app'), task: val('dk-mf-task'), title: val('dk-mf-title'), purpose: val('dk-mf-purpose'),
     stepsText: val('dk-mf-steps'), cautionsText: val('dk-mf-cautions'), linksText: val('dk-mf-links'), lastCheckedAt: val('dk-mf-checked'), version: prev ? (Number(prev.version) || 1) + 1 : 1 });
   if (v.error) return toast(v.error);
+  v.value.photos = readManualPhotos();
   addDoc('manuals', id || 'm:' + uid(), v.value);
   closeModal(); render(); toast('매뉴얼을 저장했습니다');
 }
@@ -1901,6 +1989,7 @@ function onClick(ev) {
     case 'dk-manual-save': saveManualForm(id); return;
     case 'dk-manual-del': deleteManual(id); return;
     case 'dk-manual-seed': if (session.canApprove) seedManuals(); return;
+    case 'dk-mf-photo-del': if (session.canApprove) removeManualPhoto(Number(el.dataset.idx)); return;
     case 'dk-manual-scope': ui.manualScope = String(el.dataset.v || ''); render(); return;
     case 'dk-plan-new': if (session.canApprove) openPlanForm('', String(el.dataset.room || '')); return;
     case 'dk-plan-edit': if (session.canApprove) openPlanForm(id, ''); return;
@@ -1930,6 +2019,7 @@ function onChange(ev) {
   if (act === 'dk-cf-ttype' || act === 'dk-pf-ttype') { toggleTargetFields(act.slice(0, 5)); return; }
   if (act === 'dk-cf-program') { const sel = $('#dk-cf-manual'); if (sel) sel.innerHTML = manualOptions(String(el.value || ''), ''); return; }
   if (act === 'dk-mf-scope') { const w = $('#dk-mf-w-app'); if (w) w.hidden = String(el.value || '') !== 'app'; return; }
+  if (act === 'dk-mf-photo-add') { addManualPhotos(el); return; }
   if (el.dataset.act === 'dk-note') {
     const t = taskById(el.dataset.id);
     if (!t) return;
