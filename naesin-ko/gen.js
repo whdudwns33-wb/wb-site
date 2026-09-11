@@ -306,6 +306,51 @@ var WBKOGEN = (function () {
   }
 
   /* 오늘의 세트 — planDay 출력을 문항으로 바꾼다(§4.5 세션 유형별로 나눠 쓴다) */
+  /* ── 출발선 진단 2분(§4.2) ──
+     "무엇부터 시작할까"를 정하는 표본이다. **건너뛰기가 아니다** — 안다고 답해도
+     engine.applyDiagnostic 은 reached 만 세우고 needsRecheck 를 켠다. 안정화 회전(서로 다른 날
+     3회)은 그대로 돈다. 그래서 화면도 '아는 것을 뺀다'가 아니라 '출발선을 잡는다'로 말해야 한다.
+
+     표본을 어떻게 고르는가: 무작위로 뽑으면 한 작품에 몰려 "이 학생은 2단원을 안다"가 된다.
+     작품을 번갈아 돌며(round-robin) 어휘와 개념 빈칸을 같은 비율로 섞는다. 이미 도달한 항목은
+     묻지 않는다 — 답이 이미 있는 질문이다. */
+  var DIAG_MAX = 16;        // 2분 — 문항당 7~8초로 잡은 상한(파일럿에서 실측해 고친다)
+
+  function diagnosticSet(pack, states, opts) {
+    opts = opts || {};
+    var max = opts.max == null ? DIAG_MAX : opts.max;
+    var lanes = [];
+    (pack.works || []).forEach(function (w) {
+      var vs = (w.vocab || []).filter(function (v) {
+        var s = states['v-' + v.id]; return !(s && s.reached);
+      }).map(function (v) {
+        return { key: 'v-' + v.id, kind: 'vocab', workId: w.workId, work: w.title,
+          label: v.term, hint: v.meaning || '' };
+      });
+      var bs = (w.blanks || []).filter(function (b) {
+        var s = states['b-' + b.id]; return !(s && s.reached);
+      }).map(function (b) {
+        return { key: 'b-' + b.id, kind: 'blank', workId: w.workId, work: w.title,
+          label: (b.answers || [])[0] || '', hint: b.path || '' };
+      }).filter(function (x) { return x.label; });
+      if (vs.length || bs.length) lanes.push({ vocab: vs, blanks: bs });
+    });
+    /* 작품을 번갈아, 작품 안에서는 어휘·빈칸을 번갈아 뽑는다 */
+    var out = [], turn = 0, moved = true;
+    while (out.length < max && moved) {
+      moved = false;
+      for (var i = 0; i < lanes.length && out.length < max; i++) {
+        var L = lanes[i];
+        var first = turn % 2 === 0 ? L.vocab : L.blanks;
+        var second = turn % 2 === 0 ? L.blanks : L.vocab;
+        var pick = first.shift() || second.shift();
+        if (pick) { out.push(pick); moved = true; }
+      }
+      turn += 1;
+    }
+    return out;
+  }
+
   function dailySetKo(plan, pack, concepts, rnd, opts) {
     opts = opts || {};
     var byId = {};
@@ -352,7 +397,8 @@ var WBKOGEN = (function () {
     rhetoricItem: rhetoricItem, keywordItem: keywordItem, speakerItem: speakerItem,
     negativeRhetoricItem: negativeRhetoricItem, bogiItem: bogiItem,
     oxItem: oxItem, matchingItem: matchingItem, blankItem: blankItem, vocabItem: vocabItem,
-    restoreTargets: restoreTargets, applySet: applySet, dailySetKo: dailySetKo
+    restoreTargets: restoreTargets, applySet: applySet, dailySetKo: dailySetKo,
+    DIAG_MAX: DIAG_MAX, diagnosticSet: diagnosticSet
   };
 })();
 

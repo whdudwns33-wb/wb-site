@@ -494,6 +494,15 @@
     m.push('<div class="card"><div class="spread"><h3 style="margin:0">오늘의 계획</h3>' +
       '<span class="small muted">' + (p.dday != null ? 'D-' + p.dday : '연습 모드') + '</span></div>' +
       '<div class="small muted" style="margin-top:4px">' + esc(p.note) + '</div></div>');
+    /* 출발선 진단(§4.2) — 첫 만남에 어디서 시작할지 정한다. 아직 안 했고 물어볼 것이 있을 때만 뜬다 */
+    var dg = diagPool();
+    if (!pk().diagDone && dg.length >= 4) {
+      m.push('<div class="card" style="border-color:var(--b3)"><h3>출발선 진단 · 2분</h3>' +
+        '<div class="small muted" style="margin:4px 0 10px">' + dg.length + '개를 훑어 <b>어디서 시작할지</b>만 정해요. ' +
+        '아는 것을 빼는 게 아니라 출발선을 잡는 거라, 안다고 해도 회전은 그대로 돕니다.</div>' +
+        '<div class="row">' + btn('sess-diag', '시작하기') +
+        '<button class="btn ghost" data-act="diag-skip">나중에</button></div></div>');
+    }
     if (S.task) {
       m.push('<div class="card" style="border-color:var(--b3)"><h3>오늘 수업 과제</h3>' +
         '<div><b>' + esc(S.task.title) + '</b> <span class="small muted">' + esc(S.task.date) + '</span></div>' +
@@ -539,6 +548,8 @@
       else if (a === 'sess-apply') { S.workId = (p.works[0] || {}).workId; startApply(); }
       else if (a === 'sess-essay') startEssay();
       else if (a === 'sess-dump') startDump();
+      else if (a === 'sess-diag') startDiag();
+      else if (a === 'diag-skip') { pk().diagDone = true; persist(); render(); }
     });
   }
   function btn(act, label, dis) {
@@ -1135,6 +1146,62 @@
   }
 
   /* 브레인덤프 — 판정 없이 diff만(§4.4) */
+  /* ── 출발선 진단 2분(§4.2) ──
+     "무엇부터 시작할까"만 정한다. 안다고 답해도 engine.applyDiagnostic 은 reached 만 세우고
+     needsRecheck 를 켜므로 안정화 회전(서로 다른 날 3회)은 그대로 돈다 — 그래서 화면도
+     '아는 것을 건너뛴다'가 아니라 '출발선을 잡는다'로 말한다. 과장하면 학생이 안 돌린다. */
+  function diagPool() {
+    if (!S.pack) return [];
+    return GEN.diagnosticSet({ works: canonWorks() }, pk().states, {});
+  }
+  function startDiag() {
+    var items = diagPool();
+    if (!items.length) { S.err = '진단할 것이 없어요.'; render(); return; }
+    S.session = { title: '출발선 진단', items: items, i: 0, kind: 'diag', results: [] };
+    drawDiag();
+  }
+  function drawDiag() {
+    var sess = S.session, it = sess.items[sess.i];
+    if (!it) { finishDiag(); return; }
+    full('<div class="card"><div class="spread"><h3 style="margin:0">출발선 진단</h3>' +
+      '<span class="small muted">' + (sess.i + 1) + ' / ' + sess.items.length + '</span></div>' +
+      '<div class="small muted" style="margin-top:4px">맞히는 시험이 아니에요 — 아는 만큼만 눌러 주세요.</div></div>' +
+      '<div class="q"><div class="small muted">' + esc(it.work) + ' · ' + (it.kind === 'vocab' ? '어휘' : '개념') + '</div>' +
+      '<div class="stem" style="font-size:20px;margin:10px 0">' + esc(it.label) + '</div>' +
+      '<div class="row">' +
+      '<button class="btn" data-dg="1">알아요</button>' +
+      '<button class="btn ghost" data-dg="0">모르겠어요</button></div></div>');
+    $('pane').addEventListener('click', function (e) {
+      var b = e.target.closest('[data-dg]');
+      if (!b) return;
+      sess.results.push({ key: it.key, known: b.getAttribute('data-dg') === '1' });
+      sess.i += 1;
+      drawDiag();
+    });
+  }
+  function finishDiag() {
+    var res = S.session.results || [];
+    var p = pk();
+    /* 상태가 없으면 만들어 둔다 — 진단이 먼저 오고 학습이 뒤따르는 순서다 */
+    res.forEach(function (r) {
+      if (!p.states[r.key]) {
+        var kind = r.key.indexOf('v-') === 0 ? 'vocab' : 'blank';
+        p.states[r.key] = E.createState(r.key.slice(2), kind, Date.now());
+      }
+    });
+    E.applyDiagnostic(p.states, res, Date.now());
+    p.diagDone = true;
+    persist();
+    var known = res.filter(function (r) { return r.known; }).length;
+    S.session = null;
+    full('<div class="card"><h3>출발선을 잡았어요</h3>' +
+      '<div>' + res.length + '개 중 ' + known + '개를 안다고 했어요.</div>' +
+      '<div class="small muted" style="margin-top:6px">아는 것으로 표시한 것도 <b>안정화 회전은 그대로</b> 돕니다 — ' +
+      '서로 다른 날 3번 다시 만나야 시험장에서 꺼낼 수 있어요. 다만 처음 만나는 것들보다 뒤에 놓여요.</div>' +
+      '<button class="btn" style="margin-top:10px" data-home="1">오늘 계획 보기</button></div>');
+    $('pane').addEventListener('click', function () { setTab('home'); });
+  }
+
   function startDump() {
     var w = work(S.workId) || canonWorks()[0];
     if (!w) { S.err = '작품이 없어요.'; render(); return; }

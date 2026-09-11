@@ -203,4 +203,42 @@ t('개념 빈칸은 회전마다 다른 문맥으로 묻는다 — 같은 문장
   assert.strictEqual(GEN.blankItem(work, plain, 7).context, '□□가 분다');
 });
 
+t('출발선 진단은 작품을 번갈아 뽑는다 — 한 작품에 몰리면 표본이 아니라 우연이다(§4.2)', () => {
+  const many = { works: [
+    { workId: 'w1', title: '가', vocab: [{ id: 'v1', term: '가휘1' }, { id: 'v2', term: '가휘2' }],
+      blanks: [{ id: 'b1', answers: ['가칸1'] }, { id: 'b2', answers: ['가칸2'] }] },
+    { workId: 'w2', title: '나', vocab: [{ id: 'v3', term: '나휘1' }],
+      blanks: [{ id: 'b3', answers: ['나칸1'] }, { id: 'b4', answers: ['나칸2'] }] }] };
+  const set = GEN.diagnosticSet(many, {}, { max: 4 });
+  assert.strictEqual(set.length, 4);
+  const works = set.map((x) => x.workId);
+  assert.ok(works.includes('w1') && works.includes('w2'), works.join());
+  /* 앞 4개가 한 작품에서만 나오면 안 된다 — 작품을 번갈아 돈다 */
+  assert.strictEqual(new Set(works.slice(0, 2)).size, 2, works.join());
+  /* 어휘만, 혹은 빈칸만 나오지 않는다 */
+  assert.strictEqual(new Set(set.map((x) => x.kind)).size, 2);
+});
+
+t('이미 도달한 항목은 묻지 않는다 — 답이 이미 있는 질문이다', () => {
+  const one = { works: [{ workId: 'w1', title: '가',
+    vocab: [{ id: 'v1', term: '가휘1' }], blanks: [{ id: 'b1', answers: ['가칸1'] }, { id: 'b2', answers: ['가칸2'] }] }] };
+  assert.strictEqual(GEN.diagnosticSet(one, {}, {}).length, 3);
+  const seen = GEN.diagnosticSet(one, { 'v-v1': { reached: true }, 'b-b1': { reached: true } }, {});
+  assert.deepStrictEqual(seen.map((x) => x.key), ['b-b2']);
+  /* 정답 문자열이 없는 빈칸은 물을 수 없다 */
+  const empty = { works: [{ workId: 'w1', title: '가', blanks: [{ id: 'b9', answers: [] }] }] };
+  assert.deepStrictEqual(GEN.diagnosticSet(empty, {}, {}), []);
+});
+
+t('진단은 건너뛰기가 아니다 — 안다고 해도 안정화 회전은 그대로 돈다(§4.2)', () => {
+  const E = require('./engine.js');
+  const now = Date.now();
+  const states = { 'v-1': E.createState('1', 'vocab', now) };
+  E.applyDiagnostic(states, [{ key: 'v-1', known: true }], now);
+  assert.strictEqual(states['v-1'].reached, true);
+  assert.strictEqual(states['v-1'].needsRecheck, true);
+  assert.strictEqual(states['v-1'].relearnCount, 0);
+  assert.strictEqual(E.isStable(states['v-1']), false);
+});
+
 console.log('\n' + passed + '개 검증 통과');
