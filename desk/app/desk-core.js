@@ -1030,6 +1030,77 @@
     return { value: value, error: '' };
   }
 
+  /* ── 표 캡처 → 수행 스탬프 (기획서 v1.1 §5, C안 단계적) ────────────────
+   * 크롬 확장이 보낸 표(header·rows)와 원장이 정한 규칙(어느 열이 이름·상태·학년, 어떤 값이 완료·부분)으로
+   * 수행 코어의 일일 문서(__perfday__<prog>|<날짜> = {stamp, ex})를 만든다. ex 에는 예외(미수행·부분·모름)만 든다 —
+   * 표에 없는 구독 학생은 "모름"으로 넣어 조용히 완료로 잡히지 않게 한다. */
+
+  function splitValues(text) { return String(text == null ? '' : text).split(/[,\n]/).map(s => s.trim()).filter(Boolean); }
+
+  function validateCaptureRule(input) {
+    const i = isObj(input) ? input : {};
+    if (!PROGRAMS.includes(i.program)) return { value: null, error: '프로그램을 고르세요' };
+    const num = v => (str(v) === '' ? NaN : Number(v));   // 빈 선택은 0열이 아니라 "안 고름"
+    const nameCol = num(i.nameCol), statusCol = num(i.statusCol);
+    if (!Number.isInteger(nameCol) || nameCol < 0) return { value: null, error: '이름 열을 고르세요' };
+    if (!Number.isInteger(statusCol) || statusCol < 0) return { value: null, error: '상태 열을 고르세요' };
+    if (nameCol === statusCol) return { value: null, error: '이름 열과 상태 열은 달라야 합니다' };
+    const gradeCol = str(i.gradeCol) === '' ? -1 : Number(i.gradeCol);
+    if (!Number.isInteger(gradeCol) || gradeCol < -1) return { value: null, error: '학년 열이 올바르지 않습니다' };
+    const doneValues = splitValues(i.doneText);
+    if (!doneValues.length) return { value: null, error: '완료로 볼 값을 하나 이상 적으세요 (예: 완료, O, 100%)' };
+    const partialValues = splitValues(i.partialText);
+    if (doneValues.length > 20 || partialValues.length > 20 || doneValues.concat(partialValues).some(v => v.length > 40)) return { value: null, error: '값은 20개까지, 각 40자까지입니다' };
+    const value = { kind: 'capture', program: i.program, nameCol: nameCol, statusCol: statusCol, gradeCol: gradeCol, doneValues: doneValues, partialValues: partialValues, basis: 'report', active: i.active !== false };
+    if (str(i.note)) value.note = str(i.note).slice(0, 300);
+    return { value: value, error: '' };
+  }
+
+  function cellIs(cell, values) {
+    const c = normName(cell).toLowerCase();
+    return (Array.isArray(values) ? values : []).some(v => normName(v).toLowerCase() === c);
+  }
+
+  /**
+   * capture = {rows:[[…]]} · rule = plans.capture · students = 명단 · byId = 스탬프 주체.
+   * → {stamp, ex, matched:[{id,name,st,cell}], unmatched:[이름], ambiguous:[이름], missing:[{id,name}], counts}
+   */
+  function applyCapture(capture, rule, students, byId, nowMs) {
+    const rows = isObj(capture) && Array.isArray(capture.rows) ? capture.rows : [];
+    const r = isObj(rule) ? rule : {};
+    const nameCol = Number(r.nameCol), statusCol = Number(r.statusCol), gradeCol = Number.isInteger(Number(r.gradeCol)) ? Number(r.gradeCol) : -1;
+    const subs = live(students).filter(s => str(s.status || 'active') === 'active' && isObj(s.programs) && isObj(s.programs[r.program]) && s.programs[r.program].active === true);
+    const byName = {};
+    subs.forEach(s => { const k = normName(s.name).toLowerCase(); if (k) (byName[k] = byName[k] || []).push(s); });
+    const ex = {}, matched = [], unmatched = [], ambiguous = [];
+    const seen = new Set();
+    const counts = { done: 0, partial: 0, notDone: 0, unknown: 0, missing: 0 };
+    rows.forEach(row => {
+      if (!Array.isArray(row)) return;
+      const name = str(row[nameCol]);
+      if (!name) return;
+      let cands = byName[normName(name).toLowerCase()] || [];
+      if (cands.length > 1 && gradeCol >= 0) {
+        const g = normName(row[gradeCol]).toLowerCase();
+        const narrowed = cands.filter(s => normName(s.grade).toLowerCase() === g);
+        if (narrowed.length) cands = narrowed;
+      }
+      if (!cands.length) { unmatched.push(name); return; }
+      if (cands.length > 1) { ambiguous.push(name); return; }
+      const s = cands[0];
+      const cell = str(row[statusCol]);
+      const st = cellIs(cell, r.doneValues) ? 'completed' : cellIs(cell, r.partialValues) ? 'partial' : cell ? 'not_completed' : 'unknown';
+      if (seen.has(str(s.id))) return;   // 같은 학생이 두 줄이면 첫 줄만
+      seen.add(str(s.id));
+      if (st === 'completed') counts.done++;
+      else { counts[st === 'partial' ? 'partial' : st === 'not_completed' ? 'notDone' : 'unknown']++; ex[str(s.id)] = { st: st, why: '' }; }
+      matched.push({ id: str(s.id), name: str(s.name), st: st, cell: cell });
+    });
+    const missing = subs.filter(s => !seen.has(str(s.id))).map(s => { ex[str(s.id)] = { st: 'unknown', why: '' }; return { id: str(s.id), name: str(s.name) }; });
+    counts.missing = missing.length;
+    return { stamp: { by: str(byId), at: Number(nowMs) || 0, basis: 'report' }, ex: ex, matched: matched, unmatched: unmatched, ambiguous: ambiguous, missing: missing, counts: counts };
+  }
+
   /* ── 라우트 ────────────────────────────────────────── */
 
   /** '#/students' → {route:'students', code:''} · '#/p/classcard' → {route:'room', room:'classcard'} · '#c=abc' → 코드 · 모르면 today */
@@ -1072,6 +1143,6 @@
     cardsOn: cardsOn, daysUntil: daysUntil, groupByRoom: groupByRoom, matrixOf: matrixOf, coverageOf: coverageOf, staffStats: staffStats,
     manualFor: manualFor, manualsFor: manualsFor,
     validateCard: validateCard, validateRecurring: validateRecurring, validateRange: validateRange, validateApp: validateApp, validateManual: validateManual,
-    validateExam: validateExam
+    validateExam: validateExam, validateCaptureRule: validateCaptureRule, applyCapture: applyCapture
   };
 });

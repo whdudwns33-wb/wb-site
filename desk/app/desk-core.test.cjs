@@ -561,6 +561,36 @@ test('validateExam: 필수·범위·자료 줄 파싱·PII · validateStudent sc
   assert.deepEqual(C.searchStudents([{ id: '1', name: '학생A', school: 'OO중' }, { id: '2', name: '학생B', school: 'XX중' }], 'OO', 'all').map(s => s.id), ['1']);
 });
 
+test('validateCaptureRule·applyCapture: 열 지정, 완료·부분·미수행·모름, 표에 없는 구독 학생, 동명이인·명단 밖, 중복 행', () => {
+  assert.equal(C.validateCaptureRule({ program: 'studyforce', nameCol: '', statusCol: '1' }).error, '이름 열을 고르세요');
+  assert.equal(C.validateCaptureRule({ program: 'studyforce', nameCol: '0', statusCol: '0', doneText: 'O' }).error, '이름 열과 상태 열은 달라야 합니다');
+  assert.ok(/완료로 볼 값/.test(C.validateCaptureRule({ program: 'studyforce', nameCol: '0', statusCol: '2', doneText: ' ' }).error));
+  assert.equal(C.validateCaptureRule({ program: 'exam4you', nameCol: '0', statusCol: '2', doneText: 'O' }).error, '프로그램을 고르세요');
+  const r = C.validateCaptureRule({ program: 'studyforce', nameCol: '0', statusCol: '2', gradeCol: '', doneText: '완료, O ,100%', partialText: '진행중' });
+  assert.deepEqual(r, { value: { kind: 'capture', program: 'studyforce', nameCol: 0, statusCol: 2, gradeCol: -1, doneValues: ['완료', 'O', '100%'], partialValues: ['진행중'], basis: 'report', active: true }, error: '' });
+  const students = [
+    { id: 's1', name: '학생A', grade: '중2', status: 'active', programs: { studyforce: { active: true } } },
+    { id: 's2', name: '학생B', grade: '중2', status: 'active', programs: { studyforce: { active: true } } },
+    { id: 's3', name: '학생C', grade: '중1', status: 'active', programs: { studyforce: { active: true } } },
+    { id: 's4', name: '학생C', grade: '중3', status: 'active', programs: { studyforce: { active: true } } },
+    { id: 's5', name: '학생E', grade: '중2', status: 'active', programs: { studyforce: { active: true } } },
+    { id: 's6', name: '학생F', grade: '중2', status: 'active', programs: { classcard: { active: true } } },
+    { id: 's7', name: '학생G', grade: '중2', status: 'ended', programs: { studyforce: { active: true } } }
+  ];
+  const cap = { rows: [['학생 A', '중2', '완료'], ['학생B', '중2', ''], ['학생C', '중1', 'o'], ['학생C', '중3', '진행중'], ['학생X', '중2', '완료'], ['학생A', '중2', '미완']] };
+  const out = C.applyCapture(cap, Object.assign({}, r.value, { gradeCol: 1 }), students, 'st1', 5000);
+  assert.deepEqual(out.stamp, { by: 'st1', at: 5000, basis: 'report' });
+  assert.deepEqual(out.ex, { s2: { st: 'unknown', why: '' }, s4: { st: 'partial', why: '' }, s5: { st: 'unknown', why: '' } });
+  assert.deepEqual(out.matched.map(m => [m.id, m.st]), [['s1', 'completed'], ['s2', 'unknown'], ['s3', 'completed'], ['s4', 'partial']]);
+  assert.deepEqual([out.unmatched, out.ambiguous, out.missing.map(m => m.id)], [['학생X'], [], ['s5']]);
+  assert.deepEqual(out.counts, { done: 2, partial: 1, notDone: 0, unknown: 1, missing: 1 });
+  const noGrade = C.applyCapture(cap, r.value, students, 'st1', 1);
+  assert.deepEqual(noGrade.ambiguous, ['학생C', '학생C'], '학년 열이 없으면 동명이인은 못 가른다');
+  assert.deepEqual(Object.keys(noGrade.ex).sort(), ['s2', 's3', 's4', 's5']);
+  const notDone = C.applyCapture({ rows: [['학생A', '중2', 'X']] }, r.value, students, 'st1', 1);
+  assert.deepEqual([notDone.ex.s1, notDone.counts.notDone], [{ st: 'not_completed', why: '' }, 1]);
+});
+
 test('manualFor·manualsFor: manualId 우선, 앱 카드는 app 범위, 방은 assign 우선', () => {
   const manuals = [
     { id: 'm1', scope: 'classcard', task: 'check', title: '결과 확인' },
