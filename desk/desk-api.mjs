@@ -33,6 +33,13 @@ const RANGE_STATUS = new Set(['need', 'buying', 'uploading', 'have']);
 const RANGE_SOURCES = new Set(['exam4you', 'jokbo', 'other']);
 const MANUAL_SCOPES = new Set(['studyforce', 'classcard', 'metamath', 'nelt', 'exam4you', 'jokbo', 'app']);
 const HTTPS_URL = /^https:\/\/[^\s"'<>]{1,200}$/;
+// 파일(매뉴얼 사진): D1 BLOB. 클라이언트가 긴 변 1000px JPEG 로 줄여 올리므로 400KB 면 넉넉하다. base64 본문은 그 4/3 + 여유.
+const FILE_ID = /^[A-Za-z0-9_-]{8,64}$/;
+const FILE_KINDS = new Set(['manual']);
+const FILE_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp']);
+const MAX_FILE_BYTES = 400 * 1024;
+const MAX_FILE_BODY = 620 * 1024;
+const MAX_MANUAL_PHOTOS = 12;
 const MAX_CHANGES = 200;
 const MAX_DOC_BYTES = 64 * 1024;
 const MAX_TASK_BYTES = 16 * 1024;
@@ -749,6 +756,20 @@ function ruleManuals(data, ctx) {
   if (absent(out.lastCheckedAt)) delete out.lastCheckedAt;
   else if (typeof out.lastCheckedAt !== 'string' || !YMD.test(out.lastCheckedAt)) return bad('INVALID', 'lastCheckedAt 은 YYYY-MM-DD 형식이어야 합니다');
   out.version = Number.isInteger(Number(out.version)) && Number(out.version) > 0 ? Number(out.version) : 1;
+  const photos = [];
+  if (!absent(out.photos)) {
+    if (!Array.isArray(out.photos) || out.photos.length > MAX_MANUAL_PHOTOS) return bad('INVALID', '사진은 ' + MAX_MANUAL_PHOTOS + '장까지입니다');
+    for (const p of out.photos) {
+      if (!isPlainObject(p) || typeof p.id !== 'string' || !FILE_ID.test(p.id)) return bad('INVALID', 'photos[].id 형식이 올바르지 않습니다');
+      const row = { id: p.id };
+      if (!absent(p.caption)) {
+        if (typeof p.caption !== 'string' || p.caption.length > 80) return bad('INVALID', '사진 설명은 80자까지입니다');
+        if (p.caption.trim()) row.caption = p.caption.trim();
+      }
+      photos.push(row);
+    }
+  }
+  out.photos = photos;
   const pii = findPii(out, '', null);
   if (pii) return bad('PII', pii + ' 에 전화번호·이메일·주민번호를 적을 수 없습니다');
   return { data: out };
@@ -864,6 +885,75 @@ async function exportAll(env) {
   }, 200, { 'Content-Disposition': 'attachment; filename="wb-desk-export-' + stamp + '.json"' });
 }
 
+/* ── 파일(매뉴얼 사진) ──────────────────────────────────────────────────
+ * 올리기·지우기는 원장, 보기는 인증된 누구나. <img src> 는 Bearer 를 못 실으므로 클라이언트가 fetch 로 받아 blob URL 로 그린다.
+ * D1 BLOB 바인딩은 ArrayBuffer(문서화된 형식) — 테스트·로컬 서버의 node:sqlite 대역은 ArrayBuffer 를 Uint8Array 로 바꿔 넘긴다. */
+
+async function readLimitedJson(request, maxBytes) {
+  const declared = Number(request.headers.get('content-length') || 0);
+  if (declared > maxBytes) return { error: fail('TOO_LARGE', '본문이 너무 큽니다 (' + Math.round(maxBytes / 1024) + 'KB 까지)', 413) };
+  let text = '';
+  try { text = await request.text(); } catch (error) { return { error: fail('INVALID', '본문을 읽지 못했습니다') }; }
+  if (text.length > maxBytes) return { error: fail('TOO_LARGE', '본문이 너무 큽니다 (' + Math.round(maxBytes / 1024) + 'KB 까지)', 413) };
+  const body = parseJson(text);
+  return isPlainObject(body) ? { body } : { error: fail('INVALID', 'JSON 객체가 필요합니다') };
+}
+
+function base64ToBytes(text) {
+  const clean = String(text || '').replace(/^data:[^,]*,/, '').replace(/\s+/g, '');
+  if (!clean || !/^[A-Za-z0-9+/]+={0,2}$/.test(clean)) return null;
+  try {
+    const bin = atob(clean);
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  } catch (error) { return null; }
+}
+
+function randomFileId() {
+  const bytes = new Uint8Array(12);
+  crypto.getRandomValues(bytes);
+  return 'f_' + Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function uploadFile(env, auth, request) {
+  if (auth.role !== 'admin') return fail('FORBIDDEN', '사진은 원장만 올립니다', 403);
+  const read = await readLimitedJson(request, MAX_FILE_BODY);
+  if (read.error) return read.error;
+  const body = read.body;
+  const kind = typeof body.kind === 'string' ? body.kind : 'manual';
+  if (!FILE_KINDS.has(kind)) return fail('INVALID', '모르는 파일 종류입니다');
+  if (!FILE_MIMES.has(body.mime)) return fail('INVALID', '사진은 JPEG·PNG·WebP 만 올릴 수 있습니다');
+  const bytes = base64ToBytes(body.data);
+  if (!bytes || !bytes.length) return fail('INVALID', 'data 는 base64 여야 합니다');
+  if (bytes.length > MAX_FILE_BYTES) return fail('TOO_LARGE', '사진은 ' + Math.round(MAX_FILE_BYTES / 1024) + 'KB 까지입니다 — 앱이 줄여서 올립니다', 413);
+  const ref = typeof body.ref === 'string' && DOC_ID.test(body.ref) ? body.ref : null;
+  const id = randomFileId();
+  const now = Date.now();
+  await env.DB.prepare('INSERT INTO desk_files(id,kind,mime,size,data,ref,created_at,created_by) VALUES(?,?,?,?,?,?,?,?)')
+    .bind(id, kind, body.mime, bytes.length, bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength), ref, now, auth.staffId).run();
+  return json({ ok: true, id, mime: body.mime, size: bytes.length });
+}
+
+async function getFile(env, id) {
+  if (!FILE_ID.test(id)) return fail('INVALID', '파일 id 형식이 올바르지 않습니다');
+  const row = await env.DB.prepare('SELECT mime,size,data FROM desk_files WHERE id=? LIMIT 1').bind(id).first();
+  if (!row) return fail('NOT_FOUND', '파일이 없습니다', 404);
+  const data = row.data instanceof ArrayBuffer ? new Uint8Array(row.data) : (row.data && row.data.buffer ? new Uint8Array(row.data.buffer, row.data.byteOffset || 0, row.data.byteLength) : new Uint8Array(0));
+  return new Response(data, {
+    status: 200,
+    headers: { 'Content-Type': String(row.mime), 'Content-Length': String(data.byteLength), 'Cache-Control': 'private, max-age=86400',
+      'X-Content-Type-Options': 'nosniff', 'Content-Disposition': 'inline', 'Referrer-Policy': 'no-referrer' }
+  });
+}
+
+async function deleteFile(env, auth, id) {
+  if (auth.role !== 'admin') return fail('FORBIDDEN', '사진은 원장만 지웁니다', 403);
+  if (!FILE_ID.test(id)) return fail('INVALID', '파일 id 형식이 올바르지 않습니다');
+  const r = await env.DB.prepare('DELETE FROM desk_files WHERE id=?').bind(id).run();
+  return json({ ok: true, deleted: Number(r && r.meta && r.meta.changes) || 0 });
+}
+
 /* ── 라우터 ─────────────────────────────────────────────────────────── */
 
 function methodNotAllowed() {
@@ -900,6 +990,13 @@ export async function handleApi(request, env, ctx) {
     if (path === '/api/docs') {
       if (method === 'GET') return readDocs(env, url);
       if (method === 'POST') return writeDocs(env, auth, await readJson(request));
+      return methodNotAllowed();
+    }
+    if (path === '/api/files') return method === 'POST' ? uploadFile(env, auth, request) : methodNotAllowed();
+    if (path.startsWith('/api/files/')) {
+      const id = path.slice('/api/files/'.length);
+      if (method === 'GET') return getFile(env, id);
+      if (method === 'DELETE') return deleteFile(env, auth, id);
       return methodNotAllowed();
     }
     if (path === '/api/export') {

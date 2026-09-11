@@ -17,7 +17,8 @@ const PASSWORD = 'desk-password-1';
 
 class Statement {
   constructor(database, sql) { this.database = database; this.sql = sql; this.args = []; }
-  bind(...args) { this.args = args; return this; }
+  // D1 은 BLOB 에 ArrayBuffer 를 받는다(문서 형식). node:sqlite 는 Uint8Array 만 받으므로 대역이 바꿔 준다.
+  bind(...args) { this.args = args.map(a => (a instanceof ArrayBuffer ? new Uint8Array(a) : a)); return this; }
   async first() { return this.database.prepare(this.sql).get(...this.args) || null; }
   async all() { return { results: this.database.prepare(this.sql).all(...this.args) }; }
   async run() { return this.runSync(); }
@@ -532,4 +533,43 @@ test('docs plans(exam)·students.school: 시험 템플릿 규칙(학교·시험�
   assert.equal(stu.status, 200, JSON.stringify(stu.body));
   assert.equal((await docOf(env, a.token, 'students', 'stu_s')).school, 'OO중');
   assert.equal((await putDoc(env, a.token, 'students', 'stu_s', { name: '학생A', school: 'x'.repeat(41) })).body.code, 'INVALID');
+});
+
+async function rawCall(env, method, path, options = {}) {
+  const headers = {};
+  if (options.body !== undefined) { headers['content-type'] = 'application/json'; }
+  if (options.token) headers.authorization = 'Bearer ' + options.token;
+  return handleApi(new Request(BASE + path, { method, headers, body: options.body === undefined ? undefined : JSON.stringify(options.body) }), env, {});
+}
+
+test('files: 원장만 올리고 지운다, 직원은 본다, base64·mime·크기 검증, 매뉴얼 photos 규칙', async () => {
+  const env = envFor();
+  const adminToken = await setupAdmin(env);
+  const a = await makeStaff(env, adminToken, '직원 A');
+  const bytes = Buffer.from('not-really-a-jpeg-but-bytes-are-bytes');
+  const b64 = bytes.toString('base64');
+  assert.equal((await call(env, 'POST', '/api/files', { token: a.token, body: { mime: 'image/jpeg', data: b64 } })).status, 403);
+  assert.equal((await call(env, 'POST', '/api/files', { token: adminToken, body: { mime: 'image/gif', data: b64 } })).body.code, 'INVALID');
+  assert.equal((await call(env, 'POST', '/api/files', { token: adminToken, body: { mime: 'image/jpeg', data: '***' } })).body.code, 'INVALID');
+  assert.equal((await call(env, 'POST', '/api/files', { token: adminToken, body: { mime: 'image/jpeg', kind: 'secret', data: b64 } })).body.code, 'INVALID');
+  const big = Buffer.alloc(401 * 1024, 1).toString('base64');
+  assert.equal((await call(env, 'POST', '/api/files', { token: adminToken, body: { mime: 'image/png', data: big } })).status, 413);
+  const up = await call(env, 'POST', '/api/files', { token: adminToken, body: { mime: 'image/png', data: 'data:image/png;base64,' + b64, ref: 'm1' } });
+  assert.equal(up.status, 200, JSON.stringify(up.body));
+  assert.deepEqual([up.body.mime, up.body.size, /^f_[0-9a-f]{24}$/.test(up.body.id)], ['image/png', bytes.length, true]);
+  const got = await rawCall(env, 'GET', '/api/files/' + up.body.id, { token: a.token });
+  assert.equal(got.status, 200);
+  assert.deepEqual([got.headers.get('content-type'), got.headers.get('cache-control'), Buffer.from(await got.arrayBuffer()).equals(bytes)], ['image/png', 'private, max-age=86400', true]);
+  assert.equal((await rawCall(env, 'GET', '/api/files/' + up.body.id, {})).status, 401);
+  assert.equal((await call(env, 'GET', '/api/files/f_doesnotexist000000000000', { token: a.token })).status, 404);
+  assert.equal((await call(env, 'GET', '/api/files/bad id', { token: a.token })).body.code, 'INVALID');
+  const man = { scope: 'classcard', task: 'assign', title: '세트 배정', steps: ['반을 연다'], photos: [{ id: up.body.id, caption: ' 1 ' }] };
+  assert.equal((await putDoc(env, adminToken, 'manuals', 'm1', man)).status, 200);
+  assert.deepEqual((await docOf(env, a.token, 'manuals', 'm1')).photos, [{ id: up.body.id, caption: '1' }]);
+  assert.equal((await putDoc(env, adminToken, 'manuals', 'm2', Object.assign({}, man, { photos: [{ id: 'nope' }] }))).body.code, 'INVALID');
+  assert.equal((await putDoc(env, adminToken, 'manuals', 'm2', Object.assign({}, man, { photos: Array.from({ length: 13 }, () => ({ id: up.body.id })) }))).body.code, 'INVALID');
+  assert.equal((await call(env, 'DELETE', '/api/files/' + up.body.id, { token: a.token })).status, 403);
+  const del = await call(env, 'DELETE', '/api/files/' + up.body.id, { token: adminToken });
+  assert.deepEqual([del.status, del.body.deleted], [200, 1]);
+  assert.equal((await call(env, 'GET', '/api/files/' + up.body.id, { token: a.token })).status, 404);
 });
