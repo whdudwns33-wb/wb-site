@@ -51,4 +51,13 @@ t('다의어 — 같은 뜻의 예문끼리 짝, 다른 뜻은 오답', () => {
   }
 });
 t('데이터 상태 표기 — 원장 검수 전 초안', () => { assert.ok(/검수/.test(DATA.status)); });
+t('다의어 오답은 같은 낱말의 다른 뜻 예문에서만 나온다(뜻 3개여도 다른 낱말 예문을 섞지 않는다)', function () {
+  var rnd = seeded(7);
+  for (var i = 0; i < 60; i++) {
+    var it = KM.generate('k-poly', DATA, rnd); if (!it) continue;
+    var m = /'(.+?)'와\(과\)/.exec(it.instructionKo), w = DATA.poly.filter(function (x) { return x.word === m[1]; })[0];
+    var all = w.senses.reduce(function (a, s) { return a.concat(s.examples); }, []);
+    it.choices.forEach(function (c) { assert.ok(all.indexOf(c.text) >= 0, c.text); });
+  }
+});
 console.log(n + ' tests passed');

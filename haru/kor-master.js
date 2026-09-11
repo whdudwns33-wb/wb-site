@@ -54,10 +54,12 @@ var WBHARU_KM = (function () {
     if (!w) return null;
     var si = Math.floor(rnd() * w.senses.length), sense = w.senses[si];
     var exs = shuffle(sense.examples, rnd), stem = exs[0], answer = exs[1];
-    var others = shuffle(w.senses.filter(function (s, i) { return i !== si; }).map(function (s) { return choose(rnd, s.examples); }), rnd).slice(0, 3);
+    // 오답은 같은 낱말의 다른 뜻 예문에서 먼저 채운다(뜻 3개면 한 뜻에서 예문 2개) — 다른 낱말 예문은 문맥 감별이 아니라 낱말 감별이 돼 버린다
+    var pool = shuffle(w.senses.filter(function (s, i) { return i !== si; }).reduce(function (a, s) { return a.concat(shuffle(s.examples, rnd)); }, []), rnd);
+    var others = pool.slice(0, 3);
     while (others.length < 3) others.push(choose(rnd, data.poly.filter(function (x) { return x !== w; })).senses[0].examples[0]);
     var kc = keyed(answer, others, rnd);
-    return item('poly-context', 'k-poly', "밑줄 친 '" + w.word + "'와(과) 같은 뜻으로 쓰인 것은?", kc, "'" + sense.meaning + "'의 뜻", stem);
+    return item('poly-context', 'k-poly', "다음 문장의 '" + w.word + "'와(과) 같은 뜻으로 쓰인 것은?", kc, "'" + sense.meaning + "'의 뜻", stem);
   }
   /* 4. 호응 — 자연스러운 문장 고르기 · 고쳐야 할 이유 */
   function concord(data, rnd) {
