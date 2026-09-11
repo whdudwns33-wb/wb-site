@@ -663,6 +663,30 @@ test('a matching immutable correction becomes the displayed and idempotent effec
   assert.equal(oldValue.body.code, 'ORDER_PRICE_ALREADY_SET');
 });
 
+test('an immutable correction overrides the legacy price embedded in the order JSON', async () => {
+  const db = new TestD1(); seed(db);
+  const now = Date.now();
+  const task = { id: 'json-corrected-price', title: '[주문] 100발 100중 영어 3-2 중간고사', deleted: false,
+    orderDelivery: 'scheduled_batch_v1', orderVendor: '테스트총판',
+    orderItems: [{ bookId: 'BK01', title: '100발 100중 영어 3-2 중간고사', qty: '1권',
+      studentIds: ['student-a'], unitPrice: 14400 }],
+    origin: 'staff', createdAt: now, updatedAt: now };
+  db.prepare('INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
+    .bind('task', task.id, KIM_NAMGI_STAFF_ID, JSON.stringify(task), now, now).run();
+  db.prepare('INSERT INTO book_order_sends(app,send_id,idempotency_key,task_id,vendor_name,item_count,message_hash,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)')
+    .bind('task', 'send-json-corrected', 'key-json-corrected', task.id, '테스트총판', 1, 'g'.repeat(64), 'accepted', now, now).run();
+  db.prepare('INSERT INTO book_order_fulfillments(app,task_id,item_index,book_id,student_ids,status,revision,teacher_received_at,teacher_received_by,student_handed_at,student_handed_by,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)')
+    .bind('task', task.id, 0, 'BK01', JSON.stringify(['student-a']), 'student_handed', 2,
+      now - 1000, KIM_NAMGI_STAFF_ID, now, KIM_NAMGI_STAFF_ID, now - 1000, now).run();
+  db.prepare('INSERT INTO book_order_item_price_corrections(app,task_id,item_index,previous_unit_price,corrected_unit_price,reason_code,created_at,created_by) VALUES(?,?,?,?,?,?,?,?)')
+    .bind('task', task.id, 0, 14400, 16000, 'director_amount_correction', now, 'director').run();
+
+  const listed = await call(db, { auth: admin, action: 'list' });
+  const row = listed.body.orders.find(item => item.taskId === task.id);
+  assert.equal(row.unitPrice, 16000);
+  assert.equal(row.priceCorrectedAt, now);
+});
+
 test('one-time price accepts Kim Namgi student-handed legacy books and rejects other orders', async () => {
   const db = new TestD1(); seed(db);
   const now = Date.now();

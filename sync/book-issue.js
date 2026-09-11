@@ -93,8 +93,9 @@ function orderUnitPrice(item) {
 
 function storedOrderUnitPrice(item, priceRow, correctionRow) {
   const taskPrice = orderUnitPrice(item);
-  if (taskPrice !== null) return taskPrice;
-  const original = Number(priceRow && priceRow.unit_price);
+  /* 주문 JSON에 예전 금액이 남아 있어도 승인된 불변 정정 원장이 있으면
+   * 관리자·선생님 조회 모두 정정 금액을 우선 표시한다. */
+  const original = taskPrice !== null ? taskPrice : Number(priceRow && priceRow.unit_price);
   if (!Number.isInteger(original) || original < 1 || original > MAX_UNIT_PRICE) return null;
   const previous = Number(correctionRow && correctionRow.previous_unit_price);
   const corrected = Number(correctionRow && correctionRow.corrected_unit_price);
