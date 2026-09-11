@@ -6,6 +6,8 @@
 
 import { reserve, usageSummary, readLimits } from './ai-quota.mjs';
 import { buildRound, forClient, grade, rank, ARENA_Q } from './arena.mjs';
+/* 밤 9시 푸시는 두 앱을 함께 본다 — 판정 규칙은 각 앱 모듈에 두고 여기서는 부르기만 한다 */
+import { naesinNightDueFor } from './naesin-api.mjs';
 
 const STATE_MAX_BYTES = 400_000; // 워드브레인 기록 1건 최대 크기
 const nowIso = () => new Date().toISOString();
@@ -489,15 +491,27 @@ function dueCountOf(stateRec) {
   return n;
 }
 
-/* 구독자 중 "물 줄 단어가 있는" 학생에게만 발송. 404/410 응답이면 구독 정리. */
-export async function sendNightPushes({ store, push, fetchFn }) {
-  if (!push || !push.publicKey || !push.privateJwk) return { sent: 0, skipped: 0, removed: 0, reason: 'no-vapid' };
+/* 구독자 중 "오늘 밤 할 일이 남은" 학생에게만 발송. 404/410 응답이면 구독 정리.
+   할 일은 두 앱을 합쳐서 본다(§12 Phase 2): 워드브레인에 물 줄 단어가 있거나, 내신에 오늘
+   못 끝낸 시험 범위가 있거나. naesin 어댑터를 안 넘기면 예전처럼 워드브레인만 본다.
+   알림 본문은 지금도 비어 있다(payload 암호화 전) — 어느 쪽 때문에 울렸는지는 화면에서 갈린다.
+   그래서 내신 때문에 보낸 건수를 따로 세어 돌려준다: 이 값이 0이면 규칙이 안 걸린 것이다. */
+export async function sendNightPushes({ store, push, fetchFn, naesin, now }) {
+  if (!push || !push.publicKey || !push.privateJwk) return { sent: 0, skipped: 0, removed: 0, naesinOnly: 0, reason: 'no-vapid' };
   const f = fetchFn || fetch;
-  let sent = 0, skipped = 0, removed = 0;
+  const t = now == null ? Date.now() : +now;
+  let sent = 0, skipped = 0, removed = 0, naesinOnly = 0;
   for (const code of await store.listPushCodes()) {
     const sub = await store.getPush(code);
     if (!sub || !sub.endpoint) continue;
-    if (!dueCountOf(await store.getState(code))) { skipped += 1; continue; }
+    let byNaesin = false;
+    if (!dueCountOf(await store.getState(code))) {
+      /* 워드브레인은 비었다 — 내신이 남았는지 본다. 어댑터가 실패해도 푸시 전체를 멈추지 않는다. */
+      if (naesin) {
+        try { byNaesin = (await naesinNightDueFor(naesin, code, t)).due; } catch (e) { byNaesin = false; }
+      }
+      if (!byNaesin) { skipped += 1; continue; }
+    }
     try {
       const jwt = await vapidJwt({
         audience: new URL(sub.endpoint).origin,
@@ -509,10 +523,10 @@ export async function sendNightPushes({ store, push, fetchFn }) {
         headers: { TTL: '86400', Urgency: 'normal', Authorization: 'vapid t=' + jwt + ', k=' + push.publicKey },
       });
       if (r.status === 404 || r.status === 410) { await store.delPush(code); removed += 1; }
-      else sent += 1;
+      else { sent += 1; if (byNaesin) naesinOnly += 1; }
     } catch (e) { /* 이 학생은 내일 재시도 */ }
   }
-  return { sent, skipped, removed };
+  return { sent, skipped, removed, naesinOnly };
 }
 
 /* ── 라우터 ──
