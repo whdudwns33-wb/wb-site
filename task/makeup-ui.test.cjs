@@ -294,6 +294,36 @@ test('active admin card has one processing action plus no-makeup and staff can o
   }
 });
 
+test('보강없음 확인창은 학생·수업·결석일·원수업일을 보여주고 확인 전 제출을 막는다', () => {
+  const source = block('function makeupNoMakeupContextHtml', 'function makeupDateTimeInput');
+  const calls = [];
+  const api = new Function('state', 'session', 'esc', 'staffStudentCompactLabelById', 'lessonAssignmentScheduleText',
+    'makeupOriginalStaffId', 'makeupTeacherLabel', 'MAKEUP_STATUS_LABELS', 'makeupReasonSelect', 'makeupModalErrorHtml', 'modal',
+    `${source}\nreturn { makeupNoMakeupContextHtml, makeupNoMakeupModal };`)(
+    { tasks: [{ id: 'lesson-1', subject: '수학', scheduleSlots: [], lessonHours: '2T' }] },
+    { isAdmin: true }, value => String(value || ''),
+    (id, name, grade) => `${name} ${grade}`.trim(), () => '토 13:00–14:50',
+    row => row.sourceTeacherId, id => `${id} 선생님`, { confirmed: '보강 예정' },
+    id => `<select id="${id}"></select>`, () => '', (...args) => calls.push(args)
+  );
+  const row = { caseId: 'mu-1', revision: 4, status: 'confirmed', studentId: 'student-1', studentName: '김학생', grade: '중2',
+    subject: '수학', sourceDate: '2026-09-06', sourceTaskId: 'lesson-1', sourceTeacherId: 'teacher-1' };
+  const context = api.makeupNoMakeupContextHtml(row);
+  assert.match(context, /학생/);
+  assert.match(context, /수학/);
+  assert.match(context, /결석일자/);
+  assert.match(context, /원수업일자/);
+  assert.match(context, /2026-09-06/);
+  assert.match(context, /id="muNoMakeupConfirm"/);
+  api.makeupNoMakeupModal(row);
+  assert.equal(calls.length, 1);
+  assert.match(calls[0][2], /data-act="munonesubmit"/);
+  assert.match(calls[0][2], /disabled/);
+  const submit = block('async function submitMakeupNoMakeup', '/* ── 주간 플래너');
+  assert.match(submit, /muNoMakeupConfirm/);
+  assert.match(submit, /학생·수업·결석일자·원수업일자를 먼저 확인해 주세요/);
+});
+
 test('schedule, completion, and no-makeup modals use the three-action API contract', () => {
   const source = block('function makeupCanComplete(row)', '/* ── 주간 플래너');
 
