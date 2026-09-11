@@ -43,6 +43,7 @@ t('껍데기 파일이 바뀌면 캐시 이름이 바뀐다 — 학생이 새 �
   /* 원본을 잠깐 건드렸다 되돌린다. 실패해도 원본이 남지 않도록 finally 로 복구한다 */
   const cases = [
     { file: path.join(HERE, '..', 'vocab', 'words.js'), sw: V_SW, was: before.v, what: '워드브레인 낱말' },
+    { file: path.join(HERE, '..', 'vocab', 'trace.js'), sw: V_SW, was: before.v, what: '워드브레인 따라쓰기' },
     { file: path.join(HERE, '..', 'reading', 'index.html'), sw: R_SW, was: before.r, what: '진로독서 앱' },
     /* 내신은 아이콘으로 찌른다 — 코드 파일은 다른 작업자가 동시에 고치고 있을 수 있어 건드리지 않는다 */
     { file: path.join(HERE, '..', 'naesin', 'icon.svg'), sw: N_SW, was: before.n, what: '내신브레인 앱' },
