@@ -18,6 +18,7 @@
 | `pace.js` | 회차 계측 — 지문 세트 단위 시간 귀속(paperkey `sets`), 몰아 마킹 지연, 페이스 밴드, 시험 기술 4항목 |
 | `pack-check.js` · `pack-sample.json` | 팩·paperkey 검사의 단일 소스(라이선스 게이트: origin enum·kogl1 출처·pd 현대어역·T2 sourceText·serve·만료 / paperkey: 시판 정답표 금지·holder·타 학원 모의 불허·sets 필수·동결) + 정답 제거본 `stripForStudent`. 체험 팩은 자체 창작 |
 
+| `sheet-build.mjs` | 종이 회차 조판 — 팩 → 시험지 HTML(`stripForStudent` 뒤에만 조판, 부정 발문 밑줄, 시는 행 보존, OMR 25칸) · 원장용 정답표 · paperkey(`sets` = 지문 단위 + 단독 문항 각 1). 시험지 원본은 저장소 밖(scratchpad → 원장 전달)에서만 만든다 |
 | `calc.js` | 수학 수치 생성기 — 템플릿 16개(원자 16개: 분수 사칙·변환·비율·백분율·기준량 역산·단위·나머지·GCD/LCM·평균 역산·각기둥·겉넓이 부피). 유니코드 텍스트만, 오답에 errKind:'calc'/개념 혼동 atomId 자동 태깅, `sampleSheet(atomId, 30, seed)` 로 원장 검수 표본 |
 | `gen.js` | 영어 어휘 MCQ — naesin/gen.js 단어 계열 포크(오답 충돌 방지·rnd 주입·유형 로테이션) + `markConditions`(④ 문제 오독 처방: 발문 조건 표시 훈련) |
 | `kor-master.js` · `kor-master-data.json` | 국어 어휘·문법 생성기 5종(낱말의 짜임·한자어 낱말 가족·다의어 문맥·호응·표현법 식별). 데이터는 자체 창작 초안(시구 포함) — 원장 검수·확장 대상 |
@@ -25,7 +26,7 @@
 | `report.js` | 주기 평가 — `monthly`(부모 1장 필드)·`phaseReview`(동결 세트 차이·완주율·조정 제안)·판정 규칙표·`forStudent/forParent/forCoach` 투영. 금지어 검사 통과가 테스트 |
 | `plan-build.mjs` · `plans/2027-pilot.input.json` → `plans/2027-pilot.json` | 진도 입력 → `plan.days`(82일: prep·card·passage·mock·rest·exam·retro) + facts.json 에서 마일스톤 생성. `node haru/plan-build.mjs haru/plans/2027-pilot.input.json` |
 
-전부 실행: `for f in haru/*.test.cjs; do node $f | tail -1; done; node haru/plan-build.test.mjs | tail -1`
+전부 실행: `for f in haru/*.test.cjs haru/*.test.mjs; do node $f | tail -1; done`
 
 **아직 없는 것**: 영어 300어 마스터 데이터(gen.js 가 읽을 `{id, headword, meaningKo, pos, example, definition}` 형태) · 국어 데이터 확장(합성/파생 80쌍·한자어 60·다의어 40·호응 30·시구 60행) — 콘텐츠 검수 항목.
 `haru-api.mjs`·`haru-score.mjs`·`haru-studio.mjs`·화면·배포 11곳은 **D-0(저장소 비공개)·D-5·D-6 결정 뒤**.
