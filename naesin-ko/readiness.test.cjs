@@ -209,4 +209,26 @@ t('오답이 쌓이면 위험 항목으로 세고 신호를 낸다', () => {
   assert.ok(/오답이 12개/.test(rd.alert.why), rd.alert.why);
 });
 
+t('안전판을 켜면 지시와 경고가 함께 바뀐다 — 강사가 한 조치를 못 본 화면이 되면 안 된다', () => {
+  const p = pack(1);
+  /* 아무것도 안 한 학생: 순서대로면 오늘 손댈 축은 1단계 읽기다 */
+  const plain = R.readiness(p, {}, { dday: 2 });
+  assert.strictEqual(plain.weak, 'read');
+  assert.ok(/병행 모드를 켜세요/.test(plain.alert.why), plain.alert.why);
+
+  /* 병행 모드를 켜면 사다리 순서가 풀려 가장 많이 잃은 축으로 간다 */
+  const par = R.readiness(p, {}, { dday: 2, recovery: { parallel: true, until: '2099-01-01' } });
+  assert.notStrictEqual(par.weak, 'read');
+  assert.strictEqual(par.weak, plain.parts.reduce((a, b) => (b.lost > a.lost ? b : a)).key);
+
+  /* 이미 켠 학생에게 또 켜라고 말하지 않는다 — 그다음 수단을 말한다 */
+  assert.ok(/이미 켜져 있습니다/.test(par.alert.why), par.alert.why);
+  assert.ok(/범위를 줄이세요/.test(par.alert.why), par.alert.why);
+
+  /* 작품별 게이트만 연 경우도 '켜져 있음'으로 본다 */
+  const op = R.readiness(p, {}, { dday: 2, recovery: { opens: ['w1'], until: '2099-01-01' } });
+  assert.ok(/이미 켜져 있습니다/.test(op.alert.why), op.alert.why);
+  assert.strictEqual(op.weak, 'read');       // 병행이 아니면 사다리 순서는 그대로다
+});
+
 console.log(`\nOK — ${passed}개 통과. 준비도는 개수가 아니라 '무엇이 비었는가'를 말한다.`);

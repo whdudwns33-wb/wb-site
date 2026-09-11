@@ -218,6 +218,22 @@ var WBKOENGINE = (function () {
     };
   }
 
+  /* ── 회복 편성 안전판(§5.4·§14-4) ──
+     시험이 코앞인데 사다리가 안 열린 학생에게 강사가 내리는 두 가지 판단을
+     gate() 가 아는 opts 로 바꾼다. 저장은 오버레이에 실린다(scope 계약 그대로 —
+     학생 코드면 그 학생만, default면 반 전체).
+
+     기한(until)이 **필수인 이유**: 안전판은 임시 조치다. 기한이 없으면 한 번 연 게이트가
+     영구히 열린 채 잊히고, 그러면 게이트가 있으나 마나가 된다. 지난 것은 스스로 닫힌다. */
+  function recoveryOpts(recovery, workId, now) {
+    if (!recovery) return {};
+    if (recovery.until && localDate(now) > recovery.until) return { expired: true };
+    var out = {};
+    if (recovery.parallel === true) out.parallel = true;
+    if (workId && (recovery.opens || []).indexOf(workId) >= 0) out.override = true;
+    return out;
+  }
+
   /* 오답노트 클리어 — 서로 다른 날 2회 정답이면 클리어.
      같은 세션 연속 정답은 단기 기억 재확인일 뿐이라 날짜 중복은 안 쌓인다. */
   function clearWrong(s, now) {
@@ -386,7 +402,7 @@ var WBKOENGINE = (function () {
     recordApply: recordApply, applyRate: applyRate,
     stability: stability, isStable: isStable, applyDiagnostic: applyDiagnostic,
     kindSummary: kindSummary, workSummary: workSummary,
-    gateDecision: gateDecision, gate: gate, clearWrong: clearWrong,
+    gateDecision: gateDecision, gate: gate, recoveryOpts: recoveryOpts, clearWrong: clearWrong,
     band: band, planDay: planDay, advanceStage: advanceStage
   };
 })();

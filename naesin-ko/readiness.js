@@ -166,7 +166,7 @@ var WBKOREADY = (function () {
     parts.forEach(function (p) { score += p.points; });
     score = Math.round(score);
 
-    var weak = nextAxis(parts, rate);
+    var weak = nextAxis(parts, rate, opts.recovery);
 
     var dday = opts.dday;
     if (dday == null && opts.exam && opts.exam.examDate && opts.now != null) dday = daysUntil(opts.exam.examDate, opts.now);
@@ -189,7 +189,7 @@ var WBKOREADY = (function () {
         wrongOpen: opts.wrongOpen == null ? null : opts.wrongOpen
       },
       pace: pace,
-      alert: alertOf(score, pace, untouched, works.length, opts.wrongOpen)
+      alert: alertOf(score, pace, untouched, works.length, opts.wrongOpen, opts.recovery)
     };
   }
 
@@ -204,13 +204,17 @@ var WBKOREADY = (function () {
      아무것도 안 한 학생에게 '구절 적용'이라고 말하면(가중치가 가장 크므로) 지시가 틀린다.
      3단계 적용은 1단계 읽기 없이는 못 한다(§4.1). 앞 단계가 반쯤 차야 다음이 열린다. */
   var PREREQ = { read: null, blank: 'read', vocab: 'read', apply: 'blank', restore: 'apply', essay: 'restore' };
-  function nextAxis(parts, rate) {
+  function nextAxis(parts, rate, recovery) {
+    /* 병행 모드는 사다리 순서를 푸는 조치다(§5.4) — 순차로는 남은 날에 못 끝낼 때 켠다.
+       그때까지 '앞 단계가 반쯤 차야 다음이 열린다'를 그대로 두면 화면은 여전히 1단계를
+       가리키고, 강사가 켠 조치와 학생이 받는 지시가 어긋난다. */
+    var free = !!(recovery && recovery.parallel);
     var open = [], any = null;
     parts.forEach(function (p) {
       if (!p.weight || p.rate >= 1) return;
       if (!any || p.lost > any.lost + 1e-9) any = p;
       var req = PREREQ[p.key];
-      if (req == null || rate[req] >= 0.5) open.push(p);
+      if (free || req == null || rate[req] >= 0.5) open.push(p);
     });
     var best = null;
     open.forEach(function (p) { if (!best || p.lost > best.lost + 1e-9) best = p; });
@@ -226,9 +230,13 @@ var WBKOREADY = (function () {
 
   /* 강사 화면의 신호등. **가장 이른 확정 미달을 먼저** 말한다 — 남은 날이 부족한 것은
      노력 부족과 다르고, 대응(범위 축소·병행 모드)도 다르기 때문이다. */
-  function alertOf(score, pace, untouched, works, wrongOpen) {
+  function alertOf(score, pace, untouched, works, wrongOpen, recovery) {
+    var on = !!(recovery && (recovery.parallel || (recovery.opens || []).length));
     if (pace && !pace.onTrack) {
-      return { level: 'risk', why: '안정화에 최소 ' + pace.minDays + '일이 필요한데 D-' + pace.dday + '입니다. 범위를 줄이거나 병행 모드를 켜세요.' };
+      /* 이미 안전판을 켠 학생에게 '병행 모드를 켜세요'라고 또 말하면 강사가 한 조치를
+         못 본 것이 된다 — 그다음 수단(범위 축소)을 말해야 한다. */
+      return { level: 'risk', why: '안정화에 최소 ' + pace.minDays + '일이 필요한데 D-' + pace.dday + '입니다. '
+        + (on ? '안전판은 이미 켜져 있습니다 — 이제 범위를 줄이세요.' : '범위를 줄이거나 병행 모드를 켜세요.') };
     }
     if (pace && pace.dday <= 7 && score < 60) {
       return { level: 'risk', why: 'D-' + pace.dday + '에 준비도 ' + score + '%입니다. 실전 문항보다 개념 빈칸을 먼저 돌리세요.' };

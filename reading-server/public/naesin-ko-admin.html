@@ -270,6 +270,22 @@ function render() {
     <h3>작품별 강조 메모</h3>
     <p class="muted">한 줄에 하나: <code>작품id | 메모</code></p>
     <textarea id="ovNotes" placeholder="w-bin-uija | 5연 역설을 서술형으로 낸다고 하심"></textarea>
+
+    <h3>회복 편성 안전판</h3>
+    <p class="muted">시험이 코앞인데 사다리가 안 열린 학생을 여는 장치입니다(§5.4).
+      구절 적용 정답률이 기준에 못 미쳐도 실전·서술형을 열어 줍니다.
+      <b>기한은 필수</b>예요 — 기한이 없으면 한 번 연 게이트가 영영 열린 채 잊혀 게이트가 있으나 마나가 됩니다.
+      학생 화면에는 “선생님이 열어 둔 트랙”으로 표시되고, 적용 정답률이 아직 기준 아래라는 사실도 같이 보입니다.</p>
+    <div class="grid-form">
+      <div><label class="muted">기한(이 날까지)</label><input id="rcUntil" type="date"></div>
+      <div><label class="muted">병행 모드</label>
+        <select id="rcPar"><option value="">끔 — 연 작품만</option><option value="1">켬 — 모든 작품</option></select></div>
+    </div>
+    <p class="muted" style="margin-top:6px">게이트를 열 작품 id — 한 줄에 하나 (병행 모드를 켜면 비워도 됩니다)</p>
+    <textarea id="rcOpens" style="min-height:60px" placeholder="w-bin-uija"></textarea>
+    <p class="muted">왜 열었는지 (학생 화면에도 보입니다)</p>
+    <input id="rcWhy" placeholder="예: 범위가 넓어 순차로는 시험 전에 못 끝냅니다">
+
     <div class="row" style="margin-top:10px"><button class="btn" id="btnOv">저장</button>
       <button class="btn ghost sm" id="btnOvLoad">불러오기</button><span class="muted" id="ovMsg"></span></div>
   </div>`;
@@ -770,7 +786,13 @@ function bind() {
       const o = j.overlay || {};
       $('#ovOver').value = (o.overrides || []).map((x) => `${x.targetRef} | ${(x.answers || []).join(' / ')}${x.note ? ' | ' + x.note : ''}`).join('\n');
       $('#ovNotes').value = (o.notes || []).map((n) => `${n.workId} | ${n.text}`).join('\n');
-      $('#ovMsg').textContent = '불러왔어요';
+      const rc = o.recovery || {};
+      $('#rcUntil').value = rc.until || '';
+      $('#rcPar').value = rc.parallel ? '1' : '';
+      $('#rcOpens').value = (rc.opens || []).join('\n');
+      $('#rcWhy').value = rc.why || '';
+      const live = rc.until && rc.until >= new Date().toISOString().slice(0, 10);
+      $('#ovMsg').textContent = '불러왔어요' + (rc.until ? (live ? ` · 안전판 ${rc.until}까지 켜져 있음` : ` · 안전판 기한 지남(${rc.until}) — 닫혔습니다`) : '');
     } catch (e) { $('#ovMsg').textContent = e.message; }
   };
 
@@ -780,10 +802,21 @@ function bind() {
       .map((p) => ({ targetRef: p[0], answers: p[1].split('/').map((s) => s.trim()).filter(Boolean), note: p[2] || '' }));
     const notes = $('#ovNotes').value.split('\n').map((l) => l.split('|').map((s) => s.trim()))
       .filter((p) => p[0] && p[1]).map((p) => ({ workId: p[0], text: p.slice(1).join(' | ') }));
+    const opens = $('#rcOpens').value.split('\n').map((x) => x.trim()).filter(Boolean);
+    const parallel = $('#rcPar').value === '1';
+    /* 기한만 비워 두고 저장을 누르는 실수가 잦을 자리라 화면에서 먼저 잡는다 —
+       서버도 막지만, 400 을 보고 되짚는 것보다 여기서 말해 주는 편이 낫다 */
+    if ((opens.length || parallel) && !$('#rcUntil').value) {
+      $('#ovMsg').textContent = '안전판에는 기한을 넣어 주세요 — 기한 없이 열면 영영 열린 채 잊힙니다.';
+      return;
+    }
+    const recovery = (opens.length || parallel)
+      ? { parallel, opens, until: $('#rcUntil').value, why: $('#rcWhy').value.trim() } : null;
     try {
       await api('/naesin-ko/admin/overlay', { method: 'POST', body: JSON.stringify({
-        scope: $('#ovScope').value.trim() || 'default', overrides, notes }) });
-      $('#ovMsg').textContent = `저장 완료 (덮어쓰기 ${overrides.length} · 메모 ${notes.length})`;
+        scope: $('#ovScope').value.trim() || 'default', overrides, notes, recovery }) });
+      $('#ovMsg').textContent = `저장 완료 (덮어쓰기 ${overrides.length} · 메모 ${notes.length}`
+        + (recovery ? ` · 안전판 ${recovery.until}까지${parallel ? ' 병행 모드' : ` 작품 ${opens.length}편`}` : '') + ')';
     } catch (e) { $('#ovMsg').textContent = e.message; }
   };
 

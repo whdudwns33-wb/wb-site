@@ -229,4 +229,27 @@ t('kindSummary는 kind로 나눠 센다', () => {
   assert.strictEqual(E.kindSummary(states, 'blank').reached, 1);
 });
 
+t('회복 편성 안전판 — 강사가 연 게이트만 열리고, 기한이 지나면 스스로 닫힌다(§5.4)', () => {
+  const exam = { examDate: '2026-09-20' };
+  const ws = { applyRight: 1, applyTotal: 5 };            // 정답률 20% — 기준 미달
+  assert.strictEqual(E.gate(ws, exam, {}).open, false);
+
+  const rec = { opens: ['w-1'], until: '2026-09-10' };
+  assert.strictEqual(E.gate(ws, exam, E.recoveryOpts(rec, 'w-1', d1)).open, true);
+  assert.strictEqual(E.gate(ws, exam, E.recoveryOpts(rec, 'w-1', d1)).reason, 'override');
+  /* 열지 않은 작품은 그대로 잠겨 있다 — 안전판은 작품 단위 판단이다 */
+  assert.strictEqual(E.gate(ws, exam, E.recoveryOpts(rec, 'w-2', d1)).open, false);
+
+  /* 기한이 지나면 스스로 닫힌다 — 기한 없는 안전판은 게이트를 있으나 마나로 만든다 */
+  const late = new Date(2026, 8, 11, 9, 0, 0).getTime();
+  assert.deepStrictEqual(E.recoveryOpts(rec, 'w-1', late), { expired: true });
+  assert.strictEqual(E.gate(ws, exam, E.recoveryOpts(rec, 'w-1', late)).open, false);
+
+  /* 병행 모드는 작품을 가리지 않는다 */
+  const par = { parallel: true, until: '2026-09-10' };
+  assert.strictEqual(E.gate(ws, exam, E.recoveryOpts(par, 'w-9', d1)).reason, 'parallel');
+  /* 연습 모드는 원래 게이트가 없다 — 안전판과 무관하게 열린다 */
+  assert.strictEqual(E.gate(ws, null, {}).reason, 'practice');
+});
+
 console.log('\n' + passed + '개 검증 통과');

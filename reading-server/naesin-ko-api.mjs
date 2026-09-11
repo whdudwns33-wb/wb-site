@@ -376,7 +376,22 @@ export async function handleNaesinKo(ctx) {
       workId: String((n && n.workId) || '').trim().slice(0, 60),
       text: String((n && n.text) || '').slice(0, 2000),
     })).filter((n) => n.workId && n.text) : [];
+    /* 회복 편성 안전판(§5.4) — 게이트 오버라이드·병행 모드. 오버레이와 같은 scope 계약을 쓴다:
+       학생 코드면 그 학생만, default면 반 전체. **until 은 필수**다 — 기한 없는 안전판은
+       한 번 연 게이트를 영구히 열린 채 잊히게 만들고, 그러면 게이트가 있으나 마나가 된다. */
+    let recovery = null;
+    if (b.recovery && typeof b.recovery === 'object' && !Array.isArray(b.recovery)) {
+      const until = String(b.recovery.until || '').trim();
+      if (!DATE_RE.test(until)) return j(400, { error: '안전판에는 기한(until, YYYY-MM-DD)이 있어야 해요.' });
+      const opens = Array.isArray(b.recovery.opens)
+        ? b.recovery.opens.slice(0, 100).map((x) => String(x || '').trim().slice(0, 60)).filter(Boolean) : [];
+      const parallel = b.recovery.parallel === true;
+      /* 아무것도 안 연 안전판은 저장하지 않는다 — 기록만 남고 효과가 없으면 읽는 사람을 속인다 */
+      recovery = (parallel || opens.length)
+        ? { parallel, opens, until, why: String(b.recovery.why || '').slice(0, 300) } : null;
+    }
     const rec = { overrides, notes, updatedAt: nowIso() };
+    if (recovery) rec.recovery = recovery;
     if (size(rec) > OVERLAY_MAX_BYTES) return j(413, { error: '오버레이가 너무 커요.' });
     await store.putOverlay(scope, rec);
     return j(200, { ok: true, scope, overlay: rec });

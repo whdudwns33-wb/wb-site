@@ -364,6 +364,29 @@ await t('루브릭 반영 경로도 같은 게이트를 지난다', async () => 
   assert.deepStrictEqual((await s.getPack(PACK.packId)).pack.items, undefined);
 });
 
+await t('회복 편성 안전판은 기한이 있어야 저장된다 — 기한 없는 안전판은 게이트를 있으나 마나로 만든다', async () => {
+  const s = memStore();
+  const noUntil = await call(s, { path: '/api/naesin-ko/admin/overlay', method: 'POST', who: ADMIN,
+    getBody: async () => ({ scope: 'st-1', recovery: { parallel: true } }) });
+  assert.strictEqual(noUntil.status, 400);
+  const ok = await call(s, { path: '/api/naesin-ko/admin/overlay', method: 'POST', who: ADMIN,
+    getBody: async () => ({ scope: 'st-1', recovery: { parallel: true, opens: ['w-1'], until: '2026-10-15', why: '범위가 넓어 순차로는 못 끝냅니다' } }) });
+  assert.strictEqual(ok.status, 200);
+  assert.deepStrictEqual(ok.body.overlay.recovery,
+    { parallel: true, opens: ['w-1'], until: '2026-10-15', why: '범위가 넓어 순차로는 못 끝냅니다' });
+  /* 학생이 자기 오버레이로 받아 간다 — 게이트를 여는 것은 학생 앱이다 */
+  const mine = await call(s, { path: '/api/naesin-ko/overlay', method: 'GET' });
+  assert.strictEqual(mine.body.overlay.recovery.parallel, true);
+});
+
+await t('아무것도 열지 않는 안전판은 저장하지 않는다 — 기록만 남고 효과가 없으면 읽는 사람을 속인다', async () => {
+  const s = memStore();
+  const r = await call(s, { path: '/api/naesin-ko/admin/overlay', method: 'POST', who: ADMIN,
+    getBody: async () => ({ scope: 'st-1', recovery: { parallel: false, opens: [], until: '2026-10-15' } }) });
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(r.body.overlay.recovery, undefined);
+});
+
 await t('몸통이 JSON이 아니면 저장 전에 400', async () => {
   const s = memStore();
   const r = await call(s, { path: '/api/naesin-ko/state', method: 'PUT',
