@@ -177,4 +177,25 @@ t('아예 다른 말은 찾지 않는다', () => {
   assert.strictEqual(G.hasKeyword(G.normalizeKo('즐거움이 크다'), '그리움'), false);
 });
 
+t('종이 ○△×는 화면 채점과 같은 커버리지 공식을 쓴다 — 통과선이 두 벌이면 안 된다(§4.4)', () => {
+  const targets = [{ id: 't1', label: 'A' }, { id: 't2', label: 'B' }, { id: 't3', label: 'C' }, { id: 't4', label: 'D' }];
+  const r = G.scorePaper({ t1: 'full', t2: 'full', t3: 'partial', t4: 'partial' }, targets);
+  assert.strictEqual(r.coverage, 0.75);          // (2 + 2×0.5) / 4 — gradeRestore 와 같은 식
+  assert.strictEqual(r.full, 2);
+  assert.strictEqual(r.partial, 2);
+  assert.strictEqual(r.missing, 0);
+  assert.strictEqual(r.source, 'paper');
+  /* 안 매긴 것은 '해당 없음'이 아니라 '모름'이다 — 빼고 세면 커버리지가 부풀어 통과선이 무너진다 */
+  const half = G.scorePaper({ t1: 'full', t2: 'full' }, targets);
+  assert.strictEqual(half.total, 4);
+  assert.strictEqual(half.missing, 2);
+  assert.strictEqual(half.coverage, 0.5);
+  /* 모르는 표시값은 모름으로 떨어진다 */
+  assert.strictEqual(G.scorePaper({ t1: 'ㅇ' }, [targets[0]]).coverage, 0);
+  /* 같은 판정이면 화면 채점과 결과 모양이 같아야 한다 */
+  const shape = Object.keys(G.gradeRestore({}, targets)).filter((k) => k !== 'perTarget').sort();
+  const mine = Object.keys(r).filter((k) => k !== 'perTarget' && k !== 'source').sort();
+  assert.deepStrictEqual(mine, shape);
+});
+
 console.log('\n' + passed + '개 검증 통과');

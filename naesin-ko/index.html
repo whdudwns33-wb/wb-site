@@ -314,6 +314,12 @@
   /* ── 부팅 ── */
   function boot() {
     S.data = load();
+    /* 인쇄물 QR — ?paper=<작품id>. 종이로 푼 주석 복원을 ○△× 로 들이는 화면으로 바로 간다(§4.4).
+       주소는 지우지 않는다 — 새로고침해도 같은 화면이라야 학생이 헤매지 않는다. */
+    try {
+      var q = new URLSearchParams(location.search);
+      if (q.get('paper')) S.paperWork = q.get('paper');
+    } catch (e) {}
     try { S.token = JSON.parse(localStorage.getItem(AUTH) || 'null'); } catch (e) {}
     if (S.token && typeof S.token === 'object') { S.code = S.token.code; S.token = S.token.token || S.token.t; }
     fetch('./concepts.json').then(function (r) { return r.json(); })
@@ -1202,6 +1208,72 @@
     $('pane').addEventListener('click', function () { setTab('home'); });
   }
 
+  /* ── 종이 주석 복원 ○△× 입력(§4.4) ──
+     인쇄물 QR 이 데려오는 화면이다. 종이로 푼 것을 앱 기록으로 들이되 **채점은 사람이 한 것**을
+     그대로 받는다 — 종이 답안을 다시 타이핑시키면 아무도 안 한다(그게 종이를 쓴 이유다).
+     판정 공식은 화면 채점과 같은 것을 쓴다(grade.js scorePaper) — 통과선이 두 벌이면
+     같은 학생이 종이로 풀었느냐 화면으로 풀었느냐에 따라 다른 대접을 받는다. */
+  function drawPaper() {
+    var w = work(S.paperWork);
+    if (!w) {
+      full('<div class="card"><h3>종이 채점</h3><div class="small muted">이 시험 범위에 없는 작품이에요. ' +
+        '선생님께 확인해 주세요.</div><button class="btn" style="margin-top:10px" data-pq="x">돌아가기</button></div>');
+      $('pane').addEventListener('click', function () { S.paperWork = null; setTab('home'); });
+      return;
+    }
+    var targets = GEN.restoreTargets(w);
+    if (!targets.length) {
+      full('<div class="card"><h3>종이 채점</h3><div class="small muted">이 작품은 복원할 항목이 없어요.</div>' +
+        '<button class="btn" style="margin-top:10px" data-pq="x">돌아가기</button></div>');
+      $('pane').addEventListener('click', function () { S.paperWork = null; setTab('home'); });
+      return;
+    }
+    if (!S.paper) S.paper = {};
+    var m = ['<div class="card"><h3>' + esc(w.title) + ' — 종이 채점</h3>' +
+      '<div class="small muted">인쇄물에 쓴 주석을 정본과 대조해 ○△× 로 표시하세요. ' +
+      '○ 다 맞음 · △ 일부 맞음 · × 못 씀. 표시하지 않은 항목은 <b>못 쓴 것</b>으로 셉니다.</div></div>'];
+    targets.forEach(function (t) {
+      var cur = S.paper[t.id];
+      m.push('<div class="card"><div class="small" style="font-weight:700;margin-bottom:4px">' + esc(t.label) + '</div>' +
+        (t.quote ? '<div class="quote small">' + esc(t.quote) + '</div>' : '') +
+        '<div class="small muted" style="margin:6px 0">정본: ' + esc((t.keywords || []).join(' · ')) + '</div>' +
+        '<div class="row">' +
+        ['full', 'partial', 'missing'].map(function (k, i) {
+          return '<button class="btn sm' + (cur === k ? '' : ' ghost') + '" data-pm="' + k + '" data-pt="' + esc(t.id) + '">' +
+            ['○ 다 맞음', '△ 일부', '× 못 씀'][i] + '</button>';
+        }).join('') + '</div></div>');
+    });
+    var marked = targets.filter(function (t) { return S.paper[t.id]; }).length;
+    m.push('<div class="card"><div class="small muted">' + marked + ' / ' + targets.length + ' 표시함</div>' +
+      '<div class="row" style="margin-top:8px">' +
+      '<button class="btn" data-psave="1"' + (marked ? '' : ' disabled') + '>기록에 넣기</button>' +
+      '<button class="btn ghost" data-pq="x">그만두기</button></div></div>');
+    full(m.join(''));
+    $('pane').addEventListener('click', function (e) {
+      var mk = e.target.closest('[data-pm]');
+      if (mk) { S.paper[mk.getAttribute('data-pt')] = mk.getAttribute('data-pm'); drawPaper(); return; }
+      if (e.target.closest('[data-pq]')) { S.paperWork = null; S.paper = null; setTab('home'); return; }
+      if (e.target.closest('[data-psave]')) savePaper(w, targets);
+    });
+  }
+  function savePaper(w, targets) {
+    var r = G.scorePaper(S.paper, targets);
+    var ws = st(E.workKey(w.workId), 'work');
+    var passed = r.coverage >= 0.7;
+    /* 화면 채점과 같은 전이를 탄다 — 종이로 통과한 학생이 4단계에 머무르면 안 된다 */
+    if (ws.stage === 4) E.advanceStage(ws, passed, Date.now());
+    else if (passed && ws.stage < 4) { ws.stage = 4; E.advanceStage(ws, true, Date.now()); }
+    pk().log.push({ at: Date.now(), kind: 'paper', workId: w.workId, coverage: r.coverage });
+    persist();
+    S.paperWork = null; S.paper = null;
+    full('<div class="card"><h3>종이 채점을 넣었어요</h3>' +
+      '<div class="fb ' + (passed ? 'ok' : 'hold') + '">○ ' + r.full + ' · △ ' + r.partial + ' · × ' + r.missing +
+      ' (커버리지 ' + Math.round(r.coverage * 100) + '%)' + (passed ? ' — 통과했어요.' : ' — 70% 이상이면 통과예요.') + '</div>' +
+      '<div class="small muted" style="margin-top:8px">화면에서 푼 것과 같은 기준입니다.</div>' +
+      '<button class="btn" style="margin-top:10px" data-home="1">오늘 계획 보기</button></div>');
+    $('pane').addEventListener('click', function () { setTab('home'); });
+  }
+
   function startDump() {
     var w = work(S.workId) || canonWorks()[0];
     if (!w) { S.err = '작품이 없어요.'; render(); return; }
@@ -1444,6 +1516,7 @@
   function render() {
     header();
     if (S.session) return;   // 세션 화면은 스스로 그린다
+    if (S.paperWork) return drawPaper();
     if (S.tab === 'home') renderHome();
     else if (S.tab === 'works') renderWorks();
     else if (S.tab === 'vocab') renderVocab();

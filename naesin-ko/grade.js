@@ -288,6 +288,29 @@ var WBKOGRADE = (function () {
     };
   }
 
+  /* ── 종이 주석 복원 ○△× (§4.4) ──
+     인쇄물로 푼 것을 앱 기록으로 들인다. gradeRestore 와 **같은 모양**을 돌려주는 것이 요점이다 —
+     커버리지 공식이 두 벌이 되면 같은 학생이 종이로 풀었느냐 화면으로 풀었느냐에 따라 다른
+     통과선을 받는다. 여기서 하는 일은 사람이 매긴 ○△× 를 status 로 바꾸는 것뿐이다.
+     marks: { targetId: 'full' | 'partial' | 'missing' } — 안 매긴 것은 'missing' 으로 본다
+     (빈칸을 '모름'이 아니라 '해당 없음'으로 세면 커버리지가 부풀어 통과선이 무너진다). */
+  var PAPER_MARKS = { full: 1, partial: 1, missing: 1 };
+  function scorePaper(marks, targets) {
+    var per = (targets || []).map(function (t) {
+      var v = (marks || {})[t.id];
+      var status = PAPER_MARKS[v] ? v : 'missing';
+      return { id: t.id, label: t.label, status: status, hit: [], keywords: t.keywords || [], paper: true };
+    });
+    var full = per.filter(function (p) { return p.status === 'full'; }).length;
+    var partial = per.filter(function (p) { return p.status === 'partial'; }).length;
+    return {
+      perTarget: per, full: full, partial: partial,
+      missing: per.length - full - partial, total: per.length,
+      coverage: per.length ? (full + partial * 0.5) / per.length : 0,
+      source: 'paper'
+    };
+  }
+
   /* ── 브레인덤프 diff (§4.4) — 판정 없이 "무엇을 안 썼는지"만 보여 준다 */
   function dumpDiff(input, targets) {
     var norm = normalizeKo(input);
@@ -306,7 +329,7 @@ var WBKOGRADE = (function () {
     hasKeyword: hasKeyword, coreCands: coreCands,
     countSentences: countSentences, countWords: countWords, isComplete: isComplete,
     checkConditions: checkConditions, gradeRubric: gradeRubric,
-    gradeRestore: gradeRestore, dumpDiff: dumpDiff
+    gradeRestore: gradeRestore, scorePaper: scorePaper, dumpDiff: dumpDiff
   };
 })();
 
