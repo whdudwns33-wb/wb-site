@@ -11749,11 +11749,36 @@ function makeupDateTimeModal(row, mode) {
       '" data-case="' + esc(row.caseId) + '" data-rev="' + Number(row.revision) + '">확인</button>');
 }
 
+function makeupNoMakeupContextHtml(row) {
+  const sourceTask = (state.tasks || []).find(task => String(task.id || '') === String(row && row.sourceTaskId || '')) || null;
+  const unrelated = String(row && row.sourceMode || '') === 'unrelated';
+  const studentLabel = staffStudentCompactLabelById(row && row.studentId, row && row.studentName || '학생 연결 확인 필요', row && row.grade);
+  const subject = String(row && (row.subject || row.className) || sourceTask && (sourceTask.subject || sourceTask.className) || '').trim();
+  const schedule = sourceTask
+    ? (lessonAssignmentScheduleText(sourceTask.scheduleSlots, sourceTask.lessonHours) || String(sourceTask.scheduleText || sourceTask.time || '').trim())
+    : '';
+  const lessonLabel = unrelated ? '수업무관 보강' : [subject || '수업 연결 확인 필요', schedule].filter(Boolean).join(' · ');
+  const absenceDate = String(row && row.sourceDate || '').trim() || '확인 필요';
+  const originalDate = unrelated ? '수업무관(해당 없음)' : absenceDate;
+  const fields = [
+    ['학생', studentLabel],
+    ['수업', lessonLabel],
+    ['원 수업 담당', makeupTeacherLabel(makeupOriginalStaffId(row), '담당 확인 필요')],
+    ['결석일자', absenceDate],
+    ['원수업일자', originalDate],
+    ['현재 보강 상태', MAKEUP_STATUS_LABELS[row && row.status] || '확인 필요']
+  ];
+  return '<div class="hint">아래 정보가 맞는지 확인한 뒤 보강 없음으로 처리하세요. 자동 결석보강은 결석일자와 원수업일자가 같을 수 있습니다.</div>' +
+    '<div class="student-info-grid mt14" aria-label="보강없음 처리 대상 확인">' + fields.map(field =>
+      '<div class="student-info-field"><b>' + esc(field[0]) + '</b><span>' + esc(field[1]) + '</span></div>').join('') + '</div>' +
+    '<label class="choice-row mt14"><input id="muNoMakeupConfirm" type="checkbox"> <b>학생·수업·결석일자·원수업일자를 확인했습니다.</b></label>';
+}
+
 function makeupNoMakeupModal(row) {
   if (!session.isAdmin || !row || ['completed', 'cancelled'].includes(row.status)) return;
-  modal('보강없음 처리', makeupReasonSelect('muReason') + makeupModalErrorHtml(),
+  modal('보강없음 처리', makeupNoMakeupContextHtml(row) + makeupReasonSelect('muReason') + makeupModalErrorHtml(),
     '<button class="btn btn-primary btn-block mt14" data-act="munonesubmit" data-case="' +
-      esc(row.caseId) + '" data-rev="' + Number(row.revision) + '">확인</button>');
+      esc(row.caseId) + '" data-rev="' + Number(row.revision) + '" disabled>확인</button>');
 }
 
 function makeupDateTimeInput() {
@@ -11847,6 +11872,7 @@ async function submitMakeupComplete(button) {
 }
 
 async function submitMakeupNoMakeup(button) {
+  if (!(($('#muNoMakeupConfirm') || {}).checked)) return showMakeupModalError('학생·수업·결석일자·원수업일자를 먼저 확인해 주세요');
   const reason = String(($('#muReason') || {}).value || '');
   if (!MAKEUP_REASON_LABELS[reason]) return toast('운영 사유를 선택해 주세요');
   await mutateMakeup({ action: 'no_makeup', caseId: button.dataset.case, revision: Number(button.dataset.rev), reason: reason },
@@ -23644,6 +23670,14 @@ document.addEventListener('change', ev => {
     return;
   }
   if (ev.target.closest('[data-book-catalog-review-confirm]')) syncBookCatalogReviewApproveButton();
+});
+
+/* 보강없음 확인 체크는 기존 선택 변경 위임과 분리해 수동 보강 폼의 탐색·검증을 방해하지 않는다. */
+document.addEventListener('change', ev => {
+  const makeupNoneConfirm = ev.target.closest('#muNoMakeupConfirm');
+  if (!makeupNoneConfirm) return;
+  const submit = document.querySelector('[data-act="munonesubmit"]');
+  if (submit) submit.disabled = !makeupNoneConfirm.checked;
 });
 
 /* 수업 등록 폼은 시간대 버튼으로 다시 그려져도 입력값을 유지한다. */
