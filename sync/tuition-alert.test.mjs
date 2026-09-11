@@ -228,8 +228,8 @@ test('23:50 aggregation counts only final P/L/E across subjects and creates the 
 test('same-name students stay separate by stable id and one task/date is counted at most once', async () => {
   const db = new TestD1();
   seedRoster(db, [
-    rosterStudent('student-a', '김예린', { school: '가초', grade: '초3' }),
-    rosterStudent('student-b', '김예린', { school: '나초', grade: '초5' }),
+    rosterStudent('student-a', '홍길동', { school: '가초', grade: '초3' }),
+    rosterStudent('student-b', '홍길동', { school: '나초', grade: '초5' }),
     rosterStudent('student-monthly', '월결제', { billingMode: 'monthly', sessionCycleStartDate: '' })
   ]);
   for (const studentId of ['student-a', 'student-b', 'student-monthly']) seedTask(db, 'lesson-' + studentId, studentId);

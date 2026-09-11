@@ -9,7 +9,6 @@
   const compact = value => text(value).replace(/\s+/g, '');
   const digits = value => String(value == null ? '' : value).replace(/\D/g, '');
   const mobile = value => /^01[016789]\d{7,8}$/.test(digits(value));
-  const MANUAL_NAME_REVIEW = new Set(['김예린']);
 
   function xmlText(value) {
     return String(value || '').replace(/<[^>]+>/g, '')
@@ -131,7 +130,12 @@
       const key = compact(source.name).toLocaleLowerCase('ko');
       const linkedStudentId = linkMap.get(text(source.externalStudentNo)) || '';
       const linkedStudent = linkedStudentId ? byId.get(linkedStudentId) : null;
-      const manualNameReview = MANUAL_NAME_REVIEW.has(compact(source.name));
+      /* 동명이인은 학년으로 갈려 후보가 하나로 좁혀지더라도 사람이 직접 확인한다.
+         예전에는 특정 학생 이름을 소스에 박아 뒀는데, 저장소가 public 이라
+         그게 곧 재원생 실명 노출이었다. 같은 판단을 명단에서 끌어내면
+         이름을 적을 필요가 없고, 앞으로 생기는 동명이인도 자동으로 걸린다. */
+      const sameName = byName.get(key) || [];
+      const manualNameReview = sameName.length > 1;
       const candidates = linkedStudent ? [linkedStudent]
         : (byName.get(key) || []).filter(student => gradeMatches(source, student.grade));
       let status = 'unmatched', student = null, currentContact = null;
@@ -168,5 +172,5 @@
     return { entries, counts };
   }
 
-  return { parseSpreadsheetText, buildPreview, maskPhone, mobile, digits, MANUAL_NAME_REVIEW };
+  return { parseSpreadsheetText, buildPreview, maskPhone, mobile, digits };
 });
