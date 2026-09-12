@@ -1206,15 +1206,15 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-09-11.3"></script>
-<script src="./schedule-board-core.js?v=2026-09-11.3"></script>
-<script src="./asset-core.js?v=2026-09-11.3"></script>
-<script src="./qr-core.js?v=2026-09-11.3"></script>
-<script src="./acaflow-import-core.js?v=2026-09-11.3"></script>
-<script src="./feedback-subject-catalog.js?v=2026-09-11.3"></script>
-<script src="./sync-recovery-core.js?v=2026-09-11.3"></script>
-<script src="./staff-work-session-core.js?v=2026-09-11.3"></script>
-<script src="./staff-attendance-history-core.js?v=2026-09-11.3"></script>
+<script src="./lesson-form-core.js?v=2026-09-12.1"></script>
+<script src="./schedule-board-core.js?v=2026-09-12.1"></script>
+<script src="./asset-core.js?v=2026-09-12.1"></script>
+<script src="./qr-core.js?v=2026-09-12.1"></script>
+<script src="./acaflow-import-core.js?v=2026-09-12.1"></script>
+<script src="./feedback-subject-catalog.js?v=2026-09-12.1"></script>
+<script src="./sync-recovery-core.js?v=2026-09-12.1"></script>
+<script src="./staff-work-session-core.js?v=2026-09-12.1"></script>
+<script src="./staff-attendance-history-core.js?v=2026-09-12.1"></script>
 <script>
 "use strict";
 
@@ -2848,7 +2848,7 @@ const persistentDetailsState = new Map(); // 재렌더링 뒤에도 사용자가
 const nextStudentLessonRows = new Map(); // taskId|날짜 -> 최소 다음 수업 정보 또는 null
 const nextStudentLessonLoading = new Set();
 const nextStudentLessonErrors = new Map();
-let weekendVisitRows = [], weekendVisitMonthlyCounts = [], weekendVisitNextSequences = [], weekendVisitLoadedKey = '', weekendVisitLoading = false, weekendVisitError = '';
+let weekendVisitRows = [], weekendVisitMonthlyCounts = [], weekendVisitNextSequences = [], weekendVisitStaleOpenVisits = [], weekendVisitLoadedKey = '', weekendVisitLoading = false, weekendVisitError = '';
 const weekendVisitScopeCache = new Map();
 const WEEKEND_VISIT_SCOPE_TTL_MS = 15000;
 const weekendVisitScheduleLoadingKeys = new Map();
@@ -2959,7 +2959,7 @@ function resetPersonCache(token) {
   sessionPackRows = []; sessionPackLoaded = false; sessionPackLoading = false; sessionPackError = '';
   sessionPackRestoreFocus = null;
   session4LedgerRows = new Map(); session4LedgerLoadedSignature = ''; session4LedgerLoading = false; session4LedgerError = '';
-  weekendVisitRows = []; weekendVisitMonthlyCounts = []; weekendVisitNextSequences = []; weekendVisitLoadedKey = ''; weekendVisitLoading = false; weekendVisitError = '';
+  weekendVisitRows = []; weekendVisitMonthlyCounts = []; weekendVisitNextSequences = []; weekendVisitStaleOpenVisits = []; weekendVisitLoadedKey = ''; weekendVisitLoading = false; weekendVisitError = '';
   weekendVisitScopeCache.clear(); weekendVisitScheduleLoadingKeys.clear(); weekendVisitScheduleRetryAt.clear(); weekendVisitScheduleErrors.clear();
   weekendVisitScopeRequestGeneration.clear(); weekendVisitMainRequestKey = ''; weekendVisitMainRequestGeneration = 0;
   weekendVisitScopeRevision = 0;
@@ -3987,6 +3987,7 @@ function rememberWeekendVisitScope(date, staffId, result, generation) {
     rows: Array.isArray(result && result.visits) ? result.visits : [],
     monthlyCounts: Array.isArray(result && result.monthlyCounts) ? result.monthlyCounts : [],
     nextVisitSequences: Array.isArray(result && result.nextVisitSequences) ? result.nextVisitSequences : [],
+    staleOpenVisits: Array.isArray(result && result.staleOpenVisits) ? result.staleOpenVisits : [],
     loadedAt: ++weekendVisitScopeRevision,
     fetchedAt: Date.now()
   });
@@ -4120,7 +4121,8 @@ async function loadWeekendVisitScheduleScope(date, staffId, force) {
     const next = freshWeekendVisitScope(key);
     scopeChanged = !previous || !next || JSON.stringify(previous.rows || []) !== JSON.stringify(next.rows || []) ||
       JSON.stringify(previous.monthlyCounts || []) !== JSON.stringify(next.monthlyCounts || []) ||
-      JSON.stringify(previous.nextVisitSequences || []) !== JSON.stringify(next.nextVisitSequences || []);
+      JSON.stringify(previous.nextVisitSequences || []) !== JSON.stringify(next.nextVisitSequences || []) ||
+      JSON.stringify(previous.staleOpenVisits || []) !== JSON.stringify(next.staleOpenVisits || []);
   } catch (error) {
     if (!isCurrentWeekendVisitScopeRequest(key, generation)) return;
     weekendVisitScheduleErrors.set(key, String(error && error.message || error || '불러오기 실패'));
@@ -4203,6 +4205,7 @@ async function loadWeekendVisits(date, staffId, force) {
     weekendVisitRows = cached.rows;
     weekendVisitMonthlyCounts = cached.monthlyCounts;
     weekendVisitNextSequences = cached.nextVisitSequences || [];
+    weekendVisitStaleOpenVisits = cached.staleOpenVisits || [];
     weekendVisitLoadedKey = key;
     weekendVisitError = '';
     return;
@@ -4226,11 +4229,13 @@ async function loadWeekendVisits(date, staffId, force) {
     const next = freshWeekendVisitScope(key);
     scopeChanged = !previous || !next || JSON.stringify(previous.rows || []) !== JSON.stringify(next.rows || []) ||
       JSON.stringify(previous.monthlyCounts || []) !== JSON.stringify(next.monthlyCounts || []) ||
-      JSON.stringify(previous.nextVisitSequences || []) !== JSON.stringify(next.nextVisitSequences || []);
+      JSON.stringify(previous.nextVisitSequences || []) !== JSON.stringify(next.nextVisitSequences || []) ||
+      JSON.stringify(previous.staleOpenVisits || []) !== JSON.stringify(next.staleOpenVisits || []);
     if (weekendVisitMainRequestKey === key && weekendVisitMainRequestGeneration === generation) {
       weekendVisitRows = result.visits || [];
       weekendVisitMonthlyCounts = result.monthlyCounts || [];
       weekendVisitNextSequences = result.nextVisitSequences || [];
+      weekendVisitStaleOpenVisits = result.staleOpenVisits || [];
       weekendVisitLoadedKey = key;
       weekendVisitError = '';
     }
@@ -4252,6 +4257,7 @@ function activateWeekendVisitScope(key) {
   weekendVisitRows = cached.rows;
   weekendVisitMonthlyCounts = cached.monthlyCounts;
   weekendVisitNextSequences = cached.nextVisitSequences || [];
+  weekendVisitStaleOpenVisits = cached.staleOpenVisits || [];
   weekendVisitLoadedKey = key;
   weekendVisitError = '';
   return cached;
@@ -4430,6 +4436,7 @@ function weekendVisitBoardHtml(date) {
   if (scopeError) return '<div class="card alert"><div class="card-title">주말 실제 등·하원 불러오기 실패</div>' +
     '<div class="card-sub">' + esc(scopeError) + '</div><button class="btn btn-sm btn-ghost mt8" data-act="weekendrefresh">다시 시도</button></div>';
   const scopedRows = weekendVisitRowsChronological((scope ? scope.rows : []).filter(row => row && row.status !== 'cancelled'));
+  const staleOpenVisits = scope ? (scope.staleOpenVisits || []) : [];
   const active = scopedRows.filter(row => row.status === 'active').length;
   const complete = scopedRows.filter(row => row.status === 'completed').length;
   const rows = scopedRows.map(row => {
@@ -4449,10 +4456,21 @@ function weekendVisitBoardHtml(date) {
       (sourceDate && task ? '<button class="btn btn-sm btn-ghost" data-act="weekendopensource" data-task="' + esc(task.id) +
         '" data-source-date="' + esc(sourceDate) + '">원래 수업 화면 열기</button>' : '') + '</div></div>';
   });
+  const staleWarning = staleOpenVisits.length ? '<div class="card alert weekend-visit-stale-warning"><div class="card-title">지난 날짜 미하원 보정 필요</div>' +
+    '<div class="card-sub">이전 날짜에 등원 후 하원이 기록되지 않은 건입니다. 오늘 등원은 계속할 수 있으며, 아래 날짜를 확인해 관리자 화면에서 보정해 주세요.</div>' +
+    '<div class="weekend-visit-list mt8">' + staleOpenVisits.map(row => {
+      const task = state.tasks.find(item => String(item.id) === String(row.lessonTaskId));
+      const identity = weekendVisitStudentLabel(task, row);
+      const teacher = staffById(row.staffId);
+      const subject = String(task && (task.subject || task.className) || '수업 정보 확인');
+      return '<div class="small"><b>지난 날짜 미하원 보정 필요</b> · ' + esc(label(row.visitDate)) + ' · ' +
+        esc(identity.name) + (identity.detail ? ' (' + esc(identity.detail) + ')' : '') + ' · ' + esc(subject) +
+        (teacher && teacher.name ? ' · ' + esc(teacher.name) : '') + '</div>';
+    }).join('') + '</div></div>' : '';
   return '<details class="card weekend-visit-card" data-persist-key="weekend-board"><summary><span><b>주말 실제 등·하원 현황</b>' +
     '<span class="card-sub">등원 중 ' + active + '건 · 하원 완료 ' + complete + '건</span></span></summary>' +
     (!scope ? '<div class="empty"><b>🕘</b>불러오는 중…</div>' :
-      rows.length ? '<div class="weekend-visit-list">' + rows.join('') + '</div>' : '<div class="empty">아직 기록이 없습니다.</div>') + '</details>';
+      staleWarning + (rows.length ? '<div class="weekend-visit-list">' + rows.join('') + '</div>' : '<div class="empty">아직 기록이 없습니다.</div>')) + '</details>';
 }
 
 function weekendVisitEditModal(visitId) {
@@ -4569,6 +4587,7 @@ async function saveWeekendFlexibleSettings(button) {
     weekendVisitLoadedKey = '';
     weekendVisitMonthlyCounts = [];
     weekendVisitNextSequences = [];
+    weekendVisitStaleOpenVisits = [];
     weekendFlexibleEditor = null;
     closeModal();
     showRosterStudentLessons(editor.studentId);
@@ -24382,7 +24401,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-09-11.3';
+const APP_VER = '2026-09-12.1';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
