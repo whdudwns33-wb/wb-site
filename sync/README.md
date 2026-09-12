@@ -119,9 +119,14 @@ npx wrangler d1 execute wb-sync --remote --file=./migrations/073_staff_work_logi
 npx wrangler d1 execute wb-sync --remote --file=./migrations/074_makeup_completion_links.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/075_manager_inspection_sessions.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/076_makeup_absence_retry.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/077_weekend_open_visit_per_day.sql
 
 > `076`은 보강 수업 자체가 결석된 뒤 새 일정을 잡는 재보강 경로를 추가한다. 기존 결석
 > 출결과 원래 보강 일정은 append-only 이력으로 보존하고, 재보강 일정만 새로 저장한다.
+
+> `077`은 실제 주말 등·하원 기록의 열린 상태를 학생·방문일별로 제한한다. 이전 날짜의
+> 하원 누락은 오늘 등원을 막지 않고 관리자 보정 목록에 날짜와 함께 표시하며, 같은 날짜의
+> 열린 중복 기록은 계속 차단한다.
 
 > `070`은 이미 적용된 `069` 이력을 되돌리지 않고, 그 migration이 만든 JSON 전개 view·trigger만
 > 제거한 뒤 학생별 일정 revision 원장과 경량 보강 revision trigger를 설치한다. 운영 DB에는 반드시
