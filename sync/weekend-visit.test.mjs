@@ -8,6 +8,7 @@ import { handleWeekendVisit, weekendVisitInternals } from './weekend-visit.js';
 const migration = fs.readFileSync(new URL('./migrations/050_weekend_actual_visits.sql', import.meta.url), 'utf8');
 const sourceDateMigration = fs.readFileSync(new URL('./migrations/058_weekend_visit_source_date.sql', import.meta.url), 'utf8');
 const multiVisitMigration = fs.readFileSync(new URL('./migrations/059_weekend_multi_visits.sql', import.meta.url), 'utf8');
+const openVisitPerDayMigration = fs.readFileSync(new URL('./migrations/077_weekend_open_visit_per_day.sql', import.meta.url), 'utf8');
 const studentChangeMigration = fs.readFileSync(new URL('./migrations/045_student_change_history.sql', import.meta.url), 'utf8');
 const taskWriteCasMigration = fs.readFileSync(new URL('./migrations/055_task_write_cas_guards.sql', import.meta.url), 'utf8');
 const schema = fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8');
@@ -44,7 +45,10 @@ class D1Database {
     this.sqlite.exec(taskWriteCasMigration);
     this.sqlite.exec(migration);
     this.sqlite.exec(sourceDateMigration);
-    if (options.multiVisit !== false) this.sqlite.exec('BEGIN;\n' + multiVisitMigration + '\nCOMMIT;');
+    if (options.multiVisit !== false) {
+      this.sqlite.exec('BEGIN;\n' + multiVisitMigration + '\nCOMMIT;');
+      if (options.openVisitPerDay !== false) this.sqlite.exec(openVisitPerDayMigration);
+    }
   }
   prepareNative(sql) { return this.sqlite.prepare(sql); }
   prepare(sql) { return new Statement(this, sql); }
@@ -115,7 +119,7 @@ function transferLesson(db, taskId, staffId) {
     .run(staffId, JSON.stringify(task), task.updatedAt, task.updatedAt, 'task', taskId);
 }
 
-test('050, 058, and 059 are mirrored in schema and wired before deployment', () => {
+test('050, 058, 059, and 077 are mirrored in schema and wired before deployment', () => {
   assert.doesNotMatch(migration, /DROP TABLE|DELETE FROM|UPDATE tokens/i);
   assert.doesNotMatch(sourceDateMigration, /DROP TABLE|DELETE FROM|UPDATE tokens/i);
   assert.match(multiVisitMigration, /visit_sequence\s+INTEGER NOT NULL DEFAULT 1/);
@@ -128,6 +132,10 @@ test('050, 058, and 059 are mirrored in schema and wired before deployment', () 
   assert.match(sourceDateMigration, /ADD COLUMN source_date TEXT/);
   assert.match(sourceDateMigration, /NEW\.source_date IS NOT OLD\.source_date/);
   assert.match(sourceDateMigration, /trg_weekend_actual_visits_source_date_guard/);
+  assert.match(openVisitPerDayMigration, /DROP INDEX IF EXISTS idx_weekend_actual_visits_one_open/);
+  assert.match(openVisitPerDayMigration, /ON weekend_actual_visits\(app, student_id, visit_date\)/);
+  assert.match(schema, /ON weekend_actual_visits\(app, student_id, visit_date\)\s+WHERE status = 'active'/);
+  assert.match(readme, /077_weekend_open_visit_per_day\.sql/);
   assert.doesNotMatch(sourceDateMigration, /DROP TRIGGER/i);
   assert.match(schema, /source_date\s+TEXT\s+CHECK/);
   assert.match(schema, /visit_sequence\s+INTEGER NOT NULL DEFAULT 1/);
@@ -527,6 +535,37 @@ test('list returns non-cancelled monthly visit counts in the current teacher sco
   assert.deepEqual(listed.body.monthlyCounts, [
     { lessonTaskId: 'lesson-a', studentId: 'student-a', month: '2026-08', count: 2 }
   ]);
+});
+
+test('a previous-date open visit does not block today, and admins receive its exact date', async () => {
+  const db = new D1Database(); db.seed();
+  const previousAt = Date.parse('2026-08-16T10:00:00+09:00');
+  db.sqlite.prepare(
+    'INSERT INTO weekend_actual_visits (app,visit_id,student_id,lesson_task_id,staff_id,visit_date,source_date,visit_sequence,check_in_at,check_out_at,status,revision,created_at,updated_at,created_by,updated_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)'
+  ).run('task', 'wv_' + 'a'.repeat(32), 'student-a', 'lesson-a', 'teacher-1', '2026-08-16', null, 1,
+    previousAt, null, 'active', 1, previousAt, previousAt, 'teacher-1', 'teacher-1');
+
+  const checked = await atNow(saturday, () => call(db, {
+    action: 'check_in', visitDate: '2026-08-22', sourceDate: '2026-08-23',
+    lessonTaskId: 'lesson-a', studentId: 'student-a'
+  }));
+  assert.equal(checked.status, 200);
+  assert.equal(checked.body.visit.visitDate, '2026-08-22');
+
+  const listed = await call(db, { action: 'list', visitDate: '2026-08-22' }, admin);
+  assert.equal(listed.status, 200);
+  assert.deepEqual(listed.body.staleOpenVisits.map(row => row.visitDate), ['2026-08-16']);
+  assert.equal(listed.body.staleOpenVisits[0].studentId, 'student-a');
+
+  const ownListed = await call(db, { action: 'list', visitDate: '2026-08-22' }, own);
+  assert.deepEqual(ownListed.body.staleOpenVisits, []);
+
+  const sameDate = await atNow(saturday + 1000, () => call(db, {
+    action: 'check_in', visitDate: '2026-08-22', sourceDate: '2026-08-23', visitSequence: 2,
+    lessonTaskId: 'lesson-a', studentId: 'student-a'
+  }));
+  assert.equal(sameDate.status, 409);
+  assert.equal(sameDate.body.code, 'VISIT_ALREADY_OPEN');
 });
 
 test('checkout and correction use CAS and keep append-only events', async () => {
