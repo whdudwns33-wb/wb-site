@@ -44,11 +44,11 @@ test('학생번호 링크를 우선 사용하고 원문 번호 자체는 화면�
   assert.doesNotMatch(view, /externalStudentNo/);
 });
 
-test('이름·학년 자동연결과 김예린 수동 확인 정책을 미리보기에 표시한다', () => {
+test('이름·학년 자동연결과 동명이인 수동 확인 정책을 미리보기에 표시한다', () => {
   assert.match(html, /row\.matchedByNameGrade \? ' <span class="tag ok">이름·학년 자동연결/);
-  assert.match(html, /row\.manualNameReview \? ' <span class="tag risk">김예린 직접 확인/);
-  assert.match(html, /김예린을 제외하고 이름·학년이 고유하게 일치하는 학생은 자동 연결 후보/);
-  assert.match(html, /김예린은 항상 직접 확인 대상으로 남깁니다/);
+  assert.match(html, /row\.manualNameReview \? ' <span class="tag risk">동명이인 — 직접 확인/);
+  assert.match(html, /동명이인을 제외하고 이름·학년이 고유하게 일치하는 학생은 자동 연결 후보/);
+  assert.match(html, /명단에 같은 이름이 둘 이상이면 항상 직접 확인 대상으로 남깁니다/);
 });
 
 test('원문 번호는 미리보기 DOM에 넣지 않고 마스킹 번호만 표시한다', () => {

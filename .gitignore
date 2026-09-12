@@ -22,3 +22,6 @@ reading/textbook.json
 # 프로그램데스크(desk/) — dist는 배포 워크플로우가 조립, .local은 로컬 실행용 SQLite(학생 정보 포함 가능, 커밋 금지)
 desk/dist/
 desk/.local/
+
+# 이관 학생 이름 해시 목록 — 유출 방지 검사용. 저장소에 두면 그게 곧 명단이 된다.
+task/private-names.json
