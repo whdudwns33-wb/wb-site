@@ -3719,7 +3719,7 @@ CREATE INDEX IF NOT EXISTS idx_weekend_actual_visits_student
 CREATE INDEX IF NOT EXISTS idx_weekend_actual_visits_lesson_day
   ON weekend_actual_visits(app, student_id, lesson_task_id, visit_date, visit_sequence);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_weekend_actual_visits_one_open
-  ON weekend_actual_visits(app, student_id)
+  ON weekend_actual_visits(app, student_id, visit_date)
   WHERE status = 'active';
 
 CREATE TABLE IF NOT EXISTS weekend_actual_visit_events (
