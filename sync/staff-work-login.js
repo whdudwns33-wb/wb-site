@@ -44,7 +44,11 @@ function unavailable(json, origin) {
 function parsed(row) { try { return JSON.parse(row.data); } catch { return null; } }
 function role(auth) { return auth.scope === 'all' ? (auth.id ? 'manager' : 'admin') : 'teacher'; }
 function isRequired(env, auth, profile) {
-  return staffWorkLoginEnabled(env) && auth.scope === 'own' && profile && Number(profile.login_enabled) === 1;
+  // 관리자 권한과 근무 로그인 대상은 별개다. 기존 관리자는 설정에 없으면 종전대로 유지한다.
+  const managerLoginIds = String(env.TASK_WORK_LOGIN_MANAGER_IDS_CONFIG || '').split(',').map(id => id.trim());
+  return staffWorkLoginEnabled(env) && !!auth.id &&
+    (auth.scope === 'own' || (auth.scope === 'all' && managerLoginIds.includes(auth.id))) &&
+    profile && Number(profile.login_enabled) === 1;
 }
 function configured(profile) { return !!profile && /^[a-f0-9]{64}$/.test(profile.pin_hash) && /^(?:[a-f0-9]{32}|[a-f0-9]{64})$/.test(profile.pin_salt); }
 async function readProfile(env, staffId) {
@@ -187,8 +191,8 @@ async function sessionRow(env, body, auth, profile, now, includeRevoked = false)
 
 /** 모든 업무 데이터 경로 앞에서 검사한다. 만료된 근무 세션은 기존 기기 인증을 해제하지 않는다. */
 export async function guardStaffWorkAccess(env, body, auth, pathname, origin, json) {
-  if (!staffWorkLoginEnabled(env) || String(body.app || '') !== 'task' || auth.scope !== 'own') return null;
-  if (pathname === '/staff-work-session' || pathname === '/staff-profile') return null;
+  if (!staffWorkLoginEnabled(env) || String(body.app || '') !== 'task' || !auth.id) return null;
+  if (pathname === '/staff-work-session') return null;
   try {
     const profile = await readProfile(env, auth.id);
     if (!isRequired(env, auth, profile)) return null;
@@ -214,7 +218,7 @@ export async function handleStaffWorkSession(env, app, body, origin, auth, json)
     const staffData = staff ? parsed(staff) : null;
     const base = { ok: true, required: false, authRole: role(auth), staffId: auth.id || '',
       staffName: String(staffData && staffData.name || ''), configured: false, active: false, workDate: date, clockedOut: false };
-    if (auth.scope === 'all' || !staffWorkLoginEnabled(env)) return json(base, 200, origin);
+    if (!auth.id || !staffWorkLoginEnabled(env)) return json(base, 200, origin);
     const profile = await readProfile(env, auth.id);
     base.configured = configured(profile);
     base.required = !!isRequired(env, auth, profile);

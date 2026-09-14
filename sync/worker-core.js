@@ -3140,6 +3140,10 @@ export default {
       if (url.pathname === '/staff-work-session' || url.pathname === '/staff-profile') {
         const auth = await resolveAuth(env, app, body.auth);
         if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+        if (url.pathname === '/staff-profile' && body.auth && body.auth.mode === 'person') {
+          const denied = await guardStaffWorkAccess(env, body, auth, url.pathname, okOrigin, json);
+          if (denied) return denied;
+        }
         return url.pathname === '/staff-work-session'
           ? await handleStaffWorkSession(env, app, body, okOrigin, auth, json)
           : await handleStaffProfile(env, app, body, okOrigin, auth, json);
