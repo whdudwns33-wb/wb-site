@@ -1206,15 +1206,15 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-09-12.1"></script>
-<script src="./schedule-board-core.js?v=2026-09-12.1"></script>
-<script src="./asset-core.js?v=2026-09-12.1"></script>
-<script src="./qr-core.js?v=2026-09-12.1"></script>
-<script src="./acaflow-import-core.js?v=2026-09-12.1"></script>
-<script src="./feedback-subject-catalog.js?v=2026-09-12.1"></script>
-<script src="./sync-recovery-core.js?v=2026-09-12.1"></script>
-<script src="./staff-work-session-core.js?v=2026-09-12.1"></script>
-<script src="./staff-attendance-history-core.js?v=2026-09-12.1"></script>
+<script src="./lesson-form-core.js?v=2026-09-14.1"></script>
+<script src="./schedule-board-core.js?v=2026-09-14.1"></script>
+<script src="./asset-core.js?v=2026-09-14.1"></script>
+<script src="./qr-core.js?v=2026-09-14.1"></script>
+<script src="./acaflow-import-core.js?v=2026-09-14.1"></script>
+<script src="./feedback-subject-catalog.js?v=2026-09-14.1"></script>
+<script src="./sync-recovery-core.js?v=2026-09-14.1"></script>
+<script src="./staff-work-session-core.js?v=2026-09-14.1"></script>
+<script src="./staff-attendance-history-core.js?v=2026-09-14.1"></script>
 <script>
 "use strict";
 
@@ -2017,7 +2017,7 @@ function saveWorkLogoutMemos() {
     if (JSON.stringify(draft.memo) === JSON.stringify(lessonMemoValues(getCheck(id, date)))) {
       lessonHandoffSourceDrafts.delete(key); return;
     }
-    if (!state.tasks.some(task => task.id === id && task.staffId === session.staffId && !task.deleted)) throw new Error('작성 중인 메모의 수업을 다시 확인해 주세요');
+    if (!state.tasks.some(task => task.id === id && (session.isAdmin || task.staffId === session.staffId) && !task.deleted)) throw new Error('작성 중인 메모의 수업을 다시 확인해 주세요');
     setCheck(id, date, { lessonMemo: draft.memo, note: lessonMemoText(draft.memo) });
     lessonHandoffSourceDrafts.delete(key);
   });
@@ -3534,7 +3534,7 @@ function paintStatus() {
   el.classList.toggle('off', !on);
   const workControls = $('#staffWorkControls');
   if (workControls) {
-    const show = managerInspectionActive() || (session.isStaffLink && !session.isAdmin && staffWork.required && !shouldGateStaffWork());
+    const show = managerInspectionActive() || (session.isStaffLink && staffWork.required && !shouldGateStaffWork());
     workControls.hidden = !show;
     if (managerInspectionActive()) workControls.innerHTML = '<div class="between mt8"><span class="small muted">관리자 점검 모드 · 읽기·수정 화면 확인 가능</span>' +
       '<button class="btn btn-sm btn-navy" data-act="managerinspectlogout"' + (managerInspection.busy ? ' disabled' : '') + '>점검 종료</button></div>';
@@ -20081,7 +20081,7 @@ function showStaffPrivateProfileEditor(message) {
   modal(profile.staffName + ' 선생님 · 연락처 / 로그인',
     '<label class="field"><span class="fl">휴대폰 번호</span><input class="in" id="staffProfilePhone" type="tel" inputmode="tel" autocomplete="off" value="' + esc(profile.phone || '') + '"></label>' +
     '<label class="field"><span><input id="staffProfileLoginEnabled" type="checkbox"' + (profile.loginEnabled ? ' checked' : '') + '> 출근 로그인 사용</span></label>' +
-    '<div class="hint">관리 권한이 있는 선생님은 이 설정과 무관하게 기존 접속·출퇴근 방식을 유지합니다. 연락처 변경만으로 비밀번호는 바뀌지 않습니다.</div>' +
+    '<div class="hint">출퇴근 로그인 대상 관리자는 관리 기능을 사용하면서 출근·퇴근을 기록합니다. 기존 로그인 면제 관리자는 종전 방식을 유지합니다. 연락처 변경만으로 비밀번호는 바뀌지 않습니다.</div>' +
     '<button class="btn btn-primary btn-block mt14" data-act="staffprofilesave">직원 정보 저장</button>' +
     '<hr class="sep"><div class="card-title">개인 비밀번호 ' + (profile.configured ? '재설정' : '설정') + '</div>' +
     '<label class="field mt14"><span class="fl">새 비밀번호 숫자 4자리</span><input class="in" id="staffProfileNewPin" type="password" inputmode="numeric" maxlength="4" autocomplete="new-password" placeholder="숫자 4자리"></label>' +
@@ -24401,7 +24401,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-09-12.1';
+const APP_VER = '2026-09-14.1';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
