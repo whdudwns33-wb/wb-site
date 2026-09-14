@@ -1,8 +1,8 @@
 {
   "week": "2026-W38",
-  "scannedAt": null,
+  "scannedAt": "2026-09-14",
   "preparedAt": "2026-09-11",
-  "method": null,
+  "method": "Perplexity MCP 쿼터 소진(401 insufficient_quota) → WebSearch 3쿼리 + 부처 보도자료 게시판 직접 열람(기후에너지환경부·질병관리청·고용노동부·국립문화유산연구원·우주항공청). 과기정통부는 시스템 점검 중이라 못 봄.",
   "note": "루틴 실행 전에 미리 씨앗만 넣어 둔 파일이다. ② 단계에서 스캔 결과를 items 에 덧붙이고 scannedAt·method 를 채운다. carryover 는 W37 에서 안 쓴 후보 — 새 스캔 결과와 같은 자격으로 견주고, 유효하지 않으면 hold 로 내린다.",
   "prep": {
     "이 블록을 읽는 법": "아래 「관측」은 2026-09-11 에 실제로 세어 본 값이고, 「절차」는 매주 다시 밟아야 하는 순서다. 관측값을 지침으로 착각하지 말 것 — W36 큐의 「인문·예술이 얇으니 보강」이 그렇게 굳어서 이미 균형 잡힌 분야를 또 늘릴 뻔했다. 루틴 당일에는 절차부터 돌려 숫자를 새로 얻는다.",
@@ -182,6 +182,130 @@
       "announced": "질병관리청 뇌질환연구과 2026-09-04",
       "status": "carryover",
       "note": "다음 주 후보 — pm25-grade 와 겹치지 않게 각도 조정 필요 · W37 이월"
+    },
+    {
+      "id": "jangmi-cistern",
+      "title": "1,600년 전 백제의 물 관리 시스템 — 충주 장미산성 목조 집수지",
+      "category": "history",
+      "careers": [
+        "art",
+        "media",
+        "nat"
+      ],
+      "announced": "국립문화유산연구원 국립중원문화유산연구소 2026-09-01",
+      "status": "selected",
+      "source": "https://www.nrich.go.kr/kor/boardView.do?menuIdx=283&bbscd=33&bbs_idx=48359",
+      "note": "내가 직접 200 + 본문 확인. 집수지 6.7m×깊이1.8m·9단·7m 통목재, 판축성벽, 물체질로 식물 50여 종·삼태기·소코뚜레"
+    },
+    {
+      "id": "voc-remote-sensing",
+      "title": "첨단 감시장비로 휘발성유기화합물 배출 진단 — 대산산단 자발적 협약",
+      "category": "environment",
+      "careers": [
+        "it",
+        "biz",
+        "law"
+      ],
+      "announced": "기후에너지환경부 금강유역환경청 2026-09-10",
+      "status": "selected",
+      "source": "https://www.mcee.go.kr/home/web/board/read.do?menuId=10598&boardMasterId=939&boardId=1890090",
+      "note": "내가 직접 200 + 본문 확인. SOF·DIAL 원격측정, 이동측정차량, 2025.3~11 진단"
+    },
+    {
+      "id": "flu-surveillance",
+      "title": "2026-2027절기 인플루엔자 유행주의보 — 표본감시로 유행을 읽는 법",
+      "category": "science",
+      "careers": [
+        "med",
+        "bio",
+        "media"
+      ],
+      "announced": "질병관리청 2026-09-11",
+      "status": "selected",
+      "source": "https://www.kdca.go.kr/bbs/kdca/42/312593/artclView.do",
+      "note": "내가 직접 200 + 본문 확인. ILI 25.3명/1,000(유행기준 12.9), 검출률 16.3%, 7~12세 75.1명"
+    },
+    {
+      "id": "skill-bank",
+      "title": "흩어진 경력은 한눈에 — 직무능력은행과 NCS",
+      "category": "society",
+      "careers": [
+        "biz",
+        "law",
+        "it"
+      ],
+      "announced": "고용노동부 2026-09-11",
+      "status": "selected",
+      "source": "https://www.moel.go.kr/news/enews/report/enewsView.do?news_seq=19929",
+      "note": "내가 직접 200 + 본문 확인. 강원랜드 20명 인정서로 62건 증빙 대체, 에너넷 근속 69.3→82.6%"
+    },
+    {
+      "id": "salt-plants",
+      "title": "소금 위에 피어난 식물 — 염생식물 26종 기획전",
+      "category": "science",
+      "careers": [
+        "nat",
+        "bio"
+      ],
+      "announced": "국립생물자원관 2026-09-11",
+      "status": "candidate",
+      "source": "https://www.mcee.go.kr/home/web/board/read.do?menuId=10598&boardMasterId=939&boardId=1890320",
+      "note": "다음 주 후보. 보도자료는 전시 안내 위주라 염생식물의 내염 기전은 따로 근거를 찾아야 한다"
+    },
+    {
+      "id": "t1d-siblings",
+      "title": "소아·청소년 1형 당뇨 환자의 형제자매 발병 위험",
+      "category": "science",
+      "careers": [
+        "med",
+        "bio"
+      ],
+      "announced": "질병관리청 2026-09-14 조간",
+      "status": "hold",
+      "note": "보류 — 형제자매 위험 10배라는 결과를 L1(7세~초2)에 실으면 겁을 준다. 다루려면 학년대를 L3·L4로 제한하는 판단이 먼저 필요하다"
+    },
+    {
+      "id": "solar-committee",
+      "title": "태양광 산업경쟁력 강화 위원회 출범",
+      "category": "society",
+      "careers": [
+        "biz",
+        "law",
+        "env"
+      ],
+      "announced": "기후에너지환경부 2026-09",
+      "status": "hold",
+      "note": "보류 — W37 해상풍력발전위원회와 「에너지 위원회 출범」 구조가 겹친다. 한 주 걸러 쓴다"
     }
-  ]
+  ],
+  "W38 선정 근거": {
+    "센 값 (2026-09-14)": {
+      "분야": {
+        "history": 7,
+        "environment": 8,
+        "humanities": 8,
+        "science": 8,
+        "society": 8
+      },
+      "진로 최저": "art·biz·it·law·med·media 각 9",
+      "진로 최고": "edu 11 · hum 11",
+      "시사": "16/39 (41%)"
+    },
+    "판단": [
+      "가장 얇은 분야는 history 7편으로 편차 1이다. 편차가 2 미만이라 로테이션을 봤는데, W37 이 environment·humanities·science·society 각 1편에 history 0편이었다. 두 기준이 같은 쪽을 가리켜 history 를 넣는다.",
+      "2편이던 분야가 없으므로 상한에 걸리는 분야는 없다. 나머지 셋은 humanities 를 빼고 environment·science·society 로 골랐다 — humanities 지문은 hum 진로가 자연스럽게 붙는데 hum 은 11로 최고값이다.",
+      "진로는 9편으로 묶인 여섯(art·biz·it·law·med·media)에서만 뽑아 12칸을 각 2회씩 채웠다. edu·hum 은 쓰지 않았다. 반영하면 진로 분포가 9~11에서 10~11로 좁아진다.",
+      "시사는 41%로 목표 20%를 이미 넘어 강제 할당을 하지 않았다. 발표가 최근이고 사안이 진행 중인 둘(인플루엔자 유행, VOCs 협약 이행)만 issue:true 로 두고, 발굴 성과 보도(장미산성)와 제도 성과 발표(직무능력은행)는 false 로 두었다."
+    ],
+    "반영 후 예상": {
+      "분야": {
+        "history": 8,
+        "environment": 9,
+        "science": 9,
+        "society": 9,
+        "humanities": 8
+      },
+      "진로": "10~11"
+    }
+  }
 }
