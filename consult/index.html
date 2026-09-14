@@ -1216,6 +1216,10 @@ const LEARNING_SOURCES = Object.freeze({
 const ONLINE_LEARNING_SOURCE_KEYS = Object.freeze([
   'leaders_eye', 'metamath', 'classcard', 'studyforce', 'nelt_exam', 'daily_nonfiction'
 ]);
+const CHECKLIST_ONLINE_SOURCE_DEFAULTS = Object.freeze({
+  leaders_eye: { title: '리더스아이 오늘 학습', subject: 'english', minutes: 20 },
+  daily_nonfiction: { title: '하루 비문학 독서', subject: 'korean', minutes: 20 }
+});
 const DOW = ['일','월','화','수','목','금','토'];
 const ACADEMIC_TYPES = Object.freeze({
   exam: { icon: '📝', label: '시험' },
@@ -1555,6 +1559,8 @@ function statusOf(t, date) {
 const STATUS_LABEL = { todo: '미착수', doing: '진행중', done: '완료', blocked: '막힘' };
 
 const isOnlineLearningTask = task => !!(task && ONLINE_LEARNING_SOURCE_KEYS.includes(task.source));
+const isRepeatingTask = task => !!(task && ['daily', 'weekday', 'days'].includes(task.repeat));
+const isChecklistOnlineTask = task => !!(task && CHECKLIST_ONLINE_SOURCE_DEFAULTS[task.source] && task.kind !== 'learning_daily_log');
 
 function learningResultSummary(task, check) {
   const result = check && check.learningResult;
@@ -1718,6 +1724,7 @@ function carryOver(staffId, date) {
     const d = addDays(date, -i);
     checklistTasksFor(staffId, d).forEach(t => {
       if (!t.carry || isDone(t.id, d)) return;
+      if (isOnlineLearningTask(t) && isRepeatingTask(t)) return;
       if (state.tasks.some(row => !row.deleted && row.dailyCarryFrom === t.id + '|' + d)) return;
       out.push({ t: t, date: d });
     });
@@ -2627,8 +2634,8 @@ function studentSetupWizard(me, status) {
       '<div class="card-sub">평소에는 오늘 할 일 탭만 위에서 아래로 진행하면 됩니다.</div></div><span class="pill">마지막</span></div>' +
       '<div class="student-guide-steps">' +
         '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">1</span><b>오늘 해야 할 일 확인</b></div><p>첫 카드에서 다음 공부를 확인하고, 배부 대기 항목은 <code>오늘 배부된 공부</code>에서 <code>내 체크리스트로 가져오기</code>를 누릅니다.</p></div>' +
-        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">2</span><b>공부하고 완료 기록</b></div><p>일반 공부는 스터디 플래너에서 완료 표시합니다. 리더스아이·메타수학 같은 온라인 학습은 <code>학습</code> 탭에서 바로 실행하고 결과를 기록합니다.</p></div>' +
-        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">3</span><b>미완료 정리</b></div><p>못 끝낸 공부는 이월·막힘·오늘 종료 중 하나를 선택합니다.</p></div>' +
+        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">2</span><b>공부하고 완료 기록</b></div><p>일반 공부는 스터디 플래너에서 완료 표시합니다. 반복 배정된 리더스아이·하루 비문학은 오늘 체크리스트에서도 확인하고 <code>학습 완료 기록</code>으로 결과를 남깁니다.</p></div>' +
+        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">3</span><b>미완료 정리</b></div><p>못 끝낸 공부는 이월·막힘·오늘 종료 중 하나를 선택합니다. 반복 온라인 학습은 다음 예정일에 다시 표시되어 따로 이월하지 않습니다.</p></div>' +
         '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">4</span><b>하루 마감</b></div><p>타이머 정지 → 미완료 공부 정리 → 시험·중요 일정 준비율 확인 → 마무리 내용 저장 → 보고 문자 복사 → 보호자에게 전송 → 발송했어요 순서로 끝냅니다.</p></div></div>' +
       '<div class="student-guide-tip"><b>인강 안내</b> ' + (courseCount
         ? '현재 등록된 인강이 ' + courseCount + '개 있습니다. 오늘 들을 강의도 체크리스트로 가져와 완료하세요.'
@@ -2708,14 +2715,14 @@ function viewStudentGuide() {
         '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">1</span><b>오늘 해야 할 일 확인</b></div>' +
           '<p>첫 카드에서 이월·배부 공부·온라인 학습·인강·복습 순서를 확인하고, 필요하면 <code>오늘 배부된 공부</code>를 펼칩니다.</p></div>' +
         '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">2</span><b>공부 시작하기</b></div>' +
-          '<p>배부 공부는 <code>내 체크리스트로 가져오기</code>를 누릅니다. 온라인 학습은 <code>학습</code> 탭에서 바로 실행하고 완료 결과를 기록하며, 첫 카드의 버튼을 누르면 이동합니다.</p></div>' +
+          '<p>배부 공부는 <code>내 체크리스트로 가져오기</code>를 누릅니다. 반복 배정된 리더스아이·하루 비문학은 오늘 체크리스트에 자동으로 표시되며, 첫 카드나 학습 탭에서 바로 실행합니다.</p></div>' +
         '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">3</span><b>완료 표시</b></div>' +
           '<p>일반 공부는 스터디 플래너의 체크 칸을 누릅니다. 온라인 학습은 <code>학습 완료 기록</code>을 눌러 리더스아이는 오늘 학습 결과를, 메타수학은 점수·오답 수를 입력합니다.</p></div>' +
         '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">4</span><b>하루 마감</b></div>' +
           '<p>타이머 정지 → 미완료 공부 정리 → 시험·중요 일정 준비율 확인 → 마무리 내용 저장 → 보고 문자 복사 → 보호자에게 전송 → 발송했어요 순서로 끝냅니다.</p></div>' +
       '</div>' +
       '<div class="student-guide-tip"><b>온라인 학습 표시</b> ○ 미시작 → ◐ 진행 중 → ✓ 학생 완료 순서로 바뀌며, 인증사진이 승인되면 🛡 원장 확인으로 표시됩니다.</div>' +
-      '<div class="student-guide-tip"><b>오늘 끝내지 못했다면?</b> 숨기지 말고 하루 마감에서 ‘내일로 이월’, ‘막힘’, ‘오늘 종료’ 중 하나를 선택하세요.</div>' +
+      '<div class="student-guide-tip"><b>오늘 끝내지 못했다면?</b> 숨기지 말고 하루 마감에서 ‘내일로 이월’, ‘막힘’, ‘오늘 종료’ 중 표시되는 방법을 선택하세요. 반복 온라인 학습은 다음 예정일에 자동으로 다시 표시됩니다.</div>' +
       '<div class="student-guide-tip"><b>유효 학습일 스탬프</b> 예정 공부를 하나 이상 완료하거나 순공시간을 10분 이상 기록하고, 미완료 정리와 수행 보고를 다음날 정오 전까지 끝내면 하루에 하나가 찍힙니다.</div>' +
       '<div class="student-guide-tip"><b>포인트와 문화상품권</b> 유효 학습일은 50P, 예정 학습일 3일 이상인 주의 80% 달성·주간 마무리는 250P, 예정 학습일 12일 이상인 달의 80% 달성·월간 마무리는 500P가 자동 계산됩니다. 5,000P부터 오늘 화면에서 문화상품권 교환을 신청하며, 원장이 기록과 발송을 확인한 뒤 차감됩니다.</div>' +
     '</div>' +
@@ -2772,8 +2779,8 @@ function viewToday() {
   const checklistPct = checklistTotal ? Math.round(checklistDone / checklistTotal * 100) : 0;
   const editable = session.isStaffLink || session.isAdmin;
   const carry = (cursor === today()) ? carryOver(me.id, cursor) : [];
-  const plannerList = list.filter(task => !isOnlineLearningTask(task));
-  const plannerCarry = carry.filter(item => !isOnlineLearningTask(item.t));
+  const plannerList = list.filter(task => !isOnlineLearningTask(task) || isChecklistOnlineTask(task));
+  const plannerCarry = carry.filter(item => !isOnlineLearningTask(item.t) || isChecklistOnlineTask(item.t));
   const priorCloseDates = session.isStaffLink && cursor === today() ? dailyUnclosedDates(me.id, cursor) : [];
   const priorWeekMon = session.isStaffLink && cursor === today() ? previousUnclosedWeek(me.id, cursor) : '';
   const priorMonthYm = session.isStaffLink && cursor === today() ? previousUnclosedMonth(me.id, cursor) : '';
@@ -3152,6 +3159,7 @@ function plannerTaskRow(t, date, editable, isCarry) {
   const learningDue = learning ? learningDueDate(t) : '';
   const open = openPanels.has(t.id + '|' + date);
   const resourceUrl = safeHttpsUrl(t.resourceUrl);
+  const learningUrl = isChecklistOnlineTask(t) ? todayLearningUrl(t.source) : '';
   const hasDetail = (t.steps || []).length || t.guide || t.target || resourceUrl || t.evidenceMode === 'photo';
   const running = stRunning(t.staffId, today());
   const timingThis = !!(running && running.taskId === t.id);
@@ -3179,6 +3187,7 @@ function plannerTaskRow(t, date, editable, isCarry) {
         (learning && learningDue && learningDue !== date ? '<span class="tag">마감 ' + shortDate(learningDue) + '</span>' : '') +
         (t.priority === 'high' ? '<span class="tag high">중요</span>' : '') +
         (t.evidenceMode === 'photo' && !learningState ? '<span class="tag doing">📷 인증 필요</span>' : '') +
+        (learningUrl ? '<a class="btn btn-ghost" href="' + esc(learningUrl) + '" target="_blank" rel="noopener noreferrer">' + learning.icon + ' 학습하기 ↗</a>' : '') +
         (editable && status !== 'done'
           ? '<button class="btn ' + (timingThis ? 'btn-warn' : 'btn-ghost') + '" data-act="sttask" data-id="' + t.id + '" data-subj="' + subject.label + '">' +
             (timingThis ? '⏸ 공부 정지' : '▶ 공부 시작') + '</button>'
@@ -5524,7 +5533,14 @@ function learningTaskDate(task) {
 }
 
 function learningDueDate(task) {
+  if (isRepeatingTask(task)) return '';
   return String((task && (task.dueDate || task.start)) || '');
+}
+
+function learningOccurrenceDate(task, date) {
+  if (!task) return '';
+  if (isRepeatingTask(task)) return effectiveOccursOn(task, date) ? date : '';
+  return learningTaskDate(task);
 }
 
 function learningAcademicEvent(task) {
@@ -5554,6 +5570,14 @@ function learningTasksFor(staffId, sourceKey) {
     });
 }
 
+function learningChecklistScheduleFor(staffId, sourceKey) {
+  if (!CHECKLIST_ONLINE_SOURCE_DEFAULTS[sourceKey]) return null;
+  return learningTasksFor(staffId, sourceKey).find(task =>
+    isRepeatingTask(task) && (!task.end || task.end >= today())) || null;
+}
+
+const learningChecklistPatternLocked = task => !!(task && (task.start < today() || getCheck(task.id, today())));
+
 const LEARNING_DAILY_LOG_KIND = 'learning_daily_log';
 
 function dailyLearningRecordId(staffId, sourceKey, date) {
@@ -5568,7 +5592,7 @@ function dailyLearningRecordTask(staffId, sourceKey, date) {
 
 function assignedLearningTaskForDate(staffId, sourceKey, date) {
   return learningTasksFor(staffId, sourceKey).find(task =>
-    task.kind !== LEARNING_DAILY_LOG_KIND && learningTaskDate(task) === date) || null;
+    task.kind !== LEARNING_DAILY_LOG_KIND && effectiveOccursOn(task, date)) || null;
 }
 
 function leadersEyeAccountGuide(me) {
@@ -5748,6 +5772,42 @@ function metamathRequestModal(existing) {
     '<button class="btn btn-primary btn-block" data-act="metamathrequestsave">' + (existing ? '요청 수정하기' : '문제지 요청하기') + '</button>');
 }
 
+function learningChecklistScheduleModal(sourceKey) {
+  if (!session.isAdmin) return;
+  const me = currentStaff();
+  const defaults = CHECKLIST_ONLINE_SOURCE_DEFAULTS[sourceKey];
+  if (!me || !defaults) return toast('학생과 학습 종류를 다시 선택해 주세요');
+  const source = LEARNING_SOURCES[sourceKey];
+  const task = learningChecklistScheduleFor(me.id, sourceKey);
+  const patternLocked = learningChecklistPatternLocked(task);
+  const repeat = task && ['daily', 'weekday', 'days'].includes(task.repeat) ? task.repeat : 'weekday';
+  const days = task && Array.isArray(task.days) ? task.days : [];
+  const start = task ? task.start : today();
+  const end = task ? (task.end || '') : '';
+  const minutes = task ? Number(task.estimatedMin) || defaults.minutes : defaults.minutes;
+  modal(me.name + ' — ' + source.icon + ' 체크리스트 설정',
+    '<div class="guide mb14"><b>' + esc(defaults.title) + '</b><br>선택한 날마다 오늘 체크리스트에 자동으로 표시되고, 학습 탭에서 완료하면 같은 항목이 완료됩니다.</div>' +
+    '<div class="between mb14"><span class="tag subject-tag subject-' + defaults.subject + '">' + esc(STUDY_SUBJECTS[defaults.subject].label) + '</span>' +
+      '<span class="small muted">과목 색상은 자동 지정됩니다.</span></div>' +
+    '<div class="grid2"><div class="field"><label class="fl">반복</label><select class="in" id="learningChecklistRepeat"' + (patternLocked ? ' disabled' : '') + '>' +
+      [['daily', '매일'], ['weekday', '평일(월~금)'], ['days', '요일 지정']].map(option =>
+        '<option value="' + option[0] + '"' + (repeat === option[0] ? ' selected' : '') + '>' + option[1] + '</option>').join('') +
+      '</select></div><div class="field"><label class="fl">예상 학습시간</label><select class="in" id="learningChecklistMinutes">' +
+      [10, 15, 20, 30, 40, 50, 60].map(value => '<option value="' + value + '"' + (minutes === value ? ' selected' : '') + '>' + value + '분</option>').join('') +
+      '</select></div></div>' +
+    '<div class="field"><label class="fl">요일 지정 <span class="muted">(요일 지정을 선택한 경우)</span></label><div class="chips">' +
+      DOW.map((day, index) => '<label class="chip"><input type="checkbox" data-learning-checklist-day value="' + index + '"' +
+        (days.includes(index) ? ' checked' : '') + (patternLocked ? ' disabled' : '') + '> ' + day + '</label>').join('') + '</div></div>' +
+    '<div class="grid2"><div class="field"><label class="fl">시작일</label><input class="in" id="learningChecklistStart" type="date" value="' + start + '"' +
+      (task ? ' disabled' : ' min="' + today() + '"') + '></div>' +
+      '<div class="field"><label class="fl">반복 종료일 <span class="muted">(선택)</span></label><input class="in" id="learningChecklistEnd" type="date" min="' + today() + '" value="' + end + '"></div></div>' +
+    '<div class="hint">' + (patternLocked
+      ? '과거 기록 보호를 위해 반복 방식과 요일은 고정됩니다. 바꾸려면 종료일을 오늘로 저장하고 내일부터 새로 설정해 주세요.'
+      : '종료일을 비워두면 중단할 때까지 반복됩니다.') + ' 반복 학습은 빠뜨린 날과 다음 예정분이 겹치지 않도록 이월하지 않습니다.</div>',
+    '<button class="btn btn-primary btn-block" data-act="learningchecklistsave" data-source="' + sourceKey + '">' +
+      (task ? '체크리스트 설정 저장' : '체크리스트 반복 시작') + '</button>');
+}
+
 function learningSourceCard(me, editable, sourceKey) {
   const source = LEARNING_SOURCES[sourceKey];
   if (!source) return '';
@@ -5755,10 +5815,13 @@ function learningSourceCard(me, editable, sourceKey) {
   const academy = director || isManager();
   const appOnly = source.appOnly === true;
   const onlineSource = ONLINE_LEARNING_SOURCE_KEYS.includes(sourceKey);
-  const allList = learningTasksFor(me.id, sourceKey).filter(task =>
+  const allList = learningTasksFor(me.id, sourceKey).filter(task => isRepeatingTask(task) ||
     !state.tasks.some(row => !row.deleted && row.staffId === me.id &&
       String(row.dailyCarryFrom || '').startsWith(task.id + '|')));
-  const list = allList.filter(task => task.kind !== LEARNING_DAILY_LOG_KIND || task.start !== today());
+  const checklistSchedule = learningChecklistScheduleFor(me.id, sourceKey);
+  const occurrenceDate = task => learningOccurrenceDate(task, today());
+  const list = allList.filter(task => (task.kind !== LEARNING_DAILY_LOG_KIND || task.start !== today()) &&
+    (!isRepeatingTask(task) || effectiveOccursOn(task, today())));
   const leadersEyeTracked = sourceKey === 'leaders_eye' && (director || (session.isStaffLink && !isManager()));
   const leadersEyeStudent = sourceKey === 'leaders_eye' && session.isStaffLink && !isManager() && me.id === session.staffId;
   const assignedToday = sourceKey === 'leaders_eye' ? assignedLearningTaskForDate(me.id, sourceKey, today()) : null;
@@ -5766,11 +5829,12 @@ function learningSourceCard(me, editable, sourceKey) {
   const todayRecord = assignedToday || dailyRecord;
   const todayRecorded = !!(todayRecord && isDone(todayRecord.id, today()));
   const help = director
-    ? esc(me.name) + '에게 ' + esc(source.detail) + ' 과제를 보내고 확인합니다.'
+    ? esc(me.name) + '에게 ' + esc(source.detail) + (CHECKLIST_ONLINE_SOURCE_DEFAULTS[sourceKey]
+      ? ' 반복 체크리스트를 설정하고 완료를 확인합니다.' : ' 과제를 보내고 확인합니다.')
     : academy
       ? esc(source.detail) + (appOnly ? ' 앱 연결은 휴대폰에서 이용합니다.' : source.studentUrl ? ' 사이트를 열 수 있습니다.' : ' 진행 상태를 확인합니다.') + ' 과제 발행은 원장 화면에서 합니다.'
       : sourceKey === 'leaders_eye'
-        ? '리더스아이 학습 후 ‘오늘 학습 완료 기록’을 누르세요. 회차나 별도 과제 배정은 필요하지 않습니다.'
+        ? (assignedToday ? '오늘 체크리스트의 리더스아이를 학습하고 완료 기록을 남기세요.' : '리더스아이 학습 후 ‘오늘 학습 완료 기록’을 누르세요.')
       : onlineSource
         ? esc(source.detail) + '을 실행한 뒤 아래 과제의 ‘학습 완료 기록’에서 결과를 남깁니다.'
         : esc(source.detail) + ' 과제와 진행 상태만 모아 봅니다.';
@@ -5787,12 +5851,13 @@ function learningSourceCard(me, editable, sourceKey) {
         ? '공식 앱 스토어 화면으로 이동합니다. 이미 설치했다면 ‘열기’를 눌러 주세요.'
         : '클래스카드 앱 연결은 휴대폰에서 이 화면을 열어 이용하세요.') + '</div>'
     : '';
-  const addLabel = sourceKey === 'exam_material' ? '＋ 자료 보내기' : '＋ 과제 보내기';
-  const active = list.filter(task => !isDone(task.id, learningTaskDate(task)));
-  const completed = list.filter(task => isDone(task.id, learningTaskDate(task)));
+  const addLabel = sourceKey === 'exam_material' ? '＋ 자료 보내기' :
+    sourceKey === 'daily_nonfiction' ? '＋ 1회 과제 보내기' : '＋ 과제 보내기';
+  const active = list.filter(task => !isDone(task.id, occurrenceDate(task)));
+  const completed = list.filter(task => isDone(task.id, occurrenceDate(task)));
   const late = active.filter(task => learningDueDate(task) && learningDueDate(task) < today()).length;
   const studentDue = onlineSource && session.isStaffLink && !isManager() &&
-    active.some(task => learningTaskDate(task) <= today());
+    active.some(task => occurrenceDate(task) <= today());
   const accountGuide = sourceKey === 'leaders_eye' ? leadersEyeAccountGuide(me) : '';
   const canRequestMetamath = sourceKey === 'metamath' && session.isStaffLink && !isManager() && me.id === session.staffId;
   const metamathPanel = sourceKey === 'metamath' ? metamathRequestPanel(me) : '';
@@ -5807,16 +5872,21 @@ function learningSourceCard(me, editable, sourceKey) {
     ? (active.length ? '<span class="pill warn">배정 ' + active.length + '건</span>' : '')
     : '<span class="pill' + (active.length ? ' warn' : '') + '">' +
       (onlineSource && active.length ? '완료 기록 ' : '') + active.length + '건</span>';
+  const checklistScheduleStatus = checklistSchedule
+    ? '<span class="pill">' + esc(repeatLabel(checklistSchedule)) + ' · ' + Number(checklistSchedule.estimatedMin || 20) + '분</span>' : '';
 
   return '<details class="card study-source-card" data-learning-source="' + esc(sourceKey) + '"' +
     (late || studentDue || (leadersEyeStudent && !todayRecorded) ? ' open' : '') + '>' +
     '<summary class="study-source-summary"><span class="study-source-head"><span class="study-source-icon">' + source.icon + '</span>' +
       '<span class="study-source-copy"><b>' + esc(source.label) + '</b><span>' + esc(source.detail) + '</span></span></span>' +
       '<span class="study-source-count">' + (late ? '<span class="pill bad">지연 ' + late + '</span>' : '') +
-        leadersEyeStatus + assignmentCount + '</span></summary>' +
+        checklistScheduleStatus + leadersEyeStatus + assignmentCount + '</span></summary>' +
     '<div class="study-source-body"><div class="small muted mt14">' + help + '</div>' +
     accountGuide +
     '<div class="study-source-actions">' +
+      (director && CHECKLIST_ONLINE_SOURCE_DEFAULTS[sourceKey]
+        ? '<button class="btn btn-navy" data-act="learningchecklistopen" data-source="' + esc(sourceKey) + '">' +
+          (checklistSchedule ? '✏ 체크리스트 설정' : '＋ 체크리스트 설정') + '</button>' : '') +
       (director && sourceKey !== 'leaders_eye'
         ? '<button class="btn btn-primary" data-act="learnadd" data-source="' + esc(sourceKey) + '">' + addLabel + '</button>' : '') + link +
       leadersEyeAction +
@@ -5825,10 +5895,10 @@ function learningSourceCard(me, editable, sourceKey) {
     appHint +
     metamathPanel +
     (active.length
-      ? active.map(t => taskRow(t, learningTaskDate(t), editable, false)).join('')
+      ? active.map(t => taskRow(t, occurrenceDate(t), editable, false)).join('')
       : '<div class="small muted">진행할 ' + esc(source.label) + ' 과제가 없습니다.</div>') +
     (completed.length ? '<details class="study-completed"><summary>완료 기록 ' + completed.length + '건 보기</summary>' +
-      completed.slice(0, 10).map(t => taskRow(t, learningTaskDate(t), editable, false)).join('') + '</details>' : '') +
+      completed.slice(0, 10).map(t => taskRow(t, occurrenceDate(t), editable, false)).join('') + '</details>' : '') +
     '</div></details>';
 }
 
@@ -5848,9 +5918,11 @@ function viewStudy() {
   const learningTasks = sourceKeys.flatMap(key => learningTasksFor(me.id, key).filter(task =>
     !state.tasks.some(row => !row.deleted && row.staffId === me.id &&
       String(row.dailyCarryFrom || '').startsWith(task.id + '|'))));
-  const activeTasks = learningTasks.filter(task => !isDone(task.id, learningTaskDate(task)));
-  const lateTasks = activeTasks.filter(task => learningDueDate(task) && learningDueDate(task) < today());
-  const todayTasks = activeTasks.filter(task => learningTaskDate(task) <= today());
+  const learningOccurrences = learningTasks.map(task => ({ task: task, date: learningOccurrenceDate(task, today()) }))
+    .filter(item => item.date);
+  const activeTasks = learningOccurrences.filter(item => !isDone(item.task.id, item.date));
+  const lateTasks = activeTasks.filter(item => learningDueDate(item.task) && learningDueDate(item.task) < today());
+  const todayTasks = activeTasks.filter(item => item.date <= today());
   const dueWrong = wnDue(me.id);
   const dueRounds = rdDue(me.id);
   h += '<div class="card study-hub-hero"><div class="card-title">' + roleLabel + ' · 학습 허브</div>' +
@@ -7297,8 +7369,12 @@ function dailyClosureCard(student, date) {
       '<div class="hint" style="text-align:center;margin-top:10px">새로고침해도 마감 단계와 확인 기록은 유지됩니다.</div>') + '</div>';
 }
 
-function dailyResolutionOptions(selected) {
-  return [['', '처리 방법 선택'], ['carry', '내일로 이월'], ['blocked', '막힘 · 사유 남기기'], ['closed', '오늘 종료 · 사유 남기기']]
+const canDailyCarryItem = item => !(item && item.type === 'task' && isOnlineLearningTask(item.task) && isRepeatingTask(item.task));
+
+function dailyResolutionOptions(selected, canCarry) {
+  return [['', '처리 방법 선택']]
+    .concat(canCarry === false ? [] : [['carry', '내일로 이월']])
+    .concat([['blocked', '막힘 · 사유 남기기'], ['closed', '오늘 종료 · 사유 남기기']])
     .map(([value, label]) => '<option value="' + value + '"' + (selected === value ? ' selected' : '') + '>' + label + '</option>').join('');
 }
 
@@ -7306,14 +7382,16 @@ function dailyCloseModal(staffId, date) {
   const data = dailyCloseState(staffId, date);
   const rows = data.incomplete.map(item => {
     const saved = data.close.resolutions[item.key] || {};
+    const canCarry = canDailyCarryItem(item);
     return '<div class="daily-close-item ' + studySubject(item.subjectKey).className + '">' +
       '<div class="row wraprow" style="gap:6px">' + studySubjectTag(item.subjectKey) +
         (item.carriedFromDate ? '<span class="tag carry">' + shortDate(item.carriedFromDate) + ' 이월</span>' : '') +
         (item.claimed === false ? '<span class="tag high">체크리스트에 담지 않음</span>' : '') +
+        (!canCarry ? '<span class="tag">반복 · 다음 예정일 자동 표시</span>' : '') +
         '<b class="small">' + esc(item.label) + '</b></div>' +
       (item.detail ? '<div class="small muted mt8">' + esc(item.detail) + '</div>' : '') +
       '<div class="daily-close-item-grid"><select class="in" data-daily-resolution data-key="' + esc(item.key) + '">' +
-        dailyResolutionOptions(saved.type || '') + '</select>' +
+        dailyResolutionOptions(saved.type || '', canCarry) + '</select>' +
         '<input class="in" data-daily-note data-key="' + esc(item.key) + '" value="' + esc(saved.note || '') + '" placeholder="막힘·종료 사유"></div></div>';
   }).join('');
   const events = data.events.map(ref => {
@@ -11122,6 +11200,65 @@ document.addEventListener('click', ev => {
       learningTaskModal('metamath', req.id);
       break;
     }
+    case 'learningchecklistopen': {
+      if (!session.isAdmin) break;
+      learningChecklistScheduleModal(el.dataset.source || '');
+      break;
+    }
+    case 'learningchecklistsave': {
+      if (!session.isAdmin) break;
+      const me = currentStaff();
+      const sourceKey = el.dataset.source || '';
+      const defaults = CHECKLIST_ONLINE_SOURCE_DEFAULTS[sourceKey];
+      const source = LEARNING_SOURCES[sourceKey];
+      if (!me || !defaults || !source) return toast('학생과 학습 종류를 다시 선택해 주세요');
+      let task = learningChecklistScheduleFor(me.id, sourceKey);
+      const patternLocked = learningChecklistPatternLocked(task);
+      const repeat = patternLocked ? task.repeat : (($('#learningChecklistRepeat') && $('#learningChecklistRepeat').value) || '');
+      const days = patternLocked && Array.isArray(task.days) ? task.days.slice() :
+        [...document.querySelectorAll('[data-learning-checklist-day]:checked')].map(input => Number(input.value));
+      const start = task ? task.start : (($('#learningChecklistStart') && $('#learningChecklistStart').value) || '');
+      const end = (($('#learningChecklistEnd') && $('#learningChecklistEnd').value) || '');
+      const minutes = Number(($('#learningChecklistMinutes') && $('#learningChecklistMinutes').value) || 0);
+      if (!['daily', 'weekday', 'days'].includes(repeat)) return toast('반복 방식을 선택해 주세요');
+      if (days.some(day => !Number.isInteger(day) || day < 0 || day > 6)) return toast('반복할 요일을 다시 선택해 주세요');
+      if (repeat === 'days' && !days.length) return toast('반복할 요일을 선택해 주세요');
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(start) || (!task && start < today())) return toast('시작일은 오늘 이후로 선택해 주세요');
+      if (end && (!/^\d{4}-\d{2}-\d{2}$/.test(end) || end < start || end < today())) return toast('종료일은 오늘 이후로 선택해 주세요');
+      if (!Number.isInteger(minutes) || minutes < 10 || minutes > 60) return toast('예상 학습시간을 선택해 주세요');
+      let reusedDailyRecord = false;
+      if (!task) {
+        task = sourceKey === 'leaders_eye' && start === today() &&
+          occursOn({ repeat: repeat, days: days, start: start, end: end, deleted: false }, start)
+          ? dailyLearningRecordTask(me.id, sourceKey, start) : null;
+        reusedDailyRecord = !!task;
+        if (!task) {
+          task = { id: uid(), groupId: 'learning-checklist-' + now(), staffId: me.id, createdAt: now() };
+          state.tasks.push(task);
+        }
+      }
+      if (task.kind === LEARNING_DAILY_LOG_KIND) delete task.kind;
+      Object.assign(task, {
+        source: sourceKey, title: defaults.title, studySubject: defaults.subject,
+        detail: source.detail, guide: source.guide,
+        steps: task.steps && task.steps.length ? task.steps : source.steps.map(label => ({ id: uid(), label: label })),
+        target: 0, unit: '건', time: '', priority: 'normal', estimatedMin: minutes,
+        repeat: repeat, days: repeat === 'days' ? days.sort((a, b) => a - b) : [], start: start, end: end,
+        dueDate: '', carry: false, requiresClaim: false, resourceUrl: '', evidenceMode: '',
+        origin: 'admin', updatedAt: now(), deleted: false
+      });
+      if (reusedDailyRecord) {
+        const check = getCheck(task.id, start);
+        if (check && check.done) {
+          check.steps = Object.fromEntries(task.steps.map(step => [step.id, true]));
+          check.updatedAt = now();
+        }
+      }
+      const stored = save(); queueSync();
+      if (!stored) break;
+      closeModal(); render(); toast(me.name + ' — ' + source.label + ' 체크리스트 설정을 저장했습니다');
+      break;
+    }
     case 'learnadd': {
       if (!session.isAdmin) break;
       const sourceKey = el.dataset.source || '';
@@ -13264,6 +13401,7 @@ document.addEventListener('click', ev => {
         const type = select ? select.value : ((nextResolutions[item.key] || {}).type || '');
         const note = noteInput ? noteInput.value.trim() : ((nextResolutions[item.key] || {}).note || '');
         if (!type) return toast(item.label + '의 처리 방법을 선택해 주세요');
+        if (type === 'carry' && !canDailyCarryItem(item)) return toast(item.label + '은 다음 예정일에 자동 표시되어 이월할 수 없습니다');
         if ((type === 'blocked' || type === 'closed') && !note) return toast(item.label + '의 사유를 입력해 주세요');
         const previous = nextResolutions[item.key] || {};
         nextResolutions[item.key] = {
@@ -13434,6 +13572,10 @@ document.addEventListener('click', ev => {
       const t = task();
       if (!t) break;
       if (!canEditTask(t)) return toast('원장님이 내린 지시는 수정할 수 없습니다');
+      if (session.isAdmin && CHECKLIST_ONLINE_SOURCE_DEFAULTS[t.source] && isRepeatingTask(t)) {
+        learningChecklistScheduleModal(t.source);
+        break;
+      }
       editTaskModal(id);
       break;
     }
@@ -13898,7 +14040,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-09-08.4';
+const APP_VER = '2026-09-15.1';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
