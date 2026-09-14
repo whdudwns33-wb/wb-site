@@ -10,8 +10,7 @@ var WBStaffWorkSessionCore = (function () {
     if (!value || value.ok !== true || String(value.staffId || '') !== String(staffId || '') ||
         !['teacher', 'manager'].includes(value.authRole) || typeof value.required !== 'boolean' ||
         typeof value.active !== 'boolean' || typeof value.configured !== 'boolean' ||
-        !/^\d{4}-\d{2}-\d{2}$/.test(String(value.workDate || '')) ||
-        (value.authRole === 'manager' && value.required)) throw new Error('출근 로그인 상태를 확인하지 못했습니다');
+        !/^\d{4}-\d{2}-\d{2}$/.test(String(value.workDate || ''))) throw new Error('출근 로그인 상태를 확인하지 못했습니다');
     return value;
   }
   function isActive(value, date, at) {

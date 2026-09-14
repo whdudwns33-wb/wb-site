@@ -133,6 +133,38 @@ test('manager/admin and non-enrolled teacher retain previous flow and feature fl
   assert.equal((await call(env, 'status')).status, 503);
 });
 
+test('enrolled manager retains authority but must clock in before business and private profile access', async () => {
+  const env = await fixture({ TASK_WORK_LOGIN_MANAGER_IDS_CONFIG: 'manager-a' });
+  await withNow(now, async () => {
+    const status = await call(env, 'status', {}, manager);
+    assert.equal(status.data.authRole, 'manager');
+    assert.equal(status.data.required, true);
+    assert.equal(status.data.active, false);
+    for (const path of ['/sync', '/staff-profile', '/search', '/curriculum']) {
+      assert.equal((await gate(env, '', path, manager)).data.code, 'STAFF_WORK_LOGIN_REQUIRED');
+    }
+    const response = await worker.fetch(new Request('https://example.test/staff-profile', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body('list', manager))
+    }), env);
+    assert.equal((await response.json()).code, 'STAFF_WORK_LOGIN_REQUIRED');
+    const logged = await call(env, 'login', { pin }, manager);
+    assert.equal(logged.status, 200);
+    assert.equal(logged.data.authRole, 'manager');
+    assert.equal(logged.data.attendance.owner, manager.id);
+    assert.equal(logged.data.attendance.record.at, now);
+    assert.equal(await gate(env, logged.data.workSession, '/sync', manager), null);
+    assert.equal(await gate(env, logged.data.workSession, '/staff-profile', manager), null);
+    const out = await withNow(now + 3600000, () => call(env, 'logout', {
+      auth: { ...body('logout', manager).auth, workSession: logged.data.workSession }
+    }, manager));
+    assert.equal(out.data.attendance.record.out, now + 3600000);
+    assert.equal((await gate(env, logged.data.workSession, '/sync', manager)).data.code, 'STAFF_WORK_LOGIN_REQUIRED');
+    const relogged = await withNow(now + 4000000, () => call(env, 'login', { pin }, manager));
+    assert.equal(relogged.data.attendance.record.at, now);
+    assert.equal(relogged.data.attendance.record.sessions.length, 2);
+  });
+});
+
 test('manager inspection authenticates either manager PIN without exposing the teacher device bearer', async () => {
   const env = await fixture();
   const sourceAuth = { id: 'teacher-a', scope: 'own' };
