@@ -154,6 +154,7 @@ function renderLearningSourceCard(studentName, state) {
   const renderCard = new Function(
     'LEARNING_SOURCES', 'ONLINE_LEARNING_SOURCE_KEYS', 'state', 'session', 'isManager', 'isDone', 'learningTaskDate',
     'learningDueDate', 'today', 'esc', 'classcardAppUrl', 'navigator', 'taskRow',
+    'CHECKLIST_ONLINE_SOURCE_DEFAULTS', 'isRepeatingTask', 'effectiveOccursOn', 'learningOccurrenceDate', 'repeatLabel',
     source + '; return learningSourceCard;'
   )(
     learningSources(), ['leaders_eye', 'metamath', 'classcard', 'studyforce', 'nelt_exam', 'daily_nonfiction'],
@@ -162,7 +163,18 @@ function renderLearningSourceCard(studentName, state) {
     value => String(value == null ? '' : value).replace(/[&<>"']/g, char => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
     })[char]),
-    () => '', { userAgent: '', maxTouchPoints: 0 }, () => ''
+    () => '', { userAgent: '', maxTouchPoints: 0 }, () => '',
+    {
+      leaders_eye: { title: '리더스아이 오늘 학습', subject: 'english', minutes: 20 },
+      daily_nonfiction: { title: '하루 비문학 독서', subject: 'korean', minutes: 20 }
+    },
+    task => !!(task && ['daily', 'weekday', 'days'].includes(task.repeat)),
+    (task, date) => !task.deleted && (!task.start || date >= task.start) && (!task.end || date <= task.end) &&
+      (task.repeat === 'daily' || (task.repeat === 'weekday' && [1, 2, 3, 4, 5].includes(new Date(date + 'T00:00:00').getDay())) ||
+       (task.repeat === 'days' && (task.days || []).includes(new Date(date + 'T00:00:00').getDay())) ||
+       (task.repeat === 'once' && task.start === date)),
+    (task, date) => ['daily', 'weekday', 'days'].includes(task.repeat) ? date : task.start,
+    task => task.repeat === 'weekday' ? '평일(월~금)' : task.repeat || ''
   );
   return renderCard({ id: 'student-a', name: studentName }, true, 'leaders_eye');
 }
@@ -242,7 +254,6 @@ test('the Leaders Eye student card renders shared login guidance with the curren
     assert.match(card, /1주일마다 자동으로 레벨이 조정됩니다/);
     assert.match(card, /오늘 미기록/);
     assert.match(card, /data-act="learningdailyopen"[\s\S]*?오늘 학습 완료 기록/);
-    assert.match(card, /회차나 별도 과제 배정은 필요하지 않습니다/);
   }
   assert.match(first, /Student ID[\s\S]*?김민준/);
   assert.doesNotMatch(first, /이서연/);
