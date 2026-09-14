@@ -1,5 +1,5 @@
 {
-  "version": "2026-09-07.2",
+  "version": "2026-09-14.2",
   "articles": [
     {
       "id": "nuri-space",
@@ -39272,6 +39272,3782 @@
         }
       },
       "issue": true
+    },
+    {
+      "id": "jangmi-cistern",
+      "category": "history",
+      "careers": [
+        "art",
+        "media",
+        "nat"
+      ],
+      "publishedAt": "2026-09-14",
+      "status": "published",
+      "issue": false,
+      "sources": [
+        {
+          "title": "국립문화유산연구원 국립중원문화유산연구소 보도자료 — 1,600년 전 백제의 ‘물 관리 시스템’ 충주 장미산성에서 드러나다 (2026.9.1)",
+          "url": "https://www.nrich.go.kr/kor/boardView.do?menuIdx=283&bbscd=33&bbs_idx=48359"
+        },
+        {
+          "title": "국가유산청 보도자료 — 중원역사문화권 대표 국가유산, 충주 장미산성 발굴조사 성과 공개 (2024.5.21)",
+          "url": "https://www.khs.go.kr/newsBbz/selectNewsBbzView.do?newsItemId=155704804&sectionId=b_sec_1&mn=NS_01_02"
+        }
+      ],
+      "levels": {
+        "L1": {
+          "title": "성 안에서 물통이 나왔어요",
+          "minutes": 3,
+          "paragraphs": [
+            [
+              "충주에 장미산성이라는 옛 성이 있어요. ",
+              "산 위에 쌓은 성을 ",
+              "산성이라고 해요. ",
+              "천육백 년 전에 ",
+              "백제 사람들이 쌓았어요. ",
+              "우리는 성이 ",
+              "싸움을 막는 곳이라고만 생각해요. ",
+              "그런데 이번에 성 안 땅속에서 ",
+              "큰 나무 물통이 나왔어요."
+            ],
+            [
+              "물통은 골짜기에 있었어요. ",
+              "물이 저절로 모이는 자리예요. ",
+              "이렇게 물을 모아 두는 곳을 ",
+              "집수지라고 해요. ",
+              "긴 나무를 아홉 단으로 ",
+              "맞물려 쌓아 만들었어요. ",
+              "성 안 사람들은 ",
+              "여기에 물을 담아 두고 썼어요."
+            ],
+            [
+              "집수지 안에 쌓인 흙도 ",
+              "그냥 버리지 않았어요. ",
+              "흙을 물에 풀어 ",
+              "하나하나 걸렀어요. ",
+              "그랬더니 쌀과 팥과 콩이 나왔어요. ",
+              "소와 돼지의 뼈도 나왔어요. ",
+              "옛사람이 무엇을 먹고 살았는지 ",
+              "알게 되었어요."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "산성",
+              "easy": "산 위에 쌓은 성이에요."
+            },
+            {
+              "word": "집수지",
+              "easy": "물을 모아 두려고 만든 큰 물통이에요."
+            },
+            {
+              "word": "골짜기",
+              "easy": "산과 산 사이에 움푹 팬 곳이에요."
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글은 무엇을 알려 주나요?",
+              "choices": [
+                "성을 새로 쌓는 방법",
+                "옛 성 안에서 물을 모아 두던 큰 물통이 나온 일",
+                "충주에 가는 기차 시간",
+                "나무를 심는 방법"
+              ],
+              "answer": 1,
+              "explain": "성 안 땅속에서 물을 모아 두던 나무 물통, 집수지가 나왔다는 이야기예요.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "집수지는 어디에 있었나요?",
+              "choices": [
+                "산꼭대기",
+                "성 밖 들판",
+                "성 안 골짜기",
+                "강 한가운데"
+              ],
+              "answer": 2,
+              "explain": "물통은 물이 저절로 모이는 골짜기에 있었어요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「집수지」는 무엇인가요?",
+              "choices": [
+                "물을 모아 두려고 만든 큰 물통",
+                "곡식을 넣어 두는 창고",
+                "적을 막는 높은 담",
+                "불을 피우는 자리"
+              ],
+              "answer": 0,
+              "explain": "물을 모아 두는 곳을 집수지라고 해요.",
+              "evidencePara": 1
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "백제 사람들이 골짜기에 집수지를 만든 까닭은 무엇일까요?",
+              "choices": [
+                "골짜기가 가장 시원해서",
+                "골짜기에 물이 저절로 모여서",
+                "골짜기에 나무가 많아서",
+                "골짜기가 성에서 제일 높아서"
+              ],
+              "answer": 1,
+              "explain": "골짜기는 물이 저절로 모이는 자리라고 했어요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "apply",
+              "q": "이 글에 나온 방법대로 하면, 옛 항아리 속 흙에서 작은 씨앗을 찾으려 할 때 좋은 방법은?",
+              "choices": [
+                "흙을 그냥 버려요",
+                "흙을 물에 풀어 하나하나 걸러요",
+                "흙을 햇볕에 말려 두어요",
+                "흙 위에 물을 뿌려 두어요"
+              ],
+              "answer": 1,
+              "explain": "흙을 물에 풀어 걸렀더니 쌀과 팥과 콩까지 나왔어요.",
+              "evidencePara": 2
+            }
+          ]
+        },
+        "L2": {
+          "title": "성이 물을 다루던 법",
+          "minutes": 4,
+          "paragraphs": [
+            [
+              "충주 장미산성은 ",
+              "한강을 따라 충주 분지로 들어오는 ",
+              "길목에 자리한 산성이다. ",
+              "오랫동안 돌로 쌓은 ",
+              "성으로 알려져 있었다. ",
+              "그런데 2022년 하반기부터 이어진 발굴에서 ",
+              "돌 성벽 아래가 드러났다. ",
+              "그 아래에는 ",
+              "백제 사람들이 흙으로 쌓은 ",
+              "성벽과 생활공간이 묻혀 있었다."
+            ],
+            [
+              "가장 눈에 띈 것은 ",
+              "성 안 북쪽 골짜기에서 나온 ",
+              "나무 물그릇이다. ",
+              "물을 모아 두는 이런 시설을 ",
+              "집수지라고 한다. ",
+              "안쪽 한 변이 약 6.7미터, ",
+              "깊이가 약 1.8미터인 정사각형이다. ",
+              "길이 7미터가 넘는 나무를 ",
+              "통째로 다듬어 벽마다 대고, ",
+              "아홉 단으로 맞물려 쌓았다. ",
+              "백제 한성기 집수지 가운데 ",
+              "지금까지 가장 크다."
+            ],
+            [
+              "골짜기는 물이 저절로 모이는 자리다. ",
+              "백제 사람들은 ",
+              "그 자리를 골라 ",
+              "물을 담아 두고 ",
+              "흐름을 조절했다. ",
+              "성은 싸움을 막는 곳이기만 하지 않았다. ",
+              "사람이 오래 머무르려면 ",
+              "마실 물부터 있어야 했다."
+            ],
+            [
+              "조사단은 집수지 안에 쌓인 흙도 ",
+              "그냥 버리지 않았다. ",
+              "흙을 물에 풀어 ",
+              "체로 걸러 내는 물체질을 했다. ",
+              "그러자 눈에 잘 안 보이는 것까지 ",
+              "건져 냈다. ",
+              "쌀과 팥과 콩을 비롯한 ",
+              "재배·야생식물 50여 종, ",
+              "소와 돼지와 개의 뼈가 나왔다. ",
+              "자루가 온전히 남은 도끼와 ",
+              "삼태기도 함께 나왔다."
+            ],
+            [
+              "흙으로 쌓은 성벽에서는 ",
+              "판축이라는 기술도 확인됐다. ",
+              "흙을 얇게 켜켜이 다져 올리는 ",
+              "이 방법은 ",
+              "풍납토성이나 몽촌토성 같은 ",
+              "백제 왕성의 기술이다. ",
+              "지방 산성에서는 흔하지 않았다. ",
+              "중앙에서 쓰던 토기와 칠기도 ",
+              "많이 나왔다. ",
+              "백제가 이곳에 ",
+              "중앙의 기술과 사람을 ",
+              "직접 보냈다는 뜻이다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "산성",
+              "easy": "산에 쌓은 성",
+              "hanja": "山(메 산)+城(재 성)"
+            },
+            {
+              "word": "집수지",
+              "easy": "물을 모아 두려고 만든 시설",
+              "hanja": "集(모을 집)+水(물 수)+池(못 지)"
+            },
+            {
+              "word": "물체질",
+              "easy": "흙을 물에 풀어 체로 걸러 내는 일"
+            },
+            {
+              "word": "판축",
+              "easy": "흙을 얇게 켜켜이 다져 올려 쌓는 기술",
+              "hanja": "板(널 판)+築(쌓을 축)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 알맞은 것은?",
+              "choices": [
+                "장미산성은 돌로만 쌓은 성이었다",
+                "장미산성 발굴에서 백제가 물을 다루고 성을 쌓은 기술이 드러났다",
+                "장미산성에서 금으로 만든 보물이 나왔다",
+                "장미산성은 백제가 아니라 신라가 쌓았다"
+              ],
+              "answer": 1,
+              "explain": "집수지와 판축, 출토 유물이 백제의 기술과 살림을 보여 주었다는 글이다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "집수지에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "돌을 쌓아 둥글게 만들었다",
+                "길이 7미터가 넘는 나무를 아홉 단으로 맞물려 쌓았다",
+                "성 밖 강가에 만들었다",
+                "깊이가 7미터쯤 되었다"
+              ],
+              "answer": 1,
+              "explain": "길이 7미터가 넘는 나무를 통째로 다듬어 아홉 단으로 맞물려 쌓았다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「물체질」에 해당하는 설명은?",
+              "choices": [
+                "흙을 물에 풀어 체로 걸러 내는 일",
+                "물속에서 헤엄을 치는 일",
+                "흙에 물을 부어 굳히는 일",
+                "물의 깊이를 재는 일"
+              ],
+              "answer": 0,
+              "explain": "흙을 물에 풀어 체로 걸러 내는 것이 물체질이다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "infer",
+              "q": "판축이 확인된 것이 중요한 까닭은?",
+              "choices": [
+                "판축이 가장 값싼 방법이기 때문에",
+                "왕성에 쓰던 기술이 지방 산성에서 나왔기 때문에",
+                "판축으로 쌓으면 성이 더 낮아지기 때문에",
+                "판축은 신라만 쓰던 기술이기 때문에"
+              ],
+              "answer": 1,
+              "explain": "판축은 백제 왕성의 기술인데 지방 산성에서는 흔하지 않았다고 했다.",
+              "evidencePara": 4
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "조사단이 흙까지 물체질한 덕분에 알 수 있게 된 것은?",
+              "choices": [
+                "성벽의 높이",
+                "성을 쌓은 사람의 이름",
+                "그때 사람들이 무엇을 먹고 길렀는지",
+                "성을 쌓는 데 걸린 날수"
+              ],
+              "answer": 2,
+              "explain": "물체질로 쌀·팥·콩과 짐승 뼈가 나와 먹을거리를 알 수 있게 되었다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "apply",
+              "q": "이 글대로 보면, 산성 터를 새로 발굴할 때 가장 먼저 챙겨야 할 것은?",
+              "choices": [
+                "가장 큰 돌부터 성 밖으로 옮긴다",
+                "물이 모이는 자리를 찾아 그 안의 흙까지 걸러 살핀다",
+                "성벽 높이만 재어 기록한다",
+                "토기 조각만 골라 모은다"
+              ],
+              "answer": 1,
+              "explain": "물이 모이는 자리에 집수지가 있었고, 그 흙을 걸러 살림살이가 드러났다.",
+              "evidencePara": 2
+            }
+          ],
+          "en": [
+            "Jangmisanseong is an old mountain fortress in Chungju, Korea. It sits on the road from the Han River into the Chungju basin. For a long time, people thought it was made of stone. But diggers started work there in late 2022. Under the stone wall, they found an older wall of earth. People of Baekje built it and lived there.",
+            "The most surprising find was a big wooden tank. It lay in a valley in the north of the fortress. A tank that holds water is called a jipsuji. Inside, one side is about 6.7 meters long. It is about 1.8 meters deep and square. Workers cut whole trees over 7 meters long. They stacked the wood in nine layers. It is the largest Baekje tank found so far.",
+            "Water gathers in a valley by itself. Baekje people chose that spot on purpose. They kept water there and controlled its flow. A fortress was not only a place to stop enemies. People needed water to stay there a long time.",
+            "The team did not throw away the soil in the tank. They mixed it with water and used a sieve. This way of digging is called wet sieving. So they could find very small things. They found rice, red beans, and soybeans. About fifty kinds of plants came out. Bones of cows, pigs, and dogs came out too. An axe with its handle was there as well.",
+            "The earth wall used a building way called panchuk. Workers pressed thin layers of earth again and again. Baekje used this way for royal walls in the capital. It was rare in fortresses far from the capital. Many pots and lacquer things from the capital came out too. So Baekje sent its own skills and people here."
+          ],
+          "enseg": [
+            [
+              "Jangmisanseong is an old mountain fortress in Chungju, Korea. ",
+              "It sits on the road from the Han River into the Chungju basin. ",
+              "For a long time, people thought it was made of stone. ",
+              "But diggers started work there in late 2022. ",
+              "Under the stone wall, they found an older wall of earth. ",
+              "People of Baekje built it and lived there."
+            ],
+            [
+              "The most surprising find was a big wooden tank. ",
+              "It lay in a valley in the north of the fortress. ",
+              "A tank that holds water is called a jipsuji. ",
+              "Inside, one side is about 6.7 meters long. ",
+              "It is about 1.8 meters deep and square. ",
+              "Workers cut whole trees over 7 meters long. ",
+              "They stacked the wood in nine layers. ",
+              "It is the largest Baekje tank found so far."
+            ],
+            [
+              "Water gathers in a valley by itself. ",
+              "Baekje people chose that spot on purpose. ",
+              "They kept water there and controlled its flow. ",
+              "A fortress was not only a place to stop enemies. ",
+              "People needed water to stay there a long time."
+            ],
+            [
+              "The team did not throw away the soil in the tank. ",
+              "They mixed it with water and used a sieve. ",
+              "This way of digging is called wet sieving. ",
+              "So they could find very small things. ",
+              "They found rice, red beans, and soybeans. ",
+              "About fifty kinds of plants came out. ",
+              "Bones of cows, pigs, and dogs came out too. ",
+              "An axe with its handle was there as well."
+            ],
+            [
+              "The earth wall used a building way called panchuk. ",
+              "Workers pressed thin layers of earth again and again. ",
+              "Baekje used this way for royal walls in the capital. ",
+              "It was rare in fortresses far from the capital. ",
+              "Many pots and lacquer things from the capital came out too. ",
+              "So Baekje sent its own skills and people here."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "fortress",
+              "ko": "성, 요새 (명사)",
+              "base": "fortress [ˈfɔːrtrəs]"
+            },
+            {
+              "word": "valley",
+              "ko": "골짜기 (명사)",
+              "base": "valley [ˈvæli]"
+            },
+            {
+              "word": "sieve",
+              "ko": "체 (명사)",
+              "base": "sieve [sɪv]"
+            },
+            {
+              "word": "layers",
+              "ko": "켜, 층 (명사 layer의 복수)",
+              "base": "layer [ˈleɪər]"
+            },
+            {
+              "word": "flow",
+              "ko": "흐름 (명사)",
+              "base": "flow [floʊ]"
+            },
+            {
+              "word": "rare",
+              "ko": "드문 (형용사)",
+              "base": "rare [rer]"
+            }
+          ]
+        },
+        "L3": {
+          "title": "성벽보다 다루기 어려운 것",
+          "minutes": 5,
+          "paragraphs": [
+            [
+              "산성이라고 하면 ",
+              "흔히 적을 막아 내는 성벽부터 떠올린다. ",
+              "그러나 성은 ",
+              "사람이 머무는 곳이기도 하다. ",
+              "사람이 머물려면 물이 있어야 하고, ",
+              "물은 성벽보다 훨씬 다루기 까다롭다. ",
+              "국립중원문화유산연구소가 2026년 9월 1일 공개한 ",
+              "충주 장미산성 발굴 성과가 ",
+              "보여 준 것이 그 대목이다."
+            ],
+            [
+              "장미산성은 한강을 따라 ",
+              "충주 분지로 들어서는 길목에 자리한다. ",
+              "오랫동안 돌로 쌓은 성으로만 알려져 있었는데, ",
+              "조사단은 석축성벽 아래에서 ",
+              "백제 한성기의 토성과 생활공간, ",
+              "대형 목조 집수지를 차례로 확인했다. ",
+              "집수지는 성 안 북쪽 계곡부에 있었다. ",
+              "내측 한 변이 약 6.7미터, ",
+              "깊이가 약 1.8미터인 정사각형으로, ",
+              "길이 7미터가 넘는 목재를 ",
+              "통째로 가공해 각 벽면에 쓰고 ",
+              "아홉 단으로 맞물려 쌓았다. ",
+              "백제 한성기 집수지 가운데 ",
+              "지금까지 확인된 최대 규모다."
+            ],
+            [
+              "계곡부는 물이 저절로 모이는 자리다. ",
+              "그 자리를 골라 물을 저장하고 ",
+              "흐름을 조절했다는 것은, ",
+              "물을 우연히 얻은 것이 아니라 ",
+              "계획해서 다루었다는 뜻이다. ",
+              "1,600년 전의 수자원 관리 체계와 ",
+              "토목기술이 여기서 드러난다."
+            ],
+            [
+              "조사 방법도 눈여겨볼 만하다. ",
+              "조사단은 집수지 내부에 쌓인 흙을 ",
+              "모두 물체질했다. ",
+              "흙을 물에 풀어 걸러 내면 ",
+              "삽으로는 놓치는 씨앗과 뼛조각까지 남는다. ",
+              "그 결과 쌀·팥·콩 등 ",
+              "재배·야생식물 50여 종과 ",
+              "소·돼지·개의 뼈가 확인됐다. ",
+              "자루가 온전히 남은 도끼, ",
+              "국내에서 가장 이른 시기의 실물로 판단되는 ",
+              "삼태기와 소코뚜레도 나왔다. ",
+              "삼태기는 버들이나 싸리 같은 ",
+              "가는 나뭇가지를 엮어 ",
+              "곡식이나 흙을 퍼 옮기던 도구다. ",
+              "유물 목록이 아니라 ",
+              "5세기 이곳 사람들의 밥상과 들판이 ",
+              "함께 복원되는 셈이다."
+            ],
+            [
+              "성벽에서는 판축성벽도 확인됐다. ",
+              "판축은 흙을 얇게 켜켜이 다져 올리는 기술로, ",
+              "풍납토성이나 몽촌토성처럼 ",
+              "백제 왕성을 대표하는 축성법이다. ",
+              "당시 지방 산성에서는 흔하지 않았다. ",
+              "여기에 중앙양식 토기와 칠기류가 ",
+              "다량 출토되었다. ",
+              "백제가 장미산성을 ",
+              "중원지역의 핵심 거점으로 삼아 ",
+              "중앙의 기술과 조직력을 ",
+              "직접 투입했다는 뜻이다. ",
+              "방어시설이라는 말로는 ",
+              "다 담기지 않는 자리다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "집수지",
+              "easy": "물을 모아 저장하는 시설",
+              "hanja": "集(모을 집)+水(물 수)+池(못 지)"
+            },
+            {
+              "word": "계곡부",
+              "easy": "산줄기 사이 물이 흘러내리는 골짜기 쪽",
+              "hanja": "溪(시내 계)+谷(골 곡)+部(떼 부)"
+            },
+            {
+              "word": "물체질",
+              "easy": "흙을 물에 풀어 걸러 미세한 것까지 골라내는 발굴 방법"
+            },
+            {
+              "word": "판축",
+              "easy": "흙을 얇게 켜켜이 다져 올려 쌓는 축성기술",
+              "hanja": "板(널 판)+築(쌓을 축)"
+            },
+            {
+              "word": "거점",
+              "easy": "어떤 일을 벌이는 데 발판이 되는 중요한 자리",
+              "hanja": "據(의거할 거)+點(점 점)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글이 장미산성 발굴에서 가장 주목한 것은?",
+              "choices": [
+                "성벽이 얼마나 높고 두꺼운가",
+                "성이 물을 어떻게 저장하고 다루었는가",
+                "성에서 나온 금속 무기의 종류",
+                "성을 지킨 병사의 수"
+              ],
+              "answer": 1,
+              "explain": "글은 성벽이 아니라 물을 다룬 방식과 그 기술에 초점을 둔다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "집수지의 규모와 구조에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "돌을 쌓아 만든 둥근 우물이다",
+                "내측 한 변 약 6.7미터, 깊이 약 1.8미터의 정사각형이다",
+                "내측 한 변 약 1.8미터, 깊이 약 6.7미터의 정사각형이다",
+                "성 밖 계곡부에 만든 나무 수로다"
+              ],
+              "answer": 1,
+              "explain": "내측 한 변 약 6.7미터, 깊이 약 1.8미터의 정사각형이라고 했다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「거점」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "적이 드나드는 통로",
+                "어떤 일을 벌이는 데 발판이 되는 중요한 자리",
+                "물이 모여 흐르는 골짜기",
+                "흙을 다져 올린 성벽"
+              ],
+              "answer": 1,
+              "explain": "백제가 장미산성을 중원지역의 핵심 거점으로 삼았다는 문맥에서 쓰였다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "infer",
+              "q": "물체질이라는 방법이 없었다면 놓쳤을 것으로 가장 알맞은 것은?",
+              "choices": [
+                "석축성벽의 위치",
+                "집수지의 정사각형 구조",
+                "쌀·팥·콩 같은 씨앗과 작은 뼛조각",
+                "목재를 아홉 단으로 쌓은 방식"
+              ],
+              "answer": 2,
+              "explain": "흙을 물에 풀어 걸러야 삽으로는 놓치는 씨앗과 뼛조각이 남는다고 했다.",
+              "evidencePara": 3
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "「방어시설이라는 말로는 다 담기지 않는 자리다」라는 마지막 문장이 근거로 삼는 것을 모두 묶은 것은?",
+              "choices": [
+                "성벽의 높이와 두께",
+                "물을 계획해서 다룬 집수지, 중앙의 축성기술인 판축, 중앙양식 유물",
+                "성이 한강 길목에 있다는 위치 조건",
+                "삼태기와 소코뚜레가 국내에서 가장 이르다는 점"
+              ],
+              "answer": 1,
+              "explain": "물 관리·판축·중앙양식 유물 세 가지가 방어 이상의 성격을 뒷받침한다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "apply",
+              "q": "이 글의 관점을 다른 유적 조사에 적용한다면 가장 알맞은 것은?",
+              "choices": [
+                "성벽의 둘레와 높이를 정밀하게 재는 데 예산을 몰아준다",
+                "가장 잘 보이는 큰 유물부터 골라 전시한다",
+                "물이 모이는 지형을 먼저 찾고, 그 안의 흙까지 걸러 생활 흔적을 확보한다",
+                "출토 토기의 무늬만 비교해 시기를 정한다"
+              ],
+              "answer": 2,
+              "explain": "물이 모이는 계곡부에 시설이 있었고, 그 흙을 물체질해 생활상이 복원됐다.",
+              "evidencePara": 3
+            }
+          ],
+          "en": [
+            "When we hear the word fortress, we picture walls that keep enemies out. But a fortress is also a place where people live. To live there you need water, and water is far harder to manage than a wall. On September 1, 2026, the Jungwon research institute made public what it had found at Jangmisanseong in Chungju. The finds point straight at that problem.",
+            "Jangmisanseong stands on the route that follows the Han River into the Chungju basin. For a long time it was known only as a stone fortress. Digging under the stone wall, the team found an earthen wall of Hanseong-period Baekje, living spaces, and finally a large wooden water tank. The tank sits in a valley in the northern part of the fortress. It is square, about 6.7 meters on each inner side and about 1.8 meters deep. Whole timbers longer than seven meters were shaped and set along each wall, interlocked in nine layers. No larger tank of that period has been found.",
+            "A valley is where water collects on its own. Choosing that spot to store water and control its flow means the water was not simply found; it was planned for. What appears here is a system of water management and the civil engineering of 1,600 years ago.",
+            "How they dug deserves as much attention as what they dug up. The team put every bit of soil inside the tank through water. When soil is washed and sieved, seeds and small bones that a shovel would miss stay behind. About fifty kinds of farmed and wild plants, including rice, red beans and soybeans, were identified, along with bones of cattle, pigs and dogs. An axe with its handle still whole came out, and so did a woven basket and an ox nose ring, thought to be the earliest real examples in the country. The basket was made by weaving thin willow or bush clover branches, and it carried grain or soil. What is being restored is not a list of objects but the meals and fields of people in the fifth century.",
+            "The wall itself turned out to be rammed earth. In this technique thin layers of earth are pounded down one after another, and it is the method that marks royal Baekje walls such as Pungnaptoseong and Mongchontoseong. It was not common in provincial fortresses. Along with it came pottery and lacquerware in the style of the capital. Baekje treated Jangmisanseong as a key base of the Chungwon region and sent its own skills and organization there. The word defense does not cover such a place."
+          ],
+          "enseg": [
+            [
+              "When we hear the word fortress, ",
+              "we picture walls that keep enemies out. ",
+              "But a fortress is also a place where people live. ",
+              "To live there you need water, ",
+              "and water is far harder to manage than a wall. ",
+              "On September 1, 2026, the Jungwon research institute ",
+              "made public what it had found at Jangmisanseong in Chungju. ",
+              "The finds point straight at that problem."
+            ],
+            [
+              "Jangmisanseong stands on the route that follows the Han River into the Chungju basin. ",
+              "For a long time it was known only as a stone fortress. ",
+              "Digging under the stone wall, the team found an earthen wall of Hanseong-period Baekje, ",
+              "living spaces, and finally a large wooden water tank. ",
+              "The tank sits in a valley in the northern part of the fortress. ",
+              "It is square, about 6.7 meters on each inner side and about 1.8 meters deep. ",
+              "Whole timbers longer than seven meters were shaped and set along each wall, ",
+              "interlocked in nine layers. ",
+              "No larger tank of that period has been found."
+            ],
+            [
+              "A valley is where water collects on its own. ",
+              "Choosing that spot to store water and control its flow ",
+              "means the water was not simply found; it was planned for. ",
+              "What appears here is a system of water management ",
+              "and the civil engineering of 1,600 years ago."
+            ],
+            [
+              "How they dug deserves as much attention as what they dug up. ",
+              "The team put every bit of soil inside the tank through water. ",
+              "When soil is washed and sieved, ",
+              "seeds and small bones that a shovel would miss stay behind. ",
+              "About fifty kinds of farmed and wild plants, including rice, red beans and soybeans, ",
+              "were identified, along with bones of cattle, pigs and dogs. ",
+              "An axe with its handle still whole came out, ",
+              "and so did a woven basket and an ox nose ring, ",
+              "thought to be the earliest real examples in the country. ",
+              "The basket was made by weaving thin willow or bush clover branches, ",
+              "and it carried grain or soil. ",
+              "What is being restored is not a list of objects ",
+              "but the meals and fields of people in the fifth century."
+            ],
+            [
+              "The wall itself turned out to be rammed earth. ",
+              "In this technique thin layers of earth are pounded down one after another, ",
+              "and it is the method that marks royal Baekje walls ",
+              "such as Pungnaptoseong and Mongchontoseong. ",
+              "It was not common in provincial fortresses. ",
+              "Along with it came pottery and lacquerware in the style of the capital. ",
+              "Baekje treated Jangmisanseong as a key base of the Chungwon region ",
+              "and sent its own skills and organization there. ",
+              "The word defense does not cover such a place."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "fortress",
+              "ko": "산성, 요새 (명사)",
+              "base": "fortress [ˈfɔːrtrəs]"
+            },
+            {
+              "word": "interlocked",
+              "ko": "서로 맞물린 (동사 interlock의 과거분사)",
+              "base": "interlock [ˌɪntərˈlɑːk]"
+            },
+            {
+              "word": "sieved",
+              "ko": "체로 걸러진 (동사 sieve의 과거분사)",
+              "base": "sieve [sɪv]"
+            },
+            {
+              "word": "rammed",
+              "ko": "다져 올린 (동사 ram의 과거분사)",
+              "base": "ram [ræm]"
+            },
+            {
+              "word": "provincial",
+              "ko": "지방의 (형용사)",
+              "base": "province [ˈprɑːvɪns]"
+            },
+            {
+              "word": "engineering",
+              "ko": "공학, 토목기술 (명사)",
+              "base": "engineer [ˌendʒɪˈnɪr]"
+            }
+          ]
+        },
+        "L4": {
+          "title": "성을 재는 두 번째 눈금",
+          "minutes": 6,
+          "paragraphs": [
+            [
+              "성을 평가하는 눈금은 오랫동안 하나였다. ",
+              "성벽이 얼마나 높고 두꺼운가, ",
+              "곧 얼마나 잘 막아 내는가다. ",
+              "이 눈금은 편리하지만 ",
+              "성 안에서 벌어진 일의 대부분을 놓친다. ",
+              "방어는 위기의 순간에만 작동하고, ",
+              "나머지 시간에 성은 ",
+              "사람이 먹고 자고 일하는 장소이기 때문이다. ",
+              "그 시간을 지탱하는 것은 ",
+              "성벽이 아니라 물이다. ",
+              "충주 장미산성에서 드러난 ",
+              "백제 한성기 최대 규모의 목조 집수지는 ",
+              "성을 재는 눈금을 하나 더 요구한다."
+            ],
+            [
+              "국립중원문화유산연구소가 2026년 9월 1일 공개한 성과를 보면, ",
+              "집수지는 성 안 북쪽 계곡부에 있다. ",
+              "내측 한 변 약 6.7미터, ",
+              "깊이 약 1.8미터의 정사각형이고, ",
+              "길이 7미터가 넘는 목재를 ",
+              "통째로 가공해 각 벽면에 쓰고 ",
+              "아홉 단으로 맞물려 쌓았다. ",
+              "규모보다 중요한 것은 자리다. ",
+              "계곡부는 물이 저절로 모이는 곳이니, ",
+              "그곳에 시설을 앉힌 것은 ",
+              "물을 담는 동시에 ",
+              "흐름을 조절하겠다는 판단이다. ",
+              "저장과 조절을 한 시설이 겸하도록 설계했다는 뜻이고, ",
+              "이것이 곧 수자원 관리 체계다."
+            ],
+            [
+              "두 번째로 눈여겨볼 것은 ",
+              "유물이 아니라 유물을 건지는 방법이다. ",
+              "조사단은 집수지 내부에 쌓인 흙을 ",
+              "모두 물체질했다. ",
+              "삽과 눈으로 고르면 토기와 목기는 남지만 ",
+              "씨앗과 잔뼈는 흙과 함께 버려진다. ",
+              "흙을 물에 풀어 걸러 내자 ",
+              "쌀·팥·콩을 비롯한 재배·야생식물 50여 종과 ",
+              "소·돼지·개의 뼈가 나왔다. ",
+              "자루가 온전히 남은 도끼, ",
+              "국내에서 가장 이른 시기의 실물로 판단되는 ",
+              "삼태기와 소코뚜레도 함께였다. ",
+              "삼태기는 버들·싸리 같은 가는 나뭇가지를 엮어 ",
+              "곡식을 까부르거나 ",
+              "흙을 퍼 옮기던 살림 도구다. ",
+              "무엇을 발굴했는가보다 어떻게 발굴했는가가 ",
+              "5세기의 밥상과 들판을 되살린 셈이다."
+            ],
+            [
+              "세 번째는 성벽 자체다. ",
+              "오랫동안 석성으로 알려져 있던 ",
+              "이 산성의 돌 성벽 아래에서 ",
+              "백제 한성기 판축성벽이 확인됐다. ",
+              "판축은 흙을 얇게 켜켜이 다져 올리는 축성기술로, ",
+              "풍납토성과 몽촌토성 같은 ",
+              "백제 왕성을 대표한다. ",
+              "지방 산성에서는 흔하지 않았다. ",
+              "앞선 조사에서는 ",
+              "흙 성벽과 같은 시기에 쓰인 ",
+              "부뚜막 등 취사 시설과 ",
+              "5세기 전반의 백제 토기가 ",
+              "성벽 안쪽에서 확인되기도 했다. ",
+              "중앙양식 토기와 칠기류까지 ",
+              "다량으로 나온 정황을 함께 놓으면, ",
+              "이곳에 들어온 것은 ",
+              "기술만이 아니라 그 기술을 부릴 ",
+              "인력과 조직이었다고 읽게 된다."
+            ],
+            [
+              "세 갈래는 한 문장으로 모인다. ",
+              "백제는 장미산성을 ",
+              "변방의 초소가 아니라 ",
+              "중원지역의 핵심 거점으로 구축하고 운영했다는 것이다. ",
+              "다만 여기서 한 걸음 더 나가려면 ",
+              "조심할 대목도 있다. ",
+              "최대 규모라는 말은 ",
+              "지금까지 확인된 것 가운데 가장 크다는 뜻이지, ",
+              "백제가 이곳에 가장 공을 들였다는 증명은 아니다. ",
+              "발굴은 판 만큼만 말한다. ",
+              "연구소가 산성 내부 공간에 대한 조사를 ",
+              "확대하겠다고 밝힌 것도 그래서다. ",
+              "눈금을 하나 더 얻은 것은 분명하지만, ",
+              "그 눈금으로 잴 자리는 ",
+              "아직 대부분 흙 아래에 있다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "수자원",
+              "easy": "사람이 쓸 수 있는 물을 자원으로 이르는 말",
+              "hanja": "水(물 수)+資(재물 자)+源(근원 원)"
+            },
+            {
+              "word": "물체질",
+              "easy": "흙을 물에 풀어 걸러 미세 유물과 유기물까지 수습하는 발굴 방법"
+            },
+            {
+              "word": "축성기술",
+              "easy": "성을 쌓는 데 쓰는 기술",
+              "hanja": "築(쌓을 축)+城(재 성)+技(재주 기)+術(재주 술)"
+            },
+            {
+              "word": "정황",
+              "easy": "일이 벌어진 앞뒤 사정과 형편",
+              "hanja": "情(뜻 정)+況(상황 황)"
+            },
+            {
+              "word": "거점",
+              "easy": "어떤 일을 벌이는 데 발판이 되는 중요한 자리",
+              "hanja": "據(의거할 거)+點(점 점)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "글쓴이가 말하는 「두 번째 눈금」이 가리키는 것은?",
+              "choices": [
+                "성벽의 높이와 두께",
+                "성이 사람이 머무는 시간을 어떻게 지탱했는가, 특히 물을 어떻게 다루었는가",
+                "성에서 나온 유물의 개수",
+                "성이 세워진 해를 못 박는 연대 측정"
+              ],
+              "answer": 1,
+              "explain": "방어라는 눈금이 놓치는 것, 곧 사람이 머무는 시간을 지탱한 물이 두 번째 눈금이다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "집수지의 자리에 대한 글쓴이의 설명으로 알맞은 것은?",
+              "choices": [
+                "물을 끌어오기 어려운 자리라 기술이 더 필요했다",
+                "물이 저절로 모이는 계곡부여서 저장과 흐름 조절을 겸하도록 설계했다",
+                "적의 눈에 띄지 않는 성 밖에 두었다",
+                "성에서 가장 높은 곳에 두어 물을 아래로 흘려보냈다"
+              ],
+              "answer": 1,
+              "explain": "계곡부에 시설을 앉힌 것은 물을 담는 동시에 흐름을 조절하겠다는 판단이라고 했다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「정황」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "일이 벌어진 앞뒤 사정과 형편",
+                "일을 마친 뒤 남은 기록",
+                "여럿 가운데 고른 하나",
+                "겉으로 드러난 크기와 모양"
+              ],
+              "answer": 0,
+              "explain": "중앙양식 유물이 다량으로 나온 앞뒤 사정을 함께 놓고 읽는다는 뜻이다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "infer",
+              "q": "글쓴이가 「유물이 아니라 유물을 건지는 방법」을 강조한 까닭으로 가장 알맞은 것은?",
+              "choices": [
+                "물체질이 다른 방법보다 비용이 적게 들기 때문이다",
+                "고른 방법이 무엇을 남기고 무엇을 버리는지가 복원할 수 있는 과거의 범위를 정하기 때문이다",
+                "토기와 목기가 씨앗보다 학술 가치가 낮기 때문이다",
+                "삽과 눈으로 고르는 방식이 유물을 깨뜨리기 때문이다"
+              ],
+              "answer": 1,
+              "explain": "삽과 눈으로 고르면 씨앗과 잔뼈가 버려진다 — 방법이 복원 범위를 정한다는 논지다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "critical",
+              "q": "이 글의 논지에 비추어 가장 조심해야 할 해석은?",
+              "choices": [
+                "백제가 장미산성에 중앙의 기술과 인력을 투입했다",
+                "물체질 덕분에 5세기의 밥상과 들판을 되살릴 수 있었다",
+                "최대 규모의 집수지가 나왔으니 백제가 여러 거점 가운데 이곳에 가장 공을 들였다",
+                "판축은 지방 산성에서는 흔하지 않은 기술이었다"
+              ],
+              "answer": 2,
+              "explain": "글은 최대 규모가 「지금까지 확인된 것 가운데」라는 뜻일 뿐이라고 못 박는다.",
+              "evidencePara": 4
+            }
+          ],
+          "challenge": [
+            {
+              "type": "critical",
+              "q": "「발굴은 판 만큼만 말한다」는 문장이 이 글에서 하는 일로 가장 알맞은 것은?",
+              "choices": [
+                "앞에서 정리한 세 갈래의 결론을 뒤집는다",
+                "세 갈래의 결론은 두되, 그것을 확인된 범위 밖으로 밀고 나가는 것을 막는다",
+                "발굴 예산이 부족했음을 지적한다",
+                "물체질이라는 방법의 한계를 지적한다"
+              ],
+              "answer": 1,
+              "explain": "결론을 유지하면서 「최대 규모」를 과장 해석하지 못하게 제한하는 문장이다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "apply",
+              "q": "이 글의 논리대로라면, 다른 지방 산성에서 「중앙이 직접 개입했다」고 판단하려 할 때 가장 알맞은 절차는?",
+              "choices": [
+                "성벽 규모가 가장 큰 산성을 먼저 고른다",
+                "중앙양식 토기가 한 점이라도 나오면 개입으로 본다",
+                "축성기술이 왕성의 것과 같은지, 중앙양식 유물이 함께 다량으로 나오는지를 묶어 본다",
+                "성이 도성에서 얼마나 가까운지를 기준으로 삼는다"
+              ],
+              "answer": 2,
+              "explain": "글은 판축이라는 기술과 중앙양식 유물의 다량 출토를 함께 놓고 인력·조직의 투입을 읽어 낸다.",
+              "evidencePara": 3
+            }
+          ],
+          "en": [
+            "For a long time there was only one scale for judging a fortress: how high and thick its walls were, that is, how well it kept attackers out. The scale is convenient, but it misses most of what happened inside. Defense works only in moments of crisis; the rest of the time a fortress is a place where people eat, sleep and work. What sustains those hours is not the wall but water. The wooden water tank uncovered at Jangmisanseong in Chungju, the largest known from Hanseong-period Baekje, asks for a second scale.",
+            "According to the findings released on September 1, 2026, the tank lies in a valley in the northern part of the fortress. It is square, about 6.7 meters along each inner side and about 1.8 meters deep, built from whole timbers more than seven meters long, shaped and set against each wall and interlocked in nine courses. More telling than the size is the location. A valley is where water gathers by itself, so placing the structure there was a decision to hold water and regulate its flow at the same time. Storage and control were designed into a single facility, and that is what water management means.",
+            "The second thing worth noting is not the artifacts but the method of recovering them. The team passed all of the soil inside the tank through water. Sorting by shovel and eye leaves pottery and wooden tools but throws seeds and small bones away with the dirt. Washing and sieving the soil brought out about fifty kinds of farmed and wild plants, including rice, red beans and soybeans, along with bones of cattle, pigs and dogs. An axe with its handle intact came with them, and so did a woven carrying basket and an ox nose ring, judged to be the earliest surviving examples in the country. The basket was woven from thin willow and bush clover branches and used to winnow grain or move soil. How they excavated, more than what they excavated, is what brought back the meals and fields of the fifth century.",
+            "The third point is the wall itself. Beneath the stone wall of a fortress long known as a stone one, a rammed-earth wall of Hanseong-period Baekje appeared. Ramming presses thin layers of earth down one upon another, and it is the technique that marks royal Baekje walls such as Pungnaptoseong and Mongchontoseong. It was not common in provincial fortresses. An earlier season had already found cooking installations such as hearths, contemporary with the earth wall, and Baekje pottery of the early fifth century inside the rampart. Set beside the large quantities of capital-style pottery and lacquerware, what arrived here reads as more than technique: it was the labor and organization needed to use it.",
+            "The three lines converge on one sentence. Baekje built and ran Jangmisanseong not as a frontier outpost but as a key base of the Chungwon region. Yet going one step further calls for caution. Largest known means the largest confirmed so far; it is not proof that Baekje invested most heavily here. An excavation says only as much as it has dug. That is why the institute has said it will widen its survey of the space inside the fortress. A second scale has certainly been gained, but most of what it must measure still lies under the soil."
+          ],
+          "enseg": [
+            [
+              "For a long time there was only one scale for judging a fortress: ",
+              "how high and thick its walls were, ",
+              "that is, how well it kept attackers out. ",
+              "The scale is convenient, but it misses most of what happened inside. ",
+              "Defense works only in moments of crisis; ",
+              "the rest of the time a fortress is a place where people eat, sleep and work. ",
+              "What sustains those hours is not the wall but water. ",
+              "The wooden water tank uncovered at Jangmisanseong in Chungju, ",
+              "the largest known from Hanseong-period Baekje, ",
+              "asks for a second scale."
+            ],
+            [
+              "According to the findings released on September 1, 2026, ",
+              "the tank lies in a valley in the northern part of the fortress. ",
+              "It is square, about 6.7 meters along each inner side and about 1.8 meters deep, ",
+              "built from whole timbers more than seven meters long, ",
+              "shaped and set against each wall and interlocked in nine courses. ",
+              "More telling than the size is the location. ",
+              "A valley is where water gathers by itself, ",
+              "so placing the structure there was a decision to hold water ",
+              "and regulate its flow at the same time. ",
+              "Storage and control were designed into a single facility, ",
+              "and that is what water management means."
+            ],
+            [
+              "The second thing worth noting is not the artifacts ",
+              "but the method of recovering them. ",
+              "The team passed all of the soil inside the tank through water. ",
+              "Sorting by shovel and eye leaves pottery and wooden tools ",
+              "but throws seeds and small bones away with the dirt. ",
+              "Washing and sieving the soil brought out about fifty kinds of farmed and wild plants, ",
+              "including rice, red beans and soybeans, ",
+              "along with bones of cattle, pigs and dogs. ",
+              "An axe with its handle intact came with them, ",
+              "and so did a woven carrying basket and an ox nose ring, ",
+              "judged to be the earliest surviving examples in the country. ",
+              "The basket was woven from thin willow and bush clover branches ",
+              "and used to winnow grain or move soil. ",
+              "How they excavated, more than what they excavated, ",
+              "is what brought back the meals and fields of the fifth century."
+            ],
+            [
+              "The third point is the wall itself. ",
+              "Beneath the stone wall of a fortress long known as a stone one, ",
+              "a rammed-earth wall of Hanseong-period Baekje appeared. ",
+              "Ramming presses thin layers of earth down one upon another, ",
+              "and it is the technique that marks royal Baekje walls ",
+              "such as Pungnaptoseong and Mongchontoseong. ",
+              "It was not common in provincial fortresses. ",
+              "An earlier season had already found cooking installations such as hearths, ",
+              "contemporary with the earth wall, ",
+              "and Baekje pottery of the early fifth century inside the rampart. ",
+              "Set beside the large quantities of capital-style pottery and lacquerware, ",
+              "what arrived here reads as more than technique: ",
+              "it was the labor and organization needed to use it."
+            ],
+            [
+              "The three lines converge on one sentence. ",
+              "Baekje built and ran Jangmisanseong not as a frontier outpost ",
+              "but as a key base of the Chungwon region. ",
+              "Yet going one step further calls for caution. ",
+              "Largest known means the largest confirmed so far; ",
+              "it is not proof that Baekje invested most heavily here. ",
+              "An excavation says only as much as it has dug. ",
+              "That is why the institute has said it will widen ",
+              "its survey of the space inside the fortress. ",
+              "A second scale has certainly been gained, ",
+              "but most of what it must measure still lies under the soil."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "sustains",
+              "ko": "떠받치다, 지탱하다 (동사 sustain의 3인칭 단수)",
+              "base": "sustain [səˈsteɪn]"
+            },
+            {
+              "word": "interlocked",
+              "ko": "서로 맞물린 (동사 interlock의 과거분사)",
+              "base": "interlock [ˌɪntərˈlɑːk]"
+            },
+            {
+              "word": "regulate",
+              "ko": "조절하다 (동사)",
+              "base": "regulate [ˈreɡjuleɪt]"
+            },
+            {
+              "word": "sieving",
+              "ko": "체로 거르기 (동사 sieve의 동명사)",
+              "base": "sieve [sɪv]"
+            },
+            {
+              "word": "provincial",
+              "ko": "지방의 (형용사)",
+              "base": "province [ˈprɑːvɪns]"
+            },
+            {
+              "word": "converge",
+              "ko": "한곳으로 모이다 (동사)",
+              "base": "converge [kənˈvɜːrdʒ]"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "voc-remote-sensing",
+      "category": "environment",
+      "careers": [
+        "it",
+        "biz",
+        "law"
+      ],
+      "publishedAt": "2026-09-14",
+      "status": "published",
+      "issue": true,
+      "sources": [
+        {
+          "title": "기후에너지환경부 보도자료 — 첨단 감시장비로 휘발성유기화합물 배출 진단… 대산산단 자발적 저감 나선다 (2026.9.10)",
+          "url": "https://www.mcee.go.kr/home/web/board/read.do?menuId=10598&boardMasterId=939&boardId=1890090"
+        },
+        {
+          "title": "환경부 보도자료 — 오존·미세먼지 원인물질인 휘발성유기화합물 근본적으로 줄인다 (2019.7.15)",
+          "url": "https://www.mcee.go.kr/home/web/board/read.do?menuId=10598&boardMasterId=939&boardId=1017985"
+        }
+      ],
+      "levels": {
+        "L1": {
+          "title": "빛으로 찾은 기체",
+          "minutes": 3,
+          "paragraphs": [
+            [
+              "공장에서 기체가 나와요. ",
+              "눈에 안 보이는 기체예요. ",
+              "이 기체는 ",
+              "공기를 나쁘게 만들어요. ",
+              "색도 없고 ",
+              "냄새도 잘 안 나요. ",
+              "그래서 어디서 새는지 찾기 어려워요."
+            ],
+            [
+              "연구하는 사람들은 빛을 써요. ",
+              "공기에 빛을 쏘면 ",
+              "기체가 빛을 조금 삼켜요. ",
+              "삼킨 양을 재면 ",
+              "기체가 얼마나 있는지 알아요. ",
+              "측정 장비를 차에 싣고 ",
+              "공장 둘레를 돌았어요."
+            ],
+            [
+              "공장은 평소에 규칙을 ",
+              "잘 지키고 있었어요. ",
+              "다만 가끔 하는 일이 있어요. ",
+              "기계를 고치거나 ",
+              "재료를 넣을 때예요. ",
+              "그때 기체가 조금씩 새어 나와요. ",
+              "그래서 공장과 나라가 ",
+              "함께 줄이기로 약속했어요. ",
+              "우리도 냄새가 진한 물감을 쓸 때 ",
+              "창문을 열어요."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "기체",
+              "easy": "공기처럼 눈에 잘 보이지 않고 퍼져 나가는 물질이에요.",
+              "hanja": null
+            },
+            {
+              "word": "측정",
+              "easy": "얼마나 되는지 재어서 알아보는 일이에요.",
+              "hanja": null
+            },
+            {
+              "word": "약속",
+              "easy": "앞으로 어떻게 하겠다고 서로 정하는 일이에요.",
+              "hanja": null
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글은 무엇에 대한 이야기인가요?",
+              "choices": [
+                "공장에서 나오는 기체를 빛으로 찾아낸 이야기",
+                "공장에서 물감을 만드는 이야기",
+                "차를 타고 멀리 여행을 간 이야기",
+                "산에 나무를 심은 이야기"
+              ],
+              "answer": 0,
+              "explain": "눈에 안 보이는 기체를 빛으로 찾아내고, 함께 줄이기로 한 이야기예요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "사람들은 기체를 어떻게 찾아냈나요?",
+              "choices": [
+                "코로 냄새를 맡았어요",
+                "공기에 빛을 쏘아 삼킨 양을 재었어요",
+                "공장 안에 들어가 눈으로 보았어요",
+                "물감을 칠해 보았어요"
+              ],
+              "answer": 1,
+              "explain": "빛을 쏘면 기체가 빛을 조금 삼키고, 그 양을 재면 알 수 있다고 했어요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「측정」은 무슨 뜻인가요?",
+              "choices": [
+                "얼마나 되는지 재어서 알아보는 일이에요",
+                "멀리 나가서 노는 일이에요",
+                "물건을 새로 만드는 일이에요",
+                "이름을 크게 부르는 일이에요"
+              ],
+              "answer": 0,
+              "explain": "측정은 얼마나 되는지 재어서 알아보는 일이에요.",
+              "evidencePara": 1
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "공장이 규칙을 잘 지켰는데도 기체가 새어 나온 까닭은 무엇일까요?",
+              "choices": [
+                "평소에 하지 않는 일을 가끔 하기 때문이에요",
+                "공장이 규칙을 하나도 몰랐기 때문이에요",
+                "빛이 기체를 만들었기 때문이에요",
+                "차가 공장 둘레를 돌았기 때문이에요"
+              ],
+              "answer": 0,
+              "explain": "평소에는 잘 지켰지만, 기계를 고치거나 재료를 넣는 가끔 하는 일에서 새어 나왔어요.",
+              "evidencePara": 2
+            },
+            {
+              "type": "apply",
+              "q": "냄새가 진한 물감을 쓸 때 우리가 할 수 있는 일은 무엇인가요?",
+              "choices": [
+                "창문을 열어 공기를 바꿔요",
+                "문을 꼭 닫고 있어요",
+                "물감을 더 많이 써요",
+                "불을 끄고 가만히 앉아 있어요"
+              ],
+              "answer": 0,
+              "explain": "냄새가 진한 물감을 쓸 때는 창문을 열면 좋아요.",
+              "evidencePara": 2
+            }
+          ]
+        },
+        "L2": {
+          "title": "굴뚝 밖에서 새는 것",
+          "minutes": 4,
+          "paragraphs": [
+            [
+              "공장에서 나오는 기체 가운데 ",
+              "휘발성유기화합물이라는 것이 있다. ",
+              "이 물질은 대기 중에서 ",
+              "화학반응을 거쳐 ",
+              "미세먼지와 오존으로 바뀐다. ",
+              "그래서 따로 관리해야 하는 물질로 꼽힌다."
+            ],
+            [
+              "문제는 이 기체가 ",
+              "굴뚝으로만 나오지 않는다는 점이다. ",
+              "저장탱크의 틈이나 배관 이음매처럼 ",
+              "여러 곳에서 조금씩 새어 나온다. ",
+              "굴뚝에 측정기를 달아도 ",
+              "이런 누출은 잡히지 않는다."
+            ],
+            [
+              "그래서 국립환경과학원은 빛을 쓰기로 했다. ",
+              "적외선이나 자외선 레이저를 공기에 쏘면 ",
+              "기체가 그 빛을 얼마쯤 삼킨다. ",
+              "삼킨 양을 재면 ",
+              "멀리서도 농도를 알 수 있다. ",
+              "이런 측정 장비를 차에 싣고 ",
+              "2025년 3월부터 11월까지 ",
+              "대산석유화학단지 둘레를 돌았다."
+            ],
+            [
+              "측정 결과 시설은 ",
+              "대체로 기준에 맞게 관리되고 있었다. ",
+              "다만 원료를 들여오거나 ",
+              "설비를 고치는 것처럼 ",
+              "가끔 하는 작업에서 ",
+              "더 세심한 관리가 필요했다."
+            ],
+            [
+              "2026년 9월 11일 ",
+              "금강유역환경청과 대산석유화학단지의 세 회사는 ",
+              "자발적 협약을 맺었다. ",
+              "벌을 주는 대신 ",
+              "개선 방법을 함께 정하고 ",
+              "지키기로 한 것이다. ",
+              "저장탱크를 열어 검사할 때 ",
+              "새는 가스를 모아 ",
+              "처리하는 일도 약속에 담겼다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "기체",
+              "easy": "공기처럼 일정한 모양이 없이 퍼지는 물질의 상태",
+              "hanja": "氣(기운 기)+體(몸 체)"
+            },
+            {
+              "word": "누출",
+              "easy": "안에 있던 것이 밖으로 새어 나오는 일",
+              "hanja": "漏(샐 루)+出(날 출)"
+            },
+            {
+              "word": "측정",
+              "easy": "크기나 양을 재어 값을 얻는 일",
+              "hanja": "測(헤아릴 측)+定(정할 정)"
+            },
+            {
+              "word": "협약",
+              "easy": "서로 의논해서 맺은 약속",
+              "hanja": "協(화합할 협)+約(맺을 약)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 알맞은 것은?",
+              "choices": [
+                "공장 굴뚝을 더 높게 세우기로 했다",
+                "빛으로 잰 결과를 바탕으로 공장과 정부가 함께 배출을 줄이기로 했다",
+                "대산석유화학단지에 새 공장이 들어섰다",
+                "미세먼지 예보 등급이 새로 바뀌었다"
+              ],
+              "answer": 1,
+              "explain": "빛으로 측정한 결과를 바탕으로 개선 방법을 정하고 자발적 협약을 맺었다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "detail",
+              "q": "국립환경과학원이 쓴 방법으로 알맞은 것은?",
+              "choices": [
+                "굴뚝마다 측정기를 새로 달았다",
+                "공장 안에 들어가 기계를 하나씩 열어 보았다",
+                "레이저를 쏘아 기체가 삼킨 빛의 양을 재었다",
+                "사람들에게 냄새를 맡아 달라고 부탁했다"
+              ],
+              "answer": 2,
+              "explain": "적외선이나 자외선 레이저를 쏘아 기체가 삼킨 빛의 양으로 농도를 알아냈다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "detail",
+              "q": "측정 결과로 알맞은 것은?",
+              "choices": [
+                "시설은 대체로 기준에 맞게 관리되고 있었다",
+                "시설이 모두 기준을 어기고 있었다",
+                "기체가 전혀 나오지 않았다",
+                "굴뚝에서만 기체가 나왔다"
+              ],
+              "answer": 0,
+              "explain": "시설은 대체로 기준에 맞게 관리되고 있었고, 가끔 하는 작업이 문제였다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "vocab",
+              "q": "「누출」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "안에 있던 것이 밖으로 새어 나오는 일",
+                "밖에 있던 것을 안으로 빨아들이는 일",
+                "불에 태워 없애는 일",
+                "차에 싣고 옮기는 일"
+              ],
+              "answer": 0,
+              "explain": "누출은 안에 있던 것이 밖으로 새어 나오는 일이다.",
+              "evidencePara": 1
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "굴뚝에 측정기를 달아도 이 기체를 다 잡아낼 수 없는 까닭은?",
+              "choices": [
+                "측정기 값이 너무 비싸기 때문이다",
+                "기체가 저장탱크의 틈이나 배관 이음매처럼 굴뚝이 아닌 곳에서도 새기 때문이다",
+                "기체가 밤에만 나오기 때문이다",
+                "굴뚝이 너무 낮기 때문이다"
+              ],
+              "answer": 1,
+              "explain": "이 기체는 굴뚝으로만 나오지 않고 여러 곳에서 조금씩 새어 나온다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "apply",
+              "q": "다른 산업단지에서 같은 방법을 쓰려고 한다. 가장 먼저 할 일은?",
+              "choices": [
+                "공장 문을 모두 닫게 한다",
+                "측정 장비를 실은 차로 단지 둘레를 돌며 어디서 얼마나 새는지 잰다",
+                "굴뚝을 두 배로 높인다",
+                "사람들에게 창문을 열지 말라고 알린다"
+              ],
+              "answer": 1,
+              "explain": "이번에도 먼저 측정 장비를 차에 싣고 단지 둘레를 돌며 배출을 쟀다.",
+              "evidencePara": 2
+            }
+          ],
+          "en": [
+            "Factories give off gases. One group is called VOCs. The long name is volatile organic compounds. In the air they change into fine dust and ozone. So they need special care.",
+            "These gases do not come from the chimney only. They leak little by little from tanks and pipe joints. A meter on the chimney cannot catch these leaks.",
+            "So scientists used light. They sent infrared and ultraviolet laser light into the air. The gas takes in some of that light. If you measure the missing light, you know the amount. Scientists put the tool in a car. From March to November 2025, they drove around the Daesan plant area.",
+            "The result was mostly good. The plants followed the rules well. But some jobs happen only now and then. Bringing in materials or fixing machines are such jobs. These jobs needed more careful work.",
+            "On 11 September 2026, three companies made a promise. The Geum River Basin Environmental Office signed it with them. They chose to cut the gases together, not to pay fines. For example, they will catch the gas when a tank is opened."
+          ],
+          "envocab": [
+            {
+              "word": "chimney",
+              "ko": "굴뚝 (명사)",
+              "base": "chimney [ˈtʃɪmni]"
+            },
+            {
+              "word": "leak",
+              "ko": "새다, 새어 나오다 (동사)",
+              "base": "leak [liːk]"
+            },
+            {
+              "word": "ozone",
+              "ko": "오존 (명사)",
+              "base": "ozone [ˈoʊzoʊn]"
+            },
+            {
+              "word": "measure",
+              "ko": "재다, 측정하다 (동사)",
+              "base": "measure [ˈmeʒər]"
+            },
+            {
+              "word": "promise",
+              "ko": "약속 (명사)",
+              "base": "promise [ˈprɑːmɪs]"
+            }
+          ],
+          "enseg": [
+            [
+              "Factories give off gases. ",
+              "One group is called VOCs. ",
+              "The long name is volatile organic compounds. ",
+              "In the air they change into fine dust and ozone. ",
+              "So they need special care."
+            ],
+            [
+              "These gases do not come from the chimney only. ",
+              "They leak little by little from tanks and pipe joints. ",
+              "A meter on the chimney cannot catch these leaks."
+            ],
+            [
+              "So scientists used light. ",
+              "They sent infrared and ultraviolet laser light into the air. ",
+              "The gas takes in some of that light. ",
+              "If you measure the missing light, ",
+              "you know the amount. ",
+              "Scientists put the tool in a car. ",
+              "From March to November 2025, ",
+              "they drove around the Daesan plant area."
+            ],
+            [
+              "The result was mostly good. ",
+              "The plants followed the rules well. ",
+              "But some jobs happen only now and then. ",
+              "Bringing in materials or fixing machines are such jobs. ",
+              "These jobs needed more careful work."
+            ],
+            [
+              "On 11 September 2026, ",
+              "three companies made a promise. ",
+              "The Geum River Basin Environmental Office signed it with them. ",
+              "They chose to cut the gases together, ",
+              "not to pay fines. ",
+              "For example, ",
+              "they will catch the gas when a tank is opened."
+            ]
+          ]
+        },
+        "L3": {
+          "title": "빛으로 재는 공장의 공기",
+          "minutes": 5,
+          "paragraphs": [
+            [
+              "공장 굴뚝에 측정기를 달면 ",
+              "무엇이 얼마나 나오는지 알 수 있다. ",
+              "그런데 휘발성유기화합물은 ",
+              "굴뚝만으로는 잡히지 않는다. ",
+              "저장탱크의 틈이나 배관 이음매처럼 ",
+              "방지시설을 거치지 않는 곳에서 ",
+              "조금씩 새어 나오기 때문이다. ",
+              "이 물질은 대기 중에서 화학반응을 거쳐 ",
+              "미세먼지와 오존으로 바뀌기 때문에 따로 관리한다."
+            ],
+            [
+              "국립환경과학원은 굴뚝 대신 빛을 골랐다. ",
+              "태양추적적외선측정법과 차등흡광탐지측정기 같은 장비는 ",
+              "적외선이나 자외선 레이저를 공기에 통과시킨다. ",
+              "물질은 저마다 특정한 빛을 삼키므로 ",
+              "줄어든 빛의 양을 재면 ",
+              "공기 중 농도를 ",
+              "멀리서도 알아낼 수 있다."
+            ],
+            [
+              "장비는 이동측정차량에 실렸다. ",
+              "2025년 3월부터 11월까지 연구진은 ",
+              "대산석유화학단지 주변을 차로 돌거나 ",
+              "주요 공정 근처에 차를 세우고 ",
+              "일정 시간 측정했다. ",
+              "그 결과 시설은 전반적으로 ",
+              "관리기준에 따라 적정하게 운영되고 있었다. ",
+              "다만 원료를 들여오거나 ",
+              "설비를 고치는 것처럼 ",
+              "간헐적이고 비정기적인 작업 과정에서 ",
+              "더 세심한 관리가 필요한 것으로 나타났다."
+            ],
+            [
+              "진단 결과는 사업장과 공유되었고 ",
+              "민관 협의체가 개선방안을 함께 마련했다. ",
+              "저장탱크를 열어 검사할 때 ",
+              "배출가스를 모아 처리하기, ",
+              "압력완화장치를 시험하기 전에 ",
+              "설비 안에 남은 가스를 빼내기, ",
+              "광학가스탐지카메라로 누출 시설을 ",
+              "점검하는 주기를 촘촘히 하기 등이다."
+            ],
+            [
+              "2026년 9월 11일 ",
+              "금강유역환경청은 대산석유화학단지의 세 회사와 ",
+              "자발적 협약을 맺었다. ",
+              "벌을 주는 대신 ",
+              "함께 목표를 정하고 지키기로 한 것이다. ",
+              "2019년 초미세먼지 원인물질을 줄이려고 ",
+              "맺은 협약이 휘발성유기화합물까지 넓어진 셈이다. ",
+              "남은 일은 약속이 실제로 지켜지는지 ",
+              "살피는 것이다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "화학반응",
+              "easy": "물질이 서로 만나 성질이 다른 물질로 바뀌는 변화",
+              "hanja": "化(될 화)+學(배울 학)+反(돌이킬 반)+應(응할 응)"
+            },
+            {
+              "word": "농도",
+              "easy": "일정한 양의 공기나 물에 어떤 물질이 얼마나 들어 있는지를 나타내는 값",
+              "hanja": "濃(짙을 농)+度(법도 도)"
+            },
+            {
+              "word": "간헐적",
+              "easy": "얼마 동안씩 사이를 두고 되풀이되는",
+              "hanja": "間(사이 간)+歇(쉴 헐)"
+            },
+            {
+              "word": "협의체",
+              "easy": "여러 쪽이 모여 의논하려고 만든 모임",
+              "hanja": "協(화합할 협)+議(의논할 의)+體(몸 체)"
+            },
+            {
+              "word": "자발적",
+              "easy": "남이 시켜서가 아니라 스스로 나서서 하는",
+              "hanja": "自(스스로 자)+發(필 발)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 알맞은 것은?",
+              "choices": [
+                "빛을 이용한 원격 측정으로 배출 특성을 진단하고, 그 결과를 바탕으로 자발적 협약을 맺었다",
+                "대산석유화학단지의 세 회사가 과태료를 물게 되었다",
+                "휘발성유기화합물을 완전히 없애는 기술이 개발되었다",
+                "이동측정차량이 새로 만들어져 판매되기 시작했다"
+              ],
+              "answer": 0,
+              "explain": "빛으로 진단한 결과를 사업장과 나누고 개선방안을 마련해 자발적 협약을 맺은 과정을 다룬다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "detail",
+              "q": "원격 측정의 원리로 알맞은 것은?",
+              "choices": [
+                "기체가 내는 소리의 크기를 잰다",
+                "물질마다 특정한 빛을 삼키므로 줄어든 빛의 양으로 농도를 알아낸다",
+                "기체의 무게를 저울로 직접 잰다",
+                "굴뚝에서 나온 연기의 색을 눈으로 본다"
+              ],
+              "answer": 1,
+              "explain": "물질은 저마다 특정한 빛을 삼키므로, 줄어든 빛의 양을 재면 농도를 알 수 있다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "진단에서 드러난 문제로 알맞은 것은?",
+              "choices": [
+                "시설 전체가 관리기준을 지키지 않고 있었다",
+                "측정 장비가 고장 나 자료를 얻지 못했다",
+                "원료를 들여오거나 설비를 고치는 것처럼 간헐적이고 비정기적인 작업에서 더 세심한 관리가 필요했다",
+                "밤에만 배출이 이루어지고 있었다"
+              ],
+              "answer": 2,
+              "explain": "시설은 대체로 기준대로 운영되었고, 가끔 하는 작업 과정이 과제로 남았다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "vocab",
+              "q": "「간헐적」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "얼마 동안씩 사이를 두고 되풀이되는",
+                "쉬지 않고 계속 이어지는",
+                "아주 빠르게 움직이는",
+                "여러 곳에 널리 퍼져 있는"
+              ],
+              "answer": 0,
+              "explain": "간헐적은 사이를 두고 이따금 되풀이된다는 뜻이다.",
+              "evidencePara": 2
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "굴뚝에 측정기를 다는 방법만으로는 이 물질을 관리하기 어려운 까닭은?",
+              "choices": [
+                "측정기가 자외선을 견디지 못하기 때문이다",
+                "이 물질은 방지시설을 거치지 않는 곳에서도 조금씩 새어 나오기 때문이다",
+                "이 물질은 굴뚝에서 나오면 곧바로 사라지기 때문이다",
+                "이 물질은 대기 중에서 오존을 빨아들이기 때문이다"
+              ],
+              "answer": 1,
+              "explain": "저장탱크의 틈이나 배관 이음매처럼 굴뚝이 아닌 곳에서 새기 때문에 굴뚝만으로는 잡히지 않는다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "apply",
+              "q": "협약이 실제로 효과를 내려면 무엇이 이어져야 하는가?",
+              "choices": [
+                "약속한 개선방안이 지켜지는지 살피는 일",
+                "측정 장비를 모두 없애는 일",
+                "산업단지를 다른 지역으로 옮기는 일",
+                "굴뚝의 높이를 두 배로 올리는 일"
+              ],
+              "answer": 0,
+              "explain": "글은 남은 일이 약속이 실제로 지켜지는지 살피는 것이라고 밝혔다.",
+              "evidencePara": 4
+            }
+          ],
+          "en": [
+            "If you fit a meter to a factory chimney, you can tell what comes out and how much. Volatile organic compounds, or VOCs, slip past that check. They seep out little by little from gaps in storage tanks and from pipe joints, places that no control device covers. In the air, VOCs react and turn into fine dust and ozone, so they are managed separately.",
+            "The National Institute of Environmental Research chose light instead of the chimney. Instruments such as SOF and DIAL send infrared or ultraviolet laser beams through the air. Every substance absorbs its own particular wavelengths. By measuring how much light is missing, researchers can read the concentration in the air from far away.",
+            "The instruments were loaded onto a mobile measuring vehicle. From March to November 2025, the team drove around the Daesan petrochemical complex, or parked near major processes and measured for a set time. The facilities, they found, were generally being operated in line with the standards. The weak point lay elsewhere: in occasional and irregular work, such as receiving raw materials or repairing equipment.",
+            "The findings were shared with the companies, and a public-private council drew up improvements together. Gas that escapes when a storage tank is opened for inspection is now collected and treated. Gas left inside the equipment is removed before a pressure relief device is tested. Leaking facilities are checked more often with an optical gas imaging camera.",
+            "On 11 September 2026, the Geum River Basin Environmental Office signed a voluntary agreement with three companies at Daesan. Instead of punishment, the two sides set a goal together and promised to keep it. An agreement made in 2019 to cut the causes of fine dust has now been widened to VOCs. What remains is to check whether the promise is really kept."
+          ],
+          "envocab": [
+            {
+              "word": "wavelengths",
+              "ko": "파장 (명사 wavelength의 복수)",
+              "base": "wavelength [ˈweɪvleŋθ]"
+            },
+            {
+              "word": "concentration",
+              "ko": "농도 (명사)",
+              "base": "concentration [ˌkɑːnsnˈtreɪʃn]"
+            },
+            {
+              "word": "inspection",
+              "ko": "점검, 검사 (명사)",
+              "base": "inspect [ɪnˈspekt]"
+            },
+            {
+              "word": "irregular",
+              "ko": "불규칙한, 비정기적인 (형용사)",
+              "base": "irregular [ɪˈreɡjələr]"
+            },
+            {
+              "word": "voluntary",
+              "ko": "자발적인 (형용사)",
+              "base": "voluntary [ˈvɑːlənteri]"
+            }
+          ],
+          "enseg": [
+            [
+              "If you fit a meter to a factory chimney, ",
+              "you can tell what comes out and how much. ",
+              "Volatile organic compounds, or VOCs, slip past that check. ",
+              "They seep out little by little from gaps in storage tanks and from pipe joints, ",
+              "places that no control device covers. ",
+              "In the air, VOCs react and turn into fine dust and ozone, ",
+              "so they are managed separately."
+            ],
+            [
+              "The National Institute of Environmental Research chose light instead of the chimney. ",
+              "Instruments such as SOF and DIAL send infrared or ultraviolet laser beams through the air. ",
+              "Every substance absorbs its own particular wavelengths. ",
+              "By measuring how much light is missing, ",
+              "researchers can read the concentration in the air from far away."
+            ],
+            [
+              "The instruments were loaded onto a mobile measuring vehicle. ",
+              "From March to November 2025, ",
+              "the team drove around the Daesan petrochemical complex, ",
+              "or parked near major processes and measured for a set time. ",
+              "The facilities, they found, were generally being operated in line with the standards. ",
+              "The weak point lay elsewhere: ",
+              "in occasional and irregular work, ",
+              "such as receiving raw materials or repairing equipment."
+            ],
+            [
+              "The findings were shared with the companies, ",
+              "and a public-private council drew up improvements together. ",
+              "Gas that escapes when a storage tank is opened for inspection is now collected and treated. ",
+              "Gas left inside the equipment is removed before a pressure relief device is tested. ",
+              "Leaking facilities are checked more often with an optical gas imaging camera."
+            ],
+            [
+              "On 11 September 2026, ",
+              "the Geum River Basin Environmental Office signed a voluntary agreement with three companies at Daesan. ",
+              "Instead of punishment, ",
+              "the two sides set a goal together and promised to keep it. ",
+              "An agreement made in 2019 to cut the causes of fine dust has now been widened to VOCs. ",
+              "What remains is to check whether the promise is really kept."
+            ]
+          ]
+        },
+        "L4": {
+          "title": "평소가 아니라 가끔이 문제였다",
+          "minutes": 6,
+          "paragraphs": [
+            [
+              "공장에서 무엇이 얼마나 나오는지 알고 싶다면 ",
+              "보통은 굴뚝에 측정기를 단다. ",
+              "그러나 휘발성유기화합물은 굴뚝만 지켜서는 잡히지 않는다. ",
+              "이 물질은 저장탱크의 틈, ",
+              "배관 이음매, 밸브처럼 ",
+              "방지시설을 거치지 않는 여러 곳에서 ",
+              "조금씩 새어 나오기 때문이다. ",
+              "환경 당국이 이를 비산배출이라고 부르는 이유다. ",
+              "대기 중에서 화학반응을 거쳐 ",
+              "미세먼지와 오존으로 바뀌는 성질까지 더하면, ",
+              "재는 일 자체가 관리의 출발점이 된다."
+            ],
+            [
+              "국립환경과학원이 택한 방법은 ",
+              "굴뚝이 아니라 빛이었다. ",
+              "태양추적적외선측정법과 차등흡광탐지측정기 같은 장비는 ",
+              "적외선이나 자외선 레이저를 공기 중에 통과시킨다. ",
+              "물질마다 삼키는 빛의 파장이 다르므로, ",
+              "되돌아온 빛이 얼마나 줄었는지를 재면 ",
+              "그 사이의 공기에 무엇이 얼마나 있었는지 ",
+              "계산할 수 있다. ",
+              "굴뚝에 손을 대지 않고도 ",
+              "사업장 전체에서 새어 나오는 양을 ",
+              "바깥에서 가늠하는 셈이다."
+            ],
+            [
+              "장비는 이동측정차량에 실렸다. ",
+              "2025년 3월부터 11월까지 연구진은 ",
+              "사업장 주변을 차로 돌거나, ",
+              "주요 공정 근처에 차를 세우고 ",
+              "일정 시간 동안 측정했다. ",
+              "계절과 시간을 바꿔 가며 ",
+              "모은 자료가 가리킨 곳은 뜻밖이었다. ",
+              "시설은 전반적으로 관리기준에 따라 적정하게 운영·관리되고 있었다. ",
+              "문제는 평소가 아니라 ",
+              "원료를 들여오거나 공정을 유지보수하는 것처럼 ",
+              "간헐적이고 비정기적인 작업 과정에 있었다."
+            ],
+            [
+              "진단 결과는 사업장과 공유되었고, ",
+              "민관 협의체가 개선방안을 함께 마련했다. ",
+              "저장탱크를 열어 검사할 때 ",
+              "이동식 흡수탑으로 배출가스를 붙잡아 처리하고 ",
+              "남은 찌꺼기는 그날 안에 내보내기, ",
+              "압력완화장치를 시험하기 전에 ",
+              "설비 안에 남은 가스를 빼내는 절차를 강화하기, ",
+              "광학가스탐지카메라로 비산누출시설을 ",
+              "점검하는 주기를 촘촘히 하기 같은 것들이다. ",
+              "2026년 9월 11일 ",
+              "금강유역환경청과 대산석유화학단지의 세 회사는 ",
+              "이 방안을 이행하겠다는 자발적 협약에 서명했다."
+            ],
+            [
+              "자발적 협약은 법으로 벌하는 대신 ",
+              "함께 목표를 정하고 지키게 하는 방식이다. ",
+              "2019년에 초미세먼지 원인물질을 줄이려고 ",
+              "맺은 협약이 이번에 휘발성유기화합물까지 넓어졌다. ",
+              "물론 협약은 약속이므로 ",
+              "이행을 살피는 일이 남는다. ",
+              "측정 장비와 자료를 다루는 기술자, ",
+              "개선 비용과 공정을 저울질하는 기업의 실무자, ",
+              "협약과 기준을 제도로 다듬는 정책 담당자가 ",
+              "같은 자료 위에서 만난다. ",
+              "보이지 않는 것을 재는 기술이 늘어날수록, ",
+              "그 숫자를 읽고 ",
+              "결정을 내리는 사람의 몫도 함께 커진다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "비산배출",
+              "easy": "굴뚝처럼 한곳에 모으지 않고, 방지시설을 거치지 않은 채 여기저기서 흩어져 나오는 배출",
+              "hanja": "飛(날 비)+散(흩을 산)"
+            },
+            {
+              "word": "파장",
+              "easy": "물결처럼 나아가는 빛이나 소리에서 마루와 마루 사이의 길이",
+              "hanja": "波(물결 파)+長(길 장)"
+            },
+            {
+              "word": "간헐적",
+              "easy": "얼마 동안씩 사이를 두고 되풀이되는",
+              "hanja": "間(사이 간)+歇(쉴 헐)"
+            },
+            {
+              "word": "협의체",
+              "easy": "여러 쪽이 모여 의논하려고 만든 모임",
+              "hanja": "協(화합할 협)+議(의논할 의)+體(몸 체)"
+            },
+            {
+              "word": "이행",
+              "easy": "약속하거나 정한 것을 실제로 실행하는 일",
+              "hanja": "履(밟을 이)+行(다닐 행)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 알맞은 것은?",
+              "choices": [
+                "굴뚝 밖으로 새는 물질을 빛으로 재어 진단하고, 그 결과를 바탕으로 개선방안과 자발적 협약을 마련했다",
+                "대산석유화학단지의 배출량이 처음으로 0이 되었다",
+                "정부가 세 회사에 과태료를 부과하기로 결정했다",
+                "이동측정차량이 국내에서 처음 개발되었다"
+              ],
+              "answer": 0,
+              "explain": "원격 측정 진단 → 개선방안 마련 → 자발적 협약으로 이어지는 과정을 다룬 글이다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "detail",
+              "q": "원격 측정의 원리에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "빛이 물질을 밀어내는 힘의 크기를 잰다",
+                "물질마다 삼키는 빛의 파장이 달라, 되돌아온 빛이 얼마나 줄었는지로 성분과 양을 계산한다",
+                "레이저로 물질을 태운 뒤 남은 재의 무게를 잰다",
+                "굴뚝 안에 넣은 센서가 보내는 신호를 받는다"
+              ],
+              "answer": 1,
+              "explain": "물질마다 삼키는 파장이 다르므로 줄어든 빛의 양에서 무엇이 얼마나 있었는지 계산한다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "2025년 3월부터 11월까지 이루어진 측정 방식으로 알맞은 것은?",
+              "choices": [
+                "위성으로 하루 한 번 촬영했다",
+                "공장 안 굴뚝마다 측정기를 설치했다",
+                "장비를 실은 차로 사업장 주변을 돌거나 주요 공정 근처에 세우고 일정 시간 측정했다",
+                "주민들이 직접 시료를 받아 보냈다"
+              ],
+              "answer": 2,
+              "explain": "이동측정차량으로 사업장 주변을 돌거나 주요 공정 근처에서 일정 시간 측정했다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "vocab",
+              "q": "「비산배출」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "방지시설을 거치지 않고 여러 곳에서 흩어져 나오는 배출",
+                "굴뚝 한 곳에 모아 내보내는 배출",
+                "물에 녹여 하수로 내보내는 배출",
+                "밤에만 이루어지는 배출"
+              ],
+              "answer": 0,
+              "explain": "저장탱크의 틈, 배관 이음매, 밸브처럼 방지시설을 거치지 않는 곳에서 새어 나오는 배출이다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "critical",
+              "q": "이 글을 바탕으로 자발적 협약을 평가한 것으로 가장 타당한 것은?",
+              "choices": [
+                "약속에 그칠 수 있으므로 이행을 살피는 일이 뒤따라야 한다",
+                "협약을 맺는 순간 배출이 사라지므로 더 할 일이 없다",
+                "협약은 법이 아니므로 아무런 효과도 낼 수 없다",
+                "협약보다 과태료가 언제나 더 정확한 진단을 내놓는다"
+              ],
+              "answer": 0,
+              "explain": "글은 협약이 약속인 만큼 이행을 살피는 일이 남는다고 짚는다.",
+              "evidencePara": 4
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "「문제는 평소가 아니라 간헐적·비정기적 작업에 있었다」는 진단은 개선방안의 성격을 어떻게 정했는가?",
+              "choices": [
+                "상시 시설을 새로 짓는 대신, 특정 작업을 할 때의 절차를 다듬는 쪽으로 정했다",
+                "굴뚝의 높이를 올리는 쪽으로 정했다",
+                "측정을 그만두는 쪽으로 정했다",
+                "사업장을 다른 지역으로 옮기는 쪽으로 정했다"
+              ],
+              "answer": 0,
+              "explain": "저장탱크 개방검사, 압력완화장치 시험 전 절차, 점검주기처럼 모두 특정 작업의 절차를 다듬는 내용이다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "apply",
+              "q": "다른 산업단지에 같은 방식을 적용한다면 순서로 알맞은 것은?",
+              "choices": [
+                "원격 측정으로 배출특성 진단 → 결과 공유와 협의체 → 개선방안 마련 → 협약과 이행 점검",
+                "협약 체결 → 과태료 부과 → 측정 → 진단",
+                "굴뚝 증설 → 측정 → 협약 → 진단",
+                "주민 설문 → 협약 → 측정 장비 폐기 → 진단"
+              ],
+              "answer": 0,
+              "explain": "이 글의 사례가 진단, 공유와 협의체, 개선방안, 협약과 이행 점검의 차례로 진행되었다.",
+              "evidencePara": 3
+            }
+          ],
+          "en": [
+            "The usual way to learn what a factory sends out is to fit a meter to its stack. Volatile organic compounds slip past that method. They escape in small amounts from the seams of storage tanks, from pipe joints and from valves — points that never pass through a control device. Regulators call this fugitive emission. Add the fact that these compounds react in the atmosphere and turn into fine dust and ozone, and measurement itself becomes the first step of management.",
+            "What the National Institute of Environmental Research turned to was not the stack but light. Instruments such as solar occultation flux measurement (SOF) and differential absorption lidar (DIAL) send infrared or ultraviolet laser beams through open air. Because every substance absorbs its own characteristic wavelengths, the amount of light that fails to return tells researchers what lay along that path, and how much of it. In effect, an entire site can be gauged from outside, without touching a single stack.",
+            "The instruments rode in a mobile measuring vehicle. From March to November 2025, researchers drove the perimeter of the site, or parked near key processes and measured for set periods. What the data gathered across seasons and hours pointed to was not the obvious answer. The facilities were, on the whole, being operated and managed in line with the standards. The weak point lay not in ordinary running but in intermittent, irregular tasks — receiving raw materials, or maintaining a process.",
+            "The diagnosis was shared with the companies, and a public-private council worked out improvements together. When a storage tank is opened for inspection, a mobile absorption tower now captures and treats the escaping gas, and the sludge left behind leaves the site the same day. Before a pressure relief device is tested, the procedure for clearing gas left inside the equipment has been tightened. Leak points are checked more frequently with an optical gas imaging camera. On 11 September 2026, the Geum River Basin Environmental Office and three companies at Daesan signed a voluntary agreement to carry these measures out.",
+            "A voluntary agreement sets a shared target and asks both sides to keep it, rather than punishing one of them under the law. An agreement made in 2019 to cut the precursors of fine particles has now been widened to cover volatile organic compounds. Because an agreement is a promise, the work that follows is checking that it is kept. Engineers who run the instruments and handle the data, company staff who weigh the cost of improvement against the process, and policy officers who turn agreements into rules all meet over the same figures. The better we become at measuring what cannot be seen, the larger the share of the work that belongs to the people who read those numbers and decide."
+          ],
+          "envocab": [
+            {
+              "word": "fugitive",
+              "ko": "(가스 등이) 새어 나오는, 비산의 (형용사)",
+              "base": "fugitive [ˈfjuːdʒətɪv]"
+            },
+            {
+              "word": "wavelengths",
+              "ko": "파장 (명사 wavelength의 복수)",
+              "base": "wavelength [ˈweɪvleŋθ]"
+            },
+            {
+              "word": "intermittent",
+              "ko": "간헐적인 (형용사)",
+              "base": "intermittent [ˌɪntərˈmɪtnt]"
+            },
+            {
+              "word": "voluntary",
+              "ko": "자발적인 (형용사)",
+              "base": "voluntary [ˈvɑːlənteri]"
+            },
+            {
+              "word": "precursors",
+              "ko": "전구물질 (명사 precursor의 복수)",
+              "base": "precursor [prɪˈkɜːrsər]"
+            }
+          ],
+          "enseg": [
+            [
+              "The usual way to learn what a factory sends out is to fit a meter to its stack. ",
+              "Volatile organic compounds slip past that method. ",
+              "They escape in small amounts from the seams of storage tanks, ",
+              "from pipe joints and from valves — ",
+              "points that never pass through a control device. ",
+              "Regulators call this fugitive emission. ",
+              "Add the fact that these compounds react in the atmosphere and turn into fine dust and ozone, ",
+              "and measurement itself becomes the first step of management."
+            ],
+            [
+              "What the National Institute of Environmental Research turned to was not the stack but light. ",
+              "Instruments such as solar occultation flux measurement (SOF) and differential absorption lidar (DIAL) send infrared or ultraviolet laser beams through open air. ",
+              "Because every substance absorbs its own characteristic wavelengths, ",
+              "the amount of light that fails to return tells researchers what lay along that path, ",
+              "and how much of it. ",
+              "In effect, an entire site can be gauged from outside, ",
+              "without touching a single stack."
+            ],
+            [
+              "The instruments rode in a mobile measuring vehicle. ",
+              "From March to November 2025, ",
+              "researchers drove the perimeter of the site, ",
+              "or parked near key processes and measured for set periods. ",
+              "What the data gathered across seasons and hours pointed to was not the obvious answer. ",
+              "The facilities were, on the whole, being operated and managed in line with the standards. ",
+              "The weak point lay not in ordinary running but in intermittent, irregular tasks — ",
+              "receiving raw materials, or maintaining a process."
+            ],
+            [
+              "The diagnosis was shared with the companies, ",
+              "and a public-private council worked out improvements together. ",
+              "When a storage tank is opened for inspection, ",
+              "a mobile absorption tower now captures and treats the escaping gas, ",
+              "and the sludge left behind leaves the site the same day. ",
+              "Before a pressure relief device is tested, ",
+              "the procedure for clearing gas left inside the equipment has been tightened. ",
+              "Leak points are checked more frequently with an optical gas imaging camera. ",
+              "On 11 September 2026, ",
+              "the Geum River Basin Environmental Office and three companies at Daesan signed a voluntary agreement to carry these measures out."
+            ],
+            [
+              "A voluntary agreement sets a shared target and asks both sides to keep it, ",
+              "rather than punishing one of them under the law. ",
+              "An agreement made in 2019 to cut the precursors of fine particles has now been widened to cover volatile organic compounds. ",
+              "Because an agreement is a promise, ",
+              "the work that follows is checking that it is kept. ",
+              "Engineers who run the instruments and handle the data, ",
+              "company staff who weigh the cost of improvement against the process, ",
+              "and policy officers who turn agreements into rules all meet over the same figures. ",
+              "The better we become at measuring what cannot be seen, ",
+              "the larger the share of the work that belongs to the people who read those numbers and decide."
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "id": "flu-surveillance",
+      "category": "science",
+      "careers": [
+        "med",
+        "bio",
+        "media"
+      ],
+      "publishedAt": "2026-09-14",
+      "status": "published",
+      "sources": [
+        {
+          "title": "질병관리청 보도참고자료 — 2026-2027절기 인플루엔자 유행주의보 발령, 예년보다 이른 유행, 학생 및 고위험군 대응 강화 (2026.9.11, 감염병관리과)",
+          "url": "https://www.kdca.go.kr/bbs/kdca/42/312593/artclView.do"
+        },
+        {
+          "title": "질병관리청 보도참고자료 — 2025-2026 절기 인플루엔자 유행주의보 해제 (2026.5.15, 감염병관리과)",
+          "url": "https://www.kdca.go.kr/bbs/kdca/42/311082/artclView.do"
+        }
+      ],
+      "levels": {
+        "L1": {
+          "title": "몇 명인지 세어 봐요",
+          "minutes": 3,
+          "paragraphs": [
+            [
+              "해마다 가을이면 ",
+              "열이 나고 ",
+              "기침하는 사람이 늘어요. ",
+              "나라에서는 그런 사람이 ",
+              "얼마나 되는지 세어 봐요. ",
+              "그런데 온 나라 병원을 ",
+              "다 셀 수는 없어요. ",
+              "그래서 미리 정한 병원에서만 세어요."
+            ],
+            [
+              "병원에 온 사람 ",
+              "천 명 가운데 몇 명인지를 봐요. ",
+              "이 수가 ",
+              "미리 그어 둔 선을 넘으면 알려요. ",
+              "올해는 그 선을 훌쩍 넘었어요. ",
+              "그래서 9월 11일에 ",
+              "온 나라에 알렸어요."
+            ],
+            [
+              "미리 알면 좋은 점이 많아요. ",
+              "어른들이 먼저 준비할 수 있어요. ",
+              "우리도 할 일이 있어요. ",
+              "밖에서 돌아오면 손을 씻어요. ",
+              "기침이 나오면 ",
+              "옷소매로 입을 가려요."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "병원",
+              "easy": "아픈 사람을 살펴 주고 낫게 도와주는 곳이에요.",
+              "hanja": null
+            },
+            {
+              "word": "기침",
+              "easy": "목이 간질간질할 때 「콜록」 하고 나오는 것이에요.",
+              "hanja": null
+            },
+            {
+              "word": "옷소매",
+              "easy": "옷에서 팔을 넣는 긴 부분이에요.",
+              "hanja": null
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글은 무엇에 대한 이야기인가요?",
+              "choices": [
+                "약을 새로 만드는 방법",
+                "아픈 사람이 몇 명인지 세어서 미리 알려 주는 일",
+                "병원을 새로 짓는 일",
+                "가을에 부는 바람"
+              ],
+              "answer": 1,
+              "explain": "아픈 사람 수를 세어 보고 미리 알려 주는 일에 대한 글이에요.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "온 나라 병원을 다 세지 않고 어떻게 하나요?",
+              "choices": [
+                "아무 데서도 세지 않아요",
+                "미리 정한 병원에서만 세어요",
+                "학교에서만 세어요",
+                "집집마다 찾아가요"
+              ],
+              "answer": 1,
+              "explain": "온 나라 병원을 다 셀 수 없어서 미리 정한 병원에서만 세어요.",
+              "evidencePara": 0
+            },
+            {
+              "type": "vocab",
+              "q": "「옷소매」는 어디를 말하나요?",
+              "choices": [
+                "옷에서 팔을 넣는 긴 부분",
+                "옷에서 목이 나오는 부분",
+                "신발의 바닥",
+                "모자의 끝"
+              ],
+              "answer": 0,
+              "explain": "옷소매는 옷에서 팔을 넣는 긴 부분이에요.",
+              "evidencePara": 2
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "미리 그어 둔 선이 없으면 어떤 일이 생길까요?",
+              "choices": [
+                "센 수가 많은지 적은지 견줄 데가 없어요",
+                "병원이 문을 닫아요",
+                "가을이 오지 않아요",
+                "손을 씻을 수 없어요"
+              ],
+              "answer": 0,
+              "explain": "선이 있어야 「많다」고 말할 수 있어요. 견줄 것이 없으면 알 수 없어요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "apply",
+              "q": "이 글을 읽고 오늘 우리가 할 수 있는 일은 무엇인가요?",
+              "choices": [
+                "창문을 모두 닫아요",
+                "기침이 나오면 옷소매로 입을 가려요",
+                "손을 씻지 않아요",
+                "병원 수를 세어요"
+              ],
+              "answer": 1,
+              "explain": "손을 씻고 기침할 때 옷소매로 가리는 것은 우리가 바로 할 수 있는 일이에요.",
+              "evidencePara": 2
+            }
+          ]
+        },
+        "L2": {
+          "title": "무엇을 보고 유행이라고 할까",
+          "minutes": 4,
+          "paragraphs": [
+            [
+              "독감이 돌기 시작했다는 말은 ",
+              "무엇을 보고 하는 걸까? ",
+              "온 나라 사람을 ",
+              "한 명씩 검사할 수는 없다. ",
+              "그래서 우리나라는 다른 방법을 쓴다. ",
+              "전국에서 미리 고른 병원 몇백 곳만 ",
+              "매주 살펴본다. ",
+              "전체 대신 일부를 뽑아 보는 ",
+              "이 방법을 표본감시라고 한다."
+            ],
+            [
+              "이 병원들이 세는 것은 ",
+              "한 가지다. ",
+              "38도 이상의 열이 나면서 ",
+              "기침이나 목 아픔이 있는 사람 수다. ",
+              "그런데 병원마다 ",
+              "하루에 오는 환자 수가 다르다. ",
+              "그래서 사람 수를 그대로 ",
+              "더하지 않고 비율로 바꾼다. ",
+              "병원에 온 사람 1,000명당 ",
+              "몇 명인지를 세는 것이다."
+            ],
+            [
+              "다음에 필요한 것은 ",
+              "견줄 선이다. ",
+              "질병관리청은 해마다 ",
+              "기준이 되는 수를 미리 정해 둔다. ",
+              "올해 기준은 1,000명당 12.9명이었다. ",
+              "2026년 36주차에 ",
+              "이 수가 25.3명까지 올랐다. ",
+              "지난해 같은 때는 6.6명이었다. ",
+              "미리 그어 둔 선을 넘자 ",
+              "9월 11일에 유행주의보가 내려졌다."
+            ],
+            [
+              "그런데 열과 기침만으로는 ",
+              "독감인지 아닌지 알 수 없다. ",
+              "다른 병도 ",
+              "비슷한 증상을 보이기 때문이다. ",
+              "그래서 검사에서 ",
+              "바이러스가 나온 비율도 함께 본다. ",
+              "이 비율이 5%를 넘어야 한다. ",
+              "두 신호가 같이 올라갈 때에만 ",
+              "유행이라고 말한다."
+            ],
+            [
+              "세는 일에는 끝도 있다. ",
+              "지난 절기에는 그 수가 ",
+              "3주 내내 기준 아래로 내려가자 ",
+              "주의보가 풀렸다. ",
+              "숫자를 세는 까닭은 ",
+              "미리 알리기 위해서다. ",
+              "우리는 손을 30초 씻고 ",
+              "기침할 때 ",
+              "옷소매로 가리면 된다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "표본감시",
+              "easy": "전체를 다 살피지 않고 미리 고른 일부만 살펴 전체 흐름을 읽는 방법",
+              "hanja": "標(표할 표)+本(근본 본)+監(볼 감)+視(볼 시)"
+            },
+            {
+              "word": "비율",
+              "easy": "전체 가운데 얼마나 되는지를 나타낸 몫",
+              "hanja": "比(견줄 비)+率(비율 률)"
+            },
+            {
+              "word": "기준",
+              "easy": "견주어 판단할 때 잣대로 삼는 것",
+              "hanja": "基(터 기)+準(준할 준)"
+            },
+            {
+              "word": "유행",
+              "easy": "병이 짧은 사이에 많은 사람에게 퍼지는 일",
+              "hanja": "流(흐를 류)+行(다닐 행)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 알맞은 것은?",
+              "choices": [
+                "독감에 걸리면 반드시 입원해야 한다",
+                "미리 고른 병원의 비율과 기준선으로 유행이 시작됐는지 알아낸다",
+                "온 나라 사람을 매주 검사한다",
+                "바이러스는 겨울에만 나온다"
+              ],
+              "answer": 1,
+              "explain": "전체를 다 세지 않고 표본 병원의 비율을 기준선과 견주어 판단한다는 것이 중심이다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "표본 병원들이 세는 사람은 누구인가?",
+              "choices": [
+                "38도가 넘는 열이 나면서 기침이나 목 아픔이 있는 사람",
+                "병원에 온 모든 사람",
+                "약을 사러 온 사람",
+                "예방접종을 받은 사람"
+              ],
+              "answer": 0,
+              "explain": "38도가 넘는 열에 기침이나 목 아픔이 함께 있는 사람 수를 센다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "2026년 36주차 수치와 올해 기준을 바르게 짝지은 것은?",
+              "choices": [
+                "12.9명 — 기준 25.3명",
+                "6.6명 — 기준 9.1명",
+                "25.3명 — 기준 12.9명",
+                "25.3명 — 기준 6.6명"
+              ],
+              "answer": 2,
+              "explain": "36주차에 25.3명까지 올라 올해 기준인 12.9명을 넘었다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "vocab",
+              "q": "「비율」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "가장 큰 수",
+                "전체 가운데 얼마나 되는지를 나타낸 몫",
+                "병원의 이름",
+                "달력의 주 번호"
+              ],
+              "answer": 1,
+              "explain": "비율은 전체 가운데 얼마나 되는지를 나타낸 몫이다.",
+              "evidencePara": 1
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "사람 수를 그대로 더하지 않고 비율로 바꾸는 까닭은?",
+              "choices": [
+                "병원마다 오는 환자 수가 달라서 그대로 더하면 견줄 수 없기 때문",
+                "숫자를 작아 보이게 하려고",
+                "계산이 더 재미있어서",
+                "병원 이름을 숨기려고"
+              ],
+              "answer": 0,
+              "explain": "병원 크기가 저마다 달라도 비율로 바꾸면 서로 견줄 수 있다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "apply",
+              "q": "친구가 「열이 나면 무조건 독감이야」라고 한다. 이 글을 읽고 해 줄 말로 알맞은 것은?",
+              "choices": [
+                "열이 나면 언제나 독감이 맞아",
+                "기침이 없으면 독감이 아니야",
+                "다른 병도 비슷한 증상을 보이니 검사에서 바이러스가 나오는지도 봐야 해",
+                "숫자를 세지 않아도 알 수 있어"
+              ],
+              "answer": 2,
+              "explain": "증상만으로는 원인을 알 수 없어서 검출된 비율이라는 두 번째 신호를 함께 본다.",
+              "evidencePara": 3
+            }
+          ],
+          "en": [
+            "How do we know that flu has started to spread? We cannot test every person in the country. So Korea uses a different way. Every week it looks at a few hundred chosen clinics. Watching a small part to learn about the whole is called sample surveillance.",
+            "These clinics count one thing every week. They count people with a fever of 38 degrees or higher. The person must also have a cough or a sore throat. But each clinic sees a different number of patients. So the clinics do not just add the people up. They count how many out of every 1,000 visitors.",
+            "Next we need a line to compare with. Korea's disease agency sets that number before the season starts. This year the line was 12.9 people out of 1,000. In week 36 of 2026 the number rose to 25.3. Last year at the same time it was only 6.6. The line was crossed, so a flu alert came on 11 September.",
+            "But fever and cough do not prove that it is flu. Other illnesses look almost the same. So they also check how often the virus is really found. That number must be over 5 percent. Only when both signals rise do we call it an epidemic.",
+            "Counting also tells us when it ends. Last season the number stayed under the line for three weeks. Then the alert was lifted. We count so that people can be warned early. You can wash your hands for 30 seconds. Cover your mouth with your sleeve when you cough."
+          ],
+          "enseg": [
+            [
+              "How do we know that flu has started to spread? ",
+              "We cannot test every person in the country. ",
+              "So Korea uses a different way. ",
+              "Every week it looks at a few hundred chosen clinics. ",
+              "Watching a small part to learn about the whole is called sample surveillance."
+            ],
+            [
+              "These clinics count one thing every week. ",
+              "They count people with a fever of 38 degrees or higher. ",
+              "The person must also have a cough or a sore throat. ",
+              "But each clinic sees a different number of patients. ",
+              "So the clinics do not just add the people up. ",
+              "They count how many out of every 1,000 visitors."
+            ],
+            [
+              "Next we need a line to compare with. ",
+              "Korea's disease agency sets that number before the season starts. ",
+              "This year the line was 12.9 people out of 1,000. ",
+              "In week 36 of 2026 the number rose to 25.3. ",
+              "Last year at the same time it was only 6.6. ",
+              "The line was crossed, so a flu alert came on 11 September."
+            ],
+            [
+              "But fever and cough do not prove that it is flu. ",
+              "Other illnesses look almost the same. ",
+              "So they also check how often the virus is really found. ",
+              "That number must be over 5 percent. ",
+              "Only when both signals rise do we call it an epidemic."
+            ],
+            [
+              "Counting also tells us when it ends. ",
+              "Last season the number stayed under the line for three weeks. ",
+              "Then the alert was lifted. ",
+              "We count so that people can be warned early. ",
+              "You can wash your hands for 30 seconds. ",
+              "Cover your mouth with your sleeve when you cough."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "surveillance",
+              "ko": "감시 (명사)",
+              "base": "surveillance [sərˈveɪləns]"
+            },
+            {
+              "word": "clinics",
+              "ko": "의원들 (명사 clinic의 복수형)",
+              "base": "clinic [ˈklɪnɪk]"
+            },
+            {
+              "word": "fever",
+              "ko": "열 (명사)",
+              "base": "fever [ˈfiːvər]"
+            },
+            {
+              "word": "compare",
+              "ko": "비교하다 (동사)",
+              "base": "compare [kəmˈper]"
+            },
+            {
+              "word": "signals",
+              "ko": "신호들 (명사 signal의 복수형)",
+              "base": "signal [ˈsɪɡnəl]"
+            },
+            {
+              "word": "epidemic",
+              "ko": "유행병 (명사)",
+              "base": "epidemic [ˌepɪˈdemɪk]"
+            }
+          ]
+        },
+        "L3": {
+          "title": "유행의 시작을 재는 자",
+          "minutes": 5,
+          "paragraphs": [
+            [
+              "유행이 시작됐다는 말은 ",
+              "누가 무엇을 보고 하는 것일까. ",
+              "전 국민을 매주 검사해서 ",
+              "알아내는 것은 아니다. ",
+              "그럴 만한 시간도 사람도 없다. ",
+              "대신 우리나라는 ",
+              "전국에서 미리 고른 의원 몇백 곳의 ",
+              "진료 기록만 매주 모은다. ",
+              "전체를 다 세는 대신 ",
+              "일부를 뽑아 전체를 읽어 내는 ",
+              "이 방식을 표본감시라고 한다."
+            ],
+            [
+              "표본 의원들이 세는 것은 ",
+              "인플루엔자 의사환자다. ",
+              "38℃ 이상의 열이 나면서 ",
+              "기침이나 인후통이 있는 사람을 말한다. ",
+              "확진이 아니라 ",
+              "증상만으로 정한 기준이라 ",
+              "진료실에서 곧바로 셀 수 있다. ",
+              "다만 병원마다 오는 환자 수가 다르므로 ",
+              "사람 수를 그대로 더하면 뜻이 없다. ",
+              "그래서 외래환자 1,000명당 몇 명인지, ",
+              "곧 분율로 바꾸어 견준다."
+            ],
+            [
+              "다음에 필요한 것은 견줄 선이다. ",
+              "질병관리청은 절기마다 ",
+              "유행기준을 미리 정해 둔다. ",
+              "2026-2027절기 기준은 1,000명당 12.9명이었고 ",
+              "지난 절기 기준은 9.1명이었다. ",
+              "해마다 다시 정하는 까닭은 ",
+              "절기마다 평소 수준이 다르기 때문이다. ",
+              "2026년 36주차 분율은 25.3명으로 ",
+              "기준의 두 배에 가까웠고 ",
+              "그 앞 3주는 7.5명, 9.2명, 13.3명이었다."
+            ],
+            [
+              "그런데 분율 하나만으로는 부족하다. ",
+              "열과 기침은 다른 호흡기 질환에서도 나타나기 때문에 ",
+              "분율이 올라도 ",
+              "원인이 인플루엔자가 아닐 수 있다. ",
+              "그래서 검체에서 ",
+              "실제로 바이러스가 나온 비율을 함께 본다. ",
+              "검출률은 33주 5.4%에서 36주 16.3%로 올랐다. ",
+              "두 신호가 함께 기준을 넘어야 ",
+              "비로소 유행주의보가 발령된다."
+            ],
+            [
+              "같은 장치가 유행의 끝도 알려 준다. ",
+              "지난 절기에는 분율이 ",
+              "3주 연속 유행기준 아래로 내려가자 ",
+              "주의보가 해제되었다. ",
+              "질병관리청은 이번 절기부터 ",
+              "표본 의원을 300개에서 800개로 늘렸다. ",
+              "그물눈이 촘촘해질수록 ",
+              "같은 변화를 더 일찍 ",
+              "잡아낼 수 있기 때문이다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "표본감시",
+              "easy": "전체를 다 세는 대신 미리 고른 일부만 살펴 전체 흐름을 읽는 방법",
+              "hanja": "標(표할 표)+本(근본 본)+監(볼 감)+視(볼 시)"
+            },
+            {
+              "word": "분율",
+              "easy": "전체를 정해진 수로 놓았을 때 그 가운데 차지하는 몫",
+              "hanja": "分(나눌 분)+率(비율 률)"
+            },
+            {
+              "word": "유행기준",
+              "easy": "유행이 시작됐다고 판단하려고 미리 정해 둔 수치",
+              "hanja": "流(흐를 류)+行(다닐 행)+基(터 기)+準(준할 준)"
+            },
+            {
+              "word": "검출률",
+              "easy": "검사한 검체 가운데 바이러스가 나온 것의 비율",
+              "hanja": "檢(검사할 검)+出(날 출)+率(비율 률)"
+            },
+            {
+              "word": "절기",
+              "easy": "인플루엔자 감시에서 9월부터 이듬해 8월까지를 묶어 부르는 한 주기",
+              "hanja": "節(마디 절)+期(기약할 기)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 알맞은 것은?",
+              "choices": [
+                "인플루엔자는 치료할 수 없는 병이다",
+                "전체를 다 세는 대신 표본과 기준선으로 유행의 시작을 판정한다",
+                "표본 의원은 확진자만 보고한다",
+                "검출률 하나만으로 유행주의보를 발령한다"
+              ],
+              "answer": 1,
+              "explain": "표본에서 얻은 분율을 미리 정한 기준선과 견주어 유행의 시작을 판정한다는 것이 중심이다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "인플루엔자 의사환자로 세는 사람은?",
+              "choices": [
+                "검사에서 양성이 나온 사람",
+                "38℃ 이상의 열이 나면서 기침이나 인후통이 있는 사람",
+                "입원한 사람",
+                "예방접종을 받지 않은 사람"
+              ],
+              "answer": 1,
+              "explain": "확진이 아니라 증상만으로 정한 기준이라 진료실에서 곧바로 셀 수 있다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "2026-2027절기와 지난 절기의 유행기준을 바르게 짝지은 것은?",
+              "choices": [
+                "25.3명 — 6.6명",
+                "12.9명 — 9.1명",
+                "9.1명 — 12.9명",
+                "6.6명 — 25.3명"
+              ],
+              "answer": 1,
+              "explain": "이번 절기 기준은 1,000명당 12.9명, 지난 절기 기준은 9.1명이었다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "vocab",
+              "q": "「분율」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "전체를 정해진 수로 놓았을 때 그 가운데 차지하는 몫",
+                "가장 자주 나타난 값",
+                "표본으로 뽑힌 의원의 수",
+                "검사에 쓰인 검체의 이름"
+              ],
+              "answer": 0,
+              "explain": "외래환자 1,000명당 몇 명인지로 바꾼 값이 분율이다.",
+              "evidencePara": 1
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "환자 수를 그대로 더하지 않고 분율로 바꾸는 까닭으로 가장 알맞은 것은?",
+              "choices": [
+                "병원마다 오는 환자 수가 달라 그대로 더하면 서로 견줄 수 없기 때문",
+                "분율이 환자 수보다 언제나 크기 때문",
+                "검출률을 계산할 필요가 없어지기 때문",
+                "표본 의원 수가 해마다 같기 때문"
+              ],
+              "answer": 0,
+              "explain": "규모가 다른 병원의 수치를 같은 자로 견주려고 1,000명당 값으로 바꾼다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "apply",
+              "q": "표본 의원을 300개에서 800개로 늘리면 무엇이 달라지는가?",
+              "choices": [
+                "유행기준이 저절로 낮아진다",
+                "의사환자의 정의가 바뀐다",
+                "같은 변화를 더 일찍 잡아낼 수 있다",
+                "검출률을 재지 않아도 된다"
+              ],
+              "answer": 2,
+              "explain": "그물눈이 촘촘해질수록 같은 변화를 더 일찍 잡아낼 수 있다.",
+              "evidencePara": 4
+            }
+          ],
+          "en": [
+            "Who decides that an epidemic has begun, and what do they look at? Nobody tests the whole population every week; there is neither the time nor the staff for that. Instead, a few hundred clinics chosen across the country send in their records each week. Reading the whole from a carefully chosen part is called sample surveillance.",
+            "What these clinics count is not confirmed cases but influenza-like illness: a fever of 38°C or higher together with a cough or a sore throat. Because the definition rests on symptoms alone, a doctor can count it on the spot. Clinics differ in size, however, so simply adding the numbers would mean little. The count is therefore turned into a rate: how many such patients there are per 1,000 outpatients.",
+            "The next thing needed is a line to measure against. Korea's disease agency fixes an epidemic threshold before each season begins. For 2026-2027 the line was 12.9 per 1,000; last season it was 9.1. The threshold is recalculated every year because each season has its own normal level. In week 36 of 2026 the rate reached 25.3, close to twice the line, after three weeks of 7.5, 9.2 and 13.3.",
+            "One number alone is not enough. Fever and cough appear in many respiratory illnesses, so a rising rate does not prove that influenza is the cause. Laboratories therefore report a second signal: the share of samples in which the virus is actually detected. That share climbed from 5.4 percent in week 33 to 16.3 percent in week 36. Only when both signals pass their marks is an epidemic advisory issued.",
+            "The same instrument also announces the end. Last season the advisory was lifted once the rate stayed below the threshold for three straight weeks. For this season the agency has raised the number of sample clinics from 300 to 800. The finer the net, the sooner the same change can be caught."
+          ],
+          "enseg": [
+            [
+              "Who decides that an epidemic has begun, and what do they look at? ",
+              "Nobody tests the whole population every week; ",
+              "there is neither the time nor the staff for that. ",
+              "Instead, a few hundred clinics chosen across the country send in their records each week. ",
+              "Reading the whole from a carefully chosen part is called sample surveillance."
+            ],
+            [
+              "What these clinics count is not confirmed cases but influenza-like illness: ",
+              "a fever of 38°C or higher together with a cough or a sore throat. ",
+              "Because the definition rests on symptoms alone, a doctor can count it on the spot. ",
+              "Clinics differ in size, however, so simply adding the numbers would mean little. ",
+              "The count is therefore turned into a rate: ",
+              "how many such patients there are per 1,000 outpatients."
+            ],
+            [
+              "The next thing needed is a line to measure against. ",
+              "Korea's disease agency fixes an epidemic threshold before each season begins. ",
+              "For 2026-2027 the line was 12.9 per 1,000; ",
+              "last season it was 9.1. ",
+              "The threshold is recalculated every year because each season has its own normal level. ",
+              "In week 36 of 2026 the rate reached 25.3, close to twice the line, ",
+              "after three weeks of 7.5, 9.2 and 13.3."
+            ],
+            [
+              "One number alone is not enough. ",
+              "Fever and cough appear in many respiratory illnesses, ",
+              "so a rising rate does not prove that influenza is the cause. ",
+              "Laboratories therefore report a second signal: ",
+              "the share of samples in which the virus is actually detected. ",
+              "That share climbed from 5.4 percent in week 33 to 16.3 percent in week 36. ",
+              "Only when both signals pass their marks is an epidemic advisory issued."
+            ],
+            [
+              "The same instrument also announces the end. ",
+              "Last season the advisory was lifted once the rate stayed below the threshold for three straight weeks. ",
+              "For this season the agency has raised the number of sample clinics from 300 to 800. ",
+              "The finer the net, the sooner the same change can be caught."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "surveillance",
+              "ko": "감시 (명사)",
+              "base": "surveillance [sərˈveɪləns]"
+            },
+            {
+              "word": "outpatients",
+              "ko": "외래환자들 (명사 outpatient의 복수형)",
+              "base": "outpatient [ˈaʊtpeɪʃnt]"
+            },
+            {
+              "word": "threshold",
+              "ko": "기준선, 문턱값 (명사)",
+              "base": "threshold [ˈθreʃhoʊld]"
+            },
+            {
+              "word": "respiratory",
+              "ko": "호흡기의 (형용사)",
+              "base": "respiratory [ˈrespərətɔːri]"
+            },
+            {
+              "word": "detected",
+              "ko": "검출되었다 (동사 detect의 과거분사)",
+              "base": "detect [dɪˈtekt]"
+            },
+            {
+              "word": "advisory",
+              "ko": "주의보 (명사)",
+              "base": "advisory [ədˈvaɪzəri]"
+            }
+          ]
+        },
+        "L4": {
+          "title": "유행이 시작되었다고 말하려면",
+          "minutes": 6,
+          "paragraphs": [
+            [
+              "「유행이 시작되었다」는 문장은 ",
+              "관측 없이는 성립하지 않는다. ",
+              "어딘가에서 누군가 아프다는 사실만으로는 ",
+              "유행이라 부를 수 없고, ",
+              "그 아픔이 평소보다 얼마나 많은지를 ",
+              "잴 수 있어야 한다. ",
+              "질병관리청이 9월 11일 0시부터 ",
+              "2026-2027절기 인플루엔자 유행주의보를 발령했을 때, ",
+              "그 판단을 떠받친 것은 ",
+              "병의 무서움이 아니라 두 개의 숫자였다."
+            ],
+            [
+              "첫 번째 장치는 표본이다. ",
+              "전 국민을 매주 검사하는 일은 불가능하므로, ",
+              "전국에서 미리 지정한 의원들이 ",
+              "매주 같은 방식으로 환자를 세어 보고한다. ",
+              "세는 대상은 ",
+              "확진자가 아니라 인플루엔자 의사환자, ",
+              "곧 38℃ 이상의 발열과 함께 ",
+              "기침 또는 인후통을 보이는 사람이다. ",
+              "검사 결과를 기다리지 않고 ",
+              "증상만으로 판정하므로 ",
+              "집계가 빠르게 따라온다. ",
+              "병원마다 규모가 다르니 ",
+              "환자 수를 그대로 합치지 않고, ",
+              "외래환자 1,000명당 몇 명인가라는 분율로 환산해 ",
+              "견줄 수 있는 값으로 만든다."
+            ],
+            [
+              "두 번째 장치는 ",
+              "미리 그어 둔 선이다. ",
+              "어떤 수치가 높은지 낮은지는 ",
+              "그 자체로 알 수 없고, ",
+              "견줄 기준이 있어야 판정이 된다. ",
+              "그래서 절기마다 유행기준을 먼저 정해 둔다. ",
+              "이번 절기 기준은 1,000명당 12.9명, ",
+              "지난 절기 기준은 9.1명이었다. ",
+              "기준을 절기마다 다시 정하는 것은 ",
+              "절기별 평소 수준이 다르기 때문이며, ",
+              "결과를 본 뒤에 ",
+              "선을 옮기지 않겠다는 약속이기도 하다. ",
+              "36주차 분율은 25.3명으로 ",
+              "기준의 약 두 배였고, ",
+              "앞선 3주는 7.5명, 9.2명, 13.3명이었다. ",
+              "전년 같은 기간은 6.6명이었다."
+            ],
+            [
+              "세 번째 장치는 ",
+              "서로 다른 두 신호의 교차 확인이다. ",
+              "발열과 기침은 인플루엔자만의 증상이 아니어서, ",
+              "의사환자 분율이 오르는 것만으로는 ",
+              "원인을 특정할 수 없다. ",
+              "그래서 검체에서 ",
+              "바이러스가 실제로 검출된 비율을 함께 본다. ",
+              "발령 요건은 의사환자 분율이 유행기준을 넘고 ",
+              "검출률이 5% 이상일 때이며, ",
+              "여기에 전문가 자문이 더해진다. ",
+              "검출률은 33주 5.4%에서 36주 16.3%로 올랐다. ",
+              "검출된 바이러스는 주로 A형(H1N1)pdm09였고, ",
+              "이번 절기 백신주와 유사하며 ",
+              "치료제 내성에 영향을 주는 변이는 ",
+              "확인되지 않았다."
+            ],
+            [
+              "관측 장치는 시작만 알리지 않는다. ",
+              "지난 절기에는 ",
+              "분율이 3주 연속 유행기준 아래로 내려가자 ",
+              "주의보가 해제되었다. ",
+              "같은 자로 시작과 끝을 재는 셈이다. ",
+              "장치 자체도 손본다. ",
+              "질병관리청은 이번 절기부터 ",
+              "표본 의원을 300개에서 800개로 늘려 ",
+              "시·도 단위 정보까지 내놓기로 했다. ",
+              "그물눈이 촘촘할수록 ",
+              "같은 변화를 더 일찍, ",
+              "더 작은 지역 단위로 잡아낸다. ",
+              "유행을 안다는 것은 결국 ",
+              "무엇을 어떤 단위로 ",
+              "어떤 선과 견주어 셀 것인지를 ",
+              "미리 정해 두는 일이다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "의사환자",
+              "easy": "확진 전에 정해진 증상 기준만으로 환자로 세는 대상",
+              "hanja": "疑(의심할 의)+似(닮을 사)+患(근심 환)+者(놈 자)"
+            },
+            {
+              "word": "환산",
+              "easy": "어떤 단위의 수를 다른 단위의 수로 바꾸어 셈함",
+              "hanja": "換(바꿀 환)+算(셈 산)"
+            },
+            {
+              "word": "요건",
+              "easy": "어떤 일이 이루어지려면 반드시 갖추어야 할 조건",
+              "hanja": "要(요긴할 요)+件(물건 건)"
+            },
+            {
+              "word": "교차",
+              "easy": "서로 다른 둘이 엇갈려 만남",
+              "hanja": "交(사귈 교)+叉(갈래 차)"
+            },
+            {
+              "word": "내성",
+              "easy": "약이 잘 듣지 않게 견디는 성질",
+              "hanja": "耐(견딜 내)+性(성품 성)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 알맞은 것은?",
+              "choices": [
+                "인플루엔자는 다른 호흡기 질환보다 위험하다",
+                "유행의 시작은 표본·기준선·두 신호라는 관측 장치로 판정된다",
+                "유행주의보는 전문가 자문만으로 발령된다",
+                "표본 의원은 확진 검사 결과만 보고한다"
+              ],
+              "answer": 1,
+              "explain": "글은 병의 무서움이 아니라 유행을 판정하는 세 가지 관측 장치를 다룬다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "유행주의보 발령 요건으로 알맞은 것은?",
+              "choices": [
+                "의사환자 분율이 유행기준을 넘고 검출률이 5% 이상일 때",
+                "의사환자 분율이 유행기준을 넘기만 하면",
+                "검출률이 5% 이상이기만 하면",
+                "표본 의원이 800개를 넘을 때"
+              ],
+              "answer": 0,
+              "explain": "두 신호가 함께 조건을 만족하고 전문가 자문이 더해질 때 발령된다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "detail",
+              "q": "36주차 의사환자 분율과 이번 절기 유행기준을 바르게 짝지은 것은?",
+              "choices": [
+                "12.9명 — 25.3명",
+                "9.1명 — 6.6명",
+                "25.3명 — 12.9명",
+                "6.6명 — 9.1명"
+              ],
+              "answer": 2,
+              "explain": "36주차 분율 25.3명은 이번 절기 기준 12.9명의 약 두 배였다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "vocab",
+              "q": "「환산」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "어떤 단위의 수를 다른 단위의 수로 바꾸어 셈함",
+                "여러 수를 모두 더함",
+                "가장 큰 값만 골라냄",
+                "수를 반올림해 어림함"
+              ],
+              "answer": 0,
+              "explain": "환자 수를 외래환자 1,000명당 값으로 바꾸는 것이 환산이다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "critical",
+              "q": "「기준을 절기마다 다시 정하는 것은 결과를 본 뒤에 선을 옮기지 않겠다는 약속이기도 하다」의 뜻으로 가장 알맞은 것은?",
+              "choices": [
+                "기준은 한 번 정하면 영원히 바꾸지 않는다는 뜻",
+                "결과를 보고 기준을 고치면 판정을 원하는 대로 만들 수 있으므로 재기 전에 선을 확정해 둔다는 뜻",
+                "절기마다 기준을 낮추어 발령을 쉽게 한다는 뜻",
+                "기준은 전문가가 아니라 숫자가 정한다는 뜻"
+              ],
+              "answer": 1,
+              "explain": "선을 나중에 옮기면 같은 자료로도 다른 판정이 나오므로, 재기 전에 정해 두는 것이 판정의 조건이 된다.",
+              "evidencePara": 2
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "의사환자 분율 하나만으로 유행을 판정할 수 없는 까닭으로 가장 알맞은 것은?",
+              "choices": [
+                "발열과 기침은 다른 호흡기 질환에서도 나타나 원인을 특정하지 못하기 때문",
+                "분율은 표본 의원에서만 세기 때문",
+                "분율은 절기마다 정의가 달라지기 때문",
+                "분율에는 입원환자가 들어가지 않기 때문"
+              ],
+              "answer": 0,
+              "explain": "증상 기준은 빠르지만 원인을 가리지 못해서, 검출률이라는 두 번째 신호가 필요하다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "apply",
+              "q": "어떤 지역에서 새로운 감염병을 감시하려 한다. 이 글의 방식을 따를 때 가장 먼저 해야 할 일은?",
+              "choices": [
+                "치료제를 먼저 확보한다",
+                "환자가 가장 많은 병원 한 곳만 고른다",
+                "무엇을 셀지, 어떤 단위로 바꿀지, 어떤 선과 견줄지를 미리 정한다",
+                "유행이 끝난 뒤에 기준을 정한다"
+              ],
+              "answer": 2,
+              "explain": "글의 마지막 문장이 관측의 세 가지 사전 결정을 그대로 정리하고 있다.",
+              "evidencePara": 4
+            }
+          ],
+          "en": [
+            "The sentence \"an epidemic has begun\" does not stand without measurement. That someone, somewhere, is ill is not yet an epidemic; one must be able to say how much more illness there is than usual. When Korea's disease agency issued an influenza epidemic advisory at midnight on 11 September, what carried the decision was not the frightfulness of the disease but two numbers.",
+            "The first instrument is the sample. Testing the entire population every week is impossible, so clinics designated in advance across the country count and report patients the same way each week. What they count is not confirmed cases but influenza-like illness: a fever of 38°C or higher accompanied by a cough or a sore throat. Because the judgment rests on symptoms and does not wait for laboratory results, the tally follows quickly. Since clinics differ in size, the patient counts are not simply summed; they are converted into a rate, patients per 1,000 outpatients, so that the figures can be compared.",
+            "The second instrument is a line drawn in advance. No figure is high or low in itself; a verdict requires something to measure against. An epidemic threshold is therefore set before each season. This season the line was 12.9 per 1,000, last season 9.1. Recalculating it season by season reflects the different baseline of each year, and it is also a promise not to move the line after seeing the result. In week 36 the rate stood at 25.3, roughly twice the threshold, after three weeks of 7.5, 9.2 and 13.3; a year earlier the same week read 6.6.",
+            "The third instrument is the cross-checking of two different signals. Fever and cough belong to no single disease, so a rising illness rate cannot by itself identify the cause. Laboratories therefore report the share of samples in which the virus is actually detected. An advisory is issued when the illness rate exceeds the threshold and the detection rate reaches at least 5 percent, with expert consultation added on top. That detection rate rose from 5.4 percent in week 33 to 16.3 percent in week 36. The virus found was mainly influenza A(H1N1)pdm09, reported as similar to this season's vaccine strain, with no mutation affecting resistance to antiviral drugs.",
+            "An observing system does not only announce beginnings. Last season the advisory was lifted after the rate stayed below the threshold for three consecutive weeks; the same ruler measures both ends. The instrument itself is also revised. From this season the agency has expanded its sample clinics from 300 to 800 and will publish figures down to the provincial level. The finer the mesh, the earlier and the more locally the same change is caught. To know an epidemic, in the end, is to have decided in advance what to count, in what unit, and against which line."
+          ],
+          "enseg": [
+            [
+              "The sentence \"an epidemic has begun\" does not stand without measurement. ",
+              "That someone, somewhere, is ill is not yet an epidemic; ",
+              "one must be able to say how much more illness there is than usual. ",
+              "When Korea's disease agency issued an influenza epidemic advisory at midnight on 11 September, ",
+              "what carried the decision was not the frightfulness of the disease but two numbers."
+            ],
+            [
+              "The first instrument is the sample. ",
+              "Testing the entire population every week is impossible, ",
+              "so clinics designated in advance across the country count and report patients the same way each week. ",
+              "What they count is not confirmed cases but influenza-like illness: ",
+              "a fever of 38°C or higher accompanied by a cough or a sore throat. ",
+              "Because the judgment rests on symptoms and does not wait for laboratory results, the tally follows quickly. ",
+              "Since clinics differ in size, the patient counts are not simply summed; ",
+              "they are converted into a rate, patients per 1,000 outpatients, so that the figures can be compared."
+            ],
+            [
+              "The second instrument is a line drawn in advance. ",
+              "No figure is high or low in itself; ",
+              "a verdict requires something to measure against. ",
+              "An epidemic threshold is therefore set before each season. ",
+              "This season the line was 12.9 per 1,000, last season 9.1. ",
+              "Recalculating it season by season reflects the different baseline of each year, ",
+              "and it is also a promise not to move the line after seeing the result. ",
+              "In week 36 the rate stood at 25.3, roughly twice the threshold, after three weeks of 7.5, 9.2 and 13.3; ",
+              "a year earlier the same week read 6.6."
+            ],
+            [
+              "The third instrument is the cross-checking of two different signals. ",
+              "Fever and cough belong to no single disease, ",
+              "so a rising illness rate cannot by itself identify the cause. ",
+              "Laboratories therefore report the share of samples in which the virus is actually detected. ",
+              "An advisory is issued when the illness rate exceeds the threshold and the detection rate reaches at least 5 percent, ",
+              "with expert consultation added on top. ",
+              "That detection rate rose from 5.4 percent in week 33 to 16.3 percent in week 36. ",
+              "The virus found was mainly influenza A(H1N1)pdm09, reported as similar to this season's vaccine strain, ",
+              "with no mutation affecting resistance to antiviral drugs."
+            ],
+            [
+              "An observing system does not only announce beginnings. ",
+              "Last season the advisory was lifted after the rate stayed below the threshold for three consecutive weeks; ",
+              "the same ruler measures both ends. ",
+              "The instrument itself is also revised. ",
+              "From this season the agency has expanded its sample clinics from 300 to 800 ",
+              "and will publish figures down to the provincial level. ",
+              "The finer the mesh, the earlier and the more locally the same change is caught. ",
+              "To know an epidemic, in the end, is to have decided in advance what to count, in what unit, and against which line."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "measurement",
+              "ko": "측정, 계측 (명사)",
+              "base": "measure [ˈmeʒər]"
+            },
+            {
+              "word": "designated",
+              "ko": "지정되었다 (동사 designate의 과거분사)",
+              "base": "designate [ˈdezɪɡneɪt]"
+            },
+            {
+              "word": "converted",
+              "ko": "환산되었다 (동사 convert의 과거분사)",
+              "base": "convert [kənˈvɜːrt]"
+            },
+            {
+              "word": "threshold",
+              "ko": "기준선, 문턱값 (명사)",
+              "base": "threshold [ˈθreʃhoʊld]"
+            },
+            {
+              "word": "verdict",
+              "ko": "판정 (명사)",
+              "base": "verdict [ˈvɜːrdɪkt]"
+            },
+            {
+              "word": "consecutive",
+              "ko": "연속적인 (형용사)",
+              "base": "consecutive [kənˈsekjətɪv]"
+            }
+          ]
+        }
+      },
+      "issue": true
+    },
+    {
+      "id": "skill-bank",
+      "category": "society",
+      "careers": [
+        "biz",
+        "law",
+        "it"
+      ],
+      "publishedAt": "2026-09-14",
+      "status": "published",
+      "issue": false,
+      "sources": [
+        {
+          "title": "고용노동부 보도자료 — 흩어진 경력은 한눈에, 기업 인사는 직무 중심으로! (2026-09-11)",
+          "url": "https://www.moel.go.kr/news/enews/report/enewsView.do?news_seq=19929"
+        },
+        {
+          "title": "고용노동부 보도자료 — 고용24 통합경력증명서, 한 달 만에 1만 4천 건 발급 (2026-09-10)",
+          "url": "https://www.moel.go.kr/news/enews/report/enewsView.do?news_seq=19925"
+        }
+      ],
+      "levels": {
+        "L1": {
+          "title": "내가 해 본 일",
+          "minutes": 3,
+          "paragraphs": [
+            [
+              "상을 받으면 상장을 받아요. ",
+              "무언가를 다 배우면 수료증을 받아요. ",
+              "내가 해 본 일을 ",
+              "적어 둔 것이에요. ",
+              "이런 것을 경력이라고 해요."
+            ],
+            [
+              "그런데 이 종이들은 ",
+              "여기저기 흩어져 있어요. ",
+              "학교에도 있고 학원에도 있어요. ",
+              "집 서랍에 들어 있기도 해요. ",
+              "필요할 때마다 하나씩 ",
+              "다 찾아와야 해요."
+            ],
+            [
+              "그래서 나라가 ",
+              "한곳에 모아 주기로 했어요. ",
+              "내가 배운 것과 ",
+              "해 본 일을 ",
+              "한 장에 적어 줘요. ",
+              "여러 장 대신 ",
+              "한 장만 내면 돼요. ",
+              "대신 모으려면 ",
+              "어디서나 같은 말로 ",
+              "적어 두어야 해요."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "상장",
+              "easy": "잘했다고 칭찬하며 주는 종이예요.",
+              "hanja": null
+            },
+            {
+              "word": "수료증",
+              "easy": "무언가를 끝까지 배웠다고 알려 주는 종이예요.",
+              "hanja": null
+            },
+            {
+              "word": "경력",
+              "easy": "내가 해 본 일을 적어 둔 것이에요.",
+              "hanja": null
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글은 무엇에 대한 이야기인가요?",
+              "choices": [
+                "상장을 예쁘게 꾸미는 방법",
+                "내가 해 본 일을 적은 종이를 한곳에 모으기로 한 이야기",
+                "학교에서 공부를 잘하는 방법",
+                "서랍을 정리하는 방법"
+              ],
+              "answer": 1,
+              "explain": "여기저기 흩어져 있던 종이를 한곳에 모아 준다는 이야기예요.",
+              "evidencePara": 2
+            },
+            {
+              "type": "detail",
+              "q": "종이가 흩어져 있다고 한 곳이 아닌 것은 어디인가요?",
+              "choices": [
+                "학교",
+                "학원",
+                "집 서랍",
+                "놀이터"
+              ],
+              "answer": 3,
+              "explain": "학교, 학원, 집 서랍이 나와요. 놀이터는 나오지 않아요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「경력」은 무엇인가요?",
+              "choices": [
+                "내가 해 본 일을 적어 둔 것",
+                "새로 산 공책",
+                "친구의 이름",
+                "학교에 가는 길"
+              ],
+              "answer": 0,
+              "explain": "내가 해 본 일을 적어 둔 것을 경력이라고 해요.",
+              "evidencePara": 0
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "한 장에 모아 적어 주면 무엇이 좋을까요?",
+              "choices": [
+                "종이를 여러 장 찾아다니지 않아도 돼요",
+                "종이가 더 예뻐져요",
+                "상을 더 많이 받아요",
+                "서랍이 커져요"
+              ],
+              "answer": 0,
+              "explain": "여러 장 대신 한 장만 내면 되니까 찾아다니지 않아도 돼요.",
+              "evidencePara": 2
+            },
+            {
+              "type": "apply",
+              "q": "이 글대로라면 지금부터 해 두면 좋은 일은 무엇일까요?",
+              "choices": [
+                "상장을 버려요",
+                "내가 해 본 일을 그때그때 적어 둬요",
+                "종이를 숨겨요",
+                "친구에게 다 줘요"
+              ],
+              "answer": 1,
+              "explain": "적어 둔 것이 있어야 나중에 한곳에 모을 수 있어요.",
+              "evidencePara": 0
+            }
+          ]
+        },
+        "L2": {
+          "title": "여기저기 흩어진 종이",
+          "minutes": 4,
+          "paragraphs": [
+            [
+              "사람은 살면서 여러 곳에서 배우고 일한다. ",
+              "학교에서 공부하고, ",
+              "훈련기관에서 기술을 익히고, ",
+              "시험을 쳐서 자격증을 딴다. ",
+              "회사에 들어가 일도 한다. ",
+              "그런데 이 기록은 ",
+              "한곳에 모여 있지 않다. ",
+              "학교는 학교 몫만 알고, ",
+              "회사는 회사 몫만 안다."
+            ],
+            [
+              "그래서 예전에는 ",
+              "자기가 한 일을 증명하려면 ",
+              "발품을 팔아야 했다. ",
+              "이곳저곳에 서류를 떼러 다니고, ",
+              "빠뜨린 것이 없는지 다시 확인했다. ",
+              "서류를 받는 회사도 ",
+              "한 장 한 장 진짜인지 살펴야 했다."
+            ],
+            [
+              "고용노동부는 이 기록을 ",
+              "한곳에 모으는 서비스를 열었다. ",
+              "고용24 통합경력증명 서비스다. ",
+              "2026년 7월 29일부터 ",
+              "8월 28일까지 한 달 동안 ",
+              "통합경력증명서 14,514건이 발급되었다. ",
+              "이용자 462명에게 물었더니 89.6%가 ",
+              "흩어진 이력을 ",
+              "한 번에 볼 수 있어 좋다고 답했다."
+            ],
+            [
+              "회사도 편해졌다. ",
+              "강원랜드는 2026년 신입직 채용에서 ",
+              "직무능력인정서를 받았다. ",
+              "1차 채용에서 20명이 낸 인정서가 ",
+              "개별 증빙 62건을 대신했다. ",
+              "지원자는 서류를 다시 낼 필요가 없었고, ",
+              "채용 담당자는 확인할 서류가 줄었다."
+            ],
+            [
+              "다만 모으려면 조건이 하나 있다. ",
+              "기관마다 같은 말로 적어 두어야 한다. ",
+              "그래서 나라는 ",
+              "직무에 필요한 지식과 기술을 ",
+              "부문별로 정리해 두었다. ",
+              "이것을 국가직무능력표준, ",
+              "줄여서 NCS라고 한다. ",
+              "표준이 먼저 있어야 통합이 가능하다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "자격증",
+              "easy": "일정한 능력을 갖췄다고 인정해 주는 증서",
+              "hanja": "資(재물 자)+格(격식 격)+證(증거 증)"
+            },
+            {
+              "word": "증명",
+              "easy": "어떤 사실이 맞다는 것을 근거를 들어 밝히는 일",
+              "hanja": "證(증거 증)+明(밝을 명)"
+            },
+            {
+              "word": "발급",
+              "easy": "증명서 같은 것을 만들어 내주는 일",
+              "hanja": "發(필 발)+給(줄 급)"
+            },
+            {
+              "word": "표준",
+              "easy": "여럿이 함께 따르도록 정해 둔 기준",
+              "hanja": "標(표할 표)+準(준할 준)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용은 무엇인가?",
+              "choices": [
+                "자격증은 많이 딸수록 좋다",
+                "흩어진 기록을 한곳에 모으려면 기관마다 같은 말로 적어야 한다",
+                "회사는 서류를 많이 받아야 한다",
+                "훈련기관이 학교보다 낫다"
+              ],
+              "answer": 1,
+              "explain": "마지막 문단에서 모으려면 같은 말로 적어야 한다는 조건을 든다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "detail",
+              "q": "한 달 동안 발급된 통합경력증명서는 몇 건인가?",
+              "choices": [
+                "462건",
+                "14,514건",
+                "104,109건",
+                "62건"
+              ],
+              "answer": 1,
+              "explain": "2026년 7월 29일부터 8월 28일까지 14,514건이 발급되었다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "vocab",
+              "q": "「발급」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "증명서 같은 것을 만들어 내주는 일",
+                "서류를 버리는 일",
+                "시험을 보는 일",
+                "회사에 들어가는 일"
+              ],
+              "answer": 0,
+              "explain": "증명서를 만들어 내주는 일을 발급이라고 한다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "infer",
+              "q": "20명이 낸 인정서가 증빙 62건을 대신했다는 것은 무슨 뜻인가?",
+              "choices": [
+                "한 사람이 평균 세 건 넘는 서류를 따로 내지 않아도 되었다",
+                "지원자가 62명이었다",
+                "서류가 62배로 늘었다",
+                "20명이 모두 떨어졌다"
+              ],
+              "answer": 0,
+              "explain": "20명이 인정서 한 장씩만 내고 62건의 증빙을 대신했으니, 한 사람이 세 건 넘게 덜 낸 셈이다.",
+              "evidencePara": 3
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "서류를 받는 회사가 「한 장 한 장 진짜인지 살펴야 했다」고 한 까닭은 무엇일까?",
+              "choices": [
+                "서류가 예뻐서",
+                "서류마다 만든 곳이 달라 진짜인지 따로 확인해야 해서",
+                "서류가 너무 적어서",
+                "회사가 서류 모으기를 좋아해서"
+              ],
+              "answer": 1,
+              "explain": "기록이 기관마다 따로 있으니 받는 쪽도 하나씩 확인할 수밖에 없었다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "apply",
+              "q": "우리 반 활동을 나중에 증명하려면 무엇을 먼저 정해야 할까?",
+              "choices": [
+                "활동을 적는 방식을 반 전체가 똑같이 정한다",
+                "각자 마음대로 적는다",
+                "적지 않고 기억해 둔다",
+                "활동 수를 줄인다"
+              ],
+              "answer": 0,
+              "explain": "같은 말로 적어 두어야 나중에 한곳에 모을 수 있다.",
+              "evidencePara": 4
+            }
+          ],
+          "en": [
+            "People learn and work in many places. You study at school. You learn skills at a training centre. You take a test and get a licence. Then you work at a company. But these records are not in one place. The school knows only its part. The company knows only its part.",
+            "Long ago, you had to prove your own work by yourself. You went from office to office for papers. You checked again that nothing was missing. Companies also had to check each paper one by one.",
+            "Now Korea keeps these records in one place. The service is called the combined career record. In one month, 14,514 certificates were issued. The month ran from 29 July to 28 August 2026. The ministry asked 462 users about the service. 89.6% liked seeing all their records at once.",
+            "Companies are happier too. Kangwon Land used the skill certificate for new jobs. In the first round, 20 people sent it. That one paper replaced 62 separate proofs. They did not have to send more papers.",
+            "But there is one condition. Every office must write things the same way. So the country listed the skills each job needs. This list is called the NCS. A standard must come first. Then the records can join together."
+          ],
+          "enseg": [
+            [
+              "People learn and work in many places. ",
+              "You study at school. ",
+              "You learn skills at a training centre. ",
+              "You take a test and get a licence. ",
+              "Then you work at a company. ",
+              "But these records are not in one place. ",
+              "The school knows only its part. ",
+              "The company knows only its part."
+            ],
+            [
+              "Long ago, you had to prove your own work by yourself. ",
+              "You went from office to office for papers. ",
+              "You checked again that nothing was missing. ",
+              "Companies also had to check each paper one by one."
+            ],
+            [
+              "Now Korea keeps these records in one place. ",
+              "The service is called the combined career record. ",
+              "In one month, 14,514 certificates were issued. ",
+              "The month ran from 29 July to 28 August 2026. ",
+              "The ministry asked 462 users about the service. ",
+              "89.6% liked seeing all their records at once."
+            ],
+            [
+              "Companies are happier too. ",
+              "Kangwon Land used the skill certificate for new jobs. ",
+              "In the first round, 20 people sent it. ",
+              "That one paper replaced 62 separate proofs. ",
+              "They did not have to send more papers."
+            ],
+            [
+              "But there is one condition. ",
+              "Every office must write things the same way. ",
+              "So the country listed the skills each job needs. ",
+              "This list is called the NCS. ",
+              "A standard must come first. ",
+              "Then the records can join together."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "records",
+              "ko": "기록들 (명사 record의 복수)",
+              "base": "record [ˈrekərd]"
+            },
+            {
+              "word": "licence",
+              "ko": "자격증, 면허 (명사)",
+              "base": "licence [ˈlaɪsns]"
+            },
+            {
+              "word": "prove",
+              "ko": "증명하다 (동사)",
+              "base": "prove [pruːv]"
+            },
+            {
+              "word": "certificates",
+              "ko": "증명서들 (명사 certificate의 복수)",
+              "base": "certificate [sərˈtɪfɪkət]"
+            },
+            {
+              "word": "issued",
+              "ko": "발급되었다 (동사 issue의 과거분사)",
+              "base": "issue [ˈɪʃuː]"
+            },
+            {
+              "word": "standard",
+              "ko": "표준 (명사)",
+              "base": "standard [ˈstændərd]"
+            }
+          ]
+        },
+        "L3": {
+          "title": "62건이 1건이 되려면",
+          "minutes": 5,
+          "paragraphs": [
+            [
+              "한 사람이 한 일은 한곳에 기록되지 않는다. ",
+              "학교는 자기가 가르친 것만, ",
+              "훈련기관은 자기 과정만, ",
+              "자격 발급처는 자기가 내준 자격만 안다. ",
+              "회사는 그 사람이 ",
+              "자기 회사에서 한 일만 안다. ",
+              "그래서 경력을 증명하려면 ",
+              "본인이 조각을 모아야 했다. ",
+              "어디에 무엇이 남아 있는지 ",
+              "아는 사람도 본인뿐이었다."
+            ],
+            [
+              "직무능력은행은 이 조각들을 모아 두는 제도다. ",
+              "개인의 자격·교육·훈련·경력 정보를 쌓아 통합 관리하고, ",
+              "필요할 때 인정서를 발급받아 ",
+              "취업 등에 쓰도록 돕는다. ",
+              "고용노동부는 2026년 9월, ",
+              "이 제도를 잘 활용한 사례를 ",
+              "뽑아 시상했다. ",
+              "전문가 심사를 거쳐 ",
+              "단체와 개인 부문에서 모두 10점이 선정되었다."
+            ],
+            [
+              "단체 부문 최우수는 강원랜드였다. ",
+              "2026년 신입직 채용부터 ",
+              "자격과 경력을 확인할 때 직무능력인정서를 받았는데, ",
+              "1차 채용에서 20명이 낸 인정서가 ",
+              "개별 증빙 62건을 대신했다. ",
+              "인정서를 낸 지원자는 ",
+              "추가 자료를 다시 내지 않고도 ",
+              "검토가 끝났다. ",
+              "개인 부문 최우수는 ",
+              "절삭공구를 설계해 온 연구원이었다. ",
+              "흩어져 있던 이력을 한눈에 모아 두자, ",
+              "매번 일주일 넘게 걸리던 승진보고서를 ",
+              "하루 만에 마쳤다."
+            ],
+            [
+              "그런데 모으는 일은 저절로 되지 않는다. ",
+              "기관마다 같은 일을 ",
+              "다른 말로 적어 두면 ",
+              "한곳에 쌓아도 견줄 수가 없다. ",
+              "그래서 필요한 것이 공통의 언어다. ",
+              "국가직무능력표준(NCS)은 ",
+              "산업 현장에서 직무를 수행하는 데 ",
+              "요구되는 지식·기술·소양을 ",
+              "국가가 산업 부문별·수준별로 체계화한 것이다."
+            ],
+            [
+              "표준은 채용에만 쓰이지 않는다. ",
+              "한 기업은 직무 분석에 ",
+              "NCS를 쓰기 시작한 뒤 ",
+              "교육훈련과 임금체계까지 범위를 넓혔고, ",
+              "새로 생긴 직무도 ",
+              "외부 컨설팅 없이 스스로 정리했다. ",
+              "그 결과 신입사원이 회사에 남는 비율은 ",
+              "69.3%에서 82.6%로 올랐다. ",
+              "흩어진 기록을 모으려면 ",
+              "먼저 같은 언어로 적어야 한다. ",
+              "순서를 뒤집을 수는 없다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "직무",
+              "easy": "맡아서 하는 일. 기관이나 회사에서 담당하는 업무",
+              "hanja": "職(직분 직)+務(힘쓸 무)"
+            },
+            {
+              "word": "인정서",
+              "easy": "어떤 사실이나 능력을 공식으로 인정한다고 적어 준 문서",
+              "hanja": "認(알 인)+定(정할 정)+書(글 서)"
+            },
+            {
+              "word": "증빙",
+              "easy": "사실을 뒷받침하는 근거 자료",
+              "hanja": "證(증거 증)+憑(기댈 빙)"
+            },
+            {
+              "word": "통합",
+              "easy": "둘 이상을 하나로 합치는 일",
+              "hanja": "統(거느릴 통)+合(합할 합)"
+            },
+            {
+              "word": "체계화",
+              "easy": "낱낱의 것을 짜임새 있게 정리해 하나의 틀로 만드는 일",
+              "hanja": "體(몸 체)+系(맬 계)+化(될 화)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글이 말하는 핵심 순서는 무엇인가?",
+              "choices": [
+                "기록을 먼저 모으면 표준은 저절로 생긴다",
+                "같은 언어로 적는 표준이 먼저 있어야 흩어진 기록을 모을 수 있다",
+                "자격증을 많이 딸수록 인정서가 좋아진다",
+                "기관마다 자기 방식대로 적는 편이 낫다"
+              ],
+              "answer": 1,
+              "explain": "통합이 먼저가 아니라 표준이 먼저다. 같은 언어로 적혀야 모을 수 있다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "detail",
+              "q": "강원랜드 1차 채용에서 20명이 낸 인정서가 대신한 개별 증빙은 몇 건인가?",
+              "choices": [
+                "10건",
+                "20건",
+                "62건",
+                "82건"
+              ],
+              "answer": 2,
+              "explain": "20명이 낸 인정서가 개별 증빙 62건을 대신했다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "vocab",
+              "q": "「체계화」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "낱낱의 것을 짜임새 있게 정리해 하나의 틀로 만드는 일",
+                "여러 개를 그대로 쌓아 두는 일",
+                "필요 없는 것을 골라 버리는 일",
+                "숫자를 크게 늘리는 일"
+              ],
+              "answer": 0,
+              "explain": "흩어진 것을 짜임새 있는 하나의 틀로 만드는 일이 체계화다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "infer",
+              "q": "기관마다 같은 일을 다른 말로 적으면 왜 문제가 되는가?",
+              "choices": [
+                "기록의 양이 줄어들어서",
+                "한곳에 쌓아도 서로 견줄 수 없어서",
+                "기록을 쓰는 데 돈이 더 들어서",
+                "기관이 사라져서"
+              ],
+              "answer": 1,
+              "explain": "말이 다르면 한자리에 모아도 무엇이 같고 다른지 견줄 수 없다.",
+              "evidencePara": 3
+            }
+          ],
+          "challenge": [
+            {
+              "type": "critical",
+              "q": "이 글을 바탕으로 할 때 가장 알맞은 판단은?",
+              "choices": [
+                "표준이 있으면 기록은 저절로 모인다",
+                "표준은 서로 다른 기록을 견줄 수 있게 만드는 공통의 언어 노릇을 한다",
+                "표준은 채용에서만 쓸모가 있다",
+                "표준은 기관마다 다르게 정하는 편이 낫다"
+              ],
+              "answer": 1,
+              "explain": "표준 자체가 모아 주는 것은 아니고, 모을 수 있게 하는 공통의 언어다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "apply",
+              "q": "동아리 활동을 나중에 증명하려 한다. 이 글의 방식대로라면 먼저 할 일은?",
+              "choices": [
+                "활동이 끝난 뒤 기억을 되살려 적는다",
+                "동아리마다 같은 항목과 같은 말로 활동을 기록해 둔다",
+                "활동 사진을 많이 찍어 둔다",
+                "선생님께 말로 알려 둔다"
+              ],
+              "answer": 1,
+              "explain": "같은 항목과 같은 말로 적어 두어야 나중에 한자리에 놓고 견줄 수 있다.",
+              "evidencePara": 3
+            }
+          ],
+          "en": [
+            "What one person has done is never recorded in a single place. A school knows only what it taught. A training centre knows only its own course. The body that issues a licence knows only that licence. A company knows only the work done inside it. So anyone who wanted to prove a career had to gather the pieces alone. Only that person knew where each piece was kept.",
+            "The skill bank is a system for keeping those pieces together. It stores and manages a person's licences, education, training and career records. From it, the person can receive a certificate to use when applying for a job. In September 2026 the Ministry of Employment and Labor gave awards for good use of the system. Judges chose ten cases in all, in the group and the individual classes.",
+            "The top group award went to Kangwon Land. From its 2026 hiring of new staff, the company accepted the skill certificate when checking licences and careers. In the first round, certificates from twenty applicants replaced sixty-two separate documents. Applicants who sent one did not have to submit anything again. The top individual award went to a researcher who designs cutting tools. Once the scattered records were gathered into one view, a promotion report that used to take over a week was finished in a day.",
+            "But gathering does not happen by itself. If each institution writes the same job in different words, piling the records up leaves nothing you can compare. What is needed is a shared language. The National Competency Standards, or NCS, organises the knowledge, skills and attitudes a job requires, sorted by industry sector and by level.",
+            "The standard is not used in hiring only. One company began using NCS for job analysis, then widened it to training and to its pay system. New jobs were mapped by the company itself, without outside consultants. The share of new employees who stayed rose from 69.3% to 82.6%. To gather scattered records, you must first write them in the same language. That order cannot be reversed."
+          ],
+          "enseg": [
+            [
+              "What one person has done is never recorded in a single place. ",
+              "A school knows only what it taught. ",
+              "A training centre knows only its own course. ",
+              "The body that issues a licence knows only that licence. ",
+              "A company knows only the work done inside it. ",
+              "So anyone who wanted to prove a career had to gather the pieces alone. ",
+              "Only that person knew where each piece was kept."
+            ],
+            [
+              "The skill bank is a system for keeping those pieces together. ",
+              "It stores and manages a person's licences, education, training and career records. ",
+              "From it, the person can receive a certificate to use when applying for a job. ",
+              "In September 2026 the Ministry of Employment and Labor gave awards for good use of the system. ",
+              "Judges chose ten cases in all, in the group and the individual classes."
+            ],
+            [
+              "The top group award went to Kangwon Land. ",
+              "From its 2026 hiring of new staff, the company accepted the skill certificate when checking licences and careers. ",
+              "In the first round, certificates from twenty applicants replaced sixty-two separate documents. ",
+              "Applicants who sent one did not have to submit anything again. ",
+              "The top individual award went to a researcher who designs cutting tools. ",
+              "Once the scattered records were gathered into one view, a promotion report that used to take over a week was finished in a day."
+            ],
+            [
+              "But gathering does not happen by itself. ",
+              "If each institution writes the same job in different words, piling the records up leaves nothing you can compare. ",
+              "What is needed is a shared language. ",
+              "The National Competency Standards, or NCS, organises the knowledge, skills and attitudes a job requires, sorted by industry sector and by level."
+            ],
+            [
+              "The standard is not used in hiring only. ",
+              "One company began using NCS for job analysis, then widened it to training and to its pay system. ",
+              "New jobs were mapped by the company itself, without outside consultants. ",
+              "The share of new employees who stayed rose from 69.3% to 82.6%. ",
+              "To gather scattered records, you must first write them in the same language. ",
+              "That order cannot be reversed."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "recorded",
+              "ko": "기록된 (동사 record의 과거분사)",
+              "base": "record [rɪˈkɔːrd]"
+            },
+            {
+              "word": "institution",
+              "ko": "기관 (명사)",
+              "base": "institution [ˌɪnstɪˈtuːʃn]"
+            },
+            {
+              "word": "certificate",
+              "ko": "증명서, 인정서 (명사)",
+              "base": "certificate [sərˈtɪfɪkət]"
+            },
+            {
+              "word": "Competency",
+              "ko": "직무 능력 (명사)",
+              "base": "competency [ˈkɑːmpɪtənsi]"
+            },
+            {
+              "word": "shared",
+              "ko": "공통의, 함께 쓰는 (형용사)",
+              "base": "share [ʃer]"
+            },
+            {
+              "word": "analysis",
+              "ko": "분석 (명사)",
+              "base": "analysis [əˈnæləsɪs]"
+            }
+          ]
+        },
+        "L4": {
+          "title": "표준이 먼저다",
+          "minutes": 6,
+          "paragraphs": [
+            [
+              "누군가에게 당신이 무엇을 할 수 있는지 ",
+              "보여 달라고 하면, ",
+              "대개 종이 몇 장이 돌아온다. ",
+              "졸업증명서, 수료증, 자격증, 경력증명서다. ",
+              "문제는 이 종이들이 ",
+              "처음부터 흩어진 채로 태어난다는 데 있다. ",
+              "학교는 자기가 가르친 것만, ",
+              "훈련기관은 자기 과정만, ",
+              "자격 발급처는 자기가 내준 자격만 기록한다. ",
+              "회사는 그 사람이 ",
+              "자기 회사에서 한 일만 안다. ",
+              "한 사람의 이력 전체를 ",
+              "아는 기관은 어디에도 없고, ",
+              "조각을 모으는 일은 늘 본인의 몫이었다."
+            ],
+            [
+              "그 몫을 제도가 ",
+              "대신 지겠다는 것이 직무능력은행이다. ",
+              "개인의 자격·교육·훈련·경력 정보를 쌓아 통합 관리하고, ",
+              "필요할 때 인정서를 발급받아 ",
+              "취업 등에 활용하도록 돕는다. ",
+              "비슷한 발상이 고용24의 통합경력증명 서비스에도 있다. ",
+              "서비스가 열린 뒤 한 달 동안 ",
+              "통합경력증명서 14,514건이 발급되었고, ",
+              "이용자 462명 가운데 89.6%가 ",
+              "여러 기관에 흩어진 이력을 ",
+              "한 번에 확인할 수 있다는 점을 ",
+              "장점으로 꼽았다."
+            ],
+            [
+              "효과는 숫자로 드러난다. ",
+              "강원랜드는 2026년 신입직 채용부터 ",
+              "직무능력인정서를 받기 시작했는데, ",
+              "1차 채용에서 20명이 낸 인정서가 ",
+              "개별 증빙 62건을 대신했다. ",
+              "지원자는 추가 자료를 다시 낼 필요가 없었고, ",
+              "담당자는 검증할 서류가 줄었다. ",
+              "14년 넘게 절삭공구를 설계해 온 한 연구원은 ",
+              "흩어져 있던 이력을 한눈에 관리하면서 ",
+              "부족한 역량을 진단해 ",
+              "교육과 자격으로 메웠고, ",
+              "매번 일주일 넘게 걸리던 승진보고서를 ",
+              "하루 만에 마쳤다."
+            ],
+            [
+              "그런데 모으는 일이 먼저가 아니다. ",
+              "서로 다른 기관의 기록이 ",
+              "같은 언어로 적혀 있어야 ",
+              "비로소 한자리에 놓을 수 있다. ",
+              "그 공통의 언어가 국가직무능력표준(NCS)이다. ",
+              "산업 현장에서 직무를 수행하는 데 ",
+              "요구되는 지식·기술·소양을 ",
+              "국가가 산업 부문별·수준별로 체계화한 것이다. ",
+              "한 기업은 직무 분석에 ",
+              "NCS를 쓰기 시작한 뒤 ",
+              "교육훈련과 임금체계까지 범위를 넓혔고, ",
+              "사업이 커지며 새로 생긴 직무도 ",
+              "외부 컨설팅 없이 스스로 정리했다. ",
+              "신입사원이 남는 비율은 69.3%에서 82.6%로 올랐고, ",
+              "업무 오류와 안전사고는 31건에서 23건으로 줄었다."
+            ],
+            [
+              "다만 표준에는 그늘도 있다. ",
+              "표준은 적을 수 있는 것을 적는 도구여서, ",
+              "표준의 칸에 들어가지 않는 능력은 기록에서 빠진다. ",
+              "동아리를 끝까지 끌고 간 힘, ",
+              "말이 통하지 않는 사람과 ",
+              "일을 맞춰 본 경험, ",
+              "실패한 시도에서 배운 것은 ",
+              "어느 부문 몇 수준이라고 적기 어렵다. ",
+              "기록되지 않은 경험은 없는 것이 되는가, ",
+              "아니면 기록의 바깥에도 ",
+              "증명의 방법이 남아 있는가. ",
+              "답은 아직 열려 있다. ",
+              "분명한 것은 ",
+              "내가 한 일을 나중에 어떻게 보일지가 ",
+              "그 일을 하는 동안에 ",
+              "이미 정해지기 시작한다는 점이다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "이력",
+              "easy": "지금까지 배우고 일해 온 내력",
+              "hanja": "履(밟을 이)+歷(지날 력)"
+            },
+            {
+              "word": "증빙",
+              "easy": "사실을 뒷받침하는 근거 자료",
+              "hanja": "證(증거 증)+憑(기댈 빙)"
+            },
+            {
+              "word": "역량",
+              "easy": "어떤 일을 해낼 수 있는 힘",
+              "hanja": "力(힘 력)+量(헤아릴 량)"
+            },
+            {
+              "word": "검증",
+              "easy": "사실인지 아닌지 검사해 확인하는 일",
+              "hanja": "檢(검사할 검)+證(증거 증)"
+            },
+            {
+              "word": "표준",
+              "easy": "여럿이 함께 따르도록 정해 둔 기준",
+              "hanja": "標(표할 표)+準(준할 준)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 주장은 무엇인가?",
+              "choices": [
+                "인정서를 내면 채용에 반드시 합격한다",
+                "흩어진 기록을 통합하려면 기관들이 같은 언어로 적는 표준이 먼저 서야 한다",
+                "경력은 본인이 발품을 팔아 모으는 편이 더 정확하다",
+                "표준은 사람의 능력을 빠짐없이 담아낸다"
+              ],
+              "answer": 1,
+              "explain": "모으는 일이 먼저가 아니라, 같은 언어로 적히는 일이 먼저라는 순서를 말한다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "detail",
+              "q": "본문에 나온 기업에서 신입사원이 남는 비율은 어떻게 달라졌는가?",
+              "choices": [
+                "31%에서 23%로 줄었다",
+                "69.3%에서 82.6%로 올랐다",
+                "62%에서 82%로 올랐다",
+                "89.6%에서 82.6%로 줄었다"
+              ],
+              "answer": 1,
+              "explain": "신입사원이 남는 비율은 69.3%에서 82.6%로 올랐고, 업무 오류와 안전사고는 31건에서 23건으로 줄었다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "vocab",
+              "q": "「검증」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "사실인지 아닌지 검사해 확인하는 일",
+                "서류를 새로 만들어 내는 일",
+                "능력을 길러 주는 일",
+                "기록을 지우는 일"
+              ],
+              "answer": 0,
+              "explain": "진짜인지 확인하는 일이 검증이다. 인정서는 이 부담을 줄여 준다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "infer",
+              "q": "글쓴이가 「모으는 일이 먼저가 아니다」라고 한 까닭은 무엇인가?",
+              "choices": [
+                "기록을 모으는 기술이 아직 없어서",
+                "서로 다른 기관의 기록이 같은 언어로 적혀야 비로소 나란히 놓을 수 있어서",
+                "기록을 모으면 개인정보가 새기 때문에",
+                "기록을 가진 기관의 수가 너무 적어서"
+              ],
+              "answer": 1,
+              "explain": "같은 언어로 적히지 않은 기록은 한자리에 모아도 나란히 놓을 수 없다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "critical",
+              "q": "마지막 문단이 던지는 물음으로 가장 알맞은 것은?",
+              "choices": [
+                "표준이 정한 칸에 담기지 않는 능력은 기록에서 어떻게 되는가",
+                "표준을 만드는 데 돈이 얼마나 드는가",
+                "인정서를 몇 건까지 발급할 수 있는가",
+                "어느 기관이 가장 많은 기록을 가지고 있는가"
+              ],
+              "answer": 0,
+              "explain": "글은 표준 바깥의 능력이 기록에서 빠질 수 있다는 물음을 던지고 답을 열어 둔다.",
+              "evidencePara": 4
+            }
+          ],
+          "challenge": [
+            {
+              "type": "critical",
+              "q": "표준화의 한계를 대하는 이 글의 태도로 가장 알맞은 것은?",
+              "choices": [
+                "표준은 완전하므로 걱정할 것이 없다고 단정한다",
+                "표준 바깥의 능력이 기록에서 빠질 수 있다는 문제를 제기하고 답은 열어 둔다",
+                "표준을 없애야 한다고 주장한다",
+                "기록되지 않은 경험은 가치가 없다고 단정한다"
+              ],
+              "answer": 1,
+              "explain": "「답은 아직 열려 있다」고 적어 단정하지 않고 물음으로 남겨 둔다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "apply",
+              "q": "이 글의 관점에서, 고등학생이 지금부터 할 수 있는 일로 가장 알맞은 것은?",
+              "choices": [
+                "증명이 필요해질 때 그때 몰아서 자료를 모은다",
+                "활동을 하는 동안 무엇을 배웠는지 남이 알아볼 수 있는 형태로 기록해 둔다",
+                "기록으로 남지 않는 활동은 하지 않는다",
+                "자격증만 최대한 많이 딴다"
+              ],
+              "answer": 1,
+              "explain": "나중에 어떻게 보일지는 그 일을 하는 동안에 이미 정해지기 시작한다고 했다.",
+              "evidencePara": 4
+            }
+          ],
+          "en": [
+            "Ask someone to show what they can do, and what comes back is usually a handful of papers: a diploma, a course certificate, a licence, a letter from a former employer. The trouble is that these papers are born scattered. A school records only what it taught, a training centre only its own course, a licensing body only the licence it issued. A company knows only the work done inside its own walls. No single institution holds a whole career, and putting the pieces together has always been left to the person.",
+            "The skill bank is an attempt to shift that work from the person to the system. It accumulates and manages an individual's licences, education, training and career records, and issues a certificate the person can use when applying for a job. The same idea lies behind the combined career record on the state employment portal. In the first month after it opened, 14,514 combined career certificates were issued, and of 462 users surveyed, 89.6% named seeing records from many institutions in a single view as the main benefit.",
+            "The effect shows up in numbers. Kangwon Land began accepting the skill certificate in its 2026 hiring of new staff, and in the first round certificates from twenty applicants stood in for sixty-two separate documents. Applicants did not have to submit anything twice, and reviewers had fewer papers to verify. A researcher who had spent more than fourteen years designing cutting tools brought scattered records into one view, diagnosed the gaps, and filled them with courses and licences; a promotion report that had always taken over a week was finished in a day.",
+            "Yet gathering is not the first step. Records from different institutions can be placed side by side only once they are written in the same language. That common language is the National Competency Standards, or NCS: the knowledge, skills and attitudes a job requires in the workplace, organised by the state by industry sector and by level. One company started with job analysis and widened NCS into training and pay, and when new roles appeared as the business grew it mapped them itself, without outside consultants. The share of new employees who stayed rose from 69.3% to 82.6%, and work errors and safety accidents fell from 31 to 23.",
+            "A standard casts a shadow as well. It records what can be written down, so an ability that fits no box drops out of the record. Carrying a club to the end of the year, working with someone you could hardly talk to, learning from a try that failed — none of these is easily filed under a sector and a level. Does an experience that goes unrecorded cease to exist, or does proof survive outside the record? The question is still open. What is certain is that how your work will look later begins to be settled while you are doing it."
+          ],
+          "enseg": [
+            [
+              "Ask someone to show what they can do, and what comes back is usually a handful of papers: a diploma, a course certificate, a licence, a letter from a former employer. ",
+              "The trouble is that these papers are born scattered. ",
+              "A school records only what it taught, a training centre only its own course, a licensing body only the licence it issued. ",
+              "A company knows only the work done inside its own walls. ",
+              "No single institution holds a whole career, and putting the pieces together has always been left to the person."
+            ],
+            [
+              "The skill bank is an attempt to shift that work from the person to the system. ",
+              "It accumulates and manages an individual's licences, education, training and career records, and issues a certificate the person can use when applying for a job. ",
+              "The same idea lies behind the combined career record on the state employment portal. ",
+              "In the first month after it opened, 14,514 combined career certificates were issued, and of 462 users surveyed, 89.6% named seeing records from many institutions in a single view as the main benefit."
+            ],
+            [
+              "The effect shows up in numbers. ",
+              "Kangwon Land began accepting the skill certificate in its 2026 hiring of new staff, and in the first round certificates from twenty applicants stood in for sixty-two separate documents. ",
+              "Applicants did not have to submit anything twice, and reviewers had fewer papers to verify. ",
+              "A researcher who had spent more than fourteen years designing cutting tools brought scattered records into one view, diagnosed the gaps, and filled them with courses and licences; a promotion report that had always taken over a week was finished in a day."
+            ],
+            [
+              "Yet gathering is not the first step. ",
+              "Records from different institutions can be placed side by side only once they are written in the same language. ",
+              "That common language is the National Competency Standards, or NCS: the knowledge, skills and attitudes a job requires in the workplace, organised by the state by industry sector and by level. ",
+              "One company started with job analysis and widened NCS into training and pay, and when new roles appeared as the business grew it mapped them itself, without outside consultants. ",
+              "The share of new employees who stayed rose from 69.3% to 82.6%, and work errors and safety accidents fell from 31 to 23."
+            ],
+            [
+              "A standard casts a shadow as well. ",
+              "It records what can be written down, so an ability that fits no box drops out of the record. ",
+              "Carrying a club to the end of the year, working with someone you could hardly talk to, learning from a try that failed — none of these is easily filed under a sector and a level. ",
+              "Does an experience that goes unrecorded cease to exist, or does proof survive outside the record? ",
+              "The question is still open. ",
+              "What is certain is that how your work will look later begins to be settled while you are doing it."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "scattered",
+              "ko": "흩어진 (형용사·과거분사)",
+              "base": "scatter [ˈskætər]"
+            },
+            {
+              "word": "accumulates",
+              "ko": "축적한다 (동사 accumulate)",
+              "base": "accumulate [əˈkjuːmjəleɪt]"
+            },
+            {
+              "word": "verify",
+              "ko": "검증하다 (동사)",
+              "base": "verify [ˈverɪfaɪ]"
+            },
+            {
+              "word": "Competency",
+              "ko": "직무 능력 (명사)",
+              "base": "competency [ˈkɑːmpɪtənsi]"
+            },
+            {
+              "word": "diagnosed",
+              "ko": "진단했다 (동사 diagnose의 과거형)",
+              "base": "diagnose [ˌdaɪəɡˈnoʊs]"
+            },
+            {
+              "word": "standard",
+              "ko": "표준 (명사)",
+              "base": "standard [ˈstændərd]"
+            }
+          ]
+        }
+      }
     }
   ],
   "diagnostics": {
