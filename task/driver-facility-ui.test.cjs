@@ -36,3 +36,28 @@ test('관리자는 직원별 차량·시설 담당 역할을 지정할 수 있�
   assert.match(html, /case 'toggleworkrole':/);
   assert.match(html, /s\.workRole = nextRole/);
 });
+
+test('청소시설 탭은 지정 직원 ID와 관리자에게만 추가하며 운전 역할을 변경하지 않는다', () => {
+  const start = html.indexOf('const FACILITY_TAB_STAFF_IDS');
+  const end = html.indexOf('\n}', html.indexOf('function canViewFacilityTab', start)) + 2;
+  const session = { isStaffLink: true, isAdmin: false, staffId: '' };
+  let driver = false;
+  const can = Function('session', 'isDriverFacilityStaff', html.slice(start, end) + '; return canViewFacilityTab;')(session, () => driver);
+  for (const id of ['75dfcf5c-39c0-4dd8-9a07-964084798e26', 'bf990a5a-ee95-4d1d-8547-66c4c0839e5a',
+    '40b5bce0-da8b-40d6-a3e7-f08993c1c840', '84349fea-f2f0-4fc3-b32a-aaef1e466d54', 'ef0af47e-f9d2-4dfc-bd95-887991ee9479']) {
+    session.staffId = id;
+    assert.equal(can(), true);
+  }
+  session.staffId = 'other';
+  assert.equal(can(), false);
+  driver = true;
+  assert.equal(can(), true);
+  driver = false;
+  session.isAdmin = true;
+  assert.equal(can(), true);
+  session.isAdmin = false; session.isStaffLink = false;
+  assert.equal(can(), false);
+  assert.match(html, /if \(canViewFacilityTab\(\)\) allowed.push\('facility'\)/);
+  assert.match(html, /tabs.length && canViewFacilityTab\(\) && !tabs.some/);
+  assert.doesNotMatch(html.slice(start, end), /workRole\s*=/);
+});
