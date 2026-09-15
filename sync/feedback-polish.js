@@ -869,15 +869,16 @@ export async function handleFeedbackPolish(env, app, body, origin, auth, json) {
   const homeworkText = oneLine(body.homeworkText);
   const source = oneLine(body.commentText);
   const noticeText = oneLine(body.noticeText);
-  const templateVersion = requestedTemplateVersion || (noticeText ? 'v3' : 'v2');
-  if (!SAFE_ID.test(taskId) || !validDate(feedbackDate) || !contentText || !homeworkText || !source) {
+  const expectedVersion = homeworkText ? (noticeText ? 'v3' : 'v2') : (noticeText ? 'v5' : 'v4');
+  const templateVersion = requestedTemplateVersion || expectedVersion;
+  if (!SAFE_ID.test(taskId) || !validDate(feedbackDate) || !contentText || !source) {
     return json({ ok: false, error: '수업·날짜·피드백 내용을 확인해 주세요' }, 400, origin);
   }
-  if (templateVersion !== 'v2' && templateVersion !== 'v3') {
+  if (!['v2', 'v3', 'v4', 'v5'].includes(templateVersion)) {
     return json({ ok: false, error: '피드백 템플릿 버전을 확인해 주세요' }, 400, origin);
   }
-  if ((templateVersion === 'v3' && !noticeText) || (templateVersion === 'v2' && noticeText)) {
-    return json({ ok: false, error: '안내사항과 피드백 템플릿 버전을 확인해 주세요' }, 400, origin);
+  if (templateVersion !== expectedVersion) {
+    return json({ ok: false, error: '과제·안내사항과 피드백 템플릿 버전을 확인해 주세요' }, 400, origin);
   }
   if (hasSubjectText && !requestedSubjectText) {
     return json({ ok: false, error: '과목을 확인해 주세요' }, 400, origin);
@@ -982,7 +983,7 @@ export async function handleFeedbackPolish(env, app, body, origin, auth, json) {
   };
   // V3 안내사항은 AI 입력에 보내지 않는다. 다만 최종 900자 예산과 요청 원문이 달라지므로
   // HMAC 캐시 식별자에는 포함해 서로 다른 요청 결과가 섞이지 않게 한다(평문은 저장하지 않는다).
-  const cacheContext = templateVersion === 'v3'
+  const cacheContext = templateVersion !== 'v2'
     ? { ...maskedContext, templateVersion, noticeText }
     : maskedContext;
   const residualNames = targetNameGroups.exact.concat(targetNameGroups.contextual);

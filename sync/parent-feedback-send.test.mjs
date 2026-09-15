@@ -249,6 +249,47 @@ test('schema and migrations use stable student ids, and the send ledger itself s
   assert.match(schema, /notice_text\s+TEXT/);
 });
 
+test('V4/V5 send only approved variables and retain delivery hashes for teacher/admin views', async () => {
+  for (const templateVersion of ['v4', 'v5']) {
+    const db = new TestD1();
+    const { requestKey } = seedFeedback(db, { templateVersion, fields: { homeworkText: '', noticeText: templateVersion === 'v5' ? '교재 준비' : '' } });
+    registerGuardian(db, '테스트학생');
+    let calls = 0;
+    await withFetch(async (url, options) => {
+      calls++;
+      const message = JSON.parse(options.body).messages[0];
+      assert.equal(message.kakaoOptions.templateId, 'APPROVED_' + templateVersion);
+      assert.equal(message.kakaoOptions.disableSms, true);
+      assert.equal(Object.hasOwn(message.kakaoOptions.variables, '#{과제}'), false);
+      assert.equal(Object.hasOwn(message.kakaoOptions.variables, '#{안내사항}'), templateVersion === 'v5');
+      assert.equal(Object.keys(message.kakaoOptions.variables).length, templateVersion === 'v5' ? 6 : 5);
+      return acceptedResponse();
+    }, async () => {
+      const config = { ['SOLAPI_KAKAO_FEEDBACK_TEMPLATE_ID_' + templateVersion.toUpperCase()]: 'APPROVED_' + templateVersion };
+      assert.equal((await call(db, { auth: admin, requestKey }, config)).status, 200);
+      await call(db, { auth: admin, requestKey }, config);
+      assert.equal(calls, 1, '동일 요청은 재발송하지 않는다');
+    });
+    for (const list of [listFeedbackForDirector, listFeedbackForTeacher]) {
+      const result = await list(db);
+      assert.equal(result.status, 200);
+      assert.ok(JSON.stringify(result.body).includes(templateVersion));
+      assert.ok(JSON.stringify(result.body).includes('queued'), JSON.stringify(result.body));
+    }
+  }
+});
+
+test('V4/V5 missing template IDs never fall back to old templates', async () => {
+  for (const templateVersion of ['v4', 'v5']) {
+    const db = new TestD1();
+    const { requestKey } = seedFeedback(db, { templateVersion, fields: { homeworkText: '', noticeText: templateVersion === 'v5' ? '안내' : '' } });
+    registerGuardian(db, '테스트학생');
+    await withFetch(async () => { assert.fail('발송하면 안 된다'); }, async () => {
+      assert.equal((await call(db, { auth: admin, requestKey })).body.code, 'SEND_DISABLED');
+    });
+  }
+});
+
 test('client cannot specify phone, recipient, message, or studentName — request rejected before any fetch', async () => {
   const db = new TestD1();
   const { requestKey } = seedFeedback(db);
