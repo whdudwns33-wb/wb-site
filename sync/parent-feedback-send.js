@@ -70,6 +70,8 @@ const TEMPLATE_V3_FIXED_TEXT =
   '- 안내사항 : \n\n\n' +
   '문의 사항이 있으시면 학원으로 연락부탁드립니다. 감사합니다.';
 export const MAX_PARENT_FEEDBACK_ALIMTALK_CHARS = 900;
+const TEMPLATE_V4_FIXED_TEXT = TEMPLATE_V3_FIXED_TEXT.replace('- 과제 : \n\n', '').replace('\n\n- 안내사항 : ', '');
+const TEMPLATE_V5_FIXED_TEXT = TEMPLATE_V3_FIXED_TEXT.replace('- 과제 : \n\n', '');
 export const MAX_PARENT_FEEDBACK_COMMENT_CHARS = 600;
 
 function safeEqual(a, b) {
@@ -127,7 +129,9 @@ function validateRequestShape(body) {
  *  카카오 알림톡 전용 키(SOLAPI_KAKAO_*)를 쓴다 — 교재주문·원장리포트가 쓰는
  *  기존 SOLAPI_API_KEY/SECRET과는 별개다. */
 function sendConfiguration(env, studentId, templateVersion) {
-  const templateIdValue = templateVersion === 'v3'
+  const templateIdValue = templateVersion === 'v5' ? env.SOLAPI_KAKAO_FEEDBACK_TEMPLATE_ID_V5
+    : templateVersion === 'v4' ? env.SOLAPI_KAKAO_FEEDBACK_TEMPLATE_ID_V4
+    : templateVersion === 'v3'
     ? env.SOLAPI_KAKAO_FEEDBACK_TEMPLATE_ID_V3
     : templateVersion === 'v2'
       ? env.SOLAPI_KAKAO_FEEDBACK_TEMPLATE_ID_V2 : env.SOLAPI_KAKAO_TEMPLATE_ID;
@@ -160,7 +164,9 @@ function statusConfiguration(env) {
     templateIds: {
       v1: safeProviderId(env.SOLAPI_KAKAO_TEMPLATE_ID),
       v2: safeProviderId(env.SOLAPI_KAKAO_FEEDBACK_TEMPLATE_ID_V2),
-      v3: safeProviderId(env.SOLAPI_KAKAO_FEEDBACK_TEMPLATE_ID_V3)
+      v3: safeProviderId(env.SOLAPI_KAKAO_FEEDBACK_TEMPLATE_ID_V3),
+      v4: safeProviderId(env.SOLAPI_KAKAO_FEEDBACK_TEMPLATE_ID_V4),
+      v5: safeProviderId(env.SOLAPI_KAKAO_FEEDBACK_TEMPLATE_ID_V5)
     }
   } : null;
 }
@@ -253,10 +259,15 @@ function cleanField(value) {
 
 function feedbackTemplateVersion(value) {
   const version = cleanField(value);
-  return version === 'v2' || version === 'v3' ? version : 'v1';
+  return ['v2', 'v3', 'v4', 'v5'].includes(version) ? version : 'v1';
 }
 
 function totalAlimtalkLength(fields) {
+  if (fields.templateVersion === 'v4' || fields.templateVersion === 'v5') {
+    return (fields.templateVersion === 'v5' ? TEMPLATE_V5_FIXED_TEXT.length : TEMPLATE_V4_FIXED_TEXT.length) +
+      fields.studentName.length + fields.dateText.length + fields.subjectText.length + fields.contentText.length +
+      fields.commentText.length + (fields.templateVersion === 'v5' ? fields.noticeText.length : 0);
+  }
   if (fields.templateVersion === 'v3') {
     return TEMPLATE_V3_FIXED_TEXT.length + fields.studentName.length + fields.dateText.length +
       fields.subjectText.length + fields.contentText.length + fields.homeworkText.length +
@@ -274,7 +285,9 @@ function totalAlimtalkLength(fields) {
  *  실제 글자 수를 계산한다. AI 다듬기와 실발송이 같은 900자 상한을 공유한다. */
 export function parentFeedbackV2CommentBudget(fields) {
   const safe = fields || {};
-  const templateVersion = safe.templateVersion === 'v3' || String(safe.noticeText || '').trim() ? 'v3' : 'v2';
+  const templateVersion = ['v2', 'v3', 'v4', 'v5'].includes(safe.templateVersion) ? safe.templateVersion
+    : String(safe.homeworkText || '').trim() ? (String(safe.noticeText || '').trim() ? 'v3' : 'v2')
+      : (String(safe.noticeText || '').trim() ? 'v5' : 'v4');
   const used = totalAlimtalkLength({
     templateVersion,
     studentName: String(safe.studentName || ''),
@@ -283,7 +296,7 @@ export function parentFeedbackV2CommentBudget(fields) {
     contentText: String(safe.contentText || ''),
     homeworkText: String(safe.homeworkText || ''),
     commentText: '',
-    noticeText: templateVersion === 'v3' ? String(safe.noticeText || '') : ''
+    noticeText: ['v3', 'v5'].includes(templateVersion) ? String(safe.noticeText || '') : ''
   });
   return Math.max(0, Math.min(MAX_PARENT_FEEDBACK_COMMENT_CHARS,
     MAX_PARENT_FEEDBACK_ALIMTALK_CHARS - used));
@@ -448,9 +461,10 @@ export async function attemptParentFeedbackSend(env, app, current) {
   const commentText = cleanField(current.comment_text);
   const noticeText = cleanField(current.notice_text);
   const dateText = feedbackDateText(current.feedback_date);
-  const requiredFieldsReady = templateVersion === 'v2' || templateVersion === 'v3'
-    ? subjectText && contentText && homeworkText && commentText && dateText &&
-      (templateVersion !== 'v3' || noticeText)
+  const requiredFieldsReady = ['v2', 'v3', 'v4', 'v5'].includes(templateVersion)
+    ? subjectText && contentText && commentText && dateText &&
+      (['v2', 'v3'].includes(templateVersion) ? !!homeworkText : !homeworkText) &&
+      (['v3', 'v5'].includes(templateVersion) ? !!noticeText : (templateVersion !== 'v4' || !noticeText))
     : contentText && plusText && minusText;
   if (!teacherName || !studentName || !requiredFieldsReady) {
     await markFeedbackOutcome(env, app, current.request_key, Number(current.revision),
@@ -499,10 +513,10 @@ export async function attemptParentFeedbackSend(env, app, current) {
     return { ok: false, code: guardian.error, status: 'content_approved_send_blocked' };
   }
 
-  const fields = templateVersion === 'v2' || templateVersion === 'v3'
+  const fields = ['v2', 'v3', 'v4', 'v5'].includes(templateVersion)
     ? {
       templateVersion, studentName, dateText, subjectText, contentText, homeworkText, commentText,
-      ...(templateVersion === 'v3' ? { noticeText } : {})
+      ...(['v3', 'v5'].includes(templateVersion) ? { noticeText } : {})
     }
     : { templateVersion, teacherName, studentName, contentText, plusText, minusText };
   if (totalAlimtalkLength(fields) > MAX_PARENT_FEEDBACK_ALIMTALK_CHARS) {
@@ -598,7 +612,11 @@ export async function attemptParentFeedbackSend(env, app, current) {
           to: guardian.phone, from: config.sender, type: 'ATA',
           kakaoOptions: {
             pfId: config.pfId, templateId: config.templateId, disableSms: true,
-            variables: templateVersion === 'v3' ? {
+            variables: ['v4', 'v5'].includes(templateVersion) ? {
+              '#{학생명}': studentName, '#{일시}': dateText, '#{과목}': subjectText,
+              '#{수업내용진도}': contentText, '#{코멘트}': commentText,
+              ...(templateVersion === 'v5' ? { '#{안내사항}': noticeText } : {})
+            } : templateVersion === 'v3' ? {
               '#{학생명}': studentName, '#{일시}': dateText, '#{과목}': subjectText,
               '#{수업내용진도}': contentText, '#{과제}': homeworkText, '#{코멘트}': commentText,
               '#{안내사항}': noticeText
@@ -779,7 +797,7 @@ function feedbackVariablesForRow(row) {
   const templateVersion = feedbackTemplateVersion(row.template_version);
   const studentName = cleanField(row.feedback_student_name);
   const contentText = cleanField(row.content_text);
-  if (templateVersion === 'v2' || templateVersion === 'v3') {
+  if (['v2', 'v3', 'v4', 'v5'].includes(templateVersion)) {
     return {
       templateVersion,
       studentName,
@@ -788,7 +806,7 @@ function feedbackVariablesForRow(row) {
       contentText,
       homeworkText: cleanField(row.homework_text),
       commentText: cleanField(row.comment_text),
-      ...(templateVersion === 'v3' ? { noticeText: cleanField(row.notice_text) } : {})
+      ...(['v3', 'v5'].includes(templateVersion) ? { noticeText: cleanField(row.notice_text) } : {})
     };
   }
   return {
