@@ -1206,15 +1206,15 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-09-15.1"></script>
-<script src="./schedule-board-core.js?v=2026-09-15.1"></script>
-<script src="./asset-core.js?v=2026-09-15.1"></script>
-<script src="./qr-core.js?v=2026-09-15.1"></script>
-<script src="./acaflow-import-core.js?v=2026-09-15.1"></script>
-<script src="./feedback-subject-catalog.js?v=2026-09-15.1"></script>
-<script src="./sync-recovery-core.js?v=2026-09-15.1"></script>
-<script src="./staff-work-session-core.js?v=2026-09-15.1"></script>
-<script src="./staff-attendance-history-core.js?v=2026-09-15.1"></script>
+<script src="./lesson-form-core.js?v=2026-09-15.2"></script>
+<script src="./schedule-board-core.js?v=2026-09-15.2"></script>
+<script src="./asset-core.js?v=2026-09-15.2"></script>
+<script src="./qr-core.js?v=2026-09-15.2"></script>
+<script src="./acaflow-import-core.js?v=2026-09-15.2"></script>
+<script src="./feedback-subject-catalog.js?v=2026-09-15.2"></script>
+<script src="./sync-recovery-core.js?v=2026-09-15.2"></script>
+<script src="./staff-work-session-core.js?v=2026-09-15.2"></script>
+<script src="./staff-attendance-history-core.js?v=2026-09-15.2"></script>
 <script>
 "use strict";
 
@@ -11304,7 +11304,7 @@ function makeupActions(row) {
   // 확정/제안 일정이 있는 건은 실제 보강수업의 보강완료 흐름을 사용한다.
   // 연결은 일정이 없는 미처리 결석 보강에만 노출해 두 흐름을 섞지 않는다.
   const linkable = (session.isStaffLink || session.isAdmin) && !row.confirmedDate && !row.proposedDate;
-  return (own || linkable || session.isAdmin)
+  return (own || linkable || makeupCanComplete(row))
     ? '<button class="btn btn-sm btn-primary" data-act="muprocessopen"' + key + '>보강 처리</button>' : '';
 }
 
@@ -11822,6 +11822,8 @@ function makeupCanComplete(row) {
    * 점검 중인 선생님으로 제한되며, 일반 관리자 권한 전체를 열지 않는다. */
   if (session.isAdmin || (typeof managerInspectionActive === 'function' && managerInspectionActive() &&
       !row.confirmedDate && !row.proposedDate)) return true;
+  if (row.status !== 'confirmed' && session.isStaffLink &&
+      String(session.staffId || '') === makeupDefaultStaffId(row)) return true;
   return row.status === 'confirmed' && session.isStaffLink &&
     String(row.confirmedStaffId || '') === String(session.staffId || '');
 }
@@ -11854,16 +11856,16 @@ function makeupDateTimeModal(row, mode) {
   const scheduledCompletion = mode === 'complete' && scheduled;
   const inspection = typeof managerInspectionActive === 'function' && managerInspectionActive();
   if ((rescheduling || retrying) && (!session.isAdmin || row.status !== 'confirmed')) return;
-  if (directCompletion && !session.isAdmin && !inspection) return;
+  if (directCompletion && !makeupCanComplete(row)) return;
   const date = scheduled && !retrying ? row.confirmedDate : '';
   const startTime = scheduled && !retrying ? row.confirmedStartTime : '';
   const endTime = scheduled && !retrying ? row.confirmedEndTime : '';
   const originalStaffId = makeupOriginalStaffId(row);
   const assignedStaffId = scheduled ? String(row.confirmedStaffId || '') : makeupDefaultStaffId(row);
   const title = mode === 'schedule' || mode === 'restore' ? '보강생성' : retrying ? '결석 후 재보강' : rescheduling ? '보강 수정' : '보강완료';
-  const inspectionStaffId = inspection ? String(session.staffId || '') : '';
+  const inspectionStaffId = !session.isAdmin ? String(session.staffId || '') : '';
   const staffField = (mode === 'schedule' || rescheduling || retrying || directCompletion)
-    ? (directCompletion && inspection
+    ? (directCompletion && !session.isAdmin
       ? '<div class="makeup-schedule"><b>실제 보강 담당 선생님</b><br>' +
           esc(makeupTeacherLabel(inspectionStaffId, '점검 중인 선생님')) +
           '</div><input id="muStaff" type="hidden" value="' + esc(inspectionStaffId) + '">'
@@ -11876,7 +11878,8 @@ function makeupDateTimeModal(row, mode) {
     attendanceField = '<label class="field"><span class="fl">실제 출결</span><select class="in" id="muAttendanceStatus">' +
       '<option value="P" selected>출석</option>' + MAKEUP_COMPLETION_ATTENDANCE_OPTIONS.filter(item => item[0] !== 'P').map(item =>
         '<option value="' + item[0] + '">' + item[1] + '</option>').join('') + '</select></label>' +
-      '<div class="hint">이미 완료된 보강을 정리합니다. 날짜·시작시간·종료시간을 비워 두면 실제 일시를 기록하지 않고 완료 처리하며, 출결은 출석으로 저장합니다.</div>';
+      '<div class="hint">이미 완료된 보강의 실제 날짜·시작시간·종료시간과 출결을 입력해 주세요.' +
+      (session.isAdmin || inspection ? ' 관리자는 날짜·시작시간·종료시간을 비워 두면 실제 일시 미기록으로 완료할 수 있습니다.' : '') + '</div>';
   } else if (scheduledCompletion) {
     const attendance = makeupScheduledAttendance(row);
     const attendanceLabel = makeupAttendanceLabel(attendance.value);
@@ -11907,7 +11910,9 @@ function makeupDateTimeModal(row, mode) {
     '<div class="field"><label class="fl" for="muEnd">종료시간</label><input class="in" id="muEnd" type="time" value="' + esc(endTime) + '"' + (mode === 'restore' ? ' disabled' : '') + '></div></div>' +
     attendanceField + (modeHint ? '<div class="hint">' + modeHint + '</div>' : '') + makeupModalErrorHtml(),
     '<button class="btn btn-primary btn-block mt14" data-act="' + submitAction +
-      '" data-case="' + esc(row.caseId) + '" data-rev="' + Number(row.revision) + '">확인</button>');
+      '" data-case="' + esc(row.caseId) + '" data-rev="' + Number(row.revision) + '">확인</button>' +
+    (directCompletion ? '<button class="btn btn-ghost btn-block mt8" data-act="mulinkraw" data-case="' + esc(row.caseId) +
+      '">이미 기록된 완료 보강 연결 (선택)</button>' : ''));
 }
 
 function makeupNoMakeupContextHtml(row) {
@@ -12000,7 +12005,8 @@ async function restoreMakeupSchedule(button) {
 async function submitMakeupComplete(button) {
   const row = makeupRows.find(item => item.caseId === String(button.dataset.case || ''));
   if (!makeupCanComplete(row)) return;
-  const slot = makeupDateTimeInput({ allowEmpty: row.status !== 'confirmed' });
+  const slot = makeupDateTimeInput({ allowEmpty: row.status !== 'confirmed' &&
+    (session.isAdmin || (typeof managerInspectionActive === 'function' && managerInspectionActive())) });
   if (!slot) return;
   const timeUnrecorded = !slot.date;
   const endAt = timeUnrecorded ? 0 : Date.parse(slot.date + 'T' + slot.endTime + ':00+09:00');
@@ -12018,7 +12024,7 @@ async function submitMakeupComplete(button) {
       return showMakeupModalError('보강 출결을 서버에 동기화하지 못했습니다. 연결을 확인한 뒤 다시 시도해 주세요');
     }
   } else {
-    if (!session.isAdmin && !(typeof managerInspectionActive === 'function' && managerInspectionActive())) return showMakeupModalError('일정 없이 완료한 보강은 관리자만 기록할 수 있습니다');
+    if (!makeupCanComplete(row)) return showMakeupModalError('본인이 담당하는 보강만 완료할 수 있습니다');
     const staffId = String(($('#muStaff') || {}).value || '');
     const attendanceStatus = String(($('#muAttendanceStatus') || {}).value || '');
     if (!makeupActiveStaff(staffId)) return showMakeupModalError('실제 보강 담당 선생님을 선택해 주세요');
@@ -12045,6 +12051,7 @@ async function openMakeupProcessModal(button) {
   if (!row) return;
   const scheduled = !!(row.confirmedDate && row.confirmedStartTime && row.confirmedEndTime);
   if (scheduled) return makeupDateTimeModal(row, 'complete');
+  if (makeupCanComplete(row)) return makeupDateTimeModal(row, 'complete');
   await openMakeupLinkModal(button, true);
 }
 
@@ -12064,7 +12071,7 @@ async function openMakeupLinkModal(button, showDirectCompletion) {
       (options || '<div class="empty">연결 가능한 완료 보강이 없습니다.</div>') + makeupModalErrorHtml(),
       (options ? '<button class="btn btn-primary btn-block mt14" data-act="mulinksubmit" data-case="' + esc(row.caseId) +
         '" data-rev="' + Number(row.revision) + '">이미 완료한 보강 연결</button>' : '') +
-      (showDirectCompletion && (session.isAdmin || (typeof managerInspectionActive === 'function' && managerInspectionActive())) ? '<button class="btn btn-ghost btn-block mt8" data-act="mudirectcompleteopen" data-case="' +
+      (showDirectCompletion && makeupCanComplete(row) ? '<button class="btn btn-ghost btn-block mt8" data-act="mudirectcompleteopen" data-case="' +
         esc(row.caseId) + '">새로 완료 기록 입력</button>' : ''));
   } catch (error) { toast('연결 후보를 불러오지 못했습니다 — ' + (error.message || error)); }
   finally { if (button.isConnected) button.disabled = false; }
@@ -24413,7 +24420,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-09-15.1';
+const APP_VER = '2026-09-15.2';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);

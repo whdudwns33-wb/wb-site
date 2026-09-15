@@ -2401,19 +2401,21 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
       if (direct && !['review_pending', 'reviewed', 'awaiting_parent'].includes(String(row.status))) {
         problem('일정 미생성 또는 확정 상태의 보강만 완료할 수 있습니다', 409, 'INVALID_TRANSITION');
       }
-      /* 관리자 점검 세션은 원래 태블릿의 선생님 범위만 읽고 쓰지만,
-       * 관리자가 이미 진행된 일정 없는 보강을 그 태블릿에서 정리할 수 있게
-       * 직접 완료 기록만 허용한다. 이후 staffId 검증은 그대로 적용해 범위를
-       * 점검 대상 선생님 밖으로 넓히지 않는다. */
-      if (direct && auth.scope !== 'all' && auth.inspection !== true) {
+      /* 후보 연결이 없어도 현재 담당자는 본인이 진행한 보강을 직접 완료한다.
+       * 과거 담당자나 다른 학생의 caseId를 임의로 보내는 접근은 막고,
+       * 아래 실제 staffId 검사와 원자적 원 수업 소유자 검증을 함께 유지한다. */
+      if (direct && auth.scope !== 'all' && String(auth.id || '') !== currentSourceTeacherId) {
         return json({ ok: false, code: 'MAKEUP_COMPLETE_FORBIDDEN',
-          error: '일정 없이 완료하는 보강은 원장·관리 담당만 처리할 수 있습니다' }, 403, origin);
+          error: '본인이 현재 담당하는 보강만 직접 완료할 수 있습니다' }, 403, origin);
       }
       const supplied = [body.date, body.startTime, body.endTime].map(value => String(value || '').trim());
       if (supplied.some(Boolean) && !supplied.every(Boolean)) {
         problem('실제 보강 날짜·시작시간·종료시간을 모두 입력해 주세요');
       }
       const timeUnrecorded = direct && !supplied.some(Boolean);
+      if (timeUnrecorded && auth.scope !== 'all' && auth.inspection !== true) {
+        problem('실제 보강 날짜·시작시간·종료시간을 모두 입력해 주세요');
+      }
       const confirmedRange = direct ? null : confirmedMakeupRange(row);
       if (!direct && supplied.every(Boolean) && supplied[0] !== confirmedRange.date) {
         problem('예약 보강의 날짜는 완료 단계에서 바꿀 수 없습니다. 출결·메모를 입력하기 전에 보강 수정에서 날짜를 변경해 주세요',
