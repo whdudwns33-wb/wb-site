@@ -1381,6 +1381,19 @@ function isDriverFacilityStaff() {
   return !!(session.isStaffLink && !session.isAdmin && staffWorkRole(staffById(session.staffId)) === 'driver_facility');
 }
 
+// 수업·관리 역할은 유지하고 청소시설 화면만 함께 제공한다. 이름 변경에 영향받지 않도록 직원 ID로 구분한다.
+const FACILITY_TAB_STAFF_IDS = new Set([
+  '75dfcf5c-39c0-4dd8-9a07-964084798e26',
+  'bf990a5a-ee95-4d1d-8547-66c4c0839e5a',
+  '40b5bce0-da8b-40d6-a3e7-f08993c1c840',
+  '84349fea-f2f0-4fc3-b32a-aaef1e466d54',
+  'ef0af47e-f9d2-4dfc-bd95-887991ee9479'
+]);
+function canViewFacilityTab() {
+  return !!(session.isAdmin || (session.isStaffLink &&
+    (isDriverFacilityStaff() || FACILITY_TAB_STAFF_IDS.has(String(session.staffId || '')))));
+}
+
 function plannedOccursOn(task, date) {
   if (task.deleted) return false;
   if (task.start && date < task.start) return false;
@@ -3657,6 +3670,7 @@ function render() {
       const allowed = ['today', 'week', 'lesson', 'feedback', 'books', 'transport', 'roster'];
       allowed.push('sessions');
       allowed.push('makeup');
+      if (canViewFacilityTab()) allowed.push('facility');
       if (!allowed.includes(route)) route = 'today';
     }
   }
@@ -3698,6 +3712,10 @@ function renderTabs() {
       ? [['schedule', '현황판', managerRequestInboxCount()], ['onboarding', '신규 학생', onboardingAttentionCount()], ['today', '오늘'], ['week', '주간 플래너'], ['write', '지시서 작성'],
          ['lesson', '수업 등록 및 변경'], ['feedback', '피드백 검토'], ['makeup', '보강', makeupAttentionCount()], ['sessions', '회차', sessionPackAttentionCount()], ['board', '직원 현황', a.total], ['staff', '직원 관리'], ['books', '교재'], ['transport', '차량'], ['roster', '원생'], ['devices', '기기', deviceAlertCount()], ['settings', '설정']]
       : [];
+  if (tabs.length && canViewFacilityTab() && !tabs.some(tab => tab[0] === 'facility')) {
+    const transportIndex = tabs.findIndex(tab => tab[0] === 'transport');
+    tabs.splice(transportIndex < 0 ? tabs.length : transportIndex + 1, 0, ['facility', '청소시설업무']);
+  }
   $('#tabs').innerHTML = tabs.map(([k, t, n]) =>
     '<button class="tab ' + (route === k ? 'on' : '') + '" data-go="' + k + '">' + t +
     (n ? '<span class="badge">' + n + '</span>' : '') + '</button>').join('');
@@ -17501,6 +17519,7 @@ function viewDriverTransport() {
 }
 
 function viewFacility() {
+  if (!canViewFacilityTab()) return '<div class="empty">청소시설업무 대상 직원 화면에서 확인해 주세요.</div>';
   const items = ['청소 구역', '청소 완료', '시설 이상 신고', '관리자 요청사항'];
   return '<section class="card"><div class="card-title">청소시설업무</div>' +
     '<div class="card-sub">기본 업무 항목입니다. 세부 내용과 체크 기능은 운영 방식에 맞춰 순차적으로 추가합니다.</div>' +
