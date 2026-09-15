@@ -444,6 +444,7 @@ test('allowing past schedules does not allow completion before the lesson ends',
       const calls = [];
       const bindings = {
         makeupRows: [{ caseId: 'makeup-8', status }], makeupCanComplete: () => true,
+        session: { isAdmin: true },
         makeupDateTimeInput: () => ({ date, startTime: '14:00', endTime: '14:50' }),
         showMakeupModalError: error => calls.push({ error }),
         Date: { parse: Date.parse, now: () => Date.parse('2026-09-08T12:00:00+09:00') },

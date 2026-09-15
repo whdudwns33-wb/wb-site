@@ -1254,7 +1254,7 @@ test('one complete action records an unscheduled past makeup, creates its lesson
     action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
   });
   const row = created.body.case;
-  const teacherForbidden = await callAt(db, own('teacher-a'), {
+  const teacherForbidden = await callAt(db, own('teacher-b'), {
     action: 'complete', caseId: row.caseId, revision: row.revision,
     date: '2026-08-11', startTime: '10:00', endTime: '11:00',
     staffId: 'teacher-a', attendanceStatus: 'P'
@@ -2185,7 +2185,7 @@ test('legacy restore atomically rejects a confirmed teacher deactivated after it
   assert.equal(db.database.prepare("SELECT count(*) AS n FROM tasks WHERE id LIKE 'makeup_lesson_%'").get().n, 0);
 });
 
-test('unconfirmed direct completion is admin-only and follows the current source owner while retaining history', async () => {
+test('unconfirmed direct completion follows current owner and rejects the former teacher', async () => {
   const db = new TestD1(); seed(db);
   const created = await call(db, own('teacher-a'), {
     action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
@@ -2197,19 +2197,42 @@ test('unconfirmed direct completion is admin-only and follows the current source
   const listed = await call(db, own('teacher-b'), { action: 'list' });
   assert.equal(listed.body.cases[0].sourceTeacherId, 'teacher-a');
   assert.equal(listed.body.cases[0].currentTeacherId, 'teacher-b');
-  const forbidden = await callAt(db, own('teacher-b'), {
+  const forbidden = await callAt(db, own('teacher-a'), {
     action: 'complete', caseId: created.body.case.caseId, revision: created.body.case.revision,
     date: '2026-08-11', startTime: '10:00', endTime: '11:00',
     staffId: 'teacher-b', attendanceStatus: 'P'
   }, '2026-08-11T12:00:00+09:00');
   assert.equal(forbidden.status, 403);
-  const completed = await callAt(db, all, {
+  const completed = await callAt(db, own('teacher-b'), {
     action: 'complete', caseId: created.body.case.caseId, revision: created.body.case.revision,
     date: '2026-08-11', startTime: '10:00', endTime: '11:00',
     staffId: 'teacher-b', attendanceStatus: 'P'
   }, '2026-08-11T12:00:00+09:00');
   assert.equal(completed.status, 200);
   assert.equal(completed.body.lessonTask.staffId, 'teacher-b');
+});
+
+test('teacher direct completion requires own staff, actual ended times, and valid attendance', async () => {
+  const db = new TestD1(); seed(db);
+  const created = await call(db, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  });
+  const body = { action: 'complete', caseId: created.body.case.caseId, revision: created.body.case.revision,
+    date: '2026-08-11', startTime: '10:00', endTime: '11:00', staffId: 'teacher-a', attendanceStatus: 'P' };
+  for (const [patch, status] of [
+    [{ date: '', startTime: '', endTime: '' }, 400],
+    [{ staffId: 'teacher-b' }, 403],
+    [{ endTime: '13:00' }, 409],
+    [{ attendanceStatus: 'A' }, 400]
+  ]) {
+    const result = await callAt(db, own('teacher-a'), { ...body, ...patch }, '2026-08-11T12:00:00+09:00');
+    assert.equal(result.status, status, JSON.stringify(result.body));
+    assert.equal(db.database.prepare('SELECT status FROM makeup_cases WHERE case_id=?').get(body.caseId).status, 'review_pending');
+  }
+  const result = await callAt(db, own('teacher-a'), body, '2026-08-11T12:00:00+09:00');
+  assert.equal(result.status, 200, JSON.stringify(result.body));
+  assert.equal(result.body.case.status, 'completed');
+  assert.equal(result.body.lessonTask.staffId, 'teacher-a');
 });
 
 test('manager inspection can record an unscheduled completion only for the inspected teacher scope', async () => {
