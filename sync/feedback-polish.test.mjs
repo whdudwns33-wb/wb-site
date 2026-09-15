@@ -477,6 +477,23 @@ test('요청 과목은 글자수 예산과 익명 수업 문맥에 반영되고 
   assert.equal(calls, 0);
 });
 
+test('V4/V5 allow empty homework in AI polish without exposing notices or using a paid model', async () => {
+  for (const templateVersion of ['v4', 'v5']) {
+    const noticeText = templateVersion === 'v5' ? '별도 안내문' : '';
+    let calls = 0;
+    const result = await call(seededDb(), validBody({ templateVersion, homeworkText: ' \n\u200b', noticeText }), {
+      AI: { run: async (name, input) => {
+        calls++;
+        assert.equal(name, '@cf/meta/llama-3.1-8b-instruct-fast');
+        assert.ok(!aiInputText(input).includes('별도 안내문'));
+        return { response: '__WB_STUDENT__는 오늘 3개 문제를 차분하게 확인했습니다. 풀이 과정에도 성실하게 참여했습니다.' };
+      } }
+    });
+    assert.equal(result.status, 200, JSON.stringify(result.body));
+    assert.equal(calls, 1);
+  }
+});
+
 test('V3 안내사항은 900자 코멘트 예산과 비식별 캐시에 반영하되 AI 입력에는 보내지 않는다', async () => {
   const noticeText = '다음 수업 일정은 별도 안내드리겠습니다.';
   const contentText = '수업내용'.repeat(35);

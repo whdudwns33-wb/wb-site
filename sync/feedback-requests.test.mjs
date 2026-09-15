@@ -206,6 +206,28 @@ test('v2 submission uses an optional client subject and only legacy requests fal
   assert.equal(result.status, 413);
 });
 
+test('V4/V5 accept no homework, reject hidden sections, preserve exact preview and history', async () => {
+  for (const version of ['v4', 'v5']) {
+    const db = new TestD1();
+    seedStaff(db, 'teacher-a', '가상강사'); seedToken(db, 'token-a', 'teacher-a');
+    seedTask(db, 'task-optional', 'teacher-a', { subject: '수학' });
+    const fields = { subjectText: '수학', contentText: '개념 복습', homeworkText: ' \n\u200b', commentText: '차분히 참여했습니다.', noticeText: version === 'v5' ? '교재 준비' : '', plusText: '', minusText: '' };
+    const message = '안녕하세요, WB 웩슬러브레인센터(독해력학원) 입니다.\n\n테스트학생 학생의 오늘 수업 피드백을 정리해 보내드립니다.\n\n' +
+      '- 일시 : 2026년 9월 15일\n\n- 과목 : 수학\n\n- 수업내용 · 진도 : 개념 복습\n\n- 코멘트 : 차분히 참여했습니다.' +
+      (version === 'v5' ? '\n\n- 안내사항 : 교재 준비' : '') + '\n\n\n문의 사항이 있으시면 학원으로 연락부탁드립니다. 감사합니다.';
+    const body = { auth: person('teacher-a', 'token-a'), taskId: 'task-optional', feedbackDate: '2026-09-15', templateVersion: version, message, ...fields };
+    const result = await call(db, '/feedback-request', body);
+    assert.equal(result.status, 200, JSON.stringify(result.body));
+    assert.equal(result.body.request.templateVersion, version);
+    assert.equal(result.body.request.homeworkText, '');
+    const stored = db.prepare('SELECT body FROM feedback_requests WHERE request_key=?').bind(result.body.request.requestKey).first();
+    assert.equal(stored.body, message);
+    assert.equal((await call(db, '/feedback-request', { ...body, message: message.replace('\n\n\n문의', '\n\n문의') })).body.code, 'FEEDBACK_TEMPLATE_MISMATCH');
+    assert.equal((await call(db, '/feedback-request', { ...body, homeworkText: '복습' })).body.code, 'FEEDBACK_TEMPLATE_HOMEWORK_VERSION_MISMATCH');
+    if (version === 'v4') assert.equal((await call(db, '/feedback-request', { ...body, noticeText: '안내' })).body.code, 'FEEDBACK_TEMPLATE_NOTICE_VERSION_MISMATCH');
+  }
+});
+
 test('v3 submission preserves the approved blank lines and stores all seven template variables', async () => {
   const db = new TestD1();
   seedStaff(db, 'teacher-a', '김남기'); seedToken(db, 'token-a', 'teacher-a');
@@ -309,7 +331,7 @@ test('v3 requires noticeText, v2 rejects non-empty noticeText, and unknown templ
 
   result = await call(db, '/feedback-request', {
     auth, taskId: 'task-template-policy', feedbackDate: '2026-09-09', feedbackType: 'class_feedback',
-    templateVersion: 'v4', message: '임의 문구', ...structured
+    templateVersion: 'v6', message: '임의 문구', ...structured
   });
   assert.equal(result.status, 400);
   assert.match(result.body.error, /templateVersion/);

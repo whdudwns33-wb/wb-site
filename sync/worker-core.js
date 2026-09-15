@@ -2434,7 +2434,7 @@ const FEEDBACK_STATUSES = new Set([
 ]);
 const SAFE_FEEDBACK_PART = /^[A-Za-z0-9_-]{1,64}$/;
 const SAFE_FEEDBACK_DATE = /^\d{4}-\d{2}-\d{2}$/;
-const FEEDBACK_TEMPLATE_VERSIONS = new Set(['v1', 'v2', 'v3']);
+const FEEDBACK_TEMPLATE_VERSIONS = new Set(['v1', 'v2', 'v3', 'v4', 'v5']);
 const MAX_FEEDBACK_BODY = 5000;
 const MAX_REVIEW_NOTE = 1000;
 const MAX_FEEDBACK_FIELD = 300;   // 알림톡 항목별 변수 하나당 상한 — 900자 총합 체크는 발송 시점에 다시 한다
@@ -2520,6 +2520,16 @@ function feedbackV3Body(studentName, date, subjectText, contentText, homeworkTex
     '문의 사항이 있으시면 학원으로 연락부탁드립니다. 감사합니다.';
 }
 
+function feedbackNoHomeworkBody(studentName, date, subjectText, contentText, commentText, noticeText) {
+  return '안녕하세요, WB 웩슬러브레인센터(독해력학원) 입니다.\n\n' +
+    studentName + ' 학생의 오늘 수업 피드백을 정리해 보내드립니다.\n\n' +
+    '- 일시 : ' + feedbackDateLabel(date) + '\n\n' +
+    '- 과목 : ' + subjectText + '\n\n' +
+    '- 수업내용 · 진도 : ' + contentText + '\n\n' +
+    '- 코멘트 : ' + commentText + (noticeText ? '\n\n- 안내사항 : ' + noticeText : '') + '\n\n\n' +
+    '문의 사항이 있으시면 학원으로 연락부탁드립니다. 감사합니다.';
+}
+
 function feedbackIdentity(body) {
   const taskId = String(body.taskId || '');
   const feedbackDate = String(body.feedbackDate || '');
@@ -2566,9 +2576,9 @@ const FEEDBACK_WITH_LATEST_SEND_SELECT =
 async function feedbackView(row) {
   if (!row) return null;
   const storedTemplateVersion = String(row.template_version || '');
-  const templateVersion = storedTemplateVersion === 'v2' || storedTemplateVersion === 'v3'
+  const templateVersion = ['v2', 'v3', 'v4', 'v5'].includes(storedTemplateVersion)
     ? storedTemplateVersion : 'v1';
-  const fields = templateVersion === 'v2' || templateVersion === 'v3' ? {
+  const fields = ['v2', 'v3', 'v4', 'v5'].includes(templateVersion) ? {
     templateVersion,
     studentName: feedbackStoredSendField(row.student_name),
     dateText: feedbackDateLabel(row.feedback_date),
@@ -2576,7 +2586,7 @@ async function feedbackView(row) {
     contentText: feedbackStoredSendField(row.content_text),
     homeworkText: feedbackStoredSendField(row.homework_text),
     commentText: feedbackStoredSendField(row.comment_text),
-    ...(templateVersion === 'v3' ? { noticeText: feedbackStoredSendField(row.notice_text) } : {})
+    ...(['v3', 'v5'].includes(templateVersion) ? { noticeText: feedbackStoredSendField(row.notice_text) } : {})
   } : {
     templateVersion,
     teacherName: feedbackStoredSendField(row.teacher_name),
@@ -2741,14 +2751,16 @@ async function handleFeedbackRequest(env, app, body, origin) {
   const minusText = normalizeFeedbackField(body.minusText);
   const templateV2 = identity.templateVersion === 'v2';
   const templateV3 = identity.templateVersion === 'v3';
-  const structuredTemplate = templateV2 || templateV3;
+  const noHomeworkTemplate = ['v4', 'v5'].includes(identity.templateVersion);
+  const noticeTemplate = templateV3 || identity.templateVersion === 'v5';
+  const structuredTemplate = templateV2 || templateV3 || noHomeworkTemplate;
   const hasSubjectText = Object.hasOwn(body, 'subjectText');
   const subjectText = structuredTemplate
     ? normalizeFeedbackField(hasSubjectText
       ? body.subjectText : checked.taskData.subject || checked.taskData.className || '') : '';
   const homeworkText = structuredTemplate ? normalizeFeedbackField(body.homeworkText) : '';
   const commentText = structuredTemplate ? normalizeFeedbackBody(body.commentText) : '';
-  const noticeText = templateV3 ? normalizeFeedbackField(body.noticeText) : '';
+  const noticeText = noticeTemplate ? normalizeFeedbackField(body.noticeText) : '';
   if (!contentText || (!structuredTemplate && (!plusText || !minusText))) {
     return json({ ok: false, error: structuredTemplate
       ? '수업내용·진도를 확인해 주세요'
@@ -2757,14 +2769,16 @@ async function handleFeedbackRequest(env, app, body, origin) {
   if (contentText.length > MAX_FEEDBACK_FIELD || plusText.length > MAX_FEEDBACK_FIELD || minusText.length > MAX_FEEDBACK_FIELD) {
     return json({ ok: false, error: '항목별 문구는 각각 ' + MAX_FEEDBACK_FIELD + '자까지 입력할 수 있습니다' }, 413, origin);
   }
-  if (structuredTemplate && (!subjectText || !homeworkText || !commentText || (templateV3 && !noticeText))) {
-    return json({ ok: false, error: templateV3
-      ? '과목·수업내용·과제·코멘트·안내사항을 모두 확인해 주세요'
-      : '과목·수업내용·과제·코멘트를 모두 확인해 주세요' }, 400, origin);
+  if (structuredTemplate && (!subjectText || (!noHomeworkTemplate && !homeworkText) || !commentText || (noticeTemplate && !noticeText))) {
+    return json({ ok: false, error: '과목·수업내용·코멘트 및 선택한 템플릿의 과제·안내사항 필수 항목을 확인해 주세요' }, 400, origin);
   }
-  if (templateV2 && Object.hasOwn(body, 'noticeText') && normalizeFeedbackField(body.noticeText)) {
+  if (noHomeworkTemplate && homeworkText) {
+    return json({ ok: false, code: 'FEEDBACK_TEMPLATE_HOMEWORK_VERSION_MISMATCH',
+      error: '과제가 있는 피드백은 V2 또는 V3 템플릿으로 보내 주세요' }, 409, origin);
+  }
+  if (structuredTemplate && !noticeTemplate && Object.hasOwn(body, 'noticeText') && normalizeFeedbackField(body.noticeText)) {
     return json({ ok: false, code: 'FEEDBACK_TEMPLATE_NOTICE_VERSION_MISMATCH',
-      error: '안내사항이 있는 피드백은 v3 템플릿으로 보내 주세요' }, 409, origin);
+      error: '안내사항이 있는 피드백은 V3 또는 V5 템플릿으로 보내 주세요' }, 409, origin);
   }
   if (structuredTemplate && (subjectText.length > MAX_FEEDBACK_SUBJECT || homeworkText.length > MAX_FEEDBACK_FIELD ||
       commentText.length > MAX_FEEDBACK_COMMENT || noticeText.length > MAX_FEEDBACK_FIELD)) {
@@ -2772,7 +2786,9 @@ async function handleFeedbackRequest(env, app, body, origin) {
       '자, 코멘트는 ' + MAX_FEEDBACK_COMMENT + '자, 안내사항은 ' + MAX_FEEDBACK_FIELD +
       '자까지 입력할 수 있습니다' }, 413, origin);
   }
-  const approvedTemplateBody = templateV3
+  const approvedTemplateBody = noHomeworkTemplate
+    ? feedbackNoHomeworkBody(studentName, identity.feedbackDate, subjectText, contentText, commentText, noticeText)
+    : templateV3
     ? feedbackV3Body(studentName, identity.feedbackDate, subjectText, contentText, homeworkText, commentText, noticeText)
     : templateV2
       ? feedbackV2Body(studentName, identity.feedbackDate, subjectText, contentText, homeworkText, commentText)
