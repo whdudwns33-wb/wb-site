@@ -33,7 +33,7 @@ function functionSource(name) {
   assert.fail(name + ' function is incomplete');
 }
 
-function studentConnectionHarness({ existing, exchangeFails, initialRoute }) {
+function studentConnectionHarness({ existing, exchangeFails, initialRoute, linkStaffId = 'student-a' }) {
   const source = between('function studentCacheScopedTo(staffId) {', '\nasync function connectAdminDevice()');
   const state = existing ? {
     staff: [{ id: 'student-a', name: '김학생' }],
@@ -44,7 +44,7 @@ function studentConnectionHarness({ existing, exchangeFails, initialRoute }) {
     staff: [], tasks: [], checks: {}, settings: { myToken: '', pushAt: 0 }
   };
 
-  return new Function('state', 'existing', 'exchangeFails', 'initialRoute', `
+  return new Function('state', 'existing', 'exchangeFails', 'initialRoute', 'initialLinkStaffId', `
     const STUDENT_LINK_BLOCK_KEY = 'wb_consult_student_link_blocked';
     const store = new Map([[STUDENT_LINK_BLOCK_KEY, 'old blocked error']]);
     const sessionStorage = {
@@ -52,7 +52,22 @@ function studentConnectionHarness({ existing, exchangeFails, initialRoute }) {
       setItem(key, value) { store.set(key, String(value)); },
       removeItem(key) { store.delete(key); }
     };
-    const session = { staffId: 'student-a', isStaffLink: true };
+    let linkStaffId = initialLinkStaffId;
+    const location = {
+      href: 'https://example.com/consult/' + (linkStaffId ? '?u=' + linkStaffId : '') + '#c=used-bootstrap-code',
+      pathname: '/consult/', search: linkStaffId ? '?u=' + linkStaffId : '', hash: '#c=used-bootstrap-code'
+    };
+    const historyUrls = [];
+    const history = { replaceState(_state, _title, value) {
+      const next = new URL(value, location.href);
+      location.href = next.href; location.pathname = next.pathname; location.search = next.search; location.hash = next.hash;
+      linkStaffId = next.searchParams.get('u') || '';
+      historyUrls.push(value);
+    } };
+    const session = {
+      get staffId() { return linkStaffId; },
+      get isStaffLink() { return !!linkStaffId; }
+    };
     let pendingStudentCode = 'used-bootstrap-code';
     let pendingStudentWelcome = false;
     let pendingAdminCode = '';
@@ -63,8 +78,11 @@ function studentConnectionHarness({ existing, exchangeFails, initialRoute }) {
     let viewStaff = '';
     let route = initialRoute;
     let exchangeCalls = 0;
+    let exchangeStaffId = null;
     let syncRuns = 0;
+    let syncStaffId = '';
     let resetCalls = 0;
+    let resetStaffId = '';
     let hashClears = 0;
     const routes = [];
     const toasts = [];
@@ -76,12 +94,13 @@ function studentConnectionHarness({ existing, exchangeFails, initialRoute }) {
       collect() { return []; },
       auth() { return existing ? { mode: 'person', id: 'student-a', token: state.settings.myToken } : null; },
       enabled() { return existing; },
-      async exchangeBootstrap() {
+      async exchangeBootstrap(staffId) {
         exchangeCalls++;
+        exchangeStaffId = staffId;
         if (exchangeFails) { const error = new Error('already used'); error.status = 410; throw error; }
-        return { token: 'new-student-token' };
+        return { token: 'new-student-token', staffId: 'student-a' };
       },
-      async run() { syncRuns++; }
+      async run() { syncRuns++; syncStaffId = session.staffId; }
     };
     function staffById(id) { return state.staff.find(row => row.id === id) || null; }
     function currentStaff() { return staffById(session.staffId); }
@@ -95,10 +114,9 @@ function studentConnectionHarness({ existing, exchangeFails, initialRoute }) {
     function render() {}
     function save() { return true; }
     function clearConsultLinkContacts() {}
-    function resetStudentLinkCache() { resetCalls++; return true; }
+    function resetStudentLinkCache() { resetCalls++; resetStaffId = session.staffId; return true; }
     function clearStudentCodeHash() { hashClears++; }
     function isEmbeddedStudentBrowser() { return false; }
-    const location = { hash: '' };
     function go(next) { route = next; routes.push(next); }
     function toast(message) { toasts.push(String(message)); }
     function now() { return Date.now(); }
@@ -110,12 +128,13 @@ function studentConnectionHarness({ existing, exchangeFails, initialRoute }) {
       snapshot() {
         return {
           route, routes: routes.slice(), toasts: toasts.slice(), exchangeCalls, syncRuns,
-          resetCalls, hashClears, pendingStudentCode, studentConnectError,
+          exchangeStaffId, syncStaffId, resetCalls, resetStaffId, hashClears, historyUrls: historyUrls.slice(),
+          linkedStaffId: session.staffId, pendingStudentCode, studentConnectError,
           blocked: sessionStorage.getItem(STUDENT_LINK_BLOCK_KEY)
         };
       }
     };
-  `)(state, existing, exchangeFails, initialRoute);
+  `)(state, existing, exchangeFails, initialRoute, linkStaffId);
 }
 
 function learningSources() {
@@ -135,6 +154,7 @@ function renderLearningSourceCard(studentName, state) {
   const renderCard = new Function(
     'LEARNING_SOURCES', 'ONLINE_LEARNING_SOURCE_KEYS', 'state', 'session', 'isManager', 'isDone', 'learningTaskDate',
     'learningDueDate', 'today', 'esc', 'classcardAppUrl', 'navigator', 'taskRow',
+    'CHECKLIST_ONLINE_SOURCE_DEFAULTS', 'isRepeatingTask', 'effectiveOccursOn', 'learningOccurrenceDate', 'repeatLabel',
     source + '; return learningSourceCard;'
   )(
     learningSources(), ['leaders_eye', 'metamath', 'classcard', 'studyforce', 'nelt_exam', 'daily_nonfiction'],
@@ -143,7 +163,18 @@ function renderLearningSourceCard(studentName, state) {
     value => String(value == null ? '' : value).replace(/[&<>"']/g, char => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
     })[char]),
-    () => '', { userAgent: '', maxTouchPoints: 0 }, () => ''
+    () => '', { userAgent: '', maxTouchPoints: 0 }, () => '',
+    {
+      leaders_eye: { title: '리더스아이 오늘 학습', subject: 'english', minutes: 20 },
+      daily_nonfiction: { title: '하루 비문학 독서', subject: 'korean', minutes: 20 }
+    },
+    task => !!(task && ['daily', 'weekday', 'days'].includes(task.repeat)),
+    (task, date) => !task.deleted && (!task.start || date >= task.start) && (!task.end || date <= task.end) &&
+      (task.repeat === 'daily' || (task.repeat === 'weekday' && [1, 2, 3, 4, 5].includes(new Date(date + 'T00:00:00').getDay())) ||
+       (task.repeat === 'days' && (task.days || []).includes(new Date(date + 'T00:00:00').getDay())) ||
+       (task.repeat === 'once' && task.start === date)),
+    (task, date) => ['daily', 'weekday', 'days'].includes(task.repeat) ? date : task.start,
+    task => task.repeat === 'weekday' ? '평일(월~금)' : task.repeat || ''
   );
   return renderCard({ id: 'student-a', name: studentName }, true, 'leaders_eye');
 }
@@ -164,6 +195,21 @@ test('a newly exchanged #c student opens Today and reaches the guide only from t
   const startup = between('load();', '\nrender();');
   assert.doesNotMatch(startup, /pendingStudentWelcome[\s\S]*?route\s*=\s*'guide'/,
     'startup must not force the guide over the Today default');
+});
+
+test('a code-only #c link restores the returned student ID before storing and syncing', async () => {
+  const harness = studentConnectionHarness({
+    existing: false, exchangeFails: false, initialRoute: 'today', linkStaffId: ''
+  });
+  await harness.run();
+  const result = harness.snapshot();
+
+  assert.equal(result.exchangeStaffId, '', 'code-only exchange must omit a guessed student ID');
+  assert.equal(result.linkedStaffId, 'student-a');
+  assert.equal(result.resetStaffId, 'student-a', 'the returned student ID must be in the URL before token storage');
+  assert.equal(result.syncStaffId, 'student-a', 'the first sync must use the returned student scope');
+  assert.ok(result.historyUrls.some(url => /[?&]u=student-a(?:[&#]|$)/.test(url)));
+  assert.equal(result.route, 'today');
 });
 
 test('re-tapping the same #c link reuses a valid same-student session without exchange or blocking', async () => {
@@ -208,7 +254,6 @@ test('the Leaders Eye student card renders shared login guidance with the curren
     assert.match(card, /1주일마다 자동으로 레벨이 조정됩니다/);
     assert.match(card, /오늘 미기록/);
     assert.match(card, /data-act="learningdailyopen"[\s\S]*?오늘 학습 완료 기록/);
-    assert.match(card, /회차나 별도 과제 배정은 필요하지 않습니다/);
   }
   assert.match(first, /Student ID[\s\S]*?김민준/);
   assert.doesNotMatch(first, /이서연/);

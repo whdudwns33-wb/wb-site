@@ -10,6 +10,9 @@ import {
 import worker from './worker-core.js';
 
 const migration = fs.readFileSync(new URL('./migrations/053_consult_link_send.sql', import.meta.url), 'utf8');
+const phoneOwnerMigration = fs.readFileSync(
+  new URL('./migrations/072_consult_link_phone_owner.sql', import.meta.url), 'utf8'
+);
 const schema = fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8');
 const moduleSource = fs.readFileSync(new URL('./consult-link-send.js', import.meta.url), 'utf8');
 const workerSource = fs.readFileSync(new URL('./worker-core.js', import.meta.url), 'utf8');
@@ -27,7 +30,7 @@ class Statement {
 }
 
 class TestD1 {
-  constructor() {
+  constructor(withPhoneOwner = true) {
     this.database = new DatabaseSync(':memory:');
     this.database.exec(`
       CREATE TABLE staff (
@@ -41,6 +44,7 @@ class TestD1 {
       );
     `);
     this.database.exec(migration);
+    if (withPhoneOwner) this.database.exec(phoneOwnerMigration);
   }
   prepare(sql) { return new Statement(this.database, sql); }
   batch(statements) {
@@ -58,6 +62,7 @@ class TestD1 {
 
 const authBody = { mode: 'admin', secret: 'test-secret' };
 const resolvedAdmin = { scope: 'all', role: 'admin' };
+const own = id => ({ scope: 'own', id });
 const json = (body, status = 200) => new Response(JSON.stringify(body), {
   status, headers: { 'content-type': 'application/json' }
 });
@@ -83,9 +88,12 @@ function seedStudent(db, id, name, extra = {}) {
 }
 
 async function call(db, body, options = {}) {
+  const requestAuth = options.auth && options.auth.scope === 'own'
+    ? { mode: 'person', id: options.auth.id, token: 'student-token' }
+    : authBody;
   const response = await handleConsultLinkSend(
     env(db, options.env), options.app || 'consult',
-    { app: options.app || 'consult', auth: authBody, ...body }, '*',
+    { app: options.app || 'consult', auth: requestAuth, ...body }, '*',
     options.auth || resolvedAdmin, json,
     options.issue || (async () => ({ code: 'a'.repeat(48), expiresAt: Date.now() + 86400000 })),
     options.revoke || (async () => true)
@@ -93,9 +101,113 @@ async function call(db, body, options = {}) {
   return { status: response.status, body: await response.json() };
 }
 
-async function register(db, staffId = 'student-a', phone = '010-1234-5678') {
+test('student self_get/set register only the active authenticated student and never expose raw phone', async () => {
+  const db = new TestD1();
+  seedStudent(db, 'student-a', '김학생');
+  seedStudent(db, 'student-b', '이학생');
+
+  let result = await call(db, { action: 'self_get' }, { auth: own('student-a') });
+  assert.equal(result.status, 200);
+  assert.deepEqual(result.body.contact, {
+    staffId: 'student-a', studentName: '김학생', phoneRegistered: false,
+    phoneOwner: 'unknown', consent: false, updatedAt: 0
+  });
+
+  result = await call(db, {
+    action: 'self_set', phone: '010-1234-5678', phoneOwner: 'mother',
+    consent: true, expectedUpdatedAt: 0
+  }, { auth: own('student-a') });
+  assert.equal(result.status, 200, JSON.stringify(result.body));
+  assert.equal(result.body.contact.phoneMasked, '010****5678');
+  assert.equal(result.body.contact.phoneOwner, 'mother');
+  assert.equal(JSON.stringify(result.body).includes('01012345678'), false);
+  const stored = db.prepare(
+    "SELECT staff_id,phone,phone_owner,consent,updated_by FROM consult_link_contacts WHERE app='consult'"
+  ).first();
+  assert.equal(stored.staff_id, 'student-a');
+  assert.equal(stored.phone, '01012345678');
+  assert.equal(stored.phone_owner, 'mother');
+  assert.equal(stored.consent, 1);
+  assert.equal(stored.updated_by, 'student-a');
+
+  result = await call(db, { action: 'self_get' }, { auth: own('student-a') });
+  assert.equal(result.body.contact.phoneMasked, '010****5678');
+  assert.equal(result.body.contact.phoneOwner, 'mother');
+  assert.equal(JSON.stringify(result.body).includes('01012345678'), false);
+  assert.equal(db.prepare(
+    "SELECT COUNT(*) AS count FROM consult_link_contacts WHERE staff_id='student-b'"
+  ).first().count, 0);
+});
+
+test('student self contact keeps old clients unknown and rejects invalid, injected, or inactive requests', async () => {
+  const db = new TestD1();
+  seedStudent(db, 'student-a', '김학생');
+  seedStudent(db, 'student-b', '이학생');
+
+  let result = await call(db, {
+    action: 'self_set', staffId: 'student-b', phone: '01012345678', phoneOwner: 'student', consent: true,
+    expectedUpdatedAt: 0
+  }, { auth: own('student-a') });
+  assert.equal(result.status, 400);
+  assert.equal(result.body.code, 'REQUEST_FIELD_FORBIDDEN');
+  result = await call(db, { action: 'self_get', staffId: 'student-b' }, {
+    auth: own('student-a')
+  });
+  assert.equal(result.status, 400);
+  assert.equal(result.body.code, 'REQUEST_FIELD_FORBIDDEN');
+
+  result = await call(db, {
+    action: 'self_set', phone: '01012345678', consent: true, expectedUpdatedAt: 0
+  }, { auth: own('student-b') });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.contact.phoneOwner, 'unknown');
+  assert.equal(JSON.stringify(result.body).includes('01012345678'), false);
+
+  result = await call(db, {
+    action: 'self_set', phone: '01012345678', phoneOwner: 'guardian',
+    consent: true, expectedUpdatedAt: 0
+  }, { auth: own('student-a') });
+  assert.equal(result.status, 400);
+  assert.equal(result.body.code, 'PHONE_OWNER_INVALID');
+
+  result = await call(db, {
+    action: 'self_set', phone: '01012', phoneOwner: 'student', consent: true, expectedUpdatedAt: 0
+  }, { auth: own('student-a') });
+  assert.equal(result.status, 400);
+  assert.equal(result.body.code, 'PHONE_INVALID');
+
+  result = await call(db, {
+    action: 'self_set', phone: '', phoneOwner: 'student', consent: true, expectedUpdatedAt: 0
+  }, { auth: own('student-a') });
+  assert.equal(result.status, 400);
+  assert.equal(result.body.code, 'PHONE_REQUIRED');
+
+  result = await call(db, {
+    action: 'self_set', phone: '01012345678', phoneOwner: 'student', consent: false,
+    expectedUpdatedAt: 0
+  }, { auth: own('student-a') });
+  assert.equal(result.status, 400);
+  assert.equal(result.body.code, 'CONSENT_REQUIRED');
+  assert.equal(db.prepare(
+    "SELECT COUNT(*) AS count FROM consult_link_contacts WHERE staff_id='student-a'"
+  ).first().count, 0);
+
+  result = await call(db, { action: 'self_get' }, { auth: own('missing-student') });
+  assert.equal(result.status, 409);
+  assert.equal(result.body.code, 'STUDENT_NOT_ACTIVE');
+  result = await call(db, {
+    action: 'self_set', phone: '01012345678', phoneOwner: 'student', consent: true,
+    expectedUpdatedAt: 0
+  }, { auth: own('missing-student') });
+  assert.equal(result.status, 409);
+  assert.equal(result.body.code, 'STUDENT_NOT_ACTIVE');
+});
+
+async function register(
+  db, staffId = 'student-a', phone = '010-1234-5678', phoneOwner = 'student'
+) {
   const result = await call(db, {
-    action: 'set', staffId, phone, consent: true, expectedUpdatedAt: 0
+    action: 'set', staffId, phone, phoneOwner, consent: true, expectedUpdatedAt: 0
   });
   assert.equal(result.status, 200, JSON.stringify(result.body));
   return result.body.contact;
@@ -123,6 +235,22 @@ test('migration is additive, consult-only, privacy separated, and routed with th
     assert.doesNotMatch(consultLinkLedger, /student_identity_hash/);
   }
   assert.doesNotMatch(migration, /DROP\s+TABLE|DELETE\s+FROM/i);
+  assert.doesNotMatch(phoneOwnerMigration, /DROP\s+TABLE|DELETE\s+FROM/i);
+  assert.match(schema, /phone_owner\s+TEXT NOT NULL DEFAULT 'unknown'/);
+  assert.match(phoneOwnerMigration,
+    /ADD COLUMN phone_owner TEXT NOT NULL DEFAULT 'unknown'[\s\S]*'mother'/);
+  const legacyDb = new TestD1(false);
+  legacyDb.prepare(
+    "INSERT INTO consult_link_contacts " +
+    "(app,staff_id,student_name,phone,consent,updated_at,updated_by) VALUES(?,?,?,?,?,?,?)"
+  ).bind('consult', 'legacy-student', '기존학생', '01012345678', 1, Date.now(), 'director').run();
+  legacyDb.database.exec(phoneOwnerMigration);
+  assert.equal(legacyDb.prepare(
+    "SELECT phone_owner FROM consult_link_contacts WHERE staff_id='legacy-student'"
+  ).first().phone_owner, 'unknown');
+  assert.throws(() => legacyDb.prepare(
+    "UPDATE consult_link_contacts SET phone_owner='guardian' WHERE staff_id='legacy-student'"
+  ).run(), /CHECK constraint failed/);
   assert.match(workerSource, /handleConsultLinkSend/);
   assert.match(workerSource, /issueBootstrap\(env, 'consult', staffId, BOOTSTRAP_TTL_MS\)/);
   assert.match(workerSource,
@@ -130,7 +258,8 @@ test('migration is additive, consult-only, privacy separated, and routed with th
   assert.match(wrangler, /SOLAPI_KAKAO_CONSULT_LINK_APPROVED_TEMPLATE_ID/);
   assert.match(wrangler, /WB_CONSULT_LINK_SEND_ENABLED/);
   assert.equal(CONSULT_LINK_TEMPLATE_BUTTON_URL,
-    'https://whdudwns33-wb.github.io/wb-site/consult/?u=#{학생ID}#c=#{연결코드}');
+    'https://whdudwns33-wb.github.io/wb-site/consult/#c=#{연결코드}');
+  assert.equal(CONSULT_LINK_TEMPLATE_BUTTON_URL.replace('#{연결코드}', 'b'.repeat(48)).length, 99);
   assert.match(moduleSource, /SOLAPI_TIMEOUT_MS = 8000/);
   assert.doesNotMatch(moduleSource, /student_identity_hash|identityHash/);
   assert.doesNotMatch(migration, /\bphone\b[\s\S]{0,40}consult_link_sends/i);
@@ -166,20 +295,34 @@ test('list/set mask D1-only phones, exclude owner/manager/deleted, and enforce C
   seedStudent(db, 'manager-a', '관리자', { manager: true });
   seedStudent(db, 'deleted-a', '삭제', { deleted: true });
 
-  const saved = await register(db);
+  let result = await call(db, {
+    action: 'set', staffId: 'student-a', phone: '01012345678', consent: true,
+    expectedUpdatedAt: 0
+  });
+  assert.equal(result.status, 200);
+  assert.equal(result.body.contact.phoneOwner, 'unknown');
+
+  result = await call(db, {
+    action: 'set', staffId: 'student-a', phone: '01012345678', phoneOwner: 'mother', consent: true,
+    expectedUpdatedAt: result.body.contact.updatedAt
+  });
+  assert.equal(result.status, 200);
+  const saved = result.body.contact;
   assert.equal(saved.phoneMasked, '010****5678');
+  assert.equal(saved.phoneOwner, 'mother');
   assert.equal(saved.phoneRegistered, true);
   assert.equal(JSON.stringify(saved).includes('01012345678'), false);
   const stored = db.prepare("SELECT * FROM consult_link_contacts WHERE staff_id='student-a'").first();
   assert.equal(stored.phone, '01012345678');
 
-  let result = await call(db, { action: 'list' });
+  result = await call(db, { action: 'list' });
   assert.equal(result.status, 200);
   assert.deepEqual(result.body.contacts.map(item => item.staffId), ['student-a']);
+  assert.equal(result.body.contacts[0].phoneOwner, 'mother');
   assert.equal(JSON.stringify(result.body).includes('01012345678'), false);
 
   result = await call(db, {
-    action: 'set', staffId: 'student-a', phone: '01099998888', consent: true,
+    action: 'set', staffId: 'student-a', phone: '01099998888', phoneOwner: 'student', consent: true,
     expectedUpdatedAt: 0
   });
   assert.equal(result.status, 409);
@@ -187,7 +330,7 @@ test('list/set mask D1-only phones, exclude owner/manager/deleted, and enforce C
   assert.equal(JSON.stringify(result.body).includes('01012345678'), false);
 
   result = await call(db, {
-    action: 'set', staffId: 'student-a', phone: '', consent: false,
+    action: 'set', staffId: 'student-a', phone: '', phoneOwner: 'student', consent: false,
     expectedUpdatedAt: saved.updatedAt
   });
   assert.equal(result.status, 200);
@@ -236,9 +379,8 @@ test('send creates one ATA dispatch with exact server variables and returns no p
   assert.equal(message.text, undefined);
   assert.equal(message.kakaoOptions.disableSms, true);
   assert.deepEqual(Object.keys(message.kakaoOptions.variables).sort(),
-    ['#{연결코드}', '#{학생ID}', '#{학생명}'].sort());
+    ['#{연결코드}', '#{학생명}'].sort());
   assert.equal(message.kakaoOptions.variables['#{학생명}'], '김학생');
-  assert.equal(message.kakaoOptions.variables['#{학생ID}'], 'student-a');
   assert.equal(message.kakaoOptions.variables['#{연결코드}'], 'b'.repeat(48));
   assert.equal(requestPayload.strict, true);
   assert.equal(requestPayload.allowDuplicates, false);
@@ -452,7 +594,8 @@ test('task, own scope, owner targets, and injected send fields are rejected befo
   assert.equal(result.status, 400);
   assert.equal(result.body.code, 'REQUEST_FIELD_FORBIDDEN');
   result = await call(db, {
-    action: 'set', staffId: 'owner-a', phone: '01099998888', consent: true, expectedUpdatedAt: 0
+    action: 'set', staffId: 'owner-a', phone: '01099998888', phoneOwner: 'student',
+    consent: true, expectedUpdatedAt: 0
   }, { issue });
   assert.equal(result.status, 409);
   assert.equal(fetches, 0);

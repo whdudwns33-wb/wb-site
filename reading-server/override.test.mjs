@@ -64,6 +64,59 @@ for (const f of pages) {
   if (!build.includes("'" + f + "'")) E(`public/${f} 가 build-dist.mjs 에 없습니다 — 배포본에서 404가 납니다`);
 }
 
+/* ── 워커 번들에 Node 전용 모듈이 섞이지 않는가 ──
+   2026-09-03, 팩 제작 스튜디오를 올렸는데 배포가 두 번 실패했다. 원인은 한 줄이었다:
+     import { createRequire } from 'node:module';
+   Cloudflare Workers 에는 node:module 이 없다(nodejs_compat 도 안 켜져 있고, 켜도
+   런타임 require 는 번들러가 못 푼다). 저장소 테스트는 전부 통과했다 — Node 에서는
+   그 줄이 잘 돌기 때문이다. 그래서 '테스트 초록 + 배포 실패 + 학생 화면은 옛 코드'라는
+   가장 나쁜 조합이 됐다. 여기서 worker.mjs 의 import 그래프를 훑어 그 조합을 막는다.
+   (server.mjs 는 Node 전용이라 이 검사 밖이다 — 워커에서 임포트되지 않는다.) */
+const WORKER_ENTRY = 'worker.mjs';
+function importGraph(entry) {
+  const seen = new Set(), out = [];
+  const walk = (rel) => {
+    if (seen.has(rel)) return;
+    seen.add(rel);
+    const fp = path.join(DIR, rel);
+    if (!fs.existsSync(fp)) return;
+    const txt = fs.readFileSync(fp, 'utf8');
+    /* 주석은 떼고 본다 — "createRequire 를 쓰지 마라"고 적은 주석이 스스로 걸린다 */
+    out.push({ rel, txt, code: txt.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/[^\n]*/g, '$1') });
+    /* 정적 import/export-from 만 따라간다 — 워커 번들에 실제로 들어가는 것이 그것뿐이다 */
+    for (const m of txt.matchAll(/(?:^|\n)\s*(?:import|export)[^;'"\n]*from\s*['"]([^'"]+)['"]/g)) {
+      const spec = m[1];
+      if (!spec.startsWith('.')) continue;
+      walk(path.normalize(path.join(path.dirname(rel), spec)));
+    }
+    for (const m of txt.matchAll(/(?:^|\n)\s*import\s*['"](\.[^'"]+)['"]/g)) {
+      walk(path.normalize(path.join(path.dirname(rel), m[1])));
+    }
+  };
+  walk(entry);
+  return out;
+}
+const graph = importGraph(WORKER_ENTRY);
+if (graph.length < 5) E(`워커 import 그래프를 ${graph.length}개만 찾았습니다 — 이 검사가 헛돌고 있습니다`);
+for (const { rel, code } of graph) {
+  const nodeImp = [...code.matchAll(/from\s*['"](node:[a-z_/]+)['"]/g)].map((m) => m[1]);
+  if (nodeImp.length)
+    E(`${rel} 이 ${nodeImp.join(', ')} 를 임포트합니다 — 워커 번들에 들어가면 배포가 실패합니다 (Cloudflare 에 Node 내장 모듈이 없습니다)`);
+  if (/createRequire/.test(code))
+    E(`${rel} 이 createRequire 를 씁니다 — 워커에서 못 씁니다. 정적 import 로 바꾸세요 (브라우저 공용 모듈도 기본 import 로 module.exports 를 받습니다)`);
+  if (/\brequire\s*\(/.test(code) && !/typeof module/.test(code))
+    E(`${rel} 이 런타임 require 를 씁니다 — 번들러가 풀지 못합니다`);
+}
+/* 비용 장부 어댑터가 양쪽 호스트에 다 있는가 — 한쪽만 있으면 그 호스트에서는 한도가 없는 셈이다 */
+for (const [name, rel] of [['worker.mjs', 'worker.mjs'], ['server.mjs', 'server.mjs']]) {
+  const txt = fs.readFileSync(path.join(DIR, rel), 'utf8');
+  for (const fn of ['getAiUse', 'putAiUse'])
+    if (!txt.includes(fn + ':')) E(`${name} 의 내신 저장소 어댑터에 ${fn} 이 없습니다 — 그 호스트에서는 AI 비용 한도가 걸리지 않습니다`);
+}
+
+/* 공용 검사 모듈이 실제로 그래프에 들어와 있는가 — 배포 관문이 CLI 검증기와 같은 규칙을 쓰는 근거다 */
+if (!graph.some((g) => g.rel.endsWith('pack-check.js')))
+  E('worker.mjs 그래프에 naesin/pack-check.js 가 없습니다 — 배포 관문이 검사 규칙을 잃었습니다');
 /* ── 관리 화면이 부르는 스크립트가 배포본에 있는가 ──
    화면은 public/ 전체가 서빙되는 로컬에서 만들지만 배포본은 파일을 한 장씩 복사한다.
    <script src> 하나를 새로 걸고 복사 목록에 안 넣으면 운영에서만 404가 나고, 화면은

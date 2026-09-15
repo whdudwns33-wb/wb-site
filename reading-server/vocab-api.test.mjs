@@ -788,4 +788,57 @@ await t('아레나 — 낱말이 모자라면 문제를 안 낸다', async () =>
   assert.ok(out.body.why);
 });
 
+/* ── 밤 9시 푸시가 내신도 본다 (§12 Phase 2) ── */
+/* VAPID 서명 자체는 위에서 따로 검증한다 — 여기서는 '누구에게 보내는가'만 본다.
+   다만 키가 가짜면 서명에서 던져 카운터가 안 움직이므로 실제 키를 쓴다. */
+const _pair = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
+const pushEnv = { publicKey: 'PUB', privateJwk: JSON.stringify(await crypto.subtle.exportKey('jwk', _pair.privateKey)), subject: 'mailto:t@wb.local' };
+function pushStore({ vocabDue }) {
+  return {
+    listPushCodes: async () => ['abcd'],
+    getPush: async () => ({ endpoint: 'https://push.example/abcd' }),
+    getState: async () => (vocabDue ? { state: { states: { a: { due: 1, graduated: false } } } } : { state: { states: {} } }),
+    delPush: async () => {},
+  };
+}
+function naesinAdapter({ exam, summary, savedAt }) {
+  return { getExam: async (s) => (s === 'default' ? exam : null),
+    getState: async () => ({ updatedAt: savedAt, state: { summary } }) };
+}
+const NAESIN_LEFT = { packId: '2022-ne-kimgitaek-m2-L6',
+  word: { total: 10, stable: 3 }, sentence: { total: 5, memorized: 1 } };
+const EXAM_LIVE = { examDate: '2026-09-30', packIds: ['2022-ne-kimgitaek-m2-L6'] };
+const T_NOW = Date.parse('2026-09-20T13:00:00Z');
+const okFetch = async () => ({ status: 201 });
+
+await t('밤 푸시 — 워드브레인이 비어도 내신이 남았으면 보낸다', async () => {
+  const r = await sendNightPushes({ store: pushStore({ vocabDue: false }), push: pushEnv, fetchFn: okFetch,
+    naesin: naesinAdapter({ exam: EXAM_LIVE, summary: NAESIN_LEFT, savedAt: '2026-09-19T10:00:00Z' }), now: T_NOW });
+  assert.deepStrictEqual([r.sent, r.skipped, r.naesinOnly], [1, 0, 1]);
+});
+
+await t('밤 푸시 — 둘 다 비었으면 안 보낸다', async () => {
+  const done = { ...NAESIN_LEFT, word: { total: 10, stable: 10 }, sentence: { total: 5, memorized: 5 } };
+  const r = await sendNightPushes({ store: pushStore({ vocabDue: false }), push: pushEnv, fetchFn: okFetch,
+    naesin: naesinAdapter({ exam: EXAM_LIVE, summary: done, savedAt: '2026-09-19T10:00:00Z' }), now: T_NOW });
+  assert.deepStrictEqual([r.sent, r.skipped, r.naesinOnly], [0, 1, 0]);
+});
+
+await t('밤 푸시 — 워드브레인이 남았으면 내신을 보지 않고 보낸다(naesinOnly 로 세지 않는다)', async () => {
+  const r = await sendNightPushes({ store: pushStore({ vocabDue: true }), push: pushEnv, fetchFn: okFetch,
+    naesin: naesinAdapter({ exam: EXAM_LIVE, summary: NAESIN_LEFT, savedAt: '2026-09-19T10:00:00Z' }), now: T_NOW });
+  assert.deepStrictEqual([r.sent, r.naesinOnly], [1, 0]);
+});
+
+await t('밤 푸시 — naesin 어댑터를 안 넘기면 예전 그대로(워드브레인만)', async () => {
+  const r = await sendNightPushes({ store: pushStore({ vocabDue: false }), push: pushEnv, fetchFn: okFetch, now: T_NOW });
+  assert.deepStrictEqual([r.sent, r.skipped], [0, 1]);
+});
+
+await t('밤 푸시 — 내신 저장소가 던져도 푸시 전체가 멈추지 않는다', async () => {
+  const boom = { getExam: async () => { throw new Error('KV down'); }, getState: async () => ({}) };
+  const r = await sendNightPushes({ store: pushStore({ vocabDue: false }), push: pushEnv, fetchFn: okFetch, naesin: boom, now: T_NOW });
+  assert.deepStrictEqual([r.sent, r.skipped], [0, 1], '조용히 건너뛴다');
+});
+
 console.log('\n통과 ' + passed + '개 — vocab-api 서버 라우트 검증 완료');

@@ -40,6 +40,7 @@ test('원생 정보의 담당 표시는 종료되지 않은 현재·예정 수�
   assert.match(helpers, /task\.subject \|\| task\.className \|\| task\.lessonRole/);
   assert.doesNotMatch(helpers, /String\(task\.start\) <= reference/);
   assert.match(helpers, /!task\.end \|\| String\(task\.end\) >= reference/);
+  assert.match(helpers, /isRegularLessonTask\(task\)/);
   assert.match(info, /field\('과목별 수업 담당', rosterStudentSubjectTeacherText\(student\.id\)/);
   assert.doesNotMatch(info, /field\('담당 선생님', student\.teacher/);
 });

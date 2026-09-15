@@ -103,20 +103,17 @@ test('accepted, rejected, and unknown have exact non-delivery wording', () => {
   assert.doesNotMatch(source, /발송 완료|전송 완료|전달 완료|수신 ?완료|보호자께 보냈/);
 });
 
-test('makeup notification-needed cards expose the admin manual status/send action at event revision', () => {
+test('simplified makeup cards no longer expose the old guardian notification action', () => {
   const target = block('function guardianOpsTargetForMakeup(caseId)', 'function guardianOpsTargetForSession');
-  const notification = block('function makeupNotificationHtml(row, initialLabel)', 'function makeupCard(row)');
   const card = block('function makeupCard(row)', 'function makeupKpis(rows)');
 
+  // 과거 기록의 상태 확인 도우미는 호환을 위해 남기되 새 3버튼 보강 화면에서는 호출하지 않는다.
   assert.match(target, /row\.notificationNeeded/);
   assert.match(target, /row\.notificationEventRevision/);
   for (const event of ['makeup_proposal', 'makeup_confirmed', 'makeup_cancelled']) {
     assert.match(target, new RegExp(event));
   }
-  assert.match(notification, /if \(!row\.notificationNeeded\) return ''/);
-  assert.match(notification, /session\.isAdmin && target/);
-  assert.match(notification, /알림톡 상태 확인·보내기/);
-  assert.match(card, /makeupNotificationHtml\(row/);
+  assert.doesNotMatch(card, /makeupNotificationHtml|guardianopsmakeup|알림톡 상태 확인·보내기/);
 });
 
 test('active session cards offer a manual current-balance notice only to admin/manager', () => {
@@ -134,9 +131,9 @@ test('send actions are click-only and use the existing authenticated sync error 
   const click = block("case 'gcsave':", '/* 날짜 */');
   const request = block('async function requestGuardianOpsSend(target)', '/* ── 회차제 수업');
 
-  assert.match(click, /case 'guardianopsmakeup': requestGuardianOpsSend\(guardianOpsTargetForMakeup/);
+  assert.doesNotMatch(click, /case 'guardianopsmakeup'/);
   assert.match(click, /case 'opssessionnotice': requestGuardianOpsSend\(opsSessionTarget/);
-  assert.equal((html.match(/requestGuardianOpsSend\(/g) || []).length, 3, '정의와 두 명시 클릭 외 자동 호출이 없어야 한다');
+  assert.equal((html.match(/requestGuardianOpsSend\(/g) || []).length, 2, '정의와 회차 알림의 명시 클릭 외 자동 호출이 없어야 한다');
   assert.match(request, /sync\.post\('\/guardian-ops-send'/);
   assert.match(request, /error && error\.personAuthHandled/);
 });

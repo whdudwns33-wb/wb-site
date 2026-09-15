@@ -5,7 +5,8 @@
    크론: 매일 KV 스냅샷(backup:) 10개 보관 */
 
 import { handleVocab, dumpVocab, sendNightPushes, vocabSummary } from './vocab-api.mjs';
-import { handleNaesin } from './naesin-api.mjs';
+import { handleNaesin, isReservedCode, dropReservedRows, naesinBodyLimit } from './naesin-api.mjs';
+import { handleStudio } from './naesin-studio.mjs';
 import { handleNaesinKo } from './naesin-ko-api.mjs';
 import { bookIndex, cleanWords, coachingCard, confirmAllPlan, findBook, readyToConfirm, sourceSummary, validProgress, withOverlay } from './textbook.mjs';
 import { parseRoster } from './roster.mjs';
@@ -15,9 +16,11 @@ const STATE_MAX_BYTES = 900_000;   // 학생 기록 1건 최대 크기
 const RL_MAX_FAILS = 20;           // 15분당 로그인 실패 허용 횟수
 const BACKUP_KEEP = 10;
 
+/* nosniff — 정적 자산은 _headers 가 붙이지만 워커가 직접 만든 응답에는 붙지 않았다.
+   API JSON 을 브라우저가 HTML 로 추측 렌더하는 길을 막는다(학생이 보낸 문자열이 JSON 에 실려 나간다). */
 const json = (code, obj) => new Response(JSON.stringify(obj), {
   status: code,
-  headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' },
+  headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' },
 });
 
 const nowIso = () => new Date().toISOString();
@@ -137,6 +140,7 @@ function naesinStore(env) {
   return {
     getPack: (id) => env.DB.get('naesin:pack:' + id, 'json'),
     putPack: (id, rec) => env.DB.put('naesin:pack:' + id, JSON.stringify(rec)),
+    deletePack: (id) => env.DB.delete('naesin:pack:' + id),
     getPackIds: () => env.DB.get('naesin:packs', 'json'),
     putPackIds: (ids) => env.DB.put('naesin:packs', JSON.stringify(ids)),
     getState: (c) => env.DB.get('naesin:state:' + c, 'json'),
@@ -144,8 +148,54 @@ function naesinStore(env) {
     listStateCodes: async () => (await kvListAll(env, 'naesin:state:')).map(k => k.slice('naesin:state:'.length)),
     getExam: (s) => env.DB.get('naesin:exam:' + s, 'json'),
     putExam: (s, rec) => env.DB.put('naesin:exam:' + s, JSON.stringify(rec)),
+    deleteExam: (s) => env.DB.delete('naesin:exam:' + s),
+    listExamScopes: async () => (await kvListAll(env, 'naesin:exam:')).map(k => k.slice('naesin:exam:'.length)),
     getTask: (s) => env.DB.get('naesin:task:' + s, 'json'),
     putTask: (s, rec) => env.DB.put('naesin:task:' + s, JSON.stringify(rec)),
+    /* 문항 신고 — 팩별 배열. 학생이 올리고 강사가 처리한다(팩 정오표의 원천) */
+    getReports: (id) => env.DB.get('naesin:report:' + id, 'json'),
+    putReports: (id, list) => env.DB.put('naesin:report:' + id, JSON.stringify(list)),
+    /* 수업 라이브 세션 — 지금 이 단계·투사 문제와 그 응답. 만료(4시간) 판정은 읽는 쪽이 한다.
+       KV 는 만료를 걸 수 있지만(expirationTtl) 단계를 연장할 때마다 새로 써야 하고,
+       만료된 값을 강사 화면이 「끝난 수업」으로 보여 줄 수도 있어 값은 남기고 판정만 한다. */
+    /* 팩 제작 AI 추출의 하루 사용 장부(기획서 §13-8) — 학생용 AI 한도(vocab)와 따로 센다.
+       둘을 한 장부에 담으면 팩 하나 만들다 학생들의 연상 만들기가 막힌다. */
+    getAiUse: () => env.DB.get('naesin:aiuse', 'json'),
+    putAiUse: (rec) => env.DB.put('naesin:aiuse', JSON.stringify(rec)),
+    getLive: (s) => env.DB.get('naesin:live:' + s, 'json'),
+    putLive: (s, rec) => env.DB.put('naesin:live:' + s, JSON.stringify(rec)),
+    deleteLive: (s) => Promise.all([env.DB.delete('naesin:live:' + s), env.DB.delete('naesin:livevote:' + s)]),
+    getVotes: (s) => env.DB.get('naesin:livevote:' + s, 'json'),
+    putVotes: (s, rec) => env.DB.put('naesin:livevote:' + s, JSON.stringify(rec)),
+    /* 팩 제작 작업 — 초안·검수 상태. 원천 텍스트는 구매 자료라 따로 둔다(jobsrc)
+       목록 조회가 매번 수 MB를 읽지 않게. 작업을 지우면 원천도 함께 지운다. */
+    getJob: (id) => env.DB.get('naesin:job:' + id, 'json'),
+    putJob: (id, rec) => env.DB.put('naesin:job:' + id, JSON.stringify(rec)),
+    deleteJob: (id) => env.DB.delete('naesin:job:' + id),
+    listJobs: async () => {
+      const keys = await kvListAll(env, 'naesin:job:');
+      const out = [];
+      for (const k of keys) { const v = await env.DB.get(k, 'json'); if (v) out.push(v); }
+      return out;
+    },
+    getJobSrc: (id) => env.DB.get('naesin:jobsrc:' + id, 'json'),
+    putJobSrc: (id, rec) => env.DB.put('naesin:jobsrc:' + id, JSON.stringify(rec)),
+    deleteJobSrc: (id) => env.DB.delete('naesin:jobsrc:' + id),
+    /* 시험 결과 — 키는 naesin:result:<코드>:<시험일>. 코드도 날짜도 콜론을 못 쓰므로
+       키에서 둘을 그대로 되읽을 수 있다(listResults). 학생 하나가 시험마다 한 줄. */
+    getResult: (c, d) => env.DB.get('naesin:result:' + c + ':' + d, 'json'),
+    putResult: (c, d, rec) => env.DB.put('naesin:result:' + c + ':' + d, JSON.stringify(rec)),
+    deleteResult: (c, d) => env.DB.delete('naesin:result:' + c + ':' + d),
+    listResults: async () => {
+      const out = [];
+      for (const k of await kvListAll(env, 'naesin:result:')) {
+        const rec = await env.DB.get(k, 'json');
+        if (!rec) continue;
+        const [code, examDate] = k.slice('naesin:result:'.length).split(':');
+        out.push({ ...rec, code, examDate });
+      }
+      return out;
+    },
     getStudent: (c) => env.DB.get('student:' + c, 'json'),
   };
 }
@@ -205,11 +255,19 @@ async function fullDump(env) {
   const [textbook, pubmap, textbookSrc] = await Promise.all([env.DB.get('textbook','json'), env.DB.get('pubmap','json'), env.DB.get('textbook-src','json')]);
   /* 내신브레인 — 학생 기록·시험 배정만 담는다. 팩 본문은 원장이 보관한 원본 JSON으로
      재업로드할 수 있고, 담으면 스냅샷이 팩 크기(수 MB)만큼 부풀어서 id 목록만 남긴다. */
-  const naesin = { states: {}, exams: {}, packIds: (await env.DB.get('naesin:packs', 'json')) || [] };
+  const naesin = { packIds: (await env.DB.get('naesin:packs', 'json')) || [], states: {}, exams: {}, tasks: {}, results: {} };
   for (const k of await kvListAll(env, 'naesin:state:'))
     naesin.states[k.slice('naesin:state:'.length)] = await env.DB.get(k, 'json');
   for (const k of await kvListAll(env, 'naesin:exam:'))
     naesin.exams[k.slice('naesin:exam:'.length)] = await env.DB.get(k, 'json');
+  for (const k of await kvListAll(env, 'naesin:task:'))
+    naesin.tasks[k.slice('naesin:task:'.length)] = await env.DB.get(k, 'json');
+  /* 시험 결과는 강사가 손으로 넣은 유일한 실제 성과 자료다 — 잃으면 다시 만들 수 없어서 담는다.
+     로컬 store.naesinSnapshot 과 같은 모양({[코드]:{[시험일]:rec}}). */
+  for (const k of await kvListAll(env, 'naesin:result:')) {
+    const [code, examDate] = k.slice('naesin:result:'.length).split(':');
+    (naesin.results[code] = naesin.results[code] || {})[examDate] = await env.DB.get(k, 'json');
+  }
   /* 국어브레인 — 학생 기록과 **강사가 손으로 만든 것**(오버레이·서술형 확정)을 담는다.
      팩 본문은 영어와 같은 이유로 id 목록만 남긴다. */
   const naesinKo = { states: {}, summaries: {}, reviews: {}, overlays: {}, exams: {}, tasks: {},
@@ -303,7 +361,11 @@ function parentSummary(stu, st, titles, vst, book) {
 export default {
   async scheduled(event, env, ctx) {
     /* 12:00 UTC(21:00 KST) = 밤 9시 물주기 푸시 / 그 외(18:00 UTC) = 일일 백업 */
-    if (event.cron === '0 12 * * *') ctx.waitUntil(sendNightPushes({ store: vocabStore(env), push: vocabPushEnv(env) }));
+    if (event.cron === '0 12 * * *') ctx.waitUntil(sendNightPushes({
+      store: vocabStore(env), push: vocabPushEnv(env),
+      /* 내신 몫도 함께 본다(§12 Phase 2) — 워드브레인이 비어도 시험 범위가 남았으면 부른다 */
+      naesin: naesinStore(env),
+    }));
     else ctx.waitUntil(snapshotBackup(env));
   },
 
@@ -464,10 +526,21 @@ export default {
       /* 내신 (/api/naesin/*) — 인증만 공유, 저장·라우트는 격리 (vocab 선례).
          json()이 모든 응답에 no-store를 붙인다 — 기획서 §10-3. */
       if (p.startsWith('/api/naesin/')) {
-        const out = await handleNaesin({
+        /* 몸통을 읽기 전에 content-length 로 거른다 — 팩은 4.5MB, 나머지는 300KB.
+           req.json() 은 다 읽고서야 크기를 알아서, 기기 하나가 수십 MB 를 보내면 그만큼 워커 메모리·시간을 쓴다. */
+        const len = Number(req.headers.get('content-length') || 0);
+        if (len > naesinBodyLimit(p)) return json(413, { error: '요청이 너무 커서 받을 수 없어요.' });
+        const ctx = {
           path: p, method: req.method, who, query: url.searchParams,
           getBody: () => req.json(), store: naesinStore(env),
+        };
+        /* 팩 제작 스튜디오가 먼저 본다 — 자기 경로가 아니면 null 을 돌려 다음 라우터로 넘긴다 */
+        const st = await handleStudio({
+          ...ctx,
+          ai: { apiKey: env.ANTHROPIC_API_KEY || '', model: env.NAESIN_AI_MODEL || '', env },
         });
+        if (st) return json(st.status, st.body);
+        const out = await handleNaesin(ctx);
         return json(out.status, out.body);
       }
 
@@ -556,6 +629,8 @@ export default {
         const { code, name, grade, cls, level } = await req.json();
         const c = String(code || '').trim();
         if (!/^[A-Za-z0-9-]{3,20}$/.test(c)) return json(400, { error: '학생 코드는 영문/숫자 3~20자' });
+        /* 'default' 는 내신 반 공통 배정의 scope 키 — 학생 코드로 쓰면 개별 배정과 한 키를 두고 싸운다 */
+        if (isReservedCode(c)) return json(400, { error: "'default'는 반 공통 배정에 쓰는 예약어라 학생 코드로 쓸 수 없어요." });
         if (!name) return json(400, { error: '이름 필요' });
         const prev = await env.DB.get('student:' + c, 'json');
         const stu = { ...(prev || {}), code: c, name, grade: grade || '', cls: cls || '', level: level || '', createdAt: prev?.createdAt || nowIso() };
@@ -566,7 +641,7 @@ export default {
       if (p === '/api/admin/students/bulk' && req.method === 'POST') {
         const { text, cls, grade, level, prefix, dryRun } = await req.json();
         const existing = (await kvListAll(env, 'student:')).map(k => k.slice('student:'.length));
-        const { rows, errors } = parseRoster(text, { cls, grade, level, prefix, existing });
+        const { rows, errors } = dropReservedRows(parseRoster(text, { cls, grade, level, prefix, existing }));
         if (dryRun) return json(200, { rows, errors, dryRun: true });
         let created = 0, updated = 0;
         for (const r of rows) {
@@ -734,8 +809,8 @@ export default {
 
       /* 퇴원 처리 — 학생이 남긴 것을 한 번에 지운다.
          지울 것을 하나라도 빠뜨리면, 같은 코드로 새 학생을 등록했을 때 앞 학생의
-         기록이 그대로 따라온다. 학생 정보·학습 기록·워드브레인·학부모 링크·
-         발급된 기기 토큰·승인 대기 줄까지 모두 포함한다. */
+         기록이 그대로 따라온다. 학생 정보·학습 기록·워드브레인·내신브레인(기록·개별 시험 배정)·
+         학부모 링크·발급된 기기 토큰·승인 대기 줄까지 모두 포함한다. */
       if (p === '/api/admin/students' && req.method === 'DELETE') {
         const { code } = await req.json();
         const c = String(code || '').trim();
@@ -750,15 +825,26 @@ export default {
         await drop('state:' + c);
         await drop('vocab:state:' + c);
         await drop('vocab:push:' + c);
-        /* 내신 두 앱의 기록도 함께 — 남으면 퇴원생의 학습 기록·서술형 답안이 그대로 있고,
-           라이선스(재원생 한정)와 개인정보(보관 기간) 양쪽에 걸린다.
-           국어는 요약·서술형·오버레이가 state와 다른 키에 있어 하나씩 지운다(국어 기획서 §8·§10-7). */
+        /* 내신브레인 — 학습 기록과 이 학생만의 시험 배정. 배정이 남으면 같은 코드의 새 학생이
+           앞 학생의 시험 범위(팩)를 그대로 받는다. 반 공통(default)·팩은 학생 것이 아니라 그대로 둔다. */
         await drop('naesin:state:' + c);
+        await drop('naesin:exam:' + c);
+        /* 시험 결과도 이 학생 것이다 — 남으면 같은 코드의 새 학생 화면에 앞 학생 점수가 뜨고,
+           원내 성과 분석에도 퇴원생이 계속 섞인다. 키가 코드로 시작하니 접두로 훑는다. */
+        for (const k of await kvListAll(env, 'naesin:result:' + c + ':')) await drop(k);
+        /* 문항 신고는 팩 정오표라 남긴다 — 학생이 떠나도 그 문항의 오류는 그대로다.
+           다만 누가 올렸는지는 지운다(퇴원생 식별 정보를 팩 자료에 남길 이유가 없다). */
+        for (const k of await kvListAll(env, 'naesin:report:')) {
+          const list = await env.DB.get(k, 'json');
+          if (!Array.isArray(list) || !list.some((r) => r && r.code === c)) continue;
+          await env.DB.put(k, JSON.stringify(list.map((r) => (r && r.code === c ? { ...r, code: '' } : r))));
+        }
+        /* 국어브레인 — 요약·서술형 제출·오버레이가 state 와 다른 키에 있어 하나씩 지운다
+           (국어 기획서 §8 저장 예산·§10-7). 남으면 퇴원생의 학습 기록과 서술형 답안이 그대로 있고,
+           라이선스(재원생 한정)와 개인정보 보관 기간 양쪽에 걸린다. */
         await drop('naesinko:state:' + c);
         await drop('naesinko:summary:' + c);
         await drop('naesinko:review:' + c);
-        /* 학생 개인 배정(시험·오버레이)도 코드 scope로 남아 있을 수 있다 */
-        await drop('naesin:exam:' + c);
         await drop('naesinko:exam:' + c);
         await drop('naesinko:overlay:' + c);
 

@@ -233,20 +233,31 @@ test('paper planner separates subject, study detail, completion, and the daily t
   assert.match(css, /@media \(max-width: 600px\)[\s\S]*?\.study-planner \{ grid-template-columns: 1fr/);
 });
 
-test('online learning is completed in Study instead of duplicated in the paper checklist', () => {
+test('scheduled checklist online learning is visible in Today and completed through the shared Study result', () => {
   const today = section('function viewToday()', 'function studyOffersCard(');
   const planner = section('function studyPlannerCard(', 'function plannerTaskRow(');
+  const plannerRow = section('function plannerTaskRow(', 'function plannerTaskMark(');
   const studyRow = section('function taskRow(', 'function taskPanel(');
   const nextItems = section('function todayNextActionItems(', 'function todayOptionalStudyLinks(');
   const nextCard = section('function todayNextActionCard(', 'function studyTotalHeroCard(');
   const dailyClose = section('function dailyCloseStudyItems(', 'function dailyCloseEventRefs(');
+  const carry = section('function carryOver(', '/** 그 주에 학생이 스스로 추가한 업무 */');
   const css = section('<style>', '</style>');
 
-  assert.match(today, /const plannerList = list\.filter\(task => !isOnlineLearningTask\(task\)\)/);
-  assert.match(today, /const plannerCarry = carry\.filter\(item => !isOnlineLearningTask\(item\.t\)\)/);
+  assert.match(html, /const isChecklistOnlineTask = task => !!\(task && CHECKLIST_ONLINE_SOURCE_DEFAULTS\[task\.source\] && task\.kind !== 'learning_daily_log'\)/);
+  const plannerList = today.match(/const plannerList = ([^;]+);/)?.[1] || '';
+  const plannerCarry = today.match(/const plannerCarry = ([^;]+);/)?.[1] || '';
+  assert.match(plannerList, /isChecklistOnlineTask/);
+  assert.match(plannerCarry, /isChecklistOnlineTask/);
+  assert.doesNotMatch(plannerList, /^list\.filter\(task => !isOnlineLearningTask\(task\)\)$/);
+  assert.doesNotMatch(plannerCarry, /^carry\.filter\(item => !isOnlineLearningTask\(item\.t\)\)$/);
   assert.match(today, /todayNextActionCard\(me, list, carry, offers, lectureChecklist\)/);
   assert.match(today, /studyPlannerCard\(me, cursor, plannerList, plannerCarry, editable\)/);
-  assert.doesNotMatch(planner, /online-learning-summary|isOnlineLearningTask/);
+  assert.match(planner, /plannerTaskRow\(task, date, editable, false\)/);
+  assert.match(plannerRow, /isOnlineLearningTask\(t\)/);
+  assert.match(plannerRow, /isChecklistOnlineTask\(t\)/);
+  assert.match(plannerRow, /learningStatusTag\(learningState\)/);
+  assert.match(plannerRow, /학습하기 ↗/);
   assert.match(studyRow, /learning-direct-task/);
   assert.match(studyRow, /learningState \? '' : '<button class="box"/);
   assert.match(studyRow, /✓ 학습 완료 기록/);
@@ -261,13 +272,13 @@ test('online learning is completed in Study instead of duplicated in the paper c
   assert.match(nextCard, /hiddenOnline[\s\S]*?온라인 학습 ' \+ hiddenOnline \+ '개 더 보기/);
   assert.match(nextCard, /item\.go[\s\S]*?data-go=/);
   assert.match(dailyClose, /tasksFor\(staffId, date\)/);
+  assert.match(carry, /isOnlineLearningTask\(t\) && isRepeatingTask\(t\)/);
   assert.match(css, /\.learning-status\.is-todo/);
   assert.match(css, /\.learning-status\.is-doing/);
   assert.match(css, /\.learning-status\.is-complete/);
   assert.match(css, /\.learning-status\.is-verified/);
   assert.match(css, /\.task\.learning-direct-task/);
   assert.match(css, /\.learning-direct-actions \.btn-primary/);
-  assert.doesNotMatch(css, /\.online-learning-summary/);
 });
 
 test('online learning state distinguishes timer progress, student completion, and approved proof', () => {
@@ -532,7 +543,7 @@ test('planner completion cell distinguishes completed, carried, blocked, and clo
 
 test('daily closeout requires every unfinished item and event to be reviewed after the timer stops', () => {
   const data = section('const DAILY_CLOSE_START', 'function dailyCloseStatusLabel(');
-  const modal = section('function dailyResolutionOptions(', 'function dailyCarryTask(');
+  const modal = section('const canDailyCarryItem', 'function dailyCarryTask(');
   const save = section("case 'dailyclosesave':", "case 'report':");
 
   assert.match(data, /const dailyCloseKey = staffId => '__dailyclose__' \+ staffId/);
@@ -546,9 +557,27 @@ test('daily closeout requires every unfinished item and event to be reviewed aft
   assert.match(modal, /오늘 종료 · 사유 남기기/);
   assert.match(modal, /data-daily-note/);
   assert.match(modal, /data-daily-event/);
+  assert.match(modal, /const canCarry = canDailyCarryItem\(item\)/);
+  assert.match(modal, /dailyResolutionOptions\(saved\.type \|\| '', canCarry\)/);
   assert.match(save, /공부 타이머를 먼저 정지해 주세요/);
   assert.match(save, /처리 방법을 선택해 주세요/);
+  assert.match(save, /type === 'carry' && !canDailyCarryItem\(item\)[\s\S]*?이월할 수 없습니다/);
   assert.match(save, /사유를 입력해 주세요/);
+
+  const helpers = section('const canDailyCarryItem', 'function dailyCloseModal');
+  const carryRules = Function(
+    'isOnlineLearningTask', 'isRepeatingTask',
+    helpers + '\nreturn { canDailyCarryItem, dailyResolutionOptions };'
+  )(
+    task => ['leaders_eye', 'daily_nonfiction'].includes(task && task.source),
+    task => !!(task && ['daily', 'weekday', 'days'].includes(task.repeat))
+  );
+  const recurringOnline = { type: 'task', task: { source: 'leaders_eye', repeat: 'weekday' } };
+  assert.equal(carryRules.canDailyCarryItem(recurringOnline), false);
+  assert.doesNotMatch(carryRules.dailyResolutionOptions('', false), /value="carry"|내일로 이월/);
+  assert.equal(carryRules.canDailyCarryItem({ type: 'task', task: { source: 'leaders_eye' } }), true,
+    'legacy online tasks without repeat remain carryable one-time work');
+  assert.equal(carryRules.canDailyCarryItem({ type: 'task', task: { source: 'reading', repeat: 'daily' } }), true);
 });
 
 test('unclaimed distributed study is mandatory in daily closeout and the report', () => {

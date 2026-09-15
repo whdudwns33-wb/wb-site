@@ -1,8 +1,4 @@
-/*
-  Content-Security-Policy: default-src 'self'; connect-src 'self'; img-src 'self' data:; style-src 'unsafe-inline'; script-src 'self' 'unsafe-inline'; worker-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'
-  X-Frame-Options: DENY
-  Referrer-Policy: no-referrer
-  X-Content-Type-Options: nosniff
-  X-Robots-Tag: noindex, nofollow, noarchive
-  Cache-Control: no-store
-  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
+# 이 파일은 배포에 쓰이지 않는다 — 실제 규칙은 reading/_headers 한 곳에 있다.
+# (build-dist.mjs 가 reading/_headers 만 dist 루트에 싣고, 거기 /naesin/* 규칙이 Cache-Control: no-store 를,
+#  /* 공통 규칙이 CSP·noindex 등 보안 헤더를 준다.)
+# 규칙을 고치려면 reading/_headers 를 고치고 node reading-server/dist-cache.test.mjs 로 확인한다.

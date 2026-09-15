@@ -16,11 +16,11 @@ const RECIPIENT = 'teacher-b';
 const OTHER = 'teacher-c';
 const SOURCE_MEMO = Object.freeze({
   contentProgress: 'Original first half', homework: 'Original homework',
-  comment: 'Original attendance remains late', otherNotes: 'Original note'
+  comment: 'Original attendance remains late', otherNotes: 'Original note', guardianNotice: 'Original guardian notice'
 });
 const RECIPIENT_MEMO = Object.freeze({
   contentProgress: 'Remaining second half', homework: 'Recipient homework',
-  comment: 'Recipient completion note', otherNotes: 'Separate handoff note'
+  comment: 'Recipient completion note', otherNotes: 'Separate handoff note', guardianNotice: 'Recipient guardian notice'
 });
 
 class Statement {

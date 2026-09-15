@@ -25,6 +25,8 @@ fs.copyFileSync(path.join(ROOT, 'public', 'admin.html'), path.join(DIST, 'admin'
 fs.copyFileSync(path.join(ROOT, 'public', 'vocab-review.html'), path.join(DIST, 'admin', 'vocab-review.html'));
 fs.copyFileSync(path.join(ROOT, 'public', 'metrics.html'), path.join(DIST, 'admin', 'metrics.html'));
 fs.copyFileSync(path.join(ROOT, 'public', 'naesin-admin.html'), path.join(DIST, 'admin', 'naesin-admin.html'));
+fs.copyFileSync(path.join(ROOT, 'public', 'naesin-studio.html'), path.join(DIST, 'admin', 'naesin-studio.html'));
+fs.copyFileSync(path.join(ROOT, 'public', 'naesin-live.html'), path.join(DIST, 'admin', 'naesin-live.html'));
 fs.copyFileSync(path.join(ROOT, 'public', 'naesin-ko-admin.html'), path.join(DIST, 'admin', 'naesin-ko-admin.html'));
 
 /* 어휘 나이 진단 (vocab-age/) — 로그인 없이 열리는 공개 페이지.
@@ -37,7 +39,7 @@ for (const f of ['index.html', 'age.js', 'words.json'])
 /* 워드브레인 (vocab/) — 같은 오리진 /vocab/ 에서 서빙해야 진로독서와 localStorage·토큰이 공유된다 */
 const VOCAB = path.join(ROOT, '..', 'vocab');
 fs.mkdirSync(path.join(DIST, 'vocab'), { recursive: true });
-const VOCAB_FILES = ['index.html', 'words.js', 'bridge.js', 'quiz.js', 'srs.js', 'sw.js', 'manifest.webmanifest', 'icon.svg'];
+const VOCAB_FILES = ['index.html', 'words.js', 'bridge.js', 'quiz.js', 'srs.js', 'trace.js', 'sw.js', 'manifest.webmanifest', 'icon.svg'];
 for (const f of VOCAB_FILES) fs.copyFileSync(path.join(VOCAB, f), path.join(DIST, 'vocab', f));
 /* 공통 음성 모듈 — 원본은 shared/ 하나, 두 앱에 같은 파일을 배급한다 */
 const SHARED = path.join(ROOT, '..', 'shared', 'voice.js');
@@ -88,7 +90,7 @@ function stampSW(swPath, shellPaths, prefix) {
 const rTag = stampSW(path.join(DIST, 'sw.js'),
   ['index.html', 'voice.js', 'manifest.webmanifest', 'icon.svg'].map(f => path.join(DIST, f)), 'wbr-shell');
 const vTag = stampSW(path.join(DIST, 'vocab', 'sw.js'),
-  ['index.html', 'voice.js', 'words.js', 'bridge.js', 'quiz.js', 'srs.js', 'manifest.webmanifest', 'icon.svg']
+  ['index.html', 'voice.js', 'words.js', 'bridge.js', 'quiz.js', 'srs.js', 'trace.js', 'manifest.webmanifest', 'icon.svg']
     .map(f => path.join(DIST, 'vocab', f)), 'wbv-shell');
 const nTag = stampSW(path.join(DIST, 'naesin', 'sw.js'),
   ['index.html', 'voice.js', 'engine.js', 'grade.js', 'gen.js', 'pack-sample.json', 'manifest.webmanifest', 'icon.svg']
@@ -97,6 +99,35 @@ const kTag = stampSW(path.join(DIST, 'naesin-ko', 'sw.js'),
   ['index.html', 'voice.js', 'engine.js', 'grade.js', 'gen.js', 'pack-check.js', 'readiness.js',
     'concepts.json', 'pack-sample.json', 'manifest.webmanifest', 'icon.svg']
     .map(f => path.join(DIST, 'naesin-ko', f)), 'wbk-shell');
+
+/* 조립한 것이 실제로 열리는지 확인한다.
+   여기 목록에 새 파일을 안 적으면 배포본에서 404가 나고, 그 스크립트를 쓰는 화면이
+   통째로 죽는다 — 그런데 빌드는 성공한다. 조용히 깨지는 쪽이라 빌드가 직접 막는다. */
+function verifyRefs(htmlPath) {
+  const dir = path.dirname(htmlPath);
+  const html = fs.readFileSync(htmlPath, 'utf8');
+  const refs = [];
+  const add = (re) => { let m; while ((m = re.exec(html))) refs.push(m[1]); };
+  add(/<script[^>]+src="([^"]+)"/g);
+  add(/<link[^>]+href="([^"]+)"/g);
+  const missing = refs
+    .filter((r) => !/^(https?:)?\/\//.test(r) && !r.startsWith('#') && !r.startsWith('data:') && !r.startsWith('/'))
+    .filter((r) => !fs.existsSync(path.join(dir, r.split('?')[0])));
+  return missing.map((m) => path.relative(DIST, path.join(dir, m)));
+}
+
+const broken = [];
+for (const f of ['index.html', 'vocab/index.html', 'vocab-age/index.html', 'admin/index.html',
+  'admin/metrics.html', 'admin/vocab-review.html', 'review.html', 'parent.html',
+  'naesin/index.html']) {
+  const full = path.join(DIST, f);
+  if (fs.existsSync(full)) for (const m of verifyRefs(full)) broken.push(f + ' → ' + m);
+}
+if (broken.length) {
+  console.error('dist/ 에 없는 파일을 화면이 부르고 있다:\n  ' + broken.join('\n  '));
+  console.error('build-dist.mjs 의 복사 목록에 빠진 파일이 있는지 보라.');
+  process.exit(1);
+}
 
 console.log('dist/ 조립 완료:', fs.readdirSync(DIST).join(', '));
 console.log('서비스 워커 캐시 이름:', rTag, '·', vTag, '·', nTag, '·', kTag);

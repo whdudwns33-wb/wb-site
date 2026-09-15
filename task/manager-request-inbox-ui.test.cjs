@@ -34,6 +34,9 @@ function inboxRowsFor(overrides = {}) {
     staffStudentCompactLabelById: (_studentId, fallbackName, fallbackGrade) =>
       [fallbackName, fallbackGrade].filter(Boolean).join(' '),
     taskDisplayTitle: task => String(task && task.title || '').replace(/^\[(?:수업|주문)\]\s*/, ''),
+    MANUAL_MAKEUP_REASON_LABELS: {
+      manual_absence: '결석보강', manual_exam: '시험보강', manual_other: '기타보강'
+    },
     ...overrides
   };
   const argNames = Object.keys(values);
@@ -81,23 +84,51 @@ test('퇴원·휴원·수업삭제·담당자 변경 요청은 현황판에서 �
   }
 });
 
-test('통합 요청함은 선생님별 수업 흐름 아래에 있고 아카등록 교재 목록은 읽지 않는다', () => {
+test('통합 요청함은 수업 흐름 아래에 있고 선생님 생성 보강을 함께 새로고침한다', () => {
   const schedule = source.slice(source.indexOf('function viewSchedule()'), source.indexOf('/* ── 기기 대장 ──'));
   assert.match(schedule, /scheduleTimelineHtml\(timeline, cursor, nowKst\);\s*return h \+ managerRequestInboxHtml\(\)/);
   assert.doesNotMatch(schedule, /managerRequestInboxHtml\(\) \+ scheduleToolbarHtml\(\)/);
   const loader = source.slice(source.indexOf('async function loadManagerRequestInbox'), source.indexOf('function managerRequestInboxHtml'));
-  for (const name of ['loadLessonAssignmentRequests', 'loadLessonChangeQueue', 'loadFeedbackQueue', 'loadBookAddQueue', 'loadBookEditQueue', 'loadGuardianRequests']) {
+  for (const name of ['loadLessonAssignmentRequests', 'loadLessonChangeQueue', 'loadFeedbackQueue', 'loadBookAddQueue', 'loadBookEditQueue', 'loadGuardianRequests', 'loadMakeups']) {
     assert.match(loader, new RegExp(name + '\\(force\\)'));
   }
   assert.doesNotMatch(loader, /loadBookIssues\(force\)/);
   assert.match(source, /bookAddQueueLoaded && bookEditQueueLoaded && guardianRequestsLoaded/);
+  assert.match(source, /tuitionAlertsLoaded && makeupLoaded/);
   const ready = source.slice(source.indexOf('function managerRequestInboxReady'), source.indexOf('async function loadManagerRequestInbox'));
   assert.doesNotMatch(ready, /bookIssueLoaded|bookIssueError/);
-  assert.doesNotMatch(loader, /loadMakeups\(force\)/);
+  assert.match(ready, /makeupError/);
   assert.match(source, /\['schedule', '현황판', managerRequestInboxCount\(\)\]/);
   assert.match(source, /case 'managerinboxrefresh': loadManagerRequestInbox\(true\)/);
   assert.match(source, /기존 검토 화면으로 이동하거나 보호자 요청은 여기서 안전하게 처리합니다\./);
   assert.doesNotMatch(source, /처리는 기존 검토 화면에서 안전하게 진행됩니다\./);
+  assert.match(schedule, /!managerRequestInboxReady\(\) && !managerInboxLoading && !makeupLoading/,
+    '다른 화면에서 보강 목록을 읽는 중이면 통합 요청함 재호출 루프를 만들지 않는다');
+});
+
+test('선생님이 직접 만든 진행 중 보강만 관리자 통합 요청함에 표시한다', () => {
+  const rows = inboxRowsFor({
+    lessonAssignmentRequests: [], lessonChangeQueue: [], feedbackQueue: [],
+    bookAddQueue: [], bookEditQueue: [], guardianRequestRows: [],
+    makeupRows: [
+      {
+        caseId: 'teacher-manual', creationType: 'manual', createdScope: 'own', createdBy: 'teacher-a',
+        status: 'confirmed', studentId: 'student-1', studentName: '학생B', grade: '중2',
+        manualReason: 'manual_exam', confirmedDate: '2026-09-06', confirmedStartTime: '14:00',
+        confirmedEndTime: '14:50', updatedAt: 30
+      },
+      { caseId: 'admin-manual', creationType: 'manual', createdScope: 'all', status: 'confirmed', studentName: '학생C' },
+      { caseId: 'absence', creationType: 'absence', createdScope: 'own', status: 'confirmed', studentName: '학생D' },
+      { caseId: 'done', creationType: 'manual', createdScope: 'own', status: 'completed', studentName: '학생E' }
+    ]
+  });
+
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].kind, '선생님 보강 생성');
+  assert.equal(rows[0].title, '학생B 중2');
+  assert.equal(rows[0].detail, '시험보강 · 2026-09-06 14:00–14:50');
+  assert.equal(rows[0].requester, '염다솜 선생님');
+  assert.equal(rows[0].route, 'makeup');
 });
 
 test('보호자 요청은 서버 문구 대신 안전한 enum 라벨과 CAS 식별자로 통합 요청함에 들어간다', () => {
