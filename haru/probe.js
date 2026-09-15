@@ -56,7 +56,7 @@ var WBHARU_PR = (function () {
       var order = kind === 'hole' ? ['hole', 'shaky', 'probe'] : kind === 'shaky' ? ['shaky', 'hole', 'probe'] : ['probe', 'shaky', 'hole'];
       for (var i = 0; i < order.length; i++) {
         var b = buckets[order[i]];
-        while (b.length) { var r = b.shift(); if (!used[r.atom.id]) { used[r.atom.id] = true; return { kind: kind, r: r, borrowed: order[i] !== kind }; } }
+        while (b.length) { var r = b.shift(); if (!used[r.atom.id]) { used[r.atom.id] = true; return { kind: kind, r: r, borrowed: order[i] !== kind, from: order[i] }; } }
       }
       return null;
     };
@@ -64,7 +64,8 @@ var WBHARU_PR = (function () {
       for (var k = 0; k < (want[kind] || 0); k++) {
         var got = take(kind); if (!got) continue;
         var s = got.r.state;
-        slots.push({ kind: kind, atomId: got.r.atom.id, label: S.slotLabel(kind), atomLabel: got.r.atom.label, subject: got.r.atom.subject,
+        /* 빌려 온 슬롯은 실제 버킷의 이름으로 부른다 — 첫날 학생에게 '다시 만날 칸'(구멍 자리)에 처음 보는 칸이 뜨면 거짓말이 된다 */
+        slots.push({ kind: kind, from: got.from, atomId: got.r.atom.id, label: S.slotLabel(got.from), atomLabel: got.r.atom.label, subject: got.r.atom.subject,
                      why: S.progressLine(s ? s.obs : 0, s ? s.ok : 0, M.MIN_FLUENT_OBS), mode: ph.mode, borrowed: got.borrowed });
       }
     });

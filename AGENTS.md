@@ -10,6 +10,7 @@ WB 독해력학원·웩슬러브레인센터의 원내 학습 웹앱 모음. 어
 | `reading/` | 진로독서 학생 앱 (정적 PWA) + 지문 데이터 |
 | `vocab/` | 워드브레인 — 어휘 SRS 앱 (`srs.js`·`quiz.js`는 순수 로직 모듈) |
 | `naesin/` | 내신브레인 — 영어 내신 시험대비 앱. **상세: `naesin/README.md`** |
+| `haru/` | 하루브레인 — 삼육중 대비 3년 학습 앱(학생 `/haru/`·부모 `parent.html`) + 순수 로직(좌표·SRS·원인·페이스·생성기·리포트) + `atoms.json`(원자 목록, 문항 0). 팩·대응표·플랜·시험지는 저장소에 없다(KV·관리 웹 업로드). **상세: `haru/README.md`** |
 | `reading-server/` | Cloudflare Worker(운영) + Node 로컬 서버 + 관리 웹(`public/`) + dist 조립 |
 | `shared/` | 공용 모듈 (voice.js TTS, qr.js) |
 | `docs/` | 기획서 모음 — 내신: `docs/영어내신-학습웹앱-기획서-v1.md` (v1.2) · 삼육중 대비(기획 단계, 코드 없음): `docs/삼육중-*.md` — 정본은 `삼육중-대비-학습웹앱-기획서-v1.md`, 기술 명세는 `삼육중-대비-앱-설계안-v1.md`, 전형 사실은 `삼육중-전형-사실-정본-v1.md`만 인용. `삼육중-정보수집-로그.md`는 주간 자동 스윕이 쓴다(원장이 정본 후보를 체크해야 정본이 바뀐다) |
@@ -23,6 +24,9 @@ node reading-server/<이름>.test.mjs # 서버 테스트
 node reading-server/build-dist.mjs  # dist 조립 (+ SW 캐시 이름 스탬프)
 PORT=8890 ADMIN_PIN=<pin> DATA_DIR=<dir> node reading-server/server.mjs  # 로컬 서버
 node naesin/pack-validate.mjs <팩 디렉터리>  # 레슨 팩 검증
+for f in haru/*.test.cjs haru/*.test.mjs; do node $f; done   # 하루브레인 순수 로직·달력·조판기
+node reading-server/haru-score.test.mjs && node reading-server/haru-api.test.mjs   # 하루브레인 서버
+node haru/sheet-build.mjs <팩.json> <출력 디렉터리> --frozen --key-id <id>   # 종이 회차 시험지·정답표·paperkey (저장소 밖에서)
 ```
 
 CI: `.github/workflows/deploy-reading.yml` — **main 푸시가 곧 배포**다(테스트 전부 통과 시
@@ -41,7 +45,9 @@ Cloudflare Workers `wb-reading`으로). PR은 스쿼시 머지, 제목에 `(#번
    "왜"를 적는다. 새 로직 모듈에는 반드시 `.test.cjs`/`.test.mjs`를 같이 만든다.
 3. **인증 없이 콘텐츠를 내보내지 않는다.** 학생 토큰(`wbr.auth`) 또는 관리 PIN 토큰.
    배포되는 `_headers`는 `reading/_headers` 하나다(noindex + 앱 경로 no-store) — `naesin/_headers`·
-   `vocab/_headers`는 그리로 안내하는 주석 파일이다. 내신 팩은 자기 시험 범위에 배정된 것만 받는다.
+   `vocab/_headers`·`haru/_headers`는 그리로 안내하는 주석 파일이다. 내신 팩은 자기 시험 범위에 배정된 것만 받는다.
+   하루브레인은 `GET /api/haru/pack`·`/gen`이 정답·해설·오답 태그를 뺀다(정답은 `/answer` 응답에만). 외부 초6 학생
+   (`student.apps:['haru']`)은 호스트가 `who` 검증 직후 한 곳에서 거는 `allowedApp` 게이트로 다른 세 앱을 열지 못한다.
 4. **서버 응답은 래핑 계약**: `/api/naesin/pack` → `{pack, updatedAt}`,
    `/state` → `{state, updatedAt}`, `/exam` → `{exam, scope}` — 클라이언트와 함께 맞춘다.
    학생이 올린 `state.summary`는 서버가 화이트리스트로 정규화하고 화면은 다시 이스케이프한다 —
@@ -51,9 +57,9 @@ Cloudflare Workers `wb-reading`으로). PR은 스쿼시 머지, 제목에 `(#번
 
 ## 운영 주소 (원내 전용 — 링크 외부 공유 금지)
 
-- 학생: `/` 진로독서 · `/vocab/` 워드브레인 · `/naesin/` 내신브레인
+- 학생: `/` 진로독서 · `/vocab/` 워드브레인 · `/naesin/` 내신브레인 · `/haru/` 하루브레인(부모 `/haru/parent.html?t=`)
 - 관리: `/admin/` 진로독서(+교재 코칭 원문 업로드) · `/admin/naesin-admin.html` 내신브레인
-  (팩 업로드·시험 등록·반 성취도)
+  (팩 업로드·시험 등록·반 성취도) · `/admin/haru-admin.html` 하루브레인(코치 보드·등록·팩/대응표/플랜·종이 회수·파기)
 - 베이스: `https://wb-reading.whdudwns33.workers.dev`
 
 ## 진행 중인 큰 작업: 내신브레인

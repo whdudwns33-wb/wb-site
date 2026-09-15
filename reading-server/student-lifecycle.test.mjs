@@ -128,6 +128,39 @@ try {
   ok((await req('/api/admin/students', { method: 'DELETE', token: admin, body: { code: 'default' } })).status !== 200, '⑥-4 default 학생이 존재한다');
   await req('/api/admin/students', { method: 'DELETE', token: admin, body: { code: 'LIFEBULK01' } });
 
+  /* ⑥-5 하루브레인 — 외부 초6(apps:['haru'])은 진로독서·워드브레인·내신을 열지 못하고(D-6), 기록은 3키로 갈리며,
+     퇴원 처리가 haru 4계열을 지우되 원장의 대응표(haru:paperkey:*)는 남긴다(설계안 §7-5). */
+  const HCODE = 'HARULIFE01', HKEY = 'life-key-kor';
+  const planIn = JSON.parse(fs.readFileSync(path.join(DIR, '..', 'haru', 'plans', '2027-pilot.json'), 'utf8'));
+  ok((await req('/api/haru/admin/plan', { method: 'POST', token: admin, body: { cohort: '2027-pilot', plan: planIn } })).body.ok, '⑥-5 플랜 업로드 실패');
+  ok((await req('/api/haru/admin/enroll', { method: 'POST', token: admin, body: { code: HCODE, name: '하루', cohort: '2027-pilot' } })).status === 400, '⑥-5 동의 없는 등록이 통과했다');
+  ok((await req('/api/haru/admin/enroll', { method: 'POST', token: admin, body: { code: HCODE, name: '하루', grade: '초6', cohort: '2027-pilot', consent: { at: '2026-09-10', via: 'paper' } } })).body.ok, '⑥-5 등록 실패');
+  ok((await req('/api/haru/admin/paperkey', { method: 'POST', token: admin, body: { key: { id: HKEY, label: '수명 국어', subject: 'kor', n: 2, timeLimitSec: 600, origin: 'own', holder: 'academy', frozen: true, sets: { A: [1, 2] }, map: { 1: 'k-dev-pattern', 2: 'k-refer' }, answer: { 1: '1', 2: '2' } } } })).body.ok, '⑥-5 대응표 업로드 실패');
+  const hl = (await req('/api/login', { method: 'POST', body: { code: HCODE, device: 'test' } })).body;
+  const hp = ((await req('/api/admin/pending', { token: admin })).body.pending || []).find(x => x.code === HCODE);
+  ok(hp, '⑥-5 하루 학생 승인 대기 없음');
+  await req('/api/admin/pending', { method: 'POST', token: admin, body: { nonce: hp.nonce, action: 'approve' } });
+  const hTok = (await req('/api/login/status?n=' + hl.nonce)).body.token;
+  ok(hTok, '⑥-5 하루 학생 토큰 없음');
+  ok((await req('/api/pull', { token: hTok })).status === 403, '⑥-5 apps:[haru] 토큰이 진로독서를 열었다 — apps 게이트가 뚫렸다');
+  ok((await req('/api/naesin/state', { token: hTok })).status === 403, '⑥-5 apps:[haru] 토큰이 내신을 열었다');
+  ok((await req('/api/vocab/state', { token: hTok })).status === 403, '⑥-5 apps:[haru] 토큰이 워드브레인을 열었다');
+  ok((await req('/api/pull', { token: stuTok })).status === 200, '⑥-5 재원생(apps null) 토큰이 진로독서를 못 연다');
+  ok((await req('/api/haru/today', { token: hTok })).status === 200, '⑥-5 하루 학생이 오늘 카드를 못 받는다');
+  ok((await req('/api/haru/state', { method: 'PUT', token: hTok, body: { state: { v: 2, marker: 'haru-life', days: {}, atoms: {} } } })).status === 200, '⑥-5 하루 기록 저장 실패');
+  ok((await req('/api/haru/state', { method: 'PUT', token: hTok, body: { state: { mocks: [] } } })).status === 400, '⑥-5 mocks 키가 PUT 으로 들어갔다');
+  ok((await req('/api/haru/state', { token: hTok })).body.state?.marker === 'haru-life', '⑥-5 하루 기록을 다시 못 읽는다');
+  const hRefresh = (await req('/api/token/refresh', { method: 'POST', token: hTok })).body;
+  ok(hRefresh.token && hRefresh.token !== hTok, '⑥-5 토큰 재발급 실패');
+  ok((await req('/api/haru/state', { token: hTok })).status === 200, '⑥-5 재발급 뒤 구 토큰이 바로 죽었다 — 만료 시각까지 유효해야 한다');
+  const hPl = (await req('/api/haru/admin/parentlink', { method: 'POST', token: admin, body: { code: HCODE } })).body;
+  ok(hPl.ptoken, '⑥-5 하루 부모 링크 발급 실패');
+  ok((await req('/api/haru/parent?t=' + hPl.ptoken)).status === 200, '⑥-5 부모 링크로 하루 화면을 못 본다');
+  ok((await req('/api/admin/students', { method: 'DELETE', token: admin, body: { code: HCODE } })).body.ok, '⑥-5 하루 학생 퇴원 실패');
+  ok((await req('/api/haru/parent?t=' + hPl.ptoken)).status !== 200, '⑥-5 퇴원 뒤 부모 링크가 살아 있다');
+  ok(!((await req('/api/haru/admin/board', { token: admin })).body.rows || []).some(r => r.code === HCODE), '⑥-5 퇴원 뒤 보드에 남아 있다');
+  ok(((await req('/api/haru/admin/paperkeys', { token: admin })).body.keys || []).some(k => k.id === HKEY), '⑥-5 퇴원이 대응표를 삼켰다');
+
   /* ⑦ 학부모 링크 */
   const ptok = (await req('/api/admin/parentlink', { method: 'POST', token: admin, body: { code: CODE } })).body.token;
   ok(ptok, '⑦ 학부모 링크 발급 실패');
@@ -171,6 +204,8 @@ try {
   await sleep(500); /* 저장은 300ms 디바운스 — 파일까지 반영되기를 기다린다 */
   const disk = fs.readFileSync(path.join(DATA, 'db.json'), 'utf8');
   ok(!disk.includes(CODE), '⑪ 저장 파일에 지운 학생 코드가 남아 있다');
+  ok(!disk.includes(HCODE) && !disk.includes('haru-life'), '⑪ 저장 파일에 지운 하루 학생의 기록이 남아 있다');
+  ok(disk.includes(HKEY), '⑪ 저장 파일에서 대응표가 사라졌다');
   ok(!disk.includes(PACK_ID) && !disk.includes('자체 창작 한글 본문'), '⑪ 저장 파일에 지운 팩이 남아 있다');
   /* 일일 스냅샷은 팩 본문을 싣지 않는다 — 라이선스 원문이 백업 파일로 흩어지지 않게 */
   const snapDay = (await req('/api/admin/backup-now', { method: 'POST', token: admin })).body.day;
@@ -178,6 +213,7 @@ try {
   ok(snap.naesin && Array.isArray(snap.naesin.packIds) && !('packs' in snap.naesin) && 'textbookSrc' in snap, '⑪ 스냅샷 모양이 워커 fullDump 와 다르다: ' + Object.keys(snap.naesin || {}));
   const exp = (await req('/api/admin/export', { token: admin })).body;
   ok(exp.naesin && !('packs' in exp.naesin) && 'exams' in exp.naesin && 'textbookSrc' in exp, '⑪ export 에 팩 본문이 실리거나 내신·교재 원문이 빠졌다');
+  ok(exp.haru && 'states' in exp.haru && 'paperkeys' in exp.haru && exp.haru.paperkeys[HKEY], '⑪ export 에 하루브레인 기록·대응표가 빠졌다');
 } catch (e) {
   E('예외: ' + e.message);
 } finally {

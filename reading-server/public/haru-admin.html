@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex, nofollow">
+  <title>WB 하루브레인 · 관리</title>
+  <style>
+    :root{--navy:#2B4C3F;--blue:#2F5F8F;--sky:#E7EEF6;--bg:#F5F3EE;--line:#E1E6E2;--muted:#6A7A72;--ink:#22302A;--ok:#14755e;--warn:#8a4b08;--bad:#9b352b}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Noto Sans KR",sans-serif;line-height:1.6}
+    header{display:flex;align-items:center;gap:14px;padding:13px 20px;background:var(--navy);color:#fff}header b{font-size:17px}header small{opacity:.75}header .sp{flex:1}
+    .hbtn{min-height:38px;padding:6px 14px;border:1px solid #ffffff55;border-radius:10px;background:transparent;color:#fff;font-weight:800;cursor:pointer}
+    nav{display:flex;gap:6px;flex-wrap:wrap;max-width:1100px;margin:12px auto 0;padding:0 14px}
+    nav button{min-height:38px;padding:5px 14px;border-radius:999px;border:1.5px solid #bfd0c8;background:#fff;font-weight:800;color:var(--navy);cursor:pointer}
+    nav button[aria-pressed="true"]{background:var(--navy);color:#fff;border-color:var(--navy)}
+    main{max-width:1100px;margin:auto;padding:14px 14px 60px}
+    .card{margin-bottom:14px;padding:16px 18px;border:1px solid var(--line);border-radius:14px;background:#fff}
+    h2{margin:0 0 6px;color:var(--navy);font-size:17px}h3{margin:12px 0 6px;color:var(--navy);font-size:14px}
+    button{font:inherit;cursor:pointer}input,select,textarea{font:inherit;min-height:40px;padding:6px 10px;border:1.5px solid #bfd0c8;border-radius:10px;background:#fff;color:var(--ink)}
+    textarea{width:100%;min-height:160px;font-family:ui-monospace,Consolas,monospace;font-size:12.5px}
+    .btn{min-height:40px;padding:6px 16px;border:0;border-radius:10px;background:var(--blue);color:#fff;font-weight:900}
+    .btn.ghost{background:#fff;border:1.5px solid #bfd0c8;color:var(--navy)}.btn.sm{min-height:30px;padding:2px 10px;font-size:12.5px}.btn.danger{background:#fff;border:1.5px solid #efc2bb;color:var(--bad)}
+    .tag{display:inline-block;padding:2px 9px;border-radius:999px;background:var(--sky);color:var(--blue);font-size:12px;font-weight:800}.tag.ok{background:#e7f6f0;color:var(--ok)}.tag.bad{background:#fff0ef;color:var(--bad)}.tag.warn{background:#fff4e6;color:var(--warn)}
+    .tbl{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:13.5px;white-space:nowrap}th{position:sticky;top:0;background:#f0f5f2;color:var(--navy);font-size:12px}
+    th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;font-variant-numeric:tabular-nums}tbody tr:nth-child(even) td{background:#f8faf8}
+    .grid-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;align-items:end}label.f{display:flex;flex-direction:column;font-size:12.5px;font-weight:800;color:var(--muted)}
+    .err{color:var(--bad);font-weight:700;font-size:13px;margin-top:8px;white-space:pre-wrap}.ok{color:var(--ok);font-weight:700;font-size:13px;margin-top:8px;white-space:pre-wrap}.muted{color:var(--muted);font-size:12.5px}
+    #loginCard{max-width:380px;margin:60px auto}.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    .cell{display:inline-block;min-width:110px;padding:6px 8px;margin:3px;border-radius:8px;border:1px solid var(--line);font-size:12.5px}
+    .cell.hole{background:#F8F1DF}.cell.shaky{background:#E7EEF6}.cell.fluent{background:#E6EFEA}.cell.unknown{background:#f1f1f1;color:var(--muted)}
+    pre{background:#f8faf8;padding:10px;border-radius:10px;overflow:auto;font-size:12px}
+  </style>
+</head>
+<body>
+<header><b>하루브레인 관리</b><small>코치 보드 · 등록 · 자료 · 종이 회수</small><span class="sp"></span><button class="hbtn" id="btnLogout" hidden>로그아웃</button></header>
+<nav id="nav" hidden>
+  <button data-tab="board" aria-pressed="true">코치 보드</button><button data-tab="students">학생 등록</button><button data-tab="assets">팩·대응표·플랜</button><button data-tab="paper">종이 회수</button><button data-tab="tools">링크·내보내기·파기</button>
+</nav>
+<main id="main"></main>
+<script>
+'use strict';
+const $=(s)=>document.querySelector(s);
+const esc=(s)=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+let TOKEN=localStorage.getItem('wbr.admin.token')||null;
+let TAB='board';
+async function api(path,opt){
+  let r;
+  try{r=await fetch('/api'+path,Object.assign({headers:{'Content-Type':'application/json',...(TOKEN?{Authorization:'Bearer '+TOKEN}:{})}},opt||{}));}
+  catch(e){throw new Error('네트워크 오류');}
+  const j=await r.json().catch(()=>({}));
+  if(r.status===401&&TOKEN){TOKEN=null;localStorage.removeItem('wbr.admin.token');renderLogin('세션이 만료됐어요. 다시 로그인해 주세요.');throw new Error('auth');}
+  if(!r.ok){const e=new Error(j.error||('오류 '+r.status));e.body=j;throw e;}
+  return j;
+}
+const post=(p,b)=>api(p,{method:'POST',body:JSON.stringify(b)});
+function renderLogin(msg){
+  $('#nav').hidden=true;$('#btnLogout').hidden=true;
+  $('#main').innerHTML='<div class="card" id="loginCard"><h2>관리 PIN</h2><div class="row"><input id="pin" type="password" autocomplete="off" style="flex:1"><button class="btn" id="go">로그인</button></div>'+(msg?'<div class="err">'+esc(msg)+'</div>':'')+'</div>';
+  $('#go').onclick=async()=>{try{const j=await post('/admin/login',{pin:$('#pin').value});TOKEN=j.token;localStorage.setItem('wbr.admin.token',TOKEN);show(TAB);}catch(e){renderLogin(e.message);}};
+  $('#pin').onkeydown=(e)=>{if(e.key==='Enter')$('#go').click();};
+}
+function show(tab){TAB=tab;$('#nav').hidden=false;$('#btnLogout').hidden=false;document.querySelectorAll('nav button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.tab===tab)));({board,students,assets,paper,tools})[tab]().catch(e=>{if(e.message!=='auth')$('#main').innerHTML='<div class="card"><div class="err">'+esc(e.message)+'</div></div>';});}
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>show(b.dataset.tab));
+$('#btnLogout').onclick=()=>{TOKEN=null;localStorage.removeItem('wbr.admin.token');renderLogin();};
+const CORE_LABEL={};
+async function board(){
+  const j=await api('/haru/admin/board');
+  j.coreMap.forEach(c=>{CORE_LABEL[c.id]=c.label;});
+  const rows=j.rows.map(r=>'<tr><td>'+esc(r.code)+'</td><td>'+esc(r.name)+'</td><td>'+esc(r.cohort)+'</td><td>'+(r.consent?'<span class="tag ok">동의</span>':'<span class="tag bad">동의 없음</span>')+'</td><td>'+esc(r.lastSat||'—')+'</td><td>'+r.min7+'분</td><td>'+r.confirmed+'/'+r.coreTotal+'</td><td>'+(r.flag&&r.flag!=='none'?'<span class="tag warn">'+esc(r.flag)+'</span>':'')+'</td><td>'+esc((r.envelope||[]).join(' · '))+'</td><td>'+(r.lastMock?(r.lastMock.completed?'완주':'미완주')+' / 무응답 '+r.lastMock.blank+' / 기술 '+(r.lastMock.passes==null?'—':r.lastMock.passes+'/4')+' / 지연 '+(r.lastMock.lag==null?'—':r.lastMock.lag)+(r.lastMock.retake?' (재응시)':''):'—')+'</td><td><button class="btn sm ghost" data-map="'+esc(r.code)+'">좌표</button></td></tr>').join('');
+  $('#main').innerHTML='<div class="card"><h2>코치 보드 <span class="muted">정렬: 마지막 접속 오래된 순 · 점수·순위·확률 열은 없다</span></h2><div class="tbl"><table><thead><tr><th>코드</th><th>이름</th><th>코호트</th><th>동의</th><th>마지막 앉은 날</th><th>7일</th><th>확정칸</th><th>플래그</th><th>이번 주 봉투</th><th>지난 회차: 완주 / 무응답 / 시험 기술 / 마킹 지연</th><th></th></tr></thead><tbody>'+(rows||'<tr><td colspan="11" class="muted">등록된 학생이 없습니다 — [학생 등록] 탭</td></tr>')+'</tbody></table></div></div><div id="mapBox"></div>';
+  document.querySelectorAll('[data-map]').forEach(b=>b.onclick=()=>showMap(b.dataset.map));
+}
+async function showMap(code){
+  const j=await api('/haru/admin/map?code='+encodeURIComponent(code));
+  const cell=(r)=>'<span class="cell '+esc(r.grade)+'"><b>'+esc(r.label)+'</b><br>'+esc(r.stateLabel)+(r.p!=null?' · p '+r.p+' · obs '+r.obs:' · obs '+r.obs)+'</span>';
+  const wrong=(j.wrong||[]).slice(-10).reverse().map(w=>'<div class="muted">'+esc(w.at.slice(0,10))+' · '+esc(CORE_LABEL[w.atomId]||w.atomId)+' · '+esc(w.cause)+'</div>').join('');
+  const mocks=(j.mocks||[]).map(m=>'<div>'+esc((m.at||'').slice(0,10))+' '+esc(m.keyId)+(m.retake?' (재응시)':'')+' — '+Object.keys(m.bySubject||{}).map(s=>s+' '+m.bySubject[s].ok+'/'+m.bySubject[s].n).join(' · ')+' · 무응답 '+(m.blank||0)+'</div>').join('');
+  const paper=(j.paper||[]).map(p=>'<div>'+esc(p.at)+' '+esc(p.keyId)+' — '+(p.wrongNos?'틀린 번호 '+p.wrongNos.join(','):'정답 수 '+JSON.stringify(p.correctBySubject))+'</div>').join('');
+  $('#mapBox').innerHTML='<div class="card"><h2>'+esc(code)+' 좌표 <span class="muted">강사용 내부값 — 학생 화면에는 이 라벨이 없다</span></h2><h3>코어</h3>'+j.map.core.map(cell).join('')+'<h3>주변(관측만)</h3>'+(j.map.peri.map(cell).join('')||'<span class="muted">없음</span>')+'<h3>최근 다시 볼 문항</h3>'+(wrong||'<span class="muted">없음</span>')+'<h3>회차</h3>'+(mocks||'<span class="muted">없음</span>')+'<h3>종이 회수</h3>'+(paper||'<span class="muted">없음</span>')+'</div>';
+  $('#mapBox').scrollIntoView({behavior:'smooth'});
+}
+async function students(){
+  const [s,pl]=await Promise.all([api('/haru/admin/students'),api('/haru/admin/plans')]);
+  const cohorts=pl.plans.map(p=>p.cohort);
+  const rows=s.students.map(x=>'<tr><td>'+esc(x.code)+'</td><td>'+esc(x.name)+'</td><td>'+esc(x.grade)+' '+esc(x.cls)+'</td><td>'+esc(x.cohort)+'</td><td>'+(x.apps?esc(x.apps.join(',')):'재원생(전부)')+'</td><td>'+(x.consent&&x.consent.at?esc(x.consent.at)+' '+esc(x.consent.via||''):'<span class="tag bad">없음</span>')+'</td><td>'+esc(x.expiresAt||'')+'</td><td><button class="btn sm ghost" data-plink="'+esc(x.code)+'">부모 링크</button></td></tr>').join('');
+  $('#main').innerHTML='<div class="card"><h2>학생 등록 <span class="muted">보호자 동의일이 없으면 등록되지 않는다 · 코드는 무작위(예: wb-'+Math.random().toString(36).slice(2,8)+')</span></h2><div class="grid-form">'+
+    '<label class="f">코드<input id="e_code" placeholder="wb-xxxxxx"></label><label class="f">이름<input id="e_name"></label><label class="f">학년<input id="e_grade" placeholder="초6"></label><label class="f">반<input id="e_cls"></label>'+
+    '<label class="f">코호트<select id="e_cohort">'+cohorts.map(c=>'<option>'+esc(c)+'</option>').join('')+'</select></label><label class="f">동의일<input id="e_at" type="date"></label><label class="f">동의 방식<select id="e_via"><option value="paper">종이</option><option value="digital">전자</option></select></label><label class="f">보호자(관계)<input id="e_g" placeholder="홍길동(모)"></label>'+
+    '<button class="btn" id="e_go">등록</button></div><div id="e_msg"></div>'+(cohorts.length?'':'<div class="err">플랜이 없습니다 — [팩·대응표·플랜] 탭에서 코호트 플랜을 먼저 올리세요.</div>')+'</div>'+
+    '<div class="card"><h2>등록된 학생 '+s.students.length+'명</h2><div class="tbl"><table><thead><tr><th>코드</th><th>이름</th><th>학년·반</th><th>코호트</th><th>앱</th><th>동의</th><th>만료</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div><div id="plink"></div></div>';
+  $('#e_go').onclick=async()=>{const g=($('#e_g').value||'').match(/^(.+?)\((.+)\)$/);try{const j=await post('/haru/admin/enroll',{code:$('#e_code').value,name:$('#e_name').value,grade:$('#e_grade').value,cls:$('#e_cls').value,cohort:$('#e_cohort').value,consent:{at:$('#e_at').value,via:$('#e_via').value,guardian:g?{name:g[1].trim(),rel:g[2].trim()}:null}});$('#e_msg').innerHTML='<div class="ok">등록됨: '+esc(j.student.code)+' · 만료 '+esc(j.student.expiresAt)+'. 학생 앱(/haru/)에서 코드를 넣으면 [연동 승인 대기]에 뜹니다 — 진로독서 관리 화면(/admin/)에서 승인하세요.</div>';students();}catch(e){$('#e_msg').innerHTML='<div class="err">'+esc(e.message)+'</div>';}};
+  document.querySelectorAll('[data-plink]').forEach(b=>b.onclick=async()=>{try{const j=await post('/haru/admin/parentlink',{code:b.dataset.plink});const url=location.origin+'/haru/parent.html?t='+j.ptoken;$('#plink').innerHTML='<div class="ok">'+esc(b.dataset.plink)+' 보호자 링크(만료 '+esc(j.exp.slice(0,10))+') — 동의서의 보호자 번호로만 보내세요. 이전 링크는 즉시 무효.<br><input style="width:100%" readonly value="'+esc(url)+'"></div>';}catch(e){$('#plink').innerHTML='<div class="err">'+esc(e.message)+'</div>';}});
+}
+async function assets(){
+  const [pk,kk,pl]=await Promise.all([api('/haru/admin/packs'),api('/haru/admin/paperkeys'),api('/haru/admin/plans')]);
+  $('#main').innerHTML='<div class="card"><h2>올리기 <span class="muted">JSON 을 붙여 넣는다. 검증기 오류 0 이어야 저장된다. 원문·시험지 텍스트는 대응표에 담지 않는다.</span></h2>'+
+    '<div class="row"><select id="u_kind"><option value="pack">팩 (haru:pack) — 자체 창작·공공누리·고전만</option><option value="paperkey">종이 대응표 (haru:paperkey) — sheet-build 가 만든 *-paperkey.json</option><option value="plan">코호트 플랜 (haru:plan) — plan-build 산출물</option><option value="atoms">원자 목록 (haru:atoms) — atoms.json</option></select><button class="btn" id="u_go">검증 후 저장</button></div>'+
+    '<textarea id="u_json" placeholder="{ ... }"></textarea><div id="u_msg"></div></div>'+
+    '<div class="card"><h2>팩 '+pk.packs.length+'</h2><div class="tbl"><table><thead><tr><th>id</th><th>과목</th><th>종류</th><th>코호트</th><th>tier</th><th>origin</th><th>문항</th><th>만료</th><th></th></tr></thead><tbody>'+pk.packs.map(p=>'<tr><td>'+esc(p.id)+'</td><td>'+esc(p.subject)+'</td><td>'+esc(p.kind)+'</td><td>'+esc((p.cohort||[]).join(','))+'</td><td>'+esc(p.tier)+'</td><td>'+esc(p.origin)+'</td><td>'+p.items+'</td><td>'+esc(p.expiresAt||'—')+'</td><td><button class="btn sm danger" data-delpack="'+esc(p.id)+'">삭제</button></td></tr>').join('')+'</tbody></table></div></div>'+
+    '<div class="card"><h2>종이 대응표 '+kk.keys.length+'</h2><p class="muted">회차 날의 keyId 규칙: 국어 단독 회차는 플랜의 keyId 그대로(예 own-mock-01), 3교시 회차는 keyId-과목(예 own-mock-02-kor · -math · -eng). 재응시 회차는 1교시가 retakeKeyId.</p><div class="tbl"><table><thead><tr><th>id</th><th>라벨</th><th>과목</th><th>n</th><th>origin</th><th>holder</th><th>동결</th><th>제한</th><th>정답표</th></tr></thead><tbody>'+kk.keys.map(k=>'<tr><td>'+esc(k.id)+'</td><td>'+esc(k.label)+'</td><td>'+esc(k.subject)+'</td><td>'+k.n+'</td><td>'+esc(k.origin)+'</td><td>'+esc(k.holder)+'</td><td>'+(k.frozen?'동결':'')+'</td><td>'+(k.timeLimitSec?Math.round(k.timeLimitSec/60)+'분':'—')+'</td><td>'+(k.hasAnswer?'<span class="tag ok">서버 채점</span>':'<span class="tag">강사 입력</span>')+'</td></tr>').join('')+'</tbody></table></div></div>'+
+    '<div class="card"><h2>코호트 플랜 '+pl.plans.length+'</h2><div class="tbl"><table><thead><tr><th>코호트</th><th>시험일</th><th>상태</th><th>days</th><th>국면</th><th>잠금 해제</th><th>동결 세트</th></tr></thead><tbody>'+pl.plans.map(p=>'<tr><td>'+esc(p.cohort)+'</td><td>'+esc(p.examDate)+'</td><td>'+esc(p.examDateStatus||'')+'</td><td>'+p.days+'</td><td>'+esc(p.phases.map(x=>x.id+' '+x.from+'~'+x.to).join(' / '))+'</td><td>'+esc(Object.keys(p.bands).map(b=>b+':'+p.bands[b]).join(' '))+'</td><td>'+esc(p.frozenKeyId||'')+'</td></tr>').join('')+'</tbody></table></div></div>';
+  $('#u_go').onclick=async()=>{let doc;try{doc=JSON.parse($('#u_json').value);}catch(e){$('#u_msg').innerHTML='<div class="err">JSON 이 아닙니다: '+esc(e.message)+'</div>';return;}
+    const kind=$('#u_kind').value;const body=kind==='pack'?{pack:doc}:kind==='paperkey'?{key:doc}:kind==='plan'?{cohort:doc.cohort,plan:doc}:{atoms:doc};
+    try{const j=await post('/haru/admin/'+kind,body);$('#u_msg').innerHTML='<div class="ok">저장됨 '+esc(JSON.stringify(j))+'</div>';setTimeout(assets,800);}catch(e){$('#u_msg').innerHTML='<div class="err">'+esc(e.message)+'\n'+esc((e.body&&e.body.errors||[]).map(x=>(x.where||'')+' '+(x.msg||x)).join('\n'))+'</div>';}};
+  document.querySelectorAll('[data-delpack]').forEach(b=>b.onclick=async()=>{if(!confirm(b.dataset.delpack+' 팩을 지울까요?'))return;try{await api('/haru/admin/pack',{method:'DELETE',body:JSON.stringify({id:b.dataset.delpack})});assets();}catch(e){alert(e.message);}});
+}
+async function paper(){
+  const [s,kk]=await Promise.all([api('/haru/admin/students'),api('/haru/admin/paperkeys')]);
+  $('#main').innerHTML='<div class="card"><h2>종이 회수 <span class="muted">자작 종이는 틀린 번호, 학생 소지 시판 교재는 과목별 정답 개수 1개</span></h2><div class="grid-form">'+
+    '<label class="f">학생<select id="p_code">'+s.students.map(x=>'<option value="'+esc(x.code)+'">'+esc(x.name)+' ('+esc(x.code)+')</option>').join('')+'</select></label>'+
+    '<label class="f">대응표<select id="p_key">'+kk.keys.map(k=>'<option value="'+esc(k.id)+'" data-origin="'+esc(k.origin)+'" data-n="'+k.n+'">'+esc(k.id)+' · '+esc(k.label)+' ('+esc(k.origin)+')</option>').join('')+'</select></label>'+
+    '<label class="f">날짜<input id="p_at" type="date"></label><label class="f">틀린 번호(자작) 예: 3,7,11<input id="p_wrong"></label><label class="f">정답 개수(시판) 예: math=9<input id="p_correct"></label><button class="btn" id="p_go">저장</button></div><div id="p_msg"></div></div>';
+  $('#p_go').onclick=async()=>{const opt=$('#p_key').selectedOptions[0];const body={code:$('#p_code').value,keyId:$('#p_key').value,at:$('#p_at').value||undefined};
+    if(opt&&opt.dataset.origin==='own')body.wrongNos=($('#p_wrong').value||'').split(/[,\s]+/).filter(Boolean).map(Number);
+    else{body.correctBySubject={};($('#p_correct').value||'').split(/[,\s]+/).forEach(kv=>{const m=kv.match(/^(kor|math|eng)=(\d+)$/);if(m)body.correctBySubject[m[1]]=+m[2];});}
+    try{const j=await post('/haru/admin/paper',body);$('#p_msg').innerHTML='<div class="ok">저장됨: '+esc(JSON.stringify(j.entry))+'</div>';}catch(e){$('#p_msg').innerHTML='<div class="err">'+esc(e.message)+'</div>';}};
+}
+async function tools(){
+  const [s,pl]=await Promise.all([api('/haru/admin/students'),api('/haru/admin/plans')]);
+  $('#main').innerHTML='<div class="card"><h2>학습 여권 내보내기 <span class="muted">시험일 + 7일 16:00 KST 전에는 409 (설계안 §11-3)</span></h2><div class="row"><select id="x_code">'+s.students.map(x=>'<option value="'+esc(x.code)+'">'+esc(x.name)+' ('+esc(x.code)+')</option>').join('')+'</select><button class="btn" id="x_go">JSON 받기</button></div><div id="x_msg"></div></div>'+
+    '<div class="card"><h2>파기 <span class="muted">코호트의 haru:state·mock·paper·parent 4계열만. 대응표·팩·플랜·학생 레코드는 남는다</span></h2><div class="row"><select id="d_cohort">'+pl.plans.map(p=>'<option>'+esc(p.cohort)+'</option>').join('')+'</select><button class="btn danger" id="d_go">파기</button></div><div id="d_msg"></div></div>'+
+    '<div class="card"><h2>진로독서 관리 화면</h2><p class="muted">학생 앱 연동 승인(연동 승인 대기)·퇴원 처리·백업은 <a href="/admin/">/admin/</a> 에서 합니다. 퇴원 처리는 하루브레인 기록도 함께 지웁니다.</p></div>';
+  $('#x_go').onclick=async()=>{try{const j=await api('/haru/admin/export?code='+encodeURIComponent($('#x_code').value));const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(j.report,null,2)],{type:'application/json'}));a.download='haru-'+$('#x_code').value+'.json';a.click();$('#x_msg').innerHTML='<div class="ok">내려받음</div>';}catch(e){$('#x_msg').innerHTML='<div class="err">'+esc(e.message)+'</div>';}};
+  $('#d_go').onclick=async()=>{const c=$('#d_cohort').value;if(!c||prompt('파기할 코호트 이름을 다시 입력하세요')!==c)return;try{const j=await post('/haru/admin/purge',{cohort:c});$('#d_msg').innerHTML='<div class="ok">'+j.purged+'명 파기됨</div>';}catch(e){$('#d_msg').innerHTML='<div class="err">'+esc(e.message)+'</div>';}};
+}
+if(TOKEN)show('board');else renderLogin();
+</script>
+</body>
+</html>

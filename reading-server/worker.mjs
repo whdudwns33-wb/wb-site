@@ -7,6 +7,7 @@
 import { handleVocab, dumpVocab, sendNightPushes, vocabSummary } from './vocab-api.mjs';
 import { handleNaesin, isReservedCode, dropReservedRows, naesinBodyLimit } from './naesin-api.mjs';
 import { handleStudio } from './naesin-studio.mjs';
+import { handleHaru, haruBodyLimit, allowedApp, appOfPath, dropStudentHaru, dumpHaru, weeklyAgg } from './haru-api.mjs';
 import { bookIndex, cleanWords, coachingCard, confirmAllPlan, findBook, readyToConfirm, sourceSummary, validProgress, withOverlay } from './textbook.mjs';
 import { parseRoster } from './roster.mjs';
 
@@ -199,6 +200,33 @@ function naesinStore(env) {
   };
 }
 
+/* 하루브레인 저장소 어댑터 — haru: 접두 키만 (설계안 §7-5). 학생 기록은 쓰기 주체별 3키(state·mock·paper).
+   퇴원·파기는 정확 접두 4계열만 지운다 — haru:paperkey:* 는 원장의 대응표라 와일드카드로 삼키면 안 된다. */
+function haruStore(env) {
+  const get = (k) => env.DB.get(k, 'json');
+  const put = (k, v) => env.DB.put(k, JSON.stringify(v));
+  const del = (k) => env.DB.delete(k);
+  return {
+    getPack: (id) => get('haru:pack:' + id), putPack: (id, rec) => put('haru:pack:' + id, rec), deletePack: (id) => del('haru:pack:' + id),
+    getPackIds: () => get('haru:packs'), putPackIds: (ids) => put('haru:packs', ids),
+    getPaperKey: (id) => get('haru:paperkey:' + id), putPaperKey: (id, rec) => put('haru:paperkey:' + id, rec),
+    getPaperKeyIds: () => get('haru:paperkeys'), putPaperKeyIds: (ids) => put('haru:paperkeys', ids),
+    getPlan: (c) => get('haru:plan:' + c), putPlan: (c, rec) => put('haru:plan:' + c, rec), deletePlan: (c) => del('haru:plan:' + c),
+    getPlanIds: () => get('haru:plans'), putPlanIds: (ids) => put('haru:plans', ids),
+    getAtoms: () => get('haru:atoms'), putAtoms: (rec) => put('haru:atoms', rec),
+    getState: (c) => get('haru:state:' + c), putState: (c, rec) => put('haru:state:' + c, rec), deleteState: (c) => del('haru:state:' + c),
+    listStateCodes: async () => (await kvListAll(env, 'haru:state:')).map(k => k.slice('haru:state:'.length)),
+    getMock: (c) => get('haru:mock:' + c), putMock: (c, rec) => put('haru:mock:' + c, rec), deleteMock: (c) => del('haru:mock:' + c),
+    getPaper: (c) => get('haru:paper:' + c), putPaper: (c, rec) => put('haru:paper:' + c, rec), deletePaper: (c) => del('haru:paper:' + c),
+    getParent: (t) => get('haru:parent:' + t), putParent: (t, rec) => put('haru:parent:' + t, rec), deleteParent: (t) => del('haru:parent:' + t),
+    getDist: (c, k) => get('haru:dist:' + c + ':' + k), putDist: (c, k, rec) => put('haru:dist:' + c + ':' + k, rec),
+    getReports: (id) => get('haru:report:' + id), putReports: (id, list) => put('haru:report:' + id, list),
+    getAgg: (w) => get('haru:agg:' + w), putAgg: (w, rec) => put('haru:agg:' + w, rec),
+    getStudent: (c) => get('student:' + c), putStudent: (c, rec) => put('student:' + c, rec),
+    listStudentCodes: async () => (await kvListAll(env, 'student:')).map(k => k.slice('student:'.length)),
+  };
+}
+
 function vocabPushEnv(env) {
   return {
     publicKey: env.VAPID_PUBLIC_KEY || '',
@@ -239,7 +267,9 @@ async function fullDump(env) {
     const [code, examDate] = k.slice('naesin:result:'.length).split(':');
     (naesin.results[code] = naesin.results[code] || {})[examDate] = await env.DB.get(k, 'json');
   }
-  return { service: 'wb-reading', savedAt: nowIso(), students, states, vocab, textbook: textbook || {}, pubmap: pubmap || {}, naesin, textbookSrc: textbookSrc || {} };
+  /* 하루브레인 — 학생 기록 본문(state·mock·paper)·대응표·플랜을 담는다. id 만 넣으면 기록의 백업이 KV 단일 사본이 된다(설계안 §7-5). 팩 본문은 내신과 같은 이유로 id 만. */
+  const haru = await dumpHaru(haruStore(env));
+  return { service: 'wb-reading', savedAt: nowIso(), students, states, vocab, textbook: textbook || {}, pubmap: pubmap || {}, naesin, textbookSrc: textbookSrc || {}, haru };
 }
 
 async function snapshotBackup(env) {
@@ -320,9 +350,14 @@ function parentSummary(stu, st, titles, vst, book) {
 
 export default {
   async scheduled(event, env, ctx) {
-    /* 12:00 UTC(21:00 KST) = 밤 9시 물주기 푸시 / 그 외(18:00 UTC) = 일일 백업 */
-    if (event.cron === '0 12 * * *') ctx.waitUntil(sendNightPushes({ store: vocabStore(env), push: vocabPushEnv(env) }));
-    else ctx.waitUntil(snapshotBackup(env));
+    /* 크론은 문자열로 가른다 — 모르는 크론이 전부 백업으로 도는 사고를 막는다(설계안 §7-5 #11).
+       12:00 UTC(21:00 KST) 밤 9시 물주기 푸시 · 18:00 UTC 일일 백업 · 18:10 UTC 하루브레인 주간 익명 집계(백업 직후) */
+    switch (event.cron) {
+      case '0 12 * * *': ctx.waitUntil(sendNightPushes({ store: vocabStore(env), push: vocabPushEnv(env) })); break;
+      case '10 18 * * *': ctx.waitUntil(weeklyAgg(haruStore(env), Date.now())); break;
+      case '0 18 * * *':
+      default: ctx.waitUntil(snapshotBackup(env));
+    }
   },
 
   async fetch(req, env) {
@@ -465,8 +500,38 @@ export default {
         return json(200, parentSummary(stu, st, titles, vst, coachingCard(tb, stu.book, vst, assignRec)));
       }
 
+      /* 하루브레인 부모 화면 — ptoken 으로만, 로그인 없음 (진로독서 /api/parent/summary 와 같은 자리) */
+      if (p === '/api/haru/parent' && req.method === 'GET') {
+        const out = await handleHaru({ path: p, method: 'GET', who: null, query: url.searchParams, getBody: () => req.json(), store: haruStore(env) });
+        return json(out.status, out.body);
+      }
+
       const who = await auth(env, req);
       if (!who) return json(401, { error: '로그인이 필요합니다.' });
+
+      /* apps 게이트(기획서 D-6) — who 검증 직후 ★한 곳★. 모든 학생 라우트가 여기를 지난다.
+         stu.apps == null → 재원생(전부 허용). 배열이면 그 목록만. 하루브레인 라우터에만 달면 외부 초6 토큰이 세 앱을 연다. */
+      if (!who.admin) {
+        const stuGate = await env.DB.get('student:' + who.code, 'json');
+        if (!allowedApp(stuGate, appOfPath(p))) return json(403, { error: '이 앱의 이용 대상이 아니에요.' });
+      }
+      /* 토큰 재발급 — 승인 없이. 구 토큰은 만료 시각까지 그대로 유효하다(TTL 30일·refresh 없음이면 9/12 발급이 10/12에 반 전원 만료) */
+      if (p === '/api/token/refresh' && req.method === 'POST') {
+        return json(200, { token: await newToken(env, who.code, who.admin), exp: new Date(Date.now() + TOKEN_TTL_S * 1000).toISOString() });
+      }
+
+      /* 하루브레인 (/api/haru/*) — 인증만 공유, 저장·라우트는 격리. 정답은 /answer 응답에만 나간다. */
+      if (p.startsWith('/api/haru/')) {
+        const len = Number(req.headers.get('content-length') || 0);
+        if (len > haruBodyLimit(p)) return json(413, { error: '요청이 너무 커서 받을 수 없어요.' });
+        const out = await handleHaru({
+          path: p, method: req.method, who, query: url.searchParams, getBody: () => req.json(), store: haruStore(env),
+          /* 원자 목록 기본값은 배포본의 haru/atoms.json — KV 에 올린 것이 있으면 그것이 이긴다 */
+          atomsFallback: async () => { try { return await (await env.ASSETS.fetch(new Request(url.origin + '/haru/atoms.json'))).json(); } catch (e) { return null; } },
+          randomToken: () => crypto.randomUUID().replace(/-/g, ''),
+        });
+        return json(out.status, out.body);
+      }
 
       /* 워드브레인 (/api/vocab/*) — 인증만 공유, 저장·라우트는 격리 */
       if (p.startsWith('/api/vocab/')) {
@@ -786,6 +851,10 @@ export default {
           if (!Array.isArray(list) || !list.some((r) => r && r.code === c)) continue;
           await env.DB.put(k, JSON.stringify(list.map((r) => (r && r.code === c ? { ...r, code: '' } : r))));
         }
+
+        /* 하루브레인 — 정확 접두 4계열(state·mock·paper·parent). 대응표(haru:paperkey:*)는 학생 것이 아니라 그대로 둔다. */
+        await dropStudentHaru(haruStore(env), c);
+        removed.push('haru:state:' + c, 'haru:mock:' + c, 'haru:paper:' + c);
 
         /* 기기 토큰은 토큰 값으로 저장돼 코드로 찾을 수 없다 — 전부 훑어 이 학생 것만 지운다.
            남겨 두면 그 기기는 삭제 뒤에도 계속 로그인된 상태로 남는다. */
