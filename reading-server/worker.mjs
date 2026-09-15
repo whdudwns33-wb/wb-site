@@ -7,6 +7,7 @@
 import { handleVocab, dumpVocab, sendNightPushes, vocabSummary } from './vocab-api.mjs';
 import { handleNaesin, isReservedCode, dropReservedRows, naesinBodyLimit } from './naesin-api.mjs';
 import { handleStudio } from './naesin-studio.mjs';
+import { handleNaesinKo } from './naesin-ko-api.mjs';
 import { bookIndex, cleanWords, coachingCard, confirmAllPlan, findBook, readyToConfirm, sourceSummary, validProgress, withOverlay } from './textbook.mjs';
 import { parseRoster } from './roster.mjs';
 
@@ -198,6 +199,34 @@ function naesinStore(env) {
     getStudent: (c) => env.DB.get('student:' + c, 'json'),
   };
 }
+/* 국어브레인 저장소 어댑터 — naesinko: 접두 키만 사용.
+   영어(naesin:)와 달리 요약·서술형·오버레이를 state에서 분리한 별도 키로 둔다
+   (국어 기획서 §8 저장 예산 — overview가 state를 통째로 읽지 않게). */
+function naesinKoStore(env) {
+  return {
+    getPack: (id) => env.DB.get('naesinko:pack:' + id, 'json'),
+    putPack: (id, rec) => env.DB.put('naesinko:pack:' + id, JSON.stringify(rec)),
+    getPackIds: () => env.DB.get('naesinko:packs', 'json'),
+    putPackIds: (ids) => env.DB.put('naesinko:packs', JSON.stringify(ids)),
+    /* 검수 대기 목록 — 팩과 다른 키다. 학생에게 갈 것과 안 갈 것을 저장 계층에서부터 가른다. */
+    getPending: (id) => env.DB.get('naesinko:pending:' + id, 'json'),
+    putPending: (id, rec) => env.DB.put('naesinko:pending:' + id, JSON.stringify(rec)),
+    getState: (c) => env.DB.get('naesinko:state:' + c, 'json'),
+    putState: (c, rec) => env.DB.put('naesinko:state:' + c, JSON.stringify(rec)),
+    getSummary: (c) => env.DB.get('naesinko:summary:' + c, 'json'),
+    putSummary: (c, rec) => env.DB.put('naesinko:summary:' + c, JSON.stringify(rec)),
+    listSummaryCodes: async () => (await kvListAll(env, 'naesinko:summary:')).map(k => k.slice('naesinko:summary:'.length)),
+    getReviews: (c) => env.DB.get('naesinko:review:' + c, 'json'),
+    putReviews: (c, rec) => env.DB.put('naesinko:review:' + c, JSON.stringify(rec)),
+    getOverlay: (s) => env.DB.get('naesinko:overlay:' + s, 'json'),
+    putOverlay: (s, rec) => env.DB.put('naesinko:overlay:' + s, JSON.stringify(rec)),
+    getExam: (s) => env.DB.get('naesinko:exam:' + s, 'json'),
+    putExam: (s, rec) => env.DB.put('naesinko:exam:' + s, JSON.stringify(rec)),
+    getTask: (s) => env.DB.get('naesinko:task:' + s, 'json'),
+    putTask: (s, rec) => env.DB.put('naesinko:task:' + s, JSON.stringify(rec)),
+    getStudent: (c) => env.DB.get('student:' + c, 'json'),
+  };
+}
 
 function vocabPushEnv(env) {
   return {
@@ -239,7 +268,18 @@ async function fullDump(env) {
     const [code, examDate] = k.slice('naesin:result:'.length).split(':');
     (naesin.results[code] = naesin.results[code] || {})[examDate] = await env.DB.get(k, 'json');
   }
-  return { service: 'wb-reading', savedAt: nowIso(), students, states, vocab, textbook: textbook || {}, pubmap: pubmap || {}, naesin, textbookSrc: textbookSrc || {} };
+  /* 국어브레인 — 학생 기록과 **강사가 손으로 만든 것**(오버레이·서술형 확정)을 담는다.
+     팩 본문은 영어와 같은 이유로 id 목록만 남긴다. */
+  const naesinKo = { states: {}, summaries: {}, reviews: {}, overlays: {}, exams: {}, tasks: {},
+    packIds: (await env.DB.get('naesinko:packs', 'json')) || [] };
+  for (const [prefix, bucket] of [
+    ['naesinko:state:', naesinKo.states], ['naesinko:summary:', naesinKo.summaries],
+    ['naesinko:review:', naesinKo.reviews], ['naesinko:overlay:', naesinKo.overlays],
+    ['naesinko:exam:', naesinKo.exams], ['naesinko:task:', naesinKo.tasks],
+  ]) {
+    for (const k of await kvListAll(env, prefix)) bucket[k.slice(prefix.length)] = await env.DB.get(k, 'json');
+  }
+  return { service: 'wb-reading', savedAt: nowIso(), students, states, vocab, textbook: textbook || {}, pubmap: pubmap || {}, naesin, naesinKo, textbookSrc: textbookSrc || {} };
 }
 
 async function snapshotBackup(env) {
@@ -501,6 +541,15 @@ export default {
         });
         if (st) return json(st.status, st.body);
         const out = await handleNaesin(ctx);
+        return json(out.status, out.body);
+      }
+
+      /* 국어브레인 (/api/naesin-ko/*) — 같은 격리 원칙, 저장소만 naesinko: */
+      if (p.startsWith('/api/naesin-ko/')) {
+        const out = await handleNaesinKo({
+          path: p, method: req.method, who, query: url.searchParams,
+          getBody: () => req.json(), store: naesinKoStore(env),
+        });
         return json(out.status, out.body);
       }
 
@@ -790,6 +839,14 @@ export default {
           if (!Array.isArray(list) || !list.some((r) => r && r.code === c)) continue;
           await env.DB.put(k, JSON.stringify(list.map((r) => (r && r.code === c ? { ...r, code: '' } : r))));
         }
+        /* 국어브레인 — 요약·서술형 제출·오버레이가 state 와 다른 키에 있어 하나씩 지운다
+           (국어 기획서 §8 저장 예산·§10-7). 남으면 퇴원생의 학습 기록과 서술형 답안이 그대로 있고,
+           라이선스(재원생 한정)와 개인정보 보관 기간 양쪽에 걸린다. */
+        await drop('naesinko:state:' + c);
+        await drop('naesinko:summary:' + c);
+        await drop('naesinko:review:' + c);
+        await drop('naesinko:exam:' + c);
+        await drop('naesinko:overlay:' + c);
 
         /* 기기 토큰은 토큰 값으로 저장돼 코드로 찾을 수 없다 — 전부 훑어 이 학생 것만 지운다.
            남겨 두면 그 기기는 삭제 뒤에도 계속 로그인된 상태로 남는다. */

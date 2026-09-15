@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="국어브레인">
+  <rect width="128" height="128" rx="26" fill="#2A3B2E"/>
+  <rect x="30" y="26" width="68" height="76" rx="6" fill="#F4F2EE"/>
+  <rect x="30" y="26" width="12" height="76" rx="6" fill="#7D9B6A"/>
+  <rect x="52" y="44" width="34" height="6" rx="3" fill="#2A3B2E"/>
+  <rect x="52" y="60" width="34" height="6" rx="3" fill="#2A3B2E"/>
+  <rect x="52" y="76" width="20" height="6" rx="3" fill="#B4482F"/>
+</svg>
