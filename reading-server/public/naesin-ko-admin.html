@@ -1,0 +1,937 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex, nofollow">
+  <title>WB 국어브레인 · 관리</title>
+  <style>
+    :root{--green:#2A3B2E;--acc:#3E6B4A;--soft:#e9f1ea;--bg:#f4f6f3;--line:#dde5dc;--muted:#6b7268;--ink:#222a24;--ok:#14755e;--warn:#8a4b08;--bad:#9b352b}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Noto Sans KR",sans-serif;line-height:1.6}
+    header{display:flex;align-items:center;gap:14px;padding:13px 20px;background:var(--green);color:#fff;flex-wrap:wrap}
+    header b{font-size:17px}header small{opacity:.75}header .sp{flex:1}
+    .hbtn{min-height:38px;padding:6px 14px;border:1px solid #ffffff55;border-radius:10px;background:transparent;color:#fff;font-weight:800;cursor:pointer}
+    main{max-width:1080px;margin:auto;padding:18px 14px 60px}
+    .card{margin-bottom:14px;padding:16px 18px;border:1px solid var(--line);border-radius:14px;background:#fff}
+    h2{margin:0 0 6px;color:var(--green);font-size:17px}
+    h3{margin:12px 0 6px;color:var(--green);font-size:14px}
+    button{font:inherit;cursor:pointer}
+    input,select,textarea{font:inherit;min-height:42px;padding:8px 10px;border:1.5px solid #c6d5c4;border-radius:10px;background:#fff;color:var(--ink);width:100%}
+    textarea{min-height:70px;resize:vertical}
+    .btn{min-height:42px;padding:6px 16px;border:0;border-radius:10px;background:var(--acc);color:#fff;font-weight:900}
+    .btn.ghost{background:#fff;border:1.5px solid #c6d5c4;color:var(--green)}
+    .btn.sm{min-height:34px;padding:4px 12px;font-size:13px}
+    .btn:disabled{opacity:.45;cursor:default}
+    .tag{display:inline-block;padding:3px 9px;border-radius:999px;background:var(--soft);color:var(--acc);font-size:12px;font-weight:800}
+    .tag.ok{background:#e7f6f0;color:var(--ok)}.tag.bad{background:#fff0ef;color:var(--bad)}.tag.warn{background:#fff4e6;color:var(--warn)}.tag.muted{background:#eef2ee;color:var(--muted)}
+    .stats{display:flex;gap:10px;flex-wrap:wrap;margin:6px 0}
+    .stat{flex:1;min-width:120px;padding:12px;border:1px solid #d6e4d5;border-radius:12px;background:#f7fbf7;text-align:center}
+    .stat b{display:block;font-size:22px;color:var(--green)}
+    .stat span{font-size:12px;color:var(--muted);font-weight:800}
+    .tbl{overflow-x:auto}
+    /* 준비도 — 반 그림은 평균 하나가 아니라 분포와 '누가 위험한가'다 */
+    .rdbar{display:flex;height:10px;border-radius:999px;overflow:hidden;background:#eef2ee;margin:8px 0 4px}
+    .rdbar i{display:block}
+    .rd-start{background:#e0736a}.rd-building{background:#e8b45c}.rd-ontrack{background:#7db98c}.rd-ready{background:#2e7d55}
+    .legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted);font-weight:700}
+    .legend i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:4px}
+    .risklist{margin-top:10px;font-size:13px}
+    .risklist div{padding:6px 0;border-top:1px solid var(--line)}
+    .mini{display:inline-block;width:52px;height:7px;border-radius:999px;background:#eef2ee;vertical-align:middle;overflow:hidden}
+    .mini i{display:block;height:100%;background:var(--green)}
+
+    /* 루브릭 저작 — 왼쪽에 자료(발문·조건·모범답안), 오른쪽에 내가 쓰는 채점 요소 */
+    .rub{border:1px solid var(--line);border-radius:12px;margin:10px 0;overflow:hidden}
+    .rub>summary{padding:10px 12px;cursor:pointer;background:#f7fbf7;font-weight:800;list-style:none}
+    .rub>summary::-webkit-details-marker{display:none}
+    .rub>summary .tag{margin-left:6px}
+    .rub .body{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:12px;border-top:1px solid var(--line)}
+    @media(max-width:900px){.rub .body{grid-template-columns:1fr}}
+    .rub h4{margin:0 0 6px;font-size:12px;color:var(--muted);font-weight:800}
+    .src{background:#fbfaf7;border-left:3px solid var(--soft);padding:8px 10px;border-radius:0 8px 8px 0;font-size:13px;margin-bottom:8px}
+    /* 모범답안 어절을 눌러 인정 키워드로 넣는다 — 손으로 옮겨 적다가 오타 나면 채점이 틀린다 */
+    .tok{display:inline-block;padding:1px 5px;margin:1px;border-radius:5px;background:#eef2ee;cursor:pointer;font-size:13px}
+    .tok:hover{background:var(--green);color:#fff}
+    .el{display:grid;grid-template-columns:1fr 1.4fr 56px 28px;gap:6px;margin-bottom:6px}
+    .el input{padding:6px 8px;border:1px solid var(--line);border-radius:8px;width:100%}
+    .el .x{border:none;background:none;color:var(--bad);cursor:pointer;font-size:16px}
+    .chk{margin-top:8px;font-size:13px}
+    .chk .ln{padding:5px 0;border-top:1px solid var(--line)}
+
+    /* 인쇄 — 시험지만 남기고 화면을 전부 숨긴다. 별도 페이지를 만들지 않는 이유는
+       배포본이 화면을 한 장씩 복사하기 때문이다(한 장 늘 때마다 배선이 는다). */
+    #sheet{display:none}
+    #sheet .pg{page-break-after:always}
+    #sheet .ln{font-size:15px;line-height:1.7}
+    #sheet .ln b{text-decoration:underline;text-underline-offset:3px}
+    #sheet .box{border:1px solid #999;border-radius:6px;min-height:52px;margin:6px 0 12px;padding:6px 8px}
+    /* 연 사이가 행 사이보다 확실히 넓어야 한다 — 주석란이 '1연의 내용'을 가리키는데
+       지면에서 연이 안 나뉘면 학생이 무엇을 쓰는지 알 수 없다 */
+    #sheet .st{margin:0 0 16px}
+    @media print{
+      body>*{display:none!important}
+      #sheet{display:block!important;margin:0;padding:0}
+      @page{margin:14mm}
+    }
+    .chk b.ok{color:var(--ok)}.chk b.no{color:var(--bad)}.chk b.hold{color:var(--warn)}
+    table{border-collapse:collapse;width:100%;font-size:13.5px}
+    th{position:sticky;top:0;background:#eef3ed;color:var(--green);font-size:12px}
+    th,td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+    tbody tr:nth-child(even) td{background:#f8fbf8}
+    .grid-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;align-items:end}
+    .err{color:var(--bad);font-weight:700;font-size:13px;margin-top:8px}
+    .muted{color:var(--muted);font-size:12.5px}
+    #loginCard{max-width:380px;margin:60px auto}
+    .issues{margin:8px 0 0;padding:10px 12px;border-radius:10px;font-size:13px;max-height:280px;overflow:auto}
+    .issues.bad{background:#fff0ef}.issues.warn{background:#fff4e6}.issues.ok{background:#e7f6f0}
+    .issues div{margin:2px 0}
+    label.ck{display:inline-flex;align-items:center;gap:6px;font-weight:700;margin:2px 10px 2px 0}
+    label.ck input{width:auto;min-height:auto}
+    .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    .ans{background:#f7fbf7;border-left:3px solid var(--acc);padding:8px 11px;border-radius:0 8px 8px 0;white-space:pre-wrap}
+  </style>
+</head>
+<body>
+<header><b>WB 국어브레인 · 관리</b><small>팩 업로드 · 시험 등록 · 오버레이 · 서술형 검토</small><span class="sp"></span>
+  <button class="hbtn" onclick="location.href='/admin/naesin-admin.html'">내신브레인(영어)</button>
+  <button class="hbtn" onclick="location.href='/admin/'">진로독서 관리</button>
+  <button class="hbtn" id="btnLogout">로그아웃</button>
+</header>
+<main id="app"></main>
+<div id="sheet"></div>
+
+<script src="/naesin-ko/pack-check.js"></script>
+<script src="/naesin-ko/readiness.js"></script>
+<script src="/naesin-ko/grade.js"></script>
+<script src="/naesin-ko/gen.js"></script>
+<script src="/admin/qr.js"></script>
+<script>
+/* WB 국어브레인 관리 웹 — 기획서 §6·§7.
+   인증은 진로독서 관리 웹과 같은 관리 PIN 토큰(wbr.admin.token)을 그대로 쓴다.
+   팩 검증은 학생 앱·CLI와 같은 pack-check.js를 부른다 — 규칙을 두 벌로 두지 않는다(§7[3]). */
+let TOKEN = localStorage.getItem('wbr.admin.token') || null;
+let PACKS = [], OVERVIEW = [], REVIEWS = [], ASSEMBLED = null, CONCEPTS = null;
+/* 팩과 함께 고른 검수 파일 — 팩이 아니라 루브릭 저작 대기 목록으로 간다 */
+let PENDING_UP = null;
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+async function api(path, opt) {
+  const r = await fetch('/api' + path, Object.assign({
+    headers: { 'Content-Type': 'application/json', ...(TOKEN ? { Authorization: 'Bearer ' + TOKEN } : {}) }
+  }, opt || {}));
+  const j = await r.json().catch(() => ({}));
+  if (r.status === 401 && TOKEN) {
+    TOKEN = null; localStorage.removeItem('wbr.admin.token');
+    renderLogin('세션이 만료됐어요. 다시 로그인해 주세요.');
+    throw new Error('auth');
+  }
+  if (!r.ok) throw new Error(j.error || ('오류 ' + r.status));
+  return j;
+}
+
+function renderLogin(msg) {
+  $('#app').innerHTML = `<div class="card" id="loginCard"><h2>강사 로그인</h2>
+    <p class="muted">진로독서 관리와 같은 PIN을 씁니다.</p>
+    <input id="pin" type="password" inputmode="numeric" placeholder="관리 PIN" autocomplete="current-password">
+    <button class="btn" id="go" style="margin-top:10px;width:100%">로그인</button>
+    <div class="err" id="e">${msg ? esc(msg) : ''}</div></div>`;
+  $('#go').onclick = async () => {
+    try {
+      const j = await api('/admin/login', { method: 'POST', body: JSON.stringify({ pin: $('#pin').value }) });
+      TOKEN = j.token; localStorage.setItem('wbr.admin.token', TOKEN); refresh();
+    } catch (e) { $('#e').textContent = e.message; }
+  };
+  $('#pin').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#go').click(); });
+}
+
+async function refresh() {
+  try {
+    const [ov, pk] = await Promise.all([api('/naesin-ko/admin/overview'), api('/naesin-ko/admin/packs')]);
+    OVERVIEW = ov.students || []; PACKS = pk.packs || [];
+    try { REVIEWS = (await api('/naesin-ko/admin/review')).reviews || []; } catch (e) { REVIEWS = []; }
+    render();
+  } catch (e) { if (e.message !== 'auth') $('#app').innerHTML = `<div class="card err">${esc(e.message)}</div>`; }
+}
+
+/* 학생 요약만 보고 반 그림을 만든다 — 학생 state는 서버가 통째로 읽지 않는다(§8).
+   학생 앱과 **같은 모듈**(readiness.js)이라 두 화면의 숫자가 어긋날 수 없다. */
+let CLS = { avg: null, risk: [], watch: [], dist: {}, weakTop: [], linked: 0, n: 0 };
+const AXIS_LABEL = {};
+(window.WBKOREADY ? WBKOREADY.AXES : []).forEach((a) => { AXIS_LABEL[a.key] = a.label; });
+
+/* 위험한 학생이 표 맨 위에 온다 — 스크롤해서 찾아야 하는 신호는 신호가 아니다 */
+function byReady(a, b) {
+  const s = (x) => (x.summary && x.summary.ready && typeof x.summary.ready.score === 'number') ? x.summary.ready.score : 999;
+  return s(a) - s(b);
+}
+
+function renderClass() {
+  if (!CLS.linked) return '';
+  const d = CLS.dist, n = CLS.linked;
+  const seg = (k, label) => d[k] ? `<i class="rd-${k}" style="width:${(d[k] / n) * 100}%" title="${label} ${d[k]}명"></i>` : '';
+  const weak = CLS.weakTop.slice(0, 3).map((w) => `${esc(w.label)} ${w.n}명`).join(' · ');
+  const rows = CLS.risk.concat(CLS.watch).slice(0, 8).map((r) =>
+    `<div><span class="tag ${CLS.risk.includes(r) ? 'bad' : 'warn'}">${CLS.risk.includes(r) ? '위험' : '주의'}</span>
+      <b>${esc(r.name)}</b> <span class="muted">${esc(r.why)}</span></div>`).join('');
+  return `<div class="rdbar">${seg('start', '시작 단계')}${seg('building', '쌓는 중')}${seg('ontrack', '궤도')}${seg('ready', '준비 완료')}</div>
+    <div class="legend">
+      <span><i class="rd-start"></i>시작 ${d.start}</span><span><i class="rd-building"></i>쌓는 중 ${d.building}</span>
+      <span><i class="rd-ontrack"></i>궤도 ${d.ontrack}</span><span><i class="rd-ready"></i>완료 ${d.ready}</span>
+      <span>중앙값 ${CLS.median}% · 최저 ${CLS.low}% · 최고 ${CLS.high}%</span>
+    </div>
+    ${weak ? `<p class="muted" style="margin:8px 0 0">반에서 가장 비어 있는 축: <b>${weak}</b> — 다음 수업 세트를 여기에 맞추세요.</p>` : ''}
+    ${rows ? `<div class="risklist">${rows}</div>` : ''}`;
+}
+
+function render() {
+  const linked = OVERVIEW.filter((s) => s.linked);
+  CLS = window.WBKOREADY ? WBKOREADY.classReadiness(linked) : CLS;
+  /* 목록과 같은 기준으로 센다 — 규칙이 통과시킨 답안도 표본 감사(§5.3 self)를 위해
+     확정 전까지 큐에 남는다. 카운트만 다른 기준이면 숫자와 목록이 어긋나 보인다. */
+  const hold = REVIEWS.filter((r) => !r.teacher);
+  $('#app').innerHTML = `
+  <div class="card">
+    <h2>반 성취도</h2>
+    <div class="stats">
+      <div class="stat"><b>${CLS.avg == null ? '-' : CLS.avg + '%'}</b><span>평균 준비도</span></div>
+      <div class="stat"><b>${linked.length}</b><span>학습 중</span></div>
+      <div class="stat"><b>${CLS.risk.length}</b><span>위험</span></div>
+      <div class="stat"><b>${hold.length}</b><span>서술형 미확정</span></div>
+    </div>
+    ${renderClass()}
+    <div class="tbl"><table><thead><tr>
+      <th>학생</th><th>반</th><th>준비도</th><th>비어 있는 축</th><th>작품 완료</th><th>개념 안정화</th><th>오답</th><th>서술형</th><th>최근</th>
+    </tr></thead><tbody>${linked.length ? linked.slice().sort(byReady).map(rowStudent).join('') :
+      '<tr><td colspan="9" class="muted">아직 학습 기록이 없어요.</td></tr>'}</tbody></table></div>
+  </div>
+
+  <div class="card">
+    <h2>서술형 검토 큐</h2>
+    <p class="muted">규칙 채점(1층)이 <b>보류</b>로 남긴 답안입니다. 읽고 원터치로 확정하세요 —
+      학생 화면에는 “연습 판정”으로 표시됩니다(§10-8).</p>
+    <div id="reviewList">${renderReviews()}</div>
+  </div>
+
+  <div class="card">
+    <h2>서술형 루브릭 저작</h2>
+    <p class="muted">추출기가 <b>채점 요소를 못 만든</b> 서술형입니다. 자료에 ‘핵심 단어’가 없거나,
+      있어도 모범답안이 그 요소를 다 채우지 못하는 문항이에요. 요소를 쓰고
+      <b>모범답안으로 검산</b>해서 통과하면 팩에 넣습니다 — 빈 루브릭은 배포가 막히고,
+      통과 못 하는 루브릭은 학생이 무엇을 써도 영영 보류가 됩니다.</p>
+    <div class="row">
+      <select id="rbPack">${PACKS.map((p) => `<option>${esc(p)}</option>`).join('')}</select>
+      <button class="btn ghost sm" id="btnRbLoad">불러오기</button>
+      <button class="btn ghost sm" id="btnRbSave" disabled>저작한 것 내려받기</button>
+      <span class="muted" id="rbMsg"></span>
+    </div>
+    <div id="rbList" class="muted" style="margin-top:10px">팩을 고르고 불러오기를 누르세요.</div>
+  </div>
+
+  <div class="card">
+    <h2>단원 팩 업로드</h2>
+    <p class="muted">분리 JSON을 모두 고르면 브라우저에서 합쳐 검증합니다.
+      규칙은 <code>naesin-ko/pack-check.js</code> 하나 — CLI 검증기와 같은 파일입니다.
+      <b><code>_build/review/review.json</code>도 함께 고르세요</b> — 팩에는 안 들어가고
+      위 ‘서술형 루브릭 저작’ 목록으로 갑니다.</p>
+    <input type="file" id="files" multiple accept="application/json,.json">
+    <div id="checkOut"></div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn" id="btnUpload" disabled>업로드</button>
+      <span class="muted" id="upMsg"></span>
+    </div>
+    <h3>등록된 팩</h3>
+    <div id="packList" class="muted">${PACKS.length ? PACKS.map((p) => `<span class="tag" style="margin:2px">${esc(p)}</span>`).join('') : '없음'}</div>
+  </div>
+
+  <div class="card">
+    <h2>시험 등록</h2>
+    <p class="muted">시험 프로파일(문항 수·서술형 배점)은 학교알리미 평가계획에서 옮겨 적습니다.
+      서술형 배점이 30% 이상이면 플래너가 서술형을 D-21부터 배정합니다(§5.4).</p>
+    <div class="grid-form">
+      <div><label class="muted">대상</label><input id="exScope" value="default" placeholder="default 또는 학생 코드"></div>
+      <div><label class="muted">시험일</label><input id="exDate" type="date"></div>
+      <div><label class="muted">객관식 문항 수</label><input id="exMc" type="number" min="0" placeholder="예: 21"></div>
+      <div><label class="muted">서술형 문항 수</label><input id="exEs" type="number" min="0" placeholder="예: 5"></div>
+      <div><label class="muted">서술형 배점 비율</label><input id="exW" type="number" min="0" max="100" placeholder="예: 40 (%)"></div>
+    </div>
+    <h3>범위 팩</h3>
+    <div id="exPacks">${PACKS.length ? PACKS.map((p) => `<label class="ck"><input type="checkbox" value="${esc(p)}"> ${esc(p)}</label>`).join('') : '<span class="muted">먼저 팩을 올려 주세요.</span>'}</div>
+    <div class="row" style="margin-top:10px"><button class="btn" id="btnExam">등록</button><span class="muted" id="exMsg"></span></div>
+  </div>
+
+  <div class="card">
+    <h2>오늘 수업 과제</h2>
+    <p class="muted">배정하면 학생 홈 맨 위에 고정됩니다.</p>
+    <div class="grid-form">
+      <div><label class="muted">날짜</label><input id="tkDate" type="date"></div>
+      <div><label class="muted">제목</label><input id="tkTitle" placeholder="예: 빈 의자 구절 적용"></div>
+      <div><label class="muted">팩(선택)</label><select id="tkPack"><option value="">(지정 안 함)</option>${PACKS.map((p) => `<option>${esc(p)}</option>`).join('')}</select></div>
+    </div>
+    <h3>학습 유형</h3>
+    <div id="tkTypes">${['읽기', '개념 빈칸', '구절 적용', '주석 복원', '서술형', '실전 객관식', '확인 문제', '브레인덤프']
+      .map((k) => `<label class="ck"><input type="checkbox" value="${k}"> ${k}</label>`).join('')}</div>
+    <div class="row" style="margin-top:10px"><button class="btn" id="btnTask">배정</button><span class="muted" id="tkMsg"></span></div>
+  </div>
+
+  <div class="card">
+    <h2>주석 복원 시험지 인쇄</h2>
+    <p class="muted">지문 + 빈 주석란을 종이로 뽑습니다(§4.4). 시험지 QR을 학생이 찍으면
+      바로 <b>○△× 입력 화면</b>이 열려요 — 종이 답안을 다시 타이핑시키지 않으려는 겁니다.
+      판정 기준은 화면에서 푼 것과 같습니다(커버리지 70%).</p>
+    <div class="grid-form">
+      <div><label class="muted">팩</label><select id="prPack">${PACKS.map((p) => `<option>${esc(p)}</option>`).join('')}</select></div>
+      <div><label class="muted">작품</label><select id="prWork"><option value="">팩을 고르고 불러오기</option></select></div>
+      <div><label class="muted">학생 이름(시험지에 인쇄)</label><input id="prWho" placeholder="비워도 됩니다"></div>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button class="btn ghost sm" id="btnPrLoad">불러오기</button>
+      <button class="btn sm" id="btnPrMake" disabled>시험지 만들기</button>
+      <button class="btn sm" id="btnPrPrint" disabled>인쇄</button>
+      <span class="muted" id="prMsg"></span>
+    </div>
+    <div id="prPrev" class="muted" style="margin-top:10px">작품을 고르면 미리보기가 여기 나옵니다.</div>
+  </div>
+
+  <div class="card">
+    <h2>학교 강조점 오버레이</h2>
+    <p class="muted">국어 내신의 채점 기준은 <b>학교 선생님이 수업에서 강조한 해석</b>입니다(§1.4-4).
+      정본과 다르면 여기서 덮어쓰세요 — 채점기·문항 생성기가 이 값을 따릅니다.
+      학생 필기에 기반한 정보이므로 학생 화면에는 “학교 선생님 강조”로 표시됩니다.</p>
+    <div class="grid-form">
+      <div><label class="muted">대상</label><input id="ovScope" value="default"></div>
+    </div>
+    <h3>정답 덮어쓰기</h3>
+    <p class="muted">한 줄에 하나: <code>b-빈칸id | 정답1 / 정답2 | 메모</code></p>
+    <textarea id="ovOver" placeholder="b-bl-09 | 의인법 / 활유법 | 학교에서는 활유법도 인정"></textarea>
+    <h3>작품별 강조 메모</h3>
+    <p class="muted">한 줄에 하나: <code>작품id | 메모</code></p>
+    <textarea id="ovNotes" placeholder="w-bin-uija | 5연 역설을 서술형으로 낸다고 하심"></textarea>
+
+    <h3>회복 편성 안전판</h3>
+    <p class="muted">시험이 코앞인데 사다리가 안 열린 학생을 여는 장치입니다(§5.4).
+      구절 적용 정답률이 기준에 못 미쳐도 실전·서술형을 열어 줍니다.
+      <b>기한은 필수</b>예요 — 기한이 없으면 한 번 연 게이트가 영영 열린 채 잊혀 게이트가 있으나 마나가 됩니다.
+      학생 화면에는 “선생님이 열어 둔 트랙”으로 표시되고, 적용 정답률이 아직 기준 아래라는 사실도 같이 보입니다.</p>
+    <div class="grid-form">
+      <div><label class="muted">기한(이 날까지)</label><input id="rcUntil" type="date"></div>
+      <div><label class="muted">병행 모드</label>
+        <select id="rcPar"><option value="">끔 — 연 작품만</option><option value="1">켬 — 모든 작품</option></select></div>
+    </div>
+    <p class="muted" style="margin-top:6px">게이트를 열 작품 id — 한 줄에 하나 (병행 모드를 켜면 비워도 됩니다)</p>
+    <textarea id="rcOpens" style="min-height:60px" placeholder="w-bin-uija"></textarea>
+    <p class="muted">왜 열었는지 (학생 화면에도 보입니다)</p>
+    <input id="rcWhy" placeholder="예: 범위가 넓어 순차로는 시험 전에 못 끝냅니다">
+
+    <div class="row" style="margin-top:10px"><button class="btn" id="btnOv">저장</button>
+      <button class="btn ghost sm" id="btnOvLoad">불러오기</button><span class="muted" id="ovMsg"></span></div>
+  </div>`;
+
+  bind();
+}
+
+function rowStudent(s) {
+  const m = s.summary || {};
+  const r = m.ready;
+  const pct = (a, b) => (b ? Math.round((a / b) * 100) + '%' : '-');
+  /* 준비도는 숫자 + 막대 + 신호등. 신호가 있으면 why 를 title 로 달아 둔다 —
+     한 줄에 다 쓰면 표가 안 읽히고, 안 쓰면 왜 위험한지 모른다. */
+  const lvl = r && r.alert ? r.alert.level : null;
+  const ready = r ? `<b>${r.score}%</b> <span class="mini"><i style="width:${r.score}%"></i></span>
+      ${lvl ? `<span class="tag ${lvl === 'risk' ? 'bad' : 'warn'}" title="${esc(r.alert.why)}">${lvl === 'risk' ? '위험' : '주의'}</span>` : ''}` : '-';
+  /* 가장 비어 있는 축 두 개 — 이 학생에게 오늘 무엇을 시킬지가 여기서 나온다.
+     찬 축은 빼고 센다: '비어 있는 축'에 100%가 뜨면 표를 잘못 읽게 된다. */
+  const empty = r && r.axes ? Object.keys(r.axes).filter((k) => r.axes[k] < 100).sort((a, b) => r.axes[a] - r.axes[b]) : [];
+  const axes = !r ? '-' : (empty.length
+    ? empty.slice(0, 2).map((k) => `${esc(AXIS_LABEL[k] || k)} ${r.axes[k]}%`).join(' · ')
+    : '<span class="tag ok">없음</span>');
+  return `<tr>
+    <td>${esc(s.name || s.code)}<div class="muted">${esc(s.code)}</div></td>
+    <td>${esc(s.cls || '')}</td>
+    <td>${ready}</td>
+    <td class="muted">${axes}</td>
+    <td>${m.complete != null ? `${m.complete} / ${m.works || 0}` : '-'}</td>
+    <td>${m.blankTotal ? `${m.blankStable}/${m.blankTotal} <span class="muted">(${pct(m.blankStable, m.blankTotal)})</span>` : '-'}</td>
+    <td>${m.wrongOpen != null ? (m.wrongOpen > 0 ? `<span class="tag warn">${m.wrongOpen}</span>` : '<span class="tag ok">0</span>') : '-'}</td>
+    <td>${m.essayPass != null ? `통과 ${m.essayPass}${m.essayHold ? ` · 보류 ${m.essayHold}` : ''}` : '-'}</td>
+    <td class="muted">${s.lastActive ? esc(String(s.lastActive).slice(5, 16).replace('T', ' ')) : '-'}</td>
+  </tr>`;
+}
+
+function renderReviews() {
+  const rows = REVIEWS.filter((r) => !r.teacher);
+  if (!rows.length) return '<p class="muted">검토할 답안이 없어요.</p>';
+  return rows.slice(0, 40).map((r) => {
+    const v = r.rule || {};
+    const tag = r.verdict === 'pass' ? '<span class="tag ok">규칙 통과</span>'
+      : r.verdict === 'fail' ? '<span class="tag bad">규칙 미달</span>' : '<span class="tag warn">보류</span>';
+    return `<div style="border-top:1px solid var(--line);padding:10px 0">
+      <div class="row"><b>${esc(r.name || r.code)}</b><span class="muted">${esc(r.cls || '')}</span>
+        <span class="tag muted">${esc(r.itemId)}</span>${tag}
+        <span class="muted">${v.score != null ? `${v.score}/${v.total}점` : ''}</span></div>
+      <div class="ans" style="margin:6px 0">${esc(r.answer || '(빈 답안)')}</div>
+      <div class="row">
+        <button class="btn sm" data-rv="pass" data-code="${esc(r.code)}" data-item="${esc(r.itemId)}">통과</button>
+        <button class="btn sm ghost" data-rv="hold" data-code="${esc(r.code)}" data-item="${esc(r.itemId)}">보류</button>
+        <button class="btn sm ghost" data-rv="fail" data-code="${esc(r.code)}" data-item="${esc(r.itemId)}">미달</button>
+        <input style="max-width:80px" type="number" placeholder="점수" data-pt="${esc(r.code)}|${esc(r.itemId)}">
+        <input style="max-width:260px" placeholder="한 줄 피드백" data-cm="${esc(r.code)}|${esc(r.itemId)}">
+      </div></div>`;
+  }).join('');
+}
+
+
+/* ── 서술형 루브릭 저작 ──
+   추출기가 못 만든 채점 요소를 사람이 쓰는 자리다. 이 화면이 지는 책임 넷:
+   ① 손으로 옮겨 적다 생기는 오타 — 모범답안 어절을 눌러 넣게 한다(글자 하나가 틀리면 채점이 틀린다)
+   ② 통과 못 하는 루브릭 — 저장 전에 **모범답안으로 검산**한다. 자료의 모범답안조차 요소를
+      못 채우는 루브릭을 팩에 넣으면 학생이 무엇을 써도 영영 보류가 된다(§4.1 5단계가 안 끝난다)
+   ③ 저작한 것을 잃지 않는다 — 타이핑 즉시 초안에 담고(다시 그려도 안 날아간다) 브라우저에도 남긴다.
+      세션이 끊겨도, 실수로 불러오기를 다시 눌러도 되찾을 수 있어야 한다
+   ④ 화면과 서버가 어긋나지 않는다 — 카드를 **문항 id 로** 잡고(인덱스로 잡으면 하나 빠질 때
+      전부 한 칸씩 밀려 옆 문항에 저작된다), 팩 추가와 대기 제거는 서버가 한 요청으로 처리한다 */
+let RB = { packId: '', pending: [], pack: null, draft: {}, busy: false, packIds: new Set() };
+
+function rbTokens(text) {
+  /* 어절 단위로 자른다 — 조사·문장부호는 채점기(normalizeKo)가 알아서 떼므로 그대로 둔다 */
+  return String(text || '').split(/\s+/).map((x) => x.replace(/[.,!?"'‘’“”]/g, '')).filter((x) => x.length >= 1);
+}
+/* 발문은 <b> 강조를 담은 HTML 조각이다(학생 앱과 같은 관례) — 리터럴 꺾쇠는 &lt; 로 저장돼 있다.
+   목록 줄은 글자만 필요하니 태그를 떼고 엔티티를 되돌린다. 그냥 esc() 하면 '&lt;보기&gt;'가 그대로 보인다.
+   DOMParser 는 열리지 않는 문서라 여기서 img·script 가 뜨거나 돌지 않는다. */
+function rbPlain(html) {
+  return new DOMParser().parseFromString(String(html || ''), 'text/html').body.textContent || '';
+}
+/* 발문 원문을 보여 줄 때는 강조만 살리고 나머지는 글자로 만든다 — 팩은 관리자가 올리는 것이지만
+   업로드 파일 하나가 이 화면에서 스크립트를 돌릴 수 있게 두지 않는다(관리 토큰이 여기 있다) */
+function rbRich(html) {
+  return esc(rbPlain(html)).replace(/&amp;lt;(\/?)(b|i|u|em|strong|br)&amp;gt;/g, '<$1$2>');
+}
+function rbKey(it) { return it.id; }
+function rbStore() { return 'wbk.rubric.draft.' + RB.packId; }
+function rbSave() {
+  /* 저작한 것은 서버에 넣기 전까지 이 브라우저에만 있다 — 세션 만료·새로고침에 잃지 않게 남긴다 */
+  try { localStorage.setItem(rbStore(), JSON.stringify(RB.draft)); } catch (e) { /* 용량 초과는 무시 */ }
+}
+function rbDraftOf(it) {
+  if (!RB.draft[rbKey(it)]) {
+    const seed = (it.rubric || []).map((r) => ({ element: r.element || '', kw: (r.keywords || []).join(', '), points: r.points == null ? '' : String(r.points) }));
+    RB.draft[rbKey(it)] = seed.length ? seed : [{ element: '', kw: '', points: '' }];
+  }
+  return RB.draft[rbKey(it)];
+}
+/* 배점 — 빈칸은 1점(grade.js 규칙), 숫자가 아니거나 0 이하는 저작 실수다. 조용히 NaN 을 만들지 않는다 */
+function rbPoints(v) {
+  const s = String(v == null ? '' : v).trim();
+  if (!s) return { points: null };
+  const n = Number(s.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0)));
+  if (!isFinite(n) || n <= 0) return { points: null, bad: s };
+  return { points: n };
+}
+function rbBuild(it) {
+  const rows = rbDraftOf(it).filter((r) => r.element.trim() || r.kw.trim());
+  return rows.map((r) => Object.assign({
+    element: r.element.trim(),
+    keywords: r.kw.split(',').map((x) => x.trim()).filter(Boolean),
+    source: 'authored',
+  }, { points: rbPoints(r.points).points }));
+}
+function rbBadPoints(it) {
+  return rbDraftOf(it).map((r) => rbPoints(r.points).bad).filter(Boolean);
+}
+/* 저작 중인 루브릭을 붙인 문항 — 검산과 저장이 같은 값을 본다 */
+function rbItem(it) { return Object.assign({}, it, { rubric: rbBuild(it) }); }
+
+/* 검산 — 무엇을 보는가: **루브릭이 자료의 모범답안을 알아보는가**.
+   그래서 판정 기준은 verdict 가 아니라 '요소가 다 충족되는가'다. 자료의 모범답안이 어절 나열이라
+   조건·문장 완결에서 걸리는 문항이 실제로 있는데(그건 자료 사정이지 루브릭 잘못이 아니다),
+   verdict 로만 재면 그런 문항은 어떤 루브릭으로도 영영 팩에 못 들어간다. */
+function rbCheck(it) {
+  const item = rbItem(it);
+  const bad = rbBadPoints(it);
+  if (bad.length) return { state: 'no', why: '배점은 0보다 큰 숫자로 쓰세요 — 지금 “' + bad[0] + '”. 비워 두면 1점입니다.', rows: [] };
+  if (!item.rubric.length) return { state: 'no', why: '채점 요소가 없어요.', rows: [] };
+  const holes = item.rubric.filter((r) => !r.element || !r.keywords.length);
+  if (holes.length) return { state: 'no', why: '요소 이름과 인정 키워드가 둘 다 있어야 해요.', rows: [] };
+  const models = (item.modelAnswers || []).filter(Boolean);
+  if (!models.length) {
+    return { state: 'unverified', rows: [],
+      why: '이 문항은 자료에 모범답안이 없어 검산을 못 했습니다 — 넣더라도 표본 채점으로 꼭 확인하세요.' };
+  }
+  const rows = models.map((m) => {
+    const v = WBKOGRADE.gradeRubric(m, item);
+    const missing = v.elements.filter((e) => !e.met).map((e) => e.element);
+    return { answer: m, verdict: v.verdict, score: v.score, total: v.total, missing: missing, allMet: !missing.length };
+  });
+  const full = rows.filter((r) => r.verdict === 'pass');
+  if (full.length) return { state: 'ok', rows: rows, why: '모범답안이 통과합니다 — 팩에 넣을 수 있어요.' };
+  const met = rows.filter((r) => r.allMet);
+  if (met.length) {
+    return { state: 'formOnly', rows: rows,
+      why: '채점 요소는 모범답안을 다 알아봅니다. 통과가 아닌 것은 자료의 모범답안이 조건(형식)이나 문장 완결을 못 지켜서예요 — 루브릭 문제가 아니니 넣어도 됩니다.' };
+  }
+  return { state: 'no', rows: rows,
+    why: '자료의 모범답안조차 요소를 못 채웁니다. 요소를 줄이거나, 같은 뜻의 표현을 한 요소의 키워드로 묶으세요.' };
+}
+const RB_OK = { ok: 1, unverified: 1, formOnly: 1 };
+function rbBadge(it) {
+  if (!rbBuild(it).length) return '';
+  const s = rbCheck(it).state;
+  if (s === 'ok') return '<span class="tag ok">검산 통과</span>';
+  if (s === 'formOnly') return '<span class="tag ok">요소 충족</span>';
+  if (s === 'unverified') return '<span class="tag warn">검산 못 함</span>';
+  return '<span class="tag warn">검산 필요</span>';
+}
+
+function rbRowsHtml(d) {
+  return d.map((r, k) => `<div class="el">
+    <input data-f="element" data-k="${k}" value="${esc(r.element)}" placeholder="예: 화자의 태도" maxlength="60">
+    <input data-f="kw" data-k="${k}" value="${esc(r.kw)}" placeholder="예: 감사, 고마움" maxlength="300">
+    <input data-f="points" data-k="${k}" value="${esc(String(r.points))}" placeholder="1" maxlength="4" inputmode="numeric">
+    <button type="button" class="x" data-del="${k}" title="이 요소 지우기">×</button></div>`).join('');
+}
+
+function rbRender() {
+  const box = $('#rbList');
+  if (!RB.pending.length) { box.innerHTML = '<span class="muted">루브릭을 기다리는 서술형이 없어요.</span>'; box.className = 'muted'; return; }
+  /* 펼쳐 둔 카드는 다시 그려도 펼쳐 둔다 — 문항 id 로 기억한다(번호는 하나 빠지면 밀린다) */
+  const open = new Set([...box.querySelectorAll('details.rub[open]')].map((d) => d.getAttribute('data-id')));
+  box.innerHTML = RB.pending.map((p, i) => {
+    const it = p.item;
+    const d = rbDraftOf(it);
+    const dup = RB.packIds.has(it.id);
+    return `<details class="rub" data-id="${esc(it.id)}"${open.has(it.id) ? ' open' : ''}>
+      <summary>${esc(String((it.source && it.source.no) || i + 1))}. ${esc(rbPlain(it.stem).slice(0, 60))}
+        <span class="tag muted">${esc(p.series || '')}</span>
+        <span data-badge>${dup ? '<span class="tag warn">이미 팩에 있음</span>' : rbBadge(it)}</span></summary>
+      <div class="body">
+        <div>
+          <h4>발문</h4><div class="src">${rbRich(it.stem)}</div>
+          ${(it.conditions || []).length ? `<h4>조건</h4><div class="src">${it.conditions.map((c) => esc(c.text || c.kind)).join('<br>')}</div>` : ''}
+          <h4>모범답안 — 어절을 누르면 키워드로 들어갑니다</h4>
+          ${(it.modelAnswers || []).length
+            ? (it.modelAnswers || []).map((m) => `<div class="src">${rbTokens(m).map((t) => `<button type="button" class="tok" data-tok="${esc(t)}">${esc(t)}</button>`).join(' ')}</div>`).join('')
+            : '<div class="src muted">자료에 모범답안이 없습니다 — 검산이 안 되니 표본 채점으로 확인하세요.</div>'}
+          ${it.explanation && it.explanation.main ? `<h4>해설(참고)</h4><div class="src">${esc(it.explanation.main)}</div>` : ''}
+        </div>
+        <div>
+          <h4>채점 요소 — 요소마다 하나라도 맞으면 충족</h4>
+          <div class="el" style="font-size:11px;color:var(--muted);font-weight:800">
+            <span>요소 이름</span><span>인정 키워드(쉼표)</span><span>배점</span><span></span></div>
+          <div data-rows>${rbRowsHtml(d)}</div>
+          <button type="button" class="btn ghost sm" data-add="1">＋ 요소 추가</button>
+          <div class="chk" data-chk></div>
+          <div class="row" style="margin-top:8px">
+            ${dup
+              ? '<button type="button" class="btn sm" data-drop="1">대기 목록에서 빼기</button>'
+              : '<button type="button" class="btn sm" data-check="1">모범답안으로 검산</button>' +
+                '<button type="button" class="btn sm" data-put="1">팩에 넣기</button>'}
+          </div>
+        </div>
+      </div></details>`;
+  }).join('');
+  box.className = '';
+}
+
+function rbCardOf(id) { return $('#rbList').querySelector(`details.rub[data-id="${CSS.escape(id)}"]`); }
+function rbItemOf(det) {
+  const id = det.getAttribute('data-id');
+  return (RB.pending.filter((p) => p.item.id === id)[0] || {}).item || null;
+}
+
+function rbShowCheck(det, it) {
+  const r = rbCheck(it);
+  const ok = !!RB_OK[r.state];
+  det.querySelector('[data-chk]').innerHTML =
+    `<div class="ln"><b class="${ok ? 'ok' : 'no'}">${r.state === 'ok' ? '통과' : (ok ? '넣어도 됨' : '아직')}</b> ${esc(r.why)}</div>` +
+    r.rows.map((x) => `<div class="ln"><b class="${x.verdict === 'pass' ? 'ok' : x.verdict === 'hold' ? 'hold' : 'no'}">${x.verdict}</b>
+      ${x.score}/${x.total}점 ${x.missing.length ? `· 빠짐: ${esc(x.missing.join(', '))}` : '· 요소 모두 충족'}
+      <div class="muted">${esc(String(x.answer).slice(0, 90))}</div></div>`).join('');
+  return r;
+}
+
+async function rbLoad(keepDraft) {
+  const id = $('#rbPack').value;
+  if (!id) return;
+  $('#rbMsg').textContent = '불러오는 중…';
+  try {
+    /* 개념어 사전을 먼저 확보한다 — 없으면 저작 경로의 팩 재검증이 업로드 경로보다 헐거워진다 */
+    if (!CONCEPTS) {
+      try { CONCEPTS = await (await fetch('/naesin-ko/concepts.json')).json(); } catch (err) { CONCEPTS = null; }
+    }
+    const [pd, pk] = await Promise.all([
+      api('/naesin-ko/admin/pending?id=' + encodeURIComponent(id)),
+      api('/naesin-ko/pack?id=' + encodeURIComponent(id)),
+    ]);
+    const samePack = RB.packId === id;
+    RB.packId = id;
+    RB.pack = pk.pack;
+    RB.packIds = new Set((pk.pack.items || []).map((x) => x.id));
+    RB.pending = (pd.pending || []).filter((p) => p.kind === 'item' && p.item && p.item.format === 'essay');
+    /* 저작 중이던 초안은 버리지 않는다 — 브라우저에 남긴 것을 되살린다(불러오기를 잘못 눌러도, 세션이 끊겨도) */
+    if (!(keepDraft && samePack)) {
+      RB.draft = {};
+      try { RB.draft = JSON.parse(localStorage.getItem(rbStore()) || '{}') || {}; } catch (e) { RB.draft = {}; }
+    }
+    const dup = RB.pending.filter((p) => RB.packIds.has(p.item.id)).length;
+    $('#rbMsg').textContent = `${RB.pending.length}문항 대기` + (dup ? ` · ${dup}문항은 이미 팩에 있습니다` : '');
+    $('#btnRbSave').disabled = !RB.pending.length;
+    rbRender();
+  } catch (e) { $('#rbMsg').textContent = e.message; }
+}
+
+async function rbPut(det) {
+  if (RB.busy) return;
+  const it = rbItemOf(det);
+  if (!it) { rbRender(); return; }
+  const r = rbShowCheck(det, it);
+  if (!RB_OK[r.state]) { $('#rbMsg').textContent = '검산을 통과해야 넣을 수 있어요.'; return; }
+  const item = rbItem(it);
+  /* 문항을 더했으면 counts 도 다시 세야 한다 — 손으로 세지 않고 **병합기와 같은 함수**를 쓴다
+     (assemble 이 counts 를 무시하고 다시 센다). 안 그러면 'counts 불일치'로 저장이 막힌다. */
+  const merged = Object.assign({}, RB.pack, { items: (RB.pack.items || []).concat([item]) });
+  const next = WBKOCHECK.assemble([{ name: RB.packId, json: merged }]).pack;
+  /* 팩에 넣기 전에 팩 전체를 다시 검증한다 — 한 문항 때문에 배포가 막히면 안 된다.
+     업로드 카드와 같은 조건으로 본다(개념어 사전 포함) */
+  const chk = WBKOCHECK.checkPack(next, CONCEPTS ? { concepts: CONCEPTS } : {});
+  if (chk.errors.length) { $('#rbMsg').textContent = '팩 검증 실패: ' + chk.errors[0]; return; }
+  RB.busy = true;
+  det.querySelectorAll('button').forEach((b) => { b.disabled = true; });
+  $('#rbMsg').textContent = '넣는 중…';
+  try {
+    /* 팩 추가와 대기 목록 제거를 **한 요청**으로 맡긴다 — 두 번 나눠 부르면 중간에 실패했을 때
+       문항이 양쪽에 다 있거나 양쪽에 다 없는 상태가 되고, 화면과 서버가 어긋난다(§7[3]).
+       무엇을 뺄지는 id 로 서버가 정한다 — 화면이 걸러 둔 배열을 목록 전체로 올리지 않는다. */
+    await api('/naesin-ko/admin/rubric', { method: 'POST',
+      body: JSON.stringify({ id: RB.packId, pack: next, doneItemId: it.id }) });
+    RB.pack = next;
+    RB.packIds = new Set((next.items || []).map((x) => x.id));
+    RB.pending = RB.pending.filter((p) => p.item.id !== it.id);
+    delete RB.draft[rbKey(it)];
+    rbSave();
+    $('#rbMsg').textContent = `‘${rbPlain(it.stem).slice(0, 18)}…’ 를 팩에 넣었어요 — 남은 ${RB.pending.length}문항`;
+    RB.putMsg = true;
+    $('#btnRbSave').disabled = !RB.pending.length;
+  } catch (e) {
+    /* 실패해도 화면과 데이터를 반드시 다시 맞춘다 — 여기서 안 그리면 카드가 옛 목록 기준으로 남는다 */
+    $('#rbMsg').textContent = e.message + ' — 저작한 값은 그대로 있습니다. 다시 불러온 뒤 저장하세요.';
+  } finally {
+    RB.busy = false;
+    rbRender();
+  }
+}
+
+/* 이미 팩에 든 문항이 대기 목록에 남은 경우의 퇴로 — 다시 넣을 수는 없다(id 중복) */
+async function rbDrop(det) {
+  if (RB.busy) return;
+  const it = rbItemOf(det);
+  if (!it) { rbRender(); return; }
+  RB.busy = true;
+  try {
+    await api('/naesin-ko/admin/rubric', { method: 'POST',
+      body: JSON.stringify({ id: RB.packId, doneItemId: it.id }) });
+    RB.pending = RB.pending.filter((p) => p.item.id !== it.id);
+    delete RB.draft[rbKey(it)];
+    rbSave();
+    $('#rbMsg').textContent = `대기 목록에서 뺐어요 — 남은 ${RB.pending.length}문항`;
+  } catch (e) { $('#rbMsg').textContent = e.message; }
+  finally { RB.busy = false; rbRender(); }
+}
+
+function rbBind() {
+  $('#btnRbLoad').onclick = () => rbLoad(false);
+  $('#btnRbSave').onclick = () => {
+    /* 저작한 것은 KV 에만 두지 않는다 — 작업 폴더에 남겨야 다시 만들 때 잃지 않는다.
+       화면에 보이는 값 그대로 담는다(입력이 곧 초안이라 따로 걷을 것이 없다) */
+    const out = { packId: RB.packId, savedAt: new Date().toISOString(),
+      rubrics: RB.pending.map((p) => ({ itemId: p.item.id, no: p.item.source && p.item.source.no, rubric: rbBuild(p.item) }))
+        .filter((x) => x.rubric.length) };
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(out, null, 1)], { type: 'application/json' }));
+    a.download = RB.packId + '-rubrics.json';
+    a.click();
+  };
+  /* 타이핑이 곧 초안이다 — 다시 그리기 전에 걷어 오는 방식은 **다른 카드에 쓰던 값을 잃는다**
+     (실측: 한 카드에서 요소를 추가하면 나란히 펼쳐 둔 카드의 입력이 통째로 초기화됐다) */
+  $('#rbList').addEventListener('input', (e) => {
+    const inp = e.target.closest('[data-f]');
+    if (!inp) return;
+    const det = inp.closest('details.rub');
+    const it = rbItemOf(det);
+    if (!it) return;
+    const d = rbDraftOf(it);
+    const k = Number(inp.getAttribute('data-k'));
+    if (d[k]) { d[k][inp.getAttribute('data-f')] = inp.value; rbSave(); }
+    /* 방금 저장했다는 안내를 지운다 — 다음 문항을 저작하는 내내 남아 있으면 이 문항도
+       넣은 줄로 읽는다(20문항을 연달아 저작하는 화면이라 실제로 헷갈린다) */
+    if (RB.putMsg) { $('#rbMsg').textContent = ''; RB.putMsg = false; }
+    /* 배지는 늘 자리를 지키는 칸에 그린다 — 없던 배지가 처음 생길 때도 보여야 한다 */
+    const sum = det.querySelector('summary [data-badge]');
+    if (sum && !RB.packIds.has(it.id)) sum.innerHTML = rbBadge(it);
+  });
+  $('#rbList').addEventListener('focusin', (e) => {
+    if (e.target.matches('[data-f="kw"]')) { const d = e.target.closest('details.rub'); if (d) d._lastKw = e.target; }
+  });
+  $('#rbList').addEventListener('click', (e) => {
+    const det = e.target.closest('details.rub');
+    if (!det) return;
+    const it = rbItemOf(det);
+    if (!it) return;
+    const tok = e.target.closest('[data-tok]');
+    if (tok) {
+      /* 마지막으로 손댄 키워드 칸에 넣는다 — 없으면 첫 칸. 이미 있는 낱말은 다시 넣지 않는다 */
+      const inputs = [...det.querySelectorAll('[data-f="kw"]')];
+      const box = inputs.filter((x) => x === document.activeElement)[0]
+        || (det._lastKw && det._lastKw.isConnected ? det._lastKw : null) || inputs[0];
+      if (box) {
+        const word = tok.getAttribute('data-tok');
+        const has = box.value.split(',').map((x) => x.trim()).filter(Boolean);
+        if (has.indexOf(word) < 0) {
+          box.value = has.concat([word]).join(', ');
+          box.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+        det._lastKw = box;
+        box.focus();
+      }
+      return;
+    }
+    if (e.target.closest('[data-add]')) {
+      rbDraftOf(it).push({ element: '', kw: '', points: '' });
+      rbSave();
+      /* 이 카드의 요소 칸만 다시 그린다 — 목록 전체를 다시 그릴 이유가 없다(다른 카드가 접힌다) */
+      det.querySelector('[data-rows]').innerHTML = rbRowsHtml(rbDraftOf(it));
+      return;
+    }
+    const del = e.target.closest('[data-del]');
+    if (del) {
+      const d = rbDraftOf(it);
+      const k = Number(del.getAttribute('data-del'));
+      /* 한 줄만 남았으면 지우는 대신 비운다 — 아무 반응 없는 × 는 고장으로 읽힌다 */
+      if (d.length > 1) d.splice(k, 1); else d[0] = { element: '', kw: '', points: '' };
+      rbSave();
+      det.querySelector('[data-rows]').innerHTML = rbRowsHtml(rbDraftOf(it));
+      det._lastKw = null;
+      return;
+    }
+    if (e.target.closest('[data-check]')) { $('#rbMsg').textContent = ''; rbShowCheck(det, it); return; }
+    if (e.target.closest('[data-put]')) { rbPut(det); return; }
+    if (e.target.closest('[data-drop]')) { rbDrop(det); return; }
+  });
+}
+
+function bind() {
+  rbBind();
+  $('#files').onchange = async (e) => {
+    const files = [...e.target.files];
+    const out = $('#checkOut');
+    if (!files.length) { out.innerHTML = ''; return; }
+    const parsed = [];
+    for (const f of files) {
+      try { parsed.push({ name: f.name, json: JSON.parse(await f.text()) }); }
+      catch (err) { parsed.push({ name: f.name, json: null }); }
+    }
+    /* 검수 파일(review.json)은 **팩에 넣지 않는다.** assemble 은 모르는 최상위 키를 팩 루트로
+       복사하므로 그냥 두면 초안이 학생 기기까지 간다(§7[3]). 따로 빼서 루브릭 저작 목록으로 보낸다. */
+    PENDING_UP = null;
+    for (let i = parsed.length - 1; i >= 0; i--) {
+      const j = parsed[i].json;
+      if (j && Array.isArray(j.pending) && !j.works && !j.sets && !j.items && !j.work) {
+        PENDING_UP = { id: String(j.packId || '').trim(), pending: j.pending };
+        parsed.splice(i, 1);
+      }
+    }
+    if (!CONCEPTS) {
+      try { CONCEPTS = await (await fetch('/naesin-ko/concepts.json')).json(); } catch (err) { CONCEPTS = null; }
+    }
+    /* 검수 파일만 골랐을 때 — 루브릭 저작 목록만 갈아 끼우는 정상 작업이다.
+       팩 검증기를 태우면 '작품이 없어요' 같은 팩 이야기만 늘어놓아 무엇이 잘못됐는지 알 수 없다. */
+    if (PENDING_UP && !parsed.length) {
+      ASSEMBLED = null;
+      const bad = !PENDING_UP.id;
+      out.innerHTML = `<div class="issues ${bad ? 'bad' : 'ok'}">
+        <div><b>${esc(PENDING_UP.id || '(packId 없음)')}</b> — 검수 파일만 골랐습니다</div>
+        ${bad ? '<div>✗ review.json 에 packId 가 없어요 — 어느 팩의 목록인지 알 수 없습니다.</div>'
+          : `<div>✓ 대기 ${PENDING_UP.pending.length}건을 ‘서술형 루브릭 저작’ 목록에 넣습니다(팩은 그대로).</div>`}</div>`;
+      $('#btnUpload').disabled = bad;
+      return;
+    }
+    const { pack, notes } = WBKOCHECK.assemble(parsed);
+    const r = WBKOCHECK.checkPack(pack, CONCEPTS ? { concepts: CONCEPTS } : {});
+    ASSEMBLED = r.ok ? pack : null;
+    const errs = notes.concat(r.errors);
+    out.innerHTML = `<div class="issues ${errs.length ? 'bad' : (r.warns.length ? 'warn' : 'ok')}">
+      <div><b>${esc(pack.packId || '(packId 없음)')}</b> — ${r.summary.map(esc).join(' · ')}</div>
+      ${errs.map((x) => `<div>✗ ${esc(x)}</div>`).join('')}
+      ${r.warns.map((x) => `<div>! ${esc(x)}</div>`).join('')}
+      ${!errs.length ? '<div>✓ 오류 없음 — 업로드할 수 있어요.</div>' : ''}
+      ${PENDING_UP ? `<div>· 검수 파일도 함께 올립니다 — 대기 ${PENDING_UP.pending.length}건(팩에는 안 들어갑니다).</div>` : ''}</div>`;
+    $('#btnUpload').disabled = !ASSEMBLED;
+  };
+
+  $('#btnUpload').onclick = async () => {
+    if (!ASSEMBLED && !(PENDING_UP && PENDING_UP.id)) return;
+    try {
+      let msg = '';
+      if (ASSEMBLED) {
+        await api('/naesin-ko/admin/pack', { method: 'POST', body: JSON.stringify({ id: ASSEMBLED.packId, pack: ASSEMBLED }) });
+        msg = '업로드 완료';
+      }
+      if (PENDING_UP && (!ASSEMBLED || PENDING_UP.id === ASSEMBLED.packId)) {
+        const r = await api('/naesin-ko/admin/pending', { method: 'POST', body: JSON.stringify(PENDING_UP) });
+        msg += (msg ? ' · ' : '') + `검수 대기 ${r.count}건`;
+      } else if (PENDING_UP) {
+        msg += ' · 검수 파일의 packId 가 팩과 달라 건너뛰었어요';
+      }
+      ASSEMBLED = null; PENDING_UP = null;
+      $('#files').value = '';
+      $('#checkOut').innerHTML = '';
+      /* refresh() 가 화면을 다시 그리므로 안내는 **그 뒤에** 남긴다 —
+         먼저 찍으면 뜨자마자 지워져 아무 일도 안 일어난 것처럼 보인다 */
+      await refresh();
+      $('#upMsg').textContent = msg;
+    } catch (e) { $('#upMsg').textContent = e.message; }
+  };
+
+  $('#btnExam').onclick = async () => {
+    const packIds = [...document.querySelectorAll('#exPacks input:checked')].map((i) => i.value);
+    const w = Number($('#exW').value);
+    const profile = {
+      mcCount: $('#exMc').value === '' ? null : Number($('#exMc').value),
+      essayCount: $('#exEs').value === '' ? null : Number($('#exEs').value),
+      essayWeight: $('#exW').value === '' ? null : (w > 1 ? w / 100 : w)
+    };
+    try {
+      await api('/naesin-ko/admin/exam', { method: 'POST', body: JSON.stringify({
+        scope: $('#exScope').value.trim(), examDate: $('#exDate').value, packIds, profile }) });
+      $('#exMsg').textContent = '등록 완료';
+    } catch (e) { $('#exMsg').textContent = e.message; }
+  };
+
+  $('#btnTask').onclick = async () => {
+    const typeKeys = [...document.querySelectorAll('#tkTypes input:checked')].map((i) => i.value);
+    try {
+      await api('/naesin-ko/admin/task', { method: 'POST', body: JSON.stringify({
+        date: $('#tkDate').value, title: $('#tkTitle').value.trim(),
+        typeKeys, packId: $('#tkPack').value || undefined }) });
+      $('#tkMsg').textContent = '배정 완료';
+    } catch (e) { $('#tkMsg').textContent = e.message; }
+  };
+
+  /* ── 주석 복원 시험지 인쇄(§4.4) ──
+     화면 채점과 같은 restoreTargets 를 쓴다 — 시험지에 나오는 항목과 앱이 묻는 항목이 다르면
+     ○△× 를 옮겨 적을 수가 없다. 지문은 주석 없이 그린다(그게 시험지의 요점이다). */
+  let PR = { pack: null, work: null, targets: [] };
+  $('#btnPrLoad').onclick = async () => {
+    const id = $('#prPack').value;
+    if (!id) return;
+    $('#prMsg').textContent = '불러오는 중…';
+    try {
+      const j = await api('/naesin-ko/pack?id=' + encodeURIComponent(id));
+      PR.pack = j.pack;
+      const works = (j.pack.works || []).filter((w) => w.text);
+      $('#prWork').innerHTML = works.length
+        ? works.map((w) => `<option value="${esc(w.workId)}">${esc(w.title || w.workId)}</option>`).join('')
+        : '<option value="">본문이 있는 작품이 없어요</option>';
+      $('#btnPrMake').disabled = !works.length;
+      $('#prMsg').textContent = `${works.length}편`;
+    } catch (e) { $('#prMsg').textContent = e.message; }
+  };
+  $('#btnPrMake').onclick = () => {
+    const w = (PR.pack.works || []).filter((x) => x.workId === $('#prWork').value)[0];
+    if (!w) return;
+    PR.work = w;
+    PR.targets = WBKOGEN.restoreTargets(w);
+    if (!PR.targets.length) { $('#prMsg').textContent = '이 작품은 복원할 항목이 없어요.'; return; }
+    const link = location.origin + '/naesin-ko/?paper=' + encodeURIComponent(w.workId);
+    const qr = window.WBQR ? WBQR.svg(link, { size: 120 }) : '<div class="muted">QR 모듈 없음</div>';
+    const who = $('#prWho').value.trim();
+    /* 지문은 연·행만 그린다 — 주석·날개풀이는 빼야 복원 시험지가 된다.
+       학생 앱의 poemHtml 을 쓰지 않는 이유가 이것이다(그쪽은 주석·기호를 함께 그린다). */
+    const body = ((w.text && w.text.stanzas) || []).map((stz) => '<div class="st">' +
+      (stz.lines || stz).map((ln) => `<div class="ln">${esc(typeof ln === 'string' ? ln : (ln.text || ''))}</div>`).join('') +
+      '</div>').join('');
+    $('#sheet').innerHTML = `<div class="pg">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div><div style="font-size:18px;font-weight:800">${esc(w.title || '')} — 주석 복원</div>
+          <div style="font-size:12px;color:#555">${esc(w.author || '')} · ${esc(PR.pack.packId || '')}</div>
+          <div style="font-size:12px;margin-top:6px">이름 ${who ? esc(who) : '________________'}　날짜 ____ / ____</div></div>
+        <div style="text-align:center">${qr}<div style="font-size:10px;color:#555">찍으면 ○△× 입력</div></div>
+      </div>
+      <hr style="margin:10px 0">
+      ${body}
+      <hr style="margin:12px 0">
+      <div style="font-size:13px;font-weight:700;margin-bottom:6px">표시된 구절의 주석을 힌트 없이 쓰세요</div>
+      ${PR.targets.map((t) => `<div><div style="font-size:12px;font-weight:700">${esc(t.label)}</div>
+        ${t.quote ? `<div style="font-size:12px;color:#555">${esc(t.quote)}</div>` : ''}
+        <div class="box"></div></div>`).join('')}
+    </div>`;
+    $('#prPrev').innerHTML = `<div class="issues ok"><div>준비됐어요 — 복원 항목 ${PR.targets.length}개 · QR은 ${esc(link)} 로 갑니다.</div>
+      <div>인쇄를 누르면 이 시험지만 나옵니다(화면은 숨겨집니다).</div></div>`;
+    $('#btnPrPrint').disabled = false;
+    $('#prMsg').textContent = '';
+  };
+  $('#btnPrPrint').onclick = () => window.print();
+
+  $('#btnOvLoad').onclick = async () => {
+    try {
+      const j = await api('/naesin-ko/admin/overlay?scope=' + encodeURIComponent($('#ovScope').value.trim() || 'default'));
+      const o = j.overlay || {};
+      $('#ovOver').value = (o.overrides || []).map((x) => `${x.targetRef} | ${(x.answers || []).join(' / ')}${x.note ? ' | ' + x.note : ''}`).join('\n');
+      $('#ovNotes').value = (o.notes || []).map((n) => `${n.workId} | ${n.text}`).join('\n');
+      const rc = o.recovery || {};
+      $('#rcUntil').value = rc.until || '';
+      $('#rcPar').value = rc.parallel ? '1' : '';
+      $('#rcOpens').value = (rc.opens || []).join('\n');
+      $('#rcWhy').value = rc.why || '';
+      const live = rc.until && rc.until >= new Date().toISOString().slice(0, 10);
+      $('#ovMsg').textContent = '불러왔어요' + (rc.until ? (live ? ` · 안전판 ${rc.until}까지 켜져 있음` : ` · 안전판 기한 지남(${rc.until}) — 닫혔습니다`) : '');
+    } catch (e) { $('#ovMsg').textContent = e.message; }
+  };
+
+  $('#btnOv').onclick = async () => {
+    const overrides = $('#ovOver').value.split('\n').map((l) => l.split('|').map((s) => s.trim()))
+      .filter((p) => p[0] && p[1])
+      .map((p) => ({ targetRef: p[0], answers: p[1].split('/').map((s) => s.trim()).filter(Boolean), note: p[2] || '' }));
+    const notes = $('#ovNotes').value.split('\n').map((l) => l.split('|').map((s) => s.trim()))
+      .filter((p) => p[0] && p[1]).map((p) => ({ workId: p[0], text: p.slice(1).join(' | ') }));
+    const opens = $('#rcOpens').value.split('\n').map((x) => x.trim()).filter(Boolean);
+    const parallel = $('#rcPar').value === '1';
+    /* 기한만 비워 두고 저장을 누르는 실수가 잦을 자리라 화면에서 먼저 잡는다 —
+       서버도 막지만, 400 을 보고 되짚는 것보다 여기서 말해 주는 편이 낫다 */
+    if ((opens.length || parallel) && !$('#rcUntil').value) {
+      $('#ovMsg').textContent = '안전판에는 기한을 넣어 주세요 — 기한 없이 열면 영영 열린 채 잊힙니다.';
+      return;
+    }
+    const recovery = (opens.length || parallel)
+      ? { parallel, opens, until: $('#rcUntil').value, why: $('#rcWhy').value.trim() } : null;
+    try {
+      await api('/naesin-ko/admin/overlay', { method: 'POST', body: JSON.stringify({
+        scope: $('#ovScope').value.trim() || 'default', overrides, notes, recovery }) });
+      $('#ovMsg').textContent = `저장 완료 (덮어쓰기 ${overrides.length} · 메모 ${notes.length}`
+        + (recovery ? ` · 안전판 ${recovery.until}까지${parallel ? ' 병행 모드' : ` 작품 ${opens.length}편`}` : '') + ')';
+    } catch (e) { $('#ovMsg').textContent = e.message; }
+  };
+
+  $('#reviewList').onclick = async (e) => {
+    const b = e.target.closest('[data-rv]');
+    if (!b) return;
+    const code = b.getAttribute('data-code'), itemId = b.getAttribute('data-item');
+    const key = `${code}|${itemId}`;
+    const pt = document.querySelector(`[data-pt="${key}"]`);
+    const cm = document.querySelector(`[data-cm="${key}"]`);
+    try {
+      await api('/naesin-ko/admin/review', { method: 'POST', body: JSON.stringify({
+        code, itemId, verdict: b.getAttribute('data-rv'),
+        points: pt && pt.value !== '' ? Number(pt.value) : undefined,
+        comment: cm ? cm.value : '' }) });
+      refresh();
+    } catch (err) { alert(err.message); }
+  };
+}
+
+$('#btnLogout').onclick = () => { TOKEN = null; localStorage.removeItem('wbr.admin.token'); renderLogin(); };
+if (TOKEN) refresh(); else renderLogin();
+</script>
+</body>
+</html>

@@ -1,0 +1,262 @@
+{
+  "packId": "sample-demo-U0",
+  "revision": "데모",
+  "publisher": "체험(자체 제작)",
+  "author": "WB",
+  "grade": "중2",
+  "semester": "데모",
+  "unit": "0. 체험 단원",
+  "source": {
+    "provider": "WB 자체 제작 체험 팩",
+    "producedAt": "2026-09-03",
+    "protectNotice": "실제 교과서·구매 자료와 무관한 창작 콘텐츠입니다. 테스트·데모 전용이며 수록 작품·문항 전부 자체 창작입니다."
+  },
+  "counts": { "works": 2, "sets": 2, "items": 5, "blanks": 12, "vocab": 5 },
+  "works": [
+    {
+      "workId": "w-bin-uija",
+      "title": "빈 의자",
+      "author": "한서린(가상 시인)",
+      "kind": "poem",
+      "hasCanon": true,
+      "isExternal": false,
+      "unitPath": "0 > 0-1 > (1)",
+      "overview": {
+        "genre": ["자유시", "서정시"],
+        "material": "마루 끝의 낡은 의자",
+        "tone": ["서정적", "회상적", "관조적"],
+        "theme": "빈자리를 통해 되새기는 그리움과, 부재가 오히려 커지는 마음",
+        "features": [
+          "사물을 사람처럼 그려 대상에 온기를 준다",
+          "짜임이 비슷한 두 행을 나란히 놓아 흐름을 만든다",
+          "만지는 감각으로 시간의 흔적을 드러낸다",
+          "마지막 연의 어긋난 표현이 주제를 압축한다"
+        ]
+      },
+      "composition": [
+        { "range": "1연", "summary": "볕을 안고 있는 의자를 바라봄" },
+        { "range": "2연", "summary": "할머니의 자리가 볕의 자리로 바뀜" },
+        { "range": "3연", "summary": "등받이의 결을 만지며 시간을 더듬음" },
+        { "range": "4연", "summary": "바람에 흔들리는 의자에서 인기척을 느낌" },
+        { "range": "5연", "summary": "비어 있어서 더 커진 자리 앞에 서 있음" }
+      ],
+      "structureFlow": "관찰(1~2연) → 접촉(3연) → 환기(4연) → 성찰(5연)",
+      "text": {
+        "stanzas": [
+          { "no": 1, "lines": ["마루 끝에 의자 하나", "하루 종일 해를 안고 있다"] },
+          { "no": 2, "lines": ["할머니가 앉던 자리", "이제는 볕이 앉는 자리"] },
+          { "no": 3, "lines": ["낡은 등받이에 새겨진 결", "손끝으로 오래 만져 본다"] },
+          { "no": 4, "lines": ["바람이 지나며 의자를 흔든다", "누가 다녀간 것처럼"] },
+          { "no": 5, "lines": ["비어 있어서 더 큰 자리", "나는 그 앞에 오래 서 있다"] }
+        ]
+      },
+      "lineNotes": [
+        { "anchor": "해를 안고 있다", "note": "볕이 내려앉은 모습을 의자가 품는 것처럼 나타냈다." },
+        { "anchor": "이제는 볕이 앉는 자리", "note": "사람이 없는 자리를 볕이 대신 채운다 — 부재를 드러내는 장치." },
+        { "anchor": "새겨진 결", "note": "오래 쓰인 흔적. 지나간 시간을 눈으로 보여 준다." },
+        { "anchor": "비어 있어서 더 큰 자리", "note": "비어 있는데 크다는 어긋난 말로 그리움의 크기를 나타냈다." }
+      ],
+      "marks": [
+        { "symbol": "㉠", "anchorText": "해를 안고 있다", "style": "밑줄" },
+        { "symbol": "㉡", "anchorText": "손끝으로 오래 만져 본다", "style": "밑줄" },
+        { "symbol": "㉢", "anchorText": "비어 있어서 더 큰 자리", "style": "밑줄" }
+      ],
+      "speaker": {
+        "who": "나",
+        "situation": "할머니가 앉던 빈 의자를 마루 끝에서 바라보고 있다",
+        "attitude": ["관조적", "회상적"],
+        "shift": "바라보기(1~2연) → 만지기(3연) → 서 있기(5연)로 옮겨 가며 그리움이 깊어진다",
+        "evidence": "나는 그 앞에 오래 서 있다"
+      },
+      "keywords": [
+        { "id": "k-uija", "word": "의자", "mark": null, "starred": true, "polarity": "중립", "meaning": "할머니의 자리이자 그리움이 머무는 대상", "quotes": ["마루 끝에 의자 하나"] },
+        { "id": "k-byeot", "word": "볕", "mark": null, "starred": true, "polarity": "긍정", "meaning": "빈자리를 대신 채우는 따뜻한 기억", "quotes": ["이제는 볕이 앉는 자리"] },
+        { "id": "k-gyeol", "word": "결", "mark": null, "starred": false, "polarity": "중립", "meaning": "오래 쓰인 흔적, 지나온 시간", "quotes": ["낡은 등받이에 새겨진 결"] },
+        { "id": "k-baram", "word": "바람", "mark": null, "starred": false, "polarity": "중립", "meaning": "인기척을 떠올리게 하는 것", "quotes": ["바람이 지나며 의자를 흔든다"] },
+        { "id": "k-binjari", "word": "빈 자리", "mark": "㉢", "starred": true, "polarity": "부정", "meaning": "부재가 클수록 커지는 그리움의 크기", "quotes": ["비어 있어서 더 큰 자리"] }
+      ],
+      "rhetoric": [
+        { "id": "r-1", "conceptId": "c-uiin", "name": "의인법", "mark": "㉠", "quote": "하루 종일 해를 안고 있다", "tenor": "의자", "vehicle": "사람의 행동", "effect": "사물에 온기를 주어 대상을 가깝게 느끼게 한다" },
+        { "id": "r-2", "conceptId": "c-daegu", "name": "대구법", "mark": null, "quote": "할머니가 앉던 자리 / 이제는 볕이 앉는 자리", "tenor": null, "vehicle": null, "effect": "짜임이 같은 두 행을 나란히 놓아 자리의 바뀜을 또렷하게 한다" },
+        { "id": "r-3", "conceptId": "c-simsang-chok", "name": "촉각적 심상", "mark": "㉡", "quote": "손끝으로 오래 만져 본다", "tenor": null, "vehicle": null, "effect": "만지는 감각으로 시간의 흔적을 몸으로 느끼게 한다" },
+        { "id": "r-4", "conceptId": "c-jikyu", "name": "직유법", "mark": null, "quote": "누가 다녀간 것처럼", "tenor": "바람에 흔들리는 의자", "vehicle": "사람이 다녀간 모습", "effect": "없는 사람의 인기척을 떠올리게 한다" },
+        { "id": "r-5", "conceptId": "c-yeokseol", "name": "역설", "mark": "㉢", "quote": "비어 있어서 더 큰 자리", "tenor": null, "vehicle": null, "effect": "어긋난 말로 그리움의 크기를 한 줄에 담는다" },
+        { "id": "r-6", "conceptId": "c-simsang-si", "name": "시각적 심상", "mark": null, "quote": "낡은 등받이에 새겨진 결", "tenor": null, "vehicle": null, "effect": "눈에 보이는 흔적으로 지나온 시간을 드러낸다" }
+      ],
+      "features": [
+        { "name": "일상어", "quote": "마루 끝에 의자 하나", "effect": "꾸밈없는 말로 장면을 곧바로 보여 준다" },
+        { "name": "현재형 종결", "quote": "나는 그 앞에 오래 서 있다", "effect": "지금 벌어지는 일처럼 느끼게 한다" }
+      ],
+      "vocab": [
+        { "id": "v-maru", "term": "마루", "definition": "집 안에서 방과 방 사이에 널빤지를 깔아 놓은 바닥", "conceptId": null },
+        { "id": "v-gyeol", "term": "결", "definition": "나무나 돌에 나 있는 무늬나 줄", "conceptId": null },
+        { "id": "v-yeokseol", "term": "역설", "definition": "앞뒤가 어긋나 보이지만 그 안에 참뜻이 담긴 표현", "conceptId": "c-yeokseol" },
+        { "id": "v-uiin", "term": "의인법", "definition": "사람이 아닌 것에 사람의 성질이나 행동을 입히는 표현", "conceptId": "c-uiin" },
+        { "id": "v-gwanjo", "term": "관조", "definition": "고요한 마음으로 대상을 바라보며 살피는 것", "conceptId": null }
+      ],
+      "checklist": [
+        { "question": "이 시의 표현 방법과 그 효과를 설명할 수 있는가?", "items": ["의인법이 쓰인 구절을 찾을 수 있다", "역설이 주제와 어떻게 이어지는지 말할 수 있다"] },
+        { "question": "화자의 상황과 태도를 파악했는가?", "items": ["화자가 어디에서 무엇을 보고 있는지 말할 수 있다", "태도가 어떻게 옮겨 가는지 설명할 수 있다"] }
+      ],
+      "examPoints": [
+        { "no": 1, "title": "화자의 상황·정서·태도", "stars": 3 },
+        { "no": 2, "title": "시어의 함축적 의미", "stars": 3 },
+        { "no": 3, "title": "표현 방법과 효과", "stars": 2 }
+      ],
+      "structureMap": {
+        "center": "빈 의자",
+        "branches": [
+          { "category": "표현 방법", "children": ["의인법", "대구법", "역설", "직유법"] },
+          { "category": "주요 시어", "children": ["의자", "볕", "결", "빈 자리"] },
+          { "category": "구성", "children": ["관찰", "접촉", "환기", "성찰"] }
+        ]
+      },
+      "appreciationPoints": [
+        "빈자리를 크다고 말한 까닭을 생각해 보자.",
+        "볕이 앉는다는 표현에서 무엇이 느껴지는지 말해 보자."
+      ],
+      "blanks": [
+        { "id": "bl-01", "path": "overview.genre", "label": "갈래", "text": "이 시의 갈래는 □□□·서정시다.", "answers": ["자유시"] },
+        { "id": "bl-02", "path": "overview.material", "label": "제재", "text": "제재는 마루 끝의 낡은 □□다.", "answers": ["의자"] },
+        { "id": "bl-03", "path": "overview.theme", "label": "주제", "text": "주제는 빈자리를 통해 되새기는 □□□이다.", "answers": ["그리움"] },
+        { "id": "bl-04", "path": "overview.tone", "label": "성격", "text": "성격은 서정적·회상적·□□□이다.", "answers": ["관조적"] },
+        { "id": "bl-05", "path": "composition.2", "label": "2연 내용", "text": "2연은 할머니의 자리가 □의 자리로 바뀌었음을 보여 준다.", "answers": ["볕"] },
+        { "id": "bl-06", "path": "composition.5", "label": "5연 내용", "text": "5연은 비어 있어서 더 커진 자리 앞에 선 화자의 □□을 담는다.", "answers": ["성찰"] },
+        { "id": "bl-07", "path": "keywords.k-byeot", "label": "시어 ‘볕’", "text": "‘볕’은 빈자리를 대신 채우는 따뜻한 □□이다.", "answers": ["기억"] },
+        { "id": "bl-08", "path": "keywords.k-binjari", "label": "시어 ‘빈 자리’", "text": "‘빈 자리’는 부재가 클수록 커지는 □□□의 크기를 뜻한다.", "answers": ["그리움"] },
+        { "id": "bl-09", "path": "rhetoric.r-1", "label": "표현법 ㉠", "text": "‘해를 안고 있다’에는 □□□이 쓰였다.", "answers": ["의인법"] },
+        { "id": "bl-10", "path": "rhetoric.r-5", "label": "표현법 ㉢", "text": "‘비어 있어서 더 큰 자리’에는 □□이 쓰였다.", "answers": ["역설"] },
+        { "id": "bl-11", "path": "speaker.attitude", "label": "화자의 태도", "text": "화자는 대상을 조용히 바라보는 □□적 태도를 보인다.", "answers": ["관조"] },
+        { "id": "bl-12", "path": "rhetoric.r-2", "label": "표현법", "text": "짜임이 비슷한 두 행을 나란히 놓은 것은 □□□이다.", "answers": ["대구법"] }
+      ]
+    },
+    {
+      "workId": "w-golmok",
+      "title": "골목의 끝",
+      "author": "정하윤(가상 작가)",
+      "kind": "novel",
+      "hasCanon": false,
+      "isExternal": false,
+      "unitPath": "0 > 0-1 > (2)",
+      "overview": { "genre": ["단편 소설"], "material": "이사 가는 날의 골목", "tone": ["회상적"], "theme": "떠나는 자리에서 비로소 보이는 것들", "features": [] },
+      "composition": [],
+      "keywords": [],
+      "rhetoric": [],
+      "vocab": [],
+      "blanks": []
+    }
+  ],
+  "sets": [
+    {
+      "setId": "s-1",
+      "works": [{ "label": "(가)", "workId": "w-bin-uija", "kind": "full" }],
+      "marks": [
+        { "symbol": "㉠", "workId": "w-bin-uija", "anchorText": "해를 안고 있다" },
+        { "symbol": "㉢", "workId": "w-bin-uija", "anchorText": "비어 있어서 더 큰 자리" }
+      ]
+    },
+    {
+      "setId": "s-2",
+      "works": [{
+        "label": "(가)", "workId": "w-golmok", "kind": "excerpt",
+        "prefaceSummary": "(앞부분 줄거리) ‘나’는 십 년을 산 집을 떠나는 날 아침, 짐을 실은 차를 기다리며 골목에 서 있다.",
+        "text": { "paragraphs": [
+          "짐칸 문이 닫히자 골목이 갑자기 넓어 보였다. 늘 좁다고만 생각했던 길이었다.",
+          "나는 담벼락에 붙은 낡은 스티커를 손톱으로 긁어 보다가 그만두었다. 떼어 낸다고 가져갈 수 있는 것도 아니었다.",
+          "그제야 나는 이 골목의 끝이 어디인지 한 번도 걸어가 본 적이 없다는 것을 알았다."
+        ] }
+      }],
+      "marks": []
+    }
+  ],
+  "items": [
+    {
+      "id": "it-mc-01", "format": "mc5", "setId": "s-1", "workId": "w-bin-uija",
+      "source": { "series": "체험", "section": "실전문제", "no": 1 },
+      "targetLabels": ["(가)"], "isNegative": true,
+      "stem": "(가)의 표현에 대한 설명으로 적절하지 <b>않은</b> 것은?",
+      "choices": [
+        { "no": 1, "text": "‘해를 안고 있다’는 사물을 사람처럼 그려 의자에 온기를 준다." },
+        { "no": 2, "text": "‘할머니가 앉던 자리 / 이제는 볕이 앉는 자리’는 짜임이 같은 두 행을 나란히 놓았다." },
+        { "no": 3, "text": "‘손끝으로 오래 만져 본다’는 만지는 감각을 통해 시간의 흔적을 느끼게 한다." },
+        { "no": 4, "text": "‘누가 다녀간 것처럼’은 원관념과 보조 관념을 곧바로 겹쳐 놓은 은유이다." },
+        { "no": 5, "text": "‘비어 있어서 더 큰 자리’는 어긋난 말로 그리움의 크기를 드러낸다." }
+      ],
+      "answer": 4,
+      "explanation": {
+        "main": "‘누가 다녀간 것처럼’은 ‘처럼’을 써서 두 대상을 견준 직유이지 은유가 아닙니다.",
+        "perChoice": {
+          "1": "맞습니다. 의자가 해를 ‘안는다’고 하여 사람처럼 그렸습니다(의인법).",
+          "2": "맞습니다. 두 행의 짜임이 같아 자리의 바뀜이 또렷해집니다(대구법).",
+          "3": "맞습니다. ‘손끝’이라는 촉각으로 시간을 느끼게 합니다.",
+          "4": "적절하지 않습니다. ‘처럼’이 쓰였으므로 은유가 아니라 직유입니다.",
+          "5": "맞습니다. 비어 있는데 크다는 어긋난 말이 역설입니다."
+        }
+      },
+      "skills": ["표현법", "직유", "역설"],
+      "targetRefs": ["b-bl-09", "b-bl-10", "b-bl-12"]
+    },
+    {
+      "id": "it-es-01", "format": "essay", "setId": "s-1", "workId": "w-bin-uija",
+      "source": { "series": "체험", "section": "대표유형", "no": 1 },
+      "stem": "㉢에 쓰인 표현 방법을 밝히고, 그것이 드러내는 화자의 마음을 서술하시오.",
+      "conditions": [
+        { "kind": "sentences", "value": 1, "text": "한 문장으로 쓸 것" },
+        { "kind": "form", "value": "㉢에는 ~이 쓰여 ~을 드러낸다", "text": "‘㉢에는 ~이 쓰여 ~을 드러낸다’ 형식으로 쓸 것" }
+      ],
+      "modelAnswers": ["㉢에는 역설이 쓰여 빈자리가 클수록 커지는 그리움을 드러낸다."],
+      "rubric": [
+        { "element": "표현 방법", "keywords": ["역설"], "acceptedVariants": ["역설법"], "points": 1, "source": "material" },
+        { "element": "화자의 마음", "keywords": ["그리움"], "acceptedVariants": ["보고 싶은 마음", "그리워하는 마음"], "points": 1, "source": "authored" }
+      ],
+      "totalPoints": 2,
+      "answerChecks": ["표현 방법의 이름을 정확히 썼는가?", "빈자리와 그리움의 관계를 밝혔는가?"],
+      "tip": "‘무엇이 쓰였는지’와 ‘그래서 무엇이 드러나는지’를 한 문장 안에 모두 담아야 합니다.",
+      "explanation": { "main": "비어 있는데 더 크다는 어긋난 말이 역설이며, 부재가 그리움을 키운다는 주제로 이어집니다." },
+      "skills": ["역설", "주제"],
+      "targetRefs": ["b-bl-10", "b-bl-08"]
+    },
+    {
+      "id": "it-es-02", "format": "essay", "setId": "s-2", "workId": "w-golmok",
+      "source": { "series": "체험", "section": "실전문제", "no": 2 },
+      "stem": "‘나’가 마지막 문단에서 깨달은 것이 무엇인지 서술하시오.",
+      "conditions": [
+        { "kind": "sentences", "value": 1, "text": "한 문장으로 쓸 것" },
+        { "kind": "include", "value": ["골목"], "text": "‘골목’이라는 말을 넣어 쓸 것" }
+      ],
+      "modelAnswers": ["십 년을 살면서도 골목의 끝까지 가 본 적이 없다는 것을 떠나는 날에야 알았다는 것이다."],
+      "rubric": [
+        { "element": "깨달음의 내용", "keywords": ["끝", "가 본 적"], "acceptedVariants": ["걸어가 본"], "points": 1, "source": "authored" },
+        { "element": "시점", "keywords": ["떠나", "이사"], "acceptedVariants": ["떠나는 날"], "points": 1, "source": "authored" }
+      ],
+      "totalPoints": 2,
+      "explanation": { "main": "떠나는 순간에야 늘 지나치던 것을 처음 본다는 깨달음입니다." },
+      "skills": ["내용 이해"],
+      "targetRefs": []
+    },
+    {
+      "id": "it-ox-01", "format": "ox", "workId": "w-bin-uija",
+      "source": { "series": "체험", "section": "확인문제", "no": 1 },
+      "stem": "이 시의 화자는 빈 의자를 보며 지나간 시간을 떠올리고 있다.",
+      "answer": true,
+      "explanation": { "main": "등받이의 결을 만지며 시간을 더듬는 3연이 근거입니다." },
+      "targetRefs": ["b-bl-11"]
+    },
+    {
+      "id": "it-mt-01", "format": "matching", "workId": "w-bin-uija",
+      "source": { "series": "체험", "section": "확인문제", "no": 2 },
+      "stem": "다음 시어와 그 의미를 알맞게 연결하세요.",
+      "terms": [
+        { "key": "t1", "text": "볕" },
+        { "key": "t2", "text": "결" },
+        { "key": "t3", "text": "빈 자리" }
+      ],
+      "defs": [
+        { "key": "t2", "text": "오래 쓰인 흔적, 지나온 시간" },
+        { "key": "t3", "text": "부재가 클수록 커지는 그리움의 크기" },
+        { "key": "t1", "text": "빈자리를 대신 채우는 따뜻한 기억" }
+      ],
+      "targetRefs": ["b-bl-07", "b-bl-08"]
+    }
+  ]
+}
