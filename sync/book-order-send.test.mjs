@@ -1135,11 +1135,11 @@ test('scheduler splits one vendor at whole-task boundaries before the 2000-byte 
 
 test('a short 150-task chunk reserves its send and all mappings in exactly two D1 statements', async () => {
   const db = new TestD1();
-  const cutoff = Date.now() + 1000;
   for (let index = 0; index < 150; index++) {
     seedOrderTask(db, { id: 'bulk-map-' + index, title: '[주문] A', orderDelivery: 'scheduled_batch_v1',
       orderItems: [{ title: 'A', qty: '1' }] });
   }
+  const cutoff = Date.now() + 1000;
   const originalBatch = db.batch.bind(db);
   const reservationBatchSizes = [];
   db.batch = statements => {

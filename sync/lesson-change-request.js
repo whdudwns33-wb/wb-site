@@ -25,6 +25,14 @@ import {
 } from './session-pack-transfer.js';
 import { isTaskWriteCasConflict, taskWriteCasGuardStatement } from './task-write-cas.js';
 import { isMakeupLifecycleConflict, prepareMakeupLifecycleCleanup } from './makeup-lifecycle.js';
+import {
+  assertStudentLessonScheduleAvailable,
+  studentScheduleConflictPayload
+} from './student-schedule-conflict.js';
+import {
+  readStudentScheduleRevisionSnapshot,
+  studentScheduleRevisionCasStatements
+} from './student-schedule-revision.js';
 
 const LESSON_CHANGE_FIELDS = ['days', 'time', 'repeat', 'detail', 'guide', 'target', 'unit'];
 const REQUEST_OPERATIONS = new Set([
@@ -394,7 +402,7 @@ export async function handleLessonChangeReview(env, app, body, origin, auth, jso
     if (operation === 'teacher_assignment' && String(changes.effectiveDate || '') > kstDate(now)) {
       return json({ ok: false, error: '담당 선생님 변경은 변경 시작일 당일 또는 이후에 승인해 주세요' }, 409, origin);
     }
-    if (operation !== 'lesson_fields' && !SAFE_ID.test(studentId)) {
+    if (!SAFE_ID.test(studentId)) {
       return json({ ok: false, error: 'stable studentId 연결을 확인한 뒤 승인해 주세요' }, 409, origin);
     }
 
@@ -408,7 +416,16 @@ export async function handleLessonChangeReview(env, app, body, origin, auth, jso
       }
     }
 
-    const statements = [];
+    const scheduleRevision = operation !== 'information_request' && SAFE_ID.test(studentId)
+      ? await readStudentScheduleRevisionSnapshot(env, app, [studentId])
+      : null;
+    const statements = scheduleRevision
+      ? await studentScheduleRevisionCasStatements(env, app, scheduleRevision, {
+        operation: 'lesson_change_schedule',
+        source: [requestKey, expectedRevision, operation].join('\n'),
+        updatedAt: now
+      })
+      : [];
     const requiredChangeIndexes = [];
     const actorRole = auth.role === 'manager' ? 'manager' : 'admin';
     let eventType = 'work_instruction';
@@ -438,6 +455,12 @@ export async function handleLessonChangeReview(env, app, body, origin, auth, jso
       };
       const updatedAt = Math.max(now, Number(taskRow.updated_at || 0) + 1);
       const merged = Object.assign({}, taskData, patch, { updatedAt, lastEditBy: actorRole });
+      try { await assertStudentLessonScheduleAvailable(env, app, merged); }
+      catch (error) {
+        const payload = studentScheduleConflictPayload(error);
+        if (payload) return json(payload, 409, origin);
+        throw error;
+      }
       requiredChangeIndexes.push(statements.length);
       statements.push(env.DB.prepare(
         'UPDATE tasks SET data=?, updated_at=?, srv_at=? WHERE app=? AND id=? AND owner=? AND updated_at=?'
@@ -492,6 +515,12 @@ export async function handleLessonChangeReview(env, app, body, origin, auth, jso
         updatedAt,
         lastEditBy: actorRole
       });
+      try { await assertStudentLessonScheduleAvailable(env, app, merged); }
+      catch (error) {
+        const payload = studentScheduleConflictPayload(error);
+        if (payload) return json(payload, 409, origin);
+        throw error;
+      }
       let packTransfer;
       try {
         packTransfer = await lessonSessionPackTransferStatements(env, app, {
@@ -525,6 +554,9 @@ export async function handleLessonChangeReview(env, app, body, origin, auth, jso
       ).bind(selectedStaffId, JSON.stringify(merged), updatedAt, updatedAt, app, current.task_id,
         taskRow.owner, taskRow.updated_at, app, current.task_id, selectedStaffId,
         studentId, JSON.stringify(targetAssignmentSnapshot)));
+      statements.push(await taskWriteCasGuardStatement(env, app, 'lesson_change_teacher_task',
+        [requestKey, expectedRevision, current.task_id, taskRow.owner, selectedStaffId,
+          taskRow.updated_at, updatedAt].join('\n'), updatedAt));
       statements.push(...packTransfer.statements);
       statements.push(lessonCheckOwnerTransferStatement(
         env, app, current.task_id, String(taskRow.owner || ''), selectedStaffId, updatedAt
@@ -647,6 +679,8 @@ export async function handleLessonChangeReview(env, app, body, origin, auth, jso
       if (isTaskWriteCasConflict(error)) {
         return json({ ok: false, error: '다른 변경이 먼저 저장되었습니다. 새로고침 후 다시 검토해 주세요' }, 409, origin);
       }
+      const payload = studentScheduleConflictPayload(error);
+      if (payload) return json(payload, 409, origin);
       throw error;
     }
     const reqChanged = Number(applied[requestUpdateIndex] && applied[requestUpdateIndex].meta && applied[requestUpdateIndex].meta.changes || 0);

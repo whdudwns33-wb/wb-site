@@ -351,9 +351,10 @@ function parentSummary(stu, st, titles, vst, book) {
 export default {
   async scheduled(event, env, ctx) {
     /* 크론은 문자열로 가른다 — 모르는 크론이 전부 백업으로 도는 사고를 막는다(설계안 §7-5 #11).
-       12:00 UTC(21:00 KST) 밤 9시 물주기 푸시 · 18:00 UTC 일일 백업 · 18:10 UTC 하루브레인 주간 익명 집계(백업 직후) */
+       12:00 UTC(21:00 KST) 밤 9시 물주기 푸시(내신 몫도 함께 본다 — 워드브레인이 비어도 시험 범위가 남았으면 부른다) ·
+       18:00 UTC 일일 백업 · 18:10 UTC 하루브레인 주간 익명 집계(백업 직후) */
     switch (event.cron) {
-      case '0 12 * * *': ctx.waitUntil(sendNightPushes({ store: vocabStore(env), push: vocabPushEnv(env) })); break;
+      case '0 12 * * *': ctx.waitUntil(sendNightPushes({ store: vocabStore(env), push: vocabPushEnv(env), naesin: naesinStore(env) })); break;
       case '10 18 * * *': ctx.waitUntil(weeklyAgg(haruStore(env), Date.now())); break;
       case '0 18 * * *':
       default: ctx.waitUntil(snapshotBackup(env));

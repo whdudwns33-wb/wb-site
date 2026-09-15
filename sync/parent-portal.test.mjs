@@ -179,7 +179,7 @@ function seedAwaitingMakeup(db, caseId = 'mu_parent_case', history = [], sourceD
     'notification_needed,notification_event,notification_event_revision,history,created_at,updated_at) ' +
     "VALUES(?,?,?,?,?,?,?,'awaiting_parent',3,?,?,?,1,'proposal',3,?,?,?)"
   ).bind('task', caseId, 'student-a', 'lesson-a', sourceDate, 'staff-a', 'mc_' + caseId,
-    '2026-08-20T16:00:00+09:00', '2026-08-20T17:00:00+09:00', 'staff-a',
+    '2026-08-20T18:00:00+09:00', '2026-08-20T19:00:00+09:00', 'staff-a',
     JSON.stringify(history), now, now).run();
   return caseId;
 }

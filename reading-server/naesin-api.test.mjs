@@ -3,7 +3,8 @@
 import assert from 'node:assert';
 import fs from 'node:fs';
 import { handleNaesin, naesinSummary, normalizeSummary, resolveExam, isValidDate, todayKst,
-  TASK_TYPE_KEYS, isTaskTypeKey, isReservedCode, dropReservedRows, naesinBodyLimit, BODY_LIMIT_PACK, BODY_LIMIT_STATE } from './naesin-api.mjs';
+  TASK_TYPE_KEYS, isTaskTypeKey, isReservedCode, dropReservedRows, naesinBodyLimit, BODY_LIMIT_PACK, BODY_LIMIT_STATE, naesinNightDue, naesinNightDueFor
+} from './naesin-api.mjs';
 
 let passed = 0;
 const t = async (name, fn) => { await fn(); passed += 1; console.log('  ✓ ' + name); };
@@ -1002,6 +1003,72 @@ await t('모르는 경로는 404', async () => {
   const store = memStore();
   assert.strictEqual((await call(store, { path: '/api/naesin/zzz', who: ADMIN })).status, 404);
   assert.strictEqual((await call(store, { path: '/api/naesin/pack', method: 'POST' })).status, 403, '학생에게 모르는 경로는 관리자 벽(403)에서 끝난다');
+});
+
+/* ── 밤 9시 푸시의 내신 몫 (§12 Phase 2) ── */
+const PUSH_NOW = Date.parse('2026-09-20T13:00:00Z');      // 9/20 22:00 KST
+const PUSH_EX = { examDate: '2026-09-30', packIds: ['2022-ne-kimgitaek-m2-L6'] };
+const sumRec = (stable, total, memorized, sTotal, savedIso) => ({
+  updatedAt: savedIso,
+  state: { summary: { packId: '2022-ne-kimgitaek-m2-L6',
+    word: { total, reached: total, stable }, sentence: { total: sTotal, interpreted: sTotal, memorized } } },
+});
+
+await t('밤 푸시 — 시험이 없으면 안 부른다(연습 모드는 마감이 없다)', () => {
+  assert.strictEqual(naesinNightDue(sumRec(0, 10, 0, 5, null), {}, PUSH_NOW).reason, 'no-exam');
+  assert.strictEqual(naesinNightDue(sumRec(0, 10, 0, 5, null), { packIds: [] }, PUSH_NOW).reason, 'no-exam');
+});
+
+await t('밤 푸시 — 시험이 지났으면 안 부른다', () => {
+  const r = naesinNightDue(sumRec(0, 10, 0, 5, null), { ...PUSH_EX, examDate: '2026-09-01' }, PUSH_NOW);
+  assert.deepStrictEqual([r.due, r.reason], [false, 'exam-over']);
+});
+
+await t('밤 푸시 — 남은 분량이 있고 오늘 안 했으면 부른다', () => {
+  const r = naesinNightDue(sumRec(3, 10, 1, 5, '2026-09-19T10:00:00Z'), PUSH_EX, PUSH_NOW);
+  assert.deepStrictEqual([r.due, r.reason], [true, 'due']);
+  assert.strictEqual(r.left, 11, '단어 7 + 문장 4');
+});
+
+await t('밤 푸시 — 오늘 이미 공부했으면 다시 안 부른다(KST 기준)', () => {
+  const r = naesinNightDue(sumRec(3, 10, 1, 5, '2026-09-20T09:00:00Z'), PUSH_EX, PUSH_NOW);  // 9/20 18:00 KST
+  assert.deepStrictEqual([r.due, r.reason], [false, 'studied-today']);
+  assert.strictEqual(r.left, 11, '남은 양은 그대로 보고한다');
+});
+
+await t('밤 푸시 — 전날 밤 늦게 한 것은 오늘이 아니다(KST 날짜 경계)', () => {
+  const r = naesinNightDue(sumRec(3, 10, 1, 5, '2026-09-19T14:30:00Z'), PUSH_EX, PUSH_NOW);  // 9/19 23:30 KST
+  assert.strictEqual(r.due, true);
+});
+
+await t('밤 푸시 — 다 끝냈으면 안 부른다', () => {
+  const r = naesinNightDue(sumRec(10, 10, 5, 5, '2026-09-19T10:00:00Z'), PUSH_EX, PUSH_NOW);
+  assert.deepStrictEqual([r.due, r.reason, r.left], [false, 'done', 0]);
+});
+
+await t('밤 푸시 — 요약을 한 번도 안 올린 학생은 부르지 않는다', () => {
+  assert.strictEqual(naesinNightDue({ state: {} }, PUSH_EX, PUSH_NOW).reason, 'no-summary');
+  assert.strictEqual(naesinNightDue(null, PUSH_EX, PUSH_NOW).reason, 'no-summary');
+});
+
+await t('밤 푸시 — 범위 요약(range)이 있으면 그것이 기준이다(과가 2~3개인 현실)', () => {
+  const rec = { updatedAt: '2026-09-19T10:00:00Z', state: { summary: {
+    packId: '2022-ne-kimgitaek-m2-L6',
+    word: { total: 10, stable: 10 }, sentence: { total: 5, memorized: 5 },   // 이 과는 끝났지만
+    range: { word: { total: 30, stable: 12 }, sentence: { total: 15, memorized: 4 } },  // 범위는 남았다
+  } } };
+  const r = naesinNightDue(rec, PUSH_EX, PUSH_NOW);
+  assert.deepStrictEqual([r.due, r.left], [true, 29], '범위 기준 18+11');
+});
+
+await t('naesinNightDueFor — 저장소에서 읽어 같은 판정을 한다', async () => {
+  const st = memStore();
+  await st.putExam('default', PUSH_EX);
+  await st.putState('abcd', sumRec(3, 10, 1, 5, '2026-09-19T10:00:00Z'));
+  assert.strictEqual((await naesinNightDueFor(st, 'abcd', PUSH_NOW)).due, true);
+  await st.putState('abcd', sumRec(10, 10, 5, 5, '2026-09-19T10:00:00Z'));
+  assert.strictEqual((await naesinNightDueFor(st, 'abcd', PUSH_NOW)).due, false);
+  assert.strictEqual((await naesinNightDueFor(null, 'abcd', PUSH_NOW)).reason, 'no-store', '어댑터가 없어도 던지지 않는다');
 });
 
 console.log('\n통과 ' + passed + '개 — naesin-api 서버 라우트 검증 완료');

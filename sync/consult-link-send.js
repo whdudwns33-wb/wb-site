@@ -4,8 +4,10 @@
  *
  * POST /consult-link-send
  *   { app:'consult', auth, action:'list' }
- *   { app:'consult', auth, action:'set', staffId, phone, consent, expectedUpdatedAt }
+ *   { app:'consult', auth, action:'set', staffId, phone, phoneOwner, consent, expectedUpdatedAt }
  *   { app:'consult', auth, action:'send', staffId }
+ *   { app:'consult', auth(person), action:'self_get' }
+ *   { app:'consult', auth(person), action:'self_set', phone, phoneOwner, consent, expectedUpdatedAt }
  */
 
 import { buildSolapiAuthorization, kstDateFromMs } from './director-report-send.js';
@@ -18,9 +20,9 @@ export const SOLAPI_TIMEOUT_MS = 8000;
 const MAX_PROVIDER_RESPONSE_BYTES = 64 * 1024;
 export const CONSULT_LINK_GLOBAL_DAILY_LIMIT = 150;
 export const CONSULT_LINK_TEMPLATE_BUTTON_URL =
-  'https://whdudwns33-wb.github.io/wb-site/consult/?u=#{학생ID}#c=#{연결코드}';
+  'https://whdudwns33-wb.github.io/wb-site/consult/#c=#{연결코드}';
 export const CONSULT_LINK_TEMPLATE_VARIABLE_KEYS = Object.freeze([
-  '#{학생명}', '#{학생ID}', '#{연결코드}'
+  '#{학생명}', '#{연결코드}'
 ]);
 
 class PublicError extends Error {
@@ -101,6 +103,8 @@ function publicContact(row, fallback) {
     studentName: text(row && row.student_name || fallback.name),
     phoneRegistered: !!phoneMasked,
     phoneMasked: phoneMasked || undefined,
+    phoneOwner: row && (row.phone_owner === 'student' || row.phone_owner === 'mother')
+      ? row.phone_owner : 'unknown',
     consent: !!Number(row && row.consent),
     updatedAt: Number(row && row.updated_at || 0)
   };
@@ -130,7 +134,7 @@ async function activeStudent(env, staffId) {
 
 async function contactRow(env, staffId) {
   return env.DB.prepare(
-    "SELECT staff_id,student_name,phone,consent,updated_at,updated_by " +
+    "SELECT staff_id,student_name,phone,phone_owner,consent,updated_at,updated_by " +
     "FROM consult_link_contacts WHERE app='consult' AND staff_id=? LIMIT 1"
   ).bind(staffId).first();
 }
@@ -142,7 +146,7 @@ async function listContacts(env, origin, json) {
   const students = (result.results || []).map(studentFromRow).filter(Boolean);
   const contacts = new Map();
   const contactResult = await env.DB.prepare(
-    "SELECT staff_id,student_name,phone,consent,updated_at,updated_by " +
+    "SELECT staff_id,student_name,phone,phone_owner,consent,updated_at,updated_by " +
     "FROM consult_link_contacts WHERE app='consult'"
   ).all();
   for (const row of (contactResult.results || [])) contacts.set(String(row.staff_id), row);
@@ -159,13 +163,18 @@ function contactConflict(row, student, origin, json) {
     error: '다른 기기에서 연락처가 변경되었습니다. 새로고침 후 다시 시도해 주세요',
     current: row ? publicContact(row, student) : {
       staffId: student.id, studentName: student.name, phoneRegistered: false,
-      consent: false, updatedAt: 0
+      phoneOwner: 'unknown', consent: false, updatedAt: 0
     }
   }, 409, origin);
 }
 
 async function setContact(env, body, auth, origin, json) {
   const student = await activeStudent(env, String(body.staffId || ''));
+  if (body.phoneOwner !== undefined && body.phoneOwner !== 'student' && body.phoneOwner !== 'mother') {
+    fail('PHONE_OWNER_INVALID', '휴대전화 번호의 사용자를 선택해 주세요', 400);
+  }
+  // 배포 중 열려 있던 구형 화면은 오분류하지 않고, 새 화면에서 한 번 다시 확인한다.
+  const phoneOwner = body.phoneOwner === undefined ? 'unknown' : body.phoneOwner;
   if (typeof body.consent !== 'boolean') {
     fail('CONSENT_INVALID', '발송 동의를 선택해 주세요', 400);
   }
@@ -191,16 +200,17 @@ async function setContact(env, body, auth, origin, json) {
   let saved;
   if (before) {
     saved = await env.DB.prepare(
-      "UPDATE consult_link_contacts SET student_name=?,phone=?,consent=?,updated_at=?,updated_by=? " +
+      "UPDATE consult_link_contacts SET student_name=?,phone=?,phone_owner=?,consent=?,updated_at=?,updated_by=? " +
       "WHERE app='consult' AND staff_id=? AND updated_at=?"
-    ).bind(student.name, phone || null, body.consent ? 1 : 0, now, actor(auth),
+    ).bind(student.name, phone || null, phoneOwner, body.consent ? 1 : 0, now, actor(auth),
       student.id, expectedUpdatedAt).run();
   } else {
     saved = await env.DB.prepare(
       "INSERT OR IGNORE INTO consult_link_contacts " +
-      "(app,staff_id,student_name,phone,consent,updated_at,updated_by) " +
-      "VALUES('consult',?,?,?,?,?,?)"
-    ).bind(student.id, student.name, phone || null, body.consent ? 1 : 0, now, actor(auth)).run();
+      "(app,staff_id,student_name,phone,phone_owner,consent,updated_at,updated_by) " +
+      "VALUES('consult',?,?,?,?,?,?,?)"
+    ).bind(student.id, student.name, phone || null, phoneOwner,
+      body.consent ? 1 : 0, now, actor(auth)).run();
   }
   if (changes(saved) !== 1) {
     return contactConflict(await contactRow(env, student.id), student, origin, json);
@@ -476,7 +486,6 @@ async function sendLink(
 
   const variables = {
     '#{학생명}': student.name,
-    '#{학생ID}': student.id,
     '#{연결코드}': String(issued.code)
   };
   if (Object.keys(variables).length !== CONSULT_LINK_TEMPLATE_VARIABLE_KEYS.length ||
@@ -580,14 +589,37 @@ export async function handleConsultLinkSend(
 ) {
   try {
     if (app !== 'consult') fail('APP_INVALID', '컨설팅 앱에서만 사용할 수 있습니다', 400);
-    if (!auth || auth.scope !== 'all') {
-      fail('FORBIDDEN', '원장 로그인에서만 학생 링크를 관리할 수 있습니다', 403);
-    }
     const action = String(body && body.action || '');
     if (action === 'list') exactBody(body, []);
-    else if (action === 'set') exactBody(body, ['staffId', 'phone', 'consent', 'expectedUpdatedAt']);
+    else if (action === 'set') exactBody(body,
+      ['staffId', 'phone', 'phoneOwner', 'consent', 'expectedUpdatedAt']);
     else if (action === 'send') exactBody(body, ['staffId']);
-    else fail('ACTION_INVALID', 'action은 list, set, send 중 하나여야 합니다', 400);
+    else if (action === 'self_get') exactBody(body, []);
+    else if (action === 'self_set') exactBody(body,
+      ['phone', 'phoneOwner', 'consent', 'expectedUpdatedAt']);
+    else fail('ACTION_INVALID', 'action은 list, set, send, self_get, self_set 중 하나여야 합니다', 400);
+
+    const self = action === 'self_get' || action === 'self_set';
+    if (!auth || (self ? auth.scope !== 'own' : auth.scope !== 'all')) {
+      fail('FORBIDDEN', self
+        ? '학생 본인만 연락처를 등록할 수 있습니다'
+        : '원장 로그인에서만 학생 링크를 관리할 수 있습니다', 403);
+    }
+
+    if (action === 'self_get') {
+      const student = await activeStudent(env, auth.id);
+      return json({ ok: true, contact: publicContact(await contactRow(env, student.id), student) },
+        200, origin);
+    }
+    if (action === 'self_set') {
+      if (body.consent !== true) {
+        fail('CONSENT_REQUIRED', '휴대전화 번호 등록 및 발송 동의가 필요합니다', 400);
+      }
+      return await setContact(env, {
+        staffId: auth.id, phone: body.phone, phoneOwner: body.phoneOwner, consent: body.consent,
+        expectedUpdatedAt: body.expectedUpdatedAt
+      }, auth, origin, json);
+    }
 
     if (action === 'list') return await listContacts(env, origin, json);
     if (action === 'set') return await setContact(env, body, auth, origin, json);

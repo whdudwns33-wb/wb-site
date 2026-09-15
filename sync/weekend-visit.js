@@ -332,7 +332,18 @@ async function listVisits(env, app, body, auth, json, origin) {
       month: range.month, count: Number(monthly.visit_count) || 0
     });
   }
-  return json({ ok: true, visits: rows.map(rowView), nextVisitSequences, monthlyCounts }, 200, origin);
+  // 이전 날짜에 열린 채 남은 기록은 오늘 등원을 막지 않지만, 관리자가 누락을
+  // 보정할 수 있도록 날짜를 포함한 별도 목록으로 반환한다. 선생님 범위에는
+  // 다른 수업의 기록을 노출하지 않도록 관리자 범위에서만 제공한다.
+  let staleOpenVisits = [];
+  if (auth.scope === 'all') {
+    const staleResult = await env.DB.prepare(
+      "SELECT * FROM weekend_actual_visits WHERE app=? AND visit_date<? AND status='active' " +
+      'ORDER BY visit_date,check_in_at,staff_id,student_id,lesson_task_id,visit_sequence'
+    ).bind(app, visitDate).all();
+    staleOpenVisits = (staleResult.results || []).map(rowView);
+  }
+  return json({ ok: true, visits: rows.map(rowView), nextVisitSequences, monthlyCounts, staleOpenVisits }, 200, origin);
 }
 
 function requestedConfig(body) {
@@ -514,8 +525,8 @@ async function checkIn(env, app, body, auth, json, origin) {
       error: '최근 등·하원 기록을 새로고침한 뒤 다시 시도해 주세요', nextVisitSequence: expectedSequence }, 409, origin);
   }
   const anotherOpen = await env.DB.prepare(
-    "SELECT * FROM weekend_actual_visits WHERE app=? AND student_id=? AND status='active' LIMIT 1"
-  ).bind(app, studentId).first();
+    "SELECT * FROM weekend_actual_visits WHERE app=? AND student_id=? AND visit_date=? AND status='active' LIMIT 1"
+  ).bind(app, studentId, visitDate).first();
   if (anotherOpen) {
     return json({ ok: false, code: 'VISIT_ALREADY_OPEN', error: '이 학생의 하원 전 기록이 이미 있습니다', current: rowView(anotherOpen) }, 409, origin);
   }
@@ -590,8 +601,8 @@ async function checkIn(env, app, body, auth, json, origin) {
       return json({ ok: true, idempotent: true, visit: rowView(concurrent) }, 200, origin);
     }
     const concurrentOpen = await env.DB.prepare(
-      "SELECT * FROM weekend_actual_visits WHERE app=? AND student_id=? AND status='active' LIMIT 1"
-    ).bind(app, studentId).first();
+      "SELECT * FROM weekend_actual_visits WHERE app=? AND student_id=? AND visit_date=? AND status='active' LIMIT 1"
+    ).bind(app, studentId, visitDate).first();
     if (concurrentOpen) {
       return json({ ok: false, code: 'VISIT_ALREADY_OPEN', error: '이 학생의 하원 전 기록이 이미 있습니다',
         current: rowView(concurrentOpen) }, 409, origin);

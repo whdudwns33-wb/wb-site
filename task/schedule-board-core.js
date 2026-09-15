@@ -273,7 +273,8 @@
       teacherKey: String(entry.staffId || entry.teacherName || 'unassigned'),
       startMinute: Number((entry.slot || {}).startMinute),
       endMinute: occupiedEndMinute(entry, options),
-      lessonIdentity: lessonIdentity(entry)
+      lessonIdentity: lessonIdentity(entry),
+      sourceTaskId: String((entry.task || {}).id || '')
     })).filter(item => Number.isFinite(item.startMinute) && Number.isFinite(item.endMinute) && item.endMinute > item.startMinute);
 
     const studentConflicts = new Set();
@@ -289,10 +290,10 @@
       for (let i = 0; i < items.length; i++) {
         for (let j = i + 1; j < items.length; j++) {
           const a = items[i], b = items[j];
-          // 같은 선생님·같은 수업이 중복 등록된 행은 빨간 겹침 경고로 보지 않는다.
-          // 실제로 한 학생이 서로 다른 두 수업에 동시에 배정된 경우만 학생 충돌이다.
-          const duplicateRegistration = a.teacherKey === b.teacherKey && a.lessonIdentity === b.lessonIdentity;
-          if (overlaps(a, b) && !duplicateRegistration) {
+          // 같은 task가 화면 구성 과정에서 중복된 경우만 제외한다. 서로 다른 task라면
+          // 담당자·과목·수업명이 같아도 한 학생의 실제 이중 등록으로 표시한다.
+          const sameSourceTask = a.sourceTaskId && a.sourceTaskId === b.sourceTaskId;
+          if (overlaps(a, b) && !sameSourceTask) {
             studentConflicts.add(a.index);
             studentConflicts.add(b.index);
           }

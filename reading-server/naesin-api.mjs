@@ -209,6 +209,45 @@ export function naesinSummary(code, stu, stateRec) {
   return row;
 }
 
+/* ── 밤 9시 푸시의 내신 몫 (기획서 §12 Phase 2) ──
+   종전 푸시는 워드브레인 복습만 봤다. 내신만 남은 학생은 시험이 코앞이어도 아무 알림을 못 받았는데,
+   파일럿 판정 기준이 '시험 범위 완성률'이라 매일 밤 한 번 부르는 것이 그 지표에 직접 걸린다.
+
+   판정은 **학생이 올린 요약만으로** 한다. 푸시는 구독자 수만큼 도는 자리라, 여기서 팩까지 읽으면
+   KV 왕복이 인원수만큼 늘어난다. 요약에는 이미 필요한 것이 다 있다(word.stable / sentence.memorized).
+
+   보낼 조건 셋을 모두 만족할 때만 — 하나라도 어긋나면 부르지 않는다:
+     ① 유효한 시험이 있고 범위(packIds)가 비어 있지 않다
+        — 시험이 없으면 마감도 없다. 연습 모드 학생을 매일 밤 부를 이유가 없다.
+     ② 아직 끝내지 못한 분량이 있다 (안정화 못 한 단어 또는 백지를 못 넘긴 문장).
+     ③ 오늘(KST) 학습 기록이 없다 — 이미 하고 잔 학생을 다시 부르지 않는다.
+   범위 요약(summary.range)이 있으면 그것이 기준이다(시험 범위가 2~3개 과인 현실). 없는 옛
+   저장본은 팩 하나짜리 요약(summary.word/sentence)으로 본다. */
+export function naesinNightDue(stateRec, exam, now) {
+  const off = { due: false, left: 0 };
+  if (!isObj(exam) || !Array.isArray(exam.packIds) || !exam.packIds.length) return { ...off, reason: 'no-exam' };
+  const today = todayKst(now);
+  if (typeof exam.examDate === 'string' && exam.examDate && exam.examDate < today) return { ...off, reason: 'exam-over' };
+  const S = stateRec && stateRec.state;
+  const sum = normalizeSummary(S && S.summary);
+  if (!sum) return { ...off, reason: 'no-summary' };
+  const src = sum.range || sum;
+  const left = Math.max(0, int0(src.word.total) - int0(src.word.stable))
+    + Math.max(0, int0(src.sentence.total) - int0(src.sentence.memorized));
+  if (!left) return { ...off, reason: 'done' };
+  /* 오늘 이미 했나 — 저장 시각이 곧 마지막 학습 시각이다(앱이 학습할 때마다 push 한다) */
+  const savedAt = (stateRec && stateRec.updatedAt) || (sum && sum.updatedAt) || null;
+  if (savedAt && todayKst(Date.parse(savedAt)) === today) return { due: false, left, reason: 'studied-today' };
+  return { due: true, left, reason: 'due' };
+}
+
+/* 저장소에서 한 학생 몫을 읽어 위 규칙을 적용한다 — 푸시 작업(vocab-api)이 부르는 자리 */
+export async function naesinNightDueFor(store, code, now) {
+  if (!store || typeof store.getState !== 'function' || typeof store.getExam !== 'function') return { due: false, left: 0, reason: 'no-store' };
+  const [stateRec, ex] = await Promise.all([store.getState(code), resolveExam(store, code, now)]);
+  return naesinNightDue(stateRec, ex && ex.exam, now);
+}
+
 /* ── 학생의 유효 시험 (계약 0.2) ──
    개별 배정(scope=학생 코드)이 있고 만료되지 않았으면 그것, 아니면 반 공통(default), 아니면 빈 값.
    만료 = examDate < 오늘(KST). 전에는 개별 배정이 영구히 default 를 이겨서, 지난 학기에
