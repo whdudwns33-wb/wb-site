@@ -568,13 +568,14 @@ test('lecture questions and notes sync under the student owner and keep answers 
   assert.match(answerSave, /answeredQuestion: answer \? String\(current\.question/);
 });
 
-test('five official course sites have safe direct links and smart-paste fallback', () => {
+test('official course sites have safe direct links and smart-paste fallback', () => {
   const expected = {
-    '이투스': 'https://www.etoos.com/lecture/TotalLecture.asp',
-    '메가스터디': 'https://www.megastudy.net/lecbookSearch/main.asp',
-    '대성마이맥': 'https://www.mimacstudy.com/common/getMenuContainer.ds?requestMenuId=MNMN_M004',
-    '엠베스트': 'https://www.mbest.co.kr/lecture/coursemap/main.asp',
-    '엘리하이': 'https://mjr.mbest.co.kr/lecture/list/lecture_list.asp'
+    '이투스': 'https://www.etoos.com/',
+    '메가스터디': 'https://www.megastudy.net/',
+    '대성마이맥': 'https://www.mimacstudy.com/main/main.ds',
+    '엠베스트': 'https://www.mbest.co.kr/',
+    '엘리하이': 'https://mjr.mbest.co.kr/',
+    'EBSi': 'https://www.ebsi.co.kr/'
   };
   const providerSource = between('const ING_PROVIDER_URLS = {', '\nconst ING_PROVIDER_DOMAINS');
   const providers = Function(providerSource + '\nreturn ING_PROVIDER_URLS;')();
@@ -588,10 +589,34 @@ test('five official course sites have safe direct links and smart-paste fallback
   assert.equal(matches('엠베스트', 'https://mjr.mbest.co.kr/course/1'), false);
   assert.equal(matches('엘리하이', 'https://mjr.mbest.co.kr/course/1'), true);
   assert.equal(matches('엘리하이', 'https://junior.mbest.co.kr/course/1'), true);
+  assert.equal(matches('EBSi', 'https://www.ebsi.co.kr/ebs/lms/lmsx/retrieveSbjtDtl.ebs'), true);
+  assert.equal(matches('EBSi', 'https://example.com/course/1'), false);
   assert.equal(matches('기타', 'https://example.com/course/1'), true);
+  const safeSource = between('function safeHttpsUrl(', '\nfunction toast(');
+  const courseUrlSource = between('function ingCourseSiteUrl(', '\nfunction ingCourseSiteLink(');
+  const courseUrl = Function(providerSource + '\n' + safeSource + '\n' + courseUrlSource + '\nreturn ingCourseSiteUrl;')();
+  assert.equal(courseUrl({ platform: '메가스터디', sourceUrl: 'https://www.megastudy.net/course/1' }), expected['메가스터디']);
+  assert.equal(courseUrl({ platform: '메가스터디', sourceUrl: 'javascript:alert(1)' }), expected['메가스터디']);
+  assert.equal(courseUrl({ platform: '기타', sourceUrl: 'https://example.com/course/1' }), 'https://example.com/course/1');
+  assert.equal(courseUrl({ platform: '기타', sourceUrl: 'javascript:alert(1)' }), '');
+  const siteLink = between('function ingCourseSiteLink(', '\n\nconst ingKey');
+  const renderSiteLink = Function('ingCourseSiteUrl', 'esc', siteLink + '\nreturn ingCourseSiteLink;')(
+    courseUrl, value => String(value ?? '').replace(/[&<>"']/g, char =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]));
+  const renderedLink = renderSiteLink({ platform: 'EBSi' });
+  assert.equal(renderedLink,
+    '<a class="btn btn-sm btn-ghost" href="https://www.ebsi.co.kr/" target="_blank" rel="noopener noreferrer">▶ EBSi 열기 ↗</a>');
+  assert.doesNotMatch(renderedLink, /data-act|onclick|window\.open/);
+  assert.equal([...html.matchAll(/sourceUrl: sourceUrl \|\| ING_PROVIDER_URLS\[platform\] \|\| ''/g)].length, 2);
+  assert.equal([...html.matchAll(/platform === '기타' && !sourceUrl/g)].length, 2);
+  [between('function ingRow(', '\n\n\/\*\* 오늘 화면에 붙는 인강 카드'),
+    between('function plannerLectureRow(', '\n\nfunction taskRow('),
+    between('function ingCourseCardHtml(', '\n\nfunction ingLectureNoteModal(')]
+    .forEach(source => assert.match(source, /ingCourseSiteLink/));
   const modal = between('function ingAddModal(', '\nfunction ingShowParsePreview(');
   assert.match(modal, /target="_blank" rel="noopener noreferrer"/);
   assert.match(modal, /사이트 열기 → 로그인 → 강좌 상세의 강의목차 전체 복사/);
+  assert.match(modal, /학생용 바로가기는 선택한 플랫폼 메인 페이지에 자동 연결됩니다/);
   assert.match(modal, /id="ingImages" type="file" accept="image\/\*" multiple/);
   assert.match(modal, /data-act="ingimage"/);
   assert.match(modal, /서버에 사진을 저장하지 않으며/);
