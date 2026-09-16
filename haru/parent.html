@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>하루브레인 — 보호자</title>
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+  <style>
+    /* 부모 화면 — 읽기 5, 쓰기 0 (설계안 §3-2). 점수·정답률·개별 문항·칸 이름·접속 로그 없음. */
+    :root { --bg:#F5F3EE; --panel:#fff; --ink:#22302A; --soft:#6A7A72; --line:#E1E6E2; --green:#2B4C3F; --green-soft:#E6EFEA; --amber-soft:#F8F1DF; }
+    * { box-sizing:border-box; } body { margin:0; background:var(--bg); color:var(--ink); font-family:"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif; font-size:16px; line-height:1.65; word-break:keep-all; }
+    main { max-width:560px; margin:0 auto; padding:20px 16px 40px; }
+    h1 { font-size:18px; color:var(--green); margin:0 0 6px; } .lead { color:var(--soft); font-size:14px; margin:0 0 16px; }
+    .card { background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:16px 18px; margin-bottom:12px; }
+    .kv { display:flex; justify-content:space-between; gap:12px; padding:9px 0; border-bottom:1px solid var(--line); } .kv:last-child { border-bottom:none; }
+    .kv b { text-align:right; } .bar { height:12px; background:var(--line); border-radius:99px; overflow:hidden; } .bar i { display:block; height:100%; background:var(--green); }
+    .hist { display:flex; align-items:flex-end; gap:6px; height:80px; margin-top:8px; } .hist div { flex:1; background:#C9D6CF; border-radius:4px 4px 0 0; position:relative; min-height:3px; }
+    .hist div.me { background:var(--green); } .hist div.me::after { content:'●'; position:absolute; top:-18px; left:50%; transform:translateX(-50%); color:var(--green); font-size:12px; }
+    .small { font-size:13px; color:var(--soft); } .coach { background:var(--green-soft); border-radius:12px; padding:12px 14px; }
+    .bed { font-size:24px; font-weight:900; color:var(--green); } .foot { font-size:12px; color:var(--soft); margin-top:16px; line-height:1.5; }
+    ul { padding-left:18px; margin:6px 0; } .err { background:#F9E9E6; color:#B0483A; border-radius:12px; padding:12px 14px; font-weight:700; }
+  </style>
+</head>
+<body>
+  <main id="app"><div class="card">불러오는 중…</div></main>
+  <script>
+  'use strict';
+  (function () {
+    var esc = function (s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); };
+    var app = document.getElementById('app');
+    var t = new URLSearchParams(location.search).get('t') || '';
+    fetch('/api/haru/parent?t=' + encodeURIComponent(t), { cache: 'no-store' }).then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); }).then(function (x) {
+      if (!x.ok) { app.innerHTML = '<div class="err">' + esc(x.j.error || '열 수 없어요.') + '</div>'; return; }
+      var p = x.j.parent;
+      var html = '<h1>' + esc(p.name) + ' 학생</h1><p class="lead">채점은 저희가 합니다. 부모님은 재우고 깨워 주세요.</p>';
+      html += '<div class="card"><div class="kv"><span>오늘</span><b>' + (p.today.done ? '● 했어요 · ' + p.today.min + '분' : '○ 오늘은 앉지 않았어요') + '</b></div>' +
+        '<div class="kv"><span>이번 주</span><b>누적 ' + p.week.done + '일</b></div><div class="bar"><i style="width:' + Math.round(p.week.done / 7 * 100) + '%"></i></div>' +
+        '<div class="kv"><span>지난 회차</span><b>' + (p.lastMock ? (p.lastMock.completed ? '완주 ○' : '완주 —') + ' · 무응답 ' + p.lastMock.blank : '회차 없음') + '</b></div></div>';
+      html += '<div class="card"><div class="kv"><span>이번 달 회차 분포</span></div>';
+      if (p.dist) {
+        var max = Math.max.apply(null, p.dist.bins.map(function (b) { return b.c; })) || 1;
+        html += '<div class="hist">' + p.dist.bins.map(function (b, i) { return '<div class="' + (p.dist.mine === i ? 'me' : '') + '" style="height:' + Math.round(b.c / max * 100) + '%"></div>'; }).join('') + '</div>' +
+          '<p class="small">표본 ' + p.dist.n + '명 · ' + esc(p.dist.composition) + ' · 문항 출처 ' + esc(p.dist.itemSource) + '</p>';
+      } else html += '<p class="small">표본이 30명을 넘으면 그려집니다.</p>';
+      html += '</div>';
+      if (p.coach) html += '<div class="card coach">' + esc(p.coach) + '</div>';
+      html += '<div class="card"><div class="kv"><span>오늘 취침 목표</span><span class="bed">' + esc(p.bedTarget || '—') + '</span></div><p class="small">시험 7일 전부터 매일 15분씩 당겨집니다. 이 화면은 기록을 받지 않습니다.</p></div>';
+      html += '<div class="card"><b>어른 일정</b>' + (p.milestones.length ? '<ul>' + p.milestones.map(function (m) { return '<li>' + esc(m.d.slice(5).replace('-', '/')) + (m.at ? ' ' + esc(m.at) : '') + ' — ' + esc(m.text) + '</li>'; }).join('') + '</ul>' : '<p class="small">45일 안에 예정된 일정이 없습니다.</p>') + '</div>';
+      html += '<div class="foot">' + esc(p.notice || '') + '</div>';
+      app.innerHTML = html;
+    }).catch(function () { app.innerHTML = '<div class="err">지금은 열 수 없어요. 잠시 뒤 다시 열어 주세요.</div>'; });
+  })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "name": "WB 하루브레인",
+  "short_name": "하루브레인",
+  "description": "오늘 카드 한 장 — WB 독해력학원 원내 학습 도구 (원내 전용)",
+  "lang": "ko-KR",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F5F3EE",
+  "theme_color": "#2B4C3F",
+  "icons": [
+    { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

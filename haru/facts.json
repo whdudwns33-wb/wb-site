@@ -1,0 +1,54 @@
+{
+  "admissionYear": 2027,
+  "source": "2027학년도 호남삼육중학교 신입생 입학전형 요강 (2026-04-24 공고) · 2026학년도 수험생 안내사항 (2025-10-15) · 원서접수 안내 페이지 (2026-09 확인)",
+  "docVersion": "정본 v1.2 (docs/삼육중-전형-사실-정본-v1.md)",
+  "notice": "본 앱은 WB 독해력학원이 제작한 사설 학습 도구이며, 호남삼육중학교와 어떠한 제휴·후원 관계도 없습니다. 2027학년도 모집요강(2026-04-24 공고) 기준 · 학교 사정에 따라 변경될 수 있음.",
+  "school": {
+    "name": "호남삼육중학교",
+    "district": "광주광역시 남구 (학교알리미 표기: 전남광주통합특별시 남구)",
+    "url": "https://samyook.jge.ms.kr",
+    "urlLegacy": "http://samyook.gen.ms.kr"
+  },
+  "quota": { "total": 122, "general": 70, "sda1": 30, "sda2": 10, "leader": 7, "intl": 3, "social": 2, "waitlist": 3 },
+  "scoring": { "kor": 100, "math": 100, "eng": 100, "doc": 30, "bible": 100, "generalTotal": 330, "specialTotal": 430,
+               "tieBreak": ["kor", "math", "eng"], "tieBreakSpecial": ["bible", "kor", "math", "eng"] },
+  "exam": {
+    "date": "2026-10-25",
+    "arriveBy": "08:30",
+    "periods": [
+      { "subject": "kor",  "start": "09:00", "min": 40, "items": 25, "pointsPerItem": 4 },
+      { "subject": "math", "start": "10:00", "min": 40, "items": 25, "pointsPerItem": 4 },
+      { "subject": "eng",  "start": "11:00", "min": 40, "items": 25, "pointsPerItem": 4 }
+    ],
+    "specialPeriod": { "subject": "bible", "start": "12:00", "min": 20, "items": 25 },
+    "format": "mcq-omr",
+    "penProvided": true,
+    "electronicsCollected": true,
+    "listening": "unspecified",
+    "listeningNote": "요강에 언급 없음 — 학원가는 폐지로 안내, 학교 공식 확인은 2026-09-30 설명회 후 (기획서 D-13)"
+  },
+  "schedule": {
+    "notice": "2026-04-24",
+    "briefing": "2026-09-30T19:00",
+    "formsPublished": "2026-09-29",
+    "apply": ["2026-10-06T09:00", "2026-10-09T17:00"],
+    "docs": ["2026-10-13T09:00", "2026-10-15T17:00"],
+    "ticket": ["2026-10-21T12:00", "2026-11-02T16:00"],
+    "announce": ["2026-10-30T16:00", "2026-11-06T17:00"],
+    "enroll": ["2026-11-02", "2026-11-04"],
+    "fee": 20000
+  },
+  "range": { "kor": "5-1~6-1 (지문은 교과서 밖 가능)", "math": "5-1~6-1 (고학년 다수)", "eng": "~6-1 (어휘·문법 초등 수준, 독해 지문 교과서 밖)" },
+  "afterResult": { "rejectedPlacement": "입학 허가를 받지 못한 학생은 교육청에서 배정받을 수 있음 (요강 §7-라)",
+                   "transferLimit": "합격자는 6개월 간 광주광역시내 중학교로 전학이 제한됨 (요강 §7-마)" },
+  "unverified": {
+    "applicants": "약 600~700명 (추정 — 정원 122 기준 약 5~6:1, 일반 70 기준 약 8~10:1). 학교 비공개. 어느 화면에도 표시하지 않는다",
+    "listeningAbolished": "학원가 안내, 학교 공식 미확인"
+  },
+  "history": [
+    { "admissionYear": 2027, "examDate": "2026-10-25", "items": 25 },
+    { "admissionYear": 2026, "examDate": "2025-10-19", "items": 25 },
+    { "admissionYear": 2025, "examDate": "2024-09-29", "items": 30 },
+    { "admissionYear": 2024, "examDate": "2023-09-24", "items": 30 }
+  ]
+}

@@ -1,0 +1,341 @@
+{
+  "packId": "haru-sample-kor-p01",
+  "treeId": "haru-2028",
+  "cohort": [
+    "2027-pilot",
+    "2028"
+  ],
+  "subject": "kor",
+  "kind": "passage",
+  "mode": "screen",
+  "tier": "T0",
+  "origin": "own",
+  "attribution": null,
+  "source": "WB 자체 제작 — 실제 교재·구매 자료·기출 복원본과 무관한 창작 콘텐츠. 체험·테스트용",
+  "license": {
+    "source": "own",
+    "ref": null,
+    "allowedUse": [
+      "serve",
+      "derive",
+      "print"
+    ],
+    "expiresAt": null,
+    "scope": {
+      "onlineTransmission": true,
+      "derivative": true,
+      "audience": "enrolled",
+      "maxStudents": null
+    }
+  },
+  "provenance": {
+    "method": "human",
+    "typeCardRef": null,
+    "sourceText": false
+  },
+  "timeLimitSec": null,
+  "counts": {
+    "items": 7,
+    "passages": 1
+  },
+  "passages": [
+    {
+      "id": "p-01",
+      "titleKo": "물이 도시를 지나는 길",
+      "textKo": "수돗물은 강에서 곧바로 집으로 오지 않는다. 먼저 취수장이 강물을 끌어올린다. 그다음 정수장이 흙과 찌꺼기를 가라앉히고, 모래층으로 거른 뒤, 아주 적은 양의 소독약을 섞는다. 이렇게 깨끗해진 물은 언덕 위 배수지에 모였다가, 밤낮으로 관을 따라 각 집으로 내려간다. 배수지를 언덕 위에 두는 까닭은 따로 힘을 쓰지 않아도 물이 아래로 흐르기 때문이다. 그래서 정전이 되어도 한동안은 수도꼭지에서 물이 나온다.",
+      "wordCount": 118,
+      "genre": "비문학",
+      "devPattern": "과정",
+      "translation": null,
+      "keyPhrases": [
+        "취수장이 끌어올린다",
+        "정수장이 거른다",
+        "배수지에 모였다가"
+      ],
+      "itemNos": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    }
+  ],
+  "items": [
+    {
+      "no": 1,
+      "atomId": "k-dev-pattern",
+      "tier": 2,
+      "points": 4,
+      "setId": "p-01",
+      "instructionKo": "이 글의 전개 방식으로 가장 알맞은 것은?",
+      "isNegative": false,
+      "answerCount": 1,
+      "choices": [
+        {
+          "key": "1",
+          "text": "두 대상의 차이를 견주어 설명한다",
+          "atomId": null,
+          "errKind": null
+        },
+        {
+          "key": "2",
+          "text": "일이 일어나는 순서대로 설명한다"
+        },
+        {
+          "key": "3",
+          "text": "여러 종류로 나누어 설명한다",
+          "atomId": null,
+          "errKind": null
+        },
+        {
+          "key": "4",
+          "text": "원인과 결과를 밝혀 설명한다",
+          "atomId": "k-refer",
+          "errKind": null
+        }
+      ],
+      "answerKey": "2",
+      "explanationKo": "취수장 → 정수장 → 배수지 → 집의 차례로 물이 지나는 과정을 설명한다.",
+      "cueSteps": [
+        "'먼저·그다음·이렇게' 같은 순서 표지어에 표시해 보세요",
+        "첫 문장에 '길'이 있다는 데 주목",
+        "표시 없음"
+      ]
+    },
+    {
+      "no": 2,
+      "atomId": "k-refer",
+      "tier": 2,
+      "points": 4,
+      "setId": "p-01",
+      "instructionKo": "밑줄 친 '이렇게'가 가리키는 것은?",
+      "isNegative": false,
+      "answerCount": 1,
+      "choices": [
+        {
+          "key": "1",
+          "text": "취수장이 강물을 끌어올리는 것"
+        },
+        {
+          "key": "2",
+          "text": "가라앉히고 거르고 소독하는 것"
+        },
+        {
+          "key": "3",
+          "text": "배수지에 물을 모으는 것",
+          "atomId": "k-dev-pattern",
+          "errKind": null
+        },
+        {
+          "key": "4",
+          "text": "관을 따라 집으로 내려가는 것"
+        }
+      ],
+      "answerKey": "2",
+      "explanationKo": "'이렇게'는 바로 앞 문장의 정수 과정 전체를 받는다.",
+      "cueSteps": [
+        "앞 문장을 다시 읽기",
+        "지시어 바로 앞을 보기",
+        "표시 없음"
+      ]
+    },
+    {
+      "no": 3,
+      "atomId": "k-main-sentence",
+      "tier": 1,
+      "points": 4,
+      "setId": "p-01",
+      "instructionKo": "배수지를 언덕 위에 두는 까닭으로 알맞은 것은?",
+      "isNegative": false,
+      "answerCount": 1,
+      "choices": [
+        {
+          "key": "1",
+          "text": "물이 저절로 아래로 흐르게 하려고"
+        },
+        {
+          "key": "2",
+          "text": "강물과 가까이 두려고"
+        },
+        {
+          "key": "3",
+          "text": "소독약을 잘 섞으려고"
+        },
+        {
+          "key": "4",
+          "text": "정전을 막으려고",
+          "atomId": "k-implicit",
+          "errKind": null
+        }
+      ],
+      "answerKey": "1",
+      "explanationKo": "'따로 힘을 쓰지 않아도 물이 아래로 흐르기 때문'이 글에 직접 적혀 있다.",
+      "cueSteps": [
+        "'까닭'이 나오는 문장 찾기",
+        "'때문'에 표시",
+        "표시 없음"
+      ]
+    },
+    {
+      "no": 4,
+      "atomId": "k-trap",
+      "tier": 3,
+      "points": 4,
+      "setId": "p-01",
+      "instructionKo": "이 글의 내용과 일치하지 않는 것은?",
+      "isNegative": true,
+      "answerCount": 1,
+      "choices": [
+        {
+          "key": "1",
+          "text": "정수장은 모래층으로 물을 거른다"
+        },
+        {
+          "key": "2",
+          "text": "소독약은 아주 적은 양만 섞는다"
+        },
+        {
+          "key": "3",
+          "text": "정전이 되면 곧바로 물이 끊긴다"
+        },
+        {
+          "key": "4",
+          "text": "물은 관을 따라 집으로 내려간다",
+          "atomId": "k-main-sentence",
+          "errKind": null
+        }
+      ],
+      "answerKey": "3",
+      "explanationKo": "글은 '정전이 되어도 한동안은 물이 나온다'고 했다 — '곧바로 끊긴다'는 단정어 함정.",
+      "cueSteps": [
+        "'않는' 발문에 표시",
+        "'곧바로'·'한동안' 같은 정도 표현 비교",
+        "표시 없음"
+      ]
+    },
+    {
+      "no": 5,
+      "atomId": "k-poly",
+      "tier": 2,
+      "points": 4,
+      "setId": "p-01",
+      "instructionKo": "'끌어올린다'와 같은 뜻으로 쓰인 것은?",
+      "isNegative": false,
+      "answerCount": 1,
+      "choices": [
+        {
+          "key": "1",
+          "text": "두레박으로 우물물을 끌어올렸다"
+        },
+        {
+          "key": "2",
+          "text": "친구를 팀장으로 끌어올렸다",
+          "atomId": "k-word-800",
+          "errKind": null
+        },
+        {
+          "key": "3",
+          "text": "가라앉은 기분을 끌어올렸다",
+          "atomId": null,
+          "errKind": null
+        },
+        {
+          "key": "4",
+          "text": "성적을 상위권으로 끌어올렸다",
+          "atomId": null,
+          "errKind": null
+        }
+      ],
+      "answerKey": "1",
+      "explanationKo": "글에서는 '물을 위로 옮기다'의 뜻. ②③④는 지위·기분·수준을 높인다는 비유적 뜻.",
+      "cueSteps": [
+        "글 속 문장을 다시 읽기",
+        "'물'과 짝이 되는 보기 찾기",
+        "표시 없음"
+      ]
+    },
+    {
+      "no": 6,
+      "atomId": "m-ratio-base",
+      "tier": 2,
+      "points": 4,
+      "setId": null,
+      "instructionKo": "정수장에서 물 250 L 중 10 L 가 찌꺼기로 걸러졌다. 걸러진 물의 비율을 백분율로 나타내면?",
+      "isNegative": false,
+      "answerCount": 1,
+      "choices": [
+        {
+          "key": "1",
+          "text": "4 %"
+        },
+        {
+          "key": "2",
+          "text": "25 %",
+          "atomId": "m-pct-inverse",
+          "errKind": null
+        },
+        {
+          "key": "3",
+          "text": "0.4 %",
+          "atomId": null,
+          "errKind": "calc"
+        },
+        {
+          "key": "4",
+          "text": "40 %",
+          "atomId": null,
+          "errKind": "calc"
+        }
+      ],
+      "answerKey": "1",
+      "explanationKo": "기준량 250, 비교하는 양 10 → 10/250 = 0.04 = 4 %.",
+      "cueSteps": [
+        "기준량에 표시",
+        "비교하는 양 ÷ 기준량",
+        "표시 없음"
+      ]
+    },
+    {
+      "no": 7,
+      "atomId": "m-frac-div",
+      "tier": 1,
+      "points": 4,
+      "setId": null,
+      "instructionKo": "물 3/4 L 를 컵 3개에 똑같이 나누면 한 컵에 몇 L 인가?",
+      "isNegative": false,
+      "answerCount": 1,
+      "choices": [
+        {
+          "key": "1",
+          "text": "1/4 L"
+        },
+        {
+          "key": "2",
+          "text": "9/4 L",
+          "atomId": "n-frac-basic",
+          "errKind": null
+        },
+        {
+          "key": "3",
+          "text": "1/12 L",
+          "atomId": null,
+          "errKind": "calc"
+        },
+        {
+          "key": "4",
+          "text": "3/4 L",
+          "atomId": null,
+          "errKind": "calc"
+        }
+      ],
+      "answerKey": "1",
+      "explanationKo": "3/4 ÷ 3 = 3/12 = 1/4. ④는 나누기를 빠뜨린 값, ③은 분모에 두 번 곱한 값.",
+      "cueSteps": [
+        "(분수)÷(자연수) = 분자를 나누거나 분모에 곱하기",
+        "3/4 ÷ 3 = 3/(4×3)",
+        "표시 없음"
+      ]
+    }
+  ]
+}

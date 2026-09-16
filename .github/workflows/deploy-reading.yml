@@ -8,6 +8,7 @@ on:
       - 'reading-server/**'
       - 'vocab/**'
       - 'naesin/**'
+      - 'haru/**'
       - 'naesin-ko/**'
       - 'shared/**'
       # 배포 파이프라인 자체가 바뀌면 그 판으로 한 번 돌려 봐야 한다 — 이 줄이 없으면
@@ -81,6 +82,12 @@ jobs:
         run: node reading-server/naesin-api.test.mjs
       - name: 내신브레인 팩 제작 스튜디오 테스트
         run: node reading-server/naesin-studio.test.mjs
+      - name: 하루브레인 순수 로직 테스트 (원자·달력·좌표·SRS·원인·페이스·생성기·리포트·팩 검사)
+        run: for f in haru/*.test.cjs; do node "$f" || exit 1; done
+      - name: 하루브레인 달력 생성·조판기 테스트
+        run: node haru/plan-build.test.mjs && node haru/sheet-build.test.mjs
+      - name: 하루브레인 서버 채점·라우트 테스트
+        run: node reading-server/haru-score.test.mjs && node reading-server/haru-api.test.mjs
       - name: 내신브레인 AI 추출 테스트
         run: node reading-server/naesin-extract.test.mjs
       - name: 내신브레인 수업 라이브 세션 테스트

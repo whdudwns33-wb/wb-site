@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>WB 하루브레인</title>
+  <meta name="description" content="오늘 카드 한 장 — WB 독해력학원 원내 학습 도구 (원내 전용)">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+  <meta name="theme-color" content="#2B4C3F">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <style>
+    /* 초4~초6 학생 화면 — 탭 없음, 카드 한 장. 놀이 요소 없음. 큰 글자·큰 버튼(태블릿 세로·폰). */
+    :root { --bg:#F5F3EE; --panel:#FFFFFF; --ink:#22302A; --soft:#6A7A72; --line:#E1E6E2; --green:#2B4C3F; --green-soft:#E6EFEA;
+            --mint:#8FB9A5; --amber:#B27B16; --amber-soft:#F8F1DF; --red:#B0483A; --red-soft:#F9E9E6; --blue:#2F5F8F; --blue-soft:#E7EEF6; }
+    * { box-sizing:border-box; }
+    html, body { margin:0; padding:0; min-height:100%; }
+    body { background:var(--bg); color:var(--ink); font-family:"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif; font-size:16px; line-height:1.6; word-break:keep-all; -webkit-font-smoothing:antialiased; }
+    button { font-family:inherit; font-size:inherit; cursor:pointer; border:none; background:none; color:inherit; }
+    input { font-family:inherit; font-size:1.05rem; }
+    :focus-visible { outline:3px solid var(--blue); outline-offset:2px; border-radius:8px; }
+    [hidden] { display:none !important; }
+    .bar { display:flex; align-items:center; gap:12px; padding:10px 16px; background:var(--panel); border-bottom:1px solid var(--line); position:sticky; top:0; z-index:5; }
+    .bar .brand { font-weight:900; font-size:15px; color:var(--green); }
+    .bar .who { margin-left:auto; font-size:13px; color:var(--soft); }
+    .bar .who b { color:var(--ink); }
+    .bar .dot { font-size:12px; color:var(--soft); white-space:nowrap; }
+    .bar .dot i { display:inline-block; width:8px; height:8px; border-radius:50%; background:#B7C0CC; margin-right:4px; }
+    .bar .dot.saved i { background:#2E8B57; } .bar .dot.pending i { background:var(--amber); } .bar .dot.failed i { background:var(--red); }
+    main { max-width:640px; margin:0 auto; padding:16px 16px 48px; }
+    .card { background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:18px 18px; margin-bottom:14px; }
+    .card h2 { margin:0 0 10px; font-size:17px; color:var(--green); }
+    .slot { display:flex; gap:12px; align-items:flex-start; padding:12px 0; border-top:1px solid var(--line); }
+    .slot:first-of-type { border-top:none; padding-top:4px; }
+    .slot .k { flex:none; width:28px; height:28px; border-radius:50%; background:var(--green-soft); color:var(--green); font-weight:900; display:flex; align-items:center; justify-content:center; font-size:14px; }
+    .slot .t { font-weight:800; }
+    .slot .w { font-size:13.5px; color:var(--soft); }
+    .slot.done .k { background:var(--green); color:#fff; }
+    .big { display:block; width:100%; min-height:58px; border-radius:14px; background:var(--green); color:#fff; font-weight:900; font-size:18px; margin-top:8px; }
+    .big:disabled { opacity:.45; cursor:default; }
+    .big.ghost { background:var(--panel); color:var(--green); border:2px solid var(--green); }
+    .big.warn { background:var(--amber); }
+    .row { display:flex; gap:10px; flex-wrap:wrap; }
+    .row > * { flex:1; }
+    .small { font-size:13px; color:var(--soft); }
+    .foot { font-size:12px; color:var(--soft); line-height:1.5; margin-top:20px; padding-top:10px; border-top:1px solid var(--line); }
+    .env { background:var(--amber-soft); border-radius:12px; padding:10px 12px; font-size:14px; margin-top:10px; }
+    .env label { display:flex; gap:8px; align-items:center; min-height:40px; }
+    .banner { background:var(--blue-soft); color:var(--blue); border-radius:12px; padding:12px 14px; font-weight:800; margin-bottom:14px; }
+    .err { background:var(--red-soft); color:var(--red); border-radius:12px; padding:10px 14px; font-weight:700; margin-bottom:14px; }
+    /* 러너 */
+    .prog { height:8px; background:var(--line); border-radius:99px; overflow:hidden; margin-bottom:12px; }
+    .prog i { display:block; height:100%; background:var(--green); width:0; transition:width .3s; }
+    .q .head { font-size:13px; color:var(--soft); font-weight:800; margin-bottom:6px; }
+    .q .stem { border-left:4px solid var(--mint); padding:6px 12px; margin:8px 0; background:#F8FAF8; border-radius:0 8px 8px 0; white-space:pre-line; }
+    .q .ask { font-size:17px; font-weight:800; margin:6px 0 12px; }
+    .q .neg { text-decoration:underline; text-underline-offset:3px; }
+    .choice { display:flex; align-items:center; gap:12px; width:100%; min-height:56px; padding:10px 14px; margin:8px 0; border:2px solid var(--line); border-radius:14px; background:var(--panel); text-align:left; font-size:16px; }
+    .choice .n { flex:none; width:30px; height:30px; border-radius:50%; background:var(--green-soft); color:var(--green); font-weight:900; display:flex; align-items:center; justify-content:center; }
+    .choice.ok { border-color:#2E8B57; background:#EAF5EE; }
+    .choice.picked { border-color:var(--red); background:var(--red-soft); }
+    .choice:disabled { cursor:default; }
+    .expl { background:var(--green-soft); border-radius:12px; padding:12px 14px; margin-top:12px; }
+    .cue { background:var(--amber-soft); border-radius:12px; padding:10px 14px; margin:10px 0; font-size:15px; }
+    .skip { min-height:48px; border-radius:12px; border:2px dashed var(--line); width:100%; color:var(--soft); margin-top:8px; }
+    /* 좌표 */
+    .grid { display:grid; grid-template-columns:repeat(2, 1fr); gap:8px; }
+    .cell { border-radius:12px; padding:10px 12px; border:1px solid var(--line); background:var(--panel); min-height:70px; }
+    .cell.unknown { background:#F1F1F1; color:var(--soft); }
+    .cell.hole { background:var(--amber-soft); }
+    .cell.shaky { background:var(--blue-soft); }
+    .cell.fluent { background:var(--green-soft); }
+    .cell b { display:block; font-size:14px; }
+    .cell span { font-size:12.5px; color:var(--soft); }
+    /* 답안지 */
+    .timer { font-size:34px; font-weight:900; text-align:center; font-variant-numeric:tabular-nums; margin:6px 0; }
+    .timer.low { color:var(--amber); }
+    .omr { width:100%; border-collapse:collapse; }
+    .omr td { padding:4px 2px; border-bottom:1px solid var(--line); text-align:center; }
+    .omr td.no { width:36px; font-weight:800; color:var(--soft); }
+    .omr tr.passed td.no { outline:2px solid var(--amber); border-radius:8px; }
+    .omr .b { width:44px; height:44px; border-radius:50%; border:2px solid var(--line); font-weight:900; font-size:16px; }
+    .omr .b.on { background:var(--green); color:#fff; border-color:var(--green); }
+    .omr .p { min-width:44px; height:36px; border-radius:8px; border:1px solid var(--line); font-size:12px; color:var(--soft); }
+    .omr .p.on { background:var(--amber-soft); color:var(--amber); border-color:var(--amber); }
+    .lock { text-align:center; padding:30px 10px; }
+    .lock .t { font-size:22px; font-weight:900; color:var(--green); }
+    .kv { display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--line); }
+    .kv:last-child { border-bottom:none; }
+    .link input { width:100%; min-height:54px; padding:0 14px; border:2px solid var(--line); border-radius:14px; }
+    @media (min-width:520px) { .grid { grid-template-columns:repeat(4, 1fr); } }
+  </style>
+</head>
+<body>
+  <header class="bar">
+    <span class="brand">하루브레인</span>
+    <span class="dot" id="savedot"><i></i><span id="savetxt">저장 전</span></span>
+    <span class="who" id="who"></span>
+  </header>
+  <main id="app"></main>
+  <script src="./strings.js"></script>
+  <script src="./plan.js"></script>
+  <script src="./mastery.js"></script>
+  <script src="./srs.js"></script>
+  <script src="./cause.js"></script>
+  <script src="./probe.js"></script>
+  <script>
+  'use strict';
+  (function () {
+    var S = WBHARU_S, P = WBHARU_P, M = WBHARU_M, R = WBHARU_R, C = WBHARU_C;
+    var CIR = ['①', '②', '③', '④', '⑤'];
+    var LS_STATE = 'wbh.state', LS_OMR = 'wbh.omr';
+    var $ = function (id) { return document.getElementById(id); };
+    var esc = function (s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
+    var app = $('app');
+    var NOTICE = '';
+
+    /* ── 인증: 진로독서·워드브레인·내신과 같은 wbr.auth. 연동은 코드 → 강사 승인 두 단계(호스트 /api/login) ── */
+    function auth() { try { return JSON.parse(localStorage.getItem('wbr.auth') || 'null'); } catch (e) { return null; } }
+    function saveAuth(a) { try { if (a) localStorage.setItem('wbr.auth', JSON.stringify(a)); else localStorage.removeItem('wbr.auth'); } catch (e) {} }
+    function api(path, opt) {
+      var a = auth();
+      if (!a || !a.token) return Promise.reject(new Error('no-auth'));
+      return fetch('/api/haru' + path, Object.assign({ headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + a.token } }, opt || {}))
+        .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok) { var e = new Error(j.error || ('api-' + r.status)); e.status = r.status; throw e; } return j; }); });
+    }
+    function setDot(cls, txt) { var d = $('savedot'); d.className = 'dot ' + cls; $('savetxt').textContent = txt; }
+
+    /* ── 로컬 상태 — 서버 GET /state 가 원천, 기기 캐시는 오프라인 표시용 ── */
+    var DB = null, PLAN = null, ATOMS = null, TODAY = null, CORE = [];
+    function loadCache() { try { return JSON.parse(localStorage.getItem(LS_STATE) || 'null'); } catch (e) { return null; } }
+    function cache() { try { localStorage.setItem(LS_STATE, JSON.stringify(DB)); } catch (e) {} }
+    function blank() { return { v: 2, days: {}, atoms: {}, seenPeri: {}, wrong: [], passages: [], words: {}, envelopeDone: {}, summary: {} }; }
+    var pendingPut = false;
+    function push() {
+      if (!DB) return Promise.resolve();
+      var body = Object.assign({}, DB); delete body.mocks; delete body.paper; delete body.weekly;
+      body.summary = summary();
+      setDot('pending', '저장 중');
+      return api('/state', { method: 'PUT', body: JSON.stringify({ state: body }) })
+        .then(function () { setDot('saved', '저장됨'); pendingPut = false; })
+        .catch(function (e) { setDot('failed', e.status === 429 ? '오늘 저장 상한' : '저장 안 됨'); pendingPut = true; });
+    }
+
+    /* ── 원자 상태 = 좌표(mastery) + 카드(srs) 한 객체 ── */
+    function atomState(id, now) {
+      if (!DB.atoms[id]) DB.atoms[id] = Object.assign(M.create(now), R.createCard(now, false));
+      var s = DB.atoms[id];
+      if (!s.ctx) s.ctx = []; if (!s.seen) s.seen = {};
+      return s;
+    }
+    function atomOf(id) { return ATOMS && ATOMS.byId[id]; }
+    function gradeOf(id, now) { var a = atomOf(id); return a ? M.grade(DB.atoms[id], a, now) : 'unknown'; }
+    function summary() {
+      var now = Date.now(), by = { kor: { core: 0, fluent: 0, shaky: 0, hole: 0, unknown: 0 }, math: { core: 0, fluent: 0, shaky: 0, hole: 0, unknown: 0 }, eng: { core: 0, fluent: 0, shaky: 0, hole: 0, unknown: 0 } };
+      var confirmed = 0, carry = [];
+      CORE.forEach(function (id) { var a = atomOf(id); if (!a || !by[a.subject]) return; var g = gradeOf(id, now); by[a.subject].core++; if (by[a.subject][g] != null) by[a.subject][g]++; if (g === 'fluent') { confirmed++; if (a.carryTo && carry.indexOf(a.carryTo) < 0) carry.push(a.carryTo); } });
+      var days = Object.keys(DB.days || {}).filter(function (d) { return DB.days[d].sat; }).sort();
+      var pas = DB.passages || [];
+      return { doneDays: days.length, totalDays: PLAN ? PLAN.totalDays || 0 : 0, lastDone: days.length ? days[days.length - 1] : '', confirmed: confirmed, coreTotal: CORE.length, bySubject: by,
+               gained: { atoms: confirmed, carry: carry.slice(0, 12), engWords: Object.keys(DB.words || {}).length, korMorph: 0, mockRuns: (DB.mocks || []).length, paperRecovered: (DB.wrong || []).filter(function (w) { return w.cleared > 0; }).length, oneReadRate: pas.length ? pas.filter(function (p) { return p.oneRead; }).length / pas.length : 0 },
+               phase: PLAN ? PLAN.phase.phase : '', updatedAt: new Date().toISOString() };
+    }
+
+    /* ── 화면 ── */
+    function render(html) { app.innerHTML = html; window.scrollTo(0, 0); }
+    function footer() { return '<div class="foot">' + esc(NOTICE || '본 앱은 WB 독해력학원이 제작한 사설 학습 도구이며, 호남삼육중학교와 어떠한 제휴·후원 관계도 없습니다. 전형 관련 공식 정보는 학교 홈페이지와 모집요강에서 확인하십시오.') + '</div>'; }
+
+    function showLink(msg) {
+      render('<div class="card link"><h2>선생님께 받은 학생 코드</h2>' + (msg ? '<div class="err">' + esc(msg) + '</div>' : '') +
+        '<input id="code" inputmode="latin" autocomplete="off" placeholder="wb-…"><button class="big" id="go">연결 요청</button>' +
+        '<p class="small">요청하면 선생님이 승인해 줘요. 승인되면 이 기기에서는 다시 입력할 일이 없어요.</p></div>' + footer());
+      $('go').onclick = function () {
+        var code = ($('code').value || '').trim(); if (!code) return;
+        $('go').disabled = true;
+        fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: code, device: 'haru ' + (navigator.platform || '') }) })
+          .then(function (r) { return r.json(); })
+          .then(function (j) {
+            if (!j.nonce) { showLink(j.error || '연결할 수 없어요.'); return; }
+            render('<div class="card"><h2>' + esc(j.name || '') + ' — 선생님 승인을 기다려요</h2><p class="small">승인되면 저절로 시작해요. 이 화면을 닫지 마세요.</p></div>' + footer());
+            var poll = function () {
+              fetch('/api/login/status?n=' + j.nonce).then(function (r) { return r.json(); }).then(function (s) {
+                if (s.token) { saveAuth({ token: s.token, code: s.student ? s.student.code : code, name: s.student ? s.student.name : '' }); boot(); return; }
+                if (s.denied) { showLink('선생님이 승인하지 않았어요.'); return; }
+                if (s.error) { showLink(s.error); return; }
+                setTimeout(poll, 3000);
+              }).catch(function () { setTimeout(poll, 5000); });
+            };
+            setTimeout(poll, 2500);
+          }).catch(function () { showLink('네트워크가 연결되지 않았어요.'); });
+      };
+    }
+
+    function todayKey() { return P.kstDate(Date.now()); }
+    function dayRec() { var k = todayKey(); if (!DB.days[k]) DB.days[k] = { sat: false, min: 0, blocks: 0, items: 0 }; return DB.days[k]; }
+    function mockToday() { if (!PLAN) return null; var k = todayKey(); return (PLAN.days || []).filter(function (d) { return d.d === k && d.kind === 'mock' && d.app; })[0] || null; }
+
+    function showHome(err) {
+      var now = Date.now(), ph = PLAN ? PLAN.phase : null;
+      var slots = (TODAY && TODAY.slots) || [];
+      var day = dayRec();
+      var html = '';
+      if (err) html += '<div class="err">' + esc(err) + '</div>';
+      if (PLAN && PLAN.locked) {
+        html += '<div class="card"><h2>오늘은 카드가 없어요</h2><p>여기까지 온 것으로 충분해요. 푹 쉬세요.</p>' + (PLAN.retro ? '<button class="big ghost" id="retro">' + esc('51일 동안 네가 한 것') + '</button>' : '') + '</div>';
+        render(html + footer()); if ($('retro')) $('retro').onclick = showRetro; return;
+      }
+      var mock = mockToday();
+      if (mock) html += '<div class="banner">오늘은 회차예요 — ' + esc(mock.note || '') + '<button class="big" id="omr">답안지 열기</button></div>';
+      html += '<div class="card"><h2>오늘 카드</h2>';
+      if (!slots.length) html += '<p class="small">오늘은 카드가 비어 있어요. 종이 봉투가 있으면 그것을 해요.</p>';
+      slots.forEach(function (s, i) { html += '<div class="slot' + (day.done && day.done[i] ? ' done' : '') + '"><div class="k">' + (i + 1) + '</div><div><div class="t">' + esc(s.label) + ' — ' + esc(s.atomLabel) + '</div><div class="w">' + esc(s.why) + '</div></div></div>'; });
+      if (TODAY && TODAY.envelope && TODAY.envelope.items && TODAY.envelope.items.length) {
+        html += '<div class="env">📄 이번 주 종이 봉투' + TODAY.envelope.items.map(function (it, i) { var k = TODAY.envelope.week + ':' + it.atomId; return '<label><input type="checkbox" data-env="' + esc(k) + '"' + (DB.envelopeDone[k] ? ' checked' : '') + '> ' + esc(it.label) + '</label>'; }).join('') + '</div>';
+      }
+      var canStart = slots.length > 0 && !(day.sat && day.blocks >= 1 + (ph ? ph.extendMax || 0 : 0));
+      html += '<button class="big" id="sit" ' + (canStart ? '' : 'disabled') + '>' + (day.sat ? (day.blocks >= 1 + (ph ? ph.extendMax || 0 : 0) ? '오늘은 여기까지. 자러 가자.' : '오늘 더 할래 (+' + (ph ? ph.extendBlockMin || 15 : 15) + '분)') : '앉았다') + '</button>';
+      if (ph && !day.sat) html += '<p class="small">오늘 예상 ' + esc(String(TODAY && TODAY.minEstimate || ph.dailyMin || 15)) + '분</p>';
+      html += '</div>';
+      var conf = 0; CORE.forEach(function (id) { if (gradeOf(id, now) === 'fluent') conf++; });
+      var sat = Object.keys(DB.days).filter(function (d) { return DB.days[d].sat; }).length;
+      html += '<div class="card"><div class="kv"><span>좌표 ' + CORE.length + '칸 중 붙은 칸</span><b>' + conf + '</b></div><div class="kv"><span>앉은 날</span><b>' + sat + '</b></div>' +
+        (ph && ph.phase !== 'p1' && PLAN.dday != null ? '<div class="kv"><span class="small">시험까지</span><span class="small">' + esc(String(PLAN.dday)) + '일</span></div>' : '') +
+        '<div class="row"><button class="big ghost" id="map">좌표 보기</button>' + (PLAN && PLAN.retro ? '<button class="big ghost" id="retro">51일 동안 네가 한 것</button>' : '') + '</div></div>';
+      render(html + footer());
+      if ($('omr')) $('omr').onclick = function () { showOmr(mock); };
+      if ($('map')) $('map').onclick = showMap;
+      if ($('retro')) $('retro').onclick = showRetro;
+      Array.prototype.forEach.call(document.querySelectorAll('input[data-env]'), function (cb) { cb.onchange = function () { DB.envelopeDone[cb.getAttribute('data-env')] = cb.checked; cache(); push(); }; });
+      if ($('sit')) $('sit').onclick = function () { startRunner(); };
+    }
+
+    /* ── 러너: 슬롯 3 × 문항 3. 뒤로가기 없음. 문항 단위 타이머 없음(국면 ④ D-14 전). ── */
+    var RUN = null;
+    function startRunner() {
+      var day = dayRec();
+      RUN = { slots: (TODAY && TODAY.slots) || [], si: 0, qi: 0, items: [], startedAt: Date.now(), answered: 0, block: day.sat ? day.blocks + 1 : 1, mixedPool: [] };
+      if (!day.sat) { day.sat = true; day.startedAt = new Date().toTimeString().slice(0, 5); }
+      day.blocks = RUN.block;
+      cache();
+      nextSlot();
+    }
+    function nextSlot() {
+      if (RUN.si >= RUN.slots.length) { finishRunner(); return; }
+      var slot = RUN.slots[RUN.si];
+      render('<div class="card"><div class="prog"><i style="width:' + Math.round(RUN.si / RUN.slots.length * 100) + '%"></i></div><h2>' + esc(slot.label) + ' — ' + esc(slot.atomLabel) + '</h2><p class="small">문항을 불러오는 중…</p></div>');
+      fetchItems(slot, 3).then(function (items) {
+        if (!items.length) { RUN.si++; nextSlot(); return; }
+        RUN.items = items; RUN.qi = 0; askItem();
+      }).catch(function (e) { showHome(e.message || '문항을 받지 못했어요.'); });
+    }
+    function fetchItems(slot, n) {
+      if (slot.source === 'gen') {
+        var seeds = []; for (var i = 0; i < n; i++) seeds.push(Math.floor(Math.random() * 2147483646) + 1);
+        return Promise.all(seeds.map(function (sd) { return api('/gen?atomId=' + encodeURIComponent(slot.atomId) + '&seed=' + sd).then(function (j) { return j.item; }); }));
+      }
+      if (!slot.packId) return Promise.resolve([]);
+      return api('/pack?id=' + encodeURIComponent(slot.packId)).then(function (j) {
+        var s = DB.atoms[slot.atomId] || { seen: {} };
+        var pool = (j.pack.items || []).filter(function (it) { return it.atomId === slot.atomId; })
+          .sort(function (a, b) { return ((s.seen || {})[slot.packId + '#' + a.no] || 0) - ((s.seen || {})[slot.packId + '#' + b.no] || 0) || Math.random() - 0.5; }).slice(0, n);
+        var byId = {}; (j.pack.passages || []).forEach(function (p) { byId[p.id] = p; });
+        return pool.map(function (it) { return Object.assign({ packId: slot.packId, passage: it.setId && byId[it.setId] ? byId[it.setId] : null }, it); });
+      });
+    }
+    function itemHtml(it, opts) {
+      var q = esc(it.instructionKo).replace(/(옳지 않은|일치하지 않는|아닌|틀린|다른 하나)/g, '<span class="neg">$1</span>');
+      var h = '<div class="q">';
+      if (it.passage) h += '<div class="stem">' + esc(it.passage.textKo) + '</div>';
+      if (it.stemKo) h += '<div class="stem">' + esc(it.stemKo) + '</div>';
+      h += '<div class="ask">' + q + '</div>';
+      (it.choices || []).forEach(function (c, i) { h += '<button class="choice" data-key="' + esc(c.key) + '"><span class="n">' + (CIR[i] || c.key) + '</span><span>' + esc(c.text) + '</span></button>'; });
+      if (opts && opts.dontKnow) h += '<button class="skip" data-key="skip">모름 — 다음에 다시 만날래요</button>';
+      h += '</div>';
+      return h;
+    }
+    function askItem(cueText) {
+      var slot = RUN.slots[RUN.si], it = RUN.items[RUN.qi];
+      var html = '<div class="card"><div class="prog"><i style="width:' + Math.round((RUN.si + RUN.qi / RUN.items.length) / RUN.slots.length * 100) + '%"></i></div>' +
+        '<div class="q"><div class="head">' + esc(slot.label) + ' · ' + (RUN.qi + 1) + '/' + RUN.items.length + '</div>' + (cueText ? '<div class="cue">💡 ' + esc(cueText) + '</div>' : '') + '</div>' + itemHtml(it, { dontKnow: slot.kind === 'probe' }) + '</div>';
+      render(html);
+      var t0 = Date.now();
+      Array.prototype.forEach.call(document.querySelectorAll('.choice, .skip'), function (b) {
+        b.onclick = function () { answer(b.getAttribute('data-key'), Date.now() - t0, cueText ? 1 : 0); };
+      });
+      /* 다시 만날 칸(사다리 1·2단)은 단서를 먼저 청한다 — 서버가 단계를 보고 준다(403 이면 없음) */
+      if (!cueText && slot.kind === 'hole' && RUN.qi === 0) {
+        var s = DB.atoms[slot.atomId];
+        if (s && (s.stage || 1) <= 2 && (s.cue || 0) > 0) api('/cue?' + refOf(it)).then(function (j) { if (j.cue && j.cue.text) askItem(j.cue.text); }).catch(function () {});
+      }
+    }
+    function refOf(it) { return it.gid ? 'gid=' + encodeURIComponent(it.gid) : 'packId=' + encodeURIComponent(it.packId) + '&no=' + it.no; }
+    function bodyOf(it) { return it.gid ? { gid: it.gid } : { packId: it.packId, no: it.no }; }
+    function answer(picked, ms, cue) {
+      var slot = RUN.slots[RUN.si], it = RUN.items[RUN.qi];
+      Array.prototype.forEach.call(document.querySelectorAll('.choice, .skip'), function (b) { b.disabled = true; });
+      api('/answer', { method: 'POST', body: JSON.stringify(Object.assign(bodyOf(it), { picked: picked, ms: ms, cue: cue, mixed: slot.mode === 'mixed' })) })
+        .then(function (j) { applyResult(slot, it, picked, ms, cue, j.result); })
+        .catch(function (e) { showHome(e.message || '응답을 보내지 못했어요.'); });
+    }
+    function applyResult(slot, it, picked, ms, cue, res) {
+      var now = Date.now(), s = atomState(slot.atomId, now);
+      var mixed = slot.mode === 'mixed', itemId = it.gid || it.itemId || (it.packId + '#' + it.no);
+      var before = gradeOf(slot.atomId, now);
+      M.observe(s, { ok: res.ok, form: it.form || 'mcq4', itemId: itemId, mixed: mixed, cue: cue, ms: ms }, now);
+      var ctx = { now: now, mixed: mixed, form: it.form || 'mcq4', dday: PLAN ? PLAN.dday : null, active: Object.keys(DB.atoms).length, slots: 3 };
+      if (res.ok) R.recordOk(s, ctx); else R.fail(s, ctx);
+      s.lastCause = res.ok ? null : res.cause;
+      RUN.answered++; dayRec().items = (dayRec().items || 0) + 1;
+      var after = gradeOf(slot.atomId, now);
+      var line = S.transitionLine(before, after, slot.atomLabel);
+      var html = '<div class="card"><div class="q"><div class="head">' + esc(slot.label) + '</div>' + itemHtml(it).replace(/<button class="choice"/g, '<button class="choice" disabled') + '</div>';
+      if (!res.ok && picked !== 'skip') {
+        /* 2지선다 반증 — "지금 다시 보면 풀 수 있겠어요?" 예 → 30초 안에 같은 칸 새 문항. 통과하면 원인이 '문제 오독'으로 바뀐다 */
+        html += '<div class="expl"><b>정답은 ' + (CIR[+res.answerKey - 1] || res.answerKey) + '</b></div><p class="ask">지금 다시 보니 풀 수 있을 것 같아요?</p><div class="row"><button class="big ghost" id="canDo">네, 풀 수 있어요</button><button class="big ghost" id="no">아니요, 설명이 필요해요</button></div></div>';
+        render(html);
+        $('no').onclick = function () { recordWrong(slot, it, res, res.cause); showExplain(slot, it, res); };
+        $('canDo').onclick = function () { reprobe(slot, it, res); };
+        return;
+      }
+      html += '<div class="expl">' + (res.ok ? '<b>맞았어요.</b> ' : '<b>다음에 다시 만나요.</b> ') + esc(res.explanationKo || '') + (line ? '<div class="small">' + esc(line) + '</div>' : '') + '</div><button class="big" id="next">다음</button></div>';
+      render(html);
+      var sel = document.querySelector('.choice[data-key="' + res.answerKey + '"]'); if (sel) sel.classList.add('ok');
+      if (!res.ok && picked === 'skip') recordWrong(slot, it, res, 'time');
+      $('next').onclick = nextItem;
+    }
+    function recordWrong(slot, it, res, cause) {
+      DB.wrong.push({ ref: it.gid || (it.packId + '#' + it.no), atomId: slot.atomId, cause: cause || 'gap', at: new Date().toISOString(), cleared: 0 });
+      if (DB.wrong.length > 300) DB.wrong = DB.wrong.slice(-300);
+      var s = DB.atoms[slot.atomId]; if (s) { s.cause = s.cause || {}; s.cause[cause || 'gap'] = (s.cause[cause || 'gap'] || 0) + 1; }
+    }
+    function reprobe(slot, it, res) {
+      render('<div class="card"><p class="small">같은 칸의 새 문항 — 30초</p><p>불러오는 중…</p></div>');
+      fetchItems(slot, 1).then(function (items) {
+        var nit = items[0]; if (!nit) { showExplain(slot, it, res); return; }
+        render('<div class="card"><div class="q"><div class="head">' + esc(slot.label) + ' · 다시 한 번 <span id="left">30</span>초</div></div>' + itemHtml(nit) + '</div>');
+        var t0 = Date.now(), left = 30, tm = setInterval(function () { left--; if ($('left')) $('left').textContent = left; if (left <= 0) { clearInterval(tm); done('skip'); } }, 1000);
+        var done = function (picked) {
+          clearInterval(tm);
+          Array.prototype.forEach.call(document.querySelectorAll('.choice'), function (b) { b.disabled = true; });
+          api('/probe', { method: 'POST', body: JSON.stringify(Object.assign(bodyOf(nit), { picked: picked, ms: Date.now() - t0, said: 'canDo', ok: null })) }).catch(function () { return null; })
+            .then(function () { return api('/answer', { method: 'POST', body: JSON.stringify(Object.assign(bodyOf(nit), { picked: picked, ms: Date.now() - t0, cue: 0, mixed: false })) }); })
+            .then(function (j) {
+              var ok = j.result.ok, now = Date.now(), s = atomState(slot.atomId, now);
+              M.observe(s, { ok: ok, form: nit.form || 'mcq4', itemId: nit.gid || (nit.packId + '#' + nit.no), mixed: false, cue: 0, ms: Date.now() - t0 }, now);
+              if (ok) R.recordOk(s, { now: now, mixed: false, form: 'mcq4', dday: PLAN ? PLAN.dday : null, active: Object.keys(DB.atoms).length, slots: 3 });
+              recordWrong(slot, it, res, ok ? 'misread' : res.cause);
+              showExplain(slot, it, res, ok ? '다시 보니 풀 수 있었어요 — 발문의 조건에 먼저 표시하는 연습을 해요.' : null);
+            }).catch(function () { recordWrong(slot, it, res, res.cause); showExplain(slot, it, res); });
+        };
+        Array.prototype.forEach.call(document.querySelectorAll('.choice'), function (b) { b.onclick = function () { done(b.getAttribute('data-key')); }; });
+      });
+    }
+    function showExplain(slot, it, res, extra) {
+      render('<div class="card"><div class="q"><div class="head">' + esc(slot.label) + '</div></div>' + itemHtml(it).replace(/<button class="choice"/g, '<button class="choice" disabled') +
+        '<div class="expl"><b>정답은 ' + (CIR[+res.answerKey - 1] || res.answerKey) + '</b> — ' + esc(res.explanationKo || '') + (extra ? '<div class="small">' + esc(extra) + '</div>' : '') + '</div><button class="big" id="next">다음</button></div>');
+      var sel = document.querySelector('.choice[data-key="' + res.answerKey + '"]'); if (sel) sel.classList.add('ok');
+      $('next').onclick = nextItem;
+    }
+    function nextItem() {
+      RUN.qi++;
+      cache();
+      if (RUN.qi >= RUN.items.length) { var d = dayRec(); d.done = d.done || {}; d.done[RUN.si] = true; RUN.si++; nextSlot(); return; }
+      askItem();
+    }
+    function finishRunner() {
+      var d = dayRec(), min = Math.max(1, Math.round((Date.now() - RUN.startedAt) / 60000));
+      d.min = (d.min || 0) + min; d.endedAt = new Date().toTimeString().slice(0, 5);
+      var sat = Object.keys(DB.days).filter(function (k) { return DB.days[k].sat; }).length;
+      var ph = PLAN ? PLAN.phase : null, more = ph && d.blocks < 1 + (ph.extendMax || 0);
+      cache();
+      push().then(function () {
+        render('<div class="card"><h2>오늘 카드 완료</h2><div class="kv"><span>앉은 날</span><b>' + sat + '</b></div><div class="kv"><span>오늘</span><b>' + d.min + '분</b></div>' +
+          (more ? '<button class="big ghost" id="more">오늘 더 할래 (+' + (ph.extendBlockMin || 15) + '분)</button>' : '<p>오늘은 여기까지. 자러 가자.</p>') + '<button class="big" id="home">홈으로</button></div>' + footer());
+        $('home').onclick = function () { refreshToday().then(showHome); };
+        if ($('more')) $('more').onclick = function () { refreshToday().then(function () { startRunner(); }); };
+      });
+    }
+
+    /* ── 좌표: 코어 격자. unknown 은 회색으로 남긴다(숨기지 않는다) ── */
+    function showMap() {
+      var now = Date.now(), moved = {};
+      var html = '<div class="card"><h2>좌표 ' + CORE.length + '칸</h2><div class="grid">';
+      CORE.forEach(function (id) {
+        var a = atomOf(id); if (!a) return;
+        var s = DB.atoms[id], g = gradeOf(id, now);
+        html += '<div class="cell ' + g + '"><b>' + esc(a.label) + '</b><span>' + esc(S.stateLabel(g, 'student')) + (s && s.obs ? ' · ' + esc(S.progressLine(s.obs, s.ok, M.MIN_FLUENT_OBS)) : '') + '</span></div>';
+      });
+      html += '</div><button class="big ghost" id="home">홈으로</button></div>';
+      render(html + footer());
+      $('home').onclick = showHome;
+    }
+
+    /* ── 답안지: 3교시 연속·휴식 잠금. 칸을 누르는 순간이 그 문항의 종료 시각(mark). [넘김] = pass. 정답은 한 글자도 안 나온다. ── */
+    var OMR = null;
+    function loadOmr() { try { return JSON.parse(localStorage.getItem(LS_OMR) || 'null'); } catch (e) { return null; } }
+    function saveOmr() { try { localStorage.setItem(LS_OMR, JSON.stringify(OMR)); } catch (e) {} }
+    function showOmr(mock) {
+      var subjects = mock.subjects || ['kor', 'math', 'eng'];
+      var keyIds = mock.keyIds || subjects.map(function (sub, i) { return (i === 0 && mock.retakeKeyId) ? mock.retakeKeyId : (subjects.length === 1 ? mock.keyId : mock.keyId + '-' + sub); });
+      var saved = loadOmr();
+      if (saved && saved.d === todayKey() && saved.keyId === mock.keyId) { OMR = saved; omrStep(); return; }
+      Promise.all(keyIds.map(function (k) { return api('/sheet?keyId=' + encodeURIComponent(k)).then(function (j) { return j.sheet; }); })).then(function (sheets) {
+        OMR = { d: todayKey(), keyId: mock.keyId, kind: subjects.length === 3 ? 'full' : 'single', subjects: subjects, sheets: sheets, pi: 0, periods: [], breakUntil: null };
+        saveOmr(); omrStep();
+      }).catch(function (e) { showHome('회차 대응표가 아직 등록되지 않았어요. 선생님께 말씀해 주세요. (' + (e.message || '') + ')'); });
+    }
+    var SUBJ = { kor: '국어', math: '수학', eng: '영어' };
+    function omrStep() {
+      if (OMR.pi >= OMR.subjects.length) { submitOmr(); return; }
+      if (OMR.breakUntil && Date.now() < OMR.breakUntil) { showBreak(); return; }
+      var sh = OMR.sheets[OMR.pi];
+      render('<div class="card lock"><div class="t">' + (OMR.pi + 1) + '교시 ' + esc(SUBJ[sh.subject] || sh.subject) + '</div><p>' + sh.n + '문항 · ' + Math.round((sh.timeLimitSec || 2400) / 60) + '분</p><p class="small">시작을 누르면 시간이 갑니다. 답은 칸을 눌러 표시하고, 넘긴 문항은 [넘김]을 눌러 두었다가 돌아와요.</p><button class="big" id="start">시작</button></div>');
+      $('start').onclick = function () { runPeriod(sh); };
+    }
+    function runPeriod(sh) {
+      var per = { subject: sh.subject, keyId: sh.keyId, openedAt: Date.now(), closedAt: null, marks: {}, passed: {}, events: [] };
+      OMR.cur = per; saveOmr();
+      var limit = (sh.timeLimitSec || 2400) * 1000;
+      var rows = '';
+      for (var no = 1; no <= sh.n; no++) rows += '<tr data-no="' + no + '"><td class="no">' + no + '</td>' + [1, 2, 3, 4].map(function (k) { return '<td><button class="b" data-no="' + no + '" data-key="' + k + '">' + CIR[k - 1] + '</button></td>'; }).join('') + '<td><button class="p" data-pass="' + no + '">넘김</button></td></tr>';
+      render('<div class="card"><div class="head small">' + (OMR.pi + 1) + '교시 ' + esc(SUBJ[sh.subject] || sh.subject) + '</div><div class="timer" id="timer">--:--</div><table class="omr"><tbody>' + rows + '</tbody></table><button class="big warn" id="submit">답안지 제출</button><p class="small">제출하면 되돌릴 수 없어요. 남은 시간이 있으면 검토부터 해요.</p></div>');
+      var tick = function () {
+        var left = Math.max(0, per.openedAt + limit - Date.now()), m = Math.floor(left / 60000), s = Math.floor(left % 60000 / 1000);
+        var el = $('timer'); if (!el) return;
+        el.textContent = (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+        if (left <= 5 * 60000) { el.className = 'timer low'; if (left <= 5 * 60000 && left > 5 * 60000 - 1100 && navigator.vibrate) navigator.vibrate(200); }
+        if (left <= 0) { clearInterval(tm); closePeriod(per); }
+      };
+      var tm = setInterval(tick, 1000); tick();
+      Array.prototype.forEach.call(document.querySelectorAll('.omr .b'), function (b) {
+        b.onclick = function () {
+          var no = b.getAttribute('data-no'), key = b.getAttribute('data-key');
+          per.events.push({ type: per.marks[no] ? 'change' : 'mark', no: +no, key: key, at: Date.now() });
+          if (per.marks[no]) per.events.push({ type: 'mark', no: +no, key: key, at: Date.now() });
+          per.marks[no] = key;
+          Array.prototype.forEach.call(document.querySelectorAll('.omr .b[data-no="' + no + '"]'), function (x) { x.classList.toggle('on', x === b); });
+          saveOmr();
+        };
+      });
+      Array.prototype.forEach.call(document.querySelectorAll('.omr .p'), function (b) {
+        b.onclick = function () { var no = b.getAttribute('data-pass'); per.passed[no] = !per.passed[no]; if (per.passed[no]) per.events.push({ type: 'pass', no: +no, at: Date.now() }); b.classList.toggle('on', per.passed[no]); b.closest('tr').classList.toggle('passed', per.passed[no]); saveOmr(); };
+      });
+      $('submit').onclick = function () { if (confirm('답안지를 제출할까요?')) { clearInterval(tm); closePeriod(per); } };
+    }
+    function closePeriod(per) {
+      per.closedAt = Date.now();
+      OMR.periods.push({ subject: per.subject, keyId: per.keyId, openedAt: per.openedAt, closedAt: per.closedAt, marks: per.marks, events: per.events });
+      OMR.cur = null; OMR.pi++;
+      if (OMR.pi < OMR.subjects.length) OMR.breakUntil = Date.now() + 20 * 60000;    // 휴식 20분 — 채점 진입 경로가 물리적으로 없다
+      saveOmr(); omrStep();
+    }
+    function showBreak() {
+      var next = OMR.sheets[OMR.pi];
+      render('<div class="card lock"><div class="t">쉬는 시간</div><div class="timer" id="timer">--:--</div><p>다음은 ' + (OMR.pi + 1) + '교시 ' + esc(SUBJ[next.subject] || next.subject) + '. 답 맞추기는 하지 않아요 — 채점은 선생님 서버가 해요.</p><p class="small">물 마시고, 화장실 다녀오고, 눈을 감아요.</p><button class="big" id="go" disabled>다음 교시</button></div>');
+      var tm = setInterval(function () {
+        var left = Math.max(0, OMR.breakUntil - Date.now()), m = Math.floor(left / 60000), s = Math.floor(left % 60000 / 1000);
+        var el = $('timer'); if (!el) { clearInterval(tm); return; }
+        el.textContent = (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+        if (left <= 2 * 60000 && left > 2 * 60000 - 1100 && navigator.vibrate) navigator.vibrate(300);
+        if (left <= 0) { clearInterval(tm); $('go').disabled = false; }
+      }, 1000);
+      $('go').onclick = function () { clearInterval(tm); OMR.breakUntil = null; saveOmr(); omrStep(); };
+    }
+    function submitOmr() {
+      render('<div class="card lock"><div class="t">답안지를 보내는 중…</div></div>');
+      api('/attempt', { method: 'POST', body: JSON.stringify({ kind: OMR.kind, keyId: OMR.keyId, periods: OMR.periods }) })
+        .then(function () {
+          try { localStorage.removeItem(LS_OMR); } catch (e) {}
+          OMR = null;
+          render('<div class="card lock"><div class="t">접수됐어요</div><p>결과는 내일 카드와 함께 열려요. 오늘은 여기까지.</p><button class="big" id="home">홈으로</button></div>' + footer());
+          $('home').onclick = function () { refreshToday().then(showHome); };
+        })
+        .catch(function (e) {
+          render('<div class="card lock"><div class="t">아직 보내지 못했어요</div><p class="small">' + esc(e.message || '') + '</p><button class="big" id="retry">다시 보내기</button></div>');
+          $('retry').onclick = submitOmr;
+        });
+    }
+
+    /* ── 회고 — 앉은 날과 이어지는 것 목록만. 숫자는 시험일 + 7일 16:00 뒤 서버가 열어 준다. ── */
+    function showRetro() {
+      render('<div class="card"><p>불러오는 중…</p></div>');
+      api('/retro').then(function (j) {
+        var r = j.retro, g = r.gained;
+        var html = '<div class="card"><h2>' + (r.totalDays ? r.totalDays : '51') + '일 동안 네가 만든 것</h2><div class="kv"><span>앉은 날</span><b>' + r.sat + '일' + (r.totalDays ? ' / ' + r.totalDays + '일' : '') + '</b></div>';
+        if (g) {
+          html += '<div class="kv"><span>누적</span><b>' + g.minutes + '분</b></div><div class="kv"><span>회차 완주</span><b>' + g.mockCompleted + '회 중 ' + g.mockRuns + '회</b></div>';
+          if (g.rewindsFirst != null) html += '<div class="kv"><span>1회독 되감기</span><b>첫 지문 ' + g.rewindsFirst + '회 → 마지막 지문 ' + g.rewindsLast + '회</b></div>';
+          if (g.frozenPair) html += '<div class="kv"><span>같은 세트를 두 번 풀었다</span><b>' + esc(g.frozenPair.first.at.slice(5).replace('-', '/')) + ' ' + g.frozenPair.first.ok + '개 → ' + esc(g.frozenPair.last.at.slice(5).replace('-', '/')) + ' ' + g.frozenPair.last.ok + '개</b></div>';
+          html += '<div class="kv"><span>영어 단어 누적</span><b>' + g.engWords + '개</b></div>';
+        }
+        html += '<h2 style="margin-top:14px">이건 어느 중학교에 가든 그대로 쓰인다</h2>' + (r.carry.length ? '<ul>' + r.carry.map(function (c) { return '<li>' + esc(c) + '</li>'; }).join('') + '</ul>' : '<p class="small">붙은 칸이 생기면 여기에 이어지는 것이 적혀요.</p>') +
+          '<button class="big ghost" id="home">홈으로</button></div>';
+        render(html + footer());
+        $('home').onclick = showHome;
+      }).catch(function (e) { showHome(e.message); });
+    }
+
+    /* ── 부팅 ── */
+    function refreshToday() { return api('/today').then(function (j) { TODAY = j.today; if (TODAY && TODAY.envelope) DB.envelope = TODAY.envelope; if (PLAN) PLAN.dday = j.dday; }).catch(function () {}); }
+    function boot() {
+      var a = auth();
+      if (!a || !a.token) { showLink(); return; }
+      $('who').innerHTML = '<b>' + esc(a.name || a.code) + '</b>';
+      render('<div class="card"><p>불러오는 중…</p></div>');
+      Promise.all([api('/plan'), api('/atoms'), api('/state'), api('/today')]).then(function (rs) {
+        var plan = rs[0].plan, at = rs[1], st = rs[2].state, td = rs[3];
+        PLAN = plan; PLAN.totalDays = 0;
+        NOTICE = plan.notice || NOTICE;
+        ATOMS = { list: at.atoms, byId: {} }; at.atoms.forEach(function (x) { ATOMS.byId[x.id] = x; });
+        CORE = at.core || [];
+        DB = Object.assign(blank(), st || {});
+        DB.mocks = st.mocks || []; DB.paper = st.paper || [];
+        var c = loadCache(); if (c && c.updatedLocal && (!rs[2].updatedAt || c.updatedLocal > rs[2].updatedAt)) { DB = Object.assign(DB, c, { mocks: DB.mocks, paper: DB.paper }); pendingPut = true; }
+        TODAY = td.today; PLAN.dday = td.dday;
+        if (TODAY && TODAY.envelope) DB.envelope = TODAY.envelope;
+        setDot('saved', rs[2].updatedAt ? '동기화됨' : '첫 시작');
+        if (pendingPut) push();
+        var o = loadOmr(); if (o && o.d === todayKey() && (o.cur || o.pi > 0)) { OMR = o; if (o.cur) { OMR.periods.push({ subject: o.cur.subject, keyId: o.cur.keyId, openedAt: o.cur.openedAt, closedAt: Date.now(), marks: o.cur.marks, events: o.cur.events }); OMR.cur = null; OMR.pi++; saveOmr(); } omrStep(); return; }
+        showHome();
+      }).catch(function (e) {
+        if (e.status === 401) { saveAuth(null); showLink('연결이 끊겼어요. 코드를 다시 입력해 주세요.'); return; }
+        if (e.status === 403) { render('<div class="card"><h2>' + esc(e.message) + '</h2><p class="small">선생님께 말씀해 주세요.</p><button class="big ghost" id="unlink">다른 코드로 연결</button></div>' + footer()); $('unlink').onclick = function () { saveAuth(null); showLink(); }; return; }
+        var c = loadCache();
+        if (c) { DB = c; render('<div class="card"><h2>지금은 서버와 연결되지 않아요</h2><p class="small">' + esc(e.message || '') + '</p><p>연결되면 오늘 카드가 열려요.</p></div>' + footer()); return; }
+        render('<div class="card"><h2>' + esc(e.message || '불러오지 못했어요') + '</h2><button class="big ghost" id="retry">다시 시도</button></div>' + footer());
+        $('retry').onclick = boot;
+      });
+    }
+    var _cache = cache; cache = function () { if (DB) DB.updatedLocal = new Date().toISOString(); _cache(); };
+    document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden' && pendingPut) push(); });
+    boot();
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(function () {});
+  })();
+  </script>
+</body>
+</html>

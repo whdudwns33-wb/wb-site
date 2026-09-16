@@ -1,0 +1,2 @@
+# 배포되는 _headers 는 reading/_headers 하나다 — /haru/* 의 no-store 규칙도 거기에 있다.
+# 여기에 규칙을 적어도 dist 에 실리지 않는다(build-dist.mjs 가 이 파일을 복사하지 않는다).

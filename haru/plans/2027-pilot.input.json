@@ -1,0 +1,26 @@
+{
+  "cohort": "2027-pilot",
+  "examDate": "2026-10-25",
+  "examDateStatus": "confirmed",
+  "lockAt": "12:00",
+  "retainDays": 30,
+  "numbersOpenDays": 7,
+  "order": ["kor", "math", "eng"],
+  "bands": { "5-1": "2026-09-10", "5-2": "2026-09-10", "6-1": "2026-09-10" },
+  "frozenKeyId": "own-mock-01",
+  "cardStart": "2026-09-21",
+  "phases": [ { "id": "p4", "from": "2026-09-04", "to": "2026-10-24", "dailyMin": 15, "extendBlockMin": 15, "extendMax": 2 } ],
+  "rest": ["2026-09-24", "2026-09-25", "2026-09-26", "2026-09-27", "2026-10-03", "2026-10-05", "2026-10-09"],
+  "restNote": { "2026-09-24": "추석", "2026-09-25": "추석", "2026-09-26": "추석", "2026-09-27": "추석 연휴 끝날 — 회차 없음", "2026-10-03": "개천절", "2026-10-05": "대체공휴일", "2026-10-09": "한글날" },
+  "mocks": [
+    { "d": "2026-09-13", "keyId": "own-mock-01", "subjects": ["kor"], "startAt": "09:00", "app": false, "note": "1차 · 국어 단독 40분 · 동결 세트 · 종이 답안지" },
+    { "d": "2026-10-04", "keyId": "own-mock-02", "subjects": ["kor", "math", "eng"], "startAt": "09:00", "app": true, "note": "2차 · 첫 3교시 연속 · 앱 OMR · 휴식 잠금" },
+    { "d": "2026-10-18", "keyId": "own-mock-03", "subjects": ["kor", "math", "eng"], "startAt": "09:00", "app": true, "retakeKeyId": "own-mock-01", "note": "3차 · 최종 리허설 · 1교시 = 동결 세트 재응시" }
+  ],
+  "passageDays": [2, 4],
+  "envelopeDay": 1,
+  "bed": { "base": "23:45", "target": "22:00", "days": 7 },
+  "extraMilestones": [
+    { "d": "2026-10-24", "aud": "parent", "at": "21:00", "text": "실무 카드 — 수험표(본인 출력)·EVA 실내화와 신발 주머니·필기구·수정테이프·쉬는 시간 볼 책. 사인펜은 학교 지급. 07:50 정문 개방, 대중교통 권장. 오늘은 아무것도 풀지 않습니다" }
+  ]
+}

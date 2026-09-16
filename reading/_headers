@@ -61,5 +61,7 @@
   Cache-Control: no-store
 /vocab/*
   Cache-Control: no-store
+/haru/*
+  Cache-Control: no-store
 /admin/*
   Cache-Control: no-store
