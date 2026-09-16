@@ -12,6 +12,7 @@ import { handleVocab, sendNightPushes, vocabSummary } from './vocab-api.mjs';
 import { handleNaesin, isReservedCode, dropReservedRows, naesinBodyLimit } from './naesin-api.mjs';
 import { handleStudio } from './naesin-studio.mjs';
 import { handleHaru, haruBodyLimit, allowedApp, appOfPath, dropStudentHaru, dumpHaru } from './haru-api.mjs';
+import { handleNaesinKo } from './naesin-ko-api.mjs';
 import { bookIndex, cleanWords, coachingCard, confirmAllPlan, findBook, readyToConfirm, sourceSummary, validProgress, withOverlay } from './textbook.mjs';
 import { parseRoster } from './roster.mjs';
 
@@ -22,6 +23,7 @@ const SHARED_DIR = path.join(ROOT, '..', 'shared');    // 두 앱이 함께 쓰�
 const AGE_DIR = path.join(ROOT, '..', 'vocab-age'); // 어휘 나이 진단(로그인 없이 열리는 공개 페이지)
 const NAESIN_DIR = path.join(ROOT, '..', 'naesin');    // 내신브레인 앱 정적 파일
 const HARU_DIR = path.join(ROOT, '..', 'haru');        // 하루브레인 앱 정적 파일 (팩·대응표·플랜은 여기 없다 — db.haru 전용)
+const NAESIN_KO_DIR = path.join(ROOT, '..', 'naesin-ko'); // 국어브레인 앱 정적 파일
 const PUB_DIR = path.join(ROOT, 'public');             // 관리 웹
 const PORT = +(process.env.PORT || 8890);
 const ADMIN_PIN = process.env.ADMIN_PIN || 'wb-admin-2026';
@@ -152,6 +154,37 @@ let HARU_ATOMS_CACHE = null;
 const haruAtomsFallback = async () => {
   if (!HARU_ATOMS_CACHE) { try { HARU_ATOMS_CACHE = JSON.parse(fs.readFileSync(path.join(HARU_DIR, 'atoms.json'), 'utf8')); } catch (e) { return null; } }
   return HARU_ATOMS_CACHE;
+};
+/* 국어브레인 저장소 어댑터 — db.naesinKo만 사용.
+   요약·서술형·오버레이를 state에서 분리해 둔다(국어 기획서 §8 저장 예산). */
+const naesinKoRoot = () => {
+  db.naesinKo = db.naesinKo || { packs: {}, packIds: [], states: {}, summaries: {}, reviews: {}, overlays: {}, exams: {}, tasks: {} };
+  const r = db.naesinKo;
+  r.summaries = r.summaries || {}; r.reviews = r.reviews || {}; r.overlays = r.overlays || {};
+  return r;
+};
+const naesinKoStore = {
+  getPack: (id) => naesinKoRoot().packs[id] || null,
+  putPack: (id, rec) => { naesinKoRoot().packs[id] = rec; persist(); },
+  getPackIds: () => naesinKoRoot().packIds || null,
+  putPackIds: (ids) => { naesinKoRoot().packIds = ids; persist(); },
+  /* 검수 대기 목록 — 팩과 다른 자리다. 학생에게 갈 것과 안 갈 것을 저장 계층에서부터 가른다. */
+  getPending: (id) => (naesinKoRoot().pendings || {})[id] || null,
+  putPending: (id, rec) => { const r = naesinKoRoot(); r.pendings = r.pendings || {}; r.pendings[id] = rec; persist(); },
+  getState: (c) => naesinKoRoot().states[c] || null,
+  putState: (c, rec) => { naesinKoRoot().states[c] = rec; persist(); },
+  getSummary: (c) => naesinKoRoot().summaries[c] || null,
+  putSummary: (c, rec) => { naesinKoRoot().summaries[c] = rec; persist(); },
+  listSummaryCodes: () => Object.keys(naesinKoRoot().summaries),
+  getReviews: (c) => naesinKoRoot().reviews[c] || null,
+  putReviews: (c, rec) => { naesinKoRoot().reviews[c] = rec; persist(); },
+  getOverlay: (s) => naesinKoRoot().overlays[s] || null,
+  putOverlay: (s, rec) => { naesinKoRoot().overlays[s] = rec; persist(); },
+  getExam: (s) => naesinKoRoot().exams[s] || null,
+  putExam: (s, rec) => { naesinKoRoot().exams[s] = rec; persist(); },
+  getTask: (s) => naesinKoRoot().tasks[s] || null,
+  putTask: (s, rec) => { naesinKoRoot().tasks[s] = rec; persist(); },
+  getStudent: (c) => db.students?.[c] || null,
 };
 
 const VOCAB_PUSH_ENV = {
@@ -414,6 +447,16 @@ const server = http.createServer(async (req, res) => {
         return json(res, out.status, out.body);
       }
 
+      /* 국어브레인 (/api/naesin-ko/*) — 영어와 같은 격리 원칙, 저장소만 db.naesinKo.
+         /api/naesin/ 보다 먼저 본다 — 접두어가 겹치지는 않지만 순서를 명시해 둔다. */
+      if (p.startsWith('/api/naesin-ko/')) {
+        const out = await handleNaesinKo({
+          path: p, method: req.method, who, query: url.searchParams,
+          getBody: () => readBody(req), store: naesinKoStore,
+        });
+        return json(res, out.status, out.body);
+      }
+
       /* 내신 (/api/naesin/*) — 인증만 공유, 저장·라우트는 격리 (vocab 선례).
          json()이 모든 응답에 no-store를 붙인다 — 기획서 §10-3. */
       if (p.startsWith('/api/naesin/')) {
@@ -667,6 +710,14 @@ const server = http.createServer(async (req, res) => {
           naesinRoot().reports[pid] = list.map((r) => (r && r.code === c ? { ...r, code: '' } : r));
           removed += 1;
         }
+        /* 국어브레인 — 학습 기록·요약·서술형 제출·이 학생만의 시험/오버레이.
+           반 공통(default)과 팩은 학생 것이 아니라 둔다. 워커와 동일하다. */
+        const ko = naesinKoRoot();
+        drop(ko.states, c);
+        drop(ko.summaries, c);
+        drop(ko.reviews, c);
+        drop(ko.exams, c);
+        drop(ko.overlays, c);
         /* 하루브레인 — 정확 접두 4계열(state·mock·paper·parent). 대응표는 남긴다(워커와 동일) */
         await dropStudentHaru(haruStore, c); removed += 3;
         /* 기기 토큰은 토큰 값이 키라 코드로 못 찾는다 — 훑어서 이 학생 것만 */
@@ -715,6 +766,11 @@ const server = http.createServer(async (req, res) => {
     if (p === '/naesin/voice.js') return serveFile(res, SHARED_DIR, 'voice.js');
     if (p === '/naesin' || p === '/naesin/') return serveFile(res, NAESIN_DIR, 'index.html');
     if (p.startsWith('/naesin/')) return serveFile(res, NAESIN_DIR, p.slice('/naesin/'.length));
+
+    /* 국어브레인 앱 — 팩 콘텐츠는 여기 없다(/api/naesin-ko/pack, KV·db 전용) */
+    if (p === '/naesin-ko/voice.js') return serveFile(res, SHARED_DIR, 'voice.js');
+    if (p === '/naesin-ko' || p === '/naesin-ko/') return serveFile(res, NAESIN_KO_DIR, 'index.html');
+    if (p.startsWith('/naesin-ko/')) return serveFile(res, NAESIN_KO_DIR, p.slice('/naesin-ko/'.length));
 
     /* 워드브레인 앱 */
     if (p === '/voice.js' || p === '/vocab/voice.js') return serveFile(res, SHARED_DIR, 'voice.js');

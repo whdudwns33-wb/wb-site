@@ -25,6 +25,22 @@
 /version.json
   Cache-Control: no-store
 
+# 내신 앱 셸 — 앱 디렉터리별 _headers 는 빌드가 복사하지 않고 워커도 읽지 않는다.
+# 학습 화면과 서비스 워커는 항상 최신이어야 하므로 여기에 규칙을 둔다.
+# (팩 콘텐츠는 정적 자산이 아니라 /api/*로만 나가고, 거기엔 json() 헬퍼가 no-store를 붙인다.)
+/naesin/
+  Cache-Control: no-store
+/naesin/index.html
+  Cache-Control: no-store
+/naesin/sw.js
+  Cache-Control: no-store
+/naesin-ko/
+  Cache-Control: no-store
+/naesin-ko/index.html
+  Cache-Control: no-store
+/naesin-ko/sw.js
+  Cache-Control: no-store
+
 # 학년대별 지문은 URL에 ?v=<버전>을 달고 받는다. 내용이 바뀌면 버전이 바뀌므로
 # 오래 캐시해도 안전하고, 그래야 앱을 켤 때마다 다시 받지 않는다.
 /articles-L1.json

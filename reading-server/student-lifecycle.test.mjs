@@ -128,6 +128,16 @@ try {
   ok((await req('/api/admin/students', { method: 'DELETE', token: admin, body: { code: 'default' } })).status !== 200, '⑥-4 default 학생이 존재한다');
   await req('/api/admin/students', { method: 'DELETE', token: admin, body: { code: 'LIFEBULK01' } });
 
+  /* ⑥-2b 국어브레인 — 요약·서술형 답안·오버레이가 state 와 다른 키에 있어 하나만 지워서는 안 된다
+     (국어 기획서 §8 저장 예산 · §10-7 개인정보 삭제). 퇴원이 이것들까지 지우는지 ⑪에서 확인한다. */
+  await req('/api/naesin-ko/state', { method: 'PUT', token: stuTok,
+    body: { state: { v: 1, packs: {} }, summary: { works: 1, complete: 0 } } });
+  await req('/api/naesin-ko/review', { method: 'POST', token: stuTok,
+    body: { review: { itemId: 'it-1', packId: 'dummy-ko-u1', answer: '학생이 쓴 서술형 답안', verdict: 'hold' } } });
+  await req('/api/naesin-ko/admin/overlay', { method: 'POST', token: admin,
+    body: { scope: CODE, overrides: [{ targetRef: 'b-1', answers: ['학교 정답'] }], notes: [] } });
+  ok((await req('/api/naesin-ko/review', { token: stuTok })).body.reviews?.length === 1,
+    '⑥-2b 국어 서술형 제출이 저장되지 않았다');
   /* ⑥-5 하루브레인 — 외부 초6(apps:['haru'])은 진로독서·워드브레인·내신을 열지 못하고(D-6), 기록은 3키로 갈리며,
      퇴원 처리가 haru 4계열을 지우되 원장의 대응표(haru:paperkey:*)는 남긴다(설계안 §7-5). */
   const HCODE = 'HARULIFE01', HKEY = 'life-key-kor';
@@ -214,6 +224,8 @@ try {
   const exp = (await req('/api/admin/export', { token: admin })).body;
   ok(exp.naesin && !('packs' in exp.naesin) && 'exams' in exp.naesin && 'textbookSrc' in exp, '⑪ export 에 팩 본문이 실리거나 내신·교재 원문이 빠졌다');
   ok(exp.haru && 'states' in exp.haru && 'paperkeys' in exp.haru && exp.haru.paperkeys[HKEY], '⑪ export 에 하루브레인 기록·대응표가 빠졌다');
+  ok(!disk.includes('학생이 쓴 서술형 답안'),
+    '⑪ 퇴원했는데 국어 서술형 답안이 남아 있다 — state만 지우면 review 키가 남는다');
 } catch (e) {
   E('예외: ' + e.message);
 } finally {
@@ -226,4 +238,4 @@ if (errors.length) {
   console.error(`\nFAIL — ${errors.length}건`);
   process.exit(1);
 }
-console.log('OK — 등록·승인 게이트·기록(진로독서·내신)·몸통 상한·예약어·학부모 링크·퇴원 처리(잔여 0) 통과');
+console.log('OK — 등록·승인 게이트·기록(진로독서·내신·국어)·몸통 상한·예약어·학부모 링크·퇴원 처리(잔여 0) 통과');

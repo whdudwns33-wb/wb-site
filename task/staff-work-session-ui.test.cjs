@@ -84,6 +84,22 @@ test('manager bypass is accepted only from a valid server identity and never gra
   assert.equal(await app.eval('ensureStaffWorkStatus(true)'), false);
   assert.equal(app.eval('shouldGateStaffWork()'), true);
 });
+test('attendance-enabled manager remains gated until login and can log out without losing manager role', async () => {
+  const app = runtime({ respond: async () => result({ authRole: 'manager' }) });
+  app.eval('session.isAdmin = true');
+  assert.equal(await app.eval('ensureStaffWorkStatus(false)'), false);
+  app.respond(async () => result({ authRole: 'manager', active: true, workSession: 'synthetic-work',
+    expiresAt: Date.now() + 10000, attendance: attendance() }));
+  app.get('#staffWorkPin').value = '0123';
+  await app.eval('loginStaffWork(null)');
+  assert.equal(app.eval('shouldGateStaffWork()'), false);
+  assert.equal(app.eval('session.isAdmin'), true);
+  app.respond(async () => result({ authRole: 'manager', attendance: attendance(true), clockedOut: true }));
+  await app.eval('logoutStaffWork(null)');
+  assert.equal(app.eval('shouldGateStaffWork()'), true);
+  assert.match(html, /session\.isStaffLink && staffWork\.required && !shouldGateStaffWork\(\)/);
+});
+
 test('wrong PIN keeps the durable device and pending records untouched', async () => {
   const app = runtime(); await app.eval('ensureStaffWorkStatus(false)');
   app.eval('state.checks.pending = { note: "창작 미전송 메모" }');

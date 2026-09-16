@@ -15,6 +15,9 @@ WB_GUARDIAN_CONTACT_ENABLED = "false"
 # 허용한다. guardian_contacts_by_student 행이 없는 학생만 비공개 roster의 모→부
 # 연락처를 보완 수신번호로 사용한다.
 WB_PARENT_FEEDBACK_ALL_STUDENTS_ENABLED = "true"
+# 2026-09-15 승인 확인. 템플릿 식별자는 공개 설정이며 인증정보가 아니다.
+SOLAPI_KAKAO_FEEDBACK_TEMPLATE_ID_V4 = "KA01TP260914132958314OeXz1arDfdG"
+SOLAPI_KAKAO_FEEDBACK_TEMPLATE_ID_V5 = "KA01TP260914133053400sQgorfYw2cA"
 # 아카등록 완료된 최초 고유 일반 교재만 Grok web_search로 검증한다.
 # true가 아니거나 AI binding을 사용할 수 없으면 주문 입력값을 그대로 카탈로그에 보존한다.
 WB_BOOK_CATALOG_WEB_SEARCH_ENABLED = "true"
@@ -28,8 +31,10 @@ WB_STAFF_WORK_LOGIN_ENABLED = "true"
 # 수업 피드백 실제 발송 스위치도 secret으로만 관리한다.
 # npx wrangler secret put WB_PARENT_FEEDBACK_SEND_ENABLED --config sync/wrangler.toml
 # 감사 가능한 배포 설정의 관리 담당. 기존 비밀 allowlist와 합쳐 적용한다.
-# 김남기, 김혜지 선생님은 QR 발급을 포함해 동일한 task 관리 권한을 가진다.
-TASK_MANAGER_STAFF_IDS_CONFIG = "84349fea-f2f0-4fc3-b32a-aaef1e466d54,ef0af47e-f9d2-4dfc-bd95-887991ee9479"
+# 등록된 관리 담당자는 QR 발급을 포함해 동일한 task 관리 권한을 가진다.
+TASK_MANAGER_STAFF_IDS_CONFIG = "84349fea-f2f0-4fc3-b32a-aaef1e466d54,ef0af47e-f9d2-4dfc-bd95-887991ee9479,40b5bce0-da8b-40d6-a3e7-f08993c1c840"
+# 관리 권한은 동일하지만 출퇴근 로그인을 적용할 직원의 stable ID.
+TASK_WORK_LOGIN_MANAGER_IDS_CONFIG = "40b5bce0-da8b-40d6-a3e7-f08993c1c840"
 
 # 보호자 앱은 GitHub Pages(task/admin)와 origin을 분리하고 Worker API와 같은
 # origin에서만 세션 쿠키를 사용한다. 모든 요청을 Worker가 먼저 보고 GET asset만

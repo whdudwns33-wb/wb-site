@@ -1206,15 +1206,15 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-09-12.1"></script>
-<script src="./schedule-board-core.js?v=2026-09-12.1"></script>
-<script src="./asset-core.js?v=2026-09-12.1"></script>
-<script src="./qr-core.js?v=2026-09-12.1"></script>
-<script src="./acaflow-import-core.js?v=2026-09-12.1"></script>
-<script src="./feedback-subject-catalog.js?v=2026-09-12.1"></script>
-<script src="./sync-recovery-core.js?v=2026-09-12.1"></script>
-<script src="./staff-work-session-core.js?v=2026-09-12.1"></script>
-<script src="./staff-attendance-history-core.js?v=2026-09-12.1"></script>
+<script src="./lesson-form-core.js?v=2026-09-15.2"></script>
+<script src="./schedule-board-core.js?v=2026-09-15.2"></script>
+<script src="./asset-core.js?v=2026-09-15.2"></script>
+<script src="./qr-core.js?v=2026-09-15.2"></script>
+<script src="./acaflow-import-core.js?v=2026-09-15.2"></script>
+<script src="./feedback-subject-catalog.js?v=2026-09-15.2"></script>
+<script src="./sync-recovery-core.js?v=2026-09-15.2"></script>
+<script src="./staff-work-session-core.js?v=2026-09-15.2"></script>
+<script src="./staff-attendance-history-core.js?v=2026-09-15.2"></script>
 <script>
 "use strict";
 
@@ -2017,7 +2017,7 @@ function saveWorkLogoutMemos() {
     if (JSON.stringify(draft.memo) === JSON.stringify(lessonMemoValues(getCheck(id, date)))) {
       lessonHandoffSourceDrafts.delete(key); return;
     }
-    if (!state.tasks.some(task => task.id === id && task.staffId === session.staffId && !task.deleted)) throw new Error('작성 중인 메모의 수업을 다시 확인해 주세요');
+    if (!state.tasks.some(task => task.id === id && (session.isAdmin || task.staffId === session.staffId) && !task.deleted)) throw new Error('작성 중인 메모의 수업을 다시 확인해 주세요');
     setCheck(id, date, { lessonMemo: draft.memo, note: lessonMemoText(draft.memo) });
     lessonHandoffSourceDrafts.delete(key);
   });
@@ -3534,7 +3534,7 @@ function paintStatus() {
   el.classList.toggle('off', !on);
   const workControls = $('#staffWorkControls');
   if (workControls) {
-    const show = managerInspectionActive() || (session.isStaffLink && !session.isAdmin && staffWork.required && !shouldGateStaffWork());
+    const show = managerInspectionActive() || (session.isStaffLink && staffWork.required && !shouldGateStaffWork());
     workControls.hidden = !show;
     if (managerInspectionActive()) workControls.innerHTML = '<div class="between mt8"><span class="small muted">관리자 점검 모드 · 읽기·수정 화면 확인 가능</span>' +
       '<button class="btn btn-sm btn-navy" data-act="managerinspectlogout"' + (managerInspection.busy ? ' disabled' : '') + '>점검 종료</button></div>';
@@ -7353,15 +7353,28 @@ function feedbackV3Message(t, date, fields) {
 
 function feedbackTemplateVersion(fields) {
   if (fields && fields.templateVersion === 'v1') return 'v1';
-  return feedbackFlatField(fields && fields.noticeText).trim() ? 'v3' : 'v2';
+  const hasHomework = !!feedbackFlatField(fields && fields.homeworkText).trim();
+  const hasNotice = !!feedbackFlatField(fields && fields.noticeText).trim();
+  return hasHomework ? (hasNotice ? 'v3' : 'v2') : (hasNotice ? 'v5' : 'v4');
 }
 
 function isStructuredFeedbackTemplate(templateVersion) {
-  return templateVersion === 'v2' || templateVersion === 'v3';
+  return ['v2', 'v3', 'v4', 'v5'].includes(templateVersion);
 }
 
 function feedbackStructuredMessage(t, date, fields) {
   const normalized = feedbackStructuredFields(fields);
+  const version = feedbackTemplateVersion(normalized);
+  if (version === 'v4' || version === 'v5') {
+    return '안녕하세요, WB 웩슬러브레인센터(독해력학원) 입니다.\n\n' +
+      studentOf(t) + ' 학생의 오늘 수업 피드백을 정리해 보내드립니다.\n\n' +
+      '- 일시 : ' + feedbackDateLabel(date) + '\n\n' +
+      '- 과목 : ' + normalized.subjectText + '\n\n' +
+      '- 수업내용 · 진도 : ' + normalized.contentText + '\n\n' +
+      '- 코멘트 : ' + normalized.commentText +
+      (version === 'v5' ? '\n\n- 안내사항 : ' + normalized.noticeText : '') + '\n\n\n' +
+      '문의 사항이 있으시면 학원으로 연락부탁드립니다. 감사합니다.';
+  }
   return feedbackTemplateVersion(normalized) === 'v3'
     ? feedbackV3Message(t, date, normalized) : feedbackV2Message(t, date, normalized);
 }
@@ -7411,9 +7424,9 @@ function feedbackFinalSendBlockReason(t, templateVersion, message) {
     const missing = [];
     if (!String(fbCtx.subjectText || '').trim()) missing.push('과목');
     if (!String(fbCtx.contentText || '').trim()) missing.push('수업내용 · 진도');
-    if (!String(fbCtx.homeworkText || '').trim()) missing.push('과제');
+    if (['v2', 'v3'].includes(templateVersion) && !String(fbCtx.homeworkText || '').trim()) missing.push('과제');
     if (!String(fbCtx.commentText || '').trim()) missing.push('코멘트');
-    if (templateVersion === 'v3' && !String(fbCtx.noticeText || '').trim()) missing.push('안내사항');
+    if (['v3', 'v5'].includes(templateVersion) && !String(fbCtx.noticeText || '').trim()) missing.push('안내사항');
     if (missing.length) return missing.join('·') + ' 빈칸이 있어 전송할 수 없습니다.';
     if (String(message || '').length > FEEDBACK_ALIMTALK_MAX_CHARS) {
       return '전체 문구가 900자를 초과했습니다. 수업내용·과제·코멘트 또는 안내사항을 줄여 주세요.';
@@ -7462,11 +7475,11 @@ function updateFeedbackPreviewLength(t, root) {
   const commentText = normalized.commentText;
   const subjectText = normalized.subjectText;
   const noticeText = normalized.noticeText;
-  const hasRequiredFields = !!subjectText && !!contentText && !!homeworkText && !!commentText &&
-    (fbCtx.templateVersion !== 'v3' || !!noticeText);
+  const hasRequiredFields = !!subjectText && !!contentText && !!commentText;
   const sendValid = hasRequiredFields && commentText.length <= limit &&
     message.length <= FEEDBACK_ALIMTALK_MAX_CHARS;
-  target.textContent = (fbCtx.templateVersion === 'v3' ? '안내사항 ' + noticeText.length + '/300자 · ' : '') +
+  target.textContent = (!homeworkText ? '과제 미입력 — 과제 항목 없이 발송됩니다 · ' : '') +
+    (noticeText ? '안내사항 ' + noticeText.length + '/300자 · ' : '') +
     '코멘트 ' + commentText.length + '/' + limit + '자 · 전체 ' +
     message.length + '/' + FEEDBACK_ALIMTALK_MAX_CHARS + '자 · ' + fbCtx.templateVersion.toUpperCase();
   target.className = 'small mt8 ' + (sendValid ? 'muted' : 'bad');
@@ -7522,7 +7535,7 @@ function computeFeedbackFields(t, date, fbCtx) {
     (doneSteps.length ? doneSteps.join(', ') : '') || taskCardDetail(t) ||
     [t.subject, t.className].filter(Boolean).join(' · ') || '수업 진행').slice(0, 300);
   const subjectText = feedbackFlatField(t.subject || t.className || '').slice(0, 80);
-  const homeworkText = feedbackFlatField(memo.homework || '없음').slice(0, 300) || '없음';
+  const homeworkText = feedbackFlatField(memo.homework || '').slice(0, 300);
   const noticeText = feedbackFlatField(memo.guardianNotice || '').slice(0, 300);
   const plusText = ((fbCtx && fbCtx.plus) || []).filter(id => id !== 'none').map(id => {
     const option = feedbackSubjectButton(fbCtx && fbCtx.feedbackSubject, 'strength', id);
@@ -7574,10 +7587,10 @@ function showFeedbackPreview(t, date, fields, letterText) {
     : '';
   const finalFieldEditor = structuredTemplate
     ? '<div class="card mt14"><div class="card-title mb8">최종 발송 내용 직접 수정</div>' +
-      '<div class="small muted mb8">승인된 고정 문구는 유지되고, 아래 다섯 항목만 실제 알림톡 변수로 전송됩니다. 안내사항이 비어 있으면 V2, 입력하면 V3가 자동 선택됩니다.</div>' +
+      '<div class="small muted mb8">과제·안내사항 입력 여부에 따라 승인된 V2·V3·V4·V5가 자동 선택됩니다. 비어 있는 과제·안내사항 항목은 발송 문구에서 제외됩니다.</div>' +
       '<label class="field"><span class="fl">과목</span><input class="in" maxlength="80" data-feedback-final-field="subjectText" value="' + esc(fbCtx.subjectText) + '"></label>' +
       '<label class="field"><span class="fl">수업내용 · 진도</span><textarea class="in" rows="2" maxlength="300" data-feedback-final-field="contentText">' + esc(fbCtx.contentText) + '</textarea></label>' +
-      '<label class="field"><span class="fl">과제</span><textarea class="in" rows="2" maxlength="300" data-feedback-final-field="homeworkText">' + esc(fbCtx.homeworkText) + '</textarea></label>' +
+      '<label class="field"><span class="fl">과제 (선택)</span><textarea class="in" rows="2" maxlength="300" data-feedback-final-field="homeworkText">' + esc(fbCtx.homeworkText) + '</textarea></label>' +
       '<label class="field"><span class="fl">코멘트</span><textarea class="in" rows="5" maxlength="600" data-feedback-final-field="commentText">' + esc(fbCtx.commentText) + '</textarea></label>' +
       '<label class="field"><span class="fl">안내사항 (선택)</span><textarea class="in" rows="3" maxlength="300" data-feedback-final-field="noticeText">' + esc(fbCtx.noticeText) + '</textarea></label></div>'
     : '';
@@ -9967,7 +9980,6 @@ async function polishFeedbackComment(button) {
   const missing = [];
   if (!String(context.subjectText || '').trim()) missing.push('과목');
   if (!String(context.contentText || '').trim()) missing.push('수업내용 · 진도');
-  if (!String(context.homeworkText || '').trim()) missing.push('과제');
   if (!sourceComment) missing.push('코멘트');
   if (missing.length) return stopWithReason(missing.join('·') + ' 빈칸이 있어 AI로 다듬을 수 없습니다.');
   if (sourceComment.length > FEEDBACK_COMMENT_MAX_CHARS) {
@@ -11292,7 +11304,7 @@ function makeupActions(row) {
   // 확정/제안 일정이 있는 건은 실제 보강수업의 보강완료 흐름을 사용한다.
   // 연결은 일정이 없는 미처리 결석 보강에만 노출해 두 흐름을 섞지 않는다.
   const linkable = (session.isStaffLink || session.isAdmin) && !row.confirmedDate && !row.proposedDate;
-  return (own || linkable || session.isAdmin)
+  return (own || linkable || makeupCanComplete(row))
     ? '<button class="btn btn-sm btn-primary" data-act="muprocessopen"' + key + '>보강 처리</button>' : '';
 }
 
@@ -11810,6 +11822,8 @@ function makeupCanComplete(row) {
    * 점검 중인 선생님으로 제한되며, 일반 관리자 권한 전체를 열지 않는다. */
   if (session.isAdmin || (typeof managerInspectionActive === 'function' && managerInspectionActive() &&
       !row.confirmedDate && !row.proposedDate)) return true;
+  if (row.status !== 'confirmed' && session.isStaffLink &&
+      String(session.staffId || '') === makeupDefaultStaffId(row)) return true;
   return row.status === 'confirmed' && session.isStaffLink &&
     String(row.confirmedStaffId || '') === String(session.staffId || '');
 }
@@ -11842,16 +11856,16 @@ function makeupDateTimeModal(row, mode) {
   const scheduledCompletion = mode === 'complete' && scheduled;
   const inspection = typeof managerInspectionActive === 'function' && managerInspectionActive();
   if ((rescheduling || retrying) && (!session.isAdmin || row.status !== 'confirmed')) return;
-  if (directCompletion && !session.isAdmin && !inspection) return;
+  if (directCompletion && !makeupCanComplete(row)) return;
   const date = scheduled && !retrying ? row.confirmedDate : '';
   const startTime = scheduled && !retrying ? row.confirmedStartTime : '';
   const endTime = scheduled && !retrying ? row.confirmedEndTime : '';
   const originalStaffId = makeupOriginalStaffId(row);
   const assignedStaffId = scheduled ? String(row.confirmedStaffId || '') : makeupDefaultStaffId(row);
   const title = mode === 'schedule' || mode === 'restore' ? '보강생성' : retrying ? '결석 후 재보강' : rescheduling ? '보강 수정' : '보강완료';
-  const inspectionStaffId = inspection ? String(session.staffId || '') : '';
+  const inspectionStaffId = !session.isAdmin ? String(session.staffId || '') : '';
   const staffField = (mode === 'schedule' || rescheduling || retrying || directCompletion)
-    ? (directCompletion && inspection
+    ? (directCompletion && !session.isAdmin
       ? '<div class="makeup-schedule"><b>실제 보강 담당 선생님</b><br>' +
           esc(makeupTeacherLabel(inspectionStaffId, '점검 중인 선생님')) +
           '</div><input id="muStaff" type="hidden" value="' + esc(inspectionStaffId) + '">'
@@ -11864,7 +11878,8 @@ function makeupDateTimeModal(row, mode) {
     attendanceField = '<label class="field"><span class="fl">실제 출결</span><select class="in" id="muAttendanceStatus">' +
       '<option value="P" selected>출석</option>' + MAKEUP_COMPLETION_ATTENDANCE_OPTIONS.filter(item => item[0] !== 'P').map(item =>
         '<option value="' + item[0] + '">' + item[1] + '</option>').join('') + '</select></label>' +
-      '<div class="hint">이미 완료된 보강을 정리합니다. 날짜·시작시간·종료시간을 비워 두면 실제 일시를 기록하지 않고 완료 처리하며, 출결은 출석으로 저장합니다.</div>';
+      '<div class="hint">이미 완료된 보강의 실제 날짜·시작시간·종료시간과 출결을 입력해 주세요.' +
+      (session.isAdmin || inspection ? ' 관리자는 날짜·시작시간·종료시간을 비워 두면 실제 일시 미기록으로 완료할 수 있습니다.' : '') + '</div>';
   } else if (scheduledCompletion) {
     const attendance = makeupScheduledAttendance(row);
     const attendanceLabel = makeupAttendanceLabel(attendance.value);
@@ -11895,7 +11910,9 @@ function makeupDateTimeModal(row, mode) {
     '<div class="field"><label class="fl" for="muEnd">종료시간</label><input class="in" id="muEnd" type="time" value="' + esc(endTime) + '"' + (mode === 'restore' ? ' disabled' : '') + '></div></div>' +
     attendanceField + (modeHint ? '<div class="hint">' + modeHint + '</div>' : '') + makeupModalErrorHtml(),
     '<button class="btn btn-primary btn-block mt14" data-act="' + submitAction +
-      '" data-case="' + esc(row.caseId) + '" data-rev="' + Number(row.revision) + '">확인</button>');
+      '" data-case="' + esc(row.caseId) + '" data-rev="' + Number(row.revision) + '">확인</button>' +
+    (directCompletion ? '<button class="btn btn-ghost btn-block mt8" data-act="mulinkraw" data-case="' + esc(row.caseId) +
+      '">이미 기록된 완료 보강 연결 (선택)</button>' : ''));
 }
 
 function makeupNoMakeupContextHtml(row) {
@@ -11988,7 +12005,8 @@ async function restoreMakeupSchedule(button) {
 async function submitMakeupComplete(button) {
   const row = makeupRows.find(item => item.caseId === String(button.dataset.case || ''));
   if (!makeupCanComplete(row)) return;
-  const slot = makeupDateTimeInput({ allowEmpty: row.status !== 'confirmed' });
+  const slot = makeupDateTimeInput({ allowEmpty: row.status !== 'confirmed' &&
+    (session.isAdmin || (typeof managerInspectionActive === 'function' && managerInspectionActive())) });
   if (!slot) return;
   const timeUnrecorded = !slot.date;
   const endAt = timeUnrecorded ? 0 : Date.parse(slot.date + 'T' + slot.endTime + ':00+09:00');
@@ -12006,7 +12024,7 @@ async function submitMakeupComplete(button) {
       return showMakeupModalError('보강 출결을 서버에 동기화하지 못했습니다. 연결을 확인한 뒤 다시 시도해 주세요');
     }
   } else {
-    if (!session.isAdmin && !(typeof managerInspectionActive === 'function' && managerInspectionActive())) return showMakeupModalError('일정 없이 완료한 보강은 관리자만 기록할 수 있습니다');
+    if (!makeupCanComplete(row)) return showMakeupModalError('본인이 담당하는 보강만 완료할 수 있습니다');
     const staffId = String(($('#muStaff') || {}).value || '');
     const attendanceStatus = String(($('#muAttendanceStatus') || {}).value || '');
     if (!makeupActiveStaff(staffId)) return showMakeupModalError('실제 보강 담당 선생님을 선택해 주세요');
@@ -12033,6 +12051,7 @@ async function openMakeupProcessModal(button) {
   if (!row) return;
   const scheduled = !!(row.confirmedDate && row.confirmedStartTime && row.confirmedEndTime);
   if (scheduled) return makeupDateTimeModal(row, 'complete');
+  if (makeupCanComplete(row)) return makeupDateTimeModal(row, 'complete');
   await openMakeupLinkModal(button, true);
 }
 
@@ -12052,7 +12071,7 @@ async function openMakeupLinkModal(button, showDirectCompletion) {
       (options || '<div class="empty">연결 가능한 완료 보강이 없습니다.</div>') + makeupModalErrorHtml(),
       (options ? '<button class="btn btn-primary btn-block mt14" data-act="mulinksubmit" data-case="' + esc(row.caseId) +
         '" data-rev="' + Number(row.revision) + '">이미 완료한 보강 연결</button>' : '') +
-      (showDirectCompletion && (session.isAdmin || (typeof managerInspectionActive === 'function' && managerInspectionActive())) ? '<button class="btn btn-ghost btn-block mt8" data-act="mudirectcompleteopen" data-case="' +
+      (showDirectCompletion && makeupCanComplete(row) ? '<button class="btn btn-ghost btn-block mt8" data-act="mudirectcompleteopen" data-case="' +
         esc(row.caseId) + '">새로 완료 기록 입력</button>' : ''));
   } catch (error) { toast('연결 후보를 불러오지 못했습니다 — ' + (error.message || error)); }
   finally { if (button.isConnected) button.disabled = false; }
@@ -20081,7 +20100,7 @@ function showStaffPrivateProfileEditor(message) {
   modal(profile.staffName + ' 선생님 · 연락처 / 로그인',
     '<label class="field"><span class="fl">휴대폰 번호</span><input class="in" id="staffProfilePhone" type="tel" inputmode="tel" autocomplete="off" value="' + esc(profile.phone || '') + '"></label>' +
     '<label class="field"><span><input id="staffProfileLoginEnabled" type="checkbox"' + (profile.loginEnabled ? ' checked' : '') + '> 출근 로그인 사용</span></label>' +
-    '<div class="hint">관리 권한이 있는 선생님은 이 설정과 무관하게 기존 접속·출퇴근 방식을 유지합니다. 연락처 변경만으로 비밀번호는 바뀌지 않습니다.</div>' +
+    '<div class="hint">출퇴근 로그인 대상 관리자는 관리 기능을 사용하면서 출근·퇴근을 기록합니다. 기존 로그인 면제 관리자는 종전 방식을 유지합니다. 연락처 변경만으로 비밀번호는 바뀌지 않습니다.</div>' +
     '<button class="btn btn-primary btn-block mt14" data-act="staffprofilesave">직원 정보 저장</button>' +
     '<hr class="sep"><div class="card-title">개인 비밀번호 ' + (profile.configured ? '재설정' : '설정') + '</div>' +
     '<label class="field mt14"><span class="fl">새 비밀번호 숫자 4자리</span><input class="in" id="staffProfileNewPin" type="password" inputmode="numeric" maxlength="4" autocomplete="new-password" placeholder="숫자 4자리"></label>' +
@@ -24401,7 +24420,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-09-12.1';
+const APP_VER = '2026-09-15.2';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);

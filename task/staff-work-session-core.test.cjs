@@ -22,7 +22,8 @@ test('server identity and privileged role must be validated', () => {
     active: false, workDate: '2030-01-01' };
   assert.equal(core.validateStatus(row, 't1'), row);
   assert.throws(() => core.validateStatus(row, 'other'));
-  assert.throws(() => core.validateStatus({ ...row, authRole: 'manager' }, 't1'));
+  assert.equal(core.validateStatus({ ...row, authRole: 'manager' }, 't1').required, true);
+  assert.throws(() => core.validateStatus({ ...row, authRole: 'unknown' }, 't1'));
   assert.throws(() => core.validateStatus({ ...row, active: 'true' }, 't1'));
   assert.equal(core.isLoginRequired({ status: 409, code: 'STAFF_WORK_LOGIN_REQUIRED' }), true);
   assert.equal(core.isLoginRequired({ status: 409, code: 'TASK_CONFLICT' }), false);

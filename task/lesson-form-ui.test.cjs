@@ -551,8 +551,8 @@ test('feedback v2/v3 preview uses the fixed approved templates and keeps send fi
       field + ' 최종 발송 변수를 직접 수정할 수 있어야 한다');
   }
   assert.match(preview, /승인 템플릿과[^']*발송 변수로 만든 최종 미리보기입니다/);
-  assert.match(preview, /아래 다섯 항목만 실제 알림톡 변수로 전송됩니다/);
-  assert.match(preview, /안내사항이 비어 있으면 V2, 입력하면 V3가 자동 선택됩니다/);
+  assert.match(preview, /V2·V3·V4·V5가 자동 선택됩니다/);
+  assert.match(preview, /비어 있는 과제·안내사항 항목은 발송 문구에서 제외됩니다/);
   assert.match(preview, /data-act="feedbackpolish">코멘트만 AI 다듬기/);
   assert.match(preview, /data-act="feedbackfinalsend">최종 전송/);
   assert.match(submit, /Object\.assign\(fbCtx, feedbackStructuredFields\(fbCtx\)\)/,
@@ -625,10 +625,10 @@ test('feedback v2/v3 has 100+ formal base sentences and renders the requested fi
   const versionApi = Function(html.slice(normalizeStart, normalizeEnd) + '\n' + html.slice(versionStart, versionEnd) +
     '; return { choose: feedbackTemplateVersion, flat: feedbackFlatField };')();
   const chooseVersion = versionApi.choose;
-  assert.equal(chooseVersion({ templateVersion: 'v2', noticeText: '' }), 'v2');
-  assert.equal(chooseVersion({ templateVersion: 'v2', noticeText: '안내' }), 'v3');
-  assert.equal(chooseVersion({ templateVersion: 'v3', noticeText: '   ' }), 'v2');
-  assert.equal(chooseVersion({ templateVersion: 'v3', noticeText: '\u200b\u200e\u202e\u2066\ufeff' }), 'v2',
+  assert.equal(chooseVersion({ templateVersion: 'v2', homeworkText: '복습', noticeText: '' }), 'v2');
+  assert.equal(chooseVersion({ templateVersion: 'v2', homeworkText: '복습', noticeText: '안내' }), 'v3');
+  assert.equal(chooseVersion({ templateVersion: 'v3', homeworkText: '복습', noticeText: '   ' }), 'v2');
+  assert.equal(chooseVersion({ templateVersion: 'v3', homeworkText: '복습', noticeText: '\u200b\u200e\u202e\u2066\ufeff' }), 'v2',
     '보이지 않는 zero-width·bidi 형식 문자만으로 V3가 선택되면 안 된다');
   assert.equal(versionApi.flat('안\u202e\u200b내'), '안내', '표시 방향·zero-width 제어문자는 피드백 변수에서 제거해야 한다');
   assert.equal(chooseVersion({ templateVersion: 'v1', noticeText: '과거 이력' }), 'v1');
@@ -778,6 +778,28 @@ test('feedback final v2/v3 variable fields update context and rebuild the readon
   assert.equal(budgetApi.ready({}, 0), false, '코멘트 예산이 0이면 AI 다듬기를 활성화하면 안 된다');
   assert.equal(budgetApi.ready({}, minimumBudget - 1), false);
   assert.equal(budgetApi.ready({}, minimumBudget), true, '이름 도입문+공백+AI 본문 20자가 모두 들어갈 예산이 필요하다');
+});
+
+test('V2–V5 choose optional sections from normalized inputs and preserve approved closing gaps', () => {
+  const start = html.indexOf('function feedbackV2Message(');
+  const end = html.indexOf('function feedbackPolishMinimumBudget(', start);
+  const normalizeStart = html.indexOf('function stripFeedbackFormatControls(');
+  const normalizeEnd = html.indexOf('function setFeedbackPolishStatus(', normalizeStart);
+  const api = Function('studentOf', 'feedbackDateLabel', html.slice(normalizeStart, normalizeEnd) + '\n' + html.slice(start, end) +
+    '; return { choose: feedbackTemplateVersion, budget: feedbackCommentBudget, message: feedbackStructuredMessage };')(
+    task => task.studentName, () => '2026년 9월 15일');
+  for (const [homeworkText, noticeText, version] of [['복습', '', 'v2'], ['복습', '안내', 'v3'], ['', '', 'v4'], ['', '안내', 'v5'], [' \n\u200b', ' ', 'v4']]) {
+    const fields = { subjectText: '수학', contentText: '가'.repeat(300), commentText: '나'.repeat(400), homeworkText, noticeText };
+    assert.equal(api.choose(fields), version);
+    const message = api.message({ studentName: '가상학생' }, '2026-09-15', fields);
+    assert.equal(message.includes('- 과제 : '), ['v2', 'v3'].includes(version));
+    assert.equal(message.includes('- 안내사항 : '), ['v3', 'v5'].includes(version));
+    assert.equal(api.budget({ studentName: '가상학생' }, '2026-09-15', fields), 900 - (message.length - fields.commentText.length));
+    assert.ok(message.endsWith((version === 'v2' ? '\n\n' : '\n\n\n') + '문의 사항이 있으시면 학원으로 연락부탁드립니다. 감사합니다.'));
+    assert.ok(!message.includes('과제 미입력'));
+  }
+  assert.match(html, /과제 미입력 — 과제 항목 없이 발송됩니다/);
+  assert.doesNotMatch(html, /memo\.homework \|\| '없음'/);
 });
 
 test('feedback v3 notice consumes the same 900-character budget used by preview and AI polish', () => {

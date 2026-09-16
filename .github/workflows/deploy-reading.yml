@@ -9,6 +9,7 @@ on:
       - 'vocab/**'
       - 'naesin/**'
       - 'haru/**'
+      - 'naesin-ko/**'
       - 'shared/**'
       # 배포 파이프라인 자체가 바뀌면 그 판으로 한 번 돌려 봐야 한다 — 이 줄이 없으면
       # 워크플로 수정은 CI 를 한 번도 안 거치고 들어가서, 다음 콘텐츠 변경 때 처음 터진다.
@@ -93,6 +94,32 @@ jobs:
         run: node reading-server/naesin-live.test.mjs
       - name: 내신브레인 시험 결과 분석·예측 테스트
         run: node reading-server/naesin-results.test.mjs
+      - name: 국어브레인 학습 엔진 테스트
+        run: node naesin-ko/engine.test.cjs
+      - name: 국어브레인 채점 모듈 테스트
+        run: node naesin-ko/grade.test.cjs
+      - name: 국어브레인 문항 생성 테스트
+        run: node naesin-ko/gen.test.cjs
+      - name: 국어브레인 팩 검증 규칙 테스트
+        run: node naesin-ko/pack-check.test.cjs
+      - name: 국어브레인 개념어 사전 테스트
+        run: node naesin-ko/concepts.test.cjs
+      - name: 국어브레인 준비도 테스트
+        run: node naesin-ko/readiness.test.cjs
+      - name: 국어브레인 추출 공용층 테스트
+        run: node naesin-ko/extract/spans-util.test.mjs
+      - name: 국어브레인 이해완성 추출기 테스트
+        run: node naesin-ko/extract/build-ihae.test.mjs
+      - name: 국어브레인 요약노트 추출기 테스트
+        run: node naesin-ko/extract/build-yoyak.test.mjs
+      - name: 국어브레인 단원집중 추출기 테스트
+        run: node naesin-ko/extract/build-danwon.test.mjs
+      - name: 국어브레인 서술형 공략 추출기 테스트
+        run: node naesin-ko/extract/build-seosul.test.mjs
+      - name: 국어브레인 폴더→팩 병합기 테스트
+        run: node naesin-ko/extract/build-pack.test.mjs
+      - name: 국어브레인 서버 라우트 테스트
+        run: node reading-server/naesin-ko-api.test.mjs
       - name: 교재 코칭 테스트
         run: node reading-server/textbook.test.mjs
       - name: 정적 파일 가로채기 정합 테스트
