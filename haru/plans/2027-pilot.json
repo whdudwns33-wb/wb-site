@@ -1,0 +1,739 @@
+{
+  "cohort": "2027-pilot",
+  "examDate": "2026-10-25",
+  "examDateStatus": "confirmed",
+  "lockAt": "12:00",
+  "retainDays": 30,
+  "numbersOpenDays": 7,
+  "order": [
+    "kor",
+    "math",
+    "eng"
+  ],
+  "phases": [
+    {
+      "id": "p4",
+      "from": "2026-09-04",
+      "to": "2026-10-24",
+      "dailyMin": 15,
+      "extendBlockMin": 15,
+      "extendMax": 2
+    }
+  ],
+  "bands": {
+    "5-1": "2026-09-10",
+    "5-2": "2026-09-10",
+    "6-1": "2026-09-10"
+  },
+  "frozenKeyId": "own-mock-01",
+  "bed": {
+    "base": "23:45",
+    "target": "22:00",
+    "days": 7
+  },
+  "coreAtoms": "coreByPhase",
+  "days": [
+    {
+      "d": "2026-09-04",
+      "dday": 51,
+      "phase": "p4",
+      "kind": "prep",
+      "note": "앱 없음 — 종이·등록·동의서",
+      "sub": "rebuild",
+      "mode": "block"
+    },
+    {
+      "d": "2026-09-05",
+      "dday": 50,
+      "phase": "p4",
+      "kind": "rest",
+      "note": "주말"
+    },
+    {
+      "d": "2026-09-06",
+      "dday": 49,
+      "phase": "p4",
+      "kind": "rest",
+      "note": "주말"
+    },
+    {
+      "d": "2026-09-07",
+      "dday": 48,
+      "phase": "p4",
+      "kind": "prep",
+      "note": "앱 없음 — 종이·등록·동의서",
+      "sub": "rebuild",
+      "mode": "block"
+    },
+    {
+      "d": "2026-09-08",
+      "dday": 47,
+      "phase": "p4",
+      "kind": "prep",
+      "note": "앱 없음 — 종이·등록·동의서",
+      "sub": "rebuild",
+      "mode": "block"
+    },
+    {
+      "d": "2026-09-09",
+      "dday": 46,
+      "phase": "p4",
+      "kind": "prep",
+      "note": "앱 없음 — 종이·등록·동의서",
+      "sub": "rebuild",
+      "mode": "block"
+    },
+    {
+      "d": "2026-09-10",
+      "dday": 45,
+      "phase": "p4",
+      "kind": "prep",
+      "note": "앱 없음 — 종이·등록·동의서",
+      "sub": "rebuild",
+      "mode": "block"
+    },
+    {
+      "d": "2026-09-11",
+      "dday": 44,
+      "phase": "p4",
+      "kind": "prep",
+      "note": "앱 없음 — 종이·등록·동의서",
+      "sub": "rebuild",
+      "mode": "block"
+    },
+    {
+      "d": "2026-09-12",
+      "dday": 43,
+      "phase": "p4",
+      "kind": "rest",
+      "note": "주말"
+    },
+    {
+      "d": "2026-09-13",
+      "dday": 42,
+      "phase": "p4",
+      "kind": "mock",
+      "keyId": "own-mock-01",
+      "subjects": [
+        "kor"
+      ],
+      "startAt": "09:00",
+      "app": false,
+      "note": "1차 · 국어 단독 40분 · 동결 세트 · 종이 답안지",
+      "sub": "rebuild",
+      "mode": "block"
+    },
+    {
+      "d": "2026-09-14",
+      "dday": 41,
+      "phase": "p4",
+      "kind": "prep",
+      "note": "앱 없음 — 종이·등록·동의서",
+      "sub": "rebuild",
+      "mode": "block"
+    },
+    {
+      "d": "2026-09-15",
+      "dday": 40,
+      "phase": "p4",
+      "kind": "prep",
+      "note": "앱 없음 — 종이·등록·동의서",
+      "sub": "rebuild",
+      "mode": "block"
+    },
+    {
+      "d": "2026-09-16",
+      "dday": 39,
+      "phase": "p4",
+      "kind": "prep",
+      "note": "앱 없음 — 종이·등록·동의서",
+      "sub": "rebuild",
+      "mode": "block"
+    },
+    {
+      "d": "2026-09-17",
+      "dday": 38,
+      "phase": "p4",
+      "kind": "prep",
+      "note": "앱 없음 — 종이·등록·동의서",
+      "sub": "rebuild",
+      "mode": "block"
+    },
+    {
+      "d": "2026-09-18",
+      "dday": 37,
+      "phase": "p4",
+      "kind": "prep",
+      "note": "앱 없음 — 종이·등록·동의서",
+      "sub": "rebuild",
+      "mode": "block"
+    },
+    {
+      "d": "2026-09-19",
+      "dday": 36,
+      "phase": "p4",
+      "kind": "rest",
+      "note": "주말"
+    },
+    {
+      "d": "2026-09-20",
+      "dday": 35,
+      "phase": "p4",
+      "kind": "rest",
+      "note": "주말"
+    },
+    {
+      "d": "2026-09-21",
+      "dday": 34,
+      "phase": "p4",
+      "kind": "card",
+      "sub": "rebuild",
+      "mode": "block",
+      "envelope": true
+    },
+    {
+      "d": "2026-09-22",
+      "dday": 33,
+      "phase": "p4",
+      "kind": "passage",
+      "sub": "rebuild",
+      "mode": "block"
+    },
+    {
+      "d": "2026-09-23",
+      "dday": 32,
+      "phase": "p4",
+      "kind": "card",
+      "sub": "rebuild",
+      "mode": "block"
+    },
+    {
+      "d": "2026-09-24",
+      "dday": 31,
+      "phase": "p4",
+      "kind": "rest",
+      "note": "추석"
+    },
+    {
+      "d": "2026-09-25",
+      "dday": 30,
+      "phase": "p4",
+      "kind": "rest",
+      "note": "추석"
+    },
+    {
+      "d": "2026-09-26",
+      "dday": 29,
+      "phase": "p4",
+      "kind": "rest",
+      "note": "추석"
+    },
+    {
+      "d": "2026-09-27",
+      "dday": 28,
+      "phase": "p4",
+      "kind": "rest",
+      "note": "추석 연휴 끝날 — 회차 없음"
+    },
+    {
+      "d": "2026-09-28",
+      "dday": 27,
+      "phase": "p4",
+      "kind": "card",
+      "sub": "mix",
+      "mode": "mixed",
+      "envelope": true
+    },
+    {
+      "d": "2026-09-29",
+      "dday": 26,
+      "phase": "p4",
+      "kind": "passage",
+      "sub": "mix",
+      "mode": "mixed"
+    },
+    {
+      "d": "2026-09-30",
+      "dday": 25,
+      "phase": "p4",
+      "kind": "card",
+      "sub": "mix",
+      "mode": "mixed"
+    },
+    {
+      "d": "2026-10-01",
+      "dday": 24,
+      "phase": "p4",
+      "kind": "passage",
+      "sub": "mix",
+      "mode": "mixed"
+    },
+    {
+      "d": "2026-10-02",
+      "dday": 23,
+      "phase": "p4",
+      "kind": "card",
+      "sub": "mix",
+      "mode": "mixed"
+    },
+    {
+      "d": "2026-10-03",
+      "dday": 22,
+      "phase": "p4",
+      "kind": "rest",
+      "note": "개천절"
+    },
+    {
+      "d": "2026-10-04",
+      "dday": 21,
+      "phase": "p4",
+      "kind": "mock",
+      "keyId": "own-mock-02",
+      "subjects": [
+        "kor",
+        "math",
+        "eng"
+      ],
+      "startAt": "09:00",
+      "app": true,
+      "note": "2차 · 첫 3교시 연속 · 앱 OMR · 휴식 잠금",
+      "sub": "mix",
+      "mode": "mixed"
+    },
+    {
+      "d": "2026-10-05",
+      "dday": 20,
+      "phase": "p4",
+      "kind": "rest",
+      "note": "대체공휴일"
+    },
+    {
+      "d": "2026-10-06",
+      "dday": 19,
+      "phase": "p4",
+      "kind": "passage",
+      "sub": "mix",
+      "mode": "mixed"
+    },
+    {
+      "d": "2026-10-07",
+      "dday": 18,
+      "phase": "p4",
+      "kind": "card",
+      "sub": "mix",
+      "mode": "mixed"
+    },
+    {
+      "d": "2026-10-08",
+      "dday": 17,
+      "phase": "p4",
+      "kind": "passage",
+      "sub": "mix",
+      "mode": "mixed"
+    },
+    {
+      "d": "2026-10-09",
+      "dday": 16,
+      "phase": "p4",
+      "kind": "rest",
+      "note": "한글날"
+    },
+    {
+      "d": "2026-10-10",
+      "dday": 15,
+      "phase": "p4",
+      "kind": "rest",
+      "note": "주말"
+    },
+    {
+      "d": "2026-10-11",
+      "dday": 14,
+      "phase": "p4",
+      "kind": "rest",
+      "note": "주말"
+    },
+    {
+      "d": "2026-10-12",
+      "dday": 13,
+      "phase": "p4",
+      "kind": "card",
+      "sub": "narrow",
+      "mode": "mixed",
+      "freezeNew": true,
+      "envelope": true
+    },
+    {
+      "d": "2026-10-13",
+      "dday": 12,
+      "phase": "p4",
+      "kind": "passage",
+      "sub": "narrow",
+      "mode": "mixed",
+      "freezeNew": true
+    },
+    {
+      "d": "2026-10-14",
+      "dday": 11,
+      "phase": "p4",
+      "kind": "card",
+      "sub": "narrow",
+      "mode": "mixed",
+      "freezeNew": true
+    },
+    {
+      "d": "2026-10-15",
+      "dday": 10,
+      "phase": "p4",
+      "kind": "passage",
+      "sub": "narrow",
+      "mode": "mixed",
+      "freezeNew": true
+    },
+    {
+      "d": "2026-10-16",
+      "dday": 9,
+      "phase": "p4",
+      "kind": "card",
+      "sub": "narrow",
+      "mode": "mixed",
+      "freezeNew": true
+    },
+    {
+      "d": "2026-10-17",
+      "dday": 8,
+      "phase": "p4",
+      "kind": "rest",
+      "note": "주말"
+    },
+    {
+      "d": "2026-10-18",
+      "dday": 7,
+      "phase": "p4",
+      "kind": "mock",
+      "keyId": "own-mock-03",
+      "subjects": [
+        "kor",
+        "math",
+        "eng"
+      ],
+      "startAt": "09:00",
+      "app": true,
+      "note": "3차 · 최종 리허설 · 1교시 = 동결 세트 재응시",
+      "retakeKeyId": "own-mock-01",
+      "sub": "settle",
+      "mode": "mixed",
+      "freezeNew": true
+    },
+    {
+      "d": "2026-10-19",
+      "dday": 6,
+      "phase": "p4",
+      "kind": "card",
+      "sub": "settle",
+      "mode": "mixed",
+      "freezeNew": true,
+      "envelope": true
+    },
+    {
+      "d": "2026-10-20",
+      "dday": 5,
+      "phase": "p4",
+      "kind": "passage",
+      "sub": "settle",
+      "mode": "mixed",
+      "freezeNew": true
+    },
+    {
+      "d": "2026-10-21",
+      "dday": 4,
+      "phase": "p4",
+      "kind": "card",
+      "sub": "settle",
+      "mode": "mixed",
+      "freezeNew": true
+    },
+    {
+      "d": "2026-10-22",
+      "dday": 3,
+      "phase": "p4",
+      "kind": "passage",
+      "sub": "settle",
+      "mode": "mixed",
+      "freezeNew": true
+    },
+    {
+      "d": "2026-10-23",
+      "dday": 2,
+      "phase": "p4",
+      "kind": "card",
+      "sub": "settle",
+      "mode": "mixed",
+      "freezeNew": true
+    },
+    {
+      "d": "2026-10-24",
+      "dday": 1,
+      "phase": "p4",
+      "kind": "rest",
+      "note": "주말"
+    },
+    {
+      "d": "2026-10-25",
+      "dday": 0,
+      "phase": "p5",
+      "kind": "exam",
+      "lockAt": "12:00"
+    },
+    {
+      "d": "2026-10-26",
+      "dday": -1,
+      "phase": "p5",
+      "kind": "retro"
+    },
+    {
+      "d": "2026-10-27",
+      "dday": -2,
+      "phase": "p5",
+      "kind": "retro"
+    },
+    {
+      "d": "2026-10-28",
+      "dday": -3,
+      "phase": "p5",
+      "kind": "retro"
+    },
+    {
+      "d": "2026-10-29",
+      "dday": -4,
+      "phase": "p5",
+      "kind": "retro"
+    },
+    {
+      "d": "2026-10-30",
+      "dday": -5,
+      "phase": "p5",
+      "kind": "retro"
+    },
+    {
+      "d": "2026-10-31",
+      "dday": -6,
+      "phase": "p5",
+      "kind": "retro"
+    },
+    {
+      "d": "2026-11-01",
+      "dday": -7,
+      "phase": "p5",
+      "kind": "retro"
+    },
+    {
+      "d": "2026-11-02",
+      "dday": -8,
+      "phase": "p5",
+      "kind": "retro"
+    },
+    {
+      "d": "2026-11-03",
+      "dday": -9,
+      "phase": "p5",
+      "kind": "retro"
+    },
+    {
+      "d": "2026-11-04",
+      "dday": -10,
+      "phase": "p5",
+      "kind": "retro"
+    },
+    {
+      "d": "2026-11-05",
+      "dday": -11,
+      "phase": "p5",
+      "kind": "retro"
+    },
+    {
+      "d": "2026-11-06",
+      "dday": -12,
+      "phase": "p5",
+      "kind": "retro"
+    },
+    {
+      "d": "2026-11-07",
+      "dday": -13,
+      "phase": "p5",
+      "kind": "retro"
+    },
+    {
+      "d": "2026-11-08",
+      "dday": -14,
+      "phase": "p5",
+      "kind": "retro"
+    },
+    {
+      "d": "2026-11-09",
+      "dday": -15,
+      "phase": "p5",
+      "kind": "retro"
+    },
+    {
+      "d": "2026-11-10",
+      "dday": -16,
+      "phase": "p5",
+      "kind": "retro"
+    },
+    {
+      "d": "2026-11-11",
+      "dday": -17,
+      "phase": "p5",
+      "kind": "retro"
+    },
+    {
+      "d": "2026-11-12",
+      "dday": -18,
+      "phase": "p5",
+      "kind": "retro"
+    },
+    {
+      "d": "2026-11-13",
+      "dday": -19,
+      "phase": "p5",
+      "kind": "retro"
+    },
+    {
+      "d": "2026-11-14",
+      "dday": -20,
+      "phase": "p5",
+      "kind": "retro"
+    },
+    {
+      "d": "2026-11-15",
+      "dday": -21,
+      "phase": "p5",
+      "kind": "retro"
+    },
+    {
+      "d": "2026-11-16",
+      "dday": -22,
+      "phase": "p5",
+      "kind": "retro"
+    },
+    {
+      "d": "2026-11-17",
+      "dday": -23,
+      "phase": "p5",
+      "kind": "retro"
+    },
+    {
+      "d": "2026-11-18",
+      "dday": -24,
+      "phase": "p5",
+      "kind": "retro"
+    },
+    {
+      "d": "2026-11-19",
+      "dday": -25,
+      "phase": "p5",
+      "kind": "retro"
+    },
+    {
+      "d": "2026-11-20",
+      "dday": -26,
+      "phase": "p5",
+      "kind": "retro"
+    },
+    {
+      "d": "2026-11-21",
+      "dday": -27,
+      "phase": "p5",
+      "kind": "retro"
+    },
+    {
+      "d": "2026-11-22",
+      "dday": -28,
+      "phase": "p5",
+      "kind": "retro"
+    },
+    {
+      "d": "2026-11-23",
+      "dday": -29,
+      "phase": "p5",
+      "kind": "retro"
+    },
+    {
+      "d": "2026-11-24",
+      "dday": -30,
+      "phase": "p5",
+      "kind": "retro"
+    }
+  ],
+  "milestones": [
+    {
+      "d": "2026-09-29",
+      "aud": "parent",
+      "text": "제출 서류 양식 홈페이지 원서접수 배너에서 공개"
+    },
+    {
+      "d": "2026-09-30",
+      "aud": "parent",
+      "at": "19:00",
+      "text": "입학설명회 19:00 본교 대강당"
+    },
+    {
+      "d": "2026-10-06",
+      "aud": "parent",
+      "at": "09:00",
+      "text": "원서접수 시작 (인터넷, 전형료 20,000원) — 서류 제출과 다른 기간"
+    },
+    {
+      "d": "2026-10-09",
+      "aud": "parent",
+      "at": "17:00",
+      "text": "원서접수 마감 17:00"
+    },
+    {
+      "d": "2026-10-13",
+      "aud": "parent",
+      "at": "09:00",
+      "text": "서류 제출 시작 · 학교생활기록부Ⅱ(최근 한 달 내 출력, 상단에 접수번호) · 삼육 교육 동의서 미제출 시 응시 불가"
+    },
+    {
+      "d": "2026-10-15",
+      "aud": "parent",
+      "at": "17:00",
+      "text": "서류 제출 마감 17:00 (우체국 소인까지)"
+    },
+    {
+      "d": "2026-10-21",
+      "aud": "parent",
+      "at": "12:00",
+      "text": "수험표 출력 시작 — 본인 직접 출력, 지참해야 입실"
+    },
+    {
+      "d": "2026-10-24",
+      "aud": "parent",
+      "at": "21:00",
+      "text": "실무 카드 — 수험표(본인 출력)·EVA 실내화와 신발 주머니·필기구·수정테이프·쉬는 시간 볼 책. 사인펜은 학교 지급. 07:50 정문 개방, 대중교통 권장. 오늘은 아무것도 풀지 않습니다"
+    },
+    {
+      "d": "2026-10-25",
+      "aud": "both",
+      "at": "08:30",
+      "text": "08:30까지 고사장 입실"
+    },
+    {
+      "d": "2026-10-30",
+      "aud": "parent",
+      "at": "16:00",
+      "text": "합격자 발표 16:00 — 오늘은 아무것도 안 하셔도 됩니다"
+    },
+    {
+      "d": "2026-11-02",
+      "aud": "parent",
+      "text": "합격자 등록 2026-11-02 ~ 2026-11-04"
+    }
+  ],
+  "notice": "본 앱은 WB 독해력학원이 제작한 사설 학습 도구이며, 호남삼육중학교와 어떠한 제휴·후원 관계도 없습니다. 2027학년도 모집요강(2026-04-24 공고) 기준 · 학교 사정에 따라 변경될 수 있음.",
+  "builtFrom": {
+    "facts": "정본 v1.2 (docs/삼육중-전형-사실-정본-v1.md)",
+    "admissionYear": 2027
+  }
+}

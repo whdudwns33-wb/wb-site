@@ -11,6 +11,7 @@ import { load, persist, getDb, listBackups, getBackup, snapshotNow, naesinSnapsh
 import { handleVocab, sendNightPushes, vocabSummary } from './vocab-api.mjs';
 import { handleNaesin, isReservedCode, dropReservedRows, naesinBodyLimit } from './naesin-api.mjs';
 import { handleStudio } from './naesin-studio.mjs';
+import { handleHaru, haruBodyLimit, allowedApp, appOfPath, dropStudentHaru, dumpHaru } from './haru-api.mjs';
 import { handleNaesinKo } from './naesin-ko-api.mjs';
 import { bookIndex, cleanWords, coachingCard, confirmAllPlan, findBook, readyToConfirm, sourceSummary, validProgress, withOverlay } from './textbook.mjs';
 import { parseRoster } from './roster.mjs';
@@ -21,6 +22,7 @@ const VOCAB_DIR = path.join(ROOT, '..', 'vocab');      // 워드브레인 앱 �
 const SHARED_DIR = path.join(ROOT, '..', 'shared');    // 두 앱이 함께 쓰는 파일(voice.js)
 const AGE_DIR = path.join(ROOT, '..', 'vocab-age'); // 어휘 나이 진단(로그인 없이 열리는 공개 페이지)
 const NAESIN_DIR = path.join(ROOT, '..', 'naesin');    // 내신브레인 앱 정적 파일
+const HARU_DIR = path.join(ROOT, '..', 'haru');        // 하루브레인 앱 정적 파일 (팩·대응표·플랜은 여기 없다 — db.haru 전용)
 const NAESIN_KO_DIR = path.join(ROOT, '..', 'naesin-ko'); // 국어브레인 앱 정적 파일
 const PUB_DIR = path.join(ROOT, 'public');             // 관리 웹
 const PORT = +(process.env.PORT || 8890);
@@ -123,6 +125,36 @@ const naesinStore = {
   getStudent: (c) => db.students[c] || null,
 };
 
+/* 하루브레인 저장소 어댑터 — db.haru 만 사용 (워커 haruStore 와 같은 계약). */
+const haruRoot = () => {
+  db.haru = db.haru || {};
+  for (const k of ['packs', 'paperkeys', 'plans', 'states', 'mocks', 'paper', 'parents', 'dists', 'reports', 'aggs']) db.haru[k] = db.haru[k] || {};
+  return db.haru;
+};
+const haruStore = {
+  getPack: (id) => haruRoot().packs[id] || null, putPack: (id, rec) => { haruRoot().packs[id] = rec; persist(); }, deletePack: (id) => { delete haruRoot().packs[id]; persist(); },
+  getPackIds: () => haruRoot().packIds || null, putPackIds: (ids) => { haruRoot().packIds = ids; persist(); },
+  getPaperKey: (id) => haruRoot().paperkeys[id] || null, putPaperKey: (id, rec) => { haruRoot().paperkeys[id] = rec; persist(); },
+  getPaperKeyIds: () => haruRoot().paperkeyIds || null, putPaperKeyIds: (ids) => { haruRoot().paperkeyIds = ids; persist(); },
+  getPlan: (c) => haruRoot().plans[c] || null, putPlan: (c, rec) => { haruRoot().plans[c] = rec; persist(); }, deletePlan: (c) => { delete haruRoot().plans[c]; persist(); },
+  getPlanIds: () => haruRoot().planIds || null, putPlanIds: (ids) => { haruRoot().planIds = ids; persist(); },
+  getAtoms: () => haruRoot().atoms || null, putAtoms: (rec) => { haruRoot().atoms = rec; persist(); },
+  getState: (c) => haruRoot().states[c] || null, putState: (c, rec) => { haruRoot().states[c] = rec; persist(); }, deleteState: (c) => { delete haruRoot().states[c]; persist(); },
+  listStateCodes: () => Object.keys(haruRoot().states),
+  getMock: (c) => haruRoot().mocks[c] || null, putMock: (c, rec) => { haruRoot().mocks[c] = rec; persist(); }, deleteMock: (c) => { delete haruRoot().mocks[c]; persist(); },
+  getPaper: (c) => haruRoot().paper[c] || null, putPaper: (c, rec) => { haruRoot().paper[c] = rec; persist(); }, deletePaper: (c) => { delete haruRoot().paper[c]; persist(); },
+  getParent: (t) => haruRoot().parents[t] || null, putParent: (t, rec) => { haruRoot().parents[t] = rec; persist(); }, deleteParent: (t) => { delete haruRoot().parents[t]; persist(); },
+  getDist: (c, k) => haruRoot().dists[c + ':' + k] || null, putDist: (c, k, rec) => { haruRoot().dists[c + ':' + k] = rec; persist(); },
+  getReports: (id) => haruRoot().reports[id] || null, putReports: (id, list) => { haruRoot().reports[id] = list; persist(); },
+  getAgg: (w) => haruRoot().aggs[w] || null, putAgg: (w, rec) => { haruRoot().aggs[w] = rec; persist(); },
+  getStudent: (c) => db.students[c] || null, putStudent: (c, rec) => { db.students[c] = rec; persist(); },
+  listStudentCodes: () => Object.keys(db.students),
+};
+let HARU_ATOMS_CACHE = null;
+const haruAtomsFallback = async () => {
+  if (!HARU_ATOMS_CACHE) { try { HARU_ATOMS_CACHE = JSON.parse(fs.readFileSync(path.join(HARU_DIR, 'atoms.json'), 'utf8')); } catch (e) { return null; } }
+  return HARU_ATOMS_CACHE;
+};
 /* 국어브레인 저장소 어댑터 — db.naesinKo만 사용.
    요약·서술형·오버레이를 state에서 분리해 둔다(국어 기획서 §8 저장 예산). */
 const naesinKoRoot = () => {
@@ -173,7 +205,7 @@ const json = (res, code, obj) => {
    남은 몸통은 resume() 으로 흘려보내야 응답이 정상으로 나간다 — 안 읽고 응답하면 큰 몸통은 RST 로 끝난다. */
 const BODY_LIMIT_DEFAULT = 2_000_000;
 const BODY_LIMIT_TEXTBOOK = 5_500_000;
-const bodyLimit = (p) => (p.startsWith('/api/naesin/') ? naesinBodyLimit(p) : p === '/api/admin/textbook-src' ? BODY_LIMIT_TEXTBOOK : BODY_LIMIT_DEFAULT);
+const bodyLimit = (p) => (p.startsWith('/api/naesin/') ? naesinBodyLimit(p) : p.startsWith('/api/haru/') ? haruBodyLimit(p) : p === '/api/admin/textbook-src' ? BODY_LIMIT_TEXTBOOK : BODY_LIMIT_DEFAULT);
 const tooLarge = () => { const e = new Error('too large'); e.status = 413; return e; };
 const readBody = (req, limit = BODY_LIMIT_DEFAULT) => new Promise((resolve, reject) => {
   /* 조각을 Buffer 로 모아 한 번에 디코딩한다 — 조각마다 문자열로 바꾸면 조각 경계에 걸린 한글(3바이트)이 깨진다.
@@ -382,8 +414,27 @@ const server = http.createServer(async (req, res) => {
         return json(res, 200, { token: newToken('__admin__', true) });
       }
 
+      /* 하루브레인 부모 화면 — ptoken 으로만, 로그인 없음 (워커와 동일) */
+      if (p === '/api/haru/parent' && req.method === 'GET') {
+        const out = await handleHaru({ path: p, method: 'GET', who: null, query: url.searchParams, getBody: () => readBody(req), store: haruStore });
+        return json(res, out.status, out.body);
+      }
+
       const who = auth(req);
       if (!who) return json(res, 401, { error: '로그인이 필요합니다.' });
+
+      /* apps 게이트(기획서 D-6) — who 검증 직후 한 곳 (워커와 동일). apps null 은 재원생(전부), 배열은 그 목록만 */
+      if (!who.admin && !allowedApp(db.students[who.code] || null, appOfPath(p))) return json(res, 403, { error: '이 앱의 이용 대상이 아니에요.' });
+      /* 토큰 재발급 — 구 토큰은 만료 시각까지 유효 (워커와 동일) */
+      if (p === '/api/token/refresh' && req.method === 'POST') return json(res, 200, { token: newToken(who.code, who.admin), exp: new Date(Date.now() + TOKEN_TTL).toISOString() });
+
+      /* 하루브레인 (/api/haru/*) — 인증만 공유, 저장·라우트는 격리 (워커와 동일) */
+      if (p.startsWith('/api/haru/')) {
+        if (Number(req.headers['content-length'] || 0) > haruBodyLimit(p)) { req.resume(); return json(res, 413, { error: '요청이 너무 커서 받을 수 없어요.' }); }
+        const out = await handleHaru({ path: p, method: req.method, who, query: url.searchParams, getBody: () => readBody(req, haruBodyLimit(p)), store: haruStore,
+          atomsFallback: haruAtomsFallback, randomToken: () => crypto.randomUUID().replace(/-/g, '') });
+        return json(res, out.status, out.body);
+      }
 
       /* 워드브레인 (/api/vocab/*) — 인증만 공유, 저장·라우트는 격리 */
       if (p.startsWith('/api/vocab/')) {
@@ -613,7 +664,7 @@ const server = http.createServer(async (req, res) => {
         /* 워커 fullDump 와 같은 모양 — 내신은 팩 본문 없이(packIds 만), 교재 원문(textbookSrc)은 포함.
            팩은 라이선스 원문이라 백업 파일로 흩어지지 않게 한다(store.naesinSnapshot). */
         return json(res, 200, { service: 'wb-reading', savedAt: nowIso(), students: db.students, states: db.states, vocab: db.vocab,
-          textbook: db.textbook || {}, pubmap: db.pubmap || {}, naesin: naesinSnapshot(db.naesin), textbookSrc: db.textbookSrc || {} });
+          textbook: db.textbook || {}, pubmap: db.pubmap || {}, naesin: naesinSnapshot(db.naesin), textbookSrc: db.textbookSrc || {}, haru: await dumpHaru(haruStore) });
       }
       if (p === '/api/admin/backups' && req.method === 'GET') {
         return json(res, 200, { backups: listBackups() });
@@ -667,6 +718,8 @@ const server = http.createServer(async (req, res) => {
         drop(ko.reviews, c);
         drop(ko.exams, c);
         drop(ko.overlays, c);
+        /* 하루브레인 — 정확 접두 4계열(state·mock·paper·parent). 대응표는 남긴다(워커와 동일) */
+        await dropStudentHaru(haruStore, c); removed += 3;
         /* 기기 토큰은 토큰 값이 키라 코드로 못 찾는다 — 훑어서 이 학생 것만 */
         for (const [t, rec] of Object.entries(db.tokens)) if (rec && rec.code === c) drop(db.tokens, t);
         /* 승인 대기 줄에 남으면 지운 학생이 계속 뜬다 */
@@ -704,6 +757,10 @@ const server = http.createServer(async (req, res) => {
     if (p === '/admin/qr.js') return serveFile(res, SHARED_DIR, 'qr.js');
     if (p === '/admin' || p === '/admin/') return serveFile(res, PUB_DIR, 'admin.html');
     if (p.startsWith('/admin/')) return serveFile(res, PUB_DIR, p.slice('/admin/'.length));
+
+    /* 하루브레인 앱 — 팩·대응표·플랜은 여기 없다(/api/haru/*, db.haru 전용). 정답은 어느 정적 파일에도 없다 */
+    if (p === '/haru' || p === '/haru/') return serveFile(res, HARU_DIR, 'index.html');
+    if (p.startsWith('/haru/')) return serveFile(res, HARU_DIR, p.slice('/haru/'.length));
 
     /* 내신브레인 앱 — 팩 콘텐츠는 여기 없다(/api/naesin/pack, KV·db 전용) */
     if (p === '/naesin/voice.js') return serveFile(res, SHARED_DIR, 'voice.js');
