@@ -64,6 +64,10 @@ test('textbook table carries both lineups — 2022 중1·중2 ten, 2015 중3 twe
   assert.equal(core.TEXTBOOKS['mirae-munyeongin'].label, '미래엔(문영인)');
   assert.equal(core.TEXTBOOKS['chunjae-leesanggi'].label, '천재(이상기)');
   assert.equal(core.TEXTBOOKS['kumsung-choeincheol'].label, '금성(최인철)');
+  /* 비상은 bisang 하나로 쓴다 — 국어 정본 표(docs/자료-폴더-표준.md)와 같은 표기여야
+     같은 출판사가 두 갈래로 갈리지 않는다. */
+  assert.ok(codes.every(c => !c.startsWith('visang')), 'no visang- codes; 비상 is bisang-');
+  assert.equal(core.TEXTBOOKS['bisang-hwangjongbae'].label, '비상(황종배)');
   codes.forEach(c => assert.equal(core.TEXTBOOKS[c].code, c));
   /* 학년별 라인업 수는 사이트 목록 그대로다 — 중3만 12종이고 개정도 다르다. */
   const byGrade = g => codes.filter(c => core.TEXTBOOKS[c].grades.indexOf(g) >= 0);
@@ -139,31 +143,49 @@ test('next asset id continues past the highest number and starts at 0001', () =>
 
 /* ── 인테이크 경로 · packId ── */
 
-test('intake path follows the drive folder contract from the naesin README', () => {
+test('intake path follows docs/자료-폴더-표준.md — app dir, term drawer, packId folder', () => {
+  assert.equal(core.intakePath(asset(), '2026-2'),
+    'WB 학습자료/naesin/2026-2/2022-ne-kimgitaek-m2-L5/03_단어시험.pdf');
+  /* 서랍은 사람 편의라 없어도 된다 — 도구는 팩 id 폴더만 본다. */
   assert.equal(core.intakePath(asset()),
-    'WB 교재스캔/내신브레인_영어/NE능률(김기택)/중2/L05/03_단어시험.pdf');
-  const t = asset({ catalog: { textbookCode: 'donga-yunjeongmi', grade: 'm1', unit: 3, series: '04', edition: 'teacher' } });
-  assert.equal(core.intakePath(t),
-    'WB 교재스캔/내신브레인_영어/동아(윤정미)/중1/L03/04_예상문제_PRE-STEP_교사용.pdf');
+    'WB 학습자료/naesin/2022-ne-kimgitaek-m2-L5/03_단어시험.pdf');
+  const t = asset({ catalog: { textbookCode: 'donga-yunjeongmi', grade: 'm3', unit: 3, series: '04', edition: 'teacher' } });
+  assert.equal(core.intakePath(t, '2026-2'),
+    'WB 학습자료/naesin/2026-2/2015-donga-yunjeongmi-m3-L3/04_예상문제_PRE-STEP_교사용.pdf',
+    '중3 은 2015 개정 — 폴더 이름에도 그게 박힌다');
   assert.equal(core.intakePath(asset({ catalog: { series: '03' } })), '', 'no guessing when the folder is unknown');
+  /* 폴더 이름은 팩 id 규칙을 만족해야 한다 — 한글·괄호가 들어가면 서버가 거부한다. */
+  const folder = core.intakeFolder(asset(), '2026-2').split('/').pop();
+  assert.ok(core.PACK_ID_RE.test(folder), folder + ' must match ^[A-Za-z0-9-]{3,60}$');
 });
 
-test('packId is derived from the drive path, so the path is the id', () => {
-  assert.equal(core.packIdFromPath('WB 교재스캔/내신브레인_영어/NE능률(김기택)/중2/L06/02_본문워크북.pdf'), '2022-ne-kimgitaek-m2-L6');
-  assert.equal(core.packIdFromPath('ne-kimgitaek/m2/L06'), '2022-ne-kimgitaek-m2-L6', 'codes in the path work too');
-  assert.equal(core.packIdFromPath('NE능률(김기택)/중2/L06', '2009'), '2009-ne-kimgitaek-m2-L6', 'explicit revision wins');
-  /* 중3 은 2015 개정이다 — 학년에서 유도하므로 경로만으로 맞는 접두사가 나온다. */
-  assert.equal(core.packIdFromPath('WB 교재스캔/내신브레인_영어/동아(윤정미)/중3/L06'), '2015-donga-yunjeongmi-m3-L6');
-  assert.equal(core.packIdFromPath('금성(최인철)/중3/L04'), '2015-kumsung-choeincheol-m3-L4');
-  assert.equal(core.packIdFromPath('NE능률(김기택)/중3/L01'), '', 'that book has no 중3 — no id rather than a wrong one');
-  assert.equal(core.packIdFromPath('WB 교재스캔/내신브레인_영어/NE능률(김기택)/중2'), '', 'missing unit → no id');
+test('packId is the folder name — found at any drawer depth, never re-assembled', () => {
+  assert.equal(core.packIdFromPath('WB 학습자료/naesin/2026-2/2022-ne-kimgitaek-m2-L6/02_본문워크북.pdf'),
+    '2022-ne-kimgitaek-m2-L6');
+  assert.equal(core.packIdFromPath('2022-ne-kimgitaek-m2-L6'), '2022-ne-kimgitaek-m2-L6', 'bare folder name works');
+  assert.equal(core.packIdFromPath('a/b/c/d/e/2015-kumsung-choeincheol-m3-L4/00_교과서본문.pdf'),
+    '2015-kumsung-choeincheol-m3-L4', 'drawers may be any depth');
+  /* 개정이 학년과 어긋나면 거부한다 — 폴더 이름을 사람이 손으로 적는 자리라 오타가 난다. */
+  assert.equal(core.packIdFromPath('2022-kumsung-choeincheol-m3-L4'), '', 'wrong revision for the grade');
+  assert.equal(core.packIdFromPath('2015-ne-kimgitaek-m2-L6'), '', 'wrong revision for the grade');
+  assert.equal(core.packIdFromPath('2022-nope-m2-L6'), '', 'unknown textbook');
+  /* 옛 3겹 한글 구조는 더 이상 인정하지 않는다 — 팩 id 규칙을 만족하지 못하는 폴더 이름이었다. */
+  assert.equal(core.packIdFromPath('WB 교재스캔/내신브레인_영어/NE능률(김기택)/중2/L06'), '');
   assert.equal(core.packIdFromPath(''), '');
+});
+
+test('parsePackId decomposes a folder name, or refuses it', () => {
+  assert.deepEqual(core.parsePackId('2015-donga-yunjeongmi-m3-L6'),
+    { packId: '2015-donga-yunjeongmi-m3-L6', revision: '2015', textbookCode: 'donga-yunjeongmi', grade: 'm3', unit: 6 });
+  assert.equal(core.parsePackId('2022 ne kimgitaek m2 L6'), null, 'spaces break the id rule');
+  assert.equal(core.parsePackId('2022-ne-kimgitaek-m2-L6/'), null, 'a slash is not part of an id');
+  assert.equal(core.parsePackId(''), null);
 });
 
 test('packIdOf prefers the stored path and falls back to the catalog', () => {
   assert.equal(core.packIdOf(asset()), '2022-ne-kimgitaek-m2-L5');
-  assert.equal(core.packIdOf(asset({ storage: { drivePath: 'WB 교재스캔/내신브레인_영어/YBM(박준언)/중3/L02/03_단어시험.pdf' } })),
-    '2015-ybm-parkjuneon-m3-L2', '중3 은 2015 개정 — 이 단언이 예전에 2022 로 굳어 있었다');
+  assert.equal(core.packIdOf(asset({ storage: { drivePath: 'WB 학습자료/naesin/2026-2/2015-ybm-parkjuneon-m3-L2/03_단어시험.pdf' } })),
+    '2015-ybm-parkjuneon-m3-L2');
   assert.equal(core.packIdOf({ catalog: { textbookCode: 'ne-kimgitaek', grade: 'm3', unit: 2 } }), '',
     'catalog fallback also refuses a grade the book does not have');
   assert.equal(core.packIdOf({ catalog: { textbookCode: 'nope', grade: 'm2', unit: 1 } }), '');
@@ -433,9 +455,9 @@ test('purchaseAssignments folds several assets into one sheet with a step per as
   assert.equal(a.carry, true);
   assert.equal(a.priority, 'normal', 'D-35 is not urgent');
   assert.ok(a.detail.includes('SCH-07 · 중2 · NE능률(김기택) · L05·L06 · 시험 2026-10-14 (D-35)'));
-  assert.ok(a.detail.includes('WB 교재스캔/내신브레인_영어/'));
-  assert.ok(a.detail.includes('MAT-0107 → NE능률(김기택)/중2/L05/03_단어시험.pdf (예상 5,000원)'));
-  assert.ok(a.detail.includes('MAT-0108 → NE능률(김기택)/중2/L05/04_예상문제_PRE-STEP_교사용.pdf'));
+  assert.ok(a.detail.includes('WB 학습자료/naesin/'));
+  assert.ok(a.detail.includes('MAT-0107 → 2022-ne-kimgitaek-m2-L5/03_단어시험.pdf (예상 5,000원)'));
+  assert.ok(a.detail.includes('MAT-0108 → 2022-ne-kimgitaek-m2-L5/04_예상문제_PRE-STEP_교사용.pdf'));
   assert.ok(a.detail.includes('예상 합계 10,500원'));
   assert.ok(a.guide.includes('승인된 건만 결제'));
   assert.ok(a.guide.includes('학생 이름·학교명은 적지 않습니다'));
