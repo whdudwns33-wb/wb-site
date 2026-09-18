@@ -95,6 +95,7 @@ import { handleOnboardingPatch } from './onboarding.js';
 import { handleParentPortal } from './parent-portal.js';
 import { handleStudentPortal } from './student-portal.js';
 import { handleMakeup } from './makeup.js';
+import { questionBankResult } from './question-bank.js';
 import { handleSessionPack } from './session-pack.js';
 import { handleGuardianOpsSend } from './guardian-ops-send.js';
 import { handleContactLog } from './contact-log.js';
@@ -3357,6 +3358,17 @@ export default {
         const auth = await resolveAuth(env, app, body.auth);
         if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
         return await handleMakeup(env, app, body, okOrigin, auth, json);
+      }
+      if (url.pathname === '/question-bank') {
+        const auth = await resolveAuth(env, app, body.auth);
+        if (auth && auth.scope === 'own') {
+          const staff = await activeStaffData(env, app, auth.id);
+          if (!staff || staff.workRole === 'driver_facility') return json({ ok: false, error: '이 계정에는 접근 권한이 없습니다' }, 403, okOrigin);
+        }
+        const result = questionBankResult(env, body, auth);
+        const response = json(result.data, result.status, okOrigin);
+        response.headers.set('Cache-Control', 'no-store, private');
+        return response;
       }
       if (url.pathname === '/session-pack') {
         const auth = await resolveAuth(env, app, body.auth);
