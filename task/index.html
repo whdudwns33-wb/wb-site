@@ -1206,15 +1206,15 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-09-15.2"></script>
-<script src="./schedule-board-core.js?v=2026-09-15.2"></script>
-<script src="./asset-core.js?v=2026-09-15.2"></script>
-<script src="./qr-core.js?v=2026-09-15.2"></script>
-<script src="./acaflow-import-core.js?v=2026-09-15.2"></script>
-<script src="./feedback-subject-catalog.js?v=2026-09-15.2"></script>
-<script src="./sync-recovery-core.js?v=2026-09-15.2"></script>
-<script src="./staff-work-session-core.js?v=2026-09-15.2"></script>
-<script src="./staff-attendance-history-core.js?v=2026-09-15.2"></script>
+<script src="./lesson-form-core.js?v=2026-09-18.1"></script>
+<script src="./schedule-board-core.js?v=2026-09-18.1"></script>
+<script src="./asset-core.js?v=2026-09-18.1"></script>
+<script src="./qr-core.js?v=2026-09-18.1"></script>
+<script src="./acaflow-import-core.js?v=2026-09-18.1"></script>
+<script src="./feedback-subject-catalog.js?v=2026-09-18.1"></script>
+<script src="./sync-recovery-core.js?v=2026-09-18.1"></script>
+<script src="./staff-work-session-core.js?v=2026-09-18.1"></script>
+<script src="./staff-attendance-history-core.js?v=2026-09-18.1"></script>
 <script>
 "use strict";
 
@@ -5442,6 +5442,7 @@ function taskRow(t, date, editable, isCarry) {
         originTags(t) +
       '</div>';
 
+  if (makeupLesson) h += makeupInstructionHtml(makeupRows.find(row => String(row.caseId) === String(t.makeupCaseId || '')));
   if (hasDetail && st !== 'done' && !handoffOutstanding) {
     h += '<div class="bar mini ' + (st === 'doing' ? 'doing' : '') + '" style="margin-top:8px"><i style="width:' + prog.pct + '%"></i></div>';
   }
@@ -11368,7 +11369,7 @@ function makeupCard(row) {
       (differentProposal ? '<span class="tag makeup-lesson">대체 담당 제안</span>' : '') +
       (delayed ? '<span class="tag blk">지연</span>' : scheduledToday ? '<span class="tag time">오늘</span>' : '') +
       (reason ? '<span class="tag">' + esc(reason) + '</span>' : '') + '</div>' +
-    makeupScheduleHtml(row) +
+    makeupScheduleHtml(row) + makeupInstructionHtml(row) +
     (actions ? '<div class="makeup-actions">' + actions + '</div>' : '') + '</article>';
 }
 
@@ -11537,7 +11538,7 @@ async function mutateMakeup(payload, button, successText, focusAct, closeOnSucce
     makeupLiveMessage = completedText;
     if (closeOnSuccess) closeModal();
     rememberMakeupFocus(caseId, focusAct);
-    if (route === 'makeup') render();
+    if (route === 'makeup' || payload.action === 'instruction_update' || payload.action === 'instruction_ack') render();
     toast(completedText);
     return result;
   } catch (error) {
@@ -11773,7 +11774,7 @@ function openManualMakeupModal() {
     '<div class="small muted" id="muManualLessonHint">원생을 선택하면 수업무관 또는 현재 배정된 정규수업을 고를 수 있습니다.</div>' +
     '<div class="field"><label class="fl" for="muManualReason">3. 보강 유형</label><select class="in" id="muManualReason">' +
       '<option value="">유형을 선택하세요</option>' + MANUAL_MAKEUP_REASON_OPTIONS.map(item => '<option value="' + item[0] + '">' + item[1] + '</option>').join('') + '</select></div>' +
-    manualMakeupStaffFieldHtml() +
+    manualMakeupStaffFieldHtml() + makeupInstructionFieldHtml(null) +
     '<div class="field"><label class="fl" for="muManualDate">5. 보강 날짜</label><input class="in" id="muManualDate" type="date"></div>' +
     '<div class="grid2"><div class="field"><label class="fl" for="muManualStart">시작시간</label><input class="in" id="muManualStart" type="time"></div>' +
       '<div class="field"><label class="fl" for="muManualEnd">종료시간</label><input class="in" id="muManualEnd" type="time"></div></div>' +
@@ -11810,7 +11811,9 @@ async function submitManualMakeup(button) {
   const sourceFields = sourceMode === 'unrelated'
     ? { sourceMode: sourceMode, requestId: manualMakeupRequestId }
     : { sourceMode: sourceMode, sourceTaskId: String(sourceTask.id) };
-  await mutateMakeup({ action: 'create_manual', studentId: studentId, ...sourceFields,
+  const instruction = makeupInstructionInput(sourceTask && sourceTask.staffId || staffId, staffId);
+  if (!instruction) return;
+  await mutateMakeup({ action: 'create_manual', studentId: studentId, ...sourceFields, ...instruction,
     reason: reason, date: date, startTime: startTime, endTime: endTime, staffId: staffId }, button,
     '보강수업을 생성했습니다', '', true);
 }
@@ -11826,6 +11829,65 @@ function makeupCanComplete(row) {
       String(session.staffId || '') === makeupDefaultStaffId(row)) return true;
   return row.status === 'confirmed' && session.isStaffLink &&
     String(row.confirmedStaffId || '') === String(session.staffId || '');
+}
+
+function makeupCanEditInstruction(row) {
+  return !!(row && (session.isAdmin || String(session.staffId || '') === String(row.currentTeacherId || row.sourceTeacherId || '')));
+}
+
+function makeupInstructionFieldHtml(row) {
+  const note = row && row.instructions || {};
+  return '<label class="field"><span class="fl">보강 수업 전달사항 (내부 공유)</span>' +
+    '<textarea class="in" id="muInstruction" rows="4" maxlength="1500" placeholder="교재·쪽수, 진행할 내용, 지도 시 유의사항을 적어 주세요.">' +
+    esc(note.text || '') + '</textarea></label><input id="muInstructionVersion" type="hidden" value="' + Number(note.version || 0) + '">' +
+    '<div class="hint">학부모 피드백에는 자동으로 포함되지 않습니다. 보강 담당자의 오늘 수업 카드에 바로 표시됩니다.</div>';
+}
+
+function makeupInstructionInput(sourceStaffId, staffId) {
+  const input = $('#muInstruction');
+  if (!input) return {};
+  const text = String(input.value || '').trim();
+  if (sourceStaffId && staffId !== sourceStaffId && !text &&
+      !confirm('다른 선생님이 진행할 보강에 전달사항이 없습니다. 그대로 진행하시겠습니까?')) return null;
+  return { instructionText: text, instructionVersion: Number(($('#muInstructionVersion') || {}).value || 0) };
+}
+
+function makeupInstructionHtml(row) {
+  if (!row) return '';
+  const note = row.instructions || {};
+  const canEdit = makeupCanEditInstruction(row);
+  const canAck = note.text && !note.acknowledged && String(session.staffId || '') === String(row.confirmedStaffId || '') && !!session.staffId;
+  const editButton = canEdit ? '<button class="btn btn-ghost btn-sm mt8" data-act="muinstructionedit" data-case="' +
+    esc(row.caseId) + '">' + (note.text ? '전달사항 수정' : '보강 전달사항 입력') + '</button>' : '';
+  if (!note.text) return editButton;
+  return '<section class="makeup-instruction" style="margin:10px 0;padding:12px;background:#fff4d6;border:2px solid #d58b00;border-radius:10px;color:#382500">' +
+    '<b>보강 수업 전달사항</b>' + (!note.acknowledged ? ' <b style="color:#d00000" aria-label="새 전달사항">N</b>' : '') +
+    '<div class="small">작성 · ' + esc(makeupTeacherLabel(note.authorId, '관리자')) + '</div>' +
+    '<div style="white-space:pre-wrap;overflow-wrap:anywhere;margin-top:6px">' + esc(note.text) + '</div>' +
+    '<div class="small mt8">' + (note.acknowledged ? '보강 담당자 확인 완료' : '보강 담당자 미확인') + '</div>' +
+    (canAck ? '<button class="btn btn-primary btn-sm mt8" data-act="muinstructionack" data-case="' + esc(row.caseId) + '">전달사항 확인</button>' : '') +
+    editButton + '</section>';
+}
+
+function openMakeupInstructionModal(caseId) {
+  const row = makeupRows.find(item => String(item.caseId) === String(caseId));
+  if (!makeupCanEditInstruction(row)) return;
+  modal('보강 수업 전달사항 — ' + esc(row.studentName || '학생'),
+    makeupInstructionFieldHtml(row) + makeupModalErrorHtml(),
+    '<button class="btn btn-primary btn-block mt14" data-act="muinstructionsave" data-case="' + esc(row.caseId) +
+    '" data-rev="' + Number(row.revision) + '">저장</button>');
+}
+
+async function submitMakeupInstruction(button, acknowledge) {
+  const row = makeupRows.find(item => String(item.caseId) === String(button.dataset.case));
+  if (!row) return;
+  const note = row.instructions || {};
+  const fields = acknowledge ? { instructionVersion: Number(note.version || 0), assignment: note.assignment || '' }
+    : makeupInstructionInput(row.currentTeacherId || row.sourceTeacherId, row.confirmedStaffId || row.currentTeacherId || row.sourceTeacherId);
+  if (!fields) return;
+  await mutateMakeup({ action: acknowledge ? 'instruction_ack' : 'instruction_update',
+    caseId: row.caseId, revision: acknowledge ? row.revision : Number(button.dataset.rev), ...fields }, button,
+    acknowledge ? '전달사항을 확인했습니다' : '전달사항을 저장했습니다', '', !acknowledge);
 }
 
 function makeupLessonTaskForCase(row) {
@@ -11904,6 +11966,7 @@ function makeupDateTimeModal(row, mode) {
   modal(title + ' — ' + esc(staffStudentCompactLabelById(row.studentId, row.studentName || '학생', row.grade)),
     '<div class="makeup-schedule"><b>원 수업 담당 선생님</b><br>' +
       esc(makeupTeacherLabel(originalStaffId, '원 수업 담당 확인 필요')) + '</div>' + staffField +
+    ((mode === 'schedule' || rescheduling || retrying) ? makeupInstructionFieldHtml(row) : '') +
     '<div class="field"><label class="fl" for="muDate">보강 날짜</label><input class="in" id="muDate" type="date" value="' + esc(date) + '"' +
       (directCompletion ? ' max="' + esc(today()) + '"' : '') + ((mode === 'restore' || scheduledCompletion) ? ' disabled' : '') + '></div>' +
     '<div class="grid2"><div class="field"><label class="fl" for="muStart">시작시간</label><input class="in" id="muStart" type="time" value="' + esc(startTime) + '"' + (mode === 'restore' ? ' disabled' : '') + '></div>' +
@@ -11967,7 +12030,10 @@ async function submitMakeupSchedule(button) {
   if (!slot) return;
   const staffId = String(($('#muStaff') || {}).value || '');
   if (!makeupActiveStaff(staffId)) return showMakeupModalError('활성 보강 담당 선생님을 선택해 주세요');
-  await mutateMakeup({ action: 'schedule', caseId: button.dataset.case, revision: Number(button.dataset.rev), ...slot, staffId: staffId },
+  const row = makeupRows.find(item => item.caseId === String(button.dataset.case || ''));
+  const instruction = makeupInstructionInput(row && (row.currentTeacherId || row.sourceTeacherId), staffId);
+  if (!instruction) return;
+  await mutateMakeup({ action: 'schedule', caseId: button.dataset.case, revision: Number(button.dataset.rev), ...slot, staffId: staffId, ...instruction },
     button, '보강수업을 생성했습니다', 'muschedule', true);
 }
 
@@ -11979,7 +12045,9 @@ async function submitMakeupReschedule(button) {
   if (!slot) return;
   const staffId = String(($('#muStaff') || {}).value || '');
   if (!makeupActiveStaff(staffId)) return showMakeupModalError('활성 보강 담당 선생님을 선택해 주세요');
-  await mutateMakeup({ action: 'reschedule', caseId: button.dataset.case, revision: Number(button.dataset.rev), ...slot, staffId: staffId },
+  const instruction = makeupInstructionInput(row.currentTeacherId || row.sourceTeacherId, staffId);
+  if (!instruction) return;
+  await mutateMakeup({ action: 'reschedule', caseId: button.dataset.case, revision: Number(button.dataset.rev), ...slot, staffId: staffId, ...instruction },
     button, '보강 담당자와 일정을 수정했습니다', 'mureschedule', true);
 }
 
@@ -11991,8 +12059,10 @@ async function submitMakeupRetryAfterAbsence(button) {
   if (!slot) return;
   const staffId = String(($('#muStaff') || {}).value || '');
   if (!makeupActiveStaff(staffId)) return showMakeupModalError('활성 보강 담당 선생님을 선택해 주세요');
+  const instruction = makeupInstructionInput(row.currentTeacherId || row.sourceTeacherId, staffId);
+  if (!instruction) return;
   await mutateMakeup({ action: 'reschedule_after_absence', caseId: button.dataset.case,
-    revision: Number(button.dataset.rev), ...slot, staffId: staffId },
+    revision: Number(button.dataset.rev), ...slot, staffId: staffId, ...instruction },
     button, '기존 결석 기록을 보존하고 새 보강 일정을 생성했습니다', 'muretryafter', true);
 }
 
@@ -22218,6 +22288,9 @@ document.addEventListener('click', ev => {
     case 'murefresh': makeupLoaded = false; loadMakeups(true); break;
     case 'mumanualopen': openManualMakeupModal(); break;
     case 'mumanualsubmit': submitManualMakeup(el); break;
+    case 'muinstructionedit': openMakeupInstructionModal(el.dataset.case); break;
+    case 'muinstructionsave': submitMakeupInstruction(el, false); break;
+    case 'muinstructionack': submitMakeupInstruction(el, true); break;
     case 'mucreate': createMakeupFromAbsence(String(id || ''), String(date || ''), el, { automatic: false }); break;
     case 'murecover': recoverMissingMakeup(el); break;
     case 'muschedule': {
@@ -24420,7 +24493,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-09-15.2';
+const APP_VER = '2026-09-18.1';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);

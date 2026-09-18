@@ -24,6 +24,7 @@ function makeupScheduleSubmitHarness(options = {}) {
     showMakeupModalError: error => calls.push({ error }),
     makeupActiveStaff: id => id === 'staff-1' ? { id } : null,
     makeupRows: options.rows || [{ caseId: 'makeup-8', status: 'confirmed' }],
+    makeupInstructionInput: () => ({}),
     mutateMakeup: async payload => calls.push({ payload })
   };
   const source = block('function makeupDateTimeInput()', 'async function restoreMakeupSchedule');
@@ -628,8 +629,10 @@ test('click routing covers only the simplified makeup transitions', () => {
   }
 });
 
-test('makeup UI stores no guardian contact or sensitive free-text fields', () => {
+test('makeup UI stores no guardian contact and only has the bounded internal instruction textarea', () => {
   const source = block('/* ── 보강 —', '/* ── 주간 플래너');
-  assert.doesNotMatch(source, /guardianPhone|parentPhone|phone|contact|상담메모|<textarea|prompt\s*\(/i);
+  assert.doesNotMatch(source, /guardianPhone|parentPhone|phone|contact|상담메모|prompt\s*\(/i);
+  assert.equal((source.match(/<textarea/g) || []).length, 1);
+  assert.match(source, /id="muInstruction" rows="4" maxlength="1500"/);
   assert.match(source, /정해진 운영 사유만 기록합니다/);
 });
