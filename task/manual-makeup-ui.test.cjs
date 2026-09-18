@@ -26,6 +26,7 @@ function manualMakeupSubmitHarness(options = {}) {
     MANUAL_MAKEUP_REASON_LABELS: { manual_absence: '결석보강', manual_exam: '시험보강', manual_other: '기타보강' },
     MANUAL_MAKEUP_UNRELATED: '__unrelated__',
     manualMakeupRequestId: 'request-8',
+    makeupInstructionInput: () => ({}),
     today: () => '2026-09-08',
     showMakeupModalError: error => calls.push({ error }),
     makeupActiveStaff: id => ['staff-1', 'staff-2'].includes(id) ? { id } : null,
@@ -189,7 +190,7 @@ test('확인은 create_manual의 정확한 식별자·사유·일시만 전송�
   const calls = [];
   const submit = new Function('$', 'session', 'manualMakeupSourceLessons', 'MANUAL_MAKEUP_REASON_LABELS',
     'MANUAL_MAKEUP_UNRELATED',
-    'today', 'showMakeupModalError', 'makeupActiveStaff', 'mutateMakeup', `${source}\nreturn submitManualMakeup;`)(
+    'today', 'showMakeupModalError', 'makeupActiveStaff', 'makeupInstructionInput', 'mutateMakeup', `${source}\nreturn submitManualMakeup;`)(
       id => elements[id.slice(1)] || null,
       { isAdmin: false, isStaffLink: true, staffId: 'staff-1' },
       studentId => studentId === 'student-8' ? [{ id: 'lesson-3' }] : [],
@@ -198,6 +199,7 @@ test('확인은 create_manual의 정확한 식별자·사유·일시만 전송�
       () => '2026-09-03',
       message => calls.push({ error: message }),
       staffId => staffId === 'staff-1' ? { id: staffId } : null,
+      () => ({}),
       async (payload, button, successText, focusAct, closeOnSuccess) => {
         calls.push({ payload, button, successText, focusAct, closeOnSuccess });
       }
@@ -228,7 +230,7 @@ test('수업무관 선택은 현재 담당 수업을 권한 근거로만 보내�
   };
   const calls = [];
   const submit = new Function('$', 'session', 'manualMakeupSourceLessons', 'MANUAL_MAKEUP_REASON_LABELS',
-    'MANUAL_MAKEUP_UNRELATED', 'manualMakeupRequestId', 'today', 'showMakeupModalError', 'makeupActiveStaff', 'mutateMakeup',
+    'MANUAL_MAKEUP_UNRELATED', 'manualMakeupRequestId', 'today', 'showMakeupModalError', 'makeupActiveStaff', 'makeupInstructionInput', 'mutateMakeup',
     `${source}\nreturn submitManualMakeup;`)(
       id => elements[id.slice(1)] || null,
       { isAdmin: false, isStaffLink: true, staffId: 'staff-1' },
@@ -236,6 +238,7 @@ test('수업무관 선택은 현재 담당 수업을 권한 근거로만 보내�
       { manual_absence: '결석보강', manual_exam: '시험보강' }, '__unrelated__', 'request-8',
       () => '2026-09-03', message => calls.push({ error: message }),
       staffId => staffId === 'staff-1' ? { id: staffId } : null,
+      () => ({}),
       async payload => calls.push({ payload })
     );
 
