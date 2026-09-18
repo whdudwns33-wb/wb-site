@@ -27,7 +27,13 @@ class Statement {
   bind(...args) { this.args = args; return this; }
   first() { return this.db.prepare(this.sql).get(...this.args) || null; }
   all() { return { results: this.db.prepare(this.sql).all(...this.args) }; }
-  run() { const result = this.db.prepare(this.sql).run(...this.args); return { meta: { changes: Number(result.changes || 0) } }; }
+  run() {
+    // 운영 D1의 변경 건수에는 일정 revision 트리거의 부수 변경도 포함된다.
+    const before = this.db.prepare('SELECT total_changes() AS n').get().n;
+    this.db.prepare(this.sql).run(...this.args);
+    const after = this.db.prepare('SELECT total_changes() AS n').get().n;
+    return { meta: { changes: Number(after - before) } };
+  }
 }
 
 class TestD1 {
@@ -39,6 +45,7 @@ class TestD1 {
     this.database.exec(taskWriteCasMigration);
     this.database.exec(assigneeIntegrityMigration);
     this.database.exec(studentOverlapMigration);
+    this.database.exec(fs.readFileSync(new URL('./migrations/070_remove_heavy_student_schedule_triggers.sql', import.meta.url), 'utf8'));
     this.database.exec(completionLinksMigration);
     this.database.exec(absenceRetryMigration);
     this.beforeBatch = null;
@@ -384,6 +391,24 @@ test('session4 automatic makeup keeps the prior policy for absences before the c
   });
   assert.equal(prior.status, 200, JSON.stringify(prior.body));
   assert.equal(prior.body.case.history[0].creationMode, 'automatic');
+});
+
+test('D1 trigger-inclusive commit reports success and a repeated manual creation does not duplicate the lesson', async () => {
+  const db = new TestD1(); seed(db);
+  let reported = [];
+  const batch = db.batch.bind(db);
+  db.batch = statements => { const result = batch(statements); reported = result; return result; };
+  const request = { action: 'create_manual', studentId: 'student-a', sourceTaskId: 'lesson-a',
+    reason: 'manual_exam', date: '2026-08-12', startTime: '20:00', endTime: '21:00' };
+  const created = await call(db, manager('director'), request);
+  assert.equal(reported[0].meta.changes, 2, 'case insert also increments student schedule revision');
+  assert.equal(created.status, 200, JSON.stringify(created.body));
+  assert.equal(created.body.case.status, 'confirmed');
+  assert.equal(db.database.prepare("SELECT revision FROM student_schedule_revisions WHERE student_id='student-a'").get().revision, 1);
+  const retry = await call(db, manager('director'), request);
+  assert.equal(retry.status, 200);
+  assert.equal(retry.body.idempotent, true);
+  assert.equal(db.database.prepare('SELECT count(*) AS n FROM makeup_cases').get().n, 1);
 });
 
 test('assigned teacher or administrator can create one confirmed manual makeup on a non-recurring day without changing attendance', async () => {
