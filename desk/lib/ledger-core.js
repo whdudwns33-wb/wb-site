@@ -100,7 +100,7 @@
   /* 시험기 서랍은 사람 편의다 — 도구는 팩 id 폴더만 본다(서랍을 몇 겹으로 두든 상관없다). */
   const PACK_ID_RE = /^[A-Za-z0-9-]{3,60}$/;
   /* 영어 팩 id: <개정>-<출판사저자>-<학년>-L<과> */
-  const EN_PACK_RE = /^(\d{4})-([a-z0-9]+(?:-[a-z0-9]+)*)-(m[123]|h[123])-L(\d{1,2})$/;
+  const EN_PACK_RE = /^(\d{4})-([a-z0-9]+(?:-[a-z0-9]+)*)-(m[123]|h[123])-(L\d{1,2}|S[LR]\d?)$/;
 
   const EXAM_TERMS = [
     { key: '1-mid', label: '1학기 중간' },
@@ -151,7 +151,16 @@
   const NEED_ID_RE = /^NEED-\d{4,}$/;
   const SCHOOL_RE = /^SCH-\d{2,3}$/;
   const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
-  const UNIT_MIN = 1, UNIT_MAX = 10;
+  const UNIT_MIN = 1, UNIT_MAX = 12;
+  /* 과 토큰. 교과서의 '과'가 늘 숫자인 것은 아니다 — 이그잼포유 목록에 Special Lesson·
+     Special Reading 이 섞여 있고(중1·중2 전부), 그것도 시험 범위에 들어간다. 숫자만 받으면
+     그 과는 폴더 이름을 만들 수 없어 인테이크가 통째로 멈춘다.
+       L1~L12   일반 과
+       SL·SL1·SL2   Special Lesson (사이트가 번호 없이 쓰기도 한다)
+       SR·SR1·SR2   Special Reading
+     팩 id 규칙(^[A-Za-z0-9-]{3,60}$) 안에 들어가고, 하이픈이 없어 조각 분해도 안전하다. */
+  const UNIT_RE = /^(?:L\d{1,2}|S[LR]\d?)$/;
+  const SPECIAL_UNITS = ['SL', 'SL1', 'SL2', 'SR', 'SR1', 'SR2'];
 
   function str(v) { return v == null ? '' : String(v).trim(); }
   function num(v) { const n = Number(v); return Number.isFinite(n) ? n : 0; }
@@ -189,7 +198,27 @@
   /* ── 표시 ── */
   function textbookLabel(code) { const t = TEXTBOOKS[str(code)]; return t ? t.label : ''; }
   function gradeLabel(grade) { return GRADES[str(grade)] || ''; }
-  function unitLabel(unit) { const u = num(unit); return u ? 'L' + pad2(u) : ''; }
+  /* 숫자(5)·숫자문자열('5')·토큰('sl2')을 다 받아 표준 토큰으로 돌린다. 못 읽으면 ''. */
+  function normalizeUnit(v) {
+    const raw = str(v);
+    if (!raw) return '';
+    if (/^\d{1,2}$/.test(raw)) {
+      const n = Number(raw);
+      return n >= UNIT_MIN && n <= UNIT_MAX ? 'L' + n : '';
+    }
+    const t = raw.toUpperCase().replace(/\s+/g, '');
+    if (!UNIT_RE.test(t)) return '';
+    if (t[0] === 'L') { const n = Number(t.slice(1)); return n >= UNIT_MIN && n <= UNIT_MAX ? 'L' + n : ''; }
+    return t;
+  }
+  /* 일반 과가 먼저, 그 안에서 번호 순. Special 은 뒤에 SL → SR 순으로 붙는다. */
+  function unitRank(token) {
+    const t = normalizeUnit(token);
+    if (!t) return 9999;
+    if (t[0] === 'L') return Number(t.slice(1));
+    return 100 + SPECIAL_UNITS.indexOf(t);
+  }
+  function unitLabel(unit) { return normalizeUnit(unit); }
   function seriesName(series) { const s = SERIES[str(series)]; return s ? s.name : ''; }
   function editionLabel(edition) { return EDITIONS[str(edition)] || ''; }
   function fmtWon(n) { return num(n).toLocaleString('ko-KR') + '원'; }
@@ -208,7 +237,7 @@
     return {
       textbookCode: str(c.textbookCode),
       grade: str(c.grade),
-      unit: num(c.unit) > 0 ? Math.floor(num(c.unit)) : 0,
+      unit: normalizeUnit(c.unit),
       series: /^\d$/.test(series) ? '0' + series : series,
       edition: str(c.edition) === 'teacher' ? 'teacher' : 'student'
     };
@@ -351,7 +380,7 @@
     if (!PACK_ID_RE.test(v)) return null;
     const m = v.match(EN_PACK_RE);
     if (!m) return null;
-    const revision = m[1], code = m[2], grade = m[3], unit = Number(m[4]);
+    const revision = m[1], code = m[2], grade = m[3], unit = normalizeUnit(m[4]);
     if (!TEXTBOOKS[code] || !GRADES[grade] || !unit) return null;
     if (revisionFor(code, grade) !== revision) return null;
     return { packId: v, revision: revision, textbookCode: code, grade: grade, unit: unit };
@@ -371,7 +400,7 @@
     const c = normalizeCatalog(a.catalog);
     if (!TEXTBOOKS[c.textbookCode] || !GRADES[c.grade] || !c.unit) return '';
     const rev = revisionFor(c.textbookCode, c.grade, revision);
-    return rev ? [rev, c.textbookCode, c.grade, 'L' + c.unit].join('-') : '';
+    return rev ? [rev, c.textbookCode, c.grade, c.unit].join('-') : '';
   }
 
   /* ── 전이 ── */
@@ -390,7 +419,7 @@
   /* ── 시험 범위(need_sets) ── */
   function normalizeUnits(list) {
     const arr = Array.isArray(list) ? list : str(list).split(/[,\s·]+/);
-    return uniq(arr.map(v => Math.floor(num(v))).filter(u => u >= UNIT_MIN && u <= UNIT_MAX)).sort((a, b) => a - b);
+    return uniq(arr.map(normalizeUnit).filter(Boolean)).sort((a, b) => unitRank(a) - unitRank(b));
   }
   function normalizeSeries(list, fallback) {
     const arr = Array.isArray(list) ? list.map(str) : (list == null ? fallback.slice() : str(list).split(/[,\s]+/));
@@ -432,10 +461,10 @@
     if (!SCHOOL_RE.test(need.schoolCode)) errors.push('학교 코드는 SCH-07 처럼 적습니다 (학교 이름은 넣지 않습니다)');
     if (!GRADES[need.grade]) errors.push('학년은 중1·중2·중3 중 하나입니다');
     if (!TEXTBOOKS[need.textbookCode]) errors.push('교과서를 10종 목록에서 고릅니다');
-    if (!need.units.length) errors.push('과(1~10)를 하나 이상 고릅니다');
+    if (!need.units.length) errors.push('과를 하나 이상 고릅니다 (L1~L' + UNIT_MAX + ' · ' + SPECIAL_UNITS.join('·') + ')');
     else {
-      const bad = (Array.isArray(raw.units) ? raw.units : []).map(num).filter(u => !(u >= UNIT_MIN && u <= UNIT_MAX) || u !== Math.floor(u));
-      if (bad.length) errors.push('과는 1~10 사이 정수만 됩니다');
+      const bad = (Array.isArray(raw.units) ? raw.units : []).filter(u => !normalizeUnit(u));
+      if (bad.length) errors.push('읽을 수 없는 과: ' + bad.map(str).join(', ') + ' — L1~L' + UNIT_MAX + ' 또는 ' + SPECIAL_UNITS.join('·') + ' 로 적습니다');
     }
     if (!need.examRef.examDateCopy) errors.push('시험일을 YYYY-MM-DD 로 적습니다 (consult 시험 일정의 값을 그대로 복사)');
     if (need.subject !== '영어') errors.push('Phase 0 은 영어만 다룹니다');
@@ -719,6 +748,8 @@
     STATUS: STATUS, STATUS_LABELS: STATUS_LABELS, STATUS_RANK: STATUS_RANK, TRANSITIONS: TRANSITIONS,
     EVENT_TYPES: EVENT_TYPES, EVENT_LABELS: EVENT_LABELS, BLOCK_REASONS: BLOCK_REASONS, CHANNELS: CHANNELS,
     NOTE_MAX: NOTE_MAX, ASSET_ID_RE: ASSET_ID_RE, NEED_ID_RE: NEED_ID_RE, SCHOOL_RE: SCHOOL_RE,
+    UNIT_RE: UNIT_RE, UNIT_MIN: UNIT_MIN, UNIT_MAX: UNIT_MAX, SPECIAL_UNITS: SPECIAL_UNITS,
+    normalizeUnit: normalizeUnit, unitRank: unitRank,
     ledgerKey: ledgerKey, eventKey: eventKey, needKey: needKey, fullKey: fullKey,
     isLedgerKey: isLedgerKey, kindOfKey: kindOfKey,
     assetIdFromKey: assetIdFromKey, eventIdFromKey: eventIdFromKey, needIdFromKey: needIdFromKey,

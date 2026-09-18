@@ -163,8 +163,8 @@ test('full Phase 0 flow: need set → request → approve/issue → register →
     input('grade', 'm2');
     input('textbookCode', 'ne-kimgitaek');
     input('examDateCopy', '2026-10-14');
-    click('lg-unit', 5);
-    click('lg-unit', 6);
+    click('lg-unit', 'L5');
+    click('lg-unit', 'L6');
     click('lg-series', '02');           // 필수는 빠지지 않는다
     click('lg-tseries', '06');          // 교사용 하나 뺀다
     click('lg-need-save');
@@ -173,13 +173,13 @@ test('full Phase 0 flow: need set → request → approve/issue → register →
     const need = core.normalizeNeed(env.checks[needRows[0]]);
     assert.equal(need.id, 'NEED-0001');
     assert.equal(need.schoolCode, 'SCH-07');
-    assert.deepEqual(need.units, [5, 6]);
+    assert.deepEqual(need.units, ['L5', 'L6']);
     assert.deepEqual(need.requiredSeries, ['02', '03']);
     assert.deepEqual(need.teacherSeries, ['04', '05']);
     assert.equal(need.examRef.examDateCopy, '2026-10-14');
     assert.ok(!('examDate' in need), 'no exam date column');
     html = ui.view();
-    assert.ok(html.includes('SCH-07 · 중2 · NE능률(김기택) · L05·L06'));
+    assert.ok(html.includes('SCH-07 · 중2 · NE능률(김기택) · L5·L6'));
     assert.ok(html.includes('사야 할 8'), '2 units × (02·03 + 04t·05t)');
 
     /* 구매 요청 → 승인 대기 */
@@ -294,7 +294,7 @@ test('full Phase 0 flow: need set → request → approve/issue → register →
 test('a non-admin session sees the ledger read-only and cannot write', () => {
   const env = makeHost();
   env.h.session = { isAdmin: false, isStaffLink: true, staffId: 'S-1' };
-  env.h.setCheck(core.needKey('NEED-0001'), 'all', core.normalizeNeed({ id: 'NEED-0001', schoolCode: 'SCH-07', grade: 'm2', textbookCode: 'ne-kimgitaek', units: [5], examRef: { examDateCopy: '2026-10-14' } }));
+  env.h.setCheck(core.needKey('NEED-0001'), 'all', core.normalizeNeed({ id: 'NEED-0001', schoolCode: 'SCH-07', grade: 'm2', textbookCode: 'ne-kimgitaek', units: ['L5'], examRef: { examDateCopy: '2026-10-14' } }));
   env.h.setCheck(core.ledgerKey('MAT-0001'), 'all', core.normalizeAsset({ id: 'MAT-0001', status: 'requested', catalog: { textbookCode: 'ne-kimgitaek', grade: 'm2', unit: 5, series: '03' }, links: { needId: 'NEED-0001' } }));
   const restore = installHost(env);
   try {
@@ -318,7 +318,7 @@ test('a non-admin session sees the ledger read-only and cannot write', () => {
 test('duplicate approval asks for a second confirmation', () => {
   const env = makeHost();
   const cat = { textbookCode: 'ne-kimgitaek', grade: 'm2', unit: 5, series: '03' };
-  env.h.setCheck(core.needKey('NEED-0001'), 'all', core.normalizeNeed({ id: 'NEED-0001', schoolCode: 'SCH-07', grade: 'm2', textbookCode: 'ne-kimgitaek', units: [5], examRef: { examDateCopy: '2026-10-14' } }));
+  env.h.setCheck(core.needKey('NEED-0001'), 'all', core.normalizeNeed({ id: 'NEED-0001', schoolCode: 'SCH-07', grade: 'm2', textbookCode: 'ne-kimgitaek', units: ['L5'], examRef: { examDateCopy: '2026-10-14' } }));
   env.h.setCheck(core.ledgerKey('MAT-0001'), 'all', core.normalizeAsset({ id: 'MAT-0001', status: 'registered', catalog: cat }));
   env.h.setCheck(core.ledgerKey('MAT-0002'), 'all', core.normalizeAsset({ id: 'MAT-0002', status: 'requested', catalog: cat, links: { needId: 'NEED-0001' } }));
   const restore = installHost(env);
