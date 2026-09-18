@@ -219,8 +219,8 @@ test('full Phase 0 flow: need set → request → approve/issue → register →
     assert.equal(sheet.staff, '직원 하나');
     assert.equal(sheet.title, '[자산] MAT-0001~MAT-0007 구매·인테이크');
     assert.equal(sheet.steps.length, 7);
-    assert.ok(sheet.detail.includes('WB 교재스캔/내신브레인_영어/'));
-    assert.ok(sheet.detail.includes('NE능률(김기택)/중2/L05/02_본문워크북.pdf'));
+    assert.ok(sheet.detail.includes('WB 학습자료/naesin/'));
+    assert.ok(sheet.detail.includes('2022-ne-kimgitaek-m2-L5/02_본문워크북.pdf'));
     assert.equal(core.normalizeAsset(env.checks['__lic__MAT-0001|all']).status, 'approved');
     assert.equal(ui.alertCount(), 0);
 
@@ -242,7 +242,7 @@ test('full Phase 0 flow: need set → request → approve/issue → register →
     assert.equal(reg.status, 'registered');
     assert.equal(reg.cost.amount, 6500);
     assert.equal(reg.cost.paidAt, '2026-09-09');
-    assert.equal(reg.storage.drivePath, 'WB 교재스캔/내신브레인_영어/NE능률(김기택)/중2/L05/02_본문워크북.pdf');
+    assert.equal(reg.storage.drivePath, 'WB 학습자료/naesin/2022-ne-kimgitaek-m2-L5/02_본문워크북.pdf');
     assert.equal(reg.storage.viewUrl, 'https://drive.google.com/file/d/abc/view');
     assert.equal(reg.links.packId, '2022-ne-kimgitaek-m2-L5');
     const types = eventKeys().map(k => env.checks[k].type);
