@@ -1206,15 +1206,15 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-09-18.2"></script>
-<script src="./schedule-board-core.js?v=2026-09-18.2"></script>
-<script src="./asset-core.js?v=2026-09-18.2"></script>
-<script src="./qr-core.js?v=2026-09-18.2"></script>
-<script src="./acaflow-import-core.js?v=2026-09-18.2"></script>
-<script src="./feedback-subject-catalog.js?v=2026-09-18.2"></script>
-<script src="./sync-recovery-core.js?v=2026-09-18.2"></script>
-<script src="./staff-work-session-core.js?v=2026-09-18.2"></script>
-<script src="./staff-attendance-history-core.js?v=2026-09-18.2"></script>
+<script src="./lesson-form-core.js?v=2026-09-19.1"></script>
+<script src="./schedule-board-core.js?v=2026-09-19.1"></script>
+<script src="./asset-core.js?v=2026-09-19.1"></script>
+<script src="./qr-core.js?v=2026-09-19.1"></script>
+<script src="./acaflow-import-core.js?v=2026-09-19.1"></script>
+<script src="./feedback-subject-catalog.js?v=2026-09-19.1"></script>
+<script src="./sync-recovery-core.js?v=2026-09-19.1"></script>
+<script src="./staff-work-session-core.js?v=2026-09-19.1"></script>
+<script src="./staff-attendance-history-core.js?v=2026-09-19.1"></script>
 <script>
 "use strict";
 
@@ -3664,6 +3664,7 @@ function render() {
 
   const map = { schedule: viewSchedule, onboarding: viewOnboarding, today: viewToday, question_bank: viewQuestionBank, week: viewWeek, write: viewWrite, lesson: viewLessonEntry, feedback: viewFeedbackReview, makeup: viewMakeups, sessions: viewSessionPacks, board: viewBoard, staff: viewStaffAdmin, settings: viewSettings, books: viewBooks, transport: viewTransport, roster: viewRoster, devices: viewDevices, driver_transport: viewDriverTransport, facility: viewFacility };
   replaceView(v, (map[route] || viewToday)());
+  if (route === 'question_bank') loadQuestionBank();
   if (route === 'schedule') requestAnimationFrame(() => {
     scheduleFocusTimeline();
     applyScheduleSearch(scheduleSearchQuery);
@@ -3706,7 +3707,49 @@ function renderTabs() {
 
 /* ── 링크로 들어온 지시서 확인 ── */
 function viewQuestionBank() {
-  return '<section class="card" aria-label="문제은행"><div class="card-title">문제은행</div></section>';
+  return '<section class="card" aria-label="문제은행"><div class="card-title">문제은행</div>' +
+    '<div class="hint">학원 내부용 계정입니다. 비밀번호는 보기 버튼으로 확인할 수 있습니다.</div>' +
+    '<div id="questionBankContent" aria-live="polite">불러오는 중입니다.</div></section>';
+}
+
+async function loadQuestionBank() {
+  const host = $('#questionBankContent');
+  const auth = sync.auth();
+  if (!host || !auth) return;
+  const authKey = JSON.stringify(auth);
+  try {
+    const result = await sync.post('/question-bank', { app: SYNC_APP, auth, action: 'list' });
+    if (!host.isConnected || JSON.stringify(sync.auth()) !== authKey || route !== 'question_bank') return;
+    host.innerHTML = (result.items || []).map(item =>
+      '<article class="card mt14"><div class="card-title">' + esc(item.name) + '</div>' +
+      (item.agency ? '<div>Agency ID: <b>' + esc(item.agency) + '</b></div>' : '') +
+      '<div>ID: <b style="overflow-wrap:anywhere">' + esc(item.account) + '</b></div>' +
+      '<div class="mt8">PW: <span data-qb-password style="white-space:pre-wrap;overflow-wrap:anywhere">••••••••</span> ' +
+      '<button class="btn btn-ghost btn-sm" data-act="qbpassword" data-key="' + esc(item.key) + '">비밀번호 보기</button></div></article>'
+    ).join('');
+  } catch {
+    if (host.isConnected) host.innerHTML = '<div class="hint">계정을 불러오지 못했습니다. 로그인 상태를 확인하고 다시 시도해 주세요.</div>' +
+      '<button class="btn btn-ghost" data-act="qbretry">다시 불러오기</button>';
+  }
+}
+
+async function revealQuestionBankPassword(button) {
+  const target = button.parentElement.querySelector('[data-qb-password]');
+  if (!target) return;
+  if (button.dataset.visible === 'yes') {
+    target.textContent = '••••••••'; button.dataset.visible = ''; button.textContent = '비밀번호 보기'; return;
+  }
+  const auth = sync.auth();
+  if (!auth) return toast('로그인이 필요합니다');
+  const authKey = JSON.stringify(auth);
+  button.disabled = true;
+  try {
+    const result = await sync.post('/question-bank', { app: SYNC_APP, auth, action: 'reveal', key: button.dataset.key });
+    if (!button.isConnected || route !== 'question_bank' || JSON.stringify(sync.auth()) !== authKey) return;
+    target.textContent = result.password;
+    button.dataset.visible = 'yes'; button.textContent = '비밀번호 숨기기';
+  } catch { toast('비밀번호를 불러오지 못했습니다. 로그인 상태를 확인해 주세요.'); }
+  finally { if (button.isConnected) button.disabled = false; }
 }
 
 function viewPendingAdd() {
@@ -22230,6 +22273,8 @@ document.addEventListener('click', ev => {
       if (reload) location.reload();
       break;
     }
+    case 'qbpassword': revealQuestionBankPassword(el); break;
+    case 'qbretry': loadQuestionBank(); break;
     case 'changepin': {
       const v = ($('#newPin').value || '').trim();
       if (v.length < 4) return toast('4자리 이상 입력해 주세요');
@@ -24498,7 +24543,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-09-18.2';
+const APP_VER = '2026-09-19.1';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);

@@ -27,9 +27,15 @@ test('운전 직원의 두 탭 및 인증 전 접근 제한은 유지한다', ()
   assert.deepEqual(tabs({ isStaffLink: true }, false, true), []);
   assert.deepEqual(tabs({}), []);
 });
-test('문제은행은 제목만 있고 사이트나 입력 내용이 없는 빈 화면이다', () => {
+test('계정은 비공개 API에서 읽고 비밀번호는 요청 시만 보여주며 기기에 저장하지 않는다', () => {
   const source = html.slice(html.indexOf('function viewQuestionBank()'), html.indexOf('function viewPendingAdd()'));
   const output = Function(source + ';return viewQuestionBank();')();
   assert.match(output, /문제은행/);
-  assert.doesNotMatch(output, /<a |<input|<button|https?:|fetch\(/);
+  assert.match(output, /questionBankContent/);
+  assert.match(source, /action: 'list'/);
+  assert.match(source, /action: 'reveal'/);
+  assert.match(source, /target.textContent = result.password/);
+  assert.match(source, /JSON.stringify\(sync.auth\(\)\) !== authKey/);
+  assert.doesNotMatch(source, /localStorage|sessionStorage|console\.|password.*value=/);
+  assert.match(source, /esc\(item.account\)/);
 });
