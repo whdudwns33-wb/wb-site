@@ -1016,6 +1016,14 @@ function activeStaffGuardStatement(env, app, row, staffId) {
   ).bind(app, row.case_id, Number(row.revision), row.status, app, staffId);
 }
 
+// D1 meta.changes에는 트리거의 일정 revision 갱신도 포함된다.
+// 정확히 한 대상 행을 바꿨는지는 batch 내부 SQL changes() CAS guard가 검증한다.
+// 커밋 후 메타데이터를 1과 비교하면 정상 저장까지 실패로 보고하게 된다.
+function makeupWriteReported(result) {
+  const changes = Number(result && result.meta && result.meta.changes);
+  return Number.isInteger(changes) && changes >= 1;
+}
+
 function mapAtomicMakeupError(error) {
   if (isTaskWriteCasConflict(error)) {
     problem('보강 저장 조건이 달라졌습니다. 원 수업 담당자·일정·출결 또는 전달사항의 최신 상태를 확인해 주세요', 409, 'REVISION_CONFLICT');
@@ -1036,7 +1044,7 @@ async function saveTransition(env, app, row, next, event, json, origin, now = Da
   } catch (error) {
     mapTransitionError(error);
   }
-  if (!result.meta || Number(result.meta.changes || 0) !== 1) return conflictResponse(env, app, row.case_id, json, origin);
+  if (!makeupWriteReported(result)) return conflictResponse(env, app, row.case_id, json, origin);
   return env.DB.prepare('SELECT * FROM makeup_cases WHERE app=? AND case_id=? LIMIT 1').bind(app, row.case_id).first();
 }
 
@@ -1065,7 +1073,7 @@ async function saveProposal(env, app, row, next, event, sourceIdentity, staffId,
     mapAtomicMakeupError(error);
   }
   if (!Array.isArray(results) || results.length !== statements.length ||
-      results.some(result => Number(result && result.meta && result.meta.changes || 0) !== 1)) {
+      results.some(result => !makeupWriteReported(result))) {
     return conflictResponse(env, app, row.case_id, json, origin);
   }
   return env.DB.prepare('SELECT * FROM makeup_cases WHERE app=? AND case_id=? LIMIT 1')
@@ -1147,7 +1155,7 @@ async function saveSchedule(env, app, row, next, event, source, sourceIdentity, 
     mapAtomicMakeupError(error);
   }
   if (!Array.isArray(results) || results.length !== statements.length ||
-      results.some(result => Number(result && result.meta && result.meta.changes || 0) !== 1)) {
+      results.some(result => !makeupWriteReported(result))) {
     return conflictResponse(env, app, row.case_id, json, origin);
   }
   return env.DB.prepare('SELECT * FROM makeup_cases WHERE app=? AND case_id=? LIMIT 1')
@@ -1187,7 +1195,7 @@ async function saveReschedule(env, app, row, next, event, source, sourceIdentity
     mapAtomicMakeupError(error);
   }
   if (!Array.isArray(results) || results.length !== statements.length ||
-      results.some(result => Number(result && result.meta && result.meta.changes || 0) !== 1)) {
+      results.some(result => !makeupWriteReported(result))) {
     return conflictResponse(env, app, row.case_id, json, origin);
   }
   return env.DB.prepare('SELECT * FROM makeup_cases WHERE app=? AND case_id=? LIMIT 1')
@@ -1224,7 +1232,7 @@ async function saveRescheduleAfterAbsence(env, app, row, next, event, source, so
     mapAtomicMakeupError(error);
   }
   if (!Array.isArray(results) || results.length !== statements.length ||
-      results.some(result => Number(result && result.meta && result.meta.changes || 0) !== 1)) {
+      results.some(result => !makeupWriteReported(result))) {
     return conflictResponse(env, app, row.case_id, json, origin);
   }
   return env.DB.prepare('SELECT * FROM makeup_cases WHERE app=? AND case_id=? LIMIT 1')
@@ -1250,7 +1258,7 @@ async function saveCancellation(env, app, row, next, event, currentSourceTeacher
       mapAtomicMakeupError(error);
     }
     if (!Array.isArray(missingResults) || missingResults.length !== 4 ||
-        missingResults.some(result => Number(result && result.meta && result.meta.changes || 0) !== 1)) {
+        missingResults.some(result => !makeupWriteReported(result))) {
       return conflictResponse(env, app, row.case_id, json, origin);
     }
     return env.DB.prepare('SELECT * FROM makeup_cases WHERE app=? AND case_id=? LIMIT 1')
@@ -1273,7 +1281,7 @@ async function saveCancellation(env, app, row, next, event, currentSourceTeacher
     mapAtomicMakeupError(error);
   }
   if (!Array.isArray(results) || results.length !== 4 ||
-      results.some(result => Number(result && result.meta && result.meta.changes || 0) !== 1)) {
+      results.some(result => !makeupWriteReported(result))) {
     return conflictResponse(env, app, row.case_id, json, origin);
   }
   return env.DB.prepare('SELECT * FROM makeup_cases WHERE app=? AND case_id=? LIMIT 1')
@@ -1409,7 +1417,7 @@ async function saveUnrecordedCompletion(env, app, row, next, event, document, so
     mapAtomicMakeupError(error);
   }
   if (!Array.isArray(results) || results.length !== statements.length ||
-      results.some(result => Number(result && result.meta && result.meta.changes || 0) !== 1)) {
+      results.some(result => !makeupWriteReported(result))) {
     return conflictResponse(env, app, row.case_id, json, origin);
   }
   const saved = await env.DB.prepare('SELECT * FROM makeup_cases WHERE app=? AND case_id=? LIMIT 1')
@@ -1539,7 +1547,7 @@ async function saveCompletion(env, app, row, next, event, document, source, stud
     mapAtomicMakeupError(error);
   }
   if (!Array.isArray(results) || results.length !== statements.length ||
-      results.some(result => Number(result && result.meta && result.meta.changes || 0) !== 1)) {
+      results.some(result => !makeupWriteReported(result))) {
     return conflictResponse(env, app, row.case_id, json, origin);
   }
   const saved = await env.DB.prepare('SELECT * FROM makeup_cases WHERE app=? AND case_id=? LIMIT 1')
@@ -1752,7 +1760,7 @@ async function linkCompleted(env, app, body, auth, json, origin) {
   let results;
   try { results = await env.DB.batch(statements); }
   catch (error) { return conflictResponse(env, app, caseId, json, origin); }
-  if (!results || results.some(item => Number(item?.meta?.changes || 0) !== 1)) return conflictResponse(env, app, caseId, json, origin);
+  if (!results || results.some(item => !makeupWriteReported(item))) return conflictResponse(env, app, caseId, json, origin);
   const saved = await loadCase(env, app, caseId);
   const savedCompleted = await loadCase(env, app, completedCaseId);
   return json({ ok: true, case: publicCase(saved, student, sourceForCase(saved, sourceSnapshot.task), null, null),
@@ -1966,7 +1974,7 @@ async function createManual(env, app, body, auth, json, origin) {
     mapAtomicMakeupError(error);
   }
   if (!Array.isArray(results) || results.length !== statements.length ||
-      results.some(result => Number(result && result.meta && result.meta.changes || 0) !== 1)) {
+      results.some(result => !makeupWriteReported(result))) {
     problem('보강 저장 조건이 달라졌습니다. 최신 수업과 처리 상태를 확인해 주세요', 409, 'REVISION_CONFLICT');
   }
   const saved = await loadCase(env, app, ids.caseId);
@@ -2338,7 +2346,7 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
         mapAtomicMakeupError(error);
       }
       if (!Array.isArray(results) || results.length !== 8 ||
-          results.some(result => Number(result && result.meta && result.meta.changes || 0) !== 1)) {
+          results.some(result => !makeupWriteReported(result))) {
         return conflictResponse(env, app, caseId, json, origin);
       }
       return json({ ok: true, idempotent: false,
