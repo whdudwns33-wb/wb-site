@@ -197,6 +197,80 @@ async function proposeAndConfirm(db, reviewed, staffId = 'teacher-b') {
   return confirmed.body.case;
 }
 
+test('보강 전달사항은 원담당/관리자만 편집하고 대체 담당자가 확인하며 일정 revision은 유지한다', async () => {
+  const db = new TestD1(); seed(db);
+  const reviewed = await createAndReview(db);
+  const scheduled = await call(db, all, { action: 'schedule', caseId: reviewed.caseId, revision: reviewed.revision,
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00', staffId: 'teacher-b',
+    instructionText: '창작 교재 10쪽\n풀이 과정을 확인합니다.', instructionVersion: 0 });
+  assert.equal(scheduled.status, 200, JSON.stringify(scheduled.body));
+  const row = scheduled.body.case;
+  assert.equal(row.instructions.version, 1);
+  assert.equal(row.instructions.acknowledged, false);
+  assert.equal(JSON.stringify(scheduled.body.lessonTask).includes('풀이 과정을 확인'), false);
+  const edit = { action: 'instruction_update', caseId: row.caseId, revision: row.revision,
+    instructionVersion: 1, instructionText: '창작 교재 11쪽' };
+  assert.equal((await call(db, own('teacher-b'), edit)).status, 403);
+  const changed = await callAt(db, own('teacher-a'), edit, '2026-08-11T12:02:00+09:00');
+  assert.equal(changed.status, 200, JSON.stringify(changed.body));
+  assert.equal(changed.body.case.revision, row.revision);
+  assert.equal(changed.body.case.instructions.version, 2);
+  const ack = { action: 'instruction_ack', caseId: row.caseId, revision: row.revision,
+    instructionVersion: 2, assignment: changed.body.case.instructions.assignment };
+  assert.equal((await call(db, own('teacher-a'), ack)).status, 403);
+  const acknowledged = await callAt(db, own('teacher-b'), ack, '2026-08-11T12:03:00+09:00');
+  assert.equal(acknowledged.status, 200, JSON.stringify(acknowledged.body));
+  assert.equal(acknowledged.body.case.instructions.acknowledged, true);
+  assert.equal(acknowledged.body.case.revision, row.revision);
+  const listed = await call(db, own('teacher-b'), { action: 'list' });
+  assert.equal(listed.body.cases.find(item => item.caseId === row.caseId).instructions.text, '창작 교재 11쪽');
+  assert.equal((await call(db, all, edit)).status, 409);
+  const saved = db.prepare('SELECT history FROM makeup_instructions WHERE case_id=?').bind(row.caseId).first();
+  assert.equal(JSON.parse(saved.history).length, 2);
+  const rescheduled = await callAt(db, all, { action: 'reschedule', caseId: row.caseId, revision: row.revision,
+    date: '2026-08-13', startTime: '20:00', endTime: '21:00', staffId: 'teacher-a' }, '2026-08-11T12:04:00+09:00');
+  assert.equal(rescheduled.status, 200, JSON.stringify(rescheduled.body));
+  assert.equal(rescheduled.body.case.instructions.text, '창작 교재 11쪽');
+  assert.equal(rescheduled.body.case.instructions.acknowledged, false);
+});
+
+test('보강 전달사항 생성은 원자적이고 담당 변경/동시 수정 경합을 차단한다', async () => {
+  const db = new TestD1(); seed(db);
+  const row = await createAndReview(db);
+  const payload = { action: 'instruction_update', caseId: row.caseId, revision: row.revision,
+    instructionText: '담당 인계', instructionVersion: 0 };
+  db.beforeBatch = () => {
+    const source = db.prepare("SELECT data FROM tasks WHERE id='lesson-a'").first();
+    const task = JSON.parse(source.data); task.staffId = 'teacher-b';
+    db.prepare("UPDATE tasks SET owner='teacher-b',data=?,updated_at=99 WHERE id='lesson-a'").bind(JSON.stringify(task)).run();
+  };
+  const conflict = await call(db, own('teacher-a'), payload);
+  assert.equal(conflict.status, 409, JSON.stringify(conflict.body));
+  assert.equal(db.prepare('SELECT count(*) n FROM makeup_instructions').first().n, 0);
+  assert.equal((await call(db, own('teacher-a'), payload)).status, 403);
+  const success = await callAt(db, own('teacher-b'), payload, '2026-08-11T12:01:00+09:00');
+  assert.equal(success.status, 200, JSON.stringify(success.body));
+  db.beforeBatch = () => db.prepare('UPDATE makeup_instructions SET version=2').run();
+  assert.equal((await callAt(db, all, { ...payload, instructionVersion: 1, instructionText: '덮어쓰면 안됨' },
+    '2026-08-11T12:02:00+09:00')).status, 409);
+  assert.equal(db.prepare('SELECT instruction_text FROM makeup_instructions').first().instruction_text, '담당 인계');
+});
+
+test('수업무관 생성과 완료 후에도 전달사항과 변경 이력은 보존한다', async () => {
+  const db = new TestD1(); seed(db);
+  const created = await call(db, all, { action: 'create_manual', studentId: 'student-a', sourceMode: 'unrelated',
+    requestId: 'instruction-test', reason: 'manual_other', date: '2026-08-12', startTime: '20:00', endTime: '21:00',
+    staffId: 'teacher-a', instructionText: '내부 전달 전용', instructionVersion: 0 });
+  assert.equal(created.status, 200, JSON.stringify(created.body));
+  const row = created.body.case;
+  makeupAttendance(db, row.caseId, 'teacher-a', '2026-08-12');
+  const completed = await callAt(db, all, { action: 'complete', caseId: row.caseId, revision: row.revision },
+    '2026-08-12T21:10:00+09:00');
+  assert.equal(completed.status, 200, JSON.stringify(completed.body));
+  assert.equal(completed.body.case.instructions.text, '내부 전달 전용');
+  assert.equal(completed.body.case.status, 'completed');
+});
+
 test('migration is additive and stores stable IDs, not names or contact fields', () => {
   assert.match(migration, /CREATE TABLE IF NOT EXISTS makeup_cases/);
   assert.match(migration, /MAKEUP_COMPLETE_ASSIGNEE/);
