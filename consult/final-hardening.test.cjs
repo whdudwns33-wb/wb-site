@@ -72,7 +72,7 @@ test('local save failure is persistent, non-destructive, and clears only after s
 });
 
 test('sync keeps all local changes, exposes retry, and does not erase active forms', () => {
-  const run = between('  async run(duringStudentConnect) {', '  /** 개인 링크용 토큰 발급');
+  const run = between('  async run(duringStudentConnect) {', '  /** 학생 기기에 한 번만 연결할 짧은 코드 발급');
   assert.match(run, /while \(pending\.length \|\| more\)/);
   assert.doesNotMatch(run, /guard\+\+ < 60/);
   assert.ok(run.indexOf('if (!pending.length && !localCursorSaved)') < run.indexOf('state.settings.pushAt = t0'),
@@ -94,21 +94,24 @@ test('sync keeps all local changes, exposes retry, and does not erase active for
     '명시적 화면 전환·저장 렌더에서만 보류 상태를 해소한다');
 });
 
-test('student links refresh expired tokens only after a successful sync', () => {
-  const helpers = between('async function ensureTokens(ids) {', '\n\nfunction orderText');
+test('student links use one-time code-only URLs after a successful sync', () => {
+  const helpers = between('function studentConnectLink(code) {', '\n\nfunction orderText');
   assert.match(helpers, /await sync\.run\(\)/);
   assert.match(helpers, /if \(sync\.err\) throw/);
-  assert.match(helpers, /Promise\.all\(list\.map\(s => sync\.issueToken\(s\.id\)\)\)/);
-  assert.doesNotMatch(helpers, /if \(s\.token\) return/,
-    '저장된 토큰은 만료·해제됐을 수 있으므로 새 링크에 재사용하지 않는다');
+  assert.match(helpers, /Promise\.all\(list\.map\(s => sync\.issueBootstrap\(s\.id\)\)\)/);
+  assert.match(helpers, /studentConnectLink\(row\.code\)/);
+  assert.doesNotMatch(helpers, /s\.token|issueToken|[?&]u=/,
+    '복사하는 주소에 학생 ID나 장기 토큰을 넣지 않는다');
   const allLinks = between("    case 'alllinks':", "    case 'adminlink':");
-  assert.match(allLinks, /ensureTokens\(list\.map\(s => s\.id\)\)/);
-  assert.doesNotMatch(allLinks, /catch\(\(\) => null\)/,
-    '일부 발급 실패를 숨긴 채 토큰 없는 링크를 복사하지 않는다');
+  assert.match(allLinks, /createStudentLinks\(list\.map\(s => s\.id\)\)/);
+  assert.doesNotMatch(allLinks, /catch\(\(\) => null\)/, '일부 발급 실패를 숨기지 않는다');
   const textLinks = between("    case 'orderText':", "    case 'dailycloseopen':");
-  assert.match(textLinks, /ensureToken\(id\)/);
-  assert.match(html, /setTimeout\(\(\) => ensureToken\(t\.staffId\)/,
+  assert.match(textLinks, /createStudentLink\(id\)/);
+  assert.match(html, /setTimeout\(\(\) => createStudentLink\(t\.staffId\)/,
     '안내 문자에도 발급이 확인된 학생 링크만 넣는다');
+  const connect = between('async function connectStudentLink(allowEmbeddedExchange) {', '\nasync function connectAdminDevice()');
+  assert.ok(connect.indexOf('if (!save())') < connect.indexOf('sync.exchangeBootstrap'),
+    'Safari 저장이 막힌 경우 1회용 코드를 소비하기 전에 중단한다');
 });
 
 test('backup export is fail-closed for student links', () => {

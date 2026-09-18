@@ -33,7 +33,7 @@ function functionSource(name) {
   assert.fail(name + ' function is incomplete');
 }
 
-function studentConnectionHarness({ existing, exchangeFails, initialRoute, linkStaffId = 'student-a' }) {
+function studentConnectionHarness({ existing, exchangeFails, initialRoute, linkStaffId = 'student-a', storageFails = false }) {
   const source = between('function studentCacheScopedTo(staffId) {', '\nasync function connectAdminDevice()');
   const state = existing ? {
     staff: [{ id: 'student-a', name: '김학생' }],
@@ -44,7 +44,7 @@ function studentConnectionHarness({ existing, exchangeFails, initialRoute, linkS
     staff: [], tasks: [], checks: {}, settings: { myToken: '', pushAt: 0 }
   };
 
-  return new Function('state', 'existing', 'exchangeFails', 'initialRoute', 'initialLinkStaffId', `
+  return new Function('state', 'existing', 'exchangeFails', 'initialRoute', 'initialLinkStaffId', 'storageFails', `
     const STUDENT_LINK_BLOCK_KEY = 'wb_consult_student_link_blocked';
     const store = new Map([[STUDENT_LINK_BLOCK_KEY, 'old blocked error']]);
     const sessionStorage = {
@@ -112,7 +112,7 @@ function studentConnectionHarness({ existing, exchangeFails, initialRoute, linkS
       return task ? task.staffId : null;
     }
     function render() {}
-    function save() { return true; }
+    function save() { return !storageFails; }
     function clearConsultLinkContacts() {}
     function resetStudentLinkCache() { resetCalls++; resetStaffId = session.staffId; return true; }
     function clearStudentCodeHash() { hashClears++; }
@@ -134,7 +134,7 @@ function studentConnectionHarness({ existing, exchangeFails, initialRoute, linkS
         };
       }
     };
-  `)(state, existing, exchangeFails, initialRoute, linkStaffId);
+  `)(state, existing, exchangeFails, initialRoute, linkStaffId, storageFails);
 }
 
 function learningSources() {
@@ -212,6 +212,18 @@ test('a code-only #c link restores the returned student ID before storing and sy
   assert.equal(result.route, 'today');
 });
 
+test('a code-only link is not consumed when Safari cannot persist the student session', async () => {
+  const harness = studentConnectionHarness({
+    existing: false, exchangeFails: false, initialRoute: 'today', linkStaffId: '', storageFails: true
+  });
+  await harness.run();
+  const result = harness.snapshot();
+
+  assert.equal(result.exchangeCalls, 0);
+  assert.equal(result.pendingStudentCode, 'used-bootstrap-code');
+  assert.match(result.studentConnectError, /Safari 또는 Chrome의 일반 탭/);
+});
+
 test('re-tapping the same #c link reuses a valid same-student session without exchange or blocking', async () => {
   const harness = studentConnectionHarness({ existing: true, exchangeFails: true, initialRoute: 'today' });
   await harness.run();
@@ -229,6 +241,7 @@ test('re-tapping the same #c link reuses a valid same-student session without ex
 test('student management distinguishes the student app link from guardian read-only access', () => {
   const view = functionSource('viewStaffAdmin') + '\n' + functionSource('staffAccessPanels');
   assert.match(view, /data-act="copylink"[^>]*>학생용 링크(?: 복사)?<\/button>/);
+  assert.match(view, /24시간 안에 한 번만 연결[\s\S]*?가장 최근 링크/);
   assert.match(view, /보호자 열람[\s\S]*?data-act="guardianopen"/);
 });
 

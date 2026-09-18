@@ -1974,12 +1974,11 @@ const sync = {
     }
   },
 
-  /** 개인 링크용 토큰 발급 (원장만). 링크마다 다른 토큰이라 하나가 새어도 그 학생 것만 열린다 */
-  async issueToken(staffId) {
+  /** 학생 기기에 한 번만 연결할 짧은 코드 발급 (원장만). */
+  async issueBootstrap(staffId) {
     const auth = this.auth();
     if (!auth) throw new Error('원장 화면에서만 발급할 수 있습니다');
-    const d = await this.post('/token', { app: SYNC_APP, auth: auth, staffId: staffId });
-    return d.token;
+    return await this.post('/bootstrap', { app: SYNC_APP, auth: auth, staffId: staffId });
   },
 
   async issueAdminHandoff() {
@@ -2225,6 +2224,10 @@ async function connectStudentLink(allowEmbeddedExchange) {
     const unsent = sync.collect(Number(state.settings.pushAt) || 0);
     if (unsent.length) {
       studentConnectError = '이 브라우저에 아직 동기화되지 않은 기록이 있습니다. 기존 원장 또는 학생 화면으로 돌아가 동기화한 뒤 같은 링크를 다시 열어 주세요.';
+      return;
+    }
+    if (!save()) {
+      studentConnectError = '이 브라우저에 학생 연결 정보를 저장할 수 없습니다. Safari 또는 Chrome의 일반 탭에서 링크를 다시 열어 주세요.';
       return;
     }
     const d = await sync.exchangeBootstrap(staffId, code);
@@ -10196,6 +10199,7 @@ function staffAccessPanels(student) {
   return '<hr class="sep"><div class="card-sub mb8"><b>학생용 앱</b> · 시간표·체크·학습시간·마감을 직접 기록하는 링크</div>' +
     consultLinkStudentPanel(student) +
     '<button class="btn btn-sm btn-primary mt14" data-act="copylink" data-id="' + student.id + '">학생용 링크 복사</button>' +
+    '<div class="hint mt8">새 링크는 24시간 안에 한 번만 연결됩니다. 다시 복사했다면 가장 최근 링크를 보내 주세요.</div>' +
     '<hr class="sep"><div class="card-sub mb8"><b>보호자 열람</b> · 발행 리포트와 영·수 결과지만 읽기 전용</div>' +
     '<button class="btn btn-sm btn-ghost" data-act="guardianopen" data-id="' + student.id + '">보호자 초대 링크 관리</button>' +
     '<hr class="sep">' + (rewardLocked ? '<div class="guide bad mb14"><b>문화상품권 교환 처리 중</b>완료 또는 취소 전에는 학생 삭제·대표·관리자 전환을 할 수 없습니다.</div>' : '') +
@@ -10383,32 +10387,24 @@ function closeModal() {
 
 function b64(str) { return btoa(unescape(encodeURIComponent(str))).replace(/\+/g, '-').replace(/\//g, '_'); }
 
-/** 개인 링크. 예전에는 여기에 전체 접근 비밀키를 담았는데,
- *  링크 하나가 새면 전체가 열리는 구조라 학생별 토큰으로 바꿨다. */
-function staffLink(id) {
-  const s = staffById(id);
-  const t = s && s.token ? '&t=' + encodeURIComponent(s.token) : '';
-  return location.origin + location.pathname + '?u=' + id + t;
+/** 학생 ID·토큰을 주소에 싣지 않고, 24시간 안에 한 번만 쓰는 연결 코드만 전달한다. */
+function studentConnectLink(code) {
+  return location.origin + location.pathname + '#c=' + encodeURIComponent(code);
 }
-/** 학생 정보 동기화 뒤 새 개인 토큰을 발급한다. 저장된 토큰은 만료·해제됐을 수 있어 재사용하지 않는다. */
-async function ensureTokens(ids) {
+async function createStudentLinks(ids) {
   if (sync.busy) throw new Error('동기화 중입니다. 잠시 후 다시 눌러 주세요');
   await sync.run();
   if (sync.err) throw new Error('학생 정보를 먼저 동기화해 주세요');
   const list = ids.map(id => staffById(id));
   if (list.some(s => !s || s.deleted)) throw new Error('대상을 찾을 수 없습니다');
-  const tokens = await Promise.all(list.map(s => sync.issueToken(s.id)));
-  const at = now();
-  list.forEach((s, i) => { s.token = tokens[i]; s.updatedAt = at; });
-  if (!save()) throw new Error('새 링크를 기기에 저장하지 못했습니다');
-  queueSync();
-  return tokens;
+  const issued = await Promise.all(list.map(s => sync.issueBootstrap(s.id)));
+  return issued.map(row => studentConnectLink(row.code));
 }
-async function ensureToken(id) {
-  return (await ensureTokens([id]))[0];
+async function createStudentLink(id) {
+  return (await createStudentLinks([id]))[0];
 }
 
-function orderText(staffId, date) {
+function orderText(staffId, date, link) {
   const s = staffById(staffId);
   const list = tasksFor(staffId, date);
   let txt = '📋 ' + label(date) + ' 컨설팅 플래너\n' + (s ? s.name + ' 학생\n' : '') + '─────────\n';
@@ -10418,18 +10414,18 @@ function orderText(staffId, date) {
         (t.detail ? '\n   → ' + t.detail.replace(/\n/g, '\n   ') : '') +
         ((t.steps || []).length ? '\n   단계 ' + t.steps.length + '개 · 링크에서 확인' : '')).join('\n')
     : '(배부된 공부 없음)';
-  txt += '\n─────────\n공부를 체크리스트로 가져온 뒤 시간과 완료를 기록해 주세요.\n' + staffLink(staffId);
+  txt += '\n─────────\n공부를 체크리스트로 가져온 뒤 시간과 완료를 기록해 주세요.\n' + link;
   return txt;
 }
 
 /** 방금 추가한 한 건을 카톡에 붙여넣을 문구로 */
-function quickText(t) {
+function quickText(t, link) {
   const s = staffById(t.staffId);
   return '📌 ' + (s ? s.name + ' 학생\n' : '') +
     (t.start !== today() ? label(t.start) + ' ' : '') +
     (t.time ? '[' + t.time + '] ' : '') + t.title +
     (t.priority === 'high' ? ' ⭐' : '') +
-    '\n\n오늘 배부된 공부에 올려뒀습니다. 체크리스트로 가져와 진행해 주세요.\n' + staffLink(t.staffId);
+    '\n\n오늘 배부된 공부에 올려뒀습니다. 체크리스트로 가져와 진행해 주세요.\n' + link;
 }
 
 function reportText(staffId, date) {
@@ -13368,16 +13364,16 @@ document.addEventListener('click', ev => {
       break;
     }
     case 'copylink': {
-      ensureToken(id)
-        .then(() => copy(staffLink(id)))
+      createStudentLink(id)
+        .then(copy)
         .catch(e => toast('학생용 링크를 만들지 못했습니다 — ' + e.message));
       break;
     }
     case 'alllinks': {
       const list = liveStaff().filter(s => !s.owner && !s.manager);
       toast(list.length + '명 링크 준비 중…');
-      ensureTokens(list.map(s => s.id))
-        .then(() => copy(list.map(s => s.name + '\n' + staffLink(s.id)).join('\n\n')))
+      createStudentLinks(list.map(s => s.id))
+        .then(links => copy(list.map((s, index) => s.name + '\n' + links[index]).join('\n\n')))
         .catch(e => toast('링크를 만들지 못했습니다 — ' + e.message));
       break;
     }
@@ -13392,7 +13388,7 @@ document.addEventListener('click', ev => {
     case 'wordertext': {
       const date = act === 'wordertext' ? (el.dataset.date || today()) : cursor;
       const title = act === 'wordertext' ? '학생 안내 문자' : '카카오톡 지시서 문구';
-      ensureToken(id).then(() => showText(title, orderText(id, date)))
+      createStudentLink(id).then(link => showText(title, orderText(id, date, link)))
         .catch(e => toast('학생 링크를 만들지 못했습니다 — ' + e.message));
       break;
     }
@@ -13562,8 +13558,8 @@ document.addEventListener('click', ev => {
       save(); queueSync(); render();
       toast(me.name + (t.requiresClaim ? ' — 오늘 공부를 배부했습니다' : ' — 체크리스트에 추가했습니다'));
       if (!session.isStaffLink) {
-        setTimeout(() => ensureToken(t.staffId)
-          .then(() => showText('카톡으로 보낼 문구', quickText(t)))
+        setTimeout(() => createStudentLink(t.staffId)
+          .then(link => showText('카톡으로 보낼 문구', quickText(t, link)))
           .catch(e => toast('학생 링크를 만들지 못했습니다 — ' + e.message)), 300);
       }
       break;
@@ -14055,7 +14051,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-09-15.2';
+const APP_VER = '2026-09-18.1';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
