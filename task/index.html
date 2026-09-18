@@ -1206,15 +1206,15 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-09-18.1"></script>
-<script src="./schedule-board-core.js?v=2026-09-18.1"></script>
-<script src="./asset-core.js?v=2026-09-18.1"></script>
-<script src="./qr-core.js?v=2026-09-18.1"></script>
-<script src="./acaflow-import-core.js?v=2026-09-18.1"></script>
-<script src="./feedback-subject-catalog.js?v=2026-09-18.1"></script>
-<script src="./sync-recovery-core.js?v=2026-09-18.1"></script>
-<script src="./staff-work-session-core.js?v=2026-09-18.1"></script>
-<script src="./staff-attendance-history-core.js?v=2026-09-18.1"></script>
+<script src="./lesson-form-core.js?v=2026-09-18.2"></script>
+<script src="./schedule-board-core.js?v=2026-09-18.2"></script>
+<script src="./asset-core.js?v=2026-09-18.2"></script>
+<script src="./qr-core.js?v=2026-09-18.2"></script>
+<script src="./acaflow-import-core.js?v=2026-09-18.2"></script>
+<script src="./feedback-subject-catalog.js?v=2026-09-18.2"></script>
+<script src="./sync-recovery-core.js?v=2026-09-18.2"></script>
+<script src="./staff-work-session-core.js?v=2026-09-18.2"></script>
+<script src="./staff-attendance-history-core.js?v=2026-09-18.2"></script>
 <script>
 "use strict";
 
@@ -3655,13 +3655,14 @@ function render() {
       if (!allowed.includes(route)) route = 'driver_transport';
     } else {
       const allowed = ['today', 'week', 'lesson', 'feedback', 'books', 'transport', 'roster'];
+      allowed.push('question_bank');
       allowed.push('sessions');
       allowed.push('makeup');
       if (!allowed.includes(route)) route = 'today';
     }
   }
 
-  const map = { schedule: viewSchedule, onboarding: viewOnboarding, today: viewToday, week: viewWeek, write: viewWrite, lesson: viewLessonEntry, feedback: viewFeedbackReview, makeup: viewMakeups, sessions: viewSessionPacks, board: viewBoard, staff: viewStaffAdmin, settings: viewSettings, books: viewBooks, transport: viewTransport, roster: viewRoster, devices: viewDevices, driver_transport: viewDriverTransport, facility: viewFacility };
+  const map = { schedule: viewSchedule, onboarding: viewOnboarding, today: viewToday, question_bank: viewQuestionBank, week: viewWeek, write: viewWrite, lesson: viewLessonEntry, feedback: viewFeedbackReview, makeup: viewMakeups, sessions: viewSessionPacks, board: viewBoard, staff: viewStaffAdmin, settings: viewSettings, books: viewBooks, transport: viewTransport, roster: viewRoster, devices: viewDevices, driver_transport: viewDriverTransport, facility: viewFacility };
   replaceView(v, (map[route] || viewToday)());
   if (route === 'schedule') requestAnimationFrame(() => {
     scheduleFocusTimeline();
@@ -3693,9 +3694,9 @@ function renderTabs() {
     : session.isStaffLink && !session.isAdmin
     ? (isDriverFacilityStaff()
       ? [['driver_transport', '오늘 운행'], ['facility', '청소시설업무']]
-      : [['today', '오늘 할 일'], ['week', '주간 플래너'], ['lesson', '수업 등록'], ['feedback', '피드백 상태'], ['makeup', '보강', makeupAttentionCount()], ['sessions', '회차', sessionPackAttentionCount()], ['books', '교재'], ['transport', '차량'], ['roster', '원생']])
+      : [['today', '오늘 할 일'], ['question_bank', '문제은행'], ['week', '주간 플래너'], ['lesson', '수업 등록'], ['feedback', '피드백 상태'], ['makeup', '보강', makeupAttentionCount()], ['sessions', '회차', sessionPackAttentionCount()], ['books', '교재'], ['transport', '차량'], ['roster', '원생']])
     : session.isAdmin
-      ? [['schedule', '현황판', managerRequestInboxCount()], ['onboarding', '신규 학생', onboardingAttentionCount()], ['today', '오늘'], ['week', '주간 플래너'], ['write', '지시서 작성'],
+      ? [['schedule', '현황판', managerRequestInboxCount()], ['onboarding', '신규 학생', onboardingAttentionCount()], ['today', '오늘'], ['question_bank', '문제은행'], ['week', '주간 플래너'], ['write', '지시서 작성'],
          ['lesson', '수업 등록 및 변경'], ['feedback', '피드백 검토'], ['makeup', '보강', makeupAttentionCount()], ['sessions', '회차', sessionPackAttentionCount()], ['board', '직원 현황', a.total], ['staff', '직원 관리'], ['books', '교재'], ['transport', '차량'], ['roster', '원생'], ['devices', '기기', deviceAlertCount()], ['settings', '설정']]
       : [];
   $('#tabs').innerHTML = tabs.map(([k, t, n]) =>
@@ -3704,6 +3705,10 @@ function renderTabs() {
 }
 
 /* ── 링크로 들어온 지시서 확인 ── */
+function viewQuestionBank() {
+  return '<section class="card" aria-label="문제은행"><div class="card-title">문제은행</div></section>';
+}
+
 function viewPendingAdd() {
   const byStaff = {};
   pendingAdd.forEach(a => {
@@ -24493,7 +24498,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-09-18.1';
+const APP_VER = '2026-09-18.2';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
