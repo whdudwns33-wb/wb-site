@@ -3,6 +3,7 @@ import { verifySessionPackIdentity } from './session-pack.js';
 import { isTaskWriteCasConflict, taskWriteCasGuardStatement } from './task-write-cas.js';
 import { studentScheduleConflictPayload } from './student-schedule-conflict.js';
 import { isTestStaffId } from './test-staff-attendance.js';
+import { cleanInstruction, instructionAssignment, instructionView, instructionRows, instructionWrite } from './makeup-instructions.js';
 
 const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -13,7 +14,7 @@ const STATUSES = new Set(['review_pending', 'reviewed', 'awaiting_parent', 'conf
 const ACTIONS = new Set([
   'list', 'create_from_absence', 'create_manual', 'review', 'propose', 'confirm', 'schedule', 'restore_schedule', 'complete',
   'reschedule', 'reschedule_after_absence', 'reconcile_attendance', 'no_makeup', 'cancel'
-  , 'link_candidates', 'link_completed'
+  , 'link_candidates', 'link_completed', 'instruction_update', 'instruction_ack'
 ]);
 const COMPLETED_ATTENDANCE = new Set(['P', 'L', 'E']);
 const MANUAL_REASON_CODES = new Set([
@@ -341,6 +342,7 @@ function publicCase(row, student, task, parentResponse, lessonTask) {
     parentResponseRevision: parentResponse ? Number(parentResponse.revision) : null,
     hiddenByAttendanceCorrection: String(row.status) === 'cancelled' &&
       history.length > 0 && history.at(-1).action === 'reconcile_attendance',
+    instructions: instructionView(row, row.instructionRecord),
     history, createdAt: Number(row.created_at), updatedAt: Number(row.updated_at)
   };
 }
@@ -446,7 +448,66 @@ async function assertAbsent(env, app, sourceTaskId, sourceDate, owner) {
 async function loadCase(env, app, caseId) {
   const row = await env.DB.prepare('SELECT * FROM makeup_cases WHERE app=? AND case_id=? LIMIT 1').bind(app, caseId).first();
   if (!row) problem('보강 기록을 찾을 수 없습니다', 404, 'MAKEUP_MISSING');
+  row.instructionRecord = (await instructionRows(env, app, [caseId])).get(caseId);
   return row;
+}
+
+async function appendInstructionWrite(statements, env, app, row, body, auth, now) {
+  if (!Object.prototype.hasOwnProperty.call(body, 'instructionText')) return;
+  const text = cleanInstruction(body.instructionText);
+  const note = row.instructionRecord;
+  const version = Number(body.instructionVersion);
+  if (!Number.isInteger(version) || version < 0 || version !== Number(note && note.version || 0)) {
+    problem('전달사항이 다른 기기에서 변경되었습니다. 최신 내용을 다시 열어 주세요', 409, 'INSTRUCTION_CONFLICT');
+  }
+  if (text === String(note && note.instruction_text || '')) return;
+  statements.push(instructionWrite(env, app, row.case_id, text, version, actorId(auth), now),
+    await taskWriteCasGuardStatement(env, app, 'makeup_instruction', row.case_id + ':' + version + ':' + now, now));
+}
+
+async function handleInstruction(env, app, body, auth, json, origin) {
+  const edit = body.action === 'instruction_update';
+  exactBody(body, ['caseId', 'revision', 'instructionVersion', ...(edit ? ['instructionText'] : ['assignment'])]);
+  if (edit) cleanInstruction(body.instructionText);
+  const row = await loadCase(env, app, cleanId(body.caseId, 'caseId'));
+  if (Number(row.revision) !== expectedRevision(body)) return conflictResponse(env, app, row.case_id, json, origin);
+  const snapshot = await assertCaseIdentity(env, app, row);
+  const currentOwner = String(snapshot.task.staffId || row.source_teacher_id || '');
+  if (edit ? !(auth.scope === 'all' || String(auth.id || '') === currentOwner)
+    : !(auth.id && String(auth.id) === String(row.confirmed_staff_id || ''))) {
+    problem(edit ? '원 수업 담당자와 관리자만 전달사항을 수정할 수 있습니다' : '배정된 보강 담당자만 확인할 수 있습니다', 403);
+  }
+  const now = Date.now();
+  const instructionAttempt = crypto.randomUUID();
+  const statements = [
+    sourceIdentityGuardStatement(env, app, row, snapshot.identity),
+    await casGuard(env, app, 'makeup_instruction_source', row, now, instructionAttempt),
+    env.DB.prepare('UPDATE makeup_cases SET revision=revision WHERE app=? AND case_id=? AND revision=?')
+      .bind(app, row.case_id, Number(row.revision)),
+    await casGuard(env, app, 'makeup_instruction_case', row, now, instructionAttempt)
+  ];
+  if (edit) {
+    await appendInstructionWrite(statements, env, app, row, body, auth, now);
+  } else {
+    const note = row.instructionRecord;
+    if (!note || !note.instruction_text || Number(body.instructionVersion) !== Number(note.version) ||
+        String(body.assignment || '') !== instructionAssignment(row)) {
+      problem('전달사항 또는 담당자가 변경되었습니다. 최신 내용을 다시 확인해 주세요', 409, 'INSTRUCTION_CONFLICT');
+    }
+    statements.push(env.DB.prepare(
+      'UPDATE makeup_instructions SET ack_version=version,ack_staff_id=?,ack_assignment=?,ack_at=? ' +
+      'WHERE app=? AND case_id=? AND version=?'
+    ).bind(auth.id, instructionAssignment(row), now, app, row.case_id, note.version),
+      await casGuard(env, app, 'makeup_instruction_ack', row, now, instructionAttempt));
+  }
+  try { await env.DB.batch(statements); } catch (error) { mapAtomicMakeupError(error); }
+  const fresh = await loadCase(env, app, row.case_id);
+  const document = await loadRoster(env, app);
+  const student = document.roster.students.find(item => String(item.id) === String(row.student_id));
+  const lesson = await env.DB.prepare('SELECT data FROM tasks WHERE app=? AND id=?').bind(app, makeupLessonId(row.case_id)).first();
+  return json({ ok: true, case: publicCase(fresh, student, sourceForCase(fresh, snapshot.task),
+    await latestParentResponse(env, app, fresh),
+    lesson && parseJson(lesson.data)) }, 200, origin);
 }
 
 async function assertCaseIdentity(env, app, row) {
@@ -1072,6 +1133,7 @@ async function saveSchedule(env, app, row, next, event, source, sourceIdentity, 
   await casGuard(env, app, 'makeup_schedule_case', scheduleBase, now),
   taskWrite.statement,
   await casGuard(env, app, 'makeup_schedule_task', row, now));
+  await appendInstructionWrite(statements, env, app, row, row.instructionWriteBody || {}, row.instructionWriteAuth, now);
   let results;
   try {
     results = await env.DB.batch(statements);
@@ -1107,6 +1169,7 @@ async function saveReschedule(env, app, row, next, event, source, sourceIdentity
     taskWrite.statement,
     await casGuard(env, app, 'makeup_reschedule_task', row, now)
   ];
+  await appendInstructionWrite(statements, env, app, row, row.instructionWriteBody || {}, row.instructionWriteAuth, now);
   let results;
   try {
     results = await env.DB.batch(statements);
@@ -1150,6 +1213,7 @@ async function saveRescheduleAfterAbsence(env, app, row, next, event, source, so
     taskWrite.statement,
     await casGuard(env, app, 'makeup_retry_task', row, now)
   ];
+  await appendInstructionWrite(statements, env, app, row, row.instructionWriteBody || {}, row.instructionWriteAuth, now);
   let results;
   try {
     results = await env.DB.batch(statements);
@@ -1573,6 +1637,8 @@ async function listCases(env, app, body, auth, json, origin) {
       .some(staffId => String(staffId || '') === String(auth.id || '')));
   };
   const visible = candidates.filter(normalVisibility);
+  const notes = await instructionRows(env, app, visible.map(row => String(row.case_id)));
+  for (const row of visible) row.instructionRecord = notes.get(String(row.case_id));
   // 중간 과거 담당자에게 학생 표시 정보와 history를 다시 노출하지 않는다. 태블릿에서
   // deterministic server-generated 보강 task만 폐기할 수 있는 stable 식별자만 전달한다.
   const revocations = auth.scope === 'own' ? revocationCandidates.filter(row =>
@@ -1739,12 +1805,13 @@ async function manualExistingResponse(env, app, existing, student, source, sourc
   const lessonTask = lessonRow && parseJson(lessonRow.data);
   if (!lessonRow) problem('기존 보강 수업이 누락되어 복구가 필요합니다', 409, 'MAKEUP_LESSON_MISSING');
   assertMakeupLessonIdentity(lessonRow, lessonTask, existing, staffId);
+  existing.instructionRecord = (await instructionRows(env, app, [String(existing.case_id)])).get(String(existing.case_id));
   return json({ ok: true, idempotent: true,
     case: publicCase(existing, student, sourceForCase(existing, source.task), null, lessonTask), lessonTask }, 200, origin);
 }
 
 async function createManual(env, app, body, auth, json, origin) {
-  exactBody(body, ['studentId', 'sourceTaskId', 'sourceMode', 'requestId', 'reason', 'date', 'startTime', 'endTime', 'staffId']);
+  exactBody(body, ['studentId', 'sourceTaskId', 'sourceMode', 'requestId', 'reason', 'date', 'startTime', 'endTime', 'staffId', 'instructionText', 'instructionVersion']);
   const studentId = cleanId(body.studentId, 'studentId');
   const sourceMode = cleanManualSourceMode(body.sourceMode);
   const reason = cleanManualReason(body.reason);
@@ -1870,6 +1937,7 @@ async function createManual(env, app, body, auth, json, origin) {
     await casGuard(env, app, 'makeup_create_manual_conflict', row, now),
     taskWrite.statement,
     await casGuard(env, app, 'makeup_create_manual_task', row, now));
+  await appendInstructionWrite(statements, env, app, row, body, auth, now);
   let results;
   try {
     results = await env.DB.batch(statements);
@@ -2180,6 +2248,7 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
     if (action === 'link_completed') return await linkCompleted(env, app, body, auth, json, origin);
     if (action === 'create_from_absence') return await createFromAbsence(env, app, body, auth, json, origin);
     if (action === 'create_manual') return await createManual(env, app, body, auth, json, origin);
+    if (action === 'instruction_update' || action === 'instruction_ack') return await handleInstruction(env, app, body, auth, json, origin);
     if (action === 'reconcile_attendance') return await reconcileAttendance(env, app, body, auth, json, origin);
 
     const administrative = new Set([
@@ -2191,9 +2260,9 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
     }
     exactBody(body, action === 'review' ? ['caseId', 'revision', 'decision', 'reason'] :
       action === 'propose' ? ['caseId', 'revision', 'date', 'startTime', 'endTime', 'staffId'] :
-      action === 'schedule' ? ['caseId', 'revision', 'date', 'startTime', 'endTime', 'staffId'] :
+      action === 'schedule' ? ['caseId', 'revision', 'date', 'startTime', 'endTime', 'staffId', 'instructionText', 'instructionVersion'] :
       (action === 'reschedule' || action === 'reschedule_after_absence')
-        ? ['caseId', 'revision', 'date', 'startTime', 'endTime', 'staffId'] :
+        ? ['caseId', 'revision', 'date', 'startTime', 'endTime', 'staffId', 'instructionText', 'instructionVersion'] :
       action === 'complete' ? ['caseId', 'revision', 'date', 'startTime', 'endTime', 'staffId', 'attendanceStatus'] :
       (action === 'cancel' || action === 'no_makeup') ? ['caseId', 'revision', 'reason'] :
       ['caseId', 'revision']);
@@ -2500,6 +2569,11 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
       cancellation = true;
     }
 
+    if (event && ['schedule', 'reschedule', 'reschedule_after_absence'].includes(action)) {
+      // DB 전용 부가 쓰기이므로 일정 history에 전달사항 원문을 중복 저장하지 않는다.
+      row.instructionWriteBody = body;
+      row.instructionWriteAuth = auth;
+    }
     const saved = completion ? (completion instanceof Response ? completion : completion.saved)
       : proposalSave
         ? await saveProposal(env, app, row, next, event, sourceIdentity, proposalSave.staffId,
@@ -2518,6 +2592,7 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
           ? await saveCancellation(env, app, row, next, event, currentSourceTeacherId, json, origin, requestNow)
           : await saveTransition(env, app, row, next, event, json, origin, requestNow);
     if (saved instanceof Response) return saved;
+    saved.instructionRecord = (await instructionRows(env, app, [String(saved.case_id)])).get(String(saved.case_id));
     const task = await env.DB.prepare('SELECT data FROM tasks WHERE app=? AND id=? LIMIT 1').bind(app, row.source_task_id).first();
     const lessonTaskRow = await env.DB.prepare('SELECT data FROM tasks WHERE app=? AND id=? LIMIT 1')
       .bind(app, makeupLessonId(String(row.case_id))).first();
