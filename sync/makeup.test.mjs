@@ -2309,6 +2309,20 @@ test('teacher direct completion requires own staff, actual ended times, and vali
   assert.equal(result.body.lessonTask.staffId, 'teacher-a');
 });
 
+test('caseId로 최신 한 건을 조회해도 담당자 범위는 유지한다', async () => {
+  const db = new TestD1(); seed(db);
+  const a = await createAndReview(db);
+  const b = await createAndReview(db, 'lesson-b', '2026-08-11', own('teacher-b'));
+  const ownResult = await call(db, own('teacher-a'), { action: 'list', caseId: a.caseId, limit: 1 });
+  assert.equal(ownResult.status, 200);
+  assert.deepEqual(ownResult.body.cases.map(row => row.caseId), [a.caseId]);
+  const denied = await call(db, own('teacher-a'), { action: 'list', caseId: b.caseId, limit: 1 });
+  assert.equal(denied.status, 200);
+  assert.deepEqual(denied.body.cases, []);
+  const admin = await call(db, all, { action: 'list', caseId: b.caseId, limit: 1 });
+  assert.deepEqual(admin.body.cases.map(row => row.caseId), [b.caseId]);
+});
+
 test('manager inspection can record an unscheduled completion only for the inspected teacher scope', async () => {
   const db = new TestD1(); seed(db);
   const created = await call(db, own('teacher-a'), {
