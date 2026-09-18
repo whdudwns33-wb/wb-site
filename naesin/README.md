@@ -182,18 +182,37 @@ WB 교재스캔/내신브레인_영어/        ← 드라이브. 0_먼저_읽어
 - 그 둘만 있으면 나머지(`00`·`01`·`04`~`09`)는 없어도 팩이 나온다 — 나중에 채워 다시 올리면
   그 부분만 더해진다.
 
-**교과서 코드(packId 의 가운데 조각)** — 2022 개정 중등 내신 10종. 학년은 `m1`·`m2`·`m3`.
+**교과서 코드(packId 의 가운데 조각)** — 정본은 `desk/lib/ledger-core.js` 의 `TEXTBOOKS` 다.
+**개정 연도는 학년의 속성이다**: 중1·중2 는 2022 개정 10종, **중3 은 아직 2015 개정이고 12종**이다
+(2026-09-18 이그잼포유 자료실 확인). 라인업 자체가 달라서 학년을 보지 않고 `2022-` 를 붙이면
+중3 packId 가 통째로 틀린다 — 저자가 두 라인업에 다 있는 교과서(YBM 박준언·동아 윤정미·
+동아 이병민)는 경로 파싱이 정상으로 통과해 **조용히** 틀린 값이 나온다. `revisionFor()` 가 이걸 막는다.
+
+*2022 개정 — 중1·중2 (10종)*
 
 | 교과서 | 코드 | 교과서 | 코드 |
 |---|---|---|---|
 | NE능률(김기택) | `ne-kimgitaek` | 비상(황종배) | `visang-hwangjongbae` |
 | YBM(김은형) | `ybm-kimeunhyeong` | 지학사(송미정) | `jihak-songmijeong` |
-| YBM(박준언) | `ybm-parkjuneon` | 천재(소영순) | `chunjae-soyeongsun` |
-| 동아(윤정미) | `donga-yunjeongmi` | 천재(이상기) | `chunjae-leesanggi` |
-| 동아(이병민) | `donga-leebyeongmin` | 미래엔(문영인) | `mirae-munyeongin` |
+| YBM(박준언) ※ | `ybm-parkjuneon` | 천재(소영순) | `chunjae-soyeongsun` |
+| 동아(윤정미) ※ | `donga-yunjeongmi` | 천재(이상기) | `chunjae-leesanggi` |
+| 동아(이병민) ※ | `donga-leebyeongmin` | 미래엔(문영인) | `mirae-munyeongin` |
 
-`2022-ne-kimgitaek-m2-L6` 처럼 조립한다. **드라이브 폴더 경로가 곧 packId** 라 옮겨 적을 일이
-없다 — 교과서 폴더에서 코드를, 학년·과 폴더에서 나머지를 그대로 읽는다.
+*2015 개정 — 중3 (12종)* — ※ 표시 셋은 위 코드를 그대로 쓴다(학년만 넓힘).
+
+| 교과서 | 코드 | 교과서 | 코드 |
+|---|---|---|---|
+| NE능률(김성곤) | `ne-kimseonggon` | 미래엔(최연희) | `mirae-choeyeonhui` |
+| NE능률(양현권) | `ne-yanghyeongwon` | 비상(김진완) | `visang-kimjinwan` |
+| YBM(박준언) ※ | `ybm-parkjuneon` | 지학사(민찬규) | `jihak-minchangyu` |
+| YBM(송미정) | `ybm-songmijeong` | 천재(이재영) | `chunjae-leejaeyeong` |
+| 금성(최인철) | `kumsung-choeincheol` | 천재(정사열) | `chunjae-jeongsayeol` |
+| 동아(윤정미) ※ | `donga-yunjeongmi` | 동아(이병민) ※ | `donga-leebyeongmin` |
+
+`2022-ne-kimgitaek-m2-L6` · `2015-kumsung-choeincheol-m3-L4` 처럼 조립한다.
+**드라이브 폴더 경로가 곧 packId** 라 옮겨 적을 일이 없다 — 교과서 폴더에서 코드를,
+학년·과 폴더에서 나머지를, 개정은 학년에서 읽는다. 그 교과서에 없는 학년이면 packId 를
+만들지 않는다(빈 문자열) — 추측해서 틀린 값을 내느니 안 낸다.
 
 **왜 서버가 아니라 Claude Code 세션인가.** 원장이 Claude Max 를 쓰고 있어 구독 안에서
 처리하는 것이 추가 요금 0 이다. 서버 AI 추출(`/job/extract`)은 호출마다 API 요금이 따로
