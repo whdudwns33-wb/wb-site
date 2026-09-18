@@ -58,13 +58,32 @@ test('ids round-trip out of full keys and event keys are never read as asset ids
 
 /* ── 코드표 ── */
 
-test('textbook table is the ten 2022 middle-school books with README codes', () => {
+test('textbook table carries both lineups — 2022 중1·중2 ten, 2015 중3 twelve', () => {
   const codes = Object.keys(core.TEXTBOOKS);
-  assert.equal(codes.length, 10);
   assert.equal(core.TEXTBOOKS['ne-kimgitaek'].label, 'NE능률(김기택)');
   assert.equal(core.TEXTBOOKS['mirae-munyeongin'].label, '미래엔(문영인)');
   assert.equal(core.TEXTBOOKS['chunjae-leesanggi'].label, '천재(이상기)');
+  assert.equal(core.TEXTBOOKS['kumsung-choeincheol'].label, '금성(최인철)');
   codes.forEach(c => assert.equal(core.TEXTBOOKS[c].code, c));
+  /* 학년별 라인업 수는 사이트 목록 그대로다 — 중3만 12종이고 개정도 다르다. */
+  const byGrade = g => codes.filter(c => core.TEXTBOOKS[c].grades.indexOf(g) >= 0);
+  assert.equal(byGrade('m1').length, 10);
+  assert.equal(byGrade('m2').length, 10);
+  assert.equal(byGrade('m3').length, 12);
+  /* 라벨은 폴더 이름이라 겹치면 경로를 못 가른다. */
+  const labels = codes.map(c => core.TEXTBOOKS[c].label);
+  assert.equal(new Set(labels).size, labels.length, 'labels must be unique — they are folder names');
+});
+
+test('revision comes from the grade, not from a single hardcoded default', () => {
+  assert.equal(core.REVISIONS.m2, '2022');
+  assert.equal(core.REVISIONS.m3, '2015');
+  assert.equal(core.revisionFor('ne-kimgitaek', 'm2'), '2022');
+  /* 같은 저자가 두 라인업에 다 있는 교과서 — 여기가 조용히 2022 로 찍히던 자리다. */
+  assert.equal(core.revisionFor('donga-yunjeongmi', 'm3'), '2015');
+  assert.equal(core.revisionFor('donga-yunjeongmi', 'm2'), '2022');
+  assert.equal(core.revisionFor('ne-kimgitaek', 'm3'), '', 'that book has no 중3 — do not guess');
+  assert.equal(core.revisionFor('ne-kimgitaek', 'm2', '2009'), '2009', 'an explicit revision still wins');
 });
 
 test('series table follows the exam4you numbering and flags 02/03 required, 04-06 teacher', () => {
@@ -132,7 +151,11 @@ test('intake path follows the drive folder contract from the naesin README', () 
 test('packId is derived from the drive path, so the path is the id', () => {
   assert.equal(core.packIdFromPath('WB 교재스캔/내신브레인_영어/NE능률(김기택)/중2/L06/02_본문워크북.pdf'), '2022-ne-kimgitaek-m2-L6');
   assert.equal(core.packIdFromPath('ne-kimgitaek/m2/L06'), '2022-ne-kimgitaek-m2-L6', 'codes in the path work too');
-  assert.equal(core.packIdFromPath('NE능률(김기택)/중2/L06', '2015'), '2015-ne-kimgitaek-m2-L6');
+  assert.equal(core.packIdFromPath('NE능률(김기택)/중2/L06', '2009'), '2009-ne-kimgitaek-m2-L6', 'explicit revision wins');
+  /* 중3 은 2015 개정이다 — 학년에서 유도하므로 경로만으로 맞는 접두사가 나온다. */
+  assert.equal(core.packIdFromPath('WB 교재스캔/내신브레인_영어/동아(윤정미)/중3/L06'), '2015-donga-yunjeongmi-m3-L6');
+  assert.equal(core.packIdFromPath('금성(최인철)/중3/L04'), '2015-kumsung-choeincheol-m3-L4');
+  assert.equal(core.packIdFromPath('NE능률(김기택)/중3/L01'), '', 'that book has no 중3 — no id rather than a wrong one');
   assert.equal(core.packIdFromPath('WB 교재스캔/내신브레인_영어/NE능률(김기택)/중2'), '', 'missing unit → no id');
   assert.equal(core.packIdFromPath(''), '');
 });
@@ -140,7 +163,9 @@ test('packId is derived from the drive path, so the path is the id', () => {
 test('packIdOf prefers the stored path and falls back to the catalog', () => {
   assert.equal(core.packIdOf(asset()), '2022-ne-kimgitaek-m2-L5');
   assert.equal(core.packIdOf(asset({ storage: { drivePath: 'WB 교재스캔/내신브레인_영어/YBM(박준언)/중3/L02/03_단어시험.pdf' } })),
-    '2022-ybm-parkjuneon-m3-L2');
+    '2015-ybm-parkjuneon-m3-L2', '중3 은 2015 개정 — 이 단언이 예전에 2022 로 굳어 있었다');
+  assert.equal(core.packIdOf({ catalog: { textbookCode: 'ne-kimgitaek', grade: 'm3', unit: 2 } }), '',
+    'catalog fallback also refuses a grade the book does not have');
   assert.equal(core.packIdOf({ catalog: { textbookCode: 'nope', grade: 'm2', unit: 1 } }), '');
 });
 

@@ -22,17 +22,38 @@
   const CURRICULUM = '2022';
   const SOURCE = 'examforyou';
 
+  /* 개정은 교과서가 아니라 **학년**의 속성이다 — 2022 개정이 중1·중2까지 내려왔고 중3은 아직 2015 다.
+     기본값을 '2022' 하나로 두면 중3 폴더가 조용히 2022- 로 찍힌다: 저자가 두 라인업에 모두 있는
+     교과서(YBM 박준언·동아 윤정미·동아 이병민)는 경로 파싱이 정상으로 통과해 버리기 때문에
+     틀린 packId 가 열린 채로 나온다. 그래서 학년에서 유도한다. */
+  const REVISIONS = { m1: '2022', m2: '2022', m3: '2015' };
+
+  /* grades 는 그 교과서가 실제로 있는 학년이다 — 없는 학년의 폴더에는 packId 를 만들지 않는다.
+     2022 개정 중1·중2 10종 + 2015 개정 중3 12종. 저자가 겹치는 셋(YBM 박준언 · 동아 윤정미 ·
+     동아 이병민)은 두 라인업에 다 있어 코드를 공유하고 학년만 넓혔다.
+     중3 12종은 2026-09-18 이그잼포유 자료실 목록을 옮긴 것이다(코드 슬러그는 여기서 부여). */
   const TEXTBOOKS = {
-    'ne-kimgitaek': { code: 'ne-kimgitaek', label: 'NE능률(김기택)' },
-    'ybm-kimeunhyeong': { code: 'ybm-kimeunhyeong', label: 'YBM(김은형)' },
-    'ybm-parkjuneon': { code: 'ybm-parkjuneon', label: 'YBM(박준언)' },
-    'donga-yunjeongmi': { code: 'donga-yunjeongmi', label: '동아(윤정미)' },
-    'donga-leebyeongmin': { code: 'donga-leebyeongmin', label: '동아(이병민)' },
-    'visang-hwangjongbae': { code: 'visang-hwangjongbae', label: '비상(황종배)' },
-    'jihak-songmijeong': { code: 'jihak-songmijeong', label: '지학사(송미정)' },
-    'chunjae-soyeongsun': { code: 'chunjae-soyeongsun', label: '천재(소영순)' },
-    'chunjae-leesanggi': { code: 'chunjae-leesanggi', label: '천재(이상기)' },
-    'mirae-munyeongin': { code: 'mirae-munyeongin', label: '미래엔(문영인)' }
+    /* 2022 개정 — 중1·중2 */
+    'ne-kimgitaek': { code: 'ne-kimgitaek', label: 'NE능률(김기택)', grades: ['m1', 'm2'] },
+    'ybm-kimeunhyeong': { code: 'ybm-kimeunhyeong', label: 'YBM(김은형)', grades: ['m1', 'm2'] },
+    'ybm-parkjuneon': { code: 'ybm-parkjuneon', label: 'YBM(박준언)', grades: ['m1', 'm2', 'm3'] },
+    'donga-yunjeongmi': { code: 'donga-yunjeongmi', label: '동아(윤정미)', grades: ['m1', 'm2', 'm3'] },
+    'donga-leebyeongmin': { code: 'donga-leebyeongmin', label: '동아(이병민)', grades: ['m1', 'm2', 'm3'] },
+    'visang-hwangjongbae': { code: 'visang-hwangjongbae', label: '비상(황종배)', grades: ['m1', 'm2'] },
+    'jihak-songmijeong': { code: 'jihak-songmijeong', label: '지학사(송미정)', grades: ['m1', 'm2'] },
+    'chunjae-soyeongsun': { code: 'chunjae-soyeongsun', label: '천재(소영순)', grades: ['m1', 'm2'] },
+    'chunjae-leesanggi': { code: 'chunjae-leesanggi', label: '천재(이상기)', grades: ['m1', 'm2'] },
+    'mirae-munyeongin': { code: 'mirae-munyeongin', label: '미래엔(문영인)', grades: ['m1', 'm2'] },
+    /* 2015 개정 — 중3 (위 셋은 학년만 넓혔으므로 여기 다시 적지 않는다) */
+    'ne-kimseonggon': { code: 'ne-kimseonggon', label: 'NE능률(김성곤)', grades: ['m3'] },
+    'ne-yanghyeongwon': { code: 'ne-yanghyeongwon', label: 'NE능률(양현권)', grades: ['m3'] },
+    'ybm-songmijeong': { code: 'ybm-songmijeong', label: 'YBM(송미정)', grades: ['m3'] },
+    'kumsung-choeincheol': { code: 'kumsung-choeincheol', label: '금성(최인철)', grades: ['m3'] },
+    'mirae-choeyeonhui': { code: 'mirae-choeyeonhui', label: '미래엔(최연희)', grades: ['m3'] },
+    'visang-kimjinwan': { code: 'visang-kimjinwan', label: '비상(김진완)', grades: ['m3'] },
+    'jihak-minchangyu': { code: 'jihak-minchangyu', label: '지학사(민찬규)', grades: ['m3'] },
+    'chunjae-leejaeyeong': { code: 'chunjae-leejaeyeong', label: '천재(이재영)', grades: ['m3'] },
+    'chunjae-jeongsayeol': { code: 'chunjae-jeongsayeol', label: '천재(정사열)', grades: ['m3'] }
   };
 
   const GRADES = { m1: '중1', m2: '중2', m3: '중3' };
@@ -304,6 +325,15 @@
     return folder && file ? folder + '/' + file : '';
   }
 
+  /* 개정 연도. 인자로 준 값이 최우선이고(과거 개정 자료를 다시 넣을 때), 없으면 학년에서 유도한다.
+     교과서가 그 학년에 없으면 '' — 모르면 추측하지 않고 packId 를 만들지 않는다(기존 규칙 그대로). */
+  function revisionFor(textbookCode, grade, revision) {
+    if (str(revision)) return str(revision);
+    const t = TEXTBOOKS[str(textbookCode)];
+    if (!t || t.grades.indexOf(str(grade)) < 0) return '';
+    return REVISIONS[str(grade)] || '';
+  }
+
   /* 경로에서 packId. 교과서 폴더는 표시명(NE능률(김기택))이든 코드(ne-kimgitaek)든 받는다.
      학년 '중2' → m2, 과 'L06' → L6. 조각 하나라도 못 읽으면 '' — 추측해서 만들지 않는다. */
   function packIdFromPath(path, revision) {
@@ -325,7 +355,8 @@
       }
     });
     if (!code || !grade || !unit) return '';
-    return [str(revision) || CURRICULUM, code, grade, 'L' + unit].join('-');
+    const rev = revisionFor(code, grade, revision);
+    return rev ? [rev, code, grade, 'L' + unit].join('-') : '';
   }
   function packIdOf(asset, revision) {
     const a = asset || {};
@@ -333,7 +364,8 @@
     if (fromPath) return fromPath;
     const c = normalizeCatalog(a.catalog);
     if (!TEXTBOOKS[c.textbookCode] || !GRADES[c.grade] || !c.unit) return '';
-    return [str(revision) || CURRICULUM, c.textbookCode, c.grade, 'L' + c.unit].join('-');
+    const rev = revisionFor(c.textbookCode, c.grade, revision);
+    return rev ? [rev, c.textbookCode, c.grade, 'L' + c.unit].join('-') : '';
   }
 
   /* ── 전이 ── */
@@ -673,7 +705,8 @@
 
   return {
     LEDGER_PREFIX: LEDGER_PREFIX, EVENT_PREFIX: EVENT_PREFIX, NEED_PREFIX: NEED_PREFIX,
-    CURRICULUM: CURRICULUM, SOURCE: SOURCE, DRIVE_ROOT: DRIVE_ROOT,
+    CURRICULUM: CURRICULUM, REVISIONS: REVISIONS, revisionFor: revisionFor,
+    SOURCE: SOURCE, DRIVE_ROOT: DRIVE_ROOT,
     TEXTBOOKS: TEXTBOOKS, GRADES: GRADES, SERIES: SERIES, SERIES_CODES: SERIES_CODES,
     REQUIRED_SERIES: REQUIRED_SERIES, TEACHER_SERIES: TEACHER_SERIES,
     PRICE_HINTS: PRICE_HINTS, PRICE_WARN_PCT: PRICE_WARN_PCT, EDITIONS: EDITIONS, EXAM_TERMS: EXAM_TERMS,
