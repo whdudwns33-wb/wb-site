@@ -1206,15 +1206,16 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-09-19.1"></script>
-<script src="./schedule-board-core.js?v=2026-09-19.1"></script>
-<script src="./asset-core.js?v=2026-09-19.1"></script>
-<script src="./qr-core.js?v=2026-09-19.1"></script>
-<script src="./acaflow-import-core.js?v=2026-09-19.1"></script>
-<script src="./feedback-subject-catalog.js?v=2026-09-19.1"></script>
-<script src="./sync-recovery-core.js?v=2026-09-19.1"></script>
-<script src="./staff-work-session-core.js?v=2026-09-19.1"></script>
-<script src="./staff-attendance-history-core.js?v=2026-09-19.1"></script>
+<script src="./lesson-form-core.js?v=2026-09-19.2"></script>
+<script src="./schedule-board-core.js?v=2026-09-19.2"></script>
+<script src="./asset-core.js?v=2026-09-19.2"></script>
+<script src="./qr-core.js?v=2026-09-19.2"></script>
+<script src="./acaflow-import-core.js?v=2026-09-19.2"></script>
+<script src="./feedback-subject-catalog.js?v=2026-09-19.2"></script>
+<script src="./sync-recovery-core.js?v=2026-09-19.2"></script>
+<script src="./staff-work-session-core.js?v=2026-09-19.2"></script>
+<script src="./staff-attendance-history-core.js?v=2026-09-19.2"></script>
+<script src="./makeup-recovery-core.js?v=2026-09-19.2"></script>
 <script>
 "use strict";
 
@@ -11502,11 +11503,96 @@ function viewMakeups() {
   return h;
 }
 
+const makeupMutationGate = WBMakeupRecoveryCore.createFlightGate();
+let makeupOpenSequence = 0;
+async function loadLatestMakeupCase(caseId) {
+  const auth = sync.auth();
+  if (!auth) throw new Error('동기화 인증이 필요합니다');
+  const identity = JSON.stringify(auth);
+  const result = await sync.post('/makeup', { app: SYNC_APP, auth, action: 'list', caseId, limit: 1 });
+  if (JSON.stringify(sync.auth()) !== identity) throw new Error('로그인 상태가 변경되었습니다');
+  const row = (result.cases || []).find(item => String(item.caseId) === String(caseId));
+  if (!row) throw new Error('현재 권한으로 해당 보강을 찾을 수 없습니다. 담당자와 처리 상태를 확인해 주세요');
+  replaceMakeup(row);
+  return row;
+}
+
+async function prepareFreshMakeupOpen(button) {
+  if (button.disabled) return false;
+  const sequence = ++makeupOpenSequence;
+  button.disabled = true;
+  try {
+    const row = await loadLatestMakeupCase(String(button.dataset.case || ''));
+    if (sequence !== makeupOpenSequence || !button.isConnected) return false;
+    if (['completed', 'cancelled'].includes(row.status) && button.dataset.act !== 'muinstructionedit') {
+      toast(row.status === 'completed' ? '이미 보강완료 처리된 건입니다.' : '이미 종료된 보강입니다. 처리 이력을 확인해 주세요.');
+      renderAfterSync(); return false;
+    }
+    return true;
+  } catch (error) { toast(error.message || '최신 보강 정보를 불러오지 못했습니다'); return false; }
+  finally { if (button.isConnected) button.disabled = false; }
+}
+
+function showMakeupRecovery(payload, before, fresh, button, message) {
+  const host = $('#modalHost');
+  if (!host || host.hidden || !button || !host.contains(button)) {
+    showMakeupModalError(message || '최신 보강 상태를 불러왔습니다. 다시 열어 확인해 주세요.');
+    return;
+  }
+  const changes = WBMakeupRecoveryCore.changes(before, fresh);
+  const display = (value, field) => field === 'status' ? (MAKEUP_STATUS_LABELS[value] || value || '없음')
+    : /TeacherId|StaffId/.test(field) ? makeupTeacherLabel(value, '미지정') : String(value || '없음');
+  const canRebase = fresh && before && fresh.status === before.status &&
+    !['completed', 'cancelled'].includes(fresh.status) && fresh.currentTeacherId === before.currentTeacherId &&
+    ['schedule', 'reschedule', 'reschedule_after_absence', 'complete', 'no_makeup', 'instruction_update'].includes(payload.action);
+  button.disabled = true;
+  button.dataset.recoveryHold = 'yes';
+  host._makeupRecovery = { payload, before, fresh, button, canRebase };
+  let panel = $('#muRecovery');
+  if (!panel) { panel = document.createElement('div'); panel.id = 'muRecovery'; button.parentElement.insertBefore(panel, button); }
+  panel.className = 'guide mt14';
+  panel.setAttribute('role', 'alert');
+  panel.innerHTML = '<b>입력 내용은 그대로 보존했습니다.</b><div>' + esc(message || '최신 보강 상태를 확인해 주세요.') + '</div>' +
+    (changes.length ? '<ul>' + changes.map(item => '<li><b>' + esc(item.label) + '</b>: ' +
+      esc(display(item.before, item.field)) + ' → ' + esc(display(item.after, item.field)) + '</li>').join('') + '</ul>'
+      : '<div>날짜·담당자 표시가 같아도 출결·원 수업·연결 조건이 변경되었을 수 있습니다.</div>') +
+    (canRebase ? '<button class="btn btn-ghost mt8" data-act="murecoveryaccept">변경 내용 확인 · 입력 유지</button>' +
+      '<div class="small">확인 후 입력값을 다시 검토하고 저장 버튼을 눌러 주세요. 자동으로 저장하지 않습니다.</div>'
+      : '<div>현재 상태에서는 이전 요청을 다시 저장하지 않습니다. 입력 내용을 확인한 후 창을 닫고 최신 보강에서 가능한 작업을 선택해 주세요.</div>');
+}
+
+function acceptMakeupRecovery() {
+  const host = $('#modalHost'), recovery = host && host._makeupRecovery;
+  if (!recovery || !recovery.canRebase || !recovery.button.isConnected) return;
+  const { before, fresh, button, payload } = recovery;
+  const changedSchedule = before.confirmedDate !== fresh.confirmedDate || before.confirmedStartTime !== fresh.confirmedStartTime ||
+    before.confirmedEndTime !== fresh.confirmedEndTime || before.confirmedStaffId !== fresh.confirmedStaffId;
+  if (changedSchedule) {
+    [['muDate', 'confirmedDate'], ['muStart', 'confirmedStartTime'], ['muEnd', 'confirmedEndTime'], ['muStaff', 'confirmedStaffId']].forEach(([id, field]) => {
+      const input = $('#' + id);
+      if (input && (input.disabled || input.value === String(before[field] || ''))) input.value = fresh[field] || '';
+    });
+  }
+  const note = $('#muInstruction'), version = $('#muInstructionVersion');
+  if (note && note.value === String((before.instructions || {}).text || '')) note.value = (fresh.instructions || {}).text || '';
+  if (version) version.value = Number((fresh.instructions || {}).version || 0);
+  button.dataset.rev = fresh.revision;
+  button.dataset.recoveryHold = '';
+  host._makeupSnapshot = JSON.parse(JSON.stringify(fresh));
+  host._makeupRecovery = null;
+  if ($('#muRecovery')) $('#muRecovery').remove();
+  if (payload.action === 'no_makeup' && $('#muNoMakeupConfirm')) {
+    $('#muNoMakeupConfirm').checked = false;
+    button.disabled = true;
+  } else button.disabled = false;
+  showMakeupModalError('최신 상태를 확인했습니다. 입력 내용을 검토한 뒤 다시 저장해 주세요.');
+}
+
 async function refreshMakeupsAfterConflict(error, caseId, act) {
   if (error && error.current) replaceMakeup(error.current);
   makeupLoaded = false;
   await loadMakeups(true);
-  makeupLiveMessage = '다른 기기의 최신 변경을 다시 불러왔습니다.';
+  makeupLiveMessage = '최신 보강 상태를 다시 불러왔습니다.';
   rememberMakeupFocus(caseId, act);
   if (route === 'makeup') render();
 }
@@ -11553,10 +11639,35 @@ async function mutateMakeup(payload, button, successText, focusAct, closeOnSucce
   const auth = sync.auth();
   if (!auth) return showMakeupModalError('동기화 인증이 필요합니다');
   const caseId = String(payload.caseId || '');
+  const flightKey = caseId || [payload.action, payload.studentId, payload.sourceTaskId || payload.requestId, payload.date].join('|');
+  if (!makeupMutationGate.enter(flightKey)) return null;
+  const host = $('#modalHost');
+  const before = host && host._makeupSnapshot && host._makeupSnapshot.caseId === caseId
+    ? host._makeupSnapshot : makeupRows.find(row => row.caseId === caseId);
+  let committedResult = null;
   clearMakeupModalError();
   if (button) button.disabled = true;
   try {
+    if (caseId) {
+      const fresh = await loadLatestMakeupCase(caseId);
+      if (button && !button.isConnected) return null;
+      if (WBMakeupRecoveryCore.matches(payload, fresh)) {
+        if (closeOnSuccess && (!button || button.isConnected)) closeModal();
+        renderAfterSync();
+        toast('이미 같은 내용으로 처리되어 있습니다. 중복 저장하지 않았습니다.');
+        return { ok: true, idempotent: true, case: fresh };
+      }
+      if (Number(fresh.revision) !== Number(payload.revision) ||
+          (before && WBMakeupRecoveryCore.changes(before, fresh).length > 0) ||
+          (payload.instructionVersion != null && Number((fresh.instructions || {}).version || 0) !== Number(payload.instructionVersion))) {
+        showMakeupRecovery(payload, before, fresh, button,
+          fresh.status === 'completed' ? '이미 보강완료 상태입니다. 이번 입력은 추가 저장하지 않았습니다.'
+            : '화면을 연 뒤 처리 정보가 변경되었습니다.');
+        return null;
+      }
+    }
     const result = await sync.post('/makeup', { app: SYNC_APP, auth: auth, ...payload });
+    committedResult = result;
     replaceMakeup(result.case);
     /* schedule 응답의 서버 생성 수업을 즉시 반영한다. 다음 일반 동기화도 같은 id로 합쳐진다. */
     if (result.lessonTask && result.lessonTask.id) {
@@ -11584,17 +11695,36 @@ async function mutateMakeup(payload, button, successText, focusAct, closeOnSucce
     }
     if (!completionViewsFresh) completedText += ' · 완료는 저장됨 · 최신 화면은 새로고침해 주세요';
     makeupLiveMessage = completedText;
-    if (closeOnSuccess) closeModal();
+    if (closeOnSuccess && (!button || button.isConnected)) closeModal();
     rememberMakeupFocus(caseId, focusAct);
     if (route === 'makeup' || payload.action === 'instruction_update' || payload.action === 'instruction_ack') render();
     toast(completedText);
     return result;
   } catch (error) {
+    if (committedResult) {
+      if (closeOnSuccess && (!button || button.isConnected)) closeModal();
+      showMakeupModalError('저장은 완료되었습니다. 최신 화면을 불러오지 못했으니 새로고침해 주세요.');
+      return committedResult;
+    }
     showMakeupModalError('보강 처리 실패 — ' + (error.message || error));
-    if (Number(error && error.status) === 409) await refreshMakeupsAfterConflict(error, caseId, focusAct);
+    if (Number(error && error.status) === 409) {
+      try {
+        await refreshMakeupsAfterConflict(error, caseId, focusAct);
+        if (caseId) {
+          const fresh = await loadLatestMakeupCase(caseId);
+          if (WBMakeupRecoveryCore.matches(payload, fresh)) {
+            if (closeOnSuccess && (!button || button.isConnected)) closeModal();
+            toast('이미 같은 내용으로 처리되어 있습니다. 중복 저장하지 않았습니다.');
+            return { ok: true, idempotent: true, case: fresh };
+          }
+          showMakeupRecovery(payload, before, fresh, button, error.message);
+        }
+      } catch { showMakeupModalError('최신 상태를 불러오지 못했습니다. 입력은 유지했으며 다시 확인한 뒤 시도해 주세요.'); }
+    }
     return null;
   } finally {
-    if (button && button.isConnected) button.disabled = false;
+    makeupMutationGate.leave(flightKey);
+    if (button && button.isConnected && button.dataset.recoveryHold !== 'yes') button.disabled = false;
   }
 }
 
@@ -21345,6 +21475,10 @@ function modal(title, bodyHtml, footHtml) {
       bodyHtml + (footHtml || '') +
     '</div>';
   host.hidden = false;
+  const caseButton = host.querySelector('[data-case]');
+  const makeupSnapshot = caseButton && makeupRows.find(row => row.caseId === caseButton.dataset.case);
+  host._makeupSnapshot = makeupSnapshot ? JSON.parse(JSON.stringify(makeupSnapshot)) : null;
+  host._makeupRecovery = null;
   setModalBackgroundInert(true);
   requestAnimationFrame(() => $('#modalHost button[data-act="closemodal"]')?.focus());
 }
@@ -22207,7 +22341,7 @@ function applyAssignments(input, preConfirmed) {
 /* ══════════════════════════════════════════════════════
    10. 이벤트
    ══════════════════════════════════════════════════════ */
-document.addEventListener('click', ev => {
+document.addEventListener('click', async ev => {
   if (sync.recovering) return;
   if (shouldGateStaffWork() && !ev.target.closest('[data-act="staffworklogin"],[data-act="staffworkretry"],[data-act^="managerinspect"],[data-act="closemodal"]')) return;
   if (adminDirectiveSoundEnabled()) ensureAdminDirectiveAudio();
@@ -22225,7 +22359,12 @@ document.addEventListener('click', ev => {
   const date = el.dataset.date || cursor;
   const task = () => state.tasks.find(x => x.id === id);
 
+  if (['muschedule', 'mureschedule', 'muretryafteropen', 'muprocessadminopen', 'murestoreschedule',
+    'mucompleteopen', 'muprocessopen', 'mulinkopen', 'mulinkraw', 'mudirectcompleteopen', 'munone', 'muinstructionedit'].includes(act)) {
+    if (!await prepareFreshMakeupOpen(el)) return;
+  }
   switch (act) {
+    case 'murecoveryaccept': acceptMakeupRecovery(); break;
 
     case 'nextlessonload': loadStudentNextLesson(id, date, el.dataset.force === '1'); break;
 
@@ -24543,7 +24682,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-09-19.1';
+const APP_VER = '2026-09-19.2';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);

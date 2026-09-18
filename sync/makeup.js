@@ -542,7 +542,7 @@ function expectedRevision(body) {
 
 async function conflictResponse(env, app, caseId, json, origin) {
   const fresh = await env.DB.prepare('SELECT * FROM makeup_cases WHERE app=? AND case_id=? LIMIT 1').bind(app, caseId).first();
-  return json({ ok: false, code: 'REVISION_CONFLICT', error: '다른 기기에서 먼저 변경했습니다',
+  return json({ ok: false, code: 'REVISION_CONFLICT', error: '화면을 연 뒤 보강 상태가 변경되었습니다. 최신 상태를 확인해 주세요',
     current: fresh ? publicCase(fresh) : null }, 409, origin);
 }
 
@@ -1018,7 +1018,7 @@ function activeStaffGuardStatement(env, app, row, staffId) {
 
 function mapAtomicMakeupError(error) {
   if (isTaskWriteCasConflict(error)) {
-    problem('다른 기기에서 보강 또는 보강 수업을 먼저 변경했습니다', 409, 'REVISION_CONFLICT');
+    problem('보강 저장 조건이 달라졌습니다. 원 수업 담당자·일정·출결 또는 전달사항의 최신 상태를 확인해 주세요', 409, 'REVISION_CONFLICT');
   }
   if (/UNIQUE constraint failed: tasks\.app, tasks\.id/.test(String(error && error.message || error))) {
     problem('보강 수업 식별자가 기존 수업과 충돌합니다', 409, 'MAKEUP_LESSON_IDENTITY_MISMATCH');
@@ -1082,7 +1082,7 @@ async function activeSessionPack(env, app, row) {
 function completionBatchError(error) {
   const message = String(error && error.message || error);
   if (/MAKEUP_REVISION_CONFLICT/.test(message)) {
-    problem('다른 기기에서 보강 상태가 먼저 변경되었습니다', 409, 'REVISION_CONFLICT');
+    problem('보강 처리 상태가 변경되었습니다. 최신 상태를 확인해 주세요', 409, 'REVISION_CONFLICT');
   }
   if (/SESSION_PACK_REVISION_CONFLICT/.test(message)) {
     problem('다른 기기에서 회차가 먼저 변경되었습니다', 409, 'SESSION_PACK_REVISION_CONFLICT');
@@ -1578,9 +1578,10 @@ async function historicalRevocationRows(env, app, staffId) {
 }
 
 async function listCases(env, app, body, auth, json, origin) {
-  exactBody(body, ['status', 'studentId', 'fromDate', 'toDate', 'limit']);
+  exactBody(body, ['status', 'studentId', 'fromDate', 'toDate', 'limit', 'caseId']);
   const clauses = ['app=?'];
   const binds = [app];
+  if (body.caseId) { clauses.push('case_id=?'); binds.push(cleanId(body.caseId, 'caseId')); }
   if (body.status) {
     if (!STATUSES.has(String(body.status))) return json({ ok: false, error: 'status를 확인해 주세요' }, 400, origin);
     clauses.push('status=?'); binds.push(String(body.status));
@@ -1595,7 +1596,7 @@ async function listCases(env, app, body, auth, json, origin) {
   const document = await loadRoster(env, app);
   const students = new Map(document.roster.students.map(student => [student.id, student]));
   const candidates = result.results || [];
-  const revocationCandidates = auth.scope === 'own' && SAFE_ID.test(String(auth.id || ''))
+  const revocationCandidates = !body.caseId && auth.scope === 'own' && SAFE_ID.test(String(auth.id || ''))
     ? await historicalRevocationRows(env, app, String(auth.id)) : [];
   const taskIds = [...new Set(candidates.concat(revocationCandidates)
     .map(row => String(row.source_task_id)))];
@@ -1966,7 +1967,7 @@ async function createManual(env, app, body, auth, json, origin) {
   }
   if (!Array.isArray(results) || results.length !== statements.length ||
       results.some(result => Number(result && result.meta && result.meta.changes || 0) !== 1)) {
-    problem('다른 기기에서 보강 또는 보강 수업을 먼저 변경했습니다', 409, 'REVISION_CONFLICT');
+    problem('보강 저장 조건이 달라졌습니다. 최신 수업과 처리 상태를 확인해 주세요', 409, 'REVISION_CONFLICT');
   }
   const saved = await loadCase(env, app, ids.caseId);
   const lessonRow = await env.DB.prepare('SELECT owner,data FROM tasks WHERE app=? AND id=? LIMIT 1')
