@@ -147,7 +147,7 @@ test('새 학생 링크는 fragment 1회코드를 교환하고 기존 query 토�
   const exchange = between('  async exchangeBootstrap(staffId, code) {', '\n\n  async loginAdmin');
   const absorb = between('function absorbLinkParams() {', '\nasync function connectStudentLink');
   const reset = between('function resetStudentLinkCache(token) {', '\n\n/** 링크에 담겨 온 것들을 흡수한다.');
-  const connect = between('async function connectStudentLink(allowEmbeddedExchange) {', '\n/* ══════════════════════════════════════════════════════\n   6. 렌더 헬퍼');
+  const connect = between('async function connectStudentLink(allowExchange) {', '\n/* ══════════════════════════════════════════════════════\n   6. 렌더 헬퍼');
 
   assert.match(exchange, /const body = \{ app: SYNC_APP, code: code \}/);
   assert.match(exchange, /if \(staffId\) body\.staffId = staffId/);
@@ -166,7 +166,8 @@ test('새 학생 링크는 fragment 1회코드를 교환하고 기존 query 토�
   assert.match(connect, /if \(unsent\.length\)/);
   assert.match(connect, /await waitForSyncIdle\(\)/);
   assert.match(connect, /sameStudentConnected/);
-  assert.match(connect, /isEmbeddedStudentBrowser\(navigator\.userAgent\) && !allowEmbeddedExchange/);
+  assert.match(connect, /if \(!allowExchange\)/);
+  assert.doesNotMatch(connect, /isEmbeddedStudentBrowser/);
   assert.match(connect, /studentConnectNeedsApproval = true/);
   assert.match(connect, /await sync\.exchangeBootstrap\(staffId, code\)/);
   assert.match(connect, /const resolvedStaffId = String\(\(d && d\.staffId\) \|\| staffId \|\| ''\)/);
