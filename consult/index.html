@@ -139,6 +139,11 @@
   .chip { min-height: 38px; padding: 8px 13px; border-radius: 999px; border: 1px solid var(--line); background: var(--white); font-size: 13px; font-weight: 700; color: var(--mid-gray); display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
   .chip.on { background: var(--navy); border-color: var(--navy); color: var(--white); }
   .chip.dow { min-width: 42px; padding: 8px 0; text-align: center; justify-content: center; }
+  .staff-picker { display: flex; align-items: center; gap: 10px; padding: 9px 11px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow-sm); }
+  .staff-picker label { flex: 0 0 auto; font-size: 12.5px; font-weight: 900; color: var(--navy); }
+  .staff-picker .in { min-width: 0; min-height: 44px; padding: 8px 36px 8px 11px; }
+  .student-link-qr { display: grid; place-items: center; padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--white); }
+  .student-link-qr svg { display: block; width: min(100%, 280px); height: auto; }
 
   /* ─── 날짜 네비 ─── */
   .datenav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; gap: 8px; }
@@ -1110,6 +1115,7 @@
 <div id="modalHost"></div>
 <div id="reportPrintHost"></div>
 
+<script src="../shared/qr.js?v=2026-09-20.2"></script>
 <script>
 "use strict";
 
@@ -3405,11 +3411,12 @@ function taskPanel(t, date, c, editable) {
 }
 
 function staffSwitcher(activeId) {
-  const list = liveStaff();
+  const list = liveStaff().slice().sort(studentNameCompare);
   if (list.length < 2) return '';
-  return '<div class="chips mb14">' + list.map(s =>
-    '<button class="chip ' + (s.id === activeId ? 'on' : '') + '" data-act="pickstaff" data-id="' + s.id + '">' + esc(s.name) + '</button>'
-  ).join('') + '</div>';
+  return '<div class="staff-picker mb14"><label for="staffSwitcher">학생 선택</label>' +
+    '<select class="in" id="staffSwitcher">' + list.map(s =>
+      '<option value="' + esc(s.id) + '"' + (s.id === activeId ? ' selected' : '') + '>' + esc(s.name) + '</option>'
+    ).join('') + '</select></div>';
 }
 
 function emptyStaffCard() {
@@ -10194,7 +10201,9 @@ function staffAccessPanels(student) {
   }
   return '<hr class="sep"><div class="card-sub mb8"><b>학생용 앱</b> · 시간표·체크·학습시간·마감을 직접 기록하는 링크</div>' +
     consultLinkStudentPanel(student) +
-    '<button class="btn btn-sm btn-primary mt14" data-act="copylink" data-id="' + student.id + '">학생용 링크 복사</button>' +
+    '<div class="row wraprow mt14" style="gap:8px">' +
+      '<button class="btn btn-sm btn-primary" data-act="copylink" data-id="' + student.id + '">학생용 링크 복사</button>' +
+      '<button class="btn btn-sm btn-ghost" data-act="studentqr" data-id="' + student.id + '">QR 코드 만들기</button></div>' +
     '<div class="hint mt8">새 링크는 24시간 안에 한 번만 연결됩니다. 다시 복사했다면 가장 최근 링크를 보내 주세요.</div>' +
     '<hr class="sep"><div class="card-sub mb8"><b>보호자 열람</b> · 발행 리포트와 영·수 결과지만 읽기 전용</div>' +
     '<button class="btn btn-sm btn-ghost" data-act="guardianopen" data-id="' + student.id + '">보호자 초대 링크 관리</button>' +
@@ -10398,6 +10407,18 @@ async function createStudentLinks(ids) {
 }
 async function createStudentLink(id) {
   return (await createStudentLinks([id]))[0];
+}
+
+function studentQrModal(staffId, link) {
+  const student = staffById(staffId);
+  if (!student || student.deleted || student.owner || student.manager) throw new Error('학생을 다시 선택해 주세요');
+  if (typeof WBQR === 'undefined') throw new Error('QR 모듈을 불러오지 못했습니다');
+  const qr = WBQR.svg(link, { size: 280 });
+  modal(student.name + ' 학생용 QR',
+    '<div class="student-link-qr">' + qr + '</div>' +
+    '<div class="guide mt14"><b>연결 방법</b>학생 플래너를 실제 사용할 휴대폰이나 태블릿으로 QR을 스캔한 뒤, <b>이 기기에 학생 플래너 연결</b>을 눌러 주세요.</div>' +
+    '<div class="hint mt14">이 QR은 24시간 안에 한 기기에서 한 번만 연결됩니다. 다시 만들었다면 가장 최근 QR이나 링크를 사용해 주세요.</div>',
+    '<button class="btn btn-primary btn-block mt14" data-act="closemodal">확인</button>');
 }
 
 function orderText(staffId, date, link) {
@@ -13255,12 +13276,6 @@ document.addEventListener('click', ev => {
       sendConsultStudentLink(id);
       break;
     }
-    case 'pickstaff':
-      viewStaff = id;
-      ingOpenCourseId = '';
-      ingLibraryFilter = 'active';
-      render();
-      break;
     case 'resultupload': {
       if (!session.isAdmin || session.isStaffLink) break;
       uploadResultSheet(id, el);
@@ -13363,6 +13378,16 @@ document.addEventListener('click', ev => {
       createStudentLink(id)
         .then(copy)
         .catch(e => toast('학생용 링크를 만들지 못했습니다 — ' + e.message));
+      break;
+    }
+    case 'studentqr': {
+      if (!session.isAdmin || session.isStaffLink) break;
+      el.disabled = true;
+      toast('학생용 QR을 만드는 중…');
+      createStudentLink(id)
+        .then(link => studentQrModal(id, link))
+        .catch(e => toast('학생용 QR을 만들지 못했습니다 — ' + e.message))
+        .finally(() => { if (el.isConnected) el.disabled = false; });
       break;
     }
     case 'alllinks': {
@@ -13875,6 +13900,15 @@ document.addEventListener('click', ev => {
 });
 
 document.addEventListener('change', ev => {
+  if (ev.target.id === 'staffSwitcher') {
+    const student = staffById(ev.target.value);
+    if (!student) return;
+    viewStaff = student.id;
+    ingOpenCourseId = '';
+    ingLibraryFilter = 'active';
+    render();
+    return;
+  }
   if (ev.target.id === 'ingImages') {
     const files = ev.target.files ? Array.from(ev.target.files) : [];
     const out = $('#ingImageOut');
@@ -13954,6 +13988,7 @@ document.addEventListener('input', ev => {
 
 document.addEventListener('change', ev => {
   if (ev.target.id === 'staffSearch') return;
+  if (ev.target.id === 'staffSwitcher') return;
   if (ev.target.closest && ev.target.closest('#view') && ev.target.matches('input, textarea, select')) viewInputDirty = true;
 });
 
@@ -14047,7 +14082,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-09-20.1';
+const APP_VER = '2026-09-20.2';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)

@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
+const WBQR = require('../shared/qr.js');
 
 const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
 
@@ -256,8 +257,23 @@ test('re-tapping the same #c link reuses a valid same-student session without ex
 test('student management distinguishes the student app link from guardian read-only access', () => {
   const view = functionSource('viewStaffAdmin') + '\n' + functionSource('staffAccessPanels');
   assert.match(view, /data-act="copylink"[^>]*>학생용 링크(?: 복사)?<\/button>/);
+  assert.match(view, /data-act="studentqr"[^>]*>QR 코드 만들기<\/button>/);
   assert.match(view, /24시간 안에 한 번만 연결[\s\S]*?가장 최근 링크/);
   assert.match(view, /보호자 열람[\s\S]*?data-act="guardianopen"/);
+});
+
+test('director creates the one-time student QR locally without sending its code to a third party', () => {
+  const qrModal = functionSource('studentQrModal');
+  const actions = between("    case 'copylink':", "    case 'alllinks':");
+  const link = 'https://whdudwns33-wb.github.io/wb-site/consult/#c=' + 'a'.repeat(48);
+  const svg = WBQR.svg(link, { size: 280 });
+
+  assert.match(html, /<script src="\.\.\/shared\/qr\.js\?v=2026-09-20\.2"><\/script>/);
+  assert.match(qrModal, /WBQR\.svg\(link, \{ size: 280 \}\)/);
+  assert.match(qrModal, /실제 사용할 휴대폰이나 태블릿[\s\S]*?24시간 안에 한 기기에서 한 번만 연결/);
+  assert.doesNotMatch(qrModal, /google|qrserver|chart\.api/i);
+  assert.match(actions, /case 'studentqr':[\s\S]*?session\.isAdmin[\s\S]*?createStudentLink\(id\)[\s\S]*?studentQrModal\(id, link\)/);
+  assert.match(svg, /^<svg[\s\S]*<\/svg>$/);
 });
 
 test('student link confirmation tells a parent to connect only on the daily-use device', () => {
