@@ -116,7 +116,6 @@ function studentConnectionHarness({ existing, exchangeFails, initialRoute, linkS
     function clearConsultLinkContacts() {}
     function resetStudentLinkCache() { resetCalls++; resetStaffId = session.staffId; return true; }
     function clearStudentCodeHash() { hashClears++; }
-    function isEmbeddedStudentBrowser() { return false; }
     function go(next) { route = next; routes.push(next); }
     function toast(message) { toasts.push(String(message)); }
     function now() { return Date.now(); }
@@ -129,7 +128,7 @@ function studentConnectionHarness({ existing, exchangeFails, initialRoute, linkS
         return {
           route, routes: routes.slice(), toasts: toasts.slice(), exchangeCalls, syncRuns,
           exchangeStaffId, syncStaffId, resetCalls, resetStaffId, hashClears, historyUrls: historyUrls.slice(),
-          linkedStaffId: session.staffId, pendingStudentCode, studentConnectError,
+          linkedStaffId: session.staffId, pendingStudentCode, studentConnectError, studentConnectNeedsApproval,
           blocked: sessionStorage.getItem(STUDENT_LINK_BLOCK_KEY)
         };
       }
@@ -181,7 +180,7 @@ function renderLearningSourceCard(studentName, state) {
 
 test('a newly exchanged #c student opens Today and reaches the guide only from the student tab', async () => {
   const harness = studentConnectionHarness({ existing: false, exchangeFails: false, initialRoute: 'guide' });
-  await harness.run();
+  await harness.run(true);
   const result = harness.snapshot();
 
   assert.equal(result.exchangeCalls, 1);
@@ -201,7 +200,7 @@ test('a code-only #c link restores the returned student ID before storing and sy
   const harness = studentConnectionHarness({
     existing: false, exchangeFails: false, initialRoute: 'today', linkStaffId: ''
   });
-  await harness.run();
+  await harness.run(true);
   const result = harness.snapshot();
 
   assert.equal(result.exchangeStaffId, '', 'code-only exchange must omit a guessed student ID');
@@ -216,12 +215,27 @@ test('a code-only link is not consumed when Safari cannot persist the student se
   const harness = studentConnectionHarness({
     existing: false, exchangeFails: false, initialRoute: 'today', linkStaffId: '', storageFails: true
   });
-  await harness.run();
+  await harness.run(true);
   const result = harness.snapshot();
 
   assert.equal(result.exchangeCalls, 0);
   assert.equal(result.pendingStudentCode, 'used-bootstrap-code');
   assert.match(result.studentConnectError, /Safari 또는 Chrome의 일반 탭/);
+});
+
+test('opening a fresh student link on a parent phone waits for explicit device confirmation', async () => {
+  const harness = studentConnectionHarness({
+    existing: false, exchangeFails: false, initialRoute: 'today', linkStaffId: ''
+  });
+  await harness.run();
+  const waiting = harness.snapshot();
+
+  assert.equal(waiting.exchangeCalls, 0);
+  assert.equal(waiting.pendingStudentCode, 'used-bootstrap-code');
+  assert.equal(waiting.studentConnectNeedsApproval, true);
+
+  await harness.run(true);
+  assert.equal(harness.snapshot().exchangeCalls, 1);
 });
 
 test('re-tapping the same #c link reuses a valid same-student session without exchange or blocking', async () => {
@@ -233,6 +247,7 @@ test('re-tapping the same #c link reuses a valid same-student session without ex
   assert.equal(result.resetCalls, 0, 'valid same-student cache must not be reset');
   assert.equal(result.hashClears, 1, 'the repeated #c hash must be removed');
   assert.equal(result.pendingStudentCode, '', 'the repeated bootstrap code must be discarded in memory');
+  assert.equal(result.studentConnectNeedsApproval, false);
   assert.equal(result.route, 'today');
   assert.equal(result.studentConnectError, '');
   assert.equal(result.blocked, null, 'a valid same-student revisit must clear stale blocked-link errors');
@@ -243,6 +258,16 @@ test('student management distinguishes the student app link from guardian read-o
   assert.match(view, /data-act="copylink"[^>]*>학생용 링크(?: 복사)?<\/button>/);
   assert.match(view, /24시간 안에 한 번만 연결[\s\S]*?가장 최근 링크/);
   assert.match(view, /보호자 열람[\s\S]*?data-act="guardianopen"/);
+});
+
+test('student link confirmation tells a parent to connect only on the daily-use device', () => {
+  const view = functionSource('viewStudentLinkConnect');
+  const actions = between("    case 'studentretry':", "    case 'studentsetupstart':");
+  assert.match(view, /엄마 휴대폰에서 확인 중이라면/);
+  assert.match(view, /받은 카카오톡 메시지를 아이패드로 전달/);
+  assert.match(view, /페이지를 열기만 해서는 링크가 사용되지 않습니다/);
+  assert.match(view, /data-act="studentconnect"[^>]*>이 기기에 학생 플래너 연결/);
+  assert.match(actions, /case 'studentconnect':[\s\S]*?connectStudentLink\(true\)/);
 });
 
 test('the usage guide explains connection scope and the complete daily closing order', () => {

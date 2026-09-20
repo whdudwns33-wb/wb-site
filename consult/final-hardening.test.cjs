@@ -109,7 +109,7 @@ test('student links use one-time code-only URLs after a successful sync', () => 
   assert.match(textLinks, /createStudentLink\(id\)/);
   assert.match(html, /setTimeout\(\(\) => createStudentLink\(t\.staffId\)/,
     '안내 문자에도 발급이 확인된 학생 링크만 넣는다');
-  const connect = between('async function connectStudentLink(allowEmbeddedExchange) {', '\nasync function connectAdminDevice()');
+  const connect = between('async function connectStudentLink(allowExchange) {', '\nasync function connectAdminDevice()');
   assert.ok(connect.indexOf('if (!save())') < connect.indexOf('sync.exchangeBootstrap'),
     'Safari 저장이 막힌 경우 1회용 코드를 소비하기 전에 중단한다');
 });
