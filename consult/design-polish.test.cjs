@@ -22,3 +22,14 @@ test('mobile modal respects the device safe area', () => {
   assert.match(html, /env\(safe-area-inset-bottom\)/);
   assert.match(html, /border-radius: 20px 20px 0 0/);
 });
+
+test('director views use one compact 가나다 student selector instead of expanded name chips', () => {
+  const switcher = html.slice(html.indexOf('function staffSwitcher('), html.indexOf('function emptyStaffCard('));
+  const change = html.slice(html.indexOf("document.addEventListener('change'"), html.indexOf("document.addEventListener('input'"));
+
+  assert.match(switcher, /liveStaff\(\)\.slice\(\)\.sort\(studentNameCompare\)/);
+  assert.match(switcher, /<label for="staffSwitcher">학생 선택<\/label>/);
+  assert.match(switcher, /<select class="in" id="staffSwitcher">/);
+  assert.doesNotMatch(switcher, /data-act="pickstaff"/);
+  assert.match(change, /ev\.target\.id === 'staffSwitcher'[\s\S]*?viewStaff = student\.id[\s\S]*?render\(\)/);
+});
