@@ -142,6 +142,7 @@
     .choice.ok { background: var(--green-soft); border-color: var(--green); }
     .choice.bad { background: var(--red-soft); border-color: var(--red); }
     .choice.dim { opacity: .5; }
+    .sel { flex: 1; min-width: 0; font-size: .92rem; font-weight: 700; padding: 11px 12px; border: 1px solid var(--line); border-radius: 12px; background: #fff; color: var(--ink-strong); }
     .ans-in { width: 100%; font-size: 1.1rem; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: #fff; color: var(--ink); }
     .feedback { margin-top: 12px; border-radius: 12px; padding: 12px 14px; font-size: .9rem; }
     .feedback.ok { background: var(--green-soft); color: #2E5F35; } .feedback.bad { background: var(--red-soft); color: #7A2A20; }
@@ -182,7 +183,7 @@
     <button data-view="books"><b>▤</b>단어장</button>
     <button data-view="words"><b>語</b>낱말</button>
     <button data-view="chars"><b>字</b>한자</button>
-    <button data-view="train"><b>◎</b>훈련</button>
+    <button data-view="train"><b>◎</b>점검</button>
     <button data-view="report"><b>◔</b>기록</button>
   </nav>
   <div class="sheet-back" id="sheetBack"><div class="sheet" id="sheet" role="dialog" aria-modal="true"></div></div>
@@ -232,9 +233,9 @@
   /* ── 저장소 — 기기별 기록. 연동 학생 코드와 체험(demo)을 키로 갈라 섞이지 않게 ── */
   var KEY = 'wbhj.v1:' + code;
   var db;
-  function fresh() { return { v: 1, states: {}, trace: {}, log: [], custom: {}, streak: { count: 0, last: null }, settings: { book: '', unit: '' }, created: now() }; }
+  function fresh() { return { v: 1, states: {}, trace: {}, log: [], custom: {}, checks: {}, streak: { count: 0, last: null }, settings: { book: '', unit: '' }, created: now() }; }
   function load() { try { var raw = localStorage.getItem(KEY); return raw ? JSON.parse(raw) : null; } catch (e) { return null; } }
-  function adopt(next) { db = Object.assign(fresh(), next || {}); db.states = db.states || {}; db.trace = db.trace || {}; db.log = db.log || []; db.custom = db.custom || {}; db.settings = db.settings || { book: '', unit: '' }; db.streak = db.streak || { count: 0, last: null }; }
+  function adopt(next) { db = Object.assign(fresh(), next || {}); db.states = db.states || {}; db.trace = db.trace || {}; db.log = db.log || []; db.custom = db.custom || {}; db.checks = db.checks || {}; db.settings = db.settings || { book: '', unit: '' }; db.streak = db.streak || { count: 0, last: null }; }
   adopt(load());
   function save() {
     if (db.log.length > 400) db.log = db.log.slice(-300);
@@ -253,6 +254,28 @@
   function bumpStreak() { var st = WBHSRS.bumpStreak(db.streak, now()); if (st !== db.streak) { db.streak = st; renderStreak(); } }
   function renderStreak() { $('#streakChip').textContent = '🔥 ' + ((db.streak && db.streak.count) || 0) + '일'; }
   function logEvent(kind, id, ok) { db.log.push({ t: now(), k: kind, id: id, ok: ok ? 1 : 0 }); }
+
+  /* ── 교재 점검 ──
+     센터 상담에서 「어휘가 독해다로 공부해」 하고 보내면 학생은 종이 교재로 먼저 공부한다. 그래서 이 앱의 첫 일은
+     가르치기가 아니라 그 공부를 점검하는 것이다 — 「새로 배우기」로 심지 않은 낱말도 바로 문제로 낸다(답하면 그 자리에서 심긴다).
+     단원마다 마지막 점수만 남긴다: 기록 본문이 서버 상한(400KB)을 넘지 않게, 그리고 선생님 화면이 볼 것은 '지금 어디까지 붙었나'뿐이라. */
+  var CHECK_KEEP = 40;   /* 보관하는 단원 점검 수 — 넘치면 오래된 것부터 버린다 */
+  function checkKey(bookId, unitId) { return bookId + '|' + (unitId == null ? '' : unitId); }
+  function lastCheck(bookId, unitId) { var c = db.checks[checkKey(bookId, unitId)]; return c && c.n ? c : null; }
+  function putCheck(bookId, unitId, title, n, right) {
+    db.checks[checkKey(bookId, unitId)] = { book: bookId, unit: unitId || '', title: String(title || '').slice(0, 60), n: n, right: right, at: now() };
+    var keys = Object.keys(db.checks);
+    if (keys.length > CHECK_KEEP) {
+      keys.sort(function (a, b) { return (db.checks[b].at || 0) - (db.checks[a].at || 0); });
+      keys.slice(CHECK_KEEP).forEach(function (k) { delete db.checks[k]; });
+    }
+  }
+  function checkDate(at) { return new Date(at).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' }); }
+  function checkLine(c) { return c ? '지난 점검 ' + c.right + ' / ' + c.n + ' (' + pct(c.right, c.n) + '%) · ' + checkDate(c.at) : ''; }
+  function unitTitleOf(bookId, unitId) {
+    var b = bookOf(bookId), u = b ? unitsOf(b).filter(function (x) { return x.id === unitId; })[0] : null;
+    return u ? u.title : (unitId || '');
+  }
 
   /* ── 단어장 ──
      목록(index)은 서버(/books)에서, 본문(/book?id=)은 열 때 받아 기기에 캐시한다. 미연동 기기는 체험 단어장뿐이다.
@@ -461,6 +484,7 @@
     if (tk) {
       tb = bookOf(tk.bookId); tu = tb ? unitsOf(tb).filter(function (u) { return u.id === tk.unitId; })[0] : null;
       var titems = tb && tu ? itemsOf(tb, tu.id) : [], tp = progressOf(titems), tfresh = titems.filter(function (it) { return !stateOf(it); }).length;
+      var tck = tb && tu ? lastCheck(tb.id, tu.id) : null;
       var over = !!(tk.due && tk.due < todayKst());
       html += '<div class="card" style="border-color:#E4B8B0;background:#FFF9F5"><div style="display:flex;align-items:center;gap:8px"><span class="chip t-c">이번 주 단원</span>' +
         '<span class="muted" style="font-size:.76rem">' + (tk.scope === 'student' ? '나에게' : tk.scope === 'class' ? '우리 반에' : '모두에게') + ' 선생님이 지정</span>' +
@@ -469,8 +493,10 @@
         (tb && tu
           ? '<div class="bar stack"><i class="g" style="width:' + pct(tp.graduated, tp.total) + '%"></i><i style="width:' + pct(tp.planted - tp.graduated, tp.total) + '%"></i></div>' +
             '<p class="muted" style="margin:0 0 10px;font-size:.78rem">배우는 중 ' + tp.planted + ' / ' + tp.total + ' · 장기 기억 ' + tp.graduated + (tp.due ? ' · 복습 ' + tp.due : '') + '</p>' +
-            '<div class="row">' + (tfresh ? '<button class="btn primary" id="tkLearn">새로 배우기 (' + Math.min(tfresh, LEARN_MAX) + ')</button>' : '') +
-            (tp.planted ? '<button class="btn' + (tfresh ? '' : ' primary') + '" id="tkTrain">이 단원 훈련</button>' : '') + '</div>'
+            '<button class="btn primary big" id="tkCheck">교재 점검 (' + Math.min(titems.length, TRAIN_MAX) + '문항)</button>' +
+            '<p class="muted" style="margin:6px 0 8px;font-size:.76rem">교재로 공부한 뒤 눌러요 — 앱에서 아직 안 배운 낱말도 나와요.' + (tck ? ' ' + checkLine(tck) : '') + '</p>' +
+            '<div class="row">' + (tfresh ? '<button class="btn" id="tkLearn">새로 배우기 (' + Math.min(tfresh, LEARN_MAX) + ')</button>' : '') +
+            (tp.planted ? '<button class="btn" id="tkTrain">이 단원 훈련</button>' : '') + '</div>'
           : '<p class="muted" style="margin:0">단어장을 받는 중이에요… 학원 와이파이에서 열면 바로 받아요.</p>') + '</div>';
     }
     html += '<div class="card"><div class="nums">' +
@@ -489,14 +515,17 @@
       var items = unit ? itemsOf(book, unit.id) : [];
       var p = progressOf(items);
       var fresh3 = items.filter(function (it) { return !stateOf(it); });
+      var hck = unit ? lastCheck(book.id, unit.id) : null;
       html += '<h2 class="sec">내 단어장 <small>' + esc(book.title) + '</small></h2><div class="card">' +
         '<div style="display:flex;align-items:baseline;gap:8px"><b style="color:var(--ink-strong)">' + esc(unit ? unit.title : '') + '</b>' +
         '<span class="muted">낱말 ' + items.filter(function (i) { return i.kind === 'word'; }).length + ' · 한자 ' + items.filter(function (i) { return i.kind === 'char'; }).length + '</span>' +
         '<button class="btn small ghost" id="hmPick" style="margin-left:auto">바꾸기</button></div>' +
         '<div class="bar stack"><i class="g" style="width:' + pct(p.graduated, p.total) + '%"></i><i style="width:' + pct(p.planted - p.graduated, p.total) + '%"></i></div>' +
         '<p class="muted" style="margin:0 0 10px;font-size:.78rem">배우는 중 ' + p.planted + ' / ' + p.total + ' · 장기 기억 ' + p.graduated + (p.due ? ' · 복습 ' + p.due : '') + '</p>' +
+        '<button class="btn primary big" id="hmCheck">교재 점검 (' + Math.min(items.length, TRAIN_MAX) + '문항)</button>' +
+        (hck ? '<p class="muted" style="margin:6px 0 8px;font-size:.76rem">' + checkLine(hck) + '</p>' : '<p class="muted" style="margin:6px 0 8px;font-size:.76rem">교재로 공부한 단원을 그대로 확인해요.</p>') +
         '<div class="row">' +
-        (fresh3.length ? '<button class="btn primary" id="hmLearn">새로 배우기 (' + Math.min(fresh3.length, LEARN_MAX) + ')</button>' : '<button class="btn" id="hmTrainUnit">이 단원 훈련</button>') +
+        (fresh3.length ? '<button class="btn" id="hmLearn">새로 배우기 (' + Math.min(fresh3.length, LEARN_MAX) + ')</button>' : '<button class="btn" id="hmTrainUnit">이 단원 훈련</button>') +
         (items.some(function (i) { return i.kind === 'char'; }) ? '<button class="btn blue" id="hmTrace">✍️ 따라쓰기</button>' : '') +
         '</div></div>';
     } else {
@@ -508,8 +537,10 @@
     var b3 = $('#hmTrainUnit'); if (b3) b3.addEventListener('click', function () { trainStart({ mode: 'unit', book: book.id, unit: db.settings.unit }); });
     var b4 = $('#hmTrace'); if (b4) b4.addEventListener('click', function () { render('chars'); });
     var b5 = $('#hmPick'); if (b5) b5.addEventListener('click', function () { render('books'); });
+    var b6 = $('#hmCheck'); if (b6) b6.addEventListener('click', function () { trainStart({ mode: 'check', book: book.id, unit: db.settings.unit }); });
     var t1 = $('#tkLearn'); if (t1) t1.addEventListener('click', function () { db.settings.book = tb.id; db.settings.unit = tu.id; save(); learnStart(tb, tu.id); });
     var t2 = $('#tkTrain'); if (t2) t2.addEventListener('click', function () { db.settings.book = tb.id; db.settings.unit = tu.id; save(); trainStart({ mode: 'unit', book: tb.id, unit: tu.id }); });
+    var t3 = $('#tkCheck'); if (t3) t3.addEventListener('click', function () { db.settings.book = tb.id; db.settings.unit = tu.id; save(); trainStart({ mode: 'check', book: tb.id, unit: tu.id }); });
   }
 
   /* ── 단어장 ── */
@@ -775,21 +806,23 @@
     var nh = book.words.filter(function (w) { return w.type === 'hanja'; }).length;
     var nn = book.words.length - nh;
     var html = '<h2 class="sec" style="margin-top:6px">낱말 익히기 <small>' + esc(book.title) + '</small></h2>' +
-      '<p class="muted" style="margin:-4px 0 10px;font-size:.8rem">한자어 ' + nh + ' · 고유어 ' + nn + ' — 뜻을 보고 익히고, 훈련에서 꺼내 봐요.</p>';
+      '<p class="muted" style="margin:-4px 0 10px;font-size:.8rem">한자어 ' + nh + ' · 고유어 ' + nn + ' — 교재로 공부한 단원은 「교재 점검」으로 바로 확인해요.</p>';
     var units = unitsOf(book), any = false;
     units.forEach(function (u) {
       var ws = itemsOf(book, u.id).filter(function (i) { return i.kind === 'word'; });
       if (!ws.length) return;
       any = true;
-      var p = progressOf(ws), fresh = ws.filter(function (i) { return !stateOf(i); });
+      var p = progressOf(ws), fresh = ws.filter(function (i) { return !stateOf(i); }), uck = lastCheck(book.id, u.id);
       html += '<div class="card tight"><div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><b style="color:var(--ink-strong)">' + esc(u.title) + '</b>' +
         '<span class="muted" style="font-size:.76rem">낱말 ' + ws.length + '</span>' +
         (db.settings.unit === u.id ? '<span class="chip t-a">현재</span>' : '') + '</div>' +
         '<div class="bar stack"><i class="g" style="width:' + pct(p.graduated, p.total) + '%"></i><i style="width:' + pct(p.planted - p.graduated, p.total) + '%"></i></div>' +
         '<p class="muted" style="margin:0 0 8px;font-size:.76rem">배우는 중 ' + p.planted + ' / ' + p.total + ' · 장기 기억 ' + p.graduated + (p.due ? ' · 복습 ' + p.due : '') + '</p>' +
         '<div class="row" style="margin-bottom:8px">' +
-        (fresh.length ? '<button class="btn primary small" data-wlearn="' + esc(u.id) + '">새로 배우기 (' + Math.min(fresh.length, LEARN_MAX) + ')</button>' : '') +
-        '<button class="btn small" data-wtrain="' + esc(u.id) + '"' + (p.planted ? '' : ' disabled') + '>이 단원 훈련</button></div>';
+        '<button class="btn primary small" data-wcheck="' + esc(u.id) + '">교재 점검</button>' +
+        (fresh.length ? '<button class="btn small" data-wlearn="' + esc(u.id) + '">새로 배우기 (' + Math.min(fresh.length, LEARN_MAX) + ')</button>' : '') +
+        (p.planted ? '<button class="btn small" data-wtrain="' + esc(u.id) + '">이 단원 훈련</button>' : '') + '</div>' +
+        (uck ? '<p class="muted" style="margin:-2px 0 8px;font-size:.74rem">' + checkLine(uck) + '</p>' : '');
       ws.forEach(function (i) {
         html += '<div class="wrow" data-wid="' + esc(i.sid) + '"><span class="dot ' + dotClass(i) + '"></span><span class="w">' + esc(i.w.word) + '</span>' +
           (i.w.hanja ? '<span class="hj">' + esc(i.w.hanja) + '</span>' : '<span class="chip t-n">고유어</span>') +
@@ -802,6 +835,7 @@
     el.querySelectorAll('.wrow').forEach(function (r) { r.addEventListener('click', function () { var it = resolve(r.dataset.wid); if (it) wordSheet(it); }); });
     el.querySelectorAll('[data-wlearn]').forEach(function (b2) { b2.addEventListener('click', function () { learnStart(book, b2.dataset.wlearn, 'word'); }); });
     el.querySelectorAll('[data-wtrain]').forEach(function (b2) { b2.addEventListener('click', function () { trainStart({ mode: 'unit', book: book.id, unit: b2.dataset.wtrain, only: 'word' }); }); });
+    el.querySelectorAll('[data-wcheck]').forEach(function (b2) { b2.addEventListener('click', function () { trainStart({ mode: 'check', book: book.id, unit: b2.dataset.wcheck, only: 'word' }); }); });
   }
   function renderChars() {
     var el = $('#view-chars');
@@ -815,7 +849,9 @@
       if (!cs.length) return;
       any = true;
       html += '<div class="card tight"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><b style="color:var(--ink-strong)">' + esc(u.title) + '</b><span class="muted" style="font-size:.76rem">' + cs.length + '자</span>' +
-        '<button class="btn blue small" data-unit="' + esc(u.id) + '" style="margin-left:auto">✍️ 차례로 쓰기</button></div><div class="cgrid">';
+        '<button class="btn small" data-ccheck="' + esc(u.id) + '" style="margin-left:auto;flex:none">교재 점검</button>' +
+        '<button class="btn blue small" data-unit="' + esc(u.id) + '" style="flex:none">✍️ 차례로 쓰기</button></div>' +
+        (lastCheck(book.id, u.id) ? '<p class="muted" style="margin:-2px 0 8px;font-size:.74rem">' + checkLine(lastCheck(book.id, u.id)) + '</p>' : '') + '<div class="cgrid">';
       cs.forEach(function (c) {
         var tr = db.trace[c.ch], reps = tr ? tr.reps : 0;
         html += '<div class="ctile" data-ch="' + esc(c.ch) + '">' + (c.medians ? '<span class="ord">획순</span>' : '') + '<span class="pip ' + (reps >= 9 ? 't3' : reps >= 3 ? 't2' : reps ? 't1' : '') + '"></span>' +
@@ -827,6 +863,7 @@
     html += '<p class="muted" style="font-size:.78rem">획순 표시가 있는 글자는 획마다 안내선이 나오고 순서·방향까지 봐 줘요. 없는 글자는 모양을 보고 써요 — 획순 데이터가 없는 글자의 획순은 채점하지 않아요.</p>';
     el.innerHTML = html;
     el.querySelectorAll('.ctile').forEach(function (t) { t.addEventListener('click', function () { traceOpen([t.dataset.ch]); }); });
+    el.querySelectorAll('[data-ccheck]').forEach(function (b2) { b2.addEventListener('click', function () { trainStart({ mode: 'check', book: book.id, unit: b2.dataset.ccheck, only: 'char' }); }); });
     el.querySelectorAll('[data-unit]').forEach(function (b) {
       b.addEventListener('click', function () { traceOpen(book.chars.filter(function (c) { return c.unit === b.dataset.unit; }).map(function (c) { return c.ch; })); });
     });
@@ -1132,12 +1169,18 @@
       WBHSRS.dueList(db.states, t).forEach(function (s) { var it = resolve(s.id); if (it) { it.step = s.step; items.push(it); } else TRAIN_MISSING += 1; });
     } else {
       var book = bookOf(scope.book); if (!book) return [];
-      var list = scope.mode === 'unit' ? itemsOf(book, scope.unit === '' ? '' : scope.unit) : itemsOf(book, null, { allChars: !!scope.chars });
+      var list = scope.mode === 'book' ? itemsOf(book, null, { allChars: !!scope.chars }) : itemsOf(book, scope.unit === '' ? '' : scope.unit);
       if (scope.chars) list = list.filter(function (i) { return i.kind === 'char'; });
       if (scope.only) list = list.filter(function (i) { return i.kind === scope.only; });
-      list = list.filter(function (i) { return stateOf(i); });
-      /* 복습이 밀린 것 먼저, 그다음 계단 낮은 것 */
-      list.forEach(function (i) { var s = stateOf(i); i.step = s.step; i._pri = (s.due <= t ? 0 : 1) * 100 + s.step; });
+      if (scope.mode === 'check') {
+        /* 교재 점검은 심은 것을 가리지 않는다 — 종이로 공부한 단원을 그대로 낸다. 아직 안 심은 것(방금 교재에서 본 것)을 앞에,
+           같은 처지끼리는 무작위로 — 단원이 문항 상한보다 크면 점검할 때마다 다른 낱말이 걸리게 */
+        list.forEach(function (i) { var s = stateOf(i); i.step = s ? s.step : 0; i._pri = s ? 1 : 0; });
+      } else {
+        list = list.filter(function (i) { return stateOf(i); });
+        /* 복습이 밀린 것 먼저, 그다음 계단 낮은 것 */
+        list.forEach(function (i) { var s = stateOf(i); i.step = s.step; i._pri = (s.due <= t ? 0 : 1) * 100 + s.step; });
+      }
       list.sort(function (a, b) { return a._pri - b._pri || Math.random() - 0.5; });
       items = list;
     }
@@ -1145,7 +1188,11 @@
   }
   function trainStart(scope) {
     var items = trainItems(scope);
-    if (!items.length) { toast(scope.mode === 'due' ? (TRAIN_MISSING ? '복습할 낱말의 단어장을 아직 못 받았어요 — 학원 와이파이에서 열어 주세요' : '지금 복습할 것이 없어요') : '먼저 「새로 배우기」로 심어야 훈련할 수 있어요'); return; }
+    if (!items.length) {
+      toast(scope.mode === 'due' ? (TRAIN_MISSING ? '복습할 낱말의 단어장을 아직 못 받았어요 — 학원 와이파이에서 열어 주세요' : '지금 복습할 것이 없어요')
+        : scope.mode === 'check' ? '이 단원에는 점검할 낱말이 없어요' : '먼저 「새로 배우기」로 심어야 훈련할 수 있어요');
+      return;
+    }
     if (TRAIN_MISSING) toast('단어장을 아직 못 받은 항목 ' + TRAIN_MISSING + '개는 이번 복습에서 빠졌어요');
     var qs = [], skipped = 0;
     items.forEach(function (it) { var q = WBHQUIZ.makeQuestion(it, ctxFor(it), { step: it.step || 0, rnd: Math.random }); if (q) qs.push({ item: it, q: q }); else skipped += 1; });
@@ -1160,8 +1207,8 @@
     if (!TRAIN) { trainMenu(el); return; }
     var cur = TRAIN.list[TRAIN.i];
     if (!cur) { trainDone(el); return; }
-    var label = TRAIN.scope.mode === 'due' ? '오늘 복습' : (TRAIN.scope.mode === 'unit' ? '단원 훈련' : '단어장 훈련');
-    var head = '<div class="qhead"><span class="chip t-a">' + label + '</span><span class="muted" style="font-size:.78rem">' + esc(bookTitle(cur.item.book)) + '</span><span class="prog">' + (TRAIN.i + 1) + ' / ' + TRAIN.list.length + '</span></div>';
+    var label = TRAIN.scope.mode === 'due' ? '오늘 복습' : TRAIN.scope.mode === 'check' ? '교재 점검' : (TRAIN.scope.mode === 'unit' ? '단원 훈련' : '단어장 훈련');
+    var head = '<div class="qhead"><span class="chip ' + (TRAIN.scope.mode === 'check' ? 't-c' : 't-a') + '">' + label + '</span><span class="muted" style="font-size:.78rem">' + esc(bookTitle(cur.item.book)) + '</span><span class="prog">' + (TRAIN.i + 1) + ' / ' + TRAIN.list.length + '</span></div>';
     questionRender(el, head, cur.q, function (ok, hinted) {
       var s = db.states[cur.item.sid] || (db.states[cur.item.sid] = WBHSRS.plant(cur.item.sid, now(), { book: cur.item.book }));
       var grade = ok ? (hinted ? 'hard' : 'good') : 'fail';
@@ -1180,13 +1227,26 @@
     var units = book ? unitsOf(book) : [], unit = units.filter(function (u) { return u.id === db.settings.unit; })[0] || units[0];
     var unitP = book && unit ? progressOf(itemsOf(book, unit.id)) : null, bookP = book ? progressOf(itemsOf(book, null)) : null;
     var charP = book ? progressOf(itemsOf(book, null, { allChars: true }).filter(function (i) { return i.kind === 'char'; })) : null;
-    el.innerHTML = '<h2 class="sec" style="margin-top:6px">훈련 <small>문제로 확인해요 — 보면 아는 것과 꺼낼 수 있는 것은 달라요</small></h2>' +
+    var ckUnit = unit, ckItems = ckUnit ? itemsOf(book, ckUnit.id) : [], ck = book && ckUnit ? lastCheck(book.id, ckUnit.id) : null;
+    el.innerHTML = '<h2 class="sec" style="margin-top:6px">점검 <small>교재로 공부한 것을 확인하고, 잊을 때쯤 다시 꺼내요</small></h2>' +
+      '<div class="card" style="border-color:#E4B8B0;background:#FFF9F5"><b style="color:var(--ink-strong)">교재 점검</b>' +
+      '<p class="muted" style="margin:2px 0 10px;font-size:.8rem">종이 교재로 공부한 단원을 그대로 확인해요 — 앱에서 「새로 배우기」를 하지 않은 낱말도 바로 나와요.</p>' +
+      (book && units.length
+        ? '<div class="row"><select class="sel" id="tmCkUnit" aria-label="점검할 단원">' + units.map(function (u) {
+            var un = itemsOf(book, u.id).length, uc = lastCheck(book.id, u.id);
+            return '<option value="' + esc(u.id) + '"' + (ckUnit && u.id === ckUnit.id ? ' selected' : '') + '>' + esc(u.title) + ' (' + un + (uc ? ' · 지난 점검 ' + pct(uc.right, uc.n) + '%' : '') + ')</option>';
+          }).join('') + '</select><button class="btn primary" id="tmCk"' + (ckItems.length ? '' : ' disabled') + '>점검 시작 (' + Math.min(ckItems.length, TRAIN_MAX) + ')</button></div>' +
+          '<p class="muted" style="margin:8px 0 0;font-size:.78rem">' + esc(book.title) + (ck ? ' · ' + checkLine(ck) : ' · 이 단원은 아직 점검 전이에요') + '</p>'
+        : '<p class="muted" style="margin:0">단어장을 먼저 골라 주세요 — 「단어장」 탭에서 교재를 고르면 단원이 나와요.</p>') + '</div>' +
       '<div class="card"><b style="color:var(--ink-strong)">오늘 복습</b><p class="muted" style="margin:2px 0 10px">잊기 직전의 낱말·한자 ' + due.length + '개 (모든 단어장)</p><button class="btn primary big" id="tmDue"' + (due.length ? '' : ' disabled') + '>복습 시작</button></div>' +
       (book ? '<div class="card"><b style="color:var(--ink-strong)">' + esc(book.title) + '</b>' +
         '<div class="row" style="margin-top:10px"><button class="btn" id="tmUnit"' + (unitP && unitP.planted ? '' : ' disabled') + '>' + esc(unit ? unit.title : '단원') + ' (' + (unitP ? unitP.planted : 0) + ')</button>' +
         '<button class="btn" id="tmBook"' + (bookP.planted ? '' : ' disabled') + '>단어장 전체 (' + bookP.planted + ')</button></div>' +
         '<div class="row" style="margin-top:8px"><button class="btn" id="tmChars"' + (charP.planted ? '' : ' disabled') + '>한자만 (' + charP.planted + ')</button><button class="btn ghost" id="tmPick">단어장 바꾸기</button></div>' +
         '<p class="muted" style="margin:8px 0 0;font-size:.78rem">배운 것(심은 것)만 훈련해요. 계단이 오를수록 뜻 고르기 → 빈칸·한자 조립 → 낱말 쓰기로 어려워져요.</p></div>' : '');
+    var ckSel = $('#tmCkUnit');
+    if (ckSel) ckSel.addEventListener('change', function () { db.settings.unit = ckSel.value; save(); trainMenu(el); });   /* 고른 단원이 오늘 화면과 어긋나지 않게 같이 옮긴다 */
+    var ckGo = $('#tmCk'); if (ckGo) ckGo.addEventListener('click', function () { trainStart({ mode: 'check', book: book.id, unit: ckSel ? ckSel.value : ckUnit.id }); });
     var d = $('#tmDue'); if (d) d.addEventListener('click', function () { trainStart({ mode: 'due' }); });
     var u = $('#tmUnit'); if (u) u.addEventListener('click', function () { trainStart({ mode: 'unit', book: book.id, unit: unit.id }); });
     var b = $('#tmBook'); if (b) b.addEventListener('click', function () { trainStart({ mode: 'book', book: book.id }); });
@@ -1194,11 +1254,18 @@
     var p = $('#tmPick'); if (p) p.addEventListener('click', function () { render('books'); });
   }
   function trainDone(el) {
-    var n = TRAIN.list.length, r = TRAIN.right, wrong = TRAIN.wrong, scope = TRAIN.scope;
-    el.innerHTML = '<div class="card wcard"><div class="word" style="font-size:1.5rem">' + r + ' / ' + n + ' 맞혔어요' + (r === n ? ' 🎉' : '') + '</div>' +
-      '<p class="muted">' + (wrong.length ? '틀린 것은 10분 뒤 다시 나와요 — 오늘 안에 한 번 더 만나요.' : '전부 다음 계단으로 올라갔어요.') + (TRAIN.skipped ? ' (문항을 못 만든 항목 ' + TRAIN.skipped + ')' : '') + '</p>' +
+    var n = TRAIN.list.length, r = TRAIN.right, wrong = TRAIN.wrong, scope = TRAIN.scope, skipped = TRAIN.skipped;
+    var isCheck = scope.mode === 'check', ctitle = isCheck ? unitTitleOf(scope.book, scope.unit) : '';
+    /* 점검 점수는 여기서 딱 한 번 남긴다 — trainDone 은 TRAIN 을 비우고 끝나 다시 불려도 두 번 적히지 않는다 */
+    if (isCheck) { putCheck(scope.book, scope.unit, ctitle, n, r); save(); }
+    el.innerHTML = '<div class="card wcard">' +
+      (isCheck ? '<div style="margin-bottom:6px"><span class="chip t-c">교재 점검</span> <span class="muted" style="font-size:.8rem">' + esc(bookTitle(scope.book)) + ' · ' + esc(ctitle) + '</span></div>' : '') +
+      '<div class="word" style="font-size:1.5rem">' + r + ' / ' + n + (isCheck ? ' (' + pct(r, n) + '%)' : ' 맞혔어요') + (r === n ? ' 🎉' : '') + '</div>' +
+      '<p class="muted">' + (isCheck
+        ? (r === n ? '교재 공부가 그대로 붙었어요 — 이 단원은 통과예요.' : pct(r, n) >= 80 ? '거의 붙었어요 — 틀린 것만 10분 뒤 다시 나와요.' : '아직 덜 붙었어요 — 교재를 한 번 더 보고, 틀린 것을 눌러 뜻부터 다시 봐요.') + (authed ? ' 선생님도 이 점수를 봐요.' : '')
+        : (wrong.length ? '틀린 것은 10분 뒤 다시 나와요 — 오늘 안에 한 번 더 만나요.' : '전부 다음 계단으로 올라갔어요.')) + (skipped ? ' (문항을 못 만든 항목 ' + skipped + ')' : '') + '</p>' +
       (wrong.length ? '<div class="result-list" style="text-align:left">' + wrong.map(function (it) { return '<div class="wrow" data-sid="' + esc(it.sid) + '"><span class="dot due"></span><span class="w">' + esc(it.kind === 'word' ? it.w.word : it.c.ch) + '</span><span class="m">' + esc(it.kind === 'word' ? it.w.meaning : (it.c.hun + ' ' + it.c.eum)) + '</span></div>'; }).join('') + '</div>' : '') +
-      '<div class="row" style="margin-top:12px"><button class="btn" id="tdAgain">한 번 더</button><button class="btn primary" id="tdHome">오늘 화면으로</button></div></div>';
+      '<div class="row" style="margin-top:12px"><button class="btn" id="tdAgain">' + (isCheck ? '다시 점검' : '한 번 더') + '</button><button class="btn primary" id="tdHome">오늘 화면으로</button></div></div>';
     TRAIN = null;
     $('#tdAgain').addEventListener('click', function () { trainStart(scope); });
     $('#tdHome').addEventListener('click', function () { render('home'); });
@@ -1212,12 +1279,16 @@
     Object.keys(db.states).forEach(function (id) { var s = db.states[id]; var m = id.match(/^w:([^:]+):/); var k = m ? m[1] : (s.book || '한자'); var b = byBook[k] = byBook[k] || { n: 0, g: 0 }; b.n += 1; if (s.graduated) b.g += 1; });
     var week = 0, weekOk = 0; db.log.forEach(function (l) { if (t - l.t < 7 * DAY && l.k === 'train') { week += 1; if (l.ok) weekOk += 1; } });
     var traced = Object.keys(db.trace).length;
+    var cks = Object.keys(db.checks).map(function (k) { return db.checks[k]; }).filter(function (c) { return c && c.n; }).sort(function (a, b) { return (b.at || 0) - (a.at || 0); }).slice(0, 12);
     el.innerHTML = '<h2 class="sec" style="margin-top:6px">내 기록</h2><div class="card"><div class="nums">' +
       '<div class="tn"><b>' + sum.words + '</b><span>낱말</span></div><div class="tn"><b>' + sum.chars + '</b><span>한자</span></div>' +
       '<div class="tn"><b>' + sum.graduated + '</b><span>장기 기억</span></div><div class="tn"><b>' + traced + '</b><span>써 본 한자</span></div></div>' +
       '<div class="kv" style="margin-top:12px"><span>이번 주 훈련 문항</span><b>' + week + (week ? ' (정답 ' + pct(weekOk, week) + '%)' : '') + '</b></div>' +
       '<div class="kv"><span>연속 학습일</span><b>' + ((db.streak && db.streak.count) || 0) + '일</b></div>' +
       '<div class="kv"><span>지금 복습할 것</span><b>' + sum.due + (sum.emergency ? ' (오래 방치 ' + sum.emergency + ')' : '') + '</b></div></div>' +
+      (cks.length ? '<h2 class="sec">교재 점검 <small>단원마다 마지막 점수</small></h2><div class="card">' + cks.map(function (c) {
+        return '<div class="kv"><span>' + esc(c.title || c.unit) + ' <span class="muted" style="font-size:.76rem">' + esc(bookTitle(c.book)) + ' · ' + checkDate(c.at) + '</span></span><b' + (pct(c.right, c.n) < 60 ? ' style="color:var(--red)"' : '') + '>' + c.right + ' / ' + c.n + '</b></div>';
+      }).join('') + '</div>' : '') +
       (Object.keys(byBook).length ? '<h2 class="sec">단어장별</h2><div class="card">' + Object.keys(byBook).map(function (k) { var b = byBook[k]; return '<div class="kv"><span>' + esc(k === '한자' ? '한자(공용)' : bookTitle(k)) + '</span><b>' + b.g + ' / ' + b.n + '</b></div>'; }).join('') + '</div>' : '') +
       '<h2 class="sec">연동</h2><div class="card">' + (authed
         ? '<div class="kv"><span>학생</span><b>' + esc((AUTH.student && AUTH.student.name) || AUTH.name || code) + '</b></div><div class="kv"><span>서버 저장</span><b>' + (SYNC.authBad ? '연동 만료 — 진로독서에서 다시 연동' : SYNC.avail ? (SYNC.last ? '저장됨 ' + new Date(SYNC.last).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '대기 중') : '오프라인 — 이 기기에만 저장') + '</b></div>' +
