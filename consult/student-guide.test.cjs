@@ -92,20 +92,21 @@ test('student guide explains the required routine and optional modules', () => {
 
 test('student guide keeps the daily routine visible and folds reference sections', () => {
   const guide = functionSource('viewStudentGuide');
-  const sections = guide.match(/<details class="card student-guide-section"(?: open)?>/g) || [];
+  const sections = guide.match(/<details class="card student-guide-section(?: [^"]*)?"(?: open)?>/g) || [];
 
-  assert.equal(sections.length, 6);
+  assert.equal(sections.length, 7);
   assert.equal(sections.filter(section => section.includes(' open')).length, 1);
   assert.match(guide, /<details class="card student-guide-section" open><summary class="student-guide-head">/);
-  assert.ok(guide.indexOf('✅ 매일 반드시 할 것') < guide.indexOf('🔗 처음 연결과 매일 접속'));
-  assert.match(guide, /student-guide-tip-more[^]*스탬프·포인트·기프트 카드 받는 방법/);
-  assert.match(guide, /유효 학습일 스탬프<\/b> 예정 공부/);
-  assert.match(guide, /포인트와 기프트 카드<\/b> 10월 1일부터/);
-  assert.match(guide, /기프트 카드 받는 순서<\/b><br>① 5,000P가 모이면 오늘 할 일의 ‘5,000P 교환 신청’을 누릅니다/);
-  assert.match(guide, /‘교환 확인 중’[^]*‘교환 처리 중’으로 표시됩니다/);
-  assert.match(guide, /실제 발송이 완료되면 5,000P가 차감되고 ‘기프트 카드 교환 완료’로 기록됩니다/);
+  assert.ok(guide.indexOf('✅ 매일 반드시 할 것') < guide.indexOf('🎁 기프트 카드 받는 방법'));
+  assert.ok(guide.indexOf('🎁 기프트 카드 받는 방법') < guide.indexOf('🔗 처음 연결과 매일 접속'));
+  assert.match(guide, /student-guide-reward[^]*🎁 기프트 카드 받는 방법[^]*5,000P가 모이면 신청부터 수령까지 확인해요[^]*5,000P 교환/);
+  assert.match(guide, /교환 가능 확인[^]*5,000P 교환 신청[^]*교환 확인 중[^]*교환 처리 중[^]*기프트 카드 받기/);
+  assert.match(guide, /실제 발송이 완료되면 5,000P가 차감되고 <code>기프트 카드 교환 완료<\/code>로 기록됩니다/);
   assert.match(guide, /‘교환 확인 중’에는 신청을 취소할 수 있지만 ‘교환 처리 중’에는 취소할 수 없습니다/);
   assert.match(guide, /기프트 카드 번호·링크는 플래너에 저장되지 않습니다/);
+  assert.doesNotMatch(guide, /유효 학습일 스탬프|포인트와 기프트 카드|예정 학습일 3일 이상/);
+  assert.doesNotMatch(html, /student-guide-tip-more/);
+  assert.match(html, /\.student-guide-reward \{[^}]*border: 2px solid[^}]*linear-gradient[^}]*box-shadow:/);
   assert.match(html, /\.student-guide-section > summary \{[^}]*cursor: pointer;[^}]*list-style: none;/);
   assert.match(html, /\.student-guide-section\[open\] > summary::after \{ content: '⌃'; \}/);
 });
