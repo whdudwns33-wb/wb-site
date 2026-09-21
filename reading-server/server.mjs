@@ -14,6 +14,7 @@ import { handleNaesin, isReservedCode, dropReservedRows, naesinBodyLimit } from 
 import { handleStudio } from './naesin-studio.mjs';
 import { handleHaru, haruBodyLimit, allowedApp, appOfPath, dropStudentHaru, dumpHaru } from './haru-api.mjs';
 import { handleNaesinKo } from './naesin-ko-api.mjs';
+import { handleHanja, hanjaBodyLimit, dropStudentHanja, dumpHanja } from './hanja-api.mjs';
 import { handleChunk, dropStudentChunk } from './chunk-api.mjs';
 import { handleLetter, letterBodyLimit, dropStudentLetter, dumpLetter, pushDueIssues } from './letter-api.mjs';
 import { checkAdminLogin } from './admin-auth.mjs';
@@ -29,6 +30,7 @@ const AGE_DIR = path.join(ROOT, '..', 'vocab-age'); // 어휘 나이 진단(로�
 const NAESIN_DIR = path.join(ROOT, '..', 'naesin');    // 내신브레인 앱 정적 파일
 const HARU_DIR = path.join(ROOT, '..', 'haru');        // 하루브레인 앱 정적 파일 (팩·대응표·플랜은 여기 없다 — db.haru 전용)
 const NAESIN_KO_DIR = path.join(ROOT, '..', 'naesin-ko'); // 국어브레인 앱 정적 파일
+const HANJA_DIR = path.join(ROOT, '..', 'hanja');      // 한자브레인 앱 정적 파일 (단어장은 여기 없다 — db.hanja 전용)
 const LETTER_DIR = path.join(ROOT, '..', 'letter');     // 브레인레터 앱 정적 파일 (호 본문은 여기 없다 — db.letter 전용, 체험 호는 자체 창작)
 const PUB_DIR = path.join(ROOT, 'public');             // 관리 웹
 const PORT = +(process.env.PORT || 8890);
@@ -213,6 +215,47 @@ const naesinKoStore = {
   getStudent: (c) => db.students?.[c] || null,
 };
 
+/* 한자브레인 저장소 어댑터 — db.hanja 만 사용(워드브레인과 같은 격리). 단어장 본문(books)과 목록(index)을 나눠 둔다.
+   옛 db.json 에는 hanja 칸이 없으므로 첫 접근 때 만들어 준다. */
+const hanjaRoot = () => {
+  db.hanja = db.hanja || { books: {}, index: null, states: {}, assigns: {} };
+  for (const k of ['books', 'states', 'summaries', 'assigns', 'tasks', 'push', 'remaps']) db.hanja[k] = db.hanja[k] || {};
+  return db.hanja;
+};
+const hanjaStore = {
+  getBook: (id) => hanjaRoot().books[id] || null,
+  putBook: (id, rec) => { hanjaRoot().books[id] = rec; persist(); },
+  deleteBook: (id) => { delete hanjaRoot().books[id]; persist(); },
+  getBookIds: () => hanjaRoot().index || null,
+  putBookIds: (list) => { hanjaRoot().index = list; persist(); },
+  getState: (c) => hanjaRoot().states[c] || null,
+  putState: (c, rec) => { hanjaRoot().states[c] = rec; persist(); },
+  deleteState: (c) => { delete hanjaRoot().states[c]; persist(); },
+  listStateCodes: () => Object.keys(hanjaRoot().states),
+  getAssign: (c) => hanjaRoot().assigns[c] || null,
+  putAssign: (c, rec) => { hanjaRoot().assigns[c] = rec; persist(); },
+  deleteAssign: (c) => { delete hanjaRoot().assigns[c]; persist(); },
+  listAssignCodes: () => Object.keys(hanjaRoot().assigns),
+  getSummary: (c) => hanjaRoot().summaries[c] || null,
+  putSummary: (c, rec) => { hanjaRoot().summaries[c] = rec; persist(); },
+  deleteSummary: (c) => { delete hanjaRoot().summaries[c]; persist(); },
+  listSummaryCodes: () => Object.keys(hanjaRoot().summaries),
+  getTask: (s) => hanjaRoot().tasks[s] || null,
+  putTask: (s, rec) => { hanjaRoot().tasks[s] = rec; persist(); },
+  deleteTask: (s) => { delete hanjaRoot().tasks[s]; persist(); },
+  listTaskScopes: () => Object.keys(hanjaRoot().tasks),
+  getStrokes: () => hanjaRoot().strokes || null,
+  putStrokes: (rec) => { hanjaRoot().strokes = rec; persist(); },
+  getPush: (c) => hanjaRoot().push[c] || null,
+  putPush: (c, rec) => { hanjaRoot().push[c] = rec; persist(); },
+  delPush: (c) => { delete hanjaRoot().push[c]; persist(); },
+  listPushCodes: () => Object.keys(hanjaRoot().push),
+  getRemap: (id) => hanjaRoot().remaps[id] || null,
+  putRemap: (id, rec) => { hanjaRoot().remaps[id] = rec; persist(); },
+  deleteRemap: (id) => { delete hanjaRoot().remaps[id]; persist(); },
+  getStudent: (c) => db.students[c] || null,
+  listStudentCodes: () => Object.keys(db.students),
+};
 /* 청크브레인 저장소 어댑터 — db.chunk 만 사용(학생 기록·관리용 요약). 콘텐츠는 저장소에 없다. */
 const chunkRoot = () => { db.chunk = db.chunk || { states: {}, summaries: {}, assigns: {} }; db.chunk.assigns = db.chunk.assigns || {}; return db.chunk; };
 const chunkStore = {
@@ -251,7 +294,7 @@ const json = (res, code, obj) => {
    남은 몸통은 resume() 으로 흘려보내야 응답이 정상으로 나간다 — 안 읽고 응답하면 큰 몸통은 RST 로 끝난다. */
 const BODY_LIMIT_DEFAULT = 2_000_000;
 const BODY_LIMIT_TEXTBOOK = 5_500_000;
-const bodyLimit = (p) => (p.startsWith('/api/naesin/') ? naesinBodyLimit(p) : p.startsWith('/api/haru/') ? haruBodyLimit(p) : p.startsWith('/api/letter/') ? letterBodyLimit(p) : p === '/api/admin/textbook-src' ? BODY_LIMIT_TEXTBOOK : BODY_LIMIT_DEFAULT);
+const bodyLimit = (p) => (p.startsWith('/api/naesin/') ? naesinBodyLimit(p) : p.startsWith('/api/haru/') ? haruBodyLimit(p) : p.startsWith('/api/hanja/') ? hanjaBodyLimit(p) : p.startsWith('/api/letter/') ? letterBodyLimit(p) : p === '/api/admin/textbook-src' ? BODY_LIMIT_TEXTBOOK : BODY_LIMIT_DEFAULT);
 const tooLarge = () => { const e = new Error('too large'); e.status = 413; return e; };
 const readBody = (req, limit = BODY_LIMIT_DEFAULT) => new Promise((resolve, reject) => {
   /* 조각을 Buffer 로 모아 한 번에 디코딩한다 — 조각마다 문자열로 바꾸면 조각 경계에 걸린 한글(3바이트)이 깨진다.
@@ -486,6 +529,13 @@ const server = http.createServer(async (req, res) => {
         if (Number(req.headers['content-length'] || 0) > haruBodyLimit(p)) { req.resume(); return json(res, 413, { error: '요청이 너무 커서 받을 수 없어요.' }); }
         const out = await handleHaru({ path: p, method: req.method, who, query: url.searchParams, getBody: () => readBody(req, haruBodyLimit(p)), store: haruStore,
           atomsFallback: haruAtomsFallback, randomToken: () => crypto.randomUUID().replace(/-/g, '') });
+        return json(res, out.status, out.body);
+      }
+
+      /* 한자브레인 (/api/hanja/*) — 인증만 공유, 저장·라우트는 격리(워커와 동일). 단어장은 db.hanja 에만 산다 */
+      if (p.startsWith('/api/hanja/')) {
+        if (Number(req.headers['content-length'] || 0) > hanjaBodyLimit(p)) { req.resume(); return json(res, 413, { error: '요청이 너무 커서 받을 수 없어요.' }); }
+        const out = await handleHanja({ path: p, method: req.method, who, query: url.searchParams, getBody: () => readBody(req, hanjaBodyLimit(p)), store: hanjaStore, push: VOCAB_PUSH_ENV });
         return json(res, out.status, out.body);
       }
 
@@ -734,7 +784,7 @@ const server = http.createServer(async (req, res) => {
         /* 워커 fullDump 와 같은 모양 — 내신은 팩 본문 없이(packIds 만), 교재 원문(textbookSrc)은 포함.
            팩은 라이선스 원문이라 백업 파일로 흩어지지 않게 한다(store.naesinSnapshot). */
         return json(res, 200, { service: 'wb-reading', savedAt: nowIso(), students: db.students, states: db.states, vocab: db.vocab,
-          textbook: db.textbook || {}, pubmap: db.pubmap || {}, naesin: naesinSnapshot(db.naesin), textbookSrc: db.textbookSrc || {}, haru: await dumpHaru(haruStore), letter: await dumpLetter(letterStore) });
+          textbook: db.textbook || {}, pubmap: db.pubmap || {}, naesin: naesinSnapshot(db.naesin), textbookSrc: db.textbookSrc || {}, haru: await dumpHaru(haruStore), letter: await dumpLetter(letterStore), hanja: await dumpHanja(hanjaStore) });
       }
       if (p === '/api/admin/backups' && req.method === 'GET') {
         return json(res, 200, { backups: listBackups() });
@@ -790,6 +840,8 @@ const server = http.createServer(async (req, res) => {
         drop(ko.overlays, c);
         /* 하루브레인 — 정확 접두 4계열(state·mock·paper·parent). 대응표는 남긴다(워커와 동일) */
         await dropStudentHaru(haruStore, c); removed += 3;
+        /* 한자브레인 — 기록·요약·배정·알림 구독. 단어장·획순 사전은 학생 것이 아니라 둔다(워커와 동일) */
+        await dropStudentHanja(hanjaStore, c); removed += 4;
         await dropStudentChunk(chunkStore, c);
         /* 브레인레터 — 열람·문제 기록 한 키. 호는 학생 것이 아니라 둔다(워커와 동일) */
         await dropStudentLetter(letterStore, c, (db.students[c] || {}).ptoken); removed += 1;
@@ -854,6 +906,10 @@ const server = http.createServer(async (req, res) => {
     if (p === '/naesin-ko' || p === '/naesin-ko/') return serveFile(res, NAESIN_KO_DIR, 'index.html');
     if (p.startsWith('/naesin-ko/')) return serveFile(res, NAESIN_KO_DIR, p.slice('/naesin-ko/'.length));
 
+    /* 한자브레인 앱 — 단어장은 여기 없다(/api/hanja/book, KV·db 전용). 체험 단어장(book-sample.json)은 자체 창작이라 정적으로 나간다 */
+    if (p === '/hanja/voice.js') return serveFile(res, SHARED_DIR, 'voice.js');
+    if (p === '/hanja' || p === '/hanja/') return serveFile(res, HANJA_DIR, 'index.html');
+    if (p.startsWith('/hanja/')) return serveFile(res, HANJA_DIR, p.slice('/hanja/'.length));
     /* 청크브레인 앱 — 지문·카드는 자체 창작이라 정적 파일로 나간다. 학생 기록만 /api/chunk/* */
     if (p === '/chunk/voice.js') return serveFile(res, SHARED_DIR, 'voice.js');
     if (p === '/chunk' || p === '/chunk/') return serveFile(res, CHUNK_DIR, 'index.html');
@@ -950,7 +1006,7 @@ setInterval(async () => {
   if (lastPushDay === day) return;
   lastPushDay = day;
   try {
-    const r = await sendNightPushes({ store: vocabStore, push: VOCAB_PUSH_ENV, naesin: naesinStore });
+    const r = await sendNightPushes({ store: vocabStore, push: VOCAB_PUSH_ENV, naesin: naesinStore, hanja: hanjaStore });
     if (r.sent || r.removed) console.log('[push] 밤 9시 알림(워드브레인+내신):', JSON.stringify(r));
   } catch (e) { console.error('[push] 발송 실패:', e.message); }
 }, 60000).unref();
