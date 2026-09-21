@@ -96,4 +96,31 @@ t('낱말과 한자가 나란히 — 탭이 둘 다 있고, 지금 단어장에 
   assert.ok(/한글 어휘 · 한자어/.test(app), '머리말이 한자만 내세우고 있다');
 });
 
+t('교재 점검 — 종이 교재로 공부한 단원을 앱에서 안 배웠어도 바로 문제로 낸다', () => {
+  /* 센터에서 「어휘가 독해다로 공부해」 하고 보낸 학생이 첫 번째 사용자다. 그 학생의 단원은 앱에 심긴 것이 하나도 없다 —
+     훈련이 '심은 것만'이면 점검할 길이 없어진다. 이 검사가 그 빗장이 다시 생기는 것을 막는다. */
+  const ti = app.slice(app.indexOf('function trainItems'), app.indexOf('function trainStart'));
+  assert.ok(/scope\.mode === 'check'/.test(ti), 'trainItems 에 점검 모드가 없다');
+  const branch = ti.slice(ti.indexOf("scope.mode === 'check'"));
+  const plantedGate = branch.slice(0, branch.indexOf('} else {') + 1);
+  assert.ok(!/filter\(function \(i\) \{ return stateOf\(i\); \}\)/.test(plantedGate), '점검 모드가 「심은 것만」으로 걸러진다 — 교재로 공부한 단원을 못 낸다');
+  assert.ok(/i\.step = s \? s\.step : 0/.test(ti), '안 심은 항목의 계단이 정해지지 않았다');
+  /* 답하는 순간 심긴다(기록이 이어진다) */
+  assert.ok(/db\.states\[cur\.item\.sid\] \|\| \(db\.states\[cur\.item\.sid\] = WBHSRS\.plant/.test(app), '점검에서 답한 낱말이 심기지 않는다');
+  /* 들어가는 문 — 오늘(이번 주 단원·내 단어장) · 훈련 탭 · 낱말 탭 · 한자 탭(급수 교재) */
+  ['tkCheck', 'hmCheck', 'tmCk', 'tmCkUnit'].forEach((id) => assert.ok(app.includes("id=\"" + id + "\"") || app.includes("'#" + id + "'"), id + ' 단추가 없다'));
+  assert.ok(/data-wcheck=/.test(app), '낱말 탭에 단원 점검 단추가 없다');
+  assert.ok(/data-ccheck=/.test(app), '한자 탭에 단원 점검 단추가 없다 — 한자어 편(급수 교재)은 낱말이 없어 점검할 길이 이것뿐이다');
+  assert.ok(/only: 'char'/.test(app), '한자 탭 점검이 글자만 내지 않는다');
+  /* 점수를 남기고, 선생님 화면까지 올라간다 */
+  assert.ok(/checks: \{\}/.test(app), '기록에 점검 칸(checks)이 없다');
+  assert.ok(/db\.checks = db\.checks \|\| \{\}/.test(app), '옛 기기의 기록을 열 때 점검 칸이 없어 터진다');
+  assert.ok(/function putCheck/.test(app) && /putCheck\(scope\.book, scope\.unit/.test(app), '점검 점수를 남기는 곳이 없다');
+  assert.ok(/CHECK_KEEP/.test(app), '점검 기록 상한이 없다 — 기록 본문이 서버 상한(400KB)을 넘을 수 있다');
+  ['normCheck', 'unitCheck', 'checkList'].forEach((f) => assert.ok(api.includes('export function ' + f), '서버에 ' + f + ' 가 없다'));
+  assert.ok(/lastCheck/.test(api) && /check: unitCheck\(/.test(api), '요약·진도표에 점검이 안 실린다');
+  assert.ok(/function checkCell/.test(admin) && /esc\(c\.title/.test(admin), '관리 화면이 학생이 올린 제목을 이스케이프하지 않는다');
+  assert.ok(/checkCell\(s\.lastCheck\)/.test(admin) && /checkCell\(r\.check\)/.test(admin), '현황·진도표에 점검 칸이 없다');
+});
+
 console.log(`\nOK — ${passed}개 통과`);

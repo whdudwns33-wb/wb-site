@@ -7,7 +7,7 @@ import assert from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { handleHanja, hanjaSummary, dumpHanja, dropStudentHanja, hanjaBodyLimit, BODY_LIMIT_BOOK, BODY_LIMIT_DEFAULT, buildRemap, hanjaNightDue, resolveTask, unitItemIds, unitProgress } from './hanja-api.mjs';
+import { handleHanja, hanjaSummary, dumpHanja, dropStudentHanja, hanjaBodyLimit, BODY_LIMIT_BOOK, BODY_LIMIT_DEFAULT, buildRemap, hanjaNightDue, resolveTask, unitItemIds, unitProgress, normCheck, checkList, unitCheck } from './hanja-api.mjs';
 import { sendNightPushes } from './vocab-api.mjs';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -437,6 +437,40 @@ await t('공개 범위 — ids 로 여러 권을 한 번의 쓰기로 바꾸고,
   assert.strictEqual(res.body.applied, false, '옛 값을 읽었으면 「확인 못 했다」로 알린다');
   assert.strictEqual(writes2, 1, '확인이 늦다고 다시 쓰면 안 된다 — 그것이 남의 변경을 지우는 경로다 (쓰기 ' + writes2 + '회)');
   assert.strictEqual(stale._raw.index().find((e) => e.id === 'stale-1').scope, 'assigned', '실제 저장된 값은 맞다');
+});
+
+await t('교재 점검 — 학생이 올린 점수를 서버가 조여 요약·진도표에 싣는다', async () => {
+  /* 이 점수는 학생 기기가 올린 값이다. 관리 화면이 그대로 그리는 자리라 서버에서 화이트리스트로 조인다 */
+  assert.strictEqual(normCheck(null), null);
+  assert.strictEqual(normCheck({ n: 0, right: 3 }), null, '문항 수 0은 점검이 아니다');
+  assert.strictEqual(normCheck({ n: 5000, right: 1 }), null, '문항 수 상한을 넘겼다');
+  assert.strictEqual(normCheck({ n: 'abc', right: 1 }), null);
+  const tidy = normCheck({ book: 'b1', unit: 'u03', title: 'ㄱ'.repeat(120), n: '12', right: 99, at: 1700000000000, evil: '<script>' });
+  assert.deepStrictEqual([tidy.n, tidy.right, tidy.title.length], [12, 12, 60], '정답 수는 문항 수를 못 넘고 제목은 잘린다');
+  assert.strictEqual(tidy.evil, undefined, '모르는 키가 그대로 따라 나갔다 — 화면까지 간다');
+  assert.strictEqual(normCheck({ n: 10, right: -3 }).right, 0);
+  assert.strictEqual(normCheck({ n: 10, right: 5, at: 'x' }).at, null);
+  assert.deepStrictEqual(checkList(null), []);
+
+  const store = memStore();
+  await upload(store, sample());
+  assert.strictEqual((await call(store, { path: '/api/hanja/admin/task', method: 'POST', who: ADMIN, getBody: async () => ({ scope: 'default', bookId: 'wb-hanja-starter', unitId: 'u03' }) })).status, 200);
+  const st = { states: {}, checks: {
+    'wb-hanja-starter|u03': { book: 'wb-hanja-starter', unit: 'u03', title: '3단원', n: 12, right: 9, at: 1700000000000 },
+    'wb-hanja-starter|u04': { book: 'wb-hanja-starter', unit: 'u04', title: '4단원', n: 10, right: 4, at: 1700000900000 },
+    'wb-hanja-starter|u09': { n: 0 },          /* 망가진 칸은 세지 않는다 */
+  } };
+  assert.strictEqual((await call(store, { path: '/api/hanja/state', method: 'PUT', getBody: async () => ({ state: st }) })).status, 200);
+  const sum = hanjaSummary(store._raw.states.s1);
+  assert.strictEqual(sum.checks, 2, '망가진 칸이 세어졌다');
+  assert.deepStrictEqual([sum.lastCheck.title, sum.lastCheck.right, sum.lastCheck.n], ['4단원', 4, 10], '가장 최근 점검이 아니다');
+  assert.strictEqual(store._raw.summaries.s1.lastCheck.title, '4단원', '요약 키에 점검이 안 실렸다 — 현황판이 못 본다');
+  /* 진도표는 '이번 주 단원'의 점수를 본다 — 가장 최근 점검이 아니라 그 단원 것 */
+  const pr = await call(store, { path: '/api/hanja/admin/progress', who: ADMIN, qs: 'scope=default' });
+  const row = pr.body.rows.find((r) => r.code === 's1');
+  assert.deepStrictEqual([row.check.n, row.check.right], [12, 9], JSON.stringify(row.check));
+  assert.strictEqual(pr.body.rows.find((r) => r.code === 's2').check, null, '점검 안 한 학생은 null');
+  assert.strictEqual(unitCheck(store._raw.states.s1, 'wb-hanja-starter', 'u99'), null);
 });
 
 console.log(`\nOK — ${passed}개 통과`);

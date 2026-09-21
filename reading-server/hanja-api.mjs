@@ -45,8 +45,31 @@ export function isValidDate(s) {
 
 /* ── 학생별 요약 (관리 현황판용) — 기록 저장 시점에 서버가 계산해 작은 키에 둔다 ── */
 const INTERVAL_DAYS = [0, 1, 3, 7, 14, 30, 90];
+
+/* 교재 점검 한 건 — 학생 앱이 db.checks['<단어장>|<단원>'] 에 단원마다 마지막 점수만 남긴다.
+   학생 기기가 올린 값이라 서버가 화이트리스트로 조인다: 모르는 키는 버리고, 문항 수·정답 수는 앞뒤가 맞는 정수만 남긴다. */
+export function normCheck(c) {
+  if (!isObj(c)) return null;
+  const n = Math.round(Number(c.n) || 0);
+  if (!(n > 0) || n > 1000) return null;
+  const right = Math.round(Number(c.right) || 0);
+  const at = Math.round(Number(c.at) || 0);
+  const str = (v, max) => (typeof v === 'string' ? v.slice(0, max) : '');
+  return { book: str(c.book, 60), unit: str(c.unit, 60), title: str(c.title, 60), n, right: Math.max(0, Math.min(n, right)), at: at > 0 ? at : null };
+}
+export function checkList(stateRec) {
+  const S = stateRec && stateRec.state;
+  if (!S || !isObj(S.checks)) return [];
+  return Object.values(S.checks).map(normCheck).filter(Boolean).sort((a, b) => (b.at || 0) - (a.at || 0));
+}
+/* 단원 하나의 점검 점수 — 진도표가 '이번 주 단원을 몇 점으로 통과했나'를 학생별로 보여 준다 */
+export function unitCheck(stateRec, bookId, unitId) {
+  const S = stateRec && stateRec.state;
+  const all = S && isObj(S.checks) ? S.checks : {};
+  return normCheck(all[bookId + '|' + (unitId == null ? '' : unitId)]);
+}
 export function hanjaSummary(stateRec, now) {
-  const base = { linked: !!stateRec, total: 0, words: 0, chars: 0, graduated: 0, due: 0, emergency: 0, traced: 0, streak: 0, books: [], lastActive: stateRec ? stateRec.updatedAt : null };
+  const base = { linked: !!stateRec, total: 0, words: 0, chars: 0, graduated: 0, due: 0, emergency: 0, traced: 0, streak: 0, checks: 0, lastCheck: null, books: [], lastActive: stateRec ? stateRec.updatedAt : null };
   const S = stateRec && stateRec.state;
   if (!S || !isObj(S)) return base;
   const t = now == null ? Date.now() : now;
@@ -63,6 +86,9 @@ export function hanjaSummary(stateRec, now) {
       if ((t - due) / iv >= 1.25) base.emergency += 1;
     }
   }
+  const cks = checkList(stateRec);
+  base.checks = cks.length;
+  base.lastCheck = cks[0] || null;
   base.traced = Object.keys(isObj(S.trace) ? S.trace : {}).length;
   base.streak = (isObj(S.streak) && Number(S.streak.count)) || 0;
   base.books = [...books].slice(0, 20);
@@ -452,7 +478,7 @@ export async function handleHanja(ctx) {
       if (!stu || !stu.name) continue;
       if (!one && scope !== 'default' && String(stu.cls || '').trim() !== scope) continue;
       const st = await store.getState(code);
-      rows.push({ code, name: stu.name, cls: stu.cls || '', linked: !!st, lastActive: st ? st.updatedAt : null, ...unitProgress(st, ids) });
+      rows.push({ code, name: stu.name, cls: stu.cls || '', linked: !!st, lastActive: st ? st.updatedAt : null, check: unitCheck(st, task.bookId, task.unitId), ...unitProgress(st, ids) });
     }
     rows.sort((a, b) => (a.cls === b.cls ? (a.name < b.name ? -1 : 1) : (a.cls < b.cls ? -1 : 1)));
     const unit = (rec.book.units || []).find((u) => u.id === task.unitId) || { id: task.unitId, title: task.unitId };

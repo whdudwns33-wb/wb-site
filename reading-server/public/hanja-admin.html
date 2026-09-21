@@ -151,8 +151,8 @@
 
     <h2>학생별 현황</h2>
     <div class="table-scroll"><table>
-      <thead><tr><th>이름</th><th>반</th><th class="num">낱말</th><th class="num">한자</th><th class="num">장기 기억</th><th class="num">복습 밀림</th><th class="num">오래 방치</th><th class="num">써 본 한자</th><th class="num">연속일</th><th>배정</th><th>마지막 활동</th></tr></thead>
-      <tbody id="ovBody"><tr><td colspan="11" class="muted">불러오는 중…</td></tr></tbody>
+      <thead><tr><th>이름</th><th>반</th><th class="num">낱말</th><th class="num">한자</th><th class="num">장기 기억</th><th class="num">복습 밀림</th><th class="num">오래 방치</th><th class="num">써 본 한자</th><th class="num">연속일</th><th>최근 교재 점검</th><th>배정</th><th>마지막 활동</th></tr></thead>
+      <tbody id="ovBody"><tr><td colspan="12" class="muted">불러오는 중…</td></tr></tbody>
     </table></div>
   </div>
 </div>
@@ -338,6 +338,13 @@
     }).join('') : '<span class="muted">아직 배정이 없습니다. 공개 범위가 「모두」인 단어장은 배정 없이도 모든 연동 학생에게 보여요.</span>';
   }
 
+  /* 교재 점검 칸 — 60% 아래는 붉게. 값은 학생 기기가 올린 것이라 서버가 조이고 여기서 다시 이스케이프한다 */
+  function checkCell(c) {
+    if (!c || !c.n) return '<span class="muted">—</span>';
+    var p = Math.round(c.right * 100 / c.n);
+    return '<b' + (p < 60 ? ' style="color:#B23A2E"' : '') + '>' + c.right + ' / ' + c.n + '</b> <span class="muted" style="font-size:.8rem">' + esc(c.title || '') + (c.at ? ' · ' + fmt(new Date(c.at).toISOString()) : '') + '</span>';
+  }
+
   /* ── 현황 ── */
   async function loadOverview() {
     var j = await api('/api/hanja/admin/overview');
@@ -345,8 +352,9 @@
     $('#ovBody').innerHTML = rows.length ? rows.map(function (s) {
       return '<tr><td><b>' + esc(s.name || s.code) + '</b></td><td>' + esc(s.cls || '') + '</td><td class="num">' + s.words + '</td><td class="num">' + s.chars + '</td><td class="num">' + s.graduated + '</td>' +
         '<td class="num">' + s.due + '</td><td class="num"' + (s.emergency ? ' style="color:#B23A2E;font-weight:700"' : '') + '>' + s.emergency + '</td><td class="num">' + s.traced + '</td><td class="num">' + s.streak + '</td>' +
+        '<td>' + checkCell(s.lastCheck) + '</td>' +
         '<td class="muted">' + (s.assigned || []).map(function (id) { return esc(bookTitle(id)); }).join(', ') + '</td><td class="muted">' + fmt(s.lastActive) + '</td></tr>';
-    }).join('') : '<tr><td colspan="11" class="muted">아직 앱을 연 학생이 없어요.</td></tr>';
+    }).join('') : '<tr><td colspan="12" class="muted">아직 앱을 연 학생이 없어요.</td></tr>';
   }
 
   /* ── 이번 주 단원 지정 ── */
@@ -396,12 +404,13 @@
       var rows = j.rows || [], tot = j.unit.total;
       var avg = rows.length ? Math.round(rows.reduce(function (a, r) { return a + (tot ? r.planted / tot : 0); }, 0) * 100 / rows.length) : 0;
       $('#tkProgress').innerHTML = '<h2>단원 진도 — ' + esc(scopeLabel(scope)) + ' · ' + esc(j.task.title) + ' <span class="muted">항목 ' + tot + ' · 평균 진도 ' + avg + '%</span></h2>' +
-        '<div class="table-scroll"><table><thead><tr><th>이름</th><th>반</th><th class="num">배우는 중</th><th class="num">장기 기억</th><th class="num">복습 밀림</th><th>진도</th><th>마지막 활동</th></tr></thead><tbody>' +
+        '<div class="table-scroll"><table><thead><tr><th>이름</th><th>반</th><th class="num">배우는 중</th><th class="num">장기 기억</th><th class="num">복습 밀림</th><th>교재 점검</th><th>진도</th><th>마지막 활동</th></tr></thead><tbody>' +
         (rows.length ? rows.map(function (r) {
           var p = tot ? Math.round(r.planted * 100 / tot) : 0;
           return '<tr><td><b>' + esc(r.name) + '</b></td><td>' + esc(r.cls) + '</td><td class="num">' + r.planted + ' / ' + tot + '</td><td class="num">' + r.graduated + '</td><td class="num"' + (r.due ? ' style="color:#B23A2E;font-weight:700"' : '') + '>' + r.due + '</td>' +
+            '<td>' + checkCell(r.check) + '</td>' +
             '<td><div style="width:120px;height:8px;background:#F1ECE1;border-radius:99px;overflow:hidden"><div style="width:' + p + '%;height:100%;background:' + (p >= 100 ? '#4E8C57' : '#3D6B8E') + '"></div></div></td><td class="muted">' + (r.linked ? fmt(r.lastActive) : '미연동') + '</td></tr>';
-        }).join('') : '<tr><td colspan="7" class="muted">이 범위에 등록된 학생이 없어요.</td></tr>') + '</tbody></table></div>';
+        }).join('') : '<tr><td colspan="8" class="muted">이 범위에 등록된 학생이 없어요.</td></tr>') + '</tbody></table></div>';
       $('#tkProgress').scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (e) { msg(e.message); }
   }
