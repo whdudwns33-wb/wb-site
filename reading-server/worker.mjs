@@ -9,6 +9,7 @@ import { handleNaesin, isReservedCode, dropReservedRows, naesinBodyLimit } from 
 import { handleStudio } from './naesin-studio.mjs';
 import { handleHaru, haruBodyLimit, allowedApp, appOfPath, dropStudentHaru, dumpHaru, weeklyAgg } from './haru-api.mjs';
 import { handleNaesinKo } from './naesin-ko-api.mjs';
+import { handleChunk, dropStudentChunk } from './chunk-api.mjs';
 import { handleLetter, letterBodyLimit, dropStudentLetter, dumpLetter, pushDueIssues } from './letter-api.mjs';
 import { bookIndex, cleanWords, coachingCard, confirmAllPlan, findBook, readyToConfirm, sourceSummary, validProgress, withOverlay } from './textbook.mjs';
 import { parseRoster } from './roster.mjs';
@@ -204,6 +205,25 @@ function naesinStore(env) {
 /* 국어브레인 저장소 어댑터 — naesinko: 접두 키만 사용.
    영어(naesin:)와 달리 요약·서술형·오버레이를 state에서 분리한 별도 키로 둔다
    (국어 기획서 §8 저장 예산 — overview가 state를 통째로 읽지 않게). */
+/* 청크브레인 저장소 어댑터 — chunk: 접두 키만. 콘텐츠는 정적 자산이라 KV 에는 학생 기록·요약뿐이다. */
+function chunkStore(env) {
+  return {
+    getState: (c) => env.DB.get('chunk:state:' + c, 'json'),
+    putState: (c, rec) => env.DB.put('chunk:state:' + c, JSON.stringify(rec)),
+    deleteState: (c) => env.DB.delete('chunk:state:' + c),
+    getSummary: (c) => env.DB.get('chunk:summary:' + c, 'json'),
+    putSummary: (c, rec) => env.DB.put('chunk:summary:' + c, JSON.stringify(rec)),
+    deleteSummary: (c) => env.DB.delete('chunk:summary:' + c),
+    listSummaryCodes: async () => (await kvListAll(env, 'chunk:summary:')).map(k => k.slice('chunk:summary:'.length)),
+    /* 선생님 과제 — 단계·글·카드. 학생 앱이 켤 때 받아 단계를 맞추고 과제 카드를 띄운다 */
+    getAssign: (c) => env.DB.get('chunk:assign:' + c, 'json'),
+    putAssign: (c, rec) => env.DB.put('chunk:assign:' + c, JSON.stringify(rec)),
+    deleteAssign: (c) => env.DB.delete('chunk:assign:' + c),
+    listAssignCodes: async () => (await kvListAll(env, 'chunk:assign:')).map(k => k.slice('chunk:assign:'.length)),
+    getStudent: (c) => env.DB.get('student:' + c, 'json'),
+  };
+}
+
 function naesinKoStore(env) {
   return {
     getPack: (id) => env.DB.get('naesinko:pack:' + id, 'json'),
@@ -340,9 +360,14 @@ async function fullDump(env) {
   }
   /* 하루브레인 — 학생 기록 본문(state·mock·paper)·대응표·플랜을 담는다. id 만 넣으면 기록의 백업이 KV 단일 사본이 된다(설계안 §7-5). 팩 본문은 내신과 같은 이유로 id 만. */
   const haru = await dumpHaru(haruStore(env));
+  /* 청크브레인 — 학생 기록·요약 두 계열. 콘텐츠는 저장소에 없다(정적 자산). */
+  const chunk = { states: {}, summaries: {}, assigns: {} };
+  for (const [pre, tgt] of [['chunk:state:', chunk.states], ['chunk:summary:', chunk.summaries], ['chunk:assign:', chunk.assigns]]) {
+    for (const k of await kvListAll(env, pre)) { const v = await env.DB.get(k, 'json'); if (v) tgt[k.slice(pre.length)] = v; }
+  }
   /* 브레인레터 — 호 본문(원장이 쓴 것)과 학생 기록. 팩과 달리 라이선스 원문이 아니라 통째로 담는다 */
   const letter = await dumpLetter(letterStore(env));
-  return { service: 'wb-reading', savedAt: nowIso(), students, states, vocab, textbook: textbook || {}, pubmap: pubmap || {}, naesin, naesinKo, textbookSrc: textbookSrc || {}, haru, letter };
+  return { service: 'wb-reading', savedAt: nowIso(), students, states, vocab, textbook: textbook || {}, pubmap: pubmap || {}, naesin, naesinKo, textbookSrc: textbookSrc || {}, haru, chunk, letter };
 }
 
 async function snapshotBackup(env) {
@@ -673,6 +698,14 @@ export default {
         return json(out.status, out.body);
       }
 
+      /* 청크브레인 (/api/chunk/*) — 인증만 공유, 저장·라우트는 격리. 학생 기록 하나와 관리용 요약뿐이다. */
+      if (p.startsWith('/api/chunk/')) {
+        const len = Number(req.headers.get('content-length') || 0);
+        if (len > 300_000) return json(413, { error: '요청이 너무 커서 받을 수 없어요.' });
+        const out = await handleChunk({ path: p, method: req.method, who, getBody: () => req.json(), store: chunkStore(env) });
+        return json(out.status, out.body);
+      }
+
       /* 국어브레인 (/api/naesin-ko/*) — 같은 격리 원칙, 저장소만 naesinko: */
       if (p.startsWith('/api/naesin-ko/')) {
         const out = await handleNaesinKo({
@@ -979,6 +1012,7 @@ export default {
 
         /* 하루브레인 — 정확 접두 4계열(state·mock·paper·parent). 대응표(haru:paperkey:*)는 학생 것이 아니라 그대로 둔다. */
         await dropStudentHaru(haruStore(env), c);
+        await dropStudentChunk(chunkStore(env), c);
         removed.push('haru:state:' + c, 'haru:mock:' + c, 'haru:paper:' + c);
         /* 브레인레터 — 열람·문제 기록 한 키. 호는 학생 것이 아니라 그대로 둔다 */
         await dropStudentLetter(letterStore(env), c, stu.ptoken);
