@@ -384,6 +384,8 @@ function bindAuthor(){
 function renderPrint(){
   $('#main').innerHTML='<div class="card"><h2>교재 출력</h2><p class="muted">단계를 누르면 연습장 조판 화면이 새 창에서 열려요. 글을 고르고 <b>인쇄 → PDF 로 저장</b>하면 교재가 됩니다. 「글 저작」에서 올린 선생님 지문도 그 단계 목록에 함께 떠요(여기서 열면 관리 토큰으로 받아요).</p><div class="row">'+
     R.BAND_ORDER.map((b)=>'<a class="btn ghost" href="/chunk/print.html?band='+b+'" target="_blank" rel="noopener">'+bandLabel(b)+' <span class="muted">'+PASSAGES.filter((p)=>p.band===b).length+'편</span></a>').join('')+'</div>'+
+    '<h3>화면 수업 <span class="muted">(프로젝터)</span></h3><p class="muted">큰 글씨로 띄워 놓고 스페이스를 누를 때마다 덩어리 경계를 하나씩 공개해요. 아이들이 먼저 손을 들어 맞히게 한 뒤 눌러요. 「내 글 넣기」로 수업 자료를 붙여 넣을 수도 있어요.</p><div class="row">'+
+    R.BAND_ORDER.map((b)=>'<a class="btn ghost" href="/chunk/class.html?band='+b+'" target="_blank" rel="noopener">'+bandLabel(b)+'</a>').join('')+'</div>'+
     '<h3>추천 구성</h3><ul class="muted"><li>유치·초1·초2: 표시본(밑줄 곡선) + 한 줄 한 덩어리 판 + 무표시본. 어른이 먼저 읽어 주고 따라 읽기 3회.</li><li>초3~초6: 표시본 + 무표시본 + 정답표. 주 3회, 한 편 10분.</li><li>중·고등: 무표시본 위주로 직접 긋고 정답표와 견주기. 규칙 페이지는 첫 주에만.</li></ul></div>';
 }
 

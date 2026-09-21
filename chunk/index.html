@@ -358,7 +358,7 @@
     function render(opt) {
       const y = window.scrollY;
       let html = '';
-      if (!S.band) html = vOnboard();
+      if (!S.band) html = view.pl ? vPlacement() : vOnboard();
       else if (view.name === 'home') html = vHome();
       else if (view.name === 'learn') html = sess && sess.ls ? vLesson() : vLearn();
       else if (view.name === 'practice') html = sess && sess.pr ? vSession() : vPractice();
@@ -379,7 +379,43 @@
       return (view.famErr ? '<div class="err">' + esc(view.famErr) + '</div>' : '') +
         (famMode() ? '<div class="card hero"><p class="eyebrow">가족 링크로 열었어요</p><h1>아이는 몇 학년이에요?</h1><p>선생님이 단계를 정해 두면 그에 맞춰 저절로 바뀌어요.</p></div>' : '<div class="card hero"><p class="eyebrow">처음 오셨네요</p><h1>몇 학년이에요?</h1><p>단계는 언제든 기록 탭에서 바꿀 수 있어요.</p></div>') +
         '<div class="card"><div class="grid">' + GRADES.map(([n, l]) => '<button class="grade" data-act="pick-grade" data-g="' + n + '" aria-pressed="' + (g === n) + '">' + l + '</button>').join('') + '</div>' +
-        (g != null ? '<p class="small" style="margin-top:12px">→ <b>' + R.BANDS[R.bandOfGrade(g)].label + ' 단계</b>로 시작해요. ' + esc(R.BANDS[R.bandOfGrade(g)].who) + '</p><button class="big" data-act="start-band">시작하기</button>' : '') + '</div>' + footer();
+        (g != null ? '<p class="small" style="margin-top:12px">→ <b>' + R.BANDS[R.bandOfGrade(g)].label + ' 단계</b>로 시작해요. ' + esc(R.BANDS[R.bandOfGrade(g)].who) + '</p>' +
+          '<button class="big" data-act="pl-start">2분 진단하고 시작하기</button><p class="small" style="text-align:center;margin:6px 0 0">글 한 문단을 끊어 보고 딱 맞는 단계를 찾아요. 점수는 기록에 남지 않아요.</p>' +
+          '<button class="big ghost" data-act="start-band" style="margin-top:10px">진단 없이 바로 시작</button>' : '') + '</div>' + footer();
+    }
+
+    /* ── 출발선 진단 — 첫날 자리 찾기(2분) ──
+       한 학년 아래 글의 첫 문단 하나를 끊어 보게 한다. 문장 끝은 연습과 똑같이 미리 그어 주고 채점에서 뺀다.
+       여기서 나온 점수는 기록(log)에 넣지 않는다 — 연습이 아니라 자리 찾기라서, 승급 제안·복습 사다리를 흔들면 안 된다. */
+    function startPlacement() {
+      if (view.grade == null) return;
+      const startBand = R.bandOfGrade(view.grade), testBand = SC.placementBand(startBand);
+      const b = R.BANDS[testBand], pool = ALL().filter((p) => p.band === testBand);
+      if (!pool.length) { S.band = startBand; S.grade = view.grade; save(); view = { name: 'home' }; applyBody(); render(); return; }
+      const p = pool[0];
+      /* 문장 단위 밴드(유치~초2)는 문장 하나, 그 위는 첫 문단 하나 */
+      const segs = b.sentenceMode ? R.sentencesOf(p.paragraphs[0])[0] : p.paragraphs[0];
+      const text = segs.join('');
+      view.pl = { startBand, testBand, title: p.title, segs, text, model: R.modelBoundaries(segs), given: b.sentenceMode ? [] : R.sentenceEnds(text), marks: new Set(), result: null, out: null };
+      render();
+    }
+    function vPlacement() {
+      const pl = view.pl, b = R.BANDS[pl.testBand];
+      let html = '<div class="card hero"><p class="eyebrow">출발선 진단 · 2분</p><h1>이 글을 덩어리로 끊어 볼까요?</h1><p>' + esc(R.BANDS[pl.startBand].label) + ' 로 시작하기 전에, ' + esc(b.label) + ' 글 한 문단으로 딱 맞는 자리를 찾아요.</p></div>';
+      html += '<div class="card"><p class="eyebrow">「' + esc(pl.title) + '」</p>';
+      if (!pl.result) html += '<p class="small">뜻이 나뉘는 곳의 <b>·</b> 를 눌러 ∕ 로 바꿔요.' + (pl.given.length ? ' 문장 끝 ∕ 는 미리 표시했어요.' : '') + ' 몰라도 괜찮아요 — 지금 실력을 보는 거예요.</p>';
+      else html += legendHtml(pl.result.extras.length, pl.result.neutral.length);
+      html += tokensHtml(pl.text, pl.marks, pl.result, 'pl', pl.given);
+      if (!pl.result) html += '<button class="big" data-act="pl-check">다 끊었어요</button><button class="big ghost" data-act="start-band" style="margin-top:8px">건너뛰고 시작</button>';
+      else {
+        const o = pl.out;
+        html += '<div class="score">' + pl.result.score + '점</div>' + notesHtml(pl.result.notes, 2);
+        html += '<div class="banner">' + (o.moved
+          ? '<b>' + esc(R.BANDS[o.band].label) + ' 단계</b>에서 시작할게요. 지금은 여기가 딱 맞아요 — 잘하게 되면 ' + esc(R.BANDS[pl.startBand].label) + ' 로 올려 줘요.'
+          : '<b>' + esc(R.BANDS[o.band].label) + ' 단계</b>에서 시작할게요. ' + (pl.result.score >= 85 ? '덩어리가 벌써 눈에 들어와요!' : '이 단계 글을 읽을 수 있어요.')) + '</div>';
+        html += '<button class="big" data-act="pl-go">' + esc(R.BANDS[o.band].label) + ' 단계로 시작하기</button>';
+      }
+      return html + '</div>' + footer();
     }
 
     /* 부모 모드 홈 카드 — 어른이 할 일 네 줄 + 이번 주 요약. 점수보다 「소리 내어 함께 읽었다」가 남게 쓴다 */
@@ -653,7 +689,7 @@
       if (famMode()) html += '<div class="card"><h2>가족 링크</h2><p class="small"><b>' + esc(FAM.name || '아이') + '</b> 학생의 가족 링크로 열려 있어요. 기록은 학원 서버에 저장돼 선생님과 아이의 기기에서도 같은 기록을 봐요.</p><button class="btn ghost sm" data-act="fam-unlink">이 기기에서 링크 끊기</button></div>';
       else html += '<div class="card"><h2>선생님과 연동</h2>' + (a && a.token ? '<p class="small"><b>' + esc(a.name || a.code) + '</b>으로 연동되어 있어요. 기록이 학원 서버에도 저장돼 다른 기기에서 이어서 할 수 있어요.</p><button class="btn ghost sm" data-act="unlink">이 기기에서 연동 끊기</button>' :
         '<p class="small">선생님께 받은 학생 코드를 넣으면 기록이 학원 서버에 저장돼요. 연동 없이도 이 기기에서는 계속 쓸 수 있어요.</p>' + (view.linkMsg ? '<div class="err">' + esc(view.linkMsg) + '</div>' : '') + (view.linkWait ? '<div class="banner">' + esc(view.linkWait) + ' — 선생님 승인을 기다려요. 승인되면 저절로 연결돼요.</div>' : '<div class="row"><input type="text" id="code" inputmode="latin" autocomplete="off" placeholder="wb-…" style="min-height:44px;border:1.5px solid var(--line);border-radius:12px;padding:0 12px"><button class="btn" data-act="link">연결 요청</button></div>')) + '</div>';
-      html += '<div class="card"><h2>그 밖에</h2><div class="row"><a class="btn ghost" href="./print.html?band=' + band() + '" target="_blank" rel="noopener">🖨 교재로 출력하기</a><button class="btn ghost" data-act="reset">기록 지우기</button></div></div>';
+      html += '<div class="card"><h2>그 밖에</h2><div class="row"><a class="btn ghost" href="./print.html?band=' + band() + '" target="_blank" rel="noopener">🖨 교재로 출력하기</a><a class="btn ghost" href="./class.html?band=' + band() + '" target="_blank" rel="noopener">📺 화면 수업</a><button class="btn ghost" data-act="reset">기록 지우기</button></div></div>';
       return html + footer();
     }
 
@@ -697,6 +733,9 @@
       }
       else if (act === 'go-settings') { view = { name: 'record' }; render(); setTimeout(() => { const el = $('settings'); if (el) el.scrollIntoView({ behavior: 'smooth' }); }, 30); }
       else if (act === 'pick-grade') { view.grade = +t.dataset.g; render({ keep: true }); }
+      else if (act === 'pl-start') { startPlacement(); }
+      else if (act === 'pl-check') { const pl = view.pl; pl.result = R.explain(pl.text, pl.model, [...pl.marks], pl.given); pl.out = SC.placement(pl.startBand, pl.result.score); render(); }
+      else if (act === 'pl-go') { const pl = view.pl; S.band = pl.out.band; S.grade = view.grade; save(); view = { name: 'home' }; applyBody(); render(); announce(R.BANDS[S.band].label + ' 단계로 시작해요'); }
       else if (act === 'start-band') { if (view.grade == null) return; S.band = R.bandOfGrade(view.grade); S.grade = view.grade; save(); view = { name: 'home' }; applyBody(); render(); }
       else if (act === 'band-shift') { if (S.assign && S.assign.band) { announce('선생님이 정한 단계라 바꿀 수 없어요'); return; } const nb = +t.dataset.d > 0 ? R.nextBand(band()) : R.prevBand(band()); if (!nb) return; S.band = nb; save(); applyBody(); render(); announce(R.BANDS[nb].label + ' 단계로 바꿨어요'); }
       else if (act === 'open-lesson') { const l = lessonById(t.dataset.id); if (!l) return; stopSpeak(); recRelease(); sess = { ls: { id: l.id, ci: 0, marks: new Set(), result: null, scores: [], done: false } }; view = { name: 'learn' }; try { history.pushState({ sess: 1 }, ''); } catch (e) {} render(); }
@@ -705,7 +744,7 @@
       else if (act === 'lesson-quit') { sess = null; stopSpeak(); view = { name: 'learn' }; render(); }
       else if (act === 'tts') { if (SPK) { stopSpeak(); document.querySelectorAll('[data-act="tts"]').forEach((b) => b.textContent = '🔊 들려주기'); return; } const prefix = t.dataset.prefix; let segs = []; if (sess && sess.ls) { const l = lessonById(sess.ls.id); const i = +prefix.replace('ex', ''); segs = l.examples[i].segs; } else if (sess && sess.pr) { const p = byId(sess.pr.id); segs = [].concat.apply([], p.paragraphs); if (prefix === 'all') { /* 문단 경계마다 prefix 가 다르므로 전체를 p0..pn 으로 다시 매핑 */ speakAll(p); return; } } speakSegs(segs, prefix); }
       else if (act === 'fam-unlink') { if (!confirm('이 기기에서 가족 링크를 끊을까요? 학원 기록은 그대로 남아요.')) return; saveFam(null); S = load(); view = { name: 'home' }; try { history.replaceState(null, '', location.pathname); } catch (e) {} applyBody(); render(); setDot('', '이 기기'); }
-      else if (act === 'gap') { const i = +t.dataset.i; const set = sess.ls ? sess.ls.marks : sess.pr.marks[+t.dataset.prefix.replace('u', '')]; if (set.has(i)) set.delete(i); else set.add(i); render({ keep: true }); }
+      else if (act === 'gap') { const i = +t.dataset.i; const pfx = t.dataset.prefix; const set = pfx === 'pl' ? view.pl.marks : sess.ls ? sess.ls.marks : sess.pr.marks[+pfx.replace('u', '')]; if (set.has(i)) set.delete(i); else set.add(i); render({ keep: true }); }
       else if (act === 'start-practice') { startPractice(t.dataset.id, 'practice'); }
       else if (act === 'start-review') { startPractice(t.dataset.id, 'review'); }
       else if (act === 'pr-quit') { sess = null; recRelease(); stopSpeak(); view = { name: 'home' }; render(); }

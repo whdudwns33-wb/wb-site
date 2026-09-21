@@ -43,7 +43,24 @@ var WBCHUNK_SCHED = (function () {
   var LEGACY = { E1: 'G1', E2: 'G3', E3: 'G5', M: 'G7', H: 'G10' };
   function legacyBand(b) { return LEGACY[b] || b; }
 
+  /* 단계 순서 — rules.js BAND_ORDER 와 같다(두 모듈이 서로를 부르지 않게 여기 한 번 더 적었다) */
+  var BANDS13 = ['K', 'G1', 'G2', 'G3', 'G4', 'G5', 'G6', 'G7', 'G8', 'G9', 'G10', 'G11', 'G12'];
   function gradeOf(score) { return score >= 85 ? 'good' : score >= 60 ? 'ok' : 'weak'; }
+
+  /* ── 출발선 진단 — 첫날 자리 찾기 ──
+     학년만 보고 시작하면 읽기가 느린 아이는 첫 글에서 좌절하고, 빠른 아이는 심심해한다. 그래서 «한 학년 아래» 글 하나를
+     끊어 보게 하고, 거기서도 60점 미만이면 그 아래 단계에서 시작한다. 60점 이상이면 자기 학년 단계 그대로다.
+     유치는 아래가 없어 늘 유치에서 시작한다. 이 점수는 기록(log)에 남기지 않는다 — 연습이 아니라 자리 찾기라서다.
+     되돌리기 쉬운 결정이라 한 문단으로 충분하다(2분). 승급·강등은 연습 3회가 쌓인 뒤 suggestion() 이 따로 본다. */
+  function placementBand(startBand) {
+    var i = BANDS13.indexOf(startBand);
+    return i > 0 ? BANDS13[i - 1] : startBand;
+  }
+  function placement(startBand, score) {
+    var test = placementBand(startBand);
+    if (score == null || score >= 60) return { band: startBand, testBand: test, moved: false };
+    return { band: test, testBand: test, moved: test !== startBand };
+  }
 
   /* 연습 한 번을 기록한다. res = { score, qOk, tags, mode:'practice'|'review'|'lesson', wpm, band } */
   function record(state, id, res, now) {
@@ -156,7 +173,6 @@ var WBCHUNK_SCHED = (function () {
   /* ── 끊어읽기 지수 (0~100) — 상담·월간 리포트가 인용하는 숫자 하나 ──
      최근 5회 끊기 점수 평균에 단계 가중(유치 0.5 → 고3 1.0)을 곱한다. 같은 90점이라도 고3 글에서 낸 90점이 더 높은 실력이라서다.
      단계 순서는 rules.js BAND_ORDER 와 같다(모듈을 서로 부르지 않으려고 여기 한 번 더 적었다). 기록이 없으면 null. */
-  var BANDS13 = ['K', 'G1', 'G2', 'G3', 'G4', 'G5', 'G6', 'G7', 'G8', 'G9', 'G10', 'G11', 'G12'];
   function index(state, now) {
     var s = summary(state, now);
     if (s.recentAvg == null) return null;
@@ -168,7 +184,7 @@ var WBCHUNK_SCHED = (function () {
     return { band: state.band, attempts: s.attempts, practiced: s.practiced, graduated: s.graduated, avg: s.avg, recentAvg: s.recentAvg, qRate: s.qRate, wpmRecent: s.wpmRecent, streak: s.streak, lessonsDone: s.lessonsDone, weak: weakTags(state, 5), assignDone: assignDone(state), index: index(state, now), lastAt: state.log.length ? state.log[state.log.length - 1].t : null };
   }
 
-  return { DAY: DAY, STEP_DAYS: STEP_DAYS, GRADUATE_STEP: GRADUATE_STEP, blank: blank, normalize: normalize, gradeOf: gradeOf, record: record, dueList: dueList, nextPassage: nextPassage, weakTags: weakTags, suggestion: suggestion, streak: streak, lessonDone: lessonDone, summary: summary, forTeacher: forTeacher, index: index, assignDone: assignDone, assignTotal: assignTotal, dayKey: dayKey };
+  return { DAY: DAY, STEP_DAYS: STEP_DAYS, GRADUATE_STEP: GRADUATE_STEP, blank: blank, normalize: normalize, gradeOf: gradeOf, record: record, dueList: dueList, nextPassage: nextPassage, weakTags: weakTags, suggestion: suggestion, streak: streak, lessonDone: lessonDone, summary: summary, forTeacher: forTeacher, index: index, placement: placement, placementBand: placementBand, assignDone: assignDone, assignTotal: assignTotal, dayKey: dayKey };
 })();
 
 if (typeof module !== 'undefined' && module.exports) module.exports = WBCHUNK_SCHED;
