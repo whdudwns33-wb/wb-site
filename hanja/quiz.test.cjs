@@ -107,12 +107,25 @@ t('한자 — 훈음·글자·낱말·획수 (觀·山)', () => {
   assert.notStrictEqual(Q.makeQuestion({ kind: 'char', c: noStrokes }, ctx, { rnd, kinds: ['c-count'] }).kind, 'c-count', '획수 없는 글자에 획수 문제가 나왔다');
 });
 
-t('계단이 오르면 재인에서 산출로 — step 0 은 뜻 고르기, step 4 는 낱말 쓰기', () => {
-  const w = byWord('추론');
-  assert.strictEqual(Q.makeQuestion({ kind: 'word', w }, ctx, { rnd: seeded(1), step: 0 }).kind, 'w-meaning');
-  assert.strictEqual(Q.makeQuestion({ kind: 'word', w }, ctx, { rnd: seeded(1), step: 4 }).kind, 'w-type');
-  assert.strictEqual(Q.makeQuestion({ kind: 'char', c: byCh('十') }, ctx, { rnd: seeded(1), step: 0 }).kind, 'c-hun');
-  assert.strictEqual(Q.makeQuestion({ kind: 'char', c: byCh('十') }, ctx, { rnd: seeded(1), step: 4 }).kind, 'c-write', '높은 계단의 한자는 쓰기(산출)로 확인한다');
+t('계단이 오르면 재인에서 산출로 — 계단의 유형 묶음 안에서만 나오고, 같은 계단 안에서는 섞인다', () => {
+  /* 계단이 난이도를 정하고 그 계단 안의 유형은 섞인다 — 고정이면 같은 계단 항목이 전부 같은 문제로 나온다.
+     그래서 「무엇이 나오는가」가 아니라 「그 계단의 묶음 안에 있는가」를 지킨다. */
+  const w = byWord('추론'), c = byCh('十');
+  const kindsOf = (item, step, n) => {
+    const out = new Set();
+    for (let i = 1; i <= n; i++) { const q = Q.makeQuestion(item, ctx, { rnd: seeded(i), step: step }); if (q) out.add(q.kind); }
+    return out;
+  };
+  const inTier = (got, tierList, where) => got.forEach((k) => assert.ok(tierList.includes(k), where + ' 에 없는 유형: ' + k));
+  inTier(kindsOf({ kind: 'word', w }, 0, 12), Q.PLAN.word[0], '낱말 계단 0');
+  inTier(kindsOf({ kind: 'word', w }, 4, 12), Q.PLAN.word[3], '낱말 계단 3');
+  inTier(kindsOf({ kind: 'char', c }, 0, 12), Q.PLAN.char[0], '한자 계단 0');
+  inTier(kindsOf({ kind: 'char', c }, 4, 12), Q.PLAN.char[3], '한자 계단 3');
+  /* 재인에서 산출로 — 낮은 계단에 쓰기(산출)가 없고, 높은 계단에는 있다 */
+  assert.ok(!Q.PLAN.word[0].includes('w-type') && Q.PLAN.word[3].includes('w-type'));
+  assert.ok(!Q.PLAN.char[0].includes('c-write') && Q.PLAN.char[3].includes('c-write'));
+  /* 섞이는지 — 씨앗을 바꾸면 한 계단 안에서 유형이 두 가지 이상 나온다 */
+  assert.ok(kindsOf({ kind: 'char', c }, 0, 12).size >= 2, '같은 계단인데 유형이 하나뿐 — 섞이지 않는다');
   assert.deepStrictEqual([0, 1, 2, 3, 4, 6].map(Q.tier), [0, 1, 2, 2, 3, 3]);
 });
 
@@ -168,6 +181,39 @@ t('세션 — 항목마다 계단에 맞는 문항 하나, max 로 자른다', (
   const s = Q.session(items, ctx, { rnd: seeded(9), max: 4 });
   assert.strictEqual(s.questions.length, 4);
   assert.strictEqual(s.skipped.length, 0);
+});
+
+t('급수 교재 — 낱말 항목이 없어도 글자의 예시 낱말로 「이 글자가 든 낱말」 문항이 나온다', () => {
+  /* 초등 한자 어휘 같은 급수 교재는 교재에 낱말 뜻이 없어 낱말 항목을 못 넣는다. 글자의 words 목록이 유일한 낱말 정보다. */
+  const chars = [
+    { ch: '一', hun: '한', eum: '일', unit: 'g01', strokes: 1, words: ['일등', '일주', '일생', '일주일'], _sid: 'c:一' },
+    { ch: '二', hun: '두', eum: '이', unit: 'g02', strokes: 2, words: ['이월', '이중', '이십'], _sid: 'c:二' },
+    { ch: '人', hun: '사람', eum: '인', unit: 'g03', strokes: 2, words: ['인기', '인물', '인간'], _sid: 'c:人' },
+    { ch: '日', hun: '날', eum: '일', unit: 'g04', strokes: 4, words: ['요일', '매일', '일기'], _sid: 'c:日' },
+  ];
+  const ctx = { words: [], chars: chars };
+  const q = Q.makeQuestion({ kind: 'char', c: chars[0], _sid: 'c:一' }, ctx, { kinds: ['c-word'], rnd: seeded(7) });
+  assert.ok(q, '급수 교재에서 c-word 가 안 나온다');
+  assert.strictEqual(q.kind, 'c-word');
+  assert.ok(chars[0].words.includes(q.answer), '정답이 그 글자의 낱말이 아니다: ' + q.answer);
+  assert.strictEqual(q.choices.length, 4);
+  /* 보기는 다른 글자의 낱말에서 온다 — 같은 글자의 낱말이 오답으로 섞이면 정답이 둘이 된다 */
+  const wrong = q.choices.filter((x) => x !== q.answer);
+  assert.strictEqual(wrong.length, 3);
+  wrong.forEach((w) => assert.ok(!chars[0].words.includes(w), '같은 글자의 낱말이 오답으로 섞였다: ' + w));
+  assert.ok(/일등|일주|일생|일주일/.test(q.reveal || ''), '해설에 그 글자의 낱말 목록이 없다');
+  /* 예시 낱말이 없으면 c-word 를 만들지 않는다 — makeQuestion 은 다른 유형으로 넘어간다(억지 문항을 내지 않는다) */
+  const none = Q.makeQuestion({ kind: 'char', c: { ch: '天', hun: '하늘', eum: '천', unit: 'g05', strokes: 4, _sid: 'c:天' }, _sid: 'c:天' },
+    { words: [], chars: [{ ch: '天', words: [] }] }, { kinds: ['c-word'], rnd: seeded(3) });
+  assert.ok(!none || none.kind !== 'c-word', '예시 낱말이 없는데 c-word 를 만들었다');
+  /* 낱말 항목이 있는 단어장은 예전처럼 그것을 쓴다 */
+  const withWords = { words: [
+    { word: '관측', hanja: '觀測', meaning: '재다', unit: 'u1' }, { word: '학교', hanja: '學校', meaning: '배우는 곳', unit: 'u1' },
+    { word: '이월', hanja: '二月', meaning: '두 번째 달', unit: 'u1' }, { word: '인간', hanja: '人間', meaning: '사람', unit: 'u1' },
+  ], chars: chars };
+  const q2 = Q.makeQuestion({ kind: 'char', c: { ch: '觀', hun: '볼', eum: '관', unit: 'u1', words: ['안 쓰는 낱말'], _sid: 'c:觀' }, _sid: 'c:觀' },
+    withWords, { kinds: ['c-word'], rnd: seeded(11) });
+  assert.strictEqual(q2.answer, '관측', '낱말 항목이 있으면 그쪽이 먼저다');
 });
 
 console.log(`\nOK — ${passed}개 통과`);

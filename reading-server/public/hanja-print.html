@@ -65,6 +65,7 @@
       <label><input type="checkbox" id="tWrite" checked> 한자 쓰기 (훈음 → 米자 칸에 쓰기)</label>
       <label><input type="checkbox" id="tMeaning" checked> 낱말 뜻 쓰기 (낱말 → 뜻)</label>
       <label><input type="checkbox" id="tHanja"> 한자어 표기 쓰기 (낱말·뜻 → 한자)</label>
+      <label><input type="checkbox" id="tCharWord" checked> 이 글자가 든 낱말 쓰기 (한자·훈음 → 낱말, 급수 교재용)</label>
       <label><input type="checkbox" id="tKey" checked> 정답표 (마지막 장)</label>
       <h2>순서</h2>
       <label><input type="checkbox" id="shuf"> 섞기</label>
@@ -143,6 +144,21 @@
         pages.push({ title: '한자 쓰기 — 뜻과 소리를 보고 米자 칸에 쓰세요', sub: unitTitle, html: '<div class="grid">' + part.map(function (c) { return '<div class="cell"><span class="lbl">' + esc(c.hun + ' ' + c.eum) + (c.strokes ? ' · ' + c.strokes + '획' : '') + '</span></div>'; }).join('') + '</div>' });
       });
       key.push({ title: '한자 쓰기', items: chars.map(function (c) { return c.hun + ' ' + c.eum + ' → ' + c.ch; }) });
+    }
+    /* 급수 교재(초등 한자 어휘 등)는 낱말에 뜻이 없어 「낱말 뜻 쓰기」가 안 나온다. 교재가 가르치는 것은 글자를 쓰는 낱말이라
+       글자·훈음을 주고 그 낱말을 쓰게 한다 — 앱의 「이 글자가 든 낱말」 문항과 같은 자료를 종이로 낸다. */
+    var cw = chars.filter(function (c) { return (c.words || []).length; });
+    if ($('#tCharWord').checked && cw.length) {
+      chunk(cw, 14).forEach(function (part, pi) {
+        var rows = part.map(function (c, i) {
+          return '<tr><td style="width:26px;text-align:center">' + (pi * 14 + i + 1) + '</td>' +
+            '<td style="width:96px"><span style="font-family:var(--serif);font-size:1.5rem">' + esc(c.ch) + '</span><br><span class="hint">' + esc(c.hun + ' ' + c.eum) + '</span></td>' +
+            '<td></td></tr>';
+        }).join('');
+        pages.push({ title: '이 글자가 든 낱말 쓰기 — 배운 낱말을 떠올려 쓰세요', sub: unitTitle,
+          html: '<table class="q"><thead><tr><th></th><th>한자 · 훈음</th><th>이 글자를 쓰는 낱말</th></tr></thead><tbody>' + rows + '</tbody></table>' });
+      });
+      key.push({ title: '이 글자가 든 낱말', items: cw.map(function (c, i) { return (i + 1) + '. ' + c.ch + ' ' + c.hun + ' ' + c.eum + ' — ' + (c.words || []).join(' · '); }) });
     }
     if ($('#tMeaning').checked && words.length) {
       chunk(words, 20).forEach(function (part, pi) {
