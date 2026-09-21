@@ -95,6 +95,12 @@
     </div>
 
     <h2>단어장 목록 <span class="muted" id="bkCount"></span></h2>
+    <div class="row" style="align-items:center;gap:8px;margin:0 0 8px;flex-wrap:wrap">
+      <span class="muted" style="font-size:.82rem">여러 권 한꺼번에:</span>
+      <select id="bkAllScope" style="width:auto;padding:5px 9px;font-size:.82rem"><option value="assigned">배정한 학생만</option><option value="all">모두</option></select>
+      <button class="small" id="bkAllGo">전체 적용</button>
+      <span class="muted" id="bkAllStat" style="font-size:.8rem"></span>
+    </div>
     <div class="table-scroll"><table>
       <thead><tr><th>제목</th><th>id</th><th class="num">낱말</th><th class="num">한자</th><th class="num">단원</th><th>공개 범위</th><th>종류</th><th>갱신</th><th></th></tr></thead>
       <tbody id="bkBody"><tr><td colspan="8" class="muted">불러오는 중…</td></tr></tbody>
@@ -279,6 +285,22 @@
     renderBookPick();
     if (STUDENTS.length || BOOKS.length) { try { fillTaskForm(); } catch (e) {} }
   }
+
+  /* 여러 권을 한꺼번에 — 서버가 목록을 한 번만 다시 쓰므로 연달아 바꿀 때 변경이 사라지지 않는다 */
+  $('#bkAllGo').addEventListener('click', async function () {
+    var scope = $('#bkAllScope').value;
+    var ids = BOOKS.map(function (b) { return b.id; });
+    if (!ids.length) { msg('올린 단어장이 없어요.'); return; }
+    var label = scope === 'assigned' ? '배정한 학생만' : '모두';
+    if (!confirm(ids.length + '권을 모두 「' + label + '」로 바꿀까요?' + (scope === 'assigned' ? '\n배정하지 않은 학생에게는 목록에서 사라집니다.' : ''))) return;
+    $('#bkAllStat').textContent = '바꾸는 중…';
+    try {
+      var j = await api('/api/hanja/admin/scope', { method: 'POST', body: JSON.stringify({ ids: ids, scope: scope }) });
+      $('#bkAllStat').textContent = j.applied === false ? '저장은 됐지만 목록 확인이 늦습니다 — 잠시 뒤 새로 고쳐 보세요' : ids.length + '권 → ' + label;
+      msg(ids.length + '권을 ' + label + '로 바꿨어요');
+      await loadBooks();
+    } catch (e) { $('#bkAllStat').textContent = ''; msg(e.message); }
+  });
 
   /* ── 배정 ── */
   function renderPick() {

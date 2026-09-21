@@ -29,6 +29,7 @@ const ID_RE = CHECK.ID_RE;
 const CODE_RE = /^[A-Za-z0-9-]{3,20}$/;
 const SCOPES = ['all', 'assigned'];
 const SOURCES = CHECK.SOURCES;   /* 단어장 종류 own(자체)·textbook(교재) — book-check 와 같은 목록 */
+const BULK_MAX = 50;   /* 공개 범위를 한 번에 바꿀 수 있는 권수 — 목록 한 벌을 다시 쓰는 일이라 상한을 둔다 */
 const ASSIGN_MAX = 30;                    // 학생 하나에 배정하는 단어장 상한
 const STROKES_MAX_CHARS = 5000;
 const nowIso = () => new Date().toISOString();
@@ -90,9 +91,38 @@ export async function hanjaNightDueFor(store, code, now) {
 function indexEntry(book, scope, updatedAt) {
   return { ...CHECK.bookMeta(book), scope, updatedAt };
 }
+/* 요청 본문의 id 하나 또는 ids 목록 → 중복 없는 id 배열. 옛 클라이언트({id})와 새 클라이언트({ids})가 같은 라우트를 쓴다 */
+function idList(b) {
+  const raw = Array.isArray(b && b.ids) ? b.ids : (b && b.id != null ? [b.id] : []);
+  const out = [];
+  for (const x of raw) {
+    const id = String(x == null ? '' : x).trim();
+    if (ID_RE.test(id) && !out.includes(id)) out.push(id);
+  }
+  return out;
+}
 async function readIndex(store) {
   const idx = await store.getBookIds();
   return Array.isArray(idx) ? idx.filter((e) => isObj(e) && ID_RE.test(String(e.id || ''))) : [];
+}
+
+/* 목록(hanja:books) 고치기 — 읽고 고쳐 다시 쓴다. KV 는 바로 앞의 쓰기를 못 본 옛 값을 돌려줄 수 있어,
+   한 권씩 연달아 바꾸면 뒤의 요청이 앞의 변경을 덮어써 조용히 사라진다(실제로 12권을 연달아 바꾸다 10건을 잃었다).
+   그래서 ① 여러 권을 한 번의 쓰기로 고치고 ② 쓴 뒤 되읽어 남았는지 확인하고, 아니면 한 번 더 쓴다.
+   되읽기도 옛 값일 수 있으니 확인 결과를 applied 로 돌려준다 — 화면이 「안 남았을 수 있다」고 말할 수 있게. */
+async function editIndex(store, patch) {
+  const idx = await readIndex(store);
+  const next = idx.map((e) => (patch[e.id] ? { ...e, ...patch[e.id] } : e));
+  await store.putBookIds(next);
+  const fits = (list) => list.every((e) => !patch[e.id] || Object.entries(patch[e.id]).every(([k, v]) => e[k] === v));
+  let applied = fits(await readIndex(store));
+  if (!applied) {
+    /* 옛 값을 읽었거나 사이에 다른 변경이 끼었다 — 그 값 위에 한 번 더 얹는다 */
+    const again = (await readIndex(store)).map((e) => (patch[e.id] ? { ...e, ...patch[e.id] } : e));
+    await store.putBookIds(again);
+    applied = fits(await readIndex(store));
+  }
+  return { entries: next, applied };
 }
 
 /* 재업로드 id 대응 — 낱말 텍스트(낱말|한자)가 같은데 id 가 달라진 것을 옛 id → 새 id 로 잇는다.
@@ -304,15 +334,21 @@ export async function handleHanja(ctx) {
     }
     return j(200, { ok: true, id, unassigned, untasked });
   }
+  /* 공개 범위 바꾸기 — id 하나 또는 ids 여러 개(한 번의 쓰기로). 여러 권을 한꺼번에 바꾸는 것이 기본 쓰임이다 */
   if (p === '/api/hanja/admin/scope' && method === 'POST') {
     const b = await body();
-    const id = String((b && b.id) || '').trim(), scope = String((b && b.scope) || '');
-    if (!ID_RE.test(id)) return j(400, { error: '단어장 id 가 필요해요.' });
+    const scope = String((b && b.scope) || '');
     if (!SCOPES.includes(scope)) return j(400, { error: '공개 범위는 all(연동 학생 모두) 또는 assigned(배정한 학생만)' });
+    const ids = idList(b);
+    if (!ids.length) return j(400, { error: '단어장 id(id 또는 ids)가 필요해요.' });
+    if (ids.length > BULK_MAX) return j(400, { error: '한 번에 ' + BULK_MAX + '권까지만 바꿔요.' });
     const idx = await readIndex(store);
-    if (!idx.some((e) => e.id === id)) return j(404, { error: '없는 단어장이에요.' });
-    await store.putBookIds(idx.map((e) => (e.id === id ? { ...e, scope } : e)));
-    return j(200, { ok: true, id, scope });
+    const missing = ids.filter((x) => !idx.some((e) => e.id === x));
+    if (missing.length) return j(404, { error: '없는 단어장이에요: ' + missing.slice(0, 5).join(', ') });
+    const patch = {};
+    ids.forEach((x) => { patch[x] = { scope }; });
+    const { applied } = await editIndex(store, patch);
+    return j(200, { ok: true, ids, scope, applied, ...(ids.length === 1 ? { id: ids[0] } : {}) });
   }
   /* 종류 바꾸기 — 자체(own)·교재(textbook). 학생 앱은 본문의 source 로 AI 연상 버튼을 가리므로 목록만 아니라 본문도 바꾸고
      updatedAt 을 올려 기기 캐시가 새 본문을 받게 한다. */
@@ -326,8 +362,8 @@ export async function handleHanja(ctx) {
     if (!rec || !rec.book) return j(404, { error: '없는 단어장이에요.' });
     const updatedAt = nowIso();
     await store.putBook(id, { book: { ...rec.book, source }, updatedAt });
-    await store.putBookIds(idx.map((e) => (e.id === id ? { ...e, source, updatedAt } : e)));
-    return j(200, { ok: true, id, source, updatedAt });
+    const { applied } = await editIndex(store, { [id]: { source, updatedAt } });
+    return j(200, { ok: true, id, source, updatedAt, applied });
   }
   /* 배정 — 학생들에게 단어장을 더하거나(add) 뺀다(remove). 없는 단어장은 거절, 없는 학생은 건너뛴다 */
   if (p === '/api/hanja/admin/assign' && method === 'POST') {

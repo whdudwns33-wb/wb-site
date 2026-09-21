@@ -149,11 +149,17 @@ SRS id 규약: 한자는 `c:<글자>`(단어장을 넘어 공용), 낱말은 `w:
 - `POST /admin/book {book}` 또는 `{text, id, title, publisher?, level?, note?}` (+`dryRun`) → 검사 결과·저장 (`replaced`, `remapped`).
   같은 id 는 덮어쓴다(공개 범위·배정 유지, 바뀐 낱말 id 는 remap). 본문 2MB, 단어장 1.5MB.
 - `GET /admin/books` · `GET /admin/book?id=` · `DELETE /admin/book {id}`(배정에서도 뺀다, 학생 기록은 남는다)
-- `POST /admin/scope {id, scope}` · `POST /admin/source {id, source}`(종류 — 본문·목록 갱신, updatedAt 올림) · `POST /admin/assign {codes, bookIds, action:'add'|'remove'}` · `GET /admin/assign`
+- `POST /admin/scope {id|ids, scope}` — 여러 권을 **한 번의 쓰기로** 바꾼다(50권까지). 응답의 `applied` 가 false 면 저장은 됐어도 목록 확인이 늦은 것이다.
+- `POST /admin/source {id, source}`(종류 — 본문·목록 갱신, updatedAt 올림) · `POST /admin/assign {codes, bookIds, action:'add'|'remove'}` · `GET /admin/assign`
 - `POST /admin/task {scope, bookId, unitId, due?, title?}` · `GET /admin/tasks` → `{tasks, today}` · `DELETE /admin/task {scope}`
 - `GET /admin/progress?scope=` → `{scope, task, unit:{id,title,total}, rows:[{code,name,cls,linked,planted,graduated,due,…}], today}`
 - `POST /admin/strokes {strokes:{"十":{strokes, medians}}, replace?}` (4MB) · `GET /admin/strokes` → `{strokes, updatedAt, count, withMedians}`
 - `GET /admin/overview` → 학생별 `{words, chars, graduated, due, emergency, traced, streak, books, assigned, lastActive}`
+
+목록(`hanja:books`)을 고치는 자리는 모두 `editIndex` 하나를 지난다 — KV 가 바로 앞의 쓰기를 못 본 옛 값을 돌려주면
+한 권씩 연달아 바꿀 때 뒤의 요청이 앞의 변경을 덮어써 **조용히 사라진다**(12권을 연달아 바꾸다 10건을 잃은 적이 있다).
+그래서 여러 권은 한 번의 쓰기로 고치고, 쓴 뒤 되읽어 남았는지 확인하고 아니면 한 번 더 쓴다. 관리 웹 목록 위의
+「여러 권 한꺼번에」가 그 경로를 쓴다.
 
 저장: 워커 `hanja:book:<id>` · `hanja:books`(목록) · `hanja:remap:<id>` · `hanja:state:<code>` · `hanja:summary:<code>` ·
 `hanja:assign:<code>` · `hanja:task:<scope>` · `hanja:strokes` · `hanja:push:<code>` / 로컬 `db.hanja`.
