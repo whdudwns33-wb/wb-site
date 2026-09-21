@@ -1,0 +1,40 @@
+name: 검증 (PR·작업 브랜치)
+
+# 배포 워크플로우(deploy-reading.yml)는 main 푸시에서만 돈다 — 즉 합치기 전에는 아무도 안 돌려 본다.
+# 에이전트(Codex·Claude Code)나 사람이 브랜치에서 고친 것을 합치기 전에 여기서 전부 돌린다.
+# 시크릿을 쓰지 않는다(배포하지 않으므로) — 포크에서 온 PR 도 안전하게 검증된다.
+on:
+  pull_request:
+  push:
+    branches-ignore: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  # 같은 브랜치에 연달아 밀어 넣으면 앞 실행은 버린다 — 마지막 판만 보면 된다
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  WRANGLER: wrangler@4.129.0
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # 저장소의 모든 테스트 — 배포 워크플로우가 부르는 55개보다 넓다(haru·sync·task·desk 포함).
+      # 사람이 로컬에서 부르는 명령과 같다: node scripts/check.mjs
+      - name: 전체 테스트
+        run: node scripts/check.mjs
+
+      # 워커가 실제로 번들되는지 — 배포 직전에야 알게 되는 실패를 여기서 잡는다. 시크릿 불필요.
+      - name: 워커 번들 점검 (dry-run)
+        working-directory: reading-server
+        run: npx --yes --prefer-offline $WRANGLER deploy --dry-run --outdir=/tmp/wb-bundle
