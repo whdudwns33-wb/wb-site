@@ -175,8 +175,12 @@ var WBCHUNK = (function () {
        「-고」는 절을 잇는 연결어미이기도 해서(「밥을 먹고 ∕ 이를 닦는다」) 뒷말이 보조용언일 때만 막는다. */
     if (/고$/.test(bare) && /^(?:싶|있|없|말[았아겠]|나[서니면]|계시|계셨)/.test(next)) return { tag: 'aux', why: CUT_WHY.aux(cur, next) };
     if (/지$/.test(bare) && /^(?:않|못하|못했|말)/.test(next)) return { tag: 'aux', why: CUT_WHY.aux(cur, next) };
-    if (/게$/.test(bare) && /^(?:되|됐|돼|하|했|해|만들)/.test(next)) return { tag: 'aux', why: CUT_WHY.aux(cur, next) };
-    if (/야$/.test(bare) && /^(?:하|한다|합니다|해|했|된다|됩니다|돼)/.test(next)) return { tag: 'aux', why: CUT_WHY.aux(cur, next) };
+    /* 「되」로 시작하는지만 보면 「된다·될·됐」을 놓친다 — 한글은 받침이 붙으면 글자가 통째로 바뀌기 때문이다.
+       「한」은 관형사(한 걸음)와 겹치므로 「한다·한대」처럼 서술형일 때만 본다. */
+    if (/게$/.test(bare) && /^(?:되|된|될|됨|됐|돼|됩|하[^가-힣]|하다|하는|하여|한다|한대|할|했|해|합|만들|만드)/.test(next)) return { tag: 'aux', why: CUT_WHY.aux(cur, next) };
+    if (/야$/.test(bare) && /^(?:하[^가-힣]|하다|하는|한다|할|합니다|해|했|되|된다|될|됩니다|돼)/.test(next)) return { tag: 'aux', why: CUT_WHY.aux(cur, next) };
+    /* 「수백 년 ∕ 동안」처럼 앞말에 기대는 시간 명사 — 앞이 무엇이든 붙여 읽는다 */
+    if (/^(?:동안|내내|사이|만에|가량|남짓)/.test(next)) return { tag: 'dep', why: CUT_WHY.dep(cur, next) };
     if (/[아어해여워와봐줘혀려켜쳐펴]$/.test(bare) && AUX.test(next)) return { tag: 'aux', why: CUT_WHY.aux(cur, next) };
     if (DEP_HEAD.test(bare) || depAfter(bare, next, String(ws[i + 2] || '').trim()) || (DEP2.test(next) && !/(?:면|고|서|며|자|니까|는데|은데|지만|도록|다가|려면|어|아|다\.|요\.)$/.test(bare))) return { tag: 'dep', why: CUT_WHY.dep(cur, next) };
     if (UNIT2.test(next)) return { tag: 'num', why: CUT_WHY.num(cur, next) };
@@ -270,6 +274,15 @@ var WBCHUNK = (function () {
      문장 끝·쉼표·연결어미 뒤는 «강한» 경계라 언제나 끊고, 그 사이는 밴드 눈금(target)에 맞춰
      붙여 읽어야 하는 자리(whyNotCut)를 피해 자른다. 상한(max)을 넘길 것 같으면 마지막 허용 자리에서 미리 끊는다.
      초안일 뿐이다 — 뜻 덩어리는 사람이 다듬는다. 학생 채점에는 쓰지 않는다(채점은 모범 조각과의 일치로만). */
+  /* 초안 생성기만 쓰는 보수적 검사 — 조사·어미로 끝나는 «구가 끝난 자리»에서만 끊는다.
+     「내 신발 ∕ 냄새를」처럼 맨 체언 둘이 한 덩어리를 이루는 자리를 피하려는 것이다. 관형격 「의」 뒤도 끊지 않는다.
+     채점에는 쓰지 않는다 — 학생이 거기서 끊었다고 틀렸다고 할 근거는 아니기 때문이다(그건 whyNotCut 의 몫이다). */
+  var DRAFT_TAIL = /(?:이|가|은|는|을|를|에|에서|에게|께|한테|으로|로|와|과|랑|도|만|까지|부터|보다|처럼|마다|나|라|며|고|면|서|자|어|아|해|워|여|지만|는데|은데|니까|라서|므로|려고|도록|다가|던|다|까|요|죠|네|군)$/;
+  var DRAFT_NO = /(?:의|및)$/;
+  function draftCutOk(ws, i) {
+    var bare = String(ws[i]).trim().replace(new RegExp(TAIL), '');
+    return DRAFT_TAIL.test(bare) && !DRAFT_NO.test(bare);
+  }
   function autoChunk(text, band) {
     var b = BANDS[band] || BANDS.G7, ws = words(text), out = [], cur = [], i, j;
     var target = Math.max(2, Math.round(b.target)), max = b.max;
@@ -279,9 +292,12 @@ var WBCHUNK = (function () {
       var kind = classifyBoundary(ws, i), blocked = whyNotCut(ws, i);
       if (kind === 'sent' || kind === 'comma' || (kind === 'conn' && !blocked)) { out.push(cur.join('')); cur = []; continue; }
       if (blocked) continue;
+      /* 상한에 닿으면 좋은 자리를 더 기다리지 않는다 — 조각이 밴드 상한을 넘으면 검사에서 걸린다 */
+      if (cur.length >= max) { out.push(cur.join('')); cur = []; continue; }
+      if (!draftCutOk(ws, i)) continue;
       if (cur.length >= target) { out.push(cur.join('')); cur = []; continue; }
       /* 다음 허용 경계까지 가면 상한을 넘기는가 — 넘기면 여기서 끊는다 */
-      j = i + 1; while (j < ws.length - 1 && whyNotCut(ws, j)) j++;
+      j = i + 1; while (j < ws.length - 1 && (whyNotCut(ws, j) || !draftCutOk(ws, j))) j++;
       if (cur.length + (j - i) > max) { out.push(cur.join('')); cur = []; }
     }
     if (cur.length) out.push(cur.join(''));
