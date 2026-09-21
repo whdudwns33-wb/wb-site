@@ -149,7 +149,7 @@ function learningSources() {
   );
 }
 
-function renderLearningSourceCard(studentName, state) {
+function renderLearningSourceCard(studentName, state, sourceKey = 'leaders_eye') {
   const source = between('function learningExamOptions(staffId, selected) {', '\n/* ── 학습 탭');
   const renderCard = new Function(
     'LEARNING_SOURCES', 'ONLINE_LEARNING_SOURCE_KEYS', 'state', 'session', 'isManager', 'isDone', 'learningTaskDate',
@@ -176,7 +176,7 @@ function renderLearningSourceCard(studentName, state) {
     (task, date) => ['daily', 'weekday', 'days'].includes(task.repeat) ? date : task.start,
     task => task.repeat === 'weekday' ? '평일(월~금)' : task.repeat || ''
   );
-  return renderCard({ id: 'student-a', name: studentName }, true, 'leaders_eye');
+  return renderCard({ id: 'student-a', name: studentName }, true, sourceKey);
 }
 
 test('a newly exchanged #c student opens Today and reaches the guide only from the student tab', async () => {
@@ -294,33 +294,51 @@ test('the usage guide explains connection scope and the complete daily closing o
   assert.match(guide,
     /타이머 정지[\s\S]*?미완료 공부 정리[\s\S]*?시험·중요 일정 준비율 확인[\s\S]*?마무리 내용 저장[\s\S]*?보고 문자 복사[\s\S]*?보호자에게 전송[\s\S]*?발송했어요/,
     'the guide must preserve the exact daily closing sequence');
+  assert.match(guide, /온라인 학습 사용 매뉴얼/);
+  assert.match(guide, /Agency ID[\s\S]*?wbbrain[\s\S]*?Student ID·PW는 본인이 입력/);
+  assert.match(guide, /메타수학[\s\S]*?본인 아이디·비밀번호/);
+  assert.match(guide, /사이트를 닫는 것만으로는 완료 처리되지 않습니다/);
+  assert.match(guide, /현재 학생 기기에만 저장되고 서버·원장 화면·백업으로 전송되지 않습니다/);
 });
 
-test('the Leaders Eye student card renders shared login guidance with the current student name', () => {
-  const state = { tasks: [], checks: {}, settings: {} };
+test('Leaders Eye keeps only wbbrain fixed and both services start with blank student login memo fields', () => {
+  const state = { tasks: [], checks: {}, settings: { localLearningLogins: {} } };
   const before = JSON.stringify(state);
-  const first = renderLearningSourceCard('김민준', state);
-  const second = renderLearningSourceCard('이서연', state);
+  const leaders = renderLearningSourceCard('김민준', state, 'leaders_eye');
+  const metamath = renderLearningSourceCard('김민준', state, 'metamath');
 
-  for (const card of [first, second]) {
-    assert.match(card, /Agency ID[\s\S]*?wbbrain/);
-    assert.match(card, /Student PW[\s\S]*?0000/);
-    assert.match(card, /1주일마다 자동으로 레벨이 조정됩니다/);
-    assert.match(card, /오늘 미기록/);
-    assert.match(card, /data-act="learningdailyopen"[\s\S]*?오늘 학습 완료 기록/);
-  }
-  assert.match(first, /Student ID[\s\S]*?김민준/);
-  assert.doesNotMatch(first, /이서연/);
-  assert.match(second, /Student ID[\s\S]*?이서연/);
-  assert.doesNotMatch(second, /김민준/);
+  assert.match(leaders, /Agency ID[\s\S]*?wbbrain/);
+  assert.match(leaders, /id="learningLoginId_leaders_eye"[^>]*value=""/);
+  assert.match(leaders, /id="learningLoginPw_leaders_eye"[^>]*type="password"[^>]*value=""/);
+  assert.doesNotMatch(leaders, /value="김민준"|0000/);
+  assert.match(leaders, /1주일마다 레벨이 자동으로 조정됩니다/);
+  assert.match(leaders, /오늘 미기록/);
+  assert.match(leaders, /data-act="learningdailyopen"[\s\S]*?오늘 학습 완료 기록/);
+  assert.match(metamath, /메타수학 로그인 메모/);
+  assert.match(metamath, /id="learningLoginId_metamath"[^>]*value=""/);
+  assert.match(metamath, /id="learningLoginPw_metamath"[^>]*type="password"[^>]*value=""/);
+  assert.doesNotMatch(metamath, /Agency ID|wbbrain|0000/);
   assert.equal(JSON.stringify(state), before, 'rendering login guidance must not persist credentials');
 });
 
-test('Leaders Eye login values stay out of persisted task and settings records', () => {
-  const blankState = functionSource('blankState');
-  const taskSave = between("case 'learnsave':", "\n    /* 학사관리 · 시험대비 자료 요청 */");
-  const persistence = blankState + '\n' + taskSave;
+test('student-entered login memos remain device-local and are excluded from sync and backup', () => {
+  const state = { settings: { localLearningLogins: {} } };
+  let saves = 0;
+  const saveMemo = Function('state', 'save', 'LEARNING_LOGIN_MEMO_SOURCES',
+    functionSource('saveLearningLoginMemo') + '; return saveLearningLoginMemo;')(
+    state, () => { saves++; return true; }, ['leaders_eye', 'metamath']
+  );
+  assert.equal(saveMemo('student-a', 'leaders_eye', 'my-id', 'my-password'), true);
+  assert.deepEqual(state.settings.localLearningLogins, {
+    'student-a': { leaders_eye: { loginId: 'my-id', password: 'my-password' } }
+  });
+  assert.equal(saves, 1);
+  assert.equal(saveMemo('student-a', 'unknown', 'bad', 'bad'), false);
 
-  assert.doesNotMatch(persistence, /wbbrain|0000/);
-  assert.doesNotMatch(persistence, /\b(?:agencyId|studentId|studentPw|studentPassword|leadersEyePassword)\s*:/i);
+  const memoSave = functionSource('saveLearningLoginMemo');
+  const syncCollect = functionSource('sanitizedBackupState') + '\n' + between('  collect(since) {', '\n  /** 받은 변경을 반영한다.');
+  assert.doesNotMatch(memoSave, /setCheck|queueSync|state\.tasks/);
+  assert.match(between('const LOCAL_AUTH_SETTINGS', 'function sanitizedBackupState'), /localLearningLogins/);
+  assert.doesNotMatch(syncCollect, /out\.push\(\{ table: 'settings'/);
+  assert.doesNotMatch(html, /Student PW[\s\S]{0,100}0000/);
 });

@@ -511,6 +511,8 @@ test('strict payload, consult-only routing, and authenticated task attendance ro
     giftUrl: 'https://gift.example/private'
   });
   assert.equal(result.status, 400);
+  assert.match(result.body.error, /기프트 카드/);
+  assert.doesNotMatch(workerSource, /문화상품권|상품권/);
   assert.equal(rewardData(db), null);
   result = await action(db, 'claim', REQUEST_A, { mode: 'person', id: STUDENT_ID, token: 'student-token' });
   assert.equal(result.status, 403);
