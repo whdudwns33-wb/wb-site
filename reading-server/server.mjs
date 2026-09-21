@@ -14,6 +14,7 @@ import { handleStudio } from './naesin-studio.mjs';
 import { handleHaru, haruBodyLimit, allowedApp, appOfPath, dropStudentHaru, dumpHaru } from './haru-api.mjs';
 import { handleNaesinKo } from './naesin-ko-api.mjs';
 import { handleChunk, dropStudentChunk } from './chunk-api.mjs';
+import { handleLetter, letterBodyLimit, dropStudentLetter, dumpLetter, pushDueIssues } from './letter-api.mjs';
 import { bookIndex, cleanWords, coachingCard, confirmAllPlan, findBook, readyToConfirm, sourceSummary, validProgress, withOverlay } from './textbook.mjs';
 import { parseRoster } from './roster.mjs';
 
@@ -26,6 +27,7 @@ const AGE_DIR = path.join(ROOT, '..', 'vocab-age'); // 어휘 나이 진단(로�
 const NAESIN_DIR = path.join(ROOT, '..', 'naesin');    // 내신브레인 앱 정적 파일
 const HARU_DIR = path.join(ROOT, '..', 'haru');        // 하루브레인 앱 정적 파일 (팩·대응표·플랜은 여기 없다 — db.haru 전용)
 const NAESIN_KO_DIR = path.join(ROOT, '..', 'naesin-ko'); // 국어브레인 앱 정적 파일
+const LETTER_DIR = path.join(ROOT, '..', 'letter');     // 브레인레터 앱 정적 파일 (호 본문은 여기 없다 — db.letter 전용, 체험 호는 자체 창작)
 const PUB_DIR = path.join(ROOT, 'public');             // 관리 웹
 const PORT = +(process.env.PORT || 8890);
 const ADMIN_PIN = process.env.ADMIN_PIN || 'wb-admin-2026';
@@ -153,6 +155,26 @@ const haruStore = {
   listStudentCodes: () => Object.keys(db.students),
 };
 let HARU_ATOMS_CACHE = null;
+/* 브레인레터 저장소 어댑터 — db.letter 만 사용 (워커 letterStore 와 같은 계약). 가족 링크는 db.parents(진로독서)를 읽는다 */
+const letterRoot = () => { db.letter = db.letter || {}; for (const k of ['issues', 'states', 'images', 'push']) db.letter[k] = db.letter[k] || {}; return db.letter; };
+/* 사진 바이트는 db.json 에 넣지 않는다(base64 로 부풀어 파일이 커진다) — DATA_DIR/letter-img/<id>.bin 파일로, 메타만 db.letter.images */
+const LETTER_IMG_DIR = path.join(process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(ROOT, 'data'), 'letter-img');
+const letterStore = {
+  getIssue: (id) => letterRoot().issues[id] || null, putIssue: (id, rec) => { letterRoot().issues[id] = rec; persist(); }, deleteIssue: (id) => { delete letterRoot().issues[id]; persist(); },
+  getIssueIds: () => letterRoot().issueIds || null, putIssueIds: (ids) => { letterRoot().issueIds = ids; persist(); },
+  getState: (c) => letterRoot().states[c] || null, putState: (c, rec) => { letterRoot().states[c] = rec; persist(); }, deleteState: (c) => { delete letterRoot().states[c]; persist(); },
+  listStateCodes: () => Object.keys(letterRoot().states),
+  getStudent: (c) => db.students[c] || null, putStudent: (c, rec) => { db.students[c] = rec; persist(); }, listStudentCodes: () => Object.keys(db.students),
+  getParentCode: (t) => (db.parents || {})[t] || null, putParent: (t, c) => { db.parents = db.parents || {}; db.parents[t] = c; persist(); },
+  getAiUse: () => letterRoot().aiuse || null, putAiUse: (rec) => { letterRoot().aiuse = rec; persist(); },
+  getImage: (id) => { const meta = letterRoot().images[id]; if (!meta) return null; try { return { bytes: fs.readFileSync(path.join(LETTER_IMG_DIR, id + '.bin')), meta }; } catch (e) { return null; } },
+  putImage: (id, bytes, meta) => { fs.mkdirSync(LETTER_IMG_DIR, { recursive: true }); fs.writeFileSync(path.join(LETTER_IMG_DIR, id + '.bin'), Buffer.from(bytes)); letterRoot().images[id] = meta; persist(); },
+  deleteImage: (id) => { delete letterRoot().images[id]; try { fs.unlinkSync(path.join(LETTER_IMG_DIR, id + '.bin')); } catch (e) { /* 이미 없음 */ } persist(); },
+  listImages: () => Object.values(letterRoot().images),
+  getPush: (k) => letterRoot().push[k] || null, putPush: (k, rec) => { letterRoot().push[k] = rec; persist(); }, delPush: (k) => { delete letterRoot().push[k]; persist(); },
+  listPushKeys: () => Object.keys(letterRoot().push),
+  getCalendar: () => letterRoot().calendar || null, putCalendar: (rec) => { letterRoot().calendar = rec; persist(); },
+};
 const haruAtomsFallback = async () => {
   if (!HARU_ATOMS_CACHE) { try { HARU_ATOMS_CACHE = JSON.parse(fs.readFileSync(path.join(HARU_DIR, 'atoms.json'), 'utf8')); } catch (e) { return null; } }
   return HARU_ATOMS_CACHE;
@@ -224,7 +246,7 @@ const json = (res, code, obj) => {
    남은 몸통은 resume() 으로 흘려보내야 응답이 정상으로 나간다 — 안 읽고 응답하면 큰 몸통은 RST 로 끝난다. */
 const BODY_LIMIT_DEFAULT = 2_000_000;
 const BODY_LIMIT_TEXTBOOK = 5_500_000;
-const bodyLimit = (p) => (p.startsWith('/api/naesin/') ? naesinBodyLimit(p) : p.startsWith('/api/haru/') ? haruBodyLimit(p) : p === '/api/admin/textbook-src' ? BODY_LIMIT_TEXTBOOK : BODY_LIMIT_DEFAULT);
+const bodyLimit = (p) => (p.startsWith('/api/naesin/') ? naesinBodyLimit(p) : p.startsWith('/api/haru/') ? haruBodyLimit(p) : p.startsWith('/api/letter/') ? letterBodyLimit(p) : p === '/api/admin/textbook-src' ? BODY_LIMIT_TEXTBOOK : BODY_LIMIT_DEFAULT);
 const tooLarge = () => { const e = new Error('too large'); e.status = 413; return e; };
 const readBody = (req, limit = BODY_LIMIT_DEFAULT) => new Promise((resolve, reject) => {
   /* 조각을 Buffer 로 모아 한 번에 디코딩한다 — 조각마다 문자열로 바꾸면 조각 경계에 걸린 한글(3바이트)이 깨진다.
@@ -438,6 +460,12 @@ const server = http.createServer(async (req, res) => {
         const out = await handleHaru({ path: p, method: 'GET', who: null, query: url.searchParams, getBody: () => readBody(req), store: haruStore });
         return json(res, out.status, out.body);
       }
+      /* 브레인레터 무인증 경로 — 가족 링크·가족 알림 구독·사진(id 가 곧 열쇠) (워커와 동일) */
+      if (p === '/api/letter/parent' || p.startsWith('/api/letter/parent/') || p.startsWith('/api/letter/img/')) {
+        const out = await handleLetter({ path: p, method: req.method, who: null, query: url.searchParams, getBody: () => readBody(req), store: letterStore, push: VOCAB_PUSH_ENV });
+        if (out.bytes) { res.writeHead(out.status, out.headers); res.end(Buffer.from(out.bytes)); return; }
+        return json(res, out.status, out.body);
+      }
 
       const who = auth(req);
       if (!who) return json(res, 401, { error: '로그인이 필요합니다.' });
@@ -452,6 +480,15 @@ const server = http.createServer(async (req, res) => {
         if (Number(req.headers['content-length'] || 0) > haruBodyLimit(p)) { req.resume(); return json(res, 413, { error: '요청이 너무 커서 받을 수 없어요.' }); }
         const out = await handleHaru({ path: p, method: req.method, who, query: url.searchParams, getBody: () => readBody(req, haruBodyLimit(p)), store: haruStore,
           atomsFallback: haruAtomsFallback, randomToken: () => crypto.randomUUID().replace(/-/g, '') });
+        return json(res, out.status, out.body);
+      }
+
+      /* 브레인레터 (/api/letter/*) — 인증만 공유, 저장·라우트는 격리 (워커와 동일) */
+      if (p.startsWith('/api/letter/')) {
+        if (Number(req.headers['content-length'] || 0) > letterBodyLimit(p)) { req.resume(); return json(res, 413, { error: '요청이 너무 커서 받을 수 없어요.' }); }
+        const out = await handleLetter({ path: p, method: req.method, who, query: url.searchParams, getBody: () => readBody(req, letterBodyLimit(p)), store: letterStore,
+          origin: 'http://' + (req.headers.host || ('localhost:' + PORT)), push: VOCAB_PUSH_ENV,
+          ai: { apiKey: process.env.ANTHROPIC_API_KEY || '', model: process.env.LETTER_AI_MODEL || '', env: process.env }, randomToken: () => crypto.randomUUID().replace(/-/g, '') });
         return json(res, out.status, out.body);
       }
 
@@ -690,7 +727,7 @@ const server = http.createServer(async (req, res) => {
         /* 워커 fullDump 와 같은 모양 — 내신은 팩 본문 없이(packIds 만), 교재 원문(textbookSrc)은 포함.
            팩은 라이선스 원문이라 백업 파일로 흩어지지 않게 한다(store.naesinSnapshot). */
         return json(res, 200, { service: 'wb-reading', savedAt: nowIso(), students: db.students, states: db.states, vocab: db.vocab,
-          textbook: db.textbook || {}, pubmap: db.pubmap || {}, naesin: naesinSnapshot(db.naesin), textbookSrc: db.textbookSrc || {}, haru: await dumpHaru(haruStore) });
+          textbook: db.textbook || {}, pubmap: db.pubmap || {}, naesin: naesinSnapshot(db.naesin), textbookSrc: db.textbookSrc || {}, haru: await dumpHaru(haruStore), letter: await dumpLetter(letterStore) });
       }
       if (p === '/api/admin/backups' && req.method === 'GET') {
         return json(res, 200, { backups: listBackups() });
@@ -747,6 +784,8 @@ const server = http.createServer(async (req, res) => {
         /* 하루브레인 — 정확 접두 4계열(state·mock·paper·parent). 대응표는 남긴다(워커와 동일) */
         await dropStudentHaru(haruStore, c); removed += 3;
         await dropStudentChunk(chunkStore, c);
+        /* 브레인레터 — 열람·문제 기록 한 키. 호는 학생 것이 아니라 둔다(워커와 동일) */
+        await dropStudentLetter(letterStore, c, (db.students[c] || {}).ptoken); removed += 1;
         /* 기기 토큰은 토큰 값이 키라 코드로 못 찾는다 — 훑어서 이 학생 것만 */
         for (const [t, rec] of Object.entries(db.tokens)) if (rec && rec.code === c) drop(db.tokens, t);
         /* 승인 대기 줄에 남으면 지운 학생이 계속 뜬다 */
@@ -782,12 +821,18 @@ const server = http.createServer(async (req, res) => {
 
     /* 관리 웹 */
     if (p === '/admin/qr.js') return serveFile(res, SHARED_DIR, 'qr.js');
+    if (p === '/admin/letter.js') return serveFile(res, LETTER_DIR, 'letter.js');   // 관리 편집기 미리보기가 학생 앱과 같은 렌더러를 쓴다
+    if (p === '/admin/shapes.js') return serveFile(res, LETTER_DIR, 'shapes.js');   // 도형 놀이 도우미·미리보기
     if (p === '/admin' || p === '/admin/') return serveFile(res, PUB_DIR, 'admin.html');
     if (p.startsWith('/admin/')) return serveFile(res, PUB_DIR, p.slice('/admin/'.length));
 
     /* 하루브레인 앱 — 팩·대응표·플랜은 여기 없다(/api/haru/*, db.haru 전용). 정답은 어느 정적 파일에도 없다 */
     if (p === '/haru' || p === '/haru/') return serveFile(res, HARU_DIR, 'index.html');
     if (p.startsWith('/haru/')) return serveFile(res, HARU_DIR, p.slice('/haru/'.length));
+
+    /* 브레인레터 앱 — 호 본문은 여기 없다(/api/letter/*, db.letter 전용). issue-sample.json 은 자체 창작 체험 호 */
+    if (p === '/letter' || p === '/letter/') return serveFile(res, LETTER_DIR, 'index.html');
+    if (p.startsWith('/letter/')) return serveFile(res, LETTER_DIR, p.slice('/letter/'.length));
 
     /* 내신브레인 앱 — 팩 콘텐츠는 여기 없다(/api/naesin/pack, KV·db 전용) */
     if (p === '/naesin/voice.js') return serveFile(res, SHARED_DIR, 'voice.js');
@@ -877,6 +922,17 @@ const server = http.createServer(async (req, res) => {
 
 /* 밤 9시 물주기 푸시 — 로컬 서버용 1분 폴링 (운영 워커는 크론이 담당) */
 let lastPushDay = null;
+/* 브레인레터 07:00 새 호 알림 — 로컬 서버용 1분 폴링(운영 워커는 22:00 UTC 크론) */
+let lastLetterPushDay = null;
+setInterval(async () => {
+  const d = new Date();
+  if (d.getHours() !== 7 || d.getMinutes() !== 0) return;
+  const day = d.toDateString();
+  if (lastLetterPushDay === day) return;
+  lastLetterPushDay = day;
+  try { const r = await pushDueIssues({ store: letterStore, push: VOCAB_PUSH_ENV }); if (r.pushed && r.pushed.length) console.log('[push] 브레인레터 새 호 알림:', JSON.stringify(r)); }
+  catch (e) { console.error('[push] 브레인레터 발송 실패:', e.message); }
+}, 60000).unref();
 setInterval(async () => {
   const d = new Date();
   if (d.getHours() !== 21 || d.getMinutes() !== 0) return;

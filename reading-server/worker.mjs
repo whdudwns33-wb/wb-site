@@ -10,6 +10,7 @@ import { handleStudio } from './naesin-studio.mjs';
 import { handleHaru, haruBodyLimit, allowedApp, appOfPath, dropStudentHaru, dumpHaru, weeklyAgg } from './haru-api.mjs';
 import { handleNaesinKo } from './naesin-ko-api.mjs';
 import { handleChunk, dropStudentChunk } from './chunk-api.mjs';
+import { handleLetter, letterBodyLimit, dropStudentLetter, dumpLetter, pushDueIssues } from './letter-api.mjs';
 import { bookIndex, cleanWords, coachingCard, confirmAllPlan, findBook, readyToConfirm, sourceSummary, validProgress, withOverlay } from './textbook.mjs';
 import { parseRoster } from './roster.mjs';
 
@@ -276,6 +277,36 @@ function haruStore(env) {
   };
 }
 
+/* 브레인레터 저장소 어댑터 — letter: 접두 키만(호·학생 기록·AI 장부). 가족 링크는 진로독서의 parent:<t> 를 그대로 읽는다 —
+   가정마다 링크가 하나여야 주간 문자에 링크를 두 개 넣는 일이 없다. 학생 레코드 쓰기는 letterTier·ptoken 두 필드뿐이다. */
+function letterStore(env) {
+  const get = (k) => env.DB.get(k, 'json');
+  const put = (k, v) => env.DB.put(k, JSON.stringify(v));
+  return {
+    getIssue: (id) => get('letter:issue:' + id), putIssue: (id, rec) => put('letter:issue:' + id, rec), deleteIssue: (id) => env.DB.delete('letter:issue:' + id),
+    getIssueIds: () => get('letter:issues'), putIssueIds: (ids) => put('letter:issues', ids),
+    getState: (c) => get('letter:state:' + c), putState: (c, rec) => put('letter:state:' + c, rec), deleteState: (c) => env.DB.delete('letter:state:' + c),
+    listStateCodes: async () => (await kvListAll(env, 'letter:state:')).map((k) => k.slice('letter:state:'.length)),
+    getStudent: (c) => get('student:' + c), putStudent: (c, rec) => put('student:' + c, rec),
+    listStudentCodes: async () => (await kvListAll(env, 'student:')).map((k) => k.slice('student:'.length)),
+    getParentCode: (t) => env.DB.get('parent:' + t), putParent: (t, c) => env.DB.put('parent:' + t, c),
+    getAiUse: () => get('letter:aiuse'), putAiUse: (rec) => put('letter:aiuse', rec),
+    /* 사진 — 바이트는 값, 종류·크기·이름은 KV 메타데이터(목록을 훑을 때 값을 안 읽어도 되게) */
+    getImage: async (id) => { const r = await env.DB.getWithMetadata('letter:img:' + id, 'arrayBuffer'); return r && r.value ? { bytes: r.value, meta: r.metadata || {} } : null; },
+    putImage: (id, bytes, meta) => env.DB.put('letter:img:' + id, bytes, { metadata: meta }),
+    deleteImage: (id) => env.DB.delete('letter:img:' + id),
+    listImages: async () => {
+      const out = []; let cursor;
+      do { const r = await env.DB.list({ prefix: 'letter:img:', cursor }); r.keys.forEach((k) => out.push({ id: k.name.slice('letter:img:'.length), ...(k.metadata || {}) })); cursor = r.list_complete ? null : r.cursor; } while (cursor);
+      return out;
+    },
+    /* 새 호 알림 구독 — s:<학생 코드> · f:<가족 토큰> */
+    getPush: (k) => get('letter:push:' + k), putPush: (k, rec) => put('letter:push:' + k, rec), delPush: (k) => env.DB.delete('letter:push:' + k),
+    listPushKeys: async () => (await kvListAll(env, 'letter:push:')).map((k) => k.slice('letter:push:'.length)),
+    getCalendar: () => get('letter:calendar'), putCalendar: (rec) => put('letter:calendar', rec),
+  };
+}
+
 function vocabPushEnv(env) {
   return {
     publicKey: env.VAPID_PUBLIC_KEY || '',
@@ -334,7 +365,9 @@ async function fullDump(env) {
   for (const [pre, tgt] of [['chunk:state:', chunk.states], ['chunk:summary:', chunk.summaries], ['chunk:assign:', chunk.assigns]]) {
     for (const k of await kvListAll(env, pre)) { const v = await env.DB.get(k, 'json'); if (v) tgt[k.slice(pre.length)] = v; }
   }
-  return { service: 'wb-reading', savedAt: nowIso(), students, states, vocab, textbook: textbook || {}, pubmap: pubmap || {}, naesin, naesinKo, textbookSrc: textbookSrc || {}, haru, chunk };
+  /* 브레인레터 — 호 본문(원장이 쓴 것)과 학생 기록. 팩과 달리 라이선스 원문이 아니라 통째로 담는다 */
+  const letter = await dumpLetter(letterStore(env));
+  return { service: 'wb-reading', savedAt: nowIso(), students, states, vocab, textbook: textbook || {}, pubmap: pubmap || {}, naesin, naesinKo, textbookSrc: textbookSrc || {}, haru, chunk, letter };
 }
 
 async function snapshotBackup(env) {
@@ -420,13 +453,15 @@ export default {
        18:00 UTC 일일 백업 · 18:10 UTC 하루브레인 주간 익명 집계(백업 직후) */
     switch (event.cron) {
       case '0 12 * * *': ctx.waitUntil(sendNightPushes({ store: vocabStore(env), push: vocabPushEnv(env), naesin: naesinStore(env) })); break;
+      /* 22:00 UTC(07:00 KST) — 발행일이 된 브레인레터 호의 "새 호 도착" 알림(즉시 발행분은 발행 라우트가 그 자리에서 보낸다) */
+      case '0 22 * * *': ctx.waitUntil(pushDueIssues({ store: letterStore(env), push: vocabPushEnv(env) })); break;
       case '10 18 * * *': ctx.waitUntil(weeklyAgg(haruStore(env), Date.now())); break;
       case '0 18 * * *':
       default: ctx.waitUntil(snapshotBackup(env));
     }
   },
 
-  async fetch(req, env) {
+  async fetch(req, env, cfctx) {
     const url = new URL(req.url);
     const p = url.pathname;
 
@@ -571,6 +606,12 @@ export default {
         const out = await handleHaru({ path: p, method: 'GET', who: null, query: url.searchParams, getBody: () => req.json(), store: haruStore(env) });
         return json(out.status, out.body);
       }
+      /* 브레인레터 무인증 경로 — 가족 링크(parent, 진로독서 학부모 토큰)·가족 알림 구독(parent/push/*)·사진(img/<id>, id 가 곧 열쇠) */
+      if (p === '/api/letter/parent' || p.startsWith('/api/letter/parent/') || p.startsWith('/api/letter/img/')) {
+        const out = await handleLetter({ path: p, method: req.method, who: null, query: url.searchParams, getBody: () => req.json(), store: letterStore(env), push: vocabPushEnv(env) });
+        if (out.bytes) return new Response(out.bytes, { status: out.status, headers: out.headers });
+        return json(out.status, out.body);
+      }
 
       const who = await auth(env, req);
       if (!who) return json(401, { error: '로그인이 필요합니다.' });
@@ -594,6 +635,21 @@ export default {
           path: p, method: req.method, who, query: url.searchParams, getBody: () => req.json(), store: haruStore(env),
           /* 원자 목록 기본값은 배포본의 haru/atoms.json — KV 에 올린 것이 있으면 그것이 이긴다 */
           atomsFallback: async () => { try { return await (await env.ASSETS.fetch(new Request(url.origin + '/haru/atoms.json'))).json(); } catch (e) { return null; } },
+          randomToken: () => crypto.randomUUID().replace(/-/g, ''),
+        });
+        return json(out.status, out.body);
+      }
+
+      /* 브레인레터 (/api/letter/*) — 인증만 공유, 저장·라우트는 격리. AI 초안은 관리자만, 하루 한도는 letter:aiuse 장부 */
+      if (p.startsWith('/api/letter/')) {
+        const len = Number(req.headers.get('content-length') || 0);
+        if (len > letterBodyLimit(p)) return json(413, { error: '요청이 너무 커서 받을 수 없어요.' });
+        const out = await handleLetter({
+          path: p, method: req.method, who, query: url.searchParams, getBody: () => req.json(), store: letterStore(env), origin: url.origin,
+          ai: { apiKey: env.ANTHROPIC_API_KEY || '', model: env.LETTER_AI_MODEL || '', env },
+          push: vocabPushEnv(env),
+          /* 발행 즉시 알림은 응답 뒤에 이어서 보낸다 — 구독자 수만큼 걸리는 일을 원장이 기다리지 않게 */
+          after: (pr) => { if (cfctx && cfctx.waitUntil) cfctx.waitUntil(pr); else pr.catch(() => {}); },
           randomToken: () => crypto.randomUUID().replace(/-/g, ''),
         });
         return json(out.status, out.body);
@@ -947,6 +1003,9 @@ export default {
         await dropStudentHaru(haruStore(env), c);
         await dropStudentChunk(chunkStore(env), c);
         removed.push('haru:state:' + c, 'haru:mock:' + c, 'haru:paper:' + c);
+        /* 브레인레터 — 열람·문제 기록 한 키. 호는 학생 것이 아니라 그대로 둔다 */
+        await dropStudentLetter(letterStore(env), c, stu.ptoken);
+        removed.push('letter:state:' + c, 'letter:push:s:' + c);
 
         /* 기기 토큰은 토큰 값으로 저장돼 코드로 찾을 수 없다 — 전부 훑어 이 학생 것만 지운다.
            남겨 두면 그 기기는 삭제 뒤에도 계속 로그인된 상태로 남는다. */
