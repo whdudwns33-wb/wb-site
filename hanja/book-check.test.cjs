@@ -207,11 +207,29 @@ t('한계 — 낱말 3000·한자 2000 을 넘으면 막는다', () => {
 t('목록용 메타에는 본문이 없고 단원별 셈이 있다', () => {
   const r = B.checkBook(sample());
   const m = B.bookMeta(r.book);
-  assert.deepStrictEqual(Object.keys(m).sort(), ['counts', 'id', 'level', 'note', 'publisher', 'title', 'units']);
+  assert.deepStrictEqual(Object.keys(m).sort(), ['counts', 'id', 'level', 'note', 'publisher', 'source', 'title', 'units']);
   assert.strictEqual(m.units.length, 5);
   assert.strictEqual(m.units[0].chars, 19);
   assert.strictEqual(m.units[2].words, 12);
   assert.ok(!('words' in m) && !('chars' in m));
+});
+
+t('단어장 종류(source) — own·textbook 만, 없거나 이상하면 교재, AI 연상은 자체만', () => {
+  const base = () => ({ id: 'src-1', title: '종류', units: [{ id: 'u1', title: '1일차' }], words: [{ unit: 'u1', word: '관측', meaning: '보고 재는 것', hanja: '觀測' }] });
+  const a = B.checkBook(base());
+  assert.ok(a.ok, JSON.stringify(a.errors));
+  assert.strictEqual(a.book.source, 'textbook', '종류를 안 적으면 교재 — 구매 자료가 기본이라 AI 가 잠긴 쪽이 안전하다');
+  assert.strictEqual(B.aiAllowed(a.book), false);
+  const b = B.checkBook(Object.assign(base(), { source: 'own' }));
+  assert.strictEqual(b.book.source, 'own');
+  assert.strictEqual(B.aiAllowed(b.book), true);
+  assert.strictEqual(B.bookMeta(b.book).source, 'own', '목록 메타에도 종류가 실려야 관리 웹·학생 목록이 표시한다');
+  const c = B.checkBook(Object.assign(base(), { source: 'weird' }));
+  assert.ok(c.ok && c.book.source === 'textbook' && c.warns.some((w) => w.where === 'source'), JSON.stringify(c.warns));
+  assert.strictEqual(B.parseBookText('# 1일차\n관측 | 보고 재는 것 | 觀測', { id: 'src-2', title: 't', source: 'own' }).book.source, 'own');
+  assert.strictEqual(B.parseBookText('# 1일차\n관측 | 보고 재는 것 | 觀測', { id: 'src-3', title: 't' }).book.source, 'textbook');
+  assert.strictEqual(B.aiAllowed(null), false);
+  assert.strictEqual(sample().source, 'own', '체험 단어장은 자체 창작이라 자체 단어장');
 });
 
 console.log(`\nOK — ${passed}개 통과`);

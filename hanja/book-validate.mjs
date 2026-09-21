@@ -14,7 +14,7 @@ import CHECK from './book-check.js';
 const args = process.argv.slice(2);
 const file = args.find((a) => !a.startsWith('--'));
 const opt = (k) => { const i = args.indexOf('--' + k); return i >= 0 ? args[i + 1] : undefined; };
-if (!file) { console.error('사용법: node hanja/book-validate.mjs <단어장.json|.txt> [--id <id>] [--title <제목>] [--level L2]'); process.exit(1); }
+if (!file) { console.error('사용법: node hanja/book-validate.mjs <단어장.json|.txt> [--id <id>] [--title <제목>] [--level L2] [--source own|textbook]'); process.exit(1); }
 
 let res;
 const text = fs.readFileSync(file, 'utf8');
@@ -24,9 +24,10 @@ if (/\.json$/i.test(file)) {
   if (opt('id')) raw.id = opt('id');
   if (opt('title')) raw.title = opt('title');
   if (opt('level')) raw.level = opt('level');
+  if (opt('source')) raw.source = opt('source');
   res = CHECK.checkBook(raw);
 } else {
-  res = CHECK.parseBookText(text, { id: opt('id'), title: opt('title'), level: opt('level'), publisher: opt('publisher') });
+  res = CHECK.parseBookText(text, { id: opt('id'), title: opt('title'), level: opt('level'), publisher: opt('publisher'), source: opt('source') });
 }
 
 for (const e of res.errors) console.log('  ✗ [' + e.where + '] ' + e.message);

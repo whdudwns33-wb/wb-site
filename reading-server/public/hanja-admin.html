@@ -72,10 +72,12 @@
           <div><label>제목</label><input id="bkTitle" placeholder="예: 어휘가 독해다 1"></div>
           <div><label>학년대</label><select id="bkLevel"><option value="">(없음)</option><option value="L1">L1 · 7세~초2</option><option value="L2">L2 · 초3~6</option><option value="L3">L3 · 중1~3</option><option value="L4">L4 · 고1~3</option></select></div>
         </div>
-        <div class="grid2">
+        <div class="grid3">
+          <div><label>종류</label><select id="bkSource"><option value="textbook">교재 단어장 · 구매 자료</option><option value="own">자체 단어장 · 학원이 만든 자료</option></select></div>
           <div><label>출판사 (선택)</label><input id="bkPub"></div>
           <div><label>메모 (선택)</label><input id="bkNote" placeholder="예: 3학년 화목반 교재"></div>
         </div>
+        <p class="muted" style="font-size:.78rem;margin:0 0 8px"><b>AI 연상은 자체 단어장에서만</b> 만들 수 있어요 — 교재 단어장의 뜻 문장은 외부 AI 로 보내지 않습니다. 종류는 올린 뒤 목록에서도 바꿀 수 있어요.</p>
         <label>낱말·한자 — 한 줄에 하나씩</label>
         <textarea id="bkText" rows="10" placeholder="# 1일차&#10;관측 | 보고 재는 것 | 觀(볼 관)+測(잴 측) | 별을 관측했다.&#10;다잡다 | 흐트러진 마음을 단단히 하다 | 마음을 다잡고 앉았다.&#10;觀 | 볼 관 | 25&#10;# 2일차&#10;…"></textarea>
         <p class="muted" style="font-size:.78rem;margin:6px 0 0">형식: <b>낱말 | 뜻 | 한자(선택) | 예문(선택)</b> — 구분자는 <code>|</code> 또는 탭(없으면 쉼표).
@@ -85,7 +87,7 @@
       <div id="paneJson" hidden>
         <label>단어장 JSON 파일 (<code>node hanja/book-validate.mjs</code>로 검사한 것)</label>
         <input type="file" id="bkFile" accept=".json,application/json">
-        <p class="muted" style="font-size:.78rem;margin:6px 0 0">모양: <code>{ id, title, publisher?, level?, units:[{id,title}], words:[{unit, word, meaning, hanja?, example?, syn?}], chars:[{unit, ch, hun, eum, strokes?, medians?}], strokes?:{"觀":25} }</code>.
+        <p class="muted" style="font-size:.78rem;margin:6px 0 0">모양: <code>{ id, title, publisher?, level?, source?(own 자체|textbook 교재 — 없으면 교재), units:[{id,title}], words:[{unit, word, meaning, hanja?, example?, syn?}], chars:[{unit, ch, hun, eum, strokes?, medians?}], strokes?:{"觀":25} }</code>.
         <code>medians</code>(0~1 좌표의 획 중심선, 획 순서대로)가 있는 글자만 앱에서 획순 안내·획순 판정이 열립니다.</p>
       </div>
       <div class="prev" id="prev"></div>
@@ -94,7 +96,7 @@
 
     <h2>단어장 목록 <span class="muted" id="bkCount"></span></h2>
     <div class="table-scroll"><table>
-      <thead><tr><th>제목</th><th>id</th><th class="num">낱말</th><th class="num">한자</th><th class="num">단원</th><th>공개 범위</th><th>갱신</th><th></th></tr></thead>
+      <thead><tr><th>제목</th><th>id</th><th class="num">낱말</th><th class="num">한자</th><th class="num">단원</th><th>공개 범위</th><th>종류</th><th>갱신</th><th></th></tr></thead>
       <tbody id="bkBody"><tr><td colspan="8" class="muted">불러오는 중…</td></tr></tbody>
     </table></div>
     <p class="muted" style="font-size:.78rem">공개 범위 <b>모두</b>는 연동 학생 전원에게 보이고, <b>배정한 학생만</b>은 아래에서 배정한 학생에게만 보입니다(교재를 산 학생에게만 열어야 할 때).
@@ -200,14 +202,14 @@
     if (mode === 'json') { if (!jsonBook) throw new Error('JSON 파일을 골라 주세요.'); return { book: jsonBook }; }
     var text = $('#bkText').value;
     if (!text.trim()) throw new Error('낱말을 붙여 넣어 주세요.');
-    return { text: text, id: $('#bkId').value.trim(), title: $('#bkTitle').value.trim(), level: $('#bkLevel').value, publisher: $('#bkPub').value.trim(), note: $('#bkNote').value.trim() };
+    return { text: text, id: $('#bkId').value.trim(), title: $('#bkTitle').value.trim(), level: $('#bkLevel').value, publisher: $('#bkPub').value.trim(), note: $('#bkNote').value.trim(), source: $('#bkSource').value };
   }
   function renderPreview(j) {
     var html = '';
     if (j.summary && j.summary.length) html += '<ul>' + j.summary.map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') + '</ul>';
     if (j.errors && j.errors.length) html += '<ul>' + j.errors.map(function (e) { return '<li class="err">✗ [' + esc(e.where) + '] ' + esc(e.message) + '</li>'; }).join('') + '</ul>';
     if (j.warns && j.warns.length) html += '<ul>' + j.warns.slice(0, 30).map(function (w) { return '<li class="warn">! [' + esc(w.where) + '] ' + esc(w.message) + '</li>'; }).join('') + (j.warns.length > 30 ? '<li class="warn">… 경고 ' + (j.warns.length - 30) + '건 더</li>' : '') + '</ul>';
-    if (j.meta) html += '<p class="muted">id <code>' + esc(j.meta.id) + '</code> · ' + esc(j.meta.title) + ' · 단원: ' + j.meta.units.map(function (u) { return esc(u.title) + '(' + (u.words + u.chars) + ')'; }).join(', ') + '</p>';
+    if (j.meta) html += '<p class="muted">id <code>' + esc(j.meta.id) + '</code> · ' + esc(j.meta.title) + ' · ' + (j.meta.source === 'own' ? '자체 단어장 (AI 연상 가능)' : '교재 단어장 (AI 연상 없음)') + ' · 단원: ' + j.meta.units.map(function (u) { return esc(u.title) + '(' + (u.words + u.chars) + ')'; }).join(', ') + '</p>';
     $('#prev').innerHTML = html;
   }
   $('#bkPrev').addEventListener('click', async function () {
@@ -238,17 +240,24 @@
     BOOKS = j.books || [];
     $('#bkCount').textContent = BOOKS.length ? BOOKS.length + '권' : '';
     var tb = $('#bkBody');
-    if (!BOOKS.length) { tb.innerHTML = '<tr><td colspan="8" class="muted">아직 올린 단어장이 없어요. 학생 앱에는 WB 기본 체험 단어장만 보입니다.</td></tr>'; renderBookPick(); return; }
+    if (!BOOKS.length) { tb.innerHTML = '<tr><td colspan="9" class="muted">아직 올린 단어장이 없어요. 학생 앱에는 WB 기본 체험 단어장만 보입니다.</td></tr>'; renderBookPick(); return; }
     tb.innerHTML = BOOKS.map(function (b) {
       var c = b.counts || {};
       return '<tr data-id="' + esc(b.id) + '"><td><b>' + esc(b.title) + '</b>' + (b.publisher ? '<br><span class="muted">' + esc(b.publisher) + (b.level ? ' · ' + b.level : '') + '</span>' : (b.level ? '<br><span class="muted">' + b.level + '</span>' : '')) + '</td>' +
         '<td><code>' + esc(b.id) + '</code></td><td class="num">' + (c.words || 0) + '</td><td class="num">' + (c.chars || 0) + (c.medians ? '<br><span class="muted">획순 ' + c.medians + '</span>' : '') + '</td><td class="num">' + (c.units || 0) + '</td>' +
         '<td><select data-scope="' + esc(b.id) + '" style="width:auto;padding:4px 8px;font-size:.8rem"><option value="all"' + (b.scope !== 'assigned' ? ' selected' : '') + '>모두</option><option value="assigned"' + (b.scope === 'assigned' ? ' selected' : '') + '>배정한 학생만</option></select></td>' +
+        '<td><select data-source="' + esc(b.id) + '" style="width:auto;padding:4px 8px;font-size:.8rem"><option value="textbook"' + (b.source !== 'own' ? ' selected' : '') + '>교재</option><option value="own"' + (b.source === 'own' ? ' selected' : '') + '>자체</option></select></td>' +
         '<td class="muted">' + fmt(b.updatedAt) + '</td><td><a class="small" style="display:inline-block;border:1px solid #E4DCCB;background:#F1ECE1;border-radius:9px;padding:5px 10px;font-size:.78rem;font-weight:700;color:#1F1712;text-decoration:none" href="/admin/hanja-print.html?id=' + encodeURIComponent(b.id) + '">시험지</a> <button class="small" data-dl="' + esc(b.id) + '">JSON</button> <button class="small danger" data-del="' + esc(b.id) + '">삭제</button></td></tr>';
     }).join('');
     tb.querySelectorAll('[data-scope]').forEach(function (sel) {
       sel.addEventListener('change', async function () {
         try { await api('/api/hanja/admin/scope', { method: 'POST', body: JSON.stringify({ id: sel.dataset.scope, scope: sel.value }) }); msg('공개 범위를 바꿨어요'); await loadBooks(); } catch (e) { msg(e.message); }
+      });
+    });
+    tb.querySelectorAll('[data-source]').forEach(function (sel) {
+      sel.addEventListener('change', async function () {
+        if (sel.value === 'own' && !confirm('자체 단어장으로 바꾸면 학생이 AI 연상을 만들 때 낱말·뜻이 외부 AI 로 갑니다. 학원이 만든 자료가 맞나요?')) { await loadBooks(); return; }
+        try { await api('/api/hanja/admin/source', { method: 'POST', body: JSON.stringify({ id: sel.dataset.source, source: sel.value }) }); msg('종류를 바꿨어요'); await loadBooks(); } catch (e) { msg(e.message); }
       });
     });
     tb.querySelectorAll('[data-dl]').forEach(function (b) {

@@ -7,7 +7,7 @@
  * 판정 불일치가 생기므로 규칙은 이 파일 하나에만 둔다(naesin/pack-check.js 와 같은 이유).
  *
  * 단어장 모양(정규화 뒤):
- *   { id, title, publisher?, level?, note?,
+ *   { id, title, publisher?, level?, note?, source:'own'|'textbook',   // 종류 — 자체(학원 자료)·교재(구매 자료, 기본). AI 연상은 own 만
  *     units: [{ id, title }],                       // 문제집의 단원·회차 순서 그대로
  *     words: [{ id, unit, word, type:'hanja'|'native', hanja?, parts?:[{ch,hun,eum}], literal?,
  *               meaning, example?, syn?:[], scene? }],       // id 는 '낱말|한자'(내용 기반) — 재업로드에도 안 밀린다
@@ -31,6 +31,8 @@ var WBBOOKCHECK = (function () {
   var HANJA_ANY = /[㐀-䶿一-鿿豈-﫿]/;
   var ENGLISH_WORD = /^[A-Za-z][A-Za-z\s'-]*$/;
   var LEVELS = ['L1', 'L2', 'L3', 'L4'];
+  /* 단어장 종류 — 교재(textbook)는 구매 자료라 뜻 문장을 외부 AI 로 보내지 않는다. 자체(own)는 학원이 만든 자료(체험 단어장·진로독서 어휘장). 기본은 교재 */
+  var SOURCES = ['own', 'textbook'];
 
   var LIMITS = {
     words: 3000, chars: 2000, units: 200,
@@ -142,11 +144,13 @@ var WBBOOKCHECK = (function () {
     }
     var book = {
       id: str(raw.id), title: str(raw.title, LIMITS.title), publisher: str(raw.publisher, LIMITS.publisher),
-      level: str(raw.level), note: str(raw.note, LIMITS.note), units: [], words: [], chars: [],
+      level: str(raw.level), note: str(raw.note, LIMITS.note), source: str(raw.source), units: [], words: [], chars: [],
     };
     if (!ID_RE.test(book.id)) C.err('id', 'id 는 영문·숫자·하이픈 3~60자 — 드라이브 폴더 이름과 같게 둔다 (예: eohwi-dokhae-1)');
     if (!book.title) C.err('title', '제목이 없어요.');
     if (book.level && LEVELS.indexOf(book.level) < 0) { C.warn('level', '학년대는 L1~L4 — "' + book.level + '" 는 지운다'); book.level = ''; }
+    if (book.source && SOURCES.indexOf(book.source) < 0) { C.warn('source', '종류는 own(자체)·textbook(교재) — "' + book.source + '" 는 교재로 둔다'); book.source = ''; }
+    if (!book.source) book.source = 'textbook';
 
     /* 단원 — 적힌 순서가 곧 학습 순서다 */
     var unitIdx = {};
@@ -372,7 +376,7 @@ var WBBOOKCHECK = (function () {
     book.words.forEach(function (w) { if (per[w.unit]) per[w.unit].words += 1; });
     book.chars.forEach(function (c) { if (per[c.unit]) per[c.unit].chars += 1; });
     return {
-      id: book.id, title: book.title, publisher: book.publisher || '', level: book.level || '', note: book.note || '',
+      id: book.id, title: book.title, publisher: book.publisher || '', level: book.level || '', note: book.note || '', source: book.source || 'textbook',
       counts: counts, units: book.units.map(function (u) { return per[u.id]; }),
     };
   }
@@ -384,7 +388,7 @@ var WBBOOKCHECK = (function () {
      워드브레인 배정과 같은 표기라 강사가 형식을 하나만 익히면 된다. */
   function parseBookText(text, meta) {
     meta = meta || {};
-    var raw = { id: meta.id, title: meta.title, publisher: meta.publisher, level: meta.level, note: meta.note, units: [], words: [], chars: [] };
+    var raw = { id: meta.id, title: meta.title, publisher: meta.publisher, level: meta.level, note: meta.note, source: meta.source, units: [], words: [], chars: [] };
     var lineErrors = [];
     var unit = '', unitN = 0, unitIds = {};
     String(text || '').split(/\r?\n/).forEach(function (line0, i) {
@@ -441,8 +445,11 @@ var WBBOOKCHECK = (function () {
     return res;
   }
 
+  /* AI 연상을 만들어도 되는 단어장인가 — 자체 단어장만. 화면(버튼)과 호출 직전이 같은 판정을 쓴다 */
+  function aiAllowed(book) { return !!(book && book.source === 'own'); }
+
   return {
-    ID_RE: ID_RE, LIMITS: LIMITS, LEVELS: LEVELS,
+    ID_RE: ID_RE, LIMITS: LIMITS, LEVELS: LEVELS, SOURCES: SOURCES, aiAllowed: aiAllowed,
     isHanjaChar: isHanjaChar, hanjaOf: hanjaOf, parseHanjaSpec: parseHanjaSpec, findInExample: findInExample, exampleHasWord: exampleHasWord,
     checkBook: checkBook, checkMedians: checkMedians, countsOf: countsOf, bookMeta: bookMeta, parseBookText: parseBookText,
   };

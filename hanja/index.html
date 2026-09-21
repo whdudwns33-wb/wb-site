@@ -514,7 +514,7 @@
       html += '<div class="card book' + (e.id === bid ? ' on' : '') + '" data-book="' + esc(e.id) + '">' +
         '<div class="ico' + (e.counts && e.counts.hanja < e.counts.native ? ' n' : '') + '">' + (e.counts && e.counts.chars ? '字' : '語') + '</div>' +
         '<div style="flex:1;min-width:0"><b>' + esc(e.title) + '</b>' +
-        '<span class="muted" style="font-size:.78rem">' + (e.publisher ? esc(e.publisher) + ' · ' : '') + (e.level ? e.level + ' · ' : '') +
+        '<span class="muted" style="font-size:.78rem">' + (e.source === 'own' ? '자체 · ' : '교재 · ') + (e.publisher ? esc(e.publisher) + ' · ' : '') + (e.level ? e.level + ' · ' : '') +
         '낱말 ' + (e.counts ? e.counts.words : 0) + ' · 한자 ' + (e.counts ? e.counts.chars : 0) + ' · 단원 ' + (e.units ? e.units.length : 0) + '</span>' +
         (e.mine ? ' <span class="chip t-a">선생님 배정</span>' : '') + (e.sample ? ' <span class="chip t-g">WB 기본</span>' : '') + (e.local ? ' <span class="chip t-n">내 어휘장</span>' : '') +
         (p && p.planted ? '<div class="bar stack"><i class="g" style="width:' + pct(p.graduated, p.total) + '%"></i><i style="width:' + pct(p.planted - p.graduated, p.total) + '%"></i></div>' : '') +
@@ -604,12 +604,13 @@
       sceneHtml(w) +
       '<div><button class="say-btn" data-say="' + esc(w.word + '. ' + w.meaning + (w.example ? '. ' + w.example : '')) + '">🔊 들어보기</button></div></div>';
   }
-  /* 연상 장면 — 단어장에 적힌 것(scene)이 먼저, 없으면 학생이 고른 AI 연상(검수 전/승인). 둘 다 없고 AI 가 있으면 만들기 버튼 */
+  /* 연상 장면 — 단어장에 적힌 것(scene)이 먼저, 없으면 학생이 고른 AI 연상(검수 전/승인). 둘 다 없고 AI 가 있으면 만들기 버튼 —
+     단, 자체 단어장(source own)에서만. 교재 단어장의 뜻 문장은 외부 AI 로 보내지 않는다 */
   function sceneHtml(w) {
     var mine = w._sid && db.custom[w._sid];
     var scene = w.scene || (mine && mine.scene) || '', cue = (!w.scene && mine && mine.cue) || '';
     if (scene) return '<div class="hintbox" style="text-align:left;margin-top:8px"><span class="chip t-a">연상</span> ' + (cue ? '<b>' + esc(cue) + '</b> — ' : '') + esc(scene) + (mine && !w.scene && mine.mnemoStatus === 'pending' ? ' <span class="muted">(선생님 검수 전)</span>' : '') + '</div>';
-    if (authed && SYNC.ai && !SYNC.authBad && w._sid) return '<div><button class="say-btn" data-ai="' + esc(w._sid) + '">✨ AI 연상 만들기</button></div>';
+    if (authed && SYNC.ai && !SYNC.authBad && w._sid && WBBOOKCHECK.aiAllowed(bookOf(w._book))) return '<div><button class="say-btn" data-ai="' + esc(w._sid) + '">✨ AI 연상 만들기</button></div>';
     return '';
   }
   function bindSay(root) {
@@ -619,6 +620,7 @@
   /* AI 연상 — 워드브레인의 검수 흐름을 그대로 쓴다: 후보 3개 → 학생이 하나 고름 → 검수 전(pending) → 접속 때마다 승인/반려 확인 */
   async function aiMnemo(sid) {
     var it = resolve(sid); if (!it || it.kind !== 'word') return;
+    if (!WBBOOKCHECK.aiAllowed(bookOf(it.book))) { toast('교재 단어장의 낱말은 AI 연상을 만들지 않아요'); return; }
     var w = it.w;
     try {
       var j = await api('/api/vocab/mnemonic', { method: 'POST', body: JSON.stringify({ word: w.word, meaning: w.meaning, type: w.type,

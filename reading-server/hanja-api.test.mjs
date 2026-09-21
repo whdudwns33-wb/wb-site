@@ -360,4 +360,34 @@ await t('단원 진도 셈 — 심은 것·졸업·만기만 세고 없는 항�
   assert.deepStrictEqual(unitProgress(null, ['a'], now), { total: 1, planted: 0, graduated: 0, due: 0 });
 });
 
+await t('단어장 종류 — 기본은 교재, 붙여넣기·JSON 모두 받고, /admin/source 로 바꾸면 본문·목록이 같이 바뀐다', async () => {
+  const store = memStore();
+  const text = '# 1일차\n관측 | 보고 재는 것 | 觀測\n';
+  const post = (bodyObj) => call(store, { path: '/api/hanja/admin/book', method: 'POST', who: ADMIN, getBody: async () => bodyObj });
+  const up = await post({ text, id: 'src-text', title: '교재' });
+  assert.ok(up.body.ok, JSON.stringify(up.body));
+  assert.strictEqual(up.body.meta.source, 'textbook', '종류를 안 적으면 교재');
+  assert.strictEqual((await store.getBook('src-text')).book.source, 'textbook');
+  const own = await post({ text, id: 'src-own', title: '자체', source: 'own' });
+  assert.strictEqual(own.body.meta.source, 'own');
+  /* JSON — 파일에 적힌 값이 먼저, 없으면 관리 웹 선택값 */
+  const s1 = sample(); s1.id = 'src-json-1'; delete s1.source;
+  assert.strictEqual((await upload(store, s1, { source: 'own' })).body.meta.source, 'own');
+  const s2 = sample(); s2.id = 'src-json-2'; s2.source = 'textbook';
+  assert.strictEqual((await upload(store, s2, { source: 'own' })).body.meta.source, 'textbook');
+  assert.strictEqual(store._raw.index().find((e) => e.id === 'src-own').source, 'own', '목록에 종류가 실린다');
+  /* 종류 바꾸기 */
+  const chg = (id, source) => call(store, { path: '/api/hanja/admin/source', method: 'POST', who: ADMIN, getBody: async () => ({ id, source }) });
+  assert.strictEqual((await chg('src-text', 'weird')).status, 400);
+  assert.strictEqual((await chg('nope-1', 'own')).status, 404);
+  const ok = await chg('src-text', 'own');
+  assert.strictEqual(ok.status, 200);
+  assert.ok(ok.body.updatedAt);
+  assert.strictEqual((await store.getBook('src-text')).book.source, 'own', '본문도 바뀌어야 학생 앱의 AI 버튼 판정이 따라온다');
+  assert.strictEqual(store._raw.index().find((e) => e.id === 'src-text').source, 'own');
+  const stu = await call(store, { path: '/api/hanja/book', qs: 'id=src-text' });
+  assert.strictEqual(stu.body.book.source, 'own');
+  assert.strictEqual((await call(store, { path: '/api/hanja/admin/source', method: 'POST', getBody: async () => ({ id: 'src-text', source: 'own' }) })).status, 403, '학생은 못 바꾼다');
+});
+
 console.log(`\nOK — ${passed}개 통과`);

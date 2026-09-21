@@ -65,4 +65,13 @@ t('관리 화면·인쇄 화면은 색인·추적을 막고, 인쇄 화면은 PI
   assert.ok(!/fetch\('\.\/book-sample|\/hanja\/book/.test(print), '인쇄 화면이 정적 단어장을 부른다');
 });
 
+t('AI 연상 버튼은 자체 단어장(aiAllowed)에서만 — 교재 뜻 문장이 외부 AI 로 나가지 않게', () => {
+  const btnLine = app.split('\n').find((l) => l.includes('data-ai="'));
+  assert.ok(btnLine && btnLine.includes('aiAllowed('), 'AI 연상 버튼이 단어장 종류를 보지 않는다');
+  const fn = app.slice(app.indexOf('async function aiMnemo'), app.indexOf("'/api/vocab/mnemonic'"));
+  assert.ok(fn.includes('aiAllowed('), 'aiMnemo 가 호출 직전에 종류를 다시 보지 않는다');
+  assert.ok(admin.includes('id="bkSource"') && admin.includes('data-source='), '관리 웹에 종류 선택이 없다');
+  assert.ok(api.includes("'/api/hanja/admin/source'"), '종류 바꾸기 라우트가 없다');
+});
+
 console.log(`\nOK — ${passed}개 통과`);

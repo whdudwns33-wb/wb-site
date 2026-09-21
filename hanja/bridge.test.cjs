@@ -21,6 +21,7 @@ t('한자어·고유어만 가져오고 영어·중복·뜻 없는 낱말은 뺀
   assert.deepStrictEqual(raw.words.map((w) => w.word), ['관측', '다잡다']);
   assert.strictEqual(raw.words[0].hanja, '觀(볼 관)+測(잴 측)');
   assert.strictEqual(raw.id, 'reading-vocab');
+  assert.strictEqual(raw.source, 'own', '진로독서 어휘장은 자체 기록 — AI 연상이 열린다');
 });
 
 t('검사기를 그대로 통과하고 단원은 모은 달, 최근 달이 앞', () => {
@@ -33,6 +34,7 @@ t('검사기를 그대로 통과하고 단원은 모은 달, 최근 달이 앞',
   assert.strictEqual(r.book.words[0].id, '관측|觀測', '가져올 때마다 같은 id 라야 기억 기록이 이어진다');
   assert.ok(r.book.chars.some((c) => c.ch === '觀' && c.derived));
   assert.ok(/자체 기록/.test(r.book.note));
+  assert.ok(CHECK.aiAllowed(r.book));
 });
 
 t('wbr.v1 문자열에서 어휘장만 — 깨진 값은 빈 배열', () => {

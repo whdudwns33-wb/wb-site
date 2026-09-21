@@ -57,7 +57,7 @@ node hanja/strokes-convert.mjs <graphics.txt> <출력.json> --book <단어장.js
 JSON 모양(정규화 뒤 — `book-check.js` 머리말 참조):
 
 ```
-{ id, title, publisher?, level?(L1~L4), note?,
+{ id, title, publisher?, level?(L1~L4), note?, source:'own'|'textbook',   ← 종류: 자체·교재(기본)
   units: [{ id, title }],
   words: [{ id, unit, word, type:'hanja'|'native', hanja?, parts?:[{ch,hun,eum}], literal?, meaning, example?, syn?, scene? }],
   chars: [{ ch, hun, eum, strokes?, unit, medians?, radical?, similar?, words:[…], derived? }],
@@ -65,6 +65,9 @@ JSON 모양(정규화 뒤 — `book-check.js` 머리말 참조):
 ```
 
 - **id 는 영문·숫자·하이픈 3~60자** — 드라이브의 단어장 폴더 이름과 같게 둔다(`docs/자료-폴더-표준.md`).
+- **종류 `source`** 는 둘이다. `textbook`(교재 단어장 — 구매 자료, 적지 않으면 이것) · `own`(자체 단어장 — 학원이 만든 자료).
+  관리 웹 업로드에서 고르고 목록에서 바꾼다(`POST /admin/source`, 본문·목록이 같이 바뀐다). **AI 연상은 자체 단어장에서만**
+  열린다(`book-check.js aiAllowed`) — 교재의 뜻 문장을 외부 AI 로 보내지 않기 위해서다. 체험 단어장과 진로독서 어휘장은 자체다.
 - **낱말 id 는 내용 기반**(`낱말|한자`, 붙여넣기 형식은 자동)이고 단원 id 는 제목 기반이다. 교재를 고쳐 다시 올려도
   줄이 하나 끼어들었다고 학생 기억 기록이 밀리지 않는다. 그래도 바뀐 id(오타 수정 등)는 서버가 옛 단어장과 대조해
   `hanja:remap:<id>` 에 남기고 학생 앱이 `GET /book` 의 `remap` 으로 옛 기록을 잇는다(`migrateIds`).
@@ -74,8 +77,8 @@ JSON 모양(정규화 뒤 — `book-check.js` 머리말 참조):
 - `radical`(부수)·`similar`(닮은 글자)는 문항 오답지 우선순위다 — 닮은 글자 > 같은 부수 > 같은 단원 순으로 헷갈리는
   보기를 먼저 뽑는다(`quiz.js charRank`). 없으면 단원·단어장 안에서만 고른다.
 - `syn`(고유어 유의어)이 있으면 「유의어 고르기」 문항이 열리고, `scene`(연상 장면 한 줄)은 카드에 그대로 보인다.
-  `scene` 이 없는 고유어는 학생 앱이 워드브레인과 같은 AI 연상 경로(`/api/vocab/mnemonic`, 관리 웹에서 AI 를 켠 학원만)로
-  한 번 받아 기기에 저장한다 — 낱말·뜻만 보내며 교재 원문은 보내지 않는다.
+  `scene` 이 없는 낱말은 **자체 단어장일 때만** 학생 앱이 워드브레인과 같은 AI 연상 경로(`/api/vocab/mnemonic`, AI 키가 있는 서버만)로
+  한 번 받아 기기에 저장한다 — 낱말·뜻만 보내고, 선생님 검수 뒤 확정된다. 교재 단어장에는 버튼이 없다.
 - `medians` = 획순 데이터(0~1 좌표의 획 중심선, 획 순서대로). 단어장에 없어도 **공용 획순 사전**(`hanja:strokes`)에
   있는 글자는 획순 모드가 열린다(단어장 값이 우선). 체험 단어장의 一二三十人大天口日月木山川中土上下小火水 20자에 들어 있다.
 - 검사 규칙(`checkBook`)은 오류(막음)와 경고(알림)를 가른다: 영어 낱말·뜻 없음·나쁜 한자·획수/획순 불일치는 오류,
@@ -123,7 +126,7 @@ SRS id 규약: 한자는 `c:<글자>`(단어장을 넘어 공용), 낱말은 `w:
 
 ## 강사 화면
 
-- **관리 웹** `/admin/hanja-admin.html`: 단어장 업로드(붙여넣기·JSON, 미리보기) · 목록(공개 범위·삭제·시험지 링크) ·
+- **관리 웹** `/admin/hanja-admin.html`: 단어장 업로드(붙여넣기·JSON, 미리보기, 종류 선택) · 목록(공개 범위·종류·삭제·시험지 링크) ·
   학생 배정 · **이번 주 단원 지정**(범위 = 전체·반 이름·학생 코드, 마감) + 지정한 단원의 **진도표**(학생별 심음·장기 기억·밀림) ·
   **공용 획순 사전** 업로드 · **학생 안내 QR** · 현황(저장 시점 요약 키 `hanja:summary` 로 학생 수만큼 본문을 읽지 않는다).
 - **종이 시험지** `/admin/hanja-print.html`: 단어장·단원을 고르면 훈음 쓰기·한자 쓰기·낱말 뜻 쓰기·한자어 표기 쓰기 4종 + 정답표.
@@ -143,7 +146,7 @@ SRS id 규약: 한자는 `c:<글자>`(단어장을 넘어 공용), 낱말은 `w:
 - `POST /admin/book {book}` 또는 `{text, id, title, publisher?, level?, note?}` (+`dryRun`) → 검사 결과·저장 (`replaced`, `remapped`).
   같은 id 는 덮어쓴다(공개 범위·배정 유지, 바뀐 낱말 id 는 remap). 본문 2MB, 단어장 1.5MB.
 - `GET /admin/books` · `GET /admin/book?id=` · `DELETE /admin/book {id}`(배정에서도 뺀다, 학생 기록은 남는다)
-- `POST /admin/scope {id, scope}` · `POST /admin/assign {codes, bookIds, action:'add'|'remove'}` · `GET /admin/assign`
+- `POST /admin/scope {id, scope}` · `POST /admin/source {id, source}`(종류 — 본문·목록 갱신, updatedAt 올림) · `POST /admin/assign {codes, bookIds, action:'add'|'remove'}` · `GET /admin/assign`
 - `POST /admin/task {scope, bookId, unitId, due?, title?}` · `GET /admin/tasks` → `{tasks, today}` · `DELETE /admin/task {scope}`
 - `GET /admin/progress?scope=` → `{scope, task, unit:{id,title,total}, rows:[{code,name,cls,linked,planted,graduated,due,…}], today}`
 - `POST /admin/strokes {strokes:{"十":{strokes, medians}}, replace?}` (4MB) · `GET /admin/strokes` → `{strokes, updatedAt, count, withMedians}`

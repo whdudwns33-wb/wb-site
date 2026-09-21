@@ -34,7 +34,7 @@ var WBHBRIDGE = (function () {
     });
     months.sort().reverse();
     return {
-      id: opts.id || BOOK_ID, title: opts.title || TITLE, publisher: 'WB 진로독서',
+      id: opts.id || BOOK_ID, title: opts.title || TITLE, publisher: 'WB 진로독서', source: 'own',   /* 진로독서 어휘장은 자체 기록 — AI 연상 가능 */
       note: '진로독서 앱 어휘장에서 가져온 낱말 — 이 기기의 wbr.v1 을 읽어 만든다(자체 기록, 라이선스 자료 아님).',
       units: months.map(function (m) { return { id: m, title: m === '기타' ? '기타' : m.replace('-', '년 ') + '월에 모음' }; }),
       words: words.map(function (w) { return w; }),

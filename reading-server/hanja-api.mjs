@@ -28,6 +28,7 @@ export const hanjaBodyLimit = (p) => (p === '/api/hanja/admin/book' ? BODY_LIMIT
 const ID_RE = CHECK.ID_RE;
 const CODE_RE = /^[A-Za-z0-9-]{3,20}$/;
 const SCOPES = ['all', 'assigned'];
+const SOURCES = CHECK.SOURCES;   /* 단어장 종류 own(자체)·textbook(교재) — book-check 와 같은 목록 */
 const ASSIGN_MAX = 30;                    // 학생 하나에 배정하는 단어장 상한
 const STROKES_MAX_CHARS = 5000;
 const nowIso = () => new Date().toISOString();
@@ -240,8 +241,9 @@ export async function handleHanja(ctx) {
     const b = await body();
     if (!b) return j(400, { error: '요청 본문이 JSON 이 아니에요.' });
     let res;
-    if (isObj(b.book)) res = CHECK.checkBook(b.book);
-    else if (typeof b.text === 'string') res = CHECK.parseBookText(b.text, { id: b.id, title: b.title, publisher: b.publisher, level: b.level, note: b.note });
+    /* 종류(source)는 JSON 에 적힌 값이 먼저, 없으면 관리 웹 선택값 — 둘 다 없으면 검사기가 교재로 둔다 */
+    if (isObj(b.book)) res = CHECK.checkBook(b.book.source == null && b.source ? { ...b.book, source: b.source } : b.book);
+    else if (typeof b.text === 'string') res = CHECK.parseBookText(b.text, { id: b.id, title: b.title, publisher: b.publisher, level: b.level, note: b.note, source: b.source });
     else return j(400, { error: 'book(JSON) 또는 text(붙여넣기)가 필요해요.' });
     const preview = { summary: res.summary, warns: res.warns, errors: res.errors, counts: res.counts || null, meta: res.book ? CHECK.bookMeta(res.book) : null };
     if (b.dryRun) return j(200, { ok: res.ok, preview: true, ...preview });
@@ -311,6 +313,21 @@ export async function handleHanja(ctx) {
     if (!idx.some((e) => e.id === id)) return j(404, { error: '없는 단어장이에요.' });
     await store.putBookIds(idx.map((e) => (e.id === id ? { ...e, scope } : e)));
     return j(200, { ok: true, id, scope });
+  }
+  /* 종류 바꾸기 — 자체(own)·교재(textbook). 학생 앱은 본문의 source 로 AI 연상 버튼을 가리므로 목록만 아니라 본문도 바꾸고
+     updatedAt 을 올려 기기 캐시가 새 본문을 받게 한다. */
+  if (p === '/api/hanja/admin/source' && method === 'POST') {
+    const b = await body();
+    const id = String((b && b.id) || '').trim(), source = String((b && b.source) || '');
+    if (!ID_RE.test(id)) return j(400, { error: '단어장 id 가 필요해요.' });
+    if (!SOURCES.includes(source)) return j(400, { error: '종류는 own(자체 단어장) 또는 textbook(교재 단어장)' });
+    const idx = await readIndex(store);
+    const rec = idx.some((e) => e.id === id) ? await store.getBook(id) : null;
+    if (!rec || !rec.book) return j(404, { error: '없는 단어장이에요.' });
+    const updatedAt = nowIso();
+    await store.putBook(id, { book: { ...rec.book, source }, updatedAt });
+    await store.putBookIds(idx.map((e) => (e.id === id ? { ...e, source, updatedAt } : e)));
+    return j(200, { ok: true, id, source, updatedAt });
   }
   /* 배정 — 학생들에게 단어장을 더하거나(add) 뺀다(remove). 없는 단어장은 거절, 없는 학생은 건너뛴다 */
   if (p === '/api/hanja/admin/assign' && method === 'POST') {
