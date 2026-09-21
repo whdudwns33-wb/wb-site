@@ -28,9 +28,9 @@
 | `letter.test.cjs` | `node letter/letter.test.cjs` — 학년대·주차·검증기(반례)·선택·렌더러 이스케이프·인쇄 별지·샘플 오류 0 |
 | `sw.js` · `manifest.webmanifest` · `icon.svg` | 껍데기 캐시(VERSION 은 build-dist 가 스탬프). `/api/*`·`*.json` 은 캐시하지 않는다. 글꼴 조각은 별도 캐시 `wbl-fonts` 에 캐시 먼저(껍데기가 갈려도 남는다), `fonts.css` 는 네트워크 먼저. **새 호 도착 푸시**(페이로드 없음)를 받아 알림을 띄우고, 누르면 가족 링크(Cache API `wbl-meta/famlink`)나 `/letter/` 를 연다 |
 | `_headers` | 안내 주석만 — 배포 규칙은 `reading/_headers` 의 `/letter/*` no-store |
-| `../reading-server/letter-api.mjs` | `/api/letter/*` — 가족(`parent?t=`·`parent/push/*`) · 사진(`img/<id>`, 무인증·불변 캐시) · 학생(`issues`·`issue?id=`·`state` GET/PUT·`push/*`) · 관리(`admin/issues`·`admin/issue` GET/PUT/DELETE·`admin/publish`(즉시 발행이면 알림)·`admin/push`(다시 보내기)·`admin/push/status`·`admin/students`·`admin/tier`·`admin/messages?id=`·`admin/stats?id=`·`admin/draft`(달력 프리필)·`admin/imgs`·`admin/img` POST/DELETE·`admin/calendar` GET/PUT). `sendLetterPushes`·`pushDueIssues`(07:00 크론)·`dumpLetter`(백업)·`dropStudentLetter`(퇴원, 구독도 삭제) |
+| `../reading-server/letter-api.mjs` | `/api/letter/*` — 가족(`parent?t=`·`parent/push/*`) · 사진(`img/<id>`, 무인증·불변 캐시) · 학생(`issues`·`issue?id=`·`state` GET/PUT·`push/*`) · 관리(`admin/issues`·`admin/issue` GET/PUT/DELETE·`admin/publish`(즉시 발행이면 알림)·`admin/push`(다시 보내기)·`admin/push/status`·`admin/students`·`admin/tier`·`admin/messages?id=`·`admin/stats?id=`·`admin/draft`(달력 프리필)·`admin/imgs`·`admin/img` POST/DELETE·`admin/img/gen`(AI 삽화 — 그림을 돌려주고 저장하지 않는다)·`admin/calendar` GET/PUT). `sendLetterPushes`·`pushDueIssues`(07:00 크론)·`dumpLetter`(백업)·`dropStudentLetter`(퇴원, 구독도 삭제) |
 | `../reading-server/letter-api.test.mjs` | `node reading-server/letter-api.test.mjs` — 메모리 어댑터·가짜 fetch 로 전 라우트 |
-| `../reading-server/public/letter-admin.html` | 관리 — 호 목록(발행/내리기·알림 다시 보내기·미리보기·인쇄 링크·삭제, 다음 주 달력 주제) · 편집(JSON + 머리 정보 폼 + 검증 + 학년대별 미리보기 + 사진·도형 스니펫 도우미) · AI 초안(6조각, 달력 프리필, VSI 조각은 생성기 seed 로 채움) · 주제 달력(44주 표 편집) · 사진(브라우저에서 1600px JPEG 로 줄여 올리기, 목록·삭제) · 발송 문구(가족 링크 자동 발급) · 열람 현황 · 학생 학년대 지정 |
+| `../reading-server/public/letter-admin.html` | 관리 — 호 목록(발행/내리기·알림 다시 보내기·미리보기·인쇄 링크·삭제, 다음 주 달력 주제) · 편집(JSON + 머리 정보 폼 + 검증 + 학년대별 미리보기 + 사진·도형 스니펫 도우미) · AI 초안(6조각, 달력 프리필, VSI 조각은 생성기 seed 로 채움) · 주제 달력(44주 표 편집) · 사진(브라우저에서 1600px JPEG 로 줄여 올리기, 목록·삭제, **AI 삽화 만들기** — Gemini 이미지 모델, 미리 보고 마음에 들면 올리기) · 발송 문구(가족 링크 자동 발급) · 열람 현황 · 학생 학년대 지정 |
 
 ## 학년대·웩슬러 지표
 
@@ -81,7 +81,7 @@ section 공통: { id: [a-z0-9-]{2,30} 유일, type, tiers: "all" | ["K","E1",…
 
 0. (한 학기에 한 번) [주제 달력] — 주차마다 주제 한 줄·메모를 적어 둔다. 배포본에 40주 기본값이 있고, 두뇌 놀이 지표는 순환값이 채워진다.
 1. `/admin/letter-admin.html` → [호 목록] → 다음 주 주제(달력)를 확인 → **[AI 초안 만들기]**(`ANTHROPIC_API_KEY` 가 있을 때. 주제·지표가 달력에서 채워진다. 공통 + 학년대 5 + 교육·입시 이슈 = 7조각을 차례로 받아 한 호로 조립. 시공간 조각은 생성기 seed 로 채우고, 이슈 조각만 웹 검색 도구를 켜 그 주 소식을 간추린다) 또는 [빈 템플릿] / [샘플 호 복제].
-   사진은 [사진] 탭에서 올린다(자체 촬영·제작·공공누리·CC0 만, 학생 얼굴은 동의가 있는 것만). 편집기의 [사진 넣기]·[도형 놀이 넣기]가 붙여 넣을 스니펫을 준다.
+   사진은 [사진] 탭에서 올린다(자체 촬영·제작·공공누리·CC0 만, 학생 얼굴은 동의가 있는 것만). 같은 탭의 [AI 삽화 만들기]가 장면 한 줄로 삽화를 그린다(`GEMINI_API_KEY` 가 있을 때). 편집기의 [사진 넣기]·[도형 놀이 넣기]가 붙여 넣을 스니펫을 준다.
 2. [편집] — 머리 정보 폼 + JSON. [검증] 으로 오류 0 을 만들고 오른쪽 미리보기(학년대별)로 읽어 본다. **모든 글은 자체 창작**이어야 한다(교재·기사·시험 문제를 옮기지 않는다). [저장] 은 발행 상태를 바꾸지 않는다.
 3. [호 목록] → [발행](발행일 지정, 월요일 아침이 기본). 발행일 전에는 학생·가족에게 보이지 않는다. [내리기] 로 언제든 초안으로.
    **새 호 알림**: 지금 보이는 호를 처음 발행하면 그 자리에서 구독 가정(학생 기기·가족 링크)에 푸시가 나가고, 발행일이 미래면 그날 07:00 KST 크론이 보낸다. 한 호에 한 번뿐이며 [알림 다시]로 재발송한다. VAPID 키(워드브레인과 공용)가 없으면 알림만 빠지고 나머지는 그대로다.
@@ -97,9 +97,12 @@ section 공통: { id: [a-z0-9-]{2,30} 유일, type, tiers: "all" | ["K","E1",…
 - 사진은 `/api/letter/img/<id>` 로 누구나 받을 수 있다 — id 가 128비트 무작위라 그 자체가 열쇠다(가족 링크와 같은 방식). 학생 얼굴이 나오는 사진은 올리기 전에 보호자 동의를 확인한다. SVG 는 올리지 못한다(스크립트가 들어갈 수 있다).
 - 백업(`fullDump`)에 호 본문·기록·달력·알림 구독이 담긴다(원장이 쓴 글이라 라이선스 원문이 아니다). 사진은 목록만 담긴다(바이트는 KV 에만). 퇴원 처리는 `letter:state:<code>` 와 그 학생·가족의 알림 구독을 지운다.
 - AI 초안: `ANTHROPIC_API_KEY`(모델 기본 `claude-opus-5`, `LETTER_AI_MODEL` 로 변경), 하루 한도 `LETTER_AI_DAILY`(기본 30회 = 다섯 호). 키가 없으면 초안 버튼만 안내로 동작하고 나머지는 그대로 돈다.
+- AI 삽화: `GEMINI_API_KEY`(모델 기본 `gemini-2.5-flash-image`, `LETTER_IMAGE_MODEL` 로 변경). 하루 한도는 AI 초안과 **같은 장부**(`letter:aiuse`)로 센다. 키가 없으면 [사진] 탭의 그 카드만 안내로 동작한다. 아래 「AI 삽화·바깥 도구 그림」.
+- 관리 로그인: PIN(`ADMIN_PIN`) 또는 아이디·비밀번호(`ADMIN_ID`·`ADMIN_PASSWORD`) — 판정은 `../reading-server/admin-auth.mjs` 하나(워커·로컬 서버 공용, 다이제스트 고정 시간 비교). 아래 「관리 로그인」.
 
 전부 실행: `node letter/letter.test.cjs && node letter/shapes.test.cjs && node reading-server/letter-api.test.mjs`
 로컬 서버: `PORT=8890 ADMIN_PIN=<pin> DATA_DIR=<dir> node reading-server/server.mjs` → `http://localhost:8890/letter/` · `/admin/letter-admin.html`
+(아이디 로그인·AI 삽화까지 보려면 `ADMIN_ID=<id> ADMIN_PASSWORD=<pw> GEMINI_API_KEY=<key>` 를 더한다)
 
 **아직 없는 것(다음 단계)**: 학생별 맞춤(진로독서 관심사·워드브레인 낱말과 연결, 검사 결과 기반 약한 지표 우선) · 지난 호 검색 · 이메일 발송(스티비) 연동 · 형제 가정 링크 하나로 묶기 · 유치·초저 읽어 주기 TTS(shared/voice.js).
 
@@ -120,6 +123,36 @@ section 공통: { id: [a-z0-9-]{2,30} 유일, type, tiers: "all" | ["K","E1",…
 1~6일째에는 **오늘의 5분**(`drills.js`)이 매일 맨 아래 같은 자리에 한 문제 놓인다 — 요일마다 지표가 돌아 한 주에 다섯 지표를 다 만난다. 이 구성은 어린이 신문·잡지의 고정 코너(매 호 같은 자리의 퍼즐·눈높이 사설·NIE·학생기자)와 신문 활용 교육에서 효과가 검증된 활동(요약·질문 만들기·어휘·필사·가족 토론)을 옮긴 것이다.
 
 그 학년대에 그날 섹션이 없으면(유치부의 한자 코너) 읽을거리를 **다시 읽는 날**로 채운다. 잠그지는 않는다 — 7일 띠에서 어느 날이든 열 수 있고(지난 장 다시 열기가 곧 복습), 오늘 장은 진하게·마친 날은 ✓·아직 오지 않은 날은 옅게 보인다. [오늘 장 다 읽었어요]가 `state.days[n]` 에 남고 7일째 것은 호 완독(`doneAt`)이다. `?view=paper` 또는 [신문 전체로 보기]로 예전 신문 한 면도 본다. 인쇄(PDF)는 늘 신문 전체다. 앱 모드 옵션 `noQuiz`·`foldText`·`noTts`·`noTrace` 는 `renderDay` 가 장에 맞춰 넣는다(관리 미리보기는 `noTts`·`noTrace`).
+
+## 관리 로그인 — 아이디·비밀번호 또는 PIN
+
+`/admin/letter-admin.html` 첫 화면은 **아이디·비밀번호** 칸이다(브라우저 비밀번호 관리자가 저장·자동 입력한다). 아래 링크 「PIN 으로 로그인」이
+예전 갈래이고, 고른 갈래는 그 기기에 남는다. 두 갈래 모두 같은 관리 토큰(`wbr.admin.token`)을 받으므로 다른 관리 페이지도 그대로 열린다
+(다른 관리 페이지의 첫 화면은 아직 PIN 칸이다 — 서버는 어느 갈래든 받는다).
+
+계정 만들기 — 값은 저장소에 두지 않는다(public):
+1. GitHub → Settings → Secrets and variables → Actions 에 `ADMIN_ID`·`ADMIN_PASSWORD`(10자 이상)를 추가한다.
+2. Actions → **「관리 계정·AI 삽화 시크릿 등록」**(`admin-secrets.yml`) → Run workflow(account ✓). 저장소 시크릿을 워커 시크릿으로 복사한다 — 값은 로그에 나오지 않는다.
+3. 바꿀 때도 같은 절차(저장소 시크릿을 고치고 다시 실행). 아이디 로그인이 아직 없으면 로그인 화면이 "아직 설정되지 않았어요 — PIN 으로" 라고 알려 준다.
+
+워커에서는 실패 횟수 제한(15분에 몇 번)이 PIN·아이디 두 갈래를 합쳐 센다.
+
+## AI 삽화·바깥 도구 그림
+
+**AI 삽화 만들기**([사진] 탭) — Google 의 Gemini 이미지 모델(`gemini-2.5-flash-image`, "나노바나나")에 장면 한 줄을 보내 삽화를 받는다.
+서버(`POST /api/letter/admin/img/gen {prompt, ratio}`)가 공통 지시(어린이 신문 삽화체·단순한 색면·**글자 없음**·실존 인물 없음)를 앞에 붙여
+부르고, 응답의 `inlineData` 를 매직 바이트로 확인해 base64 그대로 관리 웹에 돌려준다 — **저장하지 않는다.** 원장이 미리 보고 [이 그림 올리기]를
+눌러야 브라우저가 1600px JPEG 로 줄여 보통 사진과 같은 경로(`/admin/img`, `src: "ai"`)로 올린다. 그래서 저장소에는 고른 그림만 남고, 스니펫의
+credit 은 「WB 편집실 · AI 생성」으로 자동 표시된다. 비율은 모델이 받는 값만(`16:9` 표지·`4:3` 본문·`1:1`·`3:4`; 표지 16:10 자리는 16:9 를 cover 로 맞춘다).
+
+- 키: [Google AI Studio](https://aistudio.google.com/) 에서 API 키를 만들어 저장소 시크릿 `GEMINI_API_KEY` 로 넣고 「관리 계정·AI 삽화 시크릿 등록」 워크플로우(gemini ✓)를 실행한다. 결제를 켠 프로젝트 키여야 한다(무료 등급은 이미지 출력이 막히거나 곧 소진된다).
+- 비용: 한 장에 약 0.04달러(2026-09 기준 1290 토큰 × 이미지 출력 단가). 하루 한도는 AI 초안과 같은 장부(`LETTER_AI_DAILY`, 기본 30)로 센다 — 실패한 호출도 센다.
+- 되지 않는 것: 실존 인물·남의 캐릭터·기사 사진 흉내(모델도 거절하고, 우리 규칙에도 어긋난다). 사진처럼 보이게 만든 그림을 "자체 촬영"으로 적지 않는다.
+- 다른 모델: `LETTER_IMAGE_MODEL` 시크릿(예: `gemini-3-pro-image-preview`). 응답 형식이 같은 Gemini 계열만.
+
+**구글 플로우(Flow)·Whisk·캔바 등 바깥 도구** — 공개 API 가 없거나 우리 서버가 부를 수 없다. 거기서 만든 그림은 **PNG/JPEG 로 내려받아
+[사진] 탭에 올린다**(SVG 는 받지 않는다 — 스크립트가 들어갈 수 있다). credit 은 도구 이름을 적는다(예: `WB 편집실 · Google Flow`). 사진 크기와
+비율은 표지 16:10·본문 4:3 을 기준으로 만들면 지면에 맞는다.
 
 ## 패드에서 보는 사진 (앱 모드에만, 인쇄는 그대로)
 

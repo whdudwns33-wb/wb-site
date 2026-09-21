@@ -100,6 +100,8 @@ jobs:
         run: node letter/fetch-fonts.test.mjs
       - name: 브레인레터 서버 라우트 테스트
         run: node reading-server/letter-api.test.mjs
+      - name: 관리 로그인 판정 테스트
+        run: node reading-server/admin-auth.test.mjs
       - name: 내신브레인 AI 추출 테스트
         run: node reading-server/naesin-extract.test.mjs
       - name: 내신브레인 수업 라이브 세션 테스트
