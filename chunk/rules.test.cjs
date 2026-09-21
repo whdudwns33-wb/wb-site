@@ -148,4 +148,47 @@ t('조각 통계', () => {
   assert.strictEqual(s.n, 3); assert.strictEqual(s.words, 9); assert.strictEqual(s.max, 5); assert.strictEqual(s.over8, 0);
 });
 
+t('초안 끊기 — 문장 끝·쉼표·연결어미는 늘 끊고, 사이는 눈금대로, 붙여 읽는 자리는 피한다', () => {
+  const text = '우리 반은 지난봄에 학교 텃밭에 상추 씨앗을 심었다. 씨앗은 깨알처럼 작았지만, 일주일이 지나자 연둣빛 싹이 고개를 내밀었다.';
+  const segs = R.autoChunk(text, 'G3');
+  assert.strictEqual(segs.join(''), text, '이어붙이면 원문');
+  assert.ok(segs.some((x) => /심었다\.\s*$/.test(x)) && segs.some((x) => /작았지만,\s*$/.test(x)) && segs.some((x) => /지나자\s*$/.test(x)), '강한 경계에서 끊는다: ' + segs.map((x) => x.trim()).join(' / '));
+  const ws = R.words(text);
+  R.modelBoundaries(segs).forEach((i) => assert.strictEqual(R.whyNotCut(ws, i), null, '붙여 읽는 자리에서 끊었다: ' + ws[i]));
+  segs.forEach((x) => assert.ok(R.words(x).length <= R.BANDS.G3.max, '상한 초과: ' + x));
+  /* 상한 보호 — 허용 자리가 드문 긴 관형 연쇄도 max 를 넘기지 않는다 */
+  const long = '작은 새 한 마리가 아주 높은 나무 위의 오래된 둥지에서 조용히 노래를 부른다.';
+  R.autoChunk(long, 'G1').forEach((x) => assert.ok(R.words(x).length <= R.BANDS.G1.max, 'G1 상한 초과: ' + x));
+  assert.deepStrictEqual(R.draftParagraphs('첫 문단이다. 짧다.\n\n둘째 문단은 여기.', 'G3').length, 2);
+  assert.deepStrictEqual(R.autoChunk('', 'G3'), []);
+});
+
+t('문장 끝 미리 표시 — sentenceEnds 는 마지막 어절 뒤를 빼고, explain 은 그 자리를 채점에서 뺀다', () => {
+  const text = '비가 온다. 우산을 편다. 집에 간다.';
+  assert.deepStrictEqual(R.sentenceEnds(text), [1, 3]);
+  const model = [0, 1, 3, 4];               /* 비가∕온다.∕우산을∕편다.∕집에∕간다. 중 «비가∕» «우산을∕» «집에∕» 는 가짜 모범 */
+  const r = R.explain(text, model, [1, 3], [1, 3]);    /* 학생은 주어진 자리만 찍음 */
+  assert.strictEqual(r.model, 2, '주어진 자리를 뺀 모범 경계 수');
+  assert.strictEqual(r.hit, 0); assert.strictEqual(r.given, 2); assert.strictEqual(r.score, 0);
+  const r2 = R.explain(text, model, [0, 1, 3, 4], [1, 3]);
+  assert.strictEqual(r2.score, 100);
+  assert.strictEqual(R.explain(text, model, [0, 4]).given, 0, 'given 없으면 예전 그대로');
+});
+
+t('피드백 묶기 — 규칙별 한 묶음, 많은 순, 쉼표 뒤는 맨 뒤', () => {
+  const notes = [
+    { i: 1, kind: 'miss', tag: 'miss:phrase', why: 'A', at: '가' }, { i: 3, kind: 'neutral', tag: 'ok:comma', why: 'C', at: '다,' },
+    { i: 5, kind: 'extra', tag: 'extra:adn', why: 'B', at: '작은' }, { i: 7, kind: 'miss', tag: 'miss:phrase', why: 'A', at: '라' },
+    { i: 9, kind: 'extra', tag: 'extra:adn', why: 'B2', at: '큰' }, { i: 11, kind: 'extra', tag: 'extra:adn', why: 'B3', at: '먼' },
+  ];
+  const g = R.groupNotes(notes);
+  assert.deepStrictEqual(g.map((x) => x.tag + ':' + x.n), ['extra:adn:3', 'miss:phrase:2', 'ok:comma:1']);
+  assert.deepStrictEqual(g[0].at, ['작은', '큰', '먼']); assert.strictEqual(g[0].why, 'B'); assert.strictEqual(g[0].label, R.TAG_LABEL['extra:adn']);
+  assert.deepStrictEqual(R.groupNotes([]), []);
+});
+
+t('check — 모르는 단계여도 죽지 않는다(옛 6단계 id)', () => {
+  assert.doesNotThrow(() => R.check(['작은 새가 ', '노래를 부른다.'], 'E2'));
+});
+
 console.log('\n' + passed + '건 통과 — chunk/rules.js');

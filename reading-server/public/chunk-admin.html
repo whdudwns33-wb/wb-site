@@ -44,7 +44,7 @@
 <body>
 <header><b>청크브레인 관리</b><small>반 현황 · 학생 상세 · 과제 · 약한 규칙 · 교재</small><span class="sp"></span><button class="hbtn" id="btnRefresh" hidden>새로고침</button><button class="hbtn" id="btnLogout" hidden>로그아웃</button></header>
 <nav id="nav" hidden>
-  <button data-tab="board" aria-pressed="true">반 현황</button><button data-tab="student">학생 상세 · 과제</button><button data-tab="weak">약한 규칙</button><button data-tab="print">교재 출력</button>
+  <button data-tab="board" aria-pressed="true">반 현황</button><button data-tab="student">학생 상세 · 과제</button><button data-tab="weak">약한 규칙</button><button data-tab="author">글 저작</button><button data-tab="print">교재 출력</button>
 </nav>
 <main id="main"></main>
 <script src="/chunk/rules.js"></script>
@@ -55,11 +55,12 @@
 const $=(s)=>document.querySelector(s);
 const esc=(s)=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 const R=WBCHUNK, LESSONS=WBCHUNK_LESSONS, PASSAGES=WBCHUNK_PASSAGES;
-const pById=(id)=>PASSAGES.find((p)=>p.id===id);
+const pById=(id)=>PASSAGES.find((p)=>p.id===id)||(CUSTOM||[]).find((p)=>p.id===id);
 const lById=(id)=>LESSONS.find((l)=>l.id===id);
 const bandLabel=(b)=>R.BANDS[b]?R.BANDS[b].label:(b||'-');
 let TOKEN=localStorage.getItem('wbr.admin.token')||null;
 let TAB='board', ROWS=null, SEL=null, FILTER_CLS='', SORT='lastAt';
+let CUSTOM=null, ED=null, IMPORT=null;   /* 선생님 지문 목록(서버) · 편집 중인 글 · 진로독서 가져오기 패널 */
 async function api(path,opt){
   let r;
   try{r=await fetch('/api'+path,Object.assign({headers:{'Content-Type':'application/json',...(TOKEN?{Authorization:'Bearer '+TOKEN}:{})}},opt||{}));}
@@ -78,12 +79,13 @@ function renderLogin(msg){
   $('#pin').onkeydown=(e)=>{if(e.key==='Enter')$('#go').click();};
 }
 $('#btnLogout').onclick=()=>{TOKEN=null;localStorage.removeItem('wbr.admin.token');renderLogin();};
-$('#btnRefresh').onclick=()=>{ROWS=null;show(TAB);};
+$('#btnRefresh').onclick=()=>{ROWS=null;CUSTOM=null;show(TAB);};
 document.querySelectorAll('nav button').forEach((b)=>{b.onclick=()=>{TAB=b.dataset.tab;show(TAB);};});
 
 const rel=(t)=>{if(!t)return '-';const d=Math.floor((Date.now()-t)/86400000);return d<=0?'오늘':d===1?'어제':d+'일 전';};
 const ymd=(t)=>{const d=new Date(t);return d.getMonth()+1+'/'+d.getDate();};
 async function loadRows(){ if(ROWS) return ROWS; const j=await api('/chunk/admin/overview'); ROWS=j.rows||[]; return ROWS; }
+async function loadCustom(){ if(CUSTOM) return CUSTOM; const j=await api('/chunk/admin/custom'); CUSTOM=j.custom||[]; return CUSTOM; }
 
 async function show(tab){
   if(!TOKEN){renderLogin();return;}
@@ -93,8 +95,9 @@ async function show(tab){
   try{
     await loadRows();
     if(tab==='board') renderBoard();
-    else if(tab==='student') await renderStudent();
+    else if(tab==='student'){ await loadCustom(); await renderStudent(); }
     else if(tab==='weak') renderWeak();
+    else if(tab==='author') await renderAuthor();
     else renderPrint();
   }catch(e){ if(e.message!=='auth') $('#main').innerHTML='<div class="card"><div class="err">'+esc(e.message)+'</div></div>'; }
 }
@@ -163,7 +166,7 @@ async function renderStudent(){
   $('#main').innerHTML=html;
   bindStudentTop();
   const chosenP=new Set(a?a.passages:[]), chosenL=new Set(a?a.lessons:[]);
-  const drawP=()=>{const b=$('#fBand').value;const list=PASSAGES.filter((p)=>p.band===b);$('#pList').innerHTML=list.map((p)=>'<label><input type="checkbox" data-p="'+p.id+'" '+(chosenP.has(p.id)?'checked':'')+'> '+esc(p.title)+' <span class="muted">'+esc(p.genre)+'</span></label>').join('')+[...chosenP].filter((id)=>!list.some((p)=>p.id===id)).map((id)=>{const p=pById(id);return '<label><input type="checkbox" data-p="'+esc(id)+'" checked> '+esc(p?p.title:id)+' <span class="muted">'+(p?bandLabel(p.band):'')+'</span></label>';}).join('');$('#pCount').textContent='선택 '+chosenP.size+'개';
+  const drawP=()=>{const b=$('#fBand').value;const list=PASSAGES.concat(CUSTOM||[]).filter((p)=>p.band===b);$('#pList').innerHTML=list.map((p)=>'<label><input type="checkbox" data-p="'+p.id+'" '+(chosenP.has(p.id)?'checked':'')+'> '+esc(p.title)+' <span class="muted">'+esc(p.genre)+'</span></label>').join('')+[...chosenP].filter((id)=>!list.some((p)=>p.id===id)).map((id)=>{const p=pById(id);return '<label><input type="checkbox" data-p="'+esc(id)+'" checked> '+esc(p?p.title:id)+' <span class="muted">'+(p?bandLabel(p.band):'')+'</span></label>';}).join('');$('#pCount').textContent='선택 '+chosenP.size+'개';
     $('#pList').querySelectorAll('input').forEach((cb)=>{cb.onchange=()=>{if(cb.checked)chosenP.add(cb.dataset.p);else chosenP.delete(cb.dataset.p);$('#pCount').textContent='선택 '+chosenP.size+'개';};});};
   const drawL=()=>{const b=$('#fBand').value;const upto=R.BAND_ORDER.slice(0,R.BAND_ORDER.indexOf(b)+1);const list=LESSONS.filter((l)=>upto.indexOf(l.band)>=0).slice().reverse();$('#lList').innerHTML=list.map((l)=>'<label><input type="checkbox" data-l="'+l.id+'" '+(chosenL.has(l.id)?'checked':'')+'> '+esc(l.title)+' <span class="muted">'+bandLabel(l.band)+'</span></label>').join('');
     $('#lList').querySelectorAll('input').forEach((cb)=>{cb.onchange=()=>{if(cb.checked)chosenL.add(cb.dataset.l);else chosenL.delete(cb.dataset.l);};});};
@@ -193,9 +196,98 @@ function renderWeak(){
   $('#main').innerHTML=html;
 }
 
+/* ── 글 저작 — 선생님 지문(서버 저장). 붙여 넣기 → 규칙 초안 → 다듬기 → 저장. 진로독서 지문은 이미 끊겨 있어 그대로 초안이 된다. ── */
+const LV_BAND={L1:'G2',L2:'G4',L3:'G8',L4:'G11'}, LV_LABEL={L1:'7세~초2',L2:'초3~6',L3:'중1~3',L4:'고1~3'};
+const markedOf=(p)=>p.paragraphs.map((segs)=>R.toMarked(segs,'∕')).join('\n\n');
+const wordsOf=(p)=>R.stats([].concat.apply([],p.paragraphs)).words;
+async function renderAuthor(){ await loadCustom(); paintAuthor(); }
+function paintAuthor(){
+  let html='<div class="card"><h2>글 저작 <span class="muted">('+CUSTOM.length+'편 · 200편까지)</span></h2><p class="muted">여기서 올린 글은 학생 앱의 연습 목록(그 단계)과 교재 출력에 기본 지문과 똑같이 나타나고, 과제로도 줄 수 있어요. 글을 붙여 넣으면 규칙 검사기가 첫 끊기 초안을 내고, 선생님이 ∕ 를 옮겨 다듬은 뒤 저장해요. <b>라이선스 자료는 넣지 마세요</b> — 자체 창작·진로독서 지문만.</p>'+
+    '<div class="row"><button class="btn" id="cNew">새 글 붙여 넣기</button><button class="btn ghost" id="cImport">진로독서 지문 가져오기</button></div></div>';
+  html+='<div class="card tbl"><table><thead><tr><th>제목</th><th>단계</th><th>갈래</th><th>출처</th><th>어절</th><th>문제</th><th></th></tr></thead><tbody>'+
+    (CUSTOM.length?CUSTOM.map((p)=>'<tr><td><b>'+esc(p.title)+'</b><div class="muted">'+esc(p.id)+'</div></td><td>'+bandLabel(p.band)+'</td><td>'+esc(p.genre)+'</td><td class="muted">'+(p.source&&p.source.kind==='reading'?'진로독서 '+esc(p.source.ref):'직접 작성')+'</td><td>'+wordsOf(p)+'</td><td>'+(p.q?'○':'-')+'</td><td><button class="btn ghost sm" data-edit="'+esc(p.id)+'">편집</button> <button class="btn danger sm" data-del="'+esc(p.id)+'">삭제</button></td></tr>').join(''):'<tr><td colspan="7" class="muted">아직 올린 글이 없어요. 「새 글 붙여 넣기」나 「진로독서 지문 가져오기」로 시작해요.</td></tr>')+'</tbody></table></div>';
+  if(IMPORT) html+=importHtml();
+  if(ED) html+=editorHtml();
+  $('#main').innerHTML=html; bindAuthor();
+}
+function editorHtml(){
+  const e=ED;
+  return '<div class="card" id="editor"><h2>'+(e.id?'글 편집 <span class="muted">'+esc(e.id)+'</span>':'새 글')+'</h2>'+
+    '<div class="grid-form"><label class="f">제목 <input id="eTitle" maxlength="60" value="'+esc(e.title)+'"></label>'+
+    '<label class="f">단계 <select id="eBand">'+R.BAND_ORDER.map((b)=>'<option value="'+b+'" '+(b===e.band?'selected':'')+'>'+bandLabel(b)+' — '+esc(R.BANDS[b].who)+'</option>').join('')+'</select></label>'+
+    '<label class="f">갈래 <input id="eGenre" maxlength="12" value="'+esc(e.genre)+'" placeholder="설명 · 이야기 · 경험"></label></div>'+
+    (e.source&&e.source.kind==='reading'?'<p class="muted">출처: 진로독서 '+esc(e.source.ref)+' — 이미 끊긴 글이라 단계 눈금에 맞는지만 검사해요.</p>':'')+
+    '<h3>본문 <span class="muted">뜻이 나뉘는 곳에 ∕ 또는 / · 문단은 빈 줄로</span></h3><textarea id="eText" rows="10" style="width:100%;font-size:15px;line-height:1.8">'+esc(e.marked)+'</textarea>'+
+    '<div class="row" style="margin-top:6px"><button class="btn ghost sm" id="eDraft">초안 다시 끊기 (표시를 지우고 규칙대로)</button><button class="btn ghost sm" id="eCheck">규칙 검사</button><span class="muted" id="eStat"></span></div><div id="eWarn"></div>'+
+    '<h3>이해 문제 <span class="muted">(선택 — 비워 두면 3단계에 문제가 없어요)</span></h3><div class="grid-form"><label class="f">질문 <input id="qQ" maxlength="200" value="'+esc(e.q?e.q.q:'')+'"></label>'+
+    [0,1,2,3].map((i)=>'<label class="f">보기 '+(i+1)+' <input id="qC'+i+'" maxlength="80" value="'+esc(e.q&&e.q.choices[i]||'')+'"></label>').join('')+
+    '<label class="f">정답 <select id="qA">'+[0,1,2,3].map((i)=>'<option value="'+i+'" '+(e.q&&e.q.answer===i?'selected':'')+'>보기 '+(i+1)+'</option>').join('')+'</select></label><label class="f">해설 <input id="qE" maxlength="200" value="'+esc(e.q?e.q.explain:'')+'"></label></div>'+
+    '<div class="row" style="margin-top:10px"><button class="btn" id="eSave">저장</button><button class="btn ghost" id="eCancel">취소</button></div><div id="eMsg"></div></div>';
+}
+function importHtml(){
+  const im=IMPORT, q=(im.q||'').trim();
+  const rows=(im.list||[]).map((a,i)=>({a,i})).filter(({a})=>!q||a.title.indexOf(q)>=0);
+  return '<div class="card" id="importer"><h2>진로독서 지문 가져오기</h2><p class="muted">진로독서 지문은 이미 의미 단위로 끊겨 있어 그대로 초안이 돼요. 학년대를 고르면 목록이 뜨고, 「가져오기」를 누르면 편집기에 들어와요. 단계는 학년대에 맞춰 미리 골라 두니 필요하면 바꾸세요.</p>'+
+    '<div class="row"><label class="f">학년대 <select id="imLv">'+Object.keys(LV_LABEL).map((l)=>'<option value="'+l+'" '+(l===im.level?'selected':'')+'>'+l+' · '+LV_LABEL[l]+'</option>').join('')+'</select></label><input id="imQ" placeholder="제목 검색" style="width:180px" value="'+esc(im.q||'')+'"><button class="btn ghost sm" id="imClose">닫기</button></div>'+
+    (im.err?'<div class="err">'+esc(im.err)+'</div>':im.list?'<div class="tbl" style="max-height:340px;overflow:auto;margin-top:8px"><table><thead><tr><th>제목</th><th>분야</th><th>어절</th><th>문단</th><th></th></tr></thead><tbody>'+
+      (rows.length?rows.map(({a,i})=>'<tr><td>'+esc(a.title)+'</td><td class="muted">'+esc(a.category)+'</td><td>'+a.words+'</td><td>'+a.paras+'</td><td><button class="btn ghost sm" data-imp="'+i+'">가져오기</button></td></tr>').join(''):'<tr><td colspan="5" class="muted">맞는 글이 없어요.</td></tr>')+'</tbody></table></div>':'<p class="muted">불러오는 중…</p>')+'</div>';
+}
+async function loadImport(){
+  IMPORT.list=null; IMPORT.err='';
+  try{
+    const r=await fetch('/articles-'+IMPORT.level+'.json',{headers:{Authorization:'Bearer '+TOKEN}});
+    if(!r.ok) throw new Error('목록을 못 받았어요 ('+r.status+')');
+    const d=await r.json();
+    IMPORT.list=(d.articles||[]).filter((a)=>a.levels&&a.levels[IMPORT.level]&&Array.isArray(a.levels[IMPORT.level].paragraphs)&&a.status!=='draft')
+      .map((a)=>{const lv=a.levels[IMPORT.level];return {id:a.id,title:lv.title||a.id,category:a.category||'',paragraphs:lv.paragraphs,words:R.stats([].concat.apply([],lv.paragraphs)).words,paras:lv.paragraphs.length};});
+  }catch(e){ IMPORT.err=e.message; }
+  paintAuthor();
+}
+function editorRead(){
+  const marked=$('#eText').value, band=$('#eBand').value;
+  const paragraphs=R.fromMarked(marked);
+  const cs=[0,1,2,3].map((i)=>$('#qC'+i).value.trim()).filter(Boolean);
+  const q=$('#qQ').value.trim()?{q:$('#qQ').value.trim(),choices:cs,answer:+$('#qA').value,explain:$('#qE').value.trim()}:null;
+  return {band,title:$('#eTitle').value.trim(),genre:$('#eGenre').value.trim()||(ED.source&&ED.source.kind==='reading'?'진로독서':'선생님 글'),paragraphs,q,source:ED.source||{kind:'teacher',ref:''},marked};
+}
+function editorCheck(){
+  const e=editorRead(), warns=[];
+  e.paragraphs.forEach((segs,i)=>R.check(segs,e.band).forEach((m)=>warns.push((i+1)+'문단: '+m)));
+  const st=R.stats([].concat.apply([],e.paragraphs)), b=R.BANDS[e.band];
+  $('#eStat').textContent=e.paragraphs.length+'문단 · '+st.words+'어절 · 덩어리 '+st.n+'개 · 평균 '+st.avg+'어절 (눈금 '+b.target+', 상한 '+b.max+')';
+  $('#eWarn').innerHTML=!e.paragraphs.length?'<div class="err">본문이 비어 있어요.</div>':warns.length?'<div class="warn"><b>규칙과 다른 자리 '+warns.length+'곳</b> — 뜻에 맞게 끊었다면 그대로 저장해도 돼요.<br>'+warns.slice(0,8).map(esc).join('<br>')+(warns.length>8?'<br>…외 '+(warns.length-8)+'곳':'')+'</div>':'<div class="ok">규칙 검사 통과 — 눈금 안에 있어요.</div>';
+  return e;
+}
+function bindAuthor(){
+  const nw=$('#cNew'); if(nw) nw.onclick=()=>{ED={id:null,band:'G3',title:'',genre:'',source:{kind:'teacher',ref:''},marked:'',q:null};IMPORT=null;paintAuthor();const t=$('#eText');if(t)t.focus();};
+  const im=$('#cImport'); if(im) im.onclick=()=>{IMPORT={level:'L2',list:null,err:'',q:''};paintAuthor();loadImport();};
+  document.querySelectorAll('[data-edit]').forEach((b)=>{b.onclick=()=>{const p=CUSTOM.find((x)=>x.id===b.dataset.edit);if(!p)return;ED={id:p.id,band:p.band,title:p.title,genre:p.genre,source:p.source,marked:markedOf(p),q:p.q};IMPORT=null;paintAuthor();$('#editor').scrollIntoView();};});
+  document.querySelectorAll('[data-del]').forEach((b)=>{b.onclick=async()=>{const p=CUSTOM.find((x)=>x.id===b.dataset.del);if(!p||!confirm('「'+p.title+'」을(를) 지울까요? 이 글로 준 과제와 학생 기록의 제목이 사라져요.'))return;try{await api('/chunk/admin/custom/'+encodeURIComponent(p.id),{method:'DELETE'});CUSTOM=null;await renderAuthor();}catch(e){alert(e.message);}};});
+  const lv=$('#imLv'); if(lv) lv.onchange=()=>{IMPORT.level=lv.value;loadImport();};
+  const iq=$('#imQ'); if(iq) iq.oninput=()=>{IMPORT.q=iq.value;const pos=iq.selectionStart;paintAuthor();const n=$('#imQ');if(n){n.focus();n.setSelectionRange(pos,pos);}};
+  const ic=$('#imClose'); if(ic) ic.onclick=()=>{IMPORT=null;paintAuthor();};
+  document.querySelectorAll('[data-imp]').forEach((b)=>{b.onclick=()=>{const a=IMPORT.list[+b.dataset.imp];if(!a)return;ED={id:null,band:LV_BAND[IMPORT.level]||'G4',title:a.title,genre:'진로독서',source:{kind:'reading',ref:a.id+'|'+IMPORT.level},marked:a.paragraphs.map((segs)=>R.toMarked(segs,'∕')).join('\n\n'),q:null};IMPORT=null;paintAuthor();editorCheck();$('#editor').scrollIntoView();};});
+  if(!ED) return;
+  $('#eDraft').onclick=()=>{const plain=$('#eText').value.replace(/\s*[∕\/]+\s*/g,' ');const paras=R.draftParagraphs(plain,$('#eBand').value);$('#eText').value=paras.map((segs)=>R.toMarked(segs,'∕')).join('\n\n');editorCheck();};
+  $('#eCheck').onclick=editorCheck;
+  $('#eBand').onchange=()=>{if($('#eText').value.trim())editorCheck();};
+  $('#eCancel').onclick=()=>{ED=null;paintAuthor();};
+  $('#eSave').onclick=async()=>{
+    const e=editorCheck(); $('#eMsg').innerHTML='';
+    if(!e.title){$('#eMsg').innerHTML='<div class="err">제목을 넣어 주세요.</div>';return;}
+    if(!e.paragraphs.length){$('#eMsg').innerHTML='<div class="err">본문이 비어 있어요.</div>';return;}
+    const body={band:e.band,title:e.title,genre:e.genre,paragraphs:e.paragraphs,q:e.q,source:e.source};
+    try{
+      const j=ED.id?await put('/chunk/admin/custom/'+encodeURIComponent(ED.id),body):await post('/chunk/admin/custom',body);
+      CUSTOM=null; ED=null; await renderAuthor();
+      $('#main').insertAdjacentHTML('afterbegin','<div class="card"><div class="ok">저장했어요 — 「'+esc(j.passage.title)+'」('+bandLabel(j.passage.band)+'). 학생이 앱을 켜면 그 단계 연습 목록에 나타나요.</div></div>');
+    }catch(err){ $('#eMsg').innerHTML='<div class="err">'+esc(err.message)+'</div>'; }
+  };
+}
+
 /* ── 교재 출력 ── */
 function renderPrint(){
-  $('#main').innerHTML='<div class="card"><h2>교재 출력</h2><p class="muted">단계를 누르면 연습장 조판 화면이 새 창에서 열려요. 글을 고르고 <b>인쇄 → PDF 로 저장</b>하면 교재가 됩니다. 「내 글로 만들기」에 선생님 글을 붙여 넣을 수도 있어요(저장되지 않음).</p><div class="row">'+
+  $('#main').innerHTML='<div class="card"><h2>교재 출력</h2><p class="muted">단계를 누르면 연습장 조판 화면이 새 창에서 열려요. 글을 고르고 <b>인쇄 → PDF 로 저장</b>하면 교재가 됩니다. 「글 저작」에서 올린 선생님 지문도 그 단계 목록에 함께 떠요(여기서 열면 관리 토큰으로 받아요).</p><div class="row">'+
     R.BAND_ORDER.map((b)=>'<a class="btn ghost" href="/chunk/print.html?band='+b+'" target="_blank" rel="noopener">'+bandLabel(b)+' <span class="muted">'+PASSAGES.filter((p)=>p.band===b).length+'편</span></a>').join('')+'</div>'+
     '<h3>추천 구성</h3><ul class="muted"><li>유치·초1·초2: 표시본(밑줄 곡선) + 한 줄 한 덩어리 판 + 무표시본. 어른이 먼저 읽어 주고 따라 읽기 3회.</li><li>초3~초6: 표시본 + 무표시본 + 정답표. 주 3회, 한 편 10분.</li><li>중·고등: 무표시본 위주로 직접 긋고 정답표와 견주기. 규칙 페이지는 첫 주에만.</li></ul></div>';
 }

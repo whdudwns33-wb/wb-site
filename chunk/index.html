@@ -84,13 +84,17 @@
     .plain { margin:10px 0; line-height:1.95; font-size:1.05em; }
     .band-K .plain, .band-E1 .plain { font-size:1.35em; line-height:2.1; }
     /* 직접 끊기 — 어절 사이 틈 */
-    .tokens { display:flex; flex-wrap:wrap; align-items:center; row-gap:6px; margin:8px 0; }
-    .tok { padding:4px 3px; font-size:1.12em; }
-    .band-K .tok, .band-E1 .tok { font-size:1.45em; padding:6px 4px; }
-    .gap { width:30px; height:42px; border-radius:9px; color:#CDC3C8; font-size:1.25em; font-weight:900; flex:none; display:flex; align-items:center; justify-content:center; }
-    .band-K .gap, .band-E1 .gap { width:40px; height:50px; font-size:1.4em; }
-    .gap[aria-pressed="true"] { color:var(--plum); background:var(--plum-soft); }
-    .gap.hit { color:var(--green); background:var(--green-soft); } .gap.miss { color:var(--red); background:var(--red-soft); }
+    /* 어절 사이 틈은 좁게, 표시 전에는 옅은 점만 — 글이 표가 아니라 문장으로 보여야 덩어리가 눈에 들어온다.
+       탭 영역(높이 40px·너비 24px)은 그대로 두고 눈에 보이는 것만 줄였다. 표시한 자리는 칸이 넓어지지 않아 줄이 다시 흐르지 않는다. */
+    .tokens { display:flex; flex-wrap:wrap; align-items:center; row-gap:2px; margin:8px 0; line-height:1.35; }
+    .tok { padding:2px 1px; font-size:1.08em; }
+    .band-K .tok, .band-G1 .tok, .band-G2 .tok { font-size:1.4em; padding:4px 2px; }
+    .gap { width:20px; height:40px; border-radius:8px; color:#D6CCD2; font-size:1.05em; font-weight:900; flex:none; display:flex; align-items:center; justify-content:center; }
+    .band-K .gap, .band-G1 .gap, .band-G2 .gap { width:36px; height:48px; font-size:1.3em; }
+    .gap[aria-pressed="true"] { color:var(--plum); background:var(--plum-soft); font-size:1.2em; }
+    .gap.given { width:18px; color:var(--soft); background:none; font-size:1.1em; cursor:default; }
+    .gap.hit { color:var(--green); background:var(--green-soft); font-size:1.2em; }
+    .gap.miss { color:var(--red); background:var(--red-soft); box-shadow:inset 0 0 0 2px var(--red); font-size:1.2em; }
     .gap.extra { color:var(--gold); background:var(--gold-soft); } .gap.neutral { color:var(--blue); background:var(--blue-soft); }
     .gap:disabled { cursor:default; }
     .legend { font-size:13px; color:var(--soft); margin:6px 0; }
@@ -98,6 +102,7 @@
     .notes { display:grid; gap:6px; margin-top:10px; }
     .note { display:flex; gap:8px; padding:8px 10px; border-radius:10px; font-size:14px; background:#FBF7F9; }
     .note i { flex:none; font-style:normal; font-weight:900; }
+    .note small { display:block; color:var(--soft); margin-top:2px; }
     .note.miss { background:var(--red-soft); } .note.extra { background:var(--gold-soft); } .note.neutral { background:var(--blue-soft); }
     .stage { display:flex; gap:6px; margin:6px 0 10px; }
     .stage i { flex:1; height:6px; border-radius:99px; background:var(--line); }
@@ -162,6 +167,9 @@
   'use strict';
   (function () {
     const R = WBCHUNK, SC = WBCHUNK_SCHED, LESSONS = WBCHUNK_LESSONS, PASSAGES = WBCHUNK_PASSAGES;
+    /* 선생님 지문 — 서버(/api/chunk/custom)에서 받아 정적 지문과 합친다. 기기에 두어 오프라인·재방문에도 같은 목록이 보인다. */
+    let CUSTOM = []; try { CUSTOM = JSON.parse(localStorage.getItem('wbc.custom') || '[]'); if (!Array.isArray(CUSTOM)) CUSTOM = []; } catch (e) { CUSTOM = []; }
+    const ALL = () => PASSAGES.concat(CUSTOM);
     const LS = 'wbc.state';
     const $ = (id) => document.getElementById(id);
     const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -208,6 +216,15 @@
       else if (next && assignHas()) announce('선생님 과제가 도착했어요');
       applyBody(); render({ keep: true });
     }
+    function pullCustom() {
+      if (!auth()) return;
+      api('/custom').then((j) => {
+        if (!j || !Array.isArray(j.custom)) return;
+        CUSTOM = j.custom.filter((p) => p && p.id && R.BANDS[p.band] && Array.isArray(p.paragraphs) && p.paragraphs.length);
+        try { localStorage.setItem('wbc.custom', JSON.stringify(CUSTOM)); } catch (e) {}
+        if (!sess) render({ keep: true });
+      }).catch(() => {});
+    }
     function pullAssign() {
       if (!auth()) return;
       api('/assign').then((j) => applyAssign(j.assign ? Object.assign({}, j.assign, { updatedAt: j.updatedAt }) : null)).catch(() => {});
@@ -224,11 +241,11 @@
 
     /* ── 화면 상태 ── */
     let view = { name: 'home' }, sess = null;
-    const band = () => S.band || 'E2';
+    const band = () => S.band || 'G3'; /* 'E2' 는 6단계 시절 id — 13단계에는 없어 BANDS 조회가 깨진다 */
     const B = () => R.BANDS[band()];
-    const bandPassages = (b) => PASSAGES.filter((p) => p.band === (b || band()));
+    const bandPassages = (b) => ALL().filter((p) => p.band === (b || band()));
     const bandLessons = (b) => LESSONS.filter((l) => l.band === (b || band()));
-    const byId = (id) => PASSAGES.find((p) => p.id === id);
+    const byId = (id) => ALL().find((p) => p.id === id);
     const lessonById = (id) => LESSONS.find((l) => l.id === id);
     /* 오늘의 카드: 이 학년 카드에서 안 본 것 → 없으면 바로 아래 학년부터 내려가며 안 본 카드. 규칙은 나선형으로 쌓이므로 아래 카드도 이 학년의 것이다. */
     const bandsUpTo = (b) => R.BAND_ORDER.slice(0, R.BAND_ORDER.indexOf(b) + 1);
@@ -386,33 +403,42 @@
       if (c) {
         const text = c.segs.join(''), model = R.modelBoundaries(c.segs);
         html += '<div class="card"><p class="eyebrow">확인 문제 ' + (ls.ci + 1) + '/' + l.checks.length + '</p><p class="small">뜻이 나뉘는 곳의 <b>·</b> 를 눌러 ∕ 로 바꿔 보세요.</p>' +
-          tokensHtml(text, ls.marks, ls.result, 'ck') + (ls.result ? resultHtml(ls.result) + '<button class="big" data-act="lesson-next">' + (ls.ci + 1 < l.checks.length ? '다음 문제' : '카드 마치기') + '</button>' : '<button class="big" data-act="lesson-check">확인하기</button>') + '</div>';
+          (ls.result ? legendHtml(ls.result.extras.length, ls.result.neutral.length) : '') + tokensHtml(text, ls.marks, ls.result, 'ck') + (ls.result ? resultHtml(ls.result) + '<button class="big" data-act="lesson-next">' + (ls.ci + 1 < l.checks.length ? '다음 문제' : '카드 마치기') + '</button>' : '<button class="big" data-act="lesson-check">확인하기</button>') + '</div>';
       }
       html += '<button class="big ghost" data-act="lesson-quit">그만하기</button>';
       return html;
     }
 
     /* 어절 + 틈 — 학생이 찍은 표시와 채점 결과를 한 흐름으로 그린다 */
-    function tokensHtml(text, marks, result, prefix) {
-      const ws = R.words(text);
+    function tokensHtml(text, marks, result, prefix, given) {
+      const ws = R.words(text), G = {}; (given || []).forEach((i) => G[i] = true);
       const M = {}; if (result) { result.missed.forEach((i) => M[i] = 'miss'); result.extras.forEach((i) => M[i] = 'extra'); result.neutral.forEach((i) => M[i] = 'neutral'); }
       let out = '<div class="tokens">';
       ws.forEach((w, i) => {
         out += '<span class="tok">' + esc(w.trim()) + '</span>';
-        if (i < ws.length - 1) {
-          const on = marks.has(i);
-          let cls = 'gap', sym = on ? '∕' : '·';
-          if (result) { if (M[i]) cls += ' ' + M[i]; else if (on) cls += ' hit'; if (M[i] || on) sym = '∕'; }
-          out += '<button class="' + cls + '" data-act="gap" data-prefix="' + prefix + '" data-i="' + i + '" aria-pressed="' + on + '" ' + (result ? 'disabled' : '') + ' aria-label="' + (i + 1) + '번째 어절 뒤">' + sym + '</button>';
-        }
+        if (i >= ws.length - 1) return;
+        /* 문장 끝은 미리 그어 준 자리 — 누를 수 없고 채점에도 없다 */
+        if (G[i]) { out += '<span class="gap given" aria-hidden="true">∕</span>'; return; }
+        const on = marks.has(i);
+        let cls = 'gap', sym = on ? '∕' : '·';
+        /* 결과는 색과 기호를 함께 — 놓친 자리 ∕(테두리), 군더더기 ✕, 쉼표 뒤 ○ */
+        if (result) { if (M[i]) cls += ' ' + M[i]; else if (on) cls += ' hit'; sym = M[i] === 'extra' ? '✕' : M[i] === 'neutral' ? '○' : (M[i] || on) ? '∕' : '·'; }
+        out += '<button class="' + cls + '" data-act="gap" data-prefix="' + prefix + '" data-i="' + i + '" aria-pressed="' + on + '" ' + (result ? 'disabled' : '') + ' aria-label="' + (i + 1) + '번째 어절 뒤">' + sym + '</button>';
       });
       return out + '</div>';
     }
+    /* 범례는 글 «위»에 — 결과를 읽어 내려가기 전에 기호 뜻을 본다. 없는 종류는 적지 않아 유치·초2는 보통 두 가지만 본다. */
+    const legendHtml = (hasExtra, hasNeutral) => '<div class="legend"><b style="color:var(--green)">∕</b> 잘 끊었어요 · <b style="color:var(--red)">∕</b> 여기서도 끊어요' +
+      (hasExtra ? ' · <b style="color:var(--gold)">✕</b> 붙여 읽어요' : '') + (hasNeutral ? ' · <b style="color:var(--blue)">○</b> 쉬어도 괜찮아요' : '') + '</div>';
+    /* 같은 규칙은 한 묶음으로 — 열 곳을 놓쳐도 규칙 세 가지만 읽으면 된다. 자리 낱말은 작게 덧붙인다. */
+    function notesHtml(notes, max) {
+      const g = R.groupNotes(notes).filter((x) => x.kind !== 'neutral'), lim = max || 3;
+      if (!g.length) return '';
+      return '<div class="notes">' + g.slice(0, lim).map((x) => '<div class="note ' + x.kind + '"><i>' + (x.kind === 'miss' ? '∕' : '✕') + '</i><span><b>' + esc(x.label || (x.kind === 'miss' ? '여기서 쉬어요' : '붙여 읽어요')) + (x.n > 1 ? ' · ' + x.n + '곳' : '') + '</b> — ' + esc(x.why) +
+        '<small>' + x.at.map((a) => '「' + esc(a) + '」').join(' ') + ' 뒤</small></span></div>').join('') + (g.length > lim ? '<div class="small">…그 밖에 규칙 ' + (g.length - lim) + '가지</div>' : '') + '</div>';
+    }
     function resultHtml(r) {
-      let html = '<div class="legend"><b style="color:var(--green)">초록 ∕</b> 잘 끊었어요 · <b style="color:var(--red)">빨강 ∕</b> 여기서도 끊어요' + (r.extras.length ? ' · <b style="color:var(--gold)">주황 ∕</b> 붙여 읽어요' : '') + (r.neutral.length ? ' · <b style="color:var(--blue)">파랑 ∕</b> 쉬어도 괜찮아요' : '') + '</div>';
-      html += '<div class="score" style="font-size:30px">' + r.score + '점 <span class="small">(맞힘 ' + r.hit + '/' + r.model + (r.extra ? ' · 군더더기 ' + r.extra : '') + ')</span></div>';
-      if (r.notes.length) html += '<div class="notes">' + r.notes.slice(0, 6).map((n) => '<div class="note ' + n.kind + '"><i>' + (n.kind === 'miss' ? '∕' : n.kind === 'extra' ? '✕' : '○') + '</i><span><b>「' + esc(n.at) + '」 뒤</b> — ' + esc(n.why) + '</span></div>').join('') + (r.notes.length > 6 ? '<div class="small">…외 ' + (r.notes.length - 6) + '곳</div>' : '') + '</div>';
-      return html;
+      return '<div class="score" style="font-size:30px">' + r.score + '점 <span class="small">(맞힘 ' + r.hit + '/' + r.model + (r.extra ? ' · 군더더기 ' + r.extra : '') + ')</span></div>' + notesHtml(r.notes, 3);
     }
 
     function vPractice() {
@@ -430,13 +456,14 @@
     }
 
     /* ── 연습 세션 ── */
-    function mkUnit(segs) { const text = segs.join(''); return { segs, text, model: R.modelBoundaries(segs), words: R.words(text).length }; }
+    /* given = 미리 그어 주는 문장 끝 경계(초3 이상). 문장 단위 연습(유치~초2)은 문장 하나라 없다. */
+    function mkUnit(segs, sentMode) { const text = segs.join(''); return { segs, text, model: R.modelBoundaries(segs), words: R.words(text).length, given: sentMode ? [] : R.sentenceEnds(text) }; }
     function startPractice(id, mode) {
       const p = byId(id); if (!p) return;
       const b = R.BANDS[p.band];
       const units = [];
-      if (b.sentenceMode) p.paragraphs.forEach((segs) => R.sentencesOf(segs).forEach((ss) => units.push(mkUnit(ss))));
-      else p.paragraphs.forEach((segs) => units.push(mkUnit(segs)));
+      if (b.sentenceMode) p.paragraphs.forEach((segs) => R.sentencesOf(segs).forEach((ss) => units.push(mkUnit(ss, true))));
+      else p.paragraphs.forEach((segs) => units.push(mkUnit(segs, false)));
       recRelease(); stopSpeak();
       sess = { pr: { id, mode: mode || 'practice', stage: mode === 'review' ? 2 : 1, sentMode: b.sentenceMode, units, ui: 0, marks: units.map(() => new Set()), res: units.map(() => null), agg: null, readStart: 0, readMs: null, picked: null, self: [false, false, false], peek: false, started: Date.now() } };
       view = { name: mode === 'review' ? 'review' : 'practice' };
@@ -470,18 +497,22 @@
         let html = '<div class="card">' + head + stageBar(2, 3) + '<h2>2. 직접 끊기</h2>';
         if (pr.sentMode) {
           const u = pr.units[pr.ui], r = pr.res[pr.ui];
-          html += '<p class="small">문장 ' + (pr.ui + 1) + '/' + pr.units.length + ' — 뜻이 나뉘는 곳의 <b>·</b> 를 눌러 ∕ 로 바꿔요.</p>' + tokensHtml(u.text, pr.marks[pr.ui], r, 'u' + pr.ui);
+          html += '<p class="small">문장 ' + (pr.ui + 1) + '/' + pr.units.length + ' — 뜻이 나뉘는 곳의 <b>·</b> 를 눌러 ∕ 로 바꿔요.</p>' + (r ? legendHtml(r.extras.length, r.neutral.length) : '') + tokensHtml(u.text, pr.marks[pr.ui], r, 'u' + pr.ui);
           if (r) html += resultHtml(r) + '<button class="big" data-act="pr-unit-next">' + (pr.ui + 1 < pr.units.length ? '다음 문장' : '다음 — 표시 없이 읽기') + '</button>';
           else html += '<button class="big" data-act="pr-check">확인하기</button>';
+        } else if (!pr.agg) {
+          /* 문단 하나씩 — 긴 글에서 탭 자리가 화면을 넘지 않게. 문장 끝은 미리 그어 두어 구·절 경계에만 집중한다. */
+          const u = pr.units[pr.ui], n = pr.units.length;
+          html += '<p class="small">' + (n > 1 ? '<b>' + (pr.ui + 1) + '/' + n + ' 문단</b> · ' : '') + '뜻이 나뉘는 곳의 <b>·</b> 를 눌러 ∕ 로 바꿔요.' + (u.given.length ? ' 문장 끝 ∕ 는 미리 표시했어요.' : '') + '</p>';
+          html += tokensHtml(u.text, pr.marks[pr.ui], null, 'u' + pr.ui, u.given);
+          html += '<div class="row">' + (pr.ui > 0 ? '<button class="big ghost" data-act="pr-para" data-d="-1" style="flex:1">이전 문단</button>' : '') +
+            (pr.ui + 1 < n ? '<button class="big" data-act="pr-para" data-d="1" style="flex:2">다음 문단</button>' : '<button class="big" data-act="pr-check" style="flex:2">확인하기</button>') + '</div>';
         } else {
-          html += '<p class="small">뜻이 나뉘는 곳의 <b>·</b> 를 눌러 ∕ 로 바꿔요. 문단마다 이어서 찍고 마지막에 확인해요.</p>';
-          pr.units.forEach((u, i) => { html += '<p class="eyebrow" style="margin-top:10px">' + (i + 1) + '문단</p>' + tokensHtml(u.text, pr.marks[i], pr.res[i], 'u' + i); });
-          if (pr.agg) {
-            html += '<div class="legend"><b style="color:var(--green)">초록 ∕</b> 잘 끊었어요 · <b style="color:var(--red)">빨강 ∕</b> 여기서도 끊어요 · <b style="color:var(--gold)">주황 ∕</b> 붙여 읽어요 · <b style="color:var(--blue)">파랑 ∕</b> 쉬어도 괜찮아요</div><div class="score">' + pr.agg.score + '점</div><p class="small" style="text-align:center">맞힘 ' + pr.agg.hit + '/' + pr.agg.model + (pr.agg.extra ? ' · 군더더기 ' + pr.agg.extra : '') + '</p>';
-            const notes = [].concat.apply([], pr.res.map((r) => r ? r.notes : []));
-            if (notes.length) html += '<div class="notes">' + notes.slice(0, 8).map((n) => '<div class="note ' + n.kind + '"><i>' + (n.kind === 'miss' ? '∕' : n.kind === 'extra' ? '✕' : '○') + '</i><span><b>「' + esc(n.at) + '」 뒤</b> — ' + esc(n.why) + '</span></div>').join('') + (notes.length > 8 ? '<div class="small">…외 ' + (notes.length - 8) + '곳</div>' : '') + '</div>';
-            html += '<button class="big" data-act="pr-to3">다음 — 표시 없이 읽기</button>';
-          } else html += '<button class="big" data-act="pr-check">확인하기</button>';
+          html += legendHtml(pr.agg.extra > 0, pr.res.some((r) => r && r.neutral.length));
+          pr.units.forEach((u, i) => { html += (pr.units.length > 1 ? '<p class="eyebrow" style="margin-top:10px">' + (i + 1) + '문단</p>' : '') + tokensHtml(u.text, pr.marks[i], pr.res[i], 'u' + i, u.given); });
+          html += '<div class="score">' + pr.agg.score + '점</div><p class="small" style="text-align:center">맞힘 ' + pr.agg.hit + '/' + pr.agg.model + (pr.agg.extra ? ' · 군더더기 ' + pr.agg.extra : '') + '</p>';
+          html += notesHtml([].concat.apply([], pr.res.map((r) => r ? r.notes : [])), 3);
+          html += '<button class="big" data-act="pr-to3">다음 — 표시 없이 읽기</button>';
         }
         return html + '</div>' + quit;
       }
@@ -570,7 +601,7 @@
           if (!j.nonce) { view.linkMsg = j.error || '연결할 수 없어요.'; view.linkWait = ''; render({ keep: true }); return; }
           view.linkMsg = ''; view.linkWait = j.name || code; render({ keep: true });
           const tick = () => fetch('/api/login/status?n=' + j.nonce).then((r) => r.json()).then((s) => {
-            if (s.token) { saveAuth({ token: s.token, code: s.student ? s.student.code : code, name: s.student ? s.student.name : '' }); view.linkWait = ''; applyBody(); render({ keep: true }); pullState(); pullAssign(); return; }
+            if (s.token) { saveAuth({ token: s.token, code: s.student ? s.student.code : code, name: s.student ? s.student.name : '' }); view.linkWait = ''; applyBody(); render({ keep: true }); pullState(); pullAssign(); pullCustom(); return; }
             if (s.denied) { view.linkWait = ''; view.linkMsg = '선생님이 승인하지 않았어요.'; render({ keep: true }); return; }
             if (s.error) { view.linkWait = ''; view.linkMsg = s.error; render({ keep: true }); return; }
             poll = setTimeout(tick, 3000);
@@ -614,7 +645,8 @@
       else if (act === 'start-review') { startPractice(t.dataset.id, 'review'); }
       else if (act === 'pr-quit') { sess = null; recRelease(); stopSpeak(); view = { name: 'home' }; render(); }
       else if (act === 'pr-to2') { stopSpeak(); sess.pr.stage = 2; render(); }
-      else if (act === 'pr-check') { const pr = sess.pr; if (pr.sentMode) { const u = pr.units[pr.ui]; pr.res[pr.ui] = R.explain(u.text, u.model, [...pr.marks[pr.ui]]); } else { pr.units.forEach((u, i) => { pr.res[i] = R.explain(u.text, u.model, [...pr.marks[i]]); }); pr.agg = aggregate(pr.res); } render({ keep: true }); }
+      else if (act === 'pr-check') { const pr = sess.pr; if (pr.sentMode) { const u = pr.units[pr.ui]; pr.res[pr.ui] = R.explain(u.text, u.model, [...pr.marks[pr.ui]], u.given); } else { pr.units.forEach((u, i) => { pr.res[i] = R.explain(u.text, u.model, [...pr.marks[i]], u.given); }); pr.agg = aggregate(pr.res); } render(); }
+      else if (act === 'pr-para') { const pr = sess.pr; pr.ui = Math.max(0, Math.min(pr.units.length - 1, pr.ui + (+t.dataset.d || 0))); render(); }
       else if (act === 'pr-unit-next') { const pr = sess.pr; if (pr.ui + 1 < pr.units.length) { pr.ui += 1; render(); } else { pr.agg = aggregate(pr.res); pr.stage = 3; pr.readStart = Date.now(); render(); } }
       else if (act === 'pr-to3') { sess.pr.stage = 3; sess.pr.readStart = Date.now(); render(); }
       else if (act === 'pr-read-done') { sess.pr.readMs = Date.now() - sess.pr.readStart; render(); }
@@ -657,7 +689,7 @@
 
     /* ── 시작 ── */
     applyBody(); render();
-    if (auth()) { pullState(); pullAssign(); } else setDot('', '이 기기');
+    if (auth()) { pullState(); pullAssign(); pullCustom(); } else setDot('', '이 기기');
     if ('serviceWorker' in navigator && location.protocol.startsWith('http')) { navigator.serviceWorker.register('./sw.js').catch(() => {}); }
   })();
   </script>
