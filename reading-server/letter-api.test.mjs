@@ -324,6 +324,57 @@ await t('사진 — base64 로 올리면 매직 바이트로 종류를 정하고
   assert.equal((await admin({ path: '/api/letter/admin/img', method: 'DELETE', getBody: async () => ({ id: up.body.id }) })).status, 404);
 });
 
+await t('AI 삽화 — 키 없으면 no-key; Gemini 응답의 inlineData 를 바이트로 확인해 돌려주고 AI 장부에 남긴다; 비율·장면 검사·거절·한도', async () => {
+  const store = memStore(); seed(store);
+  const admin = (over) => call(store, { who: ADMIN, ...over });
+  const body = { prompt: '보름달 아래 감나무와 아이', ratio: '16:9' };
+  const gen = (over) => admin({ path: '/api/letter/admin/img/gen', method: 'POST', getBody: async () => body, ...over });
+  assert.deepEqual((await gen({ ai: { apiKey: 'anthropic-only' } })).body, { ok: false, reason: 'no-key' }, 'Anthropic 키만으로는 그림을 못 만든다');
+  assert.equal((await call(store, { path: '/api/letter/admin/img/gen', method: 'POST', getBody: async () => body })).status, 403, '학생은 못 만든다');
+  const gemini = { raw: { candidates: [{ content: { parts: [{ text: '설명' }, { inlineData: { mimeType: 'image/jpeg', data: PNG.toString('base64') } }] }, finishReason: 'STOP' }] } };
+  const fq = fakeFetch(gemini);
+  const ai = { imageKey: 'g-key', fetchImpl: fq, env: {} };
+  const ok = await gen({ ai });
+  assert.equal(ok.status, 200); assert.equal(ok.body.ok, true);
+  assert.equal(ok.body.type, 'image/png', '보낸 mimeType 이 아니라 바이트로 정한다'); assert.equal(ok.body.size, PNG.length); assert.equal(ok.body.data, PNG.toString('base64'));
+  assert.equal(ok.body.model, 'gemini-2.5-flash-image'); assert.equal(ok.body.ratio, '16:9'); assert.equal(ok.body.prompt, body.prompt);
+  assert.equal(ok.body.aiLeft, LETTER_AI_DAILY_DEFAULT - 1); assert.equal(ok.body.aiCap, LETTER_AI_DAILY_DEFAULT);
+  assert.equal(fq.calls.length, 1);
+  const c = fq.calls[0];
+  assert.equal(c.url, 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image:generateContent');
+  assert.equal(c.headers['x-goog-api-key'], 'g-key'); assert.equal(c.headers['x-api-key'], undefined, 'Anthropic 헤더가 섞이지 않는다');
+  assert.deepEqual(c.body.generationConfig, { responseModalities: ['IMAGE'], imageConfig: { aspectRatio: '16:9' } });
+  const text = c.body.contents[0].parts[0].text;
+  assert.ok(text.includes('장면: 보름달 아래 감나무와 아이') && /No text/.test(text) && /글자/.test(text), '장면 + 글자 없음 규칙');
+  assert.equal(store.getAiUse().count, 1, 'AI 초안과 같은 장부');
+  /* 모델 이름은 ctx 로 바꾼다, 비율을 안 주면 4:3 */
+  const fq2 = fakeFetch(gemini);
+  await gen({ getBody: async () => ({ prompt: '가을 잎' }), ai: { ...ai, fetchImpl: fq2, imageModel: 'gemini-3-pro-image-preview' } });
+  assert.ok(fq2.calls[0].url.includes('/gemini-3-pro-image-preview:generateContent')); assert.equal(fq2.calls[0].body.generationConfig.imageConfig.aspectRatio, '4:3');
+  /* 입력 검사 — 호출 전에 막는다 */
+  assert.equal((await gen({ getBody: async () => ({ prompt: ' ' }), ai })).status, 400);
+  assert.equal((await gen({ getBody: async () => ({ prompt: '달', ratio: '16:10' }), ai })).status, 400, '모델이 모르는 비율');
+  assert.equal(fq.calls.length, 1);
+  /* 실패 사유 — 실패한 호출도 장부에 남는다 */
+  const reason = async (reply) => (await gen({ ai: { ...ai, fetchImpl: fakeFetch(reply) } })).body.reason;
+  assert.equal(await reason({ raw: { promptFeedback: { blockReason: 'SAFETY' } } }), 'refused');
+  assert.equal(await reason({ raw: { candidates: [{ content: { parts: [{ text: '못 그려요' }] }, finishReason: 'IMAGE_SAFETY' }] } }), 'refused');
+  assert.equal(await reason({ raw: { candidates: [{ content: { parts: [{ text: '설명만' }] }, finishReason: 'STOP' }] } }), 'shape');
+  assert.equal(await reason({ raw: { candidates: [{ content: { parts: [{ inlineData: { mimeType: 'image/png', data: Buffer.from('<svg/>').toString('base64') } }] } }] } }), 'shape', '그림 바이트가 아니면 돌려주지 않는다');
+  assert.equal(await reason({ status: 429 }), 'api-429');
+  assert.equal(await reason(new Error('down')), 'network');
+  assert.equal(store.getAiUse().count, 8);
+  /* 한도 — 넘긴 호출은 나가지 않는다 */
+  const fq3 = fakeFetch(gemini);
+  const over = await gen({ ai: { ...ai, fetchImpl: fq3, quota: { take: () => false, left: () => 0 } } });
+  assert.equal(over.body.ok, false); assert.equal(over.body.reason, 'quota'); assert.equal(fq3.calls.length, 0);
+  /* 올릴 때 src:'ai' 를 붙이면 목록에 남는다 — 스니펫의 출처 표시가 여기서 갈린다 */
+  await admin({ path: '/api/letter/admin/img', method: 'POST', randomToken: () => 'a'.repeat(32), getBody: async () => ({ name: 'AI 삽화 · 달', data: PNG.toString('base64'), src: 'ai' }) });
+  await admin({ path: '/api/letter/admin/img', method: 'POST', randomToken: () => 'b'.repeat(32), getBody: async () => ({ name: '단풍.jpg', data: JPEG.toString('base64'), src: 'hacked' }) });
+  const list = (await admin({ path: '/api/letter/admin/imgs' })).body.images;
+  assert.deepEqual(list.map((m) => [m.name, m.src]).sort(), [['AI 삽화 · 달', 'ai'], ['단풍.jpg', 'upload']]);
+});
+
 /* ── 푸시 ── */
 const PUSH = { publicKey: 'BPUB', privateJwk: JSON.stringify({ kty: 'EC', crv: 'P-256', d: 'x', x: 'y', y: 'z' }), subject: 'mailto:t@wb' };
 function fakePush(statusFor) { const calls = []; const f = async (url) => { calls.push(url); return { status: statusFor ? statusFor(url) : 201 }; }; f.calls = calls; return f; }

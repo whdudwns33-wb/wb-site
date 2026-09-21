@@ -25,6 +25,14 @@ export const PUTS_PER_DAY = 10;              // PUT /state 하루 상한 — KV 
 export const LETTER_AI_DAILY_DEFAULT = 30;   // AI 초안 하루 호출 상한 — 한 호가 6조각(공통 + 학년대 5)이라 하루 다섯 호
 export const DRAFT_PARTS = ['shared', 'K', 'E1', 'E2', 'E3', 'M', 'news'];   // news 는 웹 검색으로 그 주의 교육·입시 소식을 간추리는 조각
 export const DEFAULT_TIER = 'E2';            // 학년을 못 읽는 학생의 임시 학년대 — 관리 웹 [학년대 지정]으로 바로잡는다
+export const IMAGE_RATIOS = ['16:9', '4:3', '1:1', '3:4'];   // AI 삽화 비율 — 모델이 받는 값만(표지 16:10 자리는 16:9 를 cover 로 맞춘다)
+export const IMAGE_PROMPT_MAX = 600;
+const IMAGE_API = 'https://generativelanguage.googleapis.com/v1beta/models/';
+const DEFAULT_IMAGE_MODEL = 'gemini-2.5-flash-image';   // "나노바나나" — LETTER_IMAGE_MODEL 로 바꾼다
+/* 삽화 공통 지시 — 배포본 SVG 삽화와 같은 결(단순한 색면·따뜻한 빛·밝은 종이 바탕). 글자는 넣지 않는다:
+   모델이 그리는 글자는 자주 틀리고, 캡션·제목은 지면이 단다. 실존 인물을 그리지 않는 것은 초상권 때문 */
+const IMAGE_STYLE = '어린이 주간 신문에 싣는 삽화. 단순한 색면과 부드러운 종이 질감, 따뜻한 빛, 밝은 바탕. 인물은 실존 인물이 아닌 그림체의 아이·가족.'
+  + ' 그림 안에 글자·숫자·워터마크·말풍선을 넣지 않는다. No text, letters, numbers, logos or watermark anywhere in the image.';
 const API_URL = 'https://api.anthropic.com/v1/messages';
 const DEFAULT_MODEL = 'claude-opus-5';
 const MAX_TOKENS = 16000;
@@ -253,6 +261,32 @@ async function callDraft({ userPrompt, apiKey, model, fetchImpl, webSearch }) {
   const obj = parseJsonBlock(text);
   if (!obj || !Array.isArray(obj.sections)) return { ok: false, reason: d && d.stop_reason === 'pause_turn' ? 'paused' : (obj ? 'shape' : 'parse') };
   return { ok: true, obj, model: (d && d.model) || null };
+}
+
+/* AI 삽화 — Gemini 이미지 모델(generateContent, 응답은 inlineData 의 base64). 바이트를 저장하지 않고 관리 웹에 돌려준다:
+   모델이 주는 PNG 는 1~2MB 라 사진 상한(1.5MB)을 자주 넘고, 관리 웹이 어차피 1600px JPEG 로 줄여 /admin/img 로 올린다 —
+   원장이 미리 보고 마음에 드는 것만 올리므로 저장소에는 고른 그림만 남는다 */
+async function callImage({ prompt, ratio, apiKey, model, fetchImpl }) {
+  const f = fetchImpl || fetch;
+  const m = model || DEFAULT_IMAGE_MODEL;
+  const req = { contents: [{ parts: [{ text: IMAGE_STYLE + '\n\n장면: ' + prompt }] }], generationConfig: { responseModalities: ['IMAGE'], imageConfig: { aspectRatio: ratio } } };
+  let r;
+  try {
+    r = await f(IMAGE_API + encodeURIComponent(m) + ':generateContent', { method: 'POST', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey }, body: JSON.stringify(req) });
+  } catch (e) { return { ok: false, reason: 'network' }; }
+  if (!r || !r.ok) return { ok: false, reason: 'api-' + ((r && r.status) || 0) };
+  let d;
+  try { d = await r.json(); } catch (e) { return { ok: false, reason: 'parse' }; }
+  if (d && d.promptFeedback && d.promptFeedback.blockReason) return { ok: false, reason: 'refused' };
+  const cand = d && Array.isArray(d.candidates) ? d.candidates[0] : null;
+  const parts = cand && cand.content && Array.isArray(cand.content.parts) ? cand.content.parts : [];
+  const part = parts.find((x) => x && x.inlineData && typeof x.inlineData.data === 'string' && x.inlineData.data);
+  if (!part) return { ok: false, reason: /SAFETY|PROHIBITED|BLOCK/i.test(String((cand && cand.finishReason) || '')) ? 'refused' : 'shape' };
+  let bytes;
+  try { bytes = b64decode(part.inlineData.data); } catch (e) { return { ok: false, reason: 'parse' }; }
+  const type = sniffImage(bytes);   // 보낸 mimeType 이 아니라 바이트로 정한다 — 올릴 때와 같은 규칙
+  if (!type) return { ok: false, reason: 'shape' };
+  return { ok: true, type, size: bytes.length, data: part.inlineData.data.replace(/\s+/g, ''), model: m };
 }
 
 /* 조각을 임시 호로 감싸 검증한다 — 조각 단위라 학년대 커버리지 경고는 뺀다 */
@@ -485,7 +519,8 @@ export async function handleLetter(ctx) {
     const type = sniffImage(bytes);
     if (!type) return j(400, { error: 'JPEG·PNG·WebP 만 올릴 수 있어요.' });
     const id = ctx.randomToken ? ctx.randomToken() : crypto.randomUUID().replace(/-/g, '');
-    const meta = { id, type, ext: IMG_TYPES[type], size: bytes.length, name: strMax(b.name, 80), w: Number.isInteger(b.w) ? b.w : null, h: Number.isInteger(b.h) ? b.h : null, at: nowIso(now) };
+    /* src: 'ai' 는 AI 삽화 — 스니펫의 credit 이 「WB 편집실 · AI 생성」 이 된다(출처 표시를 사람이 고쳐 쓰지 않게) */
+    const meta = { id, type, ext: IMG_TYPES[type], size: bytes.length, name: strMax(b.name, 80), w: Number.isInteger(b.w) ? b.w : null, h: Number.isInteger(b.h) ? b.h : null, at: nowIso(now), src: b.src === 'ai' ? 'ai' : 'upload' };
     await store.putImage(id, bytes, meta);
     return j(200, { ok: true, id, url: '/api/letter/img/' + id, size: bytes.length, type });
   }
@@ -496,6 +531,25 @@ export async function handleLetter(ctx) {
     if (!(await store.getImage(id))) return j(404, { error: '사진을 찾을 수 없어요.' });
     await store.deleteImage(id);
     return j(200, { ok: true, id });
+  }
+  /* AI 삽화 — 하루 한도는 AI 초안과 같은 장부(letter:aiuse)로 센다: 한 장에 몇십 원이라도 반복 실수를 막는 울타리는 하나면 된다 */
+  if (p === '/api/letter/admin/img/gen' && method === 'POST') {
+    const b = await body(); const bad = badBody(b); if (bad) return bad;
+    const prompt = strMax(b.prompt, IMAGE_PROMPT_MAX).trim();
+    if (prompt.length < 2) return j(400, { error: '어떤 그림을 만들지 한 줄로 적어 주세요.' });
+    const ratio = b.ratio == null || b.ratio === '' ? '4:3' : String(b.ratio);
+    if (!IMAGE_RATIOS.includes(ratio)) return j(400, { error: '비율은 ' + IMAGE_RATIOS.join(' · ') + ' 중 하나' });
+    const ai = ctx.ai || {};
+    if (!ai.imageKey) return j(200, { ok: false, reason: 'no-key' });
+    const limits = readLetterAiLimit(ai.env);
+    let useRec = store.getAiUse ? await store.getAiUse() : null;
+    const quota = ai.quota || makeQuota({ rec: useRec, limits, now, onUse: (rec) => { useRec = rec; } });
+    if (!quota.take()) return j(200, { ok: false, reason: 'quota', aiLeft: 0, aiCap: limits.total });
+    const res = await callImage({ prompt, ratio, apiKey: ai.imageKey, model: ai.imageModel, fetchImpl: ai.fetchImpl });
+    if (store.putAiUse && useRec) await store.putAiUse(useRec);
+    const aiLeft = typeof quota.left === 'function' ? quota.left() : null;
+    if (!res.ok) return j(200, { ok: false, reason: res.reason, aiLeft, aiCap: limits.total });
+    return j(200, { ok: true, type: res.type, size: res.size, data: res.data, model: res.model, prompt, ratio, aiLeft, aiCap: limits.total });
   }
   /* ── 주제 달력 — 기본값은 배포본(letter/calendar.json), 관리 웹에서 고치면 KV 가 이긴다 ── */
   if (p === '/api/letter/admin/calendar' && method === 'GET') {
