@@ -30,6 +30,7 @@ fs.copyFileSync(path.join(ROOT, 'public', 'naesin-live.html'), path.join(DIST, '
 fs.copyFileSync(path.join(ROOT, 'public', 'haru-admin.html'), path.join(DIST, 'admin', 'haru-admin.html'));
 fs.copyFileSync(path.join(ROOT, 'public', 'naesin-ko-admin.html'), path.join(DIST, 'admin', 'naesin-ko-admin.html'));
 fs.copyFileSync(path.join(ROOT, 'public', 'hanja-admin.html'), path.join(DIST, 'admin', 'hanja-admin.html'));
+fs.copyFileSync(path.join(ROOT, 'public', 'hanja-print.html'), path.join(DIST, 'admin', 'hanja-print.html'));
 fs.copyFileSync(path.join(ROOT, 'public', 'chunk-admin.html'), path.join(DIST, 'admin', 'chunk-admin.html'));
 fs.copyFileSync(path.join(ROOT, 'public', 'letter-admin.html'), path.join(DIST, 'admin', 'letter-admin.html'));
 
@@ -81,7 +82,7 @@ for (const f of HARU_FILES) fs.copyFileSync(path.join(HARU, f), path.join(DIST, 
    단어장(문제집 낱말)은 dist 에 싣지 않는다 — KV(hanja:book:*)에만 산다. book-sample.json 은 자체 창작 체험 단어장이라 실어도 된다. */
 const HANJA = path.join(ROOT, '..', 'hanja');
 fs.mkdirSync(path.join(DIST, 'hanja'), { recursive: true });
-const HANJA_FILES = ['index.html', 'srs.js', 'quiz.js', 'trace.js', 'book-check.js', 'book-sample.json', 'sw.js', 'manifest.webmanifest', 'icon.svg'];
+const HANJA_FILES = ['index.html', 'srs.js', 'quiz.js', 'trace.js', 'book-check.js', 'bridge.js', 'book-sample.json', 'sw.js', 'manifest.webmanifest', 'icon.svg'];
 for (const f of HANJA_FILES) fs.copyFileSync(path.join(HANJA, f), path.join(DIST, 'hanja', f));
 fs.copyFileSync(SHARED, path.join(DIST, 'hanja', 'voice.js'));
 /* 청크브레인 (chunk/) — 의미단위 끊어읽기. 같은 오리진 /chunk/ 에서 서빙해야 학생 토큰이 공유된다.
@@ -146,7 +147,7 @@ const hTag = stampSW(path.join(DIST, 'haru', 'sw.js'),
   ['index.html', 'strings.js', 'plan.js', 'mastery.js', 'srs.js', 'cause.js', 'probe.js', 'manifest.webmanifest', 'icon.svg']
     .map(f => path.join(DIST, 'haru', f)), 'wbh-shell');
 const jTag = stampSW(path.join(DIST, 'hanja', 'sw.js'),
-  ['index.html', 'voice.js', 'srs.js', 'quiz.js', 'trace.js', 'book-check.js', 'book-sample.json', 'manifest.webmanifest', 'icon.svg']
+  ['index.html', 'voice.js', 'srs.js', 'quiz.js', 'trace.js', 'book-check.js', 'bridge.js', 'book-sample.json', 'manifest.webmanifest', 'icon.svg']
     .map(f => path.join(DIST, 'hanja', f)), 'wbhj-shell');
 const lTag = stampSW(path.join(DIST, 'letter', 'sw.js'),
   ['index.html', 'letter.js', 'shapes.js', 'manifest.webmanifest', 'icon.svg'].map(f => path.join(DIST, 'letter', f)), 'wbl-shell');
@@ -171,7 +172,7 @@ const broken = [];
 for (const f of ['index.html', 'vocab/index.html', 'vocab-age/index.html', 'admin/index.html',
   'admin/metrics.html', 'admin/vocab-review.html', 'review.html', 'parent.html',
   'naesin/index.html', 'haru/index.html', 'haru/parent.html', 'admin/haru-admin.html', 'admin/naesin-admin.html',
-  'hanja/index.html', 'admin/hanja-admin.html',
+  'hanja/index.html', 'admin/hanja-admin.html', 'admin/hanja-print.html',
   'chunk/index.html', 'chunk/print.html', 'admin/chunk-admin.html',
   'letter/index.html', 'admin/letter-admin.html']) {
   const full = path.join(DIST, f);

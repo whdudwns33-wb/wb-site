@@ -135,6 +135,8 @@ jobs:
         run: node hanja/book-validate.mjs hanja/book-sample.json
       - name: 한자브레인 서버 라우트 테스트
         run: node reading-server/hanja-api.test.mjs
+      - name: 한자브레인 도구 테스트 (교재 텍스트 초안 추출기·획순 변환기)
+        run: node hanja/extract/draft.test.mjs && node hanja/strokes-convert.test.mjs
       - name: 청크브레인 규칙·복습 일정 테스트
         run: node chunk/rules.test.cjs && node chunk/sched.test.cjs
       - name: 청크브레인 콘텐츠 무결성 (지문·카드가 규칙과 밴드 상한을 지키는가)

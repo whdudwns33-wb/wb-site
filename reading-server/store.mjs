@@ -16,7 +16,7 @@ const BACKUP_KEEP = 10;
 
 const empty = () => ({ students: {}, states: {}, tokens: {}, pending: {}, levelLog: [], pubmap: {}, parents: {}, textbook: {}, vocab: { states: {}, mnemos: {}, push: {}, assigns: {} },
   /* 한자브레인 — 단어장 본문(books)은 라이선스 자료라 스냅샷에 싣지 않는다(hanjaSnapshot). index 는 본문 없는 목록 */
-  hanja: { books: {}, index: null, states: {}, assigns: {} } });
+  hanja: { books: {}, index: null, states: {}, summaries: {}, assigns: {}, tasks: {}, strokes: null, push: {}, remaps: {} } });
 
 let db = empty();
 
@@ -53,7 +53,8 @@ export function naesinSnapshot(n) {
 export function hanjaSnapshot(h) {
   const src = h || {};
   const index = Array.isArray(src.index) ? src.index : [];
-  return { bookIds: index.map((e) => e && e.id).filter(Boolean), index, states: src.states || {}, assigns: src.assigns || {} };
+  return { bookIds: index.map((e) => e && e.id).filter(Boolean), index, states: src.states || {}, summaries: src.summaries || {}, assigns: src.assigns || {},
+    tasks: src.tasks || {}, remaps: src.remaps || {}, strokes: src.strokes || null };
 }
 
 /* 스냅샷에 담을 것 — 학생 기록만이 아니라 강사가 손으로 만든 것(교재 검수·발행 상태)까지.

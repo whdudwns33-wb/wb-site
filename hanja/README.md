@@ -2,9 +2,11 @@
 
 한글 어휘가 부족한 학생을 위한 원내 전용 앱. **문제집 한 권 = 단어장 하나**로 올려 그 책의 낱말·한자만
 따로 배우고, 한자는 **손가락으로 직접 따라 쓴다.** 영어는 다루지 않는다(영어는 워드브레인 `/vocab/`).
+두 어휘 앱의 역할 구분은 `CLAUDE.md` 「어휘 앱 두 개의 역할」이 정본이다.
 
-주소: 학생 `/hanja/` · 관리 `/admin/hanja-admin.html` (PIN). 학생 인증은 진로독서 학생 토큰(`wbr.auth`)을 그대로 읽는다 —
-진로독서에서 학원 QR로 한 번 연동하면 이 앱도 열린다. 미연동 기기는 `book-sample.json`(자체 창작) 체험 모드다.
+주소: 학생 `/hanja/` · 관리 `/admin/hanja-admin.html` (PIN) · 종이 시험지 `/admin/hanja-print.html` (PIN).
+학생 인증은 진로독서 학생 토큰(`wbr.auth`)을 그대로 읽는다 — 진로독서에서 학원 QR로 한 번 연동하면 이 앱도 열린다
+(관리 웹 「학생 안내 QR」이 `/hanja/` 주소를 QR 로 찍어 준다). 미연동 기기는 `book-sample.json`(자체 창작) 체험 모드다.
 
 ## 구성
 
@@ -14,20 +16,28 @@ hanja/
   book-check.js     단어장 검사·정규화·붙여넣기 파서 — 관리 업로드 관문·미리보기·CLI 가 같은 규칙   [WBBOOKCHECK]
   book-validate.mjs 단어장 검증기 CLI (book-check.js 위임)
   srs.js            간격 반복 (당일 밤→1→3→7→14→30→90일, 졸업)                                    [WBHSRS]
-  quiz.js           문항 생성 — 뜻·낱말·문맥 빈칸·한자 조립·한자 표기·낱말 쓰기 / 훈음·글자·낱말·획수   [WBHQUIZ]
+  quiz.js           문항 생성 — 낱말: 뜻·낱말·문맥 빈칸·한자 조립·한자 표기·낱말 쓰기·고유어 유의어
+                              한자: 훈음·글자·낱말·획수·한자 쓰기(회상)                              [WBHQUIZ]
   trace.js          따라쓰기 판정 — 덮음률(모양 모드)·획수 대조·획순 데이터 매칭(획순 모드)             [WBHTRACE]
+  bridge.js         진로독서 어휘장(vocab 기기 저장) → 이 앱 단어장 (월별 단원, 기기 안에서만)          [WBHBRIDGE]
+  extract/draft.mjs 교재 텍스트 → 붙여넣기 형식 초안 (오프라인, review/ 에 못 뽑은 줄)
+  strokes-convert.mjs 공개 획순 데이터(graphics.txt) → 공용 획순 사전 JSON (원장 검수용 .review.txt 동반)
   book-sample.json  자체 창작 체험 단어장 (기초 한자 39자 + 한자어 34 + 고유어 14) — 커밋 가능한 유일한 단어장
   sw.js · manifest.webmanifest · icon.svg · _headers(안내 주석)
-  *.test.cjs        각 모듈 테스트 (node 로 바로 실행)
+  *.test.cjs / *.test.mjs  각 모듈 테스트 (node 로 바로 실행). app.test.cjs 는 index.html 정적 검사(스크립트·SW 셸·API 경로·이스케이프)
 reading-server/
   hanja-api.mjs     /api/hanja/* 라우트 (worker.mjs·server.mjs 양쪽에 등록)
-  public/hanja-admin.html  관리 웹 — 단어장 업로드(붙여넣기·JSON)·목록·공개 범위·학생 배정·현황
+  public/hanja-admin.html  관리 웹 — 단어장 업로드·목록·공개 범위·학생 배정·이번 주 단원(+진도표)·획순 사전·안내 QR·현황
+  public/hanja-print.html  종이 확인 시험지 — 단원 골라 4종(훈음 쓰기·한자 쓰기·낱말 뜻 쓰기·한자어 표기 쓰기) + 정답표, A4 인쇄
 ```
 
 ```
-for f in hanja/*.test.cjs; do node $f; done          # 순수 로직 테스트
+for f in hanja/*.test.cjs; do node $f; done          # 순수 로직·화면 정적 검사
+node hanja/extract/draft.test.mjs && node hanja/strokes-convert.test.mjs   # 도구 테스트
 node reading-server/hanja-api.test.mjs               # 서버 라우트 테스트
 node hanja/book-validate.mjs <단어장.json|.txt> [--id <id> --title <제목>]   # 업로드 전 검사
+node hanja/extract/draft.mjs <교재텍스트.txt> <출력 디렉터리> [--id <id> --title <제목>]   # 교재 텍스트 → words.txt 초안 (저장소 밖에서)
+node hanja/strokes-convert.mjs <graphics.txt> <출력.json> --book <단어장.json>            # 공개 획순 → 획순 사전 (저장소 밖에서)
 ```
 
 ## 단어장 (wordbook)
@@ -40,8 +50,8 @@ node hanja/book-validate.mjs <단어장.json|.txt> [--id <id> --title <제목>] 
 ```
 # 1일차                                   ← # 줄 = 새 단원(회차). 아래 줄이 그 단원에 든다
 관측 | 보고 재는 것 | 觀(볼 관)+測(잴 측) | 별을 관측했다.     ← 낱말 | 뜻 | 한자(선택) | 예문(선택)
-다잡다 | 흐트러진 마음을 단단히 하다 | 마음을 다잡고 앉았다.   ← 한자 없으면 고유어
-觀 | 볼 관 | 25                            ← 첫 칸이 한자 한 글자면 한자 항목: 훈음 · 획수(선택)
+다잡다 | 흐트러진 마음을 단단히 하다 | 마음을 다잡고 앉았다. | 유의어: 추스르다 | 연상: 옷깃을 여미는 손   ← 고유어(한자 없음). 유의어:·연상: 칸은 선택
+觀 | 볼 관 | 25 | 見 | 勸                  ← 첫 칸이 한자 한 글자면 한자 항목: 훈음 · 획수 · 부수 · 닮은 글자(선택)
 ```
 
 JSON 모양(정규화 뒤 — `book-check.js` 머리말 참조):
@@ -49,60 +59,103 @@ JSON 모양(정규화 뒤 — `book-check.js` 머리말 참조):
 ```
 { id, title, publisher?, level?(L1~L4), note?,
   units: [{ id, title }],
-  words: [{ id, unit, word, type:'hanja'|'native', hanja?, parts?:[{ch,hun,eum}], literal?, meaning, example?, syn? }],
-  chars: [{ ch, hun, eum, strokes?, unit, medians?, words:[…], derived? }],
+  words: [{ id, unit, word, type:'hanja'|'native', hanja?, parts?:[{ch,hun,eum}], literal?, meaning, example?, syn?, scene? }],
+  chars: [{ ch, hun, eum, strokes?, unit, medians?, radical?, similar?, words:[…], derived? }],
   strokes?: { "觀": 25 } }                  ← 낱말에서 끌어낸 글자에 획수를 붙일 때
 ```
 
 - **id 는 영문·숫자·하이픈 3~60자** — 드라이브의 단어장 폴더 이름과 같게 둔다(`docs/자료-폴더-표준.md`).
+- **낱말 id 는 내용 기반**(`낱말|한자`, 붙여넣기 형식은 자동)이고 단원 id 는 제목 기반이다. 교재를 고쳐 다시 올려도
+  줄이 하나 끼어들었다고 학생 기억 기록이 밀리지 않는다. 그래도 바뀐 id(오타 수정 등)는 서버가 옛 단어장과 대조해
+  `hanja:remap:<id>` 에 남기고 학생 앱이 `GET /book` 의 `remap` 으로 옛 기록을 잇는다(`migrateIds`).
 - `chars` 는 두 갈래다. **직접 적은 글자**(한자 급수 교재)는 그 단원의 학습 항목이고, 낱말의 한자 분해에서
   **끌어낸 글자**(`derived`)는 낱말에 딸린 참고다 — 한자 탭에서 따라 쓰고, 「한자만」 훈련에 들어온다.
   한자어 교재의 낱말 12개가 한자 25자에 묻히지 않게 하려는 구분이다.
-- `medians` = 획순 데이터(0~1 좌표의 획 중심선, 획 순서대로). **있는 글자만 획순 모드**가 열린다.
-  체험 단어장의 一二三十人大天口日月木山川中土上下小火水 20자에 들어 있다.
+- `radical`(부수)·`similar`(닮은 글자)는 문항 오답지 우선순위다 — 닮은 글자 > 같은 부수 > 같은 단원 순으로 헷갈리는
+  보기를 먼저 뽑는다(`quiz.js charRank`). 없으면 단원·단어장 안에서만 고른다.
+- `syn`(고유어 유의어)이 있으면 「유의어 고르기」 문항이 열리고, `scene`(연상 장면 한 줄)은 카드에 그대로 보인다.
+  `scene` 이 없는 고유어는 학생 앱이 워드브레인과 같은 AI 연상 경로(`/api/vocab/mnemonic`, 관리 웹에서 AI 를 켠 학원만)로
+  한 번 받아 기기에 저장한다 — 낱말·뜻만 보내며 교재 원문은 보내지 않는다.
+- `medians` = 획순 데이터(0~1 좌표의 획 중심선, 획 순서대로). 단어장에 없어도 **공용 획순 사전**(`hanja:strokes`)에
+  있는 글자는 획순 모드가 열린다(단어장 값이 우선). 체험 단어장의 一二三十人大天口日月木山川中土上下小火水 20자에 들어 있다.
 - 검사 규칙(`checkBook`)은 오류(막음)와 경고(알림)를 가른다: 영어 낱말·뜻 없음·나쁜 한자·획수/획순 불일치는 오류,
   예문에 낱말이 안 보임·훈음 없음·목록에 없는 단원은 경고. 미리보기(dryRun)와 실제 업로드가 같은 판정이다.
 - 공개 범위 `scope`: `all`(연동 학생 모두, 기본) · `assigned`(배정한 학생만 — 교재를 산 학생에게만 열 때).
 
+### 교재 텍스트 → 초안 (`extract/draft.mjs`)
+
+문제집을 손으로 치는 것이 병목이라, PDF 를 텍스트로 뽑은 것(`pdftotext -layout` 또는 뷰어 복사)을 받아
+붙여넣기 형식 `words.txt` 로 바꾼다. **규칙 기반 오프라인**이다 — 구매 자료를 외부 AI API 로 보내지 않는다.
+국어브레인 추출기와 같은 두 가지를 지킨다: 못 뽑은 줄은 `review/unmatched.txt` 에 줄 번호·이유와 함께 내리고,
+초안은 사람이 고친 뒤 `book-validate.mjs` 로 검사해 올린다. 산출물은 저장소 밖(드라이브 단어장 폴더)에 둔다.
+
+### 공용 획순 사전 (`strokes-convert.mjs` → `POST /admin/strokes`)
+
+획순은 글자 하나에 하나만 있으면 되므로(기억 기록도 `c:<글자>` 로 글자 단위) 단어장마다 붙이지 않고 KV 한 키에 둔다.
+Make Me a Hanzi 계열 `graphics.txt`(Arphic Public License — 원본·산출물 모두 저장소에 넣지 않는다)를 단어장이 쓰는
+글자만 골라 0~1 좌표로 바꾸고, **단어장 획수와 데이터 획 수가 다른 글자는 `.review.txt` 에 적는다.** 한국 표준 필순과
+다른 글자가 있어서 원장이 검수한 뒤 관리 웹 「공용 획순 사전」으로 올린다 — 검수 없이 올린 획순은 맞는 획순을 틀렸다고
+채점하게 된다. 관리 웹은 덧쓰기(기본)와 통째 교체를 고른다.
+
 ## 학생 앱 동작
 
-- **오늘**: 복습할 것(SRS 만기) · 현재 단어장·단원의 진도 · 새로 배우기 · 따라쓰기.
+- **오늘**: 강사가 지정한 **이번 주 단원** 카드(배우기·훈련 바로가기, 마감) · 복습할 것(SRS 만기, 모든 단어장) ·
+  현재 단어장·단원의 진도 · 새로 배우기 · 따라쓰기. 만기 항목이 든 단어장이 기기에 없으면 서버에서 자동으로 받는다.
 - **단어장**: 단어장 고르기(선생님 배정이 앞에, WB 기본 체험 단어장은 늘 마지막) → 단원 펼치기 → 낱말·한자 상세.
-- **새로 배우기(심기)**: 한 자리에 8개. 카드(뜻·한자 조립·예문·듣기)를 보고 곧바로 확인 문항 하나(즉시 인출) → 심는다.
-  첫 복습은 오늘 밤 9시.
+  맨 아래 「진로독서 어휘장 가져오기」— 같은 기기의 진로독서 어휘장(`wbr.v1` 기기 저장)을 `bridge.js` 가 월별 단원 단어장
+  (`reading-vocab`)으로 만든다. 기기 안에서만 살고 서버에 올리지 않는다.
+- **새로 배우기(심기)**: 한 자리에 8개. 카드(뜻·한자 조립·예문·연상·듣기)를 보고 곧바로 확인 문항 하나(즉시 인출) → 심는다.
+  첫 복습은 오늘 밤 9시. 기록 탭에서 **밤 9시 알림**(Web Push)을 켤 수 있다 — VAPID 키가 없는 서버는 안내만 한다.
 - **한자**: 단원별 글자 타일. 세 번 쓰되 안내가 옅어진다(보고 → 흐릿 → 기억).
-  - 획순 모드(`medians` 있음): 색 안내선을 따라 한 획씩. 획마다 자리·방향·순서를 판정하고 「획순 보기」로 순서를 본다.
+  - 획순 모드(`medians` 있음 — 단어장 또는 공용 획순 사전): 뼈대 안내선을 따라 한 획씩. 획마다 자리·방향·순서를 판정하고 「획순 보기」로 순서를 본다.
   - 모양 모드: 옅은 안내 글자를 따라 쓰고 「확인」— 안내 글자 마스크와의 덮음률·새어 나간 잉크·잉크 과다·획수를 본다.
   - **획순 데이터가 없는 글자의 획순은 채점하지 않는다.** 없는 데이터로 틀렸다고 말하면 맞는 획순도 틀렸다고 하게 된다.
   - 처음 써 본 글자는 심어진다(그날 밤 훈음 문항으로 다시 만난다).
 - **훈련**: 오늘 복습(모든 단어장) · 단원 · 단어장 전체 · 한자만. 계단이 오를수록 재인→회상→산출
-  (뜻 고르기 → 낱말 고르기·한자 표기 → 문맥 빈칸·한자 조립 → 낱말 쓰기). 첫 시도 정답 good, 힌트 뒤 정답 hard, 오답 fail.
-- **기록**: 낱말·한자·장기 기억·써 본 한자, 단어장별, 연동 상태.
+  (뜻 고르기 → 낱말 고르기·한자 표기·유의어 → 문맥 빈칸·한자 조립 → 낱말 쓰기). 한자는 세 번째 복습(간격 3일)부터 **훈음을 보고 빈 칸에
+  직접 쓰는 회상 문항**(`c-write`)이 든다 — 판정은 모양 모드와 같은 덮음률이고, 잘 맞으면 good, 아슬하면 hard, 다시면 fail.
+  첫 시도 정답 good, 힌트 뒤 정답 hard, 오답 fail.
+- **기록**: 낱말·한자·장기 기억·써 본 한자, 단어장별, 연동 상태, 밤 9시 알림 켜기/끄기.
 - 상태는 기기(`wbhj.v1:<코드>`) 정본 + 연동 학생은 서버 백업(2.5초 디바운스, 400KB). 단어장 본문은 기기에 캐시하되
   자리가 없으면 다른 단어장 캐시부터 비운다.
 
 SRS id 규약: 한자는 `c:<글자>`(단어장을 넘어 공용), 낱말은 `w:<단어장id>:<낱말id>`.
 
+## 강사 화면
+
+- **관리 웹** `/admin/hanja-admin.html`: 단어장 업로드(붙여넣기·JSON, 미리보기) · 목록(공개 범위·삭제·시험지 링크) ·
+  학생 배정 · **이번 주 단원 지정**(범위 = 전체·반 이름·학생 코드, 마감) + 지정한 단원의 **진도표**(학생별 심음·장기 기억·밀림) ·
+  **공용 획순 사전** 업로드 · **학생 안내 QR** · 현황(저장 시점 요약 키 `hanja:summary` 로 학생 수만큼 본문을 읽지 않는다).
+- **종이 시험지** `/admin/hanja-print.html`: 단어장·단원을 고르면 훈음 쓰기·한자 쓰기·낱말 뜻 쓰기·한자어 표기 쓰기 4종 + 정답표.
+  앱 밖 확인용이라 학생 기록에는 들어가지 않는다.
+
 ## 서버 API (hanja-api.mjs)
 
 학생(토큰)
 - `GET /books` → `{books:[메타 + mine], updatedAt}` — 공개 범위 `all` + 내게 배정된 것
-- `GET /book?id=` → `{book, updatedAt}` — `assigned` 단어장은 배정받은 학생만(403)
-- `GET /pull` → `{state, updatedAt}` · `PUT /state {state}` → `{ok, updatedAt}` (400KB)
+- `GET /book?id=` → `{book, updatedAt, remap}` — `assigned` 단어장은 배정받은 학생만(403). `remap` 은 재업로드로 바뀐 낱말 id 표(없으면 null)
+- `GET /pull` → `{state, updatedAt}` · `PUT /state {state}` → `{ok, updatedAt}` (400KB, 저장 시 요약 키 갱신)
+- `GET /task` → `{task, scope}` — 학생 코드 → 반 이름 → default 순으로 찾는다(`scope` 는 어디서 왔는지)
+- `GET /strokes` → `{strokes, updatedAt}` — 공용 획순 사전
+- `GET /push/key` · `POST /push/subscribe {subscription}` · `POST /push/unsubscribe` — 밤 9시 알림(워드브레인과 같은 크론이 `hanja:push:<code>` 도 보낸다)
 
 관리(PIN)
-- `POST /admin/book {book}` 또는 `{text, id, title, publisher?, level?, note?}` (+`dryRun`) → 검사 결과·저장.
-  같은 id 는 덮어쓴다(공개 범위·배정 유지). 본문 2MB, 단어장 1.5MB.
+- `POST /admin/book {book}` 또는 `{text, id, title, publisher?, level?, note?}` (+`dryRun`) → 검사 결과·저장 (`replaced`, `remapped`).
+  같은 id 는 덮어쓴다(공개 범위·배정 유지, 바뀐 낱말 id 는 remap). 본문 2MB, 단어장 1.5MB.
 - `GET /admin/books` · `GET /admin/book?id=` · `DELETE /admin/book {id}`(배정에서도 뺀다, 학생 기록은 남는다)
 - `POST /admin/scope {id, scope}` · `POST /admin/assign {codes, bookIds, action:'add'|'remove'}` · `GET /admin/assign`
+- `POST /admin/task {scope, bookId, unitId, due?, title?}` · `GET /admin/tasks` → `{tasks, today}` · `DELETE /admin/task {scope}`
+- `GET /admin/progress?scope=` → `{scope, task, unit:{id,title,total}, rows:[{code,name,cls,linked,planted,graduated,due,…}], today}`
+- `POST /admin/strokes {strokes:{"十":{strokes, medians}}, replace?}` (4MB) · `GET /admin/strokes` → `{strokes, updatedAt, count, withMedians}`
 - `GET /admin/overview` → 학생별 `{words, chars, graduated, due, emergency, traced, streak, books, assigned, lastActive}`
 
-저장: 워커 `hanja:book:<id>` · `hanja:books`(목록) · `hanja:state:<code>` · `hanja:assign:<code>` / 로컬 `db.hanja`.
-백업 덤프(`dumpHanja`)는 단어장 본문을 싣지 않는다(내신 팩과 같은 이유). 퇴원은 `state`·`assign` 두 키만 지운다.
+저장: 워커 `hanja:book:<id>` · `hanja:books`(목록) · `hanja:remap:<id>` · `hanja:state:<code>` · `hanja:summary:<code>` ·
+`hanja:assign:<code>` · `hanja:task:<scope>` · `hanja:strokes` · `hanja:push:<code>` / 로컬 `db.hanja`.
+백업 덤프(`dumpHanja`)는 단어장 본문을 싣지 않는다(내신 팩과 같은 이유). 퇴원은 `state`·`summary`·`assign`·`push` 키를 지운다.
 apps 게이트: `/api/hanja/*` 는 앱 이름 `hanja` (`haru-api.mjs appOfPath`).
 
 ## 백로그
 
-- 획순 데이터 확충 — 원장이 검수한 글자부터 `medians` 를 붙인다(체험 단어장 20자가 형식 예시).
+- 획순 사전 확충 — 변환기 산출물을 원장이 검수해 올린 글자부터 획순 모드가 열린다(체험 단어장 20자가 형식 예시).
 - 학부모 리포트 연동(진로독서 `/api/parent/summary` 에 한자 요약 한 줄).
-- 강사가 단원 단위로 「이번 주 단원」을 지정해 오늘 화면 맨 위에 띄우기.
+- 종이 시험지 결과를 앱 기록으로 되돌리기(지금은 앱 밖 확인용).

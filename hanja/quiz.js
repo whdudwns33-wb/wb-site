@@ -14,8 +14,8 @@ var WBHQUIZ = (function () {
 
   var HEAD = {
     'w-meaning': '뜻 고르기', 'w-word': '낱말 고르기', 'w-cloze': '문맥 빈칸', 'w-build': '한자 조립',
-    'w-hanja': '한자 표기', 'w-type': '낱말 쓰기',
-    'c-hun': '훈음 고르기', 'c-char': '한자 고르기', 'c-word': '이 한자가 든 낱말', 'c-count': '획수 세기',
+    'w-hanja': '한자 표기', 'w-type': '낱말 쓰기', 'w-syn': '비슷한 말',
+    'c-hun': '훈음 고르기', 'c-char': '한자 고르기', 'c-word': '이 한자가 든 낱말', 'c-count': '획수 세기', 'c-write': '한자 쓰기',
   };
 
   function shuffle(arr, rnd) {
@@ -59,7 +59,15 @@ var WBHQUIZ = (function () {
       return 3;
     };
   }
-  function charRank(c) { return function (x) { return x.unit && x.unit === c.unit ? 0 : 1; }; }
+  /* 닮은 글자(similar)·같은 부수가 0·1 — 日/目, 土/士 처럼 진짜 헷갈리는 짝을 보기로 먼저 세운다. 같은 단원 2, 나머지 3 */
+  function charRank(c) {
+    var sim = c.similar || [];
+    return function (x) {
+      if (sim.indexOf(x.ch) >= 0 || (x.similar && x.similar.indexOf(c.ch) >= 0)) return 0;
+      if (c.radical && x.radical === c.radical) return 1;
+      return x.unit && x.unit === c.unit ? 2 : 3;
+    };
+  }
 
   function choiceQ(kind, itemId, prompt, answer, opts, rnd, extra) {
     var q = { kind: kind, head: HEAD[kind], id: itemId, prompt: prompt, choices: shuffle([answer].concat(opts), rnd), answer: answer, input: false };
@@ -138,6 +146,19 @@ var WBHQUIZ = (function () {
     };
   }
 
+  /* 비슷한 말 — 정답은 유의어 하나, 보기는 다른 낱말의 유의어(없으면 낱말) */
+  function qSyn(w, ctx, rnd) {
+    if (!w.syn || !w.syn.length) return null;
+    var answer = pickOne(w.syn, rnd), mine = {}, seen = {}, opts = [];
+    w.syn.forEach(function (s) { mine[s] = true; }); mine[w.word] = true; seen[answer] = true;
+    shuffle(ctx.words, rnd).forEach(function (x) {
+      if (opts.length >= 3 || x === w || x.id === w.id) return;
+      (x.syn && x.syn.length ? x.syn : [x.word]).forEach(function (s) { if (opts.length < 3 && !seen[s] && !mine[s]) { seen[s] = true; opts.push(s); } });
+    });
+    if (opts.length < 3) return null;
+    return choiceQ('w-syn', w._sid, w.word + ' 와(과) 뜻이 가장 비슷한 말은?', answer, opts, rnd, { word: w.word, hint: w.meaning });
+  }
+
   /* ── 한자 문항 ── */
   function charLabel(c) { return c.ch + (hasGloss(c) ? ' (' + gloss(c) + ')' : ''); }
 
@@ -172,21 +193,28 @@ var WBHQUIZ = (function () {
     return choiceQ('c-count', c._sid, c.ch + ' 은(는) 몇 획일까요?', String(c.strokes), opts, rnd, { ch: c.ch, big: true, suffix: '획' });
   }
 
-  var WORD_KINDS = { 'w-meaning': qMeaning, 'w-word': qWord, 'w-cloze': qCloze, 'w-build': qBuild, 'w-hanja': qHanja, 'w-type': qType };
-  var CHAR_KINDS = { 'c-hun': qHun, 'c-char': qChar, 'c-word': qCharWord, 'c-count': qCount };
+  /* 한자 쓰기 — 훈음을 보고 빈 칸에 글자를 써낸다(산출). 판정은 화면이 trace.js 로 한다(안내 글자 없이 덮음률).
+     따라쓰기의 3회차만이 유일한 회상 쓰기였는데 그것은 배운 날 한 번뿐이었다 — 이 문항이 쓰기를 간격 반복에 싣는다. */
+  function qWrite(c) {
+    if (!hasGloss(c)) return null;
+    return { kind: 'c-write', head: HEAD['c-write'], id: c._sid, ch: c.ch, prompt: '"' + gloss(c) + '" 을(를) 한자로 써 보세요', answer: c.ch, input: false, write: true, strokes: c.strokes || null };
+  }
+
+  var WORD_KINDS = { 'w-meaning': qMeaning, 'w-word': qWord, 'w-cloze': qCloze, 'w-build': qBuild, 'w-hanja': qHanja, 'w-type': qType, 'w-syn': qSyn };
+  var CHAR_KINDS = { 'c-hun': qHun, 'c-char': qChar, 'c-word': qCharWord, 'c-count': qCount, 'c-write': qWrite };
   /* 계단별 유형 순서 — 낮은 계단은 재인(뜻 고르기), 높은 계단은 산출(쓰기) */
   var PLAN = {
     word: [
       ['w-meaning', 'w-word', 'w-hanja'],
-      ['w-word', 'w-hanja', 'w-meaning', 'w-build'],
-      ['w-cloze', 'w-build', 'w-hanja', 'w-word'],
-      ['w-type', 'w-cloze', 'w-build', 'w-hanja'],
+      ['w-word', 'w-syn', 'w-hanja', 'w-meaning', 'w-build'],
+      ['w-cloze', 'w-build', 'w-syn', 'w-hanja', 'w-word'],
+      ['w-type', 'w-cloze', 'w-build', 'w-syn', 'w-hanja'],
     ],
     char: [
       ['c-hun', 'c-char'],
       ['c-char', 'c-word', 'c-hun'],
-      ['c-word', 'c-count', 'c-char'],
-      ['c-count', 'c-word', 'c-hun'],
+      ['c-write', 'c-word', 'c-count', 'c-char'],
+      ['c-write', 'c-count', 'c-word', 'c-hun'],
     ],
   };
   function tier(step) { return step >= 4 ? 3 : (step >= 2 ? 2 : (step >= 1 ? 1 : 0)); }
@@ -214,6 +242,8 @@ var WBHQUIZ = (function () {
   /* 채점 — 첫 시도 정답 good, 힌트 뒤 정답 hard 는 화면이 정한다. 여기서는 맞고 틀림만 */
   function check(q, answer) {
     if (!q) return false;
+    /* 쓰기 문항은 trace.js 의 판정({level})을 받는다 — good·ok 가 정답, retry 는 오답 */
+    if (q.write) return !!(answer && (answer.level === 'good' || answer.level === 'ok'));
     if (q.input) return norm(answer) === norm(q.answer);
     return String(answer) === String(q.answer);
   }

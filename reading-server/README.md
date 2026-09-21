@@ -25,7 +25,8 @@ ADMIN_PIN=원하는PIN node reading-server/server.mjs   # 기본 포트 8890
 ### 한자브레인
 
 - 라우트는 `/api/hanja/*`, 데이터는 `hanja:` 접두 KV 키(로컬 `db.hanja`)만 — `hanja-api.mjs` 한 모듈. 상세는 `hanja/README.md`.
-- 학생: `GET /books`·`GET /book?id=`·`GET /pull`·`PUT /state`. 관리(PIN): `POST /admin/book`(붙여넣기·JSON, dryRun)·`GET /admin/books`·`DELETE /admin/book`·`POST /admin/scope`·`POST /admin/assign`·`GET /admin/overview`.
+- 학생: `GET /books`·`GET /book?id=`(+`remap`)·`GET /pull`·`PUT /state`(저장 시 `hanja:summary:<code>` 요약 갱신)·`GET /task`(이번 주 단원, 학생→반→default)·`GET /strokes`(공용 획순 사전)·`GET /push/key`·`POST /push/subscribe|unsubscribe`(밤 9시 알림 — 워드브레인 크론이 함께 보낸다).
+- 관리(PIN): `POST /admin/book`(붙여넣기·JSON, dryRun, 재업로드 시 낱말 id 대응 remap)·`GET /admin/books`·`DELETE /admin/book`·`POST /admin/scope`·`POST /admin/assign`·`POST /admin/task`·`GET /admin/tasks`·`DELETE /admin/task`·`GET /admin/progress?scope=`(단원별 진도)·`POST|GET /admin/strokes`(획순 사전)·`GET /admin/overview`(요약 키). 관리 화면 `/admin/hanja-admin.html`, 시험지 인쇄 `/admin/hanja-print.html`.
 - 단어장 검사 규칙은 `hanja/book-check.js` 하나 — CLI `node hanja/book-validate.mjs` 와 업로드 관문이 같은 판정. 백업 덤프에는 단어장 본문이 없다(id·메타만).
 
 ### 워드브레인 (분리 가능한 A 구조)

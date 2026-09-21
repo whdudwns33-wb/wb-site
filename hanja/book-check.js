@@ -10,8 +10,8 @@
  *   { id, title, publisher?, level?, note?,
  *     units: [{ id, title }],                       // 문제집의 단원·회차 순서 그대로
  *     words: [{ id, unit, word, type:'hanja'|'native', hanja?, parts?:[{ch,hun,eum}], literal?,
- *               meaning, example?, syn?:[] }],
- *     chars: [{ ch, hun, eum, strokes?, unit, medians?:[[[x,y],…],…], words:[…], derived? }] }
+ *               meaning, example?, syn?:[], scene? }],       // id 는 '낱말|한자'(내용 기반) — 재업로드에도 안 밀린다
+ *     chars: [{ ch, hun, eum, strokes?, unit, medians?:[[[x,y],…],…], radical?, similar?:[…], words:[…], derived? }] }
  *
  * chars 는 두 갈래로 채워진다 — 한자 급수 교재처럼 글자를 직접 적은 것(explicit)과,
  * 낱말의 한자 분해(parts)에서 끌어낸 것(derived). 직접 적은 것이 이긴다. 직접 적은 글자는 그 단원의
@@ -35,8 +35,8 @@ var WBBOOKCHECK = (function () {
   var LIMITS = {
     words: 3000, chars: 2000, units: 200,
     title: 60, publisher: 40, note: 200,
-    word: 40, meaning: 200, example: 200, unit: 40, unitTitle: 60, itemId: 40,
-    hun: 20, eum: 4, strokes: 64, medianStrokes: 64, medianPts: 64, syn: 8, synLen: 40,
+    word: 40, meaning: 200, example: 200, unit: 40, unitTitle: 60, itemId: 100,
+    hun: 20, eum: 4, strokes: 64, medianStrokes: 64, medianPts: 64, syn: 8, synLen: 40, similar: 8, scene: 200,
   };
 
   function isObj(o) { return !!o && typeof o === 'object' && !Array.isArray(o); }
@@ -130,6 +130,7 @@ var WBBOOKCHECK = (function () {
   }
 
   function pad3(n) { return (n < 10 ? '00' : n < 100 ? '0' : '') + n; }
+  function contentId(word, hanja) { return (word + (hanja ? '|' + hanja : '')).slice(0, LIMITS.itemId); }
 
   /* ── 정규화 + 검사 ── 한 번에 한다. 정규화하면서 알게 되는 것이 곧 검사 결과다. */
   function checkBook(raw, opts) {
@@ -209,7 +210,9 @@ var WBBOOKCHECK = (function () {
       if (seenWord[key]) { C.warn(where, '같은 낱말이 다시 나와 앞의 것만 남긴다' + (hanja ? ' (' + hanja + ')' : '')); return; }
       seenWord[key] = true;
 
-      var id = str(w.id, LIMITS.itemId) || ('w' + pad3(book.words.length + 1));
+      /* id 는 내용(낱말|한자)에서 만든다. 순번(w001…)으로 매기면 낱말 하나를 중간에 끼워 다시 올렸을 때
+         뒤의 id 가 전부 밀려, 학생의 기억 기록(w:<단어장>:<id>)이 다른 낱말을 가리키게 된다 — 조용히 틀어지는 종류다. */
+      var id = str(w.id, LIMITS.itemId) || contentId(word, hanja);
       if (seenId[id]) { C.err(where, 'id "' + id + '" 가 겹쳐요.'); return; }
       seenId[id] = true;
 
@@ -229,6 +232,7 @@ var WBBOOKCHECK = (function () {
       if (Array.isArray(w.syn) && w.syn.length) {
         out.syn = w.syn.map(function (s) { return str(s, LIMITS.synLen); }).filter(Boolean).slice(0, LIMITS.syn);
       }
+      if (w.scene) out.scene = str(w.scene, LIMITS.scene);   /* 연상 장면 — 고유어는 그림 한 장이 뜻을 붙든다 */
       book.words.push(out);
     });
 
@@ -260,6 +264,19 @@ var WBBOOKCHECK = (function () {
         if (out.strokes == null) out.strokes = med.length;
       }
       if (c.note) out.note = str(c.note, LIMITS.note);
+      /* 부수·닮은 글자 — 오답 보기가 진짜 헷갈리는 짝(日/目, 土/士)을 겨냥하게 하는 실마리 */
+      if (c.radical != null && c.radical !== '') {
+        var rad = str(c.radical);
+        if (!isHanjaChar(rad)) { C.err(where, '부수(radical)는 한자 한 글자여야 해요: "' + rad.slice(0, 6) + '"'); return; }
+        out.radical = rad;
+      }
+      if (c.similar != null) {
+        var sim = Array.isArray(c.similar) ? c.similar.map(function (x) { return str(x); }) : hanjaOf(c.similar);
+        var badSim = sim.filter(function (x) { return !isHanjaChar(x); });
+        if (badSim.length) { C.err(where, '닮은 글자(similar)는 한자 한 글자씩이어야 해요: "' + badSim[0].slice(0, 6) + '"'); return; }
+        sim = sim.filter(function (x, k) { return x !== ch && sim.indexOf(x) === k; }).slice(0, LIMITS.similar);
+        if (sim.length) out.similar = sim;
+      }
       charIdx[ch] = book.chars.length;
       book.chars.push(out);
     });
@@ -377,8 +394,9 @@ var WBBOOKCHECK = (function () {
         var title = line.replace(/^#+\s*/, '').trim();
         if (!title) return;
         unitN += 1;
-        var uid = 'u' + (unitN < 10 ? '0' : '') + unitN;
-        while (unitIds[uid]) uid += 'x';
+        /* 단원 id 도 제목에서 — 순번(u01)이면 단원을 하나 끼워 다시 올릴 때 학생이 고른 단원·강사 지정이 밀린다 */
+        var uid = title.slice(0, LIMITS.unit), base = uid, dup = 1;
+        while (unitIds[uid]) { dup += 1; uid = (base.slice(0, LIMITS.unit - 4) + ' (' + dup + ')'); }
         unitIds[uid] = true;
         unit = uid;
         raw.units.push({ id: uid, title: title });
@@ -395,17 +413,26 @@ var WBBOOKCHECK = (function () {
         var c = { ch: first, hun: gloss.slice(0, sp), eum: gloss.slice(sp + 1), unit: unit };
         if (cols[2] && /^\d+$/.test(cols[2])) c.strokes = Number(cols[2]);
         else if (cols[2]) lineErrors.push((i + 1) + '행: 획수는 숫자로 적어요 — "' + cols[2].slice(0, 10) + '"');
+        if (cols[3]) c.radical = cols[3];                 /* 4열 부수 */
+        if (cols[4]) c.similar = hanjaOf(cols[4]);        /* 5열 닮은 글자들 (붙여 적는다: 日目) */
         raw.chars.push(c);
         return;
       }
       var word = first, meaning = cols[1] || '';
       if (!meaning) { lineErrors.push((i + 1) + '행: 뜻이 없어요 — "' + line.slice(0, 24) + '"'); return; }
       var rest = cols.slice(2).filter(Boolean);
-      var hanjaCol = '', example = '';
-      rest.forEach(function (col) { if (!hanjaCol && HANJA_ANY.test(col)) hanjaCol = col; else if (!example) example = col; });
+      var hanjaCol = '', example = '', syn = null, scene = '';
+      rest.forEach(function (col) {
+        var m;
+        if ((m = col.match(/^(?:유의어|비슷한\s*말)\s*[:：]\s*(.+)$/))) { syn = m[1].split(/[,、·]/).map(function (x) { return x.trim(); }).filter(Boolean); return; }
+        if ((m = col.match(/^(?:연상|장면)\s*[:：]\s*(.+)$/))) { scene = m[1].trim(); return; }
+        if (!hanjaCol && HANJA_ANY.test(col)) hanjaCol = col; else if (!example) example = col;
+      });
       var w = { word: word, meaning: meaning, unit: unit };
       if (hanjaCol) w.hanja = hanjaCol;
       if (example) w.example = example;
+      if (syn && syn.length) w.syn = syn;
+      if (scene) w.scene = scene;
       raw.words.push(w);
     });
     var res = checkBook(raw);

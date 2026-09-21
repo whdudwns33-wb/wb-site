@@ -148,17 +148,46 @@ t('붙여넣기 텍스트 — 단원(#)·낱말 줄·한자 줄·구분자', () 
   assert.ok(r.ok, JSON.stringify(r.errors));
   assert.deepStrictEqual(r.book.units.map((u) => u.title), ['1일차', '2일차']);
   assert.strictEqual(r.book.words.length, 3);
-  assert.strictEqual(r.book.words[0].unit, 'u01');
+  assert.strictEqual(r.book.words[0].unit, '1일차', '단원 id 는 제목에서 나온다');
   assert.strictEqual(r.book.words[0].hanja, '觀測');
   assert.strictEqual(r.book.words[0].example, '별을 관측했다.');
   assert.strictEqual(r.book.words[1].type, 'native');
   assert.strictEqual(r.book.words[1].example, '마음을 다잡고 앉았다.');
-  assert.strictEqual(r.book.words[2].unit, 'u02');
+  assert.strictEqual(r.book.words[2].unit, '2일차');
   const by = {}; r.book.chars.forEach((c) => { by[c.ch] = c; });
   assert.strictEqual(by['觀'].strokes, 25);
   assert.ok(!by['觀'].derived, '직접 적은 글자인데 derived 로 잡혔다');
-  assert.strictEqual(by['測'].unit, 'u02');
+  assert.strictEqual(by['測'].unit, '2일차');
   assert.strictEqual(r.book.level, 'L2');
+});
+
+t('낱말·단원 id 는 내용에서 나와, 줄을 중간에 끼워 다시 올려도 안 밀린다', () => {
+  const a = B.parseBookText('# 1일차\n관측 | 뜻 | 觀測\n여태 | 지금까지', { id: 'p-1', title: 'x' }).book;
+  const b = B.parseBookText('# 1일차\n관점 | 뜻 | 觀點\n관측 | 뜻 | 觀測\n# 덧붙인 단원\n여태 | 지금까지', { id: 'p-1', title: 'x' }).book;
+  assert.strictEqual(a.words[0].id, '관측|觀測');
+  assert.strictEqual(a.words[1].id, '여태');
+  assert.strictEqual(b.words.find((w) => w.word === '관측').id, a.words[0].id, '줄을 끼웠더니 id 가 밀렸다 — 학생 기록이 다른 낱말을 가리킨다');
+  assert.strictEqual(b.words.find((w) => w.word === '여태').id, a.words[1].id);
+  assert.deepStrictEqual(b.units.map((u) => u.id), ['1일차', '덧붙인 단원']);
+  /* 같은 제목 단원은 번호를 붙여 가른다 */
+  const c = B.parseBookText('# 복습\n관측 | 뜻\n# 복습\n여태 | 뜻', { id: 'p-1', title: 'x' }).book;
+  assert.deepStrictEqual(c.units.map((u) => u.id), ['복습', '복습 (2)']);
+  /* JSON 의 명시 id 는 그대로 */
+  const d = B.checkBook({ id: 'p-1', title: 'x', words: [{ id: 'my-1', word: '관측', meaning: '뜻' }] }).book;
+  assert.strictEqual(d.words[0].id, 'my-1');
+});
+
+t('부수·닮은 글자·연상·유의어 — JSON 과 붙여넣기 양쪽에서 받는다', () => {
+  const r = B.parseBookText('日 | 날 일 | 4 | 日 | 目曰\n거들다 | 남을 도와주다 | 유의어: 돕다, 보태다 | 연상: 상자 모서리를 함께 잡는 손 | 설거지를 거들었다.', { id: 'p-1', title: 'x' });
+  assert.ok(r.ok, JSON.stringify(r.errors));
+  const c = r.book.chars[0];
+  assert.strictEqual(c.radical, '日'); assert.deepStrictEqual(c.similar, ['目', '曰']); assert.strictEqual(c.strokes, 4);
+  const w = r.book.words[0];
+  assert.deepStrictEqual(w.syn, ['돕다', '보태다']); assert.strictEqual(w.scene, '상자 모서리를 함께 잡는 손'); assert.strictEqual(w.example, '설거지를 거들었다.');
+  const j = B.checkBook({ id: 'p-1', title: 'x', chars: [{ ch: '土', hun: '흙', eum: '토', similar: '士土', radical: '土' }] }).book;
+  assert.deepStrictEqual(j.chars[0].similar, ['士'], '자기 자신은 닮은 글자에서 뺀다');
+  assert.ok(!B.checkBook({ id: 'p-1', title: 'x', chars: [{ ch: '土', hun: '흙', eum: '토', radical: '흙' }] }).ok, '한글 부수가 통과했다');
+  assert.ok(!B.checkBook({ id: 'p-1', title: 'x', chars: [{ ch: '土', hun: '흙', eum: '토', similar: ['사'] }] }).ok, '한글 닮은 글자가 통과했다');
 });
 
 t('붙여넣기 — 줄 오류는 행 번호와 함께 막는다', () => {

@@ -8,6 +8,7 @@ import { reserve, usageSummary, readLimits } from './ai-quota.mjs';
 import { buildRound, forClient, grade, rank, ARENA_Q } from './arena.mjs';
 /* 밤 9시 푸시는 두 앱을 함께 본다 — 판정 규칙은 각 앱 모듈에 두고 여기서는 부르기만 한다 */
 import { naesinNightDueFor } from './naesin-api.mjs';
+import { hanjaNightDueFor } from './hanja-api.mjs';
 
 const STATE_MAX_BYTES = 400_000; // 워드브레인 기록 1건 최대 크기
 const nowIso = () => new Date().toISOString();
@@ -496,11 +497,31 @@ function dueCountOf(stateRec) {
    못 끝낸 시험 범위가 있거나. naesin 어댑터를 안 넘기면 예전처럼 워드브레인만 본다.
    알림 본문은 지금도 비어 있다(payload 암호화 전) — 어느 쪽 때문에 울렸는지는 화면에서 갈린다.
    그래서 내신 때문에 보낸 건수를 따로 세어 돌려준다: 이 값이 0이면 규칙이 안 걸린 것이다. */
-export async function sendNightPushes({ store, push, fetchFn, naesin, now }) {
-  if (!push || !push.publicKey || !push.privateJwk) return { sent: 0, skipped: 0, removed: 0, naesinOnly: 0, reason: 'no-vapid' };
+export async function sendNightPushes({ store, push, fetchFn, naesin, hanja, now }) {
+  if (!push || !push.publicKey || !push.privateJwk) return { sent: 0, skipped: 0, removed: 0, naesinOnly: 0, hanjaSent: 0, reason: 'no-vapid' };
   const f = fetchFn || fetch;
   const t = now == null ? Date.now() : +now;
-  let sent = 0, skipped = 0, removed = 0, naesinOnly = 0;
+  let sent = 0, skipped = 0, removed = 0, naesinOnly = 0, hanjaSent = 0;
+  const sendTo = async (endpoint) => {
+    const jwt = await vapidJwt({ audience: new URL(endpoint).origin, subject: push.subject || 'mailto:admin@wb.local', privateJwk: push.privateJwk });
+    return f(endpoint, { method: 'POST', headers: { TTL: '86400', Urgency: 'normal', Authorization: 'vapid t=' + jwt + ', k=' + push.publicKey } });
+  };
+  /* 한자브레인 구독자 — 자기 서비스 워커(/hanja/)로 따로 구독하고 첫 복습이 밤 9시라 이 크론이 유일한 부름이다.
+     같은 기기가 두 앱을 다 구독했으면 끝점이 다르므로 두 번 갈 수 있다 — 앱마다 알림 한 줄이라 그대로 둔다. */
+  if (hanja && typeof hanja.listPushCodes === 'function') {
+    for (const code of await hanja.listPushCodes()) {
+      const sub = await hanja.getPush(code);
+      if (!sub || !sub.endpoint) continue;
+      let due = false;
+      try { due = (await hanjaNightDueFor(hanja, code, t)).due; } catch (e) { due = false; }
+      if (!due) { skipped += 1; continue; }
+      try {
+        const r = await sendTo(sub.endpoint);
+        if (r.status === 404 || r.status === 410) { await hanja.delPush(code); removed += 1; }
+        else { sent += 1; hanjaSent += 1; }
+      } catch (e) { /* 이 학생은 내일 재시도 */ }
+    }
+  }
   for (const code of await store.listPushCodes()) {
     const sub = await store.getPush(code);
     if (!sub || !sub.endpoint) continue;
@@ -526,7 +547,7 @@ export async function sendNightPushes({ store, push, fetchFn, naesin, now }) {
       else { sent += 1; if (byNaesin) naesinOnly += 1; }
     } catch (e) { /* 이 학생은 내일 재시도 */ }
   }
-  return { sent, skipped, removed, naesinOnly };
+  return { sent, skipped, removed, naesinOnly, hanjaSent };
 }
 
 /* ── 라우터 ──

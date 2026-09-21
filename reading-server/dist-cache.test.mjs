@@ -153,7 +153,7 @@ t('배포본 _headers — /naesin/*·/vocab/*·/haru/*·/hanja/*·/letter/*·/ad
 /* 관리 화면은 서비스 워커가 없다 — 빌드가 dist/admin/ 으로 복사하지 않으면 그 화면만
    운영에서 404 다. 로컬 서버는 public/ 을 직접 서빙해 티가 안 나므로 여기서 지킨다. */
 t('관리 화면들이 dist/admin/ 에 실린다 — 하나 빠지면 그 화면만 운영에서 404', () => {
-  const want = ['index.html', 'vocab-review.html', 'metrics.html', 'naesin-admin.html', 'naesin-studio.html', 'naesin-live.html', 'haru-admin.html', 'letter-admin.html', 'hanja-admin.html'];
+  const want = ['index.html', 'vocab-review.html', 'metrics.html', 'naesin-admin.html', 'naesin-studio.html', 'naesin-live.html', 'haru-admin.html', 'letter-admin.html', 'hanja-admin.html', 'hanja-print.html'];
   for (const f of want) {
     const fp = path.join(DIST, 'admin', f);
     assert.ok(fs.existsSync(fp), 'dist/admin/' + f + ' 가 없다 — build-dist.mjs 에 복사를 추가하세요');

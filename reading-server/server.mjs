@@ -217,7 +217,7 @@ const naesinKoStore = {
    옛 db.json 에는 hanja 칸이 없으므로 첫 접근 때 만들어 준다. */
 const hanjaRoot = () => {
   db.hanja = db.hanja || { books: {}, index: null, states: {}, assigns: {} };
-  db.hanja.books = db.hanja.books || {}; db.hanja.states = db.hanja.states || {}; db.hanja.assigns = db.hanja.assigns || {};
+  for (const k of ['books', 'states', 'summaries', 'assigns', 'tasks', 'push', 'remaps']) db.hanja[k] = db.hanja[k] || {};
   return db.hanja;
 };
 const hanjaStore = {
@@ -234,7 +234,25 @@ const hanjaStore = {
   putAssign: (c, rec) => { hanjaRoot().assigns[c] = rec; persist(); },
   deleteAssign: (c) => { delete hanjaRoot().assigns[c]; persist(); },
   listAssignCodes: () => Object.keys(hanjaRoot().assigns),
+  getSummary: (c) => hanjaRoot().summaries[c] || null,
+  putSummary: (c, rec) => { hanjaRoot().summaries[c] = rec; persist(); },
+  deleteSummary: (c) => { delete hanjaRoot().summaries[c]; persist(); },
+  listSummaryCodes: () => Object.keys(hanjaRoot().summaries),
+  getTask: (s) => hanjaRoot().tasks[s] || null,
+  putTask: (s, rec) => { hanjaRoot().tasks[s] = rec; persist(); },
+  deleteTask: (s) => { delete hanjaRoot().tasks[s]; persist(); },
+  listTaskScopes: () => Object.keys(hanjaRoot().tasks),
+  getStrokes: () => hanjaRoot().strokes || null,
+  putStrokes: (rec) => { hanjaRoot().strokes = rec; persist(); },
+  getPush: (c) => hanjaRoot().push[c] || null,
+  putPush: (c, rec) => { hanjaRoot().push[c] = rec; persist(); },
+  delPush: (c) => { delete hanjaRoot().push[c]; persist(); },
+  listPushCodes: () => Object.keys(hanjaRoot().push),
+  getRemap: (id) => hanjaRoot().remaps[id] || null,
+  putRemap: (id, rec) => { hanjaRoot().remaps[id] = rec; persist(); },
+  deleteRemap: (id) => { delete hanjaRoot().remaps[id]; persist(); },
   getStudent: (c) => db.students[c] || null,
+  listStudentCodes: () => Object.keys(db.students),
 };
 /* 청크브레인 저장소 어댑터 — db.chunk 만 사용(학생 기록·관리용 요약). 콘텐츠는 저장소에 없다. */
 const chunkRoot = () => { db.chunk = db.chunk || { states: {}, summaries: {}, assigns: {} }; db.chunk.assigns = db.chunk.assigns || {}; return db.chunk; };
@@ -511,7 +529,7 @@ const server = http.createServer(async (req, res) => {
       /* 한자브레인 (/api/hanja/*) — 인증만 공유, 저장·라우트는 격리(워커와 동일). 단어장은 db.hanja 에만 산다 */
       if (p.startsWith('/api/hanja/')) {
         if (Number(req.headers['content-length'] || 0) > hanjaBodyLimit(p)) { req.resume(); return json(res, 413, { error: '요청이 너무 커서 받을 수 없어요.' }); }
-        const out = await handleHanja({ path: p, method: req.method, who, query: url.searchParams, getBody: () => readBody(req, hanjaBodyLimit(p)), store: hanjaStore });
+        const out = await handleHanja({ path: p, method: req.method, who, query: url.searchParams, getBody: () => readBody(req, hanjaBodyLimit(p)), store: hanjaStore, push: VOCAB_PUSH_ENV });
         return json(res, out.status, out.body);
       }
 
@@ -815,8 +833,8 @@ const server = http.createServer(async (req, res) => {
         drop(ko.overlays, c);
         /* 하루브레인 — 정확 접두 4계열(state·mock·paper·parent). 대응표는 남긴다(워커와 동일) */
         await dropStudentHaru(haruStore, c); removed += 3;
-        /* 한자브레인 — 기록·배정. 단어장은 학생 것이 아니라 둔다(워커와 동일) */
-        await dropStudentHanja(hanjaStore, c); removed += 2;
+        /* 한자브레인 — 기록·요약·배정·알림 구독. 단어장·획순 사전은 학생 것이 아니라 둔다(워커와 동일) */
+        await dropStudentHanja(hanjaStore, c); removed += 4;
         await dropStudentChunk(chunkStore, c);
         /* 브레인레터 — 열람·문제 기록 한 키. 호는 학생 것이 아니라 둔다(워커와 동일) */
         await dropStudentLetter(letterStore, c, (db.students[c] || {}).ptoken); removed += 1;
@@ -978,7 +996,7 @@ setInterval(async () => {
   if (lastPushDay === day) return;
   lastPushDay = day;
   try {
-    const r = await sendNightPushes({ store: vocabStore, push: VOCAB_PUSH_ENV, naesin: naesinStore });
+    const r = await sendNightPushes({ store: vocabStore, push: VOCAB_PUSH_ENV, naesin: naesinStore, hanja: hanjaStore });
     if (r.sent || r.removed) console.log('[push] 밤 9시 알림(워드브레인+내신):', JSON.stringify(r));
   } catch (e) { console.error('[push] 발송 실패:', e.message); }
 }, 60000).unref();

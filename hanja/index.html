@@ -189,6 +189,7 @@
 
   <script src="./voice.js"></script>
   <script src="./book-check.js"></script>
+  <script src="./bridge.js"></script>
   <script src="./srs.js"></script>
   <script src="./quiz.js"></script>
   <script src="./trace.js"></script>
@@ -214,10 +215,11 @@
   var AUTH = auth();
   var authed = !!(AUTH && AUTH.token);
   var code = authed ? String((AUTH.student && AUTH.student.code) || AUTH.code || 'linked') : 'demo';
-  var SYNC = { avail: false, authBad: false, timer: null, busy: false, last: null, offline: false };
+  var SYNC = { avail: false, ai: false, authBad: false, timer: null, busy: false, last: null, offline: false };
+  function todayKst() { return new Date(now() + 9 * 3600e3).toISOString().slice(0, 10); }
   async function api(path, opt) {
     if (!authed) throw new Error('연동이 필요해요');
-    var r = await fetch('/api/hanja' + path, Object.assign({ headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + AUTH.token } }, opt || {}));
+    var r = await fetch((path.indexOf('/api/') === 0 ? path : '/api/hanja' + path), Object.assign({ headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + AUTH.token } }, opt || {}));
     if (r.status === 401) { SYNC.authBad = true; throw new Error('연동이 만료됐어요 — 진로독서 설정에서 다시 연동해 주세요'); }
     var j = await r.json();
     if (!r.ok) { var e = new Error((j && j.error) || ('오류 ' + r.status)); e.status = r.status; throw e; }
@@ -228,9 +230,9 @@
   /* ── 저장소 — 기기별 기록. 연동 학생 코드와 체험(demo)을 키로 갈라 섞이지 않게 ── */
   var KEY = 'wbhj.v1:' + code;
   var db;
-  function fresh() { return { v: 1, states: {}, trace: {}, log: [], streak: { count: 0, last: null }, settings: { book: '', unit: '' }, created: now() }; }
+  function fresh() { return { v: 1, states: {}, trace: {}, log: [], custom: {}, streak: { count: 0, last: null }, settings: { book: '', unit: '' }, created: now() }; }
   function load() { try { var raw = localStorage.getItem(KEY); return raw ? JSON.parse(raw) : null; } catch (e) { return null; } }
-  function adopt(next) { db = Object.assign(fresh(), next || {}); db.states = db.states || {}; db.trace = db.trace || {}; db.log = db.log || []; db.settings = db.settings || { book: '', unit: '' }; db.streak = db.streak || { count: 0, last: null }; }
+  function adopt(next) { db = Object.assign(fresh(), next || {}); db.states = db.states || {}; db.trace = db.trace || {}; db.log = db.log || []; db.custom = db.custom || {}; db.settings = db.settings || { book: '', unit: '' }; db.streak = db.streak || { count: 0, last: null }; }
   adopt(load());
   function save() {
     if (db.log.length > 400) db.log = db.log.slice(-300);
@@ -253,7 +255,8 @@
   /* ── 단어장 ──
      목록(index)은 서버(/books)에서, 본문(/book?id=)은 열 때 받아 기기에 캐시한다. 미연동 기기는 체험 단어장뿐이다.
      체험 단어장은 연동 학생에게도 늘 보인다 — 학원 단어장이 아직 없을 때의 첫 계단이다. */
-  var LIB = { index: [], books: {}, chars: {}, sample: null, loading: {} };
+  var LIB = { index: [], books: {}, chars: {}, sample: null, loading: {}, strokes: {}, strokesAt: null, task: null };
+  var SKEY = 'wbhj.strokes:' + code;
   var IKEY = 'wbhj.index:' + code;
   function cacheKey(id) { return 'wbhj.book:' + code + ':' + id; }
   function readCache(id) { try { return JSON.parse(localStorage.getItem(cacheKey(id)) || 'null'); } catch (e) { return null; } }
@@ -265,19 +268,66 @@
       catch (e) { if (!keys.length) return; localStorage.removeItem(keys.shift()); }   /* 자리가 없으면 다른 단어장 캐시부터 비운다 */
     }
   }
-  function installBook(book, updatedAt) {
+  function installBook(book, updatedAt, remap) {
     var res = WBBOOKCHECK.checkBook(book);
     var b = res.book;
     if (!b) return null;
     b.updatedAt = updatedAt || null;
+    if (remap) migrateIds(b.id, remap);
     b.words.forEach(function (w) { w._sid = WBHSRS.wordId(b.id, w.id); w._book = b.id; });
-    b.chars.forEach(function (c) { c._sid = WBHSRS.charId(c.ch); c._book = b.id; });
+    b.chars.forEach(function (c) { c._sid = WBHSRS.charId(c.ch); c._book = b.id; applyStrokes(c); });
     LIB.books[b.id] = b;
     /* 한자 사전 — 여러 단어장이 같은 글자를 가지면 획순·획수가 있는 쪽을 쓴다 */
     b.chars.forEach(function (c) {
       var prev = LIB.chars[c.ch];
       if (!prev || (!prev.medians && c.medians) || (!prev.strokes && c.strokes) || (!prev.hun && c.hun)) LIB.chars[c.ch] = c;
     });
+    return b;
+  }
+  /* 재업로드로 낱말 id 가 바뀐 것 — 서버가 준 옛→새 대응으로 기억 기록의 키를 옮긴다(두 번 적용해도 같다) */
+  function migrateIds(bookId, remap) {
+    var moved = 0;
+    Object.keys(remap).forEach(function (oldId) {
+      var from = WBHSRS.wordId(bookId, oldId), to = WBHSRS.wordId(bookId, remap[oldId]);
+      if (from === to || !db.states[from]) return;
+      if (!db.states[to] || (db.states[to].reps || 0) < (db.states[from].reps || 0)) { db.states[to] = db.states[from]; db.states[to].id = to; }
+      delete db.states[from]; moved += 1;
+      if (db.custom[from]) { db.custom[to] = db.custom[from]; delete db.custom[from]; }
+    });
+    if (moved) save();
+  }
+  /* 공용 획순 사전 — 단어장에 없는 획순·획수를 글자 단위로 채운다(글자 하나에 획순 하나) */
+  function applyStrokes(c) {
+    var d = LIB.strokes[c.ch]; if (!d) return;
+    if (!c.medians && d.medians) c.medians = d.medians;
+    if (!c.strokes && d.strokes) c.strokes = d.strokes;
+  }
+  async function loadStrokes() {
+    try { var cached = JSON.parse(localStorage.getItem(SKEY) || 'null'); if (cached && cached.strokes) { LIB.strokes = cached.strokes; LIB.strokesAt = cached.updatedAt || null; } } catch (e) {}
+    if (syncOn()) {
+      try {
+        var j = await api('/strokes');
+        if (j && j.strokes && (j.updatedAt || null) !== LIB.strokesAt) { LIB.strokes = j.strokes; LIB.strokesAt = j.updatedAt || null; try { localStorage.setItem(SKEY, JSON.stringify({ strokes: j.strokes, updatedAt: j.updatedAt })); } catch (e) {} }
+      } catch (e) { /* 오프라인 — 캐시로 */ }
+    }
+    Object.keys(LIB.chars).forEach(function (ch) { applyStrokes(LIB.chars[ch]); });
+    Object.keys(LIB.books).forEach(function (id) { LIB.books[id].chars.forEach(applyStrokes); });
+  }
+  /* 만기 기록이 가리키는 단어장을 미리 받아 둔다 — 새 기기에서 만기 수와 문항 수가 어긋나지 않게 */
+  async function fetchDueBooks() {
+    var want = {};
+    WBHSRS.dueList(db.states, now()).forEach(function (s) { var m = s.id.match(/^w:([^:]+):/); if (m && !bookOf(m[1]) && LIB.index.some(function (e) { return e.id === m[1]; })) want[m[1]] = true; });
+    for (var id in want) { try { await openBook(id); } catch (e) { /* 다음 접속 때 */ } }
+  }
+  /* 진로독서 어휘장 → 이 기기만의 단어장(reading-vocab). 서버에 올리지 않는다 — 학생 기록(SRS)만 서버로 간다 */
+  function bridgeImport(announce) {
+    var raw = null; try { raw = localStorage.getItem('wbr.v1'); } catch (e) {}
+    var b = installBook(WBHBRIDGE.toBook(WBHBRIDGE.readVocab(raw)), null);
+    if (!b || !b.words.length) { if (announce) toast('진로독서 어휘장에 한자어·고유어가 아직 없어요'); return null; }
+    var entry = Object.assign(metaOf(b), { local: true, scope: 'all', mine: false });
+    var k = -1; LIB.index.forEach(function (e, i) { if (e.id === b.id) k = i; });
+    if (k >= 0) LIB.index[k] = entry; else LIB.index.splice(Math.max(0, LIB.index.length - (LIB.sample ? 1 : 0)), 0, entry);
+    if (announce) toast('어휘장 낱말 ' + b.words.length + '개를 단어장으로 가져왔어요');
     return b;
   }
   async function loadSample() {
@@ -298,25 +348,27 @@
     LIB.index = idx.filter(function (e) { return e && e.id; });
     var s = await loadSample();
     if (s && !LIB.index.some(function (e) { return e.id === s.id; })) LIB.index.push(Object.assign(metaOf(s), { sample: true, scope: 'all', mine: false }));
+    if (db.settings.bridge) bridgeImport(false);
     /* 캐시된 본문은 미리 실어 둔다 — 오늘 복습 목록이 단어장을 열지 않고도 그려지게 */
-    LIB.index.forEach(function (e) { if (!LIB.books[e.id]) { var c = readCache(e.id); if (c && c.book) installBook(c.book, c.updatedAt); } });
+    LIB.index.forEach(function (e) { if (!LIB.books[e.id]) { var c = readCache(e.id); if (c && c.book) installBook(c.book, c.updatedAt, c.remap); } });
   }
   /* 본문 열기 — 캐시가 최신이면 캐시, 아니면 서버. 서버가 없으면 캐시라도 */
   async function openBook(id) {
     if (id === SAMPLE_ID && LIB.sample) return LIB.sample;
     var entry = LIB.index.filter(function (e) { return e.id === id; })[0];
+    if (entry && entry.local && LIB.books[id]) return LIB.books[id];   /* 이 기기만의 단어장(어휘장)은 서버에 없다 */
     var cached = readCache(id);
     var fresh2 = cached && entry && cached.updatedAt && entry.updatedAt && cached.updatedAt >= entry.updatedAt;
     if (LIB.books[id] && (fresh2 || !syncOn())) return LIB.books[id];
     if (syncOn() && !fresh2) {
       if (!LIB.loading[id]) LIB.loading[id] = api('/book?id=' + encodeURIComponent(id)).then(function (j) {
-        writeCache(id, { book: j.book, updatedAt: j.updatedAt });
-        return installBook(j.book, j.updatedAt);
+        writeCache(id, { book: j.book, updatedAt: j.updatedAt, remap: j.remap || null });
+        return installBook(j.book, j.updatedAt, j.remap);
       }).finally(function () { delete LIB.loading[id]; });
       try { return await LIB.loading[id]; } catch (e) { if (LIB.books[id]) return LIB.books[id]; throw e; }
     }
     if (LIB.books[id]) return LIB.books[id];
-    if (cached && cached.book) return installBook(cached.book, cached.updatedAt);
+    if (cached && cached.book) return installBook(cached.book, cached.updatedAt, cached.remap);
     if (id === SAMPLE_ID) return loadSample();
     throw new Error('단어장을 아직 받지 못했어요 — 학원 와이파이에서 열어 주세요');
   }
@@ -390,6 +442,22 @@
     var due = WBHSRS.dueList(db.states, t);
     var bid = curBookId(), book = bid ? bookOf(bid) : null;
     var html = demoNotice();
+    var tk = LIB.task, tb = null, tu = null;
+    if (tk) {
+      tb = bookOf(tk.bookId); tu = tb ? unitsOf(tb).filter(function (u) { return u.id === tk.unitId; })[0] : null;
+      var titems = tb && tu ? itemsOf(tb, tu.id) : [], tp = progressOf(titems), tfresh = titems.filter(function (it) { return !stateOf(it); }).length;
+      var over = !!(tk.due && tk.due < todayKst());
+      html += '<div class="card" style="border-color:#E4B8B0;background:#FFF9F5"><div style="display:flex;align-items:center;gap:8px"><span class="chip t-c">이번 주 단원</span>' +
+        '<span class="muted" style="font-size:.76rem">' + (tk.scope === 'student' ? '나에게' : tk.scope === 'class' ? '우리 반에' : '모두에게') + ' 선생님이 지정</span>' +
+        (tk.due ? '<span class="muted" style="margin-left:auto;font-size:.76rem;' + (over ? 'color:var(--red);font-weight:700' : '') + '">' + (over ? '마감 지남 ' : '마감 ') + esc(tk.due.slice(5).replace('-', '/')) + '</span>' : '') + '</div>' +
+        '<b style="display:block;color:var(--ink-strong);margin:6px 0 2px">' + esc(tk.title) + '</b>' +
+        (tb && tu
+          ? '<div class="bar stack"><i class="g" style="width:' + pct(tp.graduated, tp.total) + '%"></i><i style="width:' + pct(tp.planted - tp.graduated, tp.total) + '%"></i></div>' +
+            '<p class="muted" style="margin:0 0 10px;font-size:.78rem">배우는 중 ' + tp.planted + ' / ' + tp.total + ' · 장기 기억 ' + tp.graduated + (tp.due ? ' · 복습 ' + tp.due : '') + '</p>' +
+            '<div class="row">' + (tfresh ? '<button class="btn primary" id="tkLearn">새로 배우기 (' + Math.min(tfresh, LEARN_MAX) + ')</button>' : '') +
+            (tp.planted ? '<button class="btn' + (tfresh ? '' : ' primary') + '" id="tkTrain">이 단원 훈련</button>' : '') + '</div>'
+          : '<p class="muted" style="margin:0">단어장을 받는 중이에요… 학원 와이파이에서 열면 바로 받아요.</p>') + '</div>';
+    }
     html += '<div class="card"><div class="nums">' +
       '<div class="tn' + (sum.due ? ' warn' : '') + '"><b>' + sum.due + '</b><span>복습할 것</span></div>' +
       '<div class="tn"><b>' + sum.total + '</b><span>배우는 중</span></div>' +
@@ -425,6 +493,8 @@
     var b3 = $('#hmTrainUnit'); if (b3) b3.addEventListener('click', function () { trainStart({ mode: 'unit', book: book.id, unit: db.settings.unit }); });
     var b4 = $('#hmTrace'); if (b4) b4.addEventListener('click', function () { render('chars'); });
     var b5 = $('#hmPick'); if (b5) b5.addEventListener('click', function () { render('books'); });
+    var t1 = $('#tkLearn'); if (t1) t1.addEventListener('click', function () { db.settings.book = tb.id; db.settings.unit = tu.id; save(); learnStart(tb, tu.id); });
+    var t2 = $('#tkTrain'); if (t2) t2.addEventListener('click', function () { db.settings.book = tb.id; db.settings.unit = tu.id; save(); trainStart({ mode: 'unit', book: tb.id, unit: tu.id }); });
   }
 
   /* ── 단어장 ── */
@@ -433,6 +503,11 @@
     var el = $('#view-books');
     var bid = curBookId();
     var html = demoNotice() + '<h2 class="sec" style="margin-top:6px">단어장 고르기 <small>문제집 한 권이 단어장 하나</small></h2>';
+    var rvRaw = null; try { rvRaw = localStorage.getItem('wbr.v1'); } catch (e) {}
+    var rvN = WBHBRIDGE.toBook(WBHBRIDGE.readVocab(rvRaw)).words.length;
+    if (rvN) html += '<div class="card tight" style="display:flex;align-items:center;gap:10px"><div style="flex:1;min-width:0"><b style="color:var(--ink-strong)">📖 진로독서 어휘장</b>' +
+      '<span class="muted" style="display:block;font-size:.78rem">지문에서 모은 한자어·고유어 ' + rvN + '개' + (db.settings.bridge ? ' · 단어장으로 쓰는 중' : '') + '</span></div>' +
+      '<button class="btn small' + (db.settings.bridge ? '' : ' primary') + '" id="bkBridge">' + (db.settings.bridge ? '다시 가져오기' : '가져오기') + '</button></div>';
     if (!LIB.index.length) html += '<div class="card"><p class="muted" style="margin:0">아직 단어장이 없어요.</p></div>';
     LIB.index.forEach(function (e) {
       var b = bookOf(e.id), p = b ? progressOf(itemsOf(b, null)) : null;
@@ -441,7 +516,7 @@
         '<div style="flex:1;min-width:0"><b>' + esc(e.title) + '</b>' +
         '<span class="muted" style="font-size:.78rem">' + (e.publisher ? esc(e.publisher) + ' · ' : '') + (e.level ? e.level + ' · ' : '') +
         '낱말 ' + (e.counts ? e.counts.words : 0) + ' · 한자 ' + (e.counts ? e.counts.chars : 0) + ' · 단원 ' + (e.units ? e.units.length : 0) + '</span>' +
-        (e.mine ? ' <span class="chip t-a">선생님 배정</span>' : '') + (e.sample ? ' <span class="chip t-g">WB 기본</span>' : '') +
+        (e.mine ? ' <span class="chip t-a">선생님 배정</span>' : '') + (e.sample ? ' <span class="chip t-g">WB 기본</span>' : '') + (e.local ? ' <span class="chip t-n">내 어휘장</span>' : '') +
         (p && p.planted ? '<div class="bar stack"><i class="g" style="width:' + pct(p.graduated, p.total) + '%"></i><i style="width:' + pct(p.planted - p.graduated, p.total) + '%"></i></div>' : '') +
         '</div><span class="muted">' + (e.id === bid ? '✔' : '›') + '</span></div>';
     });
@@ -476,6 +551,7 @@
     el.querySelectorAll('.book').forEach(function (b) {
       b.addEventListener('click', function () { selectBook(b.dataset.book); });
     });
+    var br = $('#bkBridge'); if (br) br.addEventListener('click', function () { db.settings.bridge = true; save(); if (bridgeImport(true)) selectBook(WBHBRIDGE.BOOK_ID); });
     el.querySelectorAll('.unit').forEach(function (u) {
       var uid = u.dataset.unit, k = book.id + '|' + uid;
       u.querySelector('.unit-head').addEventListener('click', function () {
@@ -525,9 +601,60 @@
       '<div class="word">' + esc(w.word) + '</div>' + (w.hanja ? '<div class="hanja">' + esc(w.hanja) + '</div>' : '') + partsHtml(w) +
       '<div class="meaning">' + esc(w.meaning) + '</div>' + exampleHtml(w) +
       (w.syn && w.syn.length ? '<p class="muted" style="margin:6px 0 0;font-size:.82rem">비슷한 말: ' + esc(w.syn.join(', ')) + '</p>' : '') +
+      sceneHtml(w) +
       '<div><button class="say-btn" data-say="' + esc(w.word + '. ' + w.meaning + (w.example ? '. ' + w.example : '')) + '">🔊 들어보기</button></div></div>';
   }
-  function bindSay(root) { root.querySelectorAll('[data-say]').forEach(function (b) { b.addEventListener('click', function () { say(b.dataset.say); }); }); }
+  /* 연상 장면 — 단어장에 적힌 것(scene)이 먼저, 없으면 학생이 고른 AI 연상(검수 전/승인). 둘 다 없고 AI 가 있으면 만들기 버튼 */
+  function sceneHtml(w) {
+    var mine = w._sid && db.custom[w._sid];
+    var scene = w.scene || (mine && mine.scene) || '', cue = (!w.scene && mine && mine.cue) || '';
+    if (scene) return '<div class="hintbox" style="text-align:left;margin-top:8px"><span class="chip t-a">연상</span> ' + (cue ? '<b>' + esc(cue) + '</b> — ' : '') + esc(scene) + (mine && !w.scene && mine.mnemoStatus === 'pending' ? ' <span class="muted">(선생님 검수 전)</span>' : '') + '</div>';
+    if (authed && SYNC.ai && !SYNC.authBad && w._sid) return '<div><button class="say-btn" data-ai="' + esc(w._sid) + '">✨ AI 연상 만들기</button></div>';
+    return '';
+  }
+  function bindSay(root) {
+    root.querySelectorAll('[data-say]').forEach(function (b) { b.addEventListener('click', function () { say(b.dataset.say); }); });
+    root.querySelectorAll('[data-ai]').forEach(function (b) { b.addEventListener('click', function () { aiMnemo(b.dataset.ai); }); });
+  }
+  /* AI 연상 — 워드브레인의 검수 흐름을 그대로 쓴다: 후보 3개 → 학생이 하나 고름 → 검수 전(pending) → 접속 때마다 승인/반려 확인 */
+  async function aiMnemo(sid) {
+    var it = resolve(sid); if (!it || it.kind !== 'word') return;
+    var w = it.w;
+    try {
+      var j = await api('/api/vocab/mnemonic', { method: 'POST', body: JSON.stringify({ word: w.word, meaning: w.meaning, type: w.type,
+        hanja: w.parts ? w.parts.map(function (p) { return p.ch + (p.hun ? '(' + p.hun + ' ' + p.eum + ')' : ''); }).join('+') : undefined }) });
+      if (!j.ok) { toast(j.reason === 'quota' ? '오늘 AI 연상 한도를 다 썼어요 — 내일 다시' : j.reason === 'no-key' ? 'AI 연상이 아직 준비되지 않았어요' : '연상을 만들지 못했어요'); return; }
+      var cands = j.candidates || [];
+      if (j.status === 'approved' && cands[0]) { db.custom[sid] = { cue: cands[0].cue, scene: cands[0].scene, mnemoStatus: 'approved' }; save(); toast('선생님이 승인한 연상을 붙였어요'); render(curView); return; }
+      if (!cands.length) { toast('연상을 만들지 못했어요'); return; }
+      sheet('<b style="display:block;color:var(--ink-strong);margin-bottom:8px">' + esc(w.word) + ' — 마음에 드는 연상을 고르세요</b><div class="choices">' +
+        cands.map(function (c, i) { return '<button class="choice" data-pick="' + i + '"><b>' + esc(c.cue) + '</b><br><span class="muted">' + esc(c.scene) + '</span></button>'; }).join('') + '</div>' +
+        '<p class="muted" style="font-size:.78rem;margin:8px 0 0">고른 연상은 선생님 검수를 거쳐 확정돼요. 내가 만든 연상이 제일 오래 가요 — 마음에 안 들면 안 골라도 돼요.</p>', function (el) {
+        el.querySelectorAll('[data-pick]').forEach(function (b) { b.addEventListener('click', function () {
+          var c = cands[Number(b.dataset.pick)]; db.custom[sid] = { cue: c.cue, scene: c.scene, mnemoStatus: 'pending' }; save(); closeSheet(); toast('연상을 붙였어요 — 선생님 검수 뒤 확정돼요'); render(curView);
+        }); });
+      });
+    } catch (e) { toast(e.message || '연상을 만들지 못했어요'); }
+  }
+  async function refreshPendingMnemos() {
+    if (!syncOn()) return;
+    var pend = Object.keys(db.custom).filter(function (k) { return db.custom[k] && db.custom[k].mnemoStatus === 'pending'; });
+    if (!pend.length) return;
+    var byWord = {};
+    pend.forEach(function (k) { var it = resolve(k); if (it && it.kind === 'word') byWord[it.w.word] = k; });
+    var words = Object.keys(byWord).slice(0, 50);
+    if (!words.length) return;
+    try {
+      var j = await api('/api/vocab/mnemonic/check', { method: 'POST', body: JSON.stringify({ words: words }) });
+      var changed = 0;
+      (j.items || []).forEach(function (r) {
+        var k = byWord[r.word]; if (!k) return;
+        if (r.status === 'approved' && r.approved) { db.custom[k] = { cue: r.approved.cue, scene: r.approved.scene, mnemoStatus: 'approved' }; changed += 1; }
+        else if (r.status === 'rejected' || r.status === 'none') { delete db.custom[k]; changed += 1; }
+      });
+      if (changed) { save(); toast('선생님 검수 결과가 반영됐어요'); render(curView); }
+    } catch (e) { /* 다음 접속 때 */ }
+  }
   function stateHtml(item) {
     var s = stateOf(item);
     if (!s) return '<p class="muted" style="text-align:center;margin:8px 0 0">아직 안 배운 항목이에요.</p>';
@@ -708,6 +835,11 @@
     cv.width = Math.round(css * dpr); cv.height = Math.round(css * dpr);
     TRACE.size = css; TRACE.ctx = cv.getContext('2d'); TRACE.ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
+  /* 米자 격자 — 획이 어디쯤 오는지 가늠자 */
+  function paintGrid(c, s) {
+    c.save(); c.strokeStyle = '#E4DCCB'; c.lineWidth = 1; c.strokeRect(0.5, 0.5, s - 1, s - 1); c.setLineDash([4, 5]);
+    c.beginPath(); c.moveTo(s / 2, 0); c.lineTo(s / 2, s); c.moveTo(0, s / 2); c.lineTo(s, s / 2); c.moveTo(0, 0); c.lineTo(s, s); c.moveTo(s, 0); c.lineTo(0, s); c.stroke(); c.restore();
+  }
   function paintGlyph(c, s, alpha, color) {
     if (alpha <= 0) return;
     c.save(); c.globalAlpha = alpha; c.fillStyle = color || '#2B2118'; c.textAlign = 'center'; c.textBaseline = 'middle';
@@ -727,15 +859,15 @@
     var c = TRACE && TRACE.ctx, s = TRACE && TRACE.size, cur = TRACE && TRACE.cur;
     if (!c || !cur) return;
     c.clearRect(0, 0, s, s);
-    /* 米자 격자 — 획이 어디쯤 오는지 가늠자 */
-    c.save(); c.strokeStyle = '#E4DCCB'; c.lineWidth = 1; c.strokeRect(0.5, 0.5, s - 1, s - 1); c.setLineDash([4, 5]);
-    c.beginPath(); c.moveTo(s / 2, 0); c.lineTo(s / 2, s); c.moveTo(0, s / 2); c.lineTo(s, s / 2); c.moveTo(0, 0); c.lineTo(s, s); c.moveTo(s, 0); c.lineTo(0, s); c.stroke(); c.restore();
+    paintGrid(c, s);
     var a = TRACE.peek ? 0.3 : WBHTRACE.guideAlpha(cur.rep);
     var ch = traceChar();
     if (TRACE.mode === 'order' && ch && ch.medians) {
-      /* 획순 모드: 글자는 아주 옅게, 이미 맞힌 획은 연한 잉크, 이번 획은 색 안내선(마지막 회차는 없음) */
-      paintGlyph(c, s, Math.min(a, 0.12));
+      /* 획순 모드: 안내는 폰트 글리프가 아니라 중심선 뼈대다 — 글리프는 폰트마다 자리가 달라 안내선과 어긋나 보인다.
+         뼈대는 회차마다 옅어지고, 이미 맞힌 획은 연한 잉크, 이번 획은 색 안내선(마지막 회차는 없음) */
       var w = Math.max(6, s * 0.05);
+      var sa = TRACE.peek ? 0.28 : (cur.rep === 0 ? 0.18 : cur.rep === 1 ? 0.09 : 0);
+      if (sa > 0) ch.medians.forEach(function (m) { paintPoly(c, s, med(m), { color: '#2B2118', width: w, alpha: sa }); });
       ch.medians.forEach(function (m, i) { if (TRACE.done.indexOf(i) >= 0) paintPoly(c, s, med(m), { color: '#B8AFA0', width: w, alpha: 0.5 }); });
       var next = -1; for (var i2 = 0; i2 < ch.medians.length; i2++) if (TRACE.done.indexOf(i2) < 0) { next = i2; break; }
       if (next >= 0 && (a > 0 || TRACE.peek)) {
@@ -786,10 +918,10 @@
     traceUpdateNext(); tracePaint();
   }
   /* 모양 모드 — 「확인」: 안내 글자 마스크와 학생 잉크의 겹침 + 획수 */
-  function glyphMask() {
+  function glyphMask(ch) {
     var off = document.createElement('canvas'); off.width = off.height = MASK_N;
     var c = off.getContext('2d'); c.fillStyle = '#000'; c.textAlign = 'center'; c.textBaseline = 'middle';
-    c.font = Math.round(MASK_N * 0.8) + 'px ' + TRACE_FONT; c.fillText(TRACE.cur.ch, MASK_N / 2, MASK_N * 0.54);
+    c.font = Math.round(MASK_N * 0.8) + 'px ' + TRACE_FONT; c.fillText(ch, MASK_N / 2, MASK_N * 0.54);
     var d = c.getImageData(0, 0, MASK_N, MASK_N).data, m = new Uint8Array(MASK_N * MASK_N);
     for (var i = 0; i < m.length; i++) m[i] = d[i * 4 + 3] > 90 ? 1 : 0;
     return m;
@@ -797,7 +929,7 @@
   function traceJudgeShape() {
     if (!WBHTRACE.enough(TRACE.strokes, 1)) { traceTip('아직 안 썼어요 — 칸 안에 손으로 써 보세요.', 'warn'); return null; }
     var ch = traceChar();
-    var cov = WBHTRACE.coverage(glyphMask(), WBHTRACE.rasterize(TRACE.strokes, MASK_N), MASK_N);
+    var cov = WBHTRACE.coverage(glyphMask(TRACE.cur.ch), WBHTRACE.rasterize(TRACE.strokes, MASK_N), MASK_N);
     var v = WBHTRACE.verdict(cov, WBHTRACE.strokeCount(TRACE.strokes), ch ? ch.strokes : null);
     TRACE.judged = v;
     traceTip(v.msg + (v.strokeMsg ? ' ' + v.strokeMsg : ''), v.level === 'good' ? 'good' : (v.level === 'retry' ? 'warn' : ''));
@@ -869,37 +1001,76 @@
   window.addEventListener('resize', function () { if (TRACE && TRACE.cv && document.body.contains(TRACE.cv)) { traceFit(); tracePaint(); } });
 
   /* ── 훈련 ── 오늘 복습(due) · 단원 · 단어장 전체 · 한자만. 문항은 quiz.js, 판정은 SRS 로 */
-  var TRAIN = null;
+  var TRAIN = null, TRAIN_MISSING = 0;
   function questionRender(el, head, q, onAnswer, opts) {
     opts = opts || {};
     var bigText = q.big ? (q.ch || q.word || '') : '';
     var promptHtml = bigText ? '<div class="prompt big">' + esc(bigText) + '<span class="sub">' + esc(q.prompt) + '</span></div>' : '<div class="prompt">' + esc(q.prompt) + '</div>';
     var body;
-    if (q.input) body = '<input class="ans-in" id="qIn" autocomplete="off" autocapitalize="off" placeholder="낱말을 쓰세요"><div class="row" style="margin-top:10px"><button class="btn ghost small" id="qHint">힌트 보기</button><button class="btn primary" id="qSubmit">확인</button></div><div id="qHintBox"></div>';
+    if (q.write) body = '<div class="trace" style="margin-top:0"><canvas id="qCv" aria-label="쓰기 칸"></canvas><p class="trace-tip" id="qTip">빈 칸에 손가락으로 써 보세요 — 안내 글자는 없어요.' + (q.strokes ? ' (' + q.strokes + '획)' : '') + '</p>' +
+      '<div class="row trace-btns"><button class="btn ghost small" id="qClear">지우기</button><button class="btn primary small" id="qSubmit">확인</button></div></div>';
+    else if (q.input) body = '<input class="ans-in" id="qIn" autocomplete="off" autocapitalize="off" placeholder="낱말을 쓰세요"><div class="row" style="margin-top:10px"><button class="btn ghost small" id="qHint">힌트 보기</button><button class="btn primary" id="qSubmit">확인</button></div><div id="qHintBox"></div>';
     else body = '<div class="choices' + (q.bigChoices || q.suffix ? ' two' : '') + '">' + q.choices.map(function (c, i) { return '<button class="choice' + (q.bigChoices ? ' big' : '') + '" data-i="' + i + '">' + esc(c) + (q.suffix ? q.suffix : '') + '</button>'; }).join('') + '</div>' +
       (q.hint ? '<div class="row" style="margin-top:8px"><button class="btn ghost small" id="qHint">힌트 보기</button></div><div id="qHintBox"></div>' : '');
     el.innerHTML = '<div class="card">' + head + '<div style="margin-bottom:6px"><span class="chip t-h">' + esc(q.head) + '</span></div>' + promptHtml + body + '<div id="qFeed"></div></div>';
     var hinted = false, answered = false;
     var hb = $('#qHint'); if (hb) hb.addEventListener('click', function () { hinted = true; hb.disabled = true; $('#qHintBox').innerHTML = '<div class="hintbox">' + esc(q.hint || '') + '</div>'; });
-    function finish(ok, given) {
+    function finish(ok, given, soft) {
       if (answered) return; answered = true;
+      if (soft) hinted = true;   /* 쓰기에서 '비슷해요'(ok) 판정은 힌트 뒤 정답과 같은 등급으로 */
       var fb = $('#qFeed');
       var reveal = q.reveal ? q.reveal : (q.answer + (q.suffix || ''));
-      fb.innerHTML = '<div class="feedback ' + (ok ? 'ok' : 'bad') + '"><b>' + (ok ? (hinted ? '맞았어요 (힌트 사용)' : '맞았어요! ✨') : '아쉬워요') + '</b>' + (ok ? '' : '정답: ' + esc(reveal)) + (opts.extra ? '<div class="muted" style="margin-top:4px">' + opts.extra + '</div>' : '') + '</div>';
+      var detail = q.write && given && given.msg ? '<div class="muted" style="margin-top:4px">' + esc(given.msg + (given.strokeMsg ? ' ' + given.strokeMsg : '')) + '</div>' : '';
+      fb.innerHTML = '<div class="feedback ' + (ok ? 'ok' : 'bad') + '"><b>' + (ok ? (hinted ? (q.write ? '비슷해요 — 통과' : '맞았어요 (힌트 사용)') : '맞았어요! ✨') : '아쉬워요') + '</b>' + (ok ? '' : '정답: ' + esc(reveal)) + detail + (opts.extra ? '<div class="muted" style="margin-top:4px">' + opts.extra + '</div>' : '') + '</div>';
       el.querySelectorAll('.choice').forEach(function (b) { b.disabled = true; var v = q.choices[Number(b.dataset.i)]; if (v === q.answer) b.classList.add('ok'); else if (v === given) b.classList.add('bad'); else b.classList.add('dim'); });
       if (q.word && ok) say(q.word);
       onAnswer(ok, hinted);
     }
     el.querySelectorAll('.choice').forEach(function (b) { b.addEventListener('click', function () { var v = q.choices[Number(b.dataset.i)]; finish(WBHQUIZ.check(q, v), v); }); });
+    if (q.write) {
+      var pad = makePad($('#qCv'));
+      $('#qClear').addEventListener('click', function () { if (!answered) { pad.clear(); traceTipEl($('#qTip'), '', ''); } });
+      $('#qSubmit').addEventListener('click', function () {
+        if (answered) return;
+        if (!WBHTRACE.enough(pad.strokes, 1)) { traceTipEl($('#qTip'), '아직 안 썼어요 — 칸 안에 손으로 써 보세요.', 'warn'); return; }
+        var cov = WBHTRACE.coverage(glyphMask(q.ch), WBHTRACE.rasterize(pad.strokes, MASK_N), MASK_N);
+        var v = WBHTRACE.verdict(cov, WBHTRACE.strokeCount(pad.strokes), q.strokes || null);
+        pad.reveal(q.ch);                                   /* 정답 글자를 겹쳐 보여 준다 — 어디가 달랐는지 눈으로 */
+        traceTipEl($('#qTip'), v.msg, v.level === 'good' ? 'good' : v.level === 'retry' ? 'warn' : '');
+        finish(WBHQUIZ.check(q, v), v, v.level === 'ok');
+      });
+      return;
+    }
     var sb = $('#qSubmit'); if (sb) {
       var go = function () { var v = $('#qIn').value; if (!v.trim()) return; finish(WBHQUIZ.check(q, v), v); };
       sb.addEventListener('click', go); $('#qIn').addEventListener('keydown', function (e) { if (e.key === 'Enter') go(); }); $('#qIn').focus();
     }
   }
+  function traceTipEl(t, msg, cls) { if (!t) return; t.textContent = msg; t.className = 'trace-tip' + (cls ? ' ' + cls : ''); }
+  /* 쓰기 문항의 빈 칸 — 따라쓰기 패널과 같은 격자·굵기, 안내 글자 없음. 좌표는 0~1 */
+  function makePad(cv) {
+    var pad = { cv: cv, ctx: null, size: 0, strokes: [], locked: false, revealCh: null };
+    function fit() { var css = Math.round(cv.getBoundingClientRect().width) || 300; var dpr = Math.min(3, window.devicePixelRatio || 1); cv.width = Math.round(css * dpr); cv.height = Math.round(css * dpr); pad.size = css; pad.ctx = cv.getContext('2d'); pad.ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }
+    function paint() {
+      var c = pad.ctx, s = pad.size; c.clearRect(0, 0, s, s); paintGrid(c, s);
+      if (pad.revealCh) { c.save(); c.globalAlpha = 0.28; c.fillStyle = '#B23A2E'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = Math.round(s * 0.8) + 'px ' + TRACE_FONT; c.fillText(pad.revealCh, s / 2, s * 0.54); c.restore(); }
+      pad.strokes.forEach(function (st) { paintPoly(c, s, st, { color: '#2B2118', width: Math.max(4, s * 0.034) }); });
+    }
+    function pt(e) { var r = cv.getBoundingClientRect(); return { x: Math.max(0, Math.min(1, (e.clientX - r.left) / (r.width || 1))), y: Math.max(0, Math.min(1, (e.clientY - r.top) / (r.height || 1))) }; }
+    var cur = null;
+    cv.addEventListener('pointerdown', function (e) { if (!e.isPrimary || pad.locked) return; e.preventDefault(); try { cv.setPointerCapture(e.pointerId); } catch (err) {} cur = [pt(e)]; pad.strokes.push(cur); paint(); });
+    cv.addEventListener('pointermove', function (e) { if (!cur || !e.isPrimary) return; e.preventDefault(); cur.push(pt(e)); paint(); });
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (ev) { cv.addEventListener(ev, function () { cur = null; }); });
+    pad.clear = function () { pad.strokes = []; paint(); };
+    pad.reveal = function (ch) { pad.locked = true; pad.revealCh = ch; paint(); };
+    fit(); paint();
+    return pad;
+  }
   function trainItems(scope) {
     var t = now(), items = [];
+    TRAIN_MISSING = 0;
     if (scope.mode === 'due') {
-      WBHSRS.dueList(db.states, t).forEach(function (s) { var it = resolve(s.id); if (it) { it.step = s.step; items.push(it); } });
+      WBHSRS.dueList(db.states, t).forEach(function (s) { var it = resolve(s.id); if (it) { it.step = s.step; items.push(it); } else TRAIN_MISSING += 1; });
     } else {
       var book = bookOf(scope.book); if (!book) return [];
       var list = scope.mode === 'unit' ? itemsOf(book, scope.unit === '' ? '' : scope.unit) : itemsOf(book, null, { allChars: !!scope.chars });
@@ -914,7 +1085,8 @@
   }
   function trainStart(scope) {
     var items = trainItems(scope);
-    if (!items.length) { toast(scope.mode === 'due' ? '지금 복습할 것이 없어요' : '먼저 「새로 배우기」로 심어야 훈련할 수 있어요'); return; }
+    if (!items.length) { toast(scope.mode === 'due' ? (TRAIN_MISSING ? '복습할 낱말의 단어장을 아직 못 받았어요 — 학원 와이파이에서 열어 주세요' : '지금 복습할 것이 없어요') : '먼저 「새로 배우기」로 심어야 훈련할 수 있어요'); return; }
+    if (TRAIN_MISSING) toast('단어장을 아직 못 받은 항목 ' + TRAIN_MISSING + '개는 이번 복습에서 빠졌어요');
     var qs = [], skipped = 0;
     items.forEach(function (it) { var q = WBHQUIZ.makeQuestion(it, ctxFor(it), { step: it.step || 0, rnd: Math.random }); if (q) qs.push({ item: it, q: q }); else skipped += 1; });
     if (!qs.length) { toast('문항을 만들 낱말이 모자라요 — 단어장에 낱말이 더 있어야 해요'); return; }
@@ -988,18 +1160,44 @@
       '<div class="kv"><span>지금 복습할 것</span><b>' + sum.due + (sum.emergency ? ' (오래 방치 ' + sum.emergency + ')' : '') + '</b></div></div>' +
       (Object.keys(byBook).length ? '<h2 class="sec">단어장별</h2><div class="card">' + Object.keys(byBook).map(function (k) { var b = byBook[k]; return '<div class="kv"><span>' + esc(k === '한자' ? '한자(공용)' : bookTitle(k)) + '</span><b>' + b.g + ' / ' + b.n + '</b></div>'; }).join('') + '</div>' : '') +
       '<h2 class="sec">연동</h2><div class="card">' + (authed
-        ? '<div class="kv"><span>학생</span><b>' + esc((AUTH.student && AUTH.student.name) || AUTH.name || code) + '</b></div><div class="kv"><span>서버 저장</span><b>' + (SYNC.authBad ? '연동 만료 — 진로독서에서 다시 연동' : SYNC.avail ? (SYNC.last ? '저장됨 ' + new Date(SYNC.last).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '대기 중') : '오프라인 — 이 기기에만 저장') + '</b></div>'
+        ? '<div class="kv"><span>학생</span><b>' + esc((AUTH.student && AUTH.student.name) || AUTH.name || code) + '</b></div><div class="kv"><span>서버 저장</span><b>' + (SYNC.authBad ? '연동 만료 — 진로독서에서 다시 연동' : SYNC.avail ? (SYNC.last ? '저장됨 ' + new Date(SYNC.last).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) : '대기 중') : '오프라인 — 이 기기에만 저장') + '</b></div>' +
+          (pushSupported() ? '<div class="row" style="margin-top:10px"><button class="btn small' + (db.settings.nightPush ? '' : ' primary') + '" id="rpPush">' + (db.settings.nightPush ? '밤 9시 알림 끄기' : '🌙 밤 9시 알림 켜기') + '</button></div><p class="muted" style="font-size:.76rem;margin:6px 0 0">첫 복습이 밤 9시에 와요 — 복습할 것이 있는 날만 알려요.</p>' : '')
         : '<p class="muted" style="margin:0">체험 모드 — 이 기기에만 저장돼요. <a href="/">진로독서</a>에서 학원 QR로 연동하면 학원 단어장과 서버 저장이 열려요.</p>' +
           '<div class="row" style="margin-top:10px"><button class="btn ghost small" id="rpReset">체험 기록 지우기</button></div>') + '</div>' +
       '<p class="muted" style="font-size:.76rem">간격: 오늘 밤 → 1일 → 3일 → 7일 → 14일 → 30일 → 90일. 30일 간격을 통과하고 연속 3회 맞히면 장기 기억(졸업)으로 봐요.</p>';
     var r = $('#rpReset'); if (r) r.addEventListener('click', function () { if (confirm('체험 기록을 모두 지울까요?')) { adopt(null); save(); renderStreak(); render('home'); } });
+    var pb = $('#rpPush'); if (pb) pb.addEventListener('click', function () { if (db.settings.nightPush) disableNightPush(); else enableNightPush(); });
+  }
+
+  /* ── 밤 9시 알림 (Web Push) — 워드브레인과 같은 방식, 구독 키만 hanja:push. 페이로드 없는 푸시라 내용은 늘 같다 ── */
+  function b64uToU8(s) { var b = atob(s.replace(/-/g, '+').replace(/_/g, '/')); var u = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; }
+  function pushSupported() { return syncOn() && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; }
+  async function enableNightPush() {
+    try {
+      var k = await api('/push/key');
+      if (!k.ok) { toast('서버에 알림 키가 아직 설정되지 않았어요 — 선생님께 문의!'); return; }
+      var perm = await Notification.requestPermission();
+      if (perm !== 'granted') { toast('알림 권한이 꺼져 있어요 — 브라우저 설정에서 허용해 주세요'); return; }
+      var reg = await navigator.serviceWorker.ready;
+      var sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64uToU8(k.key) });
+      await api('/push/subscribe', { method: 'POST', body: JSON.stringify({ subscription: sub.toJSON() }) });
+      db.settings.nightPush = true; save();
+      toast('복습할 것이 있는 날 밤 9시에 알려 드릴게요 🌙');
+      renderReport();
+    } catch (e) { toast('알림 설정에 실패했어요 — ' + (e.message || '')); }
+  }
+  async function disableNightPush() {
+    try { var reg = await navigator.serviceWorker.ready; var sub = await reg.pushManager.getSubscription(); if (sub) await sub.unsubscribe(); await api('/push/unsubscribe', { method: 'POST', body: '{}' }); } catch (e) { /* 서버 정리는 다음 발송 때 410 으로도 된다 */ }
+    db.settings.nightPush = false; save();
+    toast('밤 9시 알림을 껐어요');
+    renderReport();
   }
 
   /* ── 부팅 ── */
   async function boot() {
     renderStreak();
     render('home');
-    try { var r = await fetch('/api/health', { cache: 'no-store' }); var j = await r.json(); SYNC.avail = !!(j && j.ok); } catch (e) { SYNC.avail = false; }
+    try { var r = await fetch('/api/health', { cache: 'no-store' }); var j = await r.json(); SYNC.avail = !!(j && j.ok); SYNC.ai = !!(j && j.ai); } catch (e) { SYNC.avail = false; SYNC.ai = false; }
     if (syncOn()) {
       try {
         var res = await api('/pull');
@@ -1009,9 +1207,15 @@
       } catch (e) { /* 오프라인·만료 — 이 기기 기록으로 계속 */ }
     }
     try { await loadIndex(); } catch (e) { toast('단어장 목록을 받지 못했어요'); }
+    /* 이번 주 단원(선생님 지정) — 오늘 화면 맨 위. 지정된 단어장은 미리 받아 둔다 */
+    if (syncOn()) { try { var tk = await api('/task'); LIB.task = tk && tk.task && tk.task.bookId ? Object.assign({ scope: tk.scope }, tk.task) : null; } catch (e) { /* 다음 접속 때 */ } }
+    await loadStrokes();
+    await fetchDueBooks();
+    if (LIB.task && !bookOf(LIB.task.bookId)) { try { await openBook(LIB.task.bookId); } catch (e) { /* 캐시 없음 */ } }
     var bid = curBookId();
     if (bid) { try { var b = await openBook(bid); if (b && !db.settings.unit && unitsOf(b)[0]) { db.settings.unit = unitsOf(b)[0].id; } } catch (e) { /* 캐시 없음 — 단어장 탭에서 다시 */ } }
     render(curView);
+    refreshPendingMnemos();
     if ('serviceWorker' in navigator) { try { navigator.serviceWorker.register('./sw.js'); } catch (e) {} }
   }
   boot();

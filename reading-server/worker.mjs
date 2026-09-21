@@ -292,7 +292,17 @@ function hanjaStore(env) {
     listStateCodes: async () => (await kvListAll(env, 'hanja:state:')).map(k => k.slice('hanja:state:'.length)),
     getAssign: (c) => get('hanja:assign:' + c), putAssign: (c, rec) => put('hanja:assign:' + c, rec), deleteAssign: (c) => del('hanja:assign:' + c),
     listAssignCodes: async () => (await kvListAll(env, 'hanja:assign:')).map(k => k.slice('hanja:assign:'.length)),
+    /* 요약은 기록 저장 시점에 서버가 쓴다 — 현황판이 학생 수만큼 400KB 기록을 읽지 않게 */
+    getSummary: (c) => get('hanja:summary:' + c), putSummary: (c, rec) => put('hanja:summary:' + c, rec), deleteSummary: (c) => del('hanja:summary:' + c),
+    listSummaryCodes: async () => (await kvListAll(env, 'hanja:summary:')).map(k => k.slice('hanja:summary:'.length)),
+    getTask: (s) => get('hanja:task:' + s), putTask: (s, rec) => put('hanja:task:' + s, rec), deleteTask: (s) => del('hanja:task:' + s),
+    listTaskScopes: async () => (await kvListAll(env, 'hanja:task:')).map(k => k.slice('hanja:task:'.length)),
+    getStrokes: () => get('hanja:strokes'), putStrokes: (rec) => put('hanja:strokes', rec),
+    getPush: (c) => get('hanja:push:' + c), putPush: (c, rec) => put('hanja:push:' + c, rec), delPush: (c) => del('hanja:push:' + c),
+    listPushCodes: async () => (await kvListAll(env, 'hanja:push:')).map(k => k.slice('hanja:push:'.length)),
+    getRemap: (id) => get('hanja:remap:' + id), putRemap: (id, rec) => put('hanja:remap:' + id, rec), deleteRemap: (id) => del('hanja:remap:' + id),
     getStudent: (c) => get('student:' + c),
+    listStudentCodes: async () => (await kvListAll(env, 'student:')).map(k => k.slice('student:'.length)),
   };
 }
 
@@ -473,7 +483,7 @@ export default {
        12:00 UTC(21:00 KST) 밤 9시 물주기 푸시(내신 몫도 함께 본다 — 워드브레인이 비어도 시험 범위가 남았으면 부른다) ·
        18:00 UTC 일일 백업 · 18:10 UTC 하루브레인 주간 익명 집계(백업 직후) */
     switch (event.cron) {
-      case '0 12 * * *': ctx.waitUntil(sendNightPushes({ store: vocabStore(env), push: vocabPushEnv(env), naesin: naesinStore(env) })); break;
+      case '0 12 * * *': ctx.waitUntil(sendNightPushes({ store: vocabStore(env), push: vocabPushEnv(env), naesin: naesinStore(env), hanja: hanjaStore(env) })); break;
       /* 22:00 UTC(07:00 KST) — 발행일이 된 브레인레터 호의 "새 호 도착" 알림(즉시 발행분은 발행 라우트가 그 자리에서 보낸다) */
       case '0 22 * * *': ctx.waitUntil(pushDueIssues({ store: letterStore(env), push: vocabPushEnv(env) })); break;
       case '10 18 * * *': ctx.waitUntil(weeklyAgg(haruStore(env), Date.now())); break;
@@ -665,7 +675,7 @@ export default {
       if (p.startsWith('/api/hanja/')) {
         const len = Number(req.headers.get('content-length') || 0);
         if (len > hanjaBodyLimit(p)) return json(413, { error: '요청이 너무 커서 받을 수 없어요.' });
-        const out = await handleHanja({ path: p, method: req.method, who, query: url.searchParams, getBody: () => req.json(), store: hanjaStore(env) });
+        const out = await handleHanja({ path: p, method: req.method, who, query: url.searchParams, getBody: () => req.json(), store: hanjaStore(env), push: vocabPushEnv(env) });
         return json(out.status, out.body);
       }
 
@@ -1032,9 +1042,9 @@ export default {
         await dropStudentHaru(haruStore(env), c);
         await dropStudentChunk(chunkStore(env), c);
         removed.push('haru:state:' + c, 'haru:mock:' + c, 'haru:paper:' + c);
-        /* 한자브레인 — 기록·배정 두 키. 단어장(hanja:book:*)은 학생 것이 아니라 둔다 */
+        /* 한자브레인 — 기록·요약·배정·알림 구독·개인 단원 지정. 단어장·획순 사전은 학생 것이 아니라 둔다 */
         await dropStudentHanja(hanjaStore(env), c);
-        removed.push('hanja:state:' + c, 'hanja:assign:' + c);
+        removed.push('hanja:state:' + c, 'hanja:summary:' + c, 'hanja:assign:' + c, 'hanja:push:' + c);
         /* 브레인레터 — 열람·문제 기록 한 키. 호는 학생 것이 아니라 그대로 둔다 */
         await dropStudentLetter(letterStore(env), c, stu.ptoken);
         removed.push('letter:state:' + c, 'letter:push:s:' + c);
