@@ -168,6 +168,14 @@ t('관리 화면들이 dist/admin/ 에 실린다 — 하나 빠지면 그 화면
   for (const f of ['index.html', 'letter.js', 'shapes.js', 'issue-sample.json', 'calendar.json', 'sw.js', 'manifest.webmanifest', 'icon.svg', 'img/leaf-autumn.svg', 'img/cover-autumn.svg'])
     assert.ok(fs.existsSync(path.join(DIST, 'letter', f)), 'dist/letter/' + f + ' 가 없다');
   assert.ok(fs.existsSync(path.join(DIST, 'admin', 'letter.js')), 'dist/admin/letter.js 가 없다 — 관리 편집기의 미리보기·검증이 통째로 죽는다');
+  /* 글꼴 — fonts.css 가 가리키는 조각이 전부 dist 에 있어야 한다. 하나라도 빠지면 그 구간 글자만 다른 글꼴로 찍힌다 */
+  const fcss = fs.readFileSync(path.join(DIST, 'letter', 'fonts', 'fonts.css'), 'utf8');
+  const refs = [...fcss.matchAll(/url\(([^)]+)\)/g)].map((m) => m[1]);
+  assert.ok(refs.length >= 200, 'fonts.css 조각이 너무 적다: ' + refs.length);
+  for (const r of refs) assert.ok(fs.existsSync(path.join(DIST, 'letter', 'fonts', r)), 'dist/letter/fonts/' + r + ' 가 없다');
+  assert.ok(!/https?:\/\//.test(fcss), 'fonts.css 가 외부 주소를 부른다 — CSP 가 막아 글꼴이 안 나온다');
+  assert.ok(fs.existsSync(path.join(DIST, 'letter', 'fonts', 'OFL.txt')), '글꼴 라이선스(OFL.txt)가 배포본에 없다');
+  assert.ok(/\/letter\/fonts\/fonts\.css/.test(fs.readFileSync(path.join(DIST, 'admin', 'letter-admin.html'), 'utf8')), '관리 웹 미리보기가 글꼴을 부르지 않는다');
   assert.ok(fs.existsSync(path.join(DIST, 'admin', 'shapes.js')), 'dist/admin/shapes.js 가 없다 — 관리 미리보기에서 도형 놀이가 안 그려진다');
   /* 배포본 삽화는 SVG 뿐이고 스크립트가 없어야 한다 — img 태그로만 쓰지만 주소를 직접 열 수도 있다 */
   for (const f of fs.readdirSync(path.join(DIST, 'letter', 'img'))) assert.ok(!/<script|onload|onerror/i.test(fs.readFileSync(path.join(DIST, 'letter', 'img', f), 'utf8')), f + ' 에 스크립트가 있다');
