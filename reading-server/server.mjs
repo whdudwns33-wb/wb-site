@@ -268,6 +268,9 @@ const chunkStore = {
   putAssign: (c, rec) => { chunkRoot().assigns[c] = rec; persist(); },
   deleteAssign: (c) => { delete chunkRoot().assigns[c]; persist(); },
   listAssignCodes: () => Object.keys(chunkRoot().assigns),
+  /* 선생님 지문 — 워커의 chunk:customs 키와 같은 모양({items, updatedAt}) */
+  getCustoms: () => chunkRoot().customs || null,
+  putCustoms: (rec) => { chunkRoot().customs = rec; persist(); },
   getStudent: (c) => db.students?.[c] || null,
 };
 
@@ -422,7 +425,7 @@ function parentSummary(stu, st, vst, assignRec) {
 }
 
 /* ── 정적 파일 ── */
-const MIME = { '.html': 'text/html; charset=utf-8', '.json': 'application/json; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.pdf': 'application/pdf', '.css': 'text/css; charset=utf-8' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.json': 'application/json; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.pdf': 'application/pdf', '.css': 'text/css; charset=utf-8', '.woff2': 'font/woff2', '.txt': 'text/plain; charset=utf-8' };
 function serveFile(res, base, rel) {
   const safe = path.normalize(rel).replace(/^(\.\.[/\\])+/, '');
   let fp = path.join(base, safe);
@@ -434,7 +437,7 @@ function serveFile(res, base, rel) {
   if (!fs.existsSync(fp)) { res.writeHead(404); res.end('not found'); return; }
   /* 학년대별 지문 데이터는 ?v=<버전> 을 달고 오므로 오래 캐시해도 안전하다
      (배포본은 reading/_headers 가 같은 규칙을 준다) */
-  const cacheable = /(^|\/)(articles-L[1-4]|hanja)\.json$/.test(fp);
+  const cacheable = /(^|\/)(articles-L[1-4]|hanja)\.json$/.test(fp) || /\/letter\/fonts\/.+\.woff2$/.test(fp);   // 글꼴 조각은 경로에 판이 박혀 있다(워커와 같은 규칙)
   res.writeHead(200, {
     'Content-Type': MIME[path.extname(fp)] || 'application/octet-stream',
     'Cache-Control': cacheable ? 'public, max-age=604800' : 'no-store',
@@ -875,6 +878,7 @@ const server = http.createServer(async (req, res) => {
     if (p === '/admin/qr.js') return serveFile(res, SHARED_DIR, 'qr.js');
     if (p === '/admin/letter.js') return serveFile(res, LETTER_DIR, 'letter.js');   // 관리 편집기 미리보기가 학생 앱과 같은 렌더러를 쓴다
     if (p === '/admin/shapes.js') return serveFile(res, LETTER_DIR, 'shapes.js');   // 도형 놀이 도우미·미리보기
+    if (p === '/admin/drills.js') return serveFile(res, LETTER_DIR, 'drills.js');   // 5분 놀이 미리보기
     if (p === '/admin' || p === '/admin/') return serveFile(res, PUB_DIR, 'admin.html');
     if (p.startsWith('/admin/')) return serveFile(res, PUB_DIR, p.slice('/admin/'.length));
 
@@ -884,6 +888,8 @@ const server = http.createServer(async (req, res) => {
 
     /* 브레인레터 앱 — 호 본문은 여기 없다(/api/letter/*, db.letter 전용). issue-sample.json 은 자체 창작 체험 호 */
     if (p === '/letter' || p === '/letter/') return serveFile(res, LETTER_DIR, 'index.html');
+    if (p === '/letter/voice.js') return serveFile(res, SHARED_DIR, 'voice.js');       // 읽어 주기 — 배포본은 build-dist 가 복사한다
+    if (p === '/letter/trace.js') return serveFile(res, VOCAB_DIR, 'trace.js');        // 한자 따라쓰기 판정(워드브레인과 같은 파일)
     if (p.startsWith('/letter/')) return serveFile(res, LETTER_DIR, p.slice('/letter/'.length));
 
     /* 내신브레인 앱 — 팩 콘텐츠는 여기 없다(/api/naesin/pack, KV·db 전용) */

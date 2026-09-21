@@ -23,7 +23,7 @@ export const STATE_BODY_LIMIT = 200_000;     // 그 외 전부
 export const STATE_MAX_BYTES = 150_000;      // 학생 기록 1건 상한
 export const PUTS_PER_DAY = 10;              // PUT /state 하루 상한 — KV 쓰기 예산은 네임스페이스 합산이다(앱은 20초 디바운스)
 export const LETTER_AI_DAILY_DEFAULT = 30;   // AI 초안 하루 호출 상한 — 한 호가 6조각(공통 + 학년대 5)이라 하루 다섯 호
-export const DRAFT_PARTS = ['shared', 'K', 'E1', 'E2', 'E3', 'M'];
+export const DRAFT_PARTS = ['shared', 'K', 'E1', 'E2', 'E3', 'M', 'news'];   // news 는 웹 검색으로 그 주의 교육·입시 소식을 간추리는 조각
 export const DEFAULT_TIER = 'E2';            // 학년을 못 읽는 학생의 임시 학년대 — 관리 웹 [학년대 지정]으로 바로잡는다
 const API_URL = 'https://api.anthropic.com/v1/messages';
 const DEFAULT_MODEL = 'claude-opus-5';
@@ -140,10 +140,17 @@ export function normalizeState(state) {
       quiz: pickMap(r.quiz, (v) => (Number.isInteger(v) && v >= 0 && v <= 4 ? v : undefined), 200),
       reveal: pickMap(r.reveal, (v) => (v === true ? true : undefined), 200),
       checks: pickMap(r.checks, (v) => (v === true ? true : undefined), 200),
+      /* 하루 한 장 — 요일(1~7)별로 마친 시각. 따라쓰기 — 섹션별 마친 회차 */
+      days: pickDays(r.days),
+      trace: pickTrace(r.trace),
+      /* 한 문장 쓰기 — 섹션:번호 키에 300자까지. 지면에 다시 그려지는 값이라 화면이 이스케이프한다(여기서는 길이·형만 본다) */
+      write: pickMap(r.write, (v) => (typeof v === 'string' && v.trim() && v.length <= 300 ? v : undefined), 40),
     };
   });
   return out;
 }
+function pickDays(src) { const out = {}; if (!isObj(src)) return out; for (let d = 1; d <= 7; d++) { const v = src[d]; if (typeof v === 'string' && v && v.length <= 30) out[d] = v; } return out; }
+function pickTrace(src) { const out = {}; if (!isObj(src)) return out; Object.keys(src).filter((k) => /^[a-z0-9-]{2,30}$/.test(k)).slice(0, 20).forEach((k) => { const v = src[k]; if (Number.isInteger(v) && v >= 0 && v <= 30) out[k] = v; }); return out; }
 
 /* 가정으로 보내는 문자 문구 — 관리 웹이 학생마다 만들어 복사한다(진로독서 parent-messages 와 같은 자리) */
 export function familyMessage(stu, issue, link, tier) {
@@ -174,22 +181,28 @@ const DRAFT_SYSTEM = `너는 WB 독해력학원·웩슬러브레인센터의 주
 규칙:
 - 출력은 JSON 객체 하나뿐이다. 설명·머리말·코드펜스를 붙이지 않는다.
 - 모든 글은 네가 새로 쓴 창작이어야 한다. 책·교과서·기사·시험 문제를 옮기거나 흉내 내지 않는다. 인명·기관·통계 수치는 널리 알려진 일반 지식만 쓰고, 확신이 없으면 쓰지 않는다.
+- 단 하나의 예외 — 교육·입시 이슈(news) 조각은 웹 검색 결과를 간추린다. 기사 문장을 옮기지 말고 사실만 짧게 정리하며, 항목마다 출처(기관·언론명)와 원문 주소를 적는다. 검색으로 확인되지 않은 수치·날짜는 쓰지 않는다.
 - 학년대별 읽을거리 길이(공백 포함): K 50~300자(부모가 읽어 주는 짧은 문장, readAloud:true), E1 160~480자, E2 380~820자, E3 560~1150자, M 800~1600자(수능 비문학처럼 원인·과정·가설 구조가 드러나게).
 - 문제 수와 보기 수: K 3문제(보기 2~3), E1 3문제(보기 3), E2 4문제(보기 4), E3 4~5문제(보기 4), M 5문제(보기 5). answer 는 0부터 시작하는 보기 번호. skill 은 main·detail·infer·vocab·apply·critical 을 섞는다. why 는 본문의 근거를 짚는 한두 문장.
 - vocab 의 word 는 반드시 본문에 그대로 나온 낱말이어야 한다. E2 이상 한자어에는 hanja 를 "葉(잎 엽)+綠(푸를 록)" 꼴로 적는다.
-- 두뇌 놀이(brain)는 지정된 웩슬러 지표를 쓰되 검사 문항을 흉내 내지 않는다. 텍스트만으로 되는 놀이(기호 세기·규칙 찾기·거꾸로 말하기·공통점 말하기 등). grid 는 문자열 배열(한 줄이 한 원소). items 마다 answer 필수(열린 놀이면 "예시: …"). parentTip 한두 문장.
+- 두뇌 놀이(brain)는 지정된 웩슬러 지표를 쓰되 검사 문항을 흉내 내지 않는다. 텍스트만으로 되는 놀이(기호 세기·규칙 찾기·거꾸로 말하기·공통점 말하기 등). grid 는 문자열 배열(한 줄이 한 원소). items 마다 answer 필수(열린 놀이면 "예시: …"). parentTip 한두 문장. 항목 하나는 생성기 놀이로 둘 수 있다: {"drill":{"kind":"span"|"symbols"|"sequence"|"common"|"odd-word","seed":1~999999}} — kind 는 지표에 맞춘다(WMI span · PSI symbols · FRI sequence · VCI common/odd-word). 시공간(VSI)은 {"figure":{"kind":"odd"|"rotate"|"mirror"|"blocks"|"complete","seed":…}}.
+- 고정 코너(매 호 같은 자리): poem(동시 6~12줄, 네가 새로 쓴 창작, author "WB 편집실") · talk(가족 대화 카드 3문 — 예측·이유·아이 삶과 잇기) · write(학년대별 한 문장 쓰기 prompts 1~2 — 요약 한 문장, 질문 만들기, "기자가 되어 한 줄") · books(실제로 널리 알려진 어린이·청소년 책 2~3권, title·author·why·for. 확신이 없는 책은 넣지 않는다). voices(독자의 답)는 네가 만들지 않는다.
 - 말투: K·E1 은 "~해요" 체, E2·E3 은 "~합니다/~다" 섞어도 됨, M 은 설명문체("~다").
 - 섹션 id 는 요청에 적힌 것을 그대로 쓴다. tiers 는 요청에 적힌 배열 또는 "all".
 - status 는 "draft". source 는 "WB 독해력학원 자체 창작 (AI 초안, 원장 검수 전)".`;
 
 function partSpec(part) {
   if (part === 'shared') return {
-    ask: '공통 조각을 만든다. 출력: {"head":{"title":"호 제목(30자 이내)","theme":"이번 주 주제 한 줄","intro":"편집자 머리말 2~3문장"},"sections":[ words(id "words", tiers ["E2","E3","M"], 한자 하나의 낱말 가족 4~6개, family {hanja,hun,eum}, task), column(id "column", tiers "all", 부모용 입시 문해력·웩슬러 칼럼 3~4문단, takeaway), checklist(id "mission", tiers "all", items 4~5), notice(id "notice", tiers "all", 원장 메모의 소식이 있으면 그것을, 없으면 "(예시)" 를 붙인 자리표시 2~3개) ]}',
+    ask: '공통 조각을 만든다. 출력: {"head":{"title":"호 제목(30자 이내)","theme":"이번 주 주제 한 줄","intro":"편집자 머리말 2~3문장"},"sections":[ words(id "words", tiers ["E2","E3","M"], 한자 하나의 낱말 가족 4~6개, family {hanja,hun,eum}, task), poem(id "poem", tiers ["K","E1","E2"], 주제와 닿는 동시 6~12줄, author "WB 편집실", task 한 줄), talk(id "talk", tiers "all", 가족 대화 카드 items 3), books(id "books", tiers "all", 주제와 닿는 실제 책 2~3권), column(id "column", tiers "all", 부모용 입시 문해력·웩슬러 칼럼 3~4문단, takeaway), checklist(id "mission", tiers "all", items 4~5), notice(id "notice", tiers "all") 는 원장 메모에 학원 소식이 있을 때만 넣는다 — 교육·입시 이슈는 news 조각이 따로 만든다 ]}',
     example: SAMPLE_PARTS().shared,
+  };
+  if (part === 'news') return {
+    ask: '교육·입시 이슈 조각을 만든다. 웹 검색으로 오늘 기준 최근 7일의 한국 교육·입시 소식 가운데 초·중등 학부모에게 뜻이 있는 것 3~5건을 고른다 — 교육부·시도교육청·한국교육과정평가원·대교협의 발표와 주요 언론 보도만 쓰고, 커뮤니티·블로그·광고·학원 홍보는 쓰지 않는다. 항목마다 title(60자 이내), summary(2~3문장, 사실만, 400자 이내), why(우리 아이·초중등 학부모에게 뜻하는 것 한 문장), source(기관·언론명), url(검색 결과에 실제로 있는 기사 주소, https), date(YYYY-MM-DD). 출력: {"sections":[ news(id "news", tiers "all", title "이번 주 교육·입시 이슈", items 3~5) ]}',
+    example: SAMPLE_PARTS().news,
   };
   const s = { K: '유치(5~7세)', E1: '초등 1~2학년', E2: '초등 3~4학년', E3: '초등 5~6학년', M: '중학교 1~3학년' }[part];
   return {
-    ask: `학년대 ${part}(${s}) 조각을 만든다. 출력: {"sections":[ read(id "read-${part.toLowerCase()}", tiers ["${part}"], title, minutes, paragraphs, vocab, questions${part === 'K' ? ', readAloud:true, lead(부모 안내 한 줄)' : ''}), brain(id "brain-${part.toLowerCase()}", tiers ["${part}"], index 는 지정된 지표, title, minutes, howTo, items 3~5, parentTip), coach(id "coach-${part.toLowerCase()}", tiers ["${part}"], title "… 부모님께", tips 2) ]}`,
+    ask: `학년대 ${part}(${s}) 조각을 만든다. 출력: {"sections":[ read(id "read-${part.toLowerCase()}", tiers ["${part}"], title, minutes, paragraphs, vocab ${part === 'K' ? '0~2' : '4~6'}개, questions${part === 'K' ? ', readAloud:true, lead(부모 안내 한 줄)' : ''}), brain(id "brain-${part.toLowerCase()}", tiers ["${part}"], index 는 지정된 지표, title, minutes, howTo, items 3~5(하나는 지표에 맞는 drill/figure 생성기 항목), parentTip), ${part === 'K' ? '' : `write(id "write-${part.toLowerCase()}", tiers ["${part}"], title, prompts 1~2 — 첫째는 "이 글을 한 문장으로", 둘째는 ${part === 'E1' ? '"글을 읽고 궁금한 것 하나"' : '"기자가 되어 제목 한 줄" 또는 "글쓴이에게 묻고 싶은 것"'}), `}coach(id "coach-${part.toLowerCase()}", tiers ["${part}"], title "… 부모님께", tips 2) ]}`,
     example: SAMPLE_PARTS()[part],
   };
 }
@@ -198,17 +211,18 @@ let SAMPLE_CACHE = null;
 export function SAMPLE_PARTS() {
   if (SAMPLE_CACHE) return SAMPLE_CACHE;
   const by = (ids) => SAMPLE.sections.filter((x) => ids.includes(x.id));
-  SAMPLE_CACHE = { shared: { head: { title: SAMPLE.title, theme: SAMPLE.theme, intro: SAMPLE.intro }, sections: by(['words', 'column', 'mission', 'notice']) } };
-  for (const t of ['K', 'E1', 'E2', 'E3', 'M']) { const k = t.toLowerCase(); SAMPLE_CACHE[t] = { sections: by(['read-' + k, 'brain-' + k, 'coach-' + k]) }; }
+  SAMPLE_CACHE = { shared: { head: { title: SAMPLE.title, theme: SAMPLE.theme, intro: SAMPLE.intro }, sections: by(['words', 'poem', 'talk', 'books', 'column', 'mission', 'notice']) } };
+  for (const t of ['K', 'E1', 'E2', 'E3', 'M']) { const k = t.toLowerCase(); SAMPLE_CACHE[t] = { sections: by(['read-' + k, 'brain-' + k, 'write-' + k, 'coach-' + k]) }; }
+  SAMPLE_CACHE.news = { sections: by(['news']) };
   return SAMPLE_CACHE;
 }
 
-export function draftUserPrompt({ part, theme, week, publishAt, brainIndex, notes }) {
+export function draftUserPrompt({ part, theme, week, publishAt, brainIndex, notes, today }) {
   const spec = partSpec(part);
   return [
     '주차: ' + week + ' (발행일 ' + publishAt + ')',
-    '이번 주 주제: ' + theme,
-    part !== 'shared' ? '이번 주 이 학년대의 두뇌 놀이 지표: ' + brainIndex + ' (' + (L.WISC[brainIndex] || {}).label + ')' : '이번 주 두뇌 놀이 지표 배정: ' + JSON.stringify(brainIndex),
+    part === 'news' ? '오늘 날짜: ' + (today || publishAt) + ' — 최근 7일 소식만' : '이번 주 주제: ' + theme,
+    part === 'news' ? null : part !== 'shared' ? '이번 주 이 학년대의 두뇌 놀이 지표: ' + brainIndex + ' (' + (L.WISC[brainIndex] || {}).label + ')' : '이번 주 두뇌 놀이 지표 배정: ' + JSON.stringify(brainIndex),
     notes ? '원장 메모: ' + notes : null,
     '',
     spec.ask,
@@ -216,14 +230,17 @@ export function draftUserPrompt({ part, theme, week, publishAt, brainIndex, note
   ].filter((x) => x != null).join('\n');
 }
 
-async function callDraft({ userPrompt, apiKey, model, fetchImpl }) {
+async function callDraft({ userPrompt, apiKey, model, fetchImpl, webSearch }) {
   const f = fetchImpl || fetch;
+  const req = { model: model || DEFAULT_MODEL, max_tokens: MAX_TOKENS, fallbacks: 'default', system: DRAFT_SYSTEM, messages: [{ role: 'user', content: userPrompt }] };
+  /* 교육·입시 이슈 조각만 웹 검색을 켠다 — 나머지는 창작이라 검색이 오히려 남의 글을 끌어온다. 한국 기준, 한 조각에 6번까지 */
+  if (webSearch) req.tools = [{ type: 'web_search_20250305', name: 'web_search', max_uses: 6, user_location: { type: 'approximate', country: 'KR', timezone: 'Asia/Seoul' } }];
   let r;
   try {
     r = await f(API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01', 'anthropic-beta': 'server-side-fallback-2026-07-01' },
-      body: JSON.stringify({ model: model || DEFAULT_MODEL, max_tokens: MAX_TOKENS, fallbacks: 'default', system: DRAFT_SYSTEM, messages: [{ role: 'user', content: userPrompt }] }),
+      body: JSON.stringify(req),
     });
   } catch (e) { return { ok: false, reason: 'network' }; }
   if (!r || !r.ok) return { ok: false, reason: 'api-' + ((r && r.status) || 0) };
@@ -231,9 +248,10 @@ async function callDraft({ userPrompt, apiKey, model, fetchImpl }) {
   try { d = await r.json(); } catch (e) { return { ok: false, reason: 'parse' }; }
   if (d && d.stop_reason === 'refusal') return { ok: false, reason: 'refused' };
   if (d && d.stop_reason === 'max_tokens') return { ok: false, reason: 'truncated' };
+  /* 웹 검색을 켜면 content 에 검색 블록이 섞여 온다 — 글 블록만 이어 붙여 JSON 을 찾는다 */
   const text = (d && Array.isArray(d.content) ? d.content : []).filter((b) => b && b.type === 'text').map((b) => b.text).join('');
   const obj = parseJsonBlock(text);
-  if (!obj || !Array.isArray(obj.sections)) return { ok: false, reason: obj ? 'shape' : 'parse' };
+  if (!obj || !Array.isArray(obj.sections)) return { ok: false, reason: d && d.stop_reason === 'pause_turn' ? 'paused' : (obj ? 'shape' : 'parse') };
   return { ok: true, obj, model: (d && d.model) || null };
 }
 
@@ -269,6 +287,25 @@ export async function handleLetter(ctx) {
     else rec = vis[0] || null;
     return j(200, { parent: { name: stu.name, tier, tierLabel: L.tierLabel(tier), guess },
       issue: rec ? L.forTier(rec.issue, tier) : null, issues: vis.map((r) => L.brief(r.issue)), updatedAt: rec ? rec.updatedAt || null : null });
+  }
+
+  /* 가족 링크의 기록 — 링크 토큰이 곧 자격(읽기와 같다). 학생 코드 하나에 기록 하나라 앱 연동 학생과 같은 자리에 쓴다.
+     원장의 열람 현황이 가족 링크로 읽은 것(하루 한 장 진행)도 세려면 기록이 기기 밖으로 나와야 한다 */
+  if (p === '/api/letter/parent/state' && (method === 'GET' || method === 'PUT')) {
+    const t = q('t');
+    const code = PTOKEN_RE.test(t) ? await store.getParentCode(t) : null;
+    if (!code) return j(404, { error: '유효하지 않은 링크예요.' });
+    if (method === 'GET') { const st = await store.getState(code); return j(200, { state: (st && st.state) || { v: 1, issues: {} }, updatedAt: st ? st.updatedAt || null : null }); }
+    const b = await body(); const bad = badBody(b); if (bad) return bad;
+    const state = normalizeState(b.state);
+    if (!state) return j(400, { error: 'state 필요' });
+    const prev = await store.getState(code);
+    const puts = prev && prev.puts && prev.puts.d === today ? prev.puts.n : 0;
+    if (puts >= PUTS_PER_DAY) return j(429, { error: '오늘 저장은 여기까지예요. 내일 이어서 해요.' });
+    const rec = { state, updatedAt: nowIso(now), puts: { d: today, n: puts + 1 } };
+    if (byteLen(rec) > STATE_MAX_BYTES) return j(413, { error: '기록이 너무 커서 저장할 수 없어요.' });
+    await store.putState(code, rec);
+    return j(200, { ok: true, updatedAt: rec.updatedAt });
   }
 
   /* 사진 — id 가 128비트 무작위라 그 자체가 열쇠다(가족 링크 토큰과 같은 방식). 내용이 바뀌지 않으니 오래 캐시한다 */
@@ -526,8 +563,8 @@ export async function handleLetter(ctx) {
     const rec = ISSUE_ID_RE.test(id) ? await store.getIssue(id) : null;
     if (!rec || !rec.issue) return j(404, { error: '그 호를 찾을 수 없어요.' });
     const issue = rec.issue;
-    const byTier = {}; L.TIER_IDS.forEach((t) => { byTier[t] = { total: 0, opened: 0, done: 0 }; });
-    const unopened = [];
+    const byTier = {}; L.TIER_IDS.forEach((t) => { byTier[t] = { total: 0, opened: 0, done: 0, days: 0 }; });
+    const unopened = [], progress = [], writes = [];
     const quiz = [];
     const qIndex = {};
     issue.sections.forEach((s) => { if (s.type === 'read') (s.questions || []).forEach((qq, qi) => { const row = { section: s.id, title: s.title, qi, skill: qq.skill || '', n: 0, correct: 0 }; qIndex[s.id + ':' + qi] = { row, answer: qq.answer }; quiz.push(row); }); });
@@ -542,22 +579,30 @@ export async function handleLetter(ctx) {
       if (r && r.openedAt) {
         byTier[tt].opened += 1;
         if (r.doneAt) byTier[tt].done += 1;
+        /* 하루 한 장 — 요일 7칸. 가족 링크로 읽은 것도 /parent/state 로 올라오므로 여기 잡힌다 */
+        const days = []; for (let d = 1; d <= 7; d++) days.push(!!(r.days && r.days[d]));
+        byTier[tt].days += days.filter(Boolean).length;
+        const nWrite = Object.keys(r.write || {}).length;
+        progress.push({ code: c, name: s.name, cls: s.cls || '', tier: tt, days, done: !!r.doneAt, writes: nWrite });
+        /* 원장이 다음 호 '지난 호 독자의 답'에 실을 문장을 고를 수 있게 — 이름은 관리 화면에서만 보이고 지면에는 원장이 줄여 적는다 */
+        Object.keys(r.write || {}).slice(0, 8).forEach((k) => { if (writes.length < 200) writes.push({ code: c, name: s.name, tier: tt, key: k, text: String(r.write[k]).slice(0, 300) }); });
         Object.keys(r.quiz || {}).forEach((k) => { const x = qIndex[k]; if (!x) return; x.row.n += 1; if (r.quiz[k] === x.answer) x.row.correct += 1; });
       } else unopened.push({ code: c, name: s.name, cls: s.cls || '', tier: tt });
     }
+    progress.sort((a, b) => L.TIER_IDS.indexOf(a.tier) - L.TIER_IDS.indexOf(b.tier) || a.name.localeCompare(b.name, 'ko'));
     const total = Object.values(byTier).reduce((a, b) => a + b.total, 0), opened = Object.values(byTier).reduce((a, b) => a + b.opened, 0);
-    return j(200, { stats: { id, total, opened, byTier, unopened, quiz } });
+    return j(200, { stats: { id, total, opened, byTier, unopened, quiz, progress, writes } });
   }
   if (p === '/api/letter/admin/draft' && method === 'POST') {
     const b = await body(); const bad = badBody(b); if (bad) return bad;
     const part = String(b.part || '');
-    if (!DRAFT_PARTS.includes(part)) return j(400, { error: 'part 는 shared·K·E1·E2·E3·M 중 하나' });
+    if (!DRAFT_PARTS.includes(part)) return j(400, { error: 'part 는 shared·K·E1·E2·E3·M·news 중 하나' });
     const week = /^\d{4}-W\d{2}$/.test(String(b.week || '')) ? b.week : L.weekId(now);
     const calRec = store.getCalendar ? await store.getCalendar() : null;
     const entry = L.calendarEntry(calRec && calRec.calendar ? calRec.calendar : CALENDAR_DEFAULT, week);
     /* 주제·지표를 안 주면 주제 달력에서 가져온다 — 매주 할 일이 "주차 확인" 하나로 준다 */
     const theme = strMax(b.theme, 200).trim() || entry.theme;
-    if (!theme) return j(400, { error: '이번 주 주제(theme)가 필요해요 — 주제 달력에도 이 주차의 주제가 없어요.' });
+    if (!theme && part !== 'news') return j(400, { error: '이번 주 주제(theme)가 필요해요 — 주제 달력에도 이 주차의 주제가 없어요.' });
     const publishAt = L.isValidDate(b.publishAt) ? b.publishAt : (L.weekStart(week) || today);
     const brainIndex = part === 'shared' ? (isObj(b.brainIndex) ? b.brainIndex : entry.indices) : (L.WISC[b.brainIndex] ? b.brainIndex : entry.indices[part]);
     const ai = ctx.ai || {};
@@ -567,7 +612,7 @@ export async function handleLetter(ctx) {
     const quota = ai.quota || makeQuota({ rec: useRec, limits, now, onUse: (rec) => { useRec = rec; } });
     if (!quota.take()) return j(200, { ok: false, reason: 'quota', part, aiLeft: 0, aiCap: limits.total });
     const notes = [strMax(b.notes, 1000).trim(), entry.notes ? '달력 메모: ' + entry.notes : ''].filter(Boolean).join('\n');
-    const res = await callDraft({ userPrompt: draftUserPrompt({ part, theme, week, publishAt, brainIndex, notes }), apiKey: ai.apiKey, model: ai.model, fetchImpl: ai.fetchImpl });
+    const res = await callDraft({ userPrompt: draftUserPrompt({ part, theme, week, publishAt, brainIndex, notes, today }), apiKey: ai.apiKey, model: ai.model, fetchImpl: ai.fetchImpl, webSearch: part === 'news' });
     /* 쓴 만큼은 성공·실패와 무관하게 남긴다 — 실패한 호출도 요금은 나간다 */
     if (store.putAiUse && useRec) await store.putAiUse(useRec);
     const aiLeft = typeof quota.left === 'function' ? quota.left() : null;

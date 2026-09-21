@@ -187,8 +187,16 @@ var WBCHUNK = (function () {
 
   /* 채점 결과에 이유를 붙인다 — 화면과 복습 태그가 같은 목록을 쓴다.
      군더더기 경계에 문법상 이유가 없으면 'fine'(너무 잘게 끊음)으로 둔다. */
-  function explain(text, model, marks) {
-    var ws = words(text), r = score(model, marks, text), notes = [];
+  function explain(text, model, marks, given) {
+    var ws = words(text);
+    /* given = 미리 표시해 준 경계(문장 끝). 학생이 찍은 것도 모범도 아닌 «주어진 자리»라 맞힘·놓침 어느 쪽에도 세지 않는다 */
+    if (given && given.length) {
+      var G = toSet(given);
+      model = (model || []).filter(function (i) { return !G[i]; });
+      marks = (marks || []).filter(function (i) { return !G[i]; });
+    }
+    var r = score(model, marks, text), notes = [];
+    r.given = given ? given.length : 0;
     r.neutral.forEach(function (i) {
       notes.push({ i: i, kind: 'neutral', tag: 'ok:comma', why: '쉼표 뒤에서 쉬어도 괜찮아요. 모범은 이어 읽었지만 틀린 건 아니에요.', at: ws[i].trim() });
     });
@@ -249,8 +257,58 @@ var WBCHUNK = (function () {
   }
 
   /* 밴드 밖의 조각은 규격에서 벗어난 것 — 콘텐츠 검사·교사 글 검사에 쓴다 */
+  /* ── 문장 끝 경계 — 초3 이상 직접 끊기에서 «미리 표시해 주는» 자리 ──
+     문장 끝은 규칙이 아니라 문장부호가 알려 주는 자리라 찍기 연습의 대상이 아니다. 미리 그어 주면 학생은
+     구·절 경계에만 집중하고, 긴 글에서 탭 수가 3분의 1로 준다. 채점은 explain(…, given) 이 이 자리를 뺀다. */
+  function sentenceEnds(text) {
+    var ws = words(text), out = [];
+    for (var i = 0; i < ws.length - 1; i++) if (RE_SENT.test(ws[i].trim())) out.push(i);
+    return out;
+  }
+
+  /* ── 초안 끊기 — 선생님이 붙여 넣은 글에서 첫 끊기 초안을 만든다 (관리 화면 「글 저작」) ──
+     문장 끝·쉼표·연결어미 뒤는 «강한» 경계라 언제나 끊고, 그 사이는 밴드 눈금(target)에 맞춰
+     붙여 읽어야 하는 자리(whyNotCut)를 피해 자른다. 상한(max)을 넘길 것 같으면 마지막 허용 자리에서 미리 끊는다.
+     초안일 뿐이다 — 뜻 덩어리는 사람이 다듬는다. 학생 채점에는 쓰지 않는다(채점은 모범 조각과의 일치로만). */
+  function autoChunk(text, band) {
+    var b = BANDS[band] || BANDS.G7, ws = words(text), out = [], cur = [], i, j;
+    var target = Math.max(2, Math.round(b.target)), max = b.max;
+    for (i = 0; i < ws.length; i++) {
+      cur.push(ws[i]);
+      if (i === ws.length - 1) break;
+      var kind = classifyBoundary(ws, i), blocked = whyNotCut(ws, i);
+      if (kind === 'sent' || kind === 'comma' || (kind === 'conn' && !blocked)) { out.push(cur.join('')); cur = []; continue; }
+      if (blocked) continue;
+      if (cur.length >= target) { out.push(cur.join('')); cur = []; continue; }
+      /* 다음 허용 경계까지 가면 상한을 넘기는가 — 넘기면 여기서 끊는다 */
+      j = i + 1; while (j < ws.length - 1 && whyNotCut(ws, j)) j++;
+      if (cur.length + (j - i) > max) { out.push(cur.join('')); cur = []; }
+    }
+    if (cur.length) out.push(cur.join(''));
+    return out;
+  }
+  /* 글 전체 → 문단별 초안. 빈 줄 또는 줄바꿈이 문단 경계. 문단 사이 공백은 조각에 남기지 않는다(원문 복원 규칙은 문단 안에서만). */
+  function draftParagraphs(text, band) {
+    return String(text || '').split(/\n\s*\n|\n/).map(function (t) { return t.replace(/\s+/g, ' ').trim(); }).filter(Boolean)
+      .map(function (t) { return autoChunk(t, band); });
+  }
+
+  /* ── 같은 규칙의 실수를 한 묶음으로 — 열 곳을 놓쳐도 설명은 규칙 수만큼만 ──
+     놓친 곳(miss)·군더더기(extra)는 많은 순, 쉼표 뒤(neutral)는 맨 뒤. at 은 자리 낱말 여섯 개까지. */
+  function groupNotes(notes) {
+    var map = {}, order = [];
+    (notes || []).forEach(function (n) {
+      var k = n.tag;
+      if (!map[k]) { map[k] = { tag: n.tag, kind: n.kind, why: n.why, label: TAG_LABEL[n.tag] || null, n: 0, at: [] }; order.push(k); }
+      map[k].n++;
+      if (map[k].at.length < 6) map[k].at.push(n.at);
+    });
+    var rank = { miss: 0, extra: 0, neutral: 1 };
+    return order.map(function (k) { return map[k]; }).sort(function (a, b) { return (rank[a.kind] - rank[b.kind]) || (b.n - a.n); });
+  }
+
   function check(segs, band) {
-    var b = BANDS[band] || BANDS.M, out = [];
+    var b = BANDS[band] || BANDS.G7, out = [];   /* 모르는 단계면 중1 눈금 — 옛 6단계 id 'M' 은 이제 없다 */
     var joined = segs.join('');
     segs.forEach(function (s, i) {
       if (!String(s).trim()) out.push('빈 조각(' + i + ')');
@@ -269,6 +327,7 @@ var WBCHUNK = (function () {
     score: score, classifyBoundary: classifyBoundary, whyNotCut: whyNotCut, explain: explain,
     BOUNDARY_WHY: BOUNDARY_WHY, TAG_LABEL: TAG_LABEL, sentencesOf: sentencesOf, stats: stats,
     toMarked: toMarked, fromMarked: fromMarked, check: check,
+    sentenceEnds: sentenceEnds, autoChunk: autoChunk, draftParagraphs: draftParagraphs, groupNotes: groupNotes,
   };
 })();
 

@@ -98,13 +98,27 @@ fs.copyFileSync(SHARED, path.join(DIST, 'chunk', 'voice.js'));
    관리 웹의 편집기 미리보기가 학생 앱과 같은 렌더러(letter.js)를 쓴다 — 원본은 letter/letter.js 하나. */
 const LETTER = path.join(ROOT, '..', 'letter');
 fs.mkdirSync(path.join(DIST, 'letter'), { recursive: true });
-const LETTER_FILES = ['index.html', 'letter.js', 'shapes.js', 'issue-sample.json', 'calendar.json', 'sw.js', 'manifest.webmanifest', 'icon.svg'];
+const LETTER_FILES = ['index.html', 'letter.js', 'shapes.js', 'drills.js', 'issue-sample.json', 'calendar.json', 'sw.js', 'manifest.webmanifest', 'icon.svg'];
 for (const f of LETTER_FILES) fs.copyFileSync(path.join(LETTER, f), path.join(DIST, 'letter', f));
+/* 파일럿 호 — 있으면 싣는다. 편집실이 만든 이번 주 호(자체 창작)를 링크만으로 연다. 없으면 앱이 샘플 호로 넘어간다 */
+if (fs.existsSync(path.join(LETTER, 'issue-pilot.json'))) fs.copyFileSync(path.join(LETTER, 'issue-pilot.json'), path.join(DIST, 'letter', 'issue-pilot.json'));
+/* 읽어 주기·한자 따라쓰기 — 원본은 shared/voice.js·vocab/trace.js 하나씩. 다른 앱과 같은 파일을 letter/ 에도 배급한다(SW 껍데기가 ./ 상대 경로로 캐시한다) */
+fs.copyFileSync(SHARED, path.join(DIST, 'letter', 'voice.js'));
+fs.copyFileSync(path.join(ROOT, '..', 'vocab', 'trace.js'), path.join(DIST, 'letter', 'trace.js'));
 /* 배포본 삽화(letter/img/*.svg) — 자체 제작 벡터 그림만. 올린 사진은 KV 에서 /api/letter/img/<id> 로 나간다 */
 fs.mkdirSync(path.join(DIST, 'letter', 'img'), { recursive: true });
 for (const f of fs.readdirSync(path.join(LETTER, 'img')).filter((x) => /\.svg$/.test(x))) fs.copyFileSync(path.join(LETTER, 'img', f), path.join(DIST, 'letter', 'img', f));
+/* 글꼴(letter/fonts/) — Noto Sans/Serif KR 조각(OFL, letter/fetch-fonts.mjs 가 받는다). fonts.css 가 가리키는 판 디렉터리째 복사한다 */
+const FONTS = path.join(LETTER, 'fonts');
+fs.mkdirSync(path.join(DIST, 'letter', 'fonts'), { recursive: true });
+for (const f of ['fonts.css', 'OFL.txt']) fs.copyFileSync(path.join(FONTS, f), path.join(DIST, 'letter', 'fonts', f));
+for (const d of fs.readdirSync(FONTS).filter((x) => fs.statSync(path.join(FONTS, x)).isDirectory())) {
+  fs.mkdirSync(path.join(DIST, 'letter', 'fonts', d), { recursive: true });
+  for (const f of fs.readdirSync(path.join(FONTS, d)).filter((x) => /\.woff2$/.test(x))) fs.copyFileSync(path.join(FONTS, d, f), path.join(DIST, 'letter', 'fonts', d, f));
+}
 fs.copyFileSync(path.join(LETTER, 'letter.js'), path.join(DIST, 'admin', 'letter.js'));
 fs.copyFileSync(path.join(LETTER, 'shapes.js'), path.join(DIST, 'admin', 'shapes.js'));
+fs.copyFileSync(path.join(LETTER, 'drills.js'), path.join(DIST, 'admin', 'drills.js'));
 
 /* ── 서비스 워커 캐시 이름을 내용에서 뽑는다 ──
    두 앱 모두 껍데기(index.html·words.js…)를 캐시 우선으로 물고 있다. 그래서
@@ -150,7 +164,7 @@ const jTag = stampSW(path.join(DIST, 'hanja', 'sw.js'),
   ['index.html', 'voice.js', 'srs.js', 'quiz.js', 'trace.js', 'book-check.js', 'bridge.js', 'book-sample.json', 'manifest.webmanifest', 'icon.svg']
     .map(f => path.join(DIST, 'hanja', f)), 'wbhj-shell');
 const lTag = stampSW(path.join(DIST, 'letter', 'sw.js'),
-  ['index.html', 'letter.js', 'shapes.js', 'manifest.webmanifest', 'icon.svg'].map(f => path.join(DIST, 'letter', f)), 'wbl-shell');
+  ['index.html', 'letter.js', 'shapes.js', 'drills.js', 'voice.js', 'trace.js', 'manifest.webmanifest', 'icon.svg'].map(f => path.join(DIST, 'letter', f)), 'wbl-shell');
 
 /* 조립한 것이 실제로 열리는지 확인한다.
    여기 목록에 새 파일을 안 적으면 배포본에서 404가 나고, 그 스크립트를 쓰는 화면이

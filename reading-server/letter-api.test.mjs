@@ -84,7 +84,7 @@ await t('학생 목록·호 — 발행된 호만, 자기 학년대 섹션만, �
   assert.equal(typeof list.body.issues[0].sections, 'number', '목록은 요약(brief)만 — 섹션은 개수'); assert.ok(list.body.issues[0].title);
   const one = await call(store, { path: '/api/letter/issue', query: Q('id=' + SAMPLE.id) });
   assert.equal(one.status, 200);
-  assert.deepEqual(one.body.issue.sections.map((s) => s.id), ['read-e2', 'words', 'brain-e2', 'mission', 'column', 'coach-e2', 'notice']);
+  assert.deepEqual(one.body.issue.sections.map((s) => s.id), ['read-e2', 'words', 'brain-e2', 'mission', 'column', 'coach-e2', 'poem', 'talk', 'write-e2', 'books', 'voices', 'news']);
   assert.equal(one.body.issue.tier, 'E2');
   /* 초안·미래 발행일은 학생에게 없다 */
   store.putIssue(SAMPLE.id, { issue: { ...clone(SAMPLE), status: 'draft' }, updatedAt: 'x' });
@@ -110,7 +110,12 @@ await t('학년을 못 읽는 학생 — 기본 학년대로 받고 guess:true',
 
 await t('학생 기록 — 화이트리스트 정규화, 하루 저장 상한, 크기 상한', async () => {
   const n = normalizeState({ issues: { '2026-W39': { openedAt: '2026-09-22T01:00:00Z', quiz: { 'read-e2:0': 1, 'read-e2:1': 9, 'bad key': 0, 'read-e2:2': 'x' }, reveal: { 'brain-e2:0': true, 'brain-e2:1': 'yes' }, checks: { 'mission:0': true }, junk: 1 }, 'nope': { quiz: {} } }, extra: true });
-  assert.deepEqual(n, { v: 1, issues: { '2026-W39': { openedAt: '2026-09-22T01:00:00Z', doneAt: '', quiz: { 'read-e2:0': 1 }, reveal: { 'brain-e2:0': true }, checks: { 'mission:0': true } } } });
+  assert.deepEqual(n, { v: 1, issues: { '2026-W39': { openedAt: '2026-09-22T01:00:00Z', doneAt: '', quiz: { 'read-e2:0': 1 }, reveal: { 'brain-e2:0': true }, checks: { 'mission:0': true }, days: {}, trace: {}, write: {} } } });
+  /* 하루 한 장·따라쓰기 — 요일은 1~7 의 시각 문자열만, 따라쓰기는 섹션 id 별 0~30 회차만 */
+  const n2 = normalizeState({ issues: { '2026-W39': { openedAt: 'x', days: { 1: '2026-09-21T01:00:00Z', 8: 'no', 2: 5, 7: '' }, trace: { words: 3, 'bad key!': 1, w2: 99, w3: -1 } } } }).issues['2026-W39'];
+  assert.deepEqual(n2.days, { 1: '2026-09-21T01:00:00Z' }); assert.deepEqual(n2.trace, { words: 3 });
+  const n3 = normalizeState({ issues: { '2026-W39': { write: { 'write-e2:0': ' 한 문장 ', 'write-e2:1': '   ', 'bad key': 'x', 'write-e2:2': 'a'.repeat(301) } } } }).issues['2026-W39'];
+  assert.deepEqual(n3.write, { 'write-e2:0': ' 한 문장 ' }, '쓴 글은 300자·형만 본다');
   assert.equal(normalizeState(null), null); assert.equal(normalizeState([]), null);
   const store = memStore(); seed(store);
   const g0 = await call(store, { path: '/api/letter/state' });
@@ -218,8 +223,8 @@ await t('관리 — 학생 목록·학년대 지정·발송 문구(가족 링크
   store.putState('st-1', { state: { v: 1, issues: { [SAMPLE.id]: { openedAt: 'x', doneAt: 'y', quiz: { 'read-e2:0': 0, 'read-e2:1': 3 }, reveal: {}, checks: {} } } }, updatedAt: 'x' });
   const stats = await admin({ path: '/api/letter/admin/stats', query: Q('id=' + SAMPLE.id) });
   assert.equal(stats.status, 200);
-  assert.deepEqual(stats.body.stats.byTier.E2, { total: 1, opened: 1, done: 1 });
-  assert.deepEqual(stats.body.stats.byTier.M, { total: 1, opened: 0, done: 0 });
+  assert.deepEqual(stats.body.stats.byTier.E2, { total: 1, opened: 1, done: 1, days: 0 });
+  assert.deepEqual(stats.body.stats.byTier.M, { total: 1, opened: 0, done: 0, days: 0 });
   assert.equal(stats.body.stats.total, 3); assert.equal(stats.body.stats.opened, 1);
   assert.deepEqual(stats.body.stats.unopened.map((u) => u.code).sort(), ['st-2', 'st-3']);
   const q0 = stats.body.stats.quiz.find((r) => r.section === 'read-e2' && r.qi === 0), q1 = stats.body.stats.quiz.find((r) => r.section === 'read-e2' && r.qi === 1);
@@ -243,19 +248,20 @@ await t('AI 초안 — 키 없으면 no-key, 조각별 호출·검증 결과 동
   const f = fakeFetch({ text: '```json\n' + JSON.stringify(parts.E2) + '\n```' });
   const ok = await admin({ path: '/api/letter/admin/draft', method: 'POST', getBody: async () => body, ai: { apiKey: 'k', env: {}, fetchImpl: f } });
   assert.equal(ok.status, 200); assert.equal(ok.body.ok, true); assert.equal(ok.body.part, 'E2');
-  assert.deepEqual(ok.body.sections.map((s) => s.id), ['read-e2', 'brain-e2', 'coach-e2']);
+  assert.deepEqual(ok.body.sections.map((s) => s.id), ['read-e2', 'brain-e2', 'coach-e2', 'write-e2']);
   assert.deepEqual(ok.body.errors, []); assert.equal(ok.body.aiLeft, LETTER_AI_DAILY_DEFAULT - 1); assert.equal(ok.body.aiCap, LETTER_AI_DAILY_DEFAULT);
   assert.equal(store.getAiUse().count, 1, '장부에 남는다');
   const c = f.calls[0];
   assert.equal(c.headers['x-api-key'], 'k'); assert.equal(c.headers['anthropic-version'], '2023-06-01'); assert.equal(c.headers['anthropic-beta'], 'server-side-fallback-2026-07-01');
   assert.equal(c.body.model, 'claude-opus-5'); assert.equal(c.body.fallbacks, 'default'); assert.ok(c.body.max_tokens >= 8000);
   const user = c.body.messages[0].content;
-  assert.ok(/가을 곤충의 겨울나기/.test(user) && /2026-W40/.test(user) && /WMI/.test(user) && /10월 3일 휴원/.test(user) && /read-e2/.test(user));
+  assert.ok(/가을 곤충의 겨울나기/.test(user) && /2026-W40/.test(user) && /WMI/.test(user) && /10월 3일 휴원/.test(user) && /read-e2/.test(user) && /write-e2/.test(user));
+  assert.ok(/drill/.test(c.body.system) && /poem\(/.test(c.body.system), '고정 코너·5분 놀이 규격이 시스템 프롬프트에');
   assert.ok(/자체 창작|창작/.test(c.body.system) && /K-WISC-V/.test(c.body.system));
   /* 공통 조각은 head 를 같이 돌려준다 */
   const fs2 = fakeFetch({ text: JSON.stringify(parts.shared) });
   const sh = await admin({ path: '/api/letter/admin/draft', method: 'POST', getBody: async () => ({ ...body, part: 'shared', brainIndex: { K: 'PSI' } }), ai: { apiKey: 'k', env: {}, fetchImpl: fs2 } });
-  assert.equal(sh.body.ok, true); assert.equal(sh.body.head.title, SAMPLE.title); assert.deepEqual(sh.body.sections.map((s) => s.id).sort(), ['column', 'mission', 'notice', 'words']);
+  assert.equal(sh.body.ok, true); assert.equal(sh.body.head.title, SAMPLE.title); assert.deepEqual(sh.body.sections.map((s) => s.id).sort(), ['books', 'column', 'mission', 'poem', 'talk', 'words']);
   assert.ok(/PSI/.test(fs2.calls[0].body.messages[0].content));
   /* 깨진 조각 — 정답 번호가 보기 밖 → 초안은 돌려주되 errors 에 적힌다(원장이 편집기에서 고친다) */
   const broken = clone(parts.E2); broken.sections[0].questions[0].answer = 9;
@@ -431,6 +437,58 @@ await t('주제 달력 — 기본값은 배포본, 저장하면 KV 가 이긴다
   assert.ok(new RegExp('지표: ' + L.rotationFor('2026-W40').K).test(f2.calls[0].body.messages[0].content), '달력에 그 학년대 지표 지정이 없으면 순환값');
   const none = await admin({ path: '/api/letter/admin/draft', method: 'POST', getBody: async () => ({ part: 'K', week: '2031-W10' }), ai: { apiKey: 'k', env: {}, fetchImpl: f2 } });
   assert.equal(none.status, 400, '달력에도 없는 주차면 주제가 필요하다');
+});
+
+
+await t('가족 링크 기록 — 링크 토큰으로 GET/PUT, 학생 코드 자리에 저장돼 열람 현황의 요일 진행에 잡힌다', async () => {
+  const store = memStore(); seed(store);
+  const fam = (over) => call(store, { who: null, query: Q('t=' + 'q'.repeat(32)), ...over });
+  const g0 = await fam({ path: '/api/letter/parent/state' });
+  assert.equal(g0.status, 200); assert.deepEqual(g0.body, { state: { v: 1, issues: {} }, updatedAt: null });
+  const r1 = await fam({ path: '/api/letter/parent/state', method: 'PUT', getBody: async () => ({ state: { issues: { [SAMPLE.id]: { openedAt: 'x', days: { 1: '2026-09-21T01:00:00Z', 2: '2026-09-22T01:00:00Z' }, trace: { words: 2 }, quiz: { 'read-m:0': 0 }, write: { 'write-m:0': '두 가설은 <원인>이 다르다' } } } } }) });
+  assert.equal(r1.status, 200); assert.ok(r1.body.updatedAt);
+  assert.deepEqual(store.getState('st-2').state.issues[SAMPLE.id].days, { 1: '2026-09-21T01:00:00Z', 2: '2026-09-22T01:00:00Z' }, '학생 코드(st-2) 자리에 저장');
+  const g1 = await fam({ path: '/api/letter/parent/state' });
+  assert.equal(g1.body.state.issues[SAMPLE.id].trace.words, 2);
+  assert.equal((await fam({ path: '/api/letter/parent/state', method: 'PUT', getBody: async () => ({ state: 'x' }) })).status, 400);
+  assert.equal((await call(store, { who: null, query: Q('t=' + 'z'.repeat(32)), path: '/api/letter/parent/state' })).status, 404, '모르는 토큰');
+  assert.equal((await call(store, { who: null, query: Q(''), path: '/api/letter/parent/state', method: 'PUT', getBody: async () => ({ state: {} }) })).status, 404, '토큰 없이는 못 쓴다');
+  /* 열람 현황 — 가족 링크로 올라온 기록도 요일 7칸으로 보인다 */
+  const stats = await call(store, { who: ADMIN, path: '/api/letter/admin/stats', query: Q('id=' + SAMPLE.id) });
+  const pr = stats.body.stats.progress.find((r) => r.code === 'st-2');
+  assert.deepEqual(pr.days, [true, true, false, false, false, false, false]); assert.equal(pr.done, false); assert.equal(pr.tier, 'M'); assert.equal(pr.writes, 1);
+  assert.deepEqual(stats.body.stats.writes, [{ code: 'st-2', name: '이중등', tier: 'M', key: 'write-m:0', text: '두 가설은 <원인>이 다르다' }], '원장이 독자의 답을 고를 목록');
+  assert.equal(stats.body.stats.byTier.M.days, 2);
+  assert.ok(!stats.body.stats.unopened.some((u) => u.code === 'st-2'));
+});
+
+await t('AI 초안 — 교육·입시 이슈 조각은 웹 검색 도구를 켜고, 주제 없이도 돌며, 검색 블록이 섞인 응답에서 JSON 을 찾는다', async () => {
+  const store = memStore(); seed(store);
+  const admin = (over) => call(store, { who: ADMIN, ...over });
+  const parts = SAMPLE_PARTS();
+  assert.equal(parts.news.sections.length, 1);
+  const raw = { model: 'claude-opus-5', stop_reason: 'end_turn', content: [
+    { type: 'server_tool_use', id: 'srvtoolu_1', name: 'web_search', input: { query: '교육부 보도자료' } },
+    { type: 'web_search_tool_result', tool_use_id: 'srvtoolu_1', content: [{ type: 'web_search_result', url: 'https://example.org/a', title: 'a', encrypted_content: 'x', page_age: null }] },
+    { type: 'text', text: '이번 주 소식입니다.\n' },
+    { type: 'text', text: JSON.stringify(parts.news), citations: [{ type: 'web_search_result_location', url: 'https://example.org/a', title: 'a', cited_text: 'x', encrypted_index: 'y' }] },
+  ] };
+  const f = fakeFetch({ raw });
+  const r = await admin({ path: '/api/letter/admin/draft', method: 'POST', getBody: async () => ({ part: 'news', theme: '', week: '2031-W10' }), ai: { apiKey: 'k', env: {}, fetchImpl: f } });
+  assert.equal(r.status, 200, JSON.stringify(r.body)); assert.equal(r.body.ok, true); assert.equal(r.body.part, 'news');
+  assert.deepEqual(r.body.sections.map((s) => s.type), ['news']); assert.deepEqual(r.body.errors, []);
+  const c = f.calls[0];
+  assert.equal(c.body.tools.length, 1); assert.equal(c.body.tools[0].type, 'web_search_20250305'); assert.equal(c.body.tools[0].user_location.country, 'KR'); assert.ok(c.body.tools[0].max_uses <= 6);
+  assert.ok(/최근 7일/.test(c.body.messages[0].content) && /교육부/.test(c.body.messages[0].content) && /https/.test(c.body.messages[0].content));
+  assert.ok(/news\) 조각은 웹 검색 결과를 간추린다/.test(c.body.system), '창작 규칙의 예외가 시스템 프롬프트에 적혀 있다');
+  /* 다른 조각은 검색을 켜지 않는다 */
+  const f2 = fakeFetch({ text: JSON.stringify(parts.E2) });
+  await admin({ path: '/api/letter/admin/draft', method: 'POST', getBody: async () => ({ part: 'E2', theme: 'x', week: '2026-W40', brainIndex: 'WMI' }), ai: { apiKey: 'k', env: {}, fetchImpl: f2 } });
+  assert.equal(f2.calls[0].body.tools, undefined);
+  /* 검색이 길어져 멈춘 응답(pause_turn)에 JSON 이 없으면 사유를 남긴다 */
+  const f3 = fakeFetch({ raw: { model: 'm', stop_reason: 'pause_turn', content: [{ type: 'text', text: '검색 중' }] } });
+  const r3 = await admin({ path: '/api/letter/admin/draft', method: 'POST', getBody: async () => ({ part: 'news', week: '2026-W40' }), ai: { apiKey: 'k', env: {}, fetchImpl: f3 } });
+  assert.equal(r3.body.ok, false); assert.equal(r3.body.reason, 'paused');
 });
 
 console.log(`\nOK — ${passed}개 통과`);

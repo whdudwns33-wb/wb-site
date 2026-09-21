@@ -140,6 +140,9 @@ t('배포본 _headers — /naesin/*·/vocab/*·/haru/*·/hanja/*·/letter/*·/ad
   }
   assert.ok(/noindex/.test(rules['/*']['X-Robots-Tag'] || ''), '전 경로 noindex 가 빠졌다');
   assert.ok(/nosniff/.test(rules['/*']['X-Content-Type-Options'] || ''));
+  /* 글꼴 목록은 외부 스타일시트다 — style-src 에 'self' 이 없으면 운영에서만 조용히 막혀 기기 글꼴로 찍힌다(로컬 서버는 CSP 를 안 붙인다) */
+  assert.ok(/style-src [^;]*'self'/.test(rules['/*']['Content-Security-Policy'] || ''), "CSP style-src 에 'self' 이 없다 — /letter/fonts/fonts.css 가 막힌다");
+  assert.ok(!/font-src/.test(rules['/*']['Content-Security-Policy'] || '') || /font-src [^;]*'self'/.test(rules['/*']['Content-Security-Policy']), 'font-src 가 있다면 self 를 허용해야 한다');
   assert.strictEqual(rules['/*']['Cache-Control'], undefined, '/* 에 Cache-Control 을 두면 분할본의 max-age 와 합쳐져 캐시가 통째로 무력화된다');
   assert.strictEqual(rules['/articles-L1.json']['Cache-Control'], 'public, max-age=604800', '분할본 캐시 규칙은 그대로');
   /* 원본 자리의 두 파일은 안내 주석만 남는다 — 규칙이 두 곳에 있으면 한 곳만 고치는 사고가 난다 */
@@ -180,9 +183,18 @@ t('관리 화면들이 dist/admin/ 에 실린다 — 하나 빠지면 그 화면
   assert.ok(hanjaFiles.every((f) => !/\.json$/.test(f) || f === 'book-sample.json'), 'dist/hanja/ 에 체험 단어장 말고 다른 JSON 이 실렸다: ' + hanjaFiles.join(', '));
   assert.ok(/자체 창작/.test(fs.readFileSync(path.join(hanjaDir, 'book-sample.json'), 'utf8')), '체험 단어장에 자체 창작 표시가 없다');
   /* 브레인레터 배포본 — 앱 껍데기 + 렌더러 + 자체 창작 체험 호. 관리 편집기가 부르는 /admin/letter.js 는 절대 경로라 verifyRefs 가 못 보니 여기서 지킨다 */
-  for (const f of ['index.html', 'letter.js', 'shapes.js', 'issue-sample.json', 'calendar.json', 'sw.js', 'manifest.webmanifest', 'icon.svg', 'img/leaf-autumn.svg', 'img/cover-autumn.svg'])
+  for (const f of ['index.html', 'letter.js', 'shapes.js', 'drills.js', 'voice.js', 'trace.js', 'issue-sample.json', 'calendar.json', 'sw.js', 'manifest.webmanifest', 'icon.svg', 'img/leaf-autumn.svg', 'img/cover-autumn.svg'])
     assert.ok(fs.existsSync(path.join(DIST, 'letter', f)), 'dist/letter/' + f + ' 가 없다');
   assert.ok(fs.existsSync(path.join(DIST, 'admin', 'letter.js')), 'dist/admin/letter.js 가 없다 — 관리 편집기의 미리보기·검증이 통째로 죽는다');
+  for (const f of ['shapes.js', 'drills.js']) assert.ok(fs.existsSync(path.join(DIST, 'admin', f)), 'dist/admin/' + f + ' 가 없다 — 미리보기의 놀이 자리가 빈다');
+  /* 글꼴 — fonts.css 가 가리키는 조각이 전부 dist 에 있어야 한다. 하나라도 빠지면 그 구간 글자만 다른 글꼴로 찍힌다 */
+  const fcss = fs.readFileSync(path.join(DIST, 'letter', 'fonts', 'fonts.css'), 'utf8');
+  const refs = [...fcss.matchAll(/url\(([^)]+)\)/g)].map((m) => m[1]);
+  assert.ok(refs.length >= 200, 'fonts.css 조각이 너무 적다: ' + refs.length);
+  for (const r of refs) assert.ok(fs.existsSync(path.join(DIST, 'letter', 'fonts', r)), 'dist/letter/fonts/' + r + ' 가 없다');
+  assert.ok(!/https?:\/\//.test(fcss), 'fonts.css 가 외부 주소를 부른다 — CSP 가 막아 글꼴이 안 나온다');
+  assert.ok(fs.existsSync(path.join(DIST, 'letter', 'fonts', 'OFL.txt')), '글꼴 라이선스(OFL.txt)가 배포본에 없다');
+  assert.ok(/\/letter\/fonts\/fonts\.css/.test(fs.readFileSync(path.join(DIST, 'admin', 'letter-admin.html'), 'utf8')), '관리 웹 미리보기가 글꼴을 부르지 않는다');
   assert.ok(fs.existsSync(path.join(DIST, 'admin', 'shapes.js')), 'dist/admin/shapes.js 가 없다 — 관리 미리보기에서 도형 놀이가 안 그려진다');
   /* 배포본 삽화는 SVG 뿐이고 스크립트가 없어야 한다 — img 태그로만 쓰지만 주소를 직접 열 수도 있다 */
   for (const f of fs.readdirSync(path.join(DIST, 'letter', 'img'))) assert.ok(!/<script|onload|onerror/i.test(fs.readFileSync(path.join(DIST, 'letter', 'img', f), 'utf8')), f + ' 에 스크립트가 있다');

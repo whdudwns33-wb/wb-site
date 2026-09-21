@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" role="img" aria-label="창가에서 밤하늘의 달을 올려다보는 아이">
+  <defs>
+    <linearGradient id="night" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#101a3c"/><stop offset="1" stop-color="#2a3a72"/></linearGradient>
+  </defs>
+  <rect width="1200" height="800" fill="#e9dfc9"/>
+  <!-- 창틀 -->
+  <rect x="150" y="80" width="900" height="600" fill="url(#night)" stroke="#7a5a3a" stroke-width="28"/>
+  <line x1="600" y1="80" x2="600" y2="680" stroke="#7a5a3a" stroke-width="18"/>
+  <line x1="150" y1="380" x2="1050" y2="380" stroke="#7a5a3a" stroke-width="18"/>
+  <!-- 별 -->
+  <g fill="#fff" opacity="0.85"><circle cx="260" cy="170" r="3"/><circle cx="420" cy="130" r="2.5"/><circle cx="520" cy="230" r="2"/><circle cx="700" cy="150" r="3"/><circle cx="930" cy="200" r="2.5"/><circle cx="980" cy="120" r="2"/><circle cx="330" cy="300" r="2"/></g>
+  <!-- 이지러지는 달: 오른쪽이 조금 어둡다 -->
+  <g transform="translate(820 230)">
+    <circle r="90" fill="#f6e7a1"/>
+    <ellipse cx="62" cy="0" rx="40" ry="92" fill="#101a3c" opacity="0.92"/>
+    <circle cx="-30" cy="-20" r="12" fill="#e9d98f"/><circle cx="-5" cy="30" r="18" fill="#e9d98f"/>
+  </g>
+  <!-- 창턱과 아이(뒷모습) -->
+  <rect x="120" y="680" width="960" height="40" fill="#8a6a44"/>
+  <circle cx="400" cy="560" r="70" fill="#3b2a1e"/>
+  <path d="M290 800 L290 640 Q400 600 510 640 L510 800 Z" fill="#2b4c3f"/>
+  <path d="M330 690 Q400 650 470 690 L470 720 L330 720 Z" fill="#e4ede7"/>
+  <!-- 공책과 연필 -->
+  <rect x="560" y="640" width="150" height="44" rx="4" fill="#fffdf5" stroke="#b9a98a" stroke-width="3"/>
+  <line x1="580" y1="656" x2="690" y2="656" stroke="#b9a98a" stroke-width="3"/><line x1="580" y1="670" x2="660" y2="670" stroke="#b9a98a" stroke-width="3"/>
+  <rect x="720" y="646" width="90" height="12" rx="6" fill="#c9a227" transform="rotate(-20 720 646)"/>
+</svg>
