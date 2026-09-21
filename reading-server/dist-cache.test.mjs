@@ -24,9 +24,10 @@ const V_SW = path.join(DIST, 'vocab', 'sw.js');
 const N_SW = path.join(DIST, 'naesin', 'sw.js');
 const K_SW = path.join(DIST, 'naesin-ko', 'sw.js');
 const H_SW = path.join(DIST, 'haru', 'sw.js');
+const C_SW = path.join(DIST, 'chunk', 'sw.js');
 
 build();
-const before = { r: swVer(R_SW), v: swVer(V_SW), n: swVer(N_SW), k: swVer(K_SW), h: swVer(H_SW) };
+const before = { r: swVer(R_SW), v: swVer(V_SW), n: swVer(N_SW), k: swVer(K_SW), h: swVer(H_SW), c: swVer(C_SW) };
 
 t('배포본의 캐시 이름이 내용에서 나온다 — 손으로 적은 값이 아니다', () => {
   assert.ok(/^wbr-shell-[0-9a-f]{10}$/.test(before.r), '진로독서 sw.js: ' + before.r);
@@ -34,6 +35,7 @@ t('배포본의 캐시 이름이 내용에서 나온다 — 손으로 적은 값
   assert.ok(/^wbn-shell-[0-9a-f]{10}$/.test(before.n), '내신브레인 sw.js: ' + before.n);
   assert.ok(/^wbk-shell-[0-9a-f]{10}$/.test(before.k), '국어브레인 sw.js: ' + before.k);
   assert.ok(/^wbh-shell-[0-9a-f]{10}$/.test(before.h), '하루브레인 sw.js: ' + before.h);
+  assert.ok(/^wbc-shell-[0-9a-f]{10}$/.test(before.c), '청크브레인 sw.js: ' + before.c);
 });
 
 t('두 번 빌드해도 같다 — 안 바뀐 배포에서 캐시가 헛되이 날아가지 않는다', () => {
@@ -43,6 +45,7 @@ t('두 번 빌드해도 같다 — 안 바뀐 배포에서 캐시가 헛되이 �
   assert.strictEqual(swVer(N_SW), before.n);
   assert.strictEqual(swVer(K_SW), before.k);
   assert.strictEqual(swVer(H_SW), before.h);
+  assert.strictEqual(swVer(C_SW), before.c);
 });
 
 t('껍데기 파일이 바뀌면 캐시 이름이 바뀐다 — 학생이 새 코드를 받는다', () => {
@@ -56,6 +59,8 @@ t('껍데기 파일이 바뀌면 캐시 이름이 바뀐다 — 학생이 새 �
     /* 국어는 개념어 사전도 셸에 실린다 — 사전을 고치면 학생이 새 사전을 받아야 한다 */
     { file: path.join(HERE, '..', 'naesin-ko', 'concepts.json'), sw: K_SW, was: before.k, what: '국어브레인 개념어 사전' },
     { file: path.join(HERE, '..', 'haru', 'icon.svg'), sw: H_SW, was: before.h, what: '하루브레인 앱' },
+    /* 청크브레인은 지문도 셸에 실린다 — 지문을 고치면 학생이 새 지문을 받아야 한다 */
+    { file: path.join(HERE, '..', 'chunk', 'passages.js'), sw: C_SW, was: before.c, what: '청크브레인 지문' },
   ];
   for (const c of cases) {
     const orig = fs.readFileSync(c.file);

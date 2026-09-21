@@ -53,6 +53,7 @@ export function appOfPath(p) {
   if (p.startsWith('/api/haru/')) return 'haru';
   if (p.startsWith('/api/vocab/')) return 'vocab';
   if (p.startsWith('/api/naesin/')) return 'naesin';
+  if (p.startsWith('/api/chunk/')) return 'chunk';
   return 'reading';
 }
 export function allowedApp(stu, app) {
