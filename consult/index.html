@@ -838,30 +838,43 @@
   .student-guide-hero .btn { position: relative; z-index: 1; background: var(--white); color: var(--navy); }
   .student-guide-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 13px; }
   .student-guide-head .pill { flex: 0 0 auto; }
+  .student-guide-section > summary { cursor: pointer; list-style: none; }
+  .student-guide-section > summary::-webkit-details-marker { display: none; }
+  .student-guide-summary-copy, .student-guide-summary-copy .card-title, .student-guide-summary-copy .card-sub { display: block; }
+  .student-guide-summary-copy { flex: 1; min-width: 0; }
+  .student-guide-section > summary::after { content: '⌄'; flex: 0 0 auto; color: var(--mid-gray); font-size: 18px; font-weight: 900; line-height: 1; }
+  .student-guide-section[open] > summary::after { content: '⌃'; }
+  .student-guide-section:not([open]) > summary { margin-bottom: 0; }
+  .student-guide-section > summary:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: 8px; }
   .student-guide-steps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
   .student-guide-step { min-width: 0; padding: 13px; border: 1px solid #DFE8F2; border-radius: 13px; background: #F8FBFF; }
   .student-guide-step-top { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
   .student-guide-number { width: 26px; height: 26px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 9px; background: #E5EFFA; color: var(--deep-blue); font-size: 12px; font-weight: 900; }
   .student-guide-step b { color: var(--navy); font-size: 13px; }
-  .student-guide-step p { color: var(--mid-gray); font-size: 11.5px; line-height: 1.55; }
+  .student-guide-step p { color: var(--mid-gray); font-size: 12.5px; line-height: 1.6; }
   .student-guide-step code { padding: 2px 5px; border-radius: 5px; background: var(--white); color: var(--deep-blue); font-family: inherit; font-size: 10.5px; font-weight: 900; }
-  .student-guide-tip { margin-top: 11px; padding: 11px 12px; border-radius: 11px; background: #FFF8E9; color: #7B5B12; font-size: 11.5px; }
+  .student-guide-tip { margin-top: 11px; padding: 11px 12px; border-radius: 11px; background: #FFF8E9; color: #7B5B12; font-size: 12px; line-height: 1.6; }
+  .student-guide-tip-more > summary { cursor: pointer; list-style: none; font-weight: 900; }
+  .student-guide-tip-more > summary::-webkit-details-marker { display: none; }
+  .student-guide-tip-more > summary::after { content: ' +'; }
+  .student-guide-tip-more[open] > summary::after { content: ' −'; }
+  .student-guide-tip-more p { margin-top: 9px; }
   .student-guide-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
   .student-guide-option { min-width: 0; padding: 14px; border: 1px solid var(--line); border-radius: 13px; }
   .student-guide-option.planner { background: #F1F7FD; border-color: #D5E5F4; }
   .student-guide-option.lecture { background: #FFF3F8; border-color: #F3DCE7; }
   .student-guide-option b { display: block; margin-bottom: 5px; color: var(--navy); font-size: 13px; }
-  .student-guide-option p { color: var(--mid-gray); font-size: 11.5px; line-height: 1.55; }
+  .student-guide-option p { color: var(--mid-gray); font-size: 12.5px; line-height: 1.6; }
   .student-guide-closes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
   .student-guide-close { padding: 13px; border-radius: 12px; background: #F7F4FF; }
   .student-guide-close b { display: block; color: var(--deep-blue); font-size: 12.5px; }
-  .student-guide-close span { display: block; margin-top: 3px; color: var(--mid-gray); font-size: 11px; }
+  .student-guide-close span { display: block; margin-top: 3px; color: var(--mid-gray); font-size: 11.5px; line-height: 1.5; }
   .student-guide-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
   .student-guide-tab { display: grid; grid-template-columns: 29px minmax(0, 1fr); gap: 8px; align-items: center; padding: 10px; border-radius: 11px; background: #F7F8FA; }
   .student-guide-tab i { display: grid; place-items: center; width: 29px; height: 29px; border-radius: 9px; background: var(--white); font-style: normal; }
   .student-guide-tab b, .student-guide-tab span { display: block; }
   .student-guide-tab b { color: var(--navy); font-size: 11.5px; }
-  .student-guide-tab span { color: var(--mid-gray); font-size: 10px; line-height: 1.35; }
+  .student-guide-tab span { color: var(--mid-gray); font-size: 11.5px; line-height: 1.45; }
   .student-guide-private { border-color: #F0D9D4; background: #FFF9F8; }
   .student-guide-private b { color: #A84739; }
   .student-setup-progress { height: 7px; overflow: hidden; border-radius: 999px; background: rgba(255,255,255,.2); }
@@ -2711,17 +2724,8 @@ function viewStudentGuide() {
       '<button class="btn" data-go="today">오늘 할 일 시작하기 →</button>' +
     '</div>' + (studentSelf ? studentSetupSummary(me) + studentPhoneSettingsCard() : '') +
 
-    '<div class="card"><div class="student-guide-head"><div><div class="card-title">처음 연결과 매일 접속</div>' +
-      '<div class="card-sub">학생용 링크는 연결용으로 한 번만 사용하고, 연결된 같은 브라우저로 계속 이용합니다.</div></div><span class="pill">첫날</span></div>' +
-      '<div class="student-guide-steps">' +
-        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">1</span><b>학생 기기에서 연결</b></div><p>카카오톡 안에서 열었다면 연결 전에 메뉴에서 Chrome 또는 Safari로 여세요.</p></div>' +
-        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">2</span><b>바로가기 저장</b></div><p>연결된 오늘 할 일 화면을 홈 화면이나 즐겨찾기에 저장합니다.</p></div>' +
-        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">3</span><b>같은 브라우저 사용</b></div><p>매일 같은 브라우저의 저장된 바로가기로 접속합니다.</p></div>' +
-        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">4</span><b>기기가 바뀌었다면</b></div><p>휴대폰이나 브라우저가 바뀌면 원장님께 새 학생용 링크를 요청합니다.</p></div>' +
-      '</div></div>' +
-
-    '<div class="card"><div class="student-guide-head"><div><div class="card-title">매일 반드시 할 것</div>' +
-      '<div class="card-sub">오늘 할 일 탭에서 순서대로 진행하세요.</div></div><span class="pill">필수</span></div>' +
+    '<details class="card student-guide-section" open><summary class="student-guide-head"><span class="student-guide-summary-copy"><span class="card-title">✅ 매일 반드시 할 것</span>' +
+      '<span class="card-sub">오늘 할 일 탭에서 순서대로 진행하세요.</span></span><span class="pill">필수</span></summary>' +
       '<div class="student-guide-steps">' +
         '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">1</span><b>오늘 해야 할 일 확인</b></div>' +
           '<p>첫 카드에서 이월·배부 공부·온라인 학습·인강·복습 순서를 확인하고, 필요하면 <code>오늘 배부된 공부</code>를 펼칩니다.</p></div>' +
@@ -2734,12 +2738,23 @@ function viewStudentGuide() {
       '</div>' +
       '<div class="student-guide-tip"><b>온라인 학습 표시</b> ○ 미시작 → ◐ 진행 중 → ✓ 학생 완료 순서로 바뀌며, 인증사진이 승인되면 🛡 원장 확인으로 표시됩니다.</div>' +
       '<div class="student-guide-tip"><b>오늘 끝내지 못했다면?</b> 숨기지 말고 하루 마감에서 ‘내일로 이월’, ‘막힘’, ‘오늘 종료’ 중 표시되는 방법을 선택하세요. 반복 온라인 학습은 다음 예정일에 자동으로 다시 표시됩니다.</div>' +
-      '<div class="student-guide-tip"><b>유효 학습일 스탬프</b> 예정 공부를 하나 이상 완료하거나 순공시간을 10분 이상 기록하고, 미완료 정리와 수행 보고를 다음날 정오 전까지 끝내면 하루에 하나가 찍힙니다.</div>' +
-      '<div class="student-guide-tip"><b>포인트와 기프트 카드</b> 10월 1일부터 유효 학습일은 100P, 예정 학습일 3일 이상인 주의 80% 달성·주간 마무리는 500P, 예정 학습일 12일 이상인 달의 80% 달성·월간 마무리는 1,000P가 자동 계산됩니다. 꾸준히 사용하면 한 달에 기프트 카드 1개를 목표로 적립할 수 있으며, 5,000P부터 오늘 화면에서 교환을 신청합니다.</div>' +
-    '</div>' +
+      '<details class="student-guide-tip student-guide-tip-more"><summary>스탬프·포인트 기준 보기</summary>' +
+        '<p><b>유효 학습일 스탬프</b> 예정 공부를 하나 이상 완료하거나 순공시간을 10분 이상 기록하고, 미완료 정리와 수행 보고를 다음날 정오 전까지 끝내면 하루에 하나가 찍힙니다.</p>' +
+        '<p><b>포인트와 기프트 카드</b> 10월 1일부터 유효 학습일은 100P, 예정 학습일 3일 이상인 주의 80% 달성·주간 마무리는 500P, 예정 학습일 12일 이상인 달의 80% 달성·월간 마무리는 1,000P가 자동 계산됩니다. 꾸준히 사용하면 한 달에 기프트 카드 1개를 목표로 적립할 수 있으며, 5,000P부터 오늘 화면에서 교환을 신청합니다.</p>' +
+      '</details>' +
+    '</details>' +
 
-    '<div class="card"><div class="student-guide-head"><div><div class="card-title">온라인 학습 사용 매뉴얼</div>' +
-      '<div class="card-sub">학습 탭에서 사이트를 열고, 끝난 뒤 플래너에 완료 기록을 남겨야 오늘 공부에 반영됩니다.</div></div><span class="pill">리더스아이 · 메타수학</span></div>' +
+    '<details class="card student-guide-section"><summary class="student-guide-head"><span class="student-guide-summary-copy"><span class="card-title">🔗 처음 연결과 매일 접속</span>' +
+      '<span class="card-sub">학생용 링크 연결과 매일 접속 방법입니다.</span></span><span class="pill">첫날</span></summary>' +
+      '<div class="student-guide-steps">' +
+        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">1</span><b>학생 기기에서 연결</b></div><p>카카오톡 안에서 열었다면 연결 전에 메뉴에서 Chrome 또는 Safari로 여세요.</p></div>' +
+        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">2</span><b>바로가기 저장</b></div><p>연결된 오늘 할 일 화면을 홈 화면이나 즐겨찾기에 저장합니다.</p></div>' +
+        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">3</span><b>같은 브라우저 사용</b></div><p>매일 같은 브라우저의 저장된 바로가기로 접속합니다.</p></div>' +
+        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">4</span><b>기기가 바뀌었다면</b></div><p>휴대폰이나 브라우저가 바뀌면 원장님께 새 학생용 링크를 요청합니다.</p></div>' +
+      '</div></details>' +
+
+    '<details class="card student-guide-section"><summary class="student-guide-head"><span class="student-guide-summary-copy"><span class="card-title">📚 온라인 학습 사용 매뉴얼</span>' +
+      '<span class="card-sub">사이트 학습부터 플래너 완료 기록까지 확인합니다.</span></span><span class="pill">리더스아이 · 메타수학</span></summary>' +
       '<div class="student-guide-steps">' +
         '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">1</span><b>학습 탭 열기</b></div><p><code>학습</code>에서 리더스아이 또는 메타수학 카드를 펼칩니다.</p></div>' +
         '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">2</span><b>로그인 정보 메모</b></div><p>리더스아이는 Agency ID <code>wbbrain</code>을 사용하고 Student ID·PW는 본인이 입력합니다. 메타수학도 본인 아이디·비밀번호를 입력합니다.</p></div>' +
@@ -2749,26 +2764,26 @@ function viewStudentGuide() {
         '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">6</span><b>오늘 할 일 확인</b></div><p>오늘 체크리스트가 완료로 바뀌었는지 확인하고, 마지막에 하루 마감과 수행 보고를 끝냅니다.</p></div>' +
       '</div><div class="student-guide-tip"><b>로그인 메모 보안</b> 입력한 아이디와 비밀번호는 현재 학생 기기에만 저장되고 서버·원장 화면·백업으로 전송되지 않습니다. 공용 기기에서는 저장하지 말고, 기기 저장공간을 지우면 메모도 사라집니다.</div>' +
       '<div class="student-guide-tip"><b>서비스별 안내</b> 리더스아이는 학습 결과에 따라 1주일마다 레벨이 자동 조정됩니다. 메타수학 문제지 요청은 화요일까지 보내면 가까운 수요일에, 수요일 이후에는 다음 수요일에 제작·배정됩니다.</div>' +
-    '</div>' +
+    '</details>' +
 
-    '<div class="card"><div class="student-guide-head"><div><div class="card-title">학생에 따라 선택해서 사용</div>' +
-      '<div class="card-sub">해당하지 않는 기능은 사용하지 않아도 됩니다.</div></div><span class="pill warn">선택</span></div>' +
+    '<details class="card student-guide-section"><summary class="student-guide-head"><span class="student-guide-summary-copy"><span class="card-title">⚙ 학생에 따라 선택해서 사용</span>' +
+      '<span class="card-sub">순공시간과 인강이 필요한 학생만 사용합니다.</span></span><span class="pill warn">선택</span></summary>' +
       '<div class="student-guide-options">' +
         '<div class="student-guide-option planner"><b>⏱ 순공시간 기록</b><p>시간을 기록하는 학생은 ‘공부 시작·정지’를 사용합니다. 타이머를 쓰지 않았다면 연필 버튼에서 과목별 실제 시간만 한 번 입력할 수 있습니다. 입력하지 않으면 보고에는 0분으로 표시될 수 있습니다.</p></div>' +
         '<div class="student-guide-option lecture"><b>🎬 인강 관리</b><p>등록된 인강이 있는 학생만 사용합니다. 오늘 들을 강의를 체크리스트에 담은 뒤 완료 표시하면 됩니다.</p></div>' +
       '</div>' +
-    '</div>' +
+    '</details>' +
 
-    '<div class="card"><div class="student-guide-head"><div><div class="card-title">일요일과 매월 말일</div>' +
-      '<div class="card-sub">평소처럼 하루 마감부터 끝내면 다음 단계가 열립니다.</div></div><span class="pill">자동 안내</span></div>' +
+    '<details class="card student-guide-section"><summary class="student-guide-head"><span class="student-guide-summary-copy"><span class="card-title">🗓 일요일과 매월 말일</span>' +
+      '<span class="card-sub">주간·월간 마무리 방법을 확인합니다.</span></span><span class="pill">자동 안내</span></summary>' +
       '<div class="student-guide-closes">' +
         '<div class="student-guide-close"><b>일요일 · 주간 마무리</b><span>이번 주 완료율과 미완료 공부를 확인하고 짧게 회고합니다.</span></div>' +
         '<div class="student-guide-close"><b>매월 말일 · 월간 마무리</b><span>이번 달 기록을 확인하고 다음 달 집중할 내용을 정합니다.</span></div>' +
       '</div><div class="student-guide-tip"><b>오늘 화면이 잠겼다면?</b> 화면에 표시된 이전 하루·주간·월간 마무리를 먼저 완료하면 자동으로 열립니다.</div>' +
-    '</div>' +
+    '</details>' +
 
-    '<div class="card"><div class="student-guide-head"><div><div class="card-title">탭은 이렇게 사용해요</div>' +
-      '<div class="card-sub">필요할 때 찾아보는 보조 화면입니다.</div></div></div>' +
+    '<details class="card student-guide-section"><summary class="student-guide-head"><span class="student-guide-summary-copy"><span class="card-title">🧭 탭은 이렇게 사용해요</span>' +
+      '<span class="card-sub">각 메뉴가 어떤 역할인지 확인합니다.</span></span></summary>' +
       '<div class="student-guide-tabs">' +
         '<div class="student-guide-tab"><i>✅</i><div><b>오늘 할 일</b><span>매일 공부하고 마감하는 필수 화면</span></div></div>' +
         '<div class="student-guide-tab"><i>📊</i><div><b>주간 플래너</b><span>요일별 수행과 주간 마무리 확인</span></div></div>' +
@@ -2777,7 +2792,7 @@ function viewStudentGuide() {
         '<div class="student-guide-tab"><i>🎬</i><div><b>인강</b><span>인강이 있는 학생의 일정·진도 관리</span></div></div>' +
         '<div class="student-guide-tab"><i>📚</i><div><b>학습</b><span>온라인 학습 실행·완료 기록, 회독·제출 확인</span></div></div>' +
       '</div>' +
-    '</div>' +
+    '</details>' +
 
     '<div class="card student-guide-private"><div class="card-title">🔒 학생용 화면과 보호자 열람은 달라요</div>' +
       '<div class="card-sub">이 화면은 시간표·체크·학습시간·마감을 직접 기록하는 학생용입니다. 보호자는 학원에서 받은 ‘WB 보호자 학습 확인’ 링크로 발행된 주간·월간 리포트와 영·수 결과지만 읽기 전용으로 확인합니다.</div></div>' +
@@ -14174,7 +14189,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-09-21.3';
+const APP_VER = '2026-09-22.1';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
