@@ -9,7 +9,7 @@
 
 const STATE_MAX_BYTES = 262_144;   // 학생 기록 1건 최대 (256KB) — log 400건 + items 로도 충분히 남는다
 const SUMMARY_MAX_BYTES = 2_048;
-const BANDS = ['K', 'E1', 'E2', 'E3', 'M', 'H'];
+const BANDS = ['K', 'G1', 'G2', 'G3', 'G4', 'G5', 'G6', 'G7', 'G8', 'G9', 'G10', 'G11', 'G12'];   /* chunk/rules.js BAND_ORDER 와 같다 */
 const nowIso = () => new Date().toISOString();
 const size = (o) => JSON.stringify(o).length;
 const isObj = (v) => v && typeof v === 'object' && !Array.isArray(v);

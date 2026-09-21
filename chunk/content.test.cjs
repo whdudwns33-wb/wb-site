@@ -43,7 +43,7 @@ P.forEach((p) => {
   (perBand[p.band] = perBand[p.band] || []).push(avg);
   /* 이해 문제 — 유치·초1~2 는 3지선다, 그 위는 4지선다. 답은 지문 안에 있어야 한다(사실 문제) */
   const q = p.q;
-  const want = (p.band === 'K' || p.band === 'E1') ? 3 : 4;
+  const want = band.sentenceMode ? 3 : 4;
   if (!q || !q.q || !Array.isArray(q.choices) || q.choices.length !== want) E(at + ': 문제는 ' + want + '지선다여야 한다');
   else {
     if (!(q.answer >= 0 && q.answer < q.choices.length)) E(at + ': answer 인덱스가 범위 밖');
@@ -58,6 +58,8 @@ R.BAND_ORDER.forEach((b) => {
   if (list.length < 6) E(b + ': 지문이 ' + list.length + '편 — 최소 6편');
   const answers = new Set(list.map((p) => p.q && p.q.answer));
   if (answers.size < 3) E(b + ': 정답 위치가 ' + [...answers].join(',') + ' 뿐 — 고르게 섞어야 찍기가 안 통한다');
+  const genres = new Set(list.map((p) => p.genre));
+  if (genres.size < 2) E(b + ': 갈래가 하나뿐 — 이야기·설명·논설 등을 섞는다');
   const avgs = perBand[b] || [];
   const avg = avgs.reduce((a, x) => a + x, 0) / (avgs.length || 1);
   const t = R.BANDS[b].target;
@@ -81,7 +83,12 @@ L.forEach((l) => {
     if (R.modelBoundaries(x.segs).length < 1) E('카드 ' + at + ' 항목 ' + i + ': 경계가 하나도 없다 — 연습이 안 된다');
   });
 });
-R.BAND_ORDER.forEach((b) => { if (L.filter((l) => l.band === b).length < 4) E(b + ': 카드가 4장 미만'); });
+/* 카드는 나선형 — 학년마다 새 카드 2장 이상, 그 학년까지 쌓인 카드가 4장 이상이면 배우기 탭이 비지 않는다 */
+R.BAND_ORDER.forEach((b, i) => {
+  if (L.filter((l) => l.band === b).length < 2) E(b + ': 새 카드가 2장 미만');
+  const upto = R.BAND_ORDER.slice(0, i + 1);
+  if (L.filter((l) => upto.indexOf(l.band) >= 0).length < 4) E(b + ': 이 학년까지 쌓인 카드가 4장 미만');
+});
 /* 모든 규칙 태그를 어느 카드든 다루는가 — 복습 탭이 「약한 규칙 → 카드」로 보낼 곳이 있어야 한다 */
 Object.keys(R.TAG_LABEL).forEach((tg) => { if (!L.some((l) => l.tags.indexOf(tg) >= 0)) E('태그 ' + tg + ' 를 다루는 카드가 없다'); });
 

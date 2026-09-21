@@ -66,6 +66,13 @@ t('붙여 읽는 자리 — 관형어·부사·수+단위·의존명사·보조�
   assert.strictEqual(why('친구를 만나게 되었다', 1), 'aux', '「-게 되다」');
   assert.strictEqual(why('일찍 자야 한다', 1), 'aux', '「-어야 하다」');
   assert.strictEqual(why('사과 한 상자를 샀다', 1), 'num', '단위 「상자」');
+  assert.strictEqual(why('호주는 한겨울이다', 0), null, '「호주는」 은 명사+조사 — 「-오는·-주는」 앞 글자를 본다');
+  assert.strictEqual(why('그 라디오는 처음엔 불편했다', 1), null, '「라디오는」 도 명사+조사');
+  assert.strictEqual(why('멀리서 돌아오는 기차를 보았다', 1), 'adn', '「돌아오는」 은 관형형');
+  assert.strictEqual(why('민호는 줄을 잡았다', 0), null, '「줄을」 은 보통 명사(끈)');
+  assert.strictEqual(why('나는 자전거를 탈 줄 안다', 2), 'dep', '「탈 줄」 — ㄹ 관형형 뒤의 의존명사');
+  assert.strictEqual(why('배식대 앞에서 양을 조절한다', 1), null, '「양을」 은 보통 명사(분량)');
+  assert.strictEqual(why('먹는 양을 조절한다', 0), 'dep', '「먹는 양」 은 의존명사');
 });
 
 t('쉼표 뒤에 찍은 군더더기는 벌점이 없다(neutral) — 모범이 이어 읽었더라도', () => {
@@ -115,19 +122,25 @@ t('표시 문자열 ↔ 조각 — 교사가 붙여 넣은 글을 조각으로',
 
 t('밴드 검사 — 상한 초과·공백 누락·붙여 읽을 자리를 이름 붙여 잡는다', () => {
   assert.deepStrictEqual(R.check(['아기 곰이 ', '잠을 자요.'], 'K'), []);
-  const long = R.check(['하나 둘 셋 넷 다섯 여섯 일곱 여덟 아홉 열 열하나'], 'H');
+  const long = R.check(['하나 둘 셋 넷 다섯 여섯 일곱 여덟 아홉 열 열하나'], 'G12');
   assert.ok(long.some((x) => /11어절/.test(x)));
-  assert.ok(R.check(['나는', '학교에 갔다.'], 'E1').some((x) => /공백/.test(x)));
-  assert.ok(R.check(['매우 높은 ', '상태로 이어진다.'], 'M').some((x) => /adn/.test(x)));
-  assert.ok(R.check(['사과 다섯 ', '개를 먹었다.'], 'E2').some((x) => /num/.test(x)));
+  assert.ok(R.check(['나는', '학교에 갔다.'], 'G1').some((x) => /공백/.test(x)));
+  assert.ok(R.check(['매우 높은 ', '상태로 이어진다.'], 'G8').some((x) => /adn/.test(x)));
+  assert.ok(R.check(['사과 다섯 ', '개를 먹었다.'], 'G3').some((x) => /num/.test(x)));
 });
 
 t('학년 → 밴드, 위·아래 밴드', () => {
   assert.strictEqual(R.bandOfGrade(0), 'K'); assert.strictEqual(R.bandOfGrade('유치'), 'K');
-  assert.strictEqual(R.bandOfGrade(2), 'E1'); assert.strictEqual(R.bandOfGrade(4), 'E2');
-  assert.strictEqual(R.bandOfGrade(6), 'E3'); assert.strictEqual(R.bandOfGrade(8), 'M'); assert.strictEqual(R.bandOfGrade(12), 'H');
-  assert.strictEqual(R.nextBand('H'), null); assert.strictEqual(R.prevBand('K'), null); assert.strictEqual(R.nextBand('E2'), 'E3');
-  R.BAND_ORDER.forEach((b) => { assert.ok(R.BANDS[b].max <= 8, b + ' 상한은 8어절 이하 (규격서 2장)'); });
+  assert.strictEqual(R.bandOfGrade(1), 'G1'); assert.strictEqual(R.bandOfGrade(4), 'G4');
+  assert.strictEqual(R.bandOfGrade(6), 'G6'); assert.strictEqual(R.bandOfGrade(8), 'G8'); assert.strictEqual(R.bandOfGrade(12), 'G12');
+  assert.strictEqual(R.bandOfGrade(15), 'G12', '학년이 넘치면 고3');
+  assert.strictEqual(R.nextBand('G12'), null); assert.strictEqual(R.prevBand('K'), null); assert.strictEqual(R.nextBand('G3'), 'G4'); assert.strictEqual(R.prevBand('G1'), 'K');
+  assert.strictEqual(R.BAND_ORDER.length, 13, '유치 + 초1~고3');
+  R.BAND_ORDER.forEach((b, i) => {
+    assert.ok(R.BANDS[b].max <= 8, b + ' 상한은 8어절 이하 (규격서 2장)');
+    if (i) assert.ok(R.BANDS[b].target >= R.BANDS[R.BAND_ORDER[i - 1]].target, b + ' 눈금은 아래 학년보다 작지 않다');
+  });
+  assert.ok(R.BANDS.K.sentenceMode && R.BANDS.G2.sentenceMode && !R.BANDS.G3.sentenceMode, '유치·초1·초2 는 문장 하나씩');
 });
 
 t('조각 통계', () => {

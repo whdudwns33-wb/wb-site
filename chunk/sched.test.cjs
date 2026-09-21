@@ -10,10 +10,13 @@ const T0 = new Date(2026, 8, 21, 15, 0, 0).getTime();
 t('빈 상태와 복원 — 빠진 칸은 채우고 이상한 값은 버린다', () => {
   const b = S.blank(T0);
   assert.strictEqual(b.band, null); assert.deepStrictEqual(b.items, {});
-  const n = S.normalize({ v: 1, band: 'E2', items: { a: { id: 'a' } }, log: 'bad', prefs: { font: 'large' } }, T0);
-  assert.strictEqual(n.band, 'E2'); assert.deepStrictEqual(n.log, []); assert.strictEqual(n.prefs.font, 'large'); assert.strictEqual(n.prefs.marker, 'auto');
+  const n = S.normalize({ v: 1, band: 'G3', items: { a: { id: 'a' } }, log: 'bad', prefs: { font: 'large' } }, T0);
+  assert.strictEqual(n.band, 'G3'); assert.deepStrictEqual(n.log, []); assert.strictEqual(n.prefs.font, 'large'); assert.strictEqual(n.prefs.marker, 'auto');
   assert.strictEqual(S.normalize(null, T0).v, 1);
   assert.strictEqual(S.normalize({ band: 7 }, T0).band, null);
+  const old = S.normalize({ band: 'E2', items: { a: { id: 'a', band: 'M' } }, log: [{ t: 1, id: 'a', band: 'H', score: 80 }] }, T0);
+  assert.strictEqual(old.band, 'G3', '옛 초3~4 밴드는 초3 단계로');
+  assert.strictEqual(old.items.a.band, 'G7'); assert.strictEqual(old.log[0].band, 'G10');
 });
 
 t('점수 등급 — 85 이상 good · 60~84 ok · 60 미만 weak', () => {
@@ -49,23 +52,23 @@ t('보통(60~84)은 제자리에서 한 칸 아래 간격, 못하면(60 미만) 
 });
 
 t('복습 목록·다음 글 고르기 — 밀린 복습 → 새 글 → 점수 낮은 글 → 다 졸업하면 없음', () => {
-  const s = S.blank(T0); s.band = 'E2';
+  const s = S.blank(T0); s.band = 'G3';
   const ids = ['a', 'b', 'c'];
-  assert.deepStrictEqual(S.nextPassage(s, ids, T0, 'E2'), { id: 'a', why: 'new' });
-  S.record(s, 'a', { score: 90, band: 'E2' }, T0);
-  assert.deepStrictEqual(S.nextPassage(s, ids, T0, 'E2'), { id: 'b', why: 'new' });
-  assert.strictEqual(S.dueList(s, T0, 'E2').length, 0);
-  assert.strictEqual(S.dueList(s, T0 + DAY + 1, 'E2').length, 1, '하루 지나면 복습');
-  assert.deepStrictEqual(S.nextPassage(s, ids, T0 + DAY + 1, 'E2'), { id: 'a', why: 'due' });
-  S.record(s, 'b', { score: 40, band: 'E2' }, T0); S.record(s, 'c', { score: 70, band: 'E2' }, T0);
+  assert.deepStrictEqual(S.nextPassage(s, ids, T0, 'G3'), { id: 'a', why: 'new' });
+  S.record(s, 'a', { score: 90, band: 'G3' }, T0);
+  assert.deepStrictEqual(S.nextPassage(s, ids, T0, 'G3'), { id: 'b', why: 'new' });
+  assert.strictEqual(S.dueList(s, T0, 'G3').length, 0);
+  assert.strictEqual(S.dueList(s, T0 + DAY + 1, 'G3').length, 1, '하루 지나면 복습');
+  assert.deepStrictEqual(S.nextPassage(s, ids, T0 + DAY + 1, 'G3'), { id: 'a', why: 'due' });
+  S.record(s, 'b', { score: 40, band: 'G3' }, T0); S.record(s, 'c', { score: 70, band: 'G3' }, T0);
   /* 아직 아무것도 due 가 아닌 시각(같은 날)에서는 점수 낮은 글 */
-  assert.deepStrictEqual(S.nextPassage(s, ids, T0 + 1, 'E2'), { id: 'b', why: 'weak' });
+  assert.deepStrictEqual(S.nextPassage(s, ids, T0 + 1, 'G3'), { id: 'b', why: 'weak' });
   /* 밀린 정도가 큰 순 — b(1일 간격)와 a(1일 간격)가 같이 밀리면 더 오래된 due 가 먼저 */
-  const due = S.dueList(s, T0 + 2 * DAY, 'E2').map((x) => x.id);
+  const due = S.dueList(s, T0 + 2 * DAY, 'G3').map((x) => x.id);
   assert.strictEqual(due.length, 3); assert.strictEqual(due[0], 'a');
-  const g = S.blank(T0); ['a', 'b', 'c'].forEach((id) => { const it = S.record(g, id, { score: 100, band: 'E2' }, T0); it.graduated = true; it.due = 0; });
-  assert.strictEqual(S.nextPassage(g, ids, T0, 'E2'), null);
-  assert.strictEqual(S.dueList(s, T0 + 2 * DAY, 'H').length, 0, '다른 밴드는 안 섞인다');
+  const g = S.blank(T0); ['a', 'b', 'c'].forEach((id) => { const it = S.record(g, id, { score: 100, band: 'G3' }, T0); it.graduated = true; it.due = 0; });
+  assert.strictEqual(S.nextPassage(g, ids, T0, 'G3'), null);
+  assert.strictEqual(S.dueList(s, T0 + 2 * DAY, 'G12').length, 0, '다른 단계는 안 섞인다');
 });
 
 t('약한 규칙 — 최근 기록의 태그를 세어 2회 이상만', () => {
@@ -80,7 +83,7 @@ t('약한 규칙 — 최근 기록의 태그를 세어 2회 이상만', () => {
 });
 
 t('단계 제안 — 같은 밴드 최근 연습 3회가 전부 85+ 이고 문제 2회 이상 정답이면 up, 전부 50 미만이면 down', () => {
-  const s = S.blank(T0); s.band = 'E2';
+  const s = S.blank(T0); s.band = 'G3';
   assert.strictEqual(S.suggestion(s, 'E2'), null);
   ['a', 'b', 'c'].forEach((id) => S.record(s, id, { score: 90, qOk: true, band: 'E2', mode: 'practice' }, T0));
   assert.strictEqual(S.suggestion(s, 'E2'), 'up');
@@ -94,15 +97,15 @@ t('단계 제안 — 같은 밴드 최근 연습 3회가 전부 85+ 이고 문�
 t('연속 학습일·요약', () => {
   const s = S.blank(T0);
   assert.strictEqual(S.streak(s, T0), 0);
-  S.record(s, 'a', { score: 80, qOk: true, wpm: 120, band: 'E2' }, T0 - 2 * DAY);
-  S.record(s, 'b', { score: 90, qOk: false, wpm: 140, band: 'E2' }, T0 - DAY);
+  S.record(s, 'a', { score: 80, qOk: true, wpm: 120, band: 'G3' }, T0 - 2 * DAY);
+  S.record(s, 'b', { score: 90, qOk: false, wpm: 140, band: 'G3' }, T0 - DAY);
   assert.strictEqual(S.streak(s, T0), 2, '어제까지 이어졌으면 오늘 아직 안 해도 2');
   assert.strictEqual(S.streak(s, T0 + 2 * DAY), 0, '이틀 비면 끊긴다');
-  S.record(s, 'c', { score: 100, qOk: true, band: 'E2' }, T0);
-  const sm = S.summary(s, T0, 'E2');
+  S.record(s, 'c', { score: 100, qOk: true, band: 'G3' }, T0);
+  const sm = S.summary(s, T0, 'G3');
   assert.strictEqual(sm.attempts, 3); assert.strictEqual(sm.practiced, 3); assert.strictEqual(sm.avg, 90); assert.strictEqual(sm.qRate, 67);
   assert.strictEqual(sm.wpmRecent, 130); assert.strictEqual(sm.streak, 3); assert.strictEqual(sm.due, 2, 'a·b 는 오늘 복습 차례');
-  S.lessonDone(s, 'e2-1', T0, 100);
+  S.lessonDone(s, 'g3-1', T0, 100);
   assert.strictEqual(S.summary(s, T0).lessonsDone, 1);
   const ft = S.forTeacher(s, T0);
   assert.deepStrictEqual(Object.keys(ft).sort(), ['attempts', 'avg', 'band', 'graduated', 'lastAt', 'lessonsDone', 'practiced', 'qRate', 'recentAvg', 'streak', 'wpmRecent']);

@@ -13,28 +13,32 @@
  */
 var WBCHUNK = (function () {
 
-  /* ── 학년대(밴드) — 유치부터 고등까지 여섯 단계 ──
-     target·max 는 한 조각의 어절 수. 규격서 2장의 L1~L4 눈금(3.3/3.7/4.1/4.5, 상한 8)을 여섯으로 펼쳤다.
-     유치(K)는 한글을 막 뗀 아이라 1~2어절, 문장 하나가 3~4어절이다. */
+  /* ── 단계(밴드) — 유치 한 단계 + 초1부터 고3까지 학년마다 한 단계, 모두 13개 ──
+     target·max 는 한 조각의 어절 수. 규격서 2장의 L1~L4 눈금(3.3/3.7/4.1/4.5, 상한 8)을 학년마다 한 칸씩 오르도록 펼쳤다.
+     유치·초1·초2 는 문단이 아니라 문장 하나씩 연습한다(sentenceMode). sentLen 은 문장 어절 수 범위, chars 는 공백 뺀 글자 수 범위,
+     rate 는 읽어 주기 빠르기 배율이다. 값은 눈금이지 규칙이 아니다 — 새 글을 쓸 때 content.test.cjs 가 이 눈금으로 걸러 준다. */
   var BANDS = {
-    K:  { key: 'K',  label: '유치',    who: '5~7세 · 한글을 막 뗀 아이', target: 2,   max: 4, sentLen: [2, 5],  chars: [30, 160],   rate: 0.85, sentenceMode: true },
-    E1: { key: 'E1', label: '초1~2',   who: '초등 1~2학년',              target: 2.5, max: 5, sentLen: [3, 8],  chars: [50, 260],   rate: 0.9,  sentenceMode: true },
-    E2: { key: 'E2', label: '초3~4',   who: '초등 3~4학년',              target: 3.3, max: 6, sentLen: [4, 14], chars: [120, 420],  rate: 0.95, sentenceMode: false },
-    E3: { key: 'E3', label: '초5~6',   who: '초등 5~6학년',              target: 3.7, max: 7, sentLen: [4, 20], chars: [180, 560],  rate: 1,    sentenceMode: false },
-    M:  { key: 'M',  label: '중등',    who: '중학교 1~3학년',            target: 4.1, max: 8, sentLen: [4, 24], chars: [220, 760],  rate: 1,    sentenceMode: false },
-    H:  { key: 'H',  label: '고등',    who: '고등학교 1~3학년',          target: 4.5, max: 8, sentLen: [4, 30], chars: [280, 1000], rate: 1,    sentenceMode: false },
+    K:   { key: 'K',   label: '유치', who: '5~7세 · 한글을 막 뗀 아이', target: 2,   max: 4, sentLen: [2, 5],  chars: [30, 160],   rate: 0.85, sentenceMode: true },
+    G1:  { key: 'G1',  label: '초1',  who: '초등학교 1학년',            target: 2.2, max: 4, sentLen: [3, 8],  chars: [40, 200],   rate: 0.9,  sentenceMode: true },
+    G2:  { key: 'G2',  label: '초2',  who: '초등학교 2학년',            target: 2.5, max: 5, sentLen: [3, 9],  chars: [60, 280],   rate: 0.9,  sentenceMode: true },
+    G3:  { key: 'G3',  label: '초3',  who: '초등학교 3학년',            target: 3,   max: 6, sentLen: [4, 12], chars: [100, 360],  rate: 0.95, sentenceMode: false },
+    G4:  { key: 'G4',  label: '초4',  who: '초등학교 4학년',            target: 3.3, max: 6, sentLen: [4, 14], chars: [130, 440],  rate: 0.95, sentenceMode: false },
+    G5:  { key: 'G5',  label: '초5',  who: '초등학교 5학년',            target: 3.5, max: 7, sentLen: [4, 17], chars: [170, 520],  rate: 1,    sentenceMode: false },
+    G6:  { key: 'G6',  label: '초6',  who: '초등학교 6학년',            target: 3.7, max: 7, sentLen: [4, 20], chars: [200, 600],  rate: 1,    sentenceMode: false },
+    G7:  { key: 'G7',  label: '중1',  who: '중학교 1학년',              target: 3.9, max: 8, sentLen: [4, 22], chars: [220, 700],  rate: 1,    sentenceMode: false },
+    G8:  { key: 'G8',  label: '중2',  who: '중학교 2학년',              target: 4.1, max: 8, sentLen: [4, 24], chars: [250, 760],  rate: 1,    sentenceMode: false },
+    G9:  { key: 'G9',  label: '중3',  who: '중학교 3학년',              target: 4.2, max: 8, sentLen: [4, 26], chars: [280, 820],  rate: 1,    sentenceMode: false },
+    G10: { key: 'G10', label: '고1',  who: '고등학교 1학년',            target: 4.4, max: 8, sentLen: [4, 30], chars: [280, 900],  rate: 1,    sentenceMode: false },
+    G11: { key: 'G11', label: '고2',  who: '고등학교 2학년',            target: 4.5, max: 8, sentLen: [4, 30], chars: [300, 1000], rate: 1,    sentenceMode: false },
+    G12: { key: 'G12', label: '고3',  who: '고등학교 3학년',            target: 4.6, max: 8, sentLen: [4, 32], chars: [320, 1100], rate: 1,    sentenceMode: false },
   };
-  var BAND_ORDER = ['K', 'E1', 'E2', 'E3', 'M', 'H'];
+  var BAND_ORDER = ['K', 'G1', 'G2', 'G3', 'G4', 'G5', 'G6', 'G7', 'G8', 'G9', 'G10', 'G11', 'G12'];
 
-  /* 학년 → 밴드. 0 = 유치(7세 이하), 1~6 초등, 7~9 중등, 10~12 고등 */
+  /* 학년 → 단계. 0 = 유치(7세 이하), 1~12 = 초1~고3. 학년마다 한 단계라 그대로 이어진다. */
   function bandOfGrade(g) {
-    var n = Number(g);
+    var n = Math.round(Number(g));
     if (!(n >= 1)) return 'K';
-    if (n <= 2) return 'E1';
-    if (n <= 4) return 'E2';
-    if (n <= 6) return 'E3';
-    if (n <= 9) return 'M';
-    return 'H';
+    return 'G' + Math.min(12, n);
   }
   function nextBand(b) { var i = BAND_ORDER.indexOf(b); return i >= 0 && i < BAND_ORDER.length - 1 ? BAND_ORDER[i + 1] : null; }
   function prevBand(b) { var i = BAND_ORDER.indexOf(b); return i > 0 ? BAND_ORDER[i - 1] : null; }
@@ -119,12 +123,25 @@ var WBCHUNK = (function () {
   /* 용언의 관형형·관형사형 — 뒤 명사를 꾸민다. 어미 확률로는 못 가른다(「높은」의 은과 「값은」의 은).
      그래서 낱말 전체(어휘)로 적는다. -는 꼴은 조사 「는」과 헷갈리는 낱말(나는·사는·서는)을 빼고 동사만 넣었다. */
   var ADN = /^(?:.*(?:하는|되는|하던|되던|이던|있던|없던|스러운|스런|다운|로운)|.+(?:한|된|할|될|왔던|갔던)|(?:높|낮|많|적|좋|넓|깊|얕|짧|밝|굵|붉|늦|드문|드물|검|희|작|젊|늙|굳|맑|흐린|시원|따뜻|차가|뜨거|즐거|무서|반가|외로|괴로|그리|가벼|무거|부드러|어두|어려|쉬|아름다|가까)(?:은|운|는)|(?:작은|큰|긴|먼|아닌|않은|남은|알맞은|옳은|빠른|느린|강한|약한|나쁜|이른|늦은|넓은|좁은|어린|새로운|중요한|필요한|가능한|다양한|뚜렷한|분명한|간단한|주요한|커다란|조그만|자그마한|기다란|둥근|네모난|파란|빨간|노란|하얀|까만|푸른|이런|저런|그런|어떤|모든|여러)|.*(?:있는|없는|오는|먹는|읽는|쓰는|주는|만드는|부르는|자라는|듣는|웃는|뛰는|달리는|흐르는|내리는|모이는|열리는|닫히는|보이는|들리는|알려진|불리는|쓰이는|잡는|찾는|배우는|가르치는|사라지는|나타나는|생기는|일어나는|말하는|생각하는|바라는|앉는|눕는|입는|신는|씻는|짓는|걷는|넘는|밟는|묶는|심는|담는|꺾는|씹는|잇는|긋는|낫는))$/;
-  var ADN_NOT = /(?:에서는|에게는|으로는|로는|까지는|부터는|보다는|처럼은|마다|나는|우리는|너는|저는|자는|기는|지는|도는|서는|사는|타는|노는|피는|부는|가는|보는|우는|이는|내는)$/;
+  var ADN_NOT = /(?:에서는|에게는|으로는|로는|까지는|부터는|보다는|처럼은|마다|나는|우리는|너는|저는|자는|기는|지는|도는|서는|사는|타는|노는|피는|부는|가는|보는|우는|이는|내는|[^아어여해워려켜쳐펴와봐줘]오는|[^아어여해워려켜쳐펴와봐줘]주는)$/;
+  /* 「라디오는」「호주는」 — 앞 글자가 어미(아·어·여…)가 아니면 명사+조사다. 「돌아오는」「걸러 주는」 은 그대로 관형형. */
   var DEP_HEAD = /^(?:할|될|갈|올|볼|들|낼|쓸|살|알|줄|먹을|읽을|만들|가르칠|배울|볼|앉을|설|탈|쉴|놀|잘)$/;
-  var JOSA = '(?:이|가|은|는|을|를|도|만|의|에|에서|에게|으로|로|와|과|랑|까지|부터|보다|처럼|마다|이다|이며|이고|입니다|이라|라도|이야|야|이에요|예요|이지|지)?';
+  var JOSA = '(?:이|가|은|는|을|를|도|만|의|에|에서|에게|으로|로|와|과|랑|까지|부터|보다|처럼|마다|이다|이며|이고|입니다|이라|라도|이야|야|이에요|예요)?';
   var TAIL = '[,.…!?」』’”\'"\\)\\]]*$';
   var wordRe = function (list) { return new RegExp('^(?:' + list + ')' + JOSA + TAIL); };
-  var DEP = wordRe('것|수|줄|바|데|때|채|뿐|만큼|따름|나름|터|점|편|즈음|무렵|때문|나위|셈|턱|적|지|리|법|양|척|체|만');
+  var DEP = wordRe('것|수|바|때|채|뿐|만큼|따름|나름|즈음|무렵|때문|나위|셈|턱');
+  /* 「줄·양·척·체·법·적·데…」 는 보통 명사이기도 하다(「줄을 잡고」「양을 조절하다」). 관형형(-ㄹ·-ㄴ·-던·-는 동사) 뒤에서만 의존명사로 본다. */
+  var DEP_AMBIG = wordRe('줄|양|척|체|법|적|지|리|편|터|점|데');
+  var VERB_NEUN = /(?:하는|되는|있는|없는|보는|먹는|가는|오는|아는|모르는|사는|주는|만드는|자는|우는|웃는|뛰는|노는|기는|서는|쓰는|읽는|듣는|다니는|살아가는)$/;
+  function rieul(w) { var c = w.charCodeAt(w.length - 1); return c >= 0xAC00 && c <= 0xD7A3 && (c - 0xAC00) % 28 === 8; }
+  function depAfter(bare, next, next2) {
+    if (DEP.test(next) && !/^(?:바로|때로|데로|점점|편지|편의|만약|만일|양쪽|양파|법을|법이|법도|법대로|체로|척척|리듬|리본|채소|채널|터널|터전|점심|점수|점원|셈이|셈을|적어도|적당|적극|지금|지도|지구|지역|지난|지붕|지혜|줄넘기|줄기|수학|수업|수영|수많|수십|수백|수천|것들)/.test(next)) return true;
+    if (DEP_AMBIG.test(next)) {
+      if (rieul(bare) || /던$/.test(bare) || VERB_NEUN.test(bare)) return true;
+      if (/^줄/.test(next) && /^(?:안|알|압|몰|모르)/.test(next2 || '')) return true;
+    }
+    return false;
+  }
   var DEP2 = /^(?:같다|같은|같이|듯|만하)/;
   var UNIT = wordRe('개|명|일|년|월|시간|분|초|배|퍼센트|도|권|장|쪽|벌|곳|번|살|세|마리|송이|그루|켤레|잔|병|칸|층|미터|킬로미터|센티미터|밀리미터|리터|킬로그램|그램|원|가지|사람|살|주|주일|달|해|바퀴|걸음|시|번째|등|위|점|줌|모|국자|척|대|채|줄|가닥|봉지|상자|통|컵|숟가락|알|톨|방울|조각|편|곡|줄기');
   var UNIT2 = wordRe('이상|이하|미만|초과|정도|가량|남짓|안팎|쯤');
@@ -161,7 +178,7 @@ var WBCHUNK = (function () {
     if (/게$/.test(bare) && /^(?:되|됐|돼|하|했|해|만들)/.test(next)) return { tag: 'aux', why: CUT_WHY.aux(cur, next) };
     if (/야$/.test(bare) && /^(?:하|한다|합니다|해|했|된다|됩니다|돼)/.test(next)) return { tag: 'aux', why: CUT_WHY.aux(cur, next) };
     if (/[아어해여워와봐줘혀려켜쳐펴]$/.test(bare) && AUX.test(next)) return { tag: 'aux', why: CUT_WHY.aux(cur, next) };
-    if (DEP_HEAD.test(bare) || (DEP.test(next) && !/^(?:바로|때로|데로|점점|편지|편의|만약|만일|양쪽|양파|법을|법이|법도|법대로|체로|척척|리듬|리본|채소|채널|터널|터전|점심|점수|점원|셈이|셈을|적어도|적당|적극|지금|지도|지구|지역|지난|지붕|지혜|줄넘기|줄기|수학|수업|수영|수많|수십|수백|수천|것들)/.test(next)) || (DEP2.test(next) && !/(?:면|고|서|며|자|니까|는데|은데|지만|도록|다가|려면|어|아|다\.|요\.)$/.test(bare))) return { tag: 'dep', why: CUT_WHY.dep(cur, next) };
+    if (DEP_HEAD.test(bare) || depAfter(bare, next, String(ws[i + 2] || '').trim()) || (DEP2.test(next) && !/(?:면|고|서|며|자|니까|는데|은데|지만|도록|다가|려면|어|아|다\.|요\.)$/.test(bare))) return { tag: 'dep', why: CUT_WHY.dep(cur, next) };
     if (UNIT2.test(next)) return { tag: 'num', why: CUT_WHY.num(cur, next) };
     if (/^(?:것|수|줄|바|리|나위|턱|셈)(?:이|가|은|는|을|를|도|만)?$/.test(bare) && /^(?:있|없|아니|이다|이며)/.test(next)) return { tag: 'dep', why: CUT_WHY.dep(cur, next) };
     if (ADN.test(bare) && !ADN_NOT.test(bare)) return { tag: 'adn', why: CUT_WHY.adn(cur, next) };

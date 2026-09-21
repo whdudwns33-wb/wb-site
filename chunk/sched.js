@@ -25,14 +25,21 @@ var WBCHUNK_SCHED = (function () {
     var out = {};
     for (var k in b) out[k] = (s[k] != null && b[k] != null && typeof s[k] === typeof b[k]) ? s[k] : b[k];
     /* band 의 기본값이 null 이라 위 비교로는 문자열이 버려진다 — 따로 본다 */
-    out.band = typeof s.band === 'string' ? s.band : null;
+    out.band = typeof s.band === 'string' ? legacyBand(s.band) : null;
     if (!out.prefs || typeof out.prefs !== 'object') out.prefs = b.prefs;
     for (var p in b.prefs) if (out.prefs[p] === undefined) out.prefs[p] = b.prefs[p];
     if (!Array.isArray(out.log)) out.log = [];
     if (!out.items || typeof out.items !== 'object' || Array.isArray(out.items)) out.items = {};
     if (!out.lessons || typeof out.lessons !== 'object' || Array.isArray(out.lessons)) out.lessons = {};
+    Object.keys(out.items).forEach(function (k) { var it = out.items[k]; if (it && typeof it.band === 'string') it.band = legacyBand(it.band); });
+    out.log.forEach(function (e) { if (e && typeof e.band === 'string') e.band = legacyBand(e.band); });
     return out;
   }
+
+  /* 2026-09-21 이전의 여섯 밴드(E1·E2·E3·M·H) 기록은 학년 단계로 옮긴다 — 각 밴드의 맨 아래 학년으로.
+     글 id 도 그때 바뀌었으므로 옛 기록의 글은 목록에서 못 찾을 수 있다. 화면은 그런 항목을 건너뛴다. */
+  var LEGACY = { E1: 'G1', E2: 'G3', E3: 'G5', M: 'G7', H: 'G10' };
+  function legacyBand(b) { return LEGACY[b] || b; }
 
   function gradeOf(score) { return score >= 85 ? 'good' : score >= 60 ? 'ok' : 'weak'; }
 

@@ -142,7 +142,7 @@
 
   function bandDefaults() {
     const b = $('band').value, sm = R.BANDS[b].sentenceMode;
-    $('size').value = b === 'K' ? 'xlarge' : (b === 'E1' ? 'large' : 'normal');
+    $('size').value = (b === 'K' || b === 'G1') ? 'xlarge' : (b === 'G2' ? 'large' : 'normal');
     $('marker').value = sm ? 'scoop' : 'slash';
     $('o-lines').checked = sm;
   }
@@ -190,8 +190,11 @@
     }
     if (O('o-rules')) {
       const ls = LESSONS.filter((l) => l.band === band);
-      pages.push('<div class="page">' + hd(band, '규칙 카드') + '<div class="title">이 단계에서 배우는 규칙 ' + ls.length + '가지</div><p class="sub">카드마다 규칙 한 줄과 보기 하나. 연습하다 막히면 여기로 돌아와요.</p>' +
-        ls.map((l, i) => '<div class="rulecard"><b>' + (i + 1) + '. ' + esc(l.title) + '</b><div class="r">' + esc(l.rule) + '</div><div class="w">' + esc(l.why) + '</div><div class="ex m-' + marker + '">' + segsHtml(l.examples[0].segs, marker) + '</div></div>').join('') + ft(org) + '</div>');
+      const upto = R.BAND_ORDER.slice(0, R.BAND_ORDER.indexOf(band));
+      const earlier = LESSONS.filter((l) => upto.indexOf(l.band) >= 0);
+      pages.push('<div class="page">' + hd(band, '규칙 카드') + '<div class="title">' + esc(R.BANDS[band].label) + '에서 새로 배우는 규칙 ' + ls.length + '가지</div><p class="sub">카드마다 규칙 한 줄과 보기 하나. 연습하다 막히면 여기로 돌아와요.</p>' +
+        ls.map((l, i) => '<div class="rulecard"><b>' + (i + 1) + '. ' + esc(l.title) + '</b><div class="r">' + esc(l.rule) + '</div><div class="w">' + esc(l.why) + '</div><div class="ex m-' + marker + '">' + segsHtml(l.examples[0].segs, marker) + '</div></div>').join('') +
+        (earlier.length ? '<div class="title" style="font-size:15px;margin-top:14px">아래 학년에서 배운 규칙 ' + earlier.length + '가지 (복습)</div>' + earlier.map((l) => '<div class="rulecard" style="padding:5px 12px"><b style="font-size:12.5px">' + esc(R.BANDS[l.band].label) + ' · ' + esc(l.title) + '</b><div class="w">' + esc(l.rule) + '</div></div>').join('') : '') + ft(org) + '</div>');
     }
     ps.forEach((p, idx) => {
       const n = idx + 1, words = R.stats([].concat.apply([], p.paragraphs)).words, nb = p.paragraphs.reduce((a, segs) => a + R.modelBoundaries(segs).length, 0);

@@ -213,7 +213,11 @@
     const bandLessons = (b) => LESSONS.filter((l) => l.band === (b || band()));
     const byId = (id) => PASSAGES.find((p) => p.id === id);
     const lessonById = (id) => LESSONS.find((l) => l.id === id);
-    const nextLesson = () => bandLessons().find((l) => !S.lessons[l.id]) || null;
+    /* 오늘의 카드: 이 학년 카드에서 안 본 것 → 없으면 바로 아래 학년부터 내려가며 안 본 카드. 규칙은 나선형으로 쌓이므로 아래 카드도 이 학년의 것이다. */
+    const bandsUpTo = (b) => R.BAND_ORDER.slice(0, R.BAND_ORDER.indexOf(b) + 1);
+    const nextLesson = () => { const order = bandsUpTo(band()).reverse(); for (const b of order) { const l = bandLessons(b).find((x) => !S.lessons[x.id]); if (l) return l; } return null; };
+    /* 약한 규칙 → 카드: 이 학년에 가까운 카드부터 */
+    const lessonForTag = (tag) => { const bi = R.BAND_ORDER.indexOf(band()); return LESSONS.filter((x) => x.tags.indexOf(tag) >= 0).sort((a, b2) => Math.abs(R.BAND_ORDER.indexOf(a.band) - bi) - Math.abs(R.BAND_ORDER.indexOf(b2.band) - bi))[0] || null; };
     const marker = () => (S.prefs.marker && S.prefs.marker !== 'auto') ? S.prefs.marker : (B().sentenceMode ? 'scoop' : 'slash');
     const rate = () => (S.prefs.rate || 1) * B().rate;
     const dkey = (t) => { const d = new Date(t); return (d.getMonth() + 1) + '월 ' + d.getDate() + '일'; };
@@ -333,10 +337,11 @@
 
     function vLearn() {
       const ls = bandLessons();
-      return '<div class="card"><p class="eyebrow">' + esc(B().label) + ' 단계</p><h2>배우기 — 규칙 카드 ' + ls.length + '장</h2><p class="small">카드 하나 = 규칙 하나 + 보기 + 확인 문제. 순서대로 보면 좋아요.</p></div>' +
-        '<div class="list">' + ls.map((l, i) => { const d = S.lessons[l.id]; return '<button class="item ' + (d ? 'done' : '') + '" data-act="open-lesson" data-id="' + l.id + '"><span class="tag ' + (d ? 'ok' : 'muted') + '">' + (d ? '✓' : (i + 1)) + '</span><span class="t"><b>' + esc(l.title) + '</b><small>' + esc(l.rule) + '</small></span><span class="go">›</span></button>'; }).join('') + '</div>' +
-        (R.prevBand(band()) ? '<p class="small" style="margin-top:12px">아래 단계 카드도 볼 수 있어요: <button class="btn ghost sm" data-act="learn-band" data-b="' + R.prevBand(band()) + '">' + R.BANDS[R.prevBand(band())].label + '</button></p>' : '') +
-        (view.altBand ? '<div class="card" style="margin-top:12px"><h2>' + esc(R.BANDS[view.altBand].label) + ' 단계 카드</h2><div class="list">' + bandLessons(view.altBand).map((l) => '<button class="item" data-act="open-lesson" data-id="' + l.id + '"><span class="t"><b>' + esc(l.title) + '</b></span><span class="go">›</span></button>').join('') + '</div></div>' : '');
+      const item = (l, i) => { const d = S.lessons[l.id]; return '<button class="item ' + (d ? 'done' : '') + '" data-act="open-lesson" data-id="' + l.id + '"><span class="tag ' + (d ? 'ok' : 'muted') + '">' + (d ? '✓' : (i + 1)) + '</span><span class="t"><b>' + esc(l.title) + '</b><small>' + esc(l.rule) + '</small></span><span class="go">›</span></button>'; };
+      const below = bandsUpTo(band()).slice(0, -1).reverse().filter((b) => bandLessons(b).length);
+      return '<div class="card"><p class="eyebrow">' + esc(B().label) + ' 단계</p><h2>배우기 — 이 학년의 새 카드 ' + ls.length + '장</h2><p class="small">카드 하나 = 규칙 하나 + 보기 + 확인 문제. 규칙은 학년마다 쌓여요. 아래 학년 카드도 이 학년의 것이니 안 본 카드는 함께 봐요.</p></div>' +
+        '<div class="list">' + ls.map(item).join('') + '</div>' +
+        (below.length ? '<div class="card" style="margin-top:12px"><h2>아래 학년 카드 (복습)</h2>' + below.map((b) => '<h3>' + esc(R.BANDS[b].label) + '</h3><div class="list">' + bandLessons(b).map(item).join('') + '</div>').join('') + '</div>' : '');
     }
 
     function vLesson() {
@@ -473,7 +478,7 @@
         (r.self != null ? '<div class="kv"><span>낭독 자기 점검</span><b>' + r.self + ' / 3</b></div>' : '') +
         '<div class="kv"><span>다음 복습</span><b>' + (it && it.graduated ? '졸업 🎓' : it ? dkey(it.due) : '-') + '</b></div></div>';
       const weak = SC.weakTags(S, 2);
-      if (weak.length) html += '<div class="card"><h2>다시 볼 규칙</h2><div class="list">' + weak.map((w) => { const l = LESSONS.filter((x) => x.tags.indexOf(w.tag) >= 0).sort((a, b2) => (a.band === band() ? -1 : 0) - (b2.band === band() ? -1 : 0))[0]; return '<button class="item" data-act="open-lesson" data-id="' + (l ? l.id : '') + '"><span class="tag warn">' + w.n + '회</span><span class="t"><b>' + esc(R.TAG_LABEL[w.tag] || w.tag) + '</b><small>' + (l ? '카드: ' + esc(l.title) : '') + '</small></span><span class="go">›</span></button>'; }).join('') + '</div></div>';
+      if (weak.length) html += '<div class="card"><h2>다시 볼 규칙</h2><div class="list">' + weak.map((w) => { const l = lessonForTag(w.tag); return '<button class="item" data-act="open-lesson" data-id="' + (l ? l.id : '') + '"><span class="tag warn">' + w.n + '회</span><span class="t"><b>' + esc(R.TAG_LABEL[w.tag] || w.tag) + '</b><small>' + (l ? '카드: ' + esc(l.title) : '') + '</small></span><span class="go">›</span></button>'; }).join('') + '</div></div>';
       const np = SC.nextPassage(S, bandPassages().map((x) => x.id), Date.now(), band());
       html += '<div class="row">' + (np ? '<button class="big" data-act="start-practice" data-id="' + np.id + '">다음 글 — 「' + esc(byId(np.id).title) + '」</button>' : '') + '<button class="big ghost" data-act="pr-quit">홈으로</button></div>';
       return html + footer();
@@ -499,7 +504,7 @@
       let html = '<div class="card"><p class="eyebrow">' + esc(B().label) + ' 단계</p><h2>복습 — 오늘 ' + due.length + '편</h2><p class="small">복습은 표시 없는 글에 바로 ∕ 를 찍는 것부터 시작해요. 85점 이상이면 다음 복습이 1 → 3 → 7 → 14 → 30일로 멀어지고, 30일 복습까지 통과하면 졸업이에요.</p>' +
         (due.length ? '<button class="big" data-act="start-review" data-id="' + due[0].id + '">복습 시작 — 「' + esc(byId(due[0].id).title) + '」</button>' : '<p class="small">오늘은 복습할 글이 없어요. 연습 탭에서 새 글을 읽어요.</p>') + '</div>';
       if (due.length > 1) html += '<div class="list">' + due.map((it) => '<button class="item" data-act="start-review" data-id="' + it.id + '"><span class="tag warn">' + Math.max(1, Math.round((now - it.due) / SC.DAY)) + '일 밀림</span><span class="t"><b>' + esc(byId(it.id).title) + '</b><small>지난 점수 ' + it.lastScore + '점 · ' + it.n + '회</small></span><span class="go">›</span></button>').join('') + '</div>';
-      html += '<div class="card"><h2>약한 규칙</h2>' + (weak.length ? '<div class="list">' + weak.map((w) => { const l = LESSONS.filter((x) => x.tags.indexOf(w.tag) >= 0).sort((a, b2) => (a.band === band() ? -1 : 0) - (b2.band === band() ? -1 : 0))[0]; return '<button class="item" data-act="open-lesson" data-id="' + (l ? l.id : '') + '"><span class="tag warn">' + w.n + '회</span><span class="t"><b>' + esc(R.TAG_LABEL[w.tag] || w.tag) + '</b><small>' + (l ? '카드 다시 보기: ' + esc(l.title) : '') + '</small></span><span class="go">›</span></button>'; }).join('') + '</div>' : '<p class="small">최근 30회 연습에서 두 번 이상 나온 실수가 없어요.</p>') + '</div>';
+      html += '<div class="card"><h2>약한 규칙</h2>' + (weak.length ? '<div class="list">' + weak.map((w) => { const l = lessonForTag(w.tag); return '<button class="item" data-act="open-lesson" data-id="' + (l ? l.id : '') + '"><span class="tag warn">' + w.n + '회</span><span class="t"><b>' + esc(R.TAG_LABEL[w.tag] || w.tag) + '</b><small>' + (l ? '카드 다시 보기: ' + esc(l.title) : '') + '</small></span><span class="go">›</span></button>'; }).join('') + '</div>' : '<p class="small">최근 30회 연습에서 두 번 이상 나온 실수가 없어요.</p>') + '</div>';
       const grad = items.filter((it) => it.graduated), sched = items.filter((it) => !it.graduated && it.due > now).sort((a, b2) => a.due - b2.due);
       html += '<div class="card"><h2>앞으로</h2>' + (sched.length ? sched.slice(0, 8).map((it) => '<div class="kv"><span>' + esc(byId(it.id).title) + '</span><b>' + dkey(it.due) + '</b></div>').join('') : '<p class="small">예정된 복습이 없어요.</p>') + (grad.length ? '<p class="small" style="margin-top:8px">🎓 졸업: ' + grad.map((it) => esc(byId(it.id).title)).join(' · ') + '</p>' : '') + '</div>';
       return html;
@@ -518,7 +523,7 @@
       html += '<div class="card set" id="settings"><h2>설정</h2>' +
         '<label><span>단계</span><select data-act="set-band">' + R.BAND_ORDER.map((b) => '<option value="' + b + '" ' + (b === band() ? 'selected' : '') + '>' + R.BANDS[b].label + ' — ' + R.BANDS[b].who + '</option>').join('') + '</select></label>' +
         '<label><span>글자 크기</span><select data-act="set-font"><option value="normal" ' + (S.prefs.font === 'normal' ? 'selected' : '') + '>보통</option><option value="large" ' + (S.prefs.font === 'large' ? 'selected' : '') + '>크게</option><option value="xlarge" ' + (S.prefs.font === 'xlarge' ? 'selected' : '') + '>아주 크게</option></select></label>' +
-        '<label><span>덩어리 표시</span><select data-act="set-marker"><option value="auto" ' + (S.prefs.marker === 'auto' ? 'selected' : '') + '>자동 (유치·초1~2 밑줄 곡선, 그 위 ∕)</option><option value="slash" ' + (S.prefs.marker === 'slash' ? 'selected' : '') + '>∕ 표시</option><option value="scoop" ' + (S.prefs.marker === 'scoop' ? 'selected' : '') + '>밑줄 곡선</option><option value="band" ' + (S.prefs.marker === 'band' ? 'selected' : '') + '>색 띠</option></select></label>' +
+        '<label><span>덩어리 표시</span><select data-act="set-marker"><option value="auto" ' + (S.prefs.marker === 'auto' ? 'selected' : '') + '>자동 (유치·초1·초2 밑줄 곡선, 그 위 ∕)</option><option value="slash" ' + (S.prefs.marker === 'slash' ? 'selected' : '') + '>∕ 표시</option><option value="scoop" ' + (S.prefs.marker === 'scoop' ? 'selected' : '') + '>밑줄 곡선</option><option value="band" ' + (S.prefs.marker === 'band' ? 'selected' : '') + '>색 띠</option></select></label>' +
         '<label><span>읽어 주기 빠르기</span><input type="range" min="0.7" max="1.3" step="0.05" value="' + (S.prefs.rate || 1) + '" data-act="set-rate"></label>' +
         '<label><span>낭독 녹음 단계 보이기</span><input type="checkbox" data-act="set-recording" ' + (S.prefs.recording ? 'checked' : '') + '></label></div>';
       /* 연동 */
@@ -570,7 +575,6 @@
       else if (act === 'pick-grade') { view.grade = +t.dataset.g; render({ keep: true }); }
       else if (act === 'start-band') { if (view.grade == null) return; S.band = R.bandOfGrade(view.grade); S.grade = view.grade; save(); view = { name: 'home' }; applyBody(); render(); }
       else if (act === 'band-shift') { const nb = +t.dataset.d > 0 ? R.nextBand(band()) : R.prevBand(band()); if (!nb) return; S.band = nb; save(); applyBody(); render(); announce(R.BANDS[nb].label + ' 단계로 바꿨어요'); }
-      else if (act === 'learn-band') { view.altBand = t.dataset.b; render({ keep: true }); }
       else if (act === 'open-lesson') { const l = lessonById(t.dataset.id); if (!l) return; stopSpeak(); recRelease(); sess = { ls: { id: l.id, ci: 0, marks: new Set(), result: null, scores: [], done: false } }; view = { name: 'learn' }; try { history.pushState({ sess: 1 }, ''); } catch (e) {} render(); }
       else if (act === 'lesson-check') { const ls = sess.ls, l = lessonById(ls.id), c = l.checks[ls.ci]; ls.result = R.explain(c.segs.join(''), R.modelBoundaries(c.segs), [...ls.marks]); ls.scores.push(ls.result.score); render({ keep: true }); }
       else if (act === 'lesson-next') { const ls = sess.ls, l = lessonById(ls.id); ls.ci += 1; ls.marks = new Set(); ls.result = null; if (ls.ci >= l.checks.length) { ls.done = true; SC.lessonDone(S, l.id, Date.now(), Math.round(ls.scores.reduce((a, b) => a + b, 0) / ls.scores.length)); save(); } render(); }
