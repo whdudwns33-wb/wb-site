@@ -60,7 +60,12 @@
     .sz-large .body { font-size:18px; line-height:2.3; } .sz-large .body.plain p { line-height:3; }
     .sz-xlarge .body { font-size:22px; line-height:2.4; } .sz-xlarge .body.plain p { line-height:3.1; word-spacing:.5em; }
     .seg { display:inline; }
-    .m-slash .seg:not(:last-child)::after { content:"∕"; color:var(--plum); font-weight:900; margin:0 5px 0 2px; }
+    /* ∕ 는 흑백 복사에서도 살아남아야 한다 — 자두색 대신 진한 먹색, 조금 크게 */
+    .m-slash .seg:not(:last-child)::after { content:"∕"; color:#2B1A26; font-weight:900; font-size:1.1em; margin:0 5px 0 2px; }
+    .compact .body { margin:4px 0; }
+    .compact .body.plain p { line-height:2.4; }
+    .compact .task { margin:6px 0; padding:6px 10px; }
+    .cut { border:0; border-top:1.5px dashed var(--plum); margin:10px 0 6px; }
     .m-scoop .seg { border-bottom:2.2px solid #333; border-radius:0 0 12px 12px; padding:0 2px 1px; margin-right:9px; }
     .m-band .seg { padding:1px 4px; margin-right:5px; border-radius:4px; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
     .m-band .seg:nth-child(odd) { background:#EFE4EA; } .m-band .seg:nth-child(even) { background:#F5EBDC; }
@@ -107,6 +112,7 @@
     <label><input type="checkbox" id="o-marked" checked> ① 따라 읽기(표시본) 페이지</label>
     <label><input type="checkbox" id="o-lines"> ①-2 한 줄에 한 덩어리 판</label>
     <label><input type="checkbox" id="o-plain" checked> ② 직접 끊기(표시 없는 본) + 문제</label>
+    <label><input type="checkbox" id="o-compact"> 촘촘한 판 — ①+② 를 한 쪽에 (짧은 글)</label>
     <label><input type="checkbox" id="o-key" checked> 정답표</label>
     <label><input type="checkbox" id="o-record" checked> 연습 기록표</label>
     <h2>모양</h2>
@@ -120,6 +126,7 @@
     <button class="big ghost" id="c-add">이 글 추가</button>
     <div id="c-warn"></div>
     <button class="big" id="print">🖨 인쇄 / PDF 로 저장</button>
+    <button class="big ghost" id="print-key" style="min-height:38px">정답표만 인쇄 (선생님용)</button>
     <p class="small" style="margin-top:10px"><a href="./">← 앱으로</a></p>
   </aside>
   <div class="preview"><div id="book"></div></div>
@@ -135,6 +142,23 @@
   const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   const q = new URLSearchParams(location.search);
   const custom = [];
+  /* 선생님 지문 — 서버에서 받아 정적 지문과 합친다. 관리 토큰(관리 화면에서 열 때)이나 학생 토큰(앱에서 열 때) 어느 쪽이든 된다. */
+  const SERVER = [];
+  function tokenAny() {
+    try {
+      const t = localStorage.getItem('wbr.admin.token'); if (t) return t;
+      const a = JSON.parse(localStorage.getItem('wbr.auth') || 'null'); if (a && a.token) return a.token; if (typeof a === 'string') return a;
+    } catch (e) {}
+    return null;
+  }
+  function pullServer() {
+    const t = tokenAny(); if (!t) return;
+    fetch('/api/chunk/custom', { headers: { Authorization: 'Bearer ' + t } }).then((r) => r.ok ? r.json() : null).then((j) => {
+      if (!j || !Array.isArray(j.custom)) return;
+      SERVER.length = 0; j.custom.forEach((p) => { if (R.BANDS[p.band] && Array.isArray(p.paragraphs) && p.paragraphs.length) SERVER.push(p); });
+      fillList(true); build();
+    }).catch(() => {});
+  }
   let selected = new Set();
 
   $('band').innerHTML = R.BAND_ORDER.map((b) => '<option value="' + b + '">' + R.BANDS[b].label + ' — ' + R.BANDS[b].who + '</option>').join('');
@@ -145,8 +169,10 @@
     $('size').value = (b === 'K' || b === 'G1') ? 'xlarge' : (b === 'G2' ? 'large' : 'normal');
     $('marker').value = sm ? 'scoop' : 'slash';
     $('o-lines').checked = sm;
+    /* 초1~초4 는 글이 짧아 ①+② 를 한 쪽에 — 여백이 8할인 쪽을 없앤다. 유치는 큰 글씨라 두 쪽으로 둔다. */
+    $('o-compact').checked = ['G1', 'G2', 'G3', 'G4'].indexOf(b) >= 0;
   }
-  function list() { return PASSAGES.filter((p) => p.band === $('band').value).concat(custom.filter((c) => c.band === $('band').value)); }
+  function list() { const b = $('band').value; return PASSAGES.filter((p) => p.band === b).concat(SERVER.filter((p) => p.band === b)).concat(custom.filter((c) => c.band === b)); }
   function fillList(all) {
     const ps = list();
     if (all) selected = new Set(ps.map((p) => p.id));
@@ -155,7 +181,17 @@
   $('band').addEventListener('change', () => { bandDefaults(); fillList(true); build(); });
   $('plist').addEventListener('change', (e) => { const cb = e.target; if (!cb.dataset.id) return; if (cb.checked) selected.add(cb.dataset.id); else selected.delete(cb.dataset.id); build(); });
   $('selall').addEventListener('click', () => { const ps = list(); if (selected.size === ps.length) selected = new Set(); else selected = new Set(ps.map((p) => p.id)); fillList(); build(); });
-  ['o-cover', 'o-rules', 'o-marked', 'o-lines', 'o-plain', 'o-key', 'o-record', 'size', 'marker', 'org'].forEach((id) => $(id).addEventListener('change', build));
+  ['o-cover', 'o-rules', 'o-marked', 'o-lines', 'o-plain', 'o-compact', 'o-key', 'o-record', 'size', 'marker', 'org'].forEach((id) => $(id).addEventListener('change', build));
+  /* 정답표만 — 학생 세트는 정답표를 빼고 뽑고, 선생님 것은 이 버튼으로 따로. 인쇄가 끝나면 원래 미리보기로 돌아온다. */
+  $('print-key').addEventListener('click', () => {
+    const ps = list().filter((p) => selected.has(p.id));
+    if (!ps.length) return;
+    $('book').innerHTML = keyPages(ps, $('band').value, $('org').value || '').join('');
+    const back = () => { window.removeEventListener('afterprint', back); build(); };
+    window.addEventListener('afterprint', back);
+    window.print();
+    setTimeout(back, 1500);
+  });
   $('org').addEventListener('input', build);
   $('print').addEventListener('click', () => window.print());
   $('c-add').addEventListener('click', () => {
@@ -176,6 +212,13 @@
   const segsHtml = (segs, marker) => segs.map((s) => '<span class="seg">' + esc(marker === 'slash' ? s.replace(/\s+$/, '') : s.trim()) + (marker === 'slash' ? ' ' : ' ') + '</span>').join('');
   const hd = (band, right) => '<div class="hd"><b>의미단위 끊어읽기 연습장</b><span>' + esc(R.BANDS[band].label) + ' 단계' + (right ? ' · ' + right : '') + '</span></div>';
   const ft = (org) => '<div class="ft"><span>' + esc(org) + '</span><span>이름 ______________</span></div>';
+  /* 정답표 — 한 장에 3~4편씩. 넘치면 브라우저가 다음 장으로 넘긴다(rulecard 는 break-inside:avoid). 「정답표만 인쇄」도 이 함수를 쓴다. */
+  function keyPages(ps, band, org) {
+    const items = ps.map((p, i) => '<div class="rulecard key"><b>' + (i + 1) + '. ' + esc(p.title) + '</b><div class="body m-slash">' + p.paragraphs.map((segs) => '<p>' + segsHtml(segs, 'slash') + '</p>').join('') + '</div>' + (p.q ? '<div class="small">문제 정답: ' + ['①', '②', '③', '④'][p.q.answer] + ' ' + esc(p.q.choices[p.q.answer]) + ' — ' + esc(p.q.explain) + '</div>' : '') + '</div>');
+    const out = [];
+    for (let i = 0; i < items.length; i += 4) out.push('<div class="page key">' + hd(band, '정답표') + '<div class="title">정답표</div><p class="sub">∕ 가 모범 경계예요. 뜻이 통하면 다른 자리도 괜찮아요 — 쉼표 뒤에서 쉬는 것은 언제나 좋아요.</p>' + items.slice(i, i + 4).join('') + ft(org) + '</div>');
+    return out;
+  }
   function build() {
     const band = $('band').value, marker = $('marker').value, size = $('size').value, org = $('org').value || '';
     const ps = list().filter((p) => selected.has(p.id));
@@ -196,8 +239,23 @@
         ls.map((l, i) => '<div class="rulecard"><b>' + (i + 1) + '. ' + esc(l.title) + '</b><div class="r">' + esc(l.rule) + '</div><div class="w">' + esc(l.why) + '</div><div class="ex m-' + marker + '">' + segsHtml(l.examples[0].segs, marker) + '</div></div>').join('') +
         (earlier.length ? '<div class="title" style="font-size:15px;margin-top:14px">아래 학년에서 배운 규칙 ' + earlier.length + '가지 (복습)</div>' + earlier.map((l) => '<div class="rulecard" style="padding:5px 12px"><b style="font-size:12.5px">' + esc(R.BANDS[l.band].label) + ' · ' + esc(l.title) + '</b><div class="w">' + esc(l.rule) + '</div></div>').join('') : '') + ft(org) + '</div>');
     }
+    const compact = O('o-compact') && O('o-marked') && O('o-plain');
     ps.forEach((p, idx) => {
       const n = idx + 1, words = R.stats([].concat.apply([], p.paragraphs)).words, nb = p.paragraphs.reduce((a, segs) => a + R.modelBoundaries(segs).length, 0);
+      const chars = p.paragraphs.map((segs) => segs.join('')).join('').replace(/\s/g, '').length;
+      const markedBody = '<div class="task"><b>① 따라 읽기</b> — ' + (marker === 'scoop' ? '밑줄 곡선' : marker === 'band' ? '색 띠' : '∕') + ' 단위로 붙여 읽고, 경계에서 살짝 쉬어요. 세 번 읽고 칸에 표시해요.</div>' +
+        '<div class="body m-' + marker + '">' + p.paragraphs.map((segs) => '<p>' + segsHtml(segs, marker) + '</p>').join('') + '</div>' +
+        '<div class="boxes"><span>소리 내어 읽기 <span class="cb"></span>1회 <span class="cb"></span>2회 <span class="cb"></span>3회</span>' + (R.BANDS[band].sentenceMode ? '<span>어른이 읽어 주기 <span class="cb"></span></span>' : '<span>3회째 걸린 시간 ____분 ____초</span>') + '</div>';
+      const plainBody = '<div class="task"><b>② 직접 끊기</b> — 뜻이 나뉘는 곳에 <b>∕</b> 를 그어요. 꾸며 주는 말, 수와 단위, 「-어 보다」 같은 한 움직임은 붙여요. 정답 자리는 ' + nb + '곳이에요.</div>' +
+        '<div class="body plain">' + p.paragraphs.map((segs) => '<p>' + esc(segs.join('')) + '</p>').join('') + '</div>' +
+        (p.q ? '<div class="q"><div class="qq">문제. ' + esc(p.q.q) + '</div>' + p.q.choices.map((c, i) => '<div class="c">' + ['①', '②', '③', '④'][i] + ' ' + esc(c) + '</div>').join('') + '</div>' : '') +
+        '<div class="score"><span>맞힌 자리 <i></i> / ' + nb + '</span><span>군더더기 <i></i></span><span>점수 <i></i></span><span>문제 <span class="cb"></span>정답</span></div>';
+      /* 짧은 글(공백 뺀 480자 이내)은 ①·② 를 한 쪽에 — 긴 글은 예전처럼 두 쪽 */
+      if (compact && chars <= 480) {
+        pages.push('<div class="page sz-' + size + ' compact">' + hd(band, n + '-①② 따라 읽기 · 직접 끊기') + '<div class="title">' + n + '. ' + esc(p.title) + '</div><p class="sub">' + esc(p.genre) + ' · ' + words + '어절 · 덩어리 ' + (nb + p.paragraphs.length) + '개</p>' +
+          markedBody + '<hr class="cut">' + plainBody + ft(org) + '</div>');
+        return;
+      }
       if (O('o-marked')) {
         pages.push('<div class="page sz-' + size + '">' + hd(band, n + '-① 따라 읽기') + '<div class="title">' + n + '. ' + esc(p.title) + '</div><p class="sub">' + esc(p.genre) + ' · ' + words + '어절 · 덩어리 ' + (nb + p.paragraphs.length) + '개</p>' +
           '<div class="task"><b>① 따라 읽기</b> — ' + (marker === 'scoop' ? '밑줄 곡선' : marker === 'band' ? '색 띠' : '∕') + ' 단위로 붙여 읽고, 경계에서 살짝 쉬어요. 세 번 읽고 칸에 표시해요.</div>' +
@@ -209,25 +267,17 @@
           '<div class="body lines">' + p.paragraphs.map((segs) => '<p>' + segs.map((s) => '<span class="seg">' + esc(s.trim()) + '</span>').join('') + '</p>').join('') + '</div>' + ft(org) + '</div>');
       }
       if (O('o-plain')) {
-        pages.push('<div class="page sz-' + size + '">' + hd(band, n + '-② 직접 끊기') + '<div class="title">' + n + '. ' + esc(p.title) + '</div>' +
-          '<div class="task"><b>② 직접 끊기</b> — 뜻이 나뉘는 곳에 <b>∕</b> 를 그어요. 꾸며 주는 말, 수와 단위, 「-어 보다」 같은 한 움직임은 붙여요. 정답 자리는 ' + nb + '곳이에요.</div>' +
-          '<div class="body plain">' + p.paragraphs.map((segs) => '<p>' + esc(segs.join('')) + '</p>').join('') + '</div>' +
-          (p.q ? '<div class="q"><div class="qq">문제. ' + esc(p.q.q) + '</div>' + p.q.choices.map((c, i) => '<div class="c">' + ['①', '②', '③', '④'][i] + ' ' + esc(c) + '</div>').join('') + '</div>' : '') +
-          '<div class="score"><span>맞힌 자리 <i></i> / ' + nb + '</span><span>군더더기 <i></i></span><span>점수 <i></i></span><span>문제 <span class="cb"></span>정답</span></div>' + ft(org) + '</div>');
+        pages.push('<div class="page sz-' + size + '">' + hd(band, n + '-② 직접 끊기') + '<div class="title">' + n + '. ' + esc(p.title) + '</div>' + plainBody + ft(org) + '</div>');
       }
     });
-    if (O('o-key') && ps.length) {
-      const items = ps.map((p, i) => '<div class="rulecard key"><b>' + (i + 1) + '. ' + esc(p.title) + '</b><div class="body m-slash">' + p.paragraphs.map((segs) => '<p>' + segsHtml(segs, 'slash') + '</p>').join('') + '</div>' + (p.q ? '<div class="small">문제 정답: ' + ['①', '②', '③', '④'][p.q.answer] + ' ' + esc(p.q.choices[p.q.answer]) + ' — ' + esc(p.q.explain) + '</div>' : '') + '</div>');
-      /* 정답표는 한 장에 3~4편씩 — 넘치면 브라우저가 알아서 다음 장으로 넘긴다(rulecard 는 break-inside:avoid) */
-      for (let i = 0; i < items.length; i += 4) pages.push('<div class="page key">' + hd(band, '정답표') + '<div class="title">정답표</div><p class="sub">∕ 가 모범 경계예요. 뜻이 통하면 다른 자리도 괜찮아요 — 쉼표 뒤에서 쉬는 것은 언제나 좋아요.</p>' + items.slice(i, i + 4).join('') + ft(org) + '</div>');
-    }
+    if (O('o-key') && ps.length) keyPages(ps, band, org).forEach((pg) => pages.push(pg));
     if (O('o-record')) {
       pages.push('<div class="page">' + hd(band, '기록표') + '<div class="title">연습 기록표</div><p class="sub">한 편이 끝날 때마다 적어요. 85점이 넘으면 1일 → 3일 → 7일 → 14일 → 30일 뒤에 다시 읽고, 30일 뒤에도 잘 읽으면 졸업이에요.</p>' +
         '<table class="rec"><tr><th style="width:15%">날짜</th><th>글</th><th style="width:13%">끊기 점수</th><th style="width:9%">문제</th><th style="width:14%">낭독 3회</th><th style="width:14%">다음 복습</th><th style="width:12%">확인</th></tr>' + Array.from({ length: 14 }, () => '<tr><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>').join('') + '</table>' + ft(org) + '</div>');
     }
     $('book').innerHTML = pages.join('') || '<div class="page"><p class="sub">왼쪽에서 글을 골라 주세요.</p></div>';
   }
-  bandDefaults(); fillList(true); build();
+  bandDefaults(); fillList(true); build(); pullServer();
 })();
 </script>
 </body>

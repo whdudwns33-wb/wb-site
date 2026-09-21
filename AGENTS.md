@@ -80,7 +80,7 @@ Cloudflare Workers `wb-reading`으로). PR은 스쿼시 머지, 제목에 `(#번
   (팩 업로드·시험 등록·반 성취도) · `/admin/naesin-ko-admin.html` 국어브레인
   (팩 업로드·시험 등록·과제 배정·학교 오버레이·서술형 검토·서술형 루브릭 저작·주석 복원 시험지 인쇄) ·
   `/admin/haru-admin.html` 하루브레인(코치 보드·등록·팩/대응표/플랜·종이 회수·파기) ·
-  `/admin/chunk-admin.html` 청크브레인(반 현황·학생 상세·약한 규칙·단계/과제 지정·교재 출력) ·
+  `/admin/chunk-admin.html` 청크브레인(반 현황·학생 상세·약한 규칙·단계/과제 지정·글 저작[선생님 지문·진로독서 가져오기]·교재 출력) ·
   `/admin/letter-admin.html` 브레인레터(호 목록·편집·AI 초안·발행·발송 문구·열람 현황·학년대 지정·인쇄)
 - 베이스: `https://wb-reading.whdudwns33.workers.dev`
 

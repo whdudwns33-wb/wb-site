@@ -225,6 +225,9 @@ const chunkStore = {
   putAssign: (c, rec) => { chunkRoot().assigns[c] = rec; persist(); },
   deleteAssign: (c) => { delete chunkRoot().assigns[c]; persist(); },
   listAssignCodes: () => Object.keys(chunkRoot().assigns),
+  /* 선생님 지문 — 워커의 chunk:customs 키와 같은 모양({items, updatedAt}) */
+  getCustoms: () => chunkRoot().customs || null,
+  putCustoms: (rec) => { chunkRoot().customs = rec; persist(); },
   getStudent: (c) => db.students?.[c] || null,
 };
 
