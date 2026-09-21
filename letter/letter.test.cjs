@@ -101,7 +101,7 @@ t('검증기 — 400KB 를 넘는 호는 막는다(학생 기기·KV 한 값 상
 
 t('학년대 선택 — 자기 학년대 섹션 + all 만, 원래 순서 그대로', () => {
   const e2 = L.forTier(SAMPLE, 'E2');
-  assert.deepEqual(e2.sections.map((s) => s.id), ['read-e2', 'words', 'brain-e2', 'mission', 'column', 'coach-e2', 'notice']);
+  assert.deepEqual(e2.sections.map((s) => s.id), ['read-e2', 'words', 'brain-e2', 'mission', 'column', 'coach-e2', 'news']);
   assert.equal(e2.tier, 'E2');
   const k = L.forTier(SAMPLE, 'K');
   assert.ok(!k.sections.some((s) => s.type === 'words'), '유치부에는 한자어 낱말 가족이 없다');
@@ -156,7 +156,8 @@ t('사진 — id 또는 file 중 하나, alt·credit 필수, 3장 이내; 렌더
   rd.image = { file: 'leaf-autumn.svg', alt: '노랗고 붉게 물든 잎 세 장', caption: '가을 잎', credit: 'WB 자체 제작 삽화' };
   assert.deepEqual(errs(i), []);
   const html = L.renderIssue(i, 'E2', { mode: 'app' });
-  assert.ok(/<figure class="np-photo"><img src="img\/leaf-autumn\.svg" alt="노랗고 붉게 물든 잎 세 장" loading="lazy">/.test(html));
+  assert.ok(/<figure class="np-photo" data-zoom="1"><img src="img\/leaf-autumn\.svg" alt="노랗고 붉게 물든 잎 세 장" loading="lazy" decoding="async">/.test(html));
+  assert.ok(!/data-zoom/.test(L.renderIssue(i, 'E2', { mode: 'print' })), '인쇄본에는 돋보기 표시가 없다');
   assert.ok(/np-credit">WB 자체 제작 삽화/.test(html));
   assert.ok(/src="\/letter\/img\/leaf-autumn\.svg"/.test(L.renderIssue(i, 'E2', { mode: 'app', imgBase: '/letter/img/' })), '관리 미리보기는 절대 경로');
   rd.image = { id: 'a'.repeat(32), alt: 'x', credit: 'WB 촬영' };
@@ -243,6 +244,69 @@ t('빈 템플릿 — 주차에서 발행일(월요일)을 채우고 섹션 종�
 t('공용 CSS 에 인쇄 규칙(A4·별지 새 쪽)과 2단 신문 짜임이 있다', () => {
   assert.ok(/@media print/.test(L.CSS) && /@page\{size:A4/.test(L.CSS) && /np-key\{break-before:page/.test(L.CSS));
   assert.ok(/@media\(min-width:640px\)\{\.np-top\{grid-template-columns/.test(L.CSS), '넓은 화면·A4 에서 본문·옆단 2단');
+});
+
+
+t('사진 크기(w·h) — 한 쌍이어야 하고, 렌더러는 width/height 와 aspect-ratio 로 자리를 먼저 잡는다', () => {
+  const i = clone(SAMPLE); const rd = i.sections.find((s) => s.id === 'read-e2');
+  rd.image = { file: 'leaf-autumn.svg', alt: 'x', credit: 'WB', w: 1600, h: 1067 };
+  assert.deepEqual(errs(i), []);
+  assert.ok(/width="1600" height="1067" style="aspect-ratio:1600\/1067"/.test(L.renderIssue(i, 'E2', { mode: 'app' })));
+  delete rd.image.h; assert.ok(errs(i).some((e) => /w·h/.test(String(e.msg || e))), '한쪽만 있으면 오류');
+  rd.image.h = 0; assert.ok(errs(i).some((e) => /w·h/.test(String(e.msg || e))));
+});
+
+t('교육·입시 이슈(news) — 제목·요약·출처 필수, 링크는 https 만; 앱은 링크, 인쇄는 출처명만', () => {
+  const i = clone(SAMPLE);
+  assert.ok(i.sections.some((s) => s.type === 'news'), '샘플 호에 이슈 섹션이 있다');
+  i.sections = i.sections.filter((s) => s.type !== 'news');
+  const n = { id: 'news', type: 'news', tiers: 'all', title: '이번 주 교육·입시 이슈', items: [{ title: '예시 제목', summary: '예시 요약.', why: '예시 뜻.', source: '예시 기관', url: 'https://example.com/x', date: '2026-09-18' }] };
+  i.sections.push(n);
+  assert.deepEqual(errs(i), []);
+  const app = L.renderIssue(i, 'M', { mode: 'app' });
+  assert.ok(/np-news/.test(app) && /이번 주 교육·입시 이슈/.test(app) && /우리 아이에게 — 예시 뜻\./.test(app));
+  assert.ok(/<a href="https:\/\/example\.com\/x" target="_blank" rel="noopener noreferrer">예시 기관 · 2026-09-18 ↗<\/a>/.test(app));
+  assert.ok(!/<a href/.test(L.renderIssue(i, 'M', { mode: 'print' })), '인쇄본에는 링크가 없다');
+  n.items[0].url = 'http://example.com/x'; assert.ok(errs(i).some((e) => /https/.test(String(e.msg || e))));
+  n.items[0].url = ''; n.items[0].source = ''; assert.ok(errs(i).some((e) => /source/.test(String(e.msg || e))));
+  n.items[0].source = '예시 기관'; n.items[0].date = '2026-13-01'; assert.ok(errs(i).some((e) => /date/.test(String(e.msg || e))));
+  n.items[0].date = ''; n.items = []; assert.ok(errs(i).some((e) => /1~6개/.test(String(e.msg || e))));
+  assert.ok(L.blankIssue('2026-W40').sections.some((s) => s.type === 'news'), '빈 템플릿에도 이슈 자리가 있다');
+});
+
+t('하루 한 장 — 발행일이 1일째, 7일에 나눠 읽고, 그 학년대에 없는 날은 읽을거리를 다시 읽는다', () => {
+  const at = (d) => Date.parse(d + 'T03:00:00Z');   // KST 정오
+  assert.equal(L.dayOf(SAMPLE, at('2026-09-21')), 1);
+  assert.equal(L.dayOf(SAMPLE, at('2026-09-24')), 4);
+  assert.equal(L.dayOf(SAMPLE, at('2026-09-10')), 1, '발행 전은 1일째');
+  assert.equal(L.dayOf(SAMPLE, at('2026-10-30')), 7, '지난 호는 7일째에 머문다');
+  assert.equal(L.dayDate(SAMPLE, 3), '2026-09-23'); assert.equal(L.dayDow(SAMPLE, 3), '수');
+  assert.equal(L.DAY_PLAN.length, 7);
+  const d1 = L.dayPage(SAMPLE, 'E2', 1); assert.deepEqual(d1.items.map((x) => x.part), ['lead', 'read']); assert.equal(d1.items[1].opts.noQuiz, true);
+  const d2 = L.dayPage(SAMPLE, 'E2', 2); assert.equal(d2.items[0].opts.foldText, true);
+  const d5 = L.dayPage(SAMPLE, 'E2', 5); assert.ok(d5.items.some((x) => x.part === 'column') && d5.items.some((x) => x.part === 'news') && d5.items.some((x) => x.part === 'coach'));
+  const k3 = L.dayPage(SAMPLE, 'K', 3); assert.equal(k3.again, true, '유치부는 한자 코너가 없어 읽을거리를 다시 읽는다'); assert.equal(k3.items[0].section.id, 'read-k');
+  assert.equal(L.dayPage(SAMPLE, 'E2', 7).items[0].part, 'review');
+});
+
+t('하루 한 장 렌더 — 1일째는 문제 없이, 2일째는 본문을 접고 문제만, 7일째는 내 답·정답·점수; 띠는 오늘·마침·미래를 구분', () => {
+  const st = { quiz: { 'read-e2:0': 0, 'read-e2:1': 3 }, checks: { 'mission:0': true }, days: { 1: '2026-09-21T01:00:00Z' } };
+  const d1 = L.renderDay(SAMPLE, 'E2', 1, { mode: 'app', state: st });
+  assert.ok(/np-daily/.test(d1) && /data-day="1"/.test(d1) && /1일째/.test(d1) && /np-lead/.test(d1) && /np-cover/.test(d1));
+  assert.ok(!/np-qs/.test(d1), '1일째엔 문제가 없다'); assert.ok(/data-tts="read-e2"/.test(d1), '읽어 주기 단추'); assert.ok(/data-p="read-e2:0"/.test(d1), '문단마다 낭독 표식');
+  const d2 = L.renderDay(SAMPLE, 'E2', 2, { mode: 'app', state: st });
+  assert.ok(/<details class="np-fold">/.test(d2) && /np-qs/.test(d2) && !/data-tts=/.test(d2));
+  const d3 = L.renderDay(SAMPLE, 'E2', 3, { mode: 'app', state: st });
+  assert.ok(/np-trace" data-trace="色"/.test(d3), '한자 따라쓰기 칸');
+  assert.ok(!/np-trace/.test(L.renderDay(SAMPLE, 'E2', 3, { mode: 'app', state: st, noTrace: true })), '관리 미리보기는 뺄 수 있다');
+  const d7 = L.renderDay(SAMPLE, 'E2', 7, { mode: 'app', state: st, nextTheme: '달의 모양' });
+  assert.ok(/np-review/.test(d7) && /<b>1<\/b>\/4/.test(d7) && /아직 안 푼 문제가 2개/.test(d7) && /다음 주 예고/.test(d7) && /달의 모양/.test(d7));
+  assert.ok(/<b>1<\/b>\/5<span>마친 미션/.test(d7));
+  const strip = L.renderDayStrip(SAMPLE, 3, 4, st);
+  assert.equal((strip.match(/class="np-sday/g) || []).length, 7);
+  assert.ok(/np-sday done" data-day="1"/.test(strip) && /np-sday cur" data-day="3"/.test(strip) && /np-sday future" data-day="5"/.test(strip));
+  assert.ok(!/data-tts=|np-trace|data-zoom/.test(L.renderIssue(SAMPLE, 'E2', { mode: 'print' })), '인쇄본에는 단추·캔버스·돋보기가 없다');
+  assert.ok(/mix-blend-mode:multiply/.test(L.CSS) && /aspect-ratio:16\/10/.test(L.CSS) && /scroll-snap-type/.test(L.CSS), '앱 사진 규칙(종이 질감·표지 비율·스냅 갤러리)');
 });
 
 console.log(`\nOK — ${passed}개 통과 (${path.basename(__filename)})`);

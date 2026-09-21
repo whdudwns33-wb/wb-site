@@ -94,6 +94,8 @@ jobs:
         run: node letter/letter.test.cjs
       - name: 브레인레터 시공간 놀이 생성기 테스트
         run: node letter/shapes.test.cjs
+      - name: 브레인레터 글꼴 CSS 다시쓰기 테스트
+        run: node letter/fetch-fonts.test.mjs
       - name: 브레인레터 서버 라우트 테스트
         run: node reading-server/letter-api.test.mjs
       - name: 내신브레인 AI 추출 테스트

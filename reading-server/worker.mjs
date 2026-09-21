@@ -529,6 +529,17 @@ export default {
        강사는 로그인해서만 본다. 서버·워커는 이 파일을 내부에서 읽어 쓴다. */
     if (p === '/textbook.json') return json(404, { error: 'not found' });
 
+    /* 브레인레터 글꼴 조각 — _headers 의 /letter/* no-store 는 화면·코드가 늘 최신이어야 해서인데, 글꼴 조각은 경로에
+       판(sans-v39/)이 박혀 있어 내용이 바뀌면 주소가 바뀐다. 오래 캐시해야 호를 열 때마다 수백 KB 를 다시 받지 않는다.
+       _headers 는 같은 헤더를 합치므로(no-store, public…) 여기서 통째로 바꾼다 — wrangler.toml run_worker_first 에 이 경로가 있어야 워커가 돈다.
+       fonts.css 는 판이 바뀌면 내용이 바뀌므로 그대로 no-store 로 둔다(woff2 만). */
+    if (p.startsWith('/letter/fonts/') && p.endsWith('.woff2')) {
+      const res = await env.ASSETS.fetch(req);
+      if (res.status !== 200) return res;
+      const h = new Headers(res.headers); h.set('Cache-Control', 'public, max-age=31536000, immutable');
+      return new Response(res.body, { status: 200, headers: h });
+    }
+
     if (!p.startsWith('/api/')) {
       /* 정적 자산 (학생 앱 + /admin) */
       return env.ASSETS.fetch(req);
