@@ -24,6 +24,8 @@ WB 독해력학원·웩슬러브레인센터의 원내 학습 웹앱 모음. 어
 ## 명령
 
 ```
+node scripts/check.mjs              # ★ 저장소 전체 테스트 한 방 (고친 뒤엔 이것부터)
+node scripts/check.mjs --only letter   # 고친 앱만 (경로에 letter 가 든 테스트)
 node <앱>/<이름>.test.cjs           # 단위 테스트 (의존성 없음, 파일별 실행)
 node reading-server/<이름>.test.mjs # 서버 테스트
 node reading-server/build-dist.mjs  # dist 조립 (+ SW 캐시 이름 스탬프)
@@ -35,12 +37,36 @@ python3 naesin-ko/extract/pdf-spans.py <PDF> --colors  # 새 출판사 자료 �
 for f in haru/*.test.cjs haru/*.test.mjs; do node $f; done   # 하루브레인 순수 로직·달력·조판기
 node reading-server/haru-score.test.mjs && node reading-server/haru-api.test.mjs   # 하루브레인 서버
 node letter/letter.test.cjs && node letter/shapes.test.cjs && node letter/drills.test.cjs && node letter/fetch-fonts.test.mjs && node reading-server/letter-api.test.mjs   # 브레인레터 순수 로직·도형·5분 놀이·글꼴·서버
+node letter/issue-validate.mjs [호.json]        # 브레인레터 호 검증 (기본: 저장소의 파일럿·샘플) — 관리 웹 [검증]과 같은 규칙
 node letter/fetch-fonts.mjs                 # 브레인레터 글꼴 조각 다시 받기(Google Fonts → letter/fonts/, OFL)
 node haru/sheet-build.mjs <팩.json> <출력 디렉터리> --frozen --key-id <id>   # 종이 회차 시험지·정답표·paperkey (저장소 밖에서)
 ```
 
-CI: `.github/workflows/deploy-reading.yml` — **main 푸시가 곧 배포**다(테스트 전부 통과 시
-Cloudflare Workers `wb-reading`으로). PR은 스쿼시 머지, 제목에 `(#번호)`가 남는 관례.
+CI 둘: `.github/workflows/checks.yml` — **PR·작업 브랜치 푸시**에서 `node scripts/check.mjs`(저장소 전체
+테스트) + 워커 번들 dry-run. 시크릿을 쓰지 않는다. `.github/workflows/deploy-reading.yml` — **main 푸시가
+곧 배포**다(그 앱 몫 테스트 통과 시 Cloudflare Workers `wb-reading`으로). PR은 스쿼시 머지, 제목에
+`(#번호)`가 남는 관례.
+
+## 에이전트 작업 규칙 (Codex · Claude Code 공통)
+
+사람이 보지 않는 사이에 고치는 일이 많다. 아래는 **어느 에이전트든** 지키는 순서다.
+
+1. **고치기 전에 읽는다**: 이 문서 + 그 앱의 `README.md`(위 지도의 "상세"). 규칙은 앱마다 다르다.
+2. **고친 뒤 `node scripts/check.mjs`** — 저장소의 모든 테스트(254개, 2분 안쪽, 외부 의존성·망 없음)를 돌린다.
+   빠르게 보려면 `--only <경로 조각>`. 초록이 아닌 상태로 PR 을 올리지 않는다.
+3. **새 로직에는 테스트를 같이 만든다**(`.test.cjs`/`.test.mjs`). `check.mjs` 가 파일을 저절로 찾아 돌린다 —
+   목록에 등록할 필요가 없다. 배포 CI 에도 넣어야 하면 `deploy-reading.yml` 에 한 줄 더한다.
+4. **main 에 직접 밀지 않는다.** main 푸시는 곧 배포다. 작업 브랜치 → PR → `checks.yml` 초록 → 스쿼시 머지.
+5. **시크릿·개인정보는 저장소에 두지 않는다**(절대 규칙 1). 키는 GitHub 저장소 시크릿 → 워커 시크릿
+   (`admin-secrets.yml`·`vocab-secrets.yml`)으로만 흐른다. 값을 워크플로우 입력이나 로그로 받지 않는다.
+6. **`CLAUDE.md` 와 `AGENTS.md` 는 같은 파일이어야 한다** — 한쪽만 고치면 `scripts/docs-sync.test.mjs` 가 막는다.
+   한쪽을 고쳤으면 `cp CLAUDE.md AGENTS.md` (또는 그 반대).
+7. 사람 확인이 필요한 것: 운영 데이터 삭제, 시크릿 교체, 가정에 나가는 문구·링크, 라이선스가 걸린 자료.
+
+**브레인레터 주간 호(가장 잦은 작업)**: `letter/issue-pilot.json` 을 갈아 끼우는 것이 곧 발행이다
+(`/letter/` 가 링크만으로 연다). 고친 뒤 `node letter/issue-validate.mjs` 로 오류 0 을 확인한다 —
+다섯 학년대(K·E1·E2·E3·M)를 모두 덮어야 하고, 모든 글은 자체 창작, 사진에는 `alt`·`credit` 이 있어야 한다.
+주제는 `letter/calendar.json` 에 주차별로 적혀 있다. 자세한 절차는 `letter/README.md`.
 
 ## 절대 규칙
 
