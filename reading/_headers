@@ -69,6 +69,8 @@
   Cache-Control: no-store
 /haru/*
   Cache-Control: no-store
+/chunk/*
+  Cache-Control: no-store
 /letter/*
   Cache-Control: no-store
 /admin/*

@@ -29,6 +29,7 @@ fs.copyFileSync(path.join(ROOT, 'public', 'naesin-studio.html'), path.join(DIST,
 fs.copyFileSync(path.join(ROOT, 'public', 'naesin-live.html'), path.join(DIST, 'admin', 'naesin-live.html'));
 fs.copyFileSync(path.join(ROOT, 'public', 'haru-admin.html'), path.join(DIST, 'admin', 'haru-admin.html'));
 fs.copyFileSync(path.join(ROOT, 'public', 'naesin-ko-admin.html'), path.join(DIST, 'admin', 'naesin-ko-admin.html'));
+fs.copyFileSync(path.join(ROOT, 'public', 'chunk-admin.html'), path.join(DIST, 'admin', 'chunk-admin.html'));
 fs.copyFileSync(path.join(ROOT, 'public', 'letter-admin.html'), path.join(DIST, 'admin', 'letter-admin.html'));
 
 /* 어휘 나이 진단 (vocab-age/) — 로그인 없이 열리는 공개 페이지.
@@ -75,6 +76,14 @@ fs.mkdirSync(path.join(DIST, 'haru'), { recursive: true });
 const HARU_FILES = ['index.html', 'parent.html', 'strings.js', 'plan.js', 'mastery.js', 'srs.js', 'cause.js', 'probe.js', 'atoms.json', 'sw.js', 'manifest.webmanifest', 'icon.svg'];
 for (const f of HARU_FILES) fs.copyFileSync(path.join(HARU, f), path.join(DIST, 'haru', f));
 
+/* 청크브레인 (chunk/) — 의미단위 끊어읽기. 같은 오리진 /chunk/ 에서 서빙해야 학생 토큰이 공유된다.
+   지문(passages.js)·카드(lessons.js)는 자체 창작이라 정적 자산으로 나간다 — chunk/content.test.cjs 가 그 전제를 지킨다.
+   print.html 은 브라우저 인쇄로 PDF 교재를 만드는 화면이라 셸에 함께 싣는다. */
+const CHUNK = path.join(ROOT, '..', 'chunk');
+fs.mkdirSync(path.join(DIST, 'chunk'), { recursive: true });
+const CHUNK_FILES = ['index.html', 'print.html', 'rules.js', 'sched.js', 'lessons.js', 'passages.js', 'sw.js', 'manifest.webmanifest', 'icon.svg'];
+for (const f of CHUNK_FILES) fs.copyFileSync(path.join(CHUNK, f), path.join(DIST, 'chunk', f));
+fs.copyFileSync(SHARED, path.join(DIST, 'chunk', 'voice.js'));
 /* 브레인레터 (letter/) — 같은 오리진 /letter/ 에서 서빙해야 학생 토큰·가족 링크·API 가 공유된다.
    호 본문은 KV 에만 있다. issue-sample.json 은 자체 창작 체험 호라 실어도 된다(라이선스 콘텐츠 0).
    관리 웹의 편집기 미리보기가 학생 앱과 같은 렌더러(letter.js)를 쓴다 — 원본은 letter/letter.js 하나. */
@@ -121,6 +130,10 @@ const kTag = stampSW(path.join(DIST, 'naesin-ko', 'sw.js'),
     'concepts.json', 'pack-sample.json', 'manifest.webmanifest', 'icon.svg']
     .map(f => path.join(DIST, 'naesin-ko', f)), 'wbk-shell');
 
+const cTag = stampSW(path.join(DIST, 'chunk', 'sw.js'),
+  ['index.html', 'print.html', 'voice.js', 'rules.js', 'sched.js', 'lessons.js', 'passages.js', 'manifest.webmanifest', 'icon.svg']
+    .map(f => path.join(DIST, 'chunk', f)), 'wbc-shell');
+
 const hTag = stampSW(path.join(DIST, 'haru', 'sw.js'),
   ['index.html', 'strings.js', 'plan.js', 'mastery.js', 'srs.js', 'cause.js', 'probe.js', 'manifest.webmanifest', 'icon.svg']
     .map(f => path.join(DIST, 'haru', f)), 'wbh-shell');
@@ -147,6 +160,7 @@ const broken = [];
 for (const f of ['index.html', 'vocab/index.html', 'vocab-age/index.html', 'admin/index.html',
   'admin/metrics.html', 'admin/vocab-review.html', 'review.html', 'parent.html',
   'naesin/index.html', 'haru/index.html', 'haru/parent.html', 'admin/haru-admin.html', 'admin/naesin-admin.html',
+  'chunk/index.html', 'chunk/print.html', 'admin/chunk-admin.html',
   'letter/index.html', 'admin/letter-admin.html']) {
   const full = path.join(DIST, f);
   if (fs.existsSync(full)) for (const m of verifyRefs(full)) broken.push(f + ' → ' + m);
@@ -158,4 +172,4 @@ if (broken.length) {
 }
 
 console.log('dist/ 조립 완료:', fs.readdirSync(DIST).join(', '));
-console.log('서비스 워커 캐시 이름:', rTag, '·', vTag, '·', nTag, '·', kTag, '·', hTag, '·', lTag);
+console.log('서비스 워커 캐시 이름:', rTag, '·', vTag, '·', nTag, '·', kTag, '·', hTag, '·', cTag, '·', lTag);
