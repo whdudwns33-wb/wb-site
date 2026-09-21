@@ -90,7 +90,7 @@ fs.copyFileSync(SHARED, path.join(DIST, 'hanja', 'voice.js'));
    print.html 은 브라우저 인쇄로 PDF 교재를 만드는 화면이라 셸에 함께 싣는다. */
 const CHUNK = path.join(ROOT, '..', 'chunk');
 fs.mkdirSync(path.join(DIST, 'chunk'), { recursive: true });
-const CHUNK_FILES = ['index.html', 'print.html', 'rules.js', 'sched.js', 'lessons.js', 'passages.js', 'sw.js', 'manifest.webmanifest', 'icon.svg'];
+const CHUNK_FILES = ['index.html', 'print.html', 'class.html', 'rules.js', 'sched.js', 'lessons.js', 'passages.js', 'sw.js', 'manifest.webmanifest', 'icon.svg'];
 for (const f of CHUNK_FILES) fs.copyFileSync(path.join(CHUNK, f), path.join(DIST, 'chunk', f));
 fs.copyFileSync(SHARED, path.join(DIST, 'chunk', 'voice.js'));
 /* 브레인레터 (letter/) — 같은 오리진 /letter/ 에서 서빙해야 학생 토큰·가족 링크·API 가 공유된다.
@@ -187,7 +187,7 @@ for (const f of ['index.html', 'vocab/index.html', 'vocab-age/index.html', 'admi
   'admin/metrics.html', 'admin/vocab-review.html', 'review.html', 'parent.html',
   'naesin/index.html', 'haru/index.html', 'haru/parent.html', 'admin/haru-admin.html', 'admin/naesin-admin.html',
   'hanja/index.html', 'admin/hanja-admin.html', 'admin/hanja-print.html',
-  'chunk/index.html', 'chunk/print.html', 'admin/chunk-admin.html',
+  'chunk/index.html', 'chunk/print.html', 'chunk/class.html', 'admin/chunk-admin.html',
   'letter/index.html', 'admin/letter-admin.html']) {
   const full = path.join(DIST, f);
   if (fs.existsSync(full)) for (const m of verifyRefs(full)) broken.push(f + ' → ' + m);

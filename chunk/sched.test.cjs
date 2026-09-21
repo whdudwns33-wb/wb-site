@@ -143,4 +143,15 @@ t('끊어읽기 지수 — 최근 5회 평균에 단계 가중(유치 0.5 → �
   assert.strictEqual(S.forTeacher(mk('G3', [90]), now).index, Math.round(90 * (0.5 + 0.5 * 3 / 12)));
 });
 
+t('출발선 진단 — 한 학년 아래에서 60점 미만이면 거기서 시작, 그 위면 학년 그대로. 유치는 아래가 없다', () => {
+  assert.strictEqual(S.placementBand('G4'), 'G3');
+  assert.strictEqual(S.placementBand('K'), 'K', '유치 아래는 없다');
+  assert.deepStrictEqual(S.placement('G4', 90), { band: 'G4', testBand: 'G3', moved: false });
+  assert.deepStrictEqual(S.placement('G4', 60), { band: 'G4', testBand: 'G3', moved: false }, '60 은 통과선');
+  assert.deepStrictEqual(S.placement('G4', 59), { band: 'G3', testBand: 'G3', moved: true });
+  assert.deepStrictEqual(S.placement('G4', 0), { band: 'G3', testBand: 'G3', moved: true });
+  assert.deepStrictEqual(S.placement('K', 10), { band: 'K', testBand: 'K', moved: false }, '유치는 내려갈 곳이 없다');
+  assert.deepStrictEqual(S.placement('G12', null), { band: 'G12', testBand: 'G11', moved: false }, '건너뛰면 학년 그대로');
+});
+
 console.log('\n' + passed + '건 통과 — chunk/sched.js');
