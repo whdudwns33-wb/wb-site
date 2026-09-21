@@ -134,7 +134,7 @@ for (const f of pages) {
 /* ── 라우트가 쓰는 저장 어댑터가 워커·로컬 양쪽에 다 있는가 ──
    naesin-ko-api.mjs 는 워커(KV)와 로컬 서버(파일)가 함께 쓴다. 한쪽 어댑터에만 메서드를
    더하면 로컬에서 다 확인하고 배포한 뒤 운영에서만 500이 난다 — 이 파일이 막으려는 바로 그 일이다. */
-for (const api of ['naesin-ko-api.mjs', 'naesin-api.mjs', 'vocab-api.mjs']) {
+for (const api of ['naesin-ko-api.mjs', 'naesin-api.mjs', 'vocab-api.mjs', 'chunk-api.mjs']) {
   const src = fs.readFileSync(path.join(DIR, api), 'utf8');
   const used = new Set([...src.matchAll(/store\.([a-zA-Z]\w*)\s*\(/g)].map((m) => m[1]));
   for (const fn of [...used].sort()) {
