@@ -12,6 +12,7 @@
  *     words: [{ id, unit, word, type:'hanja'|'native', hanja?, parts?:[{ch,hun,eum}], literal?,
  *               meaning, example?, syn?:[], scene? }],       // id 는 '낱말|한자'(내용 기반) — 재업로드에도 안 밀린다
  *     chars: [{ ch, hun, eum, strokes?, unit, medians?:[[[x,y],…],…], radical?, similar?:[…], words:[…], derived? }] }
+ *   chars 의 words 는 그 글자를 쓰는 낱말(급수 교재의 예시 낱말). 직접 적어도 되고, 낱말의 한자 분해에서 저절로 붙기도 한다.
  *
  * chars 는 두 갈래로 채워진다 — 한자 급수 교재처럼 글자를 직접 적은 것(explicit)과,
  * 낱말의 한자 분해(parts)에서 끌어낸 것(derived). 직접 적은 것이 이긴다. 직접 적은 글자는 그 단원의
@@ -38,6 +39,7 @@ var WBBOOKCHECK = (function () {
     words: 3000, chars: 2000, units: 200,
     title: 60, publisher: 40, note: 200,
     word: 40, meaning: 200, example: 200, unit: 40, unitTitle: 60, itemId: 100,
+    charWords: 12,
     hun: 20, eum: 4, strokes: 64, medianStrokes: 64, medianPts: 64, syn: 8, synLen: 40, similar: 8, scene: 200,
   };
 
@@ -268,6 +270,17 @@ var WBBOOKCHECK = (function () {
         if (out.strokes == null) out.strokes = med.length;
       }
       if (c.note) out.note = str(c.note, LIMITS.note);
+      /* 이 글자를 쓰는 낱말 — 한자 급수 교재는 글자마다 낱말 몇 개를 예로 든다(一 → 일등·일주·일생·일주일).
+         교재에 그 낱말의 뜻이 없으면 낱말 항목으로는 못 넣으니, 글자 카드의 참고 목록으로만 받는다.
+         낱말에서 끌어낸 글자의 words 와 같은 칸을 쓴다 — 화면은 한 줄로 그린다. */
+      if (c.words != null) {
+        var cw = Array.isArray(c.words) ? c.words : String(c.words).split(/[,·]/);
+        cw = cw.map(function (x) { return str(x, LIMITS.word); }).filter(function (x, k, arr) { return x && arr.indexOf(x) === k; });
+        var badCw = cw.filter(function (x) { return ENGLISH_WORD.test(x); });
+        if (badCw.length) { C.err(where, '낱말 목록(words)에 영어가 있어요: "' + badCw[0] + '"'); return; }
+        out.words = cw.slice(0, LIMITS.charWords);
+        if (cw.length > LIMITS.charWords) C.warn(where, '낱말 목록이 ' + LIMITS.charWords + '개를 넘어 뒤를 버린다 (' + cw.length + ')');
+      }
       /* 부수·닮은 글자 — 오답 보기가 진짜 헷갈리는 짝(日/目, 土/士)을 겨냥하게 하는 실마리 */
       if (c.radical != null && c.radical !== '') {
         var rad = str(c.radical);

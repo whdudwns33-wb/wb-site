@@ -87,7 +87,7 @@
       <div id="paneJson" hidden>
         <label>단어장 JSON 파일 (<code>node hanja/book-validate.mjs</code>로 검사한 것)</label>
         <input type="file" id="bkFile" accept=".json,application/json">
-        <p class="muted" style="font-size:.78rem;margin:6px 0 0">모양: <code>{ id, title, publisher?, level?, source?(own 자체|textbook 교재 — 없으면 교재), units:[{id,title}], words:[{unit, word, meaning, hanja?, example?, syn?}], chars:[{unit, ch, hun, eum, strokes?, medians?}], strokes?:{"觀":25} }</code>.
+        <p class="muted" style="font-size:.78rem;margin:6px 0 0">모양: <code>{ id, title, publisher?, level?, source?(own 자체|textbook 교재 — 없으면 교재), units:[{id,title}], words:[{unit, word, meaning, hanja?, example?, syn?}], chars:[{unit, ch, hun, eum, strokes?, medians?, words?(그 글자를 쓰는 낱말)}], strokes?:{"觀":25} }</code>.
         <code>medians</code>(0~1 좌표의 획 중심선, 획 순서대로)가 있는 글자만 앱에서 획순 안내·획순 판정이 열립니다.</p>
       </div>
       <div class="prev" id="prev"></div>

@@ -232,4 +232,27 @@ t('단어장 종류(source) — own·textbook 만, 없거나 이상하면 교재
   assert.strictEqual(sample().source, 'own', '체험 단어장은 자체 창작이라 자체 단어장');
 });
 
+t('글자의 낱말 목록(chars[].words) — 급수 교재의 예시 낱말을 뜻 없이 받는다', () => {
+  const base = (words) => ({ id: 'cw-1', title: '급수', units: [{ id: 'u1', title: '1강' }],
+    chars: [{ ch: '一', hun: '한', eum: '일', unit: 'u1', words }] });
+  const r = B.checkBook(base(['일등', '일주', '일생', '일주일']));
+  assert.ok(r.ok, JSON.stringify(r.errors));
+  assert.deepStrictEqual(r.book.chars[0].words, ['일등', '일주', '일생', '일주일']);
+  /* 쉼표·가운뎃점 한 줄도 받는다 — 붙여넣기에서 오는 모양 */
+  assert.deepStrictEqual(B.checkBook(base('일등, 일주 · 일생')).book.chars[0].words, ['일등', '일주', '일생']);
+  /* 겹친 낱말은 하나만, 12개를 넘으면 뒤를 버리고 알린다 */
+  assert.deepStrictEqual(B.checkBook(base(['일등', '일등'])).book.chars[0].words, ['일등']);
+  const many = B.checkBook(base(Array.from({ length: 15 }, (_, i) => '낱말' + i)));
+  assert.strictEqual(many.book.chars[0].words.length, 12);
+  assert.ok(many.warns.some((w) => /낱말 목록/.test(w.message)), JSON.stringify(many.warns));
+  /* 영어는 막는다 — 이 앱이 받지 않는 낱말이 글자 카드로 새어 들어가지 않게 */
+  assert.ok(!B.checkBook(base(['일등', 'first'])).ok);
+  /* 낱말에서 끌어낸 글자의 목록은 그대로다 */
+  const mixed = B.checkBook({ id: 'cw-2', title: '섞임', units: [{ id: 'u1', title: '1강' }],
+    chars: [{ ch: '觀', hun: '볼', eum: '관', unit: 'u1', words: ['관측'] }],
+    words: [{ unit: 'u1', word: '관찰', meaning: '살펴봄', hanja: '觀(볼 관)+察(살필 찰)' }] });
+  assert.ok(mixed.ok, JSON.stringify(mixed.errors));
+  assert.deepStrictEqual(mixed.book.chars.find((c) => c.ch === '觀').words, ['관측', '관찰']);
+});
+
 console.log(`\nOK — ${passed}개 통과`);
