@@ -5,7 +5,8 @@
 ## 실행
 
 ```bash
-ADMIN_PIN=원하는PIN node reading-server/server.mjs   # 기본 포트 8890 (아이디 로그인은 ADMIN_ID·ADMIN_PASSWORD 를 더한다)
+ADMIN_PIN=원하는PIN node reading-server/server.mjs   # 기본 포트 8890 (아이디 로그인은 ADMIN_ID·ADMIN_PASSWORD 를 대신 써도 된다)
+# 관리 로그인에 기본값은 없다 — 둘 다 빠지면 서버가 뜨지 않는다(공개 저장소에 기본 PIN 을 적어 두지 않으려는 것)
 ```
 
 | 경로 | 내용 |
@@ -76,4 +77,4 @@ ADMIN_PIN=원하는PIN node reading-server/server.mjs   # 기본 포트 8890 (�
 2. **Cloudflare Workers (운영 중)**: **https://wb-reading.whdudwns33.workers.dev** — 학생 앱(/) + 관리 웹(/admin) + API + 일일 백업 크론. `worker.mjs`+KV(DB)로 배포됨.
    재배포는 자동: `reading/**`·`reading-server/**` 변경이 main에 머지되면 GitHub Actions가 배포. 수동은 `node build-dist.mjs && CLOUDFLARE_API_TOKEN=... npx wrangler deploy` (reading-server/ 에서)
 
-⚠ 운영 전 필수: `ADMIN_PIN` 변경(또는 `ADMIN_ID`·`ADMIN_PASSWORD` 등록), HTTPS(터널/워커) 뒤에서만 외부 노출.
+⚠ 운영 전 필수: `ADMIN_PIN`(또는 `ADMIN_ID`·`ADMIN_PASSWORD`) 설정 — **기본값이 없어 없으면 아예 뜨지 않는다**. HTTPS(터널/워커) 뒤에서만 외부 노출.

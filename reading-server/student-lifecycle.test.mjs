@@ -22,7 +22,7 @@ import { fileURLToPath } from 'node:url';
 const DIR = path.dirname(fileURLToPath(import.meta.url));
 const PORT = 8900 + (process.pid % 90);
 const DATA = fs.mkdtempSync(path.join(os.tmpdir(), 'wbr-life-'));
-const PIN = 'wb-admin-2026';
+const PIN = 'test-pin-not-a-real-secret';  // 테스트 전용 — 서버는 이제 ADMIN_PIN 기본값을 갖지 않아 여기서 넣어 준다
 const BASE = `http://127.0.0.1:${PORT}`;
 const errors = [];
 const E = (m) => errors.push(m);
