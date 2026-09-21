@@ -20,8 +20,9 @@ id = "7c7f971952b449fdadf616ef94ef73d1"
 #           12:00 UTC(21:00 KST): 워드브레인 "자기 전 3분 물주기" Web Push
 #           18:10 UTC(03:10 KST): 하루브레인 주간 익명 집계(haru:agg:<주>, 백업 직후 · 셀 n<5 생략)
 #           22:00 UTC(07:00 KST): 브레인레터 "새 호 도착" Web Push — 발행일이 된 호(예약 발행분)만, 같은 VAPID 키
+#           09:00 UTC(18:00 KST): 청크브레인 가족 링크 "오늘 복습할 글이 있어요" Web Push — 복습이 밀린 가정에만, 같은 VAPID 키
 [triggers]
-crons = ["0 18 * * *", "0 12 * * *", "10 18 * * *", "0 22 * * *"]
+crons = ["0 18 * * *", "0 12 * * *", "10 18 * * *", "0 22 * * *", "0 9 * * *"]
 
 # 밤 9시 푸시 — VAPID 키 등록 (node reading-server/gen-vapid.mjs 로 생성, 없으면 알림 기능만 비활성):
 #   npx wrangler secret put VAPID_PUBLIC_KEY

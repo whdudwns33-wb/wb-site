@@ -11,7 +11,7 @@ import { handleStudio } from './naesin-studio.mjs';
 import { handleHaru, haruBodyLimit, allowedApp, appOfPath, dropStudentHaru, dumpHaru, weeklyAgg } from './haru-api.mjs';
 import { handleNaesinKo } from './naesin-ko-api.mjs';
 import { handleHanja, hanjaBodyLimit, dropStudentHanja, dumpHanja } from './hanja-api.mjs';
-import { handleChunk, dropStudentChunk } from './chunk-api.mjs';
+import { handleChunk, dropStudentChunk, pushDueChunk } from './chunk-api.mjs';
 import { handleLetter, letterBodyLimit, dropStudentLetter, dumpLetter, pushDueIssues } from './letter-api.mjs';
 import { checkAdminLogin } from './admin-auth.mjs';
 import { bookIndex, cleanWords, coachingCard, confirmAllPlan, findBook, readyToConfirm, sourceSummary, validProgress, withOverlay } from './textbook.mjs';
@@ -232,6 +232,11 @@ function chunkStore(env) {
     putStudent: (c, rec) => env.DB.put('student:' + c, JSON.stringify(rec)),
     getStudent: (c) => env.DB.get('student:' + c, 'json'),
     listStudentCodes: async () => (await kvListAll(env, 'student:')).map((k) => k.slice('student:'.length)),
+    /* 가족 알림 구독 — chunk:push:f:<ptoken>. 워드브레인·브레인레터와 같은 VAPID 키를 쓰되 키 공간은 따로 */
+    getPush: (k) => env.DB.get('chunk:push:' + k, 'json'),
+    putPush: (k, rec) => env.DB.put('chunk:push:' + k, JSON.stringify(rec)),
+    delPush: (k) => env.DB.delete('chunk:push:' + k),
+    listPushKeys: async () => (await kvListAll(env, 'chunk:push:')).map((k) => k.slice('chunk:push:'.length)),
   };
 }
 
@@ -496,6 +501,8 @@ export default {
       case '0 12 * * *': ctx.waitUntil(sendNightPushes({ store: vocabStore(env), push: vocabPushEnv(env), naesin: naesinStore(env), hanja: hanjaStore(env) })); break;
       /* 22:00 UTC(07:00 KST) — 발행일이 된 브레인레터 호의 "새 호 도착" 알림(즉시 발행분은 발행 라우트가 그 자리에서 보낸다) */
       case '0 22 * * *': ctx.waitUntil(pushDueIssues({ store: letterStore(env), push: vocabPushEnv(env) })); break;
+      /* 09:00 UTC(18:00 KST) — 청크브레인 가족 링크에 「오늘 복습할 글이 있어요」. 저녁밥 무렵이라 부모가 폰을 본다 */
+      case '0 9 * * *': ctx.waitUntil(pushDueChunk({ store: chunkStore(env), push: vocabPushEnv(env) })); break;
       case '10 18 * * *': ctx.waitUntil(weeklyAgg(haruStore(env), Date.now())); break;
       case '0 18 * * *':
       default: ctx.waitUntil(snapshotBackup(env));
@@ -663,7 +670,7 @@ export default {
       /* 청크브레인 가족 링크 — 진로독서 학부모 토큰(parent:<t>)으로, 로그인 없음. 라우트 모듈이 토큰을 풀고 apps 게이트를 건다 */
       if (p === '/api/chunk/parent' || p.startsWith('/api/chunk/parent/')) {
         if (Number(req.headers.get('content-length') || 0) > 300_000) return json(413, { error: '요청이 너무 커서 받을 수 없어요.' });
-        const out = await handleChunk({ path: p, method: req.method, who: null, query: url.searchParams, getBody: () => req.json(), store: chunkStore(env) });
+        const out = await handleChunk({ path: p, method: req.method, who: null, query: url.searchParams, getBody: () => req.json(), store: chunkStore(env), push: vocabPushEnv(env) });
         return json(out.status, out.body);
       }
       if (p === '/api/letter/parent' || p.startsWith('/api/letter/parent/') || p.startsWith('/api/letter/img/')) {
@@ -1068,7 +1075,7 @@ export default {
 
         /* 하루브레인 — 정확 접두 4계열(state·mock·paper·parent). 대응표(haru:paperkey:*)는 학생 것이 아니라 그대로 둔다. */
         await dropStudentHaru(haruStore(env), c);
-        await dropStudentChunk(chunkStore(env), c);
+        await dropStudentChunk(chunkStore(env), c, stu.ptoken);
         removed.push('haru:state:' + c, 'haru:mock:' + c, 'haru:paper:' + c);
         /* 한자브레인 — 기록·요약·배정·알림 구독·개인 단원 지정. 단어장·획순 사전은 학생 것이 아니라 둔다 */
         await dropStudentHanja(hanjaStore(env), c);
