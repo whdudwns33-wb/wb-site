@@ -111,6 +111,7 @@
     /* ── 모드: family(가족 링크) · student(학생 토큰) · admin(관리 미리보기) · demo(체험) ── */
     var MODE = 'demo', TIER = 'E2', GUESS = false, NAME = '', ISSUE = null, ISSUES = [], CUR_ID = '';
     var VIEW = 'day', DAY = 0, CAL = null, TRACE = {};   // 하루 한 장이 기본, 신문 전체는 토글. DAY 0 = 오늘 장으로
+    var PILOT = false;   // 파일럿 — 배포본에 실린 이번 주 호(issue-pilot.json)를 링크만으로 연다. 학년대는 가족이 고르고 기록은 기기에만
     var STATE = { v: 1, issues: {} };
     var stateKey = function () { return 'wbl.state:' + (MODE === 'family' ? 'fam:' + FAM_T.slice(0, 8) : MODE === 'student' ? 'stu:' + ((auth() || {}).code || '') : MODE); };
     function loadLocal() { try { var s = JSON.parse(localStorage.getItem(stateKey()) || 'null'); if (s && s.issues) STATE = s; } catch (e) {} }
@@ -204,12 +205,13 @@
       ttsStop();
       /* 하루 한 장이 기본 — 오늘이 며칠째인지는 발행일로 센다. 체험 호는 늘 1일째부터 보여 준다(발행일이 지나면 7일째만 보일 테니) */
       var daily = MODE !== 'admin' && VIEW === 'day' && !!tier;
-      var today = MODE === 'demo' ? 1 : L.dayOf(ISSUE);
+      var today = MODE === 'demo' && !PILOT ? 1 : L.dayOf(ISSUE);
       if (daily && !DAY) DAY = WANT_DAY >= 1 && WANT_DAY <= 7 ? WANT_DAY : today;
       var html = '';
       if (err) html += '<div class="err">' + esc(err) + '</div>';
       if (GUESS) html += '<div class="banner warn">학년을 확인하지 못해 ' + esc(L.tierLabel(TIER)) + ' 글을 보여 드려요. 학원에 학년을 알려 주시면 맞춰 드릴게요.</div>';
-      if (MODE === 'demo') html += '<div class="banner">체험 호예요. 학원에서 받은 가족 링크로 열거나, 아래에서 학생 코드로 연동하면 매주 새 호가 도착해요. 한 호는 7일에 나눠 하루 한 장씩 읽어요.</div>';
+      if (MODE === 'demo') html += PILOT ? '<div class="banner">이번 주 브레인레터예요. 위에서 아이의 학년대를 고르고 하루 한 장씩 열어 보세요. 문제·미션 기록은 이 기기에만 남아요.</div>' : '<div class="banner">체험 호예요. 학원에서 받은 가족 링크로 열거나, 아래에서 학생 코드로 연동하면 매주 새 호가 도착해요. 한 호는 7일에 나눠 하루 한 장씩 읽어요.</div>';
+      if (MODE === 'demo') setWho(PILOT ? '이번 주 호' : '체험 모드');
       if (MODE === 'admin') html += '<div class="banner">관리자 미리보기 — 학생·가족에게는 자기 학년대 섹션만 보여요.</div>';
       if (daily) {
         html += '<div class="vt"><span class="small">하루 한 장 · 오늘은 <b>' + today + '일째</b></span><button class="vbtn" data-view="paper">신문 전체로 보기</button></div>';
@@ -226,7 +228,7 @@
         if (MODE !== 'admin') html += '<div class="card done-btn">' + (st.doneAt ? '<h2>이번 호를 다 읽었어요 ✔</h2><p class="small">' + esc(st.doneAt.slice(0, 10)) + '에 끝냈어요. 다음 호도 기다려 주세요.</p>' : '<h2>다 읽었나요?</h2><p class="small">문제와 미션까지 마쳤으면 눌러 주세요.</p><button class="big" id="doneBtn">다 읽었어요</button>') + '</div>';
       }
       html += pushCard();
-      if (MODE === 'demo') html += linkCard();
+      if (MODE === 'demo' && !PILOT) html += linkCard();
       render(html); /* 지면 끝에 발행 정보(np-foot)가 있어 앱 바닥글은 겹치지 않게 뺀다 */
       if ($('doneBtn')) $('doneBtn').onclick = function () { st.doneAt = new Date().toISOString(); push(true); showIssue(); };
       if ($('dayDone')) $('dayDone').onclick = function () { var iso = new Date().toISOString(); st.days[DAY] = iso; if (DAY === 7) st.doneAt = iso; push(true); showIssue(); };
@@ -457,8 +459,9 @@
         if (!CUR_ID) return fetchJson('/api/letter/issues', { headers: bearer(a.token), cache: 'no-store' }).then(function (j) { ISSUES = j.issues || []; TIER = j.tier || TIER; GUESS = !!j.guess; if (!ISSUES.length) { ISSUE = null; showIssue(); return; } return openIssue(ISSUES[0].id); }).catch(function (e) { if (e.status === 401) { saveAuth(null); location.replace('./'); return; } fail(e); });
         return fetchJson('/api/letter/issue?id=' + encodeURIComponent(CUR_ID), { headers: bearer(a.token), cache: 'no-store' }).then(done).catch(function (e) { if (e.status === 401) { saveAuth(null); location.replace('./'); return; } fail(e); });
       }
-      /* 체험 — 배포본에 실린 자체 창작 샘플 호 */
-      return fetchJson('./issue-sample.json', { cache: 'no-store' }).then(function (issue) { ISSUES = [L.brief(issue)]; done({ issue: issue }); }).catch(fail);
+      /* 파일럿 — 배포본에 실린 이번 주 호(issue-pilot.json, 편집실이 저장소에 넣고 배포가 곧 발행). 없으면 자체 창작 샘플 호(체험) */
+      return fetchJson('./issue-pilot.json', { cache: 'no-store' }).then(function (issue) { PILOT = true; ISSUES = [L.brief(issue)]; done({ issue: issue }); })
+        .catch(function () { return fetchJson('./issue-sample.json', { cache: 'no-store' }).then(function (issue) { ISSUES = [L.brief(issue)]; done({ issue: issue }); }).catch(fail); });
     }
 
     function boot() {
