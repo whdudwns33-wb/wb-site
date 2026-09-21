@@ -390,4 +390,48 @@ await t('단어장 종류 — 기본은 교재, 붙여넣기·JSON 모두 받고
   assert.strictEqual((await call(store, { path: '/api/hanja/admin/source', method: 'POST', getBody: async () => ({ id: 'src-text', source: 'own' }) })).status, 403, '학생은 못 바꾼다');
 });
 
+await t('공개 범위 — ids 로 여러 권을 한 번의 쓰기로 바꾸고, 목록이 옛 값을 돌려줘도 되쓴다', async () => {
+  const store = memStore();
+  const ids = [];
+  for (const n of [1, 2, 3, 4]) {
+    const bk = sample(); bk.id = 'bulk-' + n; ids.push(bk.id);
+    assert.ok((await upload(store, bk)).body.ok);
+  }
+  const post = (bodyObj) => call(store, { path: '/api/hanja/admin/scope', method: 'POST', who: ADMIN, getBody: async () => bodyObj });
+  /* 옛 클라이언트의 {id} 한 건도 그대로 */
+  const one = await post({ id: 'bulk-1', scope: 'assigned' });
+  assert.strictEqual(one.status, 200);
+  assert.strictEqual(one.body.id, 'bulk-1');
+  assert.strictEqual(one.body.applied, true);
+  assert.strictEqual(store._raw.index().find((e) => e.id === 'bulk-1').scope, 'assigned');
+  /* 목록 쓰기 횟수를 센다 — 여러 권이 한 번의 쓰기로 가는지 */
+  let writes = 0;
+  const putBookIds = store.putBookIds;
+  store.putBookIds = (list) => { writes += 1; return putBookIds(list); };
+  const many = await post({ ids, scope: 'assigned' });
+  assert.strictEqual(many.status, 200);
+  assert.deepStrictEqual(many.body.ids, ids);
+  assert.strictEqual(many.body.applied, true);
+  assert.strictEqual(writes, 1, '여러 권을 한 번의 쓰기로 고쳐야 연달아 바꿀 때 변경이 사라지지 않는다 (쓰기 ' + writes + '회)');
+  assert.ok(store._raw.index().every((e) => !ids.includes(e.id) || e.scope === 'assigned'));
+  store.putBookIds = putBookIds;
+  /* 없는 id·나쁜 범위·상한 */
+  assert.strictEqual((await post({ ids: ['bulk-1', 'nope-9'], scope: 'all' })).status, 404);
+  assert.strictEqual((await post({ ids, scope: 'weird' })).status, 400);
+  assert.strictEqual((await post({ scope: 'all' })).status, 400);
+  assert.strictEqual((await post({ ids: Array.from({ length: 51 }, (_, i) => 'x-' + i), scope: 'all' })).status, 400);
+  /* KV 가 쓰기 직후 옛 목록을 돌려주는 상황 — 확인에서 걸러 한 번 더 쓴다 */
+  const stale = memStore();
+  const bk = sample(); bk.id = 'stale-1';
+  assert.ok((await upload(stale, bk)).body.ok);
+  const fresh = stale.getBookIds;
+  let reads = 0;
+  stale.getBookIds = () => { reads += 1; return reads === 2 ? JSON.parse(JSON.stringify(fresh())).map((e) => ({ ...e, scope: 'all' })) : fresh(); };
+  const retried = await call(stale, { path: '/api/hanja/admin/scope', method: 'POST', who: ADMIN, getBody: async () => ({ id: 'stale-1', scope: 'assigned' }) });
+  stale.getBookIds = fresh;
+  assert.strictEqual(retried.status, 200);
+  assert.strictEqual(retried.body.applied, true, '옛 값을 읽었으면 한 번 더 써서 맞춰야 한다');
+  assert.strictEqual(stale._raw.index().find((e) => e.id === 'stale-1').scope, 'assigned');
+});
+
 console.log(`\nOK — ${passed}개 통과`);
