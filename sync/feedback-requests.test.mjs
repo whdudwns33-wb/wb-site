@@ -167,6 +167,19 @@ test('a linked makeup and its regular lesson share one feedback request', async 
   assert.equal(regularResult.body.idempotent, true);
   assert.equal(regularResult.body.request.requestKey, makeupResult.body.request.requestKey);
   assert.equal(db.prepare("SELECT COUNT(*) AS count FROM feedback_requests WHERE app='task'").first().count, 1);
+
+  // 같은 학생이어도 대강 담당자가 다르면 원수업 요청과 절대 합치지 않는다.
+  seedStaff(db, 'teacher-b', '대강선생님'); seedToken(db, 'token-b', 'teacher-b');
+  seedTask(db, 'substitute-makeup', 'teacher-b', {
+    subject: '수학', lessonInstanceType: 'makeup', makeupSourceTaskId: 'task-a'
+  });
+  const substitute = await call(db, '/feedback-request', {
+    auth: person('teacher-b', 'token-b'), taskId: 'substitute-makeup', ...identityV2, message, ...structured
+  });
+  assert.equal(substitute.status, 200, JSON.stringify(substitute.body));
+  assert.equal(substitute.body.request.taskId, 'substitute-makeup');
+  assert.equal(substitute.body.request.owner, 'teacher-b');
+  assert.notEqual(substitute.body.request.requestKey, regularResult.body.request.requestKey);
 });
 
 test('v2 submission uses an optional client subject and only legacy requests fall back to the task subject', async () => {
