@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex, nofollow">
+  <title>WB 청크브레인 · 관리</title>
+  <link rel="icon" href="/chunk/icon.svg" type="image/svg+xml">
+  <style>
+    /* 하루브레인 관리 화면과 같은 뼈대 — 강사가 두 화면을 오가며 헤매지 않게 색만 청크브레인(자두색)으로 */
+    :root{--navy:#7A2E5C;--blue:#2F5F8F;--sky:#E7EEF6;--bg:#F7F4F0;--line:#E6E0E4;--muted:#6F667A;--ink:#2A2430;--ok:#14755e;--warn:#8a4b08;--bad:#9b352b;--plum-soft:#F5E6EE;--gold:#C8892A;--gold-soft:#FBF0DC}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Noto Sans KR",sans-serif;line-height:1.6}
+    header{display:flex;align-items:center;gap:14px;padding:13px 20px;background:var(--navy);color:#fff}header b{font-size:17px}header small{opacity:.8}header .sp{flex:1}
+    .hbtn{min-height:38px;padding:6px 14px;border:1px solid #ffffff55;border-radius:10px;background:transparent;color:#fff;font-weight:800;cursor:pointer}
+    nav{display:flex;gap:6px;flex-wrap:wrap;max-width:1200px;margin:12px auto 0;padding:0 14px}
+    nav button{min-height:38px;padding:5px 14px;border-radius:999px;border:1.5px solid #d9c4d0;background:#fff;font-weight:800;color:var(--navy);cursor:pointer}
+    nav button[aria-pressed="true"]{background:var(--navy);color:#fff;border-color:var(--navy)}
+    main{max-width:1200px;margin:auto;padding:14px 14px 60px}
+    .card{margin-bottom:14px;padding:16px 18px;border:1px solid var(--line);border-radius:14px;background:#fff}
+    h2{margin:0 0 6px;color:var(--navy);font-size:17px}h3{margin:12px 0 6px;color:var(--navy);font-size:14px}
+    button{font:inherit;cursor:pointer}input,select,textarea{font:inherit;min-height:40px;padding:6px 10px;border:1.5px solid #d9c4d0;border-radius:10px;background:#fff;color:var(--ink)}
+    textarea{width:100%;min-height:70px}
+    .btn{min-height:40px;padding:6px 16px;border:0;border-radius:10px;background:var(--navy);color:#fff;font-weight:900}
+    .btn.ghost{background:#fff;border:1.5px solid #d9c4d0;color:var(--navy)}.btn.sm{min-height:30px;padding:2px 10px;font-size:12.5px}.btn.danger{background:#fff;border:1.5px solid #efc2bb;color:var(--bad)}
+    .btn:disabled{opacity:.5;cursor:default}
+    .tag{display:inline-block;padding:2px 9px;border-radius:999px;background:var(--plum-soft);color:var(--navy);font-size:12px;font-weight:800}.tag.ok{background:#e7f6f0;color:var(--ok)}.tag.bad{background:#fff0ef;color:var(--bad)}.tag.warn{background:var(--gold-soft);color:var(--warn)}.tag.muted{background:#f1eef0;color:var(--muted)}
+    .tbl{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:13.5px;white-space:nowrap}th{position:sticky;top:0;background:#f4eef2;color:var(--navy);font-size:12px}
+    th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;font-variant-numeric:tabular-nums}tbody tr:nth-child(even) td{background:#fbf8fa}
+    tr.pick td{cursor:pointer}tr.pick:hover td{background:var(--plum-soft)}
+    .grid-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;align-items:end}label.f{display:flex;flex-direction:column;font-size:12.5px;font-weight:800;color:var(--muted)}
+    .err{color:var(--bad);font-weight:700;font-size:13px;margin-top:8px;white-space:pre-wrap}.ok{color:var(--ok);font-weight:700;font-size:13px;margin-top:8px;white-space:pre-wrap}.muted{color:var(--muted);font-size:12.5px}
+    #loginCard{max-width:380px;margin:60px auto}.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin:8px 0}
+    .stat{background:#fbf8fa;border:1px solid var(--line);border-radius:12px;padding:10px;text-align:center}.stat b{display:block;font-size:22px;color:var(--navy)}.stat span{font-size:12px;color:var(--muted)}
+    .bar{display:flex;align-items:center;gap:10px;margin:6px 0}.bar .lab{width:260px;font-size:13.5px}.bar .track{flex:1;height:14px;background:#f1eef0;border-radius:99px;overflow:hidden}.bar .fill{height:100%;background:var(--gold);border-radius:99px}.bar .n{width:130px;font-size:12.5px;color:var(--muted);text-align:right}
+    .checks{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:4px;max-height:260px;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:8px}
+    .checks label{display:flex;gap:8px;align-items:center;font-size:13.5px;min-height:30px}
+    .weak{display:inline-block;margin:2px 4px 2px 0;padding:2px 8px;border-radius:8px;background:var(--gold-soft);color:var(--warn);font-size:12.5px;font-weight:700}
+    pre{background:#fbf8fa;padding:10px;border-radius:10px;overflow:auto;font-size:12px}
+    @media (max-width:640px){.bar .lab{width:150px}.bar .n{width:90px}}
+  </style>
+</head>
+<body>
+<header><b>청크브레인 관리</b><small>반 현황 · 학생 상세 · 과제 · 약한 규칙 · 교재</small><span class="sp"></span><button class="hbtn" id="btnRefresh" hidden>새로고침</button><button class="hbtn" id="btnLogout" hidden>로그아웃</button></header>
+<nav id="nav" hidden>
+  <button data-tab="board" aria-pressed="true">반 현황</button><button data-tab="student">학생 상세 · 과제</button><button data-tab="weak">약한 규칙</button><button data-tab="print">교재 출력</button>
+</nav>
+<main id="main"></main>
+<script src="/chunk/rules.js"></script>
+<script src="/chunk/lessons.js"></script>
+<script src="/chunk/passages.js"></script>
+<script>
+'use strict';
+const $=(s)=>document.querySelector(s);
+const esc=(s)=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const R=WBCHUNK, LESSONS=WBCHUNK_LESSONS, PASSAGES=WBCHUNK_PASSAGES;
+const pById=(id)=>PASSAGES.find((p)=>p.id===id);
+const lById=(id)=>LESSONS.find((l)=>l.id===id);
+const bandLabel=(b)=>R.BANDS[b]?R.BANDS[b].label:(b||'-');
+let TOKEN=localStorage.getItem('wbr.admin.token')||null;
+let TAB='board', ROWS=null, SEL=null, FILTER_CLS='', SORT='lastAt';
+async function api(path,opt){
+  let r;
+  try{r=await fetch('/api'+path,Object.assign({headers:{'Content-Type':'application/json',...(TOKEN?{Authorization:'Bearer '+TOKEN}:{})}},opt||{}));}
+  catch(e){throw new Error('네트워크 오류');}
+  const j=await r.json().catch(()=>({}));
+  if(r.status===401&&TOKEN){TOKEN=null;localStorage.removeItem('wbr.admin.token');renderLogin('세션이 만료됐어요. 다시 로그인해 주세요.');throw new Error('auth');}
+  if(!r.ok){const e=new Error(j.error||('오류 '+r.status));e.status=r.status;e.body=j;throw e;}
+  return j;
+}
+const post=(p,b)=>api(p,{method:'POST',body:JSON.stringify(b)});
+const put=(p,b)=>api(p,{method:'PUT',body:JSON.stringify(b)});
+function renderLogin(msg){
+  $('#nav').hidden=true;$('#btnLogout').hidden=true;$('#btnRefresh').hidden=true;
+  $('#main').innerHTML='<div class="card" id="loginCard"><h2>관리 PIN</h2><div class="row"><input id="pin" type="password" autocomplete="off" style="flex:1"><button class="btn" id="go">로그인</button></div>'+(msg?'<div class="err">'+esc(msg)+'</div>':'')+'</div>';
+  $('#go').onclick=async()=>{try{const j=await post('/admin/login',{pin:$('#pin').value});TOKEN=j.token;localStorage.setItem('wbr.admin.token',TOKEN);ROWS=null;show(TAB);}catch(e){renderLogin(e.message);}};
+  $('#pin').onkeydown=(e)=>{if(e.key==='Enter')$('#go').click();};
+}
+$('#btnLogout').onclick=()=>{TOKEN=null;localStorage.removeItem('wbr.admin.token');renderLogin();};
+$('#btnRefresh').onclick=()=>{ROWS=null;show(TAB);};
+document.querySelectorAll('nav button').forEach((b)=>{b.onclick=()=>{TAB=b.dataset.tab;show(TAB);};});
+
+const rel=(t)=>{if(!t)return '-';const d=Math.floor((Date.now()-t)/86400000);return d<=0?'오늘':d===1?'어제':d+'일 전';};
+const ymd=(t)=>{const d=new Date(t);return d.getMonth()+1+'/'+d.getDate();};
+async function loadRows(){ if(ROWS) return ROWS; const j=await api('/chunk/admin/overview'); ROWS=j.rows||[]; return ROWS; }
+
+async function show(tab){
+  if(!TOKEN){renderLogin();return;}
+  $('#nav').hidden=false;$('#btnLogout').hidden=false;$('#btnRefresh').hidden=false;
+  document.querySelectorAll('nav button').forEach((b)=>b.setAttribute('aria-pressed',String(b.dataset.tab===tab)));
+  $('#main').innerHTML='<div class="card muted">불러오는 중…</div>';
+  try{
+    await loadRows();
+    if(tab==='board') renderBoard();
+    else if(tab==='student') await renderStudent();
+    else if(tab==='weak') renderWeak();
+    else renderPrint();
+  }catch(e){ if(e.message!=='auth') $('#main').innerHTML='<div class="card"><div class="err">'+esc(e.message)+'</div></div>'; }
+}
+
+/* ── 반 현황 ── */
+function renderBoard(){
+  const classes=[...new Set(ROWS.map((r)=>r.cls).filter(Boolean))].sort();
+  let rows=ROWS.filter((r)=>!FILTER_CLS||r.cls===FILTER_CLS);
+  const key={lastAt:(r)=>r.lastAt||0,recentAvg:(r)=>r.recentAvg==null?-1:r.recentAvg,attempts:(r)=>r.attempts,streak:(r)=>r.streak,name:(r)=>r.name}[SORT]||((r)=>r.lastAt||0);
+  rows=rows.slice().sort((a,b)=>{const x=key(a),y=key(b);return typeof x==='string'?x.localeCompare(y):(y-x);});
+  const active7=ROWS.filter((r)=>r.lastAt&&Date.now()-r.lastAt<7*86400000).length;
+  const avgAll=ROWS.filter((r)=>r.recentAvg!=null);
+  let html='<div class="card"><h2>반 현황 <span class="muted">('+ROWS.length+'명)</span></h2>'+
+    '<div class="stats"><div class="stat"><b>'+active7+'</b><span>최근 7일 연습</span></div><div class="stat"><b>'+(avgAll.length?Math.round(avgAll.reduce((s,r)=>s+r.recentAvg,0)/avgAll.length):'-')+'</b><span>최근 평균(연습한 학생)</span></div><div class="stat"><b>'+ROWS.filter((r)=>r.assign).length+'</b><span>과제 있는 학생</span></div><div class="stat"><b>'+ROWS.reduce((s,r)=>s+(r.graduated||0),0)+'</b><span>졸업한 글(합계)</span></div></div>'+
+    '<div class="row"><label class="f">반 <select id="cls"><option value="">전체</option>'+classes.map((c)=>'<option '+(c===FILTER_CLS?'selected':'')+'>'+esc(c)+'</option>').join('')+'</select></label>'+
+    '<label class="f">정렬 <select id="sort">'+[['lastAt','최근 활동'],['recentAvg','최근 평균'],['attempts','연습 횟수'],['streak','연속일'],['name','이름']].map(([k,l])=>'<option value="'+k+'" '+(k===SORT?'selected':'')+'>'+l+'</option>').join('')+'</select></label></div>'+
+    '<p class="muted">점수는 끊기 점수(모범 경계 대비, 0~100). 문제는 이해 문제 정답률. 어절/분은 초3 이상의 묵독 속도로 학생 자신의 지난 기록과만 비교합니다. 행을 누르면 학생 상세로 갑니다.</p></div>';
+  html+='<div class="card tbl"><table><thead><tr><th>이름</th><th>반</th><th>단계</th><th>연습</th><th>최근 평균</th><th>문제</th><th>어절/분</th><th>연속일</th><th>카드</th><th>과제</th><th>약한 규칙</th><th>최근 활동</th></tr></thead><tbody>'+
+    (rows.length?rows.map((r)=>{
+      const a=r.assign; const total=a?a.passages+a.lessons:0;
+      const assignCell=a?('<span class="tag '+(total&&r.assignDone>=total?'ok':'warn')+'">'+r.assignDone+'/'+total+'</span>'+(a.due?' <span class="muted">~'+esc(a.due.slice(5))+'</span>':'')):'<span class="muted">-</span>';
+      const avgTag=r.recentAvg==null?'-':'<span class="tag '+(r.recentAvg>=85?'ok':r.recentAvg>=60?'warn':'bad')+'">'+r.recentAvg+'</span>';
+      return '<tr class="pick" data-code="'+esc(r.code)+'"><td><b>'+esc(r.name)+'</b><div class="muted">'+esc(r.code)+'</div></td><td>'+esc(r.cls||'-')+'</td><td>'+bandLabel(r.band)+(a&&a.band&&a.band!==r.band?' <span class="tag">과제 '+bandLabel(a.band)+'</span>':'')+'</td><td>'+r.attempts+'</td><td>'+avgTag+'</td><td>'+(r.qRate==null?'-':r.qRate+'%')+'</td><td>'+(r.wpmRecent||'-')+'</td><td>'+r.streak+'</td><td>'+r.lessonsDone+'</td><td>'+assignCell+'</td><td>'+(r.weak||[]).slice(0,2).map((w)=>'<span class="weak">'+esc(R.TAG_LABEL[w.tag]||w.tag)+' '+w.n+'</span>').join('')+'</td><td>'+rel(r.lastAt)+'</td></tr>';
+    }).join(''):'<tr><td colspan="12" class="muted">아직 연습 기록이나 과제가 있는 학생이 없어요. 학생이 앱에서 연동한 뒤 한 편이라도 연습하면 여기 나타나요.</td></tr>')+'</tbody></table></div>';
+  $('#main').innerHTML=html;
+  $('#cls').onchange=(e)=>{FILTER_CLS=e.target.value;renderBoard();};
+  $('#sort').onchange=(e)=>{SORT=e.target.value;renderBoard();};
+  document.querySelectorAll('tr.pick').forEach((tr)=>{tr.onclick=()=>{SEL=tr.dataset.code;TAB='student';show(TAB);};});
+}
+
+/* ── 학생 상세 · 과제 ── */
+async function renderStudent(){
+  if(!SEL&&ROWS.length) SEL=ROWS[0].code;
+  const row=ROWS.find((r)=>r.code===SEL);
+  let html='<div class="card"><h2>학생 상세 · 과제</h2><div class="row"><label class="f">학생 <select id="sel">'+(ROWS.length?ROWS.map((r)=>'<option value="'+esc(r.code)+'" '+(r.code===SEL?'selected':'')+'>'+esc(r.name)+' ('+esc(r.cls||'반 없음')+')</option>').join(''):'<option value="">학생 없음</option>')+'</select></label>'+
+    '<label class="f">다른 코드로 과제 주기 <input id="code" placeholder="wb-…" style="width:160px"></label><button class="btn ghost sm" id="goCode">열기</button></div></div>';
+  if(!row&&!SEL){$('#main').innerHTML=html+'<div class="card muted">연습 기록이나 과제가 있는 학생이 없어요. 오른쪽 칸에 학생 코드를 넣어 과제부터 줄 수 있어요.</div>';bindStudentTop();return;}
+  const code=SEL;
+  let state=null, assignRec=null;
+  try{ const j=await api('/chunk/admin/student/'+encodeURIComponent(code)); state=j.state; }catch(e){ if(e.status!==404) throw e; }
+  try{ assignRec=await api('/chunk/admin/assign/'+encodeURIComponent(code)); }catch(e){ if(e.status!==404) throw e; }
+  const a=assignRec&&assignRec.assign?assignRec.assign:null;
+  const r=row||{code,name:code,cls:'',band:null,attempts:0,recentAvg:null,qRate:null,wpmRecent:null,streak:0,lessonsDone:0,graduated:0,practiced:0,weak:[],assignDone:0};
+  html+='<div class="card"><h2>'+esc(r.name)+' <span class="muted">'+esc(r.cls||'')+' · '+esc(code)+' · '+bandLabel(r.band)+' 단계</span></h2>'+
+    '<div class="stats"><div class="stat"><b>'+r.attempts+'</b><span>연습 횟수</span></div><div class="stat"><b>'+(r.recentAvg==null?'-':r.recentAvg)+'</b><span>최근 평균</span></div><div class="stat"><b>'+(r.qRate==null?'-':r.qRate+'%')+'</b><span>문제 정답률</span></div><div class="stat"><b>'+(r.wpmRecent||'-')+'</b><span>어절/분</span></div><div class="stat"><b>'+r.streak+'</b><span>연속일</span></div><div class="stat"><b>'+r.practiced+' / '+r.graduated+'</b><span>읽은 글 / 졸업</span></div></div>'+
+    '<h3>약한 규칙 (최근 30회)</h3>'+((r.weak||[]).length?(r.weak.map((w)=>{const l=LESSONS.find((x)=>x.tags.indexOf(w.tag)>=0&&x.band===r.band)||LESSONS.find((x)=>x.tags.indexOf(w.tag)>=0);return '<span class="weak">'+esc(R.TAG_LABEL[w.tag]||w.tag)+' × '+w.n+(l?' → 카드 「'+esc(l.title)+'」':'')+'</span>';}).join('')):'<span class="muted">두 번 이상 나온 실수가 없어요.</span>')+'</div>';
+  /* 과제 폼 */
+  const fb=a&&a.band?a.band:(r.band||'G3');
+  html+='<div class="card" id="assignCard"><h2>단계 · 과제 지정</h2><p class="muted">단계를 정하면 학생 앱의 단계가 그것으로 고정돼요(학생이 못 바꿈). 글·카드를 고르면 학생 홈에 「선생님 과제」로 떠요. 비워 두고 저장하면 과제가 지워져요.</p>'+
+    '<div class="grid-form"><label class="f">단계 <select id="aBand"><option value="">학생이 고른 대로</option>'+R.BAND_ORDER.map((b)=>'<option value="'+b+'" '+(a&&a.band===b?'selected':'')+'>'+bandLabel(b)+' — '+esc(R.BANDS[b].who)+'</option>').join('')+'</select></label>'+
+    '<label class="f">글 목록 단계 <select id="fBand">'+R.BAND_ORDER.map((b)=>'<option value="'+b+'" '+(b===fb?'selected':'')+'>'+bandLabel(b)+'</option>').join('')+'</select></label>'+
+    '<label class="f">마감일 <input id="aDue" type="date" value="'+esc(a&&a.due?a.due:'')+'"></label></div>'+
+    '<h3>글 <span class="muted" id="pCount"></span></h3><div class="checks" id="pList"></div>'+
+    '<h3>카드</h3><div class="checks" id="lList"></div>'+
+    '<h3>메모 (학생에게 보임)</h3><textarea id="aNote" maxlength="200" placeholder="예: 이번 주에 두 편, 소리 내어 3번씩">'+esc(a?a.note:'')+'</textarea>'+
+    '<div class="row" style="margin-top:8px"><button class="btn" id="aSave">저장</button><button class="btn danger" id="aClear" '+(a?'':'disabled')+'>과제 지우기</button><span class="muted">'+(assignRec&&assignRec.updatedAt?'마지막 저장 '+esc(assignRec.updatedAt.slice(0,16).replace('T',' ')):'')+'</span></div><div id="aMsg"></div></div>';
+  /* 기록 */
+  if(state){
+    const log=(state.log||[]).slice(-20).reverse();
+    html+='<div class="card tbl"><h2>최근 연습 <span class="muted">('+(state.log||[]).length+'회 중 최근 20회)</span></h2><table><thead><tr><th>날짜</th><th>글</th><th>끊기</th><th>문제</th><th>어절/분</th><th>구분</th><th>실수 태그</th></tr></thead><tbody>'+
+      (log.length?log.map((e)=>{const p=pById(e.id);return '<tr><td>'+ymd(e.t)+'</td><td>'+esc(p?p.title:e.id)+'</td><td><b>'+e.score+'</b></td><td>'+(e.qOk==null?'-':e.qOk?'○':'✕')+'</td><td>'+(e.wpm||'-')+'</td><td>'+(e.mode==='review'?'복습':'연습')+'</td><td>'+(e.tags||[]).map((t)=>esc(R.TAG_LABEL[t]||t)).join(', ')+'</td></tr>';}).join(''):'<tr><td colspan="7" class="muted">기록 없음</td></tr>')+'</tbody></table></div>';
+    const items=Object.values(state.items||{}).sort((x,y)=>(y.last||0)-(x.last||0));
+    html+='<div class="card tbl"><h2>글별 진행</h2><table><thead><tr><th>글</th><th>횟수</th><th>최근</th><th>최고</th><th>단계</th><th>다음 복습</th></tr></thead><tbody>'+
+      (items.length?items.map((it)=>{const p=pById(it.id);return '<tr><td>'+esc(p?p.title:it.id)+' <span class="muted">'+bandLabel(it.band)+'</span></td><td>'+it.n+'</td><td>'+(it.lastScore==null?'-':it.lastScore)+'</td><td>'+(it.best||0)+'</td><td>'+(it.graduated?'<span class="tag ok">졸업</span>':(it.step||0)+'/5')+'</td><td>'+(it.graduated?'-':it.due?ymd(it.due)+(it.due<=Date.now()?' <span class="tag warn">밀림</span>':''):'-')+'</td></tr>';}).join(''):'<tr><td colspan="6" class="muted">아직 없음</td></tr>')+'</tbody></table></div>';
+  } else html+='<div class="card muted">이 학생은 아직 연습 기록이 없어요. 과제는 줄 수 있어요.</div>';
+  $('#main').innerHTML=html;
+  bindStudentTop();
+  const chosenP=new Set(a?a.passages:[]), chosenL=new Set(a?a.lessons:[]);
+  const drawP=()=>{const b=$('#fBand').value;const list=PASSAGES.filter((p)=>p.band===b);$('#pList').innerHTML=list.map((p)=>'<label><input type="checkbox" data-p="'+p.id+'" '+(chosenP.has(p.id)?'checked':'')+'> '+esc(p.title)+' <span class="muted">'+esc(p.genre)+'</span></label>').join('')+[...chosenP].filter((id)=>!list.some((p)=>p.id===id)).map((id)=>{const p=pById(id);return '<label><input type="checkbox" data-p="'+esc(id)+'" checked> '+esc(p?p.title:id)+' <span class="muted">'+(p?bandLabel(p.band):'')+'</span></label>';}).join('');$('#pCount').textContent='선택 '+chosenP.size+'개';
+    $('#pList').querySelectorAll('input').forEach((cb)=>{cb.onchange=()=>{if(cb.checked)chosenP.add(cb.dataset.p);else chosenP.delete(cb.dataset.p);$('#pCount').textContent='선택 '+chosenP.size+'개';};});};
+  const drawL=()=>{const b=$('#fBand').value;const upto=R.BAND_ORDER.slice(0,R.BAND_ORDER.indexOf(b)+1);const list=LESSONS.filter((l)=>upto.indexOf(l.band)>=0).slice().reverse();$('#lList').innerHTML=list.map((l)=>'<label><input type="checkbox" data-l="'+l.id+'" '+(chosenL.has(l.id)?'checked':'')+'> '+esc(l.title)+' <span class="muted">'+bandLabel(l.band)+'</span></label>').join('');
+    $('#lList').querySelectorAll('input').forEach((cb)=>{cb.onchange=()=>{if(cb.checked)chosenL.add(cb.dataset.l);else chosenL.delete(cb.dataset.l);};});};
+  drawP();drawL();
+  $('#fBand').onchange=()=>{drawP();drawL();};
+  $('#aBand').onchange=()=>{if($('#aBand').value){$('#fBand').value=$('#aBand').value;drawP();drawL();}};
+  const save=async(body)=>{ $('#aMsg').innerHTML=''; try{ const j=await put('/chunk/admin/assign/'+encodeURIComponent(code),body); $('#aMsg').innerHTML='<div class="ok">'+(j.assign?'저장했어요. 학생이 앱을 켜면 바로 반영돼요.':'과제를 지웠어요.')+'</div>'; ROWS=null; await loadRows(); setTimeout(()=>show('student'),600); }catch(e){ $('#aMsg').innerHTML='<div class="err">'+esc(e.message)+'</div>'; } };
+  $('#aSave').onclick=()=>save({band:$('#aBand').value||null,passages:[...chosenP],lessons:[...chosenL],note:$('#aNote').value,due:$('#aDue').value||null});
+  $('#aClear').onclick=()=>{ if(confirm('이 학생의 과제와 단계 지정을 지울까요?')) save({}); };
+}
+function bindStudentTop(){
+  const sel=$('#sel'); if(sel) sel.onchange=()=>{SEL=sel.value;show('student');};
+  const go=$('#goCode'); if(go) go.onclick=()=>{const c=($('#code').value||'').trim(); if(!/^[A-Za-z0-9-]{3,20}$/.test(c)){alert('학생 코드는 영문·숫자 3~20자예요.');return;} SEL=c; show('student');};
+}
+
+/* ── 약한 규칙 분포 ── */
+function renderWeak(){
+  const tot={}, who={};
+  ROWS.forEach((r)=>(r.weak||[]).forEach((w)=>{tot[w.tag]=(tot[w.tag]||0)+w.n;who[w.tag]=(who[w.tag]||0)+1;}));
+  const tags=Object.keys(tot).sort((a,b)=>tot[b]-tot[a]);
+  const max=tags.length?tot[tags[0]]:1;
+  const bands={}; ROWS.forEach((r)=>{const b=r.band||'?';bands[b]=(bands[b]||0)+1;});
+  let html='<div class="card"><h2>약한 규칙 분포 <span class="muted">(학생별 최근 30회 실수 태그의 합)</span></h2><p class="muted">막대가 긴 규칙부터 수업에서 카드로 다루면 반 전체의 점수가 가장 빨리 오릅니다. 괄호는 그 실수를 두 번 이상 한 학생 수예요.</p>'+
+    (tags.length?tags.map((t)=>{const l=LESSONS.find((x)=>x.tags.indexOf(t)>=0);return '<div class="bar"><div class="lab">'+esc(R.TAG_LABEL[t]||t)+'</div><div class="track"><div class="fill" style="width:'+Math.round(tot[t]/max*100)+'%"></div></div><div class="n">'+tot[t]+'회 ('+who[t]+'명)'+(l?' · '+esc(l.title):'')+'</div></div>';}).join(''):'<p class="muted">아직 모인 실수 태그가 없어요.</p>')+'</div>';
+  html+='<div class="card"><h2>단계 분포</h2><div class="row">'+R.BAND_ORDER.filter((b)=>bands[b]).map((b)=>'<span class="tag">'+bandLabel(b)+' '+bands[b]+'명</span>').join('')+(bands['?']?'<span class="tag muted">단계 미정 '+bands['?']+'명</span>':'')+'</div></div>';
+  html+='<div class="card"><h2>규칙 태그 설명</h2><div class="tbl"><table><thead><tr><th>태그</th><th>뜻</th><th>다루는 카드</th></tr></thead><tbody>'+Object.keys(R.TAG_LABEL).map((t)=>'<tr><td><code>'+esc(t)+'</code></td><td>'+esc(R.TAG_LABEL[t])+'</td><td>'+LESSONS.filter((l)=>l.tags.indexOf(t)>=0).map((l)=>bandLabel(l.band)+' 「'+esc(l.title)+'」').join(', ')+'</td></tr>').join('')+'</tbody></table></div></div>';
+  $('#main').innerHTML=html;
+}
+
+/* ── 교재 출력 ── */
+function renderPrint(){
+  $('#main').innerHTML='<div class="card"><h2>교재 출력</h2><p class="muted">단계를 누르면 연습장 조판 화면이 새 창에서 열려요. 글을 고르고 <b>인쇄 → PDF 로 저장</b>하면 교재가 됩니다. 「내 글로 만들기」에 선생님 글을 붙여 넣을 수도 있어요(저장되지 않음).</p><div class="row">'+
+    R.BAND_ORDER.map((b)=>'<a class="btn ghost" href="/chunk/print.html?band='+b+'" target="_blank" rel="noopener">'+bandLabel(b)+' <span class="muted">'+PASSAGES.filter((p)=>p.band===b).length+'편</span></a>').join('')+'</div>'+
+    '<h3>추천 구성</h3><ul class="muted"><li>유치·초1·초2: 표시본(밑줄 곡선) + 한 줄 한 덩어리 판 + 무표시본. 어른이 먼저 읽어 주고 따라 읽기 3회.</li><li>초3~초6: 표시본 + 무표시본 + 정답표. 주 3회, 한 편 10분.</li><li>중·고등: 무표시본 위주로 직접 긋고 정답표와 견주기. 규칙 페이지는 첫 주에만.</li></ul></div>';
+}
+
+if(TOKEN) show(TAB); else renderLogin();
+</script>
+</body>
+</html>

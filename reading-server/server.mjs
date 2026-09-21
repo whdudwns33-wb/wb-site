@@ -13,6 +13,7 @@ import { handleNaesin, isReservedCode, dropReservedRows, naesinBodyLimit } from 
 import { handleStudio } from './naesin-studio.mjs';
 import { handleHaru, haruBodyLimit, allowedApp, appOfPath, dropStudentHaru, dumpHaru } from './haru-api.mjs';
 import { handleNaesinKo } from './naesin-ko-api.mjs';
+import { handleChunk, dropStudentChunk } from './chunk-api.mjs';
 import { handleLetter, letterBodyLimit, dropStudentLetter, dumpLetter, pushDueIssues } from './letter-api.mjs';
 import { bookIndex, cleanWords, coachingCard, confirmAllPlan, findBook, readyToConfirm, sourceSummary, validProgress, withOverlay } from './textbook.mjs';
 import { parseRoster } from './roster.mjs';
@@ -21,6 +22,7 @@ const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const APP_DIR = path.join(ROOT, '..', 'reading');      // 학생 앱 정적 파일
 const VOCAB_DIR = path.join(ROOT, '..', 'vocab');      // 워드브레인 앱 정적 파일
 const SHARED_DIR = path.join(ROOT, '..', 'shared');    // 두 앱이 함께 쓰는 파일(voice.js)
+const CHUNK_DIR = path.join(ROOT, '..', 'chunk');      // 청크브레인(의미단위 끊어읽기) — 콘텐츠는 자체 창작이라 정적으로 나간다
 const AGE_DIR = path.join(ROOT, '..', 'vocab-age'); // 어휘 나이 진단(로그인 없이 열리는 공개 페이지)
 const NAESIN_DIR = path.join(ROOT, '..', 'naesin');    // 내신브레인 앱 정적 파일
 const HARU_DIR = path.join(ROOT, '..', 'haru');        // 하루브레인 앱 정적 파일 (팩·대응표·플랜은 여기 없다 — db.haru 전용)
@@ -206,6 +208,23 @@ const naesinKoStore = {
   putExam: (s, rec) => { naesinKoRoot().exams[s] = rec; persist(); },
   getTask: (s) => naesinKoRoot().tasks[s] || null,
   putTask: (s, rec) => { naesinKoRoot().tasks[s] = rec; persist(); },
+  getStudent: (c) => db.students?.[c] || null,
+};
+
+/* 청크브레인 저장소 어댑터 — db.chunk 만 사용(학생 기록·관리용 요약). 콘텐츠는 저장소에 없다. */
+const chunkRoot = () => { db.chunk = db.chunk || { states: {}, summaries: {}, assigns: {} }; db.chunk.assigns = db.chunk.assigns || {}; return db.chunk; };
+const chunkStore = {
+  getState: (c) => chunkRoot().states[c] || null,
+  putState: (c, rec) => { chunkRoot().states[c] = rec; persist(); },
+  deleteState: (c) => { delete chunkRoot().states[c]; persist(); },
+  getSummary: (c) => chunkRoot().summaries[c] || null,
+  putSummary: (c, rec) => { chunkRoot().summaries[c] = rec; persist(); },
+  deleteSummary: (c) => { delete chunkRoot().summaries[c]; persist(); },
+  listSummaryCodes: () => Object.keys(chunkRoot().summaries),
+  getAssign: (c) => chunkRoot().assigns[c] || null,
+  putAssign: (c, rec) => { chunkRoot().assigns[c] = rec; persist(); },
+  deleteAssign: (c) => { delete chunkRoot().assigns[c]; persist(); },
+  listAssignCodes: () => Object.keys(chunkRoot().assigns),
   getStudent: (c) => db.students?.[c] || null,
 };
 
@@ -484,6 +503,13 @@ const server = http.createServer(async (req, res) => {
         return json(res, out.status, out.body);
       }
 
+      /* 청크브레인 (/api/chunk/*) — 인증만 공유, 저장소는 db.chunk (워커와 동일) */
+      if (p.startsWith('/api/chunk/')) {
+        if (Number(req.headers['content-length'] || 0) > 300_000) { req.resume(); return json(res, 413, { error: '요청이 너무 커서 받을 수 없어요.' }); }
+        const out = await handleChunk({ path: p, method: req.method, who, getBody: () => readBody(req), store: chunkStore });
+        return json(res, out.status, out.body);
+      }
+
       /* 국어브레인 (/api/naesin-ko/*) — 영어와 같은 격리 원칙, 저장소만 db.naesinKo.
          /api/naesin/ 보다 먼저 본다 — 접두어가 겹치지는 않지만 순서를 명시해 둔다. */
       if (p.startsWith('/api/naesin-ko/')) {
@@ -757,6 +783,7 @@ const server = http.createServer(async (req, res) => {
         drop(ko.overlays, c);
         /* 하루브레인 — 정확 접두 4계열(state·mock·paper·parent). 대응표는 남긴다(워커와 동일) */
         await dropStudentHaru(haruStore, c); removed += 3;
+        await dropStudentChunk(chunkStore, c);
         /* 브레인레터 — 열람·문제 기록 한 키. 호는 학생 것이 아니라 둔다(워커와 동일) */
         await dropStudentLetter(letterStore, c, (db.students[c] || {}).ptoken); removed += 1;
         /* 기기 토큰은 토큰 값이 키라 코드로 못 찾는다 — 훑어서 이 학생 것만 */
@@ -816,6 +843,11 @@ const server = http.createServer(async (req, res) => {
     if (p === '/naesin-ko/voice.js') return serveFile(res, SHARED_DIR, 'voice.js');
     if (p === '/naesin-ko' || p === '/naesin-ko/') return serveFile(res, NAESIN_KO_DIR, 'index.html');
     if (p.startsWith('/naesin-ko/')) return serveFile(res, NAESIN_KO_DIR, p.slice('/naesin-ko/'.length));
+
+    /* 청크브레인 앱 — 지문·카드는 자체 창작이라 정적 파일로 나간다. 학생 기록만 /api/chunk/* */
+    if (p === '/chunk/voice.js') return serveFile(res, SHARED_DIR, 'voice.js');
+    if (p === '/chunk' || p === '/chunk/') return serveFile(res, CHUNK_DIR, 'index.html');
+    if (p.startsWith('/chunk/')) return serveFile(res, CHUNK_DIR, p.slice('/chunk/'.length));
 
     /* 워드브레인 앱 */
     if (p === '/voice.js' || p === '/vocab/voice.js') return serveFile(res, SHARED_DIR, 'voice.js');

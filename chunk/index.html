@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>WB 청크브레인 — 의미단위 끊어읽기</title>
+  <meta name="description" content="의미 단위로 끊어 읽는 힘 — WB 독해력학원 원내 학습 도구 (원내 전용)">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+  <meta name="theme-color" content="#7A2E5C">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <style>
+    /* 유치~고등이 한 화면을 쓴다. 밴드에 따라 글자만 커진다(유치 1.45배). 탭 5개는 아래 고정. */
+    :root { --bg:#F7F4F0; --panel:#FFFFFF; --ink:#2A2430; --soft:#6F667A; --line:#E6E0E4; --plum:#7A2E5C; --plum-soft:#F5E6EE;
+            --gold:#C8892A; --gold-soft:#FBF0DC; --green:#2E7D5B; --green-soft:#E4F2EA; --red:#B23A48; --red-soft:#F8E4E7; --blue:#2F5F8F; --blue-soft:#E7EEF6; }
+    * { box-sizing:border-box; }
+    html, body { margin:0; padding:0; min-height:100%; }
+    body { background:var(--bg); color:var(--ink); font-family:"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif; font-size:16px; line-height:1.6; word-break:keep-all; -webkit-font-smoothing:antialiased; }
+    body.f-large { font-size:18px; } body.f-xlarge { font-size:20px; }
+    button { font-family:inherit; font-size:inherit; cursor:pointer; border:none; background:none; color:inherit; }
+    input, select { font-family:inherit; font-size:1rem; }
+    :focus-visible { outline:3px solid var(--blue); outline-offset:2px; border-radius:8px; }
+    [hidden] { display:none !important; }
+    .bar { display:flex; align-items:center; gap:10px; padding:10px 14px; background:var(--panel); border-bottom:1px solid var(--line); position:sticky; top:0; z-index:5; }
+    .bar .brand { font-weight:900; font-size:15px; color:var(--plum); white-space:nowrap; }
+    .bar .brand small { font-weight:700; color:var(--soft); margin-left:4px; }
+    .bar .chip { border:1.5px solid var(--plum); color:var(--plum); border-radius:99px; padding:2px 10px; font-size:12.5px; font-weight:800; }
+    .bar .who { margin-left:auto; font-size:13px; color:var(--soft); text-align:right; }
+    .bar .who b { color:var(--ink); }
+    .bar .dot { font-size:12px; color:var(--soft); white-space:nowrap; }
+    .bar .dot i { display:inline-block; width:8px; height:8px; border-radius:50%; background:#B7C0CC; margin-right:4px; }
+    .bar .dot.saved i { background:#2E8B57; } .bar .dot.pending i { background:var(--gold); } .bar .dot.failed i { background:var(--red); }
+    .bar a { color:var(--soft); font-size:12.5px; text-decoration:none; white-space:nowrap; }
+    main { max-width:680px; margin:0 auto; padding:14px 14px 96px; }
+    .card { background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:16px; margin-bottom:12px; }
+    .card h2 { margin:0 0 8px; font-size:17px; color:var(--plum); }
+    .card h3 { margin:14px 0 6px; font-size:15px; color:var(--ink); }
+    .eyebrow { margin:0 0 4px; font-size:12.5px; font-weight:800; color:var(--soft); letter-spacing:.02em; }
+    .hero { background:linear-gradient(135deg,#7A2E5C,#A34A7E); color:#fff; border:none; }
+    .hero h1 { margin:0 0 6px; font-size:22px; }
+    .hero p { margin:0; opacity:.92; }
+    .hero .eyebrow { color:#F7D9E8; }
+    .big { display:block; width:100%; min-height:54px; border-radius:14px; background:var(--plum); color:#fff; font-weight:900; font-size:17px; margin-top:10px; }
+    .big:disabled { opacity:.45; cursor:default; }
+    .big.ghost { background:var(--panel); color:var(--plum); border:2px solid var(--plum); }
+    .big.gold { background:var(--gold); }
+    .btn { display:inline-flex; align-items:center; justify-content:center; gap:6px; min-height:42px; padding:6px 14px; border-radius:12px; background:var(--plum); color:#fff; font-weight:800; }
+    a.btn { text-decoration:none; }
+    .btn.ghost { background:var(--panel); color:var(--plum); border:1.5px solid var(--plum); }
+    .btn.soft { background:var(--plum-soft); color:var(--plum); }
+    .btn.sm { min-height:36px; padding:4px 12px; font-size:14px; }
+    .btn:disabled { opacity:.45; cursor:default; }
+    .row { display:flex; gap:10px; flex-wrap:wrap; }
+    .row > * { flex:1; }
+    .small { font-size:13.5px; color:var(--soft); }
+    .tag { display:inline-block; font-size:12px; font-weight:800; border-radius:99px; padding:2px 9px; background:var(--plum-soft); color:var(--plum); }
+    .tag.ok { background:var(--green-soft); color:var(--green); } .tag.warn { background:var(--gold-soft); color:var(--gold); } .tag.bad { background:var(--red-soft); color:var(--red); } .tag.muted { background:#EFEBEE; color:var(--soft); }
+    .banner { background:var(--blue-soft); color:var(--blue); border-radius:12px; padding:12px 14px; font-weight:800; margin-bottom:12px; }
+    .err { background:var(--red-soft); color:var(--red); border-radius:12px; padding:10px 14px; font-weight:700; margin-bottom:12px; }
+    .steps { display:grid; gap:10px; }
+    .step { display:flex; gap:12px; align-items:center; padding:12px; border:1px solid var(--line); border-radius:14px; background:#FCFAF8; }
+    .step .k { flex:none; width:32px; height:32px; border-radius:50%; background:var(--plum); color:#fff; font-weight:900; display:flex; align-items:center; justify-content:center; }
+    .step .t { flex:1; min-width:0; }
+    .step .t b { display:block; }
+    .step .t small { color:var(--soft); }
+    .step.done .k { background:var(--green); }
+    .list { display:grid; gap:8px; }
+    .item { display:flex; align-items:center; gap:10px; width:100%; text-align:left; padding:12px 14px; border:1px solid var(--line); border-radius:14px; background:var(--panel); }
+    .item .t { flex:1; min-width:0; }
+    .item .t b { display:block; }
+    .item .t small { color:var(--soft); }
+    .item .go { color:var(--soft); font-weight:900; }
+    .item.done { background:#FBF7F9; }
+    /* 표시된 글 — 조각(seg) */
+    .para { margin:10px 0; line-height:2; font-size:1.05em; }
+    .band-K .para, .band-E1 .para { font-size:1.35em; line-height:2.1; }
+    .seg { display:inline; transition:background .15s; border-radius:6px; }
+    .marker-slash .seg:not(:last-child)::after { content:"∕"; color:var(--plum); font-weight:900; margin:0 5px 0 2px; }
+    .marker-scoop .seg { border-bottom:3px solid var(--gold); border-radius:0 0 14px 14px; padding:0 3px 3px; margin-right:10px; }
+    .marker-band .seg { padding:2px 5px; margin-right:6px; }
+    .marker-band .seg:nth-child(odd) { background:var(--plum-soft); } .marker-band .seg:nth-child(even) { background:var(--gold-soft); }
+    .seg.now { background:#FFE9A8 !important; box-shadow:0 0 0 3px #FFC857; }
+    .plain { margin:10px 0; line-height:1.95; font-size:1.05em; }
+    .band-K .plain, .band-E1 .plain { font-size:1.35em; line-height:2.1; }
+    /* 직접 끊기 — 어절 사이 틈 */
+    .tokens { display:flex; flex-wrap:wrap; align-items:center; row-gap:6px; margin:8px 0; }
+    .tok { padding:4px 3px; font-size:1.12em; }
+    .band-K .tok, .band-E1 .tok { font-size:1.45em; padding:6px 4px; }
+    .gap { width:30px; height:42px; border-radius:9px; color:#CDC3C8; font-size:1.25em; font-weight:900; flex:none; display:flex; align-items:center; justify-content:center; }
+    .band-K .gap, .band-E1 .gap { width:40px; height:50px; font-size:1.4em; }
+    .gap[aria-pressed="true"] { color:var(--plum); background:var(--plum-soft); }
+    .gap.hit { color:var(--green); background:var(--green-soft); } .gap.miss { color:var(--red); background:var(--red-soft); }
+    .gap.extra { color:var(--gold); background:var(--gold-soft); } .gap.neutral { color:var(--blue); background:var(--blue-soft); }
+    .gap:disabled { cursor:default; }
+    .legend { font-size:13px; color:var(--soft); margin:6px 0; }
+    .legend b { font-weight:900; }
+    .notes { display:grid; gap:6px; margin-top:10px; }
+    .note { display:flex; gap:8px; padding:8px 10px; border-radius:10px; font-size:14px; background:#FBF7F9; }
+    .note i { flex:none; font-style:normal; font-weight:900; }
+    .note.miss { background:var(--red-soft); } .note.extra { background:var(--gold-soft); } .note.neutral { background:var(--blue-soft); }
+    .stage { display:flex; gap:6px; margin:6px 0 10px; }
+    .stage i { flex:1; height:6px; border-radius:99px; background:var(--line); }
+    .stage i.on { background:var(--plum); }
+    .score { font-size:40px; font-weight:900; text-align:center; color:var(--plum); line-height:1.1; margin:6px 0; }
+    .kv { display:flex; justify-content:space-between; gap:10px; padding:8px 0; border-bottom:1px solid var(--line); }
+    .kv:last-child { border-bottom:none; }
+    .stats { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+    .stat { background:#FCFAF8; border:1px solid var(--line); border-radius:12px; padding:10px; text-align:center; }
+    .stat b { display:block; font-size:22px; color:var(--plum); }
+    .stat span { font-size:12px; color:var(--soft); }
+    .choice { display:flex; align-items:center; gap:12px; width:100%; min-height:52px; padding:8px 14px; margin:8px 0; border:2px solid var(--line); border-radius:14px; background:var(--panel); text-align:left; }
+    .choice .n { flex:none; width:28px; height:28px; border-radius:50%; background:var(--plum-soft); color:var(--plum); font-weight:900; display:flex; align-items:center; justify-content:center; }
+    .choice.ok { border-color:var(--green); background:var(--green-soft); } .choice.picked { border-color:var(--red); background:var(--red-soft); }
+    .choice:disabled { cursor:default; }
+    .expl { background:var(--green-soft); border-radius:12px; padding:12px 14px; margin-top:10px; }
+    .rule { background:var(--plum-soft); border-left:4px solid var(--plum); border-radius:0 12px 12px 0; padding:10px 14px; font-weight:800; margin:8px 0; }
+    .why { background:#FCFAF8; border-radius:12px; padding:10px 14px; margin:8px 0; font-size:15px; }
+    .ex { border:1px solid var(--line); border-radius:12px; padding:10px 12px; margin:8px 0; }
+    .ex .para { margin:4px 0; }
+    .ex .cap { font-size:13px; color:var(--soft); }
+    .grid { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+    .grade { min-height:52px; border:2px solid var(--line); border-radius:14px; background:var(--panel); font-weight:800; }
+    .grade[aria-pressed="true"] { border-color:var(--plum); background:var(--plum-soft); color:var(--plum); }
+    .checks label { display:flex; gap:10px; align-items:center; min-height:40px; font-size:15px; }
+    .checks input { width:22px; height:22px; }
+    .timer { font-size:28px; font-weight:900; text-align:center; font-variant-numeric:tabular-nums; color:var(--soft); }
+    .toolrow { display:flex; gap:8px; flex-wrap:wrap; margin:8px 0; }
+    .set label { display:flex; justify-content:space-between; align-items:center; gap:10px; min-height:44px; border-bottom:1px solid var(--line); }
+    .set label:last-child { border-bottom:none; }
+    .set select, .set input[type=text] { min-height:38px; border:1.5px solid var(--line); border-radius:10px; padding:0 10px; background:#fff; }
+    .set input[type=range] { width:140px; }
+    table.log { width:100%; border-collapse:collapse; font-size:14px; }
+    table.log th, table.log td { padding:6px 4px; border-bottom:1px solid var(--line); text-align:left; }
+    table.log th { font-size:12px; color:var(--soft); font-weight:800; }
+    .tabs { position:fixed; bottom:0; left:0; right:0; display:flex; background:var(--panel); border-top:1px solid var(--line); padding-bottom:env(safe-area-inset-bottom); z-index:6; }
+    .tabs button { flex:1; min-height:58px; font-size:12.5px; font-weight:800; color:var(--soft); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px; }
+    .tabs button .ic { font-size:20px; line-height:1; }
+    .tabs button[aria-current="page"] { color:var(--plum); }
+    #toast { position:fixed; left:50%; bottom:76px; transform:translateX(-50%); background:#2A2430; color:#fff; padding:10px 16px; border-radius:99px; font-size:14px; font-weight:700; opacity:0; pointer-events:none; transition:opacity .2s; z-index:9; max-width:90vw; }
+    #toast.on { opacity:.96; }
+    .foot { font-size:12px; color:var(--soft); line-height:1.5; margin-top:20px; padding-top:10px; border-top:1px solid var(--line); }
+    @media (min-width:560px) { .grid { grid-template-columns:repeat(4,1fr); } }
+  </style>
+</head>
+<body>
+  <header class="bar">
+    <span class="brand">청크브레인<small>∕ 끊어읽기</small></span>
+    <button class="chip" id="bandchip" data-act="go-settings" aria-label="단계 바꾸기"></button>
+    <span class="dot" id="savedot"><i></i><span id="savetxt">이 기기</span></span>
+    <span class="who" id="who"></span>
+  </header>
+  <main id="app"></main>
+  <nav class="tabs" id="tabs" aria-label="메뉴"></nav>
+  <div id="toast" role="status" aria-live="polite"></div>
+  <script src="./voice.js"></script>
+  <script src="./rules.js"></script>
+  <script src="./sched.js"></script>
+  <script src="./lessons.js"></script>
+  <script src="./passages.js"></script>
+  <script>
+  'use strict';
+  (function () {
+    const R = WBCHUNK, SC = WBCHUNK_SCHED, LESSONS = WBCHUNK_LESSONS, PASSAGES = WBCHUNK_PASSAGES;
+    const LS = 'wbc.state';
+    const $ = (id) => document.getElementById(id);
+    const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const app = $('app');
+    const TABS = [['home', '홈', '⌂'], ['learn', '배우기', '✎'], ['practice', '연습', '∕'], ['review', '복습', '↺'], ['record', '기록', '▤']];
+    const GRADES = [[0, '유치(5~7세)'], [1, '초1'], [2, '초2'], [3, '초3'], [4, '초4'], [5, '초5'], [6, '초6'], [7, '중1'], [8, '중2'], [9, '중3'], [10, '고1'], [11, '고2'], [12, '고3']];
+    const WHY = { due: '복습 차례', new: '새 글', weak: '점수를 올릴 글' };
+
+    /* ── 기록: 이 기기(localStorage)가 원천, 연동되면 서버에도 같은 것을 둔다 ── */
+    let S = load();
+    function load() { try { return SC.normalize(JSON.parse(localStorage.getItem(LS) || 'null'), Date.now()); } catch (e) { return SC.blank(Date.now()); } }
+    function persist() { try { localStorage.setItem(LS, JSON.stringify(S)); } catch (e) {} }
+    function save() { S.updatedAt = Date.now(); persist(); scheduleSync(); }
+
+    /* ── 인증: 진로독서·워드브레인·하루브레인과 같은 wbr.auth (읽기 + 연동 화면에서만 쓰기) ── */
+    function auth() { try { return JSON.parse(localStorage.getItem('wbr.auth') || 'null'); } catch (e) { return null; } }
+    function saveAuth(a) { try { if (a) localStorage.setItem('wbr.auth', JSON.stringify(a)); else localStorage.removeItem('wbr.auth'); } catch (e) {} }
+    function api(path, opt) {
+      const a = auth();
+      if (!a || !a.token) return Promise.reject(new Error('no-auth'));
+      return fetch('/api/chunk' + path, Object.assign({ headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + a.token } }, opt || {}))
+        .then((r) => r.json().catch(() => ({})).then((j) => { if (!r.ok) { const e = new Error(j.error || ('api-' + r.status)); e.status = r.status; throw e; } return j; }));
+    }
+    function setDot(cls, txt) { const d = $('savedot'); d.className = 'dot ' + cls; $('savetxt').textContent = txt; }
+    let syncTimer = null;
+    function scheduleSync() { if (!auth()) return; clearTimeout(syncTimer); syncTimer = setTimeout(pushState, 700); }
+    function pushState() {
+      if (!auth()) return;
+      setDot('pending', '저장 중');
+      api('/state', { method: 'PUT', body: JSON.stringify({ state: S, summary: SC.forTeacher(S, Date.now()) }) })
+        .then(() => setDot('saved', '저장됨'))
+        .catch((e) => { setDot('failed', e.status === 401 ? '연동 만료' : '저장 안 됨'); });
+    }
+    /* 선생님 과제 — 단계·글·카드. 단계가 정해져 있으면 학생이 고른 단계보다 우선한다. */
+    const assignSince = () => (S.assign && S.assign.updatedAt) ? (Date.parse(S.assign.updatedAt) || 0) : 0;
+    const assignDoneP = (id) => { const it = S.items[id]; return !!(it && it.last >= assignSince()); };
+    const assignDoneL = (id) => { const l = S.lessons[id]; return !!(l && l.at >= assignSince()); };
+    const assignHas = () => !!(S.assign && ((S.assign.passages || []).length || (S.assign.lessons || []).length || S.assign.note));
+    function applyAssign(rec) {
+      const before = JSON.stringify(S.assign || null), next = rec ? rec : null;
+      if (JSON.stringify(next) === before) return;
+      S.assign = next; persist();
+      if (next && next.band && next.band !== S.band) { S.band = next.band; persist(); announce('선생님이 단계를 ' + R.BANDS[next.band].label + '(으)로 정했어요'); }
+      else if (next && assignHas()) announce('선생님 과제가 도착했어요');
+      applyBody(); render({ keep: true });
+    }
+    function pullAssign() {
+      if (!auth()) return;
+      api('/assign').then((j) => applyAssign(j.assign ? Object.assign({}, j.assign, { updatedAt: j.updatedAt }) : null)).catch(() => {});
+    }
+    function pullState() {
+      if (!auth()) { setDot('', '이 기기'); return; }
+      setDot('pending', '불러오는 중');
+      api('/state').then((j) => {
+        if (j.state && (j.state.updatedAt || 0) > (S.updatedAt || 0)) { S = SC.normalize(j.state, Date.now()); persist(); applyBody(); render(); }
+        else if (!j.state && S.log.length) pushState();
+        setDot('saved', '저장됨');
+      }).catch((e) => setDot('failed', e.status === 401 ? '연동 만료' : '오프라인'));
+    }
+
+    /* ── 화면 상태 ── */
+    let view = { name: 'home' }, sess = null;
+    const band = () => S.band || 'E2';
+    const B = () => R.BANDS[band()];
+    const bandPassages = (b) => PASSAGES.filter((p) => p.band === (b || band()));
+    const bandLessons = (b) => LESSONS.filter((l) => l.band === (b || band()));
+    const byId = (id) => PASSAGES.find((p) => p.id === id);
+    const lessonById = (id) => LESSONS.find((l) => l.id === id);
+    /* 오늘의 카드: 이 학년 카드에서 안 본 것 → 없으면 바로 아래 학년부터 내려가며 안 본 카드. 규칙은 나선형으로 쌓이므로 아래 카드도 이 학년의 것이다. */
+    const bandsUpTo = (b) => R.BAND_ORDER.slice(0, R.BAND_ORDER.indexOf(b) + 1);
+    const nextLesson = () => { const order = bandsUpTo(band()).reverse(); for (const b of order) { const l = bandLessons(b).find((x) => !S.lessons[x.id]); if (l) return l; } return null; };
+    /* 약한 규칙 → 카드: 이 학년에 가까운 카드부터 */
+    const lessonForTag = (tag) => { const bi = R.BAND_ORDER.indexOf(band()); return LESSONS.filter((x) => x.tags.indexOf(tag) >= 0).sort((a, b2) => Math.abs(R.BAND_ORDER.indexOf(a.band) - bi) - Math.abs(R.BAND_ORDER.indexOf(b2.band) - bi))[0] || null; };
+    const marker = () => (S.prefs.marker && S.prefs.marker !== 'auto') ? S.prefs.marker : (B().sentenceMode ? 'scoop' : 'slash');
+    const rate = () => (S.prefs.rate || 1) * B().rate;
+    const dkey = (t) => { const d = new Date(t); return (d.getMonth() + 1) + '월 ' + d.getDate() + '일'; };
+    const fmtDate = (t) => { const d = new Date(t); return (d.getMonth() + 1) + '/' + d.getDate(); };
+
+    let toastTimer = null;
+    function announce(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('on'), 2200); }
+    function applyBody() {
+      const b = document.body;
+      b.className = '';
+      let font = S.prefs.font || 'normal';
+      if (band() === 'K' && font === 'normal') font = 'large';
+      if (font !== 'normal') b.classList.add('f-' + font);
+      b.classList.add('band-' + band());
+      $('bandchip').textContent = S.band ? B().label + ' 단계' : '단계 고르기';
+      const a = auth();
+      $('who').innerHTML = a && a.name ? '<b>' + esc(a.name) + '</b>' : '';
+    }
+
+    /* ── 읽어 주기: 조각마다 한 번씩 말하고 그 조각을 밝힌다. 두세 어절 단위라 말이 토막 나지만, 그게 끊어 읽기 모델링이다. ── */
+    let SPK = null;
+    function speakSegs(segs, prefix) {
+      stopSpeak();
+      if (!WBVoice.ttsSupported()) { announce('이 기기에서는 읽어 주기를 쓸 수 없어요'); return; }
+      WBVoice.unlock();
+      const items = segs.map((s) => String(s).trim()).filter(Boolean);
+      let i = 0, cancelled = false;
+      const mark = (idx) => {
+        document.querySelectorAll('.seg.now').forEach((el) => el.classList.remove('now'));
+        if (idx >= 0) { const el = document.querySelector('[data-seg="' + prefix + ':' + idx + '"]'); if (el) { el.classList.add('now'); } }
+        document.querySelectorAll('[data-act="tts"]').forEach((b) => { b.textContent = SPK && !cancelled && idx >= 0 ? '■ 멈추기' : '🔊 들려주기'; });
+      };
+      const step = () => {
+        if (cancelled) return;
+        if (i >= items.length) { mark(-1); SPK = null; return; }
+        mark(i);
+        WBVoice.speak(items[i++], { rate: rate(), lang: 'ko', onend: step, onerror: () => { cancelled = true; mark(-1); SPK = null; announce('소리를 낼 수 없어요. 기기 음량과 음성 설정을 확인해 주세요.'); } });
+      };
+      SPK = { cancel() { cancelled = true; WBVoice.stop(); mark(-1); SPK = null; } };
+      step();
+    }
+    function stopSpeak() { if (SPK) SPK.cancel(); else WBVoice.stop(); }
+
+    /* ── 낭독 녹음: 기기 밖으로 나가지 않는다. 재생은 URL 이 아니라 Web Audio 로 — CSP(default-src 'self')가 blob: 을 막는다. ── */
+    const REC = { r: null, blob: null, ms: 0, on: false, timer: null, t0: 0, ctx: null, src: null };
+    function recStart() {
+      if (!WBVoice.recSupported()) { announce('이 기기에서는 녹음을 쓸 수 없어요'); return; }
+      REC.r = new WBVoice.Recorder();
+      REC.r.start().then(() => { REC.on = true; REC.t0 = Date.now(); REC.blob = null; REC.timer = setInterval(() => { const el = $('rectime'); if (el) el.textContent = WBVoice.clock(Date.now() - REC.t0); }, 500); render({ keep: true }); })
+        .catch(() => announce('마이크를 쓸 수 없어요. 권한을 확인해 주세요.'));
+    }
+    function recStop() {
+      clearInterval(REC.timer); REC.on = false;
+      if (!REC.r) { render({ keep: true }); return; }
+      REC.r.stop().then((res) => { REC.blob = res ? res.blob : null; REC.ms = res ? res.ms : 0; render({ keep: true }); });
+    }
+    function recPlay() {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx || !REC.blob) return;
+      if (REC.src) { recStopPlay(); return; }
+      REC.ctx = REC.ctx || new Ctx();
+      REC.blob.arrayBuffer().then((buf) => REC.ctx.decodeAudioData(buf)).then((audio) => {
+        const src = REC.ctx.createBufferSource(); src.buffer = audio; src.connect(REC.ctx.destination);
+        src.onended = () => { REC.src = null; render({ keep: true }); };
+        src.start(); REC.src = src; render({ keep: true });
+      }).catch(() => announce('이 기기에서는 녹음을 다시 들을 수 없어요'));
+    }
+    function recStopPlay() { if (REC.src) { try { REC.src.stop(); } catch (e) {} REC.src = null; } }
+    function recRelease() { clearInterval(REC.timer); recStopPlay(); if (REC.r) REC.r.release(); REC.r = null; REC.blob = null; REC.on = false; }
+
+    /* ── 렌더 ── */
+    function render(opt) {
+      const y = window.scrollY;
+      let html = '';
+      if (!S.band) html = vOnboard();
+      else if (view.name === 'home') html = vHome();
+      else if (view.name === 'learn') html = sess && sess.ls ? vLesson() : vLearn();
+      else if (view.name === 'practice') html = sess && sess.pr ? vSession() : vPractice();
+      else if (view.name === 'review') html = sess && sess.pr ? vSession() : vReview();
+      else if (view.name === 'record') html = vRecord();
+      app.innerHTML = html;
+      $('tabs').innerHTML = TABS.map(([k, l, ic]) => '<button data-act="tab" data-tab="' + k + '" ' + (view.name === k ? 'aria-current="page"' : '') + '><span class="ic">' + ic + '</span>' + l + '</button>').join('');
+      if (opt && opt.keep) window.scrollTo(0, y); else window.scrollTo(0, 0);
+    }
+    const footer = () => '<div class="foot">WB 독해력학원 원내 학습 도구. 지문과 카드는 전부 자체 창작이며, 녹음은 이 기기 밖으로 나가지 않아요.</div>';
+    const segsHtml = (segs, prefix) => '<p class="para marker-' + marker() + '">' + segs.map((s, i) => '<span class="seg" data-seg="' + prefix + ':' + i + '">' + esc(marker() === 'slash' ? s : s.trim()) + (marker() === 'slash' ? '' : ' ') + '</span>').join('') + '</p>';
+    const ttsBtn = (segs, prefix) => WBVoice.ttsSupported() ? '<button class="btn soft sm" data-act="tts" data-prefix="' + prefix + '">🔊 들려주기</button>' : '';
+    const stageBar = (n, of) => '<div class="stage">' + Array.from({ length: of }, (_, i) => '<i class="' + (i < n ? 'on' : '') + '"></i>').join('') + '</div>';
+
+    function vOnboard() {
+      const g = view.grade;
+      return '<div class="card hero"><p class="eyebrow">처음 오셨네요</p><h1>몇 학년이에요?</h1><p>단계는 언제든 기록 탭에서 바꿀 수 있어요.</p></div>' +
+        '<div class="card"><div class="grid">' + GRADES.map(([n, l]) => '<button class="grade" data-act="pick-grade" data-g="' + n + '" aria-pressed="' + (g === n) + '">' + l + '</button>').join('') + '</div>' +
+        (g != null ? '<p class="small" style="margin-top:12px">→ <b>' + R.BANDS[R.bandOfGrade(g)].label + ' 단계</b>로 시작해요. ' + esc(R.BANDS[R.bandOfGrade(g)].who) + '</p><button class="big" data-act="start-band">시작하기</button>' : '') + '</div>' + footer();
+    }
+
+    function vHome() {
+      const now = Date.now(), sm = SC.summary(S, now, band());
+      const nl = nextLesson();
+      const np = SC.nextPassage(S, bandPassages().map((p) => p.id), now, band());
+      const due = SC.dueList(S, now, band());
+      const sug = SC.suggestion(S, band());
+      const a = auth();
+      let html = '<div class="card hero"><p class="eyebrow">' + esc(B().label) + ' 단계 · ' + esc(B().who) + '</p><h1>' + (a && a.name ? esc(a.name) + ', ' : '') + '오늘도 덩어리로 읽자!</h1>' +
+        '<p>' + (sm.streak ? '연속 ' + sm.streak + '일째 · ' : '') + '지금까지 연습 ' + sm.attempts + '회' + (sm.recentAvg != null ? ' · 최근 평균 ' + sm.recentAvg + '점' : '') + '</p></div>';
+      if (assignHas()) {
+        const a = S.assign, since = assignSince();
+        html += '<div class="card"><h2>선생님 과제' + (a.due ? ' <span class="tag warn">~' + esc(a.due.slice(5).replace('-', '/')) + '</span>' : '') + '</h2>' + (a.note ? '<p class="small">💬 ' + esc(a.note) + '</p>' : '') + '<div class="list">' +
+          (a.passages || []).map((id) => { const p = byId(id); if (!p) return ''; const d = assignDoneP(id); return '<button class="item ' + (d ? 'done' : '') + '" data-act="start-practice" data-id="' + id + '"><span class="tag ' + (d ? 'ok' : 'warn') + '">' + (d ? '✓' : '글') + '</span><span class="t"><b>' + esc(p.title) + '</b><small>' + esc(R.BANDS[p.band].label) + ' · ' + esc(p.genre) + '</small></span><span class="go">›</span></button>'; }).join('') +
+          (a.lessons || []).map((id) => { const l = lessonById(id); if (!l) return ''; const d = assignDoneL(id); return '<button class="item ' + (d ? 'done' : '') + '" data-act="open-lesson" data-id="' + id + '"><span class="tag ' + (d ? 'ok' : 'warn') + '">' + (d ? '✓' : '카드') + '</span><span class="t"><b>' + esc(l.title) + '</b><small>' + esc(R.BANDS[l.band].label) + ' 규칙 카드</small></span><span class="go">›</span></button>'; }).join('') +
+          '</div><p class="small" style="margin-top:8px">' + SC.assignDone(S) + ' / ' + SC.assignTotal(S) + ' 끝냈어요' + (since ? ' · 선생님이 ' + fmtDate(since) + '에 정함' : '') + '</p></div>';
+      }
+      const teacherBand = !!(S.assign && S.assign.band);
+      if (!teacherBand && sug === 'up' && R.nextBand(band())) html += '<div class="banner">최근 세 번 모두 85점 이상이에요. <b>' + R.BANDS[R.nextBand(band())].label + ' 단계</b>로 올라가 볼까요? <button class="btn sm" data-act="band-shift" data-d="1">올리기</button></div>';
+      if (!teacherBand && sug === 'down' && R.prevBand(band())) html += '<div class="banner">이 단계 글이 아직 어려워요. <b>' + R.BANDS[R.prevBand(band())].label + ' 단계</b>로 잠시 내려가 연습하면 더 빨리 늘어요. <button class="btn sm" data-act="band-shift" data-d="-1">내리기</button></div>';
+      html += '<div class="card"><h2>오늘의 세 걸음</h2><div class="steps">' +
+        '<div class="step ' + (nl ? '' : 'done') + '"><div class="k">1</div><div class="t"><b>배우기</b><small>' + (nl ? esc(nl.title) : '이 단계 카드를 다 봤어요') + '</small></div>' + (nl ? '<button class="btn sm" data-act="open-lesson" data-id="' + nl.id + '">열기</button>' : '') + '</div>' +
+        '<div class="step"><div class="k">2</div><div class="t"><b>연습 — 따라 읽기 → 직접 끊기 → 문제</b><small>' + (np ? '「' + esc(byId(np.id).title) + '」 · ' + WHY[np.why] : '이 단계 글을 모두 졸업했어요!') + '</small></div>' + (np ? '<button class="btn sm" data-act="start-practice" data-id="' + np.id + '">시작</button>' : '') + '</div>' +
+        '<div class="step ' + (due.length ? '' : 'done') + '"><div class="k">3</div><div class="t"><b>복습</b><small>' + (due.length ? '오늘 ' + due.length + '편이 기다려요' : '오늘 복습할 글이 없어요') + '</small></div>' + (due.length ? '<button class="btn sm" data-act="start-review" data-id="' + due[0].id + '">시작</button>' : '') + '</div>' +
+        '</div></div>';
+      html += '<div class="card"><h2>끊어 읽기가 뭐예요?</h2><p class="small">글을 한 낱말씩이 아니라 <b>뜻이 한 묶음인 덩어리</b>로 읽는 거예요. 덩어리로 읽으면 앞말을 잊지 않고, 긴 문장도 짧게 느껴져요. 교과서는 1~2학년에서 「의미가 잘 드러나도록 알맞게 띄어 읽기」를 배우고, 그 위로는 문장이 길어질수록 더 중요해져요.</p>' +
+        '<div class="row"><a class="btn ghost" href="./print.html?band=' + band() + '" target="_blank" rel="noopener">🖨 교재로 출력하기</a><a class="btn ghost" href="/">진로독서로</a></div></div>';
+      return html + footer();
+    }
+
+    function vLearn() {
+      const ls = bandLessons();
+      const item = (l, i) => { const d = S.lessons[l.id]; return '<button class="item ' + (d ? 'done' : '') + '" data-act="open-lesson" data-id="' + l.id + '"><span class="tag ' + (d ? 'ok' : 'muted') + '">' + (d ? '✓' : (i + 1)) + '</span><span class="t"><b>' + esc(l.title) + '</b><small>' + esc(l.rule) + '</small></span><span class="go">›</span></button>'; };
+      const below = bandsUpTo(band()).slice(0, -1).reverse().filter((b) => bandLessons(b).length);
+      const assigned = (S.assign && S.assign.lessons || []).map(lessonById).filter(Boolean);
+      return (assigned.length ? '<div class="card"><h2>선생님이 정한 카드</h2><div class="list">' + assigned.map((l) => '<button class="item ' + (assignDoneL(l.id) ? 'done' : '') + '" data-act="open-lesson" data-id="' + l.id + '"><span class="tag ' + (assignDoneL(l.id) ? 'ok' : 'warn') + '">' + (assignDoneL(l.id) ? '✓' : '과제') + '</span><span class="t"><b>' + esc(l.title) + '</b><small>' + esc(R.BANDS[l.band].label) + ' · ' + esc(l.rule) + '</small></span><span class="go">›</span></button>').join('') + '</div></div>' : '') +
+        '<div class="card"><p class="eyebrow">' + esc(B().label) + ' 단계</p><h2>배우기 — 이 학년의 새 카드 ' + ls.length + '장</h2><p class="small">카드 하나 = 규칙 하나 + 보기 + 확인 문제. 규칙은 학년마다 쌓여요. 아래 학년 카드도 이 학년의 것이니 안 본 카드는 함께 봐요.</p></div>' +
+        '<div class="list">' + ls.map(item).join('') + '</div>' +
+        (below.length ? '<div class="card" style="margin-top:12px"><h2>아래 학년 카드 (복습)</h2>' + below.map((b) => '<h3>' + esc(R.BANDS[b].label) + '</h3><div class="list">' + bandLessons(b).map(item).join('') + '</div>').join('') + '</div>' : '');
+    }
+
+    function vLesson() {
+      const ls = sess.ls, l = lessonById(ls.id);
+      if (ls.done) {
+        const avg = Math.round(ls.scores.reduce((a, b) => a + b, 0) / Math.max(1, ls.scores.length));
+        return '<div class="card hero"><p class="eyebrow">카드 완료</p><h1>' + esc(l.title) + '</h1><p>확인 문제 ' + avg + '점' + (avg >= 85 ? ' — 규칙을 잡았어요!' : ' — 보기를 한 번 더 읽고 연습에서 써 봐요.') + '</p></div>' +
+          '<button class="big" data-act="lesson-quit">카드 목록으로</button>' + (R.nextBand(l.band) ? '' : '') + footer();
+      }
+      let html = '<div class="card"><p class="eyebrow">배우기 · ' + esc(R.BANDS[l.band].label) + '</p><h2>' + esc(l.title) + '</h2><div class="rule">' + esc(l.rule) + '</div><div class="why"><b>왜?</b> ' + esc(l.why) + '</div>';
+      html += '<h3>보기</h3>' + l.examples.map((x, i) => '<div class="ex">' + segsHtml(x.segs, 'ex' + i) + (x.note ? '<div class="cap">' + esc(x.note) + '</div>' : '') + '<div class="toolrow">' + ttsBtn(x.segs, 'ex' + i) + '</div></div>').join('');
+      html += '<p class="small">💡 ' + esc(l.tip) + '</p></div>';
+      /* 확인 문제 — 문장에 직접 ∕ 를 찍는다 */
+      const c = l.checks[ls.ci];
+      if (c) {
+        const text = c.segs.join(''), model = R.modelBoundaries(c.segs);
+        html += '<div class="card"><p class="eyebrow">확인 문제 ' + (ls.ci + 1) + '/' + l.checks.length + '</p><p class="small">뜻이 나뉘는 곳의 <b>·</b> 를 눌러 ∕ 로 바꿔 보세요.</p>' +
+          tokensHtml(text, ls.marks, ls.result, 'ck') + (ls.result ? resultHtml(ls.result) + '<button class="big" data-act="lesson-next">' + (ls.ci + 1 < l.checks.length ? '다음 문제' : '카드 마치기') + '</button>' : '<button class="big" data-act="lesson-check">확인하기</button>') + '</div>';
+      }
+      html += '<button class="big ghost" data-act="lesson-quit">그만하기</button>';
+      return html;
+    }
+
+    /* 어절 + 틈 — 학생이 찍은 표시와 채점 결과를 한 흐름으로 그린다 */
+    function tokensHtml(text, marks, result, prefix) {
+      const ws = R.words(text);
+      const M = {}; if (result) { result.missed.forEach((i) => M[i] = 'miss'); result.extras.forEach((i) => M[i] = 'extra'); result.neutral.forEach((i) => M[i] = 'neutral'); }
+      let out = '<div class="tokens">';
+      ws.forEach((w, i) => {
+        out += '<span class="tok">' + esc(w.trim()) + '</span>';
+        if (i < ws.length - 1) {
+          const on = marks.has(i);
+          let cls = 'gap', sym = on ? '∕' : '·';
+          if (result) { if (M[i]) cls += ' ' + M[i]; else if (on) cls += ' hit'; if (M[i] || on) sym = '∕'; }
+          out += '<button class="' + cls + '" data-act="gap" data-prefix="' + prefix + '" data-i="' + i + '" aria-pressed="' + on + '" ' + (result ? 'disabled' : '') + ' aria-label="' + (i + 1) + '번째 어절 뒤">' + sym + '</button>';
+        }
+      });
+      return out + '</div>';
+    }
+    function resultHtml(r) {
+      let html = '<div class="legend"><b style="color:var(--green)">초록 ∕</b> 잘 끊었어요 · <b style="color:var(--red)">빨강 ∕</b> 여기서도 끊어요' + (r.extras.length ? ' · <b style="color:var(--gold)">주황 ∕</b> 붙여 읽어요' : '') + (r.neutral.length ? ' · <b style="color:var(--blue)">파랑 ∕</b> 쉬어도 괜찮아요' : '') + '</div>';
+      html += '<div class="score" style="font-size:30px">' + r.score + '점 <span class="small">(맞힘 ' + r.hit + '/' + r.model + (r.extra ? ' · 군더더기 ' + r.extra : '') + ')</span></div>';
+      if (r.notes.length) html += '<div class="notes">' + r.notes.slice(0, 6).map((n) => '<div class="note ' + n.kind + '"><i>' + (n.kind === 'miss' ? '∕' : n.kind === 'extra' ? '✕' : '○') + '</i><span><b>「' + esc(n.at) + '」 뒤</b> — ' + esc(n.why) + '</span></div>').join('') + (r.notes.length > 6 ? '<div class="small">…외 ' + (r.notes.length - 6) + '곳</div>' : '') + '</div>';
+      return html;
+    }
+
+    function vPractice() {
+      const now = Date.now();
+      const np = SC.nextPassage(S, bandPassages().map((p) => p.id), now, band());
+      return '<div class="card"><p class="eyebrow">' + esc(B().label) + ' 단계</p><h2>연습 — 글 ' + bandPassages().length + '편</h2><p class="small">① 표시된 글을 따라 읽고 → ② 표시 없는 글에 직접 ∕ 를 찍고 → ③ 표시 없이 읽은 뒤 문제 하나. 5~10분이면 돼요.</p>' +
+        (np ? '<button class="big" data-act="start-practice" data-id="' + np.id + '">다음 글 시작 — 「' + esc(byId(np.id).title) + '」 <span class="tag" style="background:#fff3;color:#fff">' + WHY[np.why] + '</span></button>' : '<p class="small">이 단계 글을 모두 졸업했어요. 홈에서 단계를 올려 보세요.</p>') + '</div>' +
+        '<div class="list">' + bandPassages().concat((S.assign && S.assign.passages || []).map(byId).filter((p) => p && p.band !== band())).sort((x, y) => (S.assign && S.assign.passages || []).indexOf(y.id) >= 0 ? 1 : (S.assign && S.assign.passages || []).indexOf(x.id) >= 0 ? -1 : 0).map((p) => {
+          const it = S.items[p.id]; let tag = '<span class="tag muted">아직</span>';
+          if (S.assign && (S.assign.passages || []).indexOf(p.id) >= 0) tag = assignDoneP(p.id) ? '<span class="tag ok">과제 ✓</span>' : '<span class="tag warn">과제</span>';
+          else
+          if (it) tag = it.graduated ? '<span class="tag ok">졸업</span>' : (it.due && it.due <= now ? '<span class="tag warn">복습</span>' : '<span class="tag">' + it.lastScore + '점</span>');
+          return '<button class="item ' + (it ? 'done' : '') + '" data-act="start-practice" data-id="' + p.id + '">' + tag + '<span class="t"><b>' + esc(p.title) + '</b><small>' + esc(p.genre) + ' · ' + R.stats([].concat.apply([], p.paragraphs)).words + '어절' + (it && !it.graduated && it.due ? ' · 다음 복습 ' + fmtDate(it.due) : '') + '</small></span><span class="go">›</span></button>';
+        }).join('') + '</div>';
+    }
+
+    /* ── 연습 세션 ── */
+    function mkUnit(segs) { const text = segs.join(''); return { segs, text, model: R.modelBoundaries(segs), words: R.words(text).length }; }
+    function startPractice(id, mode) {
+      const p = byId(id); if (!p) return;
+      const b = R.BANDS[p.band];
+      const units = [];
+      if (b.sentenceMode) p.paragraphs.forEach((segs) => R.sentencesOf(segs).forEach((ss) => units.push(mkUnit(ss))));
+      else p.paragraphs.forEach((segs) => units.push(mkUnit(segs)));
+      recRelease(); stopSpeak();
+      sess = { pr: { id, mode: mode || 'practice', stage: mode === 'review' ? 2 : 1, sentMode: b.sentenceMode, units, ui: 0, marks: units.map(() => new Set()), res: units.map(() => null), agg: null, readStart: 0, readMs: null, picked: null, self: [false, false, false], peek: false, started: Date.now() } };
+      view = { name: mode === 'review' ? 'review' : 'practice' };
+      try { history.pushState({ sess: 1 }, ''); } catch (e) {}
+      render();
+    }
+    function aggregate(res) {
+      let hit = 0, extra = 0, model = 0, tags = [];
+      res.forEach((r) => { if (!r) return; hit += r.hit; extra += r.extra; model += r.model; tags = tags.concat(r.tags); });
+      return { hit, extra, model, tags, score: model ? Math.max(0, Math.round((hit - 0.5 * extra) / model * 100)) : (extra ? 0 : 100) };
+    }
+    function vSession() {
+      const pr = sess.pr, p = byId(pr.id), b = R.BANDS[p.band];
+      const head = '<p class="eyebrow">' + (pr.mode === 'review' ? '복습' : '연습') + ' · 「' + esc(p.title) + '」 · ' + esc(p.genre) + '</p>';
+      const quit = '<button class="big ghost" data-act="pr-quit">그만하기</button>';
+      const all = [].concat.apply([], p.paragraphs);
+      if (pr.stage === 1) {
+        let html = '<div class="card">' + head + stageBar(1, 3) + '<h2>1. 따라 읽기</h2><p class="small">' + (marker() === 'scoop' ? '밑줄 곡선 하나가 한 덩어리예요. 곡선 끝에서 살짝 쉬며' : '∕ 에서 살짝 쉬며') + ' 소리 내어 읽어 보세요. 문장 끝에서는 크게 쉬어요.</p>';
+        let k = 0; p.paragraphs.forEach((segs) => { html += segsHtml(segs, 'p' + (k++)); });
+        html += '<div class="toolrow">' + ttsBtn(all, 'all') + '</div>';
+        if (S.prefs.recording && WBVoice.recSupported()) {
+          html += '<h3>🎙 내 낭독 듣기 <span class="small">(선택)</span></h3><p class="small">녹음해서 들어 보면 어디서 쉬었는지 스스로 알 수 있어요. 녹음은 이 기기에만 잠깐 있고 저장되지 않아요.</p><div class="toolrow">' +
+            (REC.on ? '<button class="btn" data-act="rec-stop">■ 녹음 끝 <span id="rectime">0:00</span></button>' : '<button class="btn soft" data-act="rec-start">● 녹음 시작</button>') +
+            (REC.blob && !REC.on ? '<button class="btn soft" data-act="rec-play">' + (REC.src ? '■ 멈추기' : '▶ 들어 보기 (' + WBVoice.clock(REC.ms) + ')') + '</button>' : '') + '</div>';
+          if (REC.blob && !REC.on) html += '<div class="checks"><label><input type="checkbox" data-act="self" data-i="0" ' + (pr.self[0] ? 'checked' : '') + '> 덩어리마다 살짝 쉬었어요</label><label><input type="checkbox" data-act="self" data-i="1" ' + (pr.self[1] ? 'checked' : '') + '> 덩어리 안은 붙여서 읽었어요</label><label><input type="checkbox" data-act="self" data-i="2" ' + (pr.self[2] ? 'checked' : '') + '> 문장 끝에서 크게 쉬었어요</label></div>';
+        }
+        html += '<button class="big" data-act="pr-to2">다 읽었어요 — 직접 끊어 볼래요</button></div>' + quit;
+        return html;
+      }
+      if (pr.stage === 2) {
+        let html = '<div class="card">' + head + stageBar(2, 3) + '<h2>2. 직접 끊기</h2>';
+        if (pr.sentMode) {
+          const u = pr.units[pr.ui], r = pr.res[pr.ui];
+          html += '<p class="small">문장 ' + (pr.ui + 1) + '/' + pr.units.length + ' — 뜻이 나뉘는 곳의 <b>·</b> 를 눌러 ∕ 로 바꿔요.</p>' + tokensHtml(u.text, pr.marks[pr.ui], r, 'u' + pr.ui);
+          if (r) html += resultHtml(r) + '<button class="big" data-act="pr-unit-next">' + (pr.ui + 1 < pr.units.length ? '다음 문장' : '다음 — 표시 없이 읽기') + '</button>';
+          else html += '<button class="big" data-act="pr-check">확인하기</button>';
+        } else {
+          html += '<p class="small">뜻이 나뉘는 곳의 <b>·</b> 를 눌러 ∕ 로 바꿔요. 문단마다 이어서 찍고 마지막에 확인해요.</p>';
+          pr.units.forEach((u, i) => { html += '<p class="eyebrow" style="margin-top:10px">' + (i + 1) + '문단</p>' + tokensHtml(u.text, pr.marks[i], pr.res[i], 'u' + i); });
+          if (pr.agg) {
+            html += '<div class="legend"><b style="color:var(--green)">초록 ∕</b> 잘 끊었어요 · <b style="color:var(--red)">빨강 ∕</b> 여기서도 끊어요 · <b style="color:var(--gold)">주황 ∕</b> 붙여 읽어요 · <b style="color:var(--blue)">파랑 ∕</b> 쉬어도 괜찮아요</div><div class="score">' + pr.agg.score + '점</div><p class="small" style="text-align:center">맞힘 ' + pr.agg.hit + '/' + pr.agg.model + (pr.agg.extra ? ' · 군더더기 ' + pr.agg.extra : '') + '</p>';
+            const notes = [].concat.apply([], pr.res.map((r) => r ? r.notes : []));
+            if (notes.length) html += '<div class="notes">' + notes.slice(0, 8).map((n) => '<div class="note ' + n.kind + '"><i>' + (n.kind === 'miss' ? '∕' : n.kind === 'extra' ? '✕' : '○') + '</i><span><b>「' + esc(n.at) + '」 뒤</b> — ' + esc(n.why) + '</span></div>').join('') + (notes.length > 8 ? '<div class="small">…외 ' + (notes.length - 8) + '곳</div>' : '') + '</div>';
+            html += '<button class="big" data-act="pr-to3">다음 — 표시 없이 읽기</button>';
+          } else html += '<button class="big" data-act="pr-check">확인하기</button>';
+        }
+        return html + '</div>' + quit;
+      }
+      if (pr.stage === 3) {
+        const q = p.q, answered = pr.picked != null, showText = b.sentenceMode || pr.readMs == null || pr.peek;
+        let html = '<div class="card">' + head + stageBar(3, 3) + '<h2>3. 표시 없이 읽기</h2>';
+        if (pr.readMs == null) html += '<p class="small">이번엔 표시 없이, 마음속으로 덩어리를 만들며 읽어요. 다 읽으면 버튼을 눌러요.</p>';
+        if (showText) html += p.paragraphs.map((segs) => '<p class="plain">' + esc(segs.join('')) + '</p>').join('');
+        if (pr.readMs == null) html += '<button class="big" data-act="pr-read-done">다 읽었어요</button>';
+        else {
+          if (!b.sentenceMode && !pr.peek) html += '<button class="btn ghost sm" data-act="pr-peek">글 다시 보기</button>';
+          html += '<h3>' + esc(q.q) + '</h3>' + q.choices.map((c, i) => { let cls = 'choice', n = String(i + 1); if (answered) { if (i === q.answer) { cls += ' ok'; n = '✓'; } else if (i === pr.picked) { cls += ' picked'; n = '✕'; } } return '<button class="' + cls + '" data-act="pr-pick" data-i="' + i + '" ' + (answered ? 'disabled' : '') + '><span class="n">' + n + '</span><span>' + esc(c) + '</span></button>'; }).join('');
+          if (answered) html += '<div class="expl"><b>' + (pr.picked === q.answer ? '정답!' : '아쉬워요.') + '</b> ' + esc(q.explain) + '</div><button class="big" data-act="pr-finish">결과 보기</button>';
+        }
+        return html + '</div>' + (answered ? '' : quit);
+      }
+      /* stage 4 — 결과 */
+      const r = pr.final, it = S.items[pr.id];
+      const msg = r.score >= 90 ? '덩어리가 눈에 척척 들어와요!' : r.score >= 70 ? '거의 다 왔어요. 빨간 ∕ 자리를 다시 봐요.' : '모범 ∕ 를 따라 읽고 한 번 더 해 봐요.';
+      let html = '<div class="card hero"><p class="eyebrow">' + (pr.mode === 'review' ? '복습' : '연습') + ' 완료 · 「' + esc(p.title) + '」</p><h1>끊기 ' + r.score + '점 · 문제 ' + (r.qOk ? '정답' : '오답') + '</h1><p>' + msg + '</p></div>';
+      html += '<div class="card"><div class="kv"><span>맞힌 경계</span><b>' + r.hit + ' / ' + r.model + '</b></div>' + (r.extra ? '<div class="kv"><span>군더더기 경계</span><b>' + r.extra + '</b></div>' : '') +
+        (r.wpm ? '<div class="kv"><span>읽기 속도(묵독)</span><b>' + r.wpm + '어절/분' + (r.prevWpm ? ' <span class="small">(지난번 ' + r.prevWpm + ')</span>' : '') + '</b></div>' : '') +
+        (r.self != null ? '<div class="kv"><span>낭독 자기 점검</span><b>' + r.self + ' / 3</b></div>' : '') +
+        '<div class="kv"><span>다음 복습</span><b>' + (it && it.graduated ? '졸업 🎓' : it ? dkey(it.due) : '-') + '</b></div></div>';
+      const weak = SC.weakTags(S, 2);
+      if (weak.length) html += '<div class="card"><h2>다시 볼 규칙</h2><div class="list">' + weak.map((w) => { const l = lessonForTag(w.tag); return '<button class="item" data-act="open-lesson" data-id="' + (l ? l.id : '') + '"><span class="tag warn">' + w.n + '회</span><span class="t"><b>' + esc(R.TAG_LABEL[w.tag] || w.tag) + '</b><small>' + (l ? '카드: ' + esc(l.title) : '') + '</small></span><span class="go">›</span></button>'; }).join('') + '</div></div>';
+      const np = SC.nextPassage(S, bandPassages().map((x) => x.id), Date.now(), band());
+      html += '<div class="row">' + (np ? '<button class="big" data-act="start-practice" data-id="' + np.id + '">다음 글 — 「' + esc(byId(np.id).title) + '」</button>' : '') + '<button class="big ghost" data-act="pr-quit">홈으로</button></div>';
+      return html + footer();
+    }
+    function finishPractice() {
+      const pr = sess.pr, p = byId(pr.id), b = R.BANDS[p.band];
+      const agg = pr.agg || aggregate(pr.res);
+      const words = pr.units.reduce((n, u) => n + u.words, 0);
+      /* 묵독 속도 — 3초 미만이거나 500어절/분 넘게 나오면 버튼을 서둘러 누른 것이라 기록하지 않는다 */
+      let wpm = (!b.sentenceMode && pr.readMs && pr.readMs >= 3000) ? Math.round(words / (pr.readMs / 60000)) : null;
+      if (wpm != null && wpm > 500) wpm = null;
+      const prev = S.log.filter((e) => e.wpm && e.band === p.band).slice(-1)[0];
+      const selfN = (REC.blob || pr.self.some(Boolean)) ? pr.self.filter(Boolean).length : null;
+      const res = { score: agg.score, qOk: pr.picked === p.q.answer, tags: agg.tags, mode: pr.mode, wpm: wpm, self: selfN, band: p.band };
+      SC.record(S, pr.id, res, Date.now()); save();
+      pr.final = Object.assign({}, res, { hit: agg.hit, extra: agg.extra, model: agg.model, prevWpm: prev ? prev.wpm : null });
+      pr.stage = 4; recRelease(); stopSpeak(); render();
+    }
+
+    function vReview() {
+      const now = Date.now(), due = SC.dueList(S, now, band()), weak = SC.weakTags(S, 3);
+      const items = Object.values(S.items).filter((it) => it.band === band());
+      let html = '<div class="card"><p class="eyebrow">' + esc(B().label) + ' 단계</p><h2>복습 — 오늘 ' + due.length + '편</h2><p class="small">복습은 표시 없는 글에 바로 ∕ 를 찍는 것부터 시작해요. 85점 이상이면 다음 복습이 1 → 3 → 7 → 14 → 30일로 멀어지고, 30일 복습까지 통과하면 졸업이에요.</p>' +
+        (due.length ? '<button class="big" data-act="start-review" data-id="' + due[0].id + '">복습 시작 — 「' + esc(byId(due[0].id).title) + '」</button>' : '<p class="small">오늘은 복습할 글이 없어요. 연습 탭에서 새 글을 읽어요.</p>') + '</div>';
+      if (due.length > 1) html += '<div class="list">' + due.map((it) => '<button class="item" data-act="start-review" data-id="' + it.id + '"><span class="tag warn">' + Math.max(1, Math.round((now - it.due) / SC.DAY)) + '일 밀림</span><span class="t"><b>' + esc(byId(it.id).title) + '</b><small>지난 점수 ' + it.lastScore + '점 · ' + it.n + '회</small></span><span class="go">›</span></button>').join('') + '</div>';
+      html += '<div class="card"><h2>약한 규칙</h2>' + (weak.length ? '<div class="list">' + weak.map((w) => { const l = lessonForTag(w.tag); return '<button class="item" data-act="open-lesson" data-id="' + (l ? l.id : '') + '"><span class="tag warn">' + w.n + '회</span><span class="t"><b>' + esc(R.TAG_LABEL[w.tag] || w.tag) + '</b><small>' + (l ? '카드 다시 보기: ' + esc(l.title) : '') + '</small></span><span class="go">›</span></button>'; }).join('') + '</div>' : '<p class="small">최근 30회 연습에서 두 번 이상 나온 실수가 없어요.</p>') + '</div>';
+      const grad = items.filter((it) => it.graduated), sched = items.filter((it) => !it.graduated && it.due > now).sort((a, b2) => a.due - b2.due);
+      html += '<div class="card"><h2>앞으로</h2>' + (sched.length ? sched.slice(0, 8).map((it) => '<div class="kv"><span>' + esc(byId(it.id).title) + '</span><b>' + dkey(it.due) + '</b></div>').join('') : '<p class="small">예정된 복습이 없어요.</p>') + (grad.length ? '<p class="small" style="margin-top:8px">🎓 졸업: ' + grad.map((it) => esc(byId(it.id).title)).join(' · ') + '</p>' : '') + '</div>';
+      return html;
+    }
+
+    function vRecord() {
+      const now = Date.now(), sm = SC.summary(S, now, band()), all = SC.summary(S, now);
+      const a = auth();
+      let html = '<div class="card"><p class="eyebrow">' + esc(B().label) + ' 단계</p><h2>기록</h2><div class="stats"><div class="stat"><b>' + sm.attempts + '</b><span>연습 횟수</span></div><div class="stat"><b>' + (sm.recentAvg != null ? sm.recentAvg : '-') + '</b><span>최근 평균</span></div><div class="stat"><b>' + sm.streak + '</b><span>연속 일</span></div>' +
+        '<div class="stat"><b>' + sm.practiced + '/' + bandPassages().length + '</b><span>읽은 글</span></div><div class="stat"><b>' + sm.graduated + '</b><span>졸업</span></div><div class="stat"><b>' + (sm.qRate != null ? sm.qRate + '%' : '-') + '</b><span>문제 정답률</span></div></div>' +
+        (sm.wpmRecent ? '<p class="small" style="margin-top:8px">최근 묵독 속도 ' + sm.wpmRecent + '어절/분 — 남과 비교하지 말고 지난번의 나와 비교해요.</p>' : '') + '</div>';
+      const recent = S.log.slice(-12).reverse();
+      html += '<div class="card"><h2>최근 연습</h2>' + (recent.length ? '<table class="log"><tr><th>날짜</th><th>글</th><th>끊기</th><th>문제</th><th>속도</th></tr>' + recent.map((e) => { const p = byId(e.id); return '<tr><td>' + fmtDate(e.t) + '</td><td>' + esc(p ? p.title : e.id) + (e.mode === 'review' ? ' <span class="tag muted">복습</span>' : '') + '</td><td><b>' + e.score + '</b></td><td>' + (e.qOk == null ? '-' : e.qOk ? '○' : '✕') + '</td><td>' + (e.wpm || '-') + '</td></tr>'; }).join('') + '</table>' : '<p class="small">아직 기록이 없어요.</p>') +
+        (S.log.length ? '<button class="btn ghost sm" data-act="copy-record" style="margin-top:10px">전체 기록 복사 (선생님 확인용)</button>' : '') + '</div>';
+      /* 설정 */
+      html += '<div class="card set" id="settings"><h2>설정</h2>' +
+        '<label><span>단계' + (S.assign && S.assign.band ? ' <small class="small">(선생님이 정함)</small>' : '') + '</span><select data-act="set-band" ' + (S.assign && S.assign.band ? 'disabled' : '') + '>' + R.BAND_ORDER.map((b) => '<option value="' + b + '" ' + (b === band() ? 'selected' : '') + '>' + R.BANDS[b].label + ' — ' + R.BANDS[b].who + '</option>').join('') + '</select></label>' +
+        '<label><span>글자 크기</span><select data-act="set-font"><option value="normal" ' + (S.prefs.font === 'normal' ? 'selected' : '') + '>보통</option><option value="large" ' + (S.prefs.font === 'large' ? 'selected' : '') + '>크게</option><option value="xlarge" ' + (S.prefs.font === 'xlarge' ? 'selected' : '') + '>아주 크게</option></select></label>' +
+        '<label><span>덩어리 표시</span><select data-act="set-marker"><option value="auto" ' + (S.prefs.marker === 'auto' ? 'selected' : '') + '>자동 (유치·초1·초2 밑줄 곡선, 그 위 ∕)</option><option value="slash" ' + (S.prefs.marker === 'slash' ? 'selected' : '') + '>∕ 표시</option><option value="scoop" ' + (S.prefs.marker === 'scoop' ? 'selected' : '') + '>밑줄 곡선</option><option value="band" ' + (S.prefs.marker === 'band' ? 'selected' : '') + '>색 띠</option></select></label>' +
+        '<label><span>읽어 주기 빠르기</span><input type="range" min="0.7" max="1.3" step="0.05" value="' + (S.prefs.rate || 1) + '" data-act="set-rate"></label>' +
+        '<label><span>낭독 녹음 단계 보이기</span><input type="checkbox" data-act="set-recording" ' + (S.prefs.recording ? 'checked' : '') + '></label></div>';
+      /* 연동 */
+      html += '<div class="card"><h2>선생님과 연동</h2>' + (a && a.token ? '<p class="small"><b>' + esc(a.name || a.code) + '</b>으로 연동되어 있어요. 기록이 학원 서버에도 저장돼 다른 기기에서 이어서 할 수 있어요.</p><button class="btn ghost sm" data-act="unlink">이 기기에서 연동 끊기</button>' :
+        '<p class="small">선생님께 받은 학생 코드를 넣으면 기록이 학원 서버에 저장돼요. 연동 없이도 이 기기에서는 계속 쓸 수 있어요.</p>' + (view.linkMsg ? '<div class="err">' + esc(view.linkMsg) + '</div>' : '') + (view.linkWait ? '<div class="banner">' + esc(view.linkWait) + ' — 선생님 승인을 기다려요. 승인되면 저절로 연결돼요.</div>' : '<div class="row"><input type="text" id="code" inputmode="latin" autocomplete="off" placeholder="wb-…" style="min-height:44px;border:1.5px solid var(--line);border-radius:12px;padding:0 12px"><button class="btn" data-act="link">연결 요청</button></div>')) + '</div>';
+      html += '<div class="card"><h2>그 밖에</h2><div class="row"><a class="btn ghost" href="./print.html?band=' + band() + '" target="_blank" rel="noopener">🖨 교재로 출력하기</a><button class="btn ghost" data-act="reset">기록 지우기</button></div></div>';
+      return html + footer();
+    }
+
+    /* ── 연동 (하루브레인과 같은 코드 → 강사 승인 흐름) ── */
+    let poll = null;
+    function link(code) {
+      fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code, device: 'chunk ' + (navigator.platform || '') }) })
+        .then((r) => r.json()).then((j) => {
+          if (!j.nonce) { view.linkMsg = j.error || '연결할 수 없어요.'; view.linkWait = ''; render({ keep: true }); return; }
+          view.linkMsg = ''; view.linkWait = j.name || code; render({ keep: true });
+          const tick = () => fetch('/api/login/status?n=' + j.nonce).then((r) => r.json()).then((s) => {
+            if (s.token) { saveAuth({ token: s.token, code: s.student ? s.student.code : code, name: s.student ? s.student.name : '' }); view.linkWait = ''; applyBody(); render({ keep: true }); pullState(); pullAssign(); return; }
+            if (s.denied) { view.linkWait = ''; view.linkMsg = '선생님이 승인하지 않았어요.'; render({ keep: true }); return; }
+            if (s.error) { view.linkWait = ''; view.linkMsg = s.error; render({ keep: true }); return; }
+            poll = setTimeout(tick, 3000);
+          }).catch(() => { poll = setTimeout(tick, 5000); });
+          poll = setTimeout(tick, 2500);
+        }).catch(() => { view.linkMsg = '네트워크가 연결되지 않았어요.'; render({ keep: true }); });
+    }
+
+    function copyRecord() {
+      const a = auth(), lines = ['[청크브레인 기록] ' + (a && a.name ? a.name : '') + ' · ' + B().label + ' 단계 · ' + new Date().toLocaleDateString('ko-KR')];
+      const sm = SC.summary(S, Date.now());
+      lines.push('연습 ' + sm.attempts + '회 · 평균 ' + (sm.avg != null ? sm.avg : '-') + '점 · 문제 정답률 ' + (sm.qRate != null ? sm.qRate + '%' : '-') + ' · 연속 ' + sm.streak + '일 · 카드 ' + sm.lessonsDone + '장');
+      S.log.slice(-40).forEach((e) => { const p = byId(e.id); lines.push(fmtDate(e.t) + ' ' + (p ? p.title : e.id) + ' ' + e.score + '점' + (e.qOk == null ? '' : e.qOk ? ' 정답' : ' 오답') + (e.wpm ? ' ' + e.wpm + '어절/분' : '') + (e.mode === 'review' ? ' (복습)' : '') + (e.tags && e.tags.length ? ' [' + e.tags.map((t) => R.TAG_LABEL[t] || t).join(', ') + ']' : '')); });
+      const txt = lines.join('\n');
+      const done = () => announce('복사했어요. 선생님께 붙여 넣어 보여 주세요.');
+      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done).catch(() => window.prompt('복사해 주세요', txt));
+      else window.prompt('복사해 주세요', txt);
+    }
+
+    /* ── 이벤트 (위임) ── */
+    document.addEventListener('click', (ev) => {
+      const t = ev.target.closest('[data-act]'); if (!t) return;
+      const act = t.dataset.act;
+      if (act === 'tab') {
+        /* 끝난 카드·결과 화면은 묻지 않고 떠난다. 진행 중일 때만 확인한다. */
+        const busy = sess && ((sess.ls && !sess.ls.done) || (sess.pr && sess.pr.stage < 4));
+        if (busy && !confirm('지금 하던 것을 그만둘까요?')) return;
+        sess = null; recRelease(); stopSpeak(); view = { name: t.dataset.tab }; render();
+      }
+      else if (act === 'go-settings') { view = { name: 'record' }; render(); setTimeout(() => { const el = $('settings'); if (el) el.scrollIntoView({ behavior: 'smooth' }); }, 30); }
+      else if (act === 'pick-grade') { view.grade = +t.dataset.g; render({ keep: true }); }
+      else if (act === 'start-band') { if (view.grade == null) return; S.band = R.bandOfGrade(view.grade); S.grade = view.grade; save(); view = { name: 'home' }; applyBody(); render(); }
+      else if (act === 'band-shift') { if (S.assign && S.assign.band) { announce('선생님이 정한 단계라 바꿀 수 없어요'); return; } const nb = +t.dataset.d > 0 ? R.nextBand(band()) : R.prevBand(band()); if (!nb) return; S.band = nb; save(); applyBody(); render(); announce(R.BANDS[nb].label + ' 단계로 바꿨어요'); }
+      else if (act === 'open-lesson') { const l = lessonById(t.dataset.id); if (!l) return; stopSpeak(); recRelease(); sess = { ls: { id: l.id, ci: 0, marks: new Set(), result: null, scores: [], done: false } }; view = { name: 'learn' }; try { history.pushState({ sess: 1 }, ''); } catch (e) {} render(); }
+      else if (act === 'lesson-check') { const ls = sess.ls, l = lessonById(ls.id), c = l.checks[ls.ci]; ls.result = R.explain(c.segs.join(''), R.modelBoundaries(c.segs), [...ls.marks]); ls.scores.push(ls.result.score); render({ keep: true }); }
+      else if (act === 'lesson-next') { const ls = sess.ls, l = lessonById(ls.id); ls.ci += 1; ls.marks = new Set(); ls.result = null; if (ls.ci >= l.checks.length) { ls.done = true; SC.lessonDone(S, l.id, Date.now(), Math.round(ls.scores.reduce((a, b) => a + b, 0) / ls.scores.length)); save(); } render(); }
+      else if (act === 'lesson-quit') { sess = null; stopSpeak(); view = { name: 'learn' }; render(); }
+      else if (act === 'tts') { if (SPK) { stopSpeak(); document.querySelectorAll('[data-act="tts"]').forEach((b) => b.textContent = '🔊 들려주기'); return; } const prefix = t.dataset.prefix; let segs = []; if (sess && sess.ls) { const l = lessonById(sess.ls.id); const i = +prefix.replace('ex', ''); segs = l.examples[i].segs; } else if (sess && sess.pr) { const p = byId(sess.pr.id); segs = [].concat.apply([], p.paragraphs); if (prefix === 'all') { /* 문단 경계마다 prefix 가 다르므로 전체를 p0..pn 으로 다시 매핑 */ speakAll(p); return; } } speakSegs(segs, prefix); }
+      else if (act === 'gap') { const i = +t.dataset.i; const set = sess.ls ? sess.ls.marks : sess.pr.marks[+t.dataset.prefix.replace('u', '')]; if (set.has(i)) set.delete(i); else set.add(i); render({ keep: true }); }
+      else if (act === 'start-practice') { startPractice(t.dataset.id, 'practice'); }
+      else if (act === 'start-review') { startPractice(t.dataset.id, 'review'); }
+      else if (act === 'pr-quit') { sess = null; recRelease(); stopSpeak(); view = { name: 'home' }; render(); }
+      else if (act === 'pr-to2') { stopSpeak(); sess.pr.stage = 2; render(); }
+      else if (act === 'pr-check') { const pr = sess.pr; if (pr.sentMode) { const u = pr.units[pr.ui]; pr.res[pr.ui] = R.explain(u.text, u.model, [...pr.marks[pr.ui]]); } else { pr.units.forEach((u, i) => { pr.res[i] = R.explain(u.text, u.model, [...pr.marks[i]]); }); pr.agg = aggregate(pr.res); } render({ keep: true }); }
+      else if (act === 'pr-unit-next') { const pr = sess.pr; if (pr.ui + 1 < pr.units.length) { pr.ui += 1; render(); } else { pr.agg = aggregate(pr.res); pr.stage = 3; pr.readStart = Date.now(); render(); } }
+      else if (act === 'pr-to3') { sess.pr.stage = 3; sess.pr.readStart = Date.now(); render(); }
+      else if (act === 'pr-read-done') { sess.pr.readMs = Date.now() - sess.pr.readStart; render(); }
+      else if (act === 'pr-peek') { sess.pr.peek = true; render({ keep: true }); }
+      else if (act === 'pr-pick') { if (sess.pr.picked != null) return; sess.pr.picked = +t.dataset.i; render({ keep: true }); }
+      else if (act === 'pr-finish') { finishPractice(); }
+      else if (act === 'rec-start') { recStart(); }
+      else if (act === 'rec-stop') { recStop(); }
+      else if (act === 'rec-play') { recPlay(); }
+      else if (act === 'copy-record') { copyRecord(); }
+      else if (act === 'link') { const code = ($('code').value || '').trim(); if (!code) return; link(code); }
+      else if (act === 'unlink') { if (!confirm('이 기기에서 연동을 끊을까요? 서버의 기록은 남아요.')) return; saveAuth(null); applyBody(); setDot('', '이 기기'); render(); }
+      else if (act === 'reset') { if (!confirm('이 기기의 청크브레인 기록을 모두 지울까요?')) return; S = SC.blank(Date.now()); persist(); sess = null; view = { name: 'home' }; applyBody(); render(); }
+    });
+    document.addEventListener('change', (ev) => {
+      const t = ev.target.closest('[data-act]'); if (!t) return;
+      const act = t.dataset.act;
+      if (act === 'self') { sess.pr.self[+t.dataset.i] = t.checked; }
+      else if (act === 'set-band') { if (S.assign && S.assign.band) return; S.band = t.value; save(); applyBody(); render({ keep: true }); }
+      else if (act === 'set-font') { S.prefs.font = t.value; save(); applyBody(); }
+      else if (act === 'set-marker') { S.prefs.marker = t.value; save(); }
+      else if (act === 'set-rate') { S.prefs.rate = +t.value; save(); }
+      else if (act === 'set-recording') { S.prefs.recording = t.checked; save(); }
+    });
+    function speakAll(p) {
+      /* 문단마다 data-seg 접두어가 p0, p1… 이라 전체 인덱스를 그 접두어로 돌려 준다 */
+      const flat = [], map = [];
+      p.paragraphs.forEach((segs, pi) => segs.forEach((s, si) => { flat.push(s); map.push('p' + pi + ':' + si); }));
+      stopSpeak();
+      if (!WBVoice.ttsSupported()) { announce('이 기기에서는 읽어 주기를 쓸 수 없어요'); return; }
+      WBVoice.unlock();
+      let i = 0, cancelled = false;
+      const mark = (idx) => { document.querySelectorAll('.seg.now').forEach((el) => el.classList.remove('now')); if (idx >= 0) { const el = document.querySelector('[data-seg="' + map[idx] + '"]'); if (el) el.classList.add('now'); } document.querySelectorAll('[data-act="tts"]').forEach((b) => { b.textContent = !cancelled && idx >= 0 ? '■ 멈추기' : '🔊 들려주기'; }); };
+      const step = () => { if (cancelled) return; if (i >= flat.length) { mark(-1); SPK = null; return; } mark(i); WBVoice.speak(flat[i++].trim(), { rate: rate(), lang: 'ko', onend: step, onerror: () => { cancelled = true; mark(-1); SPK = null; } }); };
+      SPK = { cancel() { cancelled = true; WBVoice.stop(); mark(-1); SPK = null; } };
+      step();
+    }
+    window.addEventListener('popstate', () => { if (sess) { sess = null; recRelease(); stopSpeak(); view = { name: view.name === 'learn' ? 'learn' : view.name === 'review' ? 'review' : view.name === 'practice' ? 'practice' : 'home' }; render(); } });
+    window.addEventListener('beforeunload', () => { stopSpeak(); });
+
+    /* ── 시작 ── */
+    applyBody(); render();
+    if (auth()) { pullState(); pullAssign(); } else setDot('', '이 기기');
+    if ('serviceWorker' in navigator && location.protocol.startsWith('http')) { navigator.serviceWorker.register('./sw.js').catch(() => {}); }
+  })();
+  </script>
+</body>
+</html>
