@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 240" role="img" aria-label="돋보기로 잎맥을 들여다보는 그림">
+  <rect width="400" height="240" fill="#F4F1E8"/>
+  <g transform="translate(120 130) rotate(-20)">
+    <path d="M0-84 C40-60 60-20 40 30 C24 66 0 80 0 80 C0 80 -24 66 -40 30 C-60-20 -40-60 0-84 Z" fill="#7BB061" stroke="#3F6B45" stroke-width="3"/>
+    <path d="M0-72 V72" stroke="#3F6B45" stroke-width="3"/>
+    <path d="M0-40 L-26-14 M0-40 L26-14 M0-10 L-30 16 M0-10 L30 16 M0 20 L-22 44 M0 20 L22 44" stroke="#3F6B45" stroke-width="2" fill="none"/>
+  </g>
+  <g transform="translate(232 108)">
+    <circle r="66" fill="#DDEBF5" fill-opacity=".85" stroke="#3B4A55" stroke-width="10"/>
+    <g transform="scale(1.7) rotate(-20)">
+      <path d="M0-30 V30" stroke="#3F6B45" stroke-width="2.4"/>
+      <path d="M0-16 L-12-4 M0-16 L12-4 M0-2 L-14 10 M0-2 L14 10 M0 12 L-10 22 M0 12 L10 22" stroke="#3F6B45" stroke-width="1.6" fill="none"/>
+      <circle cx="-6" cy="4" r="2" fill="#E7B62A"/><circle cx="7" cy="-8" r="1.6" fill="#E0762B"/><circle cx="4" cy="16" r="1.6" fill="#C4402F"/>
+    </g>
+    <path d="M48 46 L96 94" stroke="#3B4A55" stroke-width="16" stroke-linecap="round"/>
+    <path d="M52 50 L94 92" stroke="#8A6A16" stroke-width="8" stroke-linecap="round"/>
+  </g>
+</svg>

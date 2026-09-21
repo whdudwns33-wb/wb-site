@@ -1,0 +1,2 @@
+# 배포되는 _headers 는 reading/_headers 하나다 — /letter/* 의 no-store 규칙도 거기 있다.
+# 이 파일은 dist 에 실리지 않는다(build-dist.mjs 가 복사하지 않고 워커도 읽지 않는다). 규칙을 여기 적으면 조용히 무시된다.

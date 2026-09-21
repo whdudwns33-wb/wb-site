@@ -29,6 +29,7 @@ fs.copyFileSync(path.join(ROOT, 'public', 'naesin-studio.html'), path.join(DIST,
 fs.copyFileSync(path.join(ROOT, 'public', 'naesin-live.html'), path.join(DIST, 'admin', 'naesin-live.html'));
 fs.copyFileSync(path.join(ROOT, 'public', 'haru-admin.html'), path.join(DIST, 'admin', 'haru-admin.html'));
 fs.copyFileSync(path.join(ROOT, 'public', 'naesin-ko-admin.html'), path.join(DIST, 'admin', 'naesin-ko-admin.html'));
+fs.copyFileSync(path.join(ROOT, 'public', 'letter-admin.html'), path.join(DIST, 'admin', 'letter-admin.html'));
 
 /* 어휘 나이 진단 (vocab-age/) — 로그인 없이 열리는 공개 페이지.
    실리는 것은 index.html · age.js · words.json 셋뿐이다(낱말과 뜻만). */
@@ -74,6 +75,19 @@ fs.mkdirSync(path.join(DIST, 'haru'), { recursive: true });
 const HARU_FILES = ['index.html', 'parent.html', 'strings.js', 'plan.js', 'mastery.js', 'srs.js', 'cause.js', 'probe.js', 'atoms.json', 'sw.js', 'manifest.webmanifest', 'icon.svg'];
 for (const f of HARU_FILES) fs.copyFileSync(path.join(HARU, f), path.join(DIST, 'haru', f));
 
+/* 브레인레터 (letter/) — 같은 오리진 /letter/ 에서 서빙해야 학생 토큰·가족 링크·API 가 공유된다.
+   호 본문은 KV 에만 있다. issue-sample.json 은 자체 창작 체험 호라 실어도 된다(라이선스 콘텐츠 0).
+   관리 웹의 편집기 미리보기가 학생 앱과 같은 렌더러(letter.js)를 쓴다 — 원본은 letter/letter.js 하나. */
+const LETTER = path.join(ROOT, '..', 'letter');
+fs.mkdirSync(path.join(DIST, 'letter'), { recursive: true });
+const LETTER_FILES = ['index.html', 'letter.js', 'shapes.js', 'issue-sample.json', 'calendar.json', 'sw.js', 'manifest.webmanifest', 'icon.svg'];
+for (const f of LETTER_FILES) fs.copyFileSync(path.join(LETTER, f), path.join(DIST, 'letter', f));
+/* 배포본 삽화(letter/img/*.svg) — 자체 제작 벡터 그림만. 올린 사진은 KV 에서 /api/letter/img/<id> 로 나간다 */
+fs.mkdirSync(path.join(DIST, 'letter', 'img'), { recursive: true });
+for (const f of fs.readdirSync(path.join(LETTER, 'img')).filter((x) => /\.svg$/.test(x))) fs.copyFileSync(path.join(LETTER, 'img', f), path.join(DIST, 'letter', 'img', f));
+fs.copyFileSync(path.join(LETTER, 'letter.js'), path.join(DIST, 'admin', 'letter.js'));
+fs.copyFileSync(path.join(LETTER, 'shapes.js'), path.join(DIST, 'admin', 'shapes.js'));
+
 /* ── 서비스 워커 캐시 이름을 내용에서 뽑는다 ──
    두 앱 모두 껍데기(index.html·words.js…)를 캐시 우선으로 물고 있다. 그래서
    sw.js 안의 VERSION 문자열이 그대로면, 이미 앱을 깔아 둔 학생은 새 코드를
@@ -110,6 +124,8 @@ const kTag = stampSW(path.join(DIST, 'naesin-ko', 'sw.js'),
 const hTag = stampSW(path.join(DIST, 'haru', 'sw.js'),
   ['index.html', 'strings.js', 'plan.js', 'mastery.js', 'srs.js', 'cause.js', 'probe.js', 'manifest.webmanifest', 'icon.svg']
     .map(f => path.join(DIST, 'haru', f)), 'wbh-shell');
+const lTag = stampSW(path.join(DIST, 'letter', 'sw.js'),
+  ['index.html', 'letter.js', 'shapes.js', 'manifest.webmanifest', 'icon.svg'].map(f => path.join(DIST, 'letter', f)), 'wbl-shell');
 
 /* 조립한 것이 실제로 열리는지 확인한다.
    여기 목록에 새 파일을 안 적으면 배포본에서 404가 나고, 그 스크립트를 쓰는 화면이
@@ -130,7 +146,8 @@ function verifyRefs(htmlPath) {
 const broken = [];
 for (const f of ['index.html', 'vocab/index.html', 'vocab-age/index.html', 'admin/index.html',
   'admin/metrics.html', 'admin/vocab-review.html', 'review.html', 'parent.html',
-  'naesin/index.html', 'haru/index.html', 'haru/parent.html', 'admin/haru-admin.html', 'admin/naesin-admin.html']) {
+  'naesin/index.html', 'haru/index.html', 'haru/parent.html', 'admin/haru-admin.html', 'admin/naesin-admin.html',
+  'letter/index.html', 'admin/letter-admin.html']) {
   const full = path.join(DIST, f);
   if (fs.existsSync(full)) for (const m of verifyRefs(full)) broken.push(f + ' → ' + m);
 }
@@ -141,4 +158,4 @@ if (broken.length) {
 }
 
 console.log('dist/ 조립 완료:', fs.readdirSync(DIST).join(', '));
-console.log('서비스 워커 캐시 이름:', rTag, '·', vTag, '·', nTag, '·', kTag, '·', hTag);
+console.log('서비스 워커 캐시 이름:', rTag, '·', vTag, '·', nTag, '·', kTag, '·', hTag, '·', lTag);

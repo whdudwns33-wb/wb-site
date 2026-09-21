@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>WB 브레인레터</title>
+  <meta name="description" content="매주 한 호 — 독해력·입시 문해력·웩슬러 두뇌 놀이 뉴스레터 (WB 독해력학원 원내 구독 가족 전용)">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+  <meta name="theme-color" content="#17211C">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <style>
+    /* 가족이 함께 보는 화면 — 신문 한 면. 껍데기(머리띠·카드)는 신문지 팔레트, 호 본문은 letter.js 의 공용 CSS(.np)가 그린다. */
+    :root { --paper:#F3F1EB; --panel:#FFFFFF; --ink:#17211C; --soft:#5E6B65; --line:#D6D9D2; --spot:#2B4C3F; --spot-soft:#E4EDE7;
+            --gold:#C9A227; --gold-soft:#F7EDCB; --red:#A8402F; --red-soft:#F4E4DF; }
+    * { box-sizing:border-box; }
+    html, body { margin:0; padding:0; min-height:100%; }
+    body { background:var(--paper); color:var(--ink); font-family:"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif; font-size:16px; line-height:1.6; word-break:keep-all; -webkit-font-smoothing:antialiased; }
+    button { font-family:inherit; font-size:inherit; cursor:pointer; border:none; background:none; color:inherit; }
+    input, select { font-family:inherit; font-size:1rem; }
+    :focus-visible { outline:3px solid var(--spot); outline-offset:2px; }
+    [hidden] { display:none !important; }
+    .bar { display:flex; align-items:center; gap:8px; padding:8px 14px; background:var(--paper); border-bottom:1px solid var(--ink); position:sticky; top:0; z-index:5; flex-wrap:wrap; }
+    .bar .brand { font-family:"Noto Serif KR","Nanum Myeongjo","Apple Myungjo","Batang",Georgia,serif; font-weight:900; font-size:17px; letter-spacing:-.02em; color:var(--ink); white-space:nowrap; }
+    .bar .who { font-size:13px; color:var(--soft); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .bar .who b { color:var(--ink); }
+    .hb { min-height:36px; padding:3px 12px; border:1.5px solid var(--ink); background:#fff; font-weight:800; font-size:13.5px; color:var(--ink); white-space:nowrap; }
+    .hb.primary { background:var(--ink); color:#fff; }
+    .bar select { min-height:36px; border:1.5px solid var(--ink); padding:2px 8px; background:#fff; color:var(--ink); font-weight:800; font-size:13.5px; }
+    main { max-width:880px; margin:0 auto; padding:10px 16px 60px; }
+    .card { background:var(--panel); border:1px solid var(--ink); padding:16px 18px; margin:14px 0; }
+    .card h2 { margin:0 0 8px; font-size:17px; color:var(--ink); }
+    .small { font-size:13px; color:var(--soft); }
+    .banner { background:var(--spot-soft); color:var(--spot); border-left:4px solid var(--spot); padding:9px 12px; font-weight:800; margin:12px 0; font-size:14px; }
+    .banner.warn { background:var(--gold-soft); color:#6a5210; border-left-color:var(--gold); }
+    .err { background:var(--red-soft); color:var(--red); border-left:4px solid var(--red); padding:9px 12px; font-weight:700; margin:12px 0; }
+    .big { display:block; width:100%; min-height:54px; background:var(--ink); color:#fff; font-weight:900; font-size:16.5px; margin-top:10px; }
+    .big.ghost { background:#fff; color:var(--ink); border:2px solid var(--ink); }
+    .big:disabled { opacity:.45; cursor:default; }
+    .row { display:flex; gap:10px; flex-wrap:wrap; } .row > * { flex:1; }
+    .link input { width:100%; min-height:52px; padding:0 14px; border:2px solid var(--ink); }
+    .list button { display:flex; width:100%; justify-content:space-between; gap:10px; align-items:center; text-align:left; padding:12px 4px; border-bottom:1px solid var(--line); min-height:56px; }
+    .list button:last-child { border-bottom:none; }
+    .list b { display:block; } .list small { color:var(--soft); font-size:12.5px; white-space:nowrap; }
+    .sheet { position:fixed; inset:auto 0 0 0; background:var(--panel); border-top:3px solid var(--ink); box-shadow:0 -6px 24px #0002; padding:16px 16px calc(16px + env(safe-area-inset-bottom)); z-index:9; }
+    .sheet h3 { margin:0 0 6px; font-size:16px; }
+    .foot { font-size:12px; color:var(--soft); line-height:1.5; margin-top:20px; padding-top:10px; border-top:1px solid var(--line); }
+    .dot { font-size:12px; color:var(--soft); white-space:nowrap; } .dot i { display:inline-block; width:8px; height:8px; border-radius:50%; background:#B7C0CC; margin-right:4px; }
+    .dot.saved i { background:#2E8B57; } .dot.pending i { background:var(--gold); } .dot.failed i { background:var(--red); }
+    .push { display:flex; gap:12px; align-items:center; flex-wrap:wrap; } .push p { flex:1; min-width:200px; margin:0; } .push .big { width:auto; min-width:150px; margin:0; padding:0 18px; }
+    /* 인쇄(PDF) — 화면은 감추고 printArea 의 인쇄본만 */
+    #printArea { display:none; }
+    @media print { body > * { display:none !important; } #printArea { display:block !important; } .np-tierbreak { break-before:page; page-break-before:always; } }
+    @media (max-width:430px) { .hb .lbl { display:none; } }
+  </style>
+  <style id="nlcss"></style>
+</head>
+<body>
+  <header class="bar">
+    <span class="brand">브레인레터</span>
+    <span class="who" id="who"></span>
+    <span class="dot" id="savedot" hidden><i></i><span id="savetxt"></span></span>
+    <select id="tierSel" hidden aria-label="학년대"></select>
+    <button class="hb" id="btnArchive" hidden>지난 호</button>
+    <button class="hb primary" id="btnPdf" hidden>🖨 <span class="lbl">PDF로 저장</span></button>
+  </header>
+  <main id="app"><div class="card">불러오는 중…</div></main>
+  <div id="printArea" aria-hidden="true"></div>
+  <script src="./letter.js"></script>
+  <script src="./shapes.js"></script>
+  <script>
+  'use strict';
+  (function () {
+    var L = WBLETTER;
+    var $ = function (id) { return document.getElementById(id); };
+    var esc = L.esc;
+    var app = $('app');
+    document.getElementById('nlcss').textContent = L.CSS;
+
+    var qs = new URLSearchParams(location.search);
+    var FAM_T = qs.get('t') || '';
+    var WANT_ID = qs.get('id') || '';
+    var WANT_TIER = qs.get('tier') || '';
+    var AUTO_PRINT = qs.get('print') || '';
+
+    /* ── 인증: 진로독서·워드브레인·내신·하루브레인과 같은 wbr.auth. 연동은 코드 → 강사 승인(호스트 /api/login) ── */
+    function auth() { try { return JSON.parse(localStorage.getItem('wbr.auth') || 'null'); } catch (e) { return null; } }
+    function saveAuth(a) { try { if (a) localStorage.setItem('wbr.auth', JSON.stringify(a)); else localStorage.removeItem('wbr.auth'); } catch (e) {} }
+    function adminToken() { try { return localStorage.getItem('wbr.admin.token') || ''; } catch (e) { return ''; } }
+    function fetchJson(url, opt) {
+      return fetch(url, opt).then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok) { var e = new Error(j.error || ('api-' + r.status)); e.status = r.status; throw e; } return j; }); });
+    }
+    function bearer(tok) { return { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok }; }
+
+    /* ── 모드: family(가족 링크) · student(학생 토큰) · admin(관리 미리보기) · demo(체험) ── */
+    var MODE = 'demo', TIER = 'E2', GUESS = false, NAME = '', ISSUE = null, ISSUES = [], CUR_ID = '';
+    var STATE = { v: 1, issues: {} };
+    var stateKey = function () { return 'wbl.state:' + (MODE === 'family' ? 'fam:' + FAM_T.slice(0, 8) : MODE === 'student' ? 'stu:' + ((auth() || {}).code || '') : MODE); };
+    function loadLocal() { try { var s = JSON.parse(localStorage.getItem(stateKey()) || 'null'); if (s && s.issues) STATE = s; } catch (e) {} }
+    function saveLocal() { try { localStorage.setItem(stateKey(), JSON.stringify(STATE)); } catch (e) {} }
+    function issueState(id) { if (!STATE.issues[id]) STATE.issues[id] = { openedAt: '', doneAt: '', quiz: {}, reveal: {}, checks: {} }; var r = STATE.issues[id]; r.quiz = r.quiz || {}; r.reveal = r.reveal || {}; r.checks = r.checks || {}; return r; }
+    function cacheIssue(issue) { try { localStorage.setItem('wbl.cache:' + issue.id, JSON.stringify({ issue: issue, tier: TIER, at: Date.now() })); localStorage.setItem('wbl.cache:last', issue.id); } catch (e) {} }
+    function cachedIssue(id) { try { return JSON.parse(localStorage.getItem('wbl.cache:' + (id || localStorage.getItem('wbl.cache:last') || '')) || 'null'); } catch (e) { return null; } }
+
+    /* 학생 기록은 서버가 원천 — 20초 디바운스로 올리고, 화면을 떠날 때 바로 올린다(하루 상한 10회) */
+    var pushTimer = null, dirty = false;
+    function setDot(cls, txt) { var d = $('savedot'); d.hidden = MODE !== 'student'; d.className = 'dot ' + cls; $('savetxt').textContent = txt; }
+    function push(now) {
+      saveLocal();
+      if (MODE !== 'student') return;
+      dirty = true;
+      if (pushTimer) clearTimeout(pushTimer);
+      var go = function () {
+        pushTimer = null;
+        if (!dirty) return;
+        dirty = false; setDot('pending', '저장 중');
+        var a = auth(); if (!a) return;
+        fetch('/api/letter/state', { method: 'PUT', headers: bearer(a.token), body: JSON.stringify({ state: STATE }), keepalive: true })
+          .then(function (r) { if (!r.ok) throw new Error(String(r.status)); setDot('saved', '저장됨'); })
+          .catch(function (e) { setDot('failed', e.message === '429' ? '오늘 저장 상한' : '저장 안 됨'); if (e.message !== '429') dirty = true; });
+      };
+      if (now) go(); else pushTimer = setTimeout(go, 20000);
+    }
+    document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden' && dirty) push(true); });
+
+    /* ── 새 호 도착 알림(Web Push) — 학생은 토큰으로, 가족은 링크 토큰으로 구독한다. 워드브레인과 같은 배선 ── */
+    function b64uToU8(s) { var b = atob(s.replace(/-/g, '+').replace(/_/g, '/')); var u = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; }
+    function pushSupported() { return (MODE === 'student' || MODE === 'family') && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; }
+    function pushOn() { try { return localStorage.getItem('wbl.push:' + stateKey()) === '1'; } catch (e) { return false; } }
+    function setPushOn(v) { try { if (v) localStorage.setItem('wbl.push:' + stateKey(), '1'); else localStorage.removeItem('wbl.push:' + stateKey()); } catch (e) {} }
+    function pushApi(path, opt) {
+      if (MODE === 'student') return fetchJson('/api/letter/push' + path, Object.assign({ headers: bearer((auth() || {}).token) }, opt || {}));
+      return fetchJson('/api/letter/parent/push' + path + '?t=' + encodeURIComponent(FAM_T), Object.assign({ headers: { 'Content-Type': 'application/json' } }, opt || {}));
+    }
+    function enablePush() {
+      return pushApi('/key').then(function (k) {
+        if (!k.ok) throw new Error('서버에 알림 키가 아직 없어요 — 학원에 문의해 주세요.');
+        return Notification.requestPermission().then(function (perm) {
+          if (perm !== 'granted') throw new Error('알림 권한이 꺼져 있어요 — 브라우저 설정에서 허용해 주세요.');
+          return navigator.serviceWorker.ready;
+        }).then(function (reg) { return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64uToU8(k.key) }); })
+          .then(function (sub) { return pushApi('/subscribe', { method: 'POST', body: JSON.stringify({ subscription: sub.toJSON() }) }); })
+          .then(function () {
+            /* 알림을 눌렀을 때 열 주소 — 가족 링크는 토큰이 있어야 열리므로 서비스 워커가 읽을 자리(Cache API)에 적어 둔다 */
+            if (MODE === 'family' && 'caches' in window) return caches.open('wbl-meta').then(function (c) { return c.put('./famlink', new Response(location.pathname + location.search)); }).catch(function () {});
+          });
+      }).then(function () { setPushOn(true); });
+    }
+    function disablePush() {
+      return navigator.serviceWorker.ready.then(function (reg) { return reg.pushManager.getSubscription(); }).then(function (sub) { if (sub) return sub.unsubscribe(); }).catch(function () {})
+        .then(function () { return pushApi('/unsubscribe', { method: 'POST', body: '{}' }); }).catch(function () {})
+        .then(function () { setPushOn(false); });
+    }
+    function pushCard() {
+      if (!pushSupported()) return '';
+      var on = pushOn();
+      return '<div class="card push"><p><b>새 호 도착 알림</b><br><span class="small">' + (on ? '월요일 아침에 새 호가 오면 이 기기로 알려 드려요.' : '새 호가 나오면 이 기기로 알려 드릴까요? 월요일 아침 한 번뿐이에요.') + '</span></p><button class="big' + (on ? ' ghost' : '') + '" id="pushBtn">' + (on ? '알림 끄기' : '알림 켜기') + '</button></div>';
+    }
+    function bindPush() {
+      var b = $('pushBtn'); if (!b) return;
+      b.onclick = function () {
+        b.disabled = true;
+        (pushOn() ? disablePush() : enablePush()).then(function () { showIssue(); }).catch(function (e) { showIssue(e.message || '알림 설정에 실패했어요.'); });
+      };
+    }
+
+    /* ── 화면 ── */
+    function render(html) { app.innerHTML = html; window.scrollTo(0, 0); }
+    function footer() { return '<div class="foot">WB 독해력학원 · 웩슬러브레인센터 — 원내 구독 가족에게만 보내는 뉴스레터입니다. 링크를 밖으로 공유하지 마세요.</div>'; }
+    function setWho(html) { $('who').innerHTML = html; }
+    function tierPicker(show) {
+      var sel = $('tierSel'); sel.hidden = !show;
+      if (!show) return;
+      var opts = L.TIERS.map(function (t) { return '<option value="' + t.id + '"' + (t.id === TIER ? ' selected' : '') + '>' + esc(t.label) + ' ' + esc(t.range) + '</option>'; });
+      if (MODE === 'admin') opts.push('<option value="all"' + (TIER === 'all' ? ' selected' : '') + '>전체 학년대(인쇄)</option>');
+      sel.innerHTML = opts.join('');
+    }
+    $('tierSel').onchange = function () { TIER = this.value; if (MODE === 'admin') openIssue(CUR_ID); else showIssue(); };
+
+    function showIssue(err) {
+      if (!ISSUE) { render((err ? '<div class="err">' + esc(err) + '</div>' : '') + '<div class="card"><h2>아직 도착한 호가 없어요</h2><p class="small">매주 월요일 새 호가 도착해요. 조금만 기다려 주세요.</p></div>' + pushCard() + footer()); bindPush(); return; }
+      var tier = TIER === 'all' ? null : TIER;
+      var st = issueState(ISSUE.id);
+      if (!st.openedAt) { st.openedAt = new Date().toISOString(); push(); }
+      var html = '';
+      if (err) html += '<div class="err">' + esc(err) + '</div>';
+      if (GUESS) html += '<div class="banner warn">학년을 확인하지 못해 ' + esc(L.tierLabel(TIER)) + ' 글을 보여 드려요. 학원에 학년을 알려 주시면 맞춰 드릴게요.</div>';
+      if (MODE === 'demo') html += '<div class="banner">체험 호예요. 학원에서 받은 가족 링크로 열거나, 아래에서 학생 코드로 연동하면 매주 새 호가 도착해요.</div>';
+      if (MODE === 'admin') html += '<div class="banner">관리자 미리보기 — 학생·가족에게는 자기 학년대 섹션만 보여요.</div>';
+      html += L.renderIssue(ISSUE, tier, { mode: 'app', state: st });
+      if (MODE !== 'admin') html += '<div class="card done-btn">' + (st.doneAt ? '<h2>이번 호를 다 읽었어요 ✔</h2><p class="small">' + esc(st.doneAt.slice(0, 10)) + '에 끝냈어요. 다음 호도 기다려 주세요.</p>' : '<h2>다 읽었나요?</h2><p class="small">문제와 미션까지 마쳤으면 눌러 주세요.</p><button class="big" id="doneBtn">다 읽었어요</button>') + '</div>';
+      html += pushCard();
+      if (MODE === 'demo') html += linkCard();
+      render(html); /* 지면 끝에 발행 정보(np-foot)가 있어 앱 바닥글은 겹치지 않게 뺀다 */
+      if ($('doneBtn')) $('doneBtn').onclick = function () { st.doneAt = new Date().toISOString(); push(true); showIssue(); };
+      bindPush();
+      bindLink();
+    }
+    /* 문제·정답 보기·미션 체크 — 위임 하나로 받는다(다시 그릴 때마다 핸들러를 달지 않게) */
+    app.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-q],[data-ans]');
+      if (!b || !ISSUE) return;
+      var st = issueState(ISSUE.id);
+      if (b.hasAttribute('data-q')) {
+        var p = b.getAttribute('data-q').split(':');           // sid:qi:ci
+        var key = p[0] + ':' + p[1];
+        if (typeof st.quiz[key] === 'number') return;
+        st.quiz[key] = +p[2]; push();
+        var y = window.scrollY; showIssue(); window.scrollTo(0, y);
+      } else {
+        var k = b.getAttribute('data-ans');
+        st.reveal[k] = !st.reveal[k]; push();
+        var y2 = window.scrollY; showIssue(); window.scrollTo(0, y2);
+      }
+    });
+    app.addEventListener('change', function (e) {
+      var cb = e.target.closest('input[data-chk]');
+      if (!cb || !ISSUE) return;
+      var st = issueState(ISSUE.id);
+      if (cb.checked) st.checks[cb.getAttribute('data-chk')] = true; else delete st.checks[cb.getAttribute('data-chk')];
+      push();
+      var sp = cb.parentNode.querySelector('span'); if (sp) sp.className = cb.checked ? 'done' : '';
+    });
+
+    function showArchive() {
+      var rows = ISSUES.map(function (b) { return '<button data-open="' + esc(b.id) + '"><span><b>' + esc(L.issueNo(b.week)) + ' · ' + esc(b.title) + '</b><span class="small">' + esc(b.theme || '') + '</span></span><small>' + esc(b.publishAt) + (STATE.issues[b.id] && STATE.issues[b.id].doneAt ? ' ✔' : '') + '</small></button>'; }).join('');
+      render('<div class="card list"><h2>지난 호</h2>' + (rows || '<p class="small">아직 지난 호가 없어요.</p>') + '</div><button class="big ghost" id="back">이번 호로</button>' + footer());
+      Array.prototype.forEach.call(document.querySelectorAll('[data-open]'), function (b) { b.onclick = function () { openIssue(b.getAttribute('data-open')); }; });
+      $('back').onclick = function () { openIssue(ISSUES.length ? ISSUES[0].id : CUR_ID); };
+    }
+    $('btnArchive').onclick = showArchive;
+
+    /* ── 인쇄(PDF) — 브라우저 인쇄 창에서 "PDF로 저장". 정답 별지를 넣을지 고른다 ── */
+    function printIssue(withKey) {
+      if (!ISSUE) return;
+      var area = $('printArea');
+      if (TIER === 'all') {
+        area.innerHTML = L.TIER_IDS.map(function (t, i) { return '<div class="' + (i ? 'np-tierbreak' : '') + '">' + L.renderIssue(ISSUE, t, { mode: 'print', key: withKey }) + '</div>'; }).join('');
+      } else area.innerHTML = L.renderIssue(ISSUE, TIER, { mode: 'print', key: withKey });
+      closeSheet();
+      setTimeout(function () { window.print(); }, 50);
+    }
+    function closeSheet() { var s = $('pdfSheet'); if (s) s.remove(); }
+    $('btnPdf').onclick = function () {
+      closeSheet();
+      var s = document.createElement('div'); s.className = 'sheet'; s.id = 'pdfSheet';
+      s.innerHTML = '<h3>PDF로 저장 · 인쇄</h3><p class="small">인쇄 창에서 대상을 "PDF로 저장"으로 고르면 파일로 받을 수 있어요. A4 두 단으로 맞춰 두었어요.</p><div class="row"><button class="big" id="pdfKey">정답 별지 포함</button><button class="big ghost" id="pdfNoKey">정답 없이(학습지)</button></div><button class="big ghost" id="pdfClose" style="min-height:44px">닫기</button>';
+      document.body.appendChild(s);
+      $('pdfKey').onclick = function () { printIssue(true); };
+      $('pdfNoKey').onclick = function () { printIssue(false); };
+      $('pdfClose').onclick = closeSheet;
+    };
+
+    /* ── 학생 연동 카드(체험 모드 아래) ── */
+    function linkCard(msg) {
+      return '<div class="card link" id="linkCard"><h2>학생 코드로 연동</h2>' + (msg ? '<div class="err">' + esc(msg) + '</div>' : '') +
+        '<p class="small">선생님께 받은 학생 코드를 넣으면 선생님이 승인해 줘요. 승인되면 이 기기에서는 다시 입력할 일이 없고, 매주 새 호가 여기 도착해요.</p>' +
+        '<input id="code" inputmode="latin" autocomplete="off" placeholder="wb-…"><button class="big" id="go">연결 요청</button></div>';
+    }
+    function bindLink() {
+      var go = $('go'); if (!go) return;
+      go.onclick = function () {
+        var code = ($('code').value || '').trim(); if (!code) return;
+        go.disabled = true;
+        fetchJson('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: code, device: 'letter ' + (navigator.platform || '') }) })
+          .then(function (j) {
+            if (!j.nonce) throw new Error(j.error || '연결할 수 없어요.');
+            $('linkCard').innerHTML = '<h2>' + esc(j.name || '') + ' — 선생님 승인을 기다려요</h2><p class="small">승인되면 저절로 시작해요. 이 화면을 닫지 마세요.</p>';
+            var poll = function () {
+              fetch('/api/login/status?n=' + j.nonce).then(function (r) { return r.json(); }).then(function (s) {
+                if (s.token) { saveAuth({ token: s.token, code: s.student ? s.student.code : code, name: s.student ? s.student.name : '' }); location.replace('./'); return; }
+                if (s.denied) { $('linkCard').outerHTML = linkCard('선생님이 승인하지 않았어요.'); bindLink(); return; }
+                if (s.error) { $('linkCard').outerHTML = linkCard(s.error); bindLink(); return; }
+                setTimeout(poll, 3000);
+              }).catch(function () { setTimeout(poll, 5000); });
+            };
+            setTimeout(poll, 2500);
+          }).catch(function (e) { $('linkCard').outerHTML = linkCard(e.message || '네트워크가 연결되지 않았어요.'); bindLink(); });
+      };
+    }
+
+    /* ── 호 열기 — 모드별 원천 ── */
+    function openIssue(id) {
+      CUR_ID = id || '';
+      var done = function (j) {
+        ISSUE = j.issue || null; if (j.tier && MODE !== 'admin') TIER = j.tier;
+        if (typeof j.guess === 'boolean') GUESS = j.guess;
+        if (ISSUE) cacheIssue(ISSUE);
+        if (ISSUE) CUR_ID = ISSUE.id;
+        showIssue();
+        if (AUTO_PRINT && ISSUE) { var k = AUTO_PRINT !== 'nokey'; AUTO_PRINT = ''; setTimeout(function () { printIssue(k); }, 300); }
+      };
+      var fail = function (e) {
+        var c = cachedIssue(CUR_ID);
+        if (c && c.issue && (!CUR_ID || c.issue.id === CUR_ID)) { ISSUE = c.issue; if (MODE !== 'admin') TIER = c.tier || TIER; showIssue('지금은 서버에 닿지 않아 저장해 둔 호를 보여 드려요.'); return; }
+        ISSUE = null; showIssue(e && e.message);
+      };
+      if (MODE === 'family') return fetchJson('/api/letter/parent?t=' + encodeURIComponent(FAM_T) + (CUR_ID ? '&id=' + encodeURIComponent(CUR_ID) : ''), { cache: 'no-store' }).then(function (j) { ISSUES = j.issues || []; NAME = j.parent.name; GUESS = !!j.parent.guess; done({ issue: j.issue, tier: j.parent.tier }); }).catch(fail);
+      if (MODE === 'admin') return fetchJson('/api/letter/issue?id=' + encodeURIComponent(CUR_ID) + (TIER && TIER !== 'all' ? '&tier=' + TIER : ''), { headers: bearer(adminToken()), cache: 'no-store' }).then(done).catch(fail);
+      if (MODE === 'student') {
+        var a = auth();
+        if (!CUR_ID) return fetchJson('/api/letter/issues', { headers: bearer(a.token), cache: 'no-store' }).then(function (j) { ISSUES = j.issues || []; TIER = j.tier || TIER; GUESS = !!j.guess; if (!ISSUES.length) { ISSUE = null; showIssue(); return; } return openIssue(ISSUES[0].id); }).catch(function (e) { if (e.status === 401) { saveAuth(null); location.replace('./'); return; } fail(e); });
+        return fetchJson('/api/letter/issue?id=' + encodeURIComponent(CUR_ID), { headers: bearer(a.token), cache: 'no-store' }).then(done).catch(function (e) { if (e.status === 401) { saveAuth(null); location.replace('./'); return; } fail(e); });
+      }
+      /* 체험 — 배포본에 실린 자체 창작 샘플 호 */
+      return fetchJson('./issue-sample.json', { cache: 'no-store' }).then(function (issue) { ISSUES = [L.brief(issue)]; done({ issue: issue }); }).catch(fail);
+    }
+
+    function boot() {
+      var a = auth();
+      if (FAM_T) MODE = 'family';
+      else if (WANT_ID && adminToken()) MODE = 'admin';
+      else if (a && a.token) MODE = 'student';
+      else MODE = 'demo';
+      if (WANT_TIER && (L.TIER_IDS.indexOf(WANT_TIER) >= 0 || (WANT_TIER === 'all' && MODE === 'admin'))) TIER = WANT_TIER;
+      loadLocal();
+      $('btnArchive').hidden = MODE === 'admin';
+      $('btnPdf').hidden = false;
+      tierPicker(MODE === 'demo' || MODE === 'admin');
+      if (MODE === 'student') {
+        setWho('<b>' + esc(a.name || a.code || '') + '</b>');
+        fetchJson('/api/letter/state', { headers: bearer(a.token), cache: 'no-store' }).then(function (j) { if (j.state && j.state.issues) { STATE = j.state; saveLocal(); } }).catch(function () {}).then(function () { openIssue(WANT_ID); });
+        setDot('saved', '');
+        return;
+      }
+      if (MODE === 'family') { setWho('가족 화면'); openIssue(WANT_ID).then(function () { if (NAME) setWho('<b>' + esc(NAME) + '</b> 학생 가정'); }); return; }
+      if (MODE === 'admin') { setWho('관리자 미리보기'); openIssue(WANT_ID); return; }
+      setWho('체험 모드'); openIssue('');
+    }
+    boot();
+    if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(function () {});
+  })();
+  </script>
+</body>
+</html>
