@@ -29,6 +29,7 @@ fs.copyFileSync(path.join(ROOT, 'public', 'naesin-studio.html'), path.join(DIST,
 fs.copyFileSync(path.join(ROOT, 'public', 'naesin-live.html'), path.join(DIST, 'admin', 'naesin-live.html'));
 fs.copyFileSync(path.join(ROOT, 'public', 'haru-admin.html'), path.join(DIST, 'admin', 'haru-admin.html'));
 fs.copyFileSync(path.join(ROOT, 'public', 'naesin-ko-admin.html'), path.join(DIST, 'admin', 'naesin-ko-admin.html'));
+fs.copyFileSync(path.join(ROOT, 'public', 'chunk-admin.html'), path.join(DIST, 'admin', 'chunk-admin.html'));
 
 /* 어휘 나이 진단 (vocab-age/) — 로그인 없이 열리는 공개 페이지.
    실리는 것은 index.html · age.js · words.json 셋뿐이다(낱말과 뜻만). */
@@ -144,7 +145,7 @@ const broken = [];
 for (const f of ['index.html', 'vocab/index.html', 'vocab-age/index.html', 'admin/index.html',
   'admin/metrics.html', 'admin/vocab-review.html', 'review.html', 'parent.html',
   'naesin/index.html', 'haru/index.html', 'haru/parent.html', 'admin/haru-admin.html', 'admin/naesin-admin.html',
-  'chunk/index.html', 'chunk/print.html']) {
+  'chunk/index.html', 'chunk/print.html', 'admin/chunk-admin.html']) {
   const full = path.join(DIST, f);
   if (fs.existsSync(full)) for (const m of verifyRefs(full)) broken.push(f + ' → ' + m);
 }

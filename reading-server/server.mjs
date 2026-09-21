@@ -190,7 +190,7 @@ const naesinKoStore = {
 };
 
 /* 청크브레인 저장소 어댑터 — db.chunk 만 사용(학생 기록·관리용 요약). 콘텐츠는 저장소에 없다. */
-const chunkRoot = () => { db.chunk = db.chunk || { states: {}, summaries: {} }; return db.chunk; };
+const chunkRoot = () => { db.chunk = db.chunk || { states: {}, summaries: {}, assigns: {} }; db.chunk.assigns = db.chunk.assigns || {}; return db.chunk; };
 const chunkStore = {
   getState: (c) => chunkRoot().states[c] || null,
   putState: (c, rec) => { chunkRoot().states[c] = rec; persist(); },
@@ -199,6 +199,10 @@ const chunkStore = {
   putSummary: (c, rec) => { chunkRoot().summaries[c] = rec; persist(); },
   deleteSummary: (c) => { delete chunkRoot().summaries[c]; persist(); },
   listSummaryCodes: () => Object.keys(chunkRoot().summaries),
+  getAssign: (c) => chunkRoot().assigns[c] || null,
+  putAssign: (c, rec) => { chunkRoot().assigns[c] = rec; persist(); },
+  deleteAssign: (c) => { delete chunkRoot().assigns[c]; persist(); },
+  listAssignCodes: () => Object.keys(chunkRoot().assigns),
   getStudent: (c) => db.students?.[c] || null,
 };
 

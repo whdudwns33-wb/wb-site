@@ -16,7 +16,7 @@ var WBCHUNK_SCHED = (function () {
   var WEAK_WINDOW = 30;                       /* 약한 규칙은 최근 30회 기록으로 본다 */
 
   function blank(now) {
-    return { v: 1, band: null, items: {}, log: [], lessons: {}, prefs: { font: 'normal', rate: null, marker: 'auto', recording: true }, updatedAt: now || 0 };
+    return { v: 1, band: null, items: {}, log: [], lessons: {}, prefs: { font: 'normal', rate: null, marker: 'auto', recording: true }, assign: null, updatedAt: now || 0 };
   }
   /* 저장된 것을 복원할 때 빠진 칸을 채운다 — 버전이 올라가도 옛 기록이 열리게 */
   function normalize(s, now) {
@@ -26,6 +26,8 @@ var WBCHUNK_SCHED = (function () {
     for (var k in b) out[k] = (s[k] != null && b[k] != null && typeof s[k] === typeof b[k]) ? s[k] : b[k];
     /* band 의 기본값이 null 이라 위 비교로는 문자열이 버려진다 — 따로 본다 */
     out.band = typeof s.band === 'string' ? legacyBand(s.band) : null;
+    /* 선생님 과제(서버가 준 것을 그대로 보관) — 기본값이 null 이라 위 비교로는 버려진다 */
+    out.assign = s.assign && typeof s.assign === 'object' && !Array.isArray(s.assign) ? s.assign : null;
     if (!out.prefs || typeof out.prefs !== 'object') out.prefs = b.prefs;
     for (var p in b.prefs) if (out.prefs[p] === undefined) out.prefs[p] = b.prefs[p];
     if (!Array.isArray(out.log)) out.log = [];
@@ -124,6 +126,16 @@ var WBCHUNK_SCHED = (function () {
     state.updatedAt = now;
   }
 
+  /* 과제 진행 — 선생님이 정한 뒤(assign.updatedAt) 연습한 글과 본 카드만 센다 */
+  function assignDone(state) {
+    var a = state.assign; if (!a) return 0;
+    var since = a.updatedAt ? Date.parse(a.updatedAt) || 0 : 0, n = 0;
+    (a.passages || []).forEach(function (id) { var it = state.items[id]; if (it && it.last >= since) n++; });
+    (a.lessons || []).forEach(function (id) { var l = state.lessons[id]; if (l && l.at >= since) n++; });
+    return n;
+  }
+  function assignTotal(state) { var a = state.assign; return a ? (a.passages || []).length + (a.lessons || []).length : 0; }
+
   function summary(state, now, band) {
     var items = values(state.items).filter(function (it) { return !band || it.band === band; });
     var logs = state.log.filter(function (e) { return !band || e.band === band; });
@@ -143,10 +155,10 @@ var WBCHUNK_SCHED = (function () {
   /* 선생님 확인용 요약 — 서버에 함께 올리는 작은 객체(화이트리스트는 서버가 다시 건다) */
   function forTeacher(state, now) {
     var s = summary(state, now);
-    return { band: state.band, attempts: s.attempts, practiced: s.practiced, graduated: s.graduated, avg: s.avg, recentAvg: s.recentAvg, qRate: s.qRate, wpmRecent: s.wpmRecent, streak: s.streak, lessonsDone: s.lessonsDone, lastAt: state.log.length ? state.log[state.log.length - 1].t : null };
+    return { band: state.band, attempts: s.attempts, practiced: s.practiced, graduated: s.graduated, avg: s.avg, recentAvg: s.recentAvg, qRate: s.qRate, wpmRecent: s.wpmRecent, streak: s.streak, lessonsDone: s.lessonsDone, weak: weakTags(state, 5), assignDone: assignDone(state), lastAt: state.log.length ? state.log[state.log.length - 1].t : null };
   }
 
-  return { DAY: DAY, STEP_DAYS: STEP_DAYS, GRADUATE_STEP: GRADUATE_STEP, blank: blank, normalize: normalize, gradeOf: gradeOf, record: record, dueList: dueList, nextPassage: nextPassage, weakTags: weakTags, suggestion: suggestion, streak: streak, lessonDone: lessonDone, summary: summary, forTeacher: forTeacher, dayKey: dayKey };
+  return { DAY: DAY, STEP_DAYS: STEP_DAYS, GRADUATE_STEP: GRADUATE_STEP, blank: blank, normalize: normalize, gradeOf: gradeOf, record: record, dueList: dueList, nextPassage: nextPassage, weakTags: weakTags, suggestion: suggestion, streak: streak, lessonDone: lessonDone, summary: summary, forTeacher: forTeacher, assignDone: assignDone, assignTotal: assignTotal, dayKey: dayKey };
 })();
 
 if (typeof module !== 'undefined' && module.exports) module.exports = WBCHUNK_SCHED;

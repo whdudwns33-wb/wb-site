@@ -195,6 +195,23 @@
         .then(() => setDot('saved', '저장됨'))
         .catch((e) => { setDot('failed', e.status === 401 ? '연동 만료' : '저장 안 됨'); });
     }
+    /* 선생님 과제 — 단계·글·카드. 단계가 정해져 있으면 학생이 고른 단계보다 우선한다. */
+    const assignSince = () => (S.assign && S.assign.updatedAt) ? (Date.parse(S.assign.updatedAt) || 0) : 0;
+    const assignDoneP = (id) => { const it = S.items[id]; return !!(it && it.last >= assignSince()); };
+    const assignDoneL = (id) => { const l = S.lessons[id]; return !!(l && l.at >= assignSince()); };
+    const assignHas = () => !!(S.assign && ((S.assign.passages || []).length || (S.assign.lessons || []).length || S.assign.note));
+    function applyAssign(rec) {
+      const before = JSON.stringify(S.assign || null), next = rec ? rec : null;
+      if (JSON.stringify(next) === before) return;
+      S.assign = next; persist();
+      if (next && next.band && next.band !== S.band) { S.band = next.band; persist(); announce('선생님이 단계를 ' + R.BANDS[next.band].label + '(으)로 정했어요'); }
+      else if (next && assignHas()) announce('선생님 과제가 도착했어요');
+      applyBody(); render({ keep: true });
+    }
+    function pullAssign() {
+      if (!auth()) return;
+      api('/assign').then((j) => applyAssign(j.assign ? Object.assign({}, j.assign, { updatedAt: j.updatedAt }) : null)).catch(() => {});
+    }
     function pullState() {
       if (!auth()) { setDot('', '이 기기'); return; }
       setDot('pending', '불러오는 중');
@@ -323,8 +340,16 @@
       const a = auth();
       let html = '<div class="card hero"><p class="eyebrow">' + esc(B().label) + ' 단계 · ' + esc(B().who) + '</p><h1>' + (a && a.name ? esc(a.name) + ', ' : '') + '오늘도 덩어리로 읽자!</h1>' +
         '<p>' + (sm.streak ? '연속 ' + sm.streak + '일째 · ' : '') + '지금까지 연습 ' + sm.attempts + '회' + (sm.recentAvg != null ? ' · 최근 평균 ' + sm.recentAvg + '점' : '') + '</p></div>';
-      if (sug === 'up' && R.nextBand(band())) html += '<div class="banner">최근 세 번 모두 85점 이상이에요. <b>' + R.BANDS[R.nextBand(band())].label + ' 단계</b>로 올라가 볼까요? <button class="btn sm" data-act="band-shift" data-d="1">올리기</button></div>';
-      if (sug === 'down' && R.prevBand(band())) html += '<div class="banner">이 단계 글이 아직 어려워요. <b>' + R.BANDS[R.prevBand(band())].label + ' 단계</b>로 잠시 내려가 연습하면 더 빨리 늘어요. <button class="btn sm" data-act="band-shift" data-d="-1">내리기</button></div>';
+      if (assignHas()) {
+        const a = S.assign, since = assignSince();
+        html += '<div class="card"><h2>선생님 과제' + (a.due ? ' <span class="tag warn">~' + esc(a.due.slice(5).replace('-', '/')) + '</span>' : '') + '</h2>' + (a.note ? '<p class="small">💬 ' + esc(a.note) + '</p>' : '') + '<div class="list">' +
+          (a.passages || []).map((id) => { const p = byId(id); if (!p) return ''; const d = assignDoneP(id); return '<button class="item ' + (d ? 'done' : '') + '" data-act="start-practice" data-id="' + id + '"><span class="tag ' + (d ? 'ok' : 'warn') + '">' + (d ? '✓' : '글') + '</span><span class="t"><b>' + esc(p.title) + '</b><small>' + esc(R.BANDS[p.band].label) + ' · ' + esc(p.genre) + '</small></span><span class="go">›</span></button>'; }).join('') +
+          (a.lessons || []).map((id) => { const l = lessonById(id); if (!l) return ''; const d = assignDoneL(id); return '<button class="item ' + (d ? 'done' : '') + '" data-act="open-lesson" data-id="' + id + '"><span class="tag ' + (d ? 'ok' : 'warn') + '">' + (d ? '✓' : '카드') + '</span><span class="t"><b>' + esc(l.title) + '</b><small>' + esc(R.BANDS[l.band].label) + ' 규칙 카드</small></span><span class="go">›</span></button>'; }).join('') +
+          '</div><p class="small" style="margin-top:8px">' + SC.assignDone(S) + ' / ' + SC.assignTotal(S) + ' 끝냈어요' + (since ? ' · 선생님이 ' + fmtDate(since) + '에 정함' : '') + '</p></div>';
+      }
+      const teacherBand = !!(S.assign && S.assign.band);
+      if (!teacherBand && sug === 'up' && R.nextBand(band())) html += '<div class="banner">최근 세 번 모두 85점 이상이에요. <b>' + R.BANDS[R.nextBand(band())].label + ' 단계</b>로 올라가 볼까요? <button class="btn sm" data-act="band-shift" data-d="1">올리기</button></div>';
+      if (!teacherBand && sug === 'down' && R.prevBand(band())) html += '<div class="banner">이 단계 글이 아직 어려워요. <b>' + R.BANDS[R.prevBand(band())].label + ' 단계</b>로 잠시 내려가 연습하면 더 빨리 늘어요. <button class="btn sm" data-act="band-shift" data-d="-1">내리기</button></div>';
       html += '<div class="card"><h2>오늘의 세 걸음</h2><div class="steps">' +
         '<div class="step ' + (nl ? '' : 'done') + '"><div class="k">1</div><div class="t"><b>배우기</b><small>' + (nl ? esc(nl.title) : '이 단계 카드를 다 봤어요') + '</small></div>' + (nl ? '<button class="btn sm" data-act="open-lesson" data-id="' + nl.id + '">열기</button>' : '') + '</div>' +
         '<div class="step"><div class="k">2</div><div class="t"><b>연습 — 따라 읽기 → 직접 끊기 → 문제</b><small>' + (np ? '「' + esc(byId(np.id).title) + '」 · ' + WHY[np.why] : '이 단계 글을 모두 졸업했어요!') + '</small></div>' + (np ? '<button class="btn sm" data-act="start-practice" data-id="' + np.id + '">시작</button>' : '') + '</div>' +
@@ -339,7 +364,9 @@
       const ls = bandLessons();
       const item = (l, i) => { const d = S.lessons[l.id]; return '<button class="item ' + (d ? 'done' : '') + '" data-act="open-lesson" data-id="' + l.id + '"><span class="tag ' + (d ? 'ok' : 'muted') + '">' + (d ? '✓' : (i + 1)) + '</span><span class="t"><b>' + esc(l.title) + '</b><small>' + esc(l.rule) + '</small></span><span class="go">›</span></button>'; };
       const below = bandsUpTo(band()).slice(0, -1).reverse().filter((b) => bandLessons(b).length);
-      return '<div class="card"><p class="eyebrow">' + esc(B().label) + ' 단계</p><h2>배우기 — 이 학년의 새 카드 ' + ls.length + '장</h2><p class="small">카드 하나 = 규칙 하나 + 보기 + 확인 문제. 규칙은 학년마다 쌓여요. 아래 학년 카드도 이 학년의 것이니 안 본 카드는 함께 봐요.</p></div>' +
+      const assigned = (S.assign && S.assign.lessons || []).map(lessonById).filter(Boolean);
+      return (assigned.length ? '<div class="card"><h2>선생님이 정한 카드</h2><div class="list">' + assigned.map((l) => '<button class="item ' + (assignDoneL(l.id) ? 'done' : '') + '" data-act="open-lesson" data-id="' + l.id + '"><span class="tag ' + (assignDoneL(l.id) ? 'ok' : 'warn') + '">' + (assignDoneL(l.id) ? '✓' : '과제') + '</span><span class="t"><b>' + esc(l.title) + '</b><small>' + esc(R.BANDS[l.band].label) + ' · ' + esc(l.rule) + '</small></span><span class="go">›</span></button>').join('') + '</div></div>' : '') +
+        '<div class="card"><p class="eyebrow">' + esc(B().label) + ' 단계</p><h2>배우기 — 이 학년의 새 카드 ' + ls.length + '장</h2><p class="small">카드 하나 = 규칙 하나 + 보기 + 확인 문제. 규칙은 학년마다 쌓여요. 아래 학년 카드도 이 학년의 것이니 안 본 카드는 함께 봐요.</p></div>' +
         '<div class="list">' + ls.map(item).join('') + '</div>' +
         (below.length ? '<div class="card" style="margin-top:12px"><h2>아래 학년 카드 (복습)</h2>' + below.map((b) => '<h3>' + esc(R.BANDS[b].label) + '</h3><div class="list">' + bandLessons(b).map(item).join('') + '</div>').join('') + '</div>' : '');
     }
@@ -393,8 +420,10 @@
       const np = SC.nextPassage(S, bandPassages().map((p) => p.id), now, band());
       return '<div class="card"><p class="eyebrow">' + esc(B().label) + ' 단계</p><h2>연습 — 글 ' + bandPassages().length + '편</h2><p class="small">① 표시된 글을 따라 읽고 → ② 표시 없는 글에 직접 ∕ 를 찍고 → ③ 표시 없이 읽은 뒤 문제 하나. 5~10분이면 돼요.</p>' +
         (np ? '<button class="big" data-act="start-practice" data-id="' + np.id + '">다음 글 시작 — 「' + esc(byId(np.id).title) + '」 <span class="tag" style="background:#fff3;color:#fff">' + WHY[np.why] + '</span></button>' : '<p class="small">이 단계 글을 모두 졸업했어요. 홈에서 단계를 올려 보세요.</p>') + '</div>' +
-        '<div class="list">' + bandPassages().map((p) => {
+        '<div class="list">' + bandPassages().concat((S.assign && S.assign.passages || []).map(byId).filter((p) => p && p.band !== band())).sort((x, y) => (S.assign && S.assign.passages || []).indexOf(y.id) >= 0 ? 1 : (S.assign && S.assign.passages || []).indexOf(x.id) >= 0 ? -1 : 0).map((p) => {
           const it = S.items[p.id]; let tag = '<span class="tag muted">아직</span>';
+          if (S.assign && (S.assign.passages || []).indexOf(p.id) >= 0) tag = assignDoneP(p.id) ? '<span class="tag ok">과제 ✓</span>' : '<span class="tag warn">과제</span>';
+          else
           if (it) tag = it.graduated ? '<span class="tag ok">졸업</span>' : (it.due && it.due <= now ? '<span class="tag warn">복습</span>' : '<span class="tag">' + it.lastScore + '점</span>');
           return '<button class="item ' + (it ? 'done' : '') + '" data-act="start-practice" data-id="' + p.id + '">' + tag + '<span class="t"><b>' + esc(p.title) + '</b><small>' + esc(p.genre) + ' · ' + R.stats([].concat.apply([], p.paragraphs)).words + '어절' + (it && !it.graduated && it.due ? ' · 다음 복습 ' + fmtDate(it.due) : '') + '</small></span><span class="go">›</span></button>';
         }).join('') + '</div>';
@@ -521,7 +550,7 @@
         (S.log.length ? '<button class="btn ghost sm" data-act="copy-record" style="margin-top:10px">전체 기록 복사 (선생님 확인용)</button>' : '') + '</div>';
       /* 설정 */
       html += '<div class="card set" id="settings"><h2>설정</h2>' +
-        '<label><span>단계</span><select data-act="set-band">' + R.BAND_ORDER.map((b) => '<option value="' + b + '" ' + (b === band() ? 'selected' : '') + '>' + R.BANDS[b].label + ' — ' + R.BANDS[b].who + '</option>').join('') + '</select></label>' +
+        '<label><span>단계' + (S.assign && S.assign.band ? ' <small class="small">(선생님이 정함)</small>' : '') + '</span><select data-act="set-band" ' + (S.assign && S.assign.band ? 'disabled' : '') + '>' + R.BAND_ORDER.map((b) => '<option value="' + b + '" ' + (b === band() ? 'selected' : '') + '>' + R.BANDS[b].label + ' — ' + R.BANDS[b].who + '</option>').join('') + '</select></label>' +
         '<label><span>글자 크기</span><select data-act="set-font"><option value="normal" ' + (S.prefs.font === 'normal' ? 'selected' : '') + '>보통</option><option value="large" ' + (S.prefs.font === 'large' ? 'selected' : '') + '>크게</option><option value="xlarge" ' + (S.prefs.font === 'xlarge' ? 'selected' : '') + '>아주 크게</option></select></label>' +
         '<label><span>덩어리 표시</span><select data-act="set-marker"><option value="auto" ' + (S.prefs.marker === 'auto' ? 'selected' : '') + '>자동 (유치·초1·초2 밑줄 곡선, 그 위 ∕)</option><option value="slash" ' + (S.prefs.marker === 'slash' ? 'selected' : '') + '>∕ 표시</option><option value="scoop" ' + (S.prefs.marker === 'scoop' ? 'selected' : '') + '>밑줄 곡선</option><option value="band" ' + (S.prefs.marker === 'band' ? 'selected' : '') + '>색 띠</option></select></label>' +
         '<label><span>읽어 주기 빠르기</span><input type="range" min="0.7" max="1.3" step="0.05" value="' + (S.prefs.rate || 1) + '" data-act="set-rate"></label>' +
@@ -541,7 +570,7 @@
           if (!j.nonce) { view.linkMsg = j.error || '연결할 수 없어요.'; view.linkWait = ''; render({ keep: true }); return; }
           view.linkMsg = ''; view.linkWait = j.name || code; render({ keep: true });
           const tick = () => fetch('/api/login/status?n=' + j.nonce).then((r) => r.json()).then((s) => {
-            if (s.token) { saveAuth({ token: s.token, code: s.student ? s.student.code : code, name: s.student ? s.student.name : '' }); view.linkWait = ''; applyBody(); render({ keep: true }); pullState(); return; }
+            if (s.token) { saveAuth({ token: s.token, code: s.student ? s.student.code : code, name: s.student ? s.student.name : '' }); view.linkWait = ''; applyBody(); render({ keep: true }); pullState(); pullAssign(); return; }
             if (s.denied) { view.linkWait = ''; view.linkMsg = '선생님이 승인하지 않았어요.'; render({ keep: true }); return; }
             if (s.error) { view.linkWait = ''; view.linkMsg = s.error; render({ keep: true }); return; }
             poll = setTimeout(tick, 3000);
@@ -574,7 +603,7 @@
       else if (act === 'go-settings') { view = { name: 'record' }; render(); setTimeout(() => { const el = $('settings'); if (el) el.scrollIntoView({ behavior: 'smooth' }); }, 30); }
       else if (act === 'pick-grade') { view.grade = +t.dataset.g; render({ keep: true }); }
       else if (act === 'start-band') { if (view.grade == null) return; S.band = R.bandOfGrade(view.grade); S.grade = view.grade; save(); view = { name: 'home' }; applyBody(); render(); }
-      else if (act === 'band-shift') { const nb = +t.dataset.d > 0 ? R.nextBand(band()) : R.prevBand(band()); if (!nb) return; S.band = nb; save(); applyBody(); render(); announce(R.BANDS[nb].label + ' 단계로 바꿨어요'); }
+      else if (act === 'band-shift') { if (S.assign && S.assign.band) { announce('선생님이 정한 단계라 바꿀 수 없어요'); return; } const nb = +t.dataset.d > 0 ? R.nextBand(band()) : R.prevBand(band()); if (!nb) return; S.band = nb; save(); applyBody(); render(); announce(R.BANDS[nb].label + ' 단계로 바꿨어요'); }
       else if (act === 'open-lesson') { const l = lessonById(t.dataset.id); if (!l) return; stopSpeak(); recRelease(); sess = { ls: { id: l.id, ci: 0, marks: new Set(), result: null, scores: [], done: false } }; view = { name: 'learn' }; try { history.pushState({ sess: 1 }, ''); } catch (e) {} render(); }
       else if (act === 'lesson-check') { const ls = sess.ls, l = lessonById(ls.id), c = l.checks[ls.ci]; ls.result = R.explain(c.segs.join(''), R.modelBoundaries(c.segs), [...ls.marks]); ls.scores.push(ls.result.score); render({ keep: true }); }
       else if (act === 'lesson-next') { const ls = sess.ls, l = lessonById(ls.id); ls.ci += 1; ls.marks = new Set(); ls.result = null; if (ls.ci >= l.checks.length) { ls.done = true; SC.lessonDone(S, l.id, Date.now(), Math.round(ls.scores.reduce((a, b) => a + b, 0) / ls.scores.length)); save(); } render(); }
@@ -604,7 +633,7 @@
       const t = ev.target.closest('[data-act]'); if (!t) return;
       const act = t.dataset.act;
       if (act === 'self') { sess.pr.self[+t.dataset.i] = t.checked; }
-      else if (act === 'set-band') { S.band = t.value; save(); applyBody(); render({ keep: true }); }
+      else if (act === 'set-band') { if (S.assign && S.assign.band) return; S.band = t.value; save(); applyBody(); render({ keep: true }); }
       else if (act === 'set-font') { S.prefs.font = t.value; save(); applyBody(); }
       else if (act === 'set-marker') { S.prefs.marker = t.value; save(); }
       else if (act === 'set-rate') { S.prefs.rate = +t.value; save(); }
@@ -628,7 +657,7 @@
 
     /* ── 시작 ── */
     applyBody(); render();
-    if (auth()) pullState(); else setDot('', '이 기기');
+    if (auth()) { pullState(); pullAssign(); } else setDot('', '이 기기');
     if ('serviceWorker' in navigator && location.protocol.startsWith('http')) { navigator.serviceWorker.register('./sw.js').catch(() => {}); }
   })();
   </script>

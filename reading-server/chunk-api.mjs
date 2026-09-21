@@ -3,13 +3,20 @@
    격리 원칙(워드브레인·국어브레인 선례): 라우트는 /api/chunk/* 아래, 데이터는 청크 전용 저장소
    (워커: chunk: 접두 KV 키, 로컬: db.chunk)만 쓴다. 인증은 호스트의 토큰 검증 결과(who)를 그대로 받는다.
 
-   콘텐츠(지문·카드)는 자체 창작이라 정적 자산(chunk/passages.js)으로 나간다 — 서버가 나르는 것은 학생 기록뿐이다.
-   응답 계약(CLAUDE.md 절대 규칙 4): /state → {state, updatedAt}.
-   summary 는 관리 화면용 작은 요약 — 학생 기기가 올린 값이라 서버가 화이트리스트로 모양을 강제하고, 화면은 다시 이스케이프한다. */
+   콘텐츠(지문·카드)는 자체 창작이라 정적 자산(chunk/passages.js)으로 나간다 — 서버가 나르는 것은 학생 기록과 선생님 과제뿐이다.
+   응답 계약(CLAUDE.md 절대 규칙 4): /state → {state, updatedAt} · /assign → {assign, updatedAt}.
+   summary 는 관리 화면용 작은 요약 — 학생 기기가 올린 값이라 서버가 화이트리스트로 모양을 강제하고, 화면은 다시 이스케이프한다.
+
+   저장 키 세 계열: state(학생 기록 전체) · summary(관리 화면용 요약) · assign(선생님이 정한 단계·글·카드). */
 
 const STATE_MAX_BYTES = 262_144;   // 학생 기록 1건 최대 (256KB) — log 400건 + items 로도 충분히 남는다
-const SUMMARY_MAX_BYTES = 2_048;
+const SUMMARY_MAX_BYTES = 4_096;
+const ASSIGN_MAX_ITEMS = 20;
 const BANDS = ['K', 'G1', 'G2', 'G3', 'G4', 'G5', 'G6', 'G7', 'G8', 'G9', 'G10', 'G11', 'G12'];   /* chunk/rules.js BAND_ORDER 와 같다 */
+const CODE_RE = /^[A-Za-z0-9-]{3,20}$/;
+const ID_RE = /^[a-z0-9-]{2,24}$/;        /* 지문·카드 id — g3-01, k-1 */
+const TAG_RE = /^(?:miss|extra):[a-z]+$/;
+const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const nowIso = () => new Date().toISOString();
 const size = (o) => JSON.stringify(o).length;
 const isObj = (v) => v && typeof v === 'object' && !Array.isArray(v);
@@ -19,24 +26,54 @@ const pctOrNull = (v) => (v == null || !Number.isFinite(Number(v)) ? null : Math
 /* 학생 기기가 올린 요약을 모양만 강제한다 — 뜻은 해석하지 않는다(하루브레인 normalizeSummary 와 같은 원칙) */
 export function normalizeChunkSummary(sum) {
   if (!isObj(sum)) return null;
+  const weak = Array.isArray(sum.weak)
+    ? sum.weak.filter((w) => isObj(w) && TAG_RE.test(String(w.tag || ''))).slice(0, 5).map((w) => ({ tag: String(w.tag), n: int0(w.n) }))
+    : [];
   return {
     band: BANDS.includes(sum.band) ? sum.band : null,
     attempts: int0(sum.attempts), practiced: int0(sum.practiced), graduated: int0(sum.graduated),
     avg: pctOrNull(sum.avg), recentAvg: pctOrNull(sum.recentAvg), qRate: pctOrNull(sum.qRate),
     wpmRecent: sum.wpmRecent == null ? null : int0(sum.wpmRecent),
     streak: int0(sum.streak), lessonsDone: int0(sum.lessonsDone),
+    assignDone: int0(sum.assignDone),
+    weak,
     lastAt: Number.isFinite(Number(sum.lastAt)) && Number(sum.lastAt) > 0 ? Math.round(Number(sum.lastAt)) : null,
   };
 }
 
-/* 관리 overview 한 줄 — 학생 명단(students)과 요약을 합친다 */
-export function chunkOverviewRow(code, stu, rec) {
+/* 선생님 과제 — 단계·글·카드·메모·마감. 셋 다 비면 null(과제 없음). 오류는 문자열로 돌려준다. */
+export function normalizeAssign(a) {
+  if (!isObj(a)) return { error: '과제는 객체여야 해요.' };
+  const band = a.band == null || a.band === '' ? null : (BANDS.includes(a.band) ? a.band : undefined);
+  if (band === undefined) return { error: '모르는 단계예요: ' + String(a.band) };
+  const ids = (list, what) => {
+    if (list == null) return [];
+    if (!Array.isArray(list)) return { error: what + ' 목록이 배열이 아니에요.' };
+    const out = [];
+    for (const x of list) { if (!ID_RE.test(String(x))) return { error: what + ' id 형식이 아니에요: ' + String(x) }; if (out.indexOf(x) < 0) out.push(String(x)); }
+    if (out.length > ASSIGN_MAX_ITEMS) return { error: what + '은(는) ' + ASSIGN_MAX_ITEMS + '개까지만 정할 수 있어요.' };
+    return out;
+  };
+  const passages = ids(a.passages, '글'); if (passages.error) return passages;
+  const lessons = ids(a.lessons, '카드'); if (lessons.error) return lessons;
+  const note = String(a.note || '').trim().slice(0, 200);
+  const due = a.due == null || a.due === '' ? null : (DATE_RE.test(String(a.due)) ? String(a.due) : undefined);
+  if (due === undefined) return { error: '마감일은 YYYY-MM-DD 형식이에요.' };
+  if (!band && !passages.length && !lessons.length && !note) return { assign: null };
+  return { assign: { band, passages, lessons, note, due } };
+}
+
+/* 관리 overview 한 줄 — 학생 명단(students)과 요약·과제를 합친다 */
+export function chunkOverviewRow(code, stu, rec, assignRec) {
   const s = rec && rec.summary ? rec.summary : null;
+  const a = assignRec && assignRec.assign ? assignRec.assign : null;
   return {
-    code, name: stu ? stu.name || '' : '', cls: stu ? stu.cls || '' : '',
+    code, name: stu ? stu.name || '' : '', cls: stu ? stu.cls || '' : '', grade: stu ? stu.grade || '' : '',
     band: s ? s.band : null, attempts: s ? s.attempts : 0, practiced: s ? s.practiced : 0, graduated: s ? s.graduated : 0,
     avg: s ? s.avg : null, recentAvg: s ? s.recentAvg : null, qRate: s ? s.qRate : null, wpmRecent: s ? s.wpmRecent : null,
-    streak: s ? s.streak : 0, lessonsDone: s ? s.lessonsDone : 0, lastAt: s ? s.lastAt : null, updatedAt: rec ? rec.updatedAt || null : null,
+    streak: s ? s.streak : 0, lessonsDone: s ? s.lessonsDone : 0, weak: s ? s.weak || [] : [], assignDone: s ? s.assignDone || 0 : 0,
+    lastAt: s ? s.lastAt : null, updatedAt: rec ? rec.updatedAt || null : null,
+    assign: a ? { band: a.band, passages: a.passages.length, lessons: a.lessons.length, due: a.due, note: a.note, updatedAt: assignRec.updatedAt || null } : null,
   };
 }
 
@@ -64,25 +101,49 @@ export async function handleChunk({ path: p, method, who, getBody, store }) {
     }
     return j(200, { ok: true, updatedAt: rec.updatedAt });
   }
+  /* 학생이 자기 과제를 받는다 — 선생님이 정한 단계·글·카드. 없으면 null. */
+  if (p === '/api/chunk/assign' && method === 'GET' && !who.admin) {
+    const rec = await store.getAssign(who.code);
+    return j(200, { assign: rec ? rec.assign : null, updatedAt: rec ? rec.updatedAt : null });
+  }
 
   if (p.startsWith('/api/chunk/admin/')) {
     if (!who.admin) return j(403, { error: '관리자만 쓸 수 있어요.' });
     if (p === '/api/chunk/admin/overview' && method === 'GET') {
       const codes = await store.listSummaryCodes();
+      /* 과제만 있고 아직 연습 기록이 없는 학생도 표에 올라야 선생님이 과제 상태를 본다 */
+      if (store.listAssignCodes) for (const c of await store.listAssignCodes()) if (!codes.includes(c)) codes.push(c);
       const rows = [];
       for (const c of codes) {
         const stu = await store.getStudent(c);
         if (!stu) continue;                         /* 퇴원 등으로 명단에서 빠진 학생은 내보내지 않는다 */
-        rows.push(chunkOverviewRow(c, stu, await store.getSummary(c)));
+        rows.push(chunkOverviewRow(c, stu, await store.getSummary(c), await store.getAssign(c)));
       }
       rows.sort((a, b) => (b.lastAt || 0) - (a.lastAt || 0));
       return j(200, { rows, updatedAt: nowIso() });
     }
-    const m = p.match(/^\/api\/chunk\/admin\/student\/([A-Za-z0-9-]{3,20})$/);
-    if (m && method === 'GET') {
-      const rec = await store.getState(m[1]);
+    const ms = p.match(/^\/api\/chunk\/admin\/student\/([A-Za-z0-9-]{3,20})$/);
+    if (ms && method === 'GET') {
+      const rec = await store.getState(ms[1]);
       if (!rec) return j(404, { error: '기록 없음' });
       return j(200, { state: rec.state, updatedAt: rec.updatedAt });
+    }
+    const ma = p.match(/^\/api\/chunk\/admin\/assign\/([A-Za-z0-9-]{3,20})$/);
+    if (ma && method === 'GET') {
+      const rec = await store.getAssign(ma[1]);
+      return j(200, { assign: rec ? rec.assign : null, updatedAt: rec ? rec.updatedAt : null });
+    }
+    if (ma && method === 'PUT') {
+      const code = ma[1];
+      if (!CODE_RE.test(code) || !(await store.getStudent(code))) return j(404, { error: '학생 없음' });
+      const b = await body();
+      if (!b) return j(400, { error: '올바른 JSON이 아니에요.' });
+      const n = normalizeAssign(b);
+      if (n.error) return j(400, { error: n.error });
+      if (!n.assign) { await store.deleteAssign(code); return j(200, { ok: true, assign: null, updatedAt: null }); }
+      const rec = { assign: n.assign, updatedAt: nowIso() };
+      await store.putAssign(code, rec);
+      return j(200, { ok: true, assign: rec.assign, updatedAt: rec.updatedAt });
     }
     return j(404, { error: 'unknown api' });
   }
@@ -93,4 +154,5 @@ export async function handleChunk({ path: p, method, who, getBody, store }) {
 export async function dropStudentChunk(store, code) {
   if (store.deleteState) await store.deleteState(code);
   if (store.deleteSummary) await store.deleteSummary(code);
+  if (store.deleteAssign) await store.deleteAssign(code);
 }

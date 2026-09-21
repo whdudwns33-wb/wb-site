@@ -17,7 +17,8 @@
 | `content.test.cjs` | 지문·카드 무결성 — 이어붙이기·공백·단계별 어절 상한·문장 길이·글자 수·붙여 읽을 자리에서 끊지 않았나(`check`)·문제 형식·정답 위치 분산·갈래 섞임·조각 평균이 눈금 근처인가·학년마다 새 카드 2장·모든 태그를 다루는 카드가 있는가 |
 | `rules.test.cjs` · `sched.test.cjs` | 모듈 테스트 |
 | `sw.js` · `manifest.webmanifest` · `icon.svg` · `_headers` | 껍데기 캐시(VERSION 은 `build-dist` 가 스탬프) · 설치 정보 · 아이콘 · 헤더 안내(실제 규칙은 `reading/_headers`) |
-| `../reading-server/chunk-api.mjs` | `/api/chunk/state` GET → `{state, updatedAt}` · PUT `{state, summary}` (256KB 상한, 요약은 화이트리스트로 따로 저장) · `/api/chunk/admin/overview`(요약 행) · `/admin/student/:code` · `dropStudentChunk`(퇴원). 워커는 `chunk:state:`·`chunk:summary:` KV, 로컬은 `db.chunk` |
+| `../reading-server/chunk-api.mjs` | `/api/chunk/state` GET → `{state, updatedAt}` · PUT `{state, summary}` (256KB 상한, 요약은 화이트리스트로 따로 저장: 약한 규칙 태그·과제 진행 포함) · `/api/chunk/assign` GET → `{assign, updatedAt}`(학생이 받는 선생님 과제) · 관리: `/admin/overview`(요약+과제 행) · `/admin/student/:code`(기록 전체) · `/admin/assign/:code` GET/PUT(단계·글·카드·메모·마감, 빈 과제는 삭제) · `dropStudentChunk`(퇴원). 워커는 `chunk:state:`·`chunk:summary:`·`chunk:assign:` KV, 로컬은 `db.chunk` |
+| `../reading-server/public/chunk-admin.html` | 관리 화면(`/admin/chunk-admin.html`, 관리 PIN) — 반 현황 표(반 필터·정렬) · 학생 상세(요약·약한 규칙·최근 연습·글별 진행) · 단계/과제 지정(단계, 글·카드 체크, 메모, 마감) · 약한 규칙 분포(반 전체 태그 합계 → 카드 추천) · 교재 출력 링크 |
 
 ```
 node chunk/rules.test.cjs && node chunk/sched.test.cjs && node chunk/content.test.cjs
@@ -39,4 +40,4 @@ PORT=8890 ADMIN_PIN=<pin> DATA_DIR=<dir> node reading-server/server.mjs   # → 
 
 ## 아직 없는 것
 
-관리 웹 화면(`/api/chunk/admin/overview` 는 있으나 표를 그리는 페이지는 없다 — 학생 앱의 「기록 복사」로 대신) · 지문 확장(학년당 6편 → 12편) · 영어 끊어읽기(직독직해) 트랙.
+지문 확장(학년당 6편 → 12편) · 영어 끊어읽기(직독직해) 트랙 · 어른이 듣고 평정하는 낭독 4단계 카드 · 처음 보는 글의 「전이 점수」 분리.

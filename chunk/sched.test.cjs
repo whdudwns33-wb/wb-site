@@ -108,7 +108,22 @@ t('연속 학습일·요약', () => {
   S.lessonDone(s, 'g3-1', T0, 100);
   assert.strictEqual(S.summary(s, T0).lessonsDone, 1);
   const ft = S.forTeacher(s, T0);
-  assert.deepStrictEqual(Object.keys(ft).sort(), ['attempts', 'avg', 'band', 'graduated', 'lastAt', 'lessonsDone', 'practiced', 'qRate', 'recentAvg', 'streak', 'wpmRecent']);
+  assert.deepStrictEqual(Object.keys(ft).sort(), ['assignDone', 'attempts', 'avg', 'band', 'graduated', 'lastAt', 'lessonsDone', 'practiced', 'qRate', 'recentAvg', 'streak', 'weak', 'wpmRecent']);
+  assert.deepStrictEqual(ft.weak, []);
+});
+
+t('과제 진행 — 선생님이 정한 뒤에 한 것만 센다', () => {
+  const s = S.blank(T0);
+  s.assign = { band: 'G3', passages: ['a', 'b'], lessons: ['g3-1'], note: '', due: null, updatedAt: new Date(T0).toISOString() };
+  assert.strictEqual(S.assignTotal(s), 3); assert.strictEqual(S.assignDone(s), 0);
+  S.record(s, 'a', { score: 90, band: 'G3' }, T0 - DAY);           /* 과제 전에 한 것 */
+  assert.strictEqual(S.assignDone(s), 0);
+  S.record(s, 'a', { score: 90, band: 'G3' }, T0 + 1000); S.lessonDone(s, 'g3-1', T0 + 2000, 100);
+  assert.strictEqual(S.assignDone(s), 2);
+  assert.strictEqual(S.forTeacher(s, T0 + 3000).assignDone, 2);
+  assert.strictEqual(S.normalize({ assign: s.assign }, T0).assign.band, 'G3', '복원해도 과제가 남는다');
+  assert.strictEqual(S.normalize({ assign: 'x' }, T0).assign, null);
+  assert.strictEqual(S.assignDone(S.blank(T0)), 0);
 });
 
 t('기록은 400건까지만 — 오래된 것부터 버린다', () => {
