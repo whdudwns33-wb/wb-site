@@ -12,11 +12,19 @@ ADMIN_PIN=원하는PIN node reading-server/server.mjs   # 기본 포트 8890
 |------|------|
 | `/` | 학생 앱 (reading/ 폴더를 그대로 서빙 — 같은 주소라 연동이 자동 활성화) |
 | `/vocab/` | **워드브레인** (어휘 기억 앱, vocab/ 폴더) — 같은 오리진이라 진로독서 어휘장·학생 토큰이 자동 공유 |
+| `/hanja/` | **한자브레인** (한자·한글 어휘 앱, hanja/ 폴더) — 같은 오리진, 학생 토큰 공유. 단어장은 `/api/hanja/*`(KV·db 전용) |
+| `/admin/hanja-admin.html` | **한자브레인 단어장 관리** (PIN) — 문제집 단어장 업로드(붙여넣기·JSON)·공개 범위·학생 배정·현황 |
 | `/admin` | 강사 관리 웹 (PIN 로그인) — 현황판·학생 상세·백업·학부모 링크 |
 | `/admin/vocab-review.html` | **워드브레인 AI 연상 검수함** (PIN 로그인) — 승인/반려 + 학생별 어휘 현황 |
 | `/review.html` | 지문 검수 뷰어 + **발행/초안 원클릭 전환** (PIN 로그인) |
 | `/parent.html?t=…` | 학부모 주간 리포트 (학생별 열람 토큰, 로그인 불필요, 읽기 전용) |
 | `/api/health` | 상태 확인 |
+
+### 한자브레인
+
+- 라우트는 `/api/hanja/*`, 데이터는 `hanja:` 접두 KV 키(로컬 `db.hanja`)만 — `hanja-api.mjs` 한 모듈. 상세는 `hanja/README.md`.
+- 학생: `GET /books`·`GET /book?id=`·`GET /pull`·`PUT /state`. 관리(PIN): `POST /admin/book`(붙여넣기·JSON, dryRun)·`GET /admin/books`·`DELETE /admin/book`·`POST /admin/scope`·`POST /admin/assign`·`GET /admin/overview`.
+- 단어장 검사 규칙은 `hanja/book-check.js` 하나 — CLI `node hanja/book-validate.mjs` 와 업로드 관문이 같은 판정. 백업 덤프에는 단어장 본문이 없다(id·메타만).
 
 ### 워드브레인 (분리 가능한 A 구조)
 

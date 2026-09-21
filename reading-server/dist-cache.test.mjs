@@ -24,9 +24,10 @@ const V_SW = path.join(DIST, 'vocab', 'sw.js');
 const N_SW = path.join(DIST, 'naesin', 'sw.js');
 const K_SW = path.join(DIST, 'naesin-ko', 'sw.js');
 const H_SW = path.join(DIST, 'haru', 'sw.js');
+const J_SW = path.join(DIST, 'hanja', 'sw.js');
 
 build();
-const before = { r: swVer(R_SW), v: swVer(V_SW), n: swVer(N_SW), k: swVer(K_SW), h: swVer(H_SW) };
+const before = { r: swVer(R_SW), v: swVer(V_SW), n: swVer(N_SW), k: swVer(K_SW), h: swVer(H_SW), j: swVer(J_SW) };
 
 t('배포본의 캐시 이름이 내용에서 나온다 — 손으로 적은 값이 아니다', () => {
   assert.ok(/^wbr-shell-[0-9a-f]{10}$/.test(before.r), '진로독서 sw.js: ' + before.r);
@@ -34,6 +35,7 @@ t('배포본의 캐시 이름이 내용에서 나온다 — 손으로 적은 값
   assert.ok(/^wbn-shell-[0-9a-f]{10}$/.test(before.n), '내신브레인 sw.js: ' + before.n);
   assert.ok(/^wbk-shell-[0-9a-f]{10}$/.test(before.k), '국어브레인 sw.js: ' + before.k);
   assert.ok(/^wbh-shell-[0-9a-f]{10}$/.test(before.h), '하루브레인 sw.js: ' + before.h);
+  assert.ok(/^wbhj-shell-[0-9a-f]{10}$/.test(before.j), '한자브레인 sw.js: ' + before.j);
 });
 
 t('두 번 빌드해도 같다 — 안 바뀐 배포에서 캐시가 헛되이 날아가지 않는다', () => {
@@ -43,6 +45,7 @@ t('두 번 빌드해도 같다 — 안 바뀐 배포에서 캐시가 헛되이 �
   assert.strictEqual(swVer(N_SW), before.n);
   assert.strictEqual(swVer(K_SW), before.k);
   assert.strictEqual(swVer(H_SW), before.h);
+  assert.strictEqual(swVer(J_SW), before.j);
 });
 
 t('껍데기 파일이 바뀌면 캐시 이름이 바뀐다 — 학생이 새 코드를 받는다', () => {
@@ -56,6 +59,8 @@ t('껍데기 파일이 바뀌면 캐시 이름이 바뀐다 — 학생이 새 �
     /* 국어는 개념어 사전도 셸에 실린다 — 사전을 고치면 학생이 새 사전을 받아야 한다 */
     { file: path.join(HERE, '..', 'naesin-ko', 'concepts.json'), sw: K_SW, was: before.k, what: '국어브레인 개념어 사전' },
     { file: path.join(HERE, '..', 'haru', 'icon.svg'), sw: H_SW, was: before.h, what: '하루브레인 앱' },
+    /* 한자는 체험 단어장도 셸에 실린다 — 단어장을 고치면 학생이 새 단어장을 받아야 한다 */
+    { file: path.join(HERE, '..', 'hanja', 'book-sample.json'), sw: J_SW, was: before.j, what: '한자브레인 체험 단어장' },
   ];
   for (const c of cases) {
     const orig = fs.readFileSync(c.file);
@@ -72,6 +77,7 @@ t('껍데기 파일이 바뀌면 캐시 이름이 바뀐다 — 학생이 새 �
   assert.strictEqual(swVer(V_SW), before.v, '되돌렸는데 값이 안 돌아왔다');
   assert.strictEqual(swVer(N_SW), before.n, '되돌렸는데 값이 안 돌아왔다');
   assert.strictEqual(swVer(K_SW), before.k, '되돌렸는데 값이 안 돌아왔다');
+  assert.strictEqual(swVer(J_SW), before.j, '되돌렸는데 값이 안 돌아왔다');
 });
 
 t('지문 데이터 버전이 articles.json 과 version.json 에서 같다', () => {
@@ -95,6 +101,8 @@ t('미러용 원본 sw.js 는 손으로 붙인 번호를 그대로 지닌다', (
   assert.ok(/^wbn-shell-(dev|v\d+)$/.test(n), `naesin/sw.js 의 VERSION 이 이상합니다: ${n}`);
   const h = swVer(path.join(HERE, '..', 'haru', 'sw.js'));
   assert.ok(/^wbh-shell-(dev|v\d+)$/.test(h), `haru/sw.js 의 VERSION 이 이상합니다: ${h}`);
+  const j = swVer(path.join(HERE, '..', 'hanja', 'sw.js'));
+  assert.ok(/^wbhj-shell-(dev|v\d+)$/.test(j), `hanja/sw.js 의 VERSION 이 이상합니다: ${j}`);
 });
 
 /* _headers 규칙 — 배포본에 실리는 것은 reading/_headers 하나다(naesin/·vocab/ 의 것은 dist 에 없다).
@@ -110,11 +118,11 @@ function parseHeaders(text) {
   }
   return rules;
 }
-t('배포본 _headers — /naesin/*·/vocab/*·/haru/*·/admin/* 은 no-store, 전 경로 noindex, /* 에는 Cache-Control 없음', () => {
+t('배포본 _headers — /naesin/*·/vocab/*·/haru/*·/hanja/*·/admin/* 은 no-store, 전 경로 noindex, /* 에는 Cache-Control 없음', () => {
   const distText = fs.readFileSync(path.join(DIST, '_headers'), 'utf8');
   assert.strictEqual(distText, fs.readFileSync(path.join(HERE, '..', 'reading', '_headers'), 'utf8'), 'dist/_headers 는 reading/_headers 그대로여야 한다');
   const rules = parseHeaders(distText);
-  for (const p of ['/naesin/*', '/vocab/*', '/haru/*', '/admin/*']) {
+  for (const p of ['/naesin/*', '/vocab/*', '/haru/*', '/hanja/*', '/admin/*']) {
     assert.ok(rules[p], p + ' 규칙이 없다 — 그 앱의 옛 화면이 브라우저 캐시에 굳는다');
     assert.strictEqual(rules[p]['Cache-Control'], 'no-store', p);
   }
@@ -123,7 +131,7 @@ t('배포본 _headers — /naesin/*·/vocab/*·/haru/*·/admin/* 은 no-store, �
   assert.strictEqual(rules['/*']['Cache-Control'], undefined, '/* 에 Cache-Control 을 두면 분할본의 max-age 와 합쳐져 캐시가 통째로 무력화된다');
   assert.strictEqual(rules['/articles-L1.json']['Cache-Control'], 'public, max-age=604800', '분할본 캐시 규칙은 그대로');
   /* 원본 자리의 두 파일은 안내 주석만 남는다 — 규칙이 두 곳에 있으면 한 곳만 고치는 사고가 난다 */
-  for (const app of ['naesin', 'vocab', 'haru']) {
+  for (const app of ['naesin', 'vocab', 'haru', 'hanja']) {
     const own = fs.readFileSync(path.join(HERE, '..', app, '_headers'), 'utf8');
     assert.ok(own.split(/\r?\n/).every((l) => !l.trim() || l.trim().startsWith('#')), app + '/_headers 에 규칙이 남아 있다 — reading/_headers 로 옮기세요');
     assert.ok(!fs.existsSync(path.join(DIST, app, '_headers')), app + '/_headers 가 dist 에 실렸다');
@@ -133,7 +141,7 @@ t('배포본 _headers — /naesin/*·/vocab/*·/haru/*·/admin/* 은 no-store, �
 /* 관리 화면은 서비스 워커가 없다 — 빌드가 dist/admin/ 으로 복사하지 않으면 그 화면만
    운영에서 404 다. 로컬 서버는 public/ 을 직접 서빙해 티가 안 나므로 여기서 지킨다. */
 t('관리 화면들이 dist/admin/ 에 실린다 — 하나 빠지면 그 화면만 운영에서 404', () => {
-  const want = ['index.html', 'vocab-review.html', 'metrics.html', 'naesin-admin.html', 'naesin-studio.html', 'naesin-live.html', 'haru-admin.html'];
+  const want = ['index.html', 'vocab-review.html', 'metrics.html', 'naesin-admin.html', 'naesin-studio.html', 'naesin-live.html', 'haru-admin.html', 'hanja-admin.html'];
   for (const f of want) {
     const fp = path.join(DIST, 'admin', f);
     assert.ok(fs.existsSync(fp), 'dist/admin/' + f + ' 가 없다 — build-dist.mjs 에 복사를 추가하세요');
@@ -152,6 +160,13 @@ t('관리 화면들이 dist/admin/ 에 실린다 — 하나 빠지면 그 화면
     assert.ok(fs.existsSync(path.join(haruDir, f)), 'dist/haru/' + f + ' 가 없다');
   assert.ok(!fs.readdirSync(haruDir).some((f) => /pack-sample|paperkey|plans|kor-master-data|sheet/.test(f)), 'dist/haru/ 에 문항·대응표·플랜이 실렸다');
   assert.ok(!fs.readFileSync(path.join(haruDir, 'atoms.json'), 'utf8').includes('answerKey'), 'atoms.json 에 문항이 있다');
+  /* 한자브레인 배포본 — 껍데기 + 순수 로직 + 체험 단어장뿐. 구매 교재 단어장은 KV 에만 있다 */
+  const hanjaDir = path.join(DIST, 'hanja');
+  for (const f of ['index.html', 'voice.js', 'srs.js', 'quiz.js', 'trace.js', 'book-check.js', 'book-sample.json', 'sw.js'])
+    assert.ok(fs.existsSync(path.join(hanjaDir, f)), 'dist/hanja/' + f + ' 가 없다');
+  const hanjaFiles = fs.readdirSync(hanjaDir);
+  assert.ok(hanjaFiles.every((f) => !/\.json$/.test(f) || f === 'book-sample.json'), 'dist/hanja/ 에 체험 단어장 말고 다른 JSON 이 실렸다: ' + hanjaFiles.join(', '));
+  assert.ok(/자체 창작/.test(fs.readFileSync(path.join(hanjaDir, 'book-sample.json'), 'utf8')), '체험 단어장에 자체 창작 표시가 없다');
   const live = fs.readFileSync(path.join(DIST, 'admin', 'naesin-live.html'), 'utf8');
   const genSrc = (live.match(/src="([^"]*gen\.js)"/) || [])[1];
   assert.ok(genSrc, '수업 화면이 gen.js 를 불러오지 않는다 — 투사 문제를 만들 수 없다');

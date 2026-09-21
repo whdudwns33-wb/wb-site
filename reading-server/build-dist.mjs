@@ -29,6 +29,7 @@ fs.copyFileSync(path.join(ROOT, 'public', 'naesin-studio.html'), path.join(DIST,
 fs.copyFileSync(path.join(ROOT, 'public', 'naesin-live.html'), path.join(DIST, 'admin', 'naesin-live.html'));
 fs.copyFileSync(path.join(ROOT, 'public', 'haru-admin.html'), path.join(DIST, 'admin', 'haru-admin.html'));
 fs.copyFileSync(path.join(ROOT, 'public', 'naesin-ko-admin.html'), path.join(DIST, 'admin', 'naesin-ko-admin.html'));
+fs.copyFileSync(path.join(ROOT, 'public', 'hanja-admin.html'), path.join(DIST, 'admin', 'hanja-admin.html'));
 
 /* 어휘 나이 진단 (vocab-age/) — 로그인 없이 열리는 공개 페이지.
    실리는 것은 index.html · age.js · words.json 셋뿐이다(낱말과 뜻만). */
@@ -74,6 +75,14 @@ fs.mkdirSync(path.join(DIST, 'haru'), { recursive: true });
 const HARU_FILES = ['index.html', 'parent.html', 'strings.js', 'plan.js', 'mastery.js', 'srs.js', 'cause.js', 'probe.js', 'atoms.json', 'sw.js', 'manifest.webmanifest', 'icon.svg'];
 for (const f of HARU_FILES) fs.copyFileSync(path.join(HARU, f), path.join(DIST, 'haru', f));
 
+/* 한자브레인 (hanja/) — 같은 오리진 /hanja/ 에서 서빙해야 학생 토큰·API가 공유된다.
+   단어장(문제집 낱말)은 dist 에 싣지 않는다 — KV(hanja:book:*)에만 산다. book-sample.json 은 자체 창작 체험 단어장이라 실어도 된다. */
+const HANJA = path.join(ROOT, '..', 'hanja');
+fs.mkdirSync(path.join(DIST, 'hanja'), { recursive: true });
+const HANJA_FILES = ['index.html', 'srs.js', 'quiz.js', 'trace.js', 'book-check.js', 'book-sample.json', 'sw.js', 'manifest.webmanifest', 'icon.svg'];
+for (const f of HANJA_FILES) fs.copyFileSync(path.join(HANJA, f), path.join(DIST, 'hanja', f));
+fs.copyFileSync(SHARED, path.join(DIST, 'hanja', 'voice.js'));
+
 /* ── 서비스 워커 캐시 이름을 내용에서 뽑는다 ──
    두 앱 모두 껍데기(index.html·words.js…)를 캐시 우선으로 물고 있다. 그래서
    sw.js 안의 VERSION 문자열이 그대로면, 이미 앱을 깔아 둔 학생은 새 코드를
@@ -110,6 +119,9 @@ const kTag = stampSW(path.join(DIST, 'naesin-ko', 'sw.js'),
 const hTag = stampSW(path.join(DIST, 'haru', 'sw.js'),
   ['index.html', 'strings.js', 'plan.js', 'mastery.js', 'srs.js', 'cause.js', 'probe.js', 'manifest.webmanifest', 'icon.svg']
     .map(f => path.join(DIST, 'haru', f)), 'wbh-shell');
+const jTag = stampSW(path.join(DIST, 'hanja', 'sw.js'),
+  ['index.html', 'voice.js', 'srs.js', 'quiz.js', 'trace.js', 'book-check.js', 'book-sample.json', 'manifest.webmanifest', 'icon.svg']
+    .map(f => path.join(DIST, 'hanja', f)), 'wbhj-shell');
 
 /* 조립한 것이 실제로 열리는지 확인한다.
    여기 목록에 새 파일을 안 적으면 배포본에서 404가 나고, 그 스크립트를 쓰는 화면이
@@ -130,7 +142,8 @@ function verifyRefs(htmlPath) {
 const broken = [];
 for (const f of ['index.html', 'vocab/index.html', 'vocab-age/index.html', 'admin/index.html',
   'admin/metrics.html', 'admin/vocab-review.html', 'review.html', 'parent.html',
-  'naesin/index.html', 'haru/index.html', 'haru/parent.html', 'admin/haru-admin.html', 'admin/naesin-admin.html']) {
+  'naesin/index.html', 'haru/index.html', 'haru/parent.html', 'admin/haru-admin.html', 'admin/naesin-admin.html',
+  'hanja/index.html', 'admin/hanja-admin.html']) {
   const full = path.join(DIST, f);
   if (fs.existsSync(full)) for (const m of verifyRefs(full)) broken.push(f + ' → ' + m);
 }
@@ -141,4 +154,4 @@ if (broken.length) {
 }
 
 console.log('dist/ 조립 완료:', fs.readdirSync(DIST).join(', '));
-console.log('서비스 워커 캐시 이름:', rTag, '·', vTag, '·', nTag, '·', kTag, '·', hTag);
+console.log('서비스 워커 캐시 이름:', rTag, '·', vTag, '·', nTag, '·', kTag, '·', hTag, '·', jTag);

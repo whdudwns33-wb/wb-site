@@ -52,6 +52,7 @@ export function appOfPath(p) {
   if (p.startsWith('/api/token/')) return null;               // 토큰 재발급은 앱이 아니다 — 어느 앱의 학생이든 지난다
   if (p.startsWith('/api/haru/')) return 'haru';
   if (p.startsWith('/api/vocab/')) return 'vocab';
+  if (p.startsWith('/api/hanja/')) return 'hanja';
   if (p.startsWith('/api/naesin/')) return 'naesin';
   return 'reading';
 }

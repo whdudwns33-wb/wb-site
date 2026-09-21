@@ -16,7 +16,7 @@ run_worker_first = ["/articles.json", "/articles-L1.json", "/articles-L2.json", 
 binding = "DB"
 id = "7c7f971952b449fdadf616ef94ef73d1"
 
-# 크론 3개 — 18:00 UTC(03:00 KST): 일일 백업 스냅샷(backup:<날짜>, 10개 보관, vocab:·haru: 키 포함)
+# 크론 3개 — 18:00 UTC(03:00 KST): 일일 백업 스냅샷(backup:<날짜>, 10개 보관, vocab:·haru:·hanja: 키 포함 — 단어장 본문은 제외)
 #           12:00 UTC(21:00 KST): 워드브레인 "자기 전 3분 물주기" Web Push
 #           18:10 UTC(03:10 KST): 하루브레인 주간 익명 집계(haru:agg:<주>, 백업 직후 · 셀 n<5 생략)
 [triggers]

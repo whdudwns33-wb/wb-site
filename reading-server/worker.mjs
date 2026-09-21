@@ -1,6 +1,7 @@
 'use strict';
 /* WB 진로독서 — Cloudflare Workers 버전 (server.mjs의 이식)
    저장: KV(DB 바인딩) — student:<code> / state:<code> / token:<t> / parent:<t> / pubmap / backup:<날짜>
+         앱별 접두 키: vocab: / naesin: / naesinko: / haru: / hanja: (각 *-api.mjs 의 저장소 어댑터만 만진다)
    정적: [assets] dist/ (학생 앱 + /admin)
    크론: 매일 KV 스냅샷(backup:) 10개 보관 */
 
@@ -9,6 +10,7 @@ import { handleNaesin, isReservedCode, dropReservedRows, naesinBodyLimit } from 
 import { handleStudio } from './naesin-studio.mjs';
 import { handleHaru, haruBodyLimit, allowedApp, appOfPath, dropStudentHaru, dumpHaru, weeklyAgg } from './haru-api.mjs';
 import { handleNaesinKo } from './naesin-ko-api.mjs';
+import { handleHanja, hanjaBodyLimit, dropStudentHanja, dumpHanja } from './hanja-api.mjs';
 import { bookIndex, cleanWords, coachingCard, confirmAllPlan, findBook, readyToConfirm, sourceSummary, validProgress, withOverlay } from './textbook.mjs';
 import { parseRoster } from './roster.mjs';
 
@@ -256,6 +258,23 @@ function haruStore(env) {
   };
 }
 
+/* 한자브레인 저장소 어댑터 — hanja: 접두 키만. 단어장 본문(hanja:book:<id>)과 목록(hanja:books, 본문 없는 메타)을
+   나눠 둔다 — 학생 목록 조회가 단어장 본문을 읽지 않게. 퇴원은 state·assign 두 키만 지운다. */
+function hanjaStore(env) {
+  const get = (k) => env.DB.get(k, 'json');
+  const put = (k, v) => env.DB.put(k, JSON.stringify(v));
+  const del = (k) => env.DB.delete(k);
+  return {
+    getBook: (id) => get('hanja:book:' + id), putBook: (id, rec) => put('hanja:book:' + id, rec), deleteBook: (id) => del('hanja:book:' + id),
+    getBookIds: () => get('hanja:books'), putBookIds: (list) => put('hanja:books', list),
+    getState: (c) => get('hanja:state:' + c), putState: (c, rec) => put('hanja:state:' + c, rec), deleteState: (c) => del('hanja:state:' + c),
+    listStateCodes: async () => (await kvListAll(env, 'hanja:state:')).map(k => k.slice('hanja:state:'.length)),
+    getAssign: (c) => get('hanja:assign:' + c), putAssign: (c, rec) => put('hanja:assign:' + c, rec), deleteAssign: (c) => del('hanja:assign:' + c),
+    listAssignCodes: async () => (await kvListAll(env, 'hanja:assign:')).map(k => k.slice('hanja:assign:'.length)),
+    getStudent: (c) => get('student:' + c),
+  };
+}
+
 function vocabPushEnv(env) {
   return {
     publicKey: env.VAPID_PUBLIC_KEY || '',
@@ -309,7 +328,9 @@ async function fullDump(env) {
   }
   /* 하루브레인 — 학생 기록 본문(state·mock·paper)·대응표·플랜을 담는다. id 만 넣으면 기록의 백업이 KV 단일 사본이 된다(설계안 §7-5). 팩 본문은 내신과 같은 이유로 id 만. */
   const haru = await dumpHaru(haruStore(env));
-  return { service: 'wb-reading', savedAt: nowIso(), students, states, vocab, textbook: textbook || {}, pubmap: pubmap || {}, naesin, naesinKo, textbookSrc: textbookSrc || {}, haru };
+  /* 한자브레인 — 목록(메타)·학생 기록·배정. 단어장 본문은 내신 팩과 같은 이유로 id 만 */
+  const hanja = await dumpHanja(hanjaStore(env));
+  return { service: 'wb-reading', savedAt: nowIso(), students, states, vocab, textbook: textbook || {}, pubmap: pubmap || {}, naesin, naesinKo, textbookSrc: textbookSrc || {}, haru, hanja };
 }
 
 async function snapshotBackup(env) {
@@ -571,6 +592,14 @@ export default {
           atomsFallback: async () => { try { return await (await env.ASSETS.fetch(new Request(url.origin + '/haru/atoms.json'))).json(); } catch (e) { return null; } },
           randomToken: () => crypto.randomUUID().replace(/-/g, ''),
         });
+        return json(out.status, out.body);
+      }
+
+      /* 한자브레인 (/api/hanja/*) — 인증만 공유, 저장·라우트는 격리. 단어장은 KV(hanja:book:*)에만 산다 */
+      if (p.startsWith('/api/hanja/')) {
+        const len = Number(req.headers.get('content-length') || 0);
+        if (len > hanjaBodyLimit(p)) return json(413, { error: '요청이 너무 커서 받을 수 없어요.' });
+        const out = await handleHanja({ path: p, method: req.method, who, query: url.searchParams, getBody: () => req.json(), store: hanjaStore(env) });
         return json(out.status, out.body);
       }
 
@@ -913,6 +942,9 @@ export default {
         /* 하루브레인 — 정확 접두 4계열(state·mock·paper·parent). 대응표(haru:paperkey:*)는 학생 것이 아니라 그대로 둔다. */
         await dropStudentHaru(haruStore(env), c);
         removed.push('haru:state:' + c, 'haru:mock:' + c, 'haru:paper:' + c);
+        /* 한자브레인 — 기록·배정 두 키. 단어장(hanja:book:*)은 학생 것이 아니라 둔다 */
+        await dropStudentHanja(hanjaStore(env), c);
+        removed.push('hanja:state:' + c, 'hanja:assign:' + c);
 
         /* 기기 토큰은 토큰 값으로 저장돼 코드로 찾을 수 없다 — 전부 훑어 이 학생 것만 지운다.
            남겨 두면 그 기기는 삭제 뒤에도 계속 로그인된 상태로 남는다. */
