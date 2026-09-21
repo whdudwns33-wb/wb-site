@@ -7,51 +7,51 @@
   <meta name="description" content="매주 한 호 — 독해력·입시 문해력·웩슬러 두뇌 놀이 뉴스레터 (WB 독해력학원 원내 구독 가족 전용)">
   <meta name="robots" content="noindex, nofollow">
   <meta name="referrer" content="no-referrer">
-  <meta name="theme-color" content="#2B4C3F">
+  <meta name="theme-color" content="#17211C">
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
   <style>
-    /* 가족이 함께 보는 화면 — 큰 글자, 큰 버튼, 탭 없음. 학년대별 글자 크기는 letter.js 의 공용 CSS(.nl[data-tier])가 정한다. */
-    :root { --bg:#F5F3EE; --panel:#FFFFFF; --ink:#22302A; --soft:#6A7A72; --line:#E1E6E2; --green:#2B4C3F; --green-soft:#E6EFEA; --mint:#8FB9A5;
-            --amber:#B27B16; --amber-soft:#F8F1DF; --red:#B0483A; --red-soft:#F9E9E6; --blue:#2F5F8F; --blue-soft:#E7EEF6; }
+    /* 가족이 함께 보는 화면 — 신문 한 면. 껍데기(머리띠·카드)는 신문지 팔레트, 호 본문은 letter.js 의 공용 CSS(.np)가 그린다. */
+    :root { --paper:#F3F1EB; --panel:#FFFFFF; --ink:#17211C; --soft:#5E6B65; --line:#D6D9D2; --spot:#2B4C3F; --spot-soft:#E4EDE7;
+            --gold:#C9A227; --gold-soft:#F7EDCB; --red:#A8402F; --red-soft:#F4E4DF; }
     * { box-sizing:border-box; }
     html, body { margin:0; padding:0; min-height:100%; }
-    body { background:var(--bg); color:var(--ink); font-family:"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif; font-size:16px; line-height:1.6; word-break:keep-all; -webkit-font-smoothing:antialiased; }
+    body { background:var(--paper); color:var(--ink); font-family:"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif; font-size:16px; line-height:1.6; word-break:keep-all; -webkit-font-smoothing:antialiased; }
     button { font-family:inherit; font-size:inherit; cursor:pointer; border:none; background:none; color:inherit; }
     input, select { font-family:inherit; font-size:1rem; }
-    :focus-visible { outline:3px solid var(--blue); outline-offset:2px; border-radius:8px; }
+    :focus-visible { outline:3px solid var(--spot); outline-offset:2px; }
     [hidden] { display:none !important; }
-    .bar { display:flex; align-items:center; gap:8px; padding:10px 14px; background:var(--panel); border-bottom:1px solid var(--line); position:sticky; top:0; z-index:5; flex-wrap:wrap; }
-    .bar .brand { font-weight:900; font-size:15px; color:var(--green); white-space:nowrap; }
+    .bar { display:flex; align-items:center; gap:8px; padding:8px 14px; background:var(--paper); border-bottom:1px solid var(--ink); position:sticky; top:0; z-index:5; flex-wrap:wrap; }
+    .bar .brand { font-family:"Noto Serif KR","Nanum Myeongjo","Apple Myungjo","Batang",Georgia,serif; font-weight:900; font-size:17px; letter-spacing:-.02em; color:var(--ink); white-space:nowrap; }
     .bar .who { font-size:13px; color:var(--soft); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .bar .who b { color:var(--ink); }
-    .hb { min-height:38px; padding:4px 12px; border-radius:999px; border:1.5px solid #bfd0c8; background:#fff; font-weight:800; font-size:13.5px; color:var(--green); white-space:nowrap; }
-    .hb.primary { background:var(--green); color:#fff; border-color:var(--green); }
-    .bar select { min-height:38px; border-radius:999px; border:1.5px solid #bfd0c8; padding:2px 10px; background:#fff; color:var(--green); font-weight:800; font-size:13.5px; }
-    main { max-width:680px; margin:0 auto; padding:14px 14px 60px; }
-    .card { background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:18px; margin-bottom:14px; }
-    .card h2 { margin:0 0 10px; font-size:18px; color:var(--green); }
+    .hb { min-height:36px; padding:3px 12px; border:1.5px solid var(--ink); background:#fff; font-weight:800; font-size:13.5px; color:var(--ink); white-space:nowrap; }
+    .hb.primary { background:var(--ink); color:#fff; }
+    .bar select { min-height:36px; border:1.5px solid var(--ink); padding:2px 8px; background:#fff; color:var(--ink); font-weight:800; font-size:13.5px; }
+    main { max-width:880px; margin:0 auto; padding:10px 16px 60px; }
+    .card { background:var(--panel); border:1px solid var(--ink); padding:16px 18px; margin:14px 0; }
+    .card h2 { margin:0 0 8px; font-size:17px; color:var(--ink); }
     .small { font-size:13px; color:var(--soft); }
-    .banner { background:var(--blue-soft); color:var(--blue); border-radius:12px; padding:10px 14px; font-weight:800; margin-bottom:12px; font-size:14px; }
-    .banner.warn { background:var(--amber-soft); color:var(--amber); }
-    .err { background:var(--red-soft); color:var(--red); border-radius:12px; padding:10px 14px; font-weight:700; margin-bottom:12px; }
-    .big { display:block; width:100%; min-height:56px; border-radius:14px; background:var(--green); color:#fff; font-weight:900; font-size:17px; margin-top:10px; }
-    .big.ghost { background:var(--panel); color:var(--green); border:2px solid var(--green); }
+    .banner { background:var(--spot-soft); color:var(--spot); border-left:4px solid var(--spot); padding:9px 12px; font-weight:800; margin:12px 0; font-size:14px; }
+    .banner.warn { background:var(--gold-soft); color:#6a5210; border-left-color:var(--gold); }
+    .err { background:var(--red-soft); color:var(--red); border-left:4px solid var(--red); padding:9px 12px; font-weight:700; margin:12px 0; }
+    .big { display:block; width:100%; min-height:54px; background:var(--ink); color:#fff; font-weight:900; font-size:16.5px; margin-top:10px; }
+    .big.ghost { background:#fff; color:var(--ink); border:2px solid var(--ink); }
     .big:disabled { opacity:.45; cursor:default; }
     .row { display:flex; gap:10px; flex-wrap:wrap; } .row > * { flex:1; }
-    .link input { width:100%; min-height:54px; padding:0 14px; border:2px solid var(--line); border-radius:14px; }
+    .link input { width:100%; min-height:52px; padding:0 14px; border:2px solid var(--ink); }
     .list button { display:flex; width:100%; justify-content:space-between; gap:10px; align-items:center; text-align:left; padding:12px 4px; border-bottom:1px solid var(--line); min-height:56px; }
     .list button:last-child { border-bottom:none; }
     .list b { display:block; } .list small { color:var(--soft); font-size:12.5px; white-space:nowrap; }
-    .done-btn { margin-top:4px; }
-    .sheet { position:fixed; inset:auto 0 0 0; background:var(--panel); border-radius:18px 18px 0 0; box-shadow:0 -6px 24px #0002; padding:16px 16px calc(16px + env(safe-area-inset-bottom)); z-index:9; }
-    .sheet h3 { margin:0 0 6px; font-size:16px; color:var(--green); }
+    .sheet { position:fixed; inset:auto 0 0 0; background:var(--panel); border-top:3px solid var(--ink); box-shadow:0 -6px 24px #0002; padding:16px 16px calc(16px + env(safe-area-inset-bottom)); z-index:9; }
+    .sheet h3 { margin:0 0 6px; font-size:16px; }
     .foot { font-size:12px; color:var(--soft); line-height:1.5; margin-top:20px; padding-top:10px; border-top:1px solid var(--line); }
     .dot { font-size:12px; color:var(--soft); white-space:nowrap; } .dot i { display:inline-block; width:8px; height:8px; border-radius:50%; background:#B7C0CC; margin-right:4px; }
-    .dot.saved i { background:#2E8B57; } .dot.pending i { background:var(--amber); } .dot.failed i { background:var(--red); }
+    .dot.saved i { background:#2E8B57; } .dot.pending i { background:var(--gold); } .dot.failed i { background:var(--red); }
+    .push { display:flex; gap:12px; align-items:center; flex-wrap:wrap; } .push p { flex:1; min-width:200px; margin:0; } .push .big { width:auto; min-width:150px; margin:0; padding:0 18px; }
     /* 인쇄(PDF) — 화면은 감추고 printArea 의 인쇄본만 */
     #printArea { display:none; }
-    @media print { body > * { display:none !important; } #printArea { display:block !important; } .nl-tierbreak { break-before:page; page-break-before:always; } }
+    @media print { body > * { display:none !important; } #printArea { display:block !important; } .np-tierbreak { break-before:page; page-break-before:always; } }
     @media (max-width:430px) { .hb .lbl { display:none; } }
   </style>
   <style id="nlcss"></style>
@@ -68,6 +68,7 @@
   <main id="app"><div class="card">불러오는 중…</div></main>
   <div id="printArea" aria-hidden="true"></div>
   <script src="./letter.js"></script>
+  <script src="./shapes.js"></script>
   <script>
   'use strict';
   (function () {
@@ -123,6 +124,47 @@
     }
     document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden' && dirty) push(true); });
 
+    /* ── 새 호 도착 알림(Web Push) — 학생은 토큰으로, 가족은 링크 토큰으로 구독한다. 워드브레인과 같은 배선 ── */
+    function b64uToU8(s) { var b = atob(s.replace(/-/g, '+').replace(/_/g, '/')); var u = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; }
+    function pushSupported() { return (MODE === 'student' || MODE === 'family') && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window; }
+    function pushOn() { try { return localStorage.getItem('wbl.push:' + stateKey()) === '1'; } catch (e) { return false; } }
+    function setPushOn(v) { try { if (v) localStorage.setItem('wbl.push:' + stateKey(), '1'); else localStorage.removeItem('wbl.push:' + stateKey()); } catch (e) {} }
+    function pushApi(path, opt) {
+      if (MODE === 'student') return fetchJson('/api/letter/push' + path, Object.assign({ headers: bearer((auth() || {}).token) }, opt || {}));
+      return fetchJson('/api/letter/parent/push' + path + '?t=' + encodeURIComponent(FAM_T), Object.assign({ headers: { 'Content-Type': 'application/json' } }, opt || {}));
+    }
+    function enablePush() {
+      return pushApi('/key').then(function (k) {
+        if (!k.ok) throw new Error('서버에 알림 키가 아직 없어요 — 학원에 문의해 주세요.');
+        return Notification.requestPermission().then(function (perm) {
+          if (perm !== 'granted') throw new Error('알림 권한이 꺼져 있어요 — 브라우저 설정에서 허용해 주세요.');
+          return navigator.serviceWorker.ready;
+        }).then(function (reg) { return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64uToU8(k.key) }); })
+          .then(function (sub) { return pushApi('/subscribe', { method: 'POST', body: JSON.stringify({ subscription: sub.toJSON() }) }); })
+          .then(function () {
+            /* 알림을 눌렀을 때 열 주소 — 가족 링크는 토큰이 있어야 열리므로 서비스 워커가 읽을 자리(Cache API)에 적어 둔다 */
+            if (MODE === 'family' && 'caches' in window) return caches.open('wbl-meta').then(function (c) { return c.put('./famlink', new Response(location.pathname + location.search)); }).catch(function () {});
+          });
+      }).then(function () { setPushOn(true); });
+    }
+    function disablePush() {
+      return navigator.serviceWorker.ready.then(function (reg) { return reg.pushManager.getSubscription(); }).then(function (sub) { if (sub) return sub.unsubscribe(); }).catch(function () {})
+        .then(function () { return pushApi('/unsubscribe', { method: 'POST', body: '{}' }); }).catch(function () {})
+        .then(function () { setPushOn(false); });
+    }
+    function pushCard() {
+      if (!pushSupported()) return '';
+      var on = pushOn();
+      return '<div class="card push"><p><b>새 호 도착 알림</b><br><span class="small">' + (on ? '월요일 아침에 새 호가 오면 이 기기로 알려 드려요.' : '새 호가 나오면 이 기기로 알려 드릴까요? 월요일 아침 한 번뿐이에요.') + '</span></p><button class="big' + (on ? ' ghost' : '') + '" id="pushBtn">' + (on ? '알림 끄기' : '알림 켜기') + '</button></div>';
+    }
+    function bindPush() {
+      var b = $('pushBtn'); if (!b) return;
+      b.onclick = function () {
+        b.disabled = true;
+        (pushOn() ? disablePush() : enablePush()).then(function () { showIssue(); }).catch(function (e) { showIssue(e.message || '알림 설정에 실패했어요.'); });
+      };
+    }
+
     /* ── 화면 ── */
     function render(html) { app.innerHTML = html; window.scrollTo(0, 0); }
     function footer() { return '<div class="foot">WB 독해력학원 · 웩슬러브레인센터 — 원내 구독 가족에게만 보내는 뉴스레터입니다. 링크를 밖으로 공유하지 마세요.</div>'; }
@@ -137,7 +179,7 @@
     $('tierSel').onchange = function () { TIER = this.value; if (MODE === 'admin') openIssue(CUR_ID); else showIssue(); };
 
     function showIssue(err) {
-      if (!ISSUE) { render((err ? '<div class="err">' + esc(err) + '</div>' : '') + '<div class="card"><h2>아직 도착한 호가 없어요</h2><p class="small">매주 월요일 새 호가 도착해요. 조금만 기다려 주세요.</p></div>' + footer()); return; }
+      if (!ISSUE) { render((err ? '<div class="err">' + esc(err) + '</div>' : '') + '<div class="card"><h2>아직 도착한 호가 없어요</h2><p class="small">매주 월요일 새 호가 도착해요. 조금만 기다려 주세요.</p></div>' + pushCard() + footer()); bindPush(); return; }
       var tier = TIER === 'all' ? null : TIER;
       var st = issueState(ISSUE.id);
       if (!st.openedAt) { st.openedAt = new Date().toISOString(); push(); }
@@ -148,9 +190,11 @@
       if (MODE === 'admin') html += '<div class="banner">관리자 미리보기 — 학생·가족에게는 자기 학년대 섹션만 보여요.</div>';
       html += L.renderIssue(ISSUE, tier, { mode: 'app', state: st });
       if (MODE !== 'admin') html += '<div class="card done-btn">' + (st.doneAt ? '<h2>이번 호를 다 읽었어요 ✔</h2><p class="small">' + esc(st.doneAt.slice(0, 10)) + '에 끝냈어요. 다음 호도 기다려 주세요.</p>' : '<h2>다 읽었나요?</h2><p class="small">문제와 미션까지 마쳤으면 눌러 주세요.</p><button class="big" id="doneBtn">다 읽었어요</button>') + '</div>';
+      html += pushCard();
       if (MODE === 'demo') html += linkCard();
-      render(html + footer());
+      render(html); /* 지면 끝에 발행 정보(np-foot)가 있어 앱 바닥글은 겹치지 않게 뺀다 */
       if ($('doneBtn')) $('doneBtn').onclick = function () { st.doneAt = new Date().toISOString(); push(true); showIssue(); };
+      bindPush();
       bindLink();
     }
     /* 문제·정답 보기·미션 체크 — 위임 하나로 받는다(다시 그릴 때마다 핸들러를 달지 않게) */
@@ -180,7 +224,7 @@
     });
 
     function showArchive() {
-      var rows = ISSUES.map(function (b) { return '<button data-open="' + esc(b.id) + '"><span><b>' + esc(L.weekLabel(b.week)) + ' · ' + esc(b.title) + '</b><span class="small">' + esc(b.theme || '') + '</span></span><small>' + esc(b.publishAt) + (STATE.issues[b.id] && STATE.issues[b.id].doneAt ? ' ✔' : '') + '</small></button>'; }).join('');
+      var rows = ISSUES.map(function (b) { return '<button data-open="' + esc(b.id) + '"><span><b>' + esc(L.issueNo(b.week)) + ' · ' + esc(b.title) + '</b><span class="small">' + esc(b.theme || '') + '</span></span><small>' + esc(b.publishAt) + (STATE.issues[b.id] && STATE.issues[b.id].doneAt ? ' ✔' : '') + '</small></button>'; }).join('');
       render('<div class="card list"><h2>지난 호</h2>' + (rows || '<p class="small">아직 지난 호가 없어요.</p>') + '</div><button class="big ghost" id="back">이번 호로</button>' + footer());
       Array.prototype.forEach.call(document.querySelectorAll('[data-open]'), function (b) { b.onclick = function () { openIssue(b.getAttribute('data-open')); }; });
       $('back').onclick = function () { openIssue(ISSUES.length ? ISSUES[0].id : CUR_ID); };
@@ -192,7 +236,7 @@
       if (!ISSUE) return;
       var area = $('printArea');
       if (TIER === 'all') {
-        area.innerHTML = L.TIER_IDS.map(function (t, i) { return '<div class="' + (i ? 'nl-tierbreak' : '') + '">' + L.renderIssue(ISSUE, t, { mode: 'print', key: withKey }) + '</div>'; }).join('');
+        area.innerHTML = L.TIER_IDS.map(function (t, i) { return '<div class="' + (i ? 'np-tierbreak' : '') + '">' + L.renderIssue(ISSUE, t, { mode: 'print', key: withKey }) + '</div>'; }).join('');
       } else area.innerHTML = L.renderIssue(ISSUE, TIER, { mode: 'print', key: withKey });
       closeSheet();
       setTimeout(function () { window.print(); }, 50);
@@ -201,7 +245,7 @@
     $('btnPdf').onclick = function () {
       closeSheet();
       var s = document.createElement('div'); s.className = 'sheet'; s.id = 'pdfSheet';
-      s.innerHTML = '<h3>PDF로 저장 · 인쇄</h3><p class="small">인쇄 창에서 대상을 "PDF로 저장"으로 고르면 파일로 받을 수 있어요. A4 기준으로 맞춰 두었어요.</p><div class="row"><button class="big" id="pdfKey">정답 별지 포함</button><button class="big ghost" id="pdfNoKey">정답 없이(학습지)</button></div><button class="big ghost" id="pdfClose" style="min-height:44px">닫기</button>';
+      s.innerHTML = '<h3>PDF로 저장 · 인쇄</h3><p class="small">인쇄 창에서 대상을 "PDF로 저장"으로 고르면 파일로 받을 수 있어요. A4 두 단으로 맞춰 두었어요.</p><div class="row"><button class="big" id="pdfKey">정답 별지 포함</button><button class="big ghost" id="pdfNoKey">정답 없이(학습지)</button></div><button class="big ghost" id="pdfClose" style="min-height:44px">닫기</button>';
       document.body.appendChild(s);
       $('pdfKey').onclick = function () { printIssue(true); };
       $('pdfNoKey').onclick = function () { printIssue(false); };

@@ -80,9 +80,13 @@ for (const f of HARU_FILES) fs.copyFileSync(path.join(HARU, f), path.join(DIST, 
    관리 웹의 편집기 미리보기가 학생 앱과 같은 렌더러(letter.js)를 쓴다 — 원본은 letter/letter.js 하나. */
 const LETTER = path.join(ROOT, '..', 'letter');
 fs.mkdirSync(path.join(DIST, 'letter'), { recursive: true });
-const LETTER_FILES = ['index.html', 'letter.js', 'issue-sample.json', 'sw.js', 'manifest.webmanifest', 'icon.svg'];
+const LETTER_FILES = ['index.html', 'letter.js', 'shapes.js', 'issue-sample.json', 'calendar.json', 'sw.js', 'manifest.webmanifest', 'icon.svg'];
 for (const f of LETTER_FILES) fs.copyFileSync(path.join(LETTER, f), path.join(DIST, 'letter', f));
+/* 배포본 삽화(letter/img/*.svg) — 자체 제작 벡터 그림만. 올린 사진은 KV 에서 /api/letter/img/<id> 로 나간다 */
+fs.mkdirSync(path.join(DIST, 'letter', 'img'), { recursive: true });
+for (const f of fs.readdirSync(path.join(LETTER, 'img')).filter((x) => /\.svg$/.test(x))) fs.copyFileSync(path.join(LETTER, 'img', f), path.join(DIST, 'letter', 'img', f));
 fs.copyFileSync(path.join(LETTER, 'letter.js'), path.join(DIST, 'admin', 'letter.js'));
+fs.copyFileSync(path.join(LETTER, 'shapes.js'), path.join(DIST, 'admin', 'shapes.js'));
 
 /* ── 서비스 워커 캐시 이름을 내용에서 뽑는다 ──
    두 앱 모두 껍데기(index.html·words.js…)를 캐시 우선으로 물고 있다. 그래서
@@ -121,7 +125,7 @@ const hTag = stampSW(path.join(DIST, 'haru', 'sw.js'),
   ['index.html', 'strings.js', 'plan.js', 'mastery.js', 'srs.js', 'cause.js', 'probe.js', 'manifest.webmanifest', 'icon.svg']
     .map(f => path.join(DIST, 'haru', f)), 'wbh-shell');
 const lTag = stampSW(path.join(DIST, 'letter', 'sw.js'),
-  ['index.html', 'letter.js', 'manifest.webmanifest', 'icon.svg'].map(f => path.join(DIST, 'letter', f)), 'wbl-shell');
+  ['index.html', 'letter.js', 'shapes.js', 'manifest.webmanifest', 'icon.svg'].map(f => path.join(DIST, 'letter', f)), 'wbl-shell');
 
 /* 조립한 것이 실제로 열리는지 확인한다.
    여기 목록에 새 파일을 안 적으면 배포본에서 404가 나고, 그 스크립트를 쓰는 화면이

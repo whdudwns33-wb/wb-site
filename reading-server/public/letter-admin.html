@@ -36,13 +36,14 @@
   <style id="nlcss"></style>
 </head>
 <body>
-<header><b>브레인레터 관리</b><small>호 목록 · 편집 · AI 초안 · 발송 문구 · 열람 현황 · 학년대</small><span class="sp"></span>
+<header><b>브레인레터 관리</b><small>호 목록 · 편집 · AI 초안 · 주제 달력 · 사진 · 발송 문구 · 열람 현황 · 학년대</small><span class="sp"></span>
   <a class="hbtn" href="/letter/" target="_blank" rel="noopener">학생 앱 열기</a><a class="hbtn" href="/admin/">진로독서 관리</a><button class="hbtn" id="btnLogout" hidden>로그아웃</button></header>
 <nav id="nav" hidden>
-  <button data-tab="issues" aria-pressed="true">호 목록</button><button data-tab="edit">편집</button><button data-tab="draft">AI 초안</button><button data-tab="send">발송 문구</button><button data-tab="stats">열람 현황</button><button data-tab="students">학생 학년대</button>
+  <button data-tab="issues" aria-pressed="true">호 목록</button><button data-tab="edit">편집</button><button data-tab="draft">AI 초안</button><button data-tab="calendar">주제 달력</button><button data-tab="photos">사진</button><button data-tab="send">발송 문구</button><button data-tab="stats">열람 현황</button><button data-tab="students">학생 학년대</button>
 </nav>
 <main id="main"></main>
 <script src="/admin/letter.js"></script>
+<script src="/admin/shapes.js"></script>
 <script>
 'use strict';
 const L=WBLETTER;
@@ -72,23 +73,29 @@ function renderLogin(msg){
   $('#go').onclick=async()=>{try{const j=await post('/admin/login',{pin:$('#pin').value});TOKEN=j.token;localStorage.setItem('wbr.admin.token',TOKEN);show(TAB);}catch(e){renderLogin(e.message);}};
   $('#pin').onkeydown=(e)=>{if(e.key==='Enter')$('#go').click();};
 }
-function show(tab){TAB=tab;$('#nav').hidden=false;$('#btnLogout').hidden=false;document.querySelectorAll('nav button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.tab===tab)));({issues,edit,draft,send,stats,students})[tab]().catch(e=>{if(e.message!=='auth')$('#main').innerHTML='<div class="card"><div class="err">'+esc(e.message)+'</div></div>';});}
+function show(tab){TAB=tab;$('#nav').hidden=false;$('#btnLogout').hidden=false;document.querySelectorAll('nav button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.tab===tab)));({issues,edit,draft,calendar,photos,send,stats,students})[tab]().catch(e=>{if(e.message!=='auth')$('#main').innerHTML='<div class="card"><div class="err">'+esc(e.message)+'</div></div>';});}
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>show(b.dataset.tab));
 $('#btnLogout').onclick=()=>{TOKEN=null;localStorage.removeItem('wbr.admin.token');renderLogin();};
 const tierSel=(id,cur,extra)=>'<select id="'+id+'">'+L.TIERS.map(t=>'<option value="'+t.id+'"'+(t.id===cur?' selected':'')+'>'+esc(t.label)+' '+esc(t.range)+'</option>').join('')+(extra||'')+'</select>';
 const appLink=(id,tier,print)=>'/letter/?id='+encodeURIComponent(id)+'&tier='+encodeURIComponent(tier)+(print?'&print='+print:'');
 const nextWeek=()=>{const d=new Date(Date.now()+7*86400e3);return L.weekId(d.getTime());};
+/* 주제 달력 — 한 번 받아 두고 탭이 함께 쓴다(새 호 카드·AI 초안 프리필) */
+let CAL=null;
+async function getCal(){if(!CAL)CAL=await api('/letter/admin/calendar');return CAL;}
+const PREVIEW_OPTS={mode:'app',imgBase:'/letter/img/'};
 
 /* ── 호 목록 ── */
 async function issues(){
-  const j=await api('/letter/admin/issues');
+  const [j,cal,ps]=await Promise.all([api('/letter/admin/issues'),getCal().catch(()=>null),api('/letter/admin/push/status').catch(()=>null)]);
+  const nw=nextWeek();const entry=cal?L.calendarEntry(cal.calendar,nw):null;
   const rows=j.issues.map(b=>'<tr><td><b>'+esc(L.weekLabel(b.week))+'</b><br><span class="muted">'+esc(b.id)+'</span></td><td>'+esc(b.title)+'<br><span class="muted">'+esc(b.theme||'')+'</span></td><td>'+esc(b.tiers.join(' '))+'<br><span class="muted">섹션 '+b.sections+'</span></td>'+
     '<td>'+(b.status==='published'?(b.visible?'<span class="tag ok">발행</span>':'<span class="tag warn">발행 예정</span>'):'<span class="tag">초안</span>')+'<br><span class="muted">'+esc(b.publishAt)+'</span></td><td>'+b.opened+'</td><td class="muted">'+esc((b.updatedAt||'').slice(0,16).replace('T',' '))+'</td>'+
-    '<td><div class="row"><button class="btn sm ghost" data-edit="'+esc(b.id)+'">편집</button><button class="btn sm ghost" data-pv="'+esc(b.id)+'">미리보기</button><button class="btn sm ghost" data-pr="'+esc(b.id)+'">인쇄·PDF</button>'+
+    '<td><div class="row"><button class="btn sm ghost" data-edit="'+esc(b.id)+'">편집</button><button class="btn sm ghost" data-pv="'+esc(b.id)+'">미리보기</button><button class="btn sm ghost" data-pr="'+esc(b.id)+'">인쇄·PDF</button>'+(b.status==='published'&&b.visible?'<button class="btn sm ghost" data-push="'+esc(b.id)+'">알림'+(b.pushedAt?' 다시':'')+'</button>':'')+
     (b.status==='published'?'<button class="btn sm ghost" data-pub="'+esc(b.id)+'" data-to="draft">내리기</button>':'<button class="btn sm pub" data-pub="'+esc(b.id)+'" data-to="published">발행</button>')+
     '<button class="btn sm ghost" data-send="'+esc(b.id)+'">발송 문구</button><button class="btn sm ghost" data-stat="'+esc(b.id)+'">열람</button><button class="btn sm danger" data-del="'+esc(b.id)+'">삭제</button></div></td></tr>').join('');
-  $('#main').innerHTML='<div class="card"><h2>새 호 만들기</h2><p class="muted">주차 id 는 ISO 주(월요일 시작). 발행일은 그 주 월요일이 기본이고 발행 뒤에도 바꿀 수 있다. 오늘은 '+esc(j.today)+' · 이번 주 '+esc(L.weekId())+'.</p>'+
-    '<div class="row"><label class="f">주차<input id="n_week" value="'+esc(nextWeek())+'" placeholder="2026-W40" style="width:140px"></label><button class="btn ghost" id="n_blank">빈 템플릿</button><button class="btn ghost" id="n_sample">샘플 호 복제</button><button class="btn" id="n_ai">AI 초안 만들기</button></div></div>'+
+  $('#main').innerHTML='<div class="card"><h2>새 호 만들기</h2><p class="muted">주차 id 는 ISO 주(월요일 시작). 발행일은 그 주 월요일이 기본이고 발행 뒤에도 바꿀 수 있다. 오늘은 '+esc(j.today)+' · 이번 주 '+esc(L.weekId())+'.'+(ps?' · 알림 구독 '+ps.subscribers+'명(학생 '+ps.byKind.student+'·가족 '+ps.byKind.family+')'+(ps.vapid?'':' — <b>VAPID 키 없음: 알림이 나가지 않는다</b>'):'')+'</p>'+
+    (entry?'<p><b>다음 주 '+esc(L.issueNo(nw))+' 주제(달력):</b> '+(entry.hasTheme?esc(entry.theme):'<span class="tag warn">비어 있음 — [주제 달력]에서 적기</span>')+' <span class="muted">· 두뇌 놀이 지표 '+esc(L.TIER_IDS.map(t=>t+'='+entry.indices[t]).join(' '))+'</span></p>':'')+
+    '<div class="row"><label class="f">주차<input id="n_week" value="'+esc(nw)+'" placeholder="2026-W40" style="width:140px"></label><button class="btn ghost" id="n_blank">빈 템플릿</button><button class="btn ghost" id="n_sample">샘플 호 복제</button><button class="btn" id="n_ai">AI 초안 만들기</button></div></div>'+
     '<div class="card"><h2>호 목록 '+j.issues.length+'</h2><div class="tbl"><table><thead><tr><th>호</th><th>제목·주제</th><th>학년대</th><th>상태·발행일</th><th>열람</th><th>수정</th><th></th></tr></thead><tbody>'+(rows||'<tr><td colspan="7" class="muted">아직 호가 없습니다 — 위에서 만드세요. 학생 앱은 그동안 체험 호를 보여 줍니다.</td></tr>')+'</tbody></table></div><div id="i_msg"></div></div>'+
     '<div class="card" id="pvBox" hidden></div>';
   const weekOf=()=>{const w=($('#n_week').value||'').trim();if(!/^\d{4}-W\d{2}$/.test(w)){alert('주차는 YYYY-Www 형식');return null;}return w;};
@@ -101,8 +108,9 @@ async function issues(){
     '<h3>정답 별지 포함</h3><div class="row">'+L.TIERS.map(t=>'<a class="btn ghost" target="_blank" rel="noopener" href="'+appLink(b.dataset.pr,t.id,'1')+'">'+esc(t.label)+'</a>').join('')+'<a class="btn" target="_blank" rel="noopener" href="'+appLink(b.dataset.pr,'all','1')+'">전체 학년대</a></div>'+
     '<h3>정답 없이(학습지)</h3><div class="row">'+L.TIERS.map(t=>'<a class="btn ghost" target="_blank" rel="noopener" href="'+appLink(b.dataset.pr,t.id,'nokey')+'">'+esc(t.label)+'</a>').join('')+'<a class="btn" target="_blank" rel="noopener" href="'+appLink(b.dataset.pr,'all','nokey')+'">전체 학년대</a></div>';box.scrollIntoView({behavior:'smooth'});});
   document.querySelectorAll('[data-pub]').forEach(b=>b.onclick=async()=>{const to=b.dataset.to;let publishAt;if(to==='published'){publishAt=prompt('발행일(YYYY-MM-DD). 비우면 저장된 발행일 그대로',L.kstDate());if(publishAt===null)return;}
-    try{const r=await post('/letter/admin/publish',{id:b.dataset.pub,status:to,publishAt:publishAt||undefined});$('#i_msg').innerHTML='<div class="ok">'+esc(r.id)+' → '+(r.status==='published'?'발행('+esc(r.publishAt)+(r.visible?', 지금 보임':', 발행일에 열림')+')':'초안으로 내림')+'</div>';setTimeout(issues,700);}catch(e){$('#i_msg').innerHTML='<div class="err">'+esc(e.message)+'\n'+esc((e.body&&e.body.errors||[]).map(x=>x.where+' — '+x.msg).join('\n'))+'</div>';}});
+    try{const r=await post('/letter/admin/publish',{id:b.dataset.pub,status:to,publishAt:publishAt||undefined});const pu=r.push?(r.push.queued?' · 알림 발송 중':r.push.reason==='no-vapid'?' · 알림 키 없음':' · 알림 '+r.push.sent+'건'):(r.visible&&to==='published'?' · 알림은 이미 보냈음':(to==='published'?' · 알림은 발행일 07시에':''));$('#i_msg').innerHTML='<div class="ok">'+esc(r.id)+' → '+(r.status==='published'?'발행('+esc(r.publishAt)+(r.visible?', 지금 보임':', 발행일에 열림')+')':'초안으로 내림')+pu+'</div>';setTimeout(issues,700);}catch(e){$('#i_msg').innerHTML='<div class="err">'+esc(e.message)+'\n'+esc((e.body&&e.body.errors||[]).map(x=>x.where+' — '+x.msg).join('\n'))+'</div>';}});
   document.querySelectorAll('[data-send]').forEach(b=>b.onclick=()=>{DRAFT=DRAFT||{};DRAFT.sendId=b.dataset.send;show('send');});
+  document.querySelectorAll('[data-push]').forEach(b=>b.onclick=async()=>{if(!confirm('구독한 모든 가정(이 호의 학년대가 있는 가정)에 "새 호 도착" 알림을 보낼까요?'))return;try{const r=await post('/letter/admin/push',{id:b.dataset.push});$('#i_msg').innerHTML=r.ok?'<div class="ok">알림 보냄 '+r.sent+'건 · 학년대 없어 건너뜀 '+r.skipped+' · 구독 정리 '+r.removed+'</div>':'<div class="err">서버에 VAPID 키가 없어 알림을 보낼 수 없습니다 (wrangler secret VAPID_PUBLIC_KEY·VAPID_PRIVATE_JWK).</div>';}catch(e){$('#i_msg').innerHTML='<div class="err">'+esc(e.message)+'</div>';}});
   document.querySelectorAll('[data-stat]').forEach(b=>b.onclick=()=>{DRAFT=DRAFT||{};DRAFT.statId=b.dataset.stat;show('stats');});
   document.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{if(prompt('지울 호의 id 를 다시 입력하세요 ('+b.dataset.del+')')!==b.dataset.del)return;try{await api('/letter/admin/issue',{method:'DELETE',body:JSON.stringify({id:b.dataset.del})});issues();}catch(e){alert(e.message);}});
 }
@@ -115,6 +123,7 @@ async function edit(){
     '<div class="grid-form"><label class="f">제목<input id="h_title"></label><label class="f">이번 주 주제<input id="h_theme"></label><label class="f">발행일<input id="h_pub" type="date"></label></div><label class="f" style="margin-top:8px">머리말<textarea id="h_intro" style="min-height:70px;font-family:inherit;font-size:13.5px"></textarea></label>'+
     '<p class="muted">위 칸은 JSON 의 title·theme·publishAt·intro 를 바로 고친다. 섹션(읽을거리·문제·두뇌 놀이…)은 아래 JSON 에서 고친다 — 형식은 letter/README.md 의 스키마. 모든 글은 자체 창작이어야 한다(교재·기사·시험 문제를 옮기지 않는다).</p>'+
     '<textarea id="e_json" class="json" spellcheck="false"></textarea>'+
+    '<div class="row" style="margin-top:8px"><button class="btn ghost sm" id="e_photo">사진 넣기</button><button class="btn ghost sm" id="e_fig">도형 놀이 넣기</button><span class="muted">스니펫을 복사해 JSON 의 알맞은 자리(섹션의 image / brain 의 items)에 붙여 넣는다</span></div><div id="e_helper"></div>'+
     '<div class="row" style="margin-top:8px"><button class="btn ghost" id="e_check">검증</button><button class="btn" id="e_save">저장</button><button class="btn pub" id="e_savepub">저장 후 발행</button><button class="btn ghost" id="e_dl">JSON 내려받기</button><span class="muted" id="e_status"></span></div><div id="e_msg"></div></div></div>'+
     '<div><div class="card"><h2>미리보기 <span class="muted">학년대 '+tierSel('e_tier','E2')+'</span></h2><div class="preview" id="e_pv"></div></div></div></div>';
   const ta=$('#e_json');ta.value=EDIT.text;
@@ -123,7 +132,14 @@ async function edit(){
   const applyHead=()=>{const o=parse();if(!o)return;o.title=$('#h_title').value;o.theme=$('#h_theme').value;o.publishAt=$('#h_pub').value;o.intro=$('#h_intro').value;ta.value=JSON.stringify(o,null,2);EDIT.text=ta.value;preview();};
   ['h_title','h_theme','h_pub','h_intro'].forEach(id=>{$('#'+id).onchange=applyHead;});
   const report=(r)=>'<div class="'+(r.errors.length?'err':'ok')+'">'+(r.errors.length?'오류 '+r.errors.length+'건 — 저장되지 않습니다\n'+esc(r.errors.map(x=>'· '+x.where+' — '+x.msg).join('\n')):'오류 없음')+'</div>'+(r.warnings.length?'<div class="warn">경고 '+r.warnings.length+'건(저장은 됨)\n'+esc(r.warnings.map(x=>'· '+x.where+' — '+x.msg).join('\n'))+'</div>':'');
-  const preview=()=>{const o=(()=>{try{return JSON.parse(ta.value);}catch(e){return null;}})();if(!o){$('#e_pv').innerHTML='<p class="muted">JSON 을 고치는 중…</p>';return;}$('#e_pv').innerHTML=L.renderIssue(o,$('#e_tier').value,{mode:'app'});};
+  const preview=()=>{const o=(()=>{try{return JSON.parse(ta.value);}catch(e){return null;}})();if(!o){$('#e_pv').innerHTML='<p class="muted">JSON 을 고치는 중…</p>';return;}$('#e_pv').innerHTML=L.renderIssue(o,$('#e_tier').value,PREVIEW_OPTS);};
+  $('#e_photo').onclick=async()=>{const j=await api('/letter/admin/imgs');const files=['cover-autumn.svg','leaf-autumn.svg','tree-season.svg','magnifier-leaf.svg'];
+    $('#e_helper').innerHTML='<div class="card"><h3>사진 스니펫</h3><p class="muted">올린 사진은 [사진] 탭에서 올린다. 배포본 삽화(SVG)는 자체 제작본이라 file 로 쓴다. alt(그림 설명)·credit(출처)은 필수.</p>'+
+      '<div class="row">'+files.map(f=>'<button class="btn sm ghost" data-snip=\''+esc(JSON.stringify({file:f,alt:'',caption:'',credit:'WB 자체 제작 삽화'}))+'\'>'+esc(f)+'</button>').join('')+j.images.slice(0,12).map(m=>'<button class="btn sm ghost" data-snip=\''+esc(JSON.stringify({id:m.id,alt:'',caption:'',credit:'WB 자체 촬영'}))+'\'>'+esc(m.name||m.id.slice(0,8))+'</button>').join('')+'</div><pre id="e_snip">버튼을 누르면 여기 스니펫이 나온다</pre></div>';
+    document.querySelectorAll('[data-snip]').forEach(b=>b.onclick=()=>{$('#e_snip').textContent='"image": '+b.dataset.snip;copyText('"image": '+b.dataset.snip);});};
+  $('#e_fig').onclick=()=>{const kinds=Object.keys(WBSHAPES.LABEL);$('#e_helper').innerHTML='<div class="card"><h3>도형 놀이(시공간 VSI) 스니펫</h3><p class="muted">brain 섹션(index "VSI")의 items 배열에 넣는다. 그림과 정답은 seed 로 다시 만들어지니 answer 는 비워 둔다.</p><div class="row"><select id="f_kind">'+kinds.map(k=>'<option value="'+k+'">'+esc(WBSHAPES.LABEL[k])+' ('+k+')</option>').join('')+'</select><label class="f">seed<input id="f_seed" type="number" min="1" max="999999" value="'+(1+Math.floor(Math.random()*999))+'" style="width:110px"></label><label class="f">학년대<select id="f_tier">'+L.TIERS.map(t=>'<option value="'+t.id+'">'+esc(t.label)+'</option>').join('')+'</select></label><button class="btn sm" id="f_go">그려 보기</button></div><div id="f_pv" style="margin-top:8px"></div><pre id="e_snip"></pre></div>';
+    const draw=()=>{const fig={kind:$('#f_kind').value,seed:+$('#f_seed').value||1,tier:$('#f_tier').value};const g=WBSHAPES.make(fig);if(!g){$('#f_pv').innerHTML='<div class="err">seed 는 1 이상</div>';return;}$('#f_pv').innerHTML='<div class="np"><div class="np-bp">'+esc(g.prompt)+'</div>'+WBSHAPES.html(fig)+'<div class="muted">정답: '+esc(g.answerText)+(g.hint?' — '+esc(g.hint):'')+'</div></div>';const snip=JSON.stringify({figure:{kind:fig.kind,seed:fig.seed}});$('#e_snip').textContent=snip;};
+    $('#f_go').onclick=()=>{draw();copyText($('#e_snip').textContent);};draw();};
   let tmr=null;ta.oninput=()=>{EDIT.text=ta.value;EDIT.dirty=true;clearTimeout(tmr);tmr=setTimeout(()=>{preview();fillHead();},400);};
   $('#e_tier').onchange=preview;
   $('#e_check').onclick=()=>{const o=parse();if(!o)return;$('#e_msg').innerHTML=report(L.checkIssue(o));};
@@ -141,11 +157,12 @@ const IDX_DEFAULT={K:'PSI',E1:'FRI',E2:'WMI',E3:'FRI',M:'VCI'};
 async function draft(){
   DRAFT=DRAFT||{};
   const week=DRAFT.week||nextWeek();
+  const cal=await getCal().catch(()=>null);const entry=cal?L.calendarEntry(cal.calendar,week):null;
   const idxOpts=(cur)=>Object.keys(L.WISC).map(k=>'<option value="'+k+'"'+(k===cur?' selected':'')+'>'+esc(L.WISC[k].label)+' '+k+'</option>').join('');
   $('#main').innerHTML='<div class="card"><h2>AI 초안 <span class="muted">Claude 가 조각별로 초안을 쓰고, 원장이 편집기에서 검수·수정한 뒤 발행한다. 초안은 발행되지 않는다.</span></h2>'+
-    '<div class="grid-form"><label class="f">주차<input id="d_week" value="'+esc(week)+'"></label><label class="f">발행일<input id="d_pub" type="date" value="'+esc(L.weekStart(week)||'')+'"></label><label class="f" style="grid-column:span 2">이번 주 주제<input id="d_theme" placeholder="예: 가을 곤충의 겨울나기 / 지도는 왜 위가 북쪽일까"></label></div>'+
-    '<label class="f" style="margin-top:8px">원장 메모(학원 소식·강조할 점·피할 것)<textarea id="d_notes" style="min-height:70px;font-family:inherit;font-size:13.5px"></textarea></label>'+
-    '<h3>이번 주 두뇌 놀이 지표(학년대별) — 매주 돌려 가며 다섯 지표를 고르게</h3><div class="grid-form">'+L.TIERS.map(t=>'<label class="f">'+esc(t.label)+'<select id="d_idx_'+t.id+'">'+idxOpts(IDX_DEFAULT[t.id])+'</select></label>').join('')+'</div>'+
+    '<div class="grid-form"><label class="f">주차<input id="d_week" value="'+esc(week)+'"></label><label class="f">발행일<input id="d_pub" type="date" value="'+esc(L.weekStart(week)||'')+'"></label><label class="f" style="grid-column:span 2">이번 주 주제 <span class="muted">(비우면 주제 달력의 주제)</span><input id="d_theme" value="'+esc(entry&&entry.hasTheme?entry.theme:'')+'" placeholder="예: 가을 곤충의 겨울나기 / 지도는 왜 위가 북쪽일까"></label></div>'+
+    '<label class="f" style="margin-top:8px">원장 메모(학원 소식·강조할 점·피할 것)'+(entry&&entry.notes?'<span class="muted">달력 메모: '+esc(entry.notes)+'</span>':'')+'<textarea id="d_notes" style="min-height:70px;font-family:inherit;font-size:13.5px"></textarea></label>'+
+    '<h3>이번 주 두뇌 놀이 지표(학년대별) — 달력 순환값이 채워진다. 5주에 다섯 지표가 학년대마다 한 번씩</h3><div class="grid-form">'+L.TIERS.map(t=>'<label class="f">'+esc(t.label)+'<select id="d_idx_'+t.id+'">'+idxOpts(entry?entry.indices[t.id]:IDX_DEFAULT[t.id])+'</select></label>').join('')+'</div>'+
     '<div class="row" style="margin-top:10px"><button class="btn" id="d_go">초안 만들기 (6조각)</button><span class="muted" id="d_quota"></span></div>'+
     '<ol class="steps" id="d_steps"></ol><div id="d_msg"></div></div>';
   const parts=['shared','K','E1','E2','E3','M'];
@@ -160,12 +177,16 @@ async function draft(){
     if(sh)secs.push(...(sh.sections||[]).filter(s=>s.type==='checklist'||s.type==='column'));L.TIER_IDS.forEach(t=>secs.push(...pick(t,'coach-')));if(sh)secs.push(...(sh.sections||[]).filter(s=>s.type==='notice'));
     /* 조각이 id 규약을 안 지킨 섹션은 뒤에 붙인다 — 버리면 원장이 못 본다 */
     Object.keys(P).forEach(p=>{const r=P[p];if(!r||!r.ok)return;(r.sections||[]).forEach(s=>{if(s&&!secs.includes(s))secs.push(s);});});
-    const issue={id:f.week,week:f.week,publishAt:f.publishAt||L.weekStart(f.week)||L.kstDate(),status:'draft',title:sh&&sh.head?sh.head.title:'',theme:sh&&sh.head?sh.head.theme:f.theme,intro:sh&&sh.head?sh.head.intro:'',source:'WB 독해력학원 자체 창작 (AI 초안, 원장 검수 전)',sections:secs};
+    fillFigures(secs);
+    const issue={id:f.week,week:f.week,publishAt:f.publishAt||L.weekStart(f.week)||L.kstDate(),status:'draft',title:sh&&sh.head?sh.head.title:'',theme:sh&&sh.head?sh.head.theme:f.theme,intro:sh&&sh.head?sh.head.intro:'',source:'WB 독해력학원 자체 창작 (AI 초안, 원장 검수 전)',cover:null,sections:secs};
     const r=L.checkIssue(issue);
     $('#d_msg').innerHTML='<div class="'+(r.errors.length?'warn':'ok')+'">조립 완료 — 섹션 '+secs.length+'개'+(r.errors.length?', 검증 오류 '+r.errors.length+'건(편집기에서 고친 뒤 저장)':'')+'</div><div class="row"><button class="btn" id="d_open">편집기로 보내기</button></div>';
     $('#d_open').onclick=()=>openEditor(JSON.stringify(issue,null,2),'');};
   const bindRetry=()=>document.querySelectorAll('[data-retry]').forEach(b=>b.onclick=async()=>{if(!form().theme){alert('주제를 적어 주세요');return;}await callPart(b.dataset.retry);assemble();});
-  $('#d_go').onclick=async()=>{const f=form();if(!f.theme){alert('이번 주 주제를 적어 주세요');return;}if(!/^\d{4}-W\d{2}$/.test(f.week)){alert('주차는 YYYY-Www');return;}
+  /* 도형 놀이 — 시공간 조각은 AI 가 아니라 생성기 몫이다. 조립할 때 VSI 두뇌 놀이 항목에 figure 가 없으면 seed 로 채운다 */
+  const fillFigures=(secs)=>{secs.forEach(s=>{if(s.type!=='brain'||s.index!=='VSI')return;const kinds=['odd','mirror','rotate','blocks'];(s.items||[]).forEach((it,i)=>{if(!it.figure&&!(it.prompt&&it.answer)){it.figure={kind:kinds[i%kinds.length],seed:1+Math.floor(Math.random()*999)};delete it.answer;}});if(!(s.items||[]).length)s.items=kinds.map(k=>({figure:{kind:k,seed:1+Math.floor(Math.random()*999)}}));});};
+  $('#d_week').onchange=()=>{const w=$('#d_week').value.trim();const e=cal?L.calendarEntry(cal.calendar,w):null;if(!e)return;$('#d_pub').value=e.monday||'';if(e.hasTheme)$('#d_theme').value=e.theme;L.TIER_IDS.forEach(t=>{$('#d_idx_'+t).value=e.indices[t];});};
+  $('#d_go').onclick=async()=>{const f=form();if(!f.theme){alert('이번 주 주제를 적어 주세요 (또는 주제 달력에 적어 두세요)');return;}if(!/^\d{4}-W\d{2}$/.test(f.week)){alert('주차는 YYYY-Www');return;}
     $('#d_go').disabled=true;DRAFT.parts={};stepsHtml();let stopped='';
     for(const p of parts){const j=await callPart(p);if(!j.ok&&(j.reason==='no-key'||j.reason==='quota')){stopped=j.reason;break;}}
     $('#d_go').disabled=false;
@@ -174,6 +195,36 @@ async function draft(){
   stepsHtml();bindRetry();
   if(DRAFT.parts&&Object.keys(DRAFT.parts).length)assemble();
 }
+
+/* ── 주제 달력 — 40주 주제·메모·지표. 저장하면 KV 가 배포본 기본값을 덮어쓴다 ── */
+async function calendar(){
+  const [cal,list]=await Promise.all([api('/letter/admin/calendar'),api('/letter/admin/issues')]);
+  CAL=cal;
+  const have={};list.issues.forEach(b=>{have[b.week]=b;});
+  const weeks=[];let w=L.weekId();for(let i=0;i<44;i++){weeks.push(w);w=L.nextWeek(w);}
+  Object.keys(cal.calendar.weeks||{}).forEach(k=>{if(!weeks.includes(k))weeks.push(k);});weeks.sort();
+  const idxOpts=(cur,auto)=>'<option value="">'+esc(L.WISC[auto]?L.WISC[auto].label+'(순환)':'순환')+'</option>'+Object.keys(L.WISC).map(k=>'<option value="'+k+'"'+(k===cur?' selected':'')+'>'+esc(L.WISC[k].label)+'</option>').join('');
+  $('#main').innerHTML='<div class="card"><h2>주제 달력 <span class="muted">'+(cal.source==='kv'?'저장본(KV)':'배포본 기본값')+(cal.updatedAt?' · '+esc(cal.updatedAt.slice(0,10)):'')+'</span></h2><p class="muted">주제 한 줄과 메모를 적어 두면 [새 호]·[AI 초안]이 그 주차의 주제와 두뇌 놀이 지표를 자동으로 채운다. 지표는 순환값(5주에 다섯 지표가 학년대마다 한 번씩)이 기본이고, 바꾸고 싶은 칸만 고른다.</p>'+
+    '<div class="row"><button class="btn" id="c_save">저장</button><button class="btn ghost" id="c_reset">배포본 기본값으로 되돌리기(저장 전)</button><span id="c_msg"></span></div>'+
+    '<div class="tbl" style="margin-top:10px"><table><thead><tr><th>주차</th><th>월요일</th><th>주제</th><th>메모</th>'+L.TIERS.map(t=>'<th>'+esc(t.label)+'</th>').join('')+'<th>호</th></tr></thead><tbody>'+
+    weeks.map(k=>{const e=L.calendarEntry(cal.calendar,k);const ov=(cal.calendar.weeks[k]||{}).indices||{};const rot=L.rotationFor(k)||{};return '<tr data-week="'+esc(k)+'"><td><b>'+esc(L.issueNo(k))+'</b><br><span class="muted">'+esc(k)+'</span></td><td>'+esc(e.monday||'')+'</td><td><input data-f="theme" value="'+esc(e.theme)+'" style="width:260px"></td><td><input data-f="notes" value="'+esc(e.notes)+'" style="width:260px"></td>'+L.TIERS.map(t=>'<td><select data-f="idx-'+t.id+'">'+idxOpts(ov[t.id]||'',rot[t.id])+'</select></td>').join('')+'<td>'+(have[k]?(have[k].status==='published'?'<span class="tag ok">발행</span>':'<span class="tag">초안</span>'):'')+'</td></tr>';}).join('')+'</tbody></table></div></div>';
+  const collect=()=>{const out={version:1,base:L.BASE_WEEK,weeks:{}};document.querySelectorAll('tr[data-week]').forEach(tr=>{const k=tr.dataset.week;const theme=tr.querySelector('[data-f="theme"]').value.trim();const notes=tr.querySelector('[data-f="notes"]').value.trim();const idx={};L.TIER_IDS.forEach(t=>{const v=tr.querySelector('[data-f="idx-'+t+'"]').value;if(v)idx[t]=v;});if(theme||notes||Object.keys(idx).length){out.weeks[k]={};if(theme)out.weeks[k].theme=theme;if(notes)out.weeks[k].notes=notes;if(Object.keys(idx).length)out.weeks[k].indices=idx;}});return out;};
+  $('#c_save').onclick=async()=>{const c=collect();const errs=L.checkCalendar(c);if(errs.length){$('#c_msg').innerHTML='<span class="err">'+esc(errs.map(x=>x.where+' — '+x.msg).join(' / '))+'</span>';return;}try{const r=await put('/letter/admin/calendar',{calendar:c});CAL=null;$('#c_msg').innerHTML='<span class="ok">저장됨 '+esc(r.updatedAt.slice(0,16))+'</span>';}catch(e){$('#c_msg').innerHTML='<span class="err">'+esc(e.message)+'</span>';}};
+  $('#c_reset').onclick=async()=>{const r=await fetch('/letter/calendar.json',{cache:'no-store'});const d=await r.json();cal.calendar=d;cal.source='default';CAL=null;calendar();};
+}
+
+/* ── 사진 — 브라우저에서 1600px·JPEG 로 줄여 올린다(1.5MB 상한). id 는 128비트 무작위, 링크를 아는 사람만 본다 ── */
+async function photos(){
+  const j=await api('/letter/admin/imgs');
+  $('#main').innerHTML='<div class="card"><h2>사진 올리기</h2><p class="muted">자체 촬영·자체 제작·공공누리·CC0 만. 학생 얼굴이 나오는 사진은 보호자 동의가 있는 것만. 올리면 자동으로 긴 변 1600px·JPEG 로 줄인다. 호에 넣을 때 alt(그림 설명)와 credit(출처)을 적어야 저장된다.</p>'+
+    '<div class="row"><input type="file" id="ph_file" accept="image/*" multiple><span id="ph_msg" class="muted"></span></div></div>'+
+    '<div class="card"><h2>올린 사진 '+j.images.length+'</h2><div class="row" id="ph_grid">'+j.images.map(m=>'<div style="flex:0 0 200px;border:1px solid var(--line);border-radius:10px;padding:8px"><img src="'+esc(m.url)+'" alt="" style="width:100%;height:120px;object-fit:cover;border-radius:6px;background:#eee"><div class="muted" style="font-size:12px;margin-top:4px">'+esc(m.name||'')+' · '+Math.round((m.size||0)/1024)+'KB'+(m.w?' · '+m.w+'×'+m.h:'')+'<br>'+esc((m.at||'').slice(0,10))+'</div><div class="row" style="margin-top:6px"><button class="btn sm ghost" data-copy=\''+esc(JSON.stringify({id:m.id,alt:'',caption:'',credit:'WB 자체 촬영'}))+'\'>스니펫</button><button class="btn sm danger" data-del="'+esc(m.id)+'">삭제</button></div></div>').join('')+(j.images.length?'':'<p class="muted">아직 없음</p>')+'</div></div>';
+  document.querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>copyText('"image": '+b.dataset.copy));
+  document.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{if(!confirm('사진을 지울까요? 이 사진을 쓰는 호에서는 빈 자리가 됩니다.'))return;try{await api('/letter/admin/img',{method:'DELETE',body:JSON.stringify({id:b.dataset.del})});photos();}catch(e){alert(e.message);}});
+  $('#ph_file').onchange=async()=>{const files=[...$('#ph_file').files];let n=0;for(const f of files){$('#ph_msg').textContent=(n+1)+'/'+files.length+' 줄이는 중… '+f.name;try{const r=await shrink(f);const res=await post('/letter/admin/img',{name:f.name,type:r.type,data:r.data,w:r.w,h:r.h});n++;$('#ph_msg').textContent=n+'/'+files.length+' 올림 ('+Math.round(res.size/1024)+'KB)';}catch(e){$('#ph_msg').textContent='실패: '+f.name+' — '+e.message;}}if(TAB==='photos')photos();};
+}
+/* 캔버스로 줄이기 — 긴 변 1600px, JPEG 0.85. 1.5MB 를 넘으면 품질을 낮춰 다시 */
+function shrink(file){return new Promise((resolve,reject)=>{const img=new Image();const url=URL.createObjectURL(file);img.onload=()=>{URL.revokeObjectURL(url);const max=1600;let w=img.naturalWidth,h=img.naturalHeight;const s=Math.min(1,max/Math.max(w,h));w=Math.round(w*s);h=Math.round(h*s);const c=document.createElement('canvas');c.width=w;c.height=h;c.getContext('2d').drawImage(img,0,0,w,h);let q=0.85;const tryOut=()=>{const data=c.toDataURL('image/jpeg',q);const bytes=Math.round((data.length-data.indexOf(',')-1)*3/4);if(bytes>1_450_000&&q>0.4){q-=0.15;tryOut();return;}resolve({data,type:'image/jpeg',w,h});};tryOut();};img.onerror=()=>{URL.revokeObjectURL(url);reject(new Error('이미지를 읽을 수 없어요'));};img.src=url;});}
 
 /* ── 발송 문구 — 학생마다 가족 링크 포함 문구. 링크가 없던 학생은 여기서 발급된다 ── */
 async function send(){

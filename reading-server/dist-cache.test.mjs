@@ -160,9 +160,12 @@ t('관리 화면들이 dist/admin/ 에 실린다 — 하나 빠지면 그 화면
   assert.ok(!fs.readdirSync(haruDir).some((f) => /pack-sample|paperkey|plans|kor-master-data|sheet/.test(f)), 'dist/haru/ 에 문항·대응표·플랜이 실렸다');
   assert.ok(!fs.readFileSync(path.join(haruDir, 'atoms.json'), 'utf8').includes('answerKey'), 'atoms.json 에 문항이 있다');
   /* 브레인레터 배포본 — 앱 껍데기 + 렌더러 + 자체 창작 체험 호. 관리 편집기가 부르는 /admin/letter.js 는 절대 경로라 verifyRefs 가 못 보니 여기서 지킨다 */
-  for (const f of ['index.html', 'letter.js', 'issue-sample.json', 'sw.js', 'manifest.webmanifest', 'icon.svg'])
+  for (const f of ['index.html', 'letter.js', 'shapes.js', 'issue-sample.json', 'calendar.json', 'sw.js', 'manifest.webmanifest', 'icon.svg', 'img/leaf-autumn.svg', 'img/cover-autumn.svg'])
     assert.ok(fs.existsSync(path.join(DIST, 'letter', f)), 'dist/letter/' + f + ' 가 없다');
   assert.ok(fs.existsSync(path.join(DIST, 'admin', 'letter.js')), 'dist/admin/letter.js 가 없다 — 관리 편집기의 미리보기·검증이 통째로 죽는다');
+  assert.ok(fs.existsSync(path.join(DIST, 'admin', 'shapes.js')), 'dist/admin/shapes.js 가 없다 — 관리 미리보기에서 도형 놀이가 안 그려진다');
+  /* 배포본 삽화는 SVG 뿐이고 스크립트가 없어야 한다 — img 태그로만 쓰지만 주소를 직접 열 수도 있다 */
+  for (const f of fs.readdirSync(path.join(DIST, 'letter', 'img'))) assert.ok(!/<script|onload|onerror/i.test(fs.readFileSync(path.join(DIST, 'letter', 'img', f), 'utf8')), f + ' 에 스크립트가 있다');
   assert.ok(/자체 창작/.test(fs.readFileSync(path.join(DIST, 'letter', 'issue-sample.json'), 'utf8')), '배포본 체험 호에 자체 창작 표시가 없다');
   const live = fs.readFileSync(path.join(DIST, 'admin', 'naesin-live.html'), 'utf8');
   const genSrc = (live.match(/src="([^"]*gen\.js)"/) || [])[1];

@@ -3,7 +3,9 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { handleLetter, normalizeState, familyMessage, dropStudentLetter, dumpLetter, tierFor, letterBodyLimit, readLetterAiLimit,
-  draftUserPrompt, SAMPLE_PARTS, ISSUE_BODY_LIMIT, STATE_BODY_LIMIT, PUTS_PER_DAY, LETTER_AI_DAILY_DEFAULT, DEFAULT_TIER } from './letter-api.mjs';
+  draftUserPrompt, SAMPLE_PARTS, ISSUE_BODY_LIMIT, STATE_BODY_LIMIT, IMG_BODY_LIMIT, PUTS_PER_DAY, LETTER_AI_DAILY_DEFAULT, DEFAULT_TIER,
+  sniffImage, sendLetterPushes, pushDueIssues } from './letter-api.mjs';
+import { readFileSync } from 'node:fs';
 const require = createRequire(import.meta.url);
 const SAMPLE = require('../letter/issue-sample.json');
 const L = require('../letter/letter.js');
@@ -13,16 +15,19 @@ const clone = (v) => JSON.parse(JSON.stringify(v));
 
 /* 메모리 어댑터 — 워커 KV(letter: 접두)·로컬 db.letter 와 같은 계약 */
 function memStore() {
-  const issues = {}, states = {}, students = {}, parents = {};
-  let ids = null, aiUse = null;
+  const issues = {}, states = {}, students = {}, parents = {}, images = {}, push = {};
+  let ids = null, aiUse = null, calendar = null;
   return {
+    getImage: (id) => images[id] || null, putImage: (id, bytes, meta) => { images[id] = { bytes, meta }; }, deleteImage: (id) => { delete images[id]; }, listImages: () => Object.values(images).map((r) => r.meta),
+    getPush: (k) => push[k] || null, putPush: (k, rec) => { push[k] = rec; }, delPush: (k) => { delete push[k]; }, listPushKeys: () => Object.keys(push),
+    getCalendar: () => calendar, putCalendar: (rec) => { calendar = rec; },
     getIssue: (id) => issues[id] || null, putIssue: (id, rec) => { issues[id] = rec; }, deleteIssue: (id) => { delete issues[id]; },
     getIssueIds: () => ids, putIssueIds: (x) => { ids = x; },
     getState: (c) => states[c] || null, putState: (c, rec) => { states[c] = rec; }, deleteState: (c) => { delete states[c]; }, listStateCodes: () => Object.keys(states),
     getStudent: (c) => students[c] || null, putStudent: (c, rec) => { students[c] = rec; }, listStudentCodes: () => Object.keys(students),
     getParentCode: (tk) => parents[tk] || null, putParent: (tk, c) => { parents[tk] = c; },
     getAiUse: () => aiUse, putAiUse: (rec) => { aiUse = rec; },
-    _raw: { issues, states, students, parents },
+    _raw: { issues, states, students, parents, images, push },
   };
 }
 const NOW = Date.parse('2026-09-22T01:00:00Z');   // 9/22 10:00 KST (화요일, 39주)
@@ -68,7 +73,7 @@ await t('학년대 판정 — 명부 학년, 못 읽으면 기본 학년대 + gu
   assert.deepEqual(tierFor({ grade: '초3' }), { tier: 'E2', guess: false });
   assert.deepEqual(tierFor({ grade: '?' }), { tier: DEFAULT_TIER, guess: true });
   assert.deepEqual(tierFor({ grade: '', letterTier: 'K' }), { tier: 'K', guess: false });
-  assert.equal(letterBodyLimit('/api/letter/admin/issue'), ISSUE_BODY_LIMIT); assert.equal(letterBodyLimit('/api/letter/state'), STATE_BODY_LIMIT);
+  assert.equal(letterBodyLimit('/api/letter/admin/issue'), ISSUE_BODY_LIMIT); assert.equal(letterBodyLimit('/api/letter/state'), STATE_BODY_LIMIT); assert.equal(letterBodyLimit('/api/letter/admin/img'), IMG_BODY_LIMIT);
   assert.equal(readLetterAiLimit({}).total, LETTER_AI_DAILY_DEFAULT); assert.equal(readLetterAiLimit({ LETTER_AI_DAILY: '5' }).total, 5);
 });
 
@@ -231,7 +236,8 @@ await t('AI 초안 — 키 없으면 no-key, 조각별 호출·검증 결과 동
   const nokey = await admin({ path: '/api/letter/admin/draft', method: 'POST', getBody: async () => body });
   assert.equal(nokey.status, 200); assert.deepEqual(nokey.body, { ok: false, reason: 'no-key', part: 'E2' });
   assert.equal((await admin({ path: '/api/letter/admin/draft', method: 'POST', getBody: async () => ({ ...body, part: 'HS' }) })).status, 400);
-  assert.equal((await admin({ path: '/api/letter/admin/draft', method: 'POST', getBody: async () => ({ ...body, theme: ' ' }) })).status, 400);
+  assert.equal((await admin({ path: '/api/letter/admin/draft', method: 'POST', getBody: async () => ({ ...body, theme: ' ', week: '2031-W10' }) })).status, 400, '달력에도 없는 주차');
+  assert.equal((await admin({ path: '/api/letter/admin/draft', method: 'POST', getBody: async () => ({ ...body, theme: ' ' }) })).body.reason, 'no-key', '주제를 비우면 달력 주제로 진행한다');
   /* 정상 — 샘플의 E2 조각을 그대로 돌려주는 가짜 모델 */
   const parts = SAMPLE_PARTS();
   const f = fakeFetch({ text: '```json\n' + JSON.stringify(parts.E2) + '\n```' });
@@ -275,13 +281,156 @@ await t('AI 초안 — 키 없으면 no-key, 조각별 호출·검증 결과 동
 await t('퇴원·백업 — 기록만 지우고 호는 남는다 / 덤프에 호 본문과 기록이 담긴다', async () => {
   const store = memStore(); seed(store);
   store.putState('st-1', { state: { v: 1, issues: {} }, updatedAt: 'x' });
-  await dropStudentLetter(store, 'st-1');
+  store.putPush('s:st-1', { endpoint: 'https://p/1' }); store.putPush('f:' + 'q'.repeat(32), { endpoint: 'https://p/2' }); store.putPush('s:st-2', { endpoint: 'https://p/3' });
+  await dropStudentLetter(store, 'st-1', 'q'.repeat(32));
   assert.equal(store.getState('st-1'), null); assert.ok(store.getIssue(SAMPLE.id));
+  assert.deepEqual(store.listPushKeys(), ['s:st-2'], '학생 기기·가족 링크 구독을 함께 지운다');
   store.putState('st-2', { state: { v: 1, issues: {} }, updatedAt: 'y' });
   const d = await dumpLetter(store);
   assert.deepEqual(Object.keys(d.issues), [SAMPLE.id]); assert.equal(d.issues[SAMPLE.id].issue.title, SAMPLE.title);
   assert.deepEqual(Object.keys(d.states), ['st-2']);
+  assert.deepEqual(Object.keys(d.push), ['s:st-2']); assert.ok('calendar' in d && Array.isArray(d.images));
   assert.equal((await call(store, { who: ADMIN, path: '/api/letter/nope' })).status, 404);
+});
+
+/* ── 사진 ── */
+const JPEG = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(200, 1)]);
+const PNG = Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), Buffer.alloc(50, 2)]);
+await t('사진 — base64 로 올리면 매직 바이트로 종류를 정하고, id 로 누구나(링크를 아는 사람만) 받는다; SVG·큰 파일은 거절', async () => {
+  const store = memStore(); seed(store);
+  const admin = (over) => call(store, { who: ADMIN, ...over });
+  assert.equal(sniffImage(JPEG), 'image/jpeg'); assert.equal(sniffImage(PNG), 'image/png'); assert.equal(sniffImage(Buffer.from('<svg xmlns="x"></svg>')), null);
+  /* 사진 id 는 16진수 32자(crypto.randomUUID) — 가짜 토큰 생성기 대신 16진수를 준다 */
+  const up = await admin({ path: '/api/letter/admin/img', method: 'POST', randomToken: () => 'c'.repeat(31) + 'd', getBody: async () => ({ name: '단풍.jpg', type: 'image/svg+xml', data: 'data:image/jpeg;base64,' + JPEG.toString('base64'), w: 1200, h: 800 }) });
+  assert.equal(up.status, 200); assert.ok(/^[a-f0-9]{32}$/.test(up.body.id) && up.body.url === '/api/letter/img/' + up.body.id); assert.equal(up.body.type, 'image/jpeg', '보낸 type 이 아니라 바이트로 정한다');
+  const get = await call(store, { who: null, path: '/api/letter/img/' + up.body.id });
+  assert.equal(get.status, 200); assert.ok(get.bytes && get.bytes.length === JPEG.length); assert.equal(get.headers['Content-Type'], 'image/jpeg'); assert.ok(/immutable/.test(get.headers['Cache-Control']));
+  assert.equal((await call(store, { who: null, path: '/api/letter/img/' + 'b'.repeat(32) })).status, 404);
+  assert.equal((await call(store, { who: null, path: '/api/letter/img/short' })).status, 401, '형식이 다르면 사진 경로가 아니다');
+  const list = await admin({ path: '/api/letter/admin/imgs' });
+  assert.equal(list.body.images.length, 1); assert.equal(list.body.images[0].name, '단풍.jpg'); assert.equal(list.body.images[0].w, 1200); assert.ok(!('bytes' in list.body.images[0]));
+  assert.equal((await admin({ path: '/api/letter/admin/img', method: 'POST', getBody: async () => ({ data: Buffer.from('<svg></svg>').toString('base64') }) })).status, 400, 'SVG 거절');
+  assert.equal((await admin({ path: '/api/letter/admin/img', method: 'POST', getBody: async () => ({ data: '' }) })).status, 400);
+  assert.equal((await admin({ path: '/api/letter/admin/img', method: 'POST', getBody: async () => ({ data: Buffer.concat([JPEG, Buffer.alloc(1_600_000)]).toString('base64') }) })).status, 413, '1.5MB 상한');
+  assert.equal((await call(store, { path: '/api/letter/admin/img', method: 'POST', getBody: async () => ({ data: JPEG.toString('base64') }) })).status, 403, '학생은 못 올린다');
+  const del = await admin({ path: '/api/letter/admin/img', method: 'DELETE', getBody: async () => ({ id: up.body.id }) });
+  assert.equal(del.status, 200); assert.equal((await call(store, { who: null, path: '/api/letter/img/' + up.body.id })).status, 404);
+  assert.equal((await admin({ path: '/api/letter/admin/img', method: 'DELETE', getBody: async () => ({ id: up.body.id }) })).status, 404);
+});
+
+/* ── 푸시 ── */
+const PUSH = { publicKey: 'BPUB', privateJwk: JSON.stringify({ kty: 'EC', crv: 'P-256', d: 'x', x: 'y', y: 'z' }), subject: 'mailto:t@wb' };
+function fakePush(statusFor) { const calls = []; const f = async (url) => { calls.push(url); return { status: statusFor ? statusFor(url) : 201 }; }; f.calls = calls; return f; }
+/* vapidJwt 는 WebCrypto 로 서명한다 — 가짜 키로는 실패하니 여기서는 실제 키 하나를 만들어 쓴다 */
+const kp = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
+PUSH.privateJwk = JSON.stringify(await crypto.subtle.exportKey('jwk', kp.privateKey));
+await t('알림 구독 — 학생은 토큰으로, 가족은 링크 토큰으로; 키가 없으면 no-vapid', async () => {
+  const store = memStore(); seed(store);
+  assert.deepEqual((await call(store, { path: '/api/letter/push/key' })).body, { ok: false, reason: 'no-vapid' });
+  assert.deepEqual((await call(store, { path: '/api/letter/push/key', push: PUSH })).body, { ok: true, key: 'BPUB' });
+  const sub = { subscription: { endpoint: 'https://push.example/abc', keys: { p256dh: 'x', auth: 'y' } } };
+  assert.equal((await call(store, { path: '/api/letter/push/subscribe', method: 'POST', getBody: async () => sub })).status, 200);
+  assert.equal(store.getPush('s:st-1').endpoint, 'https://push.example/abc');
+  assert.equal((await call(store, { path: '/api/letter/push/subscribe', method: 'POST', getBody: async () => ({ subscription: { endpoint: 'http://insecure' } }) })).status, 400);
+  const fam = 'q'.repeat(32);
+  assert.deepEqual((await call(store, { who: null, path: '/api/letter/parent/push/key', query: Q('t=' + fam), push: PUSH })).body, { ok: true, key: 'BPUB' });
+  assert.equal((await call(store, { who: null, path: '/api/letter/parent/push/key', query: Q('t=' + 'z'.repeat(32)) })).status, 404);
+  assert.equal((await call(store, { who: null, path: '/api/letter/parent/push/subscribe', method: 'POST', query: Q('t=' + fam), getBody: async () => sub })).status, 200);
+  assert.equal(store.getPush('f:' + fam).endpoint, 'https://push.example/abc');
+  assert.equal((await call(store, { who: null, path: '/api/letter/parent/push/unsubscribe', method: 'POST', query: Q('t=' + fam), getBody: async () => ({}) })).status, 200);
+  assert.equal(store.getPush('f:' + fam), null);
+  assert.equal((await call(store, { path: '/api/letter/push/unsubscribe', method: 'POST', getBody: async () => ({}) })).status, 200);
+  assert.equal(store.getPush('s:st-1'), null);
+  const st = await call(store, { who: ADMIN, path: '/api/letter/admin/push/status', push: PUSH });
+  assert.deepEqual(st.body, { subscribers: 0, byKind: { student: 0, family: 0 }, vapid: true });
+});
+
+await t('발송 — 그 호의 학년대가 있는 가정만, 410 이면 구독 정리, 주인 없는 구독은 지운다', async () => {
+  const store = memStore(); seed(store);
+  store.putPush('s:st-1', { endpoint: 'https://p/e2' });           // 초3 → E2
+  store.putPush('f:' + 'q'.repeat(32), { endpoint: 'https://p/m' }); // 가족 링크 → st-2 중1 → M
+  store.putPush('s:ghost', { endpoint: 'https://p/ghost' });
+  store.putPush('s:st-3', { endpoint: 'https://p/gone' });          // 7세 → K, 410 응답
+  const f = fakePush((u) => (u === 'https://p/gone' ? 410 : 201));
+  const r = await sendLetterPushes({ store, push: PUSH, fetchFn: f, issue: SAMPLE, now: NOW });
+  assert.deepEqual(r, { sent: 2, skipped: 0, removed: 2 });
+  assert.deepEqual(f.calls.sort(), ['https://p/e2', 'https://p/gone', 'https://p/m']);
+  assert.equal(store.getPush('s:ghost'), null); assert.equal(store.getPush('s:st-3'), null);
+  /* 중등 전용 호 — 초3 가정에는 안 간다 */
+  const onlyM = { ...clone(SAMPLE), sections: clone(SAMPLE).sections.filter((s) => Array.isArray(s.tiers) && s.tiers.length === 1 && s.tiers[0] === 'M') };
+  const f2 = fakePush();
+  assert.deepEqual(await sendLetterPushes({ store, push: PUSH, fetchFn: f2, issue: onlyM, now: NOW }), { sent: 1, skipped: 1, removed: 0 });
+  assert.deepEqual(f2.calls, ['https://p/m']);
+  assert.equal((await sendLetterPushes({ store, push: {}, fetchFn: f2, issue: SAMPLE })).reason, 'no-vapid');
+});
+
+await t('발행 즉시 알림 — 지금 보이는 호를 처음 발행할 때 한 번만; 예약 발행분은 07시 크론이; 다시 보내기·no-vapid', async () => {
+  const store = memStore(); seed(store, { issue: false });
+  store.putPush('s:st-1', { endpoint: 'https://p/e2' });
+  const admin = (over) => call(store, { who: ADMIN, push: PUSH, ...over });
+  const f = fakePush();
+  const draft = { ...clone(SAMPLE), status: 'draft' };
+  await admin({ path: '/api/letter/admin/issue', method: 'PUT', getBody: async () => ({ issue: draft }) });
+  const pub = await admin({ path: '/api/letter/admin/publish', method: 'POST', getBody: async () => ({ id: SAMPLE.id, status: 'published' }), pushFetch: f });
+  assert.equal(pub.status, 200); assert.deepEqual(pub.body.push, { sent: 1, skipped: 0, removed: 0 });
+  assert.ok(store.getIssue(SAMPLE.id).pushedAt, 'pushedAt 이 남는다');
+  /* 내렸다 다시 올려도 두 번 보내지 않는다 */
+  await admin({ path: '/api/letter/admin/publish', method: 'POST', getBody: async () => ({ id: SAMPLE.id, status: 'draft' }) });
+  const again = await admin({ path: '/api/letter/admin/publish', method: 'POST', getBody: async () => ({ id: SAMPLE.id, status: 'published' }), pushFetch: f });
+  assert.equal(again.body.push, null); assert.equal(f.calls.length, 1);
+  /* after 훅이 있으면(워커 waitUntil) 응답은 queued, 발송은 뒤에서 */
+  const s2 = memStore(); seed(s2, { issue: false }); s2.putPush('s:st-1', { endpoint: 'https://p/e2' });
+  await call(s2, { who: ADMIN, path: '/api/letter/admin/issue', method: 'PUT', getBody: async () => ({ issue: draft }) });
+  const pending = [];
+  const f2 = fakePush();
+  const q2 = await call(s2, { who: ADMIN, push: PUSH, pushFetch: f2, after: (pr) => pending.push(pr), path: '/api/letter/admin/publish', method: 'POST', getBody: async () => ({ id: SAMPLE.id, status: 'published' }) });
+  assert.deepEqual(q2.body.push, { queued: true }); assert.equal(pending.length, 1);
+  await Promise.all(pending); assert.equal(f2.calls.length, 1); assert.ok(s2.getIssue(SAMPLE.id).pushedAt);
+  /* 예약 발행 — 발행일이 미래면 지금 안 보내고, 그날 크론이 보낸다 */
+  const s3 = memStore(); seed(s3, { issue: false }); s3.putPush('s:st-1', { endpoint: 'https://p/e2' });
+  await call(s3, { who: ADMIN, path: '/api/letter/admin/issue', method: 'PUT', getBody: async () => ({ issue: draft }) });
+  const f3 = fakePush();
+  const fut = await call(s3, { who: ADMIN, push: PUSH, pushFetch: f3, path: '/api/letter/admin/publish', method: 'POST', getBody: async () => ({ id: SAMPLE.id, status: 'published', publishAt: '2026-09-28' }) });
+  assert.equal(fut.body.push, null); assert.equal(f3.calls.length, 0);
+  assert.deepEqual((await pushDueIssues({ store: s3, push: PUSH, fetchFn: f3, now: NOW })).pushed, [], '아직 발행일 전');
+  const due = await pushDueIssues({ store: s3, push: PUSH, fetchFn: f3, now: Date.parse('2026-09-27T22:30:00Z') });   // 9/28 07:30 KST
+  assert.deepEqual(due.pushed, [{ id: SAMPLE.id, sent: 1, skipped: 0, removed: 0 }]);
+  assert.deepEqual((await pushDueIssues({ store: s3, push: PUSH, fetchFn: f3, now: Date.parse('2026-09-28T22:30:00Z') })).pushed, [], '다음 날 다시 안 보낸다');
+  assert.equal((await pushDueIssues({ store: s3, push: {}, fetchFn: f3, now: NOW })).reason, 'no-vapid');
+  /* 다시 보내기 */
+  const re = await admin({ path: '/api/letter/admin/push', method: 'POST', getBody: async () => ({ id: SAMPLE.id }), pushFetch: f });
+  assert.equal(re.status, 200); assert.equal(re.body.sent, 1); assert.equal(f.calls.length, 2);
+  assert.equal((await call(s3, { who: ADMIN, push: PUSH, pushFetch: f3, path: '/api/letter/admin/push', method: 'POST', getBody: async () => ({ id: SAMPLE.id }), now: NOW })).status, 409, '발행일 전에는 못 보낸다');
+  assert.deepEqual((await admin({ path: '/api/letter/admin/push', method: 'POST', getBody: async () => ({ id: SAMPLE.id }), push: {} })).body, { ok: false, reason: 'no-vapid' });
+});
+
+/* ── 주제 달력 ── */
+await t('주제 달력 — 기본값은 배포본, 저장하면 KV 가 이긴다, 검증 실패는 400; AI 초안이 주제·지표를 달력에서 가져온다', async () => {
+  const store = memStore(); seed(store);
+  const admin = (over) => call(store, { who: ADMIN, ...over });
+  const g0 = await admin({ path: '/api/letter/admin/calendar' });
+  assert.equal(g0.body.source, 'default'); assert.ok(g0.body.calendar.weeks['2026-W40'].theme); assert.deepEqual(g0.body.rotation, L.rotationFor(L.weekId(NOW)));
+  const bad = await admin({ path: '/api/letter/admin/calendar', method: 'PUT', getBody: async () => ({ calendar: { weeks: { 'W1': { theme: 'x' } } } }) });
+  assert.equal(bad.status, 400); assert.ok(bad.body.errors.length);
+  const ok = await admin({ path: '/api/letter/admin/calendar', method: 'PUT', getBody: async () => ({ calendar: { version: 1, weeks: { '2026-W40': { theme: '가을 곤충의 겨울나기', notes: '10월 3일 휴원', indices: { E2: 'VSI' } } } } }) });
+  assert.equal(ok.status, 200);
+  const g1 = await admin({ path: '/api/letter/admin/calendar' });
+  assert.equal(g1.body.source, 'kv'); assert.equal(g1.body.calendar.weeks['2026-W40'].theme, '가을 곤충의 겨울나기');
+  assert.equal((await call(store, { path: '/api/letter/admin/calendar' })).status, 403);
+  /* AI 초안 — theme 을 비우면 달력 주제, 지표는 달력 지정 > 순환 */
+  const parts = SAMPLE_PARTS();
+  const f = fakeFetch({ text: JSON.stringify(parts.E2) });
+  const r = await admin({ path: '/api/letter/admin/draft', method: 'POST', getBody: async () => ({ part: 'E2', week: '2026-W40' }), ai: { apiKey: 'k', env: {}, fetchImpl: f } });
+  assert.equal(r.body.ok, true);
+  const user = f.calls[0].body.messages[0].content;
+  assert.ok(/가을 곤충의 겨울나기/.test(user) && /VSI/.test(user) && /달력 메모: 10월 3일 휴원/.test(user), user.slice(0, 300));
+  /* 저장본은 배포본 기본값을 통째로 대신한다 — 저장본에 없는 주차(W41)는 주제가 없다 */
+  const f2 = fakeFetch({ text: JSON.stringify(parts.K) });
+  assert.equal((await admin({ path: '/api/letter/admin/draft', method: 'POST', getBody: async () => ({ part: 'K', week: '2026-W41' }), ai: { apiKey: 'k', env: {}, fetchImpl: f2 } })).status, 400, '저장본에 없는 주차');
+  await admin({ path: '/api/letter/admin/draft', method: 'POST', getBody: async () => ({ part: 'K', week: '2026-W40' }), ai: { apiKey: 'k', env: {}, fetchImpl: f2 } });
+  assert.ok(new RegExp('지표: ' + L.rotationFor('2026-W40').K).test(f2.calls[0].body.messages[0].content), '달력에 그 학년대 지표 지정이 없으면 순환값');
+  const none = await admin({ path: '/api/letter/admin/draft', method: 'POST', getBody: async () => ({ part: 'K', week: '2031-W10' }), ai: { apiKey: 'k', env: {}, fetchImpl: f2 } });
+  assert.equal(none.status, 400, '달력에도 없는 주차면 주제가 필요하다');
 });
 
 console.log(`\nOK — ${passed}개 통과`);

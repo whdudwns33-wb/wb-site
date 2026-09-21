@@ -33,9 +33,11 @@ ADMIN_PIN=원하는PIN node reading-server/server.mjs   # 기본 포트 8890
 ### 브레인레터 (주간 뉴스레터 — `letter/`)
 
 - 라우트는 `/api/letter/*` 아래, 데이터는 `letter:` 접두 KV(로컬: `db.letter`) — 로직은 `letter-api.mjs` 한 모듈, 검증기·렌더러는 `letter/letter.js`.
-- 가족: `GET /api/letter/parent?t=토큰[&id=]`(진로독서 학부모 토큰 공용, 로그인 없음) → `{parent, issue, issues}`.
-- 학생(Bearer): `GET /api/letter/issues` / `GET /api/letter/issue?id=` (발행일이 지난 호만, 자기 학년대 섹션만) / `GET·PUT /api/letter/state`(150KB, 하루 10회).
-- 관리(PIN): `GET /api/letter/admin/issues` · `GET·PUT·DELETE /api/letter/admin/issue` · `POST /api/letter/admin/publish {id,status,publishAt?}` · `GET /api/letter/admin/students` · `POST /api/letter/admin/tier {code,tier}` · `GET /api/letter/admin/messages?id=`(발송 문구 + 가족 링크 발급) · `GET /api/letter/admin/stats?id=` · `POST /api/letter/admin/draft {part,theme,week,…}`(AI 초안 한 조각 — `ANTHROPIC_API_KEY`, 한도 `LETTER_AI_DAILY` 기본 30).
+- 가족: `GET /api/letter/parent?t=토큰[&id=]`(진로독서 학부모 토큰 공용, 로그인 없음) → `{parent, issue, issues}` · `GET /api/letter/parent/push/key?t=` · `POST /api/letter/parent/push/subscribe|unsubscribe?t=`(새 호 푸시 구독).
+- 사진: `GET /api/letter/img/<id>`(무인증 — id 가 열쇠, 불변 캐시).
+- 학생(Bearer): `GET /api/letter/issues` / `GET /api/letter/issue?id=` (발행일이 지난 호만, 자기 학년대 섹션만) / `GET·PUT /api/letter/state`(150KB, 하루 10회) / `GET /api/letter/push/key` · `POST /api/letter/push/subscribe|unsubscribe`.
+- 관리(PIN): `GET /api/letter/admin/issues` · `GET·PUT·DELETE /api/letter/admin/issue` · `POST /api/letter/admin/publish {id,status,publishAt?}`(지금 보이는 첫 발행이면 푸시) · `POST /api/letter/admin/push {id}`(다시 보내기) · `GET /api/letter/admin/push/status` · `GET /api/letter/admin/students` · `POST /api/letter/admin/tier {code,tier}` · `GET /api/letter/admin/messages?id=`(발송 문구 + 가족 링크 발급) · `GET /api/letter/admin/stats?id=` · `POST /api/letter/admin/draft {part,theme?,week,…}`(AI 초안 한 조각 — `ANTHROPIC_API_KEY`, 한도 `LETTER_AI_DAILY` 기본 30, 주제·지표는 달력에서) · `GET /api/letter/admin/imgs` · `POST /api/letter/admin/img {name,data(base64),w,h}`(JPEG/PNG/WebP ≤1.5MB) · `DELETE /api/letter/admin/img {id}` · `GET·PUT /api/letter/admin/calendar`.
+- 새 호 푸시: 워드브레인과 같은 VAPID 키. 발행 즉시(워커 `waitUntil`) + 22:00 UTC(07:00 KST) 크론이 발행일이 된 호를 한 번 보낸다. 로컬 서버는 1분 폴링.
 - 화면: `/letter/`(학생·가족·체험·관리 미리보기 `?id=&tier=&print=`) · `/admin/letter-admin.html`.
 
 ## 동작 방식

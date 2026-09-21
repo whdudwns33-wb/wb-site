@@ -7,12 +7,18 @@
 
    호(issue)의 유일한 검증기는 letter/letter.js 의 checkIssue 다 — 관리 웹·AI 초안·저장이 같은 규칙으로 걸러진다.
    학생에게는 자기 학년대 섹션만 내려간다(forTier). 정답은 뉴스레터의 일부라 함께 내려간다(하루브레인과 다르다 —
-   시험이 아니라 가정 학습지다). */
+   시험이 아니라 가정 학습지다).
+   사진(letter:img:<id>)은 관리 웹이 올리고 id(128비트 무작위)로 서빙한다. 새 호 알림은 워드브레인의 VAPID 배선을 재사용한다.
+   주제 달력은 배포본 기본값(letter/calendar.json) 위에 KV(letter:calendar)가 덮어쓴다. */
 import L from '../letter/letter.js';
 import SAMPLE from '../letter/issue-sample.json' with { type: 'json' };
+import CALENDAR_DEFAULT from '../letter/calendar.json' with { type: 'json' };
 import { parseJsonBlock, makeQuota } from './naesin-extract.mjs';
+import { vapidJwt } from './vocab-api.mjs';
 
 export const ISSUE_BODY_LIMIT = 512_000;     // PUT /admin/issue — 호 400KB + 포장
+export const IMG_BODY_LIMIT = 2_400_000;     // POST /admin/img — 사진 1.5MB 의 base64 + 포장
+export const IMG_MAX_BYTES = 1_500_000;      // 사진 한 장 상한(관리 웹이 올리기 전에 1600px·JPEG 로 줄인다)
 export const STATE_BODY_LIMIT = 200_000;     // 그 외 전부
 export const STATE_MAX_BYTES = 150_000;      // 학생 기록 1건 상한
 export const PUTS_PER_DAY = 10;              // PUT /state 하루 상한 — KV 쓰기 예산은 네임스페이스 합산이다(앱은 20초 디바운스)
@@ -25,10 +31,12 @@ const MAX_TOKENS = 16000;
 const CODE_RE = /^[A-Za-z0-9-]{3,20}$/;
 const ISSUE_ID_RE = /^\d{4}-W\d{2}(-[a-z0-9]{1,12})?$/;
 const PTOKEN_RE = /^[A-Za-z0-9]{16,64}$/;
+const IMG_ID_RE = /^[a-f0-9]{32}$/;
+const IMG_TYPES = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
 const KEY_RE = /^[a-z0-9-]{2,30}:\d{1,2}$/;
 const TOO_LARGE = Symbol('too-large');
 
-export const letterBodyLimit = (p) => (p === '/api/letter/admin/issue' ? ISSUE_BODY_LIMIT : STATE_BODY_LIMIT);
+export const letterBodyLimit = (p) => (p === '/api/letter/admin/issue' ? ISSUE_BODY_LIMIT : p === '/api/letter/admin/img' ? IMG_BODY_LIMIT : STATE_BODY_LIMIT);
 export function readLetterAiLimit(env) {
   const n = Number((env || {}).LETTER_AI_DAILY);
   return { total: Number.isFinite(n) && n > 0 ? Math.floor(n) : LETTER_AI_DAILY_DEFAULT };
@@ -43,6 +51,74 @@ const byteLen = (v) => new TextEncoder().encode(JSON.stringify(v)).length;
 export function tierFor(stu) {
   const t = L.tierOf(stu);
   return t ? { tier: t, guess: false } : { tier: DEFAULT_TIER, guess: true };
+}
+
+/* ── 사진 — 관리 웹이 base64 로 올린다. 종류는 확장자가 아니라 앞 몇 바이트(매직 바이트)로 확인한다:
+   SVG 는 받지 않는다(스크립트가 들어갈 수 있어 직접 열면 실행된다). 배포본 삽화(letter/img/*.svg)는 저장소의 자체 제작본이라 예외. ── */
+function b64decode(s) {
+  const clean = String(s || '').replace(/^data:[^,]*,/, '').replace(/\s+/g, '');
+  if (typeof Buffer !== 'undefined') return new Uint8Array(Buffer.from(clean, 'base64'));
+  const bin = atob(clean); const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i += 1) out[i] = bin.charCodeAt(i);
+  return out;
+}
+export function sniffImage(bytes) {
+  const b = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  if (b.length > 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return 'image/jpeg';
+  if (b.length > 8 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47 && b[4] === 0x0d && b[5] === 0x0a && b[6] === 0x1a && b[7] === 0x0a) return 'image/png';
+  if (b.length > 12 && b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 && b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50) return 'image/webp';
+  return null;
+}
+
+/* ── 새 호 도착 푸시 — 워드브레인 밤 9시 푸시와 같은 배선(VAPID 서명, 페이로드 없음). 구독 키는 s:<학생 코드> 또는 f:<가족 토큰>.
+   호에 그 가정의 학년대 섹션이 없으면 보내지 않는다(유치부 가정에 중등 전용 호 알림이 가면 열어도 빈 화면이다). ── */
+async function tierOfPushKey(store, key) {
+  const [kind, id] = [key.slice(0, 2), key.slice(2)];
+  let code = null;
+  if (kind === 's:') code = id;
+  else if (kind === 'f:') code = await store.getParentCode(id);
+  if (!code) return null;
+  const stu = await store.getStudent(code);
+  return stu ? tierFor(stu).tier : null;
+}
+export async function sendLetterPushes({ store, push, fetchFn, issue, now }) {
+  if (!push || !push.publicKey || !push.privateJwk) return { sent: 0, skipped: 0, removed: 0, reason: 'no-vapid' };
+  const f = fetchFn || fetch;
+  let sent = 0, skipped = 0, removed = 0;
+  for (const key of await store.listPushKeys()) {
+    const sub = await store.getPush(key);
+    if (!sub || !sub.endpoint) continue;
+    const tier = await tierOfPushKey(store, key);
+    if (!tier) { await store.delPush(key); removed += 1; continue; }        // 퇴원했거나 링크가 바뀐 구독
+    if (issue && !L.tiersOf(issue).includes(tier)) { skipped += 1; continue; }
+    try {
+      const jwt = await vapidJwt({ audience: new URL(sub.endpoint).origin, subject: push.subject || 'mailto:admin@wb.local', privateJwk: push.privateJwk });
+      const r = await f(sub.endpoint, { method: 'POST', headers: { TTL: '172800', Urgency: 'normal', Authorization: 'vapid t=' + jwt + ', k=' + push.publicKey } });
+      if (r.status === 404 || r.status === 410) { await store.delPush(key); removed += 1; }
+      else sent += 1;
+    } catch (e) { /* 이 구독은 다음 호 때 다시 */ }
+  }
+  return { sent, skipped, removed };
+}
+/* 발행일이 된 호에 아직 알림을 안 보냈으면 보낸다 — 07:00 KST 크론이 부른다(예약 발행분). 즉시 발행은 publish 라우트가 보낸다 */
+export async function pushDueIssues({ store, push, fetchFn, now }) {
+  if (!push || !push.publicKey || !push.privateJwk) return { pushed: [], reason: 'no-vapid' };
+  const t = now == null ? Date.now() : +now;
+  const today = L.kstDate(t);
+  const out = [];
+  for (const rec of await allIssues(store)) {
+    if (!L.isVisible(rec.issue, today) || rec.pushedAt) continue;
+    const r = await sendLetterPushes({ store, push, fetchFn, issue: rec.issue, now: t });
+    if (r.reason === 'no-vapid') return { pushed: [], reason: 'no-vapid' };
+    await store.putIssue(rec.issue.id, { ...rec, pushedAt: nowIso(t), pushResult: r });
+    out.push({ id: rec.issue.id, ...r });
+  }
+  return { pushed: out };
+}
+function subscriptionEndpoint(b) {
+  const sub = b && b.subscription;
+  const ep = sub && String(sub.endpoint || '');
+  return ep && ep.length <= 500 && /^https:\/\//.test(ep) ? ep : null;
 }
 
 /* ── 학생 기록 화이트리스트 — 학생 기기가 올린 값이 강사 화면(열람 현황)에 집계된다. 모양만 강제한다 ── */
@@ -195,6 +271,29 @@ export async function handleLetter(ctx) {
       issue: rec ? L.forTier(rec.issue, tier) : null, issues: vis.map((r) => L.brief(r.issue)), updatedAt: rec ? rec.updatedAt || null : null });
   }
 
+  /* 사진 — id 가 128비트 무작위라 그 자체가 열쇠다(가족 링크 토큰과 같은 방식). 내용이 바뀌지 않으니 오래 캐시한다 */
+  const mImg = p.match(/^\/api\/letter\/img\/([a-f0-9]{32})$/);
+  if (mImg && method === 'GET') {
+    const rec = await store.getImage(mImg[1]);
+    if (!rec || !rec.bytes) return j(404, { error: '사진을 찾을 수 없어요.' });
+    return { status: 200, bytes: rec.bytes, headers: { 'Content-Type': (rec.meta && rec.meta.type) || 'application/octet-stream', 'Cache-Control': 'public, max-age=31536000, immutable', 'X-Content-Type-Options': 'nosniff', 'Content-Disposition': 'inline' } };
+  }
+  /* 가족 링크 알림 구독 — 토큰이 곧 자격이다. 구독 키 f:<토큰> */
+  if (p.startsWith('/api/letter/parent/push/')) {
+    const t = q('t');
+    const code = PTOKEN_RE.test(t) ? await store.getParentCode(t) : null;
+    if (!code) return j(404, { error: '유효하지 않은 링크예요.' });
+    if (p === '/api/letter/parent/push/key' && method === 'GET') { const key = ctx.push && ctx.push.publicKey; return j(200, key ? { ok: true, key } : { ok: false, reason: 'no-vapid' }); }
+    if (p === '/api/letter/parent/push/subscribe' && method === 'POST') {
+      const b = await body(); const bad = badBody(b); if (bad) return bad;
+      const ep = subscriptionEndpoint(b); if (!ep) return j(400, { error: '유효한 구독이 아니에요.' });
+      await store.putPush('f:' + t, { endpoint: ep, at: nowIso(now) });
+      return j(200, { ok: true });
+    }
+    if (p === '/api/letter/parent/push/unsubscribe' && method === 'POST') { await store.delPush('f:' + t); return j(200, { ok: true }); }
+    return j(404, { error: 'unknown api' });
+  }
+
   if (!who) return j(401, { error: '로그인이 필요합니다.' });
 
   let stu = null, tier = null, guess = false;
@@ -239,6 +338,15 @@ export async function handleLetter(ctx) {
     await store.putState(who.code, rec);
     return j(200, { ok: true, updatedAt: rec.updatedAt });
   }
+
+  if (p === '/api/letter/push/key' && method === 'GET' && !who.admin) { const key = ctx.push && ctx.push.publicKey; return j(200, key ? { ok: true, key } : { ok: false, reason: 'no-vapid' }); }
+  if (p === '/api/letter/push/subscribe' && method === 'POST' && !who.admin) {
+    const b = await body(); const bad = badBody(b); if (bad) return bad;
+    const ep = subscriptionEndpoint(b); if (!ep) return j(400, { error: '유효한 구독이 아니에요.' });
+    await store.putPush('s:' + who.code, { endpoint: ep, at: nowIso(now) });
+    return j(200, { ok: true });
+  }
+  if (p === '/api/letter/push/unsubscribe' && method === 'POST' && !who.admin) { await store.delPush('s:' + who.code); return j(200, { ok: true }); }
 
   if (!who.admin) return j(403, { error: '권한이 없습니다.' });
 
@@ -292,9 +400,78 @@ export async function handleLetter(ctx) {
     /* 발행하려는 호는 지금 규칙으로 다시 검증한다 — 규칙이 바뀐 뒤 저장된 옛 초안이 그대로 나가지 않게 */
     const r = L.checkIssue(issue);
     if (b.status === 'published' && r.errors.length) return j(400, { error: '발행할 수 없어요 — 오류 ' + r.errors.length + '건', errors: r.errors });
-    const out = { issue, updatedAt: nowIso(now) };
-    await store.putIssue(id, out);
-    return j(200, { ok: true, id, status: issue.status, publishAt: issue.publishAt, visible: L.isVisible(issue, today) });
+    const out = { ...rec, issue, updatedAt: nowIso(now) };
+    const visibleNow = L.isVisible(issue, today);
+    let pushInfo = null;
+    /* 지금 보이는 호를 처음 발행하면 바로 알림 — 발행일이 아직이면 07:00 크론이 그날 보낸다. 내렸다 다시 올려도 두 번 보내지 않는다 */
+    if (visibleNow && !rec.pushedAt) {
+      const run = (async () => {
+        const r = await sendLetterPushes({ store, push: ctx.push, fetchFn: ctx.pushFetch, issue, now });
+        if (r.reason !== 'no-vapid') await store.putIssue(id, { ...out, pushedAt: nowIso(now), pushResult: r });
+        return r;
+      })();
+      if (ctx.after) { ctx.after(run); pushInfo = { queued: true }; }
+      else pushInfo = await run;
+    }
+    if (!pushInfo || pushInfo.queued) await store.putIssue(id, out);
+    return j(200, { ok: true, id, status: issue.status, publishAt: issue.publishAt, visible: visibleNow, push: pushInfo });
+  }
+  /* 알림 다시 보내기 — 구독자 전원(그 호의 학년대가 있는 가정만) */
+  if (p === '/api/letter/admin/push' && method === 'POST') {
+    const b = await body(); const bad = badBody(b); if (bad) return bad;
+    const id = String(b.id || '');
+    const rec = ISSUE_ID_RE.test(id) ? await store.getIssue(id) : null;
+    if (!rec || !rec.issue) return j(404, { error: '그 호를 찾을 수 없어요.' });
+    if (!L.isVisible(rec.issue, today)) return j(409, { error: '아직 보이지 않는 호예요 — 발행일이 지나야 알림을 보낼 수 있어요.' });
+    const r = await sendLetterPushes({ store, push: ctx.push, fetchFn: ctx.pushFetch, issue: rec.issue, now });
+    if (r.reason === 'no-vapid') return j(200, { ok: false, reason: 'no-vapid' });
+    await store.putIssue(id, { ...rec, pushedAt: nowIso(now), pushResult: r });
+    return j(200, { ok: true, id, ...r });
+  }
+  if (p === '/api/letter/admin/push/status' && method === 'GET') {
+    let student = 0, family = 0;
+    for (const k of await store.listPushKeys()) { if (k.startsWith('s:')) student += 1; else if (k.startsWith('f:')) family += 1; }
+    return j(200, { subscribers: student + family, byKind: { student, family }, vapid: !!(ctx.push && ctx.push.publicKey && ctx.push.privateJwk) });
+  }
+  /* ── 사진 ── */
+  if (p === '/api/letter/admin/imgs' && method === 'GET') {
+    const images = (await store.listImages()).map((m) => ({ ...m, url: '/api/letter/img/' + m.id }));
+    images.sort((a, b) => String(b.at || '').localeCompare(String(a.at || '')));
+    return j(200, { images });
+  }
+  if (p === '/api/letter/admin/img' && method === 'POST') {
+    const b = await body(); const bad = badBody(b); if (bad) return bad;
+    let bytes;
+    try { bytes = b64decode(b.data); } catch (e) { return j(400, { error: '사진 데이터(base64)를 읽을 수 없어요.' }); }
+    if (!bytes.length) return j(400, { error: '사진 데이터가 비었어요.' });
+    if (bytes.length > IMG_MAX_BYTES) return j(413, { error: '사진이 너무 커요 — 1.5MB 이내로 줄여 주세요(관리 웹이 자동으로 줄입니다).' });
+    const type = sniffImage(bytes);
+    if (!type) return j(400, { error: 'JPEG·PNG·WebP 만 올릴 수 있어요.' });
+    const id = ctx.randomToken ? ctx.randomToken() : crypto.randomUUID().replace(/-/g, '');
+    const meta = { id, type, ext: IMG_TYPES[type], size: bytes.length, name: strMax(b.name, 80), w: Number.isInteger(b.w) ? b.w : null, h: Number.isInteger(b.h) ? b.h : null, at: nowIso(now) };
+    await store.putImage(id, bytes, meta);
+    return j(200, { ok: true, id, url: '/api/letter/img/' + id, size: bytes.length, type });
+  }
+  if (p === '/api/letter/admin/img' && method === 'DELETE') {
+    const b = await body(); const bad = badBody(b); if (bad) return bad;
+    const id = String(b.id || '');
+    if (!IMG_ID_RE.test(id)) return j(400, { error: '사진 id 형식이 아니에요.' });
+    if (!(await store.getImage(id))) return j(404, { error: '사진을 찾을 수 없어요.' });
+    await store.deleteImage(id);
+    return j(200, { ok: true, id });
+  }
+  /* ── 주제 달력 — 기본값은 배포본(letter/calendar.json), 관리 웹에서 고치면 KV 가 이긴다 ── */
+  if (p === '/api/letter/admin/calendar' && method === 'GET') {
+    const rec = store.getCalendar ? await store.getCalendar() : null;
+    return j(200, { calendar: rec && rec.calendar ? rec.calendar : CALENDAR_DEFAULT, updatedAt: rec ? rec.updatedAt || null : null, source: rec && rec.calendar ? 'kv' : 'default', rotation: L.rotationFor(L.weekId(now)) });
+  }
+  if (p === '/api/letter/admin/calendar' && method === 'PUT') {
+    const b = await body(); const bad = badBody(b); if (bad) return bad;
+    const errs = L.checkCalendar(b.calendar);
+    if (errs.length) return j(400, { error: '달력 검증 실패 — 오류 ' + errs.length + '건', errors: errs });
+    const rec = { calendar: b.calendar, updatedAt: nowIso(now) };
+    await store.putCalendar(rec);
+    return j(200, { ok: true, updatedAt: rec.updatedAt });
   }
   if (p === '/api/letter/admin/students' && method === 'GET') {
     const students = [];
@@ -375,18 +552,22 @@ export async function handleLetter(ctx) {
     const b = await body(); const bad = badBody(b); if (bad) return bad;
     const part = String(b.part || '');
     if (!DRAFT_PARTS.includes(part)) return j(400, { error: 'part 는 shared·K·E1·E2·E3·M 중 하나' });
-    const theme = strMax(b.theme, 200).trim();
-    if (!theme) return j(400, { error: '이번 주 주제(theme)가 필요해요.' });
     const week = /^\d{4}-W\d{2}$/.test(String(b.week || '')) ? b.week : L.weekId(now);
+    const calRec = store.getCalendar ? await store.getCalendar() : null;
+    const entry = L.calendarEntry(calRec && calRec.calendar ? calRec.calendar : CALENDAR_DEFAULT, week);
+    /* 주제·지표를 안 주면 주제 달력에서 가져온다 — 매주 할 일이 "주차 확인" 하나로 준다 */
+    const theme = strMax(b.theme, 200).trim() || entry.theme;
+    if (!theme) return j(400, { error: '이번 주 주제(theme)가 필요해요 — 주제 달력에도 이 주차의 주제가 없어요.' });
     const publishAt = L.isValidDate(b.publishAt) ? b.publishAt : (L.weekStart(week) || today);
-    const brainIndex = part === 'shared' ? (isObj(b.brainIndex) ? b.brainIndex : {}) : (L.WISC[b.brainIndex] ? b.brainIndex : 'FRI');
+    const brainIndex = part === 'shared' ? (isObj(b.brainIndex) ? b.brainIndex : entry.indices) : (L.WISC[b.brainIndex] ? b.brainIndex : entry.indices[part]);
     const ai = ctx.ai || {};
     if (!ai.apiKey) return j(200, { ok: false, reason: 'no-key', part });
     const limits = readLetterAiLimit(ai.env);
     let useRec = store.getAiUse ? await store.getAiUse() : null;
     const quota = ai.quota || makeQuota({ rec: useRec, limits, now, onUse: (rec) => { useRec = rec; } });
     if (!quota.take()) return j(200, { ok: false, reason: 'quota', part, aiLeft: 0, aiCap: limits.total });
-    const res = await callDraft({ userPrompt: draftUserPrompt({ part, theme, week, publishAt, brainIndex, notes: strMax(b.notes, 1000) }), apiKey: ai.apiKey, model: ai.model, fetchImpl: ai.fetchImpl });
+    const notes = [strMax(b.notes, 1000).trim(), entry.notes ? '달력 메모: ' + entry.notes : ''].filter(Boolean).join('\n');
+    const res = await callDraft({ userPrompt: draftUserPrompt({ part, theme, week, publishAt, brainIndex, notes }), apiKey: ai.apiKey, model: ai.model, fetchImpl: ai.fetchImpl });
     /* 쓴 만큼은 성공·실패와 무관하게 남긴다 — 실패한 호출도 요금은 나간다 */
     if (store.putAiUse && useRec) await store.putAiUse(useRec);
     const aiLeft = typeof quota.left === 'function' ? quota.left() : null;
@@ -398,14 +579,19 @@ export async function handleLetter(ctx) {
   return j(404, { error: 'unknown api' });
 }
 
-/* 퇴원 처리 — 학생 기록만 지운다. 호는 학생 것이 아니다 */
-export async function dropStudentLetter(store, code) {
+/* 퇴원 처리 — 학생 기록과 알림 구독(학생 기기·가족 링크)을 지운다. 호·사진·달력은 학생 것이 아니다 */
+export async function dropStudentLetter(store, code, ptoken) {
   await store.deleteState(code);
+  if (store.delPush) { await store.delPush('s:' + code); if (ptoken) await store.delPush('f:' + ptoken); }
 }
-/* 백업 — 호 본문은 원장이 쓴 것이라 통째로 담는다(내신 팩과 달리 라이선스 원문이 아니다). 학생 기록도 담는다 */
+/* 백업 — 호 본문은 원장이 쓴 것이라 통째로 담는다(내신 팩과 달리 라이선스 원문이 아니다). 학생 기록·달력·알림 구독도 담는다.
+   사진 바이트는 담지 않는다(수 MB 씩이라 스냅샷이 부푼다) — 목록(메타)만 남겨 무엇이 있었는지는 알게 한다 */
 export async function dumpLetter(store) {
-  const issues = {}, states = {};
+  const issues = {}, states = {}, push = {};
   for (const r of await allIssues(store)) issues[r.issue.id] = r;
   for (const c of await store.listStateCodes()) { const st = await store.getState(c); if (st) states[c] = st; }
-  return { issues, states };
+  if (store.listPushKeys) for (const k of await store.listPushKeys()) { const rec = await store.getPush(k); if (rec) push[k] = rec; }
+  const calendar = store.getCalendar ? await store.getCalendar() : null;
+  const images = store.listImages ? await store.listImages() : [];
+  return { issues, states, push, calendar, images };
 }
