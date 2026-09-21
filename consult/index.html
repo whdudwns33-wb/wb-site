@@ -2410,7 +2410,7 @@ function currentStaff() {
 function render() {
   sync.pendingRender = false;
   viewInputDirty = false;
-  if (route === 'guide' && (!session.isStaffLink || isManager())) route = 'today';
+  if (route === 'guide' && !((session.isStaffLink && !isManager()) || (session.isAdmin && !session.isStaffLink))) route = 'today';
   paintStatus();
   renderTabs();
   const v = $('#view');
@@ -2456,7 +2456,7 @@ function renderTabs() {
         ? [['today', '오늘'], ['week', '주간'], ['month', '일정'], ['academic', '학사관리'], ['ingang', '인강'], ['study', '학습'], ['write', '학습 배부'], ['board', '학생 현황', a.total]]
         : [['today', '오늘 할 일'], ['guide', '사용 안내'], ['week', '주간 플래너'], ['month', '일정'], ['academic', '학사관리'], ['ingang', '인강'], ['study', '학습']])
     : session.isAdmin
-      ? [['today', '오늘'], ['week', '주간'], ['month', '일정'], ['academic', '학사관리'], ['ingang', '인강', lecturePending], ['study', '학습'], ['write', '학습 배부'], ['results', '결과지'],
+      ? [['today', '오늘'], ['guide', '사용 안내'], ['week', '주간'], ['month', '일정'], ['academic', '학사관리'], ['ingang', '인강', lecturePending], ['study', '학습'], ['write', '학습 배부'], ['results', '결과지'],
          ['board', '학생 현황', a.total], ['staff', '학생 관리'], ['settings', '설정']]
       : [];
   $('#tabs').innerHTML = tabs.map(([k, t, n]) =>
@@ -2698,16 +2698,18 @@ function studentSetupReminder(me) {
 
 function viewStudentGuide() {
   const me = currentStaff();
-  if (!me || !session.isStaffLink || isManager()) return '';
-  const setupStatus = studentSetupStatus(me.id);
-  if (!setupStatus.complete) return studentSetupWizard(me, setupStatus) + studentPhoneSettingsCard();
+  const adminPreview = session.isAdmin && !session.isStaffLink;
+  const studentSelf = session.isStaffLink && !isManager();
+  if ((!studentSelf && !adminPreview) || (studentSelf && !me)) return '';
+  const setupStatus = studentSelf ? studentSetupStatus(me.id) : null;
+  if (studentSelf && !setupStatus.complete) return studentSetupWizard(me, setupStatus) + studentPhoneSettingsCard();
   return '<div class="student-guide" id="studentGuide">' +
     '<div class="card student-guide-hero">' +
-      '<span class="student-guide-kicker">학생용 · 설정 완료</span>' +
-      '<div class="student-guide-title">' + esc(me.name) + ' 학생,<br>매일 네 단계만 기억하세요</div>' +
+      '<span class="student-guide-kicker">' + (adminPreview ? '원장 확인용 · 학생 사용 안내' : '학생용 · 설정 완료') + '</span>' +
+      '<div class="student-guide-title">' + (adminPreview ? '학생용 플래너' : esc(me.name) + ' 학생') + ',<br>매일 네 단계만 기억하세요</div>' +
       '<div class="student-guide-lead">필수는 오늘 할 일 확인, 완료 표시, 하루 마감입니다. 공부시간 기록과 인강 관리는 해당하는 학생만 사용하면 됩니다.</div>' +
       '<button class="btn" data-go="today">오늘 할 일 시작하기 →</button>' +
-    '</div>' + studentSetupSummary(me) + studentPhoneSettingsCard() +
+    '</div>' + (studentSelf ? studentSetupSummary(me) + studentPhoneSettingsCard() : '') +
 
     '<div class="card"><div class="student-guide-head"><div><div class="card-title">처음 연결과 매일 접속</div>' +
       '<div class="card-sub">학생용 링크는 연결용으로 한 번만 사용하고, 연결된 같은 브라우저로 계속 이용합니다.</div></div><span class="pill">첫날</span></div>' +
@@ -14172,7 +14174,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-09-21.2';
+const APP_VER = '2026-09-21.3';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
