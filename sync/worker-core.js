@@ -56,7 +56,7 @@
  *   POST /student-portal { app, action, ... }        → 학생 앱 동의·초대·관리자 미리보기
  *   POST /guardian-ops-send { app, auth, action, ... } → 보강·회차 운영 알림톡
  *   POST /consult-link-send { app:'consult', auth(admin), action, ... } → 학생 개인 링크 연락처·알림톡 접수
- *   POST /consult-reward { app:'consult', auth(admin), action, ... } → 문화상품권 교환 선점·상태 원장
+ *   POST /consult-reward { app:'consult', auth(admin), action, ... } → 기프트 카드 교환 선점·상태 원장
  *   POST /revoke    { app, auth(admin), token|staffId } → { ok }
  *
  * 인증
@@ -176,7 +176,7 @@ function rewardProcessingLockResponse(origin, details) {
   return json(Object.assign({
     ok: false,
     code: 'REWARD_PROCESSING_LOCK',
-    error: '문화상품권 교환 처리를 완료하거나 취소한 뒤 학생 삭제·대표·관리자 전환을 진행해 주세요'
+    error: '기프트 카드 교환 처리를 완료하거나 취소한 뒤 학생 삭제·대표·관리자 전환을 진행해 주세요'
   }, details || {}), 409, origin);
 }
 
@@ -1338,7 +1338,7 @@ async function handleConsultReward(env, app, body, origin, auth) {
   if (!auth || auth.scope !== 'all' || auth.device !== true ||
       !/^sha256:[0-9a-f]{64}$/.test(String(auth.rewardActorHash || ''))) {
     return json({ ok: false, code: 'ADMIN_DEVICE_REQUIRED',
-      error: '원장 기기 로그인을 다시 연결한 뒤 문화상품권 교환을 처리해 주세요' }, 403, origin);
+      error: '원장 기기 로그인을 다시 연결한 뒤 기프트 카드 교환을 처리해 주세요' }, 403, origin);
   }
   const action = String(body.action || '');
   if (!['claim', 'reject', 'takeover', 'fulfill', 'cancel'].includes(action)) {
@@ -1346,7 +1346,7 @@ async function handleConsultReward(env, app, body, origin, auth) {
   }
   const allowedKeys = new Set(['app', 'auth', 'action', 'staffId', 'requestId']);
   if (Object.keys(body || {}).some(key => !allowedKeys.has(key))) {
-    return json({ ok: false, error: '상품권 코드, URL 또는 지원하지 않는 값은 받을 수 없습니다' }, 400, origin);
+    return json({ ok: false, error: '기프트 카드 코드, URL 또는 지원하지 않는 값은 받을 수 없습니다' }, 400, origin);
   }
   const staffId = String(body.staffId || '');
   const requestId = String(body.requestId || '');
@@ -1752,7 +1752,7 @@ async function handleSync(env, app, body, origin) {
     const t = c.table;
     if (t !== 'staff' && t !== 'tasks' && t !== 'checks') continue;
     if (!(t === 'checks' ? c.k : c.id)) continue;
-    // 상품권 교환 원장은 /consult-reward의 선점·CAS만이 쓸 수 있다.
+    // 기프트 카드 교환 원장은 /consult-reward의 선점·CAS만이 쓸 수 있다.
     // 관리 화면이 내려받은 행을 generic LWW로 재전송해도 덮어쓰지 않는다.
     if (t === 'checks' && app === 'consult' && String(c.k || '').startsWith(CONSULT_REWARD_PREFIX)) {
       if (auth.scope === 'own') {
