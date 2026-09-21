@@ -106,23 +106,21 @@ async function readIndex(store) {
   return Array.isArray(idx) ? idx.filter((e) => isObj(e) && ID_RE.test(String(e.id || ''))) : [];
 }
 
-/* 목록(hanja:books) 고치기 — 읽고 고쳐 다시 쓴다. KV 는 바로 앞의 쓰기를 못 본 옛 값을 돌려줄 수 있어,
-   한 권씩 연달아 바꾸면 뒤의 요청이 앞의 변경을 덮어써 조용히 사라진다(실제로 12권을 연달아 바꾸다 10건을 잃었다).
-   그래서 ① 여러 권을 한 번의 쓰기로 고치고 ② 쓴 뒤 되읽어 남았는지 확인하고, 아니면 한 번 더 쓴다.
-   되읽기도 옛 값일 수 있으니 확인 결과를 applied 로 돌려준다 — 화면이 「안 남았을 수 있다」고 말할 수 있게. */
+/* 목록(hanja:books) 고치기 — 읽고 고쳐 다시 쓴다. 이 구조에는 두 가지 함정이 있고 둘을 갈라 다뤄야 한다.
+   ① 읽기가 옛 값일 수 있다 — KV 는 지역마다 최대 60초쯤 앞의 쓰기를 못 본 값을 돌려준다. 이것은 화면 문제다:
+      바꾼 직후 목록이 옛 범위를 보여 줄 수 있고, 잠시 뒤 새로 고치면 맞다. 되읽기로 확인해 봐도 그 읽기가 옛 값이면
+      「안 됐다」는 잘못된 판정이 나온다.
+   ② 그 옛 값 위에 쓰면 진짜로 잃는다 — 뒤의 요청이 앞의 변경이 빠진 목록을 그대로 되쓰면 앞의 변경이 사라진다.
+      12권을 한 권씩 연달아 바꾸다 실제로 겪었다(성공 응답 12번, 남은 것 2건).
+   그래서 **여러 권은 한 번의 쓰기로** 고친다 — 요청이 하나면 자기 자신과 경합할 일이 없다.
+   되읽기는 확인(applied)까지만 하고 **되쓰지 않는다**: 옛 값 위에 한 번 더 쓰는 것이 바로 ②를 만드는 일이라,
+   확인이 늦은 것을 고치려다 다른 사람의 변경을 지우게 된다. applied 가 false 면 「아직 확인 못 했다」는 뜻이다. */
 async function editIndex(store, patch) {
   const idx = await readIndex(store);
   const next = idx.map((e) => (patch[e.id] ? { ...e, ...patch[e.id] } : e));
   await store.putBookIds(next);
   const fits = (list) => list.every((e) => !patch[e.id] || Object.entries(patch[e.id]).every(([k, v]) => e[k] === v));
-  let applied = fits(await readIndex(store));
-  if (!applied) {
-    /* 옛 값을 읽었거나 사이에 다른 변경이 끼었다 — 그 값 위에 한 번 더 얹는다 */
-    const again = (await readIndex(store)).map((e) => (patch[e.id] ? { ...e, ...patch[e.id] } : e));
-    await store.putBookIds(again);
-    applied = fits(await readIndex(store));
-  }
-  return { entries: next, applied };
+  return { entries: next, applied: fits(await readIndex(store)) };
 }
 
 /* 재업로드 id 대응 — 낱말 텍스트(낱말|한자)가 같은데 id 가 달라진 것을 옛 id → 새 id 로 잇는다.
