@@ -231,6 +231,7 @@ function chunkStore(env) {
     putParent: (t, c) => env.DB.put('parent:' + t, c),
     putStudent: (c, rec) => env.DB.put('student:' + c, JSON.stringify(rec)),
     getStudent: (c) => env.DB.get('student:' + c, 'json'),
+    listStudentCodes: async () => (await kvListAll(env, 'student:')).map((k) => k.slice('student:'.length)),
   };
 }
 

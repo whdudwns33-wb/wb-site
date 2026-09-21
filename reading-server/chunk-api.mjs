@@ -44,6 +44,7 @@ export function normalizeChunkSummary(sum) {
     wpmRecent: sum.wpmRecent == null ? null : int0(sum.wpmRecent),
     streak: int0(sum.streak), lessonsDone: int0(sum.lessonsDone),
     assignDone: int0(sum.assignDone),
+    index: pctOrNull(sum.index),
     weak,
     lastAt: Number.isFinite(Number(sum.lastAt)) && Number(sum.lastAt) > 0 ? Math.round(Number(sum.lastAt)) : null,
   };
@@ -118,7 +119,7 @@ export function chunkOverviewRow(code, stu, rec, assignRec) {
     code, name: stu ? stu.name || '' : '', cls: stu ? stu.cls || '' : '', grade: stu ? stu.grade || '' : '',
     band: s ? s.band : null, attempts: s ? s.attempts : 0, practiced: s ? s.practiced : 0, graduated: s ? s.graduated : 0,
     avg: s ? s.avg : null, recentAvg: s ? s.recentAvg : null, qRate: s ? s.qRate : null, wpmRecent: s ? s.wpmRecent : null,
-    streak: s ? s.streak : 0, lessonsDone: s ? s.lessonsDone : 0, weak: s ? s.weak || [] : [], assignDone: s ? s.assignDone || 0 : 0,
+    streak: s ? s.streak : 0, lessonsDone: s ? s.lessonsDone : 0, weak: s ? s.weak || [] : [], assignDone: s ? s.assignDone || 0 : 0, index: s ? (s.index == null ? null : s.index) : null,
     lastAt: s ? s.lastAt : null, updatedAt: rec ? rec.updatedAt || null : null,
     assign: a ? { band: a.band, passages: a.passages.length, lessons: a.lessons.length, due: a.due, note: a.note, updatedAt: assignRec.updatedAt || null } : null,
   };
@@ -232,10 +233,13 @@ export async function handleChunk({ path: p, method, who, getBody, store, query 
       const codes = await store.listSummaryCodes();
       /* 과제만 있고 아직 연습 기록이 없는 학생도 표에 올라야 선생님이 과제 상태를 본다 */
       if (store.listAssignCodes) for (const c of await store.listAssignCodes()) if (!codes.includes(c)) codes.push(c);
+      /* 아직 시작하지 않은 학생도 명단째 올린다 — 첫 과제를 코드를 손으로 치지 않고 줄 수 있게. 외부 학생(apps 배열)은 chunk 가 있어야 */
+      if (store.listStudentCodes) for (const c of await store.listStudentCodes()) if (!codes.includes(c)) codes.push(c);
       const rows = [];
       for (const c of codes) {
         const stu = await store.getStudent(c);
         if (!stu) continue;                         /* 퇴원 등으로 명단에서 빠진 학생은 내보내지 않는다 */
+        if (Array.isArray(stu.apps) && !stu.apps.includes('chunk')) continue;
         rows.push(chunkOverviewRow(c, stu, await store.getSummary(c), await store.getAssign(c)));
       }
       rows.sort((a, b) => (b.lastAt || 0) - (a.lastAt || 0));
