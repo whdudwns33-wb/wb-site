@@ -1,13 +1,13 @@
 'use strict';
 /* 청크브레인 서버 라우트 검증 (node reading-server/chunk-api.test.mjs) */
 import assert from 'node:assert';
-import { handleChunk, normalizeChunkSummary, normalizeAssign, chunkOverviewRow, dropStudentChunk } from './chunk-api.mjs';
+import { handleChunk, normalizeChunkSummary, normalizeAssign, normalizePassage, chunkOverviewRow, dropStudentChunk } from './chunk-api.mjs';
 
 let passed = 0;
 const t = async (name, fn) => { await fn(); passed += 1; console.log('  ✓ ' + name); };
 
 function memStore() {
-  const states = {}, summaries = {}, assigns = {};
+  const states = {}, summaries = {}, assigns = {}; let customs = null;
   const students = { 'st-1': { code: 'st-1', name: '김지우', cls: '초4 A반' }, 'st-2': { code: 'st-2', name: '박서준', cls: '초4 A반' } };
   return {
     getState: (c) => states[c] || null, putState: (c, rec) => { states[c] = rec; }, deleteState: (c) => { delete states[c]; },
@@ -15,6 +15,7 @@ function memStore() {
     listSummaryCodes: () => Object.keys(summaries), getStudent: (c) => students[c] || null,
     getAssign: (c) => assigns[c] || null, putAssign: (c, rec) => { assigns[c] = rec; }, deleteAssign: (c) => { delete assigns[c]; },
     listAssignCodes: () => Object.keys(assigns),
+    getCustoms: () => customs, putCustoms: (rec) => { customs = rec; },
     _raw: { states, summaries, assigns },
   };
 }
@@ -122,6 +123,42 @@ await t('퇴원 — 기록·요약·과제 키를 지운다', async () => {
   await call(s, { path: '/api/chunk/admin/assign/st-1', method: 'PUT', who: ADMIN, getBody: async () => ({ band: 'G4' }) });
   await dropStudentChunk(s, 'st-1');
   assert.strictEqual(s._raw.states['st-1'], undefined); assert.strictEqual(s._raw.summaries['st-1'], undefined); assert.strictEqual(s._raw.assigns['st-1'], undefined);
+});
+
+await t('선생님 지문 정규화 — 조각 규칙·문제 형식만 강제, 뜻은 보지 않는다', async () => {
+  const ok = normalizePassage({ band: 'G3', title: ' 텃밭 ', paragraphs: [['우리 반은 ', '상추를 심었다.']], q: { q: '무엇을 심었나?', choices: ['상추', '배추', '', '무'], answer: 0, explain: '첫 문장' } }, 'c-1');
+  assert.deepStrictEqual(Object.keys(ok.passage), ['id', 'band', 'title', 'genre', 'paragraphs', 'q', 'source']);
+  assert.strictEqual(ok.passage.title, '텃밭'); assert.strictEqual(ok.passage.genre, '선생님 글'); assert.deepStrictEqual(ok.passage.q.choices, ['상추', '배추', '무']);
+  assert.strictEqual(ok.passage.source.kind, 'teacher');
+  assert.ok(normalizePassage({ band: 'E2', title: 'x', paragraphs: [['a']] }, 'c').error, '옛 단계 id');
+  assert.ok(normalizePassage({ band: 'G3', title: '', paragraphs: [['a']] }, 'c').error, '제목 없음');
+  assert.ok(/공백/.test(normalizePassage({ band: 'G3', title: 'x', paragraphs: [['우리 반은', '상추를 심었다.']] }, 'c').error), '조각 끝 공백');
+  assert.ok(normalizePassage({ band: 'G3', title: 'x', paragraphs: [['a ', ' ']] }, 'c').error, '빈 조각');
+  assert.ok(normalizePassage({ band: 'G3', title: 'x', paragraphs: [['a']], q: { q: '?', choices: ['1'], answer: 0 } }, 'c').error, '보기 하나');
+  assert.strictEqual(normalizePassage({ band: 'G3', title: 'x', paragraphs: [['a']], q: '' }, 'c').passage.q, null, '문제 없음은 null');
+  assert.ok(normalizePassage({ band: 'G3', title: 'x', paragraphs: [['가'.repeat(4001)]] }, 'c').error, '길이 상한');
+});
+
+await t('선생님 지문 — 관리자가 만들고 고치고 지우며, 학생은 /custom 으로 목록을 받는다', async () => {
+  const s = memStore();
+  const body = { band: 'G4', title: '소금쟁이', genre: '설명', paragraphs: [['소금쟁이는 ', '물 위를 걷는다.']], q: null, source: { kind: 'reading', ref: 'water-strider|L2' } };
+  let r = await call(s, { path: '/api/chunk/admin/custom', method: 'POST', who: ADMIN, getBody: async () => body });
+  assert.strictEqual(r.status, 200, JSON.stringify(r.body)); const id = r.body.passage.id;
+  assert.ok(/^c-[a-z0-9]+$/.test(id) && id.length <= 24, id);
+  assert.deepStrictEqual(r.body.passage.source, { kind: 'reading', ref: 'water-strider|L2' });
+  r = await call(s, { path: '/api/chunk/custom', method: 'GET', who: STU });
+  assert.deepStrictEqual(Object.keys(r.body), ['custom', 'updatedAt']); assert.strictEqual(r.body.custom.length, 1); assert.strictEqual(r.body.custom[0].id, id);
+  r = await call(s, { path: '/api/chunk/admin/custom/' + id, method: 'PUT', who: ADMIN, getBody: async () => ({ ...body, title: '소금쟁이 2' }) });
+  assert.strictEqual(r.status, 200); assert.strictEqual(r.body.passage.id, id); assert.strictEqual(r.body.passage.title, '소금쟁이 2');
+  r = await call(s, { path: '/api/chunk/admin/custom', method: 'GET', who: ADMIN });
+  assert.strictEqual(r.body.custom[0].title, '소금쟁이 2');
+  assert.strictEqual((await call(s, { path: '/api/chunk/admin/custom/c-nope', method: 'PUT', who: ADMIN, getBody: async () => body })).status, 404);
+  assert.strictEqual((await call(s, { path: '/api/chunk/admin/custom', method: 'POST', who: ADMIN, getBody: async () => ({ band: 'G4', title: '', paragraphs: [] }) })).status, 400);
+  assert.strictEqual((await call(s, { path: '/api/chunk/admin/custom', method: 'POST', who: STU, getBody: async () => body })).status, 403);
+  r = await call(s, { path: '/api/chunk/admin/custom/' + id, method: 'DELETE', who: ADMIN });
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual((await call(s, { path: '/api/chunk/custom', method: 'GET', who: STU })).body.custom.length, 0);
+  assert.strictEqual((await call(s, { path: '/api/chunk/admin/custom/' + id, method: 'DELETE', who: ADMIN })).status, 404);
 });
 
 console.log('\n' + passed + '건 통과 — reading-server/chunk-api.mjs');

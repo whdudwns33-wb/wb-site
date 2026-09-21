@@ -220,6 +220,9 @@ function chunkStore(env) {
     putAssign: (c, rec) => env.DB.put('chunk:assign:' + c, JSON.stringify(rec)),
     deleteAssign: (c) => env.DB.delete('chunk:assign:' + c),
     listAssignCodes: async () => (await kvListAll(env, 'chunk:assign:')).map(k => k.slice('chunk:assign:'.length)),
+    /* 선생님 지문 — 키 하나에 전부({items, updatedAt}). 학생 앱이 켤 때 한 번에 받는다 */
+    getCustoms: () => env.DB.get('chunk:customs', 'json'),
+    putCustoms: (rec) => env.DB.put('chunk:customs', JSON.stringify(rec)),
     getStudent: (c) => env.DB.get('student:' + c, 'json'),
   };
 }
@@ -361,10 +364,11 @@ async function fullDump(env) {
   /* 하루브레인 — 학생 기록 본문(state·mock·paper)·대응표·플랜을 담는다. id 만 넣으면 기록의 백업이 KV 단일 사본이 된다(설계안 §7-5). 팩 본문은 내신과 같은 이유로 id 만. */
   const haru = await dumpHaru(haruStore(env));
   /* 청크브레인 — 학생 기록·요약 두 계열. 콘텐츠는 저장소에 없다(정적 자산). */
-  const chunk = { states: {}, summaries: {}, assigns: {} };
+  const chunk = { states: {}, summaries: {}, assigns: {}, customs: null };
   for (const [pre, tgt] of [['chunk:state:', chunk.states], ['chunk:summary:', chunk.summaries], ['chunk:assign:', chunk.assigns]]) {
     for (const k of await kvListAll(env, pre)) { const v = await env.DB.get(k, 'json'); if (v) tgt[k.slice(pre.length)] = v; }
   }
+  chunk.customs = await env.DB.get('chunk:customs', 'json');   /* 선생님 지문(키 하나) — 백업에 같이 담는다 */
   /* 브레인레터 — 호 본문(원장이 쓴 것)과 학생 기록. 팩과 달리 라이선스 원문이 아니라 통째로 담는다 */
   const letter = await dumpLetter(letterStore(env));
   return { service: 'wb-reading', savedAt: nowIso(), students, states, vocab, textbook: textbook || {}, pubmap: pubmap || {}, naesin, naesinKo, textbookSrc: textbookSrc || {}, haru, chunk, letter };

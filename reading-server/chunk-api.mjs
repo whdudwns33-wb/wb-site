@@ -7,7 +7,7 @@
    응답 계약(CLAUDE.md 절대 규칙 4): /state → {state, updatedAt} · /assign → {assign, updatedAt}.
    summary 는 관리 화면용 작은 요약 — 학생 기기가 올린 값이라 서버가 화이트리스트로 모양을 강제하고, 화면은 다시 이스케이프한다.
 
-   저장 키 세 계열: state(학생 기록 전체) · summary(관리 화면용 요약) · assign(선생님이 정한 단계·글·카드). */
+   저장 키 네 계열: state(학생 기록 전체) · summary(관리 화면용 요약) · assign(선생님이 정한 단계·글·카드) · customs(선생님이 올린 지문, 키 하나). */
 
 const STATE_MAX_BYTES = 262_144;   // 학생 기록 1건 최대 (256KB) — log 400건 + items 로도 충분히 남는다
 const SUMMARY_MAX_BYTES = 4_096;
@@ -17,6 +17,9 @@ const CODE_RE = /^[A-Za-z0-9-]{3,20}$/;
 const ID_RE = /^[a-z0-9-]{2,24}$/;        /* 지문·카드 id — g3-01, k-1 */
 const TAG_RE = /^(?:miss|extra):[a-z]+$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const CUSTOM_MAX = 200;              /* 선생님 지문 전체 상한 — 학생 앱이 켤 때 한 번에 받는 목록이라 작게 둔다 */
+const PASSAGE_MAX_CHARS = 4_000;
+const PARA_MAX = 20;
 const nowIso = () => new Date().toISOString();
 const size = (o) => JSON.stringify(o).length;
 const isObj = (v) => v && typeof v === 'object' && !Array.isArray(v);
@@ -63,6 +66,45 @@ export function normalizeAssign(a) {
   return { assign: { band, passages, lessons, note, due } };
 }
 
+/* 선생님 지문 — 관리 화면 「글 저작」이 올린 글. 정적 지문(chunk/passages.js)과 같은 모양이라 학생 앱이 그대로 합친다.
+   저장소는 키 하나(customs: {items:{id:passage}, updatedAt}) — 학생 앱이 켤 때 한 번에 받고, 선생님 편집은 드물어 읽고-고쳐-쓰기로 충분하다.
+   조각 규칙(마지막을 빼고 공백으로 끝난다·빈 조각 없음)만 강제하고 끊기의 «뜻»은 검사하지 않는다 — 그것은 관리 화면의 규칙 검사와 사람이 본다. */
+export function normalizePassage(p, id) {
+  if (!isObj(p)) return { error: '지문은 객체여야 해요.' };
+  if (!BANDS.includes(p.band)) return { error: '모르는 단계예요: ' + String(p.band) };
+  const title = String(p.title || '').trim().slice(0, 60);
+  if (!title) return { error: '제목이 필요해요.' };
+  const genre = String(p.genre || '').trim().slice(0, 12) || '선생님 글';
+  if (!Array.isArray(p.paragraphs) || !p.paragraphs.length || p.paragraphs.length > PARA_MAX) return { error: '문단은 1~' + PARA_MAX + '개여야 해요.' };
+  const paragraphs = []; let chars = 0;
+  for (const segs of p.paragraphs) {
+    if (!Array.isArray(segs) || !segs.length) return { error: '문단은 조각 배열이어야 해요.' };
+    const out = [];
+    for (let i = 0; i < segs.length; i++) {
+      const x = String(segs[i]);
+      if (!x.trim()) return { error: '빈 조각이 있어요.' };
+      if (i < segs.length - 1 && !/\s$/.test(x)) return { error: '조각은 공백으로 끝나야 해요: 「' + x + '」' };
+      out.push(x); chars += x.length;
+    }
+    paragraphs.push(out);
+  }
+  if (chars > PASSAGE_MAX_CHARS) return { error: '글이 너무 길어요 (' + PASSAGE_MAX_CHARS + '자 이내).' };
+  let q = null;
+  if (p.q != null && p.q !== '') {
+    if (!isObj(p.q)) return { error: '문제 형식이 아니에요.' };
+    const qq = String(p.q.q || '').trim().slice(0, 200);
+    const choices = Array.isArray(p.q.choices) ? p.q.choices.map((c) => String(c).trim().slice(0, 80)).filter(Boolean) : [];
+    const answer = Number(p.q.answer);
+    if (!qq || choices.length < 2 || choices.length > 4 || !Number.isInteger(answer) || answer < 0 || answer >= choices.length) return { error: '문제는 질문, 보기 2~4개, 정답 번호가 필요해요.' };
+    q = { q: qq, choices, answer, explain: String(p.q.explain || '').trim().slice(0, 200) };
+  }
+  const source = isObj(p.source) ? { kind: String(p.source.kind || 'teacher').slice(0, 12), ref: String(p.source.ref || '').slice(0, 80) } : { kind: 'teacher', ref: '' };
+  return { passage: { id, band: p.band, title, genre, paragraphs, q, source } };
+}
+/* id 는 서버가 만든다 — 과제 id 규칙(ID_RE)에 맞고 정적 지문(g3-01·k-1)과 겹치지 않게 c- 접두 */
+const newCustomId = () => ('c-' + Date.now().toString(36) + Math.floor(Math.random() * 1296).toString(36).padStart(2, '0')).toLowerCase();
+const customList = (rec) => Object.values(rec && rec.items ? rec.items : {}).sort((a, b) => String(a.id).localeCompare(String(b.id)));
+
 /* 관리 overview 한 줄 — 학생 명단(students)과 요약·과제를 합친다 */
 export function chunkOverviewRow(code, stu, rec, assignRec) {
   const s = rec && rec.summary ? rec.summary : null;
@@ -107,8 +149,40 @@ export async function handleChunk({ path: p, method, who, getBody, store }) {
     return j(200, { assign: rec ? rec.assign : null, updatedAt: rec ? rec.updatedAt : null });
   }
 
+  /* 선생님 지문 목록 — 학생·관리자 모두 받는다(교재 페이지는 어느 토큰으로든 연다). 정적 지문처럼 원문이 그대로 간다 — 자체 창작·원내 자료뿐이다. */
+  if (p === '/api/chunk/custom' && method === 'GET') {
+    const rec = await store.getCustoms();
+    return j(200, { custom: customList(rec), updatedAt: rec ? rec.updatedAt : null });
+  }
+
   if (p.startsWith('/api/chunk/admin/')) {
     if (!who.admin) return j(403, { error: '관리자만 쓸 수 있어요.' });
+    if (p === '/api/chunk/admin/custom' && method === 'GET') {
+      const rec = await store.getCustoms();
+      return j(200, { custom: customList(rec), updatedAt: rec ? rec.updatedAt : null });
+    }
+    const mc = p.match(/^\/api\/chunk\/admin\/custom(?:\/([a-z0-9-]{2,24}))?$/);
+    if (mc && (method === 'POST' || method === 'PUT' || method === 'DELETE')) {
+      const rec = (await store.getCustoms()) || { items: {}, updatedAt: null };
+      if (!isObj(rec.items)) rec.items = {};
+      const id = mc[1];
+      if (method === 'DELETE') {
+        if (!id || !rec.items[id]) return j(404, { error: '지문 없음' });
+        delete rec.items[id]; rec.updatedAt = nowIso(); await store.putCustoms(rec);
+        return j(200, { ok: true, updatedAt: rec.updatedAt });
+      }
+      if (method === 'POST' && id) return j(404, { error: 'unknown api' });
+      if (method === 'PUT' && (!id || !rec.items[id])) return j(404, { error: '지문 없음' });
+      const b = await body();
+      if (!b) return j(400, { error: '올바른 JSON이 아니에요.' });
+      const pid = method === 'POST' ? newCustomId() : id;
+      const n = normalizePassage(b, pid);
+      if (n.error) return j(400, { error: n.error });
+      if (method === 'POST' && Object.keys(rec.items).length >= CUSTOM_MAX) return j(409, { error: '선생님 지문은 ' + CUSTOM_MAX + '편까지예요. 안 쓰는 글을 지워 주세요.' });
+      rec.items[pid] = n.passage; rec.updatedAt = nowIso();
+      await store.putCustoms(rec);
+      return j(200, { ok: true, passage: n.passage, updatedAt: rec.updatedAt });
+    }
     if (p === '/api/chunk/admin/overview' && method === 'GET') {
       const codes = await store.listSummaryCodes();
       /* 과제만 있고 아직 연습 기록이 없는 학생도 표에 올라야 선생님이 과제 상태를 본다 */
