@@ -273,6 +273,10 @@ const chunkStore = {
   /* 선생님 지문 — 워커의 chunk:customs 키와 같은 모양({items, updatedAt}) */
   getCustoms: () => chunkRoot().customs || null,
   putCustoms: (rec) => { chunkRoot().customs = rec; persist(); },
+  /* 가족 링크 — db.parents(진로독서) 공용 */
+  getParentCode: (t) => (db.parents || {})[t] || null,
+  putParent: (t, c) => { db.parents = db.parents || {}; db.parents[t] = c; persist(); },
+  putStudent: (c, rec) => { db.students = db.students || {}; db.students[c] = rec; persist(); },
   getStudent: (c) => db.students?.[c] || null,
 };
 
@@ -510,6 +514,12 @@ const server = http.createServer(async (req, res) => {
         return json(res, out.status, out.body);
       }
       /* 브레인레터 무인증 경로 — 가족 링크·가족 알림 구독·사진(id 가 곧 열쇠) (워커와 동일) */
+      /* 청크브레인 가족 링크 — ptoken 으로만, 로그인 없음 (워커와 동일) */
+      if (p === '/api/chunk/parent' || p.startsWith('/api/chunk/parent/')) {
+        if (Number(req.headers['content-length'] || 0) > 300_000) { req.resume(); return json(res, 413, { error: '요청이 너무 커서 받을 수 없어요.' }); }
+        const out = await handleChunk({ path: p, method: req.method, who: null, query: url.searchParams, getBody: () => readBody(req), store: chunkStore });
+        return json(res, out.status, out.body);
+      }
       if (p === '/api/letter/parent' || p.startsWith('/api/letter/parent/') || p.startsWith('/api/letter/img/')) {
         const out = await handleLetter({ path: p, method: req.method, who: null, query: url.searchParams, getBody: () => readBody(req), store: letterStore, push: VOCAB_PUSH_ENV });
         if (out.bytes) { res.writeHead(out.status, out.headers); res.end(Buffer.from(out.bytes)); return; }

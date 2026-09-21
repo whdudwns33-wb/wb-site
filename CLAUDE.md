@@ -65,7 +65,7 @@ Cloudflare Workers `wb-reading`으로). PR은 스쿼시 머지, 제목에 `(#번
    내신 팩은 자기 시험 범위에 배정된 것만 받는다.
    하루브레인은 `GET /api/haru/pack`·`/gen`이 정답·해설·오답 태그를 뺀다(정답은 `/answer` 응답에만). 외부 초6 학생
    (`student.apps:['haru']`)은 호스트가 `who` 검증 직후 한 곳에서 거는 `allowedApp` 게이트로 다른 앱(브레인레터 포함)을 열지 못한다.
-   브레인레터 가족 링크는 진로독서 학부모 토큰(`parent:<t>`)을 그대로 쓴다 — 가정마다 링크 하나. 가족의 읽기 기록(`/api/letter/parent/state`)도 이 토큰으로 학생 코드 자리에 쓴다. 올린 사진(`/api/letter/img/<id>`)은
+   브레인레터 가족 링크와 청크브레인 가족 모드(`/chunk/?t=`)는 진로독서 학부모 토큰(`parent:<t>`)을 그대로 쓴다 — 가정마다 링크 하나. 가족의 읽기 기록(`/api/letter/parent/state`)도 이 토큰으로 학생 코드 자리에 쓴다. 올린 사진(`/api/letter/img/<id>`)은
    128비트 무작위 id 가 열쇠다(가족 링크와 같은 방식) — 사진에는 출처(credit)가 없으면 저장되지 않고, SVG 는 올리지 못한다.
    한자브레인 단어장(문제집 낱말)은 `GET /api/hanja/book`으로만 나가고, 공개 범위 `assigned`면 배정받은 학생만 받는다.
 4. **서버 응답은 래핑 계약**: 경로 명사 = 응답 키, `scope`는 학생→default 폴백 표시다.
@@ -82,7 +82,7 @@ Cloudflare Workers `wb-reading`으로). PR은 스쿼시 머지, 제목에 `(#번
 
 ## 운영 주소 (원내 전용 — 링크 외부 공유 금지)
 
-- 학생: `/` 진로독서 · `/vocab/` 워드브레인 · `/naesin/` 내신브레인(영어) · `/naesin-ko/` 국어브레인 · `/haru/` 하루브레인(부모 `/haru/parent.html?t=`) · `/chunk/` 청크브레인(교재 `/chunk/print.html`) ·
+- 학생: `/` 진로독서 · `/vocab/` 워드브레인 · `/naesin/` 내신브레인(영어) · `/naesin-ko/` 국어브레인 · `/haru/` 하루브레인(부모 `/haru/parent.html?t=`) · `/chunk/` 청크브레인(교재 `/chunk/print.html`, 가족 `/chunk/?t=` — 브레인레터와 같은 학부모 토큰) ·
   `/letter/` 브레인레터(가족 `/letter/?t=`) · `/hanja/` 한자브레인
 - 관리: `/admin/` 진로독서(+교재 코칭 원문 업로드) · `/admin/naesin-admin.html` 내신브레인
   (팩 업로드·시험 등록·반 성취도) · `/admin/naesin-ko-admin.html` 국어브레인

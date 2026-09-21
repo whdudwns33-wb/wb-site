@@ -126,6 +126,9 @@ function coachCard(b){
   ${(d.reports||[]).length?`<div class="card"><h2>완성한 탐구보고서</h2>
     ${d.reports.map(r=>`<div class="rline"><span>${esc(r.title)}</span><small>${esc(r.done)}</small></div>`).join('')}
     <p class="sub" style="margin-top:8px">보고서 원문은 아이의 앱 → 탐구 랩에서 인쇄·PDF로 받을 수 있어요.</p></div>`:''}
+  <div class="card"><h2>끊어읽기 연습 — 청크브레인</h2>
+    <p class="sub">같은 링크로 아이와 함께 5분 끊어읽기를 할 수 있어요. 어른이 먼저 읽어 주고, 아이가 따라 읽고, 직접 ∕ 를 찍어요. 기록은 학원과 자동으로 이어져요.</p>
+    <a href="/chunk/?t=${encodeURIComponent(t)}" style="display:inline-block;margin-top:6px;padding:9px 16px;border-radius:12px;border:1.5px solid currentColor;font-weight:800;text-decoration:none">함께 연습하기 →</a></div>
   <div class="card"><h2>이 리포트는요</h2>
     <p class="sub">아이가 매일 한 편, 진로에 맞는 글을 읽고 문제와 탐구보고서로 소화하는 <b>WB 진로독서</b> 기록이에요. 어휘 ${d.vocab}개 · 읽기 훈련 ${d.train}회 · 비문학 독서 요약 ${d.redbook}회가 함께 쌓였어요.</p></div>`;
 })();

@@ -226,6 +226,10 @@ function chunkStore(env) {
     /* 선생님 지문 — 키 하나에 전부({items, updatedAt}). 학생 앱이 켤 때 한 번에 받는다 */
     getCustoms: () => env.DB.get('chunk:customs', 'json'),
     putCustoms: (rec) => env.DB.put('chunk:customs', JSON.stringify(rec)),
+    /* 가족 링크 — 진로독서 parent:<t> 공용. 발급 때만 학생 레코드(ptoken)를 쓴다 */
+    getParentCode: (t) => env.DB.get('parent:' + t),
+    putParent: (t, c) => env.DB.put('parent:' + t, c),
+    putStudent: (c, rec) => env.DB.put('student:' + c, JSON.stringify(rec)),
     getStudent: (c) => env.DB.get('student:' + c, 'json'),
   };
 }
@@ -655,6 +659,12 @@ export default {
         return json(out.status, out.body);
       }
       /* 브레인레터 무인증 경로 — 가족 링크(parent, 진로독서 학부모 토큰)·가족 알림 구독(parent/push/*)·사진(img/<id>, id 가 곧 열쇠) */
+      /* 청크브레인 가족 링크 — 진로독서 학부모 토큰(parent:<t>)으로, 로그인 없음. 라우트 모듈이 토큰을 풀고 apps 게이트를 건다 */
+      if (p === '/api/chunk/parent' || p.startsWith('/api/chunk/parent/')) {
+        if (Number(req.headers.get('content-length') || 0) > 300_000) return json(413, { error: '요청이 너무 커서 받을 수 없어요.' });
+        const out = await handleChunk({ path: p, method: req.method, who: null, query: url.searchParams, getBody: () => req.json(), store: chunkStore(env) });
+        return json(out.status, out.body);
+      }
       if (p === '/api/letter/parent' || p.startsWith('/api/letter/parent/') || p.startsWith('/api/letter/img/')) {
         const out = await handleLetter({ path: p, method: req.method, who: null, query: url.searchParams, getBody: () => req.json(), store: letterStore(env), push: vocabPushEnv(env) });
         if (out.bytes) return new Response(out.bytes, { status: out.status, headers: out.headers });

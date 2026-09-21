@@ -186,6 +186,11 @@
 
     /* ── 화면 ── */
     function render(html) { app.innerHTML = html; window.scrollTo(0, 0); }
+    /* 가족 링크 → 청크브레인 가족 모드. 같은 토큰이라 부모 폰에서 아이와 5분 끊어읽기를 하고 기록은 학원에 이어진다. 호가 없는 주에도 보인다 */
+    function chunkCard() {
+      if (MODE !== 'family') return '';
+      return '<div class="card"><h2>오늘 5분 끊어읽기 — 청크브레인</h2><p class="small">아이와 함께 한 편을 덩어리로 읽어요. 어른이 먼저 읽어 주고, 아이가 따라 읽고, 직접 ∕ 를 찍어요. 기록은 학원 선생님께 그대로 이어져요.</p><a href="/chunk/?t=' + encodeURIComponent(FAM_T) + '" style="display:inline-block;margin-top:6px;padding:9px 16px;border:1.5px solid var(--ink);font-weight:800;text-decoration:none;color:var(--ink)">함께 연습하기 →</a></div>';
+    }
     function footer() { return '<div class="foot">WB 독해력학원 · 웩슬러브레인센터 — 원내 구독 가족에게만 보내는 뉴스레터입니다. 링크를 밖으로 공유하지 마세요.</div>'; }
     function setWho(html) { $('who').innerHTML = html; }
     function tierPicker(show) {
@@ -198,7 +203,7 @@
     $('tierSel').onchange = function () { TIER = this.value; if (MODE === 'admin') openIssue(CUR_ID); else showIssue(); };
 
     function showIssue(err) {
-      if (!ISSUE) { render((err ? '<div class="err">' + esc(err) + '</div>' : '') + '<div class="card"><h2>아직 도착한 호가 없어요</h2><p class="small">매주 월요일 새 호가 도착해요. 조금만 기다려 주세요.</p></div>' + pushCard() + footer()); bindPush(); return; }
+      if (!ISSUE) { render((err ? '<div class="err">' + esc(err) + '</div>' : '') + '<div class="card"><h2>아직 도착한 호가 없어요</h2><p class="small">매주 월요일 새 호가 도착해요. 조금만 기다려 주세요.</p></div>' + chunkCard() + pushCard() + footer()); bindPush(); return; }
       var tier = TIER === 'all' ? null : TIER;
       var st = issueState(ISSUE.id);
       if (!st.openedAt) { st.openedAt = new Date().toISOString(); push(); }
@@ -228,6 +233,8 @@
         if (MODE !== 'admin') html += '<div class="card done-btn">' + (st.doneAt ? '<h2>이번 호를 다 읽었어요 ✔</h2><p class="small">' + esc(st.doneAt.slice(0, 10)) + '에 끝냈어요. 다음 호도 기다려 주세요.</p>' : '<h2>다 읽었나요?</h2><p class="small">문제와 미션까지 마쳤으면 눌러 주세요.</p><button class="big" id="doneBtn">다 읽었어요</button>') + '</div>';
       }
       html += pushCard();
+      /* 가족 링크 → 청크브레인 가족 모드. 같은 토큰이라 부모 폰에서 아이와 5분 끊어읽기를 하고 기록은 학원에 이어진다 */
+      html += chunkCard();
       if (MODE === 'demo' && !PILOT) html += linkCard();
       render(html); /* 지면 끝에 발행 정보(np-foot)가 있어 앱 바닥글은 겹치지 않게 뺀다 */
       if ($('doneBtn')) $('doneBtn').onclick = function () { st.doneAt = new Date().toISOString(); push(true); showIssue(); };

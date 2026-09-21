@@ -154,6 +154,9 @@ async function renderStudent(){
     '<h3>카드</h3><div class="checks" id="lList"></div>'+
     '<h3>메모 (학생에게 보임)</h3><textarea id="aNote" maxlength="200" placeholder="예: 이번 주에 두 편, 소리 내어 3번씩">'+esc(a?a.note:'')+'</textarea>'+
     '<div class="row" style="margin-top:8px"><button class="btn" id="aSave">저장</button><button class="btn danger" id="aClear" '+(a?'':'disabled')+'>과제 지우기</button><span class="muted">'+(assignRec&&assignRec.updatedAt?'마지막 저장 '+esc(assignRec.updatedAt.slice(0,16).replace('T',' ')):'')+'</span></div><div id="aMsg"></div></div>';
+  /* 가족 링크 — 부모 폰에서 아이와 함께. 브레인레터·진로독서 리포트와 같은 토큰(가정마다 하나) */
+  html+='<div class="card"><h2>가족 링크 <span class="muted">(부모님 폰에서 아이와 함께)</span></h2><p class="muted">브레인레터·진로독서 리포트와 같은 가족 링크예요. 부모님이 이 링크로 열면 로그인 없이 아이 기록에 그대로 쌓이고, 여기 반 현황에도 보여요. 동의서의 보호자 번호로만 보내세요.</p>'+
+    '<div class="row"><button class="btn ghost sm" id="famMake">링크 만들기 / 보기</button><span id="famOut"></span></div><div id="famMsg"></div></div>';
   /* 기록 */
   if(state){
     const log=(state.log||[]).slice(-20).reverse();
@@ -165,6 +168,18 @@ async function renderStudent(){
   } else html+='<div class="card muted">이 학생은 아직 연습 기록이 없어요. 과제는 줄 수 있어요.</div>';
   $('#main').innerHTML=html;
   bindStudentTop();
+  $('#famMake').onclick=async()=>{
+    $('#famMsg').innerHTML='';
+    try{
+      const j=await post('/chunk/admin/parentlink/'+encodeURIComponent(code),{});
+      const link=location.origin+j.path;
+      const text='[WB 독해력학원] '+(j.name||r.name)+' 학생 끊어읽기 연습 링크입니다.\n부모님 폰에서 아래 링크를 열면 아이와 함께 5분 끊어읽기를 할 수 있어요. 기록은 학원과 자동으로 이어집니다.\n'+link+'\n— WB 독해력학원 · 웩슬러브레인센터';
+      $('#famOut').innerHTML='<input id="famLink" readonly value="'+esc(link)+'" style="width:min(380px,60vw)"> <button class="btn ghost sm" id="famCopy">링크 복사</button> <button class="btn ghost sm" id="famText">안내 문구 복사</button>';
+      const copy=async(v,label)=>{ try{ await navigator.clipboard.writeText(v); $('#famMsg').innerHTML='<div class="ok">'+label+' 복사했어요.</div>'; }catch(e){ const i=$('#famLink'); i.value=v; i.select(); document.execCommand('copy'); $('#famMsg').innerHTML='<div class="ok">'+label+' 복사했어요.</div>'; i.value=link; } };
+      $('#famCopy').onclick=()=>copy(link,'링크를'); $('#famText').onclick=()=>copy(text,'안내 문구를');
+      if(j.created) $('#famMsg').innerHTML='<div class="ok">가족 링크를 새로 만들었어요. 브레인레터·진로독서 리포트에서도 같은 링크가 쓰여요.</div>';
+    }catch(e){ $('#famMsg').innerHTML='<div class="err">'+esc(e.message)+'</div>'; }
+  };
   const chosenP=new Set(a?a.passages:[]), chosenL=new Set(a?a.lessons:[]);
   const drawP=()=>{const b=$('#fBand').value;const list=PASSAGES.concat(CUSTOM||[]).filter((p)=>p.band===b);$('#pList').innerHTML=list.map((p)=>'<label><input type="checkbox" data-p="'+p.id+'" '+(chosenP.has(p.id)?'checked':'')+'> '+esc(p.title)+' <span class="muted">'+esc(p.genre)+'</span></label>').join('')+[...chosenP].filter((id)=>!list.some((p)=>p.id===id)).map((id)=>{const p=pById(id);return '<label><input type="checkbox" data-p="'+esc(id)+'" checked> '+esc(p?p.title:id)+' <span class="muted">'+(p?bandLabel(p.band):'')+'</span></label>';}).join('');$('#pCount').textContent='선택 '+chosenP.size+'개';
     $('#pList').querySelectorAll('input').forEach((cb)=>{cb.onchange=()=>{if(cb.checked)chosenP.add(cb.dataset.p);else chosenP.delete(cb.dataset.p);$('#pCount').textContent='선택 '+chosenP.size+'개';};});};
