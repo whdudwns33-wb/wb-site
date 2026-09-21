@@ -12,6 +12,9 @@
    가족 링크(/api/chunk/parent*, ?t=): 진로독서 학부모 토큰(parent:<t>)으로 로그인 없이 자녀 기록을 읽고 쓴다 — 브레인레터 가족 링크와 같은 토큰이라
    가정마다 링크가 하나다. 기록은 학생 토큰과 같은 키(chunk:state:<code>)에 쌓여 선생님 화면·학생 기기와 이어진다. 토큰이 곧 자격이므로 하루 PUT 상한을 둔다. */
 
+import SC from '../chunk/sched.js';          /* 복습 사다리(due)는 학생 앱과 같은 모듈로 센다 — 두 곳에서 다르게 세면 알림이 거짓말이 된다 */
+import { vapidJwt } from './vocab-api.mjs';   /* Web Push 서명 — 워드브레인·브레인레터와 같은 VAPID 키 */
+
 const STATE_MAX_BYTES = 262_144;   // 학생 기록 1건 최대 (256KB) — log 400건 + items 로도 충분히 남는다
 const SUMMARY_MAX_BYTES = 4_096;
 const ASSIGN_MAX_ITEMS = 20;
@@ -125,7 +128,7 @@ export function chunkOverviewRow(code, stu, rec, assignRec) {
   };
 }
 
-export async function handleChunk({ path: p, method, who, getBody, store, query }) {
+export async function handleChunk({ path: p, method, who, getBody, store, query, ...ctx }) {
   const j = (status, body) => ({ status, body });
   const body = async () => { try { return await getBody(); } catch (e) { return null; } };
 
@@ -150,6 +153,22 @@ export async function handleChunk({ path: p, method, who, getBody, store, query 
     if (p === '/api/chunk/parent/state' && method === 'GET') {
       const rec = await store.getState(code);
       return j(200, { state: rec ? rec.state : null, updatedAt: rec ? rec.updatedAt : null });
+    }
+    /* ── 가족 알림 — 토큰이 곧 자격(읽기와 같다). 구독 키는 f:<ptoken> 하나라 가정마다 기기 하나다 ── */
+    if (p.startsWith('/api/chunk/parent/push/')) {
+      if (p === '/api/chunk/parent/push/key' && method === 'GET') {
+        const key = ctx && ctx.push && ctx.push.publicKey;
+        return j(200, key ? { ok: true, key } : { ok: false, reason: 'no-vapid' });
+      }
+      if (p === '/api/chunk/parent/push/subscribe' && method === 'POST') {
+        const b = await body();
+        const sub = b && b.subscription, ep = sub && String(sub.endpoint || '');
+        if (!ep || ep.length > 500 || !/^https:\/\//.test(ep)) return j(400, { error: '유효한 구독이 아니에요.' });
+        await store.putPush('f:' + t, { endpoint: ep, at: nowIso() });
+        return j(200, { ok: true });
+      }
+      if (p === '/api/chunk/parent/push/unsubscribe' && method === 'POST') { await store.delPush('f:' + t); return j(200, { ok: true }); }
+      return j(404, { error: 'unknown api' });
     }
     if (p === '/api/chunk/parent/state' && method === 'PUT') {
       const b = await body();
@@ -287,9 +306,41 @@ export async function handleChunk({ path: p, method, who, getBody, store, query 
   return j(404, { error: 'unknown api' });
 }
 
+/* ── 가족 알림 보내기 — 「오늘 복습할 글이 있어요」 ──
+   하루 한 번(저녁) 크론이 부른다. 복습할 글이 없는 가정에는 보내지 않는다 — 매일 울리면 이틀 만에 끈다.
+   페이로드는 비워 둔다(브레인레터·워드브레인과 같은 배선) — 내용은 열어서 보고, 알림에는 아이 이름도 담기지 않는다.
+   구독이 죽었거나(404/410) 링크가 끊긴 가정(퇴원·토큰 교체)은 그 자리에서 정리한다. */
+export async function pushDueChunk({ store, push, fetchFn, now }) {
+  if (!push || !push.publicKey || !push.privateJwk) return { sent: 0, skipped: 0, removed: 0, reason: 'no-vapid' };
+  if (!store.listPushKeys) return { sent: 0, skipped: 0, removed: 0, reason: 'no-store' };
+  const f = fetchFn || fetch, t = now == null ? Date.now() : +now;
+  let sent = 0, skipped = 0, removed = 0;
+  for (const key of await store.listPushKeys()) {
+    const sub = await store.getPush(key);
+    if (!sub || !sub.endpoint) { await store.delPush(key); removed += 1; continue; }
+    const token = String(key).slice(2);                       /* f:<ptoken> */
+    const code = PTOKEN_RE.test(token) && store.getParentCode ? await store.getParentCode(token) : null;
+    const stu = code ? await store.getStudent(code) : null;
+    if (!stu) { await store.delPush(key); removed += 1; continue; }
+    const rec = await store.getState(code);
+    let due = 0;
+    try { due = SC.dueList(SC.normalize(rec && rec.state, t), t).length; } catch (e) { due = 0; }
+    if (!due) { skipped += 1; continue; }
+    try {
+      const jwt = await vapidJwt({ audience: new URL(sub.endpoint).origin, subject: push.subject || 'mailto:admin@wb.local', privateJwk: push.privateJwk });
+      const r = await f(sub.endpoint, { method: 'POST', headers: { TTL: '43200', Urgency: 'normal', Authorization: 'vapid t=' + jwt + ', k=' + push.publicKey } });
+      if (r.status === 404 || r.status === 410) { await store.delPush(key); removed += 1; }
+      else sent += 1;
+    } catch (e) { /* 이 가정은 내일 다시 */ }
+  }
+  return { sent, skipped, removed };
+}
+
 /* 퇴원·파기 — 이 학생의 청크 기록 키 전부 */
-export async function dropStudentChunk(store, code) {
+export async function dropStudentChunk(store, code, ptoken) {
   if (store.deleteState) await store.deleteState(code);
   if (store.deleteSummary) await store.deleteSummary(code);
   if (store.deleteAssign) await store.deleteAssign(code);
+  /* 가족 알림 구독도 함께 — 남겨 두면 퇴원한 가정에 계속 울린다(크론이 정리하기 전까지) */
+  if (ptoken && store.delPush) await store.delPush('f:' + ptoken);
 }
