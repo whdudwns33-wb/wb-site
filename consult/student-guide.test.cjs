@@ -87,7 +87,6 @@ test('student guide explains the required routine and optional modules', () => {
   assert.match(guide, /Agency ID <code>wbbrain<\/code>/);
   assert.match(guide, /사이트를 닫는 것만으로는 완료 처리되지 않습니다/);
   assert.match(guide, /현재 학생 기기에만 저장되고 서버·원장 화면·백업으로 전송되지 않습니다/);
-  assert.match(guide, /5,000P부터 오늘 화면에서 교환을 신청/);
   assert.match(guide, /data-go="today"/);
 });
 
@@ -99,9 +98,14 @@ test('student guide keeps the daily routine visible and folds reference sections
   assert.equal(sections.filter(section => section.includes(' open')).length, 1);
   assert.match(guide, /<details class="card student-guide-section" open><summary class="student-guide-head">/);
   assert.ok(guide.indexOf('✅ 매일 반드시 할 것') < guide.indexOf('🔗 처음 연결과 매일 접속'));
-  assert.match(guide, /student-guide-tip-more[^]*스탬프·포인트 기준 보기/);
+  assert.match(guide, /student-guide-tip-more[^]*스탬프·포인트·기프트 카드 받는 방법/);
   assert.match(guide, /유효 학습일 스탬프<\/b> 예정 공부/);
   assert.match(guide, /포인트와 기프트 카드<\/b> 10월 1일부터/);
+  assert.match(guide, /기프트 카드 받는 순서<\/b><br>① 5,000P가 모이면 오늘 할 일의 ‘5,000P 교환 신청’을 누릅니다/);
+  assert.match(guide, /‘교환 확인 중’[^]*‘교환 처리 중’으로 표시됩니다/);
+  assert.match(guide, /실제 발송이 완료되면 5,000P가 차감되고 ‘기프트 카드 교환 완료’로 기록됩니다/);
+  assert.match(guide, /‘교환 확인 중’에는 신청을 취소할 수 있지만 ‘교환 처리 중’에는 취소할 수 없습니다/);
+  assert.match(guide, /기프트 카드 번호·링크는 플래너에 저장되지 않습니다/);
   assert.match(html, /\.student-guide-section > summary \{[^}]*cursor: pointer;[^}]*list-style: none;/);
   assert.match(html, /\.student-guide-section\[open\] > summary::after \{ content: '⌃'; \}/);
 });
