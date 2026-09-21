@@ -1,0 +1,102 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" role="img" aria-label="다섯 기본 자음 ㄱ ㄴ ㅁ ㅅ ㅇ 과 각 소리를 낼 때의 입안 모양, 그리고 획을 더해 만든 ㅋ ㄷ ㅌ">
+  <!-- 제41호 표지 — 자음이 발음 기관을 본떴다는 것을 한 눈에. 한지 바탕·먹선·인주색.
+       글자는 획(path)으로 그린다 — 글꼴이 없는 기기에서도 같은 모양으로 보이게. -->
+  <defs>
+    <linearGradient id="hanji" x1="0" y1="0" x2="0.3" y2="1">
+      <stop offset="0" stop-color="#f6ecd8"/><stop offset="1" stop-color="#e7d4b4"/>
+    </linearGradient>
+    <g id="mouth">
+      <!-- 입안 옆모습: 위턱 / 아래턱 / 목구멍 -->
+      <path d="M12 30 Q58 14 104 26 L104 42 Q58 32 12 46 Z" fill="#e3c4ad"/>
+      <path d="M12 98 Q58 114 104 100 L104 84 Q58 94 12 80 Z" fill="#e3c4ad"/>
+      <path d="M104 26 Q126 64 104 100 L120 100 Q140 64 120 26 Z" fill="#d2ab92"/>
+    </g>
+  </defs>
+
+  <rect width="1600" height="1000" fill="url(#hanji)"/>
+  <g stroke="#d8c5a2" stroke-width="1" opacity="0.5">
+    <path d="M0 140 H1600 M0 320 H1600 M0 500 H1600 M0 680 H1600 M0 860 H1600"/>
+  </g>
+  <rect x="40" y="40" width="1520" height="920" fill="none" stroke="#b3402f" stroke-width="3" opacity="0.45"/>
+
+  <!-- ㄱ · ㄴ · ㅁ · ㅅ · ㅇ — 글자 위, 그 소리를 내는 입안 아래 -->
+  <g>
+    <g transform="translate(110 120)">
+      <rect width="250" height="600" rx="18" fill="#fcf7ec" stroke="#d3bf9c" stroke-width="2"/>
+      <path d="M62 110 H188 V252" fill="none" stroke="#2f2a24" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M40 320 H210" stroke="#b3402f" stroke-width="3" opacity="0.6"/>
+      <g transform="translate(34 372) scale(1.48)">
+        <use href="#mouth"/>
+        <path d="M26 80 Q70 78 96 44 L104 62 Q74 96 26 96 Z" fill="#b3402f"/>
+      </g>
+    </g>
+
+    <g transform="translate(395 120)">
+      <rect width="250" height="600" rx="18" fill="#fcf7ec" stroke="#d3bf9c" stroke-width="2"/>
+      <path d="M66 104 V250 H192" fill="none" stroke="#2f2a24" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M40 320 H210" stroke="#b3402f" stroke-width="3" opacity="0.6"/>
+      <g transform="translate(34 372) scale(1.48)">
+        <use href="#mouth"/>
+        <path d="M20 84 Q42 50 62 46 L68 62 Q46 68 30 94 Z" fill="#b3402f"/>
+      </g>
+    </g>
+
+    <g transform="translate(680 120)">
+      <rect width="250" height="600" rx="18" fill="#fcf7ec" stroke="#d3bf9c" stroke-width="2"/>
+      <rect x="66" y="108" width="126" height="146" fill="none" stroke="#2f2a24" stroke-width="28" stroke-linejoin="round"/>
+      <path d="M40 320 H210" stroke="#b3402f" stroke-width="3" opacity="0.6"/>
+      <g transform="translate(34 372) scale(1.48)">
+        <use href="#mouth"/>
+        <path d="M8 38 Q20 64 8 90 L24 94 Q38 64 24 34 Z" fill="#b3402f"/>
+      </g>
+    </g>
+
+    <g transform="translate(965 120)">
+      <rect width="250" height="600" rx="18" fill="#fcf7ec" stroke="#d3bf9c" stroke-width="2"/>
+      <path d="M128 104 L66 254 M128 104 L190 254" fill="none" stroke="#2f2a24" stroke-width="28" stroke-linecap="round"/>
+      <path d="M40 320 H210" stroke="#b3402f" stroke-width="3" opacity="0.6"/>
+      <g transform="translate(34 372) scale(1.48)">
+        <use href="#mouth"/>
+        <path d="M44 42 H60 L52 60 Z M44 88 H60 L52 70 Z" fill="#b3402f"/>
+        <path d="M72 64 H104" stroke="#b3402f" stroke-width="5" stroke-linecap="round" stroke-dasharray="7 9"/>
+      </g>
+    </g>
+
+    <g transform="translate(1250 120)">
+      <rect width="250" height="600" rx="18" fill="#fcf7ec" stroke="#d3bf9c" stroke-width="2"/>
+      <circle cx="128" cy="180" r="70" fill="none" stroke="#2f2a24" stroke-width="28"/>
+      <path d="M40 320 H210" stroke="#b3402f" stroke-width="3" opacity="0.6"/>
+      <g transform="translate(34 372) scale(1.48)">
+        <use href="#mouth"/>
+        <circle cx="112" cy="63" r="18" fill="none" stroke="#b3402f" stroke-width="7"/>
+      </g>
+    </g>
+  </g>
+
+  <!-- 아래 띠: 획을 더하면 소리가 세진다 — ㄱ + 획 = ㅋ,  ㄴ + 획 = ㄷ + 획 = ㅌ -->
+  <g transform="translate(110 790)">
+    <rect width="1380" height="140" rx="18" fill="#fcf7ec" stroke="#d3bf9c" stroke-width="2"/>
+    <g fill="none" stroke="#2f2a24" stroke-width="13" stroke-linecap="round" stroke-linejoin="round">
+      <!-- ㄱ -->
+      <path d="M70 42 H132 V104"/>
+      <!-- ㅋ = ㄱ 에 가운뎃획 -->
+      <path d="M290 42 H352 V104"/>
+      <!-- ㄴ -->
+      <path d="M560 42 V104 H622"/>
+      <!-- ㄷ = ㄴ 에 윗획 -->
+      <path d="M780 42 V104 H842"/>
+      <!-- ㅌ = ㄷ 에 가운뎃획 -->
+      <path d="M1060 42 H1122 M1060 42 V104 H1122"/>
+    </g>
+    <g fill="none" stroke="#b3402f" stroke-width="13" stroke-linecap="round">
+      <path d="M296 73 H346"/>
+      <path d="M780 42 H842"/>
+      <path d="M1060 73 H1116"/>
+    </g>
+    <g fill="none" stroke="#3f6b5e" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M186 73 h48 M234 73 l-14 -12 M234 73 l-14 12"/>
+      <path d="M676 73 h48 M724 73 l-14 -12 M724 73 l-14 12"/>
+      <path d="M936 73 h48 M984 73 l-14 -12 M984 73 l-14 12"/>
+    </g>
+  </g>
+</svg>

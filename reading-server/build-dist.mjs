@@ -101,7 +101,20 @@ fs.mkdirSync(path.join(DIST, 'letter'), { recursive: true });
 const LETTER_FILES = ['index.html', 'letter.js', 'shapes.js', 'drills.js', 'issue-sample.json', 'calendar.json', 'sw.js', 'manifest.webmanifest', 'icon.svg'];
 for (const f of LETTER_FILES) fs.copyFileSync(path.join(LETTER, f), path.join(DIST, 'letter', f));
 /* 파일럿 호 — 있으면 싣는다. 편집실이 만든 이번 주 호(자체 창작)를 링크만으로 연다. 없으면 앱이 샘플 호로 넘어간다 */
-if (fs.existsSync(path.join(LETTER, 'issue-pilot.json'))) fs.copyFileSync(path.join(LETTER, 'issue-pilot.json'), path.join(DIST, 'letter', 'issue-pilot.json'));
+/* 파일럿 호 — 목록(issues.json) + 호 본문(issues/*.json). 앱이 발행일을 보고 오늘의 호를 고른다.
+   issue-pilot.json 은 예전 방식의 자리다: 아직 새 껍데기를 못 받은 기기(서비스 워커 갱신 전)가 그 파일을 찾는다.
+   그래서 저장소에는 두지 않고, 조립할 때 "오늘 열려야 하는 호" 를 그 이름으로 한 벌 더 써 둔다. */
+if (fs.existsSync(path.join(LETTER, 'issues.json'))) {
+  fs.copyFileSync(path.join(LETTER, 'issues.json'), path.join(DIST, 'letter', 'issues.json'));
+  fs.mkdirSync(path.join(DIST, 'letter', 'issues'), { recursive: true });
+  const man = JSON.parse(fs.readFileSync(path.join(LETTER, 'issues.json'), 'utf8'));
+  const list = (Array.isArray(man.issues) ? man.issues : []).slice().sort((a, b) => String(a.publishAt).localeCompare(String(b.publishAt)));
+  for (const b of list) fs.copyFileSync(path.join(LETTER, 'issues', b.file), path.join(DIST, 'letter', 'issues', b.file));
+  const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);   // KST 기준 오늘
+  const out = list.filter((b) => b.status !== 'draft' && String(b.publishAt) <= today);
+  const cur = out.length ? out[out.length - 1] : list[0];
+  if (cur) fs.copyFileSync(path.join(LETTER, 'issues', cur.file), path.join(DIST, 'letter', 'issue-pilot.json'));
+}
 /* 읽어 주기·한자 따라쓰기 — 원본은 shared/voice.js·vocab/trace.js 하나씩. 다른 앱과 같은 파일을 letter/ 에도 배급한다(SW 껍데기가 ./ 상대 경로로 캐시한다) */
 fs.copyFileSync(SHARED, path.join(DIST, 'letter', 'voice.js'));
 fs.copyFileSync(path.join(ROOT, '..', 'vocab', 'trace.js'), path.join(DIST, 'letter', 'trace.js'));
