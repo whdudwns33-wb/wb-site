@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 300" role="img" aria-label="가을 언덕 위 나무 한 그루와 떨어지는 잎">
+  <defs><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F3E7CF"/><stop offset="1" stop-color="#F8F3E8"/></linearGradient></defs>
+  <rect width="800" height="300" fill="url(#sky)"/>
+  <circle cx="660" cy="70" r="40" fill="#F2CE6B"/>
+  <path d="M0 230 Q200 170 400 220 T800 210 V300 H0 Z" fill="#CFC6A6"/>
+  <path d="M0 260 Q250 220 500 262 T800 250 V300 H0 Z" fill="#B9AE8A"/>
+  <rect x="384" y="150" width="30" height="96" rx="8" fill="#7A5230"/>
+  <path d="M399 160 L364 124 M399 176 L438 134 M399 196 L372 172" stroke="#7A5230" stroke-width="10" stroke-linecap="round"/>
+  <circle cx="400" cy="110" r="80" fill="#E0762B"/><circle cx="340" cy="126" r="52" fill="#E7B62A"/><circle cx="462" cy="130" r="54" fill="#C4402F"/><circle cx="410" cy="60" r="44" fill="#E7B62A"/>
+  <g fill="#E0762B"><ellipse cx="530" cy="170" rx="10" ry="5" transform="rotate(-30 530 170)"/><ellipse cx="580" cy="210" rx="10" ry="5" transform="rotate(25 580 210)"/></g>
+  <g fill="#C4402F"><ellipse cx="620" cy="250" rx="10" ry="5" transform="rotate(-15 620 250)"/><ellipse cx="250" cy="200" rx="9" ry="4.5" transform="rotate(30 250 200)"/></g>
+  <g fill="#E7B62A"><ellipse cx="200" cy="240" rx="9" ry="4.5" transform="rotate(-20 200 240)"/><ellipse cx="700" cy="230" rx="9" ry="4.5" transform="rotate(15 700 230)"/></g>
+</svg>
