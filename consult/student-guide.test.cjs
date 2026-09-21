@@ -76,6 +76,11 @@ test('student guide explains the required routine and optional modules', () => {
   assert.match(guide, /온라인 학습 실행·완료 기록/);
   assert.match(guide, /순공시간 기록[\s\S]*?시간을 기록하는 학생/);
   assert.match(guide, /인강 관리[\s\S]*?등록된 인강이 있는 학생만/);
+  assert.match(guide, /온라인 학습 사용 매뉴얼/);
+  assert.match(guide, /Agency ID <code>wbbrain<\/code>/);
+  assert.match(guide, /사이트를 닫는 것만으로는 완료 처리되지 않습니다/);
+  assert.match(guide, /현재 학생 기기에만 저장되고 서버·원장 화면·백업으로 전송되지 않습니다/);
+  assert.match(guide, /5,000P부터 오늘 화면에서 교환을 신청/);
   assert.match(guide, /data-go="today"/);
 });
 

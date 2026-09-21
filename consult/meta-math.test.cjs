@@ -70,7 +70,7 @@ test('Leaders Eye is the first online learning card directly above MetaMath', ()
 });
 
 test('Leaders Eye keeps its direct daily fallback and recurring assignments resolve the current occurrence', () => {
-  const helpers = section('const LEARNING_DAILY_LOG_KIND', 'function leadersEyeAccountGuide(');
+  const helpers = section('const LEARNING_DAILY_LOG_KIND', 'const LEARNING_LOGIN_MEMO_SOURCES');
   const modal = section('function leadersEyeDailyResultModal(', 'function studyPlannerCard(');
   const card = section('function learningSourceCard(', '/* ── 학습 탭');
   const add = section("case 'learnadd':", "case 'learnsave':");
@@ -210,7 +210,7 @@ test('a recurring learning assignment resolves only scheduled occurrences and dr
   assert.match(study, /learningTasks\.map\(task => \(\{ task: task, date: learningOccurrenceDate\(task, today\(\)\) \}\)\)\s*\.filter\(item => item\.date\)/);
   assert.match(study, /learningOccurrences\.filter\(item => !isDone\(item\.task\.id, item\.date\)\)/);
 
-  const source = section('function assignedLearningTaskForDate(', 'function leadersEyeAccountGuide(');
+  const source = section('function assignedLearningTaskForDate(', 'const LEARNING_LOGIN_MEMO_SOURCES');
   const task = { id: 'leaders-weekday', kind: 'learning', repeat: 'weekday' };
   const seen = [];
   const assignedLearningTaskForDate = Function(
@@ -235,14 +235,15 @@ test('a recurring learning assignment resolves only scheduled occurrences and dr
 test('NELT and daily nonfiction open the requested URLs for director, manager, and student', () => {
   const sources = section('const LEADERS_EYE_URL', 'const DOW');
   const card = section('function learningSourceCard(', '/* ── 학습 탭');
-  const renderCard = Function('session', 'isManager', 'learningTasksFor', 'learningChecklistScheduleFor', 'esc',
+  const renderCard = Function('session', 'isManager', 'learningTasksFor', 'learningChecklistScheduleFor', 'esc', 'LEARNING_LOGIN_MEMO_SOURCES',
     sources + card + '\nreturn learningSourceCard;');
   const expected = [
     ['nelt_exam', '넬트 시험', 'https://www.netutor.co.kr/st/'],
     ['daily_nonfiction', '하루 비문학 독서', 'https://wb-reading.whdudwns33.workers.dev']
   ];
   for (const role of ['director', 'manager', 'student']) {
-    const render = renderCard({ isAdmin: role === 'director' }, () => role === 'manager', () => [], () => null, String);
+    const render = renderCard({ isAdmin: role === 'director' }, () => role === 'manager', () => [], () => null, String,
+      ['leaders_eye', 'metamath']);
     for (const [key, label, url] of expected) {
       const output = render({ id: 'student-a', name: '테스트' }, role !== 'manager', key);
       assert.ok(output.includes('data-learning-source="' + key + '"'));

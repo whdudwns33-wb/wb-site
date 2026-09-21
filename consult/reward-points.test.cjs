@@ -68,19 +68,21 @@ function rewardEventHarness() {
   const weekCloseOf = (_staffId, mon) => weekCloses.get(mon) || { status: '', completedAt: 0 };
   const monthCloseOf = (_staffId, ym) => monthCloses.get(ym) || { status: '', completedAt: 0 };
   const engagementMonthSummary = (_staffId, ym) => monthSummaries.get(ym) || { plannedDays: 0, stampTargetMet: false };
+  const pointRuleFor = Function('POINT_RULE_V2_START_DATE', 'POINT_RULE_VERSION', 'POINT_DAILY', 'POINT_WEEKLY', 'POINT_MONTHLY',
+    functionSource('pointRuleFor') + '; return pointRuleFor;')('2026-10-01', 'v2', 100, 500, 1000);
   const build = Function(
-    'pointAsOfContext', 'POINT_REWARD_START_DATE', 'addDays', 'engagementDayState', 'POINT_RULE_VERSION', 'POINT_DAILY',
+    'pointAsOfContext', 'POINT_REWARD_START_DATE', 'addDays', 'engagementDayState', 'pointRuleFor',
     'dailyCloseOf', 'parseYmd', 'mondayOf', 'weekCloseDays', 'ENGAGEMENT_REWARD_RATE', 'POINT_WEEKLY_MIN_DAYS',
-    'weekCloseOf', 'POINT_WEEKLY', 'ymOf', 'monthLastDate', 'ymAdd', 'engagementMonthSummary', 'monthCloseOf',
-    'POINT_MONTHLY_MIN_DAYS', 'POINT_MONTHLY',
+    'weekCloseOf', 'ymOf', 'monthLastDate', 'ymAdd', 'engagementMonthSummary', 'monthCloseOf',
+    'POINT_MONTHLY_MIN_DAYS',
     functionSource('pointWeekSummary') + '\n' + functionSource('pointMonthSummary') + '\n' + functionSource('rewardPointEvents') +
       '; return { pointWeekSummary, pointMonthSummary, rewardPointEvents };'
   );
   const api = build(
-    pointAsOfContext, '2026-09-01', addDays, engagementDayState, 'v1', 50,
+    pointAsOfContext, '2026-09-01', addDays, engagementDayState, pointRuleFor,
     dailyCloseOf, parseYmd, mondayOf, weekCloseDays, 80, 3,
-    weekCloseOf, 250, ymOf, monthLastDate, ymAdd, engagementMonthSummary, monthCloseOf,
-    12, 500
+    weekCloseOf, ymOf, monthLastDate, ymAdd, engagementMonthSummary, monthCloseOf,
+    12
   );
   return {
     api, dayStates, weekCloses, monthCloses, monthSummaries,
@@ -192,7 +194,7 @@ test('monthly bonus needs twelve planned learning days, 80 percent and a student
   assert.equal(read(12, true, 'overridden').qualified, false);
 });
 
-test('rewardPointEvents enforces launch, finalization, period-end and unique v1 ledger boundaries', () => {
+test('rewardPointEvents preserves September v1 and switches daily, weekly and monthly events to v2 on October 1', () => {
   const harness = rewardEventHarness();
   const { api, dayStates, weekCloses, monthCloses, monthSummaries, at } = harness;
   assert.deepEqual(api.rewardPointEvents('s1', '2026-08-31'), [], 'nothing accrues before the 9/1 launch');
@@ -221,6 +223,19 @@ test('rewardPointEvents enforces launch, finalization, period-end and unique v1 
   assert.equal(finalEvents.some(event => event.id === 'v1:month:2026-09'), true);
   assert.equal(new Set(finalEvents.map(event => event.id)).size, finalEvents.length, 'v1 ledger ids must be unique');
   assert.equal(finalEvents.reduce((sum, event) => sum + event.points, 0), 900, '3 days + 1 week + 1 month');
+
+  ['2026-10-01', '2026-10-02', '2026-10-03'].forEach(date => {
+    dayStates.set(date, { eligible: true, stamped: true, finalizedAt: at(date + 'T20:00:00') });
+  });
+  weekCloses.set('2026-09-28', { status: 'complete', completedAt: at('2026-10-04T20:00:00') });
+  monthSummaries.set('2026-10', { plannedDays: 12, stampTargetMet: true });
+  monthCloses.set('2026-10', { status: 'complete', completedAt: at('2026-10-31T20:00:00') });
+  const octoberEvents = api.rewardPointEvents('s1', '2026-10-31');
+  assert.equal(octoberEvents.find(event => event.id === 'v2:day:2026-10-01').points, 100);
+  assert.equal(octoberEvents.find(event => event.id === 'v2:week:2026-09-28').points, 500,
+    'the boundary week uses its Sunday award date');
+  assert.equal(octoberEvents.find(event => event.id === 'v2:month:2026-10').points, 1000);
+  assert.equal(new Set(octoberEvents.map(event => event.id)).size, octoberEvents.length, 'v1 and v2 ledger ids stay unique');
 });
 
 test('point exchange decisions use the server CAS ledger and never become learning activity', () => {
@@ -320,7 +335,7 @@ test('Today shows a 5,000P gauge, rules and history while the director gets fulf
   const gauge = functionSource('pointGaugeHtml');
   const modal = functionSource('pointHistoryModal');
   const card = functionSource('todayNextActionCard');
-  assert.match(gauge, /문화상품권 포인트/);
+  assert.match(gauge, /기프트 카드 포인트/);
   assert.match(gauge, /role="progressbar"/);
   assert.match(gauge, /유효 학습일/);
   assert.match(gauge, /pointrequest/);
@@ -328,12 +343,12 @@ test('Today shows a 5,000P gauge, rules and history while the director gets fulf
   assert.match(card, /pointGaugeHtml\(me\.id\)/);
   assert.match(modal, /적립 방법/);
   assert.match(modal, /실제 발송 완료/);
-  assert.match(modal, /상품권 번호·링크는 앱에 저장하지 않습니다/);
+  assert.match(modal, /기프트 카드 번호·링크는 앱에 저장하지 않습니다/);
   assert.match(modal, /row\.points > 0 \? '\+' : row\.points < 0 \? '-' : ''/,
     'fulfilled exchanges must render as -5,000P instead of an unsigned amount');
   assert.match(modal, /처리 기기 확인/);
   assert.match(modal, /30분 지난 처리 인계/);
-  assert.match(modal, /새 상품권을 발송하지 마세요/);
+  assert.match(modal, /새 기프트 카드를 발송하지 마세요/);
   assert.match(modal, /이미 발송됨 · 완료·차감/);
   assert.match(modal, /processingRecovery \|\| processingShortfall/,
     'recovered and shortfall leases must use the prior-send verification choices');
@@ -346,8 +361,9 @@ test('Today shows a 5,000P gauge, rules and history while the director gets fulf
   assert.match(html, /case 'pointclaim'/);
   assert.match(html, /case 'pointownercheck'/);
   assert.match(html, /case 'pointtakeover'/);
-  assert.match(html, /새 상품권을 발송하지 말고, 이전 기기에서 이미 발송했는지 먼저 확인/);
-  assert.match(html, /인계 완료 · 새 상품권을 발송하지 말고 이전 발송 여부를 확인/);
+  assert.match(html, /새 기프트 카드를 발송하지 말고, 이전 기기에서 이미 발송했는지 먼저 확인/);
+  assert.match(html, /인계 완료 · 새 기프트 카드를 발송하지 말고 이전 발송 여부를 확인/);
+  assert.doesNotMatch(html, /문화상품권|상품권/);
   assert.match(html, /case 'pointreject'[\s\S]*'reject'/);
   assert.match(html, /const LS_KEY = 'wb_consult_v1'/);
   assert.match(html, /const SYNC_APP = 'consult'/);
