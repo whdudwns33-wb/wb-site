@@ -1,36 +1,78 @@
-# chunk/ — 청크브레인 작업 규칙 (Codex·Claude Code 공용)
+# chunk/ — 청크브레인 작업 인수인계 (Codex · Claude Code 공용)
 
-유치(5~7세) + 초1~고3, 모두 13단계(`K`·`G1`~`G12`)로 **의미 단위 끊어읽기**를 배우고 연습하고 복습하는
-원내 학습 PWA. 교재는 `print.html` 브라우저 인쇄 → PDF, 수업은 `class.html`(프로젝터).
+유치(5~7세) + 초1~고3, 모두 13단계(`K`·`G1`~`G12`)로 **의미 단위 끊어읽기**를 배우고(규칙 카드) ·
+연습하고(따라 읽기 → 직접 끊기 → 표시 없이 읽기) · 간격을 두고 되풀이하는(복습 사다리) 원내 학습 PWA.
+교재는 `print.html` 브라우저 인쇄 → PDF, 수업은 `class.html`(프로젝터).
 
-**읽는 순서**: 저장소 루트 `AGENTS.md`(= `CLAUDE.md`, 최상위 규칙) → `chunk/README.md`(이 앱의 정본 문서,
-파일별 역할·설계 근거·데이터 형식이 전부 여기 있다) → 고칠 파일. 이 문서는 **조용히 깨지는 자리**만 적는다.
+**읽는 순서**: 저장소 루트 `AGENTS.md`(= `CLAUDE.md`, 최상위 규칙) → `chunk/README.md`(이 앱의 정본 —
+파일별 역할·설계 근거·데이터 형식) → 이 문서. README 가 "무엇이 있나" 라면 이 문서는
+**"지금 어디까지 왔고, 다음에 뭘 하고, 무엇을 밟으면 조용히 깨지는가"** 다.
 
-## 고치기 전에 돌리는 것
+---
 
+## 1. 지금 상태 (2026-09-21 기준)
+
+운영 중이고 학생·가정 양쪽에 나가 있다. 주소는 원내 전용이다.
+
+| 무엇 | 어디 |
+|---|---|
+| 학생 앱 | `/chunk/` |
+| 가족 모드 | `/chunk/?t=<학부모토큰>` |
+| 교재(PDF) | `/chunk/print.html` |
+| 화면 수업 | `/chunk/class.html` |
+| 강사 관리 | `/admin/chunk-admin.html` |
+
+콘텐츠는 **전부 자체 창작**이라 저장소에 있다.
+
+- 연습 지문 **119편** — 유치 11편, 초1~고3 각 9편
+- 규칙 카드 **31장** — 학년마다 새 카드 2~3장, 아래 학년 카드는 복습 카드로 남는 나선형
+
+돌아가는 기능: 출발선 2분 진단 · 오늘의 세 걸음(배우기→연습→복습) · 간격 사다리(85점↑ 1→3→7→14→30일,
+30일 통과 시 졸업) · 약한 규칙 → 카드 연결 · 읽어 주기(TTS)와 낭독 녹음(기기 밖으로 안 나간다) ·
+선생님 지문(관리 웹 「글 저작」) · 가족 모드 · 복습이 밀린 날 저녁 6시 가족 푸시 알림 ·
+반 현황(주의 순·미완료 CSV)·반 단위 과제.
+
+## 2. 다음 할 일
+
+- **지문을 학년당 9편 → 12편으로.** 저장소에 지문 생성 도구가 없다 — 관리 웹 「글 저작」으로 학원이 채우거나,
+  손으로 써서 `passages.js` 에 넣고 `content.test.cjs` 를 통과시킨다.
+- 영어 끊어읽기(직독직해) 트랙.
+- 어른이 듣고 평정하는 낭독 4단계 카드.
+- 처음 보는 글의 **「전이 점수」 분리** — 지금은 연습한 글과 새 글의 점수가 섞여 있다.
+
+## 3. 지문 한 편 더하기 — 가장 잦은 작업
+
+`chunk/passages.js` 에 항목 하나를 더한다. 형식은 이렇다.
+
+```js
+{ id: 'g3-10', band: 'G3', title: '…', genre: '설명',
+  paragraphs: [[ '조각1 ', '조각2 ', '마지막조각' ]],
+  q: { q: '…', choices: ['…','…','…','…'], answer: 0, explain: '…' } }
 ```
-for f in chunk/*.test.cjs; do node $f; done && node reading-server/chunk-api.test.mjs
-node reading-server/override.test.mjs            # 워커·로컬 저장 어댑터 짝 검사
-node reading-server/build-dist.mjs && node reading-server/dist-cache.test.mjs
-PORT=8890 ADMIN_PIN=<pin> DATA_DIR=<dir> node reading-server/server.mjs   # → http://localhost:8890/chunk/
-```
 
-`main` 푸시가 곧 배포다. 테스트가 빨간 채로 머지하면 학생 화면이 바로 그 상태가 된다.
+지키는 것 — `content.test.cjs` 가 편마다 검사한다.
 
-## 조용히 깨지는 자리
+- **조각은 뒤 공백을 품는다.** `segs.join('') === 원문`, 마지막 조각만 공백 없음.
+- 어절 수·문장 길이·글자 수가 그 단계 눈금(`rules.js` 의 `BANDS`) 안이어야 한다.
+- 붙여 읽어야 하는 자리에서 끊지 않았는지 `check(segs, band)` 가 본다.
+- 유치·초1·초2(`sentenceMode`)는 문장 하나씩 연습하고 **보기 3개**, 그 위는 문단 단위·**보기 4개**.
+- 정답 위치를 분산하고 갈래(`genre`)를 섞는다.
 
-1. **채점(`explain`)과 초안(`autoChunk`)은 다른 것이다.** `autoChunk`·`draftParagraphs`는 글을 만들 때
-   쓰는 초안 생성기라 보수적으로 끊는다(조사·어미 뒤에서만). 이 보수적 게이트를 채점 쪽으로 옮기면
-   **학생이 옳게 끊은 자리를 틀렸다고 하게 된다.** 채점은 모범 경계와의 일치로만 나와야 한다.
+초안을 뽑고 싶으면 `R.draftParagraphs(원문, band)` 를 쓴다 — **초안일 뿐이고 채점에는 쓰지 않는다**(아래 4-1).
 
-2. **지문 조각은 공백을 품는다.** `segs.join('') === 원문` 이 성립해야 하고 마지막 조각만 공백이 없다.
-   `content.test.cjs` 가 편마다 검사한다. 손으로 조각을 고칠 때 공백을 흘리면 화면에서 낱말이 붙어 버린다.
+## 4. 조용히 깨지는 자리
 
-3. **저장 어댑터는 두 파일에 짝으로 있어야 한다.** `reading-server/worker.mjs`(운영)와 `server.mjs`(로컬)의
-   `chunkStore` 에 메서드를 더할 때 한쪽만 고치면 운영에서만 터진다. `override.test.mjs` 가 짝을 검사한다.
+1. **채점(`explain`)과 초안(`autoChunk`)은 다른 것이다.** `autoChunk`·`draftParagraphs` 는 글을 만들 때 쓰는
+   초안 생성기라 보수적으로 끊는다(조사·어미 뒤에서만). 이 게이트를 채점 쪽으로 옮기면 **학생이 옳게 끊은
+   자리를 틀렸다고 하게 된다.** 채점은 모범 경계와의 일치로만 나와야 한다.
 
-4. **새 테스트 파일을 만들면 CI 에 스텝을 더한다.** `.github/workflows/deploy-reading.yml` 의 청크 스텝은
-   파일 이름을 하나씩 적는 방식이라, 새 파일은 적지 않으면 CI 에서 영영 안 돈다.
+2. **지문 조각은 공백을 품는다.** 손으로 고칠 때 공백을 흘리면 화면에서 낱말이 붙어 버린다.
+
+3. **저장 어댑터는 워커·로컬 짝이다.** `reading-server/worker.mjs`(운영)와 `server.mjs`(로컬)의 `chunkStore` 에
+   메서드를 더할 때 한쪽만 고치면 운영에서만 터진다. `override.test.mjs` 가 짝을 검사한다.
+
+4. **새 테스트 파일을 만들면 CI 에 스텝을 더한다.** `deploy-reading.yml` 의 청크 스텝은 파일 이름을 하나씩
+   적는 방식이라, 새 파일은 적지 않으면 CI 에서 영영 안 돈다(`scripts/check.mjs` 는 저절로 찾는다).
 
 5. **서비스 워커 `VERSION` 을 손으로 만지지 않는다.** `build-dist.mjs` 가 내용 해시로 스탬프한다.
    손으로 적으면 내용이 바뀌어도 학생 기기가 옛 화면을 계속 쓴다.
@@ -38,14 +80,35 @@ PORT=8890 ADMIN_PIN=<pin> DATA_DIR=<dir> node reading-server/server.mjs   # → 
 6. **가족 링크 토큰은 진로독서 학부모 토큰 그대로다**(`parent:<t>` — 브레인레터와 같은 것, 가정마다 링크 하나).
    `/chunk/?t=` 로 들어온 기기는 로그인 없이 자녀 기록을 읽고 쓰므로, `/api/chunk/parent*` 는 호스트가
    `who` 검증 **전에** 넘긴다. 이 갈래를 일반 학생 라우트로 합치면 가족 모드가 401 로 죽는다.
+   기기 안 기록 키도 가족별이다(`wbc.state:fam:<앞 8자>`).
 
 7. **응답 키는 경로 명사와 같다**(루트 규칙 4). `/state` → `{state, updatedAt}`, `/custom` → `{custom, …}`,
    `/parent` → `{parent, assign, custom, …}`. 바꾸려면 클라이언트·서버·테스트를 한 커밋에서 함께 고친다.
 
-8. **지문·규칙 카드는 자체 창작만 커밋한다**(루트 규칙 1 — 저장소는 public). 출판 교재·문제집에서
-   베껴 오지 않는다. 학원이 쓰는 글은 관리 웹 「글 저작」으로 서버에만 올린다.
+8. **지문·규칙 카드는 자체 창작만 커밋한다**(루트 규칙 1 — 저장소는 public). 출판 교재·문제집에서 베껴 오지
+   않는다. 학원이 쓰는 글은 관리 웹 「글 저작」으로 서버에만 올린다.
 
-## 화면 고칠 때
+9. **퇴원 처리를 빠뜨리지 않는다.** `dropStudentChunk(store, code, ptoken)` 가 기록·요약·과제와 가족 푸시
+   구독까지 지운다. 새 저장 키를 더하면 여기에도 더한다 — 안 그러면 퇴원한 학생 기록이 남는다.
+
+10. **가족 푸시는 복습이 밀린 가정에만 간다.** `pushDueChunk` 가 `sched.dueList` 로 걸러 보내고, 알림에
+    아이 이름을 담지 않는다(페이로드 없는 푸시). 404·410 구독과 끊긴 링크는 그 자리에서 정리한다.
+
+## 5. 고치기 전에 돌리는 것
+
+```
+node scripts/check.mjs --only chunk      # 이 앱 몫만
+node scripts/check.mjs                   # ★ 저장소 전체 — PR 전에는 이것
+node reading-server/override.test.mjs    # 워커·로컬 저장 어댑터 짝 검사
+node reading-server/build-dist.mjs && node reading-server/dist-cache.test.mjs
+
+PORT=8890 ADMIN_PIN=<아무 긴 문자열> DATA_DIR=$(mktemp -d) node reading-server/server.mjs
+# → http://localhost:8890/chunk/   관리 http://localhost:8890/admin/chunk-admin.html
+```
+
+`main` 푸시가 곧 배포다. 테스트가 빨간 채로 머지하면 학생 화면이 바로 그 상태가 된다.
+
+## 6. 화면 고칠 때
 
 `index.html`·`print.html`·`class.html` 은 각각 한 파일짜리 앱이다. 화면은 `render()` 가 문자열로 그리고
 클릭은 `data-act` 위임 하나로 받는다. **틈(`gap`)을 한 번 누를 때마다 화면을 통째로 다시 그리므로**
@@ -57,7 +120,11 @@ DOM 핸들을 들고 있다가 다시 쓰면 안 된다(자동화 테스트도 �
 .sheet[hidden] { display:none; }
 ```
 
-## 손대지 않는 것
+관리 화면(`/admin/chunk-admin.html`)의 로그인 폼은 **공용 모듈**이 그린다
+(`reading-server/public/admin-login.js`) — 여기서 따로 만들지 않는다.
 
+## 7. 사람(원장)에게 물어야 하는 것
+
+가정에 나가는 문구·링크(가족 링크 안내, 푸시 알림 문구) · 운영 데이터 삭제 · 라이선스가 걸린 자료.
 옆 앱(`reading/`·`vocab/`·`naesin/`·`naesin-ko/`·`haru/`·`letter/`·`hanja/`)은 요청받은 범위가 아니면
 건드리지 않는다. 배포되는 헤더는 `reading/_headers` 하나이고 `chunk/_headers` 는 그리로 안내하는 주석 파일이다.
