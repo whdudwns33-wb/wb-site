@@ -1,7 +1,7 @@
 'use strict';
 /* WB 청크브레인 서비스 워커 — 앱 셸 캐시 (오프라인 연습). VERSION 은 build-dist 가 내용 해시로 스탬프한다. */
 const VERSION = 'wbc-shell-dev';
-const SHELL = ['./', './index.html', './print.html', './voice.js', './rules.js', './sched.js', './lessons.js', './passages.js', './manifest.webmanifest', './icon.svg'];
+const SHELL = ['./', './index.html', './print.html', './class.html', './voice.js', './rules.js', './sched.js', './lessons.js', './passages.js', './manifest.webmanifest', './icon.svg'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));

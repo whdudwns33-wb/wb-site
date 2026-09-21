@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WB 청크브레인 — 화면 수업</title>
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+  <link rel="icon" href="./icon.svg" type="image/svg+xml">
+  <style>
+    /* 프로젝터 한 화면 — 교실 뒷자리에서도 읽히도록 글자가 매우 크고, 조작은 스페이스 하나로 끝난다.
+       색은 학생 앱과 같은 자두색이되 배경을 밝게 둔다(빔 프로젝터는 어두운 배경에서 글자가 번진다). */
+    :root { --bg:#FBF9F7; --panel:#fff; --ink:#1F1A22; --soft:#6F667A; --line:#E6E0E4; --plum:#7A2E5C; --plum-soft:#F5E6EE; --green:#14755E; }
+    * { box-sizing:border-box; }
+    html, body { margin:0; height:100%; }
+    body { background:var(--bg); color:var(--ink); font-family:"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif; line-height:1.5; word-break:keep-all; display:flex; flex-direction:column; }
+    button, select, input, textarea { font-family:inherit; font-size:inherit; }
+    header { display:flex; align-items:center; gap:10px; flex-wrap:wrap; padding:10px 16px; background:var(--plum); color:#fff; }
+    header b { font-size:16px; letter-spacing:-.01em; }
+    header .sp { flex:1; }
+    header select, header button { min-height:36px; border-radius:9px; border:1px solid #ffffff55; background:#ffffff1a; color:#fff; padding:4px 10px; font-weight:800; cursor:pointer; }
+    header select option { color:#000; }
+    header button.on { background:#fff; color:var(--plum); }
+    main { flex:1; display:flex; align-items:center; justify-content:center; padding:min(5vh,48px) min(4vw,56px); }
+    .stage { width:100%; max-width:1500px; }
+    .ttl { font-size:clamp(15px,1.6vw,22px); color:var(--soft); font-weight:800; margin-bottom:min(3vh,20px); }
+    .flow { font-size:var(--fs); font-weight:700; letter-spacing:-.01em; line-height:1.9; }
+    /* 어절은 그대로 두고 «경계 표시»만 하나씩 켠다 — 글을 다시 흐르게 하지 않으려고 자리를 늘 차지한다 */
+    .w { white-space:nowrap; }
+    .b { display:inline-block; width:.62em; text-align:center; color:#D8CED4; transition:color .12s, transform .12s; }
+    .b.on { color:var(--plum); transform:scale(1.12); }
+    .b.now { color:var(--green); animation:pop .35s ease; }
+    @keyframes pop { 0% { transform:scale(.6); } 60% { transform:scale(1.35); } 100% { transform:scale(1.12); } }
+    .b.sent { color:#9A8C95; }              /* 문장 끝은 처음부터 보여 준다 — 규칙이 아니라 문장부호가 알려 주는 자리 */
+    .b.sent.on { color:var(--plum); }
+    footer { display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding:10px 16px; border-top:1px solid var(--line); background:var(--panel); }
+    footer .big { min-height:48px; padding:6px 24px; border-radius:12px; border:none; background:var(--plum); color:#fff; font-weight:900; font-size:17px; cursor:pointer; }
+    footer .big.ghost { background:#fff; color:var(--plum); border:2px solid var(--plum); }
+    footer .big:disabled { opacity:.4; cursor:default; }
+    .count { font-weight:900; color:var(--plum); font-variant-numeric:tabular-nums; }
+    .hint { font-size:13px; color:var(--soft); }
+    .sheet { position:fixed; inset:0; background:#0006; display:flex; align-items:center; justify-content:center; padding:20px; }
+    /* display:flex 는 hidden 의 기본값(display:none)을 이긴다 — 이 한 줄이 없으면 숨긴 팝업이 화면 전체를 덮어
+       「다음 덩어리」를 누르려는 손가락을 전부 삼킨다(수업 중에 화면이 먹통이 된다). */
+    .sheet[hidden] { display:none; }
+    .sheet .box { background:#fff; border-radius:16px; padding:18px; width:min(680px,94vw); max-height:88vh; overflow:auto; }
+    .sheet h2 { margin:0 0 8px; color:var(--plum); font-size:17px; }
+    .sheet textarea { width:100%; min-height:160px; border:1.5px solid var(--line); border-radius:10px; padding:10px; font-size:15px; line-height:1.7; }
+    .sheet .row { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; }
+    .sheet .btn { min-height:42px; padding:6px 18px; border-radius:10px; border:none; background:var(--plum); color:#fff; font-weight:800; cursor:pointer; }
+    .sheet .btn.ghost { background:#fff; color:var(--plum); border:2px solid var(--plum); }
+    .sheet .small { font-size:13px; color:var(--soft); }
+    .warn { background:#FBF0DC; border-radius:8px; padding:8px 10px; font-size:13px; margin-top:8px; }
+    @media (max-width:700px) { header b { display:none; } footer .big { padding:6px 16px; font-size:15px; } }
+  </style>
+</head>
+<body>
+<header>
+  <b>청크브레인 · 화면 수업</b>
+  <select id="band" aria-label="단계"></select>
+  <select id="pick" aria-label="글"></select>
+  <button id="own">내 글 넣기</button>
+  <span class="sp"></span>
+  <button id="smaller" aria-label="글자 작게">가−</button>
+  <button id="bigger" aria-label="글자 크게">가＋</button>
+  <button id="full">전체 화면</button>
+  <a href="./" style="color:#fff;text-decoration:none;font-weight:800;padding:0 6px">앱으로</a>
+</header>
+
+<main><div class="stage"><div class="ttl" id="ttl"></div><div class="flow" id="flow"></div></div></main>
+
+<footer>
+  <button class="big" id="prev">← 되돌리기</button>
+  <button class="big" id="next">다음 덩어리 (스페이스)</button>
+  <button class="big ghost" id="all">전부 보기</button>
+  <button class="big ghost" id="reset">처음부터</button>
+  <span class="count" id="count"></span>
+  <span class="hint">스페이스·→ 다음 · ← 되돌리기 · A 전부 · R 처음부터 · F 전체 화면</span>
+</footer>
+
+<div class="sheet" id="sheet" hidden>
+  <div class="box">
+    <h2>내 글 넣기</h2>
+    <p class="small">수업에서 쓸 글을 붙여 넣으세요. 끊는 자리를 직접 정하려면 <b>∕</b> 또는 <b>/</b> 를 찍고, 비워 두면 단계 눈금에 맞춰 규칙이 초안을 만들어요. 이 글은 저장되지 않고 이 화면에서만 쓰여요.</p>
+    <textarea id="text" placeholder="아침 일찍 운동장에 나갔다. 이슬이 풀잎마다 맺혀 있었다."></textarea>
+    <div id="warn"></div>
+    <div class="row"><button class="btn" id="use">이 글로 수업하기</button><button class="btn ghost" id="close">닫기</button></div>
+  </div>
+</div>
+
+<script src="./rules.js"></script>
+<script src="./passages.js"></script>
+<script>
+'use strict';
+(function () {
+  const R = WBCHUNK, PASSAGES = WBCHUNK_PASSAGES;
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const q = new URLSearchParams(location.search);
+
+  /* 화면에 올린 글 — 문단마다 { ws(어절), cuts(모범 경계 인덱스), sent(문장 끝) } */
+  let DOC = null, STEP = 0, FS = +(localStorage.getItem('wbc.class.fs') || 0) || 44;
+  let CUSTOM = null;   /* 선생님이 넣은 글 — 목록에서 고르면 사라진다 */
+
+  $('band').innerHTML = R.BAND_ORDER.map((b) => '<option value="' + b + '">' + R.BANDS[b].label + '</option>').join('');
+  $('band').value = R.BANDS[q.get('band')] ? q.get('band') : 'G3';
+
+  const poolOf = (b) => PASSAGES.filter((p) => p.band === b);
+  function fillPick() {
+    const ps = poolOf($('band').value);
+    $('pick').innerHTML = ps.map((p, i) => '<option value="' + i + '">' + esc(p.title) + '</option>').join('') || '<option value="">글 없음</option>';
+  }
+
+  /* 조각 배열(문단) → 화면용 구조. 문장 끝은 처음부터 회색으로 보여 주고 «세는 경계»에서는 뺀다. */
+  function build(paragraphs, title) {
+    const paras = paragraphs.map((segs) => {
+      const text = segs.join(''), ws = R.words(text);
+      const sent = R.sentenceEnds(text), sentSet = {};
+      sent.forEach((i) => sentSet[i] = true);
+      return { ws, cuts: R.modelBoundaries(segs).filter((i) => !sentSet[i]), sentSet };
+    });
+    const order = [];
+    paras.forEach((p, pi) => p.cuts.forEach((i) => order.push([pi, i])));
+    DOC = { title, paras, order };
+    STEP = 0;
+    draw();
+  }
+  function loadPicked() {
+    CUSTOM = null;
+    const ps = poolOf($('band').value), p = ps[+$('pick').value] || ps[0];
+    if (!p) { DOC = null; draw(); return; }
+    build(p.paragraphs, p.title + ' · ' + p.genre);
+  }
+
+  function draw() {
+    document.documentElement.style.setProperty('--fs', FS + 'px');
+    if (!DOC) { $('ttl').textContent = ''; $('flow').innerHTML = '<p style="color:var(--soft);font-size:20px">이 단계에는 글이 없어요. 위에서 다른 단계를 고르거나 「내 글 넣기」를 쓰세요.</p>'; $('count').textContent = ''; return; }
+    $('ttl').textContent = DOC.title;
+    const shown = {};
+    DOC.order.slice(0, STEP).forEach(([pi, i]) => { shown[pi + ':' + i] = true; });
+    const last = STEP > 0 ? DOC.order[STEP - 1] : null;
+    $('flow').innerHTML = DOC.paras.map((p, pi) => {
+      let out = '<p style="margin:0 0 .6em">';
+      p.ws.forEach((w, i) => {
+        out += '<span class="w">' + esc(w.trim()) + '</span>';
+        if (i >= p.ws.length - 1) return;
+        const isSent = !!p.sentSet[i], on = isSent || shown[pi + ':' + i];
+        const now = last && last[0] === pi && last[1] === i;
+        out += '<span class="b' + (isSent ? ' sent' : '') + (on ? ' on' : '') + (now ? ' now' : '') + '">' + (on ? '∕' : '·') + '</span>';
+      });
+      return out + '</p>';
+    }).join('');
+    $('count').textContent = DOC.order.length ? STEP + ' / ' + DOC.order.length + ' 덩어리 경계' : '끊을 자리가 없어요';
+    $('prev').disabled = STEP === 0;
+    $('next').disabled = STEP >= DOC.order.length;
+  }
+
+  const step = (d) => { if (!DOC) return; STEP = Math.max(0, Math.min(DOC.order.length, STEP + d)); draw(); };
+  $('next').onclick = () => step(1);
+  $('prev').onclick = () => step(-1);
+  $('all').onclick = () => { if (DOC) { STEP = DOC.order.length; draw(); } };
+  $('reset').onclick = () => { STEP = 0; draw(); };
+  $('band').onchange = () => { fillPick(); loadPicked(); };
+  $('pick').onchange = loadPicked;
+  $('bigger').onclick = () => { FS = Math.min(96, FS + 4); localStorage.setItem('wbc.class.fs', FS); draw(); };
+  $('smaller').onclick = () => { FS = Math.max(20, FS - 4); localStorage.setItem('wbc.class.fs', FS); draw(); };
+  $('full').onclick = () => { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen().catch(() => {}); };
+
+  /* 내 글 — 표시가 있으면 그대로, 없으면 규칙 초안(autoChunk). 저장하지 않는다(수업 중 한 번 쓰는 글) */
+  $('own').onclick = () => { $('sheet').hidden = false; $('text').focus(); };
+  $('close').onclick = () => { $('sheet').hidden = true; };
+  $('use').onclick = () => {
+    const raw = $('text').value.trim();
+    if (!raw) { $('warn').innerHTML = '<div class="warn">글을 넣어 주세요.</div>'; return; }
+    const band = $('band').value;
+    const marked = /[∕\/]/.test(raw);
+    const paras = marked ? R.fromMarked(raw) : R.draftParagraphs(raw, band);
+    if (!paras.length) { $('warn').innerHTML = '<div class="warn">문단을 찾지 못했어요.</div>'; return; }
+    const warns = [];
+    paras.forEach((segs, i) => R.check(segs, band).forEach((m) => warns.push((i + 1) + '문단: ' + m)));
+    CUSTOM = paras;
+    build(paras, '내 글 · ' + R.BANDS[band].label + (marked ? '' : ' (규칙 초안)'));
+    $('warn').innerHTML = warns.length ? '<div class="warn"><b>규칙과 다른 자리 ' + warns.length + '곳</b> — 수업에서 쓰기에는 괜찮아요.<br>' + warns.slice(0, 4).map(esc).join('<br>') + '</div>' : '';
+    $('sheet').hidden = true;
+  };
+
+  document.addEventListener('keydown', (e) => {
+    if (!$('sheet').hidden) { if (e.key === 'Escape') $('sheet').hidden = true; return; }
+    if (e.key === ' ' || e.key === 'ArrowRight' || e.key === 'PageDown') { e.preventDefault(); step(1); }
+    else if (e.key === 'ArrowLeft' || e.key === 'PageUp') { e.preventDefault(); step(-1); }
+    else if (e.key === 'a' || e.key === 'A') $('all').click();
+    else if (e.key === 'r' || e.key === 'R') $('reset').click();
+    else if (e.key === 'f' || e.key === 'F') $('full').click();
+  });
+  /* 프로젝터 앞에서 리모컨 대신 화면을 눌러 넘기는 일이 많다 — 본문 아무 데나 누르면 다음 */
+  document.querySelector('main').addEventListener('click', () => step(1));
+
+  fillPick(); loadPicked();
+})();
+</script>
+</body>
+</html>
