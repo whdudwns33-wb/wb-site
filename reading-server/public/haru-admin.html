@@ -38,6 +38,7 @@
   <button data-tab="board" aria-pressed="true">코치 보드</button><button data-tab="students">학생 등록</button><button data-tab="assets">팩·대응표·플랜</button><button data-tab="paper">종이 회수</button><button data-tab="tools">링크·내보내기·파기</button>
 </nav>
 <main id="main"></main>
+<script src="/admin/admin-login.js"></script>
 <script>
 'use strict';
 const $=(s)=>document.querySelector(s);
@@ -56,9 +57,9 @@ async function api(path,opt){
 const post=(p,b)=>api(p,{method:'POST',body:JSON.stringify(b)});
 function renderLogin(msg){
   $('#nav').hidden=true;$('#btnLogout').hidden=true;
-  $('#main').innerHTML='<div class="card" id="loginCard"><h2>관리 PIN</h2><div class="row"><input id="pin" type="password" autocomplete="off" style="flex:1"><button class="btn" id="go">로그인</button></div>'+(msg?'<div class="err">'+esc(msg)+'</div>':'')+'</div>';
-  $('#go').onclick=async()=>{try{const j=await post('/admin/login',{pin:$('#pin').value});TOKEN=j.token;localStorage.setItem('wbr.admin.token',TOKEN);show(TAB);}catch(e){renderLogin(e.message);}};
-  $('#pin').onkeydown=(e)=>{if(e.key==='Enter')$('#go').click();};
+  /* 로그인 폼은 공용 모듈이 그린다(아이디·비밀번호 기본, PIN 갈래로 전환) — reading-server/public/admin-login.js */
+  $('#main').innerHTML='<div class="card" id="loginCard"><h2>강사 로그인</h2><div id="loginHost"></div></div>';
+  WBAdminLogin.mount({host:'#loginHost',message:msg||'',classes:{btn:'btn'},onToken:function(t){TOKEN=t;try{localStorage.setItem('wbr.admin.token',TOKEN);}catch(e){}show(TAB);}});
 }
 function show(tab){TAB=tab;$('#nav').hidden=false;$('#btnLogout').hidden=false;document.querySelectorAll('nav button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.tab===tab)));({board,students,assets,paper,tools})[tab]().catch(e=>{if(e.message!=='auth')$('#main').innerHTML='<div class="card"><div class="err">'+esc(e.message)+'</div></div>';});}
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>show(b.dataset.tab));
