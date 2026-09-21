@@ -418,6 +418,38 @@
       return html + '</div>' + footer();
     }
 
+    /* ── 가족 알림(Web Push) — 복습이 밀린 저녁에만 한 번. 브레인레터·워드브레인과 같은 VAPID 키·배선 ── */
+    const pushSupported = () => famMode() && 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
+    const pushOn = () => { try { return localStorage.getItem('wbc.push') === '1'; } catch (e) { return false; } };
+    const setPushOn = (v) => { try { localStorage.setItem('wbc.push', v ? '1' : '0'); } catch (e) {} };
+    function b64uToU8(s) { const pad = '='.repeat((4 - s.length % 4) % 4); const raw = atob((s + pad).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from([...raw].map((c) => c.charCodeAt(0))); }
+    function enablePush() {
+      return api('/push/key').then((k) => {
+        if (!k.ok) throw new Error('서버에 알림 키가 아직 없어요 — 학원에 문의해 주세요.');
+        return Notification.requestPermission().then((perm) => {
+          if (perm !== 'granted') throw new Error('알림 권한이 꺼져 있어요 — 브라우저 설정에서 허용해 주세요.');
+          return navigator.serviceWorker.ready;
+        }).then((reg) => reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64uToU8(k.key) }))
+          .then((sub) => api('/push/subscribe', { method: 'POST', body: JSON.stringify({ subscription: sub.toJSON() }) }))
+          /* 알림을 눌렀을 때 열 주소 — 가족 링크는 토큰이 있어야 열리므로 서비스 워커가 읽을 자리에 적어 둔다 */
+          .then(() => ('caches' in window ? caches.open('wbc-meta').then((c) => c.put('./famlink', new Response('/chunk/?t=' + encodeURIComponent(FAM.t)))).catch(() => {}) : null));
+      }).then(() => setPushOn(true));
+    }
+    function disablePush() {
+      return navigator.serviceWorker.ready.then((reg) => reg.pushManager.getSubscription()).then((sub) => (sub ? sub.unsubscribe() : null)).catch(() => {})
+        .then(() => api('/push/unsubscribe', { method: 'POST', body: '{}' })).catch(() => {})
+        .then(() => setPushOn(false));
+    }
+    function pushCard() {
+      if (!pushSupported()) return '';
+      const on = pushOn();
+      return '<div class="card"><h2>🔔 복습 알림</h2><p class="small">' + (on
+        ? '복습할 글이 밀린 날 저녁에 이 기기로 한 번 알려 드려요. 매일 울리지는 않아요.'
+        : '복습할 글이 생긴 날 저녁에 알려 드릴까요? 복습이 없는 날은 울리지 않아요.') + '</p>' +
+        (view.pushMsg ? '<div class="err">' + esc(view.pushMsg) + '</div>' : '') +
+        '<button class="btn ' + (on ? 'ghost ' : '') + 'sm" data-act="push-toggle">' + (on ? '알림 끄기' : '알림 받기') + '</button></div>';
+    }
+
     /* 부모 모드 홈 카드 — 어른이 할 일 네 줄 + 이번 주 요약. 점수보다 「소리 내어 함께 읽었다」가 남게 쓴다 */
     function famCards(now) {
       const week = S.log.filter((e) => e.t >= now - 7 * 86400000).length, sum = SC.forTeacher(S, now);
@@ -431,6 +463,7 @@
       html += '<div class="card"><h2>이번 주</h2><div class="kv"><span>함께 연습한 글</span><b>' + week + '편</b></div><div class="kv"><span>최근 평균</span><b>' + (sum.recentAvg == null ? '-' : sum.recentAvg + '점') + '</b></div>' +
         '<div class="kv"><span>오늘 복습할 글</span><b>' + due.length + '편</b></div>' + (sum.streak ? '<div class="kv"><span>연속</span><b>' + sum.streak + '일</b></div>' : '') +
         (weak && l ? '<div class="kv"><span>집에서 한 번 더</span><b>' + esc(R.TAG_LABEL[weak.tag] || weak.tag) + '</b></div><p class="small">💡 ' + esc(l.tip) + '</p>' : '') + '</div>';
+      html += pushCard();
       return html;
     }
     function vHome() {
@@ -743,6 +776,7 @@
       else if (act === 'lesson-next') { const ls = sess.ls, l = lessonById(ls.id); ls.ci += 1; ls.marks = new Set(); ls.result = null; if (ls.ci >= l.checks.length) { ls.done = true; SC.lessonDone(S, l.id, Date.now(), Math.round(ls.scores.reduce((a, b) => a + b, 0) / ls.scores.length)); save(); } render(); }
       else if (act === 'lesson-quit') { sess = null; stopSpeak(); view = { name: 'learn' }; render(); }
       else if (act === 'tts') { if (SPK) { stopSpeak(); document.querySelectorAll('[data-act="tts"]').forEach((b) => b.textContent = '🔊 들려주기'); return; } const prefix = t.dataset.prefix; let segs = []; if (sess && sess.ls) { const l = lessonById(sess.ls.id); const i = +prefix.replace('ex', ''); segs = l.examples[i].segs; } else if (sess && sess.pr) { const p = byId(sess.pr.id); segs = [].concat.apply([], p.paragraphs); if (prefix === 'all') { /* 문단 경계마다 prefix 가 다르므로 전체를 p0..pn 으로 다시 매핑 */ speakAll(p); return; } } speakSegs(segs, prefix); }
+      else if (act === 'push-toggle') { view.pushMsg = ''; const on = pushOn(); t.disabled = true; (on ? disablePush() : enablePush()).then(() => render({ keep: true })).catch((e) => { view.pushMsg = e.message || '알림 설정에 실패했어요.'; render({ keep: true }); }); }
       else if (act === 'fam-unlink') { if (!confirm('이 기기에서 가족 링크를 끊을까요? 학원 기록은 그대로 남아요.')) return; saveFam(null); S = load(); view = { name: 'home' }; try { history.replaceState(null, '', location.pathname); } catch (e) {} applyBody(); render(); setDot('', '이 기기'); }
       else if (act === 'gap') { const i = +t.dataset.i; const pfx = t.dataset.prefix; const set = pfx === 'pl' ? view.pl.marks : sess.ls ? sess.ls.marks : sess.pr.marks[+pfx.replace('u', '')]; if (set.has(i)) set.delete(i); else set.add(i); render({ keep: true }); }
       else if (act === 'start-practice') { startPractice(t.dataset.id, 'practice'); }

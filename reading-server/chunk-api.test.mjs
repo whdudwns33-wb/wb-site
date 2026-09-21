@@ -1,13 +1,13 @@
 'use strict';
 /* 청크브레인 서버 라우트 검증 (node reading-server/chunk-api.test.mjs) */
 import assert from 'node:assert';
-import { handleChunk, normalizeChunkSummary, normalizeAssign, normalizePassage, chunkOverviewRow, dropStudentChunk } from './chunk-api.mjs';
+import { handleChunk, normalizeChunkSummary, normalizeAssign, normalizePassage, chunkOverviewRow, dropStudentChunk, pushDueChunk } from './chunk-api.mjs';
 
 let passed = 0;
 const t = async (name, fn) => { await fn(); passed += 1; console.log('  ✓ ' + name); };
 
 function memStore() {
-  const states = {}, summaries = {}, assigns = {}, parents = {}; let customs = null;
+  const states = {}, summaries = {}, assigns = {}, parents = {}, pushes = {}; let customs = null;
   const students = { 'st-1': { code: 'st-1', name: '김지우', cls: '초4 A반' }, 'st-2': { code: 'st-2', name: '박서준', cls: '초4 A반' } };
   return {
     getState: (c) => states[c] || null, putState: (c, rec) => { states[c] = rec; }, deleteState: (c) => { delete states[c]; },
@@ -18,7 +18,8 @@ function memStore() {
     getCustoms: () => customs, putCustoms: (rec) => { customs = rec; },
     getParentCode: (t) => parents[t] || null, putParent: (t, c) => { parents[t] = c; }, putStudent: (c, rec) => { students[c] = rec; },
     listStudentCodes: () => Object.keys(students),
-    _raw: { states, summaries, assigns, parents, students },
+    getPush: (k) => pushes[k] || null, putPush: (k, rec) => { pushes[k] = rec; }, delPush: (k) => { delete pushes[k]; }, listPushKeys: () => Object.keys(pushes),
+    _raw: { states, summaries, assigns, parents, students, pushes },
   };
 }
 const STU = { code: 'st-1', admin: false };
@@ -220,6 +221,58 @@ await t('요약 지수 화이트리스트 · overview 는 명단 전체(미시�
   const st2 = r.body.rows.find((x) => x.code === 'st-2');
   assert.strictEqual(st2.attempts, 0); assert.strictEqual(st2.index, null); assert.strictEqual(st2.lastAt, null);
   assert.strictEqual(r.body.rows.find((x) => x.code === 'st-1').index, 60);
+});
+
+/* ── 가족 알림 ── */
+const kp = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
+const PUSH = { publicKey: 'BPUB', privateJwk: JSON.stringify(await crypto.subtle.exportKey('jwk', kp.privateKey)), subject: 'mailto:t@wb' };
+const fakePush = (statusFor) => { const calls = []; const f = async (url) => { calls.push(url); return { status: statusFor ? statusFor(url) : 201 }; }; f.calls = calls; return f; };
+
+await t('가족 알림 구독 — 링크 토큰이 자격, 키가 없으면 no-vapid, 끝점 모양 검사', async () => {
+  const s = memStore(); const T = 'tok1234567890abcdef'; s._raw.parents[T] = 'st-1';
+  const Q = (t) => new URLSearchParams({ t });
+  assert.deepStrictEqual((await call(s, { path: '/api/chunk/parent/push/key', who: null, query: Q(T) })).body, { ok: false, reason: 'no-vapid' });
+  assert.deepStrictEqual((await call(s, { path: '/api/chunk/parent/push/key', who: null, query: Q(T), push: PUSH })).body, { ok: true, key: 'BPUB' });
+  assert.strictEqual((await call(s, { path: '/api/chunk/parent/push/key', who: null, query: Q('z'.repeat(32)) })).status, 404, '모르는 토큰');
+  const sub = { subscription: { endpoint: 'https://push.example/abc' } };
+  assert.strictEqual((await call(s, { path: '/api/chunk/parent/push/subscribe', method: 'POST', who: null, query: Q(T), getBody: async () => sub })).status, 200);
+  assert.strictEqual(s._raw.pushes['f:' + T].endpoint, 'https://push.example/abc');
+  assert.strictEqual((await call(s, { path: '/api/chunk/parent/push/subscribe', method: 'POST', who: null, query: Q(T), getBody: async () => ({ subscription: { endpoint: 'http://insecure' } }) })).status, 400);
+  assert.strictEqual((await call(s, { path: '/api/chunk/parent/push/unsubscribe', method: 'POST', who: null, query: Q(T), getBody: async () => ({}) })).status, 200);
+  assert.strictEqual(s._raw.pushes['f:' + T], undefined);
+  assert.strictEqual((await call(s, { path: '/api/chunk/parent/push/nope', who: null, query: Q(T) })).status, 404);
+});
+
+await t('가족 알림 보내기 — 복습할 글이 있는 가정에만, 죽은 구독·끊긴 링크는 정리', async () => {
+  const s = memStore(); const now = Date.parse('2026-09-21T09:00:00Z');
+  const T1 = 'aaa1234567890abcdef', T2 = 'bbb1234567890abcdef', T3 = 'ccc1234567890abcdef';
+  s._raw.parents[T1] = 'st-1'; s._raw.parents[T2] = 'st-2';
+  /* st-1 은 어제가 복습일, st-2 는 한참 뒤 */
+  s._raw.states['st-1'] = { state: { v: 1, band: 'G3', items: { 'g3-01': { id: 'g3-01', n: 1, last: now - 2 * 86400000, lastScore: 90, best: 90, step: 1, due: now - 86400000, graduated: false, band: 'G3' } }, log: [], lessons: {}, updatedAt: now } };
+  s._raw.states['st-2'] = { state: { v: 1, band: 'G3', items: { 'g3-01': { id: 'g3-01', n: 1, last: now, lastScore: 90, best: 90, step: 1, due: now + 30 * 86400000, graduated: false, band: 'G3' } }, log: [], lessons: {}, updatedAt: now } };
+  s._raw.pushes['f:' + T1] = { endpoint: 'https://push.example/one' };
+  s._raw.pushes['f:' + T2] = { endpoint: 'https://push.example/two' };
+  s._raw.pushes['f:' + T3] = { endpoint: 'https://push.example/gone' };   /* 링크가 학생과 이어지지 않는다(퇴원·토큰 교체) */
+  const f = fakePush();
+  const r = await pushDueChunk({ store: s, push: PUSH, fetchFn: f, now });
+  assert.deepStrictEqual({ sent: r.sent, skipped: r.skipped, removed: r.removed }, { sent: 1, skipped: 1, removed: 1 });
+  assert.deepStrictEqual(f.calls, ['https://push.example/one'], '복습이 밀린 가정에만');
+  assert.strictEqual(s._raw.pushes['f:' + T3], undefined, '끊긴 링크는 지운다');
+  /* 410 이면 구독을 지운다 */
+  const gone = fakePush(() => 410);
+  const r2 = await pushDueChunk({ store: s, push: PUSH, fetchFn: gone, now });
+  assert.strictEqual(r2.removed, 1); assert.strictEqual(s._raw.pushes['f:' + T1], undefined);
+  /* VAPID 키가 없으면 아무것도 보내지 않는다 */
+  assert.strictEqual((await pushDueChunk({ store: s, push: {}, fetchFn: f, now })).reason, 'no-vapid');
+});
+
+await t('퇴원 — 가족 알림 구독도 함께 지운다', async () => {
+  const s = memStore(); const T = 'ddd1234567890abcdef';
+  s._raw.pushes['f:' + T] = { endpoint: 'https://push.example/x' };
+  s._raw.states['st-1'] = { state: { v: 1 }, updatedAt: 'x' };
+  await dropStudentChunk(s, 'st-1', T);
+  assert.strictEqual(s._raw.states['st-1'], undefined);
+  assert.strictEqual(s._raw.pushes['f:' + T], undefined);
 });
 
 console.log('\n' + passed + '건 통과 — reading-server/chunk-api.mjs');
