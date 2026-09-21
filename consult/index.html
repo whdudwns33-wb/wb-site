@@ -854,11 +854,9 @@
   .student-guide-step p { color: var(--mid-gray); font-size: 12.5px; line-height: 1.6; }
   .student-guide-step code { padding: 2px 5px; border-radius: 5px; background: var(--white); color: var(--deep-blue); font-family: inherit; font-size: 10.5px; font-weight: 900; }
   .student-guide-tip { margin-top: 11px; padding: 11px 12px; border-radius: 11px; background: #FFF8E9; color: #7B5B12; font-size: 12px; line-height: 1.6; }
-  .student-guide-tip-more > summary { cursor: pointer; list-style: none; font-weight: 900; }
-  .student-guide-tip-more > summary::-webkit-details-marker { display: none; }
-  .student-guide-tip-more > summary::after { content: ' +'; }
-  .student-guide-tip-more[open] > summary::after { content: ' −'; }
-  .student-guide-tip-more p { margin-top: 9px; }
+  .student-guide-reward { border: 2px solid #F5D58C; background: linear-gradient(135deg, #FFF9E7 0%, #FFF2F5 100%); box-shadow: 0 10px 24px rgba(177,125,31,.14); }
+  .student-guide-reward .card-title { color: #7A4F00; }
+  .student-guide-reward .pill, .student-guide-reward .student-guide-number { background: #FFE7A5; color: #7A4F00; }
   .student-guide-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
   .student-guide-option { min-width: 0; padding: 14px; border: 1px solid var(--line); border-radius: 13px; }
   .student-guide-option.planner { background: #F1F7FD; border-color: #D5E5F4; }
@@ -2738,11 +2736,16 @@ function viewStudentGuide() {
       '</div>' +
       '<div class="student-guide-tip"><b>온라인 학습 표시</b> ○ 미시작 → ◐ 진행 중 → ✓ 학생 완료 순서로 바뀌며, 인증사진이 승인되면 🛡 원장 확인으로 표시됩니다.</div>' +
       '<div class="student-guide-tip"><b>오늘 끝내지 못했다면?</b> 숨기지 말고 하루 마감에서 ‘내일로 이월’, ‘막힘’, ‘오늘 종료’ 중 표시되는 방법을 선택하세요. 반복 온라인 학습은 다음 예정일에 자동으로 다시 표시됩니다.</div>' +
-      '<details class="student-guide-tip student-guide-tip-more"><summary>스탬프·포인트·기프트 카드 받는 방법</summary>' +
-        '<p><b>유효 학습일 스탬프</b> 예정 공부를 하나 이상 완료하거나 순공시간을 10분 이상 기록하고, 미완료 정리와 수행 보고를 다음날 정오 전까지 끝내면 하루에 하나가 찍힙니다.</p>' +
-        '<p><b>포인트와 기프트 카드</b> 10월 1일부터 유효 학습일은 100P, 예정 학습일 3일 이상인 주의 80% 달성·주간 마무리는 500P, 예정 학습일 12일 이상인 달의 80% 달성·월간 마무리는 1,000P가 자동 계산됩니다. 꾸준히 사용하면 한 달에 기프트 카드 1개를 목표로 적립할 수 있으며, 5,000P부터 오늘 화면에서 교환을 신청합니다.</p>' +
-        '<p><b>기프트 카드 받는 순서</b><br>① 5,000P가 모이면 오늘 할 일의 ‘5,000P 교환 신청’을 누릅니다.<br>② 신청 뒤에는 ‘교환 확인 중’, 원장이 처리를 시작하면 ‘교환 처리 중’으로 표시됩니다.<br>③ 원장이 학습 기록을 확인해 기프트 카드를 별도로 발송하며, 실제 발송이 완료되면 5,000P가 차감되고 ‘기프트 카드 교환 완료’로 기록됩니다.<br>‘교환 확인 중’에는 신청을 취소할 수 있지만 ‘교환 처리 중’에는 취소할 수 없습니다. 기프트 카드 번호·링크는 플래너에 저장되지 않습니다.</p>' +
-      '</details>' +
+    '</details>' +
+
+    '<details class="card student-guide-section student-guide-reward"><summary class="student-guide-head"><span class="student-guide-summary-copy"><span class="card-title">🎁 기프트 카드 받는 방법</span>' +
+      '<span class="card-sub">5,000P가 모이면 신청부터 수령까지 확인해요.</span></span><span class="pill">5,000P 교환</span></summary>' +
+      '<div class="student-guide-steps">' +
+        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">1</span><b>교환 가능 확인</b></div><p>오늘 할 일의 기프트 카드 게이지가 5,000P가 되면 <code>교환 가능</code>으로 바뀝니다.</p></div>' +
+        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">2</span><b>교환 신청</b></div><p><code>5,000P 교환 신청</code>을 누릅니다.</p></div>' +
+        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">3</span><b>처리 상태 확인</b></div><p>신청 뒤에는 <code>교환 확인 중</code>, 원장이 처리를 시작하면 <code>교환 처리 중</code>으로 표시됩니다.</p></div>' +
+        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">4</span><b>기프트 카드 받기</b></div><p>원장이 학습 기록을 확인해 기프트 카드를 별도로 발송합니다. 실제 발송이 완료되면 5,000P가 차감되고 <code>기프트 카드 교환 완료</code>로 기록됩니다.</p></div>' +
+      '</div><div class="student-guide-tip"><b>취소와 보관</b> ‘교환 확인 중’에는 신청을 취소할 수 있지만 ‘교환 처리 중’에는 취소할 수 없습니다. 기프트 카드 번호·링크는 플래너에 저장되지 않습니다.</div>' +
     '</details>' +
 
     '<details class="card student-guide-section"><summary class="student-guide-head"><span class="student-guide-summary-copy"><span class="card-title">🔗 처음 연결과 매일 접속</span>' +
@@ -14190,7 +14193,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-09-22.2';
+const APP_VER = '2026-09-22.3';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
