@@ -43,18 +43,25 @@ function renderTabsHtml(sessionValue, manager) {
   return target.innerHTML;
 }
 
-test('usage guide tab is available only in the regular student screen', () => {
+test('usage guide tab is available in the regular student and admin screens', () => {
   const student = renderTabsHtml({ isStaffLink: true, isAdmin: false }, false);
   const manager = renderTabsHtml({ isStaffLink: true, isAdmin: false }, true);
   const admin = renderTabsHtml({ isStaffLink: false, isAdmin: true }, false);
 
   assert.match(student, /data-go="guide"[^>]*>사용 안내/);
   assert.doesNotMatch(manager, /data-go="guide"/);
-  assert.doesNotMatch(admin, /data-go="guide"/);
+  assert.match(admin, /data-go="guide"[^>]*>사용 안내/);
 
   const render = functionSource('render');
   assert.match(render, /:\s*\['guide', 'today', 'week', 'month', 'academic', 'ingang', 'study'\]/);
   assert.match(render, /guide:\s*viewStudentGuide/);
+  assert.match(render, /session\.isAdmin && !session\.isStaffLink/);
+
+  const guide = functionSource('viewStudentGuide');
+  assert.match(guide, /adminPreview/);
+  assert.match(guide, /원장 확인용 · 학생 사용 안내/);
+  assert.match(guide, /studentSelf \? studentSetupStatus\(me\.id\) : null/);
+  assert.match(guide, /adminPreview \? '학생용 플래너'/);
 });
 
 test('student guide explains the required routine and optional modules', () => {
