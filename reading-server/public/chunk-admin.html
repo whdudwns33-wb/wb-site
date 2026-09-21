@@ -28,6 +28,10 @@
     .tbl{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:13.5px;white-space:nowrap}th{position:sticky;top:0;background:#f4eef2;color:var(--navy);font-size:12px}
     th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;font-variant-numeric:tabular-nums}tbody tr:nth-child(even) td{background:#fbf8fa}
     tr.pick td{cursor:pointer}tr.pick:hover td{background:var(--plum-soft)}
+    /* 태블릿: 표는 가로로 넘기되 이름 열은 붙어 있어야 어느 학생 줄인지 안다 */
+    .tbl{-webkit-overflow-scrolling:touch}.tbl td:first-child,.tbl th:first-child{position:sticky;left:0;background:#fff;z-index:2;box-shadow:1px 0 0 var(--line)}.tbl th:first-child{z-index:3;background:#f4eef2}tbody tr:nth-child(even) td:first-child{background:#fbf8fa}
+    tr.att td{background:#FBECEC!important}tr.att:hover td{background:#F6DEDE!important}.tag.att{background:#F4C7C7;color:var(--bad)}
+    .chk-h{grid-column:1/-1;font-weight:800;color:var(--navy);font-size:12.5px;margin-top:4px}
     .grid-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;align-items:end}label.f{display:flex;flex-direction:column;font-size:12.5px;font-weight:800;color:var(--muted)}
     .err{color:var(--bad);font-weight:700;font-size:13px;margin-top:8px;white-space:pre-wrap}.ok{color:var(--ok);font-weight:700;font-size:13px;margin-top:8px;white-space:pre-wrap}.muted{color:var(--muted);font-size:12.5px}
     #loginCard{max-width:380px;margin:60px auto}.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
@@ -59,8 +63,10 @@ const pById=(id)=>PASSAGES.find((p)=>p.id===id)||(CUSTOM||[]).find((p)=>p.id===i
 const lById=(id)=>LESSONS.find((l)=>l.id===id);
 const bandLabel=(b)=>R.BANDS[b]?R.BANDS[b].label:(b||'-');
 let TOKEN=localStorage.getItem('wbr.admin.token')||null;
-let TAB='board', ROWS=null, SEL=null, FILTER_CLS='', SORT='lastAt';
+let TAB='board', ROWS=null, SEL=null, FILTER_CLS='', SORT='attention', ONLY_LATE=false;
 let CUSTOM=null, ED=null, IMPORT=null;   /* 선생님 지문 목록(서버) · 편집 중인 글 · 진로독서 가져오기 패널 */
+let LOGIN_MODE=localStorage.getItem('wbr.admin.loginMode')||'account';   /* 로그인 갈래 — 아이디·비밀번호가 기본, PIN 은 링크로(브레인레터 관리와 동일) */
+const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');};
 async function api(path,opt){
   let r;
   try{r=await fetch('/api'+path,Object.assign({headers:{'Content-Type':'application/json',...(TOKEN?{Authorization:'Bearer '+TOKEN}:{})}},opt||{}));}
@@ -72,11 +78,18 @@ async function api(path,opt){
 }
 const post=(p,b)=>api(p,{method:'POST',body:JSON.stringify(b)});
 const put=(p,b)=>api(p,{method:'PUT',body:JSON.stringify(b)});
+/* <form> 으로 두는 이유: 브라우저 비밀번호 관리자가 아이디·비밀번호 칸을 알아보고 저장·자동 입력한다. 제출은 fetch 로만 */
 function renderLogin(msg){
   $('#nav').hidden=true;$('#btnLogout').hidden=true;$('#btnRefresh').hidden=true;
-  $('#main').innerHTML='<div class="card" id="loginCard"><h2>관리 PIN</h2><div class="row"><input id="pin" type="password" autocomplete="off" style="flex:1"><button class="btn" id="go">로그인</button></div>'+(msg?'<div class="err">'+esc(msg)+'</div>':'')+'</div>';
-  $('#go').onclick=async()=>{try{const j=await post('/admin/login',{pin:$('#pin').value});TOKEN=j.token;localStorage.setItem('wbr.admin.token',TOKEN);ROWS=null;show(TAB);}catch(e){renderLogin(e.message);}};
-  $('#pin').onkeydown=(e)=>{if(e.key==='Enter')$('#go').click();};
+  const pin=LOGIN_MODE==='pin';
+  $('#main').innerHTML='<div class="card" id="loginCard"><h2>'+(pin?'관리 PIN':'관리자 로그인')+'</h2><form id="loginForm" class="row">'+
+    (pin?'<input id="pin" name="pin" type="password" autocomplete="off" placeholder="PIN" style="flex:1">'
+        :'<input id="uid" name="username" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="아이디" style="flex:1;min-width:120px"><input id="pw" name="password" type="password" autocomplete="current-password" placeholder="비밀번호" style="flex:1;min-width:120px">')+
+    '<button class="btn" id="go" type="submit">로그인</button></form>'+(msg?'<div class="err">'+esc(msg)+'</div>':'')+
+    '<p class="muted" style="margin:8px 0 0"><a href="#" id="loginSwap">'+(pin?'아이디·비밀번호로 로그인':'PIN 으로 로그인')+'</a></p></div>';
+  $('#loginForm').onsubmit=async(e)=>{e.preventDefault();try{const body=pin?{pin:$('#pin').value}:{id:$('#uid').value,password:$('#pw').value};const j=await post('/admin/login',body);TOKEN=j.token;localStorage.setItem('wbr.admin.token',TOKEN);ROWS=null;show(TAB);}catch(e2){renderLogin(e2.message);}};
+  $('#loginSwap').onclick=(e)=>{e.preventDefault();LOGIN_MODE=pin?'account':'pin';try{localStorage.setItem('wbr.admin.loginMode',LOGIN_MODE);}catch(x){}renderLogin();};
+  (pin?$('#pin'):$('#uid')).focus();
 }
 $('#btnLogout').onclick=()=>{TOKEN=null;localStorage.removeItem('wbr.admin.token');renderLogin();};
 $('#btnRefresh').onclick=()=>{ROWS=null;CUSTOM=null;show(TAB);};
@@ -103,28 +116,54 @@ async function show(tab){
 }
 
 /* ── 반 현황 ── */
+/* 주의 점수 0~5 — 클수록 먼저 볼 학생. 최근 평균 60 미만, 7일 넘게 무활동, 마감 지난 미완료 과제, 과제가 있는데 시작 안 함 */
+function attention(r){
+  let a=0; const now=Date.now();
+  if(r.recentAvg!=null&&r.recentAvg<60)a+=2;
+  if(r.attempts>0&&r.lastAt&&now-r.lastAt>7*86400000)a+=2;
+  if(r.assign){const total=r.assign.passages+r.assign.lessons; if(total&&r.assignDone<total){ if(r.assign.due&&r.assign.due<today())a+=1; if(r.attempts===0)a+=1; }}
+  return a;
+}
+const isLate=(r)=>!!(r.assign&&(r.assign.passages+r.assign.lessons)&&r.assignDone<(r.assign.passages+r.assign.lessons)&&r.assign.due&&r.assign.due<today());
+/* 미완료 과제 명단 CSV — 마감 지난 것 먼저, 마감 없는 미완료도 뒤에. 엑셀이 한글을 읽게 BOM 을 붙인다 */
+function lateCsv(rows){
+  const list=rows.filter((r)=>r.assign&&(r.assign.passages+r.assign.lessons)&&r.assignDone<(r.assign.passages+r.assign.lessons)).sort((a,b)=>(isLate(b)-isLate(a))||String(a.assign.due||'9').localeCompare(String(b.assign.due||'9')));
+  const q=(v)=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"';
+  const lines=[['이름','반','코드','마감','상태','완료/전체','최근 평균','최근 활동','메모'].map(q).join(',')].concat(list.map((r)=>[r.name,r.cls,r.code,r.assign.due||'',isLate(r)?'마감 지남':'진행 중',r.assignDone+'/'+(r.assign.passages+r.assign.lessons),r.recentAvg==null?'':r.recentAvg,r.lastAt?new Date(r.lastAt).toISOString().slice(0,10):'없음',r.assign.note||''].map(q).join(',')));
+  return {n:list.length,late:list.filter(isLate).length,csv:'\ufeff'+lines.join('\r\n')};
+}
 function renderBoard(){
   const classes=[...new Set(ROWS.map((r)=>r.cls).filter(Boolean))].sort();
-  let rows=ROWS.filter((r)=>!FILTER_CLS||r.cls===FILTER_CLS);
-  const key={lastAt:(r)=>r.lastAt||0,recentAvg:(r)=>r.recentAvg==null?-1:r.recentAvg,attempts:(r)=>r.attempts,streak:(r)=>r.streak,name:(r)=>r.name}[SORT]||((r)=>r.lastAt||0);
+  let rows=ROWS.filter((r)=>!FILTER_CLS||r.cls===FILTER_CLS).filter((r)=>!ONLY_LATE||isLate(r));
+  const key={attention:(r)=>attention(r)*1e13+(r.lastAt||0),lastAt:(r)=>r.lastAt||0,recentAvg:(r)=>r.recentAvg==null?-1:r.recentAvg,index:(r)=>r.index==null?-1:r.index,attempts:(r)=>r.attempts,streak:(r)=>r.streak,name:(r)=>r.name}[SORT]||((r)=>r.lastAt||0);
   rows=rows.slice().sort((a,b)=>{const x=key(a),y=key(b);return typeof x==='string'?x.localeCompare(y):(y-x);});
   const active7=ROWS.filter((r)=>r.lastAt&&Date.now()-r.lastAt<7*86400000).length;
   const avgAll=ROWS.filter((r)=>r.recentAvg!=null);
   let html='<div class="card"><h2>반 현황 <span class="muted">('+ROWS.length+'명)</span></h2>'+
     '<div class="stats"><div class="stat"><b>'+active7+'</b><span>최근 7일 연습</span></div><div class="stat"><b>'+(avgAll.length?Math.round(avgAll.reduce((s,r)=>s+r.recentAvg,0)/avgAll.length):'-')+'</b><span>최근 평균(연습한 학생)</span></div><div class="stat"><b>'+ROWS.filter((r)=>r.assign).length+'</b><span>과제 있는 학생</span></div><div class="stat"><b>'+ROWS.reduce((s,r)=>s+(r.graduated||0),0)+'</b><span>졸업한 글(합계)</span></div></div>'+
     '<div class="row"><label class="f">반 <select id="cls"><option value="">전체</option>'+classes.map((c)=>'<option '+(c===FILTER_CLS?'selected':'')+'>'+esc(c)+'</option>').join('')+'</select></label>'+
-    '<label class="f">정렬 <select id="sort">'+[['lastAt','최근 활동'],['recentAvg','최근 평균'],['attempts','연습 횟수'],['streak','연속일'],['name','이름']].map(([k,l])=>'<option value="'+k+'" '+(k===SORT?'selected':'')+'>'+l+'</option>').join('')+'</select></label></div>'+
-    '<p class="muted">점수는 끊기 점수(모범 경계 대비, 0~100). 문제는 이해 문제 정답률. 어절/분은 초3 이상의 묵독 속도로 학생 자신의 지난 기록과만 비교합니다. 행을 누르면 학생 상세로 갑니다.</p></div>';
-  html+='<div class="card tbl"><table><thead><tr><th>이름</th><th>반</th><th>단계</th><th>연습</th><th>최근 평균</th><th>문제</th><th>어절/분</th><th>연속일</th><th>카드</th><th>과제</th><th>약한 규칙</th><th>최근 활동</th></tr></thead><tbody>'+
+    '<label class="f">정렬 <select id="sort">'+[['attention','주의 순'],['lastAt','최근 활동'],['recentAvg','최근 평균'],['index','끊어읽기 지수'],['attempts','연습 횟수'],['streak','연속일'],['name','이름']].map(([k,l])=>'<option value="'+k+'" '+(k===SORT?'selected':'')+'>'+l+'</option>').join('')+'</select></label>'+
+    '<label class="f" style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="onlyLate" '+(ONLY_LATE?'checked':'')+'> 마감 지난 미완료만</label>'+
+    '<button class="btn ghost sm" id="csvLate">미완료 명단 CSV</button><span class="muted" id="csvMsg"></span></div>'+
+    '<p class="muted"><b>붉은 줄</b>은 먼저 볼 학생 — 최근 평균 60 미만, 7일 넘게 무활동, 마감 지난 미완료 과제, 과제가 있는데 시작 안 함. 지수는 끊어읽기 지수(최근 5회 평균 × 단계 가중, 0~100)로 상담·리포트에 인용하는 숫자예요. 어절/분은 초3 이상의 묵독 속도로 학생 자신의 지난 기록과만 비교합니다. 행을 누르면 학생 상세로 갑니다.</p></div>';
+  html+='<div class="card tbl"><table><thead><tr><th>이름</th><th>반</th><th>단계</th><th>연습</th><th>최근 평균</th><th>지수</th><th>문제</th><th>어절/분</th><th>연속일</th><th>카드</th><th>과제</th><th>약한 규칙</th><th>최근 활동</th></tr></thead><tbody>'+
     (rows.length?rows.map((r)=>{
-      const a=r.assign; const total=a?a.passages+a.lessons:0;
-      const assignCell=a?('<span class="tag '+(total&&r.assignDone>=total?'ok':'warn')+'">'+r.assignDone+'/'+total+'</span>'+(a.due?' <span class="muted">~'+esc(a.due.slice(5))+'</span>':'')):'<span class="muted">-</span>';
+      const a=r.assign; const total=a?a.passages+a.lessons:0; const att=attention(r);
+      const assignCell=a?('<span class="tag '+(total&&r.assignDone>=total?'ok':isLate(r)?'bad':'warn')+'">'+r.assignDone+'/'+total+'</span>'+(a.due?' <span class="muted">~'+esc(a.due.slice(5))+'</span>':'')):'<span class="muted">-</span>';
       const avgTag=r.recentAvg==null?'-':'<span class="tag '+(r.recentAvg>=85?'ok':r.recentAvg>=60?'warn':'bad')+'">'+r.recentAvg+'</span>';
-      return '<tr class="pick" data-code="'+esc(r.code)+'"><td><b>'+esc(r.name)+'</b><div class="muted">'+esc(r.code)+'</div></td><td>'+esc(r.cls||'-')+'</td><td>'+bandLabel(r.band)+(a&&a.band&&a.band!==r.band?' <span class="tag">과제 '+bandLabel(a.band)+'</span>':'')+'</td><td>'+r.attempts+'</td><td>'+avgTag+'</td><td>'+(r.qRate==null?'-':r.qRate+'%')+'</td><td>'+(r.wpmRecent||'-')+'</td><td>'+r.streak+'</td><td>'+r.lessonsDone+'</td><td>'+assignCell+'</td><td>'+(r.weak||[]).slice(0,2).map((w)=>'<span class="weak">'+esc(R.TAG_LABEL[w.tag]||w.tag)+' '+w.n+'</span>').join('')+'</td><td>'+rel(r.lastAt)+'</td></tr>';
-    }).join(''):'<tr><td colspan="12" class="muted">아직 연습 기록이나 과제가 있는 학생이 없어요. 학생이 앱에서 연동한 뒤 한 편이라도 연습하면 여기 나타나요.</td></tr>')+'</tbody></table></div>';
+      const nameTag=att>=2?' <span class="tag att">주의</span>':(r.attempts===0?' <span class="tag muted">미시작</span>':'');
+      return '<tr class="pick'+(att>=2?' att':'')+'" data-code="'+esc(r.code)+'"><td><b>'+esc(r.name)+'</b>'+nameTag+'<div class="muted">'+esc(r.code)+'</div></td><td>'+esc(r.cls||'-')+'</td><td>'+bandLabel(r.band)+(a&&a.band&&a.band!==r.band?' <span class="tag">과제 '+bandLabel(a.band)+'</span>':'')+'</td><td>'+r.attempts+'</td><td>'+avgTag+'</td><td>'+(r.index==null?'-':'<b>'+r.index+'</b>')+'</td><td>'+(r.qRate==null?'-':r.qRate+'%')+'</td><td>'+(r.wpmRecent||'-')+'</td><td>'+r.streak+'</td><td>'+r.lessonsDone+'</td><td>'+assignCell+'</td><td>'+(r.weak||[]).slice(0,2).map((w)=>'<span class="weak">'+esc(R.TAG_LABEL[w.tag]||w.tag)+' '+w.n+'</span>').join('')+'</td><td>'+rel(r.lastAt)+'</td></tr>';
+    }).join(''):'<tr><td colspan="13" class="muted">'+(ONLY_LATE?'마감 지난 미완료 과제가 없어요.':'명단에 학생이 없어요. 진로독서 관리에서 학생을 등록하면 여기 나타나요.')+'</td></tr>')+'</tbody></table></div>';
   $('#main').innerHTML=html;
   $('#cls').onchange=(e)=>{FILTER_CLS=e.target.value;renderBoard();};
   $('#sort').onchange=(e)=>{SORT=e.target.value;renderBoard();};
+  $('#onlyLate').onchange=(e)=>{ONLY_LATE=e.target.checked;renderBoard();};
+  $('#csvLate').onclick=()=>{
+    const out=lateCsv(ROWS.filter((r)=>!FILTER_CLS||r.cls===FILTER_CLS));
+    if(!out.n){$('#csvMsg').textContent='미완료 과제가 없어요.';return;}
+    const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([out.csv],{type:'text/csv;charset=utf-8'}));a.download='청크브레인-미완료-'+today()+'.csv';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);
+    $('#csvMsg').textContent='미완료 '+out.n+'명(마감 지남 '+out.late+'명)을 내려받았어요.';
+  };
   document.querySelectorAll('tr.pick').forEach((tr)=>{tr.onclick=()=>{SEL=tr.dataset.code;TAB='student';show(TAB);};});
 }
 
@@ -134,7 +173,8 @@ async function renderStudent(){
   const row=ROWS.find((r)=>r.code===SEL);
   let html='<div class="card"><h2>학생 상세 · 과제</h2><div class="row"><label class="f">학생 <select id="sel">'+(ROWS.length?ROWS.map((r)=>'<option value="'+esc(r.code)+'" '+(r.code===SEL?'selected':'')+'>'+esc(r.name)+' ('+esc(r.cls||'반 없음')+')</option>').join(''):'<option value="">학생 없음</option>')+'</select></label>'+
     '<label class="f">다른 코드로 과제 주기 <input id="code" placeholder="wb-…" style="width:160px"></label><button class="btn ghost sm" id="goCode">열기</button></div></div>';
-  if(!row&&!SEL){$('#main').innerHTML=html+'<div class="card muted">연습 기록이나 과제가 있는 학생이 없어요. 오른쪽 칸에 학생 코드를 넣어 과제부터 줄 수 있어요.</div>';bindStudentTop();return;}
+  html+=bulkCard();
+  if(!row&&!SEL){$('#main').innerHTML=html+'<div class="card muted">명단에 학생이 없어요. 오른쪽 칸에 학생 코드를 넣어 과제부터 줄 수 있어요.</div>';bindStudentTop();bindBulk();return;}
   const code=SEL;
   let state=null, assignRec=null;
   try{ const j=await api('/chunk/admin/student/'+encodeURIComponent(code)); state=j.state; }catch(e){ if(e.status!==404) throw e; }
@@ -154,6 +194,9 @@ async function renderStudent(){
     '<h3>카드</h3><div class="checks" id="lList"></div>'+
     '<h3>메모 (학생에게 보임)</h3><textarea id="aNote" maxlength="200" placeholder="예: 이번 주에 두 편, 소리 내어 3번씩">'+esc(a?a.note:'')+'</textarea>'+
     '<div class="row" style="margin-top:8px"><button class="btn" id="aSave">저장</button><button class="btn danger" id="aClear" '+(a?'':'disabled')+'>과제 지우기</button><span class="muted">'+(assignRec&&assignRec.updatedAt?'마지막 저장 '+esc(assignRec.updatedAt.slice(0,16).replace('T',' ')):'')+'</span></div><div id="aMsg"></div></div>';
+  /* 가족 링크 — 부모 폰에서 아이와 함께. 브레인레터·진로독서 리포트와 같은 토큰(가정마다 하나) */
+  html+='<div class="card"><h2>가족 링크 <span class="muted">(부모님 폰에서 아이와 함께)</span></h2><p class="muted">브레인레터·진로독서 리포트와 같은 가족 링크예요. 부모님이 이 링크로 열면 로그인 없이 아이 기록에 그대로 쌓이고, 여기 반 현황에도 보여요. 동의서의 보호자 번호로만 보내세요.</p>'+
+    '<div class="row"><button class="btn ghost sm" id="famMake">링크 만들기 / 보기</button><span id="famOut"></span></div><div id="famMsg"></div></div>';
   /* 기록 */
   if(state){
     const log=(state.log||[]).slice(-20).reverse();
@@ -164,11 +207,23 @@ async function renderStudent(){
       (items.length?items.map((it)=>{const p=pById(it.id);return '<tr><td>'+esc(p?p.title:it.id)+' <span class="muted">'+bandLabel(it.band)+'</span></td><td>'+it.n+'</td><td>'+(it.lastScore==null?'-':it.lastScore)+'</td><td>'+(it.best||0)+'</td><td>'+(it.graduated?'<span class="tag ok">졸업</span>':(it.step||0)+'/5')+'</td><td>'+(it.graduated?'-':it.due?ymd(it.due)+(it.due<=Date.now()?' <span class="tag warn">밀림</span>':''):'-')+'</td></tr>';}).join(''):'<tr><td colspan="6" class="muted">아직 없음</td></tr>')+'</tbody></table></div>';
   } else html+='<div class="card muted">이 학생은 아직 연습 기록이 없어요. 과제는 줄 수 있어요.</div>';
   $('#main').innerHTML=html;
-  bindStudentTop();
+  bindStudentTop();bindBulk();
+  $('#famMake').onclick=async()=>{
+    $('#famMsg').innerHTML='';
+    try{
+      const j=await post('/chunk/admin/parentlink/'+encodeURIComponent(code),{});
+      const link=location.origin+j.path;
+      const text='[WB 독해력학원] '+(j.name||r.name)+' 학생 끊어읽기 연습 링크입니다.\n부모님 폰에서 아래 링크를 열면 아이와 함께 5분 끊어읽기를 할 수 있어요. 기록은 학원과 자동으로 이어집니다.\n'+link+'\n— WB 독해력학원 · 웩슬러브레인센터';
+      $('#famOut').innerHTML='<input id="famLink" readonly value="'+esc(link)+'" style="width:min(380px,60vw)"> <button class="btn ghost sm" id="famCopy">링크 복사</button> <button class="btn ghost sm" id="famText">안내 문구 복사</button>';
+      const copy=async(v,label)=>{ try{ await navigator.clipboard.writeText(v); $('#famMsg').innerHTML='<div class="ok">'+label+' 복사했어요.</div>'; }catch(e){ const i=$('#famLink'); i.value=v; i.select(); document.execCommand('copy'); $('#famMsg').innerHTML='<div class="ok">'+label+' 복사했어요.</div>'; i.value=link; } };
+      $('#famCopy').onclick=()=>copy(link,'링크를'); $('#famText').onclick=()=>copy(text,'안내 문구를');
+      if(j.created) $('#famMsg').innerHTML='<div class="ok">가족 링크를 새로 만들었어요. 브레인레터·진로독서 리포트에서도 같은 링크가 쓰여요.</div>';
+    }catch(e){ $('#famMsg').innerHTML='<div class="err">'+esc(e.message)+'</div>'; }
+  };
   const chosenP=new Set(a?a.passages:[]), chosenL=new Set(a?a.lessons:[]);
   const drawP=()=>{const b=$('#fBand').value;const list=PASSAGES.concat(CUSTOM||[]).filter((p)=>p.band===b);$('#pList').innerHTML=list.map((p)=>'<label><input type="checkbox" data-p="'+p.id+'" '+(chosenP.has(p.id)?'checked':'')+'> '+esc(p.title)+' <span class="muted">'+esc(p.genre)+'</span></label>').join('')+[...chosenP].filter((id)=>!list.some((p)=>p.id===id)).map((id)=>{const p=pById(id);return '<label><input type="checkbox" data-p="'+esc(id)+'" checked> '+esc(p?p.title:id)+' <span class="muted">'+(p?bandLabel(p.band):'')+'</span></label>';}).join('');$('#pCount').textContent='선택 '+chosenP.size+'개';
     $('#pList').querySelectorAll('input').forEach((cb)=>{cb.onchange=()=>{if(cb.checked)chosenP.add(cb.dataset.p);else chosenP.delete(cb.dataset.p);$('#pCount').textContent='선택 '+chosenP.size+'개';};});};
-  const drawL=()=>{const b=$('#fBand').value;const upto=R.BAND_ORDER.slice(0,R.BAND_ORDER.indexOf(b)+1);const list=LESSONS.filter((l)=>upto.indexOf(l.band)>=0).slice().reverse();$('#lList').innerHTML=list.map((l)=>'<label><input type="checkbox" data-l="'+l.id+'" '+(chosenL.has(l.id)?'checked':'')+'> '+esc(l.title)+' <span class="muted">'+bandLabel(l.band)+'</span></label>').join('');
+  const drawL=()=>{const b=$('#fBand').value;$('#lList').innerHTML=lessonChecks(b,chosenL,'data-l');
     $('#lList').querySelectorAll('input').forEach((cb)=>{cb.onchange=()=>{if(cb.checked)chosenL.add(cb.dataset.l);else chosenL.delete(cb.dataset.l);};});};
   drawP();drawL();
   $('#fBand').onchange=()=>{drawP();drawL();};
@@ -176,6 +231,46 @@ async function renderStudent(){
   const save=async(body)=>{ $('#aMsg').innerHTML=''; try{ const j=await put('/chunk/admin/assign/'+encodeURIComponent(code),body); $('#aMsg').innerHTML='<div class="ok">'+(j.assign?'저장했어요. 학생이 앱을 켜면 바로 반영돼요.':'과제를 지웠어요.')+'</div>'; ROWS=null; await loadRows(); setTimeout(()=>show('student'),600); }catch(e){ $('#aMsg').innerHTML='<div class="err">'+esc(e.message)+'</div>'; } };
   $('#aSave').onclick=()=>save({band:$('#aBand').value||null,passages:[...chosenP],lessons:[...chosenL],note:$('#aNote').value,due:$('#aDue').value||null});
   $('#aClear').onclick=()=>{ if(confirm('이 학생의 과제와 단계 지정을 지울까요?')) save({}); };
+}
+/* 카드 체크 목록 — 단계별로 묶어 그린다(그 단계까지, 위 단계부터). 단일 과제·반 단위 과제가 같이 쓴다 */
+function lessonChecks(band,chosen,attr){
+  const upto=R.BAND_ORDER.slice(0,R.BAND_ORDER.indexOf(band)+1).reverse();
+  return upto.map((b)=>{const ls=LESSONS.filter((l)=>l.band===b);if(!ls.length)return '';return '<div class="chk-h">'+bandLabel(b)+(b===band?' — 이 단계':'')+'</div>'+ls.map((l)=>'<label><input type="checkbox" '+attr+'="'+l.id+'" '+(chosen.has(l.id)?'checked':'')+'> '+esc(l.title)+'</label>').join('');}).join('');
+}
+const passageChecks=(band,chosen,attr)=>PASSAGES.concat(CUSTOM||[]).filter((p)=>p.band===band).map((p)=>'<label><input type="checkbox" '+attr+'="'+p.id+'" '+(chosen.has(p.id)?'checked':'')+'> '+esc(p.title)+' <span class="muted">'+esc(p.genre)+'</span></label>').join('');
+/* ── 반 단위 과제 — 한 반 전체에 같은 단계·글·카드·메모·마감을 한 번에. 학생마다 PUT 하나(서버 계약 그대로) ── */
+function bulkCard(){
+  const classes=[...new Set(ROWS.map((r)=>r.cls).filter(Boolean))].sort();
+  return '<div class="card" id="bulkCard"><h2>반 단위 과제 <span class="muted">(한 반 전체에 같은 과제)</span></h2><p class="muted">반을 고르고 저장하면 그 반 학생 모두의 과제가 이 내용으로 바뀌어요(기존 과제는 덮어써요). 단계를 비우면 학생이 고른 단계를 그대로 둬요.</p>'+
+    '<div class="grid-form"><label class="f">반 <select id="bCls">'+(classes.length?classes.map((c)=>'<option>'+esc(c)+'</option>').join(''):'<option value="">반 없음</option>')+'</select></label>'+
+    '<label class="f">단계 <select id="bBand"><option value="">학생이 고른 대로</option>'+R.BAND_ORDER.map((b)=>'<option value="'+b+'">'+bandLabel(b)+'</option>').join('')+'</select></label>'+
+    '<label class="f">글 목록 단계 <select id="bfBand">'+R.BAND_ORDER.map((b)=>'<option value="'+b+'" '+(b==='G3'?'selected':'')+'>'+bandLabel(b)+'</option>').join('')+'</select></label>'+
+    '<label class="f">마감일 <input id="bDue" type="date"></label></div>'+
+    '<h3>글</h3><div class="checks" id="bpList"></div><h3>카드</h3><div class="checks" id="blList"></div>'+
+    '<h3>메모 (학생에게 보임)</h3><textarea id="bNote" maxlength="200" placeholder="예: 이번 주에 두 편, 소리 내어 3번씩"></textarea>'+
+    '<div class="row" style="margin-top:8px"><button class="btn" id="bSave">반 전체에 저장</button><span class="muted" id="bCount"></span></div><div id="bMsg"></div></div>';
+}
+function bindBulk(){
+  const chosenP=new Set(), chosenL=new Set();
+  const draw=()=>{const b=$('#bfBand').value;$('#bpList').innerHTML=passageChecks(b,chosenP,'data-p')||'<span class="muted">이 단계에 글이 없어요.</span>';$('#blList').innerHTML=lessonChecks(b,chosenL,'data-l');
+    $('#bpList').querySelectorAll('input').forEach((cb)=>{cb.onchange=()=>{if(cb.checked)chosenP.add(cb.dataset.p);else chosenP.delete(cb.dataset.p);};});
+    $('#blList').querySelectorAll('input').forEach((cb)=>{cb.onchange=()=>{if(cb.checked)chosenL.add(cb.dataset.l);else chosenL.delete(cb.dataset.l);};});
+    const n=ROWS.filter((r)=>r.cls===$('#bCls').value).length;$('#bCount').textContent=$('#bCls').value?n+'명에게':'';};
+  draw();
+  $('#bfBand').onchange=draw;$('#bCls').onchange=draw;
+  $('#bBand').onchange=()=>{if($('#bBand').value){$('#bfBand').value=$('#bBand').value;draw();}};
+  $('#bSave').onclick=async()=>{
+    const cls=$('#bCls').value;const targets=ROWS.filter((r)=>r.cls===cls);
+    $('#bMsg').innerHTML='';
+    if(!targets.length){$('#bMsg').innerHTML='<div class="err">이 반에 학생이 없어요.</div>';return;}
+    if(!chosenP.size&&!chosenL.size&&!$('#bBand').value&&!$('#bNote').value.trim()){$('#bMsg').innerHTML='<div class="err">단계·글·카드·메모 중 하나는 넣어 주세요.</div>';return;}
+    if(!confirm(cls+' '+targets.length+'명의 과제를 이 내용으로 바꿀까요? 기존 과제는 덮어써요.'))return;
+    const body={band:$('#bBand').value||null,passages:[...chosenP],lessons:[...chosenL],note:$('#bNote').value,due:$('#bDue').value||null};
+    let ok=0;const fail=[];
+    for(const r of targets){try{await put('/chunk/admin/assign/'+encodeURIComponent(r.code),body);ok++;}catch(e){fail.push(r.name+'('+e.message+')');}}
+    ROWS=null;await loadRows();
+    $('#bMsg').innerHTML='<div class="'+(fail.length?'err':'ok')+'">'+ok+'명에게 저장했어요.'+(fail.length?' 실패: '+esc(fail.join(', ')):' 학생이 앱을 켜면 바로 반영돼요.')+'</div>';
+  };
 }
 function bindStudentTop(){
   const sel=$('#sel'); if(sel) sel.onchange=()=>{SEL=sel.value;show('student');};
@@ -289,6 +384,8 @@ function bindAuthor(){
 function renderPrint(){
   $('#main').innerHTML='<div class="card"><h2>교재 출력</h2><p class="muted">단계를 누르면 연습장 조판 화면이 새 창에서 열려요. 글을 고르고 <b>인쇄 → PDF 로 저장</b>하면 교재가 됩니다. 「글 저작」에서 올린 선생님 지문도 그 단계 목록에 함께 떠요(여기서 열면 관리 토큰으로 받아요).</p><div class="row">'+
     R.BAND_ORDER.map((b)=>'<a class="btn ghost" href="/chunk/print.html?band='+b+'" target="_blank" rel="noopener">'+bandLabel(b)+' <span class="muted">'+PASSAGES.filter((p)=>p.band===b).length+'편</span></a>').join('')+'</div>'+
+    '<h3>화면 수업 <span class="muted">(프로젝터)</span></h3><p class="muted">큰 글씨로 띄워 놓고 스페이스를 누를 때마다 덩어리 경계를 하나씩 공개해요. 아이들이 먼저 손을 들어 맞히게 한 뒤 눌러요. 「내 글 넣기」로 수업 자료를 붙여 넣을 수도 있어요.</p><div class="row">'+
+    R.BAND_ORDER.map((b)=>'<a class="btn ghost" href="/chunk/class.html?band='+b+'" target="_blank" rel="noopener">'+bandLabel(b)+'</a>').join('')+'</div>'+
     '<h3>추천 구성</h3><ul class="muted"><li>유치·초1·초2: 표시본(밑줄 곡선) + 한 줄 한 덩어리 판 + 무표시본. 어른이 먼저 읽어 주고 따라 읽기 3회.</li><li>초3~초6: 표시본 + 무표시본 + 정답표. 주 3회, 한 편 10분.</li><li>중·고등: 무표시본 위주로 직접 긋고 정답표와 견주기. 규칙 페이지는 첫 주에만.</li></ul></div>';
 }
 

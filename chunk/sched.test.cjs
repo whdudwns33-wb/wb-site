@@ -108,7 +108,7 @@ t('연속 학습일·요약', () => {
   S.lessonDone(s, 'g3-1', T0, 100);
   assert.strictEqual(S.summary(s, T0).lessonsDone, 1);
   const ft = S.forTeacher(s, T0);
-  assert.deepStrictEqual(Object.keys(ft).sort(), ['assignDone', 'attempts', 'avg', 'band', 'graduated', 'lastAt', 'lessonsDone', 'practiced', 'qRate', 'recentAvg', 'streak', 'weak', 'wpmRecent']);
+  assert.deepStrictEqual(Object.keys(ft).sort(), ['assignDone', 'attempts', 'avg', 'band', 'graduated', 'index', 'lastAt', 'lessonsDone', 'practiced', 'qRate', 'recentAvg', 'streak', 'weak', 'wpmRecent']);
   assert.deepStrictEqual(ft.weak, []);
 });
 
@@ -131,6 +131,27 @@ t('기록은 400건까지만 — 오래된 것부터 버린다', () => {
   for (let i = 0; i < 450; i++) S.record(s, 'p' + (i % 7), { score: 80 }, T0 + i * 1000);
   assert.strictEqual(s.log.length, 400);
   assert.strictEqual(s.log[0].t, T0 + 50 * 1000);
+});
+
+t('끊어읽기 지수 — 최근 5회 평균에 단계 가중(유치 0.5 → 고3 1.0), 기록 없으면 null', () => {
+  const now = Date.parse('2026-09-21T09:00:00Z');
+  const mk = (band, scores) => { const st = S.blank(now); st.band = band; scores.forEach((sc, i) => S.record(st, 'p' + i, { score: sc, qOk: true, tags: [], mode: 'practice', band }, now - (scores.length - i) * 60000)); return st; };
+  assert.strictEqual(S.index(S.blank(now), now), null);
+  assert.strictEqual(S.index(mk('K', [100, 100]), now), 50);
+  assert.strictEqual(S.index(mk('G12', [100]), now), 100);
+  assert.strictEqual(S.index(mk('G6', [80, 80, 80]), now), 60);
+  assert.strictEqual(S.forTeacher(mk('G3', [90]), now).index, Math.round(90 * (0.5 + 0.5 * 3 / 12)));
+});
+
+t('출발선 진단 — 한 학년 아래에서 60점 미만이면 거기서 시작, 그 위면 학년 그대로. 유치는 아래가 없다', () => {
+  assert.strictEqual(S.placementBand('G4'), 'G3');
+  assert.strictEqual(S.placementBand('K'), 'K', '유치 아래는 없다');
+  assert.deepStrictEqual(S.placement('G4', 90), { band: 'G4', testBand: 'G3', moved: false });
+  assert.deepStrictEqual(S.placement('G4', 60), { band: 'G4', testBand: 'G3', moved: false }, '60 은 통과선');
+  assert.deepStrictEqual(S.placement('G4', 59), { band: 'G3', testBand: 'G3', moved: true });
+  assert.deepStrictEqual(S.placement('G4', 0), { band: 'G3', testBand: 'G3', moved: true });
+  assert.deepStrictEqual(S.placement('K', 10), { band: 'K', testBand: 'K', moved: false }, '유치는 내려갈 곳이 없다');
+  assert.deepStrictEqual(S.placement('G12', null), { band: 'G12', testBand: 'G11', moved: false }, '건너뛰면 학년 그대로');
 });
 
 console.log('\n' + passed + '건 통과 — chunk/sched.js');

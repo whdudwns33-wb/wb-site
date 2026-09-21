@@ -16,7 +16,7 @@
 
 | 파일 | 무엇 |
 |---|---|
-| `index.html` | 학생·가족 앱. 모드 4개 — **가족 링크**(`/letter/?t=<ptoken>`, 로그인 없음, 기록은 기기에만) · **학생**(`wbr.auth` 토큰, 기록을 서버에 저장) · **관리 미리보기**(`?id=&tier=` + 관리 토큰, 초안도 봄, `tier=all`·`print=1`/`print=nokey`) · **체험**(아무것도 없으면 `issue-sample.json`). 문제 풀기(즉시 해설)·정답 보기·미션 체크·[다 읽었어요]·지난 호·[PDF로 저장](정답 별지 포함 / 정답 없이) |
+| `index.html` | 학생·가족 앱. 모드 4개 — **가족 링크**(`/letter/?t=<ptoken>`, 로그인 없음, 기록은 기기에만) · **학생**(`wbr.auth` 토큰, 기록을 서버에 저장) · **관리 미리보기**(`?id=&tier=` + 관리 토큰, 초안도 봄, `tier=all`·`print=1`/`print=nokey`) · **체험**(아무것도 없으면 `issue-sample.json`). 문제 풀기(즉시 해설)·정답 보기·미션 체크·[다 읽었어요]·지난 호·[PDF로 저장](정답 별지 포함 / 정답 없이). 가족 링크 화면에는 「오늘 5분 끊어읽기 — 청크브레인」 카드(`/chunk/?t=` 같은 토큰)가 호가 없는 주에도 뜬다 |
 | `letter.js` | 순수 로직 `WBLETTER` — 학년대 판정(`tierOf`: 명부 grade → K·E1·E2·E3·M, 원장 지정 `letterTier` 우선, 못 읽으면 진로독서 level 로 어림), KST ISO 주차(`weekId`·`weekStart`·`nextWeek`), **검증기 `checkIssue`**(관리 웹·AI 초안·서버 저장이 같은 규칙 — 사진 출처·도형 정답 일치까지), 학년대 선택 `forTier`, 가시성 `isVisible`, **렌더러 `renderIssue`**(신문 짜임, 학생 앱·관리 미리보기·인쇄가 같은 HTML), 공용 CSS(`CSS`, 2단·인쇄 규칙 포함), 빈 템플릿 `blankIssue`, **지표 순환 `rotationFor`·주제 달력 `calendarEntry`·`checkCalendar`** |
 | `shapes.js` · `shapes.test.cjs` | **시공간(VSI) 두뇌 놀이 생성기** `WBSHAPES` — 다른 하나 찾기·돌리면 어느 것·거울에 비치면·쌓기나무 세기·빈 조각 찾기. `{kind, seed}` 로 결정적으로 SVG 를 그리고 정답을 정한다(호 JSON 에는 seed 만, 그림 문자열은 저장하지 않는다). 키랄 폴리오미노만 써서 거울 문제가 성립한다 |
 | `drills.js` · `drills.test.cjs` | **5분 두뇌 놀이 생성기** `WBDRILLS` — 시공간 밖 네 지표: 거꾸로 말하기(WMI)·기호 찾기(PSI)·수열의 빈 칸(FRI)·공통점 말하기·무리에 안 드는 낱말(VCI, 자체 낱말 은행). 두뇌 놀이 항목에 `{drill:{kind,seed}}` 로 싣고, **오늘의 5분**(`daily(week,tier,day)`)이 1~6일째 매일 같은 자리에 한 문제씩 놓인다 — 사람이 매주 35문제를 짓지 않아도 매일 새 문제 |
@@ -76,6 +76,10 @@ section 공통: { id: [a-z0-9-]{2,30} 유일, type, tiers: "all" | ["K","E1",…
 문제·미션·쓰기 기록은 기기에만 남는다(서버 기록·열람 현황·푸시는 없다). 호는 편집실이 저장소에서 만들고 **main 에 합치는 것이 곧 발행**이다 —
 다음 주 호로 파일을 갈아 끼우면 배포와 함께 바뀐다(`/letter/*` 는 no-store, SW 는 json 을 캐시하지 않는다). 파일이 없으면 앱은 자체 창작 샘플 호(체험)로 넘어간다.
 호 본문은 자체 창작만 저장소에 둘 수 있다(CLAUDE.md 절대 규칙 1). 정식 운영(가족 링크·서버 기록·푸시)으로 넘어갈 때는 같은 JSON 을 관리 웹 [편집]에 붙여 넣어 발행하면 된다.
+
+**파일을 고쳤으면 합치기 전에 검증한다** — `node letter/issue-validate.mjs`(인자 없이 부르면 저장소의 파일럿·샘플을 모두 본다).
+규칙은 관리 웹 [검증]과 같은 `checkIssue` 하나다. `letter/issue-validate.test.mjs` 가 CI 에서도 같은 검사를 돌리므로,
+오류가 있는 호나 한 학년대가 빈 호는 PR 에서 막힌다 — 파일럿은 main 에 합치는 순간 가정 화면이 바뀌기 때문이다.
 
 ## 주간 운영 절차(원장)
 

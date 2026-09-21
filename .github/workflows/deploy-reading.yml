@@ -103,6 +103,10 @@ jobs:
         run: node reading-server/letter-api.test.mjs
       - name: 관리 로그인 판정 테스트
         run: node reading-server/admin-auth.test.mjs
+      - name: 브레인레터 호 검증 (저장소의 파일럿·샘플)
+        run: node letter/issue-validate.test.mjs
+      - name: 에이전트 안내 문서 동기화
+        run: node scripts/docs-sync.test.mjs
       - name: 내신브레인 AI 추출 테스트
         run: node reading-server/naesin-extract.test.mjs
       - name: 내신브레인 수업 라이브 세션 테스트

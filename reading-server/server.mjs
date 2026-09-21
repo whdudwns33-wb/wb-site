@@ -257,7 +257,7 @@ const hanjaStore = {
   listStudentCodes: () => Object.keys(db.students),
 };
 /* 청크브레인 저장소 어댑터 — db.chunk 만 사용(학생 기록·관리용 요약). 콘텐츠는 저장소에 없다. */
-const chunkRoot = () => { db.chunk = db.chunk || { states: {}, summaries: {}, assigns: {} }; db.chunk.assigns = db.chunk.assigns || {}; return db.chunk; };
+const chunkRoot = () => { db.chunk = db.chunk || { states: {}, summaries: {}, assigns: {} }; db.chunk.assigns = db.chunk.assigns || {}; db.chunk.pushes = db.chunk.pushes || {}; return db.chunk; };
 const chunkStore = {
   getState: (c) => chunkRoot().states[c] || null,
   putState: (c, rec) => { chunkRoot().states[c] = rec; persist(); },
@@ -273,7 +273,17 @@ const chunkStore = {
   /* 선생님 지문 — 워커의 chunk:customs 키와 같은 모양({items, updatedAt}) */
   getCustoms: () => chunkRoot().customs || null,
   putCustoms: (rec) => { chunkRoot().customs = rec; persist(); },
+  /* 가족 링크 — db.parents(진로독서) 공용 */
+  getParentCode: (t) => (db.parents || {})[t] || null,
+  putParent: (t, c) => { db.parents = db.parents || {}; db.parents[t] = c; persist(); },
+  putStudent: (c, rec) => { db.students = db.students || {}; db.students[c] = rec; persist(); },
   getStudent: (c) => db.students?.[c] || null,
+  listStudentCodes: () => Object.keys(db.students || {}),
+  /* 가족 알림 구독 — 워커의 chunk:push:<key> 와 같은 모양 */
+  getPush: (k) => (chunkRoot().pushes || {})[k] || null,
+  putPush: (k, rec) => { chunkRoot().pushes = chunkRoot().pushes || {}; chunkRoot().pushes[k] = rec; persist(); },
+  delPush: (k) => { if (chunkRoot().pushes) delete chunkRoot().pushes[k]; persist(); },
+  listPushKeys: () => Object.keys(chunkRoot().pushes || {}),
 };
 
 const VOCAB_PUSH_ENV = {
@@ -510,6 +520,12 @@ const server = http.createServer(async (req, res) => {
         return json(res, out.status, out.body);
       }
       /* 브레인레터 무인증 경로 — 가족 링크·가족 알림 구독·사진(id 가 곧 열쇠) (워커와 동일) */
+      /* 청크브레인 가족 링크 — ptoken 으로만, 로그인 없음 (워커와 동일) */
+      if (p === '/api/chunk/parent' || p.startsWith('/api/chunk/parent/')) {
+        if (Number(req.headers['content-length'] || 0) > 300_000) { req.resume(); return json(res, 413, { error: '요청이 너무 커서 받을 수 없어요.' }); }
+        const out = await handleChunk({ path: p, method: req.method, who: null, query: url.searchParams, getBody: () => readBody(req), store: chunkStore, push: VOCAB_PUSH_ENV });
+        return json(res, out.status, out.body);
+      }
       if (p === '/api/letter/parent' || p.startsWith('/api/letter/parent/') || p.startsWith('/api/letter/img/')) {
         const out = await handleLetter({ path: p, method: req.method, who: null, query: url.searchParams, getBody: () => readBody(req), store: letterStore, push: VOCAB_PUSH_ENV });
         if (out.bytes) { res.writeHead(out.status, out.headers); res.end(Buffer.from(out.bytes)); return; }
@@ -842,7 +858,7 @@ const server = http.createServer(async (req, res) => {
         await dropStudentHaru(haruStore, c); removed += 3;
         /* 한자브레인 — 기록·요약·배정·알림 구독. 단어장·획순 사전은 학생 것이 아니라 둔다(워커와 동일) */
         await dropStudentHanja(hanjaStore, c); removed += 4;
-        await dropStudentChunk(chunkStore, c);
+        await dropStudentChunk(chunkStore, c, (db.students[c] || {}).ptoken);
         /* 브레인레터 — 열람·문제 기록 한 키. 호는 학생 것이 아니라 둔다(워커와 동일) */
         await dropStudentLetter(letterStore, c, (db.students[c] || {}).ptoken); removed += 1;
         /* 기기 토큰은 토큰 값이 키라 코드로 못 찾는다 — 훑어서 이 학생 것만 */

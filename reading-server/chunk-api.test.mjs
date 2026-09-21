@@ -1,13 +1,13 @@
 'use strict';
 /* 청크브레인 서버 라우트 검증 (node reading-server/chunk-api.test.mjs) */
 import assert from 'node:assert';
-import { handleChunk, normalizeChunkSummary, normalizeAssign, normalizePassage, chunkOverviewRow, dropStudentChunk } from './chunk-api.mjs';
+import { handleChunk, normalizeChunkSummary, normalizeAssign, normalizePassage, chunkOverviewRow, dropStudentChunk, pushDueChunk } from './chunk-api.mjs';
 
 let passed = 0;
 const t = async (name, fn) => { await fn(); passed += 1; console.log('  ✓ ' + name); };
 
 function memStore() {
-  const states = {}, summaries = {}, assigns = {}; let customs = null;
+  const states = {}, summaries = {}, assigns = {}, parents = {}, pushes = {}; let customs = null;
   const students = { 'st-1': { code: 'st-1', name: '김지우', cls: '초4 A반' }, 'st-2': { code: 'st-2', name: '박서준', cls: '초4 A반' } };
   return {
     getState: (c) => states[c] || null, putState: (c, rec) => { states[c] = rec; }, deleteState: (c) => { delete states[c]; },
@@ -16,7 +16,10 @@ function memStore() {
     getAssign: (c) => assigns[c] || null, putAssign: (c, rec) => { assigns[c] = rec; }, deleteAssign: (c) => { delete assigns[c]; },
     listAssignCodes: () => Object.keys(assigns),
     getCustoms: () => customs, putCustoms: (rec) => { customs = rec; },
-    _raw: { states, summaries, assigns },
+    getParentCode: (t) => parents[t] || null, putParent: (t, c) => { parents[t] = c; }, putStudent: (c, rec) => { students[c] = rec; },
+    listStudentCodes: () => Object.keys(students),
+    getPush: (k) => pushes[k] || null, putPush: (k, rec) => { pushes[k] = rec; }, delPush: (k) => { delete pushes[k]; }, listPushKeys: () => Object.keys(pushes),
+    _raw: { states, summaries, assigns, parents, students, pushes },
   };
 }
 const STU = { code: 'st-1', admin: false };
@@ -68,7 +71,7 @@ await t('요약 정규화 — 모양만 강제, 범위 밖은 자른다', async 
   assert.strictEqual(normalizeChunkSummary(null), null);
   assert.strictEqual(normalizeChunkSummary([]), null);
   const n = normalizeChunkSummary({ band: 'ZZ', attempts: -5, avg: 140, qRate: 'abc', streak: 2.4, lastAt: 'x', weak: [{ tag: 'extra:adn', n: 3 }, { tag: '<b>', n: 1 }, 'x'], assignDone: 2 });
-  assert.deepStrictEqual(n, { band: null, attempts: 0, practiced: 0, graduated: 0, avg: 100, recentAvg: null, qRate: null, wpmRecent: null, streak: 2, lessonsDone: 0, assignDone: 2, weak: [{ tag: 'extra:adn', n: 3 }], lastAt: null });
+  assert.deepStrictEqual(n, { band: null, attempts: 0, practiced: 0, graduated: 0, avg: 100, recentAvg: null, qRate: null, wpmRecent: null, streak: 2, lessonsDone: 0, assignDone: 2, index: null, weak: [{ tag: 'extra:adn', n: 3 }], lastAt: null });
 });
 
 await t('관리 overview — 명단에 있는 학생만, 최근 활동 순', async () => {
@@ -109,9 +112,9 @@ await t('과제 — 관리자가 넣고, 학생이 /assign 으로 받고, 비우
   assert.strictEqual((await call(s, { path: '/api/chunk/admin/assign/nobody', method: 'PUT', who: ADMIN, getBody: async () => ({ band: 'G4' }) })).status, 404, '명단에 없는 학생');
   assert.strictEqual((await call(s, { path: '/api/chunk/admin/assign/st-1', method: 'PUT', who: ADMIN, getBody: async () => ({ band: 'ZZ' }) })).status, 400);
   assert.strictEqual((await call(s, { path: '/api/chunk/admin/assign/st-1', method: 'PUT' })).status, 403, '학생은 과제를 못 정한다');
-  /* 과제만 있고 기록이 없는 학생도 overview 에 오른다 */
+  /* 과제만 있고 기록이 없는 학생도 overview 에 오른다(명단 전체가 오르므로 st-2 는 미시작 행) */
   const ov = await call(s, { path: '/api/chunk/admin/overview', who: ADMIN });
-  assert.strictEqual(ov.body.rows.length, 1); assert.deepStrictEqual(ov.body.rows[0].assign, { band: 'G4', passages: 1, lessons: 0, due: null, note: '', updatedAt: put.body.updatedAt });
+  assert.strictEqual(ov.body.rows.length, 2); assert.deepStrictEqual(ov.body.rows.find((r) => r.code === 'st-1').assign, { band: 'G4', passages: 1, lessons: 0, due: null, note: '', updatedAt: put.body.updatedAt });
   const clr = await call(s, { path: '/api/chunk/admin/assign/st-1', method: 'PUT', who: ADMIN, getBody: async () => ({}) });
   assert.deepStrictEqual(clr.body, { ok: true, assign: null, updatedAt: null });
   assert.strictEqual(s._raw.assigns['st-1'], undefined);
@@ -159,6 +162,117 @@ await t('선생님 지문 — 관리자가 만들고 고치고 지우며, 학생
   assert.strictEqual(r.status, 200);
   assert.strictEqual((await call(s, { path: '/api/chunk/custom', method: 'GET', who: STU })).body.custom.length, 0);
   assert.strictEqual((await call(s, { path: '/api/chunk/admin/custom/' + id, method: 'DELETE', who: ADMIN })).status, 404);
+});
+
+await t('가족 링크 — 토큰이 자격, 자녀 기록과 같은 키를 읽고 쓰며 요약도 올라간다', async () => {
+  const s = memStore(); const T = 'tok1234567890abcdef'; s._raw.parents[T] = 'st-1';
+  const q = (t) => new URLSearchParams(t ? { t } : {});
+  let r = await call(s, { path: '/api/chunk/parent', who: null, query: q(T) });
+  assert.strictEqual(r.status, 200, JSON.stringify(r.body));
+  assert.deepStrictEqual(Object.keys(r.body), ['parent', 'assign', 'assignUpdatedAt', 'custom', 'updatedAt']);
+  assert.deepStrictEqual(r.body.parent, { name: '김지우', cls: '초4 A반', band: null }); assert.strictEqual(r.body.assign, null); assert.deepStrictEqual(r.body.custom, []);
+  assert.strictEqual((await call(s, { path: '/api/chunk/parent', who: null, query: q('nope') })).status, 404, '모르는 토큰');
+  assert.strictEqual((await call(s, { path: '/api/chunk/parent', who: null, query: q() })).status, 404, '토큰 없음');
+  assert.strictEqual((await call(s, { path: '/api/chunk/parent', who: null })).status, 404, 'query 없음');
+  r = await call(s, { path: '/api/chunk/parent/state', who: null, query: q(T) });
+  assert.deepStrictEqual(r.body, { state: null, updatedAt: null });
+  r = await call(s, { path: '/api/chunk/parent/state', method: 'PUT', who: null, query: q(T), getBody: async () => ({ state: { v: 1, band: 'G3', log: [] }, summary: { band: 'G3', attempts: 1, recentAvg: 90 } }) });
+  assert.strictEqual(r.status, 200); assert.ok(r.body.ok && r.body.updatedAt);
+  const stu = await call(s, { path: '/api/chunk/state', who: STU });
+  assert.strictEqual(stu.body.state.band, 'G3', '학생 토큰으로 읽어도 같은 기록');
+  assert.strictEqual(s._raw.summaries['st-1'].summary.recentAvg, 90, '요약이 관리 화면 키에');
+  /* 과제·단계가 있으면 parent.band 가 그것 */
+  s._raw.assigns['st-1'] = { assign: { band: 'G4', passages: ['g4-01'], lessons: [], note: '', due: null }, updatedAt: '2026-09-21T00:00:00.000Z' };
+  r = await call(s, { path: '/api/chunk/parent', who: null, query: q(T) });
+  assert.strictEqual(r.body.parent.band, 'G4'); assert.strictEqual(r.body.assign.passages[0], 'g4-01'); assert.strictEqual(r.body.assignUpdatedAt, '2026-09-21T00:00:00.000Z');
+  /* 하루 상한 */
+  s._raw.states['st-1'].puts = { d: new Date().toISOString().slice(0, 10), n: 60 };
+  r = await call(s, { path: '/api/chunk/parent/state', method: 'PUT', who: null, query: q(T), getBody: async () => ({ state: { v: 1 } }) });
+  assert.strictEqual(r.status, 429);
+  /* apps 게이트 — 외부 학생은 chunk 가 목록에 있어야 */
+  s._raw.students['st-2'].apps = ['haru']; s._raw.parents['tok2234567890abcdef'] = 'st-2';
+  assert.strictEqual((await call(s, { path: '/api/chunk/parent', who: null, query: q('tok2234567890abcdef') })).status, 403);
+  assert.strictEqual((await call(s, { path: '/api/chunk/parent/nope', who: null, query: q(T) })).status, 404);
+});
+
+await t('관리 — 가족 링크 발급은 한 번, 다음부터 같은 토큰(브레인레터·진로독서와 공용)', async () => {
+  const s = memStore();
+  let r = await call(s, { path: '/api/chunk/admin/parentlink/st-1', method: 'POST', who: ADMIN });
+  assert.strictEqual(r.status, 200); assert.ok(/^[a-f0-9]{32}$/.test(r.body.ptoken)); assert.strictEqual(r.body.path, '/chunk/?t=' + r.body.ptoken); assert.strictEqual(r.body.created, true);
+  assert.strictEqual(s._raw.parents[r.body.ptoken], 'st-1'); assert.strictEqual(s._raw.students['st-1'].ptoken, r.body.ptoken);
+  const again = await call(s, { path: '/api/chunk/admin/parentlink/st-1', method: 'POST', who: ADMIN });
+  assert.strictEqual(again.body.ptoken, r.body.ptoken); assert.strictEqual(again.body.created, false);
+  assert.strictEqual((await call(s, { path: '/api/chunk/admin/parentlink/st-9', method: 'POST', who: ADMIN })).status, 404);
+  assert.strictEqual((await call(s, { path: '/api/chunk/admin/parentlink/st-1', method: 'POST', who: STU })).status, 403);
+  /* 발급된 링크로 바로 열린다 */
+  const open = await call(s, { path: '/api/chunk/parent', who: null, query: new URLSearchParams({ t: r.body.ptoken }) });
+  assert.strictEqual(open.status, 200); assert.strictEqual(open.body.parent.name, '김지우');
+});
+
+await t('요약 지수 화이트리스트 · overview 는 명단 전체(미시작 포함), 외부 학생은 apps 에 chunk 가 있어야', async () => {
+  assert.strictEqual(normalizeChunkSummary({ index: 73.4 }).index, 73);
+  assert.strictEqual(normalizeChunkSummary({}).index, null);
+  const s = memStore();
+  s._raw.summaries['st-1'] = { summary: normalizeChunkSummary({ band: 'G3', attempts: 2, recentAvg: 80, index: 60 }), updatedAt: '2026-09-21T00:00:00.000Z' };
+  s._raw.students['st-3'] = { code: 'st-3', name: '외부', cls: '외부', apps: ['haru'] };
+  const r = await call(s, { path: '/api/chunk/admin/overview', who: ADMIN });
+  const codes = r.body.rows.map((x) => x.code).sort();
+  assert.deepStrictEqual(codes, ['st-1', 'st-2'], '명단의 st-2 는 미시작으로 올라오고, 외부 st-3 은 빠진다');
+  const st2 = r.body.rows.find((x) => x.code === 'st-2');
+  assert.strictEqual(st2.attempts, 0); assert.strictEqual(st2.index, null); assert.strictEqual(st2.lastAt, null);
+  assert.strictEqual(r.body.rows.find((x) => x.code === 'st-1').index, 60);
+});
+
+/* ── 가족 알림 ── */
+const kp = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
+const PUSH = { publicKey: 'BPUB', privateJwk: JSON.stringify(await crypto.subtle.exportKey('jwk', kp.privateKey)), subject: 'mailto:t@wb' };
+const fakePush = (statusFor) => { const calls = []; const f = async (url) => { calls.push(url); return { status: statusFor ? statusFor(url) : 201 }; }; f.calls = calls; return f; };
+
+await t('가족 알림 구독 — 링크 토큰이 자격, 키가 없으면 no-vapid, 끝점 모양 검사', async () => {
+  const s = memStore(); const T = 'tok1234567890abcdef'; s._raw.parents[T] = 'st-1';
+  const Q = (t) => new URLSearchParams({ t });
+  assert.deepStrictEqual((await call(s, { path: '/api/chunk/parent/push/key', who: null, query: Q(T) })).body, { ok: false, reason: 'no-vapid' });
+  assert.deepStrictEqual((await call(s, { path: '/api/chunk/parent/push/key', who: null, query: Q(T), push: PUSH })).body, { ok: true, key: 'BPUB' });
+  assert.strictEqual((await call(s, { path: '/api/chunk/parent/push/key', who: null, query: Q('z'.repeat(32)) })).status, 404, '모르는 토큰');
+  const sub = { subscription: { endpoint: 'https://push.example/abc' } };
+  assert.strictEqual((await call(s, { path: '/api/chunk/parent/push/subscribe', method: 'POST', who: null, query: Q(T), getBody: async () => sub })).status, 200);
+  assert.strictEqual(s._raw.pushes['f:' + T].endpoint, 'https://push.example/abc');
+  assert.strictEqual((await call(s, { path: '/api/chunk/parent/push/subscribe', method: 'POST', who: null, query: Q(T), getBody: async () => ({ subscription: { endpoint: 'http://insecure' } }) })).status, 400);
+  assert.strictEqual((await call(s, { path: '/api/chunk/parent/push/unsubscribe', method: 'POST', who: null, query: Q(T), getBody: async () => ({}) })).status, 200);
+  assert.strictEqual(s._raw.pushes['f:' + T], undefined);
+  assert.strictEqual((await call(s, { path: '/api/chunk/parent/push/nope', who: null, query: Q(T) })).status, 404);
+});
+
+await t('가족 알림 보내기 — 복습할 글이 있는 가정에만, 죽은 구독·끊긴 링크는 정리', async () => {
+  const s = memStore(); const now = Date.parse('2026-09-21T09:00:00Z');
+  const T1 = 'aaa1234567890abcdef', T2 = 'bbb1234567890abcdef', T3 = 'ccc1234567890abcdef';
+  s._raw.parents[T1] = 'st-1'; s._raw.parents[T2] = 'st-2';
+  /* st-1 은 어제가 복습일, st-2 는 한참 뒤 */
+  s._raw.states['st-1'] = { state: { v: 1, band: 'G3', items: { 'g3-01': { id: 'g3-01', n: 1, last: now - 2 * 86400000, lastScore: 90, best: 90, step: 1, due: now - 86400000, graduated: false, band: 'G3' } }, log: [], lessons: {}, updatedAt: now } };
+  s._raw.states['st-2'] = { state: { v: 1, band: 'G3', items: { 'g3-01': { id: 'g3-01', n: 1, last: now, lastScore: 90, best: 90, step: 1, due: now + 30 * 86400000, graduated: false, band: 'G3' } }, log: [], lessons: {}, updatedAt: now } };
+  s._raw.pushes['f:' + T1] = { endpoint: 'https://push.example/one' };
+  s._raw.pushes['f:' + T2] = { endpoint: 'https://push.example/two' };
+  s._raw.pushes['f:' + T3] = { endpoint: 'https://push.example/gone' };   /* 링크가 학생과 이어지지 않는다(퇴원·토큰 교체) */
+  const f = fakePush();
+  const r = await pushDueChunk({ store: s, push: PUSH, fetchFn: f, now });
+  assert.deepStrictEqual({ sent: r.sent, skipped: r.skipped, removed: r.removed }, { sent: 1, skipped: 1, removed: 1 });
+  assert.deepStrictEqual(f.calls, ['https://push.example/one'], '복습이 밀린 가정에만');
+  assert.strictEqual(s._raw.pushes['f:' + T3], undefined, '끊긴 링크는 지운다');
+  /* 410 이면 구독을 지운다 */
+  const gone = fakePush(() => 410);
+  const r2 = await pushDueChunk({ store: s, push: PUSH, fetchFn: gone, now });
+  assert.strictEqual(r2.removed, 1); assert.strictEqual(s._raw.pushes['f:' + T1], undefined);
+  /* VAPID 키가 없으면 아무것도 보내지 않는다 */
+  assert.strictEqual((await pushDueChunk({ store: s, push: {}, fetchFn: f, now })).reason, 'no-vapid');
+});
+
+await t('퇴원 — 가족 알림 구독도 함께 지운다', async () => {
+  const s = memStore(); const T = 'ddd1234567890abcdef';
+  s._raw.pushes['f:' + T] = { endpoint: 'https://push.example/x' };
+  s._raw.states['st-1'] = { state: { v: 1 }, updatedAt: 'x' };
+  await dropStudentChunk(s, 'st-1', T);
+  assert.strictEqual(s._raw.states['st-1'], undefined);
+  assert.strictEqual(s._raw.pushes['f:' + T], undefined);
 });
 
 console.log('\n' + passed + '건 통과 — reading-server/chunk-api.mjs');
