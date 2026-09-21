@@ -224,7 +224,7 @@
 
     /* ── 화면 상태 ── */
     let view = { name: 'home' }, sess = null;
-    const band = () => S.band || 'E2';
+    const band = () => S.band || 'G3'; /* 'E2' 는 6단계 시절 id — 13단계에는 없어 BANDS 조회가 깨진다 */
     const B = () => R.BANDS[band()];
     const bandPassages = (b) => PASSAGES.filter((p) => p.band === (b || band()));
     const bandLessons = (b) => LESSONS.filter((l) => l.band === (b || band()));

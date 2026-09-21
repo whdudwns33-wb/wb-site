@@ -138,7 +138,7 @@
   let selected = new Set();
 
   $('band').innerHTML = R.BAND_ORDER.map((b) => '<option value="' + b + '">' + R.BANDS[b].label + ' — ' + R.BANDS[b].who + '</option>').join('');
-  $('band').value = R.BANDS[q.get('band')] ? q.get('band') : 'E2';
+  $('band').value = R.BANDS[q.get('band')] ? q.get('band') : 'G3'; /* 옛 6단계 id 'E2' 가 남아 있으면 select 가 빈 값이 되어 미리보기가 죽는다 */
 
   function bandDefaults() {
     const b = $('band').value, sm = R.BANDS[b].sentenceMode;
