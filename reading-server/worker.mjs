@@ -13,6 +13,7 @@ import { handleNaesinKo } from './naesin-ko-api.mjs';
 import { handleHanja, hanjaBodyLimit, dropStudentHanja, dumpHanja } from './hanja-api.mjs';
 import { handleChunk, dropStudentChunk } from './chunk-api.mjs';
 import { handleLetter, letterBodyLimit, dropStudentLetter, dumpLetter, pushDueIssues } from './letter-api.mjs';
+import { checkAdminLogin } from './admin-auth.mjs';
 import { bookIndex, cleanWords, coachingCard, confirmAllPlan, findBook, readyToConfirm, sourceSummary, validProgress, withOverlay } from './textbook.mjs';
 import { parseRoster } from './roster.mjs';
 
@@ -622,11 +623,12 @@ export default {
         return json(200, { token: await newToken(env, stu.code, false), student: stu });
       }
 
+      /* 관리 로그인 — 아이디·비밀번호(ADMIN_ID·ADMIN_PASSWORD) 또는 PIN(ADMIN_PIN). 판정은 admin-auth.mjs 하나, 실패 횟수는 두 갈래를 합쳐 센다 */
       if (p === '/api/admin/login' && req.method === 'POST') {
         if (await rlBlocked(env, req, 'adm')) return json(429, { error: '시도가 너무 많습니다. 15분 뒤 다시 해 주세요.' });
-        const { pin } = await req.json();
-        if (!env.ADMIN_PIN || String(pin || '') !== env.ADMIN_PIN) { await rlFail(env, req, 'adm'); return json(401, { error: 'PIN이 올바르지 않습니다.' }); }
-        return json(200, { token: await newToken(env, '__admin__', true) });
+        const login = await checkAdminLogin(await req.json(), env);
+        if (!login.ok) { await rlFail(env, req, 'adm'); return json(401, { error: login.error }); }
+        return json(200, { token: await newToken(env, '__admin__', true), via: login.via });
       }
 
       /* 학부모 리포트 — 학생별 열람 토큰으로 접근(로그인 불필요) */
@@ -700,7 +702,7 @@ export default {
         if (len > letterBodyLimit(p)) return json(413, { error: '요청이 너무 커서 받을 수 없어요.' });
         const out = await handleLetter({
           path: p, method: req.method, who, query: url.searchParams, getBody: () => req.json(), store: letterStore(env), origin: url.origin,
-          ai: { apiKey: env.ANTHROPIC_API_KEY || '', model: env.LETTER_AI_MODEL || '', env },
+          ai: { apiKey: env.ANTHROPIC_API_KEY || '', model: env.LETTER_AI_MODEL || '', env, imageKey: env.GEMINI_API_KEY || '', imageModel: env.LETTER_IMAGE_MODEL || '' },
           push: vocabPushEnv(env),
           /* 발행 즉시 알림은 응답 뒤에 이어서 보낸다 — 구독자 수만큼 걸리는 일을 원장이 기다리지 않게 */
           after: (pr) => { if (cfctx && cfctx.waitUntil) cfctx.waitUntil(pr); else pr.catch(() => {}); },

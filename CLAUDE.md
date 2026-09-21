@@ -59,7 +59,7 @@ Cloudflare Workers `wb-reading`으로). PR은 스쿼시 머지, 제목에 `(#번
 2. **하우스 스타일**: vanilla HTML/CSS/JS 정적 PWA, 순수 로직은 `'use strict'` + IIFE
    var 전역 + `module.exports` 가드(브라우저/Node 공용), 외부 의존성 없음, 한국어 주석은
    "왜"를 적는다. 새 로직 모듈에는 반드시 `.test.cjs`/`.test.mjs`를 같이 만든다.
-3. **인증 없이 콘텐츠를 내보내지 않는다.** 학생 토큰(`wbr.auth`) 또는 관리 PIN 토큰.
+3. **인증 없이 콘텐츠를 내보내지 않는다.** 학생 토큰(`wbr.auth`) 또는 관리 토큰(PIN 또는 아이디·비밀번호 — 판정은 `reading-server/admin-auth.mjs` 하나, 시크릿 등록은 `admin-secrets.yml`).
    배포되는 `_headers`는 `reading/_headers` 하나다(noindex + 앱 경로 no-store) — `naesin/_headers`·
    `vocab/_headers`·`naesin-ko/_headers`·`haru/_headers`는 그리로 안내하는 주석 파일이다.
    내신 팩은 자기 시험 범위에 배정된 것만 받는다.

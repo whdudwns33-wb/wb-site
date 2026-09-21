@@ -1,7 +1,8 @@
 'use strict';
 /* WB 진로독서 백엔드 — 학생 동기화 API + 관리 웹 + 학생 앱 서빙 (Node 22 무의존성)
    실행: node reading-server/server.mjs   (기본 http://localhost:8890)
-   환경: PORT, ADMIN_PIN(기본 wb-admin-2026 — 운영 시 반드시 변경), DATA_DIR */
+   환경: PORT, ADMIN_PIN(기본 wb-admin-2026 — 운영 시 반드시 변경), ADMIN_ID·ADMIN_PASSWORD(아이디 로그인, 선택), DATA_DIR,
+         GEMINI_API_KEY(브레인레터 AI 삽화, 선택) */
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -16,6 +17,7 @@ import { handleNaesinKo } from './naesin-ko-api.mjs';
 import { handleHanja, hanjaBodyLimit, dropStudentHanja, dumpHanja } from './hanja-api.mjs';
 import { handleChunk, dropStudentChunk } from './chunk-api.mjs';
 import { handleLetter, letterBodyLimit, dropStudentLetter, dumpLetter, pushDueIssues } from './letter-api.mjs';
+import { checkAdminLogin } from './admin-auth.mjs';
 import { bookIndex, cleanWords, coachingCard, confirmAllPlan, findBook, readyToConfirm, sourceSummary, validProgress, withOverlay } from './textbook.mjs';
 import { parseRoster } from './roster.mjs';
 
@@ -495,10 +497,11 @@ const server = http.createServer(async (req, res) => {
         return json(res, 200, { token: newToken(stu.code, false), student: stu });
       }
 
+      /* 관리 로그인 — 아이디·비밀번호 또는 PIN (워커와 같은 판정기) */
       if (p === '/api/admin/login' && req.method === 'POST') {
-        const { pin } = await readBody(req);
-        if (String(pin || '') !== ADMIN_PIN) return json(res, 401, { error: 'PIN이 올바르지 않습니다.' });
-        return json(res, 200, { token: newToken('__admin__', true) });
+        const login = await checkAdminLogin(await readBody(req), { ADMIN_PIN, ADMIN_ID: process.env.ADMIN_ID, ADMIN_PASSWORD: process.env.ADMIN_PASSWORD });
+        if (!login.ok) return json(res, 401, { error: login.error });
+        return json(res, 200, { token: newToken('__admin__', true), via: login.via });
       }
 
       /* 하루브레인 부모 화면 — ptoken 으로만, 로그인 없음 (워커와 동일) */
@@ -541,7 +544,8 @@ const server = http.createServer(async (req, res) => {
         if (Number(req.headers['content-length'] || 0) > letterBodyLimit(p)) { req.resume(); return json(res, 413, { error: '요청이 너무 커서 받을 수 없어요.' }); }
         const out = await handleLetter({ path: p, method: req.method, who, query: url.searchParams, getBody: () => readBody(req, letterBodyLimit(p)), store: letterStore,
           origin: 'http://' + (req.headers.host || ('localhost:' + PORT)), push: VOCAB_PUSH_ENV,
-          ai: { apiKey: process.env.ANTHROPIC_API_KEY || '', model: process.env.LETTER_AI_MODEL || '', env: process.env }, randomToken: () => crypto.randomUUID().replace(/-/g, '') });
+          ai: { apiKey: process.env.ANTHROPIC_API_KEY || '', model: process.env.LETTER_AI_MODEL || '', env: process.env, imageKey: process.env.GEMINI_API_KEY || '', imageModel: process.env.LETTER_IMAGE_MODEL || '' },
+          randomToken: () => crypto.randomUUID().replace(/-/g, '') });
         return json(res, out.status, out.body);
       }
 
