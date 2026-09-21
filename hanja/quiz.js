@@ -178,11 +178,25 @@ var WBHQUIZ = (function () {
   function qCharWord(c, ctx, rnd) {
     var withC = ctx.words.filter(function (w) { return w.hanja && w.hanja.indexOf(c.ch) >= 0; });
     var without = ctx.words.filter(function (w) { return w.hanja && w.hanja.indexOf(c.ch) < 0; });
-    if (!withC.length || without.length < 3) return null;
-    var answer = pickOne(withC, rnd);
-    var d = distractors(without, answer, function (x) { return x.word; }, 3, rnd, wordRank(answer));
-    if (d.length < 3) return null;
-    return choiceQ('c-word', c._sid, charLabel(c) + ' 이(가) 들어간 낱말은?', answer.word, d, rnd, { ch: c.ch, reveal: answer.word + ' (' + answer.hanja + ')' });
+    if (withC.length && without.length >= 3) {
+      var answer = pickOne(withC, rnd);
+      var d = distractors(without, answer, function (x) { return x.word; }, 3, rnd, wordRank(answer));
+      if (d.length >= 3) return choiceQ('c-word', c._sid, charLabel(c) + ' 이(가) 들어간 낱말은?', answer.word, d, rnd, { ch: c.ch, reveal: answer.word + ' (' + answer.hanja + ')' });
+    }
+    /* 한자 급수 교재 — 낱말 항목(뜻)이 없고 글자마다 예시 낱말만 있다. 그 목록으로 문항을 만든다.
+       이것이 없으면 급수 교재는 훈음·글자·획수·쓰기 넷뿐이어서 「배운 글자가 어느 낱말에 쓰이는가」를 물을 길이 없다. */
+    var mine = (c.words || []).slice(0, 12);
+    if (!mine.length) return null;
+    var others = [];
+    (ctx.chars || []).forEach(function (x) {
+      if (!x || x.ch === c.ch) return;
+      (x.words || []).forEach(function (w) { if (mine.indexOf(w) < 0 && others.indexOf(w) < 0) others.push(w); });
+    });
+    if (others.length < 3) return null;
+    var ans = pickOne(mine, rnd);
+    var od = distractors(others, ans, function (x) { return x; }, 3, rnd, function (x) { return x.length === ans.length ? 0 : 1; });
+    if (od.length < 3) return null;
+    return choiceQ('c-word', c._sid, charLabel(c) + ' 이(가) 들어간 낱말은?', ans, od, rnd, { ch: c.ch, reveal: ans + ' — ' + mine.join(' · ') });
   }
   function qCount(c, ctx, rnd) {
     if (!c.strokes) return null;
@@ -211,7 +225,7 @@ var WBHQUIZ = (function () {
       ['w-type', 'w-cloze', 'w-build', 'w-syn', 'w-hanja'],
     ],
     char: [
-      ['c-hun', 'c-char'],
+      ['c-hun', 'c-char', 'c-word'],
       ['c-char', 'c-word', 'c-hun'],
       ['c-write', 'c-word', 'c-count', 'c-char'],
       ['c-write', 'c-count', 'c-word', 'c-hun'],
@@ -228,7 +242,9 @@ var WBHQUIZ = (function () {
     var target = isChar ? item.c : item.w;
     if (!target) return null;
     var table = isChar ? CHAR_KINDS : WORD_KINDS;
-    var order = opts.kinds || PLAN[isChar ? 'char' : 'word'][tier(opts.step || 0)];
+    /* 계단이 난이도를 정하고, 그 계단 안의 유형은 섞는다. 고정 순서면 같은 계단의 항목이 전부 같은 유형으로 나와
+       (급수 교재 step 1 이 다섯 문제 내내 「한자 고르기」였다) 지루하고, 한 가지 물음만 연습된다. */
+    var order = opts.kinds || shuffle(PLAN[isChar ? 'char' : 'word'][tier(opts.step || 0)], rnd);
     var all = Object.keys(table);
     var tried = {}, q = null;
     order.concat(all).forEach(function (k) {

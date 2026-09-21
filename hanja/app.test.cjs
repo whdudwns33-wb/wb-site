@@ -24,7 +24,7 @@ t('학생 앱이 부르는 스크립트가 다 있고, 인라인 코드가 파�
   const js = app.slice(app.indexOf('/* APP:JS:START */'), app.indexOf('/* APP:JS:END */'));
   assert.ok(js.length > 10000);
   new Function(js);   /* 문법 오류면 여기서 던진다 */
-  ['view-home', 'view-books', 'view-chars', 'view-train', 'view-report', 'sheetBack', 'toast', 'streakChip'].forEach((id) => assert.ok(app.includes('id="' + id + '"'), id + ' 가 없다'));
+  ['view-home', 'view-books', 'view-words', 'view-chars', 'view-train', 'view-report', 'sheetBack', 'toast', 'streakChip'].forEach((id) => assert.ok(app.includes('id="' + id + '"'), id + ' 가 없다'));
 });
 
 t('서비스 워커 셸 목록의 파일이 실제로 있고, 앱이 부르는 스크립트는 셸에 든다', () => {
@@ -75,6 +75,25 @@ t('AI 연상 버튼은 자체 단어장(aiAllowed)에서만 — 교재 뜻 문�
   assert.ok(fn.includes('aiAllowed('), 'aiMnemo 가 호출 직전에 종류를 다시 보지 않는다');
   assert.ok(admin.includes('id="bkSource"') && admin.includes('data-source='), '관리 웹에 종류 선택이 없다');
   assert.ok(api.includes("'/api/hanja/admin/source'"), '종류 바꾸기 라우트가 없다');
+});
+
+t('낱말과 한자가 나란히 — 탭이 둘 다 있고, 지금 단어장에 없는 쪽은 감춘다', () => {
+  /* 이 앱은 한글 어휘(고유어)와 한자어를 둘 다 익히는 앱이다. 낱말이 단어장 탭 안쪽에만 있으면 한자 앱처럼 읽힌다. */
+  const tabs = [...app.matchAll(/data-view="([a-z]+)"/g)].map((m) => m[1]);
+  assert.ok(tabs.includes('words'), '낱말 탭이 없다');
+  assert.ok(tabs.indexOf('words') < tabs.indexOf('chars'), '낱말 탭이 한자 탭보다 앞이어야 한다');
+  assert.ok(/<b>語<\/b>낱말/.test(app) && /<b>字<\/b>한자/.test(app), '탭 이름이 낱말·한자로 갈려 있어야 한다');
+  assert.ok(/function renderWords/.test(app) && /words: renderWords/.test(app), '낱말 뷰가 등록되지 않았다');
+  /* 빈 탭을 띄우지 않는다 — 고유어만 있는 국어 교재에서 빈 한자 탭, 글자만 있는 급수 교재에서 빈 낱말 탭 */
+  assert.ok(/function syncTabs/.test(app), '탭을 단어장에 맞춰 감추는 코드가 없다');
+  const sync = app.slice(app.indexOf('function syncTabs'), app.indexOf('function render('));
+  assert.ok(/words/.test(sync) && /chars/.test(sync) && /hidden/.test(sync));
+  /* 낱말 탭에서 시작한 배우기·훈련은 낱말만 다룬다 */
+  assert.ok(/learnStart\(book, b2\.dataset\.wlearn, 'word'\)/.test(app), '낱말 탭의 배우기가 낱말만 심지 않는다');
+  assert.ok(/only: 'word'/.test(app), '낱말 탭의 훈련이 낱말만 내지 않는다');
+  assert.ok(/if \(only\) items = items\.filter/.test(app) && /if \(scope\.only\)/.test(app), 'only 를 받는 쪽이 걸러 주지 않는다');
+  /* 머리말이 한글 어휘를 먼저 말한다 */
+  assert.ok(/한글 어휘 · 한자어/.test(app), '머리말이 한자만 내세우고 있다');
 });
 
 console.log(`\nOK — ${passed}개 통과`);
