@@ -156,10 +156,12 @@ SRS id 규약: 한자는 `c:<글자>`(단어장을 넘어 공용), 낱말은 `w:
 - `POST /admin/strokes {strokes:{"十":{strokes, medians}}, replace?}` (4MB) · `GET /admin/strokes` → `{strokes, updatedAt, count, withMedians}`
 - `GET /admin/overview` → 학생별 `{words, chars, graduated, due, emergency, traced, streak, books, assigned, lastActive}`
 
-목록(`hanja:books`)을 고치는 자리는 모두 `editIndex` 하나를 지난다 — KV 가 바로 앞의 쓰기를 못 본 옛 값을 돌려주면
-한 권씩 연달아 바꿀 때 뒤의 요청이 앞의 변경을 덮어써 **조용히 사라진다**(12권을 연달아 바꾸다 10건을 잃은 적이 있다).
-그래서 여러 권은 한 번의 쓰기로 고치고, 쓴 뒤 되읽어 남았는지 확인하고 아니면 한 번 더 쓴다. 관리 웹 목록 위의
-「여러 권 한꺼번에」가 그 경로를 쓴다.
+목록(`hanja:books`)을 고치는 자리는 모두 `editIndex` 하나를 지난다. KV 의 함정이 둘이고 갈라 다뤄야 한다 —
+**읽기가 옛 값일 수 있다**(지역마다 최대 60초쯤. 바꾼 직후 목록이 옛 범위를 보여 줄 수 있고 새로 고치면 맞다)와
+**그 옛 값 위에 쓰면 진짜로 잃는다**(뒤의 요청이 앞의 변경이 빠진 목록을 되쓴다 — 12권을 한 권씩 바꾸다 실제로 겪었다:
+성공 응답 12번, 남은 것 2건). 그래서 여러 권은 **한 번의 쓰기로** 고치고(관리 웹 목록 위 「여러 권 한꺼번에」),
+쓴 뒤 되읽기는 확인(`applied`)까지만 하고 **되쓰지 않는다** — 확인이 늦은 것을 고치려다 남의 변경을 지우게 된다.
+`applied` 가 false 면 「틀렸다」가 아니라 「아직 확인 못 했다」는 뜻이다.
 
 저장: 워커 `hanja:book:<id>` · `hanja:books`(목록) · `hanja:remap:<id>` · `hanja:state:<code>` · `hanja:summary:<code>` ·
 `hanja:assign:<code>` · `hanja:task:<scope>` · `hanja:strokes` · `hanja:push:<code>` / 로컬 `db.hanja`.
