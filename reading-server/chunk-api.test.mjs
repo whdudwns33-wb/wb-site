@@ -17,6 +17,7 @@ function memStore() {
     listAssignCodes: () => Object.keys(assigns),
     getCustoms: () => customs, putCustoms: (rec) => { customs = rec; },
     getParentCode: (t) => parents[t] || null, putParent: (t, c) => { parents[t] = c; }, putStudent: (c, rec) => { students[c] = rec; },
+    listStudentCodes: () => Object.keys(students),
     _raw: { states, summaries, assigns, parents, students },
   };
 }
@@ -69,7 +70,7 @@ await t('요약 정규화 — 모양만 강제, 범위 밖은 자른다', async 
   assert.strictEqual(normalizeChunkSummary(null), null);
   assert.strictEqual(normalizeChunkSummary([]), null);
   const n = normalizeChunkSummary({ band: 'ZZ', attempts: -5, avg: 140, qRate: 'abc', streak: 2.4, lastAt: 'x', weak: [{ tag: 'extra:adn', n: 3 }, { tag: '<b>', n: 1 }, 'x'], assignDone: 2 });
-  assert.deepStrictEqual(n, { band: null, attempts: 0, practiced: 0, graduated: 0, avg: 100, recentAvg: null, qRate: null, wpmRecent: null, streak: 2, lessonsDone: 0, assignDone: 2, weak: [{ tag: 'extra:adn', n: 3 }], lastAt: null });
+  assert.deepStrictEqual(n, { band: null, attempts: 0, practiced: 0, graduated: 0, avg: 100, recentAvg: null, qRate: null, wpmRecent: null, streak: 2, lessonsDone: 0, assignDone: 2, index: null, weak: [{ tag: 'extra:adn', n: 3 }], lastAt: null });
 });
 
 await t('관리 overview — 명단에 있는 학생만, 최근 활동 순', async () => {
@@ -110,9 +111,9 @@ await t('과제 — 관리자가 넣고, 학생이 /assign 으로 받고, 비우
   assert.strictEqual((await call(s, { path: '/api/chunk/admin/assign/nobody', method: 'PUT', who: ADMIN, getBody: async () => ({ band: 'G4' }) })).status, 404, '명단에 없는 학생');
   assert.strictEqual((await call(s, { path: '/api/chunk/admin/assign/st-1', method: 'PUT', who: ADMIN, getBody: async () => ({ band: 'ZZ' }) })).status, 400);
   assert.strictEqual((await call(s, { path: '/api/chunk/admin/assign/st-1', method: 'PUT' })).status, 403, '학생은 과제를 못 정한다');
-  /* 과제만 있고 기록이 없는 학생도 overview 에 오른다 */
+  /* 과제만 있고 기록이 없는 학생도 overview 에 오른다(명단 전체가 오르므로 st-2 는 미시작 행) */
   const ov = await call(s, { path: '/api/chunk/admin/overview', who: ADMIN });
-  assert.strictEqual(ov.body.rows.length, 1); assert.deepStrictEqual(ov.body.rows[0].assign, { band: 'G4', passages: 1, lessons: 0, due: null, note: '', updatedAt: put.body.updatedAt });
+  assert.strictEqual(ov.body.rows.length, 2); assert.deepStrictEqual(ov.body.rows.find((r) => r.code === 'st-1').assign, { band: 'G4', passages: 1, lessons: 0, due: null, note: '', updatedAt: put.body.updatedAt });
   const clr = await call(s, { path: '/api/chunk/admin/assign/st-1', method: 'PUT', who: ADMIN, getBody: async () => ({}) });
   assert.deepStrictEqual(clr.body, { ok: true, assign: null, updatedAt: null });
   assert.strictEqual(s._raw.assigns['st-1'], undefined);
@@ -205,6 +206,20 @@ await t('관리 — 가족 링크 발급은 한 번, 다음부터 같은 토큰(
   /* 발급된 링크로 바로 열린다 */
   const open = await call(s, { path: '/api/chunk/parent', who: null, query: new URLSearchParams({ t: r.body.ptoken }) });
   assert.strictEqual(open.status, 200); assert.strictEqual(open.body.parent.name, '김지우');
+});
+
+await t('요약 지수 화이트리스트 · overview 는 명단 전체(미시작 포함), 외부 학생은 apps 에 chunk 가 있어야', async () => {
+  assert.strictEqual(normalizeChunkSummary({ index: 73.4 }).index, 73);
+  assert.strictEqual(normalizeChunkSummary({}).index, null);
+  const s = memStore();
+  s._raw.summaries['st-1'] = { summary: normalizeChunkSummary({ band: 'G3', attempts: 2, recentAvg: 80, index: 60 }), updatedAt: '2026-09-21T00:00:00.000Z' };
+  s._raw.students['st-3'] = { code: 'st-3', name: '외부', cls: '외부', apps: ['haru'] };
+  const r = await call(s, { path: '/api/chunk/admin/overview', who: ADMIN });
+  const codes = r.body.rows.map((x) => x.code).sort();
+  assert.deepStrictEqual(codes, ['st-1', 'st-2'], '명단의 st-2 는 미시작으로 올라오고, 외부 st-3 은 빠진다');
+  const st2 = r.body.rows.find((x) => x.code === 'st-2');
+  assert.strictEqual(st2.attempts, 0); assert.strictEqual(st2.index, null); assert.strictEqual(st2.lastAt, null);
+  assert.strictEqual(r.body.rows.find((x) => x.code === 'st-1').index, 60);
 });
 
 console.log('\n' + passed + '건 통과 — reading-server/chunk-api.mjs');

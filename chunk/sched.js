@@ -153,12 +153,22 @@ var WBCHUNK_SCHED = (function () {
   }
 
   /* 선생님 확인용 요약 — 서버에 함께 올리는 작은 객체(화이트리스트는 서버가 다시 건다) */
+  /* ── 끊어읽기 지수 (0~100) — 상담·월간 리포트가 인용하는 숫자 하나 ──
+     최근 5회 끊기 점수 평균에 단계 가중(유치 0.5 → 고3 1.0)을 곱한다. 같은 90점이라도 고3 글에서 낸 90점이 더 높은 실력이라서다.
+     단계 순서는 rules.js BAND_ORDER 와 같다(모듈을 서로 부르지 않으려고 여기 한 번 더 적었다). 기록이 없으면 null. */
+  var BANDS13 = ['K', 'G1', 'G2', 'G3', 'G4', 'G5', 'G6', 'G7', 'G8', 'G9', 'G10', 'G11', 'G12'];
+  function index(state, now) {
+    var s = summary(state, now);
+    if (s.recentAvg == null) return null;
+    var bi = BANDS13.indexOf(state.band); if (bi < 0) bi = 3;
+    return Math.round(s.recentAvg * (0.5 + 0.5 * bi / 12));
+  }
   function forTeacher(state, now) {
     var s = summary(state, now);
-    return { band: state.band, attempts: s.attempts, practiced: s.practiced, graduated: s.graduated, avg: s.avg, recentAvg: s.recentAvg, qRate: s.qRate, wpmRecent: s.wpmRecent, streak: s.streak, lessonsDone: s.lessonsDone, weak: weakTags(state, 5), assignDone: assignDone(state), lastAt: state.log.length ? state.log[state.log.length - 1].t : null };
+    return { band: state.band, attempts: s.attempts, practiced: s.practiced, graduated: s.graduated, avg: s.avg, recentAvg: s.recentAvg, qRate: s.qRate, wpmRecent: s.wpmRecent, streak: s.streak, lessonsDone: s.lessonsDone, weak: weakTags(state, 5), assignDone: assignDone(state), index: index(state, now), lastAt: state.log.length ? state.log[state.log.length - 1].t : null };
   }
 
-  return { DAY: DAY, STEP_DAYS: STEP_DAYS, GRADUATE_STEP: GRADUATE_STEP, blank: blank, normalize: normalize, gradeOf: gradeOf, record: record, dueList: dueList, nextPassage: nextPassage, weakTags: weakTags, suggestion: suggestion, streak: streak, lessonDone: lessonDone, summary: summary, forTeacher: forTeacher, assignDone: assignDone, assignTotal: assignTotal, dayKey: dayKey };
+  return { DAY: DAY, STEP_DAYS: STEP_DAYS, GRADUATE_STEP: GRADUATE_STEP, blank: blank, normalize: normalize, gradeOf: gradeOf, record: record, dueList: dueList, nextPassage: nextPassage, weakTags: weakTags, suggestion: suggestion, streak: streak, lessonDone: lessonDone, summary: summary, forTeacher: forTeacher, index: index, assignDone: assignDone, assignTotal: assignTotal, dayKey: dayKey };
 })();
 
 if (typeof module !== 'undefined' && module.exports) module.exports = WBCHUNK_SCHED;

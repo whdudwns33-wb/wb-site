@@ -370,7 +370,8 @@
     }
     const footer = () => '<div class="foot">WB 독해력학원 원내 학습 도구. 지문과 카드는 전부 자체 창작이며, 녹음은 이 기기 밖으로 나가지 않아요.</div>';
     const segsHtml = (segs, prefix) => '<p class="para marker-' + marker() + '">' + segs.map((s, i) => '<span class="seg" data-seg="' + prefix + ':' + i + '">' + esc(marker() === 'slash' ? s : s.trim()) + (marker() === 'slash' ? '' : ' ') + '</span>').join('') + '</p>';
-    const ttsBtn = (segs, prefix) => WBVoice.ttsSupported() ? '<button class="btn soft sm" data-act="tts" data-prefix="' + prefix + '">🔊 들려주기</button>' : '';
+    const noKoVoice = () => { try { return WBVoice.ttsSupported() && typeof WBVoice.hasVoice === 'function' && speechSynthesis.getVoices().length > 0 && !WBVoice.hasVoice('ko'); } catch (e) { return false; } };
+    const ttsBtn = (segs, prefix) => !WBVoice.ttsSupported() ? '' : noKoVoice() ? '<span class="small">이 기기에는 한국어 읽어 주기 목소리가 없어요 — 어른이 읽어 주거나 기기 설정에서 한국어 음성을 내려받으면 「들려주기」가 켜져요.</span>' : '<button class="btn soft sm" data-act="tts" data-prefix="' + prefix + '">🔊 들려주기</button>';
     const stageBar = (n, of) => '<div class="stage">' + Array.from({ length: of }, (_, i) => '<i class="' + (i < n ? 'on' : '') + '"></i>').join('') + '</div>';
 
     function vOnboard() {
@@ -575,11 +576,15 @@
         return html + '</div>' + quit;
       }
       if (pr.stage === 3) {
-        const q = p.q, answered = pr.picked != null, showText = b.sentenceMode || pr.readMs == null || pr.peek;
+        /* 읽기 속도는 「읽기 시작」을 누른 순간부터 「다 읽었어요」까지만 잰다 — 안내를 읽는 시간이 섞이면 어절/분이 뜻을 잃는다.
+           문장 단위 밴드(유치~초2)는 속도를 재지 않으므로 글을 바로 보여 준다. */
+        if (b.sentenceMode && !pr.readStart) pr.readStart = Date.now();
+        const q = p.q, answered = pr.picked != null, reading = !!pr.readStart && pr.readMs == null, showText = b.sentenceMode || reading || pr.peek;
         let html = '<div class="card">' + head + stageBar(3, 3) + '<h2>3. 표시 없이 읽기</h2>' + famTip(3);
-        if (pr.readMs == null) html += '<p class="small">이번엔 표시 없이, 마음속으로 덩어리를 만들며 읽어요. 다 읽으면 버튼을 눌러요.</p>';
+        if (pr.readMs == null && !pr.readStart) html += '<p class="small">이번엔 표시 없이, 마음속으로 덩어리를 만들며 읽어요. 준비되면 「읽기 시작」을 누르고, 다 읽으면 「다 읽었어요」를 눌러요. 그 사이 시간으로 읽기 속도를 재요.</p><button class="big" data-act="pr-read-start">읽기 시작</button>';
+        else if (pr.readMs == null) html += '<p class="small">마음속으로 덩어리를 만들며 읽어요. 다 읽으면 버튼을 눌러요.</p>';
         if (showText) html += p.paragraphs.map((segs) => '<p class="plain">' + esc(segs.join('')) + '</p>').join('');
-        if (pr.readMs == null) html += '<button class="big" data-act="pr-read-done">다 읽었어요</button>';
+        if (pr.readMs == null && pr.readStart) html += '<button class="big" data-act="pr-read-done">다 읽었어요</button>';
         else {
           if (!b.sentenceMode && !pr.peek) html += '<button class="btn ghost sm" data-act="pr-peek">글 다시 보기</button>';
           html += '<h3>' + esc(q.q) + '</h3>' + q.choices.map((c, i) => { let cls = 'choice', n = String(i + 1); if (answered) { if (i === q.answer) { cls += ' ok'; n = '✓'; } else if (i === pr.picked) { cls += ' picked'; n = '✕'; } } return '<button class="' + cls + '" data-act="pr-pick" data-i="' + i + '" ' + (answered ? 'disabled' : '') + '><span class="n">' + n + '</span><span>' + esc(c) + '</span></button>'; }).join('');
@@ -707,9 +712,10 @@
       else if (act === 'pr-to2') { stopSpeak(); sess.pr.stage = 2; render(); }
       else if (act === 'pr-check') { const pr = sess.pr; if (pr.sentMode) { const u = pr.units[pr.ui]; pr.res[pr.ui] = R.explain(u.text, u.model, [...pr.marks[pr.ui]], u.given); } else { pr.units.forEach((u, i) => { pr.res[i] = R.explain(u.text, u.model, [...pr.marks[i]], u.given); }); pr.agg = aggregate(pr.res); } render(); }
       else if (act === 'pr-para') { const pr = sess.pr; pr.ui = Math.max(0, Math.min(pr.units.length - 1, pr.ui + (+t.dataset.d || 0))); render(); }
-      else if (act === 'pr-unit-next') { const pr = sess.pr; if (pr.ui + 1 < pr.units.length) { pr.ui += 1; render(); } else { pr.agg = aggregate(pr.res); pr.stage = 3; pr.readStart = Date.now(); render(); } }
-      else if (act === 'pr-to3') { sess.pr.stage = 3; sess.pr.readStart = Date.now(); render(); }
-      else if (act === 'pr-read-done') { sess.pr.readMs = Date.now() - sess.pr.readStart; render(); }
+      else if (act === 'pr-unit-next') { const pr = sess.pr; if (pr.ui + 1 < pr.units.length) { pr.ui += 1; render(); } else { pr.agg = aggregate(pr.res); pr.stage = 3; pr.readStart = 0; render(); } }
+      else if (act === 'pr-to3') { sess.pr.stage = 3; sess.pr.readStart = 0; render(); }
+      else if (act === 'pr-read-start') { sess.pr.readStart = Date.now(); render(); }
+      else if (act === 'pr-read-done') { sess.pr.readMs = Date.now() - (sess.pr.readStart || Date.now()); render(); }
       else if (act === 'pr-peek') { sess.pr.peek = true; render({ keep: true }); }
       else if (act === 'pr-pick') { if (sess.pr.picked != null) return; sess.pr.picked = +t.dataset.i; render({ keep: true }); }
       else if (act === 'pr-finish') { finishPractice(); }

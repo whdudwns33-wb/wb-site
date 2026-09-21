@@ -278,6 +278,7 @@ const chunkStore = {
   putParent: (t, c) => { db.parents = db.parents || {}; db.parents[t] = c; persist(); },
   putStudent: (c, rec) => { db.students = db.students || {}; db.students[c] = rec; persist(); },
   getStudent: (c) => db.students?.[c] || null,
+  listStudentCodes: () => Object.keys(db.students || {}),
 };
 
 const VOCAB_PUSH_ENV = {
