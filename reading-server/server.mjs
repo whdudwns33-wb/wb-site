@@ -1,7 +1,7 @@
 'use strict';
 /* WB 진로독서 백엔드 — 학생 동기화 API + 관리 웹 + 학생 앱 서빙 (Node 22 무의존성)
    실행: node reading-server/server.mjs   (기본 http://localhost:8890)
-   환경: PORT, ADMIN_PIN(기본 wb-admin-2026 — 운영 시 반드시 변경), ADMIN_ID·ADMIN_PASSWORD(아이디 로그인, 선택), DATA_DIR,
+   환경: PORT, ADMIN_PIN 또는 ADMIN_ID·ADMIN_PASSWORD(관리 로그인 — 둘 다 없으면 뜨지 않는다), DATA_DIR,
          GEMINI_API_KEY(브레인레터 AI 삽화, 선택) */
 import http from 'node:http';
 import fs from 'node:fs';
@@ -34,7 +34,18 @@ const HANJA_DIR = path.join(ROOT, '..', 'hanja');      // 한자브레인 앱 �
 const LETTER_DIR = path.join(ROOT, '..', 'letter');     // 브레인레터 앱 정적 파일 (호 본문은 여기 없다 — db.letter 전용, 체험 호는 자체 창작)
 const PUB_DIR = path.join(ROOT, 'public');             // 관리 웹
 const PORT = +(process.env.PORT || 8890);
-const ADMIN_PIN = process.env.ADMIN_PIN || 'wb-admin-2026';
+/* 관리 로그인에 기본값을 두지 않는다. 저장소가 public 이라 소스에 적은 기본 PIN 은 곧 공개된 관리자
+   비밀번호이고, 그 하나로 학생 기록 전체가 열린다. 빠뜨린 채 뜨는 것보다 뜨지 않는 편이 안전하다.
+   두 갈래(PIN / 아이디·비밀번호) 중 하나만 있으면 된다 — 판정은 admin-auth.mjs 가 한다. */
+const ADMIN_PIN = process.env.ADMIN_PIN || '';
+const ADMIN_ID = process.env.ADMIN_ID || '';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
+if (!ADMIN_PIN && !(ADMIN_ID && ADMIN_PASSWORD)) {
+  console.error('관리 로그인이 설정되지 않았습니다. 둘 중 하나를 주세요:');
+  console.error('  ADMIN_PIN=<임의의 긴 문자열> node reading-server/server.mjs');
+  console.error('  ADMIN_ID=<아이디> ADMIN_PASSWORD=<비밀번호> node reading-server/server.mjs');
+  process.exit(1);
+}
 const TOKEN_TTL = 1000 * 60 * 60 * 24 * 30;            // 30일
 
 load();
@@ -509,7 +520,7 @@ const server = http.createServer(async (req, res) => {
 
       /* 관리 로그인 — 아이디·비밀번호 또는 PIN (워커와 같은 판정기) */
       if (p === '/api/admin/login' && req.method === 'POST') {
-        const login = await checkAdminLogin(await readBody(req), { ADMIN_PIN, ADMIN_ID: process.env.ADMIN_ID, ADMIN_PASSWORD: process.env.ADMIN_PASSWORD });
+        const login = await checkAdminLogin(await readBody(req), { ADMIN_PIN, ADMIN_ID, ADMIN_PASSWORD });
         if (!login.ok) return json(res, 401, { error: login.error });
         return json(res, 200, { token: newToken('__admin__', true), via: login.via });
       }
@@ -1030,5 +1041,4 @@ setInterval(async () => {
 server.listen(PORT, () => {
   console.log(`WB 진로독서 서버 http://localhost:${PORT}`);
   console.log(`  학생 앱: /   워드브레인: /vocab/   관리 웹: /admin   연상 검수함: /admin/vocab-review.html`);
-  if (ADMIN_PIN === 'wb-admin-2026') console.log('  ⚠ 기본 ADMIN_PIN 사용 중 — 운영 배포 전 반드시 ADMIN_PIN 환경변수로 변경하세요.');
 });
