@@ -30,6 +30,8 @@ const first = new Set(m ? [...m[1].matchAll(/"([^"]+)"/g)].map(x => x[1]) : []);
 const head = worker.split("if (!p.startsWith('/api/'))")[0];
 const paths = new Set();
 for (const x of head.matchAll(/p === '(\/[^']+)'/g)) paths.add(x[1]);
+/* 접두어로 가로채는 것(p.startsWith('/letter/fonts/')) — run_worker_first 에는 글꼴(/letter/fonts/*)로 적는다 */
+for (const x of head.matchAll(/p\.startsWith\('(\/[^']+)'\)/g)) paths.add(x[1] + '*');
 /* 정규식으로 가로채는 것 — articles(-L1..L4).json */
 if (/\/\^\\\/articles\(-L\[1-4\]\)\?\\\.json\$\//.test(head) || head.includes('^\\/articles(-L[1-4])?\\.json$')) {
   ['/articles.json', '/articles-L1.json', '/articles-L2.json', '/articles-L3.json', '/articles-L4.json']

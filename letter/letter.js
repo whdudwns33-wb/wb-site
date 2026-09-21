@@ -38,8 +38,20 @@ var WBLETTER = (function () {
   var TIER_OFFSET = { M: 0, E1: 1, E3: 2, E2: 3, K: 4 };
   var BASE_WEEK = '2026-W39';
 
-  var SECTION_TYPES = ['read', 'words', 'brain', 'column', 'coach', 'notice', 'checklist'];
-  var KICKER = { read: '이번 주 읽을거리', words: '한자 코너', brain: '두뇌 놀이터', column: '학부모 칼럼', coach: '한 줄 코칭', notice: '학원 게시판', checklist: '이번 주 미션' };
+  var SECTION_TYPES = ['read', 'words', 'brain', 'column', 'coach', 'notice', 'checklist', 'news'];
+  var KICKER = { read: '이번 주 읽을거리', words: '한자 코너', brain: '두뇌 놀이터', column: '학부모 칼럼', coach: '한 줄 코칭', notice: '학원 게시판', checklist: '이번 주 미션', news: '이번 주 교육·입시 이슈' };
+  /* 하루 한 장 — 한 호를 7일에 나눠 읽는다. 신문 한 부를 한자리에서 다 읽지 않듯 하루에 한 장씩 여는 리듬이라야
+     기억에 남고(간격을 둔 반복) 가족 대화도 매일 한 토막씩 생긴다. 발행일이 1일째, 요일은 실제 날짜에서 센다.
+     잠그지는 않는다 — 주말에 몰아 보는 가정도 있고, 지난 장을 다시 여는 것이 곧 복습이다. */
+  var DAY_PLAN = [
+    { day: 1, name: '읽을거리', sub: '이번 주 글을 읽어요', parts: ['lead', 'read-text'] },
+    { day: 2, name: '읽고 답해요', sub: '어제 읽은 글로 문제를 풀어요', parts: ['read-quiz'] },
+    { day: 3, name: '한자 코너', sub: '낱말 가족을 익히고 손으로 써 봐요', parts: ['words'] },
+    { day: 4, name: '두뇌 놀이터', sub: '머리를 쓰는 놀이를 해요', parts: ['brain'] },
+    { day: 5, name: '학부모의 밤', sub: '부모님이 읽는 장이에요 — 칼럼과 이번 주 교육 이슈', parts: ['column', 'news', 'coach'] },
+    { day: 6, name: '미션 점검', sub: '이번 주 미션을 마무리해요', parts: ['checklist', 'notice'] },
+    { day: 7, name: '되돌아보기', sub: '내 답과 정답을 맞춰 보고 한 주를 마쳐요', parts: ['review'] },
+  ];
   var SKILLS = ['main', 'detail', 'infer', 'vocab', 'apply', 'critical'];
   /* 학년대별 읽을거리 글자 수(공백 포함, 진로독서 content.test 와 같은 셈법) — 넘어도 경고만. 권장치를 넘긴 글이
      틀린 글은 아니지만, 유치부 글이 400자면 부모가 읽어 주다 지친다 */
@@ -206,6 +218,11 @@ var WBLETTER = (function () {
     /* 출처 없는 사진은 저장되지 않는다 — 자체 촬영·자체 제작·공공누리·CC0 만 싣는다(CLAUDE.md 절대 규칙 1) */
     if (!str(img.credit).trim()) E(tag, '사진에는 credit(출처·저작 표시)이 필요합니다 — 자체 촬영·제작이나 공공누리·CC0 만');
     else if (img.credit.length > 80) E(tag, 'credit 은 80자 이내');
+    /* 크기(w·h)는 선택 — 있으면 사진이 오기 전에 자리를 잡아 글이 튀지 않는다. 한쪽만 있으면 비율을 못 만드니 둘 다 또는 둘 다 없이 */
+    if (img.w != null || img.h != null) {
+      var okDim = Number.isInteger(img.w) && Number.isInteger(img.h) && img.w >= 1 && img.h >= 1 && img.w <= 10000 && img.h <= 10000;
+      if (!okDim) E(tag, '사진 w·h 는 1~10000 정수 한 쌍(둘 다 적거나 둘 다 비움)');
+    }
   }
   function checkIssue(issue) {
     var errors = [], warnings = [];
@@ -324,6 +341,20 @@ var WBLETTER = (function () {
         strList(s.items, 'items', 1, 10, 400);
       } else if (s.type === 'checklist') {
         strList(s.items, 'items', 1, 8, 200);
+      } else if (s.type === 'news') {
+        /* 교육·입시 이슈 — 학원 소식 대신 그 주의 교육·입시 뉴스를 3~5건 간추린다. 출처(기관·언론명) 없는 항목은 싣지 않고,
+           링크는 https 원문만 받는다(앱에서만 열리고 인쇄본에는 출처명만 찍힌다) */
+        if (!Array.isArray(s.items) || !s.items.length || s.items.length > 6) E(tag, '이슈(items)는 1~6개');
+        else s.items.forEach(function (it, k) {
+          var ntag = tag + ' items[' + k + ']';
+          if (!isObj(it)) { E(ntag, '항목이 객체가 아닙니다'); return; }
+          if (!str(it.title).trim() || it.title.length > 80) E(ntag, 'title 은 1~80자');
+          if (!str(it.summary).trim() || it.summary.length > 400) E(ntag, 'summary 는 1~400자');
+          if (it.why != null && (typeof it.why !== 'string' || it.why.length > 200)) E(ntag, 'why(우리 아이에게 뜻하는 것)는 200자 이내 문자열');
+          if (!str(it.source).trim() || it.source.length > 60) E(ntag, 'source(기관·언론명)는 1~60자');
+          if (it.url != null && it.url !== '' && (typeof it.url !== 'string' || !/^https:\/\/[^\s"'<>]{1,300}$/.test(it.url))) E(ntag, 'url 은 https:// 로 시작하는 주소(300자 이내)');
+          if (it.date != null && it.date !== '' && !isValidDate(it.date)) E(ntag, 'date 는 YYYY-MM-DD');
+        });
       }
     });
     TIER_IDS.forEach(function (t) {
@@ -376,6 +407,7 @@ var WBLETTER = (function () {
         { id: 'mission', type: 'checklist', tiers: 'all', title: '이번 주 미션', items: [''] },
         { id: 'column', type: 'column', tiers: 'all', title: '', byline: '편집실', image: null, paragraphs: [''], takeaway: '' },
         coach('K', '유치부'), coach('E1', '초1~2'), coach('E2', '초3~4'), coach('E3', '초5~6'), coach('M', '중등'),
+        { id: 'news', type: 'news', tiers: 'all', title: '이번 주 교육·입시 이슈', items: [{ title: '', summary: '', why: '', source: '', url: '', date: '' }] },
         { id: 'notice', type: 'notice', tiers: 'all', title: '학원 게시판', items: [''] },
       ],
     };
@@ -394,15 +426,18 @@ var WBLETTER = (function () {
     if (!isObj(img)) return '';
     var src = imgSrc(img, o);
     if (!src) return '';
-    return '<figure class="np-photo' + (cls ? ' ' + cls : '') + '"><img src="' + esc(src) + '" alt="' + esc(img.alt) + '" loading="lazy">' +
+    var dim = Number.isInteger(img.w) && Number.isInteger(img.h) && img.w > 0 && img.h > 0;
+    /* 크기를 알면 자리를 먼저 잡아 사진이 오는 동안 글이 튀지 않는다(패드에서 특히 눈에 띈다). 앱에서는 눌러 크게 본다(index.html 의 돋보기) */
+    return '<figure class="np-photo' + (cls ? ' ' + cls : '') + '"' + (o.mode === 'print' ? '' : ' data-zoom="1"') + '><img src="' + esc(src) + '" alt="' + esc(img.alt) + '" loading="lazy" decoding="async"' +
+      (dim ? ' width="' + img.w + '" height="' + img.h + '" style="aspect-ratio:' + img.w + '/' + img.h + '"' : '') + '>' +
       '<figcaption>' + esc(img.caption || '') + (img.credit ? '<span class="np-credit">' + esc(img.credit) + '</span>' : '') + '</figcaption></figure>';
   }
   function gallery(list, o) {
     if (!Array.isArray(list) || !list.length) return '';
     return '<div class="np-gallery">' + list.map(function (im) { return photo(im, o); }).join('') + '</div>';
   }
-  function paras(list, cls) {
-    return (list || []).map(function (p, i) { return '<p class="' + cls + (i === 0 ? ' first' : '') + '">' + esc(p).replace(/\n/g, '<br>') + '</p>'; }).join('');
+  function paras(list, cls, sid) {
+    return (list || []).map(function (p, i) { return '<p class="' + cls + (i === 0 ? ' first' : '') + '"' + (sid ? ' data-p="' + esc(sid) + ':' + i + '"' : '') + '>' + esc(p).replace(/\n/g, '<br>') + '</p>'; }).join('');
   }
   function secOpen(s, extraCls, kickerExtra) {
     return '<section class="np-sec np-' + esc(s.type) + (extraCls ? ' ' + extraCls : '') + '" id="sec-' + esc(s.id) + '"><div class="np-kicker">' + KICKER[s.type] + (kickerExtra || '') + '</div>';
@@ -412,15 +447,20 @@ var WBLETTER = (function () {
     var h = secOpen(s, '', (s.readAloud ? ' · 부모가 읽어 주세요' : '') + (s.minutes ? ' · ' + s.minutes + '분' : ''));
     h += '<h2>' + esc(s.title) + '</h2>';
     if (s.lead) h += '<p class="np-lede">' + esc(s.lead) + '</p>';
-    h += photo(s.image, o);
-    h += '<div class="np-body">' + paras(s.paragraphs, 'np-p') + '</div>';
-    h += gallery(s.images, o);
+    var body = photo(s.image, o);
+    /* 읽어 주기 — 앱에서만(index.html 이 shared/voice.js 로 문단을 차례로 읽고 읽는 문단을 밝힌다). 유치부는 부모가 읽어 주지만
+       기기가 한 번 더 읽어 주면 아이가 글자와 소리를 맞춰 본다 */
+    if (o.mode !== 'print' && !o.noTts) body += '<div class="np-tts"><button type="button" class="np-ttsbtn" data-tts="' + esc(s.id) + '">🔊 읽어 주기</button><span class="np-tts-msg"></span></div>';
+    body += '<div class="np-body">' + paras(s.paragraphs, 'np-p', s.id) + '</div>';
+    body += gallery(s.images, o);
     if (Array.isArray(s.vocab) && s.vocab.length) {
-      h += '<div class="np-vocab"><div class="np-boxhead">낱말 노트</div><ul>' + s.vocab.map(function (v) {
+      body += '<div class="np-vocab"><div class="np-boxhead">낱말 노트</div><ul>' + s.vocab.map(function (v) {
         return '<li><b>' + esc(v.word) + '</b>' + (v.hanja ? ' <span class="np-hanja">' + esc(v.hanja) + '</span>' : '') + ' — ' + esc(v.easy) + '</li>';
       }).join('') + '</ul></div>';
     }
-    if (Array.isArray(s.questions) && s.questions.length) {
+    /* 2일째(읽고 답해요)는 본문을 접어 둔다 — 안 보고 풀어 보고, 막히면 펴서 다시 읽는다 */
+    if (o.foldText) h += '<details class="np-fold"><summary>어제 읽은 글 다시 보기</summary>' + body + '</details>'; else h += body;
+    if (!o.noQuiz && Array.isArray(s.questions) && s.questions.length) {
       h += '<div class="np-qs"><div class="np-boxhead">읽고 답해요</div>';
       s.questions.forEach(function (q, qi) {
         var picked = st.quiz && st.quiz[s.id + ':' + qi];
@@ -442,7 +482,11 @@ var WBLETTER = (function () {
   }
   function renderWords(s, tier, o) {
     var h = secOpen(s) + '<h2>' + esc(s.title) + '</h2>';
-    if (s.family) h += '<div class="np-family"><span class="np-fh">' + esc(s.family.hanja) + '</span><span class="np-fm">' + esc(s.family.hun) + ' <b>' + esc(s.family.eum) + '</b></span></div>';
+    if (s.family) {
+      h += '<div class="np-family"><span class="np-fh">' + esc(s.family.hanja) + '</span><span class="np-fm">' + esc(s.family.hun) + ' <b>' + esc(s.family.eum) + '</b></span></div>';
+      /* 따라쓰기 — 패드에서 손가락으로 세 번 쓴다(워드브레인 trace.js 의 안내 글자 옅어지기·최소 획 길이 판정을 그대로 쓴다). 앱에서만 */
+      if (o.mode !== 'print' && !o.noTrace) h += '<div class="np-trace" data-trace="' + esc(s.family.hanja) + '" data-sid="' + esc(s.id) + '"><canvas width="240" height="240" aria-label="따라쓰기 칸"></canvas><div class="np-trace-ui"><span class="np-trace-msg">손가락으로 따라 써 보세요</span><span class="np-trace-btns"><button type="button" class="np-tbtn" data-trace-clear="1">지우기</button><button type="button" class="np-tbtn primary" data-trace-ok="1">다 썼어요</button></span></div></div>';
+    }
     h += photo(s.image, o);
     h += '<ul class="np-wl">' + (s.words || []).map(function (w) {
       return '<li><b>' + esc(w.word) + '</b>' + (w.hanja ? ' <span class="np-hanja">' + esc(w.hanja) + '</span>' : '') + ' — ' + esc(w.meaning) + (w.example ? '<br><span class="np-ex">' + esc(w.example) + '</span>' : '') + '</li>';
@@ -518,7 +562,110 @@ var WBLETTER = (function () {
     if (!rows) return '';
     return '<section class="np-sec np-key"><div class="np-kicker">정답과 해설</div><h2>' + esc(issue.title) + ' — 답지</h2>' + rows + '</section>';
   }
-  var RENDER = { read: renderRead, words: renderWords, brain: renderBrain, column: renderColumn, coach: renderCoach, notice: renderNotice, checklist: renderChecklist };
+  function renderNews(s, tier, o) {
+    var h = secOpen(s) + '<h2>' + esc(s.title) + '</h2>' + photo(s.image, o) + '<ol class="np-newsl">';
+    (s.items || []).forEach(function (it) {
+      var src = esc(it.source || '') + (it.date ? ' · ' + esc(it.date) : '');
+      h += '<li><b>' + esc(it.title) + '</b><p>' + esc(it.summary) + '</p>' + (it.why ? '<p class="np-newswhy">우리 아이에게 — ' + esc(it.why) + '</p>' : '') +
+        '<span class="np-src">' + (o.mode !== 'print' && /^https:\/\//.test(str(it.url)) ? '<a href="' + esc(it.url) + '" target="_blank" rel="noopener noreferrer">' + src + ' ↗</a>' : src) + '</span></li>';
+    });
+    return h + '</ol></section>';
+  }
+  var RENDER = { read: renderRead, words: renderWords, brain: renderBrain, column: renderColumn, coach: renderCoach, notice: renderNotice, checklist: renderChecklist, news: renderNews };
+
+  /* ── 하루 한 장 ── */
+  function dayStart(issue) { return isObj(issue) ? (isValidDate(issue.publishAt) ? issue.publishAt : weekStart(issue.week)) : null; }
+  function dayOf(issue, now) {
+    var start = dayStart(issue); if (!start) return 1;
+    var d = Math.floor((Date.parse(kstDate(now) + 'T00:00:00Z') - Date.parse(start + 'T00:00:00Z')) / 86400000) + 1;
+    return d < 1 ? 1 : (d > 7 ? 7 : d);
+  }
+  function dayDate(issue, day) {
+    var start = dayStart(issue); if (!start) return '';
+    var d = new Date(Date.parse(start + 'T00:00:00Z') + ((day | 0) - 1) * 86400000);
+    return d.getUTCFullYear() + '-' + pad2(d.getUTCMonth() + 1) + '-' + pad2(d.getUTCDate());
+  }
+  function dayDow(issue, day) { var s = dayDate(issue, day); return s ? DOWS[new Date(s + 'T00:00:00Z').getUTCDay()] : ''; }
+  /* 그날의 장 — 어떤 섹션을 어떤 모양으로 그리는지. 그 학년대에 그날 섹션이 없으면(유치부의 한자 코너처럼) 읽을거리를 다시 읽는다 —
+     한 번 더 읽으면 더 잘 보이고, 빈 화면보다 낫다 */
+  function dayPage(issue, tier, day) {
+    var plan = DAY_PLAN[Math.min(7, Math.max(1, day | 0)) - 1];
+    var view = TIER_BY_ID[tier] ? forTier(issue, tier) : issue;
+    var secs = (view.sections || []).filter(isObj);
+    var of = function (type) { return secs.filter(function (x) { return x.type === type; }); };
+    var items = [];
+    plan.parts.forEach(function (part) {
+      if (part === 'lead') items.push({ part: 'lead' });
+      else if (part === 'read-text') of('read').forEach(function (x) { items.push({ part: 'read', section: x, opts: { noQuiz: true } }); });
+      else if (part === 'read-quiz') of('read').forEach(function (x) { if (Array.isArray(x.questions) && x.questions.length) items.push({ part: 'read', section: x, opts: { foldText: true, noTts: true } }); });
+      else if (part === 'review') items.push({ part: 'review' });
+      else of(part).forEach(function (x) { items.push({ part: part, section: x, opts: {} }); });
+    });
+    var again = !items.some(function (it) { return it.section || it.part === 'review'; });
+    if (again) of('read').forEach(function (x) { items.push({ part: 'read', section: x, opts: { noQuiz: true } }); });
+    return { day: plan.day, name: plan.name, sub: plan.sub, date: dayDate(issue, plan.day), dow: dayDow(issue, plan.day), items: items, again: again };
+  }
+  /* 7일째 — 내가 고른 답과 정답을 나란히. 안 푼 문제는 정답을 바로 보이지 않고 풀 기회를 남긴다 */
+  function renderReview(view, tier, o) {
+    var st = o.state || {}, SH = shapesLib();
+    var rows = '', total = 0, correct = 0, answered = 0, checks = 0, cTotal = 0;
+    (view.sections || []).forEach(function (s) {
+      if (s.type === 'read' && Array.isArray(s.questions) && s.questions.length) {
+        rows += '<div class="np-krow"><b>' + esc(s.title) + '</b><ol>' + s.questions.map(function (q, qi) {
+          total += 1;
+          var picked = st.quiz && st.quiz[s.id + ':' + qi], done = typeof picked === 'number', ok = done && picked === q.answer;
+          if (done) { answered += 1; if (ok) correct += 1; }
+          if (!done) return '<li class="skip">아직 안 풀었어요 — 화요일 장에서 풀어 보세요</li>';
+          return '<li class="' + (ok ? 'ok' : 'no') + '">' + (ok ? '○ 정답 ' : '✕ 내 답 ' + CIRCLED[picked] + ' → 정답 ') + CIRCLED[q.answer] + (q.why ? ' <span class="np-ex">' + esc(q.why) + '</span>' : '') + '</li>';
+        }).join('') + '</ol></div>';
+      }
+      if (s.type === 'brain' && Array.isArray(s.items)) {
+        rows += '<div class="np-krow"><b>' + esc(s.title) + '</b><ol>' + s.items.map(function (it) {
+          var gen = it.figure && SH ? SH.make(Object.assign({}, it.figure, { tier: tier || '' })) : null;
+          var ans = gen ? gen.answerText : str(it.answer), hint = str(it.hint) || (gen ? gen.hint : '');
+          return '<li>' + esc(ans) + (hint ? ' <span class="np-ex">(' + esc(hint) + ')</span>' : '') + '</li>';
+        }).join('') + '</ol></div>';
+      }
+      if (s.type === 'checklist') (s.items || []).forEach(function (t, i) { cTotal += 1; if (st.checks && st.checks[s.id + ':' + i]) checks += 1; });
+    });
+    var h = '<section class="np-sec np-review"><div class="np-kicker">이번 주 돌아보기</div><h2>' + esc(view.title) + '</h2>';
+    if (total || cTotal) h += '<div class="np-score">' + (total ? '<div><b>' + correct + '</b>/' + total + '<span>맞힌 문제</span></div>' : '') + (cTotal ? '<div><b>' + checks + '</b>/' + cTotal + '<span>마친 미션</span></div>' : '') + '</div>';
+    if (total && answered < total) h += '<p class="np-howto">아직 안 푼 문제가 ' + (total - answered) + '개 있어요. 화요일 장에서 풀고 다시 오면 여기서 맞춰 볼 수 있어요.</p>';
+    h += rows;
+    if (o.nextTheme) h += '<div class="np-next"><b>다음 주 예고</b>' + esc(o.nextTheme) + '</div>';
+    return h + '</section>';
+  }
+  function renderDay(issue, tier, day, opts) {
+    var o = opts || {};
+    if (!isObj(issue)) return '';
+    var t = TIER_BY_ID[tier] ? tier : null;
+    var pg = dayPage(issue, t, day);
+    var view = t ? forTier(issue, t) : issue;
+    var h = '<article class="np np-daily" data-tier="' + esc(t || '') + '" data-day="' + pg.day + '">';
+    h += '<div class="np-dhead"><div class="np-dmeta"><span>' + esc(issueNo(issue.week)) + '</span><span>' + pg.day + '일째</span>' + (pg.date ? '<span>' + esc(fmtDateKo(pg.date)) + '</span>' : '') + (issue.status === 'draft' ? '<span class="np-draft">초안</span>' : '') + '</div>' +
+      '<h1 class="np-dtitle">' + esc(pg.name) + '</h1><p class="np-dsub">' + esc(pg.again ? '오늘은 다시 읽는 날 — 한 번 더 읽으면 더 잘 보여요' : pg.sub) + '</p></div>';
+    pg.items.forEach(function (it) {
+      if (it.part === 'lead') {
+        h += '<div class="np-lead"><div class="np-kicker">이번 주 주제</div><h2 class="np-h1">' + esc(issue.title) + '</h2>' + (issue.theme ? '<p class="np-deck">' + esc(issue.theme) + '</p>' : '') +
+          photo(issue.cover, o, 'np-cover') + (issue.intro ? '<p class="np-intro">' + esc(issue.intro).replace(/\n/g, '<br>') + '</p>' : '') + '</div>';
+      } else if (it.part === 'review') {
+        h += renderReview(view, t, o);
+      } else if (it.section && RENDER[it.section.type]) {
+        var so = {}; Object.keys(o).forEach(function (k) { so[k] = o[k]; }); Object.keys(it.opts).forEach(function (k) { so[k] = it.opts[k]; });
+        h += RENDER[it.section.type](it.section, t, so);
+      }
+    });
+    return h + '</article>';
+  }
+  /* 7일 띠 — 오늘 장은 진하게, 마친 날은 ✓, 아직 오지 않은 날은 옅게(열 수는 있다) */
+  function renderDayStrip(issue, cur, today, state) {
+    var st = state || {};
+    return '<nav class="np-strip" aria-label="하루 한 장">' + DAY_PLAN.map(function (p) {
+      var done = !!(st.days && st.days[p.day]);
+      var cls = 'np-sday' + (p.day === cur ? ' cur' : '') + (done ? ' done' : '') + (p.day > today ? ' future' : '');
+      return '<button type="button" class="' + cls + '" data-day="' + p.day + '"' + (p.day === cur ? ' aria-current="page"' : '') + '><span class="np-sdow">' + esc(dayDow(issue, p.day) || String(p.day)) + '</span><span class="np-sname">' + esc(p.name) + '</span>' + (done ? '<span class="np-sok">✓</span>' : '') + '</button>';
+    }).join('') + '</nav>';
+  }
 
   function renderIssue(issue, tier, opts) {
     var o = opts || {};
@@ -531,7 +678,7 @@ var WBLETTER = (function () {
       if (!isObj(s) || !RENDER[s.type]) return;
       if (s.type === 'read') main.push(s);
       else if (s.type === 'column') wide.push(s);
-      else if (s.type === 'coach' || s.type === 'notice') narrow.push(s);
+      else if (s.type === 'coach' || s.type === 'notice' || s.type === 'news') narrow.push(s);
       else side.push(s);
     });
     var draw = function (list) { return list.map(function (s) { return RENDER[s.type](s, t, o); }).join(''); };
@@ -591,17 +738,34 @@ var WBLETTER = (function () {
     '.np-cl{list-style:none;margin:0;padding:0}.np-cl li{margin:6px 0}.np-cl label{display:flex;gap:10px;align-items:flex-start;min-height:40px;cursor:pointer}.np-cl input{width:22px;height:22px;min-height:0;padding:0;border:0;margin:4px 0 0;flex:none;accent-color:var(--np-spot)}.np-cl .done{text-decoration:line-through;color:var(--np-soft)}.np-box{display:inline-block;width:16px;height:16px;border:1.5px solid #555;vertical-align:-2px}',
     '.np-key{border:1px dashed var(--np-rule);padding:14px;margin-top:16px}.np-krow{margin:8px 0}.np-krow ol{margin:4px 0 0;padding-left:20px}',
     '.np-foot{border-top:3px solid var(--np-rule);margin-top:16px;padding-top:8px;font-size:11.5px;color:var(--np-soft);display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px 14px}',
+    /* 사진(앱) — 종이에 인쇄된 듯 바탕과 섞이고(multiply), 표지는 16:10 으로 맞춰 사진 모양이 달라도 지면이 흔들리지 않는다. 폰에서는 표지가 가장자리까지 */
+    '.np:not(.print) .np-photo img{border-radius:8px;mix-blend-mode:multiply;object-fit:cover}.np:not(.print) .np-photo[data-zoom]{cursor:zoom-in}.np:not(.print) .np-cover{position:relative}.np:not(.print) .np-cover img{aspect-ratio:16/10;border-radius:10px}',
+    '.np:not(.print) .np-cover figcaption{position:absolute;left:0;right:0;bottom:0;padding:28px 14px 10px;background:linear-gradient(#0000,#000c);color:#fff;border:0;border-radius:0 0 10px 10px}.np:not(.print) .np-cover .np-credit{color:#fffc}',
+    '@media(max-width:639px){.np:not(.print) .np-cover{margin-left:-16px;margin-right:-16px}.np:not(.print) .np-cover img{border-radius:0;border-left:0;border-right:0}.np:not(.print) .np-cover figcaption{border-radius:0}.np:not(.print) .np-gallery{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;gap:10px;margin:0 -16px 12px;padding:0 16px;scrollbar-width:none}.np:not(.print) .np-gallery .np-photo{flex:0 0 82%;scroll-snap-align:start}}',
+    '@media(min-width:640px){.np-gallery{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}}',
+    /* 하루 한 장 */
+    '.np-daily{padding-bottom:10px}.np-dhead{padding:12px 0 10px;border-bottom:3px double var(--np-rule);margin-bottom:4px}.np-dmeta{display:flex;flex-wrap:wrap;font-size:12.5px;font-weight:700;color:var(--np-soft)}.np-dmeta span{padding-right:10px;margin-right:10px;border-right:1px solid var(--np-line)}.np-dmeta span:last-child{border-right:0}.np-dtitle{font-size:30px;line-height:1.2;margin:6px 0 2px;font-weight:900;letter-spacing:-.02em}.np-dsub{margin:0;color:var(--np-spot);font-weight:700}',
+    '.np-daily .np-sec{border-bottom:0}.np-daily .np-lead{border-bottom:1px solid var(--np-line)}.np-daily .np-brain{border-top:6px solid var(--np-gold);padding-top:12px}.np-daily .np-h1{font-size:28px}',
+    '.np-strip{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin:10px 0 4px}.np-sday{display:flex;flex-direction:column;align-items:center;gap:1px;min-height:54px;padding:6px 2px;border:1.5px solid var(--np-line);border-radius:6px;background:#fff;font:inherit;color:var(--np-ink);cursor:pointer;position:relative}.np-sdow{font-weight:900;font-size:15px}.np-sname{font-size:10.5px;color:var(--np-soft);white-space:nowrap;overflow:hidden;max-width:100%;text-overflow:ellipsis}',
+    '.np-sday.cur{border-color:var(--np-ink);background:var(--np-ink);color:#fff}.np-sday.cur .np-sname{color:#fffc}.np-sday.done{border-color:var(--np-spot)}.np-sok{position:absolute;top:-7px;right:-4px;width:18px;height:18px;border-radius:50%;background:var(--np-spot);color:#fff;font-size:11px;display:flex;align-items:center;justify-content:center;font-weight:900}.np-sday.future{opacity:.55}.np-sday.cur{opacity:1}',
+    '.np-fold{margin:0 0 10px;border:1px dashed var(--np-rule);padding:6px 12px;background:#fff}.np-fold summary{cursor:pointer;font-weight:800;padding:6px 0}.np-fold[open] summary{border-bottom:1px solid var(--np-line);margin-bottom:8px}',
+    /* 읽어 주기·따라쓰기·이슈·되돌아보기 */
+    '.np-tts{display:flex;align-items:center;gap:10px;margin:0 0 10px}.np-ttsbtn{font:inherit;font-size:14px;font-weight:800;min-height:40px;padding:4px 14px;border:1.5px solid var(--np-ink);border-radius:20px;background:#fff;color:var(--np-ink);cursor:pointer}.np-ttsbtn.on{background:var(--np-ink);color:#fff}.np-tts-msg{font-size:13px;color:var(--np-soft)}.np-p.speaking{background:var(--np-gold-soft);box-shadow:0 0 0 4px var(--np-gold-soft)}',
+    '.np-trace{margin:0 0 12px;display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start}.np-trace canvas{width:240px;height:240px;max-width:100%;border:2px solid var(--np-ink);background:#fff;touch-action:none;border-radius:4px}.np-trace-ui{display:flex;flex-direction:column;gap:8px;min-width:150px;flex:1}.np-trace-msg{font-size:14px;font-weight:700}.np-trace-btns{display:flex;gap:8px;flex-wrap:wrap}.np-tbtn{font:inherit;font-size:14px;font-weight:800;min-height:40px;padding:4px 14px;border:1.5px solid var(--np-ink);background:#fff;color:var(--np-ink);cursor:pointer;border-radius:4px}.np-tbtn.primary{background:var(--np-ink);color:#fff}.np-trace.done canvas{border-color:var(--np-spot)}',
+    '.np-newsl{margin:0;padding-left:20px}.np-newsl li{margin:0 0 12px}.np-newsl li>b{display:block;font-size:15.5px;line-height:1.4}.np-newsl p{margin:3px 0;font-size:14.5px}.np-newswhy{color:var(--np-spot);font-weight:700}.np-src{font-size:12px;color:var(--np-soft);letter-spacing:.02em}.np-src a{color:var(--np-spot)}',
+    '.np-review .ok{color:var(--np-ok)}.np-review .no{color:var(--np-red)}.np-review .skip{color:var(--np-soft)}.np-score{display:flex;gap:12px;margin:0 0 12px}.np-score div{flex:1;background:#fff;border:1px solid var(--np-rule);padding:10px 12px;text-align:center;font-size:14px}.np-score b{display:block;font-size:30px;font-weight:900;line-height:1.1}.np-score span{display:block;color:var(--np-soft);font-size:12.5px}.np-next{margin-top:12px;padding:10px 12px;background:var(--np-spot-soft);border-left:3px solid var(--np-spot)}.np-next b{margin-right:8px}',
     /* 인쇄(PDF) — A4, 2단은 그대로(A4 본문 폭 ≈ 688px 로 640 기준을 넘는다), 섹션은 쪽 중간에서 잘리지 않게, 정답 별지는 새 쪽에서 */
     '@media print{@page{size:A4;margin:12mm 13mm 14mm}.np{background:#fff;padding:0;--np-line:#bbb}.np-sec{break-inside:avoid;page-break-inside:avoid}.np-side .np-sec{box-shadow:none}.np-title{font-size:40px}.np-h1{font-size:26pt}.np-p{font-size:11.5pt}.np[data-tier="K"] .np-read .np-p,.np[data-tier="E1"] .np-read .np-p{font-size:13.5pt}.np-choice.static{border:0;padding:0;min-height:0;font-size:11pt}.np-key{break-before:page;page-break-before:always}.np-reveal,.np-ans{display:none}.np-grid{font-size:15pt}.np-photo img{max-height:90mm;object-fit:cover}.np-side .np-fig-opts{grid-template-columns:repeat(2,minmax(0,1fr));max-width:230px}}',
   ].join('\n');
 
   return {
-    TIERS: TIERS, TIER_IDS: TIER_IDS, WISC: WISC, WISC_ORDER: WISC_ORDER, SECTION_TYPES: SECTION_TYPES, KICKER: KICKER, READ_CHARS: READ_CHARS, ISSUE_MAX_BYTES: ISSUE_MAX_BYTES, BASE_WEEK: BASE_WEEK, CSS: CSS,
+    TIERS: TIERS, TIER_IDS: TIER_IDS, WISC: WISC, WISC_ORDER: WISC_ORDER, SECTION_TYPES: SECTION_TYPES, KICKER: KICKER, READ_CHARS: READ_CHARS, ISSUE_MAX_BYTES: ISSUE_MAX_BYTES, BASE_WEEK: BASE_WEEK, CSS: CSS, DAY_PLAN: DAY_PLAN,
     esc: esc, kstDate: kstDate, isValidDate: isValidDate, weekId: weekId, weekStart: weekStart, weekLabel: weekLabel, issueNo: issueNo, fmtDateKo: fmtDateKo, weekIndex: weekIndex, nextWeek: nextWeek,
     rotationFor: rotationFor, calendarEntry: calendarEntry, checkCalendar: checkCalendar,
     tierFromGrade: tierFromGrade, tierOf: tierOf, tierLabel: tierLabel, editionLabel: editionLabel,
     checkIssue: checkIssue, checkImage: checkImage, forTier: forTier, isVisible: isVisible, tiersOf: tiersOf, brief: brief, blankIssue: blankIssue,
     renderIssue: renderIssue, renderKey: renderKey, imgSrc: imgSrc,
+    dayOf: dayOf, dayDate: dayDate, dayDow: dayDow, dayPage: dayPage, renderDay: renderDay, renderDayStrip: renderDayStrip, renderReview: renderReview,
   };
 })();
 
