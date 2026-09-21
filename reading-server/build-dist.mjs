@@ -91,6 +91,8 @@ const LETTER = path.join(ROOT, '..', 'letter');
 fs.mkdirSync(path.join(DIST, 'letter'), { recursive: true });
 const LETTER_FILES = ['index.html', 'letter.js', 'shapes.js', 'drills.js', 'issue-sample.json', 'calendar.json', 'sw.js', 'manifest.webmanifest', 'icon.svg'];
 for (const f of LETTER_FILES) fs.copyFileSync(path.join(LETTER, f), path.join(DIST, 'letter', f));
+/* 파일럿 호 — 있으면 싣는다. 편집실이 만든 이번 주 호(자체 창작)를 링크만으로 연다. 없으면 앱이 샘플 호로 넘어간다 */
+if (fs.existsSync(path.join(LETTER, 'issue-pilot.json'))) fs.copyFileSync(path.join(LETTER, 'issue-pilot.json'), path.join(DIST, 'letter', 'issue-pilot.json'));
 /* 읽어 주기·한자 따라쓰기 — 원본은 shared/voice.js·vocab/trace.js 하나씩. 다른 앱과 같은 파일을 letter/ 에도 배급한다(SW 껍데기가 ./ 상대 경로로 캐시한다) */
 fs.copyFileSync(SHARED, path.join(DIST, 'letter', 'voice.js'));
 fs.copyFileSync(path.join(ROOT, '..', 'vocab', 'trace.js'), path.join(DIST, 'letter', 'trace.js'));
