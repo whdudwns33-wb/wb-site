@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>한자브레인 — 단어장 관리</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #F7F4EC; color: #2B2118; font-family: "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; font-size: 15px; line-height: 1.6; word-break: keep-all; }
+  .wrap { max-width: 900px; margin: 0 auto; padding: 28px 16px 80px; }
+  h1 { font-size: 1.2rem; font-weight: 900; color: #1F1712; margin: 0 0 4px; }
+  .sub { color: #6F6459; font-size: .84rem; margin: 0 0 20px; }
+  .sub a { color: #8E3B2F; }
+  h2 { font-size: 1rem; font-weight: 900; color: #1F1712; margin: 30px 0 10px; }
+  .card { background: #fff; border: 1px solid #E4DCCB; border-radius: 12px; padding: 16px 18px; box-shadow: 0 1px 4px rgba(43,33,24,.07); margin-bottom: 12px; }
+  button { font-family: inherit; font-size: .9rem; font-weight: 700; cursor: pointer; border: 1px solid #E4DCCB; background: #F1ECE1; color: #1F1712; border-radius: 9px; padding: 9px 16px; }
+  button.primary { background: #8E3B2F; border-color: #8E3B2F; color: #fff; }
+  button.danger { background: #F8E6E2; border-color: #E4B8B0; color: #7A2A20; }
+  button.small { padding: 5px 10px; font-size: .78rem; }
+  button:disabled { opacity: .5; cursor: default; }
+  input, textarea, select { font-family: inherit; font-size: .9rem; width: 100%; border: 1px solid #E4DCCB; border-radius: 9px; padding: 9px 12px; background: #fff; color: #2B2118; }
+  textarea { resize: vertical; min-height: 56px; font-family: ui-monospace, "Nanum Gothic Coding", monospace; font-size: .84rem; }
+  label { font-size: .74rem; font-weight: 700; color: #6F6459; display: block; margin: 10px 0 4px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
+  .row { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; align-items: center; }
+  .muted { color: #6F6459; font-size: .84rem; }
+  .chip { display: inline-block; font-size: .7rem; font-weight: 700; border-radius: 6px; padding: 2px 8px; margin-left: 4px; vertical-align: middle; }
+  .c-all { background: #E6F1E6; color: #3A7A43; } .c-assigned { background: #FBF1DC; color: #B98426; } .c-err { background: #F8E6E2; color: #7A2A20; } .c-ok { background: #E6F1E6; color: #3A7A43; }
+  table { border-collapse: collapse; width: 100%; font-size: .85rem; background: #fff; }
+  th, td { padding: 9px 12px; border-bottom: 1px solid #E4DCCB; text-align: left; white-space: nowrap; vertical-align: middle; }
+  thead th { background: #F1ECE1; color: #1F1712; font-size: .78rem; }
+  .num { font-variant-numeric: tabular-nums; text-align: right; }
+  .table-scroll { overflow-x: auto; border: 1px solid #E4DCCB; border-radius: 12px; }
+  .stu-pick, .book-pick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .stu-pick label, .book-pick label { display: inline-flex; align-items: center; gap: 5px; font-size: .84rem; font-weight: 600; background: #F1ECE1; border: 1px solid #E4DCCB; border-radius: 999px; padding: 5px 12px; cursor: pointer; margin: 0; color: #2B2118; }
+  .stu-pick label.on, .book-pick label.on { background: #F8E6E2; border-color: #E4B8B0; color: #8E3B2F; }
+  .stu-pick input, .book-pick input { width: auto; margin: 0; }
+  .prev { margin-top: 12px; }
+  .prev li { font-size: .84rem; }
+  .prev .err { color: #7A2A20; } .prev .warn { color: #8A6210; }
+  .mode { display: flex; gap: 6px; margin-bottom: 8px; }
+  .mode button.on { background: #8E3B2F; color: #fff; border-color: #8E3B2F; }
+  code { background: #F1ECE1; padding: 1px 5px; border-radius: 4px; font-size: .84em; }
+  .assign-row { display: flex; gap: 10px; align-items: baseline; padding: 7px 0; border-bottom: 1px solid #E4DCCB; font-size: .85rem; flex-wrap: wrap; }
+  .assign-row:last-child { border-bottom: none; }
+  .assign-row b { min-width: 74px; }
+  #msg { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: #1F1712; color: #fff; border-radius: 99px; padding: 9px 18px; font-size: .85rem; opacity: 0; transition: opacity .25s; pointer-events: none; max-width: 90vw; }
+  #msg.show { opacity: 1; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>한자브레인 — 단어장 관리</h1>
+  <p class="sub">문제집 한 권을 단어장 하나로 올리면 학생 앱(<code>/hanja/</code>)에서 그 책의 낱말·한자만 따로 배우고 따라 씁니다. <a href="/admin">← 관리 웹</a> · <a href="/admin/vocab-review.html">워드브레인</a> · <a href="/admin/naesin-ko-admin.html">국어브레인</a></p>
+
+  <div id="login" class="card">
+    <label>관리자 PIN</label>
+    <div class="row" style="margin-top:0"><input id="pin" type="password" autocomplete="current-password" style="flex:1"><button class="primary" id="btnLogin">로그인</button></div>
+    <p class="muted" id="loginErr"></p>
+  </div>
+
+  <div id="app" hidden>
+    <h2>단어장 올리기</h2>
+    <div class="card">
+      <div class="mode"><button class="on" id="modeText">붙여넣기</button><button id="modeJson">JSON 파일</button></div>
+      <div id="paneText">
+        <div class="grid3">
+          <div><label>단어장 id (영문·숫자·하이픈)</label><input id="bkId" placeholder="예: eohwi-dokhae-1"></div>
+          <div><label>제목</label><input id="bkTitle" placeholder="예: 어휘가 독해다 1"></div>
+          <div><label>학년대</label><select id="bkLevel"><option value="">(없음)</option><option value="L1">L1 · 7세~초2</option><option value="L2">L2 · 초3~6</option><option value="L3">L3 · 중1~3</option><option value="L4">L4 · 고1~3</option></select></div>
+        </div>
+        <div class="grid3">
+          <div><label>종류</label><select id="bkSource"><option value="textbook">교재 단어장 · 구매 자료</option><option value="own">자체 단어장 · 학원이 만든 자료</option></select></div>
+          <div><label>출판사 (선택)</label><input id="bkPub"></div>
+          <div><label>메모 (선택)</label><input id="bkNote" placeholder="예: 3학년 화목반 교재"></div>
+        </div>
+        <p class="muted" style="font-size:.78rem;margin:0 0 8px"><b>AI 연상은 자체 단어장에서만</b> 만들 수 있어요 — 교재 단어장의 뜻 문장은 외부 AI 로 보내지 않습니다. 종류는 올린 뒤 목록에서도 바꿀 수 있어요.</p>
+        <label>낱말·한자 — 한 줄에 하나씩</label>
+        <textarea id="bkText" rows="10" placeholder="# 1일차&#10;관측 | 보고 재는 것 | 觀(볼 관)+測(잴 측) | 별을 관측했다.&#10;다잡다 | 흐트러진 마음을 단단히 하다 | 마음을 다잡고 앉았다.&#10;觀 | 볼 관 | 25&#10;# 2일차&#10;…"></textarea>
+        <p class="muted" style="font-size:.78rem;margin:6px 0 0">형식: <b>낱말 | 뜻 | 한자(선택) | 예문(선택)</b> — 구분자는 <code>|</code> 또는 탭(없으면 쉼표).
+        <code># 1일차</code>처럼 <code>#</code> 줄은 새 단원(회차)이고 그 아래 줄이 그 단원에 들어갑니다. 한자는 <code>觀(볼 관)+測(잴 측)</code>처럼 훈음을 넣으면 <b>한자 조립 문제</b>와 한자별 훈음이 붙고, <code>觀測</code>만 써도 됩니다.
+        첫 칸이 한자 한 글자면 한자 항목입니다: <code>觀 | 볼 관 | 25</code>(훈음 · 획수). 영어 낱말은 받지 않습니다(워드브레인에 배정).</p>
+      </div>
+      <div id="paneJson" hidden>
+        <label>단어장 JSON 파일 (<code>node hanja/book-validate.mjs</code>로 검사한 것)</label>
+        <input type="file" id="bkFile" accept=".json,application/json">
+        <p class="muted" style="font-size:.78rem;margin:6px 0 0">모양: <code>{ id, title, publisher?, level?, source?(own 자체|textbook 교재 — 없으면 교재), units:[{id,title}], words:[{unit, word, meaning, hanja?, example?, syn?}], chars:[{unit, ch, hun, eum, strokes?, medians?}], strokes?:{"觀":25} }</code>.
+        <code>medians</code>(0~1 좌표의 획 중심선, 획 순서대로)가 있는 글자만 앱에서 획순 안내·획순 판정이 열립니다.</p>
+      </div>
+      <div class="prev" id="prev"></div>
+      <div class="row"><button id="bkPrev">미리보기(검사만)</button><button class="primary" id="bkGo" disabled>올리기</button><span class="muted" id="bkStat"></span></div>
+    </div>
+
+    <h2>단어장 목록 <span class="muted" id="bkCount"></span></h2>
+    <div class="table-scroll"><table>
+      <thead><tr><th>제목</th><th>id</th><th class="num">낱말</th><th class="num">한자</th><th class="num">단원</th><th>공개 범위</th><th>종류</th><th>갱신</th><th></th></tr></thead>
+      <tbody id="bkBody"><tr><td colspan="8" class="muted">불러오는 중…</td></tr></tbody>
+    </table></div>
+    <p class="muted" style="font-size:.78rem">공개 범위 <b>모두</b>는 연동 학생 전원에게 보이고, <b>배정한 학생만</b>은 아래에서 배정한 학생에게만 보입니다(교재를 산 학생에게만 열어야 할 때).
+    지우면 학생 앱 목록에서 사라지지만 학생의 학습 기록은 남아 다시 올리면 이어집니다.</p>
+
+    <h2>학생에게 단어장 배정</h2>
+    <div class="card">
+      <label>학생 <span class="muted" id="pickCount"></span></label>
+      <div class="stu-pick" id="stuPick"><span class="muted">불러오는 중…</span></div>
+      <div class="row" style="margin-top:8px"><button class="small" id="pickAll">전체 선택</button><button class="small" id="pickNone">선택 해제</button><input id="pickCls" placeholder="반 이름으로 고르기 (예: 월수)" style="width:200px;flex:none;padding:5px 10px;font-size:.82rem"></div>
+      <label>단어장</label>
+      <div class="book-pick" id="bookPick"><span class="muted">단어장을 먼저 올려 주세요.</span></div>
+      <div class="row"><button class="primary" id="asAdd">배정하기</button><button id="asRemove">배정 해제</button></div>
+    </div>
+    <div class="card" id="asList"><span class="muted">아직 배정이 없습니다.</span></div>
+
+    <h2>이번 주 단원 지정</h2>
+    <div class="card">
+      <p class="muted" style="margin:0 0 8px;font-size:.8rem">반(또는 전체·학생 한 명)에 단원 하나를 지정하면 학생 앱 오늘 화면 맨 위에 「이번 주 단원」으로 뜹니다. 학생 → 반 → 전체 순으로 찾습니다.</p>
+      <div class="grid3">
+        <div><label>범위</label><select id="tkScope"><option value="default">전체 (default)</option></select></div>
+        <div><label>단어장</label><select id="tkBook"></select></div>
+        <div><label>단원</label><select id="tkUnit"></select></div>
+      </div>
+      <div class="grid2">
+        <div><label>마감 (선택)</label><input id="tkDue" type="date"></div>
+        <div><label>제목 (선택 — 비우면 단어장·단원 제목)</label><input id="tkTitle" placeholder="예: 3주차 — 1일차"></div>
+      </div>
+      <div class="row"><button class="primary" id="tkGo">지정하기</button><span class="muted" id="tkStat"></span></div>
+    </div>
+    <div class="card" id="tkList"><span class="muted">아직 지정한 단원이 없습니다.</span></div>
+    <div id="tkProgress"></div>
+
+    <h2>공용 획순 사전 <span class="muted" id="skStat"></span></h2>
+    <div class="card">
+      <p class="muted" style="margin:0 0 8px;font-size:.8rem">글자 하나에 획순 하나 — 모든 단어장이 함께 봅니다. <code>node hanja/strokes-convert.mjs</code>로 만든 JSON을 검수한 뒤 올리세요. 있는 글자 위에 덧씁니다(<b>전체 바꾸기</b>를 켜면 사전을 통째로 교체).</p>
+      <input type="file" id="skFile" accept=".json,application/json">
+      <div class="row"><label style="display:inline-flex;align-items:center;gap:6px;margin:0;font-size:.84rem"><input type="checkbox" id="skReplace" style="width:auto"> 전체 바꾸기</label><button class="primary" id="skGo" disabled>올리기</button><span class="muted" id="skMsg"></span></div>
+    </div>
+
+    <h2>학생 안내 QR</h2>
+    <div class="card" style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+      <div id="qrBox"></div>
+      <div class="muted" style="font-size:.84rem;flex:1;min-width:200px">교실에 붙여 두는 한자브레인 주소 QR입니다. 학생은 진로독서에서 학원 QR로 한 번 연동돼 있으면 이 주소로 바로 들어옵니다.<br><code id="qrUrl"></code><div class="row"><button class="small" id="qrPrint">인쇄</button></div></div>
+    </div>
+
+    <h2>학생별 현황</h2>
+    <div class="table-scroll"><table>
+      <thead><tr><th>이름</th><th>반</th><th class="num">낱말</th><th class="num">한자</th><th class="num">장기 기억</th><th class="num">복습 밀림</th><th class="num">오래 방치</th><th class="num">써 본 한자</th><th class="num">연속일</th><th>배정</th><th>마지막 활동</th></tr></thead>
+      <tbody id="ovBody"><tr><td colspan="11" class="muted">불러오는 중…</td></tr></tbody>
+    </table></div>
+  </div>
+</div>
+<div id="msg"></div>
+
+<script src="/admin/qr.js"></script>
+<script>
+'use strict';
+(function () {
+  var $ = function (s) { return document.querySelector(s); };
+  var token = null;
+  try { token = sessionStorage.getItem('wbhj.admin'); } catch (e) {}
+  var BOOKS = [], STUDENTS = [], mode = 'text', jsonBook = null, previewOk = false;
+
+  function msg(t) { var el = $('#msg'); el.textContent = t; el.classList.add('show'); clearTimeout(msg._t); msg._t = setTimeout(function () { el.classList.remove('show'); }, 2600); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function fmt(iso) { if (!iso) return '-'; var d = new Date(iso); return isNaN(d) ? '-' : (d.getMonth() + 1) + '/' + d.getDate() + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }
+  async function api(path, opt) {
+    var r = await fetch(path, Object.assign({ headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token } }, opt || {}));
+    var j = await r.json().catch(function () { return {}; });
+    if (r.status === 401) { token = null; try { sessionStorage.removeItem('wbhj.admin'); } catch (e) {} boot(); throw new Error('다시 로그인해 주세요'); }
+    if (!r.ok) { var e = new Error(j.error || ('오류 ' + r.status)); e.body = j; throw e; }
+    return j;
+  }
+
+  $('#btnLogin').addEventListener('click', doLogin);
+  $('#pin').addEventListener('keydown', function (e) { if (e.key === 'Enter') doLogin(); });
+  async function doLogin() {
+    try {
+      var r = await fetch('/api/admin/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin: $('#pin').value }) });
+      var j = await r.json();
+      if (!r.ok) { $('#loginErr').textContent = j.error || '로그인 실패'; return; }
+      token = j.token;
+      try { sessionStorage.setItem('wbhj.admin', token); } catch (e) {}
+      boot();
+    } catch (e) { $('#loginErr').textContent = '서버에 연결할 수 없습니다.'; }
+  }
+
+  /* ── 올리기 ── */
+  $('#modeText').addEventListener('click', function () { setMode('text'); });
+  $('#modeJson').addEventListener('click', function () { setMode('json'); });
+  function setMode(m) { mode = m; $('#modeText').classList.toggle('on', m === 'text'); $('#modeJson').classList.toggle('on', m === 'json'); $('#paneText').hidden = m !== 'text'; $('#paneJson').hidden = m !== 'json'; resetPreview(); }
+  function resetPreview() { previewOk = false; $('#bkGo').disabled = true; $('#prev').innerHTML = ''; $('#bkStat').textContent = ''; }
+  ['bkId', 'bkTitle', 'bkLevel', 'bkPub', 'bkNote', 'bkText'].forEach(function (id) { $('#' + id).addEventListener('input', resetPreview); });
+  $('#bkFile').addEventListener('change', function () {
+    resetPreview(); jsonBook = null;
+    var f = this.files && this.files[0]; if (!f) return;
+    var rd = new FileReader();
+    rd.onload = function () { try { jsonBook = JSON.parse(rd.result); $('#bkStat').textContent = f.name + ' 읽음 — 미리보기를 눌러 검사하세요.'; } catch (e) { $('#bkStat').textContent = 'JSON 파싱 실패: ' + e.message; } };
+    rd.readAsText(f, 'utf-8');
+  });
+  function payload() {
+    if (mode === 'json') { if (!jsonBook) throw new Error('JSON 파일을 골라 주세요.'); return { book: jsonBook }; }
+    var text = $('#bkText').value;
+    if (!text.trim()) throw new Error('낱말을 붙여 넣어 주세요.');
+    return { text: text, id: $('#bkId').value.trim(), title: $('#bkTitle').value.trim(), level: $('#bkLevel').value, publisher: $('#bkPub').value.trim(), note: $('#bkNote').value.trim(), source: $('#bkSource').value };
+  }
+  function renderPreview(j) {
+    var html = '';
+    if (j.summary && j.summary.length) html += '<ul>' + j.summary.map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') + '</ul>';
+    if (j.errors && j.errors.length) html += '<ul>' + j.errors.map(function (e) { return '<li class="err">✗ [' + esc(e.where) + '] ' + esc(e.message) + '</li>'; }).join('') + '</ul>';
+    if (j.warns && j.warns.length) html += '<ul>' + j.warns.slice(0, 30).map(function (w) { return '<li class="warn">! [' + esc(w.where) + '] ' + esc(w.message) + '</li>'; }).join('') + (j.warns.length > 30 ? '<li class="warn">… 경고 ' + (j.warns.length - 30) + '건 더</li>' : '') + '</ul>';
+    if (j.meta) html += '<p class="muted">id <code>' + esc(j.meta.id) + '</code> · ' + esc(j.meta.title) + ' · ' + (j.meta.source === 'own' ? '자체 단어장 (AI 연상 가능)' : '교재 단어장 (AI 연상 없음)') + ' · 단원: ' + j.meta.units.map(function (u) { return esc(u.title) + '(' + (u.words + u.chars) + ')'; }).join(', ') + '</p>';
+    $('#prev').innerHTML = html;
+  }
+  $('#bkPrev').addEventListener('click', async function () {
+    try {
+      var body = payload(); body.dryRun = true;
+      var j = await api('/api/hanja/admin/book', { method: 'POST', body: JSON.stringify(body) });
+      renderPreview(j);
+      previewOk = !!j.ok; $('#bkGo').disabled = !j.ok;
+      $('#bkStat').textContent = j.ok ? '검사 통과 — 올릴 수 있어요.' : '오류를 고친 뒤 다시 미리보기';
+    } catch (e) { if (e.body && (e.body.errors || e.body.summary)) renderPreview(e.body); msg(e.message); }
+  });
+  $('#bkGo').addEventListener('click', async function () {
+    if (!previewOk) { msg('먼저 미리보기로 검사해 주세요.'); return; }
+    try {
+      var body = payload();
+      var id = mode === 'json' ? String(body.book.id || '') : body.id;
+      if (BOOKS.some(function (b) { return b.id === id; }) && !confirm('같은 id 의 단어장이 이미 있어요. 덮어쓸까요? (학생 기록·배정은 그대로)')) return;
+      var j = await api('/api/hanja/admin/book', { method: 'POST', body: JSON.stringify(body) });
+      msg((j.replaced ? '덮어썼어요: ' : '올렸어요: ') + j.id);
+      resetPreview();
+      await loadBooks();
+    } catch (e) { if (e.body && e.body.errors) renderPreview(e.body); msg(e.message); }
+  });
+
+  /* ── 목록 ── */
+  async function loadBooks() {
+    var j = await api('/api/hanja/admin/books');
+    BOOKS = j.books || [];
+    $('#bkCount').textContent = BOOKS.length ? BOOKS.length + '권' : '';
+    var tb = $('#bkBody');
+    if (!BOOKS.length) { tb.innerHTML = '<tr><td colspan="9" class="muted">아직 올린 단어장이 없어요. 학생 앱에는 WB 기본 체험 단어장만 보입니다.</td></tr>'; renderBookPick(); return; }
+    tb.innerHTML = BOOKS.map(function (b) {
+      var c = b.counts || {};
+      return '<tr data-id="' + esc(b.id) + '"><td><b>' + esc(b.title) + '</b>' + (b.publisher ? '<br><span class="muted">' + esc(b.publisher) + (b.level ? ' · ' + b.level : '') + '</span>' : (b.level ? '<br><span class="muted">' + b.level + '</span>' : '')) + '</td>' +
+        '<td><code>' + esc(b.id) + '</code></td><td class="num">' + (c.words || 0) + '</td><td class="num">' + (c.chars || 0) + (c.medians ? '<br><span class="muted">획순 ' + c.medians + '</span>' : '') + '</td><td class="num">' + (c.units || 0) + '</td>' +
+        '<td><select data-scope="' + esc(b.id) + '" style="width:auto;padding:4px 8px;font-size:.8rem"><option value="all"' + (b.scope !== 'assigned' ? ' selected' : '') + '>모두</option><option value="assigned"' + (b.scope === 'assigned' ? ' selected' : '') + '>배정한 학생만</option></select></td>' +
+        '<td><select data-source="' + esc(b.id) + '" style="width:auto;padding:4px 8px;font-size:.8rem"><option value="textbook"' + (b.source !== 'own' ? ' selected' : '') + '>교재</option><option value="own"' + (b.source === 'own' ? ' selected' : '') + '>자체</option></select></td>' +
+        '<td class="muted">' + fmt(b.updatedAt) + '</td><td><a class="small" style="display:inline-block;border:1px solid #E4DCCB;background:#F1ECE1;border-radius:9px;padding:5px 10px;font-size:.78rem;font-weight:700;color:#1F1712;text-decoration:none" href="/admin/hanja-print.html?id=' + encodeURIComponent(b.id) + '">시험지</a> <button class="small" data-dl="' + esc(b.id) + '">JSON</button> <button class="small danger" data-del="' + esc(b.id) + '">삭제</button></td></tr>';
+    }).join('');
+    tb.querySelectorAll('[data-scope]').forEach(function (sel) {
+      sel.addEventListener('change', async function () {
+        try { await api('/api/hanja/admin/scope', { method: 'POST', body: JSON.stringify({ id: sel.dataset.scope, scope: sel.value }) }); msg('공개 범위를 바꿨어요'); await loadBooks(); } catch (e) { msg(e.message); }
+      });
+    });
+    tb.querySelectorAll('[data-source]').forEach(function (sel) {
+      sel.addEventListener('change', async function () {
+        if (sel.value === 'own' && !confirm('자체 단어장으로 바꾸면 학생이 AI 연상을 만들 때 낱말·뜻이 외부 AI 로 갑니다. 학원이 만든 자료가 맞나요?')) { await loadBooks(); return; }
+        try { await api('/api/hanja/admin/source', { method: 'POST', body: JSON.stringify({ id: sel.dataset.source, source: sel.value }) }); msg('종류를 바꿨어요'); await loadBooks(); } catch (e) { msg(e.message); }
+      });
+    });
+    tb.querySelectorAll('[data-dl]').forEach(function (b) {
+      b.addEventListener('click', async function () {
+        try {
+          var j = await api('/api/hanja/admin/book?id=' + encodeURIComponent(b.dataset.dl));
+          var blob = new Blob([JSON.stringify(j.book, null, 1)], { type: 'application/json' });
+          var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = b.dataset.dl + '.json'; a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
+        } catch (e) { msg(e.message); }
+      });
+    });
+    tb.querySelectorAll('[data-del]').forEach(function (b) {
+      b.addEventListener('click', async function () {
+        var id = b.dataset.del;
+        if (!confirm('「' + id + '」 단어장을 지울까요? 학생 앱 목록에서 사라지고 배정도 풀립니다. (학생 기록은 남아요)')) return;
+        try { var j = await api('/api/hanja/admin/book', { method: 'DELETE', body: JSON.stringify({ id: id }) }); msg('지웠어요' + (j.unassigned ? ' · 배정 해제 ' + j.unassigned + '명' : '')); await loadBooks(); await loadAssign(); } catch (e) { msg(e.message); }
+      });
+    });
+    renderBookPick();
+    if (STUDENTS.length || BOOKS.length) { try { fillTaskForm(); } catch (e) {} }
+  }
+
+  /* ── 배정 ── */
+  function renderPick() {
+    var el = $('#stuPick');
+    if (!STUDENTS.length) { el.innerHTML = '<span class="muted">등록된 학생이 없어요 — 관리 웹에서 먼저 등록하세요.</span>'; return; }
+    el.innerHTML = STUDENTS.map(function (s) { return '<label data-cls="' + esc(s.cls || '') + '"><input type="checkbox" value="' + esc(s.code) + '"> ' + esc(s.name) + (s.cls ? ' <span class="muted">' + esc(s.cls) + '</span>' : '') + '</label>'; }).join('');
+    el.querySelectorAll('input').forEach(function (i) { i.addEventListener('change', syncPick); });
+    syncPick();
+  }
+  function syncPick() { var n = 0; document.querySelectorAll('#stuPick label').forEach(function (l) { var on = l.querySelector('input').checked; l.classList.toggle('on', on); if (on) n += 1; }); $('#pickCount').textContent = n ? n + '명 선택' : ''; }
+  $('#pickAll').addEventListener('click', function () { document.querySelectorAll('#stuPick input').forEach(function (i) { i.checked = true; }); syncPick(); });
+  $('#pickNone').addEventListener('click', function () { document.querySelectorAll('#stuPick input').forEach(function (i) { i.checked = false; }); syncPick(); });
+  $('#pickCls').addEventListener('input', function () { var q = this.value.trim(); if (!q) return; document.querySelectorAll('#stuPick label').forEach(function (l) { l.querySelector('input').checked = l.dataset.cls.indexOf(q) >= 0; }); syncPick(); });
+  function renderBookPick() {
+    var el = $('#bookPick');
+    if (!BOOKS.length) { el.innerHTML = '<span class="muted">단어장을 먼저 올려 주세요.</span>'; return; }
+    el.innerHTML = BOOKS.map(function (b) { return '<label><input type="checkbox" value="' + esc(b.id) + '"> ' + esc(b.title) + (b.scope === 'assigned' ? '<span class="chip c-assigned">배정만</span>' : '') + '</label>'; }).join('');
+    el.querySelectorAll('input').forEach(function (i) { i.addEventListener('change', function () { i.closest('label').classList.toggle('on', i.checked); }); });
+  }
+  function picked(sel) { return Array.prototype.map.call(document.querySelectorAll(sel + ' input:checked'), function (i) { return i.value; }); }
+  async function assign(action) {
+    var codes = picked('#stuPick'), bookIds = picked('#bookPick');
+    if (!codes.length) { msg('학생을 골라 주세요.'); return; }
+    if (!bookIds.length) { msg('단어장을 골라 주세요.'); return; }
+    try {
+      var j = await api('/api/hanja/admin/assign', { method: 'POST', body: JSON.stringify({ codes: codes, bookIds: bookIds, action: action }) });
+      msg((action === 'remove' ? '해제: ' : '배정: ') + j.assigned.length + '명');
+      await loadAssign(); await loadOverview();
+    } catch (e) { msg(e.message); }
+  }
+  $('#asAdd').addEventListener('click', function () { assign('add'); });
+  $('#asRemove').addEventListener('click', function () { assign('remove'); });
+  function bookTitle(id) { var b = BOOKS.filter(function (x) { return x.id === id; })[0]; return b ? b.title : id; }
+  async function loadAssign() {
+    var j = await api('/api/hanja/admin/assign');
+    var items = j.items || [];
+    $('#asList').innerHTML = items.length ? items.map(function (it) {
+      return '<div class="assign-row"><b>' + esc(it.name || it.code) + '</b><span class="muted">' + esc(it.cls || '') + '</span><span>' + it.bookIds.map(function (id) { return esc(bookTitle(id)); }).join(' · ') + '</span><span class="muted" style="margin-left:auto">' + fmt(it.updatedAt) + '</span></div>';
+    }).join('') : '<span class="muted">아직 배정이 없습니다. 공개 범위가 「모두」인 단어장은 배정 없이도 모든 연동 학생에게 보여요.</span>';
+  }
+
+  /* ── 현황 ── */
+  async function loadOverview() {
+    var j = await api('/api/hanja/admin/overview');
+    var rows = j.students || [];
+    $('#ovBody').innerHTML = rows.length ? rows.map(function (s) {
+      return '<tr><td><b>' + esc(s.name || s.code) + '</b></td><td>' + esc(s.cls || '') + '</td><td class="num">' + s.words + '</td><td class="num">' + s.chars + '</td><td class="num">' + s.graduated + '</td>' +
+        '<td class="num">' + s.due + '</td><td class="num"' + (s.emergency ? ' style="color:#B23A2E;font-weight:700"' : '') + '>' + s.emergency + '</td><td class="num">' + s.traced + '</td><td class="num">' + s.streak + '</td>' +
+        '<td class="muted">' + (s.assigned || []).map(function (id) { return esc(bookTitle(id)); }).join(', ') + '</td><td class="muted">' + fmt(s.lastActive) + '</td></tr>';
+    }).join('') : '<tr><td colspan="11" class="muted">아직 앱을 연 학생이 없어요.</td></tr>';
+  }
+
+  /* ── 이번 주 단원 지정 ── */
+  var TASKS = [];
+  function fillTaskForm() {
+    var sc = $('#tkScope'), cur = sc.value;
+    var classes = []; STUDENTS.forEach(function (s) { if (s.cls && classes.indexOf(s.cls) < 0) classes.push(s.cls); });
+    classes.sort();
+    sc.innerHTML = '<option value="default">전체 (default)</option>' + classes.map(function (c) { return '<option value="' + esc(c) + '">반: ' + esc(c) + '</option>'; }).join('') +
+      STUDENTS.map(function (s) { return '<option value="' + esc(s.code) + '">학생: ' + esc(s.name) + (s.cls ? ' (' + esc(s.cls) + ')' : '') + '</option>'; }).join('');
+    if (cur) sc.value = cur;
+    var bk = $('#tkBook'), curB = bk.value;
+    bk.innerHTML = BOOKS.map(function (b) { return '<option value="' + esc(b.id) + '">' + esc(b.title) + '</option>'; }).join('');
+    if (curB) bk.value = curB;
+    fillUnits();
+  }
+  function fillUnits() {
+    var b = BOOKS.filter(function (x) { return x.id === $('#tkBook').value; })[0];
+    $('#tkUnit').innerHTML = b ? (b.units || []).map(function (u) { return '<option value="' + esc(u.id) + '">' + esc(u.title) + ' (' + (u.words + u.chars) + ')</option>'; }).join('') : '';
+  }
+  $('#tkBook').addEventListener('change', fillUnits);
+  $('#tkGo').addEventListener('click', async function () {
+    try {
+      var j = await api('/api/hanja/admin/task', { method: 'POST', body: JSON.stringify({ scope: $('#tkScope').value, bookId: $('#tkBook').value, unitId: $('#tkUnit').value, due: $('#tkDue').value, title: $('#tkTitle').value }) });
+      msg('지정했어요: ' + j.task.title); $('#tkTitle').value = '';
+      await loadTasks();
+    } catch (e) { msg(e.message); }
+  });
+  function scopeLabel(s) { if (s === 'default') return '전체'; var st = STUDENTS.filter(function (x) { return x.code === s; })[0]; return st ? '학생 ' + st.name : '반 ' + s; }
+  async function loadTasks() {
+    var j = await api('/api/hanja/admin/tasks');
+    TASKS = j.tasks || [];
+    var today = j.today || '';
+    $('#tkList').innerHTML = TASKS.length ? TASKS.map(function (t) {
+      var over = t.due && today && t.due < today;
+      return '<div class="assign-row"><b>' + esc(scopeLabel(t.scope)) + '</b><span>' + esc(t.title) + '</span>' + (t.due ? '<span class="muted"' + (over ? ' style="color:#B23A2E;font-weight:700"' : '') + '>' + (over ? '마감 지남 ' : '마감 ') + esc(t.due) + '</span>' : '') +
+        '<span style="margin-left:auto"><button class="small" data-prog="' + esc(t.scope) + '">진도</button> <button class="small danger" data-untask="' + esc(t.scope) + '">지우기</button></span></div>';
+    }).join('') : '<span class="muted">아직 지정한 단원이 없습니다.</span>';
+    $('#tkList').querySelectorAll('[data-untask]').forEach(function (b) {
+      b.addEventListener('click', async function () { if (!confirm(scopeLabel(b.dataset.untask) + '의 단원 지정을 지울까요?')) return; try { await api('/api/hanja/admin/task', { method: 'DELETE', body: JSON.stringify({ scope: b.dataset.untask }) }); await loadTasks(); $('#tkProgress').innerHTML = ''; } catch (e) { msg(e.message); } });
+    });
+    $('#tkList').querySelectorAll('[data-prog]').forEach(function (b) { b.addEventListener('click', function () { loadProgress(b.dataset.prog); }); });
+  }
+  async function loadProgress(scope) {
+    try {
+      var j = await api('/api/hanja/admin/progress?scope=' + encodeURIComponent(scope));
+      var rows = j.rows || [], tot = j.unit.total;
+      var avg = rows.length ? Math.round(rows.reduce(function (a, r) { return a + (tot ? r.planted / tot : 0); }, 0) * 100 / rows.length) : 0;
+      $('#tkProgress').innerHTML = '<h2>단원 진도 — ' + esc(scopeLabel(scope)) + ' · ' + esc(j.task.title) + ' <span class="muted">항목 ' + tot + ' · 평균 진도 ' + avg + '%</span></h2>' +
+        '<div class="table-scroll"><table><thead><tr><th>이름</th><th>반</th><th class="num">배우는 중</th><th class="num">장기 기억</th><th class="num">복습 밀림</th><th>진도</th><th>마지막 활동</th></tr></thead><tbody>' +
+        (rows.length ? rows.map(function (r) {
+          var p = tot ? Math.round(r.planted * 100 / tot) : 0;
+          return '<tr><td><b>' + esc(r.name) + '</b></td><td>' + esc(r.cls) + '</td><td class="num">' + r.planted + ' / ' + tot + '</td><td class="num">' + r.graduated + '</td><td class="num"' + (r.due ? ' style="color:#B23A2E;font-weight:700"' : '') + '>' + r.due + '</td>' +
+            '<td><div style="width:120px;height:8px;background:#F1ECE1;border-radius:99px;overflow:hidden"><div style="width:' + p + '%;height:100%;background:' + (p >= 100 ? '#4E8C57' : '#3D6B8E') + '"></div></div></td><td class="muted">' + (r.linked ? fmt(r.lastActive) : '미연동') + '</td></tr>';
+        }).join('') : '<tr><td colspan="7" class="muted">이 범위에 등록된 학생이 없어요.</td></tr>') + '</tbody></table></div>';
+      $('#tkProgress').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch (e) { msg(e.message); }
+  }
+
+  /* ── 공용 획순 사전 ── */
+  var skJson = null;
+  $('#skFile').addEventListener('change', function () {
+    skJson = null; $('#skGo').disabled = true;
+    var f = this.files && this.files[0]; if (!f) return;
+    var rd = new FileReader();
+    rd.onload = function () { try { var j = JSON.parse(rd.result); skJson = j.strokes && typeof j.strokes === 'object' ? j.strokes : j; $('#skMsg').textContent = f.name + ' — 글자 ' + Object.keys(skJson).length + '자 읽음'; $('#skGo').disabled = false; } catch (e) { $('#skMsg').textContent = 'JSON 파싱 실패: ' + e.message; } };
+    rd.readAsText(f, 'utf-8');
+  });
+  $('#skGo').addEventListener('click', async function () {
+    if (!skJson) return;
+    if ($('#skReplace').checked && !confirm('획순 사전을 통째로 바꿀까요? 지금 있는 글자는 모두 사라집니다.')) return;
+    try {
+      var j = await api('/api/hanja/admin/strokes', { method: 'POST', body: JSON.stringify({ strokes: skJson, replace: $('#skReplace').checked }) });
+      msg('획순 사전: ' + j.count + '자'); $('#skGo').disabled = true; skJson = null; $('#skFile').value = '';
+      await loadStrokes();
+    } catch (e) { msg(e.message); if (e.body && e.body.errors) $('#skMsg').textContent = e.body.errors.slice(0, 5).map(function (x) { return x.where + ': ' + x.message; }).join(' · '); }
+  });
+  async function loadStrokes() {
+    try { var j = await api('/api/hanja/admin/strokes'); $('#skStat').textContent = j.count ? j.count + '자 (획순 데이터 ' + j.withMedians + '자) · ' + fmt(j.updatedAt) : '비어 있음 — 체험 단어장의 20자만 획순 모드'; } catch (e) { $('#skStat').textContent = ''; }
+  }
+
+  /* ── 안내 QR ── */
+  function renderQr() {
+    var url = location.origin + '/hanja/';
+    $('#qrUrl').textContent = url;
+    if (window.WBQR) $('#qrBox').innerHTML = WBQR.svg(url, { size: 150 });
+    $('#qrPrint').addEventListener('click', function () {
+      var w = window.open('', '_blank'); if (!w) return;
+      w.document.write('<title>한자브레인 안내</title><div style="text-align:center;font-family:sans-serif;padding-top:60px"><h1>WB 한자브레인</h1><p>한자·한글 어휘 훈련 · 손으로 쓰는 한자</p>' + (window.WBQR ? WBQR.svg(url, { size: 260 }) : '') + '<p style="font-size:14px;color:#555">' + url + '</p><p style="font-size:13px;color:#777">진로독서에서 학원 QR로 연동한 기기로 여세요.</p></div>');
+      w.document.close(); w.focus(); w.print();
+    });
+  }
+
+  async function refresh() {
+    try { await loadBooks(); } catch (e) { msg(e.message); }
+    try { var all = await api('/api/admin/overview'); STUDENTS = (all.students || []).filter(function (s) { return s.name; }); renderPick(); } catch (e) { msg(e.message); }
+    try { await loadAssign(); } catch (e) { msg(e.message); }
+    try { fillTaskForm(); await loadTasks(); } catch (e) { msg(e.message); }
+    try { await loadStrokes(); } catch (e) { /* 표시만 */ }
+    try { renderQr(); } catch (e) { /* QR 없이도 나머지는 산다 */ }
+    try { await loadOverview(); } catch (e) { msg(e.message); }
+  }
+  function boot() { var authed = !!token; $('#login').hidden = authed; $('#app').hidden = !authed; if (authed) refresh(); }
+  boot();
+})();
+</script>
+</body>
+</html>

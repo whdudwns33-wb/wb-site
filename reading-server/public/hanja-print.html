@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>한자브레인 — 확인 시험지 인쇄</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<style>
+  /* 화면에서는 왼쪽에 설정, 오른쪽에 종이 미리보기. 인쇄하면 설정은 사라지고 종이만 A4 로 나간다 — 청크브레인 print.html 과 같은 방식.
+     단어장은 관리 PIN 토큰으로 받는다(라이선스 자료라 로그인 없이 열지 않는다). */
+  :root { --deep:#8E3B2F; --line:#E4DCCB; --soft:#6F6459; --ink:#2B2118; --serif:"Noto Serif KR","Nanum Myeongjo","Batang","BatangChe","AppleMyungjo",serif; }
+  * { box-sizing:border-box; }
+  html, body { margin:0; padding:0; }
+  body { background:#ECE8E4; color:var(--ink); font-family:"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif; font-size:15px; line-height:1.6; word-break:keep-all; }
+  button, select, input { font-family:inherit; font-size:inherit; }
+  .wrap { display:grid; grid-template-columns:320px 1fr; min-height:100vh; }
+  aside { background:#fff; border-right:1px solid var(--line); padding:16px; position:sticky; top:0; height:100vh; overflow:auto; }
+  aside h1 { font-size:17px; color:var(--deep); margin:0 0 4px; }
+  aside h2 { font-size:13px; color:var(--soft); margin:16px 0 6px; }
+  aside label { display:flex; align-items:center; gap:8px; min-height:30px; font-size:14px; }
+  aside select, aside input[type=text], aside input[type=password] { width:100%; border:1.5px solid var(--line); border-radius:8px; padding:6px 8px; }
+  .big { display:block; width:100%; min-height:44px; border-radius:12px; background:var(--deep); color:#fff; font-weight:900; border:none; margin-top:10px; cursor:pointer; }
+  .big.ghost { background:#fff; color:var(--deep); border:2px solid var(--deep); }
+  .small { font-size:12.5px; color:var(--soft); }
+  .preview { padding:20px; }
+  .page { background:#fff; width:210mm; min-height:297mm; margin:0 auto 16px; padding:14mm 14mm 16mm; box-shadow:0 4px 18px #0002; position:relative; page-break-after:always; break-after:page; }
+  .page:last-child { page-break-after:auto; break-after:auto; }
+  .hd { display:flex; justify-content:space-between; align-items:baseline; border-bottom:2px solid var(--deep); padding-bottom:4px; margin-bottom:8px; font-size:12px; color:var(--soft); }
+  .hd b { color:var(--deep); font-size:14px; }
+  .who { font-size:12px; margin-bottom:8px; }
+  .who span { display:inline-block; min-width:110px; border-bottom:1px solid #999; margin:0 6px; }
+  .ft { position:absolute; left:14mm; right:14mm; bottom:7mm; display:flex; justify-content:space-between; font-size:10.5px; color:var(--soft); }
+  table.q { width:100%; border-collapse:collapse; font-size:13px; }
+  table.q th, table.q td { border:1px solid #BBB; padding:5px 6px; vertical-align:middle; }
+  table.q th { background:#F4F0E8; font-size:12px; }
+  .hz { font-family:var(--serif); font-size:24px; text-align:center; width:52px; }
+  .blank { min-width:90px; }
+  .grid { display:grid; grid-template-columns:repeat(6, 1fr); gap:6px; margin-top:6px; }
+  .cell { border:1px solid #999; aspect-ratio:1; position:relative; background:
+    linear-gradient(to right, transparent 49.5%, #DDD 49.5%, #DDD 50.5%, transparent 50.5%),
+    linear-gradient(to bottom, transparent 49.5%, #DDD 49.5%, #DDD 50.5%, transparent 50.5%); }
+  .cell .lbl { position:absolute; top:2px; left:4px; font-size:9.5px; color:#555; background:#fff; padding:0 2px; }
+  .cell .ghost { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-family:var(--serif); font-size:34px; color:#D8D2C6; }
+  .key td { font-size:12.5px; }
+  @media print { body { background:#fff; } .wrap { display:block; } aside { display:none; } .preview { padding:0; } .page { box-shadow:none; margin:0; width:auto; min-height:auto; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <aside>
+    <h1>확인 시험지 인쇄</h1>
+    <p class="small">단어장 단원 하나로 종이 시험지를 만듭니다. 브라우저 인쇄 → PDF 저장이 곧 시험지예요.</p>
+    <div id="login">
+      <h2>관리자 PIN</h2>
+      <input id="pin" type="password" autocomplete="current-password">
+      <button class="big" id="btnLogin">로그인</button>
+      <p class="small" id="loginErr"></p>
+    </div>
+    <div id="opts" hidden>
+      <h2>단어장 · 단원</h2>
+      <select id="book"></select>
+      <select id="unit" style="margin-top:6px"></select>
+      <h2>시험지 종류</h2>
+      <label><input type="checkbox" id="tHun" checked> 훈음 쓰기 (한자 → 뜻·소리)</label>
+      <label><input type="checkbox" id="tWrite" checked> 한자 쓰기 (훈음 → 米자 칸에 쓰기)</label>
+      <label><input type="checkbox" id="tMeaning" checked> 낱말 뜻 쓰기 (낱말 → 뜻)</label>
+      <label><input type="checkbox" id="tHanja"> 한자어 표기 쓰기 (낱말·뜻 → 한자)</label>
+      <label><input type="checkbox" id="tKey" checked> 정답표 (마지막 장)</label>
+      <h2>순서</h2>
+      <label><input type="checkbox" id="shuf"> 섞기</label>
+      <label>이름 칸 <input type="text" id="cls" placeholder="반 이름 (선택)" style="flex:1"></label>
+      <button class="big" id="btnMake">시험지 만들기</button>
+      <button class="big ghost" id="btnPrint">인쇄 / PDF 저장</button>
+      <p class="small" id="stat"></p>
+    </div>
+  </aside>
+  <main class="preview" id="preview"><p class="small" style="text-align:center;padding-top:40px">로그인하고 단어장·단원을 고른 뒤 「시험지 만들기」를 누르세요.</p></main>
+</div>
+<script>
+'use strict';
+(function () {
+  var $ = function (s) { return document.querySelector(s); };
+  var token = null; try { token = sessionStorage.getItem('wbhj.admin'); } catch (e) {}
+  var BOOKS = [], BOOK = null;
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  async function api(path) {
+    var r = await fetch(path, { headers: { Authorization: 'Bearer ' + token } });
+    var j = await r.json().catch(function () { return {}; });
+    if (r.status === 401) { token = null; try { sessionStorage.removeItem('wbhj.admin'); } catch (e) {} boot(); throw new Error('다시 로그인해 주세요'); }
+    if (!r.ok) throw new Error(j.error || ('오류 ' + r.status));
+    return j;
+  }
+  $('#btnLogin').addEventListener('click', doLogin);
+  $('#pin').addEventListener('keydown', function (e) { if (e.key === 'Enter') doLogin(); });
+  async function doLogin() {
+    try {
+      var r = await fetch('/api/admin/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin: $('#pin').value }) });
+      var j = await r.json();
+      if (!r.ok) { $('#loginErr').textContent = j.error || '로그인 실패'; return; }
+      token = j.token; try { sessionStorage.setItem('wbhj.admin', token); } catch (e) {}
+      boot();
+    } catch (e) { $('#loginErr').textContent = '서버에 연결할 수 없습니다.'; }
+  }
+  function shuffle(a) { a = a.slice(); for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)); var t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+  function chunk(arr, n) { var out = []; for (var i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n)); return out; }
+
+  async function loadBooks() {
+    BOOKS = (await api('/api/hanja/admin/books')).books || [];
+    var want = new URLSearchParams(location.search).get('id');
+    $('#book').innerHTML = BOOKS.map(function (b) { return '<option value="' + esc(b.id) + '"' + (b.id === want ? ' selected' : '') + '>' + esc(b.title) + '</option>'; }).join('');
+    await loadBook();
+  }
+  async function loadBook() {
+    var id = $('#book').value; if (!id) return;
+    BOOK = (await api('/api/hanja/admin/book?id=' + encodeURIComponent(id))).book;
+    var units = BOOK.units.slice();
+    if (BOOK.words.some(function (w) { return !w.unit; }) || BOOK.chars.some(function (c) { return !c.unit; })) units.push({ id: '', title: '단원 없음' });
+    $('#unit').innerHTML = units.map(function (u) { return '<option value="' + esc(u.id) + '">' + esc(u.title) + '</option>'; }).join('');
+  }
+  $('#book').addEventListener('change', function () { loadBook().catch(function (e) { $('#stat').textContent = e.message; }); });
+
+  function page(title, sub, bodyHtml, n, total) {
+    return '<section class="page"><div class="hd"><b>WB 한자브레인 · ' + esc(BOOK.title) + '</b><span>' + esc(sub) + '</span></div>' +
+      '<div class="who">반 <span>' + esc($('#cls').value) + '</span> 이름 <span></span> 날짜 <span></span> 점수 <span></span></div>' +
+      '<h3 style="margin:0 0 6px;font-size:16px">' + esc(title) + '</h3>' + bodyHtml +
+      '<div class="ft"><span>원내 전용 — 외부 배포 금지</span><span>' + n + ' / ' + total + '</span></div></section>';
+  }
+  function make() {
+    if (!BOOK) return;
+    var uid = $('#unit').value, unitTitle = ($('#unit').selectedOptions[0] || {}).textContent || '';
+    var words = BOOK.words.filter(function (w) { return w.unit === uid; });
+    var chars = BOOK.chars.filter(function (c) { return c.unit === uid && c.hun && c.eum; });
+    if ($('#shuf').checked) { words = shuffle(words); chars = shuffle(chars); }
+    var pages = [], key = [];
+    if ($('#tHun').checked && chars.length) {
+      chunk(chars, 24).forEach(function (part, pi) {
+        var rows = chunk(part, 2).map(function (pair, i) {
+          return '<tr>' + pair.map(function (c, k) { return '<td class="num" style="width:26px;text-align:center">' + (pi * 24 + i * 2 + k + 1) + '</td><td class="hz">' + esc(c.ch) + '</td><td class="blank"></td>'; }).join('') + (pair.length < 2 ? '<td></td><td></td><td></td>' : '') + '</tr>';
+        }).join('');
+        pages.push({ title: '훈음 쓰기 — 한자를 보고 뜻과 소리를 쓰세요', sub: unitTitle, html: '<table class="q"><thead><tr><th></th><th>한자</th><th>훈 · 음</th><th></th><th>한자</th><th>훈 · 음</th></tr></thead><tbody>' + rows + '</tbody></table>' });
+      });
+      key.push({ title: '훈음 쓰기', items: chars.map(function (c, i) { return (i + 1) + '. ' + c.ch + ' ' + c.hun + ' ' + c.eum; }) });
+    }
+    if ($('#tWrite').checked && chars.length) {
+      chunk(chars, 30).forEach(function (part) {
+        pages.push({ title: '한자 쓰기 — 뜻과 소리를 보고 米자 칸에 쓰세요', sub: unitTitle, html: '<div class="grid">' + part.map(function (c) { return '<div class="cell"><span class="lbl">' + esc(c.hun + ' ' + c.eum) + (c.strokes ? ' · ' + c.strokes + '획' : '') + '</span></div>'; }).join('') + '</div>' });
+      });
+      key.push({ title: '한자 쓰기', items: chars.map(function (c) { return c.hun + ' ' + c.eum + ' → ' + c.ch; }) });
+    }
+    if ($('#tMeaning').checked && words.length) {
+      chunk(words, 20).forEach(function (part, pi) {
+        var rows = part.map(function (w, i) { return '<tr><td style="width:26px;text-align:center">' + (pi * 20 + i + 1) + '</td><td style="width:120px"><b>' + esc(w.word) + '</b>' + (w.hanja ? ' <span style="font-family:var(--serif);color:#3D6B8E">' + esc(w.hanja) + '</span>' : '') + '</td><td></td></tr>'; }).join('');
+        pages.push({ title: '낱말 뜻 쓰기 — 낱말의 뜻을 쓰세요', sub: unitTitle, html: '<table class="q"><thead><tr><th></th><th>낱말</th><th>뜻</th></tr></thead><tbody>' + rows + '</tbody></table>' });
+      });
+      key.push({ title: '낱말 뜻', items: words.map(function (w, i) { return (i + 1) + '. ' + w.word + ' — ' + w.meaning; }) });
+    }
+    var hw = words.filter(function (w) { return w.hanja; });
+    if ($('#tHanja').checked && hw.length) {
+      chunk(hw, 18).forEach(function (part, pi) {
+        var rows = part.map(function (w, i) { return '<tr><td style="width:26px;text-align:center">' + (pi * 18 + i + 1) + '</td><td style="width:100px"><b>' + esc(w.word) + '</b></td><td style="font-size:12px">' + esc(w.meaning) + '</td><td style="width:120px"></td></tr>'; }).join('');
+        pages.push({ title: '한자어 표기 쓰기 — 낱말의 한자를 쓰세요', sub: unitTitle, html: '<table class="q"><thead><tr><th></th><th>낱말</th><th>뜻</th><th>한자</th></tr></thead><tbody>' + rows + '</tbody></table>' });
+      });
+      key.push({ title: '한자어 표기', items: hw.map(function (w, i) { return (i + 1) + '. ' + w.word + ' — ' + w.hanja; }) });
+    }
+    if (!pages.length) { $('#preview').innerHTML = '<p class="small" style="text-align:center;padding-top:40px">이 단원에는 고른 종류의 항목이 없어요.</p>'; return; }
+    var total = pages.length + ($('#tKey').checked ? 1 : 0), html = pages.map(function (p, i) { return page(p.title, p.sub, p.html, i + 1, total); }).join('');
+    if ($('#tKey').checked) html += page('정답표 (교사용)', unitTitle, key.map(function (k) { return '<h4 style="margin:8px 0 2px;font-size:13px">' + esc(k.title) + '</h4><div style="font-size:12px;columns:2;column-gap:18px">' + k.items.map(esc).join('<br>') + '</div>'; }).join(''), total, total);
+    $('#preview').innerHTML = html;
+    $('#stat').textContent = '종이 ' + total + '장 · 낱말 ' + words.length + ' · 한자 ' + chars.length;
+  }
+  $('#btnMake').addEventListener('click', function () { try { make(); } catch (e) { $('#stat').textContent = e.message; } });
+  $('#btnPrint').addEventListener('click', function () { if (!$('#preview .page')) make(); window.print(); });
+
+  function boot() {
+    var authed = !!token;
+    $('#login').hidden = authed; $('#opts').hidden = !authed;
+    if (authed) loadBooks().catch(function (e) { $('#stat').textContent = e.message; });
+  }
+  boot();
+})();
+</script>
+</body>
+</html>
