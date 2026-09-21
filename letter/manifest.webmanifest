@@ -1,0 +1,14 @@
+{
+  "name": "WB 브레인레터",
+  "short_name": "브레인레터",
+  "description": "매주 한 호 — 독해력·입시 문해력·웩슬러 두뇌 놀이 뉴스레터 (WB 독해력학원 원내 구독 가족 전용)",
+  "lang": "ko-KR",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F5F3EE",
+  "theme_color": "#2B4C3F",
+  "icons": [
+    { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

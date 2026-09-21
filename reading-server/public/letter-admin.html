@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="referrer" content="no-referrer">
+  <meta name="robots" content="noindex, nofollow">
+  <title>WB 브레인레터 · 관리</title>
+  <style>
+    :root{--navy:#2B4C3F;--blue:#2F5F8F;--sky:#E7EEF6;--bg:#F5F3EE;--line:#E1E6E2;--muted:#6A7A72;--ink:#22302A;--ok:#14755e;--warn:#8a4b08;--bad:#9b352b}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Noto Sans KR",sans-serif;line-height:1.6}
+    header{display:flex;align-items:center;gap:14px;padding:13px 20px;background:var(--navy);color:#fff;flex-wrap:wrap}header b{font-size:17px}header small{opacity:.75}header .sp{flex:1}
+    .hbtn{min-height:38px;padding:6px 14px;border:1px solid #ffffff55;border-radius:10px;background:transparent;color:#fff;font-weight:800;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center}
+    nav{display:flex;gap:6px;flex-wrap:wrap;max-width:1200px;margin:12px auto 0;padding:0 14px}
+    nav button{min-height:38px;padding:5px 14px;border-radius:999px;border:1.5px solid #bfd0c8;background:#fff;font-weight:800;color:var(--navy);cursor:pointer}
+    nav button[aria-pressed="true"]{background:var(--navy);color:#fff;border-color:var(--navy)}
+    main{max-width:1200px;margin:auto;padding:14px 14px 60px}
+    .card{margin-bottom:14px;padding:16px 18px;border:1px solid var(--line);border-radius:14px;background:#fff}
+    h2{margin:0 0 6px;color:var(--navy);font-size:17px}h3{margin:12px 0 6px;color:var(--navy);font-size:14px}
+    button{font:inherit;cursor:pointer}input,select,textarea{font:inherit;min-height:40px;padding:6px 10px;border:1.5px solid #bfd0c8;border-radius:10px;background:#fff;color:var(--ink)}
+    textarea{width:100%;min-height:160px;font-family:ui-monospace,Consolas,monospace;font-size:12.5px;line-height:1.5}
+    textarea.json{min-height:420px}
+    .btn{min-height:40px;padding:6px 16px;border:0;border-radius:10px;background:var(--blue);color:#fff;font-weight:900}
+    .btn.ghost{background:#fff;border:1.5px solid #bfd0c8;color:var(--navy)}.btn.sm{min-height:30px;padding:2px 10px;font-size:12.5px}.btn.danger{background:#fff;border:1.5px solid #efc2bb;color:var(--bad)}.btn.pub{background:var(--ok);color:#fff}
+    .tag{display:inline-block;padding:2px 9px;border-radius:999px;background:var(--sky);color:var(--blue);font-size:12px;font-weight:800}.tag.ok{background:#e7f6f0;color:var(--ok)}.tag.bad{background:#fff0ef;color:var(--bad)}.tag.warn{background:#fff4e6;color:var(--warn)}
+    .tbl{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:13.5px;white-space:nowrap}th{position:sticky;top:0;background:#f0f5f2;color:var(--navy);font-size:12px}
+    th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;font-variant-numeric:tabular-nums;vertical-align:top}tbody tr:nth-child(even) td{background:#f8faf8}
+    .grid-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;align-items:end}label.f{display:flex;flex-direction:column;font-size:12.5px;font-weight:800;color:var(--muted)}
+    .err{color:var(--bad);font-weight:700;font-size:13px;margin-top:8px;white-space:pre-wrap}.ok{color:var(--ok);font-weight:700;font-size:13px;margin-top:8px;white-space:pre-wrap}.muted{color:var(--muted);font-size:12.5px}.warn{color:var(--warn);font-weight:700;font-size:13px;white-space:pre-wrap}
+    #loginCard{max-width:380px;margin:60px auto}.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    .two{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:900px){.two{grid-template-columns:1fr}}
+    .preview{max-height:80vh;overflow:auto;background:var(--bg);border-radius:12px;padding:12px}
+    .steps li{margin:4px 0}.steps .st{display:inline-block;min-width:64px;font-weight:800}
+    pre{background:#f8faf8;padding:10px;border-radius:10px;overflow:auto;font-size:12px;white-space:pre-wrap}
+  </style>
+  <style id="nlcss"></style>
+</head>
+<body>
+<header><b>브레인레터 관리</b><small>호 목록 · 편집 · AI 초안 · 발송 문구 · 열람 현황 · 학년대</small><span class="sp"></span>
+  <a class="hbtn" href="/letter/" target="_blank" rel="noopener">학생 앱 열기</a><a class="hbtn" href="/admin/">진로독서 관리</a><button class="hbtn" id="btnLogout" hidden>로그아웃</button></header>
+<nav id="nav" hidden>
+  <button data-tab="issues" aria-pressed="true">호 목록</button><button data-tab="edit">편집</button><button data-tab="draft">AI 초안</button><button data-tab="send">발송 문구</button><button data-tab="stats">열람 현황</button><button data-tab="students">학생 학년대</button>
+</nav>
+<main id="main"></main>
+<script src="/admin/letter.js"></script>
+<script>
+'use strict';
+const L=WBLETTER;
+document.getElementById('nlcss').textContent=L.CSS;
+const $=(s)=>document.querySelector(s);
+const esc=L.esc;
+let TOKEN=localStorage.getItem('wbr.admin.token')||null;
+let TAB='issues';
+/* 편집 중인 호 — 탭을 오가도 남는다. 저장 전에는 서버에 없다 */
+let EDIT={text:'',id:'',dirty:false};
+let DRAFT=null;
+async function api(path,opt){
+  let r;
+  try{r=await fetch('/api'+path,Object.assign({headers:{'Content-Type':'application/json',...(TOKEN?{Authorization:'Bearer '+TOKEN}:{})}},opt||{}));}
+  catch(e){throw new Error('네트워크 오류');}
+  const j=await r.json().catch(()=>({}));
+  if(r.status===401&&TOKEN){TOKEN=null;localStorage.removeItem('wbr.admin.token');renderLogin('세션이 만료됐어요. 다시 로그인해 주세요.');throw new Error('auth');}
+  if(!r.ok){const e=new Error(j.error||('오류 '+r.status));e.body=j;throw e;}
+  return j;
+}
+const post=(p,b)=>api(p,{method:'POST',body:JSON.stringify(b)});
+const put=(p,b)=>api(p,{method:'PUT',body:JSON.stringify(b)});
+function copyText(t){const fb=()=>{window.prompt('복사해서 사용하세요:',t);};if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(()=>alert('복사했어요'),fb);else fb();}
+function renderLogin(msg){
+  $('#nav').hidden=true;$('#btnLogout').hidden=true;
+  $('#main').innerHTML='<div class="card" id="loginCard"><h2>관리 PIN</h2><div class="row"><input id="pin" type="password" autocomplete="off" style="flex:1"><button class="btn" id="go">로그인</button></div>'+(msg?'<div class="err">'+esc(msg)+'</div>':'')+'</div>';
+  $('#go').onclick=async()=>{try{const j=await post('/admin/login',{pin:$('#pin').value});TOKEN=j.token;localStorage.setItem('wbr.admin.token',TOKEN);show(TAB);}catch(e){renderLogin(e.message);}};
+  $('#pin').onkeydown=(e)=>{if(e.key==='Enter')$('#go').click();};
+}
+function show(tab){TAB=tab;$('#nav').hidden=false;$('#btnLogout').hidden=false;document.querySelectorAll('nav button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.tab===tab)));({issues,edit,draft,send,stats,students})[tab]().catch(e=>{if(e.message!=='auth')$('#main').innerHTML='<div class="card"><div class="err">'+esc(e.message)+'</div></div>';});}
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>show(b.dataset.tab));
+$('#btnLogout').onclick=()=>{TOKEN=null;localStorage.removeItem('wbr.admin.token');renderLogin();};
+const tierSel=(id,cur,extra)=>'<select id="'+id+'">'+L.TIERS.map(t=>'<option value="'+t.id+'"'+(t.id===cur?' selected':'')+'>'+esc(t.label)+' '+esc(t.range)+'</option>').join('')+(extra||'')+'</select>';
+const appLink=(id,tier,print)=>'/letter/?id='+encodeURIComponent(id)+'&tier='+encodeURIComponent(tier)+(print?'&print='+print:'');
+const nextWeek=()=>{const d=new Date(Date.now()+7*86400e3);return L.weekId(d.getTime());};
+
+/* ── 호 목록 ── */
+async function issues(){
+  const j=await api('/letter/admin/issues');
+  const rows=j.issues.map(b=>'<tr><td><b>'+esc(L.weekLabel(b.week))+'</b><br><span class="muted">'+esc(b.id)+'</span></td><td>'+esc(b.title)+'<br><span class="muted">'+esc(b.theme||'')+'</span></td><td>'+esc(b.tiers.join(' '))+'<br><span class="muted">섹션 '+b.sections+'</span></td>'+
+    '<td>'+(b.status==='published'?(b.visible?'<span class="tag ok">발행</span>':'<span class="tag warn">발행 예정</span>'):'<span class="tag">초안</span>')+'<br><span class="muted">'+esc(b.publishAt)+'</span></td><td>'+b.opened+'</td><td class="muted">'+esc((b.updatedAt||'').slice(0,16).replace('T',' '))+'</td>'+
+    '<td><div class="row"><button class="btn sm ghost" data-edit="'+esc(b.id)+'">편집</button><button class="btn sm ghost" data-pv="'+esc(b.id)+'">미리보기</button><button class="btn sm ghost" data-pr="'+esc(b.id)+'">인쇄·PDF</button>'+
+    (b.status==='published'?'<button class="btn sm ghost" data-pub="'+esc(b.id)+'" data-to="draft">내리기</button>':'<button class="btn sm pub" data-pub="'+esc(b.id)+'" data-to="published">발행</button>')+
+    '<button class="btn sm ghost" data-send="'+esc(b.id)+'">발송 문구</button><button class="btn sm ghost" data-stat="'+esc(b.id)+'">열람</button><button class="btn sm danger" data-del="'+esc(b.id)+'">삭제</button></div></td></tr>').join('');
+  $('#main').innerHTML='<div class="card"><h2>새 호 만들기</h2><p class="muted">주차 id 는 ISO 주(월요일 시작). 발행일은 그 주 월요일이 기본이고 발행 뒤에도 바꿀 수 있다. 오늘은 '+esc(j.today)+' · 이번 주 '+esc(L.weekId())+'.</p>'+
+    '<div class="row"><label class="f">주차<input id="n_week" value="'+esc(nextWeek())+'" placeholder="2026-W40" style="width:140px"></label><button class="btn ghost" id="n_blank">빈 템플릿</button><button class="btn ghost" id="n_sample">샘플 호 복제</button><button class="btn" id="n_ai">AI 초안 만들기</button></div></div>'+
+    '<div class="card"><h2>호 목록 '+j.issues.length+'</h2><div class="tbl"><table><thead><tr><th>호</th><th>제목·주제</th><th>학년대</th><th>상태·발행일</th><th>열람</th><th>수정</th><th></th></tr></thead><tbody>'+(rows||'<tr><td colspan="7" class="muted">아직 호가 없습니다 — 위에서 만드세요. 학생 앱은 그동안 체험 호를 보여 줍니다.</td></tr>')+'</tbody></table></div><div id="i_msg"></div></div>'+
+    '<div class="card" id="pvBox" hidden></div>';
+  const weekOf=()=>{const w=($('#n_week').value||'').trim();if(!/^\d{4}-W\d{2}$/.test(w)){alert('주차는 YYYY-Www 형식');return null;}return w;};
+  $('#n_blank').onclick=()=>{const w=weekOf();if(!w)return;openEditor(JSON.stringify(L.blankIssue(w),null,2),'');};
+  $('#n_sample').onclick=async()=>{const w=weekOf();if(!w)return;const r=await fetch('/letter/issue-sample.json',{cache:'no-store'});const s=await r.json();s.id=w;s.week=w;s.publishAt=L.weekStart(w);s.status='draft';s.source='WB 독해력학원 자체 창작';openEditor(JSON.stringify(s,null,2),'');};
+  $('#n_ai').onclick=()=>{const w=weekOf();if(!w)return;DRAFT={week:w};show('draft');};
+  document.querySelectorAll('[data-edit]').forEach(b=>b.onclick=async()=>{const r=await api('/letter/admin/issue?id='+encodeURIComponent(b.dataset.edit));openEditor(JSON.stringify(r.issue,null,2),r.issue.id);});
+  document.querySelectorAll('[data-pv]').forEach(b=>b.onclick=()=>{const box=$('#pvBox');box.hidden=false;box.innerHTML='<h2>미리보기 링크 — '+esc(b.dataset.pv)+'</h2><p class="muted">관리자 로그인 상태의 이 브라우저에서만 열린다(학생 앱이 관리 토큰으로 초안도 보여 준다).</p><div class="row">'+L.TIERS.map(t=>'<a class="btn ghost" target="_blank" rel="noopener" href="'+appLink(b.dataset.pv,t.id)+'">'+esc(t.label)+'</a>').join('')+'</div>';box.scrollIntoView({behavior:'smooth'});});
+  document.querySelectorAll('[data-pr]').forEach(b=>b.onclick=()=>{const box=$('#pvBox');box.hidden=false;box.innerHTML='<h2>인쇄·PDF — '+esc(b.dataset.pr)+'</h2><p class="muted">새 탭이 열리며 인쇄 창이 뜬다. 대상을 "PDF로 저장"으로 고르면 파일. 종이로 받고 싶은 가정용은 학년대별로, 데스크 비치용은 전체 학년대로.</p>'+
+    '<h3>정답 별지 포함</h3><div class="row">'+L.TIERS.map(t=>'<a class="btn ghost" target="_blank" rel="noopener" href="'+appLink(b.dataset.pr,t.id,'1')+'">'+esc(t.label)+'</a>').join('')+'<a class="btn" target="_blank" rel="noopener" href="'+appLink(b.dataset.pr,'all','1')+'">전체 학년대</a></div>'+
+    '<h3>정답 없이(학습지)</h3><div class="row">'+L.TIERS.map(t=>'<a class="btn ghost" target="_blank" rel="noopener" href="'+appLink(b.dataset.pr,t.id,'nokey')+'">'+esc(t.label)+'</a>').join('')+'<a class="btn" target="_blank" rel="noopener" href="'+appLink(b.dataset.pr,'all','nokey')+'">전체 학년대</a></div>';box.scrollIntoView({behavior:'smooth'});});
+  document.querySelectorAll('[data-pub]').forEach(b=>b.onclick=async()=>{const to=b.dataset.to;let publishAt;if(to==='published'){publishAt=prompt('발행일(YYYY-MM-DD). 비우면 저장된 발행일 그대로',L.kstDate());if(publishAt===null)return;}
+    try{const r=await post('/letter/admin/publish',{id:b.dataset.pub,status:to,publishAt:publishAt||undefined});$('#i_msg').innerHTML='<div class="ok">'+esc(r.id)+' → '+(r.status==='published'?'발행('+esc(r.publishAt)+(r.visible?', 지금 보임':', 발행일에 열림')+')':'초안으로 내림')+'</div>';setTimeout(issues,700);}catch(e){$('#i_msg').innerHTML='<div class="err">'+esc(e.message)+'\n'+esc((e.body&&e.body.errors||[]).map(x=>x.where+' — '+x.msg).join('\n'))+'</div>';}});
+  document.querySelectorAll('[data-send]').forEach(b=>b.onclick=()=>{DRAFT=DRAFT||{};DRAFT.sendId=b.dataset.send;show('send');});
+  document.querySelectorAll('[data-stat]').forEach(b=>b.onclick=()=>{DRAFT=DRAFT||{};DRAFT.statId=b.dataset.stat;show('stats');});
+  document.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{if(prompt('지울 호의 id 를 다시 입력하세요 ('+b.dataset.del+')')!==b.dataset.del)return;try{await api('/letter/admin/issue',{method:'DELETE',body:JSON.stringify({id:b.dataset.del})});issues();}catch(e){alert(e.message);}});
+}
+function openEditor(text,id){EDIT={text,id,dirty:false};show('edit');}
+
+/* ── 편집 — JSON 편집기 + 검증 + 미리보기(학생 앱과 같은 renderIssue) ── */
+async function edit(){
+  if(!EDIT.text){$('#main').innerHTML='<div class="card"><h2>편집할 호가 없습니다</h2><p class="muted">[호 목록]에서 편집을 누르거나 새 호를 만드세요.</p></div>';return;}
+  $('#main').innerHTML='<div class="two"><div><div class="card"><h2>호 JSON '+(EDIT.id?'<span class="muted">'+esc(EDIT.id)+'</span>':'<span class="tag warn">아직 저장 안 됨</span>')+'</h2>'+
+    '<div class="grid-form"><label class="f">제목<input id="h_title"></label><label class="f">이번 주 주제<input id="h_theme"></label><label class="f">발행일<input id="h_pub" type="date"></label></div><label class="f" style="margin-top:8px">머리말<textarea id="h_intro" style="min-height:70px;font-family:inherit;font-size:13.5px"></textarea></label>'+
+    '<p class="muted">위 칸은 JSON 의 title·theme·publishAt·intro 를 바로 고친다. 섹션(읽을거리·문제·두뇌 놀이…)은 아래 JSON 에서 고친다 — 형식은 letter/README.md 의 스키마. 모든 글은 자체 창작이어야 한다(교재·기사·시험 문제를 옮기지 않는다).</p>'+
+    '<textarea id="e_json" class="json" spellcheck="false"></textarea>'+
+    '<div class="row" style="margin-top:8px"><button class="btn ghost" id="e_check">검증</button><button class="btn" id="e_save">저장</button><button class="btn pub" id="e_savepub">저장 후 발행</button><button class="btn ghost" id="e_dl">JSON 내려받기</button><span class="muted" id="e_status"></span></div><div id="e_msg"></div></div></div>'+
+    '<div><div class="card"><h2>미리보기 <span class="muted">학년대 '+tierSel('e_tier','E2')+'</span></h2><div class="preview" id="e_pv"></div></div></div></div>';
+  const ta=$('#e_json');ta.value=EDIT.text;
+  const parse=()=>{try{return JSON.parse(ta.value);}catch(e){$('#e_msg').innerHTML='<div class="err">JSON 이 아닙니다: '+esc(e.message)+'</div>';return null;}};
+  const fillHead=()=>{const o=(()=>{try{return JSON.parse(ta.value);}catch(e){return null;}})();if(!o)return;$('#h_title').value=o.title||'';$('#h_theme').value=o.theme||'';$('#h_pub').value=o.publishAt||'';$('#h_intro').value=o.intro||'';$('#e_status').textContent=o.status==='published'?'지금 상태: 발행 — [저장]은 발행 상태를 그대로 둔다':'지금 상태: 초안 — [저장]은 초안으로 남긴다';};
+  const applyHead=()=>{const o=parse();if(!o)return;o.title=$('#h_title').value;o.theme=$('#h_theme').value;o.publishAt=$('#h_pub').value;o.intro=$('#h_intro').value;ta.value=JSON.stringify(o,null,2);EDIT.text=ta.value;preview();};
+  ['h_title','h_theme','h_pub','h_intro'].forEach(id=>{$('#'+id).onchange=applyHead;});
+  const report=(r)=>'<div class="'+(r.errors.length?'err':'ok')+'">'+(r.errors.length?'오류 '+r.errors.length+'건 — 저장되지 않습니다\n'+esc(r.errors.map(x=>'· '+x.where+' — '+x.msg).join('\n')):'오류 없음')+'</div>'+(r.warnings.length?'<div class="warn">경고 '+r.warnings.length+'건(저장은 됨)\n'+esc(r.warnings.map(x=>'· '+x.where+' — '+x.msg).join('\n'))+'</div>':'');
+  const preview=()=>{const o=(()=>{try{return JSON.parse(ta.value);}catch(e){return null;}})();if(!o){$('#e_pv').innerHTML='<p class="muted">JSON 을 고치는 중…</p>';return;}$('#e_pv').innerHTML=L.renderIssue(o,$('#e_tier').value,{mode:'app'});};
+  let tmr=null;ta.oninput=()=>{EDIT.text=ta.value;EDIT.dirty=true;clearTimeout(tmr);tmr=setTimeout(()=>{preview();fillHead();},400);};
+  $('#e_tier').onchange=preview;
+  $('#e_check').onclick=()=>{const o=parse();if(!o)return;$('#e_msg').innerHTML=report(L.checkIssue(o));};
+  const save=async(pub)=>{const o=parse();if(!o)return;if(pub)o.status='published';else if(o.status!=='published')o.status='draft';const r=L.checkIssue(o);if(r.errors.length){$('#e_msg').innerHTML=report(r);return;}
+    try{const j=await put('/letter/admin/issue',{issue:o});EDIT.id=j.id;EDIT.dirty=false;ta.value=JSON.stringify(o,null,2);EDIT.text=ta.value;fillHead();$('#e_msg').innerHTML='<div class="ok">저장됨: '+esc(j.id)+' · '+(j.status==='published'?'발행(발행일 '+esc(o.publishAt)+')':'초안 — 학생에게는 아직 보이지 않는다. [호 목록]에서 발행')+'</div>'+(j.warnings.length?'<div class="warn">'+esc(j.warnings.map(x=>'· '+x.where+' — '+x.msg).join('\n'))+'</div>':'');}
+    catch(e){$('#e_msg').innerHTML='<div class="err">'+esc(e.message)+'\n'+esc((e.body&&e.body.errors||[]).map(x=>'· '+x.where+' — '+x.msg).join('\n'))+'</div>';}};
+  $('#e_save').onclick=()=>save(false);
+  $('#e_savepub').onclick=()=>{if(confirm('저장하고 바로 발행할까요? 발행일이 오늘 이하이면 학생·가족에게 즉시 보입니다.'))save(true);};
+  $('#e_dl').onclick=()=>{const o=parse();if(!o)return;const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(o,null,2)],{type:'application/json'}));a.download=(o.id||'letter')+'.json';a.click();};
+  fillHead();preview();
+}
+
+/* ── AI 초안 — 6조각(공통 + 학년대 5)을 차례로 부르고 한 호로 조립한다 ── */
+const IDX_DEFAULT={K:'PSI',E1:'FRI',E2:'WMI',E3:'FRI',M:'VCI'};
+async function draft(){
+  DRAFT=DRAFT||{};
+  const week=DRAFT.week||nextWeek();
+  const idxOpts=(cur)=>Object.keys(L.WISC).map(k=>'<option value="'+k+'"'+(k===cur?' selected':'')+'>'+esc(L.WISC[k].label)+' '+k+'</option>').join('');
+  $('#main').innerHTML='<div class="card"><h2>AI 초안 <span class="muted">Claude 가 조각별로 초안을 쓰고, 원장이 편집기에서 검수·수정한 뒤 발행한다. 초안은 발행되지 않는다.</span></h2>'+
+    '<div class="grid-form"><label class="f">주차<input id="d_week" value="'+esc(week)+'"></label><label class="f">발행일<input id="d_pub" type="date" value="'+esc(L.weekStart(week)||'')+'"></label><label class="f" style="grid-column:span 2">이번 주 주제<input id="d_theme" placeholder="예: 가을 곤충의 겨울나기 / 지도는 왜 위가 북쪽일까"></label></div>'+
+    '<label class="f" style="margin-top:8px">원장 메모(학원 소식·강조할 점·피할 것)<textarea id="d_notes" style="min-height:70px;font-family:inherit;font-size:13.5px"></textarea></label>'+
+    '<h3>이번 주 두뇌 놀이 지표(학년대별) — 매주 돌려 가며 다섯 지표를 고르게</h3><div class="grid-form">'+L.TIERS.map(t=>'<label class="f">'+esc(t.label)+'<select id="d_idx_'+t.id+'">'+idxOpts(IDX_DEFAULT[t.id])+'</select></label>').join('')+'</div>'+
+    '<div class="row" style="margin-top:10px"><button class="btn" id="d_go">초안 만들기 (6조각)</button><span class="muted" id="d_quota"></span></div>'+
+    '<ol class="steps" id="d_steps"></ol><div id="d_msg"></div></div>';
+  const parts=['shared','K','E1','E2','E3','M'];
+  const label=(p)=>p==='shared'?'공통(낱말 가족·칼럼·미션·소식)':L.tierLabel(p);
+  const stepsHtml=()=>$('#d_steps').innerHTML=parts.map(p=>{const r=DRAFT.parts&&DRAFT.parts[p];return '<li><span class="st">'+esc(label(p))+'</span> '+(r?(r.ok?'<span class="tag ok">완료</span>'+(r.errors&&r.errors.length?' <span class="tag bad">검증 오류 '+r.errors.length+'</span>':'')+(r.warnings&&r.warnings.length?' <span class="tag warn">경고 '+r.warnings.length+'</span>':''):'<span class="tag bad">실패: '+esc(r.reason)+'</span>'):(r===null?'<span class="tag">부르는 중…</span>':'<span class="muted">대기</span>'))+' <button class="btn sm ghost" data-retry="'+p+'"'+(r===null?' disabled':'')+'>'+(r?'다시':'이 조각만')+'</button></li>';}).join('');
+  const form=()=>({week:$('#d_week').value.trim(),publishAt:$('#d_pub').value,theme:$('#d_theme').value.trim(),notes:$('#d_notes').value,idx:Object.fromEntries(L.TIER_IDS.map(t=>[t,$('#d_idx_'+t).value]))});
+  const callPart=async(p)=>{const f=form();DRAFT.form=f;DRAFT.parts=DRAFT.parts||{};DRAFT.parts[p]=null;stepsHtml();
+    try{const j=await post('/letter/admin/draft',{part:p,theme:f.theme,week:f.week,publishAt:f.publishAt,notes:f.notes,brainIndex:p==='shared'?f.idx:f.idx[p]});DRAFT.parts[p]=j;if(j.aiCap!=null)$('#d_quota').textContent='오늘 남은 AI 호출 '+(j.aiLeft==null?'?':j.aiLeft)+'/'+j.aiCap;return j;}
+    catch(e){DRAFT.parts[p]={ok:false,reason:e.message};return DRAFT.parts[p];}finally{stepsHtml();bindRetry();}};
+  const assemble=()=>{const f=DRAFT.form,P=DRAFT.parts||{};const sh=P.shared&&P.shared.ok?P.shared:null;const secs=[];const pick=(p,idPrefix)=>{const r=P[p];if(!r||!r.ok)return[];return (r.sections||[]).filter(s=>s&&s.id&&s.id.indexOf(idPrefix)===0);};
+    L.TIER_IDS.forEach(t=>secs.push(...pick(t,'read-')));if(sh)secs.push(...(sh.sections||[]).filter(s=>s.type==='words'));L.TIER_IDS.forEach(t=>secs.push(...pick(t,'brain-')));
+    if(sh)secs.push(...(sh.sections||[]).filter(s=>s.type==='checklist'||s.type==='column'));L.TIER_IDS.forEach(t=>secs.push(...pick(t,'coach-')));if(sh)secs.push(...(sh.sections||[]).filter(s=>s.type==='notice'));
+    /* 조각이 id 규약을 안 지킨 섹션은 뒤에 붙인다 — 버리면 원장이 못 본다 */
+    Object.keys(P).forEach(p=>{const r=P[p];if(!r||!r.ok)return;(r.sections||[]).forEach(s=>{if(s&&!secs.includes(s))secs.push(s);});});
+    const issue={id:f.week,week:f.week,publishAt:f.publishAt||L.weekStart(f.week)||L.kstDate(),status:'draft',title:sh&&sh.head?sh.head.title:'',theme:sh&&sh.head?sh.head.theme:f.theme,intro:sh&&sh.head?sh.head.intro:'',source:'WB 독해력학원 자체 창작 (AI 초안, 원장 검수 전)',sections:secs};
+    const r=L.checkIssue(issue);
+    $('#d_msg').innerHTML='<div class="'+(r.errors.length?'warn':'ok')+'">조립 완료 — 섹션 '+secs.length+'개'+(r.errors.length?', 검증 오류 '+r.errors.length+'건(편집기에서 고친 뒤 저장)':'')+'</div><div class="row"><button class="btn" id="d_open">편집기로 보내기</button></div>';
+    $('#d_open').onclick=()=>openEditor(JSON.stringify(issue,null,2),'');};
+  const bindRetry=()=>document.querySelectorAll('[data-retry]').forEach(b=>b.onclick=async()=>{if(!form().theme){alert('주제를 적어 주세요');return;}await callPart(b.dataset.retry);assemble();});
+  $('#d_go').onclick=async()=>{const f=form();if(!f.theme){alert('이번 주 주제를 적어 주세요');return;}if(!/^\d{4}-W\d{2}$/.test(f.week)){alert('주차는 YYYY-Www');return;}
+    $('#d_go').disabled=true;DRAFT.parts={};stepsHtml();let stopped='';
+    for(const p of parts){const j=await callPart(p);if(!j.ok&&(j.reason==='no-key'||j.reason==='quota')){stopped=j.reason;break;}}
+    $('#d_go').disabled=false;
+    if(stopped){$('#d_msg').innerHTML='<div class="err">'+(stopped==='no-key'?'AI 키(ANTHROPIC_API_KEY)가 서버에 없습니다 — [호 목록]의 [빈 템플릿]이나 [샘플 호 복제]로 직접 쓰세요.':'오늘 AI 호출 한도를 다 썼습니다(LETTER_AI_DAILY). 내일 이어서 하거나 직접 쓰세요.')+'</div>';return;}
+    assemble();};
+  stepsHtml();bindRetry();
+  if(DRAFT.parts&&Object.keys(DRAFT.parts).length)assemble();
+}
+
+/* ── 발송 문구 — 학생마다 가족 링크 포함 문구. 링크가 없던 학생은 여기서 발급된다 ── */
+async function send(){
+  const list=await api('/letter/admin/issues');
+  const pub=list.issues.filter(b=>b.status==='published');
+  const cur=(DRAFT&&DRAFT.sendId)||(pub[0]&&pub[0].id)||(list.issues[0]&&list.issues[0].id)||'';
+  $('#main').innerHTML='<div class="card"><h2>발송 문구</h2><p class="muted">알림톡·문자로 보낼 문구를 학생마다 만든다. 가족 링크는 진로독서 학부모 리포트와 같은 링크(parent 토큰)라 가정마다 하나다. 링크는 동의서의 보호자 번호로만 보낸다.</p>'+
+    '<div class="row"><select id="s_id">'+list.issues.map(b=>'<option value="'+esc(b.id)+'"'+(b.id===cur?' selected':'')+'>'+esc(L.weekLabel(b.week))+' '+esc(b.title)+(b.status!=='published'?' (초안)':'')+'</option>').join('')+'</select><button class="btn" id="s_go">문구 만들기</button><button class="btn ghost" id="s_all" hidden>전체 복사</button><button class="btn ghost" id="s_links" hidden>링크 목록만 복사</button></div><div id="s_out"></div></div>';
+  const go=async()=>{const id=$('#s_id').value;if(!id)return;const j=await api('/letter/admin/messages?id='+encodeURIComponent(id));
+    const all=j.messages.map(m=>m.text).join('\n\n----------\n\n');const links=j.messages.map(m=>m.name+'\t'+m.cls+'\t'+m.link).join('\n');
+    $('#s_out').innerHTML='<p class="muted">'+j.messages.length+'명 · '+esc(L.weekLabel(j.issue.week))+' '+esc(j.issue.title)+(j.issue.status!=='published'?' — <b>아직 초안입니다. 발행 전에 보내면 링크를 열어도 호가 없습니다.</b>':'')+'</p><div class="tbl"><table><thead><tr><th>학생</th><th>반</th><th>학년대</th><th>문구</th><th></th></tr></thead><tbody>'+
+      j.messages.map((m,i)=>'<tr><td>'+esc(m.name)+'<br><span class="muted">'+esc(m.code)+'</span></td><td>'+esc(m.cls)+'</td><td>'+esc(m.tier)+'</td><td style="white-space:pre-wrap;font-size:12.5px">'+esc(m.text)+'</td><td><button class="btn sm ghost" data-cp="'+i+'">복사</button></td></tr>').join('')+'</tbody></table></div>';
+    $('#s_all').hidden=false;$('#s_links').hidden=false;$('#s_all').onclick=()=>copyText(all);$('#s_links').onclick=()=>copyText(links);
+    document.querySelectorAll('[data-cp]').forEach(b=>b.onclick=()=>copyText(j.messages[+b.dataset.cp].text));};
+  $('#s_go').onclick=go;if(cur)go();
+}
+
+/* ── 열람 현황 ── */
+async function stats(){
+  const list=await api('/letter/admin/issues');
+  const cur=(DRAFT&&DRAFT.statId)||(list.issues[0]&&list.issues[0].id)||'';
+  $('#main').innerHTML='<div class="card"><h2>열람 현황</h2><div class="row"><select id="t_id">'+list.issues.map(b=>'<option value="'+esc(b.id)+'"'+(b.id===cur?' selected':'')+'>'+esc(L.weekLabel(b.week))+' '+esc(b.title)+'</option>').join('')+'</select><button class="btn" id="t_go">보기</button></div><div id="t_out"></div></div>';
+  const go=async()=>{const id=$('#t_id').value;if(!id)return;const j=(await api('/letter/admin/stats?id='+encodeURIComponent(id))).stats;
+    $('#t_out').innerHTML='<h3>학년대별</h3><div class="tbl"><table><thead><tr><th>학년대</th><th>대상</th><th>열람</th><th>다 읽음</th></tr></thead><tbody>'+L.TIERS.map(t=>{const b=j.byTier[t.id];return '<tr><td>'+esc(t.label)+'</td><td>'+b.total+'</td><td>'+b.opened+'</td><td>'+b.done+'</td></tr>';}).join('')+'<tr><td><b>전체</b></td><td><b>'+j.total+'</b></td><td><b>'+j.opened+'</b></td><td></td></tr></tbody></table></div>'+
+      '<h3>아직 안 연 학생 '+j.unopened.length+'</h3><p class="muted">'+(j.unopened.map(u=>esc(u.name)+'('+esc(u.cls||u.tier)+')').join(' · ')||'없음')+'</p><p class="muted">가족 링크로 연 열람은 기기에만 남고 여기 잡히지 않는다 — 학생 토큰(앱 연동)으로 연 것만 센다.</p>'+
+      '<h3>문항별 정답률</h3><div class="tbl"><table><thead><tr><th>읽을거리</th><th>문항</th><th>유형</th><th>푼 학생</th><th>정답</th><th>정답률</th></tr></thead><tbody>'+(j.quiz.map(r=>'<tr><td>'+esc(r.title)+'</td><td>'+(r.qi+1)+'</td><td>'+esc(r.skill)+'</td><td>'+r.n+'</td><td>'+r.correct+'</td><td>'+(r.n?Math.round(r.correct/r.n*100)+'%':'—')+'</td></tr>').join('')||'<tr><td colspan="6" class="muted">문항 없음</td></tr>')+'</tbody></table></div>';};
+  $('#t_go').onclick=go;if(cur)go();
+}
+
+/* ── 학생 학년대 — 명부 학년에서 자동 판정, 틀리면 여기서 지정 ── */
+async function students(){
+  const j=await api('/letter/admin/students');
+  $('#main').innerHTML='<div class="card"><h2>학생 학년대 '+j.students.length+'명 <span class="muted">명부의 학년(초3·중1·7세…)으로 자동 판정한다. 못 읽으면 기본 '+esc(L.tierLabel('E2'))+'으로 보내며 표시가 뜬다 — 여기서 지정하면 그것이 이긴다.</span></h2>'+
+    '<div class="tbl"><table><thead><tr><th>코드</th><th>이름</th><th>학년·반</th><th>자동</th><th>지정</th><th>적용</th><th>가족 링크</th><th>앱</th></tr></thead><tbody>'+
+    j.students.map(s=>'<tr><td>'+esc(s.code)+'</td><td>'+esc(s.name)+'</td><td>'+esc(s.grade)+' '+esc(s.cls)+'</td><td>'+(s.autoTier?esc(L.tierLabel(s.autoTier)):'<span class="tag warn">못 읽음</span>')+'</td><td><select data-tier="'+esc(s.code)+'"><option value="">자동</option>'+L.TIERS.map(t=>'<option value="'+t.id+'"'+(s.letterTier===t.id?' selected':'')+'>'+esc(t.label)+'</option>').join('')+'</select></td><td><b>'+esc(L.tierLabel(s.tier))+'</b>'+(s.guess?' <span class="tag warn">추정</span>':'')+'</td><td>'+(s.hasLink?'<span class="tag ok">있음</span>':'<span class="muted">발송 문구에서 발급</span>')+'</td><td class="muted">'+(s.apps?esc(s.apps.join(',')):'재원생')+'</td></tr>').join('')+'</tbody></table></div><div id="u_msg"></div></div>';
+  document.querySelectorAll('[data-tier]').forEach(sel=>sel.onchange=async()=>{try{const r=await post('/letter/admin/tier',{code:sel.dataset.tier,tier:sel.value});$('#u_msg').innerHTML='<div class="ok">'+esc(r.code)+' → '+esc(L.tierLabel(r.tier))+(r.letterTier?'':' (자동)')+'</div>';}catch(e){$('#u_msg').innerHTML='<div class="err">'+esc(e.message)+'</div>';}});
+}
+if(TOKEN)show('issues');else renderLogin();
+</script>
+</body>
+</html>

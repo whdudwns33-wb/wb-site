@@ -10,6 +10,7 @@ on:
       - 'naesin/**'
       - 'haru/**'
       - 'naesin-ko/**'
+      - 'letter/**'
       - 'shared/**'
       # 배포 파이프라인 자체가 바뀌면 그 판으로 한 번 돌려 봐야 한다 — 이 줄이 없으면
       # 워크플로 수정은 CI 를 한 번도 안 거치고 들어가서, 다음 콘텐츠 변경 때 처음 터진다.
@@ -88,6 +89,10 @@ jobs:
         run: node haru/plan-build.test.mjs && node haru/sheet-build.test.mjs
       - name: 하루브레인 서버 채점·라우트 테스트
         run: node reading-server/haru-score.test.mjs && node reading-server/haru-api.test.mjs
+      - name: 브레인레터 순수 로직 테스트 (학년대·주차·검증기·렌더러·샘플 호)
+        run: node letter/letter.test.cjs
+      - name: 브레인레터 서버 라우트 테스트
+        run: node reading-server/letter-api.test.mjs
       - name: 내신브레인 AI 추출 테스트
         run: node reading-server/naesin-extract.test.mjs
       - name: 내신브레인 수업 라이브 세션 테스트

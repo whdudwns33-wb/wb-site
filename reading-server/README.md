@@ -16,6 +16,8 @@ ADMIN_PIN=원하는PIN node reading-server/server.mjs   # 기본 포트 8890
 | `/admin/vocab-review.html` | **워드브레인 AI 연상 검수함** (PIN 로그인) — 승인/반려 + 학생별 어휘 현황 |
 | `/review.html` | 지문 검수 뷰어 + **발행/초안 원클릭 전환** (PIN 로그인) |
 | `/parent.html?t=…` | 학부모 주간 리포트 (학생별 열람 토큰, 로그인 불필요, 읽기 전용) |
+| `/letter/` · `/letter/?t=…` | **브레인레터** 주간 뉴스레터 — 학생 앱 / 가족 링크(같은 학부모 토큰) / [PDF로 저장] |
+| `/admin/letter-admin.html` | **브레인레터 관리** (PIN 로그인) — 호 편집·AI 초안·발행·발송 문구·열람 현황 |
 | `/api/health` | 상태 확인 |
 
 ### 워드브레인 (분리 가능한 A 구조)
@@ -27,6 +29,14 @@ ADMIN_PIN=원하는PIN node reading-server/server.mjs   # 기본 포트 8890
 - AI 연상은 `ANTHROPIC_API_KEY` 시크릿 필요(모델 기본 `claude-opus-5`, `VOCAB_AI_MODEL`로 변경). 키가 없으면 해당 기능만 "미설정" 안내로 동작.
 - **밤 9시 물주기 푸시**: 페이로드 없는 Web Push(암호화 불필요·무의존성). `node reading-server/gen-vapid.mjs`로 키 생성 → `VAPID_PUBLIC_KEY`·`VAPID_PRIVATE_JWK` 시크릿 등록. 학생이 리포트 탭에서 "밤 9시 알림 켜기" → 21:00 KST 크론이 **물 줄 단어가 있는 구독자에게만** 발송(404/410이면 구독 자동 정리). 키가 없으면 알림 카드만 비활성.
 - 승인 반영 루프: 학생이 고른 연상이 검수 전(pending)이면 앱이 접속 때마다 `mnemonic/check`로 확인 — 승인되면 승인본으로 교체, 반려되면 제거(재생성 가능).
+
+### 브레인레터 (주간 뉴스레터 — `letter/`)
+
+- 라우트는 `/api/letter/*` 아래, 데이터는 `letter:` 접두 KV(로컬: `db.letter`) — 로직은 `letter-api.mjs` 한 모듈, 검증기·렌더러는 `letter/letter.js`.
+- 가족: `GET /api/letter/parent?t=토큰[&id=]`(진로독서 학부모 토큰 공용, 로그인 없음) → `{parent, issue, issues}`.
+- 학생(Bearer): `GET /api/letter/issues` / `GET /api/letter/issue?id=` (발행일이 지난 호만, 자기 학년대 섹션만) / `GET·PUT /api/letter/state`(150KB, 하루 10회).
+- 관리(PIN): `GET /api/letter/admin/issues` · `GET·PUT·DELETE /api/letter/admin/issue` · `POST /api/letter/admin/publish {id,status,publishAt?}` · `GET /api/letter/admin/students` · `POST /api/letter/admin/tier {code,tier}` · `GET /api/letter/admin/messages?id=`(발송 문구 + 가족 링크 발급) · `GET /api/letter/admin/stats?id=` · `POST /api/letter/admin/draft {part,theme,week,…}`(AI 초안 한 조각 — `ANTHROPIC_API_KEY`, 한도 `LETTER_AI_DAILY` 기본 30).
+- 화면: `/letter/`(학생·가족·체험·관리 미리보기 `?id=&tier=&print=`) · `/admin/letter-admin.html`.
 
 ## 동작 방식
 
