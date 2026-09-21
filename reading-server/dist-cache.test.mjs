@@ -168,9 +168,10 @@ t('관리 화면들이 dist/admin/ 에 실린다 — 하나 빠지면 그 화면
   assert.ok(!fs.readdirSync(haruDir).some((f) => /pack-sample|paperkey|plans|kor-master-data|sheet/.test(f)), 'dist/haru/ 에 문항·대응표·플랜이 실렸다');
   assert.ok(!fs.readFileSync(path.join(haruDir, 'atoms.json'), 'utf8').includes('answerKey'), 'atoms.json 에 문항이 있다');
   /* 브레인레터 배포본 — 앱 껍데기 + 렌더러 + 자체 창작 체험 호. 관리 편집기가 부르는 /admin/letter.js 는 절대 경로라 verifyRefs 가 못 보니 여기서 지킨다 */
-  for (const f of ['index.html', 'letter.js', 'shapes.js', 'issue-sample.json', 'calendar.json', 'sw.js', 'manifest.webmanifest', 'icon.svg', 'img/leaf-autumn.svg', 'img/cover-autumn.svg'])
+  for (const f of ['index.html', 'letter.js', 'shapes.js', 'drills.js', 'voice.js', 'trace.js', 'issue-sample.json', 'calendar.json', 'sw.js', 'manifest.webmanifest', 'icon.svg', 'img/leaf-autumn.svg', 'img/cover-autumn.svg'])
     assert.ok(fs.existsSync(path.join(DIST, 'letter', f)), 'dist/letter/' + f + ' 가 없다');
   assert.ok(fs.existsSync(path.join(DIST, 'admin', 'letter.js')), 'dist/admin/letter.js 가 없다 — 관리 편집기의 미리보기·검증이 통째로 죽는다');
+  for (const f of ['shapes.js', 'drills.js']) assert.ok(fs.existsSync(path.join(DIST, 'admin', f)), 'dist/admin/' + f + ' 가 없다 — 미리보기의 놀이 자리가 빈다');
   /* 글꼴 — fonts.css 가 가리키는 조각이 전부 dist 에 있어야 한다. 하나라도 빠지면 그 구간 글자만 다른 글꼴로 찍힌다 */
   const fcss = fs.readFileSync(path.join(DIST, 'letter', 'fonts', 'fonts.css'), 'utf8');
   const refs = [...fcss.matchAll(/url\(([^)]+)\)/g)].map((m) => m[1]);

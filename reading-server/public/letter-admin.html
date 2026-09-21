@@ -45,6 +45,7 @@
 <main id="main"></main>
 <script src="/admin/letter.js"></script>
 <script src="/admin/shapes.js"></script>
+<script src="/admin/drills.js"></script>
 <script>
 'use strict';
 const L=WBLETTER;
@@ -167,7 +168,7 @@ async function draft(){
     '<div class="row" style="margin-top:10px"><button class="btn" id="d_go">초안 만들기 (7조각)</button><span class="muted" id="d_quota"></span></div>'+
     '<ol class="steps" id="d_steps"></ol><div id="d_msg"></div></div>';
   const parts=['shared','K','E1','E2','E3','M','news'];
-  const label=(p)=>p==='shared'?'공통(낱말 가족·칼럼·미션)':p==='news'?'교육·입시 이슈(웹 검색으로 그 주 소식)':L.tierLabel(p);
+  const label=(p)=>p==='shared'?'공통(낱말 가족·시·대화 카드·책·칼럼·미션)':p==='news'?'교육·입시 이슈(웹 검색으로 그 주 소식)':L.tierLabel(p);
   const stepsHtml=()=>$('#d_steps').innerHTML=parts.map(p=>{const r=DRAFT.parts&&DRAFT.parts[p];return '<li><span class="st">'+esc(label(p))+'</span> '+(r?(r.ok?'<span class="tag ok">완료</span>'+(r.errors&&r.errors.length?' <span class="tag bad">검증 오류 '+r.errors.length+'</span>':'')+(r.warnings&&r.warnings.length?' <span class="tag warn">경고 '+r.warnings.length+'</span>':''):'<span class="tag bad">실패: '+esc(r.reason)+'</span>'):(r===null?'<span class="tag">부르는 중…</span>':'<span class="muted">대기</span>'))+' <button class="btn sm ghost" data-retry="'+p+'"'+(r===null?' disabled':'')+'>'+(r?'다시':'이 조각만')+'</button></li>';}).join('');
   const form=()=>({week:$('#d_week').value.trim(),publishAt:$('#d_pub').value,theme:$('#d_theme').value.trim(),notes:$('#d_notes').value,idx:Object.fromEntries(L.TIER_IDS.map(t=>[t,$('#d_idx_'+t).value]))});
   const callPart=async(p)=>{const f=form();DRAFT.form=f;DRAFT.parts=DRAFT.parts||{};DRAFT.parts[p]=null;stepsHtml();
@@ -175,7 +176,7 @@ async function draft(){
     catch(e){DRAFT.parts[p]={ok:false,reason:e.message};return DRAFT.parts[p];}finally{stepsHtml();bindRetry();}};
   const assemble=()=>{const f=DRAFT.form,P=DRAFT.parts||{};const sh=P.shared&&P.shared.ok?P.shared:null;const secs=[];const pick=(p,idPrefix)=>{const r=P[p];if(!r||!r.ok)return[];return (r.sections||[]).filter(s=>s&&s.id&&s.id.indexOf(idPrefix)===0);};
     L.TIER_IDS.forEach(t=>secs.push(...pick(t,'read-')));if(sh)secs.push(...(sh.sections||[]).filter(s=>s.type==='words'));L.TIER_IDS.forEach(t=>secs.push(...pick(t,'brain-')));
-    if(sh)secs.push(...(sh.sections||[]).filter(s=>s.type==='checklist'||s.type==='column'));L.TIER_IDS.forEach(t=>secs.push(...pick(t,'coach-')));secs.push(...pick('news','news'));if(sh)secs.push(...(sh.sections||[]).filter(s=>s.type==='notice'));
+    if(sh)secs.push(...(sh.sections||[]).filter(s=>s.type==='poem'||s.type==='talk'));L.TIER_IDS.forEach(t=>secs.push(...pick(t,'write-')));if(sh)secs.push(...(sh.sections||[]).filter(s=>s.type==='checklist'||s.type==='column'||s.type==='books'));L.TIER_IDS.forEach(t=>secs.push(...pick(t,'coach-')));secs.push(...pick('news','news'));if(sh)secs.push(...(sh.sections||[]).filter(s=>s.type==='notice'));
     /* 조각이 id 규약을 안 지킨 섹션은 뒤에 붙인다 — 버리면 원장이 못 본다 */
     Object.keys(P).forEach(p=>{const r=P[p];if(!r||!r.ok)return;(r.sections||[]).forEach(s=>{if(s&&!secs.includes(s))secs.push(s);});});
     fillFigures(secs);
@@ -251,6 +252,7 @@ async function stats(){
   const go=async()=>{const id=$('#t_id').value;if(!id)return;const j=(await api('/letter/admin/stats?id='+encodeURIComponent(id))).stats;
     $('#t_out').innerHTML='<h3>학년대별</h3><div class="tbl"><table><thead><tr><th>학년대</th><th>대상</th><th>열람</th><th>다 읽음</th></tr></thead><tbody>'+L.TIERS.map(t=>{const b=j.byTier[t.id];return '<tr><td>'+esc(t.label)+'</td><td>'+b.total+'</td><td>'+b.opened+'</td><td>'+b.done+'</td></tr>';}).join('')+'<tr><td><b>전체</b></td><td><b>'+j.total+'</b></td><td><b>'+j.opened+'</b></td><td></td></tr></tbody></table></div>'+
       '<h3>학생별 진행 — 하루 한 장(7일)</h3><div class="tbl"><table><thead><tr><th>학생</th><th>학년대</th>'+L.DAY_PLAN.map(p=>'<th title="'+esc(p.name)+'">'+p.day+'일</th>').join('')+'<th>다 읽음</th></tr></thead><tbody>'+((j.progress||[]).map(r=>'<tr><td>'+esc(r.name)+(r.cls?' <span class="muted">'+esc(r.cls)+'</span>':'')+'</td><td>'+esc(r.tier)+'</td>'+r.days.map(d=>'<td>'+(d?'●':'<span class="muted">○</span>')+'</td>').join('')+'<td>'+(r.done?'✔':'')+'</td></tr>').join('')||'<tr><td colspan="10" class="muted">아직 연 학생이 없습니다</td></tr>')+'</tbody></table></div>'+
+      '<h3>이번 주 아이들이 쓴 문장 '+((j.writes||[]).length)+'</h3><p class="muted">다음 호 [지난 호 독자의 답](voices)에 실을 문장을 고른다 — 지면에는 이름을 줄여 적는다(김○○·초3).</p><div class="tbl"><table><thead><tr><th>학생</th><th>학년대</th><th>자리</th><th>문장</th></tr></thead><tbody>'+((j.writes||[]).map(w=>'<tr><td>'+esc(w.name)+'</td><td>'+esc(w.tier)+'</td><td class="muted">'+esc(w.key)+'</td><td>'+esc(w.text)+'</td></tr>').join('')||'<tr><td colspan="4" class="muted">아직 없습니다</td></tr>')+'</tbody></table></div>'+
       '<h3>아직 안 연 학생 '+j.unopened.length+'</h3><p class="muted">'+(j.unopened.map(u=>esc(u.name)+'('+esc(u.cls||u.tier)+')').join(' · ')||'없음')+'</p><p class="muted">가족 링크로 연 것도 기록이 서버로 올라와 여기 잡힌다(앱 연동 학생과 같은 자리). 요일 칸은 [오늘 장 다 읽었어요]를 누른 날이다.</p>'+
       '<h3>문항별 정답률</h3><div class="tbl"><table><thead><tr><th>읽을거리</th><th>문항</th><th>유형</th><th>푼 학생</th><th>정답</th><th>정답률</th></tr></thead><tbody>'+(j.quiz.map(r=>'<tr><td>'+esc(r.title)+'</td><td>'+(r.qi+1)+'</td><td>'+esc(r.skill)+'</td><td>'+r.n+'</td><td>'+r.correct+'</td><td>'+(r.n?Math.round(r.correct/r.n*100)+'%':'—')+'</td></tr>').join('')||'<tr><td colspan="6" class="muted">문항 없음</td></tr>')+'</tbody></table></div>';};
   $('#t_go').onclick=go;if(cur)go();

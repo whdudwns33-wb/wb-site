@@ -79,7 +79,8 @@ t('검증기 — 섹션 규칙(id 중복·모르는 type·학년대·문항 정�
   assert.ok(bad((i) => { i.sections[0].questions[0].skill = 'guess'; }).some((e) => /skill/.test(e)));
   const brain = SAMPLE.sections.findIndex((s) => s.type === 'brain');
   assert.ok(bad((i) => { i.sections[brain].index = 'IQ'; }).some((e) => /index/.test(e)));
-  assert.ok(bad((i) => { i.sections[brain].items[0].answer = ''; }).some((e) => /answer/.test(e)));
+  const bi = SAMPLE.sections[brain].items.findIndex((it) => !it.figure && !it.drill);   // 생성기 항목(figure·drill)은 answer 가 없어도 된다
+  assert.ok(bad((i) => { i.sections[brain].items[bi].answer = ''; }).some((e) => /answer/.test(e)));
   const words = SAMPLE.sections.findIndex((s) => s.type === 'words');
   assert.ok(bad((i) => { i.sections[words].words = []; }).some((e) => /words/.test(e)));
   assert.ok(bad((i) => { i.sections[words].family = { hanja: '色' }; }).some((e) => /family/.test(e)));
@@ -101,7 +102,7 @@ t('검증기 — 400KB 를 넘는 호는 막는다(학생 기기·KV 한 값 상
 
 t('학년대 선택 — 자기 학년대 섹션 + all 만, 원래 순서 그대로', () => {
   const e2 = L.forTier(SAMPLE, 'E2');
-  assert.deepEqual(e2.sections.map((s) => s.id), ['read-e2', 'words', 'brain-e2', 'mission', 'column', 'coach-e2', 'news']);
+  assert.deepEqual(e2.sections.map((s) => s.id), ['read-e2', 'words', 'brain-e2', 'mission', 'column', 'coach-e2', 'poem', 'talk', 'write-e2', 'books', 'voices', 'news']);
   assert.equal(e2.tier, 'E2');
   const k = L.forTier(SAMPLE, 'K');
   assert.ok(!k.sections.some((s) => s.type === 'words'), '유치부에는 한자어 낱말 가족이 없다');
@@ -137,7 +138,7 @@ t('렌더러 — 학년대 섹션만, 모든 문자열 이스케이프, 앱 모�
   const noKey = L.renderIssue(i, 'M', { mode: 'print', key: false });
   assert.ok(!/정답과 해설/.test(noKey), '정답 없이 인쇄');
   /* 상태 — 고른 보기·펼친 정답·미션 체크가 다시 그려진다 */
-  const st = { quiz: { 'read-k:0': 1 }, reveal: { 'brain-k:0': true }, checks: { 'mission:1': true } };
+  const st = { quiz: { 'read-k:0': 1 }, reveal: { 'brain-k:1': true }, checks: { 'mission:1': true } };
   const withState = L.renderIssue(i, 'K', { mode: 'app', state: st });
   assert.ok(/class="np-choice ok"[^>]*data-q="read-k:0:0"/.test(withState), '정답 보기에 ok');
   assert.ok(/class="np-choice no"[^>]*data-q="read-k:0:1"/.test(withState), '고른 오답에 no');
@@ -282,10 +283,19 @@ t('하루 한 장 — 발행일이 1일째, 7일에 나눠 읽고, 그 학년대
   assert.equal(L.dayOf(SAMPLE, at('2026-10-30')), 7, '지난 호는 7일째에 머문다');
   assert.equal(L.dayDate(SAMPLE, 3), '2026-09-23'); assert.equal(L.dayDow(SAMPLE, 3), '수');
   assert.equal(L.DAY_PLAN.length, 7);
-  const d1 = L.dayPage(SAMPLE, 'E2', 1); assert.deepEqual(d1.items.map((x) => x.part), ['lead', 'read']); assert.equal(d1.items[1].opts.noQuiz, true);
-  const d2 = L.dayPage(SAMPLE, 'E2', 2); assert.equal(d2.items[0].opts.foldText, true);
-  const d5 = L.dayPage(SAMPLE, 'E2', 5); assert.ok(d5.items.some((x) => x.part === 'column') && d5.items.some((x) => x.part === 'news') && d5.items.some((x) => x.part === 'coach'));
-  const k3 = L.dayPage(SAMPLE, 'K', 3); assert.equal(k3.again, true, '유치부는 한자 코너가 없어 읽을거리를 다시 읽는다'); assert.equal(k3.items[0].section.id, 'read-k');
+  const d1 = L.dayPage(SAMPLE, 'E2', 1); assert.deepEqual(d1.items.map((x) => x.part), ['lead', 'read', 'poem', 'talk', 'daily']); assert.equal(d1.items[1].opts.noQuiz, true);
+  const d2 = L.dayPage(SAMPLE, 'E2', 2); assert.equal(d2.items[0].opts.foldText, true); assert.deepEqual(d2.items.map((x) => x.part), ['read', 'write', 'daily']);
+  assert.deepEqual(L.dayPage(SAMPLE, 'E2', 3).items.map((x) => x.part), ['words', 'cloze', 'daily']);
+  assert.deepEqual(L.dayPage(SAMPLE, 'E2', 6).items.map((x) => x.part), ['checklist', 'voices', 'daily']);
+  assert.ok(!L.dayPage(SAMPLE, 'E2', 7).items.some((x) => x.part === 'daily'), '7일째엔 오늘의 5분이 없다');
+  const d5 = L.dayPage(SAMPLE, 'E2', 5); assert.deepEqual(d5.items.map((x) => x.part), ['column', 'news', 'books', 'coach', 'daily']);
+  const noVocab = clone(SAMPLE); noVocab.sections.find((x) => x.id === 'read-k').vocab = [];
+  const k3 = L.dayPage(noVocab, 'K', 3); assert.equal(k3.again, true, '유치부는 한자 코너도 낱말 복습도 없으면 읽을거리를 다시 읽는다'); assert.equal(k3.items[0].section.id, 'read-k');
+  assert.ok(L.dayPage(SAMPLE, 'K', 3).items.some((x) => x.part === 'cloze'), '낱말 노트가 있으면 유치부도 낱말 복습');
+  /* day 지정 — 종류로 정한 날 대신 그날에 */
+  const moved = clone(SAMPLE); moved.sections.find((x) => x.id === 'write-e2').day = 6;
+  assert.ok(!L.dayPage(moved, 'E2', 2).items.some((x) => x.part === 'write') && L.dayPage(moved, 'E2', 6).items.some((x) => x.part === 'write'));
+  moved.sections.find((x) => x.id === 'write-e2').day = 9; assert.ok(errs(moved).some((e) => /day 는 1~7/.test(String(e.msg || e))));
   assert.equal(L.dayPage(SAMPLE, 'E2', 7).items[0].part, 'review');
 });
 
@@ -307,6 +317,80 @@ t('하루 한 장 렌더 — 1일째는 문제 없이, 2일째는 본문을 접�
   assert.ok(/np-sday done" data-day="1"/.test(strip) && /np-sday cur" data-day="3"/.test(strip) && /np-sday future" data-day="5"/.test(strip));
   assert.ok(!/data-tts=|np-trace|data-zoom/.test(L.renderIssue(SAMPLE, 'E2', { mode: 'print' })), '인쇄본에는 단추·캔버스·돋보기가 없다');
   assert.ok(/mix-blend-mode:multiply/.test(L.CSS) && /aspect-ratio:16\/10/.test(L.CSS) && /scroll-snap-type/.test(L.CSS), '앱 사진 규칙(종이 질감·표지 비율·스냅 갤러리)');
+});
+
+
+t('고정 코너 — 시(낭독·필사)·가족 대화 카드·한 문장 쓰기·책 한 권·독자의 답: 검증 규칙과 렌더', () => {
+  const i = clone(SAMPLE);
+  assert.deepEqual(errs(i), []);
+  const app = L.renderDay(i, 'E2', 1, { mode: 'app', state: {} });
+  assert.ok(/np-poem/.test(app) && /data-tts="poem"/.test(app) && /data-p="poem:0"/.test(app), '시는 행마다 낭독 표식');
+  assert.ok(/np-bubble/.test(app), '대화 카드');
+  const d2 = L.renderDay(i, 'E2', 2, { mode: 'app', state: { write: { 'write-e2:0': '잎이 <색>을 바꿔요' } } });
+  assert.ok(/<textarea class="np-ta" data-write="write-e2:0"[^>]*>잎이 &lt;색&gt;을 바꿔요<\/textarea>/.test(d2), '쓴 글은 이스케이프해서 되살린다');
+  const pr = L.renderIssue(i, 'E2', { mode: 'print' });
+  assert.ok(!/<textarea/.test(pr) && /np-lines-tall/.test(pr), '인쇄본은 쓸 줄');
+  const d5 = L.renderDay(i, 'E2', 5, { mode: 'app', state: {} });
+  assert.ok(/np-books/.test(d5) && /강아지똥/.test(d5) && /np-for/.test(d5));
+  const d6 = L.renderDay(i, 'E2', 6, { mode: 'app', state: {} });
+  assert.ok(/np-voices/.test(d6) && /np-quote/.test(d6));
+  /* 규칙 */
+  const bad = clone(SAMPLE);
+  bad.sections.find((x) => x.id === 'poem').lines = []; assert.ok(errs(bad).some((e) => /lines/.test(String(e.msg || e))));
+  const b2 = clone(SAMPLE); b2.sections.find((x) => x.id === 'write-e2').prompts = [{ q: '' }]; assert.ok(errs(b2).some((e) => /prompts\[0\]/.test(String(e.msg || e))));
+  const b3 = clone(SAMPLE); b3.sections.find((x) => x.id === 'books').items[0].why = ''; assert.ok(errs(b3).some((e) => /why/.test(String(e.msg || e))));
+  const b4 = clone(SAMPLE); b4.sections.find((x) => x.id === 'voices').items[0].who = 'x'.repeat(21); assert.ok(errs(b4).some((e) => /who/.test(String(e.msg || e))));
+  const b5 = clone(SAMPLE); b5.sections.find((x) => x.id === 'talk').items = []; assert.ok(errs(b5).some((e) => /items/.test(String(e.msg || e))));
+  assert.deepEqual(L.SECTION_TYPES.slice(-5), ['poem', 'talk', 'write', 'books', 'voices']);
+});
+
+t('5분 놀이(drill) — 두뇌 놀이 항목에 seed 만 싣고 답은 생성기가; 지표가 다르면 경고, 답이 다르면 오류', () => {
+  const D = require('./drills.js');
+  const i = clone(SAMPLE);
+  const b = i.sections.find((x) => x.id === 'brain-e2');
+  assert.ok(b.items.some((it) => it.drill && it.drill.kind === 'span'), '샘플 E2 두뇌 놀이에 거꾸로 말하기 생성기');
+  const app = L.renderIssue(i, 'E2', { mode: 'app' });
+  assert.ok(/np-dr-seq/.test(app), '숫자열이 그려진다');
+  const g = D.make({ kind: 'span', seed: 12, tier: 'E2' });
+  assert.ok(L.renderIssue(i, 'E2', { mode: 'print' }).includes(g.answerText), '정답 별지에 생성기 답');
+  b.items[0].answer = '1 – 2'; assert.ok(errs(i).some((e) => /생성기와 다릅니다/.test(String(e.msg || e))));
+  b.items[0].answer = g.answerText; assert.deepEqual(errs(i), []);
+  b.items[0].drill = { kind: 'nope', seed: 1 }; assert.ok(errs(i).some((e) => /drill 은/.test(String(e.msg || e))));
+  b.items[0].drill = { kind: 'symbols', seed: 3 }; delete b.items[0].answer;
+  const w = L.checkIssue(i).warnings; assert.ok(w.some((x) => /놀이 종류\(PSI\)가 섹션 지표\(WMI\)/.test(x.msg)), '지표 불일치 경고');
+});
+
+t('낱말 복습(cloze) — 낱말 노트에서 저절로, 같은 seed 면 같은 문제, 3일째에 실리고 답이 기록된다', () => {
+  const rd = SAMPLE.sections.find((x) => x.id === 'read-e2');
+  const a = L.clozeFor(rd, 5), b = L.clozeFor(rd, 5);
+  assert.deepEqual(a, b); assert.ok(a.length >= 3 && a.length <= 4);
+  a.forEach((q) => { assert.ok(q.q.includes('____')); assert.equal(q.choices.length, 4); assert.ok(q.answer >= 0 && q.answer < 4); assert.ok(!q.q.includes(q.choices[q.answer]), '빈칸 문장에 답이 남아 있지 않다'); });
+  assert.deepEqual(L.clozeFor({ paragraphs: ['x'], vocab: [{ word: 'a', easy: 'b' }] }, 1), [], '낱말이 둘 미만이면 없다');
+  const d3 = L.renderDay(SAMPLE, 'E2', 3, { mode: 'app', state: {} });
+  assert.ok(/np-cloze/.test(d3) && /data-q="cloze-read-e2:0:0"/.test(d3));
+  const items = L.clozeFor(rd, L.weekIndex('2026-W39') || 1);
+  const st = { quiz: { 'cloze-read-e2:0': items[0].answer } };
+  assert.ok(/맞았어요!/.test(L.renderDay(SAMPLE, 'E2', 3, { mode: 'app', state: st })));
+  assert.ok(/<b>1<\/b>\/1<span>낱말 복습/.test(L.renderDay(SAMPLE, 'E2', 7, { mode: 'app', state: st })), '되돌아보기에 낱말 복습 점수');
+});
+
+t('오늘의 5분 — 1~6일째 매일 같은 자리에, 주차·학년대·요일이 문제를 정하고 정답 보기가 기록된다', () => {
+  const D = require('./drills.js');
+  for (let d = 1; d <= 6; d++) {
+    const h = L.renderDay(SAMPLE, 'E1', d, { mode: 'app', state: {} });
+    assert.ok(/np-daily5/.test(h) && new RegExp('data-ans="daily-' + d + ':0"').test(h), d + '일째');
+  }
+  const dd = D.daily(SAMPLE.week, 'E1', 2), g = D.make(dd);
+  const open = L.renderDay(SAMPLE, 'E1', 2, { mode: 'app', state: { reveal: { 'daily-2:0': true } } });
+  assert.ok(open.includes(g.answerText) && /정답 숨기기/.test(open));
+  assert.ok(!/np-daily5/.test(L.renderIssue(SAMPLE, 'E1', { mode: 'print' })), '인쇄본(신문)에는 없다');
+});
+
+t('되돌아보기 — 이번 주 내가 쓴 문장이 실린다', () => {
+  const st = { write: { 'write-e2:0': '잎은 색소가 달라져서 색이 변해요' } };
+  const h = L.renderDay(SAMPLE, 'E2', 7, { mode: 'app', state: st });
+  assert.ok(/이번 주 내가 쓴 문장/.test(h) && /잎은 색소가 달라져서/.test(h));
+  assert.ok(!/이번 주 내가 쓴 문장/.test(L.renderDay(SAMPLE, 'E2', 7, { mode: 'app', state: {} })));
 });
 
 console.log(`\nOK — ${passed}개 통과 (${path.basename(__filename)})`);

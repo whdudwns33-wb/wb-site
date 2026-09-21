@@ -38,18 +38,20 @@ var WBLETTER = (function () {
   var TIER_OFFSET = { M: 0, E1: 1, E3: 2, E2: 3, K: 4 };
   var BASE_WEEK = '2026-W39';
 
-  var SECTION_TYPES = ['read', 'words', 'brain', 'column', 'coach', 'notice', 'checklist', 'news'];
-  var KICKER = { read: '이번 주 읽을거리', words: '한자 코너', brain: '두뇌 놀이터', column: '학부모 칼럼', coach: '한 줄 코칭', notice: '학원 게시판', checklist: '이번 주 미션', news: '이번 주 교육·입시 이슈' };
+  var SECTION_TYPES = ['read', 'words', 'brain', 'column', 'coach', 'notice', 'checklist', 'news', 'poem', 'talk', 'write', 'books', 'voices'];
+  var KICKER = { read: '이번 주 읽을거리', words: '한자 코너', brain: '두뇌 놀이터', column: '학부모 칼럼', coach: '한 줄 코칭', notice: '학원 게시판', checklist: '이번 주 미션', news: '이번 주 교육·입시 이슈',
+    /* 어린이 잡지가 매 호 같은 자리에 두는 고정 코너들 — 시 한 편(낭독·필사), 가족 대화 카드, 한 문장 쓰기(요약·질문 만들기·기자 되기), 책 한 권, 지난 호 독자의 답 */
+    poem: '이번 주 시 한 편', talk: '가족 대화 카드', write: '한 문장 쓰기', books: '이번 주 책 한 권', voices: '지난 호 독자의 답', cloze: '낱말 복습', daily: '오늘의 5분 · 두뇌 놀이' };
   /* 하루 한 장 — 한 호를 7일에 나눠 읽는다. 신문 한 부를 한자리에서 다 읽지 않듯 하루에 한 장씩 여는 리듬이라야
      기억에 남고(간격을 둔 반복) 가족 대화도 매일 한 토막씩 생긴다. 발행일이 1일째, 요일은 실제 날짜에서 센다.
      잠그지는 않는다 — 주말에 몰아 보는 가정도 있고, 지난 장을 다시 여는 것이 곧 복습이다. */
   var DAY_PLAN = [
-    { day: 1, name: '읽을거리', sub: '이번 주 글을 읽어요', parts: ['lead', 'read-text'] },
-    { day: 2, name: '읽고 답해요', sub: '어제 읽은 글로 문제를 풀어요', parts: ['read-quiz'] },
-    { day: 3, name: '한자 코너', sub: '낱말 가족을 익히고 손으로 써 봐요', parts: ['words'] },
+    { day: 1, name: '읽을거리', sub: '이번 주 글을 읽고, 시 한 편을 소리 내어 읽어요', parts: ['lead', 'read-text', 'poem', 'talk'] },
+    { day: 2, name: '읽고 답해요', sub: '어제 읽은 글로 문제를 풀고 한 문장으로 요약해요', parts: ['read-quiz', 'write'] },
+    { day: 3, name: '한자 코너', sub: '낱말 가족을 익히고 손으로 써 봐요', parts: ['words', 'cloze'] },
     { day: 4, name: '두뇌 놀이터', sub: '머리를 쓰는 놀이를 해요', parts: ['brain'] },
-    { day: 5, name: '학부모의 밤', sub: '부모님이 읽는 장이에요 — 칼럼과 이번 주 교육 이슈', parts: ['column', 'news', 'coach'] },
-    { day: 6, name: '미션 점검', sub: '이번 주 미션을 마무리해요', parts: ['checklist', 'notice'] },
+    { day: 5, name: '학부모의 밤', sub: '부모님이 읽는 장이에요 — 칼럼·교육 이슈·책 한 권', parts: ['column', 'news', 'books', 'coach'] },
+    { day: 6, name: '미션 점검', sub: '이번 주 미션을 마무리하고 친구들의 답을 읽어요', parts: ['checklist', 'voices', 'notice'] },
     { day: 7, name: '되돌아보기', sub: '내 답과 정답을 맞춰 보고 한 주를 마쳐요', parts: ['review'] },
   ];
   var SKILLS = ['main', 'detail', 'infer', 'vocab', 'apply', 'critical'];
@@ -81,6 +83,12 @@ var WBLETTER = (function () {
   function shapesLib() {
     if (typeof WBSHAPES !== 'undefined') return WBSHAPES;
     if (typeof require === 'function') { try { return require('./shapes.js'); } catch (e) { return null; } }
+    return null;
+  }
+  /* 5분 두뇌 놀이 생성기(drills.js) — 시공간 밖 네 지표. 도형과 같은 방식으로 seed 만 싣는다 */
+  function drillsLib() {
+    if (typeof WBDRILLS !== 'undefined') return WBDRILLS;
+    if (typeof require === 'function') { try { return require('./drills.js'); } catch (e) { return null; } }
     return null;
   }
 
@@ -245,7 +253,7 @@ var WBLETTER = (function () {
     if (!Array.isArray(issue.sections) || !issue.sections.length) { E('sections', '섹션이 하나도 없습니다'); return { errors: errors, warnings: warnings }; }
     var ids = {};
     var covered = {}; TIER_IDS.forEach(function (t) { covered[t] = { read: 0, brain: 0 }; });
-    var SH = shapesLib();
+    var SH = shapesLib(), DR = drillsLib();
     issue.sections.forEach(function (s, i) {
       var tag = 'sections[' + i + ']' + (isObj(s) && s.id ? ' ' + s.id : '');
       if (!isObj(s)) { E(tag, '섹션이 객체가 아닙니다'); return; }
@@ -267,6 +275,7 @@ var WBLETTER = (function () {
         arr.forEach(function (x, k) { if (typeof x !== 'string' || !x.trim()) { E(tag, name + '[' + k + '] 이 비었습니다'); ok = false; } else if (maxLen && x.length > maxLen) E(tag, name + '[' + k + '] 이 너무 깁니다(' + maxLen + '자)'); });
         return ok;
       };
+      if (s.day != null && !(Number.isInteger(s.day) && s.day >= 1 && s.day <= 7)) E(tag, 'day 는 1~7(하루 한 장에서 열리는 날)');
       if (s.type !== 'checklist') checkImage(s.image, tag + ' image', E);
       if (s.images != null) {
         if (s.type !== 'read' && s.type !== 'column' && s.type !== 'notice') E(tag, 'images(여러 장)는 읽을거리·칼럼·게시판에만');
@@ -313,14 +322,24 @@ var WBLETTER = (function () {
         else s.items.forEach(function (it, k) {
           var itag = tag + ' items[' + k + ']';
           if (!isObj(it)) { E(itag, '항목이 객체가 아닙니다'); return; }
-          if (it.figure != null) {
+          if (it.drill != null) {
+            /* 5분 놀이 — 도형과 같은 규칙: seed 만 싣고 정답은 생성기가 낸다 */
+            if (!DR) W(itag, '놀이 생성기(drills.js)가 없어 drill 을 검사하지 못했습니다');
+            else if (!DR.isValidDrill(it.drill)) E(itag, 'drill 은 {kind: span|symbols|sequence|common|odd-word, seed: 1~999999}');
+            else {
+              /* 놀이는 학년대에 따라 난이도(길이·격자)가 달라 답도 다르다 — 이 섹션의 학년대들 중 하나와 맞으면 통과. 비워 두는 편이 안전하다 */
+              var dgs = (validTiers.length ? validTiers : ['']).map(function (tt) { return DR.make(Object.assign({}, it.drill, { tier: tt })); }).filter(Boolean);
+              if (dgs.length && str(it.answer).trim() && !dgs.some(function (g) { return it.answer.trim() === g.answerText; })) E(itag, '놀이 정답이 생성기와 다릅니다 — 생성기 답: ' + dgs[0].answerText + ' (answer 를 비우면 자동)');
+              if (dgs.length && dgs[0].index !== s.index) W(itag, '놀이 종류(' + dgs[0].index + ')가 섹션 지표(' + s.index + ')와 다릅니다');
+            }
+          } else if (it.figure != null) {
             /* 도형 놀이 — 그림은 생성기가 seed 로 만들고, 정답도 생성기가 정한다. JSON 의 answer 는 그 답과 같아야 한다
                (원장이 답을 손으로 고쳐 어긋난 채 발행되면 아이가 맞히고도 틀렸다는 소리를 듣는다) */
             if (!SH) { W(itag, '도형 생성기(shapes.js)가 없어 figure 를 검사하지 못했습니다'); }
             else if (!SH.isValidFigure(it.figure)) E(itag, 'figure 는 {kind: odd|rotate|mirror|blocks|complete, seed: 1~999999}');
             else {
-              var g = SH.make(it.figure);
-              if (g && str(it.answer).trim() && it.answer.trim() !== g.answerText) E(itag, '도형 정답이 생성기와 다릅니다 — 생성기 답: ' + g.answerText + ' (answer 를 비우면 자동)');
+              var fgs = (validTiers.length ? validTiers : ['']).map(function (tt) { return SH.make(Object.assign({}, it.figure, { tier: tt })); }).filter(Boolean);
+              if (fgs.length && str(it.answer).trim() && !fgs.some(function (g) { return it.answer.trim() === g.answerText; })) E(itag, '도형 정답이 생성기와 다릅니다 — 생성기 답: ' + fgs[0].answerText + ' (answer 를 비우면 자동)');
             }
             if (it.prompt != null && typeof it.prompt !== 'string') E(itag, 'prompt 는 문자열');
           } else {
@@ -341,6 +360,40 @@ var WBLETTER = (function () {
         strList(s.items, 'items', 1, 10, 400);
       } else if (s.type === 'checklist') {
         strList(s.items, 'items', 1, 8, 200);
+      } else if (s.type === 'poem') {
+        /* 시는 연 사이에 빈 줄이 있다 — 빈 문자열을 연 나누기로 허용하되 전부 비면 안 된다 */
+        if (!Array.isArray(s.lines) || s.lines.length < 1 || s.lines.length > 24) E(tag, 'lines 는 1~24줄');
+        else {
+          s.lines.forEach(function (l, k) { if (typeof l !== 'string') E(tag, 'lines[' + k + '] 은 문자열'); else if (l.length > 120) E(tag, 'lines[' + k + '] 이 너무 깁니다(120자)'); });
+          if (!s.lines.some(function (l) { return typeof l === 'string' && l.trim(); })) E(tag, '시가 비었습니다');
+        }
+        if (s.author != null && (typeof s.author !== 'string' || s.author.length > 40)) E(tag, 'author 는 40자 이내 문자열 — 자체 창작 시만 싣는다');
+        if (s.task != null && (typeof s.task !== 'string' || s.task.length > 200)) E(tag, 'task 는 200자 이내 문자열');
+      } else if (s.type === 'talk') {
+        strList(s.items, 'items', 1, 5, 200);
+      } else if (s.type === 'write') {
+        if (!Array.isArray(s.prompts) || !s.prompts.length || s.prompts.length > 4) E(tag, 'prompts 는 1~4개');
+        else s.prompts.forEach(function (pq, k) {
+          if (!isObj(pq) || !str(pq.q).trim() || pq.q.length > 200) E(tag, 'prompts[' + k + '] q 는 1~200자');
+          if (isObj(pq) && pq.hint != null && (typeof pq.hint !== 'string' || pq.hint.length > 200)) E(tag, 'prompts[' + k + '] hint 는 200자 이내');
+        });
+      } else if (s.type === 'books') {
+        if (!Array.isArray(s.items) || !s.items.length || s.items.length > 4) E(tag, '책은 1~4권');
+        else s.items.forEach(function (b, k) {
+          var btag = tag + ' items[' + k + ']';
+          if (!isObj(b)) { E(btag, '항목이 객체가 아닙니다'); return; }
+          if (!str(b.title).trim() || b.title.length > 80) E(btag, 'title 은 1~80자');
+          if (b.author != null && (typeof b.author !== 'string' || b.author.length > 60)) E(btag, 'author 는 60자 이내');
+          if (!str(b.why).trim() || b.why.length > 300) E(btag, 'why(왜 이 책인가)는 1~300자');
+          if (b.for != null && (typeof b.for !== 'string' || b.for.length > 40)) E(btag, 'for 는 40자 이내');
+        });
+      } else if (s.type === 'voices') {
+        /* 지난 호 독자의 답 — 이름은 원장이 줄여 적는다(성·이니셜). 아이 이름 전체가 지면에 나가지 않게 20자 상한 */
+        if (!Array.isArray(s.items) || !s.items.length || s.items.length > 8) E(tag, '독자의 답은 1~8개');
+        else s.items.forEach(function (v, k) {
+          if (!isObj(v) || !str(v.who).trim() || v.who.length > 20) E(tag, 'items[' + k + '] who 는 1~20자');
+          if (!isObj(v) || !str(v.text).trim() || v.text.length > 300) E(tag, 'items[' + k + '] text 는 1~300자');
+        });
       } else if (s.type === 'news') {
         /* 교육·입시 이슈 — 학원 소식 대신 그 주의 교육·입시 뉴스를 3~5건 간추린다. 출처(기관·언론명) 없는 항목은 싣지 않고,
            링크는 https 원문만 받는다(앱에서만 열리고 인쇄본에는 출처명만 찍힌다) */
@@ -407,7 +460,15 @@ var WBLETTER = (function () {
         { id: 'mission', type: 'checklist', tiers: 'all', title: '이번 주 미션', items: [''] },
         { id: 'column', type: 'column', tiers: 'all', title: '', byline: '편집실', image: null, paragraphs: [''], takeaway: '' },
         coach('K', '유치부'), coach('E1', '초1~2'), coach('E2', '초3~4'), coach('E3', '초5~6'), coach('M', '중등'),
+        { id: 'poem', type: 'poem', tiers: ['K', 'E1', 'E2'], title: '', author: 'WB 편집실', lines: [''], task: '' },
+        { id: 'talk', type: 'talk', tiers: 'all', title: '오늘 저녁, 이 세 가지를 물어봐 주세요', items: ['', '', ''] },
+        { id: 'write-e1', type: 'write', tiers: ['E1'], title: '한 문장으로', prompts: [{ q: '', hint: '' }] },
+        { id: 'write-e2', type: 'write', tiers: ['E2'], title: '한 문장으로', prompts: [{ q: '', hint: '' }] },
+        { id: 'write-e3', type: 'write', tiers: ['E3'], title: '한 문장으로', prompts: [{ q: '', hint: '' }] },
+        { id: 'write-m', type: 'write', tiers: ['M'], title: '한 문장으로', prompts: [{ q: '', hint: '' }] },
+        { id: 'books', type: 'books', tiers: 'all', title: '이번 주 책 한 권', items: [{ title: '', author: '', why: '', for: '' }] },
         { id: 'news', type: 'news', tiers: 'all', title: '이번 주 교육·입시 이슈', items: [{ title: '', summary: '', why: '', source: '', url: '', date: '' }] },
+        { id: 'voices', type: 'voices', tiers: 'all', title: '지난 호 독자의 답', items: [{ who: '', text: '' }] },
         { id: 'notice', type: 'notice', tiers: 'all', title: '학원 게시판', items: [''] },
       ],
     };
@@ -494,10 +555,16 @@ var WBLETTER = (function () {
     if (s.task) h += '<div class="np-task">✎ ' + esc(s.task) + (o.mode === 'print' ? '<div class="np-lines"></div>' : '') + '</div>';
     return h + '</section>';
   }
+  /* 두뇌 놀이 항목의 답 — 손으로 적은 answer, 도형 생성기, 5분 놀이 생성기 중 하나 */
+  function brainAnswer(it, tier) {
+    var SH = shapesLib(), DR = drillsLib();
+    var gen = it.figure && SH ? SH.make(Object.assign({}, it.figure, { tier: tier || it.figure.tier || '' })) : (it.drill && DR ? DR.make(Object.assign({}, it.drill, { tier: tier || it.drill.tier || '' })) : null);
+    return { gen: gen, prompt: str(it.prompt).trim() || (gen ? gen.prompt : ''), answer: gen ? gen.answerText : str(it.answer), hint: str(it.hint) || (gen ? gen.hint : '') };
+  }
   function renderBrain(s, tier, o) {
     var st = o.state || {};
     var w = WISC[s.index] || { label: '', reading: '' };
-    var SH = shapesLib();
+    var SH = shapesLib(), DR = drillsLib();
     var h = secOpen(s, '', (s.minutes ? ' · ' + s.minutes + '분' : ''));
     h += '<h2>' + esc(s.title) + '</h2><div class="np-idx"><b>' + esc(w.label) + '</b> ' + esc(s.index) + ' — ' + esc(w.reading) + '</div>';
     h += photo(s.image, o);
@@ -505,12 +572,10 @@ var WBLETTER = (function () {
     (s.items || []).forEach(function (it, i) {
       var key = s.id + ':' + i;
       var open = st.reveal && st.reveal[key];
-      var gen = it.figure && SH ? SH.make(Object.assign({}, it.figure, { tier: tier || it.figure.tier || '' })) : null;
-      var prompt = str(it.prompt).trim() || (gen ? gen.prompt : '');
-      var answer = gen ? gen.answerText : str(it.answer);
-      var hint = str(it.hint) || (gen ? gen.hint : '');
+      var ba = brainAnswer(it, tier), prompt = ba.prompt, answer = ba.answer, hint = ba.hint;
       h += '<div class="np-bi"><p class="np-bp"><span class="np-qn">' + (i + 1) + '</span>' + esc(prompt).replace(/\n/g, '<br>') + '</p>';
       if (it.figure) h += (SH ? SH.html(Object.assign({}, it.figure, { tier: tier || it.figure.tier || '' })) : '<div class="np-fig np-fig-missing">도형은 앱 화면에서 볼 수 있어요.</div>');
+      else if (it.drill) h += (DR ? DR.html(Object.assign({}, it.drill, { tier: tier || it.drill.tier || '' })) : '<div class="np-dr np-dr-missing">놀이는 앱 화면에서 볼 수 있어요.</div>');
       if (Array.isArray(it.grid) && it.grid.length) h += '<pre class="np-grid">' + it.grid.map(esc).join('\n') + '</pre>';
       if (o.mode === 'print') h += '<div class="np-blank">답 ______</div>';
       else {
@@ -553,8 +618,7 @@ var WBLETTER = (function () {
       }
       if (s.type === 'brain' && Array.isArray(s.items)) {
         rows += '<div class="np-krow"><b>' + esc(s.title) + '</b><ol>' + s.items.map(function (it) {
-          var gen = it.figure && SH ? SH.make(Object.assign({}, it.figure, { tier: tier || '' })) : null;
-          var ans = gen ? gen.answerText : str(it.answer), hint = str(it.hint) || (gen ? gen.hint : '');
+          var ba = brainAnswer(it, tier), ans = ba.answer, hint = ba.hint;
           return '<li>' + esc(ans) + (hint ? ' <span class="np-ex">(' + esc(hint) + ')</span>' : '') + '</li>';
         }).join('') + '</ol></div>';
       }
@@ -571,7 +635,92 @@ var WBLETTER = (function () {
     });
     return h + '</ol></section>';
   }
-  var RENDER = { read: renderRead, words: renderWords, brain: renderBrain, column: renderColumn, coach: renderCoach, notice: renderNotice, checklist: renderChecklist, news: renderNews };
+  function renderPoem(s, tier, o) {
+    var h = secOpen(s) + '<h2>' + esc(s.title) + '</h2>' + (s.author ? '<div class="np-byline">' + esc(s.author) + '</div>' : '');
+    if (o.mode !== 'print' && !o.noTts) h += '<div class="np-tts"><button type="button" class="np-ttsbtn" data-tts="' + esc(s.id) + '">🔊 읽어 주기</button><span class="np-tts-msg"></span></div>';
+    h += '<div class="np-poem">' + (s.lines || []).map(function (l, i) { return str(l).trim() ? '<p class="np-line" data-p="' + esc(s.id) + ':' + i + '">' + esc(l) + '</p>' : '<p class="np-line np-stanza"></p>'; }).join('') + '</div>';
+    /* 필사 — 신문 활용 교육에서 효과가 검증된 활동. 화면에서는 안내만, 인쇄본에는 옮겨 쓸 줄을 준다 */
+    h += '<div class="np-task">✎ ' + esc(s.task || '마음에 드는 두 줄을 골라 소리 내어 읽고, 공책에 또박또박 옮겨 써 보세요.') + (o.mode === 'print' ? '<div class="np-lines np-lines-tall"></div>' : '') + '</div>';
+    return h + '</section>';
+  }
+  function renderTalk(s, tier, o) {
+    return secOpen(s) + '<h2>' + esc(s.title) + '</h2><ul class="np-talk">' + (s.items || []).map(function (q) { return '<li><span class="np-bubble">' + esc(q) + '</span></li>'; }).join('') + '</ul>' +
+      '<p class="np-ex">답이 아니라 이유를 물어봐 주세요 — "왜 그렇게 생각해?" 한 마디면 충분해요.</p></section>';
+  }
+  function renderWrite(s, tier, o) {
+    var st = o.state || {};
+    var h = secOpen(s) + '<h2>' + esc(s.title) + '</h2>';
+    (s.prompts || []).forEach(function (pq, i) {
+      var key = s.id + ':' + i, saved = st.write && typeof st.write[key] === 'string' ? st.write[key] : '';
+      h += '<div class="np-wq"><p class="np-qq"><span class="np-qn">' + (i + 1) + '</span>' + esc(pq.q) + '</p>' + (pq.hint ? '<p class="np-ex">' + esc(pq.hint) + '</p>' : '');
+      if (o.mode === 'print') h += '<div class="np-lines np-lines-tall"></div>';
+      else h += '<textarea class="np-ta" data-write="' + esc(key) + '" maxlength="300" rows="3" placeholder="여기에 써 보세요 (300자까지)">' + esc(saved) + '</textarea><div class="np-ta-note">쓰면 저절로 저장돼요. 7일째 되돌아보기에서 다시 볼 수 있어요.</div>';
+      h += '</div>';
+    });
+    return h + '</section>';
+  }
+  function renderBooks(s, tier, o) {
+    return secOpen(s) + '<h2>' + esc(s.title) + '</h2>' + photo(s.image, o) + '<ul class="np-books">' + (s.items || []).map(function (b) {
+      return '<li><b>' + esc(b.title) + '</b>' + (b.author ? ' <span class="np-hanja">' + esc(b.author) + '</span>' : '') + (b.for ? ' <span class="np-for">' + esc(b.for) + '</span>' : '') + '<p>' + esc(b.why) + '</p></li>';
+    }).join('') + '</ul></section>';
+  }
+  function renderVoices(s, tier, o) {
+    return secOpen(s) + '<h2>' + esc(s.title) + '</h2><ul class="np-voices">' + (s.items || []).map(function (v) { return '<li><span class="np-quote">' + esc(v.text) + '</span><span class="np-who">— ' + esc(v.who) + '</span></li>'; }).join('') + '</ul></section>';
+  }
+  /* 낱말 복습 — 읽을거리의 낱말 노트에서 저절로 만든다: 본문에서 그 낱말이 든 문장을 찾아 빈칸으로. 사람이 문제를 더 짓지 않아도
+     3일째에 어제 읽은 글의 낱말을 한 번 더 만난다(간격 반복) */
+  function clozeFor(read, seed) {
+    if (!isObj(read) || !Array.isArray(read.vocab) || read.vocab.length < 2) return [];
+    var rnd = shapesLib() ? shapesLib().seeded(seed || 1) : function () { return 0.5; };
+    var sentences = [];
+    (read.paragraphs || []).forEach(function (p) { String(p).split(/(?<=[.!?。])\s+/).forEach(function (x) { if (x.trim()) sentences.push(x.trim()); }); });
+    var words = read.vocab.map(function (v) { return str(v.word).trim(); }).filter(Boolean);
+    var items = [];
+    words.forEach(function (w) {
+      if (items.length >= 4) return;
+      var sent = null;
+      for (var i = 0; i < sentences.length; i++) if (sentences[i].indexOf(w) >= 0) { sent = sentences[i]; break; }
+      if (!sent) return;
+      var others = words.filter(function (x) { return x !== w; });
+      var picked = [];
+      var pool = others.slice();
+      while (picked.length < 3 && pool.length) picked.push(pool.splice(Math.floor(rnd() * pool.length), 1)[0]);
+      var choices = picked.concat([w]);
+      for (var k = choices.length - 1; k > 0; k--) { var j = Math.floor(rnd() * (k + 1)); var t = choices[k]; choices[k] = choices[j]; choices[j] = t; }
+      items.push({ q: sent.split(w).join('____'), choices: choices, answer: choices.indexOf(w), why: '본문: ' + sent });
+    });
+    return items;
+  }
+  function renderCloze(read, tier, o) {
+    var items = clozeFor(read, weekIndex(str(read.id).slice(0, 8)) || 1), st = o.state || {};
+    if (!items.length) return '';
+    var sid = 'cloze-' + read.id;
+    var h = '<section class="np-sec np-cloze" id="sec-' + esc(sid) + '"><div class="np-kicker">' + KICKER.cloze + '</div><h2>어제 읽은 글의 낱말, 빈칸에 무엇이 들어갈까요?</h2><div class="np-qs">';
+    items.forEach(function (q, qi) {
+      var picked = st.quiz && st.quiz[sid + ':' + qi], done = typeof picked === 'number';
+      h += '<div class="np-q"><p class="np-qq"><span class="np-qn">' + (qi + 1) + '</span>' + esc(q.q) + '</p><div class="np-choices">';
+      q.choices.forEach(function (c, ci) {
+        var cls = 'np-choice' + (done ? (ci === q.answer ? ' ok' : (ci === picked ? ' no' : ' dim')) : '');
+        if (o.mode === 'print') h += '<div class="np-choice static">' + CIRCLED[ci] + ' ' + esc(c) + '</div>';
+        else h += '<button type="button" class="' + cls + '" data-q="' + esc(sid) + ':' + qi + ':' + ci + '"' + (done ? ' disabled' : '') + '>' + CIRCLED[ci] + ' ' + esc(c) + '</button>';
+      });
+      h += '</div>' + (o.mode !== 'print' && done ? '<div class="np-why ' + (picked === q.answer ? 'ok' : 'no') + '">' + (picked === q.answer ? '맞았어요! ' : '정답은 ' + CIRCLED[q.answer] + '이에요. ') + esc(q.why) + '</div>' : '') + '</div>';
+    });
+    return h + '</div></section>';
+  }
+  /* 오늘의 5분 — 매일 같은 자리에 놓이는 고정 놀이(어린이 잡지의 숨은그림찾기처럼). 주차·학년대·요일이 문제를 정한다 */
+  function renderDaily(issue, tier, day, o) {
+    var DR = drillsLib(); if (!DR) return '';
+    var d = DR.daily(issue.week, tier || '', day), g = DR.make(d);
+    if (!g) return '';
+    var st = o.state || {}, key = 'daily-' + day + ':0', open = st.reveal && st.reveal[key];
+    var w = WISC[g.index] || { label: '', reading: '' };
+    var h = '<section class="np-sec np-brain np-daily5" id="sec-daily-' + day + '"><div class="np-kicker">' + KICKER.daily + '</div><h2>' + esc(g.label) + '</h2>' +
+      '<div class="np-idx"><b>' + esc(w.label) + '</b> ' + esc(g.index) + ' — ' + esc(w.reading) + '</div><p class="np-bp">' + esc(g.prompt) + '</p>' + DR.html(d);
+    if (o.mode !== 'print') { h += '<button type="button" class="np-reveal" data-ans="' + esc(key) + '">' + (open ? '정답 숨기기' : '정답 보기') + '</button>'; if (open) h += '<div class="np-ans">' + esc(g.answerText) + (g.hint ? '<br><span class="np-ex">' + esc(g.hint) + '</span>' : '') + '</div>'; }
+    return h + '</section>';
+  }
+  var RENDER = { read: renderRead, words: renderWords, brain: renderBrain, column: renderColumn, coach: renderCoach, notice: renderNotice, checklist: renderChecklist, news: renderNews, poem: renderPoem, talk: renderTalk, write: renderWrite, books: renderBooks, voices: renderVoices };
 
   /* ── 하루 한 장 ── */
   function dayStart(issue) { return isObj(issue) ? (isValidDate(issue.publishAt) ? issue.publishAt : weekStart(issue.week)) : null; }
@@ -592,17 +741,22 @@ var WBLETTER = (function () {
     var plan = DAY_PLAN[Math.min(7, Math.max(1, day | 0)) - 1];
     var view = TIER_BY_ID[tier] ? forTier(issue, tier) : issue;
     var secs = (view.sections || []).filter(isObj);
-    var of = function (type) { return secs.filter(function (x) { return x.type === type; }); };
+    /* 섹션의 day 지정이 있으면 그날에만 — 없으면 종류로 정한 날(쓰기는 2일째가 기본이고 day:6 으로 미션 날에 둘 수 있다) */
+    var placed = function (x) { return Number.isInteger(x.day) && x.day >= 1 && x.day <= 7; };
+    var of = function (type) { return secs.filter(function (x) { return x.type === type && (!placed(x) || x.day === plan.day); }); };
     var items = [];
     plan.parts.forEach(function (part) {
       if (part === 'lead') items.push({ part: 'lead' });
       else if (part === 'read-text') of('read').forEach(function (x) { items.push({ part: 'read', section: x, opts: { noQuiz: true } }); });
       else if (part === 'read-quiz') of('read').forEach(function (x) { if (Array.isArray(x.questions) && x.questions.length) items.push({ part: 'read', section: x, opts: { foldText: true, noTts: true } }); });
+      else if (part === 'cloze') secs.filter(function (x) { return x.type === 'read'; }).forEach(function (x) { if (clozeFor(x, 1).length) items.push({ part: 'cloze', section: x }); });
       else if (part === 'review') items.push({ part: 'review' });
       else of(part).forEach(function (x) { items.push({ part: part, section: x, opts: {} }); });
     });
+    secs.filter(function (x) { return placed(x) && x.day === plan.day; }).forEach(function (x) { if (!items.some(function (it) { return it.section === x; }) && RENDER[x.type]) items.push({ part: x.type, section: x, opts: {} }); });
     var again = !items.some(function (it) { return it.section || it.part === 'review'; });
     if (again) of('read').forEach(function (x) { items.push({ part: 'read', section: x, opts: { noQuiz: true } }); });
+    if (plan.day < 7) items.push({ part: 'daily' });
     return { day: plan.day, name: plan.name, sub: plan.sub, date: dayDate(issue, plan.day), dow: dayDow(issue, plan.day), items: items, again: again };
   }
   /* 7일째 — 내가 고른 답과 정답을 나란히. 안 푼 문제는 정답을 바로 보이지 않고 풀 기회를 남긴다 */
@@ -621,15 +775,20 @@ var WBLETTER = (function () {
       }
       if (s.type === 'brain' && Array.isArray(s.items)) {
         rows += '<div class="np-krow"><b>' + esc(s.title) + '</b><ol>' + s.items.map(function (it) {
-          var gen = it.figure && SH ? SH.make(Object.assign({}, it.figure, { tier: tier || '' })) : null;
-          var ans = gen ? gen.answerText : str(it.answer), hint = str(it.hint) || (gen ? gen.hint : '');
+          var ba = brainAnswer(it, tier), ans = ba.answer, hint = ba.hint;
           return '<li>' + esc(ans) + (hint ? ' <span class="np-ex">(' + esc(hint) + ')</span>' : '') + '</li>';
         }).join('') + '</ol></div>';
       }
       if (s.type === 'checklist') (s.items || []).forEach(function (t, i) { cTotal += 1; if (st.checks && st.checks[s.id + ':' + i]) checks += 1; });
     });
+    var czTotal = 0, czOk = 0, writes = [];
+    (view.sections || []).forEach(function (s) {
+      if (s.type === 'read') clozeFor(s, weekIndex(str(s.id).slice(0, 8)) || 1).forEach(function (q, qi) { var pk = st.quiz && st.quiz['cloze-' + s.id + ':' + qi]; if (typeof pk === 'number') { czTotal += 1; if (pk === q.answer) czOk += 1; } });
+      if (s.type === 'write') (s.prompts || []).forEach(function (pq, i) { var v = st.write && st.write[s.id + ':' + i]; if (typeof v === 'string' && v.trim()) writes.push({ q: pq.q, a: v.trim() }); });
+    });
     var h = '<section class="np-sec np-review"><div class="np-kicker">이번 주 돌아보기</div><h2>' + esc(view.title) + '</h2>';
-    if (total || cTotal) h += '<div class="np-score">' + (total ? '<div><b>' + correct + '</b>/' + total + '<span>맞힌 문제</span></div>' : '') + (cTotal ? '<div><b>' + checks + '</b>/' + cTotal + '<span>마친 미션</span></div>' : '') + '</div>';
+    if (total || cTotal || czTotal) h += '<div class="np-score">' + (total ? '<div><b>' + correct + '</b>/' + total + '<span>맞힌 문제</span></div>' : '') + (czTotal ? '<div><b>' + czOk + '</b>/' + czTotal + '<span>낱말 복습</span></div>' : '') + (cTotal ? '<div><b>' + checks + '</b>/' + cTotal + '<span>마친 미션</span></div>' : '') + '</div>';
+    if (writes.length) h += '<div class="np-mywrite"><div class="np-boxhead">이번 주 내가 쓴 문장</div>' + writes.map(function (w) { return '<p class="np-ex">' + esc(w.q) + '</p><p class="np-mine">' + esc(w.a) + '</p>'; }).join('') + '</div>';
     if (total && answered < total) h += '<p class="np-howto">아직 안 푼 문제가 ' + (total - answered) + '개 있어요. 화요일 장에서 풀고 다시 오면 여기서 맞춰 볼 수 있어요.</p>';
     h += rows;
     if (o.nextTheme) h += '<div class="np-next"><b>다음 주 예고</b>' + esc(o.nextTheme) + '</div>';
@@ -650,6 +809,10 @@ var WBLETTER = (function () {
           photo(issue.cover, o, 'np-cover') + (issue.intro ? '<p class="np-intro">' + esc(issue.intro).replace(/\n/g, '<br>') + '</p>' : '') + '</div>';
       } else if (it.part === 'review') {
         h += renderReview(view, t, o);
+      } else if (it.part === 'cloze') {
+        h += renderCloze(it.section, t, o);
+      } else if (it.part === 'daily') {
+        h += renderDaily(issue, t, pg.day, o);
       } else if (it.section && RENDER[it.section.type]) {
         var so = {}; Object.keys(o).forEach(function (k) { so[k] = o[k]; }); Object.keys(it.opts).forEach(function (k) { so[k] = it.opts[k]; });
         h += RENDER[it.section.type](it.section, t, so);
@@ -753,6 +916,12 @@ var WBLETTER = (function () {
     '.np-tts{display:flex;align-items:center;gap:10px;margin:0 0 10px}.np-ttsbtn{font:inherit;font-size:14px;font-weight:800;min-height:40px;padding:4px 14px;border:1.5px solid var(--np-ink);border-radius:20px;background:#fff;color:var(--np-ink);cursor:pointer}.np-ttsbtn.on{background:var(--np-ink);color:#fff}.np-tts-msg{font-size:13px;color:var(--np-soft)}.np-p.speaking{background:var(--np-gold-soft);box-shadow:0 0 0 4px var(--np-gold-soft)}',
     '.np-trace{margin:0 0 12px;display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start}.np-trace canvas{width:240px;height:240px;max-width:100%;border:2px solid var(--np-ink);background:#fff;touch-action:none;border-radius:4px}.np-trace-ui{display:flex;flex-direction:column;gap:8px;min-width:150px;flex:1}.np-trace-msg{font-size:14px;font-weight:700}.np-trace-btns{display:flex;gap:8px;flex-wrap:wrap}.np-tbtn{font:inherit;font-size:14px;font-weight:800;min-height:40px;padding:4px 14px;border:1.5px solid var(--np-ink);background:#fff;color:var(--np-ink);cursor:pointer;border-radius:4px}.np-tbtn.primary{background:var(--np-ink);color:#fff}.np-trace.done canvas{border-color:var(--np-spot)}',
     '.np-newsl{margin:0;padding-left:20px}.np-newsl li{margin:0 0 12px}.np-newsl li>b{display:block;font-size:15.5px;line-height:1.4}.np-newsl p{margin:3px 0;font-size:14.5px}.np-newswhy{color:var(--np-spot);font-weight:700}.np-src{font-size:12px;color:var(--np-soft);letter-spacing:.02em}.np-src a{color:var(--np-spot)}',
+    '.np-poem{margin:0 0 8px;padding:12px 16px;background:#fff;border-left:3px solid var(--np-gold);font-family:"Noto Serif KR","Nanum Myeongjo","Batang",serif;font-size:17px;line-height:1.9}.np-line{margin:0}.np-stanza{height:12px}.np-line.speaking{background:var(--np-gold-soft)}.np-lines-tall{height:120px}',
+    '.np-talk{list-style:none;margin:0 0 6px;padding:0}.np-talk li{margin:8px 0}.np-bubble{display:inline-block;padding:8px 14px;background:var(--np-spot-soft);border-radius:16px 16px 16px 3px;font-weight:700}',
+    '.np-wq{margin:10px 0 0;padding:8px 0 4px;border-top:1px dotted var(--np-line)}.np-ta{width:100%;min-height:78px;padding:8px 10px;border:1.5px solid var(--np-rule);border-radius:4px;font:inherit;font-size:15.5px;line-height:1.6;background:#fff;color:inherit;resize:vertical}.np-ta-note{font-size:12px;color:var(--np-soft);margin-top:4px}',
+    '.np-books{margin:0;padding-left:20px}.np-books li{margin:0 0 10px}.np-books p{margin:2px 0 0;font-size:14.5px}.np-for{font-size:11.5px;font-weight:800;color:var(--np-spot);border:1px solid var(--np-spot);border-radius:2px;padding:0 5px;margin-left:4px}',
+    '.np-voices{list-style:none;margin:0;padding:0}.np-voices li{margin:0 0 10px;padding:8px 12px;background:#fff;border:1px solid var(--np-line)}.np-quote{display:block;font-size:15px}.np-quote::before{content:"“"}.np-quote::after{content:"”"}.np-who{display:block;font-size:12.5px;color:var(--np-soft);text-align:right}',
+    '.np-dr{margin:6px 0 8px}.np-dr-seq{font-size:26px;font-weight:900;letter-spacing:.06em;padding:10px 12px;background:#fff;border:1.5px solid var(--np-rule);display:inline-block}.np-dr-words{font-size:20px;font-weight:800;padding:8px 0}.np-dr-target{font-size:14px;margin-bottom:6px}.np-dr-target b{font-size:22px}.np-dr-grid{display:inline-block;background:#fff;border:1.5px solid var(--np-rule);padding:6px 8px;line-height:1.35}.np-dr-row{display:flex;gap:6px}.np-dr-row span{display:inline-block;width:26px;text-align:center;font-size:19px}.np-daily5{border-top:6px solid var(--np-gold)}.np-mywrite{margin:0 0 12px;padding:10px 12px;background:#fff;border:1px dashed var(--np-rule)}.np-mine{margin:0 0 8px;font-weight:700}',
     '.np-review .ok{color:var(--np-ok)}.np-review .no{color:var(--np-red)}.np-review .skip{color:var(--np-soft)}.np-score{display:flex;gap:12px;margin:0 0 12px}.np-score div{flex:1;background:#fff;border:1px solid var(--np-rule);padding:10px 12px;text-align:center;font-size:14px}.np-score b{display:block;font-size:30px;font-weight:900;line-height:1.1}.np-score span{display:block;color:var(--np-soft);font-size:12.5px}.np-next{margin-top:12px;padding:10px 12px;background:var(--np-spot-soft);border-left:3px solid var(--np-spot)}.np-next b{margin-right:8px}',
     /* 인쇄(PDF) — A4, 2단은 그대로(A4 본문 폭 ≈ 688px 로 640 기준을 넘는다), 섹션은 쪽 중간에서 잘리지 않게, 정답 별지는 새 쪽에서 */
     '@media print{@page{size:A4;margin:12mm 13mm 14mm}.np{background:#fff;padding:0;--np-line:#bbb}.np-sec{break-inside:avoid;page-break-inside:avoid}.np-side .np-sec{box-shadow:none}.np-title{font-size:40px}.np-h1{font-size:26pt}.np-p{font-size:11.5pt}.np[data-tier="K"] .np-read .np-p,.np[data-tier="E1"] .np-read .np-p{font-size:13.5pt}.np-choice.static{border:0;padding:0;min-height:0;font-size:11pt}.np-key{break-before:page;page-break-before:always}.np-reveal,.np-ans{display:none}.np-grid{font-size:15pt}.np-photo img{max-height:90mm;object-fit:cover}.np-side .np-fig-opts{grid-template-columns:repeat(2,minmax(0,1fr));max-width:230px}}',
@@ -766,6 +935,7 @@ var WBLETTER = (function () {
     checkIssue: checkIssue, checkImage: checkImage, forTier: forTier, isVisible: isVisible, tiersOf: tiersOf, brief: brief, blankIssue: blankIssue,
     renderIssue: renderIssue, renderKey: renderKey, imgSrc: imgSrc,
     dayOf: dayOf, dayDate: dayDate, dayDow: dayDow, dayPage: dayPage, renderDay: renderDay, renderDayStrip: renderDayStrip, renderReview: renderReview,
+    clozeFor: clozeFor, renderCloze: renderCloze, renderDaily: renderDaily, brainAnswer: brainAnswer,
   };
 })();
 

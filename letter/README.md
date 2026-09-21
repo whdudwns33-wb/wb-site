@@ -19,6 +19,7 @@
 | `index.html` | 학생·가족 앱. 모드 4개 — **가족 링크**(`/letter/?t=<ptoken>`, 로그인 없음, 기록은 기기에만) · **학생**(`wbr.auth` 토큰, 기록을 서버에 저장) · **관리 미리보기**(`?id=&tier=` + 관리 토큰, 초안도 봄, `tier=all`·`print=1`/`print=nokey`) · **체험**(아무것도 없으면 `issue-sample.json`). 문제 풀기(즉시 해설)·정답 보기·미션 체크·[다 읽었어요]·지난 호·[PDF로 저장](정답 별지 포함 / 정답 없이) |
 | `letter.js` | 순수 로직 `WBLETTER` — 학년대 판정(`tierOf`: 명부 grade → K·E1·E2·E3·M, 원장 지정 `letterTier` 우선, 못 읽으면 진로독서 level 로 어림), KST ISO 주차(`weekId`·`weekStart`·`nextWeek`), **검증기 `checkIssue`**(관리 웹·AI 초안·서버 저장이 같은 규칙 — 사진 출처·도형 정답 일치까지), 학년대 선택 `forTier`, 가시성 `isVisible`, **렌더러 `renderIssue`**(신문 짜임, 학생 앱·관리 미리보기·인쇄가 같은 HTML), 공용 CSS(`CSS`, 2단·인쇄 규칙 포함), 빈 템플릿 `blankIssue`, **지표 순환 `rotationFor`·주제 달력 `calendarEntry`·`checkCalendar`** |
 | `shapes.js` · `shapes.test.cjs` | **시공간(VSI) 두뇌 놀이 생성기** `WBSHAPES` — 다른 하나 찾기·돌리면 어느 것·거울에 비치면·쌓기나무 세기·빈 조각 찾기. `{kind, seed}` 로 결정적으로 SVG 를 그리고 정답을 정한다(호 JSON 에는 seed 만, 그림 문자열은 저장하지 않는다). 키랄 폴리오미노만 써서 거울 문제가 성립한다 |
+| `drills.js` · `drills.test.cjs` | **5분 두뇌 놀이 생성기** `WBDRILLS` — 시공간 밖 네 지표: 거꾸로 말하기(WMI)·기호 찾기(PSI)·수열의 빈 칸(FRI)·공통점 말하기·무리에 안 드는 낱말(VCI, 자체 낱말 은행). 두뇌 놀이 항목에 `{drill:{kind,seed}}` 로 싣고, **오늘의 5분**(`daily(week,tier,day)`)이 1~6일째 매일 같은 자리에 한 문제씩 놓인다 — 사람이 매주 35문제를 짓지 않아도 매일 새 문제 |
 | `calendar.json` | **주제 달력 기본값** — 2026-W40 부터 40주의 주제·메모(자체 작성). 관리 웹 [주제 달력]에서 고치면 KV(`letter:calendar`)가 이것을 통째로 대신한다. 두뇌 놀이 지표는 순환값(라틴 방진)이 기본, 주마다 `indices` 로 덮어쓴다 |
 | `img/*.svg` | 배포본 삽화(자체 제작 벡터 그림 4점) — 호에서 `image: {file: "leaf-autumn.svg", …}` 로 쓴다. 올린 사진은 여기 없다(KV) |
 | `fonts/` · `fetch-fonts.mjs` · `fetch-fonts.test.mjs` | **글꼴** — Noto Sans KR·Noto Serif KR(가변 굵기)을 Google Fonts 와 같은 유니코드 구간 조각(각 124개 woff2, 합 9.5MB)으로 받아 둔 것. SIL OFL 1.1(전문 `fonts/OFL.txt`). `fonts.css` 의 unicode-range 로 브라우저는 지면에 쓰인 글자의 조각만 받는다(한 호에 30여 조각). 앱은 CSP(`default-src 'self'`) 때문에 외부 글꼴을 못 부르므로 같은 오리진에 둔다. 다시 받기 `node letter/fetch-fonts.mjs` — 판이 바뀌면 디렉터리 이름(`sans-v39/`)도 바뀌어 캐시가 저절로 갈린다. 워커는 `/letter/fonts/*.woff2` 를 1년 불변 캐시로 낸다(`_headers` 의 `/letter/*` no-store 를 덮어쓰려고 `wrangler.toml` run_worker_first 에 올려 두었다) |
@@ -58,6 +59,11 @@ section 공통: { id: [a-z0-9-]{2,30} 유일, type, tiers: "all" | ["K","E1",…
   brain     { index: VCI|VSI|FRI|WMI|PSI, minutes?, howTo?, items:[{prompt, answer(필수), hint?, grid?:[줄…]} | {figure:{kind: odd|rotate|mirror|blocks|complete, seed:1~999999}, prompt?, answer?}] 1~10, parentTip? }
   column    { byline?, paragraphs:[…], takeaway? }      coach { tips:[…] 1~6 }      notice { items:[…] 1~10 }      checklist { items:[…] 1~8 }
   news      { items:[{title(≤80), summary(≤400), why?(≤200 — 우리 아이에게 뜻하는 것), source(필수 ≤60 — 기관·언론명), url?(https 만), date?(YYYY-MM-DD)}] 1~6 }   ← 학원 소식(notice) 대신 그 주의 교육·입시 이슈. 앱에서만 링크가 열리고 인쇄본엔 출처명만
+  poem      { author?(≤40 — 자체 창작만), lines:[…] 1~24, task? }        talk { items:[…] 1~5 (가족 대화 카드) }
+  write     { prompts:[{q(≤200), hint?}] 1~4 }  — 앱은 textarea(300자, state.write[섹션:번호]), 인쇄는 쓸 줄. 7일째 되돌아보기에 '내가 쓴 문장'으로 다시 나온다
+  books     { items:[{title, author?, why(필수), for?}] 1~4 }      voices { items:[{who(≤20 — 이름은 줄여서), text(≤300)}] 1~8 }  — 원장이 [열람 현황]의 '아이들이 쓴 문장'에서 고른다
+  brain.items 에 { drill:{kind: span|symbols|sequence|common|odd-word, seed} } — 도형(figure)과 같은 규칙(답은 생성기, answer 를 적으면 같아야 함, 지표와 다르면 경고)
+  section.day?(1~7) — 하루 한 장에서 열리는 날을 지정(쓰기는 2일째가 기본, day:6 이면 미션 날에)
 ```
 오류(저장 불가): 형식·범위 위반, 정답 번호가 보기 밖, 섹션 id 중복, 모르는 학년대·지표, 400KB 초과, 출처 없음, 사진에 alt·credit 없음, 도형 answer 가 생성기와 다름.
 경고(저장 가능): 글자 수 권장 범위 밖, 낱말이 본문에 없음, 어느 학년대에 읽을거리·두뇌 놀이가 없음.
@@ -96,13 +102,15 @@ section 공통: { id: [a-z0-9-]{2,30} 유일, type, tiers: "all" | ["K","E1",…
 
 | 일째 | 장 | 무엇을 |
 |---|---|---|
-| 1 | 읽을거리 | 머리기사(표지·머리말) + 읽을거리 본문·낱말 노트 — 문제는 없다 |
-| 2 | 읽고 답해요 | 문제만. 본문은 `<details>` 로 접혀 있다(안 보고 풀고, 막히면 편다) |
-| 3 | 한자 코너 | 낱말 가족 + **손가락 따라쓰기** |
+| 1 | 읽을거리 | 머리기사(표지·머리말) + 읽을거리 본문·낱말 노트(문제는 없다) + **시 한 편**(낭독·필사) + **가족 대화 카드** |
+| 2 | 읽고 답해요 | 문제만(본문은 `<details>` 로 접혀 있다) + **한 문장 쓰기**(요약·질문 만들기·기자 되기) |
+| 3 | 한자 코너 | 낱말 가족 + **손가락 따라쓰기** + **낱말 복습**(어제 읽은 글의 낱말 노트에서 저절로 만든 빈칸 문제) |
 | 4 | 두뇌 놀이터 | 그 주 지표의 놀이 |
-| 5 | 학부모의 밤 | 칼럼 + 교육·입시 이슈 + 한 줄 코칭 |
-| 6 | 미션 점검 | 이번 주 미션(체크) + 학원 게시판(있으면) |
-| 7 | 되돌아보기 | 내 답 vs 정답(안 푼 문제는 정답을 감춘다)·맞힌 수·마친 미션 + 다음 주 예고(주제 달력) |
+| 5 | 학부모의 밤 | 칼럼 + 교육·입시 이슈 + **책 한 권** + 한 줄 코칭 |
+| 6 | 미션 점검 | 이번 주 미션(체크) + **지난 호 독자의 답** + 학원 게시판(있으면) |
+| 7 | 되돌아보기 | 내 답 vs 정답(안 푼 문제는 정답을 감춘다)·맞힌 수·낱말 복습·마친 미션 + **내가 쓴 문장** + 다음 주 예고(주제 달력) |
+
+1~6일째에는 **오늘의 5분**(`drills.js`)이 매일 맨 아래 같은 자리에 한 문제 놓인다 — 요일마다 지표가 돌아 한 주에 다섯 지표를 다 만난다. 이 구성은 어린이 신문·잡지의 고정 코너(매 호 같은 자리의 퍼즐·눈높이 사설·NIE·학생기자)와 신문 활용 교육에서 효과가 검증된 활동(요약·질문 만들기·어휘·필사·가족 토론)을 옮긴 것이다.
 
 그 학년대에 그날 섹션이 없으면(유치부의 한자 코너) 읽을거리를 **다시 읽는 날**로 채운다. 잠그지는 않는다 — 7일 띠에서 어느 날이든 열 수 있고(지난 장 다시 열기가 곧 복습), 오늘 장은 진하게·마친 날은 ✓·아직 오지 않은 날은 옅게 보인다. [오늘 장 다 읽었어요]가 `state.days[n]` 에 남고 7일째 것은 호 완독(`doneAt`)이다. `?view=paper` 또는 [신문 전체로 보기]로 예전 신문 한 면도 본다. 인쇄(PDF)는 늘 신문 전체다. 앱 모드 옵션 `noQuiz`·`foldText`·`noTts`·`noTrace` 는 `renderDay` 가 장에 맞춰 넣는다(관리 미리보기는 `noTts`·`noTrace`).
 

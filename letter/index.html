@@ -81,6 +81,7 @@
   <script src="./shapes.js"></script>
   <script src="./voice.js"></script>
   <script src="./trace.js"></script>
+  <script src="./drills.js"></script>
   <script>
   'use strict';
   (function () {
@@ -114,7 +115,7 @@
     var stateKey = function () { return 'wbl.state:' + (MODE === 'family' ? 'fam:' + FAM_T.slice(0, 8) : MODE === 'student' ? 'stu:' + ((auth() || {}).code || '') : MODE); };
     function loadLocal() { try { var s = JSON.parse(localStorage.getItem(stateKey()) || 'null'); if (s && s.issues) STATE = s; } catch (e) {} }
     function saveLocal() { try { localStorage.setItem(stateKey(), JSON.stringify(STATE)); } catch (e) {} }
-    function issueState(id) { if (!STATE.issues[id]) STATE.issues[id] = { openedAt: '', doneAt: '', quiz: {}, reveal: {}, checks: {} }; var r = STATE.issues[id]; if (!r.days) r.days = {}; if (!r.trace) r.trace = {}; r.quiz = r.quiz || {}; r.reveal = r.reveal || {}; r.checks = r.checks || {}; return r; }
+    function issueState(id) { if (!STATE.issues[id]) STATE.issues[id] = { openedAt: '', doneAt: '', quiz: {}, reveal: {}, checks: {} }; var r = STATE.issues[id]; if (!r.days) r.days = {}; if (!r.trace) r.trace = {}; if (!r.write) r.write = {}; r.quiz = r.quiz || {}; r.reveal = r.reveal || {}; r.checks = r.checks || {}; return r; }
     function cacheIssue(issue) { try { localStorage.setItem('wbl.cache:' + issue.id, JSON.stringify({ issue: issue, tier: TIER, at: Date.now() })); localStorage.setItem('wbl.cache:last', issue.id); } catch (e) {} }
     function cachedIssue(id) { try { return JSON.parse(localStorage.getItem('wbl.cache:' + (id || localStorage.getItem('wbl.cache:last') || '')) || 'null'); } catch (e) { return null; } }
 
@@ -239,9 +240,9 @@
     /* ── 읽어 주기 — shared/voice.js 로 문단을 차례로 읽고, 읽는 문단을 밝힌다. 기기가 못 읽으면 단추를 감춘다 ── */
     var TTS = { seq: null, sid: '' };
     function markSpeaking(key) {
-      Array.prototype.forEach.call(document.querySelectorAll('.np-p.speaking'), function (p) { p.classList.remove('speaking'); });
+      Array.prototype.forEach.call(document.querySelectorAll('.speaking'), function (p) { p.classList.remove('speaking'); });
       if (!key) return;
-      var el = document.querySelector('.np-p[data-p="' + key + '"]');
+      var el = document.querySelector('[data-p="' + key + '"]');
       if (el) { el.classList.add('speaking'); try { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) {} }
     }
     function ttsStop() {
@@ -257,7 +258,7 @@
       var msg = btn.parentNode.querySelector('.np-tts-msg');
       if (!window.WBVoice || !WBVoice.ttsSupported()) { if (msg) msg.textContent = '이 기기는 읽어 주기를 지원하지 않아요.'; return; }
       WBVoice.unlock();
-      var ps = Array.prototype.slice.call(document.querySelectorAll('.np-p[data-p^="' + sid + ':"]'));
+      var ps = Array.prototype.slice.call(document.querySelectorAll('[data-p^="' + sid + ':"]'));
       var texts = ps.map(function (p) { return p.textContent; });
       var i = -1;
       TTS.sid = sid; btn.classList.add('on'); btn.textContent = '⏹ 멈추기';
@@ -356,6 +357,15 @@
         st.reveal[k] = !st.reveal[k]; push();
         var y2 = window.scrollY; showIssue(); window.scrollTo(0, y2);
       }
+    });
+    var writeTimer = null;
+    app.addEventListener('input', function (e) {
+      var ta = e.target.closest('textarea[data-write]');
+      if (!ta || !ISSUE) return;
+      var st = issueState(ISSUE.id), v = String(ta.value || '').slice(0, 300);
+      if (v.trim()) st.write[ta.getAttribute('data-write')] = v; else delete st.write[ta.getAttribute('data-write')];
+      if (writeTimer) clearTimeout(writeTimer);
+      writeTimer = setTimeout(function () { push(); }, 1500);
     });
     app.addEventListener('change', function (e) {
       var cb = e.target.closest('input[data-chk]');
