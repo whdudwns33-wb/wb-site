@@ -269,6 +269,9 @@ var WBBOOKCHECK = (function () {
         out.medians = med;
         if (out.strokes == null) out.strokes = med.length;
       }
+      /* 낱말에서 끌어낸 글자 표시는 그대로 물고 간다 — 검사는 저장된 단어장에도 다시 도는데(앱이 열 때마다),
+         여기서 지우면 참고 글자가 단원의 제 항목으로 올라선다: 단원 문항 수가 부풀고 서버 진도표와 어긋난다. */
+      if (c.derived) out.derived = true;
       if (c.note) out.note = str(c.note, LIMITS.note);
       /* 이 글자를 쓰는 낱말 — 한자 급수 교재는 글자마다 낱말 몇 개를 예로 든다(一 → 일등·일주·일생·일주일).
          교재에 그 낱말의 뜻이 없으면 낱말 항목으로는 못 넣으니, 글자 카드의 참고 목록으로만 받는다.
