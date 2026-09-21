@@ -46,6 +46,7 @@
 <script src="/admin/letter.js"></script>
 <script src="/admin/shapes.js"></script>
 <script src="/admin/drills.js"></script>
+<script src="/admin/admin-login.js"></script>
 <script>
 'use strict';
 const L=WBLETTER;
@@ -74,15 +75,9 @@ function copyText(t){const fb=()=>{window.prompt('복사해서 사용하세요:'
 /* <form> 으로 두는 이유: 브라우저 비밀번호 관리자가 아이디·비밀번호 칸을 알아보고 저장·자동 입력한다. 제출은 fetch 로만(페이지 이동 없음) */
 function renderLogin(msg){
   $('#nav').hidden=true;$('#btnLogout').hidden=true;
-  const pin=LOGIN_MODE==='pin';
-  $('#main').innerHTML='<div class="card" id="loginCard"><h2>'+(pin?'관리 PIN':'관리자 로그인')+'</h2><form id="loginForm" class="row">'+
-    (pin?'<input id="pin" name="pin" type="password" autocomplete="off" placeholder="PIN" style="flex:1">'
-        :'<input id="uid" name="username" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="아이디" style="flex:1;min-width:120px"><input id="pw" name="password" type="password" autocomplete="current-password" placeholder="비밀번호" style="flex:1;min-width:120px">')+
-    '<button class="btn" id="go" type="submit">로그인</button></form>'+(msg?'<div class="err">'+esc(msg)+'</div>':'')+
-    '<p class="muted" style="margin:8px 0 0"><a href="#" id="loginSwap">'+(pin?'아이디·비밀번호로 로그인':'PIN 으로 로그인')+'</a></p></div>';
-  $('#loginForm').onsubmit=async(e)=>{e.preventDefault();try{const body=pin?{pin:$('#pin').value}:{id:$('#uid').value,password:$('#pw').value};const j=await post('/admin/login',body);TOKEN=j.token;localStorage.setItem('wbr.admin.token',TOKEN);show(TAB);}catch(e2){renderLogin(e2.message);}};
-  $('#loginSwap').onclick=(e)=>{e.preventDefault();LOGIN_MODE=pin?'account':'pin';try{localStorage.setItem('wbr.admin.loginMode',LOGIN_MODE);}catch(x){}renderLogin();};
-  (pin?$('#pin'):$('#uid')).focus();
+  /* 로그인 폼은 공용 모듈이 그린다(아이디·비밀번호 기본, PIN 갈래로 전환) — reading-server/public/admin-login.js */
+  $('#main').innerHTML='<div class="card" id="loginCard"><h2>강사 로그인</h2><div id="loginHost"></div></div>';
+  WBAdminLogin.mount({host:'#loginHost',message:msg||'',classes:{btn:'btn'},onToken:function(t){TOKEN=t;try{localStorage.setItem('wbr.admin.token',TOKEN);}catch(e){}show(TAB);}});
 }
 function show(tab){TAB=tab;$('#nav').hidden=false;$('#btnLogout').hidden=false;document.querySelectorAll('nav button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.tab===tab)));({issues,edit,draft,calendar,photos,send,stats,students})[tab]().catch(e=>{if(e.message!=='auth')$('#main').innerHTML='<div class="card"><div class="err">'+esc(e.message)+'</div></div>';});}
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>show(b.dataset.tab));

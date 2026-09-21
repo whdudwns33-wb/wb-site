@@ -33,6 +33,8 @@ fs.copyFileSync(path.join(ROOT, 'public', 'hanja-admin.html'), path.join(DIST, '
 fs.copyFileSync(path.join(ROOT, 'public', 'hanja-print.html'), path.join(DIST, 'admin', 'hanja-print.html'));
 fs.copyFileSync(path.join(ROOT, 'public', 'chunk-admin.html'), path.join(DIST, 'admin', 'chunk-admin.html'));
 fs.copyFileSync(path.join(ROOT, 'public', 'letter-admin.html'), path.join(DIST, 'admin', 'letter-admin.html'));
+/* 관리 화면 12장이 모두 부르는 공용 로그인 — 빠지면 운영에서 404 가 나고 아무 화면에도 못 들어간다 */
+fs.copyFileSync(path.join(ROOT, 'public', 'admin-login.js'), path.join(DIST, 'admin', 'admin-login.js'));
 
 /* 어휘 나이 진단 (vocab-age/) — 로그인 없이 열리는 공개 페이지.
    실리는 것은 index.html · age.js · words.json 셋뿐이다(낱말과 뜻만). */
