@@ -58,7 +58,7 @@
 
   <div id="login" class="card">
     <label>관리자 PIN</label>
-    <div class="row" style="margin-top:0"><input id="pin" type="password" autocomplete="current-password" style="flex:1"><button class="primary" id="btnLogin">로그인</button></div>
+      <div id="loginHost"></div>
     <p class="muted" id="loginErr"></p>
   </div>
 
@@ -159,6 +159,7 @@
 <div id="msg"></div>
 
 <script src="/admin/qr.js"></script>
+<script src="/admin/admin-login.js"></script>
 <script>
 'use strict';
 (function () {
@@ -178,17 +179,12 @@
     return j;
   }
 
-  $('#btnLogin').addEventListener('click', doLogin);
-  $('#pin').addEventListener('keydown', function (e) { if (e.key === 'Enter') doLogin(); });
   async function doLogin() {
-    try {
-      var r = await fetch('/api/admin/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin: $('#pin').value }) });
-      var j = await r.json();
-      if (!r.ok) { $('#loginErr').textContent = j.error || '로그인 실패'; return; }
-      token = j.token;
-      try { sessionStorage.setItem('wbhj.admin', token); } catch (e) {}
+    /* 로그인 폼은 공용 모듈이 그린다(아이디·비밀번호 기본, PIN 갈래로 전환) — admin-login.js */
+    WBAdminLogin.mount({ host: '#loginHost', classes: { btn: 'primary' }, onToken: function (t) {
+      token = t; try { sessionStorage.setItem('wbhj.admin', token); } catch (e) {}
       boot();
-    } catch (e) { $('#loginErr').textContent = '서버에 연결할 수 없습니다.'; }
+    } });
   }
 
   /* ── 올리기 ── */
@@ -454,6 +450,7 @@
     try { await loadOverview(); } catch (e) { msg(e.message); }
   }
   function boot() { var authed = !!token; $('#login').hidden = authed; $('#app').hidden = !authed; if (authed) refresh(); }
+  doLogin();
   boot();
 })();
 </script>

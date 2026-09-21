@@ -104,6 +104,7 @@
 </header>
 <div class="banner" id="banner" role="alert" hidden><span id="bannerMsg"></span><span class="sp"></span><button class="btn sm ghost" id="bannerRetry">다시 시도</button></div>
 <main id="app"></main>
+<script src="/admin/admin-login.js"></script>
 <script>
 'use strict';
 /* WB 내신브레인 관리 웹 — 원장·강사용.
@@ -177,19 +178,10 @@ function showBanner(msg){$('#bannerMsg').textContent=msg;$('#banner').hidden=fal
 function hideBanner(){$('#banner').hidden=true;}
 
 function renderLogin(msg){
-  $('#btnRefresh').hidden=true;$('#btnLogout').hidden=true;
-  ASSEMBLED=null;hideBanner();
-  $('#app').innerHTML=`<div class="card" id="loginCard"><h2>강사 로그인</h2>
-    <p class="muted">관리 PIN을 입력하세요. (진로독서 관리와 같은 PIN)</p>
-    <div style="display:flex;gap:8px;margin-top:10px"><input id="pin" type="password" placeholder="PIN" style="flex:1">
-    <button class="btn" id="doLogin">로그인</button></div>
-    ${msg?`<p class="err">${esc(msg)}</p>`:''}</div>`;
-  $('#doLogin').onclick=async()=>{
-    try{const j=await api('/admin/login',{method:'POST',body:JSON.stringify({pin:$('#pin').value})});
-      TOKEN=j.token;localStorage.setItem('wbr.admin.token',TOKEN);refresh();}
-    catch(e){if(!isAuth(e))renderLogin(e.message);}
-  };
-  $('#pin').addEventListener('keydown',e=>{if(e.key==='Enter')$('#doLogin').click();});
+  $('#btnRefresh').hidden=true;$('#btnLogout').hidden=true;ASSEMBLED=null;hideBanner();
+  /* 로그인 폼은 공용 모듈이 그린다(아이디·비밀번호 기본, PIN 갈래로 전환) — reading-server/public/admin-login.js */
+  $('#app').innerHTML='<div class="card" id="loginCard"><h2>강사 로그인</h2><div id="loginHost"></div></div>';
+  WBAdminLogin.mount({host:'#loginHost',message:msg||'',classes:{btn:'btn'},onToken:function(t){TOKEN=t;try{localStorage.setItem('wbr.admin.token',TOKEN);}catch(e){}refresh();}});
 }
 
 function fmtLast(t){if(!t)return '—';const d=(Date.now()-new Date(t))/60000;if(!Number.isFinite(d))return '—';

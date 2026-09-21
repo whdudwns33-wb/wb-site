@@ -78,8 +78,8 @@
   </div>
 
   <div id="login" class="card">
-    <label>관리자 PIN</label>
-    <div class="row"><input id="pin" type="password" autocomplete="current-password"><button class="primary" id="btnLogin">로그인</button></div>
+    <label>강사 로그인</label>
+    <div id="loginHost"></div>
     <p class="muted" id="loginErr"></p>
   </div>
 
@@ -103,6 +103,7 @@
 </div>
 <div id="msg"></div>
 
+<script src="/admin/admin-login.js"></script>
 <script>
 'use strict';
 (function () {
@@ -255,16 +256,13 @@
     }
   }
 
-  $('#btnLogin').onclick = async function () {
-    try {
-      var j = await api('/api/admin/login', { method: 'POST', body: { pin: $('#pin').value } });
-      token = j.token;
-      try { sessionStorage.setItem('wbv.admin', token); } catch (e) {}
-      $('#loginErr').textContent = '';
-      loadAll();
-    } catch (e) { $('#loginErr').textContent = e.message; }
-  };
-  $('#pin').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('#btnLogin').click(); });
+  /* 로그인 폼은 공용 모듈이 그린다(아이디·비밀번호 기본, PIN 갈래로 전환) — admin-login.js */
+  WBAdminLogin.mount({ host: '#loginHost', classes: { btn: 'primary' }, onToken: function (t) {
+    token = t;
+    try { sessionStorage.setItem('wbv.admin', token); } catch (e) {}
+    $('#loginErr').textContent = '';
+    loadAll();
+  } });
 
   if (token) loadAll();
 })();

@@ -60,7 +60,10 @@ t('관리 화면·인쇄 화면은 색인·추적을 막고, 인쇄 화면은 PI
   for (const [name, src] of [['hanja-admin.html', admin], ['hanja-print.html', print]]) {
     assert.ok(/noindex/.test(src), name + ' 에 noindex 가 없다');
     assert.ok(/no-referrer/.test(src), name + ' 에 referrer 정책이 없다');
-    assert.ok(/\/api\/admin\/login/.test(src), name + ' 에 PIN 로그인이 없다');
+    /* 로그인 호출은 공용 모듈(reading-server/public/admin-login.js)로 옮겼다 — 화면은 그것을 싣고 장착하는지 본다.
+       보장은 같다: 이 화면은 관리 로그인 뒤에서만 열린다. */
+    assert.ok(/admin-login\.js/.test(src), name + ' 가 공용 로그인 모듈을 싣지 않는다');
+    assert.ok(/WBAdminLogin\.mount/.test(src), name + ' 에 관리 로그인이 없다');
   }
   assert.ok(!/fetch\('\.\/book-sample|\/hanja\/book/.test(print), '인쇄 화면이 정적 단어장을 부른다');
 });

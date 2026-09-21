@@ -91,6 +91,7 @@
 </header>
 <div class="banner" id="banner" role="alert" hidden><span id="bannerMsg"></span><span class="sp"></span><button class="btn sm ghost" id="bannerClose">닫기</button></div>
 <main id="app"></main>
+<script src="/admin/admin-login.js"></script>
 <script>
 'use strict';
 /* WB 내신브레인 팩 제작 스튜디오 — 원장·강사용 (기획서 §15-2).
@@ -147,17 +148,9 @@ function fmtLast(t){if(!t)return '—';const d=(Date.now()-new Date(t))/60000;if
 
 function renderLogin(msg){
   $('#btnRefresh').hidden=true;$('#btnLogout').hidden=true;hideBanner();
-  $('#app').innerHTML=`<div class="card" id="loginCard"><h2>강사 로그인</h2>
-    <p class="muted">관리 PIN을 입력하세요. (운영 관리와 같은 PIN)</p>
-    <div style="display:flex;gap:8px;margin-top:10px"><input id="pin" type="password" placeholder="PIN" style="flex:1">
-    <button class="btn" id="doLogin">로그인</button></div>
-    ${msg?`<p class="err">${esc(msg)}</p>`:''}</div>`;
-  $('#doLogin').onclick=async()=>{
-    try{const j=await api('/admin/login',{method:'POST',body:JSON.stringify({pin:$('#pin').value})});
-      TOKEN=j.token;localStorage.setItem('wbr.admin.token',TOKEN);openList();}
-    catch(e){if(!isAuth(e))renderLogin(e.message);}
-  };
-  $('#pin').addEventListener('keydown',e=>{if(e.key==='Enter')$('#doLogin').click();});
+  /* 로그인 폼은 공용 모듈이 그린다(아이디·비밀번호 기본, PIN 갈래로 전환) — reading-server/public/admin-login.js */
+  $('#app').innerHTML='<div class="card" id="loginCard"><h2>강사 로그인</h2><div id="loginHost"></div></div>';
+  WBAdminLogin.mount({host:'#loginHost',message:msg||'',classes:{btn:'btn'},onToken:function(t){TOKEN=t;try{localStorage.setItem('wbr.admin.token',TOKEN);}catch(e){}openList();}});
 }
 
 /* ── 행 요약 ──
