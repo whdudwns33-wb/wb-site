@@ -296,7 +296,7 @@
     $('#bkAllStat').textContent = '바꾸는 중…';
     try {
       var j = await api('/api/hanja/admin/scope', { method: 'POST', body: JSON.stringify({ ids: ids, scope: scope }) });
-      $('#bkAllStat').textContent = j.applied === false ? '저장은 됐지만 목록 확인이 늦습니다 — 잠시 뒤 새로 고쳐 보세요' : ids.length + '권 → ' + label;
+      $('#bkAllStat').textContent = j.applied === false ? '저장했어요 — 목록 확인이 늦을 수 있으니 잠시 뒤 새로 고쳐 보세요' : ids.length + '권 → ' + label;
       msg(ids.length + '권을 ' + label + '로 바꿨어요');
       await loadBooks();
     } catch (e) { $('#bkAllStat').textContent = ''; msg(e.message); }
