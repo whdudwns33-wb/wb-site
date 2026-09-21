@@ -2548,10 +2548,17 @@ function feedbackIdentity(body) {
 /* 결석 보강은 서버가 원 정규수업의 stable taskId를 기록한다. 피드백의 정체성도
  * 그 연결을 따라가야 같은 학생·같은 수업의 정규수업과 보강이 이중 발송되지 않는다.
  * 수업무관 보강에는 원 수업이 없으므로 기존 taskId를 그대로 사용한다. */
-function feedbackCanonicalTaskId(taskData, taskId) {
+async function feedbackCanonicalTaskId(env, taskData, taskId, owner) {
   const sourceTaskId = taskData && taskData.lessonInstanceType === 'makeup'
     ? String(taskData.makeupSourceTaskId || '') : '';
-  return SAFE_ID.test(sourceTaskId) ? sourceTaskId : taskId;
+  if (!SAFE_ID.test(sourceTaskId)) return taskId;
+  const row = await env.DB.prepare('SELECT owner,data FROM tasks WHERE app=? AND id=? LIMIT 1')
+    .bind('task', sourceTaskId).first();
+  let source;
+  try { source = row && JSON.parse(row.data); } catch { return taskId; }
+  // 대강 선생님의 피드백을 원 담당자의 수업으로 치환하면 발송 권한이 깨진다.
+  return source && !source.deleted && row.owner === owner && source.staffId === owner &&
+    source.studentId && source.studentId === taskData.studentId ? sourceTaskId : taskId;
 }
 
 async function feedbackRequestKey(identity) {
@@ -2702,7 +2709,7 @@ async function handleFeedbackRequest(env, app, body, origin) {
   if (checked.response) return checked.response;
 
   const submittedTaskId = identity.taskId;
-  const canonicalTaskId = feedbackCanonicalTaskId(checked.taskData, submittedTaskId);
+  const canonicalTaskId = await feedbackCanonicalTaskId(env, checked.taskData, submittedTaskId, String(checked.task.owner));
   if (canonicalTaskId !== submittedTaskId) identity = { ...identity, taskId: canonicalTaskId };
 
   const owner = String(checked.task.owner);
