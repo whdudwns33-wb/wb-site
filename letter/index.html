@@ -111,7 +111,8 @@
     /* ── 모드: family(가족 링크) · student(학생 토큰) · admin(관리 미리보기) · demo(체험) ── */
     var MODE = 'demo', TIER = 'E2', GUESS = false, NAME = '', ISSUE = null, ISSUES = [], CUR_ID = '';
     var VIEW = 'day', DAY = 0, CAL = null, TRACE = {};   // 하루 한 장이 기본, 신문 전체는 토글. DAY 0 = 오늘 장으로
-    var PILOT = false;   // 파일럿 — 배포본에 실린 이번 주 호(issue-pilot.json)를 링크만으로 연다. 학년대는 가족이 고르고 기록은 기기에만
+    var PILOT = false;   // 파일럿 — 배포본에 실린 호(issues.json)를 링크만으로 연다. 학년대는 가족이 고르고 기록은 기기에만
+    var PILOT_CUR = '';  // 그중 오늘 열려야 하는 호의 id — 가족이 지난 호를 열었는지 구분해 안내를 바꾼다
     var STATE = { v: 1, issues: {} };
     var stateKey = function () { return 'wbl.state:' + (MODE === 'family' ? 'fam:' + FAM_T.slice(0, 8) : MODE === 'student' ? 'stu:' + ((auth() || {}).code || '') : MODE); };
     function loadLocal() { try { var s = JSON.parse(localStorage.getItem(stateKey()) || 'null'); if (s && s.issues) STATE = s; } catch (e) {} }
@@ -215,8 +216,11 @@
       var html = '';
       if (err) html += '<div class="err">' + esc(err) + '</div>';
       if (GUESS) html += '<div class="banner warn">학년을 확인하지 못해 ' + esc(L.tierLabel(TIER)) + ' 글을 보여 드려요. 학원에 학년을 알려 주시면 맞춰 드릴게요.</div>';
-      if (MODE === 'demo') html += PILOT ? '<div class="banner">이번 주 브레인레터예요. 위에서 아이의 학년대를 고르고 하루 한 장씩 열어 보세요. 문제·미션 기록은 이 기기에만 남아요.</div>' : '<div class="banner">체험 호예요. 학원에서 받은 가족 링크로 열거나, 아래에서 학생 코드로 연동하면 매주 새 호가 도착해요. 한 호는 7일에 나눠 하루 한 장씩 읽어요.</div>';
-      if (MODE === 'demo') setWho(PILOT ? '이번 주 호' : '체험 모드');
+      var past = PILOT && ISSUE && PILOT_CUR && ISSUE.id !== PILOT_CUR;
+      if (MODE === 'demo') html += !PILOT ? '<div class="banner">체험 호예요. 학원에서 받은 가족 링크로 열거나, 아래에서 학생 코드로 연동하면 매주 새 호가 도착해요. 한 호는 7일에 나눠 하루 한 장씩 읽어요.</div>'
+        : past ? '<div class="banner">지난 호를 보고 있어요. [지난 호] → [이번 호로] 를 누르면 이번 주 호로 돌아가요.</div>'
+        : '<div class="banner">이번 주 브레인레터예요. 위에서 아이의 학년대를 고르고 하루 한 장씩 열어 보세요. 문제·미션 기록은 이 기기에만 남아요.</div>';
+      if (MODE === 'demo') setWho(!PILOT ? '체험 모드' : ((ISSUE && L.issueNo(ISSUE.week)) || '이번 주 호') + (past ? ' (지난 호)' : ''));
       if (MODE === 'admin') html += '<div class="banner">관리자 미리보기 — 학생·가족에게는 자기 학년대 섹션만 보여요.</div>';
       if (daily) {
         html += '<div class="vt"><span class="small">하루 한 장 · 오늘은 <b>' + today + '일째</b></span><button class="vbtn" data-view="paper">신문 전체로 보기</button></div>';
@@ -466,9 +470,24 @@
         if (!CUR_ID) return fetchJson('/api/letter/issues', { headers: bearer(a.token), cache: 'no-store' }).then(function (j) { ISSUES = j.issues || []; TIER = j.tier || TIER; GUESS = !!j.guess; if (!ISSUES.length) { ISSUE = null; showIssue(); return; } return openIssue(ISSUES[0].id); }).catch(function (e) { if (e.status === 401) { saveAuth(null); location.replace('./'); return; } fail(e); });
         return fetchJson('/api/letter/issue?id=' + encodeURIComponent(CUR_ID), { headers: bearer(a.token), cache: 'no-store' }).then(done).catch(function (e) { if (e.status === 401) { saveAuth(null); location.replace('./'); return; } fail(e); });
       }
-      /* 파일럿 — 배포본에 실린 이번 주 호(issue-pilot.json, 편집실이 저장소에 넣고 배포가 곧 발행). 없으면 자체 창작 샘플 호(체험) */
-      return fetchJson('./issue-pilot.json', { cache: 'no-store' }).then(function (issue) { PILOT = true; ISSUES = [L.brief(issue)]; done({ issue: issue }); })
-        .catch(function () { return fetchJson('./issue-sample.json', { cache: 'no-store' }).then(function (issue) { ISSUES = [L.brief(issue)]; done({ issue: issue }); }).catch(fail); });
+      /* 파일럿 — 배포본에 실린 호 목록(issues.json). 편집실이 저장소에 호를 넣고 배포가 곧 발행이다.
+         여는 호는 날짜가 정한다: 발행일이 지난 것 중 가장 최근 호. 아직 아무 호도 발행일이 안 됐으면 가장 이른 호를 미리 보여 준다
+         (파일럿은 빈 화면이 나오면 안 된다). 지난 호는 [지난 호] 목록에 남아 언제든 다시 열린다.
+         목록이 없으면 예전 방식(issue-pilot.json), 그것도 없으면 자체 창작 샘플 호(체험). */
+      var openPilot = function (file, briefs) {
+        return fetchJson('./issues/' + file, { cache: 'no-store' }).then(function (issue) { PILOT = true; ISSUES = briefs; done({ issue: issue }); });
+      };
+      return fetchJson('./issues.json', { cache: 'no-store' }).then(function (man) {
+        var pick = L.pickPilot(man && man.issues);
+        if (!pick) throw new Error('호 목록이 비었습니다');
+        var cur = pick.cur;
+        PILOT_CUR = pick.cur.id || '';
+        if (CUR_ID) { var want = pick.list.filter(function (b) { return b.id === CUR_ID; })[0]; if (want) cur = want; }
+        return openPilot(cur.file, pick.list);
+      }).catch(function () {
+        return fetchJson('./issue-pilot.json', { cache: 'no-store' }).then(function (issue) { PILOT = true; ISSUES = [L.brief(issue)]; done({ issue: issue }); })
+          .catch(function () { return fetchJson('./issue-sample.json', { cache: 'no-store' }).then(function (issue) { ISSUES = [L.brief(issue)]; done({ issue: issue }); }).catch(fail); });
+      });
     }
 
     function boot() {

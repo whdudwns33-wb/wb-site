@@ -185,6 +185,16 @@ t('관리 화면들이 dist/admin/ 에 실린다 — 하나 빠지면 그 화면
   /* 브레인레터 배포본 — 앱 껍데기 + 렌더러 + 자체 창작 체험 호. 관리 편집기가 부르는 /admin/letter.js 는 절대 경로라 verifyRefs 가 못 보니 여기서 지킨다 */
   for (const f of ['index.html', 'letter.js', 'shapes.js', 'drills.js', 'voice.js', 'trace.js', 'issue-sample.json', 'calendar.json', 'sw.js', 'manifest.webmanifest', 'icon.svg', 'img/leaf-autumn.svg', 'img/cover-autumn.svg'])
     assert.ok(fs.existsSync(path.join(DIST, 'letter', f)), 'dist/letter/' + f + ' 가 없다');
+  /* 파일럿 호 — 목록과 본문이 함께 나가야 앱이 오늘의 호를 연다. issue-pilot.json 은 아직 새 껍데기를 못 받은 기기용 사본이라
+     저장소에는 없고 조립이 만든다(있어야 한다) */
+  const man = JSON.parse(fs.readFileSync(path.join(DIST, 'letter', 'issues.json'), 'utf8'));
+  assert.ok(Array.isArray(man.issues) && man.issues.length, 'dist/letter/issues.json 의 호 목록이 비었다');
+  for (const b of man.issues) assert.ok(fs.existsSync(path.join(DIST, 'letter', 'issues', b.file)), 'dist/letter/issues/' + b.file + ' 가 없다');
+  const fallback = path.join(DIST, 'letter', 'issue-pilot.json');
+  assert.ok(fs.existsSync(fallback), 'dist/letter/issue-pilot.json(구형 기기용 사본)이 없다');
+  const cur = JSON.parse(fs.readFileSync(fallback, 'utf8'));
+  assert.ok(man.issues.some((b) => b.id === cur.id), '구형 기기용 사본이 호 목록에 없는 호다');
+  assert.ok(!fs.existsSync(path.join(HERE, '..', 'letter', 'issue-pilot.json')), '저장소의 letter/issue-pilot.json 은 issues/ 로 옮겨졌다 — 두 벌이 되면 갈라진다');
   assert.ok(fs.existsSync(path.join(DIST, 'admin', 'letter.js')), 'dist/admin/letter.js 가 없다 — 관리 편집기의 미리보기·검증이 통째로 죽는다');
   for (const f of ['shapes.js', 'drills.js']) assert.ok(fs.existsSync(path.join(DIST, 'admin', f)), 'dist/admin/' + f + ' 가 없다 — 미리보기의 놀이 자리가 빈다');
   /* 글꼴 — fonts.css 가 가리키는 조각이 전부 dist 에 있어야 한다. 하나라도 빠지면 그 구간 글자만 다른 글꼴로 찍힌다 */

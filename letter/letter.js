@@ -439,6 +439,20 @@ var WBLETTER = (function () {
     });
     return TIER_IDS.filter(function (t) { return set[t]; });
   }
+  /* 파일럿 호 고르기 — 배포본 호 목록(letter/issues.json)에서 오늘 열려야 하는 호와 [지난 호] 목록을 낸다.
+     발행일이 지난 것 중 가장 최근 호가 오늘의 호다. 아직 아무 호도 발행일이 안 됐으면 가장 이른 호를 미리 보여 준다 —
+     파일럿에서 빈 화면은 "고장" 으로 보이기 때문이다. 아직 오지 않은 호는 목록에 넣지 않는다(열리지 않는 줄이 생긴다). */
+  function pickPilot(list, today) {
+    var day = isValidDate(today) ? today : kstDate();
+    var ok = (Array.isArray(list) ? list : []).filter(function (b) { return isObj(b) && str(b.file) && isValidDate(b.publishAt); })
+      .sort(function (a, b) { return String(a.publishAt).localeCompare(String(b.publishAt)); });
+    /* 초안은 어떤 경우에도 가정에 나가지 않는다 — 발행된 호가 하나도 없으면 아예 없다고 답한다(앱은 체험 호로 넘어간다) */
+    var pub = ok.filter(function (b) { return b.status !== 'draft'; });
+    if (!pub.length) return null;
+    var out = pub.filter(function (b) { return b.publishAt <= day; });
+    var cur = out.length ? out[out.length - 1] : pub[0];
+    return { cur: cur, list: (out.length ? out : [cur]).slice().reverse() };
+  }
   function brief(issue) {
     return { id: issue.id, week: issue.week, title: issue.title, theme: issue.theme || '', publishAt: issue.publishAt, status: issue.status, tiers: tiersOf(issue), sections: (issue.sections || []).length };
   }
@@ -932,7 +946,7 @@ var WBLETTER = (function () {
     esc: esc, kstDate: kstDate, isValidDate: isValidDate, weekId: weekId, weekStart: weekStart, weekLabel: weekLabel, issueNo: issueNo, fmtDateKo: fmtDateKo, weekIndex: weekIndex, nextWeek: nextWeek,
     rotationFor: rotationFor, calendarEntry: calendarEntry, checkCalendar: checkCalendar,
     tierFromGrade: tierFromGrade, tierOf: tierOf, tierLabel: tierLabel, editionLabel: editionLabel,
-    checkIssue: checkIssue, checkImage: checkImage, forTier: forTier, isVisible: isVisible, tiersOf: tiersOf, brief: brief, blankIssue: blankIssue,
+    checkIssue: checkIssue, checkImage: checkImage, forTier: forTier, isVisible: isVisible, tiersOf: tiersOf, brief: brief, pickPilot: pickPilot, blankIssue: blankIssue,
     renderIssue: renderIssue, renderKey: renderKey, imgSrc: imgSrc,
     dayOf: dayOf, dayDate: dayDate, dayDow: dayDow, dayPage: dayPage, renderDay: renderDay, renderDayStrip: renderDayStrip, renderReview: renderReview,
     clozeFor: clozeFor, renderCloze: renderCloze, renderDaily: renderDaily, brainAnswer: brainAnswer,
