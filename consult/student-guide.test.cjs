@@ -91,6 +91,21 @@ test('student guide explains the required routine and optional modules', () => {
   assert.match(guide, /data-go="today"/);
 });
 
+test('student guide keeps the daily routine visible and folds reference sections', () => {
+  const guide = functionSource('viewStudentGuide');
+  const sections = guide.match(/<details class="card student-guide-section"(?: open)?>/g) || [];
+
+  assert.equal(sections.length, 6);
+  assert.equal(sections.filter(section => section.includes(' open')).length, 1);
+  assert.match(guide, /<details class="card student-guide-section" open><summary class="student-guide-head">/);
+  assert.ok(guide.indexOf('✅ 매일 반드시 할 것') < guide.indexOf('🔗 처음 연결과 매일 접속'));
+  assert.match(guide, /student-guide-tip-more[^]*스탬프·포인트 기준 보기/);
+  assert.match(guide, /유효 학습일 스탬프<\/b> 예정 공부/);
+  assert.match(guide, /포인트와 기프트 카드<\/b> 10월 1일부터/);
+  assert.match(html, /\.student-guide-section > summary \{[^}]*cursor: pointer;[^}]*list-style: none;/);
+  assert.match(html, /\.student-guide-section\[open\] > summary::after \{ content: '⌃'; \}/);
+});
+
 test('a newly connected student opens Today after successful sync and the guide stays optional', () => {
   const connect = functionSource('connectStudentLink');
   const exchangeAt = connect.indexOf('await sync.exchangeBootstrap(staffId, code)');
