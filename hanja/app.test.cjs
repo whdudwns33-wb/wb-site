@@ -111,8 +111,18 @@ t('교재 점검 — 종이 교재로 공부한 단원을 앱에서 안 배웠�
   ['tkCheck', 'hmCheck', 'tmCk', 'tmCkUnit'].forEach((id) => assert.ok(app.includes("id=\"" + id + "\"") || app.includes("'#" + id + "'"), id + ' 단추가 없다'));
   assert.ok(/data-wcheck=/.test(app), '낱말 탭에 단원 점검 단추가 없다');
   assert.ok(/data-ccheck=/.test(app), '한자 탭에 단원 점검 단추가 없다 — 한자어 편(급수 교재)은 낱말이 없어 점검할 길이 이것뿐이다');
-  assert.ok(/only: 'char'/.test(app), '한자 탭 점검이 글자만 내지 않는다');
+  /* 한자 탭 점검은 그 단원 글자를 그대로 낸다 — 국어 교재의 글자는 전부 '낱말에서 끌어낸 것'이라 chars 없이는 빈 점검이 된다 */
+  assert.ok(/data-ccheck.*\n?.*chars: true/.test(app) || /trainStart\(\{ mode: 'check', book: book\.id, unit: b2\.dataset\.ccheck, chars: true \}\)/.test(app), '한자 탭 점검이 그 단원 글자를 못 낸다');
+  assert.ok(/allChars: !!scope\.chars \}\);\n?/.test(app) && (app.match(/allChars: !!scope\.chars/g) || []).length >= 2, '단원 범위에서 allChars 를 넘기지 않아 한자 탭 점검이 빈다');
   /* 점수를 남기고, 선생님 화면까지 올라간다 */
+  /* 단원 문항 수는 교재가 가르치는 낱말 기준이어야 한다 — 서버 진도표(unitItemIds)와 같은 셈.
+     끌어낸 글자를 단원 항목으로 세면 1강이 8문항이 아니라 17문항이 되고 선생님 화면과 숫자가 어긋난다. */
+  assert.ok(/\(all \|\| !c\.derived\)/.test(app), 'itemsOf 가 끌어낸 글자를 단원 항목에서 빼지 않는다');
+  const bc = read(path.join(DIR, 'book-check.js'));
+  assert.ok(/if \(c\.derived\) out\.derived = true;/.test(bc), '검사기가 derived 표시를 물고 가지 않는다 — 앱이 단어장을 다시 검사할 때 지워져 단원 수가 부푼다');
+  assert.ok(/function unitChars/.test(app) && /unitChars\(book, u\.id\)/.test(app), '화면이 단원 글자를 세는 공통 자리(unitChars)가 없다');
+  /* 연동 첫날 — 이번 주 단원이 있으면 그 단어장이 현재가 된다(아니면 목록 맨 앞의 엉뚱한 책을 가리킨다) */
+  assert.ok(/if \(LIB\.task && !db\.settings\.book\) \{ db\.settings\.book = LIB\.task\.bookId;/.test(app), '이번 주 단원의 단어장을 현재로 삼지 않는다');
   assert.ok(/checks: \{\}/.test(app), '기록에 점검 칸(checks)이 없다');
   assert.ok(/db\.checks = db\.checks \|\| \{\}/.test(app), '옛 기기의 기록을 열 때 점검 칸이 없어 터진다');
   assert.ok(/function putCheck/.test(app) && /putCheck\(scope\.book, scope\.unit/.test(app), '점검 점수를 남기는 곳이 없다');

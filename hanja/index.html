@@ -408,6 +408,10 @@
     book.chars.forEach(function (c) { if ((all || !c.derived) && (unitId == null || c.unit === unitId)) out.push({ kind: 'char', c: c, sid: c._sid, book: book.id }); });
     return out;
   }
+  /* 단원에 딸린 글자 전부 — 낱말에서 끌어낸 참고 글자까지. 화면(칸 수·글자 칩·따라쓰기)이 쓴다.
+     학습 항목(itemsOf)은 끌어낸 글자를 빼므로 「단원 8낱말 · 한자 9자」처럼 수가 다를 수 있다 — 그게 맞다:
+     점검·진도는 교재가 가르치는 낱말 기준이고(서버 진도표와 같은 셈), 글자는 손으로 써 보는 참고다. */
+  function unitChars(book, unitId) { return book.chars.filter(function (c) { return unitId == null || c.unit === unitId; }); }
   /* SRS id → 항목. 낱말은 그 단어장이 실려 있어야 하고, 한자는 어느 단어장에든 있으면 된다 */
   function resolve(sid) {
     if (sid.charAt(0) === 'c') { var c = LIB.chars[sid.slice(2)]; return c ? { kind: 'char', c: c, sid: sid, book: c._book } : null; }
@@ -518,7 +522,7 @@
       var hck = unit ? lastCheck(book.id, unit.id) : null;
       html += '<h2 class="sec">내 단어장 <small>' + esc(book.title) + '</small></h2><div class="card">' +
         '<div style="display:flex;align-items:baseline;gap:8px"><b style="color:var(--ink-strong)">' + esc(unit ? unit.title : '') + '</b>' +
-        '<span class="muted">낱말 ' + items.filter(function (i) { return i.kind === 'word'; }).length + ' · 한자 ' + items.filter(function (i) { return i.kind === 'char'; }).length + '</span>' +
+        '<span class="muted">낱말 ' + items.filter(function (i) { return i.kind === 'word'; }).length + ' · 한자 ' + (unit ? unitChars(book, unit.id).length : 0) + '</span>' +
         '<button class="btn small ghost" id="hmPick" style="margin-left:auto">바꾸기</button></div>' +
         '<div class="bar stack"><i class="g" style="width:' + pct(p.graduated, p.total) + '%"></i><i style="width:' + pct(p.planted - p.graduated, p.total) + '%"></i></div>' +
         '<p class="muted" style="margin:0 0 10px;font-size:.78rem">배우는 중 ' + p.planted + ' / ' + p.total + ' · 장기 기억 ' + p.graduated + (p.due ? ' · 복습 ' + p.due : '') + '</p>' +
@@ -572,7 +576,7 @@
       html += '<h2 class="sec">' + esc(book.title) + ' <small>단원을 눌러 펼쳐요</small></h2>';
       unitsOf(book).forEach(function (u) {
         var items = itemsOf(book, u.id), p = progressOf(items), open = BOOKS_UI.open[book.id + '|' + u.id];
-        var nw = items.filter(function (i) { return i.kind === 'word'; }).length, nc = items.length - nw;
+        var nw = items.filter(function (i) { return i.kind === 'word'; }).length, ucs = unitChars(book, u.id), nc = ucs.length;
         html += '<div class="card unit" data-unit="' + esc(u.id) + '"><div class="unit-head"><b>' + esc(u.title) + '</b>' +
           (db.settings.unit === u.id && db.settings.book === book.id ? '<span class="chip t-a">현재</span>' : '') +
           '<span class="n">' + (nw ? '낱말 ' + nw : '') + (nw && nc ? ' · ' : '') + (nc ? '한자 ' + nc : '') + '</span><span class="muted">' + (open ? '▾' : '▸') + '</span></div>' +
@@ -582,8 +586,7 @@
             '<button class="btn primary small" data-act="learn">새로 배우기</button>' +
             '<button class="btn small" data-act="train"' + (p.planted ? '' : ' disabled') + '>이 단원 훈련</button>' +
             (nc ? '<button class="btn blue small" data-act="trace">✍️ 따라쓰기</button>' : '') + '</div>';
-          var cs = items.filter(function (i) { return i.kind === 'char'; });
-          if (cs.length) html += '<div style="margin-bottom:8px">' + cs.map(function (i) { return '<span class="cchip" data-ch="' + esc(i.c.ch) + '" title="' + esc(i.c.hun + ' ' + i.c.eum) + '">' + esc(i.c.ch) + '</span>'; }).join('') + '</div>';
+          if (ucs.length) html += '<div style="margin-bottom:8px">' + ucs.map(function (c) { return '<span class="cchip" data-ch="' + esc(c.ch) + '" title="' + esc(c.hun + ' ' + c.eum) + '">' + esc(c.ch) + '</span>'; }).join('') + '</div>';
           items.filter(function (i) { return i.kind === 'word'; }).forEach(function (i) {
             html += '<div class="wrow" data-wid="' + esc(i.sid) + '"><span class="dot ' + dotClass(i) + '"></span><span class="w">' + esc(i.w.word) + '</span>' +
               (i.w.hanja ? '<span class="hj">' + esc(i.w.hanja) + '</span>' : '<span class="chip t-n">고유어</span>') + '<span class="m">' + esc(i.w.meaning) + '</span></div>';
@@ -845,7 +848,7 @@
     html += '<h2 class="sec" style="margin-top:6px">한자 따라쓰기 <small>' + esc(book.title) + '</small></h2>';
     var units = unitsOf(book), any = false;
     units.forEach(function (u) {
-      var cs = book.chars.filter(function (c) { return c.unit === u.id; });
+      var cs = unitChars(book, u.id);
       if (!cs.length) return;
       any = true;
       html += '<div class="card tight"><div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><b style="color:var(--ink-strong)">' + esc(u.title) + '</b><span class="muted" style="font-size:.76rem">' + cs.length + '자</span>' +
@@ -863,7 +866,7 @@
     html += '<p class="muted" style="font-size:.78rem">획순 표시가 있는 글자는 획마다 안내선이 나오고 순서·방향까지 봐 줘요. 없는 글자는 모양을 보고 써요 — 획순 데이터가 없는 글자의 획순은 채점하지 않아요.</p>';
     el.innerHTML = html;
     el.querySelectorAll('.ctile').forEach(function (t) { t.addEventListener('click', function () { traceOpen([t.dataset.ch]); }); });
-    el.querySelectorAll('[data-ccheck]').forEach(function (b2) { b2.addEventListener('click', function () { trainStart({ mode: 'check', book: book.id, unit: b2.dataset.ccheck, only: 'char' }); }); });
+    el.querySelectorAll('[data-ccheck]').forEach(function (b2) { b2.addEventListener('click', function () { trainStart({ mode: 'check', book: book.id, unit: b2.dataset.ccheck, chars: true }); }); });
     el.querySelectorAll('[data-unit]').forEach(function (b) {
       b.addEventListener('click', function () { traceOpen(book.chars.filter(function (c) { return c.unit === b.dataset.unit; }).map(function (c) { return c.ch; })); });
     });
@@ -1169,7 +1172,7 @@
       WBHSRS.dueList(db.states, t).forEach(function (s) { var it = resolve(s.id); if (it) { it.step = s.step; items.push(it); } else TRAIN_MISSING += 1; });
     } else {
       var book = bookOf(scope.book); if (!book) return [];
-      var list = scope.mode === 'book' ? itemsOf(book, null, { allChars: !!scope.chars }) : itemsOf(book, scope.unit === '' ? '' : scope.unit);
+      var list = scope.mode === 'book' ? itemsOf(book, null, { allChars: !!scope.chars }) : itemsOf(book, scope.unit === '' ? '' : scope.unit, { allChars: !!scope.chars });
       if (scope.chars) list = list.filter(function (i) { return i.kind === 'char'; });
       if (scope.only) list = list.filter(function (i) { return i.kind === scope.only; });
       if (scope.mode === 'check') {
@@ -1340,6 +1343,10 @@
     try { await loadIndex(); } catch (e) { toast('단어장 목록을 받지 못했어요'); }
     /* 이번 주 단원(선생님 지정) — 오늘 화면 맨 위. 지정된 단어장은 미리 받아 둔다 */
     if (syncOn()) { try { var tk = await api('/task'); LIB.task = tk && tk.task && tk.task.bookId ? Object.assign({ scope: tk.scope }, tk.task) : null; } catch (e) { /* 다음 접속 때 */ } }
+    /* 선생님이 이번 주 단원을 지정했고 학생이 아직 단어장을 고른 적이 없으면 그것을 현재 단어장·단원으로 삼는다.
+       안 그러면 현재 단어장이 목록 맨 앞(가장 최근에 올린 책)이 되어, 낱말·한자 탭과 「내 단어장」 카드가
+       이번 주 단원과 다른 책을 가리킨다 — 연동한 첫날 학생이 보는 화면이 이 경우다. */
+    if (LIB.task && !db.settings.book) { db.settings.book = LIB.task.bookId; db.settings.unit = LIB.task.unitId || ''; save(); }
     await loadStrokes();
     await fetchDueBooks();
     if (LIB.task && !bookOf(LIB.task.bookId)) { try { await openBook(LIB.task.bookId); } catch (e) { /* 캐시 없음 */ } }

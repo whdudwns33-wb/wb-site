@@ -255,4 +255,24 @@ t('글자의 낱말 목록(chars[].words) — 급수 교재의 예시 낱말을 
   assert.deepStrictEqual(mixed.book.chars.find((c) => c.ch === '觀').words, ['관측', '관찰']);
 });
 
+t('검사를 다시 돌려도 끌어낸 글자 표시가 남는다 — 앱은 저장된 단어장을 열 때마다 검사한다', () => {
+  /* 앱은 서버에서 받은 단어장(이미 검사를 거친 것)을 열 때 checkBook 을 한 번 더 돌린다.
+     그때 derived 를 잃으면 참고 글자가 단원의 제 항목으로 올라서서, 단원 문항 수가 부풀고
+     서버 진도표(unitItemIds 는 derived 를 뺀다)와 숫자가 어긋난다 — 실제로 1강이 8문항 대신 17문항으로 나왔다. */
+  const raw = { id: 'rt-1', title: '왕복', units: [{ id: 'u1', title: '1강' }],
+    chars: [{ ch: '山', hun: '메', eum: '산', unit: 'u1' }],
+    words: [{ unit: 'u1', word: '황홀', meaning: '눈부심', hanja: '恍(황홀할 황)+惚(황홀할 홀)' }] };
+  const one = B.checkBook(raw).book;
+  const pulled = one.chars.filter((c) => c.derived).map((c) => c.ch).sort();
+  assert.deepStrictEqual(pulled, ['惚', '恍'].sort(), '낱말에서 끌어낸 글자가 표시되지 않았다');
+  assert.strictEqual(one.chars.find((c) => c.ch === '山').derived, undefined, '직접 적은 글자에 표시가 붙었다');
+
+  const two = B.checkBook(JSON.parse(JSON.stringify(one))).book;
+  assert.deepStrictEqual(two.chars.filter((c) => c.derived).map((c) => c.ch).sort(), pulled, '두 번째 검사에서 표시가 지워졌다');
+  assert.strictEqual(two.chars.find((c) => c.ch === '山').derived, undefined);
+  /* 단원의 학습 항목 = 낱말 + 직접 적은 글자 (서버 unitItemIds 와 같은 셈) */
+  const unitItems = two.words.filter((w) => w.unit === 'u1').length + two.chars.filter((c) => !c.derived && c.unit === 'u1').length;
+  assert.strictEqual(unitItems, 2, '단원 항목 수가 서버 셈과 다르다: ' + unitItems);
+});
+
 console.log(`\nOK — ${passed}개 통과`);
