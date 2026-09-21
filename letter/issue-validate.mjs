@@ -18,7 +18,46 @@ import { fileURLToPath } from 'node:url';
 const require = createRequire(import.meta.url);
 const L = require('./letter.js');
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const DEFAULTS = ['issue-pilot.json', 'issue-sample.json'].map((f) => path.join(HERE, f)).filter((f) => fs.existsSync(f));
+const ISSUES_DIR = path.join(HERE, 'issues');
+const MANIFEST = path.join(HERE, 'issues.json');
+/* 기본 대상 — 파일럿 호 전부(issues/*.json) + 체험 호. 저장소에 든 호는 모두 오류 0 이어야 한다 */
+export function defaultFiles() {
+  const out = fs.existsSync(ISSUES_DIR) ? fs.readdirSync(ISSUES_DIR).filter((f) => f.endsWith('.json')).sort().map((f) => path.join(ISSUES_DIR, f)) : [];
+  for (const f of ['issue-pilot.json', 'issue-sample.json']) { const q = path.join(HERE, f); if (fs.existsSync(q)) out.push(q); }
+  return out;
+}
+const DEFAULTS = defaultFiles();
+
+/* 호 목록(issues.json)과 실제 파일이 어긋나면 앱이 없는 파일을 부르거나 새 호를 못 본다 —
+   파일을 넣고 목록에 안 적는 실수가 가장 흔해서 여기서 막는다 */
+export function checkManifest() {
+  const errors = [];
+  if (!fs.existsSync(MANIFEST)) return { errors: [{ where: 'issues.json', msg: '호 목록이 없습니다' }], issues: [] };
+  let man;
+  try { man = JSON.parse(fs.readFileSync(MANIFEST, 'utf8')); }
+  catch (e) { return { errors: [{ where: 'issues.json', msg: 'JSON 을 읽을 수 없어요 — ' + e.message }], issues: [] };
+  }
+  const rows = Array.isArray(man && man.issues) ? man.issues : [];
+  if (!rows.length) errors.push({ where: 'issues.json', msg: 'issues 목록이 비었습니다' });
+  const listed = new Set();
+  for (const b of rows) {
+    if (!b || !b.file) { errors.push({ where: 'issues.json', msg: 'file 없는 줄이 있습니다' }); continue; }
+    listed.add(b.file);
+    const full = path.join(ISSUES_DIR, b.file);
+    if (!fs.existsSync(full)) { errors.push({ where: 'issues.json ' + b.file, msg: '목록에 있는 파일이 없습니다' }); continue; }
+    let issue;
+    try { issue = JSON.parse(fs.readFileSync(full, 'utf8')); } catch (e) { continue; }   // 본문 오류는 validateFile 이 잡는다
+    for (const k of ['id', 'week', 'title', 'publishAt', 'status']) {
+      if (String(b[k] == null ? '' : b[k]) !== String(issue[k] == null ? '' : issue[k])) {
+        errors.push({ where: 'issues.json ' + b.file, msg: k + ' 가 호 본문과 다릅니다(목록 "' + b[k] + '" · 본문 "' + issue[k] + '")' });
+      }
+    }
+  }
+  for (const f of (fs.existsSync(ISSUES_DIR) ? fs.readdirSync(ISSUES_DIR).filter((x) => x.endsWith('.json')) : [])) {
+    if (!listed.has(f)) errors.push({ where: 'issues/' + f, msg: '호 파일이 목록(issues.json)에 없습니다 — 앱이 이 호를 열지 못합니다' });
+  }
+  return { errors, issues: rows };
+}
 
 export function validateFile(file) {
   const name = path.basename(file);
@@ -39,6 +78,14 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToP
   const files = process.argv.slice(2).length ? process.argv.slice(2) : DEFAULTS;
   if (!files.length) { console.error('검증할 호 파일이 없습니다. 사용법: node letter/issue-validate.mjs <호.json>'); process.exit(1); }
   let bad = 0;
+  /* 목록 대조는 기본 대상일 때만 — 파일 하나를 콕 집어 부를 때는 그 파일만 본다 */
+  if (!process.argv.slice(2).length) {
+    const man = checkManifest();
+    console.log('\nissues.json — 호 ' + man.issues.length + '개');
+    for (const e of man.errors) console.log(`  ✗ [${e.where}] ${e.msg}`);
+    if (!man.errors.length) console.log('  ✓ 목록과 파일이 일치');
+    if (man.errors.length) bad += 1;
+  }
   for (const f of files) {
     const r = validateFile(f);
     const head = r.issue ? `${r.issue.id || '?'} 「${r.issue.title || '?'}」 · ${(r.issue.sections || []).length}섹션 · ${r.issue.status || '?'}` : '읽기 실패';

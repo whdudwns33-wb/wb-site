@@ -7,7 +7,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
-import { validateFile } from './issue-validate.mjs';
+import { validateFile, defaultFiles, checkManifest } from './issue-validate.mjs';
 
 const require = createRequire(import.meta.url);
 const L = require('./letter.js');
@@ -17,10 +17,11 @@ const t = (name, fn) => { fn(); passed += 1; console.log('  ✓ ' + name); };
 
 console.log('issue-validate — 저장소의 브레인레터 호');
 
-t('파일럿·샘플 호는 검증기 오류 0 (경고는 허용)', () => {
-  for (const f of ['issue-pilot.json', 'issue-sample.json']) {
-    const p = path.join(HERE, f);
-    if (f === 'issue-pilot.json' && !fs.existsSync(p)) { console.log('    (파일럿 없음 — 건너뜀)'); continue; }
+t('저장소의 호는 전부 검증기 오류 0 (경고는 허용)', () => {
+  const files = defaultFiles();
+  assert.ok(files.length >= 2, '검증할 호가 ' + files.length + '개뿐 — issues/ 를 찾지 못했나');
+  for (const p of files) {
+    const f = path.basename(p);
     const r = validateFile(p);
     assert.deepEqual(r.errors, [], f + ' 오류: ' + JSON.stringify(r.errors));
     assert.ok(r.issue.sections.length >= 5, f + ' 섹션이 너무 적다');
@@ -29,14 +30,23 @@ t('파일럿·샘플 호는 검증기 오류 0 (경고는 허용)', () => {
   }
 });
 
-t('파일럿은 다섯 학년대를 모두 덮는다 — 한 학년대라도 비면 그 가정은 빈 화면을 본다', () => {
-  const p = path.join(HERE, 'issue-pilot.json');
-  if (!fs.existsSync(p)) return;
-  const issue = JSON.parse(fs.readFileSync(p, 'utf8'));
-  for (const tier of L.TIER_IDS) {
-    const forTier = L.forTier(issue, tier);
-    assert.ok(forTier.sections.length >= 3, tier + ' 학년대 섹션이 ' + forTier.sections.length + '개뿐');
+t('파일럿 호는 다섯 학년대를 모두 덮는다 — 한 학년대라도 비면 그 가정은 빈 화면을 본다', () => {
+  for (const p of defaultFiles().filter((x) => x.includes('/issues/'))) {
+    const issue = JSON.parse(fs.readFileSync(p, 'utf8'));
+    for (const tier of L.TIER_IDS) {
+      const forTier = L.forTier(issue, tier);
+      assert.ok(forTier.sections.length >= 3, path.basename(p) + ' ' + tier + ' 학년대 섹션이 ' + forTier.sections.length + '개뿐');
+    }
   }
+});
+
+t('호 목록(issues.json)이 실제 파일과 맞는다 — 어긋나면 앱이 없는 호를 부르거나 새 호를 못 연다', () => {
+  const man = checkManifest();
+  assert.deepEqual(man.errors, [], JSON.stringify(man.errors));
+  assert.ok(man.issues.length >= 1);
+  /* 목록으로 오늘의 호를 고를 수 있어야 한다 — 고를 수 없으면 가정은 체험 호를 본다 */
+  const pick = L.pickPilot(man.issues.map((b) => ({ ...b })), '2026-12-31');
+  assert.ok(pick && pick.cur && pick.cur.file, '목록에서 오늘의 호를 고르지 못한다');
 });
 
 t('망가진 호는 오류로 잡는다 — 검증기가 통과시키면 이 테스트가 무의미하다', () => {
@@ -54,6 +64,7 @@ t('망가진 호는 오류로 잡는다 — 검증기가 통과시키면 이 테
 t('CLI — 인자 없이 부르면 저장소 호를 모두 보고 0 으로 끝난다', () => {
   const out = execFileSync(process.execPath, [path.join(HERE, 'issue-validate.mjs')], { encoding: 'utf8' });
   assert.match(out, /issue-sample\.json/);
+  assert.match(out, /issues\.json — 호/);
   assert.match(out, /모두 통과/);
 });
 

@@ -393,4 +393,24 @@ t('되돌아보기 — 이번 주 내가 쓴 문장이 실린다', () => {
   assert.ok(!/이번 주 내가 쓴 문장/.test(L.renderDay(SAMPLE, 'E2', 7, { mode: 'app', state: {} })));
 });
 
+t('파일럿 호 고르기 — 발행일이 지난 것 중 가장 최근 호, 아직이면 가장 이른 호를 미리, 초안은 절대 안 나간다', () => {
+  const list = [
+    { file: 'b.json', id: '2026-W41', publishAt: '2026-10-05', status: 'published' },
+    { file: 'a.json', id: '2026-W40', publishAt: '2026-09-28', status: 'published' },
+    { file: 'c.json', id: '2026-W42', publishAt: '2026-10-12', status: 'draft' },
+  ];
+  const at = (d) => L.pickPilot(list, d);
+  assert.equal(at('2026-09-21').cur.id, '2026-W40', '아직 아무 호도 안 됐으면 가장 이른 호를 미리 보여 준다');
+  assert.deepEqual(at('2026-09-21').list.map((b) => b.id), ['2026-W40']);
+  assert.equal(at('2026-09-28').cur.id, '2026-W40', '발행일 당일부터 그 호');
+  assert.equal(at('2026-10-04').cur.id, '2026-W40', '다음 호 발행일 전까지는 그대로');
+  assert.equal(at('2026-10-05').cur.id, '2026-W41', '발행일이 되면 저절로 넘어간다');
+  assert.deepEqual(at('2026-10-05').list.map((b) => b.id), ['2026-W41', '2026-W40'], '지난 호는 목록에 남고 최신이 위');
+  assert.equal(at('2026-12-31').cur.id, '2026-W41', '초안(2026-W42)은 발행일이 지나도 열리지 않는다');
+  assert.ok(at('2026-12-31').list.every((b) => b.status !== 'draft'));
+  assert.equal(L.pickPilot([], '2026-10-05'), null);
+  assert.equal(L.pickPilot([{ file: 'c.json', id: '2026-W42', publishAt: '2026-01-01', status: 'draft' }], '2026-10-05'), null, '초안뿐이면 없는 것과 같다 — 앱은 체험 호로 넘어간다');
+  assert.equal(L.pickPilot([{ id: 'x' }, { file: 'd.json', publishAt: '나쁜날짜' }], '2026-10-05'), null, '파일·발행일이 없는 줄은 버린다');
+});
+
 console.log(`\nOK — ${passed}개 통과 (${path.basename(__filename)})`);

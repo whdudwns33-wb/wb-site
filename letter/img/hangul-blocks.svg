@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" role="img" aria-label="하늘 점과 땅 선과 사람 선으로 모음을 만들고, 자음과 모음을 네모 한 칸에 모아 글자를 만드는 과정">
+  <!-- 제41호 본문 삽화 — 천지인 모음 만들기(위)와 모아쓰기(아래). 글자는 획으로 그린다. -->
+  <defs>
+    <linearGradient id="hanji2" x1="0" y1="0" x2="0.2" y2="1">
+      <stop offset="0" stop-color="#f7eeda"/><stop offset="1" stop-color="#e9d8b9"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1600" height="1000" fill="url(#hanji2)"/>
+  <rect x="40" y="40" width="1520" height="920" fill="none" stroke="#3f6b5e" stroke-width="3" opacity="0.4"/>
+
+  <!-- 위: 하늘 점 · 땅 선 · 사람 선 세 조각으로 ㅗ ㅏ ㅜ ㅓ 를 만든다 -->
+  <g transform="translate(110 110)">
+    <g>
+      <rect width="170" height="330" rx="18" fill="#fcf7ec" stroke="#d3bf9c" stroke-width="2"/>
+      <circle cx="85" cy="165" r="30" fill="#b3402f"/>
+    </g>
+    <g transform="translate(195 0)">
+      <rect width="170" height="330" rx="18" fill="#fcf7ec" stroke="#d3bf9c" stroke-width="2"/>
+      <path d="M30 165 H140" stroke="#2f2a24" stroke-width="20" stroke-linecap="round"/>
+    </g>
+    <g transform="translate(390 0)">
+      <rect width="170" height="330" rx="18" fill="#fcf7ec" stroke="#d3bf9c" stroke-width="2"/>
+      <path d="M85 60 V270" stroke="#2f2a24" stroke-width="20" stroke-linecap="round"/>
+    </g>
+    <g fill="none" stroke="#3f6b5e" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M600 165 h70 M670 165 l-20 -17 M670 165 l-20 17"/>
+    </g>
+    <g transform="translate(710 0)">
+      <rect width="670" height="330" rx="18" fill="#fcf7ec" stroke="#d3bf9c" stroke-width="2"/>
+      <g stroke="#d3bf9c" stroke-width="2" stroke-dasharray="7 9">
+        <path d="M167 30 V300 M335 30 V300 M503 30 V300"/>
+      </g>
+      <!-- ㅗ : 땅 선 위에 하늘 점 -->
+      <g transform="translate(0 0)">
+        <path d="M30 210 H138" stroke="#2f2a24" stroke-width="18" stroke-linecap="round"/>
+        <circle cx="84" cy="150" r="19" fill="#b3402f"/>
+      </g>
+      <!-- ㅏ : 사람 선 오른쪽에 하늘 점 -->
+      <g transform="translate(168 0)">
+        <path d="M70 80 V250" stroke="#2f2a24" stroke-width="18" stroke-linecap="round"/>
+        <circle cx="128" cy="165" r="19" fill="#b3402f"/>
+      </g>
+      <!-- ㅜ : 땅 선 아래에 하늘 점 -->
+      <g transform="translate(336 0)">
+        <path d="M30 120 H138" stroke="#2f2a24" stroke-width="18" stroke-linecap="round"/>
+        <circle cx="84" cy="180" r="19" fill="#b3402f"/>
+      </g>
+      <!-- ㅓ : 사람 선 왼쪽에 하늘 점 -->
+      <g transform="translate(504 0)">
+        <path d="M98 80 V250" stroke="#2f2a24" stroke-width="18" stroke-linecap="round"/>
+        <circle cx="40" cy="165" r="19" fill="#b3402f"/>
+      </g>
+    </g>
+  </g>
+
+  <!-- 아래: ㅎ + ㅏ + ㄴ 을 네모 한 칸에 모아 '한' 을 만든다 -->
+  <g transform="translate(110 540)">
+    <!-- ㅎ -->
+    <g transform="translate(0 0)">
+      <rect width="230" height="330" rx="18" fill="#fcf7ec" stroke="#d3bf9c" stroke-width="2"/>
+      <g fill="none" stroke="#2f2a24" stroke-width="20" stroke-linecap="round">
+        <path d="M92 88 H138"/>
+        <path d="M62 140 H168"/>
+        <circle cx="115" cy="222" r="46" stroke-width="20"/>
+      </g>
+    </g>
+    <g fill="none" stroke="#3f6b5e" stroke-width="8" stroke-linecap="round">
+      <path d="M268 165 h56 M296 137 v56"/>
+    </g>
+    <!-- ㅏ -->
+    <g transform="translate(360 0)">
+      <rect width="230" height="330" rx="18" fill="#fcf7ec" stroke="#d3bf9c" stroke-width="2"/>
+      <g fill="none" stroke="#2f2a24" stroke-width="20" stroke-linecap="round">
+        <path d="M100 70 V262"/>
+        <path d="M100 166 H172"/>
+      </g>
+    </g>
+    <g fill="none" stroke="#3f6b5e" stroke-width="8" stroke-linecap="round">
+      <path d="M628 165 h56 M656 137 v56"/>
+    </g>
+    <!-- ㄴ -->
+    <g transform="translate(720 0)">
+      <rect width="230" height="330" rx="18" fill="#fcf7ec" stroke="#d3bf9c" stroke-width="2"/>
+      <path d="M78 78 V244 H172" fill="none" stroke="#2f2a24" stroke-width="20" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+    <g fill="none" stroke="#3f6b5e" stroke-width="8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M988 165 h72 M1060 165 l-20 -17 M1060 165 l-20 17"/>
+    </g>
+    <!-- 모아쓴 한 글자: 네모 한 칸 -->
+    <g transform="translate(1100 0)">
+      <rect width="330" height="330" rx="18" fill="#fcf7ec" stroke="#b3402f" stroke-width="3"/>
+      <g stroke="#d3bf9c" stroke-width="2" stroke-dasharray="8 10">
+        <path d="M165 20 V310 M20 165 H310"/>
+      </g>
+      <!-- ㅎ (왼쪽 위) -->
+      <g fill="none" stroke="#2f2a24" stroke-width="16" stroke-linecap="round">
+        <path d="M62 66 H98"/>
+        <path d="M42 102 H118"/>
+        <circle cx="80" cy="158" r="32" stroke-width="16"/>
+      </g>
+      <!-- ㅏ (오른쪽) -->
+      <g fill="none" stroke="#2f2a24" stroke-width="16" stroke-linecap="round">
+        <path d="M212 46 V214"/>
+        <path d="M212 132 H268"/>
+      </g>
+      <!-- ㄴ (아래) -->
+      <path d="M78 236 V286 H252" fill="none" stroke="#2f2a24" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+  </g>
+</svg>
