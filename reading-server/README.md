@@ -38,6 +38,7 @@ ADMIN_PIN=원하는PIN node reading-server/server.mjs   # 기본 포트 8890 (�
 - 관리 API(PIN): `GET·POST /api/vocab/admin/review` (승인 시 cue·scene 확정 — 이후 학생들에게 재사용) / `GET /api/vocab/admin/overview`.
 - AI 연상은 `ANTHROPIC_API_KEY` 시크릿 필요(모델 기본 `claude-opus-5`, `VOCAB_AI_MODEL`로 변경). 키가 없으면 해당 기능만 "미설정" 안내로 동작.
 - **관리 로그인**은 PIN(`ADMIN_PIN`) 또는 아이디·비밀번호(`ADMIN_ID`·`ADMIN_PASSWORD`) — 판정은 `admin-auth.mjs` 하나(워커·로컬 공용, 다이제스트 고정 시간 비교). 워커 시크릿은 Actions 「관리 계정·AI 삽화 시크릿 등록」(`admin-secrets.yml`)이 저장소 시크릿에서 복사한다(값을 입력으로 받지 않는다 — public 저장소). 브레인레터 AI 삽화의 `GEMINI_API_KEY` 도 같은 워크플로우.
+- **PIN 을 잊었다면** 되찾을 수 없다 — 워커 시크릿은 덮어쓸 수만 있고 읽어낼 수 없다. 저장소 시크릿에 새 `ADMIN_PIN`(10자 이상)을 넣고 위 워크플로우를 `pin` 체크로 돌리면 교체된다. 아이디·비밀번호를 새로 등록해 그쪽으로 들어가도 된다. 어느 쪽이든 **이미 로그인해 둔 기기의 관리 토큰은 최장 30일까지 살아 있다**(로그인과 따로 발급되는 값이라 교체로 끊기지 않는다).
 - **밤 9시 물주기 푸시**: 페이로드 없는 Web Push(암호화 불필요·무의존성). `node reading-server/gen-vapid.mjs`로 키 생성 → `VAPID_PUBLIC_KEY`·`VAPID_PRIVATE_JWK` 시크릿 등록. 학생이 리포트 탭에서 "밤 9시 알림 켜기" → 21:00 KST 크론이 **물 줄 단어가 있는 구독자에게만** 발송(404/410이면 구독 자동 정리). 키가 없으면 알림 카드만 비활성.
 - 승인 반영 루프: 학생이 고른 연상이 검수 전(pending)이면 앱이 접속 때마다 `mnemonic/check`로 확인 — 승인되면 승인본으로 교체, 반려되면 제거(재생성 가능).
 
