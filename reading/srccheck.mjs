@@ -191,11 +191,11 @@ const ERRPAGE = /(페이지를 찾을 수 없|파일을 찾을수없|요청하�
 const rows = [];
 let bad = 0, warn = 0;
 
-console.log(`출처 ${items.length}개를 하나씩 받아 봅니다 — 대략 ${Math.ceil(items.length * 2.5 / 60)}분\n`);
-
-for (const it of items) {
+/* 받아 온 응답 하나를 판정한다. 아래 루프가 두 번 부를 수 있어야 해서 함수로 뺐다 —
+   과부하에 걸린 서버가 404 를 돌려주는 일이 있고(khs.go.kr 이 그랬다), 그것을
+   한 번에 결함으로 확정하면 멀쩡한 출처를 갈아 끼우게 된다. */
+function judge(it, r) {
   const shape = shapeVerdict(it.url);
-  const r = await fetchWithRetry(it.url);
   const n = parseInt(r.code, 10) || 0;
   const txt = r.html ? bodyText(r.html) : '';
   /* 본문에 한국어가 거의 없으면 제목 낱말 대신 주소 슬러그로 맞춰 본다 */
@@ -231,6 +231,27 @@ for (const it of items) {
     else { verdict = 'warn'; note = `${what} ${hit.length}/${kws.length}만 본문에 있음 — 다른 문서일 수 있습니다${tail}`; }
   }
 
+  return { verdict, note, shape, txt, foreign, kws, hit };
+}
+
+console.log(`출처 ${items.length}개를 하나씩 받아 봅니다 — 대략 ${Math.ceil(items.length * 2.5 / 60)}분\n`);
+
+for (const it of items) {
+  let r = await fetchWithRetry(it.url);
+  let v = judge(it, r);
+
+  /* 결함은 한 번 더 받아 보고 확정한다. 주소 모양으로 거른 것(shape)은 망을 안 타므로 그대로.
+     2026-09-21 실사에서 khs.go.kr 두 건이 404 로 떠서 죽은 링크로 보고됐는데, 잠시 뒤
+     다시 받으니 둘 다 200 에 본문까지 멀쩡했다. ✗ 는 「원문으로 교체하라」는 신호라
+     오탐 한 번이 멀쩡한 출처를 갈아 끼우게 만든다. 확인 한 번이 그보다 싸다. */
+  if (v.verdict === 'bad' && !v.shape) {
+    await new Promise(z => setTimeout(z, 6000));
+    const r2 = await fetchWithRetry(it.url);
+    const v2 = judge(it, r2);
+    if (v2.verdict !== 'bad') { r = r2; v = v2; v.note += ' (첫 시도는 결함으로 떴다 — 재확인에서 정상)'; }
+  }
+
+  const { verdict, note, txt, foreign, kws, hit } = v;
   if (verdict === 'bad') bad++; else if (verdict === 'warn') warn++;
   const mark = verdict === 'ok' ? '  ' : verdict === 'bad' ? '✗ ' : '⚠ ';
   console.log(`${mark}${it.id}#${it.n}  ${r.code}  ${note}`);
