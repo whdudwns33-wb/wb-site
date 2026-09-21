@@ -132,6 +132,9 @@ t('배포본 _headers — /naesin/*·/vocab/*·/haru/*·/letter/*·/admin/* 은 
   }
   assert.ok(/noindex/.test(rules['/*']['X-Robots-Tag'] || ''), '전 경로 noindex 가 빠졌다');
   assert.ok(/nosniff/.test(rules['/*']['X-Content-Type-Options'] || ''));
+  /* 글꼴 목록은 외부 스타일시트다 — style-src 에 'self' 이 없으면 운영에서만 조용히 막혀 기기 글꼴로 찍힌다(로컬 서버는 CSP 를 안 붙인다) */
+  assert.ok(/style-src [^;]*'self'/.test(rules['/*']['Content-Security-Policy'] || ''), "CSP style-src 에 'self' 이 없다 — /letter/fonts/fonts.css 가 막힌다");
+  assert.ok(!/font-src/.test(rules['/*']['Content-Security-Policy'] || '') || /font-src [^;]*'self'/.test(rules['/*']['Content-Security-Policy']), 'font-src 가 있다면 self 를 허용해야 한다');
   assert.strictEqual(rules['/*']['Cache-Control'], undefined, '/* 에 Cache-Control 을 두면 분할본의 max-age 와 합쳐져 캐시가 통째로 무력화된다');
   assert.strictEqual(rules['/articles-L1.json']['Cache-Control'], 'public, max-age=604800', '분할본 캐시 규칙은 그대로');
   /* 원본 자리의 두 파일은 안내 주석만 남는다 — 규칙이 두 곳에 있으면 한 곳만 고치는 사고가 난다 */
