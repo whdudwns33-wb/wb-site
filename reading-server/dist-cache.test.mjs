@@ -29,21 +29,21 @@ const J_SW = path.join(DIST, 'hanja', 'sw.js');
 const C_SW = path.join(DIST, 'chunk', 'sw.js');
 const L_SW = path.join(DIST, 'letter', 'sw.js');
 const J_HTML = path.join(DIST, 'hanja', 'index.html');
-const hanjaScripts = () => Object.fromEntries([...fs.readFileSync(J_HTML, 'utf8').matchAll(/<script\b[^>]*\bsrc="([^"]+)"/g)].map((m) => [m[1].split('?')[0], m[1]]));
+const hanjaAssets = () => Object.fromEntries([...fs.readFileSync(J_HTML, 'utf8').matchAll(/<script\b[^>]*\bsrc="([^"]+)"|fetch\('(\.\/book-sample\.json[^']*)'\)/g)].map((m) => { const url = m[1] || m[2]; return [url.split('?')[0], url]; }));
 
 build();
 const before = { r: swVer(R_SW), v: swVer(V_SW), n: swVer(N_SW), k: swVer(K_SW), h: swVer(H_SW), c: swVer(C_SW), l: swVer(L_SW), j: swVer(J_SW) };
-const jScriptsBefore = hanjaScripts(), jHtmlBefore = fs.readFileSync(J_HTML, 'utf8'), jSwBefore = fs.readFileSync(J_SW, 'utf8');
+const jAssetsBefore = hanjaAssets(), jHtmlBefore = fs.readFileSync(J_HTML, 'utf8'), jSwBefore = fs.readFileSync(J_SW, 'utf8');
 
-t('어휘브레인 HTML과 오프라인 SHELL은 같은 내용 해시 스크립트 URL을 쓴다', () => {
+t('어휘브레인 HTML과 오프라인 SHELL은 같은 내용 해시 스크립트·체험 단어장 URL을 쓴다', () => {
   const shell = (jSwBefore.match(/const SHELL = (\[[^\]]+\]);/) || [])[1];
   assert.ok(shell, '어휘브레인 SHELL을 찾지 못했다');
-  for (const f of ['voice.js', 'book-check.js', 'bridge.js', 'srs.js', 'quiz.js', 'trace.js']) {
+  for (const f of ['voice.js', 'book-check.js', 'bridge.js', 'srs.js', 'quiz.js', 'trace.js', 'book-sample.json']) {
     const asset = './' + f, hash = crypto.createHash('sha256').update(fs.readFileSync(path.join(DIST, 'hanja', f))).digest('hex').slice(0, 10);
     const url = asset + '?v=' + hash;
-    assert.strictEqual(jScriptsBefore[asset], url, '새 HTML이 이전 SW의 ' + asset + ' 캐시에 걸린다');
+    assert.strictEqual(jAssetsBefore[asset], url, '새 HTML이 이전 SW의 ' + asset + ' 캐시에 걸린다');
     assert.ok(shell.includes("'" + url + "'"), '오프라인 셸에 같은 URL이 없다: ' + url);
-    assert.ok(!shell.includes("'" + asset + "'"), '셸이 버전 없는 스크립트를 미리 받는다: ' + asset);
+    assert.ok(!shell.includes("'" + asset + "'"), '셸이 버전 없는 파일을 미리 받는다: ' + asset);
   }
 });
 
@@ -84,8 +84,8 @@ t('껍데기 파일이 바뀌면 캐시 이름이 바뀐다 — 학생이 새 �
     { file: path.join(HERE, '..', 'naesin-ko', 'concepts.json'), sw: K_SW, was: before.k, what: '국어브레인 개념어 사전' },
     { file: path.join(HERE, '..', 'haru', 'icon.svg'), sw: H_SW, was: before.h, what: '하루브레인 앱' },
     /* 한자는 체험 단어장도 셸에 실린다 — 단어장을 고치면 학생이 새 단어장을 받아야 한다 */
-    { file: path.join(HERE, '..', 'hanja', 'book-sample.json'), sw: J_SW, was: before.j, what: '한자브레인 체험 단어장' },
-    { file: path.join(HERE, '..', 'hanja', 'bridge.js'), sw: J_SW, was: before.j, what: '어휘브레인 스크립트', script: './bridge.js' },
+    { file: path.join(HERE, '..', 'hanja', 'book-sample.json'), sw: J_SW, was: before.j, what: '어휘브레인 체험 단어장', asset: './book-sample.json' },
+    { file: path.join(HERE, '..', 'hanja', 'bridge.js'), sw: J_SW, was: before.j, what: '어휘브레인 스크립트', asset: './bridge.js' },
     /* 청크브레인은 지문도 셸에 실린다 — 지문을 고치면 학생이 새 지문을 받아야 한다 */
     { file: path.join(HERE, '..', 'chunk', 'passages.js'), sw: C_SW, was: before.c, what: '청크브레인 지문' },
     /* 브레인레터는 렌더러가 껍데기에 실린다 — 렌더러를 고치면 학생이 새 화면을 받아야 한다 */
@@ -94,14 +94,18 @@ t('껍데기 파일이 바뀌면 캐시 이름이 바뀐다 — 학생이 새 �
   for (const c of cases) {
     const orig = fs.readFileSync(c.file);
     try {
-      fs.writeFileSync(c.file, Buffer.concat([orig, Buffer.from('\n/* cache probe */\n')]));
+      if (c.asset === './book-sample.json') {
+        const sample = JSON.parse(orig);
+        sample.title += ' cache probe';
+        fs.writeFileSync(c.file, JSON.stringify(sample));
+      } else fs.writeFileSync(c.file, Buffer.concat([orig, Buffer.from('\n/* cache probe */\n')]));
       build();
       assert.notStrictEqual(swVer(c.sw), c.was, `${c.what}을 고쳤는데 캐시 이름이 그대로다 — 학생은 옛 화면을 본다`);
-      if (c.script) {
-        const next = hanjaScripts(), nextHtml = fs.readFileSync(J_HTML, 'utf8'), nextSw = fs.readFileSync(J_SW, 'utf8');
-        assert.notStrictEqual(next[c.script], jScriptsBefore[c.script], '스크립트를 고쳤는데 HTML URL이 그대로다');
-        assert.ok(nextSw.includes("'" + next[c.script] + "'"), '바뀐 스크립트가 오프라인 셸에서 빠졌다');
-        for (const asset of Object.keys(next).filter((asset) => asset !== c.script)) assert.strictEqual(next[asset], jScriptsBefore[asset], '안 바뀐 스크립트 URL까지 바뀌었다');
+      if (c.asset) {
+        const next = hanjaAssets(), nextHtml = fs.readFileSync(J_HTML, 'utf8'), nextSw = fs.readFileSync(J_SW, 'utf8');
+        assert.notStrictEqual(next[c.asset], jAssetsBefore[c.asset], '파일을 고쳤는데 HTML URL이 그대로다');
+        assert.ok(nextSw.includes("'" + next[c.asset] + "'"), '바뀐 파일이 오프라인 셸에서 빠졌다');
+        for (const asset of Object.keys(next).filter((asset) => asset !== c.asset)) assert.strictEqual(next[asset], jAssetsBefore[asset], '안 바뀐 파일 URL까지 바뀌었다');
         assert.strictEqual(swVer(R_SW), before.r, '한자 배급 수정이 진로독서 캐시를 바꿨다');
         assert.strictEqual(swVer(V_SW), before.v, '한자 배급 수정이 워드브레인 캐시를 바꿨다');
         build();
@@ -118,7 +122,7 @@ t('껍데기 파일이 바뀌면 캐시 이름이 바뀐다 — 학생이 새 �
   assert.strictEqual(swVer(N_SW), before.n, '되돌렸는데 값이 안 돌아왔다');
   assert.strictEqual(swVer(K_SW), before.k, '되돌렸는데 값이 안 돌아왔다');
   assert.strictEqual(swVer(J_SW), before.j, '되돌렸는데 값이 안 돌아왔다');
-  assert.deepStrictEqual(hanjaScripts(), jScriptsBefore, '스크립트를 되돌렸는데 URL이 안 돌아왔다');
+  assert.deepStrictEqual(hanjaAssets(), jAssetsBefore, '파일을 되돌렸는데 URL이 안 돌아왔다');
 });
 
 t('지문 데이터 버전이 articles.json 과 version.json 에서 같다', () => {
