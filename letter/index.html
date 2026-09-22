@@ -26,6 +26,7 @@
     .bar .brand { font-family:"Noto Serif KR","Nanum Myeongjo","Apple Myungjo","Batang",Georgia,serif; font-weight:900; font-size:17px; letter-spacing:-.02em; color:var(--ink); white-space:nowrap; }
     .bar .who { font-size:13px; color:var(--soft); flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
     .bar .who b { color:var(--ink); }
+    .bar-tools { display:flex; align-items:center; justify-content:flex-end; gap:8px; margin-left:auto; }
     .hb { min-height:36px; padding:3px 12px; border:1.5px solid var(--ink); background:#fff; font-weight:800; font-size:13.5px; color:var(--ink); white-space:nowrap; }
     .hb.primary { background:var(--ink); color:#fff; }
     .bar select { min-height:36px; border:1.5px solid var(--ink); padding:2px 8px; background:#fff; color:var(--ink); font-weight:800; font-size:13.5px; }
@@ -35,6 +36,9 @@
     .small { font-size:13px; color:var(--soft); }
     .banner { background:var(--spot-soft); color:var(--spot); border-left:4px solid var(--spot); padding:9px 12px; font-weight:800; margin:12px 0; font-size:14px; }
     .banner.warn { background:var(--gold-soft); color:#6a5210; border-left-color:var(--gold); }
+    .guide { margin:10px 0; border-bottom:1px solid var(--line); color:var(--soft); font-size:13px; }
+    .guide summary { cursor:pointer; padding:8px 0; font-weight:700; }
+    .guide p { margin:0 0 10px; line-height:1.7; }
     .err { background:var(--red-soft); color:var(--red); border-left:4px solid var(--red); padding:9px 12px; font-weight:700; margin:12px 0; }
     .big { display:block; width:100%; min-height:54px; background:var(--ink); color:#fff; font-weight:900; font-size:16.5px; margin-top:10px; }
     .big.ghost { background:#fff; color:var(--ink); border:2px solid var(--ink); }
@@ -64,6 +68,12 @@
     #printArea { display:none; }
     @media print { body > * { display:none !important; } dialog::backdrop { display:none; } #printArea { display:block !important; } .np-tierbreak { break-before:page; page-break-before:always; } }
     @media (max-width:430px) { .hb .lbl { display:none; } }
+    @media (max-width:600px) {
+      .bar { gap:6px; padding:6px 12px; }
+      .bar-tools { flex-basis:100%; }
+      .bar-tools select { flex:1; min-width:0; width:0; }
+      .bar-tools select, .bar-tools .hb { min-height:42px; }
+    }
   </style>
   <style id="nlcss"></style>
 </head>
@@ -72,9 +82,11 @@
     <span class="brand">브레인레터</span>
     <span class="who" id="who"></span>
     <span class="dot" id="savedot" hidden><i></i><span id="savetxt"></span></span>
-    <select id="tierSel" hidden aria-label="학년대"></select>
-    <button class="hb" id="btnArchive" hidden>지난 호</button>
-    <button class="hb primary" id="btnPdf" hidden aria-label="PDF로 저장">🖨 <span class="lbl">PDF로 저장</span></button>
+    <div class="bar-tools">
+      <select id="tierSel" hidden aria-label="학년대"></select>
+      <button class="hb" id="btnArchive" hidden>지난 호</button>
+      <button class="hb primary" id="btnPdf" hidden aria-label="PDF로 저장">🖨 <span class="lbl">PDF로 저장</span></button>
+    </div>
   </header>
   <main id="app"><div class="card">불러오는 중…</div></main>
   <div id="printArea" aria-hidden="true"></div>
@@ -220,7 +232,7 @@
       var past = PILOT && ISSUE && PILOT_CUR && ISSUE.id !== PILOT_CUR;
       if (MODE === 'demo') html += !PILOT ? '<div class="banner">체험 호예요. 학원에서 받은 가족 링크로 열거나, 아래에서 학생 코드로 연동하면 매주 새 호가 도착해요. 한 호는 7일에 나눠 하루 한 장씩 읽어요.</div>'
         : past ? '<div class="banner">지난 호를 보고 있어요. [지난 호] → [이번 호로] 를 누르면 이번 주 호로 돌아가요.</div>'
-        : '<div class="banner">이번 주 브레인레터예요. 위에서 아이의 학년대를 고르고 하루 한 장씩 열어 보세요. 문제·미션 기록은 이 기기에만 남아요.</div>';
+        : '<details class="guide"><summary>이용 안내 · 기록은 이 기기에만 남아요</summary><p>이번 주 브레인레터예요. 위에서 아이의 학년대를 고르고 하루 한 장씩 열어 보세요. 문제·미션 기록은 이 기기에만 남아요.</p></details>';
       if (MODE === 'demo') setWho(!PILOT ? '체험 모드' : ((ISSUE && L.issueNo(ISSUE.week)) || '이번 주 호') + (past ? ' (지난 호)' : ''));
       if (MODE === 'admin') html += '<div class="banner">관리자 미리보기 — 학생·가족에게는 자기 학년대 섹션만 보여요.</div>';
       if (daily) {
