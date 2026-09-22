@@ -87,16 +87,19 @@ fs.mkdirSync(path.join(DIST, 'hanja'), { recursive: true });
 const HANJA_FILES = ['index.html', 'srs.js', 'quiz.js', 'trace.js', 'book-check.js', 'bridge.js', 'book-sample.json', 'sw.js', 'manifest.webmanifest', 'icon.svg'];
 for (const f of HANJA_FILES) fs.copyFileSync(path.join(HANJA, f), path.join(DIST, 'hanja', f));
 fs.copyFileSync(SHARED, path.join(DIST, 'hanja', 'voice.js'));
-/* 새 HTML을 받은 첫 방문에도 이전 SW의 JS 캐시에 걸리지 않게 한다. 오프라인 셸도 같은 URL을 미리 받는다. */
+/* 새 HTML을 받은 첫 방문에도 이전 SW의 JS·체험 단어장 캐시에 걸리지 않게 한다. 오프라인 셸도 같은 URL을 미리 받는다. */
 const hanjaHtmlPath = path.join(DIST, 'hanja', 'index.html'), hanjaSwPath = path.join(DIST, 'hanja', 'sw.js');
 let hanjaSw = fs.readFileSync(hanjaSwPath, 'utf8');
-const hanjaHtml = fs.readFileSync(hanjaHtmlPath, 'utf8').replace(/(<script\b[^>]*\bsrc=")(\.\/[\w.-]+\.js)(")/g, (tag, before, asset, after) => {
+const versionHanjaAsset = (tag, before, asset, after) => {
   const hash = crypto.createHash('sha256').update(fs.readFileSync(path.join(DIST, 'hanja', asset))).digest('hex').slice(0, 10);
   const url = asset + '?v=' + hash;
-  if (!hanjaSw.includes("'" + asset + "'")) throw new Error('hanja/sw.js SHELL에 스크립트가 없습니다: ' + asset);
+  if (!hanjaSw.includes("'" + asset + "'")) throw new Error('hanja/sw.js SHELL에 파일이 없습니다: ' + asset);
   hanjaSw = hanjaSw.replaceAll("'" + asset + "'", "'" + url + "'");
   return before + url + after;
-});
+};
+const hanjaHtml = fs.readFileSync(hanjaHtmlPath, 'utf8')
+  .replace(/(<script\b[^>]*\bsrc=")(\.\/[\w.-]+\.js)(")/g, versionHanjaAsset)
+  .replace(/(fetch\(')(\.\/book-sample\.json)('\))/, versionHanjaAsset);
 fs.writeFileSync(hanjaHtmlPath, hanjaHtml);
 fs.writeFileSync(hanjaSwPath, hanjaSw);
 /* 청크브레인 (chunk/) — 의미단위 끊어읽기. 같은 오리진 /chunk/ 에서 서빙해야 학생 토큰이 공유된다.
