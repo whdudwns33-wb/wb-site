@@ -446,6 +446,29 @@
       };
     }
 
+    /* 파일럿 호 — 배포본에 실린 호 목록(issues.json). 편집실이 저장소에 호를 넣고 배포가 곧 발행이다.
+       여는 호는 날짜가 정한다: 발행일이 지난 것 중 가장 최근 호(`L.pickPilot`). 아직 아무 호도 발행일이 안 됐으면 가장 이른 호를
+       미리 보여 준다 — 파일럿에 빈 화면은 "고장" 으로 보인다. 지난 호는 [지난 호] 목록에 남는다.
+       목록이 없으면 예전 방식(issue-pilot.json), 그것도 없으면 자체 창작 샘플 호(체험).
+       가족 링크(?t=)로 들어왔는데 서버에 호가 없을 때도 이 함수를 쓴다 — 호를 두 군데서 따로 열지 않게 한 곳에 모았다. */
+    function loadPilot(done, fail) {
+      var openPilot = function (file, briefs) {
+        return fetchJson('./issues/' + file, { cache: 'no-store' }).then(function (issue) { PILOT = true; ISSUES = briefs; done({ issue: issue }); });
+      };
+      return fetchJson('./issues.json', { cache: 'no-store' }).then(function (man) {
+        var pick = L.pickPilot(man && man.issues);
+        if (!pick) throw new Error('호 목록이 비었습니다');
+        var cur = pick.cur;
+        PILOT_CUR = pick.cur.id || '';
+        if (CUR_ID) { var want = pick.list.filter(function (b) { return b.id === CUR_ID; })[0]; if (want) cur = want; }
+        return openPilot(cur.file, pick.list);
+      }).catch(function () {
+        return fetchJson('./issue-pilot.json', { cache: 'no-store' }).then(function (issue) { PILOT = true; ISSUES = [L.brief(issue)]; done({ issue: issue }); })
+          /* 샘플은 체험 호다 — PILOT 을 켜지 않는다(화면이 "이번 주 호" 가 아니라 "체험 모드" 라고 말해야 한다) */
+          .catch(function () { return fetchJson('./issue-sample.json', { cache: 'no-store' }).then(function (issue) { ISSUES = [L.brief(issue)]; done({ issue: issue }); }).catch(fail); });
+      });
+    }
+
     /* ── 호 열기 — 모드별 원천 ── */
     function openIssue(id) {
       CUR_ID = id || '';
@@ -463,31 +486,29 @@
         if (c && c.issue && (!CUR_ID || c.issue.id === CUR_ID)) { ISSUE = c.issue; if (MODE !== 'admin') TIER = c.tier || TIER; showIssue('지금은 서버에 닿지 않아 저장해 둔 호를 보여 드려요.'); return; }
         ISSUE = null; showIssue(e && e.message);
       };
-      if (MODE === 'family') return fetchJson('/api/letter/parent?t=' + encodeURIComponent(FAM_T) + (CUR_ID ? '&id=' + encodeURIComponent(CUR_ID) : ''), { cache: 'no-store' }).then(function (j) { ISSUES = j.issues || []; NAME = j.parent.name; GUESS = !!j.parent.guess; done({ issue: j.issue, tier: j.parent.tier }); }).catch(fail);
+      /* 파일럿 호로 한 번 넘어오면 그 뒤로는 어느 모드든 저장소의 호를 연다 — 지난 호·다른 날짜 장도 같은 자리에서 와야 한다 */
+      if (PILOT) return loadPilot(done, fail);
+      if (MODE === 'family') return fetchJson('/api/letter/parent?t=' + encodeURIComponent(FAM_T) + (CUR_ID ? '&id=' + encodeURIComponent(CUR_ID) : ''), { cache: 'no-store' }).then(function (j) {
+        NAME = j.parent.name; GUESS = !!j.parent.guess; if (j.parent.tier) TIER = j.parent.tier;
+        /* 파일럿 기간에는 호가 서버(KV)가 아니라 배포본에 있다 — 링크가 멀쩡해도 서버는 "호 없음" 이라고 답한다.
+           그때 빈 화면을 보여 주면 가족은 링크가 고장 난 줄 안다. 배포본 호를 그대로 열어 주고,
+           기록은 링크 토큰으로 계속 서버에 쌓는다(원장의 열람 현황에 그대로 잡힌다). */
+        if (!j.issue) return loadPilot(done, fail);
+        ISSUES = j.issues || [];
+        done({ issue: j.issue, tier: j.parent.tier });
+      }).catch(function (e) {
+        /* 링크가 유효하지 않아도(오래된 링크·오타) 이번 주 호는 보여 준다 — 파일럿 호는 링크만 알면 누구나 보는 것이다.
+           다만 그 기기의 기록은 서버로 보내지 않는다(누구의 기록인지 모른다) — 체험 모드와 같게 둔다. */
+        if (e && e.status === 404) { MODE = 'demo'; FAM_T = ''; return loadPilot(done, fail); }
+        return fail(e);
+      });
       if (MODE === 'admin') return fetchJson('/api/letter/issue?id=' + encodeURIComponent(CUR_ID) + (TIER && TIER !== 'all' ? '&tier=' + TIER : ''), { headers: bearer(adminToken()), cache: 'no-store' }).then(done).catch(fail);
       if (MODE === 'student') {
         var a = auth();
         if (!CUR_ID) return fetchJson('/api/letter/issues', { headers: bearer(a.token), cache: 'no-store' }).then(function (j) { ISSUES = j.issues || []; TIER = j.tier || TIER; GUESS = !!j.guess; if (!ISSUES.length) { ISSUE = null; showIssue(); return; } return openIssue(ISSUES[0].id); }).catch(function (e) { if (e.status === 401) { saveAuth(null); location.replace('./'); return; } fail(e); });
         return fetchJson('/api/letter/issue?id=' + encodeURIComponent(CUR_ID), { headers: bearer(a.token), cache: 'no-store' }).then(done).catch(function (e) { if (e.status === 401) { saveAuth(null); location.replace('./'); return; } fail(e); });
       }
-      /* 파일럿 — 배포본에 실린 호 목록(issues.json). 편집실이 저장소에 호를 넣고 배포가 곧 발행이다.
-         여는 호는 날짜가 정한다: 발행일이 지난 것 중 가장 최근 호. 아직 아무 호도 발행일이 안 됐으면 가장 이른 호를 미리 보여 준다
-         (파일럿은 빈 화면이 나오면 안 된다). 지난 호는 [지난 호] 목록에 남아 언제든 다시 열린다.
-         목록이 없으면 예전 방식(issue-pilot.json), 그것도 없으면 자체 창작 샘플 호(체험). */
-      var openPilot = function (file, briefs) {
-        return fetchJson('./issues/' + file, { cache: 'no-store' }).then(function (issue) { PILOT = true; ISSUES = briefs; done({ issue: issue }); });
-      };
-      return fetchJson('./issues.json', { cache: 'no-store' }).then(function (man) {
-        var pick = L.pickPilot(man && man.issues);
-        if (!pick) throw new Error('호 목록이 비었습니다');
-        var cur = pick.cur;
-        PILOT_CUR = pick.cur.id || '';
-        if (CUR_ID) { var want = pick.list.filter(function (b) { return b.id === CUR_ID; })[0]; if (want) cur = want; }
-        return openPilot(cur.file, pick.list);
-      }).catch(function () {
-        return fetchJson('./issue-pilot.json', { cache: 'no-store' }).then(function (issue) { PILOT = true; ISSUES = [L.brief(issue)]; done({ issue: issue }); })
-          .catch(function () { return fetchJson('./issue-sample.json', { cache: 'no-store' }).then(function (issue) { ISSUES = [L.brief(issue)]; done({ issue: issue }); }).catch(fail); });
-      });
+      return loadPilot(done, fail);
     }
 
     function boot() {
