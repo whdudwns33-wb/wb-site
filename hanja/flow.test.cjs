@@ -244,6 +244,7 @@ t('한자 집중 교재 선택과 복습은 어휘 교재·단원·기록을 섞
   assert.deepStrictEqual(copy(app.trainItems({ mode: 'due', only: 'char' }).map((it) => it.sid)), ['c:日']);
   app.renderBooks();
   assert.ok(!nodes.get('#view-books').innerHTML.includes(pure.title), '어휘 교재 선택에 한자 전용 책이 섞였다');
+  assert.ok(nodes.get('#view-books').innerHTML.includes('어휘 단원 1'), '교재의 어휘 단원 수에 한자 전용 단원을 더했다');
   app.renderReport();
   assert.ok(!nodes.get('#view-report').innerHTML.includes('한자 시험'), '어휘 시험 기록에 한자 시험이 섞였다');
 });

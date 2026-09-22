@@ -586,7 +586,7 @@
         '<div class="ico' + (e.counts && e.counts.words ? ' n' : '') + '">' + (e.counts && e.counts.words ? '어휘' : '한자') + '</div>' +
         '<div style="flex:1;min-width:0"><b>' + esc(e.title) + '</b>' +
         '<span class="muted" style="font-size:.78rem">' + (e.source === 'own' ? '자체 · ' : '교재 · ') + (e.publisher ? esc(e.publisher) + ' · ' : '') + (e.level ? e.level + ' · ' : '') +
-        (e.counts && e.counts.words ? '낱말 ' + e.counts.words : '한자 ' + (e.counts ? e.counts.chars : 0)) + ' · 단원 ' + (e.units ? e.units.length : 0) + '</span>' +
+        '낱말 ' + (e.counts ? e.counts.words : b.words.length) + ' · 어휘 단원 ' + (b ? unitsOf(b).length : (e.units || []).filter(function (u) { return u.words > 0; }).length) + '</span>' +
         ' <span class="chip ' + (e.counts && e.counts.words ? 't-h' : 't-c') + '">' + (e.counts && e.counts.words ? '어휘' : '한자') + '</span>' +
         (e.mine ? ' <span class="chip t-a">선생님 추천</span>' : '') + (e.sample ? ' <span class="chip t-g">어휘 체험</span>' : '') + (e.local ? ' <span class="chip t-n">내 어휘장</span>' : '') +
         (p && p.planted ? '<div class="bar stack"><i class="g" style="width:' + pct(p.graduated, p.total) + '%"></i><i style="width:' + pct(p.planted - p.graduated, p.total) + '%"></i></div>' : '') +
