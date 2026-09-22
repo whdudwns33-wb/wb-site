@@ -80,7 +80,7 @@ fs.mkdirSync(path.join(DIST, 'haru'), { recursive: true });
 const HARU_FILES = ['index.html', 'parent.html', 'strings.js', 'plan.js', 'mastery.js', 'srs.js', 'cause.js', 'probe.js', 'atoms.json', 'sw.js', 'manifest.webmanifest', 'icon.svg'];
 for (const f of HARU_FILES) fs.copyFileSync(path.join(HARU, f), path.join(DIST, 'haru', f));
 
-/* 한자브레인 (hanja/) — 같은 오리진 /hanja/ 에서 서빙해야 학생 토큰·API가 공유된다.
+/* 어휘브레인 (hanja/) — 같은 오리진 /hanja/ 에서 서빙해야 학생 토큰·API가 공유된다.
    단어장(문제집 낱말)은 dist 에 싣지 않는다 — KV(hanja:book:*)에만 산다. book-sample.json 은 자체 창작 체험 단어장이라 실어도 된다. */
 const HANJA = path.join(ROOT, '..', 'hanja');
 fs.mkdirSync(path.join(DIST, 'hanja'), { recursive: true });

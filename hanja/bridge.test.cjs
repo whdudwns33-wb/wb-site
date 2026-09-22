@@ -1,5 +1,5 @@
 'use strict';
-/* 진로독서 어휘장 → 한자브레인 단어장 다리 검증 (node hanja/bridge.test.cjs) */
+/* 진로독서 어휘장 → 어휘브레인 단어장 다리 검증 (node hanja/bridge.test.cjs) */
 const assert = require('assert');
 const BR = require('./bridge.js');
 const CHECK = require('./book-check.js');

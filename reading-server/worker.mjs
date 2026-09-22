@@ -293,7 +293,7 @@ function haruStore(env) {
   };
 }
 
-/* 한자브레인 저장소 어댑터 — hanja: 접두 키만. 단어장 본문(hanja:book:<id>)과 목록(hanja:books, 본문 없는 메타)을
+/* 어휘브레인 저장소 어댑터 — hanja: 접두 키만. 단어장 본문(hanja:book:<id>)과 목록(hanja:books, 본문 없는 메타)을
    나눠 둔다 — 학생 목록 조회가 단어장 본문을 읽지 않게. 퇴원은 state·assign 두 키만 지운다. */
 function hanjaStore(env) {
   const get = (k) => env.DB.get(k, 'json');
@@ -411,7 +411,7 @@ async function fullDump(env) {
   chunk.customs = await env.DB.get('chunk:customs', 'json');   /* 선생님 지문(키 하나) — 백업에 같이 담는다 */
   /* 브레인레터 — 호 본문(원장이 쓴 것)과 학생 기록. 팩과 달리 라이선스 원문이 아니라 통째로 담는다 */
   const letter = await dumpLetter(letterStore(env));
-  /* 한자브레인 — 목록(메타)·학생 기록·배정. 단어장 본문은 내신 팩과 같은 이유로 id 만 */
+  /* 어휘브레인 — 목록(메타)·학생 기록·배정. 단어장 본문은 내신 팩과 같은 이유로 id 만 */
   const hanja = await dumpHanja(hanjaStore(env));
   return { service: 'wb-reading', savedAt: nowIso(), students, states, vocab, textbook: textbook || {}, pubmap: pubmap || {}, naesin, naesinKo, textbookSrc: textbookSrc || {}, haru, chunk, letter, hanja };
 }
@@ -706,7 +706,7 @@ export default {
         return json(out.status, out.body);
       }
 
-      /* 한자브레인 (/api/hanja/*) — 인증만 공유, 저장·라우트는 격리. 단어장은 KV(hanja:book:*)에만 산다 */
+      /* 어휘브레인 (/api/hanja/*) — 인증만 공유, 저장·라우트는 격리. 단어장은 KV(hanja:book:*)에만 산다 */
       if (p.startsWith('/api/hanja/')) {
         const len = Number(req.headers.get('content-length') || 0);
         if (len > hanjaBodyLimit(p)) return json(413, { error: '요청이 너무 커서 받을 수 없어요.' });
@@ -1077,7 +1077,7 @@ export default {
         await dropStudentHaru(haruStore(env), c);
         await dropStudentChunk(chunkStore(env), c, stu.ptoken);
         removed.push('haru:state:' + c, 'haru:mock:' + c, 'haru:paper:' + c);
-        /* 한자브레인 — 기록·요약·배정·알림 구독·개인 단원 지정. 단어장·획순 사전은 학생 것이 아니라 둔다 */
+        /* 어휘브레인 — 기록·요약·배정·알림 구독·개인 단원 지정. 단어장·획순 사전은 학생 것이 아니라 둔다 */
         await dropStudentHanja(hanjaStore(env), c);
         removed.push('hanja:state:' + c, 'hanja:summary:' + c, 'hanja:assign:' + c, 'hanja:push:' + c);
         /* 브레인레터 — 열람·문제 기록 한 키. 호는 학생 것이 아니라 그대로 둔다 */

@@ -30,7 +30,7 @@ const AGE_DIR = path.join(ROOT, '..', 'vocab-age'); // 어휘 나이 진단(로�
 const NAESIN_DIR = path.join(ROOT, '..', 'naesin');    // 내신브레인 앱 정적 파일
 const HARU_DIR = path.join(ROOT, '..', 'haru');        // 하루브레인 앱 정적 파일 (팩·대응표·플랜은 여기 없다 — db.haru 전용)
 const NAESIN_KO_DIR = path.join(ROOT, '..', 'naesin-ko'); // 국어브레인 앱 정적 파일
-const HANJA_DIR = path.join(ROOT, '..', 'hanja');      // 한자브레인 앱 정적 파일 (단어장은 여기 없다 — db.hanja 전용)
+const HANJA_DIR = path.join(ROOT, '..', 'hanja');      // 어휘브레인 앱 정적 파일 (단어장은 여기 없다 — db.hanja 전용)
 const LETTER_DIR = path.join(ROOT, '..', 'letter');     // 브레인레터 앱 정적 파일 (호 본문은 여기 없다 — db.letter 전용, 체험 호는 자체 창작)
 const PUB_DIR = path.join(ROOT, 'public');             // 관리 웹
 const PORT = +(process.env.PORT || 8890);
@@ -226,7 +226,7 @@ const naesinKoStore = {
   getStudent: (c) => db.students?.[c] || null,
 };
 
-/* 한자브레인 저장소 어댑터 — db.hanja 만 사용(워드브레인과 같은 격리). 단어장 본문(books)과 목록(index)을 나눠 둔다.
+/* 어휘브레인 저장소 어댑터 — db.hanja 만 사용(워드브레인과 같은 격리). 단어장 본문(books)과 목록(index)을 나눠 둔다.
    옛 db.json 에는 hanja 칸이 없으므로 첫 접근 때 만들어 준다. */
 const hanjaRoot = () => {
   db.hanja = db.hanja || { books: {}, index: null, states: {}, assigns: {} };
@@ -559,7 +559,7 @@ const server = http.createServer(async (req, res) => {
         return json(res, out.status, out.body);
       }
 
-      /* 한자브레인 (/api/hanja/*) — 인증만 공유, 저장·라우트는 격리(워커와 동일). 단어장은 db.hanja 에만 산다 */
+      /* 어휘브레인 (/api/hanja/*) — 인증만 공유, 저장·라우트는 격리(워커와 동일). 단어장은 db.hanja 에만 산다 */
       if (p.startsWith('/api/hanja/')) {
         if (Number(req.headers['content-length'] || 0) > hanjaBodyLimit(p)) { req.resume(); return json(res, 413, { error: '요청이 너무 커서 받을 수 없어요.' }); }
         const out = await handleHanja({ path: p, method: req.method, who, query: url.searchParams, getBody: () => readBody(req, hanjaBodyLimit(p)), store: hanjaStore, push: VOCAB_PUSH_ENV });
@@ -867,7 +867,7 @@ const server = http.createServer(async (req, res) => {
         drop(ko.overlays, c);
         /* 하루브레인 — 정확 접두 4계열(state·mock·paper·parent). 대응표는 남긴다(워커와 동일) */
         await dropStudentHaru(haruStore, c); removed += 3;
-        /* 한자브레인 — 기록·요약·배정·알림 구독. 단어장·획순 사전은 학생 것이 아니라 둔다(워커와 동일) */
+        /* 어휘브레인 — 기록·요약·배정·알림 구독. 단어장·획순 사전은 학생 것이 아니라 둔다(워커와 동일) */
         await dropStudentHanja(hanjaStore, c); removed += 4;
         await dropStudentChunk(chunkStore, c, (db.students[c] || {}).ptoken);
         /* 브레인레터 — 열람·문제 기록 한 키. 호는 학생 것이 아니라 둔다(워커와 동일) */
@@ -933,7 +933,7 @@ const server = http.createServer(async (req, res) => {
     if (p === '/naesin-ko' || p === '/naesin-ko/') return serveFile(res, NAESIN_KO_DIR, 'index.html');
     if (p.startsWith('/naesin-ko/')) return serveFile(res, NAESIN_KO_DIR, p.slice('/naesin-ko/'.length));
 
-    /* 한자브레인 앱 — 단어장은 여기 없다(/api/hanja/book, KV·db 전용). 체험 단어장(book-sample.json)은 자체 창작이라 정적으로 나간다 */
+    /* 어휘브레인 앱 — 단어장은 여기 없다(/api/hanja/book, KV·db 전용). 체험 단어장(book-sample.json)은 자체 창작이라 정적으로 나간다 */
     if (p === '/hanja/voice.js') return serveFile(res, SHARED_DIR, 'voice.js');
     if (p === '/hanja' || p === '/hanja/') return serveFile(res, HANJA_DIR, 'index.html');
     if (p.startsWith('/hanja/')) return serveFile(res, HANJA_DIR, p.slice('/hanja/'.length));
