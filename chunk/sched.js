@@ -71,14 +71,17 @@ var WBCHUNK_SCHED = (function () {
     it.scores.push(sc); if (it.scores.length > 8) it.scores.shift();
     if (res.qOk === true || res.qOk === false) { it.q[1] += 1; if (res.qOk) it.q[0] += 1; }
     var g = gradeOf(sc);
-    if (g === 'good') it.step = Math.min(it.step + 1, GRADUATE_STEP);
-    else if (g === 'weak') it.step = 0;
-    else it.step = Math.max(1, it.step);
-    if (it.step >= GRADUATE_STEP) { it.graduated = true; it.due = 0; it.gradAt = now; }
-    else {
-      it.graduated = false;
-      var idx = g === 'good' ? Math.min(it.step - 1, STEP_DAYS.length - 1) : g === 'ok' ? Math.max(0, it.step - 2) : 0;
-      it.due = now + STEP_DAYS[idx] * DAY;
+    /* 예정일 전 반복으로 간격을 건너뛰거나 미루지 않는다. 낮은 점수는 졸업 뒤라도 내일 다시 확인한다. */
+    if (g === 'weak' || (!it.graduated && (!it.due || it.due <= now))) {
+      if (g === 'good') it.step = Math.min(it.step + 1, GRADUATE_STEP);
+      else if (g === 'weak') it.step = 0;
+      else it.step = Math.max(1, it.step);
+      if (it.step >= GRADUATE_STEP) { it.graduated = true; it.due = 0; it.gradAt = now; }
+      else {
+        it.graduated = false;
+        var idx = g === 'good' ? Math.min(it.step - 1, STEP_DAYS.length - 1) : g === 'ok' ? Math.max(0, it.step - 2) : 0;
+        it.due = now + STEP_DAYS[idx] * DAY;
+      }
     }
     state.log.push({ t: now, id: id, band: it.band, score: sc, qOk: res.qOk == null ? null : !!res.qOk, mode: res.mode || 'practice', wpm: res.wpm || null, self: res.self == null ? null : Math.max(0, Math.min(3, Math.round(res.self))), tags: (res.tags || []).slice(0, 12) });
     if (state.log.length > LOG_MAX) state.log.splice(0, state.log.length - LOG_MAX);
@@ -117,9 +120,14 @@ var WBCHUNK_SCHED = (function () {
       .slice(0, n || 3).map(function (k) { return { tag: k, n: cnt[k] }; });
   }
 
-  /* 단계 올리기·내리기 제안 — 같은 밴드의 최근 연습(복습 제외) 3회로 본다 */
+  /* 단계 제안은 같은 밴드의 서로 다른 최근 세 글로 본다 — 반복한 글은 최신 연습 한 번만 센다. */
   function suggestion(state, band) {
-    var recent = state.log.filter(function (e) { return e.band === band && e.mode === 'practice'; }).slice(-3);
+    var recent = [], seen = Object.create(null);
+    for (var i = state.log.length - 1; i >= 0 && recent.length < 3; i--) {
+      var e = state.log[i];
+      if (e.band !== band || e.mode !== 'practice' || seen[e.id]) continue;
+      seen[e.id] = true; recent.push(e);
+    }
     if (recent.length < 3) return null;
     var hi = recent.every(function (e) { return e.score >= 85; }) && recent.filter(function (e) { return e.qOk === true; }).length >= 2;
     if (hi) return 'up';
@@ -171,13 +179,15 @@ var WBCHUNK_SCHED = (function () {
 
   /* 선생님 확인용 요약 — 서버에 함께 올리는 작은 객체(화이트리스트는 서버가 다시 건다) */
   /* ── 끊어읽기 지수 (0~100) — 상담·월간 리포트가 인용하는 숫자 하나 ──
-     최근 5회 끊기 점수 평균에 단계 가중(유치 0.5 → 고3 1.0)을 곱한다. 같은 90점이라도 고3 글에서 낸 90점이 더 높은 실력이라서다.
-     단계 순서는 rules.js BAND_ORDER 와 같다(모듈을 서로 부르지 않으려고 여기 한 번 더 적었다). 기록이 없으면 null. */
+     최근 5회 각각의 실제 기록 단계에 가중(유치 0.5 → 고3 1.0)을 곱한 뒤 평균한다. 설정 단계만 바꿔 점수가 달라지면 안 된다.
+     옛 단계는 기존 매핑으로 읽고, 단계가 누락되거나 미상이면 추측하지 않고 제외한다. 유효 기록이 없으면 null. */
   function index(state, now) {
-    var s = summary(state, now);
-    if (s.recentAvg == null) return null;
-    var bi = BANDS13.indexOf(state.band); if (bi < 0) bi = 3;
-    return Math.round(s.recentAvg * (0.5 + 0.5 * bi / 12));
+    var recent = state.log.slice(-5).filter(function (e) { return BANDS13.indexOf(legacyBand(e.band)) >= 0; });
+    if (!recent.length) return null;
+    return Math.round(recent.reduce(function (sum, e) {
+      var bi = BANDS13.indexOf(legacyBand(e.band));
+      return sum + e.score * (0.5 + 0.5 * bi / 12);
+    }, 0) / recent.length);
   }
   function forTeacher(state, now) {
     var s = summary(state, now);

@@ -29,6 +29,9 @@ const CUSTOM_MAX = 200;              /* 선생님 지문 전체 상한 — 학�
 const PASSAGE_MAX_CHARS = 4_000;
 const PARA_MAX = 20;
 const nowIso = () => new Date().toISOString();
+const nextStateVersion = (prev) => new Date(Math.max(Date.now(), (Date.parse(prev && prev.updatedAt) || 0) + 1)).toISOString();
+/* ponytail: KV의 읽기/쓰기는 원자적이지 않다. 오래된 기기의 덮어쓰기를 거절하며, 동시 쓰기 직렬화가 필요해지면 학생별 Durable Object로 옮긴다. */
+const staleState = (b, prev) => Object.prototype.hasOwnProperty.call(b, 'baseUpdatedAt') && b.baseUpdatedAt !== (prev && prev.updatedAt || null);
 const size = (o) => JSON.stringify(o).length;
 const isObj = (v) => v && typeof v === 'object' && !Array.isArray(v);
 const int0 = (v) => (Number.isFinite(Number(v)) ? Math.max(0, Math.min(1_000_000, Math.round(Number(v)))) : 0);
@@ -175,9 +178,10 @@ export async function handleChunk({ path: p, method, who, getBody, store, query,
       if (!b) return j(400, { error: '올바른 JSON이 아니에요.' });
       if (!isObj(b.state)) return j(400, { error: 'state 필요' });
       const prev = await store.getState(code), today = nowIso().slice(0, 10);
+      if (staleState(b, prev)) return j(409, { error: '다른 기기에서 기록이 바뀌었어요. 이 기기 기록을 보관하고 선생님께 확인해 주세요.' });
       const n = prev && prev.puts && prev.puts.d === today ? prev.puts.n : 0;
       if (n >= PARENT_PUTS_PER_DAY) return j(429, { error: '오늘 저장은 여기까지예요. 내일 이어서 해요.' });
-      const rec = { state: b.state, updatedAt: nowIso(), puts: { d: today, n: n + 1 } };
+      const rec = { state: b.state, updatedAt: nextStateVersion(prev), puts: { d: today, n: n + 1 } };
       if (size(rec) > STATE_MAX_BYTES) return j(413, { error: '기록이 너무 커서 저장할 수 없어요. 선생님께 알려 주세요.' });
       await store.putState(code, rec);
       const sum = normalizeChunkSummary(b.summary);
@@ -197,7 +201,9 @@ export async function handleChunk({ path: p, method, who, getBody, store, query,
     const b = await body();
     if (!b) return j(400, { error: '올바른 JSON이 아니에요.' });
     if (!isObj(b.state)) return j(400, { error: 'state 필요' });
-    const rec = { state: b.state, updatedAt: nowIso() };
+    const prev = await store.getState(who.code);
+    if (staleState(b, prev)) return j(409, { error: '다른 기기에서 기록이 바뀌었어요. 이 기기 기록을 보관하고 선생님께 확인해 주세요.' });
+    const rec = { state: b.state, updatedAt: nextStateVersion(prev), ...(prev && prev.puts ? { puts: prev.puts } : {}) };
     if (size(rec) > STATE_MAX_BYTES) return j(413, { error: '기록이 너무 커서 저장할 수 없어요. 선생님께 알려 주세요.' });
     await store.putState(who.code, rec);
     /* 요약은 같은 요청에서 별도 키로 — 관리 화면이 state 전체를 읽지 않게 한다 */
