@@ -305,6 +305,13 @@
     const bandLessons = (b) => LESSONS.filter((l) => l.band === (b || band()));
     const byId = (id) => ALL().find((p) => p.id === id);
     const lessonById = (id) => LESSONS.find((l) => l.id === id);
+    /* 과제는 규칙 카드 → 지정 글 순서. 홈과 완료 화면이 같은 남은 과제를 가리킨다. */
+    function assignmentNext(label) {
+      const a = S.assign || {};
+      let act = 'open-lesson', item = (a.lessons || []).map(lessonById).find((l) => l && !assignDoneL(l.id));
+      if (!item) { act = 'start-practice'; item = (a.passages || []).map(byId).find((p) => p && !assignDoneP(p.id)); }
+      return item ? '<button class="big" data-act="' + act + '" data-id="' + esc(item.id) + '">' + label + ' — 「' + esc(item.title) + '」</button>' : '';
+    }
     /* 오늘의 카드: 이 학년 카드에서 안 본 것 → 없으면 바로 아래 학년부터 내려가며 안 본 카드. 규칙은 나선형으로 쌓이므로 아래 카드도 이 학년의 것이다. */
     const bandsUpTo = (b) => R.BAND_ORDER.slice(0, R.BAND_ORDER.indexOf(b) + 1);
     const nextLesson = () => { const order = bandsUpTo(band()).reverse(); for (const b of order) { const l = bandLessons(b).find((x) => !S.lessons[x.id]); if (l) return l; } return null; };
@@ -415,7 +422,7 @@
     function vOnboard() {
       const g = view.grade;
       return (view.famErr ? '<div class="err">' + esc(view.famErr) + '</div>' : '') +
-        (famMode() ? '<div class="card hero"><p class="eyebrow">가족 링크로 열었어요</p><h1>아이는 몇 학년이에요?</h1><p>선생님이 단계를 정해 두면 그에 맞춰 저절로 바뀌어요.</p></div>' : '<div class="card hero"><p class="eyebrow">처음 오셨네요</p><h1>몇 학년이에요?</h1><p>단계는 언제든 기록 탭에서 바꿀 수 있어요.</p></div>') +
+        (famMode() ? '<div class="card hero"><p class="eyebrow">센터 끊어읽기 학습</p><h1>몇 학년이에요?</h1><p>선생님이 단계를 정해 두면 그에 맞춰 저절로 바뀌어요.</p></div>' : '<div class="card hero"><p class="eyebrow">처음 오셨네요</p><h1>몇 학년이에요?</h1><p>단계는 언제든 기록 탭에서 바꿀 수 있어요.</p></div>') +
         '<div class="card"><div class="grid">' + GRADES.map(([n, l]) => '<button class="grade" data-act="pick-grade" data-g="' + n + '" aria-pressed="' + (g === n) + '">' + l + '</button>').join('') + '</div>' +
         (g != null ? '<p class="small" style="margin-top:12px">→ <b>' + R.BANDS[R.bandOfGrade(g)].label + ' 단계</b>로 시작해요. ' + esc(R.BANDS[R.bandOfGrade(g)].who) + '</p>' +
           '<button class="big" data-act="pl-start">2분 진단하고 시작하기</button><p class="small" style="text-align:center;margin:6px 0 0">글 한 문단을 끊어 보고 딱 맞는 단계를 찾아요. 점수는 기록에 남지 않아요.</p>' +
@@ -488,19 +495,19 @@
         '<button class="btn ' + (on ? 'ghost ' : '') + 'sm" data-act="push-toggle">' + (on ? '알림 끄기' : '알림 받기') + '</button></div>';
     }
 
-    /* 부모 모드 홈 카드 — 어른이 할 일 네 줄 + 이번 주 요약. 점수보다 「소리 내어 함께 읽었다」가 남게 쓴다 */
+    /* 부모앱은 학습 진입과 기록 확인, 실제 학습 안내는 학생을 향한다. */
     function famCards(now) {
       const week = S.log.filter((e) => e.t >= now - 7 * 86400000).length, sum = SC.forTeacher(S, now);
       const due = SC.dueList(S, now), weak = SC.weakTags(S, 1)[0], l = weak ? lessonForTag(weak.tag) : null;
-      let html = '<div class="card"><h2>👨‍👩‍👧 함께 5분 끊어읽기</h2><ol class="small" style="margin:6px 0 0 18px;padding:0;line-height:1.7">' +
-        '<li><b>어른이 먼저</b> 소리 내어 읽어 주세요. ∕ 에서 살짝, 문장 끝에서 크게 쉬는 걸 아이가 들어요. 「들려주기」 버튼이 대신 읽어 줘도 돼요.</li>' +
-        '<li><b>아이가 따라</b> 읽어요. 세 번까지면 충분해요.</li>' +
-        '<li><b>아이가 직접</b> ∕ 를 찍어요. 막히면 "여기까지가 한 뜻이야?"라고만 물어요. 답은 결과 화면이 설명해요.</li>' +
-        '<li>문제는 아이가 고르고, <b>왜 그렇게 골랐는지</b> 한마디 말하게 해요.</li></ol>' +
-        '<p class="small" style="margin-top:8px">기록은 학원 선생님께 그대로 이어져요. 하루 한 편, 10분이면 돼요.</p></div>';
-      html += '<div class="card"><h2>이번 주</h2><div class="kv"><span>함께 연습한 글</span><b>' + week + '편</b></div><div class="kv"><span>최근 평균</span><b>' + (sum.recentAvg == null ? '-' : sum.recentAvg + '점') + '</b></div>' +
+      let html = '<div class="card"><h2>센터에서 이렇게 학습해요</h2><ol class="small" style="margin:6px 0 0 18px;padding:0;line-height:1.7">' +
+        '<li>과제가 있으면 <b>선생님 과제부터</b> 시작해요. 규칙 카드를 보고 글을 읽어요.</li>' +
+        '<li><b>따라 읽기 → 직접 끊기 → 표시 없이 읽기</b> 순서로 연습해요. 어려우면 선생님께 물어보세요.</li>' +
+        '<li><b>결과를 확인</b>하고 남은 과제를 이어서 해요.</li></ol>' +
+        '<p class="small" style="margin-top:8px">부모님은 이 링크에서 학습 기록을 확인할 수 있어요. 저장이 끝난 기록은 선생님 화면에도 이어져요.</p>' +
+        '<button class="btn ghost sm" data-act="tab" data-tab="record">학습 기록 보기</button></div>';
+      html += '<div class="card"><h2>최근 7일</h2><div class="kv"><span>연습 횟수</span><b>' + week + '회</b></div><div class="kv"><span>최근 평균</span><b>' + (sum.recentAvg == null ? '-' : sum.recentAvg + '점') + '</b></div>' +
         '<div class="kv"><span>오늘 복습할 글</span><b>' + due.length + '편</b></div>' + (sum.streak ? '<div class="kv"><span>연속</span><b>' + sum.streak + '일</b></div>' : '') +
-        (weak && l ? '<div class="kv"><span>집에서 한 번 더</span><b>' + esc(R.TAG_LABEL[weak.tag] || weak.tag) + '</b></div><p class="small">💡 ' + esc(l.tip) + '</p>' : '') + '</div>';
+        (weak && l ? '<div class="kv"><span>다시 볼 규칙</span><b>' + esc(R.TAG_LABEL[weak.tag] || weak.tag) + '</b></div><p class="small">💡 ' + esc(l.tip) + '</p>' : '') + '</div>';
       html += pushCard();
       return html;
     }
@@ -511,19 +518,23 @@
       const due = SC.dueList(S, now, band());
       const sug = SC.suggestion(S, band());
       const a = auth();
+      const nextTask = assignmentNext('과제 시작');
+      const tasksDone = SC.assignTotal(S) > 0 && SC.assignDone(S) === SC.assignTotal(S);
       let html = '<div class="card hero"><p class="eyebrow">' + esc(B().label) + ' 단계 · ' + esc(B().who) + '</p><h1>' + (a && a.name ? esc(a.name) + ', ' : '') + '오늘도 덩어리로 읽자!</h1>' +
+        '<p>' + (nextTask ? '선생님이 정한 카드와 글부터 해 볼까요?' : tasksDone ? '선생님 과제를 모두 끝냈어요. 아래에서 복습하거나 더 연습할 수 있어요.' : '규칙 카드 한 장, 글 한 편, 복습 순서로 시작해요.') + '</p>' + nextTask +
         '<p>' + (sm.streak ? '연속 ' + sm.streak + '일째 · ' : '') + '지금까지 연습 ' + sm.attempts + '회' + (sm.recentAvg != null ? ' · 최근 평균 ' + sm.recentAvg + '점' : '') + '</p></div>';
       if (assignHas()) {
         const a = S.assign, since = assignSince();
         html += '<div class="card"><h2>선생님 과제' + (a.due ? ' <span class="tag warn">~' + esc(a.due.slice(5).replace('-', '/')) + '</span>' : '') + '</h2>' + (a.note ? '<p class="small">💬 ' + esc(a.note) + '</p>' : '') + '<div class="list">' +
-          (a.passages || []).map((id) => { const p = byId(id); if (!p) return ''; const d = assignDoneP(id); return '<button class="item ' + (d ? 'done' : '') + '" data-act="start-practice" data-id="' + id + '"><span class="tag ' + (d ? 'ok' : 'warn') + '">' + (d ? '✓' : '글') + '</span><span class="t"><b>' + esc(p.title) + '</b><small>' + esc(R.BANDS[p.band].label) + ' · ' + esc(p.genre) + '</small></span><span class="go">›</span></button>'; }).join('') +
           (a.lessons || []).map((id) => { const l = lessonById(id); if (!l) return ''; const d = assignDoneL(id); return '<button class="item ' + (d ? 'done' : '') + '" data-act="open-lesson" data-id="' + id + '"><span class="tag ' + (d ? 'ok' : 'warn') + '">' + (d ? '✓' : '카드') + '</span><span class="t"><b>' + esc(l.title) + '</b><small>' + esc(R.BANDS[l.band].label) + ' 규칙 카드</small></span><span class="go">›</span></button>'; }).join('') +
-          '</div><p class="small" style="margin-top:8px">' + SC.assignDone(S) + ' / ' + SC.assignTotal(S) + ' 끝냈어요' + (since ? ' · 선생님이 ' + fmtDate(since) + '에 정함' : '') + '</p></div>';
+          (a.passages || []).map((id) => { const p = byId(id); if (!p) return ''; const d = assignDoneP(id); return '<button class="item ' + (d ? 'done' : '') + '" data-act="start-practice" data-id="' + id + '"><span class="tag ' + (d ? 'ok' : 'warn') + '">' + (d ? '✓' : '글') + '</span><span class="t"><b>' + esc(p.title) + '</b><small>' + esc(R.BANDS[p.band].label) + ' · ' + esc(p.genre) + '</small></span><span class="go">›</span></button>'; }).join('') +
+          '</div>' + (SC.assignTotal(S) ? '<p class="small" style="margin-top:8px">' + SC.assignDone(S) + ' / ' + SC.assignTotal(S) + ' 끝냈어요' + (since ? ' · 선생님이 ' + fmtDate(since) + '에 정함' : '') + '</p>' : '') + '</div>';
       }
       const teacherBand = !!(S.assign && S.assign.band);
       if (!teacherBand && sug === 'up' && R.nextBand(band())) html += '<div class="banner">서로 다른 최근 세 글에서 모두 85점 이상이에요. <b>' + R.BANDS[R.nextBand(band())].label + ' 단계</b>로 올라가 볼까요? <button class="btn sm" data-act="band-shift" data-d="1">올리기</button></div>';
       if (!teacherBand && sug === 'down' && R.prevBand(band())) html += '<div class="banner">서로 다른 최근 세 글이 아직 어려웠어요. <b>' + R.BANDS[R.prevBand(band())].label + ' 단계</b>로 잠시 내려가 연습해 볼까요? <button class="btn sm" data-act="band-shift" data-d="-1">내리기</button></div>';
-      html += '<div class="card"><h2>오늘의 세 걸음</h2><div class="steps">' +
+      if (!nextTask && SC.assignTotal(S) && !tasksDone) html += '<div class="banner">남은 과제를 열 수 없어요. 연결 상태를 확인하고 선생님께 알려 주세요.</div>';
+      if (!nextTask) html += '<div class="card"><h2>' + (tasksDone ? '과제 다음, 더 연습하기' : '오늘의 세 걸음') + '</h2><div class="steps">' +
         '<div class="step ' + (nl ? '' : 'done') + '"><div class="k">1</div><div class="t"><b>배우기</b><small>' + (nl ? esc(nl.title) : '이 단계 카드를 다 봤어요') + '</small></div>' + (nl ? '<button class="btn sm" data-act="open-lesson" data-id="' + nl.id + '">열기</button>' : '') + '</div>' +
         '<div class="step"><div class="k">2</div><div class="t"><b>연습 — 따라 읽기 → 직접 끊기 → 문제</b><small>' + (np ? '「' + esc(byId(np.id).title) + '」 · ' + WHY[np.why] : '이 단계 글을 모두 졸업했어요!') + '</small></div>' + (np ? '<button class="btn sm" data-act="start-practice" data-id="' + np.id + '">시작</button>' : '') + '</div>' +
         '<div class="step ' + (due.length ? '' : 'done') + '"><div class="k">3</div><div class="t"><b>복습</b><small>' + (due.length ? '오늘 ' + due.length + '편이 기다려요' : '오늘 복습할 글이 없어요') + '</small></div>' + (due.length ? '<button class="btn sm" data-act="start-review" data-id="' + due[0].id + '">시작</button>' : '') + '</div>' +
@@ -550,7 +561,7 @@
       if (ls.done) {
         const avg = Math.round(ls.scores.reduce((a, b) => a + b, 0) / Math.max(1, ls.scores.length));
         return '<div class="card hero"><p class="eyebrow">카드 완료</p><h1>' + esc(l.title) + '</h1><p>확인 문제 ' + avg + '점' + (avg >= 85 ? ' — 규칙을 잡았어요!' : ' — 보기를 한 번 더 읽고 연습에서 써 봐요.') + '</p></div>' +
-          '<button class="big" data-act="lesson-quit">카드 목록으로</button>' + (R.nextBand(l.band) ? '' : '') + footer();
+          assignmentNext('다음 과제') + (SC.assignTotal(S) ? '<button class="big ghost" data-act="tab" data-tab="home">과제 현황 보기</button>' : '<button class="big" data-act="lesson-quit">카드 목록으로</button>') + footer();
       }
       let html = '<div class="card"><p class="eyebrow">배우기 · ' + esc(R.BANDS[l.band].label) + '</p><h2>' + esc(l.title) + '</h2><div class="rule">' + esc(l.rule) + '</div><div class="why"><b>왜?</b> ' + esc(l.why) + '</div>';
       html += '<h3>보기</h3>' + l.examples.map((x, i) => '<div class="ex">' + segsHtml(x.segs, 'ex' + i) + (x.note ? '<div class="cap">' + esc(x.note) + '</div>' : '') + '<div class="toolrow">' + ttsBtn(x.segs, 'ex' + i) + '</div></div>').join('');
@@ -632,22 +643,13 @@
       res.forEach((r) => { if (!r) return; hit += r.hit; extra += r.extra; model += r.model; tags = tags.concat(r.tags); });
       return { hit, extra, model, tags, score: model ? Math.max(0, Math.round((hit - 0.5 * extra) / model * 100)) : (extra ? 0 : 100) };
     }
-    /* 부모 모드 단계별 한 줄 — 어른이 지금 할 일. 학생 모드에서는 빈 문자열 */
-    function famTip(stage, r) {
-      if (!famMode()) return '';
-      const t = stage === 1 ? '어른이 먼저 소리 내어 읽어 주세요. ∕ 에서 살짝, 문장 끝에서 크게 쉬는 걸 아이가 듣게 해요. 그다음 아이가 따라 읽어요.'
-        : stage === 2 ? '아이가 스스로 누르게 해요. 막히면 "여기까지가 한 뜻이야?"라고만 물어요. 답을 알려 주지 않아도 결과 화면이 이유를 설명해요.'
-        : stage === 3 ? '이번엔 아이 혼자 눈으로 읽어요. 문제는 아이가 고르고, 왜 그렇게 골랐는지 한마디 말하게 해요.'
-        : '오늘 칭찬 한마디 — "덩어리로 읽으니까 훨씬 잘 들려!" 점수보다 소리 내어 읽은 것을 칭찬해요.' + (r && r.score < 70 ? ' 빨간 ∕ 자리 하나만 골라 같이 다시 읽어 봐요.' : '');
-      return '<div class="banner">👨‍👩‍👧 ' + t + '</div>';
-    }
     function vSession() {
       const pr = sess.pr, p = byId(pr.id), b = R.BANDS[p.band];
       const head = '<p class="eyebrow">' + (pr.mode === 'review' ? '복습' : '연습') + ' · 「' + esc(p.title) + '」 · ' + esc(p.genre) + '</p>';
       const quit = '<button class="big ghost" data-act="pr-quit">그만하기</button>';
       const all = [].concat.apply([], p.paragraphs);
       if (pr.stage === 1) {
-        let html = '<div class="card">' + head + stageBar(1, 3) + '<h2>1. 따라 읽기</h2>' + famTip(1) + '<p class="small">' + (marker() === 'scoop' ? '밑줄 곡선 하나가 한 덩어리예요. 곡선 끝에서 살짝 쉬며' : '∕ 에서 살짝 쉬며') + ' 소리 내어 읽어 보세요. 문장 끝에서는 크게 쉬어요.</p>';
+        let html = '<div class="card">' + head + stageBar(1, 3) + '<h2>1. 따라 읽기</h2><p class="small">' + (marker() === 'scoop' ? '밑줄 곡선 하나가 한 덩어리예요. 곡선 끝에서 살짝 쉬며' : '∕ 에서 살짝 쉬며') + ' 소리 내어 읽어 보세요. 문장 끝에서는 크게 쉬어요.</p>';
         let k = 0; p.paragraphs.forEach((segs) => { html += segsHtml(segs, 'p' + (k++)); });
         html += '<div class="toolrow">' + ttsBtn(all, 'all') + '</div>';
         if (S.prefs.recording && WBVoice.recSupported()) {
@@ -660,7 +662,7 @@
         return html;
       }
       if (pr.stage === 2) {
-        let html = '<div class="card">' + head + stageBar(2, 3) + '<h2>2. 직접 끊기</h2>' + famTip(2);
+        let html = '<div class="card">' + head + stageBar(2, 3) + '<h2>2. 직접 끊기</h2>';
         if (pr.sentMode) {
           const u = pr.units[pr.ui], r = pr.res[pr.ui];
           html += '<p class="small">문장 ' + (pr.ui + 1) + '/' + pr.units.length + ' — 뜻이 나뉘는 곳의 <b>·</b> 를 눌러 ∕ 로 바꿔요.</p>' + (r ? legendHtml(r.extras.length, r.neutral.length) : '') + tokensHtml(u.text, pr.marks[pr.ui], r, 'u' + pr.ui);
@@ -687,7 +689,7 @@
            문장 단위 밴드(유치~초2)는 속도를 재지 않으므로 글을 바로 보여 준다. */
         if (b.sentenceMode && !pr.readStart) pr.readStart = Date.now();
         const q = p.q, answered = pr.picked != null, reading = !!pr.readStart && pr.readMs == null, showText = b.sentenceMode || reading || pr.peek;
-        let html = '<div class="card">' + head + stageBar(3, 3) + '<h2>3. 표시 없이 읽기</h2>' + famTip(3);
+        let html = '<div class="card">' + head + stageBar(3, 3) + '<h2>3. 표시 없이 읽기</h2>';
         if (pr.readMs == null && !pr.readStart) html += '<p class="small">이번엔 표시 없이, 마음속으로 덩어리를 만들며 읽어요. 준비되면 「읽기 시작」을 누르고, 다 읽으면 「다 읽었어요」를 눌러요. 그 사이 시간으로 읽기 속도를 재요.</p><button class="big" data-act="pr-read-start">읽기 시작</button>';
         else if (pr.readMs == null) html += '<p class="small">마음속으로 덩어리를 만들며 읽어요. 다 읽으면 버튼을 눌러요.</p>';
         if (showText) html += p.paragraphs.map((segs) => '<p class="plain">' + esc(segs.join('')) + '</p>').join('');
@@ -704,7 +706,7 @@
       /* stage 4 — 결과 */
       const r = pr.final, it = S.items[pr.id];
       const msg = r.score >= 90 ? '덩어리가 눈에 척척 들어와요!' : r.score >= 70 ? '거의 다 왔어요. 빨간 ∕ 자리를 다시 봐요.' : '모범 ∕ 를 따라 읽고 한 번 더 해 봐요.';
-      let html = '<div class="card hero"><p class="eyebrow">' + (pr.mode === 'review' ? '복습' : '연습') + ' 완료 · 「' + esc(p.title) + '」</p><h1>끊기 ' + r.score + '점 · 문제 ' + (r.qOk == null ? '미측정' : r.qOk ? '정답' : '오답') + '</h1><p>' + msg + '</p></div>' + famTip(4, r);
+      let html = '<div class="card hero"><p class="eyebrow">' + (pr.mode === 'review' ? '복습' : '연습') + ' 완료 · 「' + esc(p.title) + '」</p><h1>끊기 ' + r.score + '점 · 문제 ' + (r.qOk == null ? '미측정' : r.qOk ? '정답' : '오답') + '</h1><p>' + msg + '</p></div>';
       html += '<div class="card"><div class="kv"><span>맞힌 경계</span><b>' + r.hit + ' / ' + r.model + '</b></div>' + (r.extra ? '<div class="kv"><span>군더더기 경계</span><b>' + r.extra + '</b></div>' : '') +
         (r.wpm ? '<div class="kv"><span>읽기 속도(묵독)</span><b>' + r.wpm + '어절/분' + (r.prevWpm ? ' <span class="small">(지난번 ' + r.prevWpm + ')</span>' : '') + '</b></div>' : '') +
         (r.self != null ? '<div class="kv"><span>낭독 자기 점검</span><b>' + r.self + ' / 3</b></div>' : '') +
@@ -712,7 +714,9 @@
       const weak = SC.weakTags(S, 2);
       if (weak.length) html += '<div class="card"><h2>다시 볼 규칙</h2><div class="list">' + weak.map((w) => { const l = lessonForTag(w.tag); return '<button class="item" data-act="open-lesson" data-id="' + (l ? l.id : '') + '"><span class="tag warn">' + w.n + '회</span><span class="t"><b>' + esc(R.TAG_LABEL[w.tag] || w.tag) + '</b><small>' + (l ? '카드: ' + esc(l.title) : '') + '</small></span><span class="go">›</span></button>'; }).join('') + '</div></div>';
       const np = SC.nextPassage(S, bandPassages().map((x) => x.id), Date.now(), band());
-      html += '<div class="row">' + (np ? '<button class="big" data-act="start-practice" data-id="' + np.id + '">다음 글 — 「' + esc(byId(np.id).title) + '」</button>' : '') + '<button class="big ghost" data-act="pr-quit">홈으로</button></div>';
+      const total = SC.assignTotal(S);
+      if (total) html += '<p class="small">선생님 과제 ' + SC.assignDone(S) + ' / ' + total + ' 끝냈어요</p>';
+      html += '<div class="row">' + (total ? assignmentNext('다음 과제') : np ? '<button class="big" data-act="start-practice" data-id="' + np.id + '">다음 글 — 「' + esc(byId(np.id).title) + '」</button>' : '') + '<button class="big ghost" data-act="pr-quit">' + (total ? '과제 현황 보기' : '홈으로') + '</button></div>';
       return html + footer();
     }
     function finishPractice() {

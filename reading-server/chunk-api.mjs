@@ -36,6 +36,11 @@ const size = (o) => JSON.stringify(o).length;
 const isObj = (v) => v && typeof v === 'object' && !Array.isArray(v);
 const int0 = (v) => (Number.isFinite(Number(v)) ? Math.max(0, Math.min(1_000_000, Math.round(Number(v)))) : 0);
 const pctOrNull = (v) => (v == null || !Number.isFinite(Number(v)) ? null : Math.max(0, Math.min(100, Math.round(Number(v)))));
+/* 과제 완료는 기기가 기억한 이전 과제가 아니라 현재 배정과 학습 시각으로 센다. */
+const assignDone = (state, rec) => SC.assignDone({
+  items: isObj(state && state.items) ? state.items : {}, lessons: isObj(state && state.lessons) ? state.lessons : {},
+  assign: rec && rec.assign ? { ...rec.assign, updatedAt: rec.updatedAt } : null,
+});
 
 /* 학생 기기가 올린 요약을 모양만 강제한다 — 뜻은 해석하지 않는다(하루브레인 normalizeSummary 와 같은 원칙) */
 export function normalizeChunkSummary(sum) {
@@ -185,7 +190,10 @@ export async function handleChunk({ path: p, method, who, getBody, store, query,
       if (size(rec) > STATE_MAX_BYTES) return j(413, { error: '기록이 너무 커서 저장할 수 없어요. 선생님께 알려 주세요.' });
       await store.putState(code, rec);
       const sum = normalizeChunkSummary(b.summary);
-      if (sum) { const srec = { summary: sum, updatedAt: rec.updatedAt }; if (size(srec) <= SUMMARY_MAX_BYTES) await store.putSummary(code, srec); }
+      if (sum) {
+        sum.assignDone = assignDone(b.state, await store.getAssign(code));
+        const srec = { summary: sum, updatedAt: rec.updatedAt }; if (size(srec) <= SUMMARY_MAX_BYTES) await store.putSummary(code, srec);
+      }
       return j(200, { ok: true, updatedAt: rec.updatedAt });
     }
     return j(404, { error: 'unknown api' });
@@ -209,6 +217,7 @@ export async function handleChunk({ path: p, method, who, getBody, store, query,
     /* 요약은 같은 요청에서 별도 키로 — 관리 화면이 state 전체를 읽지 않게 한다 */
     const sum = normalizeChunkSummary(b.summary);
     if (sum) {
+      sum.assignDone = assignDone(b.state, await store.getAssign(who.code));
       const srec = { summary: sum, updatedAt: rec.updatedAt };
       if (size(srec) <= SUMMARY_MAX_BYTES) await store.putSummary(who.code, srec);
     }
@@ -302,10 +311,12 @@ export async function handleChunk({ path: p, method, who, getBody, store, query,
       if (!b) return j(400, { error: '올바른 JSON이 아니에요.' });
       const n = normalizeAssign(b);
       if (n.error) return j(400, { error: n.error });
-      if (!n.assign) { await store.deleteAssign(code); return j(200, { ok: true, assign: null, updatedAt: null }); }
-      const rec = { assign: n.assign, updatedAt: nowIso() };
-      await store.putAssign(code, rec);
-      return j(200, { ok: true, assign: rec.assign, updatedAt: rec.updatedAt });
+      const rec = n.assign ? { assign: n.assign, updatedAt: nowIso() } : null;
+      if (rec) await store.putAssign(code, rec); else await store.deleteAssign(code);
+      /* 새 과제를 낸 직후에도 지난 과제의 완료 수가 반 현황에 남지 않게 한다. */
+      const [srec, stateRec] = await Promise.all([store.getSummary(code), store.getState(code)]);
+      if (srec && srec.summary) await store.putSummary(code, { ...srec, summary: { ...srec.summary, assignDone: assignDone(stateRec && stateRec.state, rec) } });
+      return j(200, { ok: true, assign: rec ? rec.assign : null, updatedAt: rec ? rec.updatedAt : null });
     }
     return j(404, { error: 'unknown api' });
   }
