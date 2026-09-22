@@ -8,9 +8,10 @@
  *
  * 단어장 모양(정규화 뒤):
  *   { id, title, publisher?, level?, note?, source:'own'|'textbook',   // 종류 — 자체(학원 자료)·교재(구매 자료, 기본). AI 연상은 own 만
+ *     curriculum?:{grade, subject},                // WB 교과 어휘의 학년·과목. 교재의 단계(level)와 다르다.
  *     units: [{ id, title }],                       // 문제집의 단원·회차 순서 그대로
  *     words: [{ id, unit, word, type:'hanja'|'native', hanja?, parts?:[{ch,hun,eum}], literal?,
- *               meaning, example?, syn?:[], scene?, context?:{prompt, choices:[], answer, explanation} }],
+ *               meaning, example?, origin?, syn?:[], scene?, context?:{prompt, choices:[], answer, explanation} }],
  *                 // id 는 '낱말|한자'(내용 기반) — 재업로드에도 안 밀린다. context 는 검수된 새 상황 적용 문항.
  *     chars: [{ ch, hun, eum, strokes?, unit, medians?:[[[x,y],…],…], radical?, similar?:[…], words:[…], derived? }] }
  *   chars 의 words 는 그 글자를 쓰는 낱말(급수 교재의 예시 낱말). 직접 적어도 되고, 낱말의 한자 분해에서 저절로 붙기도 한다.
@@ -33,13 +34,15 @@ var WBBOOKCHECK = (function () {
   var HANJA_ANY = /[㐀-䶿一-鿿豈-﫿]/;
   var ENGLISH_WORD = /^[A-Za-z][A-Za-z\s'-]*$/;
   var LEVELS = ['L1', 'L2', 'L3', 'L4'];
+  var CURRICULUM_GRADES = ['초1', '초2', '초3', '초4', '초5', '초6', '중1', '중2', '중3', '고1', '고2', '고3'];
+  var CURRICULUM_SUBJECTS = ['학습도구어', '학술도구어', '국어', '수학', '사회', '역사', '도덕', '과학', '통합교과'];
   /* 단어장 종류 — 교재(textbook)는 구매 자료라 뜻 문장을 외부 AI 로 보내지 않는다. 자체(own)는 학원이 만든 자료(체험 단어장·진로독서 어휘장). 기본은 교재 */
   var SOURCES = ['own', 'textbook'];
 
   var LIMITS = {
     words: 3000, chars: 2000, units: 200,
     title: 60, publisher: 40, note: 200,
-    word: 40, meaning: 200, example: 200, unit: 40, unitTitle: 60, itemId: 100,
+    word: 40, meaning: 200, example: 200, origin: 100, unit: 40, unitTitle: 60, itemId: 100,
     charWords: 12,
     hun: 20, eum: 4, strokes: 64, medianStrokes: 64, medianPts: 64, syn: 8, synLen: 40, similar: 8, scene: 200,
     contextPrompt: 300, contextChoice: 120, contextExplanation: 300,
@@ -179,6 +182,18 @@ var WBBOOKCHECK = (function () {
     if (book.level && LEVELS.indexOf(book.level) < 0) { C.warn('level', '학년대는 L1~L4 — "' + book.level + '" 는 지운다'); book.level = ''; }
     if (book.source && SOURCES.indexOf(book.source) < 0) { C.warn('source', '종류는 own(자체)·textbook(교재) — "' + book.source + '" 는 교재로 둔다'); book.source = ''; }
     if (!book.source) book.source = 'textbook';
+    if (Object.prototype.hasOwnProperty.call(raw, 'curriculum')) {
+      var curriculum = raw.curriculum;
+      if (!isObj(curriculum)) C.err('curriculum', 'curriculum 은 grade·subject 를 담은 객체여야 해요.');
+      else {
+        var grade = typeof curriculum.grade === 'string' ? curriculum.grade.trim() : '';
+        var subject = typeof curriculum.subject === 'string' ? curriculum.subject.trim() : '';
+        if (CURRICULUM_GRADES.indexOf(grade) < 0) C.err('curriculum.grade', '학년은 초1~초6·중1~중3·고1~고3 중 하나여야 해요.');
+        if (CURRICULUM_SUBJECTS.indexOf(subject) < 0) C.err('curriculum.subject', '과목은 ' + CURRICULUM_SUBJECTS.join('·') + ' 중 하나여야 해요.');
+        if (Object.keys(curriculum).some(function (k) { return k !== 'grade' && k !== 'subject'; })) C.err('curriculum', 'curriculum 에는 grade·subject 만 적어요.');
+        book.curriculum = { grade: grade, subject: subject };
+      }
+    }
 
     /* 단원 — 적힌 순서가 곧 학습 순서다 */
     var unitIdx = {};
@@ -224,6 +239,14 @@ var WBBOOKCHECK = (function () {
         context = checkContext(w.context, where + '.context', C);
         if (!context) return;
       }
+      /* 원어 참고는 표기 그대로 보존한다. 훈음이나 학습용 한자 항목을 이 값에서 지어내지 않는다. */
+      var origin = null;
+      if (Object.prototype.hasOwnProperty.call(w, 'origin')) {
+        if (typeof w.origin !== 'string' || !w.origin.trim() || w.origin.length > LIMITS.origin) {
+          C.err(where + '.origin', 'origin 은 1~' + LIMITS.origin + '자 원어 표기 문자열이어야 해요.'); return;
+        }
+        origin = w.origin;
+      }
 
       var parts = null;
       if (Array.isArray(w.parts) && w.parts.length) {
@@ -256,6 +279,7 @@ var WBBOOKCHECK = (function () {
       var unit = addUnit(w.unit, null, where);
       var out = { id: id, unit: unit, word: word, type: type, meaning: meaning };
       if (context) out.context = context;
+      if (origin !== null) out.origin = origin;
       if (parts) {
         out.hanja = hanja; out.parts = parts;
         var missing = parts.filter(function (p) { return !p.hun || !p.eum; });
@@ -428,10 +452,12 @@ var WBBOOKCHECK = (function () {
     book.units.forEach(function (u) { per[u.id] = { id: u.id, title: u.title, words: 0, chars: 0 }; });
     book.words.forEach(function (w) { if (per[w.unit]) per[w.unit].words += 1; });
     book.chars.forEach(function (c) { if (per[c.unit]) per[c.unit].chars += 1; });
-    return {
+    var meta = {
       id: book.id, title: book.title, publisher: book.publisher || '', level: book.level || '', note: book.note || '', source: book.source || 'textbook',
       counts: counts, units: book.units.map(function (u) { return per[u.id]; }),
     };
+    if (book.curriculum) meta.curriculum = { grade: book.curriculum.grade, subject: book.curriculum.subject };
+    return meta;
   }
 
   /* ── 붙여넣기 텍스트 → 단어장 ──
@@ -502,7 +528,7 @@ var WBBOOKCHECK = (function () {
   function aiAllowed(book) { return !!(book && book.source === 'own'); }
 
   return {
-    ID_RE: ID_RE, LIMITS: LIMITS, LEVELS: LEVELS, SOURCES: SOURCES, aiAllowed: aiAllowed,
+    ID_RE: ID_RE, LIMITS: LIMITS, LEVELS: LEVELS, SOURCES: SOURCES, CURRICULUM_GRADES: CURRICULUM_GRADES, CURRICULUM_SUBJECTS: CURRICULUM_SUBJECTS, aiAllowed: aiAllowed,
     isHanjaChar: isHanjaChar, hanjaOf: hanjaOf, parseHanjaSpec: parseHanjaSpec, findInExample: findInExample, exampleHasWord: exampleHasWord,
     checkBook: checkBook, checkMedians: checkMedians, countsOf: countsOf, bookMeta: bookMeta, parseBookText: parseBookText,
   };

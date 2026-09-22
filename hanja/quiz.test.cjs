@@ -278,7 +278,8 @@ t('상황 적용 자료가 없으면 건너뛰고, 기존 예문 빈칸을 대�
   const item = { kind: 'word', w };
   assert.strictEqual(Q.makeQuestion(item, ctx, { kinds: ['w-context'], vocabulary: true }), null);
   assert.deepStrictEqual(Q.session([item], ctx, { kinds: ['w-context'], vocabulary: true }), { questions: [], skipped: [item] });
-  const old = Q.makeQuestion(item, ctx, { kinds: ['w-cloze'], vocabulary: true });
+  assert.strictEqual(Q.makeQuestion(item, ctx, { kinds: ['w-cloze'], vocabulary: true }), null, '자동 빈칸을 검수된 문맥 평가로 내면 안 된다');
+  const old = Q.makeQuestion(item, ctx, { kinds: ['w-cloze'] });
   assert.ok(old && old.kind === 'w-cloze' && old.answer === w.word && !old.explanation, '기존 빈칸 문항이 바뀌었다');
 });
 

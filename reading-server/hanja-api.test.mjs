@@ -125,6 +125,60 @@ await t('붙여넣기 텍스트 업로드 — 관리 웹 textarea 그대로', as
   assert.ok(/1행/.test(bad.body.errors[0].message));
 });
 
+await t('일괄 업로드 — 63권 개별 미리보기, 전체 검사 뒤 본문 저장·목록 한 번 쓰기', async () => {
+  const store = memStore(), writes = [];
+  for (const method of ['putBook', 'putBookIds', 'putRemap', 'deleteRemap']) {
+    const original = store[method];
+    store[method] = (...args) => { writes.push(method); return original(...args); };
+  }
+  const books = Array.from({ length: 63 }, (_, i) => ({ id: 'batch-' + i, title: '자체 검사용 단어장 ' + i, source: 'own', words: [{ word: '살피다', meaning: '자세히 보다' }] }));
+  const post = (body) => call(store, { path: '/api/hanja/admin/book', method: 'POST', who: ADMIN, getBody: async () => body });
+  const dry = await post({ books, scope: 'assigned', dryRun: true });
+  assert.strictEqual(dry.status, 200);
+  assert.ok(dry.body.ok && dry.body.batch && dry.body.preview);
+  assert.strictEqual(dry.body.results.length, 63);
+  assert.ok(dry.body.results.every((result, i) => result.ok && result.meta.id === books[i].id));
+  assert.deepStrictEqual(writes, [], '미리보기가 저장했다');
+  const saved = await post({ books, scope: 'assigned' });
+  assert.strictEqual(saved.status, 200);
+  assert.strictEqual(saved.body.count, 63);
+  assert.strictEqual(writes.filter((method) => method === 'putBook').length, 63);
+  assert.strictEqual(writes.filter((method) => method === 'putBookIds').length, 1, '책마다 목록을 쓰면 KV의 이전 목록으로 덮을 수 있다');
+  assert.ok(store._raw.index().every((entry) => entry.scope === 'assigned'));
+  writes.length = 0;
+  const before = JSON.stringify(store._raw.books);
+  const invalid = await post({ books: [{ ...books[0], title: '저장되면 안 됨' }, { ...books[1], words: [{ word: '뜻 없음' }] }] });
+  assert.strictEqual(invalid.status, 400);
+  assert.strictEqual(invalid.body.results[1].ok, false);
+  assert.ok(invalid.body.results[1].errors.length);
+  assert.deepStrictEqual(writes, [], '한 책이 불량인데 다른 책을 먼저 저장했다');
+  assert.strictEqual(JSON.stringify(store._raw.books), before);
+  for (const body of [{ books: [books[0], books[0]] }, { books: [] }, { books: books.concat(books[0]) }, { books: [null] }, { books: books, book: books[0] }]) {
+    assert.strictEqual((await post(body)).status, 400);
+  }
+  assert.strictEqual((await post({ books: [books[0]], padding: 'x'.repeat(BODY_LIMIT_BOOK) })).status, 413);
+  assert.deepStrictEqual(writes, [], '실패한 일괄 업로드가 저장했다');
+});
+
+await t('일괄 재업로드 — 기존 공개 범위·배정·id 대응을 유지하고 새 책에만 지정 범위를 적용한다', async () => {
+  const store = memStore();
+  const old = { id: 'batch-existing', title: '자체 기존 책', words: [{ id: 'old-word', word: '관측', meaning: '보고 잼', hanja: '觀測' }] };
+  await upload(store, old, { scope: 'assigned' });
+  store._raw.assigns.s1 = { bookIds: [old.id] };
+  store._raw.remaps[old.id] = { map: { ancient: 'old-word' } };
+  let indexWrites = 0;
+  const putIndex = store.putBookIds;
+  store.putBookIds = (value) => { indexWrites += 1; putIndex(value); };
+  const books = [{ ...old, words: [{ ...old.words[0], id: 'new-word' }] }, { id: 'batch-new', title: '자체 새 책', words: [{ word: '여태', meaning: '지금까지' }] }];
+  const response = await call(store, { path: '/api/hanja/admin/book', method: 'POST', who: ADMIN, getBody: async () => ({ books, scope: 'all' }) });
+  assert.strictEqual(response.status, 200);
+  assert.deepStrictEqual(response.body.results.map((result) => [result.replaced, result.remapped]), [[true, 2], [false, 0]]);
+  assert.deepStrictEqual(store._raw.index().map((entry) => [entry.id, entry.scope]), [[old.id, 'assigned'], ['batch-new', 'all']]);
+  assert.deepStrictEqual(store._raw.remaps[old.id].map, { 'old-word': 'new-word', ancient: 'new-word' });
+  assert.deepStrictEqual(store._raw.assigns.s1.bookIds, [old.id]);
+  assert.strictEqual(indexWrites, 1);
+});
+
 await t('학생 목록·본문 — 공개 범위 all 은 모두, assigned 는 배정된 학생만 (403), 배정본은 mine 으로 앞에', async () => {
   const store = memStore();
   await upload(store, sample());
@@ -253,17 +307,49 @@ await t('재업로드 — 낱말 텍스트가 같으면 옛 id 를 새 id 로 �
   assert.deepStrictEqual(buildRemap({ words: [{ id: 'a', word: 'x', hanja: '' }] }, { words: [{ id: 'a', word: 'x', hanja: '' }] }, null), {}, 'id 가 그대로면 대응이 없다');
 });
 
-await t('기록 저장 시 요약 키가 생기고 현황은 그 키를 읽는다 (본문을 안 읽어도 같은 숫자)', async () => {
+await t('현황은 저장 이후 만기가 된 복습·밀림을 현재 시각으로 계산한다', async () => {
   const store = memStore();
   const now = Date.now();
-  await call(store, { path: '/api/hanja/state', method: 'PUT', getBody: async () => ({ state: { states: { 'c:觀': { step: 1, due: now - 86400000 }, 'w:b:x': { step: 6, due: now, graduated: true } }, trace: { '觀': {} }, streak: { count: 2 } } }) });
+  await call(store, { path: '/api/hanja/state', method: 'PUT', getBody: async () => ({ state: { states: { 'w:b:y': { step: 1, due: now + 3600000 }, 'w:b:x': { step: 6, due: now, graduated: true } }, trace: { '觀': {} }, streak: { count: 2 } } }) });
   const sum = store._raw.summaries.s1;
-  assert.ok(sum && sum.total === 2 && sum.graduated === 1 && sum.due === 1 && sum.traced === 1 && sum.streak === 2 && sum.updatedAt, JSON.stringify(sum));
-  /* 본문을 지워도 현황이 요약으로 나온다 */
-  delete store._raw.states.s1;
-  const ov = await call(store, { path: '/api/hanja/admin/overview', who: ADMIN });
-  const me = ov.body.students.find((s) => s.code === 's1');
-  assert.ok(me && me.total === 2 && me.graduated === 1, JSON.stringify(me));
+  assert.ok(sum && sum.total === 2 && sum.graduated === 1 && sum.due === 0 && sum.traced === 1 && sum.streak === 2 && sum.updatedAt, JSON.stringify(sum));
+  const originalNow = Date.now;
+  try {
+    Date.now = () => now + 3 * 86400000;
+    const ov = await call(store, { path: '/api/hanja/admin/overview', who: ADMIN });
+    const me = ov.body.students.find((s) => s.code === 's1');
+    assert.deepStrictEqual([me.total, me.graduated, me.due, me.emergency], [2, 1, 1, 1]);
+    assert.strictEqual(me.lastActive, sum.updatedAt, '현황 조회가 마지막 저장 시각을 바꾸면 안 된다');
+    assert.strictEqual(sum.due, 0, '현황 조회는 저장된 요약을 다시 쓰지 않는다');
+  } finally { Date.now = originalNow; }
+});
+
+await t('제한 교재 과제는 실제 적용될 학생의 교재 배정을 먼저 확인한다', async () => {
+  const store = memStore();
+  await upload(store, sample());
+  const bookId = 'restricted-task';
+  await upload(store, { ...sample(), id: bookId }, { scope: 'assigned' });
+  const post = (scope) => call(store, { path: '/api/hanja/admin/task', method: 'POST', who: ADMIN, getBody: async () => ({ scope, bookId, unitId: 'u03' }) });
+  const individual = await post('s1');
+  assert.strictEqual(individual.status, 400);
+  assert.deepStrictEqual(individual.body.unassignedCodes, ['s1']);
+  assert.match(individual.body.error, /학생에게 단어장 배정/);
+  assert.strictEqual(store._raw.tasks.s1, undefined, '접근할 수 없는 과제를 저장했다');
+  const previous = { bookId: 'wb-hanja-starter', unitId: 'u04' };
+  store._raw.tasks.s1 = previous;
+  store._raw.tasks['월수반'] = previous;
+  const group = await post('월수반');
+  assert.strictEqual(group.status, 400);
+  assert.deepStrictEqual(group.body.unassignedCodes, ['s3'], '개별 과제가 우선인 학생·다른 반을 검사 대상에 섞었다');
+  assert.strictEqual(store._raw.tasks['월수반'], previous, '실패한 지정이 기존 과제를 지웠다');
+  store._raw.assigns.s3 = { bookIds: [bookId] };
+  assert.strictEqual((await post('월수반')).status, 200);
+  const all = await post('default');
+  assert.strictEqual(all.status, 400);
+  assert.deepStrictEqual(all.body.unassignedCodes, ['s2'], '개별·반 과제가 우선인 학생을 전체 과제 대상으로 세었다');
+  store._raw.assigns.s2 = { bookIds: [bookId] };
+  assert.strictEqual((await post('default')).status, 200);
+  assert.strictEqual(store._raw.index().find((entry) => entry.id === bookId).scope, 'assigned', '과제 지정이 공개 범위를 넓혔다');
 });
 
 await t('이번 주 단원 — 학생 → 반 → default 폴백, 없는 단원·날짜는 거절, 진도는 단원 항목만 센다', async () => {
@@ -538,7 +624,7 @@ await t('점검 추가 필드 — 제한된 범위·힌트·오답 ID·재확인
   const base = { book: 'b', unit: 'u', title: '단원', n: 8, right: 6, at: 1700000000000 };
   assert.deepStrictEqual(normCheck(base), base);
   const c = normCheck({ ...base, total: 24, hinted: 99, wrongIds: ['w:b:a', 'w:b:a', 'bad', null, 'w:b:\n', ...Array.from({ length: 25 }, (_, i) => 'w:b:' + i)], retry: { at: base.at + 1, total: 2, right: 99, wrongIds: ['w:b:a'], evil: true } });
-  assert.deepStrictEqual([c.total, c.hinted, c.wrongIds.length, c.retry.right], [24, 6, 20, 2]);
+  assert.deepStrictEqual([c.total, c.hinted, c.wrongIds.length, c.retry.right], [24, 6, 26, 2]);
   assert.strictEqual(c.retry.evil, undefined);
   assert.strictEqual(normCheck({ ...base, total: 3 }).total, undefined);
   assert.strictEqual(normCheck({ ...base, at: Infinity }).at, null);
@@ -548,6 +634,40 @@ await t('점검 추가 필드 — 제한된 범위·힌트·오답 ID·재확인
   for (const wrongIds of [undefined, ['bad'], ['w:b:\n']]) {
     assert.strictEqual(normCheck({ ...base, retry: { at: base.at + 1, total: 2, right: 2, wrongIds } }).retry, undefined, '누락·손상된 오답 목록을 전부 해결한 빈 목록으로 바꾸면 안 된다');
   }
+  const pending = Array.from({ length: 3000 }, (_, i) => 'w:b:' + i);
+  const large = normCheck({ ...base, wrongIds: pending.concat('w:b:over'), retry: { at: base.at + 1, total: 20, right: 20, wrongIds: pending } });
+  assert.strictEqual(large.wrongIds.length, 3000);
+  assert.strictEqual(large.retry.wrongIds.length, 3000, '최근 재확인 20문항 밖의 미해결 목록이 잘렸다');
+});
+
+await t('최신 표본 시험·재확인이 만점이어도 이전 미해결 오답이 있으면 보충 필요다', async () => {
+  const store = memStore();
+  const bookId = 'pending-book', unitId = 'unit-one', at = Date.now();
+  await upload(store, { id: bookId, title: '자체 보충 검사', units: [{ id: unitId, title: '한 단원' }], words: Array.from({ length: 24 }, (_, i) => ({ id: 'word-' + i, word: '낱말' + i, meaning: '검사용 뜻 ' + i, unit: unitId })) });
+  store._raw.tasks.s1 = { bookId, unitId, updatedAt: at };
+  const pending = Array.from({ length: 4 }, (_, i) => 'w:' + bookId + ':word-' + (20 + i));
+  const check = { book: bookId, unit: unitId, n: 20, right: 20, hinted: 0, total: 24, at: at + 1, wrongIds: pending };
+  store._raw.states.s1 = { state: { checks: { [bookId + '|' + unitId]: check }, states: {} }, updatedAt: new Date(at).toISOString() };
+  const progress = () => call(store, { path: '/api/hanja/admin/progress', who: ADMIN, qs: 'scope=s1' });
+  assert.strictEqual((await progress()).body.rows[0].checkStatus, 'review');
+  check.retry = { at: at + 2, total: 20, right: 20, wrongIds: pending };
+  assert.strictEqual((await progress()).body.rows[0].checkStatus, 'review');
+});
+
+await t('관리 일괄 JSON — 범위와 63권 배열을 전달하고 책별 오류를 이스케이프해 표시한다', async () => {
+  const admin = fs.readFileSync(path.join(DIR, 'public', 'hanja-admin.html'), 'utf8');
+  const start = admin.indexOf('function payload()');
+  const end = admin.indexOf("$('#bkPrev').addEventListener", start);
+  const esc = (v) => String(v).replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+  const fns = new Function('mode', 'jsonBook', 'esc', admin.slice(start, end) + '; return { payload, previewHtml };');
+  const books = [{ id: 'test-book' }];
+  const batch = fns('json', { books, scope: 'assigned' }, esc);
+  assert.deepStrictEqual(batch.payload(), { books, scope: 'assigned', source: undefined });
+  const single = { id: 'single-book', title: '단권' };
+  assert.deepStrictEqual(fns('json', single, esc).payload(), { book: single });
+  const html = batch.previewHtml({ batch: true, ok: false, results: [{ ok: false, meta: null, errors: [{ where: '<id>', message: '<img>' }] }] });
+  assert.ok(html.includes('아무 책도 저장하지 않았어요.') && html.includes('details open'));
+  assert.ok(html.includes('&lt;id&gt;') && html.includes('&lt;img&gt;') && !html.includes('<img>'));
 });
 
 await t('관리 표시·인쇄 — 교재명과 혼자 정답을 표시하고 어휘 교재는 뜻 쓰기를 기본으로 낸다', async () => {

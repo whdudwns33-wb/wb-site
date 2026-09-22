@@ -29,13 +29,17 @@
 예를 들어 초등 3학년 학생이 『어휘가 독해다』를 공부한다면 **책 표지의 정확한 교재명·단계와 공부한 단원**을 고른다.
 학생의 3학년과 교재의 3단계는 같은 뜻으로 취급하지 않으며, 학년만 보고 교재를 자동 배정하지 않는다.
 
-내 교재는 이름·출판사로 검색하며 선생님 추천·교재 어휘·WB 교과 어휘·내 어휘장·어휘 체험을 구분한다.
+내 교재는 이름·출판사로 검색하며 선생님 추천·교재 어휘·내 어휘장·어휘 체험을 구분한다.
+**WB 교과 어휘는 오늘 또는 내 교재의 별도 진입에서 학년 → 과목 → 영역을 고르고 학습한다.**
+`settings.curriculumBook/curriculumUnit`에 선택을 따로 보존하므로 교과 학습을 다녀와도 종이 교재·단원은 유지된다.
+기존 자체 교과 4권도 이 영역에서 열며, 새 과목편의 `curriculum:{grade,subject}`를 본문과 목록에 보존한다.
 한자 전용 교재는 한자 집중에서 고르며, `settings.hanjaBook`에 따로 저장하여 어휘 교재·단원 선택을 유지한다.
 오늘 복습과 학습 기록은 어휘 기준이며, 한자 복습과 한자 시험 결과는 한자 집중에 둔다.
 
 낱말 학습은 **뜻·예문 → 뜻 확인 → 별도 상황에 적용 → 해설**이다. 마지막 두 단계는 검수된 `context`가 있는
 낱말에서만 열린다(체험 48낱말에 자체 창작 문항 포함). 단원 시험은 SRS 단계와 무관하게 뜻·문맥·회상을 섞으며,
-새 상황 자료가 없으면 기존 예문 빈칸 등 출제 가능한 유형을 쓴다. 결과의 `domains`는 뜻 이해·문맥 적용·낱말 회상의
+새 상황 자료가 없으면 뜻·낱말 회상 유형을 쓴다. 자동 예문 빈칸은 여러 답이 자연스러울 수 있어 어휘 평가에서 제외한다.
+결과의 `domains`는 뜻 이해·문맥 적용·낱말 회상의
 실제 문항 수와 혼자 맞힌 수를 학생·강사에게 보여 준다. 출제하지 않은 영역은 미실시이고, 옛 기록의 영역은 추정하지 않는다.
 
 ## 구성
@@ -90,7 +94,7 @@ node hanja/strokes-convert.mjs <graphics.txt> <출력.json> --book <단어장.js
 JSON 모양(정규화 뒤 — `book-check.js` 머리말 참조):
 
 ```
-{ id, title, publisher?, level?(L1~L4), note?, source:'own'|'textbook',   ← 종류: 자체·교재(기본)
+{ id, title, publisher?, level?(L1~L4), note?, source:'own'|'textbook', curriculum?:{grade,subject},
   units: [{ id, title }],
   words: [{ id, unit, word, type:'hanja'|'native', hanja?, parts?:[{ch,hun,eum}], literal?, meaning, example?, syn?, scene?, context? }],
   chars: [{ ch, hun, eum, strokes?, unit, medians?, radical?, similar?, words:[…], derived? }],
@@ -100,6 +104,8 @@ JSON 모양(정규화 뒤 — `book-check.js` 머리말 참조):
 - `context`는 선택 JSON 필드 `{prompt, choices, answer, explanation}`이다. 상황 질문 1~300자, 서로 다른 보기 2~4개
   (각 1~120자), 보기 중 정확히 하나와 같은 정답, 해설 1~300자가 필요하다. 있으면 전 항목을 검사하고,
   불량 자료를 조용히 버리지 않는다. 예문을 그대로 복사한 상황 대신 별도 맥락과 오답의 타당성을 사람이 검수한다.
+- `curriculum`은 WB 교과 어휘의 학년(초1~고3)·과목 분류다. 허용 값은 검사기의 `CURRICULUM_GRADES/SUBJECTS`에 있다.
+- 낱말의 선택 `origin`(1~100자)은 원자료의 한자·원어 표기를 그대로 참고로 보존한다. 카드를 펼칠 때만 보이며 훈음·한자 문항을 자동 생성하지 않는다.
 - **id 는 영문·숫자·하이픈 3~60자** — 드라이브의 단어장 폴더 이름과 같게 둔다(`docs/자료-폴더-표준.md`).
 - **종류 `source`** 는 둘이다. `textbook`(교재 단어장 — 구매 자료, 적지 않으면 이것) · `own`(자체 단어장 — 학원이 만든 자료).
   관리 웹 업로드에서 고르고 목록에서 바꾼다(`POST /admin/source`, 본문·목록이 같이 바뀐다). **AI 연상은 자체 단어장에서만**
@@ -203,14 +209,17 @@ Make Me a Hanzi 계열 `graphics.txt`(Arphic Public License — 원본·산출�
   가져온 단어장은 기기에만 살고 서버에 올리지 않는다.
 - **낱말 학습**: 낱말·뜻·예문을 먼저 보고 확인 문항을 푼다. 한 번에 최대 8개를 배우고 「다음 N개 배우기」로
   같은 단원의 나머지를 이어 간다. 한자 설명·따라쓰기는 접힌 선택 기능이다.
-  예문이 없는 교재는 예문을 만들어 채우지 않는다. 문맥 빈칸은 검수된 예문이 있을 때만 출제한다.
+  예문이 없는 교재는 예문을 만들어 채우지 않는다. 문맥 평가는 사람이 검수한 `context`만 출제한다.
 - **단원 시험**: 앱에서 먼저 배우지 않은 항목도 출제한다. 어휘 교재는 뜻·낱말·문맥·낱말 쓰기 중심이고,
   한자 표기·조립을 섞지 않는다. 최대 20문항이며 **이번에 확인한 범위와 단원 전체 항목 수**를 구별한다.
   스스로 맞힌 답과 힌트를 보고 맞힌 답을 나누고, 일부 문항 정답을 단원 전체 통과로 표시하지 않는다.
   보조 한자 시험과 오답 재확인은 원래 어휘 단원 시험 점수를 덮지 않는다.
 - **오답 보충**: 틀렸거나 힌트가 필요했던 낱말을 학습한 뒤 **그 목록만 재확인**한다. 원래 단원 시험 점수는 유지한다.
-  단원별 마지막 시험·보충 대상은 최대 40단원, 보충 대상은 단원당 최대 20개 항목 id만 저장한다.
+  단원별 마지막 시험·보충 대상은 최대 40단원, 미해결 대상은 단원당 최대 3,000개 항목 id를 보존한다(기록 전체 400KB 상한 유지).
+  새 표본 시험에서는 이전 미해결 항목을 먼저 묻고, 이번에 혼자 맞힌 항목만 보충 목록에서 뺀다. 출제되지 않은 오답은 남긴다.
   최근 재확인 결과는 원래 시험의 `retry`에 따로 남기고, 다시 틀렸거나 힌트가 필요했던 항목만 다음 보충에 남긴다.
+- **진행 중 시험**: 탭을 이동해도 이어 풀 수 있다. 그만두기·다른 시험 시작은 확인받고, 미완료 시험을 완료 점수로 저장하지 않는다.
+  페이지 새로고침·기기 종료 후 세션 복원과 교사의 중도 종료 구분은 후속 작업이다.
 - **복습**: SRS 만기가 된 항목과 배운 낱말을 다시 확인한다. 시험·즉시 재확인만으로 기억 단계를 올리지 않으며,
   만기 전 같은 날 반복 정답을 장기 기억으로 간주하지 않는다. 만기 항목이 든 교재가 기기에 없으면 서버에서 받는다.
 - **한자 학습**: 급수 교재의 단원별 글자 타일 또는 어휘 카드의 선택 기능에서 연다. **시범 → 한 획씩 따라 쓰기 → 흐릿한 안내 → 혼자 쓰기**로 안내를 줄인다.
@@ -254,13 +263,16 @@ SRS id 규약: 한자는 `c:<글자>`(단어장을 넘어 공용), 낱말은 `w:
 관리(PIN)
 - `POST /admin/book {book}` 또는 `{text, id, title, publisher?, level?, note?}` (+`dryRun`) → 검사 결과·저장 (`replaced`, `remapped`).
   같은 id 는 덮어쓴다(공개 범위·배정 유지, 바뀐 낱말 id 는 remap). 본문 2MB, 단어장 1.5MB.
+  `{books:[…],scope?,dryRun?}`는 최대 63권 일괄 업로드다. 전권 검사 성공 후 본문을 저장하고 목록은 한 번만 쓴다.
+  기존 공개 범위·배정·id 대응을 유지한다. KV 다중 키 저장 도중 장애의 원자성까지 보장하지는 않는다.
 - `GET /admin/books` · `GET /admin/book?id=` · `DELETE /admin/book {id}`(배정에서도 뺀다, 학생 기록은 남는다)
 - `POST /admin/scope {id|ids, scope}` — 여러 권을 **한 번의 쓰기로** 바꾼다(50권까지). 응답의 `applied` 가 false 면 저장은 됐어도 목록 확인이 늦은 것이다.
 - `POST /admin/source {id, source}`(종류 — 본문·목록 갱신, updatedAt 올림) · `POST /admin/assign {codes, bookIds, action:'add'|'remove'}` · `GET /admin/assign`
-- `POST /admin/task {scope, bookId, unitId, due?, title?}` · `GET /admin/tasks` → `{tasks, today}` · `DELETE /admin/task {scope}`
+- `POST /admin/task {scope, bookId, unitId, due?, title?}` — 제한 교재는 실제 적용 학생의 접근권을 먼저 검사한다. 누락 시 교재 배정을 안내하며 범위를 자동으로 넓히지 않는다.
+  `GET /admin/tasks` → `{tasks, today}` · `DELETE /admin/task {scope}`
 - `GET /admin/progress?scope=` → `{scope, task, unit:{id,title,total}, rows:[{code,name,cls,linked,planted,graduated,due,check,previousCheck,checkStatus,…}], today}`
 - `POST /admin/strokes {strokes:{"十":{strokes, medians}}, replace?}` (4MB) · `GET /admin/strokes` → `{strokes, updatedAt, count, withMedians}`
-- `GET /admin/overview` → 학생별 `{words, chars, graduated, due, emergency, traced, streak, books, assigned, lastActive}`
+- `GET /admin/overview` → 학생별 `{words, chars, graduated, due, emergency, traced, streak, books, assigned, lastActive}` — 현재 시각으로 상태를 다시 집계한다.
 
 목록(`hanja:books`)을 고치는 자리는 모두 `editIndex` 하나를 지난다. KV 의 함정이 둘이고 갈라 다뤄야 한다 —
 **읽기가 옛 값일 수 있다**(지역마다 최대 60초쯤. 바꾼 직후 목록이 옛 범위를 보여 줄 수 있고 새로 고치면 맞다)와
