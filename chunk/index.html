@@ -74,7 +74,7 @@
     .item.done { background:#FBF7F9; }
     /* 표시된 글 — 조각(seg) */
     .para { margin:10px 0; line-height:2; font-size:1.05em; }
-    .band-K .para, .band-E1 .para { font-size:1.35em; line-height:2.1; }
+    .band-K .para, .band-G1 .para, .band-G2 .para { font-size:1.35em; line-height:2.1; }
     .seg { display:inline; transition:background .15s; border-radius:6px; }
     .marker-slash .seg:not(:last-child)::after { content:"∕"; color:var(--plum); font-weight:900; margin:0 5px 0 2px; }
     .marker-scoop .seg { border-bottom:3px solid var(--gold); border-radius:0 0 14px 14px; padding:0 3px 3px; margin-right:10px; }
@@ -82,7 +82,7 @@
     .marker-band .seg:nth-child(odd) { background:var(--plum-soft); } .marker-band .seg:nth-child(even) { background:var(--gold-soft); }
     .seg.now { background:#FFE9A8 !important; box-shadow:0 0 0 3px #FFC857; }
     .plain { margin:10px 0; line-height:1.95; font-size:1.05em; }
-    .band-K .plain, .band-E1 .plain { font-size:1.35em; line-height:2.1; }
+    .band-K .plain, .band-G1 .plain, .band-G2 .plain { font-size:1.35em; line-height:2.1; }
     /* 직접 끊기 — 어절 사이 틈 */
     /* 어절 사이 틈은 좁게, 표시 전에는 옅은 점만 — 글이 표가 아니라 문장으로 보여야 덩어리가 눈에 들어온다.
        탭 영역(높이 40px·너비 24px)은 그대로 두고 눈에 보이는 것만 줄였다. 표시한 자리는 칸이 넓어지지 않아 줄이 다시 흐르지 않는다. */
@@ -811,13 +811,13 @@
     document.addEventListener('click', (ev) => {
       const t = ev.target.closest('[data-act]'); if (!t) return;
       const act = t.dataset.act;
-      if (act === 'tab') {
+      if (act === 'tab' || act === 'go-settings') {
         /* 끝난 카드·결과 화면은 묻지 않고 떠난다. 진행 중일 때만 확인한다. */
         const busy = sess && ((sess.ls && !sess.ls.done) || (sess.pr && sess.pr.stage < 4));
         if (busy && !confirm('지금 하던 것을 그만둘까요?')) return;
-        sess = null; recRelease(); stopSpeak(); view = { name: t.dataset.tab }; render();
+        sess = null; recRelease(); stopSpeak(); view = { name: act === 'go-settings' ? 'record' : t.dataset.tab }; render();
+        if (act === 'go-settings') setTimeout(() => { const el = $('settings'); if (el) el.scrollIntoView({ behavior: 'smooth' }); }, 30);
       }
-      else if (act === 'go-settings') { recRelease(); stopSpeak(); view = { name: 'record' }; render(); setTimeout(() => { const el = $('settings'); if (el) el.scrollIntoView({ behavior: 'smooth' }); }, 30); }
       else if (act === 'pick-grade') { view.grade = +t.dataset.g; render({ keep: true }); }
       else if (act === 'pl-start') { startPlacement(); }
       else if (act === 'pl-check') { const pl = view.pl; pl.result = R.explain(pl.text, pl.model, [...pl.marks], pl.given); pl.out = SC.placement(pl.startBand, pl.result.score); render(); }
@@ -831,7 +831,13 @@
       else if (act === 'tts') { if (SPK) { stopSpeak(); document.querySelectorAll('[data-act="tts"]').forEach((b) => b.textContent = '🔊 들려주기'); return; } const prefix = t.dataset.prefix; let segs = []; if (sess && sess.ls) { const l = lessonById(sess.ls.id); const i = +prefix.replace('ex', ''); segs = l.examples[i].segs; } else if (sess && sess.pr) { const p = byId(sess.pr.id); segs = [].concat.apply([], p.paragraphs); if (prefix === 'all') { /* 문단 경계마다 prefix 가 다르므로 전체를 p0..pn 으로 다시 매핑 */ speakAll(p); return; } } speakSegs(segs, prefix); }
       else if (act === 'push-toggle') { view.pushMsg = ''; const on = pushOn(); t.disabled = true; (on ? disablePush() : enablePush()).then(() => render({ keep: true })).catch((e) => { view.pushMsg = e.message || '알림 설정에 실패했어요.'; render({ keep: true }); }); }
       else if (act === 'fam-unlink') { if (!confirm('이 기기에서 가족 링크를 끊을까요? 학원 기록은 그대로 남아요.')) return; saveFam(null); try { history.replaceState(null, '', location.pathname); } catch (e) {} changeAccount(); }
-      else if (act === 'gap') { const i = +t.dataset.i; const pfx = t.dataset.prefix; const set = pfx === 'pl' ? view.pl.marks : sess.ls ? sess.ls.marks : sess.pr.marks[+pfx.replace('u', '')]; if (set.has(i)) set.delete(i); else set.add(i); render({ keep: true }); }
+      else if (act === 'gap') {
+        const i = +t.dataset.i, pfx = t.dataset.prefix;
+        const set = pfx === 'pl' ? view.pl.marks : sess.ls ? sess.ls.marks : sess.pr.marks[+pfx.replace('u', '')];
+        if (set.has(i)) set.delete(i); else set.add(i);
+        /* 버튼을 유지해야 키보드 초점과 스크롤이 끊기지 않는다. 채점 때만 전체를 다시 그린다. */
+        t.setAttribute('aria-pressed', String(set.has(i))); t.textContent = set.has(i) ? '∕' : '·';
+      }
       else if (act === 'start-practice') { startPractice(t.dataset.id, 'practice'); }
       else if (act === 'start-review') { startPractice(t.dataset.id, 'review'); }
       else if (act === 'pr-quit') { sess = null; recRelease(); stopSpeak(); view = { name: 'home' }; render(); }
