@@ -150,4 +150,15 @@ t('트랙 분리 — 어휘 단어장에서는 한자 탭을 내리고, 글자�
   assert.ok(/급수 진도/.test(app) && /trackOf\(b\) === 'hanja'/.test(app), '기록에 급수 진도가 없다');
 });
 
+t('내가 공부하는 교재를 골라 바로 시험 본다 — 점검 탭에서도, 단어장 탭에서도', () => {
+  /* 원장 지적: 「자기가 학습하는 교재를 선택해서 학습하고 시험보게 해라.」 길이 두 군데 끊겨 있었다 —
+     점검 탭에는 단원 고르기만 있어 다른 교재를 보려면 단어장 탭을 다녀와야 했고,
+     단어장 탭에서 단원을 펼쳐도 「교재 점검」 단추가 없었다(배우기·훈련·따라쓰기만). */
+  assert.ok(/id="tmCkBook"/.test(app), '점검 탭에 단어장 고르기가 없다');
+  const menu = app.slice(app.indexOf('function trainMenu'), app.indexOf('function trainDone'));
+  assert.ok(/ckBook\.addEventListener\('change'/.test(menu) && /openBook\(id\)/.test(menu), '교재를 바꿔도 그 책을 받아 오지 않는다');
+  assert.ok(/id="tmCkLearn"/.test(app) && /id="tmCkAll"/.test(app), '점검 탭에 새로 배우기·단어장 전체 점검이 없다');
+  assert.ok(/data-act="check"/.test(app) && /dataset\.act === 'check'/.test(app), '단어장 탭 단원에 교재 점검 단추가 없다');
+});
+
 console.log(`\nOK — ${passed}개 통과`);

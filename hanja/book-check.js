@@ -255,7 +255,12 @@ var WBBOOKCHECK = (function () {
       where = 'chars[' + (i + 1) + '] ' + ch;
       if (charIdx[ch] != null) { C.warn(where, '같은 한자가 다시 나와 앞의 것만 남긴다'); return; }
       var hun = str(c.hun, LIMITS.hun), eum = str(c.eum, LIMITS.eum);
-      if (!hun || !eum) { C.err(where, '훈(hun)·음(eum)이 있어야 해요 — 예: 볼 / 관'); return; }
+      /* 훈음이 없어도 받는 경우가 하나 있다: 낱말에서 끌어낸 참고 글자(derived).
+         교재에 한자 표기만 있고 훈음이 없는 자료가 있어(중학·수능 어휘) 끌어낸 글자의 훈음이 빈 채로 저장된다.
+         **검사기는 자기 산출물을 다시 검사받는다** — 앱이 단어장을 열 때마다 checkBook 을 돌린다. 여기서 막으면
+         그런 교재는 통째로 안 열린다(오류 587건으로 학생 화면에서 사라졌다). 아래 noGloss 경고가 한 줄로 알린다.
+         직접 적은 글자는 그 책이 가르치는 항목이라 훈음을 그대로 요구한다. */
+      if ((!hun || !eum) && !c.derived) { C.err(where, '훈(hun)·음(eum)이 있어야 해요 — 예: 볼 / 관'); return; }
       var out = { ch: ch, hun: hun, eum: eum, unit: addUnit(c.unit, null, where), words: [] };
       if (c.strokes != null && c.strokes !== '') {
         var n = Number(c.strokes);
