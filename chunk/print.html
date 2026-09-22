@@ -251,12 +251,12 @@
         (p.q ? '<div class="q"><div class="qq">문제. ' + esc(p.q.q) + '</div>' + p.q.choices.map((c, i) => '<div class="c">' + ['①', '②', '③', '④'][i] + ' ' + esc(c) + '</div>').join('') + '</div>' : '') +
         '<div class="score"><span>맞힌 자리 <i></i> / ' + nb + '</span><span>군더더기 <i></i></span><span>점수 <i></i></span><span>문제 <span class="cb"></span>정답</span></div>';
       /* 짧은 글(공백 뺀 480자 이내)은 ①·② 를 한 쪽에 — 긴 글은 예전처럼 두 쪽 */
-      if (compact && chars <= 480) {
+      const combined = compact && chars <= 480;
+      if (combined) {
         pages.push('<div class="page sz-' + size + ' compact">' + hd(band, n + '-①② 따라 읽기 · 직접 끊기') + '<div class="title">' + n + '. ' + esc(p.title) + '</div><p class="sub">' + esc(p.genre) + ' · ' + words + '어절 · 덩어리 ' + (nb + p.paragraphs.length) + '개</p>' +
           markedBody + '<hr class="cut">' + plainBody + ft(org) + '</div>');
-        return;
       }
-      if (O('o-marked')) {
+      if (O('o-marked') && !combined) {
         pages.push('<div class="page sz-' + size + '">' + hd(band, n + '-① 따라 읽기') + '<div class="title">' + n + '. ' + esc(p.title) + '</div><p class="sub">' + esc(p.genre) + ' · ' + words + '어절 · 덩어리 ' + (nb + p.paragraphs.length) + '개</p>' +
           '<div class="task"><b>① 따라 읽기</b> — ' + (marker === 'scoop' ? '밑줄 곡선' : marker === 'band' ? '색 띠' : '∕') + ' 단위로 붙여 읽고, 경계에서 살짝 쉬어요. 세 번 읽고 칸에 표시해요.</div>' +
           '<div class="body m-' + marker + '">' + p.paragraphs.map((segs) => '<p>' + segsHtml(segs, marker) + '</p>').join('') + '</div>' +
@@ -266,7 +266,7 @@
         pages.push('<div class="page sz-' + size + '">' + hd(band, n + '-①ʹ 한 줄 한 덩어리') + '<div class="title">' + n + '. ' + esc(p.title) + '</div><p class="sub">한 줄이 한 덩어리예요. 줄 끝에서 살짝 쉬고, 문장 끝에서 크게 쉬어요.</p>' +
           '<div class="body lines">' + p.paragraphs.map((segs) => '<p>' + segs.map((s) => '<span class="seg">' + esc(s.trim()) + '</span>').join('') + '</p>').join('') + '</div>' + ft(org) + '</div>');
       }
-      if (O('o-plain')) {
+      if (O('o-plain') && !combined) {
         pages.push('<div class="page sz-' + size + '">' + hd(band, n + '-② 직접 끊기') + '<div class="title">' + n + '. ' + esc(p.title) + '</div>' + plainBody + ft(org) + '</div>');
       }
     });

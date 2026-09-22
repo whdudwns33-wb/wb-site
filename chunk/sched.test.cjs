@@ -51,6 +51,32 @@ t('보통(60~84)은 제자리에서 한 칸 아래 간격, 못하면(60 미만) 
   assert.strictEqual(sc.lastScore, 100, '점수는 0~100 으로 자른다');
 });
 
+t('예정일 전 추가 연습은 사다리를 건너뛰지 않고, 낮은 점수는 다시 배운다', () => {
+  const s = S.blank(T0);
+  const it = S.record(s, 'p', { score: 100 }, T0);
+  for (let i = 1; i < 6; i++) S.record(s, 'p', { score: 100 }, T0 + i * 60000);
+  assert.strictEqual(it.n, 6, '추가 연습 기록은 남긴다');
+  assert.strictEqual(it.step, 1); assert.strictEqual(it.due, T0 + DAY); assert.strictEqual(it.graduated, false);
+  S.record(s, 'p', { score: 70 }, T0 + 6 * 60000);
+  assert.strictEqual(it.step, 1); assert.strictEqual(it.due, T0 + DAY, '보통 점수도 예정일을 미루지 않는다');
+  while (it.step < 5) S.record(s, 'p', { score: 100 }, it.due);
+  const finalDue = it.due;
+  S.record(s, 'p', { score: 70 }, finalDue - DAY);
+  S.record(s, 'p', { score: 100 }, finalDue - 1);
+  assert.strictEqual(it.step, 5); assert.strictEqual(it.due, finalDue); assert.strictEqual(it.graduated, false, '30일 간격이 끝나야 졸업한다');
+  S.record(s, 'p', { score: 100 }, finalDue);
+  assert.strictEqual(it.graduated, true);
+  S.record(s, 'p', { score: 100 }, finalDue + 60000);
+  assert.strictEqual(it.graduated, true); assert.strictEqual(it.due, 0); assert.strictEqual(it.gradAt, finalDue, '졸업 후 추가 연습은 졸업일도 유지한다');
+  const retryAt = finalDue + 120000;
+  S.record(s, 'p', { score: 30 }, retryAt);
+  assert.strictEqual(it.step, 0); assert.strictEqual(it.due, retryAt + DAY); assert.strictEqual(it.graduated, false);
+  S.record(s, 'p', { score: 100 }, retryAt + 60000);
+  assert.strictEqual(it.step, 0); assert.strictEqual(it.due, retryAt + DAY, '틀린 뒤 즉시 다시 맞혀도 다음 날 확인한다');
+  S.record(s, 'p', { score: 30 }, retryAt + 120000);
+  assert.strictEqual(it.step, 0); assert.strictEqual(it.due, retryAt + 120000 + DAY, '예정일 전 낮은 점수도 내일 재학습한다');
+});
+
 t('복습 목록·다음 글 고르기 — 밀린 복습 → 새 글 → 점수 낮은 글 → 다 졸업하면 없음', () => {
   const s = S.blank(T0); s.band = 'G3';
   const ids = ['a', 'b', 'c'];
@@ -94,6 +120,20 @@ t('단계 제안 — 같은 밴드 최근 연습 3회가 전부 85+ 이고 문�
   assert.strictEqual(S.suggestion(s, 'E3'), null);
 });
 
+t('단계 제안은 서로 다른 세 지문의 최신 연습을 본다', () => {
+  const s = S.blank(T0); s.band = 'G3';
+  for (let i = 0; i < 3; i++) S.record(s, 'a', { score: 100, qOk: true, band: 'G3' }, T0 + i);
+  assert.strictEqual(S.suggestion(s, 'G3'), null, '한 글만 반복해 승급하지 않는다');
+  S.record(s, 'b', { score: 90, qOk: true, band: 'G3' }, T0 + 3);
+  assert.strictEqual(S.suggestion(s, 'G3'), null);
+  S.record(s, 'c', { score: 90, qOk: true, band: 'G3' }, T0 + 4);
+  assert.strictEqual(S.suggestion(s, 'G3'), 'up');
+  S.record(s, 'a', { score: 30, qOk: false, band: 'G3' }, T0 + 5);
+  assert.strictEqual(S.suggestion(s, 'G3'), null, '같은 지문의 옛 고득점 대신 최신 점수를 본다');
+  for (let i = 6; i < 9; i++) S.record(s, 'a', { score: 30, qOk: false, band: 'G3' }, T0 + i);
+  assert.strictEqual(S.suggestion(s, 'G3'), null, '한 글만 반복해 강등하지 않는다');
+});
+
 t('연속 학습일·요약', () => {
   const s = S.blank(T0);
   assert.strictEqual(S.streak(s, T0), 0);
@@ -133,7 +173,7 @@ t('기록은 400건까지만 — 오래된 것부터 버린다', () => {
   assert.strictEqual(s.log[0].t, T0 + 50 * 1000);
 });
 
-t('끊어읽기 지수 — 최근 5회 평균에 단계 가중(유치 0.5 → 고3 1.0), 기록 없으면 null', () => {
+t('끊어읽기 지수 — 최근 5회 각각의 단계 가중(유치 0.5 → 고3 1.0)을 평균, 기록 없으면 null', () => {
   const now = Date.parse('2026-09-21T09:00:00Z');
   const mk = (band, scores) => { const st = S.blank(now); st.band = band; scores.forEach((sc, i) => S.record(st, 'p' + i, { score: sc, qOk: true, tags: [], mode: 'practice', band }, now - (scores.length - i) * 60000)); return st; };
   assert.strictEqual(S.index(S.blank(now), now), null);
@@ -141,6 +181,22 @@ t('끊어읽기 지수 — 최근 5회 평균에 단계 가중(유치 0.5 → �
   assert.strictEqual(S.index(mk('G12', [100]), now), 100);
   assert.strictEqual(S.index(mk('G6', [80, 80, 80]), now), 60);
   assert.strictEqual(S.forTeacher(mk('G3', [90]), now).index, Math.round(90 * (0.5 + 0.5 * 3 / 12)));
+});
+
+t('지수는 설정 단계가 아닌 기록 단계로 계산하고, 미상 단계는 제외한다', () => {
+  const s = S.blank(T0); s.band = 'K';
+  S.record(s, 'k', { score: 100, band: 'K' }, T0);
+  assert.strictEqual(S.index(s, T0), 50);
+  s.band = 'G12';
+  assert.strictEqual(S.index(s, T0), 50, '설정만 바꿔도 같은 값');
+  S.record(s, 'high', { score: 100, band: 'G12' }, T0 + 1);
+  assert.strictEqual(S.index(s, T0), 75, '실제로 연습한 각 단계의 가중치를 적용한다');
+  s.log = [{ score: 80, band: 'E2' }, { score: 100 }, { score: 100, band: 'unknown' }];
+  assert.strictEqual(S.index(s, T0), 50, '옛 E2는 G3으로 보고 누락·미상 단계는 추측하지 않는다');
+  s.log = [{ score: 100 }, { score: 100, band: 'unknown' }];
+  assert.strictEqual(S.index(s, T0), null, '유효한 기록 단계가 없으면 지수를 표시하지 않는다');
+  s.log = [{ score: 100, band: 'G12' }].concat(Array.from({ length: 5 }, () => ({ score: 0, band: 'K' })));
+  assert.strictEqual(S.index(s, T0), 0, '최근 다섯 건만 사용한다');
 });
 
 t('출발선 진단 — 한 학년 아래에서 60점 미만이면 거기서 시작, 그 위면 학년 그대로. 유치는 아래가 없다', () => {

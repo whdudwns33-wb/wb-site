@@ -57,6 +57,25 @@ await t('PUT /state — 저장 뒤 GET 에서 같은 기록, 요약은 화이트
   assert.strictEqual(sum.avg, 88); assert.strictEqual(sum.wpmRecent, 131); assert.strictEqual(sum.band, 'G3'); assert.strictEqual(sum.lastAt, 1700000000000);
 });
 
+await t('학생·가족 저장은 기준 버전이 오래되면 원본과 요약을 덮지 않는다', async () => {
+  const s = memStore(), token = 'family1234567890abcd';
+  s._raw.parents[token] = 'st-1';
+  const query = new URLSearchParams({ t: token });
+  const first = await call(s, { method: 'PUT', getBody: async () => ({ state: { log: ['center'] }, summary: { attempts: 1 }, baseUpdatedAt: null }) });
+  assert.equal(first.status, 200);
+  const family = await call(s, { path: '/api/chunk/parent/state', method: 'PUT', who: null, query, getBody: async () => ({ state: { log: ['center', 'home'] }, summary: { attempts: 2 }, baseUpdatedAt: first.body.updatedAt }) });
+  assert.equal(family.status, 200); assert.notEqual(family.body.updatedAt, first.body.updatedAt);
+  for (const route of [{ who: STU }, { path: '/api/chunk/parent/state', who: null, query }]) {
+    const stale = await call(s, { ...route, method: 'PUT', getBody: async () => ({ state: { log: ['old'] }, summary: { attempts: 99 }, baseUpdatedAt: first.body.updatedAt }) });
+    assert.equal(stale.status, 409);
+    assert.deepEqual(s._raw.states['st-1'].state.log, ['center', 'home']);
+    assert.equal(s._raw.summaries['st-1'].summary.attempts, 2);
+  }
+  const puts = s._raw.states['st-1'].puts.n;
+  await call(s, { method: 'PUT', getBody: async () => ({ state: { log: ['center', 'home', 'center-again'] }, baseUpdatedAt: family.body.updatedAt }) });
+  assert.equal(s._raw.states['st-1'].puts.n, puts, '학생 저장으로 가족 저장 한도를 초기화하지 않는다');
+});
+
 await t('PUT /state — 몸통이 없거나 state 가 객체가 아니면 400, 너무 크면 413', async () => {
   const s = memStore();
   assert.strictEqual((await call(s, { method: 'PUT', getBody: async () => { throw new Error('bad json'); } })).status, 400);
