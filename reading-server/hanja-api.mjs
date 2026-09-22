@@ -55,7 +55,20 @@ export function normCheck(c) {
   const right = Math.round(Number(c.right) || 0);
   const at = Math.round(Number(c.at) || 0);
   const str = (v, max) => (typeof v === 'string' ? v.slice(0, max) : '');
-  return { book: str(c.book, 60), unit: str(c.unit, 60), title: str(c.title, 60), n, right: Math.max(0, Math.min(n, right)), at: at > 0 ? at : null };
+  const validTime = (v) => Number.isFinite(v) && v > 0 && v <= 8640000000000000;
+  const ids = (v) => [...new Set((Array.isArray(v) ? v : []).filter((id) => typeof id === 'string' && /^(w:|c:)/.test(id) && id.length <= 200 && !/[\u0000-\u001f\u007f]/.test(id)))].slice(0, 20);
+  const out = { book: str(c.book, 60), unit: str(c.unit, 60), title: str(c.title, 60), n, right: Math.max(0, Math.min(n, right)), at: validTime(at) ? at : null };
+  if (Number.isFinite(Number(c.total)) && Number(c.total) >= n) out.total = Math.min(5000, Math.round(Number(c.total)));
+  if (Number.isFinite(Number(c.hinted)) && c.hinted != null) out.hinted = Math.max(0, Math.min(out.right, Math.round(Number(c.hinted))));
+  if (Array.isArray(c.wrongIds)) out.wrongIds = ids(c.wrongIds);
+  if (isObj(c.retry)) {
+    const total = Math.round(Number(c.retry.total)), at = Math.round(Number(c.retry.at));
+    const wrongIds = ids(c.retry.wrongIds);
+    if (total > 0 && total <= 20 && validTime(at) && (!out.at || at >= out.at) && Array.isArray(c.retry.wrongIds) && c.retry.wrongIds.every((id) => wrongIds.includes(id))) {
+      out.retry = { at, total, right: Math.max(0, Math.min(total, Math.round(Number(c.retry.right) || 0))), wrongIds };
+    }
+  }
+  return out;
 }
 export function checkList(stateRec) {
   const S = stateRec && stateRec.state;
@@ -170,11 +183,11 @@ export function buildRemap(prevBook, nextBook, prevRemap) {
   return map;
 }
 
-/* 단원 하나의 학습 항목 SRS id — 학생 앱 itemsOf 와 같은 규칙(낱말 + 직접 적은 한자, 끌어낸 한자는 참고) */
+/* 단원 하나의 학습 항목 SRS id — 어휘 교재는 낱말, 글자만 있는 교재는 직접 적은 한자. */
 export function unitItemIds(book, unitId) {
   const out = [];
   for (const w of (book && book.words) || []) if (w.unit === unitId) out.push('w:' + book.id + ':' + w.id);
-  for (const c of (book && book.chars) || []) if (!c.derived && c.unit === unitId) out.push('c:' + c.ch);
+  if (!((book && book.words) || []).length) for (const c of (book && book.chars) || []) if (!c.derived && c.unit === unitId) out.push('c:' + c.ch);
   return out;
 }
 export function unitProgress(stateRec, itemIds, now) {
@@ -440,6 +453,7 @@ export async function handleHanja(ctx) {
     const unitId = String(b.unitId == null ? '' : b.unitId).trim();
     const unit = (rec.book.units || []).find((u) => u.id === unitId);
     if (!unit) return j(400, { error: '그 단어장에 없는 단원이에요: ' + unitId.slice(0, 40) });
+    if (!unitItemIds(rec.book, unitId).length) return j(400, { error: '학습할 항목이 없는 단원이에요. 어휘 교재는 낱말이 있는 단원을 골라 주세요.' });
     const due = String(b.due || '').trim();
     if (due && !isValidDate(due)) return j(400, { error: '마감(due)은 실제 날짜(YYYY-MM-DD)' });
     const title = String(b.title || '').trim().slice(0, 80) || (rec.book.title + ' · ' + unit.title);
@@ -477,8 +491,21 @@ export async function handleHanja(ctx) {
       const stu = await store.getStudent(code);
       if (!stu || !stu.name) continue;
       if (!one && scope !== 'default' && String(stu.cls || '').trim() !== scope) continue;
+      /* 학생 화면에서 다른 과제가 우선하면 이 과제의 미이행자로 세지 않는다. */
+      const effective = await resolveTask(store, code, stu);
+      if (effective.scope !== (one ? 'student' : scope === 'default' ? 'default' : 'class')) continue;
       const st = await store.getState(code);
-      rows.push({ code, name: stu.name, cls: stu.cls || '', linked: !!st, lastActive: st ? st.updatedAt : null, check: unitCheck(st, task.bookId, task.unitId), ...unitProgress(st, ids) });
+      const latest = unitCheck(st, task.bookId, task.unitId);
+      const previousCheck = latest && (!latest.at || latest.at < (new Date(task.updatedAt).getTime() || 0)) ? latest : null;
+      const check = previousCheck ? null : latest;
+      let checkStatus = !ids.length ? 'empty' : !st ? 'unlinked' : previousCheck ? 'previous' : !check ? 'unchecked' : 'checked';
+      if (check && ids.length) {
+        const missed = check.n - (check.right - (check.hinted || 0));
+        if (check.total == null) checkStatus = 'unknown';
+        else if (check.n < Math.max(ids.length, check.total)) checkStatus = 'partial';
+        else if (missed) checkStatus = check.retry && check.retry.right === check.retry.total && !check.retry.wrongIds.length ? 'rechecked' : 'review';
+      }
+      rows.push({ code, name: stu.name, cls: stu.cls || '', linked: !!st, lastActive: st ? st.updatedAt : null, check, previousCheck, checkStatus, ...unitProgress(st, ids) });
     }
     rows.sort((a, b) => (a.cls === b.cls ? (a.name < b.name ? -1 : 1) : (a.cls < b.cls ? -1 : 1)));
     const unit = (rec.book.units || []).find((u) => u.id === task.unitId) || { id: task.unitId, title: task.unitId };
@@ -524,10 +551,11 @@ export async function handleHanja(ctx) {
   }
   /* 현황 — 저장 시점 요약 키를 읽는다. 요약이 없는 옛 기록만 본문을 읽어 셈한다 */
   if (p === '/api/hanja/admin/overview' && method === 'GET') {
-    const codes = new Set([...(await store.listSummaryCodes()), ...(await store.listStateCodes())]);
+    const codes = new Set([...(await store.listStudentCodes()), ...(await store.listSummaryCodes()), ...(await store.listStateCodes())]);
     const students = [];
     for (const code of codes) {
       const [stu, sum, as] = await Promise.all([store.getStudent(code), store.getSummary(code), store.getAssign(code)]);
+      if (!stu || !stu.name) continue;
       const summary = sum || hanjaSummary(await store.getState(code));
       students.push({ code, name: (stu && stu.name) || '', cls: (stu && stu.cls) || '', assigned: (as && as.bookIds) || [], ...summary });
     }

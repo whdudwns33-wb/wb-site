@@ -13,14 +13,14 @@ const state = (id, at = 1000) => { const s = SC.blank(at); s.band = 'G3'; if (id
 const response = (body, status = 200) => ({ ok: status < 400, status, json: async () => clone(body) });
 const deferred = () => { let resolve; const promise = new Promise((r) => { resolve = r; }); return { promise, resolve }; };
 
-function app({ code = 'stu-a', family, local = new Map(), records = {}, fetchHook } = {}) {
+function app({ code = 'stu-a', family, local = new Map(), records = {}, fetchHook, clock = Date } = {}) {
   if (code) local.set('wbr.auth', JSON.stringify(auth(code)));
   const nodes = {}, calls = [], timers = new Map(); let serial = 0, offline = false;
   const context = vm.createContext({
     WBCHUNK: R, WBCHUNK_SCHED: SC, WBCHUNK_LESSONS: [], WBCHUNK_PASSAGES: [],
     localStorage: { getItem: (k) => local.get(k) || null, setItem: (k, v) => local.set(k, v), removeItem: (k) => local.delete(k) },
     document: { getElementById: (id) => nodes[id] || (nodes[id] = {}) },
-    location: { search: family ? '?t=' + family : '' }, navigator: { platform: 'test' }, URLSearchParams, Date,
+    location: { search: family ? '?t=' + family : '' }, navigator: { platform: 'test' }, URLSearchParams, Date: clock,
     setTimeout: (f) => { timers.set(++serial, f); return serial; }, clearTimeout: (id) => timers.delete(id),
     fetch: async (url, opt) => {
       const request = { url, method: opt.method || 'GET', body: opt.body ? JSON.parse(opt.body) : null };
@@ -86,7 +86,7 @@ function app({ code = 'stu-a', family, local = new Map(), records = {}, fetchHoo
   assert.equal(lost.nodes.savetxt.textContent, '저장됨', 'PUT 응답 유실도 동일 기록을 GET하면 복구한다');
 
   const writing = deferred(); let firstPut = true;
-  const during = app({ fetchHook: (req) => {
+  const during = app({ clock: class extends Date { static now() { return 5000; } }, fetchHook: (req) => {
     if (req.method !== 'PUT' || !firstPut) return null;
     firstPut = false; during.records['stu-a'] = { state: clone(req.body.state), updatedAt: 'first-put' };
     return writing.promise;

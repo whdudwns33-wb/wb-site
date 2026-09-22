@@ -275,11 +275,12 @@ await t('이번 주 단원 — 학생 → 반 → default 폴백, 없는 단원�
   assert.strictEqual((await post({ scope: 'default', bookId: 'wb-hanja-starter', unitId: 'u03', due: '2026-02-30' })).status, 400, '가짜 날짜가 통과했다');
   assert.strictEqual((await post({ scope: 'default', bookId: 'wb-hanja-starter', unitId: 'u03', due: '2026-10-05' })).status, 200);
   assert.strictEqual((await post({ scope: '월수반', bookId: 'wb-hanja-starter', unitId: 'u04', title: '이번 주는 4단원' })).status, 200);
-  assert.strictEqual((await post({ scope: 's2', bookId: 'wb-hanja-starter', unitId: 'u01' })).status, 200);
+  assert.strictEqual((await post({ scope: 's2', bookId: 'wb-hanja-starter', unitId: 'u01' })).status, 400, '어휘 교재의 보조 한자 단원을 과제로 지정하면 안 된다');
+  assert.strictEqual((await post({ scope: 's2', bookId: 'wb-hanja-starter', unitId: 'u05' })).status, 200);
   const t1 = await call(store, { path: '/api/hanja/task' });                      // s1: 월수반 → 반 지정
   assert.deepStrictEqual([t1.body.scope, t1.body.task.unitId, t1.body.task.title], ['class', 'u04', '이번 주는 4단원']);
   const t2 = await call(store, { path: '/api/hanja/task', who: S2 });             // s2: 개인 지정
-  assert.deepStrictEqual([t2.body.scope, t2.body.task.unitId], ['student', 'u01']);
+  assert.deepStrictEqual([t2.body.scope, t2.body.task.unitId], ['student', 'u05']);
   store._raw.tasks['월수반'] = undefined; delete store._raw.tasks['월수반'];
   const t3 = await call(store, { path: '/api/hanja/task' });                      // 반 지정이 없으면 default
   assert.deepStrictEqual([t3.body.scope, t3.body.task.unitId, t3.body.task.due], ['default', 'u03', '2026-10-05']);
@@ -298,7 +299,7 @@ await t('이번 주 단원 — 학생 → 반 → default 폴백, 없는 단원�
   assert.strictEqual(pr.status, 200);
   const row = pr.body.rows.find((r) => r.code === 's1');
   assert.deepStrictEqual([pr.body.unit.total, row.planted, row.graduated, row.due], [12, 3, 1, 1], JSON.stringify(row));
-  assert.strictEqual(pr.body.rows.length, 3, 'default 는 등록 학생 전원');
+  assert.deepStrictEqual(pr.body.rows.map((r) => r.code).sort(), ['s1', 's3'], '개별 과제를 받은 학생을 전체 과제의 미이행자로 세면 안 된다');
   assert.strictEqual((await call(store, { path: '/api/hanja/admin/progress', who: ADMIN, qs: 'scope=s2' })).body.rows.length, 1);
   assert.strictEqual((await call(store, { path: '/api/hanja/admin/progress', who: ADMIN, qs: 'scope=없는반' })).status, 404);
   /* 단어장을 지우면 그 단어장의 지정도 지운다 */
@@ -468,9 +469,104 @@ await t('교재 점검 — 학생이 올린 점수를 서버가 조여 요약·�
   /* 진도표는 '이번 주 단원'의 점수를 본다 — 가장 최근 점검이 아니라 그 단원 것 */
   const pr = await call(store, { path: '/api/hanja/admin/progress', who: ADMIN, qs: 'scope=default' });
   const row = pr.body.rows.find((r) => r.code === 's1');
-  assert.deepStrictEqual([row.check.n, row.check.right], [12, 9], JSON.stringify(row.check));
+  assert.strictEqual(row.check, null, '과제 지정 전 점수를 이번 과제 결과로 보여 주면 안 된다');
+  assert.deepStrictEqual([row.previousCheck.n, row.previousCheck.right, row.checkStatus], [12, 9, 'previous']);
   assert.strictEqual(pr.body.rows.find((r) => r.code === 's2').check, null, '점검 안 한 학생은 null');
   assert.strictEqual(unitCheck(store._raw.states.s1, 'wb-hanja-starter', 'u99'), null);
+});
+
+await t('과제 이행 — 개별·반 우선순위, 미시작 학생, 범위·힌트·보충 결과를 구분한다', async () => {
+  const store = memStore();
+  await upload(store, sample());
+  const bookId = 'wb-hanja-starter', at = Date.parse('2026-09-22T00:00:00Z');
+  const task = { bookId, unitId: 'u03', updatedAt: new Date(at).toISOString() };
+  store._raw.tasks.default = task;
+  store._raw.tasks['월수반'] = { ...task, unitId: 'u04' };
+  store._raw.tasks.s1 = task;
+  const progress = (scope) => call(store, { path: '/api/hanja/admin/progress', who: ADMIN, qs: 'scope=' + encodeURIComponent(scope) });
+  assert.deepStrictEqual((await progress('default')).body.rows.map((r) => r.code), ['s2']);
+  assert.deepStrictEqual((await progress('월수반')).body.rows.map((r) => r.code), ['s3']);
+  assert.strictEqual((await progress('s1')).body.rows[0].checkStatus, 'unlinked');
+  store._raw.states.s1 = { state: { states: {} }, updatedAt: new Date(at).toISOString() };
+  assert.strictEqual((await progress('s1')).body.rows[0].checkStatus, 'unchecked');
+  const count = unitItemIds(store._raw.books[bookId].book, 'u03').length;
+  const check = { book: bookId, unit: 'u03', title: '3단원', n: count, right: count, total: count, hinted: 0, at: at + 1, wrongIds: [] };
+  store._raw.states.s1.state.checks = { [bookId + '|u03']: check };
+  assert.strictEqual((await progress('s1')).body.rows[0].checkStatus, 'checked');
+  for (const updatedAt of [at + 2, new Date(at + 2).toISOString()]) {
+    task.updatedAt = updatedAt;
+    assert.strictEqual((await progress('s1')).body.rows[0].checkStatus, 'previous', '숫자·문자열 과제 시각 모두 지정 전 점수를 제외해야 한다');
+  }
+  task.updatedAt = at;
+  check.n = count - 1; check.right = check.n;
+  assert.strictEqual((await progress('s1')).body.rows[0].checkStatus, 'partial', '일부만 만점이면 전체 점검으로 보이면 안 된다');
+  check.n = count; check.right = count; check.hinted = 1; check.wrongIds = ['w:' + bookId + ':w1'];
+  assert.strictEqual((await progress('s1')).body.rows[0].checkStatus, 'review', '힌트 정답을 혼자 정답으로 세면 안 된다');
+  check.retry = { at: at + 2, total: 1, right: 1, wrongIds: [] };
+  assert.strictEqual((await progress('s1')).body.rows[0].checkStatus, 'rechecked');
+  check.hinted = 2; check.wrongIds.push('w:' + bookId + ':w2');
+  assert.strictEqual((await progress('s1')).body.rows[0].checkStatus, 'rechecked', '여러 번 보충해 마지막 한 항목만 남았던 경우도 완료로 본다');
+  delete check.total;
+  assert.strictEqual((await progress('s1')).body.rows[0].checkStatus, 'unknown', '옛 점검 기록의 전체 범위를 추정하면 안 된다');
+  const overview = await call(store, { path: '/api/hanja/admin/overview', who: ADMIN });
+  assert.strictEqual(overview.body.students.length, 3);
+  assert.strictEqual(overview.body.students.find((s) => s.code === 's2').linked, false, '앱을 안 연 등록 학생이 빠졌다');
+  const mixed = { id: 'mixed', words: [{ id: 'one', unit: 'u1' }], chars: [{ ch: '一', unit: 'u1' }] };
+  assert.deepStrictEqual(unitItemIds(mixed, 'u1'), ['w:mixed:one'], '어휘 교재의 보조 한자가 이행 항목에 섞였다');
+  assert.deepStrictEqual(unitItemIds({ ...mixed, words: [] }, 'u1'), ['c:一'], '글자 전용 교재 점검은 유지해야 한다');
+  task.unitId = 'u01';
+  store._raw.states.s1.state.checks[bookId + '|u01'] = { ...check, unit: 'u01', total: count, right: count, hinted: 0 };
+  const empty = (await progress('s1')).body;
+  assert.strictEqual(empty.unit.total, 0);
+  assert.strictEqual(empty.rows[0].checkStatus, 'empty', '기존 보조 한자 과제는 미이행 또는 점검 완료 대신 재지정 대상으로 표시해야 한다');
+});
+
+await t('점검 추가 필드 — 제한된 범위·힌트·오답 ID·재확인만 보존하며 옛 기록과 호환된다', async () => {
+  const base = { book: 'b', unit: 'u', title: '단원', n: 8, right: 6, at: 1700000000000 };
+  assert.deepStrictEqual(normCheck(base), base);
+  const c = normCheck({ ...base, total: 24, hinted: 99, wrongIds: ['w:b:a', 'w:b:a', 'bad', null, 'w:b:\n', ...Array.from({ length: 25 }, (_, i) => 'w:b:' + i)], retry: { at: base.at + 1, total: 2, right: 99, wrongIds: ['w:b:a'], evil: true } });
+  assert.deepStrictEqual([c.total, c.hinted, c.wrongIds.length, c.retry.right], [24, 6, 20, 2]);
+  assert.strictEqual(c.retry.evil, undefined);
+  assert.strictEqual(normCheck({ ...base, total: 3 }).total, undefined);
+  assert.strictEqual(normCheck({ ...base, at: Infinity }).at, null);
+  assert.strictEqual(normCheck({ ...base, at: 9e15 }).at, null);
+  assert.strictEqual(normCheck({ ...base, retry: { at: base.at - 1, total: 2, right: 2 } }).retry, undefined);
+  assert.strictEqual(normCheck({ ...base, retry: { at: base.at + 1, total: 21, right: 2 } }).retry, undefined);
+  for (const wrongIds of [undefined, ['bad'], ['w:b:\n']]) {
+    assert.strictEqual(normCheck({ ...base, retry: { at: base.at + 1, total: 2, right: 2, wrongIds } }).retry, undefined, '누락·손상된 오답 목록을 전부 해결한 빈 목록으로 바꾸면 안 된다');
+  }
+});
+
+await t('관리 표시·인쇄 — 교재명과 혼자 정답을 표시하고 어휘 교재는 뜻 쓰기를 기본으로 낸다', async () => {
+  const admin = fs.readFileSync(path.join(DIR, 'public', 'hanja-admin.html'), 'utf8');
+  const fn = admin.slice(admin.indexOf('function checkCell('), admin.indexOf('/* ── 현황 ── */'));
+  const esc = (v) => String(v).replaceAll('<', '&lt;').replaceAll('>', '&gt;');
+  const render = new Function('esc', 'bookTitle', 'fmt', fn + '; return checkCell;')(esc, () => '자체 교재', () => '9/22');
+  const html = render({ book: 'b', unit: 'u', title: '<img>', n: 8, total: 24, right: 7, hinted: 2, wrongIds: ['w:b:a'], retry: { at: 1, total: 3, right: 2, wrongIds: ['w:b:a'] } });
+  assert.ok(html.includes('자체 교재') && html.includes('혼자 정답 5 / 8') && html.includes('점검 범위 8 / 24'));
+  assert.ok(html.includes('오답 재확인: 혼자 정답 2 / 3') && html.includes('보충할 낱말·한자 1개'));
+  assert.ok(html.includes('&lt;img&gt;') && !html.includes('<img>'));
+  assert.ok(render({ book: 'b', n: 8, right: 8 }).includes('전체 범위 미확인'));
+  const fill = admin.slice(admin.indexOf('function fillUnits()'), admin.indexOf("$('#tkBook').addEventListener"));
+  for (const vocabulary of [true, false]) {
+    const elements = { '#tkBook': { value: 'b' }, '#tkUnit': { innerHTML: '' } };
+    const book = { id: 'b', counts: { words: vocabulary ? 2 : 0 }, units: [{ id: 'chars', title: '보조 글자', words: 0, chars: 3 }, { id: 'words', title: '<자체 단원>', words: vocabulary ? 2 : 0, chars: 4 }] };
+    new Function('BOOKS', '$', 'esc', fill + '; fillUnits();')([book], (id) => elements[id], esc);
+    const html = elements['#tkUnit'].innerHTML;
+    assert.strictEqual(html.includes('value="chars"'), !vocabulary);
+    assert.ok(html.includes(vocabulary ? '(2낱말)' : '(4자)'));
+    assert.ok(html.includes('&lt;자체 단원&gt;') && !html.includes('<자체 단원>'));
+  }
+  const print = fs.readFileSync(path.join(DIR, 'public', 'hanja-print.html'), 'utf8');
+  const load = print.slice(print.indexOf('async function loadBook()'), print.indexOf("$('#book').addEventListener"));
+  for (const vocabulary of [true, false]) {
+    const elements = Object.fromEntries(['book', 'unit', 'tMeaning', 'tHun', 'tWrite', 'tCharWord', 'tHanja'].map((id) => ['#' + id, { value: 'b', checked: false, innerHTML: '' }]));
+    const book = { units: [{ id: 'u', title: '자체 단원' }], words: vocabulary ? [{ unit: 'u' }] : [], chars: [{ ch: '一', unit: 'u' }] };
+    await new Function('api', '$', 'BOOK', 'esc', load + '; return loadBook();')(async () => ({ book }), (id) => elements[id], null, esc);
+    assert.strictEqual(elements['#tMeaning'].checked, vocabulary);
+    for (const id of ['#tHun', '#tWrite', '#tCharWord']) assert.strictEqual(elements[id].checked, !vocabulary);
+    assert.strictEqual(elements['#tHanja'].checked, false);
+  }
 });
 
 console.log(`\nOK — ${passed}개 통과`);

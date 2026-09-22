@@ -88,10 +88,10 @@ var WBHQUIZ = (function () {
   /* ── 낱말 문항 ── */
   function wordLabel(w) { return w.word + (w.hanja ? ' (' + w.hanja + ')' : ''); }
 
-  function qMeaning(w, ctx, rnd) {
+  function qMeaning(w, ctx, rnd, opts) {
     var d = distractors(ctx.words, w, function (x) { return x.meaning; }, 3, rnd, wordRank(w));
     if (d.length < 3) return null;
-    return choiceQ('w-meaning', w._sid, wordLabel(w) + ' 의 뜻은?', w.meaning, d, rnd, { word: w.word, speak: w.word });
+    return choiceQ('w-meaning', w._sid, (opts.vocabulary ? w.word : wordLabel(w)) + ' 의 뜻은?', w.meaning, d, rnd, { word: w.word, speak: w.word });
   }
   function qWord(w, ctx, rnd) {
     var d = distractors(ctx.words, w, function (x) { return x.word; }, 3, rnd, wordRank(w));
@@ -136,13 +136,13 @@ var WBHQUIZ = (function () {
     if (d.length < 3) return null;
     return choiceQ('w-hanja', w._sid, w.word + ' (' + w.meaning + ') 의 한자 표기는?', w.hanja, d, rnd, { word: w.word, big: true, bigChoices: true });
   }
-  /* 낱말 쓰기 — 뜻을 보고 낱말을 입력한다(산출). 한자어는 한자를 힌트로 준다 */
-  function qType(w) {
+  /* 낱말 쓰기 — 뜻을 보고 낱말을 입력한다(산출). 어휘 모드에서는 한자 힌트를 쓰지 않는다 */
+  function qType(w, ctx, rnd, opts) {
     if (!w.word || w.word.length < 2) return null;
     return {
       kind: 'w-type', head: HEAD['w-type'], id: w._sid, word: w.word,
       prompt: '"' + w.meaning + '" — 이 뜻의 낱말을 쓰세요', answer: w.word, input: true,
-      hint: w.hanja ? '한자: ' + w.hanja : (w.word[0] + ' ' + new Array(w.word.length).join('_ ')).trim(),
+      hint: w.hanja && !opts.vocabulary ? '한자: ' + w.hanja : (w.word[0] + ' ' + new Array(w.word.length).join('_ ')).trim(),
     };
   }
 
@@ -216,6 +216,7 @@ var WBHQUIZ = (function () {
 
   var WORD_KINDS = { 'w-meaning': qMeaning, 'w-word': qWord, 'w-cloze': qCloze, 'w-build': qBuild, 'w-hanja': qHanja, 'w-type': qType, 'w-syn': qSyn };
   var CHAR_KINDS = { 'c-hun': qHun, 'c-char': qChar, 'c-word': qCharWord, 'c-count': qCount, 'c-write': qWrite };
+  var VOCABULARY_KINDS = ['w-meaning', 'w-word', 'w-cloze', 'w-type', 'w-syn'];
   /* 계단별 유형 순서 — 낮은 계단은 재인(뜻 고르기), 높은 계단은 산출(쓰기) */
   var PLAN = {
     word: [
@@ -234,7 +235,7 @@ var WBHQUIZ = (function () {
   function tier(step) { return step >= 4 ? 3 : (step >= 2 ? 2 : (step >= 1 ? 1 : 0)); }
 
   /* item: { kind:'word', w } | { kind:'char', c } — w/c 는 단어장 항목, _sid 는 SRS id.
-     opts: { step, rnd, kinds(고정 유형 목록) } — 유형이 안 만들어지면 같은 계단의 다른 유형, 그래도 없으면 전부 */
+     opts: { step, rnd, kinds(허용 유형 목록), vocabulary(낱말 이해만) } — 허용 유형 안에서만 대체한다 */
   function makeQuestion(item, ctx, opts) {
     opts = opts || {};
     var rnd = opts.rnd || Math.random;
@@ -242,15 +243,17 @@ var WBHQUIZ = (function () {
     var target = isChar ? item.c : item.w;
     if (!target) return null;
     var table = isChar ? CHAR_KINDS : WORD_KINDS;
+    var all = (opts.kinds || Object.keys(table)).filter(function (k) {
+      return Object.prototype.hasOwnProperty.call(table, k) && (isChar || !opts.vocabulary || VOCABULARY_KINDS.indexOf(k) >= 0);
+    });
     /* 계단이 난이도를 정하고, 그 계단 안의 유형은 섞는다. 고정 순서면 같은 계단의 항목이 전부 같은 유형으로 나와
        (급수 교재 step 1 이 다섯 문제 내내 「한자 고르기」였다) 지루하고, 한 가지 물음만 연습된다. */
-    var order = opts.kinds || shuffle(PLAN[isChar ? 'char' : 'word'][tier(opts.step || 0)], rnd);
-    var all = Object.keys(table);
+    var order = opts.kinds ? all : shuffle(PLAN[isChar ? 'char' : 'word'][tier(opts.step || 0)].filter(function (k) { return all.indexOf(k) >= 0; }), rnd);
     var tried = {}, q = null;
     order.concat(all).forEach(function (k) {
       if (q || tried[k] || !table[k]) return;
       tried[k] = true;
-      q = table[k](target, ctx, rnd);
+      q = table[k](target, ctx, rnd, opts);
     });
     return q;
   }
@@ -269,7 +272,7 @@ var WBHQUIZ = (function () {
     opts = opts || {};
     var out = [], skipped = [];
     items.forEach(function (it) {
-      var q = makeQuestion(it, ctx, { step: it.step || 0, rnd: opts.rnd, kinds: opts.kinds });
+      var q = makeQuestion(it, ctx, { step: it.step || 0, rnd: opts.rnd, kinds: opts.kinds, vocabulary: opts.vocabulary });
       if (q) out.push(q); else skipped.push(it);
     });
     return { questions: opts.max ? out.slice(0, opts.max) : out, skipped: skipped };
