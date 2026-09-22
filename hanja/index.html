@@ -619,7 +619,7 @@
     var entries = (curriculum ? curriculumBooks() : textbookBooks()).filter(function (e) { return !needle || (e.title + ' ' + (e.publisher || '')).toLowerCase().indexOf(needle) >= 0; })
       .sort(function (a, b) { return groups.indexOf(bookGroup(a)) - groups.indexOf(bookGroup(b)); });
     if (curriculum) entries.sort(function (a, b) { return grades.indexOf(curriculumGrade(a)) - grades.indexOf(curriculumGrade(b)) || ((a.curriculum && /도구어/.test(a.curriculum.subject)) ? 0 : 1) - ((b.curriculum && /도구어/.test(b.curriculum.subject)) ? 0 : 1); });
-    if (!entries.length) html += '<p class="muted">' + (curriculum ? '이 학년의 교과 어휘가 아직 등록되지 않았어요. 다른 학년을 고르거나 선생님에게 등록을 문의해 주세요.' : '찾는 교재가 없어요. 검색어를 바꾸거나 선생님에게 교재 등록을 문의해 주세요.') + '</p>';
+    if (!entries.length) html += '<p class="muted">' + (curriculum ? (!authed ? '지금은 체험 모드예요. 학원 QR로 연동하면 학년·과목별 교과 어휘를 열 수 있어요.' : '이 학년의 교과 어휘가 아직 등록되지 않았어요. 다른 학년을 고르거나 선생님에게 등록을 문의해 주세요.') : '찾는 교재가 없어요. 검색어를 바꾸거나 선생님에게 교재 등록을 문의해 주세요.') + '</p>';
     entries.forEach(function (e) {
         if (group !== (curriculum ? curriculumGrade(e) : bookGroup(e))) { group = curriculum ? curriculumGrade(e) : bookGroup(e); html += '<h3 class="sec">' + esc(group) + '</h3>'; }
       var b = bookOf(e.id), p = b ? progressOf(itemsOf(b, null)) : null;
