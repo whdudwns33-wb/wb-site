@@ -38,7 +38,7 @@ t('종류는 자체(own) — AI 연상이 열리고, 교재 뜻 문장이 아니
   });
 });
 
-t('id 가 겹치지 않고, 낱말마다 뜻·예문이 있다', () => {
+t('id 가 겹치지 않고, 낱말마다 뜻·예문이 있다 (낱말 단어장)', () => {
   const ids = new Set();
   books.forEach(({ file, raw }) => {
     const book = B.checkBook(raw).book;
@@ -68,8 +68,27 @@ t('단원이 비어 있지 않다 — 이번 주 단원으로 지정할 수 있�
     const book = B.checkBook(raw).book;
     assert.ok(book.units.length >= 2, file + ' 의 단원이 ' + book.units.length + '개뿐이다');
     book.units.forEach((u) => {
-      const n = book.words.filter((w) => w.unit === u.id).length;
-      assert.ok(n >= 5, file + ' 의 단원 「' + u.title + '」 에 낱말이 ' + n + '개뿐이다');
+      /* 급수 배정한자처럼 낱말이 없는 단어장은 글자로 센다 — 단원의 학습 항목은 낱말 + 직접 적은 글자다 */
+      const n = book.words.filter((w) => w.unit === u.id).length
+        + book.chars.filter((c) => !c.derived && c.unit === u.id).length;
+      assert.ok(n >= 5, file + ' 의 단원 「' + u.title + '」 에 학습 항목이 ' + n + '개뿐이다');
+    });
+  });
+});
+
+t('급수 배정한자 단어장은 글자마다 훈음·획수·예시 낱말이 있다', () => {
+  /* 급수 대비는 글자가 주인공이다. 획수가 없으면 획수 문항이, 예시 낱말이 없으면
+     「이 글자가 든 낱말」 문항이 빠져 문항이 훈음 고르기 하나로 줄어든다. */
+  const geupsu = books.filter(({ raw }) => /geupsu/.test(raw.id || '') || /급수/.test(raw.title || ''));
+  assert.ok(geupsu.length >= 2, '급수 단어장이 ' + geupsu.length + '개뿐이다');
+  geupsu.forEach(({ file, raw }) => {
+    const book = B.checkBook(raw).book;
+    assert.ok(book.words.length === 0, file + ' 은 글자만 담는 단어장이어야 한다');
+    assert.ok(book.chars.length >= 50, file + ' 의 글자가 ' + book.chars.length + '자뿐이다');
+    book.chars.forEach((c) => {
+      assert.ok(c.strokes >= 1, file + ' 의 ' + c.ch + ' 에 획수가 없다');
+      assert.ok((c.words || []).length >= 2, file + ' 의 ' + c.ch + ' 에 예시 낱말이 모자란다');
+      assert.ok(!c.derived, file + ' 의 ' + c.ch + ' 가 끌어낸 글자로 잡혔다 — 급수 글자는 직접 적은 항목이어야 한다');
     });
   });
 });
