@@ -107,6 +107,8 @@ jobs:
         run: node letter/issue-validate.test.mjs
       - name: 브레인레터 앱 부팅 배선 (링크 세 갈래)
         run: node letter/app-boot.test.cjs
+      - name: 브레인레터 콘텐츠·화면·관리 화면 회귀 검사
+        run: node letter/content.test.cjs && node letter/ui.test.cjs && node letter/admin-ui.test.cjs
       - name: 에이전트 안내 문서 동기화
         run: node scripts/docs-sync.test.mjs
       - name: 내신브레인 AI 추출 테스트

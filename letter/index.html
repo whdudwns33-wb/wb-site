@@ -44,7 +44,8 @@
     .list button { display:flex; width:100%; justify-content:space-between; gap:10px; align-items:center; text-align:left; padding:12px 4px; border-bottom:1px solid var(--line); min-height:56px; }
     .list button:last-child { border-bottom:none; }
     .list b { display:block; } .list small { color:var(--soft); font-size:12.5px; white-space:nowrap; }
-    .sheet { position:fixed; inset:auto 0 0 0; background:var(--panel); border-top:3px solid var(--ink); box-shadow:0 -6px 24px #0002; padding:16px 16px calc(16px + env(safe-area-inset-bottom)); z-index:9; }
+    .sheet { position:fixed; inset:auto 0 0 0; width:100%; max-width:none; margin:0; color:var(--ink); background:var(--panel); border:0; border-top:3px solid var(--ink); box-shadow:0 -6px 24px #0002; padding:16px 16px calc(16px + env(safe-area-inset-bottom)); z-index:9; }
+    .sheet::backdrop { background:#0006; }
     .sheet h3 { margin:0 0 6px; font-size:16px; }
     .foot { font-size:12px; color:var(--soft); line-height:1.5; margin-top:20px; padding-top:10px; border-top:1px solid var(--line); }
     .dot { font-size:12px; color:var(--soft); white-space:nowrap; } .dot i { display:inline-block; width:8px; height:8px; border-radius:50%; background:#B7C0CC; margin-right:4px; }
@@ -55,13 +56,13 @@
     .vbtn { font-size:13px; font-weight:800; color:var(--spot); text-decoration:underline; min-height:36px; padding:0 4px; }
     .dnav { display:flex; gap:10px; margin-top:12px; } .dnav > * { flex:1; } .dnav button { min-height:46px; border:1.5px solid var(--ink); background:#fff; font-weight:800; font-size:14.5px; }
     /* 돋보기 — 사진을 누르면 크게(패드에서 손가락 두 개로 더 키울 수 있다) */
-    .lb { position:fixed; inset:0; background:#000e; z-index:50; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:12px; touch-action:pinch-zoom; }
+    .lb { position:fixed; inset:0; width:100%; height:100%; max-width:none; max-height:none; margin:0; border:0; background:#000e; z-index:50; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:12px; touch-action:pinch-zoom; }
     .lb img { max-width:100%; max-height:80vh; object-fit:contain; border-radius:6px; background:#fff; }
     .lb-cap { color:#fff; font-size:14px; margin-top:10px; text-align:center; max-width:640px; } .lb-cap .np-credit { display:block; color:#fffa; font-size:12px; margin-top:2px; }
     .lb-x { position:absolute; top:10px; right:12px; color:#fff; font-size:22px; min-height:44px; min-width:44px; }
     /* 인쇄(PDF) — 화면은 감추고 printArea 의 인쇄본만 */
     #printArea { display:none; }
-    @media print { body > * { display:none !important; } #printArea { display:block !important; } .np-tierbreak { break-before:page; page-break-before:always; } }
+    @media print { body > * { display:none !important; } dialog::backdrop { display:none; } #printArea { display:block !important; } .np-tierbreak { break-before:page; page-break-before:always; } }
     @media (max-width:430px) { .hb .lbl { display:none; } }
   </style>
   <style id="nlcss"></style>
@@ -73,7 +74,7 @@
     <span class="dot" id="savedot" hidden><i></i><span id="savetxt"></span></span>
     <select id="tierSel" hidden aria-label="학년대"></select>
     <button class="hb" id="btnArchive" hidden>지난 호</button>
-    <button class="hb primary" id="btnPdf" hidden>🖨 <span class="lbl">PDF로 저장</span></button>
+    <button class="hb primary" id="btnPdf" hidden aria-label="PDF로 저장">🖨 <span class="lbl">PDF로 저장</span></button>
   </header>
   <main id="app"><div class="card">불러오는 중…</div></main>
   <div id="printArea" aria-hidden="true"></div>
@@ -224,13 +225,13 @@
       if (MODE === 'admin') html += '<div class="banner">관리자 미리보기 — 학생·가족에게는 자기 학년대 섹션만 보여요.</div>';
       if (daily) {
         html += '<div class="vt"><span class="small">하루 한 장 · 오늘은 <b>' + today + '일째</b></span><button class="vbtn" data-view="paper">신문 전체로 보기</button></div>';
-        html += L.renderDayStrip(ISSUE, DAY, today, st);
+        html += L.renderDayStrip(ISSUE, DAY, today, st, tier);
         html += L.renderDay(ISSUE, tier, DAY, { mode: 'app', state: st, nextTheme: nextTheme() });
         var dd = st.days[DAY];
         html += '<div class="card done-btn">' + (dd
-          ? '<h2>' + (DAY === 7 ? '이번 호를 다 읽었어요 ✔' : '오늘 장을 다 읽었어요 ✔') + '</h2><p class="small">' + esc(String(dd).slice(0, 10)) + '에 마쳤어요.' + (DAY < 7 ? ' 내일은 「' + esc(L.DAY_PLAN[DAY].name) + '」 장이에요.' : ' 다음 호도 기다려 주세요.') + '</p>'
+          ? '<h2>' + (DAY === 7 ? '이번 호를 다 읽었어요 ✔' : '오늘 장을 다 읽었어요 ✔') + '</h2><p class="small">' + esc(String(dd).slice(0, 10)) + '에 마쳤어요.' + (DAY < 7 ? ' 내일은 「' + esc(L.dayPage(ISSUE, tier, DAY + 1).name) + '」 장이에요.' : ' 다음 호도 기다려 주세요.') + '</p>'
           : '<h2>' + (DAY === 7 ? '이번 호를 다 읽었나요?' : '오늘 장을 다 읽었나요?') + '</h2><p class="small">' + (DAY === 7 ? '답을 맞춰 보고 한 주를 마쳤으면 눌러 주세요.' : '다 읽었으면 눌러 주세요. 내일 새 장이 기다려요.') + '</p><button class="big" id="dayDone">' + (DAY === 7 ? '이번 호 다 읽었어요' : '오늘 장 다 읽었어요') + '</button>') + '</div>';
-        html += '<div class="dnav">' + (DAY > 1 ? '<button type="button" data-day="' + (DAY - 1) + '">← ' + esc(L.DAY_PLAN[DAY - 2].name) + '</button>' : '<span></span>') + (DAY < 7 ? '<button type="button" data-day="' + (DAY + 1) + '">' + esc(L.DAY_PLAN[DAY].name) + ' →</button>' : '<span></span>') + '</div>';
+        html += '<div class="dnav">' + (DAY > 1 ? '<button type="button" data-day="' + (DAY - 1) + '">← ' + esc(L.dayPage(ISSUE, tier, DAY - 1).name) + '</button>' : '<span></span>') + (DAY < 7 ? '<button type="button" data-day="' + (DAY + 1) + '">' + esc(L.dayPage(ISSUE, tier, DAY + 1).name) + ' →</button>' : '<span></span>') + '</div>';
       } else {
         if (MODE !== 'admin' && tier) html += '<div class="vt"><span class="small">신문 전체</span><button class="vbtn" data-view="day">하루 한 장으로 보기</button></div>';
         html += L.renderIssue(ISSUE, tier, { mode: 'app', state: st });
@@ -333,15 +334,20 @@
     function traceClear(box) { var tr = TRACE[box.getAttribute('data-sid')]; if (!tr) return; tr.strokes = []; traceDraw(tr); }
 
     /* ── 돋보기 — 사진을 누르면 화면 가득. 패드에서는 손가락 두 개로 더 키운다 ── */
+    function openDialog(dialog) {
+      var opener = document.activeElement;
+      dialog.onclose = function () { dialog.remove(); if (opener && opener.isConnected) opener.focus({ preventScroll: true }); };
+      document.body.appendChild(dialog);
+      dialog.showModal();
+    }
     function openZoom(fig) {
       var img = fig.querySelector('img'); if (!img) return;
       var cap = fig.querySelector('figcaption');
-      var lb = document.createElement('div'); lb.className = 'lb';
+      var lb = document.createElement('dialog'); lb.className = 'lb'; lb.setAttribute('aria-label', '사진 크게 보기');
       lb.innerHTML = '<img src="' + esc(img.getAttribute('src')) + '" alt="' + esc(img.alt || '') + '"><div class="lb-cap">' + (cap ? cap.innerHTML : '') + '</div><button type="button" class="lb-x" aria-label="닫기">✕</button>';
-      lb.onclick = function () { lb.remove(); };
-      document.body.appendChild(lb);
+      lb.onclick = function () { lb.close(); };
+      openDialog(lb);
     }
-    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') { var lb = document.querySelector('.lb'); if (lb) lb.remove(); } });
 
     function afterRender() {
       if (!window.WBVoice || !WBVoice.ttsSupported()) Array.prototype.forEach.call(document.querySelectorAll('.np-tts'), function (el) { el.hidden = true; });
@@ -355,7 +361,7 @@
       var tb = e.target.closest('[data-tts]'); if (tb) { ttsToggle(tb); return; }
       var tk = e.target.closest('[data-trace-ok]'); if (tk) { traceOk(tk.closest('.np-trace')); return; }
       var tc = e.target.closest('[data-trace-clear]'); if (tc) { traceClear(tc.closest('.np-trace')); return; }
-      var z = e.target.closest('.np-photo[data-zoom]'); if (z) { openZoom(z); return; }
+      var z = e.target.closest('button[data-zoom]'); if (z) { openZoom(z.closest('.np-photo')); return; }
       var b = e.target.closest('[data-q],[data-ans]');
       if (!b || !ISSUE) return;
       var st = issueState(ISSUE.id);
@@ -365,10 +371,12 @@
         if (typeof st.quiz[key] === 'number') return;
         st.quiz[key] = +p[2]; push();
         var y = window.scrollY; showIssue(); window.scrollTo(0, y);
+        var feedback = app.querySelector('[data-feedback="' + key + '"]'); if (feedback) feedback.focus({ preventScroll: true });
       } else {
         var k = b.getAttribute('data-ans');
         st.reveal[k] = !st.reveal[k]; push();
         var y2 = window.scrollY; showIssue(); window.scrollTo(0, y2);
+        var toggle = app.querySelector('[data-ans="' + k + '"]'); if (toggle) toggle.focus({ preventScroll: true });
       }
     });
     var writeTimer = null;
@@ -398,21 +406,28 @@
     $('btnArchive').onclick = showArchive;
 
     /* ── 인쇄(PDF) — 브라우저 인쇄 창에서 "PDF로 저장". 정답 별지를 넣을지 고른다 ── */
-    function printIssue(withKey) {
+    var PRINT_KEY = true;
+    function preparePrint() {
       if (!ISSUE) return;
       var area = $('printArea');
       if (TIER === 'all') {
-        area.innerHTML = L.TIER_IDS.map(function (t, i) { return '<div class="' + (i ? 'np-tierbreak' : '') + '">' + L.renderIssue(ISSUE, t, { mode: 'print', key: withKey }) + '</div>'; }).join('');
-      } else area.innerHTML = L.renderIssue(ISSUE, TIER, { mode: 'print', key: withKey });
+        area.innerHTML = L.TIER_IDS.map(function (t, i) { return '<div class="' + (i ? 'np-tierbreak' : '') + '">' + L.renderIssue(ISSUE, t, { mode: 'print', key: PRINT_KEY }) + '</div>'; }).join('');
+      } else area.innerHTML = L.renderIssue(ISSUE, TIER, { mode: 'print', key: PRINT_KEY });
+    }
+    window.addEventListener('beforeprint', preparePrint);
+    function printIssue(withKey) {
+      if (!ISSUE) return;
+      PRINT_KEY = withKey;
+      preparePrint();
       closeSheet();
       setTimeout(function () { window.print(); }, 50);
     }
-    function closeSheet() { var s = $('pdfSheet'); if (s) s.remove(); }
+    function closeSheet() { var s = $('pdfSheet'); if (s) s.close(); }
     $('btnPdf').onclick = function () {
       closeSheet();
-      var s = document.createElement('div'); s.className = 'sheet'; s.id = 'pdfSheet';
-      s.innerHTML = '<h3>PDF로 저장 · 인쇄</h3><p class="small">인쇄 창에서 대상을 "PDF로 저장"으로 고르면 파일로 받을 수 있어요. A4 두 단으로 맞춰 두었어요.</p><div class="row"><button class="big" id="pdfKey">정답 별지 포함</button><button class="big ghost" id="pdfNoKey">정답 없이(학습지)</button></div><button class="big ghost" id="pdfClose" style="min-height:44px">닫기</button>';
-      document.body.appendChild(s);
+      var s = document.createElement('dialog'); s.className = 'sheet'; s.id = 'pdfSheet'; s.setAttribute('aria-labelledby', 'pdfTitle');
+      s.innerHTML = '<h3 id="pdfTitle">PDF로 저장 · 인쇄</h3><p class="small">인쇄 창에서 대상을 "PDF로 저장"으로 고르면 파일로 받을 수 있어요. A4 두 단으로 맞춰 두었어요.</p><div class="row"><button class="big" id="pdfKey">정답 별지 포함</button><button class="big ghost" id="pdfNoKey">정답 없이(학습지)</button></div><button class="big ghost" id="pdfClose" style="min-height:44px">닫기</button>';
+      openDialog(s);
       $('pdfKey').onclick = function () { printIssue(true); };
       $('pdfNoKey').onclick = function () { printIssue(false); };
       $('pdfClose').onclick = closeSheet;
