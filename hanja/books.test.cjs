@@ -1,0 +1,77 @@
+'use strict';
+/* 저장소에 든 자체 단어장 검사 (node hanja/books.test.cjs)
+ *
+ * hanja/books/ 는 학원이 직접 쓴 단어장이다(교과 어휘). 구매 교재와 달리 저장소에 살 수 있고,
+ * 그래서 고치다 망가뜨릴 수도 있다 — 업로드 관문과 같은 규칙(book-check)으로 여기서 먼저 막는다.
+ * 자체 자료에는 경고도 남기지 않는다: 예문에 낱말이 없거나 훈음이 빈 한자는 우리가 고칠 수 있는 것이고,
+ * 그대로 두면 문맥 빈칸·한자 조립 문항이 조용히 빠진 채 학생에게 간다. */
+const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
+const B = require('./book-check.js');
+
+let passed = 0;
+const t = (name, fn) => { fn(); passed += 1; console.log('  ✓ ' + name); };
+const DIR = path.join(__dirname, 'books');
+const files = fs.existsSync(DIR) ? fs.readdirSync(DIR).filter((f) => f.endsWith('.json')).sort() : [];
+
+t('자체 단어장이 저장소에 있다', () => {
+  assert.ok(files.length >= 4, 'hanja/books/ 에 단어장이 ' + files.length + '개뿐이다');
+});
+
+const books = files.map((f) => ({ file: f, raw: JSON.parse(fs.readFileSync(path.join(DIR, f), 'utf8')) }));
+
+t('업로드 관문과 같은 규칙으로 오류·경고 0', () => {
+  books.forEach(({ file, raw }) => {
+    const res = B.checkBook(raw);
+    assert.deepStrictEqual(res.errors, [], file + ' 오류: ' + JSON.stringify(res.errors));
+    assert.deepStrictEqual(res.warns, [], file + ' 경고: ' + JSON.stringify(res.warns));
+    assert.ok(res.ok, file + ' 가 통과하지 못했다');
+  });
+});
+
+t('종류는 자체(own) — AI 연상이 열리고, 교재 뜻 문장이 아니다', () => {
+  books.forEach(({ file, raw }) => {
+    const book = B.checkBook(raw).book;
+    assert.strictEqual(book.source, 'own', file + ' 의 종류가 own 이 아니다');
+    assert.ok(B.aiAllowed(book), file + ' 에서 AI 연상이 닫혀 있다');
+  });
+});
+
+t('id 가 겹치지 않고, 낱말마다 뜻·예문이 있다', () => {
+  const ids = new Set();
+  books.forEach(({ file, raw }) => {
+    const book = B.checkBook(raw).book;
+    assert.ok(!ids.has(book.id), '단어장 id 가 겹친다: ' + book.id);
+    ids.add(book.id);
+    book.words.forEach((w) => {
+      assert.ok(w.meaning && w.meaning.length >= 5, file + ' 의 「' + w.word + '」 뜻이 너무 짧다');
+      assert.ok(w.example, file + ' 의 「' + w.word + '」 에 예문이 없다 — 문맥 빈칸 문항이 안 나온다');
+    });
+  });
+});
+
+t('한자어의 한자에는 훈음이 다 있다 — 한자 조립·따라쓰기가 열리게', () => {
+  books.forEach(({ file, raw }) => {
+    const book = B.checkBook(raw).book;
+    book.words.filter((w) => w.type === 'hanja').forEach((w) => {
+      (w.parts || []).forEach((p) => {
+        assert.ok(p.hun && p.eum, file + ' 의 「' + w.word + '」 에서 ' + p.ch + ' 의 훈음이 비었다');
+      });
+    });
+    book.chars.forEach((c) => assert.ok(c.hun && c.eum, file + ' 의 글자 ' + c.ch + ' 에 훈음이 없다'));
+  });
+});
+
+t('단원이 비어 있지 않다 — 이번 주 단원으로 지정할 수 있게', () => {
+  books.forEach(({ file, raw }) => {
+    const book = B.checkBook(raw).book;
+    assert.ok(book.units.length >= 2, file + ' 의 단원이 ' + book.units.length + '개뿐이다');
+    book.units.forEach((u) => {
+      const n = book.words.filter((w) => w.unit === u.id).length;
+      assert.ok(n >= 5, file + ' 의 단원 「' + u.title + '」 에 낱말이 ' + n + '개뿐이다');
+    });
+  });
+});
+
+console.log(`\nOK — ${passed}개 통과`);
