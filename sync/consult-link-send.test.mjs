@@ -120,6 +120,7 @@ test('student self_get/set register only the active authenticated student and ne
   assert.equal(result.status, 200, JSON.stringify(result.body));
   assert.equal(result.body.contact.phoneMasked, '010****5678');
   assert.equal(result.body.contact.phoneOwner, 'mother');
+  assert.equal('phone' in result.body.contact, false);
   assert.equal(JSON.stringify(result.body).includes('01012345678'), false);
   const stored = db.prepare(
     "SELECT staff_id,phone,phone_owner,consent,updated_by FROM consult_link_contacts WHERE app='consult'"
@@ -133,6 +134,7 @@ test('student self_get/set register only the active authenticated student and ne
   result = await call(db, { action: 'self_get' }, { auth: own('student-a') });
   assert.equal(result.body.contact.phoneMasked, '010****5678');
   assert.equal(result.body.contact.phoneOwner, 'mother');
+  assert.equal('phone' in result.body.contact, false);
   assert.equal(JSON.stringify(result.body).includes('01012345678'), false);
   assert.equal(db.prepare(
     "SELECT COUNT(*) AS count FROM consult_link_contacts WHERE staff_id='student-b'"
@@ -288,7 +290,7 @@ test('consult staff becoming deleted, owner, or manager clears phone and consent
   }
 });
 
-test('list/set mask D1-only phones, exclude owner/manager/deleted, and enforce CAS', async () => {
+test('admin list/set expose full phones while excluding inactive roles and enforcing CAS', async () => {
   const db = new TestD1();
   seedStudent(db, 'student-a', '김학생');
   seedStudent(db, 'owner-a', '원장', { owner: true });
@@ -309,9 +311,9 @@ test('list/set mask D1-only phones, exclude owner/manager/deleted, and enforce C
   assert.equal(result.status, 200);
   const saved = result.body.contact;
   assert.equal(saved.phoneMasked, '010****5678');
+  assert.equal(saved.phone, '01012345678');
   assert.equal(saved.phoneOwner, 'mother');
   assert.equal(saved.phoneRegistered, true);
-  assert.equal(JSON.stringify(saved).includes('01012345678'), false);
   const stored = db.prepare("SELECT * FROM consult_link_contacts WHERE staff_id='student-a'").first();
   assert.equal(stored.phone, '01012345678');
 
@@ -319,7 +321,7 @@ test('list/set mask D1-only phones, exclude owner/manager/deleted, and enforce C
   assert.equal(result.status, 200);
   assert.deepEqual(result.body.contacts.map(item => item.staffId), ['student-a']);
   assert.equal(result.body.contacts[0].phoneOwner, 'mother');
-  assert.equal(JSON.stringify(result.body).includes('01012345678'), false);
+  assert.equal(result.body.contacts[0].phone, '01012345678');
 
   result = await call(db, {
     action: 'set', staffId: 'student-a', phone: '01099998888', phoneOwner: 'student', consent: true,
@@ -587,6 +589,15 @@ test('task, own scope, owner targets, and injected send fields are rejected befo
   result = await call(db, { action: 'send', staffId: 'student-a' }, {
     auth: { scope: 'own', id: 'student-a' }, issue
   });
+  assert.equal(result.status, 403);
+  result = await call(db, { action: 'list' }, {
+    auth: { scope: 'own', id: 'student-a' }
+  });
+  assert.equal(result.status, 403);
+  result = await call(db, {
+    action: 'set', staffId: 'student-a', phone: '01099998888', phoneOwner: 'student',
+    consent: true, expectedUpdatedAt: 0
+  }, { auth: { scope: 'own', id: 'student-a' } });
   assert.equal(result.status, 403);
   result = await call(db, {
     action: 'send', staffId: 'student-a', phone: '01099998888'
