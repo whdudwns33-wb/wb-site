@@ -37,6 +37,7 @@ function app(family = false) {
     globalThis.ui = {
       get state() { return S; }, get session() { return sess; }, rec: REC,
       recStart, recStop, recPlay, recRelease,
+      home(band, assign) { S = SC.blank(Date.now()); S.band = band; S.assign = assign; view = { name: 'home' }; sess = null; render(); },
       start(band, q) {
         S = SC.blank(Date.now()); S.band = band;
         CUSTOM = [{ id: 'teacher-test', band, title: '테스트 글', genre: '설명', paragraphs: [['아침에 ', '햇빛이 들었다.']], q }];
@@ -59,6 +60,62 @@ function reachReading(a) {
 }
 
 (async () => {
+  for (const family of [false, true]) await test(`${family ? '가족' : '학생'}: 지정 카드 → 지정 글 → 남은 과제 → 완료 확인`, () => {
+    const a = app(family), lesson = require('./lessons.js').find((l) => l.id === 'g3-1');
+    a.ui.home('G3', { band: 'G3', lessons: [lesson.id], passages: ['g3-02', 'g3-01'], updatedAt: new Date(Date.now() - 1000).toISOString() });
+    assert.match(a.html(), /data-act="open-lesson" data-id="g3-1">과제 시작/);
+    assert.doesNotMatch(a.html(), /오늘의 세 걸음/);
+    a.click('open-lesson', { id: lesson.id });
+    for (const c of lesson.checks) {
+      a.ui.session.ls.marks = new Set(R.modelBoundaries(c.segs));
+      a.click('lesson-check'); a.click('lesson-next');
+    }
+    assert.equal(SC.assignDone(a.ui.state), 1);
+    for (const id of ['g3-02', 'g3-01']) {
+      assert.match(a.html(), new RegExp('data-act="start-practice" data-id="' + id + '">다음 과제'));
+      a.click('start-practice', { id }); reachReading(a);
+      a.click('pr-read-start'); a.click('pr-read-done');
+      const p = require('./passages.js').find((x) => x.id === id);
+      a.click('pr-pick', { i: String(p.q.answer) }); a.click('pr-finish');
+    }
+    assert.equal(SC.assignDone(a.ui.state), 3);
+    assert.match(a.html(), /선생님 과제 3 \/ 3 끝냈어요/);
+    assert.doesNotMatch(a.html(), /다음 글 —|다음 과제 —/);
+    a.click('pr-quit');
+    assert.match(a.html(), /선생님 과제를 모두 끝냈어요/);
+    assert.match(a.html(), /과제 다음, 더 연습하기/);
+    if (family) assert.match(a.html(), /학습 기록 보기/);
+  });
+
+  await test('다른 단계의 지정 과제도 우선하고 재배정 전 기록은 완료로 세지 않음', () => {
+    const a = app(true), l = require('./lessons.js').find((x) => x.band === 'G1'), now = Date.now();
+    a.ui.home('G3', { lessons: [l.id], passages: ['g1-01'], updatedAt: new Date(now).toISOString() });
+    a.ui.state.lessons[l.id] = { at: now - 1000 };
+    a.ui.state.items['g1-01'] = { last: now - 1000, band: 'G1' };
+    a.click('tab', { tab: 'home' });
+    assert.match(a.html(), new RegExp('data-id="' + l.id + '">과제 시작'));
+    a.ui.state.lessons[l.id].at = now + 1000;
+    a.click('tab', { tab: 'home' });
+    assert.match(a.html(), /data-id="g1-01">과제 시작/);
+  });
+
+  await test('과제 없는 날과 메모만 있는 과제는 기본 학습을 안내', () => {
+    const a = app(true);
+    for (const assign of [null, { note: '<센터 안내>', passages: [], lessons: [] }]) {
+      a.ui.home('G3', assign);
+      assert.match(a.html(), /오늘의 세 걸음/);
+      assert.doesNotMatch(a.html(), /0 \/ 0 끝냈어요|>과제 시작 —/);
+      if (assign) assert.match(a.html(), /&lt;센터 안내&gt;/);
+    }
+  });
+
+  await test('불러올 수 없는 지정 글을 과제 완료로 안내하지 않음', () => {
+    const a = app(true);
+    a.ui.home('G3', { passages: ['teacher-removed'], lessons: [] });
+    assert.match(a.html(), /남은 과제를 열 수 없어요/);
+    assert.doesNotMatch(a.html(), /선생님 과제를 모두 끝냈어요|과제 다음, 더 연습하기/);
+  });
+
   for (const family of [false, true]) for (const band of ['K', 'G3']) await test(`${family ? '가족' : '학생'} ${band}: 문제 없는 글도 읽기 완료 후 미측정으로 저장`, () => {
     const a = app(family); a.ui.start(band, null); reachReading(a);
     assert.doesNotMatch(a.html(), /data-act="pr-finish"/);
