@@ -10189,7 +10189,7 @@ function studentEngagementLine(student, currentSummary, pointSummary) {
     '<button class="btn btn-sm btn-ghost mt8" data-act="pointopen" data-id="' + esc(student.id) + '">' + (account.pending ? '교환 신청 확인' : '포인트 내역') + '</button></div>';
 }
 
-/* 카카오 수신번호는 서버에만 두고, 원장 화면에는 마스킹 상태만 잠시 보관한다. */
+/* 전체 수신번호는 서버와 로그인 중인 원장 화면 메모리에만 두며 localStorage에는 저장하지 않는다. */
 const consultLinkContactsUi = {
   rows: new Map(), loaded: false, loading: false, error: '', busy: ''
 };
@@ -10202,11 +10202,13 @@ function clearConsultLinkContacts() {
   consultLinkContactsUi.busy = '';
 }
 
-function consultLinkContactRow(row) {
+function consultLinkContactRow(row, includePhone) {
   const staffId = String((row && row.staffId) || '');
   if (!staffId) return null;
+  const phone = String((row && row.phone) || '').replace(/[\s()-]/g, '');
   return {
     staffId: staffId,
+    phone: includePhone && /^01[016789]\d{7,8}$/.test(phone) ? phone : '',
     phoneMasked: String(row.phoneMasked || ''),
     phoneOwner: ['student', 'mother'].includes(row.phoneOwner) ? row.phoneOwner : 'unknown',
     consent: row.consent === true,
@@ -10232,7 +10234,7 @@ function consultLinkPhoneOwnerOptions(contact, name, labelId) {
     '</div></div>';
 }
 
-/* 학생 번호 원문은 입력→서버 전송에만 쓰고, 화면 메모리에는 마스킹 상태만 둔다. */
+/* 학생 화면에서는 번호 원문을 버리고 마스킹 상태만 둔다. */
 const studentPhoneUi = {
   staffId: '', contact: null, loaded: false, loading: false, saving: false, error: ''
 };
@@ -10379,7 +10381,7 @@ async function loadConsultLinkContacts(force) {
     if (!session.isAdmin || session.isStaffLink) return;
     const rows = new Map();
     (Array.isArray(data.contacts) ? data.contacts : []).forEach(value => {
-      const row = consultLinkContactRow(value);
+      const row = consultLinkContactRow(value, true);
       if (row) rows.set(row.staffId, row);
     });
     consultLinkContactsUi.rows = rows;
@@ -10398,7 +10400,7 @@ function consultLinkStudentPanel(student) {
   if (!student || student.owner || student.manager) return '';
   const contact = consultLinkContactsUi.rows.get(student.id) || null;
   const unavailable = !consultLinkContactsUi.loaded || !!consultLinkContactsUi.error;
-  const phone = contact && contact.phoneMasked;
+  const phone = contact && (contact.phone || contact.phoneMasked);
   const ready = consultLinkContactReady(contact);
   const sendBusy = consultLinkContactsUi.busy === 'send:' + student.id;
   const anyBusy = !!consultLinkContactsUi.busy;
@@ -10424,20 +10426,21 @@ function consultLinkContactModal(staffId, sendAfterSave) {
   const student = staffById(staffId);
   if (!student || student.deleted || student.owner || student.manager) return toast('학생을 다시 선택해 주세요');
   const contact = consultLinkContactsUi.rows.get(staffId) || null;
-  const masked = contact && contact.phoneMasked;
-  modal('학생 연락처 ' + (masked ? '수정' : '등록'),
+  const registered = contact && contact.phoneMasked;
+  const shownPhone = contact && (contact.phone || contact.phoneMasked);
+  modal('학생 연락처 ' + (registered ? '수정' : '등록'),
     '<div class="card-sub mb14"><b>' + esc(student.name) + '</b> 학생의 플래너 연락처입니다. 학생 휴대폰이 없으면 엄마 번호로 표시해 등록합니다.</div>' +
-    (masked ? '<div class="hint mb14">현재 ' + consultLinkPhoneLabel(contact) + ': <b>' + esc(masked) + '</b><br>번호를 변경하려면 종류와 전체 번호를 다시 입력해 주세요.</div>' : '') +
+    (shownPhone ? '<div class="hint mb14">현재 ' + consultLinkPhoneLabel(contact) + ': <b>' + esc(shownPhone) + '</b><br>번호를 변경하려면 종류와 전체 번호를 다시 입력해 주세요.</div>' : '') +
     consultLinkPhoneOwnerOptions(contact, 'consultLinkPhoneOwner', 'consultLinkPhoneOwnerLabel') +
     '<div class="field"><label class="fl" for="consultLinkPhone">휴대전화 번호</label>' +
       '<input class="in" id="consultLinkPhone" type="tel" inputmode="tel" autocomplete="tel" maxlength="15" placeholder="01012345678"></div>' +
     '<label class="material-type-option"><input type="checkbox" id="consultLinkConsent">' +
       '<span>학생 번호는 학생에게, 엄마 번호는 엄마에게 앱 연결 링크와 안내 수신 동의를 확인했습니다.</span></label>' +
-    '<div class="submission-privacy mt14">🔒 번호는 이 기기나 백업에 저장하지 않고 서버에서만 관리합니다.<br>엄마 번호를 선택해도 ‘보호자 공유’의 열람 초대 번호와는 별도로 관리합니다.</div>',
+    '<div class="submission-privacy mt14">🔒 전체 번호는 원장 로그인 화면에서만 표시하며 이 기기나 백업에는 저장하지 않습니다.<br>엄마 번호를 선택해도 ‘보호자 공유’의 열람 초대 번호와는 별도로 관리합니다.</div>',
     '<button class="btn btn-primary" data-act="linkcontactsave" data-id="' + esc(staffId) + '" data-v="' +
       (contact ? contact.updatedAt : 0) + '"' + (sendAfterSave ? ' data-send="1"' : '') + '>' +
       (sendAfterSave ? '동의하고 바로 보내기' : '동의 확인 후 저장') + '</button>' +
-    (masked ? '<button class="btn btn-danger" data-act="linkcontactclear" data-id="' + esc(staffId) + '" data-v="' +
+    (registered ? '<button class="btn btn-danger" data-act="linkcontactclear" data-id="' + esc(staffId) + '" data-v="' +
       contact.updatedAt + '">발송 중지·번호 삭제</button>' : '') +
     '<button class="btn btn-ghost" data-act="closemodal">취소</button>');
 }
@@ -10464,7 +10467,7 @@ async function saveConsultLinkContact(staffId, expectedUpdatedAt, button, clear,
       app: SYNC_APP, auth: sync.auth(), action: 'set', staffId: staffId, phone: phone,
       phoneOwner: phoneOwner, consent: consent, expectedUpdatedAt: Number(expectedUpdatedAt) || 0
     });
-    const row = consultLinkContactRow(Object.assign({ staffId: staffId }, data.contact || {}));
+    const row = consultLinkContactRow(Object.assign({ staffId: staffId }, data.contact || {}), true);
     if (row && row.phoneMasked) consultLinkContactsUi.rows.set(staffId, row);
     else consultLinkContactsUi.loaded = false;
     savedForSend = consultLinkContactReady(row);
@@ -14321,6 +14324,7 @@ document.addEventListener('click', ev => {
 
     /* 설정 */
     case 'savecfg': {
+      clearConsultLinkContacts();
       state.settings.syncSecret = ($('#cfgSecret').value || '').trim();
       state.settings.adminToken = '';
       save(); render(); toast('저장했습니다');
@@ -14561,7 +14565,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-09-22.4';
+const APP_VER = '2026-09-22.5';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
