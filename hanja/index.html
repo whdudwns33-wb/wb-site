@@ -593,8 +593,10 @@
           '<span class="n">' + (nw ? '낱말 ' + nw : '') + (nw && nc ? ' · ' : '') + (nc ? '한자 ' + nc : '') + '</span><span class="muted">' + (open ? '▾' : '▸') + '</span></div>' +
           '<div class="bar stack"><i class="g" style="width:' + pct(p.graduated, p.total) + '%"></i><i style="width:' + pct(p.planted - p.graduated, p.total) + '%"></i></div>';
         if (open) {
-          html += '<div class="unit-body"><div class="row" style="margin-bottom:10px">' +
-            '<button class="btn primary small" data-act="learn">새로 배우기</button>' +
+          html += '<div class="unit-body"><button class="btn primary big" data-act="check" style="margin-bottom:8px">교재 점검 (' + Math.min(items.length, TRAIN_MAX) + '문항)</button>' +
+            (lastCheck(book.id, u.id) ? '<p class="muted" style="margin:-4px 0 8px;font-size:.74rem">' + checkLine(lastCheck(book.id, u.id)) + '</p>' : '') +
+            '<div class="row" style="margin-bottom:10px">' +
+            '<button class="btn small" data-act="learn">새로 배우기</button>' +
             '<button class="btn small" data-act="train"' + (p.planted ? '' : ' disabled') + '>이 단원 훈련</button>' +
             (nc ? '<button class="btn blue small" data-act="trace">✍️ 따라쓰기</button>' : '') + '</div>';
           if (ucs.length) html += '<div style="margin-bottom:8px">' + ucs.map(function (c) { return '<span class="cchip" data-ch="' + esc(c.ch) + '" title="' + esc(c.hun + ' ' + c.eum) + '">' + esc(c.ch) + '</span>'; }).join('') + '</div>';
@@ -623,7 +625,8 @@
         btn.addEventListener('click', function (e) {
           e.stopPropagation();
           db.settings.book = book.id; db.settings.unit = uid; save();
-          if (btn.dataset.act === 'learn') learnStart(book, uid);
+          if (btn.dataset.act === 'check') trainStart({ mode: 'check', book: book.id, unit: uid });
+          else if (btn.dataset.act === 'learn') learnStart(book, uid);
           else if (btn.dataset.act === 'train') trainStart({ mode: 'unit', book: book.id, unit: uid });
           else render('chars');
         });
@@ -1250,19 +1253,41 @@
     el.innerHTML = '<h2 class="sec" style="margin-top:6px">점검 <small>교재로 공부한 것을 확인하고, 잊을 때쯤 다시 꺼내요</small></h2>' +
       '<div class="card" style="border-color:#E4B8B0;background:#FFF9F5"><b style="color:var(--ink-strong)">교재 점검</b>' +
       '<p class="muted" style="margin:2px 0 10px;font-size:.8rem">종이 교재로 공부한 단원을 그대로 확인해요 — 앱에서 「새로 배우기」를 하지 않은 낱말도 바로 나와요.</p>' +
+      (LIB.index.length
+        ? '<select class="sel" id="tmCkBook" aria-label="점검할 단어장" style="width:100%;margin-bottom:8px">' + LIB.index.map(function (e) {
+            return '<option value="' + esc(e.id) + '"' + (book && e.id === book.id ? ' selected' : '') + '>' + esc(e.title) + (e.mine ? ' (배정)' : '') + '</option>';
+          }).join('') + '</select>'
+        : '') +
       (book && units.length
         ? '<div class="row"><select class="sel" id="tmCkUnit" aria-label="점검할 단원">' + units.map(function (u) {
             var un = itemsOf(book, u.id).length, uc = lastCheck(book.id, u.id);
             return '<option value="' + esc(u.id) + '"' + (ckUnit && u.id === ckUnit.id ? ' selected' : '') + '>' + esc(u.title) + ' (' + un + (uc ? ' · 지난 점검 ' + pct(uc.right, uc.n) + '%' : '') + ')</option>';
           }).join('') + '</select><button class="btn primary" id="tmCk"' + (ckItems.length ? '' : ' disabled') + '>점검 시작 (' + Math.min(ckItems.length, TRAIN_MAX) + ')</button></div>' +
           '<p class="muted" style="margin:8px 0 0;font-size:.78rem">' + esc(book.title) + (ck ? ' · ' + checkLine(ck) : ' · 이 단원은 아직 점검 전이에요') + '</p>'
-        : '<p class="muted" style="margin:0">단어장을 먼저 골라 주세요 — 「단어장」 탭에서 교재를 고르면 단원이 나와요.</p>') + '</div>' +
+        : '<p class="muted" style="margin:0">단어장을 받는 중이에요…</p>') +
+      (book ? '<div class="row" style="margin-top:8px"><button class="btn small" id="tmCkLearn">새로 배우기</button><button class="btn small" id="tmCkAll">단어장 전체 점검</button></div>' : '') + '</div>' +
       '<div class="card"><b style="color:var(--ink-strong)">오늘 복습</b><p class="muted" style="margin:2px 0 10px">잊기 직전의 낱말·한자 ' + due.length + '개 (모든 단어장)</p><button class="btn primary big" id="tmDue"' + (due.length ? '' : ' disabled') + '>복습 시작</button></div>' +
       (book ? '<div class="card"><b style="color:var(--ink-strong)">' + esc(book.title) + '</b>' +
         '<div class="row" style="margin-top:10px"><button class="btn" id="tmUnit"' + (unitP && unitP.planted ? '' : ' disabled') + '>' + esc(unit ? unit.title : '단원') + ' (' + (unitP ? unitP.planted : 0) + ')</button>' +
         '<button class="btn" id="tmBook"' + (bookP.planted ? '' : ' disabled') + '>단어장 전체 (' + bookP.planted + ')</button></div>' +
         '<div class="row" style="margin-top:8px"><button class="btn" id="tmChars"' + (charP.planted ? '' : ' disabled') + '>한자만 (' + charP.planted + ')</button><button class="btn ghost" id="tmPick">단어장 바꾸기</button></div>' +
         '<p class="muted" style="margin:8px 0 0;font-size:.78rem">배운 것(심은 것)만 훈련해요. 계단이 오를수록 뜻 고르기 → 빈칸·한자 조립 → 낱말 쓰기로 어려워져요.</p></div>' : '');
+    var ckBook = $('#tmCkBook');
+    if (ckBook) ckBook.addEventListener('change', function () {
+      /* 교재를 바꾸면 그 책을 받아 현재 단어장으로 삼는다 — 단원은 그 책의 첫 단원부터 */
+      var id = ckBook.value;
+      db.settings.book = id; db.settings.unit = ''; save();
+      ckBook.disabled = true;
+      toast('단어장을 받는 중이에요…');   /* 큰 교재는 몇 초 걸린다 — 빈 카드만 보이면 고장으로 읽힌다 */
+      openBook(id).then(function (nb) {
+        if (nb && unitsOf(nb)[0]) { db.settings.unit = unitsOf(nb)[0].id; save(); }
+        render('train');
+      }).catch(function () { toast('단어장을 받지 못했어요 — 학원 와이파이에서 다시 열어 주세요'); render('train'); });
+    });
+    var ckLearn = $('#tmCkLearn');
+    if (ckLearn) ckLearn.addEventListener('click', function () { learnStart(book, ckSel ? ckSel.value : (ckUnit && ckUnit.id)); });
+    var ckAll = $('#tmCkAll');
+    if (ckAll) ckAll.addEventListener('click', function () { trainStart({ mode: 'book', book: book.id }); });
     var ckSel = $('#tmCkUnit');
     if (ckSel) ckSel.addEventListener('change', function () { db.settings.unit = ckSel.value; save(); trainMenu(el); });   /* 고른 단원이 오늘 화면과 어긋나지 않게 같이 옮긴다 */
     var ckGo = $('#tmCk'); if (ckGo) ckGo.addEventListener('click', function () { trainStart({ mode: 'check', book: book.id, unit: ckSel ? ckSel.value : ckUnit.id }); });

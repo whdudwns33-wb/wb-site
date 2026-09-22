@@ -275,4 +275,28 @@ t('검사를 다시 돌려도 끌어낸 글자 표시가 남는다 — 앱은 �
   assert.strictEqual(unitItems, 2, '단원 항목 수가 서버 셈과 다르다: ' + unitItems);
 });
 
+t('훈음 없는 한자 표기도 왕복한다 — 그런 교재가 통째로 안 열리던 자리', () => {
+  /* 중학·수능 어휘 교재는 낱말에 한자 표기만 있고 훈음이 없다. 그래서 끌어낸 글자의 훈음이 빈 채로 저장되는데,
+     앱은 단어장을 열 때마다 checkBook 을 다시 돌린다. 두 번째 검사에서 그것을 오류로 막으면
+     학생 화면에서 그 교재가 사라진다 — 실제로 운영에서 두 권(오류 587·627건)이 안 열리고 있었다. */
+  const raw = { id: 'ng-1', title: '훈음 없음', units: [{ id: 'u1', title: '1강' }],
+    words: [{ unit: 'u1', word: '염치', meaning: '부끄러움을 아는 마음', hanja: '廉恥' }] };
+  const one = B.checkBook(raw);
+  assert.ok(one.ok, JSON.stringify(one.errors));
+  const pulled = one.book.chars.filter((c) => c.derived);
+  assert.strictEqual(pulled.length, 2, '한자 표기에서 글자를 못 끌어냈다');
+  assert.ok(pulled.every((c) => !c.hun && !c.eum), '훈음이 없어야 하는 자리다');
+
+  const two = B.checkBook(JSON.parse(JSON.stringify(one.book)));
+  assert.deepStrictEqual(two.errors, [], '두 번째 검사에서 막혔다 — 학생 앱이 이 교재를 못 연다: ' + JSON.stringify(two.errors.slice(0, 3)));
+  assert.ok(two.ok);
+  assert.strictEqual(two.book.chars.length, 2);
+  assert.ok(two.warns.some((w) => /훈음/.test(w.message)), '훈음이 빈 것을 알리는 경고는 남아야 한다');
+
+  /* 직접 적은 글자는 여전히 훈음을 요구한다 — 그 책이 가르치는 항목이라 */
+  const explicit = B.checkBook({ id: 'ng-2', title: '직접', units: [{ id: 'u1', title: '1강' }],
+    chars: [{ ch: '山', unit: 'u1' }] });
+  assert.ok(!explicit.ok, '직접 적은 글자의 빠진 훈음이 통과했다');
+});
+
 console.log(`\nOK — ${passed}개 통과`);
