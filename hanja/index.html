@@ -441,12 +441,21 @@
   var VIEWS = { home: renderHome, books: renderBooks, words: renderWords, chars: renderChars, train: renderTrain, report: renderReport };
   /* 낱말 탭·한자 탭은 지금 단어장에 그것이 있을 때만 띄운다 — 국어 어휘 교재(고유어만)에서 빈 한자 탭이 떠 있으면
      앱이 한자만 하는 것처럼 보이고, 한자 급수 교재에서 빈 낱말 탭이 떠 있으면 학생이 헛걸음한다. */
+  /* 트랙 — 이 단어장이 가르치는 것이 낱말인가 글자인가.
+     'voca' = 한글 어휘·한자어(교재·교과 어휘) · 'hanja' = 글자 자체(급수 배정한자).
+     낱말이 하나라도 있으면 어휘 트랙이다. 한자어의 한자는 낱말에 딸린 참고지 그 책의 학습 목표가 아니다. */
+  function trackOf(book) { return book && book.words.length ? 'voca' : 'hanja'; }
+  function trackLabel(track) { return track === 'hanja' ? '한자' : '어휘'; }
+  /* 탭은 트랙을 따른다. 어휘 트랙에서는 한자 탭을 내린다 — 목록·탭이 온통 한자면 어휘 앱이 한자 앱으로 읽힌다.
+     내려도 화면 자체는 살아 있다: 낱말 카드의 「한자 따라쓰기」와 낱말 탭 단원의 「따라쓰기」가 그리로 보낸다. */
   function syncTabs() {
     var b = curBookId() ? bookOf(curBookId()) : null;
-    var has = { words: !b || !!b.words.length, chars: !b || !!b.chars.length };
+    var explicit = !b || b.chars.some(function (c) { return !c.derived; });   /* 직접 적은 글자 = 그 책이 가르치는 글자 */
+    var has = { words: !b || !!b.words.length, chars: !b || !!b.chars.length, tabChars: explicit };
     document.querySelectorAll('.tabbar button').forEach(function (btn) {
       var v = btn.dataset.view;
-      if (v === 'words' || v === 'chars') btn.hidden = !has[v];
+      if (v === 'words') btn.hidden = !has.words;
+      if (v === 'chars') btn.hidden = !has.tabChars;
     });
     return has;
   }
@@ -567,6 +576,7 @@
         '<div style="flex:1;min-width:0"><b>' + esc(e.title) + '</b>' +
         '<span class="muted" style="font-size:.78rem">' + (e.source === 'own' ? '자체 · ' : '교재 · ') + (e.publisher ? esc(e.publisher) + ' · ' : '') + (e.level ? e.level + ' · ' : '') +
         '낱말 ' + (e.counts ? e.counts.words : 0) + ' · 한자 ' + (e.counts ? e.counts.chars : 0) + ' · 단원 ' + (e.units ? e.units.length : 0) + '</span>' +
+        ' <span class="chip ' + (e.counts && e.counts.words ? 't-h' : 't-c') + '">' + (e.counts && e.counts.words ? '어휘' : '한자') + '</span>' +
         (e.mine ? ' <span class="chip t-a">선생님 배정</span>' : '') + (e.sample ? ' <span class="chip t-g">WB 기본</span>' : '') + (e.local ? ' <span class="chip t-n">내 어휘장</span>' : '') +
         (p && p.planted ? '<div class="bar stack"><i class="g" style="width:' + pct(p.graduated, p.total) + '%"></i><i style="width:' + pct(p.planted - p.graduated, p.total) + '%"></i></div>' : '') +
         '</div><span class="muted">' + (e.id === bid ? '✔' : '›') + '</span></div>';
@@ -825,7 +835,8 @@
         '<div class="row" style="margin-bottom:8px">' +
         '<button class="btn primary small" data-wcheck="' + esc(u.id) + '">교재 점검</button>' +
         (fresh.length ? '<button class="btn small" data-wlearn="' + esc(u.id) + '">새로 배우기 (' + Math.min(fresh.length, LEARN_MAX) + ')</button>' : '') +
-        (p.planted ? '<button class="btn small" data-wtrain="' + esc(u.id) + '">이 단원 훈련</button>' : '') + '</div>' +
+        (p.planted ? '<button class="btn small" data-wtrain="' + esc(u.id) + '">이 단원 훈련</button>' : '') +
+        (unitChars(book, u.id).length ? '<button class="btn blue small" data-wtrace="' + esc(u.id) + '">✍️ 한자</button>' : '') + '</div>' +
         (uck ? '<p class="muted" style="margin:-2px 0 8px;font-size:.74rem">' + checkLine(uck) + '</p>' : '');
       ws.forEach(function (i) {
         html += '<div class="wrow" data-wid="' + esc(i.sid) + '"><span class="dot ' + dotClass(i) + '"></span><span class="w">' + esc(i.w.word) + '</span>' +
@@ -840,6 +851,10 @@
     el.querySelectorAll('[data-wlearn]').forEach(function (b2) { b2.addEventListener('click', function () { learnStart(book, b2.dataset.wlearn, 'word'); }); });
     el.querySelectorAll('[data-wtrain]').forEach(function (b2) { b2.addEventListener('click', function () { trainStart({ mode: 'unit', book: book.id, unit: b2.dataset.wtrain, only: 'word' }); }); });
     el.querySelectorAll('[data-wcheck]').forEach(function (b2) { b2.addEventListener('click', function () { trainStart({ mode: 'check', book: book.id, unit: b2.dataset.wcheck, only: 'word' }); }); });
+    el.querySelectorAll('[data-wtrace]').forEach(function (b2) { b2.addEventListener('click', function () {
+      render('chars');                                   /* 한자 탭이 내려가 있어도 화면은 열린다 */
+      traceOpen(unitChars(book, b2.dataset.wtrace).map(function (c) { return c.ch; }));
+    }); });
   }
   function renderChars() {
     var el = $('#view-chars');
@@ -1284,12 +1299,19 @@
     var week = 0, weekOk = 0; db.log.forEach(function (l) { if (t - l.t < 7 * DAY && l.k === 'train') { week += 1; if (l.ok) weekOk += 1; } });
     var traced = Object.keys(db.trace).length;
     var cks = Object.keys(db.checks).map(function (k) { return db.checks[k]; }).filter(function (c) { return c && c.n; }).sort(function (a, b) { return (b.at || 0) - (a.at || 0); }).slice(0, 12);
+    /* 한자 트랙 단어장(급수 배정한자)의 진도 — 기기에 받아 둔 것만 셀 수 있다(본문이 있어야 글자 목록을 안다) */
+    var geup = LIB.index.map(function (e) { return bookOf(e.id); }).filter(function (b) { return b && trackOf(b) === 'hanja' && b.chars.length; })
+      .map(function (b) { return { title: b.title, total: b.chars.length, planted: progressOf(itemsOf(b, null, { allChars: true })).planted, graduated: progressOf(itemsOf(b, null, { allChars: true })).graduated }; });
     el.innerHTML = '<h2 class="sec" style="margin-top:6px">내 기록</h2><div class="card"><div class="nums">' +
       '<div class="tn"><b>' + sum.words + '</b><span>낱말</span></div><div class="tn"><b>' + sum.chars + '</b><span>한자</span></div>' +
       '<div class="tn"><b>' + sum.graduated + '</b><span>장기 기억</span></div><div class="tn"><b>' + traced + '</b><span>써 본 한자</span></div></div>' +
       '<div class="kv" style="margin-top:12px"><span>이번 주 훈련 문항</span><b>' + week + (week ? ' (정답 ' + pct(weekOk, week) + '%)' : '') + '</b></div>' +
       '<div class="kv"><span>연속 학습일</span><b>' + ((db.streak && db.streak.count) || 0) + '일</b></div>' +
       '<div class="kv"><span>지금 복습할 것</span><b>' + sum.due + (sum.emergency ? ' (오래 방치 ' + sum.emergency + ')' : '') + '</b></div></div>' +
+      (geup.length ? '<h2 class="sec">급수 진도 <small>배정한자 가운데 장기 기억</small></h2><div class="card">' + geup.map(function (g) {
+        return '<div class="kv"><span>' + esc(g.title) + '</span><b>' + g.graduated + ' / ' + g.total + ' <span class="muted" style="font-weight:400">(배우는 중 ' + g.planted + ')</span></b></div>' +
+          '<div class="bar stack"><i class="g" style="width:' + pct(g.graduated, g.total) + '%"></i><i style="width:' + pct(g.planted - g.graduated, g.total) + '%"></i></div>';
+      }).join('') + '</div>' : '') +
       (cks.length ? '<h2 class="sec">교재 점검 <small>단원마다 마지막 점수</small></h2><div class="card">' + cks.map(function (c) {
         return '<div class="kv"><span>' + esc(c.title || c.unit) + ' <span class="muted" style="font-size:.76rem">' + esc(bookTitle(c.book)) + ' · ' + checkDate(c.at) + '</span></span><b' + (pct(c.right, c.n) < 60 ? ' style="color:var(--red)"' : '') + '>' + c.right + ' / ' + c.n + '</b></div>';
       }).join('') + '</div>' : '') +

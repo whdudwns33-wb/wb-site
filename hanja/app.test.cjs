@@ -135,4 +135,19 @@ t('교재 점검 — 종이 교재로 공부한 단원을 앱에서 안 배웠�
   assert.ok(/checkCell\(s\.lastCheck\)/.test(admin) && /checkCell\(r\.check\)/.test(admin), '현황·진도표에 점검 칸이 없다');
 });
 
+t('트랙 분리 — 어휘 단어장에서는 한자 탭을 내리고, 글자는 낱말에 딸린 길로 들어간다', () => {
+  /* 원장 지적: 「한자 어플 느낌이 강하다.」 국어 어휘 교재도 한자어의 글자를 끌어내므로, 글자가 있다는 이유로
+     한자 탭을 띄우면 목록도 탭도 온통 한자가 된다. 트랙(낱말이 있으면 어휘)으로 갈라 탭을 정한다. */
+  assert.ok(/function trackOf/.test(app), '트랙 판정이 없다');
+  assert.ok(/b\.chars\.some\(function \(c\) \{ return !c\.derived; \}\)/.test(app), '한자 탭이 「직접 적은 글자」를 보지 않는다');
+  const sync = app.slice(app.indexOf('function syncTabs'), app.indexOf('function render('));
+  assert.ok(/tabChars/.test(sync), '탭 표시와 화면 유무를 가르지 않았다 — 탭을 내리면 따라쓰기까지 막힌다');
+  /* 내려도 길은 남는다: 낱말 탭 단원의 따라쓰기 */
+  assert.ok(/data-wtrace=/.test(app) && /traceOpen\(unitChars\(/.test(app), '낱말 탭에서 그 단원 한자를 쓸 길이 없다');
+  /* 목록에 트랙 딱지 */
+  assert.ok(/'어휘' : '한자'/.test(app), '단어장 목록에 트랙 딱지가 없다');
+  /* 기록은 어휘 진도와 급수 진도를 갈라 보여 준다 */
+  assert.ok(/급수 진도/.test(app) && /trackOf\(b\) === 'hanja'/.test(app), '기록에 급수 진도가 없다');
+});
+
 console.log(`\nOK — ${passed}개 통과`);
