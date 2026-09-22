@@ -410,13 +410,13 @@ await t('발송 — 그 호의 학년대가 있는 가정만, 410 이면 구독 
   store.putPush('s:st-3', { endpoint: 'https://p/gone' });          // 7세 → K, 410 응답
   const f = fakePush((u) => (u === 'https://p/gone' ? 410 : 201));
   const r = await sendLetterPushes({ store, push: PUSH, fetchFn: f, issue: SAMPLE, now: NOW });
-  assert.deepEqual(r, { sent: 2, skipped: 0, removed: 2 });
+  assert.deepEqual(r, { sent: 2, skipped: 0, removed: 2, failed: 0 });
   assert.deepEqual(f.calls.sort(), ['https://p/e2', 'https://p/gone', 'https://p/m']);
   assert.equal(store.getPush('s:ghost'), null); assert.equal(store.getPush('s:st-3'), null);
   /* 중등 전용 호 — 초3 가정에는 안 간다 */
   const onlyM = { ...clone(SAMPLE), sections: clone(SAMPLE).sections.filter((s) => Array.isArray(s.tiers) && s.tiers.length === 1 && s.tiers[0] === 'M') };
   const f2 = fakePush();
-  assert.deepEqual(await sendLetterPushes({ store, push: PUSH, fetchFn: f2, issue: onlyM, now: NOW }), { sent: 1, skipped: 1, removed: 0 });
+  assert.deepEqual(await sendLetterPushes({ store, push: PUSH, fetchFn: f2, issue: onlyM, now: NOW }), { sent: 1, skipped: 1, removed: 0, failed: 0 });
   assert.deepEqual(f2.calls, ['https://p/m']);
   assert.equal((await sendLetterPushes({ store, push: {}, fetchFn: f2, issue: SAMPLE })).reason, 'no-vapid');
 });
@@ -429,8 +429,15 @@ await t('발행 즉시 알림 — 지금 보이는 호를 처음 발행할 때 �
   const draft = { ...clone(SAMPLE), status: 'draft' };
   await admin({ path: '/api/letter/admin/issue', method: 'PUT', getBody: async () => ({ issue: draft }) });
   const pub = await admin({ path: '/api/letter/admin/publish', method: 'POST', getBody: async () => ({ id: SAMPLE.id, status: 'published' }), pushFetch: f });
-  assert.equal(pub.status, 200); assert.deepEqual(pub.body.push, { sent: 1, skipped: 0, removed: 0 });
+  assert.equal(pub.status, 200); assert.deepEqual(pub.body.push, { sent: 1, skipped: 0, removed: 0, failed: 0 });
   assert.ok(store.getIssue(SAMPLE.id).pushedAt, 'pushedAt 이 남는다');
+  const notified = clone(store.getIssue(SAMPLE.id));
+  await admin({ path: '/api/letter/admin/issue', method: 'PUT', getBody: async () => ({ issue: { ...notified.issue, title: '발행 후 제목 수정' } }) });
+  assert.equal(store.getIssue(SAMPLE.id).pushedAt, notified.pushedAt, '본문 저장은 발송 이력을 보존한다');
+  assert.deepEqual(store.getIssue(SAMPLE.id).pushResult, notified.pushResult);
+  assert.deepEqual((await pushDueIssues({ store, push: PUSH, fetchFn: f, now: NOW })).pushed, [], '편집 때문에 같은 호를 다시 알리지 않는다');
+  const listed = (await admin({ path: '/api/letter/admin/issues' })).body.issues[0];
+  assert.equal(listed.pushedAt, notified.pushedAt); assert.deepEqual(listed.pushResult, notified.pushResult, '목록에서도 발송 결과를 확인한다');
   /* 내렸다 다시 올려도 두 번 보내지 않는다 */
   await admin({ path: '/api/letter/admin/publish', method: 'POST', getBody: async () => ({ id: SAMPLE.id, status: 'draft' }) });
   const again = await admin({ path: '/api/letter/admin/publish', method: 'POST', getBody: async () => ({ id: SAMPLE.id, status: 'published' }), pushFetch: f });
@@ -451,7 +458,7 @@ await t('발행 즉시 알림 — 지금 보이는 호를 처음 발행할 때 �
   assert.equal(fut.body.push, null); assert.equal(f3.calls.length, 0);
   assert.deepEqual((await pushDueIssues({ store: s3, push: PUSH, fetchFn: f3, now: NOW })).pushed, [], '아직 발행일 전');
   const due = await pushDueIssues({ store: s3, push: PUSH, fetchFn: f3, now: Date.parse('2026-09-27T22:30:00Z') });   // 9/28 07:30 KST
-  assert.deepEqual(due.pushed, [{ id: SAMPLE.id, sent: 1, skipped: 0, removed: 0 }]);
+  assert.deepEqual(due.pushed, [{ id: SAMPLE.id, sent: 1, skipped: 0, removed: 0, failed: 0 }]);
   assert.deepEqual((await pushDueIssues({ store: s3, push: PUSH, fetchFn: f3, now: Date.parse('2026-09-28T22:30:00Z') })).pushed, [], '다음 날 다시 안 보낸다');
   assert.equal((await pushDueIssues({ store: s3, push: {}, fetchFn: f3, now: NOW })).reason, 'no-vapid');
   /* 다시 보내기 */
@@ -459,6 +466,89 @@ await t('발행 즉시 알림 — 지금 보이는 호를 처음 발행할 때 �
   assert.equal(re.status, 200); assert.equal(re.body.sent, 1); assert.equal(f.calls.length, 2);
   assert.equal((await call(s3, { who: ADMIN, push: PUSH, pushFetch: f3, path: '/api/letter/admin/push', method: 'POST', getBody: async () => ({ id: SAMPLE.id }), now: NOW })).status, 409, '발행일 전에는 못 보낸다');
   assert.deepEqual((await admin({ path: '/api/letter/admin/push', method: 'POST', getBody: async () => ({ id: SAMPLE.id }), push: {} })).body, { ok: false, reason: 'no-vapid' });
+});
+
+await t('알림 키가 없어도 즉시 발행은 저장된다 — 로컬과 after 훅 모두', async () => {
+  for (const queued of [false, true]) {
+    const store = memStore(); seed(store, { issue: false });
+    store.putIssue(SAMPLE.id, { issue: { ...clone(SAMPLE), status: 'draft' } }); store.putIssueIds([SAMPLE.id]);
+    const pending = [];
+    const r = await call(store, { who: ADMIN, path: '/api/letter/admin/publish', method: 'POST', push: {},
+      getBody: async () => ({ id: SAMPLE.id, status: 'published' }), ...(queued ? { after: (pr) => pending.push(pr) } : {}) });
+    assert.equal(r.status, 200); assert.equal(r.body.status, 'published');
+    assert.equal(store.getIssue(SAMPLE.id).issue.status, 'published', '응답 전에 발행이 저장된다');
+    await Promise.all(pending);
+    assert.equal(store.getIssue(SAMPLE.id).pushedAt, undefined, '키 없는 호출을 발송 완료로 기록하지 않는다');
+    assert.equal((await call(store, { path: '/api/letter/issues' })).body.issues.length, 1);
+  }
+});
+
+await t('KV 초당 1회 제한 — 저장 직후 발행과 after 결과를 재시도하고 대기 중 편집을 보존한다', async () => {
+  for (const queued of [false, true]) {
+    const store = memStore(); seed(store, { issue: false });
+    store.putPush('s:st-1', { endpoint: 'https://p/e2' });
+    const put = store.putIssue;
+    let lastWrite = -Infinity, limited = 0;
+    store.putIssue = (id, rec) => {
+      const time = Date.now();
+      if (time - lastWrite < 1000) {
+        limited += 1;
+        if (queued && rec.pushResult) {
+          const current = store.getIssue(id);
+          put(id, { ...current, issue: { ...current.issue, title: '재시도 대기 중 수정', status: 'draft' } });
+        }
+        throw new Error('KV PUT failed: 429 Too Many Requests');
+      }
+      lastWrite = time; put(id, rec);
+    };
+    await call(store, { who: ADMIN, path: '/api/letter/admin/issue', method: 'PUT', getBody: async () => ({ issue: { ...clone(SAMPLE), status: 'draft' } }) });
+    const pending = [], f = fakePush();
+    const r = await call(store, { who: ADMIN, path: '/api/letter/admin/publish', method: 'POST', push: PUSH, pushFetch: f,
+      getBody: async () => ({ id: SAMPLE.id, status: 'published' }), ...(queued ? { after: (pr) => pending.push(pr) } : {}) });
+    assert.equal(r.status, 200); assert.equal(r.body.status, 'published');
+    await Promise.all(pending);
+    const saved = store.getIssue(SAMPLE.id);
+    assert.equal(limited, 2, '저장→발행과 발행→결과 저장 모두 제한을 거쳤다');
+    assert.equal(f.calls.length, 1, '저장 재시도가 푸시를 다시 보내지는 않는다');
+    assert.ok(saved.pushedAt); assert.equal(saved.pushResult.sent, 1);
+    assert.equal(saved.issue.status, queued ? 'draft' : 'published');
+    if (queued) assert.equal(saved.issue.title, '재시도 대기 중 수정');
+  }
+  for (const message of ['KV PUT failed: 429 Too Many Requests', 'KV PUT failed: 500 Internal Server Error']) {
+    const store = memStore(); let attempts = 0;
+    store.putIssue = () => { attempts += 1; throw new Error(message); };
+    await assert.rejects(call(store, { who: ADMIN, path: '/api/letter/admin/issue', method: 'PUT', getBody: async () => ({ issue: clone(SAMPLE) }) }), (error) => error.message === message);
+    assert.equal(attempts, message.includes('429') ? 2 : 1, '429만 한 번 재시도하고 나머지 오류는 그대로 전달한다');
+  }
+});
+
+await t('알림 429·503·통신 오류는 실패로 표시하고 기존 다시 보내기로 재발송한다', async () => {
+  for (const status of [429, 503, 'network']) {
+    const store = memStore(); seed(store);
+    store.putPush('s:st-1', { endpoint: 'https://p/e2' });
+    const failed = async () => { if (status === 'network') throw new Error('offline'); return { status }; };
+    const r = await pushDueIssues({ store, push: PUSH, fetchFn: failed, now: NOW });
+    assert.equal(r.pushed[0].sent, 0); assert.equal(r.pushed[0].failed, 1);
+    assert.ok(store.getPush('s:st-1'), '일시 실패 구독은 삭제하지 않는다');
+    const list = await call(store, { who: ADMIN, path: '/api/letter/admin/issues' });
+    assert.equal(list.body.issues[0].pushResult.failed, 1);
+    const retry = await call(store, { who: ADMIN, path: '/api/letter/admin/push', method: 'POST', getBody: async () => ({ id: SAMPLE.id }), push: PUSH, pushFetch: fakePush() });
+    assert.equal(retry.body.sent, 1); assert.equal(retry.body.failed, 0);
+  }
+});
+
+await t('알림이 끝나기 전에 수정·내린 본문을 발송 결과 저장이 덮지 않는다', async () => {
+  const store = memStore(); seed(store);
+  store.putPush('s:st-1', { endpoint: 'https://p/e2' });
+  let release; const gate = new Promise((resolve) => { release = resolve; });
+  const pending = [];
+  await call(store, { who: ADMIN, path: '/api/letter/admin/publish', method: 'POST', getBody: async () => ({ id: SAMPLE.id, status: 'published' }),
+    push: PUSH, pushFetch: async () => { await gate; return { status: 201 }; }, after: (pr) => pending.push(pr) });
+  await call(store, { who: ADMIN, path: '/api/letter/admin/issue', method: 'PUT', getBody: async () => ({ issue: { ...clone(SAMPLE), title: '발송 중 수정', status: 'draft' } }) });
+  release(); await Promise.all(pending);
+  assert.equal(store.getIssue(SAMPLE.id).issue.title, '발송 중 수정');
+  assert.equal(store.getIssue(SAMPLE.id).issue.status, 'draft');
+  assert.equal(store.getIssue(SAMPLE.id).pushResult.sent, 1);
 });
 
 /* ── 주제 달력 ── */

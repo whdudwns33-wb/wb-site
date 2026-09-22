@@ -12,15 +12,17 @@ const auth = (code) => ({ code, token: code });
 const state = (id, at = 1000) => { const s = SC.blank(at); s.band = 'G3'; if (id) SC.record(s, id, { band: 'G3', score: 90 }, at); return s; };
 const response = (body, status = 200) => ({ ok: status < 400, status, json: async () => clone(body) });
 const deferred = () => { let resolve; const promise = new Promise((r) => { resolve = r; }); return { promise, resolve }; };
+/* 실행 속도와 무관하게 두 저장이 같은 밀리초에 일어나도록 한다. */
+class FixedDate extends Date { static now() { return 1800000000000; } }
 
-function app({ code = 'stu-a', family, local = new Map(), records = {}, fetchHook, clock = Date } = {}) {
+function app({ code = 'stu-a', family, local = new Map(), records = {}, fetchHook } = {}) {
   if (code) local.set('wbr.auth', JSON.stringify(auth(code)));
   const nodes = {}, calls = [], timers = new Map(); let serial = 0, offline = false;
   const context = vm.createContext({
     WBCHUNK: R, WBCHUNK_SCHED: SC, WBCHUNK_LESSONS: [], WBCHUNK_PASSAGES: [],
     localStorage: { getItem: (k) => local.get(k) || null, setItem: (k, v) => local.set(k, v), removeItem: (k) => local.delete(k) },
     document: { getElementById: (id) => nodes[id] || (nodes[id] = {}) },
-    location: { search: family ? '?t=' + family : '' }, navigator: { platform: 'test' }, URLSearchParams, Date: clock,
+    location: { search: family ? '?t=' + family : '' }, navigator: { platform: 'test' }, URLSearchParams, Date: FixedDate,
     setTimeout: (f) => { timers.set(++serial, f); return serial; }, clearTimeout: (id) => timers.delete(id),
     fetch: async (url, opt) => {
       const request = { url, method: opt.method || 'GET', body: opt.body ? JSON.parse(opt.body) : null };
@@ -86,14 +88,16 @@ function app({ code = 'stu-a', family, local = new Map(), records = {}, fetchHoo
   assert.equal(lost.nodes.savetxt.textContent, '저장됨', 'PUT 응답 유실도 동일 기록을 GET하면 복구한다');
 
   const writing = deferred(); let firstPut = true;
-  const during = app({ clock: class extends Date { static now() { return 5000; } }, fetchHook: (req) => {
+  const during = app({ fetchHook: (req) => {
     if (req.method !== 'PUT' || !firstPut) return null;
     firstPut = false; during.records['stu-a'] = { state: clone(req.body.state), updatedAt: 'first-put' };
     return writing.promise;
   } });
   await during.api.pullState(); SC.record(during.api.state, 'before-send', { score: 90, band: 'G3' }, 1000); during.api.save();
+  const sentAt = during.api.state.updatedAt;
   const inFlight = during.api.pullState(); await during.flush();
   SC.record(during.api.state, 'while-sending', { score: 90, band: 'G3' }, 2000); during.api.save();
+  assert.equal(during.api.state.updatedAt, sentAt, '학습 시각이 같아도 PUT 중 새 저장을 놓치면 안 된다');
   writing.resolve(response({ ok: true, updatedAt: 'first-put' })); await inFlight;
   assert.equal(during.api.meta.dirty, true); assert.ok(during.timers.size > 0, 'PUT 중 새 학습은 다시 저장 예약');
   await during.api.pullState();
