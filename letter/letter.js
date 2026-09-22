@@ -46,7 +46,7 @@ var WBLETTER = (function () {
      기억에 남고(간격을 둔 반복) 가족 대화도 매일 한 토막씩 생긴다. 발행일이 1일째, 요일은 실제 날짜에서 센다.
      잠그지는 않는다 — 주말에 몰아 보는 가정도 있고, 지난 장을 다시 여는 것이 곧 복습이다. */
   var DAY_PLAN = [
-    { day: 1, name: '읽을거리', sub: '이번 주 글을 읽고, 시 한 편을 소리 내어 읽어요', parts: ['lead', 'read-text', 'poem', 'talk'] },
+    { day: 1, name: '읽을거리', sub: '이번 주 글을 읽어요 — 시와 가족 대화는 여유 있을 때', parts: ['lead', 'read-text', 'poem', 'talk'] },
     { day: 2, name: '읽고 답해요', sub: '어제 읽은 글로 문제를 풀고 한 문장으로 요약해요', parts: ['read-quiz', 'write'] },
     { day: 3, name: '한자 코너', sub: '낱말 가족을 익히고 손으로 써 봐요', parts: ['words', 'cloze'] },
     { day: 4, name: '두뇌 놀이터', sub: '머리를 쓰는 놀이를 해요', parts: ['brain'] },
@@ -67,6 +67,19 @@ var WBLETTER = (function () {
   var CIRCLED = ['①', '②', '③', '④', '⑤'];
   var DOWS = ['일', '월', '화', '수', '목', '금', '토'];
   var ISSUE_MAX_BYTES = 400 * 1024;
+
+  /* 저장된 답은 원본 보기 번호다. 화면·인쇄만 같은 순서로 섞어 기존 기록의 뜻을 바꾸지 않는다. */
+  function choiceOrder(q, sid, qi) {
+    var order = (q.choices || []).map(function (_, i) { return i; });
+    var seed = 2166136261, key = sid + ':' + qi + ':' + q.q;
+    for (var k = 0; k < key.length; k += 1) seed = Math.imul(seed ^ key.charCodeAt(k), 16777619) >>> 0;
+    for (var i = order.length - 1; i > 0; i -= 1) {
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+      var j = Math.floor(seed / 4294967296 * (i + 1)), tmp = order[i]; order[i] = order[j]; order[j] = tmp;
+    }
+    return order;
+  }
+  function choiceMark(q, sid, qi, original) { return CIRCLED[choiceOrder(q, sid, qi).indexOf(original)] || ''; }
 
   function pad2(n) { return (n < 10 ? '0' : '') + n; }
   function isObj(v) { return !!v && typeof v === 'object' && !Array.isArray(v); }
@@ -360,6 +373,12 @@ var WBLETTER = (function () {
         strList(s.items, 'items', 1, 10, 400);
       } else if (s.type === 'checklist') {
         strList(s.items, 'items', 1, 8, 200);
+        if (s.itemTiers != null) {
+          if (!Array.isArray(s.itemTiers) || !Array.isArray(s.items) || s.itemTiers.length !== s.items.length) E(tag, 'itemTiers 는 items 와 길이가 같은 배열');
+          else s.itemTiers.forEach(function (ts, n) {
+            if (ts !== 'all' && (!Array.isArray(ts) || !ts.length || ts.some(function (t) { return typeof t !== 'string' || TIER_IDS.indexOf(t) < 0; }) || new Set(ts).size !== ts.length)) E(tag, 'itemTiers[' + n + '] 는 "all" 또는 중복 없는 학년대 배열');
+          });
+        }
       } else if (s.type === 'poem') {
         /* 시는 연 사이에 빈 줄이 있다 — 빈 문자열을 연 나누기로 허용하되 전부 비면 안 된다 */
         if (!Array.isArray(s.lines) || s.lines.length < 1 || s.lines.length > 24) E(tag, 'lines 는 1~24줄');
@@ -503,8 +522,9 @@ var WBLETTER = (function () {
     if (!src) return '';
     var dim = Number.isInteger(img.w) && Number.isInteger(img.h) && img.w > 0 && img.h > 0;
     /* 크기를 알면 자리를 먼저 잡아 사진이 오는 동안 글이 튀지 않는다(패드에서 특히 눈에 띈다). 앱에서는 눌러 크게 본다(index.html 의 돋보기) */
-    return '<figure class="np-photo' + (cls ? ' ' + cls : '') + '"' + (o.mode === 'print' ? '' : ' data-zoom="1"') + '><img src="' + esc(src) + '" alt="' + esc(img.alt) + '" loading="lazy" decoding="async"' +
+    return '<figure class="np-photo' + (cls ? ' ' + cls : '') + '">' + (o.mode === 'print' ? '' : '<button type="button" class="np-zoom" data-zoom="1" aria-label="사진 크게 보기: ' + esc(img.alt) + '">') + '<img src="' + esc(src) + '" alt="' + esc(img.alt) + '" loading="' + (o.mode === 'print' ? 'eager' : 'lazy') + '" decoding="async"' +
       (dim ? ' width="' + img.w + '" height="' + img.h + '" style="aspect-ratio:' + img.w + '/' + img.h + '"' : '') + '>' +
+      (o.mode === 'print' ? '' : '</button>') +
       '<figcaption>' + esc(img.caption || '') + (img.credit ? '<span class="np-credit">' + esc(img.credit) + '</span>' : '') + '</figcaption></figure>';
   }
   function gallery(list, o) {
@@ -541,14 +561,15 @@ var WBLETTER = (function () {
         var picked = st.quiz && st.quiz[s.id + ':' + qi];
         var done = typeof picked === 'number';
         h += '<div class="np-q"><p class="np-qq"><span class="np-qn">' + (qi + 1) + '</span>' + esc(q.q) + '</p><div class="np-choices">';
-        (q.choices || []).forEach(function (c, ci) {
+        choiceOrder(q, s.id, qi).forEach(function (ci, shown) {
+          var c = q.choices[ci];
           var cls = 'np-choice' + (done ? (ci === q.answer ? ' ok' : (ci === picked ? ' no' : ' dim')) : '');
-          if (o.mode === 'print') h += '<div class="np-choice static">' + CIRCLED[ci] + ' ' + esc(c) + '</div>';
-          else h += '<button type="button" class="' + cls + '" data-q="' + esc(s.id) + ':' + qi + ':' + ci + '"' + (done ? ' disabled' : '') + '>' + CIRCLED[ci] + ' ' + esc(c) + '</button>';
+          if (o.mode === 'print') h += '<div class="np-choice static">' + CIRCLED[shown] + ' ' + esc(c) + '</div>';
+          else h += '<button type="button" class="' + cls + '" data-q="' + esc(s.id) + ':' + qi + ':' + ci + '"' + (done ? ' disabled' : '') + '>' + CIRCLED[shown] + ' ' + esc(c) + '</button>';
         });
         h += '</div>';
         if (o.mode === 'print') h += '<div class="np-blank">답 ______</div>';
-        else if (done) h += '<div class="np-why ' + (picked === q.answer ? 'ok' : 'no') + '">' + (picked === q.answer ? '맞았어요! ' : '정답은 ' + CIRCLED[q.answer] + '이에요. ') + esc(q.why || '') + '</div>';
+        else if (done) h += '<div class="np-why ' + (picked === q.answer ? 'ok' : 'no') + '" data-feedback="' + esc(s.id) + ':' + qi + '" tabindex="-1">' + (picked === q.answer ? '맞았어요! ' : '정답은 ' + choiceMark(q, s.id, qi, q.answer) + '이에요. ') + esc(q.why || '') + '</div>';
         h += '</div>';
       });
       h += '</div>';
@@ -593,7 +614,7 @@ var WBLETTER = (function () {
       if (Array.isArray(it.grid) && it.grid.length) h += '<pre class="np-grid">' + it.grid.map(esc).join('\n') + '</pre>';
       if (o.mode === 'print') h += '<div class="np-blank">답 ______</div>';
       else {
-        h += '<button type="button" class="np-reveal" data-ans="' + esc(key) + '">' + (open ? '정답 숨기기' : '정답 보기') + '</button>';
+        h += '<button type="button" class="np-reveal" data-ans="' + esc(key) + '" aria-expanded="' + (open ? 'true' : 'false') + '">' + (open ? '정답 숨기기' : '정답 보기') + '</button>';
         if (open) h += '<div class="np-ans">' + esc(answer) + (hint ? '<br><span class="np-ex">' + esc(hint) + '</span>' : '') + '</div>';
       }
       h += '</div>';
@@ -614,10 +635,16 @@ var WBLETTER = (function () {
   function renderNotice(s, tier, o) {
     return secOpen(s) + '<h2>' + esc(s.title) + '</h2>' + photo(s.image, o) + '<ul class="np-notes">' + (s.items || []).map(function (t) { return '<li>' + esc(t) + '</li>'; }).join('') + '</ul>' + gallery(s.images, o) + '</section>';
   }
+  function checklistItems(s, tier) {
+    return (s.items || []).map(function (text, index) { return { text: text, index: index }; }).filter(function (it) {
+      var ts = s.itemTiers && s.itemTiers[it.index];
+      return !tier || !ts || ts === 'all' || (Array.isArray(ts) && ts.indexOf(tier) >= 0);
+    });
+  }
   function renderChecklist(s, tier, o) {
     var st = o.state || {};
-    return secOpen(s) + '<h2>' + esc(s.title) + '</h2><ul class="np-cl">' + (s.items || []).map(function (t, i) {
-      var key = s.id + ':' + i, on = !!(st.checks && st.checks[key]);
+    return secOpen(s) + '<h2>' + esc(s.title) + '</h2><ul class="np-cl">' + checklistItems(s, tier).map(function (it) {
+      var t = it.text, key = s.id + ':' + it.index, on = !!(st.checks && st.checks[key]);
       if (o.mode === 'print') return '<li><span class="np-box"></span> ' + esc(t) + '</li>';
       return '<li><label><input type="checkbox" data-chk="' + esc(key) + '"' + (on ? ' checked' : '') + '> <span' + (on ? ' class="done"' : '') + '>' + esc(t) + '</span></label></li>';
     }).join('') + '</ul></section>';
@@ -628,7 +655,7 @@ var WBLETTER = (function () {
     var SH = shapesLib();
     (issue.sections || []).forEach(function (s) {
       if (s.type === 'read' && Array.isArray(s.questions) && s.questions.length) {
-        rows += '<div class="np-krow"><b>' + esc(s.title) + '</b><ol>' + s.questions.map(function (q) { return '<li>' + CIRCLED[q.answer] + (q.why ? ' — ' + esc(q.why) : '') + '</li>'; }).join('') + '</ol></div>';
+        rows += '<div class="np-krow"><b>' + esc(s.title) + '</b><ol>' + s.questions.map(function (q, qi) { return '<li>' + choiceMark(q, s.id, qi, q.answer) + (q.why ? ' — ' + esc(q.why) : '') + '</li>'; }).join('') + '</ol></div>';
       }
       if (s.type === 'brain' && Array.isArray(s.items)) {
         rows += '<div class="np-krow"><b>' + esc(s.title) + '</b><ol>' + s.items.map(function (it) {
@@ -666,9 +693,9 @@ var WBLETTER = (function () {
     var h = secOpen(s) + '<h2>' + esc(s.title) + '</h2>';
     (s.prompts || []).forEach(function (pq, i) {
       var key = s.id + ':' + i, saved = st.write && typeof st.write[key] === 'string' ? st.write[key] : '';
-      h += '<div class="np-wq"><p class="np-qq"><span class="np-qn">' + (i + 1) + '</span>' + esc(pq.q) + '</p>' + (pq.hint ? '<p class="np-ex">' + esc(pq.hint) + '</p>' : '');
+      h += '<div class="np-wq"><p class="np-qq" id="write-label-' + esc(key) + '"><span class="np-qn">' + (i + 1) + '</span>' + esc(pq.q) + '</p>' + (pq.hint ? '<p class="np-ex">' + esc(pq.hint) + '</p>' : '');
       if (o.mode === 'print') h += '<div class="np-lines np-lines-tall"></div>';
-      else h += '<textarea class="np-ta" data-write="' + esc(key) + '" maxlength="300" rows="3" placeholder="여기에 써 보세요 (300자까지)">' + esc(saved) + '</textarea><div class="np-ta-note">쓰면 저절로 저장돼요. 7일째 되돌아보기에서 다시 볼 수 있어요.</div>';
+      else h += '<textarea class="np-ta" data-write="' + esc(key) + '" aria-labelledby="write-label-' + esc(key) + '" maxlength="300" rows="3" placeholder="여기에 써 보세요 (300자까지)">' + esc(saved) + '</textarea><div class="np-ta-note">쓰면 저절로 저장돼요. 7일째 되돌아보기에서 다시 볼 수 있어요.</div>';
       h += '</div>';
     });
     return h + '</section>';
@@ -713,12 +740,13 @@ var WBLETTER = (function () {
     items.forEach(function (q, qi) {
       var picked = st.quiz && st.quiz[sid + ':' + qi], done = typeof picked === 'number';
       h += '<div class="np-q"><p class="np-qq"><span class="np-qn">' + (qi + 1) + '</span>' + esc(q.q) + '</p><div class="np-choices">';
-      q.choices.forEach(function (c, ci) {
+      choiceOrder(q, sid, qi).forEach(function (ci, shown) {
+        var c = q.choices[ci];
         var cls = 'np-choice' + (done ? (ci === q.answer ? ' ok' : (ci === picked ? ' no' : ' dim')) : '');
-        if (o.mode === 'print') h += '<div class="np-choice static">' + CIRCLED[ci] + ' ' + esc(c) + '</div>';
-        else h += '<button type="button" class="' + cls + '" data-q="' + esc(sid) + ':' + qi + ':' + ci + '"' + (done ? ' disabled' : '') + '>' + CIRCLED[ci] + ' ' + esc(c) + '</button>';
+        if (o.mode === 'print') h += '<div class="np-choice static">' + CIRCLED[shown] + ' ' + esc(c) + '</div>';
+        else h += '<button type="button" class="' + cls + '" data-q="' + esc(sid) + ':' + qi + ':' + ci + '"' + (done ? ' disabled' : '') + '>' + CIRCLED[shown] + ' ' + esc(c) + '</button>';
       });
-      h += '</div>' + (o.mode !== 'print' && done ? '<div class="np-why ' + (picked === q.answer ? 'ok' : 'no') + '">' + (picked === q.answer ? '맞았어요! ' : '정답은 ' + CIRCLED[q.answer] + '이에요. ') + esc(q.why) + '</div>' : '') + '</div>';
+      h += '</div>' + (o.mode !== 'print' && done ? '<div class="np-why ' + (picked === q.answer ? 'ok' : 'no') + '" data-feedback="' + esc(sid) + ':' + qi + '" tabindex="-1">' + (picked === q.answer ? '맞았어요! ' : '정답은 ' + choiceMark(q, sid, qi, q.answer) + '이에요. ') + esc(q.why) + '</div>' : '') + '</div>';
     });
     return h + '</div></section>';
   }
@@ -731,7 +759,7 @@ var WBLETTER = (function () {
     var w = WISC[g.index] || { label: '', reading: '' };
     var h = '<section class="np-sec np-brain np-daily5" id="sec-daily-' + day + '"><div class="np-kicker">' + KICKER.daily + '</div><h2>' + esc(g.label) + '</h2>' +
       '<div class="np-idx"><b>' + esc(w.label) + '</b> ' + esc(g.index) + ' — ' + esc(w.reading) + '</div><p class="np-bp">' + esc(g.prompt) + '</p>' + DR.html(d);
-    if (o.mode !== 'print') { h += '<button type="button" class="np-reveal" data-ans="' + esc(key) + '">' + (open ? '정답 숨기기' : '정답 보기') + '</button>'; if (open) h += '<div class="np-ans">' + esc(g.answerText) + (g.hint ? '<br><span class="np-ex">' + esc(g.hint) + '</span>' : '') + '</div>'; }
+    if (o.mode !== 'print') { h += '<button type="button" class="np-reveal" data-ans="' + esc(key) + '" aria-expanded="' + (open ? 'true' : 'false') + '">' + (open ? '정답 숨기기' : '정답 보기') + '</button>'; if (open) h += '<div class="np-ans">' + esc(g.answerText) + (g.hint ? '<br><span class="np-ex">' + esc(g.hint) + '</span>' : '') + '</div>'; }
     return h + '</section>';
   }
   var RENDER = { read: renderRead, words: renderWords, brain: renderBrain, column: renderColumn, coach: renderCoach, notice: renderNotice, checklist: renderChecklist, news: renderNews, poem: renderPoem, talk: renderTalk, write: renderWrite, books: renderBooks, voices: renderVoices };
@@ -771,7 +799,8 @@ var WBLETTER = (function () {
     var again = !items.some(function (it) { return it.section || it.part === 'review'; });
     if (again) of('read').forEach(function (x) { items.push({ part: 'read', section: x, opts: { noQuiz: true } }); });
     if (plan.day < 7) items.push({ part: 'daily' });
-    return { day: plan.day, name: plan.name, sub: plan.sub, date: dayDate(issue, plan.day), dow: dayDow(issue, plan.day), items: items, again: again };
+    var noWords = plan.day === 3 && !items.some(function (it) { return it.part === 'words'; });
+    return { day: plan.day, name: noWords ? (again ? '다시 읽기' : '낱말 복습') : plan.name, sub: noWords ? '읽었던 글의 낱말을 다시 만나 봐요' : plan.sub, date: dayDate(issue, plan.day), dow: dayDow(issue, plan.day), items: items, again: again };
   }
   /* 7일째 — 내가 고른 답과 정답을 나란히. 안 푼 문제는 정답을 바로 보이지 않고 풀 기회를 남긴다 */
   function renderReview(view, tier, o) {
@@ -784,7 +813,7 @@ var WBLETTER = (function () {
           var picked = st.quiz && st.quiz[s.id + ':' + qi], done = typeof picked === 'number', ok = done && picked === q.answer;
           if (done) { answered += 1; if (ok) correct += 1; }
           if (!done) return '<li class="skip">아직 안 풀었어요 — 화요일 장에서 풀어 보세요</li>';
-          return '<li class="' + (ok ? 'ok' : 'no') + '">' + (ok ? '○ 정답 ' : '✕ 내 답 ' + CIRCLED[picked] + ' → 정답 ') + CIRCLED[q.answer] + (q.why ? ' <span class="np-ex">' + esc(q.why) + '</span>' : '') + '</li>';
+          return '<li class="' + (ok ? 'ok' : 'no') + '">' + (ok ? '○ 정답 ' : '✕ 내 답 ' + choiceMark(q, s.id, qi, picked) + ' → 정답 ') + choiceMark(q, s.id, qi, q.answer) + (q.why ? ' <span class="np-ex">' + esc(q.why) + '</span>' : '') + '</li>';
         }).join('') + '</ol></div>';
       }
       if (s.type === 'brain' && Array.isArray(s.items)) {
@@ -793,7 +822,7 @@ var WBLETTER = (function () {
           return '<li>' + esc(ans) + (hint ? ' <span class="np-ex">(' + esc(hint) + ')</span>' : '') + '</li>';
         }).join('') + '</ol></div>';
       }
-      if (s.type === 'checklist') (s.items || []).forEach(function (t, i) { cTotal += 1; if (st.checks && st.checks[s.id + ':' + i]) checks += 1; });
+      if (s.type === 'checklist') checklistItems(s, tier).forEach(function (it) { cTotal += 1; if (st.checks && st.checks[s.id + ':' + it.index]) checks += 1; });
     });
     var czTotal = 0, czOk = 0, writes = [];
     (view.sections || []).forEach(function (s) {
@@ -817,6 +846,10 @@ var WBLETTER = (function () {
     var h = '<article class="np np-daily" data-tier="' + esc(t || '') + '" data-day="' + pg.day + '">';
     h += '<div class="np-dhead"><div class="np-dmeta"><span>' + esc(issueNo(issue.week)) + '</span><span>' + pg.day + '일째</span>' + (pg.date ? '<span>' + esc(fmtDateKo(pg.date)) + '</span>' : '') + (issue.status === 'draft' ? '<span class="np-draft">초안</span>' : '') + '</div>' +
       '<h1 class="np-dtitle">' + esc(pg.name) + '</h1><p class="np-dsub">' + esc(pg.again ? '오늘은 다시 읽는 날 — 한 번 더 읽으면 더 잘 보여요' : pg.sub) + '</p></div>';
+    if (pg.day === 1) {
+      var extra = pg.items.filter(function (it) { return ['poem', 'talk', 'daily'].indexOf(it.part) >= 0; }).map(function (it) { return it.part === 'poem' ? '시 한 편' : it.part === 'talk' ? '가족 대화' : '오늘의 5분'; });
+      h += '<p class="np-howto"><b>오늘의 기본</b> · 읽을거리 한 편을 읽어요.' + (extra.length ? '<br><b>여유가 있으면</b> · ' + extra.join(' · ') + '도 해 보세요.' : '') + '</p>';
+    }
     pg.items.forEach(function (it) {
       if (it.part === 'lead') {
         h += '<div class="np-lead"><div class="np-kicker">이번 주 주제</div><h2 class="np-h1">' + esc(issue.title) + '</h2>' + (issue.theme ? '<p class="np-deck">' + esc(issue.theme) + '</p>' : '') +
@@ -835,12 +868,12 @@ var WBLETTER = (function () {
     return h + '</article>';
   }
   /* 7일 띠 — 오늘 장은 진하게, 마친 날은 ✓, 아직 오지 않은 날은 옅게(열 수는 있다) */
-  function renderDayStrip(issue, cur, today, state) {
+  function renderDayStrip(issue, cur, today, state, tier) {
     var st = state || {};
     return '<nav class="np-strip" aria-label="하루 한 장">' + DAY_PLAN.map(function (p) {
       var done = !!(st.days && st.days[p.day]);
       var cls = 'np-sday' + (p.day === cur ? ' cur' : '') + (done ? ' done' : '') + (p.day > today ? ' future' : '');
-      return '<button type="button" class="' + cls + '" data-day="' + p.day + '"' + (p.day === cur ? ' aria-current="page"' : '') + '><span class="np-sdow">' + esc(dayDow(issue, p.day) || String(p.day)) + '</span><span class="np-sname">' + esc(p.name) + '</span>' + (done ? '<span class="np-sok">✓</span>' : '') + '</button>';
+      return '<button type="button" class="' + cls + '" data-day="' + p.day + '"' + (p.day === cur ? ' aria-current="page"' : '') + '><span class="np-sdow">' + esc(dayDow(issue, p.day) || String(p.day)) + '</span><span class="np-sname">' + esc(tier && p.day === 3 ? dayPage(issue, tier, p.day).name : p.name) + '</span>' + (done ? '<span class="np-sok">✓</span>' : '') + '</button>';
     }).join('') + '</nav>';
   }
 
@@ -896,6 +929,7 @@ var WBLETTER = (function () {
     '.np-brain{border-top:6px solid var(--np-gold)!important}.np-brain .np-kicker{background:var(--np-gold);border-color:var(--np-gold);color:var(--np-ink)}',
     '.np-p{font-size:16.5px;margin:0 0 10px;text-align:justify;word-break:normal}.np-p.first::first-letter{font-size:1.15em;font-weight:900}.np[data-tier="K"] .np-read .np-p,.np[data-tier="E1"] .np-read .np-p{font-size:19px;line-height:1.9;text-align:left;word-break:keep-all}.np-lede{margin:0 0 10px;font-weight:700;color:var(--np-spot)}',
     '.np-photo{margin:0 0 12px}.np-photo img{width:100%;height:auto;display:block;border:1px solid var(--np-line);background:#fff}.np-photo figcaption{font-size:12.5px;color:var(--np-soft);padding:5px 0 6px;border-bottom:1px solid var(--np-line);display:flex;justify-content:space-between;gap:8px}.np-credit{font-size:11px;letter-spacing:.04em;white-space:nowrap}.np-cover{margin-top:10px}',
+    '.np-zoom{display:block;width:100%;border:0;padding:0;background:none;cursor:zoom-in}.np-cover figcaption{pointer-events:none}',
     '.np-gallery{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin:0 0 12px}.np-gallery .np-photo{margin:0}',
     '.np-boxhead{display:inline-block;font-size:11.5px;font-weight:900;letter-spacing:.06em;background:var(--np-ink);color:#fff;padding:1px 8px;margin-bottom:6px}',
     '.np-vocab{margin:8px 0 12px;padding:10px 12px 8px;border:1px dashed var(--np-rule);background:#fff}.np-vocab ul,.np-wl{margin:0;padding-left:18px}.np-vocab li,.np-wl li{margin:4px 0}.np-hanja{color:var(--np-soft);font-size:.9em}.np-ex{color:var(--np-soft);font-size:.92em}',
@@ -947,7 +981,7 @@ var WBLETTER = (function () {
     rotationFor: rotationFor, calendarEntry: calendarEntry, checkCalendar: checkCalendar,
     tierFromGrade: tierFromGrade, tierOf: tierOf, tierLabel: tierLabel, editionLabel: editionLabel,
     checkIssue: checkIssue, checkImage: checkImage, forTier: forTier, isVisible: isVisible, tiersOf: tiersOf, brief: brief, pickPilot: pickPilot, blankIssue: blankIssue,
-    renderIssue: renderIssue, renderKey: renderKey, imgSrc: imgSrc,
+    renderIssue: renderIssue, renderKey: renderKey, imgSrc: imgSrc, choiceOrder: choiceOrder, checklistItems: checklistItems,
     dayOf: dayOf, dayDate: dayDate, dayDow: dayDow, dayPage: dayPage, renderDay: renderDay, renderDayStrip: renderDayStrip, renderReview: renderReview,
     clozeFor: clozeFor, renderCloze: renderCloze, renderDaily: renderDaily, brainAnswer: brainAnswer,
   };
