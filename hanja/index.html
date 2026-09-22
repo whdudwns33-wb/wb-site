@@ -175,6 +175,7 @@
     <main>
       <section id="view-home"></section>
       <section id="view-books" hidden></section>
+      <section id="view-curriculum" hidden></section>
       <section id="view-words" hidden></section>
       <section id="view-chars" hidden></section>
       <section id="view-train" hidden></section>
@@ -265,7 +266,7 @@
   function checkKey(bookId, unitId) { return bookId + '|' + (unitId == null ? '' : unitId); }
   function lastCheck(bookId, unitId) { var c = db.checks[checkKey(bookId, unitId)]; return c && c.n ? c : null; }
   function putCheck(bookId, unitId, title, n, right, total, hinted, wrongIds, domains) {
-    db.checks[checkKey(bookId, unitId)] = { book: bookId, unit: unitId || '', title: String(title || '').slice(0, 60), n: n, right: right, at: now(), total: total, hinted: hinted || 0, wrongIds: (wrongIds || []).slice(0, TRAIN_MAX) };
+    db.checks[checkKey(bookId, unitId)] = { book: bookId, unit: unitId || '', title: String(title || '').slice(0, 60), n: n, right: right, at: now(), total: total, hinted: hinted || 0, wrongIds: (wrongIds || []).slice(0, WBBOOKCHECK.LIMITS.words) };
     if (domains) db.checks[checkKey(bookId, unitId)].domains = domains;
     var keys = Object.keys(db.checks);
     if (keys.length > CHECK_KEEP) {
@@ -417,7 +418,19 @@
   }
   function bookOf(id) { return LIB.books[id] || null; }
   function vocabularyBooks() { return LIB.index.filter(function (e) { return e.counts ? e.counts.words > 0 : !!(bookOf(e.id) && bookOf(e.id).words.length); }); }
-  function curBookId() { var list = vocabularyBooks(), id = db.settings.book; return list.some(function (e) { return e.id === id; }) ? id : (list[0] ? list[0].id : ''); }
+  function isCurriculum(e) { return !!(e && (e.curriculum || (e.source === 'own' && /교과/.test(e.title)))); }
+  function curriculumGrade(e) {
+    if (e.curriculum) return e.curriculum.grade;
+    var m = e.title.match(/(초|중|고)(?:등\s*)?([1-6])(?:학년)?/);
+    return m ? m[1] + m[2] : '';
+  }
+  function textbookBooks() { return vocabularyBooks().filter(function (e) { return !isCurriculum(e); }); }
+  function curBookId() {
+    var list = textbookBooks().sort(function (a, b) { return (a.mine ? 0 : a.sample ? 3 : a.local ? 2 : 1) - (b.mine ? 0 : b.sample ? 3 : b.local ? 2 : 1); }), id = db.settings.book;
+    return list.some(function (e) { return e.id === id; }) ? id : (list[0] ? list[0].id : '');
+  }
+  function curriculumBooks() { return vocabularyBooks().filter(function (e) { return isCurriculum(e) && (!BOOKS_UI.grade || curriculumGrade(e) === BOOKS_UI.grade); }); }
+  function curCurriculumId() { var list = curriculumBooks(), id = db.settings.curriculumBook; return list.some(function (e) { return e.id === id; }) ? id : ''; }
   function checkIsChar(c) {
     var e = LIB.index.filter(function (x) { return x.id === c.book; })[0];
     return !!(e && e.counts && !e.counts.words && e.counts.chars);
@@ -429,7 +442,9 @@
   }
   function selectUnit(book, preferred) {
     var units = unitsOf(book), unit = units.filter(function (u) { return u.id === preferred; })[0] || units[0];
-    db.settings.book = book.id; db.settings.unit = unit ? unit.id : '';
+    var curriculum = isCurriculum(book);
+    db.settings[curriculum ? 'curriculumBook' : 'book'] = book.id;
+    db.settings[curriculum ? 'curriculumUnit' : 'unit'] = unit ? unit.id : '';
     return unit;
   }
   /* 단원의 학습 항목 — 낱말 먼저, 그다음 직접 적은 한자. 낱말에서 끌어낸 한자(derived)는 참고 항목이라
@@ -470,7 +485,7 @@
 
   /* ── 화면 전환 ── */
   var curView = 'home';
-  var VIEWS = { home: renderHome, books: renderBooks, words: renderWords, chars: renderChars, train: renderTrain, report: renderReport };
+  var VIEWS = { home: renderHome, books: renderBooks, curriculum: renderBooks, words: renderWords, chars: renderChars, train: renderTrain, report: renderReport };
   /* 트랙 — 이 단어장이 가르치는 것이 낱말인가 글자인가.
      'voca' = 한글 어휘·한자어(교재·교과 어휘) · 'hanja' = 글자 자체(급수 배정한자).
      낱말이 하나라도 있으면 어휘 트랙이다. 한자어의 한자는 낱말에 딸린 참고지 그 책의 학습 목표가 아니다. */
@@ -486,14 +501,24 @@
     curView = view || curView;
     var has = syncTabs();
     if ((curView === 'words' && !has.words) || (curView === 'chars' && !has.chars)) curView = 'home';
-    ['home', 'books', 'words', 'chars', 'train', 'report'].forEach(function (v) { $('#view-' + v).hidden = v !== curView; });
-    var active = curView === 'words' ? 'books' : curView;
+    ['home', 'books', 'curriculum', 'words', 'chars', 'train', 'report'].forEach(function (v) { $('#view-' + v).hidden = v !== curView; });
+    var active = curView === 'words' || curView === 'curriculum' ? 'books' : curView;
     if (curView === 'train' && ((TRAIN && (TRAIN.scope.chars || TRAIN.scope.only === 'char')) || (LEARN && LEARN.only === 'char'))) active = 'chars';
     document.querySelectorAll('.tabbar button').forEach(function (b) { b.classList.toggle('on', b.dataset.view === active); });
     VIEWS[curView]();
     window.scrollTo(0, 0);
   }
-  document.querySelectorAll('.tabbar button').forEach(function (b) { b.addEventListener('click', function () { if (b.dataset.view === 'train') { LEARN = null; TRAIN = null; } render(b.dataset.view); }); });
+  document.querySelectorAll('.tabbar button').forEach(function (b) { b.addEventListener('click', function () { render(b.dataset.view); }); });
+  function leaveStudy() {
+    if (!TRAIN && !LEARN) return true;
+    if (!confirm('진행 중인 학습을 그만둘까요? 취소하면 이어서 공부해요. 끝내지 않은 시험 결과는 저장되지 않아요.')) return false;
+    LEARN = null; TRAIN = null;
+    return true;
+  }
+  function bindStudyQuit() {
+    var quit = $('#studyQuit');
+    if (quit) quit.addEventListener('click', function () { if (leaveStudy()) render('train'); });
+  }
   function sheet(html, onOpen) {
     var back = $('#sheetBack'), el = $('#sheet');
     el.innerHTML = '<button class="close" id="sheetClose" aria-label="닫기">✕</button>' + html;
@@ -533,28 +558,36 @@
     else if (tb && tu) html += '<div class="card"><b>선생님이 지정한 한자 학습</b><p>' + esc(tb.title + ' · ' + tu.title) + '</p><button class="btn" id="hmHanjaTask">한자 집중 학습 열기</button></div>';
     else if (tk) html += '<div class="notice">지정된 교재를 아직 받지 못했어요. 연결을 확인한 뒤 내 교재에서 다시 열어 주세요.</div>';
     if (book && unit && (!tb || tb.id !== book.id || !tu || tu.id !== unit.id)) html += studyCard(book, unit, 'hm');
-    if (!book) html += '<div class="card">교재를 불러오는 중이에요…</div>';
+    if (!book) html += '<div class="card">공부하는 교재를 선택해 주세요.</div>';
+    html += '<button class="btn big" id="hmBooks">공부한 교재·단원 고르고 시험 보기</button>' +
+      '<div class="card" style="margin-top:18px"><h2 class="sec" style="margin-top:0">WB 교과 어휘</h2><p class="muted">학년과 과목을 골라 수업에 필요한 어휘를 따로 배워요. 학습도구어를 먼저 익히고 교과 어휘를 함께 공부해요.</p><button class="btn big" id="hmCurriculum">학년·과목별 교과 어휘 학습</button></div>';
     var sum = WBHSRS.summary(db.states, now(), function (state) { return WBHSRS.kindOf(state.id) === 'word'; });
     html += '<h2 class="sec">복습할 낱말 확인</h2><div class="card"><div class="nums"><div class="tn"><b>' + sum.due + '</b><span>오늘 복습</span></div>' +
       '<div class="tn"><b>' + sum.words + '</b><span>학습한 낱말</span></div><div class="tn"><b>' + sum.graduated + '</b><span>간격 복습 완료</span></div></div>' +
-      '<button class="btn big" id="hmReview" style="margin-top:12px">오답과 오늘 복습 보기</button></div>';
+      '<button class="btn big" id="hmReview" style="margin-top:12px">' + (TRAIN || LEARN ? '진행 중인 시험·학습 이어하기' : '오답과 오늘 복습 보기') + '</button></div>';
     el.innerHTML = html;
     function bindCard(b, u, prefix) {
       var check = $('#' + prefix + 'Check'); if (!check) return;
       function select() { selectUnit(b, u.id); save(); }
       check.addEventListener('click', function () { select(); trainStart({ mode: 'check', book: b.id, unit: u.id }); });
       $('#' + prefix + 'Learn').addEventListener('click', function () { select(); learnStart(b, u.id); });
-      $('#' + prefix + 'Pick').addEventListener('click', function () { select(); BOOKS_UI.open[checkKey(b.id, u.id)] = true; render('books'); });
+      $('#' + prefix + 'Pick').addEventListener('click', function () {
+        select(); BOOKS_UI.open[checkKey(b.id, u.id)] = true; BOOKS_UI.search = '';
+        if (isCurriculum(b)) BOOKS_UI.grade = curriculumGrade(b);
+        render(isCurriculum(b) ? 'curriculum' : 'books');
+      });
       var wrong = $('#' + prefix + 'Wrong'); if (wrong) wrong.addEventListener('click', function () { reviewCheck(checkKey(b.id, u.id)); });
     }
     if (tb && tu && tb.words.length) bindCard(tb, tu, 'tk');
     var hanjaTask = $('#hmHanjaTask'); if (hanjaTask) hanjaTask.addEventListener('click', function () { db.settings.hanjaBook = tb.id; save(); render('chars'); });
     if (book && unit) bindCard(book, unit, 'hm');
-    $('#hmReview').addEventListener('click', function () { LEARN = null; TRAIN = null; render('train'); });
+    $('#hmBooks').addEventListener('click', function () { render('books'); });
+    $('#hmCurriculum').addEventListener('click', function () { render('curriculum'); });
+    $('#hmReview').addEventListener('click', function () { render('train'); });
   }
 
   /* ── 단어장 ── */
-  var BOOKS_UI = { open: {}, search: '' };
+  var BOOKS_UI = { open: {}, search: '', grade: '' };
   function bookGroup(e) {
     if (e.mine) return '선생님 추천';
     if (e.sample) return '어휘 체험';
@@ -563,23 +596,32 @@
     return '교재 어휘';
   }
   function renderBooks() {
-    var el = $('#view-books');
-    var bid = curBookId();
-    var html = demoNotice() + '<h2 class="sec" style="margin-top:6px">내 교재</h2><p class="muted">공부하는 책과 단원을 고른 뒤 시험을 보거나 낱말을 배워요. 학년과 교재 단계는 다를 수 있으니 책 표지를 확인해 주세요.</p>';
+    var curriculum = curView === 'curriculum', el = $('#view-' + (curriculum ? 'curriculum' : 'books'));
+    /* 같은 교재 선택 양식을 재사용하므로 숨겨진 쪽의 중복 id·이벤트도 함께 비운다. 선택은 settings에 남는다. */
+    $('#view-' + (curriculum ? 'books' : 'curriculum')).innerHTML = '';
+    var bid = curriculum ? curCurriculumId() : curBookId(), selectedUnit = db.settings[curriculum ? 'curriculumUnit' : 'unit'];
+    var html = demoNotice() + '<h2 class="sec" style="margin-top:6px">' + (curriculum ? 'WB 교과 어휘' : '내 교재 · 단원 시험') + '</h2><p class="muted">' +
+      (curriculum ? '학습도구어를 먼저 익히고, 교과 어휘는 수업 1주 전에 만나 보세요. 과목별로 뜻과 예문을 배우고 확인해요.' : '종이 교재로 공부한 내용을 확인해요. 책 표지의 교재명·단계를 고르고 공부한 단원에서 시험을 시작하세요. 학년과 교재 단계는 다를 수 있어요.') + '</p>' +
+      '<button class="btn" id="bkSwitch">' + (curriculum ? '내 교재 시험으로' : 'WB 교과 어휘 따로 학습하기') + '</button>';
+    if (curriculum) {
+      var grades = WBBOOKCHECK.CURRICULUM_GRADES;
+      html += '<label style="display:block;margin:16px 0">학년 <select class="sel" id="bkGrade"><option value="">전체 학년</option>' + grades.map(function (g) { return '<option value="' + g + '"' + (BOOKS_UI.grade === g ? ' selected' : '') + '>' + g + '</option>'; }).join('') + '</select></label>';
+    }
     var rvRaw = null; try { rvRaw = localStorage.getItem('wbr.v1'); } catch (e) {}
     var rvN = WBHBRIDGE.toBook(WBHBRIDGE.readVocab(rvRaw)).words.length;
-    if (rvN) html += '<div class="card tight" style="display:flex;align-items:center;gap:10px"><div style="flex:1;min-width:0"><b style="color:var(--ink-strong)">📖 진로독서 어휘장</b>' +
+    if (rvN && !curriculum) html += '<div class="card tight" style="display:flex;align-items:center;gap:10px"><div style="flex:1;min-width:0"><b style="color:var(--ink-strong)">📖 진로독서 어휘장</b>' +
       '<span class="muted" style="display:block;font-size:.78rem">지문에서 모은 한자어·고유어 ' + rvN + '개' + (db.settings.bridge ? ' · 단어장으로 쓰는 중' : '') + '</span></div>' +
       '<button class="btn small' + (db.settings.bridge ? '' : ' primary') + '" id="bkBridge">' + (db.settings.bridge ? '다시 가져오기' : '가져오기') + '</button></div>';
     if (!LIB.index.length) html += '<div class="card"><p class="muted" style="margin:0">아직 단어장이 없어요.</p></div>';
-    html += '<details class="card"' + (bookOf(bid) && !BOOKS_UI.search ? '' : ' open') + '><summary>교재 고르기 · 선생님 추천과 내 교재</summary>' +
+    html += '<details class="card"' + (!curriculum && bookOf(bid) && !BOOKS_UI.search ? '' : ' open') + '><summary>' + (curriculum ? '과목 고르기' : '교재 고르기 · 선생님 추천과 내 교재') + '</summary>' +
       '<form id="bkSearchForm" class="row" style="margin-top:12px"><input class="ans-in" id="bkSearch" type="search" aria-label="교재 이름·출판사 검색" placeholder="교재 이름이나 출판사 검색" value="' + esc(BOOKS_UI.search) + '"><button class="btn" type="submit">찾기</button></form>';
     var groups = ['선생님 추천', '교재 어휘', 'WB 교과 어휘', '내 어휘장', '어휘 체험'], group = '', needle = BOOKS_UI.search.trim().toLowerCase();
-    var entries = vocabularyBooks().filter(function (e) { return !needle || (e.title + ' ' + (e.publisher || '')).toLowerCase().indexOf(needle) >= 0; })
+    var entries = (curriculum ? curriculumBooks() : textbookBooks()).filter(function (e) { return !needle || (e.title + ' ' + (e.publisher || '')).toLowerCase().indexOf(needle) >= 0; })
       .sort(function (a, b) { return groups.indexOf(bookGroup(a)) - groups.indexOf(bookGroup(b)); });
-    if (!entries.length) html += '<p class="muted">찾는 교재가 없어요. 검색어를 바꾸거나 선생님에게 교재 등록을 문의해 주세요.</p>';
+    if (curriculum) entries.sort(function (a, b) { return grades.indexOf(curriculumGrade(a)) - grades.indexOf(curriculumGrade(b)) || ((a.curriculum && /도구어/.test(a.curriculum.subject)) ? 0 : 1) - ((b.curriculum && /도구어/.test(b.curriculum.subject)) ? 0 : 1); });
+    if (!entries.length) html += '<p class="muted">' + (curriculum ? '이 학년의 교과 어휘가 아직 등록되지 않았어요. 다른 학년을 고르거나 선생님에게 등록을 문의해 주세요.' : '찾는 교재가 없어요. 검색어를 바꾸거나 선생님에게 교재 등록을 문의해 주세요.') + '</p>';
     entries.forEach(function (e) {
-      if (group !== bookGroup(e)) { group = bookGroup(e); html += '<h3 class="sec">' + group + '</h3>'; }
+        if (group !== (curriculum ? curriculumGrade(e) : bookGroup(e))) { group = curriculum ? curriculumGrade(e) : bookGroup(e); html += '<h3 class="sec">' + esc(group) + '</h3>'; }
       var b = bookOf(e.id), p = b ? progressOf(itemsOf(b, null)) : null;
       html += '<button type="button" style="width:100%;text-align:left;margin-top:10px" class="card book' + (e.id === bid ? ' on' : '') + '" data-book="' + esc(e.id) + '">' +
         /* 낱말이 있으면 語 — 이 앱은 어휘 앱이고, 한자는 낱말에 딸린 갈래다. 글자만 있는 급수 교재만 字 */
@@ -588,6 +630,7 @@
         '<span class="muted" style="font-size:.78rem">' + (e.source === 'own' ? '자체 · ' : '교재 · ') + (e.publisher ? esc(e.publisher) + ' · ' : '') + (e.level ? e.level + ' · ' : '') +
         '낱말 ' + (e.counts ? e.counts.words : b.words.length) + ' · 어휘 단원 ' + (b ? unitsOf(b).length : (e.units || []).filter(function (u) { return u.words > 0; }).length) + '</span>' +
         ' <span class="chip ' + (e.counts && e.counts.words ? 't-h' : 't-c') + '">' + (e.counts && e.counts.words ? '어휘' : '한자') + '</span>' +
+        (curriculum ? ' <span class="chip">' + esc(e.curriculum ? e.curriculum.subject : '기존 통합 어휘') + '</span>' : '') +
         (e.mine ? ' <span class="chip t-a">선생님 추천</span>' : '') + (e.sample ? ' <span class="chip t-g">어휘 체험</span>' : '') + (e.local ? ' <span class="chip t-n">내 어휘장</span>' : '') +
         (p && p.planted ? '<div class="bar stack"><i class="g" style="width:' + pct(p.graduated, p.total) + '%"></i><i style="width:' + pct(p.planted - p.graduated, p.total) + '%"></i></div>' : '') +
         '</div><span class="muted">' + (e.id === bid ? '✔' : '›') + '</span></button>';
@@ -601,14 +644,14 @@
         var items = itemsOf(book, u.id), p = progressOf(items), open = BOOKS_UI.open[book.id + '|' + u.id];
         var nw = items.filter(function (i) { return i.kind === 'word'; }).length, ucs = unitChars(book, u.id), nc = ucs.length;
         html += '<div class="card unit" data-unit="' + esc(u.id) + '"><button class="unit-head" style="width:100%;text-align:left" aria-expanded="' + !!open + '"><b>' + esc(u.title) + '</b>' +
-          (db.settings.unit === u.id && db.settings.book === book.id ? '<span class="chip t-a">현재</span>' : '') +
+          (selectedUnit === u.id ? '<span class="chip t-a">현재</span>' : '') +
           '<span class="n">' + (nw ? '낱말 ' + nw : '한자 ' + nc) + '</span><span class="muted">' + (open ? '▾' : '▸') + '</span></button>' +
           '<div class="bar stack"><i class="g" style="width:' + pct(p.graduated, p.total) + '%"></i><i style="width:' + pct(p.planted - p.graduated, p.total) + '%"></i></div>';
         if (open) {
-          html += '<div class="unit-body"><button class="btn primary big" data-act="check" style="margin-bottom:8px">단원 시험 (' + Math.min(items.length, TRAIN_MAX) + '문항)</button>' +
+          html += '<div class="unit-body">' + (curriculum ? '<button class="btn primary big" data-act="learn" style="margin-bottom:8px">낱말 학습 시작</button>' : '') + '<button class="btn' + (curriculum ? '' : ' primary') + ' big" data-act="check" style="margin-bottom:8px">' + (curriculum ? '배운 어휘 확인' : '단원 시험') + ' (' + Math.min(items.length, TRAIN_MAX) + '문항)</button>' +
             (lastCheck(book.id, u.id) ? '<p class="muted" style="margin:-4px 0 8px;font-size:.74rem">' + checkLine(lastCheck(book.id, u.id)) + '</p>' : '') +
             '<div class="row" style="margin-bottom:10px">' +
-            '<button class="btn small" data-act="learn">' + (nw ? '낱말 학습' : '한자 학습') + '</button>' +
+            (curriculum ? '' : '<button class="btn small" data-act="learn">' + (nw ? '낱말 학습' : '한자 학습') + '</button>') +
             '<button class="btn small" data-act="train"' + (p.planted ? '' : ' disabled') + '>배운 것 복습</button></div>';
           items.filter(function (i) { return i.kind === 'word'; }).forEach(function (i) {
             html += '<div class="wrow" data-wid="' + esc(i.sid) + '"><span class="dot ' + dotClass(i) + '"></span><span class="w">' + esc(i.w.word) + '</span>' +
@@ -621,6 +664,8 @@
       });
     }
     el.innerHTML = html;
+    $('#bkSwitch').addEventListener('click', function () { BOOKS_UI.search = ''; render(curriculum ? 'books' : 'curriculum'); });
+    var grade = $('#bkGrade'); if (grade) grade.addEventListener('change', function () { BOOKS_UI.grade = grade.value; BOOKS_UI.search = ''; renderBooks(); });
     $('#bkSearchForm').addEventListener('submit', function (e) { e.preventDefault(); BOOKS_UI.search = $('#bkSearch').value; renderBooks(); });
     el.querySelectorAll('.book').forEach(function (b) {
       b.addEventListener('click', function () { selectBook(b.dataset.book); });
@@ -630,13 +675,13 @@
       var uid = u.dataset.unit, k = book.id + '|' + uid;
       u.querySelector('.unit-head').addEventListener('click', function () {
         BOOKS_UI.open[k] = !BOOKS_UI.open[k];
-        if (BOOKS_UI.open[k]) { db.settings.book = book.id; db.settings.unit = uid; save(); }
+        if (BOOKS_UI.open[k]) { selectUnit(book, uid); save(); }
         renderBooks();
       });
       u.querySelectorAll('[data-act]').forEach(function (btn) {
         btn.addEventListener('click', function (e) {
           e.stopPropagation();
-          db.settings.book = book.id; db.settings.unit = uid; save();
+          selectUnit(book, uid); save();
           if (btn.dataset.act === 'check') trainStart({ mode: 'check', book: book.id, unit: uid });
           else if (btn.dataset.act === 'learn') learnStart(book, uid);
           else if (btn.dataset.act === 'train') trainStart({ mode: 'unit', book: book.id, unit: uid });
@@ -648,18 +693,21 @@
     });
   }
   async function selectBook(id) {
-    var preferred = id === db.settings.book ? db.settings.unit : null;
-    db.settings.book = id; db.settings.unit = '';
+    var entry = LIB.index.filter(function (e) { return e.id === id; })[0], curriculum = isCurriculum(entry);
+    var bookKey = curriculum ? 'curriculumBook' : 'book', unitKey = curriculum ? 'curriculumUnit' : 'unit';
+    var preferred = id === db.settings[bookKey] ? db.settings[unitKey] : null;
+    db.settings[bookKey] = id; db.settings[unitKey] = '';
     var cached = bookOf(id); if (cached) selectUnit(cached, preferred);
+    var requestedUnit = db.settings[unitKey];
     save(); renderBooks();
     try {
       var b = await openBook(id);
-      if (db.settings.book !== id) return;
+      if (db.settings[bookKey] !== id) return;
       if (!b) throw new Error('교재를 열지 못했어요');
-      var u = selectUnit(b, preferred);
+      var u = selectUnit(b, db.settings[unitKey] !== requestedUnit ? db.settings[unitKey] : preferred);
       if (u) BOOKS_UI.open[checkKey(b.id, u.id)] = true;
       save();
-      if (curView === 'books') render('books');
+      if (curView === (curriculum ? 'curriculum' : 'books')) render(curView);
     } catch (e) { toast(e.message || '교재를 열지 못했어요'); }
   }
 
@@ -681,7 +729,8 @@
       (w.syn && w.syn.length ? '<p class="muted">비슷한 말: ' + esc(w.syn.join(', ')) + '</p>' : '') + sceneHtml(w) +
       '<div><button class="say-btn" data-say="' + esc(w.word + '. ' + w.meaning + (w.example ? '. ' + w.example : '')) + '">🔊 들어보기</button></div>' +
       (w.hanja ? '<details class="hanja-help"><summary>한자로 뜻 더 알아보기 · 선택</summary><div class="hanja">' + esc(w.hanja) + '</div>' + partsHtml(w) +
-        '<button class="say-btn" data-word-trace="' + esc(w._sid) + '">한자 따라쓰기</button></details>' : '') + '</div>';
+        '<button class="say-btn" data-word-trace="' + esc(w._sid) + '">한자 따라쓰기</button></details>' : '') +
+      (w.origin ? '<details class="hanja-help"><summary>한자·원어 참고 · 선택</summary><p>' + esc(w.origin) + '</p></details>' : '') + '</div>';
   }
   /* 연상 장면 — 단어장에 적힌 것(scene)이 먼저, 없으면 학생이 고른 AI 연상(검수 전/승인). 둘 다 없고 AI 가 있으면 만들기 버튼 —
      단, 자체 단어장(source own)에서만. 교재 단어장의 뜻 문장은 외부 AI 로 보내지 않는다 */
@@ -772,6 +821,7 @@
   /* only: 'word'|'char' — 낱말 탭에서 시작하면 낱말만 심는다. 섞어 심으면 국어 어휘 교재에서 한자가 끼어들어
      「낱말 배우려는데 왜 한자가 나오나」가 된다. 안 주면 예전처럼 그 단원 전부다. */
   function learnStart(book, unitId, only, opts) {
+    if (!leaveStudy()) { render('train'); return; }
     opts = opts || {};
     var items = opts.items || itemsOf(book, unitId == null ? null : unitId);
     if (only) items = items.filter(function (it) { return it.kind === only; });
@@ -786,7 +836,8 @@
       var book = await openBook(c.book);
       if (!book) throw new Error('교재를 받지 못했어요');
       var ids = pendingIds(c), items = itemsOf(book, c.unit).filter(function (it) { return ids.indexOf(it.sid) >= 0; });
-      if (!items.length) { toast('다시 확인할 낱말이 없어요'); return; }
+      if (!items.length) { toast('보충할 항목을 현재 단원에서 찾지 못했어요. 오답 기록은 유지돼요 — 선생님에게 교재 내용을 확인해 주세요.'); return; }
+      if (items.length < ids.length) toast('현재 단원에서 찾지 못한 보충 항목 ' + (ids.length - items.length) + '개는 오답 기록에 남겨 두어요.');
       if (checkIsChar(c)) db.settings.hanjaBook = book.id; else selectUnit(book, c.unit);
       save();
       learnStart(book, c.unit, checkIsChar(c) ? 'char' : null, { items: items, check: key });
@@ -795,7 +846,7 @@
   function learnRender(el) {
     var it = LEARN.items[LEARN.i];
     if (!it) { learnDone(el); return; }
-    var head = '<div class="qhead"><span class="chip t-a">' + (LEARN.check ? '오답 보충' : it.kind === 'word' ? '낱말 학습' : '한자 학습') + '</span><span class="muted">' + esc(bookTitle(LEARN.book.id)) + ' · ' + esc(unitTitleOf(LEARN.book.id, LEARN.unit)) + '</span><span class="prog">' + (LEARN.i + 1) + ' / ' + LEARN.items.length + '</span></div>';
+    var head = '<div class="qhead"><span class="chip t-a">' + (LEARN.check ? '오답 보충' : it.kind === 'word' ? '낱말 학습' : '한자 학습') + '</span><span class="muted">' + esc(bookTitle(LEARN.book.id)) + ' · ' + esc(unitTitleOf(LEARN.book.id, LEARN.unit)) + '</span><span class="prog">' + (LEARN.i + 1) + ' / ' + LEARN.items.length + '</span><button class="btn ghost small" id="studyQuit">그만두기</button></div>';
     if (LEARN.phase === 'card') {
       el.innerHTML = '<div class="card">' + head + (it.kind === 'word' ? wordCardHtml(it.w) : charCardHtml(it.c)) +
         (it.kind === 'char' ? '<button class="say-btn" id="lnTrace">지금 한 번 써 보기</button>' : '') +
@@ -803,6 +854,7 @@
       bindSay(el);
       $('#lnNext').addEventListener('click', function () { LEARN.phase = 'check'; learnRender(el); });
       var tb = $('#lnTrace'); if (tb) tb.addEventListener('click', function () { render('chars'); traceOpen([it.c.ch], function () { render('train'); }); });
+      bindStudyQuit();
       return;
     }
     var applying = LEARN.phase === 'apply';
@@ -810,6 +862,7 @@
     if (!q) {
       el.innerHTML = '<div class="card">' + head + '<p>이 낱말은 확인 문항을 만들 수 없어 뜻 학습만 기록해요.</p><button class="btn" id="lnSkip">다음 낱말</button></div>';
       $('#lnSkip').addEventListener('click', function () { learnPlant(it, null); LEARN.i += 1; LEARN.phase = 'card'; learnRender(el); });
+      bindStudyQuit();
       return;
     }
     questionRender(el, head, q, function (ok, hinted, replay) {
@@ -824,6 +877,7 @@
       bindSay(fb);
       $('#lnContinue').addEventListener('click', function () { if (!nextContext) LEARN.i += 1; LEARN.q = null; LEARN.phase = nextContext ? 'apply' : 'card'; learnRender(el); });
     }, {});
+    bindStudyQuit();
   }
   function learnPlant(it, ok) {
     if (!db.states[it.sid]) db.states[it.sid] = WBHSRS.plant(it.sid, now(), { book: it.book });
@@ -953,7 +1007,7 @@
     });
     function bindCharMenu() {
       bindReview(el);
-      $('#chBack').addEventListener('click', function () { LEARN = null; TRAIN = null; render('home'); });
+      $('#chBack').addEventListener('click', function () { render('home'); });
       $('#chDue').addEventListener('click', function () { trainStart({ mode: 'due', only: 'char', chars: true }); });
       $('#chBook').addEventListener('change', function () { db.settings.hanjaBook = $('#chBook').value; save(); renderChars(); });
     }
@@ -1302,7 +1356,8 @@
       if (scope.only) list = list.filter(function (i) { return i.kind === scope.only; });
       if (scope.mode === 'retry') list = list.filter(function (i) { return (scope.ids || []).indexOf(i.sid) >= 0; });
       if (scope.mode === 'check' || scope.mode === 'retry') {
-        list.forEach(function (i) { var s = stateOf(i); i.step = s ? s.step : 0; i._pri = s ? 1 : 0; });
+        var pending = pendingIds(lastCheck(scope.book, scope.unit));
+        list.forEach(function (i) { var s = stateOf(i); i.step = s ? s.step : 0; i._pri = pending.indexOf(i.sid) >= 0 ? -1 : s ? 1 : 0; });
       } else {
         list = list.filter(function (i) { return stateOf(i); });
         list.forEach(function (i) { var s = stateOf(i); i.step = s.step; i._pri = (s.due <= t ? 0 : 1) * 100 + s.step; });
@@ -1313,6 +1368,7 @@
     return items.slice(0, TRAIN_MAX);
   }
   function trainStart(scope) {
+    if (!leaveStudy()) { render('train'); return; }
     var items = trainItems(scope);
     if (!items.length) {
       toast(scope.mode === 'due' ? (TRAIN_MISSING ? '복습할 교재를 아직 못 받았어요 — 연결 후 내 교재에서 열어 주세요' : '지금 복습할 것이 없어요')
@@ -1325,7 +1381,7 @@
       var opts = { step: it.step || 0, rnd: Math.random, vocabulary: it.kind === 'word' };
       /* 교재 시험은 기억 단계와 별개다. 종이로 먼저 공부한 학생도 뜻·문맥·회상을 함께 확인한다. */
       if (it.kind === 'word' && (scope.mode === 'check' || scope.mode === 'retry')) {
-        opts.kinds = i % 2 ? ['w-context', 'w-cloze', 'w-word', 'w-type'] : (i % 4 ? ['w-type', 'w-meaning'] : ['w-meaning', 'w-type']);
+        opts.kinds = i % 2 ? ['w-context', 'w-word', 'w-type'] : (i % 4 ? ['w-type', 'w-meaning'] : ['w-meaning', 'w-type']);
       }
       var q = WBHQUIZ.makeQuestion(it, ctxFor(it), opts);
       if (q) qs.push({ item: it, q: q }); else skipped += 1;
@@ -1356,7 +1412,7 @@
     var cur = TRAIN.list[TRAIN.i];
     if (!cur) { trainDone(el); return; }
     var label = TRAIN.scope.mode === 'check' ? '단원 시험' : TRAIN.scope.mode === 'retry' ? '오답 재확인' : '복습';
-    var head = '<div class="qhead"><span class="chip t-a">' + label + '</span><span class="muted" style="font-size:.78rem">' + esc(bookTitle(cur.item.book)) + '</span><span class="prog">' + (TRAIN.i + 1) + ' / ' + TRAIN.list.length + '</span></div>';
+    var head = '<div class="qhead"><span class="chip t-a">' + label + '</span><span class="muted" style="font-size:.78rem">' + esc(bookTitle(cur.item.book)) + (TRAIN.scope.unit != null ? ' · ' + esc(unitTitleOf(cur.item.book, TRAIN.scope.unit)) : '') + '</span><span class="prog">' + (TRAIN.i + 1) + ' / ' + TRAIN.list.length + '</span><button class="btn ghost small" id="studyQuit">그만두기</button></div>';
     questionRender(el, head, cur.q, function (ok, hinted) {
       scoreAnswer(cur, ok, hinted);
       var fb = $('#qFeed');
@@ -1364,6 +1420,7 @@
       $('#qNext').addEventListener('click', function () { TRAIN.i += 1; renderTrain(); });
       var see = $('#qSee'); if (see) see.addEventListener('click', function () { cur.item.kind === 'word' ? wordSheet(cur.item) : charSheet(cur.item); });
     }, {});
+    bindStudyQuit();
   }
   function reviewListHtml(chars) {
     return Object.keys(db.checks).filter(function (key) { return pendingIds(db.checks[key]).length && checkIsChar(db.checks[key]) === !!chars; }).sort(function (a, b) { return db.checks[b].at - db.checks[a].at; }).map(function (key) {
@@ -1382,8 +1439,8 @@
       '<details class="card"><summary>교재·단원을 골라 시험 또는 학습하기</summary><b style="color:var(--ink-strong)">단원 시험</b>' +
       '<p class="muted" style="margin:2px 0 10px;font-size:.8rem">종이 교재로 공부한 단원을 그대로 확인해요 — 앱에서 「낱말 학습」를 하지 않은 낱말도 바로 나와요.</p>' +
       (LIB.index.length
-        ? '<select class="sel" id="tmCkBook" aria-label="점검할 단어장" style="width:100%;margin-bottom:8px">' + vocabularyBooks().map(function (e) {
-            return '<option value="' + esc(e.id) + '"' + (book && e.id === book.id ? ' selected' : '') + '>' + esc(e.title) + (e.mine ? ' (배정)' : '') + '</option>';
+        ? '<select class="sel" id="tmCkBook" aria-label="점검할 단어장" style="width:100%;margin-bottom:8px">' + textbookBooks().map(function (e) {
+            return '<option value="' + esc(e.id) + '"' + (e.id === bid ? ' selected' : '') + '>' + esc(e.title) + (e.mine ? ' (배정)' : '') + '</option>';
           }).join('') + '</select>'
         : '') +
       (book && units.length
@@ -1404,22 +1461,24 @@
     if (ckBook) ckBook.addEventListener('change', function () {
       /* 교재를 바꾸면 그 책을 받아 현재 단어장으로 삼는다 — 단원은 그 책의 첫 단원부터 */
       var id = ckBook.value;
-      db.settings.book = id; db.settings.unit = ''; save();
-      ckBook.disabled = true;
+      db.settings.book = id; db.settings.unit = '';
+      var cached = bookOf(id); if (cached) selectUnit(cached);
+      var requestedUnit = db.settings.unit;
+      save(); trainMenu(el);   /* 이전 교재의 단원·시작 버튼을 즉시 걷어 낸다. 캐시가 있으면 새 교재로 바로 시작한다. */
       toast('단어장을 받는 중이에요…');   /* 큰 교재는 몇 초 걸린다 — 빈 카드만 보이면 고장으로 읽힌다 */
       openBook(id).then(function (nb) {
         if (db.settings.book !== id) return;
-        if (nb) { selectUnit(nb); save(); }
-        render('train');
-      }).catch(function () { toast('단어장을 받지 못했어요 — 학원 와이파이에서 다시 열어 주세요'); render('train'); });
+        if (nb) { selectUnit(nb, db.settings.unit !== requestedUnit ? db.settings.unit : undefined); save(); }
+        if (curView === 'train' && !TRAIN && !LEARN) trainMenu(el);
+      }).catch(function () { if (db.settings.book === id) toast('단어장을 받지 못했어요 — 학원 와이파이에서 다시 열어 주세요'); });
     });
     var ckLearn = $('#tmCkLearn');
-    if (ckLearn) ckLearn.addEventListener('click', function () { learnStart(book, ckSel ? ckSel.value : (ckUnit && ckUnit.id)); });
+    if (ckLearn) ckLearn.addEventListener('click', function () { if (db.settings.book === book.id) learnStart(book, ckSel ? ckSel.value : (ckUnit && ckUnit.id)); });
     var ckAll = $('#tmCkAll');
     if (ckAll) ckAll.addEventListener('click', function () { trainStart({ mode: 'book', book: book.id }); });
     var ckSel = $('#tmCkUnit');
     if (ckSel) ckSel.addEventListener('change', function () { db.settings.unit = ckSel.value; save(); trainMenu(el); });   /* 고른 단원이 오늘 화면과 어긋나지 않게 같이 옮긴다 */
-    var ckGo = $('#tmCk'); if (ckGo) ckGo.addEventListener('click', function () { trainStart({ mode: 'check', book: book.id, unit: ckSel ? ckSel.value : ckUnit.id }); });
+    var ckGo = $('#tmCk'); if (ckGo) ckGo.addEventListener('click', function () { if (db.settings.book === book.id) trainStart({ mode: 'check', book: book.id, unit: ckSel ? ckSel.value : ckUnit.id }); });
     var d = $('#tmDue'); if (d) d.addEventListener('click', function () { trainStart({ mode: 'due' }); });
     var u = $('#tmUnit'); if (u) u.addEventListener('click', function () { trainStart({ mode: 'unit', book: book.id, unit: unit.id }); });
     var b = $('#tmBook'); if (b) b.addEventListener('click', function () { trainStart({ mode: 'book', book: book.id }); });
@@ -1437,13 +1496,16 @@
   function finishCheck(session) {
     var scope = session.scope, n = session.list.length, wrongIds = session.wrong.map(function (it) { return it.sid; });
     var book = bookOf(scope.book), auxiliary = !!(scope.chars && book && trackOf(book) !== 'hanja');
+    var passed = session.list.filter(function (entry) { return entry.independent; }).map(function (entry) { return entry.item.sid; });
     if (scope.mode === 'check' && !auxiliary) {
+      /* 새 표본에 안 나온 오답·출제하지 못한 오답은 혼자 맞혔다고 간주하지 않는다. */
+      wrongIds = pendingIds(lastCheck(scope.book, scope.unit)).filter(function (sid) { return passed.indexOf(sid) < 0; }).concat(wrongIds)
+        .filter(function (sid, i, all) { return all.indexOf(sid) === i; });
       putCheck(scope.book, scope.unit, unitTitleOf(scope.book, scope.unit), n, session.right, scope.total, session.hinted, wrongIds, sessionDomains(session));
     } else if (scope.mode === 'retry') {
       var c = db.checks[scope.check];
       if (c && c.at === session.checkAt) {
-        var passed = session.list.filter(function (entry) { return wrongIds.indexOf(entry.item.sid) < 0; }).map(function (entry) { return entry.item.sid; });
-        c.retry = { at: now(), total: n, right: session.right - session.hinted, wrongIds: pendingIds(c).filter(function (sid) { return passed.indexOf(sid) < 0; }).slice(0, TRAIN_MAX) };
+        c.retry = { at: now(), total: n, right: session.right - session.hinted, wrongIds: pendingIds(c).filter(function (sid) { return passed.indexOf(sid) < 0; }).slice(0, WBBOOKCHECK.LIMITS.words) };
       }
     }
     save();
@@ -1540,12 +1602,20 @@
       } catch (e) { /* 오프라인·만료 — 이 기기 기록으로 계속 */ }
     }
     try { await loadIndex(); } catch (e) { toast('단어장 목록을 받지 못했어요'); }
+    var oldSelection = LIB.index.filter(function (e) { return e.id === db.settings.book; })[0];
+    if (isCurriculum(oldSelection)) {
+      if (!db.settings.curriculumBook) { db.settings.curriculumBook = db.settings.book; db.settings.curriculumUnit = db.settings.unit; }
+      db.settings.book = ''; db.settings.unit = ''; save();
+    }
     /* 이번 주 단원(선생님 지정) — 오늘 화면 맨 위. 지정된 단어장은 미리 받아 둔다 */
     if (syncOn()) { try { var tk = await api('/task'); LIB.task = tk && tk.task && tk.task.bookId ? Object.assign({ scope: tk.scope }, tk.task) : null; } catch (e) { /* 다음 접속 때 */ } }
     /* 선생님이 이번 주 단원을 지정했고 학생이 아직 단어장을 고른 적이 없으면 그것을 현재 단어장·단원으로 삼는다.
        안 그러면 현재 단어장이 목록 맨 앞(가장 최근에 올린 책)이 되어, 낱말·한자 탭과 「내 단어장」 카드가
        이번 주 단원과 다른 책을 가리킨다 — 연동한 첫날 학생이 보는 화면이 이 경우다. */
-    if (LIB.task && !db.settings.book) { db.settings.book = LIB.task.bookId; db.settings.unit = LIB.task.unitId || ''; save(); }
+    if (LIB.task && !db.settings.book) {
+      var taskEntry = LIB.index.filter(function (e) { return e.id === LIB.task.bookId; })[0];
+      if (taskEntry && !isCurriculum(taskEntry) && taskEntry.counts.words) { db.settings.book = LIB.task.bookId; db.settings.unit = LIB.task.unitId || ''; save(); }
+    }
     await loadStrokes();
     await fetchDueBooks();
     if (LIB.task && !bookOf(LIB.task.bookId)) { try { await openBook(LIB.task.bookId); } catch (e) { /* 캐시 없음 */ } }

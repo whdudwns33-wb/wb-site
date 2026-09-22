@@ -223,7 +223,8 @@ var WBHQUIZ = (function () {
 
   var WORD_KINDS = { 'w-meaning': qMeaning, 'w-word': qWord, 'w-cloze': qCloze, 'w-build': qBuild, 'w-hanja': qHanja, 'w-type': qType, 'w-syn': qSyn, 'w-context': qContext };
   var CHAR_KINDS = { 'c-hun': qHun, 'c-char': qChar, 'c-word': qCharWord, 'c-count': qCount, 'c-write': qWrite };
-  var VOCABULARY_KINDS = ['w-meaning', 'w-word', 'w-cloze', 'w-type', 'w-syn', 'w-context'];
+  /* 자동 예문 빈칸은 여러 보기가 자연스러울 수 있다. 어휘 평가의 문맥 점수는 검수된 context만 쓴다. */
+  var VOCABULARY_KINDS = ['w-meaning', 'w-word', 'w-type', 'w-syn', 'w-context'];
   /* 계단별 유형 순서 — 낮은 계단은 재인(뜻 고르기), 높은 계단은 산출(쓰기) */
   var PLAN = {
     word: [
