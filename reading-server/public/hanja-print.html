@@ -61,11 +61,11 @@
       <select id="book"></select>
       <select id="unit" style="margin-top:6px"></select>
       <h2>시험지 종류</h2>
-      <label><input type="checkbox" id="tHun" checked> 훈음 쓰기 (한자 → 뜻·소리)</label>
-      <label><input type="checkbox" id="tWrite" checked> 한자 쓰기 (훈음 → 米자 칸에 쓰기)</label>
       <label><input type="checkbox" id="tMeaning" checked> 낱말 뜻 쓰기 (낱말 → 뜻)</label>
+      <label><input type="checkbox" id="tHun"> 훈음 쓰기 (한자 → 뜻·소리)</label>
+      <label><input type="checkbox" id="tWrite"> 한자 쓰기 (훈음 → 米자 칸에 쓰기)</label>
       <label><input type="checkbox" id="tHanja"> 한자어 표기 쓰기 (낱말·뜻 → 한자)</label>
-      <label><input type="checkbox" id="tCharWord" checked> 이 글자가 든 낱말 쓰기 (한자·훈음 → 낱말, 급수 교재용)</label>
+      <label><input type="checkbox" id="tCharWord"> 이 글자가 든 낱말 쓰기 (한자·훈음 → 낱말, 급수 교재용)</label>
       <label><input type="checkbox" id="tKey" checked> 정답표 (마지막 장)</label>
       <h2>순서</h2>
       <label><input type="checkbox" id="shuf"> 섞기</label>
@@ -111,6 +111,10 @@
   async function loadBook() {
     var id = $('#book').value; if (!id) return;
     BOOK = (await api('/api/hanja/admin/book?id=' + encodeURIComponent(id))).book;
+    var vocabulary = BOOK.words.length > 0;
+    $('#tMeaning').checked = vocabulary;
+    ['#tHun', '#tWrite', '#tCharWord'].forEach(function (id) { $(id).checked = !vocabulary; });
+    $('#tHanja').checked = false;
     var units = BOOK.units.slice();
     if (BOOK.words.some(function (w) { return !w.unit; }) || BOOK.chars.some(function (c) { return !c.unit; })) units.push({ id: '', title: '단원 없음' });
     $('#unit').innerHTML = units.map(function (u) { return '<option value="' + esc(u.id) + '">' + esc(u.title) + '</option>'; }).join('');

@@ -283,10 +283,10 @@
           const e = new Error('state-conflict'); e.status = 409; throw e;
         }
         if (sync.dirty) {
-          const sentAt = S.updatedAt;
+          const sentState = JSON.stringify(S); // 같은 밀리초 안의 수정도 전송 중 새 기록으로 남긴다.
           setDot('pending', '저장 중');
           const result = await api('/state', { method: 'PUT', body: JSON.stringify({ state: S, summary: SC.forTeacher(S, Date.now()), baseUpdatedAt: remoteVersion }) });
-          sync.base = result.updatedAt; sync.dirty = S.updatedAt !== sentAt; persistSync();
+          sync.base = result.updatedAt; sync.dirty = JSON.stringify(S) !== sentState; persistSync();
           if (sync.dirty) scheduleSync(); else setDot('saved', '저장됨');
         } else {
           if (j.state) { S = SC.normalize(j.state, Date.now()); persist(); applyBody(); if (!sess) render({ keep: true }); }

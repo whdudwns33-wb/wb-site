@@ -97,6 +97,8 @@ t('획순 모드 — 거꾸로 그으면 방향을, 순서를 바꾸면 순서�
   const rev = T.matchStroke(line(0.88, 0.5, 0.12, 0.5), CROSS, []);
   assert.ok(!rev.ok && rev.reversed && rev.idx === 0, JSON.stringify(rev));
   assert.ok(/왼쪽에서 오른쪽으로/.test(T.strokeHint(rev, CROSS)), T.strokeHint(rev, CROSS));
+  const short = T.matchStroke(line(0.58, 0.5, 0.5, 0.5), [[[0.5, 0.5], [0.58, 0.5]]], []);
+  assert.ok(!short.ok && short.reversed, '짧은 획의 역방향이 거리 여유 안에 들어가도 통과하면 안 된다');
   const ooo = T.matchStroke(line(0.5, 0.1, 0.5, 0.9), CROSS, []);
   assert.ok(ooo.ok && ooo.idx === 1 && ooo.outOfOrder && ooo.expected === 0, JSON.stringify(ooo));
   assert.ok(/순서가 달라요/.test(T.strokeHint(ooo, CROSS)));
