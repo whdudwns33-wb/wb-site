@@ -87,6 +87,7 @@
       <div id="paneJson" hidden>
         <label>단어장 JSON 파일 (<code>node hanja/book-validate.mjs</code>로 검사한 것)</label>
         <input type="file" id="bkFile" accept=".json,application/json">
+        <p class="muted" style="font-size:.78rem">여러 권은 <code>{"books":[단어장, ...], "scope":"all"}</code> 파일 하나로 올립니다(최대 63권·2MB). 모든 책을 검사한 뒤 저장하며 기존 책의 공개 범위·배정은 유지합니다.</p>
         <p class="muted" style="font-size:.78rem;margin:6px 0 0">모양: <code>{ id, title, publisher?, level?, source?(own 자체|textbook 교재 — 없으면 교재), units:[{id,title}], words:[{unit, word, meaning, hanja?, example?, syn?}], chars:[{unit, ch, hun, eum, strokes?, medians?, words?(그 글자를 쓰는 낱말)}], strokes?:{"觀":25} }</code>.
         <code>medians</code>(0~1 좌표의 획 중심선, 획 순서대로)가 있는 글자만 앱에서 획순 안내·획순 판정이 열립니다.</p>
       </div>
@@ -151,7 +152,7 @@
 
     <h2>학생별 현황</h2>
     <div class="table-scroll"><table>
-      <thead><tr><th>이름</th><th>반</th><th class="num">낱말</th><th class="num">한자</th><th class="num">장기 기억</th><th class="num">복습 밀림</th><th class="num">오래 방치</th><th class="num">써 본 한자</th><th class="num">연속일</th><th>최근 교재 점검</th><th>배정</th><th>마지막 활동</th></tr></thead>
+      <thead><tr><th>이름</th><th>반</th><th class="num">확인한 낱말</th><th class="num">한자</th><th class="num">장기 기억</th><th class="num">복습 밀림</th><th class="num">오래 방치</th><th class="num">써 본 한자</th><th class="num">연속일</th><th>최근 교재 점검</th><th>배정</th><th>마지막 저장</th></tr></thead>
       <tbody id="ovBody"><tr><td colspan="12" class="muted">불러오는 중…</td></tr></tbody>
     </table></div>
   </div>
@@ -201,19 +202,27 @@
     rd.readAsText(f, 'utf-8');
   });
   function payload() {
-    if (mode === 'json') { if (!jsonBook) throw new Error('JSON 파일을 골라 주세요.'); return { book: jsonBook }; }
+    if (mode === 'json') {
+      if (!jsonBook) throw new Error('JSON 파일을 골라 주세요.');
+      if (Object.prototype.hasOwnProperty.call(jsonBook, 'books')) return { books: jsonBook.books, scope: jsonBook.scope, source: jsonBook.source };
+      return { book: jsonBook };
+    }
     var text = $('#bkText').value;
     if (!text.trim()) throw new Error('낱말을 붙여 넣어 주세요.');
     return { text: text, id: $('#bkId').value.trim(), title: $('#bkTitle').value.trim(), level: $('#bkLevel').value, publisher: $('#bkPub').value.trim(), note: $('#bkNote').value.trim(), source: $('#bkSource').value };
   }
-  function renderPreview(j) {
+  function previewHtml(j) {
+    if (j.batch && j.results) return '<p><b>' + j.results.length + '권 일괄 검사</b> · ' + (j.ok ? '전체 통과' : '오류가 있는 책을 고쳐 주세요. 아무 책도 저장하지 않았어요.') + '</p>' + j.results.map(function (result, i) {
+      return '<details' + (result.ok ? '' : ' open') + '><summary>' + (i + 1) + '. ' + esc(result.meta ? result.meta.title : '단어장') + ' · ' + (result.ok ? '통과' : '오류') + '</summary>' + previewHtml(result) + '</details>';
+    }).join('');
     var html = '';
     if (j.summary && j.summary.length) html += '<ul>' + j.summary.map(function (s) { return '<li>' + esc(s) + '</li>'; }).join('') + '</ul>';
     if (j.errors && j.errors.length) html += '<ul>' + j.errors.map(function (e) { return '<li class="err">✗ [' + esc(e.where) + '] ' + esc(e.message) + '</li>'; }).join('') + '</ul>';
     if (j.warns && j.warns.length) html += '<ul>' + j.warns.slice(0, 30).map(function (w) { return '<li class="warn">! [' + esc(w.where) + '] ' + esc(w.message) + '</li>'; }).join('') + (j.warns.length > 30 ? '<li class="warn">… 경고 ' + (j.warns.length - 30) + '건 더</li>' : '') + '</ul>';
     if (j.meta) html += '<p class="muted">id <code>' + esc(j.meta.id) + '</code> · ' + esc(j.meta.title) + ' · ' + (j.meta.source === 'own' ? '자체 단어장 (AI 연상 가능)' : '교재 단어장 (AI 연상 없음)') + ' · 단원: ' + j.meta.units.map(function (u) { return esc(u.title) + '(' + (u.words + u.chars) + ')'; }).join(', ') + '</p>';
-    $('#prev').innerHTML = html;
+    return html;
   }
+  function renderPreview(j) { $('#prev').innerHTML = previewHtml(j); }
   $('#bkPrev').addEventListener('click', async function () {
     try {
       var body = payload(); body.dryRun = true;
@@ -221,19 +230,20 @@
       renderPreview(j);
       previewOk = !!j.ok; $('#bkGo').disabled = !j.ok;
       $('#bkStat').textContent = j.ok ? '검사 통과 — 올릴 수 있어요.' : '오류를 고친 뒤 다시 미리보기';
-    } catch (e) { if (e.body && (e.body.errors || e.body.summary)) renderPreview(e.body); msg(e.message); }
+    } catch (e) { if (e.body && (e.body.errors || e.body.summary || e.body.results)) renderPreview(e.body); msg(e.message); }
   });
   $('#bkGo').addEventListener('click', async function () {
     if (!previewOk) { msg('먼저 미리보기로 검사해 주세요.'); return; }
     try {
       var body = payload();
-      var id = mode === 'json' ? String(body.book.id || '') : body.id;
-      if (BOOKS.some(function (b) { return b.id === id; }) && !confirm('같은 id 의 단어장이 이미 있어요. 덮어쓸까요? (학생 기록·배정은 그대로)')) return;
+      var ids = body.books ? body.books.map(function (b) { return String(b.id || ''); }) : [mode === 'json' ? String(body.book.id || '') : body.id];
+      var replaced = ids.filter(function (id) { return BOOKS.some(function (b) { return b.id === id; }); }).length;
+      if (replaced && !confirm(body.books ? '기존 ' + replaced + '권을 포함해 총 ' + ids.length + '권을 올릴까요? (기존 공개 범위·학생 기록·배정은 그대로)' : '같은 id 의 단어장이 이미 있어요. 덮어쓸까요? (학생 기록·배정은 그대로)')) return;
       var j = await api('/api/hanja/admin/book', { method: 'POST', body: JSON.stringify(body) });
-      msg((j.replaced ? '덮어썼어요: ' : '올렸어요: ') + j.id);
+      msg(j.batch ? j.count + '권을 올렸어요.' : (j.replaced ? '덮어썼어요: ' : '올렸어요: ') + j.id);
       resetPreview();
       await loadBooks();
-    } catch (e) { if (e.body && e.body.errors) renderPreview(e.body); msg(e.message); }
+    } catch (e) { if (e.body && (e.body.errors || e.body.results)) renderPreview(e.body); msg(e.message); }
   });
 
   /* ── 목록 ── */
@@ -338,11 +348,21 @@
     }).join('') : '<span class="muted">아직 배정이 없습니다. 공개 범위가 「모두」인 단어장은 배정 없이도 모든 연동 학생에게 보여요.</span>';
   }
 
-  /* 교재 점검 칸 — 60% 아래는 붉게. 값은 학생 기기가 올린 것이라 서버가 조이고 여기서 다시 이스케이프한다 */
+  /* 참여한 항목 수와 혼자 맞힌 수를 나눠 보여 준다. 오래된 기록은 범위를 추정하지 않는다. */
   function checkCell(c) {
-    if (!c || !c.n) return '<span class="muted">—</span>';
-    var p = Math.round(c.right * 100 / c.n);
-    return '<b' + (p < 60 ? ' style="color:#B23A2E"' : '') + '>' + c.right + ' / ' + c.n + '</b> <span class="muted" style="font-size:.8rem">' + esc(c.title || '') + (c.at ? ' · ' + fmt(new Date(c.at).toISOString()) : '') + '</span>';
+    if (!c || !c.n) return '<span class="muted">미점검</span>';
+    var alone = c.right - (c.hinted || 0), p = Math.round(alone * 100 / c.n);
+    var html = '<b' + (p < 60 ? ' style="color:#B23A2E"' : '') + '>' + (c.hinted == null ? '정답 ' : '혼자 정답 ') + alone + ' / ' + c.n + '</b>' +
+      '<div class="muted" style="font-size:.8rem">' + esc(bookTitle(c.book)) + ' · ' + esc(c.title || c.unit || '') + (c.at ? ' · ' + fmt(c.at) : '') + '</div>' +
+      '<div class="muted" style="font-size:.8rem">' + (c.total == null ? '이전 형식 · 전체 범위 미확인' : '점검 범위 ' + c.n + ' / ' + c.total) + (c.hinted ? ' · 힌트 정답 ' + c.hinted : '') + '</div>';
+    if (c.domains) html += '<div style="font-size:.8rem">' + [['meaning', '뜻 이해'], ['context', '문맥 적용'], ['recall', '낱말 회상']].map(function (pair) {
+      var d = c.domains[pair[0]];
+      return pair[1] + ' ' + (d && d.n ? esc(d.right) + '/' + esc(d.n) : '미실시');
+    }).join(' · ') + '</div>';
+    if (c.retry) html += '<div style="font-size:.8rem">오답 재확인: 혼자 정답 ' + c.retry.right + ' / ' + c.retry.total + ' · ' + fmt(c.retry.at) + '</div>';
+    var unresolved = c.retry ? c.retry.wrongIds : c.wrongIds;
+    if (unresolved && unresolved.length) html += '<div style="font-size:.8rem;color:#B23A2E">보충할 낱말·한자 ' + unresolved.length + '개</div>';
+    return html;
   }
 
   /* ── 현황 ── */
@@ -352,9 +372,9 @@
     $('#ovBody').innerHTML = rows.length ? rows.map(function (s) {
       return '<tr><td><b>' + esc(s.name || s.code) + '</b></td><td>' + esc(s.cls || '') + '</td><td class="num">' + s.words + '</td><td class="num">' + s.chars + '</td><td class="num">' + s.graduated + '</td>' +
         '<td class="num">' + s.due + '</td><td class="num"' + (s.emergency ? ' style="color:#B23A2E;font-weight:700"' : '') + '>' + s.emergency + '</td><td class="num">' + s.traced + '</td><td class="num">' + s.streak + '</td>' +
-        '<td>' + checkCell(s.lastCheck) + '</td>' +
+        '<td>' + (s.linked ? checkCell(s.lastCheck) : '<span class="muted">미연동 · 미시작</span>') + '</td>' +
         '<td class="muted">' + (s.assigned || []).map(function (id) { return esc(bookTitle(id)); }).join(', ') + '</td><td class="muted">' + fmt(s.lastActive) + '</td></tr>';
-    }).join('') : '<tr><td colspan="12" class="muted">아직 앱을 연 학생이 없어요.</td></tr>';
+    }).join('') : '<tr><td colspan="12" class="muted">등록된 학생이 없어요.</td></tr>';
   }
 
   /* ── 이번 주 단원 지정 ── */
@@ -373,15 +393,16 @@
   }
   function fillUnits() {
     var b = BOOKS.filter(function (x) { return x.id === $('#tkBook').value; })[0];
-    $('#tkUnit').innerHTML = b ? (b.units || []).map(function (u) { return '<option value="' + esc(u.id) + '">' + esc(u.title) + ' (' + (u.words + u.chars) + ')</option>'; }).join('') : '';
+    var vocabulary = b && b.counts && b.counts.words > 0;
+    $('#tkUnit').innerHTML = b ? (b.units || []).filter(function (u) { return vocabulary ? u.words > 0 : u.chars > 0; }).map(function (u) { return '<option value="' + esc(u.id) + '">' + esc(u.title) + ' (' + (vocabulary ? u.words + '낱말' : u.chars + '자') + ')</option>'; }).join('') : '';
   }
   $('#tkBook').addEventListener('change', fillUnits);
   $('#tkGo').addEventListener('click', async function () {
     try {
       var j = await api('/api/hanja/admin/task', { method: 'POST', body: JSON.stringify({ scope: $('#tkScope').value, bookId: $('#tkBook').value, unitId: $('#tkUnit').value, due: $('#tkDue').value, title: $('#tkTitle').value }) });
-      msg('지정했어요: ' + j.task.title); $('#tkTitle').value = '';
+      msg('지정했어요: ' + j.task.title); $('#tkTitle').value = ''; $('#tkStat').textContent = '';
       await loadTasks();
-    } catch (e) { msg(e.message); }
+    } catch (e) { $('#tkStat').textContent = e.message; msg(e.message); }
   });
   function scopeLabel(s) { if (s === 'default') return '전체'; var st = STUDENTS.filter(function (x) { return x.code === s; })[0]; return st ? '학생 ' + st.name : '반 ' + s; }
   async function loadTasks() {
@@ -403,14 +424,17 @@
       var j = await api('/api/hanja/admin/progress?scope=' + encodeURIComponent(scope));
       var rows = j.rows || [], tot = j.unit.total;
       var avg = rows.length ? Math.round(rows.reduce(function (a, r) { return a + (tot ? r.planted / tot : 0); }, 0) * 100 / rows.length) : 0;
-      $('#tkProgress').innerHTML = '<h2>단원 진도 — ' + esc(scopeLabel(scope)) + ' · ' + esc(j.task.title) + ' <span class="muted">항목 ' + tot + ' · 평균 진도 ' + avg + '%</span></h2>' +
-        '<div class="table-scroll"><table><thead><tr><th>이름</th><th>반</th><th class="num">배우는 중</th><th class="num">장기 기억</th><th class="num">복습 밀림</th><th>교재 점검</th><th>진도</th><th>마지막 활동</th></tr></thead><tbody>' +
+      $('#tkProgress').innerHTML = '<h2>단원 점검 — ' + esc(scopeLabel(scope)) + ' · ' + esc(j.task.title) + ' <span class="muted">항목 ' + tot + ' · 평균 참여 ' + avg + '%</span></h2>' +
+        (!tot ? '<p class="muted">이 단원은 현재 학습할 항목이 없어요. 다른 단원을 다시 지정해 주세요.</p>' : '') +
+        '<p class="muted" style="font-size:.8rem">학생 화면에 이 과제가 지정된 ' + rows.length + '명입니다. 참여는 앱에서 답하거나 배운 항목 수이며, 숙달 여부는 점검 결과와 장기 기억을 함께 봅니다.</p>' +
+        '<div class="table-scroll"><table><thead><tr><th>이름</th><th>반</th><th class="num">참여한 항목</th><th class="num">장기 기억</th><th class="num">복습 밀림</th><th>교재 점검</th><th>참여율</th><th>마지막 저장</th></tr></thead><tbody>' +
         (rows.length ? rows.map(function (r) {
           var p = tot ? Math.round(r.planted * 100 / tot) : 0;
           return '<tr><td><b>' + esc(r.name) + '</b></td><td>' + esc(r.cls) + '</td><td class="num">' + r.planted + ' / ' + tot + '</td><td class="num">' + r.graduated + '</td><td class="num"' + (r.due ? ' style="color:#B23A2E;font-weight:700"' : '') + '>' + r.due + '</td>' +
-            '<td>' + checkCell(r.check) + '</td>' +
+            '<td><b>' + esc({ empty: '학습 항목 없음 · 재지정 필요', unlinked: '미연동', unchecked: '미점검', previous: '지정 후 미점검', partial: '일부 점검', review: '보충 필요', checked: '전체 점검', rechecked: '오답 재확인 완료', unknown: '점검 범위 미확인' }[r.checkStatus] || '') + '</b><br>' +
+              (r.previousCheck ? '<span class="muted">이전 점검 (이번 과제 결과 아님)</span>' + checkCell(r.previousCheck) : checkCell(r.check)) + '</td>' +
             '<td><div style="width:120px;height:8px;background:#F1ECE1;border-radius:99px;overflow:hidden"><div style="width:' + p + '%;height:100%;background:' + (p >= 100 ? '#4E8C57' : '#3D6B8E') + '"></div></div></td><td class="muted">' + (r.linked ? fmt(r.lastActive) : '미연동') + '</td></tr>';
-        }).join('') : '<tr><td colspan="8" class="muted">이 범위에 등록된 학생이 없어요.</td></tr>') + '</tbody></table></div>';
+        }).join('') : '<tr><td colspan="8" class="muted">이 과제가 적용되는 학생이 없어요. 학생·반별 지정을 확인하세요.</td></tr>') + '</tbody></table></div>';
       $('#tkProgress').scrollIntoView({ behavior: 'smooth', block: 'start' });
     } catch (e) { msg(e.message); }
   }

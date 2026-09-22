@@ -58,6 +58,30 @@ t('fail 은 두 계단 내려가 10분 뒤에 다시, hard 는 계단 유지 하
   assert.strictEqual(s.step, 2); assert.strictEqual(s.due, at(13) + DAY);
 });
 
+t('예정 전 반복 정답·힌트는 기억 단계·기한을 바꾸지 않고 실패는 처리한다', () => {
+  const s = S.plant('w:b:w1', at(10));
+  const planted = { ...s };
+  for (let i = 0; i < 6; i++) S.review(s, 'good', at(10) + i * 1000);
+  S.review(s, 'hard', at(11));
+  assert.deepStrictEqual(s, planted, '당일 반복으로 기억 상태가 올라갔다');
+  S.review(s, 'good', s.due);
+  assert.strictEqual(s.step, 1);
+  const reviewed = { ...s };
+  S.review(s, 'good', s.due - 1);
+  S.review(s, 'hard', s.due - 1);
+  assert.deepStrictEqual(s, reviewed, '예정 전 정답·힌트가 다음 복습을 밀었다');
+  S.review(s, 'fail', at(22));
+  assert.strictEqual(s.step, 0);
+  assert.strictEqual(s.lapses, 1);
+  assert.strictEqual(s.due, at(22) + 600000);
+  const failed = { ...s };
+  S.review(s, 'good', at(22) + 1000);
+  assert.deepStrictEqual(s, failed, '오답 직후 재시도가 10분 복습을 미뤘다');
+  S.review(s, 'good', s.due);
+  assert.strictEqual(s.step, 1);
+  assert.strictEqual(s.due, failed.due + DAY);
+});
+
 t('물 줄 목록은 가장 오래 방치된 것부터, 졸업·미도래는 뺀다', () => {
   const now = at(12);
   const states = {

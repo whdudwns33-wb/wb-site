@@ -299,4 +299,119 @@ t('훈음 없는 한자 표기도 왕복한다 — 그런 교재가 통째로 �
   assert.ok(!explicit.ok, '직접 적은 글자의 빠진 훈음이 통과했다');
 });
 
+t('상황 적용 문항 — 보기 2~4개를 정규화하고 재검사에도 그대로 보존한다', () => {
+  [2, 3, 4].forEach((n) => {
+    const context = { prompt: '  친구의 일을 거든 모습은?  ', choices: [' 함께  옮겼다 ', '혼자 떠났다', '일을 늘렸다', '모른 척했다'].slice(0, n),
+      answer: ' 함께\n옮겼다 ', explanation: '  친구와 짐을 나누어 들면 일을 돕는 것이다.  ' };
+    const raw = { id: 'context-1', title: '상황 적용', words: [{ word: '거들다', meaning: '남의 일을 돕다', context }] };
+    const before = JSON.stringify(raw), one = B.checkBook(raw);
+    assert.ok(one.ok, JSON.stringify(one.errors));
+    assert.deepStrictEqual(one.book.words[0].context, { prompt: '친구의 일을 거든 모습은?', choices: ['함께 옮겼다', '혼자 떠났다', '일을 늘렸다', '모른 척했다'].slice(0, n),
+      answer: '함께 옮겼다', explanation: '친구와 짐을 나누어 들면 일을 돕는 것이다.' });
+    assert.strictEqual(JSON.stringify(raw), before, '원본 자료를 바꿨다');
+    const two = B.checkBook(JSON.parse(JSON.stringify(one.book)));
+    assert.ok(two.ok, JSON.stringify(two.errors));
+    assert.deepStrictEqual(two.book, one.book, '재검사에서 상황 적용 문항이 달라졌다');
+  });
+  const legacy = B.checkBook({ id: 'context-old', title: '기존', words: [{ word: '거들다', meaning: '남의 일을 돕다' }] });
+  assert.ok(legacy.ok && !Object.hasOwn(legacy.book.words[0], 'context'), '없는 문항을 만들어 붙였다');
+});
+
+t('명시한 상황 적용 문항의 잘못된 객체·길이·보기·정답·해설은 업로드 오류다', () => {
+  const valid = { prompt: '거든 모습은?', choices: ['도왔다', '떠났다'], answer: '도왔다', explanation: '남의 일을 함께 하는 모습이다.' };
+  const bad = [null, undefined, [], '문항', 1, {},
+    { prompt: '' }, { prompt: 1 }, { prompt: '가'.repeat(301) },
+    { choices: '도왔다, 떠났다' }, { choices: ['도왔다'] }, { choices: ['도왔다', '가', '나', '다', '라'] },
+    { choices: ['도왔다', ' 도왔다 '] }, { choices: ['같이 했다', '같이  했다'], answer: '같이 했다' },
+    { choices: ['도왔다', ' '] }, { choices: ['도왔다', 2] }, { choices: ['도왔다', '가'.repeat(121)] },
+    { answer: '' }, { answer: 1 }, { answer: '없는 보기' }, { answer: '가'.repeat(121) },
+    { explanation: '' }, { explanation: 1 }, { explanation: '가'.repeat(301) },
+  ];
+  bad.forEach((change, i) => {
+    const context = change && typeof change === 'object' && !Array.isArray(change) && Object.keys(change).length
+      ? Object.assign({}, valid, change) : change;
+    const r = B.checkBook({ id: 'context-bad', title: '불량', words: [{ word: '거들다', meaning: '남의 일을 돕다', context }] });
+    assert.ok(!r.ok && r.book === null, '불량 문항을 버리고 통과했다: ' + i);
+    assert.ok(r.errors.some((e) => /context/.test(e.where)), '오류 위치에서 context 를 못 찾는다: ' + i);
+  });
+  ['prompt', 'choices', 'answer', 'explanation'].forEach((key) => {
+    const context = Object.assign({}, valid); delete context[key];
+    assert.ok(!B.checkBook({ id: 'context-missing', title: '누락', words: [{ word: '거들다', meaning: '남의 일을 돕다', context }] }).ok, key + ' 누락을 허용했다');
+  });
+  const duplicate = B.checkBook({ id: 'context-dup', title: '중복', words: [
+    { word: '거들다', meaning: '남의 일을 돕다', context: valid }, { word: '거들다', meaning: '도움', context: null },
+  ] });
+  assert.ok(!duplicate.ok, '중복 낱말이라는 이유로 잘못된 명시 문항을 조용히 버렸다');
+});
+
+t('교과 학년·과목은 교재 단계와 별개이며 본문·목록·재검사에 보존된다', () => {
+  const raw = { id: 'curriculum-test', title: '교과 검사', source: 'own', level: 'L2',
+    curriculum: { grade: ' 초3 ', subject: ' 수학 ' }, words: [{ word: '도형', meaning: '점이나 선으로 이루어진 모양' }] };
+  const before = JSON.stringify(raw), first = B.checkBook(raw);
+  assert.ok(first.ok, JSON.stringify(first.errors));
+  assert.deepStrictEqual(first.warns, []);
+  assert.deepStrictEqual(first.book.curriculum, { grade: '초3', subject: '수학' });
+  assert.strictEqual(first.book.level, 'L2', '학년이 기존 교재 단계를 덮었다');
+  const meta = B.bookMeta(first.book);
+  assert.deepStrictEqual(meta.curriculum, first.book.curriculum);
+  assert.notStrictEqual(meta.curriculum, first.book.curriculum, '목록 메타가 본문 객체를 공유한다');
+  assert.deepStrictEqual(B.checkBook(JSON.parse(JSON.stringify(first.book))).book, first.book, '재검사에서 교과 표시가 사라졌다');
+  assert.strictEqual(JSON.stringify(raw), before, '원본 메타를 수정했다');
+  raw.source = 'textbook';
+  assert.ok(B.checkBook(raw).ok, '종류를 바꾸면 교과 메타 때문에 자료가 안 열린다');
+  delete raw.curriculum;
+  assert.ok(!Object.hasOwn(B.checkBook(raw).book, 'curriculum'), '기존 교재에 교과 메타를 만들어 넣었다');
+  assert.ok(!Object.hasOwn(B.bookMeta(B.checkBook(raw).book), 'curriculum'));
+  B.CURRICULUM_GRADES.forEach((grade) => B.CURRICULUM_SUBJECTS.forEach((subject) => {
+    assert.ok(B.checkBook(Object.assign({}, raw, { curriculum: { grade, subject } })).ok, grade + ' ' + subject);
+  }));
+  assert.strictEqual(B.CURRICULUM_GRADES.length, 12);
+  assert.strictEqual(B.CURRICULUM_SUBJECTS.length, 9);
+});
+
+t('명시한 교과 메타의 잘못된 객체·학년·과목·필드는 조용히 지우지 않고 막는다', () => {
+  [null, undefined, [], '초3 수학', 3, {}, { grade: '초3' }, { subject: '수학' },
+    { grade: '초7', subject: '수학' }, { grade: '지1', subject: '수학' }, { grade: 'L2', subject: '수학' },
+    { grade: 3, subject: '수학' }, { grade: '초3', subject: 1 }, { grade: '초3', subject: '영어' },
+    { grade: '초3', subject: ' ' }, { grade: '초3', subject: '수학', school: '초등학교' },
+  ].forEach((curriculum) => {
+    const r = B.checkBook({ id: 'curriculum-bad', title: '불량 교과', curriculum, words: [{ word: '도형', meaning: '점이나 선으로 이루어진 모양' }] });
+    assert.ok(!r.ok && r.book === null, '불량 메타가 통과했다: ' + JSON.stringify(curriculum));
+    assert.ok(r.errors.some((e) => e.where.startsWith('curriculum')));
+  });
+});
+
+t('원어 참고는 한자·혼합 표기·외래어를 그대로 왕복 보존하고 한자 항목이나 id를 만들지 않는다', () => {
+  ['觀測', ' 에너지轉換 ', 'spectrum(외래어)', '가'.repeat(100)].forEach((origin) => {
+    const raw = { id: 'origin-test', title: '원어 참고', words: [{ word: '관측', meaning: '보고 재는 일', origin }] };
+    const before = JSON.stringify(raw), one = B.checkBook(raw);
+    assert.ok(one.ok, JSON.stringify(one.errors));
+    assert.deepStrictEqual(one.warns, []);
+    assert.strictEqual(one.book.words[0].origin, origin, '원어 표기를 잘라내거나 바꿨다');
+    assert.strictEqual(one.book.words[0].id, '관측', '참고 표기 때문에 기존 낱말 id가 달라졌다');
+    assert.ok(!one.book.words[0].hanja && !one.book.words[0].parts && !one.book.words[0].literal);
+    assert.deepStrictEqual(one.book.chars, [], '참고 표기에서 훈음 없는 한자 항목을 도출했다');
+    assert.deepStrictEqual(B.checkBook(JSON.parse(JSON.stringify(one.book))).book, one.book);
+    assert.strictEqual(JSON.stringify(raw), before);
+  });
+  const both = B.checkBook({ id: 'origin-both', title: '한자 병행', words: [{ word: '산수', meaning: '산과 물의 경치', origin: '山水(산과 물)', hanja: '山(메 산)+水(물 수)' }] });
+  assert.ok(both.ok);
+  assert.strictEqual(both.book.words[0].origin, '山水(산과 물)');
+  assert.strictEqual(both.book.words[0].id, '산수|山水');
+  assert.strictEqual(both.book.chars.length, 2, '기존 hanja에서 글자를 도출하는 기능이 깨졌다');
+  assert.deepStrictEqual(B.checkBook(both.book).book, both.book);
+});
+
+t('명시한 불량 원어 표기는 버리거나 자르지 않고 오류로 막는다', () => {
+  [null, undefined, 1, [], {}, '', ' \n ', '가'.repeat(101)].forEach((origin) => {
+    const r = B.checkBook({ id: 'origin-bad', title: '불량 원어', words: [{ word: '원어', meaning: '본래의 말', origin }] });
+    assert.ok(!r.ok && r.book === null, '불량 원어가 통과했다: ' + JSON.stringify(origin));
+    assert.ok(r.errors.some((e) => /\.origin$/.test(e.where)));
+  });
+  const duplicate = B.checkBook({ id: 'origin-dup', title: '중복', words: [
+    { word: '원어', meaning: '본래의 말' }, { word: '원어', meaning: '본래의 말', origin: null },
+  ] });
+  assert.ok(!duplicate.ok, '중복 낱말의 잘못된 원어를 조용히 버렸다');
+});
+
 console.log(`\nOK — ${passed}개 통과`);

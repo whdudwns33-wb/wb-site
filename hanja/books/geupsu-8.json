@@ -14,7 +14,7 @@
   ],
   "words": [],
   "chars": [
-    { "ch": "一", "hun": "한", "eum": "일", "strokes": 1, "unit": "g8-u1", "words": ["일등", "일요일"] },
+    { "ch": "一", "hun": "한", "eum": "일", "strokes": 1, "unit": "g8-u1", "words": ["일등", "일주일"] },
     { "ch": "二", "hun": "두", "eum": "이", "strokes": 2, "unit": "g8-u1", "words": ["이월", "이층"] },
     { "ch": "三", "hun": "석", "eum": "삼", "strokes": 3, "unit": "g8-u1", "words": ["삼촌", "삼월"] },
     { "ch": "四", "hun": "넉", "eum": "사", "strokes": 5, "unit": "g8-u1", "words": ["사방", "사월"] },

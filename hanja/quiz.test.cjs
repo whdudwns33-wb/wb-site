@@ -29,6 +29,7 @@ t('모든 유형이 정답을 보기 안에 두고 보기 4개가 서로 다르�
     Object.keys(Q.HEAD).filter((k) => k[0] === 'w').forEach((k) => {
       const q = Q.makeQuestion({ kind: 'word', w }, ctx, { rnd, kinds: [k] });
       if (!q) return;
+      assert.strictEqual(q.kind, k, '허용 목록 밖의 유형이 나왔다');
       kinds[q.kind] = (kinds[q.kind] || 0) + 1;
       if (!q.input && !q.write) {
         assert.strictEqual(q.choices.length, 4, q.kind + ' ' + w.word);
@@ -43,6 +44,7 @@ t('모든 유형이 정답을 보기 안에 두고 보기 4개가 서로 다르�
     Object.keys(Q.HEAD).filter((k) => k[0] === 'c').forEach((k) => {
       const q = Q.makeQuestion({ kind: 'char', c }, ctx, { rnd, kinds: [k] });
       if (!q) return;
+      assert.strictEqual(q.kind, k, '허용 목록 밖의 유형이 나왔다');
       kinds[q.kind] = (kinds[q.kind] || 0) + 1;
       if (q.write) { assert.strictEqual(q.answer, c.ch); assert.ok(Q.check(q, { level: 'good' }) && Q.check(q, { level: 'ok' }) && !Q.check(q, { level: 'retry' }) && !Q.check(q, null)); return; }
       assert.strictEqual(q.choices.length, 4, q.kind + ' ' + c.ch);
@@ -81,9 +83,9 @@ t('고유어 — 활용형 예문도 빈칸이 되고, 조립·표기 유형은 
   const w = byWord('엇갈리다');
   const q = Q.makeQuestion({ kind: 'word', w }, ctx, { rnd, kinds: ['w-cloze'] });
   assert.ok(q && /길에서 ○○○/.test(q.prompt), '활용형(엇갈렸다)을 못 가렸다: ' + (q && q.prompt));
-  /* 고정 유형이 안 만들어지면 계단의 다른 유형으로 넘어간다 — 조립을 시켰지만 고유어라 다른 것이 나온다 */
+  /* 허용 유형을 만들 수 없으면 다른 유형으로 바꾸지 않고 건너뛴다 */
   const fb = Q.makeQuestion({ kind: 'word', w }, ctx, { rnd, kinds: ['w-build'] });
-  assert.notStrictEqual(fb.kind, 'w-build');
+  assert.strictEqual(fb, null);
   /* 낱말 고르기 보기는 같은 꼴(~다)끼리 — 명사 사이에 용언 하나면 문법만으로 답이 보인다 */
   const q2 = Q.makeQuestion({ kind: 'word', w }, ctx, { rnd, kinds: ['w-word'] });
   assert.ok(q2.choices.every((v) => /다$/.test(v)), '고유어 용언 보기에 명사가 섞였다: ' + q2.choices);
@@ -104,7 +106,7 @@ t('한자 — 훈음·글자·낱말·획수 (觀·山)', () => {
   assert.strictEqual(q4.answer, '3');
   assert.ok(q4.choices.every((v) => Number(v) >= 1));
   const noStrokes = { ch: '龜', hun: '거북', eum: '귀', unit: 'u01', _sid: 'c:龜' };
-  assert.notStrictEqual(Q.makeQuestion({ kind: 'char', c: noStrokes }, ctx, { rnd, kinds: ['c-count'] }).kind, 'c-count', '획수 없는 글자에 획수 문제가 나왔다');
+  assert.strictEqual(Q.makeQuestion({ kind: 'char', c: noStrokes }, ctx, { rnd, kinds: ['c-count'] }), null, '획수 없는 글자에 획수 문제가 나왔다');
 });
 
 t('계단이 오르면 재인에서 산출로 — 계단의 유형 묶음 안에서만 나오고, 같은 계단 안에서는 섞인다', () => {
@@ -135,7 +137,7 @@ t('고유어 비슷한 말 — 유의어가 정답, 다른 낱말의 유의어�
   assert.strictEqual(q.kind, 'w-syn');
   assert.ok(w.syn.indexOf(q.answer) >= 0);
   q.choices.filter((v) => v !== q.answer).forEach((v) => assert.ok(w.syn.indexOf(v) < 0 && v !== w.word, '정답 낱말의 다른 유의어가 오답 보기에 있다: ' + v));
-  assert.strictEqual(Q.makeQuestion({ kind: 'word', w: byWord('관측') }, ctx, { rnd: seeded(2), kinds: ['w-syn'] }).kind !== 'w-syn', true, '유의어 없는 낱말에 비슷한 말 문항이 나왔다');
+  assert.strictEqual(Q.makeQuestion({ kind: 'word', w: byWord('관측') }, ctx, { rnd: seeded(2), kinds: ['w-syn'] }), null, '유의어 없는 낱말에 비슷한 말 문항이 나왔다');
 });
 
 t('닮은 글자·같은 부수가 오답 보기로 먼저 온다', () => {
@@ -164,7 +166,12 @@ t('같은 씨앗이면 같은 문항 — 화면이 다시 그려도 보기가 �
 
 t('보기가 모자라면 null — 억지 문항을 내지 않는다', () => {
   const tiny = { words: book.words.slice(0, 2), chars: [], find: B.findInExample };
-  assert.strictEqual(Q.makeQuestion({ kind: 'word', w: tiny.words[0] }, tiny, { rnd: seeded(1), kinds: ['w-meaning'] }).kind, 'w-type', '보기 3개가 안 되면 입력형만 남는다');
+  const item = { kind: 'word', w: tiny.words[0] };
+  assert.strictEqual(Q.makeQuestion(item, tiny, { rnd: seeded(1), kinds: ['w-meaning'] }), null, '보기 부족을 허용하지 않은 쓰기 문항으로 대체했다');
+  assert.strictEqual(Q.makeQuestion(item, tiny, { rnd: seeded(1), kinds: ['w-meaning', 'w-type'] }).kind, 'w-type', '허용된 쓰기로는 대체할 수 있다');
+  assert.strictEqual(Q.makeQuestion(item, tiny, { rnd: seeded(1), vocabulary: true }).kind, 'w-type', '어휘 모드도 허용 유형 안에서 대체한다');
+  assert.strictEqual(Q.makeQuestion(item, ctx, { kinds: [] }), null, '빈 허용 목록을 무시했다');
+  assert.strictEqual(Q.makeQuestion(item, ctx, { kinds: ['c-hun', 'unknown', 'constructor'] }), null, '낱말에 없는 유형을 허용했다');
   /* 훈음이 있는 글자는 보기가 없어도 쓰기 문항은 낼 수 있다 — 훈음이 없으면 아무 문항도 못 낸다 */
   const lone = { ch: '龜', hun: '거북', eum: '귀', unit: 'u01', _sid: 'c:龜' };
   const s = Q.session([{ kind: 'char', c: lone, step: 0 }], { words: [], chars: [lone] }, { rnd: seeded(1) });
@@ -181,6 +188,30 @@ t('세션 — 항목마다 계단에 맞는 문항 하나, max 로 자른다', (
   const s = Q.session(items, ctx, { rnd: seeded(9), max: 4 });
   assert.strictEqual(s.questions.length, 4);
   assert.strictEqual(s.skipped.length, 0);
+});
+
+t('어휘 모드 — 계단별 어휘 유형만 내고 한자 병기·힌트를 숨긴다', () => {
+  const allowed = ['w-meaning', 'w-word', 'w-cloze', 'w-type', 'w-syn'];
+  const w = byWord('관측'), item = { kind: 'word', w };
+  const meaning = Q.makeQuestion(item, ctx, { vocabulary: true, kinds: ['w-meaning'], rnd: seeded(2) });
+  assert.strictEqual(meaning.prompt, '관측 의 뜻은?');
+  const writing = Q.makeQuestion(item, ctx, { vocabulary: true, kinds: ['w-type'] });
+  assert.strictEqual(writing.hint, '관 _');
+  assert.strictEqual(Q.makeQuestion(item, ctx, { vocabulary: true, kinds: ['w-build', 'w-hanja'] }), null);
+  [0, 1, 2, 4].forEach((step) => {
+    const plan = Q.PLAN.word[Q.tier(step)].filter((k) => allowed.includes(k));
+    for (let seed = 1; seed <= 12; seed++) {
+      const q = Q.makeQuestion(item, ctx, { vocabulary: true, step, rnd: seeded(seed) });
+      assert.ok(q && plan.includes(q.kind), '어휘 계단 ' + step + ' 밖의 유형: ' + (q && q.kind));
+      const c = { kind: 'char', c: byCh('十') };
+      assert.deepStrictEqual(Q.makeQuestion(c, ctx, { vocabulary: true, step, rnd: seeded(seed) }),
+        Q.makeQuestion(c, ctx, { step, rnd: seeded(seed) }), '한자 문항까지 바뀌었다');
+    }
+  });
+  const s = Q.session([item], ctx, { vocabulary: true, kinds: ['w-meaning'], rnd: seeded(2) });
+  assert.deepStrictEqual(s.questions, [meaning], '세션에서 어휘 옵션을 잃었다');
+  const skipped = Q.session([item], ctx, { vocabulary: true, kinds: ['w-hanja'] });
+  assert.deepStrictEqual(skipped, { questions: [], skipped: [item] });
 });
 
 t('급수 교재 — 낱말 항목이 없어도 글자의 예시 낱말로 「이 글자가 든 낱말」 문항이 나온다', () => {
@@ -202,10 +233,10 @@ t('급수 교재 — 낱말 항목이 없어도 글자의 예시 낱말로 「�
   assert.strictEqual(wrong.length, 3);
   wrong.forEach((w) => assert.ok(!chars[0].words.includes(w), '같은 글자의 낱말이 오답으로 섞였다: ' + w));
   assert.ok(/일등|일주|일생|일주일/.test(q.reveal || ''), '해설에 그 글자의 낱말 목록이 없다');
-  /* 예시 낱말이 없으면 c-word 를 만들지 않는다 — makeQuestion 은 다른 유형으로 넘어간다(억지 문항을 내지 않는다) */
+  /* 예시 낱말이 없으면 c-word 를 만들지 않는다 */
   const none = Q.makeQuestion({ kind: 'char', c: { ch: '天', hun: '하늘', eum: '천', unit: 'g05', strokes: 4, _sid: 'c:天' }, _sid: 'c:天' },
     { words: [], chars: [{ ch: '天', words: [] }] }, { kinds: ['c-word'], rnd: seeded(3) });
-  assert.ok(!none || none.kind !== 'c-word', '예시 낱말이 없는데 c-word 를 만들었다');
+  assert.strictEqual(none, null, '예시 낱말이 없는데 문항을 만들었다');
   /* 낱말 항목이 있는 단어장은 예전처럼 그것을 쓴다 */
   const withWords = { words: [
     { word: '관측', hanja: '觀測', meaning: '재다', unit: 'u1' }, { word: '학교', hanja: '學校', meaning: '배우는 곳', unit: 'u1' },
@@ -214,6 +245,42 @@ t('급수 교재 — 낱말 항목이 없어도 글자의 예시 낱말로 「�
   const q2 = Q.makeQuestion({ kind: 'char', c: { ch: '觀', hun: '볼', eum: '관', unit: 'u1', words: ['안 쓰는 낱말'], _sid: 'c:觀' }, _sid: 'c:觀' },
     withWords, { kinds: ['c-word'], rnd: seeded(11) });
   assert.strictEqual(q2.answer, '관측', '낱말 항목이 있으면 그쪽이 먼저다');
+});
+
+t('상황 적용 — 검수한 새 상황·보기·해설로 출제하고 어휘 모드에서도 정확히 채점한다', () => {
+  const w = byWord('추론'), item = { kind: 'word', w }, before = JSON.stringify(w.context);
+  const q = Q.makeQuestion(item, ctx, { kinds: ['w-context'], vocabulary: true, rnd: seeded(6) });
+  assert.strictEqual(q.kind, 'w-context');
+  assert.strictEqual(q.head, '상황에 적용하기');
+  assert.strictEqual(q.id, w._sid);
+  assert.strictEqual(q.word, w.word);
+  assert.strictEqual(q.prompt, w.context.prompt);
+  assert.strictEqual(q.answer, w.context.answer);
+  assert.strictEqual(q.explanation, w.context.explanation);
+  assert.strictEqual(q.input, false);
+  assert.deepStrictEqual(q.choices.slice().sort(), w.context.choices.slice().sort());
+  assert.ok(Q.check(q, q.answer));
+  q.choices.filter((v) => v !== q.answer).forEach((v) => assert.ok(!Q.check(q, v), '오답이 정답으로 채점됐다: ' + v));
+  assert.ok(!/[\u3400-\u9fff]/.test(q.prompt + q.choices.join('') + q.explanation), '어휘 문맥 적용에 한자 지식이 필요하다');
+  assert.ok(!q.hint && !q.bigChoices && !q.write);
+  assert.strictEqual(JSON.stringify(w.context), before, '보기 섞기가 원본 문항을 바꿨다');
+  assert.deepStrictEqual(Q.session([item], ctx, { kinds: ['w-context'], vocabulary: true, rnd: seeded(6) }).questions, [q]);
+  [2, 3, 4].forEach((n) => {
+    const short = Object.assign({}, w, { context: Object.assign({}, w.context, { choices: w.context.choices.slice(0, n) }) });
+    const made = Q.makeQuestion({ kind: 'word', w: short }, { words: [short], chars: [] }, { kinds: ['w-context'], vocabulary: true });
+    assert.ok(made && made.choices.length === n, '보기 ' + n + '개의 검수 문항을 임의로 늘리거나 버렸다');
+    assert.ok(Q.check(made, short.context.answer));
+  });
+});
+
+t('상황 적용 자료가 없으면 건너뛰고, 기존 예문 빈칸을 대신 새 상황이라고 내지 않는다', () => {
+  const w = Object.assign({}, byWord('관측')); delete w.context;
+  const item = { kind: 'word', w };
+  assert.strictEqual(Q.makeQuestion(item, ctx, { kinds: ['w-context'], vocabulary: true }), null);
+  assert.deepStrictEqual(Q.session([item], ctx, { kinds: ['w-context'], vocabulary: true }), { questions: [], skipped: [item] });
+  assert.strictEqual(Q.makeQuestion(item, ctx, { kinds: ['w-cloze'], vocabulary: true }), null, '자동 빈칸을 검수된 문맥 평가로 내면 안 된다');
+  const old = Q.makeQuestion(item, ctx, { kinds: ['w-cloze'] });
+  assert.ok(old && old.kind === 'w-cloze' && old.answer === w.word && !old.explanation, '기존 빈칸 문항이 바뀌었다');
 });
 
 console.log(`\nOK — ${passed}개 통과`);

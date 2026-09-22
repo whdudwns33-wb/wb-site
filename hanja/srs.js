@@ -32,6 +32,8 @@ var WBHSRS = (function () {
 
   /* grade: 'fail'(틀림) | 'hard'(힌트·재시도 뒤 맞힘) | 'good'(첫 시도 정답) */
   function review(s, grade, now) {
+    /* 예정 전 반복 정답·힌트는 간격 복습으로 세지 않는다. 실패는 바로 다시 익힐 필요가 있다. */
+    if (grade !== 'fail' && now < s.due) return s;
     s.reps += 1; s.last = now;
     if (grade === 'fail') {
       s.lapses += 1; s.streak = 0;

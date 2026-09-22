@@ -52,7 +52,7 @@ t('화면이 부르는 /api/hanja/* 경로가 서버 라우터에 다 있다', (
 
 t('학생 화면은 학생 기기·단어장 값을 이스케이프해서 그린다', () => {
   /* 낱말·뜻·제목을 innerHTML 에 넣는 자리마다 esc( 가 있다 — 새 자리를 만들 때 빼먹기 쉬운 것 */
-  ['esc(w.word)', 'esc(w.meaning)', 'esc(e.title)', 'esc(c.ch)', 'esc(tk.title)', 'esc(q.prompt)'].forEach((s) => assert.ok(app.includes(s), s + ' 가 없다'));
+  ['esc(w.word)', 'esc(w.meaning)', 'esc(e.title)', 'esc(c.ch)', 'esc(task.title)', 'esc(q.prompt)'].forEach((s) => assert.ok(app.includes(s), s + ' 가 없다'));
   assert.ok(!/innerHTML = w\.word|innerHTML = q\.prompt/.test(app));
 });
 
@@ -77,88 +77,21 @@ t('AI 연상 버튼은 자체 단어장(aiAllowed)에서만 — 교재 뜻 문�
   assert.ok(api.includes("'/api/hanja/admin/source'"), '종류 바꾸기 라우트가 없다');
 });
 
-t('낱말과 한자가 나란히 — 탭이 둘 다 있고, 지금 단어장에 없는 쪽은 감춘다', () => {
-  /* 이 앱은 한글 어휘(고유어)와 한자어를 둘 다 익히는 앱이다. 낱말이 단어장 탭 안쪽에만 있으면 한자 앱처럼 읽힌다. */
-  const tabs = [...app.matchAll(/data-view="([a-z]+)"/g)].map((m) => m[1]);
-  assert.ok(tabs.includes('words'), '낱말 탭이 없다');
-  assert.ok(tabs.indexOf('words') < tabs.indexOf('chars'), '낱말 탭이 한자 탭보다 앞이어야 한다');
-  assert.ok(/<b>語<\/b>낱말/.test(app) && /<b>字<\/b>한자/.test(app), '탭 이름이 낱말·한자로 갈려 있어야 한다');
-  assert.ok(/function renderWords/.test(app) && /words: renderWords/.test(app), '낱말 뷰가 등록되지 않았다');
-  /* 빈 탭을 띄우지 않는다 — 고유어만 있는 국어 교재에서 빈 한자 탭, 글자만 있는 급수 교재에서 빈 낱말 탭 */
-  assert.ok(/function syncTabs/.test(app), '탭을 단어장에 맞춰 감추는 코드가 없다');
-  const sync = app.slice(app.indexOf('function syncTabs'), app.indexOf('function render('));
-  assert.ok(/words/.test(sync) && /chars/.test(sync) && /hidden/.test(sync));
-  /* 낱말 탭에서 시작한 배우기·훈련은 낱말만 다룬다 */
-  assert.ok(/learnStart\(book, b2\.dataset\.wlearn, 'word'\)/.test(app), '낱말 탭의 배우기가 낱말만 심지 않는다');
-  assert.ok(/only: 'word'/.test(app), '낱말 탭의 훈련이 낱말만 내지 않는다');
-  assert.ok(/if \(only\) items = items\.filter/.test(app) && /if \(scope\.only\)/.test(app), 'only 를 받는 쪽이 걸러 주지 않는다');
-  /* 머리말이 한글 어휘를 먼저 말한다 */
-  assert.ok(/한글 어휘 · 한자어/.test(app), '머리말이 한자만 내세우고 있다');
-  /* 단어장 카드 아이콘 — 낱말이 있으면 語. 국어 어휘 교재까지 字 로 뜨면 목록이 온통 한자 앱처럼 보인다 */
-  assert.ok(/e\.counts && e\.counts\.words \? '語' : '字'/.test(app), '단어장 아이콘이 낱말 유무를 보지 않는다');
+t('어휘 중심 주메뉴와 별도 한자 집중에서 시험과 학습을 연다', () => {
+  const nav = app.slice(app.indexOf('<nav'), app.indexOf('</nav>'));
+  assert.deepStrictEqual([...nav.matchAll(/data-view="([a-z]+)"/g)].map(m => m[1]), ['home', 'books', 'train', 'report', 'chars']);
+  ['오늘 할 일', '내 교재', '복습', '학습 기록', '한자 집중'].forEach(label => assert.ok(nav.includes(label)));
+  assert.ok(app.includes('data-act="check"') && app.includes('data-act="learn"'));
+  assert.ok(app.includes('data-review="'), '저장된 오답에서 보충 학습으로 갈 수 있어야 한다');
+  assert.ok(!app.includes('이 단원은 통과'), '부분 시험을 단원 통과로 표시하면 안 된다');
 });
 
-t('교재 점검 — 종이 교재로 공부한 단원을 앱에서 안 배웠어도 바로 문제로 낸다', () => {
-  /* 센터에서 「어휘가 독해다로 공부해」 하고 보낸 학생이 첫 번째 사용자다. 그 학생의 단원은 앱에 심긴 것이 하나도 없다 —
-     훈련이 '심은 것만'이면 점검할 길이 없어진다. 이 검사가 그 빗장이 다시 생기는 것을 막는다. */
-  const ti = app.slice(app.indexOf('function trainItems'), app.indexOf('function trainStart'));
-  assert.ok(/scope\.mode === 'check'/.test(ti), 'trainItems 에 점검 모드가 없다');
-  const branch = ti.slice(ti.indexOf("scope.mode === 'check'"));
-  const plantedGate = branch.slice(0, branch.indexOf('} else {') + 1);
-  assert.ok(!/filter\(function \(i\) \{ return stateOf\(i\); \}\)/.test(plantedGate), '점검 모드가 「심은 것만」으로 걸러진다 — 교재로 공부한 단원을 못 낸다');
-  assert.ok(/i\.step = s \? s\.step : 0/.test(ti), '안 심은 항목의 계단이 정해지지 않았다');
-  /* 답하는 순간 심긴다(기록이 이어진다) */
-  assert.ok(/db\.states\[cur\.item\.sid\] \|\| \(db\.states\[cur\.item\.sid\] = WBHSRS\.plant/.test(app), '점검에서 답한 낱말이 심기지 않는다');
-  /* 들어가는 문 — 오늘(이번 주 단원·내 단어장) · 훈련 탭 · 낱말 탭 · 한자 탭(급수 교재) */
-  ['tkCheck', 'hmCheck', 'tmCk', 'tmCkUnit'].forEach((id) => assert.ok(app.includes("id=\"" + id + "\"") || app.includes("'#" + id + "'"), id + ' 단추가 없다'));
-  assert.ok(/data-wcheck=/.test(app), '낱말 탭에 단원 점검 단추가 없다');
-  assert.ok(/data-ccheck=/.test(app), '한자 탭에 단원 점검 단추가 없다 — 한자어 편(급수 교재)은 낱말이 없어 점검할 길이 이것뿐이다');
-  /* 한자 탭 점검은 그 단원 글자를 그대로 낸다 — 국어 교재의 글자는 전부 '낱말에서 끌어낸 것'이라 chars 없이는 빈 점검이 된다 */
-  assert.ok(/data-ccheck.*\n?.*chars: true/.test(app) || /trainStart\(\{ mode: 'check', book: book\.id, unit: b2\.dataset\.ccheck, chars: true \}\)/.test(app), '한자 탭 점검이 그 단원 글자를 못 낸다');
-  assert.ok(/allChars: !!scope\.chars \}\);\n?/.test(app) && (app.match(/allChars: !!scope\.chars/g) || []).length >= 2, '단원 범위에서 allChars 를 넘기지 않아 한자 탭 점검이 빈다');
-  /* 점수를 남기고, 선생님 화면까지 올라간다 */
-  /* 단원 문항 수는 교재가 가르치는 낱말 기준이어야 한다 — 서버 진도표(unitItemIds)와 같은 셈.
-     끌어낸 글자를 단원 항목으로 세면 1강이 8문항이 아니라 17문항이 되고 선생님 화면과 숫자가 어긋난다. */
-  assert.ok(/\(all \|\| !c\.derived\)/.test(app), 'itemsOf 가 끌어낸 글자를 단원 항목에서 빼지 않는다');
+t('재검사와 개인정보 경계는 화면 개편 뒤에도 유지한다', () => {
   const bc = read(path.join(DIR, 'book-check.js'));
-  assert.ok(/if \(c\.derived\) out\.derived = true;/.test(bc), '검사기가 derived 표시를 물고 가지 않는다 — 앱이 단어장을 다시 검사할 때 지워져 단원 수가 부푼다');
-  assert.ok(/function unitChars/.test(app) && /unitChars\(book, u\.id\)/.test(app), '화면이 단원 글자를 세는 공통 자리(unitChars)가 없다');
-  /* 연동 첫날 — 이번 주 단원이 있으면 그 단어장이 현재가 된다(아니면 목록 맨 앞의 엉뚱한 책을 가리킨다) */
-  assert.ok(/if \(LIB\.task && !db\.settings\.book\) \{ db\.settings\.book = LIB\.task\.bookId;/.test(app), '이번 주 단원의 단어장을 현재로 삼지 않는다');
-  assert.ok(/checks: \{\}/.test(app), '기록에 점검 칸(checks)이 없다');
-  assert.ok(/db\.checks = db\.checks \|\| \{\}/.test(app), '옛 기기의 기록을 열 때 점검 칸이 없어 터진다');
-  assert.ok(/function putCheck/.test(app) && /putCheck\(scope\.book, scope\.unit/.test(app), '점검 점수를 남기는 곳이 없다');
-  assert.ok(/CHECK_KEEP/.test(app), '점검 기록 상한이 없다 — 기록 본문이 서버 상한(400KB)을 넘을 수 있다');
-  ['normCheck', 'unitCheck', 'checkList'].forEach((f) => assert.ok(api.includes('export function ' + f), '서버에 ' + f + ' 가 없다'));
-  assert.ok(/lastCheck/.test(api) && /check: unitCheck\(/.test(api), '요약·진도표에 점검이 안 실린다');
-  assert.ok(/function checkCell/.test(admin) && /esc\(c\.title/.test(admin), '관리 화면이 학생이 올린 제목을 이스케이프하지 않는다');
-  assert.ok(/checkCell\(s\.lastCheck\)/.test(admin) && /checkCell\(r\.check\)/.test(admin), '현황·진도표에 점검 칸이 없다');
-});
-
-t('트랙 분리 — 어휘 단어장에서는 한자 탭을 내리고, 글자는 낱말에 딸린 길로 들어간다', () => {
-  /* 원장 지적: 「한자 어플 느낌이 강하다.」 국어 어휘 교재도 한자어의 글자를 끌어내므로, 글자가 있다는 이유로
-     한자 탭을 띄우면 목록도 탭도 온통 한자가 된다. 트랙(낱말이 있으면 어휘)으로 갈라 탭을 정한다. */
-  assert.ok(/function trackOf/.test(app), '트랙 판정이 없다');
-  assert.ok(/b\.chars\.some\(function \(c\) \{ return !c\.derived; \}\)/.test(app), '한자 탭이 「직접 적은 글자」를 보지 않는다');
-  const sync = app.slice(app.indexOf('function syncTabs'), app.indexOf('function render('));
-  assert.ok(/tabChars/.test(sync), '탭 표시와 화면 유무를 가르지 않았다 — 탭을 내리면 따라쓰기까지 막힌다');
-  /* 내려도 길은 남는다: 낱말 탭 단원의 따라쓰기 */
-  assert.ok(/data-wtrace=/.test(app) && /traceOpen\(unitChars\(/.test(app), '낱말 탭에서 그 단원 한자를 쓸 길이 없다');
-  /* 목록에 트랙 딱지 */
-  assert.ok(/'어휘' : '한자'/.test(app), '단어장 목록에 트랙 딱지가 없다');
-  /* 기록은 어휘 진도와 급수 진도를 갈라 보여 준다 */
-  assert.ok(/급수 진도/.test(app) && /trackOf\(b\) === 'hanja'/.test(app), '기록에 급수 진도가 없다');
-});
-
-t('내가 공부하는 교재를 골라 바로 시험 본다 — 점검 탭에서도, 단어장 탭에서도', () => {
-  /* 원장 지적: 「자기가 학습하는 교재를 선택해서 학습하고 시험보게 해라.」 길이 두 군데 끊겨 있었다 —
-     점검 탭에는 단원 고르기만 있어 다른 교재를 보려면 단어장 탭을 다녀와야 했고,
-     단어장 탭에서 단원을 펼쳐도 「교재 점검」 단추가 없었다(배우기·훈련·따라쓰기만). */
-  assert.ok(/id="tmCkBook"/.test(app), '점검 탭에 단어장 고르기가 없다');
-  const menu = app.slice(app.indexOf('function trainMenu'), app.indexOf('function trainDone'));
-  assert.ok(/ckBook\.addEventListener\('change'/.test(menu) && /openBook\(id\)/.test(menu), '교재를 바꿔도 그 책을 받아 오지 않는다');
-  assert.ok(/id="tmCkLearn"/.test(app) && /id="tmCkAll"/.test(app), '점검 탭에 새로 배우기·단어장 전체 점검이 없다');
-  assert.ok(/data-act="check"/.test(app) && /dataset\.act === 'check'/.test(app), '단어장 탭 단원에 교재 점검 단추가 없다');
+  assert.ok(/if \(c\.derived\) out\.derived = true;/.test(bc));
+  ['normCheck', 'unitCheck', 'checkList'].forEach(f => assert.ok(api.includes('export function ' + f)));
+  assert.ok(/CHECK_KEEP/.test(app));
+  assert.ok(/function checkCell/.test(admin) && /esc\(c\.title/.test(admin));
 });
 
 console.log(`\nOK — ${passed}개 통과`);

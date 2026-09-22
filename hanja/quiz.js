@@ -14,7 +14,7 @@ var WBHQUIZ = (function () {
 
   var HEAD = {
     'w-meaning': '뜻 고르기', 'w-word': '낱말 고르기', 'w-cloze': '문맥 빈칸', 'w-build': '한자 조립',
-    'w-hanja': '한자 표기', 'w-type': '낱말 쓰기', 'w-syn': '비슷한 말',
+    'w-hanja': '한자 표기', 'w-type': '낱말 쓰기', 'w-syn': '비슷한 말', 'w-context': '상황에 적용하기',
     'c-hun': '훈음 고르기', 'c-char': '한자 고르기', 'c-word': '이 한자가 든 낱말', 'c-count': '획수 세기', 'c-write': '한자 쓰기',
   };
 
@@ -88,10 +88,10 @@ var WBHQUIZ = (function () {
   /* ── 낱말 문항 ── */
   function wordLabel(w) { return w.word + (w.hanja ? ' (' + w.hanja + ')' : ''); }
 
-  function qMeaning(w, ctx, rnd) {
+  function qMeaning(w, ctx, rnd, opts) {
     var d = distractors(ctx.words, w, function (x) { return x.meaning; }, 3, rnd, wordRank(w));
     if (d.length < 3) return null;
-    return choiceQ('w-meaning', w._sid, wordLabel(w) + ' 의 뜻은?', w.meaning, d, rnd, { word: w.word, speak: w.word });
+    return choiceQ('w-meaning', w._sid, (opts.vocabulary ? w.word : wordLabel(w)) + ' 의 뜻은?', w.meaning, d, rnd, { word: w.word, speak: w.word });
   }
   function qWord(w, ctx, rnd) {
     var d = distractors(ctx.words, w, function (x) { return x.word; }, 3, rnd, wordRank(w));
@@ -104,6 +104,13 @@ var WBHQUIZ = (function () {
     var d = distractors(ctx.words, w, function (x) { return x.word; }, 3, rnd, wordRank(w));
     if (d.length < 3) return null;
     return choiceQ('w-cloze', w._sid, '빈칸에 알맞은 말은?\n' + blanked, w.word, d, rnd, { word: w.word, hint: w.meaning });
+  }
+  /* 학습 카드와 다른 상황은 검수한 자료에서만 낸다. 없으면 예문을 바꿔 지어내지 않는다. */
+  function qContext(w, ctx, rnd) {
+    var c = w.context;
+    if (!c || !Array.isArray(c.choices) || !c.prompt || !c.explanation || c.choices.indexOf(c.answer) < 0) return null;
+    return choiceQ('w-context', w._sid, c.prompt, c.answer, c.choices.filter(function (v) { return v !== c.answer; }), rnd,
+      { word: w.word, explanation: c.explanation });
   }
   /* 한자 조립 — 가린 글자의 훈음을 고른다. 보기는 단어장의 다른 한자 훈음에서 */
   function qBuild(w, ctx, rnd) {
@@ -136,13 +143,13 @@ var WBHQUIZ = (function () {
     if (d.length < 3) return null;
     return choiceQ('w-hanja', w._sid, w.word + ' (' + w.meaning + ') 의 한자 표기는?', w.hanja, d, rnd, { word: w.word, big: true, bigChoices: true });
   }
-  /* 낱말 쓰기 — 뜻을 보고 낱말을 입력한다(산출). 한자어는 한자를 힌트로 준다 */
-  function qType(w) {
+  /* 낱말 쓰기 — 뜻을 보고 낱말을 입력한다(산출). 어휘 모드에서는 한자 힌트를 쓰지 않는다 */
+  function qType(w, ctx, rnd, opts) {
     if (!w.word || w.word.length < 2) return null;
     return {
       kind: 'w-type', head: HEAD['w-type'], id: w._sid, word: w.word,
       prompt: '"' + w.meaning + '" — 이 뜻의 낱말을 쓰세요', answer: w.word, input: true,
-      hint: w.hanja ? '한자: ' + w.hanja : (w.word[0] + ' ' + new Array(w.word.length).join('_ ')).trim(),
+      hint: w.hanja && !opts.vocabulary ? '한자: ' + w.hanja : (w.word[0] + ' ' + new Array(w.word.length).join('_ ')).trim(),
     };
   }
 
@@ -214,8 +221,10 @@ var WBHQUIZ = (function () {
     return { kind: 'c-write', head: HEAD['c-write'], id: c._sid, ch: c.ch, prompt: '"' + gloss(c) + '" 을(를) 한자로 써 보세요', answer: c.ch, input: false, write: true, strokes: c.strokes || null };
   }
 
-  var WORD_KINDS = { 'w-meaning': qMeaning, 'w-word': qWord, 'w-cloze': qCloze, 'w-build': qBuild, 'w-hanja': qHanja, 'w-type': qType, 'w-syn': qSyn };
+  var WORD_KINDS = { 'w-meaning': qMeaning, 'w-word': qWord, 'w-cloze': qCloze, 'w-build': qBuild, 'w-hanja': qHanja, 'w-type': qType, 'w-syn': qSyn, 'w-context': qContext };
   var CHAR_KINDS = { 'c-hun': qHun, 'c-char': qChar, 'c-word': qCharWord, 'c-count': qCount, 'c-write': qWrite };
+  /* 자동 예문 빈칸은 여러 보기가 자연스러울 수 있다. 어휘 평가의 문맥 점수는 검수된 context만 쓴다. */
+  var VOCABULARY_KINDS = ['w-meaning', 'w-word', 'w-type', 'w-syn', 'w-context'];
   /* 계단별 유형 순서 — 낮은 계단은 재인(뜻 고르기), 높은 계단은 산출(쓰기) */
   var PLAN = {
     word: [
@@ -234,7 +243,7 @@ var WBHQUIZ = (function () {
   function tier(step) { return step >= 4 ? 3 : (step >= 2 ? 2 : (step >= 1 ? 1 : 0)); }
 
   /* item: { kind:'word', w } | { kind:'char', c } — w/c 는 단어장 항목, _sid 는 SRS id.
-     opts: { step, rnd, kinds(고정 유형 목록) } — 유형이 안 만들어지면 같은 계단의 다른 유형, 그래도 없으면 전부 */
+     opts: { step, rnd, kinds(허용 유형 목록), vocabulary(낱말 이해만) } — 허용 유형 안에서만 대체한다 */
   function makeQuestion(item, ctx, opts) {
     opts = opts || {};
     var rnd = opts.rnd || Math.random;
@@ -242,15 +251,17 @@ var WBHQUIZ = (function () {
     var target = isChar ? item.c : item.w;
     if (!target) return null;
     var table = isChar ? CHAR_KINDS : WORD_KINDS;
+    var all = (opts.kinds || Object.keys(table)).filter(function (k) {
+      return Object.prototype.hasOwnProperty.call(table, k) && (isChar || !opts.vocabulary || VOCABULARY_KINDS.indexOf(k) >= 0);
+    });
     /* 계단이 난이도를 정하고, 그 계단 안의 유형은 섞는다. 고정 순서면 같은 계단의 항목이 전부 같은 유형으로 나와
        (급수 교재 step 1 이 다섯 문제 내내 「한자 고르기」였다) 지루하고, 한 가지 물음만 연습된다. */
-    var order = opts.kinds || shuffle(PLAN[isChar ? 'char' : 'word'][tier(opts.step || 0)], rnd);
-    var all = Object.keys(table);
+    var order = opts.kinds ? all : shuffle(PLAN[isChar ? 'char' : 'word'][tier(opts.step || 0)].filter(function (k) { return all.indexOf(k) >= 0; }), rnd);
     var tried = {}, q = null;
     order.concat(all).forEach(function (k) {
       if (q || tried[k] || !table[k]) return;
       tried[k] = true;
-      q = table[k](target, ctx, rnd);
+      q = table[k](target, ctx, rnd, opts);
     });
     return q;
   }
@@ -269,7 +280,7 @@ var WBHQUIZ = (function () {
     opts = opts || {};
     var out = [], skipped = [];
     items.forEach(function (it) {
-      var q = makeQuestion(it, ctx, { step: it.step || 0, rnd: opts.rnd, kinds: opts.kinds });
+      var q = makeQuestion(it, ctx, { step: it.step || 0, rnd: opts.rnd, kinds: opts.kinds, vocabulary: opts.vocabulary });
       if (q) out.push(q); else skipped.push(it);
     });
     return { questions: opts.max ? out.slice(0, opts.max) : out, skipped: skipped };
