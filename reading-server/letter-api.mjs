@@ -22,7 +22,7 @@ export const IMG_MAX_BYTES = 1_500_000;      // 사진 한 장 상한(관리 웹
 export const STATE_BODY_LIMIT = 200_000;     // 그 외 전부
 export const STATE_MAX_BYTES = 150_000;      // 학생 기록 1건 상한
 export const PUTS_PER_DAY = 10;              // PUT /state 하루 상한 — KV 쓰기 예산은 네임스페이스 합산이다(앱은 20초 디바운스)
-export const LETTER_AI_DAILY_DEFAULT = 30;   // AI 초안 하루 호출 상한 — 한 호가 6조각(공통 + 학년대 5)이라 하루 다섯 호
+export const LETTER_AI_DAILY_DEFAULT = 30;   // AI 초안 하루 호출 상한 — 한 호 7조각(공통 + 학년대 5 + 이슈), 삽화도 함께 센다
 export const DRAFT_PARTS = ['shared', 'K', 'E1', 'E2', 'E3', 'M', 'news'];   // news 는 웹 검색으로 그 주의 교육·입시 소식을 간추리는 조각
 export const DEFAULT_TIER = 'E2';            // 학년을 못 읽는 학생의 임시 학년대 — 관리 웹 [학년대 지정]으로 바로잡는다
 export const IMAGE_RATIOS = ['16:9', '4:3', '1:1', '3:4'];   // AI 삽화 비율 — 모델이 받는 값만(표지 16:10 자리는 16:9 를 cover 로 맞춘다)
@@ -90,9 +90,9 @@ async function tierOfPushKey(store, key) {
   return stu ? tierFor(stu).tier : null;
 }
 export async function sendLetterPushes({ store, push, fetchFn, issue, now }) {
-  if (!push || !push.publicKey || !push.privateJwk) return { sent: 0, skipped: 0, removed: 0, reason: 'no-vapid' };
+  if (!push || !push.publicKey || !push.privateJwk) return { sent: 0, skipped: 0, removed: 0, failed: 0, reason: 'no-vapid' };
   const f = fetchFn || fetch;
-  let sent = 0, skipped = 0, removed = 0;
+  let sent = 0, skipped = 0, removed = 0, failed = 0;
   for (const key of await store.listPushKeys()) {
     const sub = await store.getPush(key);
     if (!sub || !sub.endpoint) continue;
@@ -103,10 +103,28 @@ export async function sendLetterPushes({ store, push, fetchFn, issue, now }) {
       const jwt = await vapidJwt({ audience: new URL(sub.endpoint).origin, subject: push.subject || 'mailto:admin@wb.local', privateJwk: push.privateJwk });
       const r = await f(sub.endpoint, { method: 'POST', headers: { TTL: '172800', Urgency: 'normal', Authorization: 'vapid t=' + jwt + ', k=' + push.publicKey } });
       if (r.status === 404 || r.status === 410) { await store.delPush(key); removed += 1; }
-      else sent += 1;
-    } catch (e) { /* 이 구독은 다음 호 때 다시 */ }
+      else if (r.status >= 200 && r.status < 300) sent += 1;
+      else failed += 1;
+    } catch (e) { failed += 1; }
   }
-  return { sent, skipped, removed };
+  return { sent, skipped, removed, failed };
+}
+/* KV는 같은 키를 초당 한 번만 쓴다. 저장→발행→결과의 연속 쓰기는 1초 뒤 최신 기록에 다시 합친다.
+   ponytail: 429 재시도는 한 번뿐이다. 여러 관리자가 동시에 편집하게 되면 호별 직렬 저장으로 바꾼다. */
+async function saveIssue(store, id, update) {
+  for (let attempt = 0; ; attempt += 1) {
+    const rec = update(await store.getIssue(id));
+    if (!rec) return;
+    try { await store.putIssue(id, rec); return; }
+    catch (e) {
+      if (attempt || !/^KV PUT failed: 429\b/.test(String(e && e.message))) throw e;
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+  }
+}
+/* 발송 중 원장이 고친 본문·발행 상태는 유지하고, 마지막 발송 결과만 덧붙인다. 실패분은 관리 웹에서 다시 보낸다. */
+async function recordPush(store, id, result, now) {
+  await saveIssue(store, id, (rec) => rec && { ...rec, pushedAt: nowIso(now), pushResult: result });
 }
 /* 발행일이 된 호에 아직 알림을 안 보냈으면 보낸다 — 07:00 KST 크론이 부른다(예약 발행분). 즉시 발행은 publish 라우트가 보낸다 */
 export async function pushDueIssues({ store, push, fetchFn, now }) {
@@ -118,7 +136,7 @@ export async function pushDueIssues({ store, push, fetchFn, now }) {
     if (!L.isVisible(rec.issue, today) || rec.pushedAt) continue;
     const r = await sendLetterPushes({ store, push, fetchFn, issue: rec.issue, now: t });
     if (r.reason === 'no-vapid') return { pushed: [], reason: 'no-vapid' };
-    await store.putIssue(rec.issue.id, { ...rec, pushedAt: nowIso(t), pushResult: r });
+    await recordPush(store, rec.issue.id, r, t);
     out.push({ id: rec.issue.id, ...r });
   }
   return { pushed: out };
@@ -180,7 +198,7 @@ const visibleOf = (recs, today) => recs.filter((r) => L.isVisible(r.issue, today
 /* 학년대에 볼 것이 하나라도 있는 호만 목록에 올린다 — 유치부 학생에게 중등 전용 호가 뜨면 빈 화면이다 */
 const hasTier = (issue, tier) => L.tiersOf(issue).includes(tier);
 
-/* ── AI 초안 — 호 하나를 6조각(공통 + 학년대 5)으로 나눠 부른다. 한 번에 다 부르면 응답이 길어 브라우저가
+/* ── AI 초안 — 호 하나를 7조각(공통 + 학년대 5 + 이슈)으로 나눠 부른다. 한 번에 다 부르면 응답이 길어 브라우저가
    기다리다 끊기고, 실패하면 전부 버린다. 조각이면 관리 웹이 진행률을 보이고 실패한 조각만 다시 부른다. ── */
 const DRAFT_SYSTEM = `너는 WB 독해력학원·웩슬러브레인센터의 주간 뉴스레터 "브레인레터" 편집자다.
 유치(5~7세)부터 중학생까지 다섯 학년대(K·E1·E2·E3·M)에 같은 주제를 다른 깊이로 읽히는 글을 쓴다.
@@ -197,6 +215,7 @@ const DRAFT_SYSTEM = `너는 WB 독해력학원·웩슬러브레인센터의 주
 - 고정 코너(매 호 같은 자리): poem(동시 6~12줄, 네가 새로 쓴 창작, author "WB 편집실") · talk(가족 대화 카드 3문 — 예측·이유·아이 삶과 잇기) · write(학년대별 한 문장 쓰기 prompts 1~2 — 요약 한 문장, 질문 만들기, "기자가 되어 한 줄") · books(실제로 널리 알려진 어린이·청소년 책 2~3권, title·author·why·for. 확신이 없는 책은 넣지 않는다). voices(독자의 답)는 네가 만들지 않는다.
 - 말투: K·E1 은 "~해요" 체, E2·E3 은 "~합니다/~다" 섞어도 됨, M 은 설명문체("~다").
 - 섹션 id 는 요청에 적힌 것을 그대로 쓴다. tiers 는 요청에 적힌 배열 또는 "all".
+- 미션(checklist)의 쓰기·한자 등 특정 학년대 활동은 items와 같은 길이의 itemTiers 배열로 대상을 지정한다. 각 값은 "all" 또는 학년대 배열이며, 유치부에는 쓰기·한자 미션을 넣지 않는다.
 - status 는 "draft". source 는 "WB 독해력학원 자체 창작 (AI 초안, 원장 검수 전)".`;
 
 function partSpec(part) {
@@ -431,7 +450,7 @@ export async function handleLetter(ctx) {
       const map = (st && st.state && st.state.issues) || {};
       Object.keys(map).forEach((id) => { if (map[id] && map[id].openedAt) opened[id] = (opened[id] || 0) + 1; });
     }
-    return j(200, { issues: recs.map((r) => ({ ...L.brief(r.issue), updatedAt: r.updatedAt || null, opened: opened[r.issue.id] || 0, visible: L.isVisible(r.issue, today) })), today });
+    return j(200, { issues: recs.map((r) => ({ ...L.brief(r.issue), updatedAt: r.updatedAt || null, pushedAt: r.pushedAt || null, pushResult: r.pushResult || null, opened: opened[r.issue.id] || 0, visible: L.isVisible(r.issue, today) })), today });
   }
   if (p === '/api/letter/admin/issue' && method === 'GET') {
     const id = q('id');
@@ -445,10 +464,10 @@ export async function handleLetter(ctx) {
     const r = L.checkIssue(issue);
     if (r.errors.length) return j(400, { error: '검증 실패 — 오류 ' + r.errors.length + '건', errors: r.errors, warnings: r.warnings });
     const ids = (await store.getIssueIds()) || [];
-    const rec = { issue, updatedAt: nowIso(now) };
-    await store.putIssue(issue.id, rec);
+    const updatedAt = nowIso(now);
+    await saveIssue(store, issue.id, (prev) => ({ ...prev, issue, updatedAt }));
     if (!ids.includes(issue.id)) await store.putIssueIds(ids.concat([issue.id]));
-    return j(200, { ok: true, id: issue.id, status: issue.status, warnings: r.warnings, updatedAt: rec.updatedAt });
+    return j(200, { ok: true, id: issue.id, status: issue.status, warnings: r.warnings, updatedAt });
   }
   if (p === '/api/letter/admin/issue' && method === 'DELETE') {
     const b = await body(); const bad = badBody(b); if (bad) return bad;
@@ -471,20 +490,21 @@ export async function handleLetter(ctx) {
     /* 발행하려는 호는 지금 규칙으로 다시 검증한다 — 규칙이 바뀐 뒤 저장된 옛 초안이 그대로 나가지 않게 */
     const r = L.checkIssue(issue);
     if (b.status === 'published' && r.errors.length) return j(400, { error: '발행할 수 없어요 — 오류 ' + r.errors.length + '건', errors: r.errors });
-    const out = { ...rec, issue, updatedAt: nowIso(now) };
+    const updatedAt = nowIso(now);
     const visibleNow = L.isVisible(issue, today);
     let pushInfo = null;
+    /* 알림 키가 없거나 발송이 늦어도 발행 자체는 먼저 저장된다. */
+    await saveIssue(store, id, (prev) => ({ ...prev, issue, updatedAt }));
     /* 지금 보이는 호를 처음 발행하면 바로 알림 — 발행일이 아직이면 07:00 크론이 그날 보낸다. 내렸다 다시 올려도 두 번 보내지 않는다 */
     if (visibleNow && !rec.pushedAt) {
       const run = (async () => {
         const r = await sendLetterPushes({ store, push: ctx.push, fetchFn: ctx.pushFetch, issue, now });
-        if (r.reason !== 'no-vapid') await store.putIssue(id, { ...out, pushedAt: nowIso(now), pushResult: r });
+        if (r.reason !== 'no-vapid') await recordPush(store, id, r, now);
         return r;
       })();
       if (ctx.after) { ctx.after(run); pushInfo = { queued: true }; }
       else pushInfo = await run;
     }
-    if (!pushInfo || pushInfo.queued) await store.putIssue(id, out);
     return j(200, { ok: true, id, status: issue.status, publishAt: issue.publishAt, visible: visibleNow, push: pushInfo });
   }
   /* 알림 다시 보내기 — 구독자 전원(그 호의 학년대가 있는 가정만) */
@@ -496,7 +516,7 @@ export async function handleLetter(ctx) {
     if (!L.isVisible(rec.issue, today)) return j(409, { error: '아직 보이지 않는 호예요 — 발행일이 지나야 알림을 보낼 수 있어요.' });
     const r = await sendLetterPushes({ store, push: ctx.push, fetchFn: ctx.pushFetch, issue: rec.issue, now });
     if (r.reason === 'no-vapid') return j(200, { ok: false, reason: 'no-vapid' });
-    await store.putIssue(id, { ...rec, pushedAt: nowIso(now), pushResult: r });
+    await recordPush(store, id, r, now);
     return j(200, { ok: true, id, ...r });
   }
   if (p === '/api/letter/admin/push/status' && method === 'GET') {

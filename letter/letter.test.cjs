@@ -142,7 +142,7 @@ t('렌더러 — 학년대 섹션만, 모든 문자열 이스케이프, 앱 모�
   const withState = L.renderIssue(i, 'K', { mode: 'app', state: st });
   assert.ok(/class="np-choice ok"[^>]*data-q="read-k:0:0"/.test(withState), '정답 보기에 ok');
   assert.ok(/class="np-choice no"[^>]*data-q="read-k:0:1"/.test(withState), '고른 오답에 no');
-  assert.ok(/정답은 ①이에요/.test(withState));
+  assert.ok(withState.includes('정답은 ' + '①②③④⑤'[L.choiceOrder(i.sections[0].questions[0], 'read-k', 0).indexOf(0)] + '이에요'));
   assert.ok(/np-ans">7개/.test(withState), '펼친 정답');
   assert.ok(/data-chk="mission:1" checked/.test(withState));
   assert.equal(L.renderIssue(null, 'K'), '');
@@ -157,7 +157,7 @@ t('사진 — id 또는 file 중 하나, alt·credit 필수, 3장 이내; 렌더
   rd.image = { file: 'leaf-autumn.svg', alt: '노랗고 붉게 물든 잎 세 장', caption: '가을 잎', credit: 'WB 자체 제작 삽화' };
   assert.deepEqual(errs(i), []);
   const html = L.renderIssue(i, 'E2', { mode: 'app' });
-  assert.ok(/<figure class="np-photo" data-zoom="1"><img src="img\/leaf-autumn\.svg" alt="노랗고 붉게 물든 잎 세 장" loading="lazy" decoding="async">/.test(html));
+  assert.ok(/<figure class="np-photo"><button type="button" class="np-zoom" data-zoom="1" aria-label="사진 크게 보기: 노랗고 붉게 물든 잎 세 장"><img src="img\/leaf-autumn\.svg" alt="노랗고 붉게 물든 잎 세 장" loading="lazy" decoding="async">/.test(html));
   assert.ok(!/data-zoom/.test(L.renderIssue(i, 'E2', { mode: 'print' })), '인쇄본에는 돋보기 표시가 없다');
   assert.ok(/np-credit">WB 자체 제작 삽화/.test(html));
   assert.ok(/src="\/letter\/img\/leaf-autumn\.svg"/.test(L.renderIssue(i, 'E2', { mode: 'app', imgBase: '/letter/img/' })), '관리 미리보기는 절대 경로');
@@ -411,6 +411,62 @@ t('파일럿 호 고르기 — 발행일이 지난 것 중 가장 최근 호, �
   assert.equal(L.pickPilot([], '2026-10-05'), null);
   assert.equal(L.pickPilot([{ file: 'c.json', id: '2026-W42', publishAt: '2026-01-01', status: 'draft' }], '2026-10-05'), null, '초안뿐이면 없는 것과 같다 — 앱은 체험 호로 넘어간다');
   assert.equal(L.pickPilot([{ id: 'x' }, { file: 'd.json', publishAt: '나쁜날짜' }], '2026-10-05'), null, '파일·발행일이 없는 줄은 버린다');
+});
+
+t('보기 순서는 결정적이며 원본 답·입력·앱·복습·인쇄 답지가 같은 의미를 유지한다', () => {
+  const original = JSON.stringify(SAMPLE);
+  for (const s of SAMPLE.sections.filter((s) => s.type === 'read')) {
+    const tier = s.tiers[0], state = { quiz: {} };
+    s.questions.forEach((q, qi) => { state.quiz[s.id + ':' + qi] = q.answer; });
+    const app = L.renderIssue(SAMPLE, tier, { mode: 'app', state });
+    const paper = L.renderIssue(SAMPLE, tier, { mode: 'print' });
+    const key = L.renderKey({ sections: [s] }, tier);
+    const review = L.renderReview({ sections: [s] }, tier, { state });
+    s.questions.forEach((q, qi) => {
+      const order = L.choiceOrder(q, s.id, qi), marks = '①②③④⑤';
+      assert.deepEqual(order, L.choiceOrder(q, s.id, qi));
+      assert.deepEqual(order.slice().sort(), q.choices.map((_, i) => i));
+      order.forEach((ci, shown) => {
+        assert.ok(app.includes('data-q="' + s.id + ':' + qi + ':' + ci + '" disabled>' + marks[shown] + ' ' + L.esc(q.choices[ci])));
+        assert.ok(paper.includes('<div class="np-choice static">' + marks[shown] + ' ' + L.esc(q.choices[ci]) + '</div>'));
+      });
+      const mark = marks[order.indexOf(q.answer)];
+      assert.ok(key.includes('<li>' + mark + (q.why ? ' — ' + L.esc(q.why) : '') + '</li>'));
+      assert.ok(review.includes('○ 정답 ' + mark));
+      assert.ok(app.includes('data-feedback="' + s.id + ':' + qi + '" tabindex="-1">맞았어요!'));
+    });
+  }
+  assert.equal(JSON.stringify(SAMPLE), original, '보기 원본을 고치면 저장 기록이 달라진다');
+  const q = { q: '자체 창작 문제', choices: ['A', 'B', 'C', 'D'], answer: 0 };
+  assert.ok(new Set(Array.from({ length: 12 }, (_, qi) => L.choiceOrder(q, 'read', qi).indexOf(0))).size > 2, '같은 원본 위치의 답이 여러 표시 위치로 분산된다');
+});
+
+t('학년별 미션은 원래 체크 번호를 유지하고 잘못된 itemTiers 는 저장되지 않는다', () => {
+  const issue = clone(SAMPLE), mission = issue.sections.find((s) => s.type === 'checklist');
+  mission.itemTiers = mission.items.map((_, i) => i === 0 ? ['E2', 'E3', 'M'] : 'all');
+  assert.deepEqual(errs(issue), []);
+  assert.deepEqual(L.checklistItems(mission, 'K').map((it) => it.index), mission.items.map((_, i) => i).slice(1));
+  const html = L.renderIssue(issue, 'K', { mode: 'app', state: { checks: { [mission.id + ':1']: true } } });
+  assert.ok(!html.includes('data-chk="' + mission.id + ':0"'));
+  assert.ok(html.includes('data-chk="' + mission.id + ':1" checked'));
+  for (const invalid of [[], ['Z'], mission.items.map(() => []), mission.items.map(() => ['K', 'K'])]) {
+    mission.itemTiers = invalid; assert.ok(errs(issue).some((e) => e.includes('itemTiers')));
+  }
+  for (const invalidTier of ['constructor', '__proto__', ['K'], null, 1]) {
+    mission.itemTiers = mission.items.map(() => [invalidTier]);
+    assert.ok(errs(issue).some((e) => e.includes('itemTiers')), '학년대 값 거부: ' + JSON.stringify(invalidTier));
+  }
+});
+
+t('하루 안내는 기본과 선택을 나누고 한자가 없는 학년에는 낱말 복습이라고 한다', () => {
+  assert.ok(L.renderDay(SAMPLE, 'K', 1, { mode: 'app' }).includes('오늘의 기본'));
+  assert.ok(L.renderDay(SAMPLE, 'K', 1, { mode: 'app' }).includes('여유가 있으면'));
+  assert.equal(L.dayPage(SAMPLE, 'K', 3).name, '낱말 복습');
+  assert.equal(L.dayPage(SAMPLE, 'E2', 3).name, '한자 코너');
+  assert.ok(L.renderDayStrip(SAMPLE, 3, 3, {}, 'K').includes('낱말 복습'));
+  const write = L.renderDay(SAMPLE, 'E2', 2, { mode: 'app' });
+  assert.ok(write.includes('id="write-label-write-e2:0"'));
+  assert.ok(write.includes('aria-labelledby="write-label-write-e2:0"'));
 });
 
 console.log(`\nOK — ${passed}개 통과 (${path.basename(__filename)})`);
