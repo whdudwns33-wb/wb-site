@@ -36,7 +36,7 @@ t('호를 여는 곳은 loadPilot 하나 — 목록(issues.json)을 두 군데�
 
 t('가족 링크: 서버가 호를 안 주면 배포본 호로 넘어간다 (빈 화면 금지)', () => {
   const fam = famBranch();
-  assert.ok(/if \(!j\.issue\) return loadPilot\(/.test(fam), '서버에 호가 없을 때 파일럿으로 넘어가지 않는다');
+  assert.ok(/!j\.issue/.test(fam) && /return loadPilot\(done, fail\)/.test(fam), '서버에 호가 없을 때 파일럿으로 넘어가지 않는다');
 });
 
 t('가족 링크: 유효하지 않은 링크(404)도 이번 주 호를 보여 주되 기록은 그 기기에만', () => {
@@ -44,6 +44,12 @@ t('가족 링크: 유효하지 않은 링크(404)도 이번 주 호를 보여 �
   assert.ok(/e\.status === 404/.test(fam), '404 를 따로 다루지 않는다');
   assert.ok(/MODE = 'demo'/.test(fam) && /FAM_T = ''/.test(fam), '404 일 때 기록이 서버로 나가지 않게 체험 모드로 내려야 한다');
   assert.ok(/return fail\(e\)/.test(fam), '404 가 아닌 오류(서버 장애 등)는 그대로 알려야 한다');
+});
+
+t('가족 링크: 응답 모양이 예상과 달라도 터지지 않는다 — 중간 프록시가 엉뚱한 200 을 줄 수 있다', () => {
+  const fam = famBranch();
+  assert.ok(!/j\.parent\.[a-z]/.test(fam), 'j.parent 를 확인 없이 파고든다 — 가족이 자바스크립트 오류 문구를 보게 된다');
+  assert.ok(/j && j\.parent \? j\.parent : null/.test(fam), '응답에 parent 가 없을 때를 다루지 않는다');
 });
 
 t('한 번 파일럿으로 넘어오면 지난 호·다른 날짜도 같은 자리에서 연다', () => {

@@ -489,13 +489,16 @@
       /* 파일럿 호로 한 번 넘어오면 그 뒤로는 어느 모드든 저장소의 호를 연다 — 지난 호·다른 날짜 장도 같은 자리에서 와야 한다 */
       if (PILOT) return loadPilot(done, fail);
       if (MODE === 'family') return fetchJson('/api/letter/parent?t=' + encodeURIComponent(FAM_T) + (CUR_ID ? '&id=' + encodeURIComponent(CUR_ID) : ''), { cache: 'no-store' }).then(function (j) {
-        NAME = j.parent.name; GUESS = !!j.parent.guess; if (j.parent.tier) TIER = j.parent.tier;
+        /* 응답 모양을 믿지 않는다 — 중간의 프록시·캡티브 포털이 엉뚱한 200 을 돌려주면 j.parent 가 없다.
+           그 자리에서 터지면 가족은 자바스크립트 오류 문구를 본다. 모르는 모양은 "호 없음" 과 같이 다룬다. */
+        var par = j && j.parent ? j.parent : null;
+        if (par) { NAME = par.name || ''; GUESS = !!par.guess; if (par.tier) TIER = par.tier; }
         /* 파일럿 기간에는 호가 서버(KV)가 아니라 배포본에 있다 — 링크가 멀쩡해도 서버는 "호 없음" 이라고 답한다.
            그때 빈 화면을 보여 주면 가족은 링크가 고장 난 줄 안다. 배포본 호를 그대로 열어 주고,
            기록은 링크 토큰으로 계속 서버에 쌓는다(원장의 열람 현황에 그대로 잡힌다). */
-        if (!j.issue) return loadPilot(done, fail);
+        if (!par || !j.issue) { if (!par) { MODE = 'demo'; FAM_T = ''; } return loadPilot(done, fail); }
         ISSUES = j.issues || [];
-        done({ issue: j.issue, tier: j.parent.tier });
+        done({ issue: j.issue, tier: par.tier });
       }).catch(function (e) {
         /* 링크가 유효하지 않아도(오래된 링크·오타) 이번 주 호는 보여 준다 — 파일럿 호는 링크만 알면 누구나 보는 것이다.
            다만 그 기기의 기록은 서버로 보내지 않는다(누구의 기록인지 모른다) — 체험 모드와 같게 둔다. */
