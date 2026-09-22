@@ -799,6 +799,18 @@
   .study-reading-row { padding: 12px 0; border-bottom: 1px solid var(--light-gray); }
   .study-reading-row:last-child { border-bottom: 0; }
   .study-reading-history { margin-top: 7px; color: var(--mid-gray); font-size: 11.5px; }
+  .study-roadmap-card { overflow: hidden; border-color: #DCCEF8; background: linear-gradient(145deg, #FBF8FF, #FFFDF4); }
+  .study-roadmap-goal { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 13px; border-bottom: 1px solid #E9E0F7; }
+  .study-roadmap-school { color: #6036B4; font-size: clamp(18px, 4.4vw, 25px); font-weight: 900; letter-spacing: -.03em; }
+  .study-roadmap-list { display: grid; gap: 10px; margin-top: 13px; }
+  .study-roadmap-item { padding: 12px; border: 1px solid var(--line); border-left: 5px solid var(--subject-color); border-radius: 12px; background: linear-gradient(90deg, var(--subject-bg), rgba(255,255,255,.92) 45%); }
+  .study-roadmap-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; color: var(--mid-gray); font-size: 11px; }
+  .study-roadmap-progress { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 9px; margin-top: 9px; }
+  .study-roadmap-week { display: grid; gap: 8px; }
+  .study-roadmap-week-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 9px 0; border-bottom: 1px solid var(--light-gray); }
+  .study-roadmap-week-row:last-child { border-bottom: 0; }
+  .study-roadmap-admin-row { padding: 10px 0; border-bottom: 1px solid var(--light-gray); }
+  .study-roadmap-admin-row:last-child { border-bottom: 0; }
 
   /* ─── 보호자 읽기 전용 공유 ─── */
   .guardian-status { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; margin: 12px 0; }
@@ -2373,6 +2385,7 @@ function originTags(t) {
 function canEditTask(t) {
   if (isLectureRequestTask(t)) return false;
   if (isPointTransactionTask(t)) return false;
+  if (t && t.auto === STUDY_ROADMAP_AUTO) return false;
   if (!session.isStaffLink) return session.isAdmin;
   if (isManager()) return t.origin === 'manager';
   return t.origin === 'staff' && t.staffId === session.staffId;
@@ -5137,6 +5150,252 @@ function tbAddModal(me) {
 }
 
 /* ══════════════════════════════════════════════════════
+   교재 진도 로드맵 — 원장이 정한 범위를 학습 요일에 나누고 기존 체크리스트로 보낸다.
+   ══════════════════════════════════════════════════════ */
+const STUDY_ROADMAP_AUTO = 'study-roadmap-v1';
+const STUDY_ROADMAP_UNITS = Object.freeze({ page: '쪽', chapter: '단원', lecture: '강', problem: '문제', word: '단어' });
+const STUDY_ROADMAP_DAYS = Object.freeze([1, 2, 3, 4, 5, 6, 0]);
+
+function studyRoadmapOf(student) {
+  const raw = student && student.studyRoadmap && typeof student.studyRoadmap === 'object' ? student.studyRoadmap : {};
+  return {
+    targetSchool: String(raw.targetSchool || '').trim().slice(0, 100),
+    items: Array.isArray(raw.items) ? raw.items.filter(item => item && item.id && item.book) : []
+  };
+}
+
+function studyRoadmapActive(student) {
+  const roadmap = studyRoadmapOf(student);
+  return !!(roadmap.targetSchool && roadmap.items.length);
+}
+
+function studyRoadmapRangeText(unit, start, end) {
+  const from = Number(start), to = Number(end), labelText = STUDY_ROADMAP_UNITS[unit] || '개';
+  if (!Number.isInteger(from) || !Number.isInteger(to)) return '';
+  if (unit === 'page') return 'p.' + from + (to === from ? '' : '~' + to);
+  return from + (to === from ? '' : '~' + to) + labelText;
+}
+
+function studyRoadmapSchedule(item, fromUnit, fromDate, blockedDates, blockedRanges) {
+  const rangeStart = Math.max(Number(item && item.rangeStart) || 0, Number(fromUnit) || 0);
+  const rangeEnd = Number(item && item.rangeEnd) || 0;
+  const startDate = String((item && item.startDate) || '');
+  const endDate = String((item && item.endDate) || '');
+  const days = [...new Set((item && Array.isArray(item.days) ? item.days : []).map(Number)
+    .filter(day => Number.isInteger(day) && day >= 0 && day <= 6))];
+  if (!rangeStart || rangeEnd < rangeStart || !/^\d{4}-\d{2}-\d{2}$/.test(startDate) ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(endDate) || endDate < startDate || !days.length) return [];
+  const excluded = blockedDates instanceof Set ? blockedDates : new Set(blockedDates || []);
+  const firstDate = /^\d{4}-\d{2}-\d{2}$/.test(String(fromDate || '')) && fromDate > startDate ? fromDate : startDate;
+  const dates = [];
+  let date = firstDate, guard = 0;
+  while (date <= endDate && guard++ < 731) {
+    if (days.includes(dowOf(date)) && !excluded.has(date)) dates.push(date);
+    date = addDays(date, 1);
+  }
+  const covered = new Set();
+  (blockedRanges || []).forEach(range => {
+    const from = Math.max(rangeStart, Number(range && range.start) || 0);
+    const to = Math.min(rangeEnd, Number(range && range.end) || 0);
+    for (let unit = from; unit <= to; unit++) covered.add(unit);
+  });
+  const units = [];
+  for (let unit = rangeStart; unit <= rangeEnd; unit++) if (!covered.has(unit)) units.push(unit);
+  const sessions = Math.min(units.length, dates.length);
+  if (!sessions) return [];
+  const base = Math.floor(units.length / sessions), remainder = units.length % sessions;
+  let offset = 0;
+  return dates.slice(0, sessions).flatMap((studyDate, index) => {
+    const amount = base + (index < remainder ? 1 : 0);
+    const assigned = units.slice(offset, offset + amount);
+    offset += amount;
+    const rows = [];
+    assigned.forEach(unit => {
+      const last = rows[rows.length - 1];
+      if (last && last.end + 1 === unit) { last.end = unit; last.amount++; }
+      else rows.push({ date: studyDate, start: unit, end: unit, amount: 1 });
+    });
+    return rows;
+  });
+}
+
+function studyRoadmapTasks(staffId, itemId) {
+  return state.tasks.filter(task => !task.deleted && task.staffId === staffId && task.auto === STUDY_ROADMAP_AUTO &&
+    (!itemId || task.roadmapItemId === itemId));
+}
+
+function studyRoadmapTaskHasCheck(task) {
+  const prefix = String(task && task.id || '') + '|';
+  return !!task && Object.keys(state.checks || {}).some(key => key.startsWith(prefix));
+}
+
+function studyRoadmapTaskDone(task) {
+  const prefix = String(task && task.id || '') + '|';
+  return !!task && Object.entries(state.checks || {}).some(([key, check]) => key.startsWith(prefix) && check && check.done);
+}
+
+function studyRoadmapTaskReplaceable(task, itemId, from) {
+  return !!task && !task.deleted && task.auto === STUDY_ROADMAP_AUTO && task.roadmapItemId === itemId &&
+    task.start >= from && !task.dailyCarryFrom && !studyRoadmapTaskHasCheck(task) && !task.lastEditBy;
+}
+
+function studyRoadmapProgress(student, item) {
+  const start = Number(item.rangeStart) || 0, end = Number(item.rangeEnd) || 0;
+  const total = end >= start && start > 0 ? end - start + 1 : 0;
+  const completed = new Set();
+  studyRoadmapTasks(student.id, item.id).filter(studyRoadmapTaskDone).forEach(task => {
+    const from = Math.max(start, Number(task.roadmapRangeStart) || 0);
+    const to = Math.min(end, Number(task.roadmapRangeEnd) || 0);
+    for (let unit = from; unit <= to && unit <= end; unit++) completed.add(unit);
+  });
+  return { done: completed.size, total: total, pct: total ? Math.min(100, Math.round(completed.size / total * 100)) : 0 };
+}
+
+function commitStudyRoadmapItem(student, item) {
+  const stamp = now(), from = today();
+  const current = studyRoadmapTasks(student.id, item.id);
+  const locked = current.filter(task => !studyRoadmapTaskReplaceable(task, item.id, from));
+  current.filter(task => studyRoadmapTaskReplaceable(task, item.id, from)).forEach(task => {
+    task.deleted = true; task.updatedAt = stamp;
+  });
+  const blockedDates = new Set(locked.map(task => task.start).filter(date => date >= from));
+  const blockedRanges = locked.map(task => ({ start: task.roadmapRangeStart, end: task.roadmapRangeEnd }));
+  const schedule = studyRoadmapSchedule(item, Number(item.rangeStart) || 1, from, blockedDates, blockedRanges);
+  schedule.forEach(row => {
+    const taskId = 'roadmap-' + item.id + '-' + row.start + '-' + row.end;
+    const existing = state.tasks.find(task => task.id === taskId);
+    if (existing && studyRoadmapTaskHasCheck(existing)) return;
+    const rangeText = studyRoadmapRangeText(item.unit, row.start, row.end);
+    const next = {
+      id: taskId, groupId: 'roadmap-' + item.id, staffId: student.id,
+      auto: STUDY_ROADMAP_AUTO, roadmapItemId: item.id, roadmapPlanKey: item.id + ':' + row.start + '-' + row.end,
+      roadmapRangeStart: row.start, roadmapRangeEnd: row.end, roadmapUnit: item.unit,
+      title: item.book, studySubject: item.subject,
+      detail: rangeText + ' · ' + studyRoadmapOf(student).targetSchool + ' 목표',
+      guide: rangeText + '를 학습하고 채점한 뒤 오답을 확인하세요.',
+      steps: [], target: 0, unit: STUDY_ROADMAP_UNITS[item.unit] || '개',
+      estimatedMin: Number(item.estimatedMin) || 50, time: '', priority: 'normal',
+      repeat: 'once', days: [], start: row.date, end: '', carry: true, requiresClaim: false,
+      origin: 'admin', createdAt: existing ? existing.createdAt : stamp, updatedAt: stamp, deleted: false
+    };
+    if (existing) Object.assign(existing, next);
+    else state.tasks.push(next);
+  });
+  return schedule;
+}
+
+function stopStudyRoadmapItem(student, itemId) {
+  const stamp = now();
+  studyRoadmapTasks(student.id, itemId).filter(task => studyRoadmapTaskReplaceable(task, itemId, today())).forEach(task => {
+    task.deleted = true; task.updatedAt = stamp;
+  });
+}
+
+function studyRoadmapCard(student) {
+  const roadmap = studyRoadmapOf(student);
+  if (!roadmap.targetSchool || !roadmap.items.length) return '';
+  const summaries = roadmap.items.map(item => ({ item: item, progress: studyRoadmapProgress(student, item) }));
+  const total = summaries.reduce((sum, row) => sum + row.progress.total, 0);
+  const done = summaries.reduce((sum, row) => sum + row.progress.done, 0);
+  const pct = total ? Math.min(100, Math.round(done / total * 100)) : 0;
+  return '<div class="card study-roadmap-card" id="studyRoadmap"><div class="study-roadmap-goal"><div>' +
+    '<div class="card-sub">🎯 목표 학교</div><div class="study-roadmap-school">' + esc(roadmap.targetSchool) + '</div>' +
+    '<div class="card-sub mt8">교재별 남은 분량을 학습 요일에 자동으로 나눈 계획입니다.</div></div>' +
+    (session.isAdmin && !session.isStaffLink ? '<button class="btn btn-sm btn-ghost" data-act="roadmapopen" data-id="' + esc(student.id) + '">로드맵 설정</button>' :
+      '<span class="pill">전체 ' + pct + '%</span>') + '</div>' +
+    '<div class="study-roadmap-list">' + summaries.map(row => {
+      const item = row.item, progress = row.progress;
+      const todayTasks = tasksFor(student.id, today()).filter(task => task.auto === STUDY_ROADMAP_AUTO && task.roadmapItemId === item.id);
+      const nextTask = studyRoadmapTasks(student.id, item.id).filter(task => task.start >= today() && !studyRoadmapTaskDone(task))
+        .sort((a, b) => a.start.localeCompare(b.start))[0];
+      const todayText = todayTasks.length
+        ? '오늘 ' + todayTasks.map(task => studyRoadmapRangeText(task.roadmapUnit, task.roadmapRangeStart, task.roadmapRangeEnd)).join(', ')
+        : nextTask ? '다음 ' + shortDate(nextTask.start) + ' · ' + studyRoadmapRangeText(nextTask.roadmapUnit, nextTask.roadmapRangeStart, nextTask.roadmapRangeEnd)
+          : progress.pct >= 100 ? '목표 분량 완료' : '남은 일정 없음 · 원장 확인 필요';
+      return '<div class="study-roadmap-item ' + studySubject(item.subject).className + '"><div class="between"><div>' +
+        studySubjectTag(item.subject) + ' <b>' + esc(item.book) + '</b></div><b>' + progress.pct + '%</b></div>' +
+        '<div class="study-roadmap-meta"><span>전체 ' + esc(studyRoadmapRangeText(item.unit, item.rangeStart, item.rangeEnd)) + '</span>' +
+          '<span>' + esc(shortDate(item.startDate)) + '~' + esc(shortDate(item.endDate)) + '</span>' +
+          '<span>' + esc((item.days || []).slice().sort((a, b) => STUDY_ROADMAP_DAYS.indexOf(a) - STUDY_ROADMAP_DAYS.indexOf(b)).map(day => DOW[day]).join('·')) + '</span></div>' +
+        '<div class="study-roadmap-progress"><div class="bar mini"><i style="width:' + progress.pct + '%"></i></div>' +
+          '<span class="small"><b>' + progress.done + '</b>/' + progress.total + (STUDY_ROADMAP_UNITS[item.unit] || '개') + '</span></div>' +
+        '<div class="hint mt8"><b>' + esc(todayText) + '</b></div></div>';
+    }).join('') + '</div></div>';
+}
+
+function studyRoadmapWeekCard(student, mon, days) {
+  const roadmap = studyRoadmapOf(student);
+  if (!roadmap.targetSchool || !roadmap.items.length) return '';
+  const weekDates = days || Array.from({ length: 7 }, (_, index) => addDays(mon, index));
+  const rows = roadmap.items.map(item => {
+    const tasks = weekDates.flatMap(date => tasksFor(student.id, date).filter(task =>
+      task.auto === STUDY_ROADMAP_AUTO && task.roadmapItemId === item.id).map(task => ({ task: task, date: date })));
+    const unique = [...new Map(tasks.map(row => [row.task.id + '|' + row.date, row])).values()];
+    return { item: item, tasks: unique, done: unique.filter(row => isDone(row.task.id, row.date)).length };
+  }).filter(row => row.tasks.length);
+  if (!rows.length) return '';
+  return '<div class="card"><div class="between mb8"><div><div class="card-title">📚 이번 주 교재 로드맵</div>' +
+    '<div class="card-sub">목표 ' + esc(roadmap.targetSchool) + ' · 이번 주 배정 분량</div></div><span class="pill">' +
+    rows.reduce((sum, row) => sum + row.done, 0) + '/' + rows.reduce((sum, row) => sum + row.tasks.length, 0) + '회</span></div>' +
+    '<div class="study-roadmap-week">' + rows.map(row => '<div class="study-roadmap-week-row ' + studySubject(row.item.subject).className + '">' +
+      studySubjectTag(row.item.subject) + '<div><b>' + esc(row.item.book) + '</b><div class="small muted">' +
+      row.tasks.map(item => DOW[dowOf(item.date)] + ' ' + studyRoadmapRangeText(item.task.roadmapUnit, item.task.roadmapRangeStart, item.task.roadmapRangeEnd)).join(' · ') +
+      '</div></div><span class="pill' + (row.done === row.tasks.length ? '' : ' warn') + '">' + row.done + '/' + row.tasks.length + '</span></div>').join('') +
+    '</div></div>';
+}
+
+function studyRoadmapModal(staffId) {
+  if (!session.isAdmin || session.isStaffLink) return;
+  const student = staffById(staffId);
+  if (!student || student.deleted || student.owner || student.manager) return toast('학생을 다시 선택해 주세요');
+  const roadmap = studyRoadmapOf(student);
+  modal(student.name + ' · 교재 진도 로드맵',
+    '<div class="guide mb14"><b>필요한 학생에게만 표시됩니다.</b><br>목표 학교와 교재를 등록하면 학생의 학습 탭과 오늘 체크리스트에 자동으로 나타납니다.</div>' +
+    '<div class="field"><label class="fl" for="roadmapTargetSchool">목표 학교</label>' +
+      '<div class="row" style="gap:8px"><input class="in" id="roadmapTargetSchool" maxlength="100" value="' + esc(roadmap.targetSchool) + '" placeholder="예: 한국외국어대학교">' +
+      '<button class="btn btn-navy" data-act="roadmaptargetsave" data-id="' + esc(student.id) + '">저장</button></div></div>' +
+    '<div class="between mt14 mb8"><b>교재 계획</b><button class="btn btn-sm btn-primary" data-act="roadmapbookadd" data-id="' + esc(student.id) + '">＋ 교재 추가</button></div>' +
+    (roadmap.items.length ? roadmap.items.map(item => {
+      const progress = studyRoadmapProgress(student, item);
+      return '<div class="study-roadmap-admin-row"><div class="between"><div>' + studySubjectTag(item.subject) + ' <b>' + esc(item.book) + '</b>' +
+        '<div class="small muted mt8">' + esc(studyRoadmapRangeText(item.unit, item.rangeStart, item.rangeEnd)) + ' · ' +
+          esc(shortDate(item.startDate)) + '~' + esc(shortDate(item.endDate)) + ' · ' + progress.pct + '%</div></div>' +
+        '<div class="row" style="gap:6px"><button class="btn btn-sm btn-ghost" data-act="roadmapbookedit" data-id="' + esc(student.id) + '" data-item="' + esc(item.id) + '">수정</button>' +
+        '<button class="btn btn-sm btn-danger" data-act="roadmapbookdelete" data-id="' + esc(student.id) + '" data-item="' + esc(item.id) + '">삭제</button></div></div></div>';
+    }).join('') : '<div class="small muted">등록된 교재 계획이 없습니다.</div>') +
+    (roadmap.targetSchool || roadmap.items.length ? '<button class="btn btn-danger btn-block mt14" data-act="roadmapstop" data-id="' + esc(student.id) + '">로드맵 사용 종료</button>' : ''),
+    '<button class="btn btn-ghost btn-block" data-act="closemodal">닫기</button>');
+}
+
+function studyRoadmapBookModal(staffId, itemId) {
+  if (!session.isAdmin || session.isStaffLink) return;
+  const student = staffById(staffId);
+  const roadmap = studyRoadmapOf(student);
+  const item = roadmap.items.find(row => row.id === itemId) || {};
+  if (!student || !roadmap.targetSchool) return toast('목표 학교를 먼저 저장해 주세요');
+  const days = Array.isArray(item.days) ? item.days : [1, 2, 3, 4, 5];
+  const startDate = item.startDate || today(), endDate = item.endDate || addDays(today(), 42);
+  modal((item.id ? '✏️ 교재 계획 수정' : '📚 교재 계획 추가'),
+    '<input type="hidden" id="roadmapBookId" value="' + esc(item.id || '') + '">' +
+    '<div class="guide mb14"><b>목표 ' + esc(roadmap.targetSchool) + '</b><br>전체 범위를 선택한 요일에 균등하게 나눠 오늘 체크리스트로 보냅니다.</div>' +
+    '<div class="grid2"><div class="field"><label class="fl">과목</label><select class="in" id="roadmapSubject">' + studySubjectOptions(item.subject || '', '과목 선택') + '</select></div>' +
+      '<div class="field"><label class="fl">교재명</label><input class="in" id="roadmapBook" maxlength="120" value="' + esc(item.book || '') + '" placeholder="예: 쎈 중3-1"></div></div>' +
+    '<div class="grid2"><div class="field"><label class="fl">분량 단위</label><select class="in" id="roadmapUnit">' +
+      Object.entries(STUDY_ROADMAP_UNITS).map(([key, value]) => '<option value="' + key + '"' + ((item.unit || 'page') === key ? ' selected' : '') + '>' + value + '</option>').join('') +
+      '</select></div><div class="field"><label class="fl">한 번 예상시간</label><select class="in" id="roadmapMinutes">' +
+      [20, 30, 40, 50, 60, 90].map(value => '<option value="' + value + '"' + (Number(item.estimatedMin || 50) === value ? ' selected' : '') + '>' + value + '분</option>').join('') +
+      '</select></div></div>' +
+    '<div class="grid2"><div class="field"><label class="fl">시작 번호</label><input class="in" id="roadmapRangeStart" type="number" min="1" max="99999" inputmode="numeric" value="' + esc(item.rangeStart || '') + '" placeholder="30"></div>' +
+      '<div class="field"><label class="fl">끝 번호</label><input class="in" id="roadmapRangeEnd" type="number" min="1" max="99999" inputmode="numeric" value="' + esc(item.rangeEnd || '') + '" placeholder="150"></div></div>' +
+    '<div class="grid2"><div class="field"><label class="fl">시작일</label><input class="in" id="roadmapStartDate" type="date" value="' + esc(startDate) + '"></div>' +
+      '<div class="field"><label class="fl">완료 목표일</label><input class="in" id="roadmapEndDate" type="date" value="' + esc(endDate) + '"></div></div>' +
+    '<div class="field"><label class="fl">학습 요일</label><div class="chips">' + STUDY_ROADMAP_DAYS.map(day =>
+      '<label class="chip"><input type="checkbox" data-roadmap-day value="' + day + '"' + (days.includes(day) ? ' checked' : '') + '> ' + DOW[day] + '</label>').join('') + '</div></div>' +
+    '<div class="hint">저장하면 이미 완료했거나 기록을 남긴 분량은 보존하고, 아직 시작하지 않은 분량만 다시 배치합니다.</div>',
+    '<button class="btn btn-primary btn-block" data-act="roadmapbooksave" data-id="' + esc(student.id) + '">계획 저장</button>');
+}
+
+/* ══════════════════════════════════════════════════════
    회독 — 같은 교재를 몇 번 돌렸는지. 목표 회독수 대비 진행을 본다.
    ══════════════════════════════════════════════════════ */
 const rdKey = sid => '__rd__' + sid;
@@ -6024,6 +6283,8 @@ function viewStudy() {
       '<div class="study-kpi"><span>마감 지연</span><b>' + lateTasks.length + '건</b></div>' +
       '<div class="study-kpi"><span>복습 대기</span><b>' + (dueWrong.length + dueRounds.length) + '건</b></div></div></div>';
 
+  h += studyRoadmapCard(me);
+
   if (dueWrong.length || dueRounds.length) {
     h += '<div class="card alert"><div class="between"><div><div class="card-title">🔁 오늘 복습 대기</div>' +
       '<div class="card-sub">오늘 탭에서 체크리스트에 담아 순공시간까지 기록할 수 있습니다.</div></div>' +
@@ -6468,6 +6729,8 @@ function viewWeek() {
     '<div class="pill">' + wp.done + ' / ' + wp.total + '건 · ' + wp.pct + '%</div></div>' +
     '<div class="bar"><i style="width:' + wp.pct + '%"></i></div></div>';
 
+  h += studyRoadmapWeekCard(me, mon, days);
+
   h += '<div class="card"><div class="between mb14"><div><div class="card-title">🎯 과목별 목표시간</div>' +
     '<div class="card-sub">이번 주 목표와 실제 순공시간을 비교합니다.</div></div>' +
     (editable ? '<button class="btn btn-sm btn-ghost" data-act="weekgoal" data-mon="' + mon + '">목표 설정</button>' : '') + '</div>' +
@@ -6522,7 +6785,7 @@ function viewWeek() {
             const cls = st === 'done' ? 'done' : st === 'blocked' ? 'blocked' : st === 'doing' ? 'doing' : (d < today() ? 'miss' : '');
             return '<td><div class="week-cell-actions"><button class="dot ' + cls + '" ' +
               (editable ? 'data-act="toggle" data-id="' + t.id + '" data-date="' + d + '"' : 'disabled') + '>✓</button>' +
-              (editable && t.repeat === 'once' && st !== 'done' ? '<button class="week-move" data-act="weekmove" data-id="' + t.id + '" data-date="' + d + '" aria-label="요일 변경">↔</button>' : '') +
+              (editable && t.repeat === 'once' && st !== 'done' && t.auto !== STUDY_ROADMAP_AUTO ? '<button class="week-move" data-act="weekmove" data-id="' + t.id + '" data-date="' + d + '" aria-label="요일 변경">↔</button>' : '') +
               '</div></td>';
           }).join('') + '</tr>';
       }).join('') +
@@ -6545,7 +6808,7 @@ function viewWeek() {
           const subject = taskStudySubject(item.t);
           return '<div class="week-backlog-row ' + subject.className + '"><span class="tag subject-tag ' + subject.className + '">' + subject.label + '</span>' +
             '<div><b class="small">' + esc(item.t.title) + '</b><div class="small muted">' + shortDate(item.date) + ' 미완료</div></div>' +
-            (editable && item.t.repeat === 'once' ? '<button class="btn btn-sm btn-ghost" data-act="weekmove" data-id="' + item.t.id + '" data-date="' + item.date + '">이번 주 재배치</button>' : '') + '</div>';
+            (editable && item.t.repeat === 'once' && item.t.auto !== STUDY_ROADMAP_AUTO ? '<button class="btn btn-sm btn-ghost" data-act="weekmove" data-id="' + item.t.id + '" data-date="' + item.date + '">이번 주 재배치</button>' : '') + '</div>';
         }).join('') + '</section>' : '') +
       (offers.length ? '<section class="week-action-section"><div class="between mb8"><div><b>📨 아직 가져오지 않은 배부 공부</b>' +
         '<div class="card-sub">체크리스트에 담기 전인 원장 배부 항목입니다.</div></div></div>' +
@@ -10278,8 +10541,11 @@ function staffAccessPanels(student) {
   const subscriptionControl = student.owner || student.manager ? '' :
     '<button class="btn btn-sm btn-ghost" data-act="subscriptionopen" data-id="' + student.id + '">' +
       (subscription.active ? '구독 설정' : subscription.endedAt ? '구독 다시 시작' : '월 구독 설정') + '</button>';
+  const roadmapControl = student.owner || student.manager ? '' :
+    '<button class="btn btn-sm btn-ghost" data-act="roadmapopen" data-id="' + student.id + '">' +
+      (studyRoadmapActive(student) ? '교재 로드맵 설정' : '교재 로드맵 추가') + '</button>';
   const common = '<button class="btn btn-sm btn-ghost" data-act="managetasks" data-id="' + student.id + '">지시 목록 관리</button>' +
-    subscriptionControl +
+    roadmapControl + subscriptionControl +
     '<button class="btn btn-sm btn-ghost" data-act="toggleowner" data-id="' + student.id + '"' + identityLock + '>' +
       (student.owner ? '대표 해제' : '대표로 지정') + '</button>' +
     '<button class="btn btn-sm btn-ghost" data-act="togglemanager" data-id="' + student.id + '"' + identityLock + '>' +
@@ -10367,6 +10633,7 @@ function viewStaffAdmin() {
         '<div><div class="card-title">' + esc(s.name) +
           (s.owner ? ' <span class="tag add">대표</span>' : '') +
           (s.manager ? ' <span class="tag edit">관리자</span>' : '') +
+          (studyRoadmapActive(s) ? ' <span class="tag doing">🎯 ' + esc(studyRoadmapOf(s).targetSchool) + '</span>' : '') +
           (subscription.active ? ' <span class="tag subscription">월 구독</span>' :
             subscription.endedAt ? ' <span class="tag usage-idle">구독 종료</span>' : '') + '</div>' +
         '<div class="small muted">지시 ' + state.tasks.filter(t => t.staffId === s.id && !t.deleted && t.kind !== 'report_snapshot' && !isPointTransactionTask(t) && !isLectureRequestTask(t)).length + '건' +
@@ -11672,6 +11939,104 @@ document.addEventListener('click', ev => {
       break;
     }
 
+    /* 교재 진도 로드맵 */
+    case 'roadmapopen': {
+      studyRoadmapModal(id);
+      break;
+    }
+    case 'roadmaptargetsave': {
+      if (!session.isAdmin || session.isStaffLink) break;
+      const student = staffById(id);
+      if (!student || student.deleted || student.owner || student.manager) return toast('학생을 다시 선택해 주세요');
+      const targetSchool = String((($('#roadmapTargetSchool') || {}).value) || '').trim().slice(0, 100);
+      if (!targetSchool) return toast('목표 학교를 입력해 주세요');
+      const roadmap = studyRoadmapOf(student);
+      student.studyRoadmap = { targetSchool: targetSchool, items: roadmap.items };
+      student.updatedAt = now();
+      roadmap.items.forEach(item => commitStudyRoadmapItem(student, item));
+      if (!save()) return;
+      queueSync(); studyRoadmapModal(id); toast('목표 학교를 저장했습니다');
+      break;
+    }
+    case 'roadmapbookadd': {
+      studyRoadmapBookModal(id, '');
+      break;
+    }
+    case 'roadmapbookedit': {
+      studyRoadmapBookModal(id, el.dataset.item || '');
+      break;
+    }
+    case 'roadmapbooksave': {
+      if (!session.isAdmin || session.isStaffLink) break;
+      const student = staffById(id);
+      if (!student || student.deleted || student.owner || student.manager) return toast('학생을 다시 선택해 주세요');
+      const roadmap = studyRoadmapOf(student);
+      if (!roadmap.targetSchool) return toast('목표 학교를 먼저 저장해 주세요');
+      const itemId = String((($('#roadmapBookId') || {}).value) || '');
+      const subject = String((($('#roadmapSubject') || {}).value) || '');
+      const book = String((($('#roadmapBook') || {}).value) || '').trim().slice(0, 120);
+      const unit = String((($('#roadmapUnit') || {}).value) || '');
+      const rangeStart = Number((($('#roadmapRangeStart') || {}).value));
+      const rangeEnd = Number((($('#roadmapRangeEnd') || {}).value));
+      const startDate = String((($('#roadmapStartDate') || {}).value) || '');
+      const endDate = String((($('#roadmapEndDate') || {}).value) || '');
+      const days = [...new Set(Array.from(document.querySelectorAll('[data-roadmap-day]:checked')).map(input => Number(input.value)))]
+        .filter(day => Number.isInteger(day) && day >= 0 && day <= 6);
+      if (!STUDY_SUBJECTS[subject]) return toast('과목을 선택해 주세요');
+      if (!book) return toast('교재명을 입력해 주세요');
+      if (!STUDY_ROADMAP_UNITS[unit]) return toast('분량 단위를 선택해 주세요');
+      if (!Number.isInteger(rangeStart) || rangeStart < 1 || !Number.isInteger(rangeEnd) || rangeEnd < rangeStart || rangeEnd > 99999) {
+        return toast('시작·끝 번호를 올바르게 입력해 주세요');
+      }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate) || endDate < startDate) {
+        return toast('시작일과 완료 목표일을 확인해 주세요');
+      }
+      if (Math.round((parseYmd(endDate) - parseYmd(startDate)) / 86400000) > 730) return toast('로드맵 기간은 2년 이내로 설정해 주세요');
+      if (!days.length) return toast('학습 요일을 하나 이상 선택해 주세요');
+      const existing = roadmap.items.find(item => item.id === itemId);
+      const item = {
+        id: existing ? existing.id : uid(), subject: subject, book: book, unit: unit,
+        rangeStart: rangeStart, rangeEnd: rangeEnd, startDate: startDate, endDate: endDate,
+        days: days.sort((a, b) => STUDY_ROADMAP_DAYS.indexOf(a) - STUDY_ROADMAP_DAYS.indexOf(b)),
+        estimatedMin: Math.max(20, Math.min(90, Number((($('#roadmapMinutes') || {}).value)) || 50)),
+        createdAt: existing ? existing.createdAt : now(), updatedAt: now()
+      };
+      const preview = studyRoadmapSchedule(item, rangeStart, startDate, new Set());
+      if (!preview.length) return toast('기간 안에 선택한 학습 요일이 없습니다');
+      const items = existing ? roadmap.items.map(row => row.id === existing.id ? item : row) : roadmap.items.concat(item);
+      student.studyRoadmap = { targetSchool: roadmap.targetSchool, items: items };
+      student.updatedAt = now();
+      commitStudyRoadmapItem(student, item);
+      if (!save()) return;
+      queueSync(); studyRoadmapModal(id); toast('교재 분량을 ' + preview.length + '회로 나눠 저장했습니다');
+      break;
+    }
+    case 'roadmapbookdelete': {
+      if (!session.isAdmin || session.isStaffLink) break;
+      const student = staffById(id), roadmap = studyRoadmapOf(student);
+      const item = roadmap.items.find(row => row.id === el.dataset.item);
+      if (!student || !item) return toast('교재 계획을 다시 확인해 주세요');
+      if (!confirm(item.book + ' 교재 계획을 삭제할까요? 이미 완료한 기록은 유지됩니다.')) return;
+      stopStudyRoadmapItem(student, item.id);
+      student.studyRoadmap = { targetSchool: roadmap.targetSchool, items: roadmap.items.filter(row => row.id !== item.id) };
+      student.updatedAt = now();
+      if (!save()) return;
+      queueSync(); studyRoadmapModal(id); toast('교재 계획을 삭제했습니다');
+      break;
+    }
+    case 'roadmapstop': {
+      if (!session.isAdmin || session.isStaffLink) break;
+      const student = staffById(id), roadmap = studyRoadmapOf(student);
+      if (!student || (!roadmap.targetSchool && !roadmap.items.length)) break;
+      if (!confirm(student.name + ' 학생의 교재 로드맵 사용을 종료할까요? 이미 완료한 기록은 유지됩니다.')) return;
+      roadmap.items.forEach(item => stopStudyRoadmapItem(student, item.id));
+      student.studyRoadmap = { targetSchool: '', items: [] };
+      student.updatedAt = now();
+      if (!save()) return;
+      queueSync(); closeModal(); render(); toast('교재 로드맵 사용을 종료했습니다');
+      break;
+    }
+
     /* 회독 */
     case 'rdadd': rdAddModal(); break;
     case 'rdsave': {
@@ -12449,6 +12814,7 @@ document.addEventListener('click', ev => {
       const t = task();
       if (!me || !t || t.staffId !== me.id || t.repeat !== 'once') return toast('이 공부는 요일을 변경할 수 없습니다');
       if (t.auto === 'exam-plan-v1') return toast('시험대비 일정은 학사관리에서 재계획해 주세요');
+      if (t.auto === STUDY_ROADMAP_AUTO) return toast('교재 로드맵 설정에서 학습 요일을 바꿔 주세요');
       weekMoveModal(t, date, mondayOf(cursor));
       break;
     }
@@ -12787,6 +13153,7 @@ document.addEventListener('click', ev => {
       const me = currentStaff();
       if (!t || !me || t.staffId !== me.id) return toast('이 공부의 날짜를 변경할 수 없습니다');
       if (t.auto === 'exam-plan-v1') return toast('시험대비 일정은 학사관리에서 재계획해 주세요');
+      if (t.auto === STUDY_ROADMAP_AUTO) return toast('교재 로드맵 설정에서 학습 일정을 바꿔 주세요');
       monthMoveModal(t, date);
       break;
     }
@@ -12806,6 +13173,7 @@ document.addEventListener('click', ev => {
       const me = currentStaff();
       if (!t || !me || t.staffId !== me.id) return toast('이 공부를 이월할 수 없습니다');
       if (t.auto === 'exam-plan-v1') return toast('시험대비 일정은 학사관리에서 재계획해 주세요');
+      if (t.auto === STUDY_ROADMAP_AUTO) return toast('교재 로드맵 공부는 하루 마무리에서 이월해 주세요');
       moveMonthOccurrence(t, date, el.dataset.to || today());
       break;
     }
@@ -14193,7 +14561,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-09-22.3';
+const APP_VER = '2026-09-22.4';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
