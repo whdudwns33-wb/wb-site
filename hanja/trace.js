@@ -1,7 +1,7 @@
 'use strict';
 /* WB 어휘브레인 — 손가락 따라쓰기 판정 (순수 로직, 브라우저/Node 공용)
  *
- * 손이 획을 한 번 겪어야 한자가 눈에 들어온다. 화면은 캔버스에 안내 글자(폰트)를 옅게 깔고
+ * 화면은 캔버스에 안내 글자(폰트)를 옅게 깔고
  * 학생이 손가락으로 그 위를 긋는다. 여기서는 그 결과를 판정한다 — 캔버스는 만지지 않는다.
  * 획 좌표는 칸 한 변을 1로 둔 0~1 좌표다(화면 크기·회전에 무관).
  *
@@ -16,8 +16,7 @@
  * 획순 데이터가 없는 글자의 획순은 채점하지 않는다. 데이터 없이 "틀렸다"고 말하면 맞는 획순도
  * 틀렸다고 하게 되고, 틀린 채점은 채점을 안 하느니만 못하다(워드브레인 trace.js 의 결론 그대로).
  *
- * 세 번 쓰되 안내가 회차마다 옅어진다 — 보고 그리고, 흐릿한 것을 더듬고, 기억에서 꺼내 쓴다.
- * 베끼기 세 번은 손만 움직이고 기억은 안 남는다(인출 난이도 사다리). */
+ * 시범 뒤 세 번 쓰되 안내가 회차마다 옅어진다 — 따라 쓰고, 흐릿한 안내로 쓰고, 혼자 쓴다. */
 var WBHTRACE = (function () {
 
   var REPS = 3;
@@ -188,17 +187,17 @@ var WBHTRACE = (function () {
     }
     if (!best) return { idx: -1, dist: Infinity, reversed: false, ok: false, outOfOrder: false, expected: expected };
     /* 방향이 맞는 쪽 거리로 통과를 정한다 — 거꾸로 그은 획은 자리가 맞아도 통과가 아니다 */
-    var ok = best.fwd <= tol;
+    var ok = best.fwd <= tol && !best.reversed;
     return { idx: best.idx, dist: Math.round(best.dist * 1000) / 1000, reversed: !ok && best.reversed && best.dist <= tol, ok: ok, outOfOrder: ok && best.idx !== expected, expected: expected };
   }
 
-  /* 판정 → 학생에게 할 말. 통과여도 순서가 어긋났으면 알려 준다(획은 인정).
+  /* 판정 → 학생에게 할 말. 모양이 맞아도 순서가 어긋난 획은 다시 쓰게 한다.
      medians 를 주면 거꾸로 그은 획의 바른 방향을 말로 알려 준다. */
   function strokeHint(res, medians) {
     if (!res) return '';
     var n = (medians || []).length;
     var ord = function (i) { return (i + 1) + '번째 획'; };
-    if (res.ok && res.outOfOrder) return '획은 맞는데 순서가 달라요 — ' + ord(res.expected) + '부터 쓰는 순서예요.';
+    if (res.ok && res.outOfOrder) return '모양은 맞지만 순서가 달라요 — ' + ord(res.expected) + '부터 다시 써 보세요.';
     if (res.ok) return res.idx === n - 1 ? '마지막 획까지 다 썼어요 ✍️' : '좋아요, 다음 획!';
     if (res.reversed) {
       var dir = medians && medians[res.idx] ? directionOf(medians[res.idx]) : '';

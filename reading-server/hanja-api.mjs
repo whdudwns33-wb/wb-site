@@ -55,7 +55,29 @@ export function normCheck(c) {
   const right = Math.round(Number(c.right) || 0);
   const at = Math.round(Number(c.at) || 0);
   const str = (v, max) => (typeof v === 'string' ? v.slice(0, max) : '');
-  return { book: str(c.book, 60), unit: str(c.unit, 60), title: str(c.title, 60), n, right: Math.max(0, Math.min(n, right)), at: at > 0 ? at : null };
+  const validTime = (v) => Number.isFinite(v) && v > 0 && v <= 8640000000000000;
+  const ids = (v) => [...new Set((Array.isArray(v) ? v : []).filter((id) => typeof id === 'string' && /^(w:|c:)/.test(id) && id.length <= 200 && !/[\u0000-\u001f\u007f]/.test(id)))].slice(0, 3000);
+  const out = { book: str(c.book, 60), unit: str(c.unit, 60), title: str(c.title, 60), n, right: Math.max(0, Math.min(n, right)), at: validTime(at) ? at : null };
+  if (Number.isFinite(Number(c.total)) && Number(c.total) >= n) out.total = Math.min(5000, Math.round(Number(c.total)));
+  if (Number.isFinite(Number(c.hinted)) && c.hinted != null) out.hinted = Math.max(0, Math.min(out.right, Math.round(Number(c.hinted))));
+  if (Array.isArray(c.wrongIds)) out.wrongIds = ids(c.wrongIds);
+  if (isObj(c.domains)) {
+    const domains = {}, keys = ['meaning', 'context', 'recall'];
+    if (keys.every((key) => {
+      const d = c.domains[key];
+      if (!isObj(d) || !Number.isInteger(d.n) || !Number.isInteger(d.right) || d.n < 0 || d.right < 0 || d.right > d.n) return false;
+      domains[key] = { n: d.n, right: d.right }; return true;
+    }) && keys.reduce((sum, key) => sum + domains[key].n, 0) === out.n &&
+        keys.reduce((sum, key) => sum + domains[key].right, 0) === out.right - (out.hinted || 0)) out.domains = domains;
+  }
+  if (isObj(c.retry)) {
+    const total = Math.round(Number(c.retry.total)), at = Math.round(Number(c.retry.at));
+    const wrongIds = ids(c.retry.wrongIds);
+    if (total > 0 && total <= 20 && validTime(at) && (!out.at || at >= out.at) && Array.isArray(c.retry.wrongIds) && c.retry.wrongIds.every((id) => wrongIds.includes(id))) {
+      out.retry = { at, total, right: Math.max(0, Math.min(total, Math.round(Number(c.retry.right) || 0))), wrongIds };
+    }
+  }
+  return out;
 }
 export function checkList(stateRec) {
   const S = stateRec && stateRec.state;
@@ -170,11 +192,11 @@ export function buildRemap(prevBook, nextBook, prevRemap) {
   return map;
 }
 
-/* 단원 하나의 학습 항목 SRS id — 학생 앱 itemsOf 와 같은 규칙(낱말 + 직접 적은 한자, 끌어낸 한자는 참고) */
+/* 단원 하나의 학습 항목 SRS id — 어휘 교재는 낱말, 글자만 있는 교재는 직접 적은 한자. */
 export function unitItemIds(book, unitId) {
   const out = [];
   for (const w of (book && book.words) || []) if (w.unit === unitId) out.push('w:' + book.id + ':' + w.id);
-  for (const c of (book && book.chars) || []) if (!c.derived && c.unit === unitId) out.push('c:' + c.ch);
+  if (!((book && book.words) || []).length) for (const c of (book && book.chars) || []) if (!c.derived && c.unit === unitId) out.push('c:' + c.ch);
   return out;
 }
 export function unitProgress(stateRec, itemIds, now) {
@@ -294,32 +316,50 @@ export async function handleHanja(ctx) {
   if (p === '/api/hanja/admin/book' && method === 'POST') {
     const b = await body();
     if (!b) return j(400, { error: '요청 본문이 JSON 이 아니에요.' });
-    let res;
-    /* 종류(source)는 JSON 에 적힌 값이 먼저, 없으면 관리 웹 선택값 — 둘 다 없으면 검사기가 교재로 둔다 */
-    if (isObj(b.book)) res = CHECK.checkBook(b.book.source == null && b.source ? { ...b.book, source: b.source } : b.book);
-    else if (typeof b.text === 'string') res = CHECK.parseBookText(b.text, { id: b.id, title: b.title, publisher: b.publisher, level: b.level, note: b.note, source: b.source });
-    else return j(400, { error: 'book(JSON) 또는 text(붙여넣기)가 필요해요.' });
-    const preview = { summary: res.summary, warns: res.warns, errors: res.errors, counts: res.counts || null, meta: res.book ? CHECK.bookMeta(res.book) : null };
-    if (b.dryRun) return j(200, { ok: res.ok, preview: true, ...preview });
-    if (!res.ok) return j(400, { error: '단어장에 오류가 있어요 — 고친 뒤 다시 올려 주세요.', ...preview });
-    const book = res.book;
-    if (byteLen(book) > BOOK_MAX_BYTES) return j(413, { error: '단어장이 너무 커요 (1.5MB 이내) — 권을 나누세요.' });
+    const batch = Object.hasOwn(b, 'books');
+    if (batch && (!Array.isArray(b.books) || !b.books.length || b.books.length > 63 || b.book || b.text)) return j(400, { error: 'books는 단어장 1~63권 배열이어야 해요. book·text와 함께 보내지 마세요.' });
+    if (batch && byteLen(b) > BODY_LIMIT_BOOK) return j(413, { error: '일괄 업로드 파일은 2MB 이내로 나누세요.' });
+    let results;
+    /* 종류(source)는 각 JSON 값이 먼저, 없으면 관리 웹 선택값 — 단건과 일괄이 같은 검사기를 지난다. */
+    if (batch || isObj(b.book)) results = (batch ? b.books : [b.book]).map((book) => CHECK.checkBook(isObj(book) && book.source == null && b.source ? { ...book, source: b.source } : book));
+    else if (typeof b.text === 'string') results = [CHECK.parseBookText(b.text, { id: b.id, title: b.title, publisher: b.publisher, level: b.level, note: b.note, source: b.source })];
+    else return j(400, { error: 'book(JSON), books(일괄 JSON) 또는 text(붙여넣기)가 필요해요.' });
+    const seen = new Set();
+    let oversized = false;
+    const previews = results.map((res) => {
+      const errors = res.errors.slice(), book = res.book;
+      if (book && seen.has(book.id)) errors.push({ where: book.id, message: '일괄 파일 안에서 단어장 id가 중복돼요.' });
+      if (book) seen.add(book.id);
+      if (book && byteLen(book) > BOOK_MAX_BYTES) { oversized = true; errors.push({ where: book.id, message: '단어장이 너무 커요 (1.5MB 이내) — 권을 나누세요.' }); }
+      return { ok: res.ok && !errors.length, summary: res.summary, warns: res.warns, errors, counts: res.counts || null, meta: book ? CHECK.bookMeta(book) : null };
+    });
+    const ok = previews.every((preview) => preview.ok);
+    const preview = batch ? { batch: true, count: results.length, results: previews } : previews[0];
+    if (b.dryRun) return j(200, { ...preview, ok, preview: true });
+    if (!ok) return j(oversized ? 413 : 400, { ...preview, ok: false, error: '단어장에 오류가 있어요 — 저장하지 않았어요. 고친 뒤 다시 올려 주세요.' });
     const updatedAt = nowIso();
     const idx = await readIndex(store);
-    const prev = idx.find((e) => e.id === book.id);
-    const prevRec = prev ? await store.getBook(book.id) : null;
-    let remapped = 0;
-    if (prevRec && prevRec.book) {
-      const prevRemap = await store.getRemap(book.id);
-      const map = buildRemap(prevRec.book, book, prevRemap && prevRemap.map);
-      remapped = Object.keys(map).length;
-      if (remapped) await store.putRemap(book.id, { map, updatedAt }); else if (prevRemap) await store.deleteRemap(book.id);
+    const plans = [];
+    for (const res of results) {
+      const book = res.book, prev = idx.find((e) => e.id === book.id);
+      const prevRec = prev ? await store.getBook(book.id) : null;
+      const prevRemap = prevRec && prevRec.book ? await store.getRemap(book.id) : null;
+      const map = prevRec && prevRec.book ? buildRemap(prevRec.book, book, prevRemap && prevRemap.map) : {};
+      const scope = prev && SCOPES.includes(prev.scope) ? prev.scope : (SCOPES.includes(b.scope) ? b.scope : 'all');
+      plans.push({ book, prev, prevRemap, map, entry: indexEntry(book, scope, updatedAt) });
     }
-    const scope = prev && SCOPES.includes(prev.scope) ? prev.scope : (SCOPES.includes(b.scope) ? b.scope : 'all');
-    await store.putBook(book.id, { book, updatedAt });
-    const entry = indexEntry(book, scope, updatedAt);
-    await store.putBookIds(prev ? idx.map((e) => (e.id === book.id ? entry : e)) : idx.concat([entry]));
-    return j(200, { ok: true, id: book.id, updatedAt, replaced: !!prev, remapped, ...preview });
+    /* 전권 검사·읽기가 끝난 뒤 쓴다. KV는 다중 키 트랜잭션이 아니므로 저장 중 장애까지 원자적으로 묶지는 못한다. */
+    const next = idx.slice(), saved = [];
+    for (const [i, plan] of plans.entries()) {
+      const { book, prev, prevRemap, map, entry } = plan, remapped = Object.keys(map).length;
+      if (remapped) await store.putRemap(book.id, { map, updatedAt }); else if (prevRemap) await store.deleteRemap(book.id);
+      await store.putBook(book.id, { book, updatedAt });
+      const at = next.findIndex((e) => e.id === book.id);
+      if (at < 0) next.push(entry); else next[at] = entry;
+      saved.push({ ...previews[i], id: book.id, updatedAt, replaced: !!prev, remapped });
+    }
+    await store.putBookIds(next);
+    return j(200, batch ? { ok: true, batch: true, count: saved.length, updatedAt, results: saved } : saved[0]);
   }
   if (p === '/api/hanja/admin/books' && method === 'GET') {
     return j(200, { books: await readIndex(store), time: nowIso() });
@@ -440,8 +480,22 @@ export async function handleHanja(ctx) {
     const unitId = String(b.unitId == null ? '' : b.unitId).trim();
     const unit = (rec.book.units || []).find((u) => u.id === unitId);
     if (!unit) return j(400, { error: '그 단어장에 없는 단원이에요: ' + unitId.slice(0, 40) });
+    if (!unitItemIds(rec.book, unitId).length) return j(400, { error: '학습할 항목이 없는 단원이에요. 어휘 교재는 낱말이 있는 단원을 골라 주세요.' });
     const due = String(b.due || '').trim();
     if (due && !isValidDate(due)) return j(400, { error: '마감(due)은 실제 날짜(YYYY-MM-DD)' });
+    const entry = (await readIndex(store)).find((e) => e.id === bookId);
+    if (entry && entry.scope === 'assigned') {
+      const one = scope !== 'default' ? await store.getStudent(scope) : null;
+      const missing = [];
+      for (const code of one ? [scope] : await store.listStudentCodes()) {
+        const stu = await store.getStudent(code);
+        if (!stu || (!one && scope !== 'default' && String(stu.cls || '').trim() !== scope)) continue;
+        const effective = await resolveTask(store, code, stu);
+        if (!one && (effective.scope === 'student' || (scope === 'default' && effective.scope === 'class'))) continue;
+        if (!(((await store.getAssign(code)) || {}).bookIds || []).includes(bookId)) missing.push({ code, name: stu.name || code });
+      }
+      if (missing.length) return j(400, { error: '과제 대상 중 이 교재를 배정받지 않은 학생이 ' + missing.length + '명 있어요 (' + missing.slice(0, 5).map((s) => s.name).join(', ') + (missing.length > 5 ? ' 외' : '') + '). 「학생에게 단어장 배정」에서 먼저 배정한 뒤 다시 지정해 주세요.', unassignedCodes: missing.map((s) => s.code) });
+    }
     const title = String(b.title || '').trim().slice(0, 80) || (rec.book.title + ' · ' + unit.title);
     const task = { bookId, unitId, unitTitle: unit.title, bookTitle: rec.book.title, title, due: due || '', updatedAt: nowIso() };
     await store.putTask(scope, task);
@@ -477,8 +531,23 @@ export async function handleHanja(ctx) {
       const stu = await store.getStudent(code);
       if (!stu || !stu.name) continue;
       if (!one && scope !== 'default' && String(stu.cls || '').trim() !== scope) continue;
+      /* 학생 화면에서 다른 과제가 우선하면 이 과제의 미이행자로 세지 않는다. */
+      const effective = await resolveTask(store, code, stu);
+      if (effective.scope !== (one ? 'student' : scope === 'default' ? 'default' : 'class')) continue;
       const st = await store.getState(code);
-      rows.push({ code, name: stu.name, cls: stu.cls || '', linked: !!st, lastActive: st ? st.updatedAt : null, check: unitCheck(st, task.bookId, task.unitId), ...unitProgress(st, ids) });
+      const latest = unitCheck(st, task.bookId, task.unitId);
+      const previousCheck = latest && (!latest.at || latest.at < (new Date(task.updatedAt).getTime() || 0)) ? latest : null;
+      const check = previousCheck ? null : latest;
+      let checkStatus = !ids.length ? 'empty' : !st ? 'unlinked' : previousCheck ? 'previous' : !check ? 'unchecked' : 'checked';
+      if (check && ids.length) {
+        const missed = check.n - (check.right - (check.hinted || 0));
+        const pending = check.retry ? check.retry.wrongIds : check.wrongIds;
+        if (pending && pending.length) checkStatus = 'review';
+        else if (check.total == null) checkStatus = 'unknown';
+        else if (check.n < Math.max(ids.length, check.total)) checkStatus = 'partial';
+        else if (missed) checkStatus = check.retry && check.retry.right === check.retry.total && !check.retry.wrongIds.length ? 'rechecked' : 'review';
+      }
+      rows.push({ code, name: stu.name, cls: stu.cls || '', linked: !!st, lastActive: st ? st.updatedAt : null, check, previousCheck, checkStatus, ...unitProgress(st, ids) });
     }
     rows.sort((a, b) => (a.cls === b.cls ? (a.name < b.name ? -1 : 1) : (a.cls < b.cls ? -1 : 1)));
     const unit = (rec.book.units || []).find((u) => u.id === task.unitId) || { id: task.unitId, title: task.unitId };
@@ -522,13 +591,14 @@ export async function handleHanja(ctx) {
     const strokes = (rec && isObj(rec.strokes)) ? rec.strokes : {};
     return j(200, { strokes, updatedAt: rec ? rec.updatedAt || null : null, count: Object.keys(strokes).length, withMedians: Object.values(strokes).filter((v) => v && v.medians).length });
   }
-  /* 현황 — 저장 시점 요약 키를 읽는다. 요약이 없는 옛 기록만 본문을 읽어 셈한다 */
+  /* 현황의 만기·밀림은 현재 시각 기준이다. 마지막 저장 때의 요약만 읽으면 접속하지 않는 학생의 밀림을 놓친다. */
   if (p === '/api/hanja/admin/overview' && method === 'GET') {
-    const codes = new Set([...(await store.listSummaryCodes()), ...(await store.listStateCodes())]);
-    const students = [];
+    const codes = new Set([...(await store.listStudentCodes()), ...(await store.listSummaryCodes()), ...(await store.listStateCodes())]);
+    const students = [], now = Date.now();
     for (const code of codes) {
-      const [stu, sum, as] = await Promise.all([store.getStudent(code), store.getSummary(code), store.getAssign(code)]);
-      const summary = sum || hanjaSummary(await store.getState(code));
+      const [stu, state, as] = await Promise.all([store.getStudent(code), store.getState(code), store.getAssign(code)]);
+      if (!stu || !stu.name) continue;
+      const summary = hanjaSummary(state, now);
       students.push({ code, name: (stu && stu.name) || '', cls: (stu && stu.cls) || '', assigned: (as && as.bookIds) || [], ...summary });
     }
     students.sort((a, b) => (a.cls === b.cls ? (a.name < b.name ? -1 : 1) : (a.cls < b.cls ? -1 : 1)));
