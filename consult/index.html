@@ -1201,10 +1201,10 @@ const LEARNING_SOURCES = Object.freeze({
     noteHint: '학습 단계·결과 메모'
   },
   vocabulary: {
-    icon: '🔤', label: '어휘', centerUrl: VOCABULARY_URL, studentUrl: VOCABULARY_URL,
-    centerAction: '어휘 열기', studentAction: '어휘 학습하기',
-    detail: '어휘 학습',
-    guide: '어휘 학습을 마친 뒤, 컨설팅 플래너에서 완료 결과를 기록하세요.',
+    icon: '🌱', label: '어휘브레인', centerUrl: VOCABULARY_URL, studentUrl: VOCABULARY_URL,
+    centerAction: '어휘브레인 열기', studentAction: '어휘브레인 학습하기',
+    detail: '어휘브레인 학습',
+    guide: '어휘브레인 학습을 마친 뒤, 컨설팅 플래너에서 완료 결과를 기록하세요.',
     steps: ['어휘 학습하기', '학습 결과 확인하기'],
     noteHint: '학습한 교재·단원·결과 메모'
   },
@@ -14593,7 +14593,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-09-22.7';
+const APP_VER = '2026-09-22.8';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
