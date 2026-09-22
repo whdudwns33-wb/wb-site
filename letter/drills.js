@@ -104,7 +104,7 @@ var WBDRILLS = (function () {
   /* 지표 → 그 지표의 놀이 종류(시공간은 shapes.js 몫) */
   function kindsFor(index) { return KINDS.filter(function (k) { return INDEX_OF[k] === index; }); }
   /* 오늘의 5분 — 주차·학년대·요일로 종류와 seed 를 정한다. 같은 주 같은 요일이면 누구나 같은 문제(가족끼리 비교할 수 있게),
-     요일마다 지표가 돌아 한 주에 다섯 지표를 다 만난다 */
+     일일 놀이는 네 지표를 돌고, 시공간을 포함한 다섯 지표는 주간 놀이의 5주 순환으로 만난다 */
   function daily(week, tier, day) {
     var s = 0, str = String(week) + '|' + String(tier) + '|' + String(day);
     for (var i = 0; i < str.length; i++) s = (Math.imul(s, 31) + str.charCodeAt(i)) >>> 0;
