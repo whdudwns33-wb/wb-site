@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* WB 한자브레인 — 공개 획순 데이터 → 공용 획순 사전 변환기 (오프라인 도구)
+/* WB 어휘브레인 — 공개 획순 데이터 → 공용 획순 사전 변환기 (오프라인 도구)
  *   node hanja/strokes-convert.mjs <graphics.txt> <출력.json> (--book <단어장.json> | --chars 觀測點…) [--box 1024 --top 900]
  *
  * 입력은 Make Me a Hanzi 계열의 graphics.txt(한 줄에 JSON 하나: {"character":"十","strokes":[…],"medians":[[[x,y],…],…]}).

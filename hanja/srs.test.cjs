@@ -1,5 +1,5 @@
 'use strict';
-/* 한자브레인 간격 반복 엔진 검증 (node hanja/srs.test.cjs) */
+/* 어휘브레인 간격 반복 엔진 검증 (node hanja/srs.test.cjs) */
 const assert = require('assert');
 const S = require('./srs.js');
 

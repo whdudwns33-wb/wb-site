@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>한자브레인 — 확인 시험지 인쇄</title>
+<title>어휘브레인 — 확인 시험지 인쇄</title>
 <meta name="robots" content="noindex, nofollow">
 <meta name="referrer" content="no-referrer">
 <style>
@@ -118,7 +118,7 @@
   $('#book').addEventListener('change', function () { loadBook().catch(function (e) { $('#stat').textContent = e.message; }); });
 
   function page(title, sub, bodyHtml, n, total) {
-    return '<section class="page"><div class="hd"><b>WB 한자브레인 · ' + esc(BOOK.title) + '</b><span>' + esc(sub) + '</span></div>' +
+    return '<section class="page"><div class="hd"><b>WB 어휘브레인 · ' + esc(BOOK.title) + '</b><span>' + esc(sub) + '</span></div>' +
       '<div class="who">반 <span>' + esc($('#cls').value) + '</span> 이름 <span></span> 날짜 <span></span> 점수 <span></span></div>' +
       '<h3 style="margin:0 0 6px;font-size:16px">' + esc(title) + '</h3>' + bodyHtml +
       '<div class="ft"><span>원내 전용 — 외부 배포 금지</span><span>' + n + ' / ' + total + '</span></div></section>';

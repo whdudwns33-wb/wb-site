@@ -139,13 +139,13 @@ jobs:
         run: node naesin-ko/extract/build-pack.test.mjs
       - name: 국어브레인 서버 라우트 테스트
         run: node reading-server/naesin-ko-api.test.mjs
-      - name: 한자브레인 순수 로직 테스트 (단어장 검사·SRS·문항·따라쓰기 판정)
+      - name: 어휘브레인 순수 로직 테스트 (단어장 검사·SRS·문항·따라쓰기 판정)
         run: for f in hanja/*.test.cjs; do node "$f" || exit 1; done
-      - name: 한자브레인 체험 단어장 검증 (book-validate)
+      - name: 어휘브레인 체험 단어장 검증 (book-validate)
         run: node hanja/book-validate.mjs hanja/book-sample.json
-      - name: 한자브레인 서버 라우트 테스트
+      - name: 어휘브레인 서버 라우트 테스트
         run: node reading-server/hanja-api.test.mjs
-      - name: 한자브레인 도구 테스트 (교재 텍스트 초안 추출기·획순 변환기)
+      - name: 어휘브레인 도구 테스트 (교재 텍스트 초안 추출기·획순 변환기)
         run: node hanja/extract/draft.test.mjs && node hanja/strokes-convert.test.mjs
       - name: 청크브레인 규칙·복습 일정 테스트
         run: node chunk/rules.test.cjs && node chunk/sched.test.cjs

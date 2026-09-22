@@ -506,7 +506,7 @@ export async function sendNightPushes({ store, push, fetchFn, naesin, hanja, now
     const jwt = await vapidJwt({ audience: new URL(endpoint).origin, subject: push.subject || 'mailto:admin@wb.local', privateJwk: push.privateJwk });
     return f(endpoint, { method: 'POST', headers: { TTL: '86400', Urgency: 'normal', Authorization: 'vapid t=' + jwt + ', k=' + push.publicKey } });
   };
-  /* 한자브레인 구독자 — 자기 서비스 워커(/hanja/)로 따로 구독하고 첫 복습이 밤 9시라 이 크론이 유일한 부름이다.
+  /* 어휘브레인 구독자 — 자기 서비스 워커(/hanja/)로 따로 구독하고 첫 복습이 밤 9시라 이 크론이 유일한 부름이다.
      같은 기기가 두 앱을 다 구독했으면 끝점이 다르므로 두 번 갈 수 있다 — 앱마다 알림 한 줄이라 그대로 둔다. */
   if (hanja && typeof hanja.listPushCodes === 'function') {
     for (const code of await hanja.listPushCodes()) {
