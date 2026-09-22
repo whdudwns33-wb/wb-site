@@ -77,10 +77,10 @@ t('AI 연상 버튼은 자체 단어장(aiAllowed)에서만 — 교재 뜻 문�
   assert.ok(api.includes("'/api/hanja/admin/source'"), '종류 바꾸기 라우트가 없다');
 });
 
-t('학생 메뉴는 교재 학습 흐름 네 개이며 단원에서 시험과 학습을 함께 연다', () => {
+t('어휘 중심 주메뉴와 별도 한자 집중에서 시험과 학습을 연다', () => {
   const nav = app.slice(app.indexOf('<nav'), app.indexOf('</nav>'));
-  assert.deepStrictEqual([...nav.matchAll(/data-view="([a-z]+)"/g)].map(m => m[1]), ['home', 'books', 'train', 'report']);
-  ['오늘 할 일', '내 교재', '복습', '학습 기록'].forEach(label => assert.ok(nav.includes(label)));
+  assert.deepStrictEqual([...nav.matchAll(/data-view="([a-z]+)"/g)].map(m => m[1]), ['home', 'books', 'train', 'report', 'chars']);
+  ['오늘 할 일', '내 교재', '복습', '학습 기록', '한자 집중'].forEach(label => assert.ok(nav.includes(label)));
   assert.ok(app.includes('data-act="check"') && app.includes('data-act="learn"'));
   assert.ok(app.includes('data-review="'), '저장된 오답에서 보충 학습으로 갈 수 있어야 한다');
   assert.ok(!app.includes('이 단원은 통과'), '부분 시험을 단원 통과로 표시하면 안 된다');

@@ -345,6 +345,10 @@
     var html = '<b' + (p < 60 ? ' style="color:#B23A2E"' : '') + '>' + (c.hinted == null ? '정답 ' : '혼자 정답 ') + alone + ' / ' + c.n + '</b>' +
       '<div class="muted" style="font-size:.8rem">' + esc(bookTitle(c.book)) + ' · ' + esc(c.title || c.unit || '') + (c.at ? ' · ' + fmt(c.at) : '') + '</div>' +
       '<div class="muted" style="font-size:.8rem">' + (c.total == null ? '이전 형식 · 전체 범위 미확인' : '점검 범위 ' + c.n + ' / ' + c.total) + (c.hinted ? ' · 힌트 정답 ' + c.hinted : '') + '</div>';
+    if (c.domains) html += '<div style="font-size:.8rem">' + [['meaning', '뜻 이해'], ['context', '문맥 적용'], ['recall', '낱말 회상']].map(function (pair) {
+      var d = c.domains[pair[0]];
+      return pair[1] + ' ' + (d && d.n ? esc(d.right) + '/' + esc(d.n) : '미실시');
+    }).join(' · ') + '</div>';
     if (c.retry) html += '<div style="font-size:.8rem">오답 재확인: 혼자 정답 ' + c.retry.right + ' / ' + c.retry.total + ' · ' + fmt(c.retry.at) + '</div>';
     var unresolved = c.retry ? c.retry.wrongIds : c.wrongIds;
     if (unresolved && unresolved.length) html += '<div style="font-size:.8rem;color:#B23A2E">보충할 낱말·한자 ' + unresolved.length + '개</div>';

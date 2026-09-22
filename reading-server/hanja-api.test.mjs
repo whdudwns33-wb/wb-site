@@ -440,6 +440,19 @@ await t('공개 범위 — ids 로 여러 권을 한 번의 쓰기로 바꾸고,
   assert.strictEqual(stale._raw.index().find((e) => e.id === 'stale-1').scope, 'assigned', '실제 저장된 값은 맞다');
 });
 
+await t('교재 점검 — 뜻·문맥·회상 통계는 합계가 맞는 정수만 보존한다', async () => {
+  const domains = { meaning: { n: 5, right: 4 }, context: { n: 10, right: 9 }, recall: { n: 5, right: 5 } };
+  const c = { book: 'b1', unit: 'u1', n: 20, right: 19, hinted: 1, domains };
+  assert.deepStrictEqual(normCheck(c).domains, domains);
+  for (const patch of [null, {}, { ...domains, context: { n: 10, right: 10 } }, { ...domains, recall: { n: 5.5, right: 5 } }, { ...domains, meaning: { n: -1, right: 0 } }]) {
+    assert.strictEqual(normCheck({ ...c, domains: patch }).domains, undefined);
+  }
+  assert.strictEqual(normCheck({ n: 20, right: 19 }).domains, undefined, '옛 시험 영역을 추정하면 안 된다');
+  const store = memStore();
+  await call(store, { path: '/api/hanja/state', method: 'PUT', getBody: async () => ({ state: { states: {}, checks: { 'b1|u1': c } } }) });
+  assert.deepStrictEqual(store._raw.summaries.s1.lastCheck.domains, domains, '저장 후 현황판 요약에서 영역 통계가 사라졌다');
+});
+
 await t('교재 점검 — 학생이 올린 점수를 서버가 조여 요약·진도표에 싣는다', async () => {
   /* 이 점수는 학생 기기가 올린 값이다. 관리 화면이 그대로 그리는 자리라 서버에서 화이트리스트로 조인다 */
   assert.strictEqual(normCheck(null), null);

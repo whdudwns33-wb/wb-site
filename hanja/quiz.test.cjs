@@ -247,4 +247,39 @@ t('급수 교재 — 낱말 항목이 없어도 글자의 예시 낱말로 「�
   assert.strictEqual(q2.answer, '관측', '낱말 항목이 있으면 그쪽이 먼저다');
 });
 
+t('상황 적용 — 검수한 새 상황·보기·해설로 출제하고 어휘 모드에서도 정확히 채점한다', () => {
+  const w = byWord('추론'), item = { kind: 'word', w }, before = JSON.stringify(w.context);
+  const q = Q.makeQuestion(item, ctx, { kinds: ['w-context'], vocabulary: true, rnd: seeded(6) });
+  assert.strictEqual(q.kind, 'w-context');
+  assert.strictEqual(q.head, '상황에 적용하기');
+  assert.strictEqual(q.id, w._sid);
+  assert.strictEqual(q.word, w.word);
+  assert.strictEqual(q.prompt, w.context.prompt);
+  assert.strictEqual(q.answer, w.context.answer);
+  assert.strictEqual(q.explanation, w.context.explanation);
+  assert.strictEqual(q.input, false);
+  assert.deepStrictEqual(q.choices.slice().sort(), w.context.choices.slice().sort());
+  assert.ok(Q.check(q, q.answer));
+  q.choices.filter((v) => v !== q.answer).forEach((v) => assert.ok(!Q.check(q, v), '오답이 정답으로 채점됐다: ' + v));
+  assert.ok(!/[\u3400-\u9fff]/.test(q.prompt + q.choices.join('') + q.explanation), '어휘 문맥 적용에 한자 지식이 필요하다');
+  assert.ok(!q.hint && !q.bigChoices && !q.write);
+  assert.strictEqual(JSON.stringify(w.context), before, '보기 섞기가 원본 문항을 바꿨다');
+  assert.deepStrictEqual(Q.session([item], ctx, { kinds: ['w-context'], vocabulary: true, rnd: seeded(6) }).questions, [q]);
+  [2, 3, 4].forEach((n) => {
+    const short = Object.assign({}, w, { context: Object.assign({}, w.context, { choices: w.context.choices.slice(0, n) }) });
+    const made = Q.makeQuestion({ kind: 'word', w: short }, { words: [short], chars: [] }, { kinds: ['w-context'], vocabulary: true });
+    assert.ok(made && made.choices.length === n, '보기 ' + n + '개의 검수 문항을 임의로 늘리거나 버렸다');
+    assert.ok(Q.check(made, short.context.answer));
+  });
+});
+
+t('상황 적용 자료가 없으면 건너뛰고, 기존 예문 빈칸을 대신 새 상황이라고 내지 않는다', () => {
+  const w = Object.assign({}, byWord('관측')); delete w.context;
+  const item = { kind: 'word', w };
+  assert.strictEqual(Q.makeQuestion(item, ctx, { kinds: ['w-context'], vocabulary: true }), null);
+  assert.deepStrictEqual(Q.session([item], ctx, { kinds: ['w-context'], vocabulary: true }), { questions: [], skipped: [item] });
+  const old = Q.makeQuestion(item, ctx, { kinds: ['w-cloze'], vocabulary: true });
+  assert.ok(old && old.kind === 'w-cloze' && old.answer === w.word && !old.explanation, '기존 빈칸 문항이 바뀌었다');
+});
+
 console.log(`\nOK — ${passed}개 통과`);
