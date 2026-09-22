@@ -19,8 +19,10 @@ test('학생 연락처는 서버에만 두고 준비된 학생은 바로 보내�
   const view = between('function viewStaffAdmin() {', '\n/* ── 설정');
   const state = between('function blankState() {', '\nconst LOCAL_AUTH_SETTINGS');
   const add = between("    case 'addstaff':", "    case 'delstaff':");
+  const contactRowSource = between('function consultLinkContactRow(row, includePhone)', '\nfunction consultLinkPhoneLabel');
 
   assert.match(contacts, /rows: new Map\(\)/);
+  assert.match(contacts, /phone: includePhone && \/\^01\[016789\]\\d\{7,8\}\$\/\.test\(phone\) \? phone : ''/);
   assert.match(contacts, /phoneMasked: String\(row\.phoneMasked \|\| ''\)/);
   assert.match(contacts, /phoneOwner: \['student', 'mother'\]\.includes\(row\.phoneOwner\)/);
   assert.doesNotMatch(contacts, /localStorage|LS_KEY|state\.(?:staff|settings)|\bsave\(/,
@@ -38,7 +40,17 @@ test('학생 연락처는 서버에만 두고 준비된 학생은 바로 보내�
   assert.match(panel, /학생 연락처 수정/);
   assert.match(panel, /학생 번호 등록하고 보내기/);
   assert.match(panel, /카톡으로 학생용 링크 보내기/);
+  assert.match(panel, /contact\.phone \|\| contact\.phoneMasked/);
   assert.match(panel, /const sendDisabled = unavailable \|\| anyBusy/);
+  assert.match(html, /case 'savecfg':[\s\S]*?clearConsultLinkContacts\(\)/,
+    '동기화 자격증명을 바꾸면 메모리의 전체 번호를 즉시 지운다');
+
+  const contactRow = new Function(contactRowSource + ';return consultLinkContactRow;')();
+  const response = { staffId: 'student-a', phone: '01012345678', phoneMasked: '010****5678',
+    phoneOwner: 'student', consent: true, updatedAt: 1 };
+  assert.equal(contactRow(response, true).phone, '01012345678');
+  assert.equal(contactRow(response, false).phone, '', '학생 화면은 서버가 원문을 보내도 버린다');
+  assert.equal(contactRow({ ...response, phone: 'not-a-phone' }, true).phone, '');
 });
 
 test('학생·엄마 번호를 구분해 동의받아 저장하고 보호자 열람 번호와 분리한다', () => {
@@ -47,10 +59,12 @@ test('학생·엄마 번호를 구분해 동의받아 저장하고 보호자 열
 
   assert.match(modal, /학생 휴대폰이 없으면 엄마 번호로 표시해 등록합니다/);
   assert.match(modal, /consultLinkPhoneOwnerOptions\(contact/);
+  assert.match(modal, /shownPhone = contact && \(contact\.phone \|\| contact\.phoneMasked\)/);
   assert.match(modal, /현재 ['"] \+ consultLinkPhoneLabel\(contact\)/);
   assert.match(modal, /변경하려면 종류와 전체 번호를 다시 입력/);
   assert.match(modal, /id="consultLinkConsent"/);
   assert.match(modal, /엄마 번호를 선택해도 ‘보호자 공유’의 열람 초대 번호와는 별도로 관리합니다/);
+  assert.match(modal, /전체 번호는 원장 로그인 화면에서만 표시하며 이 기기나 백업에는 저장하지 않습니다/);
   assert.match(modal, /data-send="1"/);
   assert.match(modal, /동의하고 바로 보내기/);
   assert.match(save, /\^01\[016789\]\\d\{7,8\}\$/);
@@ -61,12 +75,13 @@ test('학생·엄마 번호를 구분해 동의받아 저장하고 보호자 열
   assert.match(save, /const consent = clear \? false/);
   assert.match(save, /sync\.post\('\/consult-link-send', \{\s*app: SYNC_APP, auth: sync\.auth\(\), action: 'set', staffId: staffId, phone: phone,\s*phoneOwner: phoneOwner, consent: consent, expectedUpdatedAt: Number\(expectedUpdatedAt\) \|\| 0\s*\}\)/);
   assert.match(save, /savedForSend = consultLinkContactReady\(row\)/);
+  assert.match(save, /data\.contact \|\| \{\}\), true\)/);
   assert.match(save, /if \(savedForSend && sendAfterSave\) await sendConsultStudentLink\(staffId\)/);
 });
 
 test('학생 번호는 본인 토큰으로 필수 등록하고 원문은 브라우저 상태에 남기지 않는다', () => {
   const render = between('function render() {', '\nfunction renderTabs()');
-  const contactHelpers = between('function consultLinkContactRow(row)', '\n/* 학생 번호 원문');
+  const contactHelpers = between('function consultLinkContactRow(row, includePhone)', '\n/* 학생 화면에서는');
   const phone = between('const studentPhoneUi =', '\nasync function loadConsultLinkContacts');
   const ownerHelpers = between('function consultLinkPhoneLabel(contact)', '\nfunction consultLinkPhoneOwnerOptions');
   const reset = between('function resetStudentLinkCache(token) {', '\n\nfunction studentCacheScopedTo');
@@ -91,6 +106,8 @@ test('학생 번호는 본인 토큰으로 필수 등록하고 원문은 브라�
   assert.match(phone, /consultLinkContactReady\(contact\)/);
   assert.match(phone, /action: 'self_get'/);
   assert.match(phone, /action: 'self_set'/);
+  assert.doesNotMatch(phone, /consultLinkContactRow\([^\n]+, true\)/,
+    '학생 self_get/self_set 응답에서는 전체 번호를 보관하지 않는다');
   assert.match(phone, /\^01\[016789\]\\d\{7,8\}\$/);
   assert.match(phone, /if \(!consent\) return toast/);
   assert.match(phone, /번호는 이 기기·플래너 백업에 저장하지 않고 컨설팅 서버에서만 관리/);
