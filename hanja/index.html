@@ -562,7 +562,8 @@
     LIB.index.forEach(function (e) {
       var b = bookOf(e.id), p = b ? progressOf(itemsOf(b, null)) : null;
       html += '<div class="card book' + (e.id === bid ? ' on' : '') + '" data-book="' + esc(e.id) + '">' +
-        '<div class="ico' + (e.counts && e.counts.hanja < e.counts.native ? ' n' : '') + '">' + (e.counts && e.counts.chars ? '字' : '語') + '</div>' +
+        /* 낱말이 있으면 語 — 이 앱은 어휘 앱이고, 한자는 낱말에 딸린 갈래다. 글자만 있는 급수 교재만 字 */
+        '<div class="ico' + (e.counts && e.counts.hanja < e.counts.native ? ' n' : '') + '">' + (e.counts && e.counts.words ? '語' : '字') + '</div>' +
         '<div style="flex:1;min-width:0"><b>' + esc(e.title) + '</b>' +
         '<span class="muted" style="font-size:.78rem">' + (e.source === 'own' ? '자체 · ' : '교재 · ') + (e.publisher ? esc(e.publisher) + ' · ' : '') + (e.level ? e.level + ' · ' : '') +
         '낱말 ' + (e.counts ? e.counts.words : 0) + ' · 한자 ' + (e.counts ? e.counts.chars : 0) + ' · 단원 ' + (e.units ? e.units.length : 0) + '</span>' +
