@@ -140,7 +140,7 @@ function renderBoard(){
     '<label class="f">정렬 <select id="sort">'+[['attention','주의 순'],['lastAt','최근 활동'],['recentAvg','최근 평균'],['index','끊어읽기 지수'],['attempts','연습 횟수'],['streak','연속일'],['name','이름']].map(([k,l])=>'<option value="'+k+'" '+(k===SORT?'selected':'')+'>'+l+'</option>').join('')+'</select></label>'+
     '<label class="f" style="flex-direction:row;align-items:center;gap:6px"><input type="checkbox" id="onlyLate" '+(ONLY_LATE?'checked':'')+'> 마감 지난 미완료만</label>'+
     '<button class="btn ghost sm" id="csvLate">미완료 명단 CSV</button><span class="muted" id="csvMsg"></span></div>'+
-    '<p class="muted"><b>붉은 줄</b>은 먼저 볼 학생 — 최근 평균 60 미만, 7일 넘게 무활동, 마감 지난 미완료 과제, 과제가 있는데 시작 안 함. 지수는 끊어읽기 지수(최근 5회 평균 × 단계 가중, 0~100)로 상담·리포트에 인용하는 숫자예요. 어절/분은 초3 이상의 묵독 속도로 학생 자신의 지난 기록과만 비교합니다. 행을 누르면 학생 상세로 갑니다.</p></div>';
+    '<p class="muted"><b>붉은 줄</b>은 먼저 볼 학생 — 최근 평균 60 미만, 7일 넘게 무활동, 마감 지난 미완료 과제, 과제가 있는데 시작 안 함. 지수는 끊어읽기 지수(최근 5회 각각의 지문 단계로 가중한 평균, 0~100)로 상담·리포트에 인용하는 숫자예요. 어절/분은 초3 이상의 묵독 속도로 학생 자신의 지난 기록과만 비교합니다. 행을 누르면 학생 상세로 갑니다.</p></div>';
   html+='<div class="card tbl"><table><thead><tr><th>이름</th><th>반</th><th>단계</th><th>연습</th><th>최근 평균</th><th>지수</th><th>문제</th><th>어절/분</th><th>연속일</th><th>카드</th><th>과제</th><th>약한 규칙</th><th>최근 활동</th></tr></thead><tbody>'+
     (rows.length?rows.map((r)=>{
       const a=r.assign; const total=a?a.passages+a.lessons:0; const att=attention(r);
