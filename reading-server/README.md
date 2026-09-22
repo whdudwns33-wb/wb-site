@@ -13,8 +13,8 @@ ADMIN_PIN=원하는PIN node reading-server/server.mjs   # 기본 포트 8890 (�
 |------|------|
 | `/` | 학생 앱 (reading/ 폴더를 그대로 서빙 — 같은 주소라 연동이 자동 활성화) |
 | `/vocab/` | **워드브레인** (어휘 기억 앱, vocab/ 폴더) — 같은 오리진이라 진로독서 어휘장·학생 토큰이 자동 공유 |
-| `/hanja/` | **한자브레인** (한자·한글 어휘 앱, hanja/ 폴더) — 같은 오리진, 학생 토큰 공유. 단어장은 `/api/hanja/*`(KV·db 전용) |
-| `/admin/hanja-admin.html` | **한자브레인 단어장 관리** (PIN) — 문제집 단어장 업로드(붙여넣기·JSON)·공개 범위·종류(자체/교재)·학생 배정·현황 |
+| `/hanja/` | **어휘브레인** (한자·한글 어휘 앱, hanja/ 폴더) — 같은 오리진, 학생 토큰 공유. 단어장은 `/api/hanja/*`(KV·db 전용) |
+| `/admin/hanja-admin.html` | **어휘브레인 단어장 관리** (PIN) — 문제집 단어장 업로드(붙여넣기·JSON)·공개 범위·종류(자체/교재)·학생 배정·현황 |
 | `/admin` | 강사 관리 웹 (PIN 로그인) — 현황판·학생 상세·백업·학부모 링크 |
 | `/admin/vocab-review.html` | **워드브레인 AI 연상 검수함** (PIN 로그인) — 승인/반려 + 학생별 어휘 현황 |
 | `/review.html` | 지문 검수 뷰어 + **발행/초안 원클릭 전환** (PIN 로그인) |
@@ -23,7 +23,7 @@ ADMIN_PIN=원하는PIN node reading-server/server.mjs   # 기본 포트 8890 (�
 | `/admin/letter-admin.html` | **브레인레터 관리** (PIN 로그인) — 호 편집·AI 초안·발행·발송 문구·열람 현황 |
 | `/api/health` | 상태 확인 |
 
-### 한자브레인
+### 어휘브레인
 
 - 라우트는 `/api/hanja/*`, 데이터는 `hanja:` 접두 KV 키(로컬 `db.hanja`)만 — `hanja-api.mjs` 한 모듈. 상세는 `hanja/README.md`.
 - 학생: `GET /books`·`GET /book?id=`(+`remap`)·`GET /pull`·`PUT /state`(저장 시 `hanja:summary:<code>` 요약 갱신)·`GET /task`(이번 주 단원, 학생→반→default)·`GET /strokes`(공용 획순 사전)·`GET /push/key`·`POST /push/subscribe|unsubscribe`(밤 9시 알림 — 워드브레인 크론이 함께 보낸다).

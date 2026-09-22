@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* WB 한자브레인 — 어휘 교재 텍스트 → 단어장 초안 (오프라인 도구)
+/* WB 어휘브레인 — 어휘 교재 텍스트 → 단어장 초안 (오프라인 도구)
  *   node hanja/extract/draft.mjs <텍스트.txt> <출력 디렉터리> [--id <단어장 id>] [--title <제목>]
  *
  * 문제집을 손으로 치는 것이 병목이다. PDF 를 텍스트로 뽑은 것(pdftotext -layout, 또는 뷰어에서 복사한 것)을

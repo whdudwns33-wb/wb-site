@@ -1,5 +1,5 @@
 'use strict';
-/* WB 한자브레인 — /api/hanja/* 라우트 (server.mjs·worker.mjs 공용, 워드브레인과 같은 "분리 가능한" 구조)
+/* WB 어휘브레인 — /api/hanja/* 라우트 (server.mjs·worker.mjs 공용, 워드브레인과 같은 "분리 가능한" 구조)
    격리 원칙: 라우트는 /api/hanja/* 아래, 데이터는 hanja 전용 저장소(워커: hanja: 접두 키, 로컬: db.hanja)만 쓴다.
    인증은 호스트의 토큰 검증 결과(who)를 받고, apps 게이트(allowedApp)는 호스트가 who 검증 직후 한 곳에서 건다.
 

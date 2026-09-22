@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>한자브레인 — 단어장 관리</title>
+<title>어휘브레인 — 단어장 관리</title>
 <meta name="robots" content="noindex, nofollow">
 <meta name="referrer" content="no-referrer">
 <style>
@@ -53,7 +53,7 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>한자브레인 — 단어장 관리</h1>
+  <h1>어휘브레인 — 단어장 관리</h1>
   <p class="sub">문제집 한 권을 단어장 하나로 올리면 학생 앱(<code>/hanja/</code>)에서 그 책의 낱말·한자만 따로 배우고 따라 씁니다. <a href="/admin">← 관리 웹</a> · <a href="/admin/vocab-review.html">워드브레인</a> · <a href="/admin/naesin-ko-admin.html">국어브레인</a></p>
 
   <div id="login" class="card">
@@ -146,7 +146,7 @@
     <h2>학생 안내 QR</h2>
     <div class="card" style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
       <div id="qrBox"></div>
-      <div class="muted" style="font-size:.84rem;flex:1;min-width:200px">교실에 붙여 두는 한자브레인 주소 QR입니다. 학생은 진로독서에서 학원 QR로 한 번 연동돼 있으면 이 주소로 바로 들어옵니다.<br><code id="qrUrl"></code><div class="row"><button class="small" id="qrPrint">인쇄</button></div></div>
+      <div class="muted" style="font-size:.84rem;flex:1;min-width:200px">교실에 붙여 두는 어휘브레인 주소 QR입니다. 학생은 진로독서에서 학원 QR로 한 번 연동돼 있으면 이 주소로 바로 들어옵니다.<br><code id="qrUrl"></code><div class="row"><button class="small" id="qrPrint">인쇄</button></div></div>
     </div>
 
     <h2>학생별 현황</h2>
@@ -444,7 +444,7 @@
     if (window.WBQR) $('#qrBox').innerHTML = WBQR.svg(url, { size: 150 });
     $('#qrPrint').addEventListener('click', function () {
       var w = window.open('', '_blank'); if (!w) return;
-      w.document.write('<title>한자브레인 안내</title><div style="text-align:center;font-family:sans-serif;padding-top:60px"><h1>WB 한자브레인</h1><p>한자·한글 어휘 훈련 · 손으로 쓰는 한자</p>' + (window.WBQR ? WBQR.svg(url, { size: 260 }) : '') + '<p style="font-size:14px;color:#555">' + url + '</p><p style="font-size:13px;color:#777">진로독서에서 학원 QR로 연동한 기기로 여세요.</p></div>');
+      w.document.write('<title>어휘브레인 안내</title><div style="text-align:center;font-family:sans-serif;padding-top:60px"><h1>WB 어휘브레인</h1><p>한글 어휘 · 한자어 · 손으로 쓰는 한자</p>' + (window.WBQR ? WBQR.svg(url, { size: 260 }) : '') + '<p style="font-size:14px;color:#555">' + url + '</p><p style="font-size:13px;color:#777">진로독서에서 학원 QR로 연동한 기기로 여세요.</p></div>');
       w.document.close(); w.focus(); w.print();
     });
   }

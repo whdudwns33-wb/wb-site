@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* WB 한자브레인 — 단어장 검증기.  node hanja/book-validate.mjs <단어장.json 또는 .txt> [--id <id>] [--title <제목>]
+/* WB 어휘브레인 — 단어장 검증기.  node hanja/book-validate.mjs <단어장.json 또는 .txt> [--id <id>] [--title <제목>]
  *
  * 단어장 = 문제집 한 권의 낱말·한자를 단원 순서대로 담은 JSON (관리 웹에 올리는 그 파일).
  * 구매 교재의 낱말은 라이선스 자료라 저장소에 없다 — 이 검증기는 업로드 전 로컬 검사다.

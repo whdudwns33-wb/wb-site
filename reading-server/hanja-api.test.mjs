@@ -1,5 +1,5 @@
 'use strict';
-/* 한자브레인 서버 라우트 검증 (node reading-server/hanja-api.test.mjs)
+/* 어휘브레인 서버 라우트 검증 (node reading-server/hanja-api.test.mjs)
  *
  * 단어장은 라이선스 자료라 인증 없이·배정 밖으로 나가면 안 되고, 학생 기록은 학생끼리 섞이면 안 된다.
  * 메모리 어댑터(워커 KV·로컬 파일 어댑터와 같은 계약)로 라우트를 통째로 돌린다. */

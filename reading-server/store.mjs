@@ -15,7 +15,7 @@ const BDIR = path.join(DIR, 'backups');
 const BACKUP_KEEP = 10;
 
 const empty = () => ({ students: {}, states: {}, tokens: {}, pending: {}, levelLog: [], pubmap: {}, parents: {}, textbook: {}, vocab: { states: {}, mnemos: {}, push: {}, assigns: {} },
-  /* 한자브레인 — 단어장 본문(books)은 라이선스 자료라 스냅샷에 싣지 않는다(hanjaSnapshot). index 는 본문 없는 목록 */
+  /* 어휘브레인 — 단어장 본문(books)은 라이선스 자료라 스냅샷에 싣지 않는다(hanjaSnapshot). index 는 본문 없는 목록 */
   hanja: { books: {}, index: null, states: {}, summaries: {}, assigns: {}, tasks: {}, strokes: null, push: {}, remaps: {} } });
 
 let db = empty();
@@ -48,7 +48,7 @@ export function naesinSnapshot(n) {
   };
 }
 
-/* 한자브레인 칸의 스냅샷 — 단어장 본문(books)은 뺀다. 워커 dumpHanja 와 같은 모양({bookIds, index, states, assigns}).
+/* 어휘브레인 칸의 스냅샷 — 단어장 본문(books)은 뺀다. 워커 dumpHanja 와 같은 모양({bookIds, index, states, assigns}).
    단어장은 원장이 보관한 원본 JSON 으로 다시 올릴 수 있고, 학생 기록·배정은 다시 만들 수 없어 담는다. */
 export function hanjaSnapshot(h) {
   const src = h || {};
