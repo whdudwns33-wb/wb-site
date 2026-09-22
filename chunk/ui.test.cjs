@@ -10,9 +10,10 @@ const deferred = () => { let resolve; const promise = new Promise((r) => { resol
 let passed = 0;
 async function test(name, fn) { await fn(); passed++; console.log('  ✓ ' + name); }
 
-function app(family = false) {
+function app(family = false, confirm = () => true) {
   const nodes = new Map(), events = {}, storage = new Map(), recorders = [], sources = [], decode = deferred();
-  const node = (id) => { if (!nodes.has(id)) nodes.set(id, { innerHTML: '', textContent: '', classList: { add() {}, remove() {} }, scrollIntoView() {} }); return nodes.get(id); };
+  let renders = 0;
+  const node = (id) => { if (!nodes.has(id)) { let html = ''; nodes.set(id, { get innerHTML() { return html; }, set innerHTML(value) { html = value; if (id === 'app') renders++; }, textContent: '', classList: { add() {}, remove() {} }, scrollIntoView() {} }); } return nodes.get(id); };
   class Recorder {
     constructor() { this.startGate = deferred(); this.stopGate = deferred(); this.active = false; this.released = 0; recorders.push(this); }
     start() { return this.startGate.promise.then(() => { this.active = true; }); }
@@ -30,12 +31,12 @@ function app(family = false) {
     window: { AudioContext, addEventListener() {}, scrollTo() {}, scrollY: 0 },
     localStorage: { getItem: (key) => storage.get(key) || null, setItem: (key, value) => storage.set(key, value), removeItem: (key) => storage.delete(key) },
     location: { search: family ? '?t=abcdefghijklmnop' : '', pathname: '/chunk/', protocol: 'http:' },
-    history: { pushState() {} }, navigator: {}, URLSearchParams, setInterval: () => 1, clearInterval() {}, setTimeout: () => 1, clearTimeout() {}, confirm: () => true,
+    history: { pushState() {} }, navigator: {}, URLSearchParams, setInterval: () => 1, clearInterval() {}, setTimeout: () => 1, clearTimeout() {}, confirm,
   };
   /* 시작 시 서버 요청만 제외한다. 렌더와 클릭 처리기는 원문 그대로 사용한다. */
   vm.runInNewContext(source.slice(0, source.indexOf('    /* ── 시작 ── */')) + `
     globalThis.ui = {
-      get state() { return S; }, get session() { return sess; }, rec: REC,
+      get state() { return S; }, get session() { return sess; }, get placement() { return view.pl; }, rec: REC,
       recStart, recStop, recPlay, recRelease,
       home(band, assign) { S = SC.blank(Date.now()); S.band = band; S.assign = assign; view = { name: 'home' }; sess = null; render(); },
       start(band, q) {
@@ -45,8 +46,8 @@ function app(family = false) {
       }
     };
   })();`, context);
-  return { ui: context.ui, recorders, sources, decode, html: () => node('app').innerHTML,
-    click(act, extra = {}) { events.click({ target: { closest: () => ({ dataset: { act, ...extra } }) } }); } };
+  return { ui: context.ui, recorders, sources, decode, html: () => node('app').innerHTML, get renders() { return renders; },
+    click(act, extra = {}) { const target = { dataset: { act, ...extra }, attributes: {}, setAttribute(key, value) { this.attributes[key] = String(value); } }; events.click({ target: { closest: () => target } }); return target; } };
 }
 
 function reachReading(a) {
@@ -60,6 +61,54 @@ function reachReading(a) {
 }
 
 (async () => {
+  for (const mode of ['진단', '카드', '연습']) await test(`${mode}: 끊기 표시를 추가·해제할 때 화면과 초점 대상을 교체하지 않음`, () => {
+    const a = app(); let marks, prefix;
+    if (mode === '진단') { a.ui.home(null, null); a.click('pick-grade', { g: '3' }); a.click('pl-start'); marks = a.ui.placement.marks; prefix = 'pl'; }
+    else if (mode === '카드') { a.ui.home('G3', null); a.click('open-lesson', { id: 'g3-1' }); marks = a.ui.session.ls.marks; prefix = 'ck'; }
+    else { a.ui.start('G3', null); a.click('pr-to2'); marks = a.ui.session.pr.marks[0]; prefix = 'u0'; }
+    const before = a.renders;
+    for (const on of [true, false]) {
+      const button = a.click('gap', { prefix, i: '0' });
+      assert.equal(marks.has(0), on);
+      assert.equal(button.attributes['aria-pressed'], String(on));
+      assert.equal(button.textContent, on ? '∕' : '·');
+      assert.equal(a.renders, before, '표시 하나를 바꿀 때 전체 DOM을 다시 그리지 않는다');
+    }
+  });
+
+  for (const mode of ['카드', '연습']) await test(`${mode}: 단계 설정 이동을 취소하면 진행을 유지하고 승인하면 종료`, () => {
+    let allow = false, asked = 0;
+    const a = app(true, () => { asked++; return allow; });
+    if (mode === '카드') { a.ui.home('G3', null); a.click('open-lesson', { id: 'g3-1' }); }
+    else { a.ui.start('G3', null); a.click('pr-to2'); }
+    const session = a.ui.session, marks = session.ls ? session.ls.marks : session.pr.marks[0];
+    a.click('gap', { prefix: session.ls ? 'ck' : 'u0', i: '0' });
+    const before = a.renders;
+    a.click('go-settings');
+    assert.equal(asked, 1); assert.equal(a.ui.session, session); assert.equal(marks.has(0), true); assert.equal(a.renders, before);
+    allow = true; a.click('go-settings');
+    assert.equal(asked, 2); assert.equal(a.ui.session, null); assert.match(a.html(), /id="settings"/);
+  });
+
+  await test('완료한 카드·연습에서 단계 설정으로 갈 때는 중단을 묻지 않음', () => {
+    const a = app(false, () => { assert.fail('완료된 학습에는 중단 확인이 없어야 한다'); });
+    a.ui.home('G3', null); a.click('open-lesson', { id: 'g3-1' });
+    const lesson = require('./lessons.js').find((l) => l.id === 'g3-1');
+    for (const c of lesson.checks) { a.ui.session.ls.marks = new Set(R.modelBoundaries(c.segs)); a.click('lesson-check'); a.click('lesson-next'); }
+    a.click('go-settings'); assert.equal(a.ui.session, null);
+    a.ui.start('G3', null); reachReading(a); a.click('pr-read-start'); a.click('pr-read-done'); a.click('pr-finish');
+    a.click('go-settings'); assert.equal(a.ui.session, null); assert.match(a.html(), /id="settings"/);
+  });
+
+  await test('녹음 중 설정 이동을 취소하면 녹음을 유지하고 승인하면 마이크를 닫음', async () => {
+    let allow = false;
+    const a = app(false, () => allow); a.ui.start('G3', null);
+    const started = a.ui.recStart(), recorder = a.recorders[0]; recorder.startGate.resolve(); await started;
+    a.click('go-settings'); assert.equal(recorder.active, true);
+    allow = true; a.click('go-settings');
+    assert.equal(recorder.active, false); assert.equal(a.ui.rec.on, false); assert.equal(a.ui.session, null);
+  });
+
   for (const family of [false, true]) await test(`${family ? '가족' : '학생'}: 지정 카드 → 지정 글 → 남은 과제 → 완료 확인`, () => {
     const a = app(family), lesson = require('./lessons.js').find((l) => l.id === 'g3-1');
     a.ui.home('G3', { band: 'G3', lessons: [lesson.id], passages: ['g3-02', 'g3-01'], updatedAt: new Date(Date.now() - 1000).toISOString() });
