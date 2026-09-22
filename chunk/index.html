@@ -191,13 +191,13 @@
     const WHY = { due: '복습 차례', new: '새 글', weak: '점수를 올릴 글' };
 
     /* ── 기록: 이 기기(localStorage)가 원천, 연동되면 서버에도 같은 것을 둔다 ── */
-    let stateKey = LSK(), S = load(), sync = loadSync(), accountEpoch = 0;
+    let stateKey = LSK(), S = load(), sync = loadSync(), accountEpoch = 0, saveRevision = 0;
     function load() { try { return SC.normalize(JSON.parse(localStorage.getItem(stateKey) || 'null'), Date.now()); } catch (e) { return SC.blank(Date.now()); } }
     function hasWork(s) { return !!(s.log.length || Object.keys(s.items).length || Object.keys(s.lessons).length); }
     function loadSync() { try { const m = JSON.parse(localStorage.getItem(stateKey + ':sync') || 'null'); if (m && typeof m === 'object') return m; } catch (e) {} return { dirty: hasWork(S) }; }
     function persistSync() { try { localStorage.setItem(stateKey + ':sync', JSON.stringify(sync)); } catch (e) {} }
     function persist() { try { localStorage.setItem(stateKey, JSON.stringify(S)); return true; } catch (e) { setDot('failed', '기기 저장 안 됨'); return false; } }
-    function save() { if (stateKey !== LSK()) { changeAccount(); return; } S.updatedAt = Math.max(Date.now(), (S.updatedAt || 0) + 1); sync.dirty = true; persistSync(); persist(); scheduleSync(); }
+    function save() { if (stateKey !== LSK()) { changeAccount(); return; } saveRevision++; S.updatedAt = Math.max(Date.now(), (S.updatedAt || 0) + 1); sync.dirty = true; persistSync(); persist(); scheduleSync(); }
 
     /* ── 인증: 진로독서·워드브레인·하루브레인과 같은 wbr.auth (읽기 + 연동 화면에서만 쓰기) ── */
     function auth() { try { return JSON.parse(localStorage.getItem('wbr.auth') || 'null'); } catch (e) { return null; } }
@@ -283,10 +283,11 @@
           const e = new Error('state-conflict'); e.status = 409; throw e;
         }
         if (sync.dirty) {
-          const sentAt = S.updatedAt;
+          /* 학습 모듈이 updatedAt을 다시 쓰므로, 같은 밀리초의 새 저장도 별도 순번으로 구별한다. */
+          const sentRevision = saveRevision;
           setDot('pending', '저장 중');
           const result = await api('/state', { method: 'PUT', body: JSON.stringify({ state: S, summary: SC.forTeacher(S, Date.now()), baseUpdatedAt: remoteVersion }) });
-          sync.base = result.updatedAt; sync.dirty = S.updatedAt !== sentAt; persistSync();
+          sync.base = result.updatedAt; sync.dirty = saveRevision !== sentRevision; persistSync();
           if (sync.dirty) scheduleSync(); else setDot('saved', '저장됨');
         } else {
           if (j.state) { S = SC.normalize(j.state, Date.now()); persist(); applyBody(); if (!sess) render({ keep: true }); }
