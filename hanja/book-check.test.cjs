@@ -299,4 +299,49 @@ t('훈음 없는 한자 표기도 왕복한다 — 그런 교재가 통째로 �
   assert.ok(!explicit.ok, '직접 적은 글자의 빠진 훈음이 통과했다');
 });
 
+t('상황 적용 문항 — 보기 2~4개를 정규화하고 재검사에도 그대로 보존한다', () => {
+  [2, 3, 4].forEach((n) => {
+    const context = { prompt: '  친구의 일을 거든 모습은?  ', choices: [' 함께  옮겼다 ', '혼자 떠났다', '일을 늘렸다', '모른 척했다'].slice(0, n),
+      answer: ' 함께\n옮겼다 ', explanation: '  친구와 짐을 나누어 들면 일을 돕는 것이다.  ' };
+    const raw = { id: 'context-1', title: '상황 적용', words: [{ word: '거들다', meaning: '남의 일을 돕다', context }] };
+    const before = JSON.stringify(raw), one = B.checkBook(raw);
+    assert.ok(one.ok, JSON.stringify(one.errors));
+    assert.deepStrictEqual(one.book.words[0].context, { prompt: '친구의 일을 거든 모습은?', choices: ['함께 옮겼다', '혼자 떠났다', '일을 늘렸다', '모른 척했다'].slice(0, n),
+      answer: '함께 옮겼다', explanation: '친구와 짐을 나누어 들면 일을 돕는 것이다.' });
+    assert.strictEqual(JSON.stringify(raw), before, '원본 자료를 바꿨다');
+    const two = B.checkBook(JSON.parse(JSON.stringify(one.book)));
+    assert.ok(two.ok, JSON.stringify(two.errors));
+    assert.deepStrictEqual(two.book, one.book, '재검사에서 상황 적용 문항이 달라졌다');
+  });
+  const legacy = B.checkBook({ id: 'context-old', title: '기존', words: [{ word: '거들다', meaning: '남의 일을 돕다' }] });
+  assert.ok(legacy.ok && !Object.hasOwn(legacy.book.words[0], 'context'), '없는 문항을 만들어 붙였다');
+});
+
+t('명시한 상황 적용 문항의 잘못된 객체·길이·보기·정답·해설은 업로드 오류다', () => {
+  const valid = { prompt: '거든 모습은?', choices: ['도왔다', '떠났다'], answer: '도왔다', explanation: '남의 일을 함께 하는 모습이다.' };
+  const bad = [null, undefined, [], '문항', 1, {},
+    { prompt: '' }, { prompt: 1 }, { prompt: '가'.repeat(301) },
+    { choices: '도왔다, 떠났다' }, { choices: ['도왔다'] }, { choices: ['도왔다', '가', '나', '다', '라'] },
+    { choices: ['도왔다', ' 도왔다 '] }, { choices: ['같이 했다', '같이  했다'], answer: '같이 했다' },
+    { choices: ['도왔다', ' '] }, { choices: ['도왔다', 2] }, { choices: ['도왔다', '가'.repeat(121)] },
+    { answer: '' }, { answer: 1 }, { answer: '없는 보기' }, { answer: '가'.repeat(121) },
+    { explanation: '' }, { explanation: 1 }, { explanation: '가'.repeat(301) },
+  ];
+  bad.forEach((change, i) => {
+    const context = change && typeof change === 'object' && !Array.isArray(change) && Object.keys(change).length
+      ? Object.assign({}, valid, change) : change;
+    const r = B.checkBook({ id: 'context-bad', title: '불량', words: [{ word: '거들다', meaning: '남의 일을 돕다', context }] });
+    assert.ok(!r.ok && r.book === null, '불량 문항을 버리고 통과했다: ' + i);
+    assert.ok(r.errors.some((e) => /context/.test(e.where)), '오류 위치에서 context 를 못 찾는다: ' + i);
+  });
+  ['prompt', 'choices', 'answer', 'explanation'].forEach((key) => {
+    const context = Object.assign({}, valid); delete context[key];
+    assert.ok(!B.checkBook({ id: 'context-missing', title: '누락', words: [{ word: '거들다', meaning: '남의 일을 돕다', context }] }).ok, key + ' 누락을 허용했다');
+  });
+  const duplicate = B.checkBook({ id: 'context-dup', title: '중복', words: [
+    { word: '거들다', meaning: '남의 일을 돕다', context: valid }, { word: '거들다', meaning: '도움', context: null },
+  ] });
+  assert.ok(!duplicate.ok, '중복 낱말이라는 이유로 잘못된 명시 문항을 조용히 버렸다');
+});
+
 console.log(`\nOK — ${passed}개 통과`);

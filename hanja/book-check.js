@@ -10,7 +10,8 @@
  *   { id, title, publisher?, level?, note?, source:'own'|'textbook',   // 종류 — 자체(학원 자료)·교재(구매 자료, 기본). AI 연상은 own 만
  *     units: [{ id, title }],                       // 문제집의 단원·회차 순서 그대로
  *     words: [{ id, unit, word, type:'hanja'|'native', hanja?, parts?:[{ch,hun,eum}], literal?,
- *               meaning, example?, syn?:[], scene? }],       // id 는 '낱말|한자'(내용 기반) — 재업로드에도 안 밀린다
+ *               meaning, example?, syn?:[], scene?, context?:{prompt, choices:[], answer, explanation} }],
+ *                 // id 는 '낱말|한자'(내용 기반) — 재업로드에도 안 밀린다. context 는 검수된 새 상황 적용 문항.
  *     chars: [{ ch, hun, eum, strokes?, unit, medians?:[[[x,y],…],…], radical?, similar?:[…], words:[…], derived? }] }
  *   chars 의 words 는 그 글자를 쓰는 낱말(급수 교재의 예시 낱말). 직접 적어도 되고, 낱말의 한자 분해에서 저절로 붙기도 한다.
  *
@@ -41,6 +42,7 @@ var WBBOOKCHECK = (function () {
     word: 40, meaning: 200, example: 200, unit: 40, unitTitle: 60, itemId: 100,
     charWords: 12,
     hun: 20, eum: 4, strokes: 64, medianStrokes: 64, medianPts: 64, syn: 8, synLen: 40, similar: 8, scene: 200,
+    contextPrompt: 300, contextChoice: 120, contextExplanation: 300,
   };
 
   function isObj(o) { return !!o && typeof o === 'object' && !Array.isArray(o); }
@@ -136,6 +138,30 @@ var WBBOOKCHECK = (function () {
   function pad3(n) { return (n < 10 ? '00' : n < 100 ? '0' : '') + n; }
   function contentId(word, hanja) { return (word + (hanja ? '|' + hanja : '')).slice(0, LIMITS.itemId); }
 
+  /* 명시한 적용 문항이 잘못됐으면 업로드를 막는다 — 버리고 저장하면 학생은 모르게 뜻 문제만 풀게 된다. */
+  function checkContext(raw, where, C) {
+    if (!isObj(raw)) { C.err(where, 'context 는 prompt·choices·answer·explanation 을 담은 객체여야 해요.'); return null; }
+    var bad = false;
+    function field(value, name, max, choice) {
+      var s = typeof value === 'string' ? value.trim() : '';
+      if (choice) s = s.replace(/\s+/g, ' ');
+      if (!s || s.length > max) { C.err(where + '.' + name, name + ' 는 1~' + max + '자 문자열이어야 해요.'); bad = true; }
+      return s;
+    }
+    var prompt = field(raw.prompt, 'prompt', LIMITS.contextPrompt);
+    var answer = field(raw.answer, 'answer', LIMITS.contextChoice, true);
+    var explanation = field(raw.explanation, 'explanation', LIMITS.contextExplanation);
+    var choices = [];
+    if (!Array.isArray(raw.choices) || raw.choices.length < 2 || raw.choices.length > 4) {
+      C.err(where + '.choices', 'choices 는 서로 다른 보기 2~4개를 담은 배열이어야 해요.'); bad = true;
+    } else {
+      choices = raw.choices.map(function (v, i) { return field(v, 'choices[' + i + ']', LIMITS.contextChoice, true); });
+      if (choices.some(function (v, i) { return choices.indexOf(v) !== i; })) { C.err(where + '.choices', '같은 보기가 두 번 있어요.'); bad = true; }
+      if (choices.indexOf(answer) < 0) { C.err(where + '.answer', 'answer 는 choices 에 있는 보기와 같아야 해요.'); bad = true; }
+    }
+    return bad ? null : { prompt: prompt, choices: choices, answer: answer, explanation: explanation };
+  }
+
   /* ── 정규화 + 검사 ── 한 번에 한다. 정규화하면서 알게 되는 것이 곧 검사 결과다. */
   function checkBook(raw, opts) {
     var C = collector();
@@ -193,6 +219,11 @@ var WBBOOKCHECK = (function () {
       if (ENGLISH_WORD.test(word)) { C.err(where, '영어 낱말은 이 앱에 넣지 않아요 — 워드브레인(/vocab/)에 배정하세요.'); return; }
       if (!meaning) { C.err(where, '뜻(meaning)이 없어요.'); return; }
       if (meaning.length > LIMITS.meaning) { C.err(where, '뜻이 ' + LIMITS.meaning + '자를 넘어요.'); return; }
+      var context = null;
+      if (Object.prototype.hasOwnProperty.call(w, 'context')) {
+        context = checkContext(w.context, where + '.context', C);
+        if (!context) return;
+      }
 
       var parts = null;
       if (Array.isArray(w.parts) && w.parts.length) {
@@ -224,6 +255,7 @@ var WBBOOKCHECK = (function () {
 
       var unit = addUnit(w.unit, null, where);
       var out = { id: id, unit: unit, word: word, type: type, meaning: meaning };
+      if (context) out.context = context;
       if (parts) {
         out.hanja = hanja; out.parts = parts;
         var missing = parts.filter(function (p) { return !p.hun || !p.eum; });

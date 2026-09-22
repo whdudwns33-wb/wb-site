@@ -14,7 +14,7 @@ var WBHQUIZ = (function () {
 
   var HEAD = {
     'w-meaning': '뜻 고르기', 'w-word': '낱말 고르기', 'w-cloze': '문맥 빈칸', 'w-build': '한자 조립',
-    'w-hanja': '한자 표기', 'w-type': '낱말 쓰기', 'w-syn': '비슷한 말',
+    'w-hanja': '한자 표기', 'w-type': '낱말 쓰기', 'w-syn': '비슷한 말', 'w-context': '상황에 적용하기',
     'c-hun': '훈음 고르기', 'c-char': '한자 고르기', 'c-word': '이 한자가 든 낱말', 'c-count': '획수 세기', 'c-write': '한자 쓰기',
   };
 
@@ -104,6 +104,13 @@ var WBHQUIZ = (function () {
     var d = distractors(ctx.words, w, function (x) { return x.word; }, 3, rnd, wordRank(w));
     if (d.length < 3) return null;
     return choiceQ('w-cloze', w._sid, '빈칸에 알맞은 말은?\n' + blanked, w.word, d, rnd, { word: w.word, hint: w.meaning });
+  }
+  /* 학습 카드와 다른 상황은 검수한 자료에서만 낸다. 없으면 예문을 바꿔 지어내지 않는다. */
+  function qContext(w, ctx, rnd) {
+    var c = w.context;
+    if (!c || !Array.isArray(c.choices) || !c.prompt || !c.explanation || c.choices.indexOf(c.answer) < 0) return null;
+    return choiceQ('w-context', w._sid, c.prompt, c.answer, c.choices.filter(function (v) { return v !== c.answer; }), rnd,
+      { word: w.word, explanation: c.explanation });
   }
   /* 한자 조립 — 가린 글자의 훈음을 고른다. 보기는 단어장의 다른 한자 훈음에서 */
   function qBuild(w, ctx, rnd) {
@@ -214,9 +221,9 @@ var WBHQUIZ = (function () {
     return { kind: 'c-write', head: HEAD['c-write'], id: c._sid, ch: c.ch, prompt: '"' + gloss(c) + '" 을(를) 한자로 써 보세요', answer: c.ch, input: false, write: true, strokes: c.strokes || null };
   }
 
-  var WORD_KINDS = { 'w-meaning': qMeaning, 'w-word': qWord, 'w-cloze': qCloze, 'w-build': qBuild, 'w-hanja': qHanja, 'w-type': qType, 'w-syn': qSyn };
+  var WORD_KINDS = { 'w-meaning': qMeaning, 'w-word': qWord, 'w-cloze': qCloze, 'w-build': qBuild, 'w-hanja': qHanja, 'w-type': qType, 'w-syn': qSyn, 'w-context': qContext };
   var CHAR_KINDS = { 'c-hun': qHun, 'c-char': qChar, 'c-word': qCharWord, 'c-count': qCount, 'c-write': qWrite };
-  var VOCABULARY_KINDS = ['w-meaning', 'w-word', 'w-cloze', 'w-type', 'w-syn'];
+  var VOCABULARY_KINDS = ['w-meaning', 'w-word', 'w-cloze', 'w-type', 'w-syn', 'w-context'];
   /* 계단별 유형 순서 — 낮은 계단은 재인(뜻 고르기), 높은 계단은 산출(쓰기) */
   var PLAN = {
     word: [

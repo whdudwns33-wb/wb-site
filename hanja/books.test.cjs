@@ -116,4 +116,23 @@ t('8급 50자 + 7급 추가 100자는 공식 배정 범위와 같다', () => {
   assert.strictEqual(new Set(all).size, 150, '8급과 7급 추가 글자가 겹친다');
 });
 
+t('체험 48낱말은 학습 예문과 다른 창작 상황·해설을 갖추고 왕복해도 보존된다', () => {
+  const raw = JSON.parse(fs.readFileSync(path.join(__dirname, 'book-sample.json'), 'utf8'));
+  const one = B.checkBook(raw), two = B.checkBook(JSON.parse(JSON.stringify(one.book)));
+  assert.ok(one.ok && two.ok, JSON.stringify(one.errors.concat(two.errors)));
+  assert.deepStrictEqual(one.warns, []);
+  assert.deepStrictEqual(two.warns, []);
+  assert.deepStrictEqual(two.book, one.book);
+  assert.strictEqual(raw.source, 'own');
+  assert.ok(/자체 창작/.test(raw.note));
+  assert.strictEqual(raw.words.length, 48);
+  raw.words.forEach((w) => {
+    assert.ok(w.context && w.context.explanation, w.word + ' 의 상황·해설이 없다');
+    assert.ok(w.example && !w.context.prompt.includes(w.example), w.word + ' 의 학습 예문을 시험에 그대로 썼다');
+    assert.ok(!/[\u3400-\u9fff]/.test(JSON.stringify(w.context)), w.word + ' 의 어휘 적용 문제에 한자가 들어갔다');
+  });
+  const wordUnits = new Set(raw.words.map((w) => w.unit));
+  raw.units.filter((u) => wordUnits.has(u.id)).forEach((u) => assert.ok(!/^(한자어|고유어)\s*—/.test(u.title), '어종이 주제 제목에 남았다: ' + u.title));
+});
+
 console.log(`\nOK — ${passed}개 통과`);

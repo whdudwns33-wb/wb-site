@@ -13,27 +13,34 @@ const inline = html.split('/* APP:JS:START */')[1].split('/* APP:JS:END */')[0];
 assert.strictEqual((inline.match(/^  boot\(\);$/gm) || []).length, 1, '앱 부팅 지점을 찾지 못했다');
 const source = inline.replace(/^  boot\(\);$/m, `  globalThis.flow = {
     installBook, itemsOf, unitsOf, selectUnit, trainItems, trainStart, scoreAnswer, finishCheck,
-    learnStart, learnPlant, learnDone, learnRender, renderTrain, migrateIds, pendingIds, putCheck, lastCheck, LIB,
-    get db() { return db; }, get train() { return TRAIN; }, get learn() { return LEARN; }
+    learnStart, learnPlant, learnDone, learnRender, renderTrain, renderChars, renderBooks, renderReport,
+    curBookId, trainMenu, sessionDomains, migrateIds, pendingIds, putCheck, lastCheck, LIB,
+    get db() { return db; }, get train() { return TRAIN; }, get learn() { return LEARN; },
+    get trace() { return TRACE; }, set trace(value) { TRACE = value; }
   };`);
 const copy = (x) => JSON.parse(JSON.stringify(x));
 let passed = 0;
 const t = (name, fn) => { fn(); passed += 1; console.log('  ✓ ' + name); };
 
 function harness() {
-  const nodes = new Map(), storage = new Map();
+  const nodes = new Map(), storage = new Map(), cancelled = [];
   function element(id) {
     let content = '';
-    const children = [], listeners = {};
+    const children = [], listeners = {}, choices = [];
     const el = {
       dataset: {}, classList: { add() {}, remove() {}, toggle() {} },
       addEventListener(type, fn) { listeners[type] = fn; },
       click() { assert.ok(listeners.click, id + '에 클릭 동작이 없다'); listeners.click(); },
-      querySelectorAll() { return []; }, focus() {},
+      change() { assert.ok(listeners.change); listeners.change(); },
+      querySelectorAll(selector) { return selector === '.choice' ? choices : []; }, focus() {},
       get innerHTML() { return content; },
       set innerHTML(value) {
         children.splice(0).forEach((key) => nodes.delete(key));
         content = value;
+        choices.splice(0);
+        for (const match of value.matchAll(/class="choice[^"]*" data-i="(\d+)"/g)) {
+          const choice = element(id + ':choice' + match[1]); choice.dataset.i = match[1]; choices.push(choice);
+        }
         for (const match of value.matchAll(/\bid="([^"]+)"/g)) {
           const key = '#' + match[1]; children.push(key); nodes.set(key, element(key));
         }
@@ -53,6 +60,7 @@ function harness() {
     getComputedStyle: () => ({ getPropertyValue: () => 'serif' }),
     localStorage: { getItem: (k) => storage.get(k) || null, setItem: (k, v) => storage.set(k, v), removeItem: (k) => storage.delete(k) },
     setTimeout() { return 0; }, clearTimeout() {},
+    cancelAnimationFrame(id) { cancelled.push(id); },
     fetch() { throw new Error('회귀 검사에서 통신하면 안 된다'); },
   };
   vm.runInNewContext(source, sandbox, { filename: 'hanja/index.html', timeout: 1000 });
@@ -76,7 +84,7 @@ function harness() {
   assert.ok(mixed && pure, '자체 시험 단어장을 설치하지 못했다');
   app.LIB.index = [mixed, pure].map(B.bookMeta);
   app.selectUnit(mixed, 'words');
-  return { app, mixed, pure, nodes, quiz };
+  return { app, mixed, pure, nodes, quiz, cancelled };
 }
 
 t('미학습 단원 시험은 낱말 24개 중 20개 — 명시한 한자도 어휘 점수에서 제외', () => {
@@ -217,4 +225,90 @@ t('교재 id 재매핑은 학습 상태가 없어도 저장된 오답과 재확�
   assert.deepStrictEqual(copy(c.retry.wrongIds), [to]);
 });
 
-console.log(`\nOK — ${passed}개 통과`);
+t('한자 집중 교재 선택과 복습은 어휘 교재·단원·기록을 섞지 않는다', () => {
+  const { app, mixed, pure, nodes } = harness();
+  const selected = [app.db.settings.book, app.db.settings.unit];
+  const word = app.itemsOf(mixed, 'words')[0];
+  app.db.states[word.sid] = S.plant(word.sid, 0);
+  app.db.states['c:日'] = S.plant('c:日', 0, { book: pure.id });
+  app.putCheck(mixed.id, 'words', '어휘 시험', 1, 0, 24, 0, [word.sid]);
+  app.putCheck(pure.id, 'first', '한자 시험', 1, 0, 2, 0, ['c:日']);
+  app.renderChars();
+  assert.ok(nodes.get('#view-chars').innerHTML.includes('한자 집중 학습'));
+  assert.ok(!nodes.get('#view-chars').innerHTML.includes('틀렸거나 도움받은 낱말 배우기'));
+  nodes.get('#chBook').value = mixed.id; nodes.get('#chBook').change();
+  assert.ok(nodes.get('#view-chars').innerHTML.includes('보조 글자'), '어휘 책의 한자 전용 단원이 사라졌다');
+  assert.deepStrictEqual([app.db.settings.book, app.db.settings.unit], selected);
+  assert.strictEqual(app.curBookId(), mixed.id);
+  assert.deepStrictEqual(copy(app.trainItems({ mode: 'due' }).map((it) => it.sid)), [word.sid]);
+  assert.deepStrictEqual(copy(app.trainItems({ mode: 'due', only: 'char' }).map((it) => it.sid)), ['c:日']);
+  app.renderBooks();
+  assert.ok(!nodes.get('#view-books').innerHTML.includes(pure.title), '어휘 교재 선택에 한자 전용 책이 섞였다');
+  app.renderReport();
+  assert.ok(!nodes.get('#view-report').innerHTML.includes('한자 시험'), '어휘 시험 기록에 한자 시험이 섞였다');
+});
+
+t('뜻 확인 뒤 별도 상황을 풀고 해설을 보며 화면 복원에도 적용 기록은 한 번만 남긴다', () => {
+  const { app, mixed, nodes } = harness();
+  const word = mixed.words[0];
+  word.context = { prompt: '새로운 상황에서 골라 보세요.', choices: ['알맞은 상황', '다른 상황'], answer: '알맞은 상황', explanation: '낱말의 뜻을 이 상황에 적용했어요.' };
+  app.learnStart(mixed, 'words', 'word', { items: app.itemsOf(mixed, 'words').slice(0, 1) });
+  nodes.get('#lnNext').click();
+  let q = app.learn.q;
+  nodes.get('#view-train').querySelectorAll('.choice')[q.choices.indexOf(q.answer)].click();
+  assert.strictEqual(app.learn.ok, 1);
+  assert.ok(nodes.get('#qFeed').innerHTML.includes('새로운 상황에 적용하기'));
+  nodes.get('#lnContinue').click();
+  q = app.learn.q;
+  assert.strictEqual(q.kind, 'w-context');
+  assert.strictEqual(app.learn.i, 0);
+  nodes.get('#view-train').querySelectorAll('.choice')[q.choices.indexOf(q.answer)].click();
+  assert.ok(nodes.get('#qFeed').innerHTML.includes(word.context.explanation));
+  assert.strictEqual(app.learn.applied, 1);
+  app.learnRender(nodes.get('#view-train'));
+  assert.strictEqual(app.learn.applied, 1);
+  assert.strictEqual(app.learn.contextN, 1);
+  assert.strictEqual(app.db.log.filter((entry) => entry.k === 'apply').length, 1);
+  nodes.get('#lnContinue').click();
+  assert.ok(nodes.get('#view-train').innerHTML.includes('새로운 상황에 적용 1 / 1'));
+});
+
+t('한자 시범 중 교재를 바꾸면 패널을 지우기 전에 애니메이션을 취소한다', () => {
+  const { app, mixed, nodes, cancelled } = harness();
+  app.renderChars();
+  app.trace = { anim: 77 };
+  nodes.get('#chBook').value = mixed.id; nodes.get('#chBook').change();
+  assert.strictEqual(app.trace, null);
+  assert.deepStrictEqual(cancelled, [77]);
+});
+
+t('처음 보는 교재 시험도 뜻·상황·회상을 출제하고 영역별로 힌트 정답을 제외한다', () => {
+  const { app, mixed } = harness();
+  mixed.words.forEach((w) => { w.context = { prompt: w.word + ' 적용 상황', choices: ['상황 하나', '상황 둘'], answer: '상황 하나', explanation: '뜻에 맞는 상황입니다.' }; });
+  app.trainStart({ mode: 'check', book: mixed.id, unit: 'words' });
+  const session = app.train;
+  assert.strictEqual(session.list.filter((e) => e.q.kind === 'w-context').length, 10);
+  assert.strictEqual(session.list.filter((e) => e.q.kind === 'w-type').length, 5);
+  session.list.forEach((entry, i) => app.scoreAnswer(entry, i !== 0, i === 1));
+  app.finishCheck(session);
+  const domains = copy(app.lastCheck(mixed.id, 'words').domains);
+  assert.deepStrictEqual(domains, { meaning: { n: 5, right: 4 }, context: { n: 10, right: 9 }, recall: { n: 5, right: 5 } });
+});
+
+/* 새 기기의 교재 미리 받기는 통신 대신 실제 함수의 요청 대상만 기록한다. */
+const preloadSource = inline.slice(inline.indexOf('  async function fetchDueBooks()'), inline.indexOf('  /* 진로독서 어휘장 →'));
+const requested = [];
+vm.runInNewContext(preloadSource + '\nfetchDueBooks()', {
+  WBHSRS: S, now: () => 86400000, db: { states: {
+    word: S.plant('w:word-book:w1', 0, { book: 'word-book' }),
+    char: S.plant('c:日', 0, { book: 'char-book' }),
+    missing: S.plant('c:月', 0, { book: 'inaccessible' }),
+  } },
+  LIB: { index: [{ id: 'word-book' }, { id: 'char-book' }] }, bookOf: () => null,
+  openBook: async (id) => { requested.push(id); },
+}).then(() => {
+  t('새 기기는 만기 낱말·한자의 교재를 모두 미리 받고 접근할 수 없는 교재는 요청하지 않는다', () => {
+    assert.deepStrictEqual(requested.sort(), ['char-book', 'word-book']);
+  });
+  console.log(`\nOK — ${passed}개 통과`);
+}).catch((e) => { console.error(e); process.exitCode = 1; });

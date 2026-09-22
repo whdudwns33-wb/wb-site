@@ -61,6 +61,15 @@ export function normCheck(c) {
   if (Number.isFinite(Number(c.total)) && Number(c.total) >= n) out.total = Math.min(5000, Math.round(Number(c.total)));
   if (Number.isFinite(Number(c.hinted)) && c.hinted != null) out.hinted = Math.max(0, Math.min(out.right, Math.round(Number(c.hinted))));
   if (Array.isArray(c.wrongIds)) out.wrongIds = ids(c.wrongIds);
+  if (isObj(c.domains)) {
+    const domains = {}, keys = ['meaning', 'context', 'recall'];
+    if (keys.every((key) => {
+      const d = c.domains[key];
+      if (!isObj(d) || !Number.isInteger(d.n) || !Number.isInteger(d.right) || d.n < 0 || d.right < 0 || d.right > d.n) return false;
+      domains[key] = { n: d.n, right: d.right }; return true;
+    }) && keys.reduce((sum, key) => sum + domains[key].n, 0) === out.n &&
+        keys.reduce((sum, key) => sum + domains[key].right, 0) === out.right - (out.hinted || 0)) out.domains = domains;
+  }
   if (isObj(c.retry)) {
     const total = Math.round(Number(c.retry.total)), at = Math.round(Number(c.retry.at));
     const wrongIds = ids(c.retry.wrongIds);
