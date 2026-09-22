@@ -97,13 +97,17 @@
 14. **이벤트 위임 선택자를 넓게 쓰지 않는다.** `[data-day]` 로 걸면 그 속성을 가진 기사 전체가 잡혀 안쪽 버튼이 죽는다
     (`button[data-day]` 처럼 좁힌다).
 15. **학생에게는 자기 학년대 섹션만 나간다**(`forTier`). 관리 미리보기에서 전체가 보인다고 학생도 본다고 착각하지 않는다.
+16. **파일럿 기간에는 호가 서버(KV)에 없다.** 가족 링크(`?t=`)로 들어오면 앱이 서버에 호를 물어보는데, 서버는 링크가 멀쩡해도
+    "호 없음" 이라고 답한다. 그대로 두면 가족은 빈 화면을 보고 링크가 고장 난 줄 안다 — 그래서 `loadPilot` 으로 넘어가
+    배포본 호를 연다(`letter/app-boot.test.cjs` 가 이 배선을 지킨다). 링크 세 갈래가 모두 열려야 한다:
+    순수 링크는 기기에 기록 · 유효한 가족 링크는 명부 학년대 + 서버에 기록 · 잘못된 링크는 체험 모드로 내려와 기기에 기록.
 
 ---
 
 ## 5. 고치기 전에 돌리는 것
 
 ```
-node scripts/check.mjs --only letter                     # 이 앱 몫 테스트
+node scripts/check.mjs --only letter                     # 이 앱 몫 테스트(호 검증·화면 배선 포함)
 node letter/issue-validate.mjs                           # 저장소의 호 전부 + 목록 대조
 node reading-server/build-dist.mjs && node reading-server/dist-cache.test.mjs   # 배포본 배선
 node scripts/check.mjs                                   # 합치기 전 전체(265개, 35초)
