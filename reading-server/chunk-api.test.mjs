@@ -1,6 +1,7 @@
 'use strict';
 /* 청크브레인 서버 라우트 검증 (node reading-server/chunk-api.test.mjs) */
 import assert from 'node:assert';
+import SC from '../chunk/sched.js';
 import { handleChunk, normalizeChunkSummary, normalizeAssign, normalizePassage, chunkOverviewRow, dropStudentChunk, pushDueChunk } from './chunk-api.mjs';
 
 let passed = 0;
@@ -226,6 +227,46 @@ await t('관리 — 가족 링크 발급은 한 번, 다음부터 같은 토큰(
   /* 발급된 링크로 바로 열린다 */
   const open = await call(s, { path: '/api/chunk/parent', who: null, query: new URLSearchParams({ t: r.body.ptoken }) });
   assert.strictEqual(open.status, 200); assert.strictEqual(open.body.parent.name, '김지우');
+});
+
+await t('센터 학습 — 가족 링크의 과제 완료가 학생·관리 현황에 이어지고 새 과제는 다시 센다', async () => {
+  const s = memStore(), before = Date.now() - 120_000;
+  const link = await call(s, { path: '/api/chunk/admin/parentlink/st-1', method: 'POST', who: ADMIN });
+  const family = { who: null, query: new URLSearchParams({ t: link.body.ptoken }) };
+  const assign = { band: 'G3', passages: ['g3-01'], lessons: ['g3-1'], note: '센터 확인용', due: null };
+  const putAssign = () => call(s, { path: '/api/chunk/admin/assign/st-1', method: 'PUT', who: ADMIN, getBody: async () => assign });
+  assert.equal((await putAssign()).status, 200);
+  s._raw.assigns['st-1'].updatedAt = new Date(before).toISOString();
+  const opened = await call(s, { ...family, path: '/api/chunk/parent' });
+  assert.deepEqual(opened.body.assign, assign); assert.equal(opened.body.parent.band, 'G3');
+  const state = SC.blank(before); state.band = 'G3';
+  state.assign = { ...opened.body.assign, updatedAt: opened.body.assignUpdatedAt };
+  SC.lessonDone(state, 'g3-1', before + 1000, 100);
+  SC.record(state, 'g3-01', { band: 'G3', score: 90, qOk: true }, before + 2000);
+  const put = await call(s, { ...family, path: '/api/chunk/parent/state', method: 'PUT', getBody: async () => ({ state, summary: SC.forTeacher(state, before + 2000), baseUpdatedAt: null }) });
+  assert.equal(put.status, 200);
+  const student = await call(s, {});
+  assert.deepEqual(student.body.state, state); assert.equal(student.body.updatedAt, put.body.updatedAt);
+  const overview = async () => (await call(s, { path: '/api/chunk/admin/overview', who: ADMIN })).body.rows.find((r) => r.code === 'st-1');
+  assert.equal((await overview()).assignDone, 2); assert.equal((await overview()).attempts, 1);
+
+  const next = await putAssign();
+  assert.equal((await overview()).assignDone, 0, '같은 글·카드를 다시 내도 이전 완료는 새 과제에 세지 않는다');
+  let version = put.body.updatedAt;
+  for (const route of [{ ...family, path: '/api/chunk/parent/state' }, { who: STU }]) {
+    const late = await call(s, { ...route, method: 'PUT', getBody: async () => ({ state, summary: SC.forTeacher(state, before + 2000), baseUpdatedAt: version }) });
+    assert.equal(late.status, 200); version = late.body.updatedAt;
+    assert.equal((await overview()).assignDone, 0, '옛 과제를 기억한 학생·가족 기기의 요약을 그대로 믿지 않는다');
+  }
+  const after = Date.parse(next.body.updatedAt) + 1;
+  state.assign = { ...next.body.assign, updatedAt: next.body.updatedAt };
+  SC.lessonDone(state, 'g3-1', after, 100);
+  SC.record(state, 'g3-01', { band: 'G3', score: 95, qOk: true }, after);
+  const done = await call(s, { ...family, path: '/api/chunk/parent/state', method: 'PUT', getBody: async () => ({ state, summary: { ...SC.forTeacher(state, after), assignDone: 99 }, baseUpdatedAt: version }) });
+  assert.equal(done.status, 200); assert.equal((await overview()).assignDone, 2, '서버도 현재 과제 뒤의 학습 시각으로 센다');
+  assert.equal((await overview()).attempts, 2);
+  await call(s, { path: '/api/chunk/admin/assign/st-1', method: 'PUT', who: ADMIN, getBody: async () => ({}) });
+  assert.equal((await overview()).assign, null); assert.equal((await overview()).assignDone, 0);
 });
 
 await t('요약 지수 화이트리스트 · overview 는 명단 전체(미시작 포함), 외부 학생은 apps 에 chunk 가 있어야', async () => {
