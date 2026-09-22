@@ -60,6 +60,7 @@ test('external study services use fixed official links without embedded login', 
   assert.doesNotMatch(html, /www\.studyforce\.co\.kr/);
   assert.match(html, /const BRAIN_LETTER_URL = 'https:\/\/wb-reading\.whdudwns33\.workers\.dev\/letter\/'/);
   assert.match(html, /const CHUNK_BRAIN_URL = 'https:\/\/wb-reading\.whdudwns33\.workers\.dev\/chunk\/'/);
+  assert.match(html, /const VOCABULARY_URL = 'https:\/\/wb-reading\.whdudwns33\.workers\.dev\/hanja\/'/);
   const chunk = section('  chunk_brain: {', '  vocabulary: {');
   assert.doesNotMatch(chunk, /\?t=|print\.html|class\.html|chunk-admin\.html/);
 
@@ -68,11 +69,11 @@ test('external study services use fixed official links without embedded login', 
   assert.doesNotMatch(card, /iframe|fetch\(|type="password"/i);
 });
 
-test('Leaders Eye is the first online learning card directly above MetaMath', () => {
+test('requested brain learning cards appear first in the requested order', () => {
   const sources = section('const LEARNING_SOURCES', 'const DOW');
   const study = section('function viewStudy(', 'function rdAddModal(');
   assert.ok(sources.indexOf('  leaders_eye: {') < sources.indexOf('  metamath: {'));
-  assert.match(sources, /const ONLINE_LEARNING_SOURCE_KEYS = Object\.freeze\(\[\s*'leaders_eye', 'metamath', 'brain_letter', 'chunk_brain', 'vocabulary',\s*'classcard', 'studyforce', 'nelt_exam', 'daily_nonfiction'/);
+  assert.match(sources, /const ONLINE_LEARNING_SOURCE_KEYS = Object\.freeze\(\[\s*'brain_letter', 'chunk_brain', 'vocabulary', 'leaders_eye', 'metamath',\s*'classcard', 'studyforce', 'nelt_exam', 'daily_nonfiction'/);
   assert.match(study, /keys: ONLINE_LEARNING_SOURCE_KEYS/);
 });
 
@@ -239,7 +240,7 @@ test('a recurring learning assignment resolves only scheduled occurrences and dr
   ]);
 });
 
-test('online services open the requested URLs and vocabulary stays in preparation', () => {
+test('online services open the requested URLs for director, manager, and student', () => {
   const sources = section('const LEADERS_EYE_URL', 'const DOW');
   const card = section('function learningSourceCard(', '/* ── 학습 탭');
   const renderCard = Function('session', 'isManager', 'learningTasksFor', 'learningChecklistScheduleFor', 'esc', 'LEARNING_LOGIN_MEMO_SOURCES',
@@ -248,7 +249,8 @@ test('online services open the requested URLs and vocabulary stays in preparatio
     ['nelt_exam', '넬트 시험', 'https://www.netutor.co.kr/st/'],
     ['daily_nonfiction', '하루 비문학 독서', 'https://wb-reading.whdudwns33.workers.dev'],
     ['brain_letter', '브레인레터', 'https://wb-reading.whdudwns33.workers.dev/letter/'],
-    ['chunk_brain', '청크브레인', 'https://wb-reading.whdudwns33.workers.dev/chunk/']
+    ['chunk_brain', '청크브레인', 'https://wb-reading.whdudwns33.workers.dev/chunk/'],
+    ['vocabulary', '어휘', 'https://wb-reading.whdudwns33.workers.dev/hanja/']
   ];
   for (const role of ['director', 'manager', 'student']) {
     const render = renderCard({ isAdmin: role === 'director' }, () => role === 'manager', () => [], () => null, String,
@@ -260,11 +262,6 @@ test('online services open the requested URLs and vocabulary stays in preparatio
       assert.ok(output.includes('href="' + url + '" target="_blank" rel="noopener noreferrer"'));
       assert.equal(output.includes('data-act="learnadd"'), role === 'director');
     }
-    const vocabulary = render({ id: 'student-a', name: '테스트' }, role !== 'manager', 'vocabulary');
-    assert.ok(vocabulary.includes('<b>어휘</b>'));
-    assert.ok(vocabulary.includes('준비 중'));
-    assert.ok(!vocabulary.includes('href='));
-    assert.ok(!vocabulary.includes('data-act="learnadd"'));
   }
   const study = section('function viewStudy(', 'function rdAddModal(');
   assert.match(study, /title: '온라인 학습'[^\n]*keys: ONLINE_LEARNING_SOURCE_KEYS/);
@@ -314,7 +311,7 @@ test('learning tasks stay student-scoped and only the director can send them', (
   assert.match(card, /<details class="card study-source-card"/);
   assert.match(card, /완료 기록/);
   assert.match(card, /data-act="learningchecklistopen"/);
-  assert.match(card, /director && !comingSoon && sourceKey !== 'leaders_eye'[\s\S]*?data-act="learnadd"/);
+  assert.match(card, /director && sourceKey !== 'leaders_eye'[\s\S]*?data-act="learnadd"/);
   assert.match(card, /data-source="' \+ esc\(sourceKey\)/);
   assert.match(add, /const sourceKey = el\.dataset\.source/);
   assert.match(add, /!LEARNING_SOURCES\[sourceKey\]/);

@@ -141,12 +141,12 @@ function learningSources() {
   const source = between('const LEARNING_SOURCES = Object.freeze(', '\nconst DOW =');
   return new Function(
     'LEADERS_EYE_URL', 'METAMATH_CENTER_URL', 'METAMATH_STUDENT_URL', 'STUDYFORCE_URL',
-    'NELT_EXAM_URL', 'DAILY_NONFICTION_URL', 'BRAIN_LETTER_URL', 'CHUNK_BRAIN_URL',
+    'NELT_EXAM_URL', 'DAILY_NONFICTION_URL', 'BRAIN_LETTER_URL', 'CHUNK_BRAIN_URL', 'VOCABULARY_URL',
     source + '; return LEARNING_SOURCES;'
   )(
     'https://leaders.example/login', 'https://math-center.example', 'https://math-student.example',
     'https://studyforce.example', 'https://nelt.example', 'https://reading.example',
-    'https://letter.example', 'https://chunk.example'
+    'https://letter.example', 'https://chunk.example', 'https://vocabulary.example'
   );
 }
 
@@ -158,7 +158,7 @@ function renderLearningSourceCard(studentName, state, sourceKey = 'leaders_eye')
     'CHECKLIST_ONLINE_SOURCE_DEFAULTS', 'isRepeatingTask', 'effectiveOccursOn', 'learningOccurrenceDate', 'repeatLabel',
     source + '; return learningSourceCard;'
   )(
-    learningSources(), ['leaders_eye', 'metamath', 'brain_letter', 'chunk_brain', 'vocabulary', 'classcard', 'studyforce', 'nelt_exam', 'daily_nonfiction'],
+    learningSources(), ['brain_letter', 'chunk_brain', 'vocabulary', 'leaders_eye', 'metamath', 'classcard', 'studyforce', 'nelt_exam', 'daily_nonfiction'],
     state, { isAdmin: false, isStaffLink: true, staffId: 'student-a' }, () => false,
     () => false, task => task.start || '', task => task.dueDate || '', () => '2026-08-31',
     value => String(value == null ? '' : value).replace(/[&<>"']/g, char => ({
