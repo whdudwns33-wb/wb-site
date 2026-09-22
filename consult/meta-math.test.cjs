@@ -17,7 +17,7 @@ test('study screen renders thirteen separate source cards and keeps legacy MetaM
     ['metamath', '메타수학'],
     ['brain_letter', '브레인레터'],
     ['chunk_brain', '청크브레인'],
-    ['vocabulary', '어휘'],
+    ['vocabulary', '어휘브레인'],
     ['classcard', '클래스카드'],
     ['studyforce', '스터디포스'],
     ['nelt_exam', '넬트 시험'],
@@ -61,6 +61,7 @@ test('external study services use fixed official links without embedded login', 
   assert.match(html, /const BRAIN_LETTER_URL = 'https:\/\/wb-reading\.whdudwns33\.workers\.dev\/letter\/'/);
   assert.match(html, /const CHUNK_BRAIN_URL = 'https:\/\/wb-reading\.whdudwns33\.workers\.dev\/chunk\/'/);
   assert.match(html, /const VOCABULARY_URL = 'https:\/\/wb-reading\.whdudwns33\.workers\.dev\/hanja\/'/);
+  assert.match(section('  vocabulary: {', '  classcard: {'), /icon: '🌱', label: '어휘브레인'/);
   const chunk = section('  chunk_brain: {', '  vocabulary: {');
   assert.doesNotMatch(chunk, /\?t=|print\.html|class\.html|chunk-admin\.html/);
 
@@ -250,7 +251,7 @@ test('online services open the requested URLs for director, manager, and student
     ['daily_nonfiction', '하루 비문학 독서', 'https://wb-reading.whdudwns33.workers.dev'],
     ['brain_letter', '브레인레터', 'https://wb-reading.whdudwns33.workers.dev/letter/'],
     ['chunk_brain', '청크브레인', 'https://wb-reading.whdudwns33.workers.dev/chunk/'],
-    ['vocabulary', '어휘', 'https://wb-reading.whdudwns33.workers.dev/hanja/']
+    ['vocabulary', '어휘브레인', 'https://wb-reading.whdudwns33.workers.dev/hanja/']
   ];
   for (const role of ['director', 'manager', 'student']) {
     const render = renderCard({ isAdmin: role === 'director' }, () => role === 'manager', () => [], () => null, String,
