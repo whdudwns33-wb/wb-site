@@ -59,8 +59,12 @@ test('roadmap divides an inclusive range evenly across selected study days', () 
 test('roadmap exists only for selected students and is managed by the director', () => {
   const source = section('const STUDY_ROADMAP_AUTO', '/* ══════════════════════════════════════════════════════\n   회독');
   const study = section('function viewStudy()', 'function rdAddModal(');
+  const roadmapView = functionSource('viewRoadmap');
   const week = section('function viewWeek()', '/* ── 월간 플래너 ── */');
   const staff = section('function staffAccessPanels(', 'function viewStaffAdmin(');
+  const render = section('function render() {', 'function renderTabs()');
+  const tabs = functionSource('renderTabs');
+  const startup = section('load();', '\nrender();');
   const handlers = section("case 'roadmapopen':", '/* 회독 */');
 
   const active = Function(`${functionSource('studyRoadmapOf')}\n${functionSource('studyRoadmapActive')}\nreturn studyRoadmapActive;`)();
@@ -71,8 +75,14 @@ test('roadmap exists only for selected students and is managed by the director',
   assert.match(source, /if \(!roadmap\.targetSchool \|\| !roadmap\.items\.length\) return ''/);
   assert.match(source, /esc\(roadmap\.targetSchool\)/);
   assert.match(source, /esc\(item\.book\)/);
-  assert.match(study, /studyRoadmapCard\(me\)/);
+  assert.doesNotMatch(study, /studyRoadmapCard\(me\)/);
+  assert.match(roadmapView, /studyRoadmapCard\(me\)/);
+  assert.match(roadmapView, /studyRoadmapWeekCard\(me, mon, days\)/);
   assert.match(week, /studyRoadmapWeekCard\(me, mon, days\)/);
+  assert.match(render, /route === 'roadmap'[^]*session\.isStaffLink[^]*studyRoadmapActive\(currentStaff\(\)\)/);
+  assert.match(render, /roadmap: viewRoadmap/);
+  assert.match(tabs, /session\.isAdmin[^]*studyRoadmapActive\(currentStaff\(\)\)[^]*\['roadmap', '로드맵'\]/);
+  assert.match(startup, /'week', 'roadmap', 'month'/);
   assert.match(staff, /data-act="roadmapopen"/);
   assert.match(handlers, /if \(!session\.isAdmin \|\| session\.isStaffLink\) break/);
   assert.match(handlers, /student\.studyRoadmap =/);
