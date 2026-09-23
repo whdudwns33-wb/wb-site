@@ -239,6 +239,72 @@ test('projected makeup lessons cannot be configured or used as recurring weekend
   assert.equal(db.sqlite.prepare('SELECT COUNT(*) count FROM weekend_actual_visits').get().count, 0);
 });
 
+test('one-off subscription lessons record actual arrival and departure on their exact date', async () => {
+  const db = new D1Database(); db.seed();
+  db.seedTask({
+    id: 'subscription_session_a', staffId: 'teacher-1', studentId: 'student-a', studentName: '학생A',
+    title: '[수업] 학생A — 스터디포스 구독 수업', taskKind: 'lesson_instruction', lessonFormVersion: 1,
+    lessonInstanceType: 'subscription', subscriptionType: 'studyforce', repeat: 'once', days: [1],
+    start: '2026-08-24', end: '2026-08-24',
+    scheduleSlots: [{ days: [1], startTime: '14:00', endTime: '15:00', validFrom: '2026-08-24', validTo: '2026-08-24' }]
+  });
+  const monday = Date.parse('2026-08-24T14:05:00+09:00');
+  const checked = await atNow(monday, () => call(db, {
+    action: 'check_in', visitDate: '2026-08-24', sourceDate: '2026-08-24', visitSequence: 1,
+    lessonTaskId: 'subscription_session_a', studentId: 'student-a'
+  }));
+  assert.equal(checked.status, 200);
+  assert.equal(checked.body.visit.status, 'active');
+  assert.equal(checked.body.visit.sourceDate, '2026-08-24');
+
+  const listed = await call(db, { action: 'list', visitDate: '2026-08-24' });
+  assert.equal(listed.status, 200);
+  assert.equal(listed.body.visits.length, 1);
+
+  const checkedOut = await atNow(monday + 3600000, () => call(db, {
+    action: 'check_out', visitId: checked.body.visit.visitId, revision: checked.body.visit.revision
+  }));
+  assert.equal(checkedOut.status, 200);
+  assert.equal(checkedOut.body.visit.status, 'completed');
+
+  const repeated = await atNow(monday + 7200000, () => call(db, {
+    action: 'check_in', visitDate: '2026-08-24', sourceDate: '2026-08-24', visitSequence: 2,
+    lessonTaskId: 'subscription_session_a', studentId: 'student-a'
+  }));
+  assert.equal(repeated.status, 422);
+  assert.equal(repeated.body.code, 'SUBSCRIPTION_VISIT_SEQUENCE_INVALID');
+});
+
+test('admin can backfill a completed subscription visit but not attach it to another date', async () => {
+  const db = new D1Database(); db.seed();
+  db.seedTask({
+    id: 'subscription_session_history', staffId: 'teacher-1', studentId: 'student-a', studentName: '학생A',
+    title: '[수업] 학생A — 검사 구독 수업', taskKind: 'lesson_instruction', lessonFormVersion: 1,
+    lessonInstanceType: 'subscription', subscriptionType: 'assessment', repeat: 'once', days: [2],
+    start: '2026-08-18', end: '2026-08-18',
+    scheduleSlots: [{ days: [2], startTime: '10:00', endTime: '11:00', validFrom: '2026-08-18', validTo: '2026-08-18' }]
+  });
+  const checkInAt = Date.parse('2026-08-18T10:07:00+09:00');
+  const checkOutAt = Date.parse('2026-08-18T11:03:00+09:00');
+  const saved = await call(db, {
+    action: 'check_in', manualRecord: true, visitDate: '2026-08-18', sourceDate: '2026-08-18', visitSequence: 1,
+    lessonTaskId: 'subscription_session_history', studentId: 'student-a', checkInAt, checkOutAt,
+    reason: '운영 기록 보정'
+  }, admin);
+  assert.equal(saved.status, 200);
+  assert.equal(saved.body.visit.status, 'completed');
+  assert.equal(saved.body.visit.checkInAt, checkInAt);
+  assert.equal(saved.body.visit.checkOutAt, checkOutAt);
+
+  const wrongDate = await call(db, {
+    action: 'check_in', manualRecord: true, visitDate: '2026-08-19', sourceDate: '2026-08-19', visitSequence: 1,
+    lessonTaskId: 'subscription_session_history', studentId: 'student-a',
+    checkInAt: Date.parse('2026-08-19T10:00:00+09:00'), checkOutAt: Date.parse('2026-08-19T11:00:00+09:00')
+  }, admin);
+  assert.equal(wrongDate.status, 422);
+  assert.equal(db.sqlite.prepare('SELECT COUNT(*) count FROM weekend_actual_visits').get().count, 1);
+});
+
 test('a completed weekend lesson can check in again with an explicit next visit sequence', async () => {
   const db = new D1Database(); db.seed();
   const first = await atNow(saturday, () => call(db, {
