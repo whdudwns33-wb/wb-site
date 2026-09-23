@@ -421,7 +421,7 @@ const LESSON_SCHEDULE_SIGNATURE_KEYS = [
 
 function isRegularLessonTaskData(data) {
   return !!(data && typeof data === 'object' && !Array.isArray(data) &&
-    !isScheduledMakeupTaskData(data) &&
+    !isScheduledMakeupTaskData(data) && String(data.lessonInstanceType || '') !== 'subscription' &&
     (hasStructuredLessonMarker(data) || data.intakeSource === 'teacher_9_field_form'));
 }
 
@@ -1023,8 +1023,9 @@ async function inspectLockedSession4AttendanceChanges(env, app, entries, now) {
     const isMakeup = String(data.lessonInstanceType || '') === 'makeup' || !!makeupCaseId;
     if (isMakeup && (String(data.lessonInstanceType || '') !== 'makeup' ||
         !SAFE_ID.test(makeupCaseId) || String(row.id) !== 'makeup_lesson_' + makeupCaseId)) return;
+    const isSubscription = String(data.lessonInstanceType || '') === 'subscription';
     tasks.set(String(row.id), { owner: String(row.owner || ''), data,
-      kind: isMakeup ? 'makeup' : 'regular', makeupCaseId });
+      kind: isMakeup ? 'makeup' : isSubscription ? 'subscription' : 'regular', makeupCaseId });
   };
   for (let offset = 0; offset < taskIds.length; offset += 80) {
     const chunk = taskIds.slice(offset, offset + 80);
@@ -1070,6 +1071,7 @@ async function inspectLockedSession4AttendanceChanges(env, app, entries, now) {
   const lessonCandidates = candidates.filter(item => {
     const task = tasks.get(item.identity.taskId);
     if (!task) return false;
+    if (task.kind === 'subscription') return false;
     const date = item.identity.date;
     if ((task.data.start && date < String(task.data.start)) ||
         (task.data.end && date > String(task.data.end))) return false;
