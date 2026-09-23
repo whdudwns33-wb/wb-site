@@ -96,6 +96,16 @@ function isLesson(task) {
     (task.taskKind === 'lesson_instruction' || task.lessonFormVersion || task.intakeVersion));
 }
 
+function isSubscriptionSession(task) {
+  return !!(task && !task.deleted && String(task.lessonInstanceType || '') === 'subscription' &&
+    ['assessment', 'studyforce'].includes(String(task.subscriptionType || '')) &&
+    String(task.repeat || '') === 'once' && validDate(String(task.start || '')));
+}
+
+function isActualVisitLesson(task) {
+  return isLesson(task) || isSubscriptionSession(task);
+}
+
 function activeOn(task, date) {
   return (!task.start || String(task.start) <= date) && (!task.end || String(task.end) >= date);
 }
@@ -131,6 +141,12 @@ function plannedWeekendOccurrence(task, date) {
  * or the single opposite day in the same Saturday/Sunday pair.
  */
 function resolveVisitSourceDate(task, visitDate, body) {
+  if (isSubscriptionSession(task)) {
+    const sourceDate = Object.prototype.hasOwnProperty.call(body || {}, 'sourceDate')
+      ? String(body.sourceDate || '') : String(visitDate || '');
+    return String(task.start || '') === String(visitDate || '') && sourceDate === String(visitDate || '')
+      ? sourceDate : '';
+  }
   const pair = weekendPairDates(visitDate);
   if (pair.length !== 2) return '';
   if (Object.prototype.hasOwnProperty.call(body || {}, 'sourceDate')) {
@@ -178,7 +194,7 @@ async function currentVisitLesson(env, app, row) {
     .bind(app, String(row.lesson_task_id)).first();
   const task = taskRow && parseJson(taskRow.data);
   const owner = String(taskRow && taskRow.owner || '');
-  if (!task || !isLesson(task) || !SAFE_ID.test(owner) ||
+  if (!task || !isActualVisitLesson(task) || !SAFE_ID.test(owner) ||
       String(task.id || '') !== String(row.lesson_task_id) || String(task.staffId || '') !== owner ||
       String(task.studentId || '') !== String(row.student_id)) return null;
   return { task, owner, taskData: String(taskRow.data || '') };
@@ -189,10 +205,16 @@ async function verifiedLesson(env, app, taskId, studentId, visitDate, auth) {
   const taskRow = await env.DB.prepare('SELECT owner,data FROM tasks WHERE app=? AND id=? LIMIT 1')
     .bind(app, taskId).first();
   const task = taskRow && parseJson(taskRow.data);
-  const weekendPolicy = weekendAttendancePolicyOn(task, visitDate);
-  if (!task || !isLesson(task) || !activeOn(task, visitDate) || weekendPolicy === 'invalid' ||
-      (weekendPolicy === 'flexible' ? !flexibleAllowedOn(task, visitDate) : !hasWeekendSchedule(task))) {
-    return { error: '현재 등록된 토·일 수업을 확인할 수 없습니다' };
+  const subscription = isSubscriptionSession(task);
+  const weekendPolicy = subscription ? 'subscription' : weekendAttendancePolicyOn(task, visitDate);
+  const eligible = subscription
+    ? String(task.start || '') === visitDate && plannedOccursOn(task, visitDate)
+    : isLesson(task) && isWeekendDate(visitDate) && activeOn(task, visitDate) && weekendPolicy !== 'invalid' &&
+      (weekendPolicy === 'flexible' ? flexibleAllowedOn(task, visitDate) : hasWeekendSchedule(task));
+  if (!task || !eligible) {
+    return { error: subscription
+      ? '선택한 날짜에 생성된 구독 수업을 확인할 수 없습니다'
+      : '현재 등록된 토·일 수업을 확인할 수 없습니다' };
   }
   if (String(task.studentId || '') !== studentId || String(task.staffId || '') !== String(taskRow.owner || '')) {
     return { error: '수업과 학생·담당자 연결이 일치하지 않습니다' };
@@ -207,7 +229,7 @@ async function verifiedLesson(env, app, taskId, studentId, visitDate, auth) {
   if (!students.some(student => student && !student.deleted && String(student.id || '') === studentId)) {
     return { error: '현재 원생 명단에서 학생을 확인할 수 없습니다' };
   }
-  return { task, staffId: String(task.staffId), taskData: String(taskRow.data || '') };
+  return { task, staffId: String(task.staffId), taskData: String(taskRow.data || ''), subscription };
 }
 
 async function latestAfterWrite(env, app, visitId) {
@@ -273,7 +295,7 @@ async function appendUpdate(env, app, current, values, eventType, reason, auth, 
 
 async function listVisits(env, app, body, auth, json, origin) {
   const visitDate = String(body.visitDate || '');
-  if (!isWeekendDate(visitDate)) return json({ ok: false, error: '토요일 또는 일요일 날짜를 선택해 주세요' }, 422, origin);
+  if (!validDate(visitDate)) return json({ ok: false, error: '조회할 날짜를 확인해 주세요' }, 422, origin);
   let staffId = auth.scope === 'own' ? String(auth.id || '') : String(body.staffId || '');
   if (staffId && !SAFE_ID.test(staffId)) return json({ ok: false, error: '담당자 정보를 확인해 주세요' }, 422, origin);
   const result = await env.DB.prepare(
@@ -480,15 +502,33 @@ async function checkIn(env, app, body, auth, json, origin) {
   if (!Number.isSafeInteger(visitSequence) || visitSequence < 1 || visitSequence > MAX_VISIT_SEQUENCE) {
     return json({ ok: false, error: '실제 등원 방문 순서를 확인해 주세요' }, 422, origin);
   }
-  if (!isWeekendDate(visitDate) || kstParts(now).date !== visitDate) {
-    return json({ ok: false, error: '실제 등원은 오늘 토·일 기록에서만 저장할 수 있습니다' }, 422, origin);
+  const manualRecord = auth.scope === 'all' && body.manualRecord === true;
+  const manualCheckInAt = Number(body.checkInAt);
+  const manualCheckOutAt = body.checkOutAt == null || body.checkOutAt === '' ? null : Number(body.checkOutAt);
+  const manualReason = String(body.reason || '').replace(/\s+/g, ' ').trim();
+  if (!validDate(visitDate) || (!manualRecord && kstParts(now).date !== visitDate)) {
+    return json({ ok: false, error: '실제 등원은 오늘 날짜에만 저장할 수 있습니다' }, 422, origin);
   }
+  if (manualRecord && (!Number.isSafeInteger(manualCheckInAt) || manualCheckInAt <= 0 ||
+      kstParts(manualCheckInAt).date !== visitDate || manualCheckOutAt == null ||
+      !Number.isSafeInteger(manualCheckOutAt) || manualCheckOutAt < manualCheckInAt ||
+      kstParts(manualCheckOutAt).date !== visitDate || !manualReason || manualReason.length > MAX_REASON ||
+      /[\u0000-\u001f\u007f]/.test(manualReason))) {
+    return json({ ok: false, error: '관리자 기록은 같은 날짜의 실제 등원·하원 시간을 모두 입력해 주세요' }, 422, origin);
+  }
+  const checkInAt = manualRecord ? manualCheckInAt : now;
+  const checkOutAt = manualRecord ? manualCheckOutAt : null;
+  const visitStatus = manualRecord ? 'completed' : 'active';
   const verified = await verifiedLesson(env, app, taskId, studentId, visitDate, auth);
   if (verified.error) return json({ ok: false, error: verified.error }, 422, origin);
   const sourceDate = resolveVisitSourceDate(verified.task, visitDate, body);
   if (!sourceDate) {
     return json({ ok: false, code: 'SOURCE_DATE_INVALID',
       error: '원래 수업 날짜와 확정 주말 시간표 연결을 확인해 주세요' }, 422, origin);
+  }
+  if (verified.subscription && visitSequence !== 1) {
+    return json({ ok: false, code: 'SUBSCRIPTION_VISIT_SEQUENCE_INVALID',
+      error: '구독 수업의 실제 등원은 생성된 수업당 한 번만 기록할 수 있습니다' }, 422, origin);
   }
 
   const linkedResult = await env.DB.prepare(
@@ -535,7 +575,7 @@ async function checkIn(env, app, body, auth, json, origin) {
     let reopened;
     try {
       reopened = await appendUpdate(env, app, existing, {
-        checkInAt: now, checkOutAt: null, status: 'active', expectedRevision: Number(existing.revision)
+        checkInAt, checkOutAt, status: visitStatus, expectedRevision: Number(existing.revision)
       }, 'reopen', '취소 후 다시 등원', auth,
       auth.scope === 'own' ? { owner: verified.staffId, taskData: verified.taskData } : null);
     } catch (error) {
@@ -557,16 +597,18 @@ async function checkIn(env, app, body, auth, json, origin) {
   const eventId = randomId('wve_');
   const actor = actorId(auth);
   const eventData = JSON.stringify({ version: 1, before: null,
-    after: { visitDate, sourceDate, visitSequence, checkInAt: now, checkOutAt: null, status: 'active' }, reason: '' });
+    after: { visitDate, sourceDate, visitSequence, checkInAt, checkOutAt, status: visitStatus },
+    reason: manualRecord ? manualReason : '' });
   let results;
   try {
     results = await env.DB.batch([
       env.DB.prepare(
       'INSERT OR IGNORE INTO weekend_actual_visits ' +
       '(app,visit_id,student_id,lesson_task_id,staff_id,visit_date,source_date,visit_sequence,check_in_at,check_out_at,status,revision,created_at,updated_at,created_by,updated_by) ' +
-      'SELECT ?,?,?,?,?,?,?,?,?,NULL,\'active\',1,?,?,?,? FROM tasks current_task ' +
+      'SELECT ?,?,?,?,?,?,?,?,?,?,?,1,?,?,?,? FROM tasks current_task ' +
       'WHERE current_task.app=? AND current_task.id=? AND current_task.owner=? AND current_task.data=?'
-    ).bind(app, visitId, studentId, taskId, verified.staffId, visitDate, sourceDate, visitSequence, now, now, now, actor, actor,
+    ).bind(app, visitId, studentId, taskId, verified.staffId, visitDate, sourceDate, visitSequence, checkInAt, checkOutAt,
+      visitStatus, now, now, actor, actor,
       app, taskId, verified.staffId, verified.taskData),
       env.DB.prepare(
       'INSERT INTO weekend_actual_visit_events (app,event_id,visit_id,event_type,event_data,actor_id,created_at) ' +
@@ -583,7 +625,7 @@ async function checkIn(env, app, body, auth, json, origin) {
       const concurrent = await env.DB.prepare(
         'SELECT * FROM weekend_actual_visits WHERE app=? AND student_id=? AND lesson_task_id=? AND visit_date=? AND visit_sequence=? LIMIT 1'
       ).bind(app, studentId, taskId, visitDate, visitSequence).first();
-      if (concurrent && concurrent.status === 'active' &&
+      if (concurrent && concurrent.status === visitStatus &&
           (concurrent.source_date == null || String(concurrent.source_date) === sourceDate)) {
         return json({ ok: true, idempotent: true, visit: rowView(concurrent) }, 200, origin);
       }
@@ -596,7 +638,7 @@ async function checkIn(env, app, body, auth, json, origin) {
     const concurrent = await env.DB.prepare(
       'SELECT * FROM weekend_actual_visits WHERE app=? AND student_id=? AND lesson_task_id=? AND visit_date=? AND visit_sequence=? LIMIT 1'
     ).bind(app, studentId, taskId, visitDate, visitSequence).first();
-    if (concurrent && concurrent.status === 'active' &&
+    if (concurrent && concurrent.status === visitStatus &&
         (concurrent.source_date == null || String(concurrent.source_date) === sourceDate)) {
       return json({ ok: true, idempotent: true, visit: rowView(concurrent) }, 200, origin);
     }
