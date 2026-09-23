@@ -14,7 +14,7 @@ assert.strictEqual((inline.match(/^  boot\(\);$/gm) || []).length, 1, '앱 부�
 const source = inline.replace(/^  boot\(\);$/m, `  globalThis.flow = {
     installBook, itemsOf, unitsOf, selectUnit, trainItems, trainStart, scoreAnswer, finishCheck,
     learnStart, learnPlant, learnDone, learnRender, renderTrain, renderChars, renderBooks, renderReport,
-    curBookId, selectBook, render, trainMenu, sessionDomains, migrateIds, pendingIds, putCheck, lastCheck, LIB,
+    curBookId, selectBook, render, trainMenu, sessionDomains, migrateIds, pendingIds, putCheck, lastCheck, LIB, say, stopSay, charCardHtml,
     setOpenBook(fn) { openBook = fn; },
     get db() { return db; }, get train() { return TRAIN; }, get learn() { return LEARN; },
     get trace() { return TRACE; }, set trace(value) { TRACE = value; }
@@ -55,9 +55,10 @@ function harness() {
   const tabs = Array.from(html.matchAll(/<button data-view="([^"]+)"/g), (match) => {
     const button = element('tab:' + match[1]); button.dataset.view = match[1]; return button;
   });
-  const quiz = { ...Q };
+  const quiz = { ...Q }, voice = { calls: [], stops: 0, supported: true,
+    ttsSupported() { return this.supported; }, speak(text, opt) { this.calls.push({ text, opt }); }, stop() { this.stops++; } };
   const sandbox = {
-    WBHSRS: S, WBHQUIZ: quiz, WBBOOKCHECK: B,
+    WBHSRS: S, WBHQUIZ: quiz, WBBOOKCHECK: B, WBVoice: voice,
     WBHBRIDGE: require('./bridge.js'), WBHTRACE: require('./trace.js'),
     document: { querySelector: (s) => nodes.get(s) || null, querySelectorAll: (s) => s === '.tabbar button' ? tabs : [], documentElement: {} },
     window: { addEventListener() {}, scrollTo() {} },
@@ -89,8 +90,54 @@ function harness() {
   assert.ok(mixed && pure, '자체 시험 단어장을 설치하지 못했다');
   app.LIB.index = [mixed, pure].map(B.bookMeta);
   app.selectUnit(mixed, 'words');
-  return { app, mixed, pure, nodes, quiz, cancelled, tabs, confirmation };
+  return { app, mixed, pure, nodes, quiz, voice, cancelled, tabs, confirmation };
 }
+
+function sayButton() {
+  return { textContent: '🔊 들어보기', nextElementSibling: { textContent: '', hidden: true },
+    classList: { toggle() {} }, setAttribute(key, value) { this[key] = value; } };
+}
+t('들어보기는 실제 재생 시작을 표시하고 다시 누르면 멈춘다', () => {
+  const { app, voice } = harness(), button = sayButton();
+  app.say('관측', button);
+  assert.match(button.textContent, /준비 중/);
+  assert.strictEqual(voice.calls.length, 1);
+  assert.strictEqual(voice.calls[0].opt.startTimeout, 5000);
+  voice.calls[0].opt.onstart();
+  assert.match(button.textContent, /듣기 멈추기/);
+  app.say('관측', button);
+  assert.strictEqual(voice.calls.length, 1);
+  assert.strictEqual(voice.stops, 1);
+  assert.strictEqual(button['aria-pressed'], 'false');
+  voice.calls[0].opt.onerror('start-timeout');
+  assert.strictEqual(button.nextElementSibling.hidden, true, '중단한 음성의 늦은 오류를 표시했다');
+});
+t('재생 실패 안내는 카드에 남고 새 음성은 옛 콜백에 영향받지 않는다', () => {
+  const { app, voice } = harness(), first = sayButton(), second = sayButton();
+  app.say('관측', first); app.say('관찰', second);
+  voice.calls[0].opt.onend();
+  assert.strictEqual(second['aria-pressed'], 'true');
+  voice.calls[1].opt.onerror('language-unavailable');
+  assert.match(second.nextElementSibling.textContent, /한국어 음성/);
+  assert.strictEqual(second.nextElementSibling.hidden, false);
+  assert.strictEqual(second['aria-pressed'], 'false');
+  app.say('관찰', second); voice.calls[2].opt.onstart(); voice.calls[2].opt.onend();
+  assert.strictEqual(second.nextElementSibling.hidden, true);
+  assert.strictEqual(second.textContent, '🔊 들어보기');
+});
+t('음성 미지원·예외를 표시하고 화면 이동은 발화를 멈춘다', () => {
+  const { app, voice } = harness(), button = sayButton();
+  voice.supported = false; app.say('관측', button);
+  assert.match(button.nextElementSibling.textContent, /지원하지 않아요/);
+  assert.strictEqual(voice.calls.length, 0);
+  voice.supported = true; app.say('관측', button); app.render('home');
+  assert.strictEqual(voice.stops, 1);
+  assert.strictEqual(button['aria-pressed'], 'false');
+  voice.speak = () => { throw new Error('engine unavailable'); };
+  app.say('관측', button);
+  assert.match(button.nextElementSibling.textContent, /재생을 시작하지 못했어요/);
+  assert.ok(!app.charCardHtml({ ch: '觀', hun: '', eum: '' }).includes('data-say'), '훈음 없는 글자에 빈 재생 버튼이 나왔다');
+});
 
 t('미학습 단원 시험은 낱말 24개 중 20개 — 명시한 한자도 어휘 점수에서 제외', () => {
   const { app, mixed } = harness();
