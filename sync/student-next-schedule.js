@@ -132,7 +132,8 @@ export function projectNextStudentLesson(value, date) {
     startTime: String(value.startTime || '').slice(0, 5), endTime: String(value.endTime || '').slice(0, 5),
     lessonHours: String(value.lessonHours || '').slice(0, 4), staffId: SAFE_ID.test(String(value.staffId || '')) ? String(value.staffId) : '',
     teacherName: String(value.teacherName || '').slice(0, 80),
-    lessonInstanceType: String(value.lessonInstanceType || '') === 'makeup' ? 'makeup' : 'regular'
+    lessonInstanceType: ['makeup', 'subscription'].includes(String(value.lessonInstanceType || ''))
+      ? String(value.lessonInstanceType) : 'regular'
   };
 }
 

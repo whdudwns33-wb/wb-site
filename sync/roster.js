@@ -22,6 +22,9 @@ const MAX_BOOK_STUDENTS = 5000;
 const ROSTER_SUBJECTS = new Set([
   '국어', '영어', '수학', '사회', '과학', '독해사고력', '독해력수업', '독해력훈련', '사고력수학', '질답', '클리닉'
 ]);
+const SUBSCRIPTION_TYPES = new Set(['assessment', 'studyforce']);
+const SUBSCRIPTION_LABELS = Object.freeze({ assessment: '검사구독', studyforce: '스터디포스구독' });
+const HHMM = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 
 function nextMonthForDate(value) {
   const [year, monthValue] = String(value || '').slice(0, 7).split('-').map(Number);
@@ -41,7 +44,63 @@ function isLessonTask(value) {
 
 function isRegularLessonTask(value) {
   return isLessonTask(value) && String(value.lessonInstanceType || '') !== 'makeup' &&
-    !String(value.makeupCaseId || '').trim();
+    String(value.lessonInstanceType || '') !== 'subscription' && !String(value.makeupCaseId || '').trim();
+}
+
+function clockMinute(value) {
+  const normalized = String(value || '').trim();
+  if (!HHMM.test(normalized)) return null;
+  const [hour, minute] = normalized.split(':').map(Number);
+  return hour * 60 + minute;
+}
+
+function subscriptionForStudent(student, type) {
+  return (Array.isArray(student && student.subscriptions) ? student.subscriptions : [])
+    .find(item => item && item.type === type) || null;
+}
+
+function subscriptionSessionTask(student, staff, input, now, actorRole) {
+  const type = String(input.subscriptionType || '');
+  const label = SUBSCRIPTION_LABELS[type];
+  if (!label) fail('subscriptionType', '구독 프로그램을 확인해 주세요');
+  const date = isoDate(input.date, 'date');
+  const startTime = text(input.startTime, 'startTime', 5, false);
+  const endTime = text(input.endTime, 'endTime', 5, false);
+  const startMinute = clockMinute(startTime);
+  const endMinute = clockMinute(endTime);
+  if (startMinute == null || endMinute == null || endMinute <= startMinute) {
+    fail('time', '시작·종료 시간을 올바르게 입력해 주세요');
+  }
+  const requestId = id(input.requestId, 'requestId');
+  const memo = text(String(input.memo || ''), 'memo', 1600, true);
+  const taskId = 'subscription_' + requestId;
+  const day = new Date(date + 'T00:00:00Z').getUTCDay();
+  const title = label + ' 수업';
+  const scheduleText = startTime + '-' + endTime;
+  return {
+    id: taskId,
+    groupId: 'subscription-' + type + '-' + student.id,
+    staffId: staff.id,
+    title: '[수업] ' + student.name + ' (' + (student.grade || '학년 미지정') + ') — ' + title,
+    detail: [label, date, scheduleText].join(' · '),
+    guide: '■ 구독 프로그램\n' + label + '\n\n■ 전달 메모\n' + (memo || '없음'),
+    steps: [
+      '지난 수업·진행 내용 확인', '오늘 진행할 내용 확인', '구독 수업 진행',
+      '학습 반응·결과 확인', '실제 진행 내용과 특이사항 기록'
+    ].map((stepLabel, index) => ({ id: taskId + '-step-' + (index + 1), label: stepLabel })),
+    target: 0, unit: '건', time: startTime, priority: 'normal', repeat: 'once', days: [day],
+    start: date, end: '', carry: false, origin: actorRole, createdAt: now, updatedAt: now, deleted: false,
+    studentId: student.id, studentName: student.name, grade: student.grade || '', subject: label,
+    className: '', lessonRole: title, lessonHours: '', scheduleText,
+    scheduleSlots: [{ slotId: 'slot-1', days: [day], startTime, endTime, lessonHours: '', validFrom: date,
+      validTo: date, lessonRole: title, status: 'normal' }],
+    scheduleStatus: 'confirmed', scheduleReviewReason: '', materials: '없음', onlineProgram: '없음',
+    onlinePrograms: [], homework: '없음', studentTraits: '없음', goal: '없음', parentRequest: '없음',
+    adminRequest: memo || '없음', taskKind: 'lesson_instruction', lessonFormVersion: 1, intakeVersion: 1,
+    lessonRevision: 1, intakeSource: 'subscription_session', lessonInstanceType: 'subscription',
+    subscriptionType: type, subscriptionStartDate: subscriptionForStudent(student, type).startDate,
+    createdByScope: actorRole
+  };
 }
 
 async function activeStaffRecord(env, app, staffId) {
@@ -156,6 +215,22 @@ function subjects(value, path) {
   return result;
 }
 
+function subscriptions(value, path) {
+  if (!Array.isArray(value) || value.length > SUBSCRIPTION_TYPES.size) {
+    fail(path, '구독 프로그램 배열을 확인해 주세요');
+  }
+  const seen = new Set();
+  return value.map((item, index) => {
+    const itemPath = path + '[' + index + ']';
+    shape(item, ['type', 'startDate'], [], itemPath);
+    const type = text(item.type, itemPath + '.type', 20, false);
+    if (!SUBSCRIPTION_TYPES.has(type)) fail(itemPath + '.type', '등록할 수 없는 구독 프로그램입니다');
+    if (seen.has(type)) fail(path, '중복 구독 프로그램이 있습니다');
+    seen.add(type);
+    return { type, startDate: isoDate(item.startDate, itemPath + '.startDate') };
+  }).sort((left, right) => left.type.localeCompare(right.type));
+}
+
 function teacherIds(value, path, empty) {
   if (!Array.isArray(value) || (!empty && !value.length) || value.length > 20) {
     fail(path, (empty ? '0~20개' : '1~20개') + '의 직원 ID 배열이어야 합니다');
@@ -197,6 +272,11 @@ function comparableStudentChangeField(student, key) {
       ? row.subjects : String(row.subject || '').split(/[·,\/]/);
     return [...new Set(source.map(item => identityText(item)).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ko'));
   }
+  if (key === 'subscriptions') {
+    return (Array.isArray(row.subscriptions) ? row.subscriptions : [])
+      .map(item => ({ type: String(item && item.type || ''), startDate: String(item && item.startDate || '') }))
+      .sort((left, right) => left.type.localeCompare(right.type));
+  }
   return row[key] == null ? '' : row[key];
 }
 
@@ -209,6 +289,7 @@ function minimalStudentForDeletion(value) {
   if (!identityText(value && value.name)) return false;
   if ((value.subjects || []).length) return false;
   if (String(value && value.billingMode || 'monthly') !== 'monthly') return false;
+  if (Array.isArray(value && value.subscriptions) && value.subscriptions.length) return false;
   return ![
     value.subject, value.phoneSelf, value.phoneFather, value.phoneMother,
     value.registrationDate, value.firstClassDate, value.end, value.reason, value.memo,
@@ -260,7 +341,7 @@ function rosterStudent(value, index) {
     ['id', 'name', 'grade', 'subject', 'start', 'end', 'reason'],
     ['memo', 'entryType', 'school', 'phoneSelf', 'phoneFather', 'phoneMother',
       'registrationDate', 'firstClassDate', 'subjects', 'teacher', 'teacherIds',
-      'billingMode', 'sessionCycleStartDate'], path);
+      'billingMode', 'sessionCycleStartDate', 'subscriptions'], path);
   const start = month(value.start, path + '.start', false);
   const end = month(value.end, path + '.end', true);
   if (end && end < start) fail(path + '.end', '시작월보다 빠를 수 없습니다');
@@ -293,6 +374,9 @@ function rosterStudent(value, index) {
   if (Object.prototype.hasOwnProperty.call(value, 'subjects')) {
     result.subjects = subjects(value.subjects, path + '.subjects');
     result.subject = result.subjects.join('·');
+  }
+  if (Object.prototype.hasOwnProperty.call(value, 'subscriptions')) {
+    result.subscriptions = subscriptions(value.subscriptions, path + '.subscriptions');
   }
   if (Object.prototype.hasOwnProperty.call(value, 'entryType')) {
     if (!['existing', 'new'].includes(value.entryType)) fail(path + '.entryType', 'existing 또는 new여야 합니다');
@@ -574,7 +658,8 @@ async function boardedStudentConflicts(env, app, document) {
 export async function handleRoster(env, app, body, origin, auth, json) {
   if (app !== 'task') return json({ ok: false, error: '이 기능은 직원 앱에서만 사용할 수 있습니다' }, 400, origin);
   const action = String(body.action || '');
-  if (!['get', 'replace', 'student_get', 'student_create', 'student_update', 'student_delete', 'student_transition'].includes(action)) {
+  if (!['get', 'replace', 'student_get', 'student_create', 'student_update', 'student_delete', 'student_transition',
+    'subscription_session_create'].includes(action)) {
     return json({ ok: false, error: '지원하지 않는 원생 명단 작업입니다' }, 400, origin);
   }
 
@@ -590,6 +675,77 @@ export async function handleRoster(env, app, body, origin, auth, json) {
     const student = document.roster.students.find(item => item.id === studentId);
     if (!student) return json({ ok: false, error: '현재 원생 명단에서 학생을 찾을 수 없습니다' }, 404, origin);
     return json({ ok: true, updatedAt: Number(row.updated_at), student: withoutRosterTeacher(student) }, 200, origin);
+  }
+
+  if (action === 'subscription_session_create') {
+    if (auth.scope !== 'all') return json({ ok: false, error: '구독 수업은 관리자만 생성할 수 있습니다' }, 403, origin);
+    const studentId = String(body.studentId || '');
+    const staffId = String(body.staffId || '');
+    if (!SAFE_ID.test(studentId) || !SAFE_ID.test(staffId)) {
+      return json({ ok: false, error: '학생과 담당 선생님을 다시 선택해 주세요' }, 400, origin);
+    }
+    const row = await env.DB.prepare('SELECT data FROM private_rosters WHERE app=? LIMIT 1').bind(app).first();
+    if (!row) return json({ ok: false, error: '원생 명단이 아직 준비되지 않았습니다' }, 409, origin);
+    let document;
+    try { document = validateRosterDocument(JSON.parse(row.data)); }
+    catch (error) { return json({ ok: false, error: '저장된 원생 데이터 형식이 올바르지 않습니다' }, 500, origin); }
+    const student = document.roster.students.find(item => item.id === studentId);
+    if (!student || rosterTransition(student)) {
+      return json({ ok: false, error: '현재 재원 중인 원생을 선택해 주세요' }, 409, origin);
+    }
+    const type = String(body.subscriptionType || '');
+    if (!subscriptionForStudent(student, type)) {
+      return json({ ok: false, error: '학생 정보에 해당 구독과 구독 시작일을 먼저 저장해 주세요' }, 409, origin);
+    }
+    const staff = await activeStaffRecord(env, app, staffId);
+    if (!staff) return json({ ok: false, error: '활성 담당 선생님을 선택해 주세요' }, 409, origin);
+    const now = Date.now();
+    let task;
+    try {
+      task = subscriptionSessionTask(student, staff, {
+        subscriptionType: type, date: body.date, startTime: body.startTime, endTime: body.endTime,
+        requestId: body.requestId, memo: body.memo
+      }, now, auth.role === 'manager' ? 'manager' : 'admin');
+    } catch (error) {
+      return json({ ok: false, error: String(error && error.message || error) }, 400, origin);
+    }
+    if (task.start < subscriptionForStudent(student, type).startDate) {
+      return json({ ok: false, error: '수업 날짜는 구독 시작일 이후여야 합니다' }, 409, origin);
+    }
+    const existing = await env.DB.prepare('SELECT owner,data FROM tasks WHERE app=? AND id=? LIMIT 1')
+      .bind(app, task.id).first();
+    if (existing) {
+      let stored;
+      try { stored = JSON.parse(existing.data || '{}'); } catch (error) { stored = null; }
+      if (stored && String(existing.owner || '') === staff.id && stored.lessonInstanceType === 'subscription' &&
+          stored.studentId === student.id && stored.subscriptionType === type) {
+        return json({ ok: true, task: stored, idempotent: true }, 200, origin);
+      }
+      return json({ ok: false, error: '같은 생성 요청 ID가 이미 사용되었습니다. 화면을 다시 열어 주세요' }, 409, origin);
+    }
+    const scheduleRevision = await readStudentScheduleRevisionSnapshot(env, app, [student.id]);
+    try { await assertStudentLessonScheduleAvailable(env, app, task); }
+    catch (error) {
+      const payload = studentScheduleConflictPayload(error);
+      if (payload) return json(payload, 409, origin);
+      throw error;
+    }
+    const statements = await studentScheduleRevisionCasStatements(env, app, scheduleRevision, {
+      operation: 'subscription_session_create', source: [task.id, student.id, staff.id, task.start].join('\n'), updatedAt: now
+    });
+    statements.push(env.DB.prepare('INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
+      .bind(app, task.id, staff.id, JSON.stringify(task), now, now));
+    statements.push(await taskWriteCasGuardStatement(env, app, 'subscription_session_task',
+      [task.id, student.id, staff.id, now].join('\n'), now));
+    try { await env.DB.batch(statements); }
+    catch (error) {
+      if (isTaskWriteCasConflict(error)) return json({ ok: false, code: 'SUBSCRIPTION_SESSION_CONFLICT',
+        error: '다른 기기에서 수업 일정이 변경되었습니다. 새로고침 후 다시 생성해 주세요' }, 409, origin);
+      const payload = studentScheduleConflictPayload(error);
+      if (payload) return json(payload, 409, origin);
+      throw error;
+    }
+    return json({ ok: true, task }, 200, origin);
   }
 
   if (action === 'student_delete') {
@@ -703,7 +859,8 @@ export async function handleRoster(env, app, body, origin, auth, json) {
         let lesson;
         try { lesson = JSON.parse(lessonRow.data || '{}'); } catch (error) { continue; }
         const lessonEnd = String(lesson && lesson.end || '');
-        if (!isRegularLessonTask(lesson) || String(lesson.id || '') !== String(lessonRow.id || '') ||
+        if ((!isRegularLessonTask(lesson) && String(lesson.lessonInstanceType || '') !== 'subscription') ||
+            String(lesson.id || '') !== String(lessonRow.id || '') ||
             String(lesson.staffId || '') !== String(lessonRow.owner || '') ||
             String(lesson.studentId || '') !== studentId ||
             (lessonEnd && (!ISO_DATE.test(lessonEnd) || lessonEnd < effectiveDate))) continue;
@@ -889,7 +1046,7 @@ export async function handleRoster(env, app, body, origin, auth, json) {
         const storedStudent = document.roster.students.find(item => item.id === inputId);
         if (storedStudent) {
           input = { ...input };
-          for (const key of ['billingMode', 'sessionCycleStartDate']) {
+          for (const key of ['billingMode', 'sessionCycleStartDate', 'subscriptions']) {
             if (!Object.prototype.hasOwnProperty.call(input, key) && Object.prototype.hasOwnProperty.call(storedStudent, key)) {
               input[key] = storedStudent[key];
             }
@@ -960,7 +1117,7 @@ export async function handleRoster(env, app, body, origin, auth, json) {
     if (action === 'student_update' && previousStudent) {
       const fields = ['name', 'school', 'grade', 'phoneSelf', 'phoneFather', 'phoneMother',
         'registrationDate', 'firstClassDate', 'subject', 'subjects', 'start', 'end', 'reason', 'memo',
-        'billingMode', 'sessionCycleStartDate'];
+        'billingMode', 'sessionCycleStartDate', 'subscriptions'];
       const changedFields = changedStudentFields(previousStudent, nextStudent, fields);
       if (changedFields.length) {
         const eventId = await studentChangeEventId('roster\n' + nextStudent.id + '\n' + expectedUpdatedAt + '\n' + updatedAt);
