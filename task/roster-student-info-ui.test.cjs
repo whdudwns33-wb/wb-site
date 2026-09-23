@@ -30,9 +30,12 @@ test('관리자 기본 정보 목록과 선생님 내 학생 목록의 이름이
 
 test('학생 정보 팝업은 학교·연락처·등록일을 포함하고 모든 값을 escape한다', () => {
   const code = block('function rosterStudentTransition(', 'function showRosterStudentInfo(');
-  const render = new Function('today', 'esc', 'state', 'isLesson', 'isRegularLessonTask', 'staffById', 'staffStudentCompactLabel', `${code}\nreturn rosterStudentInfoHtml;`)(
+  const render = new Function('today', 'esc', 'state', 'isLesson', 'isRegularLessonTask', 'staffById', 'staffStudentCompactLabel',
+    'SUBSCRIPTION_PROGRAMS', 'lessonRegistrationIsoDate', 'isSubscriptionSessionTask', 'session', `${code}\nreturn rosterStudentInfoHtml;`)(
     () => '2026-08-18', escapeHtml, { tasks: [] }, () => true, () => true, () => null,
-    student => [student && student.name, student && student.grade].filter(Boolean).join(' ')
+    student => [student && student.name, student && student.grade].filter(Boolean).join(' '),
+    [{ type: 'assessment', label: '검사구독' }, { type: 'studyforce', label: '스터디포스구독' }],
+    value => /^\d{4}-\d{2}-\d{2}$/.test(String(value || '')), () => false, { isAdmin: false }
   );
   const attack = '<img src=x onerror=alert(1)>';
   const html = render({
@@ -47,6 +50,25 @@ test('학생 정보 팝업은 학교·연락처·등록일을 포함하고 모�
     '등록과목', '신규등록일', '첫 등원일', '과목별 수업 담당', '재원 기간', '내부 메모', '수업 참고']) {
     assert.match(html, new RegExp(label));
   }
+});
+
+test('구독 프로그램은 시작일과 함께 저장하고 관리자만 날짜 지정 1회성 수업을 생성한다', () => {
+  const editor = block('let rosterStudentEditor = null;', '/* ── 신규 학생 30일 적응 관리');
+  const info = block('function rosterStudentSubscriptions(', 'function rosterStudentInfoHtml(');
+  for (const label of ['검사구독', '스터디포스구독']) assert.match(source, new RegExp(label));
+  assert.match(editor, /data-rse-subscription/);
+  assert.match(editor, /data-rse-subscription-date/);
+  assert.match(editor, /subscriptions: subscriptions/);
+  assert.match(editor, /action: 'subscription_session_create'/);
+  assert.match(editor, /data-subscription-session-date/);
+  assert.match(editor, /data-subscription-session-staff/);
+  assert.match(editor, /data-subscription-session-start/);
+  assert.match(editor, /data-subscription-session-end/);
+  assert.match(info, /session\.isAdmin/);
+  assert.match(info, /구독 수업 기록/);
+  assert.match(source, /const isRegularLessonTask = t =>[\s\S]{0,260}!isSubscriptionSessionTask\(t\)/);
+  assert.match(source, /function sessionModeLessonTask\(task\)[\s\S]{0,120}!isSubscriptionSessionTask\(task\)/);
+  assert.match(source, /\.task\.is-subscription-session/);
 });
 
 test('원생 탭은 휴원생과 퇴원생을 한 줄 요약의 접힌 목록으로 분리한다', () => {

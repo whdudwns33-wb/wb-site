@@ -102,7 +102,7 @@ function isLessonTask(task) {
 }
 
 function isRegularLessonTask(task) {
-  return isLessonTask(task) && String(task.lessonInstanceType || '') !== 'makeup' &&
+  return isLessonTask(task) && !['makeup', 'subscription'].includes(String(task.lessonInstanceType || '')) &&
     !String(task.makeupCaseId || '').trim();
 }
 
@@ -542,7 +542,7 @@ export async function handleLessonChangeReview(env, app, body, origin, auth, jso
          'AND duplicate.owner=? AND json_valid(duplicate.data) AND json_type(duplicate.data)=\'object\' ' +
          'AND json_extract(duplicate.data,\'$.studentId\')=? ' +
          'AND COALESCE(json_extract(duplicate.data,\'$.deleted\'),0)=0 ' +
-         'AND COALESCE(CAST(json_extract(duplicate.data,\'$.lessonInstanceType\') AS TEXT),\'\')<>\'makeup\' ' +
+         'AND COALESCE(CAST(json_extract(duplicate.data,\'$.lessonInstanceType\') AS TEXT),\'\') NOT IN (\'makeup\',\'subscription\') ' +
          'AND COALESCE(CAST(json_extract(duplicate.data,\'$.makeupCaseId\') AS TEXT),\'\')=\'\' ' +
          'AND (json_extract(duplicate.data,\'$.taskKind\')=\'lesson_instruction\' ' +
          'OR json_type(duplicate.data,\'$.lessonFormVersion\') IS NOT NULL ' +
