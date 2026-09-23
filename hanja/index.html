@@ -52,8 +52,8 @@
     .btn:active:not(:disabled) { transform: translateY(1px); }
     .btn[hidden] { display: none; }
     .tabbar button[hidden] { display: none; }
-    details.hanja-help { margin-top: 12px; text-align: left; border-top: 1px solid var(--line); padding-top: 10px; }
-    details.hanja-help summary { cursor: pointer; color: var(--ink-soft); font-size: .84rem; }
+    details.hanja-help { margin-top: 12px; text-align: center; border-top: 1px solid var(--line); padding-top: 10px; }
+    details.hanja-help summary { text-align: left; cursor: pointer; color: var(--ink-soft); font-size: .84rem; }
     .row { display: flex; gap: 10px; } .row > * { flex: 1; }
     .row.wrap { flex-wrap: wrap; } .row.wrap > * { flex: none; }
     h2.sec { font-size: 1.02rem; font-weight: 900; color: var(--ink-strong); margin: 24px 0 10px; }
@@ -117,6 +117,8 @@
     .example mark { background: #FFE9A8; color: inherit; border-radius: 3px; padding: 0 2px; }
     .say-btn { display: inline-flex; align-items: center; gap: 5px; border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; font-size: .82rem; font-weight: 700; color: var(--ink-strong); background: var(--card); margin: 6px 3px 0; }
     .say-btn.on { background: var(--red-soft); border-color: #E4B8B0; color: var(--deep); }
+    .say-status { display: block; margin: 6px 0; color: var(--ink-soft); font-size: .8rem; }
+    .say-status[hidden] { display: none; }
     .cchip { display: inline-block; font-family: var(--serif); font-size: 1.1rem; background: var(--card-2); border-radius: 8px; padding: 2px 8px; margin: 2px; }
 
     /* 따라쓰기 */
@@ -129,12 +131,18 @@
     .trace-tip { text-align: center; font-size: .84rem; color: var(--ink-soft); margin: 8px 0; min-height: 1.4em; }
     .trace-tip.warn { color: var(--red); font-weight: 700; }
     .trace-tip.good { color: var(--green); font-weight: 700; }
-    .trace-btns { max-width: 320px; margin: 0 auto; }
+    .trace-btns { max-width: 320px; margin: 0 auto; flex-wrap: wrap; gap: 8px; }
+    .trace-btns > * { flex: 1 1 130px; }
     .trace-mode { text-align: center; margin-bottom: 6px; }
+    .trace-reference { display: flex; align-items: center; gap: 12px; max-width: 320px; margin: 8px auto 12px; }
+    .trace-reference[hidden] { display: none; }
+    .trace-reference canvas { width: 112px; flex: 0 0 112px; margin: 0; }
+    .trace-reference .trace-tip { text-align: left; }
 
     /* 훈련 */
     .qhead { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
-    .qhead .prog { margin-left: auto; font-size: .78rem; color: var(--ink-soft); font-weight: 700; font-variant-numeric: tabular-nums; }
+    .qhead .prog { margin-left: auto; font-size: .78rem; color: var(--ink-soft); font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; flex-shrink: 0; }
+    .qhead > .chip, .qhead > button { flex-shrink: 0; }
     .prompt { font-size: 1.12rem; font-weight: 800; color: var(--ink-strong); white-space: pre-line; line-height: 1.5; margin-bottom: 14px; }
     .prompt.big { font-family: var(--serif); font-size: 3.4rem; font-weight: 500; text-align: center; line-height: 1.2; }
     .prompt .sub { display: block; font-family: "Noto Sans KR", sans-serif; font-size: .95rem; font-weight: 700; color: var(--ink-soft); margin-top: 6px; }
@@ -155,8 +163,9 @@
 
     .sheet-back { position: fixed; inset: 0; background: rgba(31,23,18,.35); z-index: 50; display: none; align-items: flex-end; justify-content: center; }
     .sheet-back.show { display: flex; }
-    .sheet { background: var(--card); width: 100%; max-width: 640px; max-height: 88vh; overflow: auto; border-radius: 18px 18px 0 0; padding: 16px 16px calc(20px + env(safe-area-inset-bottom)); }
-    .sheet .close { float: right; font-size: 1.2rem; color: var(--ink-soft); padding: 2px 8px; }
+    .sheet { position: relative; background: var(--card); width: 100%; max-width: 640px; max-height: 88vh; overflow: auto; border-radius: 18px 18px 0 0; padding: 16px 16px calc(20px + env(safe-area-inset-bottom)); }
+    .sheet .close { position: absolute; right: 16px; top: 16px; font-size: 1.2rem; color: var(--ink-soft); padding: 2px 8px; }
+    .sheet .wcard > .word { padding: 0 30px; }
     .kv { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #F1ECE1; font-size: .9rem; }
     .kv:last-child { border-bottom: none; }
     .kv b { color: var(--ink-strong); }
@@ -212,7 +221,45 @@
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function now() { return Date.now(); }
   function toast(msg) { var el = $('#toast'); el.textContent = msg; el.classList.add('show'); clearTimeout(toast._t); toast._t = setTimeout(function () { el.classList.remove('show'); }, 2200); }
-  function say(text) { try { WBVoice.unlock(); WBVoice.speak(text, { lang: 'ko-KR', rate: 0.95 }); } catch (e) {} }
+  var SPEECH = null;
+  function speechStatus(play, label, message) {
+    if (!play.button) return;
+    play.button.textContent = label;
+    play.button.classList.toggle('on', SPEECH === play);
+    play.button.setAttribute('aria-pressed', String(SPEECH === play));
+    var status = play.button.nextElementSibling;
+    if (status) { status.textContent = message || ''; status.hidden = !message; }
+  }
+  function stopSay() {
+    var old = SPEECH; SPEECH = null;
+    if (old) {
+      try { WBVoice.stop(); } catch (e) {}
+      speechStatus(old, '🔊 들어보기', '');
+    }
+  }
+  function say(text, button) {
+    var same = SPEECH && button && SPEECH.button === button;
+    stopSay();
+    if (same) return;
+    var play = { button: button }; SPEECH = play;
+    function finish(message) {
+      if (SPEECH !== play) return;
+      SPEECH = null; speechStatus(play, '🔊 들어보기', message);
+    }
+    function failed(why) {
+      var message = why === 'unsupported' ? '이 브라우저에서는 소리 읽기를 지원하지 않아요. Chrome이나 Safari에서 열어 주세요.' :
+        why === 'language-unavailable' || why === 'voice-unavailable' ? '한국어 음성을 사용할 수 없어요. 휴대폰의 글자 읽어주기 설정에서 한국어 음성을 확인해 주세요.' :
+        '소리 재생을 시작하지 못했어요. 휴대폰 미디어 음량과 한국어 음성 설정을 확인한 뒤 다시 눌러 주세요.';
+      finish(message);
+    }
+    speechStatus(play, '⏹ 준비 중 · 취소', '');
+    try {
+      if (typeof WBVoice === 'undefined' || !WBVoice.ttsSupported()) { failed('unsupported'); return; }
+      WBVoice.speak(text, { lang: 'ko-KR', rate: 0.95, startTimeout: 5000,
+        onstart: function () { if (SPEECH === play) speechStatus(play, '⏹ 듣기 멈추기', ''); },
+        onend: function () { finish(''); }, onerror: failed });
+    } catch (e) { failed('failed'); }
+  }
   function fmtDue(due) { var d = due - now(); if (d <= 0) return '지금'; if (d < 3600000) return Math.max(1, Math.round(d / 60000)) + '분 후'; if (d < DAY) return Math.round(d / 3600000) + '시간 후'; return Math.round(d / DAY) + '일 후'; }
   function pct(a, b) { return b ? Math.round(a * 100 / b) : 0; }
 
@@ -497,6 +544,7 @@
     return { words: !b || !!b.words.length, chars: true };
   }
   function render(view) {
+    stopSay();
     if (view && view !== curView) { traceStop(); }
     curView = view || curView;
     var has = syncTabs();
@@ -520,13 +568,14 @@
     if (quit) quit.addEventListener('click', function () { if (leaveStudy()) render('train'); });
   }
   function sheet(html, onOpen) {
+    stopSay();
     var back = $('#sheetBack'), el = $('#sheet');
     el.innerHTML = '<button class="close" id="sheetClose" aria-label="닫기">✕</button>' + html;
     back.classList.add('show');
     $('#sheetClose').addEventListener('click', closeSheet);
     if (onOpen) onOpen(el);
   }
-  function closeSheet() { $('#sheetBack').classList.remove('show'); $('#sheet').innerHTML = ''; traceStop(); }
+  function closeSheet() { stopSay(); $('#sheetBack').classList.remove('show'); $('#sheet').innerHTML = ''; traceStop(); }
   $('#sheetBack').addEventListener('click', function (e) { if (e.target === this) closeSheet(); });
 
   function demoNotice() {
@@ -727,7 +776,7 @@
     return '<div class="wcard"><div class="word">' + esc(w.word) + '</div>' +
       '<div class="meaning">' + esc(w.meaning) + '</div>' + exampleHtml(w) +
       (w.syn && w.syn.length ? '<p class="muted">비슷한 말: ' + esc(w.syn.join(', ')) + '</p>' : '') + sceneHtml(w) +
-      '<div><button class="say-btn" data-say="' + esc(w.word + '. ' + w.meaning + (w.example ? '. ' + w.example : '')) + '">🔊 들어보기</button></div>' +
+      '<div><button class="say-btn" aria-pressed="false" data-say="' + esc(w.word + '. ' + w.meaning + (w.example ? '. ' + w.example : '')) + '">🔊 들어보기</button><span class="say-status" role="status" hidden></span></div>' +
       (w.hanja ? '<details class="hanja-help"><summary>한자로 뜻 더 알아보기 · 선택</summary><div class="hanja">' + esc(w.hanja) + '</div>' + partsHtml(w) +
         '<button class="say-btn" data-word-trace="' + esc(w._sid) + '">한자 따라쓰기</button></details>' : '') +
       (w.origin ? '<details class="hanja-help"><summary>한자·원어 참고 · 선택</summary><p>' + esc(w.origin) + '</p></details>' : '') + '</div>';
@@ -742,7 +791,7 @@
     return '';
   }
   function bindSay(root) {
-    root.querySelectorAll('[data-say]').forEach(function (b) { b.addEventListener('click', function () { say(b.dataset.say); }); });
+    root.querySelectorAll('[data-say]').forEach(function (b) { b.addEventListener('click', function () { say(b.dataset.say, b); }); });
     root.querySelectorAll('[data-ai]').forEach(function (b) { b.addEventListener('click', function () { aiMnemo(b.dataset.ai); }); });
     root.querySelectorAll('[data-word-trace]').forEach(function (b) { b.addEventListener('click', function () {
       var it = resolve(b.dataset.wordTrace); if (!it) return;
@@ -805,7 +854,7 @@
       '<div class="meaning" style="font-weight:800">' + esc(c.hun && c.eum ? c.hun + ' ' + c.eum : '훈음 미상') + '</div>' +
       '<p class="muted" style="margin:0">' + (c.strokes ? c.strokes + '획' : '획수 미상') + (c.medians ? ' · 획순 안내 있음' : '') + '</p>' +
       (words.length ? '<p class="muted" style="margin:8px 0 0;font-size:.84rem">이 글자가 든 낱말: ' + words.map(esc).join(', ') + '</p>' : '') +
-      '<div><button class="say-btn" data-say="' + esc((c.hun || '') + ' ' + (c.eum || '')) + '">🔊 들어보기</button></div></div>';
+      (c.hun && c.eum ? '<div><button class="say-btn" aria-pressed="false" data-say="' + esc(c.hun + ' ' + c.eum) + '">🔊 들어보기</button><span class="say-status" role="status" hidden></span></div>' : '') + '</div>';
   }
   function charSheet(item) {
     sheet(charCardHtml(item.c) + stateHtml(item) + '<div class="row" style="margin-top:12px"><button class="btn blue" id="shTrace">✍️ 따라쓰기</button></div>', function (el) {
@@ -844,12 +893,13 @@
     } catch (e) { toast(e.message || '교재를 열지 못했어요'); }
   }
   function learnRender(el) {
+    stopSay();
     var it = LEARN.items[LEARN.i];
     if (!it) { learnDone(el); return; }
     var head = '<div class="qhead"><span class="chip t-a">' + (LEARN.check ? '오답 보충' : it.kind === 'word' ? '낱말 학습' : '한자 학습') + '</span><span class="muted">' + esc(bookTitle(LEARN.book.id)) + ' · ' + esc(unitTitleOf(LEARN.book.id, LEARN.unit)) + '</span><span class="prog">' + (LEARN.i + 1) + ' / ' + LEARN.items.length + '</span><button class="btn ghost small" id="studyQuit">그만두기</button></div>';
     if (LEARN.phase === 'card') {
       el.innerHTML = '<div class="card">' + head + (it.kind === 'word' ? wordCardHtml(it.w) : charCardHtml(it.c)) +
-        (it.kind === 'char' ? '<button class="say-btn" id="lnTrace">지금 한 번 써 보기</button>' : '') +
+        (it.kind === 'char' ? '<div style="text-align:center"><button class="say-btn" id="lnTrace">지금 한 번 써 보기</button></div>' : '') +
         '<button class="btn primary big" id="lnNext" style="margin-top:14px">뜻을 읽었어요 · 확인하기</button></div>';
       bindSay(el);
       $('#lnNext').addEventListener('click', function () { LEARN.phase = 'check'; learnRender(el); });
@@ -1015,9 +1065,11 @@
 
   function tracePanelHtml() {
     return '<div class="card trace" id="trPanel"><div class="trace-head"><b id="trCh"></b><span id="trHun"></span><i id="trRep"></i></div>' +
-      '<div class="trace-mode" id="trMode"></div><p class="trace-tip" id="trLesson"></p><canvas id="trCv" aria-label="따라쓰기 칸"></canvas>' +
+      '<div class="trace-mode" id="trMode"></div><p class="trace-tip" id="trLesson"></p>' +
+      '<div class="trace-reference" id="trReference"><canvas id="trModel" aria-label="모범 글자와 현재 획 안내"></canvas><div><b>모범 글자</b><p class="trace-tip" id="trModelTip">번호가 있는 점에서 시작해 화살표까지 그어요.</p></div></div><canvas id="trCv" aria-label="따라쓰기 칸"></canvas>' +
       '<p class="trace-tip" id="trStroke" aria-live="polite"></p><p class="trace-tip" id="trTip" role="status"></p>' +
-      '<div class="row trace-btns"><button class="btn ghost small" id="trClear">지우기</button><button class="btn ghost small" id="trPeek" hidden>겹쳐 보기</button>' +
+      '<div class="row trace-btns"><button class="btn ghost small" id="trUndo">한 획 지우기</button><button class="btn ghost small" id="trClear">전체 지우기</button><button class="btn ghost small" id="trPeek" hidden>모범·안내 보기</button>' +
+      '<button class="btn ghost small" id="trStrokeDemo" hidden>이번 획 보기</button>' +
       '<button class="btn ghost small" id="trAnim" hidden>시범 다시 보기</button><button class="btn primary small" id="trNext">확인</button></div>' +
       '<div class="row trace-btns" style="margin-top:8px"><button class="btn ghost small" id="trQuit">그만 쓰기</button></div></div>';
   }
@@ -1031,8 +1083,10 @@
     wrap.innerHTML = tracePanelHtml();
     TRACE = { cv: $('#trCv'), ctx: null, size: 0, plan: WBHTRACE.plan(list.join('')), step: 0, cur: null, strokes: [], done: [], mode: 'shape', phase: 'write', demoSeen: false, peek: false, anim: null, onDone: onDone || null, judged: null, retries: 0, completed: { order: 0, shape: 0 }, skipped: 0 };
     traceBindCanvas();
-    $('#trClear').addEventListener('click', function () { if (!TRACE || TRACE.anim || TRACE.phase === 'demo') return; TRACE.strokes = []; TRACE.done = []; TRACE.judged = null; traceTip('현재 단계에서 다시 써 보세요.', ''); traceUpdateNext(); tracePaint(); });
-    $('#trPeek').addEventListener('click', function () { if (!TRACE || TRACE.anim || TRACE.phase === 'demo') return; TRACE.peek = !TRACE.peek; this.textContent = TRACE.peek ? '안내 숨기기' : '겹쳐 보기'; traceUpdateLesson(); tracePaint(); });
+    $('#trClear').addEventListener('click', function () { traceErase(true); });
+    $('#trUndo').addEventListener('click', function () { traceErase(false); });
+    $('#trPeek').addEventListener('click', function () { if (!TRACE || TRACE.anim || TRACE.drawing || TRACE.phase === 'demo') return; TRACE.peek = !TRACE.peek; this.textContent = TRACE.peek ? '모범·안내 숨기기' : '모범·안내 보기'; traceUpdateLesson(); tracePaint(); });
+    $('#trStrokeDemo').addEventListener('click', function () { if (TRACE && TRACE.phase === 'write') traceAnimate(TRACE.done.length); });
     $('#trAnim').addEventListener('click', function () { traceAnimate(); });
     $('#trNext').addEventListener('click', traceNext);
     $('#trQuit').addEventListener('click', function () { var cb = TRACE && TRACE.onDone; traceStop(); if (cb) cb(); else renderChars(); });
@@ -1046,17 +1100,27 @@
     var w = $('#trPanelWrap'); if (w) w.innerHTML = '';
   }
   function traceChar() { return TRACE && TRACE.cur ? LIB.chars[TRACE.cur.ch] : null; }
+  function traceErase(all) {
+    if (!TRACE || TRACE.anim || TRACE.drawing || TRACE.phase === 'demo' || !TRACE.strokes.length) return;
+    if (all) { TRACE.strokes = []; TRACE.done = []; }
+    else { TRACE.strokes.pop(); if (TRACE.mode === 'order') TRACE.done.pop(); }
+    /* 이미 성공한 회차를 다시 써도 새 성공 횟수로 세지 않는다. */
+    TRACE.judged = null; TRACE.retries = 0;
+    traceTip(all ? '현재 단계에서 다시 써 보세요.' : '마지막 한 획을 지웠어요. 그 획부터 다시 써 보세요.', '');
+    traceUpdateNext(); tracePaint();
+  }
   function traceShow() {
     var cur = TRACE.plan[TRACE.step];
-    TRACE.cur = cur; TRACE.strokes = []; TRACE.done = []; TRACE.peek = false; TRACE.judged = null; TRACE.retries = 0; TRACE.repCounted = false;
+    TRACE.cur = cur; TRACE.strokes = []; TRACE.done = []; TRACE.drawing = false; TRACE.peek = false; TRACE.judged = null; TRACE.retries = 0; TRACE.repCounted = false;
     var c = traceChar();
     TRACE.mode = c && c.medians ? 'order' : 'shape';
     TRACE.phase = TRACE.mode === 'order' && cur.rep === 0 ? 'demo' : 'write'; TRACE.demoSeen = false;
     $('#trCh').textContent = cur.ch;
     $('#trHun').textContent = c && c.hun && c.eum ? c.hun + ' ' + c.eum + (c.strokes ? ' · ' + c.strokes + '획' : '') : (c && c.strokes ? c.strokes + '획' : '');
     $('#trMode').innerHTML = TRACE.mode === 'order' ? '<span class="chip t-c">획순 배우기</span>' : '<span class="chip t-g">모양 연습</span> <span class="muted" style="font-size:.76rem">획순 자료 없음 · 순서와 방향은 확인하지 않아요</span>';
-    $('#trPeek').hidden = !cur.last; $('#trPeek').textContent = '겹쳐 보기';
+    $('#trPeek').hidden = !cur.last; $('#trPeek').textContent = '모범·안내 보기';
     $('#trAnim').hidden = TRACE.mode !== 'order';
+    $('#trStrokeDemo').hidden = TRACE.mode !== 'order';
     traceTip(cur.rep === 0 ? (TRACE.mode === 'order' ? '먼저 움직이는 점과 획의 순서를 보세요.' : '옅은 글자를 그대로 따라 그어 보세요.')
       : cur.rep === 1 ? '더 옅어졌어요 — 획이 어디로 가는지 떠올리며.' : '이번엔 안내가 없어요. 기억해서 써 보세요.', '');
     traceUpdateNext();
@@ -1069,6 +1133,7 @@
     var stage = TRACE.phase === 'demo' ? '1. 획순 시범' : (order ? ['2. 한 획씩 따라 쓰기', '3. 흐릿한 안내로 쓰기', '4. 혼자 쓰기'][cur.rep] : ['1. 모양 따라 쓰기', '2. 흐릿한 안내로 쓰기', '3. 혼자 쓰기'][cur.rep]);
     $('#trRep').textContent = stage;
     $('#trLesson').textContent = order ? '시범 → 한 획씩 → 흐릿하게 → 혼자 쓰기' : '모양 따라 쓰기 → 흐릿하게 → 혼자 쓰기';
+    if (cur.last && TRACE.peek) $('#trLesson').textContent += ' · 지금은 모범·안내를 보고 있어요.';
     var hint = '';
     if (order) {
       var i = demoStroke == null ? TRACE.done.length : demoStroke;
@@ -1079,10 +1144,12 @@
   }
   function traceUpdateNext() {
     var b = $('#trNext'); if (!b || !TRACE) return;
-    var busy = !!TRACE.anim;
-    $('#trClear').disabled = busy || TRACE.phase === 'demo'; $('#trPeek').disabled = busy; $('#trAnim').disabled = busy;
+    var busy = !!TRACE.anim || !!TRACE.drawing, demo = TRACE.phase === 'demo';
+    $('#trClear').disabled = $('#trUndo').disabled = busy || demo || !TRACE.strokes.length;
+    $('#trPeek').disabled = busy; $('#trAnim').disabled = busy;
+    $('#trStrokeDemo').disabled = busy || demo || TRACE.mode !== 'order' || TRACE.done.length >= traceChar().medians.length;
     traceUpdateLesson();
-    if (busy) { b.disabled = true; b.textContent = '시범을 보는 중…'; return; }
+    if (busy) { b.disabled = true; b.textContent = TRACE.anim ? '시범을 보는 중…' : '획을 쓰는 중…'; return; }
     if (TRACE.phase === 'demo') { b.disabled = !TRACE.demoSeen; b.textContent = '한 획씩 따라 쓰기 시작'; return; }
     var last = TRACE.step === TRACE.plan.length - 1;
     if (TRACE.mode === 'order') { var c = traceChar(); var doneAll = c && TRACE.done.length >= c.medians.length; b.textContent = doneAll ? (last ? '다 썼어요' : '다음 →') : '다음 획을 그어요'; b.disabled = !doneAll; }
@@ -1116,9 +1183,33 @@
     c.stroke(); c.restore();
   }
   function med(m) { return m.map(function (p) { return { x: p[0], y: p[1] }; }); }
-  function tracePaint() {
+  function paintStrokeGuide(c, s, pts, index, alpha) {
+    paintPoly(c, s, pts, { color: '#B23A2E', width: Math.max(5, s * 0.05), alpha: alpha, dash: [8, 7] });
+    c.save(); c.globalAlpha = alpha; c.fillStyle = '#B23A2E'; c.beginPath();
+    c.arc(pts[0].x * s, pts[0].y * s, Math.max(9, s * 0.029), 0, Math.PI * 2); c.fill();
+    c.fillStyle = '#FFFDF8'; c.font = 'bold ' + Math.max(10, Math.round(s * 0.036)) + 'px sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillText(String(index + 1), pts[0].x * s, pts[0].y * s);
+    c.fillStyle = '#B23A2E';
+    var e = pts[pts.length - 1], p = pts[pts.length - 2] || pts[0], ang = Math.atan2(e.y - p.y, e.x - p.x), L = Math.max(10, s * 0.065);
+    c.translate(e.x * s, e.y * s); c.rotate(ang); c.beginPath(); c.moveTo(0, 0); c.lineTo(-L, -L * 0.55); c.lineTo(-L, L * 0.55); c.closePath(); c.fill(); c.restore();
+  }
+  function tracePaintModel(index) {
+    var box = $('#trReference'); box.hidden = TRACE.cur.last && !TRACE.peek && !TRACE.anim;
+    if (box.hidden) return;
+    var cv = $('#trModel'), s = 112, dpr = Math.min(3, window.devicePixelRatio || 1), ch = traceChar();
+    cv.width = cv.height = Math.round(s * dpr);
+    var c = cv.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0); paintGrid(c, s);
+    if (TRACE.mode === 'order') {
+      ch.medians.forEach(function (m) { paintPoly(c, s, med(m), { color: '#2B2118', width: 6, alpha: 0.35 }); });
+      var i = index == null ? TRACE.done.length : index;
+      if (i < ch.medians.length) paintStrokeGuide(c, s, med(ch.medians[i]), i, 1);
+      $('#trModelTip').textContent = i < ch.medians.length ? (i + 1) + ' / ' + ch.medians.length + '획 · 번호가 있는 점에서 화살표까지' : '모든 획을 썼어요.';
+    } else { paintGlyph(c, s, 1); $('#trModelTip').textContent = '획순 자료가 없어 모양만 참고해요.'; }
+  }
+  function tracePaint(demoStroke) {
     var c = TRACE && TRACE.ctx, s = TRACE && TRACE.size, cur = TRACE && TRACE.cur;
     if (!c || !cur) return;
+    tracePaintModel(demoStroke);
     c.clearRect(0, 0, s, s);
     paintGrid(c, s);
     var a = TRACE.peek ? 0.3 : WBHTRACE.guideAlpha(cur.rep);
@@ -1133,10 +1224,7 @@
       var next = -1; for (var i2 = 0; i2 < ch.medians.length; i2++) if (TRACE.done.indexOf(i2) < 0) { next = i2; break; }
       if (!TRACE.anim && TRACE.phase !== 'demo' && next >= 0 && (a > 0 || TRACE.peek)) {
         var pts = med(ch.medians[next]);
-        paintPoly(c, s, pts, { color: '#B23A2E', width: w, alpha: TRACE.peek ? 0.55 : (cur.rep === 0 ? 0.45 : 0.22), dash: [8, 7] });
-        c.save(); c.globalAlpha = cur.rep === 0 ? 0.9 : 0.5; c.fillStyle = '#B23A2E'; c.beginPath(); c.arc(pts[0].x * s, pts[0].y * s, Math.max(5, s * 0.022), 0, Math.PI * 2); c.fill();
-        var e = pts[pts.length - 1], p = pts[pts.length - 2] || pts[0], ang = Math.atan2(e.y - p.y, e.x - p.x), L = Math.max(8, s * 0.035);
-        c.translate(e.x * s, e.y * s); c.rotate(ang); c.beginPath(); c.moveTo(0, 0); c.lineTo(-L, -L * 0.55); c.lineTo(-L, L * 0.55); c.closePath(); c.fill(); c.restore();
+        paintStrokeGuide(c, s, pts, next, TRACE.peek ? 0.8 : (cur.rep === 0 ? 0.8 : 0.35));
       }
     } else {
       paintGlyph(c, s, a);
@@ -1144,24 +1232,29 @@
     if (!TRACE.anim) TRACE.strokes.forEach(function (st) { paintPoly(c, s, st, { color: '#2B2118', width: Math.max(4, s * 0.034) }); });
   }
   function traceBindCanvas() {
-    var session = TRACE, cv = TRACE.cv, cur = null;
+    var session = TRACE, cv = TRACE.cv, cur = null, pointerId = null;
     function pt(e) { var r = cv.getBoundingClientRect(); return { x: Math.max(0, Math.min(1, (e.clientX - r.left) / (r.width || 1))), y: Math.max(0, Math.min(1, (e.clientY - r.top) / (r.height || 1))) }; }
     function seg(a, b) { var c = TRACE.ctx, s = TRACE.size; c.save(); c.strokeStyle = '#2B2118'; c.lineWidth = Math.max(4, s * 0.034); c.lineCap = 'round'; c.lineJoin = 'round'; c.beginPath(); c.moveTo(a.x * s, a.y * s); c.lineTo(b.x * s + (a === b ? 0.1 : 0), b.y * s); c.stroke(); c.restore(); }
     cv.addEventListener('pointerdown', function (e) {
-      if (!e.isPrimary || TRACE !== session || TRACE.anim || TRACE.phase === 'demo' || (TRACE.mode === 'order' && TRACE.done.length >= traceChar().medians.length)) return;
+      if (!e.isPrimary || cur || TRACE !== session || TRACE.anim || TRACE.phase === 'demo' || (TRACE.mode === 'order' && TRACE.done.length >= traceChar().medians.length)) return;
       e.preventDefault();
       try { cv.setPointerCapture(e.pointerId); } catch (err) {}
-      var p = pt(e); cur = [p]; TRACE.strokes.push(cur); seg(p, p);
-      if (TRACE.mode === 'shape') { TRACE.judged = null; traceUpdateNext(); }
+      var p = pt(e); cur = [p]; pointerId = e.pointerId; TRACE.drawing = true; TRACE.strokes.push(cur); seg(p, p);
+      if (TRACE.mode === 'shape') TRACE.judged = null;
+      traceUpdateNext();
       traceTip('', '');
     });
-    cv.addEventListener('pointermove', function (e) { if (!cur || !e.isPrimary || TRACE !== session || TRACE.anim) return; e.preventDefault(); var p = pt(e); seg(cur[cur.length - 1], p); cur.push(p); });
-    function up() {
-      if (!cur) return;
+    cv.addEventListener('pointermove', function (e) { if (!cur || e.pointerId !== pointerId || !e.isPrimary || TRACE !== session || TRACE.anim) return; e.preventDefault(); var p = pt(e); seg(cur[cur.length - 1], p); cur.push(p); });
+    function up(e) {
+      if (!cur || e.pointerId !== pointerId) return;
       var st = cur; cur = null;
-      if (TRACE === session && !TRACE.anim && TRACE.mode === 'order') traceJudgeStroke(st);
+      if (TRACE !== session) return;
+      TRACE.drawing = false;
+      if (e.type === 'pointercancel' || e.type === 'lostpointercapture') { TRACE.strokes.pop(); tracePaint(); }
+      else if (!TRACE.anim && TRACE.mode === 'order') traceJudgeStroke(st);
+      traceUpdateNext();
     }
-    ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (ev) { cv.addEventListener(ev, up); });
+    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(function (ev) { cv.addEventListener(ev, up); });
   }
   /* 획순 모드 — 방금 그은 획 하나를 판정한다 */
   function traceJudgeStroke(st) {
@@ -1199,7 +1292,7 @@
   }
   function traceRepDone() {
     var ch = traceChar();
-    if (!ch || TRACE.repCounted || TRACE.anim || TRACE.phase === 'demo') return;   /* 시범과 중복 확인은 쓰기 횟수가 아니다 */
+    if (!ch || TRACE.repCounted || TRACE.anim || TRACE.drawing || TRACE.phase === 'demo') return;   /* 시범과 중복 확인은 쓰기 횟수가 아니다 */
     if (TRACE.mode === 'order' ? TRACE.done.length !== ch.medians.length : !TRACE.judged || TRACE.judged.level === 'retry' || TRACE.judged.forced) return;
     TRACE.repCounted = true;
     TRACE.completed[TRACE.mode] += 1;
@@ -1213,7 +1306,7 @@
     bumpStreak(); save();
   }
   function traceNext() {
-    if (!TRACE || TRACE.anim) return;
+    if (!TRACE || TRACE.anim || TRACE.drawing) return;
     if (TRACE.phase === 'demo') {
       if (!TRACE.demoSeen) return;
       TRACE.phase = 'write'; traceTip('색 안내선의 점에서 시작해 화살표까지 한 번에 그어요.', ''); traceUpdateNext(); tracePaint(); return;
@@ -1243,22 +1336,24 @@
     $('#trClose').addEventListener('click', function () { wrap.innerHTML = ''; if (cb) cb(); });
   }
   /* 획순 보기 — 중심선을 획 순서대로 그려 보여 준다(점이 이동). 보는 동안은 그을 수 없다 */
-  function traceAnimate() {
-    var ch = traceChar(); if (!ch || !ch.medians || TRACE.anim) return;
+  function traceAnimate(single) {
+    var ch = traceChar(); if (!ch || !ch.medians || TRACE.anim || TRACE.drawing) return;
+    var start = single == null ? 0 : single, end = single == null ? ch.medians.length : start + 1;
+    if (start < 0 || start >= ch.medians.length) return;
     var lines = ch.medians.map(function (m) { return WBHTRACE.resample(med(m), 24); });
     var session = TRACE, step = TRACE.step, t0 = null, perStroke = 850;
     function frame(ts) {
       /* 취소 뒤 늦게 도착한 콜백이 새 글자나 다른 학생 쓰기판을 바꾸지 않게 한다. */
       if (TRACE !== session || TRACE.step !== step || !TRACE.anim) return;
       if (t0 === null) t0 = ts;
-      var elapsed = ts - t0, si = Math.floor(elapsed / perStroke);
-      if (si >= lines.length) {
-        TRACE.anim = null; TRACE.demoSeen = true; traceUpdateNext(); tracePaint();
+      var elapsed = ts - t0, si = start + Math.floor(elapsed / perStroke);
+      if (si >= end) {
+        TRACE.anim = null; if (single == null) TRACE.demoSeen = true; traceUpdateNext(); tracePaint();
         traceTip(TRACE.phase === 'demo' ? '시범을 다 봤어요. 이제 한 획씩 따라 써 보세요.' : '쓰던 단계로 돌아왔어요. 다음 획부터 이어 써 보세요.', ''); return;
       }
       var pi = Math.min(23, Math.floor((elapsed % perStroke) / 26));
       var c = TRACE.ctx, s = TRACE.size;
-      tracePaint();
+      tracePaint(si);
       traceUpdateLesson(si);
       for (var i = 0; i < si; i++) paintPoly(c, s, lines[i], { color: '#B23A2E', width: Math.max(6, s * 0.05), alpha: 0.75 });
       var cur = lines[si].slice(0, pi + 1);
@@ -1267,7 +1362,7 @@
       c.save(); c.fillStyle = '#2B2118'; c.beginPath(); c.arc(last.x * s, last.y * s, Math.max(5, s * 0.024), 0, Math.PI * 2); c.fill(); c.restore();
       TRACE.anim = requestAnimationFrame(frame);
     }
-    traceTip('획순을 보는 중…', '');
+    traceTip(single == null ? '획순을 보는 중…' : (start + 1) + '번째 획만 보는 중… 보고 나서 직접 써 보세요.', '');
     TRACE.anim = requestAnimationFrame(frame);
     traceUpdateNext();
   }
@@ -1276,12 +1371,13 @@
   /* ── 훈련 ── 오늘 복습(due) · 단원 · 단어장 전체 · 한자만. 문항은 quiz.js, 판정은 SRS 로 */
   var TRAIN = null, TRAIN_MISSING = 0;
   function questionRender(el, head, q, onAnswer, opts) {
+    stopSay();
     opts = opts || {};
     var bigText = q.big ? (q.ch || q.word || '') : '';
     var promptHtml = bigText ? '<div class="prompt big">' + esc(bigText) + '<span class="sub">' + esc(q.prompt) + '</span></div>' : '<div class="prompt">' + esc(q.prompt) + '</div>';
     var body;
     if (q.write) body = '<div class="trace" style="margin-top:0"><canvas id="qCv" aria-label="쓰기 칸"></canvas><p class="trace-tip" id="qTip">빈 칸에 손가락으로 써 보세요 — 안내 글자는 없어요.' + (q.strokes ? ' (' + q.strokes + '획)' : '') + '</p>' +
-      '<div class="row trace-btns"><button class="btn ghost small" id="qClear">지우기</button><button class="btn primary small" id="qSubmit">확인</button></div></div>';
+      '<div class="row trace-btns"><button class="btn ghost small" id="qUndo">한 획 지우기</button><button class="btn ghost small" id="qClear">전체 지우기</button><button class="btn primary small" id="qSubmit">확인</button></div></div>';
     else if (q.input) body = '<input class="ans-in" id="qIn" autocomplete="off" autocapitalize="off" placeholder="낱말을 쓰세요"><div class="row" style="margin-top:10px"><button class="btn ghost small" id="qHint">힌트 보기</button><button class="btn primary" id="qSubmit">확인</button></div><div id="qHintBox"></div>';
     else body = '<div class="choices' + (q.bigChoices || q.suffix ? ' two' : '') + '">' + q.choices.map(function (c, i) { return '<button class="choice' + (q.bigChoices ? ' big' : '') + '" data-i="' + i + '">' + esc(c) + (q.suffix ? q.suffix : '') + '</button>'; }).join('') + '</div>' +
       (q.hint ? '<div class="row" style="margin-top:8px"><button class="btn ghost small" id="qHint">힌트 보기</button></div><div id="qHintBox"></div>' : '');
@@ -1304,7 +1400,11 @@
     }
     el.querySelectorAll('.choice').forEach(function (b) { b.addEventListener('click', function () { var v = q.choices[Number(b.dataset.i)]; finish(WBHQUIZ.check(q, v), v); }); });
     if (q.write) {
-      var pad = makePad($('#qCv'));
+      var pad = makePad($('#qCv'), function (p) {
+        $('#qUndo').disabled = $('#qClear').disabled = p.locked || p.drawing || !p.strokes.length;
+        $('#qSubmit').disabled = p.locked || p.drawing;
+      });
+      $('#qUndo').addEventListener('click', function () { if (!answered) { pad.undo(); traceTipEl($('#qTip'), '', ''); } });
       $('#qClear').addEventListener('click', function () { if (!answered) { pad.clear(); traceTipEl($('#qTip'), '', ''); } });
       $('#qSubmit').addEventListener('click', function () {
         if (answered) return;
@@ -1326,20 +1426,26 @@
   }
   function traceTipEl(t, msg, cls) { if (!t) return; t.textContent = msg; t.className = 'trace-tip' + (cls ? ' ' + cls : ''); }
   /* 쓰기 문항의 빈 칸 — 따라쓰기 패널과 같은 격자·굵기, 안내 글자 없음. 좌표는 0~1 */
-  function makePad(cv) {
-    var pad = { cv: cv, ctx: null, size: 0, strokes: [], locked: false, revealCh: null };
+  function makePad(cv, onChange) {
+    var pad = { cv: cv, ctx: null, size: 0, strokes: [], locked: false, drawing: false, revealCh: null };
     function fit() { var css = Math.round(cv.getBoundingClientRect().width) || 300; var dpr = Math.min(3, window.devicePixelRatio || 1); cv.width = Math.round(css * dpr); cv.height = Math.round(css * dpr); pad.size = css; pad.ctx = cv.getContext('2d'); pad.ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }
     function paint() {
       var c = pad.ctx, s = pad.size; c.clearRect(0, 0, s, s); paintGrid(c, s);
       if (pad.revealCh) { c.save(); c.globalAlpha = 0.28; c.fillStyle = '#B23A2E'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.font = Math.round(s * 0.8) + 'px ' + TRACE_FONT; c.fillText(pad.revealCh, s / 2, s * 0.54); c.restore(); }
       pad.strokes.forEach(function (st) { paintPoly(c, s, st, { color: '#2B2118', width: Math.max(4, s * 0.034) }); });
+      if (onChange) onChange(pad);
     }
     function pt(e) { var r = cv.getBoundingClientRect(); return { x: Math.max(0, Math.min(1, (e.clientX - r.left) / (r.width || 1))), y: Math.max(0, Math.min(1, (e.clientY - r.top) / (r.height || 1))) }; }
-    var cur = null;
-    cv.addEventListener('pointerdown', function (e) { if (!e.isPrimary || pad.locked) return; e.preventDefault(); try { cv.setPointerCapture(e.pointerId); } catch (err) {} cur = [pt(e)]; pad.strokes.push(cur); paint(); });
-    cv.addEventListener('pointermove', function (e) { if (!cur || !e.isPrimary) return; e.preventDefault(); cur.push(pt(e)); paint(); });
-    ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (ev) { cv.addEventListener(ev, function () { cur = null; }); });
-    pad.clear = function () { pad.strokes = []; paint(); };
+    var cur = null, pointerId = null;
+    cv.addEventListener('pointerdown', function (e) { if (!e.isPrimary || cur || pad.locked) return; e.preventDefault(); try { cv.setPointerCapture(e.pointerId); } catch (err) {} cur = [pt(e)]; pointerId = e.pointerId; pad.drawing = true; pad.strokes.push(cur); paint(); });
+    cv.addEventListener('pointermove', function (e) { if (!cur || !e.isPrimary || e.pointerId !== pointerId || pad.locked) return; e.preventDefault(); cur.push(pt(e)); paint(); });
+    ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(function (ev) { cv.addEventListener(ev, function (e) {
+      if (!cur || e.pointerId !== pointerId) return;
+      if (ev !== 'pointerup') pad.strokes.pop();
+      cur = null; pad.drawing = false; paint();
+    }); });
+    pad.clear = function () { if (pad.locked || pad.drawing) return; pad.strokes = []; paint(); };
+    pad.undo = function () { if (pad.locked || pad.drawing) return; pad.strokes.pop(); paint(); };
     pad.reveal = function (ch) { pad.locked = true; pad.revealCh = ch; paint(); };
     fit(); paint();
     return pad;
