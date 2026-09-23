@@ -2463,6 +2463,7 @@ function render() {
   sync.pendingRender = false;
   viewInputDirty = false;
   if (route === 'guide' && !((session.isStaffLink && !isManager()) || (session.isAdmin && !session.isStaffLink))) route = 'today';
+  if (route === 'roadmap' && session.isStaffLink && !studyRoadmapActive(currentStaff())) route = 'today';
   paintStatus();
   renderTabs();
   const v = $('#view');
@@ -2490,11 +2491,11 @@ function render() {
 
   // 개인 링크는 허용된 화면만 — 관리자는 발행·현황까지, 학생은 자기 플래너만
   if (session.isStaffLink) {
-    const allowed = isManager() ? ['today', 'week', 'month', 'academic', 'ingang', 'study', 'write', 'board'] : ['guide', 'today', 'week', 'month', 'academic', 'ingang', 'study'];
+    const allowed = isManager() ? ['today', 'week', 'roadmap', 'month', 'academic', 'ingang', 'study', 'write', 'board'] : ['guide', 'today', 'week', 'roadmap', 'month', 'academic', 'ingang', 'study'];
     if (!allowed.includes(route)) route = 'today';
   }
 
-  const map = { guide: viewStudentGuide, today: viewToday, week: viewWeek, month: viewMonth, academic: viewAcademic, ingang: viewIngang, study: viewStudy, write: viewWrite, results: viewResults, board: viewBoard, staff: viewStaffAdmin, settings: viewSettings };
+  const map = { guide: viewStudentGuide, today: viewToday, week: viewWeek, roadmap: viewRoadmap, month: viewMonth, academic: viewAcademic, ingang: viewIngang, study: viewStudy, write: viewWrite, results: viewResults, board: viewBoard, staff: viewStaffAdmin, settings: viewSettings };
   v.innerHTML = (map[route] || viewToday)();
   if (route === 'staff' && session.isAdmin && !session.isStaffLink) loadConsultLinkContacts();
 }
@@ -2503,12 +2504,13 @@ function renderTabs() {
   const a = alertsToday();
   const lecturePending = session.isAdmin && !session.isStaffLink
     ? teamStaff().reduce((sum, staff) => sum + lectureRequestsFor(staff.id).filter(lectureRequestActive).length, 0) : 0;
+  const roadmapTab = ((session.isAdmin && !session.isStaffLink) || studyRoadmapActive(currentStaff())) ? [['roadmap', '로드맵']] : [];
   const tabs = session.isStaffLink
     ? (isManager()
-        ? [['today', '오늘'], ['week', '주간'], ['month', '일정'], ['academic', '학사관리'], ['ingang', '인강'], ['study', '학습'], ['write', '학습 배부'], ['board', '학생 현황', a.total]]
-        : [['today', '오늘 할 일'], ['guide', '사용 안내'], ['week', '주간 플래너'], ['month', '일정'], ['academic', '학사관리'], ['ingang', '인강'], ['study', '학습']])
+        ? [['today', '오늘'], ['week', '주간'], ...roadmapTab, ['month', '일정'], ['academic', '학사관리'], ['ingang', '인강'], ['study', '학습'], ['write', '학습 배부'], ['board', '학생 현황', a.total]]
+        : [['today', '오늘 할 일'], ['guide', '사용 안내'], ['week', '주간 플래너'], ...roadmapTab, ['month', '일정'], ['academic', '학사관리'], ['ingang', '인강'], ['study', '학습']])
     : session.isAdmin
-      ? [['today', '오늘'], ['guide', '사용 안내'], ['week', '주간'], ['month', '일정'], ['academic', '학사관리'], ['ingang', '인강', lecturePending], ['study', '학습'], ['write', '학습 배부'], ['results', '결과지'],
+      ? [['today', '오늘'], ['guide', '사용 안내'], ['week', '주간'], ...roadmapTab, ['month', '일정'], ['academic', '학사관리'], ['ingang', '인강', lecturePending], ['study', '학습'], ['write', '학습 배부'], ['results', '결과지'],
          ['board', '학생 현황', a.total], ['staff', '학생 관리'], ['settings', '설정']]
       : [];
   $('#tabs').innerHTML = tabs.map(([k, t, n]) =>
@@ -2817,7 +2819,7 @@ function viewStudentGuide() {
         '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">1</span><b>목표와 교재 확인</b></div><p>원장이 목표 학교, 과목, 교재, 전체 범위와 완료 목표일을 등록합니다.</p></div>' +
         '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">2</span><b>오늘 분량 확인</b></div><p>전체 범위가 학습 요일에 자동으로 나뉘어 <code>오늘 할 일</code> 체크리스트에 표시됩니다.</p></div>' +
         '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">3</span><b>학습하고 완료 표시</b></div><p>배정된 범위를 공부한 뒤 스터디 플래너에서 완료 표시합니다. 못 끝낸 분량은 하루 마감에서 이월할 수 있습니다.</p></div>' +
-        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">4</span><b>진도 확인</b></div><p><code>학습</code> 탭에서 교재별 전체 진도율을, <code>주간 플래너</code>에서 이번 주 배정 분량과 완료 횟수를 확인합니다.</p></div>' +
+        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">4</span><b>진도 확인</b></div><p><code>로드맵</code> 탭에서 목표 학교·교재별 전체 진도율과 이번 주 배정 분량을 한 번에 확인합니다.</p></div>' +
       '</div><div class="student-guide-tip"><b>수정이 필요하다면?</b> 목표 학교·교재·기간·학습 요일은 원장 화면에서만 바꿀 수 있으므로 변경이 필요하면 요청해 주세요.</div>' +
     '</details>' +
 
@@ -2842,6 +2844,7 @@ function viewStudentGuide() {
       '<div class="student-guide-tabs">' +
         '<div class="student-guide-tab"><i>✅</i><div><b>오늘 할 일</b><span>매일 공부하고 마감하는 필수 화면</span></div></div>' +
         '<div class="student-guide-tab"><i>📊</i><div><b>주간 플래너</b><span>요일별 수행과 주간 마무리 확인</span></div></div>' +
+        '<div class="student-guide-tab"><i>🧭</i><div><b>로드맵</b><span>목표 학교·교재별 전체 진도와 이번 주 분량 확인</span></div></div>' +
         '<div class="student-guide-tab"><i>🗓</i><div><b>일정</b><span>시험·중요 일정과 월간 기록 확인</span></div></div>' +
         '<div class="student-guide-tab"><i>🎓</i><div><b>학사관리</b><span>시험·수행평가와 자료 요청 확인</span></div></div>' +
         '<div class="student-guide-tab"><i>🎬</i><div><b>인강</b><span>인강이 있는 학생의 일정·진도 관리</span></div></div>' +
@@ -5382,13 +5385,24 @@ function studyRoadmapWeekCard(student, mon, days) {
     '</div></div>';
 }
 
+function viewRoadmap() {
+  const me = currentStaff();
+  if (!me) return emptyStaffCard();
+  const h = session.isStaffLink ? '' : staffSwitcher(me.id);
+  if (!studyRoadmapActive(me)) return h + '<div class="card"><div class="empty"><b>🧭</b><strong>' + esc(me.name) + ' 학생에게 배정된 로드맵이 없습니다.</strong><br>목표 학교와 교재 계획을 등록하면 이 탭에 표시됩니다.</div>' +
+    (!me.owner && !me.manager ? '<button class="btn btn-primary btn-block" data-act="roadmapopen" data-id="' + esc(me.id) + '">교재 로드맵 추가</button>' : '') + '</div>';
+  const mon = mondayOf(today());
+  const days = Array.from({ length: 7 }, (_, index) => addDays(mon, index));
+  return h + studyRoadmapCard(me) + studyRoadmapWeekCard(me, mon, days);
+}
+
 function studyRoadmapModal(staffId) {
   if (!session.isAdmin || session.isStaffLink) return;
   const student = staffById(staffId);
   if (!student || student.deleted || student.owner || student.manager) return toast('학생을 다시 선택해 주세요');
   const roadmap = studyRoadmapOf(student);
   modal(student.name + ' · 교재 진도 로드맵',
-    '<div class="guide mb14"><b>필요한 학생에게만 표시됩니다.</b><br>목표 학교와 교재를 등록하면 학생의 학습 탭과 오늘 체크리스트에 자동으로 나타납니다.</div>' +
+    '<div class="guide mb14"><b>필요한 학생에게만 표시됩니다.</b><br>목표 학교와 교재를 등록하면 학생의 로드맵 탭과 오늘 체크리스트에 자동으로 나타납니다.</div>' +
     '<div class="field"><label class="fl" for="roadmapTargetSchool">목표 학교</label>' +
       '<div class="row" style="gap:8px"><input class="in" id="roadmapTargetSchool" maxlength="100" value="' + esc(roadmap.targetSchool) + '" placeholder="예: 한국외국어대학교">' +
       '<button class="btn btn-navy" data-act="roadmaptargetsave" data-id="' + esc(student.id) + '">저장</button></div></div>' +
@@ -6320,8 +6334,6 @@ function viewStudy() {
       '<div class="study-kpi"><span>오늘·밀림</span><b>' + todayTasks.length + '건</b></div>' +
       '<div class="study-kpi"><span>마감 지연</span><b>' + lateTasks.length + '건</b></div>' +
       '<div class="study-kpi"><span>복습 대기</span><b>' + (dueWrong.length + dueRounds.length) + '건</b></div></div></div>';
-
-  h += studyRoadmapCard(me);
 
   if (dueWrong.length || dueRounds.length) {
     h += '<div class="card alert"><div class="between"><div><div class="card-title">🔁 오늘 복습 대기</div>' +
@@ -14565,7 +14577,7 @@ if (!pendingStudentCode && session.isStaffLink && state.settings.myToken && staf
   sessionStorage.removeItem(STUDENT_LINK_BLOCK_KEY);
   studentConnectError = '';
 }
-if (session.isStaffLink && !['guide', 'today', 'week', 'month', 'academic', 'ingang', 'study', 'write', 'board'].includes(route)) route = 'today';
+if (session.isStaffLink && !['guide', 'today', 'week', 'roadmap', 'month', 'academic', 'ingang', 'study', 'write', 'board'].includes(route)) route = 'today';
 render();
 connectAdminDevice();
 if (pendingStudentCode) {
@@ -14603,7 +14615,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-09-23.1';
+const APP_VER = '2026-09-23.3';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)

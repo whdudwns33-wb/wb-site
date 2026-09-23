@@ -25,11 +25,11 @@ function functionSource(name) {
   assert.fail(name + ' function is incomplete');
 }
 
-function renderTabsHtml(sessionValue, manager) {
+function renderTabsHtml(sessionValue, manager, hasRoadmap = false) {
   const target = { innerHTML: '' };
   const source = functionSource('renderTabs');
   new Function(
-    'session', 'isManager', 'alertsToday', '$', 'requestAnimationFrame', 'route', 'teamStaff',
+    'session', 'isManager', 'alertsToday', '$', 'requestAnimationFrame', 'route', 'teamStaff', 'currentStaff', 'studyRoadmapActive',
     source + '; renderTabs();'
   )(
     sessionValue,
@@ -38,22 +38,29 @@ function renderTabsHtml(sessionValue, manager) {
     selector => selector === '#tabs' ? target : null,
     () => {},
     'today',
-    () => []
+    () => [],
+    () => ({ id: 'student-a' }),
+    () => hasRoadmap
   );
   return target.innerHTML;
 }
 
 test('usage guide tab is available in the regular student and admin screens', () => {
   const student = renderTabsHtml({ isStaffLink: true, isAdmin: false }, false);
+  const studentWithRoadmap = renderTabsHtml({ isStaffLink: true, isAdmin: false }, false, true);
   const manager = renderTabsHtml({ isStaffLink: true, isAdmin: false }, true);
   const admin = renderTabsHtml({ isStaffLink: false, isAdmin: true }, false);
 
   assert.match(student, /data-go="guide"[^>]*>사용 안내/);
   assert.doesNotMatch(manager, /data-go="guide"/);
   assert.match(admin, /data-go="guide"[^>]*>사용 안내/);
+  assert.doesNotMatch(student, /data-go="roadmap"/);
+  assert.doesNotMatch(manager, /data-go="roadmap"/);
+  assert.match(studentWithRoadmap, /data-go="roadmap"[^>]*>로드맵/);
+  assert.match(admin, /data-go="roadmap"[^>]*>로드맵/);
 
   const render = functionSource('render');
-  assert.match(render, /:\s*\['guide', 'today', 'week', 'month', 'academic', 'ingang', 'study'\]/);
+  assert.match(render, /:\s*\['guide', 'today', 'week', 'roadmap', 'month', 'academic', 'ingang', 'study'\]/);
   assert.match(render, /guide:\s*viewStudentGuide/);
   assert.match(render, /session\.isAdmin && !session\.isStaffLink/);
 
@@ -90,7 +97,7 @@ test('student guide explains the required routine and optional modules', () => {
   assert.match(guide, /현재 학생 기기에만 저장되고 서버·원장 화면·백업으로 전송되지 않습니다/);
   assert.match(guide, /목표 학교와 교재 로드맵/);
   assert.match(guide, /전체 범위가 학습 요일에 자동으로 나뉘어/);
-  assert.match(guide, /학습[^]*교재별 전체 진도율[^]*주간 플래너[^]*이번 주 배정 분량/);
+  assert.match(guide, /로드맵[^]*목표 학교·교재별 전체 진도율[^]*이번 주 배정 분량/);
   assert.match(guide, /원장 화면에서만 바꿀 수 있으므로/);
   assert.match(guide, /data-go="today"/);
 });
