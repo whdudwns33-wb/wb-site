@@ -390,7 +390,7 @@ async function latestParentResponse(env, app, row) {
 async function sourceTask(env, app, sourceTaskId, sourceDate) {
   const row = await env.DB.prepare('SELECT owner,data,updated_at FROM tasks WHERE app=? AND id=? LIMIT 1').bind(app, sourceTaskId).first();
   const task = row && parseJson(row.data);
-  if (!row || !isLesson(task) || String(task.lessonInstanceType || '') === 'makeup' || task.makeupCaseId ||
+  if (!row || !isLesson(task) || ['makeup', 'subscription'].includes(String(task.lessonInstanceType || '')) || task.makeupCaseId ||
       String(task.id || '') !== sourceTaskId ||
       !SAFE_ID.test(String(task.studentId || ''))) {
     problem('stable studentId가 있는 수업을 찾을 수 없습니다', 404, 'LESSON_MISSING');
@@ -406,7 +406,7 @@ async function manualSourceTask(env, app, sourceTaskId, studentId, targetDate) {
   const row = await env.DB.prepare('SELECT owner,data,updated_at FROM tasks WHERE app=? AND id=? LIMIT 1')
     .bind(app, sourceTaskId).first();
   const task = row && parseJson(row.data);
-  if (!row || !isLesson(task) || String(task.lessonInstanceType || '') === 'makeup' || task.makeupCaseId ||
+  if (!row || !isLesson(task) || ['makeup', 'subscription'].includes(String(task.lessonInstanceType || '')) || task.makeupCaseId ||
       String(task.id || '') !== sourceTaskId || !SAFE_ID.test(String(task.studentId || ''))) {
     problem('stable studentId가 있는 정규 수업을 찾을 수 없습니다', 404, 'LESSON_MISSING');
   }
@@ -429,7 +429,7 @@ async function teacherOwnsStudentAtDate(env, app, staffId, studentId, targetDate
     .bind(app, staffId).all();
   return (result.results || []).some(row => {
     const task = parseJson(row.data);
-    return isLesson(task) && String(task.lessonInstanceType || '') !== 'makeup' && !task.makeupCaseId &&
+    return isLesson(task) && !['makeup', 'subscription'].includes(String(task.lessonInstanceType || '')) && !task.makeupCaseId &&
       String(task.staffId || '') === String(row.owner || '') && String(task.studentId || '') === studentId &&
       (!task.start || String(task.start) <= targetDate) && (!task.end || String(task.end) >= targetDate);
   });
@@ -1781,6 +1781,7 @@ function unrelatedCreationAuthorizationGuardStatement(env, app, row, auth, stude
       "AND (json_extract(source.data,'$.taskKind')='lesson_instruction' OR " +
         "json_extract(source.data,'$.lessonFormVersion') IS NOT NULL OR json_extract(source.data,'$.intakeVersion') IS NOT NULL) " +
       "AND COALESCE(json_extract(source.data,'$.lessonInstanceType'),'')<>'makeup' " +
+      "AND COALESCE(json_extract(source.data,'$.lessonInstanceType'),'')<>'subscription' " +
       "AND COALESCE(json_extract(source.data,'$.makeupCaseId'),'')='' " +
       "AND json_extract(source.data,'$.staffId')=source.owner AND json_extract(source.data,'$.studentId')=? " +
       "AND (COALESCE(json_extract(source.data,'$.start'),'')='' OR json_extract(source.data,'$.start')<=?) " +

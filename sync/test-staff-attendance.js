@@ -33,7 +33,7 @@ function occursOnDate(task, date) {
   if (!isLesson(task) || !ISO_DATE.test(String(date || ''))) return false;
   if (task.start && String(date) < String(task.start)) return false;
   if (task.end && String(date) > String(task.end)) return false;
-  if (String(task.lessonInstanceType || '') === 'makeup' || task.makeupCaseId) return false;
+  if (['makeup', 'subscription'].includes(String(task.lessonInstanceType || '')) || task.makeupCaseId) return false;
 
   if (Array.isArray(task.scheduleSlots) && task.scheduleSlots.length) {
     const day = weekday(date);

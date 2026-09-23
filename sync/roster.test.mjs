@@ -185,6 +185,56 @@ test('schema and migration add one private JSON document table without destructi
   assert.doesNotMatch(source, /fetch\s*\(|roster\.json|textbooks\.json/);
 });
 
+test('구독 프로그램 시작일을 저장하고 날짜 지정 1회성 구독 수업을 멱등적으로 생성한다', async () => {
+  const db = new TestD1();
+  seedAuth(db);
+  const document = documentFixture();
+  document.roster.students[0].subscriptions = [
+    { type: 'assessment', startDate: '2026-09-01' },
+    { type: 'studyforce', startDate: '2026-09-10' }
+  ];
+  assert.equal((await replace(db, document)).status, 200);
+
+  const payload = {
+    auth: admin, action: 'subscription_session_create', requestId: 'request-subscription-1',
+    studentId: 'student-a', subscriptionType: 'assessment', staffId: 'teacher-a',
+    date: '2026-09-26', startTime: '14:00', endTime: '15:20', memo: '검사 결과 확인'
+  };
+  const created = await call(db, payload);
+  assert.equal(created.status, 200);
+  assert.equal(created.body.task.lessonInstanceType, 'subscription');
+  assert.equal(created.body.task.subscriptionType, 'assessment');
+  assert.equal(created.body.task.repeat, 'once');
+  assert.equal(created.body.task.start, '2026-09-26');
+  assert.equal(created.body.task.staffId, 'teacher-a');
+  assert.equal(created.body.task.studentId, 'student-a');
+  assert.deepEqual(created.body.task.scheduleSlots[0].days, [6]);
+  assert.equal(created.body.task.scheduleSlots[0].startTime, '14:00');
+  assert.equal(created.body.task.scheduleSlots[0].endTime, '15:20');
+
+  const duplicate = await call(db, payload);
+  assert.equal(duplicate.status, 200);
+  assert.equal(duplicate.body.idempotent, true);
+  assert.equal(db.database.prepare("SELECT COUNT(*) count FROM tasks WHERE app='task' AND id='subscription_request-subscription-1'").get().count, 1);
+});
+
+test('구독 정보가 없거나 구독 시작일보다 빠른 수업은 생성하지 않는다', async () => {
+  const db = new TestD1();
+  seedAuth(db);
+  const document = documentFixture();
+  document.roster.students[0].subscriptions = [{ type: 'assessment', startDate: '2026-09-20' }];
+  assert.equal((await replace(db, document)).status, 200);
+
+  const base = { auth: admin, action: 'subscription_session_create', studentId: 'student-a', staffId: 'teacher-a',
+    startTime: '14:00', endTime: '15:00', memo: '' };
+  const early = await call(db, { ...base, requestId: 'request-subscription-early', subscriptionType: 'assessment', date: '2026-09-19' });
+  assert.equal(early.status, 409);
+  assert.match(early.body.error, /구독 시작일 이후/);
+  const missing = await call(db, { ...base, requestId: 'request-subscription-missing', subscriptionType: 'studyforce', date: '2026-09-26' });
+  assert.equal(missing.status, 409);
+  assert.match(missing.body.error, /해당 구독/);
+});
+
 test('new student ids are unique eight-digit numbers without a leading zero', () => {
   const reserved = new Set(['12345678']);
   const candidates = ['12345678', '01234567', '87654321'];
