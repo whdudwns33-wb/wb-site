@@ -79,14 +79,19 @@ test('student guide explains the required routine and optional modules', () => {
   ].forEach(pattern => assert.match(guide, pattern));
   assert.match(guide, /공부시간 기록과 인강 관리는 해당하는 학생만/);
   assert.match(guide, /반복 배정된 리더스아이·하루 비문학은 오늘 체크리스트에 자동으로 표시/);
-  assert.match(guide, /온라인 학습은 <code>학습 완료 기록<\/code>을 눌러/);
+  assert.match(guide, /온라인 학습은[^]*?<code>학습 완료 기록<\/code>을 눌러/);
   assert.match(guide, /온라인 학습 실행·완료 기록/);
   assert.match(guide, /순공시간 기록[\s\S]*?시간을 기록하는 학생/);
   assert.match(guide, /인강 관리[\s\S]*?등록된 인강이 있는 학생만/);
   assert.match(guide, /온라인 학습 사용 매뉴얼/);
+  assert.match(guide, /브레인레터·청크브레인·어휘브레인·리더스아이·메타수학/);
   assert.match(guide, /Agency ID <code>wbbrain<\/code>/);
   assert.match(guide, /사이트를 닫는 것만으로는 완료 처리되지 않습니다/);
   assert.match(guide, /현재 학생 기기에만 저장되고 서버·원장 화면·백업으로 전송되지 않습니다/);
+  assert.match(guide, /목표 학교와 교재 로드맵/);
+  assert.match(guide, /전체 범위가 학습 요일에 자동으로 나뉘어/);
+  assert.match(guide, /학습[^]*교재별 전체 진도율[^]*주간 플래너[^]*이번 주 배정 분량/);
+  assert.match(guide, /원장 화면에서만 바꿀 수 있으므로/);
   assert.match(guide, /data-go="today"/);
 });
 
@@ -94,7 +99,7 @@ test('student guide keeps the daily routine visible and folds reference sections
   const guide = functionSource('viewStudentGuide');
   const sections = guide.match(/<details class="card student-guide-section(?: [^"]*)?"(?: open)?>/g) || [];
 
-  assert.equal(sections.length, 7);
+  assert.equal(sections.length, 8);
   assert.equal(sections.filter(section => section.includes(' open')).length, 1);
   assert.match(guide, /<details class="card student-guide-section" open><summary class="student-guide-head">/);
   assert.ok(guide.indexOf('✅ 매일 반드시 할 것') < guide.indexOf('🎁 기프트 카드 받는 방법'));
