@@ -961,6 +961,30 @@
   .att-history-status.complete { background: #e5f4ed; color: #176844; }
   .att-history-status.missing_out { background: #fff0d4; color: #915c08; }
   .att-history-status.invalid { background: #fde7e9; color: #a92d36; }
+  .att-calendar-list { display: grid; gap: 10px; margin-top: 12px; }
+  .att-calendar-person { border: 1px solid var(--line); border-radius: 12px; background: var(--white); overflow: hidden; }
+  .att-calendar-person > summary { min-height: 54px; display: flex; align-items: center; padding: 10px 13px; cursor: pointer; list-style: none; background: #f7f9fc; }
+  .att-calendar-person > summary::-webkit-details-marker { display: none; }
+  .att-calendar-person > summary::after { content: '펼치기'; margin-left: auto; color: var(--deep-blue); font-size: 11px; font-weight: 900; }
+  .att-calendar-person[open] > summary::after { content: '접기'; }
+  .att-calendar-person > summary b, .att-calendar-person > summary small { display: block; }
+  .att-calendar-person > summary b { color: var(--navy); font-size: 15px; }
+  .att-calendar-person > summary small { margin-top: 3px; color: var(--mid-gray); font-size: 11px; }
+  .att-calendar-week, .att-calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+  .att-calendar-week { padding: 8px 8px 4px; color: var(--mid-gray); font-size: 11px; font-weight: 900; text-align: center; }
+  .att-calendar-week span:first-child { color: #b43a45; }
+  .att-calendar-week span:last-child { color: var(--deep-blue); }
+  .att-calendar-grid { gap: 5px; padding: 4px 8px 10px; }
+  .att-calendar-day { min-width: 0; min-height: 78px; display: flex; flex-direction: column; gap: 3px; align-items: flex-start; padding: 7px; border: 1px solid #dfe5ec; border-radius: 9px; background: #f8fafc; color: #687687; text-align: left; }
+  .att-calendar-day:not(:disabled) { cursor: pointer; }
+  .att-calendar-day b { color: var(--navy); font-size: 13px; }
+  .att-calendar-day span { font-size: 11px; font-weight: 800; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  .att-calendar-day small { font-size: 10px; line-height: 1.25; }
+  .att-calendar-day.complete { border-color: #9fd5bc; background: #edf8f3; color: #176844; }
+  .att-calendar-day.missing_out { border-color: #eacb89; background: #fff6e6; color: #915c08; }
+  .att-calendar-day.invalid { border-color: #e9aeb5; background: #fff0f0; color: #a92d36; }
+  .att-calendar-day.future { opacity: .55; }
+  .att-calendar-day.is-blank { border: 0; background: transparent; }
   .att-history-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
   @media (max-width: 560px) {
     .att-history-summary { grid-template-columns: repeat(2, 1fr); }
@@ -975,6 +999,10 @@
     .att-history-table .att-history-day { text-align: right; align-self: center; }
     .att-history-table .att-history-person { grid-column: 1; grid-row: 1; }
     .att-history-table .att-history-day { grid-column: 2; grid-row: 1; }
+    .att-calendar-grid { gap: 3px; padding-left: 4px; padding-right: 4px; }
+    .att-calendar-day { min-height: 65px; padding: 5px 3px; }
+    .att-calendar-day span { font-size: 9px; }
+    .att-calendar-day small { font-size: 9px; }
   }
   .student-info-name { display: inline-flex; align-items: center; min-height: 44px; margin: -8px 0; padding: 8px 2px; border: 0; background: transparent; color: var(--deep-blue); font: inherit; font-weight: 900; text-align: left; text-decoration: underline dotted; text-underline-offset: 3px; cursor: pointer; }
   .student-info-name:hover { color: var(--navy); text-decoration-style: solid; }
@@ -1210,16 +1238,16 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-09-23.4"></script>
-<script src="./schedule-board-core.js?v=2026-09-23.4"></script>
-<script src="./asset-core.js?v=2026-09-23.4"></script>
-<script src="./qr-core.js?v=2026-09-23.4"></script>
-<script src="./acaflow-import-core.js?v=2026-09-23.4"></script>
-<script src="./feedback-subject-catalog.js?v=2026-09-23.4"></script>
-<script src="./sync-recovery-core.js?v=2026-09-23.4"></script>
-<script src="./staff-work-session-core.js?v=2026-09-23.4"></script>
-<script src="./staff-attendance-history-core.js?v=2026-09-23.4"></script>
-<script src="./makeup-recovery-core.js?v=2026-09-23.4"></script>
+<script src="./lesson-form-core.js?v=2026-09-23.6"></script>
+<script src="./schedule-board-core.js?v=2026-09-23.6"></script>
+<script src="./asset-core.js?v=2026-09-23.6"></script>
+<script src="./qr-core.js?v=2026-09-23.6"></script>
+<script src="./acaflow-import-core.js?v=2026-09-23.6"></script>
+<script src="./feedback-subject-catalog.js?v=2026-09-23.6"></script>
+<script src="./sync-recovery-core.js?v=2026-09-23.6"></script>
+<script src="./staff-work-session-core.js?v=2026-09-23.6"></script>
+<script src="./staff-attendance-history-core.js?v=2026-09-23.6"></script>
+<script src="./makeup-recovery-core.js?v=2026-09-23.6"></script>
 <script>
 "use strict";
 
@@ -13716,7 +13744,7 @@ function viewBoard() {
     '<div class="card-sub mb8">직원 ' + list.length + '명 · 지시 ' + all.total + '건 중 ' + all.done + '건 완료</div>' +
     '<div class="bar"><i style="width:' + pct + '%"></i></div></div></div>' +
     '<hr class="sep"><button class="btn btn-navy btn-block" data-act="brief">📊 오늘 마감 브리핑 만들기</button>' +
-    '<button class="btn btn-ghost btn-block" data-act="atthist" style="margin-top:8px">🕘 전체 출퇴근 이력 (최근 14일)</button></div>';
+    '<button class="btn btn-ghost btn-block" data-act="atthist" style="margin-top:8px">🗓️ 월별 출퇴근 달력</button></div>';
 
   if (mine.length) {
     h += '<div class="sect">내 업무 — 대표</div>' + mine.map(s => staffCard(s)).join('');
@@ -13788,83 +13816,142 @@ function attHistText() {
   return out;
 }
 
-/* 조회 필터만 바꾸므로 입력/출퇴근 기록은 수정하지 않고, 팝업 전체 재렌더도 하지 않는다. */
-let attendanceHistoryDates = [];
-function attendanceHistoryRows() {
-  if (!session.isAdmin || !window.WBStaffAttendanceHistoryCore) return [];
-  const all = !!($('#attHistoryAll') || {}).checked;
-  const selectedDate = String(($('#attHistoryDate') || {}).value || '');
-  const dates = all ? attendanceHistoryDates : attendanceHistoryDates.filter(date => date === selectedDate);
-  return window.WBStaffAttendanceHistoryCore.buildRows({ staff: liveStaff(), checks: state.checks,
-    dates, staffId: String(($('#attHistoryStaff') || {}).value || '') });
-}
+/* 월별 출퇴근 이력은 운영 DB를 정본으로 읽는다. 새 태블릿에서도 과거 기록이 빠지지 않는다. */
+let attendanceHistoryMonth = '';
+let attendanceHistoryChecks = {};
+let attendanceHistoryBounds = { earliestMonth: '', latestMonth: '', currentMonth: '' };
+let attendanceHistoryLoading = false;
 
-function attendanceHistoryResultsHtml(rows) {
-  const totals = window.WBStaffAttendanceHistoryCore.summary(rows);
-  const tiles = [[totals.complete, '출퇴근 완료', 'complete'], [totals.missingOut, '퇴근 미기록', 'missing_out'],
-    [totals.noRecord, '기록 없음', 'no_record'], [totals.invalid, '시간 확인 필요', 'invalid']];
-  const summary = '<div class="att-history-summary">' + tiles.map(([count, label, status]) =>
-    '<div class="att-history-stat ' + status + '"><strong>' + count + '<small style="font-size:12px;margin-left:3px">건</small></strong><span>' + label + '</span></div>').join('') + '</div>';
-  if (!rows.length) return summary + '<div class="hint">선택한 조건에 해당하는 직원이 없습니다.</div>';
-  return summary + '<div class="small muted mb8">조회 ' + rows.length + '건 · 날짜 최신순 · 시간은 24시간 기준</div>' +
-    '<div class="att-history-table-wrap" tabindex="0" aria-label="출퇴근 기록 표, 스크롤하여 더 보기"><table class="att-history-table" aria-label="선생님별 출퇴근 기록">' +
-    '<thead><tr><th scope="col">날짜</th><th scope="col">선생님</th><th scope="col">출근</th><th scope="col">퇴근</th><th scope="col">근무시간</th><th scope="col">상태</th></tr></thead><tbody>' +
-    rows.map(row => '<tr><td class="att-history-day">' + esc(shortDate(row.date)) + ' (' + esc(DOW[dowOf(row.date)]) + ')</td>' +
-      '<td class="att-history-person">' + esc(row.name) + '</td><td class="att-history-time" data-label="출근">' + esc(row.clockIn || '—') + '</td>' +
-      '<td class="att-history-time" data-label="퇴근">' + esc(row.clockOut || '—') + '</td><td data-label="근무시간">' + esc(row.duration || '—') + '</td>' +
-      '<td data-label="상태"><span class="att-history-status ' + (['complete', 'missing_out', 'no_record'].includes(row.status) ? row.status : 'invalid') + '">' + esc(row.label) + '</span></td></tr>').join('') +
-    '</tbody></table></div>';
+function attendanceHistoryStaff() {
+  const byId = new Map();
+  state.staff.filter(staff => staff && staff.id && !staff.owner).forEach(staff => byId.set(String(staff.id), staff));
+  Object.keys(attendanceHistoryChecks).forEach(key => {
+    const match = /^__att__(.+)\|\d{4}-\d{2}-\d{2}$/.exec(key);
+    if (match && !byId.has(match[1])) byId.set(match[1], { id: match[1], name: '퇴사 직원' });
+  });
+  return Array.from(byId.values()).sort((left, right) => String(left.name).localeCompare(String(right.name), 'ko'));
+}
+function attendanceHistoryRows(staffId) {
+  if (!session.isAdmin || !window.WBStaffAttendanceHistoryCore || !attendanceHistoryMonth) return [];
+  return window.WBStaffAttendanceHistoryCore.buildRows({ staff: attendanceHistoryStaff(), checks: attendanceHistoryChecks,
+    dates: daysInMonth(attendanceHistoryMonth), staffId: staffId == null ? String(($('#attHistoryStaff') || {}).value || '') : String(staffId) });
+}
+function attendanceMonthShift(month, delta) {
+  const parts = String(month || '').split('-').map(Number);
+  if (parts.length !== 2 || !parts[0] || !parts[1]) return '';
+  const date = new Date(Date.UTC(parts[0], parts[1] - 1 + delta, 1));
+  return date.getUTCFullYear() + '-' + String(date.getUTCMonth() + 1).padStart(2, '0');
+}
+function attendanceCalendarHtml(staff, rows, expanded) {
+  const recorded = rows.filter(row => row.status !== 'no_record');
+  const complete = recorded.filter(row => row.status === 'complete').length;
+  const issue = recorded.filter(row => row.status !== 'complete').length;
+  const firstDow = dowOf(attendanceHistoryMonth + '-01');
+  const blanks = Array.from({ length: firstDow }, () => '<span class="att-calendar-day is-blank" aria-hidden="true"></span>').join('');
+  const todayDate = seoulNowParts().date;
+  const days = rows.map(row => {
+    const future = row.date > todayDate;
+    const status = future ? 'future' : row.status;
+    const time = row.status === 'no_record' ? '기록 없음' : (row.clockIn || '—') + ' ~ ' + (row.clockOut || '—');
+    return '<button type="button" class="att-calendar-day ' + esc(status) + '" data-act="atthistdayedit" data-id="' + esc(staff.id) + '" data-date="' + row.date + '"' +
+      (future ? ' disabled' : '') + ' aria-label="' + esc(row.date + ' ' + row.label) + '"><b>' + Number(row.date.slice(-2)) + '</b>' +
+      '<span>' + esc(time) + '</span><small>' + esc(future ? '예정' : row.label) + '</small></button>';
+  }).join('');
+  return '<details class="att-calendar-person"' + (expanded ? ' open' : '') + '><summary><span><b>' + esc(staff.name) + '</b>' +
+    '<small>근무 ' + recorded.length + '일 · 완료 ' + complete + '건' + (issue ? ' · 확인 필요 ' + issue + '건' : '') + '</small></span></summary>' +
+    '<div class="att-calendar-week"><span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span></div>' +
+    '<div class="att-calendar-grid">' + blanks + days + '</div></details>';
 }
 function renderAttendanceHistoryResults() {
   const target = $('#attHistoryResults');
   if (!session.isAdmin || !target) return;
-  const all = !!$('#attHistoryAll').checked;
-  let date = $('#attHistoryDate').value;
-  if (!attendanceHistoryDates.includes(date)) {
-    date = attendanceHistoryDates[0];
-    $('#attHistoryDate').value = date;
-  }
-  $('#attHistoryDate').disabled = all;
-  $('#attHistoryPrev').disabled = all || date <= attendanceHistoryDates[attendanceHistoryDates.length - 1];
-  $('#attHistoryNext').disabled = all || date >= attendanceHistoryDates[0];
-  target.innerHTML = attendanceHistoryResultsHtml(attendanceHistoryRows());
+  if (attendanceHistoryLoading) { target.innerHTML = '<div class="hint">월별 출퇴근 기록을 불러오는 중입니다.</div>'; return; }
+  const selected = String(($('#attHistoryStaff') || {}).value || '');
+  const staff = attendanceHistoryStaff().filter(person => !selected || String(person.id) === selected);
+  const allRows = attendanceHistoryRows('');
+  const recorded = allRows.filter(row => row.status !== 'no_record');
+  const totals = window.WBStaffAttendanceHistoryCore.summary(recorded);
+  const summary = '<div class="att-history-summary">' +
+    '<div class="att-history-stat complete"><strong>' + recorded.length + '</strong><span>근무 기록</span></div>' +
+    '<div class="att-history-stat complete"><strong>' + totals.complete + '</strong><span>출퇴근 완료</span></div>' +
+    '<div class="att-history-stat missing_out"><strong>' + totals.missingOut + '</strong><span>퇴근 미기록</span></div>' +
+    '<div class="att-history-stat invalid"><strong>' + totals.invalid + '</strong><span>시간 확인 필요</span></div></div>';
+  target.innerHTML = summary + (staff.length ? '<div class="att-calendar-list">' + staff.map(person =>
+    attendanceCalendarHtml(person, attendanceHistoryRows(person.id), !!selected)).join('') + '</div>' :
+    '<div class="hint">선택한 조건에 해당하는 직원이 없습니다.</div>');
+  const prev = $('#attHistoryPrev'), next = $('#attHistoryNext');
+  if (prev) prev.disabled = !!attendanceHistoryBounds.earliestMonth && attendanceHistoryMonth <= attendanceHistoryBounds.earliestMonth;
+  if (next) next.disabled = attendanceHistoryMonth >= (attendanceHistoryBounds.currentMonth || today().slice(0, 7));
 }
-function openAttendanceHistory() {
+async function loadAttendanceHistoryMonth(month) {
+  if (!session.isAdmin || attendanceHistoryLoading) return;
+  const auth = sync.auth();
+  if (!auth) return toast('관리자 인증을 다시 확인해 주세요');
+  attendanceHistoryLoading = true;
+  attendanceHistoryMonth = month;
+  if ($('#attHistoryMonth')) $('#attHistoryMonth').value = month;
+  renderAttendanceHistoryResults();
+  try {
+    const result = await sync.post('/staff-attendance', { app: SYNC_APP, auth, action: 'history', month });
+    if (!result || result.month !== month || !Array.isArray(result.records)) throw new Error('월별 기록 응답을 확인하지 못했습니다');
+    attendanceHistoryChecks = {};
+    result.records.forEach(item => {
+      if (!item || !item.staffId || !/^\d{4}-\d{2}-\d{2}$/.test(String(item.date || '')) || !item.record) return;
+      const key = attKey(item.staffId) + '|' + item.date;
+      const record = Object.assign({}, item.record, { taskId: attKey(item.staffId), date: item.date,
+        updatedAt: Number(item.updatedAt) || 0 });
+      attendanceHistoryChecks[key] = record;
+      const local = state.checks[key];
+      if (!local || Number(record.updatedAt) >= Number(local.updatedAt || 0)) state.checks[key] = record;
+    });
+    attendanceHistoryBounds = result.bounds || attendanceHistoryBounds;
+    if ($('#attHistoryMonth') && attendanceHistoryBounds.earliestMonth) $('#attHistoryMonth').min = attendanceHistoryBounds.earliestMonth;
+  } catch (error) {
+    attendanceHistoryChecks = {};
+    toast('월별 출퇴근 기록을 불러오지 못했습니다 — ' + String(error && error.message || error));
+  } finally {
+    attendanceHistoryLoading = false;
+    renderAttendanceHistoryResults();
+  }
+}
+function openAttendanceHistory(staffId) {
   if (!session.isAdmin) return;
   if (!window.WBStaffAttendanceHistoryCore) return toast('출퇴근 조회 화면을 불러오지 못했습니다. 새로고침해 주세요');
-  const currentDate = seoulNowParts().date;
-  attendanceHistoryDates = Array.from({ length: 14 }, (_, index) => addDays(currentDate, -index));
-  modal('전체 출퇴근 이력', '<section class="att-history">' +
-    '<div class="card-sub mb14">오늘 기록부터 확인하고, 날짜나 선생님을 선택해 지난 기록을 볼 수 있습니다.</div>' +
-    '<div class="att-history-filters"><label for="attHistoryDate">날짜<div class="att-history-date">' +
-    '<button id="attHistoryPrev" class="btn btn-sm btn-ghost" data-act="atthistdate" data-delta="-1" aria-label="이전 날짜">‹</button>' +
-    '<input id="attHistoryDate" class="in" type="date" min="' + attendanceHistoryDates[13] + '" max="' + attendanceHistoryDates[0] + '" value="' + attendanceHistoryDates[0] + '">' +
-    '<button id="attHistoryNext" class="btn btn-sm btn-ghost" data-act="atthistdate" data-delta="1" aria-label="다음 날짜">›</button></div></label>' +
+  attendanceHistoryMonth = seoulNowParts().date.slice(0, 7);
+  attendanceHistoryChecks = {};
+  const staffOptions = state.staff.filter(staff => staff && staff.id && !staff.owner)
+    .sort((left, right) => String(left.name).localeCompare(String(right.name), 'ko'));
+  modal('월별 출퇴근 달력', '<section class="att-history">' +
+    '<div class="card-sub mb14">월을 바꾸면 최초 저장 기록부터 현재까지 모두 조회할 수 있습니다. 날짜를 누르면 관리자가 시각을 수정할 수 있습니다.</div>' +
+    '<div class="att-history-filters"><label for="attHistoryMonth">조회 월<div class="att-history-date">' +
+    '<button id="attHistoryPrev" class="btn btn-sm btn-ghost" data-act="atthistmonth" data-delta="-1" aria-label="이전 달">‹</button>' +
+    '<input id="attHistoryMonth" class="in" type="month" max="' + attendanceHistoryMonth + '" value="' + attendanceHistoryMonth + '">' +
+    '<button id="attHistoryNext" class="btn btn-sm btn-ghost" data-act="atthistmonth" data-delta="1" aria-label="다음 달">›</button></div></label>' +
     '<label for="attHistoryStaff">선생님<select id="attHistoryStaff" class="in"><option value="">전체 선생님</option>' +
-    liveStaff().map(staff => '<option value="' + esc(staff.id) + '">' + esc(staff.name) + '</option>').join('') + '</select></label>' +
-    '<label class="att-history-all"><input id="attHistoryAll" type="checkbox">전체 14일 보기</label></div>' +
-    '<div class="hint">기록 없음은 결근을 뜻하지 않습니다. 근무시간은 출근~퇴근의 단순 차이이며 휴게시간은 별도로 빼지 않습니다.</div>' +
+    staffOptions.map(staff => '<option value="' + esc(staff.id) + '"' + (String(staff.id) === String(staffId || '') ? ' selected' : '') + '>' + esc(staff.name) + '</option>').join('') + '</select></label></div>' +
+    '<div class="hint">기록 없음은 결근을 뜻하지 않습니다. 근무시간은 최초 로그인부터 마지막 로그아웃까지 표시하며 휴게시간은 별도로 빼지 않습니다.</div>' +
     '<div id="attHistoryResults" aria-live="polite"></div>' +
-    '<div class="att-history-actions"><button class="btn btn-ghost" data-act="atthistcopy">조회 결과 복사</button>' +
+    '<div class="att-history-actions"><button class="btn btn-ghost" data-act="atthistcopy">선택 월 결과 복사</button>' +
     '<button class="btn btn-primary" data-act="payrollmodal">월별 급여용 CSV 내보내기</button></div></section>');
-  renderAttendanceHistoryResults();
+  loadAttendanceHistoryMonth(attendanceHistoryMonth);
 }
-function shiftAttendanceHistoryDate(delta) {
-  if (!session.isAdmin || !$('#attHistoryDate') || $('#attHistoryAll').checked || ![-1, 1].includes(delta)) return;
-  const next = addDays($('#attHistoryDate').value, delta);
-  if (!attendanceHistoryDates.includes(next)) return;
-  $('#attHistoryDate').value = next;
-  renderAttendanceHistoryResults();
+function shiftAttendanceHistoryMonth(delta) {
+  if (!session.isAdmin || ![-1, 1].includes(delta)) return;
+  const next = attendanceMonthShift(attendanceHistoryMonth, delta);
+  const currentMonth = attendanceHistoryBounds.currentMonth || today().slice(0, 7);
+  if (!next || next > currentMonth || (attendanceHistoryBounds.earliestMonth && next < attendanceHistoryBounds.earliestMonth)) return;
+  loadAttendanceHistoryMonth(next);
 }
 function copyAttendanceHistory() {
   if (!session.isAdmin || !$('#attHistoryResults')) return;
-  const rows = attendanceHistoryRows();
-  if (!rows.length) return toast('복사할 조회 결과가 없습니다');
+  const rows = attendanceHistoryRows().filter(row => row.status !== 'no_record');
+  if (!rows.length) return toast('복사할 출퇴근 기록이 없습니다');
   copy('날짜\t선생님\t출근\t퇴근\t근무시간\t상태\n' + rows.map(row =>
-    [row.date, row.name, row.clockIn || '—', row.clockOut || '—', row.duration || '—', row.label].join('\t')).join('\n'), '조회 결과를 복사했습니다');
+    [row.date, row.name, row.clockIn || '—', row.clockOut || '—', row.duration || '—', row.label].join('\t')).join('\n'), '선택한 달의 기록을 복사했습니다');
 }
 document.addEventListener('change', event => {
-  if (['attHistoryDate', 'attHistoryStaff', 'attHistoryAll'].includes(event.target.id)) renderAttendanceHistoryResults();
+  if (event.target.id === 'attHistoryStaff') renderAttendanceHistoryResults();
+  if (event.target.id === 'attHistoryMonth' && /^\d{4}-\d{2}$/.test(event.target.value)) loadAttendanceHistoryMonth(event.target.value);
 });
 
 /** 출퇴근 기록 수정 — 급여에 직결되므로 원장·관리 담당만 교정한다. */
@@ -13875,25 +13962,19 @@ function msFromDateTime(date, hm) {
   d.setHours(h, m, 0, 0);
   return d.getTime();
 }
-function attEditModal(staffId) {
+function attEditModal(staffId, date) {
   const s = staffById(staffId);
   if (!session.isAdmin || !s) return;
-  let rows = '';
-  for (let i = 0; i < 14; i++) {
-    const d = addDays(today(), -i);
-    const a = attOf(staffId, d);
-    const editable = canEditAtt(staffId, d);
-    rows += '<div class="between small" style="padding:5px 0;gap:8px">' +
-      '<span style="min-width:64px">' + shortDate(d) + '(' + DOW[dowOf(d)] + ')</span>' +
-      '<input class="in" type="time" style="flex:1" data-act="attedit-in" data-staff="' + staffId + '" data-date="' + d + '"' +
-        (editable ? '' : ' disabled') + ' value="' + (a && a.at ? fmtTime(a.at) : '') + '">' +
-      '<span class="muted">~</span>' +
-      '<input class="in" type="time" style="flex:1" data-act="attedit-out" data-staff="' + staffId + '" data-date="' + d + '"' +
-        (editable ? '' : ' disabled') + ' value="' + (a && a.out ? fmtTime(a.out) : '') + '">' +
-      '</div>';
-  }
+  if (!date) return openAttendanceHistory(staffId);
+  const a = attOf(staffId, date);
+  const rows = '<div class="between small" style="padding:5px 0;gap:8px">' +
+    '<span style="min-width:64px">' + shortDate(date) + '(' + DOW[dowOf(date)] + ')</span>' +
+    '<input class="in" type="time" style="flex:1" data-act="attedit-in" data-staff="' + staffId + '" data-date="' + date + '" value="' + (a && a.at ? fmtTime(a.at) : '') + '">' +
+    '<span class="muted">~</span>' +
+    '<input class="in" type="time" style="flex:1" data-act="attedit-out" data-staff="' + staffId + '" data-date="' + date + '" value="' + (a && a.out ? fmtTime(a.out) : '') + '">' +
+    '</div>';
   modal('🕘 ' + esc(s.name) + ' 출퇴근 수정',
-    '<div class="hint mb14">관리자는 모든 날짜를 수정할 수 있습니다. 시간을 비우면 그 기록이 지워집니다.</div>' + rows);
+    '<div class="hint mb14">관리자는 이 날짜의 출퇴근 시각을 수정할 수 있습니다. 시간을 비우면 해당 시각이 지워집니다.</div>' + rows);
 }
 
 /** 급여용 출퇴근 내보내기 — 대표 전용. 아카플로우 등 외부 급여 계산과는
@@ -20626,7 +20707,7 @@ function viewStaffAdmin() {
     '<button class="btn btn-primary" data-act="addstaff">추가</button></div>' +
     (list.length > 1 ? '<button class="btn btn-ghost btn-block mt14" data-act="alllinks">전체 링크 한 번에 복사</button>' : '') +
     '<button class="btn btn-ghost btn-block mt8" data-act="payrollmodal">📅 급여용 출퇴근 내보내기</button>' +
-    '<button class="btn btn-ghost btn-block mt8" data-act="atthist">🕘 전체 출퇴근 이력 (최근 14일)</button>' +
+    '<button class="btn btn-ghost btn-block mt8" data-act="atthist">🗓️ 월별 출퇴근 달력</button>' +
     (session.isManager && hasVerifiedPersonAuth()
       ? '<div class="hint mt14"><b>이 관리 권한을 다른 태블릿에 연결</b><br>직원 목록에서 다시 고르지 않고, 현재 확인된 내 관리 담당 계정을 그대로 연결합니다.</div>' +
         '<button class="btn btn-ghost btn-block mt8" data-act="retryexistingauth">🔄 이 기기의 기존 연결 상태 확인</button>' +
@@ -23263,7 +23344,11 @@ document.addEventListener('click', async ev => {
       break;
     }
     case 'atthist': openAttendanceHistory(); break;
-    case 'atthistdate': shiftAttendanceHistoryDate(Number(el.dataset.delta)); break;
+    case 'atthistmonth': shiftAttendanceHistoryMonth(Number(el.dataset.delta)); break;
+    case 'atthistdayedit': {
+      if (session.isAdmin) attEditModal(id, el.dataset.date);
+      break;
+    }
     case 'atthistcopy': copyAttendanceHistory(); break;
     case 'atteditopen': {
       if (!session.isAdmin) break;
@@ -24919,7 +25004,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-09-23.4';
+const APP_VER = '2026-09-23.6';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);

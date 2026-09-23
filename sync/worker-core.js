@@ -22,7 +22,7 @@
  *   POST /lesson-create { app, auth, staffId?, lesson } → 수업 1건 등록·수정
  *   POST /lesson-create-batch { app, auth, batchKind, lessons } → 한 학생의 여러 수업 또는 같은 수업의 여러 학생 원자적 등록
  *   POST /contact-log { app, auth, sourceTaskId, type, note } → 담당 수업 학생 연락 기록
- *   POST /staff-attendance { app, auth, action } → 본인 출근·퇴근을 서버 시각으로 최초 1회 기록
+ *   POST /staff-attendance { app, auth, action } → 본인 출퇴근 기록 또는 관리자 월별 이력 조회
  *   POST /weekend-visit { app, auth, action, ... } → 토·일 실제 등·하원 기록
  *   POST /lesson-handoff { app, auth, dataGeneration, action, ... } → 당일 남은 수업 인계
  *   POST /feedback-request { app, auth, ... }     → 직원, 항목별 피드백 제출(제출 즉시 카카오 알림톡 자동 발송 시도)
