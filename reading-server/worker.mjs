@@ -14,6 +14,7 @@ import { handleHanja, hanjaBodyLimit, dropStudentHanja, dumpHanja } from './hanj
 import { handleChunk, dropStudentChunk, pushDueChunk } from './chunk-api.mjs';
 import { handleLetter, letterBodyLimit, dropStudentLetter, dumpLetter, pushDueIssues } from './letter-api.mjs';
 import { checkAdminLogin } from './admin-auth.mjs';
+import { handlePortalFamilyLink, readPortalLinkBody, withPortalFamilies } from './portal-family.mjs';
 import { bookIndex, cleanWords, coachingCard, confirmAllPlan, findBook, readyToConfirm, sourceSummary, validProgress, withOverlay } from './textbook.mjs';
 import { parseRoster } from './roster.mjs';
 
@@ -209,6 +210,19 @@ function naesinStore(env) {
    영어(naesin:)와 달리 요약·서술형·오버레이를 state에서 분리한 별도 키로 둔다
    (국어 기획서 §8 저장 예산 — overview가 state를 통째로 읽지 않게). */
 /* 청크브레인 저장소 어댑터 — chunk: 접두 키만. 콘텐츠는 정적 자산이라 KV 에는 학생 기록·요약뿐이다. */
+function portalFamilyStore(env) {
+  return {
+    getFamily: (t) => env.DB.get('portal-family:' + t, 'json'),
+    putFamily: (t, rec) => env.DB.put('portal-family:' + t, JSON.stringify(rec)),
+    listFamilyTokens: async () => (await kvListAll(env, 'portal-family:')).map(k => k.slice('portal-family:'.length)),
+    getParentCode: (t) => env.DB.get('parent:' + t),
+    putParent: (t, c) => env.DB.put('parent:' + t, c),
+    getStudent: (c) => env.DB.get('student:' + c, 'json'),
+    putStudent: (c, rec) => env.DB.put('student:' + c, JSON.stringify(rec)),
+    listStudentCodes: async () => (await kvListAll(env, 'student:')).map(k => k.slice('student:'.length)),
+  };
+}
+
 function chunkStore(env) {
   return {
     getState: (c) => env.DB.get('chunk:state:' + c, 'json'),
@@ -226,12 +240,7 @@ function chunkStore(env) {
     /* 선생님 지문 — 키 하나에 전부({items, updatedAt}). 학생 앱이 켤 때 한 번에 받는다 */
     getCustoms: () => env.DB.get('chunk:customs', 'json'),
     putCustoms: (rec) => env.DB.put('chunk:customs', JSON.stringify(rec)),
-    /* 가족 링크 — 진로독서 parent:<t> 공용. 발급 때만 학생 레코드(ptoken)를 쓴다 */
-    getParentCode: (t) => env.DB.get('parent:' + t),
-    putParent: (t, c) => env.DB.put('parent:' + t, c),
-    putStudent: (c, rec) => env.DB.put('student:' + c, JSON.stringify(rec)),
-    getStudent: (c) => env.DB.get('student:' + c, 'json'),
-    listStudentCodes: async () => (await kvListAll(env, 'student:')).map((k) => k.slice('student:'.length)),
+    ...withPortalFamilies(portalFamilyStore(env)),
     /* 가족 알림 구독 — chunk:push:f:<ptoken>. 워드브레인·브레인레터와 같은 VAPID 키를 쓰되 키 공간은 따로 */
     getPush: (k) => env.DB.get('chunk:push:' + k, 'json'),
     putPush: (k, rec) => env.DB.put('chunk:push:' + k, JSON.stringify(rec)),
@@ -330,9 +339,7 @@ function letterStore(env) {
     getIssueIds: () => get('letter:issues'), putIssueIds: (ids) => put('letter:issues', ids),
     getState: (c) => get('letter:state:' + c), putState: (c, rec) => put('letter:state:' + c, rec), deleteState: (c) => env.DB.delete('letter:state:' + c),
     listStateCodes: async () => (await kvListAll(env, 'letter:state:')).map((k) => k.slice('letter:state:'.length)),
-    getStudent: (c) => get('student:' + c), putStudent: (c, rec) => put('student:' + c, rec),
-    listStudentCodes: async () => (await kvListAll(env, 'student:')).map((k) => k.slice('student:'.length)),
-    getParentCode: (t) => env.DB.get('parent:' + t), putParent: (t, c) => env.DB.put('parent:' + t, c),
+    ...withPortalFamilies(portalFamilyStore(env)),
     getAiUse: () => get('letter:aiuse'), putAiUse: (rec) => put('letter:aiuse', rec),
     /* 사진 — 바이트는 값, 종류·크기·이름은 KV 메타데이터(목록을 훑을 때 값을 안 읽어도 되게) */
     getImage: async (id) => { const r = await env.DB.getWithMetadata('letter:img:' + id, 'arrayBuffer'); return r && r.value ? { bytes: r.value, meta: r.metadata || {} } : null; },
@@ -360,6 +367,9 @@ function vocabPushEnv(env) {
 
 async function fullDump(env) {
   const students = {}; const states = {};
+  const portalFamilies = {};
+  for (const token of await portalFamilyStore(env).listFamilyTokens())
+    portalFamilies[token] = await portalFamilyStore(env).getFamily(token);
   const codes = new Set();
   for (const prefix of ['student:', 'state:']) {
     (await kvListAll(env, prefix)).forEach(k => codes.add(k.slice(prefix.length)));
@@ -413,7 +423,7 @@ async function fullDump(env) {
   const letter = await dumpLetter(letterStore(env));
   /* 어휘브레인 — 목록(메타)·학생 기록·배정. 단어장 본문은 내신 팩과 같은 이유로 id 만 */
   const hanja = await dumpHanja(hanjaStore(env));
-  return { service: 'wb-reading', savedAt: nowIso(), students, states, vocab, textbook: textbook || {}, pubmap: pubmap || {}, naesin, naesinKo, textbookSrc: textbookSrc || {}, haru, chunk, letter, hanja };
+  return { service: 'wb-reading', savedAt: nowIso(), students, portalFamilies, states, vocab, textbook: textbook || {}, pubmap: pubmap || {}, naesin, naesinKo, textbookSrc: textbookSrc || {}, haru, chunk, letter, hanja };
 }
 
 async function snapshotBackup(env) {
@@ -598,6 +608,13 @@ export default {
          눌러도 안 되는 버튼은 학생에게 앱이 고장 난 것처럼 보인다.
          키를 넣으면 다음 접속부터 버튼이 저절로 돌아온다. 값이 아니라 있고 없음만 알린다. */
       if (p === '/api/health') return json(200, { ok: true, service: 'wb-reading', runtime: 'workers', time: nowIso(), ai: !!env.ANTHROPIC_API_KEY });
+
+      if (p === '/api/portal/family-link') {
+        const out = await handlePortalFamilyLink({ method: req.method,
+          authorization: req.headers.get('authorization'), secret: env.WB_PARENT_PORTAL_LINK_SECRET,
+          getBody: () => readPortalLinkBody(req), store: portalFamilyStore(env) });
+        return json(out.status, out.body);
+      }
 
       /* 발행 상태 맵 — 공개 읽기 (지문 발행 여부는 민감정보가 아님, 운영 루틴이 git 반영에 사용) */
       if (p === '/api/pub' && req.method === 'GET') {

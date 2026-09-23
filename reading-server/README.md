@@ -61,6 +61,8 @@ ADMIN_PIN=원하는PIN node reading-server/server.mjs   # 기본 포트 8890 (�
 
 ## API 요약
 
+- 부모 포털 자동 연결: `POST /api/portal/family-link {token,name}`. 전용 `WB_PARENT_PORTAL_LINK_SECRET` Bearer 인증만 허용한다. 32자리 무작위 키로 가족 레코드를 한 번 만들고 `{ok:true,token}`을 반환한다. 기존 학생 계정 생성·이름 대조 병합·알림 발송은 하지 않는다. 이 가족 링크는 브레인레터·청크브레인 가족 모드만 이용하며 포털이 실행 전 참여 자격을 확인한다. 기존 수동 연결 링크는 유지한다.
+
 - 공개: `GET /api/health` · `GET /api/pub`(발행 오버라이드 맵) · `GET /api/parent/summary?t=토큰`(학부모 리포트)
 - 학생: `POST /api/login {code}` → `{token, student}` / `GET /api/pull` / `PUT /api/state {state}` (Bearer, 900KB 제한) / `GET /api/league`(같은 반 스트릭 리그 — 성적 비공개)
 - 관리(Bearer, PIN 로그인): `POST /api/admin/login {pin}` / `GET /api/admin/overview` / `POST /api/admin/students` / `POST /api/admin/level` / `GET /api/admin/student/:code` / `GET /api/admin/export[?backup=날짜]` / `GET /api/admin/backups` / `POST /api/admin/backup-now` / `POST /api/admin/pub {id,status}` / `POST /api/admin/parentlink {code,reset?}` / `GET /api/admin/parent-messages`(학부모 주간 발송 문구 일괄 생성)

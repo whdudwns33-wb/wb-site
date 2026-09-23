@@ -19,7 +19,7 @@ const STATE_MAX_BYTES = 262_144;   // 학생 기록 1건 최대 (256KB) — log 
 const SUMMARY_MAX_BYTES = 4_096;
 const ASSIGN_MAX_ITEMS = 20;
 const BANDS = ['K', 'G1', 'G2', 'G3', 'G4', 'G5', 'G6', 'G7', 'G8', 'G9', 'G10', 'G11', 'G12'];   /* chunk/rules.js BAND_ORDER 와 같다 */
-const CODE_RE = /^[A-Za-z0-9-]{3,20}$/;
+const CODE_RE = /^(?:[A-Za-z0-9-]{3,20}|portal-[a-f0-9]{32})$/;
 const ID_RE = /^[a-z0-9-]{2,24}$/;        /* 지문·카드 id — g3-01, k-1 */
 const TAG_RE = /^(?:miss|extra):[a-z]+$/;
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -280,7 +280,7 @@ export async function handleChunk({ path: p, method, who, getBody, store, query,
       return j(200, { rows, updatedAt: nowIso() });
     }
     /* 가족 링크 발급 — 학생 레코드의 ptoken 을 쓰고, 없으면 만든다(진로독서·브레인레터와 같은 토큰이라 가정마다 링크 하나) */
-    const mp = p.match(/^\/api\/chunk\/admin\/parentlink\/([A-Za-z0-9-]{3,20})$/);
+    const mp = p.match(/^\/api\/chunk\/admin\/parentlink\/([A-Za-z0-9-]{3,20}|portal-[a-f0-9]{32})$/);
     if (mp && method === 'POST') {
       const stu = await store.getStudent(mp[1]);
       if (!stu) return j(404, { error: '학생 없음' });
@@ -293,13 +293,13 @@ export async function handleChunk({ path: p, method, who, getBody, store, query,
       }
       return j(200, { ptoken, path: '/chunk/?t=' + ptoken, created, name: stu.name || '' });
     }
-    const ms = p.match(/^\/api\/chunk\/admin\/student\/([A-Za-z0-9-]{3,20})$/);
+    const ms = p.match(/^\/api\/chunk\/admin\/student\/([A-Za-z0-9-]{3,20}|portal-[a-f0-9]{32})$/);
     if (ms && method === 'GET') {
       const rec = await store.getState(ms[1]);
       if (!rec) return j(404, { error: '기록 없음' });
       return j(200, { state: rec.state, updatedAt: rec.updatedAt });
     }
-    const ma = p.match(/^\/api\/chunk\/admin\/assign\/([A-Za-z0-9-]{3,20})$/);
+    const ma = p.match(/^\/api\/chunk\/admin\/assign\/([A-Za-z0-9-]{3,20}|portal-[a-f0-9]{32})$/);
     if (ma && method === 'GET') {
       const rec = await store.getAssign(ma[1]);
       return j(200, { assign: rec ? rec.assign : null, updatedAt: rec ? rec.updatedAt : null });
