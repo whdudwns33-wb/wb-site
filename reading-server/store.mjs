@@ -61,7 +61,7 @@ export function hanjaSnapshot(h) {
    이게 빠지면 복구했을 때 낱말 검수를 처음부터 다시 해야 한다. */
 function snapshotBody() {
   return { service: 'wb-reading', savedAt: new Date().toISOString(),
-    students: db.students, states: db.states, vocab: db.vocab,
+    students: db.students, portalFamilies: db.portalFamilies || {}, states: db.states, vocab: db.vocab,
     textbook: db.textbook || {}, pubmap: db.pubmap || {}, naesin: naesinSnapshot(db.naesin),
     textbookSrc: db.textbookSrc || {}, hanja: hanjaSnapshot(db.hanja) };
 }

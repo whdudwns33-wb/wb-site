@@ -18,6 +18,7 @@ import { handleHanja, hanjaBodyLimit, dropStudentHanja, dumpHanja } from './hanj
 import { handleChunk, dropStudentChunk } from './chunk-api.mjs';
 import { handleLetter, letterBodyLimit, dropStudentLetter, dumpLetter, pushDueIssues } from './letter-api.mjs';
 import { checkAdminLogin } from './admin-auth.mjs';
+import { handlePortalFamilyLink, PORTAL_LINK_BODY_LIMIT, withPortalFamilies } from './portal-family.mjs';
 import { bookIndex, cleanWords, coachingCard, confirmAllPlan, findBook, readyToConfirm, sourceSummary, validProgress, withOverlay } from './textbook.mjs';
 import { parseRoster } from './roster.mjs';
 
@@ -50,6 +51,16 @@ const TOKEN_TTL = 1000 * 60 * 60 * 24 * 30;            // 30일
 
 load();
 const db = getDb();
+const portalFamilyStore = {
+  getFamily: (t) => db.portalFamilies?.[t] || null,
+  putFamily: (t, rec) => { db.portalFamilies = db.portalFamilies || {}; db.portalFamilies[t] = rec; persist(); },
+  listFamilyTokens: () => Object.keys(db.portalFamilies || {}),
+  getParentCode: (t) => db.parents?.[t] || null,
+  putParent: (t, c) => { db.parents = db.parents || {}; db.parents[t] = c; persist(); },
+  getStudent: (c) => db.students[c] || null,
+  putStudent: (c, rec) => { db.students[c] = rec; persist(); },
+  listStudentCodes: () => Object.keys(db.students),
+};
 
 /* 워드브레인 저장소 어댑터 — db.vocab만 사용 (분리 가능한 격리) */
 const vocabPushMap = () => (db.vocab.push = db.vocab.push || {});
@@ -179,8 +190,7 @@ const letterStore = {
   getIssueIds: () => letterRoot().issueIds || null, putIssueIds: (ids) => { letterRoot().issueIds = ids; persist(); },
   getState: (c) => letterRoot().states[c] || null, putState: (c, rec) => { letterRoot().states[c] = rec; persist(); }, deleteState: (c) => { delete letterRoot().states[c]; persist(); },
   listStateCodes: () => Object.keys(letterRoot().states),
-  getStudent: (c) => db.students[c] || null, putStudent: (c, rec) => { db.students[c] = rec; persist(); }, listStudentCodes: () => Object.keys(db.students),
-  getParentCode: (t) => (db.parents || {})[t] || null, putParent: (t, c) => { db.parents = db.parents || {}; db.parents[t] = c; persist(); },
+  ...withPortalFamilies(portalFamilyStore),
   getAiUse: () => letterRoot().aiuse || null, putAiUse: (rec) => { letterRoot().aiuse = rec; persist(); },
   getImage: (id) => { const meta = letterRoot().images[id]; if (!meta) return null; try { return { bytes: fs.readFileSync(path.join(LETTER_IMG_DIR, id + '.bin')), meta }; } catch (e) { return null; } },
   putImage: (id, bytes, meta) => { fs.mkdirSync(LETTER_IMG_DIR, { recursive: true }); fs.writeFileSync(path.join(LETTER_IMG_DIR, id + '.bin'), Buffer.from(bytes)); letterRoot().images[id] = meta; persist(); },
@@ -284,12 +294,7 @@ const chunkStore = {
   /* 선생님 지문 — 워커의 chunk:customs 키와 같은 모양({items, updatedAt}) */
   getCustoms: () => chunkRoot().customs || null,
   putCustoms: (rec) => { chunkRoot().customs = rec; persist(); },
-  /* 가족 링크 — db.parents(진로독서) 공용 */
-  getParentCode: (t) => (db.parents || {})[t] || null,
-  putParent: (t, c) => { db.parents = db.parents || {}; db.parents[t] = c; persist(); },
-  putStudent: (c, rec) => { db.students = db.students || {}; db.students[c] = rec; persist(); },
-  getStudent: (c) => db.students?.[c] || null,
-  listStudentCodes: () => Object.keys(db.students || {}),
+  ...withPortalFamilies(portalFamilyStore),
   /* 가족 알림 구독 — 워커의 chunk:push:<key> 와 같은 모양 */
   getPush: (k) => (chunkRoot().pushes || {})[k] || null,
   putPush: (k, rec) => { chunkRoot().pushes = chunkRoot().pushes || {}; chunkRoot().pushes[k] = rec; persist(); },
@@ -479,6 +484,14 @@ const server = http.createServer(async (req, res) => {
          눌러도 안 되는 버튼은 학생에게 앱이 고장 난 것처럼 보인다.
          키를 넣으면 다음 접속부터 버튼이 저절로 돌아온다. 값이 아니라 있고 없음만 알린다. */
       if (p === '/api/health') return json(res, 200, { ok: true, service: 'wb-reading', time: nowIso(), ai: !!process.env.ANTHROPIC_API_KEY });
+
+      if (p === '/api/portal/family-link') {
+        const out = await handlePortalFamilyLink({ method: req.method,
+          authorization: req.headers.authorization, secret: process.env.WB_PARENT_PORTAL_LINK_SECRET,
+          getBody: () => readBody(req, PORTAL_LINK_BODY_LIMIT), store: portalFamilyStore });
+        req.resume();
+        return json(res, out.status, out.body);
+      }
 
       if (p === '/api/pub' && req.method === 'GET') return json(res, 200, { map: db.pubmap || {} });
 
@@ -811,7 +824,7 @@ const server = http.createServer(async (req, res) => {
         /* 워커 fullDump 와 같은 모양 — 내신은 팩 본문 없이(packIds 만), 교재 원문(textbookSrc)은 포함.
            팩은 라이선스 원문이라 백업 파일로 흩어지지 않게 한다(store.naesinSnapshot). */
         return json(res, 200, { service: 'wb-reading', savedAt: nowIso(), students: db.students, states: db.states, vocab: db.vocab,
-          textbook: db.textbook || {}, pubmap: db.pubmap || {}, naesin: naesinSnapshot(db.naesin), textbookSrc: db.textbookSrc || {}, haru: await dumpHaru(haruStore), letter: await dumpLetter(letterStore), hanja: await dumpHanja(hanjaStore) });
+          portalFamilies: db.portalFamilies || {}, textbook: db.textbook || {}, pubmap: db.pubmap || {}, naesin: naesinSnapshot(db.naesin), textbookSrc: db.textbookSrc || {}, haru: await dumpHaru(haruStore), letter: await dumpLetter(letterStore), hanja: await dumpHanja(hanjaStore) });
       }
       if (p === '/api/admin/backups' && req.method === 'GET') {
         return json(res, 200, { backups: listBackups() });
