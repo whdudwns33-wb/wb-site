@@ -10,6 +10,8 @@ import { readPublicBookStatus } from './public-book-status.js';
 const schema = fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8');
 const migration = fs.readFileSync(new URL('./migrations/037_book_order_identity_snapshots.sql', import.meta.url), 'utf8');
 const itemCancellationMigration = fs.readFileSync(new URL('./migrations/056_book_order_item_cancellations.sql', import.meta.url), 'utf8');
+const receivedStudentCancellationMigration = fs.readFileSync(
+  new URL('./migrations/079_book_order_received_student_cancellations.sql', import.meta.url), 'utf8');
 const admin = { mode: 'admin', secret: 'director-secret' };
 const person = { mode: 'person', id: 'teacher-a', token: 'token-a' };
 const vendorPhones = JSON.stringify({ '문자출판사': '010-1234-5678' });
@@ -115,6 +117,16 @@ test('037 is additive, append-only, and stores no student display name, contact,
     const start = sql.indexOf('CREATE TABLE IF NOT EXISTS book_order_student_snapshots');
     const table = sql.slice(start, sql.indexOf(');', start) + 2);
     assert.doesNotMatch(table, /student_name|phone|address|memo/i);
+  }
+});
+
+test('079 keeps direct-order student cancellations append-only without storing display names or contacts', () => {
+  for (const sql of [schema, receivedStudentCancellationMigration]) {
+    assert.match(sql, /CREATE TABLE IF NOT EXISTS book_order_received_student_cancellations/);
+    assert.match(sql, /BOOK_ORDER_RECEIVED_STUDENT_CANCELLATION_APPEND_ONLY/);
+    const start = sql.indexOf('CREATE TABLE IF NOT EXISTS book_order_received_student_cancellations');
+    const definition = sql.slice(start, sql.indexOf(');', start) + 2);
+    assert.doesNotMatch(definition, /student_name|phone|address|memo/i);
   }
 });
 
@@ -565,6 +577,63 @@ test('internal orders continue through handoff and admin academy registration', 
   assert.equal(academy.body.status, 'academy_registered');
   assert.equal(db.database.prepare('SELECT COUNT(*) AS count FROM completed_book_catalog').get().count, 0,
     '내부 교재는 외부 교재 자동 DB 후보에 섞지 않는다');
+});
+
+test('direct stage-3 orders cancel selected students, preserve history, and block cancellation after handoff', async () => {
+  const db = new TestD1(); seed(db);
+  const grouped = boundBody('ord_bound_cancel01');
+  grouped.auth = admin;
+  grouped.studentIds = ['student-a', 'student-b'];
+  const created = await call(db, grouped);
+  assert.equal(created.status, 201, JSON.stringify(created.body));
+
+  const before = await call(db, { auth: admin, action: 'list' }, '/book-issue');
+  let row = before.body.orders.find(item => item.taskId === grouped.taskId);
+  assert.equal(row.stage, 'teacher_received');
+  assert.equal(row.quantity, 2);
+
+  const partial = await call(db, { auth: admin, action: 'order_cancel_received_students',
+    taskId: grouped.taskId, itemIndex: 0, revision: 1, studentIds: ['student-a'], reason: '교재 종류 오선택' }, '/book-issue');
+  assert.equal(partial.status, 200, JSON.stringify(partial.body));
+  assert.equal(partial.body.allCancelled, false);
+  const partialList = await call(db, { auth: admin, action: 'list' }, '/book-issue');
+  row = partialList.body.orders.find(item => item.taskId === grouped.taskId);
+  assert.equal(row.stage, 'teacher_received');
+  assert.equal(row.quantity, 1);
+  assert.deepEqual(row.students.map(student => student.id), ['student-b']);
+  assert.deepEqual(row.cancelledStudents.map(student => student.id), ['student-a']);
+  assert.equal(row.cancelledStudents[0].reason, '교재 종류 오선택');
+  assert.equal(JSON.stringify(row.cancelledStudents).includes('phone'), false);
+
+  const reordered = boundBody('ord_bound_reorder1');
+  reordered.auth = admin;
+  reordered.title = grouped.title;
+  assert.equal((await call(db, reordered)).status, 201, '취소된 학생은 같은 교재를 다시 주문할 수 있다');
+
+  const completed = await call(db, { auth: admin, action: 'order_cancel_received_students',
+    taskId: grouped.taskId, itemIndex: 0, revision: 1, studentIds: ['student-b'], reason: '주문 전체 취소' }, '/book-issue');
+  assert.equal(completed.status, 200);
+  assert.equal(completed.body.allCancelled, true);
+  const completedList = await call(db, { auth: admin, action: 'list' }, '/book-issue');
+  row = completedList.body.orders.find(item => item.taskId === grouped.taskId);
+  assert.equal(row.stage, 'cancelled');
+  assert.equal(row.quantity, 0);
+  assert.equal(row.cancelledStudents.length, 2);
+  const handCancelled = await call(db, { auth: admin, action: 'order_transition',
+    taskId: grouped.taskId, itemIndex: 0, next: 'hand', revision: 1 }, '/book-issue');
+  assert.equal(handCancelled.status, 409);
+  assert.equal(handCancelled.body.code, 'ORDER_ALL_STUDENTS_CANCELLED');
+
+  const handedOrder = await call(db, internalBody('ord_internal_handed1'));
+  assert.equal(handedOrder.status, 201);
+  const handed = await call(db, { auth: person, action: 'order_transition', taskId: handedOrder.body.task.id,
+    itemIndex: 0, next: 'hand', revision: 1 }, '/book-issue');
+  assert.equal(handed.status, 200);
+  const tooLate = await call(db, { auth: person, action: 'order_cancel_received_students',
+    taskId: handedOrder.body.task.id, itemIndex: 0, revision: 2,
+    studentIds: ['student-a'], reason: '늦은 취소' }, '/book-issue');
+  assert.equal(tooLate.status, 409);
+  assert.equal(tooLate.body.code, 'ORDER_CANCEL_NOT_RECEIVED');
 });
 
 test('internal product metadata tampering fails the sealed snapshot verifier', async () => {

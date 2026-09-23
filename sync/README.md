@@ -130,6 +130,8 @@ npx wrangler d1 execute wb-sync --remote --file=./migrations/074_makeup_completi
 npx wrangler d1 execute wb-sync --remote --file=./migrations/075_manager_inspection_sessions.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/076_makeup_absence_retry.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/077_weekend_open_visit_per_day.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/078_makeup_instructions.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/079_book_order_received_student_cancellations.sql
 
 > `076`은 보강 수업 자체가 결석된 뒤 새 일정을 잡는 재보강 경로를 추가한다. 기존 결석
 > 출결과 원래 보강 일정은 append-only 이력으로 보존하고, 재보강 일정만 새로 저장한다.
