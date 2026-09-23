@@ -149,7 +149,14 @@ try {
   }
   assert.ok(ready, 'local server startup');
   await contract(async (p, opt = {}) => decoded(await fetch('http://127.0.0.1:' + port + p, requestOptions(opt))), 'Node');
-  const saved = JSON.parse(fs.readFileSync(path.join(dataDir, 'db.json'), 'utf8'));
+  // persist()는 300ms 뒤 원자적으로 저장하므로 실제 파일 반영을 최대 5초 기다린다.
+  let saved;
+  for (let n = 0; n < 100; n++) {
+    saved = JSON.parse(fs.readFileSync(path.join(dataDir, 'db.json'), 'utf8'));
+    if (saved.portalFamilies?.[TOKEN]?.letterTier === 'K' && saved.portalFamilies?.[OTHER]) break;
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+  assert.equal(saved.portalFamilies?.[TOKEN]?.letterTier, 'K', '가족 생성·관리 변경의 파일 저장 완료');
   assert.equal(saved.students[CODE], undefined);
   assert.equal(saved.parents[TOKEN], undefined);
   assert.equal(Object.keys(saved.portalFamilies).length, 2);
