@@ -29,7 +29,7 @@ function renderTabsHtml(sessionValue, manager, hasRoadmap = false) {
   const target = { innerHTML: '' };
   const source = functionSource('renderTabs');
   new Function(
-    'session', 'isManager', 'alertsToday', '$', 'requestAnimationFrame', 'route', 'teamStaff', 'currentStaff', 'studyRoadmapActive',
+    'session', 'isManager', 'alertsToday', '$', 'requestAnimationFrame', 'route', 'teamStaff', 'currentStaff', 'studyRoadmapAvailable',
     source + '; renderTabs();'
   )(
     sessionValue,

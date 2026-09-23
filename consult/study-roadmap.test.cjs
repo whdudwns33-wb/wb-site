@@ -75,13 +75,16 @@ test('roadmap exists only for selected students and is managed by the director',
   assert.match(source, /if \(!roadmap\.targetSchool \|\| !roadmap\.items\.length\) return ''/);
   assert.match(source, /esc\(roadmap\.targetSchool\)/);
   assert.match(source, /esc\(item\.book\)/);
+  assert.match(source, /function studyRoutineRoadmapCard/);
+  assert.match(source, /오늘 체크리스트와 연결된 반복 학습/);
   assert.doesNotMatch(study, /studyRoadmapCard\(me\)/);
   assert.match(roadmapView, /studyRoadmapCard\(me\)/);
+  assert.match(roadmapView, /studyRoutineRoadmapCard\(me\)/);
   assert.match(roadmapView, /studyRoadmapWeekCard\(me, mon, days\)/);
   assert.match(week, /studyRoadmapWeekCard\(me, mon, days\)/);
-  assert.match(render, /route === 'roadmap'[^]*session\.isStaffLink[^]*studyRoadmapActive\(currentStaff\(\)\)/);
+  assert.match(render, /route === 'roadmap'[^]*session\.isStaffLink[^]*studyRoadmapAvailable\(currentStaff\(\)\)/);
   assert.match(render, /roadmap: viewRoadmap/);
-  assert.match(tabs, /session\.isAdmin[^]*studyRoadmapActive\(currentStaff\(\)\)[^]*\['roadmap', '로드맵'\]/);
+  assert.match(tabs, /session\.isAdmin[^]*studyRoadmapAvailable\(currentStaff\(\)\)[^]*\['roadmap', '로드맵'\]/);
   assert.match(startup, /'week', 'roadmap', 'month'/);
   assert.match(staff, /data-act="roadmapopen"/);
   assert.match(handlers, /if \(!session\.isAdmin \|\| session\.isStaffLink\) break/);
@@ -89,6 +92,33 @@ test('roadmap exists only for selected students and is managed by the director',
   assert.match(handlers, /student\.updatedAt = now\(\)/);
   assert.match(handlers, /save\(\)/);
   assert.match(handlers, /queueSync\(\)/);
+});
+
+test('existing long-term director study routines also appear in the roadmap tab', () => {
+  const api = Function(`${dates}
+    const STUDY_ROADMAP_AUTO='study-roadmap-v1';
+    function today(){return '2026-09-23';}
+    let state={tasks:[
+      {id:'daily',staffId:'student-a',origin:'admin',title:'독서 20분',repeat:'daily',start:'2026-09-21',end:'2027-02-28'},
+      {id:'weekday',staffId:'student-a',origin:'admin',title:'오늘 계획',repeat:'weekday',start:'2026-09-22',end:'2027-02-28'},
+      {id:'weekly',staffId:'student-a',origin:'admin',title:'주간 리뷰',repeat:'days',days:[0],start:'2026-09-27',end:'2027-02-28'},
+      {id:'short',staffId:'student-a',origin:'admin',title:'짧은 계획',repeat:'daily',start:'2026-09-21',end:'2026-10-10'},
+      {id:'own',staffId:'student-a',origin:'staff',title:'학생 개인 계획',repeat:'daily',start:'2026-09-21',end:'2027-02-28'},
+      {id:'online',staffId:'student-a',origin:'admin',source:'leaders_eye',title:'온라인 학습',repeat:'daily',start:'2026-09-21',end:'2027-02-28'},
+      {id:'auto',staffId:'student-a',origin:'admin',auto:STUDY_ROADMAP_AUTO,title:'자동 교재 계획',repeat:'daily',start:'2026-09-21',end:'2027-02-28'},
+      {id:'special',staffId:'student-a',origin:'admin',kind:'learning_daily_log',title:'특수 기록',repeat:'daily',start:'2026-09-21',end:'2027-02-28'},
+      {id:'old',staffId:'student-a',origin:'admin',title:'지난 계획',repeat:'daily',start:'2026-01-01',end:'2026-09-22'},
+      {id:'deleted',staffId:'student-a',origin:'admin',title:'삭제 계획',repeat:'daily',start:'2026-09-21',end:'2027-02-28',deleted:true}
+    ]};
+    ${functionSource('studyRoadmapOf')}
+    ${functionSource('studyRoadmapActive')}
+    ${functionSource('studyRoutineRoadmapTasks')}
+    ${functionSource('studyRoadmapAvailable')}
+    return {studyRoutineRoadmapTasks,studyRoadmapAvailable};
+  `)();
+  assert.deepEqual(api.studyRoutineRoadmapTasks('student-a').map(task => task.id), ['daily', 'weekday', 'weekly']);
+  assert.equal(api.studyRoadmapAvailable({ id: 'student-a' }), true);
+  assert.equal(api.studyRoadmapAvailable({ id: 'student-b' }), false);
 });
 
 test('generated roadmap study reuses checklist, carry, and completion records without duplicates', () => {
