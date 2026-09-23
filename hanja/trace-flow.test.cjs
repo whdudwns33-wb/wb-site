@@ -7,8 +7,9 @@ const vm = require('vm');
 const T = require('./trace.js');
 const S = require('./srs.js');
 const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
-const source = html.slice(html.indexOf('  function tracePanelHtml()'), html.indexOf("  window.addEventListener('resize', function () { if (TRACE"));
-assert.ok(source.includes('function traceAnimate()'), '실제 쓰기 화면 함수를 찾지 못했다');
+const source = html.slice(html.indexOf('  function tracePanelHtml()'), html.indexOf("  window.addEventListener('resize', function () { if (TRACE")) +
+  html.slice(html.indexOf('  function makePad('), html.indexOf('  function trainItems('));
+assert.ok(source.includes('function traceAnimate('), '실제 쓰기 화면 함수를 찾지 못했다');
 const cross = [[[0.1, 0.5], [0.9, 0.5]], [[0.5, 0.1], [0.5, 0.9]]];
 const points = (line) => line.map(([x, y]) => ({ x, y }));
 const copy = (value) => JSON.parse(JSON.stringify(value));
@@ -142,6 +143,89 @@ t('모양을 성공적으로 쓴 회차는 모양 연습으로 한 번만 기록
   assert.strictEqual(a.TRACE.completed.order, 0); assert.strictEqual(a.TRACE.completed.shape, 1);
   h.click('trNext'); assert.strictEqual(a.TRACE.cur.rep, 1);
   assert.strictEqual(h.saves, 1);
+});
+
+t('한 획 지우기는 획 번호·판정을 되돌리고 완성 후 재작성도 한 회로 센다', () => {
+  const h = harness(), a = h.app; h.open(); h.finishDemo(); h.click('trNext');
+  assert.ok(h.node('#trUndo').disabled);
+  h.draw(cross[0]); h.click('trUndo');
+  assert.strictEqual(a.TRACE.done.length, 0); assert.strictEqual(a.TRACE.strokes.length, 0);
+  assert.ok(/1 \/ 2획/.test(h.node('#trStroke').textContent));
+  cross.forEach(h.draw); assert.strictEqual(a.db.trace['十'].reps, 1);
+  h.click('trUndo');
+  assert.deepStrictEqual(copy(a.TRACE.done), [0]); assert.strictEqual(a.TRACE.strokes.length, 1);
+  assert.strictEqual(a.TRACE.judged, null); assert.ok(h.node('#trNext').disabled);
+  assert.ok(/2 \/ 2획/.test(h.node('#trStroke').textContent));
+  h.draw(cross[1]); assert.strictEqual(a.db.trace['十'].reps, 1);
+  assert.strictEqual(a.TRACE.completed.order, 1); assert.strictEqual(h.saves, 1);
+});
+
+t('이번 획 시범은 쓰던 획과 기록을 유지하며 재생 중 지우기를 막는다', () => {
+  const h = harness(), a = h.app; h.open(); h.finishDemo(); h.click('trNext'); h.draw(cross[0]);
+  const before = copy(a.TRACE.strokes); h.click('trStrokeDemo');
+  assert.ok(a.TRACE.anim && h.node('#trUndo').disabled && h.node('#trStrokeDemo').disabled);
+  h.click('trUndo'); a.traceErase(false); a.traceNext();
+  const [id, frame] = h.frames.entries().next().value; h.frames.delete(id); frame(0);
+  assert.ok(/2 \/ 2획/.test(h.node('#trModelTip').textContent));
+  h.finishDemo();
+  assert.deepStrictEqual(copy(a.TRACE.strokes), before); assert.deepStrictEqual(copy(a.TRACE.done), [0]);
+  assert.strictEqual(h.saves, 0); assert.ok(!h.node('#trUndo').disabled);
+  h.draw(cross[1]); assert.strictEqual(a.db.trace['十'].reps, 1);
+});
+
+t('모범과 번호 안내는 따라 쓰기에 보이고 혼자 쓰기는 요청할 때만 보인다', () => {
+  const h = harness(), a = h.app; h.open(); h.finishDemo(); h.click('trNext');
+  assert.strictEqual(h.node('#trReference').hidden, false);
+  assert.ok(/1 \/ 2획/.test(h.node('#trModelTip').textContent));
+  cross.forEach(h.draw); h.click('trNext'); cross.forEach(h.draw); h.click('trNext');
+  assert.strictEqual(a.TRACE.cur.rep, 2); assert.strictEqual(h.node('#trReference').hidden, true);
+  h.click('trPeek'); assert.strictEqual(h.node('#trReference').hidden, false);
+  assert.ok(/모범·안내를 보고/.test(h.node('#trLesson').textContent));
+  h.click('trPeek'); assert.strictEqual(h.node('#trReference').hidden, true);
+  h.click('trStrokeDemo'); h.finishDemo(); assert.strictEqual(h.node('#trReference').hidden, true);
+  assert.strictEqual(h.saves, 2);
+});
+
+t('터치·펜은 한 포인터의 획만 받고 취소된 획은 판정하지 않는다', () => {
+  const h = harness(), a = h.app; h.open(); h.finishDemo(); h.click('trNext');
+  const events = h.node('#trCv').events;
+  function event(type, x, y, id = 7, pointerType = 'touch') { return { type, pointerType, pointerId: id, isPrimary: true, clientX: x * 300, clientY: y * 300, preventDefault() {} }; }
+  events.pointerdown(event('pointerdown', 0.1, 0.5));
+  events.pointermove(event('pointermove', 0.9, 0.5, 8));
+  assert.strictEqual(a.TRACE.strokes[0].length, 1);
+  a.traceErase(false); a.traceAnimate(); assert.strictEqual(a.TRACE.strokes.length, 1); assert.strictEqual(h.frames.size, 0);
+  events.pointermove(event('pointermove', 0.9, 0.5));
+  events.pointercancel(event('pointercancel', 0.9, 0.5));
+  assert.strictEqual(a.TRACE.strokes.length, 0); assert.strictEqual(a.TRACE.done.length, 0);
+  events.pointerdown(event('pointerdown', 0.1, 0.5, 9, 'pen'));
+  events.pointermove(event('pointermove', 0.9, 0.5, 9, 'pen'));
+  events.pointerup(event('pointerup', 0.9, 0.5, 9, 'pen'));
+  assert.deepStrictEqual(copy(a.TRACE.done), [0]);
+  h.click('trUndo'); assert.strictEqual(a.TRACE.strokes.length, 0);
+});
+
+t('모양 연습도 한 획 지우면 판정을 다시 하고 획순 안내는 만들지 않는다', () => {
+  const h = harness(), a = h.app; h.open('土');
+  a.TRACE.strokes = cross.map(points); h.click('trNext');
+  assert.ok(a.TRACE.judged); h.click('trUndo');
+  assert.strictEqual(a.TRACE.judged, null); assert.strictEqual(a.TRACE.strokes.length, 1);
+  assert.strictEqual(h.node('#trNext').textContent, '확인'); assert.ok(h.node('#trStrokeDemo').hidden);
+  assert.ok(/모양만/.test(h.node('#trModelTip').textContent));
+});
+
+t('쓰기 시험의 한 획 지우기는 남은 잉크를 보존하고 제출 뒤에는 잠긴다', () => {
+  const h = harness(), cv = h.node('#qCv'), pad = h.app.makePad(cv);
+  function event(type, x, y) { return { type, pointerId: 1, pointerType: 'pen', isPrimary: true, clientX: x * 300, clientY: y * 300, preventDefault() {} }; }
+  cross.forEach(line => {
+    cv.events.pointerdown(event('pointerdown', ...line[0]));
+    cv.events.pointermove(event('pointermove', ...line[1]));
+    cv.events.pointerup(event('pointerup', ...line[1]));
+  });
+  assert.strictEqual(pad.strokes.length, 2); pad.undo();
+  assert.deepStrictEqual(copy(pad.strokes), [points(cross[0])]);
+  pad.reveal('十'); pad.undo(); pad.clear();
+  assert.strictEqual(pad.strokes.length, 1); assert.strictEqual(pad.revealCh, '十');
+  cv.events.pointerdown(event('pointerdown', 0.2, 0.2)); assert.strictEqual(pad.strokes.length, 1);
 });
 
 console.log('\nOK — ' + passed + '개 통과');
