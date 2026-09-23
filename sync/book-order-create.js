@@ -211,7 +211,7 @@ export function cancelledOrderItemIndexes(rows, taskId) {
 /** Only a task outside the sealed namespace and without a seal marker may be a zero-row legacy order. */
 export async function verifyOrderTaskSnapshotRows(
   taskId, owner, task, rows, document, now = Date.now(), requireCurrentEnrollment = true,
-  cancelledItemIndexes = new Set()
+  cancelledItemIndexes = new Set(), cancelledStudentKeys = new Set()
 ) {
   const selected = (rows || []).filter(row => String(row.task_id) === String(taskId));
   if (!selected.length) {
@@ -306,7 +306,8 @@ export async function verifyOrderTaskSnapshotRows(
           Number(row.expected_row_count) !== expectedRowCount) {
         return { sealed: true, valid: false, code: 'ORDER_IDENTITY_MISMATCH' };
       }
-      if (rosterById && !cancelledItemIndexes.has(index)) {
+      if (rosterById && !cancelledItemIndexes.has(index) &&
+          !cancelledStudentKeys.has(index + '|' + String(row.student_id))) {
         const student = rosterById.get(String(row.student_id));
         if (!student || (requireCurrentEnrollment && !activeStudent(student, month)) ||
             await studentIdentityHash(student) !== String(row.student_identity_hash || '')) {
