@@ -1238,16 +1238,16 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-09-23.6"></script>
-<script src="./schedule-board-core.js?v=2026-09-23.6"></script>
-<script src="./asset-core.js?v=2026-09-23.6"></script>
-<script src="./qr-core.js?v=2026-09-23.6"></script>
-<script src="./acaflow-import-core.js?v=2026-09-23.6"></script>
-<script src="./feedback-subject-catalog.js?v=2026-09-23.6"></script>
-<script src="./sync-recovery-core.js?v=2026-09-23.6"></script>
-<script src="./staff-work-session-core.js?v=2026-09-23.6"></script>
-<script src="./staff-attendance-history-core.js?v=2026-09-23.6"></script>
-<script src="./makeup-recovery-core.js?v=2026-09-23.6"></script>
+<script src="./lesson-form-core.js?v=2026-09-23.7"></script>
+<script src="./schedule-board-core.js?v=2026-09-23.7"></script>
+<script src="./asset-core.js?v=2026-09-23.7"></script>
+<script src="./qr-core.js?v=2026-09-23.7"></script>
+<script src="./acaflow-import-core.js?v=2026-09-23.7"></script>
+<script src="./feedback-subject-catalog.js?v=2026-09-23.7"></script>
+<script src="./sync-recovery-core.js?v=2026-09-23.7"></script>
+<script src="./staff-work-session-core.js?v=2026-09-23.7"></script>
+<script src="./staff-attendance-history-core.js?v=2026-09-23.7"></script>
+<script src="./makeup-recovery-core.js?v=2026-09-23.7"></script>
 <script>
 "use strict";
 
@@ -3896,6 +3896,13 @@ function plannedWeekendOccurrence(task, date) {
  * 아니면 같은 주말의 반대 요일이 유일한 예정일일 때만 파생한다. */
 function weekendVisitSourceDate(task, row) {
   const actualDate = String(row && row.visitDate || '');
+  if (task && !task.deleted && task.lessonInstanceType === 'subscription' &&
+      ['assessment', 'studyforce'].includes(String(task.subscriptionType || '')) && String(task.repeat || '') === 'once') {
+    return row && String(row.lessonTaskId || '') === String(task.id || '') &&
+      String(row.studentId || '') === String(task.studentId || '') &&
+      actualDate === String(task.start || '') && (!row.sourceDate || String(row.sourceDate) === actualDate)
+      ? actualDate : '';
+  }
   const pair = weekendPairDates(actualDate);
   if (!task || !row || pair.length !== 2 || String(row.lessonTaskId || '') !== String(task.id || '') ||
       !String(task.studentId || '') || String(row.studentId || '') !== String(task.studentId || '')) return '';
@@ -4182,7 +4189,7 @@ function weekendVisitScopeStaffId() {
 }
 
 async function loadWeekendVisitScheduleScope(date, staffId, force) {
-  if (!isWeekendVisitDate(date)) return;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date || ''))) return;
   const key = weekendVisitScopeKey(date, staffId);
   if (!force && weekendVisitScopeIsFresh(key)) return;
   if (!force && weekendVisitScheduleLoadingKeys.has(key)) return;
@@ -4279,7 +4286,7 @@ function refreshVisibleWeekendVisitScopes(force) {
 }
 
 async function loadWeekendVisits(date, staffId, force) {
-  if (!isWeekendVisitDate(date)) return;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date || ''))) return;
   const key = weekendVisitScopeKey(date, staffId);
   const cached = freshWeekendVisitScope(key);
   if (!force && cached) {
@@ -4555,10 +4562,12 @@ function weekendVisitBoardHtml(date) {
 }
 
 function weekendVisitEditModal(visitId) {
-  const row = weekendVisitRows.find(item => String(item.visitId) === String(visitId));
+  const row = weekendVisitRows.find(item => String(item.visitId) === String(visitId)) ||
+    [...weekendVisitScopeCache.values()].flatMap(scope => scope && Array.isArray(scope.rows) ? scope.rows : [])
+      .find(item => String(item.visitId) === String(visitId));
   if (!row) return toast('등·하원 기록을 다시 불러와 주세요');
   weekendVisitEditTarget = row;
-  modal('주말 실제 등·하원 시간 수정',
+  modal('실제 등·하원 시간 수정',
     '<div class="card-sub mb14">예정 시간표는 변경되지 않습니다. 실제 방문 시간만 정정하며 이전 기록도 보존됩니다.</div>' +
     '<div class="grid2"><div class="field"><label class="fl">실제 등원</label><input class="in" id="weekendVisitIn" type="time" value="' + esc(fmtTime(row.checkInAt)) + '"></div>' +
     '<div class="field"><label class="fl">실제 하원</label><input class="in" id="weekendVisitOut" type="time" value="' + esc(row.checkOutAt ? fmtTime(row.checkOutAt) : '') + '"></div></div>' +
@@ -5361,6 +5370,10 @@ function viewToday() {
   if (!makeupLoaded && !makeupLoading) setTimeout(() => loadMakeups(false), 0);
 
   if (isWeekendVisitDate(cursor)) ensureWeekendVisitSourcePair(cursor, me.id);
+  if ((state.tasks || []).some(task => isSubscriptionSessionTask(task) && String(task.staffId || '') === String(me.id) &&
+      String(task.start || '') === String(cursor))) {
+    loadWeekendVisitScheduleScope(cursor, me.id, false);
+  }
   if (cursor === today()) {
     ensureWeekendVisitScheduleDates(weekendVisitCarryScopeDates(cursor), me.id);
   }
@@ -5527,6 +5540,7 @@ function taskRow(t, date, editable, isCarry) {
       '</div>';
 
   if (makeupLesson) h += makeupInstructionHtml(makeupRows.find(row => String(row.caseId) === String(t.makeupCaseId || '')));
+  if (subscriptionSession) h += subscriptionActualVisitHtml(t, date, editable);
   if (hasDetail && st !== 'done' && !handoffOutstanding) {
     h += '<div class="bar mini ' + (st === 'doing' ? 'doing' : '') + '" style="margin-top:8px"><i style="width:' + prog.pct + '%"></i></div>';
   }
@@ -7761,6 +7775,57 @@ const SUBSCRIPTION_PROGRAMS = Object.freeze([
 function subscriptionProgramLabel(type) {
   const found = SUBSCRIPTION_PROGRAMS.find(item => item.type === String(type || ''));
   return found ? found.label : '';
+}
+
+function subscriptionVisitRows(task, date) {
+  return weekendVisitRowsForTaskDate(task, date).filter(row => row && row.status !== 'cancelled' &&
+    String(row.lessonTaskId || '') === String(task && task.id || '') &&
+    String(row.studentId || '') === String(task && task.studentId || '') &&
+    String(row.visitDate || '') === String(date || ''));
+}
+
+function subscriptionActualVisitHtml(task, date, editable) {
+  if (!isSubscriptionSessionTask(task) || String(task.start || '') !== String(date || '')) return '';
+  const key = weekendVisitScopeKey(date, String(task.staffId || ''));
+  const scope = freshWeekendVisitScope(key);
+  if (!scope && !weekendVisitScheduleLoadingKeys.has(key)) setTimeout(() => loadWeekendVisitScheduleScope(date, task.staffId, false), 0);
+  const error = weekendVisitScheduleErrors.get(key);
+  if (error) return '<div class="weekend-visit-row"><div class="small" style="color:var(--coral)">실제 등·하원 기록을 불러오지 못했습니다.</div></div>';
+  if (!scope) return '<div class="weekend-visit-row"><div class="small muted">실제 등·하원 기록 확인 중…</div></div>';
+  const rows = subscriptionVisitRows(task, date);
+  const row = preferredWeekendVisit(rows);
+  const canRecordNow = editable && date === today();
+  let actions = '';
+  if (!row && canRecordNow) {
+    actions = '<button class="btn btn-sm btn-primary" data-act="subscriptionvisitcheckin" data-task="' + esc(task.id) +
+      '" data-student-id="' + esc(task.studentId) + '">실제 등원</button>';
+  } else if (!row && session.isAdmin) {
+    actions = '<button class="btn btn-sm btn-ghost" data-act="subscriptionvisitrecord" data-task="' + esc(task.id) +
+      '" data-date="' + esc(date) + '">시간 입력</button>';
+  } else if (row && row.status === 'active') {
+    actions = (canRecordNow ? '<button class="btn btn-sm btn-navy" data-act="weekendcheckout" data-visit="' + esc(row.visitId) +
+      '" data-rev="' + row.revision + '">실제 하원</button>' : '') +
+      (session.isAdmin ? '<button class="btn btn-sm btn-ghost" data-act="weekendedit" data-visit="' + esc(row.visitId) + '">시간 수정</button>' : '');
+  } else if (row && session.isAdmin) {
+    actions = '<button class="btn btn-sm btn-ghost" data-act="weekendedit" data-visit="' + esc(row.visitId) + '">시간 수정</button>';
+  }
+  return '<div class="weekend-visit-row' + (row && row.status === 'active' ? ' weekend-visit-live' : row ? ' weekend-visit-complete' : '') + '">' +
+    '<div><b>실제 등·하원</b><div class="small ' + (row ? '' : 'muted') + '">' +
+      (row ? esc(weekendVisitTimeText(row)) + (weekendVisitDuration(row) ? ' · ' + esc(weekendVisitDuration(row)) : '') : '아직 기록되지 않았습니다') +
+    '</div></div><div class="weekend-visit-actions">' + actions + '</div></div>';
+}
+
+function subscriptionVisitRecordModal(taskId, date) {
+  if (!session.isAdmin) return toast('관리자만 지난 실제 등·하원 시간을 입력할 수 있습니다');
+  const task = (state.tasks || []).find(item => isSubscriptionSessionTask(item) && String(item.id || '') === String(taskId || ''));
+  if (!task || String(task.start || '') !== String(date || '')) return toast('구독 수업 날짜를 다시 확인해 주세요');
+  weekendVisitEditTarget = { newSubscription: true, lessonTaskId: String(task.id), studentId: String(task.studentId), visitDate: String(date) };
+  modal('구독 수업 실제 등·하원 입력',
+    '<div class="hint mb14">' + esc(task.studentName || studentOf(task)) + ' · ' + esc(subscriptionProgramLabel(task.subscriptionType)) + ' · ' + esc(label(date)) + '</div>' +
+    '<div class="grid2"><div class="field"><label class="fl">실제 등원</label><input class="in" id="weekendVisitIn" type="time"></div>' +
+    '<div class="field"><label class="fl">실제 하원</label><input class="in" id="weekendVisitOut" type="time"></div></div>' +
+    '<div class="field"><label class="fl">입력 사유</label><input class="in" id="weekendVisitReason" maxlength="200" value="관리자 과거 기록 입력"></div>',
+    '<button class="btn btn-primary btn-block mt14" data-act="subscriptionvisitrecordsave">기록 저장</button>');
 }
 let publicationReadinessRows = [];
 let publicationReadinessLoaded = false;
@@ -23297,6 +23362,35 @@ document.addEventListener('click', async ev => {
       submitWeekendVisit(el, { action: 'check_out', visitId: visitId, revision: Number(el.dataset.rev) }, '실제 하원 시간을 저장했습니다');
       break;
     }
+    case 'subscriptionvisitcheckin': {
+      const taskId = String(el.dataset.task || '');
+      const studentId = String(el.dataset.studentId || '');
+      const taskRow = state.tasks.find(item => isSubscriptionSessionTask(item) && String(item.id || '') === taskId &&
+        String(item.studentId || '') === studentId);
+      if (!taskRow || String(taskRow.start || '') !== String(cursor) || cursor !== today()) {
+        return toast('오늘 생성된 구독 수업과 학생 정보를 다시 확인해 주세요');
+      }
+      if (!confirm((taskRow.studentName || studentOf(taskRow)) + ' 학생의 실제 등원 시간을 지금으로 저장할까요?')) break;
+      submitWeekendVisit(el, { action: 'check_in', visitDate: cursor, sourceDate: cursor, lessonTaskId: taskId,
+        studentId: studentId, visitSequence: 1 }, '구독 수업 실제 등원 시간을 저장했습니다');
+      break;
+    }
+    case 'subscriptionvisitrecord': subscriptionVisitRecordModal(String(el.dataset.task || ''), String(el.dataset.date || '')); break;
+    case 'subscriptionvisitrecordsave': {
+      const row = weekendVisitEditTarget;
+      if (!row || !row.newSubscription) return toast('기록할 구독 수업을 다시 선택해 주세요');
+      const inValue = String(($('#weekendVisitIn') || {}).value || '');
+      const outValue = String(($('#weekendVisitOut') || {}).value || '');
+      const reason = String(($('#weekendVisitReason') || {}).value || '').trim();
+      const checkInAt = weekendVisitTimestamp(row.visitDate, inValue);
+      const checkOutAt = weekendVisitTimestamp(row.visitDate, outValue);
+      if (!checkInAt || !checkOutAt || checkOutAt < checkInAt) return toast('실제 등원·하원 시간을 모두 올바르게 입력해 주세요');
+      if (!reason) return toast('입력 사유를 입력해 주세요');
+      submitWeekendVisit(el, { action: 'check_in', manualRecord: true, visitDate: row.visitDate, sourceDate: row.visitDate,
+        lessonTaskId: row.lessonTaskId, studentId: row.studentId, visitSequence: 1,
+        checkInAt: checkInAt, checkOutAt: checkOutAt, reason: reason }, '구독 수업 실제 등·하원 기록을 저장했습니다');
+      break;
+    }
     case 'weekendedit': weekendVisitEditModal(el.dataset.visit); break;
     case 'weekendsave': {
       const row = weekendVisitEditTarget;
@@ -25004,7 +25098,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-09-23.6';
+const APP_VER = '2026-09-23.7';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
