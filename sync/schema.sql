@@ -1158,6 +1158,21 @@ CREATE TABLE IF NOT EXISTS book_order_item_cancellations (
 CREATE INDEX IF NOT EXISTS idx_book_order_item_cancellations_book
   ON book_order_item_cancellations(app, book_id, cancelled_at);
 
+-- 내부·제본교재는 주문 즉시 3단계가 되므로, 원 주문은 봉인한 채 학생별 취소 이력만 추가한다.
+CREATE TABLE IF NOT EXISTS book_order_received_student_cancellations (
+  app          TEXT    NOT NULL CHECK (app = 'task'),
+  task_id      TEXT    NOT NULL,
+  item_index   INTEGER NOT NULL CHECK (item_index >= 0),
+  book_id      TEXT    NOT NULL,
+  student_id   TEXT    NOT NULL,
+  reason       TEXT    NOT NULL CHECK (length(trim(reason)) BETWEEN 1 AND 300),
+  cancelled_at INTEGER NOT NULL CHECK (cancelled_at > 0),
+  cancelled_by TEXT    NOT NULL,
+  PRIMARY KEY (app, task_id, item_index, student_id)
+);
+CREATE INDEX IF NOT EXISTS idx_book_order_received_student_cancellations_student
+  ON book_order_received_student_cancellations(app, student_id, cancelled_at);
+
 CREATE TRIGGER IF NOT EXISTS trg_book_order_snapshots_no_update
 BEFORE UPDATE ON book_order_student_snapshots
 BEGIN
@@ -1275,6 +1290,59 @@ BEFORE DELETE ON book_order_item_cancellations
 BEGIN
   SELECT RAISE(ABORT, 'BOOK_ORDER_ITEM_CANCELLATION_APPEND_ONLY');
 END;
+CREATE TRIGGER IF NOT EXISTS trg_book_order_received_student_cancellations_guard
+BEFORE INSERT ON book_order_received_student_cancellations
+WHEN NOT (
+  EXISTS (
+    SELECT 1 FROM book_order_student_snapshots snapshot
+    WHERE snapshot.app=NEW.app AND snapshot.task_id=NEW.task_id
+      AND snapshot.item_index=NEW.item_index AND snapshot.book_id=NEW.book_id
+      AND snapshot.student_id=NEW.student_id
+  )
+  AND EXISTS (
+    SELECT 1 FROM tasks task
+    WHERE task.app=NEW.app AND task.id=NEW.task_id
+      AND COALESCE(json_extract(task.data, '$.deleted'), 0)=0
+      AND json_extract(task.data, '$.orderDelivery') IN ('bound_print_v1','internal_book_v1')
+      AND json_type(task.data, '$.orderItems[' || NEW.item_index || ']')='object'
+      AND CAST(json_extract(task.data, '$.orderItems[' || NEW.item_index || '].bookId') AS TEXT)=NEW.book_id
+  )
+  AND EXISTS (
+    SELECT 1 FROM book_order_fulfillments fulfillment
+    WHERE fulfillment.app=NEW.app AND fulfillment.task_id=NEW.task_id
+      AND fulfillment.item_index=NEW.item_index AND fulfillment.book_id=NEW.book_id
+      AND fulfillment.status='teacher_received'
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM book_order_cancellations cancellation
+    WHERE cancellation.app=NEW.app AND cancellation.task_id=NEW.task_id
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM book_order_item_cancellations item_cancellation
+    WHERE item_cancellation.app=NEW.app AND item_cancellation.task_id=NEW.task_id
+      AND item_cancellation.item_index=NEW.item_index
+  )
+)
+BEGIN
+  SELECT RAISE(ABORT, 'BOOK_ORDER_RECEIVED_STUDENT_CANCEL_NOT_ALLOWED');
+END;
+CREATE TRIGGER IF NOT EXISTS trg_book_order_received_student_cancellations_release
+AFTER INSERT ON book_order_received_student_cancellations
+BEGIN
+  UPDATE book_order_active_targets SET active=0
+  WHERE app=NEW.app AND task_id=NEW.task_id AND item_index=NEW.item_index
+    AND student_id=NEW.student_id AND active=1;
+END;
+CREATE TRIGGER IF NOT EXISTS trg_book_order_received_student_cancellations_no_update
+BEFORE UPDATE ON book_order_received_student_cancellations
+BEGIN
+  SELECT RAISE(ABORT, 'BOOK_ORDER_RECEIVED_STUDENT_CANCELLATION_APPEND_ONLY');
+END;
+CREATE TRIGGER IF NOT EXISTS trg_book_order_received_student_cancellations_no_delete
+BEFORE DELETE ON book_order_received_student_cancellations
+BEGIN
+  SELECT RAISE(ABORT, 'BOOK_ORDER_RECEIVED_STUDENT_CANCELLATION_APPEND_ONLY');
+END;
 
 CREATE TRIGGER IF NOT EXISTS trg_book_order_sealed_task_update
 BEFORE UPDATE OF data ON tasks
@@ -1353,6 +1421,12 @@ WHEN OLD.app='task' AND EXISTS (
         AND item_cancellation.item_index=snapshot.item_index
     )
     AND NOT EXISTS (
+      SELECT 1 FROM book_order_received_student_cancellations student_cancellation
+      WHERE student_cancellation.app=snapshot.app AND student_cancellation.task_id=snapshot.task_id
+        AND student_cancellation.item_index=snapshot.item_index
+        AND student_cancellation.student_id=snapshot.student_id
+    )
+    AND NOT EXISTS (
       SELECT 1 FROM book_order_fulfillments fulfillment
       WHERE fulfillment.app=snapshot.app AND fulfillment.task_id=snapshot.task_id
         AND fulfillment.item_index=snapshot.item_index AND fulfillment.book_id=snapshot.book_id
@@ -1413,6 +1487,12 @@ WHEN OLD.app='task' AND EXISTS (
       SELECT 1 FROM book_order_item_cancellations item_cancellation
       WHERE item_cancellation.app=snapshot.app AND item_cancellation.task_id=snapshot.task_id
         AND item_cancellation.item_index=snapshot.item_index
+    )
+    AND NOT EXISTS (
+      SELECT 1 FROM book_order_received_student_cancellations student_cancellation
+      WHERE student_cancellation.app=snapshot.app AND student_cancellation.task_id=snapshot.task_id
+        AND student_cancellation.item_index=snapshot.item_index
+        AND student_cancellation.student_id=snapshot.student_id
     )
     AND NOT EXISTS (
       SELECT 1 FROM book_order_fulfillments fulfillment
