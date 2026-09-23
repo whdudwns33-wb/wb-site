@@ -1210,16 +1210,16 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-09-23.2"></script>
-<script src="./schedule-board-core.js?v=2026-09-23.2"></script>
-<script src="./asset-core.js?v=2026-09-23.2"></script>
-<script src="./qr-core.js?v=2026-09-23.2"></script>
-<script src="./acaflow-import-core.js?v=2026-09-23.2"></script>
-<script src="./feedback-subject-catalog.js?v=2026-09-23.2"></script>
-<script src="./sync-recovery-core.js?v=2026-09-23.2"></script>
-<script src="./staff-work-session-core.js?v=2026-09-23.2"></script>
-<script src="./staff-attendance-history-core.js?v=2026-09-23.2"></script>
-<script src="./makeup-recovery-core.js?v=2026-09-23.2"></script>
+<script src="./lesson-form-core.js?v=2026-09-23.4"></script>
+<script src="./schedule-board-core.js?v=2026-09-23.4"></script>
+<script src="./asset-core.js?v=2026-09-23.4"></script>
+<script src="./qr-core.js?v=2026-09-23.4"></script>
+<script src="./acaflow-import-core.js?v=2026-09-23.4"></script>
+<script src="./feedback-subject-catalog.js?v=2026-09-23.4"></script>
+<script src="./sync-recovery-core.js?v=2026-09-23.4"></script>
+<script src="./staff-work-session-core.js?v=2026-09-23.4"></script>
+<script src="./staff-attendance-history-core.js?v=2026-09-23.4"></script>
+<script src="./makeup-recovery-core.js?v=2026-09-23.4"></script>
 <script>
 "use strict";
 
@@ -14741,6 +14741,73 @@ async function cancelWaitingBookOrderItem(button) {
   }
 }
 
+const pendingReceivedBookOrderCancellations = new Set();
+
+function openReceivedBookOrderCancellation(button) {
+  const taskId = String(button.dataset.task || '');
+  const itemIndex = Number(button.dataset.item);
+  const row = bookOrderRows.find(item => String(item.taskId) === taskId && Number(item.itemIndex) === itemIndex);
+  if (!row || row.stage !== 'teacher_received' ||
+      !['bound_print_v1', 'internal_book_v1'].includes(String(row.orderDelivery || ''))) {
+    return toast('3단계 내부·제본교재 주문만 취소할 수 있습니다');
+  }
+  const students = Array.isArray(row.students) ? row.students : [];
+  if (!students.length) return toast('취소할 학생 연결을 찾을 수 없습니다');
+  const unitPrice = Number(row.unitPrice);
+  const priceText = Number.isInteger(unitPrice) && unitPrice > 0
+    ? unitPrice.toLocaleString('ko-KR') + '원/권' : '금액 미입력';
+  modal('주문취소 — ' + row.title,
+    '<div class="hint mb14"><b>교재</b> · ' + esc(row.title) + '<br><b>가격</b> · ' + esc(priceText) +
+      '<br>취소할 학생만 선택해 주세요. 선택하지 않은 학생의 주문은 3단계에 그대로 남습니다.</div>' +
+    '<div class="book-order-picker-list">' + students.map(student =>
+      '<label class="book-order-picker-option"><input type="checkbox" data-received-order-cancel-student value="' + esc(student.id) + '">' +
+      '<span>' + esc(staffStudentCompactLabel(student, '이름 미입력')) + '</span></label>').join('') + '</div>' +
+    '<label class="field mt14"><span class="fl">취소 사유 (필수)</span>' +
+      '<textarea class="in" rows="3" maxlength="300" data-received-order-cancel-reason ' +
+        'placeholder="예: 교재 종류를 잘못 선택함"></textarea></label>',
+    '<button class="btn btn-danger btn-block" data-act="bookorderreceivedcancelsave" data-task="' + esc(taskId) +
+      '" data-item="' + itemIndex + '" data-rev="' + Number(row.revision || 0) + '">선택 학생 주문취소 확인</button>');
+}
+
+async function saveReceivedBookOrderCancellation(button) {
+  const auth = sync.auth();
+  if (!auth) return toast('동기화 인증이 필요합니다');
+  const taskId = String(button.dataset.task || '');
+  const itemIndex = Number(button.dataset.item);
+  const key = taskId + '|' + itemIndex;
+  if (pendingReceivedBookOrderCancellations.has(key)) return;
+  const studentIds = Array.from(document.querySelectorAll('[data-received-order-cancel-student]:checked'))
+    .map(input => String(input.value || '')).filter(Boolean);
+  const reasonInput = document.querySelector('[data-received-order-cancel-reason]');
+  const reason = String(reasonInput && reasonInput.value || '').trim();
+  if (!studentIds.length) return toast('취소할 학생을 한 명 이상 선택해 주세요');
+  if (!reason) return toast('주문취소 사유를 입력해 주세요');
+
+  pendingReceivedBookOrderCancellations.add(key);
+  button.disabled = true;
+  try {
+    await sync.post('/book-issue', {
+      app: SYNC_APP, auth, action: 'order_cancel_received_students', taskId, itemIndex,
+      revision: Number(button.dataset.rev || 0), studentIds, reason
+    });
+    closeModal();
+    await loadBookIssues(true);
+    toast('선택한 학생의 교재 주문을 취소했습니다');
+  } catch (error) {
+    if (error && ['ORDER_CANCEL_NOT_RECEIVED', 'ORDER_ALL_STUDENTS_CANCELLED'].includes(error.code)) {
+      toast('이미 배부되었거나 취소된 주문입니다 — 현황을 새로고침해 주세요');
+    } else if (error && error.code === 'REVISION_CONFLICT') {
+      toast('주문 상태가 먼저 변경되었습니다 — 현황을 새로고침해 주세요');
+    } else {
+      toast('교재 주문취소 실패 — ' + String(error && error.message || error));
+    }
+    await loadBookIssues(true);
+    if (button.isConnected) button.disabled = false;
+  } finally {
+    pendingReceivedBookOrderCancellations.delete(key);
+  }
+}
+
 function cancelOrderModal(bookId) {
   const b = ((bookDb && bookDb.books) || []).find(x => x.id === bookId);
   if (!b) return;
@@ -15439,7 +15506,9 @@ function bookOrderActionButtons(row) {
   }
   if (cancelButton) return cancelButton;
   if (row.stage === 'ordered' && canTeacherAct) return '<button class="btn btn-sm btn-primary" data-act="bookordertransition" data-next="receive"' + base + '>수령완료</button>';
-  if (row.stage === 'teacher_received' && canTeacherAct) return '<button class="btn btn-sm btn-primary" data-act="bookordertransition" data-next="hand"' + base + '>배부완료</button>';
+  if (row.stage === 'teacher_received' && canTeacherAct) return '<button class="btn btn-sm btn-primary" data-act="bookordertransition" data-next="hand"' + base + '>배부완료</button>' +
+    (['bound_print_v1', 'internal_book_v1'].includes(String(row.orderDelivery || ''))
+      ? '<button class="btn btn-sm btn-danger" data-act="bookorderreceivedcancelopen"' + base + '>주문취소</button>' : '');
   if (row.stage === 'student_handed' && session.isAdmin && !row.academyRegisteredAt) {
     return '<button class="btn btn-sm btn-primary" data-act="bookordertransition" data-next="academy_register"' + base + '>아카등록완료</button>';
   }
@@ -15503,6 +15572,21 @@ function bookOrderStageHtml(stage, title, description) {
       '<div class="empty"><b>📚</b>' + esc(description) + '</div>') + '</div></details>';
 }
 
+function bookOrderCancellationHistoryHtml() {
+  const rows = (bookOrderRows || []).filter(row => Array.isArray(row.cancelledStudents) && row.cancelledStudents.length)
+    .sort((a, b) => Math.max(...b.cancelledStudents.map(item => Number(item.cancelledAt) || 0)) -
+      Math.max(...a.cancelledStudents.map(item => Number(item.cancelledAt) || 0)));
+  if (!rows.length) return '';
+  const quantity = rows.reduce((sum, row) => sum + row.cancelledStudents.length, 0);
+  return '<details class="book-order-stage"><summary><b>취소 기록</b><span class="pill">' + quantity + '권</span></summary>' +
+    '<div class="book-order-stage-list">' + rows.map(row => '<article class="book-order-row">' +
+      '<div class="between"><div><div class="card-title">' + esc(row.title) + '</div>' +
+      '<div class="card-sub">주문 ' + esc(row.teacherName || '담당 미지정') + '</div></div><span class="pill bad">취소됨</span></div>' +
+      row.cancelledStudents.map(student => '<div class="hint mt8"><b>' + esc(staffStudentCompactLabel(student, '삭제된 원생')) + '</b>' +
+        '<br>취소일 · ' + esc(bookOrderDateText(student.cancelledAt)) + '<br>사유 · ' + esc(student.reason || '사유 미입력') + '</div>').join('') +
+      '</article>').join('') + '</div></details>';
+}
+
 function viewBookIssues() {
   if (!bookIssueLoaded && !bookIssueLoading) setTimeout(() => loadBookIssues(false), 0);
   let h = '<section class="card book-issue-board"><div class="between"><div><div class="card-title">교재 주문 및 배송 현황</div>' +
@@ -15514,7 +15598,8 @@ function viewBookIssues() {
     bookOrderStageHtml('order_waiting', '1단계 · 주문대기', '저녁 8시 발송을 기다리는 교재가 없습니다.') +
     bookOrderStageHtml('order_result', '2단계 · 주문완료 / 주문실패', '저녁 8시 이후 주문 결과가 없습니다.') +
     bookOrderStageHtml('teacher_received', '3단계 · 선생님 수령', '선생님이 수령한 교재가 없습니다.') +
-    bookOrderStageHtml('student_handed', '4단계 · 학생배부 완료', '학생 배부가 완료된 교재가 없습니다.') + '</div>';
+    bookOrderStageHtml('student_handed', '4단계 · 학생배부 완료', '학생 배부가 완료된 교재가 없습니다.') +
+    bookOrderCancellationHistoryHtml() + '</div>';
   h += '</section>';
   return h;
 }
@@ -22751,6 +22836,8 @@ document.addEventListener('click', async ev => {
     case 'bookordertransition': transitionBookOrder(el); break;
     case 'bookordermanualresult': transitionManualOnlineOrder(el); break;
     case 'bookordercancel': cancelWaitingBookOrderItem(el); break;
+    case 'bookorderreceivedcancelopen': openReceivedBookOrderCancellation(el); break;
+    case 'bookorderreceivedcancelsave': saveReceivedBookOrderCancellation(el); break;
     case 'externalbookorder': submitExternalBookOrder(el); break;
     case 'internalbookstudentopen': openInternalBookStudentModal(); break;
     case 'internalbookstudentlinksave': saveInternalBookStudentLink(); break;
@@ -24832,7 +24919,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-09-23.2';
+const APP_VER = '2026-09-23.4';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
