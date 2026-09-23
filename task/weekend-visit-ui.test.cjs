@@ -69,3 +69,16 @@ test('every weekend check-in sends the selected visit sequence to the worker', (
   assert.match(normal, /const visitSequence = Number\(el\.dataset\.visitSequence\)/);
   assert.match(normal, /visitSequence:\s*visitSequence/);
 });
+
+test('subscription sessions reuse actual visit ledger on their exact one-off date', () => {
+  const source = block('function subscriptionVisitRows(', 'let publicationReadinessRows');
+  assert.match(source, /isSubscriptionSessionTask\(task\)/);
+  assert.match(source, /String\(task\.start \|\| ''\) !== String\(date \|\| ''\)/);
+  assert.match(source, /data-act="subscriptionvisitcheckin"/);
+  assert.match(source, /data-act="subscriptionvisitrecord"/);
+  assert.match(source, /관리자만 지난 실제 등·하원 시간을 입력/);
+  assert.match(html, /case 'subscriptionvisitcheckin'/);
+  assert.match(html, /case 'subscriptionvisitrecordsave'/);
+  assert.match(html, /manualRecord: true/);
+  assert.match(html, /if \(subscriptionSession\) h \+= subscriptionActualVisitHtml\(t, date, editable\)/);
+});
