@@ -217,3 +217,30 @@ test('request cards escape student text before inserting it into HTML', () => {
     'the summary containing the optional note must be escaped as one string');
   assert.doesNotMatch(card, /innerHTML\s*=\s*req\.|\+\s*req\.(?:grade|semester|unit|note)\s*\+/);
 });
+
+test('overdue requests explain the delay and students can pull the latest status', () => {
+  const card = functionSource('metamathRequestCard');
+  const panel = functionSource('metamathRequestPanel');
+  const refresh = eventCase('syncnow');
+
+  assert.match(card, /active\s*&&\s*req\.processingDate\s*&&\s*req\.processingDate\s*<\s*today\(\)/);
+  assert.match(card, /제작 예정일이 지나 최신 처리 상태를 확인해 주세요/);
+  assert.match(panel, /const canRequest = session\.isStaffLink\s*&&\s*!isManager\(\)\s*&&\s*me\.id === session\.staffId/);
+  assert.match(panel, /data-act="syncnow"/);
+  assert.match(panel, /최신 상태 확인/);
+  assert.match(refresh, /sync\.loud\s*=\s*true/);
+  assert.match(refresh, /sync\.run\(\)/);
+});
+
+test('the director queue keeps active work prominent and exposes recent assignments', () => {
+  const inbox = functionSource('metamathRequestInbox');
+
+  assert.match(inbox, /const requests = allMetamathRequests\(\)/);
+  assert.match(inbox, /\['requested', 'changed', 'preparing'\]/);
+  assert.match(inbox, /queue\.map\(req => metamathRequestCard\(req, true\)\)/);
+  assert.match(inbox, /metamathRequestStatus\(req\) === 'assigned'/);
+  assert.match(inbox, /\.slice\(0, 10\)/);
+  assert.match(inbox, /최근 배정 완료/);
+  assert.match(inbox, /recent\.map\(req => metamathRequestCard\(req, true\)\)/);
+  assert.doesNotMatch(inbox, /currentStaff\(|viewStaff/);
+});
