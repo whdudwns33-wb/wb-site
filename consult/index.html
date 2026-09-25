@@ -2414,6 +2414,8 @@ function canEditTask(t) {
   if (isLectureRequestTask(t)) return false;
   if (isPointTransactionTask(t)) return false;
   if (t && t.auto === STUDY_ROADMAP_AUTO) return false;
+  if (session.isStaffLink && t && (t.dailyCarryFrom || String(t.groupId || '').startsWith('month-carry-')) &&
+      ['admin', 'manager'].includes(t.carrySourceOrigin)) return false;
   if (!session.isStaffLink) return session.isAdmin;
   if (isManager()) return t.origin === 'manager';
   return t.origin === 'staff' && t.staffId === session.staffId;
@@ -7883,6 +7885,25 @@ function dailyCloseModal(staffId, date) {
     '<button class="btn btn-primary btn-block mt14" data-act="dailyclosesave">마무리 내용 저장</button>');
 }
 
+/** 구버전이 원장 배부 공부를 이월하며 origin까지 복제해 개인 동기화를 막은 행을 복구한다. */
+function repairLegacyStudentCarryOrigins() {
+  if (!session.isStaffLink) return false;
+  const pushAt = Number(state.settings.pushAt) || 0;
+  let changed = false;
+  state.tasks.forEach(task => {
+    const dailyCarry = String(task && task.id || '').startsWith('daily-carry-') && task.dailyCarryFrom;
+    const monthCarry = String(task && task.groupId || '').startsWith('month-carry-');
+    if (!task || task.staffId !== session.staffId || task.origin === 'staff' ||
+        Number(task.updatedAt || 0) <= pushAt || (!dailyCarry && !monthCarry)) return;
+    task.carrySourceOrigin = task.carrySourceOrigin || task.origin;
+    task.origin = 'staff';
+    task.lastEditBy = 'staff';
+    task.updatedAt = now();
+    changed = true;
+  });
+  return changed;
+}
+
 function dailyCarryTask(task, date, targetDate) {
   const carryFrom = task.id + '|' + date;
   const existing = state.tasks.find(row => !row.deleted && row.dailyCarryFrom === carryFrom);
@@ -7896,7 +7917,8 @@ function dailyCarryTask(task, date, targetDate) {
     dailyCarryFrom: carryFrom, dailyCarryRootId: rootId, dailyCarrySourceDate: date,
     dailyCarryOriginDate: task.dailyCarryOriginDate || task.dailyCarrySourceDate || date,
     dailyCarryDepth: Number(task.dailyCarryDepth || 0) + 1,
-    createdAt: stamp, updatedAt: stamp, deleted: false
+    carrySourceOrigin: task.carrySourceOrigin || task.origin,
+    origin: 'staff', lastEditBy: 'staff', createdAt: stamp, updatedAt: stamp, deleted: false
   });
   state.tasks.push(carried);
   return carried;
@@ -8521,7 +8543,10 @@ function moveMonthOccurrence(task, from, to) {
   } else {
     const carried = Object.assign({}, task, {
       id: uid(), groupId: 'month-carry-' + now(), repeat: 'once', days: [], start: to, end: '',
-      carry: true, createdAt: now(), updatedAt: now(), deleted: false
+      carry: true, origin: session.isStaffLink ? 'staff' : task.origin,
+      lastEditBy: session.isStaffLink ? 'staff' : task.lastEditBy,
+      carrySourceOrigin: task.carrySourceOrigin || task.origin,
+      createdAt: now(), updatedAt: now(), deleted: false
     });
     state.tasks.push(carried);
     save(); queueSync();
@@ -14614,7 +14639,9 @@ document.addEventListener('visibilitychange', () => {
    11. 시작
    ══════════════════════════════════════════════════════ */
 load();
-if (ensureRecentDailyCarryTasks()) { save(); queueSync(); }
+const repairedCarryOrigins = repairLegacyStudentCarryOrigins();
+const migratedRecentDailyCarryTasks = ensureRecentDailyCarryTasks();
+if (repairedCarryOrigins || migratedRecentDailyCarryTasks) { save(); queueSync(); }
 absorbLinkParams();
 const h = routeFromHash(location.hash);
 if (h) route = h;
@@ -14661,7 +14688,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-09-25.1';
+const APP_VER = '2026-09-25.2';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)

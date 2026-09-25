@@ -656,7 +656,7 @@ test('carried study becomes a unique next-day task and appears in both daily rep
     source + '\nreturn dailyCarryTask;')(state, () => '2026-08-19', (_date, _days) => '2026-08-20', () => 1234);
   const original = {
     id: 'task-a', groupId: 'group-a', staffId: 'student-a', title: '수학 오답 20문제',
-    repeat: 'once', days: [], start: '2026-08-18', carry: true, createdAt: 100, updatedAt: 100
+    repeat: 'once', days: [], start: '2026-08-18', carry: true, origin: 'admin', createdAt: 100, updatedAt: 100
   };
   const carried = dailyCarryTask(original, '2026-08-18', '2026-08-19');
   assert.equal(state.tasks.length, 1);
@@ -665,6 +665,9 @@ test('carried study becomes a unique next-day task and appears in both daily rep
   assert.equal(carried.dailyCarryFrom, 'task-a|2026-08-18');
   assert.equal(carried.dailyCarrySourceDate, '2026-08-18');
   assert.equal(carried.requiresClaim, false);
+  assert.equal(carried.origin, 'staff', 'student-created carry must be accepted by own-scope sync');
+  assert.equal(carried.lastEditBy, 'staff');
+  assert.equal(carried.carrySourceOrigin, 'admin', 'director-issued source must keep its edit permission');
   assert.equal(dailyCarryTask(original, '2026-08-18', '2026-08-19'), carried);
   assert.equal(state.tasks.length, 1);
 
@@ -686,7 +689,50 @@ test('recent legacy carry completions migrate from the original date to the actu
   assert.match(migration, /dailyCarryTask\(task, sourceDate, completedDate \|\| today\(\)\)/);
   assert.match(migration, /migratedFromCarry: true/);
   assert.match(migration, /done: false, at: null/);
-  assert.match(html, /load\(\);\nif \(ensureRecentDailyCarryTasks\(\)\) \{ save\(\); queueSync\(\); \}/);
+  assert.match(html, /const repairedCarryOrigins = repairLegacyStudentCarryOrigins\(\)/);
+  assert.match(html, /const migratedRecentDailyCarryTasks = ensureRecentDailyCarryTasks\(\)/);
+  assert.match(html, /repairedCarryOrigins \|\| migratedRecentDailyCarryTasks/);
+});
+
+test('legacy admin-origin carry tasks are repaired without touching ordinary admin tasks', () => {
+  const source = html.match(/function repairLegacyStudentCarryOrigins\(\) \{[\s\S]*?\n\}/)?.[0] || '';
+  assert.ok(source, 'legacy carry repair function must exist');
+  const state = { settings: { pushAt: 100 }, tasks: [
+    { id: 'daily-carry-task-a-2026-09-09', staffId: 'student-a', dailyCarryFrom: 'task-a|2026-09-09', origin: 'admin', updatedAt: 110 },
+    { id: 'month-task-a', groupId: 'month-carry-120', staffId: 'student-a', origin: 'admin', updatedAt: 120 },
+    { id: 'task-b', staffId: 'student-a', origin: 'admin', updatedAt: 130 },
+    { id: 'daily-carry-task-c-2026-09-09', staffId: 'student-b', dailyCarryFrom: 'task-c|2026-09-09', origin: 'admin', updatedAt: 140 },
+    { id: 'month-task-synced', groupId: 'month-carry-90', staffId: 'student-a', origin: 'admin', updatedAt: 90 }
+  ] };
+  const repair = Function('state', 'session', 'now', source + '\nreturn repairLegacyStudentCarryOrigins;')(
+    state, { isStaffLink: true, staffId: 'student-a' }, () => 200
+  );
+  assert.equal(repair(), true);
+  assert.deepEqual(state.tasks[0], {
+    id: 'daily-carry-task-a-2026-09-09', staffId: 'student-a', dailyCarryFrom: 'task-a|2026-09-09',
+    origin: 'staff', carrySourceOrigin: 'admin', lastEditBy: 'staff', updatedAt: 200
+  });
+  assert.equal(state.tasks[1].origin, 'staff');
+  assert.equal(state.tasks[1].carrySourceOrigin, 'admin');
+  assert.equal(state.tasks[2].origin, 'admin');
+  assert.equal(state.tasks[3].origin, 'admin');
+  assert.equal(state.tasks[4].origin, 'admin', 'server-synced director carry must remain untouched');
+  assert.equal(repair(), false, 'repair must be idempotent');
+});
+
+test('director-issued carried study stays read-only for the student after sync normalization', () => {
+  const source = html.match(/function canEditTask\(t\) \{[\s\S]*?\n\}/)?.[0] || '';
+  assert.ok(source, 'canEditTask function must exist');
+  const linkSession = { isStaffLink: true, isAdmin: false, staffId: 'student-a' };
+  const canEditTask = Function('isLectureRequestTask', 'isPointTransactionTask', 'STUDY_ROADMAP_AUTO', 'session', 'isManager',
+    source + '\nreturn canEditTask;')(() => false, () => false, 'study-roadmap-v1',
+    linkSession, () => false);
+  assert.equal(canEditTask({ staffId: 'student-a', origin: 'staff', dailyCarryFrom: 'task-a|2026-09-09', carrySourceOrigin: 'admin' }), false);
+  assert.equal(canEditTask({ staffId: 'student-a', origin: 'staff', groupId: 'month-carry-100', carrySourceOrigin: 'admin' }), false);
+  assert.equal(canEditTask({ staffId: 'student-a', origin: 'staff', dailyCarryFrom: 'task-b|2026-09-09', carrySourceOrigin: 'staff' }), true);
+  linkSession.isStaffLink = false;
+  linkSession.isAdmin = true;
+  assert.equal(canEditTask({ staffId: 'student-a', origin: 'staff', dailyCarryFrom: 'task-a|2026-09-09', carrySourceOrigin: 'admin' }), true);
 });
 
 test('weekly planner leads with daily closeout outcomes and keeps detailed placement secondary', () => {

@@ -146,6 +146,8 @@ test('unfinished carried study can move, roll forward, or close without deletion
   assert.match(helpers, /task\.carry && !isDone\(task\.id, date\)/);
   assert.match(helpers, /task\.repeat === 'once'/);
   assert.match(helpers, /groupId: 'month-carry-'/);
+  assert.match(helpers, /origin: session\.isStaffLink \? 'staff' : task\.origin/);
+  assert.match(helpers, /carrySourceOrigin: task\.carrySourceOrigin \|\| task\.origin/);
   assert.match(helpers, /dropReason: 'rescheduled'/);
   assert.match(month, /data-act="monthmove"/);
   assert.match(month, /data-act="monthnext"/);
