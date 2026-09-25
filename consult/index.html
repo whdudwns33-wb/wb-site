@@ -6157,6 +6157,7 @@ function metamathRequestCard(req, admin) {
     '<div class="small muted">' + esc(req.grade || '') + ' · ' + esc(req.semester || '') + ' · 제작일 ' + esc(req.processingDate ? label(req.processingDate) : '미정') + '</div></div>' +
     '<span class="pill">수학</span></div>' +
     '<div class="material-summary">' + esc(buildMetamathRequestSummary(req)) + '</div>' +
+    (overdue ? '<div class="small muted mt8">제작 예정일이 지나 최신 처리 상태를 확인해 주세요.</div>' : '') +
     (response && response.responseNote ? '<div class="hint mt8"><b>학원 안내:</b> ' + esc(response.responseNote) + '</div>' : '') +
     '<div class="academic-actions">' +
       (canEdit ? '<button class="btn btn-sm btn-ghost" data-act="metamathrequestopen" data-id="' + esc(req.id) + '">수정</button>' +
@@ -6174,21 +6175,28 @@ function metamathRequestPanel(me) {
   const requests = metamathRequestsFor(me.id).slice(-8).reverse();
   const canRequest = session.isStaffLink && !isManager() && me.id === session.staffId;
   return '<div class="guide mb14"><b>문제지가 필요할 때 요청하세요.</b><br>' +
-    '메타수학은 자동 출제가 아닙니다. 화요일까지 요청하면 가까운 수요일에, 수요일 이후 요청하면 다음 수요일에 선생님이 직접 제작·배정합니다.</div>' +
+    '메타수학은 자동 출제가 아닙니다. 화요일까지 요청하면 가까운 수요일에, 수요일 이후 요청하면 다음 수요일에 선생님이 직접 제작·배정합니다.' +
+    (canRequest ? '<div class="mt8"><button class="btn btn-sm btn-ghost" data-act="syncnow">↻ 최신 상태 확인</button></div>' : '') + '</div>' +
     (requests.length ? '<div class="fl mb8">문제지 요청 현황</div>' + requests.map(req => metamathRequestCard(req, false)).join('') :
       '<div class="small muted mb14">' + (canRequest ? '아직 요청한 문제지가 없습니다.' : '등록된 문제지 요청이 없습니다.') + '</div>');
 }
 
 function metamathRequestInbox() {
-  const queue = allMetamathRequests().filter(req => ['requested', 'changed', 'preparing'].includes(metamathRequestStatus(req)))
+  const requests = allMetamathRequests();
+  const queue = requests.filter(req => ['requested', 'changed', 'preparing'].includes(metamathRequestStatus(req)))
     .sort((a, b) => String(a.processingDate || '').localeCompare(String(b.processingDate || '')) ||
       (metamathRequestStatus(a) === 'preparing' ? -1 : 1) - (metamathRequestStatus(b) === 'preparing' ? -1 : 1) ||
       Number(a.requestedAt || 0) - Number(b.requestedAt || 0) ||
       String((staffById(a.staffId) || {}).name || '').localeCompare(String((staffById(b.staffId) || {}).name || ''), 'ko'));
+  const recent = requests.filter(req => metamathRequestStatus(req) === 'assigned')
+    .sort((a, b) => Number((metamathResponseFor(b.id) || {}).updatedAt || b.updatedAt || 0) -
+      Number((metamathResponseFor(a.id) || {}).updatedAt || a.updatedAt || 0)).slice(0, 10);
   return '<div class="card"><div class="between mb8"><div><div class="card-title">🧮 수요일 메타수학 문제지 큐</div>' +
     '<div class="card-sub">요청 정보를 확인해 메타수학 교실홈에서 직접 제작한 뒤, 학습 예정일을 정해 배정하세요.</div></div>' +
     '<span class="pill ' + (queue.length ? 'warn' : '') + '">' + queue.length + '건</span></div>' +
-    (queue.length ? queue.map(req => metamathRequestCard(req, true)).join('') : '<div class="small muted">처리할 문제지 요청이 없습니다.</div>') + '</div>';
+    (queue.length ? queue.map(req => metamathRequestCard(req, true)).join('') : '<div class="small muted">처리할 문제지 요청이 없습니다.</div>') +
+    (recent.length ? '<details class="study-completed mt14"><summary>최근 배정 완료 ' + recent.length + '건 보기</summary>' +
+      recent.map(req => metamathRequestCard(req, true)).join('') + '</details>' : '') + '</div>';
 }
 
 function metamathRequestModal(existing) {
@@ -14653,7 +14661,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-09-23.5';
+const APP_VER = '2026-09-25.1';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
