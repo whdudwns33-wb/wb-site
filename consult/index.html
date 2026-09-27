@@ -226,6 +226,8 @@
   .point-gauge-track { height: 12px; margin-top: 12px; overflow: hidden; border-radius: 999px; background: rgba(217,188,107,.22); }
   .point-gauge-track i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #F2C94C, #D9A928); }
   .point-gauge-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 7px; color: var(--mid-gray); font-size: 11px; font-weight: 700; }
+  .point-online-today { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; padding: 9px 10px; border-radius: 10px; background: rgba(255,255,255,.68); color: #765611; font-size: 11px; }
+  .point-online-today b { color: var(--navy); }
   .point-rule-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
   .point-rule-chips span { padding: 4px 8px; border: 1px solid rgba(217,169,40,.26); border-radius: 999px; background: rgba(255,255,255,.72); color: #765611; font-size: 10.5px; font-weight: 800; }
   .point-gauge-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
@@ -1272,6 +1274,9 @@ const LEARNING_SOURCES = Object.freeze({
 const ONLINE_LEARNING_SOURCE_KEYS = Object.freeze([
   'brain_letter', 'chunk_brain', 'vocabulary', 'leaders_eye', 'metamath',
   'classcard', 'studyforce', 'nelt_exam', 'daily_nonfiction'
+]);
+const POINT_ONLINE_SOURCE_KEYS = Object.freeze([
+  'brain_letter', 'chunk_brain', 'vocabulary', 'leaders_eye', 'metamath'
 ]);
 const CHECKLIST_ONLINE_SOURCE_DEFAULTS = Object.freeze({
   leaders_eye: { title: '리더스아이 오늘 학습', subject: 'english', minutes: 20 },
@@ -2786,9 +2791,9 @@ function viewStudentGuide() {
     '<details class="card student-guide-section student-guide-reward"><summary class="student-guide-head"><span class="student-guide-summary-copy"><span class="card-title">🎁 기프트 카드 받는 방법</span>' +
       '<span class="card-sub">5,000P가 모이면 신청부터 수령까지 확인해요.</span></span><span class="pill">5,000P 교환</span></summary>' +
       '<div class="student-guide-steps">' +
-        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">1</span><b>교환 가능 확인</b></div><p>오늘 할 일의 기프트 카드 게이지가 5,000P가 되면 <code>교환 가능</code>으로 바뀝니다.</p></div>' +
-        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">2</span><b>교환 신청</b></div><p><code>5,000P 교환 신청</code>을 누릅니다.</p></div>' +
-        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">3</span><b>처리 상태 확인</b></div><p>신청 뒤에는 <code>교환 확인 중</code>, 원장이 처리를 시작하면 <code>교환 처리 중</code>으로 표시됩니다.</p></div>' +
+        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">1</span><b>매일 포인트 모으기</b></div><p>10월 1일부터 하루 마감으로 최대 100P를 받습니다. 온라인 학습이 배정된 날은 하루 마감 70P와 브레인레터·청크브레인·어휘브레인·리더스아이·메타수학 완료 몫 최대 30P로 나뉩니다.</p></div>' +
+        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">2</span><b>온라인 학습 결과 기록</b></div><p>사이트를 연 것만으로는 적립되지 않습니다. 실제 학습 후 <code>학습 완료 기록</code>을 남기고 하루 마감까지 끝내야 포인트가 확정됩니다.</p></div>' +
+        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">3</span><b>교환 신청</b></div><p>오늘 할 일의 게이지가 5,000P가 되어 <code>교환 가능</code>으로 바뀌면 <code>5,000P 교환 신청</code>을 누릅니다.</p></div>' +
         '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">4</span><b>기프트 카드 받기</b></div><p>원장이 학습 기록을 확인해 기프트 카드를 별도로 발송합니다. 실제 발송이 완료되면 5,000P가 차감되고 <code>기프트 카드 교환 완료</code>로 기록됩니다.</p></div>' +
       '</div><div class="student-guide-tip"><b>취소와 보관</b> ‘교환 확인 중’에는 신청을 취소할 수 있지만 ‘교환 처리 중’에는 취소할 수 없습니다. 기프트 카드 번호·링크는 플래너에 저장되지 않습니다.</div>' +
     '</details>' +
@@ -2812,6 +2817,7 @@ function viewStudentGuide() {
         '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">5</span><b>완료 결과 기록</b></div><p>배정된 과제의 <code>학습 완료 기록</code>을 눌러 진행 단계와 결과를 남깁니다. 메타수학은 점수·오답 수도 함께 적습니다.</p></div>' +
         '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">6</span><b>오늘 할 일 확인</b></div><p>오늘 체크리스트가 완료로 바뀌었는지 확인하고, 마지막에 하루 마감과 수행 보고를 끝냅니다.</p></div>' +
       '</div><div class="student-guide-tip"><b>로그인 메모 보안</b> 입력한 아이디와 비밀번호는 현재 학생 기기에만 저장되고 서버·원장 화면·백업으로 전송되지 않습니다. 공용 기기에서는 저장하지 말고, 기기 저장공간을 지우면 메모도 사라집니다.</div>' +
+      '<div class="student-guide-tip"><b>온라인 학습 포인트</b> 배정된 서비스가 여러 개면 하루 온라인 학습 30P를 서비스 수대로 나누며, 완료한 서비스 몫만 실제 완료한 날짜에 적립됩니다. 이월 공부도 원래 날짜가 아니라 마친 날에 반영됩니다.</div>' +
       '<div class="student-guide-tip"><b>서비스별 안내</b> 브레인레터는 주간 글 읽기, 청크브레인은 의미 단위 끊어읽기, 어휘브레인은 어휘 학습에 사용합니다. 리더스아이는 학습 결과에 따라 1주일마다 레벨이 자동 조정됩니다. 메타수학 문제지 요청은 화요일까지 보내면 가까운 수요일에, 수요일 이후에는 다음 수요일에 제작·배정됩니다.</div>' +
     '</details>' +
 
@@ -6325,13 +6331,21 @@ function learningSourceCard(me, editable, sourceKey) {
       (onlineSource && active.length ? '완료 기록 ' : '') + active.length + '건</span>';
   const checklistScheduleStatus = checklistSchedule
     ? '<span class="pill">' + esc(repeatLabel(checklistSchedule)) + ' · ' + Number(checklistSchedule.estimatedMin || 20) + '분</span>' : '';
+  const pointRule = pointRuleFor(today());
+  const pointRow = pointRule.online && POINT_ONLINE_SOURCE_KEYS.includes(sourceKey)
+    ? pointOnlineLearningRows(me.id, today(), pointRule.online).find(row => row.source === sourceKey) : null;
+  const pointStatus = pointRow
+    ? '<span class="pill ' + (pointRow.done ? (engagementDayState(me.id, today()).stamped ? '' : 'warn') : 'bad') + '">' +
+      (pointRow.done
+        ? '+' + pointRow.points + 'P ' + (engagementDayState(me.id, today()).stamped ? '확정' : '마감 대기')
+        : '오늘 미학습 · +' + pointRow.points + 'P') + '</span>' : '';
 
   return '<details class="card study-source-card" data-learning-source="' + esc(sourceKey) + '"' +
     (late || studentDue || (leadersEyeStudent && !todayRecorded) ? ' open' : '') + '>' +
     '<summary class="study-source-summary"><span class="study-source-head"><span class="study-source-icon">' + source.icon + '</span>' +
       '<span class="study-source-copy"><b>' + esc(source.label) + '</b><span>' + esc(source.detail) + '</span></span></span>' +
       '<span class="study-source-count">' + (late ? '<span class="pill bad">지연 ' + late + '</span>' : '') +
-        checklistScheduleStatus + leadersEyeStatus + assignmentCount + '</span></summary>' +
+        pointStatus + checklistScheduleStatus + leadersEyeStatus + assignmentCount + '</span></summary>' +
     '<div class="study-source-body"><div class="small muted mt14">' + help + '</div>' +
     accountGuide +
     '<div class="study-source-actions">' +
@@ -7230,6 +7244,7 @@ function dailyCloseStudyItems(staffId, date, legacyClaimedLecturesOnly) {
     return {
       key: 'task:' + task.id, type: 'task', id: task.id, task: task,
       label: task.title, detail: task.detail || '', subjectKey: taskStudySubjectKey(task),
+      source: task.source || '', learningResultReady: hasLearningResult(task, check),
       carriedFromDate: task.dailyCarrySourceDate || '', carryOriginDate: task.dailyCarryOriginDate || '',
       claimed: claimed, done: !!(check && check.done), blocked: !!(check && check.blocked), dropped: !!(check && check.dropped)
     };
@@ -7371,6 +7386,7 @@ const POINT_SUPPORTED_EXCHANGE_VERSIONS = ['v1'];
 const POINT_REWARD_START_DATE = '2026-09-01';
 const POINT_RULE_V2_START_DATE = '2026-10-01';
 const POINT_DAILY = 100;
+const POINT_ONLINE_DAILY = 30;
 const POINT_WEEKLY = 500;
 const POINT_MONTHLY = 1000;
 const POINT_WEEKLY_MIN_DAYS = 3;
@@ -7382,8 +7398,44 @@ const pointExchangeKey = (staffId, requestId) => '__rewardtx__' + staffId + '|' 
 
 function pointRuleFor(date) {
   return String(date || '') >= POINT_RULE_V2_START_DATE
-    ? { version: POINT_RULE_VERSION, daily: POINT_DAILY, weekly: POINT_WEEKLY, monthly: POINT_MONTHLY }
-    : { version: 'v1', daily: 50, weekly: 250, monthly: 500 };
+    ? { version: POINT_RULE_VERSION, daily: POINT_DAILY, dailyClose: POINT_DAILY - POINT_ONLINE_DAILY,
+        online: POINT_ONLINE_DAILY, weekly: POINT_WEEKLY, monthly: POINT_MONTHLY }
+    : { version: 'v1', daily: 50, dailyClose: 50, online: 0, weekly: 250, monthly: 500 };
+}
+
+/** 하루 온라인 몫은 배정된 서비스끼리 나누고, 같은 서비스는 여러 과제여도 한 번만 인정한다. */
+function pointOnlineLearningRows(staffId, date, pool) {
+  const totalPoints = Math.max(0, Math.round(Number(pool) || 0));
+  if (!totalPoints) return [];
+  const close = dailyCloseOf(staffId, date);
+  const snapshotReady = close.itemSnapshot.length || close.status !== 'open' || close.reviewedAt || close.finalizedAt;
+  const items = snapshotReady ? close.itemSnapshot : dailyCloseStudyItems(staffId, date);
+  const grouped = new Map();
+  items.forEach(item => {
+    const task = item.task || null;
+    const source = String(item.source || (task && task.source) || '');
+    if (item.type !== 'task' || !POINT_ONLINE_SOURCE_KEYS.includes(source)) return;
+    const resultReady = item.learningResultReady === true ||
+      (item.learningResultReady === undefined && task && hasLearningResult(task, getCheck(item.id, date)));
+    if (!grouped.has(source)) grouped.set(source, false);
+    if (item.done && resultReady) grouped.set(source, true);
+  });
+  const sources = POINT_ONLINE_SOURCE_KEYS.filter(source => grouped.has(source));
+  if (!sources.length) return [];
+  const each = Math.floor(totalPoints / sources.length);
+  const remainder = totalPoints % sources.length;
+  return sources.map((source, index) => ({
+    source: source, done: grouped.get(source), points: each + (index < remainder ? 1 : 0)
+  }));
+}
+
+function pointDayBreakdown(staffId, date, rule) {
+  const onlineRows = pointOnlineLearningRows(staffId, date, rule.online);
+  return {
+    closePoints: onlineRows.length ? rule.dailyClose : rule.daily,
+    onlineRows: onlineRows,
+    onlineEarned: onlineRows.filter(row => row.done).reduce((sum, row) => sum + row.points, 0)
+  };
 }
 
 function pointNumber(value) {
@@ -7468,10 +7520,18 @@ function rewardPointEvents(staffId, asOf) {
     const day = engagementDayState(staffId, date);
     const finalizedAt = Number(day.finalizedAt) || 0;
     const rule = pointRuleFor(date);
-    if (day.stamped && finalizedAt > 0 && finalizedAt <= cutoffAt) events.push({
-      id: rule.version + ':day:' + date, type: 'day', date: date, at: Number(dailyCloseOf(staffId, date).finalizedAt) || parseYmd(date).getTime(),
-      label: '유효 학습일', points: rule.daily
-    });
+    if (day.stamped && finalizedAt > 0 && finalizedAt <= cutoffAt) {
+      const breakdown = pointDayBreakdown(staffId, date, rule);
+      const at = Number(dailyCloseOf(staffId, date).finalizedAt) || parseYmd(date).getTime();
+      events.push({
+        id: rule.version + ':day:' + date, type: 'day', date: date, at: at,
+        label: breakdown.onlineRows.length ? '유효 학습일 · 하루 마감' : '유효 학습일', points: breakdown.closePoints
+      });
+      breakdown.onlineRows.filter(row => row.done).forEach(row => events.push({
+        id: rule.version + ':online:' + date + ':' + row.source, type: 'online', date: date, at: at,
+        label: LEARNING_SOURCES[row.source].label + ' 학습 완료', points: row.points
+      }));
+    }
   }
   for (let mon = mondayOf(POINT_REWARD_START_DATE); addDays(mon, 6) <= throughDate; mon = addDays(mon, 7)) {
     const week = pointWeekSummary(staffId, mon, throughDate);
@@ -7684,12 +7744,23 @@ function pointGaugeHtml(staffId) {
     : account.deficit ? '과거 학습 기록이 바뀌어 원장 확인이 필요해요'
     : account.pending ? '5,000P 교환 신청을 원장이 확인하고 있어요'
     : account.remaining ? pointNumber(account.remaining) + ' 더 모으면 기프트 카드 교환' : '기프트 카드 교환 가능';
+  const todayBreakdown = pointDayBreakdown(staffId, today(), rule);
+  const todayOnline = rule.online
+    ? (todayBreakdown.onlineRows.length
+      ? '<div class="point-online-today"><b>오늘 온라인 학습 ' + todayBreakdown.onlineRows.filter(row => row.done).length + '/' + todayBreakdown.onlineRows.length + '</b><span>' +
+          (todayBreakdown.onlineEarned
+            ? '+' + todayBreakdown.onlineEarned + 'P · ' + (engagementDayState(staffId, today()).stamped ? '확정' : '하루 마감 후 확정')
+            : '완료하면 최대 +' + rule.online + 'P') + '</span></div>'
+      : '<div class="point-online-today"><b>오늘 온라인 학습 배정 없음</b><span>하루 마감 최대 +' + rule.daily + 'P</span></div>')
+    : '<div class="point-online-today"><b>온라인 학습 포인트</b><span>10월 1일부터 최대 +' + POINT_ONLINE_DAILY + 'P</span></div>';
   return '<div class="point-gauge-card" aria-label="기프트 카드 포인트 현황"><div class="point-gauge-head"><div>' +
     '<div class="point-gauge-title">🎁 기프트 카드 포인트</div><div class="point-gauge-value">' + pointNumber(account.balance) + ' <small>/ ' + pointNumber(POINT_EXCHANGE_COST) + '</small></div></div>' +
     status + '</div><div class="point-gauge-track" role="progressbar" aria-valuemin="0" aria-valuemax="' + POINT_EXCHANGE_COST + '" aria-valuenow="' +
       Math.min(POINT_EXCHANGE_COST, account.pending ? account.balance : account.available) + '"><i style="width:' + account.pct + '%"></i></div>' +
-    '<div class="point-gauge-meta"><span>' + esc(meta) + '</span><b>이번 달 +' + pointNumber(account.currentMonthEarned) + '</b></div>' +
-    '<div class="point-rule-chips"><span>유효 학습일 +' + rule.daily + 'P</span><span>주간 달성 +' + rule.weekly + 'P</span><span>월간 달성 +' + rule.monthly + 'P</span></div>' +
+    '<div class="point-gauge-meta"><span>' + esc(meta) + '</span><b>이번 달 +' + pointNumber(account.currentMonthEarned) + '</b></div>' + todayOnline +
+    '<div class="point-rule-chips"><span>유효 학습일 최대 +' + rule.daily + 'P</span>' +
+      (rule.online ? '<span>온라인 완료 최대 +' + rule.online + 'P 포함</span>' : '') +
+      '<span>주간 달성 +' + rule.weekly + 'P</span><span>월간 달성 +' + rule.monthly + 'P</span></div>' +
     '<div class="small muted mt8">' + goalNote + '</div>' +
     '<div class="point-gauge-actions"><button class="btn btn-sm btn-ghost" data-act="pointopen" data-id="' + esc(staffId) + '">적립 방법 · 내역</button>' +
       (ownStudent && account.canRequest ? '<button class="btn btn-sm btn-primary" data-act="pointrequest" data-id="' + esc(staffId) + '">5,000P 교환 신청</button>' : '') +
@@ -7760,7 +7831,9 @@ function pointHistoryModal(staffId) {
       '<div class="point-gauge-value">' + pointNumber(account.balance) + '</div></div>' +
       (account.processing ? '<span class="tag reward-attention">교환 처리 중</span>' : account.deficit ? '<span class="tag reward-attention">정산 확인 필요</span>' : account.pending ? '<span class="tag reward-progress">교환 확인 중</span>' : account.canRequest ? '<span class="tag reward-achieved">교환 가능</span>' : '<span class="tag reward-progress">적립 중</span>') + '</div>' +
       '<div class="point-gauge-track"><i style="width:' + account.pct + '%"></i></div></div>' +
-    '<div class="point-policy"><div><b>매일 +' + rule.daily + 'P</b><span>공부 완료 또는 순공 10분 이상, 미완료 정리, 다음날 정오 전 학생 수행 보고까지 완료한 유효 학습일</span></div>' +
+    '<div class="point-policy"><div><b>매일 최대 +' + rule.daily + 'P</b><span>' + (rule.online
+        ? '온라인 학습 배정이 없는 날은 하루 마감 100P, 배정이 있는 날은 하루 마감 70P와 완료한 서비스 몫 최대 30P를 적립합니다. 링크만 여는 것은 인정되지 않으며 학습 결과 기록과 다음날 정오 전 하루 마감까지 끝내야 확정됩니다.'
+        : '공부 완료 또는 순공 10분 이상, 미완료 정리, 다음날 정오 전 학생 수행 보고까지 완료한 유효 학습일') + '</span></div>' +
       '<div><b>매주 +' + rule.weekly + 'P</b><span>예정 학습일 3일 이상인 주에 유효 학습일 80% 이상을 달성하고 학생이 일요일 주간 마무리까지 완료</span></div>' +
       '<div><b>매월 +' + rule.monthly + 'P</b><span>예정 학습일 12일 이상인 달에 유효 학습일 80% 이상을 달성하고 학생이 말일 월간 마무리까지 완료</span></div>' +
       '<div><b>' + pointNumber(POINT_EXCHANGE_COST) + ' = 기프트 카드 1개</b><span>순위 경쟁 없이 계속 누적되며, 원장이 기록과 신청을 확인한 뒤 실제 발송 완료 시 5,000P가 차감됩니다.</span></div></div>' +
@@ -7954,10 +8027,14 @@ function ensureRecentDailyCarryTasks() {
           state.checks[ckey(carried.id, completedDate)] = {
             taskId: carried.id, date: completedDate, done: true,
             at: sourceCheck.at || sourceCheck.updatedAt || now(), steps: steps,
-            count: carried.target || 0, blocked: false, migratedFromCarry: true, updatedAt: now()
+            count: carried.target || 0, blocked: false,
+            learningResult: sourceCheck.learningResult || null,
+            learningResultUpdatedAt: sourceCheck.learningResultUpdatedAt || null,
+            migratedFromCarry: true, updatedAt: now()
           };
           state.checks[ckey(task.id, sourceDate)] = Object.assign({}, sourceCheck, {
             done: false, at: null, blocked: false, dropped: false, steps: {}, count: 0,
+            learningResult: null, learningResultUpdatedAt: null,
             migratedToCarryTask: carried.id, updatedAt: now()
           });
           changed = true;
@@ -10735,7 +10812,7 @@ function viewStaffAdmin() {
       '<div class="small muted mt8">학습·마감 기록에서 포인트를 자동 계산하고, 학생의 5,000P 신청은 실제 기프트 카드 발송 후 원장이 확정합니다.</div></div>' +
       '<div class="small"><b>교환 확인 ' + pointPending + '명</b> · 신청 가능 ' + pointReady + '명' + (pointDeficit ? ' · 정산 확인 ' + pointDeficit + '명' : '') + '</div></div>' +
       '<div class="small muted mt8">오늘 유효 학습일 ' + stampedToday + '명 · 이번 달 80% 이상 ' + engagementOnTrack + '명 · 전체 학생 현재 잔액 ' + pointNumber(pointBalances) +
-        '<br>10월 1일부터 유효 학습일 +100P · 주 3일 이상에서 80%와 주간 마무리 +500P · 월 12일 이상에서 80%와 월간 마무리 +1,000P. 기프트 카드 번호나 링크는 앱에 저장하지 않습니다.</div></div>' : '') +
+        '<br>10월 1일부터 하루 최대 100P(온라인 배정일은 하루 마감 70P + 완료한 서비스 몫 최대 30P) · 주 3일 이상에서 80%와 주간 마무리 +500P · 월 12일 이상에서 80%와 월간 마무리 +1,000P. 기프트 카드 번호나 링크는 앱에 저장하지 않습니다.</div></div>' : '') +
     (students.length ? '<div class="student-subscription-overview"><div class="between"><div><b>월 구독 관리</b>' +
       '<div class="small muted mt8">학생 이용 기능과 별개로 결제 확인만 관리합니다.</div></div>' +
       '<div class="small"><b>구독 ' + subscriptionStudents.length + '명</b> · 결제 확인 필요 ' + paymentAttention.length + '명</div></div>' +
@@ -14074,7 +14151,8 @@ document.addEventListener('click', ev => {
 
       const snapshot = data.items.map(item => ({
         key: item.key, type: item.type, label: item.label, detail: item.detail || '',
-        subjectKey: item.subjectKey, carriedFromDate: item.carriedFromDate || '',
+        subjectKey: item.subjectKey, source: item.source || '', learningResultReady: item.learningResultReady === true,
+        carriedFromDate: item.carriedFromDate || '',
         carryOriginDate: item.carryOriginDate || '', claimed: item.claimed !== false, done: item.done
       }));
       Object.keys(nextResolutions).forEach(key => {
@@ -14688,7 +14766,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-09-25.2';
+const APP_VER = '2026-09-27.1';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)

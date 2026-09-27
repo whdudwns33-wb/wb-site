@@ -35,6 +35,7 @@ function accountHarness({ earned = 0, requests = [], decisions = [], cutoffAt = 
 
 function rewardEventHarness() {
   const dayStates = new Map();
+  const dayBreakdowns = new Map();
   const weekCloses = new Map();
   const monthCloses = new Map();
   const monthSummaries = new Map();
@@ -68,10 +69,17 @@ function rewardEventHarness() {
   const weekCloseOf = (_staffId, mon) => weekCloses.get(mon) || { status: '', completedAt: 0 };
   const monthCloseOf = (_staffId, ym) => monthCloses.get(ym) || { status: '', completedAt: 0 };
   const engagementMonthSummary = (_staffId, ym) => monthSummaries.get(ym) || { plannedDays: 0, stampTargetMet: false };
-  const pointRuleFor = Function('POINT_RULE_V2_START_DATE', 'POINT_RULE_VERSION', 'POINT_DAILY', 'POINT_WEEKLY', 'POINT_MONTHLY',
-    functionSource('pointRuleFor') + '; return pointRuleFor;')('2026-10-01', 'v2', 100, 500, 1000);
+  const pointRuleFor = Function('POINT_RULE_V2_START_DATE', 'POINT_RULE_VERSION', 'POINT_DAILY', 'POINT_ONLINE_DAILY', 'POINT_WEEKLY', 'POINT_MONTHLY',
+    functionSource('pointRuleFor') + '; return pointRuleFor;')('2026-10-01', 'v2', 100, 30, 500, 1000);
+  const pointDayBreakdown = (_staffId, date, rule) => dayBreakdowns.get(date) || {
+    closePoints: rule.daily, onlineRows: [], onlineEarned: 0
+  };
+  const learningSources = {
+    brain_letter: { label: '브레인레터' }, chunk_brain: { label: '청크브레인' },
+    vocabulary: { label: '어휘브레인' }, leaders_eye: { label: '리더스아이' }, metamath: { label: '메타수학' }
+  };
   const build = Function(
-    'pointAsOfContext', 'POINT_REWARD_START_DATE', 'addDays', 'engagementDayState', 'pointRuleFor',
+    'pointAsOfContext', 'POINT_REWARD_START_DATE', 'addDays', 'engagementDayState', 'pointRuleFor', 'pointDayBreakdown', 'LEARNING_SOURCES',
     'dailyCloseOf', 'parseYmd', 'mondayOf', 'weekCloseDays', 'ENGAGEMENT_REWARD_RATE', 'POINT_WEEKLY_MIN_DAYS',
     'weekCloseOf', 'ymOf', 'monthLastDate', 'ymAdd', 'engagementMonthSummary', 'monthCloseOf',
     'POINT_MONTHLY_MIN_DAYS',
@@ -79,14 +87,39 @@ function rewardEventHarness() {
       '; return { pointWeekSummary, pointMonthSummary, rewardPointEvents };'
   );
   const api = build(
-    pointAsOfContext, '2026-09-01', addDays, engagementDayState, pointRuleFor,
+    pointAsOfContext, '2026-09-01', addDays, engagementDayState, pointRuleFor, pointDayBreakdown, learningSources,
     dailyCloseOf, parseYmd, mondayOf, weekCloseDays, 80, 3,
     weekCloseOf, ymOf, monthLastDate, ymAdd, engagementMonthSummary, monthCloseOf,
     12
   );
   return {
-    api, dayStates, weekCloses, monthCloses, monthSummaries,
+    api, dayStates, dayBreakdowns, weekCloses, monthCloses, monthSummaries,
     at: value => new Date(value).getTime()
+  };
+}
+
+function onlinePointHarness(itemsByDate, { liveItemsByDate = itemsByDate, closeByDate = {} } = {}) {
+  const sourceKeys = ['brain_letter', 'chunk_brain', 'vocabulary', 'leaders_eye', 'metamath'];
+  const rowsFor = date => itemsByDate[date] || [];
+  const build = Function(
+    'dailyCloseOf', 'dailyCloseStudyItems', 'POINT_ONLINE_SOURCE_KEYS', 'hasLearningResult', 'getCheck',
+    functionSource('pointOnlineLearningRows') + '\n' + functionSource('pointDayBreakdown') +
+      '; return { pointOnlineLearningRows, pointDayBreakdown };'
+  );
+  const api = build(
+    (_staffId, date) => Object.assign({ status: 'open', itemSnapshot: rowsFor(date) }, closeByDate[date] || {}),
+    (_staffId, date) => liveItemsByDate[date] || [], sourceKeys, () => false, () => null
+  );
+  return {
+    rows: (date, pool = 30) => api.pointOnlineLearningRows('s1', date, pool),
+    breakdown: (date, rule = { daily: 100, dailyClose: 70, online: 30 }) => api.pointDayBreakdown('s1', date, rule)
+  };
+}
+
+function onlineItem(source, { id = source, done = true, result = true, carriedFromDate = '' } = {}) {
+  return {
+    key: 'task:' + id, type: 'task', id, source, done,
+    learningResultReady: result, carriedFromDate
   };
 }
 
@@ -194,9 +227,81 @@ test('monthly bonus needs twelve planned learning days, 80 percent and a student
   assert.equal(read(12, true, 'overridden').qualified, false);
 });
 
+test('the 30P online pool is split by assigned service and requires a saved learning result', () => {
+  const one = onlinePointHarness({
+    '2026-10-01': [onlineItem('leaders_eye')]
+  });
+  assert.deepEqual(one.rows('2026-10-01'), [{ source: 'leaders_eye', done: true, points: 30 }]);
+
+  const two = onlinePointHarness({
+    '2026-10-01': [onlineItem('brain_letter'), onlineItem('metamath', { done: false })]
+  });
+  assert.deepEqual(two.rows('2026-10-01'), [
+    { source: 'brain_letter', done: true, points: 15 },
+    { source: 'metamath', done: false, points: 15 }
+  ]);
+  assert.deepEqual(two.breakdown('2026-10-01'), {
+    closePoints: 70,
+    onlineRows: two.rows('2026-10-01'),
+    onlineEarned: 15
+  });
+
+  const duplicate = onlinePointHarness({
+    '2026-10-01': [
+      onlineItem('brain_letter', { id: 'letter-a', done: false, result: false }),
+      onlineItem('brain_letter', { id: 'letter-b' }),
+      onlineItem('classcard')
+    ]
+  });
+  assert.deepEqual(duplicate.rows('2026-10-01'), [
+    { source: 'brain_letter', done: true, points: 30 }
+  ], 'the same service earns at most once and non-reward services are ignored');
+
+  const missingResult = onlinePointHarness({
+    '2026-10-01': [onlineItem('chunk_brain', { result: false })]
+  });
+  assert.equal(missingResult.rows('2026-10-01')[0].done, false,
+    'opening a site or checking done without a learning result earns nothing');
+});
+
+test('online point shares remain integer and carried study belongs only to its completion date', () => {
+  const four = onlinePointHarness({
+    '2026-10-01': ['brain_letter', 'chunk_brain', 'vocabulary', 'leaders_eye'].map(source => onlineItem(source))
+  });
+  assert.deepEqual(four.rows('2026-10-01').map(row => row.points), [8, 8, 7, 7]);
+  assert.equal(four.rows('2026-10-01').reduce((sum, row) => sum + row.points, 0), 30);
+
+  const five = onlinePointHarness({
+    '2026-10-01': ['brain_letter', 'chunk_brain', 'vocabulary', 'leaders_eye', 'metamath'].map(source => onlineItem(source))
+  });
+  assert.deepEqual(five.rows('2026-10-01').map(row => row.points), [6, 6, 6, 6, 6]);
+
+  const carry = onlinePointHarness({
+    '2026-10-01': [],
+    '2026-10-02': [onlineItem('metamath', { carriedFromDate: '2026-10-01' })]
+  });
+  assert.deepEqual(carry.rows('2026-10-01'), []);
+  assert.deepEqual(carry.rows('2026-10-02'), [{ source: 'metamath', done: true, points: 30 }]);
+  assert.deepEqual(carry.breakdown('2026-09-30', { daily: 50, dailyClose: 50, online: 0 }), {
+    closePoints: 50, onlineRows: [], onlineEarned: 0
+  }, 'September v1 remains unchanged');
+
+  assert.match(functionSource('pointOnlineLearningRows'), /snapshotReady \? close\.itemSnapshot/,
+    'a finalized day must keep the service split even if schedules change later');
+  assert.match(html, /const snapshot = data\.items\.map[\s\S]*source: item\.source[\s\S]*learningResultReady:/,
+    'daily close snapshots must preserve the service and verified result state');
+
+  const frozenEmpty = onlinePointHarness({ '2026-10-03': [] }, {
+    liveItemsByDate: { '2026-10-03': [onlineItem('brain_letter')] },
+    closeByDate: { '2026-10-03': { status: 'complete', finalizedAt: 1 } }
+  });
+  assert.deepEqual(frozenEmpty.rows('2026-10-03'), [],
+    'an intentionally empty finalized snapshot must not be replaced by a later schedule change');
+});
+
 test('rewardPointEvents preserves September v1 and switches daily, weekly and monthly events to v2 on October 1', () => {
   const harness = rewardEventHarness();
-  const { api, dayStates, weekCloses, monthCloses, monthSummaries, at } = harness;
+  const { api, dayStates, dayBreakdowns, weekCloses, monthCloses, monthSummaries, at } = harness;
   assert.deepEqual(api.rewardPointEvents('s1', '2026-08-31'), [], 'nothing accrues before the 9/1 launch');
 
   dayStates.set('2026-09-01', { eligible: true, stamped: true, finalizedAt: at('2026-09-02T10:00:00') });
@@ -227,15 +332,36 @@ test('rewardPointEvents preserves September v1 and switches daily, weekly and mo
   ['2026-10-01', '2026-10-02', '2026-10-03'].forEach(date => {
     dayStates.set(date, { eligible: true, stamped: true, finalizedAt: at(date + 'T20:00:00') });
   });
+  dayBreakdowns.set('2026-10-01', {
+    closePoints: 70,
+    onlineRows: [
+      { source: 'brain_letter', done: true, points: 15 },
+      { source: 'metamath', done: false, points: 15 }
+    ],
+    onlineEarned: 15
+  });
   weekCloses.set('2026-09-28', { status: 'complete', completedAt: at('2026-10-04T20:00:00') });
   monthSummaries.set('2026-10', { plannedDays: 12, stampTargetMet: true });
   monthCloses.set('2026-10', { status: 'complete', completedAt: at('2026-10-31T20:00:00') });
   const octoberEvents = api.rewardPointEvents('s1', '2026-10-31');
-  assert.equal(octoberEvents.find(event => event.id === 'v2:day:2026-10-01').points, 100);
+  assert.equal(octoberEvents.find(event => event.id === 'v2:day:2026-10-01').points, 70);
+  assert.equal(octoberEvents.find(event => event.id === 'v2:online:2026-10-01:brain_letter').points, 15);
+  assert.equal(octoberEvents.some(event => event.id === 'v2:online:2026-10-01:metamath'), false,
+    'an assigned but unfinished service forfeits only its own share');
+  assert.equal(octoberEvents.find(event => event.id === 'v2:day:2026-10-02').points, 100,
+    'a day without assigned online learning keeps the full daily award');
   assert.equal(octoberEvents.find(event => event.id === 'v2:week:2026-09-28').points, 500,
     'the boundary week uses its Sunday award date');
   assert.equal(octoberEvents.find(event => event.id === 'v2:month:2026-10').points, 1000);
   assert.equal(new Set(octoberEvents.map(event => event.id)).size, octoberEvents.length, 'v1 and v2 ledger ids stay unique');
+
+  dayStates.set('2026-11-01', { eligible: true, stamped: false, finalizedAt: at('2026-11-01T20:00:00') });
+  dayBreakdowns.set('2026-11-01', {
+    closePoints: 70, onlineRows: [{ source: 'leaders_eye', done: true, points: 30 }], onlineEarned: 30
+  });
+  const unclosed = api.rewardPointEvents('s1', '2026-11-01');
+  assert.equal(unclosed.some(event => event.date === '2026-11-01'), false,
+    'online completion stays unearned until the whole day is a valid student close');
 });
 
 test('point exchange decisions use the server CAS ledger and never become learning activity', () => {
@@ -338,11 +464,15 @@ test('Today shows a 5,000P gauge, rules and history while the director gets fulf
   assert.match(gauge, /기프트 카드 포인트/);
   assert.match(gauge, /role="progressbar"/);
   assert.match(gauge, /유효 학습일/);
+  assert.match(gauge, /오늘 온라인 학습/);
+  assert.match(gauge, /온라인 완료 최대/);
   assert.match(gauge, /pointrequest/);
   assert.match(gauge, /student\.owner \|\| student\.manager/);
   assert.match(card, /pointGaugeHtml\(me\.id\)/);
   assert.match(modal, /적립 방법/);
   assert.match(modal, /실제 발송 완료/);
+  assert.match(modal, /하루 마감 70P/);
+  assert.match(modal, /링크만 여는 것은 인정되지 않으며/);
   assert.match(modal, /기프트 카드 번호·링크는 앱에 저장하지 않습니다/);
   assert.match(modal, /row\.points > 0 \? '\+' : row\.points < 0 \? '-' : ''/,
     'fulfilled exchanges must render as -5,000P instead of an unsigned amount');
@@ -367,6 +497,10 @@ test('Today shows a 5,000P gauge, rules and history while the director gets fulf
   assert.match(html, /case 'pointreject'[\s\S]*'reject'/);
   assert.match(html, /const LS_KEY = 'wb_consult_v1'/);
   assert.match(html, /const SYNC_APP = 'consult'/);
+  const sourceCard = functionSource('learningSourceCard');
+  assert.match(sourceCard, /POINT_ONLINE_SOURCE_KEYS/);
+  assert.match(sourceCard, /오늘 미학습/);
+  assert.match(sourceCard, /마감 대기/);
 });
 
 test('processing identity stays reachable and blocks student deletion or role conversion', () => {

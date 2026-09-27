@@ -604,6 +604,7 @@ test('unclaimed distributed study is mandatory in daily closeout and the report'
     const getCheck = () => null;
     const isStudyClaimed = () => false;
     const taskStudySubjectKey = () => 'math';
+    const hasLearningResult = () => false;
     const ingPlan = () => [
       { cid: 'course-1', seq: 2, done: false, claimed: false },
       { cid: 'course-2', seq: 3, done: false, claimed: true, closed: true }
@@ -689,9 +690,55 @@ test('recent legacy carry completions migrate from the original date to the actu
   assert.match(migration, /dailyCarryTask\(task, sourceDate, completedDate \|\| today\(\)\)/);
   assert.match(migration, /migratedFromCarry: true/);
   assert.match(migration, /done: false, at: null/);
+  assert.match(migration, /learningResult: sourceCheck\.learningResult/);
+  assert.match(migration, /learningResult: null, learningResultUpdatedAt: null/);
   assert.match(html, /const repairedCarryOrigins = repairLegacyStudentCarryOrigins\(\)/);
   assert.match(html, /const migratedRecentDailyCarryTasks = ensureRecentDailyCarryTasks\(\)/);
   assert.match(html, /repairedCarryOrigins \|\| migratedRecentDailyCarryTasks/);
+
+  const sourceDate = '2026-09-09';
+  const completedDate = '2026-09-10';
+  const completedAt = new Date(completedDate + 'T10:00:00').getTime();
+  const task = { id: 'task-1', staffId: 'student-a', source: 'metamath', steps: [{ id: 'solve' }], target: 0 };
+  const state = {
+    tasks: [task],
+    checks: {
+      ['__dailyclose__student-a|' + sourceDate]: { done: true },
+      ['task-1|' + sourceDate]: {
+        done: true, at: completedAt,
+        learningResult: { score: 90, wrong: 2 }, learningResultUpdatedAt: completedAt
+      }
+    }
+  };
+  const addDays = (value, amount) => {
+    const date = new Date(value + 'T00:00:00');
+    date.setDate(date.getDate() + amount);
+    return date.toISOString().slice(0, 10);
+  };
+  const migrate = Function(
+    'state', 'today', 'addDays', 'liveStaff', 'dailyCloseKey', 'dailyCloseOf', 'getCheck', 'ymd',
+    'dailyCarryTask', 'isDone', 'ckey', 'now', migration + '\nreturn ensureRecentDailyCarryTasks;'
+  )(
+    state, () => completedDate, addDays, () => [{ id: 'student-a' }], id => '__dailyclose__' + id,
+    () => ({ resolutions: { 'task:task-1': { type: 'carry' } } }),
+    (id, date) => state.checks[id + '|' + date] || null,
+    value => new Date(value).toISOString().slice(0, 10),
+    (source, date, targetDate) => {
+      const carried = Object.assign({}, source, {
+        id: 'daily-carry-' + source.id + '-' + date, start: targetDate, dailyCarrySourceDate: date
+      });
+      state.tasks.push(carried);
+      return carried;
+    },
+    (id, date) => !!(state.checks[id + '|' + date] || {}).done,
+    (id, date) => id + '|' + date, () => completedAt + 1
+  );
+  assert.equal(migrate(), true);
+  const carriedCheck = state.checks['daily-carry-task-1-' + sourceDate + '|' + completedDate];
+  assert.deepEqual(carriedCheck.learningResult, { score: 90, wrong: 2 });
+  assert.equal(carriedCheck.learningResultUpdatedAt, completedAt);
+  assert.equal(state.checks['task-1|' + sourceDate].learningResult, null,
+    'the result must move instead of remaining attached to the old date');
 });
 
 test('legacy admin-origin carry tasks are repaired without touching ordinary admin tasks', () => {

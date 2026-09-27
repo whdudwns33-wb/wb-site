@@ -95,6 +95,9 @@ test('student guide explains the required routine and optional modules', () => {
   assert.match(guide, /Agency ID <code>wbbrain<\/code>/);
   assert.match(guide, /사이트를 닫는 것만으로는 완료 처리되지 않습니다/);
   assert.match(guide, /현재 학생 기기에만 저장되고 서버·원장 화면·백업으로 전송되지 않습니다/);
+  assert.match(guide, /사이트를 연 것만으로는 적립되지 않습니다/);
+  assert.match(guide, /하루 마감 70P/);
+  assert.match(guide, /이월 공부도 원래 날짜가 아니라 마친 날에 반영/);
   assert.match(guide, /목표 학교와 교재 로드맵/);
   assert.match(guide, /전체 범위가 학습 요일에 자동으로 나뉘어/);
   assert.match(guide, /로드맵[^]*목표 학교·교재별 전체 진도율[^]*이번 주 배정 분량/);
@@ -112,7 +115,7 @@ test('student guide keeps the daily routine visible and folds reference sections
   assert.ok(guide.indexOf('✅ 매일 반드시 할 것') < guide.indexOf('🎁 기프트 카드 받는 방법'));
   assert.ok(guide.indexOf('🎁 기프트 카드 받는 방법') < guide.indexOf('🔗 처음 연결과 매일 접속'));
   assert.match(guide, /student-guide-reward[^]*🎁 기프트 카드 받는 방법[^]*5,000P가 모이면 신청부터 수령까지 확인해요[^]*5,000P 교환/);
-  assert.match(guide, /교환 가능 확인[^]*5,000P 교환 신청[^]*교환 확인 중[^]*교환 처리 중[^]*기프트 카드 받기/);
+  assert.match(guide, /매일 포인트 모으기[^]*온라인 학습 결과 기록[^]*5,000P 교환 신청[^]*기프트 카드 받기/);
   assert.match(guide, /실제 발송이 완료되면 5,000P가 차감되고 <code>기프트 카드 교환 완료<\/code>로 기록됩니다/);
   assert.match(guide, /‘교환 확인 중’에는 신청을 취소할 수 있지만 ‘교환 처리 중’에는 취소할 수 없습니다/);
   assert.match(guide, /기프트 카드 번호·링크는 플래너에 저장되지 않습니다/);
