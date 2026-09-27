@@ -156,6 +156,7 @@ function renderLearningSourceCard(studentName, state, sourceKey = 'leaders_eye')
     'LEARNING_SOURCES', 'ONLINE_LEARNING_SOURCE_KEYS', 'state', 'session', 'isManager', 'isDone', 'learningTaskDate',
     'learningDueDate', 'today', 'esc', 'classcardAppUrl', 'navigator', 'taskRow',
     'CHECKLIST_ONLINE_SOURCE_DEFAULTS', 'isRepeatingTask', 'effectiveOccursOn', 'learningOccurrenceDate', 'repeatLabel',
+    'POINT_ONLINE_SOURCE_KEYS', 'pointRuleFor', 'pointOnlineLearningRows', 'engagementDayState',
     source + '; return learningSourceCard;'
   )(
     learningSources(), ['brain_letter', 'chunk_brain', 'vocabulary', 'leaders_eye', 'metamath', 'classcard', 'studyforce', 'nelt_exam', 'daily_nonfiction'],
@@ -175,7 +176,9 @@ function renderLearningSourceCard(studentName, state, sourceKey = 'leaders_eye')
        (task.repeat === 'days' && (task.days || []).includes(new Date(date + 'T00:00:00').getDay())) ||
        (task.repeat === 'once' && task.start === date)),
     (task, date) => ['daily', 'weekday', 'days'].includes(task.repeat) ? date : task.start,
-    task => task.repeat === 'weekday' ? '평일(월~금)' : task.repeat || ''
+    task => task.repeat === 'weekday' ? '평일(월~금)' : task.repeat || '',
+    ['brain_letter', 'chunk_brain', 'vocabulary', 'leaders_eye', 'metamath'],
+    () => ({ online: 0 }), () => [], () => ({ stamped: false })
   );
   return renderCard({ id: 'student-a', name: studentName }, true, sourceKey);
 }
