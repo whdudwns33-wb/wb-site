@@ -245,6 +245,8 @@ test('online services open the requested URLs for director, manager, and student
   const sources = section('const LEADERS_EYE_URL', 'const DOW');
   const card = section('function learningSourceCard(', '/* ── 학습 탭');
   const renderCard = Function('session', 'isManager', 'learningTasksFor', 'learningChecklistScheduleFor', 'esc', 'LEARNING_LOGIN_MEMO_SOURCES',
+    'pointRuleFor', 'pointOnlineLearningRows', 'engagementDayState',
+    'today',
     sources + card + '\nreturn learningSourceCard;');
   const expected = [
     ['nelt_exam', '넬트 시험', 'https://www.netutor.co.kr/st/'],
@@ -255,7 +257,7 @@ test('online services open the requested URLs for director, manager, and student
   ];
   for (const role of ['director', 'manager', 'student']) {
     const render = renderCard({ isAdmin: role === 'director' }, () => role === 'manager', () => [], () => null, String,
-      ['leaders_eye', 'metamath']);
+      ['leaders_eye', 'metamath'], () => ({ online: 0 }), () => [], () => ({ stamped: false }), () => '2026-09-27');
     for (const [key, label, url] of expected) {
       const output = render({ id: 'student-a', name: '테스트' }, role !== 'manager', key);
       assert.ok(output.includes('data-learning-source="' + key + '"'));
