@@ -87,7 +87,7 @@ test('generated makeup lessons are never allowed to recursively create another m
   assert.match(helpers, /&& !isScheduledMakeupTask\(t\)/);
   assert.match(panel, /isScheduledMakeupTask\(t\) \? ''/);
   assert.match(click, /next === 'A' && isScheduledMakeupTask\(t\)/);
-  assert.match(click, /추가 보강은 자동 생성하지 않습니다/);
+  assert.match(click, /promptAfterMakeupAbsence\(t, date, savedCheck.updatedAt\)/);
 });
 
 test('makeup auto-create never posts after sync failure and preserves retry state', async () => {
@@ -283,7 +283,7 @@ test('active admin card has one processing action plus no-makeup and staff can o
   assert.match(actions, /function openMakeupAdminProcessModal\(button\)/);
   assert.match(actions, /data-act="muschedule"[\s\S]*?>보강 일정 생성</);
   assert.match(actions, /data-act="mureschedule"[\s\S]*?>담당자·일정 수정</);
-  assert.match(actions, /data-act="muretryafteropen"[\s\S]*?>결석 후 재보강 일정 생성</);
+  assert.match(actions, /data-act="muretryafteropen"[\s\S]*?>새 보강 날짜 정하기</);
   assert.match(actions, /if \(session\.isAdmin\)/);
   assert.match(actions, /const assignedStaffId = row\.confirmedStaffId/);
   assert.match(actions, /row\.status === 'confirmed' && session\.isStaffLink/);

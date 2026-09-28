@@ -2262,7 +2262,7 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
     if (action === 'reconcile_attendance') return await reconcileAttendance(env, app, body, auth, json, origin);
 
     const administrative = new Set([
-      'review', 'propose', 'confirm', 'schedule', 'reschedule', 'reschedule_after_absence',
+      'review', 'propose', 'confirm', 'schedule', 'reschedule',
       'restore_schedule', 'no_makeup', 'cancel'
     ]);
     if (administrative.has(action) && auth.scope !== 'all') {
@@ -2447,6 +2447,11 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
       };
       rescheduledSave = { staffId, range };
     } else if (action === 'reschedule_after_absence') {
+      if (auth.scope !== 'all' && (String(auth.id || '') !== String(row.confirmed_staff_id || '') ||
+          String(body.staffId || '') !== String(auth.id || '') ||
+          Object.prototype.hasOwnProperty.call(body, 'instructionText'))) {
+        return json({ ok: false, error: '본인이 담당한 보강만 같은 담당자로 다시 예약할 수 있습니다' }, 403, origin);
+      }
       if (row.status !== 'confirmed' || !row.confirmed_start_at || !row.confirmed_end_at || !row.confirmed_staff_id) {
         problem('결석 기록이 있는 확정 보강만 재보강 일정으로 바꿀 수 있습니다', 409, 'INVALID_TRANSITION');
       }

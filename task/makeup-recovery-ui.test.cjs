@@ -6,6 +6,30 @@ const path = require('node:path');
 const core = require('./makeup-recovery-core.js');
 const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
 const source = html.slice(html.indexOf('async function mutateMakeup('), html.indexOf('async function createMakeupFromAbsence'));
+test('보강 결석은 서버 저장 뒤 두 가지 선택을 열고 정정·화면 이동·다른 팝업은 덮지 않는다', async () => {
+  const promptSource = html.slice(html.indexOf('async function promptAfterMakeupAbsence('), html.indexOf('async function openMakeupProcessModal'));
+  for (const scenario of ['saved', 'corrected', 'moved', 'modal', 'failed']) {
+    const calls = [];
+    const state = { route: 'today', cursor: '2026-08-12' };
+    const run = Function('sync', 'settleSync', 'loadLatestMakeupCase', 'getCheck', '$', 'toast', 'openMakeupAbsentChoices',
+      'let route="today", cursor="2026-08-12";' + promptSource +
+      ';return { run: promptAfterMakeupAbsence, move: () => { cursor="2026-08-13"; } };')(
+      { auth: () => ({ id: 'a' }) }, async () => {
+        if (scenario === 'failed') throw new Error('offline');
+        if (scenario === 'moved') run.move();
+      }, async () => ({ status: 'confirmed', confirmedDate: state.cursor }),
+      () => ({ att: scenario === 'corrected' ? 'P' : 'A', updatedAt: 1 }),
+      () => ({ hidden: scenario !== 'modal' }), text => calls.push(text), () => calls.push('opened'));
+    await run.run({ id: 'lesson', makeupCaseId: 'case' }, state.cursor, 1);
+    assert.equal(calls.includes('opened'), scenario === 'saved', scenario);
+    if (scenario === 'failed') assert.ok(calls.some(text => text.includes('서버 저장·조회 확인')));
+  }
+  const choices = html.slice(html.indexOf('function openMakeupAbsentChoices('), html.indexOf('async function promptAfterMakeupAbsence'));
+  assert.match(choices, /새 보강 날짜 정하기/);
+  assert.match(choices, /나중에 정하기/);
+  assert.doesNotMatch(choices, /sync.post|create_manual/);
+  assert.match(html, /재보강 일정 필요/);
+});
 function harness(options = {}) {
   const before = { caseId: 'case-a', revision: 1, status: 'reviewed', currentTeacherId: 'a' };
   const calls = [], button = { disabled: false, isConnected: true, dataset: {} };
