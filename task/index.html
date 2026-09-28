@@ -1238,16 +1238,16 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-09-28.1"></script>
-<script src="./schedule-board-core.js?v=2026-09-28.1"></script>
-<script src="./asset-core.js?v=2026-09-28.1"></script>
-<script src="./qr-core.js?v=2026-09-28.1"></script>
-<script src="./acaflow-import-core.js?v=2026-09-28.1"></script>
-<script src="./feedback-subject-catalog.js?v=2026-09-28.1"></script>
-<script src="./sync-recovery-core.js?v=2026-09-28.1"></script>
-<script src="./staff-work-session-core.js?v=2026-09-28.1"></script>
-<script src="./staff-attendance-history-core.js?v=2026-09-28.1"></script>
-<script src="./makeup-recovery-core.js?v=2026-09-28.1"></script>
+<script src="./lesson-form-core.js?v=2026-09-28.2"></script>
+<script src="./schedule-board-core.js?v=2026-09-28.2"></script>
+<script src="./asset-core.js?v=2026-09-28.2"></script>
+<script src="./qr-core.js?v=2026-09-28.2"></script>
+<script src="./acaflow-import-core.js?v=2026-09-28.2"></script>
+<script src="./feedback-subject-catalog.js?v=2026-09-28.2"></script>
+<script src="./sync-recovery-core.js?v=2026-09-28.2"></script>
+<script src="./staff-work-session-core.js?v=2026-09-28.2"></script>
+<script src="./staff-attendance-history-core.js?v=2026-09-28.2"></script>
+<script src="./makeup-recovery-core.js?v=2026-09-28.2"></script>
 <script>
 "use strict";
 
@@ -11439,6 +11439,7 @@ function makeupReasonSelect(id) {
 
 function makeupStatusPill(row) {
   if (row && row.resolvedByCompletion) return '<span class="pill ok">보강완료</span>';
+  if (row && row.status === 'confirmed' && makeupScheduledAttendance(row).value === 'A') return '<span class="pill bad">재보강 일정 필요</span>';
   const cls = row.status === 'cancelled' ? 'muted' : row.status === 'completed' ? 'ok' : row.status === 'confirmed' ? 'doing' : 'warn';
   return '<span class="pill ' + cls + '">' + esc(MAKEUP_STATUS_LABELS[row.status] || row.status) + '</span>';
 }
@@ -11492,7 +11493,7 @@ function openMakeupAdminProcessModal(button) {
   if (row.status === 'confirmed' && row.hasLessonTask === false) {
     actions += '<button class="btn btn-primary btn-block mt14" data-act="murestoreschedule"' + key + '>누락된 보강수업 생성</button>';
   } else if (scheduled && makeupAbsent) {
-    actions += '<button class="btn btn-primary btn-block mt14" data-act="muretryafteropen"' + key + '>결석 후 재보강 일정 생성</button>';
+    actions += '<button class="btn btn-primary btn-block mt14" data-act="muretryafteropen"' + key + '>새 보강 날짜 정하기</button>';
   } else if (scheduled) {
     actions += '<button class="btn btn-primary btn-block mt14" data-act="mucompleteopen"' + key + '>보강완료</button>' +
       '<button class="btn btn-ghost btn-block mt8" data-act="mureschedule"' + key + '>담당자·일정 수정</button>';
@@ -12215,7 +12216,8 @@ function makeupDateTimeModal(row, mode) {
   const directCompletion = mode === 'complete' && !scheduled;
   const scheduledCompletion = mode === 'complete' && scheduled;
   const inspection = typeof managerInspectionActive === 'function' && managerInspectionActive();
-  if ((rescheduling || retrying) && (!session.isAdmin || row.status !== 'confirmed')) return;
+  if (rescheduling && (!session.isAdmin || row.status !== 'confirmed')) return;
+  if (retrying && (row.status !== 'confirmed' || !makeupCanComplete(row))) return;
   if (directCompletion && !makeupCanComplete(row)) return;
   const date = scheduled && !retrying ? row.confirmedDate : '';
   const startTime = scheduled && !retrying ? row.confirmedStartTime : '';
@@ -12225,7 +12227,7 @@ function makeupDateTimeModal(row, mode) {
   const title = mode === 'schedule' || mode === 'restore' ? '보강생성' : retrying ? '결석 후 재보강' : rescheduling ? '보강 수정' : '보강완료';
   const inspectionStaffId = !session.isAdmin ? String(session.staffId || '') : '';
   const staffField = (mode === 'schedule' || rescheduling || retrying || directCompletion)
-    ? (directCompletion && !session.isAdmin
+    ? ((directCompletion || retrying) && !session.isAdmin
       ? '<div class="makeup-schedule"><b>실제 보강 담당 선생님</b><br>' +
           esc(makeupTeacherLabel(inspectionStaffId, '점검 중인 선생님')) +
           '</div><input id="muStaff" type="hidden" value="' + esc(inspectionStaffId) + '">'
@@ -12264,7 +12266,7 @@ function makeupDateTimeModal(row, mode) {
   modal(title + ' — ' + esc(staffStudentCompactLabelById(row.studentId, row.studentName || '학생', row.grade)),
     '<div class="makeup-schedule"><b>원 수업 담당 선생님</b><br>' +
       esc(makeupTeacherLabel(originalStaffId, '원 수업 담당 확인 필요')) + '</div>' + staffField +
-    ((mode === 'schedule' || rescheduling || retrying) ? makeupInstructionFieldHtml(row) : '') +
+    ((mode === 'schedule' || rescheduling || (retrying && session.isAdmin)) ? makeupInstructionFieldHtml(row) : '') +
     '<div class="field"><label class="fl" for="muDate">보강 날짜</label><input class="in" id="muDate" type="date" value="' + esc(date) + '"' +
       (directCompletion ? ' max="' + esc(today()) + '"' : '') + ((mode === 'restore' || scheduledCompletion) ? ' disabled' : '') + '></div>' +
     '<div class="grid2"><div class="field"><label class="fl" for="muStart">시작시간</label><input class="in" id="muStart" type="time" value="' + esc(startTime) + '"' + (mode === 'restore' ? ' disabled' : '') + '></div>' +
@@ -12350,14 +12352,14 @@ async function submitMakeupReschedule(button) {
 }
 
 async function submitMakeupRetryAfterAbsence(button) {
-  if (!session.isAdmin) return;
   const row = makeupRows.find(item => item.caseId === String(button.dataset.case || ''));
+  if (!makeupCanComplete(row)) return;
   if (!row || row.status !== 'confirmed') return showMakeupModalError('확정된 보강 일정을 다시 확인해 주세요');
   const slot = makeupDateTimeInput();
   if (!slot) return;
   const staffId = String(($('#muStaff') || {}).value || '');
   if (!makeupActiveStaff(staffId)) return showMakeupModalError('활성 보강 담당 선생님을 선택해 주세요');
-  const instruction = makeupInstructionInput(row.currentTeacherId || row.sourceTeacherId, staffId);
+  const instruction = session.isAdmin ? makeupInstructionInput(row.currentTeacherId || row.sourceTeacherId, staffId) : {};
   if (!instruction) return;
   await mutateMakeup({ action: 'reschedule_after_absence', caseId: button.dataset.case,
     revision: Number(button.dataset.rev), ...slot, staffId: staffId, ...instruction },
@@ -12414,10 +12416,38 @@ async function submitMakeupNoMakeup(button) {
     button, '보강 없음으로 처리했습니다', '', true);
 }
 
+function openMakeupAbsentChoices(row) {
+  if (!row || row.status !== 'confirmed' || !makeupCanComplete(row)) return;
+  const key = ' data-case="' + esc(row.caseId) + '" data-rev="' + Number(row.revision) + '"';
+  modal('보강 결석 · 다음 일정', '<div class="hint"><b>' + esc(row.studentName || '학생') + '</b> · ' +
+    esc(row.confirmedDate) + ' 보강은 결석으로 저장했습니다.<br>기존 결석 기록을 남기고 같은 보강의 다음 날짜를 정합니다.</div>',
+    '<button class="btn btn-primary btn-block mt14" data-act="muretryafteropen"' + key + '>새 보강 날짜 정하기</button>' +
+    '<button class="btn btn-ghost btn-block mt8" data-act="muabsencelater">나중에 정하기</button>');
+  $('#modalHost')._makeupSnapshot = JSON.parse(JSON.stringify(row));
+}
+
+async function promptAfterMakeupAbsence(task, date, updatedAt) {
+  const authKey = JSON.stringify(sync.auth());
+  const startedRoute = route, startedCursor = cursor;
+  try {
+    await settleSync();
+    const row = await loadLatestMakeupCase(String(task.makeupCaseId || ''));
+    const check = getCheck(task.id, date);
+    // 저장 중 다른 날짜/계정으로 이동하거나 출결을 정정했다면 늦게 팝업을 열지 않는다.
+    if (route !== startedRoute || cursor !== startedCursor || authKey !== JSON.stringify(sync.auth()) || !check || check.att !== 'A' ||
+        Number(check.updatedAt) !== Number(updatedAt) || row.status !== 'confirmed' || row.confirmedDate !== date) return;
+    if (!$('#modalHost').hidden) return toast('보강 결석 저장 완료 · 보강 탭에서 새 날짜를 정할 수 있습니다');
+    openMakeupAbsentChoices(row);
+  } catch (error) {
+    toast('보강 결석의 서버 저장·조회 확인이 필요합니다. 연결 확인 후 보강 탭에서 다시 처리해 주세요.');
+  }
+}
+
 async function openMakeupProcessModal(button) {
   const row = makeupRows.find(item => item.caseId === String(button.dataset.case || ''));
   if (!row) return;
   const scheduled = !!(row.confirmedDate && row.confirmedStartTime && row.confirmedEndTime);
+  if (scheduled && makeupScheduledAttendance(row).value === 'A') return openMakeupAbsentChoices(row);
   if (scheduled) return makeupDateTimeModal(row, 'complete');
   if (makeupCanComplete(row)) return makeupDateTimeModal(row, 'complete');
   await openMakeupLinkModal(button, true);
@@ -22884,6 +22914,7 @@ document.addEventListener('click', async ev => {
       break;
     }
     case 'muretryaftersubmit': submitMakeupRetryAfterAbsence(el); break;
+    case 'muabsencelater': closeModal(); toast('결석 기록은 저장됐습니다 · 보강 탭에 재보강 일정 필요로 표시됩니다'); break;
     case 'muprocessadminopen': openMakeupAdminProcessModal(el); break;
     case 'murestoreschedule': {
       makeupDateTimeModal(makeupRows.find(row => row.caseId === String(el.dataset.case || '')), 'restore');
@@ -23741,7 +23772,7 @@ document.addEventListener('click', async ev => {
       const savedCheck = setCheck(id, date, { att: next, absenceType: '' });
       if (shouldReconcileMakeup) {
         reconcileMakeupAfterAttendanceCorrection(id, date, savedCheck.updatedAt);
-      } else {
+      } else if (!(next === 'A' && isScheduledMakeupTask(t) && !isTestTeacherTask(t))) {
         settleSync().catch(() => toast('출결은 이 기기에 저장됐지만 서버 동기화를 확인해 주세요'));
       }
       if (next !== 'A') makeupCreateStates.delete(sourceKey);
@@ -23750,7 +23781,8 @@ document.addEventListener('click', async ev => {
       } else if (next === 'A' && isTestTeacherTask(t)) {
         toast('테스트쌤 수업은 보강을 생성하지 않습니다 · 다음날 출석으로 자동 처리됩니다');
       } else if (next === 'A' && isScheduledMakeupTask(t)) {
-        toast('보강수업 결석으로 저장했습니다 · 추가 보강은 자동 생성하지 않습니다');
+        toast('보강 결석을 저장하고 있습니다');
+        promptAfterMakeupAbsence(t, date, savedCheck.updatedAt);
       } else if (next === 'A' && !isMakeupLessonTask(t)) {
         toast('결석 출결 저장됨 · 상담 업무는 보강 대상이 아닙니다');
       } else if (next === 'A' && !t.studentId) {
@@ -25106,7 +25138,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-09-28.1';
+const APP_VER = '2026-09-28.2';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
