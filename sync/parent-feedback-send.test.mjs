@@ -445,6 +445,31 @@ test('cancelled requests cannot be (re)sent', async () => {
   assert.equal(r.body.code, 'CANCELLED');
 });
 
+test('manager retries a balance rejection once without changing the message or erasing history', async () => {
+  const db = new TestD1();
+  const { requestKey } = seedFeedback(db);
+  registerGuardian(db, '테스트학생');
+  let fetches = 0;
+  await withFetch(async () => {
+    fetches += 1;
+    return new Response(JSON.stringify({ errorCode: 'NotEnoughBalance' }), { status: 402 });
+  }, () => call(db, { auth: admin, requestKey }));
+  const current = db.prepare('SELECT * FROM feedback_requests WHERE request_key=?').bind(requestKey).first();
+  await withFetch(async () => { throw new Error('automatic submission must not retry a rejection'); },
+    () => attemptParentFeedbackSend({ DB: db, ...fullEnvBase }, 'task', current));
+  await withFetch(async () => { fetches += 1; return acceptedResponse(); }, async () => {
+    const results = await Promise.all([1, 2].map(() => call(db, {
+      auth: { ...person('S-kim', 'tok-kim'), workSession: 'test-session' }, requestKey
+    }, { TASK_MANAGER_STAFF_IDS_CONFIG: 'S-kim' })));
+    assert.ok(results.some(result => result.body.status === 'sent'));
+    const again = await call(db, { auth: admin, requestKey });
+    assert.equal(again.body.code, 'ALREADY_SENT');
+  });
+  assert.equal(fetches, 2);
+  const rows = db.prepare('SELECT status FROM parent_feedback_sends ORDER BY rowid').all().results;
+  assert.deepEqual(rows.map(row => row.status), ['rejected', 'accepted']);
+});
+
 test('rows missing structured fields (legacy data) are blocked before any fetch', async () => {
   const db = new TestD1();
   const { requestKey } = seedFeedback(db, { fields: { contentText: '', plusText: '', minusText: '' } });
@@ -794,9 +819,10 @@ test('HTTP 200 registration failure is rejected from failedMessageList and is ne
     const first = await call(db, { auth: admin, requestKey });
     assert.equal(first.body.code, 'SOLAPI_STATUS_1011');
     assert.equal(first.body.status, 'content_approved_send_blocked');
-    const again = await call(db, { auth: admin, requestKey });
-    assert.equal(again.body.idempotent, true);
-    assert.equal(again.body.status, 'rejected');
+    const current = db.prepare('SELECT * FROM feedback_requests WHERE request_key=?').bind(requestKey).first();
+    const again = await attemptParentFeedbackSend({ DB: db, ...fullEnvBase }, 'task', current);
+    assert.equal(again.idempotent, true);
+    assert.equal(again.status, 'rejected');
   });
   assert.equal(fetches, 1);
   const ledger = db.prepare(
