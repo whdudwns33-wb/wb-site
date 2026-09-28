@@ -1,0 +1,127 @@
+{
+  "week": "2026-W40",
+  "scannedAt": "2026-09-28",
+  "preparedAt": "2026-09-28",
+  "method": "Perplexity MCP 3쿼리(국가유산·문화 / 과학·의약·환경 / 사회·경제) 복구됨 + 부처 게시판 직접 열람(국가유산청·기후에너지환경부). W39 는 ⓪ 까지만 돌고 집필을 못 했으므로 그 큐의 14건을 이월로 안고 시작했다.",
+  "note": "W39 이월 14건은 8월 말 자료라 「최근 2~4주」에서 벗어났고 10건이 science 편중이라, 이번 주에 필요한 humanities·history 를 새로 스캔했다.",
+  "prep": {
+    "이 블록을 읽는 법": "「관측」은 2026-09-28 에 실제로 센 값이고 「절차」는 매주 다시 밟는 순서다. 관측값을 지침으로 착각하지 말 것.",
+    "관측 (2026-09-28 기준, 반영 전 43편)": {
+      "분야": {
+        "history": 8,
+        "humanities": 8,
+        "environment": 9,
+        "science": 9,
+        "society": 9
+      },
+      "진로 최저": "art·eng·env·med 각 10",
+      "진로 최고": "나머지 여덟 각 11",
+      "시사": "18/43 (42%)",
+      "마지막 발행주(W38) 로테이션": "history 1 · environment 1 · science 1 · society 1 · humanities 0"
+    },
+    "절차": [
+      "1) 분포를 직접 센다: node -e 'const d=require(\"./reading/articles.json\"),c={},r={};for(const a of d.articles){c[a.category]=(c[a.category]||0)+1;for(const x of a.careers||[])r[x]=(r[x]||0)+1;}console.log(\"분야\",c,\"\n진로\",r,\"\n시사\",d.articles.filter(a=>a.issue).length+\"/\"+d.articles.length)'",
+      "2) 가장 얇은 분야를 본다. 편차가 2편 이상이면 그쪽을 먼저 채운다.",
+      "3) 편차가 1편 이하로 고르면 직전 주 큐(queue-2026-W37.json)의 선정 내역을 읽어 로테이션으로 가른다 — 지난주 0편이던 분야를 넣고, 2편이던 분야는 2편을 넘기지 않는다.",
+      "4) 진로는 카운트가 가장 낮은 쪽부터 태깅한다. 가장 높은 두셋은 이번 주 쓰지 않는다.",
+      "5) issue:true 비율이 20% 미만이면 이번 주 2편을 시사로 잡는다. 이미 20% 를 넘으면 강제 할당 없이 ③-2 기준에 맞는 것만 붙인다."
+    ],
+    "집필 도구": [
+      "끊어 읽기 초안은 반드시 받아서 시작한다: node reading/chunk.mjs --band L4 \"문단\". 초안은 과하게 끊으므로 지우는 방향으로 손질한다.",
+      "규격: 조각 평균 L1 3.3 · L2 3.7 · L3 4.1 · L4 4.5 어절 (±0.8), 한 조각 최대 8어절. content.test.cjs 가 오류로 막는다.",
+      "걸렸을 때: node reading/chunk.mjs --style · node reading/fix-long.mjs",
+      "chunk-baseline.json 에 새 지문을 넣지 말 것 — 규격 이전 35편 면제 목록이다.",
+      "규칙 문서: docs/의미단위-끊어읽기-규격.md. 조사 뒤에서 끊는 규칙은 쓰지 않는다."
+    ]
+  },
+  "items": [
+    {
+      "id": "hwangja-hwatong",
+      "title": "나주 금성산 황자화통 — 우리나라에서 가장 오래된 화약 무기",
+      "category": "history",
+      "careers": [
+        "art",
+        "eng",
+        "nat"
+      ],
+      "announced": "국가유산청 국립나주문화유산연구소 2026-09-21",
+      "status": "selected",
+      "source": "https://www.khs.go.kr/newsBbz/selectNewsBbzView.do?newsItemId=155706381&sectionId=b_sec_1&mn=NS_01_02",
+      "note": "28자 명문 · 길이 23.75cm 무게 1,032g · 정사년이 1377 또는 1437 로만 좁혀짐"
+    },
+    {
+      "id": "shale-pigment",
+      "title": "국산 적색 셰일로 만든 항균성 석간주 대체 안료",
+      "category": "science",
+      "careers": [
+        "med",
+        "env",
+        "nat"
+      ],
+      "announced": "국가유산청 국립문화유산연구원 2026-09-18",
+      "status": "selected",
+      "source": "https://www.khs.go.kr/newsBbz/selectNewsBbzView.do?newsItemId=155706378&sectionId=b_sec_1&mn=NS_01_02",
+      "note": "울릉 태하리 주토가 국가지질공원 지정으로 막히자 평창 셰일로 대체 · 부후균 억제 약 3배 이상"
+    },
+    {
+      "id": "motor-rare-earth",
+      "title": "폐자동차 구동모터 속 희토류 순환이용 체계 착수",
+      "category": "environment",
+      "careers": [
+        "env",
+        "biz",
+        "eng"
+      ],
+      "announced": "기후에너지환경부 2026-09-22",
+      "status": "selected",
+      "source": "https://www.mcee.go.kr/home/web/board/read.do?menuId=10598&boardMasterId=939&boardId=1893260",
+      "note": "차종별 0.75~1.5kg · 연 1만 4천여 대에서 최대 15톤 · 규제특례 샌드박스"
+    },
+    {
+      "id": "chaekgado-screen",
+      "title": "책가도 병풍, 파리 기메동양박물관 특별전 출품",
+      "category": "humanities",
+      "careers": [
+        "art",
+        "media",
+        "hum"
+      ],
+      "announced": "국가유산청 국립고궁박물관 2026-09-15",
+      "status": "selected",
+      "source": "https://www.khs.go.kr/newsBbz/selectNewsBbzView.do?newsItemId=155706367&sectionId=b_sec_1&mn=NS_01_02",
+      "note": "정조 1791년 어좌 뒤 설치 · 전시명 「착시의 지식」 · 유럽 최초"
+    }
+  ],
+  "W40 선정 근거": {
+    "판단": [
+      "분야 편차가 1이라 로테이션을 봤다. 마지막으로 발행한 W38 이 humanities 0편이었고, humanities 와 history 가 함께 8편으로 가장 얇아 두 기준이 같은 쪽을 가리켰다. 둘 다 넣고 나머지 둘은 science·environment 로 골랐다.",
+      "진로는 10편으로 묶인 넷(art·eng·env·med)을 우선 쓰되, 글에 억지로 끼워 맞추지 않고 소재에 자연스러운 조합을 택했다. 억지 태깅은 ±1 불균형보다 학생에게 나쁘다.",
+      "시사는 42%로 목표를 넘어 강제 할당 없이 기준에 맞는 하나(희토류 시범사업)만 issue:true.",
+      "W39 이월 14건은 쓰지 않았다 — 8월 말 자료라 최신성이 떨어지고 분야가 science 로 몰려 이번 주 필요와 어긋난다. 그대로 W41 로 넘긴다."
+    ],
+    "반영 후": {
+      "분야": {
+        "science": 10,
+        "society": 9,
+        "environment": 10,
+        "history": 9,
+        "humanities": 9
+      },
+      "진로": {
+        "eng": 12,
+        "nat": 13,
+        "it": 11,
+        "bio": 11,
+        "med": 11,
+        "media": 12,
+        "biz": 12,
+        "law": 11,
+        "env": 12,
+        "hum": 12,
+        "edu": 11,
+        "art": 12
+      },
+      "시사": "19/47"
+    }
+  }
+}

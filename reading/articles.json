@@ -1,5 +1,5 @@
 {
-  "version": "2026-09-14.2",
+  "version": "2026-09-28.1",
   "articles": [
     {
       "id": "nuri-space",
@@ -43048,6 +43048,3811 @@
           ]
         }
       }
+    },
+    {
+      "id": "hwangja-hwatong",
+      "category": "history",
+      "careers": [
+        "art",
+        "eng",
+        "nat"
+      ],
+      "publishedAt": "2026-09-28",
+      "status": "published",
+      "issue": false,
+      "sources": [
+        {
+          "title": "국가유산청 국립나주문화유산연구소 보도자료 — (국영문 동시배포) ‘우리나라에서 가장 오래된 화약 무기’… 나주 금성산서 ‘황자화통(黃字火筒)’ 발견 (2026.9.21)",
+          "url": "https://www.khs.go.kr/newsBbz/selectNewsBbzView.do?newsItemId=155706381&sectionId=b_sec_1&mn=NS_01_02"
+        },
+        {
+          "title": "국립중앙박물관 보도자료 — [국립진주박물관] 조선무기특별전 〈화력조선〉 개막 (2021.9.16)",
+          "url": "https://www.museum.go.kr/site/main/archive/post/article_17829"
+        }
+      ],
+      "levels": {
+        "L1": {
+          "title": "글자가 새겨진 옛날 통",
+          "minutes": 3,
+          "paragraphs": [
+            [
+              "전라남도 나주에 금성산이라는 산이 있어요. ",
+              "2023년에 사람들이 ",
+              "이 산의 땅속을 살펴보았어요. ",
+              "그러다가 작고 단단한 통 하나를 찾았어요. ",
+              "아주 오래된 물건이었어요."
+            ],
+            [
+              "이것은 화통이에요. ",
+              "옛날에 화약의 힘으로 ",
+              "화살을 날려 보내던 도구예요. ",
+              "그런데 놀라운 점이 있었어요. ",
+              "몸에 글자가 새겨져 있었어요. ",
+              "모두 스물여덟 글자예요. ",
+              "이렇게 새긴 글자를 명문이라고 해요."
+            ],
+            [
+              "명문에는 이 도구의 이름과 무게가 ",
+              "적혀 있어요. ",
+              "만든 사람의 이름도 적혀 있어요. ",
+              "땅에서 나온 물건은 ",
+              "대개 말이 없어요. ",
+              "그런데 이 화통은 ",
+              "스스로 알려 주었어요. ",
+              "학자들은 삼 년 동안 ",
+              "이 글자를 읽었어요."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "화통",
+              "easy": "화약의 힘으로 화살을 멀리 날려 보내던 옛날 도구예요."
+            },
+            {
+              "word": "명문",
+              "easy": "쇠나 돌에 새겨 넣은 글자예요."
+            },
+            {
+              "word": "학자",
+              "easy": "한 가지를 오래 공부해서 깊이 아는 사람이에요."
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글은 무슨 이야기인가요?",
+              "choices": [
+                "산에 나무를 심는 이야기",
+                "땅속에서 나온 통에 글자가 새겨져 있던 이야기",
+                "화약을 만드는 방법 이야기",
+                "나주로 가는 길을 찾는 이야기"
+              ],
+              "answer": 1,
+              "explain": "땅속에서 찾은 통에 스물여덟 글자가 새겨져 있었다는 이야기예요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "이 통은 어디에서 찾았나요?",
+              "choices": [
+                "바닷속",
+                "전라남도 나주의 금성산",
+                "학교 운동장",
+                "큰 강가"
+              ],
+              "answer": 1,
+              "explain": "전라남도 나주에 있는 금성산의 땅속에서 찾았어요.",
+              "evidencePara": 0
+            },
+            {
+              "type": "vocab",
+              "q": "「명문」은 무엇인가요?",
+              "choices": [
+                "쇠나 돌에 새겨 넣은 글자",
+                "아주 유명한 사람",
+                "땅속에 묻힌 그릇",
+                "산에 난 좁은 길"
+              ],
+              "answer": 0,
+              "explain": "이렇게 새긴 글자를 명문이라고 해요.",
+              "evidencePara": 1
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "땅에서 나온 물건은 대개 말이 없다고 했어요. 이 화통은 왜 달랐을까요?",
+              "choices": [
+                "아주 크고 무거워서",
+                "몸에 글자가 새겨져 있어서",
+                "빛이 나는 색이라서",
+                "산꼭대기에서 찾아서"
+              ],
+              "answer": 1,
+              "explain": "몸에 새겨진 글자가 이름과 무게를 알려 주었어요.",
+              "evidencePara": 2
+            },
+            {
+              "type": "apply",
+              "q": "옛날 그릇을 하나 주웠어요. 언제 만든 것인지 가장 쉽게 알 수 있는 경우는 언제일까요?",
+              "choices": [
+                "그릇이 아주 무거울 때",
+                "그릇에 만든 날이 새겨져 있을 때",
+                "그릇이 깨져 있을 때",
+                "그릇이 땅속 깊이 있을 때"
+              ],
+              "answer": 1,
+              "explain": "물건에 글자가 새겨져 있으면 물건이 스스로 알려 줄 수 있어요.",
+              "evidencePara": 2
+            }
+          ]
+        },
+        "L2": {
+          "title": "스물여덟 글자가 알려 준 것",
+          "minutes": 4,
+          "paragraphs": [
+            [
+              "땅속에서 나온 옛 물건은 ",
+              "대개 스스로를 설명하지 못한다. ",
+              "언제 만들었는지, ",
+              "누가 만들었는지 ",
+              "어디에도 적혀 있지 않기 때문이다. ",
+              "그래서 학자들은 ",
+              "함께 나온 그릇이나 ",
+              "흙이 쌓인 층을 보고 ",
+              "시기를 짐작한다. ",
+              "그런데 전라남도 나주 금성산에서 나온 ",
+              "작은 통 하나는 달랐다. ",
+              "몸에 글자가 새겨져 있었다."
+            ],
+            [
+              "이 유물의 이름은 황자화통이다. ",
+              "화통은 화약의 힘으로 ",
+              "화살이나 탄알을 멀리 날려 보내는 도구다. ",
+              "길이는 23.75cm, ",
+              "무게는 1,032g으로 ",
+              "한 사람이 들고 다닐 수 있는 크기다. ",
+              "2023년 11월, ",
+              "등산로 공사를 앞두고 ",
+              "땅속을 살피던 중에 우연히 발견되었다."
+            ],
+            [
+              "몸에 새겨진 글자는 ",
+              "모두 스물여덟 자다. ",
+              "이렇게 새겨 넣은 글자를 ",
+              "명문이라고 한다. ",
+              "명문에는 이 도구의 이름과 무게가 ",
+              "적혀 있었다. ",
+              "만드는 일을 감독한 사람의 관직과 이름, ",
+              "직접 만든 장인의 이름까지 ",
+              "적혀 있었다. ",
+              "유물이 자기를 소개한 셈이다."
+            ],
+            [
+              "그런데 명문이 ",
+              "끝까지 알려 주지 못한 것이 ",
+              "하나 있다. ",
+              "바로 만든 해다. ",
+              "명문에는 정사년 12월이라고만 적혀 있는데, ",
+              "정사년은 예순 해마다 ",
+              "한 번씩 돌아오는 해 이름이다. ",
+              "그래서 1377년일 수도 있고 ",
+              "1437년일 수도 있다."
+            ],
+            [
+              "연구소는 삼 년 동안 ",
+              "이 물건을 살폈다. ",
+              "안쪽 모양을 재고, ",
+              "어떤 금속을 섞어 만들었는지도 알아냈다. ",
+              "그 결과 ",
+              "우리나라에 남아 있는 화약 무기 가운데 ",
+              "가장 이른 시기의 것으로 확인되었다. ",
+              "찾아내는 일과 밝혀내는 일은 ",
+              "서로 다른 일이었다."
+            ]
+          ],
+          "en": [
+            "Most old things found in the ground cannot explain themselves. They do not say when they were made. They do not say who made them. So scholars guess the date from pots and soil layers nearby. But one small tube from Naju, Korea, was different. It had letters cut into its body.",
+            "The tube is called the Hwangja Hwatong. A hwatong used gunpowder to shoot arrows or small balls. It is 23.75 cm long and weighs 1,032 g. One person could carry it easily. Workers found it by chance in November 2023. They were checking the ground before a mountain path was built.",
+            "Twenty-eight letters are cut into the body. Letters cut into metal like this are called an inscription. The inscription gives the name and the weight of the tube. It also gives the name of the officer who watched the work. It even gives the name of the craftsman who made it. The object introduced itself.",
+            "But the inscription does not tell us one thing. It does not tell us the year. It only says the twelfth month of the Jeongsa year. A Jeongsa year comes back every sixty years. So the tube may be from 1377, or from 1437.",
+            "The research team studied the tube for three years. They measured the shape of the inside. They also found out which metals were mixed in it. Now we know it is the oldest gunpowder weapon left in Korea. Finding a thing and understanding it are two different jobs."
+          ],
+          "vocab": [
+            {
+              "word": "유물",
+              "easy": "옛사람이 남긴 물건 가운데 지금까지 전해 오는 것.",
+              "hanja": "遺(남길 유)物(물건 물)"
+            },
+            {
+              "word": "명문",
+              "easy": "쇠나 돌에 새겨 넣은 글자.",
+              "hanja": "銘(새길 명)文(글월 문)"
+            },
+            {
+              "word": "관직",
+              "easy": "나라 일을 맡아 보는 자리와 그 이름.",
+              "hanja": "官(벼슬 관)職(직분 직)"
+            },
+            {
+              "word": "장인",
+              "easy": "손으로 물건 만드는 일을 오래 익힌 사람.",
+              "hanja": "匠(장인 장)人(사람 인)"
+            }
+          ],
+          "envocab": [
+            {
+              "word": "gunpowder",
+              "ko": "화약 (명사)",
+              "base": "gunpowder [ˈɡʌnpaʊdər]"
+            },
+            {
+              "word": "inscription",
+              "ko": "명문, 새겨 넣은 글자 (명사)",
+              "base": "inscribe [ɪnˈskraɪb]"
+            },
+            {
+              "word": "craftsman",
+              "ko": "장인 (명사)",
+              "base": "craftsman [ˈkræftsmən]"
+            },
+            {
+              "word": "weighs",
+              "ko": "무게가 나간다 (동사 weigh의 3인칭 단수형)",
+              "base": "weigh [weɪ]"
+            },
+            {
+              "word": "by chance",
+              "ko": "우연히 (숙어)",
+              "base": "chance [tʃæns]"
+            },
+            {
+              "word": "layers",
+              "ko": "켜, 층 (명사 layer의 복수)",
+              "base": "layer [ˈleɪər]"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글이 황자화통을 특별하게 본 까닭은 무엇인가?",
+              "choices": [
+                "우리나라에서 가장 큰 무기라서",
+                "몸에 새겨진 글자가 스스로를 설명해 주어서",
+                "금으로 만들어져서",
+                "박물관이 오래 보관해 온 물건이라서"
+              ],
+              "answer": 1,
+              "explain": "대개의 유물과 달리 이 통은 몸에 새긴 글자로 이름과 무게와 만든 사람을 알려 주었다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "detail",
+              "q": "황자화통은 어떻게 발견되었나?",
+              "choices": [
+                "바닷속 배 안에서 건져 올렸다",
+                "등산로 공사를 앞두고 땅속을 살피던 중에 우연히 나왔다",
+                "옛 문서를 보고 찾아 나섰다",
+                "집을 고치다가 마루 밑에서 나왔다"
+              ],
+              "answer": 1,
+              "explain": "2023년 11월, 등산로 공사를 앞두고 땅속을 살피던 중에 우연히 발견되었다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「명문」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "이름난 좋은 글",
+                "쇠나 돌에 새겨 넣은 글자",
+                "무기를 만드는 사람",
+                "물건을 넣어 두는 상자"
+              ],
+              "answer": 1,
+              "explain": "이렇게 새겨 넣은 글자를 명문이라고 한다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "detail",
+              "q": "명문이 알려 주지 못한 것은 무엇인가?",
+              "choices": [
+                "도구의 이름",
+                "도구의 무게",
+                "만든 해",
+                "장인의 이름"
+              ],
+              "answer": 2,
+              "explain": "명문에는 정사년 12월이라고만 적혀 있어 만든 해는 확정되지 않았다.",
+              "evidencePara": 3
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "정사년이라고 적힌 명문만으로 만든 해를 못 박지 못한 까닭은?",
+              "choices": [
+                "글자가 지워져서",
+                "정사년이라는 해 이름이 예순 해마다 되풀이되어서",
+                "명문이 다른 나라 글자로 적혀서",
+                "연구소가 명문을 읽지 못해서"
+              ],
+              "answer": 1,
+              "explain": "정사년은 예순 해마다 한 번씩 돌아오므로 1377년일 수도 1437년일 수도 있다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "apply",
+              "q": "이 글이 말한 「밝혀내는 일」에 해당하는 것은?",
+              "choices": [
+                "땅속에서 물건을 찾아 꺼내는 일",
+                "물건을 박물관으로 옮겨 두는 일",
+                "안쪽 모양을 재고 어떤 금속을 섞었는지 알아내는 일",
+                "물건의 사진을 찍어 두는 일"
+              ],
+              "answer": 2,
+              "explain": "연구소는 삼 년 동안 안쪽 모양을 재고 금속을 살펴 정체를 밝혔다.",
+              "evidencePara": 4
+            }
+          ],
+          "enseg": [
+            [
+              "Most old things found in the ground cannot explain themselves. ",
+              "They do not say when they were made. ",
+              "They do not say who made them. ",
+              "So scholars guess the date from pots and soil layers nearby. ",
+              "But one small tube from Naju, Korea, was different. ",
+              "It had letters cut into its body."
+            ],
+            [
+              "The tube is called the Hwangja Hwatong. ",
+              "A hwatong used gunpowder to shoot arrows or small balls. ",
+              "It is 23.",
+              "75 cm long and weighs 1,032 g. ",
+              "One person could carry it easily. ",
+              "Workers found it by chance in November 2023. ",
+              "They were checking the ground before a mountain path was built."
+            ],
+            [
+              "Twenty-eight letters are cut into the body. ",
+              "Letters cut into metal like this are called an inscription. ",
+              "The inscription gives the name and the weight of the tube. ",
+              "It also gives the name of the officer who watched the work. ",
+              "It even gives the name of the craftsman who made it. ",
+              "The object introduced itself."
+            ],
+            [
+              "But the inscription does not tell us one thing. ",
+              "It does not tell us the year. ",
+              "It only says the twelfth month of the Jeongsa year. ",
+              "A Jeongsa year comes back every sixty years. ",
+              "So the tube may be from 1377, or from 1437."
+            ],
+            [
+              "The research team studied the tube for three years. ",
+              "They measured the shape of the inside. ",
+              "They also found out which metals were mixed in it. ",
+              "Now we know it is the oldest gunpowder weapon left in Korea. ",
+              "Finding a thing and understanding it are two different jobs."
+            ]
+          ]
+        },
+        "L3": {
+          "title": "명문이 말한 것과 말하지 못한 것",
+          "minutes": 5,
+          "paragraphs": [
+            [
+              "발굴 현장에서 나온 유물은 대부분 ",
+              "자기 내력을 스스로 밝히지 못한다. ",
+              "만들어진 해도, 만든 사람도 ",
+              "몸 어디에 적혀 있지 않다. ",
+              "그래서 고고학은 ",
+              "함께 묻힌 그릇의 모양이나 ",
+              "흙이 쌓인 층의 순서를 근거로 ",
+              "시기를 좁혀 간다. ",
+              "이 추정은 ",
+              "새 자료가 나오면 다시 움직인다. ",
+              "반대로 몸에 글자를 지니고 나오는 유물은 ",
+              "드물고, 그만큼 값이 크다."
+            ],
+            [
+              "2023년 11월 전라남도 나주 금성산에서 발견된 ",
+              "황자화통이 그런 유물이다. ",
+              "등산로 공사를 앞두고 ",
+              "땅속을 살피던 중에 우연히 드러났다. ",
+              "길이 23.75cm, 구경 1.66cm, 무게 1,032g으로 ",
+              "개인이 휴대할 수 있는 소형 화기다. ",
+              "화통은 화약을 써서 ",
+              "화살이나 탄알을 쏘아 내보내는 무기로, ",
+              "당시 주력이던 활보다 ",
+              "사거리와 파괴력을 크게 높인 장비였다."
+            ],
+            [
+              "몸체에는 음각으로 새긴 ",
+              "명문 스물여덟 자가 남아 있다. ",
+              "손잡이 나무를 끼우는 부분에 ",
+              "여섯 열로 스물일곱 자, ",
+              "발사체가 나가는 부분에 한 자다. ",
+              "판독된 내용은 이렇다. ",
+              "정사년 12월에 황자화통을 만들었고, ",
+              "무게는 1근 14량이며, ",
+              "감독자는 녹사 안휴보, 장인은 석이다. ",
+              "이름과 무게와 사람이 ",
+              "한꺼번에 확인된 것이다."
+            ],
+            [
+              "그러나 명문이 ",
+              "끝내 확정해 주지 않은 것이 하나 있다. ",
+              "만든 해다. ",
+              "정사는 예순 해를 주기로 돌아오는 간지여서 ",
+              "그 자체로는 ",
+              "연도를 못 박지 못한다. ",
+              "문헌 기록과 화약무기 발달사를 ",
+              "함께 따진 끝에 ",
+              "후보는 두 해로 좁혀졌다. ",
+              "최무선의 건의로 화통도감이 설치된 1377년, ",
+              "그리고 화약무기 개량이 활발하던 1437년이다."
+            ],
+            [
+              "남은 판단은 ",
+              "글자가 아니라 몸이 맡았다. ",
+              "약통 내부가 둥근 초기 형태라는 점, ",
+              "구리와 주석과 납으로 주조하되 ",
+              "주석을 10wt% 이내로 조절해 깨짐을 막은 점, ",
+              "제련 과정의 불순물이 그대로 남은 점이 ",
+              "차례로 증언했다. ",
+              "삼 년이 걸린 까닭이 여기 있다. ",
+              "발견은 2023년에 끝났지만 ",
+              "확인은 그때부터가 시작이었다."
+            ]
+          ],
+          "en": [
+            "Most objects that come out of a dig cannot tell their own story. Nothing on them says when they were made, or by whom. So archaeologists narrow down a date from what lies around the object: the shape of pots buried with it, the order of the soil layers. Such an estimate moves again whenever new material appears. An object that carries writing on its own body is therefore rare, and valuable in proportion.",
+            "The Hwangja Hwatong, found on Geumseongsan Mountain in Naju in November 2023, is one of those objects. It came to light by chance while the ground was being checked before a mountain trail was built. It is 23.75 cm long, has a bore of 1.66 cm and weighs 1,032 g, a small firearm one person could carry. A hwatong used gunpowder to shoot arrows or shot, and it reached much farther and hit much harder than the bow, the main weapon of the day.",
+            "Twenty-eight characters are cut into the body in intaglio. Twenty-seven of them stand in six columns on the socket that holds the wooden handle, and one is on the muzzle. The reading runs like this: the Hwangja Hwatong was made in the twelfth month of the Jeongsa year; its weight is one geun and fourteen nyang; the supervisor was Noksa An Hyu-bo, and the craftsman was Seok. Name, weight and people were all confirmed at once.",
+            "One thing, however, the inscription never settles, and that is the year. Jeongsa is a name in a cycle that returns every sixty years, so on its own it cannot fix a date. After weighing written records against the history of gunpowder weapons, researchers narrowed the field to two years. One is 1377, when a proposal by Choe Mu-seon led to the founding of the Hwatong Dogam. The other is 1437, when firearms were being improved.",
+            "The rest of the judgement fell not to the letters but to the body. The powder chamber is round inside, an early form. The bronze was cast from copper, tin and lead, with the tin held under 10 wt% so the barrel would not crack. The metal still held impurities left over from smelting. Each of these spoke in turn, and that is why the work took three years. The finding ended in 2023; the confirming began there."
+          ],
+          "vocab": [
+            {
+              "word": "명문",
+              "easy": "쇠나 돌 같은 단단한 것에 새겨 넣은 글.",
+              "hanja": "銘(새길 명)文(글월 문)"
+            },
+            {
+              "word": "음각",
+              "easy": "글자나 무늬를 파 들어가게 새기는 방식.",
+              "hanja": "陰(그늘 음)刻(새길 각)"
+            },
+            {
+              "word": "판독",
+              "easy": "알아보기 어려운 글자를 따져 읽어 내는 일.",
+              "hanja": "判(판단할 판)讀(읽을 독)"
+            },
+            {
+              "word": "간지",
+              "easy": "예순 해를 주기로 되풀이되는 해 이름 체계.",
+              "hanja": "干(방패 간)支(지탱할 지)"
+            },
+            {
+              "word": "주조",
+              "easy": "쇠붙이를 녹여 거푸집에 부어 물건을 만드는 일.",
+              "hanja": "鑄(쇠불릴 주)造(지을 조)"
+            }
+          ],
+          "envocab": [
+            {
+              "word": "inscription",
+              "ko": "명문, 새겨 넣은 글 (명사)",
+              "base": "inscribe [ɪnˈskraɪb]"
+            },
+            {
+              "word": "intaglio",
+              "ko": "음각 (명사)",
+              "base": "intaglio [ɪnˈtælioʊ]"
+            },
+            {
+              "word": "bore",
+              "ko": "구경, 총열 안지름 (명사)",
+              "base": "bore [bɔːr]"
+            },
+            {
+              "word": "narrowed",
+              "ko": "좁혔다 (동사 narrow의 과거형)",
+              "base": "narrow [ˈnæroʊ]"
+            },
+            {
+              "word": "smelting",
+              "ko": "제련 (명사, 동사 smelt의 -ing형)",
+              "base": "smelt [smelt]"
+            },
+            {
+              "word": "impurities",
+              "ko": "불순물 (명사 impurity의 복수)",
+              "base": "impurity [ɪmˈpjʊrəti]"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글이 황자화통에 주목한 핵심 이유는?",
+              "choices": [
+                "우리나라 유물 가운데 크기가 가장 작아서",
+                "몸에 새긴 명문이 이름과 무게와 제작자를 스스로 증언해서",
+                "조사단이 오래 계획해 찾아낸 유물이라서",
+                "고려와 조선의 문헌에 이름이 자주 나와서"
+              ],
+              "answer": 1,
+              "explain": "대부분의 유물이 내력을 밝히지 못하는 것과 달리 이 유물은 몸에 지닌 글자로 자신을 증언했다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "detail",
+              "q": "명문에 적혀 있던 내용이 아닌 것은?",
+              "choices": [
+                "무기의 이름",
+                "무게",
+                "장인의 이름",
+                "만들어진 서기 연도"
+              ],
+              "answer": 3,
+              "explain": "명문에는 정사년 12월이라고만 적혀 있어 서기 연도는 확정되지 않았다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "vocab",
+              "q": "「간지」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "쇠붙이에 글자를 새기는 기술",
+                "예순 해를 주기로 되풀이되는 해 이름 체계",
+                "무기를 만들던 관청의 이름",
+                "금속을 녹여 거푸집에 붓는 일"
+              ],
+              "answer": 1,
+              "explain": "정사는 예순 해마다 돌아오는 간지여서 그 자체로는 연도를 못 박지 못한다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "infer",
+              "q": "확인에 삼 년이 걸린 까닭으로 가장 알맞은 것은?",
+              "choices": [
+                "명문의 글자가 모두 지워져 읽을 수 없었기 때문",
+                "명문이 연도까지 확정해 주지 못해 형태와 성분을 따로 따져야 했기 때문",
+                "유물을 발굴할 장소를 찾는 데 오래 걸렸기 때문",
+                "전시할 박물관을 정하는 데 시간이 걸렸기 때문"
+              ],
+              "answer": 1,
+              "explain": "글자가 남긴 빈자리를 약통의 형태와 금속 성분이 차례로 메워야 했다.",
+              "evidencePara": 4
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "첫 문단이 「몸에 글자를 지니고 나오는 유물은 드물고, 그만큼 값이 크다」고 한 까닭은?",
+              "choices": [
+                "글자가 있으면 유물이 더 아름다워지기 때문",
+                "주변 정보로 시기를 좁히는 추정과 달리 유물 자신이 근거를 내놓기 때문",
+                "글자가 있으면 값비싼 재료로 만들었다는 뜻이기 때문",
+                "글자가 있는 유물만 전시할 수 있기 때문"
+              ],
+              "answer": 1,
+              "explain": "주변 정보에 기댄 추정은 새 자료가 나오면 움직이지만, 몸에 새긴 글자는 유물 자신이 내놓는 근거다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "apply",
+              "q": "이 글이 보여 준 방법에 가장 가까운 것은?",
+              "choices": [
+                "옛 그릇의 무늬가 아름다워 미술 작품으로 전시한다",
+                "옛 종에 새긴 글자를 읽은 뒤 금속 성분과 주조 방식까지 함께 조사해 만든 시기를 좁힌다",
+                "옛 문서에 적힌 이야기만으로 유물의 쓰임을 정한다",
+                "비슷하게 생긴 유물을 모아 순서대로 늘어놓기만 한다"
+              ],
+              "answer": 1,
+              "explain": "글자가 말한 것에서 출발해 형태와 재료의 증언을 겹쳐 놓는 것이 이 연구의 방법이다.",
+              "evidencePara": 4
+            }
+          ],
+          "enseg": [
+            [
+              "Most objects that come out of a dig cannot tell their own story. ",
+              "Nothing on them says when they were made, or by whom. ",
+              "So archaeologists narrow down a date from what lies around the object: ",
+              "the shape of pots buried with it, the order of the soil layers. ",
+              "Such an estimate moves again whenever new material appears. ",
+              "An object that carries writing on its own body is therefore rare, ",
+              "and valuable in proportion."
+            ],
+            [
+              "The Hwangja Hwatong, found on Geumseongsan Mountain in Naju in November 2023, ",
+              "is one of those objects. ",
+              "It came to light by chance while the ground was being checked before a mountain trail was built. ",
+              "It is 23.",
+              "75 cm long, has a bore of 1.",
+              "66 cm and weighs 1,032 g, a small firearm one person could carry. ",
+              "A hwatong used gunpowder to shoot arrows or shot, ",
+              "and it reached much farther and hit much harder than the bow, ",
+              "the main weapon of the day."
+            ],
+            [
+              "Twenty-eight characters are cut into the body in intaglio. ",
+              "Twenty-seven of them stand in six columns on the socket that holds the wooden handle, ",
+              "and one is on the muzzle. ",
+              "The reading runs like this: ",
+              "the Hwangja Hwatong was made in the twelfth month of the Jeongsa year; ",
+              "its weight is one geun and fourteen nyang; the supervisor was Noksa An Hyu-bo, ",
+              "and the craftsman was Seok. ",
+              "Name, weight and people were all confirmed at once."
+            ],
+            [
+              "One thing, however, the inscription never settles, and that is the year. ",
+              "Jeongsa is a name in a cycle that returns every sixty years, ",
+              "so on its own it cannot fix a date. ",
+              "After weighing written records against the history of gunpowder weapons, ",
+              "researchers narrowed the field to two years. ",
+              "One is 1377, ",
+              "when a proposal by Choe Mu-seon led to the founding of the Hwatong Dogam. ",
+              "The other is 1437, when firearms were being improved."
+            ],
+            [
+              "The rest of the judgement fell not to the letters but to the body. ",
+              "The powder chamber is round inside, an early form. ",
+              "The bronze was cast from copper, tin and lead, ",
+              "with the tin held under 10 wt% so the barrel would not crack. ",
+              "The metal still held impurities left over from smelting. ",
+              "Each of these spoke in turn, and that is why the work took three years. ",
+              "The finding ended in 2023; the confirming began there."
+            ]
+          ]
+        },
+        "L4": {
+          "title": "스스로를 증명한 유물, 그리고 비어 있는 한 칸",
+          "minutes": 6,
+          "paragraphs": [
+            [
+              "발굴에서 나온 유물은 ",
+              "대부분 자기 내력을 말하지 못한다. ",
+              "언제 만들어졌는지도, 누구의 손을 거쳤는지도 ",
+              "몸 어디에 적혀 있지 않다. ",
+              "그래서 고고학은 함께 묻힌 토기의 모양이나 ",
+              "흙이 쌓인 층의 순서 같은 주변 정보로 ",
+              "시기를 좁혀 간다. ",
+              "이런 추정은 새 자료가 나올 때마다 ",
+              "다시 움직인다. ",
+              "그 사정을 알고 보면 ",
+              "몸에 글자를 지니고 나오는 유물이 ",
+              "왜 드물고도 값진지가 분명해진다."
+            ],
+            [
+              "2023년 11월 전라남도 나주 금성산에서 발견된 ",
+              "황자화통이 그런 유물이다. ",
+              "등산로 공사를 앞두고 ",
+              "땅속을 살피던 중에 우연히 드러났다. ",
+              "길이 23.75cm, 구경 1.66cm, 무게 1,032g으로 ",
+              "개인이 휴대할 수 있는 소형 화기다. ",
+              "화통은 화약을 써서 ",
+              "화살이나 탄알을 쏘아 내보내는 무기이며, ",
+              "당시 주력이던 활보다 ",
+              "사거리와 파괴력을 크게 높인 장비였다. ",
+              "몸체에는 음각으로 새긴 ",
+              "명문 스물여덟 자가 남아 있다. ",
+              "손잡이 나무를 끼우는 모병에 ",
+              "여섯 열로 스물일곱 자, ",
+              "발사체가 나가는 총부리에 한 자다."
+            ],
+            [
+              "판독된 명문은 이렇게 풀린다. ",
+              "정사년 12월에 황자화통을 만들었고, ",
+              "무게는 1근 14량이며, ",
+              "감독자는 녹사 안휴보, 장인은 석이다. ",
+              "이름과 무게와 사람이 한꺼번에 확정된 셈이다. ",
+              "여기서 눈여겨볼 것은 적힌 항목의 성격이다. ",
+              "감조는 제작을 감독한다는 뜻이고 ",
+              "녹사는 관서의 실무를 맡던 관직이니, ",
+              "이 글자들은 장인의 서명이 아니라 ",
+              "국가가 무기 제작을 관리한 흔적이다. ",
+              "국립진주박물관이 2021년에 연 조선무기 특별전에도 ",
+              "만력기묘 명문이 붙은 승자총통과 ",
+              "장인의 이름이 적힌 총통들이 나왔다. ",
+              "몸에 제작 정보를 새기는 일은 ",
+              "이 계통의 오랜 관행이었다."
+            ],
+            [
+              "그런데 명문이 끝내 확정해 주지 않은 칸이 ",
+              "하나 남는다. ",
+              "만든 해다. ",
+              "정사는 예순 해를 주기로 돌아오는 간지여서 ",
+              "그 자체로는 연도를 못 박지 못한다. ",
+              "문헌 기록과 화약무기 발달사를 함께 따진 끝에 ",
+              "후보는 두 해로 좁혀졌다. ",
+              "최무선의 건의로 화통도감이 세워져 ",
+              "국가가 처음 화약무기를 만들기 시작한 1377년, ",
+              "그리고 화약무기 개량이 활발하던 1437년이다. ",
+              "비교할 자료가 아직 넉넉하지 않아 ",
+              "어느 쪽인지는 답이 나오지 않았다."
+            ],
+            [
+              "남은 판단은 글자가 아니라 몸이 맡았다. ",
+              "약통 내부가 둥근 초기 형태라는 점은 ",
+              "격목을 끼워 발사 효율을 높인 ",
+              "세종대 개량 화기와 뚜렷이 갈린다. ",
+              "성분 분석은 구리와 주석과 납으로 주조하되 ",
+              "주석을 10wt% 이내로 조절해 ",
+              "폭발력에 깨지지 않게 했음을 보여 주었고, ",
+              "미세조직에 남은 불순물은 ",
+              "옛 정련 기술의 한계를 그대로 드러냈다. ",
+              "삼 년이 걸린 까닭이 여기 있다. ",
+              "명문은 출발점을 주었을 뿐, ",
+              "나머지는 형태와 재료가 차례로 증언해야 했다. ",
+              "발견은 2023년에 끝났지만 ",
+              "확인은 그때부터가 시작이었다."
+            ]
+          ],
+          "en": [
+            "Most objects recovered from an excavation cannot state their own history. Nothing on them records when they were made, or whose hands shaped them. Archaeology therefore narrows a date using what lies around the object, such as the shape of pottery buried with it or the order in which the soil accumulated, and such an estimate shifts every time new material appears. Seen against that background, it becomes clear why an artefact that emerges with writing on its own body is both rare and precious.",
+            "The Hwangja Hwatong, found on Geumseongsan Mountain in Naju in November 2023, is such an artefact. It came to light by chance while the ground was being surveyed ahead of trail construction. At 23.75 cm long, with a bore of 1.66 cm and a weight of 1,032 g, it is a small firearm that one person could carry. A hwatong fired arrows or shot using gunpowder, and it far exceeded the bow, then the main weapon, in both range and destructive power. Twenty-eight characters are cut into its body in intaglio: twenty-seven in six columns on the socket that takes the wooden handle, and one on the muzzle.",
+            "The inscription reads as follows. The Hwangja Hwatong was made in the twelfth month of the Jeongsa year; its weight is one geun and fourteen nyang; the supervisor was Noksa An Hyu-bo, and the craftsman was Seok. Name, weight and people are fixed in a single stroke. What deserves attention is the character of the items recorded. Gamjo means to supervise manufacture, and noksa was the office that handled administrative work, so these characters are not a craftsman's signature but a trace of state control over weapon production. The 2021 exhibition of Joseon weapons at the Jinju National Museum likewise showed a seungja chongtong bearing the Mallyeok Gimyo inscription, and other guns carrying the names of their makers. Cutting production details into metal was a long-standing practice in this line of work.",
+            "Yet there is one field the inscription never fills in, and that is the year of manufacture. Jeongsa belongs to a sexagenary cycle that returns every sixty years, so by itself it cannot pin down a date. Weighing written records against the development of Korean gunpowder weapons, researchers reduced the candidates to two. One is 1377, when a proposal by Choe Mu-seon established the Hwatong Dogam and the state began producing gunpowder weapons. The other is 1437, a period of active improvement in firearms. With too little comparative material available, the question remains open.",
+            "The remaining judgement fell to the body rather than to the letters. The round interior of the powder chamber marks an early form, plainly different from the improved firearms of Sejong's reign, which used a wooden plug to raise firing efficiency. Analysis of its composition showed casting in copper, tin and lead, with tin kept under 10 wt% so that the barrel would not split under the force of the charge, while impurities in the microstructure exposed the limits of the smelting technology of the time. That is why three years were needed. The inscription only supplied a starting point; form and material had to testify for the rest. The finding was over in 2023, but the confirming started there."
+          ],
+          "vocab": [
+            {
+              "word": "명문",
+              "easy": "쇠나 돌 같은 단단한 바탕에 새겨 넣은 글.",
+              "hanja": "銘(새길 명)文(글월 문)"
+            },
+            {
+              "word": "판독",
+              "easy": "알아보기 어려운 글자를 따져 읽어 내는 일.",
+              "hanja": "判(판단할 판)讀(읽을 독)"
+            },
+            {
+              "word": "간지",
+              "easy": "예순 해를 주기로 되풀이되는 해 이름 체계.",
+              "hanja": "干(방패 간)支(지탱할 지)"
+            },
+            {
+              "word": "정련",
+              "easy": "금속에서 불순물을 걸러 순도를 높이는 일.",
+              "hanja": "精(정밀할 정)鍊(단련할 련)"
+            },
+            {
+              "word": "흔적",
+              "easy": "어떤 일이 있었음을 뒤에 알려 주는 자국.",
+              "hanja": "痕(흉터 흔)跡(자취 적)"
+            }
+          ],
+          "envocab": [
+            {
+              "word": "artefact",
+              "ko": "유물, 인공 유물 (명사)",
+              "base": "artefact [ˈɑːrtɪfækt]"
+            },
+            {
+              "word": "inscription",
+              "ko": "명문, 새겨 넣은 글 (명사)",
+              "base": "inscribe [ɪnˈskraɪb]"
+            },
+            {
+              "word": "intaglio",
+              "ko": "음각 (명사)",
+              "base": "intaglio [ɪnˈtælioʊ]"
+            },
+            {
+              "word": "sexagenary",
+              "ko": "육십갑자의 (형용사)",
+              "base": "sexagenary [sekˈsædʒəneri]"
+            },
+            {
+              "word": "composition",
+              "ko": "성분 구성, 조성 (명사)",
+              "base": "compose [kəmˈpoʊz]"
+            },
+            {
+              "word": "testify",
+              "ko": "증언하다 (동사)",
+              "base": "testify [ˈtestɪfaɪ]"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 생각으로 가장 알맞은 것은?",
+              "choices": [
+                "화약 무기의 발달이 전쟁의 양상을 근본적으로 바꾸었다",
+                "우연한 발견이 계획된 발굴보다 더 큰 성과를 낸다",
+                "명문은 유물이 스스로를 증명하게 하지만 그 증언에도 비는 칸이 있어 형태와 재료가 뒤를 이어야 한다",
+                "고려와 조선의 관청 제도는 무기 제작을 엄격히 관리했다"
+              ],
+              "answer": 2,
+              "explain": "글은 명문이 밝힌 것과 끝내 밝히지 못한 것을 나누고, 나머지를 형태와 성분이 메웠다고 정리한다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "detail",
+              "q": "명문이 알려 준 정보로 이 글에 제시되지 않은 것은?",
+              "choices": [
+                "무기의 이름",
+                "무게",
+                "감독자의 관직과 이름",
+                "제작에 쓰인 금속의 배합 비율"
+              ],
+              "answer": 3,
+              "explain": "금속의 배합은 명문이 아니라 성분 분석으로 밝혀졌다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "vocab",
+              "q": "이 글에서 「흔적」이 뜻하는 바로 알맞은 것은?",
+              "choices": [
+                "보기 좋게 일부러 남긴 장식",
+                "글자를 새기는 데 쓰는 도구",
+                "어떤 일이 있었음을 뒤에 알려 주는 자국",
+                "금속 표면에 생긴 녹"
+              ],
+              "answer": 2,
+              "explain": "감조와 녹사라는 글자는 국가가 무기 제작을 관리했음을 뒤에 알려 주는 자국이다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "infer",
+              "q": "명문에 「감조」와 「녹사」가 적혀 있다는 사실에서 끌어낼 수 있는 것은?",
+              "choices": [
+                "장인이 자기 솜씨를 자랑하려 했다",
+                "이 무기의 제작이 개인의 일이 아니라 국가가 관리한 일이었다",
+                "무기를 만든 사람이 관직을 얻고자 했다",
+                "명문을 새긴 사람과 무기를 만든 사람이 같았다"
+              ],
+              "answer": 1,
+              "explain": "감조는 제작 감독을, 녹사는 관서의 실무를 맡던 관직을 가리키므로 국가의 관리 흔적으로 읽힌다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "critical",
+              "q": "「발견은 2023년에 끝났지만 확인은 그때부터가 시작이었다」가 겨냥하는 생각은?",
+              "choices": [
+                "오래된 유물일수록 값이 크다는 생각",
+                "유물을 찾아내기만 하면 그 정체도 함께 밝혀진다는 생각",
+                "우연한 발견은 학술적 가치가 없다는 생각",
+                "명문이 없는 유물은 연구할 필요가 없다는 생각"
+              ],
+              "answer": 1,
+              "explain": "발견은 하루면 되지만 무엇인지 확정하는 데는 삼 년이 걸렸다는 대비가 이 문장의 핵심이다.",
+              "evidencePara": 4
+            }
+          ],
+          "challenge": [
+            {
+              "type": "apply",
+              "q": "다른 유적에서 연대를 모르는 청동 그릇이 나왔고 바닥에 「경오년 제작」이라 새겨져 있다. 이 글의 방법을 따른다면 다음 단계로 가장 알맞은 것은?",
+              "choices": [
+                "글자가 있으므로 연도를 확정하고 연구를 끝낸다",
+                "간지는 예순 해마다 되풀이되므로 문헌과 형태·성분을 함께 대조해 후보 연도를 좁힌다",
+                "글자를 지우고 그릇의 모양만으로 판단한다",
+                "똑같이 생긴 그릇이 나올 때까지 판단을 미룬다"
+              ],
+              "answer": 1,
+              "explain": "간지만으로는 연도가 정해지지 않으므로 문헌과 형태·성분의 증언을 겹쳐야 한다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "critical",
+              "q": "이 글의 서술 태도에 대한 평가로 가장 적절한 것은?",
+              "choices": [
+                "확정된 사실과 아직 열린 물음을 구분하지 않고 하나로 묶어 단정한다",
+                "유물의 가치를 높이려고 두 후보 가운데 이른 연도만 골라 제시한다",
+                "가장 이른 시기의 화약 무기라는 확정된 사실과 제작 연도라는 미해결 문제를 나누어 밝힌다",
+                "과학 분석 결과만 신뢰하고 명문의 판독은 배제한다"
+              ],
+              "answer": 2,
+              "explain": "글은 확정된 것과 아직 답이 나오지 않은 것을 각각 제자리에 둔다.",
+              "evidencePara": 3
+            }
+          ],
+          "enseg": [
+            [
+              "Most objects recovered from an excavation cannot state their own history. ",
+              "Nothing on them records when they were made, or whose hands shaped them. ",
+              "Archaeology therefore narrows a date using what lies around the object, ",
+              "such as the shape of pottery buried with it or the order in which the soil accumulated, ",
+              "and such an estimate shifts every time new material appears. ",
+              "Seen against that background, ",
+              "it becomes clear why an artefact that emerges with writing on its own body is both rare and precious."
+            ],
+            [
+              "The Hwangja Hwatong, found on Geumseongsan Mountain in Naju in November 2023, ",
+              "is such an artefact. ",
+              "It came to light by chance while the ground was being surveyed ahead of trail construction. ",
+              "At 23.",
+              "75 cm long, with a bore of 1.",
+              "66 cm and a weight of 1,032 g, it is a small firearm that one person could carry. ",
+              "A hwatong fired arrows or shot using gunpowder, and it far exceeded the bow, ",
+              "then the main weapon, in both range and destructive power. ",
+              "Twenty-eight characters are cut into its body in intaglio: ",
+              "twenty-seven in six columns on the socket that takes the wooden handle, ",
+              "and one on the muzzle."
+            ],
+            [
+              "The inscription reads as follows. ",
+              "The Hwangja Hwatong was made in the twelfth month of the Jeongsa year; ",
+              "its weight is one geun and fourteen nyang; the supervisor was Noksa An Hyu-bo, ",
+              "and the craftsman was Seok. ",
+              "Name, weight and people are fixed in a single stroke. ",
+              "What deserves attention is the character of the items recorded. ",
+              "Gamjo means to supervise manufacture, ",
+              "and noksa was the office that handled administrative work, ",
+              "so these characters are not a craftsman's signature but a trace of state control over weapon production. ",
+              "The 2021 exhibition of Joseon weapons at the Jinju National Museum likewise showed a seungja chongtong bearing the Mallyeok Gimyo inscription, ",
+              "and other guns carrying the names of their makers. ",
+              "Cutting production details into metal was a long-standing practice in this line of work."
+            ],
+            [
+              "Yet there is one field the inscription never fills in, ",
+              "and that is the year of manufacture. ",
+              "Jeongsa belongs to a sexagenary cycle that returns every sixty years, ",
+              "so by itself it cannot pin down a date. ",
+              "Weighing written records against the development of Korean gunpowder weapons, ",
+              "researchers reduced the candidates to two. ",
+              "One is 1377, ",
+              "when a proposal by Choe Mu-seon established the Hwatong Dogam and the state began producing gunpowder weapons. ",
+              "The other is 1437, a period of active improvement in firearms. ",
+              "With too little comparative material available, the question remains open."
+            ],
+            [
+              "The remaining judgement fell to the body rather than to the letters. ",
+              "The round interior of the powder chamber marks an early form, ",
+              "plainly different from the improved firearms of Sejong's reign, ",
+              "which used a wooden plug to raise firing efficiency. ",
+              "Analysis of its composition showed casting in copper, tin and lead, ",
+              "with tin kept under 10 wt% so that the barrel would not split under the force of the charge, ",
+              "while impurities in the microstructure exposed the limits of the smelting technology of the time. ",
+              "That is why three years were needed. ",
+              "The inscription only supplied a starting point; ",
+              "form and material had to testify for the rest. ",
+              "The finding was over in 2023, but the confirming started there."
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "id": "shale-pigment",
+      "category": "science",
+      "careers": [
+        "med",
+        "env",
+        "nat"
+      ],
+      "publishedAt": "2026-09-28",
+      "status": "published",
+      "issue": false,
+      "sources": [
+        {
+          "title": "국가유산청 국립문화유산연구원 보도자료 — 국산 적색 퇴적암(셰일) 활용한 항균성 석간주 안료 개발 (2026.9.18)",
+          "url": "https://www.khs.go.kr/newsBbz/selectNewsBbzView.do?newsItemId=155706378&sectionId=b_sec_1&mn=NS_01_02"
+        },
+        {
+          "title": "국가유산청 국립문화재연구소 보도자료 — 국립문화재연구소, 전통 단청안료 기술 민간에 전파 (2019.10.30)",
+          "url": "https://www.khs.go.kr/newsBbz/selectNewsBbzView.do?newsItemId=155701730&sectionId=b_sec_1&mn=NS_01_02"
+        }
+      ],
+      "levels": {
+        "L1": {
+          "title": "다시 찾은 붉은 빛깔",
+          "minutes": 3,
+          "paragraphs": [
+            [
+              "옛날 나무 건물에는 ",
+              "붉은색을 칠했어요. ",
+              "이 붉은 물감을 석간주라고 해요. ",
+              "붉은 흙이나 돌을 ",
+              "곱게 갈아서 만들어요. ",
+              "기둥을 곱게 꾸미고 ",
+              "나무도 지켜 줘요."
+            ],
+            [
+              "그동안은 울릉도의 붉은 흙을 썼어요. ",
+              "그런데 그곳이 소중한 땅으로 정해졌어요. ",
+              "이제는 흙을 마음대로 ",
+              "캘 수 없어요. ",
+              "그래서 다른 돌을 ",
+              "찾아 나섰어요."
+            ],
+            [
+              "연구하는 사람들이 ",
+              "강원도 평창에서 돌을 찾았어요. ",
+              "진흙이 굳어서 된 ",
+              "붉은 돌이에요. ",
+              "이 돌로 만든 물감은 ",
+              "빛깔이 잘 변하지 않아요. ",
+              "나무를 썩게 하는 균도 ",
+              "잘 자라지 못하게 해요. ",
+              "옛 빛깔을 지키면서 ",
+              "건물도 더 오래가게 되었어요."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "석간주",
+              "easy": "옛 나무 건물에 칠하던 붉은 물감이에요.",
+              "hanja": null
+            },
+            {
+              "word": "연구",
+              "easy": "잘 모르는 것을 자세히 살펴보고 알아내는 일이에요.",
+              "hanja": null
+            },
+            {
+              "word": "빛깔",
+              "easy": "눈에 보이는 색이에요.",
+              "hanja": null
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글은 무엇에 대한 이야기인가요?",
+              "choices": [
+                "옛 건물에 칠하던 붉은 물감을 새 돌가루로 다시 만든 이야기",
+                "울릉도에 아주 큰 건물을 새로 지은 이야기",
+                "평창에서 진흙으로 그릇을 빚은 이야기",
+                "산에 나무를 심어 숲을 만든 이야기"
+              ],
+              "answer": 0,
+              "explain": "울릉도 흙을 못 쓰게 되자 평창의 붉은 돌로 물감을 다시 만든 이야기예요.",
+              "evidencePara": 2
+            },
+            {
+              "type": "detail",
+              "q": "울릉도의 붉은 흙을 더 쓸 수 없게 된 까닭은 무엇인가요?",
+              "choices": [
+                "흙이 모두 사라졌기 때문이에요",
+                "그곳이 소중한 땅으로 정해졌기 때문이에요",
+                "흙 빛깔이 파랗게 변했기 때문이에요",
+                "사람들이 붉은색을 싫어했기 때문이에요"
+              ],
+              "answer": 1,
+              "explain": "그곳이 소중한 땅으로 정해져서 이제는 흙을 마음대로 캘 수 없다고 했어요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「석간주」는 무엇인가요?",
+              "choices": [
+                "나무로 만든 기둥이에요",
+                "돌을 쌓아 만든 담이에요",
+                "옛 건물에 칠하던 붉은 물감이에요",
+                "흙을 담는 그릇이에요"
+              ],
+              "answer": 2,
+              "explain": "붉은 흙이나 돌을 곱게 갈아 만든, 옛 건물에 칠하던 붉은 물감이에요.",
+              "evidencePara": 0
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "평창에서 찾은 돌로 만든 물감이 좋은 까닭은 무엇일까요?",
+              "choices": [
+                "빛깔이 잘 변하지 않고 나무를 썩게 하는 균도 막아 주어서요",
+                "값이 아주 비싸서요",
+                "물에 아주 잘 녹아서요",
+                "냄새가 좋아서요"
+              ],
+              "answer": 0,
+              "explain": "빛깔이 잘 변하지 않고, 나무를 썩게 하는 균도 잘 자라지 못하게 해요.",
+              "evidencePara": 2
+            },
+            {
+              "type": "apply",
+              "q": "밖에 있는 나무 건물을 오래 지키려면 어떤 물감이 좋을까요?",
+              "choices": [
+                "비를 맞아도 빛깔이 잘 변하지 않는 물감",
+                "물이 닿으면 바로 지워지는 물감",
+                "햇빛을 보면 빛깔이 사라지는 물감",
+                "나무를 빨리 썩게 하는 물감"
+              ],
+              "answer": 0,
+              "explain": "밖에 있는 건물은 비와 햇빛을 맞으니, 빛깔이 잘 변하지 않는 물감이 좋아요.",
+              "evidencePara": 2
+            }
+          ]
+        },
+        "L2": {
+          "title": "울릉도 흙 대신 평창 돌",
+          "minutes": 4,
+          "paragraphs": [
+            [
+              "궁궐이나 절의 나무 기둥을 보면 ",
+              "짙은 붉은색이 눈에 들어온다. ",
+              "이 붉은색을 내는 ",
+              "전통 안료가 석간주다. ",
+              "석간주는 산화철 성분을 품은 ",
+              "붉은 흙이나 암석을 ",
+              "원료로 만든다. ",
+              "나무 바탕에 넓게 칠하는 가칠부터 ",
+              "세밀한 문양 채색까지 ",
+              "두루 쓰인다."
+            ],
+            [
+              "그동안 연구진은 ",
+              "옛 문헌이 원료 산출지로 적어 둔 ",
+              "울릉군 서면 태하리 황토굴의 주토로 ",
+              "석간주를 되살려 왔다. ",
+              "그런데 그 지역이 ",
+              "국가지질공원으로 지정되면서 ",
+              "원료를 확보하고 활용하는 데 ",
+              "제약이 생겼다. ",
+              "옛 기록에 적힌 자리만 고집하면 ",
+              "더는 만들 수 없게 된 것이다."
+            ],
+            [
+              "그래서 국립문화유산연구원은 ",
+              "물음을 바꾸었다. ",
+              "어느 자리에서 캔 흙이냐가 아니라 ",
+              "어떤 성질을 갖추었느냐로 ",
+              "석간주를 다시 정의했다. ",
+              "국내에서 안정적으로 구할 수 있는 ",
+              "원료광물을 두루 조사해 ",
+              "전통 방식으로 가공했고, ",
+              "만들어진 안료를 ",
+              "물성과 성분, 내후성과 기능성으로 ",
+              "종합 평가했다. ",
+              "그 결과 강원도 평창에서 나는 ",
+              "적색 셰일로 만든 안료가 ",
+              "기존 석간주를 대신할 ",
+              "색상과 성능, 색안정성을 갖춘 것으로 확인됐다."
+            ],
+            [
+              "뜻밖의 덤도 따라왔다. ",
+              "목조 건축유산의 목재를 손상시키는 ",
+              "부후균으로 시험해 보니, ",
+              "이 안료가 부후균의 생장을 억제하는 ",
+              "항균성을 지니고 있었다. ",
+              "기존 태하리 주토로 만든 석간주 안료보다 ",
+              "약 3배 이상 높았다. ",
+              "연구원은 이 제조기술을 ",
+              "국유특허로 등록하고 ",
+              "민간기관에 넘겨 ",
+              "실제 수리 현장에서 쓰이도록 할 계획이다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "안료",
+              "easy": "물감처럼 색을 내는 데 쓰는 가루 재료",
+              "hanja": "顔(얼굴 안)+料(헤아릴 료)"
+            },
+            {
+              "word": "산출지",
+              "easy": "어떤 물건이나 자원이 나는 곳",
+              "hanja": "産(낳을 산)+出(날 출)+地(땅 지)"
+            },
+            {
+              "word": "내후성",
+              "easy": "여러 기후나 환경 변화에 견디는 성질",
+              "hanja": "耐(견딜 내)+候(기후 후)+性(성품 성)"
+            },
+            {
+              "word": "억제",
+              "easy": "자라거나 커지지 못하게 눌러 막는 일",
+              "hanja": "抑(누를 억)+制(절제할 제)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 알맞은 것은?",
+              "choices": [
+                "원료를 캘 수 없게 되자 성질을 기준으로 다시 찾아, 항균성까지 갖춘 석간주 대체 안료를 만들었다",
+                "울릉군 태하리 황토굴을 국가지질공원에서 빼기로 했다",
+                "적색 셰일이 우리나라에서 처음으로 발견되었다",
+                "단청에 붉은색 대신 다른 색을 칠하기로 했다"
+              ],
+              "answer": 0,
+              "explain": "원료 산출지를 쓸 수 없게 되자 성질로 다시 정의해 평창 적색 셰일을 찾았고, 항균성까지 확인했다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "detail",
+              "q": "울릉군 태하리 주토를 쓰기 어려워진 까닭은?",
+              "choices": [
+                "주토가 모두 떨어졌기 때문에",
+                "그 지역이 국가지질공원으로 지정되어 원료 확보에 제약이 생겨서",
+                "옛 문헌이 사라졌기 때문에",
+                "주토로 만든 안료의 색이 붉지 않아서"
+              ],
+              "answer": 1,
+              "explain": "그 지역이 국가지질공원으로 지정되면서 원료를 확보하고 활용하는 데 제약이 생겼다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "부후균으로 시험했을 때 평창 적색 셰일 안료가 보인 결과는?",
+              "choices": [
+                "부후균이 더 빨리 자랐다",
+                "부후균이 안료의 색을 바꾸었다",
+                "부후균의 생장을 억제했고, 기존 석간주 안료보다 약 3배 이상 높았다",
+                "부후균에 아무런 변화가 없었다"
+              ],
+              "answer": 2,
+              "explain": "부후균의 생장을 억제하는 항균성을 지녔고, 기존 태하리 주토 석간주보다 약 3배 이상 높았다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "vocab",
+              "q": "「산출지」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "어떤 물건이나 자원이 나는 곳",
+                "물건을 사고파는 가게",
+                "계산해서 얻어 낸 숫자",
+                "사람들이 모여 사는 마을"
+              ],
+              "answer": 0,
+              "explain": "옛 문헌이 원료가 나는 곳으로 적어 둔 자리가 태하리 황토굴이었다.",
+              "evidencePara": 1
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "연구원이 '어느 자리에서 캔 흙이냐'가 아니라 '어떤 성질을 갖추었느냐'로 물음을 바꾼 까닭은?",
+              "choices": [
+                "옛 기록의 산출지를 쓸 수 없게 되어, 같은 성질을 지닌 다른 원료를 찾아야 했기 때문에",
+                "울릉도 주토의 색이 너무 밝았기 때문에",
+                "전통 방식으로 가공하는 기술이 사라졌기 때문에",
+                "평창 셰일이 울릉도 주토보다 값이 쌌기 때문에"
+              ],
+              "answer": 0,
+              "explain": "산출지를 그대로 쓸 수 없게 되자, 자리가 아니라 갖추어야 할 성질을 기준으로 삼아 다시 찾았다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "apply",
+              "q": "학교 텃밭에 늘 쓰던 흙을 더는 가져올 수 없게 되었다. 이 글의 방법을 따른다면 가장 알맞은 것은?",
+              "choices": [
+                "흙이 갖추어야 할 성질을 먼저 정하고, 그 성질에 맞는 다른 흙을 찾아 확인한다",
+                "텃밭 가꾸기를 그만둔다",
+                "가져올 수 없게 된 흙을 몰래 퍼 온다",
+                "흙 없이 씨앗만 심어 본다"
+              ],
+              "answer": 0,
+              "explain": "연구원도 자리가 아니라 성질을 기준으로 삼아 다른 원료를 찾고 평가했다.",
+              "evidencePara": 2
+            }
+          ],
+          "en": [
+            "Look at the wooden pillars of an old palace or temple. You will see a deep red color. This red comes from a traditional paint called seokganju. It is made from red soil or rock that holds iron oxide. Painters use it for the base coat and for small patterns.",
+            "For years, people used red earth from Taeha-ri on Ulleung Island. Old books named that place as the source. But the area became a national geopark. Now it is hard to dig there. The old recipe could not be made any more.",
+            "So the research institute asked a new question. What matters is not the place, but the quality. They looked for other Korean minerals and ground them the old way. Then they tested color, weather resistance and other features. Red shale from Pyeongchang passed every test.",
+            "A surprise came with it. Some fungi rot the wood of old buildings. The new paint stopped these fungi from growing. It worked about three times better than the old paint. The institute will share the patent with companies."
+          ],
+          "enseg": [
+            [
+              "Look at the wooden pillars ",
+              "of an old palace or temple. ",
+              "You will see a deep red color. ",
+              "This red comes from a traditional paint ",
+              "called seokganju. ",
+              "It is made from red soil or rock ",
+              "that holds iron oxide. ",
+              "Painters use it for the base coat ",
+              "and for small patterns."
+            ],
+            [
+              "For years, people used red earth ",
+              "from Taeha-ri on Ulleung Island. ",
+              "Old books named that place ",
+              "as the source. ",
+              "But the area became a national geopark. ",
+              "Now it is hard to dig there. ",
+              "The old recipe could not be made any more."
+            ],
+            [
+              "So the research institute asked a new question. ",
+              "What matters is not the place, ",
+              "but the quality. ",
+              "They looked for other Korean minerals ",
+              "and ground them the old way. ",
+              "Then they tested color, weather resistance ",
+              "and other features. ",
+              "Red shale from Pyeongchang ",
+              "passed every test."
+            ],
+            [
+              "A surprise came with it. ",
+              "Some fungi rot the wood ",
+              "of old buildings. ",
+              "The new paint stopped these fungi ",
+              "from growing. ",
+              "It worked about three times better ",
+              "than the old paint. ",
+              "The institute will share the patent ",
+              "with companies."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "pillars",
+              "ko": "기둥 (명사 pillar의 복수)",
+              "base": "pillar [ˈpɪlər]"
+            },
+            {
+              "word": "traditional",
+              "ko": "전통의, 전통적인 (형용사)",
+              "base": "traditional [trəˈdɪʃənl]"
+            },
+            {
+              "word": "geopark",
+              "ko": "지질공원 (명사)",
+              "base": "geopark [ˈdʒiːoʊpɑːrk]"
+            },
+            {
+              "word": "minerals",
+              "ko": "광물 (명사 mineral의 복수)",
+              "base": "mineral [ˈmɪnərəl]"
+            },
+            {
+              "word": "fungi",
+              "ko": "균, 곰팡이 (명사 fungus의 복수)",
+              "base": "fungus [ˈfʌŋɡəs]"
+            },
+            {
+              "word": "patent",
+              "ko": "특허 (명사)",
+              "base": "patent [ˈpætnt]"
+            }
+          ]
+        },
+        "L3": {
+          "title": "자리가 아니라 성질로",
+          "minutes": 5,
+          "paragraphs": [
+            [
+              "궁궐과 사찰의 나무 기둥을 물들인 ",
+              "짙은 붉은색은 ",
+              "석간주라는 전통 안료에서 나온다. ",
+              "석간주는 산화철 성분을 함유한 ",
+              "적색 토양이나 암석 등을 원료로 만드는데, ",
+              "목조건축물의 바탕을 칠하는 가칠부터 ",
+              "각종 문양 채색까지 폭넓게 쓰인다. ",
+              "색을 내는 일만 하는 것이 아니라 ",
+              "나무 표면을 덮어 ",
+              "건물을 지키는 몫도 맡는다."
+            ],
+            [
+              "그동안의 복원 연구는 ",
+              "고문헌이 원료 산출지로 기록한 ",
+              "울릉군 서면 태하리 황토굴의 주토를 따랐다. ",
+              "옛 기록에 적힌 바로 그 흙을 ",
+              "다시 쓰는 것이 ",
+              "전통을 잇는 길이라고 보았기 때문이다. ",
+              "그런데 해당 지역이 국가지질공원으로 지정되면서 ",
+              "원료를 확보하고 활용하는 데 제약이 생겼다. ",
+              "자리를 그대로 물려받는 방식이 ",
+              "막다른 길에 닿은 셈이다."
+            ],
+            [
+              "국립문화유산연구원은 물음을 바꾸어 던졌다. ",
+              "석간주를 울릉도 흙으로 만든 안료가 아니라 ",
+              "어떤 성질을 갖춘 안료로 ",
+              "다시 정의한 것이다. ",
+              "연구원은 국내에서 안정적으로 확보할 수 있는 ",
+              "원료광물을 두루 조사한 뒤 ",
+              "전통 방식으로 가공했고, ",
+              "만들어진 안료를 물성과 성분, ",
+              "내후성과 기능성으로 종합 평가해 ",
+              "외부에 노출되는 목조 건축유산의 단청에 ",
+              "쓸 수 있는지 검증했다."
+            ],
+            [
+              "성질을 기준으로 다시 찾자 ",
+              "새 원료가 나타났다. ",
+              "강원도 평창에서 산출되는 적색 셰일로 만든 안료가 ",
+              "기존 석간주를 대체할 색상과 성능, ",
+              "색안정성을 갖춘 것으로 확인됐다. ",
+              "셰일은 진흙이 쌓여 만들어진 퇴적암이다. ",
+              "연구원은 원료광물을 분쇄·수비·건조하는 공정으로 ",
+              "일정한 품질의 안료를 만드는 ",
+              "기술도 함께 확보했다."
+            ],
+            [
+              "찾다 보니 ",
+              "없던 기능까지 딸려 왔다. ",
+              "목조 건축유산의 목재를 손상시키는 ",
+              "부후균을 대상으로 시험한 결과, ",
+              "이 안료는 부후균의 생장을 억제하는 ",
+              "항균성을 지닌 것으로 나타났다. ",
+              "기존 태하리 주토로 만든 석간주 안료보다 ",
+              "약 3배 이상 높았다. ",
+              "국가유산청이 고시한 ",
+              "전통 재료 인증제의 품질기준에도 부합해, ",
+              "연구원은 특허 기술을 ",
+              "민간기관에 이전할 계획이다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "함유",
+              "easy": "어떤 성분을 안에 품고 있음",
+              "hanja": "含(머금을 함)+有(있을 유)"
+            },
+            {
+              "word": "고문헌",
+              "easy": "옛날에 쓰인 문헌",
+              "hanja": "古(옛 고)+文(글월 문)+獻(바칠 헌)"
+            },
+            {
+              "word": "내후성",
+              "easy": "각종 기후나 환경 변화에 견디는 성질",
+              "hanja": "耐(견딜 내)+候(기후 후)+性(성품 성)"
+            },
+            {
+              "word": "대체",
+              "easy": "다른 것으로 바꾸어 대신함",
+              "hanja": "代(대신할 대)+替(바꿀 체)"
+            },
+            {
+              "word": "부합",
+              "easy": "조건이나 기준에 꼭 들어맞음",
+              "hanja": "符(부호 부)+合(합할 합)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 알맞은 것은?",
+              "choices": [
+                "원료 산출지를 쓸 수 없게 되자 석간주를 성질로 다시 정의해 대체 원료를 찾았고, 항균성까지 확인됐다",
+                "국가지질공원 지정이 건축유산 보존에 도움이 되지 않는다는 점이 밝혀졌다",
+                "적색 셰일이 퇴적암이 아니라 화성암이라는 사실이 새로 확인됐다",
+                "전통 재료 인증제의 품질기준이 낮아져 더 많은 안료가 통과하게 됐다"
+              ],
+              "answer": 0,
+              "explain": "산지를 기준으로 삼던 복원이 막히자 성질을 기준으로 다시 정의했고, 평창 적색 셰일과 항균성을 얻었다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "detail",
+              "q": "글에 나온 석간주의 쓰임으로 알맞은 것은?",
+              "choices": [
+                "금속 지붕에 녹이 슬지 않게 덮는 일",
+                "목조건축물의 가칠부터 각종 문양 채색까지",
+                "종이에 글씨를 쓰는 먹을 만드는 일",
+                "기와를 굽는 가마의 연료"
+              ],
+              "answer": 1,
+              "explain": "바탕을 칠하는 가칠부터 각종 문양 채색까지 폭넓게 쓰인다고 했다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "부후균을 대상으로 한 시험에서 확인된 것은?",
+              "choices": [
+                "안료가 부후균의 생장을 억제했고, 기존 태하리 주토 석간주보다 약 3배 이상 높았다",
+                "안료가 부후균의 먹이가 되어 생장을 도왔다",
+                "부후균이 안료의 색을 더 붉게 바꾸었다",
+                "부후균은 목재가 아니라 금속을 손상시켰다"
+              ],
+              "answer": 0,
+              "explain": "부후균의 생장을 억제하는 항균성이 확인됐고, 기존 석간주 안료보다 약 3배 이상 높았다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "vocab",
+              "q": "「고문헌」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "옛날에 쓰인 문헌",
+                "높은 곳에 보관해 둔 문서",
+                "외국에서 들여온 책",
+                "아직 펴내지 않은 원고"
+              ],
+              "answer": 0,
+              "explain": "옛 기록이 원료 산출지로 적어 둔 자리를 따랐다는 대목에서 쓰였다.",
+              "evidencePara": 1
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "석간주의 정의를 산지에서 성질로 바꾼 것이 갖는 뜻으로 알맞은 것은?",
+              "choices": [
+                "전통을 잇는 기준이 '같은 자리'에서 '같은 성질'로 옮겨 갔다",
+                "전통 안료를 더는 복원하지 않기로 했다",
+                "국가지질공원 지정을 취소해 달라고 요청했다",
+                "울릉도 주토는 애초에 석간주가 아니었음이 밝혀졌다"
+              ],
+              "answer": 0,
+              "explain": "어느 자리에서 캤느냐가 아니라 색·성능·색안정성을 갖추었느냐가 기준이 되었다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "apply",
+              "q": "다른 전통 재료의 산출지가 개발로 사라졌다면, 이 글의 방법을 따라 할 수 있는 일은?",
+              "choices": [
+                "그 재료가 갖추어야 할 성질을 기준으로 삼아 국내의 다른 원료를 조사하고 검증한다",
+                "그 재료를 쓰는 전통 기술은 기록만 남기고 중단한다",
+                "산출지 둘레의 흙을 대신 쓰되 검증은 하지 않는다",
+                "외국에서 이름이 비슷한 재료를 사다 그대로 쓴다"
+              ],
+              "answer": 0,
+              "explain": "연구원도 성질을 기준으로 국내 원료광물을 두루 조사한 뒤 종합 평가로 검증했다.",
+              "evidencePara": 2
+            }
+          ],
+          "en": [
+            "The deep red on the wooden pillars of Korean palaces and temples comes from a traditional pigment called seokganju. It is made from red soil or rock that contains iron oxide, and it is used for everything from the plain base coat on a wooden building to detailed decorative patterns. The pigment does more than add color; the layer it forms also shields the wood underneath.",
+            "Until now, restoration research followed the old texts, which recorded red earth from the ocher cave at Taeha-ri in Ulleung County as the source of the raw material. Using the very soil named in the records seemed like the proper way to carry on the tradition. Then the area was designated a national geopark, and securing and using the raw material became difficult. Inheriting the old site exactly had reached a dead end.",
+            "The National Research Institute of Cultural Heritage changed the question. Instead of defining seokganju as a pigment made from Ulleung soil, it defined the pigment by the properties it must have. Researchers surveyed minerals that could be obtained steadily inside Korea, processed them in the traditional way, and then evaluated the finished pigment for physical properties, composition, weather resistance and function.",
+            "Once properties became the standard, a new source appeared. A pigment made from red shale found in Pyeongchang, Gangwon Province, proved to have the color, the performance and the color stability needed to replace the old seokganju. Shale is a sedimentary rock formed from layers of mud. The team also secured a process of crushing, levigation and drying that yields pigment of consistent quality.",
+            "Searching also brought a function nobody had asked for. Tested against the decay fungi that damage the timber of wooden heritage buildings, the pigment suppressed their growth. Its antifungal effect was about three times greater than that of the pigment made from the Taeha-ri earth. Because it also meets the national quality standard for certified traditional materials, the institute plans to transfer the patented technology to private firms."
+          ],
+          "enseg": [
+            [
+              "The deep red on the wooden pillars ",
+              "of Korean palaces and temples ",
+              "comes from a traditional pigment called seokganju. ",
+              "It is made from red soil or rock ",
+              "that contains iron oxide, ",
+              "and it is used for everything ",
+              "from the plain base coat on a wooden building ",
+              "to detailed decorative patterns. ",
+              "The pigment does more than add color; ",
+              "the layer it forms also shields the wood underneath."
+            ],
+            [
+              "Until now, restoration research followed the old texts, ",
+              "which recorded red earth from the ocher cave at Taeha-ri ",
+              "in Ulleung County ",
+              "as the source of the raw material. ",
+              "Using the very soil named in the records ",
+              "seemed like the proper way ",
+              "to carry on the tradition. ",
+              "Then the area was designated a national geopark, ",
+              "and securing and using the raw material became difficult. ",
+              "Inheriting the old site exactly ",
+              "had reached a dead end."
+            ],
+            [
+              "The National Research Institute of Cultural Heritage ",
+              "changed the question. ",
+              "Instead of defining seokganju ",
+              "as a pigment made from Ulleung soil, ",
+              "it defined the pigment by the properties it must have. ",
+              "Researchers surveyed minerals ",
+              "that could be obtained steadily inside Korea, ",
+              "processed them in the traditional way, ",
+              "and then evaluated the finished pigment ",
+              "for physical properties, composition, weather resistance and function."
+            ],
+            [
+              "Once properties became the standard, ",
+              "a new source appeared. ",
+              "A pigment made from red shale ",
+              "found in Pyeongchang, Gangwon Province, ",
+              "proved to have the color, the performance and the color stability ",
+              "needed to replace the old seokganju. ",
+              "Shale is a sedimentary rock ",
+              "formed from layers of mud. ",
+              "The team also secured a process ",
+              "of crushing, levigation and drying ",
+              "that yields pigment of consistent quality."
+            ],
+            [
+              "Searching also brought a function ",
+              "nobody had asked for. ",
+              "Tested against the decay fungi ",
+              "that damage the timber of wooden heritage buildings, ",
+              "the pigment suppressed their growth. ",
+              "Its antifungal effect was about three times greater ",
+              "than that of the pigment made from the Taeha-ri earth. ",
+              "Because it also meets the national quality standard ",
+              "for certified traditional materials, ",
+              "the institute plans to transfer the patented technology ",
+              "to private firms."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "pigment",
+              "ko": "안료, 색소 (명사)",
+              "base": "pigment [ˈpɪɡmənt]"
+            },
+            {
+              "word": "restoration",
+              "ko": "복원, 복구 (명사)",
+              "base": "restoration [ˌrestəˈreɪʃn]"
+            },
+            {
+              "word": "designated",
+              "ko": "지정되었다 (동사 designate의 과거분사)",
+              "base": "designate [ˈdezɪɡneɪt]"
+            },
+            {
+              "word": "composition",
+              "ko": "성분, 구성 (명사)",
+              "base": "composition [ˌkɑːmpəˈzɪʃn]"
+            },
+            {
+              "word": "sedimentary",
+              "ko": "퇴적의, 퇴적 작용으로 생긴 (형용사)",
+              "base": "sedimentary [ˌsedɪˈmentri]"
+            },
+            {
+              "word": "suppressed",
+              "ko": "억제했다 (동사 suppress의 과거형)",
+              "base": "suppress [səˈpres]"
+            }
+          ]
+        },
+        "L4": {
+          "title": "원료를 잃고 기능을 얻다",
+          "minutes": 6,
+          "paragraphs": [
+            [
+              "전통을 잇는다는 말은 ",
+              "흔히 옛사람이 쓰던 그 자리, ",
+              "그 재료를 그대로 되찾는 일로 이해된다. ",
+              "단청에 쓰이는 붉은 안료 석간주의 복원도 ",
+              "오래 그 길을 걸었다. ",
+              "석간주는 산화철 성분을 함유한 ",
+              "적색 토양이나 암석 등을 원료로 만드는 전통안료로, ",
+              "목조건축물의 바탕을 칠하는 가칠부터 ",
+              "각종 문양 채색까지 폭넓게 사용된다. ",
+              "그래서 복원 연구는 ",
+              "고문헌이 원료 산출지로 기록한 ",
+              "울릉군 서면 태하리 황토굴의 주토를 좇았다."
+            ],
+            [
+              "그런데 그 길이 막혔다. ",
+              "해당 지역이 국가지질공원으로 지정되면서 ",
+              "원료를 확보하고 ",
+              "활용하는 데 제약이 생긴 것이다. ",
+              "지켜야 할 가치가 둘이 부딪힌 셈이다. ",
+              "지질 유산을 지키려면 땅을 파낼 수 없고, ",
+              "건축 유산을 지키려면 그 흙이 필요했다. ",
+              "기존 석간주를 대체할 ",
+              "새로운 국내 원료광물의 발굴이 필요해진 배경이다."
+            ],
+            [
+              "국립문화유산연구원이 택한 해법은 ",
+              "정의를 바꾸는 것이었다. ",
+              "석간주를 산지로 규정하는 대신 ",
+              "성질로 규정했다. ",
+              "무엇으로 만들었느냐가 아니라 ",
+              "어떤 색을 내고 얼마나 견디느냐가 ",
+              "기준이 된 것이다. ",
+              "연구원은 국내에서 안정적으로 확보할 수 있는 ",
+              "원료광물을 조사해 전통 방식으로 가공한 뒤, ",
+              "제조한 안료를 물성과 성분, ",
+              "내후성 및 기능성 등으로 종합 평가하여 ",
+              "외부 환경에 노출되는 목조 건축유산의 단청에 ",
+              "활용할 수 있는지 검증했다. ",
+              "내후성은 각종 기후나 ",
+              "환경 변화에 견디는 성질을 말한다."
+            ],
+            [
+              "기준을 바꾸자 답이 나왔다. ",
+              "강원도 평창에서 산출되는 적색 셰일로 만든 안료가 ",
+              "기존 석간주를 대체할 수 있는 ",
+              "색상과 성능, 색안정성을 갖춘 것으로 확인됐다. ",
+              "셰일은 진흙이 쌓여 만들어진 퇴적암이다. ",
+              "원료광물 분쇄·수비·건조 등의 공정을 통해 ",
+              "일정한 품질의 안료를 제조하는 기술도 ",
+              "함께 확보했다. ",
+              "여기까지는 잃어버린 것을 메운 결과다."
+            ],
+            [
+              "예상하지 못한 성과는 ",
+              "그다음에 나왔다. ",
+              "목조 건축유산의 목재를 손상시키는 ",
+              "부후균을 대상으로 시험한 결과, ",
+              "이 안료가 부후균의 생장을 억제하는 ",
+              "항균성을 지닌 것으로 나타났다. ",
+              "기존 울릉군 태하리 주토로 만든 석간주 안료보다 ",
+              "약 3배 이상 높았다. ",
+              "국가유산청이 고시한 ",
+              "전통 재료 인증제의 품질기준에도 부합한다. ",
+              "연구원은 이 제조기술을 국유특허로 등록했다. ",
+              "특허 이름은 ",
+              "「적색 셰일을 포함하는 ",
+              "항균성 석간주 대체 안료 및 ",
+              "이의 제조방법」(특허 제10-3009558호)이다. ",
+              "앞으로 관련 민간기관에 이 기술을 이전해 ",
+              "생산과 실용화를 촉진할 계획이다. ",
+              "옛 재료를 흉내 내는 데서 멈추지 않고 ",
+              "건물이 더 오래 버티게 하는 쪽으로 ",
+              "한 걸음 더 나아간 것이다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "함유",
+              "easy": "어떤 성분을 안에 품고 있음",
+              "hanja": "含(머금을 함)+有(있을 유)"
+            },
+            {
+              "word": "제약",
+              "easy": "조건을 붙여 마음대로 하지 못하게 막음",
+              "hanja": "制(절제할 제)+約(맺을 약)"
+            },
+            {
+              "word": "내후성",
+              "easy": "각종 기후나 환경 변화에 견디는 성질",
+              "hanja": "耐(견딜 내)+候(기후 후)+性(성품 성)"
+            },
+            {
+              "word": "항균성",
+              "easy": "균이 자라지 못하게 막는 성질",
+              "hanja": "抗(막을 항)+菌(버섯 균)+性(성품 성)"
+            },
+            {
+              "word": "실용화",
+              "easy": "연구한 것을 실제 현장에서 쓸 수 있게 만드는 일",
+              "hanja": "實(열매 실)+用(쓸 용)+化(될 화)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 알맞은 것은?",
+              "choices": [
+                "원료 산출지를 쓸 수 없게 되자 석간주를 성질로 다시 정의해 평창 적색 셰일을 찾아냈고, 항균성이라는 새 기능까지 확인해 국유특허로 등록했다",
+                "국가지질공원 지정 이후 단청 복원 연구가 중단되었다",
+                "전통 재료 인증제의 품질기준에서 항균성 항목을 빼기로 개정되었다",
+                "울릉군 태하리 주토가 목재를 썩게 하는 원인으로 밝혀졌다"
+              ],
+              "answer": 0,
+              "explain": "정의를 산지에서 성질로 바꾸어 대체 원료를 찾았고, 예상하지 못한 항균성까지 얻어 특허로 등록했다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "detail",
+              "q": "원료 확보가 어려워진 직접적인 계기는?",
+              "choices": [
+                "태하리 황토굴의 주토가 모두 고갈되었다",
+                "해당 지역이 국가지질공원으로 지정되었다",
+                "고문헌에서 산출지 기록이 지워졌다",
+                "주토에서 산화철 성분이 사라졌다"
+              ],
+              "answer": 1,
+              "explain": "해당 지역이 국가지질공원으로 지정되면서 원료를 확보하고 활용하는 데 제약이 생겼다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "연구원이 제조한 안료를 평가한 항목으로 글에 제시된 것은?",
+              "choices": [
+                "무게, 가격, 생산량, 수출액",
+                "물성, 성분, 내후성, 기능성",
+                "향기, 점도, 건조 시간, 두께",
+                "채굴량, 운반 거리, 보관 기간, 포장 방식"
+              ],
+              "answer": 1,
+              "explain": "물성과 성분, 내후성 및 기능성 등으로 종합 평가해 단청에 쓸 수 있는지 검증했다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "vocab",
+              "q": "「내후성」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "각종 기후나 환경 변화에 견디는 성질",
+                "시간이 지날수록 색이 짙어지는 성질",
+                "물에 잘 녹아 고르게 퍼지는 성질",
+                "다른 재료와 섞이지 않는 성질"
+              ],
+              "answer": 0,
+              "explain": "글은 내후성을 각종 기후나 환경 변화에 견디는 성질이라고 풀이한다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "critical",
+              "q": "이 연구가 보여 주는 '전통을 잇는 방법'에 대한 평가로 가장 타당한 것은?",
+              "choices": [
+                "옛 산지를 그대로 쓰는 것만 전통이라고 보면 보존 가치끼리 부딪힐 때 길이 막히지만, 갖추어야 할 성질을 기준으로 삼으면 전통을 이으면서 새 기능도 얻을 수 있다",
+                "전통 재료는 성능이 떨어지므로 현대 재료로 완전히 바꾸는 편이 낫다는 것을 보여 준다",
+                "항균성이 확인되었으므로 석간주를 사람의 병을 고치는 의약 재료로 써도 된다는 뜻이다",
+                "고문헌의 기록은 믿을 수 없으므로 복원 연구에서 문헌 조사를 빼야 한다는 결론에 이른다"
+              ],
+              "answer": 0,
+              "explain": "글은 산지 고수가 막다른 길이 된 지점과, 성질을 기준으로 삼아 대체와 새 기능을 함께 얻은 지점을 나란히 보여 준다. 항균성은 목재 부후균의 생장 억제에 한정된 결과다.",
+              "evidencePara": 4
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "글쓴이가 '여기까지는 잃어버린 것을 메운 결과다'라고 쓴 뒤 문단을 바꾼 까닭은?",
+              "choices": [
+                "대체에 그치지 않고 기존에 없던 기능이 더해졌음을 구분해 보이려고",
+                "평창 셰일의 색안정성이 기존보다 떨어졌음을 알리려고",
+                "분쇄·수비·건조 공정이 실패했음을 밝히려고",
+                "국유특허 등록이 취소되었음을 알리려고"
+              ],
+              "answer": 0,
+              "explain": "앞 문단까지는 잃은 원료를 메운 이야기이고, 다음 문단은 예상하지 못한 항균성이라는 덤을 다룬다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "apply",
+              "q": "보존해야 할 가치가 서로 부딪히는 다른 상황에 이 글의 접근을 적용한다면 가장 알맞은 것은?",
+              "choices": [
+                "지켜야 할 핵심 성질이 무엇인지 먼저 정하고, 그 성질을 만족하는 다른 방법을 찾아 검증한다",
+                "둘 가운데 더 오래된 쪽을 따져 보지 않고 우선한다",
+                "충돌이 저절로 사라질 때까지 두 가치 모두 보존을 미룬다",
+                "규정을 고쳐 한쪽 가치를 보존 대상에서 빼 버린다"
+              ],
+              "answer": 0,
+              "explain": "연구원은 지질 유산과 건축 유산이 부딪히자 석간주가 갖추어야 할 성질을 정하고 다른 원료를 찾아 검증했다.",
+              "evidencePara": 2
+            }
+          ],
+          "en": [
+            "To carry on a tradition is commonly understood as recovering the exact place and the exact material that people once used. The restoration of seokganju, the red pigment of dancheong, long followed that path. Seokganju is a traditional pigment made from red soil or rock containing iron oxide, and it is applied widely, from the plain undercoat on a wooden building to the detailed patterns of its decorative painting. Restoration research therefore pursued the ocher earth of the cave at Taeha-ri in Ulleung County, the source recorded in old documents.",
+            "Then that path closed. The area was designated a national geopark, and obtaining and using the raw material became restricted. Two things worth preserving had collided. Protecting the geological heritage meant the ground could not be dug; protecting the architectural heritage meant that soil was needed. This is why a new domestic source mineral, one that could replace the existing seokganju, had to be found.",
+            "The institute's answer was to change the definition. Rather than fixing seokganju to a place of origin, it fixed the pigment to a set of properties: not what it was made from, but what color it produced and how well it endured. Researchers surveyed minerals that Korea could supply reliably, processed them in the traditional manner, and evaluated the resulting pigment for physical properties, composition, weather resistance and function, in order to verify whether it could be used on the dancheong of wooden heritage exposed to the open air.",
+            "Changing the standard produced an answer. A pigment made from the red shale found in Pyeongchang, Gangwon Province, was confirmed to possess the color, the performance and the color stability required to replace the existing seokganju. Shale is a sedimentary rock formed from accumulated mud. A process of crushing, levigation and drying was also established, so that pigment of consistent quality can be produced. Up to this point, the work had only restored what was lost.",
+            "The unexpected result came next. Tested against the decay fungi that damage the timber of wooden heritage buildings, the pigment was found to suppress their growth, with an antifungal effect about three times greater than that of the pigment made from the Taeha-ri earth. It also meets the quality standard of the certification system for traditional materials. The manufacturing method has been registered as a state patent, and the institute plans to transfer it to private organizations to speed up production and practical use. The work did not stop at imitating an old material; it went one step further, toward making the building last longer."
+          ],
+          "enseg": [
+            [
+              "To carry on a tradition ",
+              "is commonly understood ",
+              "as recovering the exact place and the exact material ",
+              "that people once used. ",
+              "The restoration of seokganju, the red pigment of dancheong, ",
+              "long followed that path. ",
+              "Seokganju is a traditional pigment ",
+              "made from red soil or rock containing iron oxide, ",
+              "and it is applied widely, ",
+              "from the plain undercoat on a wooden building ",
+              "to the detailed patterns of its decorative painting. ",
+              "Restoration research therefore pursued the ocher earth of the cave ",
+              "at Taeha-ri in Ulleung County, ",
+              "the source recorded in old documents."
+            ],
+            [
+              "Then that path closed. ",
+              "The area was designated a national geopark, ",
+              "and obtaining and using the raw material became restricted. ",
+              "Two things worth preserving had collided. ",
+              "Protecting the geological heritage meant the ground could not be dug; ",
+              "protecting the architectural heritage meant that soil was needed. ",
+              "This is why a new domestic source mineral, ",
+              "one that could replace the existing seokganju, ",
+              "had to be found."
+            ],
+            [
+              "The institute's answer was to change the definition. ",
+              "Rather than fixing seokganju to a place of origin, ",
+              "it fixed the pigment to a set of properties: ",
+              "not what it was made from, ",
+              "but what color it produced ",
+              "and how well it endured. ",
+              "Researchers surveyed minerals that Korea could supply reliably, ",
+              "processed them in the traditional manner, ",
+              "and evaluated the resulting pigment ",
+              "for physical properties, composition, weather resistance and function, ",
+              "in order to verify whether it could be used ",
+              "on the dancheong of wooden heritage ",
+              "exposed to the open air."
+            ],
+            [
+              "Changing the standard produced an answer. ",
+              "A pigment made from the red shale ",
+              "found in Pyeongchang, Gangwon Province, ",
+              "was confirmed to possess the color, the performance and the color stability ",
+              "required to replace the existing seokganju. ",
+              "Shale is a sedimentary rock ",
+              "formed from accumulated mud. ",
+              "A process of crushing, levigation and drying was also established, ",
+              "so that pigment of consistent quality can be produced. ",
+              "Up to this point, ",
+              "the work had only restored what was lost."
+            ],
+            [
+              "The unexpected result came next. ",
+              "Tested against the decay fungi ",
+              "that damage the timber of wooden heritage buildings, ",
+              "the pigment was found to suppress their growth, ",
+              "with an antifungal effect about three times greater ",
+              "than that of the pigment made from the Taeha-ri earth. ",
+              "It also meets the quality standard ",
+              "of the certification system for traditional materials. ",
+              "The manufacturing method has been registered as a state patent, ",
+              "and the institute plans to transfer it to private organizations ",
+              "to speed up production and practical use. ",
+              "The work did not stop at imitating an old material; ",
+              "it went one step further, ",
+              "toward making the building last longer."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "restoration",
+              "ko": "복원, 복구 (명사)",
+              "base": "restoration [ˌrestəˈreɪʃn]"
+            },
+            {
+              "word": "designated",
+              "ko": "지정되었다 (동사 designate의 과거분사)",
+              "base": "designate [ˈdezɪɡneɪt]"
+            },
+            {
+              "word": "geological",
+              "ko": "지질의, 지질학의 (형용사)",
+              "base": "geological [ˌdʒiːəˈlɑːdʒɪkl]"
+            },
+            {
+              "word": "levigation",
+              "ko": "수비(水飛) — 물에 풀어 고운 가루를 가라앉혀 얻는 일 (명사)",
+              "base": "levigation [ˌlevɪˈɡeɪʃn]"
+            },
+            {
+              "word": "antifungal",
+              "ko": "곰팡이·균의 생장을 막는 (형용사)",
+              "base": "antifungal [ˌæntiˈfʌŋɡl]"
+            },
+            {
+              "word": "imitating",
+              "ko": "흉내 내기 (동사 imitate의 동명사)",
+              "base": "imitate [ˈɪmɪteɪt]"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "motor-rare-earth",
+      "category": "environment",
+      "careers": [
+        "env",
+        "biz",
+        "eng"
+      ],
+      "publishedAt": "2026-09-28",
+      "status": "published",
+      "issue": true,
+      "sources": [
+        {
+          "title": "기후에너지환경부 보도자료 — 폐자동차 구동모터 속 희토류, 순환이용 체계 구축 착수 (2026.09.22)",
+          "url": "https://www.mcee.go.kr/home/web/board/read.do?menuId=10598&boardMasterId=939&boardId=1893260"
+        },
+        {
+          "title": "기후에너지환경부 보도자료 — 폐가전 속 희토류, 국내 산업 원료로 되살린다 (2026.08.27)",
+          "url": "https://www.mcee.go.kr/home/web/board/read.do?menuId=10598&boardMasterId=939&boardId=1886670"
+        }
+      ],
+      "levels": {
+        "L1": {
+          "title": "차 속에 숨은 자석",
+          "minutes": 3,
+          "paragraphs": [
+            [
+              "전기차는 모터의 힘으로 달려요. ",
+              "모터 안에는 ",
+              "자석이 들어 있어요. ",
+              "이 자석은 힘이 아주 세요. ",
+              "자석이 돌아야 바퀴도 굴러가요."
+            ],
+            [
+              "차가 아주 낡으면 ",
+              "폐차장으로 가요. ",
+              "사람들이 차를 하나씩 뜯어내요. ",
+              "그런데 자석은 ",
+              "모터 안에 숨어 있어요. ",
+              "차마다 모터 모양도 달라요. ",
+              "그래서 꺼내기가 어려웠어요. ",
+              "지금까지는 그냥 고철로 보냈어요."
+            ],
+            [
+              "이제 나라와 여러 곳이 ",
+              "손을 잡았어요. ",
+              "어디에 자석이 있는지 ",
+              "알려 주기로 했어요. ",
+              "꺼낸 자석을 ",
+              "사 갈 곳도 정해요. ",
+              "버리는 차 안에도 ",
+              "다시 쓸 것이 있어요. ",
+              "우리도 장난감을 버릴 때 ",
+              "건전지를 먼저 빼요."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "자석",
+              "easy": "쇠붙이를 끌어당기는 힘을 가진 물건이에요.",
+              "hanja": null
+            },
+            {
+              "word": "폐차장",
+              "easy": "오래되어 못 쓰게 된 차를 뜯어내는 곳이에요.",
+              "hanja": null
+            },
+            {
+              "word": "고철",
+              "easy": "낡아서 못 쓰게 된 쇠붙이예요.",
+              "hanja": null
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글은 무엇에 대한 이야기인가요?",
+              "choices": [
+                "버리는 차 안에 있는 자석을 다시 쓰려는 이야기",
+                "전기차를 더 빨리 달리게 하는 이야기",
+                "장난감을 새로 만드는 이야기",
+                "폐차장에 길을 내는 공사 이야기"
+              ],
+              "answer": 0,
+              "explain": "차 안에 있는 자석을 꺼내서 다시 쓰려고 여러 곳이 손을 잡았다는 이야기예요.",
+              "evidencePara": 2
+            },
+            {
+              "type": "detail",
+              "q": "자석을 꺼내기 어려웠던 까닭은 무엇인가요?",
+              "choices": [
+                "자석이 너무 가벼워서요",
+                "자석이 모터 안에 숨어 있고 차마다 모양도 달라서요",
+                "자석이 색깔이 없어서요",
+                "폐차장이 문을 닫아서요"
+              ],
+              "answer": 1,
+              "explain": "자석은 모터 안에 숨어 있고, 차마다 모터 모양도 달라서 꺼내기 어려웠어요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「고철」은 무슨 뜻인가요?",
+              "choices": [
+                "낡아서 못 쓰게 된 쇠붙이예요",
+                "새로 만든 아주 단단한 쇠예요",
+                "자석을 만드는 기계예요",
+                "차가 다니는 길이에요"
+              ],
+              "answer": 0,
+              "explain": "고철은 낡아서 못 쓰게 된 쇠붙이예요.",
+              "evidencePara": 1
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "어디에 자석이 있는지 알려 주기로 한 까닭은 무엇일까요?",
+              "choices": [
+                "자석이 있는 자리를 알아야 꺼내기 쉽기 때문이에요",
+                "자석이 색깔을 바꾸기 때문이에요",
+                "차를 더 빨리 만들기 위해서예요",
+                "폐차장을 더 크게 짓기 위해서예요"
+              ],
+              "answer": 0,
+              "explain": "자석이 어디 숨어 있는지 알면 모터를 열었을 때 바로 찾을 수 있어요.",
+              "evidencePara": 2
+            },
+            {
+              "type": "apply",
+              "q": "물건을 버릴 때 우리가 할 수 있는 일은 무엇인가요?",
+              "choices": [
+                "다시 쓸 수 있는 것을 먼저 빼 놓아요",
+                "모두 한꺼번에 버려요",
+                "건전지를 넣은 채로 버려요",
+                "장난감을 부숴서 버려요"
+              ],
+              "answer": 0,
+              "explain": "장난감의 건전지처럼, 다시 쓸 수 있는 것은 먼저 빼 놓으면 좋아요.",
+              "evidencePara": 2
+            }
+          ]
+        },
+        "L2": {
+          "title": "고철로 넘어가던 자석",
+          "minutes": 4,
+          "paragraphs": [
+            [
+              "전기차와 하이브리드차는 구동모터의 힘으로 달린다. ",
+              "이 모터 안에는 ",
+              "희토 영구자석이 들어 있다. ",
+              "차종에 따라 약 0.75~1.5kg이 쓰인다. ",
+              "자석이 세야 ",
+              "모터가 큰 힘을 낸다."
+            ],
+            [
+              "차가 수명을 다하면 ",
+              "폐차장으로 간다. ",
+              "폐차장은 차를 뜯어 ",
+              "쇠와 구리를 골라낸다. ",
+              "그런데 자석은 ",
+              "모터 안쪽에 숨어 있다. ",
+              "차를 부수는 일과 ",
+              "자석을 꺼내는 일은 다르다. ",
+              "꺼내는 쪽이 훨씬 어렵다."
+            ],
+            [
+              "값이 없어서 버린 것이 아니다. ",
+              "꺼내는 방법이 정해져 있지 않았다. ",
+              "꺼내도 사 갈 곳이 마땅치 않았다. ",
+              "그래서 구동모터는 ",
+              "대부분 고철로 넘어갔다. ",
+              "구리와 알루미늄만 조금 회수했다."
+            ],
+            [
+              "2026년 9월 22일에 ",
+              "기후에너지환경부가 세 곳과 협약을 맺었다. ",
+              "한국환경공단과 현대자동차와 한국자동차해체재활용업협회다. ",
+              "폐차장에서 나온 구동모터를 ",
+              "재활용업체까지 보내는 길을 만든다. ",
+              "자동차 회사는 ",
+              "어디에 자석이 들었는지 알려 준다."
+            ],
+            [
+              "해마다 1만 4천여 대의 폐차에서 ",
+              "자석을 모을 수 있다고 한다. ",
+              "무게로는 최대 15톤이다. ",
+              "정부는 이 결과를 보고 ",
+              "재활용 기준을 만들 계획이다. ",
+              "길이 생기면 ",
+              "버려지던 것이 다시 원료가 된다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "구동모터",
+              "easy": "전기의 힘으로 바퀴를 돌려 차를 달리게 하는 장치",
+              "hanja": "驅(몰 구)+動(움직일 동)"
+            },
+            {
+              "word": "영구자석",
+              "easy": "한 번 자석이 되면 그 힘이 오래 남아 있는 자석",
+              "hanja": "永(길 영)+久(오랠 구)+磁(자석 자)+石(돌 석)"
+            },
+            {
+              "word": "회수",
+              "easy": "내주었거나 흩어진 것을 도로 거두어들이는 일",
+              "hanja": "回(돌아올 회)+收(거둘 수)"
+            },
+            {
+              "word": "협약",
+              "easy": "여럿이 의논해 함께 지키기로 맺은 약속",
+              "hanja": "協(화합할 협)+約(맺을 약)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 가장 알맞은 것은?",
+              "choices": [
+                "구동모터 속 희토 영구자석을 되찾는 길을 만들기 시작했다",
+                "전기차가 휘발유차보다 빠르다는 것이 밝혀졌다",
+                "폐차장의 수를 줄이기로 했다",
+                "구리와 알루미늄은 재활용할 수 없게 되었다"
+              ],
+              "answer": 0,
+              "explain": "넷째 문단에서 폐차장의 구동모터를 재활용업체까지 보내는 길을 만든다고 했다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "detail",
+              "q": "구동모터가 대부분 고철로 넘어간 까닭은?",
+              "choices": [
+                "자석의 값이 아주 쌌기 때문이다",
+                "꺼내는 방법도, 사 갈 곳도 정해져 있지 않았기 때문이다",
+                "자석이 모터 밖에 붙어 있었기 때문이다",
+                "폐차장이 구리를 회수하지 못했기 때문이다"
+              ],
+              "answer": 1,
+              "explain": "셋째 문단은 값이 없어서가 아니라 방법과 살 곳이 없어서였다고 밝힌다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "detail",
+              "q": "협약에서 자동차 회사가 맡은 일은?",
+              "choices": [
+                "폐차장을 모으는 일",
+                "재활용 기준을 만드는 일",
+                "어디에 자석이 들었는지 알려 주는 일",
+                "자석을 직접 녹이는 일"
+              ],
+              "answer": 2,
+              "explain": "넷째 문단에 자동차 회사가 자석이 어디에 들었는지 알려 준다고 나온다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "vocab",
+              "q": "「회수」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "내주었거나 흩어진 것을 도로 거두어들이는 일",
+                "새 물건을 처음 만들어 내는 일",
+                "쓰던 물건을 남에게 빌려주는 일",
+                "물건의 값을 정하는 일"
+              ],
+              "answer": 0,
+              "explain": "회수는 흩어진 것을 도로 거두어들이는 일이다.",
+              "evidencePara": 2
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "'값이 없어서 버린 것이 아니다'라는 말에 담긴 뜻은?",
+              "choices": [
+                "자석은 쓸모없는 물건이라는 뜻이다",
+                "값이 나가도 길이 없으면 버려진다는 뜻이다",
+                "고철이 자석보다 비싸다는 뜻이다",
+                "폐차장이 구리를 더 좋아한다는 뜻이다"
+              ],
+              "answer": 1,
+              "explain": "값이 아니라 꺼낼 방법과 받아 줄 곳이 없어 버려졌다는 뜻이다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "apply",
+              "q": "학교에서 다 쓴 건전지를 제대로 모으려 할 때, 이 시범사업과 가장 비슷한 방법은?",
+              "choices": [
+                "모으는 통을 두고, 어디에 있는지 알리고 가져갈 곳까지 미리 정해 둔다",
+                "건전지를 아예 쓰지 않기로 한다",
+                "건전지를 사 오는 값을 올린다",
+                "건전지를 한곳에 쌓아 두고 그대로 둔다"
+              ],
+              "answer": 0,
+              "explain": "모으는 사람과 가져갈 곳, 넘겨줄 정보를 함께 정하는 것이 이 사업의 핵심이다.",
+              "evidencePara": 4
+            }
+          ],
+          "en": [
+            "Electric cars and hybrid cars run on a drive motor. Inside the motor there are strong magnets. They are made with rare earth metals. One car uses about 0.75 to 1.5 kilograms. A stronger magnet gives the motor more power.",
+            "An old car goes to a scrapyard. Workers pull it apart and pick out iron and copper. But the magnets hide deep inside the motor. Breaking a car is one job. Opening a motor is another job. The second one is much harder.",
+            "The magnets were not cheap. That was not the problem. Nobody had a clear way to take them out. Nobody was ready to buy them. So most motors left as scrap iron. Only copper and aluminium came back.",
+            "On 22 September 2026, four groups signed a promise. The Ministry of Climate, Energy and Environment led it. Now scrapyards will send motors to recycling companies. A carmaker will tell them where the magnets sit.",
+            "About 14,000 old cars a year can give back magnets. That is up to 15 tons. The government will then write new recycling rules. When a road exists, old things become material again."
+          ],
+          "enseg": [
+            [
+              "Electric cars and hybrid cars run on a drive motor. ",
+              "Inside the motor there are strong magnets. ",
+              "They are made with rare earth metals. ",
+              "One car uses about 0.75 to 1.5 kilograms. ",
+              "A stronger magnet gives the motor more power."
+            ],
+            [
+              "An old car goes to a scrapyard. ",
+              "Workers pull it apart and pick out iron and copper. ",
+              "But the magnets hide deep inside the motor. ",
+              "Breaking a car is one job. ",
+              "Opening a motor is another job. ",
+              "The second one is much harder."
+            ],
+            [
+              "The magnets were not cheap. ",
+              "That was not the problem. ",
+              "Nobody had a clear way to take them out. ",
+              "Nobody was ready to buy them. ",
+              "So most motors left as scrap iron. ",
+              "Only copper and aluminium came back."
+            ],
+            [
+              "On 22 September 2026, ",
+              "four groups signed a promise. ",
+              "The Ministry of Climate, Energy and Environment led it. ",
+              "Now scrapyards will send motors to recycling companies. ",
+              "A carmaker will tell them where the magnets sit."
+            ],
+            [
+              "About 14,000 old cars a year can give back magnets. ",
+              "That is up to 15 tons. ",
+              "The government will then write new recycling rules. ",
+              "When a road exists, ",
+              "old things become material again."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "magnet",
+              "ko": "자석 (명사)",
+              "base": "magnet [ˈmæɡnət]"
+            },
+            {
+              "word": "motor",
+              "ko": "모터, 전동기 (명사)",
+              "base": "motor [ˈmoʊtər]"
+            },
+            {
+              "word": "scrapyard",
+              "ko": "폐차장, 고물 처리장 (명사)",
+              "base": "scrapyard [ˈskræpjɑːrd]"
+            },
+            {
+              "word": "copper",
+              "ko": "구리 (명사)",
+              "base": "copper [ˈkɑːpər]"
+            },
+            {
+              "word": "recycling",
+              "ko": "재활용 (명사)",
+              "base": "recycle [ˌriːˈsaɪkl]"
+            }
+          ]
+        },
+        "L3": {
+          "title": "왜 여태 꺼내지 않았나",
+          "minutes": 5,
+          "paragraphs": [
+            [
+              "전기차와 하이브리드차는 구동모터로 달린다. ",
+              "구동모터 안에는 ",
+              "희토 영구자석이 들어 있고, ",
+              "차종에 따라 그 양이 약 0.75~1.5kg이다. ",
+              "자석의 힘이 셀수록 ",
+              "같은 크기의 모터가 더 큰 회전력을 낸다. ",
+              "전기차가 늘어날수록 ",
+              "이 자석의 쓰임도 함께 늘어난다."
+            ],
+            [
+              "그런데 수명을 다한 차에서 ",
+              "이 자석을 되찾는 일은 ",
+              "거의 이루어지지 않았다. ",
+              "폐차장에서 떼어 낸 구동모터는 ",
+              "재활용되더라도 고철로 처리되거나, ",
+              "구리와 알루미늄 같은 ",
+              "일부 유가물만 회수하는 수준에 머물렀다. ",
+              "희토 영구자석까지 분리해 ",
+              "국내에서 다시 쓰는 체계는 ",
+              "아직 충분히 마련되지 않았다."
+            ],
+            [
+              "까닭은 자석이 ",
+              "모터 안쪽에 들어 있기 때문이다. ",
+              "차를 부수는 일과 ",
+              "모터를 열어 자석을 꺼내는 일은 ",
+              "서로 다른 작업이고, ",
+              "꺼내는 쪽이 훨씬 까다롭다. ",
+              "구동모터는 구조가 복잡한 데다 ",
+              "차종마다 형태가 달라서 ",
+              "하나의 표준 공정을 짜기 어렵다. ",
+              "게다가 꺼낸 자석을 ",
+              "받아 줄 곳이 정해져 있지 않으면, ",
+              "폐차장은 애써 분리할 이유가 없다."
+            ],
+            [
+              "2026년 9월 22일, ",
+              "기후에너지환경부는 한국환경공단, 현대자동차, ",
+              "한국자동차해체재활용업협회와 시범사업 업무협약을 맺었다. ",
+              "일반 폐차를 맡는 '순환이용 지원'은 ",
+              "폐차장에서 나온 구동모터가 ",
+              "국내 재활용업체로 흘러가는 회수·유통체계를 만든다. ",
+              "한국환경공단은 재활용업체를 고르고 실적을 관리하고, ",
+              "협회는 참여 폐차장을 모으며, ",
+              "자동차 회사는 차량별로 ",
+              "자석이 어디에 들었는지와 ",
+              "모터를 떼는 방법을 알려 준다."
+            ],
+            [
+              "또 하나인 '순환고리 실증'은 ",
+              "신차 개발용 시험차를 대상으로 ",
+              "순환경제 규제특례를 활용해 ",
+              "해체부터 선별·회수까지 ",
+              "실제 공정을 검증한다. ",
+              "정부는 이 사업으로 해마다 ",
+              "1만 4천여 대의 폐전기차·하이브리드차에서 ",
+              "최대 15톤의 희토 영구자석을 ",
+              "되찾을 수 있을 것으로 본다. ",
+              "시범사업이 만드는 것은 ",
+              "기술만이 아니라, ",
+              "누가 모으고 누가 사 가는지를 정한 길이다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "유가물",
+              "easy": "버려지는 것 가운데 값이 나가 다시 쓸 수 있는 물질",
+              "hanja": "有(있을 유)+價(값 가)+物(물건 물)"
+            },
+            {
+              "word": "공정",
+              "easy": "물건을 만들거나 처리할 때 거치는 일의 순서와 단계",
+              "hanja": "工(장인 공)+程(한도 정)"
+            },
+            {
+              "word": "체계",
+              "easy": "여러 부분이 짜임새 있게 이어져 하나로 움직이는 짜임",
+              "hanja": "體(몸 체)+系(맬 계)"
+            },
+            {
+              "word": "시범사업",
+              "easy": "본격적으로 벌이기 전에 작게 먼저 해 보는 사업",
+              "hanja": "示(보일 시)+範(법 범)"
+            },
+            {
+              "word": "규제특례",
+              "easy": "정해진 규제를 한동안 풀어 주어 새 기술을 시험해 보게 하는 제도",
+              "hanja": "規(법 규)+制(절제할 제)+特(특별할 특)+例(법식 례)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 가장 알맞은 것은?",
+              "choices": [
+                "구동모터 속 희토 영구자석을 되찾기 위해 회수·유통의 길을 만들기 시작했다",
+                "전기차 구동모터의 회전력을 높이는 새 기술이 개발되었다",
+                "폐차장에서 구리와 알루미늄을 회수하는 일이 금지되었다",
+                "희토 영구자석을 쓰지 않는 모터로 모두 바꾸기로 했다"
+              ],
+              "answer": 0,
+              "explain": "넷째 문단의 협약은 폐차장에서 재활용업체까지 이어지는 회수·유통체계를 만드는 일이다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "detail",
+              "q": "구동모터에서 하나의 표준 공정을 짜기 어려운 까닭은?",
+              "choices": [
+                "구동모터가 너무 가벼워서",
+                "구동모터의 구조가 복잡하고 차종마다 형태가 달라서",
+                "구동모터에 구리가 들어 있지 않아서",
+                "폐차장이 모터를 떼어 내지 못해서"
+              ],
+              "answer": 1,
+              "explain": "셋째 문단에 구조가 복잡하고 차종마다 형태가 달라 표준 공정을 짜기 어렵다고 나온다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "detail",
+              "q": "'순환이용 지원'에서 한국환경공단이 맡은 일은?",
+              "choices": [
+                "참여 폐차장을 모으는 일",
+                "자석의 내장 위치를 알려 주는 일",
+                "재활용업체를 고르고 실적을 관리하는 일",
+                "신차 개발용 시험차를 만드는 일"
+              ],
+              "answer": 2,
+              "explain": "넷째 문단에 한국환경공단이 재활용업체를 고르고 실적을 관리한다고 나온다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "vocab",
+              "q": "「유가물」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "버려지는 것 가운데 값이 나가 다시 쓸 수 있는 물질",
+                "값이 오르내리는 주식이나 채권",
+                "공장에서 처음 만들어 낸 새 제품",
+                "물에 녹아 흔적 없이 사라지는 물질"
+              ],
+              "answer": 0,
+              "explain": "유가물은 폐기물 가운데 값이 나가 다시 쓸 수 있는 물질을 가리킨다.",
+              "evidencePara": 1
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "자동차 회사가 '자석이 어디에 들었는지'를 알려 주는 일이 중요한 까닭은?",
+              "choices": [
+                "그 정보가 없으면 폐차장이 모터를 열고도 자석을 찾기 어렵기 때문이다",
+                "그 정보가 있으면 자석의 힘이 세지기 때문이다",
+                "그 정보로 구리와 알루미늄의 값을 정하기 때문이다",
+                "그 정보가 있어야 시험차를 만들 수 있기 때문이다"
+              ],
+              "answer": 0,
+              "explain": "차종마다 형태가 다르므로, 위치 정보가 없으면 꺼내는 일 자체가 막힌다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "apply",
+              "q": "학교에서 다 쓴 건전지를 제대로 모으려 할 때, 이 시범사업에서 배울 점으로 가장 알맞은 것은?",
+              "choices": [
+                "모으는 통만 두지 말고, 어디에 있는지 알리고 가져갈 곳까지 미리 정해 둔다",
+                "건전지를 아예 쓰지 못하도록 금지한다",
+                "건전지를 모은 뒤 그대로 창고에 쌓아 둔다",
+                "건전지 값을 올려 적게 사게 한다"
+              ],
+              "answer": 0,
+              "explain": "마지막 문단이 말하듯, 필요한 것은 기술만이 아니라 누가 모으고 누가 사 가는지를 정한 길이다.",
+              "evidencePara": 4
+            }
+          ],
+          "en": [
+            "Electric and hybrid cars are driven by a traction motor. Inside that motor sit permanent magnets made with rare earth metals. Depending on the model, one car carries about 0.75 to 1.5 kilograms of them. The stronger the magnet, the more turning force a motor of the same size can produce. As electric cars spread, the demand for these magnets grows too.",
+            "Yet these magnets have almost never been recovered from cars that reach the end of their life. Even when a motor taken out at a scrapyard was recycled, it was usually handled as scrap iron, or only valuable metals such as copper and aluminium were taken back. Korea still has no complete system for separating the rare earth magnets and using them again at home.",
+            "The reason is that the magnets sit deep inside the motor. Breaking up a car and opening a motor to pull out its magnets are two different jobs, and the second one is far harder. A traction motor has a complex structure, and its shape changes from model to model, so one standard process is hard to design. And if no buyer is waiting, a scrapyard has no reason to do the extra work.",
+            "On 22 September 2026, the Ministry of Climate, Energy and Environment signed a pilot agreement with the Korea Environment Corporation, a carmaker, and the association of vehicle dismantlers. One track builds a collection route so that motors from ordinary scrapyards reach recycling companies at home. The public corporation selects the recyclers and tracks the results, the association recruits the scrapyards that join, and the carmaker hands over information about where the magnets sit and how to remove the motor.",
+            "The other track uses a circular economy regulatory sandbox on test cars built for new model development, and checks the real process from dismantling to sorting and recovery. The government expects that about 14,000 scrapped electric and hybrid cars a year could yield up to 15 tons of rare earth magnets. What this pilot really builds is not only technology but a road: who collects, who buys, and what information is passed along."
+          ],
+          "enseg": [
+            [
+              "Electric and hybrid cars are driven by a traction motor. ",
+              "Inside that motor sit permanent magnets ",
+              "made with rare earth metals. ",
+              "Depending on the model, ",
+              "one car carries about 0.75 to 1.5 kilograms of them. ",
+              "The stronger the magnet, ",
+              "the more turning force ",
+              "a motor of the same size can produce. ",
+              "As electric cars spread, ",
+              "the demand for these magnets grows too."
+            ],
+            [
+              "Yet these magnets have almost never been recovered ",
+              "from cars that reach the end of their life. ",
+              "Even when a motor taken out at a scrapyard was recycled, ",
+              "it was usually handled as scrap iron, ",
+              "or only valuable metals such as copper and aluminium were taken back. ",
+              "Korea still has no complete system ",
+              "for separating the rare earth magnets ",
+              "and using them again at home."
+            ],
+            [
+              "The reason is that the magnets sit deep inside the motor. ",
+              "Breaking up a car and opening a motor to pull out its magnets ",
+              "are two different jobs, ",
+              "and the second one is far harder. ",
+              "A traction motor has a complex structure, ",
+              "and its shape changes from model to model, ",
+              "so one standard process is hard to design. ",
+              "And if no buyer is waiting, ",
+              "a scrapyard has no reason to do the extra work."
+            ],
+            [
+              "On 22 September 2026, ",
+              "the Ministry of Climate, Energy and Environment ",
+              "signed a pilot agreement with the Korea Environment Corporation, ",
+              "a carmaker, and the association of vehicle dismantlers. ",
+              "One track builds a collection route ",
+              "so that motors from ordinary scrapyards reach recycling companies at home. ",
+              "The public corporation selects the recyclers and tracks the results, ",
+              "the association recruits the scrapyards that join, ",
+              "and the carmaker hands over information ",
+              "about where the magnets sit and how to remove the motor."
+            ],
+            [
+              "The other track uses a circular economy regulatory sandbox ",
+              "on test cars built for new model development, ",
+              "and checks the real process from dismantling to sorting and recovery. ",
+              "The government expects that about 14,000 scrapped electric and hybrid cars a year ",
+              "could yield up to 15 tons of rare earth magnets. ",
+              "What this pilot really builds is not only technology but a road: ",
+              "who collects, who buys, ",
+              "and what information is passed along."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "permanent magnet",
+              "ko": "영구자석 (명사구)",
+              "base": "permanent [ˈpɜːrmənənt] + magnet [ˈmæɡnət]"
+            },
+            {
+              "word": "recover",
+              "ko": "되찾다, 회수하다 (동사)",
+              "base": "recover [rɪˈkʌvər]"
+            },
+            {
+              "word": "dismantle",
+              "ko": "해체하다, 분해하다 (동사)",
+              "base": "dismantle [dɪsˈmæntl]"
+            },
+            {
+              "word": "structure",
+              "ko": "구조 (명사)",
+              "base": "structure [ˈstrʌktʃər]"
+            },
+            {
+              "word": "sandbox",
+              "ko": "규제특례, 샌드박스 (명사)",
+              "base": "sandbox [ˈsændbɑːks]"
+            }
+          ]
+        },
+        "L4": {
+          "title": "길이 없으면 고철이 된다",
+          "minutes": 6,
+          "paragraphs": [
+            [
+              "전기차와 하이브리드차를 굴리는 것은 구동모터다. ",
+              "그 안에는 희토 영구자석이 들어 있는데, ",
+              "차종에 따라 약 0.75~1.5kg이 쓰인다. ",
+              "자석의 힘이 셀수록 ",
+              "같은 크기의 모터가 ",
+              "더 큰 회전력을 내기 때문에, ",
+              "자석의 성능은 곧 차의 성능이 된다. ",
+              "전기차 보급이 늘수록 ",
+              "이 자석의 수요도 함께 늘어난다."
+            ],
+            [
+              "그렇다면 수명을 다한 차에서 ",
+              "자석을 되찾으면 될 일이다. ",
+              "그러나 지금까지는 그렇게 하지 못했다. ",
+              "폐차장에서 떼어 낸 구동모터는 ",
+              "재활용되는 경우에도 고철로 처리되거나, ",
+              "구리와 알루미늄 같은 일부 유가물만 ",
+              "회수하는 수준이었다. ",
+              "희토 영구자석까지 분리해 ",
+              "국내에서 다시 쓰는 체계는 ",
+              "아직 충분히 마련되어 있지 않다."
+            ],
+            [
+              "왜 여태 하지 않았을까. ",
+              "첫째, 자석은 모터 안쪽에 들어 있다. ",
+              "차를 부수는 일과 ",
+              "모터를 열어 자석만 꺼내는 일은 ",
+              "전혀 다른 작업이고, ",
+              "꺼내는 쪽이 훨씬 어렵다. ",
+              "구동모터는 구조가 복잡한 데다 ",
+              "차종마다 형태가 달라서, ",
+              "모든 차에 똑같이 적용할 ",
+              "표준 공정을 짜기가 쉽지 않다. ",
+              "둘째, 꺼낸 자석을 받아 줄 곳이 ",
+              "정해져 있지 않았다. ",
+              "팔 데가 없으면 ",
+              "폐차장은 시간을 들여 분리할 이유가 없고, ",
+              "결국 통째로 고철에 섞여 나간다."
+            ],
+            [
+              "2026년 9월 22일, ",
+              "기후에너지환경부는 한국환경공단, 현대자동차, ",
+              "한국자동차해체재활용업협회와 시범사업 업무협약을 맺었다. ",
+              "사업은 두 갈래다. ",
+              "일반 폐차를 대상으로 하는 '순환이용 지원'은 ",
+              "폐차장에서 나온 구동모터가 ",
+              "국내 재활용업체로 공급되는 회수·유통체계를 세운다. ",
+              "한국환경공단이 재활용업체 선정과 실적 관리를 맡고, ",
+              "협회가 참여 폐차장을 모으며, ",
+              "자동차 회사는 ",
+              "차량별 자석의 내장 위치와 함유 여부, ",
+              "모터를 떼는 방법 같은 정보를 넘긴다. ",
+              "정보를 넘겨주는 이 한 칸이 없으면 ",
+              "앞뒤가 이어지지 않는다."
+            ],
+            [
+              "다른 갈래인 '순환고리 실증'은 ",
+              "신차 개발용 시험차를 대상으로 ",
+              "순환경제 규제특례를 활용한다. ",
+              "규제특례는 한정된 기간과 장소와 규모에서 ",
+              "새로운 기술을 실증하게 하고, ",
+              "안전성과 유효성이 입증되면 ",
+              "규제를 고치는 제도다. ",
+              "여기서는 해체·분리부터 자석과 구리의 선별·회수까지 ",
+              "실제 공정을 돌려 보며 ",
+              "안전성과 회수율, 현장 적용 가능성을 확인한다. ",
+              "정부는 이 사업으로 해마다 ",
+              "1만 4천여 대의 폐전기차·하이브리드차에서 ",
+              "최대 15톤의 희토 영구자석을 ",
+              "회수할 수 있을 것으로 보고, ",
+              "결과를 토대로 재활용 기준을 마련할 계획이다. ",
+              "재활용은 마음먹는 일이 아니라 ",
+              "길을 까는 일이다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "내장",
+              "easy": "겉으로 드러나지 않게 속에 들어 있게 만듦",
+              "hanja": "內(안 내)+藏(감출 장)"
+            },
+            {
+              "word": "함유",
+              "easy": "어떤 물질 속에 특정 성분이 들어 있음",
+              "hanja": "含(머금을 함)+有(있을 유)"
+            },
+            {
+              "word": "실증",
+              "easy": "말이나 계획이 아니라 실제로 해 보아 사실임을 증명하는 일",
+              "hanja": "實(열매 실)+證(증거 증)"
+            },
+            {
+              "word": "유효성",
+              "easy": "실제로 쓸모가 있고 효과가 있는 성질",
+              "hanja": "有(있을 유)+效(본받을 효)+性(성품 성)"
+            },
+            {
+              "word": "회수율",
+              "easy": "본래 들어 있던 양 가운데 실제로 거두어들인 비율",
+              "hanja": "回(돌아올 회)+收(거둘 수)+率(비율 률)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 가장 알맞은 것은?",
+              "choices": [
+                "구동모터 속 희토 영구자석을 되찾기 위해, 기술과 함께 회수·유통의 길을 세우는 시범사업이 시작되었다",
+                "희토 영구자석을 쓰지 않는 구동모터가 개발되어 곧 보급된다",
+                "폐차장에서 구리와 알루미늄을 회수하는 일이 앞으로 금지된다",
+                "전기차 보급이 줄어 희토 영구자석의 수요도 함께 줄고 있다"
+              ],
+              "answer": 0,
+              "explain": "글은 기술뿐 아니라 누가 모으고 누가 사 가는지를 정하는 일이 이번 사업의 핵심이라고 말한다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "detail",
+              "q": "글쓴이가 든 '왜 여태 하지 않았나'의 두 까닭은?",
+              "choices": [
+                "자석의 값이 싸고, 폐차장이 부족했기 때문",
+                "자석이 모터 안쪽에 있어 꺼내기 어렵고, 받아 줄 곳이 없었기 때문",
+                "구리가 더 비싸고, 알루미늄이 더 많았기 때문",
+                "규제특례가 금지되어 있고, 시험차가 없었기 때문"
+              ],
+              "answer": 1,
+              "explain": "셋째 문단이 첫째·둘째로 나누어 밝힌 두 까닭이다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "detail",
+              "q": "'순환고리 실증'에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "일반 폐차를 대상으로 회수·유통체계를 세운다",
+                "신차 개발용 시험차를 대상으로 실제 재활용 공정을 돌려 확인한다",
+                "재활용업체를 고르고 실적을 관리한다",
+                "참여 폐차장을 모집하고 지원한다"
+              ],
+              "answer": 1,
+              "explain": "다섯째 문단에 시험차를 대상으로 해체부터 선별·회수까지 실제 공정을 돌려 본다고 나온다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "vocab",
+              "q": "「실증」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "실제로 해 보아 사실임을 증명하는 일",
+                "계획을 글로 자세히 적어 두는 일",
+                "값이 얼마인지 따져 보는 일",
+                "규칙을 새로 만들어 알리는 일"
+              ],
+              "answer": 0,
+              "explain": "실증은 말이나 계획이 아니라 실제로 해 보아 증명하는 일이다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "critical",
+              "q": "'재활용은 마음먹는 일이 아니라 길을 까는 일이다'라는 마지막 문장에 대한 평가로 가장 타당한 것은?",
+              "choices": [
+                "재활용에 의지가 전혀 필요 없다는 뜻이므로, 글의 앞부분과 어긋난다",
+                "자석 값이 오르면 저절로 회수된다는 뜻이므로, 시범사업이 필요 없다는 결론이 된다",
+                "누가 모으고 누가 사 가며 무슨 정보를 넘길지 정해야 회수가 실제로 굴러간다는 앞선 설명을 한 문장으로 요약한 것이다",
+                "도로를 새로 건설해야 폐차장이 늘어난다는 주장을 뒷받침한다"
+              ],
+              "answer": 2,
+              "explain": "앞 문단들이 보여 준 것은 의지의 부족이 아니라 공정·수요처·정보라는 연결의 부재였다.",
+              "evidencePara": 4
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "'정보를 넘겨주는 이 한 칸이 없으면 앞뒤가 이어지지 않는다'에서 '한 칸'이 가리키는 것은?",
+              "choices": [
+                "자석이 어디에 들었고 모터를 어떻게 떼는지 알려 주는 일",
+                "재활용업체를 선정하고 실적을 관리하는 일",
+                "참여 폐차장을 모집하고 지원하는 일",
+                "회수한 자석의 값을 정하는 일"
+              ],
+              "answer": 0,
+              "explain": "바로 앞 문장이 자동차 회사가 넘기는 내장 위치·함유 여부·탈거 방법 정보를 가리킨다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "apply",
+              "q": "규제특례를 두는 까닭을 가장 잘 살린 사례는?",
+              "choices": [
+                "새 재활용 설비를 기존 규정대로만 쓰게 하고 결과는 보지 않는다",
+                "한정된 기간과 장소에서 새 방식을 먼저 해 보고, 안전이 확인되면 규정을 고친다",
+                "새 기술은 위험하므로 아예 시험하지 않는다",
+                "규정을 먼저 모두 없앤 뒤 자유롭게 실험한다"
+              ],
+              "answer": 1,
+              "explain": "규제특례는 한정된 조건에서 실증하고, 안전성과 유효성이 입증되면 규제를 고치는 제도다.",
+              "evidencePara": 4
+            }
+          ],
+          "en": [
+            "What actually moves an electric or hybrid car is its traction motor, and inside that motor sit permanent magnets made with rare earth metals. Depending on the model, a single car carries roughly 0.75 to 1.5 kilograms of them. Because a stronger magnet lets a motor of the same size deliver more turning force, the quality of the magnet becomes the quality of the car. As electric vehicles spread, demand for these magnets rises with them.",
+            "The obvious answer is to take the magnets back out of cars that have reached the end of their life. Until now, that has not happened. Even when a motor removed at a scrapyard was recycled, it was normally handled as scrap iron, or only valuable materials such as copper and aluminium were recovered. Korea still has no adequate system for separating the rare earth magnets and returning them to domestic use.",
+            "Why not, after all this time? First, the magnets sit deep inside the motor. Breaking up a car and opening a motor to extract only its magnets are entirely different tasks, and the second is far harder. A traction motor has a complicated structure, and its shape differs from model to model, so no single standard process fits every vehicle. Second, there was nowhere for the recovered magnets to go. With no buyer waiting, a dismantler gains nothing by spending time on separation, and the motor leaves with the scrap.",
+            "On 22 September 2026, the Ministry of Climate, Energy and Environment signed a pilot agreement with the Korea Environment Corporation, a carmaker and the association of vehicle dismantlers. The project runs on two tracks. The first, aimed at ordinary end-of-life vehicles, sets up a collection and delivery system that carries motors from scrapyards to domestic recyclers. The public corporation selects recyclers and manages performance, the association recruits participating scrapyards, and the carmaker supplies information on where the magnets are built in, whether a given model contains them, and how the motor should be removed. Without that last piece of information, the chain does not connect.",
+            "The second track applies a circular economy regulatory sandbox to test vehicles built for new model development. A sandbox permits a company to demonstrate a new technology for a limited time, in a limited place and at a limited scale, and to have the rules revised if safety and effectiveness are proven. Here the whole process is run for real, from dismantling and separation to the sorting and recovery of magnets and copper, so that safety, recovery rates and on-site feasibility can be judged. The government estimates that about 14,000 scrapped electric and hybrid vehicles a year could yield up to 15 tons of rare earth magnets, and it plans to use the results to set recycling standards. Recycling is less a matter of good intentions than of laying a road."
+          ],
+          "enseg": [
+            [
+              "What actually moves an electric or hybrid car is its traction motor, ",
+              "and inside that motor sit permanent magnets made with rare earth metals. ",
+              "Depending on the model, ",
+              "a single car carries roughly 0.75 to 1.5 kilograms of them. ",
+              "Because a stronger magnet lets a motor of the same size deliver more turning force, ",
+              "the quality of the magnet becomes the quality of the car. ",
+              "As electric vehicles spread, ",
+              "demand for these magnets rises with them."
+            ],
+            [
+              "The obvious answer is to take the magnets back out ",
+              "of cars that have reached the end of their life. ",
+              "Until now, that has not happened. ",
+              "Even when a motor removed at a scrapyard was recycled, ",
+              "it was normally handled as scrap iron, ",
+              "or only valuable materials such as copper and aluminium were recovered. ",
+              "Korea still has no adequate system ",
+              "for separating the rare earth magnets and returning them to domestic use."
+            ],
+            [
+              "Why not, after all this time? ",
+              "First, the magnets sit deep inside the motor. ",
+              "Breaking up a car and opening a motor to extract only its magnets ",
+              "are entirely different tasks, ",
+              "and the second is far harder. ",
+              "A traction motor has a complicated structure, ",
+              "and its shape differs from model to model, ",
+              "so no single standard process fits every vehicle. ",
+              "Second, there was nowhere for the recovered magnets to go. ",
+              "With no buyer waiting, ",
+              "a dismantler gains nothing by spending time on separation, ",
+              "and the motor leaves with the scrap."
+            ],
+            [
+              "On 22 September 2026, ",
+              "the Ministry of Climate, Energy and Environment ",
+              "signed a pilot agreement with the Korea Environment Corporation, ",
+              "a carmaker and the association of vehicle dismantlers. ",
+              "The project runs on two tracks. ",
+              "The first, aimed at ordinary end-of-life vehicles, ",
+              "sets up a collection and delivery system ",
+              "that carries motors from scrapyards to domestic recyclers. ",
+              "The public corporation selects recyclers and manages performance, ",
+              "the association recruits participating scrapyards, ",
+              "and the carmaker supplies information on where the magnets are built in, ",
+              "whether a given model contains them, ",
+              "and how the motor should be removed. ",
+              "Without that last piece of information, ",
+              "the chain does not connect."
+            ],
+            [
+              "The second track applies a circular economy regulatory sandbox ",
+              "to test vehicles built for new model development. ",
+              "A sandbox permits a company to demonstrate a new technology ",
+              "for a limited time, in a limited place and at a limited scale, ",
+              "and to have the rules revised if safety and effectiveness are proven. ",
+              "Here the whole process is run for real, ",
+              "from dismantling and separation to the sorting and recovery of magnets and copper, ",
+              "so that safety, recovery rates and on-site feasibility can be judged. ",
+              "The government estimates that about 14,000 scrapped electric and hybrid vehicles a year ",
+              "could yield up to 15 tons of rare earth magnets, ",
+              "and it plans to use the results to set recycling standards. ",
+              "Recycling is less a matter of good intentions than of laying a road."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "traction motor",
+              "ko": "구동모터 (명사구)",
+              "base": "traction [ˈtrækʃn] + motor [ˈmoʊtər]"
+            },
+            {
+              "word": "extract",
+              "ko": "뽑아내다, 추출하다 (동사)",
+              "base": "extract [ɪkˈstrækt]"
+            },
+            {
+              "word": "dismantler",
+              "ko": "해체업체, 해체하는 사람 (명사)",
+              "base": "dismantle [dɪsˈmæntl]"
+            },
+            {
+              "word": "sandbox",
+              "ko": "규제특례, 샌드박스 (명사)",
+              "base": "sandbox [ˈsændbɑːks]"
+            },
+            {
+              "word": "feasibility",
+              "ko": "실현 가능성 (명사)",
+              "base": "feasible [ˈfiːzəbl]"
+            },
+            {
+              "word": "effectiveness",
+              "ko": "유효성, 효과 (명사)",
+              "base": "effective [ɪˈfektɪv]"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "chaekgado-screen",
+      "category": "humanities",
+      "careers": [
+        "art",
+        "media",
+        "hum"
+      ],
+      "publishedAt": "2026-09-28",
+      "status": "published",
+      "sources": [
+        {
+          "title": "국가유산청 보도자료 — (국영문 동시배포) 국립고궁박물관, 프랑스 파리 국립기메동양박물관 특별전에 '책가도 병풍' 출품 (2026.9.15)",
+          "url": "https://www.khs.go.kr/newsBbz/selectNewsBbzView.do?newsItemId=155706367&sectionId=b_sec_1&mn=NS_01_02"
+        },
+        {
+          "title": "국립중앙박물관 큐레이터 추천 소장품 — 조선시대 책가도, 책을 사랑하는 마음을 담다 (이형록 「책가도」, 조선 19세기)",
+          "url": "https://www.museum.go.kr/MUSEUM/contents/M0501000000.do?schM=view&relicRecommendId=562147"
+        },
+        {
+          "title": "한국민족문화대백과사전(한국학중앙연구원) — 책가도(冊架圖)",
+          "url": "https://encykorea.aks.ac.kr/Article/E0055679"
+        }
+      ],
+      "levels": {
+        "L1": {
+          "title": "책을 그린 그림",
+          "minutes": 3,
+          "paragraphs": [
+            [
+              "옛날 조선에는 ",
+              "책을 그린 그림이 있었어요. ",
+              "책꽂이인 서가와 ",
+              "그 안에 쌓인 책을 그려요. ",
+              "이런 그림을 책가도라고 해요. ",
+              "여러 폭을 이어 붙여 ",
+              "병풍으로 만들었어요."
+            ],
+            [
+              "임금 정조는 ",
+              "책을 아주 좋아했어요. ",
+              "그래서 자기가 앉는 자리 뒤에 ",
+              "이 그림을 걸었어요. ",
+              "임금의 등 뒤는 ",
+              "아주 중요한 자리예요. ",
+              "거기에 책장 그림을 둔 거예요."
+            ],
+            [
+              "이 병풍 한 점이 ",
+              "프랑스 파리로 갔어요. ",
+              "그곳 박물관에서 전시를 열어요. ",
+              "유럽에서 보여 주는 것은 처음이에요. ",
+              "책을 귀하게 여긴 ",
+              "마음도 함께 건너갔어요."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "서가",
+              "easy": "책을 얹어 두거나 꽂아 두는 책꽂이예요."
+            },
+            {
+              "word": "책가도",
+              "easy": "책꽂이와 그 안의 책을 그린 그림이에요."
+            },
+            {
+              "word": "병풍",
+              "easy": "여러 폭을 이어 붙여 세우는 큰 가리개예요."
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글은 무엇에 대한 이야기인가요?",
+              "choices": [
+                "책을 만드는 공장 이야기",
+                "책을 그린 그림인 책가도 이야기",
+                "프랑스 말을 배우는 방법",
+                "병풍을 접는 놀이"
+              ],
+              "answer": 1,
+              "explain": "책꽂이와 그 안의 책을 그린 그림, 책가도에 대한 이야기예요.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "정조는 책가도를 어디에 걸었나요?",
+              "choices": [
+                "대문 앞에",
+                "자기가 앉는 자리 뒤에",
+                "부엌 벽에",
+                "배 안에"
+              ],
+              "answer": 1,
+              "explain": "정조는 자기가 앉는 자리 뒤에 이 그림을 걸었어요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「병풍」은 무엇인가요?",
+              "choices": [
+                "책을 넣는 가방",
+                "그림을 그리는 붓",
+                "여러 폭을 이어 붙여 세우는 큰 가리개",
+                "집을 짓는 돌"
+              ],
+              "answer": 2,
+              "explain": "여러 폭을 이어 붙여 세우는 큰 가리개를 병풍이라고 해요.",
+              "evidencePara": 0
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "정조가 자기 자리 뒤에 책 그림을 건 까닭으로 가장 알맞은 것은?",
+              "choices": [
+                "그림이 값싸서",
+                "책을 아끼는 마음을 드러내고 싶어서",
+                "책을 숨기고 싶어서",
+                "자리가 비어서"
+              ],
+              "answer": 1,
+              "explain": "임금의 등 뒤는 아주 중요한 자리인데, 거기에 책장 그림을 두었어요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "apply",
+              "q": "교실 앞에 큰 그림 한 장을 걸려고 해요. 이 글대로 생각하면 어떤 그림이 좋을까요?",
+              "choices": [
+                "가장 비싼 그림",
+                "제일 큰 그림",
+                "아무 그림이나 한 장",
+                "우리 반이 가장 아끼는 것을 그린 그림"
+              ],
+              "answer": 3,
+              "explain": "가장 잘 보이는 자리에는 가장 아끼는 것을 걸었다는 이야기예요.",
+              "evidencePara": 1
+            }
+          ]
+        },
+        "L2": {
+          "title": "임금의 등 뒤에 선 책장",
+          "minutes": 4,
+          "paragraphs": [
+            [
+              "책을 그린 그림이 있다. ",
+              "책꽂이인 서가와 ",
+              "그 안에 쌓인 책, ",
+              "도자기와 문방구를 함께 그린다. ",
+              "이런 그림을 책가도라고 하고, ",
+              "우리말로는 책거리라고도 한다. ",
+              "여러 폭을 이어 붙여 ",
+              "병풍으로 꾸미는 일이 많았다."
+            ],
+            [
+              "책가도는 18세기 후반 ",
+              "정조 임금 때 ",
+              "크게 자리를 잡았다. ",
+              "정조는 1791년 ",
+              "어좌 뒤에 책가도 병풍을 세웠다. ",
+              "어좌는 임금이 앉는 자리다. ",
+              "임금의 등 뒤는 ",
+              "힘을 드러내는 자리인데, ",
+              "정조는 거기에 책장을 놓은 셈이다. ",
+              "그리고 책가도를 그리도록 장려했다."
+            ],
+            [
+              "그리는 법도 남달랐다. ",
+              "책가도는 서양의 원근법이 ",
+              "조선의 전통과 만나 발전한 그림이다. ",
+              "투시도법과 명암법을 쓰면 ",
+              "평평한 화면 위의 책이 ",
+              "튀어나와 보인다. ",
+              "눈을 속이는 기술로 ",
+              "책을 쌓아 올린 것이다."
+            ],
+            [
+              "이 병풍 한 점이 ",
+              "프랑스 파리로 건너갔다. ",
+              "국립고궁박물관이 국립기메동양박물관 ",
+              "특별전에 1점을 출품했다. ",
+              "전시 이름은 ",
+              "「착시의 지식, 한국: 18~20세기」이고, ",
+              "2026년 9월 16일부터 ",
+              "2027년 1월 4일까지 열린다. ",
+              "이 병풍이 유럽에 소개되는 것은 ",
+              "이번이 처음이다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "서가",
+              "easy": "책을 얹어 두는 선반이나 책꽂이",
+              "hanja": "書(글 서)+架(시렁 가)"
+            },
+            {
+              "word": "책가도",
+              "easy": "서가와 그 안의 책·기물을 그린 그림",
+              "hanja": "冊(책 책)+架(시렁 가)+圖(그림 도)"
+            },
+            {
+              "word": "어좌",
+              "easy": "임금이 앉는 자리",
+              "hanja": "御(거느릴 어)+座(자리 좌)"
+            },
+            {
+              "word": "원근법",
+              "easy": "가까운 것은 크게, 먼 것은 작게 그려 깊이를 내는 방법",
+              "hanja": "遠(멀 원)+近(가까울 근)+法(법 법)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 알맞은 것은?",
+              "choices": [
+                "책가도는 책을 주인공으로 세운 그림이고, 정조는 그것을 어좌 뒤에 두었다",
+                "병풍은 바람을 막으려고 만든 물건이다",
+                "원근법은 조선에서 처음 만들어 서양에 알려 주었다",
+                "프랑스에서 조선 그림을 처음으로 그렸다"
+              ],
+              "answer": 0,
+              "explain": "책을 그린 그림이 무엇이고, 정조가 그것을 어디에 두었는지가 글의 중심이다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "정조가 1791년에 한 일로 알맞은 것은?",
+              "choices": [
+                "어좌를 없앴다",
+                "어좌 뒤에 책가도 병풍을 세웠다",
+                "책가도를 그리지 못하게 했다",
+                "병풍을 프랑스로 보냈다"
+              ],
+              "answer": 1,
+              "explain": "정조는 1791년 어좌 뒤에 책가도 병풍을 세웠다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "이번 전시에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "2026년 9월 16일부터 2027년 1월 4일까지 파리 국립기메동양박물관에서 열린다",
+                "서울 국립고궁박물관에서 열린다",
+                "2017년에 이미 끝난 전시다",
+                "전시 이름은 「책거리의 하루」다"
+              ],
+              "answer": 0,
+              "explain": "전시 기간과 장소가 글에 그대로 적혀 있다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "vocab",
+              "q": "「어좌」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "임금이 앉는 자리",
+                "책을 올려 두는 상",
+                "그림을 그리는 방",
+                "병풍을 세우는 받침"
+              ],
+              "answer": 0,
+              "explain": "어좌는 임금이 앉는 자리라고 글에 풀이되어 있다.",
+              "evidencePara": 1
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "정조가 어좌 뒤에 무기나 용이 아니라 책장을 둔 데서 알 수 있는 것은?",
+              "choices": [
+                "임금이 그림을 그릴 줄 몰랐다는 것",
+                "임금이 배움으로 자기를 나타내려 했다는 것",
+                "그때 무기가 모자랐다는 것",
+                "용 그림이 유행하지 않았다는 것"
+              ],
+              "answer": 1,
+              "explain": "힘을 드러내는 자리에 책장을 둔 것은 무엇으로 자기를 보이려 했는지를 말해 준다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "critical",
+              "q": "전시 이름이 「착시의 지식」인 까닭을 이 글에서 찾으면?",
+              "choices": [
+                "그림 색이 어두워서",
+                "그림 속 책이 가짜 책이어서",
+                "눈을 속이는 기법으로 책을 그렸기 때문에",
+                "박물관이 파리에 있어서"
+              ],
+              "answer": 2,
+              "explain": "투시도법과 명암법으로 평평한 화면 위의 책을 튀어나와 보이게 했다.",
+              "evidencePara": 2
+            }
+          ],
+          "en": [
+            "There is a kind of Korean painting that shows books. It shows a bookcase and the books inside it. It also shows pots and writing tools. This painting is called chaekgado. Many chaekgado were made as folding screens with several panels.",
+            "Chaekgado grew popular in the late 1700s, under King Jeongjo. In 1791 he put a chaekgado screen behind his throne. A throne is the seat where a king sits. The space behind a king shows his power. Jeongjo put a bookcase there. He also asked court painters to make more chaekgado.",
+            "The way of painting was special too. Chaekgado joined Western perspective with old Korean art. Painters used perspective and shading. So the books look solid on a flat surface. They tricked the eye to pile up books.",
+            "Now one of these screens has travelled to Paris, France. The National Palace Museum of Korea lent one screen. It goes to a show at the Guimet Museum in Paris. The show is called Trompe-l'oeil Knowledge, Korea (18th-20th Century). It runs from 16 September 2026 to 4 January 2027. This screen has never been shown in Europe before."
+          ],
+          "enseg": [
+            [
+              "There is a kind of Korean painting that shows books. ",
+              "It shows a bookcase and the books inside it. ",
+              "It also shows pots and writing tools. ",
+              "This painting is called chaekgado. ",
+              "Many chaekgado were made as folding screens with several panels."
+            ],
+            [
+              "Chaekgado grew popular in the late 1700s, ",
+              "under King Jeongjo. ",
+              "In 1791 he put a chaekgado screen behind his throne. ",
+              "A throne is the seat where a king sits. ",
+              "The space behind a king shows his power. ",
+              "Jeongjo put a bookcase there. ",
+              "He also asked court painters to make more chaekgado."
+            ],
+            [
+              "The way of painting was special too. ",
+              "Chaekgado joined Western perspective with old Korean art. ",
+              "Painters used perspective and shading. ",
+              "So the books look solid on a flat surface. ",
+              "They tricked the eye to pile up books."
+            ],
+            [
+              "Now one of these screens has travelled to Paris, France. ",
+              "The National Palace Museum of Korea lent one screen. ",
+              "It goes to a show at the Guimet Museum in Paris. ",
+              "The show is called Trompe-l'oeil Knowledge, Korea (18th-20th Century). ",
+              "It runs from 16 September 2026 to 4 January 2027. ",
+              "This screen has never been shown in Europe before."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "bookcase",
+              "ko": "책장, 책꽂이 (명사)",
+              "base": "bookcase [ˈbʊkkeɪs]"
+            },
+            {
+              "word": "folding",
+              "ko": "접는 (동사 fold)",
+              "base": "fold [foʊld]"
+            },
+            {
+              "word": "throne",
+              "ko": "어좌, 왕좌 (명사)",
+              "base": "throne [θroʊn]"
+            },
+            {
+              "word": "perspective",
+              "ko": "원근법 (명사)",
+              "base": "perspective [pərˈspektɪv]"
+            },
+            {
+              "word": "shading",
+              "ko": "명암법 (명사 shade)",
+              "base": "shade [ʃeɪd]"
+            },
+            {
+              "word": "lent",
+              "ko": "빌려주었다 (동사 lend)",
+              "base": "lend [lend]"
+            }
+          ]
+        },
+        "L3": {
+          "title": "책이 주인공이 된 그림",
+          "minutes": 5,
+          "paragraphs": [
+            [
+              "책은 대개 그림 속에서 조연이다. ",
+              "책을 읽는 사람이 주인공이고 ",
+              "책은 그 손에 들린 물건이다. ",
+              "그런데 조선 후기에는 ",
+              "사람을 지우고 책만 남긴 그림이 유행했다. ",
+              "서가를 중심으로 ",
+              "책과 도자기, 문방구, 향로를 ",
+              "쌓아 올린 그림, 책가도다. ",
+              "우리말로는 책거리라고 한다. ",
+              "소유물이던 책이 ",
+              "화면의 주인공 자리로 올라선 것이다."
+            ],
+            [
+              "책가도는 18세기 후반 ",
+              "정조의 구상에서 비롯한 것으로 본다. ",
+              "책을 통해 나라를 다스리겠다는 생각이었다. ",
+              "정조는 1791년 ",
+              "어좌 뒤에 책가도 병풍을 설치하고 ",
+              "화원들에게 책가도 제작을 장려했다. ",
+              "어좌 뒤는 ",
+              "임금의 권위를 드러내는 자리다. ",
+              "그 자리에 ",
+              "무기도 용도 아닌 책장이 섰다. ",
+              "무엇으로 자기를 나타낼지를 고른 셈이다."
+            ],
+            [
+              "그리는 방법도 눈여겨볼 만하다. ",
+              "책가도는 서양의 원근법이 ",
+              "조선의 전통과 만나 발전한 양식이다. ",
+              "당시로서는 서양화에서나 보던 ",
+              "투시도법과 명암법을 응용해, ",
+              "평평한 화면 위의 서가에 ",
+              "깊이와 입체감을 만들어 냈다. ",
+              "책을 그린 그림이면서 ",
+              "눈을 속이는 기술을 쓴 그림인 셈이다."
+            ],
+            [
+              "이 병풍 한 점이 ",
+              "2026년 9월 16일부터 2027년 1월 4일까지 ",
+              "프랑스 파리 국립기메동양박물관에서 열리는 특별전에 나간다. ",
+              "전시 이름은 ",
+              "「착시의 지식, 한국: 18~20세기」다. ",
+              "국립고궁박물관이 출품했고, ",
+              "전시는 4부로 짜여 있으며 ",
+              "이 병풍은 ",
+              "1부 「18세기 조선의 지식과 책가도」에 놓인다."
+            ],
+            [
+              "이 병풍은 2017년 싱가포르 전시에 이어 ",
+              "유럽에는 처음 소개된다. ",
+              "그러나 더 오래 남을 질문은 따로 있다. ",
+              "한 사회가 무엇을 그려서 벽에 거는지는 ",
+              "그 사회가 무엇을 귀하게 여겼는지를 말해 준다. ",
+              "책을 그린 병풍은 ",
+              "그 대답을 아주 또렷하게 적어 놓은 문서다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "책가도",
+              "easy": "서가를 중심으로 책과 기물을 쌓아 그린 그림",
+              "hanja": "冊(책 책)+架(시렁 가)+圖(그림 도)"
+            },
+            {
+              "word": "서가",
+              "easy": "책을 얹어 두는 선반이나 책꽂이",
+              "hanja": "書(글 서)+架(시렁 가)"
+            },
+            {
+              "word": "어좌",
+              "easy": "임금이 앉는 자리",
+              "hanja": "御(거느릴 어)+座(자리 좌)"
+            },
+            {
+              "word": "원근법",
+              "easy": "가까운 것은 크게, 먼 것은 작게 그려 깊이를 내는 방법",
+              "hanja": "遠(멀 원)+近(가까울 근)+法(법 법)"
+            },
+            {
+              "word": "화원",
+              "easy": "궁중에서 그림 그리는 일을 맡은 관리",
+              "hanja": "畫(그림 화)+員(인원 원)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글이 말하려는 바로 가장 알맞은 것은?",
+              "choices": [
+                "책가도는 병풍을 만드는 기술의 이름이다",
+                "책을 주인공으로 세운 그림과 그것을 건 자리가 그 사회의 선택을 보여 준다",
+                "조선에서 서양 그림을 그대로 베껴 그렸다",
+                "귀한 그림은 외국에 내보내지 말아야 한다"
+              ],
+              "answer": 1,
+              "explain": "책이 주인공이 된 그림과 어좌 뒤라는 자리가 이 글의 두 축이다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "책가도를 그린 방법에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "먹으로만 그려 색을 쓰지 않았다",
+                "서양의 원근법이 조선의 전통과 만나 발전한 양식이다",
+                "서양에서 완성된 그림을 그대로 들여왔다",
+                "실제 서가를 본떠 나무로 짠 것이다"
+              ],
+              "answer": 1,
+              "explain": "투시도법과 명암법을 응용해 평면에 깊이와 입체감을 만들어 냈다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "detail",
+              "q": "이번 파리 전시에 대한 설명으로 알맞지 않은 것은?",
+              "choices": [
+                "전시는 4부로 짜여 있다",
+                "이 병풍은 1부에 놓인다",
+                "국립고궁박물관이 출품했다",
+                "이 병풍은 유럽에 여러 차례 소개된 적이 있다"
+              ],
+              "answer": 3,
+              "explain": "2017년 싱가포르 전시에 이어 유럽에는 이번이 처음이다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "vocab",
+              "q": "「화원」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "꽃을 심어 가꾸는 뜰",
+                "궁중에서 그림 그리는 일을 맡은 관리",
+                "그림을 파는 가게",
+                "그림을 보관하는 창고"
+              ],
+              "answer": 1,
+              "explain": "정조가 책가도 제작을 장려한 대상이 궁중의 화원들이다.",
+              "evidencePara": 1
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "「소유물이던 책이 화면의 주인공 자리로 올라섰다」는 말의 뜻으로 가장 알맞은 것은?",
+              "choices": [
+                "책값이 비싸졌다는 뜻이다",
+                "그림에서 사람이 사라지고 책 자체가 그릴 만한 대상이 되었다는 뜻이다",
+                "책이 더 커졌다는 뜻이다",
+                "책을 병풍으로 만들었다는 뜻이다"
+              ],
+              "answer": 1,
+              "explain": "사람을 지우고 책만 남긴 그림이 유행했다는 앞 문장과 이어진다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "critical",
+              "q": "글쓴이가 마지막 문단에서 병풍을 「문서」라고 부른 까닭으로 가장 알맞은 것은?",
+              "choices": [
+                "병풍에 글씨가 빽빽하게 적혀 있어서",
+                "병풍이 박물관의 공식 기록물이어서",
+                "무엇을 귀하게 여겼는지를 읽어 낼 수 있어서",
+                "병풍을 종이로 만들었기 때문에"
+              ],
+              "answer": 2,
+              "explain": "무엇을 그려 벽에 거는지가 그 사회의 값어치를 적어 놓은 셈이라는 뜻이다.",
+              "evidencePara": 4
+            }
+          ],
+          "en": [
+            "In most paintings a book is a supporting object. The reader is the subject, and the book is merely something held in a hand. In late Joseon, however, a kind of painting erased the people and kept only the books. Around a set of shelves it stacked books, porcelain, writing tools and incense burners. This is chaekgado, called chaekgeori in plain Korean. What had once been a possession moved into the centre of the picture.",
+            "Chaekgado is thought to have begun with King Jeongjo's plan in the late eighteenth century. He meant to govern the country through books. In 1791 he installed a chaekgado screen behind the royal throne and encouraged court painters to produce more of them. The space behind the throne is where a king's authority is displayed. In that place stood neither a weapon nor a dragon, but a bookcase. He had chosen what he wished to stand for.",
+            "The method of painting deserves attention as well. Chaekgado is a style that developed when Western perspective met Joseon tradition. Painters borrowed perspective and shading, techniques then seen only in Western art, and gave a flat surface depth and solidity. It is a painting of books that also plays a trick on the eye.",
+            "One such screen is now travelling to Paris. From 16 September 2026 to 4 January 2027 it will appear in a special exhibition at the Musee Guimet. The exhibition is titled Trompe-l'oeil Knowledge, Korea (18th-20th Century). The National Palace Museum of Korea lent the screen. The show is divided into four sections, and this screen belongs to the first, Knowledge and Chaekgado in Eighteenth-Century Joseon.",
+            "The screen was shown in Singapore in 2017, but this is its first appearance in Europe. A longer question sits behind the news. What a society chooses to paint and hang on its walls tells us what it valued. A folding screen full of books writes that answer very plainly."
+          ],
+          "enseg": [
+            [
+              "In most paintings a book is a supporting object. ",
+              "The reader is the subject, and the book is merely something held in a hand. ",
+              "In late Joseon, however, a kind of painting erased the people and kept only the books. ",
+              "Around a set of shelves it stacked books, porcelain, writing tools and incense burners. ",
+              "This is chaekgado, called chaekgeori in plain Korean. ",
+              "What had once been a possession moved into the centre of the picture."
+            ],
+            [
+              "Chaekgado is thought to have begun with King Jeongjo's plan in the late eighteenth century. ",
+              "He meant to govern the country through books. ",
+              "In 1791 he installed a chaekgado screen behind the royal throne ",
+              "and encouraged court painters to produce more of them. ",
+              "The space behind the throne is where a king's authority is displayed. ",
+              "In that place stood neither a weapon nor a dragon, but a bookcase. ",
+              "He had chosen what he wished to stand for."
+            ],
+            [
+              "The method of painting deserves attention as well. ",
+              "Chaekgado is a style that developed when Western perspective met Joseon tradition. ",
+              "Painters borrowed perspective and shading, techniques then seen only in Western art, ",
+              "and gave a flat surface depth and solidity. ",
+              "It is a painting of books that also plays a trick on the eye."
+            ],
+            [
+              "One such screen is now travelling to Paris. ",
+              "From 16 September 2026 to 4 January 2027 it will appear in a special exhibition at the Musee Guimet. ",
+              "The exhibition is titled Trompe-l'oeil Knowledge, Korea (18th-20th Century). ",
+              "The National Palace Museum of Korea lent the screen. ",
+              "The show is divided into four sections, and this screen belongs to the first, ",
+              "Knowledge and Chaekgado in Eighteenth-Century Joseon."
+            ],
+            [
+              "The screen was shown in Singapore in 2017, but this is its first appearance in Europe. ",
+              "A longer question sits behind the news. ",
+              "What a society chooses to paint and hang on its walls tells us what it valued. ",
+              "A folding screen full of books writes that answer very plainly."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "porcelain",
+              "ko": "도자기 (명사)",
+              "base": "porcelain [ˈpɔːrsəlɪn]"
+            },
+            {
+              "word": "possession",
+              "ko": "소유물 (명사)",
+              "base": "possess [pəˈzes]"
+            },
+            {
+              "word": "authority",
+              "ko": "권위 (명사)",
+              "base": "authority [əˈθɔːrəti]"
+            },
+            {
+              "word": "perspective",
+              "ko": "원근법 (명사)",
+              "base": "perspective [pərˈspektɪv]"
+            },
+            {
+              "word": "shelves",
+              "ko": "선반, 서가 (명사 shelf의 복수)",
+              "base": "shelf [ʃelf]"
+            },
+            {
+              "word": "exhibition",
+              "ko": "전시 (명사)",
+              "base": "exhibit [ɪɡˈzɪbɪt]"
+            }
+          ]
+        },
+        "L4": {
+          "title": "벽에 건 것이 대답이다",
+          "minutes": 6,
+          "paragraphs": [
+            [
+              "한 사회가 무엇을 귀하게 여기는지 ",
+              "알아보는 방법 가운데 하나는, ",
+              "그 사회가 무엇을 그려서 ",
+              "벽에 걸었는지를 보는 것이다. ",
+              "대개 벽에 걸리는 것은 ",
+              "사람이거나 산수이거나 상서로운 짐승이다. ",
+              "그런데 조선 후기에는 ",
+              "사람도 풍경도 아닌 것이 ",
+              "화면을 가득 채운 그림이 나타난다. ",
+              "서가와 그 안에 쌓인 책, ",
+              "그리고 도자기와 문방구 같은 기물이다. ",
+              "이것이 책가도이고, 우리말로는 책거리라고 한다."
+            ],
+            [
+              "책가도의 시작은 18세기 후반 ",
+              "정조의 구상으로 본다. ",
+              "책을 통해 나라를 다스린다는 뜻이었다. ",
+              "여기서 눈여겨볼 것은 책이 놓인 자리다. ",
+              "이전까지 그림 속의 책은 ",
+              "읽는 사람의 손에 들린 물건, 곧 소유물이었다. ",
+              "책가도는 사람을 아예 지우고 책만 남긴다. ",
+              "책이 배경에서 걸어 나와 ",
+              "화면의 주인공이 된 것이다. ",
+              "무엇을 주인공으로 세우는가는 ",
+              "그림의 기법이기 전에 ",
+              "그 사회의 선택이다."
+            ],
+            [
+              "그 선택이 가장 뚜렷하게 드러난 자리가 ",
+              "어좌 뒤다. ",
+              "정조는 1791년 ",
+              "자신이 앉는 자리 뒤에 책가도 병풍을 설치하고 ",
+              "화원들에게 책가도 제작을 장려했다. ",
+              "임금의 등 뒤는 권위가 서는 자리다. ",
+              "거기에 놓인 것이 ",
+              "무기도 용도 아닌 책장이었다는 사실은, ",
+              "그가 무엇으로 자기를 나타내려 했는지를 말해 준다. ",
+              "권위를 힘이 아니라 ",
+              "배움으로 설명하겠다는 선언에 가깝다."
+            ],
+            [
+              "그런데 이 그림에는 또 한 겹이 있다. ",
+              "책가도는 서양의 원근법이 ",
+              "조선의 전통 화법과 만나 발전한 양식이다. ",
+              "당시로서는 서양화에서나 보던 ",
+              "투시도법과 명암법을 응용해, ",
+              "평평한 화면 위의 서가가 ",
+              "실제로 깊이를 가진 것처럼 보이게 했다. ",
+              "눈을 속이는 기술로 지식을 그린 셈이다. ",
+              "이번에 이 병풍이 나가는 전시의 이름이 ",
+              "「착시의 지식, 한국: 18~20세기」인 것도 ",
+              "그 겹침을 가리킨다."
+            ],
+            [
+              "국립고궁박물관은 2026년 9월 16일부터 ",
+              "2027년 1월 4일까지 ",
+              "프랑스 파리 국립기메동양박물관에서 열리는 이 특별전에 ",
+              "책가도 병풍 1점을 출품했다. ",
+              "전시는 4부로 짜였고, ",
+              "이 병풍은 ",
+              "1부 「18세기 조선의 지식과 책가도」에 놓인다. ",
+              "전시장에서 관람객이 먼저 만나는 것은 ",
+              "낯선 나라의 오래된 가구일지도 모른다. ",
+              "그러나 조금 더 들여다보면 질문이 남는다. ",
+              "우리는 지금 무엇을 그려서 ",
+              "가장 잘 보이는 자리에 걸고 있는가. ",
+              "벽에 걸린 것은 언제나 ",
+              "그 자리에 건 사람의 대답이다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "기물",
+              "easy": "살림이나 의식에 쓰는 여러 도구와 그릇",
+              "hanja": "器(그릇 기)+物(물건 물)"
+            },
+            {
+              "word": "소유물",
+              "easy": "누군가가 가지고 있는 물건",
+              "hanja": "所(바 소)+有(있을 유)+物(물건 물)"
+            },
+            {
+              "word": "어좌",
+              "easy": "임금이 앉는 자리",
+              "hanja": "御(거느릴 어)+座(자리 좌)"
+            },
+            {
+              "word": "권위",
+              "easy": "남이 따르게 만드는 위엄과 힘",
+              "hanja": "權(권세 권)+威(위엄 위)"
+            },
+            {
+              "word": "명암법",
+              "easy": "밝고 어두움을 나누어 칠해 입체로 보이게 하는 방법",
+              "hanja": "明(밝을 명)+暗(어두울 암)+法(법 법)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 생각으로 가장 알맞은 것은?",
+              "choices": [
+                "조선의 그림 기술이 서양보다 앞섰다",
+                "무엇을 그려 어디에 거는가에 그 사회의 선택이 드러난다",
+                "책가도는 보존이 어려워 국외 전시를 피해야 한다",
+                "병풍은 가구이지 그림이 아니다"
+              ],
+              "answer": 1,
+              "explain": "책이 주인공이 된 그림과 어좌 뒤라는 자리, 그리고 마지막 물음이 모두 한 생각으로 모인다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "글에 따르면 책가도가 이전의 그림과 다른 점은?",
+              "choices": [
+                "사람의 손에 들린 책을 크게 그렸다",
+                "사람을 지우고 책과 기물만 화면에 남겼다",
+                "글씨만 쓰고 그림은 그리지 않았다",
+                "산수와 짐승을 함께 그렸다"
+              ],
+              "answer": 1,
+              "explain": "책가도는 읽는 사람을 지우고 책만 남겨 책을 주인공으로 세운다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "1791년 정조가 한 일로 글에 나온 것은?",
+              "choices": [
+                "기메박물관에 병풍을 보냈다",
+                "자신이 앉는 자리 뒤에 책가도 병풍을 설치하고 제작을 장려했다",
+                "어좌를 새로 짜게 했다",
+                "서양 화가를 궁중에 불러들였다"
+              ],
+              "answer": 1,
+              "explain": "어좌 뒤에 병풍을 세우고 화원들에게 제작을 장려했다고 적혀 있다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "vocab",
+              "q": "「기물」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "이상하고 기이한 일",
+                "살림이나 의식에 쓰는 여러 도구와 그릇",
+                "기록으로 남긴 문서",
+                "기계를 만드는 재료"
+              ],
+              "answer": 1,
+              "explain": "도자기와 문방구처럼 쓰임이 있는 도구와 그릇을 기물이라고 한다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "critical",
+              "q": "「눈을 속이는 기술로 지식을 그린 셈이다」라는 문장이 겨냥한 겹침으로 가장 알맞은 것은?",
+              "choices": [
+                "그림의 값이 실제보다 비싸게 매겨졌다는 것",
+                "그림이 가짜 책을 그려 사람을 속였다는 것",
+                "착시를 만드는 기법과 지식을 담은 내용이 한 화면에서 만난다는 것",
+                "서양 화법이 조선 화법보다 뛰어나다는 것"
+              ],
+              "answer": 2,
+              "explain": "투시도법과 명암법이라는 착시 기법 위에 책과 지식이라는 내용이 얹혀 있다는 뜻이다.",
+              "evidencePara": 3
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "「무엇을 주인공으로 세우는가는 그림의 기법이기 전에 그 사회의 선택이다」에서 글쓴이가 강조하는 것은?",
+              "choices": [
+                "붓과 물감의 품질이 그림을 결정한다는 것",
+                "화면에 무엇을 올릴지는 값어치의 판단에서 나온다는 것",
+                "화가의 이름이 가장 중요하다는 것",
+                "그림은 기법만 배우면 누구나 그린다는 것"
+              ],
+              "answer": 1,
+              "explain": "기법보다 먼저 무엇을 귀하게 여기는지가 주인공을 정한다는 뜻이다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "apply",
+              "q": "이 글의 관점을 학교 현관 게시판에 적용하면 가장 알맞은 물음은?",
+              "choices": [
+                "게시판을 몇 개나 놓아야 하는가",
+                "게시판 틀을 어떤 나무로 짤 것인가",
+                "가장 잘 보이는 자리에 무엇을 붙여 두었고 그것이 무엇을 말하는가",
+                "게시물을 며칠에 한 번 갈아야 하는가"
+              ],
+              "answer": 2,
+              "explain": "가장 잘 보이는 자리에 건 것이 그 집단의 대답이라는 마지막 문단과 이어진다.",
+              "evidencePara": 4
+            }
+          ],
+          "en": [
+            "One way to learn what a society prizes is to look at what it painted and hung on its walls. Usually what hangs there is a person, a landscape or an auspicious animal. In late Joseon Korea, however, a painting appears in which neither figure nor scenery fills the surface. What fills it is a set of shelves, the books stacked on them, and objects such as porcelain and writing tools. This is chaekgado, known in plain Korean as chaekgeori.",
+            "The genre is thought to have begun with King Jeongjo's design in the late eighteenth century: to govern through books. What deserves attention is where the book has been placed. Until then a book in a painting was an object held in a reader's hand, a possession. Chaekgado erases the reader altogether and keeps only the books. The book has walked out of the background and become the subject of the picture. What a society makes its subject is a choice before it is a technique.",
+            "That choice is clearest behind the throne. In 1791 Jeongjo installed a chaekgado screen behind the seat he occupied, and encouraged court painters to produce such works. The space at a king's back is where authority is established. That what stood there was neither a weapon nor a dragon but a bookcase tells us what he wished to be identified with. It comes close to a declaration that authority would be explained by learning rather than by force.",
+            "There is a second layer to this painting. Chaekgado is a style that developed when Western perspective met the painting tradition of Joseon. Borrowing perspective and shading, techniques then visible only in Western art, painters made shelves on a flat surface appear to possess real depth. Knowledge, in other words, was drawn with a technique for deceiving the eye. The exhibition now receiving the screen is titled Trompe-l'oeil Knowledge, Korea (18th-20th Century), and the title points at exactly that overlap.",
+            "The National Palace Museum of Korea has lent one chaekgado screen to this special exhibition, held at the Musee Guimet in Paris from 16 September 2026 to 4 January 2027. The show is arranged in four sections, and the screen belongs to the first, Knowledge and Chaekgado in Eighteenth-Century Joseon. A visitor may at first see nothing more than an old piece of furniture from an unfamiliar country. Look a little longer, though, and a question remains. What are we painting today, and hanging where it can best be seen? What hangs on a wall is always the answer given by whoever hung it."
+          ],
+          "enseg": [
+            [
+              "One way to learn what a society prizes is to look at what it painted and hung on its walls. ",
+              "Usually what hangs there is a person, a landscape or an auspicious animal. ",
+              "In late Joseon Korea, however, a painting appears in which neither figure nor scenery fills the surface. ",
+              "What fills it is a set of shelves, the books stacked on them, ",
+              "and objects such as porcelain and writing tools. ",
+              "This is chaekgado, known in plain Korean as chaekgeori."
+            ],
+            [
+              "The genre is thought to have begun with King Jeongjo's design in the late eighteenth century: to govern through books. ",
+              "What deserves attention is where the book has been placed. ",
+              "Until then a book in a painting was an object held in a reader's hand, a possession. ",
+              "Chaekgado erases the reader altogether and keeps only the books. ",
+              "The book has walked out of the background and become the subject of the picture. ",
+              "What a society makes its subject is a choice before it is a technique."
+            ],
+            [
+              "That choice is clearest behind the throne. ",
+              "In 1791 Jeongjo installed a chaekgado screen behind the seat he occupied, ",
+              "and encouraged court painters to produce such works. ",
+              "The space at a king's back is where authority is established. ",
+              "That what stood there was neither a weapon nor a dragon but a bookcase tells us what he wished to be identified with. ",
+              "It comes close to a declaration that authority would be explained by learning rather than by force."
+            ],
+            [
+              "There is a second layer to this painting. ",
+              "Chaekgado is a style that developed when Western perspective met the painting tradition of Joseon. ",
+              "Borrowing perspective and shading, techniques then visible only in Western art, ",
+              "painters made shelves on a flat surface appear to possess real depth. ",
+              "Knowledge, in other words, was drawn with a technique for deceiving the eye. ",
+              "The exhibition now receiving the screen is titled Trompe-l'oeil Knowledge, Korea (18th-20th Century), ",
+              "and the title points at exactly that overlap."
+            ],
+            [
+              "The National Palace Museum of Korea has lent one chaekgado screen to this special exhibition, ",
+              "held at the Musee Guimet in Paris from 16 September 2026 to 4 January 2027. ",
+              "The show is arranged in four sections, and the screen belongs to the first, ",
+              "Knowledge and Chaekgado in Eighteenth-Century Joseon. ",
+              "A visitor may at first see nothing more than an old piece of furniture from an unfamiliar country. ",
+              "Look a little longer, though, and a question remains. ",
+              "What are we painting today, and hanging where it can best be seen? ",
+              "What hangs on a wall is always the answer given by whoever hung it."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "prizes",
+              "ko": "귀하게 여기다 (동사 prize)",
+              "base": "prize [praɪz]"
+            },
+            {
+              "word": "auspicious",
+              "ko": "상서로운 (형용사)",
+              "base": "auspicious [ɔːˈspɪʃəs]"
+            },
+            {
+              "word": "genre",
+              "ko": "장르, 양식 (명사)",
+              "base": "genre [ˈʒɑːnrə]"
+            },
+            {
+              "word": "declaration",
+              "ko": "선언 (명사 declare)",
+              "base": "declare [dɪˈkler]"
+            },
+            {
+              "word": "deceiving",
+              "ko": "속이는 (동사 deceive)",
+              "base": "deceive [dɪˈsiːv]"
+            },
+            {
+              "word": "overlap",
+              "ko": "겹침 (명사)",
+              "base": "overlap [ˈoʊvərlæp]"
+            }
+          ]
+        }
+      },
+      "issue": false
     }
   ],
   "diagnostics": {
