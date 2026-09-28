@@ -5,6 +5,29 @@ const path = require('node:path');
 
 const source = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
 
+test('retry errors survive a queue redraw and simultaneous clicks send only one request', async () => {
+  const start = source.indexOf('const feedbackRetryResults = new Map();');
+  const end = source.indexOf('/* ── 보강·회차 보호자 운영', start);
+  let calls = 0, rejectRequest;
+  const pending = new Promise((resolve, reject) => { rejectRequest = reject; });
+  const run = Function('sync', 'document', 'toast', 'loadFeedbackQueue', 'loadFeedbackDateQueue',
+    'const SYNC_APP = "task"; let feedbackQueueLoaded = true, feedbackDateQueueLoadedDate = "", feedbackDateFilter = "";\n' +
+    source.slice(start, end) + '\nreturn { sendParentFeedback, feedbackRetryResults };')(
+    { auth: () => ({ mode: 'person' }), post: () => { calls++; return pending; } },
+    { getElementById: () => null }, () => {}, () => {}, () => {});
+  const first = run.sendParentFeedback('request', {});
+  await run.sendParentFeedback('request', {});
+  assert.equal(calls, 1);
+  rejectRequest(new Error('정확한 실패 이유'));
+  await first;
+  const reasonStart = source.indexOf('function feedbackReasonHtml(');
+  const reasonEnd = source.indexOf('async function loadFeedbackQueue(', reasonStart);
+  const reason = Function('feedbackRetryResults', 'esc', 'feedbackReviewPrefix',
+    source.slice(reasonStart, reasonEnd) + '; return feedbackReasonHtml;')(
+    run.feedbackRetryResults, value => String(value), () => '');
+  assert.match(reason({ requestKey: 'request', status: 'content_approved_send_blocked', reviewNote: '옛 오류' }, false), /정확한 실패 이유/);
+});
+
 function feedbackSortHelpers(state = { tasks: [] }, overrides = {}) {
   const start = source.indexOf('const FEEDBACK_WEEKDAYS');
   const end = source.indexOf('function feedbackStoredMessageHtml(', start);
