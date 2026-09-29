@@ -21,6 +21,7 @@ class Statement {
 class TestD1 {
   constructor() { this.database = new DatabaseSync(':memory:'); this.database.exec(schema); }
   prepare(sql) { return new Statement(this.database, sql); }
+  batch(statements) { this.database.exec('BEGIN IMMEDIATE'); try { const result=statements.map(s=>s.run());this.database.exec('COMMIT');return result; } catch(error) {this.database.exec('ROLLBACK');throw error;} }
 }
 
 const admin = { mode: 'admin', secret: 'director-secret' };
@@ -238,6 +239,45 @@ test('admin sees orphan/identity warnings while ordinary staff fail closed', asy
   const own = await call(db, { auth: person('teacher-a', 'token-a'), action: 'list' });
   assert.equal(own.body.warnings.length, 0);
   assert.equal(own.body.issues.some(item => item.assignmentId === 'assign-a'), false);
+});
+
+test('early academy registration keeps delivery stages and detects corrected price', async () => {
+  const db=new TestD1();seed(db);const now=Date.now();
+  const task={id:'early-order',staffId:'teacher-a',title:'[주문] 자체 교재',deleted:false,
+    orderDelivery:'scheduled_batch_v1',orderVendor:'테스트총판',orderItems:[{bookId:'BK01',title:'자체 교재',qty:'1권',studentIds:['student-a'],unitPrice:15000}],createdAt:now,updatedAt:now};
+  db.prepare('INSERT INTO tasks(app,id,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)').bind('task',task.id,'teacher-a',JSON.stringify(task),now,now).run();
+  const register={auth:admin,action:'academy_transition',next:'register',taskId:task.id,itemIndex:0,revision:0,academyRevision:0};
+  assert.equal((await call(db,register)).status,409,'waiting cannot register');
+  db.prepare('INSERT INTO book_order_sends(app,send_id,idempotency_key,task_id,vendor_name,item_count,message_hash,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)')
+    .bind('task','early-send','early-key',task.id,'테스트총판',1,'a'.repeat(64),'accepted',now,now).run();
+  assert.equal((await call(db,{...register,auth:person('teacher-a','token-a')})).status,403);
+  const originalBatch=db.batch.bind(db);
+  db.batch=statements=>{
+    db.batch=originalBatch;
+    const fresh=JSON.parse(db.prepare('SELECT data FROM tasks WHERE id=?').bind(task.id).first().data);
+    fresh.updatedAt=now+1;
+    db.prepare('UPDATE tasks SET data=? WHERE id=?').bind(JSON.stringify(fresh),task.id).run();
+    return originalBatch(statements);
+  };
+  assert.equal((await call(db,register)).status,409,'concurrent task update rolls back registration');
+  assert.equal(db.prepare('SELECT count(*) n FROM book_order_academy').first().n,0);
+  const saved=await call(db,register);assert.equal(saved.status,200,JSON.stringify(saved.body));
+  assert.equal((await call(db,register)).body.idempotent,true);
+  let row=(await call(db,{auth:admin,action:'list'})).body.orders[0];
+  assert.equal(row.stage,'ordered');assert.ok(row.academyRegisteredAt);assert.equal(row.teacherReceivedAt,null);
+  assert.equal(db.prepare('SELECT count(*) n FROM completed_book_catalog').first().n,0);
+  const receive=await call(db,{auth:person('teacher-a','token-a'),action:'order_transition',taskId:task.id,itemIndex:0,next:'receive',revision:0});
+  assert.equal(receive.status,200);
+  row=(await call(db,{auth:admin,action:'list'})).body.orders[0];assert.equal(row.stage,'teacher_received');assert.equal(row.academyCorrectionNeeded,false);
+  db.prepare('INSERT INTO book_order_item_price_corrections(app,task_id,item_index,previous_unit_price,corrected_unit_price,reason_code,created_at,created_by) VALUES(?,?,?,?,?,?,?,?)')
+    .bind('task',task.id,0,15000,16000,'director_amount_correction',Date.now()+1,'director').run();
+  row=(await call(db,{auth:admin,action:'list'})).body.orders[0];assert.equal(row.academyCorrectionNeeded,true);
+  const corrected=await call(db,{...register,next:'correct',revision:1,academyRevision:1});assert.equal(corrected.status,200,JSON.stringify(corrected.body));
+  row=(await call(db,{auth:admin,action:'list'})).body.orders[0];assert.equal(row.academyCorrectionNeeded,false);assert.equal(row.academyRegisteredAt,saved.body.academyRegisteredAt);
+  const hand=await call(db,{auth:person('teacher-a','token-a'),action:'order_transition',taskId:task.id,itemIndex:0,next:'hand',revision:1});
+  assert.equal(hand.status,200,JSON.stringify(hand.body));assert.equal(hand.body.status,'academy_registered');
+  row=(await call(db,{auth:admin,action:'list'})).body.orders[0];assert.equal(row.stage,'student_handed');assert.ok(row.studentHandedAt);assert.equal(row.academyCorrectionNeeded,false);
+  assert.equal(db.prepare('SELECT count(*) n FROM completed_book_catalog').first().n,1);
 });
 
 test('new order moves through accepted, teacher received, student handed, and admin academy registration', async () => {

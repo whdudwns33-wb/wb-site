@@ -411,6 +411,28 @@ const LOGIC_BOOK_PRICE_MATRIX = [
   ['logic_growth', '성장', [24000, 24000, 24000, 26000, 24000, 24000, 24000, 24000, 24000, 24000, 24000, 24000]]
 ];
 
+test('3단계 조기 아카등록 후 학생취소는 수정필요로 남고 4단계 등록도 동작한다', async () => {
+  for(const stage of [3,4]) {
+    const db=new TestD1();seed(db);const taskId='ord_academy_stage_'+stage;
+    const created=await call(db,internalBody(taskId,'logic_basic',1));assert.equal(created.status,201);
+    if(stage===4)assert.equal((await call(db,{auth:person,action:'order_transition',taskId,itemIndex:0,next:'hand',revision:1},'/book-issue')).status,200);
+    const registered=await call(db,{auth:admin,action:'academy_transition',taskId,itemIndex:0,next:'register',revision:stage===3?1:2,academyRevision:0},'/book-issue');
+    assert.equal(registered.status,200,JSON.stringify(registered.body));
+    let row=(await call(db,{auth:admin,action:'list'},'/book-issue')).body.orders.find(r=>r.taskId===taskId);
+    assert.equal(row.stage,stage===3?'teacher_received':'student_handed');assert.equal(row.academyCorrectionNeeded,false);
+    if(stage===3){
+      const cancel=await call(db,{auth:person,action:'order_cancel_received_students',taskId,itemIndex:0,revision:1,studentIds:['student-a'],reason:'잘못 주문'},'/book-issue');
+      assert.equal(cancel.status,200,JSON.stringify(cancel.body));
+      row=(await call(db,{auth:admin,action:'list'},'/book-issue')).body.orders.find(r=>r.taskId===taskId);
+      assert.equal(row.stage,'cancelled');assert.equal(row.academyCorrectionNeeded,true);
+      const corrected=await call(db,{auth:admin,action:'academy_transition',taskId,itemIndex:0,next:'correct',revision:row.revision,academyRevision:row.academyRevision},'/book-issue');
+      assert.equal(corrected.status,200,JSON.stringify(corrected.body));
+      row=(await call(db,{auth:admin,action:'list'},'/book-issue')).body.orders.find(r=>r.taskId===taskId);
+      assert.equal(row.academyCorrectionNeeded,false);assert.equal(row.stage,'cancelled');assert.equal(row.academyRegisteredAt,registered.body.academyRegisteredAt);
+    }
+  }
+});
+
 test('논리와 상상 42권의 서버 가격·제목·3단계 등록과 배부·아카등록 기록이 정확하다', async t => {
   const db = new TestD1(); seed(db);
   const orders = [];
