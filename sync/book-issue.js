@@ -1,4 +1,5 @@
 import { validateRosterDocument } from './roster.js';
+import { withAcademyState, transitionAcademy } from './book-academy.js';
 import {
   INTERNAL_BOOK_DELIVERY,
   cancelledOrderItemIndexes,
@@ -325,7 +326,9 @@ async function listOrderFulfillments(env, app, auth, document) {
         cancellation && cancellation.cancelled_at, studentIds, cancelledStudents));
     }
   }
-  return rows;
+  const academyResult = await env.DB.prepare('SELECT * FROM book_order_academy WHERE app=?').bind(app).all();
+  const academyByItem = new Map((academyResult.results || []).map(row => [row.task_id + '|' + row.item_index, row]));
+  return rows.map(row => withAcademyState(row, academyByItem.get(row.taskId + '|' + row.itemIndex)));
 }
 
 async function cancelReceivedOrderStudents(env, app, body, auth, json, origin) {
@@ -913,7 +916,10 @@ async function transitionOrderFulfillment(env, app, body, auth, json, origin, ct
   if (!fulfillmentMatches(row, bookId, originalStudentIds)) {
     return json({ ok: false, code: 'ORDER_IDENTITY_MISMATCH', error: '주문 항목의 학생 또는 교재 정체성이 기존 이력과 다릅니다' }, 409, origin);
   }
-  const targetStatus = next === 'receive' ? 'teacher_received' : next === 'hand' ? 'student_handed' : 'academy_registered';
+  const academyState = next === 'hand' ? (await listOrderFulfillments(env, app, auth, document))
+    .find(item => item.taskId === taskId && item.itemIndex === itemIndex) : null;
+  const alreadyRegistered = !!(academyState && academyState.academyRegisteredAt && !academyState.academyCorrectionNeeded);
+  const targetStatus = next === 'receive' ? 'teacher_received' : next === 'hand' && !alreadyRegistered ? 'student_handed' : 'academy_registered';
   if (row && Number(row.revision) === revision + 1 && String(row.status) === targetStatus) {
     return json({ ok: true, idempotent: true }, 200, origin);
   }
@@ -952,7 +958,7 @@ async function transitionOrderFulfillment(env, app, body, auth, json, origin, ct
   } else {
     const handedAt = next === 'hand' ? now : row.student_handed_at;
     const handedBy = next === 'hand' ? actor : row.student_handed_by;
-    const academyAt = next === 'academy_register' ? now : row.academy_registered_at;
+    const academyAt = next === 'academy_register' ? now : alreadyRegistered ? academyState.academyRegisteredAt : row.academy_registered_at;
     const academyBy = next === 'academy_register' ? actor : row.academy_registered_by;
     const updateStatement = env.DB.prepare(
       'UPDATE book_order_fulfillments SET status=?,revision=revision+1,student_handed_at=?,student_handed_by=?,' +
@@ -965,7 +971,7 @@ async function transitionOrderFulfillment(env, app, body, auth, json, origin, ct
       row.status, bookId, idsJson, app, taskId, itemIndex, cancelledStudentIds.size,
       ...ownerGuard.binds, ...studentGuard.binds);
     let updated;
-    const catalog = next === 'academy_register' && task.orderDelivery !== INTERNAL_BOOK_DELIVERY
+    const catalog = targetStatus === 'academy_registered' && task.orderDelivery !== INTERNAL_BOOK_DELIVERY
       ? completedCatalogRecord(env, item, task, now) : null;
     if (catalog) {
       if (typeof env.DB.batch !== 'function') {
@@ -1148,6 +1154,8 @@ async function transition(env, app, body, auth, json, origin) {
 export async function handleBookIssue(env, app, body, origin, auth, json, ctx) {
   if (app !== 'task') return json({ ok: false, error: '이 기능은 직원 앱에서만 사용할 수 있습니다' }, 400, origin);
   const action = String(body.action || '');
+  if (action === 'academy_transition') return transitionAcademy(env, app, body, auth, json, origin,
+    async () => { const document = await currentRoster(env, app); return document ? listOrderFulfillments(env, app, auth, document) : []; }, ctx);
   if (action === 'list') return listIssues(env, app, auth, json, origin);
   if (action === 'transition') return transition(env, app, body, auth, json, origin);
   if (action === 'order_link') return linkOrderStudents(env, app, body, auth, json, origin);

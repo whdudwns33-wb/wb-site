@@ -1238,16 +1238,16 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-09-28.2"></script>
-<script src="./schedule-board-core.js?v=2026-09-28.2"></script>
-<script src="./asset-core.js?v=2026-09-28.2"></script>
-<script src="./qr-core.js?v=2026-09-28.2"></script>
-<script src="./acaflow-import-core.js?v=2026-09-28.2"></script>
-<script src="./feedback-subject-catalog.js?v=2026-09-28.2"></script>
-<script src="./sync-recovery-core.js?v=2026-09-28.2"></script>
-<script src="./staff-work-session-core.js?v=2026-09-28.2"></script>
-<script src="./staff-attendance-history-core.js?v=2026-09-28.2"></script>
-<script src="./makeup-recovery-core.js?v=2026-09-28.2"></script>
+<script src="./lesson-form-core.js?v=2026-09-29.1"></script>
+<script src="./schedule-board-core.js?v=2026-09-29.1"></script>
+<script src="./asset-core.js?v=2026-09-29.1"></script>
+<script src="./qr-core.js?v=2026-09-29.1"></script>
+<script src="./acaflow-import-core.js?v=2026-09-29.1"></script>
+<script src="./feedback-subject-catalog.js?v=2026-09-29.1"></script>
+<script src="./sync-recovery-core.js?v=2026-09-29.1"></script>
+<script src="./staff-work-session-core.js?v=2026-09-29.1"></script>
+<script src="./staff-attendance-history-core.js?v=2026-09-29.1"></script>
+<script src="./makeup-recovery-core.js?v=2026-09-29.1"></script>
 <script>
 "use strict";
 
@@ -15644,7 +15644,7 @@ function viewLegacyBookIssues() {
 
 function bookOrderStageRows(stage) {
   if (stage === 'order_result') return bookOrderRows.filter(row => ['ordered', 'order_failed', 'order_check'].includes(row.stage));
-  return bookOrderRows.filter(row => row.stage === stage);
+  return bookOrderRows.filter(row => row.stage === stage && !(row.studentHandedAt && row.academyRegisteredAt && !row.academyCorrectionNeeded));
 }
 
 function bookOrderMessageStatusLabel(row) {
@@ -15658,6 +15658,7 @@ function bookOrderMessageStatusLabel(row) {
 }
 
 function bookOrderStatusLabel(row) {
+  if (row.stage === 'cancelled') return ['주문취소', 'bad'];
   if (row.needsStudentLink) return ['학생 연결 필요', 'warn'];
   if (row.integrity) return ['연결 확인 필요', 'bad'];
   if (row.stage === 'order_waiting') return ['주문대기', 'warn'];
@@ -15674,6 +15675,23 @@ function bookOrderSecondaryMessageStatusHtml(row) {
 }
 
 function bookOrderActionButtons(row) {
+  return bookOrderDeliveryButtons(row) + bookOrderAcademyButtons(row);
+}
+
+function bookOrderAcademyButtons(row) {
+  if (!session.isAdmin || row.integrity) return '';
+  const correction = !!row.academyCorrectionNeeded;
+  if (!correction && (row.academyRegisteredAt || row.needsStudentLink ||
+      !['ordered', 'teacher_received', 'student_handed'].includes(row.stage))) return '';
+  if (!correction && !(Number(row.unitPrice) > 0)) return '<span class="hint">교재 금액 입력 후 아카등록할 수 있습니다.</span>';
+  return '<button class="btn btn-sm btn-primary" data-act="bookordertransition" data-next="' +
+    (correction ? 'academy_correct' : 'academy_register') + '" data-task="' + esc(row.taskId) +
+    '" data-item="' + Number(row.itemIndex) + '" data-rev="' + Number(row.revision || 0) +
+    '" data-academy-rev="' + Number(row.academyRevision || 0) + '">' +
+    (correction ? '아카수정완료' : '아카등록완료') + '</button>';
+}
+
+function bookOrderDeliveryButtons(row) {
   const canTeacherAct = session.isAdmin || (session.isStaffLink && String(row.owner || '') === session.staffId);
   const base = ' data-task="' + esc(row.taskId) + '" data-item="' + Number(row.itemIndex) + '" data-rev="' + Number(row.revision || 0) +
     '" data-task-updated="' + Number(row.taskUpdatedAt || 0) + '"';
@@ -15693,9 +15711,6 @@ function bookOrderActionButtons(row) {
   if (row.stage === 'teacher_received' && canTeacherAct) return '<button class="btn btn-sm btn-primary" data-act="bookordertransition" data-next="hand"' + base + '>배부완료</button>' +
     (['bound_print_v1', 'internal_book_v1'].includes(String(row.orderDelivery || ''))
       ? '<button class="btn btn-sm btn-danger" data-act="bookorderreceivedcancelopen"' + base + '>주문취소</button>' : '');
-  if (row.stage === 'student_handed' && session.isAdmin && !row.academyRegisteredAt) {
-    return '<button class="btn btn-sm btn-primary" data-act="bookordertransition" data-next="academy_register"' + base + '>아카등록완료</button>';
-  }
   return '';
 }
 
@@ -15731,7 +15746,8 @@ function bookOrderDatesHtml(row) {
     ['주문요청', row.orderRequestedAt],
     ['주문완료', row.orderCompletedAt],
     ['수령완료', row.teacherReceivedAt],
-    ['배부완료', row.studentHandedAt]
+    ['배부완료', row.studentHandedAt],
+    ['아카등록', row.academyRegisteredAt]
   ].map(item => '<div class="book-order-date"><b>' + item[0] + '</b><span>' + bookOrderDateText(item[1]) + '</span></div>').join('') + '</div>';
 }
 
@@ -15741,6 +15757,8 @@ function bookOrderRowHtml(row) {
   return '<article class="book-order-row"><div class="between"><div><div class="card-title">' + esc(row.title) + ' · ' + Number(row.quantity || 0) + '권</div>' +
     '<div class="card-sub">주문 ' + esc(row.teacherName || '담당 미지정') + ' · 주문처 ' + esc(bookVendorDisplayName(row.vendorName || '미등록')) + '</div></div><span class="pill ' + label[1] + '">' + label[0] + '</span></div>' +
     bookOrderSecondaryMessageStatusHtml(row) + bookOrderMoneyHtml(row) + bookOrderPriceEntryHtml(row) + bookOrderDatesHtml(row) +
+    (row.academyCorrectionNeeded ? '<div class="hint mt8" style="color:#b42318"><b>아카 수정 필요</b> · 등록 후 취소·학생·교재·금액 정보가 달라졌습니다. 아카플로우에서 직접 수정한 뒤 확인해 주세요.</div>' :
+      row.academyRegisteredAt ? '<div class="hint mt8">아카등록 완료 · 수령·배부는 별도로 처리해 주세요.</div>' : '') +
     (students.length ? '<div class="book-order-student-list">' + students.map(student => '<span class="book-order-student">' +
       esc(staffStudentCompactLabel(student, '이름 미입력')) + '</span>').join('') + '</div>' :
       '<div class="small muted mt8">' + (row.integrity || row.needsStudentLink ? '현재 원생 명단과 주문의 stable studentId 연결을 확인해 주세요.' : '기존 수량 주문 · 학생 연결 없음') + '</div>') +
@@ -15783,6 +15801,9 @@ function viewBookIssues() {
     bookOrderStageHtml('order_result', '2단계 · 주문완료 / 주문실패', '저녁 8시 이후 주문 결과가 없습니다.') +
     bookOrderStageHtml('teacher_received', '3단계 · 선생님 수령', '선생님이 수령한 교재가 없습니다.') +
     bookOrderStageHtml('student_handed', '4단계 · 학생배부 완료', '학생 배부가 완료된 교재가 없습니다.') +
+    (session.isAdmin && bookOrderRows.some(row => row.academyCorrectionNeeded)
+      ? '<details class="book-order-stage"><summary><b>아카 수정 필요</b></summary>' +
+        bookOrderRows.filter(row => row.academyCorrectionNeeded).map(bookOrderRowHtml).join('') + '</details>' : '') +
     bookOrderCancellationHistoryHtml() + '</div>';
   h += '</section>';
   return h;
@@ -15845,14 +15866,17 @@ async function transitionBookOrder(button) {
   if (next === 'receive' && !confirm('선생님이 이 교재를 실제로 수령했나요?')) return;
   if (next === 'hand' && !confirm('선택된 학생들에게 교재를 모두 배부했나요?')) return;
   if (next === 'academy_register' && !confirm('아카에 교재 등록을 완료했나요?')) return;
+  if (next === 'academy_correct' && !confirm('아카플로우에서 취소·학생·금액 변경을 직접 수정했나요? 이 버튼은 아카플로우를 자동 수정하지 않습니다.')) return;
   button.disabled = true;
   try {
-    await sync.post('/book-issue', { app: SYNC_APP, auth: auth, action: 'order_transition',
+    const academy = next === 'academy_register' || next === 'academy_correct';
+    await sync.post('/book-issue', { app: SYNC_APP, auth: auth, action: academy ? 'academy_transition' : 'order_transition',
       taskId: String(button.dataset.task || ''), itemIndex: Number(button.dataset.item),
-      next: next, revision: Number(button.dataset.rev) || 0 });
+      next: academy ? (next === 'academy_correct' ? 'correct' : 'register') : next,
+      academyRevision: Number(button.dataset.academyRev) || 0, revision: Number(button.dataset.rev) || 0 });
     await loadBookIssues(true);
     if (next === 'academy_register') await loadCompletedBookCatalog(true);
-    toast(next === 'receive' ? '수령완료로 저장했습니다' : next === 'hand' ? '배부완료로 저장했습니다' : '아카등록완료로 저장했습니다');
+    toast(next === 'receive' ? '수령완료로 저장했습니다' : next === 'hand' ? '배부완료로 저장했습니다' : next === 'academy_correct' ? '아카수정완료로 저장했습니다' : '아카등록완료로 저장했습니다');
   } catch (error) {
     button.disabled = false;
     toast('교재 단계 저장 실패 — ' + (error.message || error));
@@ -16652,7 +16676,7 @@ function bookOrderHistorySearchKey(value) {
 function bookOrderHistoryRows(teacherId, titleQuery) {
   const selected = String(teacherId || '');
   const titleKey = bookOrderHistorySearchKey(titleQuery);
-  return bookOrderRows.filter(row => row.academyRegisteredAt &&
+  return bookOrderRows.filter(row => row.academyRegisteredAt && row.studentHandedAt && !row.academyCorrectionNeeded && row.stage !== 'cancelled' &&
     (!selected || (row.owner ? String(row.owner) : '__director__') === selected) &&
     (!titleKey || bookOrderHistorySearchKey(row.title).includes(titleKey))).slice()
     .sort((a, b) => Number(b.studentHandedAt || 0) - Number(a.studentHandedAt || 0) ||
@@ -25138,7 +25162,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-09-28.2';
+const APP_VER = '2026-09-29.1';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
