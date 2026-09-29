@@ -29,9 +29,9 @@ test('내부·제본교재 3단계 취소는 학생별 선택과 필수 사유�
 test('3단계에만 주문취소 버튼을 보이고 4단계에는 기존 아카등록 흐름만 유지한다', () => {
   const actions = block('function bookOrderActionButtons(', 'function bookOrderDateText(');
   assert.match(actions, /row\.stage === 'teacher_received'[\s\S]*bookorderreceivedcancelopen/);
-  assert.match(actions, /row\.stage === 'student_handed'[\s\S]*bookordertransition/);
-  const handed = actions.slice(actions.indexOf("row.stage === 'student_handed'"));
-  assert.doesNotMatch(handed, /bookorderreceivedcancelopen/);
+  const buttons = Function('session','esc',actions+';return bookOrderActionButtons;')({isAdmin:true},String);
+  assert.doesNotMatch(buttons({stage:'student_handed',unitPrice:1000}), /bookorderreceivedcancelopen/);
+  assert.match(buttons({stage:'student_handed',unitPrice:1000}), /아카등록완료/);
 });
 
 test('취소된 학생은 진행단계와 분리된 접기식 취소 기록에서 날짜와 사유를 확인한다', () => {

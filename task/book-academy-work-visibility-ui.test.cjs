@@ -40,8 +40,10 @@ test('아카등록 표시와 완료 버튼은 관리자 교재 탭에 그대로 
   const start = source.indexOf('function bookOrderActionButtons(');
   const end = source.indexOf('function bookOrderStageHtml(', start);
   const books = source.slice(start, end);
-  assert.match(books, /row\.stage === 'student_handed' && session\.isAdmin && !row\.academyRegisteredAt/);
-  assert.match(books, /data-next="academy_register"[\s\S]*>아카등록완료<\/button>/);
+  assert.match(books, /if \(!session\.isAdmin \|\| row\.integrity\) return ''/);
+  assert.match(books, /\['ordered', 'teacher_received', 'student_handed'\]\.includes\(row.stage\)/);
+  assert.match(books, /'academy_correct' : 'academy_register'/);
+  assert.match(books, /'아카수정완료' : '아카등록완료'/);
   assert.match(books, /해야 할 업무 · 아카등록/);
 
   assert.doesNotMatch(source, /ensureBookOrderWorkScopeData\(\)/);
