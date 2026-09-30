@@ -38,6 +38,31 @@ function titleDisplayCore() {
   };`)();
 }
 
+test('lesson card schedule respects effective dates without changing historical slots', () => {
+  const core = scheduleDisplayCore();
+  const render = new Function('groupedScheduleSlotsForDisplay', 'lessonScheduleSlotLabel', 'esc', 'lessonHoursValue', 'repeatLabel',
+    block('function lessonScheduleMetaHtml(', 'function taskCardDetail(') + '\nreturn lessonScheduleMetaHtml;')(
+      core.groupedScheduleSlotsForDisplay, core.lessonScheduleSlotLabel, String, value => value || '', () => '매주');
+  const task = { time: '16:00', scheduleSlots: [
+    { days: [1, 3, 5], startTime: '16:00', endTime: '16:50', lessonHours: '1T', validTo: '2026-09-28' },
+    { days: [1, 3, 5], startTime: '15:30', endTime: '16:20', lessonHours: '1T', validFrom: '2026-09-29' },
+    { days: [6], startTime: '12:00', endTime: '13:20', lessonHours: '1.5T' }
+  ] };
+  const original = JSON.stringify(task);
+  assert.match(render(task, '2026-09-28'), /16:00–16:50/);
+  assert.doesNotMatch(render(task, '2026-09-28'), /15:30/);
+  for (const date of ['2026-09-29', '2026-09-30', '2026-10-03']) {
+    assert.match(render(task, date), /15:30–16:20/);
+    assert.doesNotMatch(render(task, date), /16:00–16:50/);
+    assert.match(render(task, date), /토 12:00–13:20/);
+  }
+  assert.equal(JSON.stringify(task), original);
+  const expired = { time: '16:00', scheduleSlots: [{ days: [1], startTime: '16:00', endTime: '16:50', endDate: '2026-09-28' }] };
+  assert.match(render(expired, '2026-09-30'), /해당 날짜 시간표 없음/);
+  assert.doesNotMatch(render(expired, '2026-09-30'), /16:00/);
+  assert.match(render({ time: '14:00' }, '2026-09-30'), /14:00/);
+});
+
 const legacyLesson = () => ({
   id: 'legacy-lesson', title: '[수업] 학생 (중1) — 영어',
   steps: [1, 2, 3].map(index => ({ id: `legacy-${index}`, label: `기존 맞춤 ${index}` }))

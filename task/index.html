@@ -1238,16 +1238,16 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-09-29.1"></script>
-<script src="./schedule-board-core.js?v=2026-09-29.1"></script>
-<script src="./asset-core.js?v=2026-09-29.1"></script>
-<script src="./qr-core.js?v=2026-09-29.1"></script>
-<script src="./acaflow-import-core.js?v=2026-09-29.1"></script>
-<script src="./feedback-subject-catalog.js?v=2026-09-29.1"></script>
-<script src="./sync-recovery-core.js?v=2026-09-29.1"></script>
-<script src="./staff-work-session-core.js?v=2026-09-29.1"></script>
-<script src="./staff-attendance-history-core.js?v=2026-09-29.1"></script>
-<script src="./makeup-recovery-core.js?v=2026-09-29.1"></script>
+<script src="./lesson-form-core.js?v=2026-09-30.1"></script>
+<script src="./schedule-board-core.js?v=2026-09-30.1"></script>
+<script src="./asset-core.js?v=2026-09-30.1"></script>
+<script src="./qr-core.js?v=2026-09-30.1"></script>
+<script src="./acaflow-import-core.js?v=2026-09-30.1"></script>
+<script src="./feedback-subject-catalog.js?v=2026-09-30.1"></script>
+<script src="./sync-recovery-core.js?v=2026-09-30.1"></script>
+<script src="./staff-work-session-core.js?v=2026-09-30.1"></script>
+<script src="./staff-attendance-history-core.js?v=2026-09-30.1"></script>
+<script src="./makeup-recovery-core.js?v=2026-09-30.1"></script>
 <script>
 "use strict";
 
@@ -1578,9 +1578,17 @@ function lessonReferenceSteps(t) {
   return usesStandardLessonDisplay(t) && !hasStandardLessonSteps(t) ? storedTaskSteps(t) : [];
 }
 
-function lessonScheduleMetaHtml(task) {
-  const slots = groupedScheduleSlotsForDisplay(task && task.scheduleSlots, task && task.lessonHours);
+function lessonScheduleMetaHtml(task, date) {
+  // 과거 시간표도 같은 수업에 보관하므로, 카드 조회일의 유효기간만 표시한다.
+  const storedSlots = Array.isArray(task && task.scheduleSlots) ? task.scheduleSlots : [];
+  const activeSlots = storedSlots.filter(slot => {
+    const from = String(slot && (slot.validFrom || slot.startDate) || '');
+    const to = String(slot && (slot.validTo || slot.endDate) || '');
+    return (!from || from <= date) && (!to || date <= to);
+  });
+  const slots = groupedScheduleSlotsForDisplay(activeSlots, task && task.lessonHours);
   if (slots.length) return '<span class="lesson-schedule-meta">' + slots.map(slot => '<span class="tag time">' + esc(lessonScheduleSlotLabel(slot)) + '</span>').join('') + '</span>';
+  if (storedSlots.length) return '<span class="lesson-schedule-meta"><span class="tag">해당 날짜 시간표 없음</span></span>';
   return '<span class="lesson-schedule-meta">' +
     (task && task.time ? '<span class="tag time">' + esc(task.time) + '</span>' : '') +
     (lessonHoursValue(task && task.lessonHours) ? '<span class="tag time">' + esc(lessonHoursValue(task.lessonHours)) + '</span>' : '') +
@@ -5515,7 +5523,7 @@ function taskRow(t, date, editable, isCarry) {
       (detail ? '<div class="task-d">' + esc(detail) + '</div>' : '') +
       '<div class="meta' + (lesson ? ' lesson-meta' : '') + '">' +
         (isCarry ? '<span class="tag carry">⚠ ' + shortDate(date) + ' 미완료</span>' : '') +
-        (lesson ? lessonScheduleMetaHtml(t) :
+        (lesson ? lessonScheduleMetaHtml(t, date) :
           (timeDisplay ? '<span class="tag time">' + esc(timeDisplay) + '</span>' : '') +
           (!isCarry ? '<span class="tag">' + esc(repeatLabel(t)) + '</span>' : '')) +
         lessonFirstClassTag +
@@ -25162,7 +25170,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-09-29.1';
+const APP_VER = '2026-09-30.1';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
