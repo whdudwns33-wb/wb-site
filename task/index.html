@@ -1238,16 +1238,16 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-09-30.1"></script>
-<script src="./schedule-board-core.js?v=2026-09-30.1"></script>
-<script src="./asset-core.js?v=2026-09-30.1"></script>
-<script src="./qr-core.js?v=2026-09-30.1"></script>
-<script src="./acaflow-import-core.js?v=2026-09-30.1"></script>
-<script src="./feedback-subject-catalog.js?v=2026-09-30.1"></script>
-<script src="./sync-recovery-core.js?v=2026-09-30.1"></script>
-<script src="./staff-work-session-core.js?v=2026-09-30.1"></script>
-<script src="./staff-attendance-history-core.js?v=2026-09-30.1"></script>
-<script src="./makeup-recovery-core.js?v=2026-09-30.1"></script>
+<script src="./lesson-form-core.js?v=2026-09-30.2"></script>
+<script src="./schedule-board-core.js?v=2026-09-30.2"></script>
+<script src="./asset-core.js?v=2026-09-30.2"></script>
+<script src="./qr-core.js?v=2026-09-30.2"></script>
+<script src="./acaflow-import-core.js?v=2026-09-30.2"></script>
+<script src="./feedback-subject-catalog.js?v=2026-09-30.2"></script>
+<script src="./sync-recovery-core.js?v=2026-09-30.2"></script>
+<script src="./staff-work-session-core.js?v=2026-09-30.2"></script>
+<script src="./staff-attendance-history-core.js?v=2026-09-30.2"></script>
+<script src="./makeup-recovery-core.js?v=2026-09-30.2"></script>
 <script>
 "use strict";
 
@@ -21846,6 +21846,44 @@ function viewStudentPortalPanel() {
 }
 
 /* ── 설정 ── */
+function taskJsonExportPayload(exportedAt) {
+  return {
+    schema: 'wb-task-transfer-v1',
+    app: 'task',
+    exportedAt: exportedAt || new Date().toISOString(),
+    items: (state.tasks || [])
+      .filter(task => task && !task.deleted && !isBookOrderWorkTask(task) && !isLesson(task) &&
+        !isSessionLessonTask(task) && !isScheduledMakeupTask(task))
+      .map(task => {
+        const staff = staffById(task.staffId);
+        return {
+          taskId: String(task.id || ''),
+          groupId: String(task.groupId || ''),
+          staffId: String(task.staffId || ''),
+          staffName: String(staff && staff.name || ''),
+          title: String(task.title || ''),
+          detail: String(task.detail || ''),
+          guide: String(task.guide || ''),
+          steps: (Array.isArray(task.steps) ? task.steps : []).map(step => ({
+            id: String(step && step.id || ''), label: String(step && step.label || '')
+          })),
+          target: Number(task.target) || 0,
+          unit: String(task.unit || ''),
+          time: String(task.time || ''),
+          priority: task.priority === 'high' ? 'high' : 'normal',
+          repeat: String(task.repeat || 'once'),
+          days: Array.isArray(task.days) ? task.days.map(Number).filter(day => day >= 0 && day <= 6) : [],
+          start: String(task.start || ''),
+          end: String(task.end || ''),
+          carry: task.carry !== false,
+          origin: String(task.origin || ''),
+          createdAt: Number(task.createdAt) || 0,
+          updatedAt: Number(task.updatedAt) || 0
+        };
+      })
+  };
+}
+
 function viewSettings() {
   const s = state.settings;
   const lastTxt = sync.last ? new Date(sync.last).toLocaleString('ko-KR') : '아직 없음';
@@ -21855,6 +21893,11 @@ function viewSettings() {
     '<div class="row" style="gap:8px">' +
       '<button class="btn btn-ghost" data-act="export">내보내기</button>' +
       '<button class="btn btn-ghost" data-act="import">가져오기</button></div>' +
+    '<hr class="sep">' +
+    '<div class="card-title">외부 프로그램 전달</div>' +
+    '<div class="card-sub mb14">삭제되지 않은 일반 업무지시서만 JSON으로 내려받습니다. 수업·교재 주문·체크 기록·설정·접속 비밀값은 제외됩니다.<br>' +
+      '<b>자유 입력 내용에 학생 개인정보가 없는지 전달 전에 확인하세요.</b></div>' +
+    '<button class="btn btn-navy btn-block" data-act="taskjsonexport">업무지시서 JSON 받기</button>' +
   '</div>';
   if (session.isManager) {
     return '<div class="card">' +
@@ -24486,6 +24529,13 @@ document.addEventListener('click', async ev => {
       a.click(); URL.revokeObjectURL(a.href);
       break;
     }
+    case 'taskjsonexport': {
+      if (!session.isAdmin) break;
+      const payload = taskJsonExportPayload();
+      downloadFile('wb-업무지시서-외부전달-' + today() + '.json', JSON.stringify(payload, null, 2), 'application/json');
+      toast('업무지시서 ' + payload.items.length + '건을 내려받았습니다');
+      break;
+    }
     case 'import': {
       const inp = document.createElement('input');
       inp.type = 'file'; inp.accept = 'application/json';
@@ -25170,7 +25220,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-09-30.1';
+const APP_VER = '2026-09-30.2';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
