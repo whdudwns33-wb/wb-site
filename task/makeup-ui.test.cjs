@@ -25,6 +25,7 @@ function makeupScheduleSubmitHarness(options = {}) {
     makeupActiveStaff: id => id === 'staff-1' ? { id } : null,
     makeupRows: options.rows || [{ caseId: 'makeup-8', status: 'confirmed' }],
     makeupInstructionInput: () => ({}),
+    makeupCanSchedule: () => !!(!options.session || options.session.isAdmin),
     mutateMakeup: async payload => calls.push({ payload })
   };
   const source = block('function makeupDateTimeInput()', 'async function restoreMakeupSchedule');
@@ -377,7 +378,7 @@ test('past schedule dates still require complete time fields, a later end time, 
   }
 });
 
-test('past scheduling stays admin-only and rescheduling still requires a confirmed case', async () => {
+test('unauthorized scheduling is blocked and rescheduling still requires a confirmed case', async () => {
   for (const action of ['schedule', 'reschedule']) {
     for (const session of [{}, { isAdmin: false, isStaffLink: true, staffId: 'staff-1' }]) {
       const api = makeupScheduleSubmitHarness({ session });
@@ -393,7 +394,7 @@ test('past scheduling stays admin-only and rescheduling still requires a confirm
 });
 
 test('rendered schedule dates have no minimum and direct completion retains the today maximum', () => {
-  const modalSource = block('function makeupCanComplete(row)', 'function makeupLessonTaskForCase') +
+  const modalSource = block('function makeupCanSchedule(row)', 'function makeupLessonTaskForCase') +
     block('function makeupDateTimeModal(row, mode)', 'function makeupNoMakeupModal');
   const bindings = {
     session: { isAdmin: true }, today: () => '2026-09-08', esc: String,
@@ -417,7 +418,7 @@ test('rendered schedule dates have no minimum and direct completion retains the 
   };
 
   open(pending, 'schedule');
-  assert.doesNotMatch(dateInput(), /\bmin=|\bdisabled\b/);
+  assert.doesNotMatch(dateInput(), /\bmin=|\bmax=|\bdisabled\b/);
   open(scheduled, 'reschedule');
   assert.match(dateInput(), /value="2026-08-14"/);
   assert.doesNotMatch(dateInput(), /\bmin=|\bdisabled\b/);
@@ -430,6 +431,10 @@ test('rendered schedule dates have no minimum and direct completion retains the 
 
   bindings.session.isAdmin = false;
   bindings.session.isStaffLink = true;
+  bindings.session.staffId = 'staff-1';
+  open({ ...pending, currentTeacherId: 'staff-1' }, 'schedule');
+  assert.doesNotMatch(dateInput(), /\bmin=|\bmax=|\bdisabled\b/);
+  assert.match(rendered, /id="muStaff" type="hidden" value="staff-1"/);
   bindings.session.staffId = 'staff-2';
   for (const mode of ['schedule', 'reschedule', 'restore', 'complete']) {
     rendered = undefined;
