@@ -26,7 +26,7 @@ test('담당자 직접 완료는 공통 권한 검사로 검증한다', () => {
   assert.match(source.slice(start, start + 160), /본인이 담당하는 보강/);
 });
 
-test('일정 없는 본인 보강은 후보 조회 없이 완료 입력하고 이전 담당자는 허용하지 않는다', async () => {
+test('일정 없는 본인 보강은 후보 조회 없이 생성·완료 선택을 열고 이전 담당자는 허용하지 않는다', async () => {
   const start = source.indexOf('function makeupCanComplete');
   const end = source.indexOf('function makeupLessonTaskForCase', start);
   const session = { isAdmin: false, isStaffLink: true, staffId: 'teacher-a' };
@@ -41,10 +41,14 @@ test('일정 없는 본인 보강은 후보 조회 없이 완료 입력하고 �
   const fnEnd = source.indexOf('async function openMakeupLinkModal', fnStart);
   row.caseId = 'case-a';
   const open = Function('makeupRows', 'makeupCanComplete', 'makeupDateTimeModal', 'openMakeupLinkModal',
+    'makeupCanSchedule', 'modal', 'esc', 'makeupScheduleHtml',
     source.slice(fnStart, fnEnd) + '; return openMakeupProcessModal;')([row], can,
-    (selected, mode) => calls.push(mode), () => assert.fail('후보 조회가 완료 입력을 막으면 안 된다'));
+    (selected, mode) => calls.push(mode), () => assert.fail('후보 조회가 완료 입력을 막으면 안 된다'),
+    can, (title, body, buttons) => calls.push(buttons), String, () => '');
   await open({ dataset: { case: 'case-a' } });
-  assert.deepEqual(calls, ['complete']);
+  assert.equal(calls.length, 1);
+  assert.match(calls[0], /data-act="muschedule"/);
+  assert.match(calls[0], /data-act="mudirectcompleteopen"/);
 });
 
 test('일정 없는 직접 완료는 날짜·시간을 비워 둔 상태로 전송할 수 있다', () => {

@@ -75,6 +75,23 @@ class TestD1 {
 }
 
 const own = id => ({ scope: 'own', id });
+
+test('teacher schedules own future makeup but cannot schedule another teacher case or assign another teacher', async () => {
+  const db = new TestD1(); seed(db);
+  const created = await call(db, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  });
+  assert.equal(created.status, 200);
+  const payload = { action: 'schedule', caseId: created.body.case.caseId,
+    revision: created.body.case.revision, date: '2026-10-03', startTime: '10:00', endTime: '11:00', staffId: 'teacher-a' };
+  assert.equal((await call(db, own('teacher-b'), payload)).status, 403);
+  assert.equal((await call(db, own('teacher-a'), { ...payload, staffId: 'teacher-b' })).status, 403);
+  const result = await callAt(db, own('teacher-a'), payload, '2026-09-30T18:00:00+09:00');
+  assert.equal(result.status, 200, JSON.stringify(result.body));
+  assert.equal(result.body.case.status, 'confirmed');
+  assert.equal(result.body.case.confirmedDate, '2026-10-03');
+  assert.equal(result.body.lessonTask.staffId, 'teacher-a');
+});
 const manager = id => ({ scope: 'all', id, role: 'manager' });
 const all = { scope: 'all' };
 const responseJson = (object, status) => new Response(JSON.stringify(object), {
@@ -1030,7 +1047,7 @@ test('schedule immediately confirms with the source teacher and atomically creat
     action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
   });
   const row = created.body.case;
-  const forbidden = await callAt(db, own('teacher-a'), {
+  const forbidden = await callAt(db, own('teacher-b'), {
     action: 'schedule', caseId: row.caseId, revision: row.revision,
     date: '2026-08-12', startTime: '20:00', endTime: '21:00'
   }, '2026-08-11T12:00:00+09:00');
