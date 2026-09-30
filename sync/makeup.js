@@ -2262,7 +2262,7 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
     if (action === 'reconcile_attendance') return await reconcileAttendance(env, app, body, auth, json, origin);
 
     const administrative = new Set([
-      'review', 'propose', 'confirm', 'schedule', 'reschedule',
+      'review', 'propose', 'confirm', 'reschedule',
       'restore_schedule', 'no_makeup', 'cancel'
     ]);
     if (administrative.has(action) && auth.scope !== 'all') {
@@ -2398,6 +2398,11 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
       event = { action, from: row.status, to: next.status, actorId: actorId(auth), notificationNeeded: true };
       scheduledSave = { staffId: String(row.proposed_staff_id), range };
     } else if (action === 'schedule') {
+      // 선생님은 현재 본인 원수업의 보강만 본인 담당으로 생성한다.
+      if (auth.scope !== 'all' && (String(auth.id || '') !== currentSourceTeacherId ||
+          (body.staffId && String(body.staffId) !== String(auth.id)))) {
+        return json({ ok: false, error: '본인 수업의 보강만 본인 담당으로 생성할 수 있습니다' }, 403, origin);
+      }
       if (!['review_pending', 'reviewed', 'awaiting_parent'].includes(String(row.status))) {
         problem('일정이 아직 생성되지 않은 보강만 생성할 수 있습니다', 409, 'INVALID_TRANSITION');
       }
