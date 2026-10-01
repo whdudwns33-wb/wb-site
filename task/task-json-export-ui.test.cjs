@@ -83,3 +83,65 @@ test('외부 전달 JSON은 일반 업무 필드만 내보내고 비밀값과 �
     'SESSION_SENTINEL', 'MAKEUP_SENTINEL'
   ]) assert.ok(!json.includes(forbidden), forbidden);
 });
+
+test('관리자 보강 화면에 반·학생 목록 JSON 버튼과 안전한 다운로드 동작이 있다', () => {
+  const makeups = functionSource('viewMakeups');
+  assert.match(makeups, /session\.isAdmin[\s\S]*data-act="classrosterjsonexport">반·학생 목록 JSON 받기/);
+
+  const start = html.indexOf("case 'classrosterjsonexport':");
+  const action = html.slice(start, html.indexOf("case 'import':", start));
+  assert.match(action, /if \(!session\.isAdmin\) break/);
+  assert.match(action, /if \(!rosterDb\)/);
+  assert.match(action, /rosterErr = ''[\s\S]*loadRoster\(\)/);
+  assert.match(action, /classRosterJsonExportPayload\(\)/);
+  assert.match(action, /downloadFile\('wb-반별-학생목록-' \+ today\(\) \+ '\.json'/);
+  assert.match(action, /'application\/json'/);
+  assert.doesNotMatch(action, /JSON\.stringify\(state/);
+});
+
+test('반·학생 목록 JSON은 활성 반과 학생 식별값·이름만 내보낸다', () => {
+  const reference = '2026-10-01';
+  const students = [
+    { id: 'student-b', name: '가상학생나', phoneMother: 'PHONE_SENTINEL', memo: 'MEMO_SENTINEL' },
+    { id: 'student-a', name: '가상학생가', school: 'SCHOOL_SENTINEL', parentRequest: 'PARENT_SENTINEL' }
+  ];
+  const tasks = [
+    { id: 'lesson-a', studentId: 'student-a', staffId: 'staff-a', subject: '수학', scheduleText: '월·수 16:00', start: '2026-09-01', detail: 'DETAIL_SENTINEL' },
+    { id: 'lesson-b', studentId: 'student-b', staffId: 'staff-a', subject: '수학', scheduleText: '월·수 16:00', start: '2026-09-01' },
+    { id: 'lesson-duplicate', studentId: 'student-a', staffId: 'staff-a', subject: '수학', scheduleText: '월·수 16:00', start: '2026-09-01' },
+    { id: 'future', studentId: 'student-a', staffId: 'staff-a', subject: '영어', scheduleText: '금 17:00', start: '2026-11-01', futureSecret: 'FUTURE_SENTINEL' },
+    { id: 'ended', studentId: 'student-a', staffId: 'staff-a', subject: '국어', end: '2026-09-30', endedSecret: 'ENDED_SENTINEL' },
+    { id: 'deleted', studentId: 'student-a', staffId: 'staff-a', subject: '과학', deleted: true, deletedSecret: 'DELETED_SENTINEL' },
+    { id: 'makeup', studentId: 'student-a', staffId: 'staff-a', subject: '사회', makeupCaseId: 'case-a', makeupSecret: 'MAKEUP_SENTINEL' }
+  ];
+  const build = new Function('today', 'studentLinkCandidates', 'rosterStudentAssignedLessonTasks',
+    'lessonAssignmentScheduleText', 'staffById',
+    functionSource('classRosterJsonExportPayload') +
+    '; return classRosterJsonExportPayload("2026-10-01T00:00:00.000Z");');
+  const payload = build(
+    () => reference,
+    () => students,
+    (studentId, date) => tasks.filter(task => task.studentId === studentId && !task.deleted && !task.makeupCaseId && (!task.end || task.end >= date)),
+    () => '',
+    id => id === 'staff-a' ? { id, name: '김담당', phone: 'STAFF_PHONE_SENTINEL' } : null
+  );
+
+  assert.deepEqual(Object.keys(payload).sort(), ['app', 'asOf', 'classes', 'exportedAt', 'schema']);
+  assert.equal(payload.schema, 'wb-class-roster-v1');
+  assert.equal(payload.app, 'task');
+  assert.equal(payload.asOf, reference);
+  assert.equal(payload.exportedAt, '2026-10-01T00:00:00.000Z');
+  assert.deepEqual(payload.classes, [{
+    className: '수학 · 월·수 16:00 · 김담당 선생님',
+    students: [
+      { studentId: 'student-a', name: '가상학생가' },
+      { studentId: 'student-b', name: '가상학생나' }
+    ]
+  }]);
+
+  const json = JSON.stringify(payload);
+  for (const forbidden of [
+    'PHONE_SENTINEL', 'MEMO_SENTINEL', 'SCHOOL_SENTINEL', 'PARENT_SENTINEL', 'DETAIL_SENTINEL',
+    'FUTURE_SENTINEL', 'ENDED_SENTINEL', 'DELETED_SENTINEL', 'MAKEUP_SENTINEL', 'STAFF_PHONE_SENTINEL'
+  ]) assert.ok(!json.includes(forbidden), forbidden);
+});
