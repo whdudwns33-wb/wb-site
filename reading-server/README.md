@@ -5,18 +5,30 @@
 ## 실행
 
 ```bash
-ADMIN_PIN=원하는PIN node reading-server/server.mjs   # 기본 포트 8890
+ADMIN_PIN=원하는PIN node reading-server/server.mjs   # 기본 포트 8890 (아이디 로그인은 ADMIN_ID·ADMIN_PASSWORD 를 대신 써도 된다)
+# 관리 로그인에 기본값은 없다 — 둘 다 빠지면 서버가 뜨지 않는다(공개 저장소에 기본 PIN 을 적어 두지 않으려는 것)
 ```
 
 | 경로 | 내용 |
 |------|------|
 | `/` | 학생 앱 (reading/ 폴더를 그대로 서빙 — 같은 주소라 연동이 자동 활성화) |
 | `/vocab/` | **워드브레인** (어휘 기억 앱, vocab/ 폴더) — 같은 오리진이라 진로독서 어휘장·학생 토큰이 자동 공유 |
+| `/hanja/` | **어휘브레인** (한자·한글 어휘 앱, hanja/ 폴더) — 같은 오리진, 학생 토큰 공유. 단어장은 `/api/hanja/*`(KV·db 전용) |
+| `/admin/hanja-admin.html` | **어휘브레인 단어장 관리** (PIN) — 문제집 단어장 업로드(붙여넣기·JSON)·공개 범위·종류(자체/교재)·학생 배정·현황 |
 | `/admin` | 강사 관리 웹 (PIN 로그인) — 현황판·학생 상세·백업·학부모 링크 |
 | `/admin/vocab-review.html` | **워드브레인 AI 연상 검수함** (PIN 로그인) — 승인/반려 + 학생별 어휘 현황 |
 | `/review.html` | 지문 검수 뷰어 + **발행/초안 원클릭 전환** (PIN 로그인) |
 | `/parent.html?t=…` | 학부모 주간 리포트 (학생별 열람 토큰, 로그인 불필요, 읽기 전용) |
+| `/letter/` · `/letter/?t=…` | **브레인레터** 주간 뉴스레터 — 학생 앱 / 가족 링크(같은 학부모 토큰) / [PDF로 저장] |
+| `/admin/letter-admin.html` | **브레인레터 관리** (PIN 로그인) — 호 편집·AI 초안·발행·발송 문구·열람 현황 |
 | `/api/health` | 상태 확인 |
+
+### 어휘브레인
+
+- 라우트는 `/api/hanja/*`, 데이터는 `hanja:` 접두 KV 키(로컬 `db.hanja`)만 — `hanja-api.mjs` 한 모듈. 상세는 `hanja/README.md`.
+- 학생: `GET /books`·`GET /book?id=`(+`remap`)·`GET /pull`·`PUT /state`(저장 시 `hanja:summary:<code>` 요약 갱신)·`GET /task`(이번 주 단원, 학생→반→default)·`GET /strokes`(공용 획순 사전)·`GET /push/key`·`POST /push/subscribe|unsubscribe`(밤 9시 알림 — 워드브레인 크론이 함께 보낸다).
+- 관리(PIN): `POST /admin/book`(붙여넣기·JSON, dryRun, 재업로드 시 낱말 id 대응 remap)·`GET /admin/books`·`DELETE /admin/book`·`POST /admin/scope`(id 하나 또는 ids 여러 권 — 한 번의 쓰기)·`POST /admin/source`(종류 — AI 연상은 자체 단어장만)·`POST /admin/assign`·`POST /admin/task`·`GET /admin/tasks`·`DELETE /admin/task`·`GET /admin/progress?scope=`(단원별 진도)·`POST|GET /admin/strokes`(획순 사전)·`GET /admin/overview`(요약 키). 관리 화면 `/admin/hanja-admin.html`, 시험지 인쇄 `/admin/hanja-print.html`.
+- 단어장 검사 규칙은 `hanja/book-check.js` 하나 — CLI `node hanja/book-validate.mjs` 와 업로드 관문이 같은 판정. 백업 덤프에는 단어장 본문이 없다(id·메타만).
 
 ### 워드브레인 (분리 가능한 A 구조)
 
@@ -25,8 +37,20 @@ ADMIN_PIN=원하는PIN node reading-server/server.mjs   # 기본 포트 8890
 - 학생 API: `GET /api/vocab/pull` / `PUT /api/vocab/state` (400KB 제한) / `POST /api/vocab/mnemonic {word,meaning,type}` — AI 연상 3안 생성(같은 단어는 캐시, 승인되면 승인본만 반환).
 - 관리 API(PIN): `GET·POST /api/vocab/admin/review` (승인 시 cue·scene 확정 — 이후 학생들에게 재사용) / `GET /api/vocab/admin/overview`.
 - AI 연상은 `ANTHROPIC_API_KEY` 시크릿 필요(모델 기본 `claude-opus-5`, `VOCAB_AI_MODEL`로 변경). 키가 없으면 해당 기능만 "미설정" 안내로 동작.
+- **관리 로그인**은 PIN(`ADMIN_PIN`) 또는 아이디·비밀번호(`ADMIN_ID`·`ADMIN_PASSWORD`) — 판정은 `admin-auth.mjs` 하나(워커·로컬 공용, 다이제스트 고정 시간 비교). 워커 시크릿은 Actions 「관리 계정·AI 삽화 시크릿 등록」(`admin-secrets.yml`)이 저장소 시크릿에서 복사한다(값을 입력으로 받지 않는다 — public 저장소). 브레인레터 AI 삽화의 `GEMINI_API_KEY` 도 같은 워크플로우.
+- **PIN 을 잊었다면** 되찾을 수 없다 — 워커 시크릿은 덮어쓸 수만 있고 읽어낼 수 없다. 저장소 시크릿에 새 `ADMIN_PIN`(10자 이상)을 넣고 위 워크플로우를 `pin` 체크로 돌리면 교체된다. 아이디·비밀번호를 새로 등록해 그쪽으로 들어가도 된다. 어느 쪽이든 **이미 로그인해 둔 기기의 관리 토큰은 최장 30일까지 살아 있다**(로그인과 따로 발급되는 값이라 교체로 끊기지 않는다).
 - **밤 9시 물주기 푸시**: 페이로드 없는 Web Push(암호화 불필요·무의존성). `node reading-server/gen-vapid.mjs`로 키 생성 → `VAPID_PUBLIC_KEY`·`VAPID_PRIVATE_JWK` 시크릿 등록. 학생이 리포트 탭에서 "밤 9시 알림 켜기" → 21:00 KST 크론이 **물 줄 단어가 있는 구독자에게만** 발송(404/410이면 구독 자동 정리). 키가 없으면 알림 카드만 비활성.
 - 승인 반영 루프: 학생이 고른 연상이 검수 전(pending)이면 앱이 접속 때마다 `mnemonic/check`로 확인 — 승인되면 승인본으로 교체, 반려되면 제거(재생성 가능).
+
+### 브레인레터 (주간 뉴스레터 — `letter/`)
+
+- 라우트는 `/api/letter/*` 아래, 데이터는 `letter:` 접두 KV(로컬: `db.letter`) — 로직은 `letter-api.mjs` 한 모듈, 검증기·렌더러는 `letter/letter.js`.
+- 가족: `GET /api/letter/parent?t=토큰[&id=]`(진로독서 학부모 토큰 공용, 로그인 없음) → `{parent, issue, issues}` · `GET /api/letter/parent/push/key?t=` · `POST /api/letter/parent/push/subscribe|unsubscribe?t=`(새 호 푸시 구독).
+- 사진: `GET /api/letter/img/<id>`(무인증 — id 가 열쇠, 불변 캐시).
+- 학생(Bearer): `GET /api/letter/issues` / `GET /api/letter/issue?id=` (발행일이 지난 호만, 자기 학년대 섹션만) / `GET·PUT /api/letter/state`(150KB, 하루 10회) / `GET /api/letter/push/key` · `POST /api/letter/push/subscribe|unsubscribe`.
+- 관리(PIN): `GET /api/letter/admin/issues` · `GET·PUT·DELETE /api/letter/admin/issue` · `POST /api/letter/admin/publish {id,status,publishAt?}`(지금 보이는 첫 발행이면 푸시) · `POST /api/letter/admin/push {id}`(다시 보내기) · `GET /api/letter/admin/push/status` · `GET /api/letter/admin/students` · `POST /api/letter/admin/tier {code,tier}` · `GET /api/letter/admin/messages?id=`(발송 문구 + 가족 링크 발급) · `GET /api/letter/admin/stats?id=` · `POST /api/letter/admin/draft {part,theme?,week,…}`(AI 초안 한 조각 — `ANTHROPIC_API_KEY`, 한도 `LETTER_AI_DAILY` 기본 30, 주제·지표는 달력에서) · `GET /api/letter/admin/imgs` · `POST /api/letter/admin/img {name,data(base64),w,h,src?}`(JPEG/PNG/WebP ≤1.5MB) · `DELETE /api/letter/admin/img {id}` · `POST /api/letter/admin/img/gen {prompt,ratio}`(AI 삽화 — `GEMINI_API_KEY`, 그림을 base64 로 돌려주고 저장하지 않는다, 한도는 AI 초안과 같은 장부) · `GET·PUT /api/letter/admin/calendar`.
+- 새 호 푸시: 워드브레인과 같은 VAPID 키. 발행 즉시(워커 `waitUntil`) + 22:00 UTC(07:00 KST) 크론이 발행일이 된 호를 한 번 보낸다. 로컬 서버는 1분 폴링.
+- 화면: `/letter/`(학생·가족·체험·관리 미리보기 `?id=&tier=&print=`) · `/admin/letter-admin.html`.
 
 ## 동작 방식
 
@@ -36,6 +60,8 @@ ADMIN_PIN=원하는PIN node reading-server/server.mjs   # 기본 포트 8890
 - **학부모**: 관리 웹에서 학생별 링크 생성 → 학부모는 로그인 없이 주간 현황(연속·이번 주·완독·정답률·읽기 속도·최근 글·보고서 제목)만 열람.
 
 ## API 요약
+
+- 부모 포털 자동 연결: `POST /api/portal/family-link {token,name}`. 전용 `WB_PARENT_PORTAL_LINK_SECRET` Bearer 인증만 허용한다. 32자리 무작위 키로 가족 레코드를 한 번 만들고 `{ok:true,token}`을 반환한다. 기존 학생 계정 생성·이름 대조 병합·알림 발송은 하지 않는다. 이 가족 링크는 브레인레터·청크브레인 가족 모드만 이용하며 포털이 실행 전 참여 자격을 확인한다. 기존 수동 연결 링크는 유지한다.
 
 - 공개: `GET /api/health` · `GET /api/pub`(발행 오버라이드 맵) · `GET /api/parent/summary?t=토큰`(학부모 리포트)
 - 학생: `POST /api/login {code}` → `{token, student}` / `GET /api/pull` / `PUT /api/state {state}` (Bearer, 900KB 제한) / `GET /api/league`(같은 반 스트릭 리그 — 성적 비공개)
@@ -54,4 +80,4 @@ ADMIN_PIN=원하는PIN node reading-server/server.mjs   # 기본 포트 8890
 2. **Cloudflare Workers (운영 중)**: **https://wb-reading.whdudwns33.workers.dev** — 학생 앱(/) + 관리 웹(/admin) + API + 일일 백업 크론. `worker.mjs`+KV(DB)로 배포됨.
    재배포는 자동: `reading/**`·`reading-server/**` 변경이 main에 머지되면 GitHub Actions가 배포. 수동은 `node build-dist.mjs && CLOUDFLARE_API_TOKEN=... npx wrangler deploy` (reading-server/ 에서)
 
-⚠ 운영 전 필수: `ADMIN_PIN` 변경, HTTPS(터널/워커) 뒤에서만 외부 노출.
+⚠ 운영 전 필수: `ADMIN_PIN`(또는 `ADMIN_ID`·`ADMIN_PASSWORD`) 설정 — **기본값이 없어 없으면 아예 뜨지 않는다**. HTTPS(터널/워커) 뒤에서만 외부 노출.

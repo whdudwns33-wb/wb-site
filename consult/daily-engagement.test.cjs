@@ -186,7 +186,7 @@ test('Today starts with concrete next actions and keeps optional online links co
 test('director sees per-student automatic reward progress without changing consult identity', () => {
   const admin = functionSource('viewStaffAdmin');
   const line = functionSource('studentEngagementLine');
-  assert.match(admin, /포인트 · 문화상품권 교환/);
+  assert.match(admin, /포인트 · 기프트 카드 교환/);
   assert.match(admin, /pointPending/);
   assert.match(admin, /studentEngagementLine\(s,/);
   assert.match(line, /pointAccount\(student\.id/);

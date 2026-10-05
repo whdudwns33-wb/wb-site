@@ -1,7 +1,8 @@
 'use strict';
 /* WB 진로독서 백엔드 — 학생 동기화 API + 관리 웹 + 학생 앱 서빙 (Node 22 무의존성)
    실행: node reading-server/server.mjs   (기본 http://localhost:8890)
-   환경: PORT, ADMIN_PIN(기본 wb-admin-2026 — 운영 시 반드시 변경), DATA_DIR */
+   환경: PORT, ADMIN_PIN 또는 ADMIN_ID·ADMIN_PASSWORD(관리 로그인 — 둘 다 없으면 뜨지 않는다), DATA_DIR,
+         GEMINI_API_KEY(브레인레터 AI 삽화, 선택) */
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -13,6 +14,11 @@ import { handleNaesin, isReservedCode, dropReservedRows, naesinBodyLimit } from 
 import { handleStudio } from './naesin-studio.mjs';
 import { handleHaru, haruBodyLimit, allowedApp, appOfPath, dropStudentHaru, dumpHaru } from './haru-api.mjs';
 import { handleNaesinKo } from './naesin-ko-api.mjs';
+import { handleHanja, hanjaBodyLimit, dropStudentHanja, dumpHanja } from './hanja-api.mjs';
+import { handleChunk, dropStudentChunk } from './chunk-api.mjs';
+import { handleLetter, letterBodyLimit, dropStudentLetter, dumpLetter, pushDueIssues } from './letter-api.mjs';
+import { checkAdminLogin } from './admin-auth.mjs';
+import { handlePortalFamilyLink, PORTAL_LINK_BODY_LIMIT, withPortalFamilies } from './portal-family.mjs';
 import { bookIndex, cleanWords, coachingCard, confirmAllPlan, findBook, readyToConfirm, sourceSummary, validProgress, withOverlay } from './textbook.mjs';
 import { parseRoster } from './roster.mjs';
 
@@ -20,17 +26,41 @@ const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const APP_DIR = path.join(ROOT, '..', 'reading');      // 학생 앱 정적 파일
 const VOCAB_DIR = path.join(ROOT, '..', 'vocab');      // 워드브레인 앱 정적 파일
 const SHARED_DIR = path.join(ROOT, '..', 'shared');    // 두 앱이 함께 쓰는 파일(voice.js)
+const CHUNK_DIR = path.join(ROOT, '..', 'chunk');      // 청크브레인(의미단위 끊어읽기) — 콘텐츠는 자체 창작이라 정적으로 나간다
 const AGE_DIR = path.join(ROOT, '..', 'vocab-age'); // 어휘 나이 진단(로그인 없이 열리는 공개 페이지)
 const NAESIN_DIR = path.join(ROOT, '..', 'naesin');    // 내신브레인 앱 정적 파일
 const HARU_DIR = path.join(ROOT, '..', 'haru');        // 하루브레인 앱 정적 파일 (팩·대응표·플랜은 여기 없다 — db.haru 전용)
 const NAESIN_KO_DIR = path.join(ROOT, '..', 'naesin-ko'); // 국어브레인 앱 정적 파일
+const HANJA_DIR = path.join(ROOT, '..', 'hanja');      // 어휘브레인 앱 정적 파일 (단어장은 여기 없다 — db.hanja 전용)
+const LETTER_DIR = path.join(ROOT, '..', 'letter');     // 브레인레터 앱 정적 파일 (호 본문은 여기 없다 — db.letter 전용, 체험 호는 자체 창작)
 const PUB_DIR = path.join(ROOT, 'public');             // 관리 웹
 const PORT = +(process.env.PORT || 8890);
-const ADMIN_PIN = process.env.ADMIN_PIN || 'wb-admin-2026';
+/* 관리 로그인에 기본값을 두지 않는다. 저장소가 public 이라 소스에 적은 기본 PIN 은 곧 공개된 관리자
+   비밀번호이고, 그 하나로 학생 기록 전체가 열린다. 빠뜨린 채 뜨는 것보다 뜨지 않는 편이 안전하다.
+   두 갈래(PIN / 아이디·비밀번호) 중 하나만 있으면 된다 — 판정은 admin-auth.mjs 가 한다. */
+const ADMIN_PIN = process.env.ADMIN_PIN || '';
+const ADMIN_ID = process.env.ADMIN_ID || '';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
+if (!ADMIN_PIN && !(ADMIN_ID && ADMIN_PASSWORD)) {
+  console.error('관리 로그인이 설정되지 않았습니다. 둘 중 하나를 주세요:');
+  console.error('  ADMIN_PIN=<임의의 긴 문자열> node reading-server/server.mjs');
+  console.error('  ADMIN_ID=<아이디> ADMIN_PASSWORD=<비밀번호> node reading-server/server.mjs');
+  process.exit(1);
+}
 const TOKEN_TTL = 1000 * 60 * 60 * 24 * 30;            // 30일
 
 load();
 const db = getDb();
+const portalFamilyStore = {
+  getFamily: (t) => db.portalFamilies?.[t] || null,
+  putFamily: (t, rec) => { db.portalFamilies = db.portalFamilies || {}; db.portalFamilies[t] = rec; persist(); },
+  listFamilyTokens: () => Object.keys(db.portalFamilies || {}),
+  getParentCode: (t) => db.parents?.[t] || null,
+  putParent: (t, c) => { db.parents = db.parents || {}; db.parents[t] = c; persist(); },
+  getStudent: (c) => db.students[c] || null,
+  putStudent: (c, rec) => { db.students[c] = rec; persist(); },
+  listStudentCodes: () => Object.keys(db.students),
+};
 
 /* 워드브레인 저장소 어댑터 — db.vocab만 사용 (분리 가능한 격리) */
 const vocabPushMap = () => (db.vocab.push = db.vocab.push || {});
@@ -151,6 +181,25 @@ const haruStore = {
   listStudentCodes: () => Object.keys(db.students),
 };
 let HARU_ATOMS_CACHE = null;
+/* 브레인레터 저장소 어댑터 — db.letter 만 사용 (워커 letterStore 와 같은 계약). 가족 링크는 db.parents(진로독서)를 읽는다 */
+const letterRoot = () => { db.letter = db.letter || {}; for (const k of ['issues', 'states', 'images', 'push']) db.letter[k] = db.letter[k] || {}; return db.letter; };
+/* 사진 바이트는 db.json 에 넣지 않는다(base64 로 부풀어 파일이 커진다) — DATA_DIR/letter-img/<id>.bin 파일로, 메타만 db.letter.images */
+const LETTER_IMG_DIR = path.join(process.env.DATA_DIR ? path.resolve(process.env.DATA_DIR) : path.join(ROOT, 'data'), 'letter-img');
+const letterStore = {
+  getIssue: (id) => letterRoot().issues[id] || null, putIssue: (id, rec) => { letterRoot().issues[id] = rec; persist(); }, deleteIssue: (id) => { delete letterRoot().issues[id]; persist(); },
+  getIssueIds: () => letterRoot().issueIds || null, putIssueIds: (ids) => { letterRoot().issueIds = ids; persist(); },
+  getState: (c) => letterRoot().states[c] || null, putState: (c, rec) => { letterRoot().states[c] = rec; persist(); }, deleteState: (c) => { delete letterRoot().states[c]; persist(); },
+  listStateCodes: () => Object.keys(letterRoot().states),
+  ...withPortalFamilies(portalFamilyStore),
+  getAiUse: () => letterRoot().aiuse || null, putAiUse: (rec) => { letterRoot().aiuse = rec; persist(); },
+  getImage: (id) => { const meta = letterRoot().images[id]; if (!meta) return null; try { return { bytes: fs.readFileSync(path.join(LETTER_IMG_DIR, id + '.bin')), meta }; } catch (e) { return null; } },
+  putImage: (id, bytes, meta) => { fs.mkdirSync(LETTER_IMG_DIR, { recursive: true }); fs.writeFileSync(path.join(LETTER_IMG_DIR, id + '.bin'), Buffer.from(bytes)); letterRoot().images[id] = meta; persist(); },
+  deleteImage: (id) => { delete letterRoot().images[id]; try { fs.unlinkSync(path.join(LETTER_IMG_DIR, id + '.bin')); } catch (e) { /* 이미 없음 */ } persist(); },
+  listImages: () => Object.values(letterRoot().images),
+  getPush: (k) => letterRoot().push[k] || null, putPush: (k, rec) => { letterRoot().push[k] = rec; persist(); }, delPush: (k) => { delete letterRoot().push[k]; persist(); },
+  listPushKeys: () => Object.keys(letterRoot().push),
+  getCalendar: () => letterRoot().calendar || null, putCalendar: (rec) => { letterRoot().calendar = rec; persist(); },
+};
 const haruAtomsFallback = async () => {
   if (!HARU_ATOMS_CACHE) { try { HARU_ATOMS_CACHE = JSON.parse(fs.readFileSync(path.join(HARU_DIR, 'atoms.json'), 'utf8')); } catch (e) { return null; } }
   return HARU_ATOMS_CACHE;
@@ -187,6 +236,72 @@ const naesinKoStore = {
   getStudent: (c) => db.students?.[c] || null,
 };
 
+/* 어휘브레인 저장소 어댑터 — db.hanja 만 사용(워드브레인과 같은 격리). 단어장 본문(books)과 목록(index)을 나눠 둔다.
+   옛 db.json 에는 hanja 칸이 없으므로 첫 접근 때 만들어 준다. */
+const hanjaRoot = () => {
+  db.hanja = db.hanja || { books: {}, index: null, states: {}, assigns: {} };
+  for (const k of ['books', 'states', 'summaries', 'assigns', 'tasks', 'push', 'remaps']) db.hanja[k] = db.hanja[k] || {};
+  return db.hanja;
+};
+const hanjaStore = {
+  getBook: (id) => hanjaRoot().books[id] || null,
+  putBook: (id, rec) => { hanjaRoot().books[id] = rec; persist(); },
+  deleteBook: (id) => { delete hanjaRoot().books[id]; persist(); },
+  getBookIds: () => hanjaRoot().index || null,
+  putBookIds: (list) => { hanjaRoot().index = list; persist(); },
+  getState: (c) => hanjaRoot().states[c] || null,
+  putState: (c, rec) => { hanjaRoot().states[c] = rec; persist(); },
+  deleteState: (c) => { delete hanjaRoot().states[c]; persist(); },
+  listStateCodes: () => Object.keys(hanjaRoot().states),
+  getAssign: (c) => hanjaRoot().assigns[c] || null,
+  putAssign: (c, rec) => { hanjaRoot().assigns[c] = rec; persist(); },
+  deleteAssign: (c) => { delete hanjaRoot().assigns[c]; persist(); },
+  listAssignCodes: () => Object.keys(hanjaRoot().assigns),
+  getSummary: (c) => hanjaRoot().summaries[c] || null,
+  putSummary: (c, rec) => { hanjaRoot().summaries[c] = rec; persist(); },
+  deleteSummary: (c) => { delete hanjaRoot().summaries[c]; persist(); },
+  listSummaryCodes: () => Object.keys(hanjaRoot().summaries),
+  getTask: (s) => hanjaRoot().tasks[s] || null,
+  putTask: (s, rec) => { hanjaRoot().tasks[s] = rec; persist(); },
+  deleteTask: (s) => { delete hanjaRoot().tasks[s]; persist(); },
+  listTaskScopes: () => Object.keys(hanjaRoot().tasks),
+  getStrokes: () => hanjaRoot().strokes || null,
+  putStrokes: (rec) => { hanjaRoot().strokes = rec; persist(); },
+  getPush: (c) => hanjaRoot().push[c] || null,
+  putPush: (c, rec) => { hanjaRoot().push[c] = rec; persist(); },
+  delPush: (c) => { delete hanjaRoot().push[c]; persist(); },
+  listPushCodes: () => Object.keys(hanjaRoot().push),
+  getRemap: (id) => hanjaRoot().remaps[id] || null,
+  putRemap: (id, rec) => { hanjaRoot().remaps[id] = rec; persist(); },
+  deleteRemap: (id) => { delete hanjaRoot().remaps[id]; persist(); },
+  getStudent: (c) => db.students[c] || null,
+  listStudentCodes: () => Object.keys(db.students),
+};
+/* 청크브레인 저장소 어댑터 — db.chunk 만 사용(학생 기록·관리용 요약). 콘텐츠는 저장소에 없다. */
+const chunkRoot = () => { db.chunk = db.chunk || { states: {}, summaries: {}, assigns: {} }; db.chunk.assigns = db.chunk.assigns || {}; db.chunk.pushes = db.chunk.pushes || {}; return db.chunk; };
+const chunkStore = {
+  getState: (c) => chunkRoot().states[c] || null,
+  putState: (c, rec) => { chunkRoot().states[c] = rec; persist(); },
+  deleteState: (c) => { delete chunkRoot().states[c]; persist(); },
+  getSummary: (c) => chunkRoot().summaries[c] || null,
+  putSummary: (c, rec) => { chunkRoot().summaries[c] = rec; persist(); },
+  deleteSummary: (c) => { delete chunkRoot().summaries[c]; persist(); },
+  listSummaryCodes: () => Object.keys(chunkRoot().summaries),
+  getAssign: (c) => chunkRoot().assigns[c] || null,
+  putAssign: (c, rec) => { chunkRoot().assigns[c] = rec; persist(); },
+  deleteAssign: (c) => { delete chunkRoot().assigns[c]; persist(); },
+  listAssignCodes: () => Object.keys(chunkRoot().assigns),
+  /* 선생님 지문 — 워커의 chunk:customs 키와 같은 모양({items, updatedAt}) */
+  getCustoms: () => chunkRoot().customs || null,
+  putCustoms: (rec) => { chunkRoot().customs = rec; persist(); },
+  ...withPortalFamilies(portalFamilyStore),
+  /* 가족 알림 구독 — 워커의 chunk:push:<key> 와 같은 모양 */
+  getPush: (k) => (chunkRoot().pushes || {})[k] || null,
+  putPush: (k, rec) => { chunkRoot().pushes = chunkRoot().pushes || {}; chunkRoot().pushes[k] = rec; persist(); },
+  delPush: (k) => { if (chunkRoot().pushes) delete chunkRoot().pushes[k]; persist(); },
+  listPushKeys: () => Object.keys(chunkRoot().pushes || {}),
+};
+
 const VOCAB_PUSH_ENV = {
   publicKey: process.env.VAPID_PUBLIC_KEY || '',
   privateJwk: process.env.VAPID_PRIVATE_JWK || '',
@@ -205,7 +320,7 @@ const json = (res, code, obj) => {
    남은 몸통은 resume() 으로 흘려보내야 응답이 정상으로 나간다 — 안 읽고 응답하면 큰 몸통은 RST 로 끝난다. */
 const BODY_LIMIT_DEFAULT = 2_000_000;
 const BODY_LIMIT_TEXTBOOK = 5_500_000;
-const bodyLimit = (p) => (p.startsWith('/api/naesin/') ? naesinBodyLimit(p) : p.startsWith('/api/haru/') ? haruBodyLimit(p) : p === '/api/admin/textbook-src' ? BODY_LIMIT_TEXTBOOK : BODY_LIMIT_DEFAULT);
+const bodyLimit = (p) => (p.startsWith('/api/naesin/') ? naesinBodyLimit(p) : p.startsWith('/api/haru/') ? haruBodyLimit(p) : p.startsWith('/api/hanja/') ? hanjaBodyLimit(p) : p.startsWith('/api/letter/') ? letterBodyLimit(p) : p === '/api/admin/textbook-src' ? BODY_LIMIT_TEXTBOOK : BODY_LIMIT_DEFAULT);
 const tooLarge = () => { const e = new Error('too large'); e.status = 413; return e; };
 const readBody = (req, limit = BODY_LIMIT_DEFAULT) => new Promise((resolve, reject) => {
   /* 조각을 Buffer 로 모아 한 번에 디코딩한다 — 조각마다 문자열로 바꾸면 조각 경계에 걸린 한글(3바이트)이 깨진다.
@@ -338,7 +453,7 @@ function parentSummary(stu, st, vst, assignRec) {
 }
 
 /* ── 정적 파일 ── */
-const MIME = { '.html': 'text/html; charset=utf-8', '.json': 'application/json; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.pdf': 'application/pdf', '.css': 'text/css; charset=utf-8' };
+const MIME = { '.html': 'text/html; charset=utf-8', '.json': 'application/json; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml', '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.pdf': 'application/pdf', '.css': 'text/css; charset=utf-8', '.woff2': 'font/woff2', '.txt': 'text/plain; charset=utf-8' };
 function serveFile(res, base, rel) {
   const safe = path.normalize(rel).replace(/^(\.\.[/\\])+/, '');
   let fp = path.join(base, safe);
@@ -350,7 +465,7 @@ function serveFile(res, base, rel) {
   if (!fs.existsSync(fp)) { res.writeHead(404); res.end('not found'); return; }
   /* 학년대별 지문 데이터는 ?v=<버전> 을 달고 오므로 오래 캐시해도 안전하다
      (배포본은 reading/_headers 가 같은 규칙을 준다) */
-  const cacheable = /(^|\/)(articles-L[1-4]|hanja)\.json$/.test(fp);
+  const cacheable = /(^|\/)(articles-L[1-4]|hanja)\.json$/.test(fp) || /\/letter\/fonts\/.+\.woff2$/.test(fp);   // 글꼴 조각은 경로에 판이 박혀 있다(워커와 같은 규칙)
   res.writeHead(200, {
     'Content-Type': MIME[path.extname(fp)] || 'application/octet-stream',
     'Cache-Control': cacheable ? 'public, max-age=604800' : 'no-store',
@@ -369,6 +484,14 @@ const server = http.createServer(async (req, res) => {
          눌러도 안 되는 버튼은 학생에게 앱이 고장 난 것처럼 보인다.
          키를 넣으면 다음 접속부터 버튼이 저절로 돌아온다. 값이 아니라 있고 없음만 알린다. */
       if (p === '/api/health') return json(res, 200, { ok: true, service: 'wb-reading', time: nowIso(), ai: !!process.env.ANTHROPIC_API_KEY });
+
+      if (p === '/api/portal/family-link') {
+        const out = await handlePortalFamilyLink({ method: req.method,
+          authorization: req.headers.authorization, secret: process.env.WB_PARENT_PORTAL_LINK_SECRET,
+          getBody: () => readBody(req, PORTAL_LINK_BODY_LIMIT), store: portalFamilyStore });
+        req.resume();
+        return json(res, out.status, out.body);
+      }
 
       if (p === '/api/pub' && req.method === 'GET') return json(res, 200, { map: db.pubmap || {} });
 
@@ -408,15 +531,28 @@ const server = http.createServer(async (req, res) => {
         return json(res, 200, { token: newToken(stu.code, false), student: stu });
       }
 
+      /* 관리 로그인 — 아이디·비밀번호 또는 PIN (워커와 같은 판정기) */
       if (p === '/api/admin/login' && req.method === 'POST') {
-        const { pin } = await readBody(req);
-        if (String(pin || '') !== ADMIN_PIN) return json(res, 401, { error: 'PIN이 올바르지 않습니다.' });
-        return json(res, 200, { token: newToken('__admin__', true) });
+        const login = await checkAdminLogin(await readBody(req), { ADMIN_PIN, ADMIN_ID, ADMIN_PASSWORD });
+        if (!login.ok) return json(res, 401, { error: login.error });
+        return json(res, 200, { token: newToken('__admin__', true), via: login.via });
       }
 
       /* 하루브레인 부모 화면 — ptoken 으로만, 로그인 없음 (워커와 동일) */
       if (p === '/api/haru/parent' && req.method === 'GET') {
         const out = await handleHaru({ path: p, method: 'GET', who: null, query: url.searchParams, getBody: () => readBody(req), store: haruStore });
+        return json(res, out.status, out.body);
+      }
+      /* 브레인레터 무인증 경로 — 가족 링크·가족 알림 구독·사진(id 가 곧 열쇠) (워커와 동일) */
+      /* 청크브레인 가족 링크 — ptoken 으로만, 로그인 없음 (워커와 동일) */
+      if (p === '/api/chunk/parent' || p.startsWith('/api/chunk/parent/')) {
+        if (Number(req.headers['content-length'] || 0) > 300_000) { req.resume(); return json(res, 413, { error: '요청이 너무 커서 받을 수 없어요.' }); }
+        const out = await handleChunk({ path: p, method: req.method, who: null, query: url.searchParams, getBody: () => readBody(req), store: chunkStore, push: VOCAB_PUSH_ENV });
+        return json(res, out.status, out.body);
+      }
+      if (p === '/api/letter/parent' || p.startsWith('/api/letter/parent/') || p.startsWith('/api/letter/img/')) {
+        const out = await handleLetter({ path: p, method: req.method, who: null, query: url.searchParams, getBody: () => readBody(req), store: letterStore, push: VOCAB_PUSH_ENV });
+        if (out.bytes) { res.writeHead(out.status, out.headers); res.end(Buffer.from(out.bytes)); return; }
         return json(res, out.status, out.body);
       }
 
@@ -436,6 +572,23 @@ const server = http.createServer(async (req, res) => {
         return json(res, out.status, out.body);
       }
 
+      /* 어휘브레인 (/api/hanja/*) — 인증만 공유, 저장·라우트는 격리(워커와 동일). 단어장은 db.hanja 에만 산다 */
+      if (p.startsWith('/api/hanja/')) {
+        if (Number(req.headers['content-length'] || 0) > hanjaBodyLimit(p)) { req.resume(); return json(res, 413, { error: '요청이 너무 커서 받을 수 없어요.' }); }
+        const out = await handleHanja({ path: p, method: req.method, who, query: url.searchParams, getBody: () => readBody(req, hanjaBodyLimit(p)), store: hanjaStore, push: VOCAB_PUSH_ENV });
+        return json(res, out.status, out.body);
+      }
+
+      /* 브레인레터 (/api/letter/*) — 인증만 공유, 저장·라우트는 격리 (워커와 동일) */
+      if (p.startsWith('/api/letter/')) {
+        if (Number(req.headers['content-length'] || 0) > letterBodyLimit(p)) { req.resume(); return json(res, 413, { error: '요청이 너무 커서 받을 수 없어요.' }); }
+        const out = await handleLetter({ path: p, method: req.method, who, query: url.searchParams, getBody: () => readBody(req, letterBodyLimit(p)), store: letterStore,
+          origin: 'http://' + (req.headers.host || ('localhost:' + PORT)), push: VOCAB_PUSH_ENV,
+          ai: { apiKey: process.env.ANTHROPIC_API_KEY || '', model: process.env.LETTER_AI_MODEL || '', env: process.env, imageKey: process.env.GEMINI_API_KEY || '', imageModel: process.env.LETTER_IMAGE_MODEL || '' },
+          randomToken: () => crypto.randomUUID().replace(/-/g, '') });
+        return json(res, out.status, out.body);
+      }
+
       /* 워드브레인 (/api/vocab/*) — 인증만 공유, 저장·라우트는 격리 */
       if (p.startsWith('/api/vocab/')) {
         const out = await handleVocab({
@@ -444,6 +597,13 @@ const server = http.createServer(async (req, res) => {
           ai: { apiKey: process.env.ANTHROPIC_API_KEY || '', model: process.env.VOCAB_AI_MODEL || '', env: process.env },
           push: VOCAB_PUSH_ENV,
         });
+        return json(res, out.status, out.body);
+      }
+
+      /* 청크브레인 (/api/chunk/*) — 인증만 공유, 저장소는 db.chunk (워커와 동일) */
+      if (p.startsWith('/api/chunk/')) {
+        if (Number(req.headers['content-length'] || 0) > 300_000) { req.resume(); return json(res, 413, { error: '요청이 너무 커서 받을 수 없어요.' }); }
+        const out = await handleChunk({ path: p, method: req.method, who, getBody: () => readBody(req), store: chunkStore });
         return json(res, out.status, out.body);
       }
 
@@ -664,7 +824,7 @@ const server = http.createServer(async (req, res) => {
         /* 워커 fullDump 와 같은 모양 — 내신은 팩 본문 없이(packIds 만), 교재 원문(textbookSrc)은 포함.
            팩은 라이선스 원문이라 백업 파일로 흩어지지 않게 한다(store.naesinSnapshot). */
         return json(res, 200, { service: 'wb-reading', savedAt: nowIso(), students: db.students, states: db.states, vocab: db.vocab,
-          textbook: db.textbook || {}, pubmap: db.pubmap || {}, naesin: naesinSnapshot(db.naesin), textbookSrc: db.textbookSrc || {}, haru: await dumpHaru(haruStore) });
+          portalFamilies: db.portalFamilies || {}, textbook: db.textbook || {}, pubmap: db.pubmap || {}, naesin: naesinSnapshot(db.naesin), textbookSrc: db.textbookSrc || {}, haru: await dumpHaru(haruStore), letter: await dumpLetter(letterStore), hanja: await dumpHanja(hanjaStore) });
       }
       if (p === '/api/admin/backups' && req.method === 'GET') {
         return json(res, 200, { backups: listBackups() });
@@ -720,6 +880,11 @@ const server = http.createServer(async (req, res) => {
         drop(ko.overlays, c);
         /* 하루브레인 — 정확 접두 4계열(state·mock·paper·parent). 대응표는 남긴다(워커와 동일) */
         await dropStudentHaru(haruStore, c); removed += 3;
+        /* 어휘브레인 — 기록·요약·배정·알림 구독. 단어장·획순 사전은 학생 것이 아니라 둔다(워커와 동일) */
+        await dropStudentHanja(hanjaStore, c); removed += 4;
+        await dropStudentChunk(chunkStore, c, (db.students[c] || {}).ptoken);
+        /* 브레인레터 — 열람·문제 기록 한 키. 호는 학생 것이 아니라 둔다(워커와 동일) */
+        await dropStudentLetter(letterStore, c, (db.students[c] || {}).ptoken); removed += 1;
         /* 기기 토큰은 토큰 값이 키라 코드로 못 찾는다 — 훑어서 이 학생 것만 */
         for (const [t, rec] of Object.entries(db.tokens)) if (rec && rec.code === c) drop(db.tokens, t);
         /* 승인 대기 줄에 남으면 지운 학생이 계속 뜬다 */
@@ -755,12 +920,21 @@ const server = http.createServer(async (req, res) => {
 
     /* 관리 웹 */
     if (p === '/admin/qr.js') return serveFile(res, SHARED_DIR, 'qr.js');
+    if (p === '/admin/letter.js') return serveFile(res, LETTER_DIR, 'letter.js');   // 관리 편집기 미리보기가 학생 앱과 같은 렌더러를 쓴다
+    if (p === '/admin/shapes.js') return serveFile(res, LETTER_DIR, 'shapes.js');   // 도형 놀이 도우미·미리보기
+    if (p === '/admin/drills.js') return serveFile(res, LETTER_DIR, 'drills.js');   // 5분 놀이 미리보기
     if (p === '/admin' || p === '/admin/') return serveFile(res, PUB_DIR, 'admin.html');
     if (p.startsWith('/admin/')) return serveFile(res, PUB_DIR, p.slice('/admin/'.length));
 
     /* 하루브레인 앱 — 팩·대응표·플랜은 여기 없다(/api/haru/*, db.haru 전용). 정답은 어느 정적 파일에도 없다 */
     if (p === '/haru' || p === '/haru/') return serveFile(res, HARU_DIR, 'index.html');
     if (p.startsWith('/haru/')) return serveFile(res, HARU_DIR, p.slice('/haru/'.length));
+
+    /* 브레인레터 앱 — 호 본문은 여기 없다(/api/letter/*, db.letter 전용). issue-sample.json 은 자체 창작 체험 호 */
+    if (p === '/letter' || p === '/letter/') return serveFile(res, LETTER_DIR, 'index.html');
+    if (p === '/letter/voice.js') return serveFile(res, SHARED_DIR, 'voice.js');       // 읽어 주기 — 배포본은 build-dist 가 복사한다
+    if (p === '/letter/trace.js') return serveFile(res, VOCAB_DIR, 'trace.js');        // 한자 따라쓰기 판정(워드브레인과 같은 파일)
+    if (p.startsWith('/letter/')) return serveFile(res, LETTER_DIR, p.slice('/letter/'.length));
 
     /* 내신브레인 앱 — 팩 콘텐츠는 여기 없다(/api/naesin/pack, KV·db 전용) */
     if (p === '/naesin/voice.js') return serveFile(res, SHARED_DIR, 'voice.js');
@@ -771,6 +945,15 @@ const server = http.createServer(async (req, res) => {
     if (p === '/naesin-ko/voice.js') return serveFile(res, SHARED_DIR, 'voice.js');
     if (p === '/naesin-ko' || p === '/naesin-ko/') return serveFile(res, NAESIN_KO_DIR, 'index.html');
     if (p.startsWith('/naesin-ko/')) return serveFile(res, NAESIN_KO_DIR, p.slice('/naesin-ko/'.length));
+
+    /* 어휘브레인 앱 — 단어장은 여기 없다(/api/hanja/book, KV·db 전용). 체험 단어장(book-sample.json)은 자체 창작이라 정적으로 나간다 */
+    if (p === '/hanja/voice.js') return serveFile(res, SHARED_DIR, 'voice.js');
+    if (p === '/hanja' || p === '/hanja/') return serveFile(res, HANJA_DIR, 'index.html');
+    if (p.startsWith('/hanja/')) return serveFile(res, HANJA_DIR, p.slice('/hanja/'.length));
+    /* 청크브레인 앱 — 지문·카드는 자체 창작이라 정적 파일로 나간다. 학생 기록만 /api/chunk/* */
+    if (p === '/chunk/voice.js') return serveFile(res, SHARED_DIR, 'voice.js');
+    if (p === '/chunk' || p === '/chunk/') return serveFile(res, CHUNK_DIR, 'index.html');
+    if (p.startsWith('/chunk/')) return serveFile(res, CHUNK_DIR, p.slice('/chunk/'.length));
 
     /* 워드브레인 앱 */
     if (p === '/voice.js' || p === '/vocab/voice.js') return serveFile(res, SHARED_DIR, 'voice.js');
@@ -845,6 +1028,17 @@ const server = http.createServer(async (req, res) => {
 
 /* 밤 9시 물주기 푸시 — 로컬 서버용 1분 폴링 (운영 워커는 크론이 담당) */
 let lastPushDay = null;
+/* 브레인레터 07:00 새 호 알림 — 로컬 서버용 1분 폴링(운영 워커는 22:00 UTC 크론) */
+let lastLetterPushDay = null;
+setInterval(async () => {
+  const d = new Date();
+  if (d.getHours() !== 7 || d.getMinutes() !== 0) return;
+  const day = d.toDateString();
+  if (lastLetterPushDay === day) return;
+  lastLetterPushDay = day;
+  try { const r = await pushDueIssues({ store: letterStore, push: VOCAB_PUSH_ENV }); if (r.pushed && r.pushed.length) console.log('[push] 브레인레터 새 호 알림:', JSON.stringify(r)); }
+  catch (e) { console.error('[push] 브레인레터 발송 실패:', e.message); }
+}, 60000).unref();
 setInterval(async () => {
   const d = new Date();
   if (d.getHours() !== 21 || d.getMinutes() !== 0) return;
@@ -852,7 +1046,7 @@ setInterval(async () => {
   if (lastPushDay === day) return;
   lastPushDay = day;
   try {
-    const r = await sendNightPushes({ store: vocabStore, push: VOCAB_PUSH_ENV, naesin: naesinStore });
+    const r = await sendNightPushes({ store: vocabStore, push: VOCAB_PUSH_ENV, naesin: naesinStore, hanja: hanjaStore });
     if (r.sent || r.removed) console.log('[push] 밤 9시 알림(워드브레인+내신):', JSON.stringify(r));
   } catch (e) { console.error('[push] 발송 실패:', e.message); }
 }, 60000).unref();
@@ -860,5 +1054,4 @@ setInterval(async () => {
 server.listen(PORT, () => {
   console.log(`WB 진로독서 서버 http://localhost:${PORT}`);
   console.log(`  학생 앱: /   워드브레인: /vocab/   관리 웹: /admin   연상 검수함: /admin/vocab-review.html`);
-  if (ADMIN_PIN === 'wb-admin-2026') console.log('  ⚠ 기본 ADMIN_PIN 사용 중 — 운영 배포 전 반드시 ADMIN_PIN 환경변수로 변경하세요.');
 });

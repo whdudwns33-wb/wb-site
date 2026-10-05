@@ -96,9 +96,10 @@ async function sha256Hex(value) {
   return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
 }
 
-function publicContact(row, fallback) {
-  const phoneMasked = maskPhone(row && row.phone);
-  return {
+function publicContact(row, fallback, includePhone) {
+  const phone = digits(row && row.phone);
+  const phoneMasked = maskPhone(phone);
+  const contact = {
     staffId: String(row && row.staff_id || fallback.id),
     studentName: text(row && row.student_name || fallback.name),
     phoneRegistered: !!phoneMasked,
@@ -108,6 +109,8 @@ function publicContact(row, fallback) {
     consent: !!Number(row && row.consent),
     updatedAt: Number(row && row.updated_at || 0)
   };
+  if (includePhone && phoneMasked) contact.phone = phone;
+  return contact;
 }
 
 function studentFromRow(row) {
@@ -150,7 +153,7 @@ async function listContacts(env, origin, json) {
     "FROM consult_link_contacts WHERE app='consult'"
   ).all();
   for (const row of (contactResult.results || [])) contacts.set(String(row.staff_id), row);
-  const items = students.map(student => publicContact(contacts.get(student.id), student));
+  const items = students.map(student => publicContact(contacts.get(student.id), student, true));
   items.sort((left, right) => left.studentName.localeCompare(right.studentName, 'ko-KR') ||
     left.staffId.localeCompare(right.staffId));
   return json({ ok: true, contacts: items }, 200, origin);
@@ -216,7 +219,7 @@ async function setContact(env, body, auth, origin, json) {
     return contactConflict(await contactRow(env, student.id), student, origin, json);
   }
   const current = await contactRow(env, student.id);
-  return json({ ok: true, contact: publicContact(current, student) }, 200, origin);
+  return json({ ok: true, contact: publicContact(current, student, auth && auth.scope === 'all') }, 200, origin);
 }
 
 function sendConfiguration(env) {

@@ -106,6 +106,7 @@
 <script src="/naesin-ko/grade.js"></script>
 <script src="/naesin-ko/gen.js"></script>
 <script src="/admin/qr.js"></script>
+<script src="/admin/admin-login.js"></script>
 <script>
 /* WB 국어브레인 관리 웹 — 기획서 §6·§7.
    인증은 진로독서 관리 웹과 같은 관리 PIN 토큰(wbr.admin.token)을 그대로 쓴다.
@@ -131,19 +132,11 @@ async function api(path, opt) {
   return j;
 }
 
-function renderLogin(msg) {
-  $('#app').innerHTML = `<div class="card" id="loginCard"><h2>강사 로그인</h2>
-    <p class="muted">진로독서 관리와 같은 PIN을 씁니다.</p>
-    <input id="pin" type="password" inputmode="numeric" placeholder="관리 PIN" autocomplete="current-password">
-    <button class="btn" id="go" style="margin-top:10px;width:100%">로그인</button>
-    <div class="err" id="e">${msg ? esc(msg) : ''}</div></div>`;
-  $('#go').onclick = async () => {
-    try {
-      const j = await api('/admin/login', { method: 'POST', body: JSON.stringify({ pin: $('#pin').value }) });
-      TOKEN = j.token; localStorage.setItem('wbr.admin.token', TOKEN); refresh();
-    } catch (e) { $('#e').textContent = e.message; }
-  };
-  $('#pin').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('#go').click(); });
+function renderLogin(msg){
+  
+  /* 로그인 폼은 공용 모듈이 그린다(아이디·비밀번호 기본, PIN 갈래로 전환) — reading-server/public/admin-login.js */
+  $('#app').innerHTML='<div class="card" id="loginCard"><h2>강사 로그인</h2><div id="loginHost"></div></div>';
+  WBAdminLogin.mount({host:'#loginHost',message:msg||'',classes:{btn:'btn'},onToken:function(t){TOKEN=t;try{localStorage.setItem('wbr.admin.token',TOKEN);}catch(e){}refresh();}});
 }
 
 async function refresh() {

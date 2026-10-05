@@ -1,0 +1,8 @@
+{
+  "note": "형식 예시. 실제 목록은 같은 폴더의 private-names.json 에 두고 커밋하지 않는다. 아래 해시는 자체 창작 문자열('보기하나' 등)이라 학생 이름이 아니다.",
+  "sha256": [
+    "56c5aba4e0be337ddcdb9e071827d8a9bb6aefb97a246dcfa2ae8b4e7d98fce5",
+    "e9abd0a7935e09e7a2ad52acd23d4720a51b9f8e1432cdb47a2a61524f4f07fb",
+    "15db90d48d9ed48a86616e52827dd07084be8a8925f3b38628296edf59556083"
+  ]
+}

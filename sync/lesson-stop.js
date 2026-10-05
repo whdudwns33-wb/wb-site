@@ -25,7 +25,7 @@ function parseObject(value) {
 
 function regularLesson(task) {
   return !!(task && (task.taskKind === 'lesson_instruction' || task.lessonFormVersion || task.intakeVersion) &&
-    String(task.lessonInstanceType || '') !== 'makeup' && !String(task.makeupCaseId || '').trim());
+    !['makeup', 'subscription'].includes(String(task.lessonInstanceType || '')) && !String(task.makeupCaseId || '').trim());
 }
 
 /**

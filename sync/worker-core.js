@@ -22,7 +22,7 @@
  *   POST /lesson-create { app, auth, staffId?, lesson } → 수업 1건 등록·수정
  *   POST /lesson-create-batch { app, auth, batchKind, lessons } → 한 학생의 여러 수업 또는 같은 수업의 여러 학생 원자적 등록
  *   POST /contact-log { app, auth, sourceTaskId, type, note } → 담당 수업 학생 연락 기록
- *   POST /staff-attendance { app, auth, action } → 본인 출근·퇴근을 서버 시각으로 최초 1회 기록
+ *   POST /staff-attendance { app, auth, action } → 본인 출퇴근 기록 또는 관리자 월별 이력 조회
  *   POST /weekend-visit { app, auth, action, ... } → 토·일 실제 등·하원 기록
  *   POST /lesson-handoff { app, auth, dataGeneration, action, ... } → 당일 남은 수업 인계
  *   POST /feedback-request { app, auth, ... }     → 직원, 항목별 피드백 제출(제출 즉시 카카오 알림톡 자동 발송 시도)
@@ -56,7 +56,7 @@
  *   POST /student-portal { app, action, ... }        → 학생 앱 동의·초대·관리자 미리보기
  *   POST /guardian-ops-send { app, auth, action, ... } → 보강·회차 운영 알림톡
  *   POST /consult-link-send { app:'consult', auth(admin), action, ... } → 학생 개인 링크 연락처·알림톡 접수
- *   POST /consult-reward { app:'consult', auth(admin), action, ... } → 문화상품권 교환 선점·상태 원장
+ *   POST /consult-reward { app:'consult', auth(admin), action, ... } → 기프트 카드 교환 선점·상태 원장
  *   POST /revoke    { app, auth(admin), token|staffId } → { ok }
  *
  * 인증
@@ -176,7 +176,7 @@ function rewardProcessingLockResponse(origin, details) {
   return json(Object.assign({
     ok: false,
     code: 'REWARD_PROCESSING_LOCK',
-    error: '문화상품권 교환 처리를 완료하거나 취소한 뒤 학생 삭제·대표·관리자 전환을 진행해 주세요'
+    error: '기프트 카드 교환 처리를 완료하거나 취소한 뒤 학생 삭제·대표·관리자 전환을 진행해 주세요'
   }, details || {}), 409, origin);
 }
 
@@ -421,7 +421,7 @@ const LESSON_SCHEDULE_SIGNATURE_KEYS = [
 
 function isRegularLessonTaskData(data) {
   return !!(data && typeof data === 'object' && !Array.isArray(data) &&
-    !isScheduledMakeupTaskData(data) &&
+    !isScheduledMakeupTaskData(data) && String(data.lessonInstanceType || '') !== 'subscription' &&
     (hasStructuredLessonMarker(data) || data.intakeSource === 'teacher_9_field_form'));
 }
 
@@ -1023,8 +1023,9 @@ async function inspectLockedSession4AttendanceChanges(env, app, entries, now) {
     const isMakeup = String(data.lessonInstanceType || '') === 'makeup' || !!makeupCaseId;
     if (isMakeup && (String(data.lessonInstanceType || '') !== 'makeup' ||
         !SAFE_ID.test(makeupCaseId) || String(row.id) !== 'makeup_lesson_' + makeupCaseId)) return;
+    const isSubscription = String(data.lessonInstanceType || '') === 'subscription';
     tasks.set(String(row.id), { owner: String(row.owner || ''), data,
-      kind: isMakeup ? 'makeup' : 'regular', makeupCaseId });
+      kind: isMakeup ? 'makeup' : isSubscription ? 'subscription' : 'regular', makeupCaseId });
   };
   for (let offset = 0; offset < taskIds.length; offset += 80) {
     const chunk = taskIds.slice(offset, offset + 80);
@@ -1070,6 +1071,7 @@ async function inspectLockedSession4AttendanceChanges(env, app, entries, now) {
   const lessonCandidates = candidates.filter(item => {
     const task = tasks.get(item.identity.taskId);
     if (!task) return false;
+    if (task.kind === 'subscription') return false;
     const date = item.identity.date;
     if ((task.data.start && date < String(task.data.start)) ||
         (task.data.end && date > String(task.data.end))) return false;
@@ -1338,7 +1340,7 @@ async function handleConsultReward(env, app, body, origin, auth) {
   if (!auth || auth.scope !== 'all' || auth.device !== true ||
       !/^sha256:[0-9a-f]{64}$/.test(String(auth.rewardActorHash || ''))) {
     return json({ ok: false, code: 'ADMIN_DEVICE_REQUIRED',
-      error: '원장 기기 로그인을 다시 연결한 뒤 문화상품권 교환을 처리해 주세요' }, 403, origin);
+      error: '원장 기기 로그인을 다시 연결한 뒤 기프트 카드 교환을 처리해 주세요' }, 403, origin);
   }
   const action = String(body.action || '');
   if (!['claim', 'reject', 'takeover', 'fulfill', 'cancel'].includes(action)) {
@@ -1346,7 +1348,7 @@ async function handleConsultReward(env, app, body, origin, auth) {
   }
   const allowedKeys = new Set(['app', 'auth', 'action', 'staffId', 'requestId']);
   if (Object.keys(body || {}).some(key => !allowedKeys.has(key))) {
-    return json({ ok: false, error: '상품권 코드, URL 또는 지원하지 않는 값은 받을 수 없습니다' }, 400, origin);
+    return json({ ok: false, error: '기프트 카드 코드, URL 또는 지원하지 않는 값은 받을 수 없습니다' }, 400, origin);
   }
   const staffId = String(body.staffId || '');
   const requestId = String(body.requestId || '');
@@ -1752,7 +1754,7 @@ async function handleSync(env, app, body, origin) {
     const t = c.table;
     if (t !== 'staff' && t !== 'tasks' && t !== 'checks') continue;
     if (!(t === 'checks' ? c.k : c.id)) continue;
-    // 상품권 교환 원장은 /consult-reward의 선점·CAS만이 쓸 수 있다.
+    // 기프트 카드 교환 원장은 /consult-reward의 선점·CAS만이 쓸 수 있다.
     // 관리 화면이 내려받은 행을 generic LWW로 재전송해도 덮어쓰지 않는다.
     if (t === 'checks' && app === 'consult' && String(c.k || '').startsWith(CONSULT_REWARD_PREFIX)) {
       if (auth.scope === 'own') {
@@ -2548,10 +2550,17 @@ function feedbackIdentity(body) {
 /* 결석 보강은 서버가 원 정규수업의 stable taskId를 기록한다. 피드백의 정체성도
  * 그 연결을 따라가야 같은 학생·같은 수업의 정규수업과 보강이 이중 발송되지 않는다.
  * 수업무관 보강에는 원 수업이 없으므로 기존 taskId를 그대로 사용한다. */
-function feedbackCanonicalTaskId(taskData, taskId) {
+async function feedbackCanonicalTaskId(env, taskData, taskId, owner) {
   const sourceTaskId = taskData && taskData.lessonInstanceType === 'makeup'
     ? String(taskData.makeupSourceTaskId || '') : '';
-  return SAFE_ID.test(sourceTaskId) ? sourceTaskId : taskId;
+  if (!SAFE_ID.test(sourceTaskId)) return taskId;
+  const row = await env.DB.prepare('SELECT owner,data FROM tasks WHERE app=? AND id=? LIMIT 1')
+    .bind('task', sourceTaskId).first();
+  let source;
+  try { source = row && JSON.parse(row.data); } catch { return taskId; }
+  // 대강 선생님의 피드백을 원 담당자의 수업으로 치환하면 발송 권한이 깨진다.
+  return source && !source.deleted && row.owner === owner && source.staffId === owner &&
+    source.studentId && source.studentId === taskData.studentId ? sourceTaskId : taskId;
 }
 
 async function feedbackRequestKey(identity) {
@@ -2702,7 +2711,7 @@ async function handleFeedbackRequest(env, app, body, origin) {
   if (checked.response) return checked.response;
 
   const submittedTaskId = identity.taskId;
-  const canonicalTaskId = feedbackCanonicalTaskId(checked.taskData, submittedTaskId);
+  const canonicalTaskId = await feedbackCanonicalTaskId(env, checked.taskData, submittedTaskId, String(checked.task.owner));
   if (canonicalTaskId !== submittedTaskId) identity = { ...identity, taskId: canonicalTaskId };
 
   const owner = String(checked.task.owner);

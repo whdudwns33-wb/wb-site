@@ -56,24 +56,21 @@ var WBVoice = (function () {
 
   function hasVoice(lang) { return !!voiceFor(lang); }
 
-  var speaking = false, unlocked = false;
+  var current = null, startWatch = null;
 
-  /* 모바일 브라우저는 '사용자가 누른 그 순간' 안에서 speak()가 호출돼야 소리를 낸다.
-     목소리 목록을 기다렸다가 말하면 그 순간을 놓쳐 조용히 실패한다.
-     그래서 버튼을 누르자마자 무음 한 마디를 먼저 넣어 잠금을 푼다. */
+  /* 기존 호출부와 호환한다. 빈 무음 발화를 넣고 곧 취소하지 않는다.
+     실제 발화는 speak()가 클릭 안에서 바로 요청하며, 일시 정지도 거기서 푼다. */
   function unlock() {
     var s = synth();
-    if (!s) return false;
+    if (!ttsSupported()) return false;
     try {
       if (s.resume) s.resume();
-      if (!unlocked) {
-        var u = new SpeechSynthesisUtterance(' ');
-        u.volume = 0; u.rate = 1;
-        s.speak(u);
-        unlocked = true;
-      }
       return true;
     } catch (e) { return false; }
+  }
+
+  function ttsError(opt, why) {
+    if (opt.onerror) opt.onerror(why); else if (opt.onend) opt.onend();
   }
 
   /* 한 덩어리를 읽는다. onend는 끝났을 때 한 번만 부른다(중단 시엔 부르지 않는다). */
@@ -81,39 +78,51 @@ var WBVoice = (function () {
     opt = opt || {};
     var s = synth();
     var body = String(text || '').trim();
-    if (!s || !body) { if (opt.onend) opt.onend(); return null; }
+    if (!body) { if (opt.onend) opt.onend(); return null; }
+    if (!ttsSupported()) { ttsError(opt, 'unsupported'); return null; }
+    if (current || s.speaking || s.pending) stop();
 
     var lang = opt.lang || langOf(body);
-    var u = new SpeechSynthesisUtterance(body);
-    var v = voiceFor(lang);
-    if (v) { u.voice = v; u.lang = v.lang; } else { u.lang = lang === 'en' ? 'en-US' : 'ko-KR'; }
-    u.rate = Math.min(2, Math.max(0.5, opt.rate == null ? 1 : opt.rate));
-    u.pitch = opt.pitch == null ? 1 : opt.pitch;
+    var u;
+    try {
+      u = new SpeechSynthesisUtterance(body);
+      var v = voiceFor(lang);
+      if (v) { u.voice = v; u.lang = v.lang; } else { u.lang = lang === 'en' ? 'en-US' : lang === 'ko' ? 'ko-KR' : lang; }
+      u.rate = Math.min(2, Math.max(0.5, opt.rate == null ? 1 : opt.rate));
+      u.pitch = opt.pitch == null ? 1 : opt.pitch;
+    } catch (e) { ttsError(opt, 'failed'); return null; }
 
-    var settled = false;
+    var started = false;
+    function finish(why) {
+      if (current !== u) return;
+      current = null; clearTimeout(startWatch); startWatch = null;
+      if (why) ttsError(opt, why); else if (opt.onend) opt.onend();
+    }
     /* 소리가 실제로 시작됐는지는 이것으로만 알 수 있다.
        getVoices()가 비어 있어도 엔진이 읽어 주는 기기가 있고, 목록이 차 있어도
        한 마디도 못 내는 기기가 있다. 목록을 믿지 말고 시작 신호를 믿는다. */
-    if (opt.onstart) u.onstart = function () { try { opt.onstart(); } catch (e) {} };
-    u.onend = function () { if (settled) return; settled = true; speaking = false; if (opt.onend) opt.onend(); };
-    u.onerror = function (e) {
-      if (settled) return; settled = true; speaking = false;
-      // 사용자가 멈춘 것(interrupted/canceled)은 오류가 아니다
-      var why = (e && e.error) || '';
-      if (why === 'interrupted' || why === 'canceled') return;
-      if (opt.onerror) opt.onerror(why); else if (opt.onend) opt.onend();
+    u.onstart = function () {
+      if (current !== u || started) return;
+      started = true; clearTimeout(startWatch); startWatch = null;
+      if (opt.onstart) { try { opt.onstart(); } catch (e) {} }
     };
+    u.onend = function () { finish(); };
+    u.onerror = function (e) { finish((e && e.error) || 'failed'); };
 
-    // iOS는 cancel 직후 speak하면 먹통이 되는 일이 있어 한 박자 띄운다
-    try { s.cancel(); } catch (e) {}
-    speaking = true;
-    setTimeout(function () { try { s.speak(u); } catch (e) { u.onerror({ error: 'failed' }); } }, 40);
+    current = u;
+    /* 필요한 화면에서만 시작을 감시한다. stop/교체 뒤 늦은 이벤트는 새 발화를 건드리지 않는다. */
+    if (opt.startTimeout > 0) startWatch = setTimeout(function () {
+      if (current !== u || started) return;
+      stop(); ttsError(opt, 'start-timeout');
+    }, opt.startTimeout);
+    /* 클릭 안에서 요청해 재생 권한을 보존하고, stop 뒤의 예약 재생을 없앤다. */
+    try { if (s.resume) s.resume(); s.speak(u); } catch (e) { u.onerror({ error: 'failed' }); }
     return u;
   }
 
   function stop() {
     var s = synth();
-    speaking = false;
+    current = null; clearTimeout(startWatch); startWatch = null;
     if (s) { try { s.cancel(); } catch (e) {} }
   }
 
@@ -122,20 +131,20 @@ var WBVoice = (function () {
   function speakSeq(list, opt) {
     opt = opt || {};
     var items = (list || []).map(function (x) { return String(x == null ? '' : x).trim(); }).filter(Boolean);
-    var i = 0, cancelled = false;
+    var i = 0, cancelled = false, utterance = null;
     function step() {
       if (cancelled) return;
       if (i >= items.length) { if (opt.onend) opt.onend(); return; }
-      speak(items[i++], {
-        rate: opt.rate, lang: opt.lang, onstart: opt.onstart, onend: step,
-        onerror: function (why) { cancelled = true; if (opt.onerror) opt.onerror(why); },
+      utterance = speak(items[i++], {
+        rate: opt.rate, lang: opt.lang, startTimeout: opt.startTimeout, onstart: opt.onstart, onend: step,
+        onerror: function (why) { cancelled = true; ttsError(opt, why); },
       });
     }
     step();
-    return { cancel: function () { cancelled = true; stop(); } };
+    return { cancel: function () { cancelled = true; if (current === utterance) stop(); } };
   }
 
-  function isSpeaking() { return speaking; }
+  function isSpeaking() { return !!current; }
 
   /* ── 낭독 녹음 ── */
   function recSupported() {

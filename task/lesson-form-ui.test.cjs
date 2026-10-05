@@ -232,8 +232,8 @@ test('all lesson registration paths use per-time lesson hours and Monday-first w
 
 test('lesson card metadata renders each grouped weekday-time-hours schedule', () => {
   const card = html.slice(html.indexOf("const lesson = isLesson(t);"), html.indexOf("'<div class=\"task-actions\">", html.indexOf("const lesson = isLesson(t);")));
-  assert.match(card, /lessonScheduleMetaHtml\(t\)/);
-  assert.match(html, /groupedScheduleSlotsForDisplay\(task && task\.scheduleSlots, task && task\.lessonHours\)/);
+  assert.match(card, /lessonScheduleMetaHtml\(t, date\)/);
+  assert.match(html, /groupedScheduleSlotsForDisplay\(activeSlots, task && task\.lessonHours\)/);
 });
 
 test('collapsed lesson cards show the next lesson summary beside schedule metadata and today no longer has punch buttons', () => {

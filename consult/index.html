@@ -226,6 +226,8 @@
   .point-gauge-track { height: 12px; margin-top: 12px; overflow: hidden; border-radius: 999px; background: rgba(217,188,107,.22); }
   .point-gauge-track i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #F2C94C, #D9A928); }
   .point-gauge-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 7px; color: var(--mid-gray); font-size: 11px; font-weight: 700; }
+  .point-online-today { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; padding: 9px 10px; border-radius: 10px; background: rgba(255,255,255,.68); color: #765611; font-size: 11px; }
+  .point-online-today b { color: var(--navy); }
   .point-rule-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
   .point-rule-chips span { padding: 4px 8px; border: 1px solid rgba(217,169,40,.26); border-radius: 999px; background: rgba(255,255,255,.72); color: #765611; font-size: 10.5px; font-weight: 800; }
   .point-gauge-actions { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
@@ -799,6 +801,18 @@
   .study-reading-row { padding: 12px 0; border-bottom: 1px solid var(--light-gray); }
   .study-reading-row:last-child { border-bottom: 0; }
   .study-reading-history { margin-top: 7px; color: var(--mid-gray); font-size: 11.5px; }
+  .study-roadmap-card { overflow: hidden; border-color: #DCCEF8; background: linear-gradient(145deg, #FBF8FF, #FFFDF4); }
+  .study-roadmap-goal { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-bottom: 13px; border-bottom: 1px solid #E9E0F7; }
+  .study-roadmap-school { color: #6036B4; font-size: clamp(18px, 4.4vw, 25px); font-weight: 900; letter-spacing: -.03em; }
+  .study-roadmap-list { display: grid; gap: 10px; margin-top: 13px; }
+  .study-roadmap-item { padding: 12px; border: 1px solid var(--line); border-left: 5px solid var(--subject-color); border-radius: 12px; background: linear-gradient(90deg, var(--subject-bg), rgba(255,255,255,.92) 45%); }
+  .study-roadmap-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; color: var(--mid-gray); font-size: 11px; }
+  .study-roadmap-progress { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 9px; margin-top: 9px; }
+  .study-roadmap-week { display: grid; gap: 8px; }
+  .study-roadmap-week-row { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; padding: 9px 0; border-bottom: 1px solid var(--light-gray); }
+  .study-roadmap-week-row:last-child { border-bottom: 0; }
+  .study-roadmap-admin-row { padding: 10px 0; border-bottom: 1px solid var(--light-gray); }
+  .study-roadmap-admin-row:last-child { border-bottom: 0; }
 
   /* ─── 보호자 읽기 전용 공유 ─── */
   .guardian-status { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; margin: 12px 0; }
@@ -838,30 +852,41 @@
   .student-guide-hero .btn { position: relative; z-index: 1; background: var(--white); color: var(--navy); }
   .student-guide-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 13px; }
   .student-guide-head .pill { flex: 0 0 auto; }
+  .student-guide-section > summary { cursor: pointer; list-style: none; }
+  .student-guide-section > summary::-webkit-details-marker { display: none; }
+  .student-guide-summary-copy, .student-guide-summary-copy .card-title, .student-guide-summary-copy .card-sub { display: block; }
+  .student-guide-summary-copy { flex: 1; min-width: 0; }
+  .student-guide-section > summary::after { content: '⌄'; flex: 0 0 auto; color: var(--mid-gray); font-size: 18px; font-weight: 900; line-height: 1; }
+  .student-guide-section[open] > summary::after { content: '⌃'; }
+  .student-guide-section:not([open]) > summary { margin-bottom: 0; }
+  .student-guide-section > summary:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: 8px; }
   .student-guide-steps { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
   .student-guide-step { min-width: 0; padding: 13px; border: 1px solid #DFE8F2; border-radius: 13px; background: #F8FBFF; }
   .student-guide-step-top { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
   .student-guide-number { width: 26px; height: 26px; display: grid; place-items: center; flex: 0 0 auto; border-radius: 9px; background: #E5EFFA; color: var(--deep-blue); font-size: 12px; font-weight: 900; }
   .student-guide-step b { color: var(--navy); font-size: 13px; }
-  .student-guide-step p { color: var(--mid-gray); font-size: 11.5px; line-height: 1.55; }
+  .student-guide-step p { color: var(--mid-gray); font-size: 12.5px; line-height: 1.6; }
   .student-guide-step code { padding: 2px 5px; border-radius: 5px; background: var(--white); color: var(--deep-blue); font-family: inherit; font-size: 10.5px; font-weight: 900; }
-  .student-guide-tip { margin-top: 11px; padding: 11px 12px; border-radius: 11px; background: #FFF8E9; color: #7B5B12; font-size: 11.5px; }
+  .student-guide-tip { margin-top: 11px; padding: 11px 12px; border-radius: 11px; background: #FFF8E9; color: #7B5B12; font-size: 12px; line-height: 1.6; }
+  .student-guide-reward { border: 2px solid #F5D58C; background: linear-gradient(135deg, #FFF9E7 0%, #FFF2F5 100%); box-shadow: 0 10px 24px rgba(177,125,31,.14); }
+  .student-guide-reward .card-title { color: #7A4F00; }
+  .student-guide-reward .pill, .student-guide-reward .student-guide-number { background: #FFE7A5; color: #7A4F00; }
   .student-guide-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
   .student-guide-option { min-width: 0; padding: 14px; border: 1px solid var(--line); border-radius: 13px; }
   .student-guide-option.planner { background: #F1F7FD; border-color: #D5E5F4; }
   .student-guide-option.lecture { background: #FFF3F8; border-color: #F3DCE7; }
   .student-guide-option b { display: block; margin-bottom: 5px; color: var(--navy); font-size: 13px; }
-  .student-guide-option p { color: var(--mid-gray); font-size: 11.5px; line-height: 1.55; }
+  .student-guide-option p { color: var(--mid-gray); font-size: 12.5px; line-height: 1.6; }
   .student-guide-closes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
   .student-guide-close { padding: 13px; border-radius: 12px; background: #F7F4FF; }
   .student-guide-close b { display: block; color: var(--deep-blue); font-size: 12.5px; }
-  .student-guide-close span { display: block; margin-top: 3px; color: var(--mid-gray); font-size: 11px; }
+  .student-guide-close span { display: block; margin-top: 3px; color: var(--mid-gray); font-size: 11.5px; line-height: 1.5; }
   .student-guide-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
   .student-guide-tab { display: grid; grid-template-columns: 29px minmax(0, 1fr); gap: 8px; align-items: center; padding: 10px; border-radius: 11px; background: #F7F8FA; }
   .student-guide-tab i { display: grid; place-items: center; width: 29px; height: 29px; border-radius: 9px; background: var(--white); font-style: normal; }
   .student-guide-tab b, .student-guide-tab span { display: block; }
   .student-guide-tab b { color: var(--navy); font-size: 11.5px; }
-  .student-guide-tab span { color: var(--mid-gray); font-size: 10px; line-height: 1.35; }
+  .student-guide-tab span { color: var(--mid-gray); font-size: 11.5px; line-height: 1.45; }
   .student-guide-private { border-color: #F0D9D4; background: #FFF9F8; }
   .student-guide-private b { color: #A84739; }
   .student-setup-progress { height: 7px; overflow: hidden; border-radius: 999px; background: rgba(255,255,255,.2); }
@@ -1131,6 +1156,9 @@ const CLASSCARD_IOS_APP_URL = 'https://apps.apple.com/kr/app/id1176435331';
 const STUDYFORCE_URL = 'https://hol.sfcenter.co.kr/';
 const NELT_EXAM_URL = 'https://www.netutor.co.kr/st/';
 const DAILY_NONFICTION_URL = 'https://wb-reading.whdudwns33.workers.dev';
+const BRAIN_LETTER_URL = 'https://wb-reading.whdudwns33.workers.dev/letter/';
+const CHUNK_BRAIN_URL = 'https://wb-reading.whdudwns33.workers.dev/chunk/';
+const VOCABULARY_URL = 'https://wb-reading.whdudwns33.workers.dev/hanja/';
 
 function classcardAppUrl(userAgent, maxTouchPoints) {
   const ua = String(userAgent || '');
@@ -1157,6 +1185,30 @@ const LEARNING_SOURCES = Object.freeze({
     guide: '메타수학 학생홈을 열어 문제 풀이와 오답학습을 마친 뒤, 컨설팅 플래너에서 진행 단계를 체크하세요.',
     steps: ['문제 풀기', '오답학습 마치기'],
     noteHint: '점수·오답 수 메모 (예: 82점, 오답 6개)'
+  },
+  brain_letter: {
+    icon: '📰', label: '브레인레터', centerUrl: BRAIN_LETTER_URL, studentUrl: BRAIN_LETTER_URL,
+    centerAction: '브레인레터 열기', studentAction: '브레인레터 읽기',
+    detail: '매주 새로운 주간 뉴스레터 읽기',
+    guide: '브레인레터에서 오늘의 글을 읽고 활동을 마친 뒤, 컨설팅 플래너에서 완료 결과를 기록하세요.',
+    steps: ['오늘의 글 읽기', '오늘의 활동 마치기'],
+    noteHint: '읽은 글·기억에 남는 내용 메모'
+  },
+  chunk_brain: {
+    icon: '🧩', label: '청크브레인', centerUrl: CHUNK_BRAIN_URL, studentUrl: CHUNK_BRAIN_URL,
+    centerAction: '청크브레인 열기', studentAction: '청크브레인 학습하기',
+    detail: '의미 단위 끊어읽기 학습 · 원내 전용',
+    guide: '청크브레인에서 오늘의 배우기·연습·복습을 마친 뒤, 컨설팅 플래너에서 완료 결과를 기록하세요.',
+    steps: ['오늘의 세 걸음 학습하기', '학습 결과 확인하기'],
+    noteHint: '학습 단계·결과 메모'
+  },
+  vocabulary: {
+    icon: '🌱', label: '어휘브레인', centerUrl: VOCABULARY_URL, studentUrl: VOCABULARY_URL,
+    centerAction: '어휘브레인 열기', studentAction: '어휘브레인 학습하기',
+    detail: '어휘브레인 학습',
+    guide: '어휘브레인 학습을 마친 뒤, 컨설팅 플래너에서 완료 결과를 기록하세요.',
+    steps: ['어휘 학습하기', '학습 결과 확인하기'],
+    noteHint: '학습한 교재·단원·결과 메모'
   },
   classcard: {
     icon: '🔤', label: '클래스카드', appOnly: true,
@@ -1220,7 +1272,11 @@ const LEARNING_SOURCES = Object.freeze({
   }
 });
 const ONLINE_LEARNING_SOURCE_KEYS = Object.freeze([
-  'leaders_eye', 'metamath', 'classcard', 'studyforce', 'nelt_exam', 'daily_nonfiction'
+  'brain_letter', 'chunk_brain', 'vocabulary', 'leaders_eye', 'metamath',
+  'classcard', 'studyforce', 'nelt_exam', 'daily_nonfiction'
+]);
+const POINT_ONLINE_SOURCE_KEYS = Object.freeze([
+  'brain_letter', 'chunk_brain', 'vocabulary', 'leaders_eye', 'metamath'
 ]);
 const CHECKLIST_ONLINE_SOURCE_DEFAULTS = Object.freeze({
   leaders_eye: { title: '리더스아이 오늘 학습', subject: 'english', minutes: 20 },
@@ -1300,12 +1356,12 @@ function blankState() {
     staff: [],
     tasks: [],
     checks: {},
-    settings: { adminPin: '', adminLoginId: '', syncUrl: '', syncSecret: '', adminToken: '', centerName: 'WB 웩슬러브레인센터', dataGeneration: 0 }
+    settings: { adminPin: '', adminLoginId: '', syncUrl: '', syncSecret: '', adminToken: '', centerName: 'WB 웩슬러브레인센터', dataGeneration: 0, localLearningLogins: {} }
   };
 }
 
 const LOCAL_AUTH_SETTINGS = Object.freeze([
-  'adminPin', 'adminLoginId', 'syncSecret', 'adminToken', 'myToken', 'syncUrl', 'pullAt', 'pushAt', 'dataGeneration'
+  'adminPin', 'adminLoginId', 'syncSecret', 'adminToken', 'myToken', 'syncUrl', 'pullAt', 'pushAt', 'dataGeneration', 'localLearningLogins'
 ]);
 function sanitizedBackupState(source) {
   const copy = JSON.parse(JSON.stringify(source || blankState()));
@@ -1962,7 +2018,7 @@ const sync = {
           this.err = '';
           this.dirty = true;
           renderAfterSync();
-          toast('처리 중인 상품권 교환이 있어 학생 변경을 취소하고 서버 정보로 복구했습니다');
+          toast('처리 중인 기프트 카드 교환이 있어 학생 변경을 취소하고 서버 정보로 복구했습니다');
           queueSync(); // 이어서 processing 원장을 받아 정산 화면을 다시 연다.
           return;
         }
@@ -2090,8 +2146,11 @@ function clearStudentCodeHash() {
 
 /** 원장·다른 학생 캐시를 새 학생 권한으로 올리지 않도록 운영 데이터만 비운다. */
 function resetStudentLinkCache(token) {
+  const staffId = session.staffId;
+  const savedLogins = state.settings.localLearningLogins || {};
+  const localLearningLogins = staffId && savedLogins[staffId] ? { [staffId]: savedLogins[staffId] } : {};
   const settings = Object.assign({}, state.settings || {}, {
-    myToken: String(token || ''), pullAt: 0, pushAt: 0
+    myToken: String(token || ''), pullAt: 0, pushAt: 0, localLearningLogins: localLearningLogins
   });
   state = Object.assign(blankState(), { staff: [], tasks: [], checks: {}, settings: settings });
   viewStaff = '';
@@ -2359,6 +2418,9 @@ function originTags(t) {
 function canEditTask(t) {
   if (isLectureRequestTask(t)) return false;
   if (isPointTransactionTask(t)) return false;
+  if (t && t.auto === STUDY_ROADMAP_AUTO) return false;
+  if (session.isStaffLink && t && (t.dailyCarryFrom || String(t.groupId || '').startsWith('month-carry-')) &&
+      ['admin', 'manager'].includes(t.carrySourceOrigin)) return false;
   if (!session.isStaffLink) return session.isAdmin;
   if (isManager()) return t.origin === 'manager';
   return t.origin === 'staff' && t.staffId === session.staffId;
@@ -2407,7 +2469,8 @@ function currentStaff() {
 function render() {
   sync.pendingRender = false;
   viewInputDirty = false;
-  if (route === 'guide' && (!session.isStaffLink || isManager())) route = 'today';
+  if (route === 'guide' && !((session.isStaffLink && !isManager()) || (session.isAdmin && !session.isStaffLink))) route = 'today';
+  if (route === 'roadmap' && session.isStaffLink && !studyRoadmapAvailable(currentStaff())) route = 'today';
   paintStatus();
   renderTabs();
   const v = $('#view');
@@ -2435,11 +2498,11 @@ function render() {
 
   // 개인 링크는 허용된 화면만 — 관리자는 발행·현황까지, 학생은 자기 플래너만
   if (session.isStaffLink) {
-    const allowed = isManager() ? ['today', 'week', 'month', 'academic', 'ingang', 'study', 'write', 'board'] : ['guide', 'today', 'week', 'month', 'academic', 'ingang', 'study'];
+    const allowed = isManager() ? ['today', 'week', 'roadmap', 'month', 'academic', 'ingang', 'study', 'write', 'board'] : ['guide', 'today', 'week', 'roadmap', 'month', 'academic', 'ingang', 'study'];
     if (!allowed.includes(route)) route = 'today';
   }
 
-  const map = { guide: viewStudentGuide, today: viewToday, week: viewWeek, month: viewMonth, academic: viewAcademic, ingang: viewIngang, study: viewStudy, write: viewWrite, results: viewResults, board: viewBoard, staff: viewStaffAdmin, settings: viewSettings };
+  const map = { guide: viewStudentGuide, today: viewToday, week: viewWeek, roadmap: viewRoadmap, month: viewMonth, academic: viewAcademic, ingang: viewIngang, study: viewStudy, write: viewWrite, results: viewResults, board: viewBoard, staff: viewStaffAdmin, settings: viewSettings };
   v.innerHTML = (map[route] || viewToday)();
   if (route === 'staff' && session.isAdmin && !session.isStaffLink) loadConsultLinkContacts();
 }
@@ -2448,12 +2511,13 @@ function renderTabs() {
   const a = alertsToday();
   const lecturePending = session.isAdmin && !session.isStaffLink
     ? teamStaff().reduce((sum, staff) => sum + lectureRequestsFor(staff.id).filter(lectureRequestActive).length, 0) : 0;
+  const roadmapTab = ((session.isAdmin && !session.isStaffLink) || studyRoadmapAvailable(currentStaff())) ? [['roadmap', '로드맵']] : [];
   const tabs = session.isStaffLink
     ? (isManager()
-        ? [['today', '오늘'], ['week', '주간'], ['month', '일정'], ['academic', '학사관리'], ['ingang', '인강'], ['study', '학습'], ['write', '학습 배부'], ['board', '학생 현황', a.total]]
-        : [['today', '오늘 할 일'], ['guide', '사용 안내'], ['week', '주간 플래너'], ['month', '일정'], ['academic', '학사관리'], ['ingang', '인강'], ['study', '학습']])
+        ? [['today', '오늘'], ['week', '주간'], ...roadmapTab, ['month', '일정'], ['academic', '학사관리'], ['ingang', '인강'], ['study', '학습'], ['write', '학습 배부'], ['board', '학생 현황', a.total]]
+        : [['today', '오늘 할 일'], ['guide', '사용 안내'], ['week', '주간 플래너'], ...roadmapTab, ['month', '일정'], ['academic', '학사관리'], ['ingang', '인강'], ['study', '학습']])
     : session.isAdmin
-      ? [['today', '오늘'], ['week', '주간'], ['month', '일정'], ['academic', '학사관리'], ['ingang', '인강', lecturePending], ['study', '학습'], ['write', '학습 배부'], ['results', '결과지'],
+      ? [['today', '오늘'], ['guide', '사용 안내'], ['week', '주간'], ...roadmapTab, ['month', '일정'], ['academic', '학사관리'], ['ingang', '인강', lecturePending], ['study', '학습'], ['write', '학습 배부'], ['results', '결과지'],
          ['board', '학생 현황', a.total], ['staff', '학생 관리'], ['settings', '설정']]
       : [];
   $('#tabs').innerHTML = tabs.map(([k, t, n]) =>
@@ -2645,6 +2709,7 @@ function studentSetupWizard(me, status) {
       '<div class="student-guide-tip"><b>인강 안내</b> ' + (courseCount
         ? '현재 등록된 인강이 ' + courseCount + '개 있습니다. 오늘 들을 강의도 체크리스트로 가져와 완료하세요.'
         : '현재 등록된 인강은 없습니다. 인강 탭에서 필요한 강좌의 배정을 요청할 수 있습니다.') + '</div>' +
+      '<div class="student-guide-tip"><b>온라인 학습 안내</b> 설정을 마치면 사용 안내 탭의 리더스아이·메타수학 매뉴얼에서 로그인부터 완료 기록까지 다시 확인할 수 있습니다.</div>' +
       '<div class="student-setup-actions"><button class="btn btn-primary" data-act="studentsetupfinish">확인했어요 · 설정 완료</button>' +
         '<button class="btn btn-ghost" data-go="today">나중에 마무리하기</button></div></div>';
   }
@@ -2694,71 +2759,106 @@ function studentSetupReminder(me) {
 
 function viewStudentGuide() {
   const me = currentStaff();
-  if (!me || !session.isStaffLink || isManager()) return '';
-  const setupStatus = studentSetupStatus(me.id);
-  if (!setupStatus.complete) return studentSetupWizard(me, setupStatus) + studentPhoneSettingsCard();
+  const adminPreview = session.isAdmin && !session.isStaffLink;
+  const studentSelf = session.isStaffLink && !isManager();
+  if ((!studentSelf && !adminPreview) || (studentSelf && !me)) return '';
+  const setupStatus = studentSelf ? studentSetupStatus(me.id) : null;
+  if (studentSelf && !setupStatus.complete) return studentSetupWizard(me, setupStatus) + studentPhoneSettingsCard();
   return '<div class="student-guide" id="studentGuide">' +
     '<div class="card student-guide-hero">' +
-      '<span class="student-guide-kicker">학생용 · 설정 완료</span>' +
-      '<div class="student-guide-title">' + esc(me.name) + ' 학생,<br>매일 네 단계만 기억하세요</div>' +
+      '<span class="student-guide-kicker">' + (adminPreview ? '원장 확인용 · 학생 사용 안내' : '학생용 · 설정 완료') + '</span>' +
+      '<div class="student-guide-title">' + (adminPreview ? '학생용 플래너' : esc(me.name) + ' 학생') + ',<br>매일 네 단계만 기억하세요</div>' +
       '<div class="student-guide-lead">필수는 오늘 할 일 확인, 완료 표시, 하루 마감입니다. 공부시간 기록과 인강 관리는 해당하는 학생만 사용하면 됩니다.</div>' +
       '<button class="btn" data-go="today">오늘 할 일 시작하기 →</button>' +
-    '</div>' + studentSetupSummary(me) + studentPhoneSettingsCard() +
+    '</div>' + (studentSelf ? studentSetupSummary(me) + studentPhoneSettingsCard() : '') +
 
-    '<div class="card"><div class="student-guide-head"><div><div class="card-title">처음 연결과 매일 접속</div>' +
-      '<div class="card-sub">학생용 링크는 연결용으로 한 번만 사용하고, 연결된 같은 브라우저로 계속 이용합니다.</div></div><span class="pill">첫날</span></div>' +
-      '<div class="student-guide-steps">' +
-        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">1</span><b>학생 기기에서 연결</b></div><p>카카오톡 안에서 열었다면 연결 전에 메뉴에서 Chrome 또는 Safari로 여세요.</p></div>' +
-        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">2</span><b>바로가기 저장</b></div><p>연결된 오늘 할 일 화면을 홈 화면이나 즐겨찾기에 저장합니다.</p></div>' +
-        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">3</span><b>같은 브라우저 사용</b></div><p>매일 같은 브라우저의 저장된 바로가기로 접속합니다.</p></div>' +
-        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">4</span><b>기기가 바뀌었다면</b></div><p>휴대폰이나 브라우저가 바뀌면 원장님께 새 학생용 링크를 요청합니다.</p></div>' +
-      '</div></div>' +
-
-    '<div class="card"><div class="student-guide-head"><div><div class="card-title">매일 반드시 할 것</div>' +
-      '<div class="card-sub">오늘 할 일 탭에서 순서대로 진행하세요.</div></div><span class="pill">필수</span></div>' +
+    '<details class="card student-guide-section" open><summary class="student-guide-head"><span class="student-guide-summary-copy"><span class="card-title">✅ 매일 반드시 할 것</span>' +
+      '<span class="card-sub">오늘 할 일 탭에서 순서대로 진행하세요.</span></span><span class="pill">필수</span></summary>' +
       '<div class="student-guide-steps">' +
         '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">1</span><b>오늘 해야 할 일 확인</b></div>' +
           '<p>첫 카드에서 이월·배부 공부·온라인 학습·인강·복습 순서를 확인하고, 필요하면 <code>오늘 배부된 공부</code>를 펼칩니다.</p></div>' +
         '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">2</span><b>공부 시작하기</b></div>' +
           '<p>배부 공부는 <code>내 체크리스트로 가져오기</code>를 누릅니다. 반복 배정된 리더스아이·하루 비문학은 오늘 체크리스트에 자동으로 표시되며, 첫 카드나 학습 탭에서 바로 실행합니다.</p></div>' +
         '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">3</span><b>완료 표시</b></div>' +
-          '<p>일반 공부는 스터디 플래너의 체크 칸을 누릅니다. 온라인 학습은 <code>학습 완료 기록</code>을 눌러 리더스아이는 오늘 학습 결과를, 메타수학은 점수·오답 수를 입력합니다.</p></div>' +
+          '<p>일반 공부는 스터디 플래너의 체크 칸을 누릅니다. 온라인 학습은 각 서비스 카드의 <code>학습 완료 기록</code>을 눌러 학습 결과나 메모를 남깁니다.</p></div>' +
         '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">4</span><b>하루 마감</b></div>' +
           '<p>타이머 정지 → 미완료 공부 정리 → 시험·중요 일정 준비율 확인 → 마무리 내용 저장 → 보고 문자 복사 → 보호자에게 전송 → 발송했어요 순서로 끝냅니다.</p></div>' +
       '</div>' +
       '<div class="student-guide-tip"><b>온라인 학습 표시</b> ○ 미시작 → ◐ 진행 중 → ✓ 학생 완료 순서로 바뀌며, 인증사진이 승인되면 🛡 원장 확인으로 표시됩니다.</div>' +
       '<div class="student-guide-tip"><b>오늘 끝내지 못했다면?</b> 숨기지 말고 하루 마감에서 ‘내일로 이월’, ‘막힘’, ‘오늘 종료’ 중 표시되는 방법을 선택하세요. 반복 온라인 학습은 다음 예정일에 자동으로 다시 표시됩니다.</div>' +
-      '<div class="student-guide-tip"><b>유효 학습일 스탬프</b> 예정 공부를 하나 이상 완료하거나 순공시간을 10분 이상 기록하고, 미완료 정리와 수행 보고를 다음날 정오 전까지 끝내면 하루에 하나가 찍힙니다.</div>' +
-      '<div class="student-guide-tip"><b>포인트와 문화상품권</b> 유효 학습일은 50P, 예정 학습일 3일 이상인 주의 80% 달성·주간 마무리는 250P, 예정 학습일 12일 이상인 달의 80% 달성·월간 마무리는 500P가 자동 계산됩니다. 5,000P부터 오늘 화면에서 문화상품권 교환을 신청하며, 원장이 기록과 발송을 확인한 뒤 차감됩니다.</div>' +
-    '</div>' +
+    '</details>' +
 
-    '<div class="card"><div class="student-guide-head"><div><div class="card-title">학생에 따라 선택해서 사용</div>' +
-      '<div class="card-sub">해당하지 않는 기능은 사용하지 않아도 됩니다.</div></div><span class="pill warn">선택</span></div>' +
+    '<details class="card student-guide-section student-guide-reward"><summary class="student-guide-head"><span class="student-guide-summary-copy"><span class="card-title">🎁 기프트 카드 받는 방법</span>' +
+      '<span class="card-sub">5,000P가 모이면 신청부터 수령까지 확인해요.</span></span><span class="pill">5,000P 교환</span></summary>' +
+      '<div class="student-guide-steps">' +
+        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">1</span><b>매일 포인트 모으기</b></div><p>10월 1일부터 하루 마감으로 최대 100P를 받습니다. 온라인 학습이 배정된 날은 하루 마감 70P와 브레인레터·청크브레인·어휘브레인·리더스아이·메타수학 완료 몫 최대 30P로 나뉩니다.</p></div>' +
+        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">2</span><b>온라인 학습 결과 기록</b></div><p>사이트를 연 것만으로는 적립되지 않습니다. 실제 학습 후 <code>학습 완료 기록</code>을 남기고 하루 마감까지 끝내야 포인트가 확정됩니다.</p></div>' +
+        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">3</span><b>교환 신청</b></div><p>오늘 할 일의 게이지가 5,000P가 되어 <code>교환 가능</code>으로 바뀌면 <code>5,000P 교환 신청</code>을 누릅니다.</p></div>' +
+        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">4</span><b>기프트 카드 받기</b></div><p>원장이 학습 기록을 확인해 기프트 카드를 별도로 발송합니다. 실제 발송이 완료되면 5,000P가 차감되고 <code>기프트 카드 교환 완료</code>로 기록됩니다.</p></div>' +
+      '</div><div class="student-guide-tip"><b>취소와 보관</b> ‘교환 확인 중’에는 신청을 취소할 수 있지만 ‘교환 처리 중’에는 취소할 수 없습니다. 기프트 카드 번호·링크는 플래너에 저장되지 않습니다.</div>' +
+    '</details>' +
+
+    '<details class="card student-guide-section"><summary class="student-guide-head"><span class="student-guide-summary-copy"><span class="card-title">🔗 처음 연결과 매일 접속</span>' +
+      '<span class="card-sub">학생용 링크 연결과 매일 접속 방법입니다.</span></span><span class="pill">첫날</span></summary>' +
+      '<div class="student-guide-steps">' +
+        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">1</span><b>학생 기기에서 연결</b></div><p>카카오톡 안에서 열었다면 연결 전에 메뉴에서 Chrome 또는 Safari로 여세요.</p></div>' +
+        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">2</span><b>바로가기 저장</b></div><p>연결된 오늘 할 일 화면을 홈 화면이나 즐겨찾기에 저장합니다.</p></div>' +
+        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">3</span><b>같은 브라우저 사용</b></div><p>매일 같은 브라우저의 저장된 바로가기로 접속합니다.</p></div>' +
+        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">4</span><b>기기가 바뀌었다면</b></div><p>휴대폰이나 브라우저가 바뀌면 원장님께 새 학생용 링크를 요청합니다.</p></div>' +
+      '</div></details>' +
+
+    '<details class="card student-guide-section"><summary class="student-guide-head"><span class="student-guide-summary-copy"><span class="card-title">📚 온라인 학습 사용 매뉴얼</span>' +
+      '<span class="card-sub">사이트 학습부터 플래너 완료 기록까지 확인합니다.</span></span><span class="pill">브레인 학습 · 리더스아이 · 메타수학</span></summary>' +
+      '<div class="student-guide-steps">' +
+        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">1</span><b>학습 탭 열기</b></div><p><code>학습</code>에서 브레인레터·청크브레인·어휘브레인·리더스아이·메타수학 중 이용할 카드를 펼칩니다.</p></div>' +
+        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">2</span><b>로그인 정보 확인</b></div><p>리더스아이는 Agency ID <code>wbbrain</code>을 사용하고 Student ID·PW는 본인이 입력합니다. 메타수학도 본인 아이디·비밀번호를 입력합니다.</p></div>' +
+        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">3</span><b>사이트에서 학습</b></div><p><code>학습하기</code> 버튼으로 이동해 카드에 안내된 학습을 끝냅니다. 메타수학 문제지가 없다면 먼저 <code>문제지 요청</code>을 보냅니다.</p></div>' +
+        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">4</span><b>플래너로 돌아오기</b></div><p>학습이 끝나면 이 플래너의 학습 탭으로 돌아옵니다. 사이트를 닫는 것만으로는 완료 처리되지 않습니다.</p></div>' +
+        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">5</span><b>완료 결과 기록</b></div><p>배정된 과제의 <code>학습 완료 기록</code>을 눌러 진행 단계와 결과를 남깁니다. 메타수학은 점수·오답 수도 함께 적습니다.</p></div>' +
+        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">6</span><b>오늘 할 일 확인</b></div><p>오늘 체크리스트가 완료로 바뀌었는지 확인하고, 마지막에 하루 마감과 수행 보고를 끝냅니다.</p></div>' +
+      '</div><div class="student-guide-tip"><b>로그인 메모 보안</b> 입력한 아이디와 비밀번호는 현재 학생 기기에만 저장되고 서버·원장 화면·백업으로 전송되지 않습니다. 공용 기기에서는 저장하지 말고, 기기 저장공간을 지우면 메모도 사라집니다.</div>' +
+      '<div class="student-guide-tip"><b>온라인 학습 포인트</b> 배정된 서비스가 여러 개면 하루 온라인 학습 30P를 서비스 수대로 나누며, 완료한 서비스 몫만 실제 완료한 날짜에 적립됩니다. 이월 공부도 원래 날짜가 아니라 마친 날에 반영됩니다.</div>' +
+      '<div class="student-guide-tip"><b>서비스별 안내</b> 브레인레터는 주간 글 읽기, 청크브레인은 의미 단위 끊어읽기, 어휘브레인은 어휘 학습에 사용합니다. 리더스아이는 학습 결과에 따라 1주일마다 레벨이 자동 조정됩니다. 메타수학 문제지 요청은 화요일까지 보내면 가까운 수요일에, 수요일 이후에는 다음 수요일에 제작·배정됩니다.</div>' +
+    '</details>' +
+
+    '<details class="card student-guide-section"><summary class="student-guide-head"><span class="student-guide-summary-copy"><span class="card-title">🎯 목표 학교와 교재 로드맵</span>' +
+      '<span class="card-sub">로드맵이 배정된 학생에게만 보이는 교재 진도 계획입니다.</span></span><span class="pill warn">선택 적용</span></summary>' +
+      '<div class="student-guide-steps">' +
+        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">1</span><b>목표와 교재 확인</b></div><p>원장이 목표 학교, 과목, 교재, 전체 범위와 완료 목표일을 등록합니다.</p></div>' +
+        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">2</span><b>오늘 분량 확인</b></div><p>전체 범위가 학습 요일에 자동으로 나뉘어 <code>오늘 할 일</code> 체크리스트에 표시됩니다.</p></div>' +
+        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">3</span><b>학습하고 완료 표시</b></div><p>배정된 범위를 공부한 뒤 스터디 플래너에서 완료 표시합니다. 못 끝낸 분량은 하루 마감에서 이월할 수 있습니다.</p></div>' +
+        '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">4</span><b>진도 확인</b></div><p><code>로드맵</code> 탭에서 목표 학교·교재별 전체 진도율과 이번 주 배정 분량을 한 번에 확인합니다.</p></div>' +
+      '</div><div class="student-guide-tip"><b>수정이 필요하다면?</b> 목표 학교·교재·기간·학습 요일은 원장 화면에서만 바꿀 수 있으므로 변경이 필요하면 요청해 주세요.</div>' +
+    '</details>' +
+
+    '<details class="card student-guide-section"><summary class="student-guide-head"><span class="student-guide-summary-copy"><span class="card-title">⚙ 학생에 따라 선택해서 사용</span>' +
+      '<span class="card-sub">순공시간과 인강이 필요한 학생만 사용합니다.</span></span><span class="pill warn">선택</span></summary>' +
       '<div class="student-guide-options">' +
         '<div class="student-guide-option planner"><b>⏱ 순공시간 기록</b><p>시간을 기록하는 학생은 ‘공부 시작·정지’를 사용합니다. 타이머를 쓰지 않았다면 연필 버튼에서 과목별 실제 시간만 한 번 입력할 수 있습니다. 입력하지 않으면 보고에는 0분으로 표시될 수 있습니다.</p></div>' +
         '<div class="student-guide-option lecture"><b>🎬 인강 관리</b><p>등록된 인강이 있는 학생만 사용합니다. 오늘 들을 강의를 체크리스트에 담은 뒤 완료 표시하면 됩니다.</p></div>' +
       '</div>' +
-    '</div>' +
+    '</details>' +
 
-    '<div class="card"><div class="student-guide-head"><div><div class="card-title">일요일과 매월 말일</div>' +
-      '<div class="card-sub">평소처럼 하루 마감부터 끝내면 다음 단계가 열립니다.</div></div><span class="pill">자동 안내</span></div>' +
+    '<details class="card student-guide-section"><summary class="student-guide-head"><span class="student-guide-summary-copy"><span class="card-title">🗓 일요일과 매월 말일</span>' +
+      '<span class="card-sub">주간·월간 마무리 방법을 확인합니다.</span></span><span class="pill">자동 안내</span></summary>' +
       '<div class="student-guide-closes">' +
         '<div class="student-guide-close"><b>일요일 · 주간 마무리</b><span>이번 주 완료율과 미완료 공부를 확인하고 짧게 회고합니다.</span></div>' +
         '<div class="student-guide-close"><b>매월 말일 · 월간 마무리</b><span>이번 달 기록을 확인하고 다음 달 집중할 내용을 정합니다.</span></div>' +
       '</div><div class="student-guide-tip"><b>오늘 화면이 잠겼다면?</b> 화면에 표시된 이전 하루·주간·월간 마무리를 먼저 완료하면 자동으로 열립니다.</div>' +
-    '</div>' +
+    '</details>' +
 
-    '<div class="card"><div class="student-guide-head"><div><div class="card-title">탭은 이렇게 사용해요</div>' +
-      '<div class="card-sub">필요할 때 찾아보는 보조 화면입니다.</div></div></div>' +
+    '<details class="card student-guide-section"><summary class="student-guide-head"><span class="student-guide-summary-copy"><span class="card-title">🧭 탭은 이렇게 사용해요</span>' +
+      '<span class="card-sub">각 메뉴가 어떤 역할인지 확인합니다.</span></span></summary>' +
       '<div class="student-guide-tabs">' +
         '<div class="student-guide-tab"><i>✅</i><div><b>오늘 할 일</b><span>매일 공부하고 마감하는 필수 화면</span></div></div>' +
         '<div class="student-guide-tab"><i>📊</i><div><b>주간 플래너</b><span>요일별 수행과 주간 마무리 확인</span></div></div>' +
+        '<div class="student-guide-tab"><i>🧭</i><div><b>로드맵</b><span>목표 학교·교재별 전체 진도와 이번 주 분량 확인</span></div></div>' +
         '<div class="student-guide-tab"><i>🗓</i><div><b>일정</b><span>시험·중요 일정과 월간 기록 확인</span></div></div>' +
         '<div class="student-guide-tab"><i>🎓</i><div><b>학사관리</b><span>시험·수행평가와 자료 요청 확인</span></div></div>' +
         '<div class="student-guide-tab"><i>🎬</i><div><b>인강</b><span>인강이 있는 학생의 일정·진도 관리</span></div></div>' +
         '<div class="student-guide-tab"><i>📚</i><div><b>학습</b><span>온라인 학습 실행·완료 기록, 회독·제출 확인</span></div></div>' +
       '</div>' +
-    '</div>' +
+    '</details>' +
 
     '<div class="card student-guide-private"><div class="card-title">🔒 학생용 화면과 보호자 열람은 달라요</div>' +
       '<div class="card-sub">이 화면은 시간표·체크·학습시간·마감을 직접 기록하는 학생용입니다. 보호자는 학원에서 받은 ‘WB 보호자 학습 확인’ 링크로 발행된 주간·월간 리포트와 영·수 결과지만 읽기 전용으로 확인합니다.</div></div>' +
@@ -5099,6 +5199,301 @@ function tbAddModal(me) {
 }
 
 /* ══════════════════════════════════════════════════════
+   교재 진도 로드맵 — 원장이 정한 범위를 학습 요일에 나누고 기존 체크리스트로 보낸다.
+   ══════════════════════════════════════════════════════ */
+const STUDY_ROADMAP_AUTO = 'study-roadmap-v1';
+const STUDY_ROADMAP_UNITS = Object.freeze({ page: '쪽', chapter: '단원', lecture: '강', problem: '문제', word: '단어' });
+const STUDY_ROADMAP_DAYS = Object.freeze([1, 2, 3, 4, 5, 6, 0]);
+
+function studyRoadmapOf(student) {
+  const raw = student && student.studyRoadmap && typeof student.studyRoadmap === 'object' ? student.studyRoadmap : {};
+  return {
+    targetSchool: String(raw.targetSchool || '').trim().slice(0, 100),
+    items: Array.isArray(raw.items) ? raw.items.filter(item => item && item.id && item.book) : []
+  };
+}
+
+function studyRoadmapActive(student) {
+  const roadmap = studyRoadmapOf(student);
+  return !!(roadmap.targetSchool && roadmap.items.length);
+}
+
+function studyRoutineRoadmapTasks(staffId) {
+  const current = today();
+  return state.tasks.filter(task => {
+    if (!task || task.deleted || task.staffId !== staffId || task.origin !== 'admin' || task.source || task.auto || task.kind ||
+        !String(task.title || '').trim() ||
+        !['daily', 'weekday', 'days'].includes(task.repeat)) return false;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(String(task.start || '')) ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(String(task.end || ''))) return false;
+    return task.end >= current && task.end >= addDays(task.start, 28);
+  }).sort((a, b) => a.start.localeCompare(b.start) || String(a.title).localeCompare(String(b.title), 'ko'));
+}
+
+function studyRoadmapAvailable(student) {
+  return !!student && (studyRoadmapActive(student) || !!studyRoutineRoadmapTasks(student.id).length);
+}
+
+function studyRoadmapRangeText(unit, start, end) {
+  const from = Number(start), to = Number(end), labelText = STUDY_ROADMAP_UNITS[unit] || '개';
+  if (!Number.isInteger(from) || !Number.isInteger(to)) return '';
+  if (unit === 'page') return 'p.' + from + (to === from ? '' : '~' + to);
+  return from + (to === from ? '' : '~' + to) + labelText;
+}
+
+function studyRoadmapSchedule(item, fromUnit, fromDate, blockedDates, blockedRanges) {
+  const rangeStart = Math.max(Number(item && item.rangeStart) || 0, Number(fromUnit) || 0);
+  const rangeEnd = Number(item && item.rangeEnd) || 0;
+  const startDate = String((item && item.startDate) || '');
+  const endDate = String((item && item.endDate) || '');
+  const days = [...new Set((item && Array.isArray(item.days) ? item.days : []).map(Number)
+    .filter(day => Number.isInteger(day) && day >= 0 && day <= 6))];
+  if (!rangeStart || rangeEnd < rangeStart || !/^\d{4}-\d{2}-\d{2}$/.test(startDate) ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(endDate) || endDate < startDate || !days.length) return [];
+  const excluded = blockedDates instanceof Set ? blockedDates : new Set(blockedDates || []);
+  const firstDate = /^\d{4}-\d{2}-\d{2}$/.test(String(fromDate || '')) && fromDate > startDate ? fromDate : startDate;
+  const dates = [];
+  let date = firstDate, guard = 0;
+  while (date <= endDate && guard++ < 731) {
+    if (days.includes(dowOf(date)) && !excluded.has(date)) dates.push(date);
+    date = addDays(date, 1);
+  }
+  const covered = new Set();
+  (blockedRanges || []).forEach(range => {
+    const from = Math.max(rangeStart, Number(range && range.start) || 0);
+    const to = Math.min(rangeEnd, Number(range && range.end) || 0);
+    for (let unit = from; unit <= to; unit++) covered.add(unit);
+  });
+  const units = [];
+  for (let unit = rangeStart; unit <= rangeEnd; unit++) if (!covered.has(unit)) units.push(unit);
+  const sessions = Math.min(units.length, dates.length);
+  if (!sessions) return [];
+  const base = Math.floor(units.length / sessions), remainder = units.length % sessions;
+  let offset = 0;
+  return dates.slice(0, sessions).flatMap((studyDate, index) => {
+    const amount = base + (index < remainder ? 1 : 0);
+    const assigned = units.slice(offset, offset + amount);
+    offset += amount;
+    const rows = [];
+    assigned.forEach(unit => {
+      const last = rows[rows.length - 1];
+      if (last && last.end + 1 === unit) { last.end = unit; last.amount++; }
+      else rows.push({ date: studyDate, start: unit, end: unit, amount: 1 });
+    });
+    return rows;
+  });
+}
+
+function studyRoadmapTasks(staffId, itemId) {
+  return state.tasks.filter(task => !task.deleted && task.staffId === staffId && task.auto === STUDY_ROADMAP_AUTO &&
+    (!itemId || task.roadmapItemId === itemId));
+}
+
+function studyRoadmapTaskHasCheck(task) {
+  const prefix = String(task && task.id || '') + '|';
+  return !!task && Object.keys(state.checks || {}).some(key => key.startsWith(prefix));
+}
+
+function studyRoadmapTaskDone(task) {
+  const prefix = String(task && task.id || '') + '|';
+  return !!task && Object.entries(state.checks || {}).some(([key, check]) => key.startsWith(prefix) && check && check.done);
+}
+
+function studyRoadmapTaskReplaceable(task, itemId, from) {
+  return !!task && !task.deleted && task.auto === STUDY_ROADMAP_AUTO && task.roadmapItemId === itemId &&
+    task.start >= from && !task.dailyCarryFrom && !studyRoadmapTaskHasCheck(task) && !task.lastEditBy;
+}
+
+function studyRoadmapProgress(student, item) {
+  const start = Number(item.rangeStart) || 0, end = Number(item.rangeEnd) || 0;
+  const total = end >= start && start > 0 ? end - start + 1 : 0;
+  const completed = new Set();
+  studyRoadmapTasks(student.id, item.id).filter(studyRoadmapTaskDone).forEach(task => {
+    const from = Math.max(start, Number(task.roadmapRangeStart) || 0);
+    const to = Math.min(end, Number(task.roadmapRangeEnd) || 0);
+    for (let unit = from; unit <= to && unit <= end; unit++) completed.add(unit);
+  });
+  return { done: completed.size, total: total, pct: total ? Math.min(100, Math.round(completed.size / total * 100)) : 0 };
+}
+
+function commitStudyRoadmapItem(student, item) {
+  const stamp = now(), from = today();
+  const current = studyRoadmapTasks(student.id, item.id);
+  const locked = current.filter(task => !studyRoadmapTaskReplaceable(task, item.id, from));
+  current.filter(task => studyRoadmapTaskReplaceable(task, item.id, from)).forEach(task => {
+    task.deleted = true; task.updatedAt = stamp;
+  });
+  const blockedDates = new Set(locked.map(task => task.start).filter(date => date >= from));
+  const blockedRanges = locked.map(task => ({ start: task.roadmapRangeStart, end: task.roadmapRangeEnd }));
+  const schedule = studyRoadmapSchedule(item, Number(item.rangeStart) || 1, from, blockedDates, blockedRanges);
+  schedule.forEach(row => {
+    const taskId = 'roadmap-' + item.id + '-' + row.start + '-' + row.end;
+    const existing = state.tasks.find(task => task.id === taskId);
+    if (existing && studyRoadmapTaskHasCheck(existing)) return;
+    const rangeText = studyRoadmapRangeText(item.unit, row.start, row.end);
+    const next = {
+      id: taskId, groupId: 'roadmap-' + item.id, staffId: student.id,
+      auto: STUDY_ROADMAP_AUTO, roadmapItemId: item.id, roadmapPlanKey: item.id + ':' + row.start + '-' + row.end,
+      roadmapRangeStart: row.start, roadmapRangeEnd: row.end, roadmapUnit: item.unit,
+      title: item.book, studySubject: item.subject,
+      detail: rangeText + ' · ' + studyRoadmapOf(student).targetSchool + ' 목표',
+      guide: rangeText + '를 학습하고 채점한 뒤 오답을 확인하세요.',
+      steps: [], target: 0, unit: STUDY_ROADMAP_UNITS[item.unit] || '개',
+      estimatedMin: Number(item.estimatedMin) || 50, time: '', priority: 'normal',
+      repeat: 'once', days: [], start: row.date, end: '', carry: true, requiresClaim: false,
+      origin: 'admin', createdAt: existing ? existing.createdAt : stamp, updatedAt: stamp, deleted: false
+    };
+    if (existing) Object.assign(existing, next);
+    else state.tasks.push(next);
+  });
+  return schedule;
+}
+
+function stopStudyRoadmapItem(student, itemId) {
+  const stamp = now();
+  studyRoadmapTasks(student.id, itemId).filter(task => studyRoadmapTaskReplaceable(task, itemId, today())).forEach(task => {
+    task.deleted = true; task.updatedAt = stamp;
+  });
+}
+
+function studyRoadmapCard(student) {
+  const roadmap = studyRoadmapOf(student);
+  if (!roadmap.targetSchool || !roadmap.items.length) return '';
+  const summaries = roadmap.items.map(item => ({ item: item, progress: studyRoadmapProgress(student, item) }));
+  const total = summaries.reduce((sum, row) => sum + row.progress.total, 0);
+  const done = summaries.reduce((sum, row) => sum + row.progress.done, 0);
+  const pct = total ? Math.min(100, Math.round(done / total * 100)) : 0;
+  return '<div class="card study-roadmap-card" id="studyRoadmap"><div class="study-roadmap-goal"><div>' +
+    '<div class="card-sub">🎯 목표 학교</div><div class="study-roadmap-school">' + esc(roadmap.targetSchool) + '</div>' +
+    '<div class="card-sub mt8">교재별 남은 분량을 학습 요일에 자동으로 나눈 계획입니다.</div></div>' +
+    (session.isAdmin && !session.isStaffLink ? '<button class="btn btn-sm btn-ghost" data-act="roadmapopen" data-id="' + esc(student.id) + '">로드맵 설정</button>' :
+      '<span class="pill">전체 ' + pct + '%</span>') + '</div>' +
+    '<div class="study-roadmap-list">' + summaries.map(row => {
+      const item = row.item, progress = row.progress;
+      const todayTasks = tasksFor(student.id, today()).filter(task => task.auto === STUDY_ROADMAP_AUTO && task.roadmapItemId === item.id);
+      const nextTask = studyRoadmapTasks(student.id, item.id).filter(task => task.start >= today() && !studyRoadmapTaskDone(task))
+        .sort((a, b) => a.start.localeCompare(b.start))[0];
+      const todayText = todayTasks.length
+        ? '오늘 ' + todayTasks.map(task => studyRoadmapRangeText(task.roadmapUnit, task.roadmapRangeStart, task.roadmapRangeEnd)).join(', ')
+        : nextTask ? '다음 ' + shortDate(nextTask.start) + ' · ' + studyRoadmapRangeText(nextTask.roadmapUnit, nextTask.roadmapRangeStart, nextTask.roadmapRangeEnd)
+          : progress.pct >= 100 ? '목표 분량 완료' : '남은 일정 없음 · 원장 확인 필요';
+      return '<div class="study-roadmap-item ' + studySubject(item.subject).className + '"><div class="between"><div>' +
+        studySubjectTag(item.subject) + ' <b>' + esc(item.book) + '</b></div><b>' + progress.pct + '%</b></div>' +
+        '<div class="study-roadmap-meta"><span>전체 ' + esc(studyRoadmapRangeText(item.unit, item.rangeStart, item.rangeEnd)) + '</span>' +
+          '<span>' + esc(shortDate(item.startDate)) + '~' + esc(shortDate(item.endDate)) + '</span>' +
+          '<span>' + esc((item.days || []).slice().sort((a, b) => STUDY_ROADMAP_DAYS.indexOf(a) - STUDY_ROADMAP_DAYS.indexOf(b)).map(day => DOW[day]).join('·')) + '</span></div>' +
+        '<div class="study-roadmap-progress"><div class="bar mini"><i style="width:' + progress.pct + '%"></i></div>' +
+          '<span class="small"><b>' + progress.done + '</b>/' + progress.total + (STUDY_ROADMAP_UNITS[item.unit] || '개') + '</span></div>' +
+        '<div class="hint mt8"><b>' + esc(todayText) + '</b></div></div>';
+    }).join('') + '</div></div>';
+}
+
+function studyRoutineRoadmapCard(student) {
+  const tasks = studyRoutineRoadmapTasks(student.id);
+  if (!tasks.length) return '';
+  const from = tasks.reduce((date, task) => !date || task.start < date ? task.start : date, '');
+  const to = tasks.reduce((date, task) => !date || task.end > date ? task.end : date, '');
+  return '<div class="card study-roadmap-card"><div class="study-roadmap-goal"><div>' +
+    '<div class="card-sub">🧭 장기 학습 계획</div><div class="study-roadmap-school">' + esc(student.name) + ' 맞춤 학습</div>' +
+    '<div class="card-sub mt8">' + esc(from.replace(/-/g, '.')) + ' ~ ' + esc(to.replace(/-/g, '.')) +
+      ' · 오늘 체크리스트와 연결된 반복 학습입니다.</div></div>' +
+    (session.isAdmin && !session.isStaffLink && !studyRoadmapActive(student)
+      ? '<button class="btn btn-sm btn-ghost" data-act="roadmapopen" data-id="' + esc(student.id) + '">교재 계획 추가</button>'
+      : '<span class="pill">' + tasks.length + '개 계획</span>') + '</div>' +
+    '<div class="study-roadmap-list">' + tasks.map(task =>
+      '<div class="study-roadmap-item ' + taskStudySubject(task).className + '"><div>' +
+        taskStudySubjectTag(task) + ' <b>' + esc(task.title) + '</b></div>' +
+        '<div class="study-roadmap-meta"><span>' + esc(repeatLabel(task)) + '</span>' +
+          '<span>' + esc(shortDate(task.start)) + '~' + esc(shortDate(task.end)) + '</span>' +
+          (Number(task.estimatedMin) > 0 ? '<span>예상 ' + Math.round(Number(task.estimatedMin)) + '분</span>' : '') + '</div>' +
+        (task.detail ? '<div class="small muted mt8">' + esc(task.detail) + '</div>' : '') + '</div>'
+    ).join('') + '</div></div>';
+}
+
+function studyRoadmapWeekCard(student, mon, days) {
+  const roadmap = studyRoadmapOf(student);
+  if (!roadmap.targetSchool || !roadmap.items.length) return '';
+  const weekDates = days || Array.from({ length: 7 }, (_, index) => addDays(mon, index));
+  const rows = roadmap.items.map(item => {
+    const tasks = weekDates.flatMap(date => tasksFor(student.id, date).filter(task =>
+      task.auto === STUDY_ROADMAP_AUTO && task.roadmapItemId === item.id).map(task => ({ task: task, date: date })));
+    const unique = [...new Map(tasks.map(row => [row.task.id + '|' + row.date, row])).values()];
+    return { item: item, tasks: unique, done: unique.filter(row => isDone(row.task.id, row.date)).length };
+  }).filter(row => row.tasks.length);
+  if (!rows.length) return '';
+  return '<div class="card"><div class="between mb8"><div><div class="card-title">📚 이번 주 교재 로드맵</div>' +
+    '<div class="card-sub">목표 ' + esc(roadmap.targetSchool) + ' · 이번 주 배정 분량</div></div><span class="pill">' +
+    rows.reduce((sum, row) => sum + row.done, 0) + '/' + rows.reduce((sum, row) => sum + row.tasks.length, 0) + '회</span></div>' +
+    '<div class="study-roadmap-week">' + rows.map(row => '<div class="study-roadmap-week-row ' + studySubject(row.item.subject).className + '">' +
+      studySubjectTag(row.item.subject) + '<div><b>' + esc(row.item.book) + '</b><div class="small muted">' +
+      row.tasks.map(item => DOW[dowOf(item.date)] + ' ' + studyRoadmapRangeText(item.task.roadmapUnit, item.task.roadmapRangeStart, item.task.roadmapRangeEnd)).join(' · ') +
+      '</div></div><span class="pill' + (row.done === row.tasks.length ? '' : ' warn') + '">' + row.done + '/' + row.tasks.length + '</span></div>').join('') +
+    '</div></div>';
+}
+
+function viewRoadmap() {
+  const me = currentStaff();
+  if (!me) return emptyStaffCard();
+  const h = session.isStaffLink ? '' : staffSwitcher(me.id);
+  if (!studyRoadmapAvailable(me)) return h + '<div class="card"><div class="empty"><b>🧭</b><strong>' + esc(me.name) + ' 학생에게 배정된 로드맵이 없습니다.</strong><br>목표 학교와 교재 계획을 등록하면 이 탭에 표시됩니다.</div>' +
+    (!me.owner && !me.manager ? '<button class="btn btn-primary btn-block" data-act="roadmapopen" data-id="' + esc(me.id) + '">교재 로드맵 추가</button>' : '') + '</div>';
+  const mon = mondayOf(today());
+  const days = Array.from({ length: 7 }, (_, index) => addDays(mon, index));
+  return h + studyRoadmapCard(me) + studyRoutineRoadmapCard(me) + studyRoadmapWeekCard(me, mon, days);
+}
+
+function studyRoadmapModal(staffId) {
+  if (!session.isAdmin || session.isStaffLink) return;
+  const student = staffById(staffId);
+  if (!student || student.deleted || student.owner || student.manager) return toast('학생을 다시 선택해 주세요');
+  const roadmap = studyRoadmapOf(student);
+  modal(student.name + ' · 교재 진도 로드맵',
+    '<div class="guide mb14"><b>필요한 학생에게만 표시됩니다.</b><br>목표 학교와 교재를 등록하면 학생의 로드맵 탭과 오늘 체크리스트에 자동으로 나타납니다.</div>' +
+    '<div class="field"><label class="fl" for="roadmapTargetSchool">목표 학교</label>' +
+      '<div class="row" style="gap:8px"><input class="in" id="roadmapTargetSchool" maxlength="100" value="' + esc(roadmap.targetSchool) + '" placeholder="예: 한국외국어대학교">' +
+      '<button class="btn btn-navy" data-act="roadmaptargetsave" data-id="' + esc(student.id) + '">저장</button></div></div>' +
+    '<div class="between mt14 mb8"><b>교재 계획</b><button class="btn btn-sm btn-primary" data-act="roadmapbookadd" data-id="' + esc(student.id) + '">＋ 교재 추가</button></div>' +
+    (roadmap.items.length ? roadmap.items.map(item => {
+      const progress = studyRoadmapProgress(student, item);
+      return '<div class="study-roadmap-admin-row"><div class="between"><div>' + studySubjectTag(item.subject) + ' <b>' + esc(item.book) + '</b>' +
+        '<div class="small muted mt8">' + esc(studyRoadmapRangeText(item.unit, item.rangeStart, item.rangeEnd)) + ' · ' +
+          esc(shortDate(item.startDate)) + '~' + esc(shortDate(item.endDate)) + ' · ' + progress.pct + '%</div></div>' +
+        '<div class="row" style="gap:6px"><button class="btn btn-sm btn-ghost" data-act="roadmapbookedit" data-id="' + esc(student.id) + '" data-item="' + esc(item.id) + '">수정</button>' +
+        '<button class="btn btn-sm btn-danger" data-act="roadmapbookdelete" data-id="' + esc(student.id) + '" data-item="' + esc(item.id) + '">삭제</button></div></div></div>';
+    }).join('') : '<div class="small muted">등록된 교재 계획이 없습니다.</div>') +
+    (roadmap.targetSchool || roadmap.items.length ? '<button class="btn btn-danger btn-block mt14" data-act="roadmapstop" data-id="' + esc(student.id) + '">로드맵 사용 종료</button>' : ''),
+    '<button class="btn btn-ghost btn-block" data-act="closemodal">닫기</button>');
+}
+
+function studyRoadmapBookModal(staffId, itemId) {
+  if (!session.isAdmin || session.isStaffLink) return;
+  const student = staffById(staffId);
+  const roadmap = studyRoadmapOf(student);
+  const item = roadmap.items.find(row => row.id === itemId) || {};
+  if (!student || !roadmap.targetSchool) return toast('목표 학교를 먼저 저장해 주세요');
+  const days = Array.isArray(item.days) ? item.days : [1, 2, 3, 4, 5];
+  const startDate = item.startDate || today(), endDate = item.endDate || addDays(today(), 42);
+  modal((item.id ? '✏️ 교재 계획 수정' : '📚 교재 계획 추가'),
+    '<input type="hidden" id="roadmapBookId" value="' + esc(item.id || '') + '">' +
+    '<div class="guide mb14"><b>목표 ' + esc(roadmap.targetSchool) + '</b><br>전체 범위를 선택한 요일에 균등하게 나눠 오늘 체크리스트로 보냅니다.</div>' +
+    '<div class="grid2"><div class="field"><label class="fl">과목</label><select class="in" id="roadmapSubject">' + studySubjectOptions(item.subject || '', '과목 선택') + '</select></div>' +
+      '<div class="field"><label class="fl">교재명</label><input class="in" id="roadmapBook" maxlength="120" value="' + esc(item.book || '') + '" placeholder="예: 쎈 중3-1"></div></div>' +
+    '<div class="grid2"><div class="field"><label class="fl">분량 단위</label><select class="in" id="roadmapUnit">' +
+      Object.entries(STUDY_ROADMAP_UNITS).map(([key, value]) => '<option value="' + key + '"' + ((item.unit || 'page') === key ? ' selected' : '') + '>' + value + '</option>').join('') +
+      '</select></div><div class="field"><label class="fl">한 번 예상시간</label><select class="in" id="roadmapMinutes">' +
+      [20, 30, 40, 50, 60, 90].map(value => '<option value="' + value + '"' + (Number(item.estimatedMin || 50) === value ? ' selected' : '') + '>' + value + '분</option>').join('') +
+      '</select></div></div>' +
+    '<div class="grid2"><div class="field"><label class="fl">시작 번호</label><input class="in" id="roadmapRangeStart" type="number" min="1" max="99999" inputmode="numeric" value="' + esc(item.rangeStart || '') + '" placeholder="30"></div>' +
+      '<div class="field"><label class="fl">끝 번호</label><input class="in" id="roadmapRangeEnd" type="number" min="1" max="99999" inputmode="numeric" value="' + esc(item.rangeEnd || '') + '" placeholder="150"></div></div>' +
+    '<div class="grid2"><div class="field"><label class="fl">시작일</label><input class="in" id="roadmapStartDate" type="date" value="' + esc(startDate) + '"></div>' +
+      '<div class="field"><label class="fl">완료 목표일</label><input class="in" id="roadmapEndDate" type="date" value="' + esc(endDate) + '"></div></div>' +
+    '<div class="field"><label class="fl">학습 요일</label><div class="chips">' + STUDY_ROADMAP_DAYS.map(day =>
+      '<label class="chip"><input type="checkbox" data-roadmap-day value="' + day + '"' + (days.includes(day) ? ' checked' : '') + '> ' + DOW[day] + '</label>').join('') + '</div></div>' +
+    '<div class="hint">저장하면 이미 완료했거나 기록을 남긴 분량은 보존하고, 아직 시작하지 않은 분량만 다시 배치합니다.</div>',
+    '<button class="btn btn-primary btn-block" data-act="roadmapbooksave" data-id="' + esc(student.id) + '">계획 저장</button>');
+}
+
+/* ══════════════════════════════════════════════════════
    회독 — 같은 교재를 몇 번 돌렸는지. 목표 회독수 대비 진행을 본다.
    ══════════════════════════════════════════════════════ */
 const rdKey = sid => '__rd__' + sid;
@@ -5614,13 +6009,48 @@ function assignedLearningTaskForDate(staffId, sourceKey, date) {
     task.kind !== LEARNING_DAILY_LOG_KIND && effectiveOccursOn(task, date)) || null;
 }
 
-function leadersEyeAccountGuide(me) {
-  if (!me) return '';
-  return '<div class="guide mt14 mb14"><b>리더스아이 로그인 정보</b><br>' +
-    'Agency ID: <strong>wbbrain</strong><br>' +
-    'Student ID: <strong>' + esc(me.name) + '</strong><br>' +
-    'Student PW: <strong>0000</strong><br>' +
-    '<span class="small muted">레벨 안내: 학습 결과에 따라 1주일마다 자동으로 레벨이 조정됩니다.</span></div>';
+const LEARNING_LOGIN_MEMO_SOURCES = Object.freeze(['leaders_eye', 'metamath']);
+
+function learningLoginMemo(staffId, sourceKey) {
+  if (!staffId || !LEARNING_LOGIN_MEMO_SOURCES.includes(sourceKey)) return { loginId: '', password: '' };
+  const all = state.settings.localLearningLogins || {};
+  const memo = all[staffId] && all[staffId][sourceKey];
+  return {
+    loginId: String(memo && memo.loginId || '').slice(0, 120),
+    password: String(memo && memo.password || '').slice(0, 128)
+  };
+}
+
+function saveLearningLoginMemo(staffId, sourceKey, loginId, password) {
+  if (!staffId || !LEARNING_LOGIN_MEMO_SOURCES.includes(sourceKey)) return false;
+  const all = Object.assign({}, state.settings.localLearningLogins || {});
+  const own = Object.assign({}, all[staffId] || {});
+  const next = { loginId: String(loginId || '').trim().slice(0, 120), password: String(password || '').slice(0, 128) };
+  if (next.loginId || next.password) own[sourceKey] = next;
+  else delete own[sourceKey];
+  if (Object.keys(own).length) all[staffId] = own;
+  else delete all[staffId];
+  state.settings.localLearningLogins = all;
+  return save();
+}
+
+function learningLoginMemoCard(me, sourceKey) {
+  if (!me || !LEARNING_LOGIN_MEMO_SOURCES.includes(sourceKey)) return '';
+  const leadersEye = sourceKey === 'leaders_eye';
+  const ownStudent = session.isStaffLink && !isManager() && me.id === session.staffId;
+  const agency = leadersEye ? 'Agency ID: <strong>wbbrain</strong><br>' : '';
+  if (!ownStudent) return '<div class="guide mt14 mb14"><b>' + (leadersEye ? '리더스아이' : '메타수학') +
+    ' 로그인 안내</b><br>' + agency + '<span class="small muted">개인 아이디와 비밀번호는 학생 본인 기기에서만 입력합니다.</span></div>';
+  const memo = learningLoginMemo(me.id, sourceKey);
+  return '<div class="guide mt14 mb14"><b>' + (leadersEye ? '리더스아이' : '메타수학') + ' 로그인 메모</b><br>' + agency +
+    '<div class="grid2 mt14"><div class="field"><label class="fl" for="learningLoginId_' + sourceKey + '">' +
+      (leadersEye ? 'Student ID' : '본인 아이디') + '</label><input class="in" id="learningLoginId_' + sourceKey + '" maxlength="120" autocomplete="off" autocapitalize="none" spellcheck="false" value="' + esc(memo.loginId) + '" placeholder="본인 아이디 입력"></div>' +
+      '<div class="field"><label class="fl" for="learningLoginPw_' + sourceKey + '">' +
+        (leadersEye ? 'Student PW' : '본인 비밀번호') + '</label><input class="in" id="learningLoginPw_' + sourceKey + '" type="password" maxlength="128" autocomplete="off" value="' + esc(memo.password) + '" placeholder="본인 비밀번호 입력"></div></div>' +
+    '<div class="row wraprow"><button class="btn btn-sm btn-ghost" data-act="learningloginsave" data-source="' + sourceKey + '">이 기기에 메모 저장</button>' +
+      ((memo.loginId || memo.password) ? '<button class="btn btn-sm btn-danger" data-act="learningloginclear" data-source="' + sourceKey + '">메모 지우기</button>' : '') + '</div>' +
+    '<span class="small muted">서버·원장 화면·백업에는 전송되지 않습니다. 공용 기기에는 저장하지 마세요.' +
+      (leadersEye ? ' 학습 결과에 따라 1주일마다 레벨이 자동으로 조정됩니다.' : '') + '</span></div>';
 }
 
 const METAMATH_REQUEST_STATUS = Object.freeze({
@@ -5735,6 +6165,7 @@ function metamathRequestCard(req, admin) {
     '<div class="small muted">' + esc(req.grade || '') + ' · ' + esc(req.semester || '') + ' · 제작일 ' + esc(req.processingDate ? label(req.processingDate) : '미정') + '</div></div>' +
     '<span class="pill">수학</span></div>' +
     '<div class="material-summary">' + esc(buildMetamathRequestSummary(req)) + '</div>' +
+    (overdue ? '<div class="small muted mt8">제작 예정일이 지나 최신 처리 상태를 확인해 주세요.</div>' : '') +
     (response && response.responseNote ? '<div class="hint mt8"><b>학원 안내:</b> ' + esc(response.responseNote) + '</div>' : '') +
     '<div class="academic-actions">' +
       (canEdit ? '<button class="btn btn-sm btn-ghost" data-act="metamathrequestopen" data-id="' + esc(req.id) + '">수정</button>' +
@@ -5752,21 +6183,28 @@ function metamathRequestPanel(me) {
   const requests = metamathRequestsFor(me.id).slice(-8).reverse();
   const canRequest = session.isStaffLink && !isManager() && me.id === session.staffId;
   return '<div class="guide mb14"><b>문제지가 필요할 때 요청하세요.</b><br>' +
-    '메타수학은 자동 출제가 아닙니다. 화요일까지 요청하면 가까운 수요일에, 수요일 이후 요청하면 다음 수요일에 선생님이 직접 제작·배정합니다.</div>' +
+    '메타수학은 자동 출제가 아닙니다. 화요일까지 요청하면 가까운 수요일에, 수요일 이후 요청하면 다음 수요일에 선생님이 직접 제작·배정합니다.' +
+    (canRequest ? '<div class="mt8"><button class="btn btn-sm btn-ghost" data-act="syncnow">↻ 최신 상태 확인</button></div>' : '') + '</div>' +
     (requests.length ? '<div class="fl mb8">문제지 요청 현황</div>' + requests.map(req => metamathRequestCard(req, false)).join('') :
       '<div class="small muted mb14">' + (canRequest ? '아직 요청한 문제지가 없습니다.' : '등록된 문제지 요청이 없습니다.') + '</div>');
 }
 
 function metamathRequestInbox() {
-  const queue = allMetamathRequests().filter(req => ['requested', 'changed', 'preparing'].includes(metamathRequestStatus(req)))
+  const requests = allMetamathRequests();
+  const queue = requests.filter(req => ['requested', 'changed', 'preparing'].includes(metamathRequestStatus(req)))
     .sort((a, b) => String(a.processingDate || '').localeCompare(String(b.processingDate || '')) ||
       (metamathRequestStatus(a) === 'preparing' ? -1 : 1) - (metamathRequestStatus(b) === 'preparing' ? -1 : 1) ||
       Number(a.requestedAt || 0) - Number(b.requestedAt || 0) ||
       String((staffById(a.staffId) || {}).name || '').localeCompare(String((staffById(b.staffId) || {}).name || ''), 'ko'));
+  const recent = requests.filter(req => metamathRequestStatus(req) === 'assigned')
+    .sort((a, b) => Number((metamathResponseFor(b.id) || {}).updatedAt || b.updatedAt || 0) -
+      Number((metamathResponseFor(a.id) || {}).updatedAt || a.updatedAt || 0)).slice(0, 10);
   return '<div class="card"><div class="between mb8"><div><div class="card-title">🧮 수요일 메타수학 문제지 큐</div>' +
     '<div class="card-sub">요청 정보를 확인해 메타수학 교실홈에서 직접 제작한 뒤, 학습 예정일을 정해 배정하세요.</div></div>' +
     '<span class="pill ' + (queue.length ? 'warn' : '') + '">' + queue.length + '건</span></div>' +
-    (queue.length ? queue.map(req => metamathRequestCard(req, true)).join('') : '<div class="small muted">처리할 문제지 요청이 없습니다.</div>') + '</div>';
+    (queue.length ? queue.map(req => metamathRequestCard(req, true)).join('') : '<div class="small muted">처리할 문제지 요청이 없습니다.</div>') +
+    (recent.length ? '<details class="study-completed mt14"><summary>최근 배정 완료 ' + recent.length + '건 보기</summary>' +
+      recent.map(req => metamathRequestCard(req, true)).join('') + '</details>' : '') + '</div>';
 }
 
 function metamathRequestModal(existing) {
@@ -5877,7 +6315,7 @@ function learningSourceCard(me, editable, sourceKey) {
   const late = active.filter(task => learningDueDate(task) && learningDueDate(task) < today()).length;
   const studentDue = onlineSource && session.isStaffLink && !isManager() &&
     active.some(task => occurrenceDate(task) <= today());
-  const accountGuide = sourceKey === 'leaders_eye' ? leadersEyeAccountGuide(me) : '';
+  const accountGuide = LEARNING_LOGIN_MEMO_SOURCES.includes(sourceKey) ? learningLoginMemoCard(me, sourceKey) : '';
   const canRequestMetamath = sourceKey === 'metamath' && session.isStaffLink && !isManager() && me.id === session.staffId;
   const metamathPanel = sourceKey === 'metamath' ? metamathRequestPanel(me) : '';
   const leadersEyeAction = leadersEyeStudent && !assignedToday
@@ -5893,13 +6331,21 @@ function learningSourceCard(me, editable, sourceKey) {
       (onlineSource && active.length ? '완료 기록 ' : '') + active.length + '건</span>';
   const checklistScheduleStatus = checklistSchedule
     ? '<span class="pill">' + esc(repeatLabel(checklistSchedule)) + ' · ' + Number(checklistSchedule.estimatedMin || 20) + '분</span>' : '';
+  const pointRule = pointRuleFor(today());
+  const pointRow = pointRule.online && POINT_ONLINE_SOURCE_KEYS.includes(sourceKey)
+    ? pointOnlineLearningRows(me.id, today(), pointRule.online).find(row => row.source === sourceKey) : null;
+  const pointStatus = pointRow
+    ? '<span class="pill ' + (pointRow.done ? (engagementDayState(me.id, today()).stamped ? '' : 'warn') : 'bad') + '">' +
+      (pointRow.done
+        ? '+' + pointRow.points + 'P ' + (engagementDayState(me.id, today()).stamped ? '확정' : '마감 대기')
+        : '오늘 미학습 · +' + pointRow.points + 'P') + '</span>' : '';
 
   return '<details class="card study-source-card" data-learning-source="' + esc(sourceKey) + '"' +
     (late || studentDue || (leadersEyeStudent && !todayRecorded) ? ' open' : '') + '>' +
     '<summary class="study-source-summary"><span class="study-source-head"><span class="study-source-icon">' + source.icon + '</span>' +
       '<span class="study-source-copy"><b>' + esc(source.label) + '</b><span>' + esc(source.detail) + '</span></span></span>' +
       '<span class="study-source-count">' + (late ? '<span class="pill bad">지연 ' + late + '</span>' : '') +
-        checklistScheduleStatus + leadersEyeStatus + assignmentCount + '</span></summary>' +
+        pointStatus + checklistScheduleStatus + leadersEyeStatus + assignmentCount + '</span></summary>' +
     '<div class="study-source-body"><div class="small muted mt14">' + help + '</div>' +
     accountGuide +
     '<div class="study-source-actions">' +
@@ -6395,6 +6841,8 @@ function viewWeek() {
     '<div class="pill">' + wp.done + ' / ' + wp.total + '건 · ' + wp.pct + '%</div></div>' +
     '<div class="bar"><i style="width:' + wp.pct + '%"></i></div></div>';
 
+  h += studyRoadmapWeekCard(me, mon, days);
+
   h += '<div class="card"><div class="between mb14"><div><div class="card-title">🎯 과목별 목표시간</div>' +
     '<div class="card-sub">이번 주 목표와 실제 순공시간을 비교합니다.</div></div>' +
     (editable ? '<button class="btn btn-sm btn-ghost" data-act="weekgoal" data-mon="' + mon + '">목표 설정</button>' : '') + '</div>' +
@@ -6449,7 +6897,7 @@ function viewWeek() {
             const cls = st === 'done' ? 'done' : st === 'blocked' ? 'blocked' : st === 'doing' ? 'doing' : (d < today() ? 'miss' : '');
             return '<td><div class="week-cell-actions"><button class="dot ' + cls + '" ' +
               (editable ? 'data-act="toggle" data-id="' + t.id + '" data-date="' + d + '"' : 'disabled') + '>✓</button>' +
-              (editable && t.repeat === 'once' && st !== 'done' ? '<button class="week-move" data-act="weekmove" data-id="' + t.id + '" data-date="' + d + '" aria-label="요일 변경">↔</button>' : '') +
+              (editable && t.repeat === 'once' && st !== 'done' && t.auto !== STUDY_ROADMAP_AUTO ? '<button class="week-move" data-act="weekmove" data-id="' + t.id + '" data-date="' + d + '" aria-label="요일 변경">↔</button>' : '') +
               '</div></td>';
           }).join('') + '</tr>';
       }).join('') +
@@ -6472,7 +6920,7 @@ function viewWeek() {
           const subject = taskStudySubject(item.t);
           return '<div class="week-backlog-row ' + subject.className + '"><span class="tag subject-tag ' + subject.className + '">' + subject.label + '</span>' +
             '<div><b class="small">' + esc(item.t.title) + '</b><div class="small muted">' + shortDate(item.date) + ' 미완료</div></div>' +
-            (editable && item.t.repeat === 'once' ? '<button class="btn btn-sm btn-ghost" data-act="weekmove" data-id="' + item.t.id + '" data-date="' + item.date + '">이번 주 재배치</button>' : '') + '</div>';
+            (editable && item.t.repeat === 'once' && item.t.auto !== STUDY_ROADMAP_AUTO ? '<button class="btn btn-sm btn-ghost" data-act="weekmove" data-id="' + item.t.id + '" data-date="' + item.date + '">이번 주 재배치</button>' : '') + '</div>';
         }).join('') + '</section>' : '') +
       (offers.length ? '<section class="week-action-section"><div class="between mb8"><div><b>📨 아직 가져오지 않은 배부 공부</b>' +
         '<div class="card-sub">체크리스트에 담기 전인 원장 배부 항목입니다.</div></div></div>' +
@@ -6796,6 +7244,7 @@ function dailyCloseStudyItems(staffId, date, legacyClaimedLecturesOnly) {
     return {
       key: 'task:' + task.id, type: 'task', id: task.id, task: task,
       label: task.title, detail: task.detail || '', subjectKey: taskStudySubjectKey(task),
+      source: task.source || '', learningResultReady: hasLearningResult(task, check),
       carriedFromDate: task.dailyCarrySourceDate || '', carryOriginDate: task.dailyCarryOriginDate || '',
       claimed: claimed, done: !!(check && check.done), blocked: !!(check && check.blocked), dropped: !!(check && check.dropped)
     };
@@ -6930,20 +7379,64 @@ function engagementMonthSummary(staffId, ym, asOf) {
   };
 }
 
-/* 포인트 v1 — 학습 기록에서 적립 후보를 자동 계산하고, 실제 상품권 교환은 원장이 확정한다. */
-const POINT_RULE_VERSION = 'v1';
+/* 포인트는 학습 기록에서 자동 계산하고, 실제 기프트 카드 교환만 원장이 확정한다. */
+const POINT_RULE_VERSION = 'v2';
 const POINT_EXCHANGE_LEDGER_VERSION = 'v1';
 const POINT_SUPPORTED_EXCHANGE_VERSIONS = ['v1'];
 const POINT_REWARD_START_DATE = '2026-09-01';
-const POINT_DAILY = 50;
-const POINT_WEEKLY = 250;
-const POINT_MONTHLY = 500;
+const POINT_RULE_V2_START_DATE = '2026-10-01';
+const POINT_DAILY = 100;
+const POINT_ONLINE_DAILY = 30;
+const POINT_WEEKLY = 500;
+const POINT_MONTHLY = 1000;
 const POINT_WEEKLY_MIN_DAYS = 3;
 const POINT_MONTHLY_MIN_DAYS = 12;
 const POINT_EXCHANGE_COST = 5000;
 const POINT_PROCESSING_STALE_MS = 30 * 60 * 1000;
 const pointRequestKey = staffId => '__pointrequest__' + staffId;
 const pointExchangeKey = (staffId, requestId) => '__rewardtx__' + staffId + '|' + requestId;
+
+function pointRuleFor(date) {
+  return String(date || '') >= POINT_RULE_V2_START_DATE
+    ? { version: POINT_RULE_VERSION, daily: POINT_DAILY, dailyClose: POINT_DAILY - POINT_ONLINE_DAILY,
+        online: POINT_ONLINE_DAILY, weekly: POINT_WEEKLY, monthly: POINT_MONTHLY }
+    : { version: 'v1', daily: 50, dailyClose: 50, online: 0, weekly: 250, monthly: 500 };
+}
+
+/** 하루 온라인 몫은 배정된 서비스끼리 나누고, 같은 서비스는 여러 과제여도 한 번만 인정한다. */
+function pointOnlineLearningRows(staffId, date, pool) {
+  const totalPoints = Math.max(0, Math.round(Number(pool) || 0));
+  if (!totalPoints) return [];
+  const close = dailyCloseOf(staffId, date);
+  const snapshotReady = close.itemSnapshot.length || close.status !== 'open' || close.reviewedAt || close.finalizedAt;
+  const items = snapshotReady ? close.itemSnapshot : dailyCloseStudyItems(staffId, date);
+  const grouped = new Map();
+  items.forEach(item => {
+    const task = item.task || null;
+    const source = String(item.source || (task && task.source) || '');
+    if (item.type !== 'task' || !POINT_ONLINE_SOURCE_KEYS.includes(source)) return;
+    const resultReady = item.learningResultReady === true ||
+      (item.learningResultReady === undefined && task && hasLearningResult(task, getCheck(item.id, date)));
+    if (!grouped.has(source)) grouped.set(source, false);
+    if (item.done && resultReady) grouped.set(source, true);
+  });
+  const sources = POINT_ONLINE_SOURCE_KEYS.filter(source => grouped.has(source));
+  if (!sources.length) return [];
+  const each = Math.floor(totalPoints / sources.length);
+  const remainder = totalPoints % sources.length;
+  return sources.map((source, index) => ({
+    source: source, done: grouped.get(source), points: each + (index < remainder ? 1 : 0)
+  }));
+}
+
+function pointDayBreakdown(staffId, date, rule) {
+  const onlineRows = pointOnlineLearningRows(staffId, date, rule.online);
+  return {
+    closePoints: onlineRows.length ? rule.dailyClose : rule.daily,
+    onlineRows: onlineRows,
+    onlineEarned: onlineRows.filter(row => row.done).reduce((sum, row) => sum + row.points, 0)
+  };
+}
 
 function pointNumber(value) {
   return Math.max(0, Math.round(Number(value) || 0)).toLocaleString('ko-KR') + 'P';
@@ -7026,25 +7519,36 @@ function rewardPointEvents(staffId, asOf) {
   for (let date = POINT_REWARD_START_DATE; date <= throughDate; date = addDays(date, 1)) {
     const day = engagementDayState(staffId, date);
     const finalizedAt = Number(day.finalizedAt) || 0;
-    if (day.stamped && finalizedAt > 0 && finalizedAt <= cutoffAt) events.push({
-      id: POINT_RULE_VERSION + ':day:' + date, type: 'day', date: date, at: Number(dailyCloseOf(staffId, date).finalizedAt) || parseYmd(date).getTime(),
-      label: '유효 학습일', points: POINT_DAILY
-    });
+    const rule = pointRuleFor(date);
+    if (day.stamped && finalizedAt > 0 && finalizedAt <= cutoffAt) {
+      const breakdown = pointDayBreakdown(staffId, date, rule);
+      const at = Number(dailyCloseOf(staffId, date).finalizedAt) || parseYmd(date).getTime();
+      events.push({
+        id: rule.version + ':day:' + date, type: 'day', date: date, at: at,
+        label: breakdown.onlineRows.length ? '유효 학습일 · 하루 마감' : '유효 학습일', points: breakdown.closePoints
+      });
+      breakdown.onlineRows.filter(row => row.done).forEach(row => events.push({
+        id: rule.version + ':online:' + date + ':' + row.source, type: 'online', date: date, at: at,
+        label: LEARNING_SOURCES[row.source].label + ' 학습 완료', points: row.points
+      }));
+    }
   }
   for (let mon = mondayOf(POINT_REWARD_START_DATE); addDays(mon, 6) <= throughDate; mon = addDays(mon, 7)) {
     const week = pointWeekSummary(staffId, mon, throughDate);
     const completedAt = Number(weekCloseOf(staffId, mon).completedAt) || 0;
+    const rule = pointRuleFor(week.sun);
     if (week.qualified && completedAt > 0 && completedAt <= cutoffAt) events.push({
-      id: POINT_RULE_VERSION + ':week:' + mon, type: 'week', date: week.sun, at: Number(weekCloseOf(staffId, mon).completedAt) || parseYmd(week.sun).getTime(),
-      label: '주간 80% + 주간 마무리', points: POINT_WEEKLY
+      id: rule.version + ':week:' + mon, type: 'week', date: week.sun, at: Number(weekCloseOf(staffId, mon).completedAt) || parseYmd(week.sun).getTime(),
+      label: '주간 80% + 주간 마무리', points: rule.weekly
     });
   }
   for (let ym = ymOf(POINT_REWARD_START_DATE); monthLastDate(ym) <= throughDate; ym = ymAdd(ym, 1)) {
     const month = pointMonthSummary(staffId, ym, throughDate);
     const completedAt = Number(monthCloseOf(staffId, ym).completedAt) || 0;
+    const rule = pointRuleFor(month.lastDate);
     if (month.qualified && completedAt > 0 && completedAt <= cutoffAt) events.push({
-      id: POINT_RULE_VERSION + ':month:' + ym, type: 'month', date: month.lastDate, at: Number(monthCloseOf(staffId, ym).completedAt) || parseYmd(month.lastDate).getTime(),
-      label: '월간 80% + 월간 마무리', points: POINT_MONTHLY
+      id: rule.version + ':month:' + ym, type: 'month', date: month.lastDate, at: Number(monthCloseOf(staffId, ym).completedAt) || parseYmd(month.lastDate).getTime(),
+      label: '월간 80% + 월간 마무리', points: rule.monthly
     });
   }
   return events.sort((a, b) => Number(b.at || 0) - Number(a.at || 0));
@@ -7106,13 +7610,13 @@ function pointHistory(staffId) {
   account.decisions.filter(task => task.exchangeStatus !== 'processing').forEach(task => rows.push({
     id: 'exchange:' + task.pointRequestId, type: 'exchange', date: ymd(new Date(Number(task.updatedAt || task.createdAt || now()))),
     at: Number(task.updatedAt || task.createdAt || 0),
-    label: task.exchangeStatus === 'fulfilled' ? '문화상품권 교환 완료' : '교환 신청 취소',
+    label: task.exchangeStatus === 'fulfilled' ? '기프트 카드 교환 완료' : '교환 신청 취소',
     points: task.exchangeStatus === 'fulfilled' ? -POINT_EXCHANGE_COST : 0
   }));
   if (account.pending) rows.push({
     id: 'request:' + account.pending.id, type: 'request', date: ymd(new Date(account.pending.requestedAt)),
     at: account.processing ? Number(account.processing.updatedAt || account.pending.requestedAt) : account.pending.requestedAt,
-    label: account.processing ? '문화상품권 교환 처리 중' : '문화상품권 교환 확인 중', points: 0
+    label: account.processing ? '기프트 카드 교환 처리 중' : '기프트 카드 교환 확인 중', points: 0
   });
   return rows.sort((a, b) => Number(b.at || 0) - Number(a.at || 0));
 }
@@ -7161,7 +7665,7 @@ async function runPointExchangeAdminAction(staffId, requestId, action) {
   if (!session.isAdmin || session.isStaffLink || !['claim', 'reject', 'takeover', 'fulfill', 'cancel'].includes(action) || pointExchangeUi.busy) return null;
   const student = staffById(staffId);
   if (!state.settings.adminToken) {
-    toast('문화상품권 처리는 원장 기기 로그인을 다시 연결한 뒤 이용해 주세요');
+    toast('기프트 카드 처리는 원장 기기 로그인을 다시 연결한 뒤 이용해 주세요');
     return null;
   }
   if ((action === 'claim' || action === 'reject') && (!student || student.deleted || student.owner || student.manager)) {
@@ -7226,22 +7730,38 @@ function pointGaugeHtml(staffId) {
   const student = staffById(staffId);
   if (!student || student.owner || student.manager) return '';
   const account = pointAccount(staffId, today());
+  const rule = pointRuleFor(today());
+  const goalNote = today() < POINT_RULE_V2_START_DATE
+    ? '10월 1일부터 매일 100P · 매주 500P · 매월 1,000P로 올라갑니다.'
+    : '꾸준히 학습하고 주간·월간 마무리까지 하면 한 달에 기프트 카드 1개를 목표로 적립할 수 있어요.';
   const ownStudent = session.isStaffLink && !isManager() && session.staffId === staffId;
   const status = account.processing ? '<span class="tag reward-attention">교환 처리 중</span>'
     : account.deficit ? '<span class="tag reward-attention">정산 확인 필요</span>'
     : account.pending ? '<span class="tag reward-progress">교환 확인 중</span>'
     : account.balance >= POINT_EXCHANGE_COST ? '<span class="tag reward-achieved">교환 가능</span>'
     : '<span class="tag reward-progress">적립 중</span>';
-  const meta = account.processing ? '원장이 상품권 교환을 처리하고 있어요'
+  const meta = account.processing ? '원장이 기프트 카드 교환을 처리하고 있어요'
     : account.deficit ? '과거 학습 기록이 바뀌어 원장 확인이 필요해요'
     : account.pending ? '5,000P 교환 신청을 원장이 확인하고 있어요'
-    : account.remaining ? pointNumber(account.remaining) + ' 더 모으면 문화상품권 교환' : '문화상품권 교환 가능';
-  return '<div class="point-gauge-card" aria-label="문화상품권 포인트 현황"><div class="point-gauge-head"><div>' +
-    '<div class="point-gauge-title">🎁 문화상품권 포인트</div><div class="point-gauge-value">' + pointNumber(account.balance) + ' <small>/ ' + pointNumber(POINT_EXCHANGE_COST) + '</small></div></div>' +
+    : account.remaining ? pointNumber(account.remaining) + ' 더 모으면 기프트 카드 교환' : '기프트 카드 교환 가능';
+  const todayBreakdown = pointDayBreakdown(staffId, today(), rule);
+  const todayOnline = rule.online
+    ? (todayBreakdown.onlineRows.length
+      ? '<div class="point-online-today"><b>오늘 온라인 학습 ' + todayBreakdown.onlineRows.filter(row => row.done).length + '/' + todayBreakdown.onlineRows.length + '</b><span>' +
+          (todayBreakdown.onlineEarned
+            ? '+' + todayBreakdown.onlineEarned + 'P · ' + (engagementDayState(staffId, today()).stamped ? '확정' : '하루 마감 후 확정')
+            : '완료하면 최대 +' + rule.online + 'P') + '</span></div>'
+      : '<div class="point-online-today"><b>오늘 온라인 학습 배정 없음</b><span>하루 마감 최대 +' + rule.daily + 'P</span></div>')
+    : '<div class="point-online-today"><b>온라인 학습 포인트</b><span>10월 1일부터 최대 +' + POINT_ONLINE_DAILY + 'P</span></div>';
+  return '<div class="point-gauge-card" aria-label="기프트 카드 포인트 현황"><div class="point-gauge-head"><div>' +
+    '<div class="point-gauge-title">🎁 기프트 카드 포인트</div><div class="point-gauge-value">' + pointNumber(account.balance) + ' <small>/ ' + pointNumber(POINT_EXCHANGE_COST) + '</small></div></div>' +
     status + '</div><div class="point-gauge-track" role="progressbar" aria-valuemin="0" aria-valuemax="' + POINT_EXCHANGE_COST + '" aria-valuenow="' +
       Math.min(POINT_EXCHANGE_COST, account.pending ? account.balance : account.available) + '"><i style="width:' + account.pct + '%"></i></div>' +
-    '<div class="point-gauge-meta"><span>' + esc(meta) + '</span><b>이번 달 +' + pointNumber(account.currentMonthEarned) + '</b></div>' +
-    '<div class="point-rule-chips"><span>유효 학습일 +' + POINT_DAILY + 'P</span><span>주간 달성 +' + POINT_WEEKLY + 'P</span><span>월간 달성 +' + POINT_MONTHLY + 'P</span></div>' +
+    '<div class="point-gauge-meta"><span>' + esc(meta) + '</span><b>이번 달 +' + pointNumber(account.currentMonthEarned) + '</b></div>' + todayOnline +
+    '<div class="point-rule-chips"><span>유효 학습일 최대 +' + rule.daily + 'P</span>' +
+      (rule.online ? '<span>온라인 완료 최대 +' + rule.online + 'P 포함</span>' : '') +
+      '<span>주간 달성 +' + rule.weekly + 'P</span><span>월간 달성 +' + rule.monthly + 'P</span></div>' +
+    '<div class="small muted mt8">' + goalNote + '</div>' +
     '<div class="point-gauge-actions"><button class="btn btn-sm btn-ghost" data-act="pointopen" data-id="' + esc(staffId) + '">적립 방법 · 내역</button>' +
       (ownStudent && account.canRequest ? '<button class="btn btn-sm btn-primary" data-act="pointrequest" data-id="' + esc(staffId) + '">5,000P 교환 신청</button>' : '') +
     '</div></div>';
@@ -7254,6 +7774,7 @@ function pointHistoryModal(staffId) {
   const director = session.isAdmin && !session.isStaffLink;
   if (!ownStudent && !director) return;
   const account = pointAccount(staffId, today());
+  const rule = pointRuleFor(today());
   const rows = pointHistory(staffId).slice(0, 30);
   const ownedKey = account.pending ? pointOwnedRequestKey(staffId, account.pending.id) : '';
   const ownedHere = !!(account.processing && ownedKey && pointExchangeUi.ownedRequests.has(ownedKey));
@@ -7267,20 +7788,20 @@ function pointHistoryModal(staffId) {
     : '<div class="empty" style="padding:24px 10px"><b>🌱</b>아직 적립 내역이 없습니다.</div>';
   let pendingActions = '';
   if (account.pending && director && !state.settings.adminToken) {
-    pendingActions = '<div class="guide bad mt14"><b>원장 기기 로그인 재연결 필요</b>기존 비밀키 연결만으로는 상품권 교환을 처리할 수 없습니다. 설정에서 원장 아이디·비밀번호로 다시 로그인해 주세요.</div>';
+    pendingActions = '<div class="guide bad mt14"><b>원장 기기 로그인 재연결 필요</b>기존 비밀키 연결만으로는 기프트 카드 교환을 처리할 수 없습니다. 설정에서 원장 아이디·비밀번호로 다시 로그인해 주세요.</div>';
   } else if (account.pending && account.processing) {
     if (director) {
       if (ownedHere) {
         pendingActions += (processingRecovery || processingShortfall)
           ? '<div class="guide bad mt14"><b>' + (processingShortfall ? '포인트 부족 · 실제 발송 여부 확인 필수' : '복구된 처리 · 이전 발송 여부 확인 필수') +
-            '</b>새 상품권을 발송하지 마세요. 실제 발송 내역을 먼저 확인한 뒤 아래 두 가지 중 하나만 선택하세요.</div>' +
+            '</b>새 기프트 카드를 발송하지 마세요. 실제 발송 내역을 먼저 확인한 뒤 아래 두 가지 중 하나만 선택하세요.</div>' +
             '<div class="grid2 mt14"><button class="btn btn-primary" data-act="pointfulfill" data-id="' + esc(staffId) + '" data-request-id="' + esc(account.pending.id) + '">이미 발송됨 · 완료·차감' + (processingShortfall ? '·정산 부족 표시' : '') + '</button>' +
             '<button class="btn btn-danger" data-act="pointadmincancel" data-id="' + esc(staffId) + '" data-request-id="' + esc(account.pending.id) + '">미발송 확인 · 처리 취소</button></div>'
-          : '<div class="guide mt14"><b>이 기기가 교환 처리를 선점했습니다</b>문화상품권을 실제로 발송하고, 성공한 뒤에만 완료를 누르세요. 상품권 번호·링크는 앱에 저장하지 않습니다.</div>' +
+          : '<div class="guide mt14"><b>이 기기가 교환 처리를 선점했습니다</b>기프트 카드를 실제로 발송하고, 성공한 뒤에만 완료를 누르세요. 기프트 카드 번호·링크는 앱에 저장하지 않습니다.</div>' +
             '<div class="grid2 mt14"><button class="btn btn-primary" data-act="pointfulfill" data-id="' + esc(staffId) + '" data-request-id="' + esc(account.pending.id) + '">실제 발송 완료 · 5,000P 차감</button>' +
             '<button class="btn btn-danger" data-act="pointadmincancel" data-id="' + esc(staffId) + '" data-request-id="' + esc(account.pending.id) + '">발송 전 처리 취소</button></div>';
       } else {
-        pendingActions += '<div class="guide bad mt14"><b>처리 기기를 확인해 주세요</b>선점한 기기가 맞는지 서버에서 확인하기 전에는 상품권을 발송하거나 취소할 수 없습니다.</div>' +
+        pendingActions += '<div class="guide bad mt14"><b>처리 기기를 확인해 주세요</b>선점한 기기가 맞는지 서버에서 확인하기 전에는 기프트 카드를 발송하거나 취소할 수 없습니다.</div>' +
           '<button class="btn btn-ghost btn-block mt14" data-act="pointownercheck" data-id="' + esc(staffId) + '" data-request-id="' + esc(account.pending.id) + '">처리 기기 확인</button>' +
           (processingStale ? '<button class="btn btn-danger btn-block mt14" data-act="pointtakeover" data-id="' + esc(staffId) + '" data-request-id="' + esc(account.pending.id) + '">30분 지난 처리 인계</button>' : '');
       }
@@ -7290,10 +7811,10 @@ function pointHistoryModal(staffId) {
   } else if (account.pending) {
     if (director) {
       if (account.deficit || account.balance < POINT_EXCHANGE_COST) {
-        pendingActions = '<div class="guide bad mt14"><b>신청 잔액이 부족합니다</b>교환 처리를 시작하거나 상품권을 발송하지 마세요. 학생 또는 원장이 처리 전 신청을 취소할 수 있습니다.</div>' +
+        pendingActions = '<div class="guide bad mt14"><b>신청 잔액이 부족합니다</b>교환 처리를 시작하거나 기프트 카드를 발송하지 마세요. 학생 또는 원장이 처리 전 신청을 취소할 수 있습니다.</div>' +
           '<button class="btn btn-danger btn-block mt14" data-act="pointreject" data-id="' + esc(staffId) + '" data-request-id="' + esc(account.pending.id) + '">신청 취소 처리 · 포인트 미차감</button>';
       } else {
-        pendingActions = '<div class="guide mt14"><b>교환 신청 확인</b>잔액과 학습 기록을 확인한 뒤 먼저 서버에서 교환 처리를 선점하세요. 선점 성공 안내가 나온 기기에서만 상품권을 발송합니다.</div>' +
+        pendingActions = '<div class="guide mt14"><b>교환 신청 확인</b>잔액과 학습 기록을 확인한 뒤 먼저 서버에서 교환 처리를 선점하세요. 선점 성공 안내가 나온 기기에서만 기프트 카드를 발송합니다.</div>' +
           '<div class="grid2 mt14"><button class="btn btn-primary" data-act="pointclaim" data-id="' + esc(staffId) + '" data-request-id="' + esc(account.pending.id) + '">교환 처리 시작</button>' +
           '<button class="btn btn-danger" data-act="pointreject" data-id="' + esc(staffId) + '" data-request-id="' + esc(account.pending.id) + '">신청 취소 처리</button></div>';
       }
@@ -7303,17 +7824,19 @@ function pointHistoryModal(staffId) {
   } else if (account.deficit) {
     pendingActions = '<div class="guide bad mt14"><b>정산 확인 필요</b>과거 학습 기록 변경으로 확정 교환액이 현재 자동 적립액보다 큽니다. 추가 교환을 진행하지 말고 기록을 확인해 주세요.</div>';
   } else if (ownStudent && account.canRequest) {
-    pendingActions = '<button class="btn btn-primary btn-block mt14" data-act="pointrequest" data-id="' + esc(staffId) + '">5,000P 문화상품권 교환 신청</button>';
+    pendingActions = '<button class="btn btn-primary btn-block mt14" data-act="pointrequest" data-id="' + esc(staffId) + '">5,000P 기프트 카드 교환 신청</button>';
   }
   modal((director ? student.name + ' · ' : '') + '포인트 적립 방법',
     '<div class="point-gauge-card" style="margin-top:0"><div class="point-gauge-head"><div><div class="point-gauge-title">현재 교환 잔액</div>' +
       '<div class="point-gauge-value">' + pointNumber(account.balance) + '</div></div>' +
       (account.processing ? '<span class="tag reward-attention">교환 처리 중</span>' : account.deficit ? '<span class="tag reward-attention">정산 확인 필요</span>' : account.pending ? '<span class="tag reward-progress">교환 확인 중</span>' : account.canRequest ? '<span class="tag reward-achieved">교환 가능</span>' : '<span class="tag reward-progress">적립 중</span>') + '</div>' +
       '<div class="point-gauge-track"><i style="width:' + account.pct + '%"></i></div></div>' +
-    '<div class="point-policy"><div><b>매일 +' + POINT_DAILY + 'P</b><span>공부 완료 또는 순공 10분 이상, 미완료 정리, 다음날 정오 전 학생 수행 보고까지 완료한 유효 학습일</span></div>' +
-      '<div><b>매주 +' + POINT_WEEKLY + 'P</b><span>예정 학습일 3일 이상인 주에 유효 학습일 80% 이상을 달성하고 학생이 일요일 주간 마무리까지 완료</span></div>' +
-      '<div><b>매월 +' + POINT_MONTHLY + 'P</b><span>예정 학습일 12일 이상인 달에 유효 학습일 80% 이상을 달성하고 학생이 말일 월간 마무리까지 완료</span></div>' +
-      '<div><b>' + pointNumber(POINT_EXCHANGE_COST) + ' = 문화상품권</b><span>순위 경쟁 없이 계속 누적되며, 원장이 기록과 신청을 확인한 뒤 실제 발송 완료 시 5,000P가 차감됩니다.</span></div></div>' +
+    '<div class="point-policy"><div><b>매일 최대 +' + rule.daily + 'P</b><span>' + (rule.online
+        ? '온라인 학습 배정이 없는 날은 하루 마감 100P, 배정이 있는 날은 하루 마감 70P와 완료한 서비스 몫 최대 30P를 적립합니다. 링크만 여는 것은 인정되지 않으며 학습 결과 기록과 다음날 정오 전 하루 마감까지 끝내야 확정됩니다.'
+        : '공부 완료 또는 순공 10분 이상, 미완료 정리, 다음날 정오 전 학생 수행 보고까지 완료한 유효 학습일') + '</span></div>' +
+      '<div><b>매주 +' + rule.weekly + 'P</b><span>예정 학습일 3일 이상인 주에 유효 학습일 80% 이상을 달성하고 학생이 일요일 주간 마무리까지 완료</span></div>' +
+      '<div><b>매월 +' + rule.monthly + 'P</b><span>예정 학습일 12일 이상인 달에 유효 학습일 80% 이상을 달성하고 학생이 말일 월간 마무리까지 완료</span></div>' +
+      '<div><b>' + pointNumber(POINT_EXCHANGE_COST) + ' = 기프트 카드 1개</b><span>순위 경쟁 없이 계속 누적되며, 원장이 기록과 신청을 확인한 뒤 실제 발송 완료 시 5,000P가 차감됩니다.</span></div></div>' +
     '<div class="between mt14"><b class="small">최근 적립·교환 내역</b><span class="small muted">총 적립 ' + pointNumber(account.earned) + '</span></div>' + historyHtml + pendingActions);
 }
 
@@ -7435,6 +7958,25 @@ function dailyCloseModal(staffId, date) {
     '<button class="btn btn-primary btn-block mt14" data-act="dailyclosesave">마무리 내용 저장</button>');
 }
 
+/** 구버전이 원장 배부 공부를 이월하며 origin까지 복제해 개인 동기화를 막은 행을 복구한다. */
+function repairLegacyStudentCarryOrigins() {
+  if (!session.isStaffLink) return false;
+  const pushAt = Number(state.settings.pushAt) || 0;
+  let changed = false;
+  state.tasks.forEach(task => {
+    const dailyCarry = String(task && task.id || '').startsWith('daily-carry-') && task.dailyCarryFrom;
+    const monthCarry = String(task && task.groupId || '').startsWith('month-carry-');
+    if (!task || task.staffId !== session.staffId || task.origin === 'staff' ||
+        Number(task.updatedAt || 0) <= pushAt || (!dailyCarry && !monthCarry)) return;
+    task.carrySourceOrigin = task.carrySourceOrigin || task.origin;
+    task.origin = 'staff';
+    task.lastEditBy = 'staff';
+    task.updatedAt = now();
+    changed = true;
+  });
+  return changed;
+}
+
 function dailyCarryTask(task, date, targetDate) {
   const carryFrom = task.id + '|' + date;
   const existing = state.tasks.find(row => !row.deleted && row.dailyCarryFrom === carryFrom);
@@ -7448,7 +7990,8 @@ function dailyCarryTask(task, date, targetDate) {
     dailyCarryFrom: carryFrom, dailyCarryRootId: rootId, dailyCarrySourceDate: date,
     dailyCarryOriginDate: task.dailyCarryOriginDate || task.dailyCarrySourceDate || date,
     dailyCarryDepth: Number(task.dailyCarryDepth || 0) + 1,
-    createdAt: stamp, updatedAt: stamp, deleted: false
+    carrySourceOrigin: task.carrySourceOrigin || task.origin,
+    origin: 'staff', lastEditBy: 'staff', createdAt: stamp, updatedAt: stamp, deleted: false
   });
   state.tasks.push(carried);
   return carried;
@@ -7484,10 +8027,14 @@ function ensureRecentDailyCarryTasks() {
           state.checks[ckey(carried.id, completedDate)] = {
             taskId: carried.id, date: completedDate, done: true,
             at: sourceCheck.at || sourceCheck.updatedAt || now(), steps: steps,
-            count: carried.target || 0, blocked: false, migratedFromCarry: true, updatedAt: now()
+            count: carried.target || 0, blocked: false,
+            learningResult: sourceCheck.learningResult || null,
+            learningResultUpdatedAt: sourceCheck.learningResultUpdatedAt || null,
+            migratedFromCarry: true, updatedAt: now()
           };
           state.checks[ckey(task.id, sourceDate)] = Object.assign({}, sourceCheck, {
             done: false, at: null, blocked: false, dropped: false, steps: {}, count: 0,
+            learningResult: null, learningResultUpdatedAt: null,
             migratedToCarryTask: carried.id, updatedAt: now()
           });
           changed = true;
@@ -8073,7 +8620,10 @@ function moveMonthOccurrence(task, from, to) {
   } else {
     const carried = Object.assign({}, task, {
       id: uid(), groupId: 'month-carry-' + now(), repeat: 'once', days: [], start: to, end: '',
-      carry: true, createdAt: now(), updatedAt: now(), deleted: false
+      carry: true, origin: session.isStaffLink ? 'staff' : task.origin,
+      lastEditBy: session.isStaffLink ? 'staff' : task.lastEditBy,
+      carrySourceOrigin: task.carrySourceOrigin || task.origin,
+      createdAt: now(), updatedAt: now(), deleted: false
     });
     state.tasks.push(carried);
     save(); queueSync();
@@ -9837,7 +10387,7 @@ function studentEngagementLine(student, currentSummary, pointSummary) {
     '<button class="btn btn-sm btn-ghost mt8" data-act="pointopen" data-id="' + esc(student.id) + '">' + (account.pending ? '교환 신청 확인' : '포인트 내역') + '</button></div>';
 }
 
-/* 카카오 수신번호는 서버에만 두고, 원장 화면에는 마스킹 상태만 잠시 보관한다. */
+/* 전체 수신번호는 서버와 로그인 중인 원장 화면 메모리에만 두며 localStorage에는 저장하지 않는다. */
 const consultLinkContactsUi = {
   rows: new Map(), loaded: false, loading: false, error: '', busy: ''
 };
@@ -9850,11 +10400,13 @@ function clearConsultLinkContacts() {
   consultLinkContactsUi.busy = '';
 }
 
-function consultLinkContactRow(row) {
+function consultLinkContactRow(row, includePhone) {
   const staffId = String((row && row.staffId) || '');
   if (!staffId) return null;
+  const phone = String((row && row.phone) || '').replace(/[\s()-]/g, '');
   return {
     staffId: staffId,
+    phone: includePhone && /^01[016789]\d{7,8}$/.test(phone) ? phone : '',
     phoneMasked: String(row.phoneMasked || ''),
     phoneOwner: ['student', 'mother'].includes(row.phoneOwner) ? row.phoneOwner : 'unknown',
     consent: row.consent === true,
@@ -9880,7 +10432,7 @@ function consultLinkPhoneOwnerOptions(contact, name, labelId) {
     '</div></div>';
 }
 
-/* 학생 번호 원문은 입력→서버 전송에만 쓰고, 화면 메모리에는 마스킹 상태만 둔다. */
+/* 학생 화면에서는 번호 원문을 버리고 마스킹 상태만 둔다. */
 const studentPhoneUi = {
   staffId: '', contact: null, loaded: false, loading: false, saving: false, error: ''
 };
@@ -10027,7 +10579,7 @@ async function loadConsultLinkContacts(force) {
     if (!session.isAdmin || session.isStaffLink) return;
     const rows = new Map();
     (Array.isArray(data.contacts) ? data.contacts : []).forEach(value => {
-      const row = consultLinkContactRow(value);
+      const row = consultLinkContactRow(value, true);
       if (row) rows.set(row.staffId, row);
     });
     consultLinkContactsUi.rows = rows;
@@ -10046,7 +10598,7 @@ function consultLinkStudentPanel(student) {
   if (!student || student.owner || student.manager) return '';
   const contact = consultLinkContactsUi.rows.get(student.id) || null;
   const unavailable = !consultLinkContactsUi.loaded || !!consultLinkContactsUi.error;
-  const phone = contact && contact.phoneMasked;
+  const phone = contact && (contact.phone || contact.phoneMasked);
   const ready = consultLinkContactReady(contact);
   const sendBusy = consultLinkContactsUi.busy === 'send:' + student.id;
   const anyBusy = !!consultLinkContactsUi.busy;
@@ -10072,20 +10624,21 @@ function consultLinkContactModal(staffId, sendAfterSave) {
   const student = staffById(staffId);
   if (!student || student.deleted || student.owner || student.manager) return toast('학생을 다시 선택해 주세요');
   const contact = consultLinkContactsUi.rows.get(staffId) || null;
-  const masked = contact && contact.phoneMasked;
-  modal('학생 연락처 ' + (masked ? '수정' : '등록'),
+  const registered = contact && contact.phoneMasked;
+  const shownPhone = contact && (contact.phone || contact.phoneMasked);
+  modal('학생 연락처 ' + (registered ? '수정' : '등록'),
     '<div class="card-sub mb14"><b>' + esc(student.name) + '</b> 학생의 플래너 연락처입니다. 학생 휴대폰이 없으면 엄마 번호로 표시해 등록합니다.</div>' +
-    (masked ? '<div class="hint mb14">현재 ' + consultLinkPhoneLabel(contact) + ': <b>' + esc(masked) + '</b><br>번호를 변경하려면 종류와 전체 번호를 다시 입력해 주세요.</div>' : '') +
+    (shownPhone ? '<div class="hint mb14">현재 ' + consultLinkPhoneLabel(contact) + ': <b>' + esc(shownPhone) + '</b><br>번호를 변경하려면 종류와 전체 번호를 다시 입력해 주세요.</div>' : '') +
     consultLinkPhoneOwnerOptions(contact, 'consultLinkPhoneOwner', 'consultLinkPhoneOwnerLabel') +
     '<div class="field"><label class="fl" for="consultLinkPhone">휴대전화 번호</label>' +
       '<input class="in" id="consultLinkPhone" type="tel" inputmode="tel" autocomplete="tel" maxlength="15" placeholder="01012345678"></div>' +
     '<label class="material-type-option"><input type="checkbox" id="consultLinkConsent">' +
       '<span>학생 번호는 학생에게, 엄마 번호는 엄마에게 앱 연결 링크와 안내 수신 동의를 확인했습니다.</span></label>' +
-    '<div class="submission-privacy mt14">🔒 번호는 이 기기나 백업에 저장하지 않고 서버에서만 관리합니다.<br>엄마 번호를 선택해도 ‘보호자 공유’의 열람 초대 번호와는 별도로 관리합니다.</div>',
+    '<div class="submission-privacy mt14">🔒 전체 번호는 원장 로그인 화면에서만 표시하며 이 기기나 백업에는 저장하지 않습니다.<br>엄마 번호를 선택해도 ‘보호자 공유’의 열람 초대 번호와는 별도로 관리합니다.</div>',
     '<button class="btn btn-primary" data-act="linkcontactsave" data-id="' + esc(staffId) + '" data-v="' +
       (contact ? contact.updatedAt : 0) + '"' + (sendAfterSave ? ' data-send="1"' : '') + '>' +
       (sendAfterSave ? '동의하고 바로 보내기' : '동의 확인 후 저장') + '</button>' +
-    (masked ? '<button class="btn btn-danger" data-act="linkcontactclear" data-id="' + esc(staffId) + '" data-v="' +
+    (registered ? '<button class="btn btn-danger" data-act="linkcontactclear" data-id="' + esc(staffId) + '" data-v="' +
       contact.updatedAt + '">발송 중지·번호 삭제</button>' : '') +
     '<button class="btn btn-ghost" data-act="closemodal">취소</button>');
 }
@@ -10112,7 +10665,7 @@ async function saveConsultLinkContact(staffId, expectedUpdatedAt, button, clear,
       app: SYNC_APP, auth: sync.auth(), action: 'set', staffId: staffId, phone: phone,
       phoneOwner: phoneOwner, consent: consent, expectedUpdatedAt: Number(expectedUpdatedAt) || 0
     });
-    const row = consultLinkContactRow(Object.assign({ staffId: staffId }, data.contact || {}));
+    const row = consultLinkContactRow(Object.assign({ staffId: staffId }, data.contact || {}), true);
     if (row && row.phoneMasked) consultLinkContactsUi.rows.set(staffId, row);
     else consultLinkContactsUi.loaded = false;
     savedForSend = consultLinkContactReady(row);
@@ -10184,13 +10737,16 @@ function staffAccessPanels(student) {
   const subscription = studentSubscription(student);
   const rewardLocked = hasProcessingPointExchange(student.id);
   const identityLock = rewardLocked
-    ? ' disabled aria-disabled="true" title="문화상품권 교환 처리 완료 또는 취소 후 변경할 수 있습니다"'
+    ? ' disabled aria-disabled="true" title="기프트 카드 교환 처리 완료 또는 취소 후 변경할 수 있습니다"'
     : '';
   const subscriptionControl = student.owner || student.manager ? '' :
     '<button class="btn btn-sm btn-ghost" data-act="subscriptionopen" data-id="' + student.id + '">' +
       (subscription.active ? '구독 설정' : subscription.endedAt ? '구독 다시 시작' : '월 구독 설정') + '</button>';
+  const roadmapControl = student.owner || student.manager ? '' :
+    '<button class="btn btn-sm btn-ghost" data-act="roadmapopen" data-id="' + student.id + '">' +
+      (studyRoadmapActive(student) ? '교재 로드맵 설정' : '교재 로드맵 추가') + '</button>';
   const common = '<button class="btn btn-sm btn-ghost" data-act="managetasks" data-id="' + student.id + '">지시 목록 관리</button>' +
-    subscriptionControl +
+    roadmapControl + subscriptionControl +
     '<button class="btn btn-sm btn-ghost" data-act="toggleowner" data-id="' + student.id + '"' + identityLock + '>' +
       (student.owner ? '대표 해제' : '대표로 지정') + '</button>' +
     '<button class="btn btn-sm btn-ghost" data-act="togglemanager" data-id="' + student.id + '"' + identityLock + '>' +
@@ -10207,7 +10763,7 @@ function staffAccessPanels(student) {
     '<div class="hint mt8">새 링크는 24시간 안에 한 번만 연결됩니다. 다시 복사했다면 가장 최근 링크를 보내 주세요.</div>' +
     '<hr class="sep"><div class="card-sub mb8"><b>보호자 열람</b> · 발행 리포트와 영·수 결과지만 읽기 전용</div>' +
     '<button class="btn btn-sm btn-ghost" data-act="guardianopen" data-id="' + student.id + '">보호자 초대 링크 관리</button>' +
-    '<hr class="sep">' + (rewardLocked ? '<div class="guide bad mb14"><b>문화상품권 교환 처리 중</b>완료 또는 취소 전에는 학생 삭제·대표·관리자 전환을 할 수 없습니다.</div>' : '') +
+    '<hr class="sep">' + (rewardLocked ? '<div class="guide bad mb14"><b>기프트 카드 교환 처리 중</b>완료 또는 취소 전에는 학생 삭제·대표·관리자 전환을 할 수 없습니다.</div>' : '') +
     '<div class="row wraprow" style="gap:8px">' + common + '</div>';
 }
 
@@ -10252,11 +10808,11 @@ function viewStaffAdmin() {
         (normalizedQuery || filterMode !== 'all' ? matching.length + '명 표시됨' : '전체 ' + list.length + '명') + '</div></div>' : '') +
     (usage.length ? '<div class="student-usage-summary"><div><span>오늘 학습</span><b>' + todayUsers + '명</b></div>' +
       '<div><span>1~7일 전</span><b>' + recentUsers + '명</b></div><div><span>확인 필요</span><b>' + idleUsers + '명</b></div></div>' : '') +
-    (students.length ? '<div class="student-engagement-overview"><div class="between"><div><b>🎁 포인트 · 문화상품권 교환</b>' +
-      '<div class="small muted mt8">학습·마감 기록에서 포인트를 자동 계산하고, 학생의 5,000P 신청은 실제 상품권 발송 후 원장이 확정합니다.</div></div>' +
+    (students.length ? '<div class="student-engagement-overview"><div class="between"><div><b>🎁 포인트 · 기프트 카드 교환</b>' +
+      '<div class="small muted mt8">학습·마감 기록에서 포인트를 자동 계산하고, 학생의 5,000P 신청은 실제 기프트 카드 발송 후 원장이 확정합니다.</div></div>' +
       '<div class="small"><b>교환 확인 ' + pointPending + '명</b> · 신청 가능 ' + pointReady + '명' + (pointDeficit ? ' · 정산 확인 ' + pointDeficit + '명' : '') + '</div></div>' +
       '<div class="small muted mt8">오늘 유효 학습일 ' + stampedToday + '명 · 이번 달 80% 이상 ' + engagementOnTrack + '명 · 전체 학생 현재 잔액 ' + pointNumber(pointBalances) +
-        '<br>유효 학습일 +50P · 주 3일 이상에서 80%와 주간 마무리 +250P · 월 12일 이상에서 80%와 월간 마무리 +500P. 상품권 번호나 링크는 앱에 저장하지 않습니다.</div></div>' : '') +
+        '<br>10월 1일부터 하루 최대 100P(온라인 배정일은 하루 마감 70P + 완료한 서비스 몫 최대 30P) · 주 3일 이상에서 80%와 주간 마무리 +500P · 월 12일 이상에서 80%와 월간 마무리 +1,000P. 기프트 카드 번호나 링크는 앱에 저장하지 않습니다.</div></div>' : '') +
     (students.length ? '<div class="student-subscription-overview"><div class="between"><div><b>월 구독 관리</b>' +
       '<div class="small muted mt8">학생 이용 기능과 별개로 결제 확인만 관리합니다.</div></div>' +
       '<div class="small"><b>구독 ' + subscriptionStudents.length + '명</b> · 결제 확인 필요 ' + paymentAttention.length + '명</div></div>' +
@@ -10278,6 +10834,7 @@ function viewStaffAdmin() {
         '<div><div class="card-title">' + esc(s.name) +
           (s.owner ? ' <span class="tag add">대표</span>' : '') +
           (s.manager ? ' <span class="tag edit">관리자</span>' : '') +
+          (studyRoadmapActive(s) ? ' <span class="tag doing">🎯 ' + esc(studyRoadmapOf(s).targetSchool) + '</span>' : '') +
           (subscription.active ? ' <span class="tag subscription">월 구독</span>' :
             subscription.endedAt ? ' <span class="tag usage-idle">구독 종료</span>' : '') + '</div>' +
         '<div class="small muted">지시 ' + state.tasks.filter(t => t.staffId === s.id && !t.deleted && t.kind !== 'report_snapshot' && !isPointTransactionTask(t) && !isLectureRequestTask(t)).length + '건' +
@@ -10285,7 +10842,7 @@ function viewStaffAdmin() {
           (s.manager ? ' · 현황 보기·발행 가능' : '') + '</div>' + studentUsageLine(s) +
           studentEngagementLine(s, engagementByStudent.get(s.id), pointByStudent.get(s.id)) + studentSubscriptionLine(s) + '</div></div>' +
         '<button class="btn btn-sm btn-danger" data-act="delstaff" data-id="' + s.id + '"' +
-          (rewardLocked ? ' disabled aria-disabled="true" title="문화상품권 교환 처리 완료 또는 취소 후 삭제할 수 있습니다"' : '') + '>삭제</button></div>' +
+          (rewardLocked ? ' disabled aria-disabled="true" title="기프트 카드 교환 처리 완료 또는 취소 후 삭제할 수 있습니다"' : '') + '>삭제</button></div>' +
         staffAccessPanels(s) + '</div>';
     }).join('') +
       '<div class="card" id="staffSearchEmpty"' + ((normalizedQuery || filterMode !== 'all') && !matching.length ? '' : ' hidden') +
@@ -11134,6 +11691,28 @@ document.addEventListener('click', ev => {
     }
 
     /* 학습 카드 */
+    case 'learningloginsave': {
+      const me = currentStaff();
+      const sourceKey = el.dataset.source || '';
+      if (!me || !session.isStaffLink || isManager() || me.id !== session.staffId || !LEARNING_LOGIN_MEMO_SOURCES.includes(sourceKey)) break;
+      const loginEl = $('#learningLoginId_' + sourceKey);
+      const passwordEl = $('#learningLoginPw_' + sourceKey);
+      const loginId = String(loginEl && loginEl.value || '').trim();
+      const password = String(passwordEl && passwordEl.value || '');
+      if (!loginId && !password) return toast('본인 아이디 또는 비밀번호를 입력해 주세요');
+      if (!saveLearningLoginMemo(me.id, sourceKey, loginId, password)) return toast('로그인 메모를 저장하지 못했습니다');
+      render(); toast('이 기기에만 로그인 메모를 저장했습니다');
+      break;
+    }
+    case 'learningloginclear': {
+      const me = currentStaff();
+      const sourceKey = el.dataset.source || '';
+      if (!me || !session.isStaffLink || isManager() || me.id !== session.staffId || !LEARNING_LOGIN_MEMO_SOURCES.includes(sourceKey)) break;
+      if (!confirm('이 기기에 저장한 로그인 메모를 지울까요?')) break;
+      if (!saveLearningLoginMemo(me.id, sourceKey, '', '')) return toast('로그인 메모를 지우지 못했습니다');
+      render(); toast('로그인 메모를 지웠습니다');
+      break;
+    }
     case 'metamathrequestopen': {
       if (!session.isStaffLink) break;
       if (isManager()) return toast('문제지 요청은 학생 본인 링크에서 할 수 있어요');
@@ -11558,6 +12137,104 @@ document.addEventListener('click', ev => {
       if (!session.isAdmin) break;
       const req = materialRequestById(id);
       if (req) copy(materialRequestSearchText(req));
+      break;
+    }
+
+    /* 교재 진도 로드맵 */
+    case 'roadmapopen': {
+      studyRoadmapModal(id);
+      break;
+    }
+    case 'roadmaptargetsave': {
+      if (!session.isAdmin || session.isStaffLink) break;
+      const student = staffById(id);
+      if (!student || student.deleted || student.owner || student.manager) return toast('학생을 다시 선택해 주세요');
+      const targetSchool = String((($('#roadmapTargetSchool') || {}).value) || '').trim().slice(0, 100);
+      if (!targetSchool) return toast('목표 학교를 입력해 주세요');
+      const roadmap = studyRoadmapOf(student);
+      student.studyRoadmap = { targetSchool: targetSchool, items: roadmap.items };
+      student.updatedAt = now();
+      roadmap.items.forEach(item => commitStudyRoadmapItem(student, item));
+      if (!save()) return;
+      queueSync(); studyRoadmapModal(id); toast('목표 학교를 저장했습니다');
+      break;
+    }
+    case 'roadmapbookadd': {
+      studyRoadmapBookModal(id, '');
+      break;
+    }
+    case 'roadmapbookedit': {
+      studyRoadmapBookModal(id, el.dataset.item || '');
+      break;
+    }
+    case 'roadmapbooksave': {
+      if (!session.isAdmin || session.isStaffLink) break;
+      const student = staffById(id);
+      if (!student || student.deleted || student.owner || student.manager) return toast('학생을 다시 선택해 주세요');
+      const roadmap = studyRoadmapOf(student);
+      if (!roadmap.targetSchool) return toast('목표 학교를 먼저 저장해 주세요');
+      const itemId = String((($('#roadmapBookId') || {}).value) || '');
+      const subject = String((($('#roadmapSubject') || {}).value) || '');
+      const book = String((($('#roadmapBook') || {}).value) || '').trim().slice(0, 120);
+      const unit = String((($('#roadmapUnit') || {}).value) || '');
+      const rangeStart = Number((($('#roadmapRangeStart') || {}).value));
+      const rangeEnd = Number((($('#roadmapRangeEnd') || {}).value));
+      const startDate = String((($('#roadmapStartDate') || {}).value) || '');
+      const endDate = String((($('#roadmapEndDate') || {}).value) || '');
+      const days = [...new Set(Array.from(document.querySelectorAll('[data-roadmap-day]:checked')).map(input => Number(input.value)))]
+        .filter(day => Number.isInteger(day) && day >= 0 && day <= 6);
+      if (!STUDY_SUBJECTS[subject]) return toast('과목을 선택해 주세요');
+      if (!book) return toast('교재명을 입력해 주세요');
+      if (!STUDY_ROADMAP_UNITS[unit]) return toast('분량 단위를 선택해 주세요');
+      if (!Number.isInteger(rangeStart) || rangeStart < 1 || !Number.isInteger(rangeEnd) || rangeEnd < rangeStart || rangeEnd > 99999) {
+        return toast('시작·끝 번호를 올바르게 입력해 주세요');
+      }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate) || endDate < startDate) {
+        return toast('시작일과 완료 목표일을 확인해 주세요');
+      }
+      if (Math.round((parseYmd(endDate) - parseYmd(startDate)) / 86400000) > 730) return toast('로드맵 기간은 2년 이내로 설정해 주세요');
+      if (!days.length) return toast('학습 요일을 하나 이상 선택해 주세요');
+      const existing = roadmap.items.find(item => item.id === itemId);
+      const item = {
+        id: existing ? existing.id : uid(), subject: subject, book: book, unit: unit,
+        rangeStart: rangeStart, rangeEnd: rangeEnd, startDate: startDate, endDate: endDate,
+        days: days.sort((a, b) => STUDY_ROADMAP_DAYS.indexOf(a) - STUDY_ROADMAP_DAYS.indexOf(b)),
+        estimatedMin: Math.max(20, Math.min(90, Number((($('#roadmapMinutes') || {}).value)) || 50)),
+        createdAt: existing ? existing.createdAt : now(), updatedAt: now()
+      };
+      const preview = studyRoadmapSchedule(item, rangeStart, startDate, new Set());
+      if (!preview.length) return toast('기간 안에 선택한 학습 요일이 없습니다');
+      const items = existing ? roadmap.items.map(row => row.id === existing.id ? item : row) : roadmap.items.concat(item);
+      student.studyRoadmap = { targetSchool: roadmap.targetSchool, items: items };
+      student.updatedAt = now();
+      commitStudyRoadmapItem(student, item);
+      if (!save()) return;
+      queueSync(); studyRoadmapModal(id); toast('교재 분량을 ' + preview.length + '회로 나눠 저장했습니다');
+      break;
+    }
+    case 'roadmapbookdelete': {
+      if (!session.isAdmin || session.isStaffLink) break;
+      const student = staffById(id), roadmap = studyRoadmapOf(student);
+      const item = roadmap.items.find(row => row.id === el.dataset.item);
+      if (!student || !item) return toast('교재 계획을 다시 확인해 주세요');
+      if (!confirm(item.book + ' 교재 계획을 삭제할까요? 이미 완료한 기록은 유지됩니다.')) return;
+      stopStudyRoadmapItem(student, item.id);
+      student.studyRoadmap = { targetSchool: roadmap.targetSchool, items: roadmap.items.filter(row => row.id !== item.id) };
+      student.updatedAt = now();
+      if (!save()) return;
+      queueSync(); studyRoadmapModal(id); toast('교재 계획을 삭제했습니다');
+      break;
+    }
+    case 'roadmapstop': {
+      if (!session.isAdmin || session.isStaffLink) break;
+      const student = staffById(id), roadmap = studyRoadmapOf(student);
+      if (!student || (!roadmap.targetSchool && !roadmap.items.length)) break;
+      if (!confirm(student.name + ' 학생의 교재 로드맵 사용을 종료할까요? 이미 완료한 기록은 유지됩니다.')) return;
+      roadmap.items.forEach(item => stopStudyRoadmapItem(student, item.id));
+      student.studyRoadmap = { targetSchool: '', items: [] };
+      student.updatedAt = now();
+      if (!save()) return;
+      queueSync(); closeModal(); render(); toast('교재 로드맵 사용을 종료했습니다');
       break;
     }
 
@@ -12338,6 +13015,7 @@ document.addEventListener('click', ev => {
       const t = task();
       if (!me || !t || t.staffId !== me.id || t.repeat !== 'once') return toast('이 공부는 요일을 변경할 수 없습니다');
       if (t.auto === 'exam-plan-v1') return toast('시험대비 일정은 학사관리에서 재계획해 주세요');
+      if (t.auto === STUDY_ROADMAP_AUTO) return toast('교재 로드맵 설정에서 학습 요일을 바꿔 주세요');
       weekMoveModal(t, date, mondayOf(cursor));
       break;
     }
@@ -12676,6 +13354,7 @@ document.addEventListener('click', ev => {
       const me = currentStaff();
       if (!t || !me || t.staffId !== me.id) return toast('이 공부의 날짜를 변경할 수 없습니다');
       if (t.auto === 'exam-plan-v1') return toast('시험대비 일정은 학사관리에서 재계획해 주세요');
+      if (t.auto === STUDY_ROADMAP_AUTO) return toast('교재 로드맵 설정에서 학습 일정을 바꿔 주세요');
       monthMoveModal(t, date);
       break;
     }
@@ -12695,6 +13374,7 @@ document.addEventListener('click', ev => {
       const me = currentStaff();
       if (!t || !me || t.staffId !== me.id) return toast('이 공부를 이월할 수 없습니다');
       if (t.auto === 'exam-plan-v1') return toast('시험대비 일정은 학사관리에서 재계획해 주세요');
+      if (t.auto === STUDY_ROADMAP_AUTO) return toast('교재 로드맵 공부는 하루 마무리에서 이월해 주세요');
       moveMonthOccurrence(t, date, el.dataset.to || today());
       break;
     }
@@ -13116,14 +13796,14 @@ document.addEventListener('click', ev => {
     }
     case 'pointrequest': {
       if (!session.isStaffLink || isManager() || session.staffId !== id) break;
-      if (!confirm('5,000P 문화상품권 교환을 신청할까요? 원장님이 학습 기록을 확인한 뒤 발송합니다.')) break;
+      if (!confirm('5,000P 기프트 카드 교환을 신청할까요? 원장님이 학습 기록을 확인한 뒤 발송합니다.')) break;
       if (!pointExchangeRequest(id)) return toast('교환 가능한 포인트와 신청 상태를 다시 확인해 주세요');
-      closeModal(); render(); toast('문화상품권 교환을 신청했습니다');
+      closeModal(); render(); toast('기프트 카드 교환을 신청했습니다');
       break;
     }
     case 'pointcancel': {
       if (!session.isStaffLink || isManager() || session.staffId !== id) break;
-      if (!confirm('문화상품권 교환 신청을 취소할까요? 예약된 포인트는 다시 사용할 수 있습니다.')) break;
+      if (!confirm('기프트 카드 교환 신청을 취소할까요? 예약된 포인트는 다시 사용할 수 있습니다.')) break;
       if (!cancelPointExchangeRequest(id, el.dataset.requestId || '')) return toast('취소할 신청을 다시 확인해 주세요');
       closeModal(); render(); toast('교환 신청을 취소했습니다');
       break;
@@ -13132,10 +13812,10 @@ document.addEventListener('click', ev => {
       if (!session.isAdmin || session.isStaffLink) break;
       const student = staffById(id);
       const requestId = el.dataset.requestId || '';
-      if (!student || !confirm(student.name + ' 학생의 교환 처리를 이 기기에서 시작할까요?\n서버 선점 성공 안내가 나온 뒤에만 상품권을 발송하세요.')) break;
+      if (!student || !confirm(student.name + ' 학생의 교환 처리를 이 기기에서 시작할까요?\n서버 선점 성공 안내가 나온 뒤에만 기프트 카드를 발송하세요.')) break;
       runPointExchangeAdminAction(id, requestId, 'claim').then(response => {
         if (!response) return;
-        if (response.owned === true) toast('교환 처리 선점 완료 · 이제 이 기기에서만 상품권을 발송하세요');
+        if (response.owned === true) toast('교환 처리 선점 완료 · 이제 이 기기에서만 기프트 카드를 발송하세요');
         else toast('다른 원장 기기에서 이미 처리 중입니다 · 이 기기에서는 발송하지 마세요');
       });
       break;
@@ -13153,9 +13833,9 @@ document.addEventListener('click', ev => {
     case 'pointtakeover': {
       if (!session.isAdmin || session.isStaffLink) break;
       const student = staffById(id);
-      if (!student || !confirm(student.name + ' 학생의 30분 지난 교환 처리를 이 기기로 인계할까요?\n새 상품권을 발송하지 말고, 이전 기기에서 이미 발송했는지 먼저 확인해야 합니다.\n인계 후에는 “이미 발송됨 → 완료” 또는 “미발송 → 취소”만 선택하세요.')) break;
+      if (!student || !confirm(student.name + ' 학생의 30분 지난 교환 처리를 이 기기로 인계할까요?\n새 기프트 카드를 발송하지 말고, 이전 기기에서 이미 발송했는지 먼저 확인해야 합니다.\n인계 후에는 “이미 발송됨 → 완료” 또는 “미발송 → 취소”만 선택하세요.')) break;
       runPointExchangeAdminAction(id, el.dataset.requestId || '', 'takeover').then(response => {
-        if (response && response.owned === true) toast('인계 완료 · 새 상품권을 발송하지 말고 이전 발송 여부를 확인하세요');
+        if (response && response.owned === true) toast('인계 완료 · 새 기프트 카드를 발송하지 말고 이전 발송 여부를 확인하세요');
       });
       break;
     }
@@ -13172,16 +13852,16 @@ document.addEventListener('click', ev => {
     case 'pointfulfill': {
       if (!session.isAdmin || session.isStaffLink) break;
       const student = staffById(id);
-      if (!student || !confirm(student.name + ' 학생에게 문화상품권을 실제로 발송했나요?\n확정하면 5,000P가 차감되며 학생이 수정할 수 없는 기록으로 남습니다.')) break;
+      if (!student || !confirm(student.name + ' 학생에게 기프트 카드를 실제로 발송했나요?\n확정하면 5,000P가 차감되며 학생이 수정할 수 없는 기록으로 남습니다.')) break;
       runPointExchangeAdminAction(id, el.dataset.requestId || '', 'fulfill').then(response => {
-        if (response && response.status === 'fulfilled') toast('상품권 발송 완료 · 5,000P를 차감했습니다');
+        if (response && response.status === 'fulfilled') toast('기프트 카드 발송 완료 · 5,000P를 차감했습니다');
       });
       break;
     }
     case 'pointadmincancel': {
       if (!session.isAdmin || session.isStaffLink) break;
       const student = staffById(id);
-      if (!student || !confirm(student.name + ' 학생에게 상품권을 아직 발송하지 않았나요?\n발송하지 않은 것이 확실할 때만 처리를 취소하세요. 포인트는 차감하지 않습니다.')) break;
+      if (!student || !confirm(student.name + ' 학생에게 기프트 카드를 아직 발송하지 않았나요?\n발송하지 않은 것이 확실할 때만 처리를 취소하세요. 포인트는 차감하지 않습니다.')) break;
       runPointExchangeAdminAction(id, el.dataset.requestId || '', 'cancel').then(response => {
         if (response && response.status === 'cancelled') toast('교환 처리를 취소했습니다');
       });
@@ -13308,7 +13988,7 @@ document.addEventListener('click', ev => {
     case 'delstaff': {
       if (!session.isAdmin) break;
       const s = staffById(id);
-      if (s && hasProcessingPointExchange(id)) return toast('문화상품권 교환 처리를 완료하거나 취소한 뒤 학생을 삭제해 주세요');
+      if (s && hasProcessingPointExchange(id)) return toast('기프트 카드 교환 처리를 완료하거나 취소한 뒤 학생을 삭제해 주세요');
       if (!s || !confirm(s.name + ' 님을 삭제할까요? 지시 기록은 남습니다.')) return;
       s.deleted = true; s.updatedAt = now();
       save(); queueSync(); render();
@@ -13318,7 +13998,7 @@ document.addEventListener('click', ev => {
       if (!session.isAdmin) break;
       const s = staffById(id);
       if (!s) break;
-      if (hasProcessingPointExchange(id)) return toast('문화상품권 교환 처리를 완료하거나 취소한 뒤 대표 여부를 변경해 주세요');
+      if (hasProcessingPointExchange(id)) return toast('기프트 카드 교환 처리를 완료하거나 취소한 뒤 대표 여부를 변경해 주세요');
       s.owner = !s.owner; s.updatedAt = now();
       save(); queueSync(); render();
       toast(s.owner ? s.name + ' — 대표로 지정 (학생 통계에서 제외)' : s.name + ' — 대표 해제');
@@ -13328,7 +14008,7 @@ document.addEventListener('click', ev => {
       if (!session.isAdmin) break;
       const s = staffById(id);
       if (!s) break;
-      if (hasProcessingPointExchange(id)) return toast('문화상품권 교환 처리를 완료하거나 취소한 뒤 관리자 여부를 변경해 주세요');
+      if (hasProcessingPointExchange(id)) return toast('기프트 카드 교환 처리를 완료하거나 취소한 뒤 관리자 여부를 변경해 주세요');
       s.manager = !s.manager; s.updatedAt = now();
       save(); queueSync(); render();
       toast(s.manager
@@ -13471,7 +14151,8 @@ document.addEventListener('click', ev => {
 
       const snapshot = data.items.map(item => ({
         key: item.key, type: item.type, label: item.label, detail: item.detail || '',
-        subjectKey: item.subjectKey, carriedFromDate: item.carriedFromDate || '',
+        subjectKey: item.subjectKey, source: item.source || '', learningResultReady: item.learningResultReady === true,
+        carriedFromDate: item.carriedFromDate || '',
         carryOriginDate: item.carryOriginDate || '', claimed: item.claimed !== false, done: item.done
       }));
       Object.keys(nextResolutions).forEach(key => {
@@ -13842,6 +14523,7 @@ document.addEventListener('click', ev => {
 
     /* 설정 */
     case 'savecfg': {
+      clearConsultLinkContacts();
       state.settings.syncSecret = ($('#cfgSecret').value || '').trim();
       state.settings.adminToken = '';
       save(); render(); toast('저장했습니다');
@@ -14035,7 +14717,9 @@ document.addEventListener('visibilitychange', () => {
    11. 시작
    ══════════════════════════════════════════════════════ */
 load();
-if (ensureRecentDailyCarryTasks()) { save(); queueSync(); }
+const repairedCarryOrigins = repairLegacyStudentCarryOrigins();
+const migratedRecentDailyCarryTasks = ensureRecentDailyCarryTasks();
+if (repairedCarryOrigins || migratedRecentDailyCarryTasks) { save(); queueSync(); }
 absorbLinkParams();
 const h = routeFromHash(location.hash);
 if (h) route = h;
@@ -14044,7 +14728,7 @@ if (!pendingStudentCode && session.isStaffLink && state.settings.myToken && staf
   sessionStorage.removeItem(STUDENT_LINK_BLOCK_KEY);
   studentConnectError = '';
 }
-if (session.isStaffLink && !['guide', 'today', 'week', 'month', 'academic', 'ingang', 'study', 'write', 'board'].includes(route)) route = 'today';
+if (session.isStaffLink && !['guide', 'today', 'week', 'roadmap', 'month', 'academic', 'ingang', 'study', 'write', 'board'].includes(route)) route = 'today';
 render();
 connectAdminDevice();
 if (pendingStudentCode) {
@@ -14082,7 +14766,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-09-20.2';
+const APP_VER = '2026-09-27.1';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)

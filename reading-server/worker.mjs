@@ -1,6 +1,7 @@
 'use strict';
 /* WB 진로독서 — Cloudflare Workers 버전 (server.mjs의 이식)
    저장: KV(DB 바인딩) — student:<code> / state:<code> / token:<t> / parent:<t> / pubmap / backup:<날짜>
+         앱별 접두 키: vocab: / naesin: / naesinko: / haru: / hanja: (각 *-api.mjs 의 저장소 어댑터만 만진다)
    정적: [assets] dist/ (학생 앱 + /admin)
    크론: 매일 KV 스냅샷(backup:) 10개 보관 */
 
@@ -9,6 +10,11 @@ import { handleNaesin, isReservedCode, dropReservedRows, naesinBodyLimit } from 
 import { handleStudio } from './naesin-studio.mjs';
 import { handleHaru, haruBodyLimit, allowedApp, appOfPath, dropStudentHaru, dumpHaru, weeklyAgg } from './haru-api.mjs';
 import { handleNaesinKo } from './naesin-ko-api.mjs';
+import { handleHanja, hanjaBodyLimit, dropStudentHanja, dumpHanja } from './hanja-api.mjs';
+import { handleChunk, dropStudentChunk, pushDueChunk } from './chunk-api.mjs';
+import { handleLetter, letterBodyLimit, dropStudentLetter, dumpLetter, pushDueIssues } from './letter-api.mjs';
+import { checkAdminLogin } from './admin-auth.mjs';
+import { handlePortalFamilyLink, readPortalLinkBody, withPortalFamilies } from './portal-family.mjs';
 import { bookIndex, cleanWords, coachingCard, confirmAllPlan, findBook, readyToConfirm, sourceSummary, validProgress, withOverlay } from './textbook.mjs';
 import { parseRoster } from './roster.mjs';
 
@@ -203,6 +209,46 @@ function naesinStore(env) {
 /* 국어브레인 저장소 어댑터 — naesinko: 접두 키만 사용.
    영어(naesin:)와 달리 요약·서술형·오버레이를 state에서 분리한 별도 키로 둔다
    (국어 기획서 §8 저장 예산 — overview가 state를 통째로 읽지 않게). */
+/* 청크브레인 저장소 어댑터 — chunk: 접두 키만. 콘텐츠는 정적 자산이라 KV 에는 학생 기록·요약뿐이다. */
+function portalFamilyStore(env) {
+  return {
+    getFamily: (t) => env.DB.get('portal-family:' + t, 'json'),
+    putFamily: (t, rec) => env.DB.put('portal-family:' + t, JSON.stringify(rec)),
+    listFamilyTokens: async () => (await kvListAll(env, 'portal-family:')).map(k => k.slice('portal-family:'.length)),
+    getParentCode: (t) => env.DB.get('parent:' + t),
+    putParent: (t, c) => env.DB.put('parent:' + t, c),
+    getStudent: (c) => env.DB.get('student:' + c, 'json'),
+    putStudent: (c, rec) => env.DB.put('student:' + c, JSON.stringify(rec)),
+    listStudentCodes: async () => (await kvListAll(env, 'student:')).map(k => k.slice('student:'.length)),
+  };
+}
+
+function chunkStore(env) {
+  return {
+    getState: (c) => env.DB.get('chunk:state:' + c, 'json'),
+    putState: (c, rec) => env.DB.put('chunk:state:' + c, JSON.stringify(rec)),
+    deleteState: (c) => env.DB.delete('chunk:state:' + c),
+    getSummary: (c) => env.DB.get('chunk:summary:' + c, 'json'),
+    putSummary: (c, rec) => env.DB.put('chunk:summary:' + c, JSON.stringify(rec)),
+    deleteSummary: (c) => env.DB.delete('chunk:summary:' + c),
+    listSummaryCodes: async () => (await kvListAll(env, 'chunk:summary:')).map(k => k.slice('chunk:summary:'.length)),
+    /* 선생님 과제 — 단계·글·카드. 학생 앱이 켤 때 받아 단계를 맞추고 과제 카드를 띄운다 */
+    getAssign: (c) => env.DB.get('chunk:assign:' + c, 'json'),
+    putAssign: (c, rec) => env.DB.put('chunk:assign:' + c, JSON.stringify(rec)),
+    deleteAssign: (c) => env.DB.delete('chunk:assign:' + c),
+    listAssignCodes: async () => (await kvListAll(env, 'chunk:assign:')).map(k => k.slice('chunk:assign:'.length)),
+    /* 선생님 지문 — 키 하나에 전부({items, updatedAt}). 학생 앱이 켤 때 한 번에 받는다 */
+    getCustoms: () => env.DB.get('chunk:customs', 'json'),
+    putCustoms: (rec) => env.DB.put('chunk:customs', JSON.stringify(rec)),
+    ...withPortalFamilies(portalFamilyStore(env)),
+    /* 가족 알림 구독 — chunk:push:f:<ptoken>. 워드브레인·브레인레터와 같은 VAPID 키를 쓰되 키 공간은 따로 */
+    getPush: (k) => env.DB.get('chunk:push:' + k, 'json'),
+    putPush: (k, rec) => env.DB.put('chunk:push:' + k, JSON.stringify(rec)),
+    delPush: (k) => env.DB.delete('chunk:push:' + k),
+    listPushKeys: async () => (await kvListAll(env, 'chunk:push:')).map((k) => k.slice('chunk:push:'.length)),
+  };
+}
+
 function naesinKoStore(env) {
   return {
     getPack: (id) => env.DB.get('naesinko:pack:' + id, 'json'),
@@ -256,6 +302,61 @@ function haruStore(env) {
   };
 }
 
+/* 어휘브레인 저장소 어댑터 — hanja: 접두 키만. 단어장 본문(hanja:book:<id>)과 목록(hanja:books, 본문 없는 메타)을
+   나눠 둔다 — 학생 목록 조회가 단어장 본문을 읽지 않게. 퇴원은 state·assign 두 키만 지운다. */
+function hanjaStore(env) {
+  const get = (k) => env.DB.get(k, 'json');
+  const put = (k, v) => env.DB.put(k, JSON.stringify(v));
+  const del = (k) => env.DB.delete(k);
+  return {
+    getBook: (id) => get('hanja:book:' + id), putBook: (id, rec) => put('hanja:book:' + id, rec), deleteBook: (id) => del('hanja:book:' + id),
+    getBookIds: () => get('hanja:books'), putBookIds: (list) => put('hanja:books', list),
+    getState: (c) => get('hanja:state:' + c), putState: (c, rec) => put('hanja:state:' + c, rec), deleteState: (c) => del('hanja:state:' + c),
+    listStateCodes: async () => (await kvListAll(env, 'hanja:state:')).map(k => k.slice('hanja:state:'.length)),
+    getAssign: (c) => get('hanja:assign:' + c), putAssign: (c, rec) => put('hanja:assign:' + c, rec), deleteAssign: (c) => del('hanja:assign:' + c),
+    listAssignCodes: async () => (await kvListAll(env, 'hanja:assign:')).map(k => k.slice('hanja:assign:'.length)),
+    /* 요약은 기록 저장 시점에 서버가 쓴다 — 현황판이 학생 수만큼 400KB 기록을 읽지 않게 */
+    getSummary: (c) => get('hanja:summary:' + c), putSummary: (c, rec) => put('hanja:summary:' + c, rec), deleteSummary: (c) => del('hanja:summary:' + c),
+    listSummaryCodes: async () => (await kvListAll(env, 'hanja:summary:')).map(k => k.slice('hanja:summary:'.length)),
+    getTask: (s) => get('hanja:task:' + s), putTask: (s, rec) => put('hanja:task:' + s, rec), deleteTask: (s) => del('hanja:task:' + s),
+    listTaskScopes: async () => (await kvListAll(env, 'hanja:task:')).map(k => k.slice('hanja:task:'.length)),
+    getStrokes: () => get('hanja:strokes'), putStrokes: (rec) => put('hanja:strokes', rec),
+    getPush: (c) => get('hanja:push:' + c), putPush: (c, rec) => put('hanja:push:' + c, rec), delPush: (c) => del('hanja:push:' + c),
+    listPushCodes: async () => (await kvListAll(env, 'hanja:push:')).map(k => k.slice('hanja:push:'.length)),
+    getRemap: (id) => get('hanja:remap:' + id), putRemap: (id, rec) => put('hanja:remap:' + id, rec), deleteRemap: (id) => del('hanja:remap:' + id),
+    getStudent: (c) => get('student:' + c),
+    listStudentCodes: async () => (await kvListAll(env, 'student:')).map(k => k.slice('student:'.length)),
+  };
+}
+
+/* 브레인레터 저장소 어댑터 — letter: 접두 키만(호·학생 기록·AI 장부). 가족 링크는 진로독서의 parent:<t> 를 그대로 읽는다 —
+   가정마다 링크가 하나여야 주간 문자에 링크를 두 개 넣는 일이 없다. 학생 레코드 쓰기는 letterTier·ptoken 두 필드뿐이다. */
+function letterStore(env) {
+  const get = (k) => env.DB.get(k, 'json');
+  const put = (k, v) => env.DB.put(k, JSON.stringify(v));
+  return {
+    getIssue: (id) => get('letter:issue:' + id), putIssue: (id, rec) => put('letter:issue:' + id, rec), deleteIssue: (id) => env.DB.delete('letter:issue:' + id),
+    getIssueIds: () => get('letter:issues'), putIssueIds: (ids) => put('letter:issues', ids),
+    getState: (c) => get('letter:state:' + c), putState: (c, rec) => put('letter:state:' + c, rec), deleteState: (c) => env.DB.delete('letter:state:' + c),
+    listStateCodes: async () => (await kvListAll(env, 'letter:state:')).map((k) => k.slice('letter:state:'.length)),
+    ...withPortalFamilies(portalFamilyStore(env)),
+    getAiUse: () => get('letter:aiuse'), putAiUse: (rec) => put('letter:aiuse', rec),
+    /* 사진 — 바이트는 값, 종류·크기·이름은 KV 메타데이터(목록을 훑을 때 값을 안 읽어도 되게) */
+    getImage: async (id) => { const r = await env.DB.getWithMetadata('letter:img:' + id, 'arrayBuffer'); return r && r.value ? { bytes: r.value, meta: r.metadata || {} } : null; },
+    putImage: (id, bytes, meta) => env.DB.put('letter:img:' + id, bytes, { metadata: meta }),
+    deleteImage: (id) => env.DB.delete('letter:img:' + id),
+    listImages: async () => {
+      const out = []; let cursor;
+      do { const r = await env.DB.list({ prefix: 'letter:img:', cursor }); r.keys.forEach((k) => out.push({ id: k.name.slice('letter:img:'.length), ...(k.metadata || {}) })); cursor = r.list_complete ? null : r.cursor; } while (cursor);
+      return out;
+    },
+    /* 새 호 알림 구독 — s:<학생 코드> · f:<가족 토큰> */
+    getPush: (k) => get('letter:push:' + k), putPush: (k, rec) => put('letter:push:' + k, rec), delPush: (k) => env.DB.delete('letter:push:' + k),
+    listPushKeys: async () => (await kvListAll(env, 'letter:push:')).map((k) => k.slice('letter:push:'.length)),
+    getCalendar: () => get('letter:calendar'), putCalendar: (rec) => put('letter:calendar', rec),
+  };
+}
+
 function vocabPushEnv(env) {
   return {
     publicKey: env.VAPID_PUBLIC_KEY || '',
@@ -266,6 +367,9 @@ function vocabPushEnv(env) {
 
 async function fullDump(env) {
   const students = {}; const states = {};
+  const portalFamilies = {};
+  for (const token of await portalFamilyStore(env).listFamilyTokens())
+    portalFamilies[token] = await portalFamilyStore(env).getFamily(token);
   const codes = new Set();
   for (const prefix of ['student:', 'state:']) {
     (await kvListAll(env, prefix)).forEach(k => codes.add(k.slice(prefix.length)));
@@ -309,7 +413,17 @@ async function fullDump(env) {
   }
   /* 하루브레인 — 학생 기록 본문(state·mock·paper)·대응표·플랜을 담는다. id 만 넣으면 기록의 백업이 KV 단일 사본이 된다(설계안 §7-5). 팩 본문은 내신과 같은 이유로 id 만. */
   const haru = await dumpHaru(haruStore(env));
-  return { service: 'wb-reading', savedAt: nowIso(), students, states, vocab, textbook: textbook || {}, pubmap: pubmap || {}, naesin, naesinKo, textbookSrc: textbookSrc || {}, haru };
+  /* 청크브레인 — 학생 기록·요약 두 계열. 콘텐츠는 저장소에 없다(정적 자산). */
+  const chunk = { states: {}, summaries: {}, assigns: {}, customs: null };
+  for (const [pre, tgt] of [['chunk:state:', chunk.states], ['chunk:summary:', chunk.summaries], ['chunk:assign:', chunk.assigns]]) {
+    for (const k of await kvListAll(env, pre)) { const v = await env.DB.get(k, 'json'); if (v) tgt[k.slice(pre.length)] = v; }
+  }
+  chunk.customs = await env.DB.get('chunk:customs', 'json');   /* 선생님 지문(키 하나) — 백업에 같이 담는다 */
+  /* 브레인레터 — 호 본문(원장이 쓴 것)과 학생 기록. 팩과 달리 라이선스 원문이 아니라 통째로 담는다 */
+  const letter = await dumpLetter(letterStore(env));
+  /* 어휘브레인 — 목록(메타)·학생 기록·배정. 단어장 본문은 내신 팩과 같은 이유로 id 만 */
+  const hanja = await dumpHanja(hanjaStore(env));
+  return { service: 'wb-reading', savedAt: nowIso(), students, portalFamilies, states, vocab, textbook: textbook || {}, pubmap: pubmap || {}, naesin, naesinKo, textbookSrc: textbookSrc || {}, haru, chunk, letter, hanja };
 }
 
 async function snapshotBackup(env) {
@@ -394,14 +508,18 @@ export default {
        12:00 UTC(21:00 KST) 밤 9시 물주기 푸시(내신 몫도 함께 본다 — 워드브레인이 비어도 시험 범위가 남았으면 부른다) ·
        18:00 UTC 일일 백업 · 18:10 UTC 하루브레인 주간 익명 집계(백업 직후) */
     switch (event.cron) {
-      case '0 12 * * *': ctx.waitUntil(sendNightPushes({ store: vocabStore(env), push: vocabPushEnv(env), naesin: naesinStore(env) })); break;
+      case '0 12 * * *': ctx.waitUntil(sendNightPushes({ store: vocabStore(env), push: vocabPushEnv(env), naesin: naesinStore(env), hanja: hanjaStore(env) })); break;
+      /* 22:00 UTC(07:00 KST) — 발행일이 된 브레인레터 호의 "새 호 도착" 알림(즉시 발행분은 발행 라우트가 그 자리에서 보낸다) */
+      case '0 22 * * *': ctx.waitUntil(pushDueIssues({ store: letterStore(env), push: vocabPushEnv(env) })); break;
+      /* 09:00 UTC(18:00 KST) — 청크브레인 가족 링크에 「오늘 복습할 글이 있어요」. 저녁밥 무렵이라 부모가 폰을 본다 */
+      case '0 9 * * *': ctx.waitUntil(pushDueChunk({ store: chunkStore(env), push: vocabPushEnv(env) })); break;
       case '10 18 * * *': ctx.waitUntil(weeklyAgg(haruStore(env), Date.now())); break;
       case '0 18 * * *':
       default: ctx.waitUntil(snapshotBackup(env));
     }
   },
 
-  async fetch(req, env) {
+  async fetch(req, env, cfctx) {
     const url = new URL(req.url);
     const p = url.pathname;
 
@@ -469,6 +587,17 @@ export default {
        강사는 로그인해서만 본다. 서버·워커는 이 파일을 내부에서 읽어 쓴다. */
     if (p === '/textbook.json') return json(404, { error: 'not found' });
 
+    /* 브레인레터 글꼴 조각 — _headers 의 /letter/* no-store 는 화면·코드가 늘 최신이어야 해서인데, 글꼴 조각은 경로에
+       판(sans-v39/)이 박혀 있어 내용이 바뀌면 주소가 바뀐다. 오래 캐시해야 호를 열 때마다 수백 KB 를 다시 받지 않는다.
+       _headers 는 같은 헤더를 합치므로(no-store, public…) 여기서 통째로 바꾼다 — wrangler.toml run_worker_first 에 이 경로가 있어야 워커가 돈다.
+       fonts.css 는 판이 바뀌면 내용이 바뀌므로 그대로 no-store 로 둔다(woff2 만). */
+    if (p.startsWith('/letter/fonts/') && p.endsWith('.woff2')) {
+      const res = await env.ASSETS.fetch(req);
+      if (res.status !== 200) return res;
+      const h = new Headers(res.headers); h.set('Cache-Control', 'public, max-age=31536000, immutable');
+      return new Response(res.body, { status: 200, headers: h });
+    }
+
     if (!p.startsWith('/api/')) {
       /* 정적 자산 (학생 앱 + /admin) */
       return env.ASSETS.fetch(req);
@@ -479,6 +608,13 @@ export default {
          눌러도 안 되는 버튼은 학생에게 앱이 고장 난 것처럼 보인다.
          키를 넣으면 다음 접속부터 버튼이 저절로 돌아온다. 값이 아니라 있고 없음만 알린다. */
       if (p === '/api/health') return json(200, { ok: true, service: 'wb-reading', runtime: 'workers', time: nowIso(), ai: !!env.ANTHROPIC_API_KEY });
+
+      if (p === '/api/portal/family-link') {
+        const out = await handlePortalFamilyLink({ method: req.method,
+          authorization: req.headers.get('authorization'), secret: env.WB_PARENT_PORTAL_LINK_SECRET,
+          getBody: () => readPortalLinkBody(req), store: portalFamilyStore(env) });
+        return json(out.status, out.body);
+      }
 
       /* 발행 상태 맵 — 공개 읽기 (지문 발행 여부는 민감정보가 아님, 운영 루틴이 git 반영에 사용) */
       if (p === '/api/pub' && req.method === 'GET') {
@@ -516,11 +652,12 @@ export default {
         return json(200, { token: await newToken(env, stu.code, false), student: stu });
       }
 
+      /* 관리 로그인 — 아이디·비밀번호(ADMIN_ID·ADMIN_PASSWORD) 또는 PIN(ADMIN_PIN). 판정은 admin-auth.mjs 하나, 실패 횟수는 두 갈래를 합쳐 센다 */
       if (p === '/api/admin/login' && req.method === 'POST') {
         if (await rlBlocked(env, req, 'adm')) return json(429, { error: '시도가 너무 많습니다. 15분 뒤 다시 해 주세요.' });
-        const { pin } = await req.json();
-        if (!env.ADMIN_PIN || String(pin || '') !== env.ADMIN_PIN) { await rlFail(env, req, 'adm'); return json(401, { error: 'PIN이 올바르지 않습니다.' }); }
-        return json(200, { token: await newToken(env, '__admin__', true) });
+        const login = await checkAdminLogin(await req.json(), env);
+        if (!login.ok) { await rlFail(env, req, 'adm'); return json(401, { error: login.error }); }
+        return json(200, { token: await newToken(env, '__admin__', true), via: login.via });
       }
 
       /* 학부모 리포트 — 학생별 열람 토큰으로 접근(로그인 불필요) */
@@ -546,6 +683,18 @@ export default {
         const out = await handleHaru({ path: p, method: 'GET', who: null, query: url.searchParams, getBody: () => req.json(), store: haruStore(env) });
         return json(out.status, out.body);
       }
+      /* 브레인레터 무인증 경로 — 가족 링크(parent, 진로독서 학부모 토큰)·가족 알림 구독(parent/push/*)·사진(img/<id>, id 가 곧 열쇠) */
+      /* 청크브레인 가족 링크 — 진로독서 학부모 토큰(parent:<t>)으로, 로그인 없음. 라우트 모듈이 토큰을 풀고 apps 게이트를 건다 */
+      if (p === '/api/chunk/parent' || p.startsWith('/api/chunk/parent/')) {
+        if (Number(req.headers.get('content-length') || 0) > 300_000) return json(413, { error: '요청이 너무 커서 받을 수 없어요.' });
+        const out = await handleChunk({ path: p, method: req.method, who: null, query: url.searchParams, getBody: () => req.json(), store: chunkStore(env), push: vocabPushEnv(env) });
+        return json(out.status, out.body);
+      }
+      if (p === '/api/letter/parent' || p.startsWith('/api/letter/parent/') || p.startsWith('/api/letter/img/')) {
+        const out = await handleLetter({ path: p, method: req.method, who: null, query: url.searchParams, getBody: () => req.json(), store: letterStore(env), push: vocabPushEnv(env) });
+        if (out.bytes) return new Response(out.bytes, { status: out.status, headers: out.headers });
+        return json(out.status, out.body);
+      }
 
       const who = await auth(env, req);
       if (!who) return json(401, { error: '로그인이 필요합니다.' });
@@ -569,6 +718,29 @@ export default {
           path: p, method: req.method, who, query: url.searchParams, getBody: () => req.json(), store: haruStore(env),
           /* 원자 목록 기본값은 배포본의 haru/atoms.json — KV 에 올린 것이 있으면 그것이 이긴다 */
           atomsFallback: async () => { try { return await (await env.ASSETS.fetch(new Request(url.origin + '/haru/atoms.json'))).json(); } catch (e) { return null; } },
+          randomToken: () => crypto.randomUUID().replace(/-/g, ''),
+        });
+        return json(out.status, out.body);
+      }
+
+      /* 어휘브레인 (/api/hanja/*) — 인증만 공유, 저장·라우트는 격리. 단어장은 KV(hanja:book:*)에만 산다 */
+      if (p.startsWith('/api/hanja/')) {
+        const len = Number(req.headers.get('content-length') || 0);
+        if (len > hanjaBodyLimit(p)) return json(413, { error: '요청이 너무 커서 받을 수 없어요.' });
+        const out = await handleHanja({ path: p, method: req.method, who, query: url.searchParams, getBody: () => req.json(), store: hanjaStore(env), push: vocabPushEnv(env) });
+        return json(out.status, out.body);
+      }
+
+      /* 브레인레터 (/api/letter/*) — 인증만 공유, 저장·라우트는 격리. AI 초안은 관리자만, 하루 한도는 letter:aiuse 장부 */
+      if (p.startsWith('/api/letter/')) {
+        const len = Number(req.headers.get('content-length') || 0);
+        if (len > letterBodyLimit(p)) return json(413, { error: '요청이 너무 커서 받을 수 없어요.' });
+        const out = await handleLetter({
+          path: p, method: req.method, who, query: url.searchParams, getBody: () => req.json(), store: letterStore(env), origin: url.origin,
+          ai: { apiKey: env.ANTHROPIC_API_KEY || '', model: env.LETTER_AI_MODEL || '', env, imageKey: env.GEMINI_API_KEY || '', imageModel: env.LETTER_IMAGE_MODEL || '' },
+          push: vocabPushEnv(env),
+          /* 발행 즉시 알림은 응답 뒤에 이어서 보낸다 — 구독자 수만큼 걸리는 일을 원장이 기다리지 않게 */
+          after: (pr) => { if (cfctx && cfctx.waitUntil) cfctx.waitUntil(pr); else pr.catch(() => {}); },
           randomToken: () => crypto.randomUUID().replace(/-/g, ''),
         });
         return json(out.status, out.body);
@@ -603,6 +775,14 @@ export default {
         });
         if (st) return json(st.status, st.body);
         const out = await handleNaesin(ctx);
+        return json(out.status, out.body);
+      }
+
+      /* 청크브레인 (/api/chunk/*) — 인증만 공유, 저장·라우트는 격리. 학생 기록 하나와 관리용 요약뿐이다. */
+      if (p.startsWith('/api/chunk/')) {
+        const len = Number(req.headers.get('content-length') || 0);
+        if (len > 300_000) return json(413, { error: '요청이 너무 커서 받을 수 없어요.' });
+        const out = await handleChunk({ path: p, method: req.method, who, getBody: () => req.json(), store: chunkStore(env) });
         return json(out.status, out.body);
       }
 
@@ -912,7 +1092,14 @@ export default {
 
         /* 하루브레인 — 정확 접두 4계열(state·mock·paper·parent). 대응표(haru:paperkey:*)는 학생 것이 아니라 그대로 둔다. */
         await dropStudentHaru(haruStore(env), c);
+        await dropStudentChunk(chunkStore(env), c, stu.ptoken);
         removed.push('haru:state:' + c, 'haru:mock:' + c, 'haru:paper:' + c);
+        /* 어휘브레인 — 기록·요약·배정·알림 구독·개인 단원 지정. 단어장·획순 사전은 학생 것이 아니라 둔다 */
+        await dropStudentHanja(hanjaStore(env), c);
+        removed.push('hanja:state:' + c, 'hanja:summary:' + c, 'hanja:assign:' + c, 'hanja:push:' + c);
+        /* 브레인레터 — 열람·문제 기록 한 키. 호는 학생 것이 아니라 그대로 둔다 */
+        await dropStudentLetter(letterStore(env), c, stu.ptoken);
+        removed.push('letter:state:' + c, 'letter:push:s:' + c);
 
         /* 기기 토큰은 토큰 값으로 저장돼 코드로 찾을 수 없다 — 전부 훑어 이 학생 것만 지운다.
            남겨 두면 그 기기는 삭제 뒤에도 계속 로그인된 상태로 남는다. */

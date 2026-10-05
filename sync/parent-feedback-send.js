@@ -46,7 +46,7 @@ const QUEUED_STATUS_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const CARRIER_STATUS_MAX_AGE_MS = 72 * 60 * 60 * 1000;
 const GLOBAL_DAILY_LIMIT = 150;
 const ALLOWED_REQUEST_KEYS = new Set(['app', 'auth', 'requestKey']);
-const ALLOWED_AUTH_KEYS = new Set(['mode', 'secret', 'id', 'token']);
+const ALLOWED_AUTH_KEYS = new Set(['mode', 'secret', 'id', 'token', 'workSession']);
 const FORBIDDEN_REQUEST_KEYS = /(?:phone|^to$|^from$|message|recipient|guardian|studentname)/i;
 
 /** Solapi에 등록된 템플릿 원문에서 변수 자리표시자만 뺀 고정 문구다.
@@ -440,7 +440,7 @@ async function markFeedbackOutcome(env, app, requestKey, revision, status, note,
  * 실제 발송을 시도하는 공용 로직. HTTP 엔드포인트(수동 재시도)와 /feedback-request 제출
  * 처리(자동 발송)가 둘 다 이 함수를 쓴다. current는 feedback_requests 행이어야 한다.
  */
-export async function attemptParentFeedbackSend(env, app, current) {
+export async function attemptParentFeedbackSend(env, app, current, options = {}) {
   const now0 = Date.now();
   if (current.status === 'sent') {
     return { ok: true, idempotent: true, code: 'ALREADY_SENT', status: 'sent' };
@@ -526,9 +526,15 @@ export async function attemptParentFeedbackSend(env, app, current) {
   }
 
   const variablesHash = await sha256Hex(JSON.stringify(fields));
-  const idempotencyKey = await sha256Hex(
-    [app, current.request_key, verifiedStudent.studentId, guardian.phone, variablesHash].join('\u001f')
-  );
+  // 확정 실패는 관리자 명시 재시도에서만 새 시도로 남긴다. 같은 실패를 동시에
+  // 재시도하면 같은 키를 사용하므로 아래 원자적 INSERT가 한 번만 발송한다.
+  const retryOf = options.manualRetry ? await env.DB.prepare(
+    'SELECT send_id, status FROM parent_feedback_sends WHERE app=? AND feedback_request_key=? ' +
+    'ORDER BY created_at DESC, rowid DESC LIMIT 1'
+  ).bind(app, current.request_key).first() : null;
+  const identity = [app, current.request_key, verifiedStudent.studentId, guardian.phone, variablesHash];
+  if (retryOf && retryOf.status === 'rejected') identity.push('manual-retry', retryOf.send_id);
+  const idempotencyKey = await sha256Hex(identity.join('\u001f'));
   const sendId = 'pfs_' + idempotencyKey.slice(0, 48);
   const now = Date.now();
 
@@ -1163,12 +1169,15 @@ export async function handleParentFeedbackSend(env, app, body, origin, auth, jso
     .bind(app, requestKey).first();
   if (!current) return json({ ok: false, error: '피드백 요청을 찾을 수 없습니다' }, 404, origin);
 
-  const result = await attemptParentFeedbackSend(env, app, current);
+  const result = await attemptParentFeedbackSend(env, app, current, { manualRetry: true });
   if (result.status === 'sent') return json(result, 200, origin);
   if (result.code && RETRY_HTTP_STATUS[result.code] != null) {
     return json({ ...result, error: RETRY_ERROR_TEXT[result.code] }, RETRY_HTTP_STATUS[result.code], origin);
   }
   // 거절은 502, 판단불가(unknown·dispatching)는 202로 구분한다.
   // unknown은 중복 위험 때문에 Solapi 확인 전 같은 내용으로 다시 보내지 않는다.
-  return json(result, responseStatusFor(result.sendStatus || result.status), origin);
+  const error = /^SOLAPI_HTTP_402/.test(String(result.code || ''))
+    ? '솔라피 잔액이 부족하여 접수하지 못했습니다. 충전 후 재발송해 주세요.'
+    : result.code ? '솔라피 발송을 완료하지 못했습니다 (' + result.code + ')' : '발송 결과를 확인해 주세요';
+  return json({ ...result, error }, responseStatusFor(result.sendStatus || result.status), origin);
 }

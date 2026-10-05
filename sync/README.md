@@ -1,5 +1,13 @@
 # WB 동기화 백엔드 (Cloudflare Workers + D1)
 
+## 교재 아카등록과 배송 분리 (2026-09-29)
+
+- `080_book_order_academy.sql` → Worker → Pages 순서로 배포한다.
+- 관리자 `academy_transition`은 주문완료·수령·배부 단계에서 별도 원장에 등록한다. 미발송·주문실패·연결 오류·금액 누락은 등록할 수 없다.
+- 등록 당시 학생 ID·금액·교재·취소 상태를 비교해 `academyCorrectionNeeded`를 계산한다. 관리자가 아카플로우에서 직접 수정한 후 `correct`로 확인한다. 외부 시스템에 자동 쓰기나 메시지 발송을 하지 않는다.
+- 수령·배부는 독립적으로 계속 진행하며, 배부와 아카등록이 모두 완료되고 수정 필요가 없을 때만 주문 기록으로 이동한다. 외부교재DB 생성도 두 조건이 완료된 뒤 진행한다.
+- 기존 `academy_registered` 배송 원장은 유지한다. 기존 등록 건의 후속 금액 정정·학생 취소 역시 수정 필요로 표시한다.
+
 학생 100명 이상을 감당하기 위해 기존 Apps Script 동기화를 대체한다.
 
 ## 관리자 근무 로그인 구분 (2026-09-14)
@@ -130,6 +138,8 @@ npx wrangler d1 execute wb-sync --remote --file=./migrations/074_makeup_completi
 npx wrangler d1 execute wb-sync --remote --file=./migrations/075_manager_inspection_sessions.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/076_makeup_absence_retry.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/077_weekend_open_visit_per_day.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/078_makeup_instructions.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/079_book_order_received_student_cancellations.sql
 
 > `076`은 보강 수업 자체가 결석된 뒤 새 일정을 잡는 재보강 경로를 추가한다. 기존 결석
 > 출결과 원래 보강 일정은 append-only 이력으로 보존하고, 재보강 일정만 새로 저장한다.

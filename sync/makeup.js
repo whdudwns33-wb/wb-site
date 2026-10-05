@@ -390,7 +390,7 @@ async function latestParentResponse(env, app, row) {
 async function sourceTask(env, app, sourceTaskId, sourceDate) {
   const row = await env.DB.prepare('SELECT owner,data,updated_at FROM tasks WHERE app=? AND id=? LIMIT 1').bind(app, sourceTaskId).first();
   const task = row && parseJson(row.data);
-  if (!row || !isLesson(task) || String(task.lessonInstanceType || '') === 'makeup' || task.makeupCaseId ||
+  if (!row || !isLesson(task) || ['makeup', 'subscription'].includes(String(task.lessonInstanceType || '')) || task.makeupCaseId ||
       String(task.id || '') !== sourceTaskId ||
       !SAFE_ID.test(String(task.studentId || ''))) {
     problem('stable studentId가 있는 수업을 찾을 수 없습니다', 404, 'LESSON_MISSING');
@@ -406,7 +406,7 @@ async function manualSourceTask(env, app, sourceTaskId, studentId, targetDate) {
   const row = await env.DB.prepare('SELECT owner,data,updated_at FROM tasks WHERE app=? AND id=? LIMIT 1')
     .bind(app, sourceTaskId).first();
   const task = row && parseJson(row.data);
-  if (!row || !isLesson(task) || String(task.lessonInstanceType || '') === 'makeup' || task.makeupCaseId ||
+  if (!row || !isLesson(task) || ['makeup', 'subscription'].includes(String(task.lessonInstanceType || '')) || task.makeupCaseId ||
       String(task.id || '') !== sourceTaskId || !SAFE_ID.test(String(task.studentId || ''))) {
     problem('stable studentId가 있는 정규 수업을 찾을 수 없습니다', 404, 'LESSON_MISSING');
   }
@@ -429,7 +429,7 @@ async function teacherOwnsStudentAtDate(env, app, staffId, studentId, targetDate
     .bind(app, staffId).all();
   return (result.results || []).some(row => {
     const task = parseJson(row.data);
-    return isLesson(task) && String(task.lessonInstanceType || '') !== 'makeup' && !task.makeupCaseId &&
+    return isLesson(task) && !['makeup', 'subscription'].includes(String(task.lessonInstanceType || '')) && !task.makeupCaseId &&
       String(task.staffId || '') === String(row.owner || '') && String(task.studentId || '') === studentId &&
       (!task.start || String(task.start) <= targetDate) && (!task.end || String(task.end) >= targetDate);
   });
@@ -1781,6 +1781,7 @@ function unrelatedCreationAuthorizationGuardStatement(env, app, row, auth, stude
       "AND (json_extract(source.data,'$.taskKind')='lesson_instruction' OR " +
         "json_extract(source.data,'$.lessonFormVersion') IS NOT NULL OR json_extract(source.data,'$.intakeVersion') IS NOT NULL) " +
       "AND COALESCE(json_extract(source.data,'$.lessonInstanceType'),'')<>'makeup' " +
+      "AND COALESCE(json_extract(source.data,'$.lessonInstanceType'),'')<>'subscription' " +
       "AND COALESCE(json_extract(source.data,'$.makeupCaseId'),'')='' " +
       "AND json_extract(source.data,'$.staffId')=source.owner AND json_extract(source.data,'$.studentId')=? " +
       "AND (COALESCE(json_extract(source.data,'$.start'),'')='' OR json_extract(source.data,'$.start')<=?) " +
@@ -2261,7 +2262,7 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
     if (action === 'reconcile_attendance') return await reconcileAttendance(env, app, body, auth, json, origin);
 
     const administrative = new Set([
-      'review', 'propose', 'confirm', 'schedule', 'reschedule', 'reschedule_after_absence',
+      'review', 'propose', 'confirm', 'reschedule',
       'restore_schedule', 'no_makeup', 'cancel'
     ]);
     if (administrative.has(action) && auth.scope !== 'all') {
@@ -2397,6 +2398,11 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
       event = { action, from: row.status, to: next.status, actorId: actorId(auth), notificationNeeded: true };
       scheduledSave = { staffId: String(row.proposed_staff_id), range };
     } else if (action === 'schedule') {
+      // 선생님은 현재 본인 원수업의 보강만 본인 담당으로 생성한다.
+      if (auth.scope !== 'all' && (String(auth.id || '') !== currentSourceTeacherId ||
+          (body.staffId && String(body.staffId) !== String(auth.id)))) {
+        return json({ ok: false, error: '본인 수업의 보강만 본인 담당으로 생성할 수 있습니다' }, 403, origin);
+      }
       if (!['review_pending', 'reviewed', 'awaiting_parent'].includes(String(row.status))) {
         problem('일정이 아직 생성되지 않은 보강만 생성할 수 있습니다', 409, 'INVALID_TRANSITION');
       }
@@ -2446,6 +2452,11 @@ export async function handleMakeup(env, app, body, origin, auth, json) {
       };
       rescheduledSave = { staffId, range };
     } else if (action === 'reschedule_after_absence') {
+      if (auth.scope !== 'all' && (String(auth.id || '') !== String(row.confirmed_staff_id || '') ||
+          String(body.staffId || '') !== String(auth.id || '') ||
+          Object.prototype.hasOwnProperty.call(body, 'instructionText'))) {
+        return json({ ok: false, error: '본인이 담당한 보강만 같은 담당자로 다시 예약할 수 있습니다' }, 403, origin);
+      }
       if (row.status !== 'confirmed' || !row.confirmed_start_at || !row.confirmed_end_at || !row.confirmed_staff_id) {
         problem('결석 기록이 있는 확정 보강만 재보강 일정으로 바꿀 수 있습니다', 409, 'INVALID_TRANSITION');
       }

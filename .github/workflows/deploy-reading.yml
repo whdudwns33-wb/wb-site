@@ -10,6 +10,9 @@ on:
       - 'naesin/**'
       - 'haru/**'
       - 'naesin-ko/**'
+      - 'hanja/**'
+      - 'chunk/**'
+      - 'letter/**'
       - 'shared/**'
       # 배포 파이프라인 자체가 바뀌면 그 판으로 한 번 돌려 봐야 한다 — 이 줄이 없으면
       # 워크플로 수정은 CI 를 한 번도 안 거치고 들어가서, 다음 콘텐츠 변경 때 처음 터진다.
@@ -88,6 +91,26 @@ jobs:
         run: node haru/plan-build.test.mjs && node haru/sheet-build.test.mjs
       - name: 하루브레인 서버 채점·라우트 테스트
         run: node reading-server/haru-score.test.mjs && node reading-server/haru-api.test.mjs
+      - name: 브레인레터 순수 로직 테스트 (학년대·주차·검증기·렌더러·샘플 호)
+        run: node letter/letter.test.cjs
+      - name: 브레인레터 시공간 놀이 생성기 테스트
+        run: node letter/shapes.test.cjs
+      - name: 브레인레터 5분 두뇌 놀이 생성기 테스트
+        run: node letter/drills.test.cjs
+      - name: 브레인레터 글꼴 CSS 다시쓰기 테스트
+        run: node letter/fetch-fonts.test.mjs
+      - name: 브레인레터 서버 라우트 테스트
+        run: node reading-server/letter-api.test.mjs
+      - name: 관리 로그인 판정 테스트
+        run: node reading-server/admin-auth.test.mjs
+      - name: 브레인레터 호 검증 (저장소의 파일럿·샘플)
+        run: node letter/issue-validate.test.mjs
+      - name: 브레인레터 앱 부팅 배선 (링크 세 갈래)
+        run: node letter/app-boot.test.cjs
+      - name: 브레인레터 콘텐츠·화면·관리 화면 회귀 검사
+        run: node letter/content.test.cjs && node letter/ui.test.cjs && node letter/admin-ui.test.cjs
+      - name: 에이전트 안내 문서 동기화
+        run: node scripts/docs-sync.test.mjs
       - name: 내신브레인 AI 추출 테스트
         run: node reading-server/naesin-extract.test.mjs
       - name: 내신브레인 수업 라이브 세션 테스트
@@ -120,6 +143,24 @@ jobs:
         run: node naesin-ko/extract/build-pack.test.mjs
       - name: 국어브레인 서버 라우트 테스트
         run: node reading-server/naesin-ko-api.test.mjs
+      - name: 어휘브레인 순수 로직 테스트 (단어장 검사·SRS·문항·따라쓰기 판정)
+        run: for f in hanja/*.test.cjs; do node "$f" || exit 1; done
+      - name: 어휘브레인 체험 단어장 검증 (book-validate)
+        run: node hanja/book-validate.mjs hanja/book-sample.json
+      - name: 어휘브레인 서버 라우트 테스트
+        run: node reading-server/hanja-api.test.mjs
+      - name: 어휘브레인 도구 테스트 (교재 텍스트 초안 추출기·획순 변환기)
+        run: node hanja/extract/draft.test.mjs && node hanja/strokes-convert.test.mjs
+      - name: 청크브레인 규칙·복습 일정 테스트
+        run: node chunk/rules.test.cjs && node chunk/sched.test.cjs
+      - name: 청크브레인 콘텐츠 무결성 (지문·카드가 규칙과 밴드 상한을 지키는가)
+        run: node chunk/content.test.cjs
+      - name: 청크브레인 서버 라우트 테스트
+        run: node reading-server/chunk-api.test.mjs
+      - name: 부모 포털 가족 자동 연결 검증
+        run: node reading-server/portal-family.test.mjs
+      - name: 청크브레인 학생 화면·동기화·인쇄 회귀 검사
+        run: node chunk/ui.test.cjs && node chunk/sync.test.cjs && node chunk/print.test.cjs
       - name: 교재 코칭 테스트
         run: node reading-server/textbook.test.mjs
       - name: 정적 파일 가로채기 정합 테스트

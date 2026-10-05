@@ -75,6 +75,23 @@ class TestD1 {
 }
 
 const own = id => ({ scope: 'own', id });
+
+test('teacher schedules own future makeup but cannot schedule another teacher case or assign another teacher', async () => {
+  const db = new TestD1(); seed(db);
+  const created = await call(db, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  });
+  assert.equal(created.status, 200);
+  const payload = { action: 'schedule', caseId: created.body.case.caseId,
+    revision: created.body.case.revision, date: '2026-10-03', startTime: '10:00', endTime: '11:00', staffId: 'teacher-a' };
+  assert.equal((await call(db, own('teacher-b'), payload)).status, 403);
+  assert.equal((await call(db, own('teacher-a'), { ...payload, staffId: 'teacher-b' })).status, 403);
+  const result = await callAt(db, own('teacher-a'), payload, '2026-09-30T18:00:00+09:00');
+  assert.equal(result.status, 200, JSON.stringify(result.body));
+  assert.equal(result.body.case.status, 'confirmed');
+  assert.equal(result.body.case.confirmedDate, '2026-10-03');
+  assert.equal(result.body.lessonTask.staffId, 'teacher-a');
+});
 const manager = id => ({ scope: 'all', id, role: 'manager' });
 const all = { scope: 'all' };
 const responseJson = (object, status) => new Response(JSON.stringify(object), {
@@ -1030,7 +1047,7 @@ test('schedule immediately confirms with the source teacher and atomically creat
     action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
   });
   const row = created.body.case;
-  const forbidden = await callAt(db, own('teacher-a'), {
+  const forbidden = await callAt(db, own('teacher-b'), {
     action: 'schedule', caseId: row.caseId, revision: row.revision,
     date: '2026-08-12', startTime: '20:00', endTime: '21:00'
   }, '2026-08-11T12:00:00+09:00');
@@ -1904,6 +1921,38 @@ test('an absent makeup can be rescheduled as a retry while preserving the origin
   const completed = await callAt(db, own('teacher-b'), {
     action: 'complete', caseId, revision: retried.body.case.revision
   }, '2026-08-14T20:00:00+09:00');
+  assert.equal(completed.status, 200, JSON.stringify(completed.body));
+  assert.equal(completed.body.case.status, 'completed');
+});
+
+test('own teacher retries an absent makeup without another case, but cannot reassign or edit another teacher', async () => {
+  const db = new TestD1(); seed(db);
+  const created = await call(db, own('teacher-a'), {
+    action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10'
+  });
+  const scheduled = await call(db, all, {
+    action: 'schedule', caseId: created.body.case.caseId, revision: created.body.case.revision,
+    date: '2026-08-12', startTime: '20:00', endTime: '21:00'
+  });
+  assert.equal(scheduled.status, 200);
+  const caseId = scheduled.body.case.caseId;
+  const payload = { action: 'reschedule_after_absence', caseId, revision: scheduled.body.case.revision,
+    date: '2026-08-14', startTime: '19:00', endTime: '20:00', staffId: 'teacher-a' };
+  makeupAttendance(db, caseId, 'teacher-a', '2026-08-12', 'A');
+  const at = '2026-08-13T12:00:00+09:00';
+  assert.equal((await callAt(db, own('teacher-b'), { ...payload, staffId: 'teacher-b' }, at)).status, 403);
+  assert.equal((await callAt(db, own('teacher-a'), { ...payload, staffId: 'teacher-b' }, at)).status, 403);
+  assert.equal((await callAt(db, own('teacher-a'), { ...payload, instructionText: '변경', instructionVersion: 0 }, at)).status, 403);
+  const result = await callAt(db, own('teacher-a'), payload, at);
+  assert.equal(result.status, 200, JSON.stringify(result.body));
+  assert.equal(result.body.case.caseId, caseId);
+  assert.equal(result.body.case.confirmedDate, '2026-08-14');
+  assert.equal(db.database.prepare('SELECT count(*) AS n FROM makeup_cases').get().n, 1);
+  const oldCheck = JSON.parse(db.database.prepare('SELECT data FROM checks WHERE k=?').get('makeup_lesson_' + caseId + '|2026-08-12').data);
+  assert.equal(oldCheck.att, 'A');
+  makeupAttendance(db, caseId, 'teacher-a', '2026-08-14', 'P');
+  const completed = await callAt(db, own('teacher-a'), { action: 'complete', caseId, revision: result.body.case.revision },
+    '2026-08-14T21:00:00+09:00');
   assert.equal(completed.status, 200, JSON.stringify(completed.body));
   assert.equal(completed.body.case.status, 'completed');
 });

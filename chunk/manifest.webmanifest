@@ -1,0 +1,14 @@
+{
+  "name": "WB 청크브레인 — 의미단위 끊어읽기",
+  "short_name": "청크브레인",
+  "description": "유치부터 고등까지, 의미 단위로 끊어 읽는 힘을 배우고·연습하고·복습하는 WB 원내 학습 앱",
+  "lang": "ko-KR",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F7F4F0",
+  "theme_color": "#7A2E5C",
+  "icons": [
+    { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

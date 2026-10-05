@@ -38,9 +38,9 @@ test('teacher attendance buttons use the dedicated server path and never toggle 
 
 test('attendance correction UI and handlers remain available only to administrators', () => {
   assert.match(source, /const canEditAtt = \(\) => session\.isAdmin;/);
-  const modal = block('function attEditModal(staffId)', '/** 급여용 출퇴근 내보내기');
+  const modal = block('function attEditModal(staffId, date)', '/** 급여용 출퇴근 내보내기');
   assert.match(modal, /if \(!session\.isAdmin \|\| !s\) return;/);
-  assert.match(modal, /관리자는 모든 날짜를 수정할 수 있습니다/);
+  assert.match(modal, /관리자는 이 날짜의 출퇴근 시각을 수정할 수 있습니다/);
 
   const open = block("case 'atteditopen':", "case 'payrollmodal':");
   assert.match(open, /if \(!session\.isAdmin\) break;/);

@@ -29,6 +29,12 @@ fs.copyFileSync(path.join(ROOT, 'public', 'naesin-studio.html'), path.join(DIST,
 fs.copyFileSync(path.join(ROOT, 'public', 'naesin-live.html'), path.join(DIST, 'admin', 'naesin-live.html'));
 fs.copyFileSync(path.join(ROOT, 'public', 'haru-admin.html'), path.join(DIST, 'admin', 'haru-admin.html'));
 fs.copyFileSync(path.join(ROOT, 'public', 'naesin-ko-admin.html'), path.join(DIST, 'admin', 'naesin-ko-admin.html'));
+fs.copyFileSync(path.join(ROOT, 'public', 'hanja-admin.html'), path.join(DIST, 'admin', 'hanja-admin.html'));
+fs.copyFileSync(path.join(ROOT, 'public', 'hanja-print.html'), path.join(DIST, 'admin', 'hanja-print.html'));
+fs.copyFileSync(path.join(ROOT, 'public', 'chunk-admin.html'), path.join(DIST, 'admin', 'chunk-admin.html'));
+fs.copyFileSync(path.join(ROOT, 'public', 'letter-admin.html'), path.join(DIST, 'admin', 'letter-admin.html'));
+/* 관리 화면 12장이 모두 부르는 공용 로그인 — 빠지면 운영에서 404 가 나고 아무 화면에도 못 들어간다 */
+fs.copyFileSync(path.join(ROOT, 'public', 'admin-login.js'), path.join(DIST, 'admin', 'admin-login.js'));
 
 /* 어휘 나이 진단 (vocab-age/) — 로그인 없이 열리는 공개 페이지.
    실리는 것은 index.html · age.js · words.json 셋뿐이다(낱말과 뜻만). */
@@ -74,6 +80,76 @@ fs.mkdirSync(path.join(DIST, 'haru'), { recursive: true });
 const HARU_FILES = ['index.html', 'parent.html', 'strings.js', 'plan.js', 'mastery.js', 'srs.js', 'cause.js', 'probe.js', 'atoms.json', 'sw.js', 'manifest.webmanifest', 'icon.svg'];
 for (const f of HARU_FILES) fs.copyFileSync(path.join(HARU, f), path.join(DIST, 'haru', f));
 
+/* 어휘브레인 (hanja/) — 같은 오리진 /hanja/ 에서 서빙해야 학생 토큰·API가 공유된다.
+   단어장(문제집 낱말)은 dist 에 싣지 않는다 — KV(hanja:book:*)에만 산다. book-sample.json 은 자체 창작 체험 단어장이라 실어도 된다. */
+const HANJA = path.join(ROOT, '..', 'hanja');
+fs.mkdirSync(path.join(DIST, 'hanja'), { recursive: true });
+const HANJA_FILES = ['index.html', 'srs.js', 'quiz.js', 'trace.js', 'book-check.js', 'bridge.js', 'book-sample.json', 'sw.js', 'manifest.webmanifest', 'icon.svg'];
+for (const f of HANJA_FILES) fs.copyFileSync(path.join(HANJA, f), path.join(DIST, 'hanja', f));
+fs.copyFileSync(SHARED, path.join(DIST, 'hanja', 'voice.js'));
+/* 새 HTML을 받은 첫 방문에도 이전 SW의 JS·체험 단어장 캐시에 걸리지 않게 한다. 오프라인 셸도 같은 URL을 미리 받는다. */
+const hanjaHtmlPath = path.join(DIST, 'hanja', 'index.html'), hanjaSwPath = path.join(DIST, 'hanja', 'sw.js');
+let hanjaSw = fs.readFileSync(hanjaSwPath, 'utf8');
+const versionHanjaAsset = (tag, before, asset, after) => {
+  const hash = crypto.createHash('sha256').update(fs.readFileSync(path.join(DIST, 'hanja', asset))).digest('hex').slice(0, 10);
+  const url = asset + '?v=' + hash;
+  if (!hanjaSw.includes("'" + asset + "'")) throw new Error('hanja/sw.js SHELL에 파일이 없습니다: ' + asset);
+  hanjaSw = hanjaSw.replaceAll("'" + asset + "'", "'" + url + "'");
+  return before + url + after;
+};
+const hanjaHtml = fs.readFileSync(hanjaHtmlPath, 'utf8')
+  .replace(/(<script\b[^>]*\bsrc=")(\.\/[\w.-]+\.js)(")/g, versionHanjaAsset)
+  .replace(/(fetch\(')(\.\/book-sample\.json)('\))/, versionHanjaAsset);
+fs.writeFileSync(hanjaHtmlPath, hanjaHtml);
+fs.writeFileSync(hanjaSwPath, hanjaSw);
+/* 청크브레인 (chunk/) — 의미단위 끊어읽기. 같은 오리진 /chunk/ 에서 서빙해야 학생 토큰이 공유된다.
+   지문(passages.js)·카드(lessons.js)는 자체 창작이라 정적 자산으로 나간다 — chunk/content.test.cjs 가 그 전제를 지킨다.
+   print.html 은 브라우저 인쇄로 PDF 교재를 만드는 화면이라 셸에 함께 싣는다. */
+const CHUNK = path.join(ROOT, '..', 'chunk');
+fs.mkdirSync(path.join(DIST, 'chunk'), { recursive: true });
+const CHUNK_FILES = ['index.html', 'print.html', 'class.html', 'rules.js', 'sched.js', 'lessons.js', 'passages.js', 'sw.js', 'manifest.webmanifest', 'icon.svg'];
+for (const f of CHUNK_FILES) fs.copyFileSync(path.join(CHUNK, f), path.join(DIST, 'chunk', f));
+fs.copyFileSync(SHARED, path.join(DIST, 'chunk', 'voice.js'));
+/* 브레인레터 (letter/) — 같은 오리진 /letter/ 에서 서빙해야 학생 토큰·가족 링크·API 가 공유된다.
+   호 본문은 KV 에만 있다. issue-sample.json 은 자체 창작 체험 호라 실어도 된다(라이선스 콘텐츠 0).
+   관리 웹의 편집기 미리보기가 학생 앱과 같은 렌더러(letter.js)를 쓴다 — 원본은 letter/letter.js 하나. */
+const LETTER = path.join(ROOT, '..', 'letter');
+fs.mkdirSync(path.join(DIST, 'letter'), { recursive: true });
+const LETTER_FILES = ['index.html', 'letter.js', 'shapes.js', 'drills.js', 'issue-sample.json', 'calendar.json', 'sw.js', 'manifest.webmanifest', 'icon.svg'];
+for (const f of LETTER_FILES) fs.copyFileSync(path.join(LETTER, f), path.join(DIST, 'letter', f));
+/* 파일럿 호 — 있으면 싣는다. 편집실이 만든 이번 주 호(자체 창작)를 링크만으로 연다. 없으면 앱이 샘플 호로 넘어간다 */
+/* 파일럿 호 — 목록(issues.json) + 호 본문(issues/*.json). 앱이 발행일을 보고 오늘의 호를 고른다.
+   issue-pilot.json 은 예전 방식의 자리다: 아직 새 껍데기를 못 받은 기기(서비스 워커 갱신 전)가 그 파일을 찾는다.
+   그래서 저장소에는 두지 않고, 조립할 때 "오늘 열려야 하는 호" 를 그 이름으로 한 벌 더 써 둔다. */
+if (fs.existsSync(path.join(LETTER, 'issues.json'))) {
+  fs.copyFileSync(path.join(LETTER, 'issues.json'), path.join(DIST, 'letter', 'issues.json'));
+  fs.mkdirSync(path.join(DIST, 'letter', 'issues'), { recursive: true });
+  const man = JSON.parse(fs.readFileSync(path.join(LETTER, 'issues.json'), 'utf8'));
+  const list = (Array.isArray(man.issues) ? man.issues : []).slice().sort((a, b) => String(a.publishAt).localeCompare(String(b.publishAt)));
+  for (const b of list) fs.copyFileSync(path.join(LETTER, 'issues', b.file), path.join(DIST, 'letter', 'issues', b.file));
+  const today = new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);   // KST 기준 오늘
+  const out = list.filter((b) => b.status !== 'draft' && String(b.publishAt) <= today);
+  const cur = out.length ? out[out.length - 1] : list[0];
+  if (cur) fs.copyFileSync(path.join(LETTER, 'issues', cur.file), path.join(DIST, 'letter', 'issue-pilot.json'));
+}
+/* 읽어 주기·한자 따라쓰기 — 원본은 shared/voice.js·vocab/trace.js 하나씩. 다른 앱과 같은 파일을 letter/ 에도 배급한다(SW 껍데기가 ./ 상대 경로로 캐시한다) */
+fs.copyFileSync(SHARED, path.join(DIST, 'letter', 'voice.js'));
+fs.copyFileSync(path.join(ROOT, '..', 'vocab', 'trace.js'), path.join(DIST, 'letter', 'trace.js'));
+/* 배포본 삽화(letter/img/*.svg) — 자체 제작 벡터 그림만. 올린 사진은 KV 에서 /api/letter/img/<id> 로 나간다 */
+fs.mkdirSync(path.join(DIST, 'letter', 'img'), { recursive: true });
+for (const f of fs.readdirSync(path.join(LETTER, 'img')).filter((x) => /\.svg$/.test(x))) fs.copyFileSync(path.join(LETTER, 'img', f), path.join(DIST, 'letter', 'img', f));
+/* 글꼴(letter/fonts/) — Noto Sans/Serif KR 조각(OFL, letter/fetch-fonts.mjs 가 받는다). fonts.css 가 가리키는 판 디렉터리째 복사한다 */
+const FONTS = path.join(LETTER, 'fonts');
+fs.mkdirSync(path.join(DIST, 'letter', 'fonts'), { recursive: true });
+for (const f of ['fonts.css', 'OFL.txt']) fs.copyFileSync(path.join(FONTS, f), path.join(DIST, 'letter', 'fonts', f));
+for (const d of fs.readdirSync(FONTS).filter((x) => fs.statSync(path.join(FONTS, x)).isDirectory())) {
+  fs.mkdirSync(path.join(DIST, 'letter', 'fonts', d), { recursive: true });
+  for (const f of fs.readdirSync(path.join(FONTS, d)).filter((x) => /\.woff2$/.test(x))) fs.copyFileSync(path.join(FONTS, d, f), path.join(DIST, 'letter', 'fonts', d, f));
+}
+fs.copyFileSync(path.join(LETTER, 'letter.js'), path.join(DIST, 'admin', 'letter.js'));
+fs.copyFileSync(path.join(LETTER, 'shapes.js'), path.join(DIST, 'admin', 'shapes.js'));
+fs.copyFileSync(path.join(LETTER, 'drills.js'), path.join(DIST, 'admin', 'drills.js'));
+
 /* ── 서비스 워커 캐시 이름을 내용에서 뽑는다 ──
    두 앱 모두 껍데기(index.html·words.js…)를 캐시 우선으로 물고 있다. 그래서
    sw.js 안의 VERSION 문자열이 그대로면, 이미 앱을 깔아 둔 학생은 새 코드를
@@ -107,9 +183,18 @@ const kTag = stampSW(path.join(DIST, 'naesin-ko', 'sw.js'),
     'concepts.json', 'pack-sample.json', 'manifest.webmanifest', 'icon.svg']
     .map(f => path.join(DIST, 'naesin-ko', f)), 'wbk-shell');
 
+const cTag = stampSW(path.join(DIST, 'chunk', 'sw.js'),
+  ['index.html', 'print.html', 'voice.js', 'rules.js', 'sched.js', 'lessons.js', 'passages.js', 'manifest.webmanifest', 'icon.svg']
+    .map(f => path.join(DIST, 'chunk', f)), 'wbc-shell');
+
 const hTag = stampSW(path.join(DIST, 'haru', 'sw.js'),
   ['index.html', 'strings.js', 'plan.js', 'mastery.js', 'srs.js', 'cause.js', 'probe.js', 'manifest.webmanifest', 'icon.svg']
     .map(f => path.join(DIST, 'haru', f)), 'wbh-shell');
+const jTag = stampSW(path.join(DIST, 'hanja', 'sw.js'),
+  ['index.html', 'voice.js', 'srs.js', 'quiz.js', 'trace.js', 'book-check.js', 'bridge.js', 'book-sample.json', 'manifest.webmanifest', 'icon.svg']
+    .map(f => path.join(DIST, 'hanja', f)), 'wbhj-shell');
+const lTag = stampSW(path.join(DIST, 'letter', 'sw.js'),
+  ['index.html', 'letter.js', 'shapes.js', 'drills.js', 'voice.js', 'trace.js', 'manifest.webmanifest', 'icon.svg'].map(f => path.join(DIST, 'letter', f)), 'wbl-shell');
 
 /* 조립한 것이 실제로 열리는지 확인한다.
    여기 목록에 새 파일을 안 적으면 배포본에서 404가 나고, 그 스크립트를 쓰는 화면이
@@ -130,7 +215,10 @@ function verifyRefs(htmlPath) {
 const broken = [];
 for (const f of ['index.html', 'vocab/index.html', 'vocab-age/index.html', 'admin/index.html',
   'admin/metrics.html', 'admin/vocab-review.html', 'review.html', 'parent.html',
-  'naesin/index.html', 'haru/index.html', 'haru/parent.html', 'admin/haru-admin.html', 'admin/naesin-admin.html']) {
+  'naesin/index.html', 'haru/index.html', 'haru/parent.html', 'admin/haru-admin.html', 'admin/naesin-admin.html',
+  'hanja/index.html', 'admin/hanja-admin.html', 'admin/hanja-print.html',
+  'chunk/index.html', 'chunk/print.html', 'chunk/class.html', 'admin/chunk-admin.html',
+  'letter/index.html', 'admin/letter-admin.html']) {
   const full = path.join(DIST, f);
   if (fs.existsSync(full)) for (const m of verifyRefs(full)) broken.push(f + ' → ' + m);
 }
@@ -141,4 +229,4 @@ if (broken.length) {
 }
 
 console.log('dist/ 조립 완료:', fs.readdirSync(DIST).join(', '));
-console.log('서비스 워커 캐시 이름:', rTag, '·', vTag, '·', nTag, '·', kTag, '·', hTag);
+console.log('서비스 워커 캐시 이름:', rTag, '·', vTag, '·', nTag, '·', kTag, '·', hTag, '·', cTag, '·', lTag, '·', jTag);

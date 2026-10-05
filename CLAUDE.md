@@ -3,6 +3,13 @@
 WB 독해력학원·웩슬러브레인센터의 원내 학습 웹앱 모음. 어떤 에이전트(Claude Code, Codex 등)든
 이 문서와 각 앱의 문서를 읽고 같은 규칙으로 이어서 작업한다.
 
+## 부모 포털 가족 자동 연결 (2026-09-23 원장 승인)
+
+- 부모 포털에서 참여 자격을 확인한 가족은 브레인레터·청크브레인을 처음 열 때 자동 연결한다. 전용 서비스 키 `WB_PARENT_PORTAL_LINK_SECRET`로 인증한 `POST /api/portal/family-link`만 별도 가족 레코드를 만들며 무작위 키와 표시 이름만 받는다. 재시도는 같은 가족을 반환한다.
+- 기존 가족 링크와 학생 기록은 그대로 유지한다. 자동 생성 가족은 두 앱의 가족 모드에만 연결하며 일반 학생 로그인·다른 앱 권한·자동 알림을 만들지 않는다. 이름으로 기존 학생을 추측해 합치지 않는다.
+- 서비스 키 값은 저장소 코드·워크플로우 입력·로그에 넣지 않는다. GitHub 저장소 시크릿에서 `admin-secrets.yml`의 `portal_link` 선택으로 워커에 공급한다. 부모 포털의 같은 전용 키와 함께 설정한다.
+- `reading-server/portal-family.test.mjs` 및 저장소 전체 검사를 통과하고 기존 main 자동 배포 절차를 따른다.
+
 ## 저장소 지도
 
 | 경로 | 내용 |
@@ -15,6 +22,9 @@ WB 독해력학원·웩슬러브레인센터의 원내 학습 웹앱 모음. 어
 | `reading-server/` | Cloudflare Worker(운영) + Node 로컬 서버 + 관리 웹(`public/`) + dist 조립 |
 | `shared/` | 공용 모듈 (voice.js TTS, qr.js) |
 | `docs/` | 기획서 + 자료 폴더 표준(`자료-폴더-표준.md`) — 내신 영어: `docs/영어내신-학습웹앱-기획서-v1.md` (v1.2) · 내신 국어: `docs/국어내신-학습웹앱-기획서-v1.md` (v1.1) · 프로그램데스크: `docs/외부프로그램-자료운영-직원웹앱-기획제안-3안-v0.md` (§8 방향 변경·구현 현황) · v1 3안(직원의 관리자): `docs/프로그램데스크-기획서-v1.md` · 삼육중 대비(코드는 `haru/`): `docs/삼육중-*.md` — 정본은 `삼육중-대비-학습웹앱-기획서-v1.md`, 기술 명세는 `삼육중-대비-앱-설계안-v1.md`, 전형 사실은 `삼육중-전형-사실-정본-v1.md`만 인용. `삼육중-정보수집-로그.md`는 주간 자동 스윕이 쓴다(원장이 정본 후보를 체크해야 정본이 바뀐다) |
+| `hanja/` | 어휘브레인(옛 한자브레인 — 폴더·주소 `/hanja/`·KV 키 `hanja:*`·API는 유지) — 추천 교재의 어휘를 **단원 시험 → 부족한 낱말 학습 → 재확인**하는 앱(영어 없음). 문제집 한 권 = 단어장 하나(관리 웹 업로드·KV 전용, 낱말 id는 내용 기반). 주메뉴는 **오늘 할 일·내 교재·복습·학습 기록·한자 집중**. 어휘 시험은 뜻·문맥·회상 결과를 구분하며, 검수된 상황 자료가 있는 낱말은 별도 상황과 해설을 학습한다. 한자 집중은 어휘 교재 선택을 유지한 채 훈음·획순 수업·혼자 쓰기·한자 시험을 공부하는 별도 영역이다. 종이 교재로 공부한 학생은 앱 학습 기록 없이 바로 시험 볼 수 있고, 실제 출제 범위·스스로 정답·힌트 정답을 구별한다. 보조 한자·오답 재확인은 원래 단원 시험 점수를 덮지 않는다. 이번 주 단원(반·학생)·교사 현황·종이 시험지·밤 9시 알림. AI 연상은 자체(`own`) 단어장만 허용하고 교재(`textbook`) 뜻은 외부 AI로 보내지 않는다. 순수 로직 `book-check.js`·`srs.js`·`quiz.js`·`trace.js`·`bridge.js`, 도구 `extract/draft.mjs`·`strokes-convert.mjs`. `book-sample.json`은 자체 창작 체험, `books/`는 자체 교과 어휘 초3~초6(각 80낱말·8단원) + 급수 8급 50자·7급 추가 100자(공식 목록 대조 완료). `books.test.cjs`는 업로드 관문과 같은 검사·재검사 왕복에서 오류·경고 0을 요구한다. **상세: `hanja/README.md`**, 인수인계: `hanja/AGENTS.md` |
+| `chunk/` | 청크브레인 — 의미단위 끊어읽기 학습 앱(유치 + 초1~고3 학년별 13단계: 배우기·연습·복습 + `print.html` 로 PDF 교재 + `class.html` 프로젝터 수업). 지문·카드는 자체 창작이라 저장소에 있다. **상세: `chunk/README.md`**, 고칠 때 깨지는 자리: `chunk/AGENTS.md`, 근거: `docs/의미단위-끊어읽기-앱-연구노트-v1.md` |
+| `letter/` | **브레인레터** — 유치~중등 다섯 학년대 주간 뉴스레터(신문 짜임, 가족 링크 `/letter/?t=`·학생 앱·PDF 인쇄·새 호 푸시). 순수 로직 `letter.js`(검증기·렌더러·지표 순환·하루 한 장 7일 리듬 하나) + `shapes.js`(시공간 도형 생성기) + `drills.js`(나머지 네 지표 5분 놀이 생성기·오늘의 5분) + 자체 창작 체험 호 `issue-sample.json` + 주제 달력 `calendar.json` + 자체 제작 삽화 `img/` + 글꼴 `fonts/`(Noto Sans/Serif KR 조각, OFL — `fetch-fonts.mjs` 가 받는다). 읽어 주기·한자 따라쓰기는 `shared/voice.js`·`vocab/trace.js` 를 배급받아 쓴다. 호 본문·올린 사진은 KV 에만 — 단 **파일럿**은 편집실이 만든 자체 창작 호를 `issues/<주차>.json` + 목록 `issues.json` 으로 저장소에 두고 `/letter/` 가 링크만으로 연다(발행일이 되면 그 호로 자동 전환). **상세: `letter/README.md`**, 고칠 때 깨지는 자리·인수인계: `letter/AGENTS.md`, 기획 `docs/브레인레터-주간뉴스레터-기획서-v1.md` |
 | `vocab-age/` | 어휘 나이 진단 (유일한 공개 페이지) |
 | `desk/` | **프로그램데스크** — 학원과 별개 사업(구독 학생의 프로그램·자료 운영) 앱. 새 워커 `wb-desk` + 새 D1. **상세: `desk/README.md`** |
 | `desk-ext/` | 프로그램데스크 크롬 확장(표 캡처, MV3). 학생 정보 없음. `desk/build.mjs`가 `dist/ext/`로 복사 |
@@ -22,6 +32,8 @@ WB 독해력학원·웩슬러브레인센터의 원내 학습 웹앱 모음. 어
 ## 명령
 
 ```
+node scripts/check.mjs              # ★ 저장소 전체 테스트 한 방 (고친 뒤엔 이것부터)
+node scripts/check.mjs --only letter   # 고친 앱만 (경로에 letter 가 든 테스트)
 node <앱>/<이름>.test.cjs           # 단위 테스트 (의존성 없음, 파일별 실행)
 node reading-server/<이름>.test.mjs # 서버 테스트
 node reading-server/build-dist.mjs  # dist 조립 (+ SW 캐시 이름 스탬프)
@@ -32,11 +44,44 @@ node naesin-ko/extract/build-pack.mjs <단원 폴더>       # 국어: 폴더 하
 python3 naesin-ko/extract/pdf-spans.py <PDF> --colors  # 새 출판사 자료 색 팔레트 점검
 for f in haru/*.test.cjs haru/*.test.mjs; do node $f; done   # 하루브레인 순수 로직·달력·조판기
 node reading-server/haru-score.test.mjs && node reading-server/haru-api.test.mjs   # 하루브레인 서버
+node letter/letter.test.cjs && node letter/shapes.test.cjs && node letter/drills.test.cjs && node letter/fetch-fonts.test.mjs && node reading-server/letter-api.test.mjs   # 브레인레터 순수 로직·도형·5분 놀이·글꼴·서버
+node letter/issue-validate.mjs [호.json]        # 브레인레터 호 검증 (기본: 저장소의 파일럿·샘플) — 관리 웹 [검증]과 같은 규칙
+node letter/fetch-fonts.mjs                 # 브레인레터 글꼴 조각 다시 받기(Google Fonts → letter/fonts/, OFL)
 node haru/sheet-build.mjs <팩.json> <출력 디렉터리> --frozen --key-id <id>   # 종이 회차 시험지·정답표·paperkey (저장소 밖에서)
+for f in hanja/*.test.cjs; do node $f; done && node reading-server/hanja-api.test.mjs   # 어휘브레인 순수 로직·화면 정적 검사·서버
+node hanja/extract/draft.test.mjs && node hanja/strokes-convert.test.mjs           # 어휘브레인 도구
+node hanja/book-validate.mjs <단어장.json|.txt> [--id <id> --title <제목>]   # 어휘브레인 단어장 검사 (업로드 전)
+node hanja/extract/draft.mjs <교재텍스트.txt> <출력 디렉터리>                 # 어휘브레인: 교재 텍스트 → words.txt 초안 + review/ (저장소 밖에서)
+node hanja/strokes-convert.mjs <graphics.txt> <출력.json> --book <단어장.json>   # 어휘브레인: 공개 획순 데이터 → 획순 사전(원장 검수 뒤 관리 웹 업로드)
+for f in chunk/*.test.cjs; do node $f; done && node reading-server/chunk-api.test.mjs   # 청크브레인 순수 로직·지문 무결성·서버
 ```
 
-CI: `.github/workflows/deploy-reading.yml` — **main 푸시가 곧 배포**다(테스트 전부 통과 시
-Cloudflare Workers `wb-reading`으로). PR은 스쿼시 머지, 제목에 `(#번호)`가 남는 관례.
+CI 둘: `.github/workflows/checks.yml` — **PR·작업 브랜치 푸시**에서 `node scripts/check.mjs`(저장소 전체
+테스트) + 워커 번들 dry-run. 시크릿을 쓰지 않는다. `.github/workflows/deploy-reading.yml` — **main 푸시가
+곧 배포**다(그 앱 몫 테스트 통과 시 Cloudflare Workers `wb-reading`으로). PR은 스쿼시 머지, 제목에
+`(#번호)`가 남는 관례.
+
+## 에이전트 작업 규칙 (Codex · Claude Code 공통)
+
+사람이 보지 않는 사이에 고치는 일이 많다. 아래는 **어느 에이전트든** 지키는 순서다.
+
+1. **고치기 전에 읽는다**: 이 문서 + 그 앱의 `README.md`(위 지도의 "상세"). 규칙은 앱마다 다르다.
+2. **고친 뒤 `node scripts/check.mjs`** — 저장소의 모든 테스트를 돌린다(1분 안쪽, 외부 의존성·망 없음).
+   빠르게 보려면 `--only <경로 조각>`. 초록이 아닌 상태로 PR 을 올리지 않는다.
+3. **새 로직에는 테스트를 같이 만든다**(`.test.cjs`/`.test.mjs`). `check.mjs` 가 파일을 저절로 찾아 돌린다 —
+   목록에 등록할 필요가 없다. 배포 CI 에도 넣어야 하면 `deploy-reading.yml` 에 한 줄 더한다.
+4. **main 에 직접 밀지 않는다.** main 푸시는 곧 배포다. 작업 브랜치 → PR → `checks.yml` 초록 → 스쿼시 머지.
+5. **시크릿·개인정보는 저장소에 두지 않는다**(절대 규칙 1). 키는 GitHub 저장소 시크릿 → 워커 시크릿
+   (`admin-secrets.yml`·`vocab-secrets.yml`)으로만 흐른다. 값을 워크플로우 입력이나 로그로 받지 않는다.
+6. **`CLAUDE.md` 와 `AGENTS.md` 는 같은 파일이어야 한다** — 한쪽만 고치면 `scripts/docs-sync.test.mjs` 가 막는다.
+   한쪽을 고쳤으면 `cp CLAUDE.md AGENTS.md` (또는 그 반대).
+7. 사람 확인이 필요한 것: 운영 데이터 삭제, 시크릿 교체, 가정에 나가는 문구·링크, 라이선스가 걸린 자료.
+
+**브레인레터 주간 호(가장 잦은 작업)**: `letter/issues/<주차>.json` 을 새로 쓰고 `letter/issues.json` 에 한 줄 더한다.
+발행일(그 주 월요일)이 되면 `/letter/` 가 저절로 그 호로 넘어간다 — 파일을 갈아 끼우러 다시 오지 않는다.
+쓴 뒤 `node letter/issue-validate.mjs` 로 오류 0 을 확인한다 — 다섯 학년대(K·E1·E2·E3·M)를 모두 덮어야 하고,
+모든 글은 자체 창작, 사진에는 `alt`·`credit` 이 있어야 한다. 주제는 `letter/calendar.json` 에 주차별로 적혀 있다.
+자세한 절차는 `letter/README.md`.
 
 ## 절대 규칙
 
@@ -49,16 +94,21 @@ Cloudflare Workers `wb-reading`으로). PR은 스쿼시 머지, 제목에 `(#번
 2. **하우스 스타일**: vanilla HTML/CSS/JS 정적 PWA, 순수 로직은 `'use strict'` + IIFE
    var 전역 + `module.exports` 가드(브라우저/Node 공용), 외부 의존성 없음, 한국어 주석은
    "왜"를 적는다. 새 로직 모듈에는 반드시 `.test.cjs`/`.test.mjs`를 같이 만든다.
-3. **인증 없이 콘텐츠를 내보내지 않는다.** 학생 토큰(`wbr.auth`) 또는 관리 PIN 토큰.
+3. **인증 없이 콘텐츠를 내보내지 않는다.** 학생 토큰(`wbr.auth`) 또는 관리 토큰(PIN 또는 아이디·비밀번호 — 판정은 `reading-server/admin-auth.mjs` 하나, 시크릿 등록은 `admin-secrets.yml`).
    배포되는 `_headers`는 `reading/_headers` 하나다(noindex + 앱 경로 no-store) — `naesin/_headers`·
    `vocab/_headers`·`naesin-ko/_headers`·`haru/_headers`는 그리로 안내하는 주석 파일이다.
    내신 팩은 자기 시험 범위에 배정된 것만 받는다.
    하루브레인은 `GET /api/haru/pack`·`/gen`이 정답·해설·오답 태그를 뺀다(정답은 `/answer` 응답에만). 외부 초6 학생
-   (`student.apps:['haru']`)은 호스트가 `who` 검증 직후 한 곳에서 거는 `allowedApp` 게이트로 다른 세 앱을 열지 못한다.
+   (`student.apps:['haru']`)은 호스트가 `who` 검증 직후 한 곳에서 거는 `allowedApp` 게이트로 다른 앱(브레인레터 포함)을 열지 못한다.
+   브레인레터 가족 링크와 청크브레인 가족 모드(`/chunk/?t=`)는 진로독서 학부모 토큰(`parent:<t>`)을 그대로 쓴다 — 가정마다 링크 하나. 가족의 읽기 기록(`/api/letter/parent/state`)도 이 토큰으로 학생 코드 자리에 쓴다. 올린 사진(`/api/letter/img/<id>`)은
+   128비트 무작위 id 가 열쇠다(가족 링크와 같은 방식) — 사진에는 출처(credit)가 없으면 저장되지 않고, SVG 는 올리지 못한다.
+   어휘브레인 단어장(문제집 낱말)은 `GET /api/hanja/book`으로만 나가고, 공개 범위 `assigned`면 배정받은 학생만 받는다.
 4. **서버 응답은 래핑 계약**: 경로 명사 = 응답 키, `scope`는 학생→default 폴백 표시다.
    `/pack` → `{pack, updatedAt}` · `/state` → `{state, updatedAt}` · `/exam` → `{exam, scope}` ·
    `/task` → `{task, scope}` · (국어) `/overlay` → `{overlay, scope}` · `/review` → `{reviews, updatedAt}` ·
-   (하루) `/today` → `{today, dday, updatedAt}` · `/attempt` → `{accepted, at}`(채점 결과는 돌려주지 않는다).
+   (하루) `/today` → `{today, dday, updatedAt}` · `/attempt` → `{accepted, at}`(채점 결과는 돌려주지 않는다) ·
+   (레터) `/issue` → `{issue, tier, updatedAt}` · `/issues` → `{issues, tier}` · `/parent` → `{parent, issue, issues}`.
+   (한자) `/books` → `{books, updatedAt}` · `/book` → `{book, updatedAt}`.
    클라이언트와 함께 맞춘다.
    학생이 올린 `state.summary`는 서버가 화이트리스트로 정규화하고 화면은 다시 이스케이프한다 —
    강사 화면은 학생 기기가 올린 값을 그리는 곳이라 두 겹을 모두 유지한다.
@@ -67,12 +117,24 @@ Cloudflare Workers `wb-reading`으로). PR은 스쿼시 머지, 제목에 `(#번
 
 ## 운영 주소 (원내 전용 — 링크 외부 공유 금지)
 
-- 학생: `/` 진로독서 · `/vocab/` 워드브레인 · `/naesin/` 내신브레인(영어) · `/naesin-ko/` 국어브레인 · `/haru/` 하루브레인(부모 `/haru/parent.html?t=`)
+- 학생: `/` 진로독서 · `/vocab/` 워드브레인 · `/naesin/` 내신브레인(영어) · `/naesin-ko/` 국어브레인 · `/haru/` 하루브레인(부모 `/haru/parent.html?t=`) · `/chunk/` 청크브레인(교재 `/chunk/print.html`, 화면 수업 `/chunk/class.html`, 가족 `/chunk/?t=` — 브레인레터와 같은 학부모 토큰) ·
+  `/letter/` 브레인레터(가족 `/letter/?t=`) · `/hanja/` 어휘브레인
 - 관리: `/admin/` 진로독서(+교재 코칭 원문 업로드) · `/admin/naesin-admin.html` 내신브레인
   (팩 업로드·시험 등록·반 성취도) · `/admin/naesin-ko-admin.html` 국어브레인
   (팩 업로드·시험 등록·과제 배정·학교 오버레이·서술형 검토·서술형 루브릭 저작·주석 복원 시험지 인쇄) ·
-  `/admin/haru-admin.html` 하루브레인(코치 보드·등록·팩/대응표/플랜·종이 회수·파기)
+  `/admin/haru-admin.html` 하루브레인(코치 보드·등록·팩/대응표/플랜·종이 회수·파기) ·
+  `/admin/chunk-admin.html` 청크브레인(반 현황[주의 순·미완료 CSV]·학생 상세·약한 규칙·단계/과제 지정·반 단위 과제·글 저작[선생님 지문·진로독서 가져오기]·가족 링크·교재 출력) ·
+  `/admin/letter-admin.html` 브레인레터(호 목록·편집·AI 초안·발행·발송 문구·열람 현황·학년대 지정·인쇄) ·
+  `/admin/hanja-admin.html` 어휘브레인(단어장 업로드·공개 범위·학생 배정·이번 주 단원·진도표·획순 사전·안내 QR·현황) · `/admin/hanja-print.html` 어휘브레인 종이 시험지
 - 베이스: `https://wb-reading.whdudwns33.workers.dev`
+
+## 어휘 앱 두 개의 역할
+
+- **워드브레인 `/vocab/`**: 진로독서 지문에서 모은 어휘장이 1순위 입력이고 영어까지 다룬다. 강사 배정은 「이번 주 단어」 묶음.
+- **어휘브레인 `/hanja/`**: 한글 어휘가 약한 학생이 **추천 교재의 단원 시험 → 낱말 학습 → 재확인**을 하는 앱. 영어 없음. 한자는 별도의 한자 집중에서 학습하고, 어휘 카드의 한자 설명은 선택해서 연다.
+  강사 지정은 「이번 주 단원」. 진로독서 어휘장은 `hanja/bridge.js` 로 이 앱에서도 단어장으로 가져올 수 있다(기기 안에서만, 서버에 안 올린다).
+  단어장 종류가 자체(`own`)면 AI 연상이 열리고 교재(`textbook`)면 닫힌다 — 체험 단어장·진로독서 어휘장은 자체, 올린 문제집은 교재가 기본이다.
+  한 학생이 둘 다 쓰면 기억 기록은 앱마다 따로다 — 같은 낱말을 두 앱에 심지 않도록 배정 단위를 나눈다(워드브레인=읽기 어휘·영어, 어휘브레인=교재).
 
 ## 진행 중인 큰 작업: 내신브레인
 

@@ -127,7 +127,8 @@ function lessonIdentity(value, taskId, taskOwner) {
 
 function lessonTask(value, taskId, taskOwner) {
   return lessonIdentity(value, taskId, taskOwner) &&
-    String(value.lessonInstanceType || '') !== 'makeup' && !String(value.makeupCaseId || '').trim();
+    !['makeup', 'subscription'].includes(String(value.lessonInstanceType || '')) &&
+    !String(value.makeupCaseId || '').trim();
 }
 
 function makeupOriginAllowsSession(historyValue) {

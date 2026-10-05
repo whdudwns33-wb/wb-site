@@ -25,6 +25,7 @@ function makeupScheduleSubmitHarness(options = {}) {
     makeupActiveStaff: id => id === 'staff-1' ? { id } : null,
     makeupRows: options.rows || [{ caseId: 'makeup-8', status: 'confirmed' }],
     makeupInstructionInput: () => ({}),
+    makeupCanSchedule: () => !!(!options.session || options.session.isAdmin),
     mutateMakeup: async payload => calls.push({ payload })
   };
   const source = block('function makeupDateTimeInput()', 'async function restoreMakeupSchedule');
@@ -87,7 +88,7 @@ test('generated makeup lessons are never allowed to recursively create another m
   assert.match(helpers, /&& !isScheduledMakeupTask\(t\)/);
   assert.match(panel, /isScheduledMakeupTask\(t\) \? ''/);
   assert.match(click, /next === 'A' && isScheduledMakeupTask\(t\)/);
-  assert.match(click, /추가 보강은 자동 생성하지 않습니다/);
+  assert.match(click, /promptAfterMakeupAbsence\(t, date, savedCheck.updatedAt\)/);
 });
 
 test('makeup auto-create never posts after sync failure and preserves retry state', async () => {
@@ -283,7 +284,7 @@ test('active admin card has one processing action plus no-makeup and staff can o
   assert.match(actions, /function openMakeupAdminProcessModal\(button\)/);
   assert.match(actions, /data-act="muschedule"[\s\S]*?>보강 일정 생성</);
   assert.match(actions, /data-act="mureschedule"[\s\S]*?>담당자·일정 수정</);
-  assert.match(actions, /data-act="muretryafteropen"[\s\S]*?>결석 후 재보강 일정 생성</);
+  assert.match(actions, /data-act="muretryafteropen"[\s\S]*?>새 보강 날짜 정하기</);
   assert.match(actions, /if \(session\.isAdmin\)/);
   assert.match(actions, /const assignedStaffId = row\.confirmedStaffId/);
   assert.match(actions, /row\.status === 'confirmed' && session\.isStaffLink/);
@@ -377,7 +378,7 @@ test('past schedule dates still require complete time fields, a later end time, 
   }
 });
 
-test('past scheduling stays admin-only and rescheduling still requires a confirmed case', async () => {
+test('unauthorized scheduling is blocked and rescheduling still requires a confirmed case', async () => {
   for (const action of ['schedule', 'reschedule']) {
     for (const session of [{}, { isAdmin: false, isStaffLink: true, staffId: 'staff-1' }]) {
       const api = makeupScheduleSubmitHarness({ session });
@@ -393,7 +394,7 @@ test('past scheduling stays admin-only and rescheduling still requires a confirm
 });
 
 test('rendered schedule dates have no minimum and direct completion retains the today maximum', () => {
-  const modalSource = block('function makeupCanComplete(row)', 'function makeupLessonTaskForCase') +
+  const modalSource = block('function makeupCanSchedule(row)', 'function makeupLessonTaskForCase') +
     block('function makeupDateTimeModal(row, mode)', 'function makeupNoMakeupModal');
   const bindings = {
     session: { isAdmin: true }, today: () => '2026-09-08', esc: String,
@@ -417,7 +418,7 @@ test('rendered schedule dates have no minimum and direct completion retains the 
   };
 
   open(pending, 'schedule');
-  assert.doesNotMatch(dateInput(), /\bmin=|\bdisabled\b/);
+  assert.doesNotMatch(dateInput(), /\bmin=|\bmax=|\bdisabled\b/);
   open(scheduled, 'reschedule');
   assert.match(dateInput(), /value="2026-08-14"/);
   assert.doesNotMatch(dateInput(), /\bmin=|\bdisabled\b/);
@@ -430,6 +431,10 @@ test('rendered schedule dates have no minimum and direct completion retains the 
 
   bindings.session.isAdmin = false;
   bindings.session.isStaffLink = true;
+  bindings.session.staffId = 'staff-1';
+  open({ ...pending, currentTeacherId: 'staff-1' }, 'schedule');
+  assert.doesNotMatch(dateInput(), /\bmin=|\bmax=|\bdisabled\b/);
+  assert.match(rendered, /id="muStaff" type="hidden" value="staff-1"/);
   bindings.session.staffId = 'staff-2';
   for (const mode of ['schedule', 'reschedule', 'restore', 'complete']) {
     rendered = undefined;

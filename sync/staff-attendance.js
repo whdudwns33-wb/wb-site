@@ -149,12 +149,71 @@ function resultPayload(row, key, idempotent) {
   };
 }
 
+function safeHistoryRecord(data) {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
+  const sessions = attendanceSessions(data).slice(0, 24).map(item => ({
+    in: item.in,
+    out: item.out || null
+  }));
+  return {
+    done: data.done === true,
+    at: finiteTimestamp(data.at) || null,
+    out: finiteTimestamp(data.out) || null,
+    sessions
+  };
+}
+
+async function attendanceHistory(env, app, body, origin, auth, json) {
+  if (!auth || auth.scope !== 'all') {
+    return json({ ok: false, code: 'STAFF_ATTENDANCE_ADMIN_REQUIRED',
+      error: '전체 출퇴근 기록은 관리자만 조회할 수 있습니다' }, 403, origin);
+  }
+  const month = String(body.month || '');
+  const currentMonth = staffAttendanceDate().slice(0, 7);
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month) || month > currentMonth) {
+    return json({ ok: false, code: 'STAFF_ATTENDANCE_MONTH_INVALID',
+      error: '조회할 월을 확인해 주세요' }, 400, origin);
+  }
+
+  const list = await env.DB.prepare(
+    'SELECT k,owner,data,updated_at FROM checks WHERE app=? AND k GLOB ? ORDER BY k LIMIT 2001'
+  ).bind(app, STAFF_ATTENDANCE_PREFIX + '*|' + month + '-??').all();
+  const sourceRows = Array.isArray(list && list.results) ? list.results : [];
+  if (sourceRows.length > 2000) {
+    return json({ ok: false, code: 'STAFF_ATTENDANCE_HISTORY_TOO_LARGE',
+      error: '한 달 출퇴근 기록이 너무 많아 조회할 수 없습니다' }, 409, origin);
+  }
+  const keyPattern = /^__att__([A-Za-z0-9_-]{1,128})\|(\d{4}-\d{2}-\d{2})$/;
+  const records = [];
+  for (const row of sourceRows) {
+    const match = keyPattern.exec(String(row && row.k || ''));
+    if (!match || !String(match[2]).startsWith(month + '-') || String(row.owner || '') !== match[1]) continue;
+    const record = safeHistoryRecord(parseData(row));
+    if (!record) continue;
+    records.push({ staffId: match[1], date: match[2], record,
+      updatedAt: Number(row.updated_at) || 0 });
+  }
+
+  const bounds = await env.DB.prepare(
+    "SELECT MIN(substr(k,-10)) earliest_date, MAX(substr(k,-10)) latest_date " +
+    "FROM checks WHERE app=? AND k GLOB '__att__*|????-??-??'"
+  ).bind(app).first();
+  const earliestDate = String(bounds && bounds.earliest_date || '');
+  const latestDate = String(bounds && bounds.latest_date || '');
+  return json({ ok: true, month, records, bounds: {
+    earliestMonth: /^\d{4}-\d{2}-\d{2}$/.test(earliestDate) ? earliestDate.slice(0, 7) : currentMonth,
+    latestMonth: /^\d{4}-\d{2}-\d{2}$/.test(latestDate) ? latestDate.slice(0, 7) : currentMonth,
+    currentMonth
+  } }, 200, origin);
+}
+
 /** 서버 시각으로 여러 출퇴근 세션을 누적한다. at/out은 최초 출근·최종 퇴근 요약이다. */
 export async function handleStaffAttendance(env, app, body, origin, auth, json) {
   if (app !== 'task') return json({ ok: false, error: '업무지시서에서만 사용할 수 있습니다' }, 400, origin);
   const action = String(body.action || '');
+  if (action === 'history') return attendanceHistory(env, app, body, origin, auth, json);
   if (!['clock_in', 'clock_out'].includes(action)) {
-    return json({ ok: false, error: 'action은 clock_in 또는 clock_out이어야 합니다' }, 400, origin);
+    return json({ ok: false, error: '지원하지 않는 출퇴근 작업입니다' }, 400, origin);
   }
   const staffId = String(auth && auth.id || '');
   if (!SAFE_ID.test(staffId)) {

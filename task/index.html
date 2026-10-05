@@ -192,6 +192,8 @@
   .lesson-attendance-tag { border: 1px solid rgba(30,157,214,.18); font-weight: 900; }
   .lesson-first-class-tag { background: #D7263D; color: #fff; border: 1px solid #A9192C; font-weight: 900; box-shadow: 0 0 0 2px rgba(215,38,61,.16); }
   .task.is-first-class { border-left: 6px solid #D7263D; background: #FFF0F2; box-shadow: 0 2px 8px rgba(215,38,61,.18); }
+  .task.is-subscription-session { margin-right: -8px; margin-left: -8px; padding-right: 8px; padding-left: 8px; border-left: 4px solid #0F766E; border-radius: 10px; background: #F0FDFA; }
+  .tag.subscription-session { border-color: #99F6E4; background: #CCFBF1; color: #115E59; font-weight: 900; }
   .note { margin-top: 8px; width: 100%; font-size: 13px; line-height: 1.6; padding: 10px 12px; border: 1px dashed var(--line); border-radius: 8px; background: var(--ivory); white-space: pre-wrap; overflow-wrap: anywhere; }
   textarea.note { display: block; min-height: 44px; resize: vertical; transition: height .18s ease, min-height .18s ease, border-color .18s ease, background .18s ease; }
   .memo-editor:focus-within textarea.note { min-height: 132px; border-style: solid; border-color: var(--blue); background: var(--white); outline: 2px solid rgba(30,157,214,.12); }
@@ -861,8 +863,10 @@
   .schedule-list-row.is-makeup { margin-right: -6px; margin-left: -6px; padding-right: 6px; padding-left: 6px; border-left: 4px solid #A21CAF; border-radius: 8px; background: #FDF4FF; }
   .schedule-list-row.is-makeup.is-conflict { background: #FFF5F3; }
   .schedule-legend-dot.makeup { border-color: #86198F; background: #D946EF; }
+  .schedule-legend-dot.subscription { border-color: #0F766E; background: #2DD4BF; }
   .schedule-timeline-block.is-makeup { border: 2px solid #A21CAF; background: linear-gradient(135deg, #F5D0FE 0%, #E879F9 100%); color: #581C87; box-shadow: 0 0 0 2px rgba(162,28,175,.18), 0 3px 10px rgba(162,28,175,.28); }
   .schedule-timeline-block.is-makeup.is-current { border: 2px solid #86198F; background: #A21CAF; color: var(--white); box-shadow: 0 0 0 2px rgba(162,28,175,.2), 0 3px 12px rgba(162,28,175,.4); }
+  .schedule-timeline-block.is-subscription { border: 2px solid #0F766E; background: linear-gradient(135deg, #CCFBF1 0%, #5EEAD4 100%); color: #134E4A; box-shadow: 0 0 0 2px rgba(15,118,110,.15), 0 3px 10px rgba(15,118,110,.24); }
   .schedule-timeline-block.is-makeup.is-ended { border: 2px solid #A855F7; background: #F3E8FF; color: #6D28D9; box-shadow: 0 0 0 1px rgba(168,85,247,.16); }
   .schedule-timeline-block.is-makeup.is-conflict { border-color: var(--coral); background: #FFF1EF; color: #9E3629; }
   @media (max-width: 720px) {
@@ -957,6 +961,30 @@
   .att-history-status.complete { background: #e5f4ed; color: #176844; }
   .att-history-status.missing_out { background: #fff0d4; color: #915c08; }
   .att-history-status.invalid { background: #fde7e9; color: #a92d36; }
+  .att-calendar-list { display: grid; gap: 10px; margin-top: 12px; }
+  .att-calendar-person { border: 1px solid var(--line); border-radius: 12px; background: var(--white); overflow: hidden; }
+  .att-calendar-person > summary { min-height: 54px; display: flex; align-items: center; padding: 10px 13px; cursor: pointer; list-style: none; background: #f7f9fc; }
+  .att-calendar-person > summary::-webkit-details-marker { display: none; }
+  .att-calendar-person > summary::after { content: '펼치기'; margin-left: auto; color: var(--deep-blue); font-size: 11px; font-weight: 900; }
+  .att-calendar-person[open] > summary::after { content: '접기'; }
+  .att-calendar-person > summary b, .att-calendar-person > summary small { display: block; }
+  .att-calendar-person > summary b { color: var(--navy); font-size: 15px; }
+  .att-calendar-person > summary small { margin-top: 3px; color: var(--mid-gray); font-size: 11px; }
+  .att-calendar-week, .att-calendar-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+  .att-calendar-week { padding: 8px 8px 4px; color: var(--mid-gray); font-size: 11px; font-weight: 900; text-align: center; }
+  .att-calendar-week span:first-child { color: #b43a45; }
+  .att-calendar-week span:last-child { color: var(--deep-blue); }
+  .att-calendar-grid { gap: 5px; padding: 4px 8px 10px; }
+  .att-calendar-day { min-width: 0; min-height: 78px; display: flex; flex-direction: column; gap: 3px; align-items: flex-start; padding: 7px; border: 1px solid #dfe5ec; border-radius: 9px; background: #f8fafc; color: #687687; text-align: left; }
+  .att-calendar-day:not(:disabled) { cursor: pointer; }
+  .att-calendar-day b { color: var(--navy); font-size: 13px; }
+  .att-calendar-day span { font-size: 11px; font-weight: 800; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+  .att-calendar-day small { font-size: 10px; line-height: 1.25; }
+  .att-calendar-day.complete { border-color: #9fd5bc; background: #edf8f3; color: #176844; }
+  .att-calendar-day.missing_out { border-color: #eacb89; background: #fff6e6; color: #915c08; }
+  .att-calendar-day.invalid { border-color: #e9aeb5; background: #fff0f0; color: #a92d36; }
+  .att-calendar-day.future { opacity: .55; }
+  .att-calendar-day.is-blank { border: 0; background: transparent; }
   .att-history-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
   @media (max-width: 560px) {
     .att-history-summary { grid-template-columns: repeat(2, 1fr); }
@@ -971,6 +999,10 @@
     .att-history-table .att-history-day { text-align: right; align-self: center; }
     .att-history-table .att-history-person { grid-column: 1; grid-row: 1; }
     .att-history-table .att-history-day { grid-column: 2; grid-row: 1; }
+    .att-calendar-grid { gap: 3px; padding-left: 4px; padding-right: 4px; }
+    .att-calendar-day { min-height: 65px; padding: 5px 3px; }
+    .att-calendar-day span { font-size: 9px; }
+    .att-calendar-day small { font-size: 9px; }
   }
   .student-info-name { display: inline-flex; align-items: center; min-height: 44px; margin: -8px 0; padding: 8px 2px; border: 0; background: transparent; color: var(--deep-blue); font: inherit; font-weight: 900; text-align: left; text-decoration: underline dotted; text-underline-offset: 3px; cursor: pointer; }
   .student-info-name:hover { color: var(--navy); text-decoration-style: solid; }
@@ -1206,16 +1238,16 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-09-19.2"></script>
-<script src="./schedule-board-core.js?v=2026-09-19.2"></script>
-<script src="./asset-core.js?v=2026-09-19.2"></script>
-<script src="./qr-core.js?v=2026-09-19.2"></script>
-<script src="./acaflow-import-core.js?v=2026-09-19.2"></script>
-<script src="./feedback-subject-catalog.js?v=2026-09-19.2"></script>
-<script src="./sync-recovery-core.js?v=2026-09-19.2"></script>
-<script src="./staff-work-session-core.js?v=2026-09-19.2"></script>
-<script src="./staff-attendance-history-core.js?v=2026-09-19.2"></script>
-<script src="./makeup-recovery-core.js?v=2026-09-19.2"></script>
+<script src="./lesson-form-core.js?v=2026-10-01.1"></script>
+<script src="./schedule-board-core.js?v=2026-10-01.1"></script>
+<script src="./asset-core.js?v=2026-10-01.1"></script>
+<script src="./qr-core.js?v=2026-10-01.1"></script>
+<script src="./acaflow-import-core.js?v=2026-10-01.1"></script>
+<script src="./feedback-subject-catalog.js?v=2026-10-01.1"></script>
+<script src="./sync-recovery-core.js?v=2026-10-01.1"></script>
+<script src="./staff-work-session-core.js?v=2026-10-01.1"></script>
+<script src="./staff-attendance-history-core.js?v=2026-10-01.1"></script>
+<script src="./makeup-recovery-core.js?v=2026-10-01.1"></script>
 <script>
 "use strict";
 
@@ -1546,9 +1578,17 @@ function lessonReferenceSteps(t) {
   return usesStandardLessonDisplay(t) && !hasStandardLessonSteps(t) ? storedTaskSteps(t) : [];
 }
 
-function lessonScheduleMetaHtml(task) {
-  const slots = groupedScheduleSlotsForDisplay(task && task.scheduleSlots, task && task.lessonHours);
+function lessonScheduleMetaHtml(task, date) {
+  // 과거 시간표도 같은 수업에 보관하므로, 카드 조회일의 유효기간만 표시한다.
+  const storedSlots = Array.isArray(task && task.scheduleSlots) ? task.scheduleSlots : [];
+  const activeSlots = storedSlots.filter(slot => {
+    const from = String(slot && (slot.validFrom || slot.startDate) || '');
+    const to = String(slot && (slot.validTo || slot.endDate) || '');
+    return (!from || from <= date) && (!to || date <= to);
+  });
+  const slots = groupedScheduleSlotsForDisplay(activeSlots, task && task.lessonHours);
   if (slots.length) return '<span class="lesson-schedule-meta">' + slots.map(slot => '<span class="tag time">' + esc(lessonScheduleSlotLabel(slot)) + '</span>').join('') + '</span>';
+  if (storedSlots.length) return '<span class="lesson-schedule-meta"><span class="tag">해당 날짜 시간표 없음</span></span>';
   return '<span class="lesson-schedule-meta">' +
     (task && task.time ? '<span class="tag time">' + esc(task.time) + '</span>' : '') +
     (lessonHoursValue(task && task.lessonHours) ? '<span class="tag time">' + esc(lessonHoursValue(task.lessonHours)) + '</span>' : '') +
@@ -3864,6 +3904,13 @@ function plannedWeekendOccurrence(task, date) {
  * 아니면 같은 주말의 반대 요일이 유일한 예정일일 때만 파생한다. */
 function weekendVisitSourceDate(task, row) {
   const actualDate = String(row && row.visitDate || '');
+  if (task && !task.deleted && task.lessonInstanceType === 'subscription' &&
+      ['assessment', 'studyforce'].includes(String(task.subscriptionType || '')) && String(task.repeat || '') === 'once') {
+    return row && String(row.lessonTaskId || '') === String(task.id || '') &&
+      String(row.studentId || '') === String(task.studentId || '') &&
+      actualDate === String(task.start || '') && (!row.sourceDate || String(row.sourceDate) === actualDate)
+      ? actualDate : '';
+  }
   const pair = weekendPairDates(actualDate);
   if (!task || !row || pair.length !== 2 || String(row.lessonTaskId || '') !== String(task.id || '') ||
       !String(task.studentId || '') || String(row.studentId || '') !== String(task.studentId || '')) return '';
@@ -4150,7 +4197,7 @@ function weekendVisitScopeStaffId() {
 }
 
 async function loadWeekendVisitScheduleScope(date, staffId, force) {
-  if (!isWeekendVisitDate(date)) return;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date || ''))) return;
   const key = weekendVisitScopeKey(date, staffId);
   if (!force && weekendVisitScopeIsFresh(key)) return;
   if (!force && weekendVisitScheduleLoadingKeys.has(key)) return;
@@ -4247,7 +4294,7 @@ function refreshVisibleWeekendVisitScopes(force) {
 }
 
 async function loadWeekendVisits(date, staffId, force) {
-  if (!isWeekendVisitDate(date)) return;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(date || ''))) return;
   const key = weekendVisitScopeKey(date, staffId);
   const cached = freshWeekendVisitScope(key);
   if (!force && cached) {
@@ -4523,10 +4570,12 @@ function weekendVisitBoardHtml(date) {
 }
 
 function weekendVisitEditModal(visitId) {
-  const row = weekendVisitRows.find(item => String(item.visitId) === String(visitId));
+  const row = weekendVisitRows.find(item => String(item.visitId) === String(visitId)) ||
+    [...weekendVisitScopeCache.values()].flatMap(scope => scope && Array.isArray(scope.rows) ? scope.rows : [])
+      .find(item => String(item.visitId) === String(visitId));
   if (!row) return toast('등·하원 기록을 다시 불러와 주세요');
   weekendVisitEditTarget = row;
-  modal('주말 실제 등·하원 시간 수정',
+  modal('실제 등·하원 시간 수정',
     '<div class="card-sub mb14">예정 시간표는 변경되지 않습니다. 실제 방문 시간만 정정하며 이전 기록도 보존됩니다.</div>' +
     '<div class="grid2"><div class="field"><label class="fl">실제 등원</label><input class="in" id="weekendVisitIn" type="time" value="' + esc(fmtTime(row.checkInAt)) + '"></div>' +
     '<div class="field"><label class="fl">실제 하원</label><input class="in" id="weekendVisitOut" type="time" value="' + esc(row.checkOutAt ? fmtTime(row.checkOutAt) : '') + '"></div></div>' +
@@ -5329,6 +5378,10 @@ function viewToday() {
   if (!makeupLoaded && !makeupLoading) setTimeout(() => loadMakeups(false), 0);
 
   if (isWeekendVisitDate(cursor)) ensureWeekendVisitSourcePair(cursor, me.id);
+  if ((state.tasks || []).some(task => isSubscriptionSessionTask(task) && String(task.staffId || '') === String(me.id) &&
+      String(task.start || '') === String(cursor))) {
+    loadWeekendVisitScheduleScope(cursor, me.id, false);
+  }
   if (cursor === today()) {
     ensureWeekendVisitScheduleDates(weekendVisitCarryScopeDates(cursor), me.id);
   }
@@ -5437,6 +5490,7 @@ function viewToday() {
 function taskRow(t, date, editable, isCarry) {
   const lesson = isLesson(t);
   const makeupLesson = isScheduledMakeupTask(t);
+  const subscriptionSession = isSubscriptionSessionTask(t);
   const recordContext = lesson ? lessonRecordContext(t, date) : null;
   const recordDate = recordContext ? recordContext.recordDate : date;
   const c = recordDate ? getCheck(t.id, recordDate) : null;
@@ -5461,20 +5515,22 @@ function taskRow(t, date, editable, isCarry) {
   const showFinalBox = session.isAdmin || !usesStandardLessonDisplay(t);
   const canEditRecord = editable && (!lesson || !!(recordContext && recordContext.inputEnabled && recordDate));
 
-  let h = '<div class="task ' + st + (st === 'blocked' ? ' isblocked' : '') + (makeupLesson ? ' is-makeup-lesson' : '') + (isFirstClass ? ' is-first-class' : '') + '" data-task="' + t.id + '">' +
+  let h = '<div class="task ' + st + (st === 'blocked' ? ' isblocked' : '') + (makeupLesson ? ' is-makeup-lesson' : '') +
+    (subscriptionSession ? ' is-subscription-session' : '') + (isFirstClass ? ' is-first-class' : '') + '" data-task="' + t.id + '">' +
     (showFinalBox ? '<button class="box" ' + (canEditRecord ? 'data-act="toggle" data-id="' + t.id + '" data-date="' + (lesson ? recordDate : date) + '"' : 'disabled') + '>✓</button>' : '') +
     '<div class="task-body">' +
       '<div class="task-t">' + esc(taskDisplayTitle(t)) + '</div>' +
       (detail ? '<div class="task-d">' + esc(detail) + '</div>' : '') +
       '<div class="meta' + (lesson ? ' lesson-meta' : '') + '">' +
         (isCarry ? '<span class="tag carry">⚠ ' + shortDate(date) + ' 미완료</span>' : '') +
-        (lesson ? lessonScheduleMetaHtml(t) :
+        (lesson ? lessonScheduleMetaHtml(t, date) :
           (timeDisplay ? '<span class="tag time">' + esc(timeDisplay) + '</span>' : '') +
           (!isCarry ? '<span class="tag">' + esc(repeatLabel(t)) + '</span>' : '')) +
         lessonFirstClassTag +
         lessonAttendanceTag +
         (lesson && (session.isStaffLink || session.isAdmin) && t.studentId ? studentNextLessonCompactHtml(t, date) : '') +
         (makeupLesson ? '<span class="tag makeup-lesson">보강수업</span>' + makeupSourceDateTag : '') +
+        (subscriptionSession ? '<span class="tag subscription-session">' + esc(subscriptionProgramLabel(t.subscriptionType)) + ' 수업</span>' : '') +
         (t.priority === 'high' ? '<span class="tag high">중요</span>' : '') +
         (st === 'blocked' ? '<span class="tag blk">막힘</span>' : '') +
         (st === 'doing' ? '<span class="tag doing">' + (handoffOutstanding ? '인계 진행중 · 원 수업 ' : '진행중 ') + prog.done + '/' + prog.total + prog.unit + '</span>' : '') +
@@ -5492,6 +5548,7 @@ function taskRow(t, date, editable, isCarry) {
       '</div>';
 
   if (makeupLesson) h += makeupInstructionHtml(makeupRows.find(row => String(row.caseId) === String(t.makeupCaseId || '')));
+  if (subscriptionSession) h += subscriptionActualVisitHtml(t, date, editable);
   if (hasDetail && st !== 'done' && !handoffOutstanding) {
     h += '<div class="bar mini ' + (st === 'doing' ? 'doing' : '') + '" style="margin-top:8px"><i style="width:' + prog.pct + '%"></i></div>';
   }
@@ -6365,8 +6422,11 @@ const isLesson = t => /^\[(수업|컨설팅)\]/.test(t.title || '');
 /** 보강 원장에서 만든 1회성 수업. 원 수업과 별도 체크 키를 사용하며 다시 보강을 만들지 않는다. */
 const isScheduledMakeupTask = t => !!(t && !t.deleted && (t.lessonInstanceType === 'makeup' ||
   t.makeupCaseId || t.makeupSourceTaskId));
+const isSubscriptionSessionTask = t => !!(t && !t.deleted && t.lessonInstanceType === 'subscription' &&
+  ['assessment', 'studyforce'].includes(String(t.subscriptionType || '')));
 /** 정규 수업 관리 화면에는 보강 원장이 투영한 1회성 수업을 섞지 않는다. */
-const isRegularLessonTask = t => !!(t && !t.deleted && isLesson(t) && !isScheduledMakeupTask(t));
+const isRegularLessonTask = t => !!(t && !t.deleted && isLesson(t) && !isScheduledMakeupTask(t) &&
+  !isSubscriptionSessionTask(t));
 /** 수업 지시서 세부 형식 판별 */
 const isMakeupLessonTask = t => !!(t && !t.deleted && (t.taskKind === 'lesson_instruction' ||
   t.lessonFormVersion || t.intakeVersion || /^\[수업\]/.test(String(t.title || ''))) && !isScheduledMakeupTask(t));
@@ -7716,6 +7776,65 @@ let lessonAssignmentDraft = null;
 const ROSTER_SUBJECT_OPTIONS = [
   '국어', '영어', '수학', '사회', '과학', '독해사고력', '독해력수업', '독해력훈련', '사고력수학', '질답', '클리닉'
 ];
+const SUBSCRIPTION_PROGRAMS = Object.freeze([
+  { type: 'assessment', label: '검사구독' },
+  { type: 'studyforce', label: '스터디포스구독' }
+]);
+function subscriptionProgramLabel(type) {
+  const found = SUBSCRIPTION_PROGRAMS.find(item => item.type === String(type || ''));
+  return found ? found.label : '';
+}
+
+function subscriptionVisitRows(task, date) {
+  return weekendVisitRowsForTaskDate(task, date).filter(row => row && row.status !== 'cancelled' &&
+    String(row.lessonTaskId || '') === String(task && task.id || '') &&
+    String(row.studentId || '') === String(task && task.studentId || '') &&
+    String(row.visitDate || '') === String(date || ''));
+}
+
+function subscriptionActualVisitHtml(task, date, editable) {
+  if (!isSubscriptionSessionTask(task) || String(task.start || '') !== String(date || '')) return '';
+  const key = weekendVisitScopeKey(date, String(task.staffId || ''));
+  const scope = freshWeekendVisitScope(key);
+  if (!scope && !weekendVisitScheduleLoadingKeys.has(key)) setTimeout(() => loadWeekendVisitScheduleScope(date, task.staffId, false), 0);
+  const error = weekendVisitScheduleErrors.get(key);
+  if (error) return '<div class="weekend-visit-row"><div class="small" style="color:var(--coral)">실제 등·하원 기록을 불러오지 못했습니다.</div></div>';
+  if (!scope) return '<div class="weekend-visit-row"><div class="small muted">실제 등·하원 기록 확인 중…</div></div>';
+  const rows = subscriptionVisitRows(task, date);
+  const row = preferredWeekendVisit(rows);
+  const canRecordNow = editable && date === today();
+  let actions = '';
+  if (!row && canRecordNow) {
+    actions = '<button class="btn btn-sm btn-primary" data-act="subscriptionvisitcheckin" data-task="' + esc(task.id) +
+      '" data-student-id="' + esc(task.studentId) + '">실제 등원</button>';
+  } else if (!row && session.isAdmin) {
+    actions = '<button class="btn btn-sm btn-ghost" data-act="subscriptionvisitrecord" data-task="' + esc(task.id) +
+      '" data-date="' + esc(date) + '">시간 입력</button>';
+  } else if (row && row.status === 'active') {
+    actions = (canRecordNow ? '<button class="btn btn-sm btn-navy" data-act="weekendcheckout" data-visit="' + esc(row.visitId) +
+      '" data-rev="' + row.revision + '">실제 하원</button>' : '') +
+      (session.isAdmin ? '<button class="btn btn-sm btn-ghost" data-act="weekendedit" data-visit="' + esc(row.visitId) + '">시간 수정</button>' : '');
+  } else if (row && session.isAdmin) {
+    actions = '<button class="btn btn-sm btn-ghost" data-act="weekendedit" data-visit="' + esc(row.visitId) + '">시간 수정</button>';
+  }
+  return '<div class="weekend-visit-row' + (row && row.status === 'active' ? ' weekend-visit-live' : row ? ' weekend-visit-complete' : '') + '">' +
+    '<div><b>실제 등·하원</b><div class="small ' + (row ? '' : 'muted') + '">' +
+      (row ? esc(weekendVisitTimeText(row)) + (weekendVisitDuration(row) ? ' · ' + esc(weekendVisitDuration(row)) : '') : '아직 기록되지 않았습니다') +
+    '</div></div><div class="weekend-visit-actions">' + actions + '</div></div>';
+}
+
+function subscriptionVisitRecordModal(taskId, date) {
+  if (!session.isAdmin) return toast('관리자만 지난 실제 등·하원 시간을 입력할 수 있습니다');
+  const task = (state.tasks || []).find(item => isSubscriptionSessionTask(item) && String(item.id || '') === String(taskId || ''));
+  if (!task || String(task.start || '') !== String(date || '')) return toast('구독 수업 날짜를 다시 확인해 주세요');
+  weekendVisitEditTarget = { newSubscription: true, lessonTaskId: String(task.id), studentId: String(task.studentId), visitDate: String(date) };
+  modal('구독 수업 실제 등·하원 입력',
+    '<div class="hint mb14">' + esc(task.studentName || studentOf(task)) + ' · ' + esc(subscriptionProgramLabel(task.subscriptionType)) + ' · ' + esc(label(date)) + '</div>' +
+    '<div class="grid2"><div class="field"><label class="fl">실제 등원</label><input class="in" id="weekendVisitIn" type="time"></div>' +
+    '<div class="field"><label class="fl">실제 하원</label><input class="in" id="weekendVisitOut" type="time"></div></div>' +
+    '<div class="field"><label class="fl">입력 사유</label><input class="in" id="weekendVisitReason" maxlength="200" value="관리자 과거 기록 입력"></div>',
+    '<button class="btn btn-primary btn-block mt14" data-act="subscriptionvisitrecordsave">기록 저장</button>');
+}
 let publicationReadinessRows = [];
 let publicationReadinessLoaded = false;
 let publicationReadinessLoading = false;
@@ -9343,7 +9462,8 @@ function feedbackCanonicalTask(task) {
   if (!task || !task.id) return task || null;
   const sourceId = String(task.lessonInstanceType === 'makeup' ? task.makeupSourceTaskId || '' : '');
   if (!sourceId) return task;
-  return state.tasks.find(row => row && String(row.id || '') === sourceId && !row.deleted) || task;
+  return state.tasks.find(row => row && String(row.id || '') === sourceId && !row.deleted &&
+    row.staffId === task.staffId && row.studentId && row.studentId === task.studentId) || task;
 }
 
 function feedbackOccurrenceIsMakeup(task) {
@@ -9472,6 +9592,7 @@ function feedbackStoredMessageHtml(item) {
 
 function feedbackReasonHtml(item, ownCard) {
   let note = String(item && item.reviewNote || '').trim();
+  if (!ownCard) note = feedbackRetryResults.get(item && item.requestKey)?.message || note;
   const blocked = !!item && item.status === 'content_approved_send_blocked';
   if (!note && blocked) note = '솔라피 발송 접수가 완료되지 않았습니다.';
   if (!note) return '';
@@ -10228,13 +10349,19 @@ async function reviewFeedbackRequest(action, key, revision) {
 }
 
 /** 막혔던 알림톡을 다시 접수한다 — 원장만, 승인과는 별개의 명시적 클릭 */
+const feedbackRetryResults = new Map();
 async function sendParentFeedback(key, button) {
+  if (feedbackRetryResults.get(key)?.busy) return;
   const auth = sync.auth();
   if (!auth) return toast('동기화 인증이 필요합니다');
+  feedbackRetryResults.set(key, { busy: true, message: '솔라피에 재발송을 요청하고 있습니다.' });
   const resultBox = document.getElementById('fbSendResult-' + key);
   if (button) { button.disabled = true; button.textContent = '보내는 중…'; }
   try {
     const res = await sync.post('/parent-feedback-send', { app: SYNC_APP, auth: auth, requestKey: key });
+    feedbackRetryResults.set(key, { busy: false, message: res.status === 'sent' || res.code === 'ALREADY_SENT'
+      ? '솔라피 접수 완료 · 실제 전달 결과는 상태 확인 후 표시됩니다.'
+      : '발송 결과 확인 중입니다. 중복 접수하지 말고 상태를 확인해 주세요.' });
     feedbackQueueLoaded = false;
     feedbackDateQueueLoadedDate = '';
     if (res.status === 'sent') {
@@ -10253,6 +10380,7 @@ async function sendParentFeedback(key, button) {
     }
   } catch (error) {
     if (button) { button.disabled = false; button.textContent = '📱 지금 학부모께 알림톡 접수'; }
+    feedbackRetryResults.set(key, { busy: false, message: '재발송 실패 — ' + (error.message || error) });
     if (resultBox) resultBox.textContent = '❌ ' + (error.message || error);
     else toast('발송 실패 — ' + (error.message || error));
     feedbackDateQueueLoadedDate = '';
@@ -10454,7 +10582,7 @@ function sessionModeRouteVisible() {
 }
 
 function sessionModeLessonTask(task) {
-  return isSessionLessonTask(task);
+  return isSessionLessonTask(task) && !isSubscriptionSessionTask(task);
 }
 
 function sessionPackForLessonTask(task, referenceDate) {
@@ -11319,6 +11447,7 @@ function makeupReasonSelect(id) {
 
 function makeupStatusPill(row) {
   if (row && row.resolvedByCompletion) return '<span class="pill ok">보강완료</span>';
+  if (row && row.status === 'confirmed' && makeupScheduledAttendance(row).value === 'A') return '<span class="pill bad">재보강 일정 필요</span>';
   const cls = row.status === 'cancelled' ? 'muted' : row.status === 'completed' ? 'ok' : row.status === 'confirmed' ? 'doing' : 'warn';
   return '<span class="pill ' + cls + '">' + esc(MAKEUP_STATUS_LABELS[row.status] || row.status) + '</span>';
 }
@@ -11372,7 +11501,7 @@ function openMakeupAdminProcessModal(button) {
   if (row.status === 'confirmed' && row.hasLessonTask === false) {
     actions += '<button class="btn btn-primary btn-block mt14" data-act="murestoreschedule"' + key + '>누락된 보강수업 생성</button>';
   } else if (scheduled && makeupAbsent) {
-    actions += '<button class="btn btn-primary btn-block mt14" data-act="muretryafteropen"' + key + '>결석 후 재보강 일정 생성</button>';
+    actions += '<button class="btn btn-primary btn-block mt14" data-act="muretryafteropen"' + key + '>새 보강 날짜 정하기</button>';
   } else if (scheduled) {
     actions += '<button class="btn btn-primary btn-block mt14" data-act="mucompleteopen"' + key + '>보강완료</button>' +
       '<button class="btn btn-ghost btn-block mt8" data-act="mureschedule"' + key + '>담당자·일정 수정</button>';
@@ -11486,7 +11615,9 @@ function viewMakeups() {
     '<div class="card-sub">결석으로 생성된 보강 건과 관리자·선생님이 직접 생성한 보강을 생성·완료·없음 세 가지 동작으로 처리합니다.</div></div>' +
     '<button class="btn btn-sm btn-ghost" data-act="murefresh">새로고침</button></div>' +
     (session.isAdmin || (session.isStaffLink && session.staffId)
-      ? '<button class="btn btn-primary mt14" data-act="mumanualopen">보강생성(수업무관)</button>' : '') +
+      ? '<div class="row wraprow mt14" style="gap:8px"><button class="btn btn-primary" data-act="mumanualopen">보강생성(수업무관)</button>' +
+        (session.isAdmin ? '<button class="btn btn-ghost" data-act="classrosterjsonexport">반·학생 목록 JSON 받기</button>' : '') +
+        '</div>' : '') +
     '<div class="makeup-reason-guide">보강생성은 선택한 날짜의 담당 선생님 오늘 수업과 관리자 현황판에 보강수업을 만듭니다. 보강완료는 실제 진행 일시를 기록합니다.</div>' +
     '<div class="small muted mt8" role="status" aria-live="polite">' + esc(makeupLiveMessage) + '</div></section>';
   if (makeupLoading && !makeupLoaded) return h + '<div class="card" role="status" aria-live="polite"><div class="empty"><b>⏳</b>보강 현황을 불러오는 중입니다.</div></div>';
@@ -11996,6 +12127,12 @@ async function submitManualMakeup(button) {
     '보강수업을 생성했습니다', '', true);
 }
 
+function makeupCanSchedule(row) {
+  return !!(row && ['review_pending', 'reviewed', 'awaiting_parent'].includes(row.status) &&
+    !row.confirmedDate && (session.isAdmin || (session.isStaffLink &&
+      String(session.staffId || '') === String(row.currentTeacherId || row.sourceTeacherId || ''))));
+}
+
 function makeupCanComplete(row) {
   if (!row || ['completed', 'cancelled'].includes(row.status)) return false;
   /* 관리자 점검 모드는 선생님 화면을 유지하지만, 관리자가 그 태블릿에서
@@ -12088,14 +12225,15 @@ function makeupAttendanceLabel(value) {
 }
 
 function makeupDateTimeModal(row, mode) {
-  if (!row || ((mode === 'schedule' || mode === 'restore') ? !session.isAdmin : !makeupCanComplete(row))) return;
+  if (!row || (mode === 'schedule' ? !makeupCanSchedule(row) : mode === 'restore' ? !session.isAdmin : !makeupCanComplete(row))) return;
   const scheduled = !!(row.confirmedDate && row.confirmedStartTime && row.confirmedEndTime);
   const rescheduling = mode === 'reschedule';
   const retrying = mode === 'retry';
   const directCompletion = mode === 'complete' && !scheduled;
   const scheduledCompletion = mode === 'complete' && scheduled;
   const inspection = typeof managerInspectionActive === 'function' && managerInspectionActive();
-  if ((rescheduling || retrying) && (!session.isAdmin || row.status !== 'confirmed')) return;
+  if (rescheduling && (!session.isAdmin || row.status !== 'confirmed')) return;
+  if (retrying && (row.status !== 'confirmed' || !makeupCanComplete(row))) return;
   if (directCompletion && !makeupCanComplete(row)) return;
   const date = scheduled && !retrying ? row.confirmedDate : '';
   const startTime = scheduled && !retrying ? row.confirmedStartTime : '';
@@ -12105,7 +12243,7 @@ function makeupDateTimeModal(row, mode) {
   const title = mode === 'schedule' || mode === 'restore' ? '보강생성' : retrying ? '결석 후 재보강' : rescheduling ? '보강 수정' : '보강완료';
   const inspectionStaffId = !session.isAdmin ? String(session.staffId || '') : '';
   const staffField = (mode === 'schedule' || rescheduling || retrying || directCompletion)
-    ? (directCompletion && !session.isAdmin
+    ? ((mode === 'schedule' || directCompletion || retrying) && !session.isAdmin
       ? '<div class="makeup-schedule"><b>실제 보강 담당 선생님</b><br>' +
           esc(makeupTeacherLabel(inspectionStaffId, '점검 중인 선생님')) +
           '</div><input id="muStaff" type="hidden" value="' + esc(inspectionStaffId) + '">'
@@ -12144,7 +12282,7 @@ function makeupDateTimeModal(row, mode) {
   modal(title + ' — ' + esc(staffStudentCompactLabelById(row.studentId, row.studentName || '학생', row.grade)),
     '<div class="makeup-schedule"><b>원 수업 담당 선생님</b><br>' +
       esc(makeupTeacherLabel(originalStaffId, '원 수업 담당 확인 필요')) + '</div>' + staffField +
-    ((mode === 'schedule' || rescheduling || retrying) ? makeupInstructionFieldHtml(row) : '') +
+    ((mode === 'schedule' || rescheduling || (retrying && session.isAdmin)) ? makeupInstructionFieldHtml(row) : '') +
     '<div class="field"><label class="fl" for="muDate">보강 날짜</label><input class="in" id="muDate" type="date" value="' + esc(date) + '"' +
       (directCompletion ? ' max="' + esc(today()) + '"' : '') + ((mode === 'restore' || scheduledCompletion) ? ' disabled' : '') + '></div>' +
     '<div class="grid2"><div class="field"><label class="fl" for="muStart">시작시간</label><input class="in" id="muStart" type="time" value="' + esc(startTime) + '"' + (mode === 'restore' ? ' disabled' : '') + '></div>' +
@@ -12203,7 +12341,7 @@ function makeupDateTimeInput() {
 }
 
 async function submitMakeupSchedule(button) {
-  if (!session.isAdmin) return;
+  if (!makeupCanSchedule(makeupRows.find(item => item.caseId === String(button.dataset.case || '')))) return;
   const slot = makeupDateTimeInput();
   if (!slot) return;
   const staffId = String(($('#muStaff') || {}).value || '');
@@ -12230,14 +12368,14 @@ async function submitMakeupReschedule(button) {
 }
 
 async function submitMakeupRetryAfterAbsence(button) {
-  if (!session.isAdmin) return;
   const row = makeupRows.find(item => item.caseId === String(button.dataset.case || ''));
+  if (!makeupCanComplete(row)) return;
   if (!row || row.status !== 'confirmed') return showMakeupModalError('확정된 보강 일정을 다시 확인해 주세요');
   const slot = makeupDateTimeInput();
   if (!slot) return;
   const staffId = String(($('#muStaff') || {}).value || '');
   if (!makeupActiveStaff(staffId)) return showMakeupModalError('활성 보강 담당 선생님을 선택해 주세요');
-  const instruction = makeupInstructionInput(row.currentTeacherId || row.sourceTeacherId, staffId);
+  const instruction = session.isAdmin ? makeupInstructionInput(row.currentTeacherId || row.sourceTeacherId, staffId) : {};
   if (!instruction) return;
   await mutateMakeup({ action: 'reschedule_after_absence', caseId: button.dataset.case,
     revision: Number(button.dataset.rev), ...slot, staffId: staffId, ...instruction },
@@ -12294,10 +12432,45 @@ async function submitMakeupNoMakeup(button) {
     button, '보강 없음으로 처리했습니다', '', true);
 }
 
+function openMakeupAbsentChoices(row) {
+  if (!row || row.status !== 'confirmed' || !makeupCanComplete(row)) return;
+  const key = ' data-case="' + esc(row.caseId) + '" data-rev="' + Number(row.revision) + '"';
+  modal('보강 결석 · 다음 일정', '<div class="hint"><b>' + esc(row.studentName || '학생') + '</b> · ' +
+    esc(row.confirmedDate) + ' 보강은 결석으로 저장했습니다.<br>기존 결석 기록을 남기고 같은 보강의 다음 날짜를 정합니다.</div>',
+    '<button class="btn btn-primary btn-block mt14" data-act="muretryafteropen"' + key + '>새 보강 날짜 정하기</button>' +
+    '<button class="btn btn-ghost btn-block mt8" data-act="muabsencelater">나중에 정하기</button>');
+  $('#modalHost')._makeupSnapshot = JSON.parse(JSON.stringify(row));
+}
+
+async function promptAfterMakeupAbsence(task, date, updatedAt) {
+  const authKey = JSON.stringify(sync.auth());
+  const startedRoute = route, startedCursor = cursor;
+  try {
+    await settleSync();
+    const row = await loadLatestMakeupCase(String(task.makeupCaseId || ''));
+    const check = getCheck(task.id, date);
+    // 저장 중 다른 날짜/계정으로 이동하거나 출결을 정정했다면 늦게 팝업을 열지 않는다.
+    if (route !== startedRoute || cursor !== startedCursor || authKey !== JSON.stringify(sync.auth()) || !check || check.att !== 'A' ||
+        Number(check.updatedAt) !== Number(updatedAt) || row.status !== 'confirmed' || row.confirmedDate !== date) return;
+    if (!$('#modalHost').hidden) return toast('보강 결석 저장 완료 · 보강 탭에서 새 날짜를 정할 수 있습니다');
+    openMakeupAbsentChoices(row);
+  } catch (error) {
+    toast('보강 결석의 서버 저장·조회 확인이 필요합니다. 연결 확인 후 보강 탭에서 다시 처리해 주세요.');
+  }
+}
+
 async function openMakeupProcessModal(button) {
   const row = makeupRows.find(item => item.caseId === String(button.dataset.case || ''));
   if (!row) return;
+  if (makeupCanSchedule(row)) {
+    const key = ' data-case="' + esc(row.caseId) + '" data-rev="' + Number(row.revision) + '"';
+    modal('보강 처리', makeupScheduleHtml(row),
+      '<button class="btn btn-primary btn-block mt14" data-act="muschedule"' + key + '>보강 일정 생성</button>' +
+      '<button class="btn btn-ghost btn-block mt8" data-act="mudirectcompleteopen"' + key + '>보강완료 · 이미 진행한 수업</button>');
+    return;
+  }
   const scheduled = !!(row.confirmedDate && row.confirmedStartTime && row.confirmedEndTime);
+  if (scheduled && makeupScheduledAttendance(row).value === 'A') return openMakeupAbsentChoices(row);
   if (scheduled) return makeupDateTimeModal(row, 'complete');
   if (makeupCanComplete(row)) return makeupDateTimeModal(row, 'complete');
   await openMakeupLinkModal(button, true);
@@ -12722,6 +12895,7 @@ function scheduleTimelineHtml(timeline, date, nowKst) {
   const legend = '<div class="schedule-legend">' +
     '<span class="schedule-legend-item"><i class="schedule-legend-dot"></i>일반</span>' +
     '<span class="schedule-legend-item"><i class="schedule-legend-dot makeup"></i>보강</span>' +
+    '<span class="schedule-legend-item"><i class="schedule-legend-dot subscription"></i>구독</span>' +
     (todayView ? '<span class="schedule-legend-item"><i class="schedule-legend-dot current"></i>수업 중</span>' +
       '<span class="schedule-legend-item"><i class="schedule-legend-dot next"></i>다음</span>' : '') +
     '<span class="schedule-legend-item"><i class="schedule-legend-dot conflict"></i>학생 수업 겹침</span>' +
@@ -12764,14 +12938,15 @@ function scheduleTimelineHtml(timeline, date, nowKst) {
       const isNext = nextStart !== null && session.startMinute === nextStart;
       const conflict = session.studentConflict;
       const isMakeup = session.entries.some(entry => isScheduledMakeupTask(entry.task));
-      const classes = ['schedule-timeline-block', isMakeup ? 'is-makeup' : '', isEnded ? 'is-ended' : '', isNext ? 'is-next' : '', isCurrent ? 'is-current' : '', conflict ? 'is-conflict' : ''].filter(Boolean).join(' ');
+      const isSubscription = session.entries.some(entry => isSubscriptionSessionTask(entry.task));
+      const classes = ['schedule-timeline-block', isMakeup ? 'is-makeup' : '', isSubscription ? 'is-subscription' : '', isEnded ? 'is-ended' : '', isNext ? 'is-next' : '', isCurrent ? 'is-current' : '', conflict ? 'is-conflict' : ''].filter(Boolean).join(' ');
       const width = Math.max(38, Math.round((session.endMinute - session.startMinute) * pxPerMinute) - 4);
       const attendanceText = scheduleAttendanceSummaryText(session, date);
       const attendanceDetails = session.entries.map(entry => {
         const att = scheduleAttendance(entry, date);
         return staffStudentCompactLabelById(entry.studentId, entry.studentName, entry.grade) + ' ' + att.label;
       }).join(', ');
-      const stateText = (isMakeup ? '보강수업 · ' : '') + (isCurrent ? '현재 수업' : isNext ? '다음 수업' : isEnded ? '종료 수업' : '예정 수업') +
+      const stateText = (isMakeup ? '보강수업 · ' : isSubscription ? '구독수업 · ' : '') + (isCurrent ? '현재 수업' : isNext ? '다음 수업' : isEnded ? '종료 수업' : '예정 수업') +
         (conflict ? ' · 학생 수업 겹침 확인 필요' : '');
       const title = stateText + ' · ' + row.teacherName + ' 선생님 · ' + session.label + ' · ' + names.join(', ') +
         ' · ' + attendanceDetails + (conflict ? ' · 같은 학생의 서로 다른 수업 시간이 겹칩니다' : '');
@@ -12779,7 +12954,7 @@ function scheduleTimelineHtml(timeline, date, nowKst) {
         ' data-act="scheduleblock" data-date="' + esc(date) + '" data-teacher="' + esc(row.teacherKey) + '" data-lesson="' + esc(session.lessonIdentity) + '" data-start="' + session.startMinute + '" data-end="' + session.endMinute + '"' +
         ' title="' + esc(title) + '" aria-label="' + esc(title) + '"><span class="schedule-flow-attendance-list">' +
         visual.attendanceRows.map(item => '<span class="schedule-flow-attendance ' + item.cls + '"><b>' + esc(item.name) + '</b><i>' +
-          esc((isMakeup ? '보강 · ' : '') + item.label) + '</i></span>').join('') +
+          esc((isMakeup ? '보강 · ' : isSubscription ? '구독 · ' : '') + item.label) + '</i></span>').join('') +
         '</span><small class="sr-only">' + esc(attendanceText) + '</small></button>';
     });
     h += '</div>';
@@ -12803,9 +12978,11 @@ function scheduleTimelineModal(entries, date) {
       ].filter(row => row[1]);
       const displayGrade = studentDisplayGradeLabel(rosterStudentByStableId(entry.studentId), entry.grade);
       const makeupLesson = isScheduledMakeupTask(task);
-      return '<div class="task' + (makeupLesson ? ' is-makeup-lesson' : '') + '"><div class="task-body"><div class="between"><div class="task-t">' + esc(entry.studentName) +
+      const subscriptionLesson = isSubscriptionSessionTask(task);
+      return '<div class="task' + (makeupLesson ? ' is-makeup-lesson' : '') + (subscriptionLesson ? ' is-subscription-session' : '') + '"><div class="task-body"><div class="between"><div class="task-t">' + esc(entry.studentName) +
         (displayGrade ? ' <span class="pill">' + esc(displayGrade) + '</span>' : '') + '</div><span class="row" style="gap:5px">' +
-        (makeupLesson ? '<span class="tag makeup-lesson">보강수업</span>' : '') + sessionModeBadgeHtml(task, date) +
+        (makeupLesson ? '<span class="tag makeup-lesson">보강수업</span>' : '') +
+        (subscriptionLesson ? '<span class="tag subscription-session">구독수업</span>' : '') + sessionModeBadgeHtml(task, date) +
         '<span class="pill ' + att.cls + '">' + esc(att.label) + '</span></span></div>' +
         details.map(row => '<div class="schedule-info-row"><b>' + esc(row[0]) + '</b>' + esc(row[1]) + '</div>').join('') + '</div></div>';
     }).join('');
@@ -13693,7 +13870,7 @@ function viewBoard() {
     '<div class="card-sub mb8">직원 ' + list.length + '명 · 지시 ' + all.total + '건 중 ' + all.done + '건 완료</div>' +
     '<div class="bar"><i style="width:' + pct + '%"></i></div></div></div>' +
     '<hr class="sep"><button class="btn btn-navy btn-block" data-act="brief">📊 오늘 마감 브리핑 만들기</button>' +
-    '<button class="btn btn-ghost btn-block" data-act="atthist" style="margin-top:8px">🕘 전체 출퇴근 이력 (최근 14일)</button></div>';
+    '<button class="btn btn-ghost btn-block" data-act="atthist" style="margin-top:8px">🗓️ 월별 출퇴근 달력</button></div>';
 
   if (mine.length) {
     h += '<div class="sect">내 업무 — 대표</div>' + mine.map(s => staffCard(s)).join('');
@@ -13765,83 +13942,142 @@ function attHistText() {
   return out;
 }
 
-/* 조회 필터만 바꾸므로 입력/출퇴근 기록은 수정하지 않고, 팝업 전체 재렌더도 하지 않는다. */
-let attendanceHistoryDates = [];
-function attendanceHistoryRows() {
-  if (!session.isAdmin || !window.WBStaffAttendanceHistoryCore) return [];
-  const all = !!($('#attHistoryAll') || {}).checked;
-  const selectedDate = String(($('#attHistoryDate') || {}).value || '');
-  const dates = all ? attendanceHistoryDates : attendanceHistoryDates.filter(date => date === selectedDate);
-  return window.WBStaffAttendanceHistoryCore.buildRows({ staff: liveStaff(), checks: state.checks,
-    dates, staffId: String(($('#attHistoryStaff') || {}).value || '') });
-}
+/* 월별 출퇴근 이력은 운영 DB를 정본으로 읽는다. 새 태블릿에서도 과거 기록이 빠지지 않는다. */
+let attendanceHistoryMonth = '';
+let attendanceHistoryChecks = {};
+let attendanceHistoryBounds = { earliestMonth: '', latestMonth: '', currentMonth: '' };
+let attendanceHistoryLoading = false;
 
-function attendanceHistoryResultsHtml(rows) {
-  const totals = window.WBStaffAttendanceHistoryCore.summary(rows);
-  const tiles = [[totals.complete, '출퇴근 완료', 'complete'], [totals.missingOut, '퇴근 미기록', 'missing_out'],
-    [totals.noRecord, '기록 없음', 'no_record'], [totals.invalid, '시간 확인 필요', 'invalid']];
-  const summary = '<div class="att-history-summary">' + tiles.map(([count, label, status]) =>
-    '<div class="att-history-stat ' + status + '"><strong>' + count + '<small style="font-size:12px;margin-left:3px">건</small></strong><span>' + label + '</span></div>').join('') + '</div>';
-  if (!rows.length) return summary + '<div class="hint">선택한 조건에 해당하는 직원이 없습니다.</div>';
-  return summary + '<div class="small muted mb8">조회 ' + rows.length + '건 · 날짜 최신순 · 시간은 24시간 기준</div>' +
-    '<div class="att-history-table-wrap" tabindex="0" aria-label="출퇴근 기록 표, 스크롤하여 더 보기"><table class="att-history-table" aria-label="선생님별 출퇴근 기록">' +
-    '<thead><tr><th scope="col">날짜</th><th scope="col">선생님</th><th scope="col">출근</th><th scope="col">퇴근</th><th scope="col">근무시간</th><th scope="col">상태</th></tr></thead><tbody>' +
-    rows.map(row => '<tr><td class="att-history-day">' + esc(shortDate(row.date)) + ' (' + esc(DOW[dowOf(row.date)]) + ')</td>' +
-      '<td class="att-history-person">' + esc(row.name) + '</td><td class="att-history-time" data-label="출근">' + esc(row.clockIn || '—') + '</td>' +
-      '<td class="att-history-time" data-label="퇴근">' + esc(row.clockOut || '—') + '</td><td data-label="근무시간">' + esc(row.duration || '—') + '</td>' +
-      '<td data-label="상태"><span class="att-history-status ' + (['complete', 'missing_out', 'no_record'].includes(row.status) ? row.status : 'invalid') + '">' + esc(row.label) + '</span></td></tr>').join('') +
-    '</tbody></table></div>';
+function attendanceHistoryStaff() {
+  const byId = new Map();
+  state.staff.filter(staff => staff && staff.id && !staff.owner).forEach(staff => byId.set(String(staff.id), staff));
+  Object.keys(attendanceHistoryChecks).forEach(key => {
+    const match = /^__att__(.+)\|\d{4}-\d{2}-\d{2}$/.exec(key);
+    if (match && !byId.has(match[1])) byId.set(match[1], { id: match[1], name: '퇴사 직원' });
+  });
+  return Array.from(byId.values()).sort((left, right) => String(left.name).localeCompare(String(right.name), 'ko'));
+}
+function attendanceHistoryRows(staffId) {
+  if (!session.isAdmin || !window.WBStaffAttendanceHistoryCore || !attendanceHistoryMonth) return [];
+  return window.WBStaffAttendanceHistoryCore.buildRows({ staff: attendanceHistoryStaff(), checks: attendanceHistoryChecks,
+    dates: daysInMonth(attendanceHistoryMonth), staffId: staffId == null ? String(($('#attHistoryStaff') || {}).value || '') : String(staffId) });
+}
+function attendanceMonthShift(month, delta) {
+  const parts = String(month || '').split('-').map(Number);
+  if (parts.length !== 2 || !parts[0] || !parts[1]) return '';
+  const date = new Date(Date.UTC(parts[0], parts[1] - 1 + delta, 1));
+  return date.getUTCFullYear() + '-' + String(date.getUTCMonth() + 1).padStart(2, '0');
+}
+function attendanceCalendarHtml(staff, rows, expanded) {
+  const recorded = rows.filter(row => row.status !== 'no_record');
+  const complete = recorded.filter(row => row.status === 'complete').length;
+  const issue = recorded.filter(row => row.status !== 'complete').length;
+  const firstDow = dowOf(attendanceHistoryMonth + '-01');
+  const blanks = Array.from({ length: firstDow }, () => '<span class="att-calendar-day is-blank" aria-hidden="true"></span>').join('');
+  const todayDate = seoulNowParts().date;
+  const days = rows.map(row => {
+    const future = row.date > todayDate;
+    const status = future ? 'future' : row.status;
+    const time = row.status === 'no_record' ? '기록 없음' : (row.clockIn || '—') + ' ~ ' + (row.clockOut || '—');
+    return '<button type="button" class="att-calendar-day ' + esc(status) + '" data-act="atthistdayedit" data-id="' + esc(staff.id) + '" data-date="' + row.date + '"' +
+      (future ? ' disabled' : '') + ' aria-label="' + esc(row.date + ' ' + row.label) + '"><b>' + Number(row.date.slice(-2)) + '</b>' +
+      '<span>' + esc(time) + '</span><small>' + esc(future ? '예정' : row.label) + '</small></button>';
+  }).join('');
+  return '<details class="att-calendar-person"' + (expanded ? ' open' : '') + '><summary><span><b>' + esc(staff.name) + '</b>' +
+    '<small>근무 ' + recorded.length + '일 · 완료 ' + complete + '건' + (issue ? ' · 확인 필요 ' + issue + '건' : '') + '</small></span></summary>' +
+    '<div class="att-calendar-week"><span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span></div>' +
+    '<div class="att-calendar-grid">' + blanks + days + '</div></details>';
 }
 function renderAttendanceHistoryResults() {
   const target = $('#attHistoryResults');
   if (!session.isAdmin || !target) return;
-  const all = !!$('#attHistoryAll').checked;
-  let date = $('#attHistoryDate').value;
-  if (!attendanceHistoryDates.includes(date)) {
-    date = attendanceHistoryDates[0];
-    $('#attHistoryDate').value = date;
-  }
-  $('#attHistoryDate').disabled = all;
-  $('#attHistoryPrev').disabled = all || date <= attendanceHistoryDates[attendanceHistoryDates.length - 1];
-  $('#attHistoryNext').disabled = all || date >= attendanceHistoryDates[0];
-  target.innerHTML = attendanceHistoryResultsHtml(attendanceHistoryRows());
+  if (attendanceHistoryLoading) { target.innerHTML = '<div class="hint">월별 출퇴근 기록을 불러오는 중입니다.</div>'; return; }
+  const selected = String(($('#attHistoryStaff') || {}).value || '');
+  const staff = attendanceHistoryStaff().filter(person => !selected || String(person.id) === selected);
+  const allRows = attendanceHistoryRows('');
+  const recorded = allRows.filter(row => row.status !== 'no_record');
+  const totals = window.WBStaffAttendanceHistoryCore.summary(recorded);
+  const summary = '<div class="att-history-summary">' +
+    '<div class="att-history-stat complete"><strong>' + recorded.length + '</strong><span>근무 기록</span></div>' +
+    '<div class="att-history-stat complete"><strong>' + totals.complete + '</strong><span>출퇴근 완료</span></div>' +
+    '<div class="att-history-stat missing_out"><strong>' + totals.missingOut + '</strong><span>퇴근 미기록</span></div>' +
+    '<div class="att-history-stat invalid"><strong>' + totals.invalid + '</strong><span>시간 확인 필요</span></div></div>';
+  target.innerHTML = summary + (staff.length ? '<div class="att-calendar-list">' + staff.map(person =>
+    attendanceCalendarHtml(person, attendanceHistoryRows(person.id), !!selected)).join('') + '</div>' :
+    '<div class="hint">선택한 조건에 해당하는 직원이 없습니다.</div>');
+  const prev = $('#attHistoryPrev'), next = $('#attHistoryNext');
+  if (prev) prev.disabled = !!attendanceHistoryBounds.earliestMonth && attendanceHistoryMonth <= attendanceHistoryBounds.earliestMonth;
+  if (next) next.disabled = attendanceHistoryMonth >= (attendanceHistoryBounds.currentMonth || today().slice(0, 7));
 }
-function openAttendanceHistory() {
+async function loadAttendanceHistoryMonth(month) {
+  if (!session.isAdmin || attendanceHistoryLoading) return;
+  const auth = sync.auth();
+  if (!auth) return toast('관리자 인증을 다시 확인해 주세요');
+  attendanceHistoryLoading = true;
+  attendanceHistoryMonth = month;
+  if ($('#attHistoryMonth')) $('#attHistoryMonth').value = month;
+  renderAttendanceHistoryResults();
+  try {
+    const result = await sync.post('/staff-attendance', { app: SYNC_APP, auth, action: 'history', month });
+    if (!result || result.month !== month || !Array.isArray(result.records)) throw new Error('월별 기록 응답을 확인하지 못했습니다');
+    attendanceHistoryChecks = {};
+    result.records.forEach(item => {
+      if (!item || !item.staffId || !/^\d{4}-\d{2}-\d{2}$/.test(String(item.date || '')) || !item.record) return;
+      const key = attKey(item.staffId) + '|' + item.date;
+      const record = Object.assign({}, item.record, { taskId: attKey(item.staffId), date: item.date,
+        updatedAt: Number(item.updatedAt) || 0 });
+      attendanceHistoryChecks[key] = record;
+      const local = state.checks[key];
+      if (!local || Number(record.updatedAt) >= Number(local.updatedAt || 0)) state.checks[key] = record;
+    });
+    attendanceHistoryBounds = result.bounds || attendanceHistoryBounds;
+    if ($('#attHistoryMonth') && attendanceHistoryBounds.earliestMonth) $('#attHistoryMonth').min = attendanceHistoryBounds.earliestMonth;
+  } catch (error) {
+    attendanceHistoryChecks = {};
+    toast('월별 출퇴근 기록을 불러오지 못했습니다 — ' + String(error && error.message || error));
+  } finally {
+    attendanceHistoryLoading = false;
+    renderAttendanceHistoryResults();
+  }
+}
+function openAttendanceHistory(staffId) {
   if (!session.isAdmin) return;
   if (!window.WBStaffAttendanceHistoryCore) return toast('출퇴근 조회 화면을 불러오지 못했습니다. 새로고침해 주세요');
-  const currentDate = seoulNowParts().date;
-  attendanceHistoryDates = Array.from({ length: 14 }, (_, index) => addDays(currentDate, -index));
-  modal('전체 출퇴근 이력', '<section class="att-history">' +
-    '<div class="card-sub mb14">오늘 기록부터 확인하고, 날짜나 선생님을 선택해 지난 기록을 볼 수 있습니다.</div>' +
-    '<div class="att-history-filters"><label for="attHistoryDate">날짜<div class="att-history-date">' +
-    '<button id="attHistoryPrev" class="btn btn-sm btn-ghost" data-act="atthistdate" data-delta="-1" aria-label="이전 날짜">‹</button>' +
-    '<input id="attHistoryDate" class="in" type="date" min="' + attendanceHistoryDates[13] + '" max="' + attendanceHistoryDates[0] + '" value="' + attendanceHistoryDates[0] + '">' +
-    '<button id="attHistoryNext" class="btn btn-sm btn-ghost" data-act="atthistdate" data-delta="1" aria-label="다음 날짜">›</button></div></label>' +
+  attendanceHistoryMonth = seoulNowParts().date.slice(0, 7);
+  attendanceHistoryChecks = {};
+  const staffOptions = state.staff.filter(staff => staff && staff.id && !staff.owner)
+    .sort((left, right) => String(left.name).localeCompare(String(right.name), 'ko'));
+  modal('월별 출퇴근 달력', '<section class="att-history">' +
+    '<div class="card-sub mb14">월을 바꾸면 최초 저장 기록부터 현재까지 모두 조회할 수 있습니다. 날짜를 누르면 관리자가 시각을 수정할 수 있습니다.</div>' +
+    '<div class="att-history-filters"><label for="attHistoryMonth">조회 월<div class="att-history-date">' +
+    '<button id="attHistoryPrev" class="btn btn-sm btn-ghost" data-act="atthistmonth" data-delta="-1" aria-label="이전 달">‹</button>' +
+    '<input id="attHistoryMonth" class="in" type="month" max="' + attendanceHistoryMonth + '" value="' + attendanceHistoryMonth + '">' +
+    '<button id="attHistoryNext" class="btn btn-sm btn-ghost" data-act="atthistmonth" data-delta="1" aria-label="다음 달">›</button></div></label>' +
     '<label for="attHistoryStaff">선생님<select id="attHistoryStaff" class="in"><option value="">전체 선생님</option>' +
-    liveStaff().map(staff => '<option value="' + esc(staff.id) + '">' + esc(staff.name) + '</option>').join('') + '</select></label>' +
-    '<label class="att-history-all"><input id="attHistoryAll" type="checkbox">전체 14일 보기</label></div>' +
-    '<div class="hint">기록 없음은 결근을 뜻하지 않습니다. 근무시간은 출근~퇴근의 단순 차이이며 휴게시간은 별도로 빼지 않습니다.</div>' +
+    staffOptions.map(staff => '<option value="' + esc(staff.id) + '"' + (String(staff.id) === String(staffId || '') ? ' selected' : '') + '>' + esc(staff.name) + '</option>').join('') + '</select></label></div>' +
+    '<div class="hint">기록 없음은 결근을 뜻하지 않습니다. 근무시간은 최초 로그인부터 마지막 로그아웃까지 표시하며 휴게시간은 별도로 빼지 않습니다.</div>' +
     '<div id="attHistoryResults" aria-live="polite"></div>' +
-    '<div class="att-history-actions"><button class="btn btn-ghost" data-act="atthistcopy">조회 결과 복사</button>' +
+    '<div class="att-history-actions"><button class="btn btn-ghost" data-act="atthistcopy">선택 월 결과 복사</button>' +
     '<button class="btn btn-primary" data-act="payrollmodal">월별 급여용 CSV 내보내기</button></div></section>');
-  renderAttendanceHistoryResults();
+  loadAttendanceHistoryMonth(attendanceHistoryMonth);
 }
-function shiftAttendanceHistoryDate(delta) {
-  if (!session.isAdmin || !$('#attHistoryDate') || $('#attHistoryAll').checked || ![-1, 1].includes(delta)) return;
-  const next = addDays($('#attHistoryDate').value, delta);
-  if (!attendanceHistoryDates.includes(next)) return;
-  $('#attHistoryDate').value = next;
-  renderAttendanceHistoryResults();
+function shiftAttendanceHistoryMonth(delta) {
+  if (!session.isAdmin || ![-1, 1].includes(delta)) return;
+  const next = attendanceMonthShift(attendanceHistoryMonth, delta);
+  const currentMonth = attendanceHistoryBounds.currentMonth || today().slice(0, 7);
+  if (!next || next > currentMonth || (attendanceHistoryBounds.earliestMonth && next < attendanceHistoryBounds.earliestMonth)) return;
+  loadAttendanceHistoryMonth(next);
 }
 function copyAttendanceHistory() {
   if (!session.isAdmin || !$('#attHistoryResults')) return;
-  const rows = attendanceHistoryRows();
-  if (!rows.length) return toast('복사할 조회 결과가 없습니다');
+  const rows = attendanceHistoryRows().filter(row => row.status !== 'no_record');
+  if (!rows.length) return toast('복사할 출퇴근 기록이 없습니다');
   copy('날짜\t선생님\t출근\t퇴근\t근무시간\t상태\n' + rows.map(row =>
-    [row.date, row.name, row.clockIn || '—', row.clockOut || '—', row.duration || '—', row.label].join('\t')).join('\n'), '조회 결과를 복사했습니다');
+    [row.date, row.name, row.clockIn || '—', row.clockOut || '—', row.duration || '—', row.label].join('\t')).join('\n'), '선택한 달의 기록을 복사했습니다');
 }
 document.addEventListener('change', event => {
-  if (['attHistoryDate', 'attHistoryStaff', 'attHistoryAll'].includes(event.target.id)) renderAttendanceHistoryResults();
+  if (event.target.id === 'attHistoryStaff') renderAttendanceHistoryResults();
+  if (event.target.id === 'attHistoryMonth' && /^\d{4}-\d{2}$/.test(event.target.value)) loadAttendanceHistoryMonth(event.target.value);
 });
 
 /** 출퇴근 기록 수정 — 급여에 직결되므로 원장·관리 담당만 교정한다. */
@@ -13852,25 +14088,19 @@ function msFromDateTime(date, hm) {
   d.setHours(h, m, 0, 0);
   return d.getTime();
 }
-function attEditModal(staffId) {
+function attEditModal(staffId, date) {
   const s = staffById(staffId);
   if (!session.isAdmin || !s) return;
-  let rows = '';
-  for (let i = 0; i < 14; i++) {
-    const d = addDays(today(), -i);
-    const a = attOf(staffId, d);
-    const editable = canEditAtt(staffId, d);
-    rows += '<div class="between small" style="padding:5px 0;gap:8px">' +
-      '<span style="min-width:64px">' + shortDate(d) + '(' + DOW[dowOf(d)] + ')</span>' +
-      '<input class="in" type="time" style="flex:1" data-act="attedit-in" data-staff="' + staffId + '" data-date="' + d + '"' +
-        (editable ? '' : ' disabled') + ' value="' + (a && a.at ? fmtTime(a.at) : '') + '">' +
-      '<span class="muted">~</span>' +
-      '<input class="in" type="time" style="flex:1" data-act="attedit-out" data-staff="' + staffId + '" data-date="' + d + '"' +
-        (editable ? '' : ' disabled') + ' value="' + (a && a.out ? fmtTime(a.out) : '') + '">' +
-      '</div>';
-  }
+  if (!date) return openAttendanceHistory(staffId);
+  const a = attOf(staffId, date);
+  const rows = '<div class="between small" style="padding:5px 0;gap:8px">' +
+    '<span style="min-width:64px">' + shortDate(date) + '(' + DOW[dowOf(date)] + ')</span>' +
+    '<input class="in" type="time" style="flex:1" data-act="attedit-in" data-staff="' + staffId + '" data-date="' + date + '" value="' + (a && a.at ? fmtTime(a.at) : '') + '">' +
+    '<span class="muted">~</span>' +
+    '<input class="in" type="time" style="flex:1" data-act="attedit-out" data-staff="' + staffId + '" data-date="' + date + '" value="' + (a && a.out ? fmtTime(a.out) : '') + '">' +
+    '</div>';
   modal('🕘 ' + esc(s.name) + ' 출퇴근 수정',
-    '<div class="hint mb14">관리자는 모든 날짜를 수정할 수 있습니다. 시간을 비우면 그 기록이 지워집니다.</div>' + rows);
+    '<div class="hint mb14">관리자는 이 날짜의 출퇴근 시각을 수정할 수 있습니다. 시간을 비우면 해당 시각이 지워집니다.</div>' + rows);
 }
 
 /** 급여용 출퇴근 내보내기 — 대표 전용. 아카플로우 등 외부 급여 계산과는
@@ -14718,6 +14948,73 @@ async function cancelWaitingBookOrderItem(button) {
   }
 }
 
+const pendingReceivedBookOrderCancellations = new Set();
+
+function openReceivedBookOrderCancellation(button) {
+  const taskId = String(button.dataset.task || '');
+  const itemIndex = Number(button.dataset.item);
+  const row = bookOrderRows.find(item => String(item.taskId) === taskId && Number(item.itemIndex) === itemIndex);
+  if (!row || row.stage !== 'teacher_received' ||
+      !['bound_print_v1', 'internal_book_v1'].includes(String(row.orderDelivery || ''))) {
+    return toast('3단계 내부·제본교재 주문만 취소할 수 있습니다');
+  }
+  const students = Array.isArray(row.students) ? row.students : [];
+  if (!students.length) return toast('취소할 학생 연결을 찾을 수 없습니다');
+  const unitPrice = Number(row.unitPrice);
+  const priceText = Number.isInteger(unitPrice) && unitPrice > 0
+    ? unitPrice.toLocaleString('ko-KR') + '원/권' : '금액 미입력';
+  modal('주문취소 — ' + row.title,
+    '<div class="hint mb14"><b>교재</b> · ' + esc(row.title) + '<br><b>가격</b> · ' + esc(priceText) +
+      '<br>취소할 학생만 선택해 주세요. 선택하지 않은 학생의 주문은 3단계에 그대로 남습니다.</div>' +
+    '<div class="book-order-picker-list">' + students.map(student =>
+      '<label class="book-order-picker-option"><input type="checkbox" data-received-order-cancel-student value="' + esc(student.id) + '">' +
+      '<span>' + esc(staffStudentCompactLabel(student, '이름 미입력')) + '</span></label>').join('') + '</div>' +
+    '<label class="field mt14"><span class="fl">취소 사유 (필수)</span>' +
+      '<textarea class="in" rows="3" maxlength="300" data-received-order-cancel-reason ' +
+        'placeholder="예: 교재 종류를 잘못 선택함"></textarea></label>',
+    '<button class="btn btn-danger btn-block" data-act="bookorderreceivedcancelsave" data-task="' + esc(taskId) +
+      '" data-item="' + itemIndex + '" data-rev="' + Number(row.revision || 0) + '">선택 학생 주문취소 확인</button>');
+}
+
+async function saveReceivedBookOrderCancellation(button) {
+  const auth = sync.auth();
+  if (!auth) return toast('동기화 인증이 필요합니다');
+  const taskId = String(button.dataset.task || '');
+  const itemIndex = Number(button.dataset.item);
+  const key = taskId + '|' + itemIndex;
+  if (pendingReceivedBookOrderCancellations.has(key)) return;
+  const studentIds = Array.from(document.querySelectorAll('[data-received-order-cancel-student]:checked'))
+    .map(input => String(input.value || '')).filter(Boolean);
+  const reasonInput = document.querySelector('[data-received-order-cancel-reason]');
+  const reason = String(reasonInput && reasonInput.value || '').trim();
+  if (!studentIds.length) return toast('취소할 학생을 한 명 이상 선택해 주세요');
+  if (!reason) return toast('주문취소 사유를 입력해 주세요');
+
+  pendingReceivedBookOrderCancellations.add(key);
+  button.disabled = true;
+  try {
+    await sync.post('/book-issue', {
+      app: SYNC_APP, auth, action: 'order_cancel_received_students', taskId, itemIndex,
+      revision: Number(button.dataset.rev || 0), studentIds, reason
+    });
+    closeModal();
+    await loadBookIssues(true);
+    toast('선택한 학생의 교재 주문을 취소했습니다');
+  } catch (error) {
+    if (error && ['ORDER_CANCEL_NOT_RECEIVED', 'ORDER_ALL_STUDENTS_CANCELLED'].includes(error.code)) {
+      toast('이미 배부되었거나 취소된 주문입니다 — 현황을 새로고침해 주세요');
+    } else if (error && error.code === 'REVISION_CONFLICT') {
+      toast('주문 상태가 먼저 변경되었습니다 — 현황을 새로고침해 주세요');
+    } else {
+      toast('교재 주문취소 실패 — ' + String(error && error.message || error));
+    }
+    await loadBookIssues(true);
+    if (button.isConnected) button.disabled = false;
+  } finally {
+    pendingReceivedBookOrderCancellations.delete(key);
+  }
+}
+
 function cancelOrderModal(bookId) {
   const b = ((bookDb && bookDb.books) || []).find(x => x.id === bookId);
   if (!b) return;
@@ -15370,7 +15667,7 @@ function viewLegacyBookIssues() {
 
 function bookOrderStageRows(stage) {
   if (stage === 'order_result') return bookOrderRows.filter(row => ['ordered', 'order_failed', 'order_check'].includes(row.stage));
-  return bookOrderRows.filter(row => row.stage === stage);
+  return bookOrderRows.filter(row => row.stage === stage && !(row.studentHandedAt && row.academyRegisteredAt && !row.academyCorrectionNeeded));
 }
 
 function bookOrderMessageStatusLabel(row) {
@@ -15384,6 +15681,7 @@ function bookOrderMessageStatusLabel(row) {
 }
 
 function bookOrderStatusLabel(row) {
+  if (row.stage === 'cancelled') return ['주문취소', 'bad'];
   if (row.needsStudentLink) return ['학생 연결 필요', 'warn'];
   if (row.integrity) return ['연결 확인 필요', 'bad'];
   if (row.stage === 'order_waiting') return ['주문대기', 'warn'];
@@ -15400,6 +15698,23 @@ function bookOrderSecondaryMessageStatusHtml(row) {
 }
 
 function bookOrderActionButtons(row) {
+  return bookOrderDeliveryButtons(row) + bookOrderAcademyButtons(row);
+}
+
+function bookOrderAcademyButtons(row) {
+  if (!session.isAdmin || row.integrity) return '';
+  const correction = !!row.academyCorrectionNeeded;
+  if (!correction && (row.academyRegisteredAt || row.needsStudentLink ||
+      !['ordered', 'teacher_received', 'student_handed'].includes(row.stage))) return '';
+  if (!correction && !(Number(row.unitPrice) > 0)) return '<span class="hint">교재 금액 입력 후 아카등록할 수 있습니다.</span>';
+  return '<button class="btn btn-sm btn-primary" data-act="bookordertransition" data-next="' +
+    (correction ? 'academy_correct' : 'academy_register') + '" data-task="' + esc(row.taskId) +
+    '" data-item="' + Number(row.itemIndex) + '" data-rev="' + Number(row.revision || 0) +
+    '" data-academy-rev="' + Number(row.academyRevision || 0) + '">' +
+    (correction ? '아카수정완료' : '아카등록완료') + '</button>';
+}
+
+function bookOrderDeliveryButtons(row) {
   const canTeacherAct = session.isAdmin || (session.isStaffLink && String(row.owner || '') === session.staffId);
   const base = ' data-task="' + esc(row.taskId) + '" data-item="' + Number(row.itemIndex) + '" data-rev="' + Number(row.revision || 0) +
     '" data-task-updated="' + Number(row.taskUpdatedAt || 0) + '"';
@@ -15416,10 +15731,9 @@ function bookOrderActionButtons(row) {
   }
   if (cancelButton) return cancelButton;
   if (row.stage === 'ordered' && canTeacherAct) return '<button class="btn btn-sm btn-primary" data-act="bookordertransition" data-next="receive"' + base + '>수령완료</button>';
-  if (row.stage === 'teacher_received' && canTeacherAct) return '<button class="btn btn-sm btn-primary" data-act="bookordertransition" data-next="hand"' + base + '>배부완료</button>';
-  if (row.stage === 'student_handed' && session.isAdmin && !row.academyRegisteredAt) {
-    return '<button class="btn btn-sm btn-primary" data-act="bookordertransition" data-next="academy_register"' + base + '>아카등록완료</button>';
-  }
+  if (row.stage === 'teacher_received' && canTeacherAct) return '<button class="btn btn-sm btn-primary" data-act="bookordertransition" data-next="hand"' + base + '>배부완료</button>' +
+    (['bound_print_v1', 'internal_book_v1'].includes(String(row.orderDelivery || ''))
+      ? '<button class="btn btn-sm btn-danger" data-act="bookorderreceivedcancelopen"' + base + '>주문취소</button>' : '');
   return '';
 }
 
@@ -15455,7 +15769,8 @@ function bookOrderDatesHtml(row) {
     ['주문요청', row.orderRequestedAt],
     ['주문완료', row.orderCompletedAt],
     ['수령완료', row.teacherReceivedAt],
-    ['배부완료', row.studentHandedAt]
+    ['배부완료', row.studentHandedAt],
+    ['아카등록', row.academyRegisteredAt]
   ].map(item => '<div class="book-order-date"><b>' + item[0] + '</b><span>' + bookOrderDateText(item[1]) + '</span></div>').join('') + '</div>';
 }
 
@@ -15465,6 +15780,8 @@ function bookOrderRowHtml(row) {
   return '<article class="book-order-row"><div class="between"><div><div class="card-title">' + esc(row.title) + ' · ' + Number(row.quantity || 0) + '권</div>' +
     '<div class="card-sub">주문 ' + esc(row.teacherName || '담당 미지정') + ' · 주문처 ' + esc(bookVendorDisplayName(row.vendorName || '미등록')) + '</div></div><span class="pill ' + label[1] + '">' + label[0] + '</span></div>' +
     bookOrderSecondaryMessageStatusHtml(row) + bookOrderMoneyHtml(row) + bookOrderPriceEntryHtml(row) + bookOrderDatesHtml(row) +
+    (row.academyCorrectionNeeded ? '<div class="hint mt8" style="color:#b42318"><b>아카 수정 필요</b> · 등록 후 취소·학생·교재·금액 정보가 달라졌습니다. 아카플로우에서 직접 수정한 뒤 확인해 주세요.</div>' :
+      row.academyRegisteredAt ? '<div class="hint mt8">아카등록 완료 · 수령·배부는 별도로 처리해 주세요.</div>' : '') +
     (students.length ? '<div class="book-order-student-list">' + students.map(student => '<span class="book-order-student">' +
       esc(staffStudentCompactLabel(student, '이름 미입력')) + '</span>').join('') + '</div>' :
       '<div class="small muted mt8">' + (row.integrity || row.needsStudentLink ? '현재 원생 명단과 주문의 stable studentId 연결을 확인해 주세요.' : '기존 수량 주문 · 학생 연결 없음') + '</div>') +
@@ -15480,6 +15797,21 @@ function bookOrderStageHtml(stage, title, description) {
       '<div class="empty"><b>📚</b>' + esc(description) + '</div>') + '</div></details>';
 }
 
+function bookOrderCancellationHistoryHtml() {
+  const rows = (bookOrderRows || []).filter(row => Array.isArray(row.cancelledStudents) && row.cancelledStudents.length)
+    .sort((a, b) => Math.max(...b.cancelledStudents.map(item => Number(item.cancelledAt) || 0)) -
+      Math.max(...a.cancelledStudents.map(item => Number(item.cancelledAt) || 0)));
+  if (!rows.length) return '';
+  const quantity = rows.reduce((sum, row) => sum + row.cancelledStudents.length, 0);
+  return '<details class="book-order-stage"><summary><b>취소 기록</b><span class="pill">' + quantity + '권</span></summary>' +
+    '<div class="book-order-stage-list">' + rows.map(row => '<article class="book-order-row">' +
+      '<div class="between"><div><div class="card-title">' + esc(row.title) + '</div>' +
+      '<div class="card-sub">주문 ' + esc(row.teacherName || '담당 미지정') + '</div></div><span class="pill bad">취소됨</span></div>' +
+      row.cancelledStudents.map(student => '<div class="hint mt8"><b>' + esc(staffStudentCompactLabel(student, '삭제된 원생')) + '</b>' +
+        '<br>취소일 · ' + esc(bookOrderDateText(student.cancelledAt)) + '<br>사유 · ' + esc(student.reason || '사유 미입력') + '</div>').join('') +
+      '</article>').join('') + '</div></details>';
+}
+
 function viewBookIssues() {
   if (!bookIssueLoaded && !bookIssueLoading) setTimeout(() => loadBookIssues(false), 0);
   let h = '<section class="card book-issue-board"><div class="between"><div><div class="card-title">교재 주문 및 배송 현황</div>' +
@@ -15491,7 +15823,11 @@ function viewBookIssues() {
     bookOrderStageHtml('order_waiting', '1단계 · 주문대기', '저녁 8시 발송을 기다리는 교재가 없습니다.') +
     bookOrderStageHtml('order_result', '2단계 · 주문완료 / 주문실패', '저녁 8시 이후 주문 결과가 없습니다.') +
     bookOrderStageHtml('teacher_received', '3단계 · 선생님 수령', '선생님이 수령한 교재가 없습니다.') +
-    bookOrderStageHtml('student_handed', '4단계 · 학생배부 완료', '학생 배부가 완료된 교재가 없습니다.') + '</div>';
+    bookOrderStageHtml('student_handed', '4단계 · 학생배부 완료', '학생 배부가 완료된 교재가 없습니다.') +
+    (session.isAdmin && bookOrderRows.some(row => row.academyCorrectionNeeded)
+      ? '<details class="book-order-stage"><summary><b>아카 수정 필요</b></summary>' +
+        bookOrderRows.filter(row => row.academyCorrectionNeeded).map(bookOrderRowHtml).join('') + '</details>' : '') +
+    bookOrderCancellationHistoryHtml() + '</div>';
   h += '</section>';
   return h;
 }
@@ -15553,14 +15889,17 @@ async function transitionBookOrder(button) {
   if (next === 'receive' && !confirm('선생님이 이 교재를 실제로 수령했나요?')) return;
   if (next === 'hand' && !confirm('선택된 학생들에게 교재를 모두 배부했나요?')) return;
   if (next === 'academy_register' && !confirm('아카에 교재 등록을 완료했나요?')) return;
+  if (next === 'academy_correct' && !confirm('아카플로우에서 취소·학생·금액 변경을 직접 수정했나요? 이 버튼은 아카플로우를 자동 수정하지 않습니다.')) return;
   button.disabled = true;
   try {
-    await sync.post('/book-issue', { app: SYNC_APP, auth: auth, action: 'order_transition',
+    const academy = next === 'academy_register' || next === 'academy_correct';
+    await sync.post('/book-issue', { app: SYNC_APP, auth: auth, action: academy ? 'academy_transition' : 'order_transition',
       taskId: String(button.dataset.task || ''), itemIndex: Number(button.dataset.item),
-      next: next, revision: Number(button.dataset.rev) || 0 });
+      next: academy ? (next === 'academy_correct' ? 'correct' : 'register') : next,
+      academyRevision: Number(button.dataset.academyRev) || 0, revision: Number(button.dataset.rev) || 0 });
     await loadBookIssues(true);
     if (next === 'academy_register') await loadCompletedBookCatalog(true);
-    toast(next === 'receive' ? '수령완료로 저장했습니다' : next === 'hand' ? '배부완료로 저장했습니다' : '아카등록완료로 저장했습니다');
+    toast(next === 'receive' ? '수령완료로 저장했습니다' : next === 'hand' ? '배부완료로 저장했습니다' : next === 'academy_correct' ? '아카수정완료로 저장했습니다' : '아카등록완료로 저장했습니다');
   } catch (error) {
     button.disabled = false;
     toast('교재 단계 저장 실패 — ' + (error.message || error));
@@ -16360,7 +16699,7 @@ function bookOrderHistorySearchKey(value) {
 function bookOrderHistoryRows(teacherId, titleQuery) {
   const selected = String(teacherId || '');
   const titleKey = bookOrderHistorySearchKey(titleQuery);
-  return bookOrderRows.filter(row => row.academyRegisteredAt &&
+  return bookOrderRows.filter(row => row.academyRegisteredAt && row.studentHandedAt && !row.academyCorrectionNeeded && row.stage !== 'cancelled' &&
     (!selected || (row.owner ? String(row.owner) : '__director__') === selected) &&
     (!titleKey || bookOrderHistorySearchKey(row.title).includes(titleKey))).slice()
     .sort((a, b) => Number(b.studentHandedAt || 0) - Number(a.studentHandedAt || 0) ||
@@ -19078,6 +19417,32 @@ function rosterStudentLessonsHtml(student) {
   }).join('');
 }
 
+function rosterStudentSubscriptions(student) {
+  const raw = Array.isArray(student && student.subscriptions) ? student.subscriptions : [];
+  return SUBSCRIPTION_PROGRAMS.map(program => {
+    const saved = raw.find(item => item && String(item.type || '') === program.type);
+    return saved && lessonRegistrationIsoDate(saved.startDate)
+      ? { type: program.type, label: program.label, startDate: saved.startDate } : null;
+  }).filter(Boolean);
+}
+
+function rosterSubscriptionActionsHtml(student) {
+  const programs = rosterStudentSubscriptions(student);
+  if (!programs.length) return '';
+  const history = (state.tasks || []).filter(task => isSubscriptionSessionTask(task) &&
+    String(task.studentId || '') === String(student.id || '')).sort((left, right) =>
+    String(right.start || '').localeCompare(String(left.start || '')) || String(right.time || '').localeCompare(String(left.time || '')));
+  return '<div class="guide mt14"><b>구독 수업</b><div class="small mt8">지정한 날짜에만 1회성 수업을 생성합니다. 정규 시간표·회차·자동 보강에는 포함되지 않습니다.</div>' +
+    (session.isAdmin ? '<div class="row wraprow mt8" style="gap:8px">' + programs.map(program =>
+      '<button class="btn btn-sm btn-primary" data-act="subscriptionlessonopen" data-id="' + esc(student.id) +
+      '" data-subscription-type="' + esc(program.type) + '">' + esc(program.label) + ' 수업 생성</button>').join('') + '</div>' : '') +
+    (history.length ? '<details class="mt14"><summary><b>구독 수업 기록 ' + history.length + '건</b></summary><div class="mt8">' +
+      history.map(task => '<div class="small" style="padding:7px 0;border-top:1px solid var(--line)"><b>' +
+        esc(subscriptionProgramLabel(task.subscriptionType)) + '</b> · ' + esc(task.start || '') + ' · ' +
+        esc(String(task.scheduleText || task.time || '')) + ' · ' + esc(((staffById(task.staffId) || {}).name || '담당 미지정')) + ' 선생님</div>').join('') +
+      '</div></details>' : '<div class="small muted mt14">아직 생성된 구독 수업이 없습니다.</div>') + '</div>';
+}
+
 function rosterStudentInfoHtml(student, lessonReferences, taskId) {
   const status = rosterStudentInfoStatus(student);
   const changed = typeof studentChangedFieldSet === 'function' ? studentChangedFieldSet(student.id, taskId) : new Set();
@@ -19098,6 +19463,7 @@ function rosterStudentInfoHtml(student, lessonReferences, taskId) {
     field('등록과목', student.subject, false, ['subject', 'subjects']) +
     field('신규등록일', student.registrationDate, false, ['registrationDate']) +
     field('첫 등원일', student.firstClassDate, false, ['firstClassDate']) +
+    rosterStudentSubscriptions(student).map(program => field(program.label + ' 시작일', program.startDate, false, ['subscriptions'])).join('') +
     '<div class="student-info-field"><b>결제 구분' + (changed.has('billingMode') ? marker('결제 구분') : '') +
       '</b><span>' + esc(billingMode) + '</span></div>' +
     (String(student.billingMode || 'monthly') === 'session4'
@@ -19109,6 +19475,7 @@ function rosterStudentInfoHtml(student, lessonReferences, taskId) {
     (student.reason ? field('종료 사유', student.reason, true, ['reason']) : '') +
     (student.memo ? field('내부 메모', student.memo, true, ['memo']) : '') +
     (references.length ? field('수업 참고', references.map(item => '· ' + item).join('\n'), true, ['guide', 'steps', 'lessonReferences']) : '') + '</div>' +
+    rosterSubscriptionActionsHtml(student) +
     studentAttendancePanelHtml(student) +
     (typeof studentChangeHistoryHtml === 'function' ? studentChangeHistoryHtml(student.id) : '');
 }
@@ -19200,6 +19567,7 @@ function rosterStudentCanDelete(student) {
   if (!String(student && student.name || '').trim()) return false;
   if (rosterStudentLessonTasks(student.id).length || rosterStudentSubjects(student).length) return false;
   if (String(student.billingMode || 'monthly') !== 'monthly') return false;
+  if (rosterStudentSubscriptions(student).length) return false;
   return ![
     student.subject, student.phoneSelf, student.phoneFather, student.phoneMother,
     student.registrationDate, student.firstClassDate, student.end, student.reason, student.memo,
@@ -19209,6 +19577,7 @@ function rosterStudentCanDelete(student) {
 
 function rosterStudentEditorHtml(student, assignment) {
   const selectedSubjects = new Set(rosterStudentSubjects(student));
+  const selectedSubscriptions = new Map(rosterStudentSubscriptions(student).map(item => [item.type, item]));
   const isCreate = !student._editing;
   const isNew = student.entryType === 'new' && isCreate;
   const transition = rosterStudentTransition(student);
@@ -19230,6 +19599,17 @@ function rosterStudentEditorHtml(student, assignment) {
       '<div class="small mt8">담당 변경은 학생 정보의 수업 정보 확인 및 수정에서 각 수업별로 처리합니다.</div></div>' : '') +
     '<div class="grid2"><label class="field"><span class="fl">신규등록일 (선택)</span><input class="in" type="date" data-rse-registration-date value="' + esc(student.registrationDate || '') + '"></label>' +
     '<label class="field"><span class="fl">첫 등원일 (선택)</span><input class="in" type="date" data-rse-first-class-date value="' + esc(student.firstClassDate || '') + '"></label></div>' +
+    '<div class="field"><span class="fl">구독 프로그램 · 중복 선택 가능</span><div class="chips">' + SUBSCRIPTION_PROGRAMS.map(program => {
+      const selected = selectedSubscriptions.get(program.type);
+      return '<label class="chip"><input type="checkbox" data-rse-subscription value="' + esc(program.type) + '"' +
+        (selected ? ' checked' : '') + ' onchange="updateRosterSubscriptionFields(this)"> ' + esc(program.label) + '</label>';
+    }).join('') + '</div></div>' +
+    '<div class="grid2" data-rse-subscription-dates>' + SUBSCRIPTION_PROGRAMS.map(program => {
+      const selected = selectedSubscriptions.get(program.type);
+      return '<label class="field" data-rse-subscription-date-wrap="' + esc(program.type) + '"' + (selected ? '' : ' hidden') +
+        '><span class="fl">' + esc(program.label) + ' 시작일 · 필수</span><input class="in" type="date" data-rse-subscription-date="' +
+        esc(program.type) + '"' + (selected ? ' required aria-required="true"' : '') + ' value="' + esc(selected && selected.startDate || '') + '"></label>';
+    }).join('') + '</div>' +
     '<div class="grid2"><label class="field"><span class="fl">결제 구분</span><select class="in" data-rse-billing-mode onchange="updateRosterBillingFields(this)">' +
       '<option value="monthly"' + (billingMode === 'monthly' ? ' selected' : '') + '>월결제</option>' +
       '<option value="session4"' + (billingMode === 'session4' ? ' selected' : '') + '>회차제 · 4회</option></select></label>' +
@@ -19260,6 +19640,23 @@ function updateRosterBillingFields(selectElement) {
     input.setAttribute('aria-required', sessionMode ? 'true' : 'false');
     if (!sessionMode) input.value = '';
   }
+}
+
+function updateRosterSubscriptionFields(inputElement) {
+  const root = inputElement && (inputElement.closest('#modalHost') || document);
+  if (!root) return;
+  SUBSCRIPTION_PROGRAMS.forEach(program => {
+    const checkbox = root.querySelector('[data-rse-subscription][value="' + program.type + '"]');
+    const input = root.querySelector('[data-rse-subscription-date="' + program.type + '"]');
+    const wrap = root.querySelector('[data-rse-subscription-date-wrap="' + program.type + '"]');
+    const selected = !!(checkbox && checkbox.checked);
+    if (wrap) wrap.hidden = !selected;
+    if (input) {
+      input.required = selected;
+      input.setAttribute('aria-required', selected ? 'true' : 'false');
+      if (!selected) input.value = '';
+    }
+  });
 }
 
 function showRosterStudentEditor(student, assignment) {
@@ -19384,7 +19781,7 @@ async function openRosterStudentEditor(studentId, assignment, entryType) {
       id: '', name: assignment ? assignment.studentName : '', grade: assignment ? assignment.grade : '',
       school: assignment ? String(assignment.school || '') : '', phoneSelf: '', phoneFather: '', phoneMother: '', registrationDate: '', firstClassDate: '',
       subject: '', subjects: [], start: today().slice(0, 7), end: '', reason: '', memo: '',
-      billingMode: 'monthly', sessionCycleStartDate: '',
+      billingMode: 'monthly', sessionCycleStartDate: '', subscriptions: [],
       entryType: entryType === 'new' ? 'new' : 'existing', _editing: false
     }, assignment);
     return;
@@ -19410,6 +19807,9 @@ async function saveRosterStudent(button) {
   const billingMode = value('[data-rse-billing-mode]') === 'session4' ? 'session4' : 'monthly';
   let sessionCycleStartDate = billingMode === 'session4' ? value('[data-rse-session-cycle-start]') : '';
   if (billingMode === 'monthly') sessionCycleStartDate = '';
+  const subscriptions = Array.from(document.querySelectorAll('[data-rse-subscription]:checked')).map(input => ({
+    type: String(input.value || ''), startDate: value('[data-rse-subscription-date="' + String(input.value || '') + '"]')
+  }));
   const student = {
     id: editor.student.id, name: value('[data-rse-name]'), school: value('[data-rse-school]'), grade: value('[data-rse-grade]'),
     phoneSelf: value('[data-rse-phone-self]'), phoneFather: value('[data-rse-phone-father]'),
@@ -19417,12 +19817,16 @@ async function saveRosterStudent(button) {
     subject: subjects.join('·'), subjects: subjects,
     start: isNew ? (registrationDate.slice(0, 7) || today().slice(0, 7)) : value('[data-rse-start]'),
     end: isNew ? '' : value('[data-rse-end]'), reason: isNew ? '' : value('[data-rse-reason]'),
-    memo: value('[data-rse-memo]'), billingMode: billingMode, sessionCycleStartDate: sessionCycleStartDate
+    memo: value('[data-rse-memo]'), billingMode: billingMode, sessionCycleStartDate: sessionCycleStartDate,
+    subscriptions: subscriptions
   };
   if (editor.student.entryType) student.entryType = editor.student.entryType;
   if (!student.name) return toast('이름을 입력해 주세요');
   if (!student.start) return toast('시작월을 입력해 주세요');
   if (billingMode === 'session4' && !sessionCycleStartDate) return toast('회차 시작일을 입력해 주세요');
+  if (subscriptions.some(item => !subscriptionProgramLabel(item.type) || !lessonRegistrationIsoDate(item.startDate))) {
+    return toast('선택한 구독 프로그램의 구독 시작일을 입력해 주세요');
+  }
   const auth = sync.auth();
   if (!auth) return toast('관리자 인증을 확인해 주세요');
   button.disabled = true; button.textContent = '저장 중…';
@@ -19451,6 +19855,66 @@ async function saveRosterStudent(button) {
   } catch (error) {
     button.disabled = false; button.textContent = editor.assignment ? '기존 원생 추가 후 명단 연결' : '저장';
     toast('원생 저장 실패 — ' + (error.message || error));
+  }
+}
+
+let subscriptionSessionDraft = null;
+
+function openSubscriptionSessionCreator(studentId, subscriptionType) {
+  if (!session.isAdmin) return toast('관리자만 구독 수업을 생성할 수 있습니다');
+  const student = rosterDb && Array.isArray(rosterDb.students) &&
+    rosterDb.students.find(item => String(item.id || '') === String(studentId || ''));
+  const program = student && rosterStudentSubscriptions(student).find(item => item.type === String(subscriptionType || ''));
+  if (!student || !program) return toast('학생 정보의 구독 상태와 시작일을 다시 확인해 주세요');
+  const defaultDate = program.startDate > today() ? program.startDate : today();
+  subscriptionSessionDraft = { requestId: uid(), studentId: String(student.id), subscriptionType: program.type };
+  modal(program.label + ' 수업 생성',
+    '<div class="guide mb14"><b>' + esc(staffStudentCompactLabel(student)) + '</b><div class="small mt8">' +
+      esc(program.label) + ' 시작일 ' + esc(program.startDate) + ' · 지정한 날짜에만 1회성 수업으로 생성됩니다.</div></div>' +
+    '<div class="grid2"><label class="field"><span class="fl">수업 날짜</span><input class="in" type="date" data-subscription-session-date min="' +
+      esc(program.startDate) + '" value="' + esc(defaultDate) + '"></label>' +
+    '<label class="field"><span class="fl">담당 선생님</span><select class="in" data-subscription-session-staff><option value="">선택</option>' +
+      lessonRegistrationStaffList().map(staff => '<option value="' + esc(staff.id) + '">' + esc(staff.name) + '</option>').join('') +
+      '</select></label></div>' +
+    '<div class="grid2"><label class="field"><span class="fl">시작시간</span><input class="in" type="time" data-subscription-session-start></label>' +
+    '<label class="field"><span class="fl">종료시간</span><input class="in" type="time" data-subscription-session-end></label></div>' +
+    '<label class="field"><span class="fl">수업 제목</span><input class="in" value="' + esc(program.label + ' 수업') + '" readonly></label>' +
+    '<label class="field"><span class="fl">담당 선생님 전달 메모 (선택)</span><textarea class="in" rows="4" maxlength="1600" data-subscription-session-memo ' +
+      'placeholder="이번 수업에서 확인할 내용을 적어 주세요."></textarea></label>' +
+    '<div class="hint">생성한 수업은 담당 선생님의 해당 날짜 오늘 화면과 관리자 현황판에 표시됩니다. 정규 시간표·회차 차감·결석 자동 보강에는 포함되지 않습니다.</div>',
+    '<button class="btn btn-primary btn-block mt14" data-act="subscriptionlessonsave">구독 수업 생성</button>');
+}
+
+async function createSubscriptionSession(button) {
+  const draft = subscriptionSessionDraft;
+  if (!session.isAdmin || !draft) return;
+  const value = selector => String((document.querySelector(selector) || {}).value || '').trim();
+  const date = value('[data-subscription-session-date]');
+  const staffId = value('[data-subscription-session-staff]');
+  const startTime = value('[data-subscription-session-start]');
+  const endTime = value('[data-subscription-session-end]');
+  const memo = value('[data-subscription-session-memo]');
+  if (!lessonRegistrationIsoDate(date)) return toast('수업 날짜를 선택해 주세요');
+  if (!staffId) return toast('담당 선생님을 선택해 주세요');
+  if (!startTime || !endTime || startTime >= endTime) return toast('시작·종료 시간을 올바르게 입력해 주세요');
+  const auth = sync.auth();
+  if (!auth) return toast('관리자 인증을 확인해 주세요');
+  if (button) { button.disabled = true; button.textContent = '생성 중…'; }
+  try {
+    const result = await sync.post('/roster', {
+      app: SYNC_APP, auth, action: 'subscription_session_create', requestId: draft.requestId,
+      studentId: draft.studentId, subscriptionType: draft.subscriptionType, staffId, date, startTime, endTime, memo
+    });
+    if (!result || !result.task) throw new Error('생성된 수업 정보를 확인할 수 없습니다');
+    applyCreatedLesson(result.task);
+    subscriptionSessionDraft = null;
+    closeModal();
+    await sync.run();
+    render();
+    toast(subscriptionProgramLabel(draft.subscriptionType) + ' 수업을 생성했습니다');
+  } catch (error) {
+    if (button) { button.disabled = false; button.textContent = '구독 수업 생성'; }
+    toast('구독 수업 생성 실패 — ' + String(error && error.message || error));
   }
 }
 
@@ -20393,7 +20857,7 @@ function viewStaffAdmin() {
     '<button class="btn btn-primary" data-act="addstaff">추가</button></div>' +
     (list.length > 1 ? '<button class="btn btn-ghost btn-block mt14" data-act="alllinks">전체 링크 한 번에 복사</button>' : '') +
     '<button class="btn btn-ghost btn-block mt8" data-act="payrollmodal">📅 급여용 출퇴근 내보내기</button>' +
-    '<button class="btn btn-ghost btn-block mt8" data-act="atthist">🕘 전체 출퇴근 이력 (최근 14일)</button>' +
+    '<button class="btn btn-ghost btn-block mt8" data-act="atthist">🗓️ 월별 출퇴근 달력</button>' +
     (session.isManager && hasVerifiedPersonAuth()
       ? '<div class="hint mt14"><b>이 관리 권한을 다른 태블릿에 연결</b><br>직원 목록에서 다시 고르지 않고, 현재 확인된 내 관리 담당 계정을 그대로 연결합니다.</div>' +
         '<button class="btn btn-ghost btn-block mt8" data-act="retryexistingauth">🔄 이 기기의 기존 연결 상태 확인</button>' +
@@ -21397,6 +21861,82 @@ function viewStudentPortalPanel() {
 }
 
 /* ── 설정 ── */
+function taskJsonExportPayload(exportedAt) {
+  return {
+    schema: 'wb-task-transfer-v1',
+    app: 'task',
+    exportedAt: exportedAt || new Date().toISOString(),
+    items: (state.tasks || [])
+      .filter(task => task && !task.deleted && !isBookOrderWorkTask(task) && !isLesson(task) &&
+        !isSessionLessonTask(task) && !isScheduledMakeupTask(task))
+      .map(task => {
+        const staff = staffById(task.staffId);
+        return {
+          taskId: String(task.id || ''),
+          groupId: String(task.groupId || ''),
+          staffId: String(task.staffId || ''),
+          staffName: String(staff && staff.name || ''),
+          title: String(task.title || ''),
+          detail: String(task.detail || ''),
+          guide: String(task.guide || ''),
+          steps: (Array.isArray(task.steps) ? task.steps : []).map(step => ({
+            id: String(step && step.id || ''), label: String(step && step.label || '')
+          })),
+          target: Number(task.target) || 0,
+          unit: String(task.unit || ''),
+          time: String(task.time || ''),
+          priority: task.priority === 'high' ? 'high' : 'normal',
+          repeat: String(task.repeat || 'once'),
+          days: Array.isArray(task.days) ? task.days.map(Number).filter(day => day >= 0 && day <= 6) : [],
+          start: String(task.start || ''),
+          end: String(task.end || ''),
+          carry: task.carry !== false,
+          origin: String(task.origin || ''),
+          createdAt: Number(task.createdAt) || 0,
+          updatedAt: Number(task.updatedAt) || 0
+        };
+      })
+  };
+}
+
+function classRosterJsonExportPayload(exportedAt) {
+  const reference = today();
+  const groups = new Map();
+  studentLinkCandidates(reference.slice(0, 7), false).forEach(student => {
+    rosterStudentAssignedLessonTasks(student.id, reference)
+      .filter(task => !task.start || String(task.start) <= reference)
+      .forEach(task => {
+        const subject = String(task.subject || '').trim();
+        const namedClass = String(task.className || '').trim();
+        const role = String(task.lessonRole || '').trim();
+        const baseName = [...new Set([subject, namedClass].filter(Boolean))].join(' · ') || role || '반 미지정';
+        const schedule = lessonAssignmentScheduleText(task.scheduleSlots, task.lessonHours) || String(task.scheduleText || '').trim();
+        const teacher = staffById(task.staffId);
+        const teacherName = teacher && teacher.name ? String(teacher.name).trim() : '';
+        const key = [String(task.staffId || ''), baseName, schedule].join('\u0000');
+        if (!groups.has(key)) groups.set(key, {
+          className: [baseName, schedule, teacherName ? teacherName + ' 선생님' : ''].filter(Boolean).join(' · '),
+          students: new Map()
+        });
+        groups.get(key).students.set(String(student.id), {
+          studentId: String(student.id),
+          name: String(student.name)
+        });
+      });
+  });
+  return {
+    schema: 'wb-class-roster-v1',
+    app: 'task',
+    asOf: reference,
+    exportedAt: exportedAt || new Date().toISOString(),
+    classes: Array.from(groups.values()).map(group => ({
+      className: group.className,
+      students: Array.from(group.students.values()).sort((a, b) =>
+        a.name.localeCompare(b.name, 'ko') || a.studentId.localeCompare(b.studentId))
+    })).sort((a, b) => a.className.localeCompare(b.className, 'ko'))
+  };
+}
+
 function viewSettings() {
   const s = state.settings;
   const lastTxt = sync.last ? new Date(sync.last).toLocaleString('ko-KR') : '아직 없음';
@@ -21406,6 +21946,11 @@ function viewSettings() {
     '<div class="row" style="gap:8px">' +
       '<button class="btn btn-ghost" data-act="export">내보내기</button>' +
       '<button class="btn btn-ghost" data-act="import">가져오기</button></div>' +
+    '<hr class="sep">' +
+    '<div class="card-title">외부 프로그램 전달</div>' +
+    '<div class="card-sub mb14">삭제되지 않은 일반 업무지시서만 JSON으로 내려받습니다. 수업·교재 주문·체크 기록·설정·접속 비밀값은 제외됩니다.<br>' +
+      '<b>자유 입력 내용에 학생 개인정보가 없는지 전달 전에 확인하세요.</b></div>' +
+    '<button class="btn btn-navy btn-block" data-act="taskjsonexport">업무지시서 JSON 받기</button>' +
   '</div>';
   if (session.isManager) {
     return '<div class="card">' +
@@ -22497,6 +23042,7 @@ document.addEventListener('click', async ev => {
       break;
     }
     case 'muretryaftersubmit': submitMakeupRetryAfterAbsence(el); break;
+    case 'muabsencelater': closeModal(); toast('결석 기록은 저장됐습니다 · 보강 탭에 재보강 일정 필요로 표시됩니다'); break;
     case 'muprocessadminopen': openMakeupAdminProcessModal(el); break;
     case 'murestoreschedule': {
       makeupDateTimeModal(makeupRows.find(row => row.caseId === String(el.dataset.case || '')), 'restore');
@@ -22564,6 +23110,8 @@ document.addEventListener('click', async ev => {
     case 'rosterstudentedit': openRosterStudentEditor(String(id || ''), null); break;
     case 'rosterstudentsave': saveRosterStudent(el); break;
     case 'rosterstudentdelete': deleteRosterStudent(el); break;
+    case 'subscriptionlessonopen': openSubscriptionSessionCreator(String(id || ''), String(el.dataset.subscriptionType || '')); break;
+    case 'subscriptionlessonsave': createSubscriptionSession(el); break;
     case 'rostertransitionopen': openRosterTransition(String(el.dataset.operation || '')); break;
     case 'rosterreturnslotadd':
       captureRosterTransitionDraft();
@@ -22601,6 +23149,8 @@ document.addEventListener('click', async ev => {
     case 'bookordertransition': transitionBookOrder(el); break;
     case 'bookordermanualresult': transitionManualOnlineOrder(el); break;
     case 'bookordercancel': cancelWaitingBookOrderItem(el); break;
+    case 'bookorderreceivedcancelopen': openReceivedBookOrderCancellation(el); break;
+    case 'bookorderreceivedcancelsave': saveReceivedBookOrderCancellation(el); break;
     case 'externalbookorder': submitExternalBookOrder(el); break;
     case 'internalbookstudentopen': openInternalBookStudentModal(); break;
     case 'internalbookstudentlinksave': saveInternalBookStudentLink(); break;
@@ -22979,6 +23529,35 @@ document.addEventListener('click', async ev => {
       submitWeekendVisit(el, { action: 'check_out', visitId: visitId, revision: Number(el.dataset.rev) }, '실제 하원 시간을 저장했습니다');
       break;
     }
+    case 'subscriptionvisitcheckin': {
+      const taskId = String(el.dataset.task || '');
+      const studentId = String(el.dataset.studentId || '');
+      const taskRow = state.tasks.find(item => isSubscriptionSessionTask(item) && String(item.id || '') === taskId &&
+        String(item.studentId || '') === studentId);
+      if (!taskRow || String(taskRow.start || '') !== String(cursor) || cursor !== today()) {
+        return toast('오늘 생성된 구독 수업과 학생 정보를 다시 확인해 주세요');
+      }
+      if (!confirm((taskRow.studentName || studentOf(taskRow)) + ' 학생의 실제 등원 시간을 지금으로 저장할까요?')) break;
+      submitWeekendVisit(el, { action: 'check_in', visitDate: cursor, sourceDate: cursor, lessonTaskId: taskId,
+        studentId: studentId, visitSequence: 1 }, '구독 수업 실제 등원 시간을 저장했습니다');
+      break;
+    }
+    case 'subscriptionvisitrecord': subscriptionVisitRecordModal(String(el.dataset.task || ''), String(el.dataset.date || '')); break;
+    case 'subscriptionvisitrecordsave': {
+      const row = weekendVisitEditTarget;
+      if (!row || !row.newSubscription) return toast('기록할 구독 수업을 다시 선택해 주세요');
+      const inValue = String(($('#weekendVisitIn') || {}).value || '');
+      const outValue = String(($('#weekendVisitOut') || {}).value || '');
+      const reason = String(($('#weekendVisitReason') || {}).value || '').trim();
+      const checkInAt = weekendVisitTimestamp(row.visitDate, inValue);
+      const checkOutAt = weekendVisitTimestamp(row.visitDate, outValue);
+      if (!checkInAt || !checkOutAt || checkOutAt < checkInAt) return toast('실제 등원·하원 시간을 모두 올바르게 입력해 주세요');
+      if (!reason) return toast('입력 사유를 입력해 주세요');
+      submitWeekendVisit(el, { action: 'check_in', manualRecord: true, visitDate: row.visitDate, sourceDate: row.visitDate,
+        lessonTaskId: row.lessonTaskId, studentId: row.studentId, visitSequence: 1,
+        checkInAt: checkInAt, checkOutAt: checkOutAt, reason: reason }, '구독 수업 실제 등·하원 기록을 저장했습니다');
+      break;
+    }
     case 'weekendedit': weekendVisitEditModal(el.dataset.visit); break;
     case 'weekendsave': {
       const row = weekendVisitEditTarget;
@@ -23026,7 +23605,11 @@ document.addEventListener('click', async ev => {
       break;
     }
     case 'atthist': openAttendanceHistory(); break;
-    case 'atthistdate': shiftAttendanceHistoryDate(Number(el.dataset.delta)); break;
+    case 'atthistmonth': shiftAttendanceHistoryMonth(Number(el.dataset.delta)); break;
+    case 'atthistdayedit': {
+      if (session.isAdmin) attEditModal(id, el.dataset.date);
+      break;
+    }
     case 'atthistcopy': copyAttendanceHistory(); break;
     case 'atteditopen': {
       if (!session.isAdmin) break;
@@ -23317,7 +23900,7 @@ document.addEventListener('click', async ev => {
       const savedCheck = setCheck(id, date, { att: next, absenceType: '' });
       if (shouldReconcileMakeup) {
         reconcileMakeupAfterAttendanceCorrection(id, date, savedCheck.updatedAt);
-      } else {
+      } else if (!(next === 'A' && isScheduledMakeupTask(t) && !isTestTeacherTask(t))) {
         settleSync().catch(() => toast('출결은 이 기기에 저장됐지만 서버 동기화를 확인해 주세요'));
       }
       if (next !== 'A') makeupCreateStates.delete(sourceKey);
@@ -23326,7 +23909,8 @@ document.addEventListener('click', async ev => {
       } else if (next === 'A' && isTestTeacherTask(t)) {
         toast('테스트쌤 수업은 보강을 생성하지 않습니다 · 다음날 출석으로 자동 처리됩니다');
       } else if (next === 'A' && isScheduledMakeupTask(t)) {
-        toast('보강수업 결석으로 저장했습니다 · 추가 보강은 자동 생성하지 않습니다');
+        toast('보강 결석을 저장하고 있습니다');
+        promptAfterMakeupAbsence(t, date, savedCheck.updatedAt);
       } else if (next === 'A' && !isMakeupLessonTask(t)) {
         toast('결석 출결 저장됨 · 상담 업무는 보강 대상이 아닙니다');
       } else if (next === 'A' && !t.studentId) {
@@ -23996,6 +24580,26 @@ document.addEventListener('click', async ev => {
       a.href = URL.createObjectURL(blob);
       a.download = 'wb-업무지시서-' + today() + '.json';
       a.click(); URL.revokeObjectURL(a.href);
+      break;
+    }
+    case 'taskjsonexport': {
+      if (!session.isAdmin) break;
+      const payload = taskJsonExportPayload();
+      downloadFile('wb-업무지시서-외부전달-' + today() + '.json', JSON.stringify(payload, null, 2), 'application/json');
+      toast('업무지시서 ' + payload.items.length + '건을 내려받았습니다');
+      break;
+    }
+    case 'classrosterjsonexport': {
+      if (!session.isAdmin) break;
+      if (!rosterDb) {
+        rosterErr = '';
+        loadRoster();
+        toast('원생 명단을 불러오는 중입니다. 잠시 후 다시 눌러 주세요');
+        break;
+      }
+      const payload = classRosterJsonExportPayload();
+      downloadFile('wb-반별-학생목록-' + today() + '.json', JSON.stringify(payload, null, 2), 'application/json');
+      toast('반 ' + payload.classes.length + '개 목록을 내려받았습니다');
       break;
     }
     case 'import': {
@@ -24682,7 +25286,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-09-19.2';
+const APP_VER = '2026-10-01.1';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);

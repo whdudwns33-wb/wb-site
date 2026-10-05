@@ -10,11 +10,14 @@ const section = (start, end) => {
   return from >= 0 && to > from ? html.slice(from, to) : '';
 };
 
-test('study screen renders ten separate source cards and keeps legacy MetaMath tasks', () => {
+test('study screen renders thirteen separate source cards and keeps legacy MetaMath tasks', () => {
   const sources = section('const LEARNING_SOURCES', 'const ONLINE_LEARNING_SOURCE_KEYS');
   const expected = [
     ['leaders_eye', '리더스아이'],
     ['metamath', '메타수학'],
+    ['brain_letter', '브레인레터'],
+    ['chunk_brain', '청크브레인'],
+    ['vocabulary', '어휘브레인'],
     ['classcard', '클래스카드'],
     ['studyforce', '스터디포스'],
     ['nelt_exam', '넬트 시험'],
@@ -55,22 +58,28 @@ test('external study services use fixed official links without embedded login', 
   assert.match(html, /const STUDYFORCE_URL = 'https:\/\/hol\.sfcenter\.co\.kr\/'/);
   assert.match(html, /centerUrl: STUDYFORCE_URL, studentUrl: STUDYFORCE_URL/);
   assert.doesNotMatch(html, /www\.studyforce\.co\.kr/);
+  assert.match(html, /const BRAIN_LETTER_URL = 'https:\/\/wb-reading\.whdudwns33\.workers\.dev\/letter\/'/);
+  assert.match(html, /const CHUNK_BRAIN_URL = 'https:\/\/wb-reading\.whdudwns33\.workers\.dev\/chunk\/'/);
+  assert.match(html, /const VOCABULARY_URL = 'https:\/\/wb-reading\.whdudwns33\.workers\.dev\/hanja\/'/);
+  assert.match(section('  vocabulary: {', '  classcard: {'), /icon: '🌱', label: '어휘브레인'/);
+  const chunk = section('  chunk_brain: {', '  vocabulary: {');
+  assert.doesNotMatch(chunk, /\?t=|print\.html|class\.html|chunk-admin\.html/);
 
   const card = section('function learningSourceCard(', '/* ── 학습 탭');
   assert.match(card, /target="_blank" rel="noopener noreferrer"/);
   assert.doesNotMatch(card, /iframe|fetch\(|type="password"/i);
 });
 
-test('Leaders Eye is the first online learning card directly above MetaMath', () => {
+test('requested brain learning cards appear first in the requested order', () => {
   const sources = section('const LEARNING_SOURCES', 'const DOW');
   const study = section('function viewStudy(', 'function rdAddModal(');
   assert.ok(sources.indexOf('  leaders_eye: {') < sources.indexOf('  metamath: {'));
-  assert.match(sources, /const ONLINE_LEARNING_SOURCE_KEYS = Object\.freeze\(\[\s*'leaders_eye', 'metamath', 'classcard', 'studyforce', 'nelt_exam', 'daily_nonfiction'/);
+  assert.match(sources, /const ONLINE_LEARNING_SOURCE_KEYS = Object\.freeze\(\[\s*'brain_letter', 'chunk_brain', 'vocabulary', 'leaders_eye', 'metamath',\s*'classcard', 'studyforce', 'nelt_exam', 'daily_nonfiction'/);
   assert.match(study, /keys: ONLINE_LEARNING_SOURCE_KEYS/);
 });
 
 test('Leaders Eye keeps its direct daily fallback and recurring assignments resolve the current occurrence', () => {
-  const helpers = section('const LEARNING_DAILY_LOG_KIND', 'function leadersEyeAccountGuide(');
+  const helpers = section('const LEARNING_DAILY_LOG_KIND', 'const LEARNING_LOGIN_MEMO_SOURCES');
   const modal = section('function leadersEyeDailyResultModal(', 'function studyPlannerCard(');
   const card = section('function learningSourceCard(', '/* ── 학습 탭');
   const add = section("case 'learnadd':", "case 'learnsave':");
@@ -210,7 +219,7 @@ test('a recurring learning assignment resolves only scheduled occurrences and dr
   assert.match(study, /learningTasks\.map\(task => \(\{ task: task, date: learningOccurrenceDate\(task, today\(\)\) \}\)\)\s*\.filter\(item => item\.date\)/);
   assert.match(study, /learningOccurrences\.filter\(item => !isDone\(item\.task\.id, item\.date\)\)/);
 
-  const source = section('function assignedLearningTaskForDate(', 'function leadersEyeAccountGuide(');
+  const source = section('function assignedLearningTaskForDate(', 'const LEARNING_LOGIN_MEMO_SOURCES');
   const task = { id: 'leaders-weekday', kind: 'learning', repeat: 'weekday' };
   const seen = [];
   const assignedLearningTaskForDate = Function(
@@ -232,17 +241,23 @@ test('a recurring learning assignment resolves only scheduled occurrences and dr
   ]);
 });
 
-test('NELT and daily nonfiction open the requested URLs for director, manager, and student', () => {
+test('online services open the requested URLs for director, manager, and student', () => {
   const sources = section('const LEADERS_EYE_URL', 'const DOW');
   const card = section('function learningSourceCard(', '/* ── 학습 탭');
-  const renderCard = Function('session', 'isManager', 'learningTasksFor', 'learningChecklistScheduleFor', 'esc',
+  const renderCard = Function('session', 'isManager', 'learningTasksFor', 'learningChecklistScheduleFor', 'esc', 'LEARNING_LOGIN_MEMO_SOURCES',
+    'pointRuleFor', 'pointOnlineLearningRows', 'engagementDayState',
+    'today',
     sources + card + '\nreturn learningSourceCard;');
   const expected = [
     ['nelt_exam', '넬트 시험', 'https://www.netutor.co.kr/st/'],
-    ['daily_nonfiction', '하루 비문학 독서', 'https://wb-reading.whdudwns33.workers.dev']
+    ['daily_nonfiction', '하루 비문학 독서', 'https://wb-reading.whdudwns33.workers.dev'],
+    ['brain_letter', '브레인레터', 'https://wb-reading.whdudwns33.workers.dev/letter/'],
+    ['chunk_brain', '청크브레인', 'https://wb-reading.whdudwns33.workers.dev/chunk/'],
+    ['vocabulary', '어휘브레인', 'https://wb-reading.whdudwns33.workers.dev/hanja/']
   ];
   for (const role of ['director', 'manager', 'student']) {
-    const render = renderCard({ isAdmin: role === 'director' }, () => role === 'manager', () => [], () => null, String);
+    const render = renderCard({ isAdmin: role === 'director' }, () => role === 'manager', () => [], () => null, String,
+      ['leaders_eye', 'metamath'], () => ({ online: 0 }), () => [], () => ({ stamped: false }), () => '2026-09-27');
     for (const [key, label, url] of expected) {
       const output = render({ id: 'student-a', name: '테스트' }, role !== 'manager', key);
       assert.ok(output.includes('data-learning-source="' + key + '"'));
