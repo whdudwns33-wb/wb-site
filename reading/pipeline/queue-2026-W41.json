@@ -191,59 +191,59 @@
       "note": "tb-genome(9-07)과 유전체 각도가 겹칠 수 있다 — 쓰려면 다르게 잡을 것"
     },
     {
-      "선정": "W41",
+      "selected": "W41",
       "id": "online-refund",
-      "분야": "society",
-      "진로": [
+      "category": "society",
+      "careers": [
         "law",
         "biz",
         "media"
       ],
-      "제목": "인터넷으로 산 물건을 7일 안에 무를 수 있는 까닭",
-      "출처": [
+      "title": "인터넷으로 산 물건을 7일 안에 무를 수 있는 까닭",
+      "source": [
         "https://www.easylaw.go.kr/CSP/CnpClsMain.laf?popMenu=ov&csmSeq=835&ccfNo=4&cciNo=1&cnpClsNo=2",
         "https://law.go.kr/LSW//lsLawLinkInfo.do?chrClsCd=010202&lsId=009318&lsJoLnkSeq=1000527255&print=print"
       ]
     },
     {
-      "선정": "W41",
+      "selected": "W41",
       "id": "sinan-rosewood",
-      "분야": "history",
-      "진로": [
+      "category": "history",
+      "careers": [
         "art",
         "eng",
         "nat"
       ],
-      "제목": "신안선 자단목 — 천자문으로 번호를 매긴 700년 전 물류",
-      "출처": [
+      "title": "신안선 자단목 — 천자문으로 번호를 매긴 700년 전 물류",
+      "source": [
         "https://www.khs.go.kr/newsBbz/selectNewsBbzView.do?newsItemId=155706366&sectionId=b_sec_1&mn=NS_01_02"
       ]
     },
     {
-      "선정": "W41",
+      "selected": "W41",
       "id": "word-history-dict",
-      "분야": "humanities",
-      "진로": [
+      "category": "humanities",
+      "careers": [
         "hum",
         "edu",
         "it"
       ],
-      "제목": "우리말어휘역사사전 — 도깨비·삼겹살·대박의 내력",
-      "출처": [
+      "title": "우리말어휘역사사전 — 도깨비·삼겹살·대박의 내력",
+      "source": [
         "https://www.korean.go.kr/front/board/boardStandardView.do?board_id=6&mn_id=183&b_seq=1068"
       ]
     },
     {
-      "선정": "W41",
+      "selected": "W41",
       "id": "boar-ai-alert",
-      "분야": "environment",
-      "진로": [
+      "category": "environment",
+      "careers": [
         "env",
         "bio",
         "it"
       ],
-      "제목": "도시 멧돼지를 미리 보는 인공지능",
-      "출처": [
+      "title": "도시 멧돼지를 미리 보는 인공지능",
+      "source": [
         "https://www.mcee.go.kr/home/web/board/read.do?menuId=10598&boardMasterId=939&boardId=1895570"
       ]
     }
