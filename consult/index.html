@@ -13482,7 +13482,7 @@ document.addEventListener('click', ev => {
       if (monthCloseUnclosedWeeks(me.id, ym).length) return toast('주간 기록이 바뀌었습니다. 남은 마감부터 확인해 주세요');
       const nextClose = Object.assign({}, close, { status: 'complete', completedAt: now() });
       setCheck(monthCloseKey(me.id), ym, { close: nextClose, done: true });
-      closeModal(); cursor = today(); cursorPinned = false; render();
+      closeModal(); cursor = agendaDate = today(); ymCursor = ymOf(cursor); cursorPinned = false; go('today');
       toast('이번 달 마감을 완료했습니다');
       break;
     }
@@ -14766,7 +14766,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-09-27.1';
+const APP_VER = '2026-10-05.1';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
