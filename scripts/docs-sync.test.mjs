@@ -29,7 +29,7 @@ t('문서가 가리키는 명령·파일이 실제로 있다 — 죽은 안내�
 
 t('앱별 작업 문서(AGENTS.md)가 루트 지도에서 가리키는 자리에 있다', () => {
   const doc = read('CLAUDE.md');
-  for (const f of ['chunk/AGENTS.md', 'letter/AGENTS.md']) {
+  for (const f of ['chunk/AGENTS.md', 'letter/AGENTS.md', 'haru/AGENTS.md']) {
     assert.ok(fs.existsSync(path.join(ROOT, f)), f + ' 가 없는데 지도가 가리킨다');
     assert.ok(doc.includes(f), '루트 지도에 ' + f + ' 안내가 없다');
     /* 인수인계 문서는 "무엇을 돌려야 하는가" 를 반드시 담는다 — 그것이 빠지면 읽어도 시작할 수 없다 */
