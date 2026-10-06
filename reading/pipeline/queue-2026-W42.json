@@ -1,0 +1,167 @@
+{
+  "week": "2026-W42",
+  "scannedAt": null,
+  "preparedAt": "2026-10-05",
+  "method": "퍼플렉시티 3질의 스캔(실패 시 WebSearch) + 발행 부처 게시판에서 주소·본문 확인",
+  "note": "월요일 세션은 기억이 없다. prep 의 절차를 그대로 밟고, 숫자는 실행일에 다시 센다.",
+  "prep": {
+    "관측": "2026-10-05 W41 머지 직후 직접 셈 — 분야 science 10 · society 10 · history 10 · humanities 10 · environment 11. 진로 med 11 / bio·law·edu 12 / eng·it·media·biz·env·hum·art 13 / nat 14. 시사 22/51 = 43%. (그날의 관측이지 지침이 아니다 — W42 실행일에 반드시 다시 센다.)",
+    "절차": [
+      "① reading/articles.json 을 열어 분야·진로·시사를 직접 센다. 기억이나 이 파일의 숫자를 믿지 않는다.",
+      "② 얇은 분야부터 채우되, 직전 주 큐 파일의 선정 내역을 읽어 같은 분야가 연속되지 않게 한다.",
+      "③ 진로는 가장 적은 쪽에서 뽑는다. 억지로 맞추지 말고, 소재에 맞지 않으면 붙이지 않는다.",
+      "④ 출처는 발행 부처 지면에서 받아 본문에 그 주장이 실제로 있는지 확인한다(루틴 v1.8).",
+      "⑤ 숫자는 그 숫자가 든 문장을 출처에서 찾아 뜻까지 맞는지 본다."
+    ],
+    "이번 주 1순위": "med 진로가 11 로 혼자 남았다. W41 네 소재에 의료가 없어 억지로 붙이지 않았다. W42 는 의료·보건 소재를 한 편 넣어 med 를 채운다. 반대로 nat(14)·그 다음 13 묶음은 피한다. 분야는 environment(11)가 가장 두꺼우니 나머지 넷(각 10) 중에서 고른다.",
+    "집필 도구": "node reading/chunk.mjs --band <L1|L2|L3|L4> \"문단\" 으로 초안을 받아 손질한다. 손으로 끊지 않는다.",
+    "이번 주에 알게 된 것": [
+      "출처 추출 스크립트가 짧은 줄을 버리면 조문의 호·목이 통째로 사라진다. W41 에서 그 때문에 집필 브리프에 추출문에 없는 사실 두 개가 들어갔다(집필 에이전트가 거부해 지문에는 안 들어갔다). <scratchpad>/extract.py 는 번호 붙은 항목을 짧아도 남기도록 고쳐 두었다 — 다음에도 이것을 쓴다.",
+      "같은 달에 같은 수를 두 번 쓰지 않는다. W40 이 유물 명문 판독이어서 W41 신안선은 「화물 관리 체계」로 각도를 틀었다. 소재가 겹치는지가 아니라 글의 수가 겹치는지를 본다.",
+      "출처 두 개가 같은 수치를 다르게 말하면(지연이자 연 15% / 연 40% 이내) 그 수치는 쓰지 않는다."
+    ]
+  },
+  "items": [
+    {
+      "id": "content-industry-stats",
+      "title": "콘텐츠산업 매출·수출 통계 (KOCCA)",
+      "category": "humanities",
+      "careers": [
+        "media",
+        "biz"
+      ],
+      "summary": "장르별 매출 구조와 성장 — humanities 보강재.",
+      "announced": "",
+      "source": "",
+      "status": "carryover",
+      "note": "W35 이월 — humanities 부족 해소용 다음 주 우선 승격, 수치 원문 확인 필요 · W36 이월 · W37 이월 · W38 이월 · W40 도 미사용(8월 말 자료 — 최신성 확인 필요)",
+      "메모": " · W41 정리: 날짜에 매이지 않아 남김 · W41 미사용"
+    },
+    {
+      "id": "geological-map-100y",
+      "title": "1:5만 국가기본지질도 완간 — 100년의 결실",
+      "category": "science",
+      "careers": [],
+      "summary": "국가기본지질도 완간, 국제 심포지엄 예고",
+      "announced": "한국지질자원연구원 2026-08-31 (심포지엄 10.9)",
+      "source": "",
+      "status": "carryover",
+      "note": "다음 주 후보 — 역사·과학 교차, 진로 nat·eng · W37 이월 · W38 이월 · W40 도 미사용(8월 말 자료 — 최신성 확인 필요)",
+      "메모": " · W41 정리: 날짜에 매이지 않아 남김 · W41 미사용"
+    },
+    {
+      "id": "baekje-record",
+      "title": "기록으로 깨어나는 백제왕도",
+      "category": "history",
+      "careers": [],
+      "summary": "백제왕도 핵심유적 학술대회",
+      "announced": "국가유산청 2026-09-04 (학술대회 9.11 대전)",
+      "source": "",
+      "status": "carryover",
+      "note": "다음 주 후보 — 이번 주는 humanities 를 라메세움으로 채움 · W37 이월 · W38 이월 · W40 도 미사용(8월 말 자료 — 최신성 확인 필요)",
+      "메모": " · W41 정리: 날짜에 매이지 않아 남김 · W41 미사용"
+    },
+    {
+      "id": "salt-plants",
+      "title": "소금 위에 피어난 식물 — 염생식물 26종 기획전",
+      "category": "science",
+      "careers": [
+        "nat",
+        "bio"
+      ],
+      "summary": "",
+      "announced": "국립생물자원관 2026-09-11",
+      "source": "https://www.mcee.go.kr/home/web/board/read.do?menuId=10598&boardMasterId=939&boardId=1890320",
+      "status": "carryover",
+      "note": "다음 주 후보. 보도자료는 전시 안내 위주라 염생식물의 내염 기전은 따로 근거를 찾아야 한다 · W38 이월 · W40 도 미사용(8월 말 자료 — 최신성 확인 필요)",
+      "메모": " · W41 정리: 날짜에 매이지 않아 남김 · W41 미사용"
+    },
+    {
+      "id": "t1d-siblings",
+      "title": "소아·청소년 1형 당뇨 환자의 형제자매 발병 위험",
+      "category": "science",
+      "careers": [
+        "med",
+        "bio"
+      ],
+      "summary": "",
+      "announced": "질병관리청 2026-09-14 조간",
+      "source": "",
+      "status": "hold",
+      "note": "보류 — 형제자매 위험 10배라는 결과를 L1(7세~초2)에 실으면 겁을 준다. 다루려면 학년대를 L3·L4로 제한하는 판단이 먼저 필요하다 · W38 이월 · W40 도 미사용(8월 말 자료 — 최신성 확인 필요)",
+      "메모": " · W41 미사용"
+    },
+    {
+      "id": "solar-committee",
+      "title": "태양광 산업경쟁력 강화 위원회 출범",
+      "category": "society",
+      "careers": [
+        "biz",
+        "law",
+        "env"
+      ],
+      "summary": "",
+      "announced": "기후에너지환경부 2026-09",
+      "source": "",
+      "status": "hold",
+      "note": "보류 — W37 해상풍력발전위원회와 「에너지 위원회 출범」 구조가 겹친다. 한 주 걸러 쓴다 · W38 이월 · W40 도 미사용(8월 말 자료 — 최신성 확인 필요)",
+      "메모": " · W41 미사용"
+    },
+    {
+      "id": "jeonseung-craft",
+      "title": "전통을 잇는 30인의 길, 오늘의 전승공예품으로 만나다",
+      "category": "humanities",
+      "careers": [
+        "art",
+        "media"
+      ],
+      "announced": "국가유산청 2026-09-18",
+      "status": "carryover",
+      "source": "https://www.khs.go.kr/newsBbz/selectNewsBbzView.do?newsItemId=155706377&sectionId=b_sec_1&mn=NS_01_02",
+      "note": "W40 스캔에서 본 후보 — 주소는 목록에서 뽑았을 뿐 본문 미확인",
+      "메모": " · W41 미사용"
+    },
+    {
+      "id": "hoeamsa-symposium",
+      "title": "회암사, 고고·미술·과학의 틀로 바라보다 (공동 학술대회)",
+      "category": "humanities",
+      "careers": [
+        "art",
+        "nat"
+      ],
+      "announced": "국립문화유산연구원·양주시립회암사지박물관 2026-09-18",
+      "status": "carryover",
+      "note": "한 유적을 세 학문의 틀로 본다는 각도가 좋다. 주소 미확인",
+      "메모": " · W41 미사용"
+    },
+    {
+      "id": "household-chem-survey",
+      "title": "생활화학제품 2,213개 안전성 조사 — 해외직구 제품 부적합 집중",
+      "category": "environment",
+      "careers": [
+        "env",
+        "law",
+        "biz"
+      ],
+      "announced": "기후에너지환경부 2026-09-23",
+      "status": "carryover",
+      "source": "https://www.mcee.go.kr/home/web/board/read.do?menuId=10598&boardMasterId=939&boardId=1894070",
+      "note": "생활 밀착 소재. 겁주지 않게 쓰는 것이 관건",
+      "메모": " · W41 미사용"
+    },
+    {
+      "id": "dcm-genome",
+      "title": "한국인 확장성 심근병증, 유전정보 활용한 맞춤형 환자관리 근거",
+      "category": "science",
+      "careers": [
+        "med",
+        "bio",
+        "it"
+      ],
+      "announced": "질병관리청 2026-09-22",
+      "status": "carryover",
+      "note": "tb-genome(9-07)과 유전체 각도가 겹칠 수 있다 — 쓰려면 다르게 잡을 것",
+      "메모": " · W41 미사용"
+    }
+  ]
+}

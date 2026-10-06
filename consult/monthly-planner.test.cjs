@@ -259,3 +259,10 @@ test('monthly closeout requires reflection, next-month decisions, report copy, a
   assert.match(month, /학생이 어려웠던 점/);
   assert.match(month, /학생의 다음 달 집중/);
 });
+
+test('monthly closeout always returns to the current Today view', () => {
+  const finish = section("case 'monthclosefinish':", "case 'monthoverrideopen':");
+
+  assert.match(finish, /cursor = agendaDate = today\(\); ymCursor = ymOf\(cursor\); cursorPinned = false; go\('today'\)/,
+    'finishing from a past monthly calendar must reset every date view and open Today');
+});
