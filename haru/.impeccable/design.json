@@ -1,0 +1,108 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-06T11:55:36Z",
+  "title": "Design System: 삼육중 및 영재원 대비",
+  "extensions": {
+    "colorMeta": {
+      "accent": { "role": "primary", "displayName": "글자용 초록" },
+      "btn": { "role": "primary", "displayName": "버튼 바탕 초록" },
+      "green-soft": { "role": "primary", "displayName": "옅은 초록 바탕" },
+      "bg": { "role": "neutral", "displayName": "따뜻한 화면 바탕" },
+      "panel": { "role": "neutral", "displayName": "패널 바탕" },
+      "ink": { "role": "neutral", "displayName": "본문 글자" },
+      "soft": { "role": "neutral", "displayName": "보조 글자" },
+      "line": { "role": "neutral", "displayName": "장식 구분선" },
+      "edge": { "role": "neutral", "displayName": "조작 요소 테두리" }
+    },
+    "typographyMeta": {
+      "body": { "displayName": "학생 본문", "purpose": "학생 화면의 기본 글줄." },
+      "guide-body": { "displayName": "안내 본문", "purpose": "긴 준비 안내의 기본 글줄." },
+      "guide-headline": { "displayName": "안내 첫 제목", "purpose": "안내 첫 제목; 900px 이하에서 2rem." },
+      "guide-title": { "displayName": "안내 절 제목", "purpose": "안내 절 제목; 900px 이하에서 1.5rem." }
+    },
+    "shadows": [],
+    "motion": [
+      { "name": "progress-width", "value": "width .3s", "purpose": "학생 진행 막대의 폭 전환; prefers-reduced-motion:reduce에서는 none." },
+      { "name": "skeleton-delay", "value": "skeleton-show 0s .5s forwards", "purpose": "학생 로딩 뼈대는 visibility:hidden에서 0.5초 뒤 visible로 전환." }
+    ],
+    "breakpoints": [
+      { "name": "student-grid", "value": "520px" },
+      { "name": "student-guide-body", "value": "700px" },
+      { "name": "guide-single-column-max", "value": "900px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "학생 채운 버튼",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "학생 화면의 주 조작; 최소 높이와 disabled 상태를 보존한다.",
+      "html": "<button class=\"ds-button-primary\" type=\"button\">연결 요청</button>",
+      "css": ".ds-button-primary{display:block;width:100%;min-height:58px;margin-top:8px;border:0;border-radius:14px;background:var(--btn,#2B4C3F);color:var(--on-btn,#FFFFFF);font-family:\"Noto Sans KR\",\"Apple SD Gothic Neo\",\"Malgun Gothic\",sans-serif;font-size:1.125em;font-weight:900;cursor:pointer}.ds-button-primary:focus-visible{outline:3px solid var(--blue,#2F5F8F);outline-offset:2px;border-radius:8px}.ds-button-primary:disabled{background:var(--line,#E1E6E2);color:var(--soft,#56645D);cursor:default}"
+    },
+    {
+      "name": "학생 외곽선 버튼",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "현재 화면의 보조 조작.",
+      "html": "<button class=\"ds-button-ghost\" type=\"button\">코드 다시 입력</button>",
+      "css": ".ds-button-ghost{display:block;width:100%;min-height:58px;margin-top:8px;border:2px solid var(--accent,#2B4C3F);border-radius:14px;background:var(--panel,#FFFFFF);color:var(--accent,#2B4C3F);font-family:\"Noto Sans KR\",\"Apple SD Gothic Neo\",\"Malgun Gothic\",sans-serif;font-size:1.125em;font-weight:900;cursor:pointer}.ds-button-ghost:focus-visible{outline:3px solid var(--blue,#2F5F8F);outline-offset:2px;border-radius:8px}"
+    },
+    {
+      "name": "학생 코드 입력",
+      "kind": "input",
+      "refersTo": "input-code",
+      "description": "학생 연동 코드 입력의 현재 형태.",
+      "html": "<input class=\"ds-input-code\" aria-label=\"선생님께 받은 학생 코드\" type=\"text\" inputmode=\"text\" autocapitalize=\"none\" autocorrect=\"off\" spellcheck=\"false\" autocomplete=\"off\" placeholder=\"wb-…\">",
+      "css": ".ds-input-code{width:100%;min-height:54px;padding:0 14px;border:2px solid var(--edge,#86938C);border-radius:14px;background:var(--panel,#FFFFFF);color:var(--ink,#22302A);font-family:\"Noto Sans KR\",\"Apple SD Gothic Neo\",\"Malgun Gothic\",sans-serif;font-size:1.05rem}.ds-input-code::placeholder{color:var(--soft,#56645D);opacity:1}.ds-input-code:focus-visible{outline:3px solid var(--blue,#2F5F8F);outline-offset:2px;border-radius:8px}"
+    },
+    {
+      "name": "학생 상태 칩",
+      "kind": "chip",
+      "refersTo": "chip",
+      "description": "학생 카드 안의 작은 상태 표시.",
+      "html": "<span class=\"ds-chip\">처음 보는 칸</span>",
+      "css": ".ds-chip{display:inline-block;margin:0 4px 2px 0;padding:1px 9px;border-radius:99px;background:var(--green-soft,#E6EFEA);color:var(--accent,#2B4C3F);font-family:\"Noto Sans KR\",\"Apple SD Gothic Neo\",\"Malgun Gothic\",sans-serif;font-size:.8125em;font-weight:800;line-height:1.5}"
+    },
+    {
+      "name": "학생 카드",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "학생 화면의 기본 내용 패널; 보호자는 내부 여백이 다르다.",
+      "html": "<div class=\"ds-card\"><h2>오늘 카드</h2></div>",
+      "css": ".ds-card{margin-bottom:14px;padding:18px 18px;border:1px solid var(--line,#E1E6E2);border-radius:16px;background:var(--panel,#FFFFFF);color:var(--ink,#22302A);font-family:\"Noto Sans KR\",\"Apple SD Gothic Neo\",\"Malgun Gothic\",sans-serif;line-height:1.6}.ds-card h2{margin:0 0 10px;color:var(--accent,#2B4C3F);font-size:1.0625em}"
+    },
+    {
+      "name": "안내 메모",
+      "kind": "card",
+      "refersTo": "guide-note",
+      "description": "긴 준비 안내 안의 보조 설명 패널.",
+      "html": "<div class=\"ds-guide-note\"><p><strong>준비 안내</strong></p></div>",
+      "css": ".ds-guide-note{margin:20px 0;padding:16px 20px;border:1px solid var(--line,#E1E6E2);border-radius:12px;background:var(--panel,#FFFFFF);color:var(--ink,#22302A);font:1rem/1.75 \"Noto Sans KR\",\"Apple SD Gothic Neo\",\"Malgun Gothic\",sans-serif;word-break:keep-all;overflow-wrap:break-word}.ds-guide-note p{margin:0}@media(min-width:700px){.ds-guide-note{font-size:1.125rem}}"
+    },
+    {
+      "name": "안내 목차",
+      "kind": "nav",
+      "refersTo": "guide-nav",
+      "description": "준비 안내 본문으로 이동하는 텍스트 목차.",
+      "html": "<nav class=\"ds-guide-nav\" aria-label=\"본문 목차\"><a href=\"#samyuk\">삼육중 지원·준비</a><a href=\"#gift\">영재원 선택·준비</a><a href=\"#roadmap\">학년별 로드맵</a></nav>",
+      "css": ".ds-guide-nav{font-family:\"Noto Sans KR\",\"Apple SD Gothic Neo\",\"Malgun Gothic\",sans-serif;line-height:1.75}.ds-guide-nav a{display:block;min-height:44px;padding:8px 0;color:var(--accent,#2B4C3F);font-size:.9375rem;text-underline-offset:4px}.ds-guide-nav a:hover{text-decoration-thickness:2px}.ds-guide-nav a:focus-visible{outline:3px solid var(--blue,#2F5F8F);outline-offset:4px;border-radius:4px}@media(max-width:900px){.ds-guide-nav{display:flex;flex-wrap:wrap;gap:0 20px}}"
+    },
+    {
+      "name": "학년 바로가기",
+      "kind": "nav",
+      "refersTo": "grade-link",
+      "description": "안내에서 현재 학년의 준비 내용으로 이동한다.",
+      "html": "<nav class=\"ds-grade-nav\" aria-label=\"학년별 준비\"><a href=\"#grade3\">초3</a><a href=\"#grade4\">초4</a><a href=\"#grade5\">초5</a><a href=\"#grade6\">초6</a></nav>",
+      "css": ".ds-grade-nav{display:flex;flex-wrap:wrap;gap:8px;margin:20px 0;font:1rem/1.75 \"Noto Sans KR\",\"Apple SD Gothic Neo\",\"Malgun Gothic\",sans-serif}.ds-grade-nav a{min-height:44px;padding:6px 16px;border:1px solid var(--accent,#2B4C3F);border-radius:10px;color:var(--accent,#2B4C3F);text-decoration:none;font-weight:700}.ds-grade-nav a:hover{background:var(--green-soft,#E6EFEA)}.ds-grade-nav a:focus-visible{outline:3px solid var(--blue,#2F5F8F);outline-offset:4px;border-radius:4px}@media(min-width:700px){.ds-grade-nav{font-size:1.125rem}}"
+    }
+  ],
+  "narrative": {
+    "northStar": "현재 학생·보호자 화면의 시각 체계",
+    "overview": "따뜻한 바탕, 초록 글자, 한국어 시스템 글꼴을 유지한다. 학생 화면은 큰 조작 요소와 카드, 보호자 화면은 읽기 카드, 준비 안내는 여백·구분선·목차·기본 펼침 목록으로 구성한다. 이 문서는 `index.html`, `parent.html`, `guide.html`의 현재 구현을 기록하며 새로운 시각 정체성을 정하지 않는다.",
+    "keyCharacteristics": ["한국어 글줄과 초록 강조", "운영체제 설정을 따르는 라이트·다크", "그림자 없이 바탕색·테두리·여백으로 구분"],
+    "rules": [],
+    "dos": ["**Do** 기존 한국어 글꼴 스택과 라이트·다크 CSS 변수 역할을 유지한다.", "**Do** 장식 구분선과 조작 요소 테두리를 구분하고 키보드 포커스를 보이게 한다."],
+    "donts": ["**Don't** 다크의 글자용 초록과 버튼 바탕을 하나로 합치지 않는다.", "**Don't** 안내의 넓은 문서 배치를 학생·보호자 화면의 공통 레이아웃으로 바꾸지 않는다."]
+  }
+}

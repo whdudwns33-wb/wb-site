@@ -20,6 +20,7 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (url.origin !== location.origin || e.request.method !== 'GET') return;
+  if (/^\/haru\/guide(?:\.html)?\/?$/.test(url.pathname)) return; // 전형 안내는 캐시하거나 오프라인에서 독서 홈으로 바꾸지 않는다
 
   // API 응답은 절대 캐시하지 않는다 — 캐시되면 배정·기록 같은 최신 데이터가 오래된 값으로 굳는다
   if (url.pathname.startsWith('/api/')) return;
