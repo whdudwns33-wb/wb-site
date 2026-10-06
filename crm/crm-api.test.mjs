@@ -611,3 +611,131 @@ test('내보내기는 원장만 — 문서·직원·큐·연결표', async () =>
   assert.ok(ex.body.docs.length >= 1 && ex.body.staff.length === 1 && ex.body.queue.length === 2 && Array.isArray(ex.body.links));
   assert.match(ex.headers.get('content-disposition'), /wb-crm-export-/);
 });
+
+const membership = (program = 'friend', overrides = {}) => ({ leadId: 'rel-lead', program, startDate: '2025-01-01', status: 'active', benefitState: 'unchecked', ...overrides });
+const programExam = (membershipId, overrides = {}) => ({ membershipId, cycleStart: '2025-01-01', cycleEnd: '2025-03-31', dueDate: '2025-03-31', ...overrides });
+const relationWrite = (env, token, c, id, data, at = 0) => putDoc(env, token, c, id, data, { expectedUpdatedAt: at });
+async function relationDoc(env, token, c, id) {
+  return (await call(env, 'GET', '/api/docs', { token })).body.docs.find(d => d.c === c && d.id === id);
+}
+
+// 두 요청이 같은 이전 버전을 읽은 뒤 함께 진행해야 DB CAS를 실제로 검증한다.
+async function raceWrites(env, collection, ids, writes) {
+  const prepare = env.DB.prepare.bind(env.DB);
+  let reads = 0, release;
+  const gate = new Promise(resolve => { release = resolve; });
+  env.DB.prepare = sql => {
+    const s = prepare(sql), first = s.first.bind(s);
+    if (sql === 'SELECT data,updated_at,updated_by,deleted FROM crm_documents WHERE collection=? AND id=? LIMIT 1') s.first = async () => {
+      const row = await first();
+      if (s.args[0] === collection && ids.includes(s.args[1]) && reads < 2) { if (++reads === 2) release(); await gate; }
+      return row;
+    };
+    return s;
+  };
+  try { return await Promise.all(writes.map(write => write())); }
+  finally { env.DB.prepare = prepare; }
+}
+
+test('관계 참여 — 직원 저장·고객 참조·고정 id·필수 CAS, 파트너 차단과 HubSpot 분리', async () => {
+  const env = envFor(), admin = await setupAdmin(env), staff = await makeStaff(env, admin, '관계 담당');
+  const id = 'rel-lead__friend', raw = membership();
+  assert.equal((await relationWrite(env, staff.token, 'memberships', id, raw)).body.code, 'INVALID', '없는 고객은 연결하지 않는다');
+  await putDoc(env, admin, 'leads', 'rel-lead', lead({ stage: 'won' }));
+  const queueBefore = await queue(env, admin);
+  assert.equal((await putDoc(env, staff.token, 'memberships', id, raw)).body.code, 'INVALID', '버전 생략은 거절한다');
+  assert.equal((await putDoc(env, staff.token, 'memberships', id, raw, { expectedUpdatedAt: '0' })).body.code, 'INVALID');
+  assert.equal((await relationWrite(env, staff.token, 'memberships', 'random-id', raw)).body.code, 'INVALID');
+  assert.equal((await relationWrite(env, staff.token, 'memberships', id, { ...raw, note: 'a@example.test' })).body.code, 'PII');
+  const created = await relationWrite(env, staff.token, 'memberships', id, raw);
+  assert.equal(created.status, 200, JSON.stringify(created.body));
+  assert.equal(created.body.results[0].queued, 0);
+  let doc = await relationDoc(env, admin, 'memberships', id);
+  assert.equal(doc.data.owner, staff.id);
+  assert.equal((await relationWrite(env, staff.token, 'memberships', id, { ...raw, program: 'supporter' }, doc.updatedAt)).body.code, 'IMMUTABLE');
+  assert.equal((await relationWrite(env, staff.token, 'memberships', id, raw)).body.code, 'STALE');
+  const race = await raceWrites(env, 'memberships', [id], ['한 번', '다른 메모'].map(note => () => relationWrite(env, staff.token, 'memberships', id, { ...raw, note }, doc.updatedAt)));
+  assert.deepEqual(race.map(r => r.status).sort(), [200, 409]);
+  assert.equal(race.find(r => r.status === 409).body.code, 'STALE');
+  doc = await relationDoc(env, admin, 'memberships', id);
+  assert.ok(['한 번', '다른 메모'].includes(doc.data.note));
+  assert.equal((await relationWrite(env, staff.token, 'memberships', 'rel-lead__supporter', membership('supporter'))).status, 200, '동일 고객의 다른 프로그램은 독립 기록이다');
+  assert.deepEqual((await queue(env, admin)).items, queueBefore.items, '프로그램 저장은 딜·메모 큐를 만들지 않는다');
+  assert.equal((await putDoc(env, admin, 'memberships', id, {}, { deleted: true, expectedUpdatedAt: doc.updatedAt })).body.code, 'APPEND_ONLY');
+  const partner = await makePartner(env, admin, '검증학원');
+  assert.equal((await relationWrite(env, partner.token, 'memberships', id, raw, doc.updatedAt)).status, 401);
+  assert.equal((await call(env, 'GET', '/api/docs', { token: partner.token })).status, 401);
+  await putDoc(env, admin, 'leads', 'rel-lead', {}, { deleted: true });
+  assert.equal((await relationWrite(env, staff.token, 'memberships', id, raw, doc.updatedAt)).body.code, 'INVALID', '삭제된 고객은 참조하지 않는다');
+});
+
+test('프로그램 활동 — 친구 리뷰만·서포터즈 별도, 확인자 서버 신원과 월 고정·PII·미래일', async () => {
+  const env = envFor(), admin = await setupAdmin(env), staff = await makeStaff(env, admin, '확인 담당');
+  await putDoc(env, admin, 'leads', 'rel-lead', lead());
+  for (const program of ['friend', 'supporter']) assert.equal((await relationWrite(env, admin, 'memberships', 'rel-lead__' + program, membership(program))).status, 200);
+  const raw = { membershipId: 'rel-lead__friend', month: '2025-02', date: '2025-02-02', kind: 'review', status: 'pending', evidence: '센터에서 원본 확인', by: 'forged' };
+  assert.equal((await relationWrite(env, staff.token, 'programActivities', 'missing', { ...raw, membershipId: 'missing' })).body.code, 'INVALID');
+  assert.equal((await relationWrite(env, staff.token, 'programActivities', 'a1', { ...raw, kind: 'referral' })).body.code, 'INVALID');
+  assert.equal((await relationWrite(env, staff.token, 'programActivities', 'a1', { ...raw, evidence: '010-1111-2222' })).body.code, 'PII');
+  assert.equal((await relationWrite(env, staff.token, 'programActivities', 'a1', { ...raw, date: '2025-02-30' })).body.code, 'INVALID');
+  assert.equal((await relationWrite(env, staff.token, 'programActivities', 'a1', { ...raw, month: '9999-01', date: '9999-01-01', status: 'confirmed' })).body.code, 'INVALID');
+  assert.equal((await relationWrite(env, staff.token, 'programActivities', 'a1', raw)).status, 200);
+  let doc = await relationDoc(env, admin, 'programActivities', 'a1');
+  assert.equal(doc.data.by, staff.id);
+  assert.equal((await relationWrite(env, admin, 'programActivities', 'a1', { ...raw, month: '2025-03', date: '2025-03-02' }, doc.updatedAt)).body.code, 'IMMUTABLE');
+  assert.equal((await relationWrite(env, admin, 'programActivities', 'a1', { ...raw, membershipId: 'rel-lead__supporter' }, doc.updatedAt)).body.code, 'IMMUTABLE');
+  assert.equal((await relationWrite(env, admin, 'programActivities', 'a1', { ...raw, status: 'confirmed' }, doc.updatedAt)).status, 200);
+  doc = await relationDoc(env, admin, 'programActivities', 'a1');
+  assert.deepEqual([doc.data.by, doc.data.status], ['admin', 'confirmed'], '마지막 확인자를 서버가 기록한다');
+  for (const kind of ['referral', 'brunch']) assert.equal((await relationWrite(env, staff.token, 'programActivities', kind, { ...raw, membershipId: 'rel-lead__supporter', kind })).status, 200);
+  assert.equal((await relationDoc(env, admin, 'memberships', 'rel-lead__friend')).data.benefitState, 'unchecked', '활동 확인이 혜택을 자동 승인하지 않는다');
+});
+
+test('프로그램 검사 — 회차 누적·활동 수동 확인, 완료 보존과 친구 1회 동시 완료 차단', async () => {
+  const env = envFor(), admin = await setupAdmin(env);
+  await putDoc(env, admin, 'leads', 'rel-lead', lead());
+  for (const program of ['friend', 'supporter']) await relationWrite(env, admin, 'memberships', 'rel-lead__' + program, membership(program));
+  const support = programExam('rel-lead__supporter', { completedDate: '2025-03-31', activitiesChecked: true });
+  assert.equal((await relationWrite(env, admin, 'programExams', 'e1', { ...support, activitiesChecked: false })).body.code, 'INVALID');
+  assert.equal((await relationWrite(env, admin, 'programExams', 'e1', { ...support, completedDate: '9999-01-01' })).body.code, 'INVALID');
+  assert.equal((await relationWrite(env, admin, 'programExams', 'e1', support)).status, 200, '활동 건수를 추정하지 않고 담당 확인을 저장한다');
+  const first = await relationDoc(env, admin, 'programExams', 'e1');
+  for (const patch of [{ completedDate: '' }, { completedDate: '2025-03-30' }, { cycleStart: '2025-01-02' }, { membershipId: 'rel-lead__friend' }]) {
+    assert.equal((await relationWrite(env, admin, 'programExams', 'e1', { ...support, ...patch }, first.updatedAt)).body.code, 'IMMUTABLE');
+  }
+  assert.equal((await relationWrite(env, admin, 'programExams', 'e2', programExam('rel-lead__supporter', { cycleStart: '2025-04-01', cycleEnd: '2025-06-30', dueDate: '2025-06-30', completedDate: '2025-06-30', activitiesChecked: true }))).status, 200);
+  assert.deepEqual((await relationDoc(env, admin, 'programExams', 'e1')).data, first.data, '다음 3개월 회차가 이전 회차를 덮지 않는다');
+  const friend = programExam('rel-lead__friend', { completedDate: '2025-03-31' });
+  const race = await raceWrites(env, 'programExams', ['friend-a', 'friend-b'], ['friend-a', 'friend-b'].map(id => () => relationWrite(env, admin, 'programExams', id, friend)));
+  assert.deepEqual(race.map(r => r.status).sort(), [200, 409]);
+  assert.equal(race.find(r => r.status === 409).body.code, 'DUPLICATE', '서로 다른 문서 id도 두 번 완료할 수 없다');
+  assert.equal((await relationWrite(env, admin, 'programExams', 'friend-c', friend)).body.code, 'DUPLICATE');
+  const docs = (await call(env, 'GET', '/api/docs', { token: admin })).body.docs;
+  assert.equal(docs.filter(d => d.c === 'programExams' && d.data.membershipId === 'rel-lead__friend' && d.data.completedDate).length, 1);
+  assert.equal(docs.filter(d => d.c === 'programExams' && d.data.membershipId === 'rel-lead__supporter').length, 2);
+  assert.ok(docs.filter(d => d.c === 'memberships').every(d => d.data.status === 'active' && d.data.benefitState === 'unchecked'));
+});
+
+test('맘스쿨 — 검사 증거·보호자 확인·정원·중복 검증, 동시 참석 변경은 CAS로 보존', async () => {
+  const env = envFor(), admin = await setupAdmin(env), staff = await makeStaff(env, admin, '모임 담당');
+  for (let i = 0; i < 7; i++) await putDoc(env, admin, 'leads', 'g-lead-' + i, lead({ stage: i === 6 ? 'inquiry' : 'tested', consultedAt: '2025-01-01' }));
+  const participant = i => ({ leadId: 'g-lead-' + i, status: 'invited', inspectionConfirmed: true });
+  const raw = { topic: '아이 독서 이야기', date: '2025-05-01', time: '10:30', place: '센터', capacity: 4, participants: Array.from({ length: 6 }, (_, i) => participant(i)) };
+  assert.equal((await relationWrite(env, staff.token, 'gatherings', 'g1', { ...raw, participants: [participant(6)] })).body.code, 'INVALID', '상담 완료만으로 검사 완료를 추정하지 않는다');
+  assert.equal((await relationWrite(env, staff.token, 'gatherings', 'g1', { ...raw, participants: [{ ...participant(0), inspectionConfirmed: false }] })).body.code, 'INVALID');
+  assert.equal((await relationWrite(env, staff.token, 'gatherings', 'g1', { ...raw, participants: [participant(0), participant(0)] })).body.code, 'INVALID');
+  assert.equal((await relationWrite(env, staff.token, 'gatherings', 'g1', { ...raw, participants: [{ ...participant(0), nextContactDate: '2025-05-02' }] })).body.code, 'INVALID');
+  assert.equal((await relationWrite(env, staff.token, 'gatherings', 'g1', { ...raw, participants: [{ ...participant(0), note: '990101-1234567' }] })).body.code, 'PII');
+  assert.equal((await relationWrite(env, staff.token, 'gatherings', 'g1', raw)).status, 200, '초대 후보는 정원을 넘을 수 있다');
+  const doc = await relationDoc(env, admin, 'gatherings', 'g1');
+  const full = { ...raw, participantsChecked: true, participants: raw.participants.map((p, i) => ({ ...p, status: i < 4 ? 'confirmed' : 'invited' })) };
+  assert.equal((await relationWrite(env, staff.token, 'gatherings', 'g1', { ...full, participantsChecked: false }, doc.updatedAt)).body.code, 'INVALID');
+  assert.equal((await relationWrite(env, staff.token, 'gatherings', 'g1', { ...full, participants: raw.participants.map(p => ({ ...p, status: 'confirmed' })) }, doc.updatedAt)).body.code, 'INVALID');
+  const race = await raceWrites(env, 'gatherings', ['g1'], [full, { ...raw, note: '다른 직원 메모' }].map(data => () => relationWrite(env, staff.token, 'gatherings', 'g1', data, doc.updatedAt)));
+  assert.deepEqual(race.map(r => r.status).sort(), [200, 409]);
+  assert.equal(race.find(r => r.status === 409).body.code, 'STALE');
+  const current = await relationDoc(env, admin, 'gatherings', 'g1');
+  const completed = { ...full, status: 'completed', participants: full.participants.map((p, i) => ({ ...p, status: i < 2 ? 'attended' : 'absent' })) };
+  assert.equal((await relationWrite(env, staff.token, 'gatherings', 'g1', completed, current.updatedAt)).status, 200, '결석으로 실제 참석이 4명 미만이어도 기록한다');
+  assert.equal((await relationDoc(env, admin, 'gatherings', 'g1')).data.participants.length, 6, '결석 기록도 보존한다');
+});

@@ -316,4 +316,140 @@ t('PII 패턴 — 전화·이메일·주민번호를 찾고, 허용 경로(phone
   assert.equal(C.findPii(['x', '010-0000-0000'], 'list'), 'list[1]');
 });
 
+t('관계관리 회원 — 친구·서포터즈 구분과 필수값·실제 날짜를 검증한다', () => {
+  const raw = { leadId: 'l1', program: 'friend', startDate: '2026-10-01', owner: 's1', status: 'active', benefitState: 'unchecked', nextContactDate: TODAY, nextAction: '다음 활동 안내', note: '상담 후 참여' };
+  const friend = C.validateMembership(raw, { today: TODAY });
+  const supporter = C.validateMembership({ ...raw, program: 'supporter', status: 'paused', benefitState: 'paused', pauseDate: TODAY }, { today: TODAY });
+  assert.ok(friend.ok, friend.error);
+  assert.ok(supporter.ok, supporter.error);
+  assert.deepEqual([friend.data.program, supporter.data.program, supporter.data.status, supporter.data.benefitState], ['friend', 'supporter', 'paused', 'paused']);
+  assert.equal(C.validateMembership({ ...raw, leadId: '' }).ok, false);
+  assert.equal(C.validateMembership({ ...raw, program: '' }).ok, false);
+  for (const program of ['__proto__', 'constructor', 'toString', ['friend'], { toString: null }]) {
+    assert.equal(C.validateMembership({ ...raw, program }).ok, false, '프로그램은 목록에 있는 문자열만 허용한다');
+  }
+  assert.equal(C.validateMembership({ ...raw, startDate: '' }).ok, false);
+  assert.equal(C.validateMembership({ ...raw, nextAction: '' }).ok, false, '다음 연락일에는 할 일이 필요하다');
+  assert.equal(C.validateMembership({ ...raw, nextContactDate: '' }).ok, false, '다음 할 일에는 연락일이 필요하다');
+  assert.ok(C.validateMembership({ ...raw, nextContactDate: '', nextAction: '' }).ok);
+  for (const key of ['startDate', 'nextContactDate', 'pauseDate', 'resumeDate']) {
+    assert.equal(C.validateMembership({ ...raw, [key]: '2026-02-29' }).ok, false, key + '는 존재하는 날짜여야 한다');
+    for (const date of [['2026-10-01'], { toString: null }]) assert.equal(C.validateMembership({ ...raw, [key]: date }).ok, false, key + '는 문자열이어야 한다');
+  }
+  assert.ok(C.validateMembership({ ...raw, startDate: '2024-02-29' }).ok, '윤년의 2월 29일은 허용한다');
+});
+
+t('프로그램 활동 — 월·날짜 검증, 회원별 월 상태는 확인·보완·대기 순이다', () => {
+  const raw = { membershipId: 'm-friend', month: '2026-10', kind: 'review', date: '2026-10-01', evidence: '후기 작성 확인', status: 'confirmed', note: '', by: 's1' };
+  const valid = C.validateProgramActivity(raw, { today: TODAY });
+  assert.ok(valid.ok, valid.error);
+  assert.deepEqual([valid.data.membershipId, valid.data.month, valid.data.status], ['m-friend', '2026-10', 'confirmed']);
+  for (const patch of [{ membershipId: '' }, { month: '' }, { month: '2026-13' }, { month: '2026-1' }, { month: ['2026-10'] }, { kind: '' }, { date: '' }, { date: '2026-04-31' }, { date: ['2026-10-01'] }, { date: { toString: null } }]) {
+    assert.equal(C.validateProgramActivity({ ...raw, ...patch }).ok, false, JSON.stringify(patch));
+  }
+  const activities = [{ ...raw, membershipId: 'm-supporter' }, { ...raw, month: '2026-09' }];
+  assert.equal(C.programMonthStatus('m-friend', '2026-10', activities), 'missing', '다른 프로그램 회원·다른 달 기록을 가져오지 않는다');
+  activities.push({ ...raw, status: 'pending' });
+  assert.equal(C.programMonthStatus('m-friend', '2026-10', activities), 'pending');
+  activities.push({ ...raw, status: 'supplement' });
+  assert.equal(C.programMonthStatus('m-friend', '2026-10', activities), 'supplement');
+  activities.push(raw, { ...raw, status: 'pending' });
+  assert.equal(C.programMonthStatus('m-friend', '2026-10', activities), 'confirmed');
+  assert.equal(C.programMonthStatus('m-friend', '2026-10', [null, 1, 'noise', ...activities]), 'confirmed');
+});
+
+t('프로그램 검사 — 필수 주기·예정일과 예약·완료일의 실제 날짜를 검증한다', () => {
+  const raw = { membershipId: 'm-supporter', cycleStart: '2026-10-01', cycleEnd: '2026-12-31', dueDate: '2026-12-31', bookedDate: '2026-12-20', completedDate: '2026-12-21', activitiesChecked: true, note: '활동 기록 확인' };
+  const valid = C.validateProgramExam(raw, { today: TODAY });
+  assert.ok(valid.ok, valid.error);
+  assert.deepEqual([valid.data.membershipId, valid.data.completedDate, valid.data.activitiesChecked], ['m-supporter', '2026-12-21', true]);
+  assert.equal(C.validateProgramExam({ ...raw, membershipId: '' }).ok, false);
+  for (const key of ['cycleStart', 'cycleEnd', 'dueDate']) assert.equal(C.validateProgramExam({ ...raw, [key]: '' }).ok, false, key + '는 필수다');
+  for (const key of ['cycleStart', 'cycleEnd', 'dueDate', 'bookedDate', 'completedDate']) {
+    assert.equal(C.validateProgramExam({ ...raw, [key]: '2026-02-29' }).ok, false, key + '는 존재하는 날짜여야 한다');
+    for (const date of [['2026-10-01'], { toString: null }]) assert.equal(C.validateProgramExam({ ...raw, [key]: date }).ok, false, key + '는 문자열이어야 한다');
+  }
+  assert.equal(C.validateProgramExam({ ...raw, cycleStart: '2027-01-01' }).ok, false, '주기 시작은 종료보다 늦을 수 없다');
+});
+
+t('모임 — 확정·참석만 정원에 포함하고 중복·미확인 참가자는 거절한다', () => {
+  const participants = ['confirmed', 'confirmed', 'attended', 'invited', 'invited', 'absent', 'cancelled'].map((status, i) => ({ leadId: 'l' + i, status, inspectionConfirmed: true, nextContactDate: '', nextAction: '', note: '' }));
+  const raw = { topic: '검사 후 독서 이야기', date: TODAY, time: '10:30', place: '상담실', capacity: 4, status: 'planned', owner: 's1', note: '', participantsChecked: true, participants };
+  const valid = C.validateGathering(raw, { today: TODAY });
+  assert.ok(valid.ok, valid.error);
+  assert.equal(valid.data.participants.length, 7, '초대 후보·결석·취소 기록은 정원이 차도 보존한다');
+  assert.equal(valid.data.participantsChecked, true);
+  assert.equal(C.validateGathering({ ...raw, participantsChecked: false }).ok, false, '확정·참석자가 있으면 참가자 확인이 필요하다');
+  assert.ok(C.validateGathering({ ...raw, participantsChecked: false, owner: '', place: '', participants: [{ ...participants[0], status: 'invited' }] }).ok, '초대 후보만 있으면 확인 전에도 저장한다');
+  assert.ok(C.validateGathering({ ...raw, participants: [participants[0]] }).ok, '확정 인원이 정원보다 적어도 저장한다');
+  const full = [...participants, { leadId: 'l7', status: 'confirmed', inspectionConfirmed: true }];
+  assert.ok(C.validateGathering({ ...raw, participants: full }).ok);
+  assert.equal(C.validateGathering({ ...raw, participants: [...full, { leadId: 'l8', status: 'attended', inspectionConfirmed: true }] }).ok, false);
+  assert.equal(C.validateGathering({ ...raw, participantsChecked: false, participants: Array.from({ length: 5 }, (_, i) => ({ leadId: 'l' + i, status: ['confirmed'], inspectionConfirmed: true })) }).ok, false, '배열 상태값으로 정원·참가자 확인을 우회할 수 없다');
+  assert.equal(C.validateGathering({ ...raw, participants: [...participants, { ...participants[0], status: 'cancelled' }] }).ok, false);
+  for (const inspectionConfirmed of [false, 'true', undefined]) {
+    assert.equal(C.validateGathering({ ...raw, participants: [{ ...participants[0], inspectionConfirmed }] }).ok, false);
+  }
+  for (const patch of [{ nextContactDate: TODAY, nextAction: '' }, { nextContactDate: '', nextAction: '참석 확인' }]) {
+    assert.equal(C.validateGathering({ ...raw, participants: [{ ...participants[0], ...patch }] }).ok, false, '참가자 연락일과 할 일은 함께 입력한다');
+  }
+  for (const capacity of [3, 7, 4.5, [4]]) assert.equal(C.validateGathering({ ...raw, capacity }).ok, false);
+  for (const capacity of [5, 6]) assert.ok(C.validateGathering({ ...raw, capacity }).ok);
+  for (const patch of [{ topic: '' }, { date: '' }, { date: '2026-04-31' }, { date: ['2026-10-01'] }, { date: { toString: null } }, { time: '' }, { time: '24:00' }]) assert.equal(C.validateGathering({ ...raw, ...patch }).ok, false);
+  for (const date of [['2026-10-01'], { toString: null }]) assert.equal(C.validateGathering({ ...raw, participants: [{ ...participants[0], nextContactDate: date, nextAction: '참석 확인' }] }).ok, false);
+});
+
+t('검사 완료 자격 — 실제 검사일 또는 검사 단계만 인정하고 상담일·성사만으로 추정하지 않는다', () => {
+  for (const stage of ['tested', 'interpreted', 'upsell']) assert.equal(C.hasCompletedInspection({ pipeline: 'inspection', stage }, TODAY), true);
+  assert.equal(C.hasCompletedInspection({ pipeline: 'academy', stage: 'active', inspection: { date: TODAY } }, TODAY), true);
+  assert.equal(C.hasCompletedInspection({ inspection: { date: '2024-02-29' } }, TODAY), true);
+  for (const lead of [null, {}, { consultedAt: '2026-10-01' }, { inspection: { date: '2026-10-07' } }, { inspection: { date: '2026-02-29' } }, { pipeline: 'inspection', stage: 'won' }, { pipeline: 'academy', stage: 'tested' }, { pipeline: 'academy', stage: 'active' }]) {
+    assert.equal(C.hasCompletedInspection(lead, TODAY), false, JSON.stringify(lead));
+  }
+});
+
+t('관계 연락 작업 — 오늘·연체만, 중지는 유지하고 종료·취소·빈 할 일은 제외한다', () => {
+  const base = { leadId: 'l1', program: 'friend', status: 'active', nextContactDate: TODAY, nextAction: '활동 안내' };
+  const memberships = [
+    { ...base, id: 'm-today' }, { ...base, id: 'm-paused', program: 'supporter', status: 'paused', nextContactDate: '2026-10-01' },
+    { ...base, id: 'm-ended', status: 'ended' }, { ...base, id: 'm-future', nextContactDate: '2026-10-07' },
+    { ...base, id: 'm-empty', nextAction: '   ' }, { ...base, id: 'm-no-date', nextContactDate: '' }, { ...base, id: 'm-invalid', nextContactDate: '2026-02-29' }
+  ];
+  const participant = { leadId: 'l2', status: 'confirmed', nextContactDate: TODAY, nextAction: '참석 확인' };
+  const gatherings = [
+    { id: 'g-planned', status: 'planned', participants: [participant, { ...participant, leadId: 'l3', status: 'cancelled' }, { ...participant, leadId: 'l4', nextAction: '' }] },
+    { id: 'g-completed', status: 'completed', participants: [{ ...participant, status: 'attended' }] },
+    { id: 'g-cancelled', status: 'cancelled', participants: [participant] },
+    { id: 'g-future', status: 'planned', participants: [{ ...participant, nextContactDate: '2026-10-07' }] }
+  ];
+  const before = JSON.stringify([memberships, gatherings]);
+  assert.deepEqual(C.relationshipTasks([null, ...memberships], [null, ...gatherings, { id: 'g-noise', participants: [null, 1, 'noise'] }], TODAY).map(x => [x.source, x.id]).sort(), [
+    ['gathering', 'g-completed'], ['gathering', 'g-planned'], ['membership', 'm-paused'], ['membership', 'm-today']
+  ]);
+  assert.equal(JSON.stringify([memberships, gatherings]), before, '할 일 조회가 원본 상태를 바꾸지 않는다');
+});
+
+t('관계관리 문서 — 네 컬렉션의 병합·충돌 보호·삭제와 라우트를 지원한다', () => {
+  const collections = ['memberships', 'programActivities', 'programExams', 'gatherings'];
+  const empty = C.emptyState();
+  for (const c of collections) {
+    assert.deepEqual(empty[c], []);
+    assert.ok(C.COLLECTIONS.includes(c), c + ' 동기화 컬렉션이 있어야 한다');
+  }
+  const docs = collections.map((c, i) => ({ c, id: 'r' + i, data: { note: '원본' }, updatedAt: 10 }));
+  const merged = C.mergeDocs(empty, docs, []);
+  assert.equal(merged.changed, 4);
+  for (const doc of docs) {
+    assert.equal(merged.local[doc.c][0].id, doc.id);
+    assert.deepEqual(C.revertDoc(merged.local, doc.c + '|' + doc.id).data, { note: '원본' });
+  }
+  const stale = C.mergeDocs(merged.local, docs.map(d => ({ ...d, data: { note: '이전' }, updatedAt: 5 })), []);
+  assert.equal(stale.changed, 0);
+  const pending = C.mergeDocs(merged.local, [{ ...docs[0], data: { note: '서버' }, updatedAt: 20 }], ['memberships|r0']);
+  assert.deepEqual([pending.skipped, pending.local.memberships[0].note], [1, '원본']);
+  const removed = C.mergeDocs(merged.local, docs.map(d => ({ ...d, deleted: true, updatedAt: 20 })), []);
+  for (const c of collections) assert.deepEqual(removed.local[c], []);
+  assert.equal(C.routeOf('#/relationships').route, 'relationships');
+});
+
 console.log('crm-core: ' + passed + ' 통과');
