@@ -43,6 +43,9 @@ const MANUAL_SCOPES = new Set(['studyforce', 'classcard', 'metamath', 'nelt', 'e
 const HTTPS_URL = /^https:\/\/[^\s"'<>]{1,200}$/;
 // 파일(매뉴얼 사진): D1 BLOB. 클라이언트가 긴 변 1000px JPEG 로 줄여 올리므로 400KB 면 넉넉하다. base64 본문은 그 4/3 + 여유.
 const FILE_ID = /^[A-Za-z0-9_-]{8,64}$/;
+// 문서에 적히는 사진 id 는 randomFileId 가 발급한 모양(f_+16진 24자리)만 받는다 — 이 칸은 PII 검사에서 빼므로
+// 전화번호 모양 문자열이 id 자리에 들어오는 길을 모양으로 막는다. GET/DELETE /api/files 경로는 느슨한 FILE_ID 그대로.
+const MANUAL_PHOTO_ID = /^f_[0-9a-f]{24}$/;
 const FILE_KINDS = new Set(['manual']);
 const FILE_MIMES = new Set(['image/jpeg', 'image/png', 'image/webp']);
 const MAX_FILE_BYTES = 400 * 1024;
@@ -794,7 +797,7 @@ function ruleManuals(data, ctx) {
   if (!absent(out.photos)) {
     if (!Array.isArray(out.photos) || out.photos.length > MAX_MANUAL_PHOTOS) return bad('INVALID', '사진은 ' + MAX_MANUAL_PHOTOS + '장까지입니다');
     for (const p of out.photos) {
-      if (!isPlainObject(p) || typeof p.id !== 'string' || !FILE_ID.test(p.id)) return bad('INVALID', 'photos[].id 형식이 올바르지 않습니다');
+      if (!isPlainObject(p) || typeof p.id !== 'string' || !MANUAL_PHOTO_ID.test(p.id)) return bad('INVALID', 'photos[].id 형식이 올바르지 않습니다');
       const row = { id: p.id };
       if (!absent(p.caption)) {
         if (typeof p.caption !== 'string' || p.caption.length > 80) return bad('INVALID', '사진 설명은 80자까지입니다');
@@ -805,7 +808,7 @@ function ruleManuals(data, ctx) {
   }
   out.photos = photos;
   // 사진 id 는 서버가 발급한 16진 24자리(f_…)라 글이 아니다 — 숫자 13자리가 우연히 이어지면 주민번호 패턴에 걸려
-  // 약 0.7% 확률로 저장이 막혔다. id 는 위에서 모양만 확인하고, 자유 텍스트인 caption 만 PII 검사에 넣는다.
+  // 약 0.7% 확률로 저장이 막혔다. id 는 위에서 MANUAL_PHOTO_ID 로 모양을 확정했으니, 자유 텍스트인 caption 만 PII 검사에 넣는다.
   const pii = findPii(Object.assign({}, out, { photos: photos.map(p => ({ caption: p.caption })) }), '', null);
   if (pii) return bad('PII', pii + ' 에 전화번호·이메일·주민번호를 적을 수 없습니다');
   return { data: out };

@@ -641,4 +641,10 @@ test('manuals: 숫자가 이어진 사진 id 는 PII 로 보지 않고, 사진 �
   // 사진 밖의 자유 텍스트(단계·주의)는 전처럼 막힌다 — id 예외가 다른 칸까지 풀리지 않는다
   const step = await putDoc(env, adminToken, 'manuals', 'm-step', Object.assign({}, man, { steps: ['상담은 02-123-4567 로'], photos: [{ id: rrnLike }] }));
   assert.deepEqual([step.status, step.body.code, step.body.error.startsWith('steps[0].text ')], [400, 'PII', true]);
+  // id 자리는 서버 발급 모양(f_+16진 24자리)만 받는다 — PII 검사를 빼는 대신 전화번호 모양 문자열이 id 로 들어오는 길을 모양으로 막는다
+  for (const id of ['010-1234-5678', '01012345678', '123456-1234567', 'f_doesnotexist000000000000', 'F_1234561234567ABCDEFABCDE']) {
+    const r = await putDoc(env, adminToken, 'manuals', 'm-bad', Object.assign({}, man, { photos: [{ id }] }));
+    assert.deepEqual([r.status, r.body.code], [400, 'INVALID'], id);
+  }
+  assert.equal(await docOf(env, adminToken, 'manuals', 'm-bad'), null, '거절된 문서는 저장되지 않는다');
 });
