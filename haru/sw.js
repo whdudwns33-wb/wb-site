@@ -1,8 +1,8 @@
 'use strict';
-/* WB 하루브레인 서비스 워커 — 앱 껍데기만 캐시한다. 팩·문항·기록(/api/*)은 절대 캐시하지 않는다(설계안 §7-1).
+/* 삼육중 및 영재원 대비 서비스 워커 — 앱 껍데기와 자체 샘플만 캐시한다. 운영 팩·문항·기록(/api/*)은 절대 캐시하지 않는다(설계안 §7-1).
    VERSION 은 build-dist.mjs 가 껍데기 파일 내용 해시로 스탬프한다 — 손으로 올리지 않는다. */
 const VERSION = 'wbh-shell-dev';
-const SHELL = ['./', './index.html', './strings.js', './plan.js', './mastery.js', './srs.js', './cause.js', './probe.js', './manifest.webmanifest', './icon.svg'];
+const SHELL = ['./', './index.html', './strings.js', './plan.js', './mastery.js', './srs.js', './cause.js', './probe.js', './preview.js', './manifest.webmanifest', './icon.svg'];
 
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));

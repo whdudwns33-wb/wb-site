@@ -35,7 +35,7 @@ async function adminContext({ now = openedAt - 1, students = [{ code: 'demo-a', 
 // 학생 앱은 IIFE 안의 필요한 함수만 이웃 함수 경계로 잘라 실행한다.
 function studentContext(names, mocks = {}) {
   const nodes = Object.fromEntries(['savedot', 'savetxt', 'home', 'more', 'left', 'reprobeBar'].map(k => [k, element()]));
-  const context = vm.createContext({ $: id => nodes[id], document: { querySelectorAll: () => [] } });
+  const context = vm.createContext({ $: id => nodes[id], document: { querySelectorAll: () => [] }, PREVIEW_MODE: false, PREVIEW: null });
   const functions = names.map(name => {
     const start = student.indexOf('    function ' + name + '(');
     const end = student.indexOf('\n    function ', start + 1);
@@ -190,5 +190,41 @@ function studentContext(names, mocks = {}) {
     assert.equal(explained, true);
     assert.ok(clears > 0);
   });
-  console.log('하루브레인 화면 회귀:', count, '개 통과');
+  await t('샘플은 실제 인증·기록을 읽거나 쓰지 않고 운영 요청도 보내지 않음', async () => {
+    const storageCalls = [], calls = [];
+    const { context, nodes } = studentContext(['auth', 'saveAuth', 'api', 'loadCache', 'cache', 'loadOmr', 'saveOmr', 'setDot', 'push', 'submitOmr'], {
+      PREVIEW_MODE: true, PREVIEW: { api: async (p) => { calls.push(p); return { accepted: true }; } },
+      localStorage: Object.fromEntries(['getItem', 'setItem', 'removeItem'].map(k => [k, (...args) => { storageCalls.push([k, ...args]); return '{"token":"기존 인증"}'; }])),
+      fetch() { throw new Error('샘플에서 운영 요청을 보냈습니다'); },
+      DB: {}, OMR: { kind: 'single', keyId: 'preview', periods: [] },
+      LS_STATE: 'wbh.state', LS_OMR: 'wbh.omr', pendingPut: true,
+      render() {}, loading: () => '', footer: () => '', refreshToday: async () => {}, showHome() {},
+    });
+    assert.equal(vm.runInContext('auth().name', context), '샘플 학생');
+    vm.runInContext('saveAuth(null); cache(); saveOmr();', context);
+    assert.equal(vm.runInContext('loadCache()', context), null);
+    assert.equal(vm.runInContext('loadOmr()', context), null);
+    vm.runInContext("setDot('saved')", context);
+    assert.equal(nodes.savedot.hidden, true);
+    await vm.runInContext('push()', context);
+    assert.equal(context.pendingPut, false);
+    vm.runInContext('submitOmr()', context); await settle();
+    assert.deepEqual(calls, ['/attempt']);
+    assert.deepEqual(storageCalls, []);
+    assert.match(student, /if \(!PREVIEW_MODE && 'serviceWorker' in navigator\)/);
+  });
+  await t('샘플 모듈 누락은 오류로 끝내고 정상 API의 인증 계약은 유지', async () => {
+    const calls = [];
+    const { context } = studentContext(['api'], {
+      PREVIEW_MODE: true, PREVIEW: null,
+      auth: () => ({ token: '기존 인증' }),
+      fetch: async (url, opt) => { calls.push([url, opt.headers.Authorization]); return { ok: true, json: async () => ({ today: {} }) }; },
+    });
+    await assert.rejects(vm.runInContext("api('/today')", context), /샘플을 불러오지/);
+    assert.deepEqual(calls, []);
+    context.PREVIEW_MODE = false;
+    await vm.runInContext("api('/today')", context);
+    assert.deepEqual(calls, [['/api/haru/today', 'Bearer 기존 인증']]);
+  });
+  console.log('삼육중 및 영재원 대비 화면 회귀:', count, '개 통과');
 })().catch(error => { console.error(error); process.exitCode = 1; });
