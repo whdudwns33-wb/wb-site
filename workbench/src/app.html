@@ -3,9 +3,10 @@
 :root{
   --bg:#F6F7F4; --panel:#FFFFFF; --ink:#1C2B2A; --ink2:#5A6B68; --line:#E2E6E1;
   --accent:#0F6B5C; --accent-soft:#E3F0EC; --accent-ink:#0A4A40;
-  --ok:#2E7D32; --warn:#B26A00; --danger:#B3261E; --warn-soft:#FFF4E0; --danger-soft:#FBEAE9; --ok-soft:#E8F3E8;
+  --ok:#2A7230; --warn:#9C5D00; --danger:#B3261E; --warn-soft:#FFF4E0; --danger-soft:#FBEAE9; --ok-soft:#E8F3E8;
   --chip:#EEF1ED; --shadow:0 1px 3px rgba(28,43,42,.08);
   --tk2bg:#F4E1EE; --tk2ink:#A03A80; --tk3bg:#E9E3F7; --tk3ink:#5B44A8;
+  --on-accent:#FFFFFF; color-scheme:light;
 }
 :root:not([data-theme="light"]) { }
 @media (prefers-color-scheme: dark){
@@ -15,6 +16,7 @@
     --ok:#7BC67E; --warn:#E0A94F; --danger:#E58E88; --warn-soft:#332A18; --danger-soft:#33201E; --ok-soft:#1E2E1F;
     --chip:#273029; --shadow:0 1px 3px rgba(0,0,0,.4);
     --tk2bg:#332030; --tk2ink:#D98CC0; --tk3bg:#282442; --tk3ink:#A794E0;
+    --on-accent:#0E1A17; color-scheme:dark;
   }
 }
 :root[data-theme="dark"]{
@@ -23,6 +25,7 @@
   --ok:#7BC67E; --warn:#E0A94F; --danger:#E58E88; --warn-soft:#332A18; --danger-soft:#33201E; --ok-soft:#1E2E1F;
   --chip:#273029; --shadow:0 1px 3px rgba(0,0,0,.4);
   --tk2bg:#332030; --tk2ink:#D98CC0; --tk3bg:#282442; --tk3ink:#A794E0;
+  --on-accent:#0E1A17; color-scheme:dark;
 }
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);
@@ -37,7 +40,7 @@ h1,h2,h3,h4{margin:0;line-height:1.3;text-wrap:balance}
 /* ── 사이드바 ── */
 .side{width:230px;flex-shrink:0;border-right:1px solid var(--line);background:var(--panel);padding:14px 12px;display:flex;flex-direction:column;gap:4px;position:sticky;top:0;height:100vh;overflow-y:auto}
 .brand{display:flex;align-items:center;gap:8px;padding:4px 8px 14px;cursor:pointer}
-.brand .mark{width:30px;height:30px;border-radius:8px;background:var(--accent);color:#fff;display:grid;place-items:center;font-weight:800;font-size:13px;letter-spacing:-.5px}
+.brand .mark{width:30px;height:30px;border-radius:8px;background:var(--accent);color:var(--on-accent);display:grid;place-items:center;font-weight:800;font-size:13px;letter-spacing:-.5px}
 .brand b{font-size:15px;letter-spacing:-.3px}
 .brand small{display:block;color:var(--ink2);font-weight:400;font-size:11px}
 .navbtn{display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:8px 10px;border-radius:8px;color:var(--ink2);font-weight:600}
@@ -59,7 +62,7 @@ h1,h2,h3,h4{margin:0;line-height:1.3;text-wrap:balance}
 .btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;font-weight:600;border:1px solid var(--line);background:var(--panel);box-shadow:var(--shadow)}
 a.btn{text-decoration:none;color:var(--ink)}
 .btn:hover{border-color:var(--accent)}
-.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
 .btn.pri:hover{filter:brightness(1.08)}
 .btn.sm{padding:4px 10px;font-size:12.5px;box-shadow:none}
 .btn.ghost{border-color:transparent;box-shadow:none;color:var(--ink2)}
@@ -112,7 +115,7 @@ a.btn{text-decoration:none;color:var(--ink)}
 /* ── 진학 분석 C안 (상담 보드) ── */
 .bfilters{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
 .fchip{border:1.5px solid var(--line);background:var(--panel);color:var(--ink2);border-radius:999px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
-.fchip.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.fchip.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
 .bsummary{background:var(--accent-soft);border-radius:10px;padding:10px 14px;font-size:13px;margin-bottom:10px;color:var(--accent-ink)}
 .bpins{border:1.5px dashed var(--line);border-radius:10px;padding:8px 12px;font-size:12.5px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
 .bpin{background:var(--accent-soft);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600;color:var(--accent-ink);display:inline-flex;gap:5px;align-items:center}
@@ -239,6 +242,72 @@ details.acc2[open]{padding-bottom:14px}
 .calev{font-size:10.5px;text-align:left;border-radius:5px;padding:1px 5px;background:var(--accent-soft);color:var(--accent-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;border:none}
 .calev.warn{background:var(--warn-soft);color:var(--warn)}
 .calev.danger{background:var(--danger-soft);color:var(--danger)}
+.calev.res{background:var(--ok-soft);color:var(--ok)}
+/* 수시 지원 현황 */
+.aplref{padding:12px 16px;margin-bottom:12px}
+.aplref-h{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;margin-bottom:9px;font-size:13.5px}
+.aplref-h span{color:var(--ink2);font-size:12px}
+.aplgr{display:grid;grid-template-columns:minmax(120px,1.7fr) repeat(6,minmax(54px,1fr));gap:8px}
+.aplgr label{display:flex;flex-direction:column;gap:3px;font-size:11px;font-weight:700;color:var(--ink2)}
+.aplgr input{text-align:center;font-variant-numeric:tabular-nums;font-weight:700;font-size:15px;padding:6px 4px}
+.aplgr .ex input{text-align:left;font-weight:600;font-size:13.5px;padding:6px 10px}
+.aplsum{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+.aplwarn{border:1px solid var(--danger);background:var(--danger-soft);color:var(--danger);border-radius:10px;padding:9px 13px;margin-bottom:10px;font-size:13px;line-height:1.5}
+.aplwarn.soft{border-color:var(--warn);background:var(--warn-soft);color:var(--warn)}
+.aplgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:12px;align-items:start}
+.aplcard{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:9px;box-shadow:var(--shadow)}
+.aplcard.won{border-color:var(--ok);box-shadow:inset 3px 0 0 var(--ok),var(--shadow)}
+.aplcard.lost{opacity:.6}
+.aplcard.add{border-style:dashed;box-shadow:none;background:transparent;gap:7px}
+.apl-or{font-size:11px;color:var(--ink2);text-align:center}
+.aplhead{display:flex;gap:10px;align-items:flex-start;justify-content:space-between}
+.apln{min-width:0}
+.apln b{font-size:15.5px;letter-spacing:-.3px;display:block}
+.apln span{display:block;color:var(--ink2);font-size:12.5px;margin-top:1px}
+.aplst{width:auto;flex:none;font-size:12px;font-weight:700;padding:3px 8px;border-radius:999px;background:var(--chip);color:var(--ink2);border-color:transparent}
+.aplst.acc{background:var(--accent-soft);color:var(--accent-ink)}
+.aplst.ok{background:var(--ok-soft);color:var(--ok)}
+.aplst.warn{background:var(--warn-soft);color:var(--warn)}
+.aplst.danger{background:var(--danger-soft);color:var(--danger)}
+.aplmeta{display:flex;gap:6px;align-items:center}
+.aplkind{width:auto;border:0;cursor:pointer}
+.apltrack{font-size:12.5px;padding:4px 8px;flex:1;min-width:0}
+.aplwait{display:flex;gap:4px;align-items:center;font-size:12px;color:var(--warn);font-weight:700;white-space:nowrap}
+.aplwait input{width:52px;padding:3px 6px}
+.apldates{display:flex;flex-direction:column;gap:8px}
+.aplrow .lb{display:flex;align-items:center;justify-content:space-between;margin-bottom:3px;min-height:20px}
+.aplrow .v{display:flex;gap:5px;align-items:center}
+.aplrow .v input[type=date]{flex:1;min-width:0;padding:5px 7px;font-size:12.5px}
+.aplrow .v select{width:auto;flex:none;padding:5px 6px;font-size:12.5px}
+.aplrow .k,.aplmin .k,.apled .k{font-size:11px;font-weight:700;color:var(--ink2)}
+.aplmin{border-radius:9px;padding:9px 11px;background:var(--chip)}
+.aplmin.ok{background:var(--ok-soft)}
+.aplmin.edge{background:var(--warn-soft)}
+.aplmin.fail{background:var(--danger-soft)}
+.aplmin-h{display:flex;gap:7px;align-items:center;justify-content:space-between;min-height:20px}
+.aplmin .rule{font-size:13px;font-weight:600;margin-top:3px}
+.aplmin .rule .none{color:var(--ink2);font-weight:500}
+.aplmin .hint{font-size:12px;margin-top:5px}
+.aplmin.fail .hint{color:var(--danger)}
+.aplmin.edge .hint{color:var(--warn)}
+.aplmin details{margin-top:5px}
+.aplmin summary{font-size:12px;color:var(--ink2);cursor:pointer;font-weight:600}
+.apled{display:flex;flex-direction:column;gap:7px;margin-top:7px;font-size:12.5px}
+.apled .r{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.apled select{width:auto;padding:3px 6px;font-size:12.5px}
+.apled input[type=number]{width:64px;padding:3px 6px}
+.apled input:not([type]){font-size:12.5px;padding:5px 8px}
+.aplck{display:inline-flex;gap:4px;align-items:center;font-weight:600;cursor:pointer;font-size:12.5px}
+.aplck input{width:auto;margin:0}
+.aplmemo{font-size:12.5px;padding:6px 9px}
+.aplfoot{display:flex;justify-content:space-between;align-items:center;color:var(--ink2)}
+.aplfoot .aplck{font-weight:500;font-size:11.5px}
+.aplnote{font-size:11.5px;color:var(--ink2);margin:14px 2px 0}
+.apltbl tr:not(:first-child){cursor:pointer}
+.apltbl tr:not(:first-child):hover td{background:var(--chip)}
+.aplsub{font-size:11.5px;color:var(--ink2)}
+.apld{font-variant-numeric:tabular-nums}
+@media (max-width:720px){.aplgr{grid-template-columns:repeat(3,1fr)}.aplgr .ex{grid-column:1/-1}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 
@@ -486,6 +555,9 @@ function focusList(){
     if(ex.length){score+=3;reasons.push([`${ex[0].name} D-${dday(ex[0].date)}`,"danger"]);}
     const cd=s.consult&&s.consult.contractEnd?dday(s.consult.contractEnd):null;
     if(cd!==null&&cd>=0&&cd<=60){score+=2;reasons.push([`계약 D-${cd}`,"warn"]);}
+    const ax=aplNext(s);
+    if(ax&&dday(ax.ex.date)<=10){score+=3;reasons.push([`${ax.univ} ${ax.ex.kind||"고사"} D-${dday(ax.ex.date)}`,"danger"]);}
+    if(aplConflicts(s).some(c=>c.hard&&dday(c.date)>=0)){score+=3;reasons.push(["수시 일정 충돌","danger"]);}
     return {s,score,reasons};
   }).filter(x=>x.score>0).sort((a,b)=>b.score-a.score).slice(0,5);}
 
@@ -496,6 +568,7 @@ function renderSide(){
   <div class="brand" onclick="go('home')"><div class="mark">WB</div><div><b>컨설팅 워크벤치</b><small>웩슬러브레인센터</small></div></div>
   <button class="navbtn ${view.page==='home'?'on':''}" onclick="go('home')">🏠 <span class="txt">대시보드</span></button>
   <button class="navbtn ${view.page==='cal'?'on':''}" onclick="go('cal')">🗓 <span class="txt">월간 캘린더</span></button>
+  <button class="navbtn ${view.page==='apply'?'on':''}" onclick="go('apply')">📮 <span class="txt">수시 지원 현황</span></button>
   <button class="navbtn ${view.page==='lab'?'on':''}" onclick="go('lab')">🧪 <span class="txt">노하우 랩</span></button>
   <button class="navbtn ${view.page==='ipsi'?'on':''}" onclick="go('ipsi')">🎯 <span class="txt">진학 가능권 분석</span></button>
   <button class="navbtn ${view.page==='mock'?'on':''}" onclick="go('mock')">🧾 <span class="txt">모의지원</span></button>
@@ -546,15 +619,6 @@ function renderHome(){
     좌측 하단 <u>가져오기</u>로 시드 JSON(students.json)을 불러오거나, 학생을 직접 추가하세요.<br>
     모든 데이터는 이 브라우저에만 저장됩니다.</div>`:`
 
-  <div class="sec"><h2>⏰ 마감 임박 수행평가 <span class="n">전체 학생</span></h2>
-  <div class="card">${allTasks.length?allTasks.slice(0,8).map(t=>`
-    <div class="duer" onclick="openStu('${t.stu.id}');view.tab='tasks';render()">
-      ${ddayChip(t.due)}
-      <span class="who">${esc(t.stu.name)}</span>
-      <span class="what">${esc(t.subject)} · ${esc(t.topic)}</span>
-      <span class="st chip">${esc(t.status)}</span>
-    </div>`).join(""):`<div class="empty">진행 중 수행평가가 없습니다</div>`}</div></div>
-
   ${db.students.some(s=>s.grade==="고3")?(()=>{const d=dday(db.meta.suneung);
     const g3=db.students.filter(s=>s.grade==="고3").map(s=>esc(s.name)).join(" · ");
     return `<div class="card" style="display:flex;align-items:center;gap:12px;margin-bottom:4px;border-color:var(--danger)">
@@ -564,6 +628,26 @@ function renderHome(){
     <input type=date value="${esc(db.meta.suneung)}" style="width:150px" onchange="db.meta.suneung=this.value;save();render()">
     </div>`;})():""}
 
+
+  ${(()=>{const up=db.students.flatMap(st=>aplList(st).filter(a=>!aplDead(a)).flatMap(a=>[
+      a.ex&&a.ex.date?{d:a.ex.date,st,a,l:`${a.ex.kind||"대학별고사"}${a.ex.time?" "+a.ex.time:""}`}:null,
+      a.res&&a.res.date&&a.status!=="최종 합격"?{d:a.res.date,st,a,l:"발표"}:null].filter(Boolean)))
+      .filter(e=>{const n=dday(e.d);return n>=0&&n<=30;}).sort((x,y)=>x.d<y.d?-1:1);
+    return up.length?`<div class="sec"><h2>📮 다가오는 수시 일정 <span class="n">30일 이내</span>
+      <button class="btn ghost sm" style="margin-left:auto" onclick="go('apply')">전체 보기</button></h2>
+    <div class="card">${up.slice(0,6).map(e=>`
+      <div class="duer" onclick="openApl('${e.st.id}')">
+        ${ddayChip(e.d)}<span class="who">${esc(e.st.name)}</span>
+        <span class="what"><b class="apld">${aplMD(e.d)}</b> ${esc(e.l)} · ${esc(e.a.univ)} ${esc(e.a.major)}</span>
+      </div>`).join("")}</div></div>`:"";})()}
+  <div class="sec"><h2>⏰ 마감 임박 수행평가 <span class="n">전체 학생</span></h2>
+  <div class="card">${allTasks.length?allTasks.slice(0,8).map(t=>`
+    <div class="duer" onclick="openStu('${t.stu.id}');view.tab='tasks';render()">
+      ${ddayChip(t.due)}
+      <span class="who">${esc(t.stu.name)}</span>
+      <span class="what">${esc(t.subject)} · ${esc(t.topic)}</span>
+      <span class="st chip">${esc(t.status)}</span>
+    </div>`).join(""):`<div class="empty" style="padding:14px">진행 중 수행평가가 없습니다</div>`}</div></div>
   <div class="sec"><h2>🔥 이번 주 포커스 <span class="n">관리 필요도 상위 — 자동 산출</span></h2>
   <div class="card">${(()=>{const f=focusList();return f.length?f.map(({s,reasons})=>`
     <div class="duer" onclick="openStu('${s.id}')">
@@ -600,6 +684,8 @@ function renderHome(){
 function renderStu(){
   const s=stu();if(!s){go("home");return;}
   const tabs=[["overview","프로파일"],["acad","학업 관리"],["saenggibu","생기부"],["tasks","수행평가"],["inquiry","탐구보고서"],["records","상담 관리"],["adm","진학사 통"],["plan","월간 계획"]];
+  /* 고3(또는 지원 기록이 있는 학생)은 수시 지원 탭을 프로파일 바로 뒤에 둔다 */
+  if(s.grade==="고3"||(s.apply||[]).length)tabs.splice(1,0,["apply","수시 지원"]);
   $("#main").innerHTML=`
   <div class="crumb">학생 / ${esc(s.grade)}</div>
   <div class="pagehead"><div>
@@ -628,7 +714,7 @@ function renderStu(){
     </div>`;})()}
   <div class="tabs">${tabs.map(([k,l])=>`<button class="tab ${view.tab===k?'on':''}" onclick="view.tab='${k}';render()">${l}</button>`).join("")}</div>
   <div id="tabbody"></div>`;
-  ({overview:tabOverview,acad:tabAcad,saenggibu:tabSaenggibu,tasks:tabTasks,inquiry:tabInquiry,adm:tabAdm,records:tabRecords,plan:tabPlan})[view.tab]();
+  ({overview:tabOverview,apply:tabApply,acad:tabAcad,saenggibu:tabSaenggibu,tasks:tabTasks,inquiry:tabInquiry,adm:tabAdm,records:tabRecords,plan:tabPlan})[view.tab]();
 }
 
 /* ── 프로파일 탭 ── */
@@ -1267,7 +1353,7 @@ function editorInquiry(){
   $("#tabbody").innerHTML=`
   <button class="btn sm" onclick="view.editInq=null;render()">← 목록</button>
   <div class="card" style="margin-top:10px">
-    <div class="statuses" style="margin-bottom:12px">${INQ_STAGES.map(st=>`<button class="stpill" style="${q.status===st?'background:var(--accent);color:#fff':''}" onclick="upInq('status','${st}')">${st}</button>`).join("")}</div>
+    <div class="statuses" style="margin-bottom:12px">${INQ_STAGES.map(st=>`<button class="stpill" style="${q.status===st?'background:var(--accent);color:var(--on-accent)':''}" onclick="upInq('status','${st}')">${st}</button>`).join("")}</div>
     <div class="formgrid">
       <div class="frow"><label>과목</label><input value="${esc(q.subject)}" onchange="upInq('subject',this.value)"></div>
       <div class="frow"><label>산출 형태</label><select onchange="upInq('type',this.value)">${["보고서","PPT발표","포스터"].map(x=>`<option ${q.type===x?"selected":""}>${x}</option>`).join("")}</select></div>
@@ -2611,8 +2697,8 @@ function renderHsSim(){
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
       <div class="frow" style="margin:0"><label>상위 %</label><input value="${esc(view.hsP||"")}" placeholder="예: 6" style="width:90px" onchange="view.hsP=this.value;render()"></div>
       <span style="color:var(--ink2);font-size:12px;padding-bottom:9px">또는</span>
-      <div class="frow" style="margin:0"><label>전교 등수</label><input value="${esc(view.hsRank||"")}" placeholder="12" style="width:80px" onchange="view.hsRank=this.value;render()"></div>
-      <div class="frow" style="margin:0"><label>재적수</label><input value="${esc(view.hsTot||"")}" placeholder="320" style="width:80px" onchange="view.hsTot=this.value;render()"></div>
+      <div class="frow" style="margin:0"><label>전교 등수</label><input value="${esc(view.hsRank||"")}" placeholder="예: 12" style="width:80px" onchange="view.hsRank=this.value;render()"></div>
+      <div class="frow" style="margin:0"><label>재적수</label><input value="${esc(view.hsTot||"")}" placeholder="예: 320" style="width:80px" onchange="view.hsTot=this.value;render()"></div>
       <div class="frow" style="margin:0"><label>희망 계열</label>
         <div style="display:flex;gap:5px;flex-wrap:wrap">${["전체",...Object.keys(FIELD_KW)].map(f=>`<button class="fchip ${field===f?"on":""}" onclick="view.hsField='${f}';render()">${f}</button>`).join("")}</div></div>
     </div>
@@ -3236,13 +3322,243 @@ ${tasks}
 
 [최근 성적 추이]
 ${grades}
-
+${(s.apply||[]).length?`
+[수시 지원 현황 — 기준 등급 ${(s.mockRef&&s.mockRef.exam)||"미입력"}]
+${aplList(s).map(a=>{const c=minCheck(a.min,s.mockRef);return `- ${a.univ} ${a.major} (${a.kind}${a.track?" · "+a.track:""}) [${a.status}]${a.ex.date?` 대학별고사 ${a.ex.date}${a.ex.time?" "+a.ex.time:""}`:""}${a.res.date?` 발표 ${a.res.date}`:""} · 최저: ${minText(a.min)}${c.state==="na"?"":` → ${({ok:"충족",edge:"경계",fail:"미충족",nodata:"등급 미입력",bad:"기준 미완성"})[c.state]}${c.hint?` (${c.hint})`:""}`}`;}).join("\n")}
+`:""}
 [브리핑 구성 — 운영가이드 §4]
 1. 이전 상담 요약 (결정사항 + 이번 달 안건)
 2. 이번 달 수행평가 현황 (완료/진행/예정)
 3. 학습플래너 달성 여부 + 성적 추이 한 줄 평가 (성취 공유 = 자신감 관리)
 4. 제안 상담 아젠다 3~5개 — LCSI ${s.lcsi||"미파악"} 접근법 반영${cd!==null&&cd<=60?`
 5. ⚠️ 계약 만료 D-${cd} — 갱신 논의를 아젠다에 반드시 포함하라`:""}`);}
+
+/* ═══════════ 수시 지원 현황 ═══════════
+   학생별 지원 카드(6장 + 6장 제외 대학) · 수능최저 충족 판정 · 대학별고사 일정 겹침 경고.
+   판정은 "기준 등급"(최근 모의고사·가채점)과 대조한 상담용 참고치 — 실제 성적표로 반드시 다시 확인한다. */
+const APL_KINDS=["교과","종합","논술","실기","기타"];
+const APL_KCLS={"교과":"tk0","종합":"tk1","논술":"tk2","실기":"tk3","기타":""};
+const APL_ST=["준비","지원 완료","1단계 합격","최종 합격","예비","불합격","미응시"];
+const APL_STC={"준비":"","지원 완료":"acc","1단계 합격":"warn","최종 합격":"ok","예비":"warn","불합격":"danger","미응시":"danger"};
+const APL_AREAS=["국","수","영","탐"];
+const APL_GR=[["국","국어"],["수","수학"],["영","영어"],["탐1","탐구1"],["탐2","탐구2"],["한","한국사"]];
+const aplDead=a=>a.status==="불합격"||a.status==="미응시";
+function aplList(s){return s.apply=s.apply||[];}
+function aplNew(p){return Object.assign({id:uid(),univ:"",major:"",track:"",kind:"종합",free:false,
+  min:{on:false,areas:["국","수","영","탐"],n:2,sum:5,must:"",tam:"1",hist:0,note:""},
+  ex:{date:"",time:"",kind:""},res:{date:""},status:"준비",wait:"",memo:""},p||{});}
+function aplTam(g,mode){
+  const t=[g.탐1,g.탐2].map(Number).filter(v=>v>=1&&v<=9);
+  if(mode==="1")return t.length?Math.min(...t):null;
+  if(t.length<2)return null;
+  const avg=(t[0]+t[1])/2;return mode==="2t"?Math.floor(avg):avg;}
+/* 반영 영역 중 n개를 골라 합을 최소로 — 필수 영역이 있으면 그것부터 넣는다 */
+function aplPick(v,areas,n,must){
+  let pool=areas.map(a=>[a,v[a]]),chosen=[];
+  if(must){chosen.push(pool.find(x=>x[0]===must));pool=pool.filter(x=>x[0]!==must);}
+  pool.sort((a,b)=>a[1]-b[1]);chosen=chosen.concat(pool.slice(0,n-chosen.length));
+  return{sum:chosen.reduce((t,x)=>t+x[1],0),used:chosen.map(x=>x[0])};}
+function minCheck(m,g){
+  if(!m||!m.on)return{state:"na"};
+  g=g||{};
+  const v={국:+g.국||null,수:+g.수||null,영:+g.영||null,탐:aplTam(g,m.tam||"1")};
+  const areas=(m.areas||[]).filter(a=>APL_AREAS.includes(a));
+  const cap=+m.sum||0,n=Math.max(1,Math.min(+m.n||1,areas.length));
+  if(!areas.length||!cap)return{state:"bad",msg:"기준을 완성하세요"};
+  if(m.must&&!areas.includes(m.must))return{state:"bad",msg:`필수 ${m.must}이(가) 반영 영역에 없음`};
+  const miss=areas.filter(a=>v[a]==null);
+  if(miss.length)return{state:"nodata",msg:`${miss.join("·")} 등급 미입력`};
+  if(m.hist&&!(+g.한))return{state:"nodata",msg:"한국사 등급 미입력"};
+  const r=aplPick(v,areas,n,m.must),margin=Math.round((cap-r.sum)*10)/10;
+  const base={sum:Math.round(r.sum*10)/10,cap,margin,used:r.used};
+  if(m.hist&&+g.한>+m.hist)return{...base,state:"fail",hint:`한국사 ${m.hist}등급 이내 필요 (현재 ${g.한})`};
+  if(margin<0){
+    let best=null;
+    for(const a of areas)for(let k=1;k<=3;k++){
+      if(v[a]-k<1)break;
+      if(aplPick({...v,[a]:v[a]-k},areas,n,m.must).sum<=cap){if(!best||k<best.k)best={a,k};break;}}
+    return{...base,state:"fail",hint:best?`${best.a} ${best.k}등급 오르면 충족`:"한 영역만으로는 부족 — 두 영역 이상 상승 필요"};}
+  if(margin<1)return{...base,state:"edge",hint:`${r.used.join("·")} 중 하나라도 1등급 내려가면 미충족`};
+  return{...base,state:"ok"};}
+function minText(m){
+  if(!m||!m.on)return"수능최저 없음";
+  const ar=(m.areas||[]).map(a=>a==="탐"?`탐(${m.tam==="1"?"1":m.tam==="2t"?"2·절사":"2"})`:a).join("");
+  return `${ar} 중 ${m.must?m.must+" 포함 ":""}${m.n}개 합 ${m.sum}${m.hist?` · 한국사 ${m.hist}`:""}${m.note?` · ${m.note}`:""}`;}
+function minVerdict(c){
+  return c.state==="na"?`<span class="chip">최저 없음</span>`
+    :c.state==="ok"?`<span class="chip ok">충족 · 여유 ${c.margin}</span>`
+    :c.state==="edge"?`<span class="chip warn">경계 · 합 ${c.sum}/${c.cap}</span>`
+    :c.state==="fail"?`<span class="chip danger">미충족${c.sum!=null?` · 합 ${c.sum}/${c.cap}`:""}</span>`
+    :`<span class="chip">${esc(c.msg||"")}</span>`;}
+/* 같은 날 대학별고사 — 시간대가 같거나 비어 있으면 충돌, 오전·오후로 갈리면 이동 확인 */
+function aplConflicts(s){
+  const by={};
+  for(const a of aplList(s))if(a.ex&&a.ex.date&&!aplDead(a))(by[a.ex.date]=by[a.ex.date]||[]).push(a);
+  return Object.entries(by).filter(([,arr])=>arr.length>1).map(([date,items])=>{
+    const t=items.map(a=>a.ex.time||"");
+    return{date,items,hard:t.some(x=>!x)||new Set(t).size<t.length};}).sort((a,b)=>a.date<b.date?-1:1);}
+function aplNext(s){
+  return aplList(s).filter(a=>!aplDead(a)&&a.ex&&a.ex.date&&dday(a.ex.date)>=0)
+    .sort((a,b)=>a.ex.date<b.ex.date?-1:1)[0]||null;}
+const aplMD=d=>d?d.slice(5).replace("-","/"):"";
+function aplConfHtml(conf,who){
+  return conf.map(c=>`<div class="aplwarn ${c.hard?"":"soft"}">${c.hard?"⛔ 일정 충돌":"⚠️ 같은 날 두 곳"} — <b>${aplMD(c.date)}</b>${who?` ${esc(who)}`:""}:
+    ${c.items.map(a=>`${esc(a.univ)} ${esc(a.ex.kind||"대학별고사")}${a.ex.time?` (${a.ex.time})`:""}`).join(" · ")}
+    ${c.hard?" — 시간대가 같거나 비어 있습니다. 모집요강에서 시간을 확인하세요.":" — 이동 시간을 확인하세요."}</div>`).join("");}
+
+/* ── 학생 탭 ── */
+function tabApply(){
+  const s=stu();const L=aplList(s);
+  const g=s.mockRef=s.mockRef||{exam:""};
+  const n6=L.filter(a=>!a.free).length;
+  const chk=L.map(a=>minCheck(a.min,g));
+  const cnt=k=>chk.filter(c=>c.state===k).length;
+  const conf=aplConflicts(s),nx=aplNext(s);
+  const res={won:L.filter(a=>a.status==="최종 합격").length,wait:L.filter(a=>a.status==="예비").length};
+  const pool=(s.univs||[]).filter(u=>!L.some(a=>a.univ===u.univ&&a.major===u.major));
+  $("#tabbody").innerHTML=`
+  <div class="card aplref">
+    <div class="aplref-h"><b>기준 등급</b><span>최근 모의고사 또는 가채점 — 아래 카드의 수능최저 판정에 씁니다</span></div>
+    <div class="aplgr">
+      <label class="ex"><span>시험</span><input value="${esc(g.exam||"")}" placeholder="예: 9월 모평" onchange="aplRef('exam',this.value)"></label>
+      ${APL_GR.map(([k,l])=>`<label><span>${l}</span><input type=number min=1 max=9 inputmode=numeric value="${esc(g[k]??"")}" onchange="aplRef('${k}',this.value)"></label>`).join("")}
+    </div>
+  </div>
+  <div class="aplsum">
+    <span class="chip ${n6>6?"danger":n6===6?"ok":""}">수시 ${n6}/6장${L.length>n6?` · 6장 제외 ${L.length-n6}`:""}</span>
+    ${[["ok","ok","최저 충족"],["edge","warn","경계"],["fail","danger","미충족"],["nodata","","등급 미입력"]].map(([k,cl,l])=>cnt(k)?`<span class="chip ${cl}">${l} ${cnt(k)}</span>`:"").join("")}
+    ${nx?`<span class="chip acc">다음 ${esc(nx.univ)} ${esc(nx.ex.kind||"대학별고사")} D-${dday(nx.ex.date)}</span>`:""}
+    ${res.won?`<span class="chip ok">최종 합격 ${res.won}</span>`:""}${res.wait?`<span class="chip warn">예비 ${res.wait}</span>`:""}
+  </div>
+  ${n6>6?`<div class="aplwarn">수시는 6장까지입니다 (현재 ${n6}장). 과기원·사관학교·경찰대·산업대·전문대는 카드의 "6장 제외"를 체크하세요.</div>`:""}
+  ${aplConfHtml(conf)}
+  <div class="aplgrid">
+    ${L.map((a,i)=>aplCard(a,i,chk[i])).join("")}
+    <div class="aplcard add">
+      <b style="font-size:13.5px">＋ 지원 추가</b>
+      ${pool.length?`<select id=apl_pick onchange="aplFromUniv(this.value)"><option value="">관심대학에서 가져오기…</option>
+        ${pool.map(u=>`<option value="${esc(u.univ)}|${esc(u.major)}|${esc(u.track||"")}">${esc(u.univ)} ${esc(u.major)}${u.track?` · ${esc(u.track)}`:""}</option>`).join("")}</select>
+        <div class="apl-or">또는 직접 입력</div>`:""}
+      <input id=apl_univ placeholder="대학 (예: 이화여대)">
+      <input id=apl_major placeholder="학과 (예: 화학·나노과학과)">
+      <div style="display:flex;gap:6px"><select id=apl_kind style="width:auto">${APL_KINDS.map(k=>`<option>${k}</option>`).join("")}</select>
+        <input id=apl_track placeholder="전형명 (예: 논술전형)"></div>
+      <button class="btn sm pri" onclick="aplAdd()">추가</button>
+    </div>
+  </div>
+  <p class="aplnote">수능최저 판정은 기준 등급과 대조한 <b>상담용 참고치</b>입니다. 탐구 반영 방식(상위 1과목·2과목 평균·절사)과 영어·한국사 조건은 대학마다 달라 모집요강으로 확인하세요.</p>`;}
+function aplCard(a,i,c){
+  const st=a.status||"준비",op=view.aplOpen===a.id;
+  return `<div class="aplcard ${st==="최종 합격"?"won":aplDead(a)?"lost":""}">
+    <div class="aplhead">
+      <div class="apln"><b>${esc(a.univ)}</b><span>${esc(a.major||"학과 미입력")}</span></div>
+      <select class="aplst ${APL_STC[st]}" aria-label="지원 상태" onchange="aplSet(${i},'status',this.value)">${APL_ST.map(x=>`<option ${x===st?"selected":""}>${x}</option>`).join("")}</select>
+    </div>
+    <div class="aplmeta">
+      <select class="aplkind tchip ${APL_KCLS[a.kind]||""}" aria-label="전형 유형" onchange="aplSet(${i},'kind',this.value)">${APL_KINDS.map(k=>`<option ${k===a.kind?"selected":""}>${k}</option>`).join("")}</select>
+      <input class="apltrack" value="${esc(a.track||"")}" placeholder="전형명" onchange="aplSet(${i},'track',this.value.trim())">
+      ${st==="예비"?`<label class="aplwait">예비 <input type=number min=1 value="${esc(a.wait||"")}" onchange="aplSet(${i},'wait',this.value)">번</label>`:""}
+    </div>
+    <div class="apldates">
+      <div class="aplrow"><div class="lb"><span class="k">대학별고사</span>${a.ex.date&&!aplDead(a)?ddayChip(a.ex.date):""}</div>
+        <div class="v"><input type=date value="${esc(a.ex.date||"")}" aria-label="대학별고사 날짜" onchange="aplSet(${i},'ex.date',this.value)">
+        <select aria-label="시간대" onchange="aplSet(${i},'ex.time',this.value)">${["","오전","오후"].map(t=>`<option value="${t}" ${t===(a.ex.time||"")?"selected":""}>${t||"시간"}</option>`).join("")}</select>
+        <select aria-label="고사 종류" onchange="aplSet(${i},'ex.kind',this.value)">${["","면접","논술","실기","적성"].map(t=>`<option value="${t}" ${t===(a.ex.kind||"")?"selected":""}>${t||"종류"}</option>`).join("")}</select></div></div>
+      <div class="aplrow"><div class="lb"><span class="k">합격자 발표</span>${a.res.date&&(st==="지원 완료"||st==="1단계 합격"||st==="준비")?ddayChip(a.res.date):""}</div>
+        <div class="v"><input type=date value="${esc(a.res.date||"")}" aria-label="합격자 발표일" onchange="aplSet(${i},'res.date',this.value)"></div></div>
+    </div>
+    <div class="aplmin ${c.state}">
+      <div class="aplmin-h"><span class="k">수능최저</span>${c.state==="na"?"":minVerdict(c)}</div>
+      <div class="rule">${a.min.on?esc(minText(a.min)):`<span class="none">없음</span>`}</div>
+      ${c.hint?`<div class="hint">${esc(c.hint)}</div>`:""}
+      <details ${op?"open":""} ontoggle="aplToggle('${a.id}',this.open)"><summary>기준 ${a.min.on?"편집":"입력"}</summary>
+        <div class="apled">
+          <label class="aplck"><input type=checkbox ${a.min.on?"checked":""} onchange="aplSet(${i},'min.on',this.checked)"> 수능최저 있음</label>
+          ${a.min.on?`
+          <div class="r"><span class="k">반영</span>${APL_AREAS.map(x=>`<label class="aplck"><input type=checkbox ${a.min.areas.includes(x)?"checked":""} onchange="aplArea(${i},'${x}',this.checked)">${x}</label>`).join("")}</div>
+          <div class="r"><span class="k">합</span>
+            <select aria-label="영역 수" onchange="aplSet(${i},'min.n',+this.value)">${[1,2,3,4].filter(n=>n<=Math.max(1,a.min.areas.length)).map(n=>`<option ${n===+a.min.n?"selected":""}>${n}</option>`).join("")}</select>개 영역 합
+            <input type=number min=1 max=36 aria-label="등급 합" value="${esc(a.min.sum)}" onchange="aplSet(${i},'min.sum',+this.value)"> 이내</div>
+          <div class="r"><span class="k">필수</span>
+            <select aria-label="필수 영역" onchange="aplSet(${i},'min.must',this.value)"><option value="">없음</option>${a.min.areas.map(x=>`<option ${x===a.min.must?"selected":""}>${x}</option>`).join("")}</select>
+            <span class="k" style="margin-left:6px">한국사</span>
+            <select aria-label="한국사 조건" onchange="aplSet(${i},'min.hist',+this.value)">${[0,3,4,5,6].map(h=>`<option value="${h}" ${h===+a.min.hist?"selected":""}>${h?h+"등급 이내":"없음"}</option>`).join("")}</select></div>
+          <div class="r"><span class="k">탐구</span>
+            <select aria-label="탐구 반영" onchange="aplSet(${i},'min.tam',this.value)">${[["1","상위 1과목"],["2","2과목 평균"],["2t","2과목 평균 · 소수 절사"]].map(([v,l])=>`<option value="${v}" ${v===a.min.tam?"selected":""}>${l}</option>`).join("")}</select></div>
+          <input aria-label="기타 조건" value="${esc(a.min.note||"")}" placeholder="기타 조건 메모 (예: 영어 2등급 이내, 과탐 응시)" onchange="aplSet(${i},'min.note',this.value.trim())">`:""}
+        </div></details>
+    </div>
+    <input class="aplmemo" value="${esc(a.memo||"")}" placeholder="메모 (예: 제시문 면접, 수리논술 2문항)" onchange="aplSet(${i},'memo',this.value)">
+    <div class="aplfoot">
+      <label class="aplck"><input type=checkbox ${a.free?"checked":""} onchange="aplSet(${i},'free',this.checked)"> 6장 제외 대학</label>
+      <button class="btn ghost sm" onclick="aplDel(${i})">삭제</button>
+    </div>
+  </div>`;}
+function aplToggle(id,open){if(open)view.aplOpen=id;else if(view.aplOpen===id)view.aplOpen=null;}
+function aplRef(k,v){const s=stu();s.mockRef=s.mockRef||{};
+  if(k==="exam")s.mockRef.exam=v.trim();
+  else{const n=Math.round(+v);s.mockRef[k]=v===""||!n?"":Math.max(1,Math.min(9,n));}
+  save();tabApply();}
+function aplSet(i,path,v){
+  const a=aplList(stu())[i];if(!a)return;
+  const ks=path.split(".");let o=a;for(const k of ks.slice(0,-1))o=o[k]=o[k]||{};
+  o[ks[ks.length-1]]=v;
+  if(path==="min.on"&&v)view.aplOpen=a.id;
+  save();tabApply();}
+function aplArea(i,x,on){const m=aplList(stu())[i].min;
+  m.areas=APL_AREAS.filter(y=>y===x?on:m.areas.includes(y));
+  if(m.must&&!m.areas.includes(m.must))m.must="";
+  m.n=Math.max(1,Math.min(+m.n||1,m.areas.length||1));save();tabApply();}
+function aplKindOf(track){const t=track||"";
+  return /논술/.test(t)?"논술":/교과|지역인재|추천/.test(t)?"교과":/실기|특기/.test(t)?"실기":"종합";}
+function aplFromUniv(v){if(!v)return;const [u,m,t]=v.split("|");
+  aplList(stu()).push(aplNew({univ:u,major:m,track:t,kind:aplKindOf(t)}));save();tabApply();toast(`${u} ${m} 추가`);}
+function aplAdd(){
+  const u=$("#apl_univ").value.trim();if(!u){toast("대학명을 입력하세요");return;}
+  aplList(stu()).push(aplNew({univ:u,major:$("#apl_major").value.trim(),kind:$("#apl_kind").value,track:$("#apl_track").value.trim()}));
+  save();tabApply();toast(`${u} 추가`);}
+function aplDel(i){const a=aplList(stu())[i];if(!a||!confirm(`${a.univ} ${a.major} 지원 카드를 삭제할까요?`))return;
+  aplList(stu()).splice(i,1);save();tabApply();}
+function openApl(id){openStu(id);view.tab="apply";render();}
+
+/* ── 전체 보드 ── */
+function renderApply(){
+  const who=db.students.filter(s=>s.grade==="고3"||(s.apply||[]).length);
+  const ev=[];
+  for(const s of who)for(const a of aplList(s)){if(aplDead(a))continue;
+    if(a.ex&&a.ex.date)ev.push({d:a.ex.date,s,a,t:"ex"});
+    if(a.res&&a.res.date&&a.status!=="최종 합격")ev.push({d:a.res.date,s,a,t:"res"});}
+  const up=ev.filter(e=>dday(e.d)>=0).sort((x,y)=>x.d<y.d?-1:x.d>y.d?1:x.t<y.t?-1:1);
+  const confAll=who.map(s=>({s,c:aplConflicts(s)})).filter(x=>x.c.length);
+  const clashKey=new Set(confAll.flatMap(x=>x.c.map(c=>x.s.id+c.date)));
+  const sd=dday(db.meta.suneung);
+  $("#main").innerHTML=`
+  <div class="pagehead"><div><h1>수시 지원 현황</h1>
+    <div class="sub">고3 지원 카드 · 대학별고사와 발표 일정 · 수능최저 충족${sd!==null&&sd>=0?` — 수능 D-${sd}`:""}</div></div></div>
+  ${confAll.map(x=>aplConfHtml(x.c,x.s.name)).join("")}
+  <div class="sec" style="margin-top:6px"><h2>🗓 다가오는 일정 <span class="n">대학별고사 · 합격자 발표</span></h2>
+  <div class="card">${up.length?up.slice(0,24).map(e=>`
+    <div class="duer" onclick="openApl('${e.s.id}')">
+      ${ddayChip(e.d)}
+      <span class="who">${esc(e.s.name)}</span>
+      <span class="what"><b class="apld">${aplMD(e.d)}</b> ${e.t==="ex"?`${esc(e.a.ex.kind||"대학별고사")}${e.a.ex.time?" "+e.a.ex.time:""}`:"발표"} · ${esc(e.a.univ)} ${esc(e.a.major)}</span>
+      <span class="st">${e.t==="ex"&&clashKey.has(e.s.id+e.d)?`<span class="chip danger">같은 날</span>`:`<span class="chip ${e.t==="ex"?"":"acc"}">${e.t==="ex"?esc(e.a.kind):"발표"}</span>`}</span>
+    </div>`).join(""):`<div class="empty" style="padding:16px"><b>예정된 일정이 없습니다</b>학생 페이지 › 수시 지원 탭에서 대학별고사·발표일을 넣으면 여기에 모입니다.</div>`}</div></div>
+  <div class="sec"><h2>👥 학생별 <span class="n">지원 장수 · 수능최저 · 결과</span></h2>
+  ${who.length?`<div class="card" style="padding:6px 8px"><div class="tablewrap"><table class="t apltbl">
+    <tr><th>학생</th><th>지원</th><th>수능최저 (기준 등급)</th><th>다음 일정</th><th>결과</th></tr>
+    ${who.map(s=>{const L=aplList(s),g=s.mockRef||{};const n6=L.filter(a=>!a.free).length;
+      const ch=L.map(a=>minCheck(a.min,g)).filter(c=>c.state!=="na");
+      const c=k=>ch.filter(x=>x.state===k).length,nx=aplNext(s);
+      const won=L.filter(a=>a.status==="최종 합격").length,wt=L.filter(a=>a.status==="예비").length,lo=L.filter(a=>a.status==="불합격").length;
+      return `<tr onclick="openApl('${s.id}')">
+        <td><b>${esc(s.name)}</b></td>
+        <td>${L.length?`<span class="chip ${n6>6?"danger":n6===6?"ok":""}">${n6}/6</span>${L.length>n6?` <span class="chip">+${L.length-n6}</span>`:""}`:`<span class="chip danger">미입력</span>`}</td>
+        <td>${!L.length?`<span class="aplsub">-</span>`:ch.length?`${c("ok")?`<span class="chip ok">충족 ${c("ok")}</span> `:""}${c("edge")?`<span class="chip warn">경계 ${c("edge")}</span> `:""}${c("fail")?`<span class="chip danger">미충족 ${c("fail")}</span> `:""}${c("nodata")?`<span class="chip">등급 미입력</span>`:""}<div class="aplsub">${esc(g.exam||"기준 시험 미입력")}</div>`:`<span class="aplsub">최저 기준 없음</span>`}</td>
+        <td>${nx?`${ddayChip(nx.ex.date)} <span class="aplsub">${esc(nx.univ)} ${esc(nx.ex.kind||"")}</span>`:`<span class="aplsub">-</span>`}</td>
+        <td>${won?`<span class="chip ok">합격 ${won}</span> `:""}${wt?`<span class="chip warn">예비 ${wt}</span> `:""}${lo?`<span class="chip danger">불합격 ${lo}</span>`:""}${!won&&!wt&&!lo?`<span class="aplsub">${L.length?"대기":"-"}</span>`:""}</td>
+      </tr>`;}).join("")}
+  </table></div></div>`:`<div class="card empty"><b>고3 학생이 없습니다</b></div>`}</div>`;}
 
 /* ═══════════ 월간 캘린더 ═══════════ */
 function consultDateInMonth(s,y,m){
@@ -3267,6 +3583,11 @@ function renderCal(){
     for(const e of (s.exams||[]))
       if(e.date&&e.date.slice(0,7)===ym)
         (ev[e.date]=ev[e.date]||[]).push({label:`${s.name} ${e.name}`,cls:"danger",id:s.id});
+    for(const a of (s.apply||[])){if(aplDead(a))continue;
+      if(a.ex&&a.ex.date&&a.ex.date.slice(0,7)===ym)
+        (ev[a.ex.date]=ev[a.ex.date]||[]).push({label:`${s.name} ${a.univ} ${a.ex.kind||"고사"}${a.ex.time?" "+a.ex.time:""}`,cls:"danger",id:s.id,tab:"apply"});
+      if(a.res&&a.res.date&&a.res.date.slice(0,7)===ym&&a.status!=="최종 합격")
+        (ev[a.res.date]=ev[a.res.date]||[]).push({label:`${s.name} ${a.univ} 발표`,cls:"res",id:s.id,tab:"apply"});}
   }
   const startPad=new Date(y,mo,1).getDay();
   const daysIn=new Date(y,mo+1,0).getDate();
@@ -3275,9 +3596,9 @@ function renderCal(){
   for(let d=1;d<=daysIn;d++){
     const ds=`${ym}-${String(d).padStart(2,"0")}`;
     cells+=`<div class="calcell ${ds===today()?'today':''}"><span class="dnum">${d}</span>
-      ${(ev[ds]||[]).map(e=>`<button class="calev ${e.cls}" onclick="openStu('${e.id}')">${esc(e.label)}</button>`).join("")}</div>`;}
+      ${(ev[ds]||[]).map(e=>`<button class="calev ${e.cls}" title="${esc(e.label)}" onclick="${e.tab?`openApl('${e.id}')`:`openStu('${e.id}')`}">${esc(e.label)}</button>`).join("")}</div>`;}
   $("#main").innerHTML=`
-  <div class="pagehead"><div><h1>월간 캘린더</h1><div class="sub">정기 상담 + 수행평가 마감</div></div>
+  <div class="pagehead"><div><h1>월간 캘린더</h1><div class="sub">정기 상담 · 수행평가 마감 · 수시 대학별고사와 발표</div></div>
   <div style="display:flex;gap:6px;align-items:center">
     <button class="btn sm" onclick="view.calOffset--;render()">←</button>
     <b style="min-width:92px;text-align:center;font-variant-numeric:tabular-nums">${y}년 ${mo+1}월</b>
@@ -3287,7 +3608,7 @@ function renderCal(){
   <div class="card" style="padding:12px">
     <div class="calgrid">${DAYS.map(d=>`<div class="calhead">${d}</div>`).join("")}${cells}</div>
     <p style="font-size:11.5px;color:var(--ink2);margin:10px 2px 0">
-    <span class="chip acc">상담</span> <span class="chip warn">수행평가 마감</span> <span class="chip danger">시험</span> · 정기 주기를 등록한 학생만 상담이 표시됩니다. 항목을 누르면 그 학생으로 이동.</p>
+    <span class="chip acc">상담</span> <span class="chip warn">수행평가 마감</span> <span class="chip danger">시험·대학별고사</span> <span class="chip ok">합격 발표</span> · 정기 주기를 등록한 학생만 상담이 표시됩니다. 항목을 누르면 그 학생으로 이동.</p>
   </div>`;}
 
 /* ═══════════ 학부모 월간 리포트 ═══════════ */
@@ -3449,6 +3770,7 @@ function render(){
   if(view.page==="home")renderHome();
   else if(view.page==="knowhow")renderKnowhow();
   else if(view.page==="cal")renderCal();
+  else if(view.page==="apply")renderApply();
   else if(view.page==="lab")renderLab();
   else if(view.page==="adiga")renderAdiga();
   else if(view.page==="ipsi")renderIpsi();
