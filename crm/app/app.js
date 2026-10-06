@@ -14,7 +14,7 @@ const C = WBCrmCore;
 const TOKEN_KEY = 'crm.token';
 const POLL_MS = 60000;
 const FLUSH_MS = 300;
-const TABS = [['today', '오늘'], ['pipeline', '파이프라인'], ['leads', '리드'], ['stats', '성과'], ['hubspot', '허브스팟'], ['partners', '파트너'], ['admin', '관리']];
+const TABS = [['today', '오늘'], ['leads', '고객'], ['pipeline', '파이프라인'], ['stats', '성과'], ['partners', '파트너'], ['hubspot', '허브스팟'], ['admin', '관리']];
 
 let state = C.emptyState();
 let session = null;              // {role, canApprove, staffId, name}
@@ -28,6 +28,7 @@ const ui = {
 const boot = { health: null, err: '', busy: false };
 const outbox = C.createOutbox();
 let syncErr = '', lastSync = 0, flushTimer = null, flushing = false, pollTimer = null, modalReturnFocus = null;
+let modalInitialValues = '';
 
 /* ── 도우미 ─────────────────────────────────────────── */
 const $ = sel => document.querySelector(sel);
@@ -63,18 +64,29 @@ function toast(msg) {
   t.textContent = String(msg == null ? '' : msg); t.classList.add('on');
   clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('on'), 2800);
 }
-function setInert(on) { ['.topbar', '.tabs', '#view'].forEach(sel => { const el = $(sel); if (el) el.inert = on; }); }
+function setInert(on) { ['.skip-link', '.topbar', '.tabs', '#view'].forEach(sel => { const el = $(sel); if (el) el.inert = on; }); }
+function modalValues() {
+  const host = $('#modalHost');
+  return JSON.stringify(Array.from(host ? host.querySelectorAll('input, select, textarea') : [], el => [el.value, el.checked]));
+}
+function modalDirty() {
+  const host = $('#modalHost');
+  return !!host && !host.hidden && modalValues() !== modalInitialValues;
+}
 function modal(title, bodyHtml, footHtml) {
   const host = $('#modalHost'); if (!host) return;
   if (host.hidden) modalReturnFocus = document.activeElement;
   host.innerHTML = '<div class="modal-box"><div class="between mb14"><div class="card-title" id="modalTitle">' + esc(title) + '</div>' +
     '<button class="btn btn-sm btn-ghost" data-act="closemodal" aria-label="닫기">닫기</button></div>' + bodyHtml + (footHtml || '') + '</div>';
+  modalInitialValues = modalValues();
   host.hidden = false; setInert(true);
   requestAnimationFrame(() => { const first = host.querySelector('input:not([type=checkbox]), select, textarea'); (first || host.querySelector('[data-act="closemodal"]') || host).focus(); });
 }
-function closeModal() {
+function closeModal(saved) {
   const host = $('#modalHost'); if (!host) return;
+  if (saved !== true && modalDirty() && !confirm('작성 중인 내용이 있습니다. 저장하지 않고 닫을까요?')) return;
   host.hidden = true; host.innerHTML = ''; setInert(false);
+  modalInitialValues = '';
   const target = modalReturnFocus; modalReturnFocus = null;
   if (target && document.contains(target) && typeof target.focus === 'function') target.focus();
 }
@@ -302,6 +314,7 @@ async function doLogout() {
 function render() {
   const who = $('#who'), org = $('#orgName'), tabs = $('#tabs'), view = $('#view');
   if (!view) return;
+  document.body.classList.toggle('signed-in', !!session);
   if (org) org.textContent = session ? String(settings().orgName || '') : '';
   if (who) who.innerHTML = session ? '<span class="whoami' + (session.canApprove ? ' owner' : '') + '">' + esc(session.canApprove ? '원장' : session.name) + '</span><button class="btn-bar" data-act="logout">로그아웃</button>' : '';
   if (tabs) { tabs.hidden = !session; if (session) updateTabs(); }
@@ -336,7 +349,7 @@ function updateTabs() {
   wrap.innerHTML = TABS.filter(t => session.canApprove || !C.OWNER_ROUTES.includes(t[0])).map(t => {
     const on = route === t[0] || (route === 'lead' && t[0] === 'leads');
     const badge = t[0] === 'today' && todayN ? '<span class="badge">' + todayN + '</span>' : t[0] === 'hubspot' && hsN ? '<span class="badge soft">' + hsN + '</span>' : '';
-    return '<button class="tab' + (on ? ' on' : '') + '" data-act="go" data-r="' + t[0] + '">' + esc(t[1]) + badge + '</button>';
+    return (t[0] === 'partners' ? '<span class="nav-group">운영 관리</span>' : '') + '<button class="tab' + (on ? ' on' : '') + '"' + (on ? ' aria-current="page"' : '') + ' data-act="go" data-r="' + t[0] + '">' + esc(t[1]) + badge + '</button>';
   }).join('');
 }
 function syncBanner() {
@@ -451,12 +464,22 @@ function viewLeads() {
   if (ui.channel) list = list.filter(l => l.channel === ui.channel);
   if (ui.owner) list = list.filter(l => String(l.owner) === ui.owner);
   list.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)) || String(a.name).localeCompare(String(b.name)));
-  let h = '<div class="between mb8"><h1 class="page" style="margin:0">리드 <small class="muted small">' + list.length + '</small></h1><button class="btn btn-primary btn-sm" data-act="new-lead">＋ 새 문의</button></div>';
-  h += '<div class="card"><div class="row wraprow mb8"><input class="in" id="f-q" placeholder="이름·아이·학교·전화 검색" value="' + esc(q) + '" style="flex:1;min-width:160px">' +
-    '<select class="in" id="f-channel" style="width:auto"><option value="">채널 전체</option>' + opt(C.CHANNELS, ui.channel) + '</select>' +
-    (session.canApprove ? '<select class="in" id="f-owner" style="width:auto"><option value="">담당 전체</option><option value="admin"' + (ui.owner === 'admin' ? ' selected' : '') + '>원장</option>' + liveStaff().map(s => '<option value="' + esc(s.id) + '"' + (ui.owner === String(s.id) ? ' selected' : '') + '>' + esc(s.name) + '</option>').join('') + '</select>' : '') + '</div>' +
-    '<div class="chips mb8">' + [['open', '진행·보류'], ['won', '등록'], ['lost', '이탈'], ['all', '전체']].map(([k, l]) => '<button class="chip' + (ui.status === k ? ' on' : '') + '" data-act="status-filter" data-s="' + k + '">' + l + '</button>').join('') + '</div>';
-  h += list.length ? list.slice(0, 200).map(l => leadRow(l, l.phone ? '<span>· ' + esc(C.maskPhone(l.phone)) + '</span>' : '')).join('') : '<div class="empty small">조건에 맞는 리드가 없습니다</div>';
+  let h = '<div class="between page-tools"><div><h1 class="page">고객 <small class="muted">' + list.length + '명</small></h1><p class="card-sub">상담 진행 상황과 다음 연락 일정을 확인하세요.</p></div><button class="btn btn-primary" data-act="new-lead">새 문의</button></div>';
+  h += '<div class="card customer-list"><div class="customer-filters"><div class="row wraprow mb8"><input class="in" id="f-q" aria-label="고객 검색" placeholder="이름·아이·학교·전화 검색" value="' + esc(q) + '" style="flex:1;min-width:160px">' +
+    '<select class="in" id="f-channel" aria-label="유입 채널" style="width:auto"><option value="">채널 전체</option>' + opt(C.CHANNELS, ui.channel) + '</select>' +
+    (session.canApprove ? '<select class="in" id="f-owner" aria-label="담당자" style="width:auto"><option value="">담당 전체</option><option value="admin"' + (ui.owner === 'admin' ? ' selected' : '') + '>원장</option>' + liveStaff().map(s => '<option value="' + esc(s.id) + '"' + (ui.owner === String(s.id) ? ' selected' : '') + '>' + esc(s.name) + '</option>').join('') + '</select>' : '') + '</div>' +
+    '<div class="chips">' + [['open', '진행·보류'], ['won', '등록'], ['lost', '이탈'], ['all', '전체']].map(([k, l]) => '<button class="chip' + (ui.status === k ? ' on' : '') + '" aria-pressed="' + (ui.status === k) + '" data-act="status-filter" data-s="' + k + '">' + l + '</button>').join('') + '</div></div>';
+  h += list.length ? '<div class="customer-table-scroll"><table class="customer-table"><caption class="sr-only">고객별 상담 단계와 다음 연락 일정</caption><thead><tr>' + ['고객 · 학생', '상담 단계', '유입 채널', '담당자', '최근 기록', '다음 연락'].map(label => '<th scope="col">' + label + '</th>').join('') + '</tr></thead><tbody>' + list.slice(0, 200).map(l => {
+    const recent = activitiesOf(l.id)[0];
+    const next = l.status === 'open' ? C.nextFollowup(l) : null;
+    const late = next ? C.daysBetween(next.due, today()) : 0;
+    return '<tr><td class="customer-name"><a href="#/lead/' + esc(l.id) + '">' + esc(l.name) + '</a>' + (l.hot && l.status === 'open' ? ' <span class="pill hot">HOT</span>' : '') +
+      '<div class="small muted">' + esc(l.child && l.child.name || '학생 미입력') + (l.child && l.child.grade ? ' · ' + esc(l.child.grade) : '') + '</div>' + (l.phone ? '<div class="small muted">' + esc(C.maskPhone(l.phone)) + '</div>' : '') + '</td>' +
+      '<td data-label="상담 단계"><span>' + esc(C.STAGE_LABEL[l.stage] || l.stage) + '</span> ' + statusPill(l) + '<div class="small muted">' + esc(C.PIPELINE_LABEL[l.pipeline]) + '</div></td>' +
+      '<td data-label="유입 채널">' + esc(l.channel || '기타') + '</td><td data-label="담당자">' + esc(staffName(l.owner)) + '</td>' +
+      '<td data-label="최근 기록">' + (recent ? esc(recent.at) + '<div class="small muted">' + esc(C.ACTIVITY_LABEL[recent.type] || recent.type) + '</div>' : '<span class="muted">기록 없음</span>') + '</td>' +
+      '<td data-label="다음 연락">' + (next ? '<span class="' + (late > 0 ? 'overdue' : '') + '">' + esc(next.due) + '</span><div class="small ' + (late > 0 ? 'overdue' : 'muted') + '">' + (late > 0 ? late + '일 지남' : late === 0 ? '오늘 연락' : 'D+' + next.day + ' 팔로업') + '</div>' : '<span class="muted">' + (l.status === 'hold' ? '보류 중' : C.isClosed(l.stage) ? '종료' : '일정 없음') + '</span>') + '</td></tr>';
+  }).join('') + '</tbody></table></div>' : '<div class="empty small">조건에 맞는 고객이 없습니다</div>';
   if (list.length > 200) h += '<div class="hint mt8">200건까지만 보입니다 — 검색으로 좁혀 주세요</div>';
   return h + '</div>';
 }
@@ -472,9 +495,9 @@ function viewLead(id) {
   const hs = l.hubspot || {};
   const dis = C.daysInStage(l, t);
   let h = '<div class="row mb8"><button class="btn btn-sm btn-ghost" data-act="back">‹ 뒤로</button></div>';
-  h += '<div class="card"><div class="between wraprow"><div><div class="card-title">' + esc(l.name) + ' <span class="muted small">' + esc(C.RELATION_HONORIFIC[l.relation] || '') + '</span>' + (l.child && l.child.name ? ' · ' + esc(l.child.name) + (l.child.grade ? ' <span class="muted small">' + esc(l.child.grade) + '</span>' : '') : '') + '</div>' +
+  h += '<div class="lead-layout"><section class="card lead-profile" aria-label="고객 정보"><div class="between wraprow"><div><h1 class="page">' + esc(l.name) + ' <span class="muted small">' + esc(C.RELATION_HONORIFIC[l.relation] || '') + '</span></h1>' + (l.child && l.child.name ? '<p class="card-sub">' + esc(l.child.name) + (l.child.grade ? ' · ' + esc(l.child.grade) : '') + '</p>' : '') +
     '<div class="row wraprow mt8">' + (l.hot && l.status === 'open' ? '<span class="pill hot">HOT</span>' : '') + '<span class="pill acc">' + esc(C.PIPELINE_LABEL[l.pipeline]) + '</span><span class="pill">' + esc(C.STAGE_LABEL[l.stage] || l.stage) + (dis !== null ? ' · ' + dis + '일' : '') + '</span>' + statusPill(l) + '<span class="tag">' + esc(l.channel) + (l.channelNote ? ' · ' + esc(l.channelNote) : '') + '</span></div></div>' +
-    '<div class="row wraprow"><button class="btn btn-sm btn-ghost" data-act="edit-lead" data-id="' + esc(id) + '">수정</button><button class="btn btn-sm btn-primary" data-act="new-activity" data-id="' + esc(id) + '">＋ 기록</button></div></div>';
+    '<div class="row wraprow"><button class="btn btn-sm btn-ghost" data-act="edit-lead" data-id="' + esc(id) + '">정보 수정</button></div></div>';
   h += '<div class="row wraprow mt14"><label class="fl" style="margin:0" for="f-stage">단계</label><select class="in" id="f-stage" data-id="' + esc(id) + '" style="width:auto">' + stages.map(s => '<option value="' + s + '"' + (s === l.stage ? ' selected' : '') + '>' + esc(C.STAGE_LABEL[s]) + '</option>').join('') +
     (l.pipeline === 'inspection' ? '<option value="__academy">→ 학원 등록 파이프라인으로(트라이얼)</option>' : '') + '</select>' +
     (l.status === 'open' ? '<button class="btn btn-sm btn-warn" data-act="outcome" data-id="' + esc(id) + '" data-kind="hold">장기보류</button>' : '') +
@@ -495,44 +518,45 @@ function viewLead(id) {
     (l.outcome && l.status !== 'open' ? '<dt>판정</dt><dd>' + esc(C.STATUS_LABEL[l.status]) + ' · ' + esc(l.outcome.at || '') + (l.outcome.reason ? ' · ' + esc(l.outcome.reason + ' ' + (C.LOST_REASON_LABEL[l.outcome.reason] || '')) : '') + (l.outcome.note ? '<div class="small muted">' + esc(l.outcome.note) + '</div>' : '') + '</dd>' : '') +
     (l.memo ? '<dt>메모</dt><dd style="white-space:pre-wrap">' + esc(l.memo) + '</dd>' : '') +
     '<dt>HubSpot</dt><dd>' + (hs.contactId ? '<span class="tag ok">연결됨</span> ' + (C.hubspotRecordUrl(portal, 'contact', hs.contactId) ? '<a href="' + esc(C.hubspotRecordUrl(portal, 'contact', hs.contactId)) + '" target="_blank" rel="noopener noreferrer">연락처 열기</a>' : '') +
-      (hs.deals && hs.deals[l.pipeline] && C.hubspotRecordUrl(portal, 'deal', hs.deals[l.pipeline].dealId) ? ' · <a href="' + esc(C.hubspotRecordUrl(portal, 'deal', hs.deals[l.pipeline].dealId)) + '" target="_blank" rel="noopener noreferrer">딜 열기</a>' : '') : '<span class="tag">아직 안 보냄</span>') + leadQueueHtml(id) + '</dd></dl></div>';
+      (hs.deals && hs.deals[l.pipeline] && C.hubspotRecordUrl(portal, 'deal', hs.deals[l.pipeline].dealId) ? ' · <a href="' + esc(C.hubspotRecordUrl(portal, 'deal', hs.deals[l.pipeline].dealId)) + '" target="_blank" rel="noopener noreferrer">딜 열기</a>' : '') : '<span class="tag">아직 안 보냄</span>') + leadQueueHtml(id) + '</dd></dl></section>';
+  let nextHtml = '<aside class="lead-next" aria-label="다음 연락과 연계">';
   // 팔로업
   const fus = Array.isArray(l.followups) ? l.followups.slice().sort((a, b) => a.day - b.day) : [];
-  h += '<div class="card"><div class="between"><div class="card-title">팔로업</div>' + (l.status === 'open' || l.status === 'hold' ? '<button class="btn btn-sm btn-ghost" data-act="fu-reset" data-id="' + esc(id) + '">' + (fus.length ? '일정 다시 잡기' : '일정 잡기') + '</button>' : '') + '</div>';
-  h += fus.length ? fus.map(f => {
+  nextHtml += '<section class="card"><div class="between"><h2 class="card-title">다음 연락</h2>' + (l.status === 'open' || l.status === 'hold' ? '<button class="btn btn-sm btn-ghost" data-act="fu-reset" data-id="' + esc(id) + '">' + (fus.length ? '일정 다시 잡기' : '일정 잡기') + '</button>' : '') + '</div>';
+  nextHtml += fus.length ? fus.map(f => {
     const late = f.status === 'pending' ? C.daysBetween(f.due, t) : null;
     return '<div class="fu' + (f.status !== 'pending' ? ' done' : late > 0 ? ' late' : '') + '"><div class="grow"><span class="tag acc">D+' + f.day + ' ' + esc(C.FOLLOWUP_LABEL[f.day] || '') + '</span> <span class="due">' + esc(f.due) + '</span>' +
       (f.status === 'done' ? ' <span class="tag ok">완료 ' + esc(C.RESULT_LABEL[f.result] || '') + '</span>' : f.status === 'skipped' ? ' <span class="tag">건너뜀</span>' : late > 0 ? ' <span class="tag bad">' + late + '일 밀림</span>' : '') + (f.note ? '<div class="small muted">' + esc(f.note) + '</div>' : '') + '</div>' +
       (f.status === 'pending' && l.status === 'open' ? '<button class="btn btn-sm btn-ghost" data-act="fu-draft" data-id="' + esc(id) + '" data-day="' + f.day + '">초안</button><button class="btn btn-sm btn-primary" data-act="fu-log" data-id="' + esc(id) + '" data-day="' + f.day + '">기록</button><button class="btn btn-sm" data-act="fu-skip" data-id="' + esc(id) + '" data-day="' + f.day + '">건너뜀</button>' : '') + '</div>';
   }).join('') : '<div class="hint">상담·CS 기록을 남기면서 "팔로업 일정 시작"을 켜면 D+3 · D+7 · D+14 가 잡힙니다.</div>';
-  h += '</div>';
+  nextHtml += '</section>';
   // 파트너에 소개(나가는 소개)
   const refs = referralsOf(id);
-  h += '<div class="card"><div class="between"><div class="card-title">파트너 소개 <span class="muted small">' + refs.length + '</span></div>' +
+  nextHtml += '<div class="card"><div class="between"><div class="card-title">파트너 소개 <span class="muted small">' + refs.length + '</span></div>' +
     (activePartners().length ? '<button class="btn btn-sm btn-ghost" data-act="refer-form" data-id="' + esc(id) + '">파트너에 소개</button>' : (session.canApprove ? '<a class="small" href="#/partners">파트너 등록</a>' : '')) + '</div>';
-  h += refs.length ? refs.map(r => { const p = partnerById(r.partnerId); return '<div class="fu"><div class="grow"><b>' + esc(p ? p.name : '(삭제된 파트너)') + '</b> <span class="muted small">' + esc(r.at) + (r.note ? ' · ' + esc(r.note) : '') + '</span>' + (r.partnerNote ? '<div class="small">파트너: ' + esc(r.partnerNote) + '</div>' : '') + '</div>' +
+  nextHtml += refs.length ? refs.map(r => { const p = partnerById(r.partnerId); return '<div class="fu"><div class="grow"><b>' + esc(p ? p.name : '(삭제된 파트너)') + '</b> <span class="muted small">' + esc(r.at) + (r.note ? ' · ' + esc(r.note) : '') + '</span>' + (r.partnerNote ? '<div class="small">파트너: ' + esc(r.partnerNote) + '</div>' : '') + '</div>' +
     '<select class="in" style="width:auto" id="f-refstatus-' + esc(r.id) + '" data-rid="' + esc(r.id) + '">' + C.REFERRAL_STATUS.map(k => '<option value="' + k + '"' + (k === r.status ? ' selected' : '') + '>' + esc(C.REFERRAL_STATUS_LABEL[k]) + '</option>').join('') + '</select></div>'; }).join('')
     : '<div class="hint">검사·해석 뒤 맞는 학원이 있으면 가정 동의를 받고 소개합니다. 파트너 포털에 아이 이름·학년·사유만 보입니다.</div>';
-  h += '</div>';
+  nextHtml += '</div>';
   // 크레딧(원장)
   if (session.canApprove) {
     const credits = creditsOf(id);
     const referred = state.leads.filter(x => x.referrerLeadId === id);
-    h += '<div class="card"><div class="between"><div class="card-title">소개 크레딧 <span class="muted small">잔액 ' + esc(fmtWon(C.creditBalance(state.credits, id))) + (l.creditBalanceHs !== undefined ? ' · HubSpot ' + esc(fmtWon(l.creditBalanceHs)) : '') + '</span></div>' +
+    nextHtml += '<div class="card"><div class="between wraprow"><div class="card-title">소개 크레딧 <span class="muted small">잔액 ' + esc(fmtWon(C.creditBalance(state.credits, id))) + (l.creditBalanceHs !== undefined ? ' · HubSpot ' + esc(fmtWon(l.creditBalanceHs)) : '') + '</span></div>' +
       '<div class="row"><button class="btn btn-sm btn-ghost" data-act="credit-form" data-id="' + esc(id) + '" data-type="accrue">적립</button><button class="btn btn-sm btn-ghost" data-act="credit-form" data-id="' + esc(id) + '" data-type="use">사용</button></div></div>';
-    if (referred.length) h += '<div class="hint mt8">소개한 리드: ' + referred.map(x => '<a href="#/lead/' + esc(x.id) + '">' + esc(C.leadLabel(x)) + '</a>').join(', ') + '</div>';
-    h += credits.length ? credits.map(c => '<div class="fu"><div class="grow"><span class="tag' + (c.amount > 0 ? ' ok' : '') + '">' + esc(C.CREDIT_LABEL[c.type] || c.type) + '</span> ' + esc(fmtWon(c.amount)) + ' <span class="muted small">' + esc(c.at) + (c.note ? ' · ' + esc(c.note) : '') + '</span></div></div>').join('') : '<div class="hint mt8">v2.0 — 피소개자 검사 완료 시 소개자에게 15,000원, 같은 소개자 30일 쿨다운, 24개월 뒤 소멸.</div>';
-    h += '</div>';
+    if (referred.length) nextHtml += '<div class="hint mt8">소개한 리드: ' + referred.map(x => '<a href="#/lead/' + esc(x.id) + '">' + esc(C.leadLabel(x)) + '</a>').join(', ') + '</div>';
+    nextHtml += credits.length ? credits.map(c => '<div class="fu"><div class="grow"><span class="tag' + (c.amount > 0 ? ' ok' : '') + '">' + esc(C.CREDIT_LABEL[c.type] || c.type) + '</span> ' + esc(fmtWon(c.amount)) + ' <span class="muted small">' + esc(c.at) + (c.note ? ' · ' + esc(c.note) : '') + '</span></div></div>').join('') : '<div class="hint mt8">v2.0 — 피소개자 검사 완료 시 소개자에게 15,000원, 같은 소개자 30일 쿨다운, 24개월 뒤 소멸.</div>';
+    nextHtml += '</div>';
   }
   // 타임라인
-  h += '<div class="card"><div class="card-title">기록 <span class="muted small">' + acts.length + '</span></div>';
+  h += '<section class="card lead-history" aria-label="상담 기록"><div class="between wraprow"><h2 class="card-title">상담 · 활동 기록 <span class="muted small">' + acts.length + '</span></h2><button class="btn btn-primary" data-act="new-activity" data-id="' + esc(id) + '">기록 남기기</button></div>';
   h += acts.length ? '<div class="tl mt8">' + acts.map(a => '<div class="tl-item' + (a.type === 'stage' || a.type === 'hubspot' ? ' sys' : '') + '"><div class="tl-head"><b>' + esc(C.ACTIVITY_LABEL[a.type] || a.type) + '</b>' +
     (a.result ? '<span class="tag">' + esc(C.RESULT_LABEL[a.result] || a.result) + '</span>' : '') + (a.followupDay ? '<span class="tag acc">D+' + a.followupDay + '</span>' : '') + '<span>' + esc(a.at) + '</span><span>' + esc(staffName(a.by)) + '</span>' +
     (a.hubspot && a.hubspot.noteId ? '<span class="dot ok" title="HubSpot 노트로 보냄"></span>' : '') + '</div>' +
     (a.type === 'stage' ? '<div class="tl-text muted">' + esc((C.STAGE_LABEL[a.from] || a.from || '') + ' → ' + (C.STAGE_LABEL[a.to] || a.to || '')) + (a.text ? ' · ' + esc(a.text) : '') + '</div>' : a.text ? '<div class="tl-text">' + esc(a.text) + '</div>' : '') + '</div>').join('') + '</div>'
     : '<div class="hint mt8">아직 기록이 없습니다.</div>';
-  h += '</div>';
-  if (session.canApprove) h += '<div class="right"><button class="btn btn-sm btn-danger" data-act="delete-lead" data-id="' + esc(id) + '">리드 삭제</button></div>';
+  h += '</section>' + nextHtml + '</aside></div>';
+  if (session.canApprove) h += '<div class="right"><button class="btn btn-sm btn-danger" data-act="delete-lead" data-id="' + esc(id) + '">고객 삭제</button></div>';
   return h;
 }
 function leadQueueHtml(id) {
@@ -748,7 +772,7 @@ function savePartnerForm(id) {
   const pii = C.findPii(v.data);
   if (pii) return toast(pii + ' 에 전화번호·이메일이 있습니다 — 담당자 전화는 전화 칸에만');
   queueChange('partners', id || uid('pt'), v.data);
-  closeModal(); toast(prev ? '저장했습니다' : '등록했습니다 — 링크를 발급해 파트너에게 보내세요'); render();
+  closeModal(true); toast(prev ? '저장했습니다' : '등록했습니다 — 링크를 발급해 파트너에게 보내세요'); render();
 }
 async function partnerLink(id) {
   const p = partnerById(id); if (!p) return;
@@ -778,7 +802,7 @@ function saveReferForm(id) {
   queueChange('referrals', uid('rf'), v.data);
   const p = partnerById(partnerId);
   addActivity(id, { type: 'note', text: '파트너 소개 → ' + (p ? p.name : '') + (v.data.note ? ' · ' + v.data.note : '') });
-  closeModal(); toast('소개를 보냈습니다 — 파트너 포털에 표시됩니다'); render();
+  closeModal(true); toast('소개를 보냈습니다 — 파트너 포털에 표시됩니다'); render();
 }
 function setReferralStatus(rid, status) {
   const r = state.referrals.find(x => x.id === rid); if (!r) return;
@@ -895,7 +919,7 @@ function saveLeadForm(id) {
   const newId = id || uid('ld');
   queueChange('leads', newId, out);
   if (!prev && out.source) addActivity(newId, { type: 'note', text: '문의 원문\n' + out.source, at: today() });
-  closeModal();
+  closeModal(true);
   toast(prev ? '저장했습니다' : '등록했습니다' + (out.hot ? ' — 핫 리드' : ''));
   if (!prev) go('lead', newId); else render();
 }
@@ -957,7 +981,7 @@ function saveOutcome(id, kind, lostStage) {
   if (!updateLead(id, patch)) return;
   if (kind !== 'hold') addActivity(id, { type: 'stage', from, to: patch.stage, text: (kind === 'won' && patch.pipeline === 'academy' ? '등록 → 학원 등록(트라이얼)' : title(kind)) + (note ? ' · ' + note : '') });
   else addActivity(id, { type: 'note', text: '장기보류' + (note ? ' · ' + note : '') });
-  closeModal(); toast(title(kind) + ' 처리했습니다'); render();
+  closeModal(true); toast(title(kind) + ' 처리했습니다'); render();
   function title(k) { return k === 'won' ? '등록 확정' : k === 'lost' ? '이탈 확정' : '장기보류'; }
 }
 function unhold(id) {
@@ -1008,7 +1032,7 @@ function saveActivityForm(id) {
     if (checked('f-tointerp') && l.pipeline === 'inspection') { patch.stage = 'interpreted'; patch.stageAt = today(); addActivity(id, { type: 'stage', from: l.stage, to: 'interpreted', at }); }
   }
   if (Object.keys(patch).length) updateLead(id, patch);
-  closeModal(); toast('기록했습니다' + (patch.followups && !fuDay ? ' — 팔로업 일정이 잡혔습니다' : '')); render();
+  closeModal(true); toast('기록했습니다' + (patch.followups && !fuDay ? ' — 팔로업 일정이 잡혔습니다' : '')); render();
 }
 function skipFollowup(id, day) {
   const l = leadById(id); if (!l) return;
@@ -1047,14 +1071,16 @@ function saveCredit(id, type) {
   if (!v.ok) return toast(v.error);
   if (C.findPii({ note: v.data.note })) return toast('메모에 전화번호·이메일을 적을 수 없습니다');
   queueChange('credits', uid('cr'), v.data);
-  closeModal(); toast('크레딧을 기록했습니다 — HubSpot 잔액(wb_credit_balance)은 반영 큐로 갑니다'); render();
+  closeModal(true); toast('크레딧을 기록했습니다 — HubSpot 잔액(wb_credit_balance)은 반영 큐로 갑니다'); render();
 }
 
 /* ── 이벤트 ───────────────────────────────────────── */
 document.addEventListener('click', async e => {
+  if (e.target === $('#modalHost')) return closeModal();
   const el = e.target.closest('[data-act]'); if (!el) return;
   const act = el.dataset.act, id = el.dataset.id || '';
   switch (act) {
+    case 'focus-content': e.preventDefault(); return $('#view').focus();
     case 'login': return doLogin(el);
     case 'setup': return doSetup(el);
     case 'logout': return doLogout();
@@ -1123,7 +1149,7 @@ document.addEventListener('click', async e => {
       if (!cur) return toast('현재 비밀번호를 입력하세요');
       if (next.length < 8 || next.length > 72) return toast('새 비밀번호는 8~72자');
       if (next !== next2) return toast('새 비밀번호 두 칸이 다릅니다');
-      try { await api('/api/password', { password: cur, newPassword: next }); closeModal(); toast('비밀번호를 바꿨습니다 — 다른 원장 기기는 다시 로그인해야 합니다'); }
+      try { await api('/api/password', { password: cur, newPassword: next }); closeModal(true); toast('비밀번호를 바꿨습니다 — 다른 원장 기기는 다시 로그인해야 합니다'); }
       catch (err) { toast(err.code === 'LOGIN_FAILED' ? '현재 비밀번호가 맞지 않습니다' : '변경 실패 — ' + err.message); }
       return;
     }
@@ -1164,6 +1190,6 @@ document.addEventListener('keydown', e => {
 });
 window.addEventListener('hashchange', onHash);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); });
-window.addEventListener('beforeunload', e => { if (outbox.size()) { e.preventDefault(); e.returnValue = ''; } });
+window.addEventListener('beforeunload', e => { if (outbox.size() || modalDirty()) { e.preventDefault(); e.returnValue = ''; } });
 
 startApp();
