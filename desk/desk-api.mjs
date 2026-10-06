@@ -804,7 +804,9 @@ function ruleManuals(data, ctx) {
     }
   }
   out.photos = photos;
-  const pii = findPii(out, '', null);
+  // 사진 id 는 서버가 발급한 16진 24자리(f_…)라 글이 아니다 — 숫자 13자리가 우연히 이어지면 주민번호 패턴에 걸려
+  // 약 0.7% 확률로 저장이 막혔다. id 는 위에서 모양만 확인하고, 자유 텍스트인 caption 만 PII 검사에 넣는다.
+  const pii = findPii(Object.assign({}, out, { photos: photos.map(p => ({ caption: p.caption })) }), '', null);
   if (pii) return bad('PII', pii + ' 에 전화번호·이메일·주민번호를 적을 수 없습니다');
   return { data: out };
 }

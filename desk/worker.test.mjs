@@ -622,3 +622,23 @@ test('files: 원장만 올리고 지운다, 직원은 본다, base64·mime·크�
   assert.deepEqual([del.status, del.body.deleted], [200, 1]);
   assert.equal((await call(env, 'GET', '/api/files/' + up.body.id, { token: a.token })).status, 404);
 });
+
+test('manuals: 숫자가 이어진 사진 id 는 PII 로 보지 않고, 사진 설명의 전화·주민번호는 여전히 막는다', async () => {
+  const env = envFor();
+  const adminToken = await setupAdmin(env);
+  // 16진 24자리 안에 주민번호 모양(6자리+1~4+6자리)·휴대전화 모양(010…)이 들어간 id — 실제 randomFileId 가 만들 수 있는 값
+  const rrnLike = 'f_1234561234567abcdefabcde';
+  const phoneLike = 'f_01012345678abcdefabcdefa';
+  assert.ok(/^f_[0-9a-f]{24}$/.test(rrnLike) && /^f_[0-9a-f]{24}$/.test(phoneLike), '테스트 id 가 서버 발급 모양이어야 한다');
+  const man = { scope: 'classcard', task: 'assign', title: '세트 배정', steps: ['반을 연다'] };
+  const ok = await putDoc(env, adminToken, 'manuals', 'm-ids', Object.assign({}, man, { photos: [{ id: rrnLike, caption: '1' }, { id: phoneLike }] }));
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  assert.deepEqual((await docOf(env, adminToken, 'manuals', 'm-ids')).photos, [{ id: rrnLike, caption: '1' }, { id: phoneLike }]);
+  const cap = await putDoc(env, adminToken, 'manuals', 'm-cap', Object.assign({}, man, { photos: [{ id: rrnLike, caption: '문의 010-1234-5678' }] }));
+  assert.deepEqual([cap.status, cap.body.code, cap.body.error.startsWith('photos[0].caption ')], [400, 'PII', true]);
+  const rrnCap = await putDoc(env, adminToken, 'manuals', 'm-cap', Object.assign({}, man, { photos: [{ id: phoneLike }, { id: rrnLike, caption: '123456-1234567' }] }));
+  assert.deepEqual([rrnCap.status, rrnCap.body.code, rrnCap.body.error.startsWith('photos[1].caption ')], [400, 'PII', true]);
+  // 사진 밖의 자유 텍스트(단계·주의)는 전처럼 막힌다 — id 예외가 다른 칸까지 풀리지 않는다
+  const step = await putDoc(env, adminToken, 'manuals', 'm-step', Object.assign({}, man, { steps: ['상담은 02-123-4567 로'], photos: [{ id: rrnLike }] }));
+  assert.deepEqual([step.status, step.body.code, step.body.error.startsWith('steps[0].text ')], [400, 'PII', true]);
+});
