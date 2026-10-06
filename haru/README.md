@@ -8,6 +8,10 @@
 자체 창작 예시만 사용하며 로그인·운영 API·기기 기록을 읽거나 쓰지 않는다. 새로고침하면 초기화된다.
 표시 이름은 원장 요청으로 바꿨다. 경로·KV 키·기존 인증은 유지하고, 영재원 기능은 D-2·D-8 승인 대기다.
 
+**준비 안내**: `/haru/guide.html` → 삼육중 지원·준비, 광주·전남 영재원 기관별 안내, 초3~초6 로드맵, 가정·학원 역할, 공식 출처.
+로그인 없이 읽는 정적 문서다. 공식 사실과 WB 준비 제안을 구분하고, 개인정보·API·저장소·영재원 학습 기능은 쓰지 않는다.
+공식 일정은 갱신이 필요하므로 루트·haru SW가 안내 주소를 캐시하거나 학생 홈으로 대체하지 않는다.
+
 ## 화면·서버 (P0, 2026-09-15)
 
 | 파일 | 무엇 |
@@ -15,6 +19,7 @@
 | `index.html` | 학생 앱 — 연동(코드 → 강사 승인) · 홈(오늘 카드 3슬롯·이번 주 봉투·[앉았다]·좌표 요약·상시 고지) · 러너(슬롯당 3문항, 틀리면 "지금 다시 보면 풀 수 있어요?" 2지선다 → 30초 반증 → 해설) · 좌표 16칸 · 답안지(교시별 타이머·[넘김]·휴식 20분 잠금·`/attempt`) · 회고. 학생 화면 문자열은 `strings.js` 금지어 검사를 통과한다 |
 | `parent.html` | 부모 화면(ptoken) — 오늘·이번 주·지난 회차 완주/무응답·분포(n≥30)·취침 목표·어른 일정. 쓰기 없음 |
 | `preview.js` | 검토용 자체 창작 샘플 — 기존 화면에 메모리 응답만 공급. 실제 계정·기록·운영 요청 없음 |
+| `guide.html` · `guide.test.cjs` | 보호자·원장용 준비 안내와 일정·배포·두 SW 경계 회귀 검사. 안내 자료만 추가하며 기존 학습 계약을 바꾸지 않음 |
 | `sw.js` · `manifest.webmanifest` · `icon.svg` | 껍데기 캐시(VERSION 은 build-dist 가 스탬프) — `/api/*`·`*.json` 은 캐시하지 않는다 |
 | `../reading-server/haru-api.mjs` | `/api/haru/*` — 학생(atoms·plan·today·gen·pack·cue·state·answer·probe·attempt·sheet·retro·report) · 부모(parent?t=) · 관리(students·enroll·pack·paperkey·paper·plan·cohort·atoms·board·map·parentlink·reports·export·purge). consent → 만료(회고 통과) → 배정 게이트. `allowedApp`(apps 게이트)·`weeklyAgg`(크론) 내보내기 |
 | `../reading-server/haru-score.mjs` | 서버 채점 — `scorePeriod`(paperkey/screen-mock)·`mockRecord`·분포(`distUpdate`, n<30 비표시)·주간 익명 집계(10명·셀 5 미만 생략)·코치 보드 행·강사 좌표 |
