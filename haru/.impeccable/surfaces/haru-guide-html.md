@@ -19,6 +19,6 @@ STORY: 두 준비 경로의 차이를 알고 기관과 현재 학년을 고른�
 
 FIRST VIEWPORT: 상단 브랜드와 학생 샘플 링크, 큰 준비 안내 제목, 두 경로 바로가기, 왼쪽 목차/본문. 폰에서는 목차가 위로 모이며 핵심 일정과 경로가 보인다.
 
-FORM: 기존 체계 안의 정확히 지정된 정보 안내 확장. 별도 시각 정체성·컨셉 추첨·이미지 시안 없이 코드로 구현한다. 구조는 목차 → 준비 경로 → 기관별 사실 → 학년별 로드맵 → 역할 → 출처.
+FORM: 기존 체계 안의 정확히 지정된 정보 안내 확장. 별도 시각 정체성·컨셉 추첨·이미지 시안 없이 코드로 구현한다. 구조는 목차 → 준비 경로 → 기관별 사실 → 학년별 로드맵 → 초4 4주 과정 → 역할 → 출처. 초4는 선택형 A/B 경로와 주별 기본 details를 펼쳐 목표·활동·관찰·쉬운 대안을 읽는다. 학습 실행·배정·입력·저장은 없다.
 
 FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
