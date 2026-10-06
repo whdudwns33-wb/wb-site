@@ -25,6 +25,7 @@ const LAST_SEEN_WRITE_GAP_MS = 60 * 1000;
 const STAFF_ID = /^[A-Za-z0-9_-]{3,64}$/;
 const QUEUE_ID = /^q_[a-z0-9]{12,40}$/;
 const COLLECTIONS = new Set(CORE.COLLECTIONS.filter(c => c !== 'staff'));
+const RELATIONSHIP_VALIDATORS = { memberships: CORE.validateMembership, programActivities: CORE.validateProgramActivity, programExams: CORE.validateProgramExam, gatherings: CORE.validateGathering };
 const MAX_CHANGES = 200;
 const MAX_DOC_BYTES = 64 * 1024;
 const PUSH_LIMIT_DEFAULT = 10;
@@ -308,6 +309,52 @@ function ruleReferrals(data, ctx) {
 }
 const RULES = { leads: ruleLeads, activities: ruleActivities, credits: ruleCredits, settings: ruleSettings, partners: rulePartners, referrals: ruleReferrals };
 
+async function ruleRelationship(env, c, raw, ctx) {
+  const v = RELATIONSHIP_VALIDATORS[c](raw);
+  if (!v.ok) return bad('INVALID', v.error);
+  const data = v.data, prev = ctx.previous;
+  const fixed = c === 'memberships' ? ['leadId', 'program'] : c === 'programActivities' ? ['membershipId', 'month'] : c === 'programExams' ? ['membershipId', 'cycleStart', 'cycleEnd'] : [];
+  if (prev && fixed.some(k => prev[k] !== data[k])) return bad('IMMUTABLE', '고객·프로그램·활동 월·검사 회차는 만든 뒤 바꿀 수 없습니다', 409);
+  if (c === 'memberships' && ctx.id !== data.leadId + '__' + data.program) return bad('INVALID', '참여 기록 id 는 고객 id와 프로그램으로 고정됩니다');
+  if (c === 'programActivities') data.by = ctx.auth.staffId;
+  if (c === 'programActivities' && data.status === 'confirmed' && data.date > kstToday()) return bad('INVALID', '미래 날짜의 활동은 완료 확인할 수 없습니다');
+  if ('owner' in data) {
+    data.owner = data.owner || (prev && prev.owner) || ctx.auth.staffId;
+    if (!STAFF_ID.test(data.owner)) return bad('INVALID', '담당자 id 형식이 올바르지 않습니다');
+  }
+  const text = { note: data.note, evidence: data.evidence, nextAction: data.nextAction, topic: data.topic, place: data.place,
+    participants: (data.participants || []).map(p => ({ note: p.note, nextAction: p.nextAction })) };
+  if (findPii(text, '', [])) return bad('PII', '관계 기록 본문에 전화번호·이메일·주민번호를 적을 수 없습니다');
+
+  // 참조한 원본도 쓰기 직전 같은 버전인지 확인한다. 검사 확인 뒤 고객이 바뀌거나 삭제되는 경쟁을 막는다.
+  const references = [];
+  const read = async (collection, id) => {
+    const doc = await loadDoc(env, collection, id);
+    if (doc) references.push({ c: collection, id, updatedAt: doc.updatedAt });
+    return doc && doc.data;
+  };
+  if (c === 'memberships' && !(await read('leads', data.leadId))) return bad('INVALID', '존재하는 고객을 선택해 주세요');
+  let friendCompletion = false;
+  if (data.membershipId) {
+    const membership = await read('memberships', data.membershipId);
+    if (!membership || !(await read('leads', membership.leadId))) return bad('INVALID', '참여 기록 또는 고객이 없습니다');
+    if (c === 'programActivities' && membership.program === 'friend' && data.kind !== 'review') return bad('INVALID', '친구맺기는 리뷰 확인만 기록합니다');
+    if (c === 'programExams') {
+      if (prev && prev.completedDate && prev.completedDate !== data.completedDate) return bad('IMMUTABLE', '완료한 검사 날짜는 지우거나 바꿀 수 없습니다', 409);
+      if (data.completedDate && data.completedDate > kstToday()) return bad('INVALID', '미래 날짜를 검사 완료로 기록할 수 없습니다');
+      if (membership.program === 'supporter' && data.completedDate && !data.activitiesChecked) return bad('INVALID', '담당자가 활동을 확인한 뒤 검사 완료를 기록해 주세요');
+      friendCompletion = membership.program === 'friend' && !!data.completedDate;
+    }
+  }
+  if (c === 'gatherings') {
+    for (const participant of data.participants) {
+      const lead = await read('leads', participant.leadId);
+      if (!lead || !CORE.hasCompletedInspection(lead, kstToday())) return bad('INVALID', '참가자는 검사 실시가 확인된 기존 고객이어야 합니다');
+    }
+  }
+  return { data, references, friendCompletion };
+}
+
 /* ── 문서 읽기·쓰기 ─────────────────────────────────────────────────── */
 
 function docView(row) {
@@ -343,6 +390,8 @@ async function applyChange(env, auth, change, settings) {
   if (c === 'settings' && auth.role !== 'admin') return reject('FORBIDDEN', '설정은 원장만 바꿀 수 있습니다', 403);
   const row = await env.DB.prepare('SELECT data,updated_at,updated_by,deleted FROM crm_documents WHERE collection=? AND id=? LIMIT 1').bind(c, id).first();
   const currentAt = row ? Number(row.updated_at) : 0;
+  const relationship = Object.prototype.hasOwnProperty.call(RELATIONSHIP_VALIDATORS, c);
+  if (relationship && (typeof change.expectedUpdatedAt !== 'number' || !Number.isSafeInteger(change.expectedUpdatedAt) || change.expectedUpdatedAt < 0)) return reject('INVALID', '관계 기록은 expectedUpdatedAt 숫자가 필요합니다 — 새 기록은 0');
   if (!absent(change.expectedUpdatedAt)) {
     const expected = Number(change.expectedUpdatedAt);
     if (!Number.isFinite(expected) || expected !== currentAt) return reject('STALE', '다른 기기에서 먼저 바뀌었습니다', 409, { current: currentView(row) });
@@ -350,12 +399,14 @@ async function applyChange(env, auth, change, settings) {
   const exists = !!row && !Number(row.deleted);
   const previous = exists ? parseJson(row.data) : null;
   let data = {};
+  let relationshipRule;
   if (!wantDelete) {
     if (!isPlainObject(change.data)) return reject('INVALID', 'data 는 객체여야 합니다');
     if (byteLength(JSON.stringify(change.data)) > MAX_DOC_BYTES) return reject('TOO_LARGE', '문서는 64KB 까지입니다', 400);
-    const verdict = RULES[c](change.data, { auth, id, exists, previous });
+    const verdict = relationship ? await ruleRelationship(env, c, change.data, { auth, id, exists, previous }) : RULES[c](change.data, { auth, id, exists, previous });
     if (verdict.code) return reject(verdict.code, verdict.error, verdict.status);
     data = verdict.data;
+    if (relationship) relationshipRule = verdict;
     // 파트너 연결은 실제 파트너 문서를 가리켜야 한다 — 없는 id 가 붙으면 정산·포털이 엉킨다.
     if (c === 'leads' && data.partnerId && !(await loadDoc(env, 'partners', data.partnerId))) return reject('INVALID', '없는 파트너입니다');
     if (c === 'referrals' && !exists) {
@@ -365,7 +416,25 @@ async function applyChange(env, auth, change, settings) {
     }
   }
   const updatedAt = Math.max(Date.now(), currentAt + 1);
-  await env.DB.prepare(
+  if (relationship) {
+    const guards = 'NOT EXISTS (SELECT 1 FROM json_each(?) ref WHERE NOT EXISTS (SELECT 1 FROM crm_documents d WHERE d.collection=json_extract(ref.value,\'$.c\') AND d.id=json_extract(ref.value,\'$.id\') AND d.updated_at=json_extract(ref.value,\'$.updatedAt\') AND d.deleted=0))' +
+      (relationshipRule.friendCompletion ? ' AND NOT EXISTS (SELECT 1 FROM crm_documents e WHERE e.collection=\'programExams\' AND e.deleted=0 AND e.id<>? AND json_extract(e.data,\'$.membershipId\')=? AND COALESCE(json_extract(e.data,\'$.completedDate\'),\'\')<>\'\')' : '');
+    const guardArgs = [JSON.stringify(relationshipRule.references)];
+    if (relationshipRule.friendCompletion) guardArgs.push(id, data.membershipId);
+    // 새 문서와 기존 문서 모두 DB 문장 자체에서 CAS. 두 직원의 저장이 동시에 도착해도 한 번만 반영된다.
+    const saved = row ? await env.DB.prepare('UPDATE crm_documents SET data=?,updated_at=?,updated_by=?,deleted=0 WHERE collection=? AND id=? AND updated_at=? AND ' + guards)
+      .bind(JSON.stringify(data), updatedAt, auth.staffId, c, id, currentAt, ...guardArgs).run() :
+      await env.DB.prepare('INSERT INTO crm_documents(collection,id,data,updated_at,updated_by,deleted) SELECT ?,?,?,?,?,0 WHERE ' + guards + ' ON CONFLICT(collection,id) DO NOTHING')
+        .bind(c, id, JSON.stringify(data), updatedAt, auth.staffId, ...guardArgs).run();
+    if (!changesOf(saved)) {
+      if (relationshipRule.friendCompletion) {
+        const completed = await env.DB.prepare('SELECT id FROM crm_documents WHERE collection=\'programExams\' AND deleted=0 AND id<>? AND json_extract(data,\'$.membershipId\')=? AND COALESCE(json_extract(data,\'$.completedDate\'),\'\')<>\'\' LIMIT 1').bind(id, data.membershipId).first();
+        if (completed) return reject('DUPLICATE', '친구맺기 검사는 이미 1회 완료 기록이 있습니다', 409);
+      }
+      const current = await env.DB.prepare('SELECT data,updated_at,updated_by,deleted FROM crm_documents WHERE collection=? AND id=? LIMIT 1').bind(c, id).first();
+      return reject('STALE', '다른 기기에서 관계 기록 또는 참조 고객이 바뀌었습니다. 새로고침 후 확인해 주세요', 409, { current: currentView(current) });
+    }
+  } else await env.DB.prepare(
     'INSERT INTO crm_documents(collection,id,data,updated_at,updated_by,deleted) VALUES(?,?,?,?,?,?) ' +
     'ON CONFLICT(collection,id) DO UPDATE SET data=excluded.data,updated_at=excluded.updated_at,updated_by=excluded.updated_by,deleted=excluded.deleted'
   ).bind(c, id, JSON.stringify(data), updatedAt, auth.staffId, wantDelete ? 1 : 0).run();
@@ -375,7 +444,7 @@ async function applyChange(env, auth, change, settings) {
       .bind('리드 삭제', updatedAt, auth.staffId, updatedAt, id).run();
   }
   let queued = 0;
-  if (!wantDelete && settings.hubspot.enabled) queued = await enqueueFor(env, auth, settings, c, id, previous, data);
+  if (!wantDelete && !relationship && settings.hubspot.enabled) queued = await enqueueFor(env, auth, settings, c, id, previous, data);
   return { status: 200, result: Object.assign(item, { updatedAt, queued }) };
 }
 

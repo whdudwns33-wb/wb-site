@@ -10,7 +10,10 @@ const source = fs.readFileSync(path.join(__dirname, 'app/app.js'), 'utf8').repla
 
 function harness() {
   const handlers = {}, surfaces = { '.skip-link': {}, '.topbar': {}, '.tabs': {}, '#view': {} };
-  const host = { hidden: true, fields: [], html: '', querySelectorAll() { return this.fields; }, querySelector() { return this.fields[0] || null; }, focus() {} };
+  const host = { hidden: true, fields: [], html: '', closeButton: { focus() {} }, querySelectorAll() { return this.fields; }, querySelector(selector) {
+    if (selector.startsWith('button') || selector === '[data-act="closemodal"]') return this.closeButton;
+    return this.fields.find(el => !(selector.includes(':disabled') && el.disabled) && !(selector.includes(':not([hidden])') && el.hidden) && !(selector.includes(':not([type=hidden])') && el.type === 'hidden') && el.type !== 'checkbox') || null;
+  }, focus() {} };
   Object.defineProperty(host, 'innerHTML', { get() { return this.html; }, set(value) { this.html = value; if (!value) this.fields = []; } });
   let confirmations = 0, restoredFocus = 0, accept = false;
   const opener = { focus() { restoredFocus++; } };
@@ -46,6 +49,21 @@ test('기존 값은 그대로 닫히고 수정 후 원복하면 확인하지 않
   assert.equal(h.confirmations, 0);
   assert.equal(h.restoredFocus, 1);
   assert.equal(h.surfaces['#view'].inert, false);
+});
+
+test('모달 첫 초점은 비활성·숨긴 입력을 건너뛰고 입력이 없으면 닫기 버튼으로 간다', () => {
+  const h = harness();
+  let focused = '';
+  h.open([
+    { disabled: true, focus() { focused = 'disabled'; } },
+    { type: 'hidden', focus() { focused = 'hidden-type'; } },
+    { hidden: true, focus() { focused = 'hidden'; } },
+    { focus() { focused = 'editable'; } }
+  ]);
+  assert.equal(focused, 'editable');
+  h.host.closeButton.focus = () => { focused = 'close'; };
+  h.open([{ disabled: true, focus() { focused = 'disabled'; } }]);
+  assert.equal(focused, 'close');
 });
 
 test('닫기·ESC·배경은 변경 확인을 거치고 취소하면 입력을 보존한다', async () => {
