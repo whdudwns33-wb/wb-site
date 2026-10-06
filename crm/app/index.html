@@ -20,7 +20,8 @@
 <!-- 순수 로직(crm-core) 먼저, 런타임(app.js) 은 body 끝에서. 서버도 같은 crm-core.js 를 읽는다. -->
 <script src="./crm-core.js?v=dev"></script>
 </head>
-<body>
+<body class="crm-app">
+<a class="skip-link" href="#view" data-act="focus-content">본문으로 이동</a>
 <header class="topbar">
   <div class="wrap">
     <div class="brand">WB 세일즈데스크<small id="orgName"></small></div>
@@ -28,7 +29,7 @@
   </div>
 </header>
 <nav class="tabs" id="tabs" hidden aria-label="화면"><div class="wrap" id="tabsWrap"></div></nav>
-<main class="wrap" id="view" aria-live="polite"></main>
+<main class="wrap" id="view" tabindex="-1" aria-live="polite"></main>
 <div id="modalHost" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="modalTitle"></div>
 <div id="toast" role="status" aria-live="polite"></div>
 <script src="./app.js?v=dev"></script>

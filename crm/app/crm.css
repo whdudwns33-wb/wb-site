@@ -191,6 +191,69 @@ select.in { appearance: auto; }
 table { border-collapse: collapse; font-size: 13px; }
 details > summary { cursor: pointer; }
 
+/* 직원 화면은 넓은 PC에서 탐색·고객·후속 업무를 함께 보여 준다. 파트너 포털에는 적용하지 않는다. */
+.skip-link { position: fixed; top: -80px; left: 16px; z-index: 250; background: var(--surface); padding: 10px 16px; border-radius: var(--radius-s); }
+.skip-link:focus { top: 8px; }
+.nav-group { display: none; }
+.page-tools { margin: 8px 0 20px; align-items: start; gap: 16px; }
+.page-tools h1.page { margin: 0 0 4px; }
+.page-tools h1 small { font-size: 14px; }
+.crm-app .customer-list { padding: 0; overflow: hidden; }
+.customer-filters { padding: 18px; border-bottom: 1px solid var(--line); }
+.customer-table-scroll { overflow-x: auto; }
+.customer-table { width: 100%; text-align: left; }
+.customer-table th { padding: 12px 16px; color: var(--muted); font-size: 12px; font-weight: 500; background: var(--bg); white-space: nowrap; }
+.customer-table td { padding: 16px; border-top: 1px solid var(--line); vertical-align: top; }
+.customer-table td:not(:first-child) { min-width: 100px; }
+.customer-table tbody tr:hover { background: var(--bg); }
+.customer-name { min-width: 180px; overflow-wrap: anywhere; }
+.customer-name a { display: inline-block; padding: 3px 0; font-size: 14px; font-weight: 700; text-decoration: none; }
+.customer-name a:hover { text-decoration: underline; }
+.customer-list > .hint { padding: 0 18px 14px; }
+.overdue { color: var(--bad); font-weight: 500; }
+.lead-layout { display: grid; gap: 16px; align-items: start; grid-template-areas: 'profile' 'history' 'next'; }
+.lead-layout .card { margin-bottom: 0; }
+.lead-profile { grid-area: profile; min-width: 0; }
+.lead-profile h1 { overflow-wrap: anywhere; }
+.lead-profile .kv { grid-template-columns: 72px minmax(0, 1fr); }
+.lead-history { grid-area: history; min-width: 0; }
+.lead-history .tl { margin-top: 20px; }
+.lead-history .tl-item { padding-bottom: 20px; }
+.lead-next { grid-area: next; min-width: 0; display: grid; gap: 16px; }
+.lead-next .fu .grow { flex-basis: 100%; }
+.lead-layout select.in { max-width: 100%; }
+.lead-layout + .right { margin-top: 18px; }
+.crm-app input, .crm-app textarea { caret-color: var(--accent); }
+.crm-app input::placeholder, .crm-app textarea::placeholder { color: var(--muted); opacity: 1; }
+@media (min-width: 1024px) {
+  .crm-app.signed-in .topbar .wrap { max-width: none; padding: 0 28px; }
+  .crm-app.signed-in .tabs { position: fixed; top: 54px; bottom: 0; left: 0; width: 188px; border-bottom: 0; border-right: 1px solid var(--line); overflow-y: auto; }
+  .crm-app.signed-in .tabs .wrap { display: flex; flex-direction: column; gap: 4px; padding: 24px 14px; overflow: visible; }
+  .crm-app.signed-in .tab { border-radius: var(--radius-s); min-height: 44px; padding: 11px 14px; text-align: left; justify-content: space-between; }
+  .crm-app.signed-in .tab.on { background: var(--accent-bg); color: var(--accent); }
+  .crm-app.signed-in .nav-group { display: block; margin: 26px 14px 6px; font-size: 12px; color: var(--muted); }
+  .crm-app.signed-in #view { max-width: none; margin-left: 188px; padding: 24px 28px; }
+  .lead-layout { grid-template-columns: 270px minmax(0, 1fr); grid-template-areas: 'profile history' 'next history'; }
+}
+@media (min-width: 1440px) {
+  .lead-layout { grid-template-columns: 280px minmax(340px, 1fr) 300px; grid-template-areas: 'profile history next'; }
+}
+@media (max-width: 719px) {
+  .crm-app .customer-list { border: 0; box-shadow: none; background: transparent; overflow: visible; }
+  .customer-filters { padding: 14px; margin-bottom: 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+  .customer-table-scroll { overflow: visible; }
+  .customer-table, .customer-table tbody { display: block; }
+  .customer-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .customer-table tr { display: grid; grid-template-columns: 1fr 1fr; margin-bottom: 12px; padding: 16px; gap: 14px 18px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+  .customer-table td { display: block; padding: 0; border: 0; min-width: 0 !important; overflow-wrap: anywhere; }
+  .customer-table td::before { content: attr(data-label); display: block; color: var(--muted); font-size: 12px; margin-bottom: 3px; }
+  .customer-table .customer-name { grid-column: 1 / -1; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+  .customer-name a { font-size: 16px; padding: 7px 0; }
+  .customer-table .customer-name::before { display: none; }
+  .crm-app .brand small { display: none; }
+  .page-tools .btn { flex-shrink: 0; }
+}
+
 /* 파트너 포털 — 같은 어휘, 조금 더 넓은 숨 */
 body.partner #view { padding-top: 18px; }
 body.partner .wrap { max-width: 640px; }
