@@ -75,6 +75,13 @@
     /* 러너 */
     .prog { height:10px; background:var(--green-soft); border:1px solid var(--edge); border-radius:99px; overflow:hidden; margin-bottom:12px; }
     .prog i { display:block; height:100%; background:var(--accent); width:0; transition:width .3s; }
+    .countdown { font-size:1.25rem; font-weight:900; color:var(--accent); font-variant-numeric:tabular-nums; margin:8px 0; }
+    .icon { width:1.1em; height:1.1em; vertical-align:-.15em; }
+    /* 빠른 응답에는 뼈대를 띄우지 않는다 — CSS 지연만 쓰므로 요청·화면 전환 시각은 그대로다 */
+    .skeleton { visibility:hidden; animation:skeleton-show 0s .5s forwards; }
+    .skeleton i { display:block; height:1em; margin:12px 0; border-radius:8px; background:var(--green-soft); }
+    .skeleton i:first-child { width:60%; }
+    @keyframes skeleton-show { to { visibility:visible; } }
     .q .head { font-size:.8125em; color:var(--soft); font-weight:800; margin-bottom:6px; }
     .q .stem { border-left:4px solid var(--mint); padding:6px 12px; margin:8px 0; background:var(--tint); border-radius:0 8px 8px 0; white-space:pre-line; }
     .q .ask { font-size:1.0625em; font-weight:800; margin:6px 0 12px; }
@@ -146,7 +153,7 @@
 <body>
   <header class="bar">
     <span class="brand">하루브레인</span>
-    <span class="dot" id="savedot"><i></i><span id="savetxt">저장 전</span></span>
+    <span class="dot" id="savedot" role="status" hidden><i aria-hidden="true"></i><span id="savetxt"></span></span>
     <span class="who" id="who"></span>
   </header>
   <main id="app"></main>
@@ -164,6 +171,7 @@
     var SUBJ = { kor: '국어', math: '수학', eng: '영어' };
     var NET_MSG = '인터넷이 연결되지 않았어요. 연결되면 다시 해 봐요.';
     var CHECK = '<svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+    var PAPER = '<svg class="icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M4 1.5h5l3 3v10H4zM9 1.5v3h3M6 8h4M6 11h4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
     var LS_STATE = 'wbh.state', LS_OMR = 'wbh.omr';
     var $ = function (id) { return document.getElementById(id); };
     var esc = function (s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
@@ -186,7 +194,12 @@
       if (navigator.onLine === false || /fetch|network|load failed/i.test(m)) return NET_MSG;
       return fallback;
     }
-    function setDot(cls, txt) { var d = $('savedot'); d.className = 'dot ' + cls; $('savetxt').textContent = txt; }
+    function setDot(cls, detail) {
+      var d = $('savedot'); d.className = 'dot ' + cls; d.hidden = cls === 'pending';
+      if (d.hidden) return;
+      $('savetxt').textContent = cls === 'saved' ? '저장됨' : '저장 못 함';
+      d.title = detail || ''; d.setAttribute('aria-label', $('savetxt').textContent + (detail ? ' · ' + detail : ''));
+    }
 
     /* ── 로컬 상태 — 서버 GET /state 가 원천, 기기 캐시는 오프라인 표시용 ── */
     var DB = null, PLAN = null, ATOMS = null, TODAY = null, CORE = [], RETRO = null;
@@ -200,8 +213,8 @@
       body.summary = summary();
       setDot('pending', '저장 중');
       return api('/state', { method: 'PUT', body: JSON.stringify({ state: body }) })
-        .then(function () { setDot('saved', '저장됨'); pendingPut = false; })
-        .catch(function (e) { setDot('failed', e.status === 429 ? '오늘 저장 상한' : '저장 안 됨'); pendingPut = true; });
+        .then(function () { setDot('saved'); pendingPut = false; })
+        .catch(function (e) { setDot('failed', e.status === 429 ? '오늘 저장 상한' : '연결되면 다시 저장해요.'); pendingPut = true; });
     }
 
     /* ── 원자 상태 = 좌표(mastery) + 카드(srs) 한 객체 ── */
@@ -227,6 +240,7 @@
     /* ── 화면 ── */
     /* keep: 같은 문항 위에 결과만 덧그릴 때 — 스크롤을 그대로 두고 showResult 가 결과 상자로 데려간다. 새 화면(새 문항 등)은 맨 위부터 */
     function render(html, keep) { app.innerHTML = html; if (!keep) window.scrollTo(0, 0); }
+    function loading(text, head) { return '<div class="card" aria-busy="true">' + (head || '') + '<p class="small" role="status">' + esc(text || '불러오는 중…') + '</p><div class="skeleton" aria-hidden="true"><i></i><i></i><i></i></div></div>'; }
     function footer() { return '<div class="foot">' + esc(NOTICE || '본 앱은 WB 독해력학원이 제작한 사설 학습 도구이며, 호남삼육중학교와 어떠한 제휴·후원 관계도 없습니다. 전형 관련 공식 정보는 학교 홈페이지와 모집요강에서 확인하십시오.') + '</div>'; }
     function motion() { return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'; }
     /* 답안지 타이머 줄·결과 상자는 머리 막대 바로 아래에 붙는다 — 글자 크기 설정에 따라 막대 높이가 달라서 잰다 */
@@ -236,6 +250,7 @@
     var LINK_SEQ = 0;   // 승인 대기 폴링의 세대 — [코드 다시 입력] 뒤에 이전 폴링이 새 화면을 덮지 않게
     function showLink(msg, typed) {
       LINK_SEQ++;
+      $('savedot').hidden = true; $('who').textContent = '';
       render('<form class="card link" id="lf" novalidate><h2><label for="code">선생님께 받은 학생 코드</label></h2>' + (msg ? '<div class="err" id="lerr">' + esc(msg) + '</div>' : '') +
         /* 학생 코드는 대소문자를 가린다(서버 정확 일치) — 태블릿이 첫 글자를 대문자로 바꾸지 않게 자동 고침을 모두 끈다. 소문자로 바꾸지도 않는다 */
         '<input id="code" name="code" type="text" inputmode="text" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="off" enterkeyhint="go" placeholder="wb-…"' + (msg ? ' aria-invalid="true" aria-describedby="lerr"' : '') + '>' +
@@ -303,7 +318,7 @@
         html += '<div class="slot' + (done ? ' done' : '') + '"><div class="k">' + (done ? CHECK : (i + 1)) + '</div><div><div><span class="chip">' + esc(s.label) + '</span>' + (done ? '<span class="chip fin">했어요</span>' : '') + '</div><div class="t">' + esc(s.atomLabel) + '</div><div class="w">' + esc(s.why) + '</div></div></div>';
       });
       if (TODAY && TODAY.envelope && TODAY.envelope.items && TODAY.envelope.items.length) {
-        html += '<div class="env">📄 이번 주 종이 봉투' + TODAY.envelope.items.map(function (it, i) { var k = TODAY.envelope.week + ':' + it.atomId; return '<label><input type="checkbox" data-env="' + esc(k) + '"' + (DB.envelopeDone[k] ? ' checked' : '') + '> ' + esc(it.label) + '</label>'; }).join('') + '</div>';
+        html += '<div class="env">' + PAPER + ' 이번 주 종이 봉투' + TODAY.envelope.items.map(function (it, i) { var k = TODAY.envelope.week + ':' + it.atomId; return '<label><input type="checkbox" data-env="' + esc(k) + '"' + (DB.envelopeDone[k] ? ' checked' : '') + '> ' + esc(it.label) + '</label>'; }).join('') + '</div>';
       }
       var capped = day.sat && day.blocks >= 1 + (ph ? ph.extendMax || 0 : 0);
       if (capped) html += '<div class="rest">오늘은 여기까지. 자러 가자.</div>';
@@ -337,7 +352,7 @@
     function nextSlot() {
       if (RUN.si >= RUN.slots.length) { finishRunner(); return; }
       var slot = RUN.slots[RUN.si];
-      render('<div class="card"><div class="prog"><i style="width:' + Math.round(RUN.si / RUN.slots.length * 100) + '%"></i></div><span class="chip">' + esc(slot.label) + '</span><h2>' + esc(slot.atomLabel) + '</h2><p class="small">문항을 불러오는 중…</p></div>');
+      render(loading('문항을 불러오는 중…', runHead(slot, true) + '<h2>' + esc(slot.atomLabel) + '</h2>'));
       fetchItems(slot, 3).then(function (items) {
         if (!items.length) { RUN.si++; nextSlot(); return; }
         RUN.items = items; RUN.qi = 0; askItem();
@@ -383,9 +398,10 @@
       return h;
     }
     /* 결과 화면도 문항 화면과 같은 머리(진행 막대·순번)를 둔다 — 위쪽 높이가 같아야 스크롤을 그대로 둘 수 있다 */
-    function runHead(slot) {
-      return '<div class="prog"><i style="width:' + Math.round((RUN.si + RUN.qi / RUN.items.length) / RUN.slots.length * 100) + '%"></i></div>' +
-        '<div class="q"><div class="head">' + esc(slot.label) + ' · ' + (RUN.qi + 1) + '/' + RUN.items.length + '</div></div>';
+    function runHead(slot, preparing) {
+      var pct = Math.round((RUN.si + (preparing ? 0 : RUN.qi / RUN.items.length)) / RUN.slots.length * 100);
+      return '<div class="prog" role="progressbar" aria-label="오늘 카드 진행" aria-valuemin="0" aria-valuemax="100" aria-valuenow="' + pct + '"><i style="width:' + pct + '%"></i></div>' +
+        '<div class="q"><div class="head">카드 ' + (RUN.si + 1) + '/' + RUN.slots.length + ' · ' + (preparing ? '문항 준비 중' : '문항 ' + (RUN.qi + 1) + '/' + RUN.items.length) + ' · ' + esc(slot.label) + '</div></div>';
     }
     function markChoices(answerKey, picked) {
       Array.prototype.forEach.call(document.querySelectorAll('.choice'), function (b) {
@@ -402,8 +418,7 @@
     }
     function askItem(cueText) {
       var slot = RUN.slots[RUN.si], it = RUN.items[RUN.qi];
-      var html = '<div class="card"><div class="prog"><i style="width:' + Math.round((RUN.si + RUN.qi / RUN.items.length) / RUN.slots.length * 100) + '%"></i></div>' +
-        '<div class="q"><div class="head">' + esc(slot.label) + ' · ' + (RUN.qi + 1) + '/' + RUN.items.length + '</div>' + (cueText ? '<div class="cue">💡 ' + esc(cueText) + '</div>' : '') + '</div>' + itemHtml(it, { dontKnow: slot.kind === 'probe' }) + '</div>';
+      var html = '<div class="card">' + runHead(slot) + (cueText ? '<div class="cue">단서 · ' + esc(cueText) + '</div>' : '') + itemHtml(it, { dontKnow: slot.kind === 'probe' }) + '</div>';
       render(html);
       var t0 = Date.now();
       Array.prototype.forEach.call(document.querySelectorAll('.choice, .skip'), function (b) {
@@ -464,12 +479,12 @@
       var s = DB.atoms[slot.atomId]; if (s) { s.cause = s.cause || {}; s.cause[cause || 'gap'] = (s.cause[cause || 'gap'] || 0) + 1; }
     }
     function reprobe(slot, it, res, picked, shown) {
-      render('<div class="card"><p class="small">같은 칸의 새 문항 — 30초</p><p>불러오는 중…</p></div>');
+      render(loading('같은 칸의 새 문항을 불러오는 중…', runHead(slot)));
       var fallback = function () { recordWrong(slot, it, res, res.cause); showExplain(slot, it, res, null, picked); };
       fetchItems(slot, slot.source === 'gen' ? 2 : 1, shown).then(function (items) {
         var nit = items[0]; if (!nit) { fallback(); return; }
-        render('<div class="card"><div class="q"><div class="head">' + esc(slot.label) + ' · 다시 한 번 <span id="left">30</span>초</div></div>' + itemHtml(nit) + '</div>');
-        var t0 = Date.now(), left = 30, tm = setInterval(function () { left--; if ($('left')) $('left').textContent = left; if (left <= 0) { clearInterval(tm); done('skip'); } }, 1000);
+        render('<div class="card">' + runHead(slot) + '<div class="countdown" role="timer">다시 한 번 · <span id="left">30</span>초</div><div class="prog" id="reprobeBar" role="progressbar" aria-label="다시 푸는 남은 시간" aria-valuemin="0" aria-valuemax="30" aria-valuenow="30"><i style="width:100%"></i></div><p class="small">시간이 다 되면 ‘모름’으로 기록돼요.</p>' + itemHtml(nit) + '</div>');
+        var t0 = Date.now(), left = 30, tm = setInterval(function () { left--; if ($('left')) { $('left').textContent = left; $('reprobeBar').setAttribute('aria-valuenow', left); $('reprobeBar').firstElementChild.style.width = (left / 30 * 100) + '%'; } if (left <= 0) { clearInterval(tm); done('skip'); } }, 1000);
         var done = function (pk) {
           clearInterval(tm);
           Array.prototype.forEach.call(document.querySelectorAll('.choice'), function (b) { b.disabled = true; });
@@ -506,8 +521,8 @@
       var ph = PLAN ? PLAN.phase : null, more = ph && d.blocks < 1 + (ph.extendMax || 0);
       cache();
       push().then(function () {
-        render('<div class="card"><h2>오늘 카드 완료</h2><div class="kv"><span>앉은 날</span><b>' + sat + '</b></div><div class="kv"><span>오늘</span><b>' + d.min + '분</b></div>' +
-          (more ? '<button class="big ghost" id="more">오늘 더 할래 (+' + (ph.extendBlockMin || 15) + '분)</button>' : '<div class="rest">오늘은 여기까지. 자러 가자.</div>') + '<button class="big" id="home">홈으로</button></div>' + footer());
+        render('<div class="card"><div class="prog" role="progressbar" aria-label="오늘 카드 진행" aria-valuemin="0" aria-valuemax="100" aria-valuenow="100"><i style="width:100%"></i></div><h2>오늘 카드 완료</h2><div class="kv"><span>앉은 날</span><b>' + sat + '일</b></div><div class="kv"><span>오늘</span><b>' + d.min + '분</b></div><button class="big" id="home">홈으로</button>' +
+          (more ? '<button class="big ghost" id="more">오늘 더 할래 (+' + (ph.extendBlockMin || 15) + '분)</button>' : '<div class="rest">오늘은 여기까지. 자러 가자.</div>') + '</div>' + footer());
         $('home').onclick = function () { refreshToday().then(showHome); };
         if ($('more')) $('more').onclick = function () { refreshToday().then(function () { startRunner(); }); };
       });
@@ -637,7 +652,7 @@
       $('go').onclick = function () { clearInterval(tm); OMR.breakUntil = null; saveOmr(); omrStep(); };
     }
     function submitOmr() {
-      render('<div class="card lock"><div class="t">답안지를 보내는 중…</div></div>');
+      render(loading('답안지를 보내는 중…'));
       api('/attempt', { method: 'POST', body: JSON.stringify({ kind: OMR.kind, keyId: OMR.keyId, periods: OMR.periods }) })
         .then(function () {
           try { localStorage.removeItem(LS_OMR); } catch (e) {}
@@ -653,7 +668,7 @@
 
     /* ── 회고 — 앉은 날과 이어지는 것 목록만. 숫자는 시험일 + 7일 16:00 뒤 서버가 열어 준다. 앉은 날은 누적으로만 센다(분모 없음) ── */
     function showRetro() {
-      render('<div class="card"><p>불러오는 중…</p></div>');
+      render(loading());
       api('/retro').then(function (j) {
         var r = j.retro, g = r.gained;
         RETRO = r;
@@ -677,7 +692,7 @@
       var a = auth();
       if (!a || !a.token) { showLink(); return; }
       $('who').innerHTML = '<b>' + esc(a.name || a.code) + '</b>';
-      render('<div class="card"><p>불러오는 중…</p></div>');
+      render(loading());
       Promise.all([api('/plan'), api('/atoms'), api('/state'), api('/today')]).then(function (rs) {
         var plan = rs[0].plan, at = rs[1], st = rs[2].state, td = rs[3];
         PLAN = plan; PLAN.totalDays = 0;
@@ -689,7 +704,7 @@
         var c = loadCache(); if (c && c.updatedLocal && (!rs[2].updatedAt || c.updatedLocal > rs[2].updatedAt)) { DB = Object.assign(DB, c, { mocks: DB.mocks, paper: DB.paper }); pendingPut = true; }
         TODAY = td.today; PLAN.dday = td.dday;
         if (TODAY && TODAY.envelope) DB.envelope = TODAY.envelope;
-        setDot('saved', rs[2].updatedAt ? '동기화됨' : '첫 시작');
+        setDot('saved');
         if (pendingPut) push();
         var o = loadOmr(); if (o && o.d === todayKey() && (o.cur || o.pi > 0)) { OMR = o; if (o.cur) { OMR.periods.push({ subject: o.cur.subject, keyId: o.cur.keyId, openedAt: o.cur.openedAt, closedAt: Date.now(), marks: o.cur.marks, events: o.cur.events }); OMR.cur = null; OMR.pi++; saveOmr(); } omrStep(); return; }
         loadRetro().then(function () { showHome(); });
