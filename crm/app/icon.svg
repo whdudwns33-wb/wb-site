@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- WB 세일즈데스크 홈 화면 아이콘 — 남색 바탕에 파이프라인(세 단계 → 성사) 마크. 텍스트·개인정보 없음. -->
+  <rect width="128" height="128" rx="28" fill="#1B2A4A"/>
+  <rect x="22" y="40" width="22" height="48" rx="5" fill="#9FB3D9"/>
+  <rect x="53" y="30" width="22" height="58" rx="5" fill="#C9D6EE"/>
+  <rect x="84" y="20" width="22" height="68" rx="5" fill="#2F6FED"/>
+  <path d="M24 100 H104" stroke="#F4F5F9" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="95" cy="50" r="7" fill="#F4F5F9"/>
+</svg>
