@@ -7,25 +7,30 @@
   <meta name="robots" content="noindex, nofollow">
   <title>WB 하루브레인 · 관리</title>
   <style>
-    :root{--navy:#2B4C3F;--blue:#2F5F8F;--sky:#E7EEF6;--bg:#F5F3EE;--line:#E1E6E2;--muted:#6A7A72;--ink:#22302A;--ok:#14755e;--warn:#8a4b08;--bad:#9b352b}
-    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Noto Sans KR",sans-serif;line-height:1.6}
-    header{display:flex;align-items:center;gap:14px;padding:13px 20px;background:var(--navy);color:#fff}header b{font-size:17px}header small{opacity:.75}header .sp{flex:1}
-    .hbtn{min-height:38px;padding:6px 14px;border:1px solid #ffffff55;border-radius:10px;background:transparent;color:#fff;font-weight:800;cursor:pointer}
+    :root{--navy:#2B4C3F;--blue:#2F5F8F;--sky:#E7EEF6;--bg:#F5F3EE;--line:#E1E6E2;--edge:#86938C;--muted:#56645D;--ink:#22302A;--ok:#14755e;--warn:#8a4b08;--bad:#9b352b}
+    /* [hidden] 을 display 규칙이 덮지 않게 — nav{display:flex} 가 로그인 전 탭을 드러내던 결함(눌러서 로그인 폼이 사라짐) */
+    [hidden]{display:none!important}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Noto Sans KR",sans-serif;line-height:1.6;word-break:keep-all;overflow-wrap:anywhere}
+    header{display:flex;align-items:center;gap:14px;padding:13px 20px;background:var(--navy);color:#fff}header b{font-size:17px;white-space:nowrap}header small{opacity:.75}header .sp{flex:1}
+    @media (max-width:640px){header small{display:none}}   /* 폰에서는 탭과 같은 부제를 접는다 — 제목·로그아웃이 낱말 중간에서 꺾였다 */
+    .hbtn{flex:none;white-space:nowrap;min-height:38px;padding:6px 14px;border:1px solid #ffffff55;border-radius:10px;background:transparent;color:#fff;font-weight:800;cursor:pointer}
     nav{display:flex;gap:6px;flex-wrap:wrap;max-width:1100px;margin:12px auto 0;padding:0 14px}
-    nav button{min-height:38px;padding:5px 14px;border-radius:999px;border:1.5px solid #bfd0c8;background:#fff;font-weight:800;color:var(--navy);cursor:pointer}
+    nav button{min-height:44px;padding:5px 14px;border-radius:999px;border:1.5px solid #bfd0c8;background:#fff;font-weight:800;color:var(--navy);cursor:pointer}
     nav button[aria-pressed="true"]{background:var(--navy);color:#fff;border-color:var(--navy)}
     main{max-width:1100px;margin:auto;padding:14px 14px 60px}
     .card{margin-bottom:14px;padding:16px 18px;border:1px solid var(--line);border-radius:14px;background:#fff}
     h2{margin:0 0 6px;color:var(--navy);font-size:17px}h3{margin:12px 0 6px;color:var(--navy);font-size:14px}
-    button{font:inherit;cursor:pointer}input,select,textarea{font:inherit;min-height:40px;padding:6px 10px;border:1.5px solid #bfd0c8;border-radius:10px;background:#fff;color:var(--ink)}
+    button{font:inherit;cursor:pointer}input,select,textarea{font:inherit;min-height:40px;max-width:100%;padding:6px 10px;border:1.5px solid var(--edge);border-radius:10px;background:#fff;color:var(--ink)}
     textarea{width:100%;min-height:160px;font-family:ui-monospace,Consolas,monospace;font-size:12.5px}
     .btn{min-height:40px;padding:6px 16px;border:0;border-radius:10px;background:var(--blue);color:#fff;font-weight:900}
-    .btn.ghost{background:#fff;border:1.5px solid #bfd0c8;color:var(--navy)}.btn.sm{min-height:30px;padding:2px 10px;font-size:12.5px}.btn.danger{background:#fff;border:1.5px solid #efc2bb;color:var(--bad)}
+    .btn.ghost{background:#fff;border:1.5px solid var(--edge);color:var(--navy)}.btn.sm{min-height:36px;padding:2px 12px;font-size:12.5px}.btn:disabled{opacity:.45;cursor:not-allowed}.btn.danger{background:#fff;border:1.5px solid #efc2bb;color:var(--bad)}
     .tag{display:inline-block;padding:2px 9px;border-radius:999px;background:var(--sky);color:var(--blue);font-size:12px;font-weight:800}.tag.ok{background:#e7f6f0;color:var(--ok)}.tag.bad{background:#fff0ef;color:var(--bad)}.tag.warn{background:#fff4e6;color:var(--warn)}
     .tbl{overflow-x:auto}table{border-collapse:collapse;width:100%;font-size:13.5px;white-space:nowrap}th{position:sticky;top:0;background:#f0f5f2;color:var(--navy);font-size:12px}
-    th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;font-variant-numeric:tabular-nums}tbody tr:nth-child(even) td{background:#f8faf8}
+    th,td{padding:8px 10px;border-bottom:1px solid var(--line);text-align:left;font-variant-numeric:tabular-nums}.tbl tbody tr:nth-child(even) td{background:#f8faf8}
+    /* 첫 열(코드·id)은 가로 스크롤에도 남긴다 — [좌표]를 누르면 표가 오른쪽 끝으로 밀려 누구의 행인지 사라졌다 */
+    .tbl th:first-child,.tbl td:first-child{position:sticky;left:0;z-index:1;box-shadow:inset -1px 0 0 var(--line)}.tbl td:first-child{background:#fff}.tbl th:first-child{z-index:2}
     .grid-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;align-items:end}label.f{display:flex;flex-direction:column;font-size:12.5px;font-weight:800;color:var(--muted)}
-    .err{color:var(--bad);font-weight:700;font-size:13px;margin-top:8px;white-space:pre-wrap}.ok{color:var(--ok);font-weight:700;font-size:13px;margin-top:8px;white-space:pre-wrap}.muted{color:var(--muted);font-size:12.5px}
+    .err{color:var(--bad);font-weight:700;font-size:13px;margin-top:8px;white-space:pre-wrap}.empty{margin:10px 0 0;padding:10px 12px;border-radius:10px;background:#fff4e6;color:var(--warn);font-weight:700;font-size:13.5px}.ok{color:var(--ok);font-weight:700;font-size:13px;margin-top:8px;white-space:pre-wrap}.muted{color:var(--muted);font-size:12.5px}
     #loginCard{max-width:380px;margin:60px auto}.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
     .cell{display:inline-block;min-width:110px;padding:6px 8px;margin:3px;border-radius:8px;border:1px solid var(--line);font-size:12.5px}
     .cell.hole{background:#F8F1DF}.cell.shaky{background:#E7EEF6}.cell.fluent{background:#E6EFEA}.cell.unknown{background:#f1f1f1;color:var(--muted)}
@@ -61,7 +66,7 @@ function renderLogin(msg){
   $('#main').innerHTML='<div class="card" id="loginCard"><h2>강사 로그인</h2><div id="loginHost"></div></div>';
   WBAdminLogin.mount({host:'#loginHost',message:msg||'',classes:{btn:'btn'},onToken:function(t){TOKEN=t;try{localStorage.setItem('wbr.admin.token',TOKEN);}catch(e){}show(TAB);}});
 }
-function show(tab){TAB=tab;$('#nav').hidden=false;$('#btnLogout').hidden=false;document.querySelectorAll('nav button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.tab===tab)));({board,students,assets,paper,tools})[tab]().catch(e=>{if(e.message!=='auth')$('#main').innerHTML='<div class="card"><div class="err">'+esc(e.message)+'</div></div>';});}
+function show(tab){TAB=tab;if(!TOKEN){renderLogin();return;}$('#nav').hidden=false;$('#btnLogout').hidden=false;document.querySelectorAll('nav button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.tab===tab)));({board,students,assets,paper,tools})[tab]().catch(e=>{if(e.message!=='auth')$('#main').innerHTML='<div class="card"><div class="err">'+esc(e.message)+'</div></div>';});}
 document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>show(b.dataset.tab));
 $('#btnLogout').onclick=()=>{TOKEN=null;localStorage.removeItem('wbr.admin.token');renderLogin();};
 const CORE_LABEL={};
@@ -84,23 +89,41 @@ async function showMap(code){
 async function students(){
   const [s,pl]=await Promise.all([api('/haru/admin/students'),api('/haru/admin/plans')]);
   const cohorts=pl.plans.map(p=>p.cohort);
-  const rows=s.students.map(x=>'<tr><td>'+esc(x.code)+'</td><td>'+esc(x.name)+'</td><td>'+esc(x.grade)+' '+esc(x.cls)+'</td><td>'+esc(x.cohort)+'</td><td>'+(x.apps?esc(x.apps.join(',')):'재원생(전부)')+'</td><td>'+(x.consent&&x.consent.at?esc(x.consent.at)+' '+esc(x.consent.via||''):'<span class="tag bad">없음</span>')+'</td><td>'+esc(x.expiresAt||'')+'</td><td><button class="btn sm ghost" data-plink="'+esc(x.code)+'">부모 링크</button></td></tr>').join('');
+  const rows=s.students.map(x=>'<tr><td>'+esc(x.code)+'</td><td>'+esc(x.name)+'</td><td>'+esc(x.grade)+' '+esc(x.cls)+'</td><td>'+esc(x.cohort)+'</td><td>'+(x.apps?esc(x.apps.join(',')):'재원생(전부)')+'</td><td>'+(x.consent&&x.consent.at?esc(x.consent.at)+' '+esc(x.consent.via||''):'<span class="tag bad">없음</span>')+'</td><td>'+esc(x.expiresAt||'')+'</td><td><div class="row" style="flex-wrap:nowrap">'+(x.haruPtoken?'<button class="btn sm ghost" data-pview="'+esc(x.code)+'">링크 보기</button><button class="btn sm danger" data-plink="'+esc(x.code)+'">부모 링크 새로 발급</button>':'<button class="btn sm ghost" data-plink="'+esc(x.code)+'">부모 링크 새로 발급</button>')+'</div></td></tr>').join('');
   $('#main').innerHTML='<div class="card"><h2>학생 등록 <span class="muted">보호자 동의일이 없으면 등록되지 않는다 · 코드는 무작위(예: wb-'+Math.random().toString(36).slice(2,8)+')</span></h2><div class="grid-form">'+
     '<label class="f">코드<input id="e_code" placeholder="wb-xxxxxx"></label><label class="f">이름<input id="e_name"></label><label class="f">학년<input id="e_grade" placeholder="초6"></label><label class="f">반<input id="e_cls"></label>'+
     '<label class="f">코호트<select id="e_cohort">'+cohorts.map(c=>'<option>'+esc(c)+'</option>').join('')+'</select></label><label class="f">동의일<input id="e_at" type="date"></label><label class="f">동의 방식<select id="e_via"><option value="paper">종이</option><option value="digital">전자</option></select></label><label class="f">보호자(관계)<input id="e_g" placeholder="홍길동(모)"></label>'+
     '<button class="btn" id="e_go">등록</button></div><div id="e_msg"></div>'+(cohorts.length?'':'<div class="err">플랜이 없습니다 — [팩·대응표·플랜] 탭에서 코호트 플랜을 먼저 올리세요.</div>')+'</div>'+
-    '<div class="card"><h2>등록된 학생 '+s.students.length+'명</h2><div class="tbl"><table><thead><tr><th>코드</th><th>이름</th><th>학년·반</th><th>코호트</th><th>앱</th><th>동의</th><th>만료</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div><div id="plink"></div></div>';
+    '<div class="card"><h2>등록된 학생 '+s.students.length+'명</h2><div class="tbl"><table><thead><tr><th>코드</th><th>이름</th><th>학년·반</th><th>코호트</th><th>앱</th><th>동의</th><th>만료</th><th></th></tr></thead><tbody>'+(rows||'<tr><td colspan="8" class="muted">등록된 학생이 없습니다 — 위 칸을 채워 [등록]</td></tr>')+'</tbody></table></div><div id="plink"></div></div>';
   $('#e_go').onclick=async()=>{const g=($('#e_g').value||'').match(/^(.+?)\((.+)\)$/);try{const j=await post('/haru/admin/enroll',{code:$('#e_code').value,name:$('#e_name').value,grade:$('#e_grade').value,cls:$('#e_cls').value,cohort:$('#e_cohort').value,consent:{at:$('#e_at').value,via:$('#e_via').value,guardian:g?{name:g[1].trim(),rel:g[2].trim()}:null}});$('#e_msg').innerHTML='<div class="ok">등록됨: '+esc(j.student.code)+' · 만료 '+esc(j.student.expiresAt)+'. 학생 앱(/haru/)에서 코드를 넣으면 [연동 승인 대기]에 뜹니다 — 진로독서 관리 화면(/admin/)에서 승인하세요.</div>';students();}catch(e){$('#e_msg').innerHTML='<div class="err">'+esc(e.message)+'</div>';}};
-  document.querySelectorAll('[data-plink]').forEach(b=>b.onclick=async()=>{try{const j=await post('/haru/admin/parentlink',{code:b.dataset.plink});const url=location.origin+'/haru/parent.html?t='+j.ptoken;$('#plink').innerHTML='<div class="ok">'+esc(b.dataset.plink)+' 보호자 링크(만료 '+esc(j.exp.slice(0,10))+') — 동의서의 보호자 번호로만 보내세요. 이전 링크는 즉시 무효.<br><input style="width:100%" readonly value="'+esc(url)+'"></div>';}catch(e){$('#plink').innerHTML='<div class="err">'+esc(e.message)+'</div>';}});
+  const byCode={};s.students.forEach(x=>{byCode[x.code]=x;});
+  document.querySelectorAll('[data-pview]').forEach(b=>b.onclick=()=>{const x=byCode[b.dataset.pview];if(x&&x.haruPtoken)showPlink(x.code,x.haruPtoken,null,false);});
+  /* 새로 발급은 지금 링크를 서버에서 바로 지운다(haru-api parentlink) — 학부모 화면이 '유효하지 않은 링크'가 되므로 확인을 받는다 */
+  document.querySelectorAll('[data-plink]').forEach(b=>b.onclick=async()=>{const code=b.dataset.plink,had=byCode[code]&&byCode[code].haruPtoken;
+    if(had&&!confirm('지금 쓰는 링크가 바로 끊깁니다. 새로 발급할까요?'))return;
+    let j;try{j=await post('/haru/admin/parentlink',{code});}catch(e){if(e.message!=='auth')$('#plink').innerHTML='<div class="err">'+esc(e.message)+'</div>';return;}
+    try{await students();}catch(e){}   // 목록 새로 고침이 실패해도 새 링크는 반드시 보여 준다 — 이전 링크는 이미 끊겼다
+    showPlink(code,j.ptoken,j.exp,!!had);});
+}
+/* 만료 시각은 KST 로 적는다 — UTC ISO 를 잘라 쓰면 하루 이르게 보인다(11-24 00:00 KST = 11-23T15:00Z) */
+const kstTime=(iso)=>new Date(Date.parse(iso)+9*3600000).toISOString().slice(0,16).replace('T',' ');
+function showPlink(code,ptoken,expIso,replaced){
+  if(!$('#plink'))return;
+  const url=location.origin+'/haru/parent.html?t='+ptoken;
+  $('#plink').innerHTML='<div class="ok" role="status">'+esc(code)+' 보호자 링크'+(expIso?' · 만료 '+esc(kstTime(expIso))+' (한국 시각)':'')+' — 동의서의 보호자 번호로만 보내세요.'+(replaced?' 이전 링크는 끊겼습니다.':'')+'</div>'+
+    '<div class="row" style="margin-top:6px"><input id="plinkUrl" readonly aria-label="보호자 링크" value="'+esc(url)+'" style="flex:1 1 160px;min-width:0"><button class="btn" id="plinkCopy">복사</button></div><div class="muted" id="plinkCopyMsg" aria-live="polite"></div>';
+  $('#plinkCopy').onclick=async()=>{const inp=$('#plinkUrl');let ok=false;
+    try{await navigator.clipboard.writeText(inp.value);ok=true;}catch(e){try{inp.select();ok=document.execCommand('copy');}catch(e2){}}
+    $('#plinkCopyMsg').textContent=ok?'복사했습니다.':'복사하지 못했습니다 — 칸을 눌러 직접 복사하세요.';};
 }
 async function assets(){
   const [pk,kk,pl]=await Promise.all([api('/haru/admin/packs'),api('/haru/admin/paperkeys'),api('/haru/admin/plans')]);
   $('#main').innerHTML='<div class="card"><h2>올리기 <span class="muted">JSON 을 붙여 넣는다. 검증기 오류 0 이어야 저장된다. 원문·시험지 텍스트는 대응표에 담지 않는다.</span></h2>'+
     '<div class="row"><select id="u_kind"><option value="pack">팩 (haru:pack) — 자체 창작·공공누리·고전만</option><option value="paperkey">종이 대응표 (haru:paperkey) — sheet-build 가 만든 *-paperkey.json</option><option value="plan">코호트 플랜 (haru:plan) — plan-build 산출물</option><option value="atoms">원자 목록 (haru:atoms) — atoms.json</option></select><button class="btn" id="u_go">검증 후 저장</button></div>'+
     '<textarea id="u_json" placeholder="{ ... }"></textarea><div id="u_msg"></div></div>'+
-    '<div class="card"><h2>팩 '+pk.packs.length+'</h2><div class="tbl"><table><thead><tr><th>id</th><th>과목</th><th>종류</th><th>코호트</th><th>tier</th><th>origin</th><th>문항</th><th>만료</th><th></th></tr></thead><tbody>'+pk.packs.map(p=>'<tr><td>'+esc(p.id)+'</td><td>'+esc(p.subject)+'</td><td>'+esc(p.kind)+'</td><td>'+esc((p.cohort||[]).join(','))+'</td><td>'+esc(p.tier)+'</td><td>'+esc(p.origin)+'</td><td>'+p.items+'</td><td>'+esc(p.expiresAt||'—')+'</td><td><button class="btn sm danger" data-delpack="'+esc(p.id)+'">삭제</button></td></tr>').join('')+'</tbody></table></div></div>'+
-    '<div class="card"><h2>종이 대응표 '+kk.keys.length+'</h2><p class="muted">회차 날의 keyId 규칙: 국어 단독 회차는 플랜의 keyId 그대로(예 own-mock-01), 3교시 회차는 keyId-과목(예 own-mock-02-kor · -math · -eng). 재응시 회차는 1교시가 retakeKeyId.</p><div class="tbl"><table><thead><tr><th>id</th><th>라벨</th><th>과목</th><th>n</th><th>origin</th><th>holder</th><th>동결</th><th>제한</th><th>정답표</th></tr></thead><tbody>'+kk.keys.map(k=>'<tr><td>'+esc(k.id)+'</td><td>'+esc(k.label)+'</td><td>'+esc(k.subject)+'</td><td>'+k.n+'</td><td>'+esc(k.origin)+'</td><td>'+esc(k.holder)+'</td><td>'+(k.frozen?'동결':'')+'</td><td>'+(k.timeLimitSec?Math.round(k.timeLimitSec/60)+'분':'—')+'</td><td>'+(k.hasAnswer?'<span class="tag ok">서버 채점</span>':'<span class="tag">강사 입력</span>')+'</td></tr>').join('')+'</tbody></table></div></div>'+
-    '<div class="card"><h2>코호트 플랜 '+pl.plans.length+'</h2><div class="tbl"><table><thead><tr><th>코호트</th><th>시험일</th><th>상태</th><th>days</th><th>국면</th><th>잠금 해제</th><th>동결 세트</th></tr></thead><tbody>'+pl.plans.map(p=>'<tr><td>'+esc(p.cohort)+'</td><td>'+esc(p.examDate)+'</td><td>'+esc(p.examDateStatus||'')+'</td><td>'+p.days+'</td><td>'+esc(p.phases.map(x=>x.id+' '+x.from+'~'+x.to).join(' / '))+'</td><td>'+esc(Object.keys(p.bands).map(b=>b+':'+p.bands[b]).join(' '))+'</td><td>'+esc(p.frozenKeyId||'')+'</td></tr>').join('')+'</tbody></table></div></div>';
+    '<div class="card"><h2>팩 '+pk.packs.length+'</h2><div class="tbl"><table><thead><tr><th>id</th><th>과목</th><th>종류</th><th>코호트</th><th>tier</th><th>origin</th><th>문항</th><th>만료</th><th></th></tr></thead><tbody>'+(pk.packs.length?'':'<tr><td colspan="9" class="muted">팩이 없습니다 — 위 [올리기]에서 먼저 올리세요</td></tr>')+pk.packs.map(p=>'<tr><td>'+esc(p.id)+'</td><td>'+esc(p.subject)+'</td><td>'+esc(p.kind)+'</td><td>'+esc((p.cohort||[]).join(','))+'</td><td>'+esc(p.tier)+'</td><td>'+esc(p.origin)+'</td><td>'+p.items+'</td><td>'+esc(p.expiresAt||'—')+'</td><td><button class="btn sm danger" data-delpack="'+esc(p.id)+'">삭제</button></td></tr>').join('')+'</tbody></table></div></div>'+
+    '<div class="card"><h2>종이 대응표 '+kk.keys.length+'</h2><p class="muted">회차 날의 keyId 규칙: 국어 단독 회차는 플랜의 keyId 그대로(예 own-mock-01), 3교시 회차는 keyId-과목(예 own-mock-02-kor · -math · -eng). 재응시 회차는 1교시가 retakeKeyId.</p><div class="tbl"><table><thead><tr><th>id</th><th>라벨</th><th>과목</th><th>n</th><th>origin</th><th>holder</th><th>동결</th><th>제한</th><th>정답표</th></tr></thead><tbody>'+(kk.keys.length?'':'<tr><td colspan="9" class="muted">대응표가 없습니다 — 위 [올리기]에서 먼저 올리세요</td></tr>')+kk.keys.map(k=>'<tr><td>'+esc(k.id)+'</td><td>'+esc(k.label)+'</td><td>'+esc(k.subject)+'</td><td>'+k.n+'</td><td>'+esc(k.origin)+'</td><td>'+esc(k.holder)+'</td><td>'+(k.frozen?'동결':'')+'</td><td>'+(k.timeLimitSec?Math.round(k.timeLimitSec/60)+'분':'—')+'</td><td>'+(k.hasAnswer?'<span class="tag ok">서버 채점</span>':'<span class="tag">강사 입력</span>')+'</td></tr>').join('')+'</tbody></table></div></div>'+
+    '<div class="card"><h2>코호트 플랜 '+pl.plans.length+'</h2><div class="tbl"><table><thead><tr><th>코호트</th><th>시험일</th><th>상태</th><th>days</th><th>국면</th><th>잠금 해제</th><th>동결 세트</th></tr></thead><tbody>'+(pl.plans.length?'':'<tr><td colspan="7" class="muted">플랜이 없습니다 — 위 [올리기]에서 먼저 올리세요</td></tr>')+pl.plans.map(p=>'<tr><td>'+esc(p.cohort)+'</td><td>'+esc(p.examDate)+'</td><td>'+esc(p.examDateStatus||'')+'</td><td>'+p.days+'</td><td>'+esc(p.phases.map(x=>x.id+' '+x.from+'~'+x.to).join(' / '))+'</td><td>'+esc(Object.keys(p.bands).map(b=>b+':'+p.bands[b]).join(' '))+'</td><td>'+esc(p.frozenKeyId||'')+'</td></tr>').join('')+'</tbody></table></div></div>';
   $('#u_go').onclick=async()=>{let doc;try{doc=JSON.parse($('#u_json').value);}catch(e){$('#u_msg').innerHTML='<div class="err">JSON 이 아닙니다: '+esc(e.message)+'</div>';return;}
     const kind=$('#u_kind').value;const body=kind==='pack'?{pack:doc}:kind==='paperkey'?{key:doc}:kind==='plan'?{cohort:doc.cohort,plan:doc}:{atoms:doc};
     try{const j=await post('/haru/admin/'+kind,body);$('#u_msg').innerHTML='<div class="ok">저장됨 '+esc(JSON.stringify(j))+'</div>';setTimeout(assets,800);}catch(e){$('#u_msg').innerHTML='<div class="err">'+esc(e.message)+'\n'+esc((e.body&&e.body.errors||[]).map(x=>(x.where||'')+' '+(x.msg||x)).join('\n'))+'</div>';}};
@@ -108,10 +131,11 @@ async function assets(){
 }
 async function paper(){
   const [s,kk]=await Promise.all([api('/haru/admin/students'),api('/haru/admin/paperkeys')]);
+  const empty=!kk.keys.length?'대응표가 없습니다 — [팩·대응표·플랜]에서 먼저 올리세요':!s.students.length?'등록된 학생이 없습니다 — [학생 등록]에서 먼저 등록하세요':'';
   $('#main').innerHTML='<div class="card"><h2>종이 회수 <span class="muted">자작 종이는 틀린 번호, 학생 소지 시판 교재는 과목별 정답 개수 1개</span></h2><div class="grid-form">'+
     '<label class="f">학생<select id="p_code">'+s.students.map(x=>'<option value="'+esc(x.code)+'">'+esc(x.name)+' ('+esc(x.code)+')</option>').join('')+'</select></label>'+
     '<label class="f">대응표<select id="p_key">'+kk.keys.map(k=>'<option value="'+esc(k.id)+'" data-origin="'+esc(k.origin)+'" data-n="'+k.n+'">'+esc(k.id)+' · '+esc(k.label)+' ('+esc(k.origin)+')</option>').join('')+'</select></label>'+
-    '<label class="f">날짜<input id="p_at" type="date"></label><label class="f">틀린 번호(자작) 예: 3,7,11<input id="p_wrong"></label><label class="f">정답 개수(시판) 예: math=9<input id="p_correct"></label><button class="btn" id="p_go">저장</button></div><div id="p_msg"></div></div>';
+    '<label class="f">날짜<input id="p_at" type="date"></label><label class="f">틀린 번호(자작) 예: 3,7,11<input id="p_wrong"></label><label class="f">정답 개수(시판) 예: math=9<input id="p_correct"></label><button class="btn" id="p_go"'+(empty?' disabled aria-describedby="p_empty"':'')+'>저장</button></div>'+(empty?'<p class="empty" id="p_empty">'+esc(empty)+'</p>':'')+'<div id="p_msg"></div></div>';
   $('#p_go').onclick=async()=>{const opt=$('#p_key').selectedOptions[0];const body={code:$('#p_code').value,keyId:$('#p_key').value,at:$('#p_at').value||undefined};
     if(opt&&opt.dataset.origin==='own')body.wrongNos=($('#p_wrong').value||'').split(/[,\s]+/).filter(Boolean).map(Number);
     else{body.correctBySubject={};($('#p_correct').value||'').split(/[,\s]+/).forEach(kv=>{const m=kv.match(/^(kor|math|eng)=(\d+)$/);if(m)body.correctBySubject[m[1]]=+m[2];});}
