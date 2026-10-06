@@ -28,6 +28,7 @@ WB 독해력학원·웩슬러브레인센터의 원내 학습 웹앱 모음. 어
 | `vocab-age/` | 어휘 나이 진단 (유일한 공개 페이지) |
 | `desk/` | **프로그램데스크** — 학원과 별개 사업(구독 학생의 프로그램·자료 운영) 앱. 새 워커 `wb-desk` + 새 D1. **상세: `desk/README.md`** |
 | `desk-ext/` | 프로그램데스크 크롬 확장(표 캡처, MV3). 학생 정보 없음. `desk/build.mjs`가 `dist/ext/`로 복사 |
+| `crm/` | **세일즈데스크** — 상담·CS 가 끝난 가정의 전환 CRM(문의 → 검사 → 해석 → D+3·7·14 팔로업 → 등록/보류/이탈+사유 → 월 KPI) + **HubSpot 연동**(원장 승인 큐 → 연락처·딜·노트, 변경분 가져오기, 단계 자동 매핑, `wb_*` 속성) + **파트너 학원 연계**(포털 `/partner/`, `partner-api.mjs` — 같은 워커·D1 이지만 출입구·API·표를 분리해 둠, 기획 `docs/파트너학원-연계-기획서-v0.md`). 새 워커 `wb-crm` + 새 D1. 순수 로직 `crm-core.js` 를 브라우저·서버가 같이 쓴다. HubSpot 토큰은 워커 시크릿 `HUBSPOT_ACCESS_TOKEN` 뿐. **상세: `crm/README.md`** |
 
 ## 명령
 
@@ -54,11 +55,14 @@ node hanja/book-validate.mjs <단어장.json|.txt> [--id <id> --title <제목>] 
 node hanja/extract/draft.mjs <교재텍스트.txt> <출력 디렉터리>                 # 어휘브레인: 교재 텍스트 → words.txt 초안 + review/ (저장소 밖에서)
 node hanja/strokes-convert.mjs <graphics.txt> <출력.json> --book <단어장.json>   # 어휘브레인: 공개 획순 데이터 → 획순 사전(원장 검수 뒤 관리 웹 업로드)
 for f in chunk/*.test.cjs; do node $f; done && node reading-server/chunk-api.test.mjs   # 청크브레인 순수 로직·지문 무결성·서버
+node crm/crm-core.test.cjs && node crm/hubspot.test.mjs && node crm/crm-api.test.mjs   # 세일즈데스크 순수 로직·HubSpot 클라이언트(가짜 fetch)·서버·파트너 포털
+PORT=8892 node crm/dev-server.mjs            # 세일즈데스크 로컬 서버 (HUBSPOT_ACCESS_TOKEN=… 환경변수로 실제 연동 시험, 파일에 두지 않는다)
 ```
 
 CI 둘: `.github/workflows/checks.yml` — **PR·작업 브랜치 푸시**에서 `node scripts/check.mjs`(저장소 전체
 테스트) + 워커 번들 dry-run. 시크릿을 쓰지 않는다. `.github/workflows/deploy-reading.yml` — **main 푸시가
-곧 배포**다(그 앱 몫 테스트 통과 시 Cloudflare Workers `wb-reading`으로). PR은 스쿼시 머지, 제목에
+곧 배포**다(그 앱 몫 테스트 통과 시 Cloudflare Workers `wb-reading`으로). 별도 워커는 자기 워크플로우가 배포한다
+(`deploy-desk.yml` → `wb-desk`, `deploy-crm.yml` → `wb-crm` — HubSpot 토큰도 여기서 저장소 시크릿 → 워커 시크릿으로 복사). PR은 스쿼시 머지, 제목에
 `(#번호)`가 남는 관례.
 
 ## 에이전트 작업 규칙 (Codex · Claude Code 공통)

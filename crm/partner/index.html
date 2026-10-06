@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#1B2A4A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="WB 파트너">
+<title>WB 파트너 포털</title>
+<link rel="icon" href="../icon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap">
+<!-- 세일즈데스크와 같은 시각 어휘(crm.css)를 쓰되, 코드·토큰은 완전히 따로다(partner.js · /api/partner/*). -->
+<link rel="stylesheet" href="../crm.css?v=dev">
+</head>
+<body class="partner">
+<header class="topbar">
+  <div class="wrap">
+    <div class="brand">WB 파트너<small id="orgName"></small></div>
+    <div class="row" id="who"></div>
+  </div>
+</header>
+<main class="wrap" id="view" aria-live="polite"></main>
+<div id="toast" role="status" aria-live="polite"></div>
+<script src="./partner.js?v=dev"></script>
+</body>
+</html>

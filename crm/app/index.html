@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#1B2A4A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="세일즈데스크">
+<title>WB 세일즈데스크</title>
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="./icon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="./crm.css?v=dev">
+<!-- 순수 로직(crm-core) 먼저, 런타임(app.js) 은 body 끝에서. 서버도 같은 crm-core.js 를 읽는다. -->
+<script src="./crm-core.js?v=dev"></script>
+</head>
+<body>
+<header class="topbar">
+  <div class="wrap">
+    <div class="brand">WB 세일즈데스크<small id="orgName"></small></div>
+    <div class="row" id="who"></div>
+  </div>
+</header>
+<nav class="tabs" id="tabs" hidden aria-label="화면"><div class="wrap" id="tabsWrap"></div></nav>
+<main class="wrap" id="view" aria-live="polite"></main>
+<div id="modalHost" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="modalTitle"></div>
+<div id="toast" role="status" aria-live="polite"></div>
+<script src="./app.js?v=dev"></script>
+</body>
+</html>

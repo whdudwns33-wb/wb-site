@@ -1,0 +1,26 @@
+# WB 세일즈데스크 — 별도 워커 wb-crm (https://wb-crm.whdudwns33.workers.dev)
+# 상담·CS 가 끝난 뒤의 전환 관리(팔로업·판정·KPI)와 HubSpot 연동. 학습 앱(wb-reading)·프로그램데스크(wb-desk)와 데이터를 섞지 않으려 워커·D1 을 따로 둔다.
+name = "wb-crm"
+main = "worker.mjs"
+compatibility_date = "2026-08-01"
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+# 정적 파일은 워커를 거치지 않고 바로 나간다. /api/* 만 워커가 받는다(worker.mjs → crm-api.mjs).
+run_worker_first = ["/api/*"]
+
+# D1 — 배포 워크플로우가 `wrangler d1 create wb-crm` 로 얻은 실제 id 로 __CRM_D1_ID__ 를 치환한 뒤
+# migrations/*.sql 을 순서대로 `wrangler d1 execute --file` 로 전부 적용한다(멱등).
+[[d1_databases]]
+binding = "DB"
+database_name = "wb-crm"
+database_id = "__CRM_D1_ID__"
+
+# 15분마다 — 원장이 승인한 HubSpot 반영 큐를 밀어 넣는다(worker.mjs scheduled). 토큰이 없으면 아무것도 안 한다.
+[triggers]
+crons = ["*/15 * * * *"]
+
+# HubSpot Private App 토큰 — 배포 워크플로우(deploy-crm.yml)가 저장소 시크릿 HUBSPOT_ACCESS_TOKEN 을 워커 시크릿으로 복사한다.
+# 손으로 넣을 때: printf '%s' "$TOKEN" | npx wrangler secret put HUBSPOT_ACCESS_TOKEN
+# 선택: HUBSPOT_API_BASE (기본 https://api.hubapi.com)

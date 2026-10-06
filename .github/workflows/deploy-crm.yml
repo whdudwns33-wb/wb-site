@@ -1,0 +1,132 @@
+name: Deploy wb-crm worker
+
+# WB 세일즈데스크(crm/) — 상담·CS 뒤 전환 CRM + HubSpot 연동 + 파트너 포털. 워커 wb-crm + D1 wb-crm.
+# main 에 crm/ 가 바뀌어 올라오면 테스트 → 빌드 → D1 → 마이그레이션 → 번들 검증 → 배포 → HubSpot 토큰 복사 → 상태 확인.
+# D1 은 첫 실행에서 만들고, 이후에는 이름으로 id 를 찾아 wrangler.toml 의 자리표시에 넣는다(저장소 파일은 그대로).
+# 마이그레이션은 전부 IF NOT EXISTS 라 매번 전체를 순서대로 적용해도 안전하다(crm/README.md 규칙).
+# HubSpot 토큰은 저장소 시크릿 HUBSPOT_ACCESS_TOKEN → 워커 시크릿으로만 흐른다(값은 마스킹, 입력·로그로 받지 않는다).
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'crm/**'
+      - '.github/workflows/deploy-crm.yml'
+  workflow_dispatch:
+
+permissions: {}
+
+env:
+  WRANGLER: wrangler@4.129.0
+  D1_NAME: wb-crm
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: crm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: 순수 로직·HubSpot·서버·파트너 테스트 (전부 통과해야 배포)
+        run: |
+          node crm-core.test.cjs
+          node --test hubspot.test.mjs crm-api.test.mjs
+
+      - name: 정적 파일 조립 (dist/)
+        run: node build.mjs
+
+      - name: wrangler 캐시
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm/_npx
+          key: npx-${{ runner.os }}-${{ env.WRANGLER }}
+
+      - name: 토큰 확인
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::error::CLOUDFLARE_API_TOKEN 시크릿이 없습니다. Settings → Secrets and variables → Actions 에 추가하세요 (D1 편집 + Workers 편집 권한)."
+            exit 1
+          fi
+
+      - name: D1 데이터베이스 준비
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          find_id() {
+            npx --yes --prefer-offline $WRANGLER d1 list --json | node -e '
+              let s=""; process.stdin.on("data",d=>s+=d).on("end",()=>{
+                const rows=JSON.parse(s); const hit=rows.find(r=>r.name===process.env.D1_NAME);
+                process.stdout.write(hit ? (hit.uuid||hit.id||"") : "");
+              });'
+          }
+          id=$(find_id)
+          if [ -z "$id" ]; then
+            echo "D1 $D1_NAME 이 없어 새로 만듭니다"
+            npx --yes --prefer-offline $WRANGLER d1 create "$D1_NAME" >/dev/null
+            id=$(find_id)
+          fi
+          if [ -z "$id" ]; then echo "::error::D1 id 를 얻지 못했습니다"; exit 1; fi
+          sed -i "s/__CRM_D1_ID__/$id/" wrangler.toml
+          grep -q "$id" wrangler.toml
+          echo "D1 $D1_NAME 준비됨"
+
+      - name: D1 마이그레이션 적용 (전부 멱등)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          for f in $(ls migrations/*.sql | sort); do
+            echo "== $f"
+            npx --yes --prefer-offline $WRANGLER d1 execute "$D1_NAME" --remote --file="$f" -y
+          done
+
+      - name: 워커 번들 검증 (dry-run)
+        run: |
+          npx --yes --prefer-offline $WRANGLER deploy --dry-run --outdir=/tmp/wb-crm-bundle
+          if grep -rl 'node:' /tmp/wb-crm-bundle/*.js 2>/dev/null | head -1 | grep -q .; then
+            echo "::error::워커 번들에 node: 내장 모듈이 남아 있습니다"
+            exit 1
+          fi
+
+      - name: 배포
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes --prefer-offline $WRANGLER deploy
+
+      # 저장소 시크릿이 비어 있으면 건너뛴다(연동 없이도 앱은 돈다). 값은 마스킹된 채로만 러너를 지난다 — 길이만 보고 출력하지 않는다.
+      - name: HubSpot 토큰 → 워커 시크릿 복사 (있을 때만)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          TOKEN: ${{ secrets.HUBSPOT_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [ -z "${TOKEN:-}" ]; then
+            echo "::notice::HUBSPOT_ACCESS_TOKEN 저장소 시크릿이 없어 HubSpot 연동은 꺼진 채 배포합니다 (crm/README.md §5)."
+            exit 0
+          fi
+          if [ "${#TOKEN}" -lt 20 ]; then
+            echo "::error::HUBSPOT_ACCESS_TOKEN 이 너무 짧습니다(값은 출력하지 않습니다)."
+            exit 1
+          fi
+          echo "::add-mask::$TOKEN"
+          printf '%s' "$TOKEN" | npx --yes --prefer-offline $WRANGLER secret put HUBSPOT_ACCESS_TOKEN
+          echo "HubSpot 토큰 등록 완료 — 허브스팟 탭 [다시 확인]"
+
+      - name: 상태 확인
+        run: |
+          set -euo pipefail
+          sleep 5
+          curl -fsS https://wb-crm.whdudwns33.workers.dev/api/health
+          echo
+          echo "배포 완료 — https://wb-crm.whdudwns33.workers.dev/ 에서 관리자 비밀번호를 만들면 시작됩니다."

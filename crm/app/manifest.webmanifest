@@ -1,0 +1,14 @@
+{
+  "name": "WB 세일즈데스크",
+  "short_name": "세일즈데스크",
+  "description": "상담·CS 가 끝난 뒤의 전환 관리 — 팔로업·판정·KPI·HubSpot 연동. 원내 직원 전용",
+  "lang": "ko-KR",
+  "start_url": "./#/today",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#F4F5F9",
+  "theme_color": "#1B2A4A",
+  "icons": [
+    { "src": "./icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
