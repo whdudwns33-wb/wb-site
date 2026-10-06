@@ -70,6 +70,32 @@ function serviceWorker(file = 'sw.js', offline = false) {
       assert.ok(dates.some(actual => actual.startsWith(expected)), '정본 일정 누락: ' + expected);
     }
   });
+  await t('초4 과정은 목차·상단·학년 안내에서 연결되고 두 선택안의 4주·시간·대안을 유지', () => {
+    const course = guide.match(/<section\b[^>]*id="course"[^>]*>[\s\S]*?<\/section>/)?.[0];
+    assert.ok(course, '초4 과정 본문 누락');
+    const contents = guide.slice(guide.indexOf('<aside'), guide.indexOf('</aside>'));
+    const intro = guide.slice(guide.indexOf('<main'), guide.indexOf('<section'));
+    const grade4 = guide.match(/<details\b[^>]*id="grade4"[^>]*>[\s\S]*?<\/details>/)?.[0];
+    for (const entry of [contents, intro, grade4]) assert.match(entry || '', /href="#course"/);
+    for (const route of ['a', 'b']) {
+      assert.match(course, new RegExp('href="#course-' + route + '"'));
+      assert.match(course, new RegExp('<h3\\b[^>]*id="course-' + route + '"'));
+    }
+    const weeks = [...course.matchAll(/<details\b[^>]*id="course-([ab])([1-4])"[^>]*>[\s\S]*?<\/details>/g)];
+    assert.equal((course.match(/<details\b/g) || []).length, 8);
+    assert.deepEqual(weeks.map(match => match[1] + match[2]).sort(), ['a1', 'a2', 'a3', 'a4', 'b1', 'b2', 'b3', 'b4']);
+    for (const [html, , week] of weeks) {
+      assert.match(html, new RegExp('<summary>\\s*<h4>' + week + '주'));
+      for (const label of ['목표', '교사가 볼 것', '다음 지원']) assert.ok(html.includes(label), label + ' 누락');
+    }
+    const text = course.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ');
+    for (const contract of [/두 경로는 별도 선택안/, /주 최대 50분/, /주 최대 40분/,
+      /기존 평일 10분 학습을 대체/, /추가 숙제가 아닙니다/, /평일 카드·종이 회차를 추가하지 않는/,
+      /자료는 교사가/, /보호자가 새 문제·해설을 만들지/, /피곤하면 5분 이하/,
+      /빠진 활동은 몰아서 하지/, /배우지 않았다면 배운 자연수·실물·표현으로 바꾸고 둘 다 하지/,
+      /실제 개설·배정·시행 시점은 미확정/, /앱의 영재원 학습 기능 제공을 뜻하지/]) assert.match(text, contract);
+    assert.doesNotMatch(course, /<(?:input|textarea|select|button)\b/i);
+  });
   await t('안내 주소·확장자·후행 슬래시·쿼리에서 SW 캐시와 홈 폴백을 모두 우회', () => {
     for (const file of workers) {
       const { request, calls } = serviceWorker(file, true);
