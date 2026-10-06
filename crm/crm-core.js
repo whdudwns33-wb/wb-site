@@ -95,8 +95,16 @@
   const CREDIT_TYPES = ['accrue', 'use', 'expire', 'adjust'];
   const CREDIT_LABEL = { accrue: '적립', use: '사용', expire: '소멸', adjust: '조정' };
 
-  const ROUTES = ['login', 'today', 'pipeline', 'leads', 'lead', 'stats', 'hubspot', 'partners', 'admin'];
+  const ROUTES = ['login', 'today', 'pipeline', 'leads', 'lead', 'relationships', 'stats', 'hubspot', 'partners', 'admin'];
   const OWNER_ROUTES = ['hubspot', 'partners', 'admin'];
+
+  const PROGRAM_LABEL = { friend: '친구맺기', supporter: '서포터즈' };
+  const MEMBERSHIP_STATUS_LABEL = { active: '참여 중', paused: '일시 중지', ended: '종료' };
+  const PROGRAM_ACTIVITY_LABEL = { review: '리뷰', referral: '소개', brunch: '브런치' };
+  const PROGRAM_ACTIVITY_STATUS_LABEL = { pending: '확인 대기', confirmed: '확인 완료', supplement: '보완 필요' };
+  const BENEFIT_STATE_LABEL = { unchecked: '미확인', confirmed: '확인 완료', paused: '보류' };
+  const GATHERING_STATUS_LABEL = { planned: '예정', completed: '완료', cancelled: '취소' };
+  const ATTENDANCE_LABEL = { invited: '초대', confirmed: '참석 확정', attended: '참석', absent: '불참', cancelled: '취소' };
 
   /* 파트너 학원 연계 — 들어오는 소개(파트너→센터)는 리드의 partnerId, 나가는 소개(센터→파트너)는 referrals 문서. */
   const PARTNER_STATUS = ['active', 'paused'];
@@ -589,6 +597,99 @@
     };
   }
 
+  /* ── 관계 프로그램 — 센터의 확인·후속 연락 기록만, 혜택·포털 권한은 바꾸지 않는다 ── */
+
+  function relationshipId(value) { return typeof value === 'string' && /^[A-Za-z0-9_|.:@-]{1,160}$/.test(value); }
+  function relationshipStrings(raw, keys) { return keys.every(k => raw[k] == null || typeof raw[k] === 'string'); }
+  function optionalDates(data, keys) { return keys.every(k => !data[k] || validYmd(data[k])); }
+  function hasLabel(labels, value) { return typeof value === 'string' && Object.prototype.hasOwnProperty.call(labels, value); }
+
+  function validateMembership(raw) {
+    if (!isObj(raw) || !relationshipId(raw.leadId)) return invalid('고객을 선택해 주세요');
+    if (!relationshipStrings(raw, ['startDate', 'owner', 'nextContactDate', 'nextAction', 'pauseDate', 'resumeDate', 'note'])) return invalid('참여 기록의 날짜·본문은 문자열이어야 합니다');
+    if (!hasLabel(PROGRAM_LABEL, raw.program)) return invalid('참여 프로그램을 선택해 주세요');
+    const data = { leadId: raw.leadId, program: raw.program, startDate: str(raw.startDate), owner: clean(raw.owner, 160),
+      status: raw.status === undefined ? 'active' : raw.status, nextContactDate: str(raw.nextContactDate), nextAction: clean(raw.nextAction),
+      benefitState: raw.benefitState === undefined ? 'unchecked' : raw.benefitState,
+      pauseDate: str(raw.pauseDate), resumeDate: str(raw.resumeDate), note: cleanMulti(raw.note) };
+    if (!validYmd(data.startDate) || !optionalDates(data, ['nextContactDate', 'pauseDate', 'resumeDate'])) return invalid('참여·연락 날짜를 확인해 주세요');
+    if (!!data.nextContactDate !== !!data.nextAction) return invalid('다음 연락일과 할 일을 함께 입력하거나 함께 비워 주세요');
+    if (!hasLabel(MEMBERSHIP_STATUS_LABEL, data.status) || !hasLabel(BENEFIT_STATE_LABEL, data.benefitState)) return invalid('참여·혜택 확인 상태가 올바르지 않습니다');
+    return { ok: true, data: data };
+  }
+
+  function validateProgramActivity(raw) {
+    if (!isObj(raw) || !relationshipId(raw.membershipId)) return invalid('참여 기록을 선택해 주세요');
+    if (!relationshipStrings(raw, ['month', 'date', 'evidence', 'note', 'by'])) return invalid('활동 기록의 날짜·본문은 문자열이어야 합니다');
+    const data = { membershipId: raw.membershipId, month: str(raw.month), kind: raw.kind, date: str(raw.date),
+      evidence: cleanMulti(raw.evidence), status: raw.status === undefined ? 'pending' : raw.status, note: cleanMulti(raw.note), by: clean(raw.by, 160) };
+    if (!validYmd(data.month + '-01') || !validYmd(data.date) || ymOf(data.date) !== data.month) return invalid('활동일은 선택한 월의 실제 날짜여야 합니다');
+    if (!hasLabel(PROGRAM_ACTIVITY_LABEL, data.kind) || !hasLabel(PROGRAM_ACTIVITY_STATUS_LABEL, data.status)) return invalid('활동 종류·확인 상태가 올바르지 않습니다');
+    return { ok: true, data: data };
+  }
+
+  function validateProgramExam(raw) {
+    if (!isObj(raw) || !relationshipId(raw.membershipId)) return invalid('참여 기록을 선택해 주세요');
+    if (!relationshipStrings(raw, ['cycleStart', 'cycleEnd', 'dueDate', 'bookedDate', 'completedDate', 'note'])) return invalid('검사 기록의 날짜·본문은 문자열이어야 합니다');
+    const data = { membershipId: raw.membershipId, cycleStart: str(raw.cycleStart), cycleEnd: str(raw.cycleEnd), dueDate: str(raw.dueDate),
+      bookedDate: str(raw.bookedDate), completedDate: str(raw.completedDate), activitiesChecked: raw.activitiesChecked === true, note: cleanMulti(raw.note) };
+    if (![data.cycleStart, data.cycleEnd, data.dueDate].every(validYmd) || !optionalDates(data, ['bookedDate', 'completedDate'])) return invalid('검사 회차·예약·완료 날짜를 확인해 주세요');
+    if (data.cycleEnd < data.cycleStart) return invalid('회차 종료일은 시작일보다 빠를 수 없습니다');
+    if (raw.activitiesChecked !== undefined && typeof raw.activitiesChecked !== 'boolean') return invalid('활동 확인은 체크로 표시해 주세요');
+    return { ok: true, data: data };
+  }
+
+  function validateGathering(raw) {
+    if (!isObj(raw)) return invalid('맘스쿨 정보를 입력해 주세요');
+    if (!relationshipStrings(raw, ['topic', 'date', 'time', 'place', 'owner', 'note']) || !['number', 'string'].includes(typeof raw.capacity)) return invalid('모임 날짜·본문·정원 형식이 올바르지 않습니다');
+    const data = { topic: clean(raw.topic, 120), date: str(raw.date), time: str(raw.time), place: clean(raw.place, 160), capacity: Number(raw.capacity),
+      status: raw.status === undefined ? 'planned' : raw.status, owner: clean(raw.owner, 160), note: cleanMulti(raw.note),
+      participantsChecked: raw.participantsChecked === true, participants: [] };
+    if (!data.topic || !validYmd(data.date) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(data.time)) return invalid('주제·날짜·시간을 확인해 주세요');
+    if (![4, 5, 6].includes(data.capacity) || !hasLabel(GATHERING_STATUS_LABEL, data.status)) return invalid('정원은 4~6명이며 올바른 모임 상태가 필요합니다');
+    if (raw.participantsChecked !== undefined && typeof raw.participantsChecked !== 'boolean') return invalid('보호자 인원 확인은 체크로 표시해 주세요');
+    if (raw.participants !== undefined && !Array.isArray(raw.participants)) return invalid('참가자 목록 형식이 올바르지 않습니다');
+    const seen = new Set();
+    for (const row of raw.participants || []) {
+      if (!isObj(row) || !relationshipId(row.leadId) || seen.has(row.leadId)) return invalid('참가 고객이 없거나 중복되었습니다');
+      if (!relationshipStrings(row, ['nextContactDate', 'nextAction', 'note'])) return invalid('참가자의 날짜·본문은 문자열이어야 합니다');
+      if (!hasLabel(ATTENDANCE_LABEL, row.status) || row.inspectionConfirmed !== true) return invalid('참석 상태와 검사 실시 확인이 필요합니다');
+      const p = { leadId: row.leadId, status: row.status, inspectionConfirmed: true, nextContactDate: str(row.nextContactDate), nextAction: clean(row.nextAction), note: cleanMulti(row.note) };
+      if (!optionalDates(p, ['nextContactDate'])) return invalid('참가자 다음 연락일을 확인해 주세요');
+      if (!!p.nextContactDate !== !!p.nextAction) return invalid('참가자 다음 연락일과 할 일을 함께 입력하거나 함께 비워 주세요');
+      seen.add(row.leadId); data.participants.push(p);
+    }
+    const occupied = data.participants.filter(p => ['confirmed', 'attended'].includes(p.status)).length;
+    if (occupied > data.capacity) return invalid('확정·참석 인원이 정원을 넘습니다');
+    if (occupied && !data.participantsChecked) return invalid('각 행이 서로 다른 보호자 1명인지 확인해 주세요 — 형제 중복은 제외합니다');
+    return { ok: true, data: data };
+  }
+
+  function hasCompletedInspection(lead, today) {
+    if (!isObj(lead)) return false;
+    const date = lead.inspection && lead.inspection.date;
+    return !!(validYmd(date) && validYmd(today) && date <= today) ||
+      (lead.pipeline === 'inspection' && ['tested', 'interpreted', 'upsell'].includes(lead.stage));
+  }
+  function programMonthStatus(membershipId, month, activities) {
+    const statuses = (Array.isArray(activities) ? activities : []).filter(a => isObj(a) && a.membershipId === membershipId && a.month === month).map(a => a.status);
+    return ['confirmed', 'supplement', 'pending'].find(s => statuses.includes(s)) || 'missing';
+  }
+  function relationshipTasks(memberships, gatherings, today) {
+    if (!validYmd(today)) return [];
+    const tasks = [];
+    const add = (row, source, id) => {
+      if (row.leadId && validYmd(row.nextContactDate) && row.nextContactDate <= today && clean(row.nextAction)) {
+        tasks.push({ leadId: row.leadId, date: row.nextContactDate, action: clean(row.nextAction), source: source, id: id });
+      }
+    };
+    (Array.isArray(memberships) ? memberships : []).forEach(m => { if (isObj(m) && m.status !== 'ended') add(m, 'membership', m.id); });
+    (Array.isArray(gatherings) ? gatherings : []).forEach(g => {
+      if (isObj(g) && g.status !== 'cancelled') (Array.isArray(g.participants) ? g.participants : []).forEach(p => { if (isObj(p) && p.status !== 'cancelled') add(p, 'gathering', g.id); });
+    });
+    return tasks.sort((a, b) => a.date.localeCompare(b.date));
+  }
+
   /* ── 검색·정렬 ───────────────────────────────────── */
 
   function leadMatches(lead, q) {
@@ -607,7 +708,7 @@
 
   /* ── 문서 병합·변경 큐(desk-core 와 같은 계약) ───── */
 
-  const COLLECTIONS = ['leads', 'activities', 'credits', 'partners', 'referrals', 'settings', 'staff'];
+  const COLLECTIONS = ['leads', 'activities', 'credits', 'partners', 'referrals', 'memberships', 'programActivities', 'programExams', 'gatherings', 'settings', 'staff'];
   function docKey(c, id) { return str(c) + '|' + str(id); }
   function upsert(list, id, data, del) {
     const i = list.findIndex(x => isObj(x) && str(x.id) === str(id));
@@ -615,11 +716,11 @@
     const item = Object.assign({}, data, { id: str(id) });
     if (i >= 0) list[i] = item; else list.push(item);
   }
-  function emptyState() { return { leads: [], activities: [], credits: [], partners: [], referrals: [], staff: [], settings: {}, meta: {}, base: {} }; }
+  function emptyState() { return { leads: [], activities: [], credits: [], partners: [], referrals: [], memberships: [], programActivities: [], programExams: [], gatherings: [], staff: [], settings: {}, meta: {}, base: {} }; }
   function mergeDocs(local, docs, pendingKeys) {
     const Lc = isObj(local) ? local : {};
     const out = emptyState();
-    ['leads', 'activities', 'credits', 'partners', 'referrals', 'staff'].forEach(k => { out[k] = (Array.isArray(Lc[k]) ? Lc[k] : []).slice(); });
+    COLLECTIONS.filter(k => k !== 'settings').forEach(k => { out[k] = (Array.isArray(Lc[k]) ? Lc[k] : []).slice(); });
     out.settings = Object.assign({}, isObj(Lc.settings) ? Lc.settings : {});
     out.meta = Object.assign({}, isObj(Lc.meta) ? Lc.meta : {});
     out.base = Object.assign({}, isObj(Lc.base) ? Lc.base : {});
@@ -640,6 +741,7 @@
         case 'credits': upsert(out.credits, d.id, data, del); break;
         case 'partners': upsert(out.partners, d.id, data, del); break;
         case 'referrals': upsert(out.referrals, d.id, data, del); break;
+        case 'memberships': case 'programActivities': case 'programExams': case 'gatherings': upsert(out[d.c], d.id, data, del); break;
         case 'staff': upsert(out.staff, d.id, data, del); break;
         case 'settings': out.settings = del ? {} : Object.assign({}, data); break;
         default: return;
@@ -722,6 +824,10 @@
     ACTIVITY_TYPES: ACTIVITY_TYPES, ACTIVITY_LABEL: ACTIVITY_LABEL, ANCHOR_TYPES: ANCHOR_TYPES,
     CREDIT_AMOUNT: CREDIT_AMOUNT, CREDIT_COOLDOWN_DAYS: CREDIT_COOLDOWN_DAYS, CREDIT_EXPIRE_MONTHS: CREDIT_EXPIRE_MONTHS, CREDIT_TYPES: CREDIT_TYPES, CREDIT_LABEL: CREDIT_LABEL,
     ROUTES: ROUTES, OWNER_ROUTES: OWNER_ROUTES, COLLECTIONS: COLLECTIONS,
+    PROGRAM_LABEL: PROGRAM_LABEL, MEMBERSHIP_STATUS_LABEL: MEMBERSHIP_STATUS_LABEL, PROGRAM_ACTIVITY_LABEL: PROGRAM_ACTIVITY_LABEL,
+    PROGRAM_ACTIVITY_STATUS_LABEL: PROGRAM_ACTIVITY_STATUS_LABEL, BENEFIT_STATE_LABEL: BENEFIT_STATE_LABEL, GATHERING_STATUS_LABEL: GATHERING_STATUS_LABEL, ATTENDANCE_LABEL: ATTENDANCE_LABEL,
+    validateMembership: validateMembership, validateProgramActivity: validateProgramActivity, validateProgramExam: validateProgramExam, validateGathering: validateGathering,
+    hasCompletedInspection: hasCompletedInspection, programMonthStatus: programMonthStatus, relationshipTasks: relationshipTasks,
     PARTNER_STATUS: PARTNER_STATUS, PARTNER_STATUS_LABEL: PARTNER_STATUS_LABEL, REFERRAL_STATUS: REFERRAL_STATUS, REFERRAL_STATUS_LABEL: REFERRAL_STATUS_LABEL, COARSE_STAGE_LABEL: COARSE_STAGE_LABEL,
     validatePartner: validatePartner, validateReferral: validateReferral, coarseStage: coarseStage, partnerStats: partnerStats, partnerStatement: partnerStatement,
     SYNC_KINDS: SYNC_KINDS, SYNC_KIND_LABEL: SYNC_KIND_LABEL, SYNC_TRACKS: SYNC_TRACKS, SYNC_TRACK_LABEL: SYNC_TRACK_LABEL, SYNC_STATUS: SYNC_STATUS, SYNC_STATUS_LABEL: SYNC_STATUS_LABEL,
