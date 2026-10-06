@@ -65,7 +65,7 @@ function fakeHubspot(overrides) {
     const wild = Object.keys(routes).find(k => k.endsWith('/*') && (init.method + ' ' + u.pathname).startsWith(k.slice(0, -1)));
     const handler = exact || (wild ? routes[wild] : null);
     if (!handler) return new Response(JSON.stringify({ message: 'no route ' + init.method + ' ' + u.pathname }), { status: 404 });
-    const out = handler(call, u);
+    const out = await handler(call, u);
     if (out instanceof Response) return out;
     return new Response(JSON.stringify(out), { status: 200, headers: { 'content-type': 'application/json' } });
   };
@@ -137,6 +137,9 @@ test('health → setup → login 실패·잠금, 직원 링크 교환은 1회, /
   assert.equal((await call(env, 'POST', '/api/login', { body: { password: PASSWORD } })).status, 429);
   const me = await call(env, 'GET', '/api/me', { token: admin });
   assert.deepEqual([me.body.role, me.body.staffId], ['admin', 'admin']);
+  const wrongCur = await call(env, 'POST', '/api/password', { token: admin, body: { password: 'nope-nope-nope', newPassword: 'crm-password-2' } });
+  assert.deepEqual([wrongCur.status, wrongCur.body.code], [403, 'LOGIN_FAILED'], '401 이면 클라이언트가 세션을 버린다');
+  assert.equal((await call(env, 'GET', '/api/me', { token: admin })).status, 200, '토큰은 그대로다');
   const staff = await makeStaff(env, admin, '실장A');
   const me2 = await call(env, 'GET', '/api/me', { token: staff.token });
   assert.deepEqual([me2.body.role, me2.body.name], ['staff', '실장A']);
@@ -156,6 +159,7 @@ test('리드 문서 — 검증·정규화, 전화는 전화 칸에만(PII), hubs
   assert.ok(docs.some(d => d.c === 'staff' && d.id === staff.id), '직원 명단이 문서로 함께 내려온다');
   const pii = await putDoc(env, staff.token, 'leads', 'l1', lead({ memo: '엄마 번호 010-1234-5678' }));
   assert.deepEqual([pii.status, pii.body.code], [400, 'PII']);
+  assert.equal((await putDoc(env, staff.token, 'leads', 'l1', lead({ hubspot: { contactId: '1234561234567', deals: { inspection: { dealId: '9012341234567' } } } }))).status, 200, '서버 소유 hubspot 필드의 숫자열은 PII 검사 대상이 아니다');
   assert.equal((await putDoc(env, staff.token, 'leads', 'l1', lead({ name: '' }))).body.code, 'INVALID');
   assert.equal((await putDoc(env, staff.token, 'leads', 'l1', {}, { deleted: true })).status, 403);
   assert.equal((await putDoc(env, admin, 'leads', 'l1', {}, { deleted: true })).status, 200);
@@ -244,9 +248,18 @@ test('반영 큐 — 리드 생성은 contact(quick)+deal(quick), 단계 전이�
   assert.deepEqual([all.body.changed, all.body.counts.approved, all.body.counts.rejected], [2, 2, 1]);
   const un = await call(env, 'POST', '/api/hubspot/queue', { token: admin, body: { op: 'unapprove', ids: [deal.id] } });
   assert.equal(un.body.changed, 1);
+  // 원장이 승인한 딜 줄의 단계가 그 뒤에 바뀌면 승인은 무효 — 다시 승인 대기
+  await call(env, 'POST', '/api/hubspot/queue', { token: admin, body: { op: 'approve', ids: [deal.id] } });
+  assert.equal((await queue(env, admin, '?leadId=l1&status=approved')).items.length, 2, '연락처 줄 + 딜 줄');
+  await putDoc(env, staff.token, 'leads', 'l1', lead({ stage: 'lost', phone: '010-0000-1111' }));
+  const again = (await queue(env, admin, '?leadId=l1')).items.find(i => i.kind === 'deal');
+  assert.deepEqual([again.id, again.status, again.payload.stage], [deal.id, 'pending', 'lost'], '승인 없이 다른 단계가 나가면 안 된다');
+  await call(env, 'POST', '/api/hubspot/queue', { token: admin, body: { op: 'approve', ids: [deal.id] } });
+  await putDoc(env, staff.token, 'leads', 'l1', lead({ stage: 'lost', phone: '010-0000-1111', memo: '같은 단계' }));
+  assert.equal((await queue(env, admin, '?leadId=l1')).items.find(i => i.kind === 'deal').status, 'approved', '단계가 그대로면 승인은 유지');
   assert.equal((await call(env, 'POST', '/api/hubspot/queue', { token: admin, body: { op: 'approve', ids: ['bad'] } })).status, 400);
-  assert.equal((await queue(env, admin, '?status=pending')).items.length, 1);
-  assert.equal((await queue(env, admin, '?leadId=l1&status=approved')).items.length, 1);
+  assert.equal((await queue(env, admin, '?status=pending')).items.length, 0);
+  assert.equal((await queue(env, admin, '?leadId=l1&status=approved')).items.length, 2);
 });
 
 test('빠른 입력 자동 승인을 켜면 contact·note 는 approved 로 태어나고 deal 전이는 pending, 연동을 끄면 큐가 생기지 않는다', async () => {
@@ -272,6 +285,14 @@ test('검사 여정 → 학원 등록으로 넘기면 검사 여정 딜은 성�
   const q = await queue(env, admin, '?status=pending');
   const deals = q.items.filter(i => i.kind === 'deal').map(i => [i.payload.pipeline, i.payload.stage, i.track]).sort();
   assert.deepEqual(deals, [['academy', 'trial', 'quick'], ['inspection', 'won', 'review']]);
+  const order = q.items.filter(i => i.kind === 'deal').sort((a, b) => a.createdAt - b.createdAt).map(i => i.payload.pipeline);
+  assert.deepEqual(order, ['inspection', 'academy'], '검사 여정 성사가 학원 트라이얼보다 먼저 처리된다');
+  // 되돌아오면 학원 등록 줄은 반려되고 검사 여정 줄 하나만 남는다
+  const back = await putDoc(env, admin, 'leads', 'l1', lead({ pipeline: 'inspection', stage: 'interpreted' }));
+  assert.equal(back.status, 200, JSON.stringify(back.body));
+  const open = (await queue(env, admin, '?leadId=l1')).items.filter(i => i.kind === 'deal' && (i.status === 'pending' || i.status === 'approved'));
+  assert.deepEqual(open.map(i => [i.payload.pipeline, i.payload.stage]), [['inspection', 'interpreted']]);
+  assert.equal((await queue(env, admin, '?leadId=l1&status=rejected')).items.filter(i => i.payload.pipeline === 'academy').length, 1);
 });
 
 test('HubSpot 상태 — 토큰 없음 → connected:false, 토큰 있음 → 포털 정보를 설정 문서에 심는다, 원장만', async () => {
@@ -287,8 +308,11 @@ test('HubSpot 상태 — 토큰 없음 → connected:false, 토큰 있음 → �
   const s = await call(env2, 'GET', '/api/hubspot/status', { token: admin2 });
   assert.deepEqual([s.body.connected, s.body.portal.portalId, s.body.portal.uiDomain], [true, '245', 'app-na2.hubspot.com']);
   assert.equal(hs.calls[0].auth, 'Bearer pat-test');
-  const settings = (await call(env2, 'GET', '/api/docs', { token: admin2 })).body.docs.find(x => x.c === 'settings').data;
-  assert.equal(settings.hubspot.portal.portalId, '245');
+  const settingsDoc = (await call(env2, 'GET', '/api/docs', { token: admin2 })).body.docs.find(x => x.c === 'settings');
+  assert.equal(settingsDoc.data.hubspot.portal.portalId, '245');
+  await call(env2, 'GET', '/api/hubspot/status', { token: admin2 });
+  const settingsAgain = (await call(env2, 'GET', '/api/docs', { token: admin2 })).body.docs.find(x => x.c === 'settings');
+  assert.equal(settingsAgain.updatedAt, settingsDoc.updatedAt, '포털 정보가 같으면 설정 문서를 다시 쓰지 않는다(클라이언트 저장이 STALE 로 거절되지 않게)');
   assert.ok(!JSON.stringify(s.body).includes('pat-test'), '응답에 토큰이 새지 않는다');
   const bad = fakeHubspot({ 'GET /account-info/v3/details': () => new Response(JSON.stringify({ message: 'bad token' }), { status: 401 }) });
   const env3 = envFor(bad);
@@ -370,6 +394,22 @@ test('push — 승인된 큐를 HubSpot 에 쓴다: 연락처 생성(중복 검�
   assert.equal(created.length, 0);
   const l2 = (await call(env, 'GET', '/api/docs', { token: admin })).body.docs.find(d => d.id === 'l2').data;
   assert.equal(l2.hubspot.contactId, '555');
+  // 같은 연락처가 이미 l2 에 연결돼 있다 — l3 은 가로채지 못하고 실패로 남는다
+  await putDoc(env, admin, 'leads', 'l3', lead({ name: '형제', phone: '010-0000-2222' }));
+  await call(env, 'POST', '/api/hubspot/queue', { token: admin, body: { op: 'approveAll' } });
+  const p3 = await call(env, 'POST', '/api/hubspot/push', { token: admin, body: {} });
+  assert.ok(p3.body.failed >= 1);
+  const failedRow = (await queue(env, admin, '?leadId=l3&status=failed')).items[0];
+  assert.match(failedRow.error, /LINKED/);
+  assert.equal(env.DB.database.prepare('SELECT lead_id FROM crm_hs_links WHERE contact_id=?').get('555').lead_id, 'l2', '연결표가 바뀌지 않는다');
+  // HubSpot 왕복 사이에 직원이 고친 메모는 살아남는다(문서 전체가 아니라 hubspot 필드만 고친다)
+  hs.routes['POST /crm/v3/objects/contacts/search'] = () => ({ total: 0, results: [] });
+  hs.routes['POST /crm/v3/objects/contacts'] = async c => { await putDoc(env, admin, 'leads', 'l4', lead({ name: '보호자D', phone: '010-0000-4444', memo: '왕복 중 고친 메모' })); return { id: '4444', properties: c.body.properties }; };
+  await putDoc(env, admin, 'leads', 'l4', lead({ name: '보호자D', phone: '010-0000-4444', memo: '처음 메모' }));
+  await call(env, 'POST', '/api/hubspot/queue', { token: admin, body: { op: 'approveAll' } });
+  await call(env, 'POST', '/api/hubspot/push', { token: admin, body: {} });
+  const l4 = (await call(env, 'GET', '/api/docs', { token: admin })).body.docs.find(d => d.id === 'l4').data;
+  assert.deepEqual([l4.memo, l4.hubspot.contactId], ['왕복 중 고친 메모', '4444']);
 });
 
 test('push — 매핑 없는 딜은 failed(UNMAPPED), 재시도(retry)는 approved 로, 429 는 멈추고 큐를 남긴다, 지운 리드는 실패', async () => {
@@ -392,12 +432,13 @@ test('push — 매핑 없는 딜은 failed(UNMAPPED), 재시도(retry)는 approv
   await call(env, 'POST', '/api/hubspot/queue', { token: admin, body: { op: 'approveAll' } });
   const lim = await call(env, 'POST', '/api/hubspot/push', { token: admin, body: {} });
   assert.deepEqual([lim.body.done, lim.body.failed, lim.body.stopped, lim.body.remaining], [0, 0, 'HUBSPOT_RATE', 1]);
-  // 지운 리드의 큐는 실패로 기록
+  // 지운 리드의 열린 큐 줄은 반려로 닫힌다 — 보낼 것이 없다
   delete hs.routes['PATCH /crm/v3/objects/contacts/*'];
   hs.routes['PATCH /crm/v3/objects/contacts/*'] = c => ({ id: c.path.split('/').pop() });
   await putDoc(env, admin, 'leads', 'l1', {}, { deleted: true });
   const gone = await call(env, 'POST', '/api/hubspot/push', { token: admin, body: {} });
-  assert.equal(gone.body.failed, 1);
+  assert.deepEqual([gone.body.done, gone.body.failed, gone.body.remaining], [0, 0, 0]);
+  assert.equal((await queue(env, admin, '?leadId=l1&status=rejected')).items.length, 1);
   // flushQueue 를 직접(크론 경로) — 토큰 없으면 코드로 알린다
   const none = await flushQueue({ DB: new TestD1() }, 5);
   assert.deepEqual([none.ok, none.code], [false, 'HUBSPOT_NO_TOKEN']);
@@ -420,22 +461,24 @@ test('pull — 변경분 연락처를 리드로 들여오고(딜 → 단계), �
   const admin = await setupAdmin(env);
   await saveMapping(env, admin, hs);
   await putDoc(env, admin, 'leads', 'local1', lead({ name: '로컬B', memo: '우리 메모' }));
-  // local1 에는 미반영 큐가 있다 → 첫 pull 에서 건너뛴다
+  // local1 에는 미반영 큐가 있다 → 첫 pull 에서 건너뛰고 retry 목록에 남는다
   let r = await call(env, 'POST', '/api/hubspot/pull', { token: admin, body: { full: true } });
   assert.equal(r.status, 200, JSON.stringify(r.body));
-  assert.deepEqual([r.body.created, r.body.updated, r.body.conflicts, r.body.more], [1, 0, 1, false]);
+  assert.deepEqual([r.body.created, r.body.updated, r.body.conflicts, r.body.more, r.body.retry], [1, 0, 1, false, 1]);
   let docs = (await call(env, 'GET', '/api/docs', { token: admin })).body.docs;
   const imported = docs.find(d => d.id === 'hs_901').data;
   assert.deepEqual([imported.name, imported.phone, imported.channel, imported.stage, imported.pipeline, imported.hubspot.contactId, imported.hubspot.deals.inspection.dealId, imported.createdAt, imported.owner],
     ['김보호', '010-0000-5555', '당근', 'interpreted', 'inspection', '901', 'd77', '2026-09-01', 'admin']);
   assert.equal(docs.find(d => d.id === 'local1').data.name, '로컬B');
-  // 큐를 비우면 local1 도 들여온다 — wb_crm_lead_id 로 연결되고 메모는 지킨다
+  // 큐를 비우면 증분 pull 이 커서와 상관없이 건너뛴 연락처를 id 로 다시 읽어 local1 에 들여온다 — wb_crm_lead_id 로 연결되고 메모는 지킨다
   await call(env, 'POST', '/api/hubspot/queue', { token: admin, body: { op: 'approveAll' } });
   const ids = (await queue(env, admin, '?status=approved')).items.map(i => i.id);
   env.DB.database.prepare("UPDATE crm_sync_queue SET status='done'").run();
   assert.ok(ids.length);
-  r = await call(env, 'POST', '/api/hubspot/pull', { token: admin, body: { full: true } });
-  assert.deepEqual([r.body.created, r.body.updated, r.body.conflicts], [0, 2, 0]);
+  hs.routes['POST /crm/v3/objects/contacts/batch/read'] = c => ({ results: c.body.inputs.filter(i => i.id === '902').map(() => ({ id: '902', updatedAt: '2026-10-02T00:00:00Z', properties: { firstname: 'B', wb_crm_lead_id: 'local1', lastmodifieddate: '1700000000500' } })) });
+  r = await call(env, 'POST', '/api/hubspot/pull', { token: admin, body: {} });
+  assert.deepEqual([r.body.created, r.body.updated, r.body.conflicts, r.body.retry], [0, 1, 0, 0]);
+  assert.ok(hs.calls.some(c => c.path === '/crm/v3/objects/contacts/batch/read'));
   docs = (await call(env, 'GET', '/api/docs', { token: admin })).body.docs;
   const local = docs.find(d => d.id === 'local1').data;
   assert.deepEqual([local.name, local.memo, local.hubspot.contactId], ['B', '우리 메모', '902']);
@@ -448,6 +491,15 @@ test('pull — 변경분 연락처를 리드로 들여오고(딜 → 단계), �
   assert.deepEqual([r.body.seen, r.body.created], [0, 0]);
   const status = await call(env, 'GET', '/api/hubspot/status', { token: admin });
   assert.equal(status.body.pull.since, 1700000000501);
+  // 원장이 지운 리드는 전체 가져오기로도 되살아나지 않는다
+  await putDoc(env, admin, 'leads', 'hs_901', {}, { deleted: true });
+  r = await call(env, 'POST', '/api/hubspot/pull', { token: admin, body: { full: true } });
+  assert.equal(r.body.deleted, 1);
+  assert.equal((await call(env, 'GET', '/api/docs', { token: admin })).body.docs.find(d => d.id === 'hs_901').deleted, true);
+  // HubSpot 쪽 이름에 전화 패턴이 섞인 연락처는 들여오지 않고 invalid 로 센다
+  hs.routes['POST /crm/v3/objects/contacts/search'] = () => ({ total: 1, results: [{ id: '903', updatedAt: '2026-10-03T00:00:00Z', properties: { firstname: '엄마 010-1111-2222', lastmodifieddate: '1700000000900' } }] });
+  r = await call(env, 'POST', '/api/hubspot/pull', { token: admin, body: { full: true } });
+  assert.deepEqual([r.body.invalid, r.body.created], [1, 0]);
 });
 
 async function makePartner(env, admin, name) {
@@ -485,6 +537,7 @@ test('파트너 포털 — 소개 보내기 → 센터 리드(채널 파트너)�
   assert.deepEqual([noConsent.status, noConsent.body.code], [400, 'CONSENT']);
   assert.equal((await call(env, 'POST', '/api/partner/referrals', { token: partner.token, body: { name: '보호자B', consent: true, memo: '연락 010-1111-2222' } })).body.code, 'PII');
   assert.equal((await call(env, 'POST', '/api/partner/referrals', { token: partner.token, body: { consent: true } })).body.code, 'INVALID');
+  assert.equal((await call(env, 'POST', '/api/partner/referrals', { token: partner.token, body: { name: '김엄마 010-1234-5678', consent: true } })).body.code, 'PII');
   const made = await call(env, 'POST', '/api/partner/referrals', { token: partner.token, body: { name: '보호자B', phone: '01000001234', childName: '아이', grade: '초4', memo: '독해가 약해요', consent: true } });
   assert.equal(made.status, 200, JSON.stringify(made.body));
   assert.deepEqual([made.body.referral.name, made.body.referral.stage, made.body.referral.childName], ['보호자B', '접수', '아이']);

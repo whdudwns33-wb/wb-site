@@ -7,15 +7,8 @@ export const SYSTEM_ID = 'hubspot';
 export const SETTINGS_ID = 'main';
 export const DOC_ID = /^[A-Za-z0-9_|.:@-]{1,160}$/;
 
-// 실명은 정규식으로 가를 수 없으므로 전화·이메일·주민번호 "패턴"만 서버가 거부한다(desk/requests.mjs 와 같은 규칙).
-// 전화는 leads.phone, 이메일은 leads.email 한 칸에만 허용한다 — 메모·기록 본문에 번호가 흩어지지 않게.
-export const PII_PATTERNS = [
-  /01[0-9]-?\d{3,4}-?\d{4}/,
-  /0\d{1,2}-\d{3,4}-\d{4}/,
-  /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/,
-  /\d{6}-?[1-4]\d{6}/
-];
-export const PII_ALLOWED_PATHS = new Set(['phone', 'email']);
+// PII 규칙의 정본은 crm-core.js(화면도 같은 검사로 저장 전에 막는다). 전화는 phone, 이메일은 email 칸에만.
+export const PII_ALLOWED_PATHS = new Set(CORE.PII_ALLOWED_PATHS);
 
 const encoder = new TextEncoder();
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
@@ -32,7 +25,8 @@ export function json(obj, status, extraHeaders) {
   });
 }
 export function fail(code, error, status, extra) { return json(Object.assign({ ok: false, code, error }, extra || {}), status || 400); }
-export function hasPii(text) { return PII_PATTERNS.some(p => p.test(String(text || ''))); }
+export function hasPii(text) { return CORE.hasPii(text); }
+export function findPii(value, path, skip) { return CORE.findPii(value, path, skip); }
 export function isPlainObject(v) { return !!v && typeof v === 'object' && !Array.isArray(v); }
 export function absent(v) { return v === undefined || v === null || v === ''; }
 export function parseJson(text) { try { return JSON.parse(String(text)); } catch (error) { return null; } }
@@ -87,6 +81,22 @@ export async function loadSettings(env) {
     hubspot: { enabled: hs.enabled !== false, autoApproveQuick: !!hs.autoApproveQuick, map: isPlainObject(hs.map) ? hs.map : {}, portal: isPlainObject(hs.portal) ? hs.portal : {} } };
 }
 /** 서버(hubspot)가 문서를 쓴다 — 규칙 검사 없이 값을 그대로. updated_at 은 반드시 커진다. */
+/** 문서의 일부 필드만 고친다 — 현재 행을 다시 읽어 patchFn(data) 를 적용하고 updated_at 이 그대로일 때만 쓴다(CAS, 3회).
+ *  HubSpot 왕복 사이에 직원이 같은 리드를 고쳤어도 그 편집을 덮지 않는다. 지워진 문서는 건드리지 않는다. */
+export async function patchDocFields(env, c, id, patchFn, by) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const row = await env.DB.prepare('SELECT data,updated_at,deleted FROM crm_documents WHERE collection=? AND id=? LIMIT 1').bind(c, id).first();
+    if (!row || Number(row.deleted)) return null;
+    const current = parseJson(row.data) || {};
+    const next = patchFn(Object.assign({}, current));
+    const updatedAt = Math.max(Date.now(), Number(row.updated_at) + 1);
+    const r = await env.DB.prepare('UPDATE crm_documents SET data=?,updated_at=?,updated_by=? WHERE collection=? AND id=? AND updated_at=?')
+      .bind(JSON.stringify(next), updatedAt, by || SYSTEM_ID, c, id, Number(row.updated_at)).run();
+    if (changesOf(r) > 0) return next;
+  }
+  throw new Error('문서가 계속 바뀌어 HubSpot 연결 정보를 적지 못했습니다 — 다시 시도합니다');
+}
+
 export async function writeDocRaw(env, c, id, data, by) {
   const row = await env.DB.prepare('SELECT updated_at FROM crm_documents WHERE collection=? AND id=? LIMIT 1').bind(c, id).first();
   const updatedAt = Math.max(Date.now(), (row ? Number(row.updated_at) : 0) + 1);
@@ -109,26 +119,36 @@ export function same(a, b) { return JSON.stringify(a === undefined ? null : a) =
 export async function enqueueFor(env, auth, settings, c, id, previous, data) {
   const now = Date.now();
   let n = 0;
+  // 새 줄의 created_at 은 이 리드의 기존 줄보다 반드시 크다 — 합쳐진 줄(옛 created_at)과 새 줄의 처리 순서(검사 여정 성사 → 학원 트라이얼)가
+  // 같은 ms 안에서도 섞이지 않게. flushQueue 가 created_at 순으로 보낸다.
+  const last = await env.DB.prepare('SELECT MAX(created_at) AS m FROM crm_sync_queue WHERE lead_id=?').bind(c === 'leads' ? id : String(data.leadId || '')).first();
+  let tick = Math.max(now, Number(last && last.m || 0) + 1);
   const put = async (leadId, kind, payload) => {
     const track = CORE.syncTrack(kind, payload);
     const status = track === 'quick' && settings.hubspot.autoApproveQuick ? 'approved' : 'pending';
     if (kind !== 'note') {
-      const open = await env.DB.prepare('SELECT id,payload,track FROM crm_sync_queue WHERE lead_id=? AND kind=? AND status IN (\'pending\',\'approved\') ORDER BY created_at DESC LIMIT 1').bind(leadId, kind).first();
-      if (open && (kind === 'contact' || (parseJson(open.payload) || {}).pipeline === payload.pipeline)) {
+      // 같은 리드·같은 종류(딜은 같은 파이프라인)의 열린 줄이 있으면 그 줄을 갈아 끼운다 — 한 리드에 종류당 한 줄.
+      const open = kind === 'deal'
+        ? await env.DB.prepare('SELECT id,payload,track,status FROM crm_sync_queue WHERE lead_id=? AND kind=? AND status IN (\'pending\',\'approved\') AND json_extract(payload,\'$.pipeline\')=? ORDER BY created_at DESC LIMIT 1').bind(leadId, kind, String(payload.pipeline)).first()
+        : await env.DB.prepare('SELECT id,payload,track,status FROM crm_sync_queue WHERE lead_id=? AND kind=? AND status IN (\'pending\',\'approved\') ORDER BY created_at DESC LIMIT 1').bind(leadId, kind).first();
+      if (open) {
         const prevPayload = parseJson(open.payload) || {};
         const merged = kind === 'deal' ? Object.assign({}, payload, { transition: !!(payload.transition || prevPayload.transition) })
           : Object.assign({}, payload, { fields: [...new Set((prevPayload.fields || []).concat(payload.fields || []))] });
         const mergedTrack = CORE.syncTrack(kind, merged);
-        const mergedStatus = mergedTrack === 'review' ? (open.track === 'review' ? undefined : 'pending') : undefined;
-        await env.DB.prepare('UPDATE crm_sync_queue SET payload=?,track=?,status=COALESCE(?,status),updated_at=? WHERE id=?')
-          .bind(JSON.stringify(merged), mergedTrack, mergedStatus || null, now, open.id).run();
+        // 원장이 이미 승인한 줄의 내용이 바뀌면(다른 단계로) 승인은 무효다 — 검토 트랙은 다시 승인 대기로. 빠른 입력은 자동 승인 설정을 따른다.
+        let mergedStatus = open.status;
+        if (mergedTrack === 'review') mergedStatus = (open.status === 'approved' && prevPayload.stage !== merged.stage) || open.track !== 'review' ? 'pending' : open.status;
+        await env.DB.prepare('UPDATE crm_sync_queue SET payload=?,track=?,status=?,updated_at=MAX(?,created_at) WHERE id=?')
+          .bind(JSON.stringify(merged), mergedTrack, mergedStatus, now, open.id).run();
         n++;
         return;
       }
     }
     await env.DB.prepare(
       'INSERT INTO crm_sync_queue(id,lead_id,kind,track,status,payload,attempts,created_at,created_by,updated_at) VALUES(?,?,?,?,?,?,0,?,?,?)'
-    ).bind('q_' + randomSlug(16), leadId, kind, track, status, JSON.stringify(payload), now, auth.staffId, now).run();
+    ).bind('q_' + randomSlug(16), leadId, kind, track, status, JSON.stringify(payload), tick, auth.staffId, tick).run();
+    tick++;
     n++;
   };
   if (c === 'leads') {
@@ -137,7 +157,12 @@ export async function enqueueFor(env, auth, settings, c, id, previous, data) {
     const stageChanged = isNew || previous.pipeline !== data.pipeline || previous.stage !== data.stage;
     if (stageChanged) {
       // 검사 여정 → 학원 등록으로 넘어가면 검사 여정 딜은 성사로 닫힌다(등록했으니 학원 파이프라인으로 이어가는 것이다).
-      if (!isNew && previous.pipeline === 'inspection' && data.pipeline === 'academy' && previous.stage !== 'won') {
+      const crossover = !isNew && previous.pipeline === 'inspection' && data.pipeline === 'academy' && previous.stage !== 'won';
+      // 지금 가는 파이프라인이 아닌 열린 딜 줄은 더 이상 사실이 아니다(되돌아온 경우) — 반려로 닫아 옛 단계가 HubSpot 에 가지 않게.
+      const keep = crossover ? [data.pipeline, 'inspection'] : [data.pipeline];
+      await env.DB.prepare('UPDATE crm_sync_queue SET status=\'rejected\',error=?,decided_at=?,decided_by=?,updated_at=MAX(?,created_at) WHERE lead_id=? AND kind=\'deal\' AND status IN (\'pending\',\'approved\') AND json_extract(payload,\'$.pipeline\') NOT IN (' + keep.map(() => '?').join(',') + ')')
+        .bind('리드가 다른 파이프라인으로 옮겨져 무효', now, 'system', now, id, ...keep).run();
+      if (crossover) {
         await put(id, 'deal', { pipeline: 'inspection', stage: 'won', transition: true, dealName: dealName(data, 'inspection') });
       }
       const hadDeal = !!(data.hubspot && data.hubspot.deals && data.hubspot.deals[data.pipeline] && data.hubspot.deals[data.pipeline].dealId);

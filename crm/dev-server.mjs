@@ -50,15 +50,14 @@ function resolveStatic(pathname) {
   let clean;
   try { clean = decodeURIComponent(pathname.split('?')[0]); } catch (e) { return null; }
   if (clean === '/' || clean === '') clean = '/index.html';
-  if (clean === '/partner' || clean === '/partner/') clean = '/partner/index.html';
+  if (clean === '/partner/') clean = '/partner/index.html';
   if (fs.existsSync(path.join(DIST, 'index.html'))) {
     const file = path.join(DIST, clean);
     return inside(DIST, file) && fs.existsSync(file) && fs.statSync(file).isFile() ? file : null;
   }
-  let name = clean.slice(1);
+  const name = clean.slice(1);
   if (APP_FILES.has(name)) return path.join(APP, name);
   if (name === 'crm-core.js') return path.join(here, 'crm-core.js');
-  if (name === 'partner' || name === 'partner/') name = 'partner/index.html';
   if (name.startsWith('partner/') && /^[A-Za-z0-9_.-]+$/.test(name.slice(8)) && !/\.test\./.test(name)) {
     const file = path.join(here, 'partner', name.slice(8));
     return fs.existsSync(file) ? file : null;
@@ -93,6 +92,8 @@ if (process.env.HUBSPOT_ACCESS_TOKEN) env.HUBSPOT_ACCESS_TOKEN = process.env.HUB
 if (process.env.HUBSPOT_API_BASE) env.HUBSPOT_API_BASE = process.env.HUBSPOT_API_BASE;
 const server = http.createServer((req, res) => {
   const pathname = String(req.url || '/').split('?')[0];
+  // /partner 는 /partner/ 로 — 상대 경로(./partner.js)가 /partner.js 로 풀리지 않게(운영 자산 바인딩도 같은 리다이렉트를 한다)
+  if (pathname === '/partner') { const q = String(req.url || '').slice(pathname.length); res.writeHead(301, { Location: '/partner/' + q }); res.end(); return; }
   const handler = pathname === '/api' || pathname.startsWith('/api/') ? proxyApi(req, res, env) : Promise.resolve(serveStatic(pathname, res));
   handler.catch(error => {
     res.writeHead(500, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });

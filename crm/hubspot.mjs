@@ -125,7 +125,8 @@ export function createClient(options) {
     const res = await request('GET', '/crm/v3/properties/contacts');
     return (res && Array.isArray(res.results) ? res.results : []).map(p => ({
       name: str(p.name), label: str(p.label), type: str(p.type), fieldType: str(p.fieldType),
-      options: (Array.isArray(p.options) ? p.options : []).map(x => ({ value: str(x.value), label: str(x.label) }))
+      // hidden·description 을 지켜야 선택지를 덧붙이는 PATCH 가 원장이 숨긴 옛 선택지를 되살리지 않는다
+      options: (Array.isArray(p.options) ? p.options : []).map(x => ({ value: str(x.value), label: str(x.label), hidden: !!x.hidden, description: str(x.description) }))
     }));
   }
 
@@ -153,7 +154,7 @@ export function createClient(options) {
       const have = new Set(existing.options.map(o => o.value));
       const missing = spec.options.filter(opt => !have.has(typeof opt === 'string' ? opt : opt.value));
       if (!missing.length) continue;
-      const options = existing.options.map((o, i) => ({ label: o.label || o.value, value: o.value, displayOrder: i, hidden: false }))
+      const options = existing.options.map((o, i) => Object.assign({ label: o.label || o.value, value: o.value, displayOrder: i, hidden: !!o.hidden }, o.description ? { description: o.description } : {}))
         .concat(optionRows(missing).map((o, i) => Object.assign(o, { displayOrder: existing.options.length + i })));
       try { await request('PATCH', '/crm/v3/properties/contacts/' + encodeURIComponent(spec.name), { options }); updated.push(spec.name); }
       catch (error) { failed.push({ name: spec.name, error: str(error && error.message || error) }); }
@@ -180,18 +181,35 @@ export function createClient(options) {
     };
   }
 
-  /** 전화(붙임·띄움 두 꼴)·이메일로 이미 있는 연락처를 찾는다 — 만들기 전에 꼭 부른다(중복 생성 방지). */
+  /** 이메일·전화로 이미 있는 연락처를 찾는다 — 만들기 전에 꼭 부른다(중복 생성 방지). 검색 API 는 OR 그룹을 5개까지만 받으므로
+   *  이메일(유일 키)을 첫 자리에 두고, 전화는 HubSpot 이 서식을 벗겨 저장하는 계산 속성(hs_searchable_calculated_*)에 숫자만으로,
+   *  그리고 우리 표기(010-0000-0000)로 phone·mobilephone 을 한 번 더 본다. */
   async function findContact(phone, email) {
     const groups = [];
+    if (CORE.validEmail(email)) groups.push({ filters: [{ propertyName: 'email', operator: 'EQ', value: str(email).toLowerCase() }] });
     const digits = str(phone).replace(/\D/g, '');
     if (digits) {
-      const forms = [...new Set([digits, CORE.normalizePhone(digits), '+82' + digits.replace(/^0/, '')])];
-      forms.forEach(v => { groups.push({ filters: [{ propertyName: 'phone', operator: 'EQ', value: v }] }); groups.push({ filters: [{ propertyName: 'mobilephone', operator: 'EQ', value: v }] }); });
+      const dashed = CORE.normalizePhone(digits);
+      groups.push({ filters: [{ propertyName: 'hs_searchable_calculated_phone_number', operator: 'EQ', value: digits }] });
+      groups.push({ filters: [{ propertyName: 'hs_searchable_calculated_mobile_number', operator: 'EQ', value: digits }] });
+      groups.push({ filters: [{ propertyName: 'phone', operator: 'EQ', value: dashed }] });
+      groups.push({ filters: [{ propertyName: 'mobilephone', operator: 'EQ', value: dashed }] });
     }
-    if (CORE.validEmail(email)) groups.push({ filters: [{ propertyName: 'email', operator: 'EQ', value: str(email).toLowerCase() }] });
     if (!groups.length) return null;
     const res = await searchContacts(groups.slice(0, 5), ['firstname', 'lastname', 'phone', 'mobilephone', 'email'], '', 5);
     return res.results[0] || null;
+  }
+
+  /** 연락처 id 들을 속성과 함께 읽는다(가져오기에서 건너뛴 연락처를 다음에 다시 볼 때). */
+  async function readContacts(contactIds, available) {
+    const ids = [...new Set((Array.isArray(contactIds) ? contactIds : []).map(str).filter(Boolean))];
+    const props = STANDARD_PROPERTIES.concat(WB_PROPERTY_NAMES.filter(n => !available || available.has(n)));
+    const out = [];
+    for (let i = 0; i < ids.length; i += PAGE) {
+      const res = await request('POST', '/crm/v3/objects/contacts/batch/read', { inputs: ids.slice(i, i + PAGE).map(id => ({ id })), properties: props });
+      (res && Array.isArray(res.results) ? res.results : []).forEach(c => out.push(normalizeObject(c)));
+    }
+    return out;
   }
 
   async function createContact(properties) { return normalizeObject(await request('POST', '/crm/v3/objects/contacts', { properties })); }
@@ -244,7 +262,7 @@ export function createClient(options) {
     return out;
   }
 
-  return { request, status, pipelines, listContactProperties, checkProperties, ensureProperties, searchContacts, findContact,
+  return { request, status, pipelines, listContactProperties, checkProperties, ensureProperties, searchContacts, findContact, readContacts,
     createContact, updateContact, createDeal, updateDeal, createNote, contactsModifiedSince, dealIdsForContacts, readDeals };
 }
 
@@ -299,7 +317,7 @@ export function leadFromContact(contact, existing, ctx) {
   const first = str(p.firstname).trim(), last = str(p.lastname).trim();
   const name = (last && first ? last + first : (first || last)).trim();
   if (name) lead.name = name.slice(0, 40);
-  else if (!lead.name) lead.name = str(p.email || p.phone || ('HubSpot ' + c.id)).slice(0, 40);
+  else if (!lead.name) lead.name = ('HubSpot 연락처 ' + c.id).slice(0, 40);   // 이메일·전화를 이름에 넣으면 PII 규칙이 그 리드의 저장을 막는다
   const phone = CORE.normalizePhone(p.phone || p.mobilephone);
   if (phone) lead.phone = phone;
   if (CORE.validEmail(p.email)) lead.email = str(p.email).toLowerCase();

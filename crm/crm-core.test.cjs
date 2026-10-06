@@ -306,4 +306,14 @@ t('파트너 연계 — 채널 감지(파트너가 소개보다 먼저), 파트�
   assert.equal(C.routeOf('#/partners').route, 'partners');
 });
 
+t('PII 패턴 — 전화·이메일·주민번호를 찾고, 허용 경로(phone·email)와 skip 아래는 건너뛴다', () => {
+  assert.ok(C.hasPii('연락 010-1234-5678') && C.hasPii('a@b.co') && C.hasPii('900101-1234567') && !C.hasPii('초3 아이'));
+  assert.equal(C.findPii({ name: 'A', phone: '010-1234-5678', email: 'a@b.co', memo: '없음' }), null);
+  assert.equal(C.findPii({ name: 'A', memo: '엄마 010-1234-5678' }), 'memo');
+  assert.equal(C.findPii({ child: { school: '02-123-4567' } }), 'child.school');
+  assert.equal(C.findPii({ hubspot: { contactId: '1234561234567' } }, '', ['hubspot']), null, 'skip 아래는 보지 않는다');
+  assert.equal(C.findPii({ hubspot: { contactId: '1234561234567' } }), 'hubspot.contactId');
+  assert.equal(C.findPii(['x', '010-0000-0000'], 'list'), 'list[1]');
+});
+
 console.log('crm-core: ' + passed + ' 통과');

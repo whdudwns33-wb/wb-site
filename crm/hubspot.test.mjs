@@ -70,7 +70,7 @@ test('속성 점검·생성 — 없는 것만 만들고 enum 옵션을 붙인다
 test('ensureProperties — 이미 있는 선택형 속성에 빠진 선택지(파트너)를 PATCH 로 더하고 기존 선택지는 지킨다', async () => {
   const f = fakeFetch({
     'GET /crm/v3/properties/contacts': { results: WB_PROPERTY_NAMES.map(n => (n === 'wb_source_channel'
-      ? { name: n, type: 'enumeration', options: [{ label: '맘카페', value: '맘카페' }, { label: '센터폰', value: '센터폰' }, { label: '옛채널', value: '옛채널' }] }
+      ? { name: n, type: 'enumeration', options: [{ label: '맘카페', value: '맘카페' }, { label: '센터폰', value: '센터폰' }, { label: '옛채널', value: '옛채널', hidden: true, description: '쓰지 않음' }] }
       : { name: n, type: 'string', options: ((WB_PROPERTIES.find(p => p.name === n) || {}).options || []).map(v => (typeof v === 'string' ? { label: v, value: v } : v)) })) },
     'PATCH /crm/v3/properties/contacts/wb_source_channel': call => ({ name: 'wb_source_channel', options: call.body.options })
   });
@@ -81,18 +81,30 @@ test('ensureProperties — 이미 있는 선택형 속성에 빠진 선택지(�
   assert.ok(values.includes('옛채널') && values.includes('파트너') && values.includes('맘카페'));
   assert.equal(values.length, 3 + (8 - 2), '기존 3 + 빠진 6');
   assert.ok(patch.body.options.every((o, i) => o.displayOrder === i));
+  const old = patch.body.options.find(o => o.value === '옛채널');
+  assert.deepEqual([old.hidden, old.description], [true, '쓰지 않음'], '원장이 숨긴 선택지는 숨긴 채로 남는다');
+  assert.equal(patch.body.options.find(o => o.value === '파트너').hidden, false);
 });
 
-test('findContact — 전화 두 꼴(+국제)과 이메일을 OR 그룹으로 검색하고 첫 결과를 준다', async () => {
+test('findContact — 이메일이 첫 그룹에 살아남고, 전화는 계산 속성(숫자만)+표기 두 속성으로, 그룹은 5개 이내', async () => {
   const f = fakeFetch({ 'POST /crm/v3/objects/contacts/search': { total: 1, results: [{ id: '77', properties: { firstname: 'A' } }] } });
   const hs = createClient({ token: 't', fetch: f.fetchImpl });
   const found = await hs.findContact('010-0000-0000', 'a@b.co');
   assert.equal(found.id, '77');
   const groups = f.calls[0].body.filterGroups;
-  assert.ok(groups.length <= 5);
-  const values = groups.map(g => g.filters[0].value);
-  assert.ok(values.includes('01000000000') && values.includes('010-0000-0000'));
+  assert.equal(groups.length, 5);
+  const pairs = groups.map(g => g.filters[0].propertyName + '=' + g.filters[0].value);
+  assert.equal(pairs[0], 'email=a@b.co', '전화가 있어도 이메일 그룹이 잘리지 않는다');
+  assert.ok(pairs.includes('hs_searchable_calculated_phone_number=01000000000') && pairs.includes('hs_searchable_calculated_mobile_number=01000000000'));
+  assert.ok(pairs.includes('phone=010-0000-0000') && pairs.includes('mobilephone=010-0000-0000'));
+  assert.ok(!pairs.some(x => /\+82/.test(x)), '국가번호 표기는 보내지 않는다');
+  await hs.findContact('01000000000', '');
+  assert.equal(f.calls[1].body.filterGroups.length, 4);
   assert.equal(await hs.findContact('', ''), null);
+  const read = fakeFetch({ 'POST /crm/v3/objects/contacts/batch/read': c => ({ results: c.body.inputs.map(i => ({ id: i.id, properties: { firstname: 'x' } })) }) });
+  const rows = await createClient({ token: 't', fetch: read.fetchImpl }).readContacts(['1', '2', '1'], new Set(['wb_source_channel']));
+  assert.deepEqual(rows.map(r => r.id), ['1', '2']);
+  assert.ok(read.calls[0].body.properties.includes('wb_source_channel') && !read.calls[0].body.properties.includes('wb_child_name'));
 });
 
 test('연락처·딜·노트 쓰기 — 경로·연결(association typeId 3·202)·본문', async () => {
@@ -179,7 +191,7 @@ test('leadFromContact — 성+이름, 전화 정규화, 날짜 두 형식, 기�
   assert.deepEqual([merged.name, merged.memo, merged.followups.length, merged.channel, merged.hubspot.deals.inspection.dealId], ['A', '중요 메모', 1, '맘카페', '1']);
   assert.equal(existing.memo, '중요 메모', '원본을 바꾸지 않는다');
   const nameless = leadFromContact({ id: '9', properties: { email: 'x@y.z' } }, null);
-  assert.equal(nameless.name, 'x@y.z');
+  assert.equal(nameless.name, 'HubSpot 연락처 9', '이메일을 이름으로 쓰면 PII 규칙에 걸린다');
   assert.equal(hsDate('garbage'), '');
 });
 

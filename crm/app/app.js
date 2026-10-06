@@ -587,7 +587,11 @@ async function loadHubspotPanel(force) {
     ui.hs.queue = q.items; ui.hs.counts = q.counts;
     if (s.connected && !ui.hs.props) { try { ui.hs.props = await api('/api/hubspot/properties'); } catch (e) { ui.hs.props = { error: e.message }; } }
   } catch (e) { ui.hs.err = e.message; }
-  finally { ui.hs.busy = ''; if (route === 'hubspot' && !typingInView()) render(); else updateTabs(); }
+  finally {
+    ui.hs.busy = '';
+    try { await poll(); } catch (e) { /* 상태 확인이 설정 문서(포털 정보)를 고쳤을 수 있어 meta 를 맞춘다 */ }
+    if (route === 'hubspot' && !typingInView()) render(); else updateTabs();
+  }
 }
 function viewHubspot() {
   const s = ui.hs.status;
@@ -741,6 +745,8 @@ function savePartnerForm(id) {
     terms: { inbound: val('f-pin'), outbound: val('f-pout'), note: prev && prev.terms ? prev.terms.note || '' : '' }, link: val('f-plink'), memo: val('f-pmemo') });
   const v = C.validatePartner(data, { today: today() });
   if (!v.ok) return toast(v.error);
+  const pii = C.findPii(v.data);
+  if (pii) return toast(pii + ' 에 전화번호·이메일이 있습니다 — 담당자 전화는 전화 칸에만');
   queueChange('partners', id || uid('pt'), v.data);
   closeModal(); toast(prev ? '저장했습니다' : '등록했습니다 — 링크를 발급해 파트너에게 보내세요'); render();
 }
@@ -768,6 +774,7 @@ function saveReferForm(id) {
   if (!checked('f-rconsent')) return toast('가정의 동의 확인을 체크해 주세요');
   const v = C.validateReferral({ leadId: id, partnerId, note: val('f-rnote'), consent: true, at: today(), by: session.staffId }, { today: today() });
   if (!v.ok) return toast(v.error);
+  if (C.findPii({ note: v.data.note })) return toast('소개 사유에 전화번호·이메일을 적을 수 없습니다');
   queueChange('referrals', uid('rf'), v.data);
   const p = partnerById(partnerId);
   addActivity(id, { type: 'note', text: '파트너 소개 → ' + (p ? p.name : '') + (v.data.note ? ' · ' + v.data.note : '') });
@@ -845,7 +852,7 @@ function leadFormHtml(l) {
       '<div class="field"><label class="fl" for="f-acad">학원 상태(HubSpot wb_academy_status)</label><select class="in" id="f-acad"><option value="">—</option>' + opt(['미등록', '트라이얼', '재원', '이탈', '퇴원'], L.academyStatus) + '</select></div>' : '') +
     (session.canApprove ? '<div class="field"><label class="fl" for="f-owner2">담당</label><select class="in" id="f-owner2"><option value="admin"' + (!L.owner || L.owner === 'admin' ? ' selected' : '') + '>원장</option>' + liveStaff().map(x => '<option value="' + esc(x.id) + '"' + (L.owner === x.id ? ' selected' : '') + '>' + esc(x.name) + '</option>').join('') + '</select></div>' : '') +
     '<label class="check"><input type="checkbox" id="f-hot"' + (L.hot ? ' checked' : '') + '> 핫 리드(바로 연락)</label>' +
-    '<div class="field"><label class="fl" for="f-memo">메모</label><textarea class="in" id="f-memo" rows="2">' + esc(L.memo || '') + '</textarea><div class="hint">전화번호는 전화 칸에만 — 메모·기록에 번호가 있으면 저장되지 않습니다.</div></div>';
+    '<div class="field"><label class="fl" for="f-memo">메모</label><textarea class="in" id="f-memo" rows="2">' + esc(L.memo || '') + '</textarea><div class="hint">전화번호는 전화 칸에만 — 문의 원문·메모·기록에 번호가 있으면 저장되지 않습니다.</div></div>';
 }
 function openLeadForm(id) {
   const l = id ? leadById(id) : null;
@@ -881,6 +888,9 @@ function saveLeadForm(id) {
   }
   const v = C.validateLead(data, { today: today() });
   if (!v.ok) return toast(v.error);
+  // 서버가 거절할 저장은 여기서 막는다 — 저장이 뒤늦게 거절되면 리드가 사라진 것처럼 보인다
+  const pii = C.findPii(v.data, '', ['phone', 'email', 'hubspot', 'creditBalanceHs']);
+  if (pii) return toast((pii === 'source' ? '문의 원문' : pii === 'memo' ? '메모' : pii) + '에 전화번호·이메일이 있습니다 — 전화는 전화 칸에만 적고 본문에서는 지워 주세요');
   const out = Object.assign(v.data, { hubspot: prev ? prev.hubspot : {} });
   const newId = id || uid('ld');
   queueChange('leads', newId, out);
@@ -892,6 +902,7 @@ function saveLeadForm(id) {
 function addActivity(leadIdValue, fields) {
   const v = C.validateActivity(Object.assign({ leadId: leadIdValue, at: today(), ts: now(), by: session.staffId }, fields), { today: today() });
   if (!v.ok) { toast(v.error); return null; }
+  if (C.findPii({ text: v.data.text })) { toast('기록에 전화번호·이메일을 적을 수 없습니다 — 전화는 리드의 전화 칸에만'); return null; }
   const id = uid('ac');
   queueChange('activities', id, v.data);
   return id;
@@ -906,15 +917,16 @@ function updateLead(id, patch, note) {
   if (note) toast(note);
   return out;
 }
-function moveStage(id, target) {
+function moveStage(id, target, selectEl) {
   const l = leadById(id); if (!l) return;
-  if (target === '__academy') return openOutcome(id, 'won', true);
+  const reset = () => { if (selectEl) selectEl.value = l.stage; };   // 창을 닫거나 실패하면 select 가 실제 단계를 보여 줘야 같은 항목을 다시 고를 수 있다
+  if (target === '__academy') { reset(); return openOutcome(id, 'won', true); }
   if (target === l.stage) return;
-  if (target === 'won') return openOutcome(id, 'won');
-  if (target === 'lost' || target === 'churned') return openOutcome(id, 'lost', false, target);
+  if (target === 'won') { reset(); return openOutcome(id, 'won'); }
+  if (target === 'lost' || target === 'churned') { reset(); return openOutcome(id, 'lost', false, target); }
   const from = l.stage;
   const patch = { stage: target, stageAt: today(), status: 'open', outcome: null };
-  if (updateLead(id, patch)) { addActivity(id, { type: 'stage', from, to: target }); render(); }
+  if (updateLead(id, patch)) { addActivity(id, { type: 'stage', from, to: target }); render(); } else reset();
 }
 function openOutcome(id, kind, toAcademy, lostStage) {
   const l = leadById(id); if (!l) return;
@@ -982,6 +994,7 @@ function saveActivityForm(id) {
   const type = val('f-atype'), result = val('f-aresult'), at = val('f-adate') || today(), text = val('f-atext');
   const fuDay = Number(val('f-fuday')) || 0;
   if (fuDay && !result) return toast('팔로업 결과(연락됨·답장·부재중)를 골라 주세요');
+  if (C.findPii({ text, strength: val('f-strength2') })) return toast('기록·강점에 전화번호·이메일을 적을 수 없습니다 — 전화는 리드의 전화 칸에만');
   const actId = addActivity(id, { type: fuDay ? 'followup' : type, result, text, at, followupDay: fuDay });
   if (!actId) return;
   const patch = {};
@@ -1032,6 +1045,7 @@ function saveCredit(id, type) {
   if (type === 'use' && amount > C.creditBalance(state.credits, id) && !confirm('잔액보다 큽니다. 그래도 기록할까요?')) return;
   const v = C.validateCredit({ leadId: id, type, amount: type === 'accrue' ? amount : -amount, note: val('f-cnote'), at: today(), referredLeadId: referred, by: session.staffId }, { today: today() });
   if (!v.ok) return toast(v.error);
+  if (C.findPii({ note: v.data.note })) return toast('메모에 전화번호·이메일을 적을 수 없습니다');
   queueChange('credits', uid('cr'), v.data);
   closeModal(); toast('크레딧을 기록했습니다 — HubSpot 잔액(wb_credit_balance)은 반영 큐로 갑니다'); render();
 }
@@ -1120,7 +1134,7 @@ document.addEventListener('click', async e => {
 document.addEventListener('change', e => {
   const t = e.target;
   if (!t || !t.id && !t.dataset.act) return;
-  if (t.id === 'f-stage') return moveStage(t.dataset.id, t.value);
+  if (t.id === 'f-stage') return moveStage(t.dataset.id, t.value, t);
   if (t.id === 'f-channel') { ui.channel = t.value; return render(); }
   if (t.id === 'f-owner') { ui.owner = t.value; return render(); }
   if (t.id === 'f-channel2' || t.id === 'f-hot') { t.dataset.touched = '1'; if (t.id === 'f-channel2') togglePartnerField(); return; }

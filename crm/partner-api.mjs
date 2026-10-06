@@ -3,7 +3,7 @@
 // 파트너가 보낸 가정은 센터 리드로 바로 생긴다(채널 '파트너' + partnerId) — 리드가 두 곳에 생기지 않게 같은 D1 을 쓴다.
 // 나중에 별도 워커로 떼어낼 때는 이 파일 + crm/partner/ + crm_partner_* 표를 옮긴다(crm-shared 의 도우미는 복사).
 import CORE from './crm-core.js';
-import { SYSTEM_ID, DOC_ID, json, fail, hasPii, isPlainObject, changesOf, kstToday, readJson, sha256Hex, randomOpaqueValue, randomSlug,
+import { SYSTEM_ID, DOC_ID, PII_ALLOWED_PATHS, json, fail, hasPii, findPii, isPlainObject, changesOf, kstToday, readJson, sha256Hex, randomOpaqueValue, randomSlug,
   loadDoc, loadCollection, loadSettings, writeDocRaw, enqueueFor, LINK_CODE, CODE_TTL_MS } from './crm-shared.mjs';
 
 const TOKEN_TTL_MS = 180 * 24 * 60 * 60 * 1000;
@@ -136,6 +136,8 @@ async function createReferral(env, auth, body) {
     source: '파트너 ' + String(auth.partner.name || '') + ' 소개' + (memo ? '\n' + memo : ''), pipeline: 'inspection', stage: 'inquiry', owner: 'admin', createdAt: today, stageAt: today
   }, { today });
   if (!v.ok) return fail('INVALID', v.error);
+  const pii = findPii(v.data, '', PII_ALLOWED_PATHS);
+  if (pii) return fail('PII', '이름·학년 칸에 전화번호·이메일을 적을 수 없습니다 — 전화는 전화 칸에');
   const id = 'ld_' + randomSlug(14);
   const data = Object.assign(v.data, { hubspot: {} });
   await writeDocRaw(env, 'leads', id, data, partnerActor(auth.partnerId));

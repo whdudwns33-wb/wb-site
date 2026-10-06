@@ -103,9 +103,10 @@ async function send(btn) {
   if (!body.phone) return toast('보호자 전화를 입력해 주세요');
   if (!body.consent) return toast('보호자 동의 확인을 체크해 주세요');
   busy = true; if (btn) btn.disabled = true;
-  try { await api('/api/partner/referrals', body); toast('보냈습니다 — 센터가 연락드립니다'); await load(); tab = 'inbound'; }
+  let ok = false;
+  try { await api('/api/partner/referrals', body); ok = true; toast('보냈습니다 — 센터가 연락드립니다'); await load(); tab = 'inbound'; }
   catch (e) { toast('접수 실패 — ' + e.message); }
-  finally { busy = false; render(); }
+  finally { busy = false; if (ok) render(); else if (btn) btn.disabled = false; }   // 실패하면 적은 내용을 지우지 않는다
 }
 async function setStatus(id, status, note) {
   try { await api('/api/partner/referrals/' + encodeURIComponent(id) + '/status', note === undefined ? { status } : { status, note }); toast('표시했습니다'); await load(); render(); }

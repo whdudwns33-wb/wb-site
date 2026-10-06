@@ -118,6 +118,35 @@
   const MAX_TEXT = 1000;
   const MAX_NAME = 40;
 
+  /* 개인정보 패턴 — 전화·이메일·주민번호. 실명은 정규식으로 가를 수 없어 "패턴"만 본다. 서버가 거부하는 규칙과 같은 것이라
+   * 화면도 저장 전에 같은 검사로 막는다(저장이 거절되면 리드가 사라진 것처럼 보이기 때문). 전화는 phone, 이메일은 email 칸에만. */
+  const PII_PATTERNS = [
+    /01[0-9]-?\d{3,4}-?\d{4}/,
+    /0\d{1,2}-\d{3,4}-\d{4}/,
+    /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/,
+    /\d{6}-?[1-4]\d{6}/
+  ];
+  const PII_ALLOWED_PATHS = ['phone', 'email'];
+  function hasPii(text) { return PII_PATTERNS.some(p => p.test(str(text))); }
+  /** 문자열 값을 전부 훑어 PII 패턴이 있는 첫 경로를 돌려준다. skip 에 든 경로(점 표기)는 그 아래 전부 건너뛴다. */
+  function findPii(value, path, skip) {
+    const skipSet = skip instanceof Set ? skip : new Set(Array.isArray(skip) ? skip : PII_ALLOWED_PATHS);
+    if (typeof value === 'string') return hasPii(value) ? (path || '(값)') : null;
+    if (Array.isArray(value)) {
+      for (let i = 0; i < value.length; i++) { const f = findPii(value[i], path + '[' + i + ']', skipSet); if (f) return f; }
+      return null;
+    }
+    if (isObj(value)) {
+      for (const key of Object.keys(value)) {
+        const next = path ? path + '.' + key : key;
+        if (skipSet.has(next)) continue;
+        const f = findPii(value[key], next, skipSet);
+        if (f) return f;
+      }
+    }
+    return null;
+  }
+
   /* ── 도우미 ───────────────────────────────────────── */
 
   function isObj(v) { return !!v && typeof v === 'object' && !Array.isArray(v); }
@@ -696,6 +725,7 @@
     PARTNER_STATUS: PARTNER_STATUS, PARTNER_STATUS_LABEL: PARTNER_STATUS_LABEL, REFERRAL_STATUS: REFERRAL_STATUS, REFERRAL_STATUS_LABEL: REFERRAL_STATUS_LABEL, COARSE_STAGE_LABEL: COARSE_STAGE_LABEL,
     validatePartner: validatePartner, validateReferral: validateReferral, coarseStage: coarseStage, partnerStats: partnerStats, partnerStatement: partnerStatement,
     SYNC_KINDS: SYNC_KINDS, SYNC_KIND_LABEL: SYNC_KIND_LABEL, SYNC_TRACKS: SYNC_TRACKS, SYNC_TRACK_LABEL: SYNC_TRACK_LABEL, SYNC_STATUS: SYNC_STATUS, SYNC_STATUS_LABEL: SYNC_STATUS_LABEL,
+    PII_PATTERNS: PII_PATTERNS, PII_ALLOWED_PATHS: PII_ALLOWED_PATHS, hasPii: hasPii, findPii: findPii,
     ymdOf: ymdOf, parseYmd: parseYmd, validYmd: validYmd, addDays: addDays, addMonths: addMonths, daysBetween: daysBetween, ymOf: ymOf, weekdayKo: weekdayKo, childCall: childCall,
     normalizePhone: normalizePhone, maskPhone: maskPhone, validEmail: validEmail, clean: clean,
     detectChannel: detectChannel, detectHot: detectHot,
