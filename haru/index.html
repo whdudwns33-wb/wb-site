@@ -7,89 +7,140 @@
   <meta name="description" content="오늘 카드 한 장 — WB 독해력학원 원내 학습 도구 (원내 전용)">
   <meta name="robots" content="noindex, nofollow">
   <meta name="referrer" content="no-referrer">
-  <meta name="theme-color" content="#2B4C3F">
+  <meta name="theme-color" content="#2B4C3F" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#1C2420" media="(prefers-color-scheme: dark)">
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
   <style>
     /* 초4~초6 학생 화면 — 탭 없음, 카드 한 장. 놀이 요소 없음. 큰 글자·큰 버튼(태블릿 세로·폰). */
-    :root { --bg:#F5F3EE; --panel:#FFFFFF; --ink:#22302A; --soft:#6A7A72; --line:#E1E6E2; --green:#2B4C3F; --green-soft:#E6EFEA;
-            --mint:#8FB9A5; --amber:#B27B16; --amber-soft:#F8F1DF; --red:#B0483A; --red-soft:#F9E9E6; --blue:#2F5F8F; --blue-soft:#E7EEF6; }
+    /* 색은 전부 이 토큰으로만 쓴다(부모 화면이 같은 이름·값을 복사해 쓴다). 취침 전 저녁에 여는 앱이라 다크 한 벌을 같은 이름으로 둔다.
+       글자용 초록(--accent)과 버튼 바탕(--btn)을 나눈 까닭: 다크에서는 글자는 밝아야 하고 흰 글자를 얹을 버튼 바탕은 어두워야 해서 한 값으로 둘 다 못 한다.
+       --line 은 장식 구분선, --edge 는 눌러야 하는 것의 테두리(선택지·버블·입력칸 — 비텍스트 3:1). */
+    :root { color-scheme:light dark;
+            --bg:#F5F3EE; --panel:#FFFFFF; --ink:#22302A; --soft:#56645D; --line:#E1E6E2; --edge:#86938C;
+            --accent:#2B4C3F; --btn:#2B4C3F; --on-btn:#FFFFFF; --warn:#8A5A0B; --green-soft:#E6EFEA; --mint:#8FB9A5;
+            --amber:#7A4F00; --amber-soft:#F8F1DF; --red:#B0483A; --red-soft:#F9E9E6; --blue:#2F5F8F; --blue-soft:#E7EEF6;
+            --ok:#2E8B57; --ok-soft:#EAF5EE; --tint:#F8FAF8; --mute:#F1F1F1; --idle:#B7C0CC; }
+    @media (prefers-color-scheme:dark) {
+      :root { --bg:#141A17; --panel:#1C2420; --ink:#E6ECE8; --soft:#A3B1AA; --line:#2E3A34; --edge:#6E7D76;
+              --accent:#8FC7AE; --btn:#2E5546; --on-btn:#FFFFFF; --warn:#8A5A0B; --green-soft:#22352C; --mint:#4F7F69;
+              --amber:#E2B661; --amber-soft:#3A2F17; --red:#F0A090; --red-soft:#3A2220; --blue:#8DB9E6; --blue-soft:#1E2B3A;
+              --ok:#5FBF8C; --ok-soft:#1F3328; --tint:#18201C; --mute:#232B27; --idle:#5E6B65; }
+    }
     * { box-sizing:border-box; }
     html, body { margin:0; padding:0; min-height:100%; }
-    body { background:var(--bg); color:var(--ink); font-family:"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif; font-size:16px; line-height:1.6; word-break:keep-all; -webkit-font-smoothing:antialiased; }
+    /* 글자 크기는 rem/em — 기기의 글자 크기 설정을 따라가게 */
+    body { background:var(--bg); color:var(--ink); font-family:"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif; font-size:1rem; line-height:1.6; word-break:keep-all; -webkit-font-smoothing:antialiased; }
     button { font-family:inherit; font-size:inherit; cursor:pointer; border:none; background:none; color:inherit; }
-    input { font-family:inherit; font-size:1.05rem; }
+    input { font-family:inherit; font-size:1.05rem; color:var(--ink); background:var(--panel); }
     :focus-visible { outline:3px solid var(--blue); outline-offset:2px; border-radius:8px; }
     [hidden] { display:none !important; }
     .bar { display:flex; align-items:center; gap:12px; padding:10px 16px; background:var(--panel); border-bottom:1px solid var(--line); position:sticky; top:0; z-index:5; }
-    .bar .brand { font-weight:900; font-size:15px; color:var(--green); }
-    .bar .who { margin-left:auto; font-size:13px; color:var(--soft); }
+    .bar .brand { font-weight:900; font-size:.9375em; color:var(--accent); }
+    .bar .who { margin-left:auto; font-size:.8125em; color:var(--soft); }
     .bar .who b { color:var(--ink); }
-    .bar .dot { font-size:12px; color:var(--soft); white-space:nowrap; }
-    .bar .dot i { display:inline-block; width:8px; height:8px; border-radius:50%; background:#B7C0CC; margin-right:4px; }
-    .bar .dot.saved i { background:#2E8B57; } .bar .dot.pending i { background:var(--amber); } .bar .dot.failed i { background:var(--red); }
+    .bar .dot { font-size:.75em; color:var(--soft); white-space:nowrap; }
+    .bar .dot i { display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--idle); margin-right:4px; }
+    .bar .dot.saved i { background:var(--ok); } .bar .dot.pending i { background:var(--amber); } .bar .dot.failed i { background:var(--red); }
     main { max-width:640px; margin:0 auto; padding:16px 16px 48px; }
     .card { background:var(--panel); border:1px solid var(--line); border-radius:16px; padding:18px 18px; margin-bottom:14px; }
-    .card h2 { margin:0 0 10px; font-size:17px; color:var(--green); }
+    .card h2 { margin:0 0 10px; font-size:1.0625em; color:var(--accent); }
+    .card h3 { margin:16px 0 8px; font-size:.9375em; font-weight:900; display:flex; align-items:baseline; gap:8px; }
+    .card h3 .small { font-weight:700; }
+    .chip { display:inline-block; font-size:.8125em; font-weight:800; line-height:1.5; padding:1px 9px; border-radius:99px; background:var(--green-soft); color:var(--accent); margin:0 4px 2px 0; }
+    .chip.fin { background:var(--btn); color:var(--on-btn); }
     .slot { display:flex; gap:12px; align-items:flex-start; padding:12px 0; border-top:1px solid var(--line); }
     .slot:first-of-type { border-top:none; padding-top:4px; }
-    .slot .k { flex:none; width:28px; height:28px; border-radius:50%; background:var(--green-soft); color:var(--green); font-weight:900; display:flex; align-items:center; justify-content:center; font-size:14px; }
+    .slot .k { flex:none; width:2em; height:2em; border-radius:50%; background:var(--green-soft); color:var(--accent); font-weight:900; display:flex; align-items:center; justify-content:center; font-size:.875em; }
+    .slot .k svg { width:1.1em; height:1.1em; }
     .slot .t { font-weight:800; }
-    .slot .w { font-size:13.5px; color:var(--soft); }
-    .slot.done .k { background:var(--green); color:#fff; }
-    .big { display:block; width:100%; min-height:58px; border-radius:14px; background:var(--green); color:#fff; font-weight:900; font-size:18px; margin-top:8px; }
-    .big:disabled { opacity:.45; cursor:default; }
-    .big.ghost { background:var(--panel); color:var(--green); border:2px solid var(--green); }
-    .big.warn { background:var(--amber); }
+    .slot .w { font-size:.84375em; color:var(--soft); }
+    .slot.done .k { background:var(--btn); color:var(--on-btn); }
+    .slot.done .t { color:var(--soft); }
+    .big { display:block; width:100%; min-height:58px; border-radius:14px; background:var(--btn); color:var(--on-btn); font-weight:900; font-size:1.125em; margin-top:8px; }
+    .big:disabled { background:var(--line); color:var(--soft); cursor:default; }
+    .big.ghost { background:var(--panel); color:var(--accent); border:2px solid var(--accent); }
+    .big.warn { background:var(--warn); }
+    /* 마무리 말은 버튼이 아니라 안내 상자 — 꺼진 버튼으로 그리면 칭찬이 '고장 난 버튼'으로 읽힌다 */
+    .rest { background:var(--green-soft); color:var(--accent); font-weight:900; font-size:1.125em; text-align:center; padding:18px; border-radius:14px; margin-top:8px; }
     .row { display:flex; gap:10px; flex-wrap:wrap; }
     .row > * { flex:1; }
-    .small { font-size:13px; color:var(--soft); }
-    .foot { font-size:12px; color:var(--soft); line-height:1.5; margin-top:20px; padding-top:10px; border-top:1px solid var(--line); }
-    .env { background:var(--amber-soft); border-radius:12px; padding:10px 12px; font-size:14px; margin-top:10px; }
-    .env label { display:flex; gap:8px; align-items:center; min-height:40px; }
+    .small { font-size:.8125em; color:var(--soft); }
+    .foot { font-size:.8125em; color:var(--soft); line-height:1.5; margin-top:20px; padding-top:10px; border-top:1px solid var(--line); }
+    .env { background:var(--amber-soft); border-radius:12px; padding:10px 12px; font-size:.875em; margin-top:10px; }
+    .env label { display:flex; gap:10px; align-items:center; min-height:48px; }
+    .env input { flex:none; width:1.5rem; height:1.5rem; margin:0; accent-color:var(--accent); }
     .banner { background:var(--blue-soft); color:var(--blue); border-radius:12px; padding:12px 14px; font-weight:800; margin-bottom:14px; }
     .err { background:var(--red-soft); color:var(--red); border-radius:12px; padding:10px 14px; font-weight:700; margin-bottom:14px; }
     /* 러너 */
-    .prog { height:8px; background:var(--line); border-radius:99px; overflow:hidden; margin-bottom:12px; }
-    .prog i { display:block; height:100%; background:var(--green); width:0; transition:width .3s; }
-    .q .head { font-size:13px; color:var(--soft); font-weight:800; margin-bottom:6px; }
-    .q .stem { border-left:4px solid var(--mint); padding:6px 12px; margin:8px 0; background:#F8FAF8; border-radius:0 8px 8px 0; white-space:pre-line; }
-    .q .ask { font-size:17px; font-weight:800; margin:6px 0 12px; }
+    .prog { height:10px; background:var(--green-soft); border:1px solid var(--edge); border-radius:99px; overflow:hidden; margin-bottom:12px; }
+    .prog i { display:block; height:100%; background:var(--accent); width:0; transition:width .3s; }
+    .q .head { font-size:.8125em; color:var(--soft); font-weight:800; margin-bottom:6px; }
+    .q .stem { border-left:4px solid var(--mint); padding:6px 12px; margin:8px 0; background:var(--tint); border-radius:0 8px 8px 0; white-space:pre-line; }
+    .q .ask { font-size:1.0625em; font-weight:800; margin:6px 0 12px; }
     .q .neg { text-decoration:underline; text-underline-offset:3px; }
-    .choice { display:flex; align-items:center; gap:12px; width:100%; min-height:56px; padding:10px 14px; margin:8px 0; border:2px solid var(--line); border-radius:14px; background:var(--panel); text-align:left; font-size:16px; }
-    .choice .n { flex:none; width:30px; height:30px; border-radius:50%; background:var(--green-soft); color:var(--green); font-weight:900; display:flex; align-items:center; justify-content:center; }
-    .choice.ok { border-color:#2E8B57; background:#EAF5EE; }
-    .choice.picked { border-color:var(--red); background:var(--red-soft); }
+    .choice { display:flex; align-items:center; gap:12px; width:100%; min-height:56px; padding:10px 14px; margin:8px 0; border:2px solid var(--edge); border-radius:14px; background:var(--panel); text-align:left; font-size:1em; }
+    .choice .n { flex:none; width:1.875em; height:1.875em; border-radius:50%; background:var(--green-soft); color:var(--accent); font-weight:900; display:flex; align-items:center; justify-content:center; }
+    .choice .ct { flex:1; min-width:0; }
+    .choice .tag { flex:none; font-size:.8125em; font-weight:800; color:var(--blue); }
+    /* 내가 고른 답은 중립(파랑)으로만 — 빨강은 결손 표시라 쓰지 않는다. 정답이기도 하면 초록이 이긴다 */
+    .choice.mine { border-color:var(--blue); background:var(--blue-soft); }
+    .choice.ok { border-color:var(--ok); background:var(--ok-soft); }
     .choice:disabled { cursor:default; }
+    .fb { scroll-margin-top:calc(var(--barh, 48px) + 12px); scroll-margin-bottom:16px; }
+    .fb:focus { outline:none; }
     .expl { background:var(--green-soft); border-radius:12px; padding:12px 14px; margin-top:12px; }
-    .cue { background:var(--amber-soft); border-radius:12px; padding:10px 14px; margin:10px 0; font-size:15px; }
-    .skip { min-height:48px; border-radius:12px; border:2px dashed var(--line); width:100%; color:var(--soft); margin-top:8px; }
-    /* 좌표 */
-    .grid { display:grid; grid-template-columns:repeat(2, 1fr); gap:8px; }
-    .cell { border-radius:12px; padding:10px 12px; border:1px solid var(--line); background:var(--panel); min-height:70px; }
-    .cell.unknown { background:#F1F1F1; color:var(--soft); }
-    .cell.hole { background:var(--amber-soft); }
-    .cell.shaky { background:var(--blue-soft); }
-    .cell.fluent { background:var(--green-soft); }
-    .cell b { display:block; font-size:14px; }
-    .cell span { font-size:12.5px; color:var(--soft); }
-    /* 답안지 */
-    .timer { font-size:34px; font-weight:900; text-align:center; font-variant-numeric:tabular-nums; margin:6px 0; }
+    .cue { background:var(--amber-soft); border-radius:12px; padding:10px 14px; margin:10px 0; font-size:.9375em; }
+    .skip { min-height:48px; border-radius:12px; border:2px dashed var(--edge); width:100%; color:var(--soft); margin-top:8px; }
+    /* 좌표 — minmax(0,1fr): 1fr 의 최소폭은 auto 라서 keep-all 인 긴 라벨이 열을 불린다 */
+    .grid { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:8px; }
+    .cell { min-width:0; overflow-wrap:anywhere; border-radius:12px; padding:10px 12px; border:1px solid var(--line); background:var(--panel); min-height:70px; }
+    .cell.unknown, .legend i.unknown { background:var(--mute); }
+    .cell.unknown { color:var(--soft); }
+    .cell.hole, .legend i.hole { background:var(--amber-soft); }
+    .cell.shaky, .legend i.shaky { background:var(--blue-soft); }
+    .cell.fluent, .legend i.fluent { background:var(--green-soft); }
+    .cell b { display:block; font-size:.875em; }
+    .cell span { font-size:.78125em; color:var(--soft); }
+    .legend { display:grid; grid-template-columns:repeat(2, max-content); gap:2px 16px; margin:0 0 4px; font-size:.8125em; color:var(--soft); }
+    .legend span { display:inline-flex; align-items:center; gap:6px; }
+    .legend i { width:14px; height:14px; border-radius:4px; border:1px solid var(--edge); }
+    /* 답안지 — 남은 시간·표시 수는 13번 아래를 마킹할 때도 보여야 한다(시간 압박 훈련이 화면에서 성립하게) */
+    .omrbar { position:sticky; top:var(--barh, 48px); z-index:4; background:var(--panel); margin:0 -18px 6px; padding:4px 18px 8px; border-bottom:1px solid var(--line); text-align:center; }
+    .timer { font-size:2.125em; font-weight:900; text-align:center; font-variant-numeric:tabular-nums; margin:6px 0; }
+    .omrbar .timer { margin:0; line-height:1.2; }
     .timer.low { color:var(--amber); }
+    .tally { font-size:.875em; font-weight:700; color:var(--soft); font-variant-numeric:tabular-nums; }
+    .tcue { font-size:.9375em; font-weight:900; color:var(--amber); }
+    .tcue:empty { display:none; }
     .omr { width:100%; border-collapse:collapse; }
     .omr td { padding:4px 2px; border-bottom:1px solid var(--line); text-align:center; }
+    .omr tr:nth-child(5n) td { border-bottom:2px solid var(--edge); }
     .omr td.no { width:36px; font-weight:800; color:var(--soft); }
-    .omr tr.passed td.no { outline:2px solid var(--amber); border-radius:8px; }
-    .omr .b { width:44px; height:44px; border-radius:50%; border:2px solid var(--line); font-weight:900; font-size:16px; }
-    .omr .b.on { background:var(--green); color:#fff; border-color:var(--green); }
-    .omr .p { min-width:44px; height:36px; border-radius:8px; border:1px solid var(--line); font-size:12px; color:var(--soft); }
-    .omr .p.on { background:var(--amber-soft); color:var(--amber); border-color:var(--amber); }
+    .omr tr.passed td.no { outline:2px solid var(--amber); outline-offset:-2px; border-radius:8px; }
+    .omr .b { width:44px; height:44px; border-radius:50%; border:2px solid var(--edge); font-weight:900; font-size:1em; }
+    .omr .b.on { background:var(--btn); color:var(--on-btn); border-color:var(--accent); }
+    .omr .p { min-width:44px; min-height:44px; padding:0 6px; border-radius:8px; border:1px solid var(--edge); font-size:.875em; color:var(--soft); }
+    .omr .p.on { background:var(--amber-soft); color:var(--amber); border-color:var(--amber); font-weight:800; }
+    .confirm { background:var(--amber-soft); border-radius:12px; padding:12px 14px; margin-top:12px; scroll-margin-bottom:16px; }
+    .confirm .sum { margin:0 0 4px; font-weight:900; }
+    .confirm .small { margin:0 0 4px; }
     .lock { text-align:center; padding:30px 10px; }
-    .lock .t { font-size:22px; font-weight:900; color:var(--green); }
-    .kv { display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--line); }
+    .lock .t { font-size:1.375em; font-weight:900; color:var(--accent); }
+    .kv { display:flex; justify-content:space-between; align-items:baseline; gap:12px; padding:8px 0; border-bottom:1px solid var(--line); }
     .kv:last-child { border-bottom:none; }
-    .link input { width:100%; min-height:54px; padding:0 14px; border:2px solid var(--line); border-radius:14px; }
-    @media (min-width:520px) { .grid { grid-template-columns:repeat(4, 1fr); } }
+    .link input { width:100%; min-height:54px; padding:0 14px; border:2px solid var(--edge); border-radius:14px; }
+    .link input::placeholder { color:var(--soft); opacity:1; }
+    @media (min-width:520px) { .grid { grid-template-columns:repeat(4, minmax(0, 1fr)); } .legend { grid-template-columns:repeat(4, max-content); } }
+    /* 태블릿 세로 — 폰 크기 글자로 두면 문항이 640px 기둥에 작게 남는다. 답안지는 버블이 흩어지지 않게 폭을 묶는다 */
+    @media (min-width:700px) {
+      body { font-size:1.125rem; }
+      main { max-width:720px; }
+      .q .ask { font-size:1.25rem; }
+      .choice { font-size:1.125rem; min-height:64px; }
+      .omr { max-width:460px; margin:0 auto; }
+    }
+    @media (prefers-reduced-motion:reduce) { .prog i { transition:none; } }
   </style>
 </head>
 <body>
@@ -109,7 +160,10 @@
   'use strict';
   (function () {
     var S = WBHARU_S, P = WBHARU_P, M = WBHARU_M, R = WBHARU_R, C = WBHARU_C;
-    var CIR = ['①', '②', '③', '④', '⑤'];
+    var CIR = ['①', '②', '③', '④', '⑤'];   // 문장 속 번호용('정답은 ③'). 원 바탕 안에는 맨 숫자를 쓴다 — 원이 두 겹이 된다
+    var SUBJ = { kor: '국어', math: '수학', eng: '영어' };
+    var NET_MSG = '인터넷이 연결되지 않았어요. 연결되면 다시 해 봐요.';
+    var CHECK = '<svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
     var LS_STATE = 'wbh.state', LS_OMR = 'wbh.omr';
     var $ = function (id) { return document.getElementById(id); };
     var esc = function (s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
@@ -125,10 +179,17 @@
       return fetch('/api/haru' + path, Object.assign({ headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + a.token } }, opt || {}))
         .then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { if (!r.ok) { var e = new Error(j.error || ('api-' + r.status)); e.status = r.status; throw e; } return j; }); });
     }
+    /* 아이 화면에 나가는 오류 문장 — 서버가 준 한국어 문장은 그대로 두고, 브라우저 원문('Failed to fetch')·내부 코드('api-500')는 아이 말로 바꾼다 */
+    function errText(e, fallback) {
+      var m = String((e && e.message) || '');
+      if (e && e.status) return !m || /^api-\d+$/.test(m) ? fallback : m;
+      if (navigator.onLine === false || /fetch|network|load failed/i.test(m)) return NET_MSG;
+      return fallback;
+    }
     function setDot(cls, txt) { var d = $('savedot'); d.className = 'dot ' + cls; $('savetxt').textContent = txt; }
 
     /* ── 로컬 상태 — 서버 GET /state 가 원천, 기기 캐시는 오프라인 표시용 ── */
-    var DB = null, PLAN = null, ATOMS = null, TODAY = null, CORE = [];
+    var DB = null, PLAN = null, ATOMS = null, TODAY = null, CORE = [], RETRO = null;
     function loadCache() { try { return JSON.parse(localStorage.getItem(LS_STATE) || 'null'); } catch (e) { return null; } }
     function cache() { try { localStorage.setItem(LS_STATE, JSON.stringify(DB)); } catch (e) {} }
     function blank() { return { v: 2, days: {}, atoms: {}, seenPeri: {}, wrong: [], passages: [], words: {}, envelopeDone: {}, summary: {} }; }
@@ -164,37 +225,62 @@
     }
 
     /* ── 화면 ── */
-    function render(html) { app.innerHTML = html; window.scrollTo(0, 0); }
+    /* keep: 같은 문항 위에 결과만 덧그릴 때 — 스크롤을 그대로 두고 showResult 가 결과 상자로 데려간다. 새 화면(새 문항 등)은 맨 위부터 */
+    function render(html, keep) { app.innerHTML = html; if (!keep) window.scrollTo(0, 0); }
     function footer() { return '<div class="foot">' + esc(NOTICE || '본 앱은 WB 독해력학원이 제작한 사설 학습 도구이며, 호남삼육중학교와 어떠한 제휴·후원 관계도 없습니다. 전형 관련 공식 정보는 학교 홈페이지와 모집요강에서 확인하십시오.') + '</div>'; }
+    function motion() { return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'; }
+    /* 답안지 타이머 줄·결과 상자는 머리 막대 바로 아래에 붙는다 — 글자 크기 설정에 따라 막대 높이가 달라서 잰다 */
+    function measureBar() { document.documentElement.style.setProperty('--barh', document.querySelector('.bar').offsetHeight + 'px'); }
+    function pad2(n) { return (n < 10 ? '0' : '') + n; }
 
-    function showLink(msg) {
-      render('<div class="card link"><h2>선생님께 받은 학생 코드</h2>' + (msg ? '<div class="err">' + esc(msg) + '</div>' : '') +
-        '<input id="code" inputmode="latin" autocomplete="off" placeholder="wb-…"><button class="big" id="go">연결 요청</button>' +
-        '<p class="small">요청하면 선생님이 승인해 줘요. 승인되면 이 기기에서는 다시 입력할 일이 없어요.</p></div>' + footer());
-      $('go').onclick = function () {
-        var code = ($('code').value || '').trim(); if (!code) return;
-        $('go').disabled = true;
+    var LINK_SEQ = 0;   // 승인 대기 폴링의 세대 — [코드 다시 입력] 뒤에 이전 폴링이 새 화면을 덮지 않게
+    function showLink(msg, typed) {
+      LINK_SEQ++;
+      render('<form class="card link" id="lf" novalidate><h2><label for="code">선생님께 받은 학생 코드</label></h2>' + (msg ? '<div class="err" id="lerr">' + esc(msg) + '</div>' : '') +
+        /* 학생 코드는 대소문자를 가린다(서버 정확 일치) — 태블릿이 첫 글자를 대문자로 바꾸지 않게 자동 고침을 모두 끈다. 소문자로 바꾸지도 않는다 */
+        '<input id="code" name="code" type="text" inputmode="text" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="off" enterkeyhint="go" placeholder="wb-…"' + (msg ? ' aria-invalid="true" aria-describedby="lerr"' : '') + '>' +
+        '<button class="big" id="go" type="submit">연결 요청</button>' +
+        '<p class="small">요청하면 선생님이 승인해 줘요. 승인되면 이 기기에서는 다시 입력할 일이 없어요.</p></form>' + footer());
+      var input = $('code');
+      /* 오류가 나도 친 글자를 남긴다 — 무엇을 잘못 쳤는지 아이가 보고 고칠 수 있게 */
+      if (typed) input.value = typed;
+      if (msg) { input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
+      $('lf').onsubmit = function (ev) {
+        ev.preventDefault();
+        var code = (input.value || '').trim(); if (!code) { input.focus(); return; }
+        var go = $('go'); go.disabled = true; go.textContent = '보내는 중…';
         fetch('/api/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: code, device: 'haru ' + (navigator.platform || '') }) })
           .then(function (r) { return r.json(); })
           .then(function (j) {
-            if (!j.nonce) { showLink(j.error || '연결할 수 없어요.'); return; }
-            render('<div class="card"><h2>' + esc(j.name || '') + ' — 선생님 승인을 기다려요</h2><p class="small">승인되면 저절로 시작해요. 이 화면을 닫지 마세요.</p></div>' + footer());
-            var poll = function () {
-              fetch('/api/login/status?n=' + j.nonce).then(function (r) { return r.json(); }).then(function (s) {
-                if (s.token) { saveAuth({ token: s.token, code: s.student ? s.student.code : code, name: s.student ? s.student.name : '' }); boot(); return; }
-                if (s.denied) { showLink('선생님이 승인하지 않았어요.'); return; }
-                if (s.error) { showLink(s.error); return; }
-                setTimeout(poll, 3000);
-              }).catch(function () { setTimeout(poll, 5000); });
-            };
-            setTimeout(poll, 2500);
-          }).catch(function () { showLink('네트워크가 연결되지 않았어요.'); });
+            if (!j.nonce) { showLink(j.error || '연결할 수 없어요.', code); return; }
+            showPending(j, code);
+          }).catch(function () { showLink(NET_MSG, code); });
       };
+    }
+    function showPending(j, code) {
+      var seq = LINK_SEQ;
+      render('<div class="card"><h2>' + (j.name ? esc(j.name) + ' — ' : '') + '선생님 승인을 기다려요</h2><p class="small">승인되면 저절로 시작해요. 이 화면을 닫지 마세요.</p>' +
+        '<button class="big ghost" id="again" type="button">코드 다시 입력</button></div>' + footer());
+      $('again').onclick = function () { showLink('', code); };
+      var poll = function () {
+        if (seq !== LINK_SEQ) return;
+        fetch('/api/login/status?n=' + j.nonce).then(function (r) { return r.json(); }).then(function (s) {
+          if (seq !== LINK_SEQ) return;
+          if (s.token) { saveAuth({ token: s.token, code: s.student ? s.student.code : code, name: s.student ? s.student.name : '' }); boot(); return; }
+          if (s.denied) { showLink('선생님이 승인하지 않았어요.', code); return; }
+          if (s.error) { showLink(s.error, code); return; }
+          setTimeout(poll, 3000);
+        }).catch(function () { if (seq === LINK_SEQ) setTimeout(poll, 5000); });
+      };
+      setTimeout(poll, 2500);
     }
 
     function todayKey() { return P.kstDate(Date.now()); }
     function dayRec() { var k = todayKey(); if (!DB.days[k]) DB.days[k] = { sat: false, min: 0, blocks: 0, items: 0 }; return DB.days[k]; }
     function mockToday() { if (!PLAN) return null; var k = todayKey(); return (PLAN.days || []).filter(function (d) { return d.d === k && d.kind === 'mock' && d.app; })[0] || null; }
+    /* 회고 제목·버튼은 서버가 센 일수 하나로 — 버튼과 제목의 숫자가 달라지지 않게 */
+    function retroTitle() { return (RETRO && RETRO.totalDays ? RETRO.totalDays + '일 동안' : '그동안') + ' 네가 만든 것'; }
+    function loadRetro() { return PLAN && PLAN.retro ? api('/retro').then(function (j) { RETRO = j.retro; }).catch(function () {}) : Promise.resolve(); }
 
     function showHome(err) {
       var now = Date.now(), ph = PLAN ? PLAN.phase : null;
@@ -203,26 +289,33 @@
       var html = '';
       if (err) html += '<div class="err">' + esc(err) + '</div>';
       if (PLAN && PLAN.locked) {
-        html += '<div class="card"><h2>오늘은 카드가 없어요</h2><p>여기까지 온 것으로 충분해요. 푹 쉬세요.</p>' + (PLAN.retro ? '<button class="big ghost" id="retro">' + esc('51일 동안 네가 한 것') + '</button>' : '') + '</div>';
+        html += '<div class="card"><h2>오늘은 카드가 없어요</h2><p>여기까지 온 것으로 충분해요. 푹 쉬세요.</p>' + (PLAN.retro ? '<button class="big ghost" id="retro">' + esc(retroTitle()) + '</button>' : '') + '</div>';
         render(html + footer()); if ($('retro')) $('retro').onclick = showRetro; return;
       }
       var mock = mockToday();
-      if (mock) html += '<div class="banner">오늘은 회차예요 — ' + esc(mock.note || '') + '<button class="big" id="omr">답안지 열기</button></div>';
+      /* 플랜 note 는 강사용 메모라 아이에게 그대로 보이지 않는다 — 교시 수만 아이 말로 */
+      if (mock) html += '<div class="banner">오늘은 회차예요 — ' + ((mock.subjects || ['kor', 'math', 'eng']).length > 1 ? '시험처럼 세 교시를 이어서 풀어요.' : '시험처럼 한 교시를 풀어요.') + '<button class="big" id="omr">답안지 열기</button></div>';
       html += '<div class="card"><h2>오늘 카드</h2>';
       if (!slots.length) html += '<p class="small">오늘은 카드가 비어 있어요. 종이 봉투가 있으면 그것을 해요.</p>';
-      slots.forEach(function (s, i) { html += '<div class="slot' + (day.done && day.done[i] ? ' done' : '') + '"><div class="k">' + (i + 1) + '</div><div><div class="t">' + esc(s.label) + ' — ' + esc(s.atomLabel) + '</div><div class="w">' + esc(s.why) + '</div></div></div>'; });
+      /* 완료 표시는 원자 id 로 단다 — 슬롯 순번으로 달면 [오늘 더 할래]의 새 슬롯이 앞 블록의 표시를 물려받는다(옛 숫자 키는 원자 id 와 겹치지 않아 저절로 무시된다) */
+      slots.forEach(function (s, i) {
+        var done = !!(day.done && day.done[s.atomId] === true);
+        html += '<div class="slot' + (done ? ' done' : '') + '"><div class="k">' + (done ? CHECK : (i + 1)) + '</div><div><div><span class="chip">' + esc(s.label) + '</span>' + (done ? '<span class="chip fin">했어요</span>' : '') + '</div><div class="t">' + esc(s.atomLabel) + '</div><div class="w">' + esc(s.why) + '</div></div></div>';
+      });
       if (TODAY && TODAY.envelope && TODAY.envelope.items && TODAY.envelope.items.length) {
         html += '<div class="env">📄 이번 주 종이 봉투' + TODAY.envelope.items.map(function (it, i) { var k = TODAY.envelope.week + ':' + it.atomId; return '<label><input type="checkbox" data-env="' + esc(k) + '"' + (DB.envelopeDone[k] ? ' checked' : '') + '> ' + esc(it.label) + '</label>'; }).join('') + '</div>';
       }
-      var canStart = slots.length > 0 && !(day.sat && day.blocks >= 1 + (ph ? ph.extendMax || 0 : 0));
-      html += '<button class="big" id="sit" ' + (canStart ? '' : 'disabled') + '>' + (day.sat ? (day.blocks >= 1 + (ph ? ph.extendMax || 0 : 0) ? '오늘은 여기까지. 자러 가자.' : '오늘 더 할래 (+' + (ph ? ph.extendBlockMin || 15 : 15) + '분)') : '앉았다') + '</button>';
+      var capped = day.sat && day.blocks >= 1 + (ph ? ph.extendMax || 0 : 0);
+      if (capped) html += '<div class="rest">오늘은 여기까지. 자러 가자.</div>';
+      /* 회차 날의 '지금 할 일'은 답안지 하나 — [앉았다]는 고스트로 낮춘다 */
+      else if (slots.length) html += '<button class="big' + (mock ? ' ghost' : '') + '" id="sit">' + (day.sat ? '오늘 더 할래 (+' + (ph ? ph.extendBlockMin || 15 : 15) + '분)' : '앉았다') + '</button>';
       if (ph && !day.sat) html += '<p class="small">오늘 예상 ' + esc(String(TODAY && TODAY.minEstimate || ph.dailyMin || 15)) + '분</p>';
       html += '</div>';
       var conf = 0; CORE.forEach(function (id) { if (gradeOf(id, now) === 'fluent') conf++; });
       var sat = Object.keys(DB.days).filter(function (d) { return DB.days[d].sat; }).length;
       html += '<div class="card"><div class="kv"><span>좌표 ' + CORE.length + '칸 중 붙은 칸</span><b>' + conf + '</b></div><div class="kv"><span>앉은 날</span><b>' + sat + '</b></div>' +
         (ph && ph.phase !== 'p1' && PLAN.dday != null ? '<div class="kv"><span class="small">시험까지</span><span class="small">' + esc(String(PLAN.dday)) + '일</span></div>' : '') +
-        '<div class="row"><button class="big ghost" id="map">좌표 보기</button>' + (PLAN && PLAN.retro ? '<button class="big ghost" id="retro">51일 동안 네가 한 것</button>' : '') + '</div></div>';
+        '<div class="row"><button class="big ghost" id="map">좌표 보기</button>' + (PLAN && PLAN.retro ? '<button class="big ghost" id="retro">' + esc(retroTitle()) + '</button>' : '') + '</div></div>';
       render(html + footer());
       if ($('omr')) $('omr').onclick = function () { showOmr(mock); };
       if ($('map')) $('map').onclick = showMap;
@@ -235,7 +328,7 @@
     var RUN = null;
     function startRunner() {
       var day = dayRec();
-      RUN = { slots: (TODAY && TODAY.slots) || [], si: 0, qi: 0, items: [], startedAt: Date.now(), answered: 0, block: day.sat ? day.blocks + 1 : 1, mixedPool: [] };
+      RUN = { slots: (TODAY && TODAY.slots) || [], si: 0, qi: 0, items: [], startedAt: Date.now(), answered: 0, block: day.sat ? day.blocks + 1 : 1, mixedPool: [], packs: {} };
       if (!day.sat) { day.sat = true; day.startedAt = new Date().toTimeString().slice(0, 5); }
       day.blocks = RUN.block;
       cache();
@@ -244,36 +337,68 @@
     function nextSlot() {
       if (RUN.si >= RUN.slots.length) { finishRunner(); return; }
       var slot = RUN.slots[RUN.si];
-      render('<div class="card"><div class="prog"><i style="width:' + Math.round(RUN.si / RUN.slots.length * 100) + '%"></i></div><h2>' + esc(slot.label) + ' — ' + esc(slot.atomLabel) + '</h2><p class="small">문항을 불러오는 중…</p></div>');
+      render('<div class="card"><div class="prog"><i style="width:' + Math.round(RUN.si / RUN.slots.length * 100) + '%"></i></div><span class="chip">' + esc(slot.label) + '</span><h2>' + esc(slot.atomLabel) + '</h2><p class="small">문항을 불러오는 중…</p></div>');
       fetchItems(slot, 3).then(function (items) {
         if (!items.length) { RUN.si++; nextSlot(); return; }
         RUN.items = items; RUN.qi = 0; askItem();
-      }).catch(function (e) { showHome(e.message || '문항을 받지 못했어요.'); });
+      }).catch(function (e) { showHome(errText(e, '문항을 받지 못했어요.')); });
     }
-    function fetchItems(slot, n) {
+    function refKey(it) { return it.gid || (it.packId + '#' + it.no); }
+    function sigOf(it) { return [it.instructionKo, it.stemKo || ''].concat((it.choices || []).map(function (c) { return c.text; })).join('|'); }
+    /* exclude: 이 칸에서 이미 정답을 보여 준 문항. 30초 반증이 그중 하나를 다시 내면 아이는 방금 본 답을 고르고,
+       원인이 '문제 오독'(cause.js misread)으로 잘못 남는다 — 그래서 반증 풀에서 뺀다. 생성기는 seed 가 달라도 같은 문장이 나올 수 있어 내용으로도 거른다 */
+    function fetchItems(slot, n, exclude) {
+      var skip = {}, sig = {};
+      (exclude || []).forEach(function (it) { skip[refKey(it)] = true; sig[sigOf(it)] = true; });
       if (slot.source === 'gen') {
         var seeds = []; for (var i = 0; i < n; i++) seeds.push(Math.floor(Math.random() * 2147483646) + 1);
-        return Promise.all(seeds.map(function (sd) { return api('/gen?atomId=' + encodeURIComponent(slot.atomId) + '&seed=' + sd).then(function (j) { return j.item; }); }));
+        return Promise.all(seeds.map(function (sd) { return api('/gen?atomId=' + encodeURIComponent(slot.atomId) + '&seed=' + sd).then(function (j) { return j.item; }); }))
+          .then(function (items) { return exclude ? items.filter(function (it) { return it && !skip[it.gid] && !sig[sigOf(it)]; }) : items; });
       }
       if (!slot.packId) return Promise.resolve([]);
-      return api('/pack?id=' + encodeURIComponent(slot.packId)).then(function (j) {
-        var s = DB.atoms[slot.atomId] || { seen: {} };
-        var pool = (j.pack.items || []).filter(function (it) { return it.atomId === slot.atomId; })
-          .sort(function (a, b) { return ((s.seen || {})[slot.packId + '#' + a.no] || 0) - ((s.seen || {})[slot.packId + '#' + b.no] || 0) || Math.random() - 0.5; }).slice(0, n);
-        var byId = {}; (j.pack.passages || []).forEach(function (p) { byId[p.id] = p; });
-        return pool.map(function (it) { return Object.assign({ packId: slot.packId, passage: it.setId && byId[it.setId] ? byId[it.setId] : null }, it); });
-      });
+      return packOf(slot.packId).then(function (pack) { return pickPack(slot, pack, n, skip); });
+    }
+    /* 한 번 앉은 동안 팩은 한 번만 받는다 — 반증을 낼 문항이 남았는지 2지선다를 띄우기 전에 바로 알아야 해서 */
+    function packOf(id) {
+      if (RUN && RUN.packs[id]) return Promise.resolve(RUN.packs[id]);
+      return api('/pack?id=' + encodeURIComponent(id)).then(function (j) { if (RUN) RUN.packs[id] = j.pack; return j.pack; });
+    }
+    function pickPack(slot, pack, n, skip) {
+      var s = DB.atoms[slot.atomId] || { seen: {} };
+      var pool = (pack.items || []).filter(function (it) { return it.atomId === slot.atomId && !(skip && skip[slot.packId + '#' + it.no]); })
+        .sort(function (a, b) { return ((s.seen || {})[slot.packId + '#' + a.no] || 0) - ((s.seen || {})[slot.packId + '#' + b.no] || 0) || Math.random() - 0.5; }).slice(0, n);
+      var byId = {}; (pack.passages || []).forEach(function (p) { byId[p.id] = p; });
+      return pool.map(function (it) { return Object.assign({ packId: slot.packId, passage: it.setId && byId[it.setId] ? byId[it.setId] : null }, it); });
     }
     function itemHtml(it, opts) {
       var q = esc(it.instructionKo).replace(/(옳지 않은|일치하지 않는|아닌|틀린|다른 하나)/g, '<span class="neg">$1</span>');
+      var off = opts && opts.done ? ' disabled' : '';
       var h = '<div class="q">';
       if (it.passage) h += '<div class="stem">' + esc(it.passage.textKo) + '</div>';
       if (it.stemKo) h += '<div class="stem">' + esc(it.stemKo) + '</div>';
       h += '<div class="ask">' + q + '</div>';
-      (it.choices || []).forEach(function (c, i) { h += '<button class="choice" data-key="' + esc(c.key) + '"><span class="n">' + (CIR[i] || c.key) + '</span><span>' + esc(c.text) + '</span></button>'; });
+      (it.choices || []).forEach(function (c, i) { h += '<button class="choice" data-key="' + esc(c.key) + '"' + off + '><span class="n">' + (i + 1) + '</span><span class="ct">' + esc(c.text) + '</span></button>'; });
       if (opts && opts.dontKnow) h += '<button class="skip" data-key="skip">모름 — 다음에 다시 만날래요</button>';
       h += '</div>';
       return h;
+    }
+    /* 결과 화면도 문항 화면과 같은 머리(진행 막대·순번)를 둔다 — 위쪽 높이가 같아야 스크롤을 그대로 둘 수 있다 */
+    function runHead(slot) {
+      return '<div class="prog"><i style="width:' + Math.round((RUN.si + RUN.qi / RUN.items.length) / RUN.slots.length * 100) + '%"></i></div>' +
+        '<div class="q"><div class="head">' + esc(slot.label) + ' · ' + (RUN.qi + 1) + '/' + RUN.items.length + '</div></div>';
+    }
+    function markChoices(answerKey, picked) {
+      Array.prototype.forEach.call(document.querySelectorAll('.choice'), function (b) {
+        var k = b.getAttribute('data-key');
+        if (answerKey != null && k === String(answerKey)) b.classList.add('ok');
+        if (picked && picked !== 'skip' && k === picked) { b.classList.add('mine'); b.insertAdjacentHTML('beforeend', '<span class="tag">내가 고른 답</span>'); }
+      });
+    }
+    /* 결과는 답을 누른 자리에 그대로 그리고 결과 상자를 화면 가운데로 데려온다 — 맨 위로 튀면 아이는 결과가 나왔는지도 모른 채 지문을 다시 본다 */
+    function showResult() {
+      var fb = $('fb'); if (!fb) return;
+      fb.scrollIntoView({ block: fb.offsetHeight > window.innerHeight * 0.7 ? 'start' : 'center', behavior: motion() });
+      fb.focus({ preventScroll: true });
     }
     function askItem(cueText) {
       var slot = RUN.slots[RUN.si], it = RUN.items[RUN.qi];
@@ -297,7 +422,7 @@
       Array.prototype.forEach.call(document.querySelectorAll('.choice, .skip'), function (b) { b.disabled = true; });
       api('/answer', { method: 'POST', body: JSON.stringify(Object.assign(bodyOf(it), { picked: picked, ms: ms, cue: cue, mixed: slot.mode === 'mixed' })) })
         .then(function (j) { applyResult(slot, it, picked, ms, cue, j.result); })
-        .catch(function (e) { showHome(e.message || '응답을 보내지 못했어요.'); });
+        .catch(function (e) { showHome(errText(e, '응답을 보내지 못했어요.')); });
     }
     function applyResult(slot, it, picked, ms, cue, res) {
       var now = Date.now(), s = atomState(slot.atomId, now);
@@ -310,58 +435,68 @@
       RUN.answered++; dayRec().items = (dayRec().items || 0) + 1;
       var after = gradeOf(slot.atomId, now);
       var line = S.transitionLine(before, after, slot.atomLabel);
-      var html = '<div class="card"><div class="q"><div class="head">' + esc(slot.label) + '</div>' + itemHtml(it).replace(/<button class="choice"/g, '<button class="choice" disabled') + '</div>';
+      var html = '<div class="card">' + runHead(slot) + itemHtml(it, { done: true });
       if (!res.ok && picked !== 'skip') {
-        /* 2지선다 반증 — "지금 다시 보면 풀 수 있겠어요?" 예 → 30초 안에 같은 칸 새 문항. 통과하면 원인이 '문제 오독'으로 바뀐다 */
-        html += '<div class="expl"><b>정답은 ' + (CIR[+res.answerKey - 1] || res.answerKey) + '</b></div><p class="ask">지금 다시 보니 풀 수 있을 것 같아요?</p><div class="row"><button class="big ghost" id="canDo">네, 풀 수 있어요</button><button class="big ghost" id="no">아니요, 설명이 필요해요</button></div></div>';
-        render(html);
-        $('no').onclick = function () { recordWrong(slot, it, res, res.cause); showExplain(slot, it, res); };
-        $('canDo').onclick = function () { reprobe(slot, it, res); };
+        /* 2지선다 반증 — "지금 다시 보면 풀 수 있겠어요?" 예 → 30초 안에 같은 칸 새 문항. 통과하면 원인이 '문제 오독'으로 바뀐다.
+           이 칸에 정답을 아직 안 보여 준 문항이 없으면 반증이 성립하지 않으니 묻지 않고 해설로 간다('아니요'와 같은 기록) */
+        var shown = RUN.items.slice(0, RUN.qi + 1);
+        var pack = slot.source === 'gen' ? null : RUN.packs[slot.packId];
+        if (slot.source !== 'gen' && !(pack && pickPack(slot, pack, 1, skipOf(shown)).length)) { recordWrong(slot, it, res, res.cause); showExplain(slot, it, res, null, picked); return; }
+        html += '<div class="fb" id="fb" tabindex="-1"><div class="expl"><b>정답은 ' + (CIR[+res.answerKey - 1] || res.answerKey) + '</b></div><p class="ask">지금 다시 보니 풀 수 있을 것 같아요?</p><div class="row"><button class="big ghost" id="canDo">네, 풀 수 있어요</button><button class="big ghost" id="no">아니요, 설명이 필요해요</button></div></div></div>';
+        render(html, true);
+        markChoices(null, picked);
+        $('no').onclick = function () { recordWrong(slot, it, res, res.cause); showExplain(slot, it, res, null, picked); };
+        $('canDo').onclick = function () { reprobe(slot, it, res, picked, shown); };
+        showResult();
         return;
       }
-      html += '<div class="expl">' + (res.ok ? '<b>맞았어요.</b> ' : '<b>다음에 다시 만나요.</b> ') + esc(res.explanationKo || '') + (line ? '<div class="small">' + esc(line) + '</div>' : '') + '</div><button class="big" id="next">다음</button></div>';
-      render(html);
-      var sel = document.querySelector('.choice[data-key="' + res.answerKey + '"]'); if (sel) sel.classList.add('ok');
+      html += '<div class="fb" id="fb" tabindex="-1"><div class="expl">' + (res.ok ? '<b>맞았어요.</b> ' : '<b>다음에 다시 만나요.</b> ') + esc(res.explanationKo || '') + (line ? '<div class="small">' + esc(line) + '</div>' : '') + '</div><button class="big" id="next">다음</button></div></div>';
+      render(html, true);
+      markChoices(res.answerKey, picked);
       if (!res.ok && picked === 'skip') recordWrong(slot, it, res, 'time');
       $('next').onclick = nextItem;
+      showResult();
     }
+    function skipOf(items) { var o = {}; items.forEach(function (x) { o[refKey(x)] = true; }); return o; }
     function recordWrong(slot, it, res, cause) {
       DB.wrong.push({ ref: it.gid || (it.packId + '#' + it.no), atomId: slot.atomId, cause: cause || 'gap', at: new Date().toISOString(), cleared: 0 });
       if (DB.wrong.length > 300) DB.wrong = DB.wrong.slice(-300);
       var s = DB.atoms[slot.atomId]; if (s) { s.cause = s.cause || {}; s.cause[cause || 'gap'] = (s.cause[cause || 'gap'] || 0) + 1; }
     }
-    function reprobe(slot, it, res) {
+    function reprobe(slot, it, res, picked, shown) {
       render('<div class="card"><p class="small">같은 칸의 새 문항 — 30초</p><p>불러오는 중…</p></div>');
-      fetchItems(slot, 1).then(function (items) {
-        var nit = items[0]; if (!nit) { showExplain(slot, it, res); return; }
+      var fallback = function () { recordWrong(slot, it, res, res.cause); showExplain(slot, it, res, null, picked); };
+      fetchItems(slot, slot.source === 'gen' ? 2 : 1, shown).then(function (items) {
+        var nit = items[0]; if (!nit) { fallback(); return; }
         render('<div class="card"><div class="q"><div class="head">' + esc(slot.label) + ' · 다시 한 번 <span id="left">30</span>초</div></div>' + itemHtml(nit) + '</div>');
         var t0 = Date.now(), left = 30, tm = setInterval(function () { left--; if ($('left')) $('left').textContent = left; if (left <= 0) { clearInterval(tm); done('skip'); } }, 1000);
-        var done = function (picked) {
+        var done = function (pk) {
           clearInterval(tm);
           Array.prototype.forEach.call(document.querySelectorAll('.choice'), function (b) { b.disabled = true; });
-          api('/probe', { method: 'POST', body: JSON.stringify(Object.assign(bodyOf(nit), { picked: picked, ms: Date.now() - t0, said: 'canDo', ok: null })) }).catch(function () { return null; })
-            .then(function () { return api('/answer', { method: 'POST', body: JSON.stringify(Object.assign(bodyOf(nit), { picked: picked, ms: Date.now() - t0, cue: 0, mixed: false })) }); })
+          api('/probe', { method: 'POST', body: JSON.stringify(Object.assign(bodyOf(nit), { picked: pk, ms: Date.now() - t0, said: 'canDo', ok: null })) }).catch(function () { return null; })
+            .then(function () { return api('/answer', { method: 'POST', body: JSON.stringify(Object.assign(bodyOf(nit), { picked: pk, ms: Date.now() - t0, cue: 0, mixed: false })) }); })
             .then(function (j) {
               var ok = j.result.ok, now = Date.now(), s = atomState(slot.atomId, now);
               M.observe(s, { ok: ok, form: nit.form || 'mcq4', itemId: nit.gid || (nit.packId + '#' + nit.no), mixed: false, cue: 0, ms: Date.now() - t0 }, now);
               if (ok) R.recordOk(s, { now: now, mixed: false, form: 'mcq4', dday: PLAN ? PLAN.dday : null, active: Object.keys(DB.atoms).length, slots: 3 });
               recordWrong(slot, it, res, ok ? 'misread' : res.cause);
-              showExplain(slot, it, res, ok ? '다시 보니 풀 수 있었어요 — 발문의 조건에 먼저 표시하는 연습을 해요.' : null);
-            }).catch(function () { recordWrong(slot, it, res, res.cause); showExplain(slot, it, res); });
+              showExplain(slot, it, res, ok ? '다시 보니 풀 수 있었어요 — 문제 문장의 조건에 먼저 표시하는 연습을 해요.' : null, picked);
+            }).catch(function () { recordWrong(slot, it, res, res.cause); showExplain(slot, it, res, null, picked); });
         };
         Array.prototype.forEach.call(document.querySelectorAll('.choice'), function (b) { b.onclick = function () { done(b.getAttribute('data-key')); }; });
-      });
+      }).catch(fallback);
     }
-    function showExplain(slot, it, res, extra) {
-      render('<div class="card"><div class="q"><div class="head">' + esc(slot.label) + '</div></div>' + itemHtml(it).replace(/<button class="choice"/g, '<button class="choice" disabled') +
-        '<div class="expl"><b>정답은 ' + (CIR[+res.answerKey - 1] || res.answerKey) + '</b> — ' + esc(res.explanationKo || '') + (extra ? '<div class="small">' + esc(extra) + '</div>' : '') + '</div><button class="big" id="next">다음</button></div>');
-      var sel = document.querySelector('.choice[data-key="' + res.answerKey + '"]'); if (sel) sel.classList.add('ok');
+    function showExplain(slot, it, res, extra, picked) {
+      render('<div class="card">' + runHead(slot) + itemHtml(it, { done: true }) +
+        '<div class="fb" id="fb" tabindex="-1"><div class="expl"><b>정답은 ' + (CIR[+res.answerKey - 1] || res.answerKey) + '</b> — ' + esc(res.explanationKo || '') + (extra ? '<div class="small">' + esc(extra) + '</div>' : '') + '</div><button class="big" id="next">다음</button></div></div>', true);
+      markChoices(res.answerKey, picked);
       $('next').onclick = nextItem;
+      showResult();
     }
     function nextItem() {
       RUN.qi++;
       cache();
-      if (RUN.qi >= RUN.items.length) { var d = dayRec(); d.done = d.done || {}; d.done[RUN.si] = true; RUN.si++; nextSlot(); return; }
+      if (RUN.qi >= RUN.items.length) { var d = dayRec(); d.done = d.done || {}; d.done[RUN.slots[RUN.si].atomId] = true; RUN.si++; nextSlot(); return; }
       askItem();
     }
     function finishRunner() {
@@ -372,22 +507,28 @@
       cache();
       push().then(function () {
         render('<div class="card"><h2>오늘 카드 완료</h2><div class="kv"><span>앉은 날</span><b>' + sat + '</b></div><div class="kv"><span>오늘</span><b>' + d.min + '분</b></div>' +
-          (more ? '<button class="big ghost" id="more">오늘 더 할래 (+' + (ph.extendBlockMin || 15) + '분)</button>' : '<p>오늘은 여기까지. 자러 가자.</p>') + '<button class="big" id="home">홈으로</button></div>' + footer());
+          (more ? '<button class="big ghost" id="more">오늘 더 할래 (+' + (ph.extendBlockMin || 15) + '분)</button>' : '<div class="rest">오늘은 여기까지. 자러 가자.</div>') + '<button class="big" id="home">홈으로</button></div>' + footer());
         $('home').onclick = function () { refreshToday().then(showHome); };
         if ($('more')) $('more').onclick = function () { refreshToday().then(function () { startRunner(); }); };
       });
     }
 
-    /* ── 좌표: 코어 격자. unknown 은 회색으로 남긴다(숨기지 않는다) ── */
+    /* ── 좌표: 코어 격자. unknown 은 회색으로 남긴다(숨기지 않는다). 과목 셋으로 묶어야 '16칸 중 n칸'이 한눈에 읽힌다 ── */
     function showMap() {
-      var now = Date.now(), moved = {};
-      var html = '<div class="card"><h2>좌표 ' + CORE.length + '칸</h2><div class="grid">';
-      CORE.forEach(function (id) {
-        var a = atomOf(id); if (!a) return;
-        var s = DB.atoms[id], g = gradeOf(id, now);
-        html += '<div class="cell ' + g + '"><b>' + esc(a.label) + '</b><span>' + esc(S.stateLabel(g, 'student')) + (s && s.obs ? ' · ' + esc(S.progressLine(s.obs, s.ok, M.MIN_FLUENT_OBS)) : '') + '</span></div>';
+      var now = Date.now(), groups = { kor: [], math: [], eng: [] };
+      CORE.forEach(function (id) { var a = atomOf(id); if (a) (groups[a.subject] = groups[a.subject] || []).push(a); });
+      var html = '<div class="card"><h2>좌표 ' + CORE.length + '칸</h2>' +
+        '<p class="legend">' + ['unknown', 'hole', 'shaky', 'fluent'].map(function (g) { return '<span><i class="' + g + '" aria-hidden="true"></i>' + esc(S.stateLabel(g, 'student')) + '</span>'; }).join('') + '</p>';
+      Object.keys(groups).forEach(function (sub) {
+        if (!groups[sub].length) return;
+        html += '<h3>' + esc(SUBJ[sub] || sub) + '<span class="small">' + groups[sub].length + '칸</span></h3><div class="grid">';
+        groups[sub].forEach(function (a) {
+          var s = DB.atoms[a.id], g = gradeOf(a.id, now);
+          html += '<div class="cell ' + g + '"><b>' + esc(a.label) + '</b><span>' + esc(S.stateLabel(g, 'student')) + (s && s.obs ? ' · ' + esc(S.progressLine(s.obs, s.ok, M.MIN_FLUENT_OBS)) : '') + '</span></div>';
+        });
+        html += '</div>';
       });
-      html += '</div><button class="big ghost" id="home">홈으로</button></div>';
+      html += '<button class="big ghost" id="home">홈으로</button></div>';
       render(html + footer());
       $('home').onclick = showHome;
     }
@@ -404,9 +545,8 @@
       Promise.all(keyIds.map(function (k) { return api('/sheet?keyId=' + encodeURIComponent(k)).then(function (j) { return j.sheet; }); })).then(function (sheets) {
         OMR = { d: todayKey(), keyId: mock.keyId, kind: subjects.length === 3 ? 'full' : 'single', subjects: subjects, sheets: sheets, pi: 0, periods: [], breakUntil: null };
         saveOmr(); omrStep();
-      }).catch(function (e) { showHome('회차 대응표가 아직 등록되지 않았어요. 선생님께 말씀해 주세요. (' + (e.message || '') + ')'); });
+      }).catch(function (e) { showHome(e && e.status ? '오늘 답안지가 아직 준비되지 않았어요. 선생님께 말해 주세요.' : NET_MSG); });
     }
-    var SUBJ = { kor: '국어', math: '수학', eng: '영어' };
     function omrStep() {
       if (OMR.pi >= OMR.subjects.length) { submitOmr(); return; }
       if (OMR.breakUntil && Date.now() < OMR.breakUntil) { showBreak(); return; }
@@ -414,18 +554,35 @@
       render('<div class="card lock"><div class="t">' + (OMR.pi + 1) + '교시 ' + esc(SUBJ[sh.subject] || sh.subject) + '</div><p>' + sh.n + '문항 · ' + Math.round((sh.timeLimitSec || 2400) / 60) + '분</p><p class="small">시작을 누르면 시간이 갑니다. 답은 칸을 눌러 표시하고, 넘긴 문항은 [넘김]을 눌러 두었다가 돌아와요.</p><button class="big" id="start">시작</button></div>');
       $('start').onclick = function () { runPeriod(sh); };
     }
+    function omrCounts(sh, per) {
+      var blanks = [];
+      for (var no = 1; no <= sh.n; no++) if (!per.marks[no]) blanks.push(no);
+      return { marked: sh.n - blanks.length, passed: Object.keys(per.passed).filter(function (k) { return per.passed[k]; }).length, blanks: blanks };
+    }
     function runPeriod(sh) {
       var per = { subject: sh.subject, keyId: sh.keyId, openedAt: Date.now(), closedAt: null, marks: {}, passed: {}, events: [] };
       OMR.cur = per; saveOmr();
       var limit = (sh.timeLimitSec || 2400) * 1000;
       var rows = '';
-      for (var no = 1; no <= sh.n; no++) rows += '<tr data-no="' + no + '"><td class="no">' + no + '</td>' + [1, 2, 3, 4].map(function (k) { return '<td><button class="b" data-no="' + no + '" data-key="' + k + '">' + CIR[k - 1] + '</button></td>'; }).join('') + '<td><button class="p" data-pass="' + no + '">넘김</button></td></tr>';
-      render('<div class="card"><div class="head small">' + (OMR.pi + 1) + '교시 ' + esc(SUBJ[sh.subject] || sh.subject) + '</div><div class="timer" id="timer">--:--</div><table class="omr"><tbody>' + rows + '</tbody></table><button class="big warn" id="submit">답안지 제출</button><p class="small">제출하면 되돌릴 수 없어요. 남은 시간이 있으면 검토부터 해요.</p></div>');
+      for (var no = 1; no <= sh.n; no++) rows += '<tr data-no="' + no + '"><td class="no">' + no + '</td>' + [1, 2, 3, 4].map(function (k) { return '<td><button class="b" data-no="' + no + '" data-key="' + k + '">' + k + '</button></td>'; }).join('') + '<td><button class="p" data-pass="' + no + '">넘김</button></td></tr>';
+      measureBar();
+      render('<div class="card"><div class="head small">' + (OMR.pi + 1) + '교시 ' + esc(SUBJ[sh.subject] || sh.subject) + '</div>' +
+        '<div class="omrbar"><div class="timer" id="timer">--:--</div><div class="tally" id="tally"></div><div class="tcue" id="tcue" role="status"></div></div>' +
+        '<table class="omr"><tbody>' + rows + '</tbody></table>' +
+        '<div id="subwrap"><button class="big warn" id="submit">답안지 제출</button><p class="small">제출하면 되돌릴 수 없어요. 남은 시간이 있으면 검토부터 해요.</p></div>' +
+        '<div class="confirm" id="confirm" tabindex="-1" hidden></div></div>');
+      var tally = function () { var c = omrCounts(sh, per); $('tally').textContent = '표시 ' + c.marked + ' · 넘김 ' + c.passed + ' · 빈칸 ' + c.blanks.length; };
+      tally();
       var tick = function () {
         var left = Math.max(0, per.openedAt + limit - Date.now()), m = Math.floor(left / 60000), s = Math.floor(left % 60000 / 1000);
         var el = $('timer'); if (!el) return;
-        el.textContent = (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
-        if (left <= 5 * 60000) { el.className = 'timer low'; if (left <= 5 * 60000 && left > 5 * 60000 - 1100 && navigator.vibrate) navigator.vibrate(200); }
+        el.textContent = pad2(m) + ':' + pad2(s);
+        /* 5분 경고는 색만으로 하지 않는다 — 태블릿은 진동이 없고, 색만 바뀌면 못 알아챈다 */
+        if (left <= 5 * 60000) {
+          el.className = 'timer low';
+          if (!$('tcue').textContent) $('tcue').textContent = '마지막 5분이에요 — 넘긴 번호와 빈칸부터 봐요';
+          if (left > 5 * 60000 - 1100 && navigator.vibrate) navigator.vibrate(200);
+        }
         if (left <= 0) { clearInterval(tm); closePeriod(per); }
       };
       var tm = setInterval(tick, 1000); tick();
@@ -436,13 +593,27 @@
           if (per.marks[no]) per.events.push({ type: 'mark', no: +no, key: key, at: Date.now() });
           per.marks[no] = key;
           Array.prototype.forEach.call(document.querySelectorAll('.omr .b[data-no="' + no + '"]'), function (x) { x.classList.toggle('on', x === b); });
-          saveOmr();
+          saveOmr(); tally();
         };
       });
       Array.prototype.forEach.call(document.querySelectorAll('.omr .p'), function (b) {
-        b.onclick = function () { var no = b.getAttribute('data-pass'); per.passed[no] = !per.passed[no]; if (per.passed[no]) per.events.push({ type: 'pass', no: +no, at: Date.now() }); b.classList.toggle('on', per.passed[no]); b.closest('tr').classList.toggle('passed', per.passed[no]); saveOmr(); };
+        b.onclick = function () { var no = b.getAttribute('data-pass'); per.passed[no] = !per.passed[no]; if (per.passed[no]) per.events.push({ type: 'pass', no: +no, at: Date.now() }); b.classList.toggle('on', per.passed[no]); b.closest('tr').classList.toggle('passed', per.passed[no]); saveOmr(); tally(); };
       });
-      $('submit').onclick = function () { if (confirm('답안지를 제출할까요?')) { clearInterval(tm); closePeriod(per); } };
+      /* 제출 확인은 앱 안에서 — 빈칸 수가 코치 보드의 관측값이라, 내기 전에 아이가 직접 보게 한다 */
+      $('submit').onclick = function () {
+        var c = omrCounts(sh, per), box = $('confirm');
+        box.innerHTML = '<p class="sum">표시 ' + c.marked + ' · 넘김 ' + c.passed + ' · 빈칸 ' + c.blanks.length + ' — 제출하면 되돌릴 수 없어요</p>' +
+          '<p class="small">' + (c.blanks.length ? '빈칸 번호: ' + c.blanks.join(', ') : '빈칸이 없어요.') + '</p>' +
+          '<div class="row"><button class="big ghost" id="review" type="button">검토하기</button><button class="big warn" id="send" type="button">제출</button></div>';
+        box.hidden = false; $('subwrap').hidden = true;
+        box.scrollIntoView({ block: 'nearest', behavior: motion() }); box.focus({ preventScroll: true });
+        $('review').onclick = function () {
+          box.hidden = true; $('subwrap').hidden = false;
+          var row = c.blanks.length ? document.querySelector('.omr tr[data-no="' + c.blanks[0] + '"]') : null;
+          if (row) row.scrollIntoView({ block: 'center', behavior: motion() });
+        };
+        $('send').onclick = function () { clearInterval(tm); closePeriod(per); };
+      };
     }
     function closePeriod(per) {
       per.closedAt = Date.now();
@@ -452,15 +623,17 @@
       saveOmr(); omrStep();
     }
     function showBreak() {
-      var next = OMR.sheets[OMR.pi];
-      render('<div class="card lock"><div class="t">쉬는 시간</div><div class="timer" id="timer">--:--</div><p>다음은 ' + (OMR.pi + 1) + '교시 ' + esc(SUBJ[next.subject] || next.subject) + '. 답 맞추기는 하지 않아요 — 채점은 선생님 서버가 해요.</p><p class="small">물 마시고, 화장실 다녀오고, 눈을 감아요.</p><button class="big" id="go" disabled>다음 교시</button></div>');
-      var tm = setInterval(function () {
+      var next = OMR.sheets[OMR.pi], at = new Date(Math.ceil(OMR.breakUntil / 60000) * 60000);
+      render('<div class="card lock"><div class="t">쉬는 시간</div><div class="timer" id="timer">--:--</div><p>다음은 ' + (OMR.pi + 1) + '교시 ' + esc(SUBJ[next.subject] || next.subject) + '. 답 맞추기는 하지 않아요 — 선생님이 나중에 채점해요.</p><p class="small">물 마시고, 화장실 다녀오고, 눈을 감아요.</p>' +
+        '<button class="big" id="go" disabled>다음 교시</button><p class="small" id="unlock">' + pad2(at.getHours()) + ':' + pad2(at.getMinutes()) + '에 열려요</p></div>');
+      var tick = function () {
         var left = Math.max(0, OMR.breakUntil - Date.now()), m = Math.floor(left / 60000), s = Math.floor(left % 60000 / 1000);
         var el = $('timer'); if (!el) { clearInterval(tm); return; }
-        el.textContent = (m < 10 ? '0' : '') + m + ':' + (s < 10 ? '0' : '') + s;
+        el.textContent = pad2(m) + ':' + pad2(s);
         if (left <= 2 * 60000 && left > 2 * 60000 - 1100 && navigator.vibrate) navigator.vibrate(300);
-        if (left <= 0) { clearInterval(tm); $('go').disabled = false; }
-      }, 1000);
+        if (left <= 0) { clearInterval(tm); $('go').disabled = false; $('unlock').textContent = '지금 시작할 수 있어요'; }
+      };
+      var tm = setInterval(tick, 1000); tick();
       $('go').onclick = function () { clearInterval(tm); OMR.breakUntil = null; saveOmr(); omrStep(); };
     }
     function submitOmr() {
@@ -473,19 +646,20 @@
           $('home').onclick = function () { refreshToday().then(showHome); };
         })
         .catch(function (e) {
-          render('<div class="card lock"><div class="t">아직 보내지 못했어요</div><p class="small">' + esc(e.message || '') + '</p><button class="big" id="retry">다시 보내기</button></div>');
+          render('<div class="card lock"><div class="t">아직 보내지 못했어요</div><p class="small">' + esc(errText(e, '잠깐 뒤에 다시 보내 봐요.')) + '</p><button class="big" id="retry">다시 보내기</button></div>');
           $('retry').onclick = submitOmr;
         });
     }
 
-    /* ── 회고 — 앉은 날과 이어지는 것 목록만. 숫자는 시험일 + 7일 16:00 뒤 서버가 열어 준다. ── */
+    /* ── 회고 — 앉은 날과 이어지는 것 목록만. 숫자는 시험일 + 7일 16:00 뒤 서버가 열어 준다. 앉은 날은 누적으로만 센다(분모 없음) ── */
     function showRetro() {
       render('<div class="card"><p>불러오는 중…</p></div>');
       api('/retro').then(function (j) {
         var r = j.retro, g = r.gained;
-        var html = '<div class="card"><h2>' + (r.totalDays ? r.totalDays : '51') + '일 동안 네가 만든 것</h2><div class="kv"><span>앉은 날</span><b>' + r.sat + '일' + (r.totalDays ? ' / ' + r.totalDays + '일' : '') + '</b></div>';
+        RETRO = r;
+        var html = '<div class="card"><h2>' + esc(retroTitle()) + '</h2><div class="kv"><span>앉은 날</span><b>' + r.sat + '일</b></div>';
         if (g) {
-          html += '<div class="kv"><span>누적</span><b>' + g.minutes + '분</b></div><div class="kv"><span>회차 완주</span><b>' + g.mockCompleted + '회 중 ' + g.mockRuns + '회</b></div>';
+          html += '<div class="kv"><span>누적</span><b>' + g.minutes + '분</b></div><div class="kv"><span>회차 완주</span><b>' + g.mockRuns + '회 중 ' + g.mockCompleted + '회</b></div>';
           if (g.rewindsFirst != null) html += '<div class="kv"><span>1회독 되감기</span><b>첫 지문 ' + g.rewindsFirst + '회 → 마지막 지문 ' + g.rewindsLast + '회</b></div>';
           if (g.frozenPair) html += '<div class="kv"><span>같은 세트를 두 번 풀었다</span><b>' + esc(g.frozenPair.first.at.slice(5).replace('-', '/')) + ' ' + g.frozenPair.first.ok + '개 → ' + esc(g.frozenPair.last.at.slice(5).replace('-', '/')) + ' ' + g.frozenPair.last.ok + '개</b></div>';
           html += '<div class="kv"><span>영어 단어 누적</span><b>' + g.engWords + '개</b></div>';
@@ -494,7 +668,7 @@
           '<button class="big ghost" id="home">홈으로</button></div>';
         render(html + footer());
         $('home').onclick = showHome;
-      }).catch(function (e) { showHome(e.message); });
+      }).catch(function (e) { showHome(errText(e, '불러오지 못했어요.')); });
     }
 
     /* ── 부팅 ── */
@@ -518,18 +692,19 @@
         setDot('saved', rs[2].updatedAt ? '동기화됨' : '첫 시작');
         if (pendingPut) push();
         var o = loadOmr(); if (o && o.d === todayKey() && (o.cur || o.pi > 0)) { OMR = o; if (o.cur) { OMR.periods.push({ subject: o.cur.subject, keyId: o.cur.keyId, openedAt: o.cur.openedAt, closedAt: Date.now(), marks: o.cur.marks, events: o.cur.events }); OMR.cur = null; OMR.pi++; saveOmr(); } omrStep(); return; }
-        showHome();
+        loadRetro().then(function () { showHome(); });
       }).catch(function (e) {
         if (e.status === 401) { saveAuth(null); showLink('연결이 끊겼어요. 코드를 다시 입력해 주세요.'); return; }
         if (e.status === 403) { render('<div class="card"><h2>' + esc(e.message) + '</h2><p class="small">선생님께 말씀해 주세요.</p><button class="big ghost" id="unlink">다른 코드로 연결</button></div>' + footer()); $('unlink').onclick = function () { saveAuth(null); showLink(); }; return; }
         var c = loadCache();
-        if (c) { DB = c; render('<div class="card"><h2>지금은 서버와 연결되지 않아요</h2><p class="small">' + esc(e.message || '') + '</p><p>연결되면 오늘 카드가 열려요.</p></div>' + footer()); return; }
-        render('<div class="card"><h2>' + esc(e.message || '불러오지 못했어요') + '</h2><button class="big ghost" id="retry">다시 시도</button></div>' + footer());
+        if (c) { DB = c; render('<div class="card"><h2>지금은 서버와 연결되지 않아요</h2><p class="small">' + esc(errText(e, '잠깐 뒤에 다시 열어 봐요.')) + '</p><p>연결되면 오늘 카드가 열려요.</p></div>' + footer()); return; }
+        render('<div class="card"><h2>불러오지 못했어요</h2><p class="small">' + esc(errText(e, '잠깐 뒤에 다시 해 봐요.')) + '</p><button class="big ghost" id="retry">다시 시도</button></div>' + footer());
         $('retry').onclick = boot;
       });
     }
     var _cache = cache; cache = function () { if (DB) DB.updatedLocal = new Date().toISOString(); _cache(); };
     document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden' && pendingPut) push(); });
+    measureBar(); window.addEventListener('resize', measureBar);
     boot();
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(function () {});
   })();

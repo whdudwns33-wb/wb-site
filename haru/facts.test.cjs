@@ -35,4 +35,11 @@ t('학교 URL 이 있고 학교명이 앱 이름에 쓰이지 않는다', () => 
   assert.ok(/^https:\/\//.test(F.school.url));
   assert.ok(!/haru|하루/.test(F.school.name));
 });
+/* 상시 고지는 기획서 §4 의 세 문장 그대로다. 홈페이지 주소만은 정본 v1.2 의 현재 주소(school.url)를 따른다 —
+   설계안 v1 이 "고지의 링크는 facts.json.school.url 에서 읽는다"로 정했다(구 주소는 리다이렉트). */
+t('상시 고지 — 제휴 없음 · 공식 정보는 학교 홈페이지와 요강 · 요강 기준일, 주소는 school.url 과 같다', () => {
+  assert.ok(F.notice.includes('사설 학습 도구') && F.notice.includes('제휴·후원 관계도 없습니다'));
+  assert.ok(F.notice.includes('학교 홈페이지(' + new URL(F.school.url).host + ')와 모집요강에서 확인하십시오'));
+  assert.ok(F.notice.includes(F.admissionYear + '학년도 모집요강(' + F.schedule.notice + ' 공고) 기준'));
+});
 console.log(n + ' tests passed');

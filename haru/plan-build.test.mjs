@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { buildPlan, milestonesFromFacts, FACTS } from './plan-build.mjs';
 import P from './plan.js';
+import S from './strings.js';
 let n = 0; function t(name, fn) { fn(); n++; console.log('ok', name); }
 const input = JSON.parse(fs.readFileSync(new URL('./plans/2027-pilot.input.json', import.meta.url), 'utf8'));
 const plan = buildPlan(input);
@@ -44,6 +45,26 @@ t('마일스톤은 facts.json 에서 — 부모 항목과 입실(both)', () => {
   assert.ok(ms.some((m) => m.d === '2026-09-29'));
   assert.ok(plan.milestones.some((m) => m.d === '2026-10-24' && m.at === '21:00'));
   assert.deepEqual(P.milestonesFor(plan, 'student', P.kstAt('2026-10-20', '20:00')).map((m) => m.d), ['2026-10-25']);
+});
+/* 부모 화면(parent.html)은 마일스톤 문구와 고지를 그대로 그린다 — 부모 금지어는 화면이 아니라 원천에서 막는다.
+   저장소의 플랜 파일(관리 웹에 올리는 그 파일)과 빌더 산출물을 둘 다 본다. */
+const COMMITTED = JSON.parse(fs.readFileSync(new URL('./plans/2027-pilot.json', import.meta.url), 'utf8'));
+const forParent = (pl) => pl.milestones.filter((m) => m.aud === 'parent' || m.aud === 'both');
+t('부모에게 가는 마일스톤·상시 고지에 부모 금지어가 없다 (저장소 플랜 + 빌더 산출물)', () => {
+  for (const pl of [COMMITTED, plan]) {
+    assert.ok(forParent(pl).length >= 10);
+    forParent(pl).forEach((m) => assert.deepEqual(S.findForbidden(m.text, 'parent'), [], m.d + ' ' + m.text));
+    assert.deepEqual(S.findForbidden(pl.notice, 'parent'), [], pl.notice);
+    assert.deepEqual(S.findForbidden(pl.notice, 'student'), [], pl.notice);   // 고지는 학생 홈에도 나간다
+  }
+});
+t('저장소의 플랜 파일 = 빌더 산출물 (facts.json·빌더를 고치고 다시 빌드하지 않으면 실패)', () => {
+  assert.deepEqual(COMMITTED, JSON.parse(JSON.stringify(plan)));
+});
+t('부모 화면이 시험일을 읽는 입실 마일스톤은 시험일에 하나뿐', () => {
+  /* parent.html 은 서버가 시험일을 따로 주지 않아 이 문구로 D-7 취침 위상 전진 기간을 판정한다 */
+  const exam = forParent(plan).filter((m) => /고사장 입실/.test(m.text));
+  assert.equal(exam.length, 1); assert.equal(exam[0].d, plan.examDate);
 });
 t('회차가 휴일과 겹치면 빌드가 거부된다', () => {
   const bad = JSON.parse(JSON.stringify(input)); bad.mocks[0].d = '2026-09-27';
