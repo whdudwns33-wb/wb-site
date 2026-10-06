@@ -14,7 +14,7 @@ const C = WBCrmCore;
 const TOKEN_KEY = 'crm.token';
 const POLL_MS = 60000;
 const FLUSH_MS = 300;
-const TABS = [['today', '오늘'], ['leads', '고객'], ['pipeline', '파이프라인'], ['stats', '성과'], ['partners', '파트너'], ['hubspot', '허브스팟'], ['admin', '관리']];
+const TABS = [['today', '오늘'], ['leads', '고객'], ['pipeline', '파이프라인'], ['relationships', '관계관리'], ['stats', '성과'], ['partners', '파트너'], ['hubspot', '허브스팟'], ['admin', '관리']];
 
 let state = C.emptyState();
 let session = null;              // {role, canApprove, staffId, name}
@@ -23,12 +23,14 @@ let leadId = '';                 // route === 'lead'
 const ui = {
   pipe: 'inspection', q: '', status: 'open', channel: '', owner: '', phoneShown: {}, ym: C.ymOf(C.ymdOf(new Date())),
   hs: { status: null, pipelines: null, suggested: null, props: null, queue: [], counts: null, busy: '', err: '', filter: 'pending', map: null },
-  leadQueue: {}, linkBusy: false, detect: null
+  leadQueue: {}, linkBusy: false, detect: null,
+  relationships: { tab: 'friend', q: '', month: C.ymOf(C.ymdOf(new Date())), status: '' }
 };
 const boot = { health: null, err: '', busy: false };
 const outbox = C.createOutbox();
 let syncErr = '', lastSync = 0, flushTimer = null, flushing = false, pollTimer = null, modalReturnFocus = null;
 let modalInitialValues = '';
+let relationshipEdit = null, relationshipSaving = false;
 
 /* ── 도우미 ─────────────────────────────────────────── */
 const $ = sel => document.querySelector(sel);
@@ -74,19 +76,22 @@ function modalDirty() {
   return !!host && !host.hidden && modalValues() !== modalInitialValues;
 }
 function modal(title, bodyHtml, footHtml) {
+  relationshipEdit = null;
   const host = $('#modalHost'); if (!host) return;
   if (host.hidden) modalReturnFocus = document.activeElement;
   host.innerHTML = '<div class="modal-box"><div class="between mb14"><div class="card-title" id="modalTitle">' + esc(title) + '</div>' +
     '<button class="btn btn-sm btn-ghost" data-act="closemodal" aria-label="닫기">닫기</button></div>' + bodyHtml + (footHtml || '') + '</div>';
   modalInitialValues = modalValues();
   host.hidden = false; setInert(true);
-  requestAnimationFrame(() => { const first = host.querySelector('input:not([type=checkbox]), select, textarea'); (first || host.querySelector('[data-act="closemodal"]') || host).focus(); });
+  requestAnimationFrame(() => { const first = host.querySelector('input:not(:disabled):not([hidden]):not([type=checkbox]):not([type=hidden]), select:not(:disabled):not([hidden]), textarea:not(:disabled):not([hidden])'); (first || host.querySelector('button:not(:disabled):not([hidden])') || host).focus(); });
 }
 function closeModal(saved) {
   const host = $('#modalHost'); if (!host) return;
+  if (relationshipSaving && saved !== true) return;
   if (saved !== true && modalDirty() && !confirm('작성 중인 내용이 있습니다. 저장하지 않고 닫을까요?')) return;
   host.hidden = true; host.innerHTML = ''; setInert(false);
   modalInitialValues = '';
+  relationshipEdit = null;
   const target = modalReturnFocus; modalReturnFocus = null;
   if (target && document.contains(target) && typeof target.focus === 'function') target.focus();
 }
@@ -328,6 +333,7 @@ function render() {
         case 'pipeline': h += viewPipeline(); break;
         case 'leads': h += viewLeads(); break;
         case 'lead': h += viewLead(leadId); break;
+        case 'relationships': h += viewRelationships(); break;
         case 'stats': h += viewStats(); break;
         case 'hubspot': h += session.canApprove ? viewHubspot() : viewToday(); break;
         case 'partners': h += session.canApprove ? viewPartners() : viewToday(); break;
@@ -344,7 +350,7 @@ function render() {
 function updateTabs() {
   const wrap = $('#tabsWrap'); if (!wrap || !session) return;
   const board = C.todayBoard(state.leads, state.activities, today());
-  const todayN = board.followups.length + board.decide.length + board.fresh.length;
+  const todayN = board.followups.length + board.decide.length + board.fresh.length + C.relationshipTasks(state.memberships, state.gatherings, today()).filter(x => leadById(x.leadId)).length;
   const hsN = ui.hs.counts ? (ui.hs.counts.pending || 0) + (ui.hs.counts.failed || 0) : 0;
   wrap.innerHTML = TABS.filter(t => session.canApprove || !C.OWNER_ROUTES.includes(t[0])).map(t => {
     const on = route === t[0] || (route === 'lead' && t[0] === 'leads');
@@ -403,6 +409,7 @@ function viewToday() {
       '<button class="btn btn-sm" data-act="fu-skip" data-id="' + esc(x.lead.id) + '" data-day="' + f.day + '">건너뜀</button></div>';
   }).join('') : '<div class="empty small">오늘 할 팔로업이 없습니다</div>';
   h += '</div>';
+  h += relationshipTodayHtml();
   if (b.decide.length) {
     h += '<div class="card"><div class="card-title">최종판정 대기 <span class="badge">' + b.decide.length + '</span></div><div class="card-sub mb8">상담 뒤 14일이 지났는데 아직 결정이 없습니다 — 등록 · 장기보류 · 이탈(사유) 중 하나로.</div>';
     h += b.decide.map(x => leadRow(x.lead, '<span class="tag warn">D+' + x.days + '</span>',
@@ -520,6 +527,7 @@ function viewLead(id) {
     '<dt>HubSpot</dt><dd>' + (hs.contactId ? '<span class="tag ok">연결됨</span> ' + (C.hubspotRecordUrl(portal, 'contact', hs.contactId) ? '<a href="' + esc(C.hubspotRecordUrl(portal, 'contact', hs.contactId)) + '" target="_blank" rel="noopener noreferrer">연락처 열기</a>' : '') +
       (hs.deals && hs.deals[l.pipeline] && C.hubspotRecordUrl(portal, 'deal', hs.deals[l.pipeline].dealId) ? ' · <a href="' + esc(C.hubspotRecordUrl(portal, 'deal', hs.deals[l.pipeline].dealId)) + '" target="_blank" rel="noopener noreferrer">딜 열기</a>' : '') : '<span class="tag">아직 안 보냄</span>') + leadQueueHtml(id) + '</dd></dl></section>';
   let nextHtml = '<aside class="lead-next" aria-label="다음 연락과 연계">';
+  nextHtml += relationshipLeadHtml(id);
   // 팔로업
   const fus = Array.isArray(l.followups) ? l.followups.slice().sort((a, b) => a.day - b.day) : [];
   nextHtml += '<section class="card"><div class="between"><h2 class="card-title">다음 연락</h2>' + (l.status === 'open' || l.status === 'hold' ? '<button class="btn btn-sm btn-ghost" data-act="fu-reset" data-id="' + esc(id) + '">' + (fus.length ? '일정 다시 잡기' : '일정 잡기') + '</button>' : '') + '</div>';
@@ -726,6 +734,211 @@ function setAutoQuick(on) {
 }
 
 /* ── 화면: 파트너(원장) ────────────────────────────── */
+/* 관계관리: 센터앱 원본 확인과 후속 연락. 이용권·포인트·딜은 여기서 바꾸지 않는다. */
+const RELATIONSHIP_PORTAL = 'https://portal.wbcowork.com/admin/relationships?tab=app';
+function relationshipSource() {
+  return '<p class="hint relationship-source">센터앱에서 확인한 혜택·활동 기록입니다. 실제 이용권·리워드·소검사 사용은 센터앱에서 관리합니다. <a href="' + RELATIONSHIP_PORTAL + '" target="_blank" rel="noopener noreferrer">센터앱 원본 확인</a></p>';
+}
+function relationshipMonthLabel(id, month) {
+  const status = C.programMonthStatus(id, month, state.programActivities);
+  return '<span class="pill' + (status === 'confirmed' ? ' ok' : status === 'supplement' ? ' warn' : '') + '">' + esc(C.PROGRAM_ACTIVITY_STATUS_LABEL[status] || '기록 없음') + '</span>';
+}
+function relationshipTodayHtml() {
+  const tasks = C.relationshipTasks(state.memberships, state.gatherings, today()).filter(x => leadById(x.leadId));
+  if (!tasks.length) return '';
+  return '<section class="card"><h2 class="card-title">관계관리 · 연락 예정 ' + tasks.length + '건</h2><p class="card-sub">오늘까지 예정된 미처리 연락입니다. 연락 후 해당 기록의 다음 연락일·할 일을 갱신하세요.</p>' + tasks.map(x =>
+    '<div class="fu' + (x.date < today() ? ' late' : '') + '"><div class="grow"><a href="#/lead/' + esc(x.leadId) + '">' + esc(C.leadLabel(leadById(x.leadId))) + '</a><div><span class="due">' + esc(x.date) + '</span> · ' + esc(x.action) + '</div></div><button class="btn btn-sm btn-ghost" data-act="' + (x.source === 'membership' ? 'membership-edit' : 'gathering-edit') + '" data-id="' + esc(x.id) + '">후속 기록</button></div>'
+  ).join('') + '</section>';
+}
+function relationshipLeadHtml(id) {
+  const members = state.memberships.filter(m => m.leadId === id);
+  const groups = state.gatherings.filter(g => g.participants.some(p => p.leadId === id)).sort((a, b) => b.date.localeCompare(a.date));
+  return '<section class="card"><div class="between"><h2 class="card-title">관계관리</h2><button class="btn btn-sm btn-ghost" data-act="membership-new" data-lead="' + esc(id) + '">참여 기록</button></div>' +
+    (members.length ? members.map(m => '<div class="fu"><div class="grow"><b>' + esc(C.PROGRAM_LABEL[m.program]) + '</b> · ' + esc(C.MEMBERSHIP_STATUS_LABEL[m.status]) + '<div class="hint">' + esc(m.startDate) + ' 시작 · 이번 달 ' + relationshipMonthLabel(m.id, C.ymOf(today())) + '</div>' + (m.nextContactDate ? '<div class="small">' + esc(m.nextContactDate) + ' · ' + esc(m.nextAction || '할 일 미입력') + '</div>' : '') + '</div><button class="btn btn-sm btn-ghost" data-act="membership-edit" data-id="' + esc(m.id) + '">상세</button></div>').join('') : '<p class="hint mt8">참여 기록이 없습니다.</p>') +
+    groups.slice(0, 3).map(g => '<div class="fu"><div class="grow">맘스쿨 · ' + esc(g.topic) + '<div class="hint">' + esc(g.date) + ' · ' + esc(C.ATTENDANCE_LABEL[g.participants.find(p => p.leadId === id).status]) + '</div></div><button class="btn btn-sm btn-ghost" data-act="gathering-edit" data-id="' + esc(g.id) + '">보기</button></div>').join('') + '<a class="small" href="#/relationships">관계관리 전체 보기</a></section>';
+}
+function viewRelationships() {
+  const u = ui.relationships, gathering = u.tab === 'gatherings';
+  const labels = gathering ? C.GATHERING_STATUS_LABEL : C.MEMBERSHIP_STATUS_LABEL;
+  let h = '<div class="between page-tools"><div><h1 class="page">관계관리</h1><p class="card-sub">참여 활동과 소모임을 확인하고 다음 연락을 이어갑니다.</p></div><button class="btn btn-primary" data-act="' + (gathering ? 'gathering-new' : 'membership-new') + '" data-program="' + esc(u.tab) + '">' + (gathering ? '맘스쿨 모임 추가' : '참여 기록 추가') + '</button></div>' + relationshipSource();
+  h += '<div class="pipe-switch" aria-label="관계 프로그램">' + [['friend', '친구맺기'], ['supporter', '서포터즈'], ['gatherings', '맘스쿨']].map(([key, label]) => '<button class="btn btn-sm ' + (u.tab === key ? 'btn-navy' : 'btn-ghost') + '" data-act="relationship-tab" data-tab="' + key + '" aria-pressed="' + (u.tab === key) + '">' + label + '</button>').join('') + '</div>';
+  h += '<div class="card customer-list"><div class="customer-filters relationship-filters"><div class="field"><label class="fl" for="r-query">' + (gathering ? '주제·참가 고객 검색' : '회원 검색') + '</label><input class="in" id="r-query" value="' + esc(u.q) + '" placeholder="' + (gathering ? '주제 또는 고객 이름' : '고객 이름·학생·학교') + '"></div><div class="field"><label class="fl" for="r-month">' + (gathering ? '모임 월' : '활동 확인 월') + '</label><input class="in" id="r-month" type="month" value="' + esc(u.month) + '"></div><div class="field"><label class="fl" for="r-status">상태</label><select class="in" id="r-status"><option value="">전체</option>' + opt(Object.keys(labels), u.status, v => labels[v]) + '</select></div></div>';
+  const list = gathering ? state.gatherings.filter(g => (!u.month || g.date.startsWith(u.month)) && (!u.status || g.status === u.status) && (!u.q || g.topic.toLowerCase().includes(u.q.toLowerCase()) || g.participants.some(p => C.leadMatches(leadById(p.leadId), u.q)))).sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time)) :
+    state.memberships.filter(m => m.program === u.tab && leadById(m.leadId) && C.leadMatches(leadById(m.leadId), u.q) && (!u.status || m.status === u.status)).sort((a, b) => String(a.nextContactDate || '9999').localeCompare(String(b.nextContactDate || '9999')));
+  if (!list.length) h += '<div class="empty small">' + (gathering ? '조건에 맞는 모임이 없습니다. 월을 바꾸거나 모임을 추가하세요.' : '조건에 맞는 회원이 없습니다. 고객을 선택해 참여 기록을 추가하세요.') + '</div>';
+  else h += '<div class="customer-table-scroll"><table class="customer-table relationship-table"><caption class="sr-only">' + (gathering ? '맘스쿨 모임 목록' : esc(C.PROGRAM_LABEL[u.tab]) + ' 회원과 활동 확인') + '</caption><thead><tr>' + (gathering ? ['주제', '일정·장소', '정원·참석', '진행 담당', '상태'] : ['고객·프로그램', '시작·참여 상태', '선택 월 활동', '센터앱 혜택 확인', '다음 연락']).map(x => '<th scope="col">' + x + '</th>').join('') + '</tr></thead><tbody>' + list.map(x => {
+    if (gathering) {
+      const occupied = x.participants.filter(p => ['confirmed', 'attended'].includes(p.status)).length;
+      return '<tr><td class="customer-name"><button class="relationship-name" data-act="gathering-edit" data-id="' + esc(x.id) + '">' + esc(x.topic) + '</button></td><td data-label="일정·장소">' + esc(x.date) + ' ' + esc(x.time) + '<div class="hint">' + esc(x.place || '장소 미정') + '</div></td><td data-label="정원·참석">확정·참석 ' + occupied + ' / ' + x.capacity + '명<div class="hint">초대 ' + x.participants.filter(p => p.status === 'invited').length + '명 · ' + (x.participantsChecked ? '보호자 중복 확인' : '보호자 중복 미확인') + '</div></td><td data-label="진행 담당">' + esc(staffName(x.owner)) + '</td><td data-label="상태">' + esc(C.GATHERING_STATUS_LABEL[x.status]) + '</td></tr>';
+    }
+    const l = leadById(x.leadId);
+    return '<tr><td class="customer-name"><button class="relationship-name" data-act="membership-edit" data-id="' + esc(x.id) + '">' + esc(C.leadLabel(l)) + '</button><div class="hint">' + esc(C.PROGRAM_LABEL[x.program]) + ' · ' + esc(staffName(x.owner)) + '</div></td><td data-label="시작·참여 상태">' + esc(x.startDate) + '<div>' + esc(C.MEMBERSHIP_STATUS_LABEL[x.status]) + '</div></td><td data-label="선택 월 활동">' + relationshipMonthLabel(x.id, u.month) + '</td><td data-label="센터앱 혜택 확인">' + esc(C.BENEFIT_STATE_LABEL[x.benefitState]) + '</td><td data-label="다음 연락">' + (x.nextContactDate ? '<span class="' + (x.nextContactDate < today() ? 'overdue' : '') + '">' + esc(x.nextContactDate) + '</span><div class="hint">' + esc(x.nextAction || '할 일 미입력') + '</div>' : '<span class="muted">일정 없음</span>') + '</td></tr>';
+  }).join('') + '</tbody></table></div>';
+  h += '</div><details class="relationship-rules"><summary>운영 기준 확인</summary>' + (gathering ? '<p>검사를 마친 보호자 4~6명이 주제별로 차를 마시며 센터와 보호자의 관계를 이어갑니다. 대표 고객 한 행이 보호자 한 명인지 확인하고 형제 중복은 제외하세요. 참석 기록만으로 서포터즈 활동·가입·딜 단계·매출은 바뀌지 않습니다.</p>' : u.tab === 'friend' ? '<p>월 1회 리뷰 링크·캡처는 부모 포털 원본에서 확인합니다. 기본 활동지와 3개월 소검사 1회 무료는 리뷰와 별개이며, 첫 리뷰 등록 후 청크브레인·어휘브레인·브레인레터 3종 개통을 센터앱에서 확인합니다. 소검사를 마쳐도 친구맺기 전체 참여가 자동 종료되지 않습니다.</p>' : '<p>등록일부터 혜택이 시작됩니다. 매월 후기·지인 소개·브런치 동반 중 1회 활동을 확인합니다. 3개월 각각의 월 활동을 확인한 뒤 소검사를 반복하며, 한 달에 몰아 한 활동은 다른 달을 채우지 않습니다. 활동이 없으면 바로 종료하지 않고 보완 후 담당자가 확인합니다. 포인트는 별도입니다.</p>') + '<p>소검사 기준일·예정일은 담당자가 확인해 입력합니다. 자동 전환·중복 혜택 지급·포인트 정산은 하지 않습니다.</p></details>';
+  return h;
+}
+function relationshipField(id, label, value, type, labels) {
+  const attrs = ' class="in" id="' + id + '"';
+  return '<div class="field"><label class="fl" for="' + id + '">' + esc(label) + '</label>' + (labels ? '<select' + attrs + '>' + opt(Object.keys(labels), value, v => labels[v]) + '</select>' : type === 'textarea' ? '<textarea' + attrs + ' rows="3" maxlength="1000">' + esc(value) + '</textarea>' : '<input' + attrs + ' type="' + (type || 'text') + '" value="' + esc(value) + '"' + (!type || type === 'text' ? ' maxlength="200"' : '') + '>') + '</div>';
+}
+function relationshipOwner(value) {
+  const owners = { admin: '원장' }; liveStaff().forEach(s => { owners[s.id] = s.name; });
+  if (value && !owners[value]) owners[value] = staffName(value) + ' (기존 담당)';
+  return relationshipField('r-owner', '담당자', value || session.staffId, '', owners);
+}
+function relationshipLeadOptions(query, selected, inspectionOnly) {
+  return '<option value="">고객 선택</option>' + state.leads.filter(l => (!inspectionOnly || C.hasCompletedInspection(l, today())) && (l.id === selected || C.leadMatches(l, query))).map(l => '<option value="' + esc(l.id) + '"' + (l.id === selected ? ' selected' : '') + '>' + esc(C.leadLabel(l)) + '</option>').join('');
+}
+function relationshipLeadPicker(selected, inspectionOnly) {
+  return '<div class="field"><label class="fl" for="r-lead-search">' + (inspectionOnly ? '검사 완료 고객 찾기' : 'CRM 고객 찾기') + '</label><input class="in" id="r-lead-search" data-inspection="' + (inspectionOnly ? '1' : '') + '" placeholder="이름·학생·학교 검색"><label class="fl mt8" for="r-lead">고객 선택</label><select class="in" id="r-lead">' + relationshipLeadOptions('', selected, inspectionOnly) + '</select></div>';
+}
+function relationshipCanOpen() {
+  return !relationshipSaving && (!modalDirty() || confirm('작성 중인 변경을 저장하지 않고 다른 기록을 열까요?'));
+}
+function relationshipModal(title, html, c, id, backId) {
+  const at = state.meta[C.docKey(c, id)];
+  modal(title, html + (at ? '<p class="hint">CRM 기록 저장 · ' + esc(new Date(Number(at)).toLocaleString('ko-KR')) + '</p>' : '') + '<p class="hint">메모에는 전화·이메일·검사 점수를 적지 마세요. 고객 정보는 기존 CRM 고객을 선택합니다.</p><div id="r-error" class="banner bad" role="alert" hidden></div><button class="btn btn-sm btn-ghost" id="r-reload" data-act="relationship-reload" hidden>최신 기록 다시 열기</button>', '<button class="btn btn-primary btn-block mt14" id="r-save" data-act="relationship-save">저장하고 확인</button>');
+  relationshipEdit = { c, id, expectedUpdatedAt: state.meta[C.docKey(c, id)] || 0, backId, acceptedAt: 0 };
+  $('#modalHost').querySelector('.modal-box').classList.add('relationship-modal');
+}
+function openMembershipForm(id, program, customerId) {
+  if (!relationshipCanOpen()) return;
+  const m = state.memberships.find(x => x.id === id);
+  if (id && !m) return toast('참여 기록을 찾을 수 없습니다');
+  const value = m || { leadId: customerId || '', program: program === 'supporter' ? 'supporter' : 'friend', status: 'active', benefitState: 'unchecked', startDate: today() };
+  let html = relationshipSource() + (m ? '<p class="relationship-person">' + esc(C.leadLabel(leadById(m.leadId))) + ' · ' + esc(C.PROGRAM_LABEL[m.program]) + '</p>' : relationshipLeadPicker(value.leadId, false) + relationshipField('r-program', '프로그램', value.program, '', C.PROGRAM_LABEL));
+  html += '<div class="grid2">' + relationshipField('r-start', '참여 시작일', value.startDate, 'date') + relationshipOwner(value.owner) + relationshipField('r-member-status', '참여 상태', value.status, '', C.MEMBERSHIP_STATUS_LABEL) + relationshipField('r-benefit', '센터앱 혜택 확인 상태', value.benefitState, '', C.BENEFIT_STATE_LABEL) + '</div><p class="hint mb14">혜택 확인 상태는 센터앱을 확인했다는 기록이며 이용권을 생성하지 않습니다.</p><div class="grid2">' + relationshipField('r-pause', '일시 중지일', value.pauseDate, 'date') + relationshipField('r-resume', '재개일', value.resumeDate, 'date') + relationshipField('r-next-date', '다음 연락일', value.nextContactDate, 'date') + relationshipField('r-next-action', '다음 할 일', value.nextAction) + '</div>' + relationshipField('r-note', '운영 메모', value.note, 'textarea');
+  if (m) html += membershipRecordsHtml(m);
+  relationshipModal(m ? '참여 상세 · ' + C.PROGRAM_LABEL[m.program] : '참여 기록 추가', html, 'memberships', id || '', '');
+}
+function membershipRecordsHtml(m) {
+  const activities = state.programActivities.filter(a => a.membershipId === m.id).sort((a, b) => b.date.localeCompare(a.date));
+  const exams = state.programExams.filter(e => e.membershipId === m.id).sort((a, b) => b.cycleStart.localeCompare(a.cycleStart));
+  return '<section class="relationship-records"><div class="between"><h3 class="card-title">월 활동</h3><button class="btn btn-sm btn-ghost" data-act="program-activity-new" data-id="' + esc(m.id) + '">활동 추가</button></div><p class="hint">' + esc(ui.relationships.month) + ' · ' + relationshipMonthLabel(m.id, ui.relationships.month) + ' · 리뷰 증빙 원본은 부모 포털에서 확인합니다.</p>' + (activities.length ? activities.map(a => '<div class="fu"><div class="grow"><b>' + esc(a.month) + ' · ' + esc(C.PROGRAM_ACTIVITY_LABEL[a.kind]) + '</b><div class="hint">' + esc(a.date) + ' · ' + esc(C.PROGRAM_ACTIVITY_STATUS_LABEL[a.status]) + '</div><p class="relationship-text">' + esc(a.evidence || '원본 확인 메모 없음') + '</p>' + (a.note ? '<p class="hint relationship-text">' + esc(a.note) + '</p>' : '') + '</div><button class="btn btn-sm btn-ghost" data-act="program-activity-edit" data-id="' + esc(a.id) + '">수정</button></div>').join('') : '<p class="hint mt8">활동 기록이 없습니다.</p>') + '</section><section class="relationship-records"><div class="between"><h3 class="card-title">소검사 회차</h3><button class="btn btn-sm btn-ghost" data-act="program-exam-new" data-id="' + esc(m.id) + '">회차 추가</button></div><p class="hint">센터앱의 사용 내역을 확인합니다. 완료 회차는 덮어쓰지 않습니다.</p>' + (exams.length ? exams.map(e => '<div class="fu"><div class="grow"><b>' + esc(e.cycleStart) + ' ~ ' + esc(e.cycleEnd) + '</b><div class="hint">예정 ' + esc(e.dueDate) + (e.bookedDate ? ' · 예약 ' + esc(e.bookedDate) : '') + (e.completedDate ? ' · 완료 ' + esc(e.completedDate) : '') + '</div><div class="hint">' + (e.activitiesChecked ? '회차 활동 확인' : '회차 활동 미확인') + '</div>' + (e.note ? '<p class="relationship-text">' + esc(e.note) + '</p>' : '') + '</div>' + (e.completedDate ? '<span class="pill ok">완료 기록</span>' : '<button class="btn btn-sm btn-ghost" data-act="program-exam-edit" data-id="' + esc(e.id) + '">예약·완료 기록</button>') + '</div>').join('') : '<p class="hint mt8">소검사 회차가 없습니다. 기준일 확인 후 추가하세요.</p>') + '</section>';
+}
+function openProgramActivity(id, membershipId) {
+  if (!relationshipCanOpen()) return;
+  const a = state.programActivities.find(x => x.id === id), m = state.memberships.find(x => x.id === (a ? a.membershipId : membershipId));
+  if (!m || (id && !a)) return toast('참여 기록을 찾을 수 없습니다');
+  const v = a || { month: ui.relationships.month || C.ymOf(today()), kind: 'review', status: 'pending', date: '' };
+  relationshipModal('월 활동 · ' + C.PROGRAM_LABEL[m.program], '<p class="relationship-person">' + esc(C.leadLabel(leadById(m.leadId))) + '</p>' + relationshipSource() + '<div class="grid2">' + relationshipField('r-activity-month', '활동 월', v.month, 'month') + relationshipField('r-activity-date', '실제 활동일', v.date, 'date') + relationshipField('r-activity-kind', '활동 종류', v.kind, '', m.program === 'friend' ? { review: C.PROGRAM_ACTIVITY_LABEL.review } : C.PROGRAM_ACTIVITY_LABEL) + relationshipField('r-activity-status', '확인 상태', v.status, '', C.PROGRAM_ACTIVITY_STATUS_LABEL) + '</div>' + relationshipField('r-evidence', '센터앱 원본 확인 메모', v.evidence, 'textarea') + '<p class="hint mb14">리뷰 링크·캡처는 부모 포털에 보관합니다. 여기에는 확인한 내용만 적으세요. 한 달 활동 여러 건이 다른 달을 채우지는 않습니다.</p>' + relationshipField('r-note', '보완·후속 메모', v.note, 'textarea'), 'programActivities', id || uid('pa'), m.id);
+  $('#r-activity-month').disabled = !!a;
+}
+function openProgramExam(id, membershipId) {
+  if (!relationshipCanOpen()) return;
+  const e = state.programExams.find(x => x.id === id), m = state.memberships.find(x => x.id === (e ? e.membershipId : membershipId));
+  if (!m || (id && !e)) return toast('참여 기록을 찾을 수 없습니다');
+  if (e && e.completedDate) return toast('완료 회차는 수정하지 않습니다. 참여 상세에서 확인하세요.');
+  const v = e || {};
+  relationshipModal('소검사 회차 · ' + C.PROGRAM_LABEL[m.program], '<p class="relationship-person">' + esc(C.leadLabel(leadById(m.leadId))) + '</p><p class="hint mb14">담당자가 정확한 기준일과 센터앱 원본을 확인해 입력합니다. 날짜는 자동 계산하지 않습니다.' + (m.program === 'friend' ? ' 친구맺기 무료 소검사는 1회이며 리뷰와 별개입니다.' : ' 서포터즈는 3개월 각각의 월 활동을 확인합니다.') + '</p><div class="grid2">' + relationshipField('r-cycle-start', '회차 시작일', v.cycleStart, 'date') + relationshipField('r-cycle-end', '회차 종료일', v.cycleEnd, 'date') + relationshipField('r-due-date', '담당자 확인 예정일', v.dueDate, 'date') + relationshipField('r-booked-date', '예약일', v.bookedDate, 'date') + relationshipField('r-completed-date', '센터앱 확인 완료일', v.completedDate, 'date') + '</div><label class="check"><input type="checkbox" id="r-activities-checked"' + (v.activitiesChecked ? ' checked' : '') + '>회차의 월별 활동을 각각 확인했습니다</label>' + (m.program === 'friend' ? '<p class="hint">친구맺기는 이 체크가 무료 소검사 조건이 아닙니다.</p>' : '') + relationshipField('r-note', '회차 확인 메모', v.note, 'textarea') + '<p class="hint">완료일 저장 뒤에는 회차를 수정할 수 없습니다. 참여 전체는 종료되지 않습니다.</p>', 'programExams', id || uid('pe'), m.id);
+  $('#r-cycle-start').disabled = !!e; $('#r-cycle-end').disabled = !!e;
+  $('#r-completed-date').max = today();
+}
+function gatheringParticipantHtml(p) {
+  const key = uid('rp'), lead = leadById(p.leadId);
+  return '<fieldset class="relationship-participant" data-lead="' + esc(p.leadId) + '"><legend>' + esc(lead ? C.leadLabel(lead) : '삭제된 고객') + '</legend><input type="hidden" value="' + esc(p.leadId) + '"><div class="grid2">' + relationshipField(key + '-status', '참석 상태', p.status, '', C.ATTENDANCE_LABEL).replace('class="in"', 'class="in" data-part="status"') + relationshipField(key + '-date', '다음 연락일', p.nextContactDate, 'date').replace('class="in"', 'class="in" data-part="nextContactDate"') + '</div>' + relationshipField(key + '-action', '다음 할 일', p.nextAction).replace('class="in"', 'class="in" data-part="nextAction"') + relationshipField(key + '-note', '참가자 이야기·후속 요약', p.note, 'textarea').replace('class="in"', 'class="in" data-part="note"') + '<label class="check"><input type="checkbox" data-part="inspectionConfirmed"' + (p.inspectionConfirmed ? ' checked' : '') + '>검사 실시를 확인했습니다</label><button class="btn btn-sm btn-ghost" data-act="gathering-remove-participant">목록에서 제외</button></fieldset>';
+}
+function openGatheringForm(id) {
+  if (!relationshipCanOpen()) return;
+  const g = state.gatherings.find(x => x.id === id);
+  if (id && !g) return toast('모임 기록을 찾을 수 없습니다');
+  const v = g || { capacity: 4, status: 'planned', participants: [] };
+  relationshipModal(g ? '맘스쿨 · ' + g.topic : '맘스쿨 모임 추가', '<p class="hint mb14">검사를 마친 보호자 4~6명의 주제별 차 모임입니다. 주제에 맞춰 이야기를 나누며 센터와 보호자의 관계를 이어갑니다.</p>' + relationshipField('r-topic', '함께 이야기할 주제', v.topic) + '<div class="grid2">' + relationshipField('r-gathering-date', '모임 날짜', v.date, 'date') + relationshipField('r-time', '시작 시간', v.time, 'time') + relationshipField('r-place', '장소', v.place) + relationshipOwner(v.owner) + relationshipField('r-capacity', '정원', v.capacity, '', { 4: '4명', 5: '5명', 6: '6명' }) + relationshipField('r-gathering-status', '모임 상태', v.status, '', C.GATHERING_STATUS_LABEL) + '</div><section class="relationship-records"><h3 class="card-title">참가 보호자</h3><p class="hint mb14">검사 완료 근거가 있는 CRM 고객만 선택할 수 있습니다. 초대 후보는 정원보다 많아도 되며 확정·참석 인원은 정원 안으로 조정하세요.</p>' + relationshipLeadPicker('', true) + '<label class="check"><input type="checkbox" id="r-inspection-confirmed">선택한 고객의 검사 실시를 확인했습니다</label><button class="btn btn-sm btn-ghost mb14" data-act="gathering-add-participant">초대 목록에 추가</button><div id="r-participants">' + v.participants.map(gatheringParticipantHtml).join('') + '</div><label class="check"><input type="checkbox" id="r-participants-checked"' + (v.participantsChecked ? ' checked' : '') + '>각 행이 서로 다른 보호자 1명인지 확인했습니다 (형제 중복 제외)</label></section>' + relationshipField('r-note', '모임 이야기 요약', v.note, 'textarea') + '<p class="hint">참석으로 서포터즈 활동 인정·가입·딜 단계·매출이 자동 변경되지 않습니다.</p>', 'gatherings', id || uid('gathering'), '');
+}
+function relationshipError(message, stale) {
+  const el = $('#r-error'); if (el) { el.textContent = message; el.hidden = false; }
+  const reload = $('#r-reload'); if (reload) reload.hidden = !stale;
+}
+function addGatheringParticipant() {
+  const id = val('r-lead'), lead = leadById(id), list = $('#r-participants');
+  if (!lead || !C.hasCompletedInspection(lead, today()) || !checked('r-inspection-confirmed')) return relationshipError('검사 완료 고객을 선택하고 검사 실시 확인에 체크해 주세요.');
+  if (Array.from(list.querySelectorAll('[data-lead]')).some(row => row.dataset.lead === id)) return relationshipError('이미 목록에 있는 고객입니다. 형제 고객도 같은 보호자라면 중복으로 추가하지 마세요.');
+  list.insertAdjacentHTML('beforeend', gatheringParticipantHtml({ leadId: id, status: 'invited', inspectionConfirmed: true }));
+  $('#r-participants-checked').checked = false; $('#r-inspection-confirmed').checked = false; $('#r-lead').value = ''; $('#r-error').hidden = true;
+}
+function relationshipFormData(edit) {
+  if (edit.c === 'memberships') {
+    const previous = state.memberships.find(m => m.id === edit.id);
+    return C.validateMembership({ leadId: previous ? previous.leadId : val('r-lead'), program: previous ? previous.program : val('r-program'), startDate: val('r-start'), owner: val('r-owner'), status: val('r-member-status'), benefitState: val('r-benefit'), pauseDate: val('r-pause'), resumeDate: val('r-resume'), nextContactDate: val('r-next-date'), nextAction: val('r-next-action'), note: val('r-note') });
+  }
+  if (edit.c === 'programActivities') return C.validateProgramActivity({ membershipId: edit.backId, month: val('r-activity-month'), kind: val('r-activity-kind'), date: val('r-activity-date'), status: val('r-activity-status'), evidence: val('r-evidence'), note: val('r-note') });
+  if (edit.c === 'programExams') return C.validateProgramExam({ membershipId: edit.backId, cycleStart: val('r-cycle-start'), cycleEnd: val('r-cycle-end'), dueDate: val('r-due-date'), bookedDate: val('r-booked-date'), completedDate: val('r-completed-date'), activitiesChecked: checked('r-activities-checked'), note: val('r-note') });
+  const participants = Array.from($('#r-participants').querySelectorAll('[data-lead]'), row => {
+    const data = { leadId: row.dataset.lead }; row.querySelectorAll('[data-part]').forEach(el => { data[el.dataset.part] = el.type === 'checkbox' ? el.checked : el.value.trim(); }); return data;
+  });
+  return C.validateGathering({ topic: val('r-topic'), date: val('r-gathering-date'), time: val('r-time'), place: val('r-place'), capacity: val('r-capacity'), owner: val('r-owner'), status: val('r-gathering-status'), note: val('r-note'), participantsChecked: checked('r-participants-checked'), participants });
+}
+async function saveRelationship() {
+  const edit = relationshipEdit;
+  if (!edit || relationshipSaving) return;
+  if (!edit.acceptedAt) {
+    const verdict = relationshipFormData(edit);
+    if (!verdict.ok) return relationshipError(verdict.error);
+    const data = verdict.data;
+    const pii = C.findPii({ note: data.note, evidence: data.evidence, nextAction: data.nextAction, topic: data.topic, place: data.place,
+      participants: (data.participants || []).map(p => ({ note: p.note, nextAction: p.nextAction })) });
+    if (pii) return relationshipError('메모·확인 기록에 전화번호·이메일·주민번호를 적을 수 없습니다. 고객 정보는 기존 고객을 선택하세요.');
+    if (edit.c === 'memberships' && !edit.id) {
+      edit.id = verdict.data.leadId + '__' + verdict.data.program;
+      if (state.memberships.some(m => m.id === edit.id)) { edit.id = ''; return relationshipError('이 고객의 프로그램 참여 기록이 이미 있습니다. 기존 참여 상세에서 수정해 주세요.'); }
+    }
+    if (edit.c === 'memberships' && edit.id !== verdict.data.leadId + '__' + verdict.data.program) return relationshipError('이미 저장을 시도한 기록의 고객·프로그램은 바꿀 수 없습니다. 이 기록의 저장 결과를 먼저 확인하세요.');
+    edit.data = verdict.data;
+  }
+  relationshipSaving = true;
+  const controls = Array.from($('#modalHost').querySelectorAll('input, select, textarea, button'));
+  const disabled = controls.map(el => el.disabled); controls.forEach(el => { el.disabled = true; });
+  const button = $('#r-save'); button.textContent = edit.acceptedAt ? '저장 결과 확인 중…' : '저장 중…';
+  $('#r-error').hidden = true;
+  try {
+    if (!edit.acceptedAt) {
+      const res = await api('/api/docs', { changes: [{ c: edit.c, id: edit.id, data: edit.data, expectedUpdatedAt: edit.expectedUpdatedAt }] });
+      const result = (res.results || []).find(r => r.c === edit.c && r.id === edit.id);
+      if (!result || result.code || !result.updatedAt) throw Object.assign(new Error(result && result.error || '서버 저장 응답을 확인하지 못했습니다'), { code: result && result.code || 'UNVERIFIED' });
+      edit.acceptedAt = result.updatedAt;
+    }
+    await loadAll();
+    const saved = state[edit.c].find(x => x.id === edit.id);
+    if (!saved || Number(state.meta[C.docKey(edit.c, edit.id)]) < Number(edit.acceptedAt)) throw new Error('서버의 저장 기록을 아직 다시 읽지 못했습니다');
+    if (!Object.entries(edit.data).filter(([key, value]) => key !== 'by' && !(key === 'owner' && !value)).every(([key, value]) => JSON.stringify(saved[key]) === JSON.stringify(value))) throw Object.assign(new Error('저장 후 다른 변경이 확인되었습니다'), { code: 'STALE' });
+    relationshipSaving = false;
+    closeModal(true); render();
+    if (edit.backId) openMembershipForm(edit.backId);
+    toast('서버에서 저장 기록을 확인했습니다');
+  } catch (error) {
+    if (error.code === 'STALE') {
+      try { await loadAll(); } catch (_) { /* 입력은 유지하고 다음 명시적 재조회에서 다시 확인한다. */ }
+      relationshipError('다른 기기에서 먼저 바뀌었습니다. 입력은 유지했습니다. 내용을 따로 확인한 뒤 ‘최신 기록 다시 열기’로 최신 값부터 검토해 주세요.', true);
+    } else relationshipError((edit.acceptedAt ? '저장은 접수되었지만 재조회하지 못했습니다. 입력을 유지했습니다. ‘저장 결과 다시 확인’을 누르세요. ' : '저장하지 못했거나 결과가 확정되지 않았습니다. 입력을 유지했습니다. 같은 기록으로 다시 시도해 주세요. ') + error.message);
+  } finally {
+    relationshipSaving = false;
+    if (relationshipEdit === edit) {
+      controls.forEach((el, i) => { el.disabled = edit.acceptedAt && /^(INPUT|SELECT|TEXTAREA)$/.test(el.tagName) ? true : disabled[i]; });
+      button.disabled = false; button.textContent = edit.acceptedAt ? '저장 결과 다시 확인' : '저장하고 확인';
+    }
+  }
+}
+async function reloadRelationship() {
+  const edit = relationshipEdit; if (!edit || relationshipSaving) return;
+  const button = $('#r-reload');
+  relationshipSaving = true; button.disabled = true; button.textContent = '최신 기록 조회 중…';
+  try {
+    await loadAll();
+    relationshipSaving = false;
+    if (relationshipEdit !== edit) return;
+    if (!state[edit.c].some(x => x.id === edit.id)) return relationshipError('서버에 저장된 기록이 없습니다. 입력을 유지했습니다. 고객·참여 상태를 확인한 뒤 같은 기록으로 다시 저장해 주세요.', true);
+    if (edit.c === 'memberships') return openMembershipForm(edit.id);
+    if (edit.c === 'programActivities') return openProgramActivity(edit.id, edit.backId);
+    if (edit.c === 'programExams') return openProgramExam(edit.id, edit.backId);
+    return openGatheringForm(edit.id);
+  } catch (error) {
+    relationshipError('최신 기록을 조회하지 못해 입력을 유지했습니다. 연결을 확인한 뒤 다시 열어 주세요. ' + error.message, true);
+  } finally {
+    relationshipSaving = false;
+    if (relationshipEdit === edit) { button.disabled = false; button.textContent = '최신 기록 다시 열기'; }
+  }
+}
+
 function viewPartners() {
   const ym = ui.ym;
   const prev = C.ymOf(C.addMonths(ym + '-01', -1)), next = C.ymOf(C.addMonths(ym + '-01', 1));
@@ -1085,6 +1298,19 @@ document.addEventListener('click', async e => {
     case 'setup': return doSetup(el);
     case 'logout': return doLogout();
     case 'closemodal': return closeModal();
+    case 'relationship-tab': ui.relationships.tab = el.dataset.tab; ui.relationships.status = ''; return render();
+    case 'membership-new': return openMembershipForm('', el.dataset.program || ui.relationships.tab, el.dataset.lead);
+    case 'membership-edit': return openMembershipForm(id);
+    case 'program-activity-new': return openProgramActivity('', id);
+    case 'program-activity-edit': return openProgramActivity(id);
+    case 'program-exam-new': return openProgramExam('', id);
+    case 'program-exam-edit': return openProgramExam(id);
+    case 'gathering-new': return openGatheringForm('');
+    case 'gathering-edit': return openGatheringForm(id);
+    case 'gathering-add-participant': return addGatheringParticipant();
+    case 'gathering-remove-participant': el.closest('.relationship-participant').remove(); $('#r-participants-checked').checked = false; return;
+    case 'relationship-save': return saveRelationship();
+    case 'relationship-reload': return reloadRelationship();
     case 'reload': return location.reload();
     case 'retry-sync': syncErr = ''; return flush();
     case 'go': return go(el.dataset.r);
@@ -1161,6 +1387,8 @@ document.addEventListener('change', e => {
   const t = e.target;
   if (!t || !t.id && !t.dataset.act) return;
   if (t.id === 'f-stage') return moveStage(t.dataset.id, t.value, t);
+  if (t.id === 'r-month') { ui.relationships.month = t.value || C.ymOf(today()); return render(); }
+  if (t.id === 'r-status') { ui.relationships.status = t.value; return render(); }
   if (t.id === 'f-channel') { ui.channel = t.value; return render(); }
   if (t.id === 'f-owner') { ui.owner = t.value; return render(); }
   if (t.id === 'f-channel2' || t.id === 'f-hot') { t.dataset.touched = '1'; if (t.id === 'f-channel2') togglePartnerField(); return; }
@@ -1180,6 +1408,15 @@ document.addEventListener('change', e => {
   }
 });
 document.addEventListener('input', e => {
+  if (e.target && e.target.id === 'r-lead-search') {
+    const select = $('#r-lead'); if (select) select.innerHTML = relationshipLeadOptions(e.target.value, select.value, e.target.dataset.inspection === '1');
+    return;
+  }
+  if (e.target && e.target.id === 'r-query') {
+    ui.relationships.q = e.target.value; clearTimeout(render._relationshipQuery);
+    render._relationshipQuery = setTimeout(() => { const pos = e.target.selectionStart; render(); const input = $('#r-query'); if (input) { input.focus(); input.setSelectionRange(pos, pos); } }, 160);
+    return;
+  }
   if (e.target && e.target.id === 'f-q') { ui.q = e.target.value; const card = e.target.closest('.card'); const list = card ? card.querySelectorAll('.lead') : []; void list; clearTimeout(render._q); render._q = setTimeout(() => { const pos = e.target.selectionStart; render(); const q = $('#f-q'); if (q) { q.focus(); try { q.setSelectionRange(pos, pos); } catch (err) { /* iOS */ } } }, 160); }
 });
 document.addEventListener('keydown', e => {
@@ -1190,6 +1427,6 @@ document.addEventListener('keydown', e => {
 });
 window.addEventListener('hashchange', onHash);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); });
-window.addEventListener('beforeunload', e => { if (outbox.size() || modalDirty()) { e.preventDefault(); e.returnValue = ''; } });
+window.addEventListener('beforeunload', e => { if (outbox.size() || relationshipSaving || modalDirty()) { e.preventDefault(); e.returnValue = ''; } });
 
 startApp();

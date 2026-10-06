@@ -255,6 +255,33 @@ details > summary { cursor: pointer; }
 }
 
 /* 파트너 포털 — 같은 어휘, 조금 더 넓은 숨 */
+.relationship-source { margin: 0 0 18px; max-width: 78ch; color: var(--ink-2); }
+.relationship-source a { color: var(--ink-2); }
+.relationship-filters { display: grid; grid-template-columns: minmax(180px, 1fr) 170px 160px; gap: 14px; }
+.relationship-filters .field { margin: 0; }
+.relationship-name { color: var(--accent); font-size: 14px; font-weight: 700; text-align: left; padding: 6px 0; line-height: 1.5; white-space: normal; overflow-wrap: anywhere; }
+.relationship-name:hover { text-decoration: underline; }
+.relationship-table td { font-variant-numeric: tabular-nums; }
+.relationship-rules { margin: 22px 0; color: var(--ink-2); font-size: 13px; max-width: 78ch; }
+.relationship-rules summary { color: var(--ink); padding: 10px 0; font-weight: 600; }
+.relationship-rules p { margin: 10px 0; line-height: 1.75; }
+.relationship-modal { max-width: 700px; }
+.relationship-person { font-weight: 700; color: var(--ink); margin: 0 0 18px; overflow-wrap: anywhere; }
+.relationship-records { border-top: 1px solid var(--line); margin-top: 22px; padding-top: 18px; margin-bottom: 18px; }
+.relationship-text { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; }
+.relationship-participant { border: 1px solid var(--line); border-radius: var(--radius-s); padding: 14px; margin: 18px 0; min-width: 0; }
+.relationship-participant legend { font-size: 14px; font-weight: 700; padding: 0 6px; max-width: 100%; overflow-wrap: anywhere; }
+.relationship-modal [hidden] { display: none !important; }
+.relationship-modal .check { align-items: flex-start; }
+@media (max-width: 719px) {
+  .relationship-filters { grid-template-columns: 1fr 1fr; }
+  .relationship-filters .field:first-child { grid-column: 1 / -1; }
+  .relationship-modal { padding: 16px; }
+  .relationship-modal .grid2 { grid-template-columns: 1fr; }
+  .relationship-name { font-size: 16px; min-height: 44px; }
+  .relationship-modal .btn-sm { min-height: 40px; }
+}
+
 body.partner #view { padding-top: 18px; }
 body.partner .wrap { max-width: 640px; }
 body.partner .brand { white-space: nowrap; }
