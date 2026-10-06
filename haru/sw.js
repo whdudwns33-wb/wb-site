@@ -13,6 +13,7 @@ self.addEventListener('activate', (e) => {
 self.addEventListener('fetch', (e) => {
   const url = new URL(e.request.url);
   if (url.origin !== location.origin || e.request.method !== 'GET') return;
+  if (/^\/haru\/guide(?:\.html)?\/?$/.test(url.pathname)) return;     // 전형 안내는 최신 원문만 열고 오프라인에서 학생 홈으로 바꾸지 않는다
   if (url.pathname.startsWith('/api/')) return;                       // 문항·기록은 네트워크만
   if (/\.json$/.test(url.pathname)) return;                            // atoms.json 도 캐시하지 않는다 — 원자 목록이 바뀌면 바로 받아야 한다
   if (e.request.mode === 'navigate') {
