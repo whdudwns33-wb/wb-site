@@ -12,7 +12,9 @@ const ymd = (t) => new Date(t).toISOString().slice(0, 10);
 const utc = (d) => Date.parse(d + 'T00:00:00Z');
 const dow = (d) => new Date(utc(d)).getUTCDay();   // 0 일 … 6 토
 
-/* 요강 일정 → aud:'parent' 마일스톤. 원서·서류·수험표·발표는 부모 화면 항목이지 학생 항목이 아니다. */
+/* 요강 일정 → aud:'parent' 마일스톤. 원서·서류·수험표·발표는 부모 화면 항목이지 학생 항목이 아니다.
+   부모 화면에 그대로 나가는 문구라 부모 금지어 검사(strings.js FORBIDDEN.parent — '합격' 포함)를 통과해야 한다.
+   그래서 요강의 '합격자 발표·등록'을 '결과 발표·입학 등록'으로 옮겨 쓴다(plan-build.test.mjs). */
 export function milestonesFromFacts(facts, extra) {
   const S = facts.schedule, day = (s) => s.slice(0, 10), hm = (s) => (s.length > 10 ? s.slice(11, 16) : null);
   const m = [
@@ -24,8 +26,8 @@ export function milestonesFromFacts(facts, extra) {
     { d: day(S.docs[1]), aud: 'parent', at: hm(S.docs[1]), text: '서류 제출 마감 ' + hm(S.docs[1]) + ' (우체국 소인까지)' },
     { d: day(S.ticket[0]), aud: 'parent', at: hm(S.ticket[0]), text: '수험표 출력 시작 — 본인 직접 출력, 지참해야 입실' },
     { d: facts.exam.date, aud: 'both', at: facts.exam.arriveBy, text: facts.exam.arriveBy + '까지 고사장 입실' },
-    { d: day(S.announce[0]), aud: 'parent', at: hm(S.announce[0]), text: '합격자 발표 ' + hm(S.announce[0]) + ' — 오늘은 아무것도 안 하셔도 됩니다' },
-    { d: S.enroll[0], aud: 'parent', text: '합격자 등록 ' + S.enroll[0] + ' ~ ' + S.enroll[1] }
+    { d: day(S.announce[0]), aud: 'parent', at: hm(S.announce[0]), text: '결과 발표 ' + hm(S.announce[0]) + ' — 오늘은 아무것도 안 하셔도 됩니다' },
+    { d: S.enroll[0], aud: 'parent', text: '입학 등록 ' + S.enroll[0] + ' ~ ' + S.enroll[1] }
   ];
   return m.concat(extra || []).sort((a, b) => a.d.localeCompare(b.d));
 }
