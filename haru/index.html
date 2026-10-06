@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>WB 하루브레인</title>
+  <title>삼육중 및 영재원 대비</title>
   <meta name="description" content="오늘 카드 한 장 — WB 독해력학원 원내 학습 도구 (원내 전용)">
   <meta name="robots" content="noindex, nofollow">
   <meta name="referrer" content="no-referrer">
@@ -36,7 +36,7 @@
     :focus-visible { outline:3px solid var(--blue); outline-offset:2px; border-radius:8px; }
     [hidden] { display:none !important; }
     .bar { display:flex; align-items:center; gap:12px; padding:10px 16px; background:var(--panel); border-bottom:1px solid var(--line); position:sticky; top:0; z-index:5; }
-    .bar .brand { font-weight:900; font-size:.9375em; color:var(--accent); }
+    .bar .brand { min-width:0; font-weight:900; font-size:.9375em; color:var(--accent); }
     .bar .who { margin-left:auto; font-size:.8125em; color:var(--soft); }
     .bar .who b { color:var(--ink); }
     .bar .dot { font-size:.75em; color:var(--soft); white-space:nowrap; }
@@ -60,6 +60,11 @@
     .big { display:block; width:100%; min-height:58px; border-radius:14px; background:var(--btn); color:var(--on-btn); font-weight:900; font-size:1.125em; margin-top:8px; }
     .big:disabled { background:var(--line); color:var(--soft); cursor:default; }
     .big.ghost { background:var(--panel); color:var(--accent); border:2px solid var(--accent); }
+    a.big { display:flex; align-items:center; justify-content:center; text-decoration:none; }
+    .preview { max-width:720px; margin:16px auto 0; padding:0 16px; }
+    .preview p { margin:4px 0; }
+    .preview nav { display:flex; flex-wrap:wrap; gap:4px 12px; }
+    .preview a { display:inline-flex; align-items:center; min-height:44px; color:var(--accent); font-weight:800; text-underline-offset:3px; }
     .big.warn { background:var(--warn); }
     /* 마무리 말은 버튼이 아니라 안내 상자 — 꺼진 버튼으로 그리면 칭찬이 '고장 난 버튼'으로 읽힌다 */
     .rest { background:var(--green-soft); color:var(--accent); font-weight:900; font-size:1.125em; text-align:center; padding:18px; border-radius:14px; margin-top:8px; }
@@ -152,10 +157,22 @@
 </head>
 <body>
   <header class="bar">
-    <span class="brand">하루브레인</span>
+    <span class="brand">삼육중 및 영재원 대비</span>
     <span class="dot" id="savedot" role="status" hidden><i aria-hidden="true"></i><span id="savetxt"></span></span>
     <span class="who" id="who"></span>
   </header>
+  <aside class="preview" id="preview" hidden aria-label="샘플 미리보기 안내">
+    <strong>샘플 미리보기</strong>
+    <p class="small">직접 만든 예시로 둘러보세요. 기록은 저장되지 않고 새로고침하면 초기화됩니다. 영재원 기능은 준비 중입니다.</p>
+    <nav aria-label="샘플 화면 선택">
+      <a href="./?preview=1">학생 홈</a>
+      <a href="./?preview=1&amp;view=map">좌표</a>
+      <a href="./?preview=1&amp;view=omr">답안지</a>
+      <a href="./?preview=1&amp;view=retro">회고</a>
+      <a href="./parent.html?preview=1">보호자</a>
+      <a href="./">실제 연결 화면</a>
+    </nav>
+  </aside>
   <main id="app"></main>
   <script src="./strings.js"></script>
   <script src="./plan.js"></script>
@@ -163,6 +180,7 @@
   <script src="./srs.js"></script>
   <script src="./cause.js"></script>
   <script src="./probe.js"></script>
+  <script src="./preview.js"></script>
   <script>
   'use strict';
   (function () {
@@ -177,11 +195,15 @@
     var esc = function (s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
     var app = $('app');
     var NOTICE = '';
+    var PREVIEW_MODE = new URLSearchParams(location.search).get('preview') === '1';
+    var PREVIEW = PREVIEW_MODE && typeof WBHARU_PREVIEW !== 'undefined' ? WBHARU_PREVIEW.create() : null;
 
     /* ── 인증: 진로독서·워드브레인·내신과 같은 wbr.auth. 연동은 코드 → 강사 승인 두 단계(호스트 /api/login) ── */
-    function auth() { try { return JSON.parse(localStorage.getItem('wbr.auth') || 'null'); } catch (e) { return null; } }
-    function saveAuth(a) { try { if (a) localStorage.setItem('wbr.auth', JSON.stringify(a)); else localStorage.removeItem('wbr.auth'); } catch (e) {} }
+    function auth() { if (PREVIEW_MODE) return { token: 'preview', name: '샘플 학생' }; try { return JSON.parse(localStorage.getItem('wbr.auth') || 'null'); } catch (e) { return null; } }
+    function saveAuth(a) { if (PREVIEW_MODE) return; try { if (a) localStorage.setItem('wbr.auth', JSON.stringify(a)); else localStorage.removeItem('wbr.auth'); } catch (e) {} }
     function api(path, opt) {
+      // 샘플은 기존 인증보다 먼저 분기한다 — 로그인된 기기에서도 운영 요청을 보내지 않는다.
+      if (PREVIEW_MODE) return PREVIEW ? PREVIEW.api(path, opt) : Promise.reject(new Error('샘플을 불러오지 못했어요.'));
       var a = auth();
       if (!a || !a.token) return Promise.reject(new Error('no-auth'));
       return fetch('/api/haru' + path, Object.assign({ headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + a.token } }, opt || {}))
@@ -195,6 +217,7 @@
       return fallback;
     }
     function setDot(cls, detail) {
+      if (PREVIEW_MODE) { $('savedot').hidden = true; return; }
       var d = $('savedot'); d.className = 'dot ' + cls; d.hidden = cls === 'pending';
       if (d.hidden) return;
       $('savetxt').textContent = cls === 'saved' ? '저장됨' : '저장 못 함';
@@ -203,11 +226,12 @@
 
     /* ── 로컬 상태 — 서버 GET /state 가 원천, 기기 캐시는 오프라인 표시용 ── */
     var DB = null, PLAN = null, ATOMS = null, TODAY = null, CORE = [], RETRO = null;
-    function loadCache() { try { return JSON.parse(localStorage.getItem(LS_STATE) || 'null'); } catch (e) { return null; } }
-    function cache() { try { localStorage.setItem(LS_STATE, JSON.stringify(DB)); } catch (e) {} }
+    function loadCache() { if (PREVIEW_MODE) return null; try { return JSON.parse(localStorage.getItem(LS_STATE) || 'null'); } catch (e) { return null; } }
+    function cache() { if (PREVIEW_MODE) return; try { localStorage.setItem(LS_STATE, JSON.stringify(DB)); } catch (e) {} }
     function blank() { return { v: 2, days: {}, atoms: {}, seenPeri: {}, wrong: [], passages: [], words: {}, envelopeDone: {}, summary: {} }; }
     var pendingPut = false;
     function push() {
+      if (PREVIEW_MODE) { pendingPut = false; return Promise.resolve(); }
       if (!DB) return Promise.resolve();
       var body = Object.assign({}, DB); delete body.mocks; delete body.paper; delete body.weekly;
       body.summary = summary();
@@ -255,7 +279,8 @@
         /* 학생 코드는 대소문자를 가린다(서버 정확 일치) — 태블릿이 첫 글자를 대문자로 바꾸지 않게 자동 고침을 모두 끈다. 소문자로 바꾸지도 않는다 */
         '<input id="code" name="code" type="text" inputmode="text" autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="off" enterkeyhint="go" placeholder="wb-…"' + (msg ? ' aria-invalid="true" aria-describedby="lerr"' : '') + '>' +
         '<button class="big" id="go" type="submit">연결 요청</button>' +
-        '<p class="small">요청하면 선생님이 승인해 줘요. 승인되면 이 기기에서는 다시 입력할 일이 없어요.</p></form>' + footer());
+        '<p class="small">요청하면 선생님이 승인해 줘요. 승인되면 이 기기에서는 다시 입력할 일이 없어요.</p></form>' +
+        '<div class="card"><h2>샘플로 먼저 둘러보기</h2><p class="small">학생 학습과 좌표, 답안지, 보호자 화면을 예시로 볼 수 있어요.</p><a class="big ghost" href="./?preview=1">샘플 미리보기</a></div>' + footer());
       var input = $('code');
       /* 오류가 나도 친 글자를 남긴다 — 무엇을 잘못 쳤는지 아이가 보고 고칠 수 있게 */
       if (typed) input.value = typed;
@@ -550,8 +575,8 @@
 
     /* ── 답안지: 3교시 연속·휴식 잠금. 칸을 누르는 순간이 그 문항의 종료 시각(mark). [넘김] = pass. 정답은 한 글자도 안 나온다. ── */
     var OMR = null;
-    function loadOmr() { try { return JSON.parse(localStorage.getItem(LS_OMR) || 'null'); } catch (e) { return null; } }
-    function saveOmr() { try { localStorage.setItem(LS_OMR, JSON.stringify(OMR)); } catch (e) {} }
+    function loadOmr() { if (PREVIEW_MODE) return null; try { return JSON.parse(localStorage.getItem(LS_OMR) || 'null'); } catch (e) { return null; } }
+    function saveOmr() { if (PREVIEW_MODE) return; try { localStorage.setItem(LS_OMR, JSON.stringify(OMR)); } catch (e) {} }
     function showOmr(mock) {
       var subjects = mock.subjects || ['kor', 'math', 'eng'];
       var keyIds = mock.keyIds || subjects.map(function (sub, i) { return (i === 0 && mock.retakeKeyId) ? mock.retakeKeyId : (subjects.length === 1 ? mock.keyId : mock.keyId + '-' + sub); });
@@ -655,7 +680,7 @@
       render(loading('답안지를 보내는 중…'));
       api('/attempt', { method: 'POST', body: JSON.stringify({ kind: OMR.kind, keyId: OMR.keyId, periods: OMR.periods }) })
         .then(function () {
-          try { localStorage.removeItem(LS_OMR); } catch (e) {}
+          if (!PREVIEW_MODE) { try { localStorage.removeItem(LS_OMR); } catch (e) {} }
           OMR = null;
           render('<div class="card lock"><div class="t">접수됐어요</div><p>결과는 내일 카드와 함께 열려요. 오늘은 여기까지.</p><button class="big" id="home">홈으로</button></div>' + footer());
           $('home').onclick = function () { refreshToday().then(showHome); };
@@ -689,6 +714,8 @@
     /* ── 부팅 ── */
     function refreshToday() { return api('/today').then(function (j) { TODAY = j.today; if (TODAY && TODAY.envelope) DB.envelope = TODAY.envelope; if (PLAN) PLAN.dday = j.dday; }).catch(function () {}); }
     function boot() {
+      if (PREVIEW_MODE && !PREVIEW) { render('<div class="card"><h2>샘플을 열지 못했어요</h2><p>새로고침해 주세요.</p></div>'); return; }
+      if (PREVIEW_MODE) $('preview').hidden = false;
       var a = auth();
       if (!a || !a.token) { showLink(); return; }
       $('who').innerHTML = '<b>' + esc(a.name || a.code) + '</b>';
@@ -707,7 +734,13 @@
         setDot('saved');
         if (pendingPut) push();
         var o = loadOmr(); if (o && o.d === todayKey() && (o.cur || o.pi > 0)) { OMR = o; if (o.cur) { OMR.periods.push({ subject: o.cur.subject, keyId: o.cur.keyId, openedAt: o.cur.openedAt, closedAt: Date.now(), marks: o.cur.marks, events: o.cur.events }); OMR.cur = null; OMR.pi++; saveOmr(); } omrStep(); return; }
-        loadRetro().then(function () { showHome(); });
+        loadRetro().then(function () {
+          var view = PREVIEW_MODE ? new URLSearchParams(location.search).get('view') : '';
+          if (view === 'map') showMap();
+          else if (view === 'omr') showOmr(mockToday());
+          else if (view === 'retro') showRetro();
+          else showHome();
+        });
       }).catch(function (e) {
         if (e.status === 401) { saveAuth(null); showLink('연결이 끊겼어요. 코드를 다시 입력해 주세요.'); return; }
         if (e.status === 403) { render('<div class="card"><h2>' + esc(e.message) + '</h2><p class="small">선생님께 말씀해 주세요.</p><button class="big ghost" id="unlink">다른 코드로 연결</button></div>' + footer()); $('unlink').onclick = function () { saveAuth(null); showLink(); }; return; }
@@ -721,7 +754,7 @@
     document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden' && pendingPut) push(); });
     measureBar(); window.addEventListener('resize', measureBar);
     boot();
-    if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(function () {});
+    if (!PREVIEW_MODE && 'serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(function () {});
   })();
   </script>
 </body>

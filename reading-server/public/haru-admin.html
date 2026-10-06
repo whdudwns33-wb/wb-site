@@ -5,13 +5,13 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="referrer" content="no-referrer">
   <meta name="robots" content="noindex, nofollow">
-  <title>WB 하루브레인 · 관리</title>
+  <title>삼육중 및 영재원 대비 · 관리</title>
   <style>
     :root{--navy:#2B4C3F;--blue:#2F5F8F;--sky:#E7EEF6;--bg:#F5F3EE;--line:#E1E6E2;--edge:#86938C;--muted:#56645D;--ink:#22302A;--ok:#14755e;--warn:#8a4b08;--bad:#9b352b}
     /* [hidden] 을 display 규칙이 덮지 않게 — nav{display:flex} 가 로그인 전 탭을 드러내던 결함(눌러서 로그인 폼이 사라짐) */
     [hidden]{display:none!important}
     *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font-family:"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif;line-height:1.6;word-break:keep-all;overflow-wrap:anywhere}
-    header{display:flex;align-items:center;gap:14px;padding:13px 20px;background:var(--navy);color:#fff}header b{font-size:17px;white-space:nowrap}header small{opacity:.75}header .sp{flex:1}
+    header{display:flex;align-items:center;gap:14px;padding:13px 20px;background:var(--navy);color:#fff}header b{font-size:17px;min-width:0;line-height:1.4}header small{opacity:.75}header .sp{flex:1}
     @media (max-width:640px){header small{display:none}}   /* 폰에서는 탭과 같은 부제를 접는다 — 제목·로그아웃이 낱말 중간에서 꺾였다 */
     .hbtn{flex:none;white-space:nowrap;min-height:38px;padding:6px 14px;border:1px solid #ffffff55;border-radius:10px;background:transparent;color:#fff;font-weight:800;cursor:pointer}
     nav{display:flex;gap:6px;flex-wrap:wrap;max-width:1100px;margin:12px auto 0;padding:0 14px}
@@ -40,7 +40,7 @@
   </style>
 </head>
 <body>
-<header><b>하루브레인 관리</b><small>코치 보드 · 등록 · 자료 · 종이 회수</small><span class="sp"></span><button class="hbtn" id="btnLogout" hidden>로그아웃</button></header>
+<header><b>삼육중 및 영재원 대비 관리</b><small>코치 보드 · 등록 · 자료 · 종이 회수</small><span class="sp"></span><button class="hbtn" id="btnLogout" hidden>로그아웃</button></header>
 <nav id="nav" hidden>
   <button data-tab="board" aria-pressed="true">코치 보드</button><button data-tab="students">학생 등록</button><button data-tab="assets">팩·대응표·플랜</button><button data-tab="paper">종이 회수</button><button data-tab="tools">링크·내보내기·파기</button>
 </nav>
@@ -150,7 +150,7 @@ async function tools(){
   const [s,pl]=await Promise.all([api('/haru/admin/students'),api('/haru/admin/plans')]);
   $('#main').innerHTML='<div class="card"><h2>학습 여권 내보내기</h2><div class="row"><select id="x_code" aria-label="내보낼 학생">'+s.students.map(x=>'<option value="'+esc(x.code)+'">'+esc(x.name)+' ('+esc(x.code)+')</option>').join('')+'</select><button class="btn" id="x_go" disabled aria-describedby="x_when">JSON 받기</button><span class="muted" id="x_when" role="status">개방 시각 확인 중</span></div><div id="x_msg"></div></div>'+
     '<div class="card"><h2>파기 <span class="muted">코호트의 haru:state·mock·paper·parent 4계열만. 대응표·팩·플랜·학생 레코드는 남는다</span></h2><div class="row"><select id="d_cohort">'+pl.plans.map(p=>'<option>'+esc(p.cohort)+'</option>').join('')+'</select><button class="btn danger" id="d_go">파기</button></div><div id="d_msg"></div></div>'+
-    '<div class="card"><h2>진로독서 관리 화면</h2><p class="muted">학생 앱 연동 승인(연동 승인 대기)·퇴원 처리·백업은 <a href="/admin/">/admin/</a> 에서 합니다. 퇴원 처리는 하루브레인 기록도 함께 지웁니다.</p></div>';
+    '<div class="card"><h2>진로독서 관리 화면</h2><p class="muted">학생 앱 연동 승인(연동 승인 대기)·퇴원 처리·백업은 <a href="/admin/">/admin/</a> 에서 합니다. 퇴원 처리는 삼육중 및 영재원 대비 기록도 함께 지웁니다.</p></div>';
   const codeSelect=$('#x_code'),exportButton=$('#x_go'),when=$('#x_when');
   async function updateExport(){
     const code=codeSelect.value,student=s.students.find(x=>x.code===code);

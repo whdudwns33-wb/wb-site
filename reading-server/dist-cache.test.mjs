@@ -83,6 +83,7 @@ t('껍데기 파일이 바뀌면 캐시 이름이 바뀐다 — 학생이 새 �
     /* 국어는 개념어 사전도 셸에 실린다 — 사전을 고치면 학생이 새 사전을 받아야 한다 */
     { file: path.join(HERE, '..', 'naesin-ko', 'concepts.json'), sw: K_SW, was: before.k, what: '국어브레인 개념어 사전' },
     { file: path.join(HERE, '..', 'haru', 'icon.svg'), sw: H_SW, was: before.h, what: '하루브레인 앱' },
+    { file: path.join(HERE, '..', 'haru', 'preview.js'), sw: H_SW, was: before.h, what: '삼육중 및 영재원 대비 자체 샘플' },
     /* 한자는 체험 단어장도 셸에 실린다 — 단어장을 고치면 학생이 새 단어장을 받아야 한다 */
     { file: path.join(HERE, '..', 'hanja', 'book-sample.json'), sw: J_SW, was: before.j, what: '어휘브레인 체험 단어장', asset: './book-sample.json' },
     { file: path.join(HERE, '..', 'hanja', 'bridge.js'), sw: J_SW, was: before.j, what: '어휘브레인 스크립트', asset: './bridge.js' },
@@ -204,9 +205,9 @@ t('관리 화면들이 dist/admin/ 에 실린다 — 하나 빠지면 그 화면
     assert.ok(/no-referrer/.test(txt), f + ' 에 referrer 정책이 없다');
   }
   /* 수업 화면은 학생 앱과 같은 문항 생성기를 불러 쓴다 — 그 경로가 배포본에 있어야 한다 */
-  /* 하루브레인 배포본 — 정답이 어느 정적 파일에도 없고(팩·대응표는 KV), 학생 화면에 금지어가 없다 */
+  /* 삼육중 및 영재원 대비 배포본 — 운영 팩·대응표는 KV에만 있고 공개 예시는 preview.js에 격리한다 */
   const haruDir = path.join(DIST, 'haru');
-  for (const f of ['index.html', 'parent.html', 'atoms.json', 'strings.js', 'plan.js', 'mastery.js', 'srs.js', 'cause.js', 'probe.js'])
+  for (const f of ['index.html', 'parent.html', 'atoms.json', 'strings.js', 'plan.js', 'mastery.js', 'srs.js', 'cause.js', 'probe.js', 'preview.js'])
     assert.ok(fs.existsSync(path.join(haruDir, f)), 'dist/haru/' + f + ' 가 없다');
   assert.ok(!fs.readdirSync(haruDir).some((f) => /pack-sample|paperkey|plans|kor-master-data|sheet/.test(f)), 'dist/haru/ 에 문항·대응표·플랜이 실렸다');
   assert.ok(!fs.readFileSync(path.join(haruDir, 'atoms.json'), 'utf8').includes('answerKey'), 'atoms.json 에 문항이 있다');
