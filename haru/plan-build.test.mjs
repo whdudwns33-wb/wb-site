@@ -66,6 +66,14 @@ t('부모 화면이 시험일을 읽는 입실 마일스톤은 시험일에 하�
   const exam = forParent(plan).filter((m) => /고사장 입실/.test(m.text));
   assert.equal(exam.length, 1); assert.equal(exam[0].d, plan.examDate);
 });
+t('어른 일정은 시각·시작일을 반복하지 않고 마감과 등록 종료일을 유지한다', () => {
+  const ms = milestonesFromFacts(FACTS);
+  ms.forEach((m) => { if (m.at) assert.ok(!m.text.includes(m.at), m.text); });
+  const exam = ms.find((m) => m.aud === 'both');
+  assert.equal(exam.at, FACTS.exam.arriveBy); assert.equal(exam.text, '고사장 입실 마감');
+  const enroll = ms.find((m) => m.d === FACTS.schedule.enroll[0]);
+  assert.ok(!enroll.text.includes(enroll.d)); assert.ok(enroll.text.endsWith(FACTS.schedule.enroll[1] + '까지'));
+});
 t('회차가 휴일과 겹치면 빌드가 거부된다', () => {
   const bad = JSON.parse(JSON.stringify(input)); bad.mocks[0].d = '2026-09-27';
   assert.throws(() => buildPlan(bad), /휴일/);
