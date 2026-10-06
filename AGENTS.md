@@ -49,6 +49,9 @@
 ## 코드 컨벤션 (app.html)
 - 단일 HTML + 바닐라 JS. 프레임워크·외부 CDN·빌드 도구 추가 금지.
 - 테마: 모든 색은 CSS 토큰(`:root` 3블록 — 라이트/`prefers-color-scheme: dark`/`[data-theme="dark"]`)으로.
+  강조색 배경 위 글자는 `var(--on-accent)`.
+- 글자 크기는 **`--fs-xs/sm/md/lg/xl`(11.5/12.5/14/16/22px) 5단계만** — 새 px 값을 만들지 말 것.
+  간격은 4px 격자(`--sp-1`~`--sp-6` = 4·8·12·16·24·32). 제목에 장식 이모지를 넣지 않는다(순서 표시 1️⃣·①은 허용).
 - 데이터 접근: 대량 입결은 `allIpRows()`/`ipGroups()`(캐시 — `save()`가 무효화), 고교는 `allHsRows()`.
 - 판정 로직: 수시=등급(`classify`), 정시=수능 백분위(`classifyPct`), 변환은 `gradeToTopPct`/`topPctToGrade`(CUM9).
 - 문구 원칙: 분석 결과는 "예측"이 아니라 "상담용 참고치"로 표기, 출처(어디가·연도) 명시.

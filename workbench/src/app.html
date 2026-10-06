@@ -7,6 +7,10 @@
   --chip:#EEF1ED; --shadow:0 1px 3px rgba(28,43,42,.08);
   --tk2bg:#F4E1EE; --tk2ink:#A03A80; --tk3bg:#E9E3F7; --tk3ink:#5B44A8;
   --on-accent:#FFFFFF; color-scheme:light;
+  /* 글자 5단계 — 새 크기를 만들지 말고 이 중에서 고를 것 */
+  --fs-xs:11.5px; --fs-sm:12.5px; --fs-md:14px; --fs-lg:16px; --fs-xl:22px;
+  /* 간격 4px 격자 */
+  --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:24px; --sp-6:32px;
 }
 :root:not([data-theme="light"]) { }
 @media (prefers-color-scheme: dark){
@@ -30,7 +34,7 @@
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);
   font-family:"Pretendard Variable",Pretendard,"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
-  font-size:14px;line-height:1.55;}
+  font-size:var(--fs-md);line-height:1.55;}
 button{font:inherit;color:inherit;background:none;border:none;cursor:pointer;padding:0}
 input,select,textarea{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:7px 10px;width:100%}
 textarea{resize:vertical;min-height:90px;line-height:1.6}
@@ -40,125 +44,125 @@ h1,h2,h3,h4{margin:0;line-height:1.3;text-wrap:balance}
 /* ── 사이드바 ── */
 .side{width:230px;flex-shrink:0;border-right:1px solid var(--line);background:var(--panel);padding:14px 12px;display:flex;flex-direction:column;gap:4px;position:sticky;top:0;height:100vh;overflow-y:auto}
 .brand{display:flex;align-items:center;gap:8px;padding:4px 8px 14px;cursor:pointer}
-.brand .mark{width:30px;height:30px;border-radius:8px;background:var(--accent);color:var(--on-accent);display:grid;place-items:center;font-weight:800;font-size:13px;letter-spacing:-.5px}
-.brand b{font-size:15px;letter-spacing:-.3px}
-.brand small{display:block;color:var(--ink2);font-weight:400;font-size:11px}
+.brand .mark{width:30px;height:30px;border-radius:8px;background:var(--accent);color:var(--on-accent);display:grid;place-items:center;font-weight:800;font-size:var(--fs-md);letter-spacing:-.5px}
+.brand b{font-size:var(--fs-lg);letter-spacing:-.3px}
+.brand small{display:block;color:var(--ink2);font-weight:400;font-size:var(--fs-xs)}
 .navbtn{display:flex;align-items:center;gap:8px;width:100%;text-align:left;padding:8px 10px;border-radius:8px;color:var(--ink2);font-weight:600}
 .navbtn:hover{background:var(--chip)}
 .navbtn.on{background:var(--accent-soft);color:var(--accent-ink)}
-.side .grp{margin-top:10px;padding:6px 10px 2px;font-size:11px;font-weight:700;color:var(--ink2);letter-spacing:.08em}
+.side .grp{margin-top:10px;padding:6px 10px 2px;font-size:var(--fs-xs);font-weight:700;color:var(--ink2);letter-spacing:.08em}
 .stubtn{display:flex;align-items:center;gap:8px;width:100%;padding:6px 10px;border-radius:8px;color:var(--ink)}
 .stubtn:hover{background:var(--chip)}
 .stubtn.on{background:var(--accent-soft);color:var(--accent-ink);font-weight:700}
 .stubtn .dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
-.stubtn .cnt{margin-left:auto;font-size:11px;color:var(--ink2)}
+.stubtn .cnt{margin-left:auto;font-size:var(--fs-xs);color:var(--ink2)}
 .side .foot{margin-top:auto;padding-top:12px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:2px}
 /* ── 본문 ── */
-.main{flex:1;min-width:0;padding:22px 26px 60px;max-width:1060px}
-.crumb{color:var(--ink2);font-size:12px;margin-bottom:4px}
-.pagehead{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:18px;flex-wrap:wrap}
-.pagehead h1{font-size:22px;letter-spacing:-.4px}
+.main{flex:1;min-width:0;padding:var(--sp-5) var(--sp-5) 64px;max-width:1060px}
+.crumb{color:var(--ink2);font-size:var(--fs-sm);margin-bottom:4px}
+.pagehead{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:var(--sp-4);flex-wrap:wrap}
+.pagehead h1{font-size:var(--fs-xl);letter-spacing:-.4px}
 .pagehead .sub{color:var(--ink2);margin-top:3px}
 .btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;font-weight:600;border:1px solid var(--line);background:var(--panel);box-shadow:var(--shadow)}
 a.btn{text-decoration:none;color:var(--ink)}
 .btn:hover{border-color:var(--accent)}
 .btn.pri{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
 .btn.pri:hover{filter:brightness(1.08)}
-.btn.sm{padding:4px 10px;font-size:12.5px;box-shadow:none}
+.btn.sm{padding:4px 10px;font-size:var(--fs-sm);box-shadow:none}
 .btn.ghost{border-color:transparent;box-shadow:none;color:var(--ink2)}
 .btn.ghost:hover{color:var(--danger)}
 /* 카드/그리드 */
-.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;box-shadow:var(--shadow)}
-.grid{display:grid;gap:12px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:var(--sp-4);box-shadow:var(--shadow)}
+.grid{display:grid;gap:var(--sp-3)}
 .grid.cols3{grid-template-columns:repeat(auto-fill,minmax(240px,1fr))}
 .grid.cols2{grid-template-columns:repeat(auto-fill,minmax(320px,1fr))}
-.chip{display:inline-flex;align-items:center;gap:4px;background:var(--chip);border-radius:999px;padding:2px 9px;font-size:11.5px;font-weight:600;color:var(--ink2)}
+.chip{display:inline-flex;align-items:center;gap:4px;background:var(--chip);border-radius:999px;padding:2px 9px;font-size:var(--fs-xs);font-weight:600;color:var(--ink2)}
 .chip.acc{background:var(--accent-soft);color:var(--accent-ink)}
 .chip.warn{background:var(--warn-soft);color:var(--warn)}
 .chip.danger{background:var(--danger-soft);color:var(--danger)}
 .chip.ok{background:var(--ok-soft);color:var(--ok)}
-.sec{margin-top:26px}
-.sec>h2{font-size:15px;margin-bottom:10px;display:flex;align-items:center;gap:8px}
-.sec>h2 .n{color:var(--ink2);font-weight:500;font-size:13px}
+.sec{margin-top:var(--sp-6)}
+.sec>h2{font-size:var(--fs-lg);margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.sec>h2 .n{color:var(--ink2);font-weight:500;font-size:var(--fs-md)}
 /* 학생 카드 */
 .stucard{cursor:pointer;transition:border-color .15s}
 .stucard:hover{border-color:var(--accent)}
-.stucard h3{font-size:15px;display:flex;align-items:center;gap:7px}
+.stucard h3{font-size:var(--fs-lg);display:flex;align-items:center;gap:7px}
 /* ── 입시 검색 A안 (디렉터리) ── */
 .ugrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(225px,1fr));gap:10px}
 .ucard{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:13px;cursor:pointer;text-align:left;font-family:inherit;color:var(--ink);transition:border-color .15s,box-shadow .15s}
 .ucard:hover{border-color:var(--accent);box-shadow:var(--shadow)}
 .ucard .utop{display:flex;gap:10px;align-items:center;margin-bottom:8px}
-.uinit{width:38px;height:38px;border-radius:9px;display:grid;place-items:center;color:#fff;font-weight:700;font-size:13.5px;flex:none}
-.ucard .uname{font-size:14.5px;font-weight:700}
-.ucard .ureg{font-size:11px;color:var(--ink2)}
-.ucard .umeta{display:flex;justify-content:space-between;font-size:12px;color:var(--ink2)}
+.uinit{width:38px;height:38px;border-radius:9px;display:grid;place-items:center;color:#fff;font-weight:700;font-size:var(--fs-md);flex:none}
+.ucard .uname{font-size:var(--fs-md);font-weight:700}
+.ucard .ureg{font-size:var(--fs-xs);color:var(--ink2)}
+.ucard .umeta{display:flex;justify-content:space-between;font-size:var(--fs-sm);color:var(--ink2)}
 .ucard .urange{font-weight:600;color:var(--accent);font-variant-numeric:tabular-nums}
 .mrow{background:var(--panel);border:1px solid var(--line);border-radius:10px;margin-bottom:7px;overflow:hidden}
 .mbtn{display:flex;width:100%;align-items:center;gap:9px;padding:10px 13px;background:none;border:0;font:inherit;cursor:pointer;text-align:left;color:var(--ink)}
-.mbtn .mname{font-weight:600;font-size:13.5px;flex:1;min-width:0}
-.mbtn .mcut{font-weight:600;color:var(--accent);font-size:13.5px;flex:none;font-variant-numeric:tabular-nums}
-.mbtn .marr{color:var(--ink2);flex:none;transition:transform .15s;font-size:11px}
+.mbtn .mname{font-weight:600;font-size:var(--fs-md);flex:1;min-width:0}
+.mbtn .mcut{font-weight:600;color:var(--accent);font-size:var(--fs-md);flex:none;font-variant-numeric:tabular-nums}
+.mbtn .marr{color:var(--ink2);flex:none;transition:transform .15s;font-size:var(--fs-xs)}
 .mrow.open .marr{transform:rotate(90deg)}
 .mtrend{display:none;border-top:1px dashed var(--line);padding:11px 13px;gap:7px;flex-wrap:wrap;align-items:center}
 .mrow.open .mtrend{display:flex}
 .ycell{flex:1;min-width:70px;max-width:110px;background:var(--chip);border-radius:8px;padding:6px 8px;text-align:center}
-.ycell .yy{font-size:10px;color:var(--ink2);letter-spacing:.05em;font-variant-numeric:tabular-nums}
-.ycell .yc{font-weight:600;font-size:13.5px;font-variant-numeric:tabular-nums}
-.ycell .yd{font-size:10px;font-weight:600}
+.ycell .yy{font-size:var(--fs-xs);color:var(--ink2);letter-spacing:.05em;font-variant-numeric:tabular-nums}
+.ycell .yc{font-weight:600;font-size:var(--fs-md);font-variant-numeric:tabular-nums}
+.ycell .yd{font-size:var(--fs-xs);font-weight:600}
 .yd.up{color:var(--danger)}.yd.dn{color:var(--ok)}.yd.fl{color:var(--ink2)}
-.tchip{font-size:10.5px;font-weight:700;border-radius:6px;padding:2px 7px;flex:none;white-space:nowrap}
+.tchip{font-size:var(--fs-xs);font-weight:700;border-radius:6px;padding:2px 7px;flex:none;white-space:nowrap}
 .tchip.tk0{background:var(--accent-soft);color:var(--accent-ink)}
 .tchip.tk1{background:var(--warn-soft);color:var(--warn)}
 .tchip.tk2{background:var(--tk2bg,#F4E1EE);color:var(--tk2ink,#A03A80)}
 .tchip.tk3{background:var(--tk3bg,#E9E3F7);color:var(--tk3ink,#5B44A8)}
 /* ── 진학 분석 C안 (상담 보드) ── */
 .bfilters{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
-.fchip{border:1.5px solid var(--line);background:var(--panel);color:var(--ink2);border-radius:999px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit}
+.fchip{border:1.5px solid var(--line);background:var(--panel);color:var(--ink2);border-radius:999px;padding:5px 12px;font-size:var(--fs-sm);font-weight:600;cursor:pointer;font-family:inherit}
 .fchip.on{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
-.bsummary{background:var(--accent-soft);border-radius:10px;padding:10px 14px;font-size:13px;margin-bottom:10px;color:var(--accent-ink)}
-.bpins{border:1.5px dashed var(--line);border-radius:10px;padding:8px 12px;font-size:12.5px;display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
-.bpin{background:var(--accent-soft);border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600;color:var(--accent-ink);display:inline-flex;gap:5px;align-items:center}
-.bpin button{border:0;background:none;cursor:pointer;color:var(--accent-ink);padding:0;font-size:12px;line-height:1}
+.bsummary{background:var(--accent-soft);border-radius:10px;padding:10px 14px;font-size:var(--fs-md);margin-bottom:10px;color:var(--accent-ink)}
+.bpins{border:1.5px dashed var(--line);border-radius:10px;padding:8px 12px;font-size:var(--fs-sm);display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.bpin{background:var(--accent-soft);border-radius:999px;padding:3px 10px;font-size:var(--fs-sm);font-weight:600;color:var(--accent-ink);display:inline-flex;gap:5px;align-items:center}
+.bpin button{border:0;background:none;cursor:pointer;color:var(--accent-ink);padding:0;font-size:var(--fs-sm);line-height:1}
 .bcols{display:grid;grid-template-columns:repeat(auto-fit,minmax(195px,1fr));gap:10px;align-items:start}
 .bcol{background:var(--chip);border-radius:11px;padding:8px}
-.bcol h4{font-size:12px;font-weight:700;padding:2px 5px 7px;display:flex;justify-content:space-between}
+.bcol h4{font-size:var(--fs-sm);font-weight:700;padding:2px 5px 7px;display:flex;justify-content:space-between}
 .bcol .bcnt{color:var(--ink2);font-weight:600;font-variant-numeric:tabular-nums}
 .bcol.k0 h4{color:var(--ok)}.bcol.k1 h4{color:var(--accent-ink)}.bcol.k2 h4{color:var(--warn)}.bcol.k3 h4{color:var(--danger)}
 .kcard{background:var(--panel);border-radius:9px;border:1px solid var(--line);border-left:3.5px solid transparent;padding:8px 10px;margin-bottom:7px;position:relative}
 .bcol.k0 .kcard{border-left-color:var(--ok)}.bcol.k1 .kcard{border-left-color:var(--accent)}
 .bcol.k2 .kcard{border-left-color:var(--warn)}.bcol.k3 .kcard{border-left-color:var(--danger)}
-.kcard .ku{font-size:10.5px;color:var(--ink2);font-weight:600}
-.kcard .km{font-weight:700;font-size:12.5px;padding-right:20px;line-height:1.35}
-.kcard .kb{display:flex;justify-content:space-between;align-items:center;gap:6px;margin-top:4px;font-size:11px;color:var(--ink2)}
+.kcard .ku{font-size:var(--fs-xs);color:var(--ink2);font-weight:600}
+.kcard .km{font-weight:700;font-size:var(--fs-sm);padding-right:20px;line-height:1.35}
+.kcard .kb{display:flex;justify-content:space-between;align-items:center;gap:6px;margin-top:4px;font-size:var(--fs-xs);color:var(--ink2)}
 .kcard .kb>span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
-.kcard .kcut{font-weight:600;font-size:12.5px;color:var(--ink);font-variant-numeric:tabular-nums;white-space:nowrap}
-.kstar{position:absolute;top:5px;right:6px;border:0;background:none;cursor:pointer;font-size:14px;color:var(--line);padding:2px;line-height:1}
+.kcard .kcut{font-weight:600;font-size:var(--fs-sm);color:var(--ink);font-variant-numeric:tabular-nums;white-space:nowrap}
+.kstar{position:absolute;top:5px;right:6px;border:0;background:none;cursor:pointer;font-size:var(--fs-md);color:var(--line);padding:2px;line-height:1}
 .kstar.on{color:#DBA60F}
-.bmore{font-size:11px;color:var(--ink2);text-align:center;padding:3px 0 1px}
+.bmore{font-size:var(--fs-xs);color:var(--ink2);text-align:center;padding:3px 0 1px}
 /* ── B안 지형(등급 맵) ── */
 .terrain{overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:6px 4px;margin-bottom:10px}
-.tlegend{display:flex;gap:12px;font-size:11px;color:var(--ink2);padding:4px 12px 6px;flex-wrap:wrap}
+.tlegend{display:flex;gap:12px;font-size:var(--fs-xs);color:var(--ink2);padding:4px 12px 6px;flex-wrap:wrap}
 .tlegend i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px}
 /* ── 모의지원 ── */
 .gapbar{height:8px;border-radius:99px;background:var(--chip);overflow:hidden;flex:1;min-width:80px;position:relative}
 .gapbar i{position:absolute;top:0;bottom:0;border-radius:99px}
 .mockrow{border:1px solid var(--line);border-radius:11px;padding:12px 14px;margin-bottom:9px;background:var(--panel)}
 .mockrow .mrtop{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
-.mockrow .mrgap{display:flex;align-items:center;gap:10px;margin:8px 0 2px;font-size:12.5px}
-.mockrow .fix{font-size:12.5px;color:var(--ink2);margin-top:7px;padding-top:7px;border-top:1px dashed var(--line)}
+.mockrow .mrgap{display:flex;align-items:center;gap:10px;margin:8px 0 2px;font-size:var(--fs-sm)}
+.mockrow .fix{font-size:var(--fs-sm);color:var(--ink2);margin-top:7px;padding-top:7px;border-top:1px dashed var(--line)}
 .mocksel{display:flex;width:100%;align-items:center;gap:8px;padding:9px 12px;background:var(--panel);border:1px solid var(--line);border-radius:9px;margin-bottom:6px;cursor:pointer;font:inherit;text-align:left;color:var(--ink)}
 .mocksel:hover{border-color:var(--accent)}
-.mocksel .cnt{margin-left:auto;font-size:11.5px;color:var(--ink2);white-space:nowrap}
-.stucard .meta{color:var(--ink2);font-size:12.5px;margin:6px 0 10px;min-height:2.6em}
+.mocksel .cnt{margin-left:auto;font-size:var(--fs-xs);color:var(--ink2);white-space:nowrap}
+.stucard .meta{color:var(--ink2);font-size:var(--fs-sm);margin:6px 0 10px;min-height:2.6em}
 .stucard .chips{display:flex;flex-wrap:wrap;gap:5px}
 /* 마감 스트립 */
 .duer{display:flex;align-items:center;gap:10px;padding:9px 4px;border-bottom:1px solid var(--line)}
 .duer:last-child{border-bottom:none}
-.duer .dd{font-variant-numeric:tabular-nums;font-weight:800;width:52px;text-align:center;border-radius:8px;padding:3px 0;font-size:12.5px}
+.duer .dd{font-variant-numeric:tabular-nums;font-weight:800;width:52px;text-align:center;border-radius:8px;padding:3px 0;font-size:var(--fs-sm)}
 .duer .who{font-weight:700;width:70px}
 .duer .what{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.duer .st{font-size:11.5px}
+.duer .st{font-size:var(--fs-xs)}
 /* 탭 */
 .tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-bottom:18px;overflow-x:auto}
 .tab{padding:9px 14px;font-weight:600;color:var(--ink2);border-bottom:2px solid transparent;white-space:nowrap}
@@ -166,59 +170,59 @@ a.btn{text-decoration:none;color:var(--ink)}
 .tab.on{color:var(--accent-ink);border-bottom-color:var(--accent)}
 /* 폼 */
 .frow{display:grid;grid-template-columns:110px 1fr;gap:8px 12px;align-items:center;margin-bottom:8px}
-.frow label{font-size:12.5px;font-weight:600;color:var(--ink2)}
+.frow label{font-size:var(--fs-sm);font-weight:600;color:var(--ink2)}
 .formgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px 16px}
 @media(max-width:760px){.formgrid{grid-template-columns:1fr}.main{padding:16px}.side{width:64px}.side .txt,.side .grp,.brand small,.brand b{display:none}}
 /* 생기부 에디터 */
 .charbar{height:5px;border-radius:3px;background:var(--chip);overflow:hidden;margin-top:6px}
 .charbar i{display:block;height:100%;background:var(--accent);transition:width .2s}
 .charbar.over i{background:var(--danger)}
-.cntline{display:flex;justify-content:space-between;font-size:12px;color:var(--ink2);margin-top:4px;font-variant-numeric:tabular-nums}
-.flag{background:var(--danger-soft);color:var(--danger);border-radius:6px;padding:2px 7px;font-size:12px;font-weight:600;display:inline-block;margin:2px 4px 2px 0}
+.cntline{display:flex;justify-content:space-between;font-size:var(--fs-sm);color:var(--ink2);margin-top:4px;font-variant-numeric:tabular-nums}
+.flag{background:var(--danger-soft);color:var(--danger);border-radius:6px;padding:2px 7px;font-size:var(--fs-sm);font-weight:600;display:inline-block;margin:2px 4px 2px 0}
 .guide3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:10px 0}
 @media(max-width:860px){.guide3{grid-template-columns:1fr}}
 .guide3 .g{background:var(--accent-soft);border-radius:10px;padding:10px 12px}
-.guide3 .g b{display:block;font-size:12px;color:var(--accent-ink);margin-bottom:3px}
-.guide3 .g span{font-size:12px;color:var(--ink2)}
+.guide3 .g b{display:block;font-size:var(--fs-sm);color:var(--accent-ink);margin-bottom:3px}
+.guide3 .g span{font-size:var(--fs-sm);color:var(--ink2)}
 /* 체크리스트 */
 .ck{display:flex;align-items:flex-start;gap:8px;padding:5px 0;cursor:pointer}
 .ck input{width:auto;margin-top:3px}
 .ck.done span{color:var(--ink2);text-decoration:line-through}
 /* 수행평가 */
 .statuses{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
-.stpill{padding:4px 12px;border-radius:999px;font-size:12.5px;font-weight:700;background:var(--chip);color:var(--ink2)}
+.stpill{padding:4px 12px;border-radius:999px;font-size:var(--fs-sm);font-weight:700;background:var(--chip);color:var(--ink2)}
 .taskrow{display:flex;align-items:center;gap:10px;padding:10px 4px;border-bottom:1px solid var(--line);cursor:pointer}
 .taskrow:hover{background:var(--chip)}
 .taskrow .subj{font-weight:700;width:84px;flex-shrink:0}
 .taskrow .top{flex:1;min-width:0}
-.taskrow .due{font-variant-numeric:tabular-nums;font-size:12.5px;color:var(--ink2);width:88px;text-align:right}
+.taskrow .due{font-variant-numeric:tabular-nums;font-size:var(--fs-sm);color:var(--ink2);width:88px;text-align:right}
 /* 기록 타임라인 */
 .rec{border-left:2px solid var(--line);padding:2px 0 14px 14px;margin-left:6px;position:relative}
 .rec::before{content:"";position:absolute;left:-5px;top:6px;width:8px;height:8px;border-radius:50%;background:var(--accent)}
 .rec .rh{display:flex;gap:8px;align-items:baseline}
-.rec .rh b{font-size:13.5px}
-.rec .rh time{color:var(--ink2);font-size:12px;font-variant-numeric:tabular-nums}
-.rec dl{margin:6px 0 0;display:grid;grid-template-columns:78px 1fr;gap:3px 10px;font-size:13px}
+.rec .rh b{font-size:var(--fs-md)}
+.rec .rh time{color:var(--ink2);font-size:var(--fs-sm);font-variant-numeric:tabular-nums}
+.rec dl{margin:6px 0 0;display:grid;grid-template-columns:78px 1fr;gap:3px 10px;font-size:var(--fs-md)}
 .rec dt{color:var(--ink2);font-weight:600}
 .rec dd{margin:0;white-space:pre-wrap}
 /* 노하우 */
 .kh{border-left:3px solid var(--accent);padding:2px 0 2px 14px;margin-bottom:18px}
-.kh h3{font-size:14px;margin-bottom:6px}
-.kh p,.kh ul{margin:4px 0;color:var(--ink);font-size:13.5px}
+.kh h3{font-size:var(--fs-md);margin-bottom:6px}
+.kh p,.kh ul{margin:4px 0;color:var(--ink);font-size:var(--fs-md)}
 .kh ul{padding-left:18px}
-.kh .src{font-size:11.5px;color:var(--ink2)}
-table.t{width:100%;border-collapse:collapse;font-size:13px}
-table.t th{text-align:left;color:var(--ink2);font-weight:600;font-size:12px;border-bottom:1px solid var(--line);padding:5px 8px}
+.kh .src{font-size:var(--fs-xs);color:var(--ink2)}
+table.t{width:100%;border-collapse:collapse;font-size:var(--fs-md)}
+table.t th{text-align:left;color:var(--ink2);font-weight:600;font-size:var(--fs-sm);border-bottom:1px solid var(--line);padding:5px 8px}
 table.t td{border-bottom:1px solid var(--line);padding:6px 8px;vertical-align:top}
 .tablewrap{overflow-x:auto}
 /* 마크다운 뷰 */
-.mdv{font-size:13.5px}
-.mdv h1{font-size:17px;margin:14px 0 6px}.mdv h2{font-size:15px;margin:14px 0 6px}.mdv h3{font-size:13.5px;margin:10px 0 4px}
+.mdv{font-size:var(--fs-md)}
+.mdv h1{font-size:var(--fs-lg);margin:14px 0 6px}.mdv h2{font-size:var(--fs-lg);margin:14px 0 6px}.mdv h3{font-size:var(--fs-md);margin:10px 0 4px}
 .mdv table{width:100%;border-collapse:collapse;margin:8px 0}
-.mdv th,.mdv td{border:1px solid var(--line);padding:4px 8px;text-align:left;font-size:12.5px}
+.mdv th,.mdv td{border:1px solid var(--line);padding:4px 8px;text-align:left;font-size:var(--fs-sm)}
 .mdv th{background:var(--chip)}
 .mdv ul{padding-left:20px;margin:4px 0}
-.mdv code{background:var(--chip);border-radius:4px;padding:1px 5px;font-size:12px}
+.mdv code{background:var(--chip);border-radius:4px;padding:1px 5px;font-size:var(--fs-sm)}
 .empty{color:var(--ink2);text-align:center;padding:34px 10px}
 .empty b{display:block;color:var(--ink);margin-bottom:4px}
 /* 토스트/모달 */
@@ -227,85 +231,96 @@ table.t td{border-bottom:1px solid var(--line);padding:6px 8px;vertical-align:to
 .modal{position:fixed;inset:0;background:rgba(10,16,15,.45);display:none;place-items:center;z-index:50;padding:20px}
 .modal.open{display:grid}
 .modal .box{background:var(--panel);border-radius:14px;padding:20px;width:min(560px,100%);max-height:88vh;overflow-y:auto}
-.modal .box h2{font-size:16px;margin-bottom:14px}
+.modal .box h2{font-size:var(--fs-lg);margin-bottom:14px}
 .mfoot{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
 details.acc2{border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin-bottom:8px;background:var(--panel)}
-details.acc2 summary{cursor:pointer;font-weight:700;font-size:13.5px}
+details.acc2 summary{cursor:pointer;font-weight:700;font-size:var(--fs-md)}
 details.acc2[open]{padding-bottom:14px}
 /* 월간 캘린더 */
 .calgrid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px}
-.calhead{text-align:center;font-size:11px;font-weight:700;color:var(--ink2);padding:4px 0}
+.calhead{text-align:center;font-size:var(--fs-xs);font-weight:700;color:var(--ink2);padding:4px 0}
 .calcell{min-height:76px;border:1px solid var(--line);border-radius:8px;padding:4px;display:flex;flex-direction:column;gap:2px;overflow:hidden}
 .calcell.pad{border:none}
 .calcell.today{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
-.calcell .dnum{font-size:11px;color:var(--ink2);font-variant-numeric:tabular-nums}
-.calev{font-size:10.5px;text-align:left;border-radius:5px;padding:1px 5px;background:var(--accent-soft);color:var(--accent-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;border:none}
+.calcell .dnum{font-size:var(--fs-xs);color:var(--ink2);font-variant-numeric:tabular-nums}
+.calev{font-size:var(--fs-xs);text-align:left;border-radius:5px;padding:1px 5px;background:var(--accent-soft);color:var(--accent-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;border:none}
 .calev.warn{background:var(--warn-soft);color:var(--warn)}
 .calev.danger{background:var(--danger-soft);color:var(--danger)}
 .calev.res{background:var(--ok-soft);color:var(--ok)}
+/* 학생 화면 머리 신호 */
+.sig{display:inline-flex;align-items:center;gap:5px;font-size:var(--fs-xs);color:var(--ink2);padding:2px 10px 2px 8px;border:1px solid var(--line);border-radius:999px;background:var(--panel)}
+.sig::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--ink2);flex:none}
+.sig.ok::before{background:var(--ok)}.sig.warn::before{background:var(--warn)}.sig.danger::before{background:var(--danger)}
+.sig b{color:var(--ink);font-weight:700}.sig.danger b{color:var(--danger)}
+/* 상담 레이더 — 미등록 접기 */
+.radar-off{display:flex;flex-wrap:wrap;align-items:center;gap:var(--sp-2);padding:var(--sp-2) var(--sp-1)}
+.radar-off .names{display:flex;flex-wrap:wrap;gap:2px 10px}
+.radar-off .names button{font-weight:600;color:var(--ink);text-decoration:underline;text-decoration-color:var(--line);text-underline-offset:3px}
+.radar-off .names button:hover{color:var(--accent);text-decoration-color:var(--accent)}
+.radar-off .hint{flex-basis:100%;font-size:var(--fs-xs);color:var(--ink2)}
 /* 수시 지원 현황 */
 .aplref{padding:12px 16px;margin-bottom:12px}
-.aplref-h{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;margin-bottom:9px;font-size:13.5px}
-.aplref-h span{color:var(--ink2);font-size:12px}
+.aplref-h{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap;margin-bottom:9px;font-size:var(--fs-md)}
+.aplref-h span{color:var(--ink2);font-size:var(--fs-sm)}
 .aplgr{display:grid;grid-template-columns:minmax(120px,1.7fr) repeat(6,minmax(54px,1fr));gap:8px}
-.aplgr label{display:flex;flex-direction:column;gap:3px;font-size:11px;font-weight:700;color:var(--ink2)}
-.aplgr input{text-align:center;font-variant-numeric:tabular-nums;font-weight:700;font-size:15px;padding:6px 4px}
-.aplgr .ex input{text-align:left;font-weight:600;font-size:13.5px;padding:6px 10px}
+.aplgr label{display:flex;flex-direction:column;gap:3px;font-size:var(--fs-xs);font-weight:700;color:var(--ink2)}
+.aplgr input{text-align:center;font-variant-numeric:tabular-nums;font-weight:700;font-size:var(--fs-lg);padding:6px 4px}
+.aplgr .ex input{text-align:left;font-weight:600;font-size:var(--fs-md);padding:6px 10px}
 .aplsum{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
-.aplwarn{border:1px solid var(--danger);background:var(--danger-soft);color:var(--danger);border-radius:10px;padding:9px 13px;margin-bottom:10px;font-size:13px;line-height:1.5}
+.aplwarn{border:1px solid var(--danger);background:var(--danger-soft);color:var(--danger);border-radius:10px;padding:9px 13px;margin-bottom:10px;font-size:var(--fs-md);line-height:1.5}
 .aplwarn.soft{border-color:var(--warn);background:var(--warn-soft);color:var(--warn)}
 .aplgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:12px;align-items:start}
 .aplcard{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:9px;box-shadow:var(--shadow)}
 .aplcard.won{border-color:var(--ok);box-shadow:inset 3px 0 0 var(--ok),var(--shadow)}
 .aplcard.lost{opacity:.6}
 .aplcard.add{border-style:dashed;box-shadow:none;background:transparent;gap:7px}
-.apl-or{font-size:11px;color:var(--ink2);text-align:center}
+.apl-or{font-size:var(--fs-xs);color:var(--ink2);text-align:center}
 .aplhead{display:flex;gap:10px;align-items:flex-start;justify-content:space-between}
 .apln{min-width:0}
-.apln b{font-size:15.5px;letter-spacing:-.3px;display:block}
-.apln span{display:block;color:var(--ink2);font-size:12.5px;margin-top:1px}
-.aplst{width:auto;flex:none;font-size:12px;font-weight:700;padding:3px 8px;border-radius:999px;background:var(--chip);color:var(--ink2);border-color:transparent}
+.apln b{font-size:var(--fs-lg);letter-spacing:-.3px;display:block}
+.apln span{display:block;color:var(--ink2);font-size:var(--fs-sm);margin-top:1px}
+.aplst{width:auto;flex:none;font-size:var(--fs-sm);font-weight:700;padding:3px 8px;border-radius:999px;background:var(--chip);color:var(--ink2);border-color:transparent}
 .aplst.acc{background:var(--accent-soft);color:var(--accent-ink)}
 .aplst.ok{background:var(--ok-soft);color:var(--ok)}
 .aplst.warn{background:var(--warn-soft);color:var(--warn)}
 .aplst.danger{background:var(--danger-soft);color:var(--danger)}
 .aplmeta{display:flex;gap:6px;align-items:center}
 .aplkind{width:auto;border:0;cursor:pointer}
-.apltrack{font-size:12.5px;padding:4px 8px;flex:1;min-width:0}
-.aplwait{display:flex;gap:4px;align-items:center;font-size:12px;color:var(--warn);font-weight:700;white-space:nowrap}
+.apltrack{font-size:var(--fs-sm);padding:4px 8px;flex:1;min-width:0}
+.aplwait{display:flex;gap:4px;align-items:center;font-size:var(--fs-sm);color:var(--warn);font-weight:700;white-space:nowrap}
 .aplwait input{width:52px;padding:3px 6px}
 .apldates{display:flex;flex-direction:column;gap:8px}
 .aplrow .lb{display:flex;align-items:center;justify-content:space-between;margin-bottom:3px;min-height:20px}
 .aplrow .v{display:flex;gap:5px;align-items:center}
-.aplrow .v input[type=date]{flex:1;min-width:0;padding:5px 7px;font-size:12.5px}
-.aplrow .v select{width:auto;flex:none;padding:5px 6px;font-size:12.5px}
-.aplrow .k,.aplmin .k,.apled .k{font-size:11px;font-weight:700;color:var(--ink2)}
+.aplrow .v input[type=date]{flex:1;min-width:0;padding:5px 7px;font-size:var(--fs-sm)}
+.aplrow .v select{width:auto;flex:none;padding:5px 6px;font-size:var(--fs-sm)}
+.aplrow .k,.aplmin .k,.apled .k{font-size:var(--fs-xs);font-weight:700;color:var(--ink2)}
 .aplmin{border-radius:9px;padding:9px 11px;background:var(--chip)}
 .aplmin.ok{background:var(--ok-soft)}
 .aplmin.edge{background:var(--warn-soft)}
 .aplmin.fail{background:var(--danger-soft)}
 .aplmin-h{display:flex;gap:7px;align-items:center;justify-content:space-between;min-height:20px}
-.aplmin .rule{font-size:13px;font-weight:600;margin-top:3px}
+.aplmin .rule{font-size:var(--fs-md);font-weight:600;margin-top:3px}
 .aplmin .rule .none{color:var(--ink2);font-weight:500}
-.aplmin .hint{font-size:12px;margin-top:5px}
+.aplmin .hint{font-size:var(--fs-sm);margin-top:5px}
 .aplmin.fail .hint{color:var(--danger)}
 .aplmin.edge .hint{color:var(--warn)}
 .aplmin details{margin-top:5px}
-.aplmin summary{font-size:12px;color:var(--ink2);cursor:pointer;font-weight:600}
-.apled{display:flex;flex-direction:column;gap:7px;margin-top:7px;font-size:12.5px}
+.aplmin summary{font-size:var(--fs-sm);color:var(--ink2);cursor:pointer;font-weight:600}
+.apled{display:flex;flex-direction:column;gap:7px;margin-top:7px;font-size:var(--fs-sm)}
 .apled .r{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
-.apled select{width:auto;padding:3px 6px;font-size:12.5px}
+.apled select{width:auto;padding:3px 6px;font-size:var(--fs-sm)}
 .apled input[type=number]{width:64px;padding:3px 6px}
-.apled input:not([type]){font-size:12.5px;padding:5px 8px}
-.aplck{display:inline-flex;gap:4px;align-items:center;font-weight:600;cursor:pointer;font-size:12.5px}
+.apled input:not([type]){font-size:var(--fs-sm);padding:5px 8px}
+.aplck{display:inline-flex;gap:4px;align-items:center;font-weight:600;cursor:pointer;font-size:var(--fs-sm)}
 .aplck input{width:auto;margin:0}
-.aplmemo{font-size:12.5px;padding:6px 9px}
+.aplmemo{font-size:var(--fs-sm);padding:6px 9px}
 .aplfoot{display:flex;justify-content:space-between;align-items:center;color:var(--ink2)}
-.aplfoot .aplck{font-weight:500;font-size:11.5px}
-.aplnote{font-size:11.5px;color:var(--ink2);margin:14px 2px 0}
+.aplfoot .aplck{font-weight:500;font-size:var(--fs-xs)}
+.aplnote{font-size:var(--fs-xs);color:var(--ink2);margin:14px 2px 0}
 .apltbl tr:not(:first-child){cursor:pointer}
 .apltbl tr:not(:first-child):hover td{background:var(--chip)}
-.aplsub{font-size:11.5px;color:var(--ink2)}
+.aplsub{font-size:var(--fs-xs);color:var(--ink2)}
 .apld{font-variant-numeric:tabular-nums}
 @media (max-width:720px){.aplgr{grid-template-columns:repeat(3,1fr)}.aplgr .ex{grid-column:1/-1}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
@@ -466,7 +481,7 @@ function pager(total,per,vkey,cur){
   const btn=(p,l,dis)=>`<button class="btn ghost sm" ${dis?"disabled style='opacity:.4'":""} onclick="view.${vkey}=${p};render();document.querySelector('.card').scrollIntoView()">${l}</button>`;
   return `<div style="display:flex;gap:8px;align-items:center;justify-content:center;margin-top:12px">
     ${btn(cur-1,"◀ 이전",cur<=0)}
-    <span style="font-size:12px;color:var(--ink2)">${cur+1} / ${pages} 페이지 · 총 ${total.toLocaleString()}건</span>
+    <span style="font-size:var(--fs-sm);color:var(--ink2)">${cur+1} / ${pages} 페이지 · 총 ${total.toLocaleString()}건</span>
     ${btn(cur+1,"다음 ▶",cur>=pages-1)}</div>`;}
 function pageClamp(total,per,vkey){const pages=Math.max(1,Math.ceil(total/per));const c=Math.min(Math.max(0,view[vkey]||0),pages-1);view[vkey]=c;return c;}
 /* 진학 실적 요약 문자열 (표·카드 공용) — g>0일 때만 진학률 표기 */
@@ -547,7 +562,7 @@ function focusList(){
     const od=overdueDays(s);
     if(od===null){score+=3;reasons.push(["상담 기록 없음","danger"]);}
     else if(od>40){score+=3;reasons.push([`상담 ${od}일 경과`,"danger"]);}
-    if(!nextConsult(s)){score+=1;reasons.push(["주기 미등록","warn"]);}
+    if(!nextConsult(s))score+=1; /* 칩은 상담 레이더의 "주기 미등록" 줄이 대신 보여 준다 */
     const urgent=(s.tasks||[]).filter(t=>t.status!=="제출완료"&&t.due&&dday(t.due)!==null&&dday(t.due)>=0&&dday(t.due)<=7);
     if(urgent.length){score+=2*Math.min(urgent.length,2);reasons.push([`수행 마감 ${urgent.length}건`,"warn"]);}
     const ex=(s.exams||[]).filter(e=>e.date&&dday(e.date)!==null&&dday(e.date)>=0&&dday(e.date)<=14)
@@ -591,7 +606,7 @@ function renderSide(){
     <button class="navbtn" onclick="importJson()">📥 <span class="txt">가져오기 (시드)</span></button>
     <button class="navbtn" onclick="exportJson()">📤 <span class="txt">백업 내보내기</span></button>
     ${(()=>{const lb=db.meta&&db.meta.lastExport;const n=lb?Math.floor((new Date(today())-new Date(lb))/864e5):null;
-      return `<div class="txt" style="padding:2px 10px;font-size:10.5px;color:${n===null||n>7?'var(--danger)':'var(--ink2)'}">${n===null?"⚠ 백업한 적 없음":n===0?"오늘 백업함":`마지막 백업 ${n}일 전`}</div>`;})()}
+      return `<div class="txt" style="padding:2px 10px;font-size:var(--fs-xs);color:${n===null||n>7?'var(--danger)':'var(--ink2)'}">${n===null?"⚠ 백업한 적 없음":n===0?"오늘 백업함":`마지막 백업 ${n}일 전`}</div>`;})()}
   </div>`;}
 
 function go(p){view.page=p;view.stuId=p==="stu"?view.stuId:null;render();}
@@ -622,9 +637,9 @@ function renderHome(){
   ${db.students.some(s=>s.grade==="고3")?(()=>{const d=dday(db.meta.suneung);
     const g3=db.students.filter(s=>s.grade==="고3").map(s=>esc(s.name)).join(" · ");
     return `<div class="card" style="display:flex;align-items:center;gap:12px;margin-bottom:4px;border-color:var(--danger)">
-    <span style="font-size:22px">🎯</span>
-    <div style="flex:1"><b style="font-size:16px">수능 ${d!==null&&d>=0?"D-"+d:"날짜 확인 필요"}</b>
-    <div style="font-size:12px;color:var(--ink2)">고3: ${g3}</div></div>
+    <span style="font-size:var(--fs-xl)">🎯</span>
+    <div style="flex:1"><b style="font-size:var(--fs-lg)">수능 ${d!==null&&d>=0?"D-"+d:"날짜 확인 필요"}</b>
+    <div style="font-size:var(--fs-sm);color:var(--ink2)">고3: ${g3}</div></div>
     <input type=date value="${esc(db.meta.suneung)}" style="width:150px" onchange="db.meta.suneung=this.value;save();render()">
     </div>`;})():""}
 
@@ -633,14 +648,14 @@ function renderHome(){
       a.ex&&a.ex.date?{d:a.ex.date,st,a,l:`${a.ex.kind||"대학별고사"}${a.ex.time?" "+a.ex.time:""}`}:null,
       a.res&&a.res.date&&a.status!=="최종 합격"?{d:a.res.date,st,a,l:"발표"}:null].filter(Boolean)))
       .filter(e=>{const n=dday(e.d);return n>=0&&n<=30;}).sort((x,y)=>x.d<y.d?-1:1);
-    return up.length?`<div class="sec"><h2>📮 다가오는 수시 일정 <span class="n">30일 이내</span>
+    return up.length?`<div class="sec"><h2>다가오는 수시 일정 <span class="n">30일 이내</span>
       <button class="btn ghost sm" style="margin-left:auto" onclick="go('apply')">전체 보기</button></h2>
     <div class="card">${up.slice(0,6).map(e=>`
       <div class="duer" onclick="openApl('${e.st.id}')">
         ${ddayChip(e.d)}<span class="who">${esc(e.st.name)}</span>
         <span class="what"><b class="apld">${aplMD(e.d)}</b> ${esc(e.l)} · ${esc(e.a.univ)} ${esc(e.a.major)}</span>
       </div>`).join("")}</div></div>`:"";})()}
-  <div class="sec"><h2>⏰ 마감 임박 수행평가 <span class="n">전체 학생</span></h2>
+  <div class="sec"><h2>마감 임박 수행평가 <span class="n">전체 학생</span></h2>
   <div class="card">${allTasks.length?allTasks.slice(0,8).map(t=>`
     <div class="duer" onclick="openStu('${t.stu.id}');view.tab='tasks';render()">
       ${ddayChip(t.due)}
@@ -648,25 +663,27 @@ function renderHome(){
       <span class="what">${esc(t.subject)} · ${esc(t.topic)}</span>
       <span class="st chip">${esc(t.status)}</span>
     </div>`).join(""):`<div class="empty" style="padding:14px">진행 중 수행평가가 없습니다</div>`}</div></div>
-  <div class="sec"><h2>🔥 이번 주 포커스 <span class="n">관리 필요도 상위 — 자동 산출</span></h2>
+  <div class="sec"><h2>이번 주 포커스 <span class="n">관리 필요도 상위 — 자동 산출</span></h2>
   <div class="card">${(()=>{const f=focusList();return f.length?f.map(({s,reasons})=>`
     <div class="duer" onclick="openStu('${s.id}')">
       <span class="who">${esc(s.name)}</span>
       <span class="what" style="display:flex;gap:5px;flex-wrap:wrap;white-space:normal">${reasons.map(([l,c])=>`<span class="chip ${c}">${esc(l)}</span>`).join("")}</span>
     </div>`).join(""):`<div class="empty" style="padding:14px"><b>전원 관리 상태 양호</b>밀린 상담·임박 마감·임박 시험이 없습니다.</div>`})()}</div></div>
 
-  <div class="sec"><h2>📅 상담 레이더 <span class="n">정기 상담 사이클</span></h2>
-  <div class="card">${db.students.map(s=>({s,next:nextConsult(s),od:overdueDays(s)}))
-    .sort((a,b)=>((a.next||"9999")<(b.next||"9999"))?-1:1)
-    .map(({s,next,od})=>`
+  <div class="sec"><h2>상담 레이더 <span class="n">정기 상담 사이클</span></h2>
+  <div class="card">${(()=>{const rows=db.students.map(s=>({s,next:nextConsult(s),od:overdueDays(s)}));
+    const on=rows.filter(r=>r.next).sort((a,b)=>a.next<b.next?-1:1),off=rows.filter(r=>!r.next);
+    return on.map(({s,next,od})=>`
     <div class="duer" onclick="openStu('${s.id}');view.tab='records';render()">
-      ${next?ddayChip(next):`<span class="dd chip danger">주기없음</span>`}
+      ${ddayChip(next)}
       <span class="who">${esc(s.name)}</span>
-      <span class="what">${next?`다음 상담 ${next}`:"정기 주기 미등록 — 상담 관리 탭에서 설정"}${s.consult&&s.consult.time?` ${esc(s.consult.time)}`:""}</span>
+      <span class="what">다음 상담 ${next}${s.consult&&s.consult.time?` ${esc(s.consult.time)}`:""}</span>
       <span class="st">${od===null?`<span class="chip danger">기록 없음</span>`:od>40?`<span class="chip danger">${od}일 경과</span>`:`<span class="chip ok">${od}일 전</span>`}</span>
-    </div>`).join("")}</div></div>
+    </div>`).join("")+(off.length?`<div class="radar-off"><span class="chip danger">주기 미등록 ${off.length}명</span>
+      <span class="names">${off.map(({s})=>`<button onclick="openStu('${s.id}');view.tab='records';render()">${esc(s.name)}</button>`).join("")}</span>
+      <span class="hint">학생 › 상담 관리에서 주기를 정하면 이 목록에 일정으로 뜹니다</span></div>`:"");})()}</div></div>
 
-  <div class="sec"><h2>👥 학생별 현황</h2>
+  <div class="sec"><h2>학생별 현황</h2>
   <div class="grid cols3">${db.students.map(s=>{
     const nT=(s.tasks||[]).filter(t=>t.status!=="제출완료").length;
     const nS=(s.saenggibu||[]).length;
@@ -703,7 +720,7 @@ function renderStu(){
     const urgent=act.filter(t=>t.due&&dday(t.due)!==null&&dday(t.due)<=7).length;
     const sg=(s.saenggibu||[]).length;
     const cdd=s.consult&&s.consult.contractEnd?dday(s.consult.contractEnd):null;
-    const c360=(l,st,x)=>`<span class="chip ${st}">${l} ${x}</span>`;
+    const c360=(l,st,x)=>`<span class="sig ${st}">${l} <b>${x}</b></span>`;
     return `<div style="display:flex;gap:6px;flex-wrap:wrap;margin:-8px 0 12px">
       ${c360("프로파일",profN===4?"ok":profN>=2?"warn":"danger",profN+"/4")}
       ${c360("상담",(nxt&&od!==null&&od<=40)?"ok":nxt?"warn":"danger",nxt?"다음 "+nxt.slice(5):"주기없음")}
@@ -721,7 +738,7 @@ function renderStu(){
 function tabOverview(){
   const s=stu();
   $("#tabbody").innerHTML=`
-  <div class="card"><h2 style="font-size:14px;margin-bottom:12px">기본 정보</h2>
+  <div class="card"><h2 style="font-size:var(--fs-md);margin-bottom:12px">기본 정보</h2>
     <div class="formgrid">
       ${[["name","이름"],["grade","학년"],["school","학교"],["career","진로 목표"],["targetUniv","목표 대학/학과"],["lcsi","LCSI 유형"]].map(([k,l])=>`
       <div class="frow"><label>${l}</label>${
@@ -733,15 +750,15 @@ function tabOverview(){
       <input value="${esc(s.narrative||"")}" placeholder="[교과 개념] → [진로 맥락] → [사회적 의미] — 학생별 변형" onchange="upStu('narrative',this.value)"></div>
     <div class="frow" style="grid-template-columns:110px 1fr"><label>접근·특이사항</label>
       <textarea rows=2 onchange="upStu('notes',this.value)">${esc(s.notes||"")}</textarea></div>
-    ${s.lcsi&&LCSI[s.lcsi]?`<p style="margin:8px 0 0;font-size:12.5px;color:var(--accent-ink)">💡 ${esc(s.lcsi)} 접근: ${esc(LCSI[s.lcsi])}</p>`:""}
+    ${s.lcsi&&LCSI[s.lcsi]?`<p style="margin:8px 0 0;font-size:var(--fs-sm);color:var(--accent-ink)">💡 ${esc(s.lcsi)} 접근: ${esc(LCSI[s.lcsi])}</p>`:""}
   </div>
-  <div class="sec"><h2>📈 성적 기록 <span class="n">내신·모의고사 통합 — 브리핑 프롬프트에 최근 추이 자동 포함</span></h2>
+  <div class="sec"><h2>성적 기록 <span class="n">내신·모의고사 통합 — 브리핑 프롬프트에 최근 추이 자동 포함</span></h2>
   <div class="card">
     ${(s.grades||[]).length?`<div class="tablewrap"><table class="t">
       <tr><th>날짜</th><th>시험</th><th>과목</th><th>점수/등급</th><th></th></tr>
       ${s.grades.map((g,i)=>`<tr><td>${esc(g.date)}</td><td>${esc(g.exam)}</td><td>${esc(g.subject)}</td><td>${esc(g.score)}</td>
         <td><button class="btn ghost sm" onclick="stu().grades.splice(${i},1);save();render()">✕</button></td></tr>`).join("")}
-    </table></div>`:`<p style="color:var(--ink2);font-size:12.5px;margin:0 0 8px">기록이 없습니다. 상담에서 성적이 언급되면 바로 추가하세요 — 성취 추이 공유가 자신감 관리의 핵심입니다.</p>`}
+    </table></div>`:`<p style="color:var(--ink2);font-size:var(--fs-sm);margin:0 0 8px">기록이 없습니다. 상담에서 성적이 언급되면 바로 추가하세요 — 성취 추이 공유가 자신감 관리의 핵심입니다.</p>`}
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
       <input type=date id=g_date style="width:140px">
       <input id=g_exam placeholder="시험 (예: 6월 모의고사)" style="width:170px">
@@ -750,7 +767,7 @@ function tabOverview(){
       <button class="btn sm" onclick="addGrade()">추가</button>
     </div>
   </div></div>
-  <div class="sec"><h2>📉 성장 궤적 <span class="n">중3 기준선 → 고교 보정 → 실측 — 예측선 위에 실제선을 얹는 6년짜리 그림</span></h2>
+  <div class="sec"><h2>성장 궤적 <span class="n">중3 기준선 → 고교 보정 → 실측 — 예측선 위에 실제선을 얹는 6년짜리 그림</span></h2>
   <div class="card">
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:8px">
       <div class="frow" style="margin:0"><label>중3 상위 %</label>
@@ -764,7 +781,7 @@ function tabOverview(){
           <button class="btn sm" onclick="addGpa()">기록</button></div></div>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:8px">
-      <span style="font-size:11.5px;color:var(--ink2);font-weight:600;padding-bottom:9px">다요인지능(백분위)</span>
+      <span style="font-size:var(--fs-xs);color:var(--ink2);font-weight:600;padding-bottom:9px">다요인지능(백분위)</span>
       <div class="frow" style="margin:0"><label>어휘적용력</label>
         <input value="${esc(s.dyVo||"")}" placeholder="예: 90" style="width:80px" onchange="upStu('dyVo',this.value)"></div>
       <div class="frow" style="margin:0"><label>언어유추력</label>
@@ -855,8 +872,8 @@ function trajHtml(s){
       :cur<msBand[0]-0.2?`<span class="chip ok">중3 예측 상회</span>`:`<span class="chip">중3 예측 범위 안</span>`;}
   return `<div style="overflow-x:auto"><svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" style="min-width:520px">
     ${grid}${band(msBand,"var(--w1,#2F6DB5)","중3 예측",true)}${band(potBand,"var(--accent)",potLabel,false)}${line}${dots}${xlabels}</svg></div>
-  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">${gapLine}${predLine}</div>
-  <p style="font-size:11.5px;color:var(--ink2);margin:6px 0 0">고교 보정: ${esc(ha.why)}. 밴드는 참고치 — 예측이 아니라 상담의 출발선입니다. 등급 축은 1(위)~${gmax}(아래).</p>`;}
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">${gapLine}${predLine}</div>
+  <p style="font-size:var(--fs-xs);color:var(--ink2);margin:8px 0 0">고교 보정: ${esc(ha.why)}. 밴드는 참고치 — 예측이 아니라 상담의 출발선입니다. 등급 축은 1(위)~${gmax}(아래).</p>`;}
 function upStu(k,v){stu()[k]=v;save();renderSide();}
 function addGrade(){const s=stu();s.grades=s.grades||[];
   const g={date:$("#g_date").value||today(),exam:$("#g_exam").value.trim(),subject:$("#g_subject").value.trim(),score:$("#g_score").value.trim()};
@@ -893,7 +910,7 @@ function editorSaenggibu(){
   const flags=scanBanned(d.draft||"");
   $("#tabbody").innerHTML=`
   <button class="btn sm" onclick="view.editDraft=null;render()">← 목록</button>
-  <div class="card" style="margin-top:10px">
+  <div class="card" style="margin-top:12px">
     <div class="formgrid">
       <div class="frow"><label>항목</label><select onchange="upDraft('category',this.value)">${CATS.map(c=>`<option ${d.category===c?"selected":""}>${c}</option>`).join("")}</select></div>
       <div class="frow"><label>과목/영역</label><input value="${esc(d.subject)}" placeholder="예: 사회문화, 자율활동" onchange="upDraft('subject',this.value)"></div>
@@ -911,9 +928,9 @@ function editorSaenggibu(){
       oninput="liveCount(this.value)">${esc(d.draft)}</textarea>
     <div class="charbar ${len>lim?'over':''}" id="cbar"><i style="width:${Math.min(100,len/lim*100)}%"></i></div>
     <div class="cntline"><span id="ccnt">${len} / ${lim}자 (${d.category} NEIS 상한)</span><span>공백 포함 기준</span></div>
-    <div id="cflags" style="margin-top:6px">${flags.map(f=>`<span class="flag">⚠ ${esc(f)}</span>`).join("")}</div>
+    <div id="cflags" style="margin-top:8px">${flags.map(f=>`<span class="flag">⚠ ${esc(f)}</span>`).join("")}</div>
 
-    <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+    <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
       <button class="btn pri" onclick="saveDraft()">저장</button>
       <button class="btn" onclick="copyDraftPrompt()">🤖 Claude 초안 프롬프트 복사</button>
       <button class="btn" onclick="qcheck()">✓ 품질 검사</button>
@@ -945,7 +962,7 @@ function qcheck(){
   ];
   modal(`<h2>품질 검사 — ${esc(d.category)}</h2>
   ${checks.map(([ok,l])=>`<div class="ck ${ok?'done':''}"><input type=checkbox disabled ${ok?"checked":""}><span>${ok?"":"❗ "}${esc(l)}</span></div>`).join("")}
-  <p style="font-size:12.5px;color:var(--ink2);margin-top:10px">기준: 진로 연결 서론 · 심화 키워드 3개 이상 · 생기부 기재 가능 문장 (운영가이드 §3 초안 품질 기준)</p>
+  <p style="font-size:var(--fs-sm);color:var(--ink2);margin-top:12px">기준: 진로 연결 서론 · 심화 키워드 3개 이상 · 생기부 기재 가능 문장 (운영가이드 §3 초안 품질 기준)</p>
   <div class=mfoot><button class="btn pri" onclick=closeModal()>확인</button></div>`);}
 
 /* ── 수행평가 탭 ── */
@@ -958,7 +975,7 @@ function tabTasks(){
     <button class="btn pri sm" onclick="newTask()">＋ 수행평가 등록</button></div>
   <details class="acc2" ${s.taskStrategy&&s.taskStrategy.content?"":"open"}>
     <summary>🧠 학기 수행 전략 ${s.taskStrategy&&s.taskStrategy.updated?`<span style="font-weight:400;color:var(--ink2)">(${esc(s.taskStrategy.updated)} 수립)</span>`:`<span class="chip warn">미수립</span>`}</summary>
-    <p style="font-size:12px;color:var(--ink2);margin:8px 0">수행은 다 잘하는 게 아니라 <b>세특에 걸리는 것에 걸고, 나머지는 기본만</b> — 전략 프롬프트 결과를 여기 저장해 두면 학기 내내 기준이 됩니다.</p>
+    <p style="font-size:var(--fs-sm);color:var(--ink2);margin:8px 0">수행은 다 잘하는 게 아니라 <b>세특에 걸리는 것에 걸고, 나머지는 기본만</b> — 전략 프롬프트 결과를 여기 저장해 두면 학기 내내 기준이 됩니다.</p>
     <textarea id="tstr" rows=5 placeholder="과목별 우선순위 / 수행별 공략 각도 / 일정 배분 / 세특 전환 계획 / 버릴 것">${esc(s.taskStrategy&&s.taskStrategy.content||"")}</textarea>
     <div style="display:flex;gap:8px;margin-top:8px">
       <button class="btn sm pri" onclick="copyTaskStrategy()">🧠 전략 수립 프롬프트</button>
@@ -969,7 +986,7 @@ function tabTasks(){
     <div class="taskrow" onclick="view.editTask=${i};render()">
       ${ddayChip(t.due)}
       <span class="subj">${esc(t.subject)}</span>
-      <span class="top">${esc(t.topic)} <span class="chip" style="margin-left:6px">${esc(t.type||"")}</span></span>
+      <span class="top">${esc(t.topic)} <span class="chip" style="margin-left:8px">${esc(t.type||"")}</span></span>
       <span class="chip ${t.status==="제출완료"?"ok":t.status==="공지수신"?"warn":"acc"}">${esc(t.status)}</span>
     </div>`).join("")}</div>`
   :`<div class="card empty"><b>등록된 수행평가가 없습니다</b>공지 수신 즉시 등록 → 24~48시간 내 초안이 원칙입니다.</div>`}`;}
@@ -981,7 +998,7 @@ function editorTask(){
   const ckList=[...TASK_CK["공통"],...TASK_CK["초안"],...(t.type==="발표"?TASK_CK["발표"]:[])];
   $("#tabbody").innerHTML=`
   <button class="btn sm" onclick="view.editTask=null;render()">← 목록</button>
-  <div class="card" style="margin-top:10px">
+  <div class="card" style="margin-top:12px">
     <div class="formgrid">
       <div class="frow"><label>과목</label><input value="${esc(t.subject)}" onchange="upTask('subject',this.value)"></div>
       <div class="frow"><label>유형</label><select onchange="upTask('type',this.value)">${["보고서","발표","실험","논술","포트폴리오"].map(x=>`<option ${t.type===x?"selected":""}>${x}</option>`).join("")}</select></div>
@@ -993,15 +1010,15 @@ function editorTask(){
     <div class="frow" style="grid-template-columns:110px 1fr"><label>메모</label>
       <textarea rows=3 placeholder="분량·형식 요건, 교사 강조점, 자료 링크" onchange="upTask('notes',this.value)">${esc(t.notes||"")}</textarea></div>
 
-    <h3 style="font-size:13.5px;margin:14px 0 4px">원스톱 체크리스트 <span style="font-weight:400;color:var(--ink2)">(공지 → 24~48h 초안 → 리허설)</span></h3>
+    <h3 style="font-size:var(--fs-md);margin:16px 0 4px">원스톱 체크리스트 <span style="font-weight:400;color:var(--ink2)">(공지 → 24~48h 초안 → 리허설)</span></h3>
     ${ckList.map((c,i)=>`<label class="ck ${t.ck[i]?'done':''}"><input type=checkbox ${t.ck[i]?"checked":""} onchange="stu().tasks[${view.editTask}].ck[${i}]=this.checked;save();render()"><span>${esc(c)}</span></label>`).join("")}
 
-    <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+    <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
       <button class="btn" onclick="copyTaskPrompt()">🤖 Claude 초안 프롬프트 복사</button>
       <button class="btn" onclick="taskToDraft()">✍ 생기부 소재로 전환</button>
       <button class="btn ghost" onclick="stu().tasks.splice(view.editTask,1);view.editTask=null;save();render()">삭제</button>
     </div>
-    ${t.status==="제출완료"?"":`<p style="margin:8px 0 0;font-size:12px;color:var(--ink2)">💡 제출이 끝나면 반드시 "생기부 소재로 전환"까지 — 수행평가의 진짜 목적은 세특 소재 확보입니다.</p>`}
+    ${t.status==="제출완료"?"":`<p style="margin:8px 0 0;font-size:var(--fs-sm);color:var(--ink2)">💡 제출이 끝나면 반드시 "생기부 소재로 전환"까지 — 수행평가의 진짜 목적은 세특 소재 확보입니다.</p>`}
   </div>`;}
 function upTask(k,v){stu().tasks[view.editTask][k]=v;save();renderSide();}
 function taskToDraft(){const s=stu();const t=s.tasks[view.editTask];
@@ -1043,7 +1060,7 @@ function tabAcad(){
   const s=stu();const exams=(s.exams||[]).slice().sort((a,b)=>(a.date||"")<(b.date||"")?-1:1);
   const subs=s.subjectsMgmt||[];
   $("#tabbody").innerHTML=`
-  <div class="card"><h2 style="font-size:14px;margin-bottom:8px">🗓 시험 일정 <span style="font-weight:400;color:var(--ink2)">월간 캘린더·이번 주 포커스에 자동 반영</span></h2>
+  <div class="card"><h2 style="font-size:var(--fs-md);margin-bottom:8px">시험 일정 <span style="font-weight:400;color:var(--ink2)">월간 캘린더·이번 주 포커스에 자동 반영</span></h2>
     ${exams.length?exams.map(e=>{const idx=s.exams.indexOf(e);return `
       <div class="duer">${ddayChip(e.date)}
         <span class="who" style="width:auto;min-width:86px">${esc(e.name)}</span>
@@ -1051,14 +1068,14 @@ function tabAcad(){
         ${dday(e.date)!==null&&dday(e.date)>=0?`<button class="btn sm" onclick="copyExamPrep(${idx})">📚 대비 전략</button>`
           :`<button class="btn sm" onclick="examReview(${idx})">📝 리뷰${e.review?" ✓":""}</button>`}
         <button class="btn ghost sm" onclick="stu().exams.splice(${idx},1);save();render()">✕</button>
-      </div>`;}).join(""):`<p style="color:var(--ink2);font-size:12.5px;margin:0 0 8px">등록된 시험이 없습니다. 시험이 상담·수행·플래너의 기준점입니다 — 학기 초에 전부 넣어두세요.</p>`}
+      </div>`;}).join(""):`<p style="color:var(--ink2);font-size:var(--fs-sm);margin:0 0 8px">등록된 시험이 없습니다. 시험이 상담·수행·플래너의 기준점입니다 — 학기 초에 전부 넣어두세요.</p>`}
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
       <select id=ex_name style="width:130px">${["중간고사","기말고사","모의고사","수능","수행집중기","기타"].map(x=>`<option>${x}</option>`).join("")}</select>
       <input type=date id=ex_date style="width:150px">
       <input id=ex_memo placeholder="범위·비고 (선택)" style="flex:1;min-width:150px">
       <button class="btn sm" onclick="addExam()">추가</button></div>
   </div>
-  <div class="sec"><h2>📖 과목별 관리 <span class="n">목표 vs 현재 — 갭이 곧 우선순위</span></h2>
+  <div class="sec"><h2>과목별 관리 <span class="n">목표 vs 현재 — 갭이 곧 우선순위</span></h2>
   <div class="card">
     ${subs.length?`<div class="tablewrap"><table class="t">
       <tr><th>과목</th><th>목표</th><th>현재</th><th>교재·진도</th><th>약점 메모</th><th></th></tr>
@@ -1069,12 +1086,12 @@ function tabAcad(){
         <td><input value="${esc(x.prog||"")}" style="min-width:120px" onchange="stu().subjectsMgmt[${i}].prog=this.value;save()"></td>
         <td><input value="${esc(x.weak||"")}" style="min-width:140px" onchange="stu().subjectsMgmt[${i}].weak=this.value;save()"></td>
         <td><button class="btn ghost sm" onclick="stu().subjectsMgmt.splice(${i},1);save();render()">✕</button></td></tr>`).join("")}
-    </table></div>`:`<p style="color:var(--ink2);font-size:12.5px;margin:0 0 8px">과목을 등록하면 시험 대비 전략 프롬프트가 이 표를 근거로 작성됩니다.</p>`}
+    </table></div>`:`<p style="color:var(--ink2);font-size:var(--fs-sm);margin:0 0 8px">과목을 등록하면 시험 대비 전략 프롬프트가 이 표를 근거로 작성됩니다.</p>`}
     <div style="display:flex;gap:6px;margin-top:8px">
       <input id=sb_name placeholder="과목 (예: 수학)" style="width:150px">
       <button class="btn sm" onclick="addSubj()">추가</button></div>
   </div></div>
-  <div class="sec"><h2>🧭 학업 전략 메모</h2>
+  <div class="sec"><h2>학업 전략 메모</h2>
   <div class="card">
     <textarea id="acmemo" rows=5 placeholder="시험 대비 전략 결과·학습 방향 결정 사항을 여기에 축적">${esc(s.acadMemo||"")}</textarea>
     <div style="display:flex;gap:8px;margin-top:8px">
@@ -1118,8 +1135,8 @@ ${e.memo?`\n[시험 범위·비고] ${e.memo}`:""}
 
 /* ── 시험 리뷰 · 방학 로드맵 · 공유 페이지 ── */
 function examReview(i){const s=stu();const e=s.exams[i];
-  modal(`<h2>📝 ${esc(e.name)} 리뷰 (${esc(e.date)})</h2>
-  <p style="font-size:12px;color:var(--ink2);margin:0 0 8px">시험 직후가 골든타임 — 리뷰 프롬프트 결과를 여기 저장하면 다음 시험 대비 전략이 이걸 근거로 씁니다.</p>
+  modal(`<h2>${esc(e.name)} 리뷰 (${esc(e.date)})</h2>
+  <p style="font-size:var(--fs-sm);color:var(--ink2);margin:0 0 8px">시험 직후가 골든타임 — 리뷰 프롬프트 결과를 여기 저장하면 다음 시험 대비 전략이 이걸 근거로 씁니다.</p>
   <textarea id=exrev rows=10 placeholder="오답 유형 분석·교정 포인트 붙여넣기">${esc(e.review||"")}</textarea>
   <div class=mfoot><button class=btn onclick=closeModal()>닫기</button>
   <button class="btn" onclick="copyExamReview(${i})">🤖 리뷰 프롬프트 복사</button>
@@ -1147,7 +1164,7 @@ ${subs}
 5. 플래너 반영 항목 — 주간 루틴에 추가할 것 2~3개
 6. 출력 마지막에 "리뷰 요약 5줄" — 워크벤치 시험 리뷰 칸에 저장할 형태로`);}
 function genVacationPrompt(){
- modal(`<h2>🏖 방학 로드맵 프롬프트</h2>
+ modal(`<h2>방학 로드맵 프롬프트</h2>
  <div class="frow" style="grid-template-columns:70px 1fr"><label>방학</label>
   <select id=vc_season><option>여름방학</option><option>겨울방학</option></select></div>
  <div class="frow" style="grid-template-columns:70px 1fr"><label>기간</label>
@@ -1182,11 +1199,11 @@ function genSharePage(){
   const sd=(s.grade==="고3")?dday(db.meta.suneung):null;
   const html=`<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(s.name)} 플래너</title>
 <style>body{font-family:"Apple SD Gothic Neo","Malgun Gothic",sans-serif;max-width:640px;margin:0 auto;padding:20px;color:#1C2B2A;background:#F6F7F4}
-h1{font-size:20px}h2{font-size:15px;border-left:3px solid #0F6B5C;padding-left:8px;margin-top:22px}
-.chip{display:inline-block;background:#E3F0EC;color:#0A4A40;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:700;margin-right:6px}
+h1{font-size:var(--fs-xl)}h2{font-size:var(--fs-lg);border-left:3px solid #0F6B5C;padding-left:8px;margin-top:24px}
+.chip{display:inline-block;background:#E3F0EC;color:#0A4A40;border-radius:999px;padding:2px 10px;font-size:var(--fs-sm);font-weight:700;margin-right:8px}
 .red{background:#FBEAE9;color:#B3261E}
-pre{background:#fff;border:1px solid #E2E6E1;border-radius:10px;padding:14px;white-space:pre-wrap;font-family:inherit;font-size:13.5px;line-height:1.7}
-li{margin:4px 0}footer{color:#5A6B68;font-size:11.5px;margin-top:24px}</style></head><body>
+pre{background:#fff;border:1px solid #E2E6E1;border-radius:10px;padding:14px;white-space:pre-wrap;font-family:inherit;font-size:var(--fs-md);line-height:1.7}
+li{margin:4px 0}footer{color:#5A6B68;font-size:var(--fs-xs);margin-top:24px}</style></head><body>
 <h1>${esc(s.name)} 학습 플래너 <span class="chip">${esc(ym)}</span>${sd!==null&&sd>=0?`<span class="chip red">수능 D-${sd}</span>`:""}</h1>
 ${exams.length?`<h2>다가오는 시험</h2><ul>${exams.map(e=>`<li><b>${esc(e.name)}</b> ${esc(e.date)} (D-${dday(e.date)})</li>`).join("")}</ul>`:""}
 ${tasks.length?`<h2>수행평가 마감</h2><ul>${tasks.map(t=>`<li>${esc(t.subject)} ${esc(t.topic)} — ${esc(t.due)} (D-${dday(t.due)})</li>`).join("")}</ul>`:""}
@@ -1215,7 +1232,7 @@ function tabRecords(){
   const c=s.consult||{};const next=nextConsult(s);const prep=c.prep||{};
   const cd=c.contractEnd?dday(c.contractEnd):null;
   $("#tabbody").innerHTML=`
-  <div class="card" style="margin-bottom:14px"><h2 style="font-size:14px;margin-bottom:10px">📅 정기 상담 사이클 <span style="font-weight:400;color:var(--ink2)">D-7 안내 → D-1 브리핑 → 당일 → D+1 기록</span></h2>
+  <div class="card" style="margin-bottom:16px"><h2 style="font-size:var(--fs-md);margin-bottom:12px">정기 상담 사이클 <span style="font-weight:400;color:var(--ink2)">D-7 안내 → D-1 브리핑 → 당일 → D+1 기록</span></h2>
     <div class="formgrid">
       <div class="frow"><label>매월 주차</label><select onchange="upConsult('week',this.value)">
         <option value="">미설정</option>${[1,2,3,4].map(w=>`<option value="${w}" ${String(c.week)===String(w)?"selected":""}>${w}주차</option>`).join("")}</select></div>
@@ -1228,7 +1245,7 @@ function tabRecords(){
         ${next?`${ddayChip(next)} <b>${next}</b>`:`<span class="chip danger">주기 미등록</span>`}</div></div>
       <div class="frow"><label>수동 지정</label><input type=date value="${esc(c.nextOverride||"")}" onchange="upConsult('nextOverride',this.value)"></div>
     </div>
-    <div style="margin:10px 0 4px">
+    <div style="margin:12px 0 4px">
       <label class="ck ${prep.sms?'done':''}"><input type=checkbox ${prep.sms?"checked":""} onchange="upPrep('sms',this.checked)"><span>D-7 학부모 안내 문자 발송</span></label>
       <label class="ck ${prep.brief?'done':''}"><input type=checkbox ${prep.brief?"checked":""} onchange="upPrep('brief',this.checked)"><span>D-1 상담 브리핑 생성</span></label>
       <label class="ck"><input type=checkbox disabled ${next&&lastRecordDate(s)>=next?"checked":""}><span>당일 기록 완료 (아래 기록 저장 시 자동)</span></label>
@@ -1244,9 +1261,9 @@ function tabRecords(){
         <input type=date value="${esc(c.contractEnd||"")}" onchange="upConsult('contractEnd',this.value)" style="flex:1">
         ${cd!==null?(cd<=60?`<span class="chip ${cd<=30?"danger":"warn"}">갱신 D-${cd}</span>`:`<span class="chip ok">D-${cd}</span>`):""}</div></div>
     </div>
-    ${cd!==null&&cd<=60?`<p style="margin:6px 0 0;font-size:12.5px;color:var(--warn)">💡 계약 만료 60일 이내 — 다음 상담 아젠다에 갱신 논의를 추가하세요.</p>`:""}
+    ${cd!==null&&cd<=60?`<p style="margin:8px 0 0;font-size:var(--fs-sm);color:var(--warn)">💡 계약 만료 60일 이내 — 다음 상담 아젠다에 갱신 논의를 추가하세요.</p>`:""}
   </div>
-  <div class="card"><h2 style="font-size:14px;margin-bottom:10px">새 기록 <span style="font-weight:400;color:var(--ink2)">(Zoom 피드백 기록 형식)</span></h2>
+  <div class="card"><h2 style="font-size:var(--fs-md);margin-bottom:12px">새 기록 <span style="font-weight:400;color:var(--ink2)">(Zoom 피드백 기록 형식)</span></h2>
     <div class="formgrid">
       <div class="frow"><label>날짜</label><input type=date id=r_date value="${today()}"></div>
       <div class="frow"><label>세션 유형</label><select id=r_type>${["Zoom 피드백","대면 상담","자료 검토","성과 공유","전화"].map(x=>`<option>${x}</option>`).join("")}</select></div>
@@ -1262,7 +1279,7 @@ function tabRecords(){
     <dl>${r.main?`<dt>주요 내용</dt><dd>${esc(r.main)}</dd>`:""}${r.next?`<dt>다음 과제</dt><dd>${esc(r.next)}</dd>`:""}
     ${r.sess?`<dt>다음 세션</dt><dd>${esc(r.sess)}</dd>`:""}${r.etc?`<dt>특이사항</dt><dd>${esc(r.etc)}</dd>`:""}</dl></div>`).join("")
   :`<div class="card empty"><b>기록이 없습니다</b>상담 후에는 즉시 기록 — 프로파일이 살아있어야 다음 작업이 빨라집니다.</div>`}</div>
-  <div class="sec"><h2>📱 학부모 소통 로그 <span class="n">문자·전화·카톡 접점 — 리포트·재계약 근거</span></h2>
+  <div class="sec"><h2>학부모 소통 로그 <span class="n">문자·전화·카톡 접점 — 리포트·재계약 근거</span></h2>
   <div class="card">
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
       <input type=date id=cl_date value="${today()}" style="width:145px">
@@ -1274,7 +1291,7 @@ function tabRecords(){
       <span class="chip">${esc(l.ch)}</span>
       <span class="what" style="white-space:normal">${esc(l.sum)}</span>
       <button class="btn ghost sm" onclick="stu().commLogs.splice(${i},1);save();render()">✕</button></div>`).join("")
-    ||`<p style="color:var(--ink2);font-size:12.5px;margin:0">기록 없음 — 학부모와의 모든 접점을 한 줄씩 남기면 월간 리포트와 재계약 근거가 됩니다.</p>`}
+    ||`<p style="color:var(--ink2);font-size:var(--fs-sm);margin:0">기록 없음 — 학부모와의 모든 접점을 한 줄씩 남기면 월간 리포트와 재계약 근거가 됩니다.</p>`}
   </div></div>`;}
 function addCommLog(){const s=stu();s.commLogs=s.commLogs||[];
   const sum=$("#cl_sum").value.trim();if(!sum){toast("내용을 입력하세요");return;}
@@ -1291,20 +1308,20 @@ function tabPlan(){
   const s=stu();const ym=new Date().toISOString().slice(0,7);
   $("#tabbody").innerHTML=`
   <div class="grid cols2">
-    <div class="card"><h2 style="font-size:14px">진도계획표 생성</h2>
-      <p style="font-size:12.5px;color:var(--ink2)">프로파일·미완료 과제를 반영한 ${ym} 진도계획표 초안 템플릿을 만듭니다.</p>
+    <div class="card"><h2 style="font-size:var(--fs-md)">진도계획표 생성</h2>
+      <p style="font-size:var(--fs-sm);color:var(--ink2)">프로파일·미완료 과제를 반영한 ${ym} 진도계획표 초안 템플릿을 만듭니다.</p>
       <button class="btn pri sm" onclick="genPlan('진도계획표')">템플릿 생성</button></div>
-    <div class="card"><h2 style="font-size:14px">주간 플래너 생성</h2>
-      <p style="font-size:12.5px;color:var(--ink2)">주별 체크리스트 형식 — 학생 발송용.</p>
+    <div class="card"><h2 style="font-size:var(--fs-md)">주간 플래너 생성</h2>
+      <p style="font-size:var(--fs-sm);color:var(--ink2)">주별 체크리스트 형식 — 학생 발송용.</p>
       <button class="btn pri sm" onclick="genPlan('주간플래너')">템플릿 생성</button></div>
-    <div class="card"><h2 style="font-size:14px">학부모 월간 리포트</h2>
-      <p style="font-size:12.5px;color:var(--ink2)">이번 달 상담·수행평가·성적을 발송용 문안으로 자동 조립합니다.</p>
+    <div class="card"><h2 style="font-size:var(--fs-md)">학부모 월간 리포트</h2>
+      <p style="font-size:var(--fs-sm);color:var(--ink2)">이번 달 상담·수행평가·성적을 발송용 문안으로 자동 조립합니다.</p>
       <button class="btn pri sm" onclick="genParentReport()">리포트 생성</button></div>
-    <div class="card"><h2 style="font-size:14px">🏖 방학 로드맵</h2>
-      <p style="font-size:12.5px;color:var(--ink2)">취약 보완·선행·탐구/독서·루틴 4블록으로 방학을 설계합니다.</p>
+    <div class="card"><h2 style="font-size:var(--fs-md)">방학 로드맵</h2>
+      <p style="font-size:var(--fs-sm);color:var(--ink2)">취약 보완·선행·탐구/독서·루틴 4블록으로 방학을 설계합니다.</p>
       <button class="btn pri sm" onclick="genVacationPrompt()">로드맵 프롬프트</button></div>
-    <div class="card"><h2 style="font-size:14px">🔗 학생 공유 페이지</h2>
-      <p style="font-size:12.5px;color:var(--ink2)">플래너·시험·마감만 담긴 읽기전용 HTML — 카톡으로 학생에게 전달.</p>
+    <div class="card"><h2 style="font-size:var(--fs-md)">학생 공유 페이지</h2>
+      <p style="font-size:var(--fs-sm);color:var(--ink2)">플래너·시험·마감만 담긴 읽기전용 HTML — 카톡으로 학생에게 전달.</p>
       <button class="btn pri sm" onclick="genSharePage()">공유 파일 생성</button></div>
   </div>
   <div class="sec"><h2>생성된 계획 <span class="n">${(s.planners||[]).length}건</span></h2>
@@ -1336,7 +1353,7 @@ function tabInquiry(){
     <div class="taskrow" onclick="view.editInq=${i};render()">
       <span class="chip ${q.status==="완성"?"ok":"acc"}">${esc(q.status)}</span>
       <span class="subj">${esc(q.subject||"")}</span>
-      <span class="top">${esc(q.topic||"(주제 미정)")} <span class="chip" style="margin-left:6px">${esc(q.type)}</span></span>
+      <span class="top">${esc(q.topic||"(주제 미정)")} <span class="chip" style="margin-left:8px">${esc(q.type)}</span></span>
       <span class="due">${esc(q.updatedAt||"")}</span>
     </div>`).join("")}</div>`
   :`<div class="card empty"><b>탐구보고서가 없습니다</b>주제선정 → Perplexity 자료조사 → 초안 → 검증 → 완성(PPT는 Gamma).<br>진로 연계 탐구가 세특의 최상급 소재입니다.</div>`}`;}
@@ -1352,7 +1369,7 @@ function editorInquiry(){
   const s=stu();const q=s.inquiries[view.editInq];
   $("#tabbody").innerHTML=`
   <button class="btn sm" onclick="view.editInq=null;render()">← 목록</button>
-  <div class="card" style="margin-top:10px">
+  <div class="card" style="margin-top:12px">
     <div class="statuses" style="margin-bottom:12px">${INQ_STAGES.map(st=>`<button class="stpill" style="${q.status===st?'background:var(--accent);color:var(--on-accent)':''}" onclick="upInq('status','${st}')">${st}</button>`).join("")}</div>
     <div class="formgrid">
       <div class="frow"><label>과목</label><input value="${esc(q.subject)}" onchange="upInq('subject',this.value)"></div>
@@ -1373,7 +1390,7 @@ function editorInquiry(){
       <button class="btn" onclick="saveInqFile()">📁 폴더용 저장</button>
       <button class="btn ghost" onclick="stu().inquiries.splice(view.editInq,1);view.editInq=null;save();render()">삭제</button>
     </div>
-    <p style="margin:8px 0 0;font-size:12px;color:var(--ink2)">버튼은 전부 Cowork에 붙여넣는 프롬프트입니다 (Perplexity·Gamma가 연결된 곳에서 실행).
+    <p style="margin:8px 0 0;font-size:var(--fs-sm);color:var(--ink2)">버튼은 전부 Cowork에 붙여넣는 프롬프트입니다 (Perplexity·Gamma가 연결된 곳에서 실행).
     완성되면 수행평가처럼 생기부 탭에서 세특 소재로 연결하세요.</p>
   </div>`;}
 function copyInqTopic(){const s=stu();const q=s.inquiries[view.editInq];
@@ -1454,25 +1471,25 @@ function tabAdm(){
     <a class="btn sm" href="https://tong.jinhak.com" target="_blank" rel="noopener">📊 진학사 통 열기</a>
     <button class="btn sm" onclick="copyTongFetch()">📥 통 자료 수집 프롬프트</button>
     <button class="btn sm pri" onclick="copyAdmStrategy()">🧭 입시 전략 프롬프트</button>
-    <span style="font-size:11.5px;color:var(--ink2);align-self:center">공식 입결·전형 데이터는 좌측 "어디가 데이터"에서 관리</span>
+    <span style="font-size:var(--fs-xs);color:var(--ink2);align-self:center">공식 입결·전형 데이터는 좌측 "어디가 데이터"에서 관리</span>
   </div>
-  <div class="card"><h2 style="font-size:14px;margin-bottom:8px">🎯 관심 대학 <span style="font-weight:400;color:var(--ink2)">어디가·통에서 확인한 내용을 여기에 축적</span></h2>
+  <div class="card"><h2 style="font-size:var(--fs-md);margin-bottom:8px">관심 대학 <span style="font-weight:400;color:var(--ink2)">어디가·통에서 확인한 내용을 여기에 축적</span></h2>
     ${univs.length?`<div class="tablewrap"><table class="t">
       <tr><th>대학</th><th>학과</th><th>전형</th><th>통 예측/등급컷</th><th>확인일</th><th></th></tr>
       ${univs.map((u,i)=>`<tr>
         <td>${esc(u.univ)}</td><td>${esc(u.major)}</td><td>${esc(u.track||"")}</td>
         <td><input value="${esc(u.tong||"")}" style="min-width:120px" onchange="stu().univs[${i}].tong=this.value;stu().univs[${i}].checked=today();save()"></td>
-        <td style="font-size:12px;color:var(--ink2)">${esc(u.checked||"-")}</td>
+        <td style="font-size:var(--fs-sm);color:var(--ink2)">${esc(u.checked||"-")}</td>
         <td><button class="btn ghost sm" onclick="stu().univs.splice(${i},1);save();render()">✕</button></td></tr>`).join("")}
-    </table></div>`:`<p style="color:var(--ink2);font-size:12.5px;margin:0 0 8px">관심 대학이 없습니다. 목표 대학·학과를 등록하고 통 예측을 축적하세요 — 추이가 상담 자산이 됩니다.</p>`}
+    </table></div>`:`<p style="color:var(--ink2);font-size:var(--fs-sm);margin:0 0 8px">관심 대학이 없습니다. 목표 대학·학과를 등록하고 통 예측을 축적하세요 — 추이가 상담 자산이 됩니다.</p>`}
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
       <input id=u_univ placeholder="대학" style="width:130px"><input id=u_major placeholder="학과" style="width:150px">
       <input id=u_track placeholder="전형 (학종/교과/논술/정시)" style="width:170px">
       <button class="btn sm" onclick="addUniv()">추가</button>
     </div></div>
-  <div class="sec"><h2>📊 진학사 통 기록 <span class="n">모의지원·합격예측 스냅샷 (유료 데이터의 우리쪽 사본)</span></h2>
+  <div class="sec"><h2>진학사 통 기록 <span class="n">모의지원·합격예측 스냅샷 (유료 데이터의 우리쪽 사본)</span></h2>
   <div class="card">
-    <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap">
+    <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
       <input type=date id=tg_date value="${today()}" style="width:150px">
       <input id=tg_note placeholder="예: 6모 기준 모의지원 — OO대 안정, XX대 소신" style="flex:1;min-width:200px">
       <button class="btn sm" onclick="addTong()">기록</button></div>
@@ -1540,34 +1557,34 @@ function renderLab(){
   <div class="pagehead"><div><h1>노하우 랩</h1>
   <div class="sub">입시 동향 수집 + 컨설팅·수행평가 노하우 학습 — 축적분은 입시 전략 프롬프트에 자동 반영</div></div></div>
 
-  <div class="card"><h2 style="font-size:14px;margin-bottom:6px">📡 입시 동향 노트 <span style="font-weight:400;color:var(--ink2)">주 1회 권장 (월요일 아침 5분)</span></h2>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+  <div class="card"><h2 style="font-size:var(--fs-md);margin-bottom:8px">입시 동향 노트 <span style="font-weight:400;color:var(--ink2)">주 1회 권장 (월요일 아침 5분)</span></h2>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
       <button class="btn sm pri" onclick="copyTrendScan()">📡 동향 스캔 프롬프트 (Perplexity)</button>
       <button class="btn sm" onclick="copyDeepDive()">🎓 심화 학습 프롬프트 (딥리서치)</button>
     </div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
       <input id=tr_title placeholder="제목 (예: 2026-08 2주차 동향)" style="width:220px">
       <input id=tr_src placeholder="출처 도구 (예: Perplexity)" style="width:150px">
       <button class="btn sm" onclick="addTrend()">저장</button></div>
     <textarea id=tr_content rows=4 placeholder="스캔 결과를 여기 붙여넣고 저장 — 최근 3건이 학생별 입시 전략 프롬프트에 자동 포함됩니다"></textarea>
-    <div style="margin-top:10px">${trends.map((t,i)=>`<details class="acc2"><summary>[${esc(t.date)}] ${esc(t.title)} <span style="color:var(--ink2);font-weight:400">${esc(t.source||"")}</span></summary>
-      <div style="white-space:pre-wrap;font-size:13px;margin-top:8px">${esc(t.content)}</div>
-      <button class="btn ghost sm" style="margin-top:6px" onclick="db.trends.splice(${i},1);save();render()">삭제</button></details>`).join("")||`<p style="color:var(--ink2);font-size:12.5px">아직 없습니다. 스캔 프롬프트 → Cowork 실행 → 결과 저장으로 시작하세요.</p>`}</div>
+    <div style="margin-top:12px">${trends.map((t,i)=>`<details class="acc2"><summary>[${esc(t.date)}] ${esc(t.title)} <span style="color:var(--ink2);font-weight:400">${esc(t.source||"")}</span></summary>
+      <div style="white-space:pre-wrap;font-size:var(--fs-md);margin-top:8px">${esc(t.content)}</div>
+      <button class="btn ghost sm" style="margin-top:8px" onclick="db.trends.splice(${i},1);save();render()">삭제</button></details>`).join("")||`<p style="color:var(--ink2);font-size:var(--fs-sm)">아직 없습니다. 스캔 프롬프트 → Cowork 실행 → 결과 저장으로 시작하세요.</p>`}</div>
   </div>
 
-  <div class="sec"><h2>🎓 노하우 노트 <span class="n">상담·수행에서 배운 것을 한 문장씩 축적</span></h2>
+  <div class="sec"><h2>노하우 노트 <span class="n">상담·수행에서 배운 것을 한 문장씩 축적</span></h2>
   <div class="card">
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
       <select id=ls_cat style="width:130px">${["컨설팅","수행평가","생기부","탐구","입시","기타"].map(c=>`<option>${c}</option>`).join("")}</select>
       <input id=ls_content placeholder="예: 발표형 수행은 리허설 1회 녹화가 완성도를 크게 올린다" style="flex:1;min-width:200px">
       <button class="btn sm" onclick="addLesson()">추가</button></div>
     ${lessons.map((l,i)=>`<div class="duer"><span class="chip acc">${esc(l.cat)}</span>
       <span class="what" style="white-space:normal">${esc(l.content)}</span>
       <span class="due">${esc(l.date)}</span>
-      <button class="btn ghost sm" onclick="db.lessons.splice(${i},1);save();render()">✕</button></div>`).join("")||`<p style="color:var(--ink2);font-size:12.5px;margin:4px 0 0">축적된 노하우가 없습니다. 심화 학습 결과의 "실행 노하우 5개"를 여기에 옮기세요.</p>`}
+      <button class="btn ghost sm" onclick="db.lessons.splice(${i},1);save();render()">✕</button></div>`).join("")||`<p style="color:var(--ink2);font-size:var(--fs-sm);margin:4px 0 0">축적된 노하우가 없습니다. 심화 학습 결과의 "실행 노하우 5개"를 여기에 옮기세요.</p>`}
   </div></div>
 
-  <div class="sec"><h2>🗓 입시 데이터 배포 캘린더 <span class="n">대교협·어디가 공식 자료가 갱신되는 시점 — 놓치지 말 것</span></h2>
+  <div class="sec"><h2>입시 데이터 배포 캘린더 <span class="n">대교협·어디가 공식 자료가 갱신되는 시점 — 놓치지 말 것</span></h2>
   <div class="card"><div class="tablewrap"><table class="t">
     <tr><th>시기</th><th>무엇이 나오나</th><th>어디서</th><th>액션</th></tr>
     <tr><td><b>4월 말</b></td><td>차년도 <b>대입전형 시행계획</b> — 전 대학 전형방법·모집인원 확정 발표</td><td>교육부·대교협 보도자료 (첨부 PDF/HWP)</td><td>관심 대학 전형 변경점 스캔 → 학생별 전략 갱신</td></tr>
@@ -1576,10 +1593,10 @@ function renderLab(){
     <tr><td>8월</td><td>차차년도 <b>대입 기본사항</b> (제도 변경 예고)</td><td>대교협</td><td>중2·고1 장기 로드맵에 반영</td></tr>
     <tr><td>9월</td><td>정시 모집요강·정시 특징</td><td>어디가·대학 입학처</td><td>고3 정시 라인 점검</td></tr>
   </table></div>
-  <p style="font-size:12px;color:var(--ink2);margin:8px 0 0"><b>가장 중요한 건 5월 말</b> — 이때 어디가 등급컷이 새 연도로 바뀝니다. 이 시점에 "관심대학 일괄 조회"를 한 번 돌려 노트를 통째로 갱신하세요. 시도교육청 진학센터(경기·서울 등)는 이 자료를 엑셀·PDF로 재가공해 로그인 없이 배포합니다.</p>
+  <p style="font-size:var(--fs-sm);color:var(--ink2);margin:8px 0 0"><b>가장 중요한 건 5월 말</b> — 이때 어디가 등급컷이 새 연도로 바뀝니다. 이 시점에 "관심대학 일괄 조회"를 한 번 돌려 노트를 통째로 갱신하세요. 시도교육청 진학센터(경기·서울 등)는 이 자료를 엑셀·PDF로 재가공해 로그인 없이 배포합니다.</p>
   </div></div>
 
-  <div class="sec"><h2>🧰 도구 배치 가이드</h2>
+  <div class="sec"><h2>도구 배치 가이드</h2>
   <div class="card"><div class="tablewrap"><table class="t">
     <tr><th>용도</th><th>1순위 도구</th><th>이유·방법</th></tr>
     <tr><td>주간 입시 동향</td><td><b>Claude(Cowork)+Perplexity</b></td><td>계정에 이미 연결됨. 스캔 프롬프트 실행 → 결과를 동향 노트에 저장. 원하면 매주 자동 루틴화 가능</td></tr>
@@ -1590,7 +1607,7 @@ function renderLab(){
     <tr><td>유료 예측 데이터</td><td>진학사 통 (tong.jinhak.com)</td><td>API 없음 — Cowork+Chrome 제어 수집 프롬프트로 조회·폴더 저장, 또는 수동 기록</td></tr>
     <tr><td>축적 자료 질의</td><td>NotebookLM</td><td>동향·상담 노트가 쌓이면 업로드해 "우리 자료" 근거로 답변받기</td></tr>
   </table></div>
-  <p style="font-size:12px;color:var(--ink2);margin:8px 0 0">권장 리듬 — 매주 월: 동향 스캔(5분) · 매월 1회: 심화 학습(30분) · 분기 1회: 노하우 노트 정리 → 라이브러리 반영. 자동화를 원하면 주간 스캔은 예약 루틴으로 만들 수 있습니다.</p>
+  <p style="font-size:var(--fs-sm);color:var(--ink2);margin:8px 0 0">권장 리듬 — 매주 월: 동향 스캔(5분) · 매월 1회: 심화 학습(30분) · 분기 1회: 노하우 노트 정리 → 라이브러리 반영. 자동화를 원하면 주간 스캔은 예약 루틴으로 만들 수 있습니다.</p>
   </div></div>`;}
 function addTrend(){db.trends=db.trends||[];
   const t={date:today(),title:$("#tr_title").value.trim()||("동향 "+today()),source:$("#tr_src").value.trim(),content:$("#tr_content").value.trim()};
@@ -1618,7 +1635,7 @@ function copyDeepDive(){
  modal(`<h2>심화 학습 프롬프트</h2>
  <div class="frow" style="grid-template-columns:70px 1fr"><label>주제</label>
    <input id=dd_topic placeholder="예: 세특에서 대학이 실제로 평가하는 것"></div>
- <p style="font-size:12px;color:var(--ink2)">Gemini Deep Research에 붙여넣거나, Cowork(Claude)에서 실행하면 폴더 저장까지 자동입니다.</p>
+ <p style="font-size:var(--fs-sm);color:var(--ink2)">Gemini Deep Research에 붙여넣거나, Cowork(Claude)에서 실행하면 폴더 저장까지 자동입니다.</p>
  <div class=mfoot><button class=btn onclick=closeModal()>취소</button>
  <button class="btn pri" onclick="doDeepDive()">프롬프트 복사</button></div>`);}
 function doDeepDive(){const topic=$("#dd_topic").value.trim()||"고등 컨설팅 노하우 심화";closeModal();
@@ -1660,11 +1677,11 @@ function renderSearch(){
     if(view.sUniv){
       const ug=f.filter(g=>g.univ===view.sUniv).sort((a,b)=>a.major.localeCompare(b.major,"ko")||(a.cutG||9)-(b.cutG||9));
       body=filters+`
-      <button class="btn ghost sm" style="margin-bottom:10px" onclick="view.sUniv=null;render()">← 대학 목록</button>
+      <button class="btn ghost sm" style="margin-bottom:12px" onclick="view.sUniv=null;render()">← 대학 목록</button>
       <div style="display:flex;align-items:center;gap:11px;margin-bottom:12px">
         <div class="uinit" style="background:${uColor(view.sUniv)}">${esc(view.sUniv.slice(0,2))}</div>
-        <div><b style="font-size:17px">${esc(view.sUniv)}</b>
-        <div style="font-size:12px;color:var(--ink2)">${esc(ug[0]?.region||"")} · 학과·전형 ${ug.length}건 — 행을 누르면 연도별 추이가 펼쳐집니다</div></div></div>
+        <div><b style="font-size:var(--fs-lg)">${esc(view.sUniv)}</b>
+        <div style="font-size:var(--fs-sm);color:var(--ink2)">${esc(ug[0]?.region||"")} · 학과·전형 ${ug.length}건 — 행을 누르면 연도별 추이가 펼쳐집니다</div></div></div>
       ${(()=>{const per=120,cur=pageClamp(ug.length,per,"sDPage");return ug.slice(cur*per,cur*per+per);})().map(g=>{
         const open=view.sKey===g.key;
         const ys=g.isJ?Object.keys(g.pcts).sort():g.ys;
@@ -1673,7 +1690,7 @@ function renderSearch(){
         <button class="mbtn" onclick="view.sKey=view.sKey==='${esc(g.key)}'?null:'${esc(g.key)}';render()">
           <span class="marr">▶</span><span class="mname">${esc(g.major)}</span>
           <span class="tchip tk${ttypeIdx(g.track)}">${esc(g.track||"")}</span>
-          <span class="mcut">${cutTxt}<span style="color:var(--ink2);font-weight:400;font-size:11px"> ${esc(g.isJ?g.pctYear:g.latestYear)}</span></span></button>
+          <span class="mcut">${cutTxt}<span style="color:var(--ink2);font-weight:400;font-size:var(--fs-xs)"> ${esc(g.isJ?g.pctYear:g.latestYear)}</span></span></button>
         <div class="mtrend">${ys.length?ys.map((y,i)=>{
           const c=g.isJ?g.pcts[y]:g.years[y];const p=i>0?(g.isJ?g.pcts[ys[i-1]]:g.years[ys[i-1]]):null;
           const d=p!=null?+(c-p).toFixed(2):null;
@@ -1681,7 +1698,7 @@ function renderSearch(){
           const easier=g.isJ?(d!=null&&d<-0.5):(d!=null&&d>0.05);
           return `<div class="ycell" title="경쟁률 ${esc(g.rates[y]||"-")}"><div class="yy">${y}</div><div class="yc">${g.isJ?c:fmtCut(c)}</div>
             <div class="yd ${harder?"up":easier?"dn":"fl"}">${d==null?"·":harder?"▲ 강화":easier?"▼ 완화":"— 유지"}</div></div>`;}).join("")
-          :`<span style="font-size:12px;color:var(--ink2)">연도별 수치 없음 (환산점수 전용 전형)</span>`}
+          :`<span style="font-size:var(--fs-sm);color:var(--ink2)">연도별 수치 없음 (환산점수 전용 전형)</span>`}
           <button class="btn ghost sm" title="수동 분석 DB에 추가" onclick='addBulkToIpdb(${JSON.stringify(JSON.stringify([g.univ,g.major,g.track,g.isJ?g.pctYear:g.latestYear,g.y50[g.latestYear]||"",g.isJ?"":String(g.latest??""),g.rates[g.latestYear]||""]))})'>＋ DB</button>
         </div></div>`;}).join("")||`<div class="empty"><b>조건에 맞는 학과가 없습니다</b></div>`}
       ${pager(ug.length,120,"sDPage",view.sDPage||0)}`;
@@ -1691,7 +1708,7 @@ function renderSearch(){
       const us=[...byU.entries()].sort((a,b)=>a[0].localeCompare(b[0],"ko"));
       const perU=72,curU=pageClamp(us.length,perU,"sUPage");
       body=filters+`
-      <p style="font-size:12px;color:var(--ink2);margin:0 0 10px">대학 ${us.length}곳 · 학과·전형 ${f.length.toLocaleString()}건 — 카드를 누르면 학과·연도 추이로 들어갑니다</p>
+      <p style="font-size:var(--fs-sm);color:var(--ink2);margin:0 0 12px">대학 ${us.length}곳 · 학과·전형 ${f.length.toLocaleString()}건 — 카드를 누르면 학과·연도 추이로 들어갑니다</p>
       <div class="ugrid">${us.slice(curU*perU,curU*perU+perU).map(([u,list])=>{
         const cuts=list.map(g=>g.cutG).filter(n=>n!=null).sort((a,b)=>a-b);
         return `<button class="ucard" onclick="view.sUniv='${esc(u)}';view.sKey=null;view.sDPage=0;render()">
@@ -1728,7 +1745,7 @@ function renderSearch(){
     const shown=f.slice(curH*perH,curH*perH+perH);
     body=`
     <form onsubmit="event.preventDefault();view.sq=$('#sq').value;view.sHsPage=0;render()">
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
       <input id="sq" value="${esc(view.sq||"")}" placeholder="학교명 검색 (예: 순천, 여고)" style="flex:1;min-width:200px">
       <select onchange="view.sLevel=this.value;view.sHsType='';view.sHsPage=0;render()" style="width:92px">
         <option value="">학교급 전체</option>${[["고","고등학교"],["중","중학교(호남)"],["초","초등학교(호남)"]].map(([v,l])=>`<option value="${v}" ${lv===v?"selected":""}>${l}</option>`).join("")}</select>
@@ -1745,26 +1762,26 @@ function renderSearch(){
         ${[["","이름순"],["u4","4년제 진학률↓"],["go","진학률↓"],["st","재적수↓"]].map(([v,l])=>`<option value="${v}" ${so===v?"selected":""}>${l}</option>`).join("")}</select>
       <button class="btn sm pri">검색</button>
     </div></form>
-    <p style="font-size:12px;color:var(--ink2);margin:0 0 8px">${f.length.toLocaleString()}건${f.length>perH?` — ${curH*perH+1}~${Math.min(f.length,(curH+1)*perH)}건 표시`:""} · 총 ${rows.length.toLocaleString()}개교 (WB 평가 보유 ${rows.filter(r=>!r.bulk).length}곳)</p>
+    <p style="font-size:var(--fs-sm);color:var(--ink2);margin:0 0 8px">${f.length.toLocaleString()}건${f.length>perH?` — ${curH*perH+1}~${Math.min(f.length,(curH+1)*perH)}건 표시`:""} · 총 ${rows.length.toLocaleString()}개교 (WB 평가 보유 ${rows.filter(r=>!r.bulk).length}곳)</p>
     ${shown.length?`<div class="tablewrap"><table class="t">
       <tr><th>학교</th><th>유형</th><th>지역</th><th>내신경쟁</th><th>진학 실적</th><th>비고</th><th></th></tr>
       ${shown.map(r=>`<tr><td><b>${esc(r.name)}</b></td><td>${esc(r.type||"")}</td><td>${esc(r.region||"")}</td>
         <td>${r.level?`<span class="chip ${r.level==="상"?"warn":""}">${esc(r.level)}</span>`:""}</td>
-        <td style="font-size:11.5px;white-space:nowrap" title="${r.met&&r.met[0]>0?`2025년 2월 졸업 ${r.met[0]}명 · 진학 ${r.met[1]} (4년제 ${r.met[2]}) · 재적 ${r.met[3]||"-"} · 연간 전출 ${r.met[4]||0} — 학교알리미`:""}">${hsMetHtml(r.met)}</td>
-        <td style="font-size:11.5px;color:var(--ink2)">${esc(r.feature||"")}</td>
-        <td>${r.bulk?`<button class="btn ghost sm" title="고교 DB에 추가 (고교 추천에 반영)" onclick='addBulkToHsdb(${JSON.stringify(JSON.stringify([r.name,r.type,r.region]))})'>＋</button>`:`<span class="chip acc" style="font-size:10px">보유</span>`}</td></tr>`).join("")}
+        <td style="font-size:var(--fs-xs);white-space:nowrap" title="${r.met&&r.met[0]>0?`2025년 2월 졸업 ${r.met[0]}명 · 진학 ${r.met[1]} (4년제 ${r.met[2]}) · 재적 ${r.met[3]||"-"} · 연간 전출 ${r.met[4]||0} — 학교알리미`:""}">${hsMetHtml(r.met)}</td>
+        <td style="font-size:var(--fs-xs);color:var(--ink2)">${esc(r.feature||"")}</td>
+        <td>${r.bulk?`<button class="btn ghost sm" title="고교 DB에 추가 (고교 추천에 반영)" onclick='addBulkToHsdb(${JSON.stringify(JSON.stringify([r.name,r.type,r.region]))})'>＋</button>`:`<span class="chip acc" style="font-size:var(--fs-xs)">보유</span>`}</td></tr>`).join("")}
     </table></div>${pager(f.length,perH,"sHsPage",curH)}`
     :`<div class="empty"><b>결과 없음</b>${rows.length<100?(window.__bulkStatus==="loading"?"학교 데이터를 불러오는 중입니다 — 잠시 후 자동으로 나타납니다.":"학교 데이터가 아직 로드되지 않았습니다 — 새로고침 해보세요."):"검색어를 바꿔보세요."}</div>`}`;
   }
   $("#main").innerHTML=`
   <div class="pagehead"><div><h1>입시 검색</h1>
   <div class="sub">대학 입결(어디가 발표 기준)과 전국 고교를 검색 — ＋를 누르면 분석·추천 DB에 편입됩니다</div></div></div>
-  <div class="tabs" style="margin-bottom:14px">
+  <div class="tabs" style="margin-bottom:16px">
     <button class="tab ${tab==="univ"?"on":""}" onclick="view.searchTab='univ';view.sq='';render()">🎓 대학·학과 입결</button>
     <button class="tab ${tab==="hs"?"on":""}" onclick="view.searchTab='hs';view.sq='';render()">🏫 학교 (전국 고교 + 호남 초·중)</button>
   </div>
   <div class="card">${body}</div>
-  <p style="font-size:11.5px;color:var(--ink2);margin:10px 2px 0">출처: 한국대학교육협의회 어디가 공식 발표(재정리본)·나이스 학교기본정보·학교알리미 공시(졸업생 진로 2025년 2월 졸업 기준, 재적·전출 2026 공시) — 내부 상담 참고용. 최신 수치는 어디가·대학 입학처에서 최종 확인.</p>`;}
+  <p style="font-size:var(--fs-xs);color:var(--ink2);margin:12px 2px 0">출처: 한국대학교육협의회 어디가 공식 발표(재정리본)·나이스 학교기본정보·학교알리미 공시(졸업생 진로 2025년 2월 졸업 기준, 재적·전출 2026 공시) — 내부 상담 참고용. 최신 수치는 어디가·대학 입학처에서 최종 확인.</p>`;}
 function addBulkToIpdb(j){const r=JSON.parse(j);db.ipdb=db.ipdb||[];
   db.ipdb.push({univ:r[0],major:r[1],track:r[2],year:String(r[3]),cut50:r[4],cut70:r[5],rate:r[6],source:"어디가 발표"});
   save();render();toast("분석 DB에 추가");}
@@ -1921,7 +1938,7 @@ function terrainSvg(list,myG){
   const byU=new Map();
   for(const it of list){if(it.j.kind!=="s")continue;
     if(!byU.has(it.g.univ))byU.set(it.g.univ,[]);byU.get(it.g.univ).push(it.g);}
-  if(!byU.size)return `<p style="font-size:12px;color:var(--ink2);padding:8px 12px">지형에 올릴 수시(등급) 항목이 없습니다.</p>`;
+  if(!byU.size)return `<p style="font-size:var(--fs-sm);color:var(--ink2);padding:8px 12px">지형에 올릴 수시(등급) 항목이 없습니다.</p>`;
   const lanes=[...byU.entries()].sort((a,b)=>Math.min(...a[1].map(x=>x.latest))-Math.min(...b[1].map(x=>x.latest))).slice(0,16);
   const X0=Math.max(1,myG-1.6),X1=Math.min(9,myG+1.6),W=960,PL=104,PR=16,LH=32,H=lanes.length*LH+56;
   const x=v=>PL+(Math.min(X1,Math.max(X0,v))-X0)/(X1-X0)*(W-PL-PR);
@@ -1995,14 +2012,14 @@ function renderIpsi(){
     </div>
     ${summary}
     ${view.ipsiTerrain?`<div class="terrain">${terrainSvg(list,myG)}</div>`:""}
-    <div class="bpins">${sSel?`<b style="font-size:11px;color:var(--accent-ink)">★ ${esc(sSel.name)} 관심대학</b>`:`<b style="font-size:11px;color:var(--ink2)">★ 세션 핀</b>`}
+    <div class="bpins">${sSel?`<b style="font-size:var(--fs-xs);color:var(--accent-ink)">★ ${esc(sSel.name)} 관심대학</b>`:`<b style="font-size:var(--fs-xs);color:var(--ink2)">★ 세션 핀</b>`}
       ${pinned.length?pinned.map(p=>`<span class="bpin">${esc(p)}</span>`).join(""):`<span style="color:var(--ink2)">카드의 ★을 누르면 ${sSel?"학생 관심대학에 저장됩니다":"여기에 쌓입니다 — 학생을 선택하면 그 학생에게 저장"}</span>`}</div>
     <div class="bcols">${cols.map((c,i)=>`<div class="bcol k${i}"><h4>${KN[i]}<span class="bcnt">${c.length.toLocaleString()}</span></h4>
       ${c.slice(0,i===3?8:30).map(it=>boardCard(it.g,it.j)).join("")}
       ${c.length>(i===3?8:30)?`<div class="bmore">+ ${(c.length-(i===3?8:30)).toLocaleString()}건 — 계열·지역으로 좁혀보세요</div>`:""}</div>`).join("")}</div>
-    ${showJ&&jList.length?`<div class="sec" style="margin-top:14px"><h2 style="font-size:13.5px">🌙 정시(수능) 가능권 <span class="n">수능 백분위 ${myPct} 추정 기준 · 백분위 공개 전형 ${jList.length.toLocaleString()}건 중 근접 12</span></h2>
+    ${showJ&&jList.length?`<div class="sec" style="margin-top:16px"><h2 style="font-size:var(--fs-md)">정시(수능) 가능권 <span class="n">수능 백분위 ${myPct} 추정 기준 · 백분위 공개 전형 ${jList.length.toLocaleString()}건 중 근접 12</span></h2>
     <div class="bcols" style="grid-template-columns:repeat(auto-fill,minmax(195px,1fr))">${jList.slice(0,12).map(it=>`<div class="bcol k${order[it.j.cls[0]]}" style="padding:0;background:none">${boardCard(it.g,it.j)}</div>`).join("")}</div></div>`:""}
-    <p style="font-size:11.5px;color:var(--ink2);margin:8px 0 0">판정: 수시(교과·종합·논술)는 최신 70%컷 등급과 내 등급(밴드 중앙 ${myG.toFixed(2)}) 차이 — +0.4 안정 / ±0.2 적정 / −0.8 소신. 정시(수능)는 최종등록자 수능 백분위와 내 추정 백분위(${myPct}) 차이 — +5 안정 / ±3 적정 / −10 소신. 같은 학과·전형은 최신 연도 1건, ▲▼는 전년 대비 컷 강화·완화. 연도별 추이는 입시 검색에서.</p>`;
+    <p style="font-size:var(--fs-xs);color:var(--ink2);margin:8px 0 0">판정: 수시(교과·종합·논술)는 최신 70%컷 등급과 내 등급(밴드 중앙 ${myG.toFixed(2)}) 차이 — +0.4 안정 / ±0.2 적정 / −0.8 소신. 정시(수능)는 최종등록자 수능 백분위와 내 추정 백분위(${myPct}) 차이 — +5 안정 / ±3 적정 / −10 소신. 같은 학과·전형은 최신 연도 1건, ▲▼는 전년 대비 컷 강화·완화. 연도별 추이는 입시 검색에서.</p>`;
   }else if(R&&!rows.length){
     matchHtml=`<div class="empty"><b>입결 데이터가 비어 있습니다</b>입시 검색에서 ＋로 추가하거나, 어디가 데이터 섹션의 조회 프롬프트로 채우세요.</div>`;
   }
@@ -2010,7 +2027,7 @@ function renderIpsi(){
   <div class="pagehead"><div><h1>진학 가능권 분석</h1>
   <div class="sub">웩슬러·중학 성적·고교 내신 → 입결 DB 대조. <b>예측이 아니라 상담용 가능권 참고치</b>입니다.</div></div></div>
 
-  <div class="card"><h2 style="font-size:14px;margin-bottom:10px">1️⃣ 입력</h2>
+  <div class="card"><h2 style="font-size:var(--fs-md);margin-bottom:12px">1️⃣ 입력</h2>
     <div class="frow"><label>학생 연동</label>
       <select onchange="view.ipsiStu=this.value||null;render()" style="max-width:240px">
         <option value="">직접 입력 (학생 미지정)</option>
@@ -2018,7 +2035,7 @@ function renderIpsi(){
       </select></div>
     ${view.ipsiStu?(()=>{const s=db.students.find(x=>x.id===view.ipsiStu);
       const gr=(s?.grades||[]).slice(-3).map(g=>`${g.exam} ${g.subject} ${g.score}`).join(" · ");
-      return `<p style="font-size:11.5px;color:var(--ink2);margin:2px 0 8px">★ 핀이 <b>${esc(s?.name||"")}</b>의 관심대학으로 저장됩니다${gr?` — 최근 성적: ${esc(gr)}`:" — 성적 기록이 없으니 아래에 직접 입력하세요"}</p>`;})():""}
+      return `<p style="font-size:var(--fs-xs);color:var(--ink2);margin:2px 0 8px">★ 핀이 <b>${esc(s?.name||"")}</b>의 관심대학으로 저장됩니다${gr?` — 최근 성적: ${esc(gr)}`:" — 성적 기록이 없으니 아래에 직접 입력하세요"}</p>`;})():""}
     <div class="frow"><label>입력 유형</label>
       <select id="ip_mode" onchange="view.ipsiMode=this.value;view.ipsiResult=null;render()">
         <option value="hs" ${(view.ipsiMode||"hs")==="hs"?"selected":""}>고교 내신 (9등급제 평균)</option>
@@ -2033,55 +2050,55 @@ function renderIpsi(){
           <option value="5" ${view.ipsiScale==="5"?"selected":""}>5등급제 (고1·고2)</option>
         </select></div>
       <div class="frow"><label>내신 평균</label><input id="ip_hs" placeholder="${view.ipsiScale==="5"?"예: 1.5 (1~5)":"예: 2.4"}" style="width:120px"></div>
-      <p style="font-size:11.5px;color:var(--ink2);margin:4px 0 0">${view.ipsiScale==="5"?"5등급제 평균을 그대로 넣으면 상위% 기준으로 9등급 등가로 환산해 대조합니다 (입결 DB가 9등급제 과거 자료). 환산치는 결과에 표시됩니다.":"고1·고2는 위에서 5등급제를 선택하면 학교 통지 그대로 입력할 수 있습니다."}</p>`
+      <p style="font-size:var(--fs-xs);color:var(--ink2);margin:4px 0 0">${view.ipsiScale==="5"?"5등급제 평균을 그대로 넣으면 상위% 기준으로 9등급 등가로 환산해 대조합니다 (입결 DB가 9등급제 과거 자료). 환산치는 결과에 표시됩니다.":"고1·고2는 위에서 5등급제를 선택하면 학교 통지 그대로 입력할 수 있습니다."}</p>`
     :view.ipsiMode==="ms"?`
       <div class="formgrid">
         <div class="frow"><label>전교 등수</label><input id="ip_msrank" placeholder="예: 12" style="width:100px"></div>
         <div class="frow"><label>재적수</label><input id="ip_mstot" placeholder="예: 320" style="width:100px"></div>
       </div>
       <div class="frow"><label>또는 상위 %</label><input id="ip_ms" placeholder="예: 3.8" style="width:120px"></div>
-      <p style="font-size:11.5px;color:var(--ink2);margin:4px 0 0">일반고 진학 가정의 예상 밴드입니다. 학군·고교 유형(자사·특목)에 따라 크게 달라지므로 반드시 밴드로만 해석하세요.</p>`
+      <p style="font-size:var(--fs-xs);color:var(--ink2);margin:4px 0 0">일반고 진학 가정의 예상 밴드입니다. 학군·고교 유형(자사·특목)에 따라 크게 달라지므로 반드시 밴드로만 해석하세요.</p>`
     :view.ipsiMode==="dy"?`
       <div class="formgrid">
         <div class="frow"><label>어휘적용력 백분위</label><input id="ip_dy_vo" value="${esc(sst?.dyVo||"")}" placeholder="예: 90" style="width:100px"></div>
         <div class="frow"><label>언어유추력 백분위</label><input id="ip_dy_an" value="${esc(sst?.dyAn||"")}" placeholder="예: 85" style="width:100px"></div>
         <div class="frow"><label>추리력 백분위</label><input id="ip_dy_re" value="${esc(sst?.dyRe||"")}" placeholder="예: 95 (선택)" style="width:110px"></div>
       </div>
-      <p style="font-size:11.5px;color:var(--ink2);margin:4px 0 0">검사지의 백분위를 그대로 입력하세요(높을수록 좋음). <b>어휘적용력·언어유추력 → 교과(내신) 잠재 밴드</b>,
+      <p style="font-size:var(--fs-xs);color:var(--ink2);margin:4px 0 0">검사지의 백분위를 그대로 입력하세요(높을수록 좋음). <b>어휘적용력·언어유추력 → 교과(내신) 잠재 밴드</b>,
       <b>추리력 → 수능(정시) 백분위 잠재치</b>로 환산해 분석합니다. 초2부터 가능한 검사라 초등 결과는 장기 잠재 참고치로만 해석하세요 — 상관 보정(0.6)이 포함됩니다.</p>`
     :`
       <div class="frow"><label>전체지능 FSIQ</label><input id="ip_iq" value="${esc(sst?.baseFsiq||"")}" placeholder="예: 122" style="width:120px"></div>
-      <p style="font-size:11.5px;color:var(--ink2);margin:4px 0 0">⚠️ 지능은 성취를 결정하지 않습니다(상관 약 0.5~0.6). 이 분석은 <b>잠재력이 온전히 성취로 전환될 때의 상한 참고치</b>이며,
+      <p style="font-size:var(--fs-xs);color:var(--ink2);margin:4px 0 0">⚠️ 지능은 성취를 결정하지 않습니다(상관 약 0.5~0.6). 이 분석은 <b>잠재력이 온전히 성취로 전환될 때의 상한 참고치</b>이며,
       현재 성적과의 갭을 보는 것이 목적입니다 — 그 갭을 줄이는 것이 컨설팅입니다.</p>`}
-    <div style="margin-top:10px"><button class="btn pri sm" onclick="runIpsi()">분석 실행</button></div>
+    <div style="margin-top:12px"><button class="btn pri sm" onclick="runIpsi()">분석 실행</button></div>
   </div>
 
   ${R?`<div class="sec"><h2>2️⃣ 결과</h2>
   <div class="card">
-    <p style="margin:0 0 10px"><b>${esc(R.label)}</b></p>
+    <p style="margin:0 0 12px"><b>${esc(R.label)}</b></p>
     ${matchHtml}
-    <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
       <button class="btn sm" onclick="copyIpsiReport()">📋 상담용 요약 복사</button>
     </div>
-    <p style="font-size:11.5px;color:var(--warn);margin:8px 0 0">⚠️ 본 결과는 과거 공개 입결(출처: 한국대학교육협의회 어디가 등)과의 단순 대조 참고치입니다.
+    <p style="font-size:var(--fs-xs);color:var(--warn);margin:8px 0 0">⚠️ 본 결과는 과거 공개 입결(출처: 한국대학교육협의회 어디가 등)과의 단순 대조 참고치입니다.
     실제 합격 가능성은 전형 요소·수능최저·경쟁률 변동에 따라 달라지며, 최종 판단은 상담에서 합니다.</p>
   </div></div>
   ${R.mode==="ms"&&view.ipsiPct?(()=>{const [tt,desc]=hsStrategy(view.ipsiPct);const m=hsMatch(view.ipsiPct);
-    return `<div class="sec"><h2>🏫 고교 추천 <span class="n">중학 상위 ${view.ipsiPct.toFixed(1)}% 기준 — 우리 고교 DB 대조</span></h2>
+    return `<div class="sec"><h2>고교 추천 <span class="n">중학 상위 ${view.ipsiPct.toFixed(1)}% 기준 — 우리 고교 DB 대조</span></h2>
     <div class="card">
       <p style="margin:0 0 4px"><span class="chip acc">${tt}</span></p>
-      <p style="font-size:13px;margin:0 0 10px">${desc}</p>
+      <p style="font-size:var(--fs-md);margin:0 0 12px">${desc}</p>
       ${m.length?`<div class="tablewrap"><table class="t">
         <tr><th>판정</th><th>학교</th><th>유형</th><th>지역</th><th>내신경쟁</th><th>특징</th></tr>
         ${m.map(r=>`<tr><td><span class="chip ${r.fit[1]}">${r.fit[0]}</span></td>
           <td><b>${esc(r.name)}</b></td><td>${esc(r.type)}</td><td>${esc(r.region||"")}</td>
-          <td>${esc(r.level||"중")}</td><td style="font-size:12px;color:var(--ink2)">${esc(r.feature||"")}</td></tr>`).join("")}
+          <td>${esc(r.level||"중")}</td><td style="font-size:var(--fs-sm);color:var(--ink2)">${esc(r.feature||"")}</td></tr>`).join("")}
       </table></div>
-      <p style="font-size:11.5px;color:var(--ink2);margin:6px 0 0">판정은 성적대·학교 유형·내신 경쟁 강도 기반 참고치 — 통학 거리·학교 분위기·학종 프로그램은 상담에서 확정합니다.</p>`
+      <p style="font-size:var(--fs-xs);color:var(--ink2);margin:8px 0 0">판정은 성적대·학교 유형·내신 경쟁 강도 기반 참고치 — 통학 거리·학교 분위기·학종 프로그램은 상담에서 확정합니다.</p>`
       :`<div class="empty" style="padding:14px"><b>고교 DB가 비어 있습니다</b>아래 고교 DB에 광주·전남 학교를 넣으면 추천이 나옵니다 — "콘텐츠DB 추출 프롬프트"가 가장 빠릅니다.</div>`}
     </div></div>`;})():""}`:""}
 
-  <div class="sec"><h2>🗄 입결 DB <span class="n">매칭 데이터 ${rows.length.toLocaleString()}건 (대량 ${(BULK.ip||[]).length.toLocaleString()} + 수동 ${manual.length}) — 행을 누르면 상세</span></h2>
+  <div class="sec"><h2>입결 DB <span class="n">매칭 데이터 ${rows.length.toLocaleString()}건 (대량 ${(BULK.ip||[]).length.toLocaleString()} + 수동 ${manual.length}) — 행을 누르면 상세</span></h2>
   <div class="card">
     <details class="acc2"><summary>✏️ 직접 입력 (진학사 통·모평 수치 — 정시는 전형명을 "수능(…)"으로)</summary>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0">
@@ -2093,14 +2110,14 @@ function renderIpsi(){
       <button class="btn sm" onclick="addIpdb()">추가</button>
     </div></details>
     <details class="acc2"><summary>📥 CSV 붙여넣기 가져오기 (어디가 조회 프롬프트 결과)</summary>
-      <p style="font-size:11.5px;color:var(--ink2);margin:6px 0">형식: 대학,학과,전형,연도,50컷,70컷,경쟁률,출처,수능백분위(정시만·선택) — 한 줄에 하나. 정시는 전형을 "수능(…)"으로 적어야 백분위 매칭에 반영</p>
+      <p style="font-size:var(--fs-xs);color:var(--ink2);margin:8px 0">형식: 대학,학과,전형,연도,50컷,70컷,경쟁률,출처,수능백분위(정시만·선택) — 한 줄에 하나. 정시는 전형을 "수능(…)"으로 적어야 백분위 매칭에 반영</p>
       <textarea id="db_csv" rows=4 placeholder="전남대학교,의예과,학종(고교생활우수자),2026,1.2,1.4,7.2,어디가"></textarea>
-      <button class="btn sm" style="margin-top:6px" onclick="importIpdb()">가져오기</button>
+      <button class="btn sm" style="margin-top:8px" onclick="importIpdb()">가져오기</button>
     </details>
     ${manual.length?`<div style="display:flex;justify-content:flex-end;margin-top:8px">
-      <select onchange="view.dbSort=this.value;render()" style="width:130px;font-size:12px">
+      <select onchange="view.dbSort=this.value;render()" style="width:130px;font-size:var(--fs-sm)">
         ${[["univ","대학 가나다순"],["cut","컷 낮은순"],["year","연도 최신순"],["recent","최근 입력순"]].map(([v,l])=>`<option value="${v}" ${(view.dbSort||"univ")===v?"selected":""}>${l}</option>`).join("")}</select></div>
-    <div class="tablewrap" style="margin-top:6px"><table class="t">
+    <div class="tablewrap" style="margin-top:8px"><table class="t">
       <tr><th>대학</th><th>학과</th><th>전형</th><th>연도</th><th>50컷</th><th>70컷</th><th>백분위</th><th>출처</th><th></th></tr>
       ${manual.map((r,i)=>({r,i})).sort((a,b)=>{
         const so=view.dbSort||"univ";
@@ -2111,12 +2128,12 @@ function renderIpsi(){
       }).map(({r,i})=>`<tr style="cursor:pointer" title="눌러서 연도별 상세 보기" onclick="ipDetail('${esc(uniNorm(r.univ))}|${esc(r.major)}|${esc(r.track||"")}')">
         <td><b>${esc(r.univ)}</b></td><td>${esc(r.major)}</td><td>${esc(r.track||"")}</td>
         <td>${esc(r.year||"")}</td><td>${esc(r.cut50||"")}</td><td>${esc(r.cut70||"")}</td><td>${esc(r.pct||"")}</td>
-        <td style="font-size:11.5px;color:var(--ink2)">${esc(r.source||"")}</td>
+        <td style="font-size:var(--fs-xs);color:var(--ink2)">${esc(r.source||"")}</td>
         <td><button class="btn ghost sm" onclick="event.stopPropagation();db.ipdb.splice(${i},1);save();render()">✕</button></td></tr>`).join("")}
-    </table></div>`:`<p style="color:var(--ink2);font-size:12.5px;margin:8px 0 0">수동 추가분이 없습니다. 대량 데이터는 입시 검색에서 이미 매칭에 쓰이고, 여기엔 CSV·직접 입력분만 관리됩니다.</p>`}
+    </table></div>`:`<p style="color:var(--ink2);font-size:var(--fs-sm);margin:8px 0 0">수동 추가분이 없습니다. 대량 데이터는 입시 검색에서 이미 매칭에 쓰이고, 여기엔 CSV·직접 입력분만 관리됩니다.</p>`}
   </div></div>
 
-  <div class="sec"><h2>🏫 고교 DB <span class="n">${(db.hsdb||[]).length}건 — 중학생 고교 추천에 사용 (광주·전남)</span></h2>
+  <div class="sec"><h2>고교 DB <span class="n">${(db.hsdb||[]).length}건 — 중학생 고교 추천에 사용 (광주·전남)</span></h2>
   <div class="card">
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
       <input id="hs_name" placeholder="학교명" style="width:130px">
@@ -2127,17 +2144,17 @@ function renderIpsi(){
       <input id="hs_src" placeholder="출처" style="width:100px">
       <button class="btn sm" onclick="addHsdb()">추가</button>
     </div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
       <button class="btn sm pri" onclick="copyHsdbExtract()">📥 콘텐츠DB 추출 프롬프트</button>
     </div>
     <details class="acc2"><summary>📥 CSV 붙여넣기 (학교명,유형,지역,내신경쟁,특징,출처)</summary>
       <textarea id="hs_csv" rows=4 placeholder="OO고등학교,일반고,광주 서구,중,학종 프로그램 우수,콘텐츠DB"></textarea>
-      <button class="btn sm" style="margin-top:6px" onclick="importHsdb()">가져오기</button>
+      <button class="btn sm" style="margin-top:8px" onclick="importHsdb()">가져오기</button>
     </details>
     ${(db.hsdb||[]).length?`<div style="display:flex;justify-content:flex-end;margin-top:8px">
-      <select onchange="view.hsDbSort=this.value;render()" style="width:130px;font-size:12px">
+      <select onchange="view.hsDbSort=this.value;render()" style="width:130px;font-size:var(--fs-sm)">
         ${[["region","지역순"],["level","경쟁 상→하"],["name","이름 가나다순"]].map(([v,l])=>`<option value="${v}" ${(view.hsDbSort||"region")===v?"selected":""}>${l}</option>`).join("")}</select></div>
-    <div class="tablewrap" style="margin-top:6px"><table class="t">
+    <div class="tablewrap" style="margin-top:8px"><table class="t">
       <tr><th>학교</th><th>유형</th><th>지역</th><th>경쟁</th><th>특징</th><th></th></tr>
       ${(db.hsdb||[]).map((r,i)=>({r,i})).sort((a,b)=>{
         const so=view.hsDbSort||"region";const LV={"상":0,"중":1,"하":2};
@@ -2145,7 +2162,7 @@ function renderIpsi(){
         if(so==="name")return a.r.name.localeCompare(b.r.name,"ko");
         return (a.r.region||"").localeCompare(b.r.region||"","ko")||a.r.name.localeCompare(b.r.name,"ko");
       }).map(({r,i})=>`<tr><td><b>${esc(r.name)}</b></td><td>${esc(r.type)}</td><td>${esc(r.region||"")}</td>
-        <td>${esc(r.level||"중")}</td><td style="font-size:12px;color:var(--ink2)">${esc(r.feature||"")}</td>
+        <td>${esc(r.level||"중")}</td><td style="font-size:var(--fs-sm);color:var(--ink2)">${esc(r.feature||"")}</td>
         <td><button class="btn ghost sm" onclick="db.hsdb.splice(${i},1);save();render()">✕</button></td></tr>`).join("")}
     </table></div>`:""}
   </div></div>`;}
@@ -2501,7 +2518,7 @@ function achPanelHtml(){
   const D=achDb();const names=Object.keys(D).sort((a,b)=>a.localeCompare(b,"ko"));
   const p=view.achParsed;
   const cur=view.achSchool||"";
-  const savedList=names.length?`<div style="display:flex;gap:5px;flex-wrap:wrap;margin:6px 0">
+  const savedList=names.length?`<div style="display:flex;gap:5px;flex-wrap:wrap;margin:8px 0">
     ${names.map(n=>`<span class="bpin" style="${cur===n?"border-color:var(--accent)":""}">
       <button style="background:none;border:0;color:inherit;cursor:pointer;font:inherit;padding:0"
         onclick="view.achSchool='${esc(n)}';render()">${esc(n)} <span style="color:var(--ink2)">${esc(D[n].level)}·${D[n].rows.length}행</span></button>
@@ -2510,10 +2527,10 @@ function achPanelHtml(){
   if(p){
     const ok=p.rows.filter(r=>r.use!==false).length;
     preview=`<div style="margin-top:8px">
-      <p style="font-size:12px;margin-bottom:5px">${p.rows.length}행을 읽었습니다 — 사용 ${ok}행 · 제외 ${p.rows.length-ok}행 · 실패 ${p.failed.length}행
+      <p style="font-size:var(--fs-sm);margin-bottom:4px">${p.rows.length}행을 읽었습니다 — 사용 ${ok}행 · 제외 ${p.rows.length-ok}행 · 실패 ${p.failed.length}행
         <span class="chip ${p.level==="고"?"warn":"acc"}">${p.level==="고"?"고등학교 서식":"중학교 서식"}</span>
         <button class="btn ghost sm" onclick="view.achLevel='${p.level==="고"?"중":"고"}';render()">서식 바꾸기</button></p>
-      ${p.warn.map(w=>`<div class="note" style="font-size:12px;padding:7px 11px;margin-bottom:5px">${esc(w)}</div>`).join("")}
+      ${p.warn.map(w=>`<div class="note" style="font-size:var(--fs-sm);padding:7px 11px;margin-bottom:4px">${esc(w)}</div>`).join("")}
       <div class="tablewrap" style="max-height:280px;overflow:auto"><table class="t">
         <tr><th>사용</th><th>학년·학기</th><th>과목</th><th>평균</th><th>표준편차</th><th>A</th><th>B</th><th>C</th><th>D</th><th>E</th><th>비고</th></tr>
         ${p.rows.map((r,i)=>`<tr style="${r.use===false?"opacity:.45":""}">
@@ -2522,21 +2539,21 @@ function achPanelHtml(){
           <td><b>${esc(r.subj)}</b>${r.norm!==r.subj?`<span style="color:var(--ink2)"> →${esc(r.norm)}</span>`:""}</td>
           <td class="mono">${r.avg==null?"":r.avg}</td><td class="mono">${r.sd==null?"":r.sd}</td>
           ${r.d.map(v=>`<td class="mono">${v==null?"—":v}</td>`).join("")}
-          <td style="font-size:11px;color:var(--ink2)">${r.excl?esc(r.excl):(r.scale===3?"3단계 과목":(r.needsReview?"확인 필요":""))}</td></tr>`).join("")}
+          <td style="font-size:var(--fs-xs);color:var(--ink2)">${r.excl?esc(r.excl):(r.scale===3?"3단계 과목":(r.needsReview?"확인 필요":""))}</td></tr>`).join("")}
       </table></div>
-      ${p.failed.length?`<details style="margin-top:6px"><summary style="font-size:12px;color:var(--danger)">읽지 못한 ${p.failed.length}행 보기</summary>
-        <div style="font-size:11.5px;color:var(--ink2);margin-top:4px">${p.failed.map(f=>esc(f.subj+" | "+f.raw)).join("<br>")}</div></details>`:""}
+      ${p.failed.length?`<details style="margin-top:8px"><summary style="font-size:var(--fs-sm);color:var(--danger)">읽지 못한 ${p.failed.length}행 보기</summary>
+        <div style="font-size:var(--fs-xs);color:var(--ink2);margin-top:4px">${p.failed.map(f=>esc(f.subj+" | "+f.raw)).join("<br>")}</div></details>`:""}
       <button class="btn pri sm" style="margin-top:8px" onclick="achDoSave()">이 내용으로 저장</button></div>`;}
-  return `<details class="acc2" style="margin-top:10px" ${p||cur?"open":""}>
+  return `<details class="acc2" style="margin-top:12px" ${p||cur?"open":""}>
     <summary>📊 학교 성취도 분포 넣기 (선택) — 학교알리미 ‘4-나 교과별 학업성취 사항’</summary>
-    ${achBulkCount()?`<div class="note" style="font-size:12px;margin:6px 0"><b>내장 데이터 ${achBulkCount()}개교</b> — 학교알리미 공시(2023~2025학년도)를 이미 담고 있습니다.
+    ${achBulkCount()?`<div class="note" style="font-size:var(--fs-sm);margin:8px 0"><b>내장 데이터 ${achBulkCount()}개교</b> — 학교알리미 공시(2023~2025학년도)를 이미 담고 있습니다.
       해당 학교는 <b>학교명만 입력하면</b> 붙여넣기 없이 바로 보정됩니다. 없는 학교만 아래로 넣으세요.
       고교는 <b>1학년 공통과목</b>만 씁니다 — 2·3학년 선택과목은 수강 집단이 갈려 학교 전체 분포로 볼 수 없습니다.</div>`:""}
-    <p style="font-size:11.5px;color:var(--ink2);margin:6px 0">학교알리미에서 표를 드래그해 그대로 붙여넣으세요. 열 순서가 다르거나 헤더가 섞여도 읽습니다.
+    <p style="font-size:var(--fs-xs);color:var(--ink2);margin:8px 0">학교알리미에서 표를 드래그해 그대로 붙여넣으세요. 열 순서가 다르거나 헤더가 섞여도 읽습니다.
       읽은 뒤 아래 표에서 쓸 행만 남기고 저장하면, 그 학교의 실제 A 비율로 상위% 추정을 다시 계산합니다.
       <b>보안문자는 사람이 직접 입력해야 합니다</b> — 자동 조회는 하지 않습니다.</p>
     ${savedList}
-    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end;margin-bottom:6px">
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end;margin-bottom:8px">
       <div class="frow" style="margin:0"><label>학교명</label>
         <input id="achschool" value="${esc(cur)}" placeholder="예: 고실중학교" style="width:190px"
           onchange="view.achSchool=this.value.trim();render()"></div>
@@ -2550,47 +2567,47 @@ function achPanelHtml(){
         <input value="${esc(view.achYear||"")}" placeholder="2026" style="width:76px" onchange="view.achYear=this.value"></div>
     </div>
     <textarea id="achpaste" rows="5" placeholder="예)  2  1  1~8  국어  72.4  18.3  24.1  26.5  19.2  11.9"
-      style="width:100%;font-family:ui-monospace,monospace;font-size:12px">${esc(view.achText||"")}</textarea>
-    <button class="btn sm" style="margin-top:6px" onclick="achDoParse()">읽기</button>
+      style="width:100%;font-family:ui-monospace,monospace;font-size:var(--fs-sm)">${esc(view.achText||"")}</textarea>
+    <button class="btn sm" style="margin-top:8px" onclick="achDoParse()">읽기</button>
     ${preview}
-    <p style="font-size:11px;color:var(--ink2);margin-top:8px">출처: 학교알리미 4-나. 교과별 학업성취 사항 (원장 직접 조회분).
+    <p style="font-size:var(--fs-xs);color:var(--ink2);margin-top:8px">출처: 학교알리미 4-나. 교과별 학업성취 사항 (원장 직접 조회분).
       4월 공시는 전 학년도 1·2학기, 9월 공시는 당해 학년도 1학기 자료입니다 — 화면에서 연도·학기를 반드시 확인하세요.</p>
   </details>`;}
 function achCorrHtml(){
   const r=achResult();
   if(!r.base)return"";
   const rec=r.rec;
-  if(!rec)return `<p style="font-size:11.5px;color:var(--ink2);margin:6px 0 0">○ 보정 미적용 — 학교 분포가 없어 기존 기준표로 계산했습니다. 위 ‘학교 성취도 분포 넣기’에 학교알리미 표를 넣으면 이 학교 기준으로 다시 계산합니다.</p>`;
-  if(rec.level!=="중")return `<p style="font-size:11.5px;color:var(--warn);margin:6px 0 0">저장된 ${esc(view.achSchool)} 자료가 고등학교 서식입니다 — 중학교 분포를 넣어야 상위% 보정이 됩니다.</p>`;
+  if(!rec)return `<p style="font-size:var(--fs-xs);color:var(--ink2);margin:8px 0 0">○ 보정 미적용 — 학교 분포가 없어 기존 기준표로 계산했습니다. 위 ‘학교 성취도 분포 넣기’에 학교알리미 표를 넣으면 이 학교 기준으로 다시 계산합니다.</p>`;
+  if(rec.level!=="중")return `<p style="font-size:var(--fs-xs);color:var(--warn);margin:8px 0 0">저장된 ${esc(view.achSchool)} 자료가 고등학교 서식입니다 — 중학교 분포를 넣어야 상위% 보정이 됩니다.</p>`;
   const c=r.corr;
-  if(!c)return `<p style="font-size:11.5px;color:var(--warn);margin:6px 0 0">보정하려면 학기별 성취도를 <b>국·영·수·사·과 순서로 5글자</b>(예: AABBA) 입력하세요.</p>`;
+  if(!c)return `<p style="font-size:var(--fs-xs);color:var(--warn);margin:8px 0 0">보정하려면 학기별 성취도를 <b>국·영·수·사·과 순서로 5글자</b>(예: AABBA) 입력하세요.</p>`;
   if(!c.ok){
     const why={NO_DIST:"학교 분포가 비어 있습니다",NO_MATCH:"입력한 과목과 학교 분포가 맞지 않습니다",
       FEW_SUBJ:`분포가 확인된 과목이 ${c.n||0}개뿐입니다 (4개 이상 필요)`,
       WEAK_DIST:`대체분포 비중이 ${Math.round((c.imputeShare||0)*100)}%로 높습니다 (30% 이하 필요)`,CALC:"계산 실패"}[c.reason]||c.reason;
-    return `<p style="font-size:11.5px;color:var(--warn);margin:6px 0 0">⚠️ 보정 미적용 — ${esc(why)}. 기존 기준표 결과를 그대로 씁니다.</p>`;}
+    return `<p style="font-size:var(--fs-xs);color:var(--warn);margin:8px 0 0">⚠️ 보정 미적용 — ${esc(why)}. 기존 기준표 결과를 그대로 씁니다.</p>`;}
   const bar=(lo,hi,color)=>`<div style="position:relative;height:15px;background:var(--chip);border-radius:8px;overflow:hidden">
     <div style="position:absolute;left:${lo}%;width:${Math.max(1,hi-lo)}%;top:0;bottom:0;background:${color};opacity:.75"></div></div>`;
   const usedA=c.used.filter(u=>u.lv===0).length;
-  return `<div class="kcard" style="margin-top:9px;border-left-color:var(--accent)">
+  return `<div class="kcard" style="margin-top:8px;border-left-color:var(--accent)">
     <div class="ku">${esc(view.achSchool)} 분포 반영 · 국·영·수·사·과 ${c.nSubj}과목 중 실측분포 ${usedA}건${c.imputeShare>0?` · 대체 ${Math.round(c.imputeShare*100)}%`:""}
-      ${rec.bulk?`<span class="chip acc" style="font-size:10px">내장 공시자료</span>`:`<span class="chip" style="font-size:10px">직접 입력분</span>`}</div>
-    <div style="font-size:11.5px;color:var(--ink2);margin:6px 0 2px">기존 기준표 — 상위 ${r.base.lo}~${r.base.hi}%</div>
+      ${rec.bulk?`<span class="chip acc" style="font-size:var(--fs-xs)">내장 공시자료</span>`:`<span class="chip" style="font-size:var(--fs-xs)">직접 입력분</span>`}</div>
+    <div style="font-size:var(--fs-xs);color:var(--ink2);margin:8px 0 2px">기존 기준표 — 상위 ${r.base.lo}~${r.base.hi}%</div>
     ${bar(r.base.lo,r.base.hi,"var(--ink2)")}
-    <div style="font-size:11.5px;color:var(--accent-ink);margin:7px 0 2px">이 학교 분포 반영 — <b>상위 ${c.lo}~${c.hi}%</b> <span style="font-size:11px;color:var(--ink2)">(중심 ${c.mid}%)</span></div>
+    <div style="font-size:var(--fs-xs);color:var(--accent-ink);margin:8px 0 2px">이 학교 분포 반영 — <b>상위 ${c.lo}~${c.hi}%</b> <span style="font-size:var(--fs-xs);color:var(--ink2)">(중심 ${c.mid}%)</span></div>
     ${bar(c.lo,c.hi,"var(--accent)")}
-    ${c.wide?`<div class="note" style="margin-top:8px;font-size:12px">범위가 상위 ${c.lo}~${c.hi}%로 너무 넓어 숫자로 쓰기 어렵습니다.
+    ${c.wide?`<div class="note" style="margin-top:8px;font-size:var(--fs-sm)">범위가 상위 ${c.lo}~${c.hi}%로 너무 넓어 숫자로 쓰기 어렵습니다.
       지금 자료로는 <b>‘${esc(c.label)}’</b> 정도까지만 말할 수 있습니다. 학기가 더 쌓이거나 배치고사·전과목 석차가 있으면 훨씬 좁아집니다.</div>`
-      :`<div style="font-size:11.5px;color:var(--ink2);margin-top:6px">기존 기준표(상위 ${r.base.lo}~${r.base.hi}%)와 비교해 이 학교의 실제 성취도 분포를 반영한 결과입니다.</div>`}
-    <details style="margin-top:7px"><summary style="font-size:11.5px;color:var(--ink2)">계산에 쓴 근거 보기</summary>
-      <div class="tablewrap" style="margin-top:5px"><table class="t">
+      :`<div style="font-size:var(--fs-xs);color:var(--ink2);margin-top:8px">기존 기준표(상위 ${r.base.lo}~${r.base.hi}%)와 비교해 이 학교의 실제 성취도 분포를 반영한 결과입니다.</div>`}
+    <details style="margin-top:8px"><summary style="font-size:var(--fs-xs);color:var(--ink2)">계산에 쓴 근거 보기</summary>
+      <div class="tablewrap" style="margin-top:4px"><table class="t">
         <tr><th>과목</th><th>학생</th><th>학교 A~E (%)</th><th>출처</th></tr>
         ${c.used.map(u=>`<tr><td>${esc(u.subj)}${u.gr?` <span style="color:var(--ink2)">${u.gr}-${u.tm}</span>`:""}</td>
-          <td><b>${esc(u.grade)}</b></td><td class="mono" style="font-size:11.5px">${u.d.map(v=>Math.round(v*10)/10).join(" / ")}</td>
-          <td style="font-size:11px;color:var(--ink2)">${["실측","같은 과목 타학기","같은 학기 평균","학교 전체 평균"][u.lv]}${u.dyear?` · ${u.dyear}학년도`:""}</td></tr>`).join("")}
-        ${c.dropped.map(d=>`<tr style="opacity:.5"><td>${esc(d.subj||"")}</td><td>${esc(d.grade||"")}</td><td colspan=2 style="font-size:11px">제외 — ${esc(d.why||"")}</td></tr>`).join("")}
+          <td><b>${esc(u.grade)}</b></td><td class="mono" style="font-size:var(--fs-xs)">${u.d.map(v=>Math.round(v*10)/10).join(" / ")}</td>
+          <td style="font-size:var(--fs-xs);color:var(--ink2)">${["실측","같은 과목 타학기","같은 학기 평균","학교 전체 평균"][u.lv]}${u.dyear?` · ${u.dyear}학년도`:""}</td></tr>`).join("")}
+        ${c.dropped.map(d=>`<tr style="opacity:.5"><td>${esc(d.subj||"")}</td><td>${esc(d.grade||"")}</td><td colspan=2 style="font-size:var(--fs-xs)">제외 — ${esc(d.why||"")}</td></tr>`).join("")}
       </table></div></details>
-    <p style="font-size:11px;color:var(--warn);margin-top:7px">⚠️ 이 보정은 아직 실제 석차 결과로 검증(캘리브레이션)되지 않았습니다 — 범위를 안전하게 넓게 잡았습니다.
+    <p style="font-size:var(--fs-xs);color:var(--warn);margin-top:8px">⚠️ 이 보정은 아직 실제 석차 결과로 검증(캘리브레이션)되지 않았습니다 — 범위를 안전하게 넓게 잡았습니다.
       절대평가 성취도는 학교가 시험 난이도와 지필:수행 비율을 정하므로 같은 A라도 학교마다 의미가 다릅니다. 배치고사·전과목 석차가 있으면 그쪽을 우선하세요.
       이 값은 <b>그 중학교 안에서의 위치</b>이며 고교 내신 등급과 1:1로 대응하지 않습니다.</p>
   </div>`;}
@@ -2603,7 +2620,7 @@ function achHsHtml(name){ /* 저장된 고교 성취도 공시 요약 — 모델
   const sd=sds.length?sds.reduce((a,b)=>a+b,0)/sds.length:null;
   const aPct=rows.filter(r=>r.d&&r.d[0]!=null).map(r=>r.d[0]);
   const aAvg=aPct.length?aPct.reduce((a,b)=>a+b,0)/aPct.length:null;
-  return `<div style="font-size:11.5px;margin-top:4px;color:var(--accent-ink)">📊 공시 성취도 — 국·영·수·사·과 평균 <b>${avg.toFixed(1)}</b>${sd!=null?` · 표준편차 ${sd.toFixed(1)}`:""}${aAvg!=null?` · A ${aAvg.toFixed(0)}%`:""}
+  return `<div style="font-size:var(--fs-xs);margin-top:4px;color:var(--accent-ink)">📊 공시 성취도 — 국·영·수·사·과 평균 <b>${avg.toFixed(1)}</b>${sd!=null?` · 표준편차 ${sd.toFixed(1)}`:""}${aAvg!=null?` · A ${aAvg.toFixed(0)}%`:""}
     <span style="color:var(--ink2)">(${rec.bulk?"1학년 공통 ":""}${rows.length}과목)</span></div>`;}
 function achEff(){ /* 시뮬레이터가 쓸 값 — 보정이 되면 밴드 폭과 무관하게 보정값을 쓴다.
   (밴드가 넓을 때 고정표로 되돌리면 "더 정확해서"가 아니라 "더 좁아서" 쓰는 것이 되어 과신을 부른다) */
@@ -2659,8 +2676,8 @@ function renderHsSim(){
       j.sort((a,b)=>(a.g.cutG??9)-(b.g.cutG??9));
       const pick3=k=>j.filter(x=>x.v.cls[0]===k).slice(0,3);
       const ji=j.filter(x=>x.g.track.includes("지역인재")).length;
-      const mini=(k,arr)=>arr.length?`<div style="margin-top:7px"><b style="font-size:11px;color:var(--ink2)">${k} 상단</b>
-        ${arr.map(x=>`<div style="font-size:12px;margin-top:3px"><b>${esc(x.g.univ)}</b> ${esc(x.g.major)}
+      const mini=(k,arr)=>arr.length?`<div style="margin-top:8px"><b style="font-size:var(--fs-xs);color:var(--ink2)">${k} 상단</b>
+        ${arr.map(x=>`<div style="font-size:var(--fs-sm);margin-top:4px"><b>${esc(x.g.univ)}</b> ${esc(x.g.major)}
         <span style="color:var(--ink2)">(${esc(x.g.track)}, ${fmtCut(x.g.latest)})</span></div>`).join("")}</div>`:"";
       const ty=row.type||"유형 미상";
       const isElite=["특목","자사","자율","과학","외고","외국어","국제","영재"].some(k=>ty.includes(k));
@@ -2674,56 +2691,56 @@ function renderHsSim(){
         <div class="kcard" style="border-left-color:var(--accent)">
           <div class="ku">${esc(ty)}${row.level?` · 내신경쟁 ${esc(row.level)}`:""}${adj?` · 보정 ${adj>0?"+":""}${adj.toFixed(1)}`:""}</div>
           <div class="km">예상 내신 <span class="mono">${band[0].toFixed(1)}~${band[1].toFixed(1)}</span>등급</div>
-          ${row.met&&row.met[0]>0?`<div style="font-size:11.5px;margin-top:5px">🎓 ${hsMetHtml(row.met,true)}</div>`:""}
+          ${row.met&&row.met[0]>0?`<div style="font-size:var(--fs-xs);margin-top:4px">🎓 ${hsMetHtml(row.met,true)}</div>`:""}
           ${achHsHtml(row.name)}
           ${mini("적정",pick3("적정"))}${mini("소신",pick3("소신"))}
-          ${isHonam?`<div style="font-size:11.5px;color:var(--accent-ink);margin-top:6px">📍 지역인재 자격 — 가능권에 ${ji}건</div>`
-            :`<div style="font-size:11.5px;color:var(--ink2);margin-top:6px">지역인재 비대상 지역</div>`}
-          <div style="font-size:11.5px;color:var(--ink2);margin-top:6px;border-top:1px dashed var(--line);padding-top:5px">${trade}</div>
+          ${isHonam?`<div style="font-size:var(--fs-xs);color:var(--accent-ink);margin-top:8px">📍 지역인재 자격 — 가능권에 ${ji}건</div>`
+            :`<div style="font-size:var(--fs-xs);color:var(--ink2);margin-top:8px">지역인재 비대상 지역</div>`}
+          <div style="font-size:var(--fs-xs);color:var(--ink2);margin-top:8px;border-top:1px dashed var(--line);padding-top:5px">${trade}</div>
           <button class="kstar" title="비교에서 제거" style="color:var(--ink2)" onclick="view.hsPicks=view.hsPicks.filter(x=>x!=='${esc(name)}');render()">✕</button>
         </div></div>`;}).join("");
     cmp=`<div class="sec"><h2>3️⃣ 나란히 비교 <span class="n">같은 학생(상위 ${p.toFixed(1)}%)이 각 학교에 갔을 때</span>
       <button class="btn sm" style="margin-left:auto" onclick="copyHsSim()">📋 상담용 요약 복사</button>
       <button class="btn sm pri" onclick="hsSimReport()">📄 학부모 리포트 (파일)</button></h2>
       <div class="bcols" style="grid-template-columns:repeat(auto-fit,minmax(240px,1fr))">${colsH}</div>
-      ${usingAch&&ach&&ach.corrected&&ach.wide?`<div class="note" style="margin-top:8px;font-size:12px">⚠️ 성취도 추정 범위가 상위 ${ach.lo}~${ach.hi}%로 넓습니다 — 아래 학교별 예상 내신도 그만큼 불확실합니다.
+      ${usingAch&&ach&&ach.corrected&&ach.wide?`<div class="note" style="margin-top:8px;font-size:var(--fs-sm)">⚠️ 성취도 추정 범위가 상위 ${ach.lo}~${ach.hi}%로 넓습니다 — 아래 학교별 예상 내신도 그만큼 불확실합니다.
         이 학교는 A 비율이 높아 성취도만으로 교내 위치를 좁히기 어렵습니다. 배치고사·전과목 석차가 있으면 그쪽을 우선하세요.</div>`:""}
-      <p style="font-size:11.5px;color:var(--warn);margin:8px 0 0">⚠️ 예상 내신은 학교 유형·경쟁 강도 기반 <b>시뮬레이션</b>입니다(자사·특목은 오차 큼). 진학률의 "기타"에는 재수 준비가 포함되어 <b>정시 강세 학교일수록 진학률이 낮게 보일 수 있습니다</b>. 통학·분위기·프로그램은 상담에서 확정하세요.</p></div>`;
+      <p style="font-size:var(--fs-xs);color:var(--warn);margin:8px 0 0">⚠️ 예상 내신은 학교 유형·경쟁 강도 기반 <b>시뮬레이션</b>입니다(자사·특목은 오차 큼). 진학률의 "기타"에는 재수 준비가 포함되어 <b>정시 강세 학교일수록 진학률이 낮게 보일 수 있습니다</b>. 통학·분위기·프로그램은 상담에서 확정하세요.</p></div>`;
   }
   $("#main").innerHTML=`
   <div class="pagehead"><div><h1>고교 선택 시뮬레이터</h1>
   <div class="sub">"어느 고등학교 보내야 하나" — 후보 고교별 예상 내신과 3년 뒤 대학 가능권을 나란히 비교합니다 (중3 상담용)</div></div></div>
-  <div class="card"><h2 style="font-size:14px;margin-bottom:10px">1️⃣ 학생 성적 (중학교)</h2>
+  <div class="card"><h2 style="font-size:var(--fs-md);margin-bottom:12px">1️⃣ 학생 성적 (중학교)</h2>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
       <div class="frow" style="margin:0"><label>상위 %</label><input value="${esc(view.hsP||"")}" placeholder="예: 6" style="width:90px" onchange="view.hsP=this.value;render()"></div>
-      <span style="color:var(--ink2);font-size:12px;padding-bottom:9px">또는</span>
+      <span style="color:var(--ink2);font-size:var(--fs-sm);padding-bottom:9px">또는</span>
       <div class="frow" style="margin:0"><label>전교 등수</label><input value="${esc(view.hsRank||"")}" placeholder="예: 12" style="width:80px" onchange="view.hsRank=this.value;render()"></div>
       <div class="frow" style="margin:0"><label>재적수</label><input value="${esc(view.hsTot||"")}" placeholder="예: 320" style="width:80px" onchange="view.hsTot=this.value;render()"></div>
       <div class="frow" style="margin:0"><label>희망 계열</label>
         <div style="display:flex;gap:5px;flex-wrap:wrap">${["전체",...Object.keys(FIELD_KW)].map(f=>`<button class="fchip ${field===f?"on":""}" onclick="view.hsField='${f}';render()">${f}</button>`).join("")}</div></div>
     </div>
-    <details class="acc2" style="margin-top:10px" ${ach?"open":""}><summary>📗 또는 절대평가 성취도로 입력 (학년·학기별, A~E)</summary>
-      <p style="font-size:11.5px;color:var(--ink2);margin:6px 0">학기마다 주요과목 성취도를 이어 적으세요 (예: 국영수사과 = AABBA). 순서 무관, A~E만 인식. 상위%나 등수를 비우면 이 성취도로 추정합니다.</p>
+    <details class="acc2" style="margin-top:12px" ${ach?"open":""}><summary>📗 또는 절대평가 성취도로 입력 (학년·학기별, A~E)</summary>
+      <p style="font-size:var(--fs-xs);color:var(--ink2);margin:8px 0">학기마다 주요과목 성취도를 이어 적으세요 (예: 국영수사과 = AABBA). 순서 무관, A~E만 인식. 상위%나 등수를 비우면 이 성취도로 추정합니다.</p>
       <div style="display:flex;gap:6px;flex-wrap:wrap">
-        ${ACH_TERMS.map(t=>`<div class="frow" style="margin:0"><label style="font-size:11px">${t}</label>
+        ${ACH_TERMS.map(t=>`<div class="frow" style="margin:0"><label style="font-size:var(--fs-xs)">${t}</label>
           <input value="${esc((view.hsAch||{})[t]||"")}" placeholder="AABBA" style="width:92px"
             onchange="view.hsAch=view.hsAch||{};view.hsAch['${t}']=this.value;render()"></div>`).join("")}
       </div>
-      ${ach?`<p style="font-size:12px;margin:8px 0 0"><span class="chip acc">성취도 평균 ${ach.avg} (${ach.n}과목)</span>
+      ${ach?`<p style="font-size:var(--fs-sm);margin:8px 0 0"><span class="chip acc">성취도 평균 ${ach.avg} (${ach.n}과목)</span>
         <span class="chip ${usingAch?"warn":""}">상위 ${ach.lo}~${ach.hi}% 추정${usingAch?` — 중앙 ${ach.mid}%로 시뮬 적용 중`:" (상위% 직접 입력이 우선)"}</span>
         ${ach.corrected?`<span class="chip acc">✅ ${esc(view.achSchool||"")} 분포 보정</span>`:""}
         ${ach.corrected&&ach.wide?`<span class="chip danger">범위 넓음 — 이 자료로는 ‘${esc(ach.label)}’까지만</span>`:""}</p>
-      <p style="font-size:11px;color:var(--ink2);margin:4px 0 0">⚠️ 절대평가 성취도는 학교별 A 비율 편차가 커서 상위% 환산이 원리적으로 근사치입니다 — 반드시 밴드로만 해석하고, 배치고사·전과목 석차가 있으면 그쪽을 우선하세요.</p>`:""}
+      <p style="font-size:var(--fs-xs);color:var(--ink2);margin:4px 0 0">⚠️ 절대평가 성취도는 학교별 A 비율 편차가 커서 상위% 환산이 원리적으로 근사치입니다 — 반드시 밴드로만 해석하고, 배치고사·전과목 석차가 있으면 그쪽을 우선하세요.</p>`:""}
         ${achPanelHtml()}
     ${achCorrHtml()}
   </details></div>
   <div class="sec"><h2>2️⃣ 후보 고교 (최대 3곳)</h2><div class="card">
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px">
-      ${picks.map(n=>`<span class="bpin">${esc(n)}<button onclick="view.hsPicks=view.hsPicks.filter(x=>x!=='${esc(n)}');render()">✕</button></span>`).join("")||`<span style="color:var(--ink2);font-size:12.5px">전국 고교 ${hsRows.length.toLocaleString()}곳에서 검색해 추가하세요</span>`}</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+      ${picks.map(n=>`<span class="bpin">${esc(n)}<button onclick="view.hsPicks=view.hsPicks.filter(x=>x!=='${esc(n)}');render()">✕</button></span>`).join("")||`<span style="color:var(--ink2);font-size:var(--fs-sm)">전국 고교 ${hsRows.length.toLocaleString()}곳에서 검색해 추가하세요</span>`}</div>
     ${picks.length<3?`<input id="hsq" value="${esc(view.hsSchQ||"")}" placeholder="학교명 검색 (예: 순천, 상무고)" oninput="hsQIn(this)" style="max-width:340px">
     <div id="hscand">${hsCandHtml()}</div>`:""}
   </div></div>
-  ${cmp||(picks.length&&!(p>0)?`<p style="font-size:12.5px;color:var(--danger);margin-top:10px">상위 % 또는 등수/재적수를 입력하면 비교가 나옵니다.</p>`:"")}`;}
+  ${cmp||(picks.length&&!(p>0)?`<p style="font-size:var(--fs-sm);color:var(--danger);margin-top:12px">상위 % 또는 등수/재적수를 입력하면 비교가 나옵니다.</p>`:"")}`;}
 function copyHsSim(){
   let p=parseFloat(view.hsP);
   const rank=parseFloat(view.hsRank),tot=parseFloat(view.hsTot);
@@ -2823,7 +2840,7 @@ function renderPartner(){
   $("#main").innerHTML=`
   <div class="pagehead"><div><h1>학교 파트너십</h1>
   <div class="sub">지역 중·고교 제휴 채널 — 웩슬러 단체검사·진로 특강으로 들어가고, 학교별 진학 리포트로 돌려주고, 상담 리드로 받습니다</div></div></div>
-  <div class="card"><h2 style="font-size:14px;margin-bottom:8px">제휴 학교 관리 <span style="font-weight:400;color:var(--ink2);font-size:12px">${P.length}곳</span></h2>
+  <div class="card"><h2 style="font-size:var(--fs-md);margin-bottom:8px">제휴 학교 관리 <span style="font-weight:400;color:var(--ink2);font-size:var(--fs-sm)">${P.length}곳</span></h2>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
       <input id="pt_school" placeholder="학교명" style="width:150px">
       <input id="pt_contact" placeholder="담당(직책·이름)" style="width:140px">
@@ -2833,7 +2850,7 @@ function renderPartner(){
     </div>
     ${P.length?`<div class="tablewrap"><table class="t">
       <tr><th>학교</th><th>상태</th><th>담당</th><th>다음 액션</th><th>리드</th><th>메모</th><th>문서</th><th></th></tr>
-      ${P.map((r,i)=>`<tr><td><b>${esc(r.school)}</b><div style="font-size:11px;color:var(--ink2)">${esc(r.region||"")}</div></td>
+      ${P.map((r,i)=>`<tr><td><b>${esc(r.school)}</b><div style="font-size:var(--fs-xs);color:var(--ink2)">${esc(r.region||"")}</div></td>
         <td><select style="width:110px" onchange="db.partners[${i}].status=this.value;save();render()">${ST.map(s=>`<option ${r.status===s?"selected":""}>${s}</option>`).join("")}</select></td>
         <td><input value="${esc(r.contact||"")}" style="width:110px" onchange="db.partners[${i}].contact=this.value;save()"></td>
         <td><input type="date" value="${esc(r.next||"")}" style="width:130px" onchange="db.partners[${i}].next=this.value;save();render()">${r.next?ddayChip(r.next):""}</td>
@@ -2845,19 +2862,19 @@ function renderPartner(){
         <td><button class="btn ghost sm" onclick="db.partners.splice(${i},1);save();render()">✕</button></td></tr>`).join("")}
     </table></div>`:`<div class="empty" style="padding:14px"><b>제휴 학교가 없습니다</b>첫 목표 학교를 추가하고 제안서 버튼으로 시작하세요 — 웩슬러 단체검사가 제휴의 명분입니다.</div>`}
   </div>
-  <div class="sec"><h2>📄 표준 문서 <span class="n">복사해서 다듬어 쓰는 3종 — 학생 개인정보는 어떤 문서에도 넣지 않습니다</span></h2>
+  <div class="sec"><h2>표준 문서 <span class="n">복사해서 다듬어 쓰는 3종 — 학생 개인정보는 어떤 문서에도 넣지 않습니다</span></h2>
   <div class="grid cols3">
-    <div class="card"><h3 style="font-size:13.5px;margin-bottom:6px">① 제휴 제안서</h3>
-      <p style="font-size:12.5px;color:var(--ink2);margin:0 0 8px">교장·진로부장 앞으로 보내는 1장짜리 — 제공(단체검사·특강·리포트)과 요청(시간·안내장)을 명시</p>
+    <div class="card"><h3 style="font-size:var(--fs-md);margin-bottom:8px">① 제휴 제안서</h3>
+      <p style="font-size:var(--fs-sm);color:var(--ink2);margin:0 0 8px">교장·진로부장 앞으로 보내는 1장짜리 — 제공(단체검사·특강·리포트)과 요청(시간·안내장)을 명시</p>
       <button class="btn sm" onclick="copyPartnerProposal('')">복사</button></div>
-    <div class="card"><h3 style="font-size:13.5px;margin-bottom:6px">② 진로 특강 구성안 (45분)</h3>
-      <p style="font-size:12.5px;color:var(--ink2);margin:0 0 8px">중3 대상 "성적대별 고교·대학 지도" — 우리 데이터 기반, 신청서가 곧 상담 리드</p>
+    <div class="card"><h3 style="font-size:var(--fs-md);margin-bottom:8px">② 진로 특강 구성안 (45분)</h3>
+      <p style="font-size:var(--fs-sm);color:var(--ink2);margin:0 0 8px">중3 대상 "성적대별 고교·대학 지도" — 우리 데이터 기반, 신청서가 곧 상담 리드</p>
       <button class="btn sm" onclick="copyLecturePlan()">복사</button></div>
-    <div class="card"><h3 style="font-size:13.5px;margin-bottom:6px">③ 학교별 진학 리포트</h3>
-      <p style="font-size:12.5px;color:var(--ink2);margin:0 0 8px">그 학교 성적대별 진학 라인을 입결 DB에서 실수치로 채워 생성 — 담임·진로부장 전달용</p>
+    <div class="card"><h3 style="font-size:var(--fs-md);margin-bottom:8px">③ 학교별 진학 리포트</h3>
+      <p style="font-size:var(--fs-sm);color:var(--ink2);margin:0 0 8px">그 학교 성적대별 진학 라인을 입결 DB에서 실수치로 채워 생성 — 담임·진로부장 전달용</p>
       <button class="btn sm" onclick="copySchoolReport('')">학교명 입력 후 생성</button></div>
   </div></div>
-  <p style="font-size:11.5px;color:var(--ink2);margin:10px 2px 0">운영 원칙: 학교에서 받는 데이터는 익명 분포까지만 · 문서에 학생 실명 금지 · 특강·검사 → 개별 해석상담 전환은 학부모 동의 기반.</p>`;}
+  <p style="font-size:var(--fs-xs);color:var(--ink2);margin:12px 2px 0">운영 원칙: 학교에서 받는 데이터는 익명 분포까지만 · 문서에 학생 실명 금지 · 특강·검사 → 개별 해석상담 전환은 학부모 동의 기반.</p>`;}
 function addPartner(){db.partners=db.partners||[];
   const s=$("#pt_school").value.trim();if(!s){toast("학교명을 입력하세요");return;}
   const row=allHsRows().find(h=>h.name===s||h.name.includes(s));
@@ -2949,7 +2966,7 @@ function mkCandHtml(){
     return cand.map(m=>`<button class="mocksel" onclick="view.mkSel='${esc(m.univ)}|${esc(m.major)}';render()">
       <b>${esc(m.univ)}</b> ${esc(m.major)}<span class="cnt">${esc(m.region||"")} · 전형 ${m.tracks.length}개</span></button>`).join("")
       ||`<div class="empty">검색 결과 없음</div>`;}
-  return `<p style="font-size:12.5px;color:var(--ink2);margin:0">검색해서 목표를 선택하세요 — 학생 연동 시 그 학생의 관심대학이 아래에 바로 나옵니다.</p>
+  return `<p style="font-size:var(--fs-sm);color:var(--ink2);margin:0">검색해서 목표를 선택하세요 — 학생 연동 시 그 학생의 관심대학이 아래에 바로 나옵니다.</p>
     ${view.mkStu?(()=>{const s=db.students.find(x=>x.id===view.mkStu);
       return (s?.univs||[]).slice(0,8).map(u=>{const k=uniNorm(u.univ)+"|"+u.major;
         return majors.has(k)?`<button class="mocksel" onclick="view.mkSel='${esc(k)}';render()"><b>${esc(uniNorm(u.univ))}</b> ${esc(u.major)}<span class="cnt">관심대학</span></button>`:"";}).join("");})():""}`;}
@@ -2958,7 +2975,7 @@ function hsCandHtml(){
   if(!q)return"";
   const picks=view.hsPicks||[];
   return allHsRows().filter(h=>h.type!=="초등학교"&&h.type!=="중학교"&&h.name.includes(q)&&!picks.includes(h.name)).slice(0,8)
-    .map(h=>`<button class="mocksel" style="margin-top:6px" onclick="view.hsPicks=[...(view.hsPicks||[]),'${esc(h.name)}'];view.hsSchQ='';render()">
+    .map(h=>`<button class="mocksel" style="margin-top:8px" onclick="view.hsPicks=[...(view.hsPicks||[]),'${esc(h.name)}'];view.hsSchQ='';render()">
       <b>${esc(h.name)}</b><span class="cnt">${esc(h.type||"")} · ${esc(h.region||"")}${h.level?" · 경쟁 "+esc(h.level):""}${h.met&&h.met[0]>0?" · 4년제 "+Math.round(h.met[2]/h.met[0]*100)+"%":""}</span></button>`).join("");}
 function mkQIn(el){view.mkQ=el.value;const c=document.getElementById("mkcand");if(c)c.innerHTML=mkCandHtml();}
 function hsQIn(el){view.hsSchQ=el.value;const c=document.getElementById("hscand");if(c)c.innerHTML=hsCandHtml();}
@@ -2971,14 +2988,14 @@ function ipDetail(key){
   const g=ipGroups().find(x=>x.key===key);if(!g)return;
   const ys=[...new Set([...g.ys,...Object.keys(g.pcts)])].sort().reverse();
   modal(`<h2>${esc(g.univ)} ${esc(g.major)}</h2>
-  <p style="font-size:12.5px;color:var(--ink2);margin:4px 0 10px">
+  <p style="font-size:var(--fs-sm);color:var(--ink2);margin:4px 0 12px">
     <span class="tchip tk${ttypeIdx(g.track)}">${esc(g.track||"")}</span> ${g.region?" · "+esc(g.region):""} · ${ys.length}개 연도</p>
   <div class="tablewrap"><table class="t">
     <tr><th>연도</th><th>70%컷</th><th>50%컷</th><th>수능백분위</th><th>경쟁률</th></tr>
     ${ys.map(y=>`<tr><td>${y}</td><td>${g.years[y]!=null?fmtCut(g.years[y]):"—"}</td>
       <td>${esc(g.y50[y]||"—")}</td><td>${g.pcts[y]!=null?g.pcts[y]:"—"}</td><td>${esc(g.rates[y]||"—")}</td></tr>`).join("")}
   </table></div>
-  <p style="font-size:11px;color:var(--ink2);margin:8px 0 0">출처: 한국대학교육협의회 어디가 발표(재정리본)·수동 입력분 — 수시 컷=최종등록자 교과등급, 정시=백분위·환산점수. ▲연도별 추이로 강화·완화를 읽으세요.</p>
+  <p style="font-size:var(--fs-xs);color:var(--ink2);margin:8px 0 0">출처: 한국대학교육협의회 어디가 발표(재정리본)·수동 입력분 — 수시 컷=최종등록자 교과등급, 정시=백분위·환산점수. ▲연도별 추이로 강화·완화를 읽으세요.</p>
   <div class="mfoot">
     <button class="btn sm" onclick="closeModal();view.mkSel='${esc(g.univ)}|${esc(g.major)}';view.mkQ='${esc(g.univ)} ${esc(g.major)}';go('mock')">🧾 모의지원으로</button>
     <button class="btn sm" onclick="closeModal();view.sUniv='${esc(g.univ)}';view.sq='';view.searchTab='univ';go('search')">🔍 검색에서 보기</button>
@@ -3063,18 +3080,18 @@ function renderMock(){
       }
       return `<div class="mockrow">
         <div class="mrtop"><span class="tchip tk${ti}">${esc(t.track)}</span>
-          <b style="font-size:13.5px">${cutTxt}</b>
+          <b style="font-size:var(--fs-md)">${cutTxt}</b>
           ${cls?`<span class="chip ${cls[1]}">${cls[0]}</span>`:""}
           ${t.rates[t.latestYear]?`<span class="chip">경쟁률 ${esc(t.rates[t.latestYear])}</span>`:""}</div>
-        ${cls||trend?`<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-top:6px">
+        ${cls||trend?`<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-top:8px">
           ${cls?gaugeSvg(d,unit,dTxt):""}${trend}</div>`:""}
-        ${cls&&est?`<p style="font-size:11px;color:var(--ink2);margin:2px 0 0">${est.replace(" · ","")}</p>`:""}
+        ${cls&&est?`<p style="font-size:var(--fs-xs);color:var(--ink2);margin:2px 0 0">${est.replace(" · ","")}</p>`:""}
         ${fix?`<div class="fix">💡 ${fix}</div>`:""}
       </div>`;}).join("");
     // 지역인재 팁
     const ji=tracks.find(t=>t.track.includes("지역인재")&&t.latest!=null);
     const gen=tracks.find(t=>!t.track.includes("지역인재")&&ttypeIdx(t.track)===0&&t.latest!=null);
-    const jiTip=ji&&gen?`<p style="font-size:12.5px;margin:6px 0 0;color:var(--accent-ink)">📍 지역인재 전형 보유 — ${ji.latest>gen.latest?`일반 대비 컷이 ${fmtCut(ji.latest-gen.latest)}등급 완화(${fmtCut(gen.latest)}→${fmtCut(ji.latest)}). 호남권 재학생이면 우선 검토.`:`일반과 컷 차이 미미(${fmtCut(gen.latest)} vs ${fmtCut(ji.latest)}) — 경쟁률 비교로 판단.`}</p>`:"";
+    const jiTip=ji&&gen?`<p style="font-size:var(--fs-sm);margin:8px 0 0;color:var(--accent-ink)">📍 지역인재 전형 보유 — ${ji.latest>gen.latest?`일반 대비 컷이 ${fmtCut(ji.latest-gen.latest)}등급 완화(${fmtCut(gen.latest)}→${fmtCut(ji.latest)}). 호남권 재학생이면 우선 검토.`:`일반과 컷 차이 미미(${fmtCut(gen.latest)} vs ${fmtCut(ji.latest)}) — 경쟁률 비교로 판단.`}</p>`:"";
     // 웩슬러 갭 코칭
     let iqLine="";
     if(!isNaN(iq)&&iq>=40&&iq<=160){
@@ -3090,14 +3107,14 @@ function renderMock(){
     verdict=`<div class="sec"><h2>3️⃣ 판정 — ${esc(sel.univ)} ${esc(sel.major)}
       ${view.mkStu?`<button class="btn sm" style="margin-left:auto" onclick="mkSaveUniv()">★ 학생 관심대학에 추가</button>`:""}</h2>
     <div class="card">${rowsH||'<div class="empty">전형 데이터가 없습니다</div>'}${jiTip}${iqLine}
-    ${alts.length?`<div class="fix" style="margin-top:10px;border-top:1px dashed var(--line);padding-top:9px">🔄 <b>같은 계열 대안</b> (적정·안정만): ${alts.map(a=>`${esc(a.x.univ)} ${esc(a.x.major)}(${esc(a.x.track)}, ${a.j.kind==="j"?"백분위 "+a.x.pct:fmtCut(a.x.latest)})`).join(" · ")}</div>`:""}
-    <p style="font-size:11.5px;color:var(--warn);margin:10px 0 0">⚠️ 과거 공개 입결 대조 참고치 — 합격 예측이 아닙니다. 수능최저·모집인원 변동·면접은 반영되지 않으며 최종 판단은 상담에서.</p>
+    ${alts.length?`<div class="fix" style="margin-top:12px;border-top:1px dashed var(--line);padding-top:9px">🔄 <b>같은 계열 대안</b> (적정·안정만): ${alts.map(a=>`${esc(a.x.univ)} ${esc(a.x.major)}(${esc(a.x.track)}, ${a.j.kind==="j"?"백분위 "+a.x.pct:fmtCut(a.x.latest)})`).join(" · ")}</div>`:""}
+    <p style="font-size:var(--fs-xs);color:var(--warn);margin:12px 0 0">⚠️ 과거 공개 입결 대조 참고치 — 합격 예측이 아닙니다. 수능최저·모집인원 변동·면접은 반영되지 않으며 최종 판단은 상담에서.</p>
     </div></div>`;
   }
   $("#main").innerHTML=`
   <div class="pagehead"><div><h1>모의지원</h1>
   <div class="sub">목표 대학·학과를 정하면 전형별로 <b>부족한지 남는지, 무엇을 보완할지</b>를 5개년 입결로 진단합니다</div></div></div>
-  <div class="card"><h2 style="font-size:14px;margin-bottom:10px">1️⃣ 내 성적</h2>
+  <div class="card"><h2 style="font-size:var(--fs-md);margin-bottom:12px">1️⃣ 내 성적</h2>
     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
       <div class="frow" style="margin:0"><label>학생 연동</label>
         <select onchange="view.mkStu=this.value||null;render()" style="width:170px">
@@ -3116,13 +3133,13 @@ function renderMock(){
       <div class="frow" style="margin:0"><label>FSIQ (선택)</label>
         <input value="${esc(view.mkIq||"")}" placeholder="예: 122" style="width:90px" onchange="view.mkIq=this.value;render()"></div>
     </div>
-    <p style="font-size:11.5px;color:var(--ink2);margin:6px 0 0">수능 백분위를 비우면 내신에서 추정합니다(정시 판정은 근사치). FSIQ를 넣으면 잠재력 대비 갭 코칭이 붙습니다.</p></div>
+    <p style="font-size:var(--fs-xs);color:var(--ink2);margin:8px 0 0">수능 백분위를 비우면 내신에서 추정합니다(정시 판정은 근사치). FSIQ를 넣으면 잠재력 대비 갭 코칭이 붙습니다.</p></div>
   <div class="sec"><h2>2️⃣ 목표 대학·학과</h2><div class="card">
     <input id="mkq" value="${esc(view.mkQ||"")}" placeholder="대학·학과 검색 (예: 전남대 화학, 조선대 의예)" oninput="mkQIn(this)" style="margin-bottom:8px">
     ${sel?`<div class="mocksel" style="border-color:var(--accent);cursor:default"><b>${esc(sel.univ)} ${esc(sel.major)}</b><span class="chip acc">선택됨</span>
       <button class="btn ghost sm" style="margin-left:auto" onclick="view.mkSel=null;render()">변경</button></div>`:""}
     <div id="mkcand">${mkCandHtml()}</div>
-    ${sel&&isNaN(g)?`<p style="font-size:12.5px;color:var(--danger);margin:6px 0 0">내신 평균을 입력하면 판정이 나옵니다.</p>`:""}
+    ${sel&&isNaN(g)?`<p style="font-size:var(--fs-sm);color:var(--danger);margin:8px 0 0">내신 평균을 입력하면 판정이 나옵니다.</p>`:""}
   </div></div>
   ${verdict}`;}
 function mkSaveUniv(){
@@ -3143,27 +3160,27 @@ function renderAdiga(){
   <div class="sub">대학어디가(adiga.kr) 공식 입결·전형 데이터를 수집·축적 — 쌓인 노트는 학생별 입시 전략 프롬프트에 자동 주입</div></div>
   <a class="btn sm" href="https://www.adiga.kr" target="_blank" rel="noopener">🏛 어디가 열기</a></div>
 
-  <div class="card" style="border-color:var(--warn)"><h2 style="font-size:14px;margin-bottom:6px">⚖️ 이용 원칙 <span style="font-weight:400;color:var(--ink2)">(실측 조사 2026-08 기준)</span></h2>
-    <p style="font-size:12.5px;margin:0 0 6px"><b>수치(등급컷·경쟁률 등 사실정보)를 조회해 우리 양식에 옮겨 적고 "출처: 한국대학교육협의회 어디가"를 표시</b>하는 것은 안전합니다. 반면 화면·PDF 통째 복제, 프로그램 대량 크롤링, 유료 상품에의 재가공은 대교협 사전 협의(02-6919-3975) 대상입니다.</p>
-    <p style="font-size:11.5px;color:var(--ink2);margin:0">어디가는 robots.txt로 봇을 전면 차단하고 약관이 정보 재제공을 금지합니다 — 그래서 이 앱은 <b>상담 대상 대학만 소량 조회 + 수치 인용</b> 방식으로 설계돼 있습니다.</p>
+  <div class="card" style="border-color:var(--warn)"><h2 style="font-size:var(--fs-md);margin-bottom:8px">이용 원칙 <span style="font-weight:400;color:var(--ink2)">(실측 조사 2026-08 기준)</span></h2>
+    <p style="font-size:var(--fs-sm);margin:0 0 8px"><b>수치(등급컷·경쟁률 등 사실정보)를 조회해 우리 양식에 옮겨 적고 "출처: 한국대학교육협의회 어디가"를 표시</b>하는 것은 안전합니다. 반면 화면·PDF 통째 복제, 프로그램 대량 크롤링, 유료 상품에의 재가공은 대교협 사전 협의(02-6919-3975) 대상입니다.</p>
+    <p style="font-size:var(--fs-xs);color:var(--ink2);margin:0">어디가는 robots.txt로 봇을 전면 차단하고 약관이 정보 재제공을 금지합니다 — 그래서 이 앱은 <b>상담 대상 대학만 소량 조회 + 수치 인용</b> 방식으로 설계돼 있습니다.</p>
   </div>
 
-  <div class="card" style="margin-top:12px"><h2 style="font-size:14px;margin-bottom:8px">📥 데이터 수집 (3가지 경로)</h2>
+  <div class="card" style="margin-top:12px"><h2 style="font-size:var(--fs-md);margin-bottom:8px">데이터 수집 (3가지 경로)</h2>
     <div class="tablewrap"><table class="t">
       <tr><th>경로</th><th>내용</th><th>등급컷</th></tr>
       <tr><td><b>① 어디가 화면 조회</b></td><td>학과별 입결(50·70%컷)·경쟁률·평가기준. <b>소량 조회 후 수치만 인용</b>이 원칙 — 대량 크롤링 금지</td><td>✅ 있음</td></tr>
       <tr><td><b>② 공공데이터 API</b></td><td>대교협 대학정보공시(경쟁률·충원율·등록률)·학과정보 무료 API. 합법·자동화 가능하나 <b>학교/전형유형 단위까지만</b></td><td>❌ 없음</td></tr>
       <tr><td>③ 공식 대량 배포</td><td>연 2회 대교협 발표(4월말 시행계획·5월말 입시결과) + 교육청 진학센터 재가공 PDF. 로그인 불필요</td><td>✅ 5월</td></tr>
     </table></div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
       <button class="btn sm pri" onclick="copyAdigaCollect()">📥 ① 입결 조회 프롬프트</button>
       <button class="btn sm" onclick="copyAdigaApi()">🔑 ② 공공 API 세팅</button>
       <button class="btn sm" onclick="copyAdigaBulk()">📦 관심대학 일괄 조회</button>
     </div>
-    <p style="font-size:12px;color:var(--ink2);margin:8px 0 0">조회 결과는 Drive <code>코워크/컨설팅/_입시데이터/</code>에 저장 + 아래 노트에 요약 축적(출처 표시). 노트가 쌓일수록 전략 프롬프트가 정확해집니다.</p>
+    <p style="font-size:var(--fs-sm);color:var(--ink2);margin:8px 0 0">조회 결과는 Drive <code>코워크/컨설팅/_입시데이터/</code>에 저장 + 아래 노트에 요약 축적(출처 표시). 노트가 쌓일수록 전략 프롬프트가 정확해집니다.</p>
   </div>
 
-  <div class="sec"><h2>🗂 대학 데이터 노트 <span class="n">${notes.length}건 — 학생 관심대학과 이름이 일치하면 전략 프롬프트에 자동 포함</span></h2>
+  <div class="sec"><h2>대학 데이터 노트 <span class="n">${notes.length}건 — 학생 관심대학과 이름이 일치하면 전략 프롬프트에 자동 포함</span></h2>
   <div class="card">
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
       <input id=ad_univ placeholder="대학" style="width:130px" list="univlist">
@@ -3173,15 +3190,15 @@ function renderAdiga(){
       <button class="btn sm" onclick="addAdiga()">저장</button>
     </div>
     <textarea id=ad_content rows=4 placeholder="수집 결과를 붙여넣기 — 예: 2026 학종 OO전형 70%컷 2.8등급, 경쟁률 8.4:1, 수능최저 2합5, 전년 대비 모집 5명 감소"></textarea>
-    <div style="display:flex;gap:6px;align-items:center;margin-top:10px">
+    <div style="display:flex;gap:6px;align-items:center;margin-top:12px">
       <input placeholder="대학명으로 필터" value="${esc(univFilter)}" style="width:180px" oninput="view.adigaFilter=this.value;render()">
       ${univFilter?`<button class="btn ghost sm" onclick="view.adigaFilter='';render()">필터 해제</button>`:""}
     </div>
     <div style="margin-top:8px">${shown.map((n,i)=>{const idx=notes.indexOf(n);return `
       <details class="acc2"><summary><b>${esc(n.univ)}</b> ${esc(n.major||"")} <span style="color:var(--ink2);font-weight:400">[${esc(n.date)}] ${esc(n.source||"")}</span></summary>
-      <div style="white-space:pre-wrap;font-size:13px;margin-top:8px">${esc(n.content)}</div>
-      <button class="btn ghost sm" style="margin-top:6px" onclick="db.adiga.splice(${idx},1);save();render()">삭제</button></details>`;}).join("")
-    ||`<p style="color:var(--ink2);font-size:12.5px">노트가 없습니다. 수집 프롬프트 → Cowork 실행 → 결과 저장으로 시작하세요.</p>`}</div>
+      <div style="white-space:pre-wrap;font-size:var(--fs-md);margin-top:8px">${esc(n.content)}</div>
+      <button class="btn ghost sm" style="margin-top:8px" onclick="db.adiga.splice(${idx},1);save();render()">삭제</button></details>`;}).join("")
+    ||`<p style="color:var(--ink2);font-size:var(--fs-sm)">노트가 없습니다. 수집 프롬프트 → Cowork 실행 → 결과 저장으로 시작하세요.</p>`}</div>
   </div></div>`;}
 function addAdiga(){db.adiga=db.adiga||[];
   const n={date:today(),univ:$("#ad_univ").value.trim(),major:$("#ad_major").value.trim(),source:$("#ad_src").value.trim(),content:$("#ad_content").value.trim()};
@@ -3435,7 +3452,7 @@ function tabApply(){
   <div class="aplgrid">
     ${L.map((a,i)=>aplCard(a,i,chk[i])).join("")}
     <div class="aplcard add">
-      <b style="font-size:13.5px">＋ 지원 추가</b>
+      <b style="font-size:var(--fs-md)">＋ 지원 추가</b>
       ${pool.length?`<select id=apl_pick onchange="aplFromUniv(this.value)"><option value="">관심대학에서 가져오기…</option>
         ${pool.map(u=>`<option value="${esc(u.univ)}|${esc(u.major)}|${esc(u.track||"")}">${esc(u.univ)} ${esc(u.major)}${u.track?` · ${esc(u.track)}`:""}</option>`).join("")}</select>
         <div class="apl-or">또는 직접 입력</div>`:""}
@@ -3481,7 +3498,7 @@ function aplCard(a,i,c){
             <input type=number min=1 max=36 aria-label="등급 합" value="${esc(a.min.sum)}" onchange="aplSet(${i},'min.sum',+this.value)"> 이내</div>
           <div class="r"><span class="k">필수</span>
             <select aria-label="필수 영역" onchange="aplSet(${i},'min.must',this.value)"><option value="">없음</option>${a.min.areas.map(x=>`<option ${x===a.min.must?"selected":""}>${x}</option>`).join("")}</select>
-            <span class="k" style="margin-left:6px">한국사</span>
+            <span class="k" style="margin-left:8px">한국사</span>
             <select aria-label="한국사 조건" onchange="aplSet(${i},'min.hist',+this.value)">${[0,3,4,5,6].map(h=>`<option value="${h}" ${h===+a.min.hist?"selected":""}>${h?h+"등급 이내":"없음"}</option>`).join("")}</select></div>
           <div class="r"><span class="k">탐구</span>
             <select aria-label="탐구 반영" onchange="aplSet(${i},'min.tam',this.value)">${[["1","상위 1과목"],["2","2과목 평균"],["2t","2과목 평균 · 소수 절사"]].map(([v,l])=>`<option value="${v}" ${v===a.min.tam?"selected":""}>${l}</option>`).join("")}</select></div>
@@ -3536,7 +3553,7 @@ function renderApply(){
   <div class="pagehead"><div><h1>수시 지원 현황</h1>
     <div class="sub">고3 지원 카드 · 대학별고사와 발표 일정 · 수능최저 충족${sd!==null&&sd>=0?` — 수능 D-${sd}`:""}</div></div></div>
   ${confAll.map(x=>aplConfHtml(x.c,x.s.name)).join("")}
-  <div class="sec" style="margin-top:6px"><h2>🗓 다가오는 일정 <span class="n">대학별고사 · 합격자 발표</span></h2>
+  <div class="sec" style="margin-top:8px"><h2>다가오는 일정 <span class="n">대학별고사 · 합격자 발표</span></h2>
   <div class="card">${up.length?up.slice(0,24).map(e=>`
     <div class="duer" onclick="openApl('${e.s.id}')">
       ${ddayChip(e.d)}
@@ -3544,7 +3561,7 @@ function renderApply(){
       <span class="what"><b class="apld">${aplMD(e.d)}</b> ${e.t==="ex"?`${esc(e.a.ex.kind||"대학별고사")}${e.a.ex.time?" "+e.a.ex.time:""}`:"발표"} · ${esc(e.a.univ)} ${esc(e.a.major)}</span>
       <span class="st">${e.t==="ex"&&clashKey.has(e.s.id+e.d)?`<span class="chip danger">같은 날</span>`:`<span class="chip ${e.t==="ex"?"":"acc"}">${e.t==="ex"?esc(e.a.kind):"발표"}</span>`}</span>
     </div>`).join(""):`<div class="empty" style="padding:16px"><b>예정된 일정이 없습니다</b>학생 페이지 › 수시 지원 탭에서 대학별고사·발표일을 넣으면 여기에 모입니다.</div>`}</div></div>
-  <div class="sec"><h2>👥 학생별 <span class="n">지원 장수 · 수능최저 · 결과</span></h2>
+  <div class="sec"><h2>학생별 <span class="n">지원 장수 · 수능최저 · 결과</span></h2>
   ${who.length?`<div class="card" style="padding:6px 8px"><div class="tablewrap"><table class="t apltbl">
     <tr><th>학생</th><th>지원</th><th>수능최저 (기준 등급)</th><th>다음 일정</th><th>결과</th></tr>
     ${who.map(s=>{const L=aplList(s),g=s.mockRef||{};const n6=L.filter(a=>!a.free).length;
@@ -3607,7 +3624,7 @@ function renderCal(){
   </div></div>
   <div class="card" style="padding:12px">
     <div class="calgrid">${DAYS.map(d=>`<div class="calhead">${d}</div>`).join("")}${cells}</div>
-    <p style="font-size:11.5px;color:var(--ink2);margin:10px 2px 0">
+    <p style="font-size:var(--fs-xs);color:var(--ink2);margin:12px 2px 0">
     <span class="chip acc">상담</span> <span class="chip warn">수행평가 마감</span> <span class="chip danger">시험·대학별고사</span> <span class="chip ok">합격 발표</span> · 정기 주기를 등록한 학생만 상담이 표시됩니다. 항목을 누르면 그 학생으로 이동.</p>
   </div>`;}
 
@@ -3637,7 +3654,7 @@ ${gr.length?gr.map(g=>`- ${g.date} ${g.exam} ${g.subject}: ${g.score}`).join("\n
 
 WB 웩슬러브레인센터 드림`;
   modal(`<h2>학부모 월간 리포트 (${ym})</h2>
-  <p style="font-size:12px;color:var(--ink2);margin:0 0 8px">발송 전 문안을 다듬어 주세요 — 기록·성적에서 자동 조립된 초안입니다.</p>
+  <p style="font-size:var(--fs-sm);color:var(--ink2);margin:0 0 8px">발송 전 문안을 다듬어 주세요 — 기록·성적에서 자동 조립된 초안입니다.</p>
   <textarea id=prept rows=15>${esc(txt)}</textarea>
   <div class=mfoot><button class=btn onclick=closeModal()>닫기</button>
   <button class="btn" onclick="saveFile('${ym}_월간리포트.md',$('#prept').value)">📁 파일 저장</button>
@@ -3700,7 +3717,7 @@ function renderKnowhow(){
     <li>상담 전: 자동 브리핑 (이전 요약 → 수행 현황 → 플래너 달성 → 아젠다 3~5개)</li>
     <li>상담 후: <b>즉시</b> 기록 + 프로파일 업데이트 — 기록이 다음 작업 속도를 결정한다</li>
     <li>학부모 안내 문자 템플릿:</li></ul>
-    <div class="card" style="font-size:12.5px;white-space:pre-wrap;margin-top:6px">안녕하세요, {학생명} 학생 어머니/아버지!
+    <div class="card" style="font-size:var(--fs-sm);white-space:pre-wrap;margin-top:8px">안녕하세요, {학생명} 학생 어머니/아버지!
 이번 달 컨설팅 상담 일정 안내드립니다.
 
 일시: {날짜} {시간}
@@ -3732,7 +3749,7 @@ function exportJson(){db.meta=db.meta||{};db.meta.lastExport=today();save();rend
   saveFile(`wb-consulting-backup-${today()}.json`,JSON.stringify(db,null,2));}
 function importJson(){
   modal(`<h2>데이터 가져오기</h2>
-  <p style="font-size:12.5px;color:var(--ink2)"><b>병합</b>: 같은 이름의 학생은 이 기기의 초안·기록을 유지하고 신규만 추가합니다 (시드 파일용).<br>
+  <p style="font-size:var(--fs-sm);color:var(--ink2)"><b>병합</b>: 같은 이름의 학생은 이 기기의 초안·기록을 유지하고 신규만 추가합니다 (시드 파일용).<br>
   <b>전체 복원</b>: 이 기기의 데이터를 백업 파일 내용으로 완전히 교체합니다 — 다른 기기의 최신 백업을 그대로 옮길 때 사용하세요.</p>
   <input type=file id=impf accept=".json">
   <div class=mfoot><button class=btn onclick=closeModal()>취소</button>
