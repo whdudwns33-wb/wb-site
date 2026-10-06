@@ -8,6 +8,8 @@
 | `app.html` | **앱 원본 (공개, 개인정보 0).** 기능 수정은 전부 이 파일에서 (단일 HTML, 의존성 없음) |
 | `wrapper-template.html` | 비밀번호 입력 화면 + WebCrypto 복호화 로직 |
 | `check-password.mjs` | **빌드 전 필수** — 백업을 실제로 복호화해 비밀번호가 맞는지 확인 |
+| `check-names.mjs` | 공개 파일 실명 검사 — 이름은 비공개 시드에서 읽는다 |
+| `backup-encrypt.mjs` | 평문 → `../backup/*.enc.json` 재암호화 (틀린 비밀번호 거부 + 되읽기 대조) |
 | `build.mjs` | seed·bulk 주입 → AES-256-GCM 암호화 → `../index.html` 생성 + 복호화 자가검증 |
 | `private-seed.json` | **gitignored.** 학생 시드 — `../backup/private-seed.enc.json` 에서 복원 |
 | `bulk-data.json` | **gitignored.** 입결 5개년+전국고교 — `../backup/bulk-data.enc.json` 에서 복원 |
@@ -31,10 +33,10 @@ WB_PASSWORD='<비밀번호>' node workbench/src/check-password.mjs  # 먼저 이
 WB_PASSWORD='<비밀번호>' node workbench/src/build.mjs   # "복호화 검증: 일치 ✓" 확인
 # ⚠ build.mjs 의 "일치 ✓" 는 비밀번호가 틀려도 뜬다 — 진짜 검증은 check-password.mjs 뿐이다.
 # 3) 실명 검사 (공개 파일에 학생 실명 0건이어야 함 — 통과 못 하면 커밋 금지)
-grep -c "한수빈\|박세윤\|조유빈\|강준서\|마윤서\|김아린\|강현서\|김태련\|고현준\|오수아\|남혁준\|윤시현" workbench/src/app.html  # → 0
+node workbench/src/check-names.mjs   # → "실명 검사 ✓ — 0건" (이름은 비공개 시드에서 읽음)
 # 4) 소스 커밋: 작업 브랜치에 app.html + index.html
 git add workbench/src/app.html workbench/index.html workbench/bulk.enc.json && git commit && git push origin claude/agent-performance-optimization-rj8ql6
-# 5) 배포: main에는 index.html 한 파일만 (Pages가 main을 서비스)
+# 5) 배포: main에는 index.html + bulk.enc.json 두 파일만, 반드시 함께 (Pages가 main을 서비스)
 git worktree add /tmp/wt-main origin/main && cd /tmp/wt-main \
   && git checkout -b deploy-$(date +%s) origin/main \
   && cp <저장소>/workbench/index.html <저장소>/workbench/bulk.enc.json workbench/ \
@@ -59,7 +61,9 @@ WB_PASSWORD='...' node workbench/src/build.mjs             # 재빌드
 DB 항목만 추가된다(로컬 입력 보호). 이미 쓰던 기기를 백업 시점으로 완전히 맞추려면 앱의
 "가져오기 → 전체 복원"으로 백업 파일을 직접 읽힌다.
 
-`private-seed.json`을 수정했다면 `../backup/private-seed.enc.json`도 재생성해 커밋한다 (backup/README 참조 역방향).
+`private-seed.json`·`bulk-data.json`을 수정했다면 **배포보다 먼저** 재암호화해 커밋한다:
+`WB_PASSWORD='...' node workbench/src/backup-encrypt.mjs` → `git add workbench/backup/*.enc.json`.
+평문은 gitignored라 기기·컨테이너가 초기화되면 사라진다 (2026-09-16 실제 소실).
 
 ## 설계 원칙
 
@@ -70,9 +74,10 @@ DB 항목만 추가된다(로컬 입력 보호). 이미 쓰던 기기를 백업 
 - 외부 서비스(Perplexity·Gamma·진학사·어디가)는 앱이 직접 호출하지 않는다 — 앱은 프롬프트를 조립만 한다.
 - 입결 대량 데이터는 약관상 평문 재배포 금지 — 암호문 밖으로 꺼내지 않는다.
 
-## 구조 (2026-09 현재)
+## 구조 (2026-10 현재 · v37)
 
 - 전역: 대시보드 / 월간 캘린더 / 노하우 랩 / 진학 가능권 분석(상담 보드+등급 지형) / 모의지원 /
   고교 선택 시뮬레이터 / 입시 검색(대학 디렉터리+고교) / 학교 파트너십 / 어디가 데이터 / 노하우 라이브러리
-- 학생별 8탭: 프로파일(성적기록·성장 궤적) · 학업 관리 · 생기부 · 수행평가 · 탐구보고서 · 상담 관리 · 진학사 통 · 월간 계획
+- 수시 지원 현황(전체 보드): 고3 대학별고사·발표 일정, 학생별 지원 장수·수능최저·결과
+- 학생별 9탭: 프로파일(성적기록·성장 궤적) · 수시 지원(고3 또는 지원 기록 있을 때) · 학업 관리 · 생기부 · 수행평가 · 탐구보고서 · 상담 관리 · 진학사 통 · 월간 계획
 - 데이터 계층: `SEED_PRIV`(학생 시드) / `BULK`(입결·고교 대량) / `ipGroups()`(대학|학과|전형 그룹 캐시, `save()`가 무효화)
