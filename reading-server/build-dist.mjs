@@ -74,10 +74,10 @@ const NAESINKO_FILES = ['index.html', 'engine.js', 'grade.js', 'gen.js', 'pack-c
 for (const f of NAESINKO_FILES) fs.copyFileSync(path.join(NAESINKO, f), path.join(DIST, 'naesin-ko', f));
 fs.copyFileSync(SHARED, path.join(DIST, 'naesin-ko', 'voice.js'));
 /* 하루브레인 (haru/) — 같은 오리진 /haru/ 에서 서빙해야 학생 코드·API가 공유된다.
-   앱 껍데기·순수 로직·atoms.json과 검토용 자체 샘플(preview.js)만 싣는다. 운영 팩·대응표·플랜·시험지는 dist 에 없다(설계안 §5-0). */
+   앱 껍데기·순수 로직·atoms.json·공개 준비 안내와 검토용 자체 샘플(preview.js)만 싣는다. 운영 팩·대응표·플랜·시험지는 dist 에 없다(설계안 §5-0). */
 const HARU = path.join(ROOT, '..', 'haru');
 fs.mkdirSync(path.join(DIST, 'haru'), { recursive: true });
-const HARU_FILES = ['index.html', 'parent.html', 'strings.js', 'plan.js', 'mastery.js', 'srs.js', 'cause.js', 'probe.js', 'preview.js', 'atoms.json', 'sw.js', 'manifest.webmanifest', 'icon.svg'];
+const HARU_FILES = ['index.html', 'parent.html', 'guide.html', 'strings.js', 'plan.js', 'mastery.js', 'srs.js', 'cause.js', 'probe.js', 'preview.js', 'atoms.json', 'sw.js', 'manifest.webmanifest', 'icon.svg'];
 for (const f of HARU_FILES) fs.copyFileSync(path.join(HARU, f), path.join(DIST, 'haru', f));
 
 /* 어휘브레인 (hanja/) — 같은 오리진 /hanja/ 에서 서빙해야 학생 토큰·API가 공유된다.
@@ -215,7 +215,7 @@ function verifyRefs(htmlPath) {
 const broken = [];
 for (const f of ['index.html', 'vocab/index.html', 'vocab-age/index.html', 'admin/index.html',
   'admin/metrics.html', 'admin/vocab-review.html', 'review.html', 'parent.html',
-  'naesin/index.html', 'haru/index.html', 'haru/parent.html', 'admin/haru-admin.html', 'admin/naesin-admin.html',
+  'naesin/index.html', 'haru/index.html', 'haru/parent.html', 'haru/guide.html', 'admin/haru-admin.html', 'admin/naesin-admin.html',
   'hanja/index.html', 'admin/hanja-admin.html', 'admin/hanja-print.html',
   'chunk/index.html', 'chunk/print.html', 'chunk/class.html', 'admin/chunk-admin.html',
   'letter/index.html', 'admin/letter-admin.html']) {
