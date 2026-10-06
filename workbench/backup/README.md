@@ -40,6 +40,16 @@ console.log("복원 완료");'
 ```
 
 두 파일을 복원한 뒤 `WB_PASSWORD='<비밀번호>' node workbench/src/build.mjs` 로 재빌드한다.
+
+## 재암호화 (평문을 바꾼 뒤 — 배포보다 먼저)
+
+```bash
+WB_PASSWORD='<비밀번호>' node workbench/src/backup-encrypt.mjs        # all | bulk | seed
+git add workbench/backup/*.enc.json && git commit -m "workbench: 백업 재암호화 — <무엇을 바꿨나>"
+```
+
+지금 백업이 그 비밀번호로 열리지 않으면 덮어쓰지 않고, 쓴 직후 다시 복호화해 원본과 바이트 단위로 대조한다.
+평문 두 파일은 gitignored라 기기·컨테이너가 초기화되면 사라진다 — 바꿨으면 즉시 재암호화해 커밋할 것.
 **앱 데이터(시드 이후 입력분)의 정본은 사용 중인 브라우저 localStorage** — 다른 기기는 시드 상태에서 시작하므로,
 옮길 때는 기존 기기에서 내보내기/복사로 동기화한다. (Drive 이중 백업: `워크벤치_시드_v2_전체(재빌드용).json`)
 

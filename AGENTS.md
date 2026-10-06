@@ -3,6 +3,8 @@
 이 저장소는 WB 웩슬러브레인센터의 공개 사이트다. GitHub Pages가 `main`을 서비스한다.
 **컨설팅 워크벤치**(`workbench/`) 작업이 대부분이며, 아래 규칙은 필수다.
 
+> **처음 인계받은 에이전트는 [`workbench/HANDOFF.md`](workbench/HANDOFF.md)를 먼저 읽는다** — 현재 상태·할 일·사고 기록·코드 지도.
+
 ## 브랜치 규칙
 - 워크벤치 **소스 작업은 전부 `claude/agent-performance-optimization-rj8ql6` 브랜치**에서 한다.
 - `main`에는 워크벤치 관련으로 **암호화 배포본 두 파일(`workbench/index.html`, `workbench/bulk.enc.json`)만** 올린다
@@ -22,8 +24,7 @@
    대량 데이터 로드가 실패한다(2026-09-02 실제 사고). 라이브 해시는 index.html과 bulk.enc.json
    **둘 다** 대조할 것. 앱은 빌드 태그(BUILD_TAG ↔ bulk의 t 필드)로 불일치를 감지해 경고를 띄운다.
 4. 원장 데이터 반영: Drive `WB_워크벤치_백업` 폴더의 최신 `wb-consulting-backup-*.json`을 받아
-   `node workbench/src/seed-from-backup.mjs <백업파일>` → 재빌드 → 두 파일 배포 →
-   `workbench/backup/private-seed.enc.json` 재암호화 커밋(backup/README) →
+   `node workbench/src/seed-from-backup.mjs <백업파일>` → `backup-encrypt.mjs seed`로 재암호화 커밋 → 재빌드 → 두 파일 배포 →
    `workbench/backup/last-drive-import.json`(fileId·modifiedTime) 갱신. 매일 아침 루틴이 이를 자동 수행한다.
 
 ## 병행 작업 규칙 (Claude 세션·Codex·다른 컴퓨터가 같이 쓸 때)
@@ -32,14 +33,16 @@
   워크벤치 소스를 건드리지 않는다. 겹치면 푸시 거부·짝 불일치 배포가 날 수 있다.
 - 배포(main 푸시)는 한 번에 한 주체만. 배포 직후 라이브 해시 2개(index·bulk) 대조를 끝내기 전에는 다른 주체가 배포하지 않는다.
 - 충돌이 나면 `app.html`은 수동 병합(자동 병합 금지 — 단일 파일이라 조용히 깨진다), `index.html`·`bulk.enc.json`은 병합하지 말고 재빌드로 다시 만든다.
-- 비공개 파일(`private-seed.json`·`bulk-data.json`)을 바꾼 주체가 `backup/*.enc.json` 재암호화까지 책임진다.
+- 비공개 파일(`private-seed.json`·`bulk-data.json`)을 바꾼 주체가 `backup/*.enc.json` 재암호화까지 책임진다 —
+  `node workbench/src/backup-encrypt.mjs`, **배포보다 먼저**.
 
 ## 절대 규칙 (위반 시 커밋 금지)
 1. **공개 파일에 학생 실명·연락처 0건.** `app.html`·문서·커밋 메시지 포함.
-   검사: `grep -c "한수빈\|박세윤\|조유빈\|강준서\|마윤서\|김아린\|강현서\|김태련\|고현준\|오수아\|남혁준\|윤시현" workbench/src/app.html` → 0.
+   검사: `node workbench/src/check-names.mjs` → "실명 검사 ✓ — 0건". 이름은 비공개 시드에서 읽는다 —
+   **이름 목록을 문서·코드에 직접 적지 말 것** (그 자체가 공개 저장소 노출이다).
 2. **비밀번호를 코드·문서·커밋에 적지 않는다.** 환경변수로만 사용.
 3. **`private-seed.json`·`bulk-data.json`을 평문으로 커밋하지 않는다** (.gitignore 유지).
-   내용을 바꿨으면 `workbench/backup/*.enc.json`을 재암호화해 함께 커밋한다 (backup/README 참조).
+   내용을 바꿨으면 `workbench/backup/*.enc.json`을 재암호화해 함께 커밋한다 (`backup-encrypt.mjs`).
 4. **입결 대량 데이터(어디가 재정리본)를 평문으로 공개 위치에 내보내지 않는다** — 약관상 재배포 금지.
 5. `workbench/index.html`은 자동 생성물 — 직접 수정 금지, 항상 build.mjs로 재생성.
 
