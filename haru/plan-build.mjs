@@ -19,15 +19,15 @@ export function milestonesFromFacts(facts, extra) {
   const S = facts.schedule, day = (s) => s.slice(0, 10), hm = (s) => (s.length > 10 ? s.slice(11, 16) : null);
   const m = [
     { d: day(S.formsPublished), aud: 'parent', text: '제출 서류 양식 홈페이지 원서접수 배너에서 공개' },
-    { d: day(S.briefing), aud: 'parent', at: hm(S.briefing), text: '입학설명회 ' + hm(S.briefing) + ' 본교 대강당' },
+    { d: day(S.briefing), aud: 'parent', at: hm(S.briefing), text: '입학설명회 · 본교 대강당' },
     { d: day(S.apply[0]), aud: 'parent', at: hm(S.apply[0]), text: '원서접수 시작 (인터넷, 전형료 ' + facts.schedule.fee.toLocaleString('ko-KR') + '원) — 서류 제출과 다른 기간' },
-    { d: day(S.apply[1]), aud: 'parent', at: hm(S.apply[1]), text: '원서접수 마감 ' + hm(S.apply[1]) },
+    { d: day(S.apply[1]), aud: 'parent', at: hm(S.apply[1]), text: '원서접수 마감' },
     { d: day(S.docs[0]), aud: 'parent', at: hm(S.docs[0]), text: '서류 제출 시작 · 학교생활기록부Ⅱ(최근 한 달 내 출력, 상단에 접수번호) · 삼육 교육 동의서 미제출 시 응시 불가' },
-    { d: day(S.docs[1]), aud: 'parent', at: hm(S.docs[1]), text: '서류 제출 마감 ' + hm(S.docs[1]) + ' (우체국 소인까지)' },
+    { d: day(S.docs[1]), aud: 'parent', at: hm(S.docs[1]), text: '서류 제출 마감 (우체국 소인까지)' },
     { d: day(S.ticket[0]), aud: 'parent', at: hm(S.ticket[0]), text: '수험표 출력 시작 — 본인 직접 출력, 지참해야 입실' },
-    { d: facts.exam.date, aud: 'both', at: facts.exam.arriveBy, text: facts.exam.arriveBy + '까지 고사장 입실' },
-    { d: day(S.announce[0]), aud: 'parent', at: hm(S.announce[0]), text: '결과 발표 ' + hm(S.announce[0]) + ' — 오늘은 아무것도 안 하셔도 됩니다' },
-    { d: S.enroll[0], aud: 'parent', text: '입학 등록 ' + S.enroll[0] + ' ~ ' + S.enroll[1] }
+    { d: facts.exam.date, aud: 'both', at: facts.exam.arriveBy, text: '고사장 입실 마감' },
+    { d: day(S.announce[0]), aud: 'parent', at: hm(S.announce[0]), text: '결과 발표 — 오늘은 아무것도 안 하셔도 됩니다' },
+    { d: S.enroll[0], aud: 'parent', text: '입학 등록 · ' + S.enroll[1] + '까지' }
   ];
   return m.concat(extra || []).sort((a, b) => a.d.localeCompare(b.d));
 }
