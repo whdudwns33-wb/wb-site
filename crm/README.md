@@ -62,6 +62,8 @@
 - **속성**: 표준(이름·전화·이메일·lifecyclestage=customer 는 성사 때만) + WB 사용자 속성 `wb_source_channel`(선택지에 `파트너` 보강)·`wb_academy_status`·`wb_credit_balance`·`wb_referrer_contact_id`·`wb_retest_due_date`·`wb_inspection_type`·`wb_inspection_date`·`wb_child_name`·`wb_child_birth`·`wb_child_grade`·`wb_consult_date`·`wb_lost_reason`·`wb_crm_lead_id`·`wb_partner`. 포털에 없는 속성은 만들기 전까지 보내지 않는다.
 - **단계 매핑**: 우리 단계 라벨 = HubSpot 딜 단계 라벨이면 자동(검사 여정·학원 등록). `성사(등록)`↔`성사된 거래`, `미성사`↔`성사되지 않은 거래` 는 별칭. 안 맞는 단계는 손으로 고른다.
 
+현재 **완전 자동 양방향 동기화는 아니다**. 15분 크론은 승인된 큐를 최대 20건 전송하고, HubSpot 변경분 가져오기는 원장이 이 화면에서 실행한다. 화면의 60초 새로고침은 로컬 데이터를 읽을 뿐 HubSpot을 가져오지 않는다. 빠른 입력 자동 승인은 연락처·노트·신규 딜에 적용될 수 있고 기존 딜 단계 전이는 승인 대상이다. HubSpot에서 작성한 노트를 로컬 상담 기록으로 가져오는 기능은 아직 없다. 세일즈데스크만으로 일상 업무를 하려면 전송 중복·충돌 보호를 보강한 뒤 자동 가져오기와 상태 표시를 확장한다.
+
 ## 5. HubSpot 토큰 등록 (원장 1회)
 
 1. HubSpot → 설정 → 통합 → **비공개 앱(Private Apps)** → 앱 만들기. 스코프: `crm.objects.contacts`(읽기·쓰기) · `crm.objects.deals`(읽기·쓰기) · `crm.schemas.contacts`(읽기·쓰기 — 속성 만들기) · `crm.objects.owners`(읽기). 노트는 contacts 쓰기 스코프로 충분하다.
