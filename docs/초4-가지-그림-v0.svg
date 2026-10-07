@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 180" role="img" aria-labelledby="title desc">
+  <title id="title">낱말 가지의 그림 지원 후보</title>
+  <desc id="desc">그림 가는 잎이 난 나뭇가지, 그림 나는 꼭지가 있는 길쭉한 채소 가지다. WB 자체 창작 그림이며 배부 전 교사 검토용이다.</desc>
+  <rect width="480" height="180" fill="white"/>
+  <g fill="none" stroke="#222" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M45 146 168 59 M94 111 80 57 M127 88 192 91"/>
+    <path d="M80 77Q46 68 61 44Q82 47 80 77Z M108 101Q112 62 137 67Q140 91 108 101Z M158 66Q159 29 182 35Q186 60 158 66Z M166 91Q187 109 209 93Q204 75 166 91Z"/>
+    <path d="M356 49C398 41 420 64 411 101C403 134 375 154 349 143C326 133 326 114 342 92C352 77 356 63 356 49Z"/>
+    <path d="M356 51 348 40 363 42 368 27 379 42 393 38 388 53 375 59 365 55Z M371 29Q367 18 357 19"/>
+    <path d="M397 77Q405 103 379 126"/>
+  </g>
+  <g fill="#222" font-family="sans-serif" font-size="18" text-anchor="middle">
+    <text x="125" y="173">가</text>
+    <text x="370" y="173">나</text>
+  </g>
+</svg>
