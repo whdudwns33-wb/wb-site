@@ -117,6 +117,8 @@ export function same(a, b) { return JSON.stringify(a === undefined ? null : a) =
 
 /** 문서 변경 → 큐 줄. 같은 리드의 같은 종류(pending)가 있으면 payload 만 갈아 끼운다(한 리드에 한 줄). */
 export async function enqueueFor(env, auth, settings, c, id, previous, data) {
+  const leadId = c === 'leads' ? id : String(data.leadId || '');
+  if (await env.DB.prepare('SELECT lead_id FROM crm_portal_links WHERE lead_id=?').bind(leadId).first()) return 0;
   const now = Date.now();
   let n = 0;
   // 새 줄의 created_at 은 이 리드의 기존 줄보다 반드시 크다 — 합쳐진 줄(옛 created_at)과 새 줄의 처리 순서(검사 여정 성사 → 학원 트라이얼)가
