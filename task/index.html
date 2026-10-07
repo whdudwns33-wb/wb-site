@@ -3741,9 +3741,10 @@ function renderTabs() {
       ? [['schedule', '현황판', managerRequestInboxCount()], ['onboarding', '신규 학생', onboardingAttentionCount()], ['today', '오늘'], ['question_bank', '문제은행'], ['week', '주간 플래너'], ['write', '지시서 작성'],
          ['lesson', '수업 등록 및 변경'], ['feedback', '피드백 검토'], ['makeup', '보강', makeupAttentionCount()], ['sessions', '회차', sessionPackAttentionCount()], ['board', '직원 현황', a.total], ['staff', '직원 관리'], ['books', '교재'], ['transport', '차량'], ['roster', '원생'], ['devices', '기기', deviceAlertCount()], ['settings', '설정']]
       : [];
-  $('#tabs').innerHTML = tabs.map(([k, t, n]) =>
+  // 동일한 메뉴 갱신으로 클릭 중인 버튼이 사라지지 않도록 유지한다.
+  replaceView($('#tabs'), tabs.map(([k, t, n]) =>
     '<button class="tab ' + (route === k ? 'on' : '') + '" data-go="' + k + '">' + t +
-    (n ? '<span class="badge">' + n + '</span>' : '') + '</button>').join('');
+    (n ? '<span class="badge">' + n + '</span>' : '') + '</button>').join(''));
 }
 
 /* ── 링크로 들어온 지시서 확인 ── */
