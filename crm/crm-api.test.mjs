@@ -6,6 +6,7 @@ import test from 'node:test';
 import { DatabaseSync } from 'node:sqlite';
 import { handleApi, flushQueue } from './crm-api.mjs';
 import worker from './worker.mjs';
+import { portalSummary, claimHubspot, releaseHubspot } from './portal-api.mjs';
 
 const migrationDir = new URL('./migrations/', import.meta.url);
 const migration = fs.readdirSync(migrationDir).filter(n => n.endsWith('.sql')).sort().map(n => fs.readFileSync(new URL(n, migrationDir), 'utf8')).join('\n');
@@ -110,6 +111,156 @@ async function saveMapping(env, token, hs) {
   assert.equal(r.status, 200, JSON.stringify(r.body));
   return p.body.suggested;
 }
+
+function portalFixture(familyId = '101') {
+  return { schemaVersion: 1, familyId, hubspot: { contactId: '501', appointments: [{ appointmentId: '301', dealId: '701' }, { appointmentId: '302', dealId: null }] },
+    membership: { friend: 'active', supporter: 'available' }, app: { installation: 'verified', launchObserved: true },
+    benefits: { parentAccess: 'active', brainAppsEligible: true }, cs: { pendingCount: 2, nextContactDate: '2026-10-14' }, brunch: { attendedCount: 1 } };
+}
+function portalRemote(data) { return new Response(JSON.stringify(data), { headers: { 'content-type': 'application/json' } }); }
+
+test('센터앱 연결 — 관리자만 명시 ID 연결, 원본/버전/중복 보호, 직원 읽기, 형제 분리', async () => {
+  const env = envFor(), admin = await setupAdmin(env), staff = await makeStaff(env, admin, '직원');
+  await putDoc(env, admin, 'leads', 'p1', lead());
+  await putDoc(env, admin, 'leads', 'p2', lead());
+  const body = { leadId: 'p1', familyId: '101', expectedUpdatedAt: 0 };
+  const link = (token, value = body) => call(env, 'POST', '/api/portal/link', { token, body: value });
+  assert.equal((await link()).status, 401);
+  assert.equal((await link(staff.token)).status, 403);
+  for (const familyId of [101, '0', '01', '../1', '1?x', '9223372036854775808', '', '1e2']) {
+    assert.equal((await link(admin, { ...body, familyId })).status, 400);
+  }
+  assert.equal((await link(admin, { ...body, expectedUpdatedAt: '0' })).status, 400);
+  assert.equal((await link(admin, { ...body, leadId: 'missing' })).status, 404);
+  const saved = await link(admin);
+  assert.equal(saved.status, 200, JSON.stringify(saved.body));
+  assert.equal(saved.body.configured, false);
+  assert.deepEqual([saved.body.link.familyId, saved.body.link.checkedAt, saved.body.link.snapshot], ['101', 0, null]);
+  assert.equal(saved.body.link.sourceUrl, 'https://portal.wbcowork.com/admin/family/101');
+  assert.equal((await call(env, 'GET', '/api/portal/link?leadId=p1', { token: staff.token })).body.link.familyId, '101');
+  assert.equal((await link(admin)).body.code, 'STALE');
+  assert.equal((await link(admin, { ...body, leadId: 'p2' })).body.code, 'DUPLICATE');
+  assert.equal((await link(admin, { ...body, leadId: 'p2', familyId: '102' })).status, 200, '같은 전화의 형제도 다른 고객번호');
+  assert.equal((await call(env, 'POST', '/api/portal/refresh', { token: staff.token, body: { leadId: 'p1', expectedUpdatedAt: saved.body.link.updatedAt } })).body.code, 'PORTAL_NOT_CONFIGURED');
+  const exported = await call(env, 'GET', '/api/export', { token: admin });
+  assert.equal(exported.body.portalLinks.length, 2);
+  await putDoc(env, admin, 'leads', 'p1', {}, { deleted: true });
+  assert.equal((await call(env, 'GET', '/api/portal/link?leadId=p1', { token: admin })).status, 404);
+});
+
+test('센터앱 요약 — 읽기 키·고정 주소·리다이렉트 금지·화이트리스트, 실패와 경합은 이전 기록 보호', async () => {
+  const env = envFor(), admin = await setupAdmin(env), staff = await makeStaff(env, admin, '직원');
+  env.WB_SALESDESK_READ_KEY = 'test-read-only-placeholder';
+  await putDoc(env, admin, 'leads', 'p1', lead());
+  let result = await call(env, 'POST', '/api/portal/link', { token: admin, body: { leadId: 'p1', familyId: '101', expectedUpdatedAt: 0 } });
+  let link = result.body.link;
+  const refresh = () => call(env, 'POST', '/api/portal/refresh', { token: staff.token, body: { leadId: 'p1', expectedUpdatedAt: link.updatedAt, snapshot: { injected: true } } });
+  env.PORTAL_FETCH = async (url, init) => {
+    assert.equal(url, 'https://portal.wbcowork.com/api/integrations/salesdesk/families/101');
+    assert.equal(init.headers.Authorization, 'Bearer test-read-only-placeholder');
+    assert.equal(init.redirect, 'error'); assert.ok(init.signal instanceof AbortSignal);
+    return portalRemote({ ...portalFixture(), privateNote: 'must not store', hubspot: { ...portalFixture().hubspot, token: 'never expose' } });
+  };
+  result = await refresh();
+  assert.equal(result.status, 200, JSON.stringify(result.body));
+  link = result.body.link;
+  assert.deepEqual(link.snapshot, portalFixture());
+  assert.ok(link.checkedAt > 0 && link.updatedAt > 0);
+  assert.ok(!JSON.stringify(result.body).includes(env.WB_SALESDESK_READ_KEY));
+  for (const badFetch of [async () => new Response('remote diagnostic', { status: 503 }), async () => new Response('missing', { status: 404 }),
+    async () => { throw new Error('test-read-only-placeholder'); }, async () => portalRemote(portalFixture('999')), async () => new Response('<html>login</html>'),
+    async () => portalRemote({ ...portalFixture(), membership: { friend: 'made_up', supporter: 'available' } }),
+    async () => new Response('x'.repeat(262145), { headers: { 'content-type': 'application/json' } })]) {
+    env.PORTAL_FETCH = badFetch;
+    result = await refresh();
+    assert.equal(result.status, 502);
+    assert.ok(!JSON.stringify(result.body).includes(env.WB_SALESDESK_READ_KEY));
+    const persisted = (await call(env, 'GET', '/api/portal/link?leadId=p1', { token: admin })).body.link;
+    assert.deepEqual(persisted, link);
+  }
+  env.PORTAL_FETCH = async () => {
+    const remapped = await call(env, 'POST', '/api/portal/link', { token: admin, body: { leadId: 'p1', familyId: '102', expectedUpdatedAt: link.updatedAt } });
+    assert.equal(remapped.status, 200);
+    return portalRemote(portalFixture());
+  };
+  assert.equal((await refresh()).body.code, 'STALE');
+  const remapped = (await call(env, 'GET', '/api/portal/link?leadId=p1', { token: admin })).body.link;
+  assert.equal(remapped.familyId, '102'); assert.equal(remapped.snapshot, null); assert.equal(remapped.checkedAt, 0);
+  assert.throws(() => portalSummary({ ...portalFixture(), cs: { pendingCount: -1, nextContactDate: null } }, '101'));
+  assert.throws(() => portalSummary({ ...portalFixture(), hubspot: { contactId: '01', appointments: [] } }, '101'));
+  assert.throws(() => portalSummary({ ...portalFixture(), hubspot: { contactId: null, appointments: [{ appointmentId: '1', dealId: null }, { appointmentId: '1', dealId: null }] } }, '101'));
+});
+
+test('센터앱 연결 고객의 HubSpot 신규 큐·기존 승인 큐·가져오기를 보류하고 수동 기록은 유지한다', async () => {
+  const hs = fakeHubspot(), env = envFor(hs), admin = await setupAdmin(env);
+  await saveMapping(env, admin, hs);
+  await putDoc(env, admin, 'leads', 'p1', lead());
+  await call(env, 'POST', '/api/hubspot/queue', { token: admin, body: { op: 'approveAll' } });
+  await call(env, 'POST', '/api/portal/link', { token: admin, body: { leadId: 'p1', familyId: '101', expectedUpdatedAt: 0 } });
+  const updated = await putDoc(env, admin, 'leads', 'p1', lead({ stage: 'booked' }));
+  assert.equal(updated.body.results[0].queued, 0);
+  const note = await putDoc(env, admin, 'activities', 'note_portal', { leadId: 'p1', type: 'note', text: '후속 확인' });
+  assert.equal(note.body.results[0].queued, 0);
+  const pushed = await flushQueue(env, 20);
+  assert.equal(pushed.done, 0); assert.equal(pushed.failed, 2);
+  assert.ok(pushed.results.every(r => r.error.startsWith('PORTAL_LINKED')));
+  assert.ok(!hs.calls.some(c => ['PATCH', 'POST'].includes(c.method) && /objects\/(contacts|deals|notes)/.test(c.path)));
+  const q = await queue(env, admin);
+  assert.equal((await call(env, 'POST', '/api/hubspot/queue', { token: admin, body: { op: 'retry', ids: q.items.map(i => i.id) } })).body.code, 'PORTAL_LINKED');
+  hs.routes['POST /crm/v3/objects/contacts/search'] = () => ({ total: 1, results: [{ id: '501', properties: { firstname: '다른이름', wb_crm_lead_id: 'p1', lastmodifieddate: '1791327600000' } }] });
+  let pull = await call(env, 'POST', '/api/hubspot/pull', { token: admin, body: { full: true } });
+  assert.equal(pull.body.portalSkipped, 1); assert.equal(pull.body.updated, 0); assert.equal(pull.body.retry, 0);
+  const docs = (await call(env, 'GET', '/api/docs', { token: admin })).body.docs;
+  assert.equal(docs.find(d => d.c === 'leads' && d.id === 'p1').data.stage, 'booked');
+  assert.equal(docs.find(d => d.c === 'activities' && d.id === 'note_portal').data.text, '후속 확인');
+  const link = (await call(env, 'GET', '/api/portal/link?leadId=p1', { token: admin })).body.link;
+  env.WB_SALESDESK_READ_KEY = 'test-read-only-placeholder'; env.PORTAL_FETCH = async () => portalRemote(portalFixture());
+  await call(env, 'POST', '/api/portal/refresh', { token: admin, body: { leadId: 'p1', expectedUpdatedAt: link.updatedAt } });
+  hs.routes['POST /crm/v3/objects/contacts/search'] = () => ({ total: 1, results: [{ id: '501', properties: { firstname: '별도연락처', lastmodifieddate: '1791327600000' } }] });
+  pull = await call(env, 'POST', '/api/hubspot/pull', { token: admin, body: { full: true } });
+  assert.equal(pull.body.portalSkipped, 1); assert.equal(pull.body.created, 0, '센터 원본 연락처를 새 리드로 복제하지 않는다');
+});
+
+test('HubSpot 반영과 센터앱 연결 경합 — 진행 중 반영 보호와 만료 임대 복구', async () => {
+  const env = envFor(), admin = await setupAdmin(env);
+  await putDoc(env, admin, 'leads', 'p1', lead());
+  const token = await claimHubspot(env, 'p1');
+  assert.ok(token); assert.equal(await claimHubspot(env, 'p1'), null);
+  const body = { leadId: 'p1', familyId: '101', expectedUpdatedAt: 0 };
+  assert.equal((await call(env, 'POST', '/api/portal/link', { token: admin, body })).body.code, 'SYNC_BUSY');
+  await releaseHubspot(env, 'p1', 'wrong');
+  assert.equal(await claimHubspot(env, 'p1'), null);
+  env.DB.database.prepare('UPDATE crm_hs_inflight SET expires_at=0').run();
+  assert.ok(await claimHubspot(env, 'p1'));
+  env.DB.database.prepare('UPDATE crm_hs_inflight SET expires_at=0').run();
+  assert.equal((await call(env, 'POST', '/api/portal/link', { token: admin, body })).status, 200);
+  assert.equal(await claimHubspot(env, 'p1'), null, '연결 뒤에는 새 외부 반영을 선점할 수 없다');
+});
+
+test('연결하지 않은 다른 리드도 확인된 센터앱 연락처·예약 딜을 덮거나 노트를 쓰지 않는다', async () => {
+  const hs = fakeHubspot(), env = envFor(hs), admin = await setupAdmin(env);
+  await saveMapping(env, admin, hs);
+  await putDoc(env, admin, 'leads', 'p1', lead());
+  const linked = await call(env, 'POST', '/api/portal/link', { token: admin, body: { leadId: 'p1', familyId: '101', expectedUpdatedAt: 0 } });
+  env.WB_SALESDESK_READ_KEY = 'test-read-only-placeholder'; env.PORTAL_FETCH = async () => portalRemote(portalFixture());
+  await call(env, 'POST', '/api/portal/refresh', { token: admin, body: { leadId: 'p1', expectedUpdatedAt: linked.body.link.updatedAt } });
+  for (const id of ['existing', 'found', 'deal_only']) {
+    await putDoc(env, admin, 'leads', id, lead());
+    if (id === 'existing') {
+      env.DB.database.prepare("UPDATE crm_documents SET data=json_set(data,'$.hubspot.contactId','501') WHERE collection='leads' AND id=?").run(id);
+      await putDoc(env, admin, 'activities', 'note_collision', { leadId: id, type: 'note', text: '기존 연락처 확인' });
+    }
+    if (id === 'found') hs.routes['POST /crm/v3/objects/contacts/search'] = () => ({ total: 1, results: [{ id: '501', properties: {} }] });
+    if (id === 'deal_only') env.DB.database.prepare("UPDATE crm_documents SET data=json_set(data,'$.hubspot.contactId','999','$.hubspot.deals.inspection.dealId','701') WHERE collection='leads' AND id=?").run(id);
+    const rows = (await queue(env, admin, '?leadId=' + id)).items.filter(q => id !== 'deal_only' || q.kind === 'deal');
+    await call(env, 'POST', '/api/hubspot/queue', { token: admin, body: { op: 'approve', ids: rows.map(q => q.id) } });
+    hs.calls.length = 0;
+    const pushed = await flushQueue(env, 20);
+    assert.equal(pushed.done, 0, id); assert.equal(pushed.failed, rows.length, id);
+    assert.ok(pushed.results.every(r => r.error.startsWith('PORTAL_LINKED')), id);
+    assert.ok(!hs.calls.some(c => (c.method === 'PATCH' || c.method === 'POST') && /^\/crm\/v3\/objects\/(contacts|deals|notes)(\/[^/]+)?$/.test(c.path) && !c.path.endsWith('/search')), id);
+  }
+});
 
 test('마이그레이션은 멱등이고 표·인덱스를 만든다 · 워커는 /api 만 코드로 받는다', async () => {
   const db = new TestD1();
@@ -526,6 +677,9 @@ test('파트너 — 등록은 원장만, 링크는 1회, 파트너 토큰은 /ap
   assert.deepEqual([me.body.partner.name, me.body.partner.terms.inbound, me.body.stats.inbound], ['가나수학', '검사비 20% 할인', 0]);
   assert.ok(!JSON.stringify(me.body).includes('010-'), '파트너 응답에 전화번호가 없다');
   assert.equal((await call(env, 'GET', '/api/docs', { token: partner.token })).status, 401, '파트너 토큰으로 직원 API 를 열 수 없다');
+  assert.equal((await call(env, 'GET', '/api/portal/link?leadId=p1', { token: partner.token })).status, 401);
+  assert.equal((await call(env, 'POST', '/api/portal/link', { token: partner.token, body: { leadId: 'p1', familyId: '101', expectedUpdatedAt: 0 } })).status, 401);
+  assert.equal((await call(env, 'POST', '/api/portal/refresh', { token: partner.token, body: { leadId: 'p1', expectedUpdatedAt: 0 } })).status, 401);
   assert.equal((await call(env, 'GET', '/api/partner/me', { token: staff.token })).status, 401, '직원 토큰으로 파트너 API 를 열 수 없다');
 });
 

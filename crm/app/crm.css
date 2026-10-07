@@ -221,6 +221,12 @@ details > summary { cursor: pointer; }
 .lead-history .tl-item { padding-bottom: 20px; }
 .lead-next { grid-area: next; min-width: 0; display: grid; gap: 16px; }
 .lead-next .fu .grow { flex-basis: 100%; }
+.portal-summary .kv { grid-template-columns: 82px minmax(0, 1fr); }
+.portal-summary dd, .portal-references li { overflow-wrap: anywhere; }
+.portal-references { margin: 16px 0; font-size: 13px; }
+.portal-references summary { padding: 8px 0; }
+.portal-references ul { margin: 8px 0; padding-left: 20px; max-height: 220px; overflow-y: auto; }
+.portal-modal [hidden] { display: none !important; }
 .lead-layout select.in { max-width: 100%; }
 .lead-layout + .right { margin-top: 18px; }
 .crm-app input, .crm-app textarea { caret-color: var(--accent); }
