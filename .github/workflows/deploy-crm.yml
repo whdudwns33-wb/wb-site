@@ -34,8 +34,7 @@ jobs:
 
       - name: 순수 로직·HubSpot·서버·파트너 테스트 (전부 통과해야 배포)
         run: |
-          node crm-core.test.cjs
-          node --test hubspot.test.mjs crm-api.test.mjs
+          node ../scripts/check.mjs --only crm
 
       - name: 정적 파일 조립 (dist/)
         run: node build.mjs
@@ -123,6 +122,23 @@ jobs:
           echo "::add-mask::$TOKEN"
           printf '%s' "$TOKEN" | npx --yes --prefer-offline $WRANGLER secret put HUBSPOT_ACCESS_TOKEN
           echo "HubSpot 토큰 등록 완료 — 허브스팟 탭 [다시 확인]"
+
+      - name: 센터앱 조회 키 → 워커 시크릿 복사 (있을 때만)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          PORTAL_READ_KEY: ${{ secrets.WB_SALESDESK_READ_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${PORTAL_READ_KEY:-}" ]; then
+            echo "::notice::센터앱 조회 키 미등록 — 고객 원본 링크만 사용합니다."
+            exit 0
+          fi
+          if [ "${#PORTAL_READ_KEY}" -lt 32 ]; then
+            echo "::error::센터앱 조회 키 길이가 올바르지 않습니다."
+            exit 1
+          fi
+          printf '%s' "$PORTAL_READ_KEY" | npx --yes --prefer-offline $WRANGLER secret put WB_SALESDESK_READ_KEY
 
       - name: 상태 확인
         run: |
