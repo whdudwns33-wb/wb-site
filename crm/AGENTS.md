@@ -16,10 +16,10 @@ HubSpot 실제 연동을 로컬에서 시험하려면 `HUBSPOT_ACCESS_TOKEN=… 
 
 ## 1. 지금 상태 (2026-10-07)
 
-- **센터앱 연결 구현**: 고객 상세에서 아동별 `family.id`를 원장이 명시적으로 연결한다. `crm_portal_links`(마이그레이션 003)에 최소 요약/확인 시각을 저장하며 화면 진입 시 읽기 갱신한다. 연결된 고객의 HubSpot 쓰기는 센터앱이 담당하고 기존 큐는 보류한다. 서버·화면·시크릿 설정 계약은 README §11. 이번 작업 브랜치는 `codex/crm-portal-link-20261007`; 실제 배포 여부는 해당 PR과 Deploy 결과로 확인한다. 실고객 연결은 원장 로그인 후 대조해야 하며 가상 검증을 실데이터 연결 완료로 보고하지 않는다.
+- **센터앱 연결 배포 완료(PR #429)**: 고객 상세에서 아동별 `family.id`를 원장이 명시적으로 연결한다. `crm_portal_links`(마이그레이션 003)에 최소 요약/확인 시각을 저장하며 화면 진입 시 읽기 갱신한다. 연결된 고객의 HubSpot 쓰기는 센터앱이 담당하고 기존 큐는 보류한다. 서버·화면·시크릿 설정 계약은 README §11. Deploy 실행 `37563919464` 성공, 운영 새 자산·health 정상·비인증 조회 401을 확인했다. 실고객 연결은 원장 로그인 후 대조해야 하며 가상 검증을 실데이터 연결 완료로 보고하지 않는다.
   검증: 전체 293/293, CRM 6개 파일(API 26·센터앱 UI 8개 사례 포함), dist 조립, 가상 데이터의 PC·모바일 연결/표시 검사를 통과했다. 전용 `WB_SALESDESK_READ_KEY`는 센터 PC 사용자 환경변수와 GitHub 시크릿에 신규 등록했다. 기존 키·실고객 기록은 변경하지 않았다.
 
-- **배포됨**: `https://wb-crm.whdudwns33.workers.dev/` (워커 `wb-crm`, D1 `wb-crm`, 마이그레이션 001·002 적용). 관계관리 PR #423까지 배포 완료.
+- **배포됨**: `https://wb-crm.whdudwns33.workers.dev/` (워커 `wb-crm`, D1 `wb-crm`, 마이그레이션 001·002·003 적용). 센터앱 연결 PR #429까지 배포 완료.
 - **관리자 설정 완료** — 2026-10-06 관계관리 작업 시작 시 운영 `/api/health`의 `setup:true`를 확인했다. 직원·파트너는 원장이 링크를 발급해야 들어온다. 관리자 비밀번호를 다시 만들거나 재설정하지 않는다.
 - **HubSpot 서버 키 등록 완료**: 전용 비공개 앱 `WB Sales Desk`와 README §5의 7개 권한을 만들고 `HUBSPOT_ACCESS_TOKEN`을 GitHub 시크릿에 저장했다. Actions `Deploy wb-crm worker` 실행 `37459212755` 성공, 운영 health `hubspot:true` 확인. 이 값은 키 존재만 뜻한다. 세일즈데스크 관리자 로그인 후 실제 API 연결 확인·매핑·첫 가져오기는 아직 남아 있다. 기존 n8n용 앱의 토큰·권한은 변경하지 않았다.
   원장 포털에는 딜 파이프라인 "검사 여정"(default)·"학원 등록" 2개와 `wb_source_channel`·`wb_academy_status`·`wb_credit_balance`·`wb_referrer_contact_id`·`wb_retest_due_date`·`wb_risk_signals` 가 이미 있고, 나머지 `wb_*` 8개는 [없는 속성 만들기]가 만든다. 포털 id 는 설정 문서(`settings.hubspot.portal`)에 서버가 심는다 — 저장소에 적지 않는다.
