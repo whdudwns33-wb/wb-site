@@ -23,7 +23,7 @@ let leadId = '';                 // route === 'lead'
 const ui = {
   pipe: 'inspection', q: '', status: 'open', channel: '', owner: '', phoneShown: {}, ym: C.ymOf(C.ymdOf(new Date())),
   hs: { status: null, pipelines: null, suggested: null, props: null, queue: [], counts: null, busy: '', err: '', filter: 'pending', map: null },
-  leadQueue: {}, linkBusy: false, detect: null,
+  leadQueue: {}, portal: {}, linkBusy: false, detect: null,
   relationships: { tab: 'friend', q: '', month: C.ymOf(C.ymdOf(new Date())), status: '' }
 };
 const boot = { health: null, err: '', busy: false };
@@ -31,6 +31,7 @@ const outbox = C.createOutbox();
 let syncErr = '', lastSync = 0, flushTimer = null, flushing = false, pollTimer = null, modalReturnFocus = null;
 let modalInitialValues = '';
 let relationshipEdit = null, relationshipSaving = false;
+let portalEdit = null, portalSaving = false;
 
 /* ── 도우미 ─────────────────────────────────────────── */
 const $ = sel => document.querySelector(sel);
@@ -77,6 +78,7 @@ function modalDirty() {
 }
 function modal(title, bodyHtml, footHtml) {
   relationshipEdit = null;
+  portalEdit = null;
   const host = $('#modalHost'); if (!host) return;
   if (host.hidden) modalReturnFocus = document.activeElement;
   host.innerHTML = '<div class="modal-box"><div class="between mb14"><div class="card-title" id="modalTitle">' + esc(title) + '</div>' +
@@ -87,11 +89,12 @@ function modal(title, bodyHtml, footHtml) {
 }
 function closeModal(saved) {
   const host = $('#modalHost'); if (!host) return;
-  if (relationshipSaving && saved !== true) return;
+  if ((relationshipSaving || portalSaving) && saved !== true) return;
   if (saved !== true && modalDirty() && !confirm('작성 중인 내용이 있습니다. 저장하지 않고 닫을까요?')) return;
   host.hidden = true; host.innerHTML = ''; setInert(false);
   modalInitialValues = '';
   relationshipEdit = null;
+  portalEdit = null;
   const target = modalReturnFocus; modalReturnFocus = null;
   if (target && document.contains(target) && typeof target.focus === 'function') target.focus();
 }
@@ -134,6 +137,8 @@ async function api(path, body, opts) {
 }
 function onAuthLost() {
   if (!session && !getToken()) return;
+  closeModal(true);
+  ui.portal = {};
   setToken(''); session = null; stopPolling(); outbox.clear(); state = C.emptyState(); route = 'login'; render(); toast('다시 로그인해 주세요');
 }
 
@@ -238,6 +243,7 @@ async function afterAuth() {
   startPolling();
   applyRoute(C.routeOf(location.hash));
   render();
+  if (route === 'lead' && leadId) loadPortalLink(leadId);
 }
 function applyRoute(r) {
   route = r.route === 'login' ? 'today' : r.route;
@@ -258,7 +264,7 @@ function onHash() {
   if (!session) { route = 'login'; render(); return; }
   applyRoute(r);
   if (route === 'hubspot') loadHubspotPanel();
-  if (route === 'lead' && leadId) loadLeadQueue(leadId);
+  if (route === 'lead' && leadId) { loadLeadQueue(leadId); loadPortalLink(leadId); }
   render();
 }
 async function linkExchange(code) {
@@ -312,6 +318,7 @@ async function doLogout() {
   if (outbox.size() && !confirm('저장되지 않은 변경 ' + outbox.size() + '건이 있습니다. 그래도 로그아웃할까요?')) return;
   try { await api('/api/logout', {}); } catch (e) { /* 토큰은 버린다 */ }
   setToken(''); session = null; stopPolling(); outbox.clear(); state = C.emptyState();
+  ui.portal = {};
   await loadHealth(); route = 'login'; history.replaceState(null, '', '#/login'); render();
 }
 
@@ -527,6 +534,7 @@ function viewLead(id) {
     '<dt>HubSpot</dt><dd>' + (hs.contactId ? '<span class="tag ok">연결됨</span> ' + (C.hubspotRecordUrl(portal, 'contact', hs.contactId) ? '<a href="' + esc(C.hubspotRecordUrl(portal, 'contact', hs.contactId)) + '" target="_blank" rel="noopener noreferrer">연락처 열기</a>' : '') +
       (hs.deals && hs.deals[l.pipeline] && C.hubspotRecordUrl(portal, 'deal', hs.deals[l.pipeline].dealId) ? ' · <a href="' + esc(C.hubspotRecordUrl(portal, 'deal', hs.deals[l.pipeline].dealId)) + '" target="_blank" rel="noopener noreferrer">딜 열기</a>' : '') : '<span class="tag">아직 안 보냄</span>') + leadQueueHtml(id) + '</dd></dl></section>';
   let nextHtml = '<aside class="lead-next" aria-label="다음 연락과 연계">';
+  nextHtml += '<section class="card portal-summary" id="portal-summary" aria-label="센터앱 원본">' + portalLinkHtml(id) + '</section>';
   nextHtml += relationshipLeadHtml(id);
   // 팔로업
   const fus = Array.isArray(l.followups) ? l.followups.slice().sort((a, b) => a.day - b.day) : [];
@@ -578,6 +586,131 @@ function leadQueueHtml(id) {
 async function loadLeadQueue(id) {
   try { const r = await api('/api/hubspot/queue?leadId=' + encodeURIComponent(id)); ui.leadQueue[id] = r.items; ui.hs.counts = r.counts; if (route === 'lead' && leadId === id && !typingInView()) render(); }
   catch (e) { /* 큐 표시는 부가 정보 */ }
+}
+
+/* 센터앱은 고객번호로만 연결한다. 요약과 기존 영업 기록을 섞어 쓰지 않는다. */
+const PORTAL_FAMILY_ID = /^[1-9][0-9]{0,18}$/;
+const PORTAL_FRIEND_LABEL = { available: '참여 안내', review_required: '첫 후기 등록 필요', active: '3개월 무료 이용 중', expired: '무료 소검사 예약 가능', review_confirmed: '무료 이용 연결 확인 중', completed: '소검사 완료 · 다음 상담' };
+const PORTAL_SUPPORTER_LABEL = { available: '참여 안내', setup_required: '센터 확인 중', active: '서포터즈 이용 중' };
+function portalLinkHtml(id) {
+  const p = ui.portal[id] || {}, link = p.link, s = link && link.snapshot;
+  let h = '<div class="between wraprow"><h2 class="card-title">센터앱 원본</h2>' +
+    (session.canApprove && p.loaded ? '<button class="btn btn-sm btn-ghost" data-act="portal-edit" data-id="' + esc(id) + '"' + (p.busy ? ' disabled' : '') + '>' + (link ? '연결 수정' : '고객번호 연결') + '</button>' : '') + '</div>';
+  if (!p.loaded) return h + '<p class="hint" role="status">' + (p.err ? esc(p.err) : '연결 정보를 확인하고 있습니다.') + '</p>' + (p.err ? '<button class="btn btn-sm btn-ghost" data-act="portal-load" data-id="' + esc(id) + '">다시 확인</button>' : '');
+  if (!link) return h + '<p class="hint">센터앱 고객번호를 연결하면 친구맺기·서포터즈·혜택 상태를 여기서 확인할 수 있습니다. ' + (session.canApprove ? '형제는 각각의 고객번호로 연결하세요.' : '고객번호 연결은 원장님이 할 수 있습니다.') + '</p>';
+  h += '<p class="small">고객번호 ' + esc(link.familyId) + ' · <a href="https://portal.wbcowork.com/admin/family/' + esc(link.familyId) + '" target="_blank" rel="noopener noreferrer">센터앱 고객 열기</a></p>';
+  if (!p.configured) h += '<p class="banner warn">센터앱 조회 연결을 준비 중입니다. 원본은 위 링크에서 확인할 수 있습니다.</p>';
+  if (p.err) h += '<p class="banner bad" role="alert">' + esc(p.err) + (s ? ' 이전에 확인한 상태를 표시합니다.' : ' 현재 상태를 확인하지 못했습니다.') + '</p>';
+  if (s) {
+    const labels = [
+      ['친구맺기', PORTAL_FRIEND_LABEL[s.membership.friend]],
+      ['서포터즈', PORTAL_SUPPORTER_LABEL[s.membership.supporter]],
+      ['앱 설치', { unknown: '미확인', guided: '안내 완료', verified: '직원 확인 완료' }[s.app.installation]],
+      ['앱 실행', s.app.launchObserved ? '실행 기록 있음' : '실행 기록 없음'],
+      ['부모앱 이용', { preparing: '준비 중', scheduled: '시작 예정', active: '이용 기간 중', expired: '이용 기간 종료' }[s.benefits.parentAccess]],
+      ['학습 앱 자격', s.benefits.brainAppsEligible ? '이용 조건 충족' : '이용 조건 미충족'],
+      ['센터 CS', '미완료 ' + s.cs.pendingCount + '건' + (s.cs.nextContactDate ? ' · 다음 연락 ' + s.cs.nextContactDate : '')],
+      ['브런치 참석', s.brunch.attendedCount + '회']
+    ];
+    h += '<dl class="kv">' + labels.map(([k, v]) => '<dt>' + k + '</dt><dd>' + esc(v || '미확인') + '</dd>').join('') + '</dl>';
+    const hub = s.hubspot, portal = hsSettings().portal || {};
+    const reference = (type, recordId, label) => {
+      const url = C.hubspotRecordUrl(portal, type, recordId);
+      return url ? '<a href="' + esc(url) + '" target="_blank" rel="noopener noreferrer">' + esc(label) + '</a>' : esc(label);
+    };
+    h += '<details class="portal-references"><summary>센터앱의 HubSpot 연결 번호</summary><p class="hint">' + (hub.contactId ? reference('contact', hub.contactId, '연락처 ' + hub.contactId) : '연락처 연결 없음') + '</p>' +
+      (hub.appointments.length ? '<ul>' + hub.appointments.map(a => '<li>예약 ' + esc(a.appointmentId) + ' · ' + (a.dealId ? reference('deal', a.dealId, '딜 ' + a.dealId) : '딜 연결 없음') + '</li>').join('') + '</ul>' : '<p class="hint">예약 기록이 없습니다.</p>') + '</details>';
+    h += '<p class="hint">센터앱에서 확인 · ' + esc(new Date(link.checkedAt).toLocaleString('ko-KR')) + '<br>학습 앱 계정의 준비 여부는 센터앱에서 확인하세요. 브런치 참석은 맘스쿨 기록과 별개로 표시합니다.</p>';
+  } else h += '<p class="hint">아직 센터앱 상태를 가져오지 않았습니다.</p>';
+  h += '<p class="hint">이 고객의 HubSpot 전송은 센터앱에서 관리합니다. 아래 영업 후속 기록은 별도로 유지됩니다.</p>';
+  return h + '<button class="btn btn-sm btn-ghost" data-act="portal-refresh" data-id="' + esc(id) + '"' + (p.busy || !p.configured ? ' disabled' : '') + '>' + (p.busy ? '확인 중…' : '센터앱 최신 상태 확인') + '</button>';
+}
+function patchPortal(id) {
+  if (!session || route !== 'lead' || leadId !== id) return;
+  const el = $('#portal-summary');
+  if (el) {
+    const act = el.contains(document.activeElement) ? document.activeElement.dataset.act : '';
+    el.innerHTML = portalLinkHtml(id);
+    if (act) { const target = el.querySelector('[data-act="' + act + '"]'); if (target && !target.disabled) target.focus(); }
+  }
+}
+async function loadPortalLink(id) {
+  const p = ui.portal[id] || (ui.portal[id] = {}), who = session;
+  if (!who || p.busy) return;
+  p.busy = true; p.err = ''; patchPortal(id);
+  try {
+    const res = await api('/api/portal/link?leadId=' + encodeURIComponent(id));
+    if (session !== who || ui.portal[id] !== p) return;
+    Object.assign(p, res, { loaded: true });
+  } catch (e) { if (session === who && ui.portal[id] === p) p.err = e.message; }
+  finally { p.busy = false; patchPortal(id); }
+  if (session === who && ui.portal[id] === p && !p.err && p.link && p.configured) await refreshPortal(id);
+}
+async function refreshPortal(id) {
+  const p = ui.portal[id], who = session;
+  if (!who || !p || p.busy || !p.link) return;
+  p.busy = true; p.err = ''; patchPortal(id);
+  try {
+    const res = await api('/api/portal/refresh', { leadId: id, expectedUpdatedAt: p.link.updatedAt });
+    if (session === who && ui.portal[id] === p) Object.assign(p, res);
+  } catch (e) {
+    if (session !== who || ui.portal[id] !== p) return;
+    p.err = e.message;
+    if (e.code === 'STALE') {
+      // 다른 기기의 연결 변경 뒤에는 옛 고객 요약을 계속 현재 정보로 표시하지 않는다.
+      try { const res = await api('/api/portal/link?leadId=' + encodeURIComponent(id)); if (session === who && ui.portal[id] === p) Object.assign(p, res); }
+      catch (readError) { p.err = '연결이 변경되었으나 다시 확인하지 못했습니다. 고객 화면을 다시 열어 주세요.'; }
+    }
+  } finally { p.busy = false; patchPortal(id); }
+}
+function openPortalLink(id) {
+  const p = ui.portal[id], l = leadById(id);
+  if (!session.canApprove || !l || !p || !p.loaded || p.busy) return;
+  modal('센터앱 고객 연결', '<p class="relationship-person">' + esc(C.leadLabel(l)) + '</p><p class="hint">센터앱에서 같은 아이의 고객 상세를 열어 주소 끝의 고객번호를 확인하세요. 형제는 전화번호가 같아도 각각 연결합니다.</p>' +
+    '<div class="field"><label class="fl" for="portal-family-id">센터앱 고객번호</label><input class="in" id="portal-family-id" inputmode="numeric" maxlength="19" value="' + esc(p.link ? p.link.familyId : '') + '" autocomplete="off"></div>' +
+    '<label class="check"><input type="checkbox" id="portal-confirmed">센터앱과 같은 아이인지 확인했습니다</label><p class="hint">연결한 고객의 HubSpot 전송은 센터앱이 담당합니다. 기존 세일즈데스크 전송 대기는 보류됩니다.</p><div id="portal-error" class="banner bad" role="alert" hidden></div>' +
+    '<button class="btn btn-sm btn-ghost" id="portal-reload" data-act="portal-reload" hidden>최신 연결 확인</button>',
+    '<button class="btn btn-primary btn-block mt14" id="portal-save" data-act="portal-save">고객번호 연결</button>');
+  const box = $('#modalHost').querySelector('.modal-box'); if (box) box.classList.add('portal-modal');
+  portalEdit = { id, expectedUpdatedAt: p.link ? p.link.updatedAt : 0 };
+}
+async function savePortalLink() {
+  if (!portalEdit || portalSaving) return;
+  const edit = portalEdit, familyId = val('portal-family-id'), who = session;
+  const error = $('#portal-error');
+  const showError = msg => { if (error) { error.hidden = false; error.textContent = msg; } };
+  if (!PORTAL_FAMILY_ID.test(familyId)) return showError('고객번호는 0으로 시작하지 않는 숫자로 입력해 주세요.');
+  if (!checked('portal-confirmed')) return showError('같은 아이인지 확인한 뒤 체크해 주세요.');
+  portalSaving = true;
+  ['portal-save', 'portal-family-id', 'portal-confirmed', 'portal-reload'].forEach(id => { const el = $('#' + id); if (el) el.disabled = true; });
+  try {
+    const res = await api('/api/portal/link', { leadId: edit.id, familyId, expectedUpdatedAt: edit.expectedUpdatedAt });
+    if (session !== who || portalEdit !== edit) return;
+    ui.portal[edit.id] = Object.assign({}, res, { loaded: true, busy: false, err: '' });
+    portalSaving = false;
+    closeModal(true); patchPortal(edit.id); toast('센터앱 고객번호를 연결했습니다');
+    if (res.configured) await refreshPortal(edit.id);
+  } catch (e) {
+    if (session !== who || portalEdit !== edit) return;
+    showError(e.message + (e.code === 'STALE' ? ' 최신 연결을 확인한 뒤 다시 저장해 주세요.' : ' 입력한 내용은 그대로 남아 있습니다.'));
+    if (e.code === 'STALE') $('#portal-reload').hidden = false;
+  } finally {
+    portalSaving = false;
+    ['portal-save', 'portal-family-id', 'portal-confirmed', 'portal-reload'].forEach(id => { const el = $('#' + id); if (el) el.disabled = false; });
+  }
+}
+async function reloadPortalEdit() {
+  const edit = portalEdit, who = session;
+  if (!edit || portalSaving) return;
+  try {
+    const res = await api('/api/portal/link?leadId=' + encodeURIComponent(edit.id));
+    if (session !== who || portalEdit !== edit) return;
+    edit.expectedUpdatedAt = res.link ? res.link.updatedAt : 0;
+    ui.portal[edit.id] = Object.assign({}, res, { loaded: true });
+    $('#portal-confirmed').checked = false;
+    $('#portal-error').textContent = '현재 연결: ' + (res.link ? res.link.familyId : '없음') + '. 입력한 번호는 유지했습니다. 같은 아이인지 다시 확인해 주세요.';
+    $('#portal-reload').hidden = true; patchPortal(edit.id);
+  } catch (e) { if (session === who && portalEdit === edit) $('#portal-error').textContent = '최신 연결 확인 실패 — ' + e.message; }
 }
 
 /* ── 화면: 성과 ─────────────────────────────────────── */
@@ -708,7 +841,7 @@ async function hsAction(kind, arg) {
       toast('속성 ' + r.created.length + '개 만들었습니다' + (r.failed.length ? ' · 실패 ' + r.failed.length : ''));
     } else if (kind === 'pull') {
       const r = await api('/api/hubspot/pull', { full: !!arg });
-      ui.hs.pullMsg = '가져오기 — 새 리드 ' + r.created + ' · 갱신 ' + r.updated + ' · 건너뜀(미반영 변경) ' + r.conflicts + (r.more ? ' · 더 있음(다시 누르세요)' : '');
+      ui.hs.pullMsg = '가져오기 — 새 리드 ' + r.created + ' · 갱신 ' + r.updated + ' · 건너뜀(미반영 변경) ' + r.conflicts + (r.portalSkipped ? ' · 센터앱 관리 ' + r.portalSkipped : '') + (r.more ? ' · 더 있음(다시 누르세요)' : '');
       await loadAll();
     } else if (kind === 'push') {
       const r = await api('/api/hubspot/push', { limit: 25 });
@@ -1298,6 +1431,11 @@ document.addEventListener('click', async e => {
     case 'setup': return doSetup(el);
     case 'logout': return doLogout();
     case 'closemodal': return closeModal();
+    case 'portal-edit': return openPortalLink(id);
+    case 'portal-save': return savePortalLink();
+    case 'portal-reload': return reloadPortalEdit();
+    case 'portal-load': return loadPortalLink(id);
+    case 'portal-refresh': return refreshPortal(id);
     case 'relationship-tab': ui.relationships.tab = el.dataset.tab; ui.relationships.status = ''; return render();
     case 'membership-new': return openMembershipForm('', el.dataset.program || ui.relationships.tab, el.dataset.lead);
     case 'membership-edit': return openMembershipForm(id);
@@ -1427,6 +1565,6 @@ document.addEventListener('keydown', e => {
 });
 window.addEventListener('hashchange', onHash);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); });
-window.addEventListener('beforeunload', e => { if (outbox.size() || relationshipSaving || modalDirty()) { e.preventDefault(); e.returnValue = ''; } });
+window.addEventListener('beforeunload', e => { if (outbox.size() || relationshipSaving || portalSaving || modalDirty()) { e.preventDefault(); e.returnValue = ''; } });
 
 startApp();
