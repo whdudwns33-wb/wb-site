@@ -853,25 +853,52 @@ test('unassigned students may omit school, grade, subjects, and teachers before 
 test('same-name students are separated by school and grade, then by parent contacts', async () => {
   const db = new TestD1(); seedAuth(db); await replace(db);
   let current = await call(db, { auth: admin, action: 'get' });
+  const confirmedDuplicateStudentIds = [];
   const create = async student => call(db, {
     auth: admin, action: 'student_create', expectedUpdatedAt: current.body.updatedAt,
+    confirmedDuplicateStudentIds,
     student: { id: 'client-id', teacher: '', subject: '', start: '2026-08', end: '', reason: '', teacherIds: [], ...student }
   });
   const first = await create({ name: '김예린', school: '초', grade: '6', phoneMother: '010-1111-1111' });
   assert.equal(first.status, 200);
   current = first;
+  confirmedDuplicateStudentIds.push(first.body.student.id);
   const second = await create({ name: '김예린', school: '치평초', grade: '3', phoneMother: '010-2222-2222' });
   assert.equal(second.status, 200);
   current = second;
+  confirmedDuplicateStudentIds.push(second.body.student.id);
   const third = await create({ name: '김예린', school: '치평초', grade: '3', phoneMother: '010-3333-3333' });
   assert.equal(third.status, 200);
   current = third;
+  confirmedDuplicateStudentIds.push(third.body.student.id);
   const duplicate = await create({ name: '김예린', school: '치평초', grade: '3', phoneMother: '010-3333-3333' });
   assert.equal(duplicate.status, 409);
   assert.equal(duplicate.body.code, 'STUDENT_ALREADY_EXISTS');
   const ambiguousWithoutPhone = await create({ name: '김예린', school: '치평초', grade: '3' });
   assert.equal(ambiguousWithoutPhone.status, 409);
   assert.equal(ambiguousWithoutPhone.body.code, 'STUDENT_ALREADY_EXISTS');
+});
+
+test('same-name preflight is private, read-only and requires explicit confirmation to create a different student', async () => {
+  const db = new TestD1(); seedAuth(db); await replace(db);
+  const check = await call(db, { auth: admin, action: 'student_name_check', name: ' 가 학 생 ' });
+  assert.equal(check.status, 200);
+  assert.deepEqual(check.body.students.map(s => s.id), ['student-a']);
+  assert.equal(check.body.students[0].mother, '미입력');
+  const denied = await call(db, { auth: person('teacher-a', 'token-a'), action: 'student_name_check', name: '가학생' });
+  assert.equal(denied.status, 403);
+  const student = { name: '가학생', school: '다른초', grade: '5', start: '2026-08', end: '', reason: '', subject: '' };
+  const create = extra => call(db, { auth: admin, action: 'student_create', expectedUpdatedAt: check.body.updatedAt, student, ...extra });
+  const blocked = await create({});
+  assert.equal(blocked.body.code, 'STUDENT_SAME_NAME_CONFIRM_REQUIRED');
+  const wrong = await create({ confirmedDuplicateStudentIds: ['student-b'] });
+  assert.equal(wrong.body.code, 'STUDENT_SAME_NAME_CONFIRM_REQUIRED');
+  const created = await create({ confirmedDuplicateStudentIds: ['student-a'] });
+  assert.equal(created.status, 200);
+  assert.notEqual(created.body.student.id, 'student-a');
+  assert.match(created.body.student.id, /^[1-9]\d{7}$/);
+  const stale = await create({ confirmedDuplicateStudentIds: ['student-a'] });
+  assert.equal(stale.body.code, 'ROSTER_REVISION_CONFLICT');
 });
 
 test('person roster and book candidates follow current lesson stable ids instead of roster teacherIds', async () => {

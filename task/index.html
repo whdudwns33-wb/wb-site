@@ -19796,6 +19796,42 @@ async function openRosterStudentEditor(studentId, assignment, entryType) {
   } catch (error) { closeModal(); toast('원생 정보를 불러오지 못했습니다 — ' + (error.message || error)); }
 }
 
+function confirmRosterSameName(students) {
+  // 기존 입력 폼은 유지하여 취소해도 작성 내용이 사라지지 않게 한다.
+  return new Promise(resolve => {
+    const dialog = document.createElement('div');
+    dialog.className = 'modal';
+    dialog.setAttribute('role', 'dialog');
+    dialog.setAttribute('aria-modal', 'true');
+    dialog.setAttribute('aria-label', '동명이인 확인');
+    dialog.style.cssText = 'display:grid;z-index:160';
+    dialog.innerHTML = '<div style="max-width:560px;width:100%;max-height:85vh;overflow:auto;background:white;border-radius:16px;padding:24px"><h3>동명이인이 이미 등록되어 있습니다</h3><p>학교·학년과 보호자 연락처 끝자리를 비교해 주세요. 같은 학생이면 새로 등록하지 않습니다.</p>' +
+      students.map((student, index) => '<div class="card"><b>' + esc(student.name) + '</b> · ' + esc(student.school || '학교 미입력') + ' · ' + esc(student.grade || '학년 미입력') +
+        '<p>부: ' + esc(student.father) + ' / 모: ' + esc(student.mother) + '</p>' +
+        '<button type="button" class="btn" data-same-student="' + index + '">같은 학생 · 기존 정보 보기</button></div>').join('') +
+      '<p class="hint">학교·학년도 같다면 보호자 연락처로 구분해야 합니다.</p>' +
+      '<button type="button" class="btn primary" data-different-student>다른 학생입니다 · 새로 등록</button> ' +
+      '<button type="button" class="btn" data-cancel-duplicate>취소 · 입력 계속</button></div>';
+    const previousFocus = document.activeElement;
+    const finish = result => { dialog.remove(); if (previousFocus) previousFocus.focus(); resolve(result); };
+    dialog.addEventListener('keydown', event => {
+      if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); finish({ cancel: true }); }
+      if (event.key === 'Tab') {
+        const buttons = Array.from(dialog.querySelectorAll('button'));
+        const first = buttons[0], last = buttons[buttons.length - 1];
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+      }
+    });
+    dialog.querySelector('[data-cancel-duplicate]').onclick = () => finish({ cancel: true });
+    dialog.querySelector('[data-different-student]').onclick = () => finish({ different: true });
+    dialog.querySelectorAll('[data-same-student]').forEach(button => {
+      button.onclick = () => finish({ studentId: students[Number(button.dataset.sameStudent)].id });
+    });
+    document.body.appendChild(dialog); dialog.querySelector('[data-cancel-duplicate]').focus();
+  });
+}
+
 async function saveRosterStudent(button) {
   const editor = rosterStudentEditor;
   if (!session.isAdmin || !editor || !rosterDb) return;
@@ -19831,9 +19867,27 @@ async function saveRosterStudent(button) {
   if (!auth) return toast('관리자 인증을 확인해 주세요');
   button.disabled = true; button.textContent = '저장 중…';
   try {
+    let confirmedDuplicateStudentIds = [];
+    let expectedUpdatedAt = Number(rosterDb.updatedAt);
+    if (!editor.student._editing) {
+      const check = await sync.post('/roster', { app: SYNC_APP, auth: auth, action: 'student_name_check', name: student.name });
+      expectedUpdatedAt = Number(check.updatedAt);
+      if (check.students.length) {
+        const choice = await confirmRosterSameName(check.students);
+        if (!choice.different) {
+          button.disabled = false; button.textContent = '저장';
+          if (choice.studentId) {
+            closeModal(); rosterStudentEditor = null;
+            await openRosterStudentEditor(choice.studentId, null);
+          }
+          return;
+        }
+        confirmedDuplicateStudentIds = check.students.map(item => item.id);
+      }
+    }
     const result = await sync.post('/roster', {
       app: SYNC_APP, auth: auth, action: editor.student._editing ? 'student_update' : 'student_create',
-      expectedUpdatedAt: Number(rosterDb.updatedAt), student: student
+      expectedUpdatedAt: expectedUpdatedAt, student: student, confirmedDuplicateStudentIds: confirmedDuplicateStudentIds
     });
     const assignment = editor.assignment;
     if (assignment) {

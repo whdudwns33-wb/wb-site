@@ -59,7 +59,8 @@ test('원생 저장은 결제방식과 회차 시작일을 함께 보내고 잘�
   assert.match(save, /billingMode\s*===\s*'session4'/);
   assert.match(save, /회차 시작일/);
   assert.match(save, /billingMode\s*===\s*'monthly'[\s\S]{0,180}(?:''|sessionCycleStartDate)/);
-  assert.match(save, /expectedUpdatedAt:\s*Number\(rosterDb\.updatedAt\)/);
+  assert.match(save, /expectedUpdatedAt = Number\(rosterDb\.updatedAt\)/);
+  assert.match(save, /expectedUpdatedAt:\s*expectedUpdatedAt/);
 });
 
 test('학생 정보 팝업은 결제 구분과 회차 시작일을 escape해 표시한다', () => {
