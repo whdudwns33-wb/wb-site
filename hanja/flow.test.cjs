@@ -24,7 +24,7 @@ let passed = 0;
 const t = (name, fn) => { fn(); passed += 1; console.log('  ✓ ' + name); };
 
 function harness() {
-  const nodes = new Map(), storage = new Map(), cancelled = [], confirmation = { answer: true, count: 0 };
+  const nodes = new Map(), storage = new Map(), cancelled = [], windowListeners = {}, confirmation = { answer: true, count: 0 };
   function element(id) {
     let content = '';
     const children = [], listeners = {}, choices = [];
@@ -33,7 +33,8 @@ function harness() {
       addEventListener(type, fn) { listeners[type] = fn; },
       click() { assert.ok(listeners.click, id + '에 클릭 동작이 없다'); listeners.click(); },
       change() { assert.ok(listeners.change); listeners.change(); },
-      querySelectorAll(selector) { return selector === '.choice' ? choices : []; }, focus() {},
+      querySelectorAll(selector) { return selector === '.choice' ? choices : []; },
+      focus() { this.focusCount = (this.focusCount || 0) + 1; },
       get innerHTML() { return content; },
       set innerHTML(value) {
         children.splice(0).forEach((key) => nodes.delete(key));
@@ -61,7 +62,7 @@ function harness() {
     WBHSRS: S, WBHQUIZ: quiz, WBBOOKCHECK: B, WBVoice: voice,
     WBHBRIDGE: require('./bridge.js'), WBHTRACE: require('./trace.js'),
     document: { querySelector: (s) => nodes.get(s) || null, querySelectorAll: (s) => s === '.tabbar button' ? tabs : [], documentElement: {} },
-    window: { addEventListener() {}, scrollTo() {} },
+    window: { addEventListener(type, fn) { windowListeners[type] = fn; }, scrollTo() {} },
     getComputedStyle: () => ({ getPropertyValue: () => 'serif' }),
     localStorage: { getItem: (k) => storage.get(k) || null, setItem: (k, v) => storage.set(k, v), removeItem: (k) => storage.delete(k) },
     setTimeout() { return 0; }, clearTimeout() {},
@@ -90,7 +91,7 @@ function harness() {
   assert.ok(mixed && pure, '자체 시험 단어장을 설치하지 못했다');
   app.LIB.index = [mixed, pure].map(B.bookMeta);
   app.selectUnit(mixed, 'words');
-  return { app, mixed, pure, nodes, quiz, voice, cancelled, tabs, confirmation };
+  return { app, mixed, pure, nodes, quiz, voice, cancelled, tabs, confirmation, windowListeners };
 }
 
 function sayButton() {
@@ -264,6 +265,41 @@ t('도움 화면을 다녀와 문항을 다시 그려도 답변과 점수는 한
   assert.ok(nodes.get('#lnContinue'));
   nodes.get('#lnContinue').click();
   assert.strictEqual(app.learn.q, null, '다음 낱말에 이전 문항이 남았다');
+});
+
+t('빈 낱말 답은 채점하지 않고 안내한 뒤 입력칸에 다시 초점을 둔다', () => {
+  const { app, mixed, nodes, quiz } = harness();
+  quiz.makeQuestion = (it, ctx, opts) => Q.makeQuestion(it, ctx, { ...opts, kinds: ['w-type'] });
+  app.trainStart({ mode: 'check', book: mixed.id, unit: 'words' });
+  const input = nodes.get('#qIn'), focused = input.focusCount;
+  input.value = '';
+  assert.ok(nodes.get('#view-train').innerHTML.includes('aria-label="낱말을 쓰세요"'));
+  nodes.get('#qSubmit').click();
+  assert.strictEqual(app.train.i, 0);
+  assert.strictEqual(app.train.right, 0);
+  assert.strictEqual(app.db.log.length, 0);
+  assert.strictEqual(nodes.get('#toast').textContent, '낱말을 써 주세요');
+  assert.strictEqual(input.focusCount, focused + 1);
+});
+
+t('진행 중인 시험·학습은 새로고침 이탈을 경고하고 끝내면 해제한다', () => {
+  const { app, mixed, nodes, windowListeners } = harness();
+  function leaving() {
+    const event = { prevented: false, preventDefault() { this.prevented = true; } };
+    windowListeners.beforeunload(event);
+    return event;
+  }
+  assert.strictEqual(leaving().prevented, false);
+  app.trainStart({ mode: 'check', book: mixed.id, unit: 'words' });
+  const active = leaving();
+  assert.strictEqual(active.prevented, true);
+  assert.strictEqual(active.returnValue, '');
+  nodes.get('#studyQuit').click();
+  assert.strictEqual(leaving().prevented, false);
+  app.trace = {};
+  assert.strictEqual(leaving().prevented, true, '한자 따라쓰기 중 이탈을 경고하지 않았다');
+  app.trace = null;
+  assert.strictEqual(leaving().prevented, false);
 });
 
 t('교재 id 재매핑은 학습 상태가 없어도 저장된 오답과 재확인 목록에 적용', () => {

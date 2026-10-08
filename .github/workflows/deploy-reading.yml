@@ -147,8 +147,8 @@ jobs:
         run: for f in hanja/*.test.cjs; do node "$f" || exit 1; done
       - name: 어휘브레인 체험 단어장 검증 (book-validate)
         run: node hanja/book-validate.mjs hanja/book-sample.json
-      - name: 어휘브레인 서버 라우트 테스트
-        run: node reading-server/hanja-api.test.mjs
+      - name: 어휘브레인 서버 라우트·인쇄 테스트
+        run: node reading-server/hanja-api.test.mjs && node reading-server/public/hanja-print.test.cjs
       - name: 어휘브레인 도구 테스트 (교재 텍스트 초안 추출기·획순 변환기)
         run: node hanja/extract/draft.test.mjs && node hanja/strokes-convert.test.mjs
       - name: 청크브레인 규칙·복습 일정 테스트

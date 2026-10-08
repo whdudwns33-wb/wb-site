@@ -575,7 +575,17 @@ const server = http.createServer(async (req, res) => {
       /* 어휘브레인 (/api/hanja/*) — 인증만 공유, 저장·라우트는 격리(워커와 동일). 단어장은 db.hanja 에만 산다 */
       if (p.startsWith('/api/hanja/')) {
         if (Number(req.headers['content-length'] || 0) > hanjaBodyLimit(p)) { req.resume(); return json(res, 413, { error: '요청이 너무 커서 받을 수 없어요.' }); }
-        const out = await handleHanja({ path: p, method: req.method, who, query: url.searchParams, getBody: () => readBody(req, hanjaBodyLimit(p)), store: hanjaStore, push: VOCAB_PUSH_ENV });
+        const out = await handleHanja({
+          path: p, method: req.method, who, query: url.searchParams, getBody: () => readBody(req, hanjaBodyLimit(p)), store: hanjaStore, push: VOCAB_PUSH_ENV,
+          mnemonic: (body) => handleVocab({
+            path: '/api/vocab/mnemonic', method: 'POST', who, getBody: async () => body, store: vocabStore,
+            ai: { apiKey: process.env.ANTHROPIC_API_KEY || '', model: process.env.VOCAB_AI_MODEL || '', env: process.env },
+          }),
+          mnemonicCheck: (body) => handleVocab({
+            path: '/api/vocab/mnemonic/check', method: 'POST', who, getBody: async () => body, store: vocabStore,
+            ai: { env: process.env },
+          }),
+        });
         return json(res, out.status, out.body);
       }
 

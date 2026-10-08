@@ -52,7 +52,7 @@
     <h1>확인 시험지 인쇄</h1>
     <p class="small">단어장 단원 하나로 종이 시험지를 만듭니다. 브라우저 인쇄 → PDF 저장이 곧 시험지예요.</p>
     <div id="login">
-      <h2>관리자 PIN</h2>
+      <h2>강사 로그인</h2>
       <div id="loginHost"></div>
       <p class="small" id="loginErr"></p>
     </div>
@@ -67,6 +67,7 @@
       <label><input type="checkbox" id="tHanja"> 한자어 표기 쓰기 (낱말·뜻 → 한자)</label>
       <label><input type="checkbox" id="tCharWord"> 이 글자가 든 낱말 쓰기 (한자·훈음 → 낱말, 급수 교재용)</label>
       <label><input type="checkbox" id="tKey" checked> 정답표 (마지막 장)</label>
+      <p class="small" style="color:var(--deep)"><b>따로 인쇄:</b> 훈음 쓰기와 한자 쓰기처럼 서로 정답이 보이는 시험은 한 종류씩 인쇄해 학생에게 따로 나눠 주세요.</p>
       <h2>순서</h2>
       <label><input type="checkbox" id="shuf"> 섞기</label>
       <label>이름 칸 <input type="text" id="cls" placeholder="반 이름 (선택)" style="flex:1"></label>
@@ -166,7 +167,7 @@
     }
     if ($('#tMeaning').checked && words.length) {
       chunk(words, 20).forEach(function (part, pi) {
-        var rows = part.map(function (w, i) { return '<tr><td style="width:26px;text-align:center">' + (pi * 20 + i + 1) + '</td><td style="width:120px"><b>' + esc(w.word) + '</b>' + (w.hanja ? ' <span style="font-family:var(--serif);color:#3D6B8E">' + esc(w.hanja) + '</span>' : '') + '</td><td></td></tr>'; }).join('');
+        var rows = part.map(function (w, i) { return '<tr><td style="width:26px;text-align:center">' + (pi * 20 + i + 1) + '</td><td style="width:120px"><b>' + esc(w.word) + '</b></td><td></td></tr>'; }).join('');
         pages.push({ title: '낱말 뜻 쓰기 — 낱말의 뜻을 쓰세요', sub: unitTitle, html: '<table class="q"><thead><tr><th></th><th>낱말</th><th>뜻</th></tr></thead><tbody>' + rows + '</tbody></table>' });
       });
       key.push({ title: '낱말 뜻', items: words.map(function (w, i) { return (i + 1) + '. ' + w.word + ' — ' + w.meaning; }) });
