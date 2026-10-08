@@ -70,27 +70,45 @@ export function portalSummary(raw, familyId) {
 async function fetchSummary(env, familyId) {
   // 테스트에서만 fetch를 주입한다. 운영 주소/헤더를 클라이언트가 정할 수 없고 리다이렉트로 키를 보내지 않는다.
   const fetchImpl = typeof env.PORTAL_FETCH === 'function' ? env.PORTAL_FETCH : globalThis.fetch;
-  const remote = await fetchImpl(ORIGIN + '/api/integrations/salesdesk/families/' + familyId, {
-    method: 'GET', headers: { Authorization: 'Bearer ' + env.WB_SALESDESK_READ_KEY, Accept: 'application/json' },
-    redirect: 'error', signal: AbortSignal.timeout(8000)
-  });
-  if (!remote.ok) throw new Error(remote.status === 404 ? 'PORTAL_NOT_FOUND' : 'PORTAL_UNAVAILABLE');
-  if (!remote.headers.get('content-type')?.toLowerCase().includes('application/json') || Number(remote.headers.get('content-length')) > MAX_BYTES) throw new Error('PORTAL_FORMAT');
-  const reader = remote.body?.getReader();
-  if (!reader) throw new Error('PORTAL_FORMAT');
-  let bytes = 0, text = '';
-  const decoder = new TextDecoder();
+  let phase = 'request', code = 'PORTAL_UNAVAILABLE', upstreamStatus;
   try {
-    while (true) {
-      const part = await reader.read();
-      if (part.done) break;
-      bytes += part.value.byteLength;
-      if (bytes > MAX_BYTES) throw new Error('PORTAL_FORMAT');
-      text += decoder.decode(part.value, { stream: true });
+    const remote = await fetchImpl(ORIGIN + '/api/integrations/salesdesk/families/' + familyId, {
+      method: 'GET', headers: { Authorization: 'Bearer ' + env.WB_SALESDESK_READ_KEY, Accept: 'application/json' },
+      redirect: 'error', signal: AbortSignal.timeout(8000)
+    });
+    phase = 'response';
+    if (Number.isInteger(remote.status) && remote.status >= 100 && remote.status <= 599) upstreamStatus = remote.status;
+    if (!remote.ok) {
+      code = remote.status === 401 || remote.status === 403 ? 'PORTAL_AUTH' : remote.status === 404 ? 'PORTAL_NOT_FOUND' : remote.status === 503 ? 'PORTAL_UPSTREAM_UNAVAILABLE' : 'PORTAL_UNAVAILABLE';
+      throw new Error();
     }
-    text += decoder.decode();
-  } finally { await reader.cancel().catch(() => {}); }
-  return portalSummary(JSON.parse(text), familyId);
+    phase = 'content_type'; code = 'PORTAL_FORMAT';
+    if (!remote.headers.get('content-type')?.toLowerCase().includes('application/json') || Number(remote.headers.get('content-length')) > MAX_BYTES) throw new Error();
+    phase = 'body';
+    const reader = remote.body?.getReader();
+    if (!reader) throw new Error();
+    let bytes = 0, text = '';
+    const decoder = new TextDecoder();
+    code = 'PORTAL_UNAVAILABLE';
+    try {
+      while (true) {
+        const part = await reader.read();
+        if (part.done) break;
+        bytes += part.value.byteLength;
+        if (bytes > MAX_BYTES) { code = 'PORTAL_FORMAT'; throw new Error(); }
+        text += decoder.decode(part.value, { stream: true });
+      }
+      text += decoder.decode();
+    } finally { await reader.cancel().catch(() => {}); }
+    phase = 'json'; code = 'PORTAL_FORMAT';
+    const parsed = JSON.parse(text);
+    phase = 'schema';
+    return portalSummary(parsed, familyId);
+  } catch (error) {
+    if ((phase === 'request' || phase === 'body') && ['TimeoutError', 'AbortError'].includes(error?.name)) code = 'PORTAL_TIMEOUT';
+    // 예외 본문·URL·응답·키를 전달하지 않는다. 이 함수가 만든 단계/코드/HTTP 숫자만 진단에 쓴다.
+    throw Object.assign(new Error('센터앱 조회 실패'), { code, phase, ...(upstreamStatus === undefined ? {} : { upstreamStatus }) });
+  }
 }
 
 export async function handlePortalApi(request, env, auth) {
@@ -136,8 +154,19 @@ export async function handlePortalApi(request, env, auth) {
   let snapshot;
   try { snapshot = await fetchSummary(env, current.family_id); }
   catch (error) {
-    const missing = error?.message === 'PORTAL_NOT_FOUND';
-    return fail(missing ? 'PORTAL_NOT_FOUND' : 'PORTAL_UNAVAILABLE', missing ? '센터앱에서 고객번호를 찾지 못했습니다. 이전 확인 기록은 유지됩니다' : '센터앱 정보를 확인하지 못했습니다. 이전 확인 기록은 유지됩니다', 502);
+    const messages = {
+      PORTAL_AUTH: '센터앱 조회가 인증 또는 접근 권한 확인에서 거부되었습니다',
+      PORTAL_NOT_FOUND: '센터앱에서 고객번호를 찾지 못했습니다',
+      PORTAL_UPSTREAM_UNAVAILABLE: '센터앱 조회 서비스를 사용할 수 없습니다',
+      PORTAL_FORMAT: '센터앱 응답 형식이 맞지 않아 정보를 불러오지 못했습니다',
+      PORTAL_TIMEOUT: '센터앱 조회 시간이 초과되었습니다',
+      PORTAL_UNAVAILABLE: '센터앱 정보를 확인하지 못했습니다'
+    };
+    const code = Object.hasOwn(messages, error?.code) ? error.code : 'PORTAL_UNAVAILABLE';
+    const diagnostic = {};
+    if (['request', 'response', 'content_type', 'body', 'json', 'schema'].includes(error?.phase)) diagnostic.phase = error.phase;
+    if (Number.isInteger(error?.upstreamStatus) && error.upstreamStatus >= 100 && error.upstreamStatus <= 599) diagnostic.upstreamStatus = error.upstreamStatus;
+    return fail(code, messages[code] + '. 이전 확인 기록은 유지됩니다', 502, diagnostic);
   }
   const saved = await env.DB.prepare("UPDATE crm_portal_links SET snapshot=?,checked_at=?,updated_at=? WHERE lead_id=? AND updated_at=? AND family_id=? AND EXISTS (SELECT 1 FROM crm_documents WHERE collection='leads' AND id=? AND deleted=0)")
     .bind(JSON.stringify(snapshot), Date.now(), Math.max(Date.now(), updatedAt), leadId, body.expectedUpdatedAt, current.family_id, leadId).run();
