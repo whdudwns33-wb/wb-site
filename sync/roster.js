@@ -659,7 +659,7 @@ export async function handleRoster(env, app, body, origin, auth, json) {
   if (app !== 'task') return json({ ok: false, error: '이 기능은 직원 앱에서만 사용할 수 있습니다' }, 400, origin);
   const action = String(body.action || '');
   if (!['get', 'replace', 'student_get', 'student_create', 'student_update', 'student_delete', 'student_transition',
-    'subscription_session_create'].includes(action)) {
+    'subscription_session_create', 'student_name_check'].includes(action)) {
     return json({ ok: false, error: '지원하지 않는 원생 명단 작업입니다' }, 400, origin);
   }
 
@@ -1015,6 +1015,21 @@ export async function handleRoster(env, app, body, origin, auth, json) {
     return json({ ok: true, updatedAt: rosterUpdatedAt, student: withoutRosterTeacher(student), task: responseTask }, 200, origin);
   }
 
+  if (action === 'student_name_check') {
+    if (auth.scope !== 'all') return json({ ok: false, error: '관리자만 원생 중복 확인을 할 수 있습니다' }, 403, origin);
+    const row = await env.DB.prepare('SELECT data,updated_at FROM private_rosters WHERE app=? LIMIT 1').bind(app).first();
+    if (!row) return json({ ok: false, error: '원생 명단을 불러오지 못했습니다' }, 409, origin);
+    const document = validateRosterDocument(JSON.parse(row.data));
+    const name = identityText(body.name);
+    if (!name) return json({ ok: false, error: '이름을 입력해 주세요' }, 400, origin);
+    const masked = value => { const digits = String(value || '').replace(/\D/g, ''); return digits ? '끝 ' + digits.slice(-4) : '미입력'; };
+    const students = document.roster.students.filter(item => identityText(item.name) === name).map(item => ({
+      id: item.id, name: item.name, school: item.school, grade: item.grade,
+      father: masked(item.phoneFather), mother: masked(item.phoneMother), reason: item.reason || ''
+    }));
+    return json({ ok: true, updatedAt: Number(row.updated_at), students }, 200, origin);
+  }
+
   if (action === 'student_create' || action === 'student_update') {
     if (auth.scope !== 'all') return json({ ok: false, error: '원생 기본 정보는 원장만 수정할 수 있습니다' }, 403, origin);
     const expectedUpdatedAt = Number(body.expectedUpdatedAt);
@@ -1077,6 +1092,13 @@ export async function handleRoster(env, app, body, origin, auth, json) {
       error: '같은 이름·학교·학년의 원생이 이미 있거나 보호자 연락처 없이 구분할 수 없습니다. 기존 원생을 선택해 주세요',
       studentId: same ? same.id : undefined }, 409, origin);
     if (action === 'student_create') {
+      const sameNameIds = document.roster.students.filter(item => identityText(item.name) === identityText(nextStudent.name))
+        .map(item => item.id).sort();
+      const confirmed = Array.isArray(body.confirmedDuplicateStudentIds) ? [...new Set(body.confirmedDuplicateStudentIds)].sort() : [];
+      if (sameNameIds.length && JSON.stringify(sameNameIds) !== JSON.stringify(confirmed)) {
+        return json({ ok: false, code: 'STUDENT_SAME_NAME_CONFIRM_REQUIRED',
+          error: '동명이인이 있습니다. 기존 학생과 다른 학생인지 확인한 뒤 등록해 주세요' }, 409, origin);
+      }
       if (index >= 0) return json({ ok: false, code: 'STUDENT_ID_EXISTS', error: '이미 등록된 원생 ID입니다. 명단을 새로고침해 주세요' }, 409, origin);
       document.roster.students.push(nextStudent);
     } else {
