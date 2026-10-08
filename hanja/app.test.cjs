@@ -56,7 +56,7 @@ t('학생 화면은 학생 기기·단어장 값을 이스케이프해서 그린
   assert.ok(!/innerHTML = w\.word|innerHTML = q\.prompt/.test(app));
 });
 
-t('관리 화면·인쇄 화면은 색인·추적을 막고, 인쇄 화면은 PIN 뒤에서만 단어장을 받는다', () => {
+t('관리 화면·인쇄 화면은 색인·추적을 막고, 인쇄 화면은 강사 로그인 뒤에서만 단어장을 받는다', () => {
   for (const [name, src] of [['hanja-admin.html', admin], ['hanja-print.html', print]]) {
     assert.ok(/noindex/.test(src), name + ' 에 noindex 가 없다');
     assert.ok(/no-referrer/.test(src), name + ' 에 referrer 정책이 없다');
@@ -71,10 +71,13 @@ t('관리 화면·인쇄 화면은 색인·추적을 막고, 인쇄 화면은 PI
 t('AI 연상 버튼은 자체 단어장(aiAllowed)에서만 — 교재 뜻 문장이 외부 AI 로 나가지 않게', () => {
   const btnLine = app.split('\n').find((l) => l.includes('data-ai="'));
   assert.ok(btnLine && btnLine.includes('aiAllowed('), 'AI 연상 버튼이 단어장 종류를 보지 않는다');
-  const fn = app.slice(app.indexOf('async function aiMnemo'), app.indexOf("'/api/vocab/mnemonic'"));
+  const fn = app.slice(app.indexOf('async function aiMnemo'), app.indexOf('async function refreshPendingMnemos'));
   assert.ok(fn.includes('aiAllowed('), 'aiMnemo 가 호출 직전에 종류를 다시 보지 않는다');
+  assert.ok(fn.includes("'/api/hanja/mnemonic'") && fn.includes('bookId: it.book') && fn.includes('wordId: w.id'), '서버가 단어장 종류와 저장된 낱말을 확인하는 경로를 쓰지 않는다');
+  assert.ok(fn.includes('entry.local || entry.sample') && fn.includes("'/api/vocab/mnemonic'"), '기기 안의 자체 자료가 기존 AI 경로를 잃었다');
+  assert.ok(app.includes("'/api/hanja/mnemonic/check'"), '한자 전용 학생이 AI 연상 검수 결과를 확인할 경로가 없다');
   assert.ok(admin.includes('id="bkSource"') && admin.includes('data-source='), '관리 웹에 종류 선택이 없다');
-  assert.ok(api.includes("'/api/hanja/admin/source'"), '종류 바꾸기 라우트가 없다');
+  assert.ok(api.includes("'/api/hanja/admin/source'") && api.includes("'/api/hanja/mnemonic'"), '종류 변경 또는 보호된 AI 라우트가 없다');
 });
 
 t('어휘 중심 주메뉴와 별도 한자 집중에서 시험과 학습을 연다', () => {

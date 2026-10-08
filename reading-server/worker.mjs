@@ -727,7 +727,17 @@ export default {
       if (p.startsWith('/api/hanja/')) {
         const len = Number(req.headers.get('content-length') || 0);
         if (len > hanjaBodyLimit(p)) return json(413, { error: '요청이 너무 커서 받을 수 없어요.' });
-        const out = await handleHanja({ path: p, method: req.method, who, query: url.searchParams, getBody: () => req.json(), store: hanjaStore(env), push: vocabPushEnv(env) });
+        const out = await handleHanja({
+          path: p, method: req.method, who, query: url.searchParams, getBody: () => req.json(), store: hanjaStore(env), push: vocabPushEnv(env),
+          mnemonic: (body) => handleVocab({
+            path: '/api/vocab/mnemonic', method: 'POST', who, getBody: async () => body, store: vocabStore(env),
+            ai: { apiKey: env.ANTHROPIC_API_KEY || '', model: env.VOCAB_AI_MODEL || '', env },
+          }),
+          mnemonicCheck: (body) => handleVocab({
+            path: '/api/vocab/mnemonic/check', method: 'POST', who, getBody: async () => body, store: vocabStore(env),
+            ai: { env },
+          }),
+        });
         return json(out.status, out.body);
       }
 

@@ -804,8 +804,13 @@
     if (!WBBOOKCHECK.aiAllowed(bookOf(it.book))) { toast('교재 단어장의 낱말은 AI 연상을 만들지 않아요'); return; }
     var w = it.w;
     try {
-      var j = await api('/api/vocab/mnemonic', { method: 'POST', body: JSON.stringify({ word: w.word, meaning: w.meaning, type: w.type,
-        hanja: w.parts ? w.parts.map(function (p) { return p.ch + (p.hun ? '(' + p.hun + ' ' + p.eum + ')' : ''); }).join('+') : undefined }) });
+      var entry = LIB.index.filter(function (e) { return e.id === it.book; })[0];
+      /* 체험·진로독서 어휘장은 기기 안에서 만든 자체 자료라 서버 단어장에 없다. 업로드 단어장은 서버가 source와 원문을 다시 확인한다. */
+      var localOwn = entry && (entry.local || entry.sample);
+      var payload = localOwn
+        ? { word: w.word, meaning: w.meaning, type: w.type, hanja: w.parts ? w.parts.map(function (p) { return p.ch + (p.hun ? '(' + p.hun + ' ' + p.eum + ')' : ''); }).join('+') : undefined }
+        : { bookId: it.book, wordId: w.id };
+      var j = await api(localOwn ? '/api/vocab/mnemonic' : '/api/hanja/mnemonic', { method: 'POST', body: JSON.stringify(payload) });
       if (!j.ok) { toast(j.reason === 'quota' ? '오늘 AI 연상 한도를 다 썼어요 — 내일 다시' : j.reason === 'no-key' ? 'AI 연상이 아직 준비되지 않았어요' : '연상을 만들지 못했어요'); return; }
       var cands = j.candidates || [];
       if (j.status === 'approved' && cands[0]) { db.custom[sid] = { cue: cands[0].cue, scene: cands[0].scene, mnemoStatus: 'approved' }; save(); toast('선생님이 승인한 연상을 붙였어요'); render(curView); return; }
@@ -828,7 +833,7 @@
     var words = Object.keys(byWord).slice(0, 50);
     if (!words.length) return;
     try {
-      var j = await api('/api/vocab/mnemonic/check', { method: 'POST', body: JSON.stringify({ words: words }) });
+      var j = await api('/api/hanja/mnemonic/check', { method: 'POST', body: JSON.stringify({ words: words }) });
       var changed = 0;
       (j.items || []).forEach(function (r) {
         var k = byWord[r.word]; if (!k) return;
@@ -1370,6 +1375,10 @@
 
   /* ── 훈련 ── 오늘 복습(due) · 단원 · 단어장 전체 · 한자만. 문항은 quiz.js, 판정은 SRS 로 */
   var TRAIN = null, TRAIN_MISSING = 0;
+  window.addEventListener('beforeunload', function (e) {
+    if (!TRAIN && !LEARN && !TRACE) return;
+    e.preventDefault(); e.returnValue = '';
+  });
   function questionRender(el, head, q, onAnswer, opts) {
     stopSay();
     opts = opts || {};
@@ -1378,7 +1387,7 @@
     var body;
     if (q.write) body = '<div class="trace" style="margin-top:0"><canvas id="qCv" aria-label="쓰기 칸"></canvas><p class="trace-tip" id="qTip">빈 칸에 손가락으로 써 보세요 — 안내 글자는 없어요.' + (q.strokes ? ' (' + q.strokes + '획)' : '') + '</p>' +
       '<div class="row trace-btns"><button class="btn ghost small" id="qUndo">한 획 지우기</button><button class="btn ghost small" id="qClear">전체 지우기</button><button class="btn primary small" id="qSubmit">확인</button></div></div>';
-    else if (q.input) body = '<input class="ans-in" id="qIn" autocomplete="off" autocapitalize="off" placeholder="낱말을 쓰세요"><div class="row" style="margin-top:10px"><button class="btn ghost small" id="qHint">힌트 보기</button><button class="btn primary" id="qSubmit">확인</button></div><div id="qHintBox"></div>';
+    else if (q.input) body = '<input class="ans-in" id="qIn" autocomplete="off" autocapitalize="off" aria-label="낱말을 쓰세요" placeholder="낱말을 쓰세요"><div class="row" style="margin-top:10px"><button class="btn ghost small" id="qHint">힌트 보기</button><button class="btn primary" id="qSubmit">확인</button></div><div id="qHintBox"></div>';
     else body = '<div class="choices' + (q.bigChoices || q.suffix ? ' two' : '') + '">' + q.choices.map(function (c, i) { return '<button class="choice' + (q.bigChoices ? ' big' : '') + '" data-i="' + i + '">' + esc(c) + (q.suffix ? q.suffix : '') + '</button>'; }).join('') + '</div>' +
       (q.hint ? '<div class="row" style="margin-top:8px"><button class="btn ghost small" id="qHint">힌트 보기</button></div><div id="qHintBox"></div>' : '');
     el.innerHTML = '<div class="card">' + head + '<div style="margin-bottom:6px"><span class="chip t-h">' + esc(q.head) + '</span></div>' + promptHtml + body + '<div id="qFeed"></div></div>';
@@ -1419,7 +1428,7 @@
       return;
     }
     var sb = $('#qSubmit'); if (sb) {
-      var go = function () { var v = $('#qIn').value; if (!v.trim()) return; finish(WBHQUIZ.check(q, v), v); };
+      var go = function () { var v = $('#qIn').value; if (!v.trim()) { toast('낱말을 써 주세요'); $('#qIn').focus(); return; } finish(WBHQUIZ.check(q, v), v); };
       sb.addEventListener('click', go); $('#qIn').addEventListener('keydown', function (e) { if (e.key === 'Enter') go(); }); $('#qIn').focus();
     }
     if (q.response) finish(q.response.ok, q.response.given, q.response.hinted);
