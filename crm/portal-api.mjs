@@ -74,7 +74,8 @@ async function fetchSummary(env, familyId) {
   try {
     const remote = await fetchImpl(ORIGIN + '/api/integrations/salesdesk/families/' + familyId, {
       method: 'GET', headers: { Authorization: 'Bearer ' + env.WB_SALESDESK_READ_KEY, Accept: 'application/json' },
-      redirect: 'error', signal: AbortSignal.timeout(8000)
+      // workerd는 error 모드를 지원하지 않는다. manual로 받되 아래 !ok가 3xx를 거절한다.
+      redirect: 'manual', signal: AbortSignal.timeout(8000)
     });
     phase = 'response';
     if (Number.isInteger(remote.status) && remote.status >= 100 && remote.status <= 599) upstreamStatus = remote.status;

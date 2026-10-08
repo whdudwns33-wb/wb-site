@@ -158,7 +158,7 @@ test('센터앱 요약 — 읽기 키·고정 주소·리다이렉트 금지·�
   env.PORTAL_FETCH = async (url, init) => {
     assert.equal(url, 'https://portal.wbcowork.com/api/integrations/salesdesk/families/101');
     assert.equal(init.headers.Authorization, 'Bearer test-read-only-placeholder');
-    assert.equal(init.redirect, 'error'); assert.ok(init.signal instanceof AbortSignal);
+    assert.equal(init.redirect, 'manual'); assert.ok(init.signal instanceof AbortSignal);
     return portalRemote({ ...portalFixture(), privateNote: 'must not store', hubspot: { ...portalFixture().hubspot, token: 'never expose' } });
   };
   result = await refresh();
@@ -168,6 +168,22 @@ test('센터앱 요약 — 읽기 키·고정 주소·리다이렉트 금지·�
   assert.ok(link.checkedAt > 0 && link.updatedAt > 0);
   assert.ok(!JSON.stringify(result.body).includes(env.WB_SALESDESK_READ_KEY));
   const privateDiagnostic = 'test-read-only-placeholder https://private.invalid/customer-test';
+  for (const status of [301, 302, 307]) {
+    let calls = 0;
+    env.PORTAL_FETCH = async (url, init) => {
+      calls++;
+      assert.equal(url, 'https://portal.wbcowork.com/api/integrations/salesdesk/families/101');
+      assert.equal(init.redirect, 'manual', '리다이렉트 대상에 인증 헤더를 전달하지 않는다');
+      return new Response(privateDiagnostic, { status, headers: { location: 'https://private.invalid/customer-test' } });
+    };
+    result = await refresh();
+    assert.equal(calls, 1);
+    assert.equal(result.status, 502);
+    assert.deepEqual([result.body.code, result.body.phase, result.body.upstreamStatus], ['PORTAL_UNAVAILABLE', 'response', status]);
+    assert.ok(!JSON.stringify(result.body).includes(env.WB_SALESDESK_READ_KEY));
+    assert.ok(!JSON.stringify(result.body).includes('private.invalid'));
+    assert.deepEqual((await call(env, 'GET', '/api/portal/link?leadId=p1', { token: admin })).body.link, link);
+  }
   for (const [badFetch, code, phase, upstreamStatus] of [
     ...[401, 403, 404, 429, 500, 503].map(status => [async () => new Response(privateDiagnostic, { status }),
       status === 401 || status === 403 ? 'PORTAL_AUTH' : status === 404 ? 'PORTAL_NOT_FOUND' : status === 503 ? 'PORTAL_UPSTREAM_UNAVAILABLE' : 'PORTAL_UNAVAILABLE', 'response', status]),
