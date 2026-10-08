@@ -167,14 +167,27 @@ test('센터앱 요약 — 읽기 키·고정 주소·리다이렉트 금지·�
   assert.deepEqual(link.snapshot, portalFixture());
   assert.ok(link.checkedAt > 0 && link.updatedAt > 0);
   assert.ok(!JSON.stringify(result.body).includes(env.WB_SALESDESK_READ_KEY));
-  for (const badFetch of [async () => new Response('remote diagnostic', { status: 503 }), async () => new Response('missing', { status: 404 }),
-    async () => { throw new Error('test-read-only-placeholder'); }, async () => portalRemote(portalFixture('999')), async () => new Response('<html>login</html>'),
-    async () => portalRemote({ ...portalFixture(), membership: { friend: 'made_up', supporter: 'available' } }),
-    async () => new Response('x'.repeat(262145), { headers: { 'content-type': 'application/json' } })]) {
+  const privateDiagnostic = 'test-read-only-placeholder https://private.invalid/customer-test';
+  for (const [badFetch, code, phase, upstreamStatus] of [
+    ...[401, 403, 404, 429, 500, 503].map(status => [async () => new Response(privateDiagnostic, { status }),
+      status === 401 || status === 403 ? 'PORTAL_AUTH' : status === 404 ? 'PORTAL_NOT_FOUND' : status === 503 ? 'PORTAL_UPSTREAM_UNAVAILABLE' : 'PORTAL_UNAVAILABLE', 'response', status]),
+    [async () => { throw Object.assign(new Error(privateDiagnostic), { code: 'PORTAL_AUTH', phase: privateDiagnostic, upstreamStatus: privateDiagnostic }); }, 'PORTAL_UNAVAILABLE', 'request'],
+    [async () => { throw new DOMException(privateDiagnostic, 'TimeoutError'); }, 'PORTAL_TIMEOUT', 'request'],
+    [async () => portalRemote(portalFixture('999')), 'PORTAL_FORMAT', 'schema', 200],
+    [async () => new Response('<html>' + privateDiagnostic + '</html>'), 'PORTAL_FORMAT', 'content_type', 200],
+    [async () => new Response(privateDiagnostic, { headers: { 'content-type': 'application/json' } }), 'PORTAL_FORMAT', 'json', 200],
+    [async () => portalRemote({ ...portalFixture(), membership: { friend: 'made_up', supporter: 'available' } }), 'PORTAL_FORMAT', 'schema', 200],
+    [async () => new Response('x'.repeat(262145), { headers: { 'content-type': 'application/json' } }), 'PORTAL_FORMAT', 'body', 200],
+    [async () => new Response(new ReadableStream({ start(controller) { controller.error(new Error(privateDiagnostic)); } }), { headers: { 'content-type': 'application/json' } }), 'PORTAL_UNAVAILABLE', 'body', 200]
+  ]) {
     env.PORTAL_FETCH = badFetch;
     result = await refresh();
     assert.equal(result.status, 502);
+    assert.deepEqual([result.body.code, result.body.phase, result.body.upstreamStatus], [code, phase, upstreamStatus]);
+    assert.deepEqual(Object.keys(result.body).sort(), ['ok', 'code', 'error', 'phase', ...(upstreamStatus === undefined ? [] : ['upstreamStatus'])].sort());
     assert.ok(!JSON.stringify(result.body).includes(env.WB_SALESDESK_READ_KEY));
+    assert.ok(!JSON.stringify(result.body).includes('private.invalid'));
+    assert.equal((await call(env, 'GET', '/api/me', { token: staff.token })).status, 200, '센터앱 인증 거절로 CRM에서 로그아웃하지 않는다');
     const persisted = (await call(env, 'GET', '/api/portal/link?leadId=p1', { token: admin })).body.link;
     assert.deepEqual(persisted, link);
   }
