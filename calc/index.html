@@ -1,0 +1,1077 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>WB 연산 체험</title>
+<style>
+/* WB 연산: 모눈 공책 바탕, 흰 종이, 100칸 숙달 격자, 빨간 색연필 채점. 강조는 셈 청록 하나 (design/DESIGN.md). 가상 학생만. */
+:root{
+  --paper:#F7F9F6; --sheet:#FFFFFF; --grid:#D6E3E1; --ink:#22282C; --ink-2:#525C63; --ink-3:#66707A; --line:#E1E6E3;
+  --teal:#0F6E6E; --teal-ink:#FFFFFF; --teal-soft:#DDEFEE; --teal-text:#0B5555;
+  --red:#CF2F39; --red-ink:#B3222C; --red-soft:#FBE8E9; --hl:#FFE36B;
+  --mid:#8A5200; --mid-soft:#FFF0D3; --mid-fill:#E9A23B;
+  --lift:0 1px 2px rgba(20,60,60,.06),0 8px 22px rgba(20,60,60,.08);
+  --f:"Apple SD Gothic Neo","Malgun Gothic","Noto Sans KR",system-ui,sans-serif; --r:12px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --paper:#121618; --sheet:#1A1F21; --grid:#22312F; --ink:#E8ECEA; --ink-2:#B5BFBA; --ink-3:#95A09B; --line:#2A3236;
+  --teal:#7FD4D0; --teal-ink:#06302F; --teal-soft:#16383A; --teal-text:#9BE3DF;
+  --red:#FF7A80; --red-ink:#FF8F94; --red-soft:#3B1D21; --hl:#6A5A12; --mid:#F5C37A; --mid-soft:#36290F; --mid-fill:#C98A2E;
+  --lift:0 1px 2px rgba(0,0,0,.3),0 8px 22px rgba(0,0,0,.28); color-scheme:dark}}
+:root[data-theme="dark"]{
+  --paper:#121618; --sheet:#1A1F21; --grid:#22312F; --ink:#E8ECEA; --ink-2:#B5BFBA; --ink-3:#95A09B; --line:#2A3236;
+  --teal:#7FD4D0; --teal-ink:#06302F; --teal-soft:#16383A; --teal-text:#9BE3DF;
+  --red:#FF7A80; --red-ink:#FF8F94; --red-soft:#3B1D21; --hl:#6A5A12; --mid:#F5C37A; --mid-soft:#36290F; --mid-fill:#C98A2E;
+  --lift:0 1px 2px rgba(0,0,0,.3),0 8px 22px rgba(0,0,0,.28); color-scheme:dark}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--paper);color:var(--ink);font-family:var(--f);font-size:17px;line-height:1.6;word-break:keep-all;min-height:100dvh;
+  background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:14px 14px}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer;border:1px solid var(--line);background:var(--sheet);border-radius:var(--r);min-height:44px;padding:8px 14px}
+button:active{transform:translateY(1px)}
+:focus-visible{outline:3px solid var(--teal);outline-offset:2px}
+h1,h2,h3{font-weight:800;letter-spacing:-.01em;line-height:1.25;margin:0}
+h2{font-size:1.4rem} h3{font-size:1.1rem}
+p{margin:0}
+.num{font-variant-numeric:tabular-nums}
+.muted{color:var(--ink-2)} .small{font-size:.9rem} .tiny{font-size:.82rem;color:var(--ink-3)}
+.eyebrow{font-size:.8rem;letter-spacing:.06em;color:var(--ink-2)}
+.bar{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--paper) 90%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.bar-in{max-width:860px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.brand{font-weight:800;font-size:1.05rem;display:flex;align-items:center;gap:8px}
+.brand i{display:inline-block;width:18px;height:18px;border:2px solid var(--teal);border-radius:4px;background:linear-gradient(var(--teal) 50%,transparent 50%)}
+.bar select{min-height:44px;border:1px solid var(--line);border-radius:var(--r);background:var(--sheet);padding:6px 10px}
+.spacer{flex:1}
+.seg{display:flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;background:var(--sheet)}
+.seg button{border:0;border-radius:0;min-height:40px;padding:6px 14px;background:transparent}
+.seg button.on{background:var(--teal);color:var(--teal-ink)}
+main{max-width:760px;margin:0 auto;padding:16px 16px 40px}
+.sheet{background:var(--sheet);border:1px solid var(--line);border-radius:var(--r);padding:16px}
+.sheet+.sheet,.sheet+.stack,.stack>*+*{margin-top:16px}
+.today{box-shadow:var(--lift);display:grid;grid-template-columns:84px 1fr;gap:16px;align-items:start}
+.lvbox{width:84px;height:84px;border:1px solid var(--grid);border-radius:8px;display:grid;place-items:center;font-size:2rem;font-weight:800;color:var(--teal);position:relative;background:var(--sheet)}
+.lvbox:before,.lvbox:after{content:"";position:absolute;background:var(--grid)} .lvbox:before{left:50%;top:0;bottom:0;width:1px} .lvbox:after{top:50%;left:0;right:0;height:1px}
+.lvbox b{position:relative;z-index:1;background:var(--sheet);padding:0 6px}
+.btn{background:var(--teal);color:var(--teal-ink);border-color:var(--teal);font-weight:700;min-height:54px;padding:10px 22px;font-size:1.05rem}
+.btn.ghost{background:var(--sheet);color:var(--ink);border-color:var(--line);font-weight:600}
+.btn[disabled]{opacity:.5;cursor:default}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);border-radius:8px;padding:4px 10px;font-size:.95rem;background:var(--sheet);min-height:36px}
+.chip.e{background:var(--mid-soft);color:var(--mid);border-color:transparent;font-weight:600}
+.chip.bag{border-style:dashed}
+.chip.ok{background:var(--teal-soft);color:var(--teal-text);border-color:transparent}
+/* 격자 */
+.grid{display:grid;gap:3px;width:max-content;max-width:100%}
+.grid .h{font-size:.72rem;color:var(--ink-3);display:grid;place-items:center;height:22px}
+.grid .c{width:26px;height:26px;border-radius:6px;border:1.5px solid var(--grid);display:grid;place-items:center;font-size:.68rem;color:var(--ink-3)}
+.grid .c.prac{background:var(--mid-fill);border-color:var(--mid-fill);color:#fff}
+.grid .c.done{background:var(--teal);border-color:var(--teal);color:var(--teal-ink)}
+.grid .c.slow{box-shadow:inset 0 0 0 2px var(--mid-fill)}
+.grid .c.anim{animation:fill .3s ease-out}
+@keyframes fill{from{transform:scale(.6)}to{transform:scale(1)}}
+.gridwrap{overflow:auto;padding-bottom:4px}
+@media (min-width:520px){.grid .c{width:32px;height:32px;font-size:.78rem}}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:.85rem;color:var(--ink-2);margin-top:8px}
+.legend i{display:inline-block;width:14px;height:14px;border-radius:4px;border:1.5px solid var(--grid);vertical-align:-2px;margin-right:4px}
+.legend i.prac{background:var(--mid-fill);border-color:var(--mid-fill)} .legend i.done{background:var(--teal);border-color:var(--teal)} .legend i.slow{box-shadow:inset 0 0 0 2px var(--mid-fill)}
+.buckets{display:grid;gap:8px}
+.bucket{display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px;border:1px solid var(--line);border-radius:8px;padding:8px 12px}
+.bucket .st{font-size:.85rem;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--sheet);border:1px solid var(--line)}
+.bucket .st.prac{background:var(--mid-soft);color:var(--mid);border-color:transparent} .bucket .st.done{background:var(--teal-soft);color:var(--teal-text);border-color:transparent}
+.map{display:flex;gap:6px;flex-wrap:wrap}
+.map span{width:38px;height:38px;border-radius:8px;border:1.5px dashed var(--grid);display:grid;place-items:center;font-weight:700;font-size:.9rem;color:var(--ink-3)}
+.map span.past{background:var(--teal);color:var(--teal-ink);border-style:solid;border-color:var(--teal)}
+.map span.now{border:2px solid var(--teal);color:var(--teal-text);border-style:solid}
+.stamps{display:flex;gap:6px;flex-wrap:wrap}
+.stamps span{width:30px;height:30px;border-radius:50%;border:1.5px solid var(--grid);display:grid;place-items:center;font-size:.7rem;color:var(--ink-3)}
+.stamps span.on{background:var(--teal);border-color:var(--teal);color:var(--teal-ink)}
+/* 진행 */
+.run{display:flex;flex-direction:column;min-height:calc(100dvh - 70px)}
+.dots{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;padding:6px 0}
+.dots i{width:12px;height:12px;border-radius:50%;border:1.5px solid var(--grid)} .dots i.done{background:var(--teal);border-color:var(--teal)} .dots i.now{border:2px solid var(--teal)} .dots i.star{border-color:var(--red);background:var(--red-soft)}
+.stage{flex:1;display:grid;place-items:center;padding:12px 0;text-align:center}
+.expr{font-size:clamp(2.2rem,9vw,3.4rem);font-weight:800;letter-spacing:.02em;line-height:1.2}
+.expr .box{display:inline-block;min-width:1.6em;border-bottom:4px solid var(--teal);padding:0 .1em;color:var(--teal-text)}
+.expr .box.empty:after{content:"";display:inline-block;width:2px;height:.9em;background:var(--teal);vertical-align:-.1em;animation:blink 1s steps(2) infinite}
+@keyframes blink{to{opacity:0}}
+.fb{min-height:2.2rem;font-size:1.05rem;color:var(--ink-2);margin-top:8px}
+.fb .wrong{text-decoration:underline wavy var(--red);text-decoration-thickness:2px;color:var(--red-ink);font-weight:700}
+.fb .ans{color:var(--teal-text);font-weight:800;font-size:1.3rem}
+/* 세로셈 */
+.col{display:inline-grid;grid-auto-rows:54px;gap:2px;font-size:2rem;font-weight:800;justify-items:end}
+.col .cell{width:54px;height:54px;display:grid;place-items:center;border-radius:8px}
+.col .carry{height:26px;font-size:.95rem;color:var(--mid);border:1.5px dashed var(--grid);width:30px;margin:0 12px 0 auto;display:grid;place-items:center;cursor:pointer}
+.col .carry.on{border-color:var(--mid-fill);background:var(--mid-soft)}
+.col .carryrow{grid-auto-rows:28px;height:28px}
+.col .op{color:var(--ink-2);font-size:1.6rem}
+.col .line{height:4px;background:var(--ink);border-radius:2px;grid-column:1/-1;width:100%;align-self:center}
+.col .ans{border:2px solid var(--grid);background:var(--sheet);cursor:pointer;color:var(--teal-text)}
+.col .ans.act{border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-soft)}
+.col .carry.act{border-color:var(--teal);border-style:solid}
+.divin{display:flex;gap:18px;justify-content:center;align-items:end;flex-wrap:wrap;margin-top:10px}
+.divin .f{display:grid;gap:4px;text-align:center}
+.divin .f span{font-size:.9rem;color:var(--ink-2)}
+.divin .f b{min-width:92px;height:56px;border:2px solid var(--grid);border-radius:8px;display:grid;place-items:center;font-size:1.8rem;color:var(--teal-text);cursor:pointer}
+.divin .f b.act{border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-soft)}
+.pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;max-width:360px;width:100%;margin:0 auto;padding:8px 0 4px}
+.pad.left{margin-left:0} .pad.right{margin-right:0}
+.pad button{min-height:58px;font-size:1.5rem;font-weight:700;border-radius:12px}
+.pad button.ok{background:var(--teal);color:var(--teal-ink);border-color:var(--teal)}
+.pad button.del{font-size:1.1rem}
+.ring{position:relative;width:60px;height:60px;margin-left:auto}
+.ring svg{transform:rotate(-90deg)} .ring b{position:absolute;inset:0;display:grid;place-items:center;font-size:.85rem}
+/* 결과 */
+.res{display:grid;gap:8px}
+.res .it{display:grid;grid-template-columns:40px 1fr;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line)}
+.res .it:last-child{border-bottom:0}
+.mark{width:40px;height:40px}
+.mark path{fill:none;stroke:var(--red);stroke-width:2.6;stroke-linecap:round;stroke-dasharray:140;stroke-dashoffset:140;animation:draw .6s ease-out forwards}
+@keyframes draw{to{stroke-dashoffset:0}}
+.res .g{color:var(--red-ink);text-decoration:underline wavy var(--red);font-weight:700}
+.card{border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;background:var(--sheet)}
+.card .ex mark{background:var(--hl);color:var(--ink);padding:0 4px;border-radius:4px}
+.stamp{display:inline-grid;place-items:center;width:84px;height:84px;border:3px solid var(--teal);border-radius:50%;color:var(--teal-text);font-weight:800;transform:rotate(-8deg);font-size:.95rem;text-align:center;line-height:1.2}
+/* 만져 보기 */
+.tf{display:inline-grid;grid-template-columns:repeat(5,30px);gap:5px;padding:6px;border:2px solid var(--ink-2);border-radius:8px}
+.tf i{width:30px;height:30px;border-radius:50%;border:1.5px solid var(--grid)} .tf i.a{background:var(--teal)} .tf i.b{background:var(--mid-fill)}
+.rods{display:flex;gap:4px;align-items:flex-end;flex-wrap:wrap}
+.rods i{display:inline-block;background:var(--teal);border-radius:3px} .rods i.t{width:12px;height:60px} .rods i.o{width:12px;height:12px}
+/* 선생님 */
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.tabs button{border-radius:999px;min-height:40px}
+.tabs button.on{background:var(--teal);color:var(--teal-ink);border-color:var(--teal)}
+table{border-collapse:collapse;width:100%;font-size:.92rem}
+th,td{border-bottom:1px solid var(--line);padding:6px 6px;text-align:left;white-space:nowrap}
+th{font-weight:600;color:var(--ink-2);font-size:.82rem}
+.hm{width:22px;height:22px;border-radius:5px;border:1px solid var(--line);display:inline-block}
+.hm.low{background:var(--red-soft);border-color:transparent} .hm.prac{background:var(--mid-soft);border-color:transparent} .hm.done{background:var(--teal);border-color:var(--teal)}
+.tw{overflow:auto}
+label.f{display:grid;gap:4px;font-size:.9rem;color:var(--ink-2)}
+label.f input,label.f select{min-height:44px;border:1px solid var(--line);border-radius:8px;padding:6px 10px;background:var(--sheet);color:var(--ink);width:100%;max-width:100%;min-width:0}
+.sw{display:flex;align-items:center;gap:10px;min-height:44px}
+.sw input{width:22px;height:22px;accent-color:var(--teal)}
+.form{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.paper{display:grid;grid-template-columns:repeat(2,1fr);gap:6px 14px;font-size:1.05rem;font-variant-numeric:tabular-nums}
+.paper div{border-bottom:1px solid var(--line);padding:4px 0}
+@media (min-width:520px){.paper{grid-template-columns:repeat(4,1fr)}}
+.queue{display:grid;gap:8px} .queue pre{white-space:pre-wrap;font:inherit;font-size:.85rem;background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:10px;margin:0}
+.note{border-left:3px solid var(--mid-fill);padding:6px 12px;background:var(--mid-soft);color:var(--mid);border-radius:0 8px 8px 0;font-size:.92rem}
+.why{background:var(--paper);border:1px solid var(--line);border-radius:8px;padding:8px 12px;margin-top:8px}
+.bagrows{display:grid;gap:6px;margin-top:10px}
+.bagrow{display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px;border:1px dashed var(--grid);border-radius:8px;padding:6px 12px;min-height:44px}
+.bagrow.due{border-color:var(--mid-fill);background:var(--mid-soft)}
+.bagrow .lab{font-weight:600;font-size:1.05rem}
+.bagrow .tag{font-size:.8rem;font-weight:600;padding:1px 7px;border-radius:6px;background:var(--mid-soft);color:var(--mid);margin-left:6px;vertical-align:1px}
+.bagrow.due .tag{background:var(--sheet)}
+.bagrow .tag.card{background:var(--teal);color:var(--teal-ink)}
+.stage-card{background:var(--sheet);border:1px solid var(--line);border-radius:var(--r);padding:18px 20px 14px;display:inline-block}
+.pad button.del{background:var(--paper)}
+.res .it.bad{background:var(--red-soft);border-radius:8px;padding:8px 10px;margin:0 -10px}
+.res .it .n{color:var(--ink-3);font-size:.9rem;margin-right:4px}
+.grid .c.anim{position:relative} .grid .c.anim:after{content:"";position:absolute;right:2px;top:2px;width:6px;height:6px;border-radius:50%;background:var(--hl)}
+.legend i.new{position:relative} .legend i.new:after{content:"";position:absolute;right:1px;top:1px;width:5px;height:5px;border-radius:50%;background:var(--hl)}
+.actions{display:grid;gap:10px} .actions .btn{width:100%}
+@media (min-width:520px){.actions{grid-template-columns:auto auto;justify-content:start} .actions .btn{width:auto}}
+.strip{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;max-width:420px;width:100%;margin:0 auto;padding:8px 0 4px}
+.strip button{min-height:58px;font-size:1.5rem;font-weight:700;border-radius:12px}
+.pic{display:flex;gap:14px;justify-content:center;align-items:center;flex-wrap:wrap;margin:4px 0 10px}
+.pic .plus{font-size:1.6rem;color:var(--ink-2);font-weight:700}
+.dg{display:inline-grid;grid-template-columns:repeat(5,36px);gap:6px}
+.dg.frame{padding:8px;border:2px solid var(--ink-2);border-radius:10px}
+.dg i{width:36px;height:36px;border-radius:50%;border:2px solid var(--grid);display:block}
+.dg i.a{background:var(--teal);border-color:var(--teal)} .dg i.b{background:var(--mid-fill);border-color:var(--mid-fill)}
+.dg i.q{border-style:dashed;border-color:var(--teal)}
+.dg i.x{background:var(--grid);border-color:var(--grid);position:relative} .dg i.x:after{content:"";position:absolute;left:-2px;right:-2px;top:15px;height:3px;background:var(--ink-2);transform:rotate(-35deg)}
+.cover{display:inline-grid;place-items:center;min-width:64px;height:52px;background:var(--ink-2);color:#fff;border-radius:10px;font-weight:800;font-size:1.4rem}
+.qt{font-size:1.35rem;font-weight:800;margin-bottom:6px}
+.listen{min-height:40px;padding:4px 12px;font-size:.95rem;border-radius:999px}
+.stage-card.kid{padding-top:12px}
+.hintbtn,.linkbtn{min-height:40px;padding:4px 12px;font-size:.95rem;border-radius:999px}
+.hint{border:1px dashed var(--teal);border-radius:var(--r);padding:12px 14px;margin:10px auto 0;background:var(--sheet);text-align:left;max-width:440px}
+.hint .eyebrow{color:var(--teal-text)} .hint ol{margin:6px 0 0;padding-left:20px} .hint li{margin:3px 0;font-size:.95rem;line-height:1.5}
+.hint .viz{margin:6px 0 8px;text-align:center}
+.nl{width:100%;max-width:380px;height:60px;display:block;margin:0 auto}
+.arr{display:inline-grid;gap:4px} .arr i{width:14px;height:14px;border-radius:50%;background:var(--teal);display:block} .arr i.r{background:var(--mid-fill)}
+.self{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:8px} .self button{min-height:40px;font-size:.9rem;border-radius:999px;padding:4px 12px} .self button.on{background:var(--teal);color:var(--teal-ink);border-color:var(--teal)}
+.goalbar{height:10px;border-radius:999px;background:var(--line);overflow:hidden;margin-top:6px} .goalbar i{display:block;height:100%;background:var(--teal);border-radius:999px}
+.spark{width:100%;max-width:420px;height:80px;display:block}
+.spark .ln{fill:none;stroke:var(--teal);stroke-width:2;stroke-linejoin:round} .spark .pt{fill:var(--teal)} .spark .gl{stroke:var(--mid-fill);stroke-width:1.5;stroke-dasharray:4 4} .spark .ax{stroke:var(--line);stroke-width:1} .spark text{font-size:11px;fill:var(--ink-3)}
+.topics{display:grid;gap:10px} .topic{text-align:left;padding:12px 14px;display:grid;gap:2px} .topic b{font-size:1.05rem} .topic span{font-size:.9rem;color:var(--ink-2)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:.95rem;align-items:baseline} .kv b{color:var(--ink-2);font-weight:600;font-size:.85rem}
+.asgrow{border:1px solid var(--line);border-radius:8px;padding:8px 12px;display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}
+.asgrow.done{background:var(--teal-soft);border-color:transparent}
+.funnel{display:grid;grid-template-columns:repeat(5,1fr);gap:6px} .funnel div{border:1px solid var(--line);border-radius:8px;padding:8px 6px;text-align:center} .funnel b{display:block;font-size:1.2rem} .funnel span{font-size:.78rem;color:var(--ink-2)}
+@media (max-width:520px){.funnel{grid-template-columns:repeat(3,1fr)}}
+.tagx{font-size:.78rem;font-weight:600;padding:1px 7px;border-radius:6px;background:var(--teal-soft);color:var(--teal-text);margin-left:6px;vertical-align:1px}
+.frac{display:inline-grid;text-align:center;vertical-align:middle;line-height:1.15;font-size:.72em;margin:0 .1em} .frac b{display:block;padding:0 .25em} .frac b:first-child{border-bottom:3px solid currentColor}
+.fin{display:inline-grid;gap:4px;justify-items:center;vertical-align:middle;margin-left:.3em}
+.fin b{min-width:84px;height:54px;border:2px solid var(--grid);border-radius:8px;display:grid;place-items:center;font-size:1.6rem;color:var(--teal-text);cursor:pointer;background:var(--sheet)} .fin b.act{border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-soft)}
+.fin i{display:block;width:96px;height:4px;background:var(--ink);border-radius:2px} .fin span{font-size:.75rem;color:var(--ink-3)}
+.pad.dec{grid-template-columns:repeat(4,1fr);max-width:440px} .pad.dec button.z{grid-column:span 3}
+.fbars{display:grid;gap:8px;justify-items:center} .fbar{display:inline-grid;gap:2px;border:2px solid var(--ink-2);border-radius:6px;padding:2px} .fbar i{width:22px;height:26px;background:var(--line);border-radius:3px} .fbar i.on{background:var(--teal)} .fbar i.on2{background:var(--mid-fill)}
+#dbst{font-size:.78rem;color:var(--ink-3);border:1px solid var(--line);border-radius:999px;padding:2px 8px}
+@media (prefers-reduced-motion: reduce){*{animation:none!important;transition:none!important}}
+@media print{body{background:#fff}.bar,.noprint{display:none!important}main{max-width:none;padding:0}.sheet{border:0}}
+</style>
+</head>
+<body>
+<div class="bar"><div class="bar-in">
+  <div class="brand"><i></i> WB 연산 <span class="tiny">체험판 · 가상 학생</span> <span id="dbst" title="저장 위치">이 기기 저장</span></div>
+  <div class="spacer"></div>
+  <select id="stuSel" aria-label="학생 고르기"></select>
+  <div class="seg" role="tablist"><button id="mStu" class="on" aria-label="학생 화면">학생</button><button id="mTea" aria-label="선생님 화면">선생님</button><button id="mTri" aria-label="체험 화면">체험</button></div>
+</div></div>
+<main id="app"></main>
+<script>window.WB_PUBLIC=true;</script>
+<script>
+/*ENGINE-START*/
+/* WB 연산 엔진 — 순수 함수. 브라우저와 node에서 같이 씀. */
+var CALC = (function(){
+  function rng(seed){ var t=(seed>>>0)||1; return function(){ t+=0x6D2B79F5; var r=Math.imul(t^(t>>>15),1|t); r^=r+Math.imul(r^(r>>>7),61|r); return ((r^(r>>>14))>>>0)/4294967296; }; }
+  function ri(r,lo,hi){ return lo+Math.floor(r()*(hi-lo+1)); }
+  function pick(r,arr){ return arr[Math.floor(r()*arr.length)]; }
+  function shuffle(r,arr){ var a=arr.slice(); for(var i=a.length-1;i>0;i--){ var j=Math.floor(r()*(i+1)); var t=a[i]; a[i]=a[j]; a[j]=t; } return a; }
+  function hash(s){ var h=2166136261; for(var i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619); } return h>>>0; }
+  function digs(n){ return String(n).split('').map(Number); }
+  function addDays(d,n){ var p=d.split('-').map(Number); var x=new Date(p[0],p[1]-1,p[2]+n); function z(v){ return (v<10?'0':'')+v; } return x.getFullYear()+'-'+z(x.getMonth()+1)+'-'+z(x.getDate()); }
+
+  /* 실수 유형 */
+  var ETYPES = {
+    E1:{name:'받아올림을 빠뜨렸어요', card:'10 넘으면 1을 올려요', tip:'일의 자리가 10을 넘으면 1을 십의 자리로 올려요. 7+6=13이면 3을 쓰고 1은 옆집으로.', ex:'47 + 36 = 83 (7+6=13, 1은 십의 자리로)'},
+    E2:{name:'올림 수를 그 자리에 그대로 썼어요', card:'13은 3만 쓰고 1은 옆집으로', tip:'한 칸에는 숫자 하나만 들어가요. 13이 나오면 3을 쓰고 1은 왼쪽 칸 위에 작게 적어요.', ex:'47 + 36 = 83 (13은 3만 쓰고 1은 옆집으로)'},
+    E3:{name:'큰 수에서 작은 수를 뺐어요', card:'위가 작으면 옆집에서 10을 빌려요', tip:'위 숫자가 아래보다 작으면 거꾸로 빼면 안 돼요. 왼쪽 칸에서 10을 빌려 와요.', ex:'52 − 38 = 14 (십의 자리에서 10 빌림)'},
+    E4:{name:'빌리고 나서 윗자리를 안 줄였어요', card:'빌려 줬으면 하나 줄어요', tip:'10을 빌려 주면 그 칸은 1이 작아져요. 작게 줄을 긋고 새 숫자를 적어요.', ex:'52 − 38 = 14 (5는 4가 돼요)'},
+    E5:{name:'0을 건너 빌릴 때 백의 자리를 안 줄였어요', card:'0은 백의 자리에서 먼저 빌려요', tip:'십의 자리가 0이면 백의 자리에서 먼저 빌려요. 백의 자리도 하나 줄어요.', ex:'305 − 17 = 288 (3은 2가 돼요)'},
+    E6:{name:'자리를 잘못 맞췄어요', card:'일의 자리끼리 줄을 맞춰요', tip:'오른쪽 끝(일의 자리)부터 줄을 맞춰 써요. 23+5는 3과 5가 같은 줄이에요.', ex:'23 + 5 = 28 (3과 5가 같은 줄)'},
+    E7:{name:'기호를 다른 셈으로 풀었어요', card:'× 는 묶음이 몇 번', tip:'기호를 먼저 봐요. + 는 모으기, × 는 같은 수를 여러 번.', ex:'8 × 3 = 24 (8을 3번)'},
+    E8:{name:'구구단 이웃 답과 바뀌었어요', card:'이 조합만 따로 외워요', tip:'7×8=56. 이웃한 7×7=49, 7×9=63과 헷갈리기 쉬워요. 이 한 칸만 주머니에 넣어요.', ex:'7 × 8 = 56 (7×7=49, 7×9=63과 달라요)'},
+    E9:{name:'나머지가 나누는 수보다 커요', card:'나머지는 나누는 수보다 작아야 해요', tip:'나머지가 나누는 수와 같거나 크면 한 번 더 나눌 수 있어요. 몫을 1 올려요.', ex:'17 ÷ 5 = 3 … 2 (2는 5보다 작아요)'},
+    E10:{name:'하나 차이가 났어요(세기 실수)', card:'10 만들기로 세지 않고 떠올려요', tip:'손가락으로 세면 하나가 빠지기 쉬워요. 8+5는 8+2=10, 그리고 3 → 13.', ex:'8 + 5 = 13 (8+2=10, 그리고 3)'},
+    E11:{name:'둘째 줄을 한 칸 밀지 않았어요', card:'둘째 줄은 한 칸 왼쪽으로', tip:'십의 자리와 곱한 줄은 한 칸 왼쪽에서 시작해요. 그 자리는 0이에요.', ex:'23 × 12 = 276 (46 + 230)'},
+    E12:{name:'9를 10으로 보고 그대로 더했어요', card:'9는 10보다 1 작아요', tip:'9+6은 10+6=16에서 1을 빼요 → 15.', ex:'9 + 6 = 15 (10+6−1)'},
+    E13:{name:'약분을 안 했어요', card:'답은 가장 간단한 분수로', tip:'분자와 분모를 같은 수로 나눌 수 있으면 끝까지 나눠요. 4/8 → 1/2.', ex:'4/8 = 1/2 (4로 나눔)'},
+    E14:{name:'분모끼리도 더했어요', card:'분모가 같으면 분자만 더해요', tip:'1/4 + 2/4는 조각이 같은 크기예요. 조각 수만 더해요 → 3/4.', ex:'1/4 + 2/4 = 3/4'},
+    E15:{name:'소수점을 안 맞췄어요', card:'소수점끼리 줄을 맞춰요', tip:'1.2 + 0.35는 1.20 + 0.35로 자리를 맞추고 더해요 → 1.55.', ex:'1.2 + 0.35 = 1.55'},
+    E16:{name:'앞에서부터 차례로 계산했어요', card:'곱셈 · 나눗셈이 먼저, 괄호는 가장 먼저', tip:'12 + 3 × 4는 3 × 4 = 12를 먼저 하고 12 + 12 = 24.', ex:'12 + 3 × 4 = 24'},
+    E17:{name:'나눗셈을 뒤집지 않고 곱했어요', card:'나누는 분수는 뒤집어 곱해요', tip:'2/3 ÷ 4/5 = 2/3 × 5/4 = 10/12 = 5/6.', ex:'2/3 ÷ 4/5 = 5/6'}
+  };
+
+  /* 전략 카드(새 칸 열 때) */
+  var STRATEGY = {
+    plus0:{title:'0과 1 더하기', body:'0을 더하면 그대로, 1을 더하면 다음 수예요.', ex:'6+1=7'},
+    plus2:{title:'2 더하기', body:'2를 더하면 다음 다음 수예요.', ex:'6+2=8'},
+    dbl:{title:'두 배', body:'같은 수 두 번. 손가락 양손으로 같은 개수.', ex:'4+4=8'},
+    ten:{title:'10 만들기', body:'둘이 모여 10이 되는 짝을 외워요.', ex:'3+7=10'},
+    near:{title:'가까운 두 배', body:'두 배에서 1 더해요.', ex:'6+7=6+6+1=13'},
+    nine:{title:'9 더하기', body:'10을 더하고 1을 빼요.', ex:'9+5=10+5−1=14'},
+    make10:{title:'10을 건너 더하기', body:'10이 되게 먼저 채우고 나머지를 더해요.', ex:'8+5=8+2+3=13'},
+    back:{title:'10에서 빼기', body:'10을 먼저 만들어 빼고 나머지를 빼요.', ex:'13−5=13−3−2=8'},
+    family:{title:'덧셈 ↔ 뺄셈 가족', body:'3+4=7을 알면 7−3, 7−4도 알아요.', ex:'7−4=3'},
+    x2:{title:'2단·5단', body:'2단은 두 배, 5단은 5·10·15…', ex:'5×6=30'},
+    x3:{title:'3단·4단', body:'4단은 2단의 두 배예요.', ex:'4×6=2×6+2×6=24'},
+    xhi:{title:'6·7·8·9단', body:'9단은 10번에서 한 번 빼요.', ex:'9×7=70−7=63'},
+    div:{title:'나눗셈은 곱셈 거꾸로', body:'42÷6은 "6×□=42"예요.', ex:'6×7=42 → 42÷6=7'},
+    col:{title:'세로셈', body:'일의 자리부터 오른쪽 줄을 맞춰요.', ex:'일 → 십 → 백'},
+    split:{title:'가르기·모으기', body:'7은 3과 4, 2와 5…', ex:'7=3+4'},
+    kcount:{title:'하나씩 짚으며 세기', body:'점을 손가락으로 하나씩 짚으며 세요.', ex:'1, 2, 3 …'},
+    knext:{title:'다음 수 · 앞 수', body:'하나 더 있으면 다음 수, 하나 없으면 앞 수.', ex:'4 다음은 5'},
+    kjoin:{title:'모으기', body:'두 묶음을 이어서 세요.', ex:'2개와 3개 → 5개'},
+    kpic:{title:'그림으로 더하기·빼기', body:'더하면 이어 세고, 빼면 가리고 세요.', ex:'3 + 2 = 5'},
+    frac:{title:'분수 더하기·빼기', body:'분모가 같으면 분자끼리. 다르면 먼저 통분해요.', ex:'1/4 + 2/4 = 3/4'},
+    fracx:{title:'분수 곱하기·나누기', body:'곱하기는 분자끼리 · 분모끼리. 나누기는 뒤집어 곱해요.', ex:'2/3 ÷ 4/5 = 2/3 × 5/4'},
+    reduce:{title:'약분', body:'분자와 분모를 같은 수로 끝까지 나눠요.', ex:'6/18 = 1/3'},
+    dec:{title:'소수 계산', body:'소수점끼리 줄을 맞추고 자연수처럼 계산해요.', ex:'1.2 + 0.35 = 1.55'},
+    mix:{title:'혼합 계산 순서', body:'괄호 → 곱셈·나눗셈 → 덧셈·뺄셈.', ex:'12 + 3 × 4 = 24'}
+  };
+
+  function cellStrategy(cell){
+    var m;
+    if((m=cell.match(/^\+(\d),(\d)$/))){ var a=+m[1],b=+m[2],s=a+b; if(a<=1||b<=1) return 'plus0'; if(a===2||b===2) return 'plus2'; if(a===b) return 'dbl'; if(s===10) return 'ten'; if(Math.abs(a-b)===1) return 'near'; if(a===9||b===9) return 'nine'; return s>10?'make10':'plus2'; }
+    if(cell[0]==='-') return (+cell.split(',')[0].slice(1) + +cell.split(',')[1])>10?'back':'family';
+    if((m=cell.match(/^×(\d),(\d)$/))){ var x=Math.max(+m[1],+m[2]); return x<=5?(x<=2?'x2':'x3'):'xhi'; }
+    if(cell[0]==='÷') return 'div';
+    if(cell[0]==='m'||cell[0]==='g') return 'split';
+    if(cell.indexOf('분수')===0) return (cell.indexOf('×')>=0||cell.indexOf('÷')>=0)?'fracx':'frac'; if(cell==='약분') return 'reduce'; if(cell.indexOf('소수')===0) return 'dec'; if(cell.indexOf('혼합')===0||cell==='괄호') return 'mix';
+    if(cell[0]==='k'){ if(cell[1]==='c') return 'kcount'; if(cell[1]==='n'||cell[1]==='p') return 'knext'; if(cell[1]==='m'||cell[1]==='g') return 'kjoin'; return 'kpic'; }
+    return 'col';
+  }
+
+  /* 단계 */
+  function addOrder(){ var o=[],seen={}; function add(a,b){ var k='+'+a+','+b; if(!seen[k]){seen[k]=1;o.push(k);} }
+    for(var a=0;a<=9;a++){ add(a,0); add(a,1); add(0,a); add(1,a); }
+    for(a=0;a<=9;a++){ add(a,2); add(2,a); }
+    for(a=0;a<=9;a++) add(a,a);
+    for(a=0;a<=9;a++) add(a,10-a>9?0:10-a);
+    for(a=0;a<=8;a++){ add(a,a+1); add(a+1,a); }
+    for(a=0;a<=9;a++){ add(a,9); add(9,a); }
+    for(a=0;a<=9;a++) for(var b=0;b<=9;b++) add(a,b);
+    return o; }
+  function subOrder(){ return addOrder().map(function(k){ return '-'+k.slice(1); }); }
+  function mulOrder(){ var o=[],seen={}; function add(a,b){ var k='×'+a+','+b; if(!seen[k]){seen[k]=1;o.push(k);} }
+    [2,5,3,4,6,7,8,9].forEach(function(t){ for(var a=1;a<=9;a++){ add(t,a); add(a,t); } });
+    for(var a=1;a<=9;a++) for(var b=1;b<=9;b++) add(a,b); return o; }
+  function divOrder(){ return mulOrder().map(function(k){ return '÷'+k.slice(1); }); }
+
+  var KLEVELS = [
+    {n:-3,name:'세기 (1~10)',code:'누리과정 자연탐구',input:'strip',grade:0,
+      cells:function(){ var c=[]; for(var k=1;k<=10;k++) c.push('kc'+k); return c; },
+      make:function(cell,r){ var k=+cell.slice(2); return P({op:'c',a:k,b:null,ans:k,text:'점이 몇 개예요?',say:'점이 몇 개예요?',label:'점 '+k+'개 세기',pic:{t:'count',n:k,frame:k>5||r()<0.3},cell:cell,level:-3}); }},
+    {n:-2,name:'하나 더 · 하나 덜',code:'누리과정 자연탐구',input:'strip',grade:0,
+      cells:function(){ var c=[]; for(var k=1;k<=9;k++) c.push('kn'+k); for(k=2;k<=10;k++) c.push('kp'+k); return c; },
+      make:function(cell,r){ var k=+cell.slice(2), nx=cell[1]==='n'; return P({op:'1',a:k,b:null,ans:nx?k+1:k-1,text:k+(nx?' 다음 수는?':' 바로 앞 수는?'),say:k+(nx?' 다음 수는 뭐예요?':' 바로 앞 수는 뭐예요?'),label:k+(nx?' 다음 수':' 앞 수'),pic:{t:'next',n:k,next:nx},cell:cell,level:-2}); }},
+    {n:-1,name:'그림 모으기 · 가르기 (5까지)',code:'누리과정 자연탐구 · [2수01-04]',input:'strip',grade:0,
+      cells:function(){ var c=[]; for(var t=2;t<=5;t++){ c.push('km'+t); c.push('kg'+t); } return c; },
+      make:function(cell,r){ var t=+cell.slice(2), a=ri(r,1,t-1), b=t-a;
+        if(cell[1]==='m') return P({op:'+',a:a,b:b,ans:t,text:'모두 몇 개예요?',say:'청록 점 '+a+'개와 호박 점 '+b+'개를 모으면 모두 몇 개예요?',label:a+'과 '+b+' 모으기',pic:{t:'join',a:a,b:b},cell:cell,level:-1});
+        return P({op:'+',a:a,b:null,ans:b,text:t+'개 중에 가려진 점은?',say:'점이 모두 '+t+'개예요. '+a+'개가 보여요. 가려진 점은 몇 개예요?',label:t+' 가르기('+a+'과 □)',pic:{t:'hide',n:t,show:a},cell:cell,level:-1,missing:true,total:t}); }},
+    {n:0,name:'그림 덧셈 · 뺄셈 (10까지)',code:'누리과정 자연탐구 · [2수01-05]',input:'strip',grade:0,
+      cells:function(){ var c=[]; for(var a=1;a<=9;a++) for(var b=1;b<=9;b++){ if(a+b<=10) c.push('k+'+a+','+b); } for(a=2;a<=10;a++) for(b=1;b<a;b++) c.push('k-'+a+','+b); return c; },
+      make:function(cell,r){ var m=cell.match(/^k([+\-])(\d+),(\d+)$/), a=+m[2], b=+m[3];
+        if(m[1]==='+') return P({op:'+',a:a,b:b,ans:a+b,text:a+' + '+b+' = □',say:a+' 더하기 '+b+'는?',label:a+'+'+b,pic:{t:'join',a:a,b:b},cell:cell,level:0});
+        return P({op:'-',a:a,b:b,ans:a-b,text:a+' − '+b+' = □',say:a+' 빼기 '+b+'는?',label:a+'−'+b,pic:{t:'take',n:a,take:b},cell:cell,level:0}); }}
+  ];
+  function gcd(a,b){ a=Math.abs(a); b=Math.abs(b); while(b){ var t=a%b; a=b; b=t; } return a||1; }
+  function fr(n,d){ var g=gcd(n,d); if(d<0){ n=-n; d=-d; } return {n:n/g,d:d/g}; }
+  function fmt(x,k){ return +x.toFixed(k); }
+  function ftext(n,d){ return d===1?String(n):n+'/'+d; }
+  var HI_LEVELS = [
+    {n:14,name:'혼합 계산',code:'[6수01-01]',input:'row',grade:5,bucket:true,
+      cells:function(){ return ['혼합+×','혼합−÷','괄호'];
+      },
+      make:function(cell,r){ var a,b,c,t,ans,ltr;
+        if(cell==='혼합+×'){ a=ri(r,5,40); b=ri(r,2,9); c=ri(r,2,9); t=a+' + '+b+' × '+c; ans=a+b*c; ltr=(a+b)*c; }
+        else if(cell==='혼합−÷'){ b=ri(r,2,9); c=ri(r,2,9); a=ri(r,b*c+5,b*c+60); t=a+' − '+(b*c)+' ÷ '+c; ans=a-b; ltr=(a-b*c)/c; }
+        else { if(r()<0.5){ a=ri(r,3,30); b=ri(r,2,20); c=ri(r,2,6); t='('+a+' + '+b+') × '+c; ans=(a+b)*c; ltr=a+b*c; } else { c=ri(r,2,6); b=ri(r,2,15); a=b+c*ri(r,2,9); t='('+a+' − '+b+') ÷ '+c; ans=(a-b)/c; ltr=a-b/c; } }
+        return P({op:'mix',a:a,b:b,c:c,ans:ans,ltr:ltr,text:t+' = □',cell:cell,level:14}); }},
+    {n:15,name:'분수 · 소수 덧셈 · 뺄셈',code:'[4수01-15·16] [6수01-06·08]',input:'frac',grade:4,bucket:true,
+      cells:function(){ return ['분수+같은','분수−같은','소수+','소수−','약분','분수+다른','분수−다른']; },
+      make:function(cell,r){ var d,n1,n2,a,b,v;
+        if(cell==='분수+같은'){ d=ri(r,3,12); n1=ri(r,1,d-2); n2=ri(r,1,d-n1); v=fr(n1+n2,d); return P({op:'f+',f:[n1,d,n2,d],ans:v,text:n1+'/'+d+' + '+n2+'/'+d+' = □',cell:cell,level:15}); }
+        if(cell==='분수−같은'){ d=ri(r,3,12); n1=ri(r,2,d-1); n2=ri(r,1,n1-1); v=fr(n1-n2,d); return P({op:'f-',f:[n1,d,n2,d],ans:v,text:n1+'/'+d+' − '+n2+'/'+d+' = □',cell:cell,level:15}); }
+        if(cell==='소수+'){ a=fmt(ri(r,1,999)/100,2); b=fmt(ri(r,1,999)/100,2); return P({op:'d+',a:a,b:b,ans:fmt(a+b,2),text:a+' + '+b+' = □',cell:cell,level:15,input:'row',decimal:true}); }
+        if(cell==='소수−'){ a=fmt(ri(r,100,999)/100,2); b=fmt(ri(r,1,Math.round(a*100)-1)/100,2); return P({op:'d-',a:a,b:b,ans:fmt(a-b,2),text:a+' − '+b+' = □',cell:cell,level:15,input:'row',decimal:true}); }
+        if(cell==='약분'){ do{ d=ri(r,2,9); n1=ri(r,1,d-1); }while(gcd(n1,d)!==1); var k=ri(r,2,6); return P({op:'fr',f:[n1*k,d*k],ans:{n:n1,d:d},text:(n1*k)+'/'+(d*k)+' 을 약분하면 = □',cell:cell,level:15}); }
+        var d1,d2; do{ d1=ri(r,2,9); d2=ri(r,2,9); n1=ri(r,1,d1-1); n2=ri(r,1,d2-1); }while(d1===d2||gcd(n1,d1)!==1||gcd(n2,d2)!==1);
+        if(cell==='분수+다른'){ v=fr(n1*d2+n2*d1,d1*d2); return P({op:'f+',f:[n1,d1,n2,d2],ans:v,text:n1+'/'+d1+' + '+n2+'/'+d2+' = □',cell:cell,level:15}); }
+        if(n1*d2<=n2*d1){ var tn=n1; n1=n2; n2=tn; var td=d1; d1=d2; d2=td; if(n1*d2===n2*d1){ n1=d1-1; n2=1; } } v=fr(n1*d2-n2*d1,d1*d2); return P({op:'f-',f:[n1,d1,n2,d2],ans:v,text:n1+'/'+d1+' − '+n2+'/'+d2+' = □',cell:cell,level:15}); }},
+    {n:16,name:'분수 · 소수 곱셈 · 나눗셈',code:'[6수01-09·11·13·15]',input:'frac',grade:6,bucket:true,
+      cells:function(){ return ['분수×자연수','분수×분수','분수÷자연수','분수÷분수','소수×','소수÷']; },
+      make:function(cell,r){ var n1,d1,n2,d2,k,a,b,v;
+        if(cell==='분수×자연수'){ d1=ri(r,2,9); n1=ri(r,1,d1-1); k=ri(r,2,9); v=fr(n1*k,d1); return P({op:'f×',f:[n1,d1,k,1],ans:v,text:n1+'/'+d1+' × '+k+' = □',cell:cell,level:16}); }
+        if(cell==='분수×분수'){ do{ d1=ri(r,2,9); n1=ri(r,1,d1-1); d2=ri(r,2,9); n2=ri(r,1,d2-1); }while(gcd(n1,d1)!==1||gcd(n2,d2)!==1); v=fr(n1*n2,d1*d2); return P({op:'f×',f:[n1,d1,n2,d2],ans:v,text:n1+'/'+d1+' × '+n2+'/'+d2+' = □',cell:cell,level:16}); }
+        if(cell==='분수÷자연수'){ d1=ri(r,2,9); n1=ri(r,1,d1-1); k=ri(r,2,6); v=fr(n1,d1*k); return P({op:'f÷',f:[n1,d1,k,1],ans:v,text:n1+'/'+d1+' ÷ '+k+' = □',cell:cell,level:16}); }
+        if(cell==='분수÷분수'){ do{ d1=ri(r,2,9); n1=ri(r,1,d1-1); d2=ri(r,2,9); n2=ri(r,1,d2-1); }while(gcd(n1,d1)!==1||gcd(n2,d2)!==1); v=fr(n1*d2,d1*n2); return P({op:'f÷',f:[n1,d1,n2,d2],ans:v,text:n1+'/'+d1+' ÷ '+n2+'/'+d2+' = □',cell:cell,level:16}); }
+        if(cell==='소수×'){ a=fmt(ri(r,11,99)/10,1); b=fmt(ri(r,2,9)/10,1); if(r()<0.4) b=ri(r,2,9); return P({op:'d×',a:a,b:b,ans:fmt(a*b,2),text:a+' × '+b+' = □',cell:cell,level:16,input:'row',decimal:true}); }
+        b=fmt(ri(r,2,9)/10,1); var q=fmt(ri(r,11,99)/10,1); a=fmt(b*q,2); return P({op:'d÷',a:a,b:b,ans:q,text:a+' ÷ '+b+' = □',cell:cell,level:16,input:'row',decimal:true}); }}
+  ];
+  var LEVELS = [
+    {n:1,name:'가르기·모으기',code:'[2수01-04]',input:'row',grade:1,
+      cells:function(){ var c=[]; for(var t=2;t<=10;t++){ c.push('m'+t); c.push('g'+t); } return c; },
+      make:function(cell,r){ var t=+cell.slice(1); var a=ri(r,1,t-1), b=t-a;
+        if(cell[0]==='m') return P({op:'+',a:a,b:b,ans:t,text:a+' + '+b+' = □',cell:cell,level:1});
+        return P({op:'+',a:a,b:null,ans:b,text:t+' = '+a+' + □',cell:cell,level:1,missing:true,total:t}); }},
+    {n:2,name:'10까지 덧셈·뺄셈',code:'[2수01-05·06·07]',input:'row',grade:1,
+      cells:function(){ return addOrder().filter(function(k){ var p=k.slice(1).split(','); return +p[0]+ +p[1]<=10; }).concat(subOrder().filter(function(k){ var p=k.slice(1).split(','); return +p[0]+ +p[1]<=10 && +p[1]>0; })); },
+      make:function(cell,r){ return factProblem(cell,2); }},
+    {n:3,name:'10 만들기·받아올림 덧셈',code:'[2수01-06]',input:'row',grade:1,
+      cells:function(){ return ['t1','t2','t3','t4','t5','t6','t7','t8','t9'].concat(addOrder().filter(function(k){ var p=k.slice(1).split(','); return +p[0]+ +p[1]>10; })); },
+      make:function(cell,r){ if(cell[0]==='t'){ var a=+cell.slice(1); return P({op:'+',a:a,b:null,ans:10-a,text:a+' + □ = 10',cell:cell,level:3,missing:true,total:10}); } return factProblem(cell,3); }},
+    {n:4,name:'받아내림 뺄셈',code:'[2수01-06·07]',input:'row',grade:1,
+      cells:function(){ return subOrder().filter(function(k){ var p=k.slice(1).split(','); return +p[0]+ +p[1]>10 && +p[1]>0 && +p[0]>0; }); },
+      make:function(cell,r){ return factProblem(cell,4); }},
+    {n:5,name:'두 자리 덧셈·뺄셈(받아올림 없음)',code:'[2수01-06]',input:'col',grade:2,bucket:true,
+      cells:function(){ return ['+2d1d','+2d2d','-2d1d','-2d2d']; },
+      make:function(cell,r){ var a,b; if(cell==='+2d1d'){ a=ri(r,10,89); b=ri(r,1,9-a%10); if(b<1){a=a-(a%10)+ri(r,0,4); b=ri(r,1,9-a%10);} return col('+',a,b,cell,5); }
+        if(cell==='+2d2d'){ var t1=ri(r,1,8), t2=ri(r,1,9-t1), o1=ri(r,0,8), o2=ri(r,0,9-o1); return col('+',t1*10+o1,t2*10+o2,cell,5); }
+        if(cell==='-2d1d'){ a=ri(r,11,99); b=ri(r,0,a%10); if(b===0)b=Math.min(a%10,1); if(b===0){a=a+3;b=2;} return col('-',a,b,cell,5); }
+        var T1=ri(r,2,9), T2=ri(r,1,T1-1), O1=ri(r,1,9), O2=ri(r,0,O1); return col('-',T1*10+O1,T2*10+O2,cell,5); }},
+    {n:6,name:'두 자리 받아올림·받아내림',code:'[2수01-06]',input:'col',grade:2,bucket:true,
+      cells:function(){ return ['+올림','+올림·백','-내림','-내림·0']; },
+      make:function(cell,r){ var a,b; if(cell==='+올림'){ do{ a=ri(r,12,89); b=ri(r,12,89);}while(a%10+b%10<10 || a+b>=100); return col('+',a,b,cell,6); }
+        if(cell==='+올림·백'){ do{ a=ri(r,30,99); b=ri(r,30,99);}while(a+b<100); return col('+',a,b,cell,6); }
+        if(cell==='-내림'){ do{ a=ri(r,21,99); b=ri(r,12,a-1);}while(a%10>=b%10 || a%10===0); return col('-',a,b,cell,6); }
+        do{ a=ri(r,2,9)*10; b=ri(r,11,a-1);}while(b%10===0); return col('-',a,b,cell,6); }},
+    {n:7,name:'세 수 계산·□ 구하기',code:'[2수01-08·09]',input:'row',grade:2,bucket:true,
+      cells:function(){ return ['3+','3-','3±','□+','□-']; },
+      make:function(cell,r){ var a,b,c; if(cell==='3+'){ a=ri(r,5,40); b=ri(r,3,30); c=ri(r,2,20); return P({op:'3',a:a,b:b,c:c,ans:a+b+c,text:a+' + '+b+' + '+c+' = □',cell:cell,level:7}); }
+        if(cell==='3-'){ a=ri(r,40,99); b=ri(r,5,20); c=ri(r,5,a-b-1); return P({op:'3',a:a,b:b,c:c,ans:a-b-c,text:a+' − '+b+' − '+c+' = □',cell:cell,level:7}); }
+        if(cell==='3±'){ a=ri(r,10,60); b=ri(r,5,30); c=ri(r,2,Math.min(30,a+b-1)); return P({op:'3',a:a,b:b,c:c,ans:a+b-c,text:a+' + '+b+' − '+c+' = □',cell:cell,level:7}); }
+        if(cell==='□+'){ a=ri(r,3,50); b=ri(r,2,40); return P({op:'+',a:a,b:null,ans:b,text:a+' + □ = '+(a+b),cell:cell,level:7,missing:true,total:a+b}); }
+        a=ri(r,20,99); b=ri(r,2,a-1); return P({op:'-',a:a,b:null,ans:b,text:a+' − □ = '+(a-b),cell:cell,level:7,missing:true,total:a-b}); }},
+    {n:8,name:'곱셈구구',code:'[2수01-10·11]',input:'row',grade:2,
+      cells:function(){ return mulOrder(); }, make:function(cell,r){ return factProblem(cell,8); }},
+    {n:9,name:'세 자리 덧셈·뺄셈',code:'[4수01-03]',input:'col',grade:3,bucket:true,
+      cells:function(){ return ['+3d','+3d올림2','-3d','-3d0']; },
+      make:function(cell,r){ var a,b; if(cell==='+3d'){ a=ri(r,100,699); b=ri(r,100,999-a); return col('+',a,b,cell,9); }
+        if(cell==='+3d올림2'){ do{ a=ri(r,150,799); b=ri(r,150,999-a);}while(a%10+b%10<10 || (Math.floor(a/10)%10+Math.floor(b/10)%10+1)<10); return col('+',a,b,cell,9); }
+        if(cell==='-3d'){ do{ a=ri(r,200,999); b=ri(r,101,a-1);}while(a%10>=b%10 && Math.floor(a/10)%10>=Math.floor(b/10)%10); return col('-',a,b,cell,9); }
+        do{ a=ri(r,2,9)*100+ri(r,0,9); b=ri(r,11,a-1);}while(b%10<=a%10); return col('-',a,b,cell,9); }},
+    {n:10,name:'(두·세 자리)×(한 자리)',code:'[4수01-04]',input:'col',grade:3,bucket:true,
+      cells:function(){ return ['×2d1d','×2d1d올림','×3d1d']; },
+      make:function(cell,r){ var a,b; if(cell==='×2d1d'){ do{ a=ri(r,11,49); b=ri(r,2,4);}while(a%10*b>=10); return col('×',a,b,cell,10); }
+        if(cell==='×2d1d올림'){ do{ a=ri(r,12,99); b=ri(r,3,9);}while(a%10*b<10); return col('×',a,b,cell,10); }
+        a=ri(r,102,499); b=ri(r,2,9); return col('×',a,b,cell,10); }},
+    {n:11,name:'나눗셈(구구 거꾸로)·나머지',code:'[4수01-05·06]',input:'div',grade:3,
+      cells:function(){ return divOrder().concat(['r÷2','r÷3','r÷4','r÷5','r÷6','r÷7','r÷8','r÷9']); },
+      make:function(cell,r){ if(cell[0]==='r'){ var d=+cell.slice(2); var q=ri(r,2,9), rem=ri(r,1,d-1); return P({op:'÷',a:q*d+rem,b:d,ans:q,rem:rem,text:(q*d+rem)+' ÷ '+d,cell:cell,level:11}); } return factProblem(cell,11); }},
+    {n:12,name:'(두 자리)×(두 자리)·(두·세 자리)÷(한 자리)',code:'[4수01-04·06]',input:'col',grade:4,bucket:true,
+      cells:function(){ return ['×2d2d','÷2d1d','÷2d1d나머지','÷3d1d']; },
+      make:function(cell,r){ var a,b; if(cell==='×2d2d'){ a=ri(r,12,59); b=ri(r,12,39); return col('×',a,b,cell,12); }
+        if(cell==='÷2d1d'){ b=ri(r,2,9); var q=ri(r,10,Math.floor(99/b)); return P({op:'÷',a:q*b,b:b,ans:q,rem:0,text:(q*b)+' ÷ '+b,cell:cell,level:12,input:'div'}); }
+        if(cell==='÷2d1d나머지'){ b=ri(r,2,9); var q2=ri(r,10,Math.floor(95/b)), rm=ri(r,1,b-1); return P({op:'÷',a:q2*b+rm,b:b,ans:q2,rem:rm,text:(q2*b+rm)+' ÷ '+b,cell:cell,level:12,input:'div'}); }
+        b=ri(r,2,9); var q3=ri(r,Math.ceil(100/b),Math.floor(999/b)), rm3=ri(r,0,b-1); return P({op:'÷',a:q3*b+rm3,b:b,ans:q3,rem:rm3,text:(q3*b+rm3)+' ÷ '+b,cell:cell,level:12,input:'div'}); }},
+    {n:13,name:'(세 자리)÷(두 자리)·어림',code:'[4수01-07·08]',input:'div',grade:4,bucket:true,
+      cells:function(){ return ['÷3d2d','÷3d2d나머지','어림+']; },
+      make:function(cell,r){ var b,q,rm; if(cell==='어림+'){ var a=ri(r,120,880), b2=ri(r,120,880); var est=Math.round(a/100)*100+Math.round(b2/100)*100; return P({op:'~',a:a,b:b2,ans:est,text:a+' + '+b2+' ≈ □ (백의 자리까지 어림)',cell:cell,level:13,input:'row'}); }
+        b=ri(r,12,39); q=ri(r,Math.ceil(100/b),Math.floor(999/b)); rm=cell==='÷3d2d'?0:ri(r,1,b-1); return P({op:'÷',a:q*b+rm,b:b,ans:q,rem:rm,text:(q*b+rm)+' ÷ '+b,cell:cell,level:13,input:'div'}); }}
+  ];
+  LEVELS = KLEVELS.concat(LEVELS).concat(HI_LEVELS);
+  function L(n){ for(var i=0;i<LEVELS.length;i++) if(LEVELS[i].n===n) return LEVELS[i]; return null; }
+  function levelLabel(n){ return n<=0 ? '유치 '+(n+4)+'단계' : n+'단계'; }
+  function nextLevel(n){ var i=LEVELS.indexOf(L(n)); return i>=0&&i<LEVELS.length-1 ? LEVELS[i+1].n : null; }
+  function P(o){ if(!o.input){ var Lv=L(o.level); o.input=Lv?Lv.input:'row'; } if(o.op==='÷') o.input='div'; if(o.decimal) o.ansStr=String(o.ans); o.id=o.label?o.label+'|'+o.text:o.text; return o; }
+  function col(op,a,b,cell,level){ var ans=op==='+'?a+b:op==='-'?a-b:a*b; return P({op:op,a:a,b:b,ans:ans,text:a+' '+(op==='-'?'−':op)+' '+b,cell:cell,level:level,input:'col'}); }
+  function factProblem(cell,level){ var op=cell[0], p=cell.slice(1).split(',').map(Number), a=p[0], b=p[1];
+    if(op==='+') return P({op:'+',a:a,b:b,ans:a+b,text:a+' + '+b+' = □',cell:cell,level:level});
+    if(op==='-') return P({op:'-',a:a+b,b:b,ans:a,text:(a+b)+' − '+b+' = □',cell:cell,level:level});
+    if(op==='×') return P({op:'×',a:a,b:b,ans:a*b,text:a+' × '+b+' = □',cell:cell,level:level});
+    return P({op:'÷',a:a*b,b:b,ans:a,rem:0,text:(a*b)+' ÷ '+b,cell:cell,level:level,input:'div'}); }
+  function levelCells(n){ var Lv=L(n); if(!Lv._cells) Lv._cells=Lv.cells(); return Lv._cells; }
+
+  /* 실수 유형 판정 */
+  function bugAdd(a,b,mode){ var A=digs(a).reverse(), B=digs(b).reverse(), n=Math.max(A.length,B.length), out='', carry=0;
+    for(var i=0;i<n;i++){ var s=(A[i]||0)+(B[i]||0)+(mode==='E1'?0:carry); if(mode==='E2'){ out=String(s)+out; carry=0; } else if(mode==='E1'){ out=(s%10)+out; } else { out=(s%10)+out; carry=s>=10?1:0; } }
+    if(mode!=='E1'&&mode!=='E2'&&carry) out='1'+out; return +out; }
+  function bugSub(a,b,mode){ var A=digs(a).reverse(), B=digs(b).reverse(), n=A.length, out='', borrow=0;
+    for(var i=0;i<n;i++){ var t=A[i]-(mode==='E4'?0:borrow), u=B[i]||0, d;
+      if(mode==='E3'){ d=Math.abs(A[i]-u); borrow=0; }
+      else if(mode==='E4'){ if(t<u){ d=t+10-u; } else d=t-u; }
+      else if(mode==='E5'){ if(t<u){ d=t+10-u; borrow=(A[i]===0)?0:1; } else { d=t-u; borrow=0; } }
+      else { if(t<u){ d=t+10-u; borrow=1; } else { d=t-u; borrow=0; } }
+      out=d+out; }
+    return +out; }
+  function diagnose(p, given){
+    var E=[], op=p.op;
+    if(p.input==='frac'){ var gn=+given.n, gd=(given.d===''||given.d===undefined)?1:+given.d; if(isNaN(gn)||isNaN(gd)||!gd) return E; var f=p.f||[];
+      if(gn*p.ans.d===p.ans.n*gd && gcd(gn,gd)!==1) E.push('E13');
+      else if((op==='f+'||op==='f-')&&f.length===4&&f[1]===f[3]&&gd===f[1]+f[3]&&gn===(op==='f+'?f[0]+f[2]:f[0]-f[2])) E.push('E14');
+      else if(op==='f÷'&&f.length===4){ var wn=f[0]*f[2], wd=f[1]*f[3]; if(gn*wd===wn*gd) E.push('E17'); }
+      return E; }
+    if(p.decimal){ var gv=+given; if(isNaN(gv)) return E; if(op==='d+'||op==='d-'){ var A=+String(p.a).replace('.',''), B=+String(p.b).replace('.',''), S=op==='d+'?A+B:A-B; for(var k=0;k<=3;k++){ if(Math.abs(gv*Math.pow(10,k)-S)<1e-6 && Math.abs(gv-p.ans)>1e-9){ E.push('E15'); break; } } } return E; }
+    if(op==='mix'){ var gm=+given; if(!isNaN(gm)&&Math.abs(gm-p.ltr)<1e-9&&Math.abs(gm-p.ans)>1e-9) E.push('E16'); return E; }
+    var g=(typeof given==='object')?given.q:given; if(g===''||g===null||g===undefined||isNaN(g)) return E;
+    var a=p.a, b=p.b;
+    if(op==='÷'){ var r=(typeof given==='object')?given.r:0; if(r>=b) E.push('E9'); else if(g*b+r!==a && Math.abs(g-p.ans)===1 && g*b+r<=a+b) E.push('E9');
+      if(E.length===0 && r===0 && b<=9 && p.rem===0 && (g===p.ans+1||g===p.ans-1)) E.push('E8');
+      return E; }
+    if(p.missing){ var t=p.total; if(op==='+'&&g===t) E.push('E7'); if(Math.abs(g-p.ans)===1) E.push('E10'); return E; }
+    if(op==='3'||op==='~'||op==='c'||op==='1') { if(Math.abs(g-p.ans)===1) E.push('E10'); return E; }
+    if(op==='+'){
+      if(a>=10||b>=10){ if(bugAdd(a,b,'E1')===g && g!==p.ans) E.push('E1'); if(bugAdd(a,b,'E2')===g && g!==p.ans) E.push('E2');
+        var da=String(a).length, db=String(b).length; if(da!==db){ var sh=Math.min(a,b)*Math.pow(10,Math.abs(da-db)); if(Math.max(a,b)+sh===g) E.push('E6'); } }
+      else { if(a*b===g && a*b!==p.ans) E.push('E7'); if((a===9||b===9)&&g===p.ans+1) E.push('E12'); }
+      if(E.length===0 && Math.abs(g-p.ans)===1) E.push('E10');
+    } else if(op==='-'){
+      if(a>=10){ if(bugSub(a,b,'E3')===g) E.push('E3'); if(bugSub(a,b,'E4')===g && E.indexOf('E3')<0) E.push('E4');
+        if(String(a).indexOf('0')>0 && bugSub(a,b,'E5')===g && E.length===0) E.push('E5');
+        var da2=String(a).length, db2=String(b).length; if(da2!==db2 && b<10){ if(a-b*Math.pow(10,da2-db2)===g) E.push('E6'); } }
+      if(E.length===0 && Math.abs(g-p.ans)===1) E.push('E10');
+    } else if(op==='×'){
+      if(a<10&&b<10){ if(a+b===g) E.push('E7'); else { var near=false; for(var x=1;x<=9&&!near;x++) for(var y=1;y<=9;y++){ if(x*y===g && g!==p.ans && (Math.abs(x-a)+Math.abs(y-b)<=2 || Math.abs(x-b)+Math.abs(y-a)<=2)){ near=true; break; } } if(near) E.push('E8'); } }
+      else if(b>=10){ var p1=a*(b%10), p2=a*Math.floor(b/10); if(p1+p2===g) E.push('E11'); }
+      else { if(bugAdd(0,0,'x')===0){ var A=digs(a).reverse(), out='', c=0; for(var i=0;i<A.length;i++){ var s=A[i]*b; out=(s%10)+out; } if(+out===g) E.push('E1'); } }
+    }
+    return E;
+  }
+
+  /* 주머니 · 숙달 */
+  var INTERVALS=[1,3,7,14];
+  function fastLimit(grade){ return grade<=0?Infinity:grade<=2?5000:3000; }
+  function emptyState(){ return {grid:{}, bag:[], runs:[], stamps:[], assigns:[], flags:{}, paper:[], reports:[]}; }
+  function cellState(st,cell){ return st.grid[cell]||{s:0,st:'new',days:[],slow:false}; }
+  function levelProgress(st,n){ var cells=levelCells(n), done=0, prac=0; cells.forEach(function(c){ var g=st.grid[c]; if(g&&g.st==='done') done++; else if(g&&g.st==='prac') prac++; }); return {total:cells.length,done:done,prac:prac,ratio:done/cells.length}; }
+
+  function buildSession(st, student, today, opts){
+    opts=opts||{}; var n=student.level, cells=levelCells(n), count=opts.count||(student.grade<=0?8:12), Lv=L(n);
+    var r=rng(hash(student.id+today+(opts.seed||'')+n));
+    var due=st.bag.filter(function(b){ return b.due<=today; }).slice(0, opts.confirm?0:4);
+    var assigns=opts.confirm?[]:openAssigns(st).filter(function(a){ return a.level===n; });
+    var newCells=cells.filter(function(c){ return cellState(st,c).st==='new'; }).slice(0, due.length?2:3);
+    var prac=shuffle(r,cells.filter(function(c){ return cellState(st,c).st==='prac' && !due.some(function(b){return b.cell===c;}); })).slice(0,3);
+    var done=shuffle(r,cells.filter(function(c){ return cellState(st,c).st==='done'; }));
+    var list=[], used={};
+    function push(cell,tag,E){ var p; var tries=0; do{ p=Lv.make(cell,r); tries++; }while(used[p.id]&&tries<20); if(used[p.id]) return; used[p.id]=1; p.tag=tag; if(E) p.forE=E; list.push(p); }
+    assigns.forEach(function(as){ for(var ai=0;ai<3;ai++){ var ap; if(as.cell){ ap=Lv.make(as.cell,r); } else { ap=null; for(var tr=0;tr<30&&!ap;tr++){ var cnd=Lv.make(pick(r,cells),r); if(targetsE(cnd,as.code)) ap=cnd; } } if(!ap||used[ap.id]) continue; used[ap.id]=1; ap.tag='assign'; ap.assignId=as.id; if(as.code) ap.forE=as.code; list.push(ap); } });
+    due.forEach(function(b){ if(b.type==='E'){ var c=0; for(var i=0;i<30&&c<3;i++){ var cand=Lv.make(pick(r,cells),r); if(targetsE(cand,b.code)&&!used[cand.id]){ used[cand.id]=1; cand.tag='bag'; cand.forE=b.code; list.push(cand); c++; } } } else push(b.cell,'bag'); });
+    newCells.forEach(function(c){ push(c,'new'); });
+    prac.forEach(function(c){ push(c,'prac'); });
+    var i=0; while(list.length<count && i<200){ var pool=done.length?done:(Lv._shuf||(Lv._shuf=shuffle(r,cells))); var c=pool[(i++)%pool.length]; if(Lv.bucket){ var pr=Lv.make(c,r); if(!used[pr.id]){ used[pr.id]=1; pr.tag=cellState(st,c).st==='done'?'review':'prac'; list.push(pr);} } else push(c, cellState(st,c).st==='done'?'review':'prac'); if(i>cells.length&&list.length<count&&!Lv.bucket){ var any=pick(r,cells); push(any,'prac'); } }
+    list=list.slice(0,count);
+    if(opts.confirm) list=shuffle(r,list); else { var news=list.filter(function(p){return p.tag==='new';}), rest=shuffle(r,list.filter(function(p){return p.tag!=='new';})); list=rest.slice(0,2).concat(news.slice(0,1),rest.slice(2,5),news.slice(1),rest.slice(5)); }
+    var why=whyLine(due,newCells,Lv);
+    return {level:n,levelName:Lv.name,problems:list,why:why,newCells:newCells,dueCount:due.length,confirm:!!opts.confirm};
+  }
+  function targetsE(p,code){ var a=p.a,b=p.b; switch(code){
+    case 'E1': case 'E2': return p.op==='+'&&a>=10&&(a%10+b%10>=10);
+    case 'E3': case 'E4': return p.op==='-'&&a>=10&&(a%10<b%10);
+    case 'E5': return p.op==='-'&&String(a).indexOf('0')>0;
+    case 'E6': return (p.op==='+'||p.op==='-')&&String(a).length!==String(b).length;
+    case 'E7': return (p.op==='×'||p.op==='+')&&a<10&&b<10;
+    case 'E8': return p.op==='×'&&a<10&&b<10&&(a>=6||b>=6);
+    case 'E9': return p.op==='÷'&&p.rem>0;
+    case 'E10': case 'E12': return (p.op==='+'||p.op==='-')&&a<20&&!p.missing;
+    case 'E11': return p.op==='×'&&b>=10;
+    } return false; }
+  function cellLabel(cell){ var m; if((m=cell.match(/^([+\-×÷])(\d),(\d)$/))){ var a=+m[2],b=+m[3]; if(m[1]==='+') return a+'+'+b; if(m[1]==='-') return (a+b)+'−'+b; if(m[1]==='×') return a+'×'+b; return (a*b)+'÷'+b; }
+    if(cell[0]==='k'){ if(cell[1]==='c') return '점 '+cell.slice(2)+'개 세기'; if(cell[1]==='n') return cell.slice(2)+' 다음 수'; if(cell[1]==='p') return cell.slice(2)+' 앞 수'; if(cell[1]==='m') return cell.slice(2)+' 모으기'; if(cell[1]==='g') return cell.slice(2)+' 가르기'; var km=cell.match(/^k([+\-])(\d+),(\d+)$/); if(km) return km[2]+(km[1]==='+'?'+':'−')+km[3]; }
+    if(cell[0]==='m') return cell.slice(1)+' 모으기'; if(cell[0]==='g') return cell.slice(1)+' 가르기'; if(cell[0]==='t') return cell.slice(1)+'의 10 짝'; if(cell[0]==='r') return cell.slice(2)+'로 나눈 나머지';
+    return BUCKET_LABEL[cell]||cell; }
+  var BUCKET_LABEL={'+2d1d':'두 자리 + 한 자리','+2d2d':'두 자리 + 두 자리','-2d1d':'두 자리 − 한 자리','-2d2d':'두 자리 − 두 자리','+올림':'받아올림 덧셈','+올림·백':'합이 100 넘는 덧셈','-내림':'받아내림 뺄셈','-내림·0':'일의 자리가 0인 뺄셈','3+':'세 수 덧셈','3-':'세 수 뺄셈','3±':'덧셈·뺄셈 섞어서','□+':'□ 덧셈식','□-':'□ 뺄셈식','+3d':'세 자리 덧셈','+3d올림2':'두 번 받아올림','-3d':'세 자리 뺄셈','-3d0':'0이 있는 뺄셈','×2d1d':'두 자리 × 한 자리','×2d1d올림':'올림 있는 곱셈','×3d1d':'세 자리 × 한 자리','×2d2d':'두 자리 × 두 자리','÷2d1d':'두 자리 ÷ 한 자리','÷2d1d나머지':'나머지 있는 나눗셈','÷3d1d':'세 자리 ÷ 한 자리','÷3d2d':'세 자리 ÷ 두 자리','÷3d2d나머지':'나머지 있는 ÷ 두 자리','어림+':'어림셈','혼합+×':'덧셈과 곱셈 섞어서','혼합−÷':'뺄셈과 나눗셈 섞어서','괄호':'괄호가 있는 식','분수+같은':'분모 같은 분수 덧셈','분수−같은':'분모 같은 분수 뺄셈','소수+':'소수 덧셈','소수−':'소수 뺄셈','약분':'약분','분수+다른':'분모 다른 분수 덧셈','분수−다른':'분모 다른 분수 뺄셈','분수×자연수':'분수 × 자연수','분수×분수':'분수 × 분수','분수÷자연수':'분수 ÷ 자연수','분수÷분수':'분수 ÷ 분수','소수×':'소수 곱셈','소수÷':'소수 나눗셈'};
+  function whyLine(due,newCells,L){ if(L.grade===0){ var dd=due.filter(function(b){return b.type!=='E';}); return (dd.length?'다시 볼 것 '+dd.length+'개. ':'')+(newCells.length?'새 것 '+newCells.length+'개.':'')+' 천천히 해도 돼요.'; } var e=due.filter(function(b){return b.type==='E';})[0];
+    if(e) return '지난 판에서 "'+ETYPES[e.code].name+'"가 두 번 나왔어요. 오늘 그 유형을 3문제 다시 봐요.';
+    var d=due.filter(function(b){return b.type!=='E';}); if(d.length) return '주머니에서 '+d.map(function(b){return cellLabel(b.cell);}).slice(0,3).join(', ')+(d.length>3?' 등':'')+'을 다시 봐요.'+(newCells.length?' 새 칸 '+newCells.length+'개도 열어요.':'');
+    if(newCells.length) return '오늘 새 칸: '+newCells.map(cellLabel).join(', ')+' — '+STRATEGY[cellStrategy(newCells[0])].title+' 카드로 시작해요.';
+    return L.name+' 칸들이 그대로 남아 있는지 다시 봐요.'; }
+
+  function check(p, given){
+    if(p.input==='frac'){ var n=+given.n, d=(given.d===''||given.d===undefined)?1:+given.d; if(isNaN(n)||isNaN(d)||d===0) return false; return n*p.ans.d===p.ans.n*d && gcd(n,d)===1; }
+    if(p.decimal){ return Math.abs(+given-p.ans)<1e-9; }
+    if(p.op==='÷'){ var q=+given.q, r=given.r===''||given.r===undefined?0:+given.r; return q===p.ans && r===(p.rem||0); } return +given===p.ans; }
+
+  function applyRun(st, student, session, results, today){
+    var limit=fastLimit(student.grade), ecount={}, graded=0, correct=0, slowN=0, firstN=0, helpedN=0, touchN=0;
+    results.forEach(function(res,i){ var p=session.problems[i]; var g=st.grid[p.cell]||{s:0,st:'new',days:[],slow:false};
+      var fast=res.ms<=limit; res.fast=fast; res.E=res.ok?[]:diagnose(p,res.given); res.E.forEach(function(e){ ecount[e]=(ecount[e]||0)+1; });
+      if(res.timeout) return;
+      if(res.skipped) { touchN++; g.s=0; g.st='prac'; bagAdd(st,{cell:p.cell,type:'cell',E:res.E,due:addDays(today,1),idx:0,s:0}); st.grid[p.cell]=g; return; } graded++;
+      if(res.ok){ correct++; if(!res.help) firstN++; else helpedN++; if(fast){ g.s++; if(g.days.indexOf(today)<0) g.days.push(today); g.slow=false; if(g.s>=3&&g.days.length>=3) g.st='done'; else if(g.st==='new') g.st='prac'; }
+        else { slowN++; g.slow=true; if(g.st==='new') g.st='prac'; bagAdd(st,{cell:p.cell,type:'cell',E:[],due:addDays(today,1),idx:0,s:0,slow:true}); } }
+      else { if(res.retry) helpedN++; g.s=0; g.st='prac'; bagAdd(st,{cell:p.cell,type:'cell',E:res.E,due:addDays(today,1),idx:0,s:0}); }
+      st.grid[p.cell]=g;
+      if(p.assignId){ var asg=(st.assigns||[]).filter(function(a){return a.id===p.assignId;})[0]; if(asg&&!asg.done){ if(res.ok&&!res.help){ asg.s++; if(asg.s>=3){ asg.done=true; asg.doneAt=today; } } else asg.s=0; } }
+      if(p.tag==='bag'&&!p.forE){ var b=st.bag.filter(function(x){return x.cell===p.cell&&x.type==='cell';})[0]; if(b){ if(res.ok&&fast){ b.s++; b.idx=Math.min(b.idx+1,INTERVALS.length-1); b.due=addDays(today,INTERVALS[b.idx]); if(b.s>=3){ st.bag.splice(st.bag.indexOf(b),1); b.grad=true; } } else { b.s=0; b.idx=0; b.due=addDays(today,1); if(!res.ok) b.E=res.E; } } }
+    });
+    Object.keys(ecount).forEach(function(e){ if(ecount[e]>=2){ var ex=st.bag.filter(function(b){return b.type==='E'&&b.code===e;})[0]; if(ex){ ex.due=addDays(today,1); } else st.bag.push({type:'E',code:e,due:addDays(today,1),idx:0,s:0}); } });
+    st.bag.filter(function(b){return b.type==='E';}).forEach(function(b){ if(session.problems.some(function(p){return p.forE===b.code;})){ var allOk=session.problems.every(function(p,i){ return p.forE!==b.code || (results[i].ok&&results[i].fast); }); if(allOk){ b.s++; if(b.s>=2) st.bag.splice(st.bag.indexOf(b),1); else { b.idx=Math.min(b.idx+1,3); b.due=addDays(today,INTERVALS[b.idx]); } } else { b.s=0; b.due=addDays(today,1); } } });
+    var run={date:today,level:session.level,confirm:session.confirm,n:graded,ok:correct,slow:slowN,first:firstN,helped:helpedN,touched:touchN,E:ecount,items:session.problems.map(function(p,i){ return {t:p.label||p.text,pic:!!p.pic,cell:p.cell,tag:p.tag,ok:results[i].ok,g:results[i].given,ms:results[i].ms,E:results[i].E,skip:!!results[i].skipped,help:!!results[i].help,retry:!!results[i].retry,self:results[i].self||null}; })};
+    run.doneAll=Object.keys(st.grid).filter(function(k){return st.grid[k].st==='done';}).length;
+    st.runs.push(run); if(st.runs.length>150) st.runs.splice(0,st.runs.length-150); if(st.stamps.indexOf(today)<0) st.stamps.push(today);
+    var prog=levelProgress(st,student.level); run.levelRatio=prog.ratio; var nl=nextLevel(student.level); if(prog.ratio>=0.9 && !session.confirm && nl!==null && (student.grade<=2 || st.runs.some(function(x){return x.confirm&&x.level===student.level&&x.ok/x.n>=0.9;}))){ student.level=nl; run.levelUp=true; }
+    return run;
+  }
+  function bagAdd(st,item){ var ex=st.bag.filter(function(b){return b.type==='cell'&&b.cell===item.cell;})[0]; if(ex){ ex.due=item.due; ex.idx=0; ex.s=0; if(item.E&&item.E.length) ex.E=item.E; ex.slow=item.slow; return; } st.bag.push(item); }
+  function topE(ecount){ var best=null; Object.keys(ecount).forEach(function(e){ if(!best||ecount[e]>ecount[best]) best=e; }); return best; }
+
+  /* 풀이 단계(체계적 지도): 문제를 어떻게 푸는지 자리별로 */
+  function jo(n,k){ var d=+String(n).slice(-1); var v=(d===0||d===1||d===3||d===6||d===7||d===8); return k==='은'?(v?'은':'는'):(v?'을':'를'); }
+  function steps(p){
+    var out=[], a=p.a, b=p.b, op=p.op;
+    if(p.pic){ if(p.pic.t==='count') return ['점을 하나씩 짚으며 세요.','마지막에 말한 수가 개수예요.']; if(p.pic.t==='next') return [a+'에서 '+(p.pic.next?'하나 더':'하나 덜')+'.', '답은 '+p.ans+'.']; if(p.pic.t==='join') return ['청록 점을 먼저 세고 이어서 호박 점을 세요.', a+' 다음에 '+b+'개 더 → '+(a+b)+'.']; if(p.pic.t==='hide') return ['모두 '+p.total+'개예요. 보이는 점을 세요: '+a+'.', p.total+'에서 '+a+'을 빼면 가려진 점은 '+p.ans+'.']; if(p.pic.t==='take') return [a+'개에서 '+b+'개를 가려요.','남은 점을 세면 '+p.ans+'.']; }
+    if(op==='mix'){ var o1=p.text.indexOf('(')>=0?'괄호 안을 먼저 계산해요.':'곱셈 · 나눗셈을 먼저 계산해요.'; return [o1, '그 다음 남은 덧셈 · 뺄셈을 해요.', '답은 '+p.ans+'.']; }
+    if(op==='fr') return ['분자와 분모를 같은 수로 나눠요.', '더 나눌 수 없을 때까지: '+p.f[0]+'/'+p.f[1]+' → '+p.ans.n+'/'+p.ans.d+'.'];
+    if(op==='f+'||op==='f-'){ var f=p.f; if(f[1]===f[3]) return ['분모가 같으면 분자끼리만 '+(op==='f+'?'더해요':'빼요')+': '+f[0]+(op==='f+'?' + ':' − ')+f[2]+' = '+(op==='f+'?f[0]+f[2]:f[0]-f[2])+'.', '분모 '+f[1]+'은 그대로. 약분이 되면 약분해요.', '답은 '+ftext(p.ans.n,p.ans.d)+'.']; var cd=f[1]*f[3]; return ['분모가 다르면 먼저 통분해요: 분모 '+f[1]+'과 '+f[3]+' → '+cd+'.', f[0]+'/'+f[1]+' = '+(f[0]*f[3])+'/'+cd+', '+f[2]+'/'+f[3]+' = '+(f[2]*f[1])+'/'+cd+'.', '분자끼리 계산하고 약분해요: 답은 '+ftext(p.ans.n,p.ans.d)+'.']; }
+    if(op==='f×'){ return ['분자는 분자끼리, 분모는 분모끼리 곱해요.', (p.f[0]*p.f[2])+'/'+(p.f[1]*p.f[3])+' → 약분하면 '+ftext(p.ans.n,p.ans.d)+'.']; }
+    if(op==='f÷'){ return ['나누는 분수를 뒤집어 곱해요: '+p.f[2]+'/'+p.f[3]+' → '+p.f[3]+'/'+p.f[2]+'.', (p.f[0]*p.f[3])+'/'+(p.f[1]*p.f[2])+' → 약분하면 '+ftext(p.ans.n,p.ans.d)+'.']; }
+    if(op==='d+'||op==='d-') return ['소수점끼리 줄을 맞춰 세로로 써요(빈 자리는 0).', '자연수처럼 계산하고 소수점을 그대로 내려요.', '답은 '+p.ans+'.'];
+    if(op==='d×') return ['소수점을 무시하고 자연수처럼 곱해요.', '두 수의 소수점 아래 자리 수를 더한 만큼 소수점을 찍어요.', '답은 '+p.ans+'.'];
+    if(op==='d÷') return ['나누는 수가 자연수가 되게 두 수의 소수점을 같이 옮겨요.', '자연수처럼 나누고 소수점을 맞춰요.', '답은 '+p.ans+'.'];
+    if(p.missing){ if(op==='+') return [a+'에 얼마를 더하면 '+p.total+'이 될까요?', p.total+' − '+a+' = '+p.ans+'.']; return [a+'에서 얼마를 빼면 '+p.total+'이 될까요?', a+' − '+p.total+' = '+p.ans+'.']; }
+    if(op==='3'||op==='~') return ['앞에서부터 차례로 계산해요.', '답은 '+p.ans+'.'];
+    if(op==='÷'){ var q=p.ans, r=p.rem||0; out.push(b+'단에서 '+a+'에 가장 가까운 것을 찾아요: '+b+' × '+q+' = '+(b*q)+'.'); out.push(r?('남는 것은 '+a+' − '+(b*q)+' = '+r+'. 나머지 '+r+'은 '+b+'보다 작아요.'):'딱 떨어져요. 나머지 0.'); return out; }
+    if(a<10&&b<10){
+      if(op==='+'){ if(a+b<=10) return [a+'에서 '+b+'만큼 이어 세요.', '답은 '+(a+b)+'.']; var need=10-Math.max(a,b), small=Math.min(a,b); return [Math.max(a,b)+'에 '+need+jo(need,'을')+' 더해 10을 만들어요.', '남은 '+(small-need)+jo(small-need,'을')+' 더해요: 10 + '+(small-need)+' = '+(a+b)+'.']; }
+      if(op==='-'){ return [a+'에서 '+b+'을 빼요.', '답은 '+(a-b)+'.']; }
+      if(op==='×'){ return [a+jo(a,'을')+' '+b+'번 더한 것과 같아요.', b+'단: '+a+' × '+b+' = '+(a*b)+'.']; }
+    }
+    if(op==='-'&&a<20&&a>=10){ var o=a%10; return [a+'에서 먼저 '+o+jo(o,'을')+' 빼 10을 만들어요.', '10에서 남은 '+(b-o)+jo(b-o,'을')+' 빼요: 10 − '+(b-o)+' = '+(a-b)+'.']; }
+    var A=String(a).split('').reverse().map(Number), B=String(b).split('').reverse().map(Number), names=['일','십','백','천'];
+    if(op==='+'){ var c=0; for(var i=0;i<Math.max(A.length,B.length);i++){ var sum=(A[i]||0)+(B[i]||0)+c; var t=names[i]+'의 자리: '+(A[i]||0)+' + '+(B[i]||0)+(c?' + 올림 1':'')+' = '+sum+'.'; if(sum>=10){ t+=' '+(sum%10)+jo(sum%10,'을')+' 쓰고 1을 올려요.'; c=1; } else { t+=' '+sum+jo(sum,'을')+' 써요.'; c=0; } out.push(t); } if(c) out.push('맨 앞에 올림 1을 써요.'); out.push('답은 '+p.ans+'.'); return out; }
+    if(op==='-'){ var br=0; for(var j=0;j<A.length;j++){ var raw=A[j]-br, bot=B[j]||0, t2=names[j]+'의 자리: '; if(raw<0){ var tv=raw+10; t2+='0은 이미 빌려줬어요. 옆집에서 또 10을 빌려 '+tv+' − '+bot+' = '+(tv-bot)+'.'; br=1; } else if(raw<bot){ t2+=raw+jo(raw,'은')+' '+bot+'보다 작아요. 옆집에서 10을 빌려 '+(raw+10)+' − '+bot+' = '+(raw+10-bot)+'.'; br=1; } else { t2+=raw+' − '+bot+' = '+(raw-bot)+'.'; br=0; } out.push(t2); } out.push('답은 '+p.ans+'.'); return out; }
+    if(op==='×'){ if(b<10){ var cm=0; for(var k=0;k<A.length;k++){ var m=A[k]*b+cm; var t3=names[k]+'의 자리: '+A[k]+' × '+b+(cm?' + 올림 '+cm:'')+' = '+m+'.'; if(k<A.length-1&&m>=10){ t3+=' '+(m%10)+jo(m%10,'을')+' 쓰고 '+Math.floor(m/10)+jo(Math.floor(m/10),'을')+' 올려요.'; cm=Math.floor(m/10); } else { t3+=' '+m+jo(m,'을')+' 써요.'; cm=0; } out.push(t3); } out.push('답은 '+p.ans+'.'); return out; }
+      return ['먼저 '+a+' × '+(b%10)+' = '+(a*(b%10))+'.', '다음 '+a+' × '+Math.floor(b/10)+'0 = '+(a*Math.floor(b/10)*10)+' (한 칸 왼쪽에서 시작).', '두 줄을 더해요: '+(a*(b%10))+' + '+(a*Math.floor(b/10)*10)+' = '+p.ans+'.']; }
+    return ['답은 '+p.ans+'.'];
+  }
+  /* 힌트 표상(반구체물): 어떤 그림을 보여 줄지 */
+  function hintViz(p){ var a=p.a, b=p.b, op=p.op;
+    if(p.pic) return {t:'pic'};
+    if(p.input==='frac'&&p.f) return {t:'fbar',f:p.f,op:op};
+    if(p.decimal||op==='mix') return {t:'none'};
+    if(p.missing) return op==='+'?{t:'line',max:Math.max(10,p.total),marks:[a,p.total]}:{t:'line',max:Math.max(10,a),marks:[p.total,a]};
+    if(op==='+'&&a<10&&b<10) return a+b<=10?{t:'tenframe',a:a,b:b}:{t:'line',max:20,marks:[a,a+b]};
+    if(op==='-'&&a<=20) return {t:'line',max:20,marks:[a-b,a]};
+    if((op==='+'||op==='-')&&a<1000) return {t:'rods',a:a,b:b,op:op};
+    if(op==='×'&&a<10&&b<10) return {t:'array',a:a,b:b};
+    if(op==='×') return {t:'split',a:a,b:b};
+    if(op==='÷') return {t:'groups',a:a,b:b,q:p.ans,r:p.rem||0};
+    return {t:'none'};
+  }
+  /* 체험 주제(마케팅용 6가지, 어사이드 기획 v0.1) */
+  var TRIAL_TOPICS=[
+    {id:'t1',name:'10 만들기와 가르기·모으기',hook:'10이 되는 짝을 알면 큰 덧셈이 쉬워져요.',pick:function(r){ return r()<0.5?[3,'t'+ri(r,1,9)]:[1,pick(r,levelCells(1))]; },home:'집에서: 손가락 열 개로 "3이면 몇 개 더?" 놀이를 해 보세요.'},
+    {id:'t2',name:'20까지 덧셈·뺄셈',hook:'10을 건너는 덧셈·뺄셈에서 세기 대신 떠올리기로.',pick:function(r){ return r()<0.5?[3,pick(r,levelCells(3).filter(function(c){return c[0]==='+';}))]:[4,pick(r,levelCells(4))]; },home:'집에서: 8+5를 "8+2 그리고 3"으로 말해 보게 하세요.'},
+    {id:'t3',name:'받아올림 없는 두 자리 덧셈',hook:'일의 자리끼리, 십의 자리끼리 줄을 맞춰요.',pick:function(r){ return [5,r()<0.5?'+2d1d':'+2d2d']; },home:'집에서: 세로로 쓸 때 오른쪽 끝을 맞추는지 봐 주세요.'},
+    {id:'t4',name:'받아내림 없는 두 자리 뺄셈',hook:'자리마다 위에서 아래를 빼요.',pick:function(r){ return [5,r()<0.5?'-2d1d':'-2d2d']; },home:'집에서: 십 막대와 낱개로 수를 놓고 빼 보게 하세요.'},
+    {id:'t5',name:'받아올림 있는 두 자리 덧셈',hook:'10이 넘으면 1을 옆집으로 올려요.',pick:function(r){ return [6,r()<0.7?'+올림':'+올림·백']; },home:'집에서: 올림 1을 작은 글씨로 적는 습관을 칭찬해 주세요.'},
+    {id:'t6',name:'받아내림 있는 두 자리 뺄셈',hook:'위가 작으면 옆집에서 10을 빌려요.',pick:function(r){ return [6,r()<0.7?'-내림':'-내림·0']; },home:'집에서: 빌려 준 자리의 숫자를 하나 줄였는지 같이 확인해 주세요.'}
+  ];
+  function buildTrial(topicId,seed){ var tp=TRIAL_TOPICS.filter(function(t){return t.id===topicId;})[0]; var r=rng(hash('trial'+topicId+(seed||''))); var list=[], used={}, tries=0;
+    while(list.length<6&&tries<60){ tries++; var pk=tp.pick(r), pr=L(pk[0]).make(pk[1],r); if(used[pr.id]) continue; used[pr.id]=1; pr.tag='trial'; list.push(pr); }
+    return {trial:true,topic:tp,level:list[0].level,levelName:tp.name,problems:list,why:tp.hook,newCells:[],dueCount:0,confirm:false}; }
+  /* 수업 막힘 배정 */
+  function addAssign(st,item,today){ var id='a'+(st.assigns?st.assigns.length+1:1); st.assigns=st.assigns||[]; var a={id:id,cell:item.cell||null,code:item.code||null,level:item.level,note:item.note||'',created:today,s:0,done:false,doneAt:null,recheck:false}; st.assigns.push(a); return a; }
+  function openAssigns(st){ return (st.assigns||[]).filter(function(a){return !a.done;}); }
+  /* 개념 후보: 같은 유형 7일 안에 2번 이상, 또는 "모르겠어요" 자기 보고 */
+  function candidates(st,today){ var from=addDays(today,-7), cnt={}, unk={}; st.runs.forEach(function(r){ if(r.date<from) return; Object.keys(r.E||{}).forEach(function(e){ cnt[e]=(cnt[e]||0)+r.E[e]; }); (r.items||[]).forEach(function(it){ if(it.self==='unknown'&&it.E&&it.E.length) unk[it.E[0]]=(unk[it.E[0]]||0)+1; }); });
+    var out=[]; Object.keys(cnt).forEach(function(e){ if(cnt[e]>=2||unk[e]){ var f=(st.flags||{})[e]; out.push({code:e,count:cnt[e],unknown:unk[e]||0,status:f?f.status:'open'}); } }); return out; }
+  /* 기록(그래프용): 날짜별 잘해요 칸 수 · 처음 맞힘 비율 */
+  function history(st,today,days){ var out=[]; for(var i=days-1;i>=0;i--){ var d=addDays(today,-i); var rs=st.runs.filter(function(r){return r.date===d&&!r.confirm;}); var last=rs[rs.length-1]; var n=0,f=0; rs.forEach(function(r){ n+=r.n; f+=(r.first||0); }); out.push({date:d,done:last?last.doneAll:null,first:n?f/n:null,n:n}); }
+    var lastDone=null; out.forEach(function(x){ if(x.done===null) x.done=lastDone; else lastDone=x.done; }); return out; }
+  function weekGoal(st,today){ var h=history(st,today,8), start=h[0].done||0, now=h[h.length-1].done||0; return {start:start,now:now,goal:6,gain:now-start}; }
+
+  return {rng:rng,ri:ri,hash:hash,gcd:gcd,fr:fr,LEVELS:LEVELS,L:L,levelLabel:levelLabel,nextLevel:nextLevel,steps:steps,hintViz:hintViz,TRIAL_TOPICS:TRIAL_TOPICS,buildTrial:buildTrial,addAssign:addAssign,openAssigns:openAssigns,candidates:candidates,history:history,weekGoal:weekGoal,ETYPES:ETYPES,STRATEGY:STRATEGY,levelCells:levelCells,cellStrategy:cellStrategy,cellLabel:cellLabel,diagnose:diagnose,buildSession:buildSession,applyRun:applyRun,check:check,emptyState:emptyState,cellState:cellState,levelProgress:levelProgress,fastLimit:fastLimit,addDays:addDays,topE:topE,INTERVALS:INTERVALS,targetsE:targetsE,bugAdd:bugAdd,bugSub:bugSub};
+})();
+if(typeof module!=='undefined') module.exports=CALC;
+/*ENGINE-END*/
+
+</script>
+<script>
+(function(){
+'use strict';
+var PUBLIC=!!window.WB_PUBLIC; var KEY=PUBLIC?'wbcalc-public-1':'wbcalc-trial-1';
+function qs(k){ try{ return new URLSearchParams(location.search).get(k)||''; }catch(e){ return ''; } }
+var $=function(s,el){ return (el||document).querySelector(s); };
+function esc(s){ return String(s).replace(/[&<>"]/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+function today(){ var d=new Date(); function z(v){ return (v<10?'0':'')+v; } return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate()); }
+function gradeName(g){ return g<=0?'유치':'초'+g; }
+function maxRuns(s){ return s.grade<=0?2:3; }
+function speak(t){ try{ if(!('speechSynthesis' in window)) return; var u=new SpeechSynthesisUtterance(t); u.lang='ko-KR'; u.rate=0.9; speechSynthesis.cancel(); speechSynthesis.speak(u); }catch(e){} }
+function sayText(p){ return p.say||p.text.replace(/\s*=\s*□/,'는?').replace(/□/g,'빈칸').replace(/\+/g,' 더하기 ').replace(/−/g,' 빼기 ').replace(/×/g,' 곱하기 ').replace(/÷/g,' 나누기 ').replace(/…/g,' 나머지 '); }
+function mask(n){ return n.length<=1?n:n.length===2?n[0]+'*':n[0]+'*'+n.slice(2); }
+
+/* ---------- 저장 · 가상 학생 ---------- */
+var DB=null;
+function load(){ try{ var s=localStorage.getItem(KEY); if(s){ DB=JSON.parse(s); if(DB.v===3) return; } }catch(e){} DB=seed(); save(); }
+var dbRef=null, dbCache={}, dbQueue=Promise.resolve();
+function setDbStatus(t,title){ var el=$('#dbst'); if(el){ el.textContent=t; if(title) el.title=title; } }
+function dbDocs(){ var docs={'calc/main':{v:DB.v,queue:DB.queue||[],ops:DB.ops||{},students:DB.students}}; Object.keys(DB.states).forEach(function(id){ docs['calc_states/'+id]=DB.states[id]; }); return docs; }
+var dbSubs={};
+function applyRemote(path,sn){ if(!sn.exists||sn.metadata.hasPendingWrites) return; var d=sn.data(); var body=JSON.parse(JSON.stringify(d)); delete body.updatedAt; var js=JSON.stringify(body); if(dbCache[path]===js) return; dbCache[path]=js;
+  if(path==='calc/main'){ DB.students=body.students||[]; DB.queue=body.queue||[]; DB.ops=body.ops||DB.ops; if(DB.students.length&&!DB.students.some(function(x){return x.id===DB.cur;})) DB.cur=DB.students[0].id; subscribeStates(); }
+  else { var id=path.split('/')[1]; DB.states[id]=body; }
+  try{ localStorage.setItem(KEY,JSON.stringify(DB)); }catch(e){} setDbStatus('공유 저장됨 · 다른 기기 변경 받음'); if(view!=='run'&&!(run&&run.trial)) render(); }
+function subscribeStates(){ if(!dbRef) return; DB.students.forEach(function(st){ var path='calc_states/'+st.id; if(dbSubs[path]) return; dbSubs[path]=dbRef.doc(path).onSnapshot(function(sn){ applyRemote(path,sn); },function(e){ setDbStatus('동기화 끊김','다시 열면 이어져요: '+String(e&&e.message||e)); }); }); }
+function subscribeAll(){ if(!dbRef||dbSubs['calc/main']) return; dbSubs['calc/main']=dbRef.doc('calc/main').onSnapshot(function(sn){ applyRemote('calc/main',sn); },function(e){ setDbStatus('동기화 끊김','다시 열면 이어져요: '+String(e&&e.message||e)); }); subscribeStates(); }
+function save(){ try{ localStorage.setItem(KEY,JSON.stringify(DB)); }catch(e){}
+  if(!dbRef) return; var docs=dbDocs(); Object.keys(docs).forEach(function(path){ var js=JSON.stringify(docs[path]); if(dbCache[path]===js) return; dbCache[path]=js; var body=JSON.parse(js); body.updatedAt=new Date().toISOString(); dbQueue=dbQueue.then(function(){ return dbRef.doc(path).set(body); }).then(function(){ setDbStatus('공유 저장됨'); if(path.indexOf('calc_states/')===0) subscribeStates(); }).catch(function(e){ setDbStatus('저장 실패',String(e&&e.message||e)); }); }); }
+function connectDb(){ if(typeof claude==='undefined'||!claude||!claude.use) return; claude.use('db').then(function(db){ if(!db){ setDbStatus('이 기기 저장','이 계정으로는 공유 저장을 쓸 수 없어 이 기기에만 저장돼요'); return; } dbRef=db; setDbStatus('공유 저장 연결 중');
+    return db.doc('calc/main').get().then(function(main){ if(!main.exists){ dbCache={}; save(); setDbStatus('공유 저장됨','이 아티팩트의 db에 저장돼요. 다른 태블릿에서도 같은 기록을 봐요'); subscribeAll(); return; }
+      var m=main.data(); var ids=(m.students||[]).map(function(x){return x.id;}); return Promise.all(ids.map(function(id){ return db.doc('calc_states/'+id).get(); })).then(function(snaps){ var states={}; snaps.forEach(function(sn,i){ var sd=sn.exists?JSON.parse(JSON.stringify(sn.data())):CALC.emptyState(); delete sd.updatedAt; states[ids[i]]=sd; });
+        var cur=ids.indexOf(DB.cur)>=0?DB.cur:ids[0]; DB={v:m.v||3,cur:cur,mode:DB.mode,queue:m.queue||[],ops:m.ops||{start:{},done:{},parent:{},material:{},consult:{}},students:JSON.parse(JSON.stringify(m.students||[])),states:states}; var docs=dbDocs(); dbCache={}; Object.keys(docs).forEach(function(k){ dbCache[k]=JSON.stringify(docs[k]); }); try{ localStorage.setItem(KEY,JSON.stringify(DB)); }catch(e){} setDbStatus('공유 저장됨','이 아티팩트의 db에 저장돼요. 다른 태블릿에서도 같은 기록을 봐요'); subscribeAll(); if(view!=='run') render(); }); });
+  }).catch(function(e){ dbRef=null; setDbStatus('이 기기 저장','공유 저장 연결 실패: '+String(e&&e.message||e)); }); }
+function seed(){
+  if(PUBLIC) return {v:3,cur:'',mode:'trial',queue:[],ops:{start:{},done:{},parent:{},material:{},consult:{},from:{}},students:[],states:{}};
+  var db={v:3,cur:'haneul',mode:'stu',queue:[],ops:{start:{},done:{},parent:{},material:{},consult:{},from:{}},students:[
+    {id:'dasom',name:'다솜',grade:0,level:-3,left:false,sound:false,confirm:false,read:true},
+    {id:'boram',name:'보람',grade:1,level:2,left:false,sound:false,confirm:false},
+    {id:'haneul',name:'하늘',grade:2,level:5,left:false,sound:false,confirm:false},
+    {id:'bada',name:'바다',grade:3,level:8,left:false,sound:false,confirm:true}],states:{}};
+  var prof={dasom:{E10:.1,slow:0},boram:{E10:.12,slow:.2},haneul:{E3:.35,E1:.15,slow:.15},bada:{E8:.35,slow:.08}};
+  var t=today();
+  db.students.forEach(function(s){ var st=CALC.emptyState(), r=CALC.rng(CALC.hash(s.id)); var pf=prof[s.id];
+    for(var d=18;d>=1;d--){ if(r()<0.15) continue; var day=CALC.addDays(t,-d); var ses=CALC.buildSession(st,s,day); var lim=CALC.fastLimit(s.grade); if(lim===Infinity) lim=4000;
+      var res=ses.problems.map(function(p){ var wrong=null, late=d>8?1:0.4;
+        if(pf.E3&&p.op==='-'&&p.a>=10&&p.a%10<p.b%10&&r()<pf.E3*late) wrong=CALC.bugSub(p.a,p.b,'E3');
+        else if(pf.E1&&p.op==='+'&&p.a>=10&&p.a%10+p.b%10>=10&&r()<pf.E1*late) wrong=CALC.bugAdd(p.a,p.b,'E1');
+        else if(pf.E8&&p.op==='×'&&(p.a>=6||p.b>=6)&&r()<pf.E8*late) wrong=p.a*(p.b+(r()<.5?1:-1));
+        else if(pf.E10&&(p.op==='+'||p.op==='-'||p.op==='c'||p.op==='1')&&!p.missing&&r()<pf.E10*late) wrong=p.ans+(r()<.5?1:-1);
+        else if(r()<0.02) wrong=p.ans+2;
+        var slow=r()<pf.slow; var given=wrong!==null?(p.op==='÷'?{q:wrong,r:0}:wrong):(p.op==='÷'?{q:p.ans,r:p.rem||0}:p.ans);
+        return {ok:wrong===null,given:given,ms:slow?lim+1500:900+Math.floor(r()*1500)}; });
+      CALC.applyRun(st,s,ses,res,day); }
+    db.states[s.id]=st; });
+  var hs=db.states.haneul, hst=db.students.filter(function(x){return x.id==='haneul';})[0]; CALC.addAssign(hs,{cell:'-내림',level:hst.level,note:'문장제 교재 3번에서 받아내림 막힘'},CALC.addDays(t,-2)); hs.assigns[0].s=1;
+  hs.paper.push({date:CALC.addDays(t,-6),ok:17,n:20,level:hst.level});
+  return db;
+}
+var TRIAL_STU={id:'trial',name:'체험',grade:2,level:5,left:false,sound:false,confirm:false,read:false}, trialState=null;
+function stu(){ if(DB.mode==='trial') return TRIAL_STU; return DB.students.filter(function(s){ return s.id===DB.cur; })[0]||DB.students[0]; }
+function state(){ if(DB.mode==='trial'){ if(!trialState) trialState=CALC.emptyState(); return trialState; } var st=DB.states[stu().id]; st.assigns=st.assigns||[]; st.flags=st.flags||{}; st.paper=st.paper||[]; st.reports=st.reports||[]; return st; }
+function ops(k,topic){ DB.ops=DB.ops||{start:{},done:{},parent:{},material:{},consult:{}}; DB.ops[k]=DB.ops[k]||{}; DB.ops[k][topic]=(DB.ops[k][topic]||0)+1; if(k==='start'){ DB.ops.from=DB.ops.from||{}; var f=(qs('from')||'직접').slice(0,40); DB.ops.from[f]=(DB.ops.from[f]||0)+1; } save(); }
+
+/* ---------- 화면 ---------- */
+var view='home', run=null, teaTab='class', teaStu=null;
+var app=$('#app');
+function go(v){ view=v; render(); window.scrollTo(0,0); }
+function render(){
+  if(PUBLIC){ DB.mode='trial'; $('#stuSel').style.display='none'; $('.seg').style.display='none'; if(qs('ops')==='1'&&view!=='run'){ app.innerHTML=opsHTML(); return; } }
+  $('#mStu').classList.toggle('on',DB.mode==='stu'); $('#mTea').classList.toggle('on',DB.mode==='tea'); $('#mTri').classList.toggle('on',DB.mode==='trial'); $('#stuSel').style.display=DB.mode==='trial'?'none':'';
+  var sel=$('#stuSel'); sel.innerHTML=DB.students.map(function(s){ return '<option value="'+s.id+'"'+(s.id===DB.cur?' selected':'')+'>'+esc(s.name)+' · '+gradeName(s.grade)+'</option>'; }).join('');
+  if(DB.mode==='tea'){ renderTeacher(); return; }
+  if(DB.mode==='trial'){ if(view==='run') renderRun(); else if(view==='touch') renderTouch(); else if(view==='trialResult') renderTrialResult(); else renderTrialHome(); return; }
+  if(view==='run') renderRun(); else if(view==='result') renderResult(); else if(view==='touch') renderTouch(); else renderHome();
+}
+
+/* 격자 그림 */
+function gridHTML(st,level,anim){
+  var L=CALC.L(level), cells=CALC.levelCells(level);
+  if(L.bucket) return '<div class="buckets">'+cells.map(function(c){ var g=CALC.cellState(st,c); var lab=CALC.cellLabel(c);
+      return '<div class="bucket"><span>'+esc(lab)+' <span class="tiny num">'+(g.s||0)+'번 연속</span></span><span class="st '+g.st+'">'+(g.st==='done'?'잘해요':g.st==='prac'?'연습 중':'아직')+'</span></div>'; }).join('')+'</div>';
+  var op=cells[0][0]==='m'||cells[0][0]==='g'||cells[0][0]==='t'||cells[0][0]==='k'?null:cells.filter(function(c){return /^[+\-×÷]/.test(c);})[0][0];
+  if(!op){ var prK=CALC.levelProgress(st,level); return '<div class="row" style="justify-content:space-between"><b>'+esc(L.name)+'</b><span class="tiny num">잘해요 '+prK.done+' / '+prK.total+'</span></div><div class="row" style="margin-top:8px">'+cells.map(function(c){ var g=CALC.cellState(st,c); return '<span class="chip '+(g.st==='done'?'ok':g.st==='prac'?'e':'')+(anim&&anim[c]?' anim':'')+'">'+esc(CALC.cellLabel(c))+'</span>'; }).join('')+'</div><div class="legend"><span><i></i>아직</span><span><i class="prac"></i>연습 중</span><span><i class="done"></i>잘해요</span></div>'; }
+  var lo=(op==='×'||op==='÷')?1:0, hi=9, n=hi-lo+1, h='<div class="gridwrap"><div class="grid" style="grid-template-columns:repeat('+(n+1)+',auto)"><div class="h">'+op+'</div>';
+  for(var b=lo;b<=hi;b++) h+='<div class="h num">'+b+'</div>';
+  var inLevel={}; cells.forEach(function(c){ inLevel[c]=1; });
+  for(var a=lo;a<=hi;a++){ h+='<div class="h num">'+a+'</div>'; for(b=lo;b<=hi;b++){ var k=op+a+','+b; var g=st.grid[k]; var cls='c'+(g?' '+g.st:'')+(g&&g.slow?' slow':'')+(anim&&anim[k]?' anim':''); var t=inLevel[k]?'':'·'; var lab=op==='+'?a+'+'+b:op==='-'?(a+b)+'−'+b:op==='×'?a+'×'+b:(a*b)+'÷'+b; h+='<div class="'+cls+'" title="'+lab+'" style="'+(inLevel[k]?'':'opacity:.35')+'">'+(inLevel[k]?'':'')+'</div>'; } }
+  var nAnim=anim?Object.keys(anim).filter(function(k){return inLevel[k];}).length:0; h+='</div></div><div class="legend"><span><i></i>아직</span><span><i class="prac"></i>연습 중</span><span><i class="done"></i>잘해요</span><span><i class="slow"></i>느렸던 칸</span>'+(nAnim?'<span><i class="done new"></i>오늘 바뀐 칸 ('+nAnim+')</span>':'')+'<span style="opacity:.6">흐린 칸 = 다른 단계</span></div>';
+  var pr=CALC.levelProgress(st,level); h='<div class="row" style="justify-content:space-between"><b>'+esc(opName(op))+' 격자</b><span class="tiny num">잘해요 '+pr.done+' / '+pr.total+'</span></div>'+h;
+  return h;
+}
+function opName(op){ return {'+':'덧셈','-':'뺄셈','×':'곱셈','÷':'나눗셈'}[op]; }
+function mapHTML(level){ var h='<div class="map">'; for(var i=-3;i<=16;i++){ var Lv=CALC.L(i); h+='<span class="'+(i<level?'past':i===level?'now':'')+'" title="'+(Lv?esc(Lv.name):'2차')+'">'+(i<=0?'유'+(i+4):i)+'</span>'; } return h+'</div>'; }
+function stampsHTML(st){ var t=today(), h='<div class="stamps">'; for(var i=13;i>=0;i--){ var d=CALC.addDays(t,-i); h+='<span class="'+(st.stamps.indexOf(d)>=0?'on':'')+'" title="'+d+'">'+(+d.slice(8))+'</span>'; } return h+'</div>'; }
+function sparkHTML(hist,key,goal){ var vals=hist.map(function(h){return h[key];}); var have=vals.filter(function(v){return v!==null;}); if(!have.length) return '<p class="tiny">아직 기록이 없어요.</p>'; var max=Math.max(1,Math.max.apply(null,have),goal||0), w=420,h=80,padL=8,padR=8,padT=10,padB=18; var n=hist.length; function X(i){ return padL+i*(w-padL-padR)/(n-1); } function Y(v){ return padT+(1-v/max)*(h-padT-padB); }
+  var pts=vals.map(function(v,i){ return v===null?null:[X(i),Y(v)]; }).filter(Boolean); var d=pts.map(function(p,i){ return (i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1); }).join(' ');
+  var svg='<svg class="spark" viewBox="0 0 '+w+' '+h+'" role="img" aria-label="최근 '+n+'일 '+(key==='done'?'잘해요 칸 수':'처음 맞힘 비율')+'"><line class="ax" x1="'+padL+'" y1="'+(h-padB)+'" x2="'+(w-padR)+'" y2="'+(h-padB)+'"/>'+(goal?'<line class="gl" x1="'+padL+'" y1="'+Y(goal)+'" x2="'+(w-padR)+'" y2="'+Y(goal)+'"/><text x="'+(w-padR)+'" y="'+(Y(goal)-3)+'" text-anchor="end">목표 '+goal+'</text>':'')+'<path class="ln" d="'+d+'"/>';
+  hist.forEach(function(hh,i){ if(vals[i]===null) return; svg+='<circle class="pt" cx="'+X(i).toFixed(1)+'" cy="'+Y(vals[i]).toFixed(1)+'" r="4"><title>'+hh.date+' · '+(key==='done'?vals[i]+'칸':Math.round(vals[i]*100)+'%')+'</title></circle>'; });
+  svg+='<text x="'+padL+'" y="'+(h-4)+'">'+hist[0].date.slice(5)+'</text><text x="'+(w-padR)+'" y="'+(h-4)+'" text-anchor="end">'+hist[n-1].date.slice(5)+'</text></svg>'; return svg; }
+function goalHTML(st){ var g=CALC.weekGoal(st,today()), hist=CALC.history(st,today(),14), pct=Math.min(100,Math.round(Math.max(0,g.gain)/g.goal*100)); var last=hist[hist.length-1].done||0, week=hist[6].done; return '<div class="row" style="justify-content:space-between"><b>내 기록</b><span class="tiny num">이번 주 목표 잘해요 +'+g.goal+'칸 · 지금 +'+Math.max(0,g.gain)+'칸</span></div><div class="goalbar" role="progressbar" aria-valuenow="'+pct+'" aria-valuemin="0" aria-valuemax="100"><i style="width:'+pct+'%"></i></div><p class="tiny num" style="margin:4px 0 6px">잘해요 칸 '+last+'개'+(week!==null&&week!==undefined?' · 지난주 이맘때 '+week+'개':'')+' · 다른 아이와 비교하지 않아요</p>'+sparkHTML(hist,'done',(hist[0].done||0)+g.goal); }
+function runsToday(st){ return st.runs.filter(function(r){ return r.date===today(); }).length; }
+
+function renderHome(){
+  var s=stu(), st=state(), L=CALC.L(s.level), ses=CALC.buildSession(st,s,today()), n=runsToday(st), mx=maxRuns(s), kid=s.grade<=0;
+  var due=st.bag.filter(function(b){ return b.due<=today(); });
+  app.innerHTML=
+  '<div class="sheet today"><div class="lvbox"><b class="num">'+(s.level<=0?'유'+(s.level+4):s.level)+'</b></div><div>'+
+    '<p class="eyebrow">오늘 한 장 · '+esc(s.name)+'</p><h2>'+CALC.levelLabel(s.level)+' · '+esc(L.name)+'</h2>'+
+    '<p class="muted small num">'+ses.problems.length+'문제 · 새 칸 '+ses.newCells.length+' · 주머니 '+ses.dueCount+' · 약 '+(kid?5:10)+'분'+(kid?' · 시간은 재지 않아요':'')+' <span class="tiny">'+esc(L.code)+'</span></p>'+
+    '<p class="why small">'+esc(ses.why).replace(/(\d+[+\u2212\u00d7\u00f7]\d+)/g,'<b class="num">$1</b>')+'</p>'+
+    '<div class="row" style="margin-top:12px"><button class="btn" id="start"'+(n>=mx?' disabled':'')+'>'+(n>=mx?'오늘은 다 했어요 ('+mx+'판)':n>0?'한 판 더 ('+n+'/'+mx+')':'시작하기')+'</button>'+
+    (s.confirm&&s.grade>=3&&CALC.levelProgress(st,s.level).ratio>=0.5?'<button class="btn ghost" id="confirm">확인 모드 2분</button>':s.confirm&&s.grade>=3?'<span class="tiny">확인 모드는 이 단계 칸의 절반이 "잘해요"가 되면 열려요(배운 것만 시간 재기).</span>':'')+'</div>'+
+    (n>0?'<p class="tiny" style="margin-top:8px">오늘 초록불 — 오늘 양은 채웠어요.</p>':'')+
+  '</div></div>'+
+  '<div class="sheet">'+goalHTML(st)+'</div>'+
+  '<div class="sheet">'+gridHTML(st,s.level)+'</div>'+
+  '<div class="sheet"><div class="row" style="justify-content:space-between"><b>주머니</b><span class="tiny">보고 → 가리고 적기 → 확인 · 1 → 3 → 7 → 14일, 세 번 잇달아 맞히면 졸업</span></div>'+
+    (st.bag.length?'<div class="bagrows">'+st.bag.slice().sort(function(a,b){return a.due<b.due?-1:1;}).slice(0,8).map(function(b){ var due=b.due<=today(); var lab=b.type==='E'?'<span class="tag card">유형 카드</span> '+esc(s.grade<=0?'하나씩 짚으며 세요':CALC.ETYPES[b.code].card):'<span class="num">'+esc(CALC.cellLabel(b.cell))+'</span>'+(b.E&&b.E.length?'<span class="tag">'+b.E[0]+'</span>':'')+(b.slow?'<span class="tag">느림</span>':''); return '<div class="bagrow'+(due?' due':'')+'"><span class="lab">'+lab+'</span><span class="tiny num">'+(due?'오늘':b.due.slice(5).replace('-','/'))+'</span></div>'; }).join('')+(st.bag.length>8?'<p class="tiny">… 외 '+(st.bag.length-8)+'개</p>':'')+'</div>':'<p class="muted small" style="margin-top:8px">비어 있어요.</p>')+
+  '</div>'+
+  '<div class="sheet"><div class="row" style="justify-content:space-between"><b>단계 지도</b><span class="tiny num">지금 '+CALC.levelLabel(s.level)+'</span></div><p class="tiny" style="margin-bottom:8px">유치 1~4단계 · 초등 1~16단계</p>'+mapHTML(s.level)+'</div>'+
+  '<div class="sheet"><div class="row" style="justify-content:space-between"><b>출석 도장</b><span class="tiny">최근 14일</span></div><p class="tiny" style="margin-bottom:8px">숫자나 순위는 없어요</p>'+stampsHTML(st)+'<p class="tiny" style="margin-top:10px">기록은 이 기기에만 저장돼요. 다른 기기와 이어지지 않아요. 지우기는 선생님 화면 › 학생.</p></div>';
+  $('#start').onclick=function(){ startRun(false); };
+  if($('#confirm')) $('#confirm').onclick=function(){ startRun(true); };
+}
+
+/* ---------- 진행 ---------- */
+function startRun(confirm){
+  var s=stu(), st=state();
+  var ses=CALC.buildSession(st,s,today(),confirm?{confirm:true,count:20,seed:String(Date.now())}:{seed:String(runsToday(st))});
+  run={ses:ses,i:0,results:[],attempt:1,typed:'',colCells:null,act:0,field:'q',q:'',r:'',t0:0,first:null,timer:null,confirm:confirm,left:s.grade*0+120,endAt:confirm?Date.now()+120000:0,anim:{}};
+  go('run'); if(confirm) tick();
+}
+function tick(){ if(!run||!run.confirm||view!=='run') return; var left=Math.max(0,Math.ceil((run.endAt-Date.now())/1000)); var el=$('#ring'); if(el){ el.querySelector('b').textContent=left+'초'; el.querySelector('circle.p').setAttribute('stroke-dashoffset',String(163*(1-left/120))); } if(left<=0){ finishRun(true); return; } run.timer=setTimeout(tick,500); }
+function cur(){ return run.ses.problems[run.i]; }
+function renderRun(){
+  var p=cur(), s=stu(), ses=run.ses;
+  var dots=ses.problems.map(function(q,i){ var r=run.results[i]; return '<i class="'+(i===run.i?'now':r?(r.ok?'done':'star'):'')+'"></i>'; }).join('');
+  if(p.input==='frac'&&run.field!=='n'&&run.field!=='d') run.field='n';
+  var inp=p.input==='col'?colHTML(p):p.input==='div'?divHTML(p):p.input==='strip'?stripHTML(p):p.input==='frac'?fracHTML(p):rowHTML(p); var kid=p.input==='strip';
+  if(run.hintOpen===undefined) run.hintOpen=(p.tag==='new'&&CALC.L(p.level).bucket&&!run.confirm);
+  var hintBtn=(!kid&&!run.confirm)?'<button id="hint" class="hintbtn" aria-expanded="'+(run.hintOpen?'true':'false')+'">'+(run.hintOpen?'힌트 닫기':'힌트')+'</button>':'';
+  app.innerHTML='<div class="run"><div class="row noprint" style="justify-content:space-between"><button id="quit" class="small">그만하기</button><span class="tiny num">'+(run.i+1)+' / '+ses.problems.length+(run.confirm?' · 확인 모드':run.trial?' · 체험':'')+(p.tag==='assign'?' · 선생님 배정':p.tag==='recheck'?' · 숫자 바꿔 확인':'')+'</span>'+hintBtn+(run.confirm?'<div class="ring" id="ring"><svg width="60" height="60" viewBox="0 0 60 60"><circle cx="30" cy="30" r="26" fill="none" stroke="var(--line)" stroke-width="5"/><circle class="p" cx="30" cy="30" r="26" fill="none" stroke="var(--teal)" stroke-width="5" stroke-dasharray="163" stroke-dashoffset="0"/></svg><b class="num">120초</b></div>':'')+'</div>'+
+    '<div class="dots">'+dots+'</div><div class="stage"><div><div class="stage-card'+(kid?' kid':'')+'">'+inp+'</div>'+(run.hintOpen?hintHTML(p):'')+'<div class="fb" id="fb">'+(run.attempt===2?'한 번 더 적어요':'')+'</div></div></div>'+
+    (kid?'<div class="strip" id="pad">'+[0,1,2,3,4,5,6,7,8,9,10].map(function(d){ return '<button data-k="'+d+'">'+d+'</button>'; }).join('')+'</div>':(p.decimal?'<div class="pad dec" id="pad">'+[7,8,9].map(function(d){ return '<button data-k="'+d+'">'+d+'</button>'; }).join('')+'<button class="del" data-k="del" aria-label="지우기">지움</button>'+[4,5,6].map(function(d){ return '<button data-k="'+d+'">'+d+'</button>'; }).join('')+'<button data-k="." aria-label="소수점">.</button>'+[1,2,3].map(function(d){ return '<button data-k="'+d+'">'+d+'</button>'; }).join('')+'<button class="ok" data-k="ok" aria-label="확인">확인</button><button class="z" data-k="0">0</button></div>':'<div class="pad '+(s.left?'left':'right')+'" id="pad">'+[7,8,9,4,5,6,1,2,3].map(function(d){ return '<button data-k="'+d+'">'+d+'</button>'; }).join('')+'<button class="del" data-k="del" aria-label="지우기">지움</button><button data-k="0">0</button><button class="ok" data-k="ok" aria-label="확인">확인</button></div>'))+'</div>';
+  run.t0=performance.now(); run.first=null;
+  if(s.read&&run.attempt===1) speak(sayText(p)); var lb=$('#listen'); if(lb) lb.onclick=function(){ speak(sayText(p)); };
+  var hb=$('#hint'); if(hb) hb.onclick=function(){ run.hintOpen=!run.hintOpen; if(run.hintOpen){ run.help=run.help||{}; run.help[run.i]=true; } var keep={typed:run.typed,colCells:run.colCells,carries:run.carries,q:run.q,r:run.r,act:run.act,field:run.field,t0:run.t0,first:run.first}; renderRun(); Object.keys(keep).forEach(function(k){ run[k]=keep[k]; }); if(p.input==='col') paintCol(); else if(p.input==='div') paintDiv(); else { var bx=$('#box'); if(bx){ bx.textContent=run.typed; bx.classList.toggle('empty',!run.typed); } } };
+  $('#quit').onclick=function(){ if(run.timer) clearTimeout(run.timer); var wasTrial=run.trial; run=null; go(wasTrial?'trialHome':'home'); };
+  $('#pad').onclick=function(e){ var b=e.target.closest('button'); if(b) key(b.getAttribute('data-k')); };
+  app.querySelectorAll('[data-cell]').forEach(function(el){ el.onclick=function(){ run.act=+el.getAttribute('data-cell'); run.field=el.getAttribute('data-field')||run.field; paintCol(); }; });
+  app.querySelectorAll('[data-f]').forEach(function(el){ el.onclick=function(){ run.field=el.getAttribute('data-f'); paintDiv(); }; });
+  app.querySelectorAll('[data-ff]').forEach(function(el){ el.onclick=function(){ run.field=el.getAttribute('data-ff'); paintFrac(); }; });
+}
+function vizHTML(v,p){ if(v.t==='pic') return picHTML(p.pic); if(v.t==='none') return '';
+  if(v.t==='tenframe'){ var h='<span class="dg frame">'; for(var i=0;i<10;i++) h+='<i class="'+(i<v.a?'a':i<v.a+v.b?'b':'')+'"></i>'; return h+'</span>'; }
+  if(v.t==='line'){ var W=380,L=14,R=14,y=28,max=v.max; function X(n){ return L+n*(W-L-R)/max; } var sv='<svg class="nl" viewBox="0 0 '+W+' 60" role="img" aria-label="수직선 0부터 '+max+'"><line x1="'+L+'" y1="'+y+'" x2="'+(W-R)+'" y2="'+y+'" stroke="var(--ink-2)" stroke-width="2"/>'; var stp=max>40?5:1, lab=max>40?10:5; for(var n=0;n<=max;n+=stp){ var big=n%lab===0; sv+='<line x1="'+X(n)+'" y1="'+(y-(big?8:4))+'" x2="'+X(n)+'" y2="'+(y+(big?8:4))+'" stroke="var(--ink-2)" stroke-width="1.5"/>'; if(big) sv+='<text x="'+X(n)+'" y="'+(y+22)+'" text-anchor="middle" font-size="11" fill="var(--ink-3)">'+n+'</text>'; }
+    var m0=v.marks[0], m1=v.marks[1]; sv+='<path d="M'+X(m0)+' '+(y-2)+' Q '+((X(m0)+X(m1))/2)+' '+(y-26)+' '+X(m1)+' '+(y-2)+'" fill="none" stroke="var(--mid-fill)" stroke-width="2"/><circle cx="'+X(m0)+'" cy="'+y+'" r="5" fill="var(--teal)"/><circle cx="'+X(m1)+'" cy="'+y+'" r="5" fill="var(--teal)"/><text x="'+X(m0)+'" y="'+(y-10)+'" text-anchor="middle" font-size="12" font-weight="700" fill="var(--teal-text)">'+m0+'</text><text x="'+X(m1)+'" y="'+(y-10)+'" text-anchor="middle" font-size="12" font-weight="700" fill="var(--teal-text)">'+m1+'</text></svg>'; return sv; }
+  if(v.t==='rods'){ function rods(n){ var t=Math.floor(n/10)%10, hd=Math.floor(n/100), o=n%10, h2='<div class="rods" style="justify-content:center">'; for(var i=0;i<hd;i++) h2+='<i class="t" style="width:22px;opacity:.8" title="100"></i>'; for(i=0;i<t;i++) h2+='<i class="t"></i>'; for(i=0;i<o;i++) h2+='<i class="o"></i>'; return h2+'</div>'; } return '<p class="tiny num">'+v.a+' = '+(v.a>=100?'백 '+Math.floor(v.a/100)+' · ':'')+'십 '+(Math.floor(v.a/10)%10)+' · 낱개 '+(v.a%10)+'</p>'+rods(v.a)+'<p class="tiny num" style="margin-top:6px">'+(v.op==='+'?'더하는':'빼는')+' '+v.b+' = '+(v.b>=100?'백 '+Math.floor(v.b/100)+' · ':'')+'십 '+(Math.floor(v.b/10)%10)+' · 낱개 '+(v.b%10)+'</p>'+rods(v.b); }
+  if(v.t==='array'){ var g='<span class="arr" style="grid-template-columns:repeat('+v.b+',14px)">'; for(var k=0;k<v.a*v.b;k++) g+='<i></i>'; return g+'</span><p class="tiny num">'+v.b+'개씩 '+v.a+'줄</p>'; }
+  if(v.t==='fbar'){ var f=v.f; function bar(n,d,cls){ if(d===1) return '<p class="tiny num">'+n+'</p>'; var h3='<span class="fbar" style="grid-template-columns:repeat('+Math.min(d,12)+',22px)">'; for(var i=0;i<d;i++) h3+='<i class="'+(i<n?cls:'')+'"></i>'; return h3+'</span>'; } return '<div class="fbars">'+bar(f[0],f[1],'on')+(f.length>2?'<span class="plus">'+(v.op==='f+'?'+':v.op==='f-'?'−':v.op==='f×'?'×':'÷')+'</span>'+bar(f[2],f[3],'on2'):'')+'</div>'; }
+  if(v.t==='split') return '<p class="num">'+v.a+' × '+v.b+' = '+v.a+'×'+(v.b%10)+' + '+v.a+'×'+Math.floor(v.b/10)+'0</p>';
+  if(v.t==='groups'){ var gg='<span class="arr" style="grid-template-columns:repeat('+Math.min(v.b,10)+',14px)">'; for(var z=0;z<Math.min(v.a,60);z++) gg+='<i class="'+(z<v.q*v.b?'':'r')+'"></i>'; return gg+'</span><p class="tiny num">'+v.b+'개씩 묶으면 '+v.q+'묶음'+(v.r?', 남는 것 '+v.r:'')+'</p>'; }
+  return ''; }
+function hintHTML(p){ var st=CALC.steps(p), v=CALC.hintViz(p); if(p.tag!=='new'){ st=st.filter(function(t){return t.indexOf('답은 ')<0;}).slice(0,1).map(function(t){ return t.replace(/\s*=\s*\d+\.$/, ' = □.'); }); if(!st.length) st=['그림을 보고 세어 봐요.']; } return '<div class="hint" id="hintbox"><p class="eyebrow">'+(p.tag==='new'?'풀이 보기 · 새 칸이에요':'힌트')+'</p><div class="viz">'+vizHTML(v,p)+'</div><ol>'+st.map(function(t){ return '<li>'+esc(t)+'</li>'; }).join('')+'</ol>'+(p.tag==='new'?'<p class="tiny" style="margin-top:6px">단계를 보면서 따라 풀어요. 다음 문제부터는 혼자 해 봐요.</p>':'')+'</div>'; }
+function picHTML(pic){ if(!pic) return ''; function dots(n,cls,frame,extra){ var h='<span class="dg'+(frame?' frame':'')+'">'; for(var i=0;i<(frame?10:n);i++) h+='<i class="'+(i<n?cls:'')+'"></i>'; return h+(extra||'')+'</span>'; }
+  if(pic.t==='count') return '<div class="pic">'+dots(pic.n,'a',pic.frame)+'</div>';
+  if(pic.t==='next'){ var h='<div class="pic"><span class="dg">'; if(!pic.next) h+='<i class="q"></i>'; for(var i=0;i<pic.n;i++) h+='<i class="a"></i>'; if(pic.next) h+='<i class="q"></i>'; return h+'</span></div>'; }
+  if(pic.t==='join') return '<div class="pic">'+dots(pic.a,'a')+'<span class="plus">+</span>'+dots(pic.b,'b')+'</div>';
+  if(pic.t==='hide') return '<div class="pic">'+dots(pic.show,'a')+'<span class="cover">?</span></div>';
+  if(pic.t==='take'){ var h2='<div class="pic"><span class="dg">'; for(var j=0;j<pic.n;j++) h2+='<i class="'+(j<pic.n-pic.take?'a':'x')+'"></i>'; return h2+'</span></div>'; }
+  return ''; }
+function stripHTML(p){ var head=p.text.indexOf('□')>=0?rowHTML(p):'<div class="qt">'+esc(p.text)+'</div><div class="expr num"><span class="box '+(run.typed?'':'empty')+' num" id="box">'+esc(run.typed)+'</span></div>'; return '<div class="row" style="justify-content:flex-end"><button class="listen" id="listen" aria-label="문제 읽어 주기">듣기</button></div>'+picHTML(p.pic)+head; }
+function fx(t){ return t.replace(/(\d+)\/(\d+)/g,'<span class="frac"><b>$1</b><b>$2</b></span>'); }
+function fracHTML(p){ return '<div class="expr num">'+fx(esc(p.text.replace(' = □','')))+' = <span class="fin"><b class="num'+(run.field==='n'?' act':'')+'" data-ff="n">'+esc(run.q)+'</b><i></i><b class="num'+(run.field==='d'?' act':'')+'" data-ff="d">'+esc(run.r)+'</b><span>위 분자 · 아래 분모 (가장 간단한 분수로)</span></span></div>'; }
+function paintFrac(){ var stage=$('.stage > div'); stage.innerHTML='<div class="stage-card">'+fracHTML(cur())+'</div>'+(run.hintOpen?hintHTML(cur()):'')+'<div class="fb" id="fb">'+$('#fb').innerHTML+'</div>'; app.querySelectorAll('[data-ff]').forEach(function(el){ el.onclick=function(){ run.field=el.getAttribute('data-ff'); paintFrac(); }; }); }
+function rowHTML(p){ var t=fx(esc(p.text)).replace('□','<span class="box '+(run.typed?'':'empty')+' num" id="box">'+esc(run.typed)+'</span>'); return '<div class="expr num">'+t+'</div>'; }
+function colHTML(p){ var n=String(p.ans).length, A=String(p.a), B=String(p.b), w=Math.max(n,A.length,B.length)+1;
+  if(!run.colCells){ run.colCells=[]; for(var i=0;i<n;i++) run.colCells.push(''); run.carries=[]; for(i=0;i<w;i++) run.carries.push(''); run.act=n-1; run.field='a'; }
+  function pad(s){ var o=''; for(var i=0;i<w-s.length;i++) o+='<div class="cell"></div>'; return o+s.split('').map(function(c){ return '<div class="cell num">'+c+'</div>'; }).join(''); }
+  var h='<div class="col" style="grid-template-columns:repeat('+w+',54px)">';
+  for(var i=0;i<w;i++) h+='<div class="carry num'+(run.carries[i]?' on':'')+(run.field==='c'&&run.act===i?' act':'')+'" data-cell="'+i+'" data-field="c" title="받아올림 적기">'+esc(run.carries[i])+'</div>';
+  h+=pad(A); h+='<div class="cell op">'+(p.op==='-'?'−':p.op)+'</div>'+pad(B).slice('<div class="cell"></div>'.length); h+='<div class="line"></div>';
+  for(i=0;i<w-n;i++) h+='<div class="cell"></div>';
+  for(i=0;i<n;i++) h+='<div class="cell ans num'+(run.field==='a'&&run.act===i?' act':'')+'" data-cell="'+i+'" data-field="a">'+esc(run.colCells[i])+'</div>';
+  return h+'</div>'; }
+function paintCol(){ var p=cur(); if(p.input!=='col') return; var stage=$('.stage > div'); stage.innerHTML='<div class="stage-card">'+colHTML(p)+'</div>'+(run.hintOpen?hintHTML(p):'')+'<div class="fb" id="fb">'+$('#fb').innerHTML+'</div>'; app.querySelectorAll('[data-cell]').forEach(function(el){ el.onclick=function(){ run.act=+el.getAttribute('data-cell'); run.field=el.getAttribute('data-field'); paintCol(); }; }); }
+function divHTML(p){ return '<div class="expr num">'+esc(p.text)+'</div><div class="divin"><div class="f" data-f="q"><span>몫</span><b class="num'+(run.field==='q'?' act':'')+'">'+esc(run.q)+'</b></div><div class="f" data-f="r"><span>나머지</span><b class="num'+(run.field==='r'?' act':'')+'">'+esc(run.r)+'</b></div></div>'; }
+function paintDiv(){ var stage=$('.stage > div'); stage.innerHTML='<div class="stage-card">'+divHTML(cur())+'</div>'+(run.hintOpen?hintHTML(cur()):'')+'<div class="fb" id="fb">'+$('#fb').innerHTML+'</div>'; app.querySelectorAll('[data-f]').forEach(function(el){ el.onclick=function(){ run.field=el.getAttribute('data-f'); paintDiv(); }; }); }
+var autoT=null;
+function key(k){
+  if(!run||view!=='run'||run.lock) return; var p=cur();
+  if(run.first===null && k!=='ok' && k!=='del') run.first=performance.now()-run.t0;
+  if(autoT){ clearTimeout(autoT); autoT=null; }
+  if(p.input==='strip'){ if(k==='del'||k==='ok') return; run.typed=String(k); var bx=$('#box'); if(bx){ bx.textContent=run.typed; bx.classList.remove('empty'); } submit(+k); return; }
+  if(p.input==='frac'){
+    if(k==='del'){ if(run.field==='n') run.q=run.q.slice(0,-1); else run.r=run.r.slice(0,-1); }
+    else if(k!=='ok'&&k!=='.'){ if(run.field==='n'&&run.q.length<3) run.q+=k; else if(run.field==='d'&&run.r.length<3) run.r+=k; }
+    if(k==='ok'){ if(run.q===''){ paintFrac(); return; } if(run.field==='n'&&run.r===''&&p.ans.d!==1){ run.field='d'; paintFrac(); return; } submit({n:+run.q,d:run.r===''?1:+run.r}); return; }
+    paintFrac(); return; }
+  if(p.input==='row'){
+    if(k==='del') run.typed=run.typed.slice(0,-1); else if(k==='.'){ if(p.decimal&&run.typed.indexOf('.')<0&&run.typed!=='') run.typed+='.'; } else if(k!=='ok'){ if(run.typed.length<7) run.typed+=k; }
+    var box=$('#box'); box.textContent=run.typed; box.classList.toggle('empty',!run.typed);
+    var need=p.decimal?p.ansStr.length:String(p.ans).length;
+    if(p.decimal){ if(k==='ok'){ if(run.typed!==''&&run.typed!=='.') submit(run.typed); return; } if(run.typed.length===need&&run.typed.indexOf('.')>0) autoT=setTimeout(function(){ submit(run.typed); },700); return; }
+    if(k==='ok'){ if(run.typed!=='') submit(+run.typed); return; }
+    if(run.typed.length>need) { submit(+run.typed); return; }
+    if(run.typed.length===need) autoT=setTimeout(function(){ submit(+run.typed); },700);
+  } else if(p.input==='col'){
+    var arr=run.field==='c'?run.carries:run.colCells;
+    if(k==='del'){ if(arr[run.act]==='' && run.field==='a' && run.act<run.colCells.length-1) run.act++; arr[run.act]=''; }
+    else if(k!=='ok'){ arr[run.act]=k; if(run.field==='a' && run.act>0) run.act--; else if(run.field==='c'){ run.field='a'; } }
+    paintCol();
+    var filled=run.colCells.every(function(c){ return c!==''; });
+    if(k==='ok'){ if(run.colCells.some(function(c){return c!=='';})) submit(+run.colCells.join('')||0); return; }
+    if(filled) autoT=setTimeout(function(){ submit(+run.colCells.join('')); },500);
+  } else {
+    if(k==='del'){ if(run.field==='q') run.q=run.q.slice(0,-1); else run.r=run.r.slice(0,-1); }
+    else if(k!=='ok'){ if(run.field==='q'&&run.q.length<4) run.q+=k; else if(run.field==='r'&&run.r.length<3) run.r+=k; }
+    paintDiv();
+    if(k==='ok'){ if(run.q!=='') submit({q:+run.q,r:run.r===''?0:+run.r}); return; }
+    if(run.field==='q' && run.q.length===String(p.ans).length && p.level>=11){ autoT=setTimeout(function(){ run.field='r'; paintDiv(); },600); }
+    if(run.field==='r' && run.q!=='' && run.r.length===String(p.rem||0).length) autoT=setTimeout(function(){ submit({q:+run.q,r:+run.r}); },700);
+  }
+}
+function submit(given){
+  var p=cur(), ok=CALC.check(p,given), ms=run.first===null?performance.now()-run.t0:run.first; run.lock=true;
+  var fb=$('#fb');
+  var helped=!!(run.help&&run.help[run.i]);
+  if(ok){ if(run.attempt===1) run.results[run.i]={ok:true,given:given,ms:ms,help:helped}; else { run.results[run.i].retry=true; if(!run.confirm&&!run.trial&&CALC.L(p.level).bucket&&run.ses.problems.length<15&&p.tag!=='recheck'){ var rp=CALC.L(p.level).make(p.cell,CALC.rng(CALC.hash(p.id+Date.now()))); if(!run.ses.problems.some(function(q){return q.id===rp.id;})){ rp.tag='recheck'; run.ses.problems.push(rp); } } } fb.textContent=''; setTimeout(next,250); return; }
+  if(run.confirm){ run.results[run.i]={ok:false,given:given,ms:ms}; setTimeout(next,250); return; }
+  var shown=p.input==='frac'?(given.d===1?String(given.n):given.n+'/'+given.d):typeof given==='object'?given.q+(given.r?' … '+given.r:''):given, ans=p.input==='frac'?(p.ans.d===1?String(p.ans.n):p.ans.n+'/'+p.ans.d):p.op==='÷'?p.ans+((p.rem||0)?' … '+p.rem:''):p.ans;
+  if(run.attempt===1){ run.results[run.i]={ok:false,given:given,ms:ms,help:helped}; fb.innerHTML='<span class="wrong num">'+esc(shown)+'</span> → 정답 <span class="ans num">'+esc(ans)+'</span> · '+(p.input==='strip'?'다시 한 번 눌러요':'한 번 더 적어요')+(p.input==='strip'?'':'<div class="self" id="self"><span class="tiny" style="align-self:center">왜 그랬을까요?</span><button data-s="slip">잘못 눌렀어요</button><button data-s="confused">헷갈렸어요</button><button data-s="unknown">모르겠어요</button></div>'); run.attempt=2; if(stu().read) speak('정답은 '+ans+'. 다시 한 번.');
+    var sf=$('#self'); if(sf) sf.onclick=function(e){ var b=e.target.closest('button'); if(!b) return; run.results[run.i].self=b.getAttribute('data-s'); sf.querySelectorAll('button').forEach(function(x){ x.classList.toggle('on',x===b); }); };
+    setTimeout(function(){ resetInput(); run.lock=false; if(p.input==='col') paintCol(); else if(p.input==='div') paintDiv(); else if(p.input==='frac'){ run.field='n'; paintFrac(); } else { var b=$('#box'); b.textContent=''; b.classList.add('empty'); } },250); return; }
+  run.results[run.i].skipped=true; run.touch={p:p,given:run.results[run.i].given}; setTimeout(function(){ go('touch'); },250);
+}
+function resetInput(){ run.typed=''; run.colCells=null; run.carries=null; run.q=''; run.r=''; run.field='q'; }
+function next(){ run.lock=false; run.attempt=1; run.hintOpen=undefined; resetInput(); run.i++; if(run.i>=run.ses.problems.length){ finishRun(false); return; } renderRun(); }
+function finishRun(timeout){
+  if(run.timer) clearTimeout(run.timer);
+  var s=stu(), st=state(), ses=run.ses;
+  var results=ses.problems.map(function(p,i){ return run.results[i]||{ok:false,given:'',ms:0,timeout:true}; });
+  if(run.trial){ run.done={results:results}; ops('done',ses.topic.id); go('trialResult'); return; }
+  var before={}; Object.keys(st.grid).forEach(function(k){ before[k]=st.grid[k].st; });
+  var r=CALC.applyRun(st,s,ses,results,today());
+  var anim={}; Object.keys(st.grid).forEach(function(k){ if(before[k]!==st.grid[k].st) anim[k]=1; });
+  run.done={run:r,anim:anim,timeout:timeout}; save(); go('result');
+}
+document.addEventListener('keydown',function(e){ if(view!=='run'||DB.mode==='tea') return; if(/^[0-9]$/.test(e.key)) key(e.key); else if(e.key==='.') key('.'); else if(e.key==='/'&&cur().input==='frac'){ e.preventDefault(); run.field='d'; paintFrac(); } else if(e.key==='Backspace') key('del'); else if(e.key==='Enter') key('ok'); else if(e.key==='Tab'&&cur().input==='div'){ e.preventDefault(); run.field=run.field==='q'?'r':'q'; paintDiv(); } });
+
+/* ---------- 만져 보기 ---------- */
+function renderTouch(){
+  var p=run.touch.p, h='';
+  if(p.op==='c'||p.op==='1'){ h='<div class="pic">'+picHTML({t:'count',n:p.ans,frame:p.ans>5})+'</div><p>하나씩 짚으며 세요. 모두 '+p.ans+'개예요.</p>'; }
+  else if((p.op==='+'||p.op==='-')&&p.a<=10&&(p.b===null||p.b<=10)){ var a=p.missing?p.a:p.a, b=p.missing?p.ans:p.b, tot=p.op==='+'?a+b:a;
+    var dots=''; for(var i=0;i<10;i++) dots+='<i class="'+(i<(p.op==='+'?a:tot-b)?'a':i<(p.op==='+'?a+b:tot)?'b':'')+'"></i>';
+    h='<div class="tf">'+dots+'</div><p style="margin-top:10px">'+(p.op==='+'?'청록 '+a+'개와 호박 '+b+'개를 모으면 '+(a+b)+'개예요.':tot+'개에서 '+b+'개를 가리면 청록 '+(tot-b)+'개가 남아요.')+'</p>';
+  } else if((p.op==='+'||p.op==='-')&&p.a<100){ function rods(n){ var t=Math.floor(n/10), o=n%10, s='<div class="rods">'; for(var i=0;i<t;i++) s+='<i class="t"></i>'; for(i=0;i<o;i++) s+='<i class="o"></i>'; return s+'</div>'; }
+    h='<p class="muted small">'+p.a+' = 십 막대 '+Math.floor(p.a/10)+'개, 낱개 '+(p.a%10)+'개</p>'+rods(p.a)+'<p class="muted small" style="margin-top:10px">'+(p.op==='+'?'더하는 ':'빼는 ')+p.b+' = 십 막대 '+Math.floor(p.b/10)+'개, 낱개 '+(p.b%10)+'개</p>'+rods(p.b)+'<p style="margin-top:10px">'+(p.op==='+'?'낱개끼리 모아 10이 되면 십 막대 하나로 바꿔요.':'낱개가 모자라면 십 막대 하나를 낱개 10개로 바꿔서 빼요.')+' 정답은 '+p.ans+'.</p>';
+  } else if(p.op==='×'&&p.a<10&&p.b<10){ var g=''; for(var r=0;r<p.a;r++){ g+='<div class="rods">'; for(var c=0;c<p.b;c++) g+='<i class="o"></i>'; g+='</div>'; } h='<div style="display:grid;gap:4px">'+g+'</div><p style="margin-top:10px">'+p.b+'개씩 '+p.a+'줄 = '+p.ans+'개예요.</p>';
+  } else if(p.op==='÷'){ h='<p>'+p.a+' 안에 '+p.b+'이(가) 몇 번 들어갈까요? '+p.b+' × '+p.ans+' = '+(p.b*p.ans)+(p.rem?', 남는 것 '+p.rem:'')+'.</p><p class="muted small" style="margin-top:6px">나머지는 나누는 수 '+p.b+'보다 작아야 해요.</p>';
+  } else if(p.input==='frac'||p.decimal||p.op==='mix'){ h='<div class="viz">'+vizHTML(CALC.hintViz(p),p)+'</div><ol class="small" style="padding-left:20px">'+CALC.steps(p).map(function(t){ return '<li>'+esc(t)+'</li>'; }).join('')+'</ol>'; }
+  else { h='<p>'+esc(p.text.replace('□',String(p.ans)))+'</p><p class="muted small">일의 자리부터 차례로 다시 해 봐요.</p>'; }
+  var E=CALC.diagnose(p,run.touch.given), card=E.length?CALC.ETYPES[E[0]]:null;
+  app.innerHTML='<div class="sheet"><p class="eyebrow">만져 보기 · 점수에 들어가지 않아요</p><h2 class="num">'+esc(p.text.replace(' = □',''))+'</h2><div style="margin-top:14px">'+h+'</div>'+(card?'<div class="card" style="margin-top:14px"><p class="eyebrow">전략 카드</p><h3>'+esc(card.card)+'</h3><p class="small" style="margin-top:4px">'+esc(card.tip)+'</p></div>':'')+'<div class="row" style="margin-top:16px"><button class="btn" id="cont">다음 문제</button></div></div>';
+  $('#cont').onclick=function(){ go('run'); next(); };
+}
+
+/* ---------- 결과 ---------- */
+function circle(){ return '<svg class="mark" viewBox="0 0 40 40"><path d="M30 9c-6-5-18-3-20 8s8 17 17 13 8-14 2-17"/></svg>'; }
+function star(){ return '<svg class="mark" viewBox="0 0 40 40"><path d="M20 5l4.5 10 10.5 1-8 7 2.5 10.5L20 28l-9.5 5.5L13 23l-8-7 10.5-1z"/></svg>'; }
+function renderResult(){
+  var s=stu(), st=state(), ses=run.ses, r=run.done.run, items=r.items;
+  var E=r.E, top=CALC.topE(E), card=null;
+  if(top&&E[top]>=2) card=s.grade<=0?{eyebrow:'전략 카드',title:'하나씩 짚으며 세요',body:'점을 손가락으로 하나씩 짚으며 세요. 마지막에 말한 수가 개수예요.',ex:'1, 2, 3 …'}:{eyebrow:'전략 카드 · '+top,title:CALC.ETYPES[top].card,body:CALC.ETYPES[top].tip,ex:CALC.ETYPES[top].ex||''};
+  else if(ses.newCells.length){ var sk=CALC.STRATEGY[CALC.cellStrategy(ses.newCells[0])]; card={eyebrow:'전략 카드 · 오늘 새 칸',title:sk.title,body:sk.body,ex:sk.ex}; }
+  var list=items.map(function(it,i){ var ok=it.ok&&!it.skip; var pr=ses.problems[i]; var full=pr.input==='frac'?(pr.ans.d===1?String(pr.ans.n):pr.ans.n+'/'+pr.ans.d):pr.op==='÷'?pr.ans+((pr.rem||0)?' … '+pr.rem:''):String(pr.ans); var t=it.t.indexOf('= □')>=0?fx(esc(it.t.replace('= □',ok?'= '+full:'='))):it.t.indexOf('□')>=0?fx(esc(it.t.replace('□',ok?full:'□'))):fx(esc(it.t))+' ='+(ok?' '+full:'');
+    var tags=(it.tag==='recheck'?'<span class="tagx">숫자 바꿔 확인</span>':it.tag==='assign'?'<span class="tagx">선생님 배정</span>':'')+(it.help?'<span class="tagx">힌트 봄</span>':'')+(it.retry?'<span class="tagx">고쳐서 맞음</span>':'');
+    var detail=tags+(ok?'<span class="tiny">'+(it.ms>CALC.fastLimit(s.grade)?'<span class="chip e" style="min-height:26px;padding:0 8px">느렸어요</span>':'')+'</span>':(it.skip&&!it.g&&it.g!==0?'<span class="tiny">시간이 다 됐어요</span>':'<span class="g num">'+esc(typeof it.g==='object'?(it.g.n!==undefined?it.g.n+'/'+it.g.d:it.g.q+(it.g.r?' … '+it.g.r:'')):it.g)+'</span> → <b class="num">'+esc(full)+'</b> '+(it.E||[]).map(function(e){ return '<span class="chip e" style="min-height:28px;padding:0 8px;font-size:.85rem">'+e+' · '+esc(CALC.ETYPES[e].name)+'</span>'; }).join(' ')+(it.skip?' <span class="tiny">만져 봤어요</span>':'')));
+    return '<div class="it'+(ok?'':' bad')+'"><div style="animation-delay:'+(i*0.1)+'s">'+(ok?circle():star())+'</div><div><span class="n num">'+(i+1)+'.</span><span class="num" style="font-weight:600;font-size:1.1rem">'+t+'</span> '+detail+'</div></div>'; }).join('');
+  app.innerHTML='<div class="sheet"><div class="row" style="justify-content:space-between"><div><p class="eyebrow">'+(ses.confirm?'확인 모드 결과':'오늘 결과')+' · '+esc(s.name)+'</p><h2 class="num">'+r.ok+' / '+r.n+(r.slow?' <span class="small muted">· 느렸던 칸 '+r.slow+'</span>':'')+'</h2><p class="small muted num">처음에 맞힘 '+(r.first||0)+' · 도움 받고 해결 '+(r.helped||0)+(r.touched?' · 만져 봄 '+r.touched:'')+'</p>'+(r.levelUp?'<p class="small" style="color:var(--teal-text);font-weight:700">'+CALC.levelLabel(r.level)+' 칸을 다 채웠어요. 다음은 '+CALC.levelLabel(s.level)+'!</p>':'')+'</div>'+(ses.confirm?'':'<div class="stamp">오늘<br>초록불</div>')+'</div>'+
+    '<div class="res" style="margin-top:14px">'+list+'</div></div>'+
+    (card?'<div class="card"><p class="eyebrow">'+esc(card.eyebrow)+'</p><h3>'+esc(card.title)+'</h3><p class="small" style="margin-top:4px">'+esc(card.body)+'</p>'+(card.ex?'<p class="ex num" style="margin-top:6px">'+(function(x){ var m=x.match(/^(.*?)(\s\(.*\))?$/); return '<mark>'+esc(m[1])+'</mark>'+(m[2]?' <span class="tiny">'+esc(m[2].trim())+'</span>':''); })(card.ex)+'</p>':'')+'</div>':'')+
+    '<div class="sheet">'+goalHTML(st)+'</div>'+
+    '<div class="sheet">'+gridHTML(st,r.level,run.done.anim)+'</div>'+
+    '<p class="tiny" style="margin:0 4px 8px">문제가 이상하면 <button class="linkbtn" id="report">이상해요</button> 로 알려 주세요. 선생님 확인함에 들어가요.</p>'+
+    '<div class="sheet actions"><button class="btn" id="home">홈으로</button>'+(!ses.confirm&&runsToday(st)<maxRuns(s)?'<button class="btn ghost" id="more">한 판 더</button>':'')+'</div>';
+  $('#home').onclick=function(){ run=null; go('home'); }; if($('#more')) $('#more').onclick=function(){ startRun(false); };
+  var rb=$('#report'); if(rb) rb.onclick=function(){ st.reports.push({date:today(),t:items.map(function(it){return it.t;}).join(', ').slice(0,80),level:r.level}); save(); rb.textContent='알렸어요'; rb.disabled=true; };
+}
+
+/* ---------- 선생님 ---------- */
+function acc7(st,level){ var t=today(), from=CALC.addDays(t,-7), n=0, ok=0; st.runs.forEach(function(r){ if(r.level===level&&r.date>=from){ n+=r.n; ok+=r.ok; } }); return n?ok/n:null; }
+function eCount(st,days){ var from=CALC.addDays(today(),-days), c={}; st.runs.forEach(function(r){ if(r.date>=from) Object.keys(r.E).forEach(function(e){ c[e]=(c[e]||0)+r.E[e]; }); }); return c; }
+function renderTeacher(){
+  var tabs=[['class','반 현황'],['student','학생'],['assign','배정'],['review','확인함'],['paper','100칸 종이'],['report','월간 보고'],['ops','운영 현황']];
+  var h='<div class="tabs noprint">'+tabs.map(function(t){ return '<button data-t="'+t[0]+'" class="'+(teaTab===t[0]?'on':'')+'">'+t[1]+'</button>'; }).join('')+'</div>';
+  if(teaTab==='class') h+=classHTML(); else if(teaTab==='student') h+=studentHTML(); else if(teaTab==='assign') h+=assignHTML(); else if(teaTab==='review') h+=reviewHTML(); else if(teaTab==='paper') h+=paperHTML(); else if(teaTab==='ops') h+=opsHTML(); else h+=reportHTML();
+  app.innerHTML=h;
+  app.querySelectorAll('.tabs button').forEach(function(b){ b.onclick=function(){ teaTab=b.getAttribute('data-t'); render(); }; });
+  bindTeacher();
+}
+function allAssigns(){ var out=[]; DB.students.forEach(function(s){ (DB.states[s.id].assigns||[]).forEach(function(a){ out.push({s:s,a:a}); }); }); return out; }
+function classHTML(){
+  var asg=allAssigns(), done=asg.filter(function(x){return x.a.done;}).length, open=asg.length-done, cands=0; DB.students.forEach(function(s){ cands+=CALC.candidates(DB.states[s.id],today()).filter(function(c){return c.status==='open';}).length; }); var lit=DB.students.filter(function(s){ return DB.states[s.id].stamps.indexOf(today())>=0; }).length;
+  var h='<div class="sheet"><b>오늘</b><div class="kv num" style="margin-top:8px"><b>초록불</b><span>'+lit+' / '+DB.students.length+'명이 오늘 양을 채웠어요</span><b>배정</b><span>완료 '+done+' · 진행 '+open+(asg.length?' · 완료율 '+Math.round(done/asg.length*100)+'%':'')+' <span class="tiny">(시범 목표 80%)</span></span><b>확인함</b><span>개념 후보 '+cands+'건 · 선생님 확인 전에는 판정하지 않아요</span></div></div>';
+  h+='<div class="sheet"><b>학생 × 단계</b><p class="tiny" style="margin-bottom:8px">빈칸 = 기록 없음 · 빨강 = 최근 7일 정답률 60% 아래 · 호박 = 연습 중 · 청록 = 잘해요(90%). 순위 · 점수 열은 없어요.</p><div class="tw"><table><tr><th>학생</th>';
+  CALC.LEVELS.forEach(function(Lv){ h+='<th class="num">'+(Lv.n<=0?'유'+(Lv.n+4):Lv.n)+'</th>'; }); h+='<th>지금</th></tr>';
+  DB.students.forEach(function(s){ var st=DB.states[s.id]; h+='<tr><td>'+esc(s.name)+' <span class="tiny">'+gradeName(s.grade)+'</span></td>';
+    for(var li=0;li<CALC.LEVELS.length;li++){ var l=CALC.LEVELS[li].n; var pr=CALC.levelProgress(st,l), a=acc7(st,l), cls=''; if(pr.done+pr.prac>0||a!==null){ if(a!==null&&a<0.6) cls='low'; else if(pr.ratio>=0.9) cls='done'; else cls='prac'; } h+='<td><span class="hm '+cls+'" title="'+CALC.levelLabel(l)+' 잘해요 '+pr.done+'/'+pr.total+(a!==null?' · 7일 정답률 '+Math.round(a*100)+'%':'')+'"></span></td>'; }
+    h+='<td class="num">'+CALC.levelLabel(s.level)+'</td></tr>'; });
+  h+='</table></div></div>';
+  h+='<div class="sheet"><b>학생 × 실수 유형 (최근 30일)</b><div class="tw" style="margin-top:8px"><table><tr><th>학생</th>'; for(var i=1;i<=12;i++) h+='<th>E'+i+'</th>'; h+='</tr>';
+  DB.students.forEach(function(s){ var c=eCount(DB.states[s.id],30); h+='<tr><td>'+esc(s.name)+'</td>'; for(var i=1;i<=12;i++){ var n=c['E'+i]||0; h+='<td class="num" style="'+(n>=3?'color:var(--red-ink);font-weight:700':n?'':'color:var(--ink-3)')+'">'+(n||'·')+'</td>'; } h+='</tr>'; });
+  h+='</table></div><p class="tiny" style="margin-top:8px">'+Object.keys(CALC.ETYPES).map(function(e){ return e+' '+CALC.ETYPES[e].name; }).join(' · ')+'</p></div>';
+  h+='<div class="sheet"><b>주머니 비우기</b><p class="tiny">오늘 꺼낼 것이 6개를 넘으면 그날 판에 다 못 들어가요(한 판 4개). 선생님이 한 판 더 시키거나 100칸 종이로 덜어 주세요.</p><div style="display:grid;gap:6px;margin-top:8px">'+DB.students.map(function(s){ var st=DB.states[s.id], d=st.bag.filter(function(b){return b.due<=today();}).length; var lab=d===0?'<span class="tiny">비었어요</span>':d<=5?'<span class="small num">오늘 '+d+'개</span>':'<span class="small num" style="color:var(--mid);font-weight:700">오늘 '+d+'개 · 많아요</span>'; return '<div class="asgrow"><span>'+esc(s.name)+' <span class="tiny num">주머니 '+st.bag.length+'</span></span>'+lab+'</div>'; }).join('')+'</div></div>';
+  return h;
+}
+function assignHTML(){
+  var s=DB.students.filter(function(x){return x.id===(teaStu||DB.cur);})[0]||DB.students[0]; teaStu=s.id; var st=DB.states[s.id]; var lv=+(window.__asgLevel||s.level); var Lv=CALC.L(lv), cells=CALC.levelCells(lv);
+  var cellOpts=cells.slice().sort(function(a,b){ var ga=CALC.cellState(st,a).st, gb=CALC.cellState(st,b).st; var o={prac:0,new:1,done:2}; return o[ga]-o[gb]; }).slice(0,Lv.bucket?cells.length:30).map(function(c){ var g=CALC.cellState(st,c); return '<option value="c:'+esc(c)+'">'+esc(CALC.cellLabel(c))+' ('+(g.st==='done'?'잘해요':g.st==='prac'?'연습 중':'아직')+')</option>'; }).join('');
+  var eOpts=Object.keys(CALC.ETYPES).map(function(e){ return '<option value="e:'+e+'">'+e+' · '+esc(CALC.ETYPES[e].name)+'</option>'; }).join('');
+  var h='<div class="sheet"><b>수업 막힘 배정</b><p class="tiny">수업에서 계산 때문에 막힌 아이에게 그 연산만 배정해요. 다음 판부터 3문제씩 들어가고, 힌트 없이 3번 잇달아 맞히면 완료. 완료 뒤 문장제에서 다시 되는지 선생님이 확인해요.</p>'+
+    '<div class="form" style="margin-top:12px"><label class="f">학생<select id="tStu">'+DB.students.map(function(x){ return '<option value="'+x.id+'"'+(x.id===s.id?' selected':'')+'>'+esc(x.name)+'</option>'; }).join('')+'</select></label>'+
+    '<label class="f">단계<select id="asgLevel">'+CALC.LEVELS.map(function(L){ return '<option value="'+L.n+'"'+(L.n===lv?' selected':'')+'>'+CALC.levelLabel(L.n)+' · '+esc(L.name)+'</option>'; }).join('')+'</select></label>'+
+    '<label class="f">무엇을<select id="asgWhat"><optgroup label="칸 · 묶음">'+cellOpts+'</optgroup><optgroup label="실수 유형">'+eOpts+'</optgroup></select></label>'+
+    '<label class="f">메모(교재 · 문항)<input id="asgNote" placeholder="예: 문장제 교재 12쪽 3번에서 받아내림 막힘"></label></div>'+
+    '<div class="row" style="margin-top:10px"><button class="btn" id="asgAdd">배정하기</button></div></div>';
+  var all=allAssigns().sort(function(x,y){ return (x.a.done?1:0)-(y.a.done?1:0) || (x.a.created<y.a.created?1:-1); });
+  h+='<div class="sheet"><b>배정 목록</b><div style="display:grid;gap:8px;margin-top:8px">'+(all.length?all.map(function(x){ var a=x.a; var what=a.cell?CALC.cellLabel(a.cell):a.code+' · '+CALC.ETYPES[a.code].name; return '<div class="asgrow'+(a.done?' done':'')+'"><div><b>'+esc(x.s.name)+'</b> · '+esc(what)+' <span class="tiny">'+CALC.levelLabel(a.level)+' · '+a.created.slice(5)+'</span><br><span class="small">'+esc(a.note||'')+'</span></div><div style="text-align:right"><span class="num small">'+(a.done?'완료 '+a.doneAt.slice(5):a.s+' / 3')+'</span>'+(a.done?'<br><label class="sw" style="min-height:32px;font-size:.85rem"><input type="checkbox" data-recheck="'+x.s.id+':'+a.id+'"'+(a.recheck?' checked':'')+'> 문장제에서 확인</label>':'<br><button class="small" data-del="'+x.s.id+':'+a.id+'" style="min-height:32px">거두기</button>')+'</div></div>'; }).join(''):'<span class="muted small">아직 없어요</span>')+'</div></div>';
+  return h;
+}
+function reviewHTML(){
+  var h='<div class="sheet"><b>개념 후보 확인함</b><p class="tiny">같은 실수 유형이 7일 안에 2번 이상이거나 아이가 "모르겠어요"라고 한 것. 마지막 답만 보고 개념 부족으로 단정하지 않아요. 선생님이 풀이를 보고 정해요.</p><div style="display:grid;gap:8px;margin-top:8px">';
+  var any=false; DB.students.forEach(function(s){ var st=DB.states[s.id]; CALC.candidates(st,today()).forEach(function(c){ any=true; h+='<div class="asgrow"><div><b>'+esc(s.name)+'</b> · '+c.code+' · '+esc(CALC.ETYPES[c.code].name)+'<br><span class="tiny num">7일 '+c.count+'번'+(c.unknown?' · "모르겠어요" '+c.unknown+'번':'')+'</span></div><div class="row">'+(c.status==='open'?'<button class="small" data-flag="'+s.id+':'+c.code+':concept" style="min-height:36px">개념 보충</button><button class="small" data-flag="'+s.id+':'+c.code+':slip" style="min-height:36px">실수였음</button>':'<span class="chip '+(c.status==='concept'?'e':'ok')+'">'+(c.status==='concept'?'개념 보충으로 배정됨':'실수로 봄')+'</span>')+'</div></div>'; }); });
+  if(!any) h+='<span class="muted small">지금은 없어요</span>'; h+='</div></div>';
+  var reps=[]; DB.students.forEach(function(s){ (DB.states[s.id].reports||[]).forEach(function(r){ reps.push({s:s,r:r}); }); });
+  h+='<div class="sheet"><b>문제 오류 신고</b><div style="display:grid;gap:8px;margin-top:8px">'+(reps.length?reps.map(function(x){ return '<div class="asgrow"><div><b>'+esc(x.s.name)+'</b> · '+x.r.date.slice(5)+' · '+CALC.levelLabel(x.r.level)+'<br><span class="tiny">'+esc(x.r.t)+'</span></div><span class="tiny">'+(x.r.ok?'확인함':'대기')+'</span></div>'; }).join(''):'<span class="muted small">없어요</span>')+'</div></div>';
+  return h;
+}
+function opsHTML(){ var o=DB.ops||{start:{},done:{},parent:{},material:{},consult:{}}; function sum(k){ var n=0; Object.keys(o[k]||{}).forEach(function(t){ n+=o[k][t]; }); return n; }
+  var h='<div class="sheet"><b>체험(마케팅) 운영 현황</b><p class="tiny">글 → 로그인 없는 체험 → 학부모 안내 → 자료 · 상담 순서로 봐요. 방문 수가 아니라 끝까지 한 비율과 안내 열람을 봐요. 체험판이라 이 기기 안 숫자예요.</p><div class="funnel num" style="margin-top:10px"><div><b>'+sum('start')+'</b><span>체험 시작</span></div><div><b>'+sum('done')+'</b><span>완료</span></div><div><b>'+sum('parent')+'</b><span>학부모 안내 열람</span></div><div><b>'+sum('material')+'</b><span>자료 신청</span></div><div><b>'+sum('consult')+'</b><span>상담 안내 클릭</span></div></div>'+(sum('start')?'<p class="tiny num" style="margin-top:8px">완료율 '+Math.round(sum('done')/sum('start')*100)+'% (시범 목표 75%)</p>':'')+'</div>';
+  var fr=o.from||{}; h+='<div class="sheet"><b>유입 출처</b><p class="tiny">공개 체험 주소에 <span class="num">?from=글이름&amp;topic=t5</span> 를 붙이면 어느 글에서 왔는지와 바로 들어간 주제가 집계돼요.</p><div class="row" style="margin-top:8px">'+(Object.keys(fr).length?Object.keys(fr).map(function(k){ return '<span class="chip num">'+esc(k)+' · '+fr[k]+'</span>'; }).join(''):'<span class="muted small">아직 없어요</span>')+'</div></div>';
+  h+='<div class="sheet"><b>주제별</b><div class="tw" style="margin-top:8px"><table><tr><th>주제</th><th>시작</th><th>완료</th><th>안내</th><th>자료</th><th>상담</th></tr>'+CALC.TRIAL_TOPICS.map(function(t){ return '<tr><td>'+esc(t.name)+'</td><td class="num">'+(o.start[t.id]||0)+'</td><td class="num">'+(o.done[t.id]||0)+'</td><td class="num">'+(o.parent[t.id]||0)+'</td><td class="num">'+(o.material[t.id]||0)+'</td><td class="num">'+(o.consult[t.id]||0)+'</td></tr>'; }).join('')+'</table></div><p class="tiny" style="margin-top:8px">상담 연결 원칙: 체험 전에 연락처를 묻지 않음 · 낮은 점수로 검사를 권하지 않음 · 자료 · 상담은 학부모가 고름 · 마케팅 동의와 학습 이용을 묶지 않음.</p></div>';
+  return h;
+}
+function studentHTML(){
+  var s=DB.students.filter(function(x){return x.id===(teaStu||DB.cur);})[0]||DB.students[0]; teaStu=s.id; var st=DB.states[s.id];
+  var h='<div class="sheet"><div class="row" style="justify-content:space-between"><b>학생</b><select id="tStu">'+DB.students.map(function(x){ return '<option value="'+x.id+'"'+(x.id===s.id?' selected':'')+'>'+esc(x.name)+'</option>'; }).join('')+'</select></div>'+
+    '<div class="form" style="margin-top:12px"><label class="f">학년<select id="fGrade">'+[0,1,2,3,4,5,6].map(function(g){ return '<option value="'+g+'"'+(g===s.grade?' selected':'')+'>'+gradeName(g)+'</option>'; }).join('')+'</select></label>'+
+    '<label class="f">단계<select id="fLevel">'+CALC.LEVELS.map(function(L){ return '<option value="'+L.n+'"'+(L.n===s.level?' selected':'')+'>'+CALC.levelLabel(L.n)+' · '+esc(L.name)+'</option>'; }).join('')+'</select></label></div>'+
+    '<div class="row" style="margin-top:10px"><label class="sw"><input type="checkbox" id="fConfirm"'+(s.confirm?' checked':'')+'> 확인 모드 열기(초3 이상)</label><label class="sw"><input type="checkbox" id="fLeft"'+(s.left?' checked':'')+'> 왼손 숫자판</label><label class="sw"><input type="checkbox" id="fSound"'+(s.sound?' checked':'')+'> 소리(맞음 · 틀림 같은 소리)</label><label class="sw"><input type="checkbox" id="fRead"'+(s.read?' checked':'')+'> 문제 읽어 주기(유치 기본 켬)</label></div>'+
+    '<p class="tiny" style="margin-top:8px">'+(s.grade<=0?'시간은 재지 않아요 · 8문제 · 하루 2판':'빠름 기준 '+(CALC.fastLimit(s.grade)/1000)+'초(첫 숫자까지) · 하루 3판')+' · 출석 '+st.stamps.length+'일</p></div>';
+  h+='<div class="sheet">'+goalHTML(st)+'<p class="tiny" style="margin-top:8px">처음 맞힘 비율(최근 14일)</p>'+sparkHTML(CALC.history(st,today(),14),'first')+'</div>';
+  h+='<div class="sheet">'+gridHTML(st,s.level)+'</div>';
+  var myAsg=(st.assigns||[]); h+='<div class="sheet"><b>배정 ('+myAsg.filter(function(a){return !a.done;}).length+' 진행)</b><div style="display:grid;gap:6px;margin-top:8px">'+(myAsg.length?myAsg.map(function(a){ return '<div class="asgrow'+(a.done?' done':'')+'"><span>'+esc(a.cell?CALC.cellLabel(a.cell):a.code+' · '+CALC.ETYPES[a.code].name)+' <span class="tiny">'+esc(a.note||'')+'</span></span><span class="num small">'+(a.done?'완료'+(a.recheck?' · 문장제 확인':''):a.s+' / 3')+'</span></div>'; }).join(''):'<span class="muted small">없어요 (배정 탭에서)</span>')+'</div></div>';
+  h+='<div class="sheet"><b>종이 확인 기록</b><p class="tiny">100칸 종이나 새 지필 문제로 1주 뒤에도 되는지 적어 둬요(유지 확인).</p><div class="row" style="margin-top:8px"><label class="f">맞은 수<input id="paperOk" type="number" min="0" max="100" value="18" style="width:90px"></label><label class="f">문제 수<input id="paperN" type="number" min="1" max="100" value="20" style="width:90px"></label><button class="btn ghost" id="paperAdd" style="align-self:end">기록</button></div><div class="row" style="margin-top:8px">'+(st.paper.length?st.paper.slice().reverse().map(function(pp){ return '<span class="chip num">'+pp.date.slice(5)+' · '+pp.ok+'/'+pp.n+' · '+CALC.levelLabel(pp.level)+'</span>'; }).join(''):'<span class="muted small">아직 없어요</span>')+'</div></div>';
+  h+='<div class="sheet"><b>주머니 ('+st.bag.length+')</b><div class="row" style="margin-top:8px">'+(st.bag.length?st.bag.slice().sort(function(a,b){return a.due<b.due?-1:1;}).map(function(b){ var lab=b.type==='E'?'유형 '+b.code+' · '+CALC.ETYPES[b.code].name:CALC.cellLabel(b.cell)+(b.E&&b.E.length?' · '+b.E.join(','):'')+(b.slow?' · 느림':''); return '<span class="chip bag num">'+esc(lab)+' <span class="tiny">'+b.due.slice(5).replace('-','/')+' · '+(b.s||0)+'/3</span></span>'; }).join(''):'<span class="muted small">비어 있어요</span>')+'</div></div>';
+  h+='<div class="sheet"><b>최근 판</b><div class="tw" style="margin-top:8px"><table><tr><th>날짜</th><th>단계</th><th>맞음</th><th>처음</th><th>도움</th><th>느림</th><th>실수 유형</th></tr>'+st.runs.slice(-10).reverse().map(function(r){ return '<tr><td class="num">'+r.date.slice(5)+(r.confirm?' 확인':'')+'</td><td class="num">'+CALC.levelLabel(r.level)+'</td><td class="num">'+r.ok+'/'+r.n+'</td><td class="num">'+(r.first||0)+'</td><td class="num">'+(r.helped||0)+'</td><td class="num">'+r.slow+'</td><td>'+Object.keys(r.E).map(function(e){return e+'×'+r.E[e];}).join(' ')+'</td></tr>'; }).join('')+'</table></div></div>'+
+  '<div class="sheet"><b>기록</b><p class="tiny">기록은 이 기기에만 저장돼요. 공동 태블릿이면 아이를 바꿀 때 위에서 학생을 고르고, 필요하면 지워요.</p><div class="row" style="margin-top:8px"><button class="btn ghost" id="wipe">이 학생 기록 지우기</button></div></div>';
+  return h;
+}
+function paperHTML(){
+  var s=DB.students.filter(function(x){return x.id===(teaStu||DB.cur);})[0]||DB.students[0]; teaStu=s.id; var st=DB.states[s.id], L=CALC.L(s.level), r=CALC.rng(CALC.hash(s.id+today()+'paper')), cells=CALC.levelCells(s.level);
+  var bagCells=st.bag.filter(function(b){return b.type==='cell';}).map(function(b){return b.cell;}); var list=[], used={};
+  var tries=0; while(list.length<100 && tries<3000){ tries++; var idx=list.length, inBag=idx<bagCells.length*3; var c=inBag?bagCells[idx%bagCells.length]:cells[Math.floor(r()*cells.length)]; var p=L.make(c,r); if(used[p.id] && !inBag && tries%6!==0) continue; used[p.id]=1; list.push(p); }
+  var h='<div class="sheet"><div class="row noprint" style="justify-content:space-between"><div><b>100칸 종이 · '+esc(s.name)+'</b><p class="tiny">주머니 칸을 앞에 3번씩, 나머지는 지금 단계. 집에서 1분, 어른이 채점. 브라우저 인쇄로 출력해요.</p></div><div class="row"><select id="tStu">'+DB.students.map(function(x){ return '<option value="'+x.id+'"'+(x.id===s.id?' selected':'')+'>'+esc(x.name)+'</option>'; }).join('')+'</select><button class="btn ghost" id="print">인쇄</button></div></div>'+
+    '<p class="small" style="margin:10px 0 6px">WB 연산 · '+CALC.levelLabel(s.level)+' '+esc(L.name)+' · 이름: ________ · 날짜: '+today()+'</p><div class="paper">'+list.map(function(p,i){ var body=p.pic?paperPic(p):fx(esc(p.text.replace(' = □','')))+(p.op==='÷'||p.input==='col'?' = ':''); return '<div><span class="tiny">'+(i+1)+'</span> '+body+'</div>'; }).join('')+'</div></div>';
+  return h;
+}
+function paperPic(p){ var d=function(n,ch){ var o=''; for(var i=0;i<n;i++) o+=ch; return o; }; var c=p.pic; if(c.t==='count') return d(c.n,'●')+' → '; if(c.t==='next') return (c.next?d(c.n,'●')+' ○':'○ '+d(c.n,'●'))+' → '; if(c.t==='join') return d(c.a,'●')+' + '+d(c.b,'○')+' → '; if(c.t==='hide') return d(c.show,'●')+' ■ ('+(c.n)+'개) → '; if(c.t==='take') return d(c.n-c.take,'●')+d(c.take,'⊗')+' → '; return ''; }
+function reportHTML(){
+  var s=DB.students.filter(function(x){return x.id===(teaStu||DB.cur);})[0]||DB.students[0]; teaStu=s.id; var st=DB.states[s.id], t=today(), from=CALC.addDays(t,-30);
+  var doneNow=Object.keys(st.grid).filter(function(k){return st.grid[k].st==='done';}).length, doneBefore=Object.keys(st.grid).filter(function(k){ var g=st.grid[k]; return g.st==='done'&&g.days.length>=3&&g.days[2]<from; }).length;
+  var days=st.stamps.filter(function(d){return d>=from;}).length, ec=eCount(st,30), top=CALC.topE(ec), runs=st.runs.filter(function(r){return r.date>=from;}), n=0, ok=0; runs.forEach(function(r){ n+=r.n; ok+=r.ok; });
+  var ym=t.slice(0,7).replace('-',''), key='calc-'+ym+'-'+String(DB.queue.length+1).padStart(4,'0');
+  var body='#{보호자}님, #{학생명} '+(s.grade<=0?'어린이':'학생')+'의 이번 달 연산 소식입니다. 연습한 날 #{출석일}일, 잘해요 칸 #{잘해요전}개 → #{잘해요후}개, 정답률 #{정답률}%. '+(top?'이번 달 자주 나온 실수는 "'+CALC.ETYPES[top].name+'"였고 전략 카드로 연습했습니다.':'')+' 다음 달에는 #{다음단계}단계로 갑니다. — WB 독해력학원';
+  var h='<div class="sheet"><div class="row" style="justify-content:space-between"><b>월간 보고 미리 보기 · '+esc(s.name)+'</b><select id="tStu">'+DB.students.map(function(x){ return '<option value="'+x.id+'"'+(x.id===s.id?' selected':'')+'>'+esc(x.name)+'</option>'; }).join('')+'</select></div>'+
+    '<div class="row" style="margin-top:12px"><span class="chip num">연습한 날 '+days+'일</span><span class="chip num">잘해요 칸 '+doneBefore+' → '+doneNow+'</span><span class="chip num">정답률 '+(n?Math.round(ok/n*100):0)+'%</span>'+(top?'<span class="chip e">'+top+' · '+esc(CALC.ETYPES[top].name)+' '+ec[top]+'번</span>':'')+'</div>'+
+    '<div style="margin-top:12px">'+gridHTML(st,s.level)+'</div>'+
+    '<div class="note" style="margin-top:14px">학부모 발송은 이 앱에서 하지 않아요. 아래 "후보 넣기"는 번호 · 실명 없이 후보만 큐에 쌓고(DRY_RUN), 운영 PC의 study-notify 가 컨트롤타워 승인 큐로 올리고, 원장님 승인 뒤에만 알림톡이 나가요.</div>'+
+    '<div class="row" style="margin-top:12px"><button class="btn ghost" id="queue">알림 후보 넣기 (DRY_RUN)</button></div></div>'+
+    '<div class="sheet"><b>알림 후보 큐 ('+DB.queue.length+')</b><div class="queue" style="margin-top:8px">'+(DB.queue.length?DB.queue.slice().reverse().map(function(q){ return '<pre>'+esc(JSON.stringify(q,null,1))+'</pre>'; }).join(''):'<span class="muted small">비어 있어요</span>')+'</div></div>';
+  window.__cand={key:key,title:t.slice(5,7).replace(/^0/,'')+'월 연산 월간 보고 1건',summary:'출석 '+days+'일 · 잘해요 '+doneBefore+'→'+doneNow+' · 정답률 '+(n?Math.round(ok/n*100):0)+'%',body:body,templateCode:'TBD_CALC_MONTHLY',count:1,scheduledAt:CALC.addDays(t,1)+' 18:00',audience:mask(s.name)+' 보호자',dryRun:true};
+  return h;
+}
+function bindTeacher(){
+  var sel=$('#tStu'); if(sel) sel.onchange=function(){ teaStu=sel.value; render(); };
+  var s=DB.students.filter(function(x){return x.id===teaStu;})[0];
+  if($('#fGrade')){ $('#fGrade').onchange=function(){ s.grade=+this.value; save(); render(); }; $('#fLevel').onchange=function(){ s.level=+this.value; save(); render(); }; $('#fConfirm').onchange=function(){ s.confirm=this.checked; save(); }; $('#fLeft').onchange=function(){ s.left=this.checked; save(); }; $('#fSound').onchange=function(){ s.sound=this.checked; save(); }; $('#fRead').onchange=function(){ s.read=this.checked; save(); }; }
+  if($('#print')) $('#print').onclick=function(){ window.print(); };
+  var al=$('#asgLevel'); if(al) al.onchange=function(){ window.__asgLevel=+this.value; render(); };
+  var aa=$('#asgAdd'); if(aa) aa.onclick=function(){ var w=$('#asgWhat').value, lv=+$('#asgLevel').value, st=DB.states[teaStu]; st.assigns=st.assigns||[]; CALC.addAssign(st, w[0]==='c'?{cell:w.slice(2),level:lv,note:$('#asgNote').value}:{code:w.slice(2),level:lv,note:$('#asgNote').value}, today()); save(); render(); };
+  app.querySelectorAll('[data-del]').forEach(function(b){ b.onclick=function(){ var k=b.getAttribute('data-del').split(':'), st=DB.states[k[0]]; st.assigns=st.assigns.filter(function(a){return a.id!==k[1];}); save(); render(); }; });
+  app.querySelectorAll('[data-recheck]').forEach(function(c){ c.onchange=function(){ var k=c.getAttribute('data-recheck').split(':'), a=DB.states[k[0]].assigns.filter(function(x){return x.id===k[1];})[0]; if(a) a.recheck=c.checked; save(); }; });
+  app.querySelectorAll('[data-flag]').forEach(function(b){ b.onclick=function(){ var k=b.getAttribute('data-flag').split(':'), st=DB.states[k[0]]; st.flags=st.flags||{}; st.flags[k[1]]={status:k[2],date:today()}; if(k[2]==='concept'){ var sS=DB.students.filter(function(x){return x.id===k[0];})[0]; CALC.addAssign(st,{code:k[1],level:sS.level,note:'확인함에서 개념 보충으로'},today()); } save(); render(); }; });
+  var pa=$('#paperAdd'); if(pa) pa.onclick=function(){ var st=DB.states[teaStu], sS=DB.students.filter(function(x){return x.id===teaStu;})[0]; st.paper=st.paper||[]; st.paper.push({date:today(),ok:+$('#paperOk').value,n:+$('#paperN').value,level:sS.level}); save(); render(); };
+  var wp=$('#wipe'); if(wp) wp.onclick=function(){ if(confirm('이 학생의 기록을 모두 지울까요? 되돌릴 수 없어요.')){ DB.states[teaStu]=CALC.emptyState(); save(); render(); } };
+  if($('#queue')) $('#queue').onclick=function(){ DB.queue.push(window.__cand); save(); render(); };
+}
+
+/* ---------- 체험(마케팅) ---------- */
+var autoTopicDone=false;
+function startTrial(id){ ops('start',id); trialState=CALC.emptyState(); var ses=CALC.buildTrial(id,String(Date.now())); run={ses:ses,i:0,results:[],attempt:1,typed:'',colCells:null,act:0,field:'q',q:'',r:'',t0:0,first:null,timer:null,confirm:false,trial:true,endAt:0,anim:{}}; go('run'); }
+function renderTrialHome(){
+  if(!autoTopicDone){ autoTopicDone=true; var tq=qs('topic'); if(tq&&CALC.TRIAL_TOPICS.some(function(t){return t.id===tq;})){ startTrial(tq); return; } }
+  app.innerHTML='<div class="sheet today" style="grid-template-columns:1fr"><div><p class="eyebrow">WB 학습실 · 연산 체험 (가칭)</p><h2>계산은 되는데 문장제에서 막히나요?</h2><p class="small muted" style="margin-top:6px">주제 하나를 골라 6문제, 약 3분. 로그인도 연락처도 없어요. 결과는 "이번 체험에서 본 학습 모습"으로 보여 드려요.</p></div></div>'+
+    '<div class="sheet"><b>주제 고르기</b><div class="topics" style="margin-top:10px">'+CALC.TRIAL_TOPICS.map(function(t){ return '<button class="topic" data-topic="'+t.id+'"><b>'+esc(t.name)+'</b><span>'+esc(t.hook)+'</span></button>'; }).join('')+'</div></div>'+
+    '<p class="tiny" style="margin:0 4px">체험 중 힌트를 보면 "도움 받고 해결"로 따로 세요. 몇 문제로 능력이나 원인을 판정하지 않아요.</p>';
+  app.querySelectorAll('[data-topic]').forEach(function(b){ b.onclick=function(){ startTrial(b.getAttribute('data-topic')); }; });
+}
+function renderTrialResult(){
+  var ses=run.ses, tp=ses.topic, res=run.done.results, first=0, helped=0, touched=0, again=[];
+  res.forEach(function(r,i){ if(r.skipped) touched++; else if(r.ok&&!r.help) first++; else if(r.ok||r.retry) helped++; if(!r.ok||r.help||r.skipped){ var E=r.ok?[]:CALC.diagnose(ses.problems[i],r.given); again.push(E.length?CALC.ETYPES[E[0]].card:ses.problems[i].text.replace(' = □','')); } });
+  var good=first>=4?'처음에 스스로 맞힌 문제가 '+first+'개예요. 이 주제는 꽤 익숙해요.':first>=2?'절반쯤은 처음에 맞혔고, 나머지는 힌트나 다시 풀기로 해결했어요.':'힌트를 보며 차근차근 해결했어요. 혼자 떠올리는 연습을 더 하면 좋아요.';
+  var list=ses.problems.map(function(p,i){ var r=res[i], ok=r.ok&&!r.skipped; return '<div class="it'+(ok?'':' bad')+'"><div>'+(ok?circle():star())+'</div><div><span class="n num">'+(i+1)+'.</span><span class="num" style="font-weight:600;font-size:1.1rem">'+esc(p.text.replace(' = □',''))+' = '+(ok?p.ans:'□')+'</span> '+(r.help?'<span class="tagx">힌트 봄</span>':'')+(r.retry?'<span class="tagx">고쳐서 맞음</span>':'')+(r.skipped?'<span class="tagx">만져 봄</span>':'')+'</div></div>'; }).join('');
+  app.innerHTML='<div class="sheet"><p class="eyebrow">체험 결과 · '+esc(tp.name)+'</p><h2 class="num">처음에 맞힘 '+first+' · 도움 받고 해결 '+helped+(touched?' · 만져 봄 '+touched:'')+'</h2><div class="res" style="margin-top:12px">'+list+'</div></div>'+
+    '<div class="card"><p class="eyebrow">이번 체험에서 본 학습 모습</p><div class="kv" style="margin-top:6px"><b>잘한 점</b><span>'+esc(good)+'</span><b>다시 살펴볼 부분</b><span>'+(again.length?esc(again.filter(function(v,i,a){return a.indexOf(v)===i;}).slice(0,2).join(' · ')):'지금은 없어요. 숫자를 바꿔 한 번 더 해 보면 좋아요.')+'</span><b>집에서 한 가지</b><span>'+esc(tp.home)+'</span></div><p class="tiny" style="margin-top:8px">몇 문제로 아이의 능력이나 원인을 판정하지 않아요. 검사 권유도 하지 않아요.</p></div>'+
+    '<div class="sheet"><div class="row" style="justify-content:space-between"><b>학부모 안내</b><button class="btn ghost" id="parent" style="min-height:44px">'+(run.parentOpen?'닫기':'보기')+'</button></div>'+(run.parentOpen?'<div style="margin-top:10px"><p class="small"><b>WB가 보는 법.</b> 틀린 답에서 "왜 그랬는지"를 봐요. 예를 들어 52−38을 26이라고 쓰면 "큰 수에서 작은 수를 뺐어요"예요. 그 한 가지만 짧게 연습하고, 며칠 뒤 숫자를 바꿔 다시 확인해요.</p><p class="small" style="margin-top:6px"><b>집에서 돕는 법.</b> '+esc(tp.home)+' 시간을 재지 말고, 틀리면 정답을 보여 주고 한 번 더 적게 해 주세요.</p><div class="row" style="margin-top:10px"><button class="btn ghost" id="material">관련 글 · 활동지 받기</button><button class="btn ghost" id="consult">상담 안내 보기</button></div><p class="tiny" style="margin-top:6px">체험판에서는 아무 데도 보내지 않아요(눌린 수만 운영 현황에 세요). 연락처는 받지 않아요.</p></div>':'')+'</div>'+
+    '<div class="sheet actions"><button class="btn" id="again">다른 주제 체험</button><button class="btn ghost" id="retry">같은 주제 다시(숫자 바뀜)</button></div>';
+  $('#parent').onclick=function(){ if(!run.parentOpen){ ops('parent',tp.id); } run.parentOpen=!run.parentOpen; renderTrialResult(); };
+  var mb=$('#material'); if(mb) mb.onclick=function(){ ops('material',tp.id); mb.textContent='신청됐어요(체험판)'; mb.disabled=true; };
+  var cb=$('#consult'); if(cb) cb.onclick=function(){ ops('consult',tp.id); cb.textContent='안내를 봤어요(체험판)'; cb.disabled=true; };
+  $('#again').onclick=function(){ run=null; go('trialHome'); };
+  $('#retry').onclick=function(){ startTrial(tp.id); };
+}
+/* ---------- 부팅 ---------- */
+load();
+if(!PUBLIC) connectDb(); else { var bd=$('.brand'); if(bd) bd.innerHTML='<i></i> WB 학습실 · 연산 체험 <span class="tiny">가칭 · WB 독해력학원</span>'; }
+$('#stuSel').onchange=function(){ DB.cur=this.value; teaStu=DB.cur; run=null; save(); view='home'; render(); };
+$('#mStu').onclick=function(){ DB.mode='stu'; run=null; view='home'; save(); render(); };
+$('#mTea').onclick=function(){ DB.mode='tea'; run=null; save(); render(); };
+$('#mTri').onclick=function(){ DB.mode='trial'; run=null; view='trialHome'; save(); render(); };
+render();
+})();
+</script>
+</body>
+</html>
