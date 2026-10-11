@@ -19,6 +19,15 @@
    "theme": "입 모양을 그려 만든 글자 — 한글날 주간",
    "publishAt": "2026-10-05",
    "status": "published"
+  },
+  {
+   "file": "2026-W42.json",
+   "id": "2026-W42",
+   "week": "2026-W42",
+   "title": "가을 곤충은 어디로 갈까?",
+   "theme": "알·번데기·어른벌레 — 곤충의 겨울나기",
+   "publishAt": "2026-10-12",
+   "status": "published"
   }
  ]
 }
