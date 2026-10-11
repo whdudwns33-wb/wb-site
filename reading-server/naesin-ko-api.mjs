@@ -31,6 +31,19 @@ const EXAM_PACKS_MAX = 20;
 const VERDICTS = ['pass', 'hold', 'fail'];
 
 const nowIso = () => new Date().toISOString();
+
+/* 이 학생에게 배정된 팩 id 들 — 내 것 → 반 공통(default) 순서는 /exam 라우트와 같아야 한다.
+   두 곳이 어긋나면 학생 화면에는 범위로 보이는 단원을 서버가 403 으로 막는 상태가 된다. */
+/* 몸통 상한 — 워커가 req.json() 으로 다 읽기 전에 content-length 로 거른다.
+   형제 앱(naesinBodyLimit)과 같은 모양이고 값만 국어 라우트에 맞춘다: 팩·검수 목록은 크고
+   나머지(학생 기록·서술형 제출·오버레이)는 작다. 이 분기에만 가드가 없었다. */
+const KO_BIG_BODY_PATHS = ['/api/naesin-ko/admin/pack', '/api/naesin-ko/admin/rubric', '/api/naesin-ko/admin/pending'];
+export const naesinKoBodyLimit = (p) => (KO_BIG_BODY_PATHS.includes(p) ? 4_500_000 : 300_000);
+
+const examPackIds = async (store, code) => {
+  const rec = (await store.getExam(code)) || (await store.getExam('default'));
+  return (rec && Array.isArray(rec.packIds)) ? rec.packIds : [];
+};
 /* ── 서버가 지키는 짧은 목록 ──
    전체 검증은 관리 웹이 `naesin-ko/pack-check.js` 로 한다(규칙은 거기 하나다). 서버는 그 모듈을
    못 부른다 — 이 파일은 Cloudflare Worker 와 공용이라 node:module·createRequire 를 쓸 수 없고,
@@ -109,10 +122,17 @@ export async function handleNaesinKo(ctx) {
   /* ── 학생 (관리자 토큰도 통과) ── */
 
   /* 팩 서빙 — 인증 없이는 아무것도 나가지 않는다(§10-4).
-     학생·관리자 모두 열 수 있다 — 검수 화면이 방금 올린 팩을 같은 라우트로 확인한다. */
+     학생은 **자기 시험 범위에 배정된 팩만** 받는다. 인증만으로 열어 두면 팩 id 하나로 남의 범위가
+     나가는데, id 가 `2022-cheonjae-nomisuk-m2-1-U1` 같은 교과서 좌표라 추측이 된다.
+     영어 팩(naesin-api.mjs)에는 이 게이트가 있고 국어에만 없었다 — 같은 규칙으로 맞춘다.
+     관리자는 통과한다: 검수 화면·루브릭 저작이 방금 올린 팩을 같은 라우트로 되읽는다. */
   if (p === '/api/naesin-ko/pack' && method === 'GET') {
     const id = String((ctx.query && ctx.query.get('id')) || '').trim();
     if (!PACK_ID_RE.test(id)) return j(400, { error: '팩 id가 필요해요.' });
+    if (!who.admin) {
+      const allowed = await examPackIds(store, who.code);
+      if (!allowed.includes(id)) return j(403, { error: '배정되지 않은 단원이에요.' });
+    }
     const rec = await store.getPack(id);
     if (!rec) return j(404, { error: '팩을 찾을 수 없어요.' });
     return j(200, { pack: rec.pack, updatedAt: rec.updatedAt || null });
