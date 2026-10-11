@@ -191,8 +191,12 @@
   /* ── 로컬 저장 ── */
   function blank() { return { v: 1, packs: {}, savedAt: 0 }; }
   function load() {
-    try { var j = JSON.parse(localStorage.getItem(LS) || 'null'); return (j && j.v === 1) ? j : blank(); }
-    catch (e) { return blank(); }
+    try {
+      var j = JSON.parse(localStorage.getItem(LS) || 'null');
+      if (!j || j.v !== 1) return blank();
+      if (scrubWrong(j)) S.scrubbed = true;
+      return j;
+    } catch (e) { return blank(); }
   }
   function pk() {
     var id = S.packId || 'none';
@@ -326,7 +330,9 @@
       .then(function (j) { S.concepts = j.concepts || []; })
       .catch(function () { S.concepts = []; })
       .then(function () { return S.token ? online() : demo(); })
-      .then(render);
+      .then(render)
+      /* 지운 발문이 서버·다른 기기에도 남아 있다 — 한 번 올려 거기서도 사라지게 한다 */
+      .then(function () { if (S.scrubbed) persist(); });
   }
 
   function demo(msg, assigned) {
@@ -419,7 +425,11 @@
         S.overlay = (rs[2].body && rs[2].body.overlay) || null;
         /* 서버 기록이 더 최신이면 그것을 쓴다 — 기기를 바꿔도 이어진다 */
         var sv = rs[3].body && rs[3].body.state;
-        if (sv && sv.v === 1 && (sv.savedAt || 0) > (S.data.savedAt || 0)) S.data = sv;
+        if (sv && sv.v === 1 && (sv.savedAt || 0) > (S.data.savedAt || 0)) {
+          /* 서버 기록에도 옛 발문이 들어 있다 — 받아 쓰기 전에 지우고, 지웠으면 올려 보낸다 */
+          if (scrubWrong(sv)) S.scrubbed = true;
+          S.data = sv;
+        }
         S.packIds = (S.exam && S.exam.packIds) || [];
         if (!S.packIds.length) return demo('아직 시험 범위가 등록되지 않았어요 — 체험 팩으로 연습할 수 있어요.');
         return loadPack(S.packIds[0], true);
@@ -957,10 +967,50 @@
     $('pane').addEventListener('click', function () { setTab('home'); });
   }
 
+  /* 오답노트에 **발문 원문을 적지 않는다.** 적으면 그 글이 localStorage(학생 태블릿) ·
+     KV `naesinko:state:*` · 야간 백업(`backup:<날짜>` 10일분)까지 그대로 복제된다.
+     라이선스 자료를 금고(원장 PC)에 두는 결정(2026-10-11)은 "자료는 라이선스 칸에만 있다"를
+     전제로 하는데, 이 한 줄이 그 전제를 깨고 있었다 — 팩 본문은 백업에서 공들여 뺐는데
+     학생 기록이 발문을 태우고 들어갔다. 되찾을 **좌표만** 남긴다: 작품 id·종류·지면 번호는
+     자료 본문이 아니다. 화면에 보일 이름은 wrongLabel() 이 팩에서 그때그때 만든다. */
   function markWrong(key, it) {
     var w = pk().wrong;
-    w[key] = w[key] || { key: key, label: (it && (it.stem || it.context)) || key, n: 0, cleared: false, dates: [] };
+    if (!w[key]) {
+      w[key] = { key: key, n: 0, cleared: false, dates: [],
+        workId: (it && it.workId) || S.workId || null,
+        kind: (it && it.kind) || null,
+        mark: (it && it.mark) || null,
+        no: (it && it.source && it.source.no) || null };
+    }
     w[key].n += 1; w[key].cleared = false; w[key].dates = [];
+  }
+
+  /* 오답 한 줄의 이름 — 기록에는 글이 없으니 좌표로 그때그때 만든다.
+     팩이 손에 없으면(체험 모드·다른 단원) 종류만 보인다. */
+  var KIND_NAME = { vocab: '어휘', blank: '개념 빈칸', rhetoric: '표현', keyword: '시어',
+    speaker: '화자', ox: 'O/X', matching: '짝 맞추기', composition: '구성', apply: '구절 적용' };
+  function wrongLabel(x) {
+    var out = [], wk = x && x.workId ? work(x.workId) : null;
+    if (wk && wk.title) out.push(wk.title);
+    if (x && x.mark) out.push(x.mark);
+    if (x && x.kind) out.push(KIND_NAME[x.kind] || x.kind);
+    if (x && x.no) out.push(x.no + '번');
+    /* 표식도 번호도 없으면 같은 작품의 여러 줄이 똑같아 보인다 — id 꼬리로 가린다(글이 아니다) */
+    if (!(x && (x.mark || x.no))) out.push(String((x && x.key) || '').slice(-8));
+    if (!out.length) out.push(String((x && x.key) || ''));
+    return out.length ? out.join(' · ') : String((x && x.key) || '');
+  }
+
+  /* 옛 버전이 적어 둔 발문을 불러올 때 지운다 — 수도를 잠그는 것과 이미 흘러나온 물을
+     닦는 것은 다른 일이라 둘을 같이 한다. 지운 뒤 한 번 올려 보내 서버 기록에서도 사라진다. */
+  function scrubWrong(d) {
+    var n = 0, ps = (d && d.packs) || {}, id, w, k;
+    for (id in ps) {
+      w = ps[id] && ps[id].wrong;
+      if (!w || typeof w !== 'object') continue;
+      for (k in w) if (w[k] && typeof w[k] === 'object' && 'label' in w[k]) { delete w[k].label; n += 1; }
+    }
+    return n;
   }
   function clearIfWrong(key) {
     var w = pk().wrong[key];
@@ -1115,7 +1165,13 @@
       var back = r.perTarget.filter(function (t) { return t.status === 'missing'; });
       if (back.length) html += '<div class="small muted" style="margin-top:8px">누락한 ' + back.length +
         '개 항목은 개념 빈칸으로 다시 나와요.</div>';
-      back.forEach(function (t) { markWrong('rt-' + t.id, { stem: t.label }); });
+      /* 채점 결과(perTarget)에는 종류가 없다 — 원래 목표에서 찾아 좌표를 넘긴다.
+         표식(㉠·㉡)은 자료를 가리키는 기호일 뿐이라 기록에 남겨도 된다. 그게 없으면
+         오답노트 아홉 줄이 같은 작품 이름으로만 보여 학생이 무엇을 틀렸는지 못 가린다. */
+      back.forEach(function (t) {
+        var src = targets.filter(function (x) { return x.id === t.id; })[0] || {};
+        markWrong('rt-' + t.id, { kind: src.kind, workId: w.workId, mark: src.mark || null });
+      });
       persist();
       $('rfb').innerHTML = html;
     });
@@ -1502,7 +1558,7 @@
       /* 오답 → 연결된 개념 단위 되돌리기(§5.4). targetRefs가 비면(정본 없는 작품)
          작품 단위 오답노트로만 남는다. */
       (it.targetRefs || []).forEach(function (ref) {
-        if (ref.indexOf('b-') === 0) markWrong(ref, { stem: it.stem });
+        if (ref.indexOf('b-') === 0) markWrong(ref, { kind: 'blank', workId: it.workId });
       });
     }
     persist();
@@ -1561,7 +1617,7 @@
     else {
       m.push('<div class="small muted">서로 다른 날 2번 맞히면 지워져요. 남은 ' + open.length + '개</div><table class="mx" style="margin-top:6px">');
       open.slice(0, 30).forEach(function (x) {
-        m.push('<tr><td class="t">' + esc(String(x.label).slice(0, 60)) + '</td><td>' + x.n + '회</td>' +
+        m.push('<tr><td class="t">' + esc(wrongLabel(x).slice(0, 60)) + '</td><td>' + x.n + '회</td>' +
           '<td>' + (x.dates || []).length + '/2일</td></tr>');
       });
       m.push('</table>');

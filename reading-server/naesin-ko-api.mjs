@@ -16,6 +16,31 @@
    - review   : 서술형 제출·판정·확정 (문항별 레코드, 답안 원문이 여기 산다)
    - overlay  : 학교 강조점·정답 덮어쓰기 (시험 scope 단위, 강사 작성물) */
 
+/* 오답노트에서 발문 원문을 떼어 낸다.
+   앱은 2026-10-11 부터 좌표만 적지만, 서비스 워커에 옛 버전이 남은 태블릿이 한동안 계속
+   발문을 올려 보낸다 — 그러면 라이선스 자료가 KV `naesinko:state:*` 와 야간 백업에 눕는다.
+   금고(원장 PC) 결정의 전제는 "자료는 라이선스 칸에만 있다"이므로 서버에서 한 번 더 막는다.
+   쓸 때도 읽을 때도 건다 — 이미 들어 있는 기록을 다시 내보내지 않기 위해서다.
+   돌려주는 값은 지운(또는 셈한) 개수다.
+   `countOnly` 는 **고치지 않고 세기만** 한다 — 저장 어댑터가 저장된 객체를 그대로 돌려주는
+   호스트(로컬 서버의 파일 어댑터·테스트 메모리 어댑터)가 있어서, 세어 보기만 하려다
+   실제로 지워 버리는 일이 생긴다. 워커(KV)는 매번 새로 파싱해 티가 안 나는 차이다. */
+export const scrubWrongLabels = (state, opts) => {
+  const countOnly = !!(opts && opts.countOnly);
+  const packs = (state && typeof state === 'object' && state.packs) || {};
+  let n = 0;
+  for (const id of Object.keys(packs)) {
+    const w = packs[id] && packs[id].wrong;
+    if (!w || typeof w !== 'object') continue;
+    for (const k of Object.keys(w)) {
+      if (!w[k] || typeof w[k] !== 'object' || !('label' in w[k])) continue;
+      if (!countOnly) delete w[k].label;
+      n += 1;
+    }
+  }
+  return n;
+};
+
 const STATE_MAX_BYTES = 262_144;    // 학생 SRS 기록 1건 최대 (256KB)
 const SUMMARY_MAX_BYTES = 8_192;    // 관리 화면 요약 1건 최대 (8KB)
 const REVIEW_MAX_BYTES = 16_384;    // 서술형 제출 1건 최대 (16KB)
@@ -140,6 +165,8 @@ export async function handleNaesinKo(ctx) {
 
   if (p === '/api/naesin-ko/state' && method === 'GET' && !who.admin) {
     const rec = await store.getState(who.code);
+    /* 옛 기록에 남은 발문은 내보내지 않는다 — 기기를 바꿔도 다시 퍼지지 않게 */
+    if (rec && rec.state) scrubWrongLabels(rec.state);
     return j(200, { state: rec ? rec.state : {}, updatedAt: rec ? rec.updatedAt : null });
   }
   if (p === '/api/naesin-ko/state' && method === 'PUT' && !who.admin) {
@@ -147,6 +174,9 @@ export async function handleNaesinKo(ctx) {
     if (!b) return j(400, { error: '올바른 JSON이 아니에요.' });
     const state = b.state;
     if (!state || typeof state !== 'object') return j(400, { error: 'state 필요' });
+    /* 상한 검사보다 **먼저** 지운다 — 발문을 뺀 뒤의 크기로 재야 옛 기기가 상한에 걸려
+       기록을 아예 못 올리는 일이 없다 */
+    scrubWrongLabels(state);
     const rec = { state, updatedAt: nowIso() };
     /* 상한을 넘으면 조용히 실패하지 않고 413으로 알린다 — 학생 화면이 경고를 띄운다.
        서술형 답안은 여기 오지 않는다(/review로 간다) — state가 부푸는 주범이었다. */
@@ -468,6 +498,26 @@ export async function handleNaesinKo(ctx) {
       students.push(naesinKoSummary(code, stu, sum));
     }
     return j(200, { students, time: nowIso() });
+  }
+
+  /* 이미 들어 있는 기록을 한 번 청소한다 — 쓰기·읽기 가드는 앞으로를 막을 뿐이고,
+     어제까지 쌓인 발문은 KV 에 그대로 있다. 야간 백업은 10일이면 저절로 밀려 나간다.
+     GET 은 세어만 보고(먼저 규모를 보고 누른다) POST 가 실제로 지운다. */
+  if (p === '/api/naesin-ko/admin/scrub' && (method === 'GET' || method === 'POST')) {
+    const dry = method === 'GET';
+    let records = 0, labels = 0, touched = 0;
+    for (const code of await store.listStateCodes()) {
+      const rec = await store.getState(code);
+      if (!rec || !rec.state) continue;
+      records += 1;
+      const n = scrubWrongLabels(rec.state, { countOnly: dry });
+      if (!n) continue;
+      labels += n; touched += 1;
+      /* updatedAt 은 올리지 않는다 — 올리면 학생 기기의 더 새 기록이 서버 것에 밀려
+         진도가 되돌아간다(앱은 savedAt 비교로 더 새 쪽을 쓴다) */
+      if (!dry) await store.putState(code, rec);
+    }
+    return j(200, { dryRun: dry, records, touched, labels });
   }
 
   return j(404, { error: 'unknown api' });

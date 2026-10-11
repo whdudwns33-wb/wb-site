@@ -245,20 +245,23 @@ var WBKOGEN = (function () {
     (work.rhetoric || []).forEach(function (r) {
       if (!r.mark) return;
       out.push({
-        id: 'rt-rh-' + r.id, kind: 'rhetoric', label: r.mark + '의 표현 방법과 효과',
+        id: 'rt-rh-' + r.id, kind: 'rhetoric', mark: r.mark, label: r.mark + '의 표현 방법과 효과',
         quote: r.quote, keywords: [r.name].concat(r.effect ? [r.effect] : []).filter(Boolean)
       });
     });
     (work.keywords || []).forEach(function (k) {
       if (!k.mark) return;
       out.push({
-        id: 'rt-kw-' + k.id, kind: 'keyword', label: k.mark + ' ‘' + k.word + '’의 함축적 의미',
+        id: 'rt-kw-' + k.id, kind: 'keyword', mark: k.mark, label: k.mark + ' ‘' + k.word + '’의 함축적 의미',
         quote: (k.quotes && k.quotes[0]) || null, keywords: k.meaning ? [k.meaning] : []
       });
     });
     (work.composition || []).forEach(function (c, i) {
       out.push({
-        id: 'rt-cp-' + i, kind: 'composition', label: c.range + '의 내용',
+        /* 표식(㉠·㉡)을 label 안에만 두지 않고 따로 낸다 — 오답노트는 글을 저장하지 않고
+           좌표만 남기므로(index.html markWrong) 가릴 거리가 필요하다. 구성 항목은 표식이
+           없어 연 번호를 쓴다 — 둘 다 자료를 가리키는 기호이고 본문이 아니다. */
+        id: 'rt-cp-' + i, kind: 'composition', mark: (i + 1) + '번째', label: c.range + '의 내용',
         quote: null, keywords: c.summary ? [c.summary] : []
       });
     });

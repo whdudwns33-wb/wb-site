@@ -219,6 +219,9 @@ function render() {
       <button class="btn ghost sm" id="btnRbSave" disabled>저작한 것 내려받기</button>
       <span class="muted" id="rbMsg"></span>
     </div>
+    <p class="muted" style="margin-top:6px">내려받은 파일에는 <b>교재에서 온 채점 기준</b>이 섞입니다 —
+      자료를 두는 그 컴퓨터(금고)에만 두세요. 휴대폰·다른 노트북에서 받으면 사본이 금고 밖에 생깁니다.
+      브라우저에 남는 저작 초안은 <b>2주 뒤 저절로 지워집니다</b>.</p>
     <div id="rbList" class="muted" style="margin-top:10px">팩을 고르고 불러오기를 누르세요.</div>
   </div>
 
@@ -402,10 +405,34 @@ function rbRich(html) {
   return esc(rbPlain(html)).replace(/&amp;lt;(\/?)(b|i|u|em|strong|br)&amp;gt;/g, '<$1$2>');
 }
 function rbKey(it) { return it.id; }
-function rbStore() { return 'wbk.rubric.draft.' + RB.packId; }
+const RB_DRAFT_PREFIX = 'wbk.rubric.draft.';
+const RB_DRAFT_TTL_MS = 14 * 24 * 60 * 60 * 1000;   /* 2주 — 한 단원 저작이 끝나는 기간 */
+function rbStore() { return RB_DRAFT_PREFIX + RB.packId; }
 function rbSave() {
-  /* 저작한 것은 서버에 넣기 전까지 이 브라우저에만 있다 — 세션 만료·새로고침에 잃지 않게 남긴다 */
-  try { localStorage.setItem(rbStore(), JSON.stringify(RB.draft)); } catch (e) { /* 용량 초과는 무시 */ }
+  /* 저작한 것은 서버에 넣기 전까지 이 브라우저에만 있다 — 세션 만료·새로고침에 잃지 않게 남긴다.
+     다만 **영구히 두지 않는다**: 루브릭 초안은 팩에서 씨를 받아 오므로(rbDraftOf 의 seed)
+     라이선스 자료가 섞인다. 자료를 금고(원장 PC)에만 두는 결정(2026-10-11)에서, 이 브라우저
+     저장소는 금고 밖이다. 그래서 적은 시각을 함께 남겨 2주가 지나면 지우고,
+     남은 초안이 없으면(= 다 팩에 넣었으면) 칸 자체를 비운다. */
+  try {
+    if (!RB.draft || !Object.keys(RB.draft).length) { localStorage.removeItem(rbStore()); return; }
+    localStorage.setItem(rbStore(), JSON.stringify({ at: Date.now(), draft: RB.draft }));
+  } catch (e) { /* 용량 초과는 무시 */ }
+}
+/* 이 브라우저에 남은 모든 단원의 초안을 훑어 기한 지난 것을 지운다 — 저작을 중간에 그만둔
+   단원이 가장 오래 남는 자리다. 돌려주는 값은 지운 칸 수(화면에 알린다). */
+function rbSweep() {
+  let gone = 0;
+  try {
+    for (const k of Object.keys(localStorage)) {
+      if (k.indexOf(RB_DRAFT_PREFIX) !== 0) continue;
+      let at = 0;
+      try { const v = JSON.parse(localStorage.getItem(k) || 'null'); at = (v && v.at) || 0; } catch (e) { at = 0; }
+      /* at 이 없는 것은 이 규칙 이전에 적힌 초안이다 — 나이를 알 수 없으니 지운다 */
+      if (!at || Date.now() - at > RB_DRAFT_TTL_MS) { localStorage.removeItem(k); gone += 1; }
+    }
+  } catch (e) { /* 저장소를 못 읽는 브라우저는 그냥 넘어간다 */ }
+  return gone;
 }
 function rbDraftOf(it) {
   if (!RB.draft[rbKey(it)]) {
@@ -565,7 +592,12 @@ async function rbLoad(keepDraft) {
     /* 저작 중이던 초안은 버리지 않는다 — 브라우저에 남긴 것을 되살린다(불러오기를 잘못 눌러도, 세션이 끊겨도) */
     if (!(keepDraft && samePack)) {
       RB.draft = {};
-      try { RB.draft = JSON.parse(localStorage.getItem(rbStore()) || '{}') || {}; } catch (e) { RB.draft = {}; }
+      rbSweep();
+      try {
+        const v = JSON.parse(localStorage.getItem(rbStore()) || 'null');
+        /* { at, draft } 가 새 모양이다. 옛 모양(초안 그대로)은 rbSweep 이 이미 지웠으니 여기 안 온다 */
+        RB.draft = (v && v.draft && typeof v.draft === 'object') ? v.draft : {};
+      } catch (e) { RB.draft = {}; }
     }
     const dup = RB.pending.filter((p) => RB.packIds.has(p.item.id)).length;
     $('#rbMsg').textContent = `${RB.pending.length}문항 대기` + (dup ? ` · ${dup}문항은 이미 팩에 있습니다` : '');
@@ -635,6 +667,13 @@ async function rbDrop(det) {
 function rbBind() {
   $('#btnRbLoad').onclick = () => rbLoad(false);
   $('#btnRbSave').onclick = () => {
+    /* 라이선스 자료가 섞인 파일을 내보내기 전에 한 번 묻는다(원장 결정 2026-10-11 — 기능은
+       남기고 경고만). 자료는 금고(원장 PC)에만 둔다는 결정 아래에서, 다운로드 폴더는 그 컴퓨터가
+       금고일 때만 금고 안이다. 관리 웹은 휴대폰·다른 노트북에서도 열린다. */
+    if (!confirm('이 파일에는 교재에서 온 채점 기준이 섞입니다.\n\n자료를 두는 그 컴퓨터(금고)에만 두세요 — 지금 이 기기가 그 컴퓨터인가요?\n\n저작한 값은 서버에도 들어가 있어, 받지 않아도 잃지 않습니다.')) {
+      $('#rbMsg').textContent = '내려받지 않았어요 — 저작한 값은 그대로 있습니다.';
+      return;
+    }
     /* 저작한 것은 KV 에만 두지 않는다 — 작업 폴더에 남겨야 다시 만들 때 잃지 않는다.
        화면에 보이는 값 그대로 담는다(입력이 곧 초안이라 따로 걷을 것이 없다) */
     const out = { packId: RB.packId, savedAt: new Date().toISOString(),
