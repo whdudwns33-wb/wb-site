@@ -9,7 +9,7 @@ import { handleVocab, dumpVocab, sendNightPushes, vocabSummary } from './vocab-a
 import { handleNaesin, isReservedCode, dropReservedRows, naesinBodyLimit } from './naesin-api.mjs';
 import { handleStudio } from './naesin-studio.mjs';
 import { handleHaru, haruBodyLimit, allowedApp, appOfPath, dropStudentHaru, dumpHaru, weeklyAgg } from './haru-api.mjs';
-import { handleNaesinKo } from './naesin-ko-api.mjs';
+import { handleNaesinKo, naesinKoBodyLimit } from './naesin-ko-api.mjs';
 import { handleHanja, hanjaBodyLimit, dropStudentHanja, dumpHanja } from './hanja-api.mjs';
 import { handleChunk, dropStudentChunk, pushDueChunk } from './chunk-api.mjs';
 import { handleLetter, letterBodyLimit, dropStudentLetter, dumpLetter, pushDueIssues } from './letter-api.mjs';
@@ -788,6 +788,8 @@ export default {
 
       /* 국어브레인 (/api/naesin-ko/*) — 같은 격리 원칙, 저장소만 naesinko: */
       if (p.startsWith('/api/naesin-ko/')) {
+        const len = Number(req.headers.get('content-length') || 0);
+        if (len > naesinKoBodyLimit(p)) return json(413, { error: '요청이 너무 커서 받을 수 없어요.' });
         const out = await handleNaesinKo({
           path: p, method: req.method, who, query: url.searchParams,
           getBody: () => req.json(), store: naesinKoStore(env),

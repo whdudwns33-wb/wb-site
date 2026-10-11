@@ -13,7 +13,7 @@ import { handleVocab, sendNightPushes, vocabSummary } from './vocab-api.mjs';
 import { handleNaesin, isReservedCode, dropReservedRows, naesinBodyLimit } from './naesin-api.mjs';
 import { handleStudio } from './naesin-studio.mjs';
 import { handleHaru, haruBodyLimit, allowedApp, appOfPath, dropStudentHaru, dumpHaru } from './haru-api.mjs';
-import { handleNaesinKo } from './naesin-ko-api.mjs';
+import { handleNaesinKo, naesinKoBodyLimit } from './naesin-ko-api.mjs';
 import { handleHanja, hanjaBodyLimit, dropStudentHanja, dumpHanja } from './hanja-api.mjs';
 import { handleChunk, dropStudentChunk } from './chunk-api.mjs';
 import { handleLetter, letterBodyLimit, dropStudentLetter, dumpLetter, pushDueIssues } from './letter-api.mjs';
@@ -327,7 +327,7 @@ const json = (res, code, obj) => {
    남은 몸통은 resume() 으로 흘려보내야 응답이 정상으로 나간다 — 안 읽고 응답하면 큰 몸통은 RST 로 끝난다. */
 const BODY_LIMIT_DEFAULT = 2_000_000;
 const BODY_LIMIT_TEXTBOOK = 5_500_000;
-const bodyLimit = (p) => (p.startsWith('/api/naesin/') ? naesinBodyLimit(p) : p.startsWith('/api/haru/') ? haruBodyLimit(p) : p.startsWith('/api/hanja/') ? hanjaBodyLimit(p) : p.startsWith('/api/letter/') ? letterBodyLimit(p) : p === '/api/admin/textbook-src' ? BODY_LIMIT_TEXTBOOK : BODY_LIMIT_DEFAULT);
+const bodyLimit = (p) => (p.startsWith('/api/naesin-ko/') ? naesinKoBodyLimit(p) : p.startsWith('/api/naesin/') ? naesinBodyLimit(p) : p.startsWith('/api/haru/') ? haruBodyLimit(p) : p.startsWith('/api/hanja/') ? hanjaBodyLimit(p) : p.startsWith('/api/letter/') ? letterBodyLimit(p) : p === '/api/admin/textbook-src' ? BODY_LIMIT_TEXTBOOK : BODY_LIMIT_DEFAULT);
 const tooLarge = () => { const e = new Error('too large'); e.status = 413; return e; };
 const readBody = (req, limit = BODY_LIMIT_DEFAULT) => new Promise((resolve, reject) => {
   /* 조각을 Buffer 로 모아 한 번에 디코딩한다 — 조각마다 문자열로 바꾸면 조각 경계에 걸린 한글(3바이트)이 깨진다.
@@ -627,9 +627,12 @@ const server = http.createServer(async (req, res) => {
       /* 국어브레인 (/api/naesin-ko/*) — 영어와 같은 격리 원칙, 저장소만 db.naesinKo.
          /api/naesin/ 보다 먼저 본다 — 접두어가 겹치지는 않지만 순서를 명시해 둔다. */
       if (p.startsWith('/api/naesin-ko/')) {
+        /* 상한은 워커와 같은 함수에서 온다 — 로컬에서만 통과하거나 로컬에서만 막히는 팩이 생기면
+           안 된다(기본 2MB 로는 3MB 짜리 단원 팩이 로컬에서만 413 이었다). */
+        if (Number(req.headers['content-length'] || 0) > naesinKoBodyLimit(p)) { req.resume(); return json(res, 413, { error: '요청이 너무 커서 받을 수 없어요.' }); }
         const out = await handleNaesinKo({
           path: p, method: req.method, who, query: url.searchParams,
-          getBody: () => readBody(req), store: naesinKoStore,
+          getBody: () => readBody(req, naesinKoBodyLimit(p)), store: naesinKoStore,
         });
         return json(res, out.status, out.body);
       }
