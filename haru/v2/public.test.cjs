@@ -29,13 +29,13 @@ async function test(name, fn) { await fn(); console.log('통과:', name); count+
     assert.equal(catalog.phase({ start:'2026-10-25', end:'2026-10-25', kind:'시험' }, Date.parse('2026-10-26T00:00:00+09:00')), '지난 일정');
   });
   await test('기관·분야별 필터는 지원 가능을 추정하지 않고 빈 결과를 복원', () => {
-    assert.equal(data.courses.filter(c => catalog.matches(c, '6', '인문')).length, 0);
+    assert.equal(data.courses.filter(c => catalog.matches(c, '1', '인문')).length, 0);
     assert.equal(data.courses.filter(c => catalog.matches(c, '1', '체육')).length, 1);
     const elements = {};
     for (const id of ['grade','field','reset','result-count','empty']) elements[id] = { value:'', textContent:'', hidden:true, handlers:{}, addEventListener(type,fn) { this.handlers[type] = fn; } };
     const rows = data.courses.map(c => ({ dataset:{ grades:c.grades.join(','), fields:c.fields.join('|') }, hidden:false }));
     vm.runInNewContext(read('public.js'), { window:{ HaruCatalog:catalog }, document:{ getElementById:id => elements[id], querySelectorAll:selector => selector === '[data-course]' ? rows : [] } });
-    elements.grade.value = '6'; elements.field.value = '인문'; elements.grade.handlers.change();
+    elements.grade.value = '1'; elements.field.value = '인문'; elements.grade.handlers.change();
     assert.ok(rows.every(row => row.hidden)); assert.equal(elements.empty.hidden, false);
     elements.reset.handlers.click(); assert.ok(rows.every(row => !row.hidden)); assert.equal(elements.empty.hidden, true);
   });
@@ -62,7 +62,7 @@ async function test(name, fn) { await fn(); console.log('통과:', name); count+
     const gifted = read('gwangju-gifted/index.html');
     assert.equal((gifted.match(/data-course=/g) || []).length, data.courses.length);
     assert.match(gifted, /교육청 계열/); assert.match(gifted, /대학부설/);
-    assert.match(gifted, /최신 원문 수집 실패/); assert.match(gifted, /2026-10-06/);
+    assert.match(gifted, /확인 필요/);
     assert.match(gifted, /2026-10-11/); assert.match(gifted, /<noscript>/);
     assert.doesNotMatch(read('public.js'), /fetch\s*\(|localStorage|sessionStorage|serviceWorker|\/api\/|innerHTML/);
   });
@@ -74,6 +74,23 @@ async function test(name, fn) { await fn(); console.log('통과:', name); count+
     assert.ok(data.events.some(e => e.institution === 'gnue' && e.kind === '교사추천 서류'));
     const admission = data.admissions.find(a => a.institution === 'gnue');
     assert.match(admission.restrictions,/자체 온라인/); assert.doesNotMatch(admission.documents,/GED/);
+  });
+  await test('보조 기관의 출처·학년도·지역·일정과 공개 안내를 함께 검증', () => {
+    for (const mutate of [d => d.directory[0].source = '없는 출처', d => d.directory[0].year = 2026, d => d.directory[0].region = '광주', d => d.directory.push(d.directory[0]), d => d.directory.find(i => i.events.length).events[0].end = '2026-01-01', d => d.sources.at(-1).url = 'https://ged.kedi.re.kr.evil.example/']) {
+      const copy = structuredClone(data); mutate(copy); assert.throws(() => catalog.validate(copy));
+    }
+    const home = read('index.html'), gifted = read('gwangju-gifted/index.html');
+    for (const entry of data.directory) assert.ok(home.includes('id="directory-' + entry.id + '"'));
+    assert.match(home, /전남·전북 전체 기관 명부는 미완료/);
+    for (const id of ['art','kiwoom','kaist-gwangju','jnu']) assert.ok(gifted.includes('id="' + id + '"'));
+    assert.equal(data.courses.filter(c => ['kiwoom','kaist-gwangju','jnu'].includes(c.institution)).length, 0);
+    assert.equal(data.events.filter(e => ['kiwoom','kaist-gwangju'].includes(e.institution)).length, 0);
+    assert.match(data.admissions.find(a => a.institution === 'kaist-gwangju').restrictions, /상충/);
+    const jb = data.directory.find(i => i.id === 'jb-ai');
+    assert.equal(jb.events.find(e => e.kind === '원서').start, '2026-11-10T09:00');
+    assert.ok(jb.events.filter(e => ['시험','면접'].includes(e.kind)).every(e => !e.end.includes('T')));
+    assert.match(home, /시각 상충/); assert.match(gifted, /실제 개설·배정이 미정/);
+    assert.equal(catalog.phase({kind:'설명회',start:'2026-10-17T14:00',end:'2026-10-17T14:00'}, catalog.instant('2026-10-18')), '지난 일정');
   });
   console.log('새 공개 안내:', count, '개 통과');
 })().catch(error => { console.error(error); process.exitCode = 1; });

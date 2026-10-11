@@ -10,7 +10,7 @@
   }
   function phase(event, now = Date.now()) {
     const start = instant(event.start), end = instant(event.end);
-    const past = event.kind && ['시험', '발표', '학교 안내'].includes(event.kind) ? '지난 일정' : '마감';
+    const past = event.kind && ['시험', '면접', '설명회', '요강 공지 예정', '발표', '학교 안내'].includes(event.kind) ? '지난 일정' : '마감';
     if (now < start) return '예정';
     // 날짜만 있는 마감은 임의의 마감 시각을 확정하지 않는다.
     if (!event.end.includes('T')) return now >= end + 86400000 ? past : '기간 내 · 시각 확인';
@@ -24,8 +24,8 @@
     instant(data.referenceDate);
     const unique = rows => { const ids = rows.map(row => row.id); if (new Set(ids).size !== ids.length) throw new Error('중복 id'); return new Set(ids); };
     const sources = unique(data.sources), institutions = unique(data.institutions);
-    unique(data.courses); unique(data.admissions);
-    const official = new Set(['samyook.jge.ms.kr', 'gice.gen.go.kr', 'ai.jge.go.kr', 'gifted.gnue.ac.kr']);
+    unique(data.courses); unique(data.admissions); unique(data.directory);
+    const official = new Set(['samyook.jge.ms.kr', 'gice.gen.go.kr', 'ai.jge.go.kr', 'gifted.gnue.ac.kr', 'csge.jnu.ac.kr', 'school.jbedu.kr', 'office.jbedu.kr', 'posef.or.kr', 'changpyeong.hs.jne.kr', 'www.jnei.go.kr', 'gifted.mokpo.ac.kr', 'www.scnu.ac.kr', 'select.gifted.ac.kr', 'ged.kedi.re.kr']);
     for (const source of data.sources) {
       const url = new URL(source.url);
       if (url.protocol !== 'https:' || !official.has(url.hostname) || url.username || url.password) throw new Error('공식 출처 주소 오류');
@@ -38,6 +38,10 @@
     }
     for (const admission of data.admissions) if (!institutions.has(admission.institution) || admission.year !== data.educationYear) throw new Error('전형 학년도 오류');
     for (const event of data.events) if (!institutions.has(event.institution) || instant(event.end) < instant(event.start)) throw new Error('일정 연결·순서 오류');
+    for (const entry of data.directory) {
+      if (!sources.has(entry.source) || entry.year !== data.educationYear || !['전남', '전북'].includes(entry.region) || !entry.name || !Array.isArray(entry.events)) throw new Error('보조 기관 안내 오류');
+      for (const event of entry.events) if (instant(event.end) < instant(event.start)) throw new Error('보조 기관 일정 오류');
+    }
     if (!/^0\d{1,2}-\d{3,4}-\d{4}$/.test(data.contact.phone)) throw new Error('상담 전화 오류');
     return data;
   }
