@@ -114,5 +114,38 @@ async function test(name, fn) { await fn(); console.log('통과:', name); count+
     for (const id of ['mokpo-2027-1011','scnu-2027-1011','jbnu-2027-1011']) assert.ok(data.sources.some(s => s.id === id));
     assert.match(read('index.html'), /전남광주통합특별시/);
   });
+  await test('광주 첨부 보완과 GED 지역 공고는 미확인 자격·일정을 추정하지 않음', () => {
+    const admission = id => data.admissions.find(a => a.institution === id);
+    const aiRegistration = data.events.find(e => e.institution === 'ai' && e.kind === '등록');
+    assert.equal(aiRegistration.start, '2026-12-24');
+    assert.equal(aiRegistration.end, '2026-12-31');
+    assert.equal(data.events.filter(e => e.institution === 'gice' && e.kind === '등록').length, 0);
+    assert.match(admission('gice').restrictions, /최신 첨부에서 미확인/);
+    assert.match(admission('ai').target, /1년 이상 이수/);
+    assert.match(admission('art').assessment, /심화는 별도 시험 없이/);
+    assert.ok(data.courses.filter(c => ['art-advanced','art-writing-advanced'].includes(c.id)).every(c => c.name.includes('본원 기초 수료예정자')));
+    const artDates = data.events.filter(e => e.institution === 'art' && e.kind === '시험');
+    assert.deepEqual(artDates.map(e => e.start), ['2026-12-12T09:00','2026-12-19T09:00']);
+    assert.match(admission('kaist-gwangju').restrictions, /2027년 3월 예정/);
+    const ged = data.sources.filter(s => /^ged-(jn|jb)-\d+-1011$/.test(s.id));
+    assert.equal(ged.filter(s => s.id.startsWith('ged-jn-')).length, 4);
+    assert.equal(ged.filter(s => s.id.startsWith('ged-jb-')).length, 17);
+    for (const s of ged) {
+      const url = new URL(s.url);
+      assert.equal(url.searchParams.get('stndYear'), '2027');
+      assert.ok(data.directory.some(i => i.source === s.id));
+      assert.equal(s.status, '확인 필요');
+    }
+    const schoolClass = data.directory.find(i => i.id === 'jb-25747');
+    assert.match(schoolClass.target, /익산가온초 현재 초4~5 재학생만/);
+    const hw = data.directory.find(i => i.id === 'jb-25746');
+    assert.equal(hw.kind, '학교 영재학급');
+    assert.equal(hw.events[0].end, '2026-11-17T15:00');
+    const jeonju = data.directory.find(i => i.id === 'jb-25849');
+    assert.equal(jeonju.events[0].end, '2026-11-17T17:00');
+    assert.match(data.directory.find(i => i.id === 'jn-25908').limits, /예술의 인접지역/);
+    assert.match(data.directory.find(i => i.id === 'jn-ged').limits, /모든 운영기관 명부는 아님/);
+    assert.equal(data.courses.length, 21);
+  });
   console.log('새 공개 안내:', count, '개 통과');
 })().catch(error => { console.error(error); process.exitCode = 1; });
