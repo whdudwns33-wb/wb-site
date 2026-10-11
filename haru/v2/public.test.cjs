@@ -13,7 +13,7 @@ async function test(name, fn) { await fn(); console.log('통과:', name); count+
   await test('입학연도·현재학년·출처 버전과 이전 확인 이력 보존', () => {
     catalog.validate(data);
     assert.equal(data.sources.find(s => s.id === 'gnue-2027-1007').checkedAt, '2026-10-07');
-    const changes = [d => d.educationYear = 2028, d => d.sources[0].url = 'javascript:alert(1)', d => d.sources[0].checkedAt = '2026-10-12', d => d.sources[0].checkedAt = '2026-02-30', d => d.institutions[0].source = '없는 출처', d => d.courses[0].grades = [7], d => d.courses.push(d.courses[0]), d => d.events[0].end = '2026-10-01', d => d.admissions[0].year = 2026];
+    const changes = [d => d.educationYear = 2028, d => d.sources[0].url = 'javascript:alert(1)', d => d.sources[0].checkedAt = '2026-10-13', d => d.sources[0].checkedAt = '2026-02-30', d => d.institutions[0].source = '없는 출처', d => d.courses[0].grades = [7], d => d.courses.push(d.courses[0]), d => d.events[0].end = '2026-10-01', d => d.admissions[0].year = 2026];
     for (const mutate of changes) { const copy = structuredClone(data); mutate(copy); assert.throws(() => catalog.validate(copy)); }
   });
   await test('한국시간 접수 시작·마감 경계와 미확정 마감 시각', () => {
@@ -146,6 +146,40 @@ async function test(name, fn) { await fn(); console.log('통과:', name); count+
     assert.match(data.directory.find(i => i.id === 'jn-25908').limits, /예술의 인접지역/);
     assert.match(data.directory.find(i => i.id === 'jn-ged').limits, /모든 운영기관 명부는 아님/);
     assert.equal(data.courses.length, 21);
+  });
+  await test('GED 밖 공식 요강과 설립 공지는 접수·학년·확인 범위를 구분', () => {
+    const ks = data.directory.find(i => i.id === 'ksnu');
+    assert.match(ks.process, /GED 접수 불인정/);
+    assert.match(ks.target, /현재 전북 소재 학교 초5/);
+    assert.match(ks.limits, /10\/13 우체국 소인/);
+    assert.equal(ks.events.find(e => e.kind === '원서').end, '2026-10-13');
+    assert.equal(ks.events.find(e => e.kind === '시험').start, '2026-10-17T14:00');
+    const planned = data.directory.find(i => i.id === 'kentech');
+    assert.deepEqual(planned.events, []);
+    assert.match(planned.target, /미확인/);
+    const security = data.directory.find(i => i.id === 'mokpo-security');
+    assert.deepEqual(security.events, []);
+    assert.equal(data.sources.find(s => s.id === security.source).status, '전년도 참고');
+    assert.match(security.target, /2027.*확인 필요/);
+    for (const id of ['mokpo-office', 'yeosu-office', 'naju-office']) {
+      const entry = data.directory.find(i => i.id === id);
+      assert.deepEqual(entry.events, []);
+      assert.match(entry.target, /2027.*미확인/);
+      assert.equal(data.sources.find(s => s.id === entry.source).status, '전년도 참고');
+    }
+    const je = data.directory.find(i => i.id === 'jeongeup');
+    assert.match(je.target, /본원 초6 수료예정/);
+    assert.equal(je.events.find(e => e.kind === '면접').end, '2026-12-05T14:00');
+    const gim = data.directory.find(i => i.id === 'gimje');
+    assert.match(gim.limits, /자동진급 6명을 제외한 9명/);
+    assert.equal(gim.events.find(e => e.kind === '면접').end, '2026-12-05T13:30');
+    const art = data.admissions.find(a => a.institution === 'art');
+    assert.match(art.target, /미디어아트 중1~3.*문예창작 중1~2/);
+    assert.doesNotMatch(art.restrictions, /학년 표 상충/);
+    assert.ok(data.sources.some(s => s.id === 'gw-art-hwp-1011'));
+    const fake = structuredClone(data);
+    fake.sources.find(s => s.id === 'ksnu-2027-1012').url = 'https://kunsan.gidea.co.kr.evil.example/';
+    assert.throws(() => catalog.validate(fake));
   });
   console.log('새 공개 안내:', count, '개 통과');
 })().catch(error => { console.error(error); process.exitCode = 1; });
