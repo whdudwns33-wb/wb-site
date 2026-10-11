@@ -519,3 +519,53 @@ test('purchaseAssignments splits long lists and returns nothing without a staff 
   assert.deepEqual(core.purchaseAssignments(many, need(), '', '2026-09-09'), { assignments: [] });
   assert.deepEqual(core.purchaseAssignments([], need(), '담당', '2026-09-09'), { assignments: [] });
 });
+
+/* ── 문서 ↔ 코드 대조 ──
+   docs/자료-폴더-표준.md 가 "이 표와 그쪽이 어긋나면 코드가 맞다(테스트가 둘을 대조한다)" 고
+   적어 두는데, 그 테스트가 없었다. 그래서 naesin/README.md 의 비상 코드가 `visang-` 으로
+   어긋난 채 1년을 살았다 — 원장이 폴더 이름을 그 표에서 베끼므로, 표가 틀리면 팩 id 가 갈라진다.
+   없는 관문을 있다고 적어 두는 것이 드리프트의 원인이었으니 여기서 관문을 실제로 만든다. */
+const fs = require('node:fs');
+const path = require('node:path');
+const REPO = path.join(__dirname, '..', '..');
+const readDoc = (p) => fs.readFileSync(path.join(REPO, p), 'utf8');
+/* 표 안의 `코드` 만 — 지면의 packId 예시(`2022-…`)·경로는 빼고 교과서 코드 꼴만 센다 */
+function codesInTables(text) {
+  const out = new Set();
+  text.split(/\r?\n/).forEach((line) => {
+    if (!line.trim().startsWith('|')) return;
+    for (const m of line.matchAll(/`([a-z][a-z0-9]*(?:-[a-z0-9]+)+)`/g)) {
+      if (!/^\d/.test(m[1])) out.add(m[1]);
+    }
+  });
+  return out;
+}
+function slice(text, from, to) {
+  const a = text.indexOf(from); assert.ok(a >= 0, '문서에서 ' + from + ' 를 못 찾았다 — 표가 옮겨졌나?');
+  const b = text.indexOf(to, a); assert.ok(b > a, '문서에서 ' + to + ' 를 못 찾았다');
+  return text.slice(a, b);
+}
+
+test('docs/자료-폴더-표준.md 의 영어 교과서 표가 TEXTBOOKS 와 같다 (코드·학년 둘 다)', () => {
+  const doc = readDoc('docs/자료-폴더-표준.md');
+  const section = slice(doc, '*영어(`naesin/`)*', '**비상은 `bisang` 하나로 쓴다**');
+  const codes = codesInTables(section);
+  assert.deepEqual([...codes].sort(), Object.keys(core.TEXTBOOKS).sort(),
+    'docs/자료-폴더-표준.md 의 코드 목록이 TEXTBOOKS 와 다르다');
+  /* 학년 열까지 본다 — 개정은 학년에서 유도하므로 학년이 틀리면 packId 의 개정 연도가 틀린다 */
+  const GRADE = { 중1: 'm1', 중2: 'm2', 중3: 'm3' };
+  section.split(/\r?\n/).forEach((line) => {
+    const m = line.match(/^\|[^|]*\|\s*`([a-z][a-z0-9-]+)`\s*\|([^|]*)\|/);
+    if (!m) return;
+    const want = m[2].trim().split('·').map((g) => GRADE[g.trim()]).filter(Boolean);
+    assert.deepEqual(core.TEXTBOOKS[m[1]].grades.slice().sort(), want.slice().sort(),
+      m[1] + ' 의 학년이 문서와 코드에서 다르다');
+  });
+});
+
+test('naesin/README.md 의 교과서 코드표도 같은 19종이다 — 원장이 폴더 이름을 여기서 베낀다', () => {
+  const readme = readDoc('naesin/README.md');
+  const section = slice(readme, '*2022 개정 — 중1·중2 (10종)*', '`2022-ne-kimgitaek-m2-L6`');
+  assert.deepEqual([...codesInTables(section)].sort(), Object.keys(core.TEXTBOOKS).sort(),
+    'naesin/README.md 의 코드표가 TEXTBOOKS 와 다르다 — 비상은 bisang 하나다');
+});
