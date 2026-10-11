@@ -1048,6 +1048,7 @@ function renderTrialHome(){
     '<p class="tiny" style="margin:0 4px">체험 중 힌트를 보면 "도움 받고 해결"로 따로 세요. 몇 문제로 능력이나 원인을 판정하지 않아요.</p>';
   app.querySelectorAll('[data-topic]').forEach(function(b){ b.onclick=function(){ startTrial(b.getAttribute('data-topic')); }; });
 }
+function linkBtn(k,label){ var u=(window.WB_LINKS||{})[k]; if(u&&/^https?:\/\//.test(u)) return '<a class="btn ghost" id="'+k+'" href="'+esc(u)+'" target="_blank" rel="noopener" style="display:inline-grid;place-items:center;text-decoration:none">'+label+'</a>'; return '<button class="btn ghost" id="'+k+'">'+label+'</button>'; }
 function renderTrialResult(){
   var ses=run.ses, tp=ses.topic, res=run.done.results, first=0, helped=0, touched=0, again=[];
   res.forEach(function(r,i){ if(r.skipped) touched++; else if(r.ok&&!r.help) first++; else if(r.ok||r.retry) helped++; if(!r.ok||r.help||r.skipped){ var E=r.ok?[]:CALC.diagnose(ses.problems[i],r.given); again.push(E.length?CALC.ETYPES[E[0]].card:ses.problems[i].text.replace(' = □','')); } });
@@ -1055,16 +1056,18 @@ function renderTrialResult(){
   var list=ses.problems.map(function(p,i){ var r=res[i], ok=r.ok&&!r.skipped; return '<div class="it'+(ok?'':' bad')+'"><div>'+(ok?circle():star())+'</div><div><span class="n num">'+(i+1)+'.</span><span class="num" style="font-weight:600;font-size:1.1rem">'+esc(p.text.replace(' = □',''))+' = '+(ok?p.ans:'□')+'</span> '+(r.help?'<span class="tagx">힌트 봄</span>':'')+(r.retry?'<span class="tagx">고쳐서 맞음</span>':'')+(r.skipped?'<span class="tagx">만져 봄</span>':'')+'</div></div>'; }).join('');
   app.innerHTML='<div class="sheet"><p class="eyebrow">체험 결과 · '+esc(tp.name)+'</p><h2 class="num">처음에 맞힘 '+first+' · 도움 받고 해결 '+helped+(touched?' · 만져 봄 '+touched:'')+'</h2><div class="res" style="margin-top:12px">'+list+'</div></div>'+
     '<div class="card"><p class="eyebrow">이번 체험에서 본 학습 모습</p><div class="kv" style="margin-top:6px"><b>잘한 점</b><span>'+esc(good)+'</span><b>다시 살펴볼 부분</b><span>'+(again.length?esc(again.filter(function(v,i,a){return a.indexOf(v)===i;}).slice(0,2).join(' · ')):'지금은 없어요. 숫자를 바꿔 한 번 더 해 보면 좋아요.')+'</span><b>집에서 한 가지</b><span>'+esc(tp.home)+'</span></div><p class="tiny" style="margin-top:8px">몇 문제로 아이의 능력이나 원인을 판정하지 않아요. 검사 권유도 하지 않아요.</p></div>'+
-    '<div class="sheet"><div class="row" style="justify-content:space-between"><b>학부모 안내</b><button class="btn ghost" id="parent" style="min-height:44px">'+(run.parentOpen?'닫기':'보기')+'</button></div>'+(run.parentOpen?'<div style="margin-top:10px"><p class="small"><b>WB가 보는 법.</b> 틀린 답에서 "왜 그랬는지"를 봐요. 예를 들어 52−38을 26이라고 쓰면 "큰 수에서 작은 수를 뺐어요"예요. 그 한 가지만 짧게 연습하고, 며칠 뒤 숫자를 바꿔 다시 확인해요.</p><p class="small" style="margin-top:6px"><b>집에서 돕는 법.</b> '+esc(tp.home)+' 시간을 재지 말고, 틀리면 정답을 보여 주고 한 번 더 적게 해 주세요.</p><div class="row" style="margin-top:10px"><button class="btn ghost" id="material">관련 글 · 활동지 받기</button><button class="btn ghost" id="consult">상담 안내 보기</button></div><p class="tiny" style="margin-top:6px">체험판에서는 아무 데도 보내지 않아요(눌린 수만 운영 현황에 세요). 연락처는 받지 않아요.</p></div>':'')+'</div>'+
+    '<div class="sheet"><div class="row" style="justify-content:space-between"><b>학부모 안내</b><button class="btn ghost" id="parent" style="min-height:44px">'+(run.parentOpen?'닫기':'보기')+'</button></div>'+(run.parentOpen?'<div style="margin-top:10px"><p class="small"><b>WB가 보는 법.</b> 틀린 답에서 "왜 그랬는지"를 봐요. 예를 들어 52−38을 26이라고 쓰면 "큰 수에서 작은 수를 뺐어요"예요. 그 한 가지만 짧게 연습하고, 며칠 뒤 숫자를 바꿔 다시 확인해요.</p><p class="small" style="margin-top:6px"><b>집에서 돕는 법.</b> '+esc(tp.home)+' 시간을 재지 말고, 틀리면 정답을 보여 주고 한 번 더 적게 해 주세요.</p><div class="row" style="margin-top:10px">'+linkBtn('material','관련 글 · 활동지 받기')+linkBtn('consult','상담 안내 보기')+'</div><p class="tiny" style="margin-top:6px">'+((window.WB_LINKS||{}).material||(window.WB_LINKS||{}).consult?'버튼을 누르면 학원 페이지가 새 창에서 열려요. 눌린 수만 운영 현황에 세고, 연락처는 받지 않아요.':'체험판에서는 아무 데도 보내지 않아요(눌린 수만 운영 현황에 세요). 연락처는 받지 않아요.')+'</p></div>':'')+'</div>'+
     '<div class="sheet actions"><button class="btn" id="again">다른 주제 체험</button><button class="btn ghost" id="retry">같은 주제 다시(숫자 바뀜)</button></div>';
   $('#parent').onclick=function(){ if(!run.parentOpen){ ops('parent',tp.id); } run.parentOpen=!run.parentOpen; renderTrialResult(); };
-  var mb=$('#material'); if(mb) mb.onclick=function(){ ops('material',tp.id); mb.textContent='신청됐어요(체험판)'; mb.disabled=true; };
-  var cb=$('#consult'); if(cb) cb.onclick=function(){ ops('consult',tp.id); cb.textContent='안내를 봤어요(체험판)'; cb.disabled=true; };
+  var mb=$('#material'); if(mb) mb.onclick=function(){ ops('material',tp.id); if(mb.tagName==='BUTTON'){ mb.textContent='신청됐어요(체험판)'; mb.disabled=true; } };
+  var cb=$('#consult'); if(cb) cb.onclick=function(){ ops('consult',tp.id); if(cb.tagName==='BUTTON'){ cb.textContent='안내를 봤어요(체험판)'; cb.disabled=true; } };
   $('#again').onclick=function(){ run=null; go('trialHome'); };
   $('#retry').onclick=function(){ startTrial(tp.id); };
 }
 /* ---------- 부팅 ---------- */
 load();
+window.WB_LINKS=window.WB_LINKS||{};
+if(PUBLIC){ try{ fetch('links.json',{cache:'no-store'}).then(function(r){ return r.ok?r.json():null; }).then(function(j){ if(j&&typeof j==='object'){ window.WB_LINKS=j; if(view==='trialResult') render(); } }).catch(function(){}); }catch(e){} }
 if(!PUBLIC) connectDb(); else { var bd=$('.brand'); if(bd) bd.innerHTML='<i></i> WB 학습실 · 연산 체험 <span class="tiny">가칭 · WB 독해력학원</span>'; }
 $('#stuSel').onchange=function(){ DB.cur=this.value; teaStu=DB.cur; run=null; save(); view='home'; render(); };
 $('#mStu').onclick=function(){ DB.mode='stu'; run=null; view='home'; save(); render(); };
