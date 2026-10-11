@@ -150,6 +150,9 @@ function naesinStore(env) {
     deletePack: (id) => env.DB.delete('naesin:pack:' + id),
     getPackIds: () => env.DB.get('naesin:packs', 'json'),
     putPackIds: (ids) => env.DB.put('naesin:packs', JSON.stringify(ids)),
+    /* 학생 → 교과서 코드 (naesin:books). 학교를 기록하지 않는 이유는 server.mjs 쪽 주석과 같다. */
+    getBooks: () => env.DB.get('naesin:books', 'json'),
+    putBooks: (map) => env.DB.put('naesin:books', JSON.stringify(map)),
     getState: (c) => env.DB.get('naesin:state:' + c, 'json'),
     putState: (c, rec) => env.DB.put('naesin:state:' + c, JSON.stringify(rec)),
     listStateCodes: async () => (await kvListAll(env, 'naesin:state:')).map(k => k.slice('naesin:state:'.length)),

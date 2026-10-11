@@ -113,6 +113,12 @@ const naesinStore = {
   deletePack: (id) => { delete naesinRoot().packs[id]; persist(); },
   getPackIds: () => naesinRoot().packIds || null,
   putPackIds: (ids) => { naesinRoot().packIds = ids; persist(); },
+  /* 학생 → 교과서 코드 한 칸. 학교를 거치지 않는다 — 학교명은 개인정보 성격이 있고(절대 규칙 1),
+     desk 자료원장이 이미 학교↔교과서↔학년↔과를 '구매 범위'로 들고 있어 같은 이름의 다른 사실을
+     두 곳에 두면 갈라진다. 학생 레코드가 아니라 내신 전용 자리에 두는 이유는 /api/admin/students
+     POST 가 구조분해한 키만 명시 기록해서(server.mjs 의 그 자리), 거기 끼우면 다른 수정 한 번에 날아간다. */
+  getBooks: () => naesinRoot().books || null,
+  putBooks: (map) => { naesinRoot().books = map; persist(); },
   getState: (c) => naesinRoot().states[c] || null,
   putState: (c, rec) => { naesinRoot().states[c] = rec; persist(); },
   listStateCodes: () => Object.keys(naesinRoot().states),
