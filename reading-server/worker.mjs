@@ -260,6 +260,7 @@ function naesinKoStore(env) {
     putPending: (id, rec) => env.DB.put('naesinko:pending:' + id, JSON.stringify(rec)),
     getState: (c) => env.DB.get('naesinko:state:' + c, 'json'),
     putState: (c, rec) => env.DB.put('naesinko:state:' + c, JSON.stringify(rec)),
+    listStateCodes: async () => (await kvListAll(env, 'naesinko:state:')).map(k => k.slice('naesinko:state:'.length)),
     getSummary: (c) => env.DB.get('naesinko:summary:' + c, 'json'),
     putSummary: (c, rec) => env.DB.put('naesinko:summary:' + c, JSON.stringify(rec)),
     listSummaryCodes: async () => (await kvListAll(env, 'naesinko:summary:')).map(k => k.slice('naesinko:summary:'.length)),

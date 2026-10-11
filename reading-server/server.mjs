@@ -229,6 +229,7 @@ const naesinKoStore = {
   putPending: (id, rec) => { const r = naesinKoRoot(); r.pendings = r.pendings || {}; r.pendings[id] = rec; persist(); },
   getState: (c) => naesinKoRoot().states[c] || null,
   putState: (c, rec) => { naesinKoRoot().states[c] = rec; persist(); },
+  listStateCodes: () => Object.keys(naesinKoRoot().states),
   getSummary: (c) => naesinKoRoot().summaries[c] || null,
   putSummary: (c, rec) => { naesinKoRoot().summaries[c] = rec; persist(); },
   listSummaryCodes: () => Object.keys(naesinKoRoot().summaries),
