@@ -9,7 +9,6 @@
   const compact = value => text(value).replace(/\s+/g, '');
   const digits = value => String(value == null ? '' : value).replace(/\D/g, '');
   const mobile = value => /^01[016789]\d{7,8}$/.test(digits(value));
-  const MANUAL_NAME_REVIEW = new Set(['김예린']);
 
   function xmlText(value) {
     return String(value || '').replace(/<[^>]+>/g, '')
@@ -131,9 +130,14 @@
       const key = compact(source.name).toLocaleLowerCase('ko');
       const linkedStudentId = linkMap.get(text(source.externalStudentNo)) || '';
       const linkedStudent = linkedStudentId ? byId.get(linkedStudentId) : null;
-      const manualNameReview = MANUAL_NAME_REVIEW.has(compact(source.name));
+      /* 동명이인은 명부에서 유도한다 — 한때 특정 학생 이름을 코드에 박아 두었는데, 공개 저장소에
+         실명을 두는 것이고(절대 규칙 1) 원장이 기억한 한 명만 걸러서 나머지는 그대로 통과했다.
+         명부에 같은 이름이 둘 이상이면 **학년으로 하나로 좁혀져도** 직접 확인 대상으로 남긴다:
+         아카플로우 쪽 학년이 비었거나 한쪽만 올라와 있으면 좁혀진 한 명이 그 사람이 아닐 수 있다. */
+      const sameName = byName.get(key) || [];
+      const manualNameReview = sameName.length > 1;
       const candidates = linkedStudent ? [linkedStudent]
-        : (byName.get(key) || []).filter(student => gradeMatches(source, student.grade));
+        : sameName.filter(student => gradeMatches(source, student.grade));
       let status = 'unmatched', student = null, currentContact = null;
       if (!mobile(source.phone)) status = 'invalid_phone';
       else if (linkedStudentId && !linkedStudent) status = 'link_orphan';
@@ -168,5 +172,5 @@
     return { entries, counts };
   }
 
-  return { parseSpreadsheetText, buildPreview, maskPhone, mobile, digits, MANUAL_NAME_REVIEW };
+  return { parseSpreadsheetText, buildPreview, maskPhone, mobile, digits };
 });

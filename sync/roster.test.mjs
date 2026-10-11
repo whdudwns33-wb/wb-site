@@ -480,7 +480,7 @@ test('minimal student deletion fails closed for extra profile data or any stable
   const create = async (expectedUpdatedAt, name, extra = {}) => await call(db, {
     auth: admin, action: 'student_create', expectedUpdatedAt,
     student: {
-      id: 'ignored-by-server', name, school: '치평초', grade: '초3', teacher: '', subject: '',
+      id: 'ignored-by-server', name, school: '나초', grade: '초3', teacher: '', subject: '',
       start: '2026-08', end: '', reason: '', entryType: 'new', teacherIds: [], ...extra
     }
   });
@@ -857,19 +857,19 @@ test('same-name students are separated by school and grade, then by parent conta
     auth: admin, action: 'student_create', expectedUpdatedAt: current.body.updatedAt,
     student: { id: 'client-id', teacher: '', subject: '', start: '2026-08', end: '', reason: '', teacherIds: [], ...student }
   });
-  const first = await create({ name: '김예린', school: '초', grade: '6', phoneMother: '010-1111-1111' });
+  const first = await create({ name: '나학생', school: '초', grade: '6', phoneMother: '010-1111-1111' });
   assert.equal(first.status, 200);
   current = first;
-  const second = await create({ name: '김예린', school: '치평초', grade: '3', phoneMother: '010-2222-2222' });
+  const second = await create({ name: '나학생', school: '나초', grade: '3', phoneMother: '010-2222-2222' });
   assert.equal(second.status, 200);
   current = second;
-  const third = await create({ name: '김예린', school: '치평초', grade: '3', phoneMother: '010-3333-3333' });
+  const third = await create({ name: '나학생', school: '나초', grade: '3', phoneMother: '010-3333-3333' });
   assert.equal(third.status, 200);
   current = third;
-  const duplicate = await create({ name: '김예린', school: '치평초', grade: '3', phoneMother: '010-3333-3333' });
+  const duplicate = await create({ name: '나학생', school: '나초', grade: '3', phoneMother: '010-3333-3333' });
   assert.equal(duplicate.status, 409);
   assert.equal(duplicate.body.code, 'STUDENT_ALREADY_EXISTS');
-  const ambiguousWithoutPhone = await create({ name: '김예린', school: '치평초', grade: '3' });
+  const ambiguousWithoutPhone = await create({ name: '나학생', school: '나초', grade: '3' });
   assert.equal(ambiguousWithoutPhone.status, 409);
   assert.equal(ambiguousWithoutPhone.body.code, 'STUDENT_ALREADY_EXISTS');
 });
