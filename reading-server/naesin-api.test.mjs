@@ -13,6 +13,7 @@ const t = async (name, fn) => { await fn(); passed += 1; console.log('  ✓ ' + 
 function memStore() {
   const packs = {}, states = {}, exams = {}, tasks = {}, results = {}, reports = {}, live = {}, votes = {};
   let packIds = null;
+  let books = null;
   const students = { 'st-1': { code: 'st-1', name: '김지우', cls: '중2 A반' }, 'st-2': { code: 'st-2', name: '박서준', cls: '중2 A반' } };
   return {
     getPack: (id) => packs[id] || null,
@@ -20,6 +21,8 @@ function memStore() {
     deletePack: (id) => { delete packs[id]; },
     getPackIds: () => packIds,
     putPackIds: (ids) => { packIds = ids; },
+    getBooks: () => books,
+    putBooks: (m) => { books = m; },
     getState: (c) => states[c] || null,
     putState: (c, rec) => { states[c] = rec; },
     listStateCodes: () => Object.keys(states),
@@ -95,6 +98,8 @@ await t('학생이 관리자 라우트를 부르면 403', async () => {
     ['/api/naesin/admin/exam', 'DELETE'],
     ['/api/naesin/admin/exams', 'GET'],
     ['/api/naesin/admin/overview', 'GET'],
+    ['/api/naesin/admin/books', 'GET'],
+    ['/api/naesin/admin/books', 'PUT'],
   ]) {
     const r = await call(store, { path, method });
     assert.strictEqual(r.status, 403, path + ' ' + method + ' — 학생에게 열리면 안 된다');
@@ -1069,6 +1074,45 @@ await t('naesinNightDueFor — 저장소에서 읽어 같은 판정을 한다', 
   await st.putState('abcd', sumRec(10, 10, 5, 5, '2026-09-19T10:00:00Z'));
   assert.strictEqual((await naesinNightDueFor(st, 'abcd', PUSH_NOW)).due, false);
   assert.strictEqual((await naesinNightDueFor(null, 'abcd', PUSH_NOW)).reason, 'no-store', '어댑터가 없어도 던지지 않는다');
+});
+
+await t('교과서 지정 — 저장·되읽기, 빈 값은 해제, 래핑 계약(books 키)', async () => {
+  const store = memStore();
+  const empty = await call(store, { path: '/api/naesin/admin/books', who: ADMIN });
+  assert.deepStrictEqual(empty.body.books, {}, '아무것도 없으면 빈 객체 — null 을 내보내면 화면이 터진다');
+
+  const put = await call(store, { path: '/api/naesin/admin/books', method: 'PUT', who: ADMIN,
+    getBody: async () => ({ books: { 'wb-001': 'ne-kimgitaek', 'wb-002': 'bisang-hwangjongbae', 'wb-003': '' } }) });
+  assert.strictEqual(put.status, 200);
+  assert.deepStrictEqual(put.body.books, { 'wb-001': 'ne-kimgitaek', 'wb-002': 'bisang-hwangjongbae' },
+    '빈 값은 지정 해제 — 잘못 넣은 학생을 되돌릴 길이 있어야 한다');
+  assert.strictEqual(put.body.count, 2);
+
+  const got = await call(store, { path: '/api/naesin/admin/books', who: ADMIN });
+  assert.deepStrictEqual(got.body.books, put.body.books, '되읽기가 같아야 한다');
+});
+
+await t('교과서 지정 — 형식이 틀린 줄은 전부 거절하고 저장하지 않는다', async () => {
+  const store = memStore();
+  await call(store, { path: '/api/naesin/admin/books', method: 'PUT', who: ADMIN,
+    getBody: async () => ({ books: { 'wb-001': 'ne-kimgitaek' } }) });
+  for (const bad of [
+    { 'wb-001': 'NE-Kimgitaek' },        // 대문자 — packId 가운데 조각은 소문자다
+    { 'wb-001': 'ne kimgitaek' },        // 공백
+    { 'wb-001': 'ne_kimgitaek' },        // 밑줄
+    { 'wb-001': '-ne-kimgitaek' },       // 하이픈으로 시작
+    { 'bad code': 'ne-kimgitaek' },      // 학생 코드 형식 아님
+  ]) {
+    const r = await call(store, { path: '/api/naesin/admin/books', method: 'PUT', who: ADMIN, getBody: async () => ({ books: bad }) });
+    assert.strictEqual(r.status, 400, JSON.stringify(bad));
+    assert.ok(Array.isArray(r.body.errors) && r.body.errors.length, '무엇이 틀렸는지 줄 단위로 알려 준다');
+  }
+  /* 거절된 PUT 이 기존 지정을 지우지 않았는지 — 부분 저장이 더 나쁘다 */
+  const got = await call(store, { path: '/api/naesin/admin/books', who: ADMIN });
+  assert.deepStrictEqual(got.body.books, { 'wb-001': 'ne-kimgitaek' }, '실패한 PUT 은 아무것도 바꾸지 않는다');
+
+  const nob = await call(store, { path: '/api/naesin/admin/books', method: 'PUT', who: ADMIN, getBody: async () => ({}) });
+  assert.strictEqual(nob.status, 400, 'books 가 없으면 400');
 });
 
 console.log('\n통과 ' + passed + '개 — naesin-api 서버 라우트 검증 완료');

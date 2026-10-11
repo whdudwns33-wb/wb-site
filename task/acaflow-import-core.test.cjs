@@ -87,15 +87,18 @@ test('학생번호가 삭제된 WB 학생을 가리키면 이름으로 재추정
   assert.equal(preview.entries[0].studentId, '');
 });
 
-test('김예린을 제외한 고유 이름·학년 일치는 자동 연결하고 김예린은 확인 대상으로 남긴다', () => {
+test('명부에 이름이 하나뿐이면 자동 연결하고, 동명이인은 학년으로 좁혀져도 확인 대상으로 남긴다', () => {
+  /* 동명이인 판정은 명부에서 유도한다 — 실명을 코드에 박지 않는다(절대 규칙 1).
+     '나학생' 은 명부에 중1·고1 둘이라, 학년이 중1 하나로 좁혀져도 자동 연결하지 않는다:
+     아카플로우 쪽 학년이 비었거나 한쪽만 올라와 있으면 그 한 명이 그 사람이 아닐 수 있다. */
   const roster = [
     { id: 's1', name: '가학생', grade: '중1' },
-    { id: 's2', name: '김예린', grade: '중1' },
-    { id: 's3', name: '김예린', grade: '고1' }
+    { id: 's2', name: '나학생', grade: '중1' },
+    { id: 's3', name: '나학생', grade: '고1' }
   ];
   const rows = [
     { sourceRow: 2, name: '가학생', grade: '1', school: '예시중', phone: '01011112222' },
-    { sourceRow: 3, name: '김예린', grade: '중1', school: '', phone: '01033334444' }
+    { sourceRow: 3, name: '나학생', grade: '중1', school: '', phone: '01033334444' }
   ];
   const preview = core.buildPreview(rows, roster, new Map());
   assert.equal(preview.entries[0].studentId, 's1');
@@ -104,6 +107,32 @@ test('김예린을 제외한 고유 이름·학년 일치는 자동 연결하고
   assert.equal(preview.entries[1].studentId, '');
   assert.equal(preview.entries[1].status, 'ambiguous');
   assert.equal(preview.entries[1].manualNameReview, true);
+});
+
+test('동명이인이면 같은 학년이어도, 어느 이름이든 확인 대상이다 — 외워 둔 한 명만 걸러선 안 된다', () => {
+  /* 한때 이 판정이 코드에 박힌 이름 하나였다. 그래서 **그 이름이 아닌** 동명이인은
+     그대로 자동 연결됐다 — 엉뚱한 가정에 학부모 연락처가 붙는 경로다. 명부에서 유도하면
+     원장이 기억하지 못한 동명이인까지 전부 걸린다. 이 테스트가 그 회귀를 막는다. */
+  const roster = [
+    { id: 's1', name: '다학생', grade: '중2' },
+    { id: 's2', name: '다학생', grade: '중2' }
+  ];
+  const preview = core.buildPreview(
+    [{ sourceRow: 2, name: '다학생', grade: '중2', school: '', phone: '01055556666' }],
+    roster, new Map()
+  );
+  assert.equal(preview.entries[0].status, 'ambiguous');
+  assert.equal(preview.entries[0].manualNameReview, true);
+  assert.equal(preview.entries[0].studentId, '');
+});
+
+test('명부에 이름이 하나뿐이면 동명이인 표시를 달지 않는다 — 거짓 확인 요청을 만들지 않는다', () => {
+  const preview = core.buildPreview(
+    [{ sourceRow: 2, name: '가학생', grade: '중1', school: '', phone: '01011112222' }],
+    [{ id: 's1', name: '가학생', grade: '중1' }], new Map()
+  );
+  assert.equal(preview.entries[0].manualNameReview, false);
+  assert.equal(preview.entries[0].studentId, 's1');
 });
 
 test('이름이 같아도 학년이 비어 있거나 다른 학교급이면 자동 연결하지 않는다', () => {
@@ -117,10 +146,12 @@ test('이름이 같아도 학년이 비어 있거나 다른 학교급이면 자�
   assert.deepEqual(preview.entries.map(row => row.studentId), ['', '']);
 });
 
-test('김예린도 이미 확정된 아카플로우 학생번호 연결은 유지한다', () => {
+test('동명이인도 이미 확정된 아카플로우 학생번호 연결은 유지한다', () => {
+  /* 학생번호로 확정된 연결은 이름 중복보다 세다 — 매번 다시 확인하라고 하면 쓸 수 없다 */
   const preview = core.buildPreview(
-    [{ sourceRow: 2, externalStudentNo: 'YE-1', name: '김예린', grade: '중1', school: '', phone: '01011112222' }],
-    [{ id: 's1', name: '김예린', grade: '중1' }], new Map(), new Map([['YE-1', 's1']])
+    [{ sourceRow: 2, externalStudentNo: 'NA-1', name: '나학생', grade: '중1', school: '', phone: '01011112222' }],
+    [{ id: 's1', name: '나학생', grade: '중1' }, { id: 's2', name: '나학생', grade: '고1' }],
+    new Map(), new Map([['NA-1', 's1']])
   );
   assert.equal(preview.entries[0].studentId, 's1');
   assert.equal(preview.entries[0].linkedByStudentNo, true);
