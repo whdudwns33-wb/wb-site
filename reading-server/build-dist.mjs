@@ -54,6 +54,8 @@ fs.copyFileSync(SHARED, path.join(DIST, 'voice.js'));
 fs.copyFileSync(SHARED, path.join(DIST, 'vocab', 'voice.js'));
 /* QR 인코더 — 관리 웹이 학생 연동 QR을 그린다. CSP가 'self'만 허용해 CDN을 못 쓴다. */
 fs.copyFileSync(path.join(ROOT, '..', 'shared', 'qr.js'), path.join(DIST, 'admin', 'qr.js'));
+/* 팩 커버리지 순수 로직 — 관리 웹 전용이라 학생 앱 dist 에는 싣지 않는다(학생이 명부를 볼 일이 없다) */
+fs.copyFileSync(path.join(ROOT, '..', 'naesin', 'coverage.js'), path.join(DIST, 'admin', 'coverage.js'));
 
 /* 내신브레인 (naesin/) — 같은 오리진 /naesin/ 에서 서빙해야 학생 코드·API가 공유된다.
    팩 콘텐츠(구매 자료)는 dist에 싣지 않는다 — KV에만 산다(기획서 §9.3).

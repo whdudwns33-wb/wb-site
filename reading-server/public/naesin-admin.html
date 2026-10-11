@@ -19,6 +19,7 @@
     h3{margin:12px 0 6px;color:var(--navy);font-size:14px}
     button{font:inherit;cursor:pointer}
     input,select{font:inherit;min-height:42px;padding:0 10px;border:1.5px solid #bfd7e1;border-radius:10px;background:#fff;color:var(--ink)}
+    textarea{font:13px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;width:100%;min-height:150px;padding:8px 10px;border:1.5px solid #bfd7e1;border-radius:10px;background:#fff;color:var(--ink);resize:vertical}
     .btn{min-height:42px;padding:6px 16px;border:0;border-radius:10px;background:var(--blue);color:#fff;font-weight:900}
     .btn.ghost{background:#fff;border:1.5px solid #bfd7e1;color:var(--navy)}
     .btn.sm{min-height:32px;padding:3px 10px;font-size:12.5px}
@@ -105,6 +106,7 @@
 <div class="banner" id="banner" role="alert" hidden><span id="bannerMsg"></span><span class="sp"></span><button class="btn sm ghost" id="bannerRetry">다시 시도</button></div>
 <main id="app"></main>
 <script src="/admin/admin-login.js"></script>
+<script src="/admin/coverage.js"></script>
 <script>
 'use strict';
 /* WB 내신브레인 관리 웹 — 원장·강사용.
@@ -117,6 +119,9 @@ const $=s=>document.querySelector(s);
 const esc=t=>String(t==null?'':t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let TOKEN=localStorage.getItem('wbr.admin.token')||null;
 let OV=null,PACKS=[],FILTER='전체',TASK=null,EXAMS=null,ROSTER=[],REPORTS=null;
+/* 교과서 지정표(계약: /naesin/admin/books → {books}) — null 은 '아직 못 받았다'로 {} 와 구분한다.
+   BOOK_DRAFT 는 아직 저장 안 한 입력칸 내용 — 다른 카드가 다시 그려져도 치던 글이 날아가지 않게 한다. */
+let BOOKS=null,BOOK_DRAFT=null,BOOK_FLASH='';
 /* 시험 결과(계약 R2) — RESULTS=null 은 '아직 못 받았다'(라우트 없음·일시 오류)로, 빈 배열과 구분한다.
    RES_DRAFT 는 아직 저장 안 한 입력값('시험일|코드' → 칸별 문자열) — 한 행을 저장해 표를 다시 그려도
    옆자리 강사가 치던 다른 행의 점수가 날아가지 않게 한다. */
@@ -255,6 +260,7 @@ function ensureShell(){
     <div id="packPreview"></div>
     <div id="packList"></div>
   </div>
+  <section id="bookArea"></section>
   <section id="coverArea"></section>
   <section id="examArea"></section><section id="resultArea"></section><section id="analysisArea"></section>
   <section id="reportArea"></section>`;
@@ -264,7 +270,7 @@ function ensureShell(){
 function render(){
   $('#btnRefresh').hidden=false;$('#btnLogout').hidden=false;
   ensureShell();
-  renderOverview();renderTask();renderPackList();renderCoverage();renderExamForm();renderExamList();renderResults();renderAnalysis();renderReports();
+  renderOverview();renderTask();renderPackList();renderBooks();renderCoverage();renderExamForm();renderExamList();renderResults();renderAnalysis();renderReports();
 }
 
 /* ── 반 성취도 ── */
@@ -891,6 +897,128 @@ function renderRetry(msg){
     <p class="muted">로그인은 유지돼요. 연결을 확인한 뒤 다시 시도하세요.</p><button class="btn" id="btnRetry">다시 시도</button></div>`;
   $('#btnRetry').onclick=refresh;
 }
+/* ── 교과서별 자료 준비 ──
+   왜 아래 「팩 커버리지」와 따로 있는가: 그 카드는 **이미 등록된 시험**의 packIds 만 본다. 그래서
+   "시험을 등록하기도 전에 어느 교과서 자료부터 모아야 하는가" 라는 질문에 답하지 못한다. 그 답은
+   재원생이 실제로 쓰는 교과서에만 있고, 학생이 많은 (교과서·학년) 조합이 먼저 만들 팩이다.
+   학교를 묻지 않고 '학생 → 교과서' 한 칸만 두는 이유, 과를 단정하지 않는 이유는 naesin/coverage.js 머리말.
+   판정은 전부 그 모듈이 한다 — 여기서 다시 계산하면 학생 앱·테스트와 갈라진다. */
+const COV=(typeof WBNaesinCoverage!=='undefined')?WBNaesinCoverage:null;
+const GRADE_KO={m1:'중1',m2:'중2',m3:'중3',h1:'고1',h2:'고2',h3:'고3'};
+const gradeKo=g=>GRADE_KO[g]||String(g||'—');
+const UNSET_WHY={'no-book':'교과서 미지정','no-grade':'학년을 못 읽음'};
+/* 지정표 ↔ 입력칸. 한 줄에 한 명, '#' 뒤는 사람이 읽을 메모라 저장할 때 버린다.
+   명부 전체를 미리 깔아 주는 이유: 빈 칸이 곧 '아직 모르는 학생' 목록이라 따로 찾을 필요가 없다. */
+function booksToText(roster,books){
+  const b=books||{};
+  return (Array.isArray(roster)?roster:[]).map(s=>{
+    const memo=[s.name,s.grade,s.cls].map(x=>String(x==null?'':x).trim()).filter(Boolean).join(' · ');
+    const head=s.code+'  '+(b[s.code]||'');
+    return (memo?head.padEnd(32,' ')+'# '+memo:head);
+  }).join('\n');
+}
+function parseBooksText(text){
+  const map={},errors=[];
+  String(text==null?'':text).split(/\r?\n/).forEach((raw,i)=>{
+    const line=raw.replace(/#.*$/,'').trim();
+    if(!line)return;
+    const parts=line.split(/[\s,]+/).filter(Boolean);
+    const code=parts[0]||'',book=parts[1]||'';
+    if(parts.length>2)return errors.push((i+1)+'행: 한 줄에 학생 코드와 교과서 코드 둘만 적으세요.');
+    if(!/^[A-Za-z0-9-]{3,20}$/.test(code))return errors.push((i+1)+'행: 학생 코드 형식이 아니에요 — '+code);
+    if(book&&(!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(book)||book.length>40))
+      return errors.push((i+1)+'행: 교과서 코드는 소문자·숫자·하이픈이에요 (예 ne-kimgitaek) — '+book);
+    /* 같은 학생이 두 줄에 서로 다른 교과서로 나오면 어느 쪽이 맞는지 화면이 정할 일이 아니다 */
+    if(map[code]!=null&&map[code]!==book)return errors.push((i+1)+'행: '+code+' 가 두 번 나오는데 교과서가 달라요.');
+    map[code]=book;   /* 빈 값은 지정 해제 — 서버 PUT 도 같은 규약이다 */
+  });
+  return {map,errors};
+}
+function renderBooks(){
+  const el=$('#bookArea'); if(!el)return;
+  const head='<div class="card"><h2>교과서별 자료 준비 <small>재원생 교과서 ↔ 보유 팩</small></h2>';
+  /* 모듈이 없으면(배포본 복사 누락) 조용히 틀린 수를 그리지 않는다 — 화면이 왜 비었는지 말해 준다 */
+  if(!COV)return void(el.innerHTML=head+'<p class="muted">커버리지 모듈(<code>/admin/coverage.js</code>)을 불러오지 못했어요 — 배포본에서 빠졌을 수 있습니다.</p></div>');
+  if(!BOOKS)return void(el.innerHTML=head+'<p class="muted">교과서 지정표를 불러오지 못했어요 — 새로고침으로 다시 시도하세요.</p></div>');
+  const flash=BOOK_FLASH;BOOK_FLASH='';   /* 저장 알림은 한 번만 */
+  const rep=COV.report({roster:ROSTER,books:BOOKS,packs:PACKS,exams:EXAMS});
+  const empty=rep.combos.filter(c=>c.empty);
+  const noBook=rep.unset.filter(u=>u.why==='no-book');
+  let body;
+  if(!ROSTER.length){
+    body='<p class="muted">명부를 불러오지 못했어요 — 학생 목록이 없으면 교과서 조합을 셀 수 없습니다.</p>';
+  }else if(!rep.combos.length){
+    body='<p class="muted">아직 교과서를 지정한 학생이 없어요 — 아래 칸에 한 명씩 적으면 조합이 여기 쌓입니다.</p>';
+  }else{
+    body=`<div class="tbl"><table><thead><tr>
+      <th>교과서</th><th>학년</th><th>학생</th><th>보유 팩</th><th>먼저 만들 드라이브 폴더 이름</th></tr></thead><tbody>
+      ${rep.combos.map(c=>{
+        const names=c.names.slice(0,6).map(n=>esc(n.name||n.code)).join(', ')+(c.names.length>6?' … +'+num(c.names.length-6):'');
+        const packs=c.packs
+          ? `<span class="tag ok">${num(c.packs)}개</span> <span class="muted">${c.packIds.map(id=>esc(String(id).split('-').pop())).join(' ')}</span>`
+          : '<span class="tag bad">0개</span>';
+        /* 고등은 개정 연도를 아직 정하지 않아 접두사를 만들 수 없다 — 비워 두고 그렇게 말한다 */
+        const folder=c.folderPrefix
+          ? `<code>${esc(c.folderPrefix)}</code><span class="muted">L1 …</span>`
+          : '<span class="muted">개정 연도 미정 — 폴더 이름은 원장이 정합니다</span>';
+        return `<tr class="${c.empty?'hot':''}"><td><code>${esc(c.book)}</code></td><td>${esc(gradeKo(c.grade))}</td>
+          <td><b>${num(c.students)}명</b><br><span class="muted">${names}</span></td>
+          <td style="white-space:normal">${packs}</td>
+          <td style="white-space:normal">${folder}</td></tr>`;
+      }).join('')}</tbody></table></div>`;
+  }
+  const heads=[];
+  if(flash)heads.push(`<div class="issues ok">${esc(flash)}</div>`);
+  if(empty.length)heads.push(`<div class="issues bad"><b>학생이 있는데 팩이 없는 조합 ${num(empty.length)}개</b> — 이것이 먼저 만들 자료입니다. 드라이브에 이 이름으로 폴더를 만들고 과 번호를 붙이세요.
+    <div>${empty.map(c=>'<span class="tag bad">'+esc(c.folderPrefix||c.book+'-'+c.grade)+'</span> <span class="muted">'+num(c.students)+'명</span>').join(' · ')}</div></div>`);
+  if(rep.mismatches.length)heads.push(`<div class="issues bad"><b>배정된 팩이 학생의 교과서·학년과 다른 학생 ${num(rep.mismatches.length)}명</b> — 그 학생은 자기 교과서가 아닌 자료를 받고 있어요.
+    <div>${rep.mismatches.slice(0,8).map(m=>esc(m.name||m.code)+': '+m.bad.slice(0,3).map(b=>esc(b.packId)+' ('+(b.kind==='book'?'교과서 '+esc(b.want)+' 인데':'학년 '+esc(gradeKo(b.want))+' 인데')+' '+esc(b.kind==='book'?b.got:gradeKo(b.got))+')').join(', ')).join('<br>')}</div></div>`);
+  if(rep.unset.length)heads.push(`<div class="issues warn"><b>조합에 못 넣은 학생 ${num(rep.unset.length)}명</b> — ${['no-book','no-grade'].filter(w=>rep.unset.some(u=>u.why===w)).map(w=>esc(UNSET_WHY[w])+' '+num(rep.unset.filter(u=>u.why===w).length)+'명').join(' · ')}.
+    <div class="muted">${rep.unset.slice(0,20).map(u=>esc(u.name||u.code)).join(', ')}${rep.unset.length>20?' … +'+num(rep.unset.length-20):''}</div></div>`);
+  if(!heads.length&&rep.combos.length)heads.push('<div class="issues ok">재원생이 쓰는 교과서·학년 조합마다 팩이 있어요.</div>');
+  el.innerHTML=head+`<p class="muted">학생이 많은 조합부터 보여 줍니다 — <b>학생은 있는데 팩이 0개</b>인 조합이 먼저 만들 자료예요. <b>과(Lesson)는 여기서 판정하지 않습니다</b> — 어느 과가 시험 범위인지는 학교가 정하므로 아래 「팩 커버리지」가 봅니다. 교과서를 모르는 학생은 경고 대신 '보류'로 셉니다.</p>
+    ${heads.join('')}${body}
+    <h3>교과서 지정</h3>
+    <p class="muted">한 줄에 한 명 — <code>학생코드 교과서코드</code>, 모르면 교과서 칸을 비워 두세요. 교과서 코드는 팩 id 의 가운데 토큰이에요(<code>2022-<b>ne-kimgitaek</b>-m2-L6</code> → <code>ne-kimgitaek</code>). <code>#</code> 뒤는 메모라 저장하지 않습니다. <b>저장하면 이 칸의 내용이 지정표 전체가 됩니다</b> — 칸에서 지운 학생은 지정이 풀려요. 학교명은 적지 않습니다.</p>
+    <textarea id="bkText" spellcheck="false" aria-label="교과서 지정표"></textarea>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px">
+      <button class="btn" id="btnBooks"${ROSTER.length?'':' disabled'}>지정표 저장</button>
+      <button class="btn ghost sm" id="btnBooksReset">서버 값으로 되돌리기</button>
+      <span class="muted">지정된 학생 ${num(Object.keys(BOOKS).length)}명 / 명부 ${num(ROSTER.length)}명</span>
+    </div>
+    <div id="bkMsg"></div></div>`;
+  $('#bkText').value=BOOK_DRAFT!=null?BOOK_DRAFT:booksToText(ROSTER,BOOKS);
+  $('#bkText').oninput=()=>{BOOK_DRAFT=$('#bkText').value;};
+  /* 명부를 못 받았으면 입력칸이 비어 있다 — 그 상태로 저장하면 지정표가 통째로 날아간다 */
+  if(!ROSTER.length)$('#bkMsg').innerHTML='<div class="issues warn">명부를 불러오지 못해 저장을 막았어요 — 지금 저장하면 지정표가 전부 지워집니다. 새로고침 뒤에 다시 시도하세요.</div>';
+  $('#btnBooks').onclick=saveBooks;
+  $('#btnBooksReset').onclick=()=>{BOOK_DRAFT=null;renderBooks();};
+}
+async function saveBooks(){
+  const out=m=>{const e=$('#bkMsg');if(e)e.innerHTML=m;};
+  const {map,errors}=parseBooksText($('#bkText').value);
+  const show=list=>list.slice(0,12).map(x=>'<div>'+esc(x)+'</div>').join('')+(list.length>12?'<div class="muted">… 그 밖에 '+num(list.length-12)+'줄</div>':'');
+  if(errors.length)return out('<div class="issues bad"><b>고칠 줄이 있어요 — 한 줄이라도 틀리면 저장하지 않습니다.</b>'+show(errors)+'</div>');
+  /* 명부에 없는 코드는 오타일 때가 많다. 전학생을 아직 명부에 안 넣었을 수도 있어 막지는 않고 되묻는다. */
+  const known=new Set(ROSTER.map(s=>s.code));
+  const strangers=Object.keys(map).filter(c=>!known.has(c));
+  if(strangers.length&&!confirm(`명부에 없는 학생 코드가 ${strangers.length}개 있어요 (${strangers.slice(0,5).join(', ')}). 오타가 아니라면 그대로 저장합니다. 계속할까요?`))return;
+  /* 이 저장은 지정표 전체를 덮는다 — 칸에서 줄을 지우거나 일부만 붙여넣었으면 그만큼 지정이 풀린다.
+     되돌릴 길이 원장의 기억뿐이라 몇 명이 풀리는지 숫자로 보여 주고 되묻는다. */
+  const drop=Object.keys(BOOKS||{}).filter(c=>!map[c]);
+  if(drop.length&&!confirm(`교과서 지정이 풀리는 학생이 ${drop.length}명 있어요 (${drop.slice(0,5).join(', ')}). 이 칸의 내용이 지정표 전체가 됩니다. 계속할까요?`))return;
+  try{
+    const j=await api('/naesin/admin/books',{method:'PUT',body:JSON.stringify({books:map})});
+    BOOKS=(j.books&&typeof j.books==='object')?j.books:{};
+    BOOK_DRAFT=null;BOOK_FLASH='저장 완료 — 교과서를 지정한 학생 '+num(j.count)+'명';
+    renderBooks();
+  }catch(e){
+    if(isAuth(e))return;
+    const list=Array.isArray(e.body&&e.body.errors)?e.body.errors:[];
+    out('<div class="issues bad"><b>'+esc(e.message)+'</b>'+show(list)+'</div>');
+  }
+}
+
 /* ── 팩 커버리지 ──
    콘텐츠 공급이 병목이다. 학생 화면에서 어떤 과가 안 열리는 경우는 두 가지뿐인데
    방향이 서로 반대라 한쪽만 보면 놓친다.
@@ -900,7 +1028,9 @@ function renderRetry(msg){
    (2) 팩은 올렸는데 어느 시험 범위에도 안 들어갔다 — 팩 업로드와 시험 등록이 별개 화면이라
        막을 수가 없고 실제로 자주 난다. 학생은 그 과를 아예 못 받는다.
    「업로드된 팩」칸은 모든 팩을 '배포됨'으로 보여 주는 게 함정이어서, 배정 여부는 여기서 판정한다.
-   학교↔교과서 매핑이 생기면 needOf 만 넓히면 된다. */
+   이 카드는 **이미 등록된 시험**만 본다 — 시험 등록 전에 어느 자료부터 모을지는 위 「교과서별 자료
+   준비」가 답한다(한때 이 자리에 "매핑이 생기면 needOf 만 넓히면 된다"고 적혀 있었지만 그건 틀렸다:
+   필요한 것은 시험 범위를 늘리는 일이 아니라 시험이 없는 학생까지 세는 다른 판정이었다). */
 const COVER_WARN_DAYS=21;   /* 시험 3주 전부터 빠진 팩을 경고로 — 팩 하나 만드는 데 그만큼은 걸린다 */
 function needOf(ex){ return (Array.isArray(ex&&ex.packIds)?ex.packIds:[]).map(String); }
 function coverRows(exams,packs){
@@ -1016,12 +1146,13 @@ async function resolveReport(packId,itemRef){
 async function refresh(){
   hideBanner();
   try{
-    const [ov,pk,tk,ex,ro,rs,rp]=await Promise.all([
+    const [ov,pk,tk,ex,ro,rs,rp,bk]=await Promise.all([
       api('/naesin/admin/overview'),api('/naesin/admin/packs'),
       api('/naesin/admin/task').catch(optional),api('/naesin/admin/exams').catch(optional),
       api('/admin/overview').catch(optional),     // 호스트 명부 전체 — 개별 배정 대상 목록
       api('/naesin/admin/results').catch(optional),   // 시험 결과 + 성과 분석 (계약 R2)
-      api('/naesin/admin/reports').catch(optional)]);   // 문항 신고 — 팩 정오표의 원천
+      api('/naesin/admin/reports').catch(optional),   // 문항 신고 — 팩 정오표의 원천
+      api('/naesin/admin/books').catch(optional)]);   // 교과서 지정표 — 커버리지 카드의 입력
     OV=ov;PACKS=(Array.isArray(pk.packs)?pk.packs:[]).map(String);
     TASK=(tk&&tk.task&&tk.task.date)?tk.task:null;
     EXAMS=ex&&Array.isArray(ex.exams)?ex.exams:null;
@@ -1029,6 +1160,7 @@ async function refresh(){
     ROSTER=ro&&Array.isArray(ro.students)?ro.students.filter(s=>s&&s.code):[];
     takeResults(rs);
     REPORTS=rp&&Array.isArray(rp.packs)?rp.packs:null;
+    BOOKS=(bk&&bk.books&&typeof bk.books==='object')?bk.books:null;
     render();
   }catch(e){
     if(isAuth(e))return;   // api()가 이미 로그인 화면을 그렸다
