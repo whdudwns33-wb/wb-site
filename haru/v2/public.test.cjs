@@ -92,5 +92,27 @@ async function test(name, fn) { await fn(); console.log('통과:', name); count+
     assert.match(home, /시각 상충/); assert.match(gifted, /실제 개설·배정이 미정/);
     assert.equal(catalog.phase({kind:'설명회',start:'2026-10-17T14:00',end:'2026-10-17T14:00'}, catalog.instant('2026-10-18')), '지난 일정');
   });
+  await test('대학부설 첨부의 전형별 자격·자체 접수·마감 조건을 분리', () => {
+    const entry = id => data.directory.find(e => e.id === id);
+    const general = entry('mokpo'), special = entry('mokpo-special');
+    assert.notEqual(general.source, special.source);
+    assert.equal(general.events.find(e => e.kind === '원서').end, '2026-11-10T18:00');
+    assert.equal(special.events.find(e => e.kind === '원서').end, '2026-10-19T18:00');
+    assert.match(general.limits, /지역 표기/);
+    assert.match(special.target, /이수 요건/);
+    assert.ok(!special.events.some(e => e.kind === '교사추천' || e.kind === '시험'));
+    assert.match(entry('scnu').target, /전남 소재 학교/);
+    assert.match(entry('scnu').limits, /마감일 도착/);
+    assert.equal(entry('scnu').events.filter(e => e.kind === '원서').length, 2);
+    assert.match(entry('jbnu').process, /GED 접수 인정하지 않음/);
+    assert.match(entry('jbnu').limits, /우편 소인/);
+    const deadline = entry('jbnu').events.find(e => e.kind === '원서');
+    assert.equal(catalog.phase(deadline, catalog.instant('2026-11-06T18:00')), '기간 내');
+    assert.equal(catalog.phase(deadline, catalog.instant('2026-11-06T18:01')), '마감');
+    const observation = entry('scnu').events.find(e => e.kind === '관찰평가');
+    assert.equal(catalog.phase(observation, catalog.instant('2026-12-21')), '지난 일정');
+    for (const id of ['mokpo-2027-1011','scnu-2027-1011','jbnu-2027-1011']) assert.ok(data.sources.some(s => s.id === id));
+    assert.match(read('index.html'), /전남광주통합특별시/);
+  });
   console.log('새 공개 안내:', count, '개 통과');
 })().catch(error => { console.error(error); process.exitCode = 1; });

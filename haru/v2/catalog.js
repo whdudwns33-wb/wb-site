@@ -10,7 +10,7 @@
   }
   function phase(event, now = Date.now()) {
     const start = instant(event.start), end = instant(event.end);
-    const past = event.kind && ['시험', '면접', '설명회', '요강 공지 예정', '발표', '학교 안내'].includes(event.kind) ? '지난 일정' : '마감';
+    const past = event.kind && ['시험', '면접', '관찰평가', '설명회', '요강 공지 예정', '발표', '학교 안내'].includes(event.kind) ? '지난 일정' : '마감';
     if (now < start) return '예정';
     // 날짜만 있는 마감은 임의의 마감 시각을 확정하지 않는다.
     if (!event.end.includes('T')) return now >= end + 86400000 ? past : '기간 내 · 시각 확인';
