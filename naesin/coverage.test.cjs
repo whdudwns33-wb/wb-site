@@ -129,5 +129,47 @@ t('고등 학년은 개정을 모르므로 폴더 접두사를 주지 않는다'
   eq(r.combos[0].folderPrefix, '');
 });
 
+/* ── desk 와 문법이 어긋나지 않는가 ──
+   이 모듈은 교과서 코드표를 일부러 복제하지 않는다(머리말). 그래서 남는 위험은 **문법**이다 —
+   desk 가 만드는 폴더 이름을 이쪽이 못 읽으면 보유 팩이 0개로 보이고, 반대면 없는 조합이 선다.
+   두 모듈은 같은 저장소에 있고 ledger-core 에 module.exports 가드가 있어 여기서 바로 대조된다. */
+const LEDGER = require('../desk/lib/ledger-core.js');
+t('desk 가 만든 팩 id 를 이쪽이 같은 조각으로 읽는다 — 19종 × 학년 전부', () => {
+  let n = 0;
+  Object.keys(LEDGER.TEXTBOOKS).forEach((code) => {
+    LEDGER.TEXTBOOKS[code].grades.forEach((grade) => {
+      ['L1', 'L12', 'SL', 'SL2', 'SR1'].forEach((unit) => {
+        const id = LEDGER.revisionFor(code, grade) + '-' + code + '-' + grade + '-' + unit;
+        const parsed = LEDGER.parsePackId(id);
+        ok(parsed, 'desk 가 자기 팩 id 를 못 읽는다: ' + id);
+        const mine = C.splitPackId(id);
+        ok(mine, '이쪽이 desk 의 팩 id 를 못 읽는다: ' + id);
+        eq(mine.book, code, id + ' 의 교과서');
+        eq(mine.grade, grade, id + ' 의 학년');
+        eq(mine.unit, unit, id + ' 의 과');
+        /* 폴더 접두사가 desk 가 쓰는 개정과 같아야 한다 — 다르면 원장이 빈 폴더를 만든다 */
+        eq(C.folderPrefix(code, grade), LEDGER.revisionFor(code, grade) + '-' + code + '-' + grade + '-',
+          code + ' ' + grade + ' 의 폴더 접두사가 desk 와 다르다');
+        n += 1;
+      });
+    });
+  });
+  ok(n >= 95, '대조한 조합이 너무 적다: ' + n);
+});
+
+t('desk 가 거절하는 팩 id 는 이쪽도 조합으로 세지 않는다', () => {
+  /* desk 에 없는 학년(고등)·교과서-학년 불일치는 폴더가 될 수 없다 — 세면 못 채우는 줄이 선다 */
+  eq(LEDGER.revisionFor('ne-kimgitaek', 'h1'), '', 'desk 가 고등 개정을 알게 되면 이쪽도 같이 넓혀야 한다');
+  eq(C.folderPrefix('ne-kimgitaek', 'h1'), '', '고등에 폴더 이름을 주면 안 된다');
+  /* 중1 교과서를 중3 에 붙인 id 는 desk 가 거절한다. 이쪽은 문법만 보므로 읽기는 한다 —
+     그래도 '보유 팩' 으로 세지 않는 것은 book|grade 키가 학생 쪽과 안 맞아서다. */
+  eq(LEDGER.parsePackId('2015-ne-kimgitaek-m3-L1'), null, 'desk 가 학년 불일치를 통과시킨다');
+  const r = C.report({ roster: [{ code: 'S1', name: '가가', grade: '중3' }], books: { S1: 'ne-kimgitaek' },
+    packs: ['2015-ne-kimgitaek-m3-L1'], exams: [] });
+  eq(r.combos.length, 1);
+  eq(r.combos[0].packs, 1, '문법이 맞는 팩은 세지만, 폴더 이름은 desk 규칙(2022-)으로 준다');
+  eq(r.combos[0].folderPrefix, '2015-ne-kimgitaek-m3-', '중3 은 2015 개정이다');
+});
+
 if (fail) { console.error('\n실패 ' + fail + '건'); process.exit(1); }
 console.log('OK — packId 문법·학년 정규화·배정 해석·조합 집계·불일치 경고, 그리고 모를 때 침묵하는 것까지 통과');

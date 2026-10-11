@@ -103,6 +103,14 @@ t('지정표 전체를 덮는 저장이라 두 자리에서 되묻고, 명부가
   assert.ok(/strangers\.length&&!confirm\(/.test(save), '명부에 없는 코드를 되묻지 않는다');
 });
 
+t('고등 조합은 먼저 만들 목록에 섞지 않는다 — 채울 수 있는 폴더 이름이 없다', () => {
+  const card = admin.slice(admin.indexOf('function renderBooks('), admin.indexOf('async function saveBooks('));
+  /* desk 의 REVISIONS 에 고등이 없어 h 학년 packId 는 만들어질 수 없다 — 섞으면 못 채우는 줄이 1위로 올라간다 */
+  assert.ok(/c\.empty&&c\.folderPrefix/.test(card), '고등 조합이 먼저 만들 목록에 섞인다');
+  assert.ok(/const highs=rep\.combos\.filter\(c=>!c\.folderPrefix\)/.test(card), '고등 조합을 따로 세지 않는다');
+  assert.ok(/고등 조합/.test(card), '고등 조합을 왜 안 셌는지 화면이 말하지 않는다');
+});
+
 t('카드가 과(Lesson)를 단정하지 않는다 — 그 판정은 팩 커버리지 몫이다', () => {
   const card = admin.slice(admin.indexOf('function renderBooks('), admin.indexOf('/* ── 팩 커버리지 ──'));
   assert.ok(card.length > 1000);

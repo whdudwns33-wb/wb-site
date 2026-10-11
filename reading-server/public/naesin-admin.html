@@ -942,7 +942,10 @@ function renderBooks(){
   if(!BOOKS)return void(el.innerHTML=head+'<p class="muted">교과서 지정표를 불러오지 못했어요 — 새로고침으로 다시 시도하세요.</p></div>');
   const flash=BOOK_FLASH;BOOK_FLASH='';   /* 저장 알림은 한 번만 */
   const rep=COV.report({roster:ROSTER,books:BOOKS,packs:PACKS,exams:EXAMS});
-  const empty=rep.combos.filter(c=>c.empty);
+  /* 팩 id 체계(개정 연도)는 아직 중1~중3 뿐이다 — desk 쪽 REVISIONS 에도 고등이 없다.
+     고등 조합을 '먼저 만들 자료'에 섞으면 영원히 못 채우는 줄이 수집 순서 1위로 올라간다. */
+  const empty=rep.combos.filter(c=>c.empty&&c.folderPrefix);
+  const highs=rep.combos.filter(c=>!c.folderPrefix);
   const noBook=rep.unset.filter(u=>u.why==='no-book');
   let body;
   if(!ROSTER.length){
@@ -971,6 +974,8 @@ function renderBooks(){
   if(flash)heads.push(`<div class="issues ok">${esc(flash)}</div>`);
   if(empty.length)heads.push(`<div class="issues bad"><b>학생이 있는데 팩이 없는 조합 ${num(empty.length)}개</b> — 이것이 먼저 만들 자료입니다. 드라이브에 이 이름으로 폴더를 만들고 과 번호를 붙이세요.
     <div>${empty.map(c=>'<span class="tag bad">'+esc(c.folderPrefix||c.book+'-'+c.grade)+'</span> <span class="muted">'+num(c.students)+'명</span>').join(' · ')}</div></div>`);
+  if(highs.length)heads.push(`<div class="issues warn"><b>고등 조합 ${num(highs.length)}개는 세지 않았어요</b> — 팩 id 체계(개정 연도)가 아직 중1~중3 뿐입니다. 고등 자료를 쓰려면 폴더 이름 규칙을 먼저 정해야 해요.
+    <div class="muted">${highs.map(c=>esc(c.book)+' '+esc(gradeKo(c.grade))+' '+num(c.students)+'명').join(' · ')}</div></div>`);
   if(rep.mismatches.length)heads.push(`<div class="issues bad"><b>배정된 팩이 학생의 교과서·학년과 다른 학생 ${num(rep.mismatches.length)}명</b> — 그 학생은 자기 교과서가 아닌 자료를 받고 있어요.
     <div>${rep.mismatches.slice(0,8).map(m=>esc(m.name||m.code)+': '+m.bad.slice(0,3).map(b=>esc(b.packId)+' ('+(b.kind==='book'?'교과서 '+esc(b.want)+' 인데':'학년 '+esc(gradeKo(b.want))+' 인데')+' '+esc(b.kind==='book'?b.got:gradeKo(b.got))+')').join(', ')).join('<br>')}</div></div>`);
   if(rep.unset.length)heads.push(`<div class="issues warn"><b>조합에 못 넣은 학생 ${num(rep.unset.length)}명</b> — ${['no-book','no-grade'].filter(w=>rep.unset.some(u=>u.why===w)).map(w=>esc(UNSET_WHY[w])+' '+num(rep.unset.filter(u=>u.why===w).length)+'명').join(' · ')}.

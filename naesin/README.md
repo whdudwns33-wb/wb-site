@@ -209,7 +209,7 @@ WB 학습자료/                        ← 드라이브 공유 폴더 하나
 
 | 교과서 | 코드 | 교과서 | 코드 |
 |---|---|---|---|
-| NE능률(김기택) | `ne-kimgitaek` | 비상(황종배) | `visang-hwangjongbae` |
+| NE능률(김기택) | `ne-kimgitaek` | 비상(황종배) | `bisang-hwangjongbae` |
 | YBM(김은형) | `ybm-kimeunhyeong` | 지학사(송미정) | `jihak-songmijeong` |
 | YBM(박준언) ※ | `ybm-parkjuneon` | 천재(소영순) | `chunjae-soyeongsun` |
 | 동아(윤정미) ※ | `donga-yunjeongmi` | 천재(이상기) | `chunjae-leesanggi` |
@@ -220,7 +220,7 @@ WB 학습자료/                        ← 드라이브 공유 폴더 하나
 | 교과서 | 코드 | 교과서 | 코드 |
 |---|---|---|---|
 | NE능률(김성곤) | `ne-kimseonggon` | 미래엔(최연희) | `mirae-choeyeonhui` |
-| NE능률(양현권) | `ne-yanghyeongwon` | 비상(김진완) | `visang-kimjinwan` |
+| NE능률(양현권) | `ne-yanghyeongwon` | 비상(김진완) | `bisang-kimjinwan` |
 | YBM(박준언) ※ | `ybm-parkjuneon` | 지학사(민찬규) | `jihak-minchangyu` |
 | YBM(송미정) | `ybm-songmijeong` | 천재(이재영) | `chunjae-leejaeyeong` |
 | 금성(최인철) | `kumsung-choeincheol` | 천재(정사열) | `chunjae-jeongsayeol` |
