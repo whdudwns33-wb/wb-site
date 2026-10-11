@@ -2,7 +2,7 @@
 /* 국어브레인 서버 라우트 검증 (node reading-server/naesin-ko-api.test.mjs)
    정본: 국어 기획서 §9.2 라우트·§8 저장 예산·§10-4 접근 통제 */
 import assert from 'node:assert';
-import { handleNaesinKo, naesinKoSummary } from './naesin-ko-api.mjs';
+import { handleNaesinKo, naesinKoSummary, naesinKoBodyLimit } from './naesin-ko-api.mjs';
 
 let passed = 0;
 const t = async (name, fn) => { await fn(); passed += 1; console.log('  ✓ ' + name); };
@@ -80,15 +80,20 @@ await t('같은 팩 재업로드는 id 목록을 중복시키지 않는다', asy
   assert.deepStrictEqual(await s.getPackIds(), [PACK.packId]);
 });
 
-await t('팩 서빙은 학생·관리자 모두 열 수 있고, 없는 팩은 404', async () => {
+await t('팩 서빙 — 배정된 학생과 관리자가 열고, 없는 팩은 404', async () => {
   const s = memStore();
   await call(s, { path: '/api/naesin-ko/admin/pack', method: 'POST', who: ADMIN,
     getBody: async () => ({ id: PACK.packId, pack: PACK }) });
+  await call(s, { path: '/api/naesin-ko/admin/exam', method: 'POST', who: ADMIN,
+    getBody: async () => ({ scope: 'default', examDate: '2099-12-31', packIds: [PACK.packId] }) });
   const q = new URLSearchParams({ id: PACK.packId });
   const stu = await call(s, { path: '/api/naesin-ko/pack', method: 'GET', query: q });
   assert.strictEqual(stu.status, 200);
   assert.strictEqual(stu.body.pack.packId, PACK.packId);
-  const none = await call(s, { path: '/api/naesin-ko/pack', method: 'GET', query: new URLSearchParams({ id: 'no-such-pack' }) });
+  /* 없는 팩은 404 — 관리자 기준이다. 학생에게는 범위 게이트가 먼저 걸려 403 이 되는데,
+     그게 맞다: 없는 팩의 존재 여부를 학생에게 알려 줄 이유가 없다. */
+  const none = await call(s, { path: '/api/naesin-ko/pack', method: 'GET', who: ADMIN,
+    query: new URLSearchParams({ id: 'no-such-pack' }) });
   assert.strictEqual(none.status, 404);
 });
 
@@ -401,6 +406,63 @@ await t('naesinKoSummary는 요약이 객체일 때만 실어 보낸다', async 
   const bad = naesinKoSummary('st-2', null, { summary: ['배열은 안 됨'], updatedAt: 'x' });
   assert.strictEqual(bad.summary, undefined);
   assert.strictEqual(bad.linked, true);
+});
+
+await t('학생은 배정된 단원만 받는다 — 팩 id 는 교과서 좌표라 추측이 된다(§10-4)', async () => {
+  const s = memStore();
+  await call(s, { path: '/api/naesin-ko/admin/pack', method: 'POST', who: ADMIN,
+    getBody: async () => ({ id: PACK.packId, pack: PACK }) });
+  const q = new URLSearchParams({ id: PACK.packId });
+
+  /* 범위가 없으면 막힌다 — 예전에는 인증만 있으면 누구에게나 나갔다 */
+  assert.strictEqual((await call(s, { path: '/api/naesin-ko/pack', query: q })).status, 403);
+
+  /* 내 범위에 들어오면 받는다 */
+  await call(s, { path: '/api/naesin-ko/admin/exam', method: 'POST', who: ADMIN,
+    getBody: async () => ({ scope: 'st-1', examDate: '2099-12-31', packIds: [PACK.packId] }) });
+  assert.strictEqual((await call(s, { path: '/api/naesin-ko/pack', query: q })).status, 200);
+
+  /* 남의 범위에만 있는 단원은 여전히 막힌다 */
+  const other = new URLSearchParams({ id: 'other-ko-u9' });
+  assert.strictEqual((await call(s, { path: '/api/naesin-ko/pack', query: other })).status, 403);
+});
+
+await t('반 공통(default) 범위도 통과하고, 관리자는 범위와 무관하게 받는다', async () => {
+  const s = memStore();
+  await call(s, { path: '/api/naesin-ko/admin/pack', method: 'POST', who: ADMIN,
+    getBody: async () => ({ id: PACK.packId, pack: PACK }) });
+  const q = new URLSearchParams({ id: PACK.packId });
+
+  /* 관리자는 게이트를 지난다 — 검수 화면·루브릭 저작이 방금 올린 팩을 같은 라우트로 되읽는다 */
+  assert.strictEqual((await call(s, { path: '/api/naesin-ko/pack', who: ADMIN, query: q })).status, 200);
+
+  /* 학생은 아직 403 */
+  assert.strictEqual((await call(s, { path: '/api/naesin-ko/pack', query: q })).status, 403);
+
+  /* 반 공통으로 걸면 열린다 — /exam 라우트의 폴백 순서와 같아야 한다 */
+  await call(s, { path: '/api/naesin-ko/admin/exam', method: 'POST', who: ADMIN,
+    getBody: async () => ({ scope: 'default', examDate: '2099-12-31', packIds: [PACK.packId] }) });
+  assert.strictEqual((await call(s, { path: '/api/naesin-ko/pack', query: q })).status, 200);
+
+  /* 내 범위가 따로 있으면 그것이 이긴다 — 반 공통에만 있는 단원은 막힌다.
+     (/admin/exam 은 없는 팩 id 를 400 으로 막으므로 2단원 팩을 먼저 올린다) */
+  const U2 = { packId: 'mine-ko-u2', revision: '데모', works: [{ workId: 'w-2', title: '더미 2단원' }] };
+  await call(s, { path: '/api/naesin-ko/admin/pack', method: 'POST', who: ADMIN,
+    getBody: async () => ({ id: U2.packId, pack: U2 }) });
+  const put = await call(s, { path: '/api/naesin-ko/admin/exam', method: 'POST', who: ADMIN,
+    getBody: async () => ({ scope: 'st-1', examDate: '2099-12-31', packIds: [U2.packId] }) });
+  assert.strictEqual(put.status, 200, '학생 범위 저장 실패: ' + JSON.stringify(put.body));
+  assert.strictEqual((await call(s, { path: '/api/naesin-ko/pack', query: q })).status, 403);
+});
+
+await t('몸통 상한은 관리 경로만 크다 — 형제 앱과 같은 모양', async () => {
+  assert.strictEqual(naesinKoBodyLimit('/api/naesin-ko/admin/pack'), 4_500_000);
+  assert.strictEqual(naesinKoBodyLimit('/api/naesin-ko/admin/rubric'), 4_500_000);
+  assert.strictEqual(naesinKoBodyLimit('/api/naesin-ko/admin/pending'), 4_500_000);
+  /* 학생 기록·서술형 제출은 작다 — 기기 하나가 수십 MB 를 밀어 넣지 못하게 */
+  assert.strictEqual(naesinKoBodyLimit('/api/naesin-ko/state'), 300_000);
+  assert.strictEqual(naesinKoBodyLimit('/api/naesin-ko/review'), 300_000);
+  assert.strictEqual(naesinKoBodyLimit('/api/naesin-ko/admin/exam'), 300_000);
 });
 
 await t('모르는 경로는 404', async () => {

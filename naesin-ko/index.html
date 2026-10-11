@@ -329,11 +329,85 @@
       .then(render);
   }
 
-  function demo(msg) {
+  function demo(msg, assigned) {
     S.demo = true; S.packId = 'sample-demo-U0';
+    /* 범위가 이미 배정됐는데 받아 오기만 실패한 경우를 구분한다 — 그때 "시험 범위가 배정되면
+       바뀝니다"라고 하면 거짓말이 된다(선생님은 이미 배정하셨다). */
+    S.assigned = !!assigned;
+    S.workId = null; S.paper = null;
     if (msg) S.err = msg;
     return fetch('./pack-sample.json').then(function (r) { return r.json(); })
       .then(function (p) { S.pack = p; });
+  }
+
+  /* 시험 범위 팩 받기 — 부팅과 재시도와 단원 전환이 같은 길을 쓴다.
+     받은 팩은 일단 S.pending 에 두고 **끼울 때를 고른다.** 학생이 누른 전환(now=true)이면 바로
+     갈고, 배경 재시도면 공부가 끝난 뒤로 미룬다 — 세션 도중에 갈면 화면은 체험 문항을 계속 내는데
+     (render 는 S.session 이면 되돌아간다) 기록은 실제 단원 칸(pk())에 쌓이고 서버로도 올라간다. */
+  function loadPack(id, now) {
+    return api('/pack?id=' + encodeURIComponent(id)).then(function (r) {
+      if (r.status === 200) {
+        S.pending = { id: id, pack: r.body.pack };
+        return now ? applyPack() : applyPending(false);
+      }
+      return packFail(r.status, id);
+    }).catch(function () { return packFail(0, id); });
+  }
+
+  /* 지금 갈면 쓰던 것이 사라지는가. 세션·종이 채점은 플래그로 알지만 주석 복원·서술형 입력은
+     플래그 없이 textarea 로만 산다 — 적어 둔 글이 있으면 그것도 '공부 중'이다. */
+  function busy(typed) {
+    if (S.session || S.paperWork) return true;
+    if (!typed) return false;
+    var f = $('wrap').querySelectorAll('textarea, input[type=text]'), i;
+    for (i = 0; i < f.length; i += 1) if (String(f[i].value || '').trim()) return true;
+    return false;
+  }
+
+  /* 받아 둔 팩을 안전한 순간에만 끼운다. 못 끼우면 그대로 두고 다음 기회(setTab)를 기다린다.
+     leaving=true 는 학생이 스스로 화면을 떠나는 순간이라, 적어 둔 글은 어차피 버려진다. */
+  function applyPending(leaving) {
+    if (!S.pending) return false;
+    if (busy(!leaving)) return false;
+    return applyPack();
+  }
+  function applyPack() {
+    var p = S.pending;
+    S.pending = null; S.retryId = null;
+    S.demo = false; S.err = null; S.retries = 0; S.retries403 = 0;
+    S.packId = p.id; S.pack = p.pack;
+    /* 작품 선택·종이 채점은 팩 안의 id 를 가리킨다 — 팩이 갈리면 가리킬 곳이 없어진다 */
+    S.workId = null; S.paper = null;
+    return true;
+  }
+
+  /* 못 받았을 때 — 체험 팩으로 내려 주되 **이유를 바르게 말하고, 스스로 다시 올라온다.**
+     예전에는 어떤 실패든 한 문장으로 뭉뚱그렸고, 한 번 떨어지면 신호가 돌아와도 그 세션 내내
+     체험 팩에 머물렀다. 학생은 앱을 껐다 켤 생각을 안 한다. */
+  var RETRY_MS = [30000, 120000, 600000, 1800000];
+  function packFail(status, id) {
+    var why = status === 403 ? '이 단원은 아직 나에게 배정되지 않았어요 — 선생님께 말씀드려 주세요.'
+      : status === 404 ? '선생님이 이 단원 자료를 아직 올리지 않으셨어요.'
+        : '시험 범위 자료를 지금 받지 못했어요 — 잠시 뒤 저절로 다시 받아 올게요.';
+    /* 403 도 두 번은 다시 묻는다 — 선생님이 방금 범위를 바꾸셨을 때 KV 가 1분쯤 옛 범위를
+       내주는 구간이 있어, 영구 거절로 단정하면 그 사이 학생이 체험 팩에 갇힌다.
+       404(아직 올리지 않으셨다)는 기다려도 바뀌지 않으니 다시 묻지 않는다. */
+    var p403 = status === 403;
+    var n = p403 ? (S.retries403 || 0) : (S.retries || 0);
+    if (status !== 404 && (!p403 || n < 2)) {
+      if (p403) S.retries403 = n + 1; else S.retries = n + 1;
+      S.retryId = id;
+      /* 조용히 다시 시도한다 — 인프라 사정을 학생에게 설명하지 않는다.
+         그 사이 다른 단원이 열렸으면(= 체험 모드를 벗어났으면) 끼어들지 않는다. */
+      setTimeout(function () {
+        if (!S.demo || S.retryId !== id) return;
+        loadPack(id).then(function (ok) { if (ok) render(); });
+      }, RETRY_MS[Math.min(n, RETRY_MS.length - 1)]);
+    }
+    S.pending = null;
+    /* 이미 체험 팩을 보고 있으면 다시 받아 끼우지 않는다 — 보고 있던 화면이 날아간다 */
+    if (S.demo && S.pack) { S.err = why; S.assigned = true; return false; }
+    return demo(why, true).then(function () { return false; });
   }
 
   function online() {
@@ -348,11 +422,7 @@
         if (sv && sv.v === 1 && (sv.savedAt || 0) > (S.data.savedAt || 0)) S.data = sv;
         S.packIds = (S.exam && S.exam.packIds) || [];
         if (!S.packIds.length) return demo('아직 시험 범위가 등록되지 않았어요 — 체험 팩으로 연습할 수 있어요.');
-        S.packId = S.packIds[0];
-        return api('/pack?id=' + encodeURIComponent(S.packId)).then(function (r) {
-          if (r.status !== 200) return demo('팩을 불러오지 못했어요 — 체험 팩으로 연습할 수 있어요.');
-          S.pack = r.body.pack;
-        });
+        return loadPack(S.packIds[0], true);
       })
       .catch(function () { return demo('서버에 연결하지 못했어요 — 체험 팩으로 연습할 수 있어요.'); });
   }
@@ -402,11 +472,28 @@
   }
 
   /* ── 렌더 ── */
-  function setTab(t) { S.tab = t; S.session = null; render(); }
+  function setTab(t) { S.tab = t; S.session = null; applyPending(true); render(); }
   document.getElementById('tabs').addEventListener('click', function (e) {
     var b = e.target.closest('button[data-tab]');
     if (b) setTab(b.getAttribute('data-tab'));
   });
+
+  /* 단원 전환 — 부팅 때 **한 번만** 건다. #wrap 은 innerHTML 만 갈리고 요소 자체는 남으므로,
+     화면 함수 안에서 걸면 다시 그릴 때마다 핸들러가 쌓인다. */
+  $('wrap').addEventListener('click', function (e) {
+    var u = e.target.closest('[data-unit]');
+    if (!u) return;
+    var id = u.getAttribute('data-unit');
+    if (id === S.packId) return;
+    S.session = null; S.err = null; S.paperWork = null;
+    loadPack(id, true).then(function () { setTab('home'); });
+  });
+
+  /* 단원 이름 — 팩 id 는 `2022-cheonjae-nomisuk-m2-1-U1` 같은 좌표라 학생에게는 끝의 단원만 보인다 */
+  function unitLabel(id) {
+    var m = String(id || '').match(/U(\d+)$/);
+    return m ? m[1] + '단원' : String(id || '').slice(-8);
+  }
 
   function header() {
     var out = [];
@@ -434,7 +521,19 @@
   function banner() {
     var out = '';
     if (S.err) out += '<div class="banner warn">' + esc(S.err) + '</div>';
-    if (S.demo) out += '<div class="banner info">체험 팩(자체 창작 작품)으로 연습 중이에요. 시험 범위가 배정되면 우리 학교 작품으로 바뀝니다.</div>';
+    if (S.demo) {
+      out += '<div class="banner info">체험 팩(자체 창작 작품)으로 연습 중이에요. ' +
+        (S.assigned ? '우리 학교 작품은 받는 대로 바뀝니다.' : '시험 범위가 배정되면 우리 학교 작품으로 바뀝니다.') + '</div>';
+    }
+    /* 시험 범위가 여러 단원이면 고를 수 있어야 한다 — 예전에는 첫 단원만 받아서 2단원이
+       범위에 있어도 학생이 열 길이 없었다. 기록은 pk() 가 팩 id 로 나눠 담으므로 단원마다 따로 쌓인다.
+       체험 모드에서도 버튼을 남긴다 — 전환이 실패해 체험 팩으로 떨어졌을 때 되돌아갈 길이 이것뿐이다. */
+    if ((S.packIds || []).length > 1) {
+      out += '<div class="banner info"><b>단원</b> ' + S.packIds.map(function (id) {
+        return '<button class="btn sm' + (id === S.packId ? '' : ' ghost') + '" data-unit="' + esc(id) + '">' +
+          esc(unitLabel(id)) + '</button>';
+      }).join(' ') + '</div>';
+    }
     return out;
   }
 
