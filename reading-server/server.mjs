@@ -49,6 +49,12 @@ if (!ADMIN_PIN && !(ADMIN_ID && ADMIN_PASSWORD)) {
   process.exit(1);
 }
 const TOKEN_TTL = 1000 * 60 * 60 * 24 * 30;            // 30일
+/* 관리 전용 모드 — 이 서버를 터널·포트포워딩으로 외부에 열 때 쓴다(docs/로컬-서버-외부공개-터널.md §1-A).
+   학생 기록의 정본은 운영 워커의 KV 다. 이 서버는 db.json 이라 둘은 섞이지 않는데, 학생이 어쩌다
+   외부 주소를 열어 로그인하면 그 순간부터 같은 학생의 진도가 두 곳에 따로 쌓인다 — 되돌리기 어렵다.
+   토큰은 서명이 아니라 각 저장소에 든 난수라, 토큰 발급 자리만 닫으면 로컬에 학생 기록이 생길 길이 없다.
+   관리 로그인과 관리 화면이 쓰는 공용 모듈(/naesin/gen.js 등)은 그대로 둔다 — 막으면 관리 웹이 깨진다. */
+const ADMIN_ONLY = /^(1|true|yes|on)$/i.test(process.env.WB_ADMIN_ONLY || '');
 
 load();
 const db = getDb();
@@ -505,6 +511,13 @@ const server = http.createServer(async (req, res) => {
         const stu = code && db.students[code];
         if (!stu) return json(res, 404, { error: '유효하지 않은 링크예요. 학원에 문의해 주세요.' });
         return json(res, 200, parentSummary(stu, db.states[code] || null, vocabStore.getState(code), vocabStore.getAssign(code)));
+      }
+
+      /* 관리 전용 모드에서는 학생 토큰을 내주지 않는다. 두 자리를 함께 닫는다 —
+         /api/login 이 연동 요청을 만들고, 토큰이 실제로 나가는 곳은 /api/login/status 다.
+         하나만 닫으면 남아 있던 nonce 로 토큰이 한 번 더 나갈 수 있다. */
+      if (ADMIN_ONLY && (p === '/api/login' || p === '/api/login/status')) {
+        return json(res, 403, { error: '이 주소는 관리 전용이에요. 학생 앱은 학원에서 안내한 주소를 쓰세요.' });
       }
 
       /* 학생 연동은 '요청 → 강사 승인' 두 단계 (워커와 동일) */
@@ -1058,4 +1071,6 @@ setInterval(async () => {
 server.listen(PORT, () => {
   console.log(`WB 진로독서 서버 http://localhost:${PORT}`);
   console.log(`  학생 앱: /   워드브레인: /vocab/   관리 웹: /admin   연상 검수함: /admin/vocab-review.html`);
+  /* 어느 모드로 떴는지 한 줄로 알린다 — 터널을 붙인 뒤 이 줄을 보고 확인한다. */
+  if (ADMIN_ONLY) console.log('  [관리 전용] WB_ADMIN_ONLY=on — 학생 로그인(/api/login·/api/login/status)을 내주지 않습니다');
 });
