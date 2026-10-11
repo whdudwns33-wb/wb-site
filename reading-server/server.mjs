@@ -113,6 +113,12 @@ const naesinStore = {
   deletePack: (id) => { delete naesinRoot().packs[id]; persist(); },
   getPackIds: () => naesinRoot().packIds || null,
   putPackIds: (ids) => { naesinRoot().packIds = ids; persist(); },
+  /* 학생 → 교과서 코드 한 칸. 학교를 거치지 않는다 — 학교명은 개인정보 성격이 있고(절대 규칙 1),
+     desk 자료원장이 이미 학교↔교과서↔학년↔과를 '구매 범위'로 들고 있어 같은 이름의 다른 사실을
+     두 곳에 두면 갈라진다. 학생 레코드가 아니라 내신 전용 자리에 두는 이유는 /api/admin/students
+     POST 가 구조분해한 키만 명시 기록해서(server.mjs 의 그 자리), 거기 끼우면 다른 수정 한 번에 날아간다. */
+  getBooks: () => naesinRoot().books || null,
+  putBooks: (map) => { naesinRoot().books = map; persist(); },
   getState: (c) => naesinRoot().states[c] || null,
   putState: (c, rec) => { naesinRoot().states[c] = rec; persist(); },
   listStateCodes: () => Object.keys(naesinRoot().states),
@@ -883,6 +889,9 @@ const server = http.createServer(async (req, res) => {
         drop(naesinRoot().states, c);
         drop(naesinRoot().exams, c);
         drop(naesinRoot().results, c);
+        /* 교과서 지정표는 맵 한 레코드다 — 위 drop 들과 달리 학생 키가 따로 없어서 여기서 지운다.
+           안 지우면 퇴원생이 '교과서별 자료 준비' 조합에 남아 수집 순서를 흔든다(워커와 동일). */
+        drop(naesinRoot().books || {}, c);
         /* 문항 신고는 팩 정오표라 남긴다 — 학생이 떠나도 그 문항의 오류는 그대로다.
            다만 누가 올렸는지는 지운다(퇴원생 식별 정보를 팩 자료에 남길 이유가 없다). 워커와 동일. */
         for (const [pid, list] of Object.entries(naesinRoot().reports)) {
@@ -940,6 +949,7 @@ const server = http.createServer(async (req, res) => {
 
     /* 관리 웹 */
     if (p === '/admin/qr.js') return serveFile(res, SHARED_DIR, 'qr.js');
+    if (p === '/admin/coverage.js') return serveFile(res, NAESIN_DIR, 'coverage.js');   // 팩 커버리지 순수 로직 — 관리 카드가 학생 앱과 같은 모듈을 쓴다
     if (p === '/admin/letter.js') return serveFile(res, LETTER_DIR, 'letter.js');   // 관리 편집기 미리보기가 학생 앱과 같은 렌더러를 쓴다
     if (p === '/admin/shapes.js') return serveFile(res, LETTER_DIR, 'shapes.js');   // 도형 놀이 도우미·미리보기
     if (p === '/admin/drills.js') return serveFile(res, LETTER_DIR, 'drills.js');   // 5분 놀이 미리보기
