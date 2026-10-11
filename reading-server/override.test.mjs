@@ -145,6 +145,20 @@ for (const api of ['naesin-ko-api.mjs', 'naesin-api.mjs', 'vocab-api.mjs', 'chun
   }
 }
 
+/* ── 몸통 상한이 워커·로컬 양쪽에 같이 걸려 있는가 ──
+   라우터 모듈이 상한 함수를 내보내면 그 상한은 **계약**이다. 한쪽 호스트만 걸면 로컬에서
+   413 이던 팩이 운영에서는 통과하거나(반대도) — 로컬 확인이 운영을 대변하지 못한다.
+   실제로 국어브레인이 워커에만 걸려 있었고, 로컬은 기본 2MB 라 3MB 팩이 로컬에서만 막혔다. */
+const limits = fs.readdirSync(DIR).filter((f) => f.endsWith('-api.mjs'))
+  .flatMap((f) => [...fs.readFileSync(path.join(DIR, f), 'utf8')
+    .matchAll(/export const (\w*BodyLimit)\s*=/g)].map((m) => [f, m[1]]));
+if (!limits.length) E('몸통 상한 함수를 하나도 찾지 못했습니다 — 이 검사가 헛돌고 있습니다');
+for (const [file, fn] of limits) {
+  const gate = new RegExp('>\\s*' + fn + '\\(p\\)');
+  if (!gate.test(worker)) E(`${file} 의 ${fn} 이 worker.mjs 에서 쓰이지 않습니다 — 운영 상한이 없는 셈입니다`);
+  if (!gate.test(server)) E(`${file} 의 ${fn} 이 server.mjs 에서 쓰이지 않습니다 — 로컬 확인이 운영과 달라집니다`);
+}
+
 /* ── 파일럿 지표 화면의 기준값이 코드와 같은가 ──
    화면에 적힌 70%·60%는 사람이 손으로 쓴 글이고, 판정은 vocab-api.mjs 의 PILOT 이 한다.
    한쪽만 고치면 화면이 "기준 70%"라고 써 놓고 75%로 판정하는 상태가 된다. */
@@ -171,4 +185,4 @@ if (errors.length) {
   console.error(`\nFAIL — ${errors.length}건`);
   process.exit(1);
 }
-console.log(`OK — 워커 가로채기 ${paths.size}개 · 관리 화면 ${pages.length}장 배포 배선(스크립트 포함) · 저장 어댑터 짝 맞음 · 파일럿 기준값 일치`);
+console.log(`OK — 워커 가로채기 ${paths.size}개 · 관리 화면 ${pages.length}장 배포 배선(스크립트 포함) · 저장 어댑터 짝 맞음 · 몸통 상한 ${limits.length}개 양쪽 · 파일럿 기준값 일치`);
