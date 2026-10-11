@@ -154,11 +154,15 @@ reading-server/
 원장이 구매 자료 **PDF 를 드라이브에 올리면**, 그 PDF 를 **Claude Code 세션에서 읽어** 팩 JSON 을
 만들고, 관리 웹 제작 스튜디오에 **파일로 넣어** 검수·배포한다. 텍스트로 바꿔 올릴 필요가 없다.
 
+**폴더 규칙의 정본은 `docs/자료-폴더-표준.md` 다** — 앱이 여러 개라 국어·영어가 같은 규칙을 쓴다.
+아래는 영어 자리만 발췌한 것이고, 어긋나면 그 문서가 맞다.
+
 ```
-WB 교재스캔/내신브레인_영어/        ← 드라이브. 0_먼저_읽어주세요.txt 에 같은 안내가 있다
-  NE능률(김기택)/                   ← 교과서(저자) — 이그잼포유 중등 내신 목록 10종 그대로
-    중2/                            ← 학년
-      L06/                          ← 과. 이 폴더 하나가 팩 하나다
+WB 학습자료/                        ← 드라이브 공유 폴더 하나
+  naesin/                           ← 앱 폴더 = 저장소 디렉터리 이름
+    2026-2/                         ← 시험기 서랍. 사람 편의라 몇 겹이든, 없어도 된다
+      2022-ne-kimgitaek-m2-L6/      ← 폴더 이름이 곧 팩 id. 이 폴더 하나가 팩 하나다
+        _meta.txt                   → revision: 2022   (개정만 지면 어디에도 없다)
         00_교과서본문.pdf           → sentences[].en 정본 대조
         01_내용정리.pdf             → dialogues · sentences.chunks
         02_본문워크북.pdf           → sentences (정본) ★필수
@@ -168,6 +172,14 @@ WB 교재스캔/내신브레인_영어/        ← 드라이브. 0_먼저_읽어
         07_문법워크북.pdf           → patterns
         08_문법객관식.pdf           → items
 ```
+
+**폴더 이름이 곧 팩 id 다.** 영문·숫자·하이픈만 쓴다(`^[A-Za-z0-9-]{3,60}$`) — 한글·공백·괄호가
+들어가면 서버가 거부한다. 이 제한은 **팩 id 폴더에만** 걸린다(위 공유 폴더·서랍·PDF 파일명은 한글 OK).
+과 자리는 숫자만이 아니다 — `L6` 외에 Special Lesson 은 `SL`·`SL1`·`SL2`, Special Reading 은
+`SR`·`SR1`·`SR2` 다(`ledger-core.js` 의 `UNIT_RE`). `L` 뒤 번호에 0 을 채우지 않는다. 개정 연도는 학년에서 유도하므로(중1·중2=2022, 중3=2015) 사람이
+폴더 이름에 손으로 적을 일은 없다. `desk/lib/ledger-core.js` 의 `intakeFolder()` 가 이 경로를
+만들고 `packIdFromPath()` 가 되읽는다 — 경로 조각을 역조립하지 않고 **폴더 이름을 그대로** 쓴다.
+개정이 학년과 어긋나면 id 를 만들지 않는다(빈 문자열).
 
 **파일 앞 두 자리가 계약이다** — 이그잼포유 시리즈 번호를 그대로 쓰고, 그 번호로 어느 추출
 종류에 들어갈지가 정해진다. 뒤 한글 이름은 자유.
@@ -182,18 +194,37 @@ WB 교재스캔/내신브레인_영어/        ← 드라이브. 0_먼저_읽어
 - 그 둘만 있으면 나머지(`00`·`01`·`04`~`09`)는 없어도 팩이 나온다 — 나중에 채워 다시 올리면
   그 부분만 더해진다.
 
-**교과서 코드(packId 의 가운데 조각)** — 2022 개정 중등 내신 10종. 학년은 `m1`·`m2`·`m3`.
+**교과서 코드(packId 의 가운데 조각)** — 정본은 `desk/lib/ledger-core.js` 의 `TEXTBOOKS` 다.
+**개정 연도는 학년의 속성이다**: 중1·중2 는 2022 개정 10종, **중3 은 아직 2015 개정이고 12종**이다
+(2026-09-18 이그잼포유 자료실 확인). 라인업 자체가 달라서 학년을 보지 않고 `2022-` 를 붙이면
+중3 packId 가 통째로 틀린다 — 저자가 두 라인업에 다 있는 교과서(YBM 박준언·동아 윤정미·
+동아 이병민)는 경로 파싱이 정상으로 통과해 **조용히** 틀린 값이 나온다. `revisionFor()` 가 이걸 막는다.
+
+*2022 개정 — 중1·중2 (10종)*
 
 | 교과서 | 코드 | 교과서 | 코드 |
 |---|---|---|---|
 | NE능률(김기택) | `ne-kimgitaek` | 비상(황종배) | `visang-hwangjongbae` |
 | YBM(김은형) | `ybm-kimeunhyeong` | 지학사(송미정) | `jihak-songmijeong` |
-| YBM(박준언) | `ybm-parkjuneon` | 천재(소영순) | `chunjae-soyeongsun` |
-| 동아(윤정미) | `donga-yunjeongmi` | 천재(이상기) | `chunjae-leesanggi` |
-| 동아(이병민) | `donga-leebyeongmin` | 미래엔(문영인) | `mirae-munyeongin` |
+| YBM(박준언) ※ | `ybm-parkjuneon` | 천재(소영순) | `chunjae-soyeongsun` |
+| 동아(윤정미) ※ | `donga-yunjeongmi` | 천재(이상기) | `chunjae-leesanggi` |
+| 동아(이병민) ※ | `donga-leebyeongmin` | 미래엔(문영인) | `mirae-munyeongin` |
 
-`2022-ne-kimgitaek-m2-L6` 처럼 조립한다. **드라이브 폴더 경로가 곧 packId** 라 옮겨 적을 일이
-없다 — 교과서 폴더에서 코드를, 학년·과 폴더에서 나머지를 그대로 읽는다.
+*2015 개정 — 중3 (12종)* — ※ 표시 셋은 위 코드를 그대로 쓴다(학년만 넓힘).
+
+| 교과서 | 코드 | 교과서 | 코드 |
+|---|---|---|---|
+| NE능률(김성곤) | `ne-kimseonggon` | 미래엔(최연희) | `mirae-choeyeonhui` |
+| NE능률(양현권) | `ne-yanghyeongwon` | 비상(김진완) | `visang-kimjinwan` |
+| YBM(박준언) ※ | `ybm-parkjuneon` | 지학사(민찬규) | `jihak-minchangyu` |
+| YBM(송미정) | `ybm-songmijeong` | 천재(이재영) | `chunjae-leejaeyeong` |
+| 금성(최인철) | `kumsung-choeincheol` | 천재(정사열) | `chunjae-jeongsayeol` |
+| 동아(윤정미) ※ | `donga-yunjeongmi` | 동아(이병민) ※ | `donga-leebyeongmin` |
+
+`2022-ne-kimgitaek-m2-L6` · `2015-kumsung-choeincheol-m3-L4` 처럼 조립한다.
+**드라이브 폴더 경로가 곧 packId** 라 옮겨 적을 일이 없다 — 교과서 폴더에서 코드를,
+학년·과 폴더에서 나머지를, 개정은 학년에서 읽는다. 그 교과서에 없는 학년이면 packId 를
+만들지 않는다(빈 문자열) — 추측해서 틀린 값을 내느니 안 낸다.
 
 **왜 서버가 아니라 Claude Code 세션인가.** 원장이 Claude Max 를 쓰고 있어 구독 안에서
 처리하는 것이 추가 요금 0 이다. 서버 AI 추출(`/job/extract`)은 호출마다 API 요금이 따로
