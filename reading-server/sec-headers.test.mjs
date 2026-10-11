@@ -46,9 +46,15 @@ try {
 
   /* 네 갈래를 모두 본다 — 정적 루트·앱 디렉터리·API·404. 라우팅 분기마다 따로 쓰면
      한 갈래만 빠지는데, 빠진 쪽이 하필 관리 웹이면 그게 공개로 색인된다. */
-  const paths = ['/', '/naesin/', '/vocab/', '/admin/', '/api/health', '/이런-경로-없다'];
+  const paths = ['/', '/naesin/', '/vocab/', '/admin/', '/api/health', '/이런-경로-없다',
+    '/haru/v2/', '/haru/v2/samyook/', '/haru/v2/gwangju-gifted/'];
   for (const p of paths) {
     const r = await fetch(BASE + p);
+    if (p.startsWith('/haru/v2/')) {
+      ok(r.status === 200, p + ' 새 안내 경로가 열리지 않는다');
+      const body = await r.text();
+      ok(body.includes('id="main"') && body.includes('삼육중 및 영재원 대비'), p + ' 읽기 안내 대신 다른 화면을 받았다');
+    }
     for (const k of Object.keys(WANT)) {
       ok(r.headers.get(k) === WANT[k],
         `${p} 응답에 ${k} 가 정본과 다르다 — 받은 값: ${JSON.stringify(r.headers.get(k))}`);

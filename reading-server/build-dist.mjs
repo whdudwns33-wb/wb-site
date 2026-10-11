@@ -79,6 +79,13 @@ const HARU = path.join(ROOT, '..', 'haru');
 fs.mkdirSync(path.join(DIST, 'haru'), { recursive: true });
 const HARU_FILES = ['index.html', 'parent.html', 'guide.html', 'strings.js', 'plan.js', 'mastery.js', 'srs.js', 'cause.js', 'probe.js', 'preview.js', 'atoms.json', 'sw.js', 'manifest.webmanifest', 'icon.svg'];
 for (const f of HARU_FILES) fs.copyFileSync(path.join(HARU, f), path.join(DIST, 'haru', f));
+/* 읽기 안내만 복사한다. 생성기·검사·학생 데이터는 공개하지 않는다. */
+const HARU_PUBLIC_FILES = ['v2/index.html', 'v2/samyook/index.html', 'v2/gwangju-gifted/index.html', 'v2/style.css', 'v2/catalog.js', 'v2/public.js', 'v2/catalog.json'];
+for (const f of HARU_PUBLIC_FILES) {
+  const target = path.join(DIST, 'haru', f);
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.copyFileSync(path.join(HARU, f), target);
+}
 
 /* 어휘브레인 (hanja/) — 같은 오리진 /hanja/ 에서 서빙해야 학생 토큰·API가 공유된다.
    단어장(문제집 낱말)은 dist 에 싣지 않는다 — KV(hanja:book:*)에만 산다. book-sample.json 은 자체 창작 체험 단어장이라 실어도 된다. */
@@ -215,7 +222,7 @@ function verifyRefs(htmlPath) {
 const broken = [];
 for (const f of ['index.html', 'vocab/index.html', 'vocab-age/index.html', 'admin/index.html',
   'admin/metrics.html', 'admin/vocab-review.html', 'review.html', 'parent.html',
-  'naesin/index.html', 'haru/index.html', 'haru/parent.html', 'haru/guide.html', 'admin/haru-admin.html', 'admin/naesin-admin.html',
+  'naesin/index.html', 'haru/index.html', 'haru/parent.html', 'haru/guide.html', 'haru/v2/index.html', 'haru/v2/samyook/index.html', 'haru/v2/gwangju-gifted/index.html', 'admin/haru-admin.html', 'admin/naesin-admin.html',
   'hanja/index.html', 'admin/hanja-admin.html', 'admin/hanja-print.html',
   'chunk/index.html', 'chunk/print.html', 'chunk/class.html', 'admin/chunk-admin.html',
   'letter/index.html', 'admin/letter-admin.html']) {
