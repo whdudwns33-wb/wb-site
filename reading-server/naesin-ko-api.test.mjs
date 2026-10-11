@@ -22,6 +22,7 @@ function memStore() {
     getSummary: (c) => summaries[c] || null,
     putSummary: (c, rec) => { summaries[c] = rec; },
     listSummaryCodes: () => Object.keys(summaries),
+    listStateCodes: () => Object.keys(states),
     getReviews: (c) => reviews[c] || null,
     putReviews: (c, rec) => { reviews[c] = rec; },
     getOverlay: (s) => overlays[s] || null,
@@ -468,6 +469,99 @@ await t('몸통 상한은 관리 경로만 크다 — 형제 앱과 같은 모�
 await t('모르는 경로는 404', async () => {
   const s = memStore();
   assert.strictEqual((await call(s, { path: '/api/naesin-ko/nope', who: ADMIN })).status, 404);
+});
+
+/* ── 라이선스 자료가 학생 기록을 타고 KV·야간 백업에 눕지 않는가 ──
+   오답노트가 발문 원문을 담고 있었다(2026-10-11 발견). 앱은 이제 좌표만 적지만, 서비스 워커에
+   옛 버전이 남은 태블릿이 한동안 계속 발문을 올려 보낸다. 서버가 쓸 때·읽을 때 모두 떼어 낸다.
+   자료는 금고(원장 PC)에만 둔다는 결정의 전제가 "자료는 라이선스 칸에만 있다"이고,
+   이 가드가 그 전제를 지킨다. */
+const STEM = '이 시의 화자가 처한 상황으로 가장 적절한 것은?';
+const dirtyState = () => ({
+  v: 1, savedAt: 1, packs: {
+    'dummy-ko-u1': {
+      states: {}, essays: {}, dump: [], log: [],
+      wrong: {
+        'item-a': { key: 'item-a', label: STEM, n: 2, cleared: false, dates: [] },
+        'rt-b': { key: 'rt-b', label: '㉠ ‘죽는 날까지’의 함축적 의미', n: 1, cleared: false, dates: [] },
+        'apply-c': { key: 'apply-c', workId: 'w-1', kind: 'apply', no: 7, n: 1, cleared: false, dates: [] },
+      },
+    },
+  },
+});
+const stemsIn = (o) => JSON.stringify(o).includes(STEM);
+
+await t('학생이 올린 발문은 저장되지 않는다 — 좌표는 남는다', async () => {
+  const s = memStore();
+  const r = await call(s, { path: '/api/naesin-ko/state', method: 'PUT',
+    getBody: async () => ({ state: dirtyState() }) });
+  assert.strictEqual(r.status, 200);
+  const saved = s._raw.states['st-1'];
+  assert.ok(saved, '기록이 저장되지 않았다');
+  assert.ok(!stemsIn(saved), '발문이 저장소에 들어갔다 — KV·야간 백업까지 복제된다');
+  const w = saved.state.packs['dummy-ko-u1'].wrong;
+  /* 지우는 것은 글뿐이다 — 오답노트 자체(횟수·해결 여부)는 학생의 공부 기록이라 남는다 */
+  assert.strictEqual(w['item-a'].n, 2);
+  assert.strictEqual(w['item-a'].cleared, false);
+  assert.ok(!('label' in w['item-a']), 'label 이 남아 있다');
+  assert.ok(!('label' in w['rt-b']), '주석 복원 쪽 label 이 남아 있다');
+  /* 좌표만 적은 새 앱의 기록은 손대지 않는다 */
+  assert.strictEqual(w['apply-c'].workId, 'w-1');
+  assert.strictEqual(w['apply-c'].no, 7);
+});
+
+await t('발문을 뺀 뒤의 크기로 상한을 잰다 — 옛 기기가 기록을 아예 못 올리면 안 된다', async () => {
+  const s = memStore();
+  const st = dirtyState();
+  /* 상한(300KB)을 넘기는 것은 발문뿐이게 만든다 */
+  st.packs['dummy-ko-u1'].wrong['item-big'] = { key: 'item-big', label: '가'.repeat(200_000), n: 1, cleared: false, dates: [] };
+  const r = await call(s, { path: '/api/naesin-ko/state', method: 'PUT', getBody: async () => ({ state: st }) });
+  assert.strictEqual(r.status, 200, '발문을 떼면 상한 안인데 413 이 났다');
+  assert.ok(!('label' in s._raw.states['st-1'].state.packs['dummy-ko-u1'].wrong['item-big']));
+});
+
+await t('이미 저장된 발문은 내보내지 않는다 — 기기를 바꿔도 다시 퍼지지 않는다', async () => {
+  const s = memStore();
+  /* 가드가 생기기 전에 들어간 기록을 직접 심는다 */
+  s._raw.states['st-1'] = { state: dirtyState(), updatedAt: '2026-10-01T00:00:00.000Z' };
+  const r = await call(s, { path: '/api/naesin-ko/state', method: 'GET' });
+  assert.strictEqual(r.status, 200);
+  assert.ok(!stemsIn(r.body), '응답에 발문이 실려 나갔다');
+});
+
+await t('관리 청소 — GET 은 세어만 보고 POST 가 지운다', async () => {
+  const s = memStore();
+  s._raw.states['st-1'] = { state: dirtyState(), updatedAt: '2026-10-01T00:00:00.000Z' };
+  s._raw.states['st-2'] = { state: dirtyState(), updatedAt: '2026-10-02T00:00:00.000Z' };
+  const dry = await call(s, { path: '/api/naesin-ko/admin/scrub', method: 'GET', who: ADMIN });
+  assert.strictEqual(dry.status, 200);
+  assert.strictEqual(dry.body.dryRun, true);
+  assert.strictEqual(dry.body.records, 2);
+  assert.strictEqual(dry.body.touched, 2);
+  assert.strictEqual(dry.body.labels, 4, '학생 2명 × 발문 2개를 세야 한다');
+  /* 세어만 봤으니 아직 저장소에는 남아 있다 */
+  assert.ok(stemsIn(s._raw.states['st-1']));
+
+  const wet = await call(s, { path: '/api/naesin-ko/admin/scrub', method: 'POST', who: ADMIN });
+  assert.strictEqual(wet.body.dryRun, false);
+  assert.strictEqual(wet.body.labels, 4);
+  assert.ok(!stemsIn(s._raw.states['st-1']), '청소 뒤에도 발문이 남아 있다');
+  assert.ok(!stemsIn(s._raw.states['st-2']));
+  /* updatedAt 은 올리지 않는다 — 올리면 학생 기기의 더 새 기록이 서버 것에 밀려 진도가 되돌아간다 */
+  assert.strictEqual(s._raw.states['st-1'].updatedAt, '2026-10-01T00:00:00.000Z');
+  /* 두 번 돌려도 탈이 없다 */
+  assert.strictEqual((await call(s, { path: '/api/naesin-ko/admin/scrub', method: 'POST', who: ADMIN })).body.labels, 0);
+});
+
+await t('청소는 관리자만 — 학생 토큰은 403, 기록도 손대지 않는다', async () => {
+  const s = memStore();
+  /* 관리 경로는 naesin-ko-api.mjs 의 한 줄 관문(`if (!who.admin) return 403`)이 전부 막는다 */
+  assert.strictEqual((await call(s, { path: '/api/naesin-ko/admin/scrub', method: 'GET' })).status, 403);
+  assert.strictEqual((await call(s, { path: '/api/naesin-ko/admin/scrub', method: 'POST' })).status, 403);
+  /* 남의 기록을 훑는 라우트라 막혔을 때 저장소에 손이 가지 않았는지까지 본다 */
+  s._raw.states['st-2'] = { state: dirtyState(), updatedAt: '2026-10-02T00:00:00.000Z' };
+  await call(s, { path: '/api/naesin-ko/admin/scrub', method: 'POST' });
+  assert.ok(stemsIn(s._raw.states['st-2']), '권한 없는 호출이 남의 기록을 고쳤다');
 });
 
 console.log('\n통과 ' + passed + '개 — 국어브레인 서버 라우트 검증 완료');
