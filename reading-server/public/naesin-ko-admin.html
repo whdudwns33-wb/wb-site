@@ -219,6 +219,9 @@ function render() {
       <button class="btn ghost sm" id="btnRbSave" disabled>저작한 것 내려받기</button>
       <span class="muted" id="rbMsg"></span>
     </div>
+    <p class="muted" style="margin-top:6px">내려받은 파일에는 <b>교재에서 온 채점 기준</b>이 섞입니다 —
+      자료를 두는 그 컴퓨터(금고)에만 두세요. 휴대폰·다른 노트북에서 받으면 사본이 금고 밖에 생깁니다.
+      브라우저에 남는 저작 초안은 <b>2주 뒤 저절로 지워집니다</b>.</p>
     <div id="rbList" class="muted" style="margin-top:10px">팩을 고르고 불러오기를 누르세요.</div>
   </div>
 
@@ -664,6 +667,13 @@ async function rbDrop(det) {
 function rbBind() {
   $('#btnRbLoad').onclick = () => rbLoad(false);
   $('#btnRbSave').onclick = () => {
+    /* 라이선스 자료가 섞인 파일을 내보내기 전에 한 번 묻는다(원장 결정 2026-10-11 — 기능은
+       남기고 경고만). 자료는 금고(원장 PC)에만 둔다는 결정 아래에서, 다운로드 폴더는 그 컴퓨터가
+       금고일 때만 금고 안이다. 관리 웹은 휴대폰·다른 노트북에서도 열린다. */
+    if (!confirm('이 파일에는 교재에서 온 채점 기준이 섞입니다.\n\n자료를 두는 그 컴퓨터(금고)에만 두세요 — 지금 이 기기가 그 컴퓨터인가요?\n\n저작한 값은 서버에도 들어가 있어, 받지 않아도 잃지 않습니다.')) {
+      $('#rbMsg').textContent = '내려받지 않았어요 — 저작한 값은 그대로 있습니다.';
+      return;
+    }
     /* 저작한 것은 KV 에만 두지 않는다 — 작업 폴더에 남겨야 다시 만들 때 잃지 않는다.
        화면에 보이는 값 그대로 담는다(입력이 곧 초안이라 따로 걷을 것이 없다) */
     const out = { packId: RB.packId, savedAt: new Date().toISOString(),

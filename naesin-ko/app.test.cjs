@@ -109,6 +109,14 @@ t('관리 웹의 루브릭 초안은 기한이 있다 — 브라우저에 영구
   assert.ok(/localStorage\.removeItem\(rbStore\(\)\)/.test(admin), '초안이 비었을 때 칸을 비우지 않는다');
   assert.ok(/at: Date\.now\(\)/.test(admin), '초안에 적은 시각이 없으면 나이를 알 수 없다');
   assert.ok(/rbSweep\(\);/.test(admin), 'rbSweep 을 부르는 곳이 없다');
+  /* 내려받기는 남기고 경고만 띄운다(원장 결정 2026-10-11) — 누르기 전에 보이는 고정 안내와
+     누른 뒤의 확인, 둘 다 있어야 한다. 확인만 있으면 늦고, 안내만 있으면 지나친다. */
+  assert.ok(/금고/.test(admin), '다운로드 파일을 어디 둬야 하는지 화면에 적혀 있지 않다');
+  const dl = admin.slice(admin.indexOf("$('#btnRbSave').onclick"), admin.indexOf("$('#btnRbSave').onclick") + 1400);
+  assert.ok(/confirm\(/.test(dl), '내려받기 전에 묻지 않는다 — 라이선스 자료가 섞인 파일이다');
+  assert.ok(dl.indexOf('confirm(') < dl.indexOf('a.click()'), '묻기 전에 이미 내려받는다');
+  assert.ok(/return;/.test(dl.slice(dl.indexOf('confirm('), dl.indexOf('a.click()'))),
+    '아니오를 눌러도 내려받는다');
 });
 
 console.log('OK — ' + passed + '개 통과');
