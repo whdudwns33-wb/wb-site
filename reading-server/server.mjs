@@ -18,6 +18,7 @@ import { handleHanja, hanjaBodyLimit, dropStudentHanja, dumpHanja } from './hanj
 import { handleChunk, dropStudentChunk } from './chunk-api.mjs';
 import { handleLetter, letterBodyLimit, dropStudentLetter, dumpLetter, pushDueIssues } from './letter-api.mjs';
 import { checkAdminLogin } from './admin-auth.mjs';
+import { applySecurityHeaders } from './sec-headers.mjs';
 import { handlePortalFamilyLink, PORTAL_LINK_BODY_LIMIT, withPortalFamilies } from './portal-family.mjs';
 import { bookIndex, cleanWords, coachingCard, confirmAllPlan, findBook, readyToConfirm, sourceSummary, validProgress, withOverlay } from './textbook.mjs';
 import { parseRoster } from './roster.mjs';
@@ -475,6 +476,9 @@ function serveFile(res, base, rel) {
 
 /* ── 서버 ── */
 const server = http.createServer(async (req, res) => {
+  /* 운영(Cloudflare)이 reading/_headers 로 전 경로에 붙이는 보안 헤더를 이 서버도 붙인다.
+     노출 경로가 늘어나도(터널·포트포워딩) 라우팅 어디서도 빠지지 않게 핸들러 맨 앞 한 곳에서 건다. */
+  applySecurityHeaders(res);
   const url = new URL(req.url, 'http://x');
   const p = url.pathname;
   try {
