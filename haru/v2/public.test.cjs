@@ -81,7 +81,7 @@ async function test(name, fn) { await fn(); console.log('통과:', name); count+
     }
     const home = read('index.html'), gifted = read('gwangju-gifted/index.html');
     for (const entry of data.directory) assert.ok(home.includes('id="directory-' + entry.id + '"'));
-    assert.match(home, /전남·전북 전체 기관 명부는 미완료/);
+    assert.match(home, /2026 운영·2027 모집의 전수 확인은 미완료/);
     for (const id of ['art','kiwoom','kaist-gwangju','jnu']) assert.ok(gifted.includes('id="' + id + '"'));
     assert.equal(data.courses.filter(c => ['kiwoom','kaist-gwangju','jnu'].includes(c.institution)).length, 0);
     assert.equal(data.events.filter(e => ['kiwoom','kaist-gwangju'].includes(e.institution)).length, 0);
@@ -133,7 +133,7 @@ async function test(name, fn) { await fn(); console.log('통과:', name); count+
     for (const s of ged) {
       const url = new URL(s.url);
       assert.equal(url.searchParams.get('stndYear'), '2027');
-      assert.ok(data.directory.some(i => i.source === s.id));
+      assert.ok(data.directory.some(i => i.source === s.id || i.source === s.id + '-conditions'));
       assert.equal(s.status, '확인 필요');
     }
     const schoolClass = data.directory.find(i => i.id === 'jb-25747');
@@ -146,6 +146,13 @@ async function test(name, fn) { await fn(); console.log('통과:', name); count+
     assert.match(data.directory.find(i => i.id === 'jn-25908').limits, /예술의 인접지역/);
     assert.match(data.directory.find(i => i.id === 'jn-ged').limits, /모든 운영기관 명부는 아님/);
     assert.equal(data.courses.length, 21);
+    for (const id of ['jn-cyber', 'jb-cyber']) {
+      const entry = data.directory.find(e => e.id === id);
+      assert.deepEqual(entry.events, []);
+      assert.match(entry.target, /2027.*미확인/);
+      assert.equal(data.sources.find(s => s.id === entry.source).status, '전년도 참고');
+    }
+    for (const name of ['완산서초', '화정초']) assert.match(data.directory.find(e => e.name.includes(name)).limits, /폐지·미운영으로 확정하지 않음/);
   });
   await test('GED 밖 공식 요강과 설립 공지는 접수·학년·확인 범위를 구분', () => {
     const ks = data.directory.find(i => i.id === 'ksnu');
@@ -180,6 +187,37 @@ async function test(name, fn) { await fn(); console.log('통과:', name); count+
     const fake = structuredClone(data);
     fake.sources.find(s => s.id === 'ksnu-2027-1012').url = 'https://kunsan.gidea.co.kr.evil.example/';
     assert.throws(() => catalog.validate(fake));
+  });
+  await test('등록 명부와 현 모집 자격·추천·증빙의 확인 범위를 혼용하지 않음', () => {
+    const registered = data.sources.filter(s => s.id.startsWith('roster-') && s.id.endsWith('-2025-1012'));
+    assert.equal(registered.length, 24);
+    assert.equal(registered.filter(s => s.id.startsWith('roster-jn-')).length, 16);
+    for (const source of registered) {
+      assert.equal(new URL(source.url).searchParams.get('stndYear'), '2025');
+      assert.equal(source.status, '전년도 참고');
+    }
+    assert.equal(data.directory.length, 68);
+    assert.equal(data.courses.length, 21);
+    for (const id of ['jn-cyber', 'jb-cyber']) {
+      const entry = data.directory.find(e => e.id === id);
+      assert.deepEqual(entry.events, []);
+      assert.match(entry.target, /2027.*미확인/);
+      assert.equal(data.sources.find(s => s.id === entry.source).status, '전년도 참고');
+    }
+    for (const name of ['완산서초', '화정초']) assert.match(data.directory.find(e => e.name.includes(name)).limits, /폐지·미운영으로 확정하지 않음/);
+    const buan = data.directory.find(e => e.source === 'buan-2027-1012');
+    assert.match(buan.target, /1년 이상 수료/);
+    assert.match(buan.limits, /자기소개서.*1개월 이내/);
+    assert.equal(buan.events[0].end, '2026-11-17T17:00');
+    assert.match(data.directory.find(e => e.id === 'jn-25908').limits, /7일 이내.*학교 밖.*1개월 이내/);
+    assert.match(data.directory.find(e => e.id === 'jb-25934').limits, /학습계획서 필수.*포트폴리오 선택/);
+    assert.match(data.directory.find(e => e.id === 'jb-25746').limits, /GED 첨부파일/);
+    assert.match(data.directory.find(e => e.id === 'jb-25747').limits, /담임에게/);
+    assert.match(data.directory.find(e => e.id === 'jb-25963').limits, /포트폴리오 20매 이내/);
+    for (const entry of data.directory.filter(e => e.source.startsWith('roster-'))) {
+      assert.deepEqual(entry.events, []);
+      assert.match(entry.target, /2027.*미확인/);
+    }
   });
   console.log('새 공개 안내:', count, '개 통과');
 })().catch(error => { console.error(error); process.exitCode = 1; });

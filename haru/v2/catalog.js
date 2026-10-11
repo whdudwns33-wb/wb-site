@@ -25,7 +25,7 @@
     const unique = rows => { const ids = rows.map(row => row.id); if (new Set(ids).size !== ids.length) throw new Error('중복 id'); return new Set(ids); };
     const sources = unique(data.sources), institutions = unique(data.institutions);
     unique(data.courses); unique(data.admissions); unique(data.directory);
-    const official = new Set(['samyook.jge.ms.kr', 'gice.gen.go.kr', 'ai.jge.go.kr', 'gifted.gnue.ac.kr', 'csge.jnu.ac.kr', 'school.jbedu.kr', 'office.jbedu.kr', 'posef.or.kr', 'changpyeong.hs.jne.kr', 'www.jnei.go.kr', 'gifted.mokpo.ac.kr', 'www.scnu.ac.kr', 'select.gifted.ac.kr', 'ged.kedi.re.kr', 'kunsan.gidea.co.kr', 'kentech.ac.kr', 'kj-gart.jge.ms.kr', 'dream.mokpo.ac.kr', 'talented.kaist.ac.kr', 'mped.jge.go.kr', 'ysed.jge.go.kr', 'njed.jne.go.kr']);
+    const official = new Set(['samyook.jge.ms.kr', 'gice.gen.go.kr', 'ai.jge.go.kr', 'gifted.gnue.ac.kr', 'csge.jnu.ac.kr', 'school.jbedu.kr', 'office.jbedu.kr', 'posef.or.kr', 'changpyeong.hs.jne.kr', 'www.jnei.go.kr', 'gifted.mokpo.ac.kr', 'www.scnu.ac.kr', 'select.gifted.ac.kr', 'ged.kedi.re.kr', 'kunsan.gidea.co.kr', 'kentech.ac.kr', 'kj-gart.jge.ms.kr', 'dream.mokpo.ac.kr', 'talented.kaist.ac.kr', 'mped.jge.go.kr', 'ysed.jge.go.kr', 'njed.jne.go.kr', 'jge.go.kr', 'www.jbe.go.kr']);
     for (const source of data.sources) {
       const url = new URL(source.url);
       if (url.protocol !== 'https:' || !official.has(url.hostname) || url.username || url.password) throw new Error('공식 출처 주소 오류');
