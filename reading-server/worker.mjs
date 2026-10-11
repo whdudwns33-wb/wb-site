@@ -1086,7 +1086,9 @@ export default {
           if (books && typeof books === 'object' && c in books) {
             delete books[c];
             await env.DB.put('naesin:books', JSON.stringify(books));
-            removed += 1;
+            /* removed 는 지운 키 목록이다(개수가 아니다) — 이 맵은 키를 지우는 게 아니라
+               한 칸만 비우므로 무엇을 비웠는지 적는다. */
+            removed.push('naesin:books/' + c);
           }
         }
         /* 문항 신고는 팩 정오표라 남긴다 — 학생이 떠나도 그 문항의 오류는 그대로다.
