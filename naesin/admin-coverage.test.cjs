@@ -111,6 +111,21 @@ t('고등 조합은 먼저 만들 목록에 섞지 않는다 — 채울 수 있�
   assert.ok(/고등 조합/.test(card), '고등 조합을 왜 안 셌는지 화면이 말하지 않는다');
 });
 
+t('퇴원 학생은 교과서 지정표에서도 빠진다 — 유령 학생이 수집 순서를 흔든다', () => {
+  /* 지정표는 맵 한 레코드라 학생별 키를 지우는 기존 방식으로 닿지 않는다. 양쪽 호스트 모두 */
+  assert.ok(/drop\(naesinRoot\(\)\.books \|\| \{\}, c\)/.test(server), 'server.mjs 퇴원 처리가 naesin:books 를 안 지운다');
+  assert.ok(/const books = await env\.DB\.get\('naesin:books', 'json'\)/.test(worker), 'worker.mjs 퇴원 처리가 naesin:books 를 안 지운다');
+  assert.ok(/delete books\[c\]/.test(worker) && /env\.DB\.put\('naesin:books'/.test(worker), 'worker 가 지운 뒤 다시 쓰지 않는다');
+});
+
+t('조합 표가 낡은 지정 단서를 보여 준다 — 단정하지는 않는다', () => {
+  const card = admin.slice(admin.indexOf('function renderBooks('), admin.indexOf('async function saveBooks('));
+  assert.ok(/c\.staleHint/.test(card), '낡은 지정 단서를 쓰지 않는다');
+  assert.ok(/c\.bookGrades\.map/.test(card), '어느 학년 팩이 있는지 보여 주지 않는다');
+  /* '틀렸다'고 쓰면 거짓 경고가 된다 — 코드표를 안 보므로 단정할 근거가 없다 */
+  assert.ok(/있을 수|그대로일 수/.test(card), '단서를 단정으로 적었다');
+});
+
 t('카드가 과(Lesson)를 단정하지 않는다 — 그 판정은 팩 커버리지 몫이다', () => {
   const card = admin.slice(admin.indexOf('function renderBooks('), admin.indexOf('/* ── 팩 커버리지 ──'));
   assert.ok(card.length > 1000);

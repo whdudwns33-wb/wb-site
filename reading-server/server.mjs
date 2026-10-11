@@ -889,6 +889,9 @@ const server = http.createServer(async (req, res) => {
         drop(naesinRoot().states, c);
         drop(naesinRoot().exams, c);
         drop(naesinRoot().results, c);
+        /* 교과서 지정표는 맵 한 레코드다 — 위 drop 들과 달리 학생 키가 따로 없어서 여기서 지운다.
+           안 지우면 퇴원생이 '교과서별 자료 준비' 조합에 남아 수집 순서를 흔든다(워커와 동일). */
+        drop(naesinRoot().books || {}, c);
         /* 문항 신고는 팩 정오표라 남긴다 — 학생이 떠나도 그 문항의 오류는 그대로다.
            다만 누가 올렸는지는 지운다(퇴원생 식별 정보를 팩 자료에 남길 이유가 없다). 워커와 동일. */
         for (const [pid, list] of Object.entries(naesinRoot().reports)) {

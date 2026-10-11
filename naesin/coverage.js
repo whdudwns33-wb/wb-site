@@ -47,8 +47,10 @@
   function str(v) { return v == null ? '' : String(v).trim(); }
   function arr(v) { return Array.isArray(v) ? v : []; }
 
-  /* 학생에게 실제로 걸린 배정 — 서버 규약과 같은 순서다(개별 scope 가 살아 있으면 그것, 아니면 반 공통).
-     exams 는 관리 화면이 이미 들고 있는 배열이고 각 항목에 scope·packIds·expired 가 있다. */
+  /* 학생에게 실제로 걸린 배정 — reading-server/naesin-api.mjs 의 resolveExam 과 **같은 해석**이어야 한다.
+     그쪽은 만료를 **개별 배정에만** 걸고 반 공통은 지난 날짜여도 그대로 준다('시험 종료 · 자율 학습').
+     한때 여기서 반 공통도 만료면 null 로 봤는데, 그러면 서버가 아직 그 팩을 주고 있는 학생의
+     교과서 불일치를 **조용히 넘긴다** — 경고를 놓치는 쪽이라 '모르면 침묵' 원칙이 아니라 버그였다. */
   function examFor(exams, code) {
     var mine = null, def = null;
     arr(exams).forEach(function (ex) {
@@ -57,18 +59,22 @@
       else if (str(ex.scope) === 'default') def = ex;
     });
     if (mine && !mine.expired) return mine;
-    if (def && !def.expired) return def;
-    return null;
+    return def || null;
   }
 
   /* (교과서, 학년) 조합별 집계. books 는 { 학생코드: 교과서코드 } 한 칸짜리 지정표다. */
   function combos(roster, books, packs) {
-    var have = {};
+    var have = {}, gradesOf = {};
     arr(packs).forEach(function (id) {
       var p = splitPackId(id);
       if (!p) return;
       var k = p.book + '|' + p.grade;
       (have[k] = have[k] || []).push(p.packId);
+      /* 그 교과서에 팩이 있는 학년들 — 학년이 바뀐 학생(중2→중3)이 지정만 그대로 남으면
+         있을 수 없는 조합이 '먼저 만들 자료' 1위로 선다. 단정하지는 않고(그 교과서가 정말
+         그 학년에 없는지는 desk 코드표의 질문이다) 어느 학년 팩이 있는지만 같이 보여 준다. */
+      if (gradesOf[p.book] && gradesOf[p.book].indexOf(p.grade) >= 0) return;
+      (gradesOf[p.book] = gradesOf[p.book] || []).push(p.grade);
     });
     var rows = {}, unset = [];
     arr(roster).forEach(function (s) {
@@ -78,7 +84,8 @@
       var g = gradeToken(s.grade);
       if (!book || !g) { unset.push({ code: code, name: str(s.name), why: !book ? 'no-book' : 'no-grade' }); return; }
       var k = book + '|' + g;
-      var r = rows[k] || (rows[k] = { book: book, grade: g, students: [], packIds: have[k] || [] });
+      var r = rows[k] || (rows[k] = { book: book, grade: g, students: [], packIds: have[k] || [],
+        bookGrades: (gradesOf[book] || []).slice().sort() });
       r.students.push({ code: code, name: str(s.name), cls: str(s.cls) });
     });
     return {
@@ -133,6 +140,9 @@
           students: r.students.length, names: r.students,
           packIds: r.packIds, packs: r.packIds.length,
           folderPrefix: folderPrefix(r.book, r.grade),
+          /* 이 교과서에 팩이 있는 다른 학년들 — 비어 있지 않고 이 학년이 없으면 지정이 낡았을 수 있다 */
+          bookGrades: r.bookGrades,
+          staleHint: r.packIds.length === 0 && r.bookGrades.length > 0,
           /* 학생이 있는데 팩이 하나도 없는 조합 — 이것이 '먼저 만들 것'이다 */
           empty: r.packIds.length === 0,
         };

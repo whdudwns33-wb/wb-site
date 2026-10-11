@@ -1079,6 +1079,16 @@ export default {
         /* 시험 결과도 이 학생 것이다 — 남으면 같은 코드의 새 학생 화면에 앞 학생 점수가 뜨고,
            원내 성과 분석에도 퇴원생이 계속 섞인다. 키가 코드로 시작하니 접두로 훑는다. */
         for (const k of await kvListAll(env, 'naesin:result:' + c + ':')) await drop(k);
+        /* 교과서 지정표는 맵 **한 레코드**라 키 하나를 지우는 방식으로 닿지 않는다 — 안 지우면
+           퇴원생이 '교과서별 자료 준비' 조합에 계속 끼어 수집 순서를 흔든다(유령 학생). */
+        {
+          const books = await env.DB.get('naesin:books', 'json');
+          if (books && typeof books === 'object' && c in books) {
+            delete books[c];
+            await env.DB.put('naesin:books', JSON.stringify(books));
+            removed += 1;
+          }
+        }
         /* 문항 신고는 팩 정오표라 남긴다 — 학생이 떠나도 그 문항의 오류는 그대로다.
            다만 누가 올렸는지는 지운다(퇴원생 식별 정보를 팩 자료에 남길 이유가 없다). */
         for (const k of await kvListAll(env, 'naesin:report:')) {

@@ -41,7 +41,10 @@ t('examFor — 개별 배정이 살아 있으면 그것, 만료면 반 공통으
   eq(C.examFor(exams, 'S1').scope, 'S1');
   eq(C.examFor(exams, 'S2').scope, 'default', '만료된 개별 배정은 반 공통으로 폴백');
   eq(C.examFor(exams, 'S9').scope, 'default', '개별 배정이 없으면 반 공통');
-  eq(C.examFor([{ scope: 'default', expired: true }], 'S1'), null, '반 공통도 만료면 배정 없음');
+  /* 반 공통은 만료여도 서버가 그대로 준다(naesin-api.mjs resolveExam: '지난 날짜여도 그대로') —
+     여기서 null 로 보면 아직 팩을 받는 학생의 불일치를 놓친다. 한때 반대로 고정돼 있었다. */
+  eq(C.examFor([{ scope: 'default', expired: true }], 'S1').scope, 'default', '만료된 반 공통도 살아 있는 배정이다');
+  eq(C.examFor([], 'S1'), null, '배정이 아예 없으면 null');
   eq(C.examFor([], 'S1'), null);
 });
 
@@ -101,11 +104,35 @@ t('mismatches — 교과서 지정이 없으면 판정하지 않는다 (거짓 �
   eq(r.mismatches, [], '모르는 것을 틀렸다고 하지 않는다');
 });
 
-t('mismatches — 배정이 없거나 만료면 판정하지 않는다', () => {
+t('mismatches — 만료된 반 공통도 판정한다 (서버가 아직 그 팩을 준다)', () => {
+  const r = C.report({ roster: [{ code: 'S1', name: '가가', grade: '중2' }], books: { S1: 'ne-kimgitaek' },
+    packs: [], exams: [{ scope: 'default', packIds: ['2022-bisang-hwangjongbae-m2-L6'], expired: true }] });
+  eq(r.mismatches.length, 1, '만료된 반 공통의 교과서 불일치를 놓치면 안 된다');
+  eq(r.mismatches[0].bad[0].kind, 'book');
+});
+
+t('조합에 그 교과서의 팩 학년을 같이 준다 — 학년이 바뀐 학생의 낡은 지정을 알아보게', () => {
+  /* 중2 때 지정하고 중3 이 된 학생: (ne-kimgitaek, m3) 는 팩이 0개라 '먼저 만들 자료' 1위로 선다.
+     단정하지 않되, 그 교과서에 m2 팩만 있다는 사실은 보여 줘야 원장이 지정을 고친다. */
+  const r = C.report({ roster: [{ code: 'S1', name: '가가', grade: '중3' }], books: { S1: 'ne-kimgitaek' },
+    packs: ['2022-ne-kimgitaek-m2-L1', '2022-ne-kimgitaek-m2-L2'], exams: [] });
+  eq(r.combos.length, 1);
+  eq(r.combos[0].packs, 0, 'm3 팩은 없다');
+  eq(r.combos[0].bookGrades, ['m2'], '그 교과서에 팩이 있는 학년');
+  eq(r.combos[0].staleHint, true, '팩 0개인데 다른 학년 팩이 있으면 지정이 낡았을 수 있다');
+  /* 팩이 아예 없는 교과서는 단서가 없다 — 그건 정말로 먼저 만들 자료다 */
+  const fresh = C.report({ roster: [{ code: 'S2', name: '나나', grade: '중3' }], books: { S2: 'kumsung-choeincheol' },
+    packs: [], exams: [] });
+  eq(fresh.combos[0].staleHint, false, '단서가 없으면 의심하지 않는다');
+  eq(fresh.combos[0].bookGrades, []);
+});
+
+t('mismatches — 배정이 아예 없으면 판정하지 않는다', () => {
   eq(C.report({ roster: [ROSTER[0]], books: BOOKS, packs: [], exams: [] }).mismatches, []);
+  /* 만료된 **개별** 배정은 서버가 안 준다(resolveExam 이 개별에만 만료를 건다) — 반 공통도 없으면 판정 없음 */
   eq(C.report({ roster: [ROSTER[0]], books: BOOKS, packs: [],
-    exams: [{ scope: 'default', packIds: ['2022-bisang-hwangjongbae-m2-L6'], expired: true }] }).mismatches, [],
-    '지난 시험의 배정은 경고 대상이 아니다');
+    exams: [{ scope: ROSTER[0].code, packIds: ['2022-bisang-hwangjongbae-m2-L6'], expired: true }] }).mismatches, [],
+    '만료된 개별 배정만 있고 반 공통이 없으면 받는 팩이 없다');
 });
 
 t('mismatches — 올바른 배정에는 아무 말도 하지 않는다', () => {

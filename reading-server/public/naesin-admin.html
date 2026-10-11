@@ -964,9 +964,14 @@ function renderBooks(){
         const folder=c.folderPrefix
           ? `<code>${esc(c.folderPrefix)}</code><span class="muted">L1 …</span>`
           : '<span class="muted">개정 연도 미정 — 폴더 이름은 원장이 정합니다</span>';
+        /* 팩이 0개인데 그 교과서의 다른 학년 팩은 있다 — 학년이 바뀐 학생의 낡은 지정일 수 있다.
+           단정하지 않고 사실만 붙인다(그 교과서가 그 학년에 정말 없는지는 코드표의 질문이다). */
+        const stale=c.staleHint
+          ? `<br><span class="muted">이 교과서는 ${c.bookGrades.map(g=>esc(gradeKo(g))).join('·')} 팩만 있어요 — 학년이 바뀐 학생의 지정이 그대로일 수 있습니다</span>`
+          : '';
         return `<tr class="${c.empty?'hot':''}"><td><code>${esc(c.book)}</code></td><td>${esc(gradeKo(c.grade))}</td>
           <td><b>${num(c.students)}명</b><br><span class="muted">${names}</span></td>
-          <td style="white-space:normal">${packs}</td>
+          <td style="white-space:normal">${packs}${stale}</td>
           <td style="white-space:normal">${folder}</td></tr>`;
       }).join('')}</tbody></table></div>`;
   }
