@@ -75,4 +75,48 @@ t('단원 전환 버튼은 체험 모드에서도 남는다 — 돌아갈 길이
   assert.ok(/loadPack\(id, true\)/.test(js), '단원 전환이 즉시 반영되지 않는다');
 });
 
+/* ── 라이선스 자료가 학생 기록에 베껴지지 않는가 ──
+   오답노트가 발문 원문(it.stem)을 담아 localStorage·KV·야간 백업까지 복제하고 있었다.
+   자료를 금고(원장 PC)에만 두는 결정의 전제가 "자료는 라이선스 칸에만 있다"인데
+   이 한 줄이 그 전제를 깨고 있었다 — 코드 모양으로 못 박는다. */
+t('오답노트는 좌표만 적는다 — 발문 원문을 담지 않는다', () => {
+  const mw = body('markWrong');
+  assert.ok(!/\bit\.stem\b/.test(mw) && !/\bit\.context\b/.test(mw),
+    'markWrong 이 발문·지문을 기록에 넣는다 — 그 글이 KV·야간 백업까지 복제된다');
+  ['workId', 'kind', 'no'].forEach((f) => assert.ok(new RegExp(f + ':').test(mw), mw + ' 에 ' + f + ' 좌표가 없다'));
+  assert.ok(!/label:/.test(mw), 'markWrong 이 아직 label 을 적는다');
+  /* 합성 객체로 부르는 자리도 글을 넘기면 안 된다 */
+  assert.ok(!/markWrong\([^)]*stem\s*:/.test(js), '어느 호출부가 아직 stem 을 넘긴다');
+  /* 화면 이름은 좌표로 그때그때 만든다 */
+  assert.ok(/function wrongLabel\(/.test(js), 'wrongLabel 이 없다');
+  assert.ok(/esc\(wrongLabel\(x\)/.test(js), '오답 표가 아직 저장된 글을 그린다');
+});
+
+t('옛 버전이 적어 둔 발문을 불러올 때 지우고, 지웠으면 올려 보낸다', () => {
+  const sc = body('scrubWrong');
+  assert.ok(/delete w\[k\]\.label/.test(sc), 'scrubWrong 이 label 을 지우지 않는다');
+  /* 불러오는 길이 둘이다 — 기기(localStorage)와 서버 기록. 둘 다 걸려야 한다 */
+  assert.ok(/scrubWrong\(j\)/.test(body('load')), 'localStorage 를 불러올 때 지우지 않는다');
+  assert.ok(/scrubWrong\(sv\)/.test(body('online')), '서버 기록을 받을 때 지우지 않는다');
+  /* 수도를 잠그는 것과 흘러나온 물을 닦는 것은 다른 일이다 — 지운 것을 올려 서버에서도 없애야 한다 */
+  assert.ok(/if \(S\.scrubbed\) persist\(\)/.test(js), '지운 기록을 서버로 올려 보내지 않는다');
+});
+
+t('관리 웹의 루브릭 초안은 기한이 있다 — 브라우저에 영구히 남지 않는다', () => {
+  const admin = fs.readFileSync(path.join(DIR, '..', 'reading-server', 'public', 'naesin-ko-admin.html'), 'utf8');
+  assert.ok(/RB_DRAFT_TTL_MS/.test(admin), '초안 기한이 없다 — 저작을 중간에 그만둔 단원이 영구히 남는다');
+  assert.ok(/function rbSweep\(/.test(admin), '기한 지난 초안을 훑어 지우는 길이 없다');
+  assert.ok(/localStorage\.removeItem\(rbStore\(\)\)/.test(admin), '초안이 비었을 때 칸을 비우지 않는다');
+  assert.ok(/at: Date\.now\(\)/.test(admin), '초안에 적은 시각이 없으면 나이를 알 수 없다');
+  assert.ok(/rbSweep\(\);/.test(admin), 'rbSweep 을 부르는 곳이 없다');
+  /* 내려받기는 남기고 경고만 띄운다(원장 결정 2026-10-11) — 누르기 전에 보이는 고정 안내와
+     누른 뒤의 확인, 둘 다 있어야 한다. 확인만 있으면 늦고, 안내만 있으면 지나친다. */
+  assert.ok(/금고/.test(admin), '다운로드 파일을 어디 둬야 하는지 화면에 적혀 있지 않다');
+  const dl = admin.slice(admin.indexOf("$('#btnRbSave').onclick"), admin.indexOf("$('#btnRbSave').onclick") + 1400);
+  assert.ok(/confirm\(/.test(dl), '내려받기 전에 묻지 않는다 — 라이선스 자료가 섞인 파일이다');
+  assert.ok(dl.indexOf('confirm(') < dl.indexOf('a.click()'), '묻기 전에 이미 내려받는다');
+  assert.ok(/return;/.test(dl.slice(dl.indexOf('confirm('), dl.indexOf('a.click()'))),
+    '아니오를 눌러도 내려받는다');
+});
+
 console.log('OK — ' + passed + '개 통과');
