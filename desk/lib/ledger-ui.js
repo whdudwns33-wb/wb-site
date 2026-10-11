@@ -186,10 +186,14 @@
     const c = core();
     const d = draft;
     const opt = (v, t, cur) => '<option value="' + h.esc(v) + '"' + (v === cur ? ' selected' : '') + '>' + h.esc(t) + '</option>';
+    /* 과는 숫자만이 아니다 — Special Lesson·Special Reading 도 시험 범위에 들어간다(ledger-core UNIT_RE). */
     const unitChips = [];
-    for (let u = 1; u <= 10; u++) {
-      unitChips.push('<button class="chip' + (d.units.includes(u) ? ' on' : '') + '" data-act="lg-unit" data-id="' + u + '">L' + String(u).padStart(2, '0') + '</button>');
-    }
+    const unitTokens = [];
+    for (let u = c.UNIT_MIN; u <= c.UNIT_MAX; u++) unitTokens.push('L' + u);
+    c.SPECIAL_UNITS.forEach(t => unitTokens.push(t));
+    unitTokens.forEach(t => {
+      unitChips.push('<button class="chip' + (d.units.includes(t) ? ' on' : '') + '" data-act="lg-unit" data-id="' + t + '">' + t + '</button>');
+    });
     const sChips = c.SERIES_CODES.map(s => {
       const fixed = c.SERIES[s].required;
       const on = d.requiredSeries.includes(s);
@@ -510,7 +514,8 @@
       case 'lg-need-cancel': draft = null; h.render(); return;
       case 'lg-unit': {
         if (!draft) return;
-        const u = Number(id);
+        const u = c.normalizeUnit(id);
+        if (!u) return;
         draft.units = draft.units.includes(u) ? draft.units.filter(x => x !== u) : draft.units.concat(u);
         h.render(); return;
       }

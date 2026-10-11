@@ -22,17 +22,38 @@
   const CURRICULUM = '2022';
   const SOURCE = 'examforyou';
 
+  /* 개정은 교과서가 아니라 **학년**의 속성이다 — 2022 개정이 중1·중2까지 내려왔고 중3은 아직 2015 다.
+     기본값을 '2022' 하나로 두면 중3 폴더가 조용히 2022- 로 찍힌다: 저자가 두 라인업에 모두 있는
+     교과서(YBM 박준언·동아 윤정미·동아 이병민)는 경로 파싱이 정상으로 통과해 버리기 때문에
+     틀린 packId 가 열린 채로 나온다. 그래서 학년에서 유도한다. */
+  const REVISIONS = { m1: '2022', m2: '2022', m3: '2015' };
+
+  /* grades 는 그 교과서가 실제로 있는 학년이다 — 없는 학년의 폴더에는 packId 를 만들지 않는다.
+     2022 개정 중1·중2 10종 + 2015 개정 중3 12종. 저자가 겹치는 셋(YBM 박준언 · 동아 윤정미 ·
+     동아 이병민)은 두 라인업에 다 있어 코드를 공유하고 학년만 넓혔다.
+     중3 12종은 2026-09-18 이그잼포유 자료실 목록을 옮긴 것이다(코드 슬러그는 여기서 부여). */
   const TEXTBOOKS = {
-    'ne-kimgitaek': { code: 'ne-kimgitaek', label: 'NE능률(김기택)' },
-    'ybm-kimeunhyeong': { code: 'ybm-kimeunhyeong', label: 'YBM(김은형)' },
-    'ybm-parkjuneon': { code: 'ybm-parkjuneon', label: 'YBM(박준언)' },
-    'donga-yunjeongmi': { code: 'donga-yunjeongmi', label: '동아(윤정미)' },
-    'donga-leebyeongmin': { code: 'donga-leebyeongmin', label: '동아(이병민)' },
-    'visang-hwangjongbae': { code: 'visang-hwangjongbae', label: '비상(황종배)' },
-    'jihak-songmijeong': { code: 'jihak-songmijeong', label: '지학사(송미정)' },
-    'chunjae-soyeongsun': { code: 'chunjae-soyeongsun', label: '천재(소영순)' },
-    'chunjae-leesanggi': { code: 'chunjae-leesanggi', label: '천재(이상기)' },
-    'mirae-munyeongin': { code: 'mirae-munyeongin', label: '미래엔(문영인)' }
+    /* 2022 개정 — 중1·중2 */
+    'ne-kimgitaek': { code: 'ne-kimgitaek', label: 'NE능률(김기택)', grades: ['m1', 'm2'] },
+    'ybm-kimeunhyeong': { code: 'ybm-kimeunhyeong', label: 'YBM(김은형)', grades: ['m1', 'm2'] },
+    'ybm-parkjuneon': { code: 'ybm-parkjuneon', label: 'YBM(박준언)', grades: ['m1', 'm2', 'm3'] },
+    'donga-yunjeongmi': { code: 'donga-yunjeongmi', label: '동아(윤정미)', grades: ['m1', 'm2', 'm3'] },
+    'donga-leebyeongmin': { code: 'donga-leebyeongmin', label: '동아(이병민)', grades: ['m1', 'm2', 'm3'] },
+    'bisang-hwangjongbae': { code: 'bisang-hwangjongbae', label: '비상(황종배)', grades: ['m1', 'm2'] },
+    'jihak-songmijeong': { code: 'jihak-songmijeong', label: '지학사(송미정)', grades: ['m1', 'm2'] },
+    'chunjae-soyeongsun': { code: 'chunjae-soyeongsun', label: '천재(소영순)', grades: ['m1', 'm2'] },
+    'chunjae-leesanggi': { code: 'chunjae-leesanggi', label: '천재(이상기)', grades: ['m1', 'm2'] },
+    'mirae-munyeongin': { code: 'mirae-munyeongin', label: '미래엔(문영인)', grades: ['m1', 'm2'] },
+    /* 2015 개정 — 중3 (위 셋은 학년만 넓혔으므로 여기 다시 적지 않는다) */
+    'ne-kimseonggon': { code: 'ne-kimseonggon', label: 'NE능률(김성곤)', grades: ['m3'] },
+    'ne-yanghyeongwon': { code: 'ne-yanghyeongwon', label: 'NE능률(양현권)', grades: ['m3'] },
+    'ybm-songmijeong': { code: 'ybm-songmijeong', label: 'YBM(송미정)', grades: ['m3'] },
+    'kumsung-choeincheol': { code: 'kumsung-choeincheol', label: '금성(최인철)', grades: ['m3'] },
+    'mirae-choeyeonhui': { code: 'mirae-choeyeonhui', label: '미래엔(최연희)', grades: ['m3'] },
+    'bisang-kimjinwan': { code: 'bisang-kimjinwan', label: '비상(김진완)', grades: ['m3'] },
+    'jihak-minchangyu': { code: 'jihak-minchangyu', label: '지학사(민찬규)', grades: ['m3'] },
+    'chunjae-leejaeyeong': { code: 'chunjae-leejaeyeong', label: '천재(이재영)', grades: ['m3'] },
+    'chunjae-jeongsayeol': { code: 'chunjae-jeongsayeol', label: '천재(정사열)', grades: ['m3'] }
   };
 
   const GRADES = { m1: '중1', m2: '중2', m3: '중3' };
@@ -69,8 +90,17 @@
 
   const EDITIONS = { student: '학생용', teacher: '교사용' };
 
-  /* 인테이크 드라이브 루트(README). 팩 하나 = 과 폴더 하나. */
-  const DRIVE_ROOT = 'WB 교재스캔/내신브레인_영어';
+  /* 인테이크 드라이브 루트. 정본은 docs/자료-폴더-표준.md 다 —
+     공유 폴더 하나(WB 학습자료) 아래 **앱 폴더 이름을 저장소 디렉터리와 같게** 두고,
+     그 아래 시험기 서랍(사람용), 그 아래 **폴더 이름이 곧 팩 id** 인 폴더 하나가 팩 하나다.
+     옛 3겹 구조('교과서 라벨/학년/L과')는 한글·괄호가 들어가 팩 id 규칙(^[A-Za-z0-9-]{3,60}$)을
+     만족하지 못했다 — 폴더 이름을 그대로 팩 id 로 쓰지 못하고 매번 역조립해야 했다. */
+  const DRIVE_ROOT = 'WB 학습자료';
+  const APP_DIR = 'naesin';
+  /* 시험기 서랍은 사람 편의다 — 도구는 팩 id 폴더만 본다(서랍을 몇 겹으로 두든 상관없다). */
+  const PACK_ID_RE = /^[A-Za-z0-9-]{3,60}$/;
+  /* 영어 팩 id: <개정>-<출판사저자>-<학년>-L<과> */
+  const EN_PACK_RE = /^(\d{4})-([a-z0-9]+(?:-[a-z0-9]+)*)-(m[123]|h[123])-(L\d{1,2}|S[LR]\d?)$/;
 
   const EXAM_TERMS = [
     { key: '1-mid', label: '1학기 중간' },
@@ -121,7 +151,16 @@
   const NEED_ID_RE = /^NEED-\d{4,}$/;
   const SCHOOL_RE = /^SCH-\d{2,3}$/;
   const YMD_RE = /^\d{4}-\d{2}-\d{2}$/;
-  const UNIT_MIN = 1, UNIT_MAX = 10;
+  const UNIT_MIN = 1, UNIT_MAX = 12;
+  /* 과 토큰. 교과서의 '과'가 늘 숫자인 것은 아니다 — 이그잼포유 목록에 Special Lesson·
+     Special Reading 이 섞여 있고(중1·중2 전부), 그것도 시험 범위에 들어간다. 숫자만 받으면
+     그 과는 폴더 이름을 만들 수 없어 인테이크가 통째로 멈춘다.
+       L1~L12   일반 과
+       SL·SL1·SL2   Special Lesson (사이트가 번호 없이 쓰기도 한다)
+       SR·SR1·SR2   Special Reading
+     팩 id 규칙(^[A-Za-z0-9-]{3,60}$) 안에 들어가고, 하이픈이 없어 조각 분해도 안전하다. */
+  const UNIT_RE = /^(?:L\d{1,2}|S[LR]\d?)$/;
+  const SPECIAL_UNITS = ['SL', 'SL1', 'SL2', 'SR', 'SR1', 'SR2'];
 
   function str(v) { return v == null ? '' : String(v).trim(); }
   function num(v) { const n = Number(v); return Number.isFinite(n) ? n : 0; }
@@ -159,7 +198,27 @@
   /* ── 표시 ── */
   function textbookLabel(code) { const t = TEXTBOOKS[str(code)]; return t ? t.label : ''; }
   function gradeLabel(grade) { return GRADES[str(grade)] || ''; }
-  function unitLabel(unit) { const u = num(unit); return u ? 'L' + pad2(u) : ''; }
+  /* 숫자(5)·숫자문자열('5')·토큰('sl2')을 다 받아 표준 토큰으로 돌린다. 못 읽으면 ''. */
+  function normalizeUnit(v) {
+    const raw = str(v);
+    if (!raw) return '';
+    if (/^\d{1,2}$/.test(raw)) {
+      const n = Number(raw);
+      return n >= UNIT_MIN && n <= UNIT_MAX ? 'L' + n : '';
+    }
+    const t = raw.toUpperCase().replace(/\s+/g, '');
+    if (!UNIT_RE.test(t)) return '';
+    if (t[0] === 'L') { const n = Number(t.slice(1)); return n >= UNIT_MIN && n <= UNIT_MAX ? 'L' + n : ''; }
+    return t;
+  }
+  /* 일반 과가 먼저, 그 안에서 번호 순. Special 은 뒤에 SL → SR 순으로 붙는다. */
+  function unitRank(token) {
+    const t = normalizeUnit(token);
+    if (!t) return 9999;
+    if (t[0] === 'L') return Number(t.slice(1));
+    return 100 + SPECIAL_UNITS.indexOf(t);
+  }
+  function unitLabel(unit) { return normalizeUnit(unit); }
   function seriesName(series) { const s = SERIES[str(series)]; return s ? s.name : ''; }
   function editionLabel(edition) { return EDITIONS[str(edition)] || ''; }
   function fmtWon(n) { return num(n).toLocaleString('ko-KR') + '원'; }
@@ -178,7 +237,7 @@
     return {
       textbookCode: str(c.textbookCode),
       grade: str(c.grade),
-      unit: num(c.unit) > 0 ? Math.floor(num(c.unit)) : 0,
+      unit: normalizeUnit(c.unit),
       series: /^\d$/.test(series) ? '0' + series : series,
       edition: str(c.edition) === 'teacher' ? 'teacher' : 'student'
     };
@@ -288,52 +347,60 @@
   /* ── 인테이크 경로 · packId ──
      "드라이브 폴더 경로가 곧 packId" 라는 내신브레인 계약을 그대로 쓴다.
      사람이 며칠 뒤 다시 와서 적는 칸을 없애는 것이 이 두 함수의 목적이다. */
-  function intakeFolder(assetOrCatalog) {
+  function intakeFolder(assetOrCatalog, term) {
     const src = assetOrCatalog && typeof assetOrCatalog === 'object' ? assetOrCatalog : {};
     const c = normalizeCatalog(src.catalog && typeof src.catalog === 'object' ? src.catalog : src);
-    const tb = textbookLabel(c.textbookCode);
-    const gr = gradeLabel(c.grade);
-    const un = unitLabel(c.unit);
-    if (!tb || !gr || !un) return '';
-    return [DRIVE_ROOT, tb, gr, un].join('/');
+    const id = packIdOf({ catalog: c });
+    if (!id) return '';
+    /* 서랍이 없으면 앱 폴더 바로 아래 둔다 — 도구는 팩 id 폴더만 보므로 어느 쪽이든 동작한다. */
+    return [DRIVE_ROOT, APP_DIR].concat(str(term) ? [str(term)] : []).concat([id]).join('/');
   }
-  function intakePath(asset) {
-    const folder = intakeFolder(asset);
+  function intakePath(asset, term) {
+    const folder = intakeFolder(asset, term);
     const c = normalizeCatalog(asset && asset.catalog ? asset.catalog : asset);
     const file = fileName(c.series, c.edition);
     return folder && file ? folder + '/' + file : '';
   }
 
-  /* 경로에서 packId. 교과서 폴더는 표시명(NE능률(김기택))이든 코드(ne-kimgitaek)든 받는다.
-     학년 '중2' → m2, 과 'L06' → L6. 조각 하나라도 못 읽으면 '' — 추측해서 만들지 않는다. */
-  function packIdFromPath(path, revision) {
-    const segs = str(path).replace(/\\/g, '/').split('/').map(s => s.trim()).filter(Boolean);
-    let code = '', grade = '', unit = 0;
-    segs.forEach(seg => {
-      if (!code) {
-        const byLabel = Object.keys(TEXTBOOKS).find(k => TEXTBOOKS[k].label === seg);
-        if (byLabel) { code = byLabel; return; }
-        if (TEXTBOOKS[seg]) { code = seg; return; }
-      }
-      if (code && !grade) {
-        const g = seg.match(/^중([123])$/) || seg.match(/^(m[123])$/);
-        if (g) { grade = g[1].length === 1 ? 'm' + g[1] : g[1]; return; }
-      }
-      if (code && grade && !unit) {
-        const u = seg.match(/^L(\d{1,2})$/i);
-        if (u) { unit = Number(u[1]); }
-      }
-    });
-    if (!code || !grade || !unit) return '';
-    return [str(revision) || CURRICULUM, code, grade, 'L' + unit].join('-');
+  /* 개정 연도. 인자로 준 값이 최우선이고(과거 개정 자료를 다시 넣을 때), 없으면 학년에서 유도한다.
+     교과서가 그 학년에 없으면 '' — 모르면 추측하지 않고 packId 를 만들지 않는다(기존 규칙 그대로). */
+  function revisionFor(textbookCode, grade, revision) {
+    if (str(revision)) return str(revision);
+    const t = TEXTBOOKS[str(textbookCode)];
+    if (!t || t.grades.indexOf(str(grade)) < 0) return '';
+    return REVISIONS[str(grade)] || '';
+  }
+
+  /* 경로에서 packId. 정본은 "폴더 이름이 곧 팩 id" 라(docs/자료-폴더-표준.md §2), 경로 조각 중
+     팩 id 꼴인 것을 찾아 그대로 돌려준다 — 조각을 역조립하지 않는다. 서랍을 몇 겹으로 두든 통한다.
+     아는 교과서·그 교과서에 있는 학년·맞는 개정일 때만 인정한다. 하나라도 어긋나면 '' —
+     추측해서 틀린 id 를 내느니 안 낸다. */
+  function parsePackId(id) {
+    const v = str(id);
+    if (!PACK_ID_RE.test(v)) return null;
+    const m = v.match(EN_PACK_RE);
+    if (!m) return null;
+    const revision = m[1], code = m[2], grade = m[3], unit = normalizeUnit(m[4]);
+    if (!TEXTBOOKS[code] || !GRADES[grade] || !unit) return null;
+    if (revisionFor(code, grade) !== revision) return null;
+    return { packId: v, revision: revision, textbookCode: code, grade: grade, unit: unit };
+  }
+  function packIdFromPath(path) {
+    const segs = str(path).replace(/\\/g, '/').split('/').map(x => x.trim()).filter(Boolean);
+    for (let i = segs.length - 1; i >= 0; i--) {
+      const hit = parsePackId(segs[i]);
+      if (hit) return hit.packId;
+    }
+    return '';
   }
   function packIdOf(asset, revision) {
     const a = asset || {};
-    const fromPath = packIdFromPath(a.storage && a.storage.drivePath, revision);
+    const fromPath = packIdFromPath(a.storage && a.storage.drivePath);
     if (fromPath) return fromPath;
     const c = normalizeCatalog(a.catalog);
     if (!TEXTBOOKS[c.textbookCode] || !GRADES[c.grade] || !c.unit) return '';
-    return [str(revision) || CURRICULUM, c.textbookCode, c.grade, 'L' + c.unit].join('-');
+    const rev = revisionFor(c.textbookCode, c.grade, revision);
+    return rev ? [rev, c.textbookCode, c.grade, c.unit].join('-') : '';
   }
 
   /* ── 전이 ── */
@@ -352,7 +419,7 @@
   /* ── 시험 범위(need_sets) ── */
   function normalizeUnits(list) {
     const arr = Array.isArray(list) ? list : str(list).split(/[,\s·]+/);
-    return uniq(arr.map(v => Math.floor(num(v))).filter(u => u >= UNIT_MIN && u <= UNIT_MAX)).sort((a, b) => a - b);
+    return uniq(arr.map(normalizeUnit).filter(Boolean)).sort((a, b) => unitRank(a) - unitRank(b));
   }
   function normalizeSeries(list, fallback) {
     const arr = Array.isArray(list) ? list.map(str) : (list == null ? fallback.slice() : str(list).split(/[,\s]+/));
@@ -394,10 +461,10 @@
     if (!SCHOOL_RE.test(need.schoolCode)) errors.push('학교 코드는 SCH-07 처럼 적습니다 (학교 이름은 넣지 않습니다)');
     if (!GRADES[need.grade]) errors.push('학년은 중1·중2·중3 중 하나입니다');
     if (!TEXTBOOKS[need.textbookCode]) errors.push('교과서를 10종 목록에서 고릅니다');
-    if (!need.units.length) errors.push('과(1~10)를 하나 이상 고릅니다');
+    if (!need.units.length) errors.push('과를 하나 이상 고릅니다 (L1~L' + UNIT_MAX + ' · ' + SPECIAL_UNITS.join('·') + ')');
     else {
-      const bad = (Array.isArray(raw.units) ? raw.units : []).map(num).filter(u => !(u >= UNIT_MIN && u <= UNIT_MAX) || u !== Math.floor(u));
-      if (bad.length) errors.push('과는 1~10 사이 정수만 됩니다');
+      const bad = (Array.isArray(raw.units) ? raw.units : []).filter(u => !normalizeUnit(u));
+      if (bad.length) errors.push('읽을 수 없는 과: ' + bad.map(str).join(', ') + ' — L1~L' + UNIT_MAX + ' 또는 ' + SPECIAL_UNITS.join('·') + ' 로 적습니다');
     }
     if (!need.examRef.examDateCopy) errors.push('시험일을 YYYY-MM-DD 로 적습니다 (consult 시험 일정의 값을 그대로 복사)');
     if (need.subject !== '영어') errors.push('Phase 0 은 영어만 다룹니다');
@@ -641,9 +708,9 @@
       const lines = [];
       if (n) lines.push(needLabel(n) + (examDate ? ' · 시험 ' + examDate + (dLeft != null ? ' (D-' + dLeft + ')' : '') : ''));
       lines.push('공식 구매: ' + (link.url || '(공식 링크 미설정 — 관리 담당에게 확인)') + ' — 앱에서 승인된 건만 결제');
-      lines.push('드라이브 루트: ' + DRIVE_ROOT + '/');
+      lines.push('드라이브 루트: ' + DRIVE_ROOT + '/' + APP_DIR + '/  (폴더 이름 = 팩 id, _meta.txt 에 revision)');
       group.forEach(a => {
-        lines.push(a.id + ' → ' + (intakePath(a) || catalogLabel(a) || '(카탈로그 미지정)').replace(DRIVE_ROOT + '/', '') +
+        lines.push(a.id + ' → ' + (intakePath(a) || catalogLabel(a) || '(카탈로그 미지정)').replace(DRIVE_ROOT + '/' + APP_DIR + '/', '') +
           (a.cost.hint ? ' (예상 ' + fmtWon(a.cost.hint) + ')' : ''));
       });
       lines.push('예상 합계 ' + fmtWon(total));
@@ -673,13 +740,16 @@
 
   return {
     LEDGER_PREFIX: LEDGER_PREFIX, EVENT_PREFIX: EVENT_PREFIX, NEED_PREFIX: NEED_PREFIX,
-    CURRICULUM: CURRICULUM, SOURCE: SOURCE, DRIVE_ROOT: DRIVE_ROOT,
+    CURRICULUM: CURRICULUM, REVISIONS: REVISIONS, revisionFor: revisionFor,
+    SOURCE: SOURCE, DRIVE_ROOT: DRIVE_ROOT, APP_DIR: APP_DIR, PACK_ID_RE: PACK_ID_RE, parsePackId: parsePackId,
     TEXTBOOKS: TEXTBOOKS, GRADES: GRADES, SERIES: SERIES, SERIES_CODES: SERIES_CODES,
     REQUIRED_SERIES: REQUIRED_SERIES, TEACHER_SERIES: TEACHER_SERIES,
     PRICE_HINTS: PRICE_HINTS, PRICE_WARN_PCT: PRICE_WARN_PCT, EDITIONS: EDITIONS, EXAM_TERMS: EXAM_TERMS,
     STATUS: STATUS, STATUS_LABELS: STATUS_LABELS, STATUS_RANK: STATUS_RANK, TRANSITIONS: TRANSITIONS,
     EVENT_TYPES: EVENT_TYPES, EVENT_LABELS: EVENT_LABELS, BLOCK_REASONS: BLOCK_REASONS, CHANNELS: CHANNELS,
     NOTE_MAX: NOTE_MAX, ASSET_ID_RE: ASSET_ID_RE, NEED_ID_RE: NEED_ID_RE, SCHOOL_RE: SCHOOL_RE,
+    UNIT_RE: UNIT_RE, UNIT_MIN: UNIT_MIN, UNIT_MAX: UNIT_MAX, SPECIAL_UNITS: SPECIAL_UNITS,
+    normalizeUnit: normalizeUnit, unitRank: unitRank,
     ledgerKey: ledgerKey, eventKey: eventKey, needKey: needKey, fullKey: fullKey,
     isLedgerKey: isLedgerKey, kindOfKey: kindOfKey,
     assetIdFromKey: assetIdFromKey, eventIdFromKey: eventIdFromKey, needIdFromKey: needIdFromKey,

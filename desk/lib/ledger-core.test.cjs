@@ -58,13 +58,36 @@ test('ids round-trip out of full keys and event keys are never read as asset ids
 
 /* ── 코드표 ── */
 
-test('textbook table is the ten 2022 middle-school books with README codes', () => {
+test('textbook table carries both lineups — 2022 중1·중2 ten, 2015 중3 twelve', () => {
   const codes = Object.keys(core.TEXTBOOKS);
-  assert.equal(codes.length, 10);
   assert.equal(core.TEXTBOOKS['ne-kimgitaek'].label, 'NE능률(김기택)');
   assert.equal(core.TEXTBOOKS['mirae-munyeongin'].label, '미래엔(문영인)');
   assert.equal(core.TEXTBOOKS['chunjae-leesanggi'].label, '천재(이상기)');
+  assert.equal(core.TEXTBOOKS['kumsung-choeincheol'].label, '금성(최인철)');
+  /* 비상은 bisang 하나로 쓴다 — 국어 정본 표(docs/자료-폴더-표준.md)와 같은 표기여야
+     같은 출판사가 두 갈래로 갈리지 않는다. */
+  assert.ok(codes.every(c => !c.startsWith('visang')), 'no visang- codes; 비상 is bisang-');
+  assert.equal(core.TEXTBOOKS['bisang-hwangjongbae'].label, '비상(황종배)');
   codes.forEach(c => assert.equal(core.TEXTBOOKS[c].code, c));
+  /* 학년별 라인업 수는 사이트 목록 그대로다 — 중3만 12종이고 개정도 다르다. */
+  const byGrade = g => codes.filter(c => core.TEXTBOOKS[c].grades.indexOf(g) >= 0);
+  assert.equal(byGrade('m1').length, 10);
+  assert.equal(byGrade('m2').length, 10);
+  assert.equal(byGrade('m3').length, 12);
+  /* 라벨은 폴더 이름이라 겹치면 경로를 못 가른다. */
+  const labels = codes.map(c => core.TEXTBOOKS[c].label);
+  assert.equal(new Set(labels).size, labels.length, 'labels must be unique — they are folder names');
+});
+
+test('revision comes from the grade, not from a single hardcoded default', () => {
+  assert.equal(core.REVISIONS.m2, '2022');
+  assert.equal(core.REVISIONS.m3, '2015');
+  assert.equal(core.revisionFor('ne-kimgitaek', 'm2'), '2022');
+  /* 같은 저자가 두 라인업에 다 있는 교과서 — 여기가 조용히 2022 로 찍히던 자리다. */
+  assert.equal(core.revisionFor('donga-yunjeongmi', 'm3'), '2015');
+  assert.equal(core.revisionFor('donga-yunjeongmi', 'm2'), '2022');
+  assert.equal(core.revisionFor('ne-kimgitaek', 'm3'), '', 'that book has no 중3 — do not guess');
+  assert.equal(core.revisionFor('ne-kimgitaek', 'm2', '2009'), '2009', 'an explicit revision still wins');
 });
 
 test('series table follows the exam4you numbering and flags 02/03 required, 04-06 teacher', () => {
@@ -94,9 +117,9 @@ test('file names carry the two-digit series prefix and the teacher suffix', () =
 /* ── 카탈로그 키·중복 ── */
 
 test('catalog key is source|textbook|grade|unit|series|edition', () => {
-  assert.equal(core.catalogKey(asset()), 'examforyou|ne-kimgitaek|m2|5|03|student');
+  assert.equal(core.catalogKey(asset()), 'examforyou|ne-kimgitaek|m2|L5|03|student');
   assert.equal(core.catalogKey({ textbookCode: 'ne-kimgitaek', grade: 'm2', unit: '05', series: '3', edition: 'teacher' }),
-    'examforyou|ne-kimgitaek|m2|5|03|teacher', 'bare catalog, padded unit and short series are normalized');
+    'examforyou|ne-kimgitaek|m2|L5|03|teacher', 'bare catalog, numeric unit and short series are normalized');
   assert.equal(core.catalogKey({ textbookCode: 'ne-kimgitaek' }), '', 'incomplete catalog has no key');
 });
 
@@ -120,27 +143,75 @@ test('next asset id continues past the highest number and starts at 0001', () =>
 
 /* ── 인테이크 경로 · packId ── */
 
-test('intake path follows the drive folder contract from the naesin README', () => {
+test('intake path follows docs/자료-폴더-표준.md — app dir, term drawer, packId folder', () => {
+  assert.equal(core.intakePath(asset(), '2026-2'),
+    'WB 학습자료/naesin/2026-2/2022-ne-kimgitaek-m2-L5/03_단어시험.pdf');
+  /* 서랍은 사람 편의라 없어도 된다 — 도구는 팩 id 폴더만 본다. */
   assert.equal(core.intakePath(asset()),
-    'WB 교재스캔/내신브레인_영어/NE능률(김기택)/중2/L05/03_단어시험.pdf');
-  const t = asset({ catalog: { textbookCode: 'donga-yunjeongmi', grade: 'm1', unit: 3, series: '04', edition: 'teacher' } });
-  assert.equal(core.intakePath(t),
-    'WB 교재스캔/내신브레인_영어/동아(윤정미)/중1/L03/04_예상문제_PRE-STEP_교사용.pdf');
+    'WB 학습자료/naesin/2022-ne-kimgitaek-m2-L5/03_단어시험.pdf');
+  const t = asset({ catalog: { textbookCode: 'donga-yunjeongmi', grade: 'm3', unit: 3, series: '04', edition: 'teacher' } });
+  assert.equal(core.intakePath(t, '2026-2'),
+    'WB 학습자료/naesin/2026-2/2015-donga-yunjeongmi-m3-L3/04_예상문제_PRE-STEP_교사용.pdf',
+    '중3 은 2015 개정 — 폴더 이름에도 그게 박힌다');
   assert.equal(core.intakePath(asset({ catalog: { series: '03' } })), '', 'no guessing when the folder is unknown');
+  /* 폴더 이름은 팩 id 규칙을 만족해야 한다 — 한글·괄호가 들어가면 서버가 거부한다. */
+  const folder = core.intakeFolder(asset(), '2026-2').split('/').pop();
+  assert.ok(core.PACK_ID_RE.test(folder), folder + ' must match ^[A-Za-z0-9-]{3,60}$');
 });
 
-test('packId is derived from the drive path, so the path is the id', () => {
-  assert.equal(core.packIdFromPath('WB 교재스캔/내신브레인_영어/NE능률(김기택)/중2/L06/02_본문워크북.pdf'), '2022-ne-kimgitaek-m2-L6');
-  assert.equal(core.packIdFromPath('ne-kimgitaek/m2/L06'), '2022-ne-kimgitaek-m2-L6', 'codes in the path work too');
-  assert.equal(core.packIdFromPath('NE능률(김기택)/중2/L06', '2015'), '2015-ne-kimgitaek-m2-L6');
-  assert.equal(core.packIdFromPath('WB 교재스캔/내신브레인_영어/NE능률(김기택)/중2'), '', 'missing unit → no id');
+test('packId is the folder name — found at any drawer depth, never re-assembled', () => {
+  assert.equal(core.packIdFromPath('WB 학습자료/naesin/2026-2/2022-ne-kimgitaek-m2-L6/02_본문워크북.pdf'),
+    '2022-ne-kimgitaek-m2-L6');
+  assert.equal(core.packIdFromPath('2022-ne-kimgitaek-m2-L6'), '2022-ne-kimgitaek-m2-L6', 'bare folder name works');
+  assert.equal(core.packIdFromPath('a/b/c/d/e/2015-kumsung-choeincheol-m3-L4/00_교과서본문.pdf'),
+    '2015-kumsung-choeincheol-m3-L4', 'drawers may be any depth');
+  /* 개정이 학년과 어긋나면 거부한다 — 폴더 이름을 사람이 손으로 적는 자리라 오타가 난다. */
+  assert.equal(core.packIdFromPath('2022-kumsung-choeincheol-m3-L4'), '', 'wrong revision for the grade');
+  assert.equal(core.packIdFromPath('2015-ne-kimgitaek-m2-L6'), '', 'wrong revision for the grade');
+  assert.equal(core.packIdFromPath('2022-nope-m2-L6'), '', 'unknown textbook');
+  /* 옛 3겹 한글 구조는 더 이상 인정하지 않는다 — 팩 id 규칙을 만족하지 못하는 폴더 이름이었다. */
+  assert.equal(core.packIdFromPath('WB 교재스캔/내신브레인_영어/NE능률(김기택)/중2/L06'), '');
   assert.equal(core.packIdFromPath(''), '');
+});
+
+test('unit tokens cover Special Lesson / Special Reading, not just numbers', () => {
+  /* 이그잼포유 목록에 Special Lesson·Special Reading 이 실제로 있다 — 숫자만 받으면
+     그 과는 폴더 이름을 만들 수 없어 인테이크가 멈춘다. */
+  assert.equal(core.normalizeUnit(6), 'L6');
+  assert.equal(core.normalizeUnit('6'), 'L6');
+  assert.equal(core.normalizeUnit('l6'), 'L6', 'case is normalized');
+  assert.equal(core.normalizeUnit('sl2'), 'SL2');
+  assert.equal(core.normalizeUnit('SL'), 'SL', 'the site writes it without a number too');
+  assert.equal(core.normalizeUnit('SR1'), 'SR1');
+  assert.equal(core.normalizeUnit('Special Lesson 2'), '', 'the site label is not a token');
+  assert.equal(core.normalizeUnit(0), '');
+  assert.equal(core.normalizeUnit(core.UNIT_MAX + 1), '');
+  /* 팩 id 로 왕복해야 폴더 이름으로 쓸 수 있다. */
+  const id = core.packIdOf({ catalog: { textbookCode: 'ne-kimgitaek', grade: 'm2', unit: 'SL2' } });
+  assert.equal(id, '2022-ne-kimgitaek-m2-SL2');
+  assert.ok(core.PACK_ID_RE.test(id));
+  assert.equal(core.packIdFromPath('WB 학습자료/naesin/2026-2/' + id + '/02_본문워크북.pdf'), id);
+  assert.equal(core.packIdOf({ catalog: { textbookCode: 'ne-kimgitaek', grade: 'm1', unit: 'SR' } }),
+    '2022-ne-kimgitaek-m1-SR');
+  /* 정렬: 일반 과가 먼저, Special 은 뒤에 SL → SR 순. */
+  assert.deepEqual(core.normalizeNeed({ units: ['SR1', 'L10', 'SL', 'L2', 'SL2'] }).units,
+    ['L2', 'L10', 'SL', 'SL2', 'SR1']);
+});
+
+test('parsePackId decomposes a folder name, or refuses it', () => {
+  assert.deepEqual(core.parsePackId('2015-donga-yunjeongmi-m3-L6'),
+    { packId: '2015-donga-yunjeongmi-m3-L6', revision: '2015', textbookCode: 'donga-yunjeongmi', grade: 'm3', unit: 'L6' });
+  assert.equal(core.parsePackId('2022 ne kimgitaek m2 L6'), null, 'spaces break the id rule');
+  assert.equal(core.parsePackId('2022-ne-kimgitaek-m2-L6/'), null, 'a slash is not part of an id');
+  assert.equal(core.parsePackId(''), null);
 });
 
 test('packIdOf prefers the stored path and falls back to the catalog', () => {
   assert.equal(core.packIdOf(asset()), '2022-ne-kimgitaek-m2-L5');
-  assert.equal(core.packIdOf(asset({ storage: { drivePath: 'WB 교재스캔/내신브레인_영어/YBM(박준언)/중3/L02/03_단어시험.pdf' } })),
-    '2022-ybm-parkjuneon-m3-L2');
+  assert.equal(core.packIdOf(asset({ storage: { drivePath: 'WB 학습자료/naesin/2026-2/2015-ybm-parkjuneon-m3-L2/03_단어시험.pdf' } })),
+    '2015-ybm-parkjuneon-m3-L2');
+  assert.equal(core.packIdOf({ catalog: { textbookCode: 'ne-kimgitaek', grade: 'm3', unit: 2 } }), '',
+    'catalog fallback also refuses a grade the book does not have');
   assert.equal(core.packIdOf({ catalog: { textbookCode: 'nope', grade: 'm2', unit: 1 } }), '');
 });
 
@@ -171,7 +242,7 @@ test('validateNeed accepts a well-formed set and normalizes it', () => {
   const r = core.validateNeed({ schoolCode: 'sch-07', grade: 'm2', textbookCode: 'ne-kimgitaek', units: [6, 5, 5], examDateCopy: '2026-10-14' });
   assert.equal(r.ok, true, r.errors.join(' / '));
   assert.equal(r.need.schoolCode, 'SCH-07');
-  assert.deepEqual(r.need.units, [5, 6]);
+  assert.deepEqual(r.need.units, ['L5', 'L6'], '숫자 입력도 토큰으로 정규화된다');
   assert.equal(r.need.subject, '영어');
   assert.equal(r.need.examRef.examDateCopy, '2026-10-14');
   assert.deepEqual(r.need.requiredSeries, ['02', '03']);
@@ -179,7 +250,7 @@ test('validateNeed accepts a well-formed set and normalizes it', () => {
 });
 
 test('validateNeed rejects school names, bad grades, unknown books, bad units and missing dates', () => {
-  const r = core.validateNeed({ schoolCode: '어느중학교', grade: 'h1', textbookCode: 'unknown', units: [0, 11, 2.5], examDateCopy: '10/14' });
+  const r = core.validateNeed({ schoolCode: '어느중학교', grade: 'h1', textbookCode: 'unknown', units: [0, 99, 2.5], examDateCopy: '10/14' });
   assert.equal(r.ok, false);
   assert.ok(r.errors.some(e => e.includes('SCH-07')));
   assert.ok(r.errors.some(e => e.includes('학년')));
@@ -206,7 +277,7 @@ test('examDateOf prefers the consult reference and falls back to the Phase 0 cop
 });
 
 test('needLabel names the set by code, grade, book and units', () => {
-  assert.equal(core.needLabel(need()), 'SCH-07 · 중2 · NE능률(김기택) · L05·L06');
+  assert.equal(core.needLabel(need()), 'SCH-07 · 중2 · NE능률(김기택) · L5·L6');
 });
 
 /* ── 필요 산출 ── */
@@ -222,7 +293,7 @@ test('deriveNeeds yields required student files plus recommended teacher files p
   assert.ok(required.every(r => r.edition === 'student'));
   assert.ok(d.rows.filter(r => r.tier === 'recommended').every(r => r.edition === 'teacher'));
   assert.equal(d.rows[0].fileName, '02_본문워크북.pdf');
-  assert.equal(d.rows[0].catalogKey, 'examforyou|ne-kimgitaek|m2|5|02|student');
+  assert.equal(d.rows[0].catalogKey, 'examforyou|ne-kimgitaek|m2|L5|02|student');
 });
 
 test('deriveNeeds excludes owned files and holds pending ones apart from the buy list', () => {
@@ -407,15 +478,15 @@ test('purchaseAssignments folds several assets into one sheet with a step per as
   assert.equal(a.start, '2026-09-09');
   assert.equal(a.carry, true);
   assert.equal(a.priority, 'normal', 'D-35 is not urgent');
-  assert.ok(a.detail.includes('SCH-07 · 중2 · NE능률(김기택) · L05·L06 · 시험 2026-10-14 (D-35)'));
-  assert.ok(a.detail.includes('WB 교재스캔/내신브레인_영어/'));
-  assert.ok(a.detail.includes('MAT-0107 → NE능률(김기택)/중2/L05/03_단어시험.pdf (예상 5,000원)'));
-  assert.ok(a.detail.includes('MAT-0108 → NE능률(김기택)/중2/L05/04_예상문제_PRE-STEP_교사용.pdf'));
+  assert.ok(a.detail.includes('SCH-07 · 중2 · NE능률(김기택) · L5·L6 · 시험 2026-10-14 (D-35)'));
+  assert.ok(a.detail.includes('WB 학습자료/naesin/'));
+  assert.ok(a.detail.includes('MAT-0107 → 2022-ne-kimgitaek-m2-L5/03_단어시험.pdf (예상 5,000원)'));
+  assert.ok(a.detail.includes('MAT-0108 → 2022-ne-kimgitaek-m2-L5/04_예상문제_PRE-STEP_교사용.pdf'));
   assert.ok(a.detail.includes('예상 합계 10,500원'));
   assert.ok(a.guide.includes('승인된 건만 결제'));
   assert.ok(a.guide.includes('학생 이름·학교명은 적지 않습니다'));
   const first = typeof a.steps[0] === 'string' ? a.steps[0] : a.steps[0].label;
-  assert.equal(first, 'MAT-0107 · 03_단어시험.pdf → NE능률(김기택)/중2/L05');
+  assert.equal(first, 'MAT-0107 · 03_단어시험.pdf → NE능률(김기택)/중2/L5');
 });
 
 test('purchaseAssignments uses the official link key on steps when the link module is present', () => {
@@ -423,7 +494,7 @@ test('purchaseAssignments uses the official link key on steps when the link modu
     { buyUrl: 'https://example.test/buy', linkKey: 'exam4you' });
   const a = out.assignments[0];
   assert.ok(a.detail.includes('https://example.test/buy'));
-  assert.deepEqual(a.steps[0], { label: 'MAT-0001 · 03_단어시험.pdf → NE능률(김기택)/중2/L05', ext: 'exam4you' });
+  assert.deepEqual(a.steps[0], { label: 'MAT-0001 · 03_단어시험.pdf → NE능률(김기택)/중2/L5', ext: 'exam4you' });
   assert.equal(a.priority, 'high', 'D-13 is urgent');
 });
 
