@@ -44,11 +44,26 @@ test('학생번호 링크를 우선 사용하고 원문 번호 자체는 화면�
   assert.doesNotMatch(view, /externalStudentNo/);
 });
 
-test('이름·학년 자동연결과 김예린 수동 확인 정책을 미리보기에 표시한다', () => {
+test('이름·학년 자동연결과 동명이인 수동 확인 정책을 미리보기에 표시한다', () => {
   assert.match(html, /row\.matchedByNameGrade \? ' <span class="tag ok">이름·학년 자동연결/);
-  assert.match(html, /row\.manualNameReview \? ' <span class="tag risk">김예린 직접 확인/);
-  assert.match(html, /김예린을 제외하고 이름·학년이 고유하게 일치하는 학생은 자동 연결 후보/);
-  assert.match(html, /김예린은 항상 직접 확인 대상으로 남깁니다/);
+  assert.match(html, /row\.manualNameReview \? ' <span class="tag risk">동명이인 직접 확인/);
+  assert.match(html, /명부에 같은 이름이 하나뿐이고 이름·학년이 일치하는 학생만 자동 연결 후보/);
+  assert.match(html, /명부에 같은 이름이 둘 이상인 학생은 항상 직접 확인 대상으로 남깁니다/);
+});
+
+/* 공개 저장소다(절대 규칙 1). 한때 동명이인 판정이 **코드에 박힌 학생 실명 하나**였고,
+   화면 문구에도 그 이름이 그대로 나갔다. 판정을 명부에서 유도하도록 바꿨으니, 그 자리에
+   이름이 다시 박히는 것을 막는다 — 특정 이름을 적어 두면 그 이름만 막혀서(그리고 그 이름이
+   저장소에 남아서) 관문이 못 된다. 그래서 '한글 이름 목록을 코드에 박는 모양'을 막는다. */
+test('동명이인 판정에 사람 이름을 코드·화면에 박지 않는다', () => {
+  const core = fs.readFileSync(new URL('./acaflow-import-core.js', `file://${__filename}`), 'utf8');
+  assert.match(core, /byName\.get\(key\)/, '판정이 명부에서 유도되지 않는다');
+  assert.match(core, /sameName\.length > 1/, '명부 중복 수로 판정하지 않는다');
+  /* 한글 이름을 담은 Set·배열 리터럴 — 예전 MANUAL_NAME_REVIEW 모양 */
+  assert.doesNotMatch(core, /new Set\(\s*\[\s*'[가-힣]{2,4}'/, '한글 이름 목록이 코드에 박혔다');
+  assert.doesNotMatch(core, /NAME_REVIEW\s*=/, '이름 목록 상수가 되살아났다');
+  /* 화면 문구의 한글 이름 — '…을 제외하고' 처럼 특정 학생을 지목하는 꼴 */
+  assert.doesNotMatch(html, /[가-힣]{3}(?:을|은) (?:제외하고|항상 직접 확인)/, '화면 문구가 특정 학생을 지목한다');
 });
 
 test('원문 번호는 미리보기 DOM에 넣지 않고 마스킹 번호만 표시한다', () => {
