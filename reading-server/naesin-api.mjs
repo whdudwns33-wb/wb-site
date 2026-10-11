@@ -330,6 +330,7 @@ async function scopesUsingPack(store, id) {
      store: {                           // 내신 전용 저장소 어댑터 (전부 async 허용)
        getPack(id), putPack(id, rec), deletePack(id),
        getPackIds(), putPackIds(ids),   // naesin:packs — 저장된 팩 id 배열
+       getBooks(), putBooks(map),       // naesin:books — { 학생코드: 교과서코드 } (팩 커버리지용)
        getState(code), putState(code, rec), listStateCodes(),
        getExam(scope), putExam(scope, rec), deleteExam(scope), listExamScopes(),   // scope: 'default' | 학생코드
        getTask(scope), putTask(scope, rec),   // 수업 과제 — 현재는 'default'만 사용
@@ -595,6 +596,35 @@ export async function handleNaesin(ctx) {
 
   if (p === '/api/naesin/admin/packs' && method === 'GET') {
     return j(200, { packs: (await store.getPackIds()) || [], time: nowIso() });
+  }
+
+  /* 학생 → 교과서 지정 (팩 커버리지용). 응답 키는 경로 명사와 같다(래핑 계약, 절대 규칙 4).
+     교과서 코드 목록과 대조하지 않는다 — 목록을 여기 복제하면 desk 와 갈라진다(visang/bisang
+     드리프트가 그 사고였다). 대신 오타는 커버리지 화면에서 "학생 N명인데 팩 0개" 로 드러난다.
+     문법만 본다: 소문자·숫자·하이픈. packId 의 가운데 조각과 같은 꼴이라야 조합이 맞는다. */
+  if (p === '/api/naesin/admin/books' && method === 'GET') {
+    return j(200, { books: (await store.getBooks()) || {}, updatedAt: nowIso() });
+  }
+  if (p === '/api/naesin/admin/books' && method === 'PUT') {
+    const b = await body();
+    const bad = badBody(b); if (bad) return bad;
+    const src = b && typeof b.books === 'object' && b.books ? b.books : null;
+    if (!src) return j(400, { error: 'books 가 필요해요 — { 학생코드: 교과서코드 } 꼴입니다.' });
+    const out = {}, errors = [];
+    for (const code of Object.keys(src)) {
+      const c = String(code || '').trim();
+      const v = String(src[code] == null ? '' : src[code]).trim();
+      if (!/^[A-Za-z0-9-]{3,20}$/.test(c)) { errors.push(c.slice(0, 20) + ': 학생 코드 형식이 아니에요'); continue; }
+      /* 빈 값은 지정 해제다 — 지우는 길이 없으면 잘못 넣은 학생을 되돌릴 수 없다 */
+      if (!v) continue;
+      if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(v) || v.length > 40) {
+        errors.push(c + ': 교과서 코드는 소문자·숫자·하이픈이에요 (예 ne-kimgitaek)'); continue;
+      }
+      out[c] = v;
+    }
+    if (errors.length) return j(400, { error: '고칠 줄이 있어요.', errors });
+    await store.putBooks(out);
+    return j(200, { books: out, count: Object.keys(out).length, updatedAt: nowIso() });
   }
   /* 팩 삭제 — 어떤 배정(반 공통·학생별)이든 참조 중이면 거절한다(409).
      지우고 나면 그 배정을 받은 학생 앱이 404를 만나고서야 아는데, 그때는 수업 중이다. */

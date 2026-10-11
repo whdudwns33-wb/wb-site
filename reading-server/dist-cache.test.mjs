@@ -198,6 +198,13 @@ t('관리 화면들이 dist/admin/ 에 실린다 — 하나 빠지면 그 화면
     assert.ok(fs.existsSync(fp), 'dist/admin/' + f + ' 가 없다 — build-dist.mjs 에 복사를 추가하세요');
     assert.ok(fs.statSync(fp).size > 2000, 'dist/admin/' + f + ' 가 비었다');
   }
+  /* 관리 화면이 불러 쓰는 스크립트도 같이 실려야 한다 — 빠지면 그 카드만 조용히 비고,
+     로컬 서버는 각 앱 디렉터리에서 직접 서빙해 티가 안 난다(server.mjs 의 /admin/*.js 라우트). */
+  for (const f of ['admin-login.js', 'qr.js', 'coverage.js']) {
+    const fp = path.join(DIST, 'admin', f);
+    assert.ok(fs.existsSync(fp), 'dist/admin/' + f + ' 가 없다 — build-dist.mjs 에 복사를 추가하세요');
+    assert.ok(fs.statSync(fp).size > 500, 'dist/admin/' + f + ' 가 비었다');
+  }
   /* 제작·수업 화면은 원천과 학생 실시간 상태를 다루므로 색인·추적을 막는 메타가 반드시 있어야 한다 */
   for (const f of ['naesin-studio.html', 'naesin-live.html']) {
     const txt = fs.readFileSync(path.join(DIST, 'admin', f), 'utf8');
