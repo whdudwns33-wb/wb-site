@@ -1,0 +1,58 @@
+{
+  "currentYear": 2026,
+  "educationYear": 2027,
+  "referenceDate": "2026-10-11",
+  "contact": { "phone": "062-672-7575", "source": "기존 WB 홈페이지 index.html의 공개 상담 전화", "tags": ["삼육중", "광주 영재교육", "둘 다", "기타"] },
+  "sources": [
+    { "id": "samyook-2027-v1.2", "url": "https://samyook.jge.ms.kr/xboard/board.php?mode=view&number=9384&tbnum=3", "label": "2027학년도 호남삼육중학교 모집요강", "checkedAt": "2026-10-06", "status": "확인 필요", "retrieval": "수집 실패", "note": "기존 정본 v1.2의 값 유지. 10/11 원문 재접속 실패로 최신 변경 미확인." },
+    { "id": "gice-2027-1006", "url": "https://gice.gen.go.kr/board.es?act=view&bid=0022&list_no=17423&mid=a10403020000&nPage=1&tag=", "label": "광주 교육청 계열 2027학년도 선발 공고", "checkedAt": "2026-10-06", "status": "확인 필요", "retrieval": "수집 실패", "note": "10/6 조사 문서의 본문·첨부 확인값 유지. 10/11 원문 재접속 실패. 학교별 안내와 해당 기관 첨부를 다시 확인." },
+    { "id": "ai-2027-1006", "url": "https://ai.jge.go.kr/board.php?id=9&sid=&acode=4252&mode=v", "label": "광주광역시교육청 AI정보영재교육원 선발 공고", "checkedAt": "2026-10-06", "status": "확인 필요", "retrieval": "수집 실패", "note": "기존 조사 문서 확인값 유지. 최신 첨부와 과정별 자격 재확인 필요." },
+    { "id": "gnue-2027-1007", "url": "https://gifted.gnue.ac.kr/index.9is?contentUid=4a9f18ab6fcb578b016fe268c5de32ab", "label": "광주교대 요강 이전 확인 기록", "checkedAt": "2026-10-07", "status": "공식 확인", "retrieval": "성공", "note": "기존 안내의 확인 이력 보존. 현재 화면은 10/11 재확인 버전을 사용." },
+    { "id": "gnue-2027-1011", "url": "https://gifted.gnue.ac.kr/index.9is?contentUid=4a9f18ab6fcb578b016fe268c5de32ab", "label": "2027학년도 광주교육대학교 영재교육원 모집요강", "checkedAt": "2026-10-11", "status": "공식 확인", "retrieval": "성공", "note": "공식 HTML의 신입생 과정·일정·서류·유의사항 확인. 지역 조건과 과정별 추가 공지는 별도 확인." }
+  ],
+  "institutions": [
+    { "id": "samyook", "name": "호남삼육중학교", "kind": "중학교", "region": "전국 지원 여부·전형별 자격은 최신 요강 대조 필요", "source": "samyook-2027-v1.2" },
+    { "id": "gice", "name": "광주광역시창의융합교육원 영재교육원", "kind": "교육청 계열", "region": "광주 학교 재학생 기준. 학교 밖 학생·거점별 조건은 기관 요강 확인", "source": "gice-2027-1006" },
+    { "id": "ai", "name": "광주광역시교육청 AI정보영재교육원", "kind": "교육청 계열", "region": "광주 학교 재학생 기준. 과정별 추가 조건 재확인 필요", "source": "ai-2027-1006" },
+    { "id": "gnue", "name": "광주교육대학교 영재교육원", "kind": "대학부설", "region": "지역 조건 별도 확인 필요. 광주 소재만으로 지원 가능을 판단하지 않음", "source": "gnue-2027-1011" }
+  ],
+  "courses": [
+    { "id": "gice-math-science", "institution": "gice", "name": "초등 수학·과학", "grades": [3,4,5], "nextGrades": "초4~6", "fields": ["수학","과학"] },
+    { "id": "gice-convergence", "institution": "gice", "name": "초등 융합", "grades": [3,4,5], "nextGrades": "초4~6", "fields": ["융합"] },
+    { "id": "gice-invention", "institution": "gice", "name": "초등 발명", "grades": [4,5], "nextGrades": "초5~6", "fields": ["발명"] },
+    { "id": "gice-middle", "institution": "gice", "name": "중등 수학·과학·융합·발명 후보", "grades": [6], "nextGrades": "중1", "fields": ["수학","과학","융합","발명"] },
+    { "id": "ai-primary", "institution": "ai", "name": "초등 AI 도전·발전", "grades": [4,5], "nextGrades": "초5~6", "fields": ["AI·정보"] },
+    { "id": "ai-middle", "institution": "ai", "name": "중등 AI정보 후보", "grades": [6], "nextGrades": "중1", "fields": ["AI·정보"] },
+    { "id": "gnue-math", "institution": "gnue", "name": "수학", "grades": [2,3,4,5], "nextGrades": "초3~6", "fields": ["수학"] },
+    { "id": "gnue-science", "institution": "gnue", "name": "과학", "grades": [2,3,4,5], "nextGrades": "초3~6", "fields": ["과학"] },
+    { "id": "gnue-robot", "institution": "gnue", "name": "로봇사이언스 기초·중급·심화·심화2", "grades": [2,3,4,5], "nextGrades": "초3~6", "fields": ["로봇"] },
+    { "id": "gnue-sw", "institution": "gnue", "name": "SW·AI 코딩 기초·중급·심화", "grades": [2,3,4,5], "nextGrades": "초3~6", "fields": ["AI·정보"] },
+    { "id": "gnue-human-basic", "institution": "gnue", "name": "인문융합 기초", "grades": [2,3], "nextGrades": "초3~4", "fields": ["인문"] },
+    { "id": "gnue-human-advanced", "institution": "gnue", "name": "인문융합 심화", "grades": [4,5], "nextGrades": "초5~6", "fields": ["인문"] },
+    { "id": "gnue-art-basic", "institution": "gnue", "name": "미술 기초", "grades": [2,3], "nextGrades": "초3~4", "fields": ["예술"] },
+    { "id": "gnue-art-advanced", "institution": "gnue", "name": "미술 심화", "grades": [4,5], "nextGrades": "초5~6", "fields": ["예술"] },
+    { "id": "gnue-gym", "institution": "gnue", "name": "체조 기초", "grades": [1,2,3], "nextGrades": "초2~4", "fields": ["체육"] }
+  ],
+  "admissions": [
+    { "id": "samyook-2027-general", "institution": "samyook", "year": 2027, "name": "일반전형 중심 안내", "target": "2026년 현재 초6, 졸업 예정 등 세부 자격 확인", "assessment": "국어·수학·영어 및 학교생활기록부. 특별전형의 추가 조건은 별도 요강 확인", "documents": "지원서·학교생활기록부와 전형별 증빙을 원문에서 대조", "restrictions": "일반전형의 자기소개서·면접은 기존 정본에 없음. 영어 듣기는 공식 확인 필요. 다른 기관에 동일 조건을 적용하지 않음" },
+    { "id": "gice-2027", "institution": "gice", "year": 2027, "name": "교사관찰추천 선발", "target": "아래 과정의 현재 학년·거점별 자격 확인", "assessment": "학교 추천 후 영재성 검사. 예술 기관의 실기 등 별도 전형과 구분", "documents": "GED 지원·검사지·지원서 출력 및 교사 전달, 학교 추천 여부 확인", "restrictions": "기관·영역 선택 제한과 학교 자체 마감을 해당 공고에서 확인. 대학부설에 이 절차를 일괄 적용하지 않음" },
+    { "id": "ai-2027", "institution": "ai", "year": 2027, "name": "AI정보 선발", "target": "초등 도전·발전 등 과정별 지원 조건 확인", "assessment": "학교 추천과 영재성 검사. 과정별 세부 기준 재확인", "documents": "GED 지원 및 추천 교사 전달, 별도 첨부서류 확인", "restrictions": "기존 수료 여부 등 도전·발전 과정 차이는 해당 요강 확인. 모든 과정에 동일 자격을 단정하지 않음" },
+    { "id": "gnue-2027-new", "institution": "gnue", "year": 2027, "name": "신입생 선발", "target": "과정별 현재 초1~5. 지역·학교 밖 학생 조건은 별도 확인", "assessment": "분야별 지필 또는 실기 및 구술·심층면접", "documents": "교사 추천서, 최근 증명사진, 해당자 증빙. 전형료 납부까지 확인", "restrictions": "자체 온라인 접수. 우편·방문 불가. 한 과정만 지원하며 접수 후 변경 불가. 최종 이중 등록 불가. 본원생 전형은 별도 확인" }
+  ],
+  "events": [
+    { "institution": "gice", "kind": "학교 안내", "start": "2026-10-12", "end": "2026-10-16", "note": "다니는 학교의 자체 안내·마감 확인" },
+    { "institution": "gice", "kind": "원서", "start": "2026-10-19", "end": "2026-10-26", "note": "GED, 정확한 마감 시각은 원문 확인" },
+    { "institution": "gice", "kind": "학교추천", "start": "2026-11-06", "end": "2026-11-06", "note": "학교 자체 마감과 구분, 교사추천 완료 여부 별도 확인" },
+    { "institution": "gice", "kind": "시험", "start": "2026-12-05", "end": "2026-12-05", "note": "평가 시각·장소는 별도 공지 확인" },
+    { "institution": "gice", "kind": "등록", "start": "2026-12-21", "end": "2026-12-24", "note": "합격자 대상, 정확한 시각 재확인" },
+    { "institution": "ai", "kind": "원서", "start": "2026-10-19", "end": "2026-10-26", "note": "GED, 해당 AI 과정 요강 재확인" },
+    { "institution": "ai", "kind": "학교추천", "start": "2026-11-06", "end": "2026-11-06", "note": "교사추천과 학교 자체 마감 별도 확인" },
+    { "institution": "ai", "kind": "시험", "start": "2026-12-05", "end": "2026-12-05", "note": "평가 시각·장소 별도 확인" },
+    { "institution": "ai", "kind": "등록", "start": "2026-12-21", "end": "2026-12-24", "note": "합격자 대상, 정확한 시각 재확인" },
+    { "institution": "gnue", "kind": "원서", "start": "2026-10-15T10:00", "end": "2026-10-30T17:00", "note": "자체 홈페이지 접수·납부 확인" },
+    { "institution": "gnue", "kind": "교사추천 서류", "start": "2026-10-15T10:00", "end": "2026-10-30T17:00", "note": "추천서를 원서에 첨부" },
+    { "institution": "gnue", "kind": "시험", "start": "2026-12-12", "end": "2026-12-13", "note": "과정별 평가일·시간 추후 공지" },
+    { "institution": "gnue", "kind": "발표", "start": "2027-01-11T14:00", "end": "2027-01-11T14:00", "note": "홈페이지에서 결과 확인" },
+    { "institution": "gnue", "kind": "등록", "start": "2027-01-11T14:00", "end": "2027-01-18T17:00", "note": "합격자 등록, 수강료·절차 대조" }
+  ]
+}

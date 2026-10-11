@@ -472,7 +472,7 @@ function serveFile(res, base, rel) {
   if (!fs.existsSync(fp)) { res.writeHead(404); res.end('not found'); return; }
   /* 학년대별 지문 데이터는 ?v=<버전> 을 달고 오므로 오래 캐시해도 안전하다
      (배포본은 reading/_headers 가 같은 규칙을 준다) */
-  const cacheable = /(^|\/)(articles-L[1-4]|hanja)\.json$/.test(fp) || /\/letter\/fonts\/.+\.woff2$/.test(fp);   // 글꼴 조각은 경로에 판이 박혀 있다(워커와 같은 규칙)
+  const cacheable = /(^|[/\\])(articles-L[1-4]|hanja)\.json$/.test(fp) || /[/\\]letter[/\\]fonts[/\\].+\.woff2$/.test(fp);   // Windows 경로도 같은 캐시 규칙을 적용한다
   res.writeHead(200, {
     'Content-Type': MIME[path.extname(fp)] || 'application/octet-stream',
     'Cache-Control': cacheable ? 'public, max-age=604800' : 'no-store',
