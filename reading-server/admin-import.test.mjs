@@ -130,6 +130,36 @@ try {
     ok(br.status === 400 || br.status === 200, `망가진 스냅샷에 ${br.status} 를 냈다: ${JSON.stringify(bad)}`);
   }
 
+  /* ── ⑤ 칸 하나의 꼴이 다르면 그 칸만 거절하고 **덮지 않는다** ──
+     잘린 파일·손으로 만든 파일에서 students 가 문자열·배열로 올 수 있다. 그대로 넣으면
+     db.students 가 맵이 아니게 되고, 그 상태가 디스크에 저장돼 **재기동으로도 안 돌아온다**.
+     관리 인증은 사람이 잘못된 파일을 고르는 일을 막아 주지 않는다. */
+  for (const junk of ['문자열', [1, 2], 42, true]) {
+    const bad = { ...snapshot(), students: junk };
+    const r2 = await post(s.base, '/api/admin/import', { confirm: 'replace', snapshot: bad }, token);
+    ok(r2.status === 200, `꼴이 다른 칸에 ${r2.status} 를 냈다: ${JSON.stringify(junk)}`);
+    const j2 = await r2.json();
+    ok(!(j2.applied || []).includes('students'),
+      `꼴이 다른 students 를 적용했다고 보고한다: ${JSON.stringify(junk)}`);
+    ok((j2.skipped || []).some((x) => x.section === 'students' && /꼴/.test(x.why || '')),
+      `꼴이 다른 칸을 조용히 넘겼다: ${JSON.stringify(junk)} → ${JSON.stringify(j2.skipped)}`);
+    /* 명부가 살아 있어야 한다 — **다른 라우트로** 읽어 확인한다 */
+    const ov2 = await get(s.base, '/api/admin/overview', token);
+    ok(ov2.status === 200, `꼴이 다른 칸을 받은 뒤 명부 라우트가 깨졌다 (${ov2.status}): ${JSON.stringify(junk)}`);
+    const list2 = (await ov2.json()).students;
+    ok(Array.isArray(list2) && list2.some((x) => x.code === 'S1'),
+      `꼴이 다른 칸이 명부를 덮었다: ${JSON.stringify(junk)} → ${JSON.stringify(list2).slice(0, 120)}`);
+  }
+  /* 하위 칸(naesin)도 같다 — 맵이 아니면 거절하고 본문·기존 값을 지키지 않는다 */
+  const koJunk = await post(s.base, '/api/admin/import',
+    { confirm: 'replace', snapshot: { ...snapshot(), naesin: '아니다' } }, token);
+  ok(koJunk.status === 200, `하위 칸 꼴 오류에 ${koJunk.status} 를 냈다`);
+  const kj = await koJunk.json();
+  ok((kj.skipped || []).some((x) => x.section === 'naesin'), '꼴이 다른 naesin 을 조용히 넘겼다');
+  const ex2 = await get(s.base, '/api/naesin/admin/exams', token);
+  ok(ex2.status === 200 && ((await ex2.json()).exams || []).some((x) => x.scope === 'default'),
+    '꼴이 다른 naesin 이 기존 시험 배정을 지웠다');
+
   /* ── 워커에는 이 라우트가 없어야 한다 ── */
   const worker = fs.readFileSync(path.join(DIR, 'worker.mjs'), 'utf8');
   ok(!/\/api\/admin\/import/.test(worker),
