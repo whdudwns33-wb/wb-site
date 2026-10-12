@@ -24,17 +24,33 @@ function gate(j){let pending=0,total=0;const warns=[];
     if(!j.review[key]){pending++;if(r._pdfReview)warns.push({where:kind,message:kind+'['+i+'] PDF 원천 대조 필요'});}});
   return{ok:false,pending,total,errors:[],warns,summary:[]};}
 function screen(){
-  const nodes=new Map(),rendered=new Map(),requests=[],storage=new Map([['wbr.admin.token','own-test-admin-token']]);let stored=job();
+  const nodes=new Map(),rendered=new Map(),events=new Map(),requests=[],storage=new Map([['wbr.admin.token','own-test-admin-token']]);let stored=job(),rowRenders=0,appGeneration=0;
+  const decode=s=>s.replace(/&(amp|lt|gt|quot|#39);/g,(_,key)=>({amp:'&',lt:'<',gt:'>',quot:'"','#39':"'"}[key]));
   function node(s){if(!s.startsWith('#')||!ids.has(s.slice(1)))return null;
     if(!nodes.has(s)){
-      const el={textContent:'',value:'',files:[],disabled:rendered.get(s)||false,hidden:false,querySelectorAll:()=>[],querySelector:()=>null};let markup='';
-      Object.defineProperty(el,'innerHTML',{get:()=>markup,set:value=>{markup=value;if(s==='#app'){
-        rendered.clear();for(const m of value.matchAll(/<[^>]+\bid="([^"]+)"[^>]*>/g)){const selector='#'+m[1],disabled=/\sdisabled(?:[\s=>])/.test(m[0]);rendered.set(selector,disabled);if(nodes.has(selector))nodes.get(selector).disabled=disabled;}
-      }}});nodes.set(s,el);
+      const el={textContent:'',value:'',files:[],...(rendered.get(s)||{disabled:false}),hidden:false,focus(){},querySelectorAll:()=>[],querySelector:()=>null};let markup='';
+      Object.defineProperty(el,'innerHTML',{get:()=>markup,set:value=>{markup=value;if(s==='#app'||s==='#rowList'){
+        if(s==='#app'){rendered.clear();appGeneration++;}else rowRenders++;
+        for(const m of value.matchAll(/<[^>]+\bid="([^"]+)"[^>]*>/g)){
+          const selector='#'+m[1],attrs={disabled:/\sdisabled(?:[\s=>])/.test(m[0]),checked:/\schecked(?:[\s=>])/.test(m[0])};
+          const input=/\svalue="([^"]*)"/.exec(m[0]);if(input)attrs.value=decode(input[1]);
+          const textarea=new RegExp('<textarea[^>]*id="'+m[1]+'"[^>]*>([\\s\\S]*?)<\\/textarea>').exec(value);if(textarea)attrs.value=decode(textarea[1]);
+          rendered.set(selector,attrs);if(nodes.has(selector))Object.assign(nodes.get(selector),attrs);
+        }
+      }}});
+      if(s==='#rowList')el.querySelectorAll=selector=>{
+        const rows=selector==='.row'?/\bdata-key="([^"]+)"/g:/^\[data-[a-z]+\]$/.test(selector)?new RegExp('\\b'+selector.slice(1,-1)+'="([^"]+)"','g'):null;
+        if(!rows)return[];return Array.from(markup.matchAll(rows),m=>{
+          const attr=selector==='.row'?'key':selector.slice(6,-1),key=selector+decode(m[1]);
+          if(!nodes.has(key))nodes.set(key,{dataset:{[attr]:decode(m[1])}});return nodes.get(key);
+        });
+      };nodes.set(s,el);
     }return nodes.get(s);}
-  function chunks(selector){const m=/^\[data-pdf-chunk-(en|ko)\]$/.exec(selector);if(!m)return[];
-    return Array.from(node('#app').innerHTML.matchAll(new RegExp('<textarea data-pdf-chunk-'+m[1]+'="(\\d+)"[^>]*>([\\s\\S]*?)<\\/textarea>','g')),x=>{
-      const key=selector+x[1];if(!nodes.has(key))nodes.set(key,{value:x[2],dataset:{[m[1]==='en'?'pdfChunkEn':'pdfChunkKo']:x[1]}});return nodes.get(key);});}
+  function chunks(selector){const m=/^\[data-pdf-(chunk|keyword)-(en|ko)\]$/.exec(selector);if(!m)return[];
+    return Array.from(node('#app').innerHTML.matchAll(new RegExp('<textarea data-pdf-'+m[1]+'-'+m[2]+'="(\\d+)"[^>]*>([\\s\\S]*?)<\\/textarea>','g')),x=>{
+      const key=selector+x[1],dataset='pdf'+(m[1]==='chunk'?'Chunk':'Keyword')+(m[2]==='en'?'En':'Ko');
+      if(!nodes.has(key))nodes.set(key,{dataset:{[dataset]:x[1]}});const el=nodes.get(key);
+      if(el.generation!==appGeneration){el.value=decode(x[2]);el.generation=appGeneration;}return el;});}
   let fetchImpl=async(url,opt)=>{
     if(url==='/api/health')return response({localPdfReview:true});
     if(url==='/api/naesin/admin/job/draft'){stored={...stored,draft:{...stored.draft,...JSON.parse(opt.body).draft},updatedAt:new Date(Date.parse(stored.updatedAt)+1).toISOString()};return response({job:stored,gate:gate(stored)});}
@@ -52,17 +68,17 @@ function screen(){
     }
     throw new Error('허용하지 않은 테스트 요청: '+url);
   };
-  const ctx=vm.createContext({document:{querySelector:node,querySelectorAll:chunks,addEventListener(){}},
+  const ctx=vm.createContext({document:{querySelector:node,querySelectorAll:chunks,addEventListener:(type,fn)=>events.set(type,fn)},
     localStorage:{getItem:k=>storage.get(k)||null,removeItem:k=>storage.delete(k),setItem:(k,v)=>storage.set(k,v)},
     WBAdminLogin:{mount(){}},WBPACKCHECK:require('./pack-check.js'),confirm:()=>true,
     fetch:async(url,opt)=>{requests.push({url,...opt});return fetchImpl(url,opt);}});
   const stop=inline.indexOf("$('#bannerClose').onclick=hideBanner;");assert.ok(stop>1000);
   vm.runInContext(inline.slice(0,stop)+`
-    this.ui={putPdfReviewFile,putDraftFiles,putDraft,pdfReviewDraft,regularDraft,pdfColumnsHtml,pdfSentenceHtml,loadPdfSentence,savePdfSentence,renderSrc,renderJob,review,bulkOk,openJob,openList,renderLogin,
-      get:()=>({JOB,GATE,PDF_LOCAL,BUSY}),set:j=>{JOB=j;GATE={ok:false,pending:0,total:0,errors:[],warns:[],summary:[]};VIEW='job';JOB_READ++;},
-      setGate:g=>{GATE=g;},setLocal:p=>{PDF_LOCAL=p;},setToken:t=>{TOKEN=t;}};`,ctx);
+    this.ui={putPdfReviewFile,putDraftFiles,putDraft,pdfReviewDraft,regularDraft,pdfColumnsHtml,pdfSentenceHtml,loadPdfSentence,savePdfSentence,savePdfWord,renderSrc,renderJob,review,bulkOk,openJob,openList,renderLogin,
+      get:()=>({JOB,GATE,PDF_LOCAL,PDF_WORD_EDIT,VIEW,SEL,EDIT,SRC,BUSY}),set:j=>{JOB=j;GATE={ok:false,pending:0,total:0,errors:[],warns:[],summary:[]};VIEW='job';JOB_READ++;},
+      setGate:g=>{GATE=g;},setLocal:p=>{PDF_LOCAL=p;},setToken:t=>{TOKEN=t;},showAll:()=>{FONLY='all';renderJob();}};`,ctx);
   ctx.ui.set(stored);
-  return{...ctx.ui,node,chunks,requests,setStored:j=>{stored=j;},setFetch:f=>{fetchImpl=f;}};
+  return{...ctx.ui,node,chunks,events,requests,rowRenders:()=>rowRenders,setStored:j=>{stored=j;},setFetch:f=>{fetchImpl=f;}};
 }
 async function loadPassage(ui){ui.node('#pdfReviewFile').files=[{text:async()=>JSON.stringify(passageDraft())}];await ui.putPdfReviewFile();}
 function field(ui,id,value){const el=ui.node('#'+id);el.value=value;el.oninput();}
@@ -70,6 +86,10 @@ function pair(ui,enColumn='0',enStart='1',enEnd='2',koColumn='1',koStart='1',koE
   for(const [id,value] of [['pdfEnColumn',enColumn],['pdfEnStart',enStart],['pdfEnEnd',enEnd],['pdfKoColumn',koColumn],['pdfKoStart',koStart],['pdfKoEnd',koEnd]])field(ui,id,value);
   ui.loadPdfSentence();}
 function chunk(ui,index,en,ko){for(const [side,value] of [['en',en],['ko',ko]]){const el=ui.chunks('[data-pdf-chunk-'+side+']')[index];el.value=value;el.oninput();}}
+function keyword(ui,index,en,ko){for(const [side,value] of [['en',en],['ko',ko]]){const el=ui.chunks('[data-pdf-keyword-'+side+']')[index];el.value=value;el.oninput();}}
+function editRow(ui,key){const button=ui.node('#rowList').querySelectorAll('[data-edit]').find(el=>el.dataset.edit===key);assert.ok(button);button.onclick();}
+function wordInput(ui,head=' own fixed word ',pos=' adj. ',meanings=' 뜻 하나\n\n 뜻 둘 '){field(ui,'pdfWordHead',head);field(ui,'pdfWordPos',pos);field(ui,'pdfWordMean',meanings);}
+function wordSection(ui,section,checked){const el=ui.node('#pdfWord'+section);el.checked=checked;el.onchange();}
 
 (async()=>{
   await t('학원 내 PC capability가 false·없음·네트워크 오류면 구매 검수 파일을 읽거나 올리지 않는다',async()=>{
@@ -231,7 +251,7 @@ function chunk(ui,index,en,ko){for(const [side,value] of [['en',en],['ko',ko]]){
     const sent=JSON.parse(ui.requests.slice(before).find(r=>r.url.endsWith('/job/draft')).body);
     assert.equal(sent.baseUpdatedAt,'2026-01-01T00:00:00.001Z');
     assert.deepEqual(Object.keys(sent.draft),['sentences']);assert.deepEqual(sent.draft.sentences[0],old);assert.equal(sent.draft.sentences.length,2);
-    assert.deepEqual(sent.draft.sentences[1],{seq:8,dayGroup:'body-1',en:'A toy is red.',ko:'장난감이 빨갛다.',chunks:[{en:'A toy',ko:'장난감은'},{en:'is red.',ko:'빨갛다.'}],
+    assert.deepEqual(sent.draft.sentences[1],{seq:8,dayGroup:'body-1',en:'A toy is red.',ko:'장난감이 빨갛다.',chunks:[{en:'A toy',ko:'장난감은'},{en:'is red.',ko:'빨갛다.'}],keywords:[],
       _pdfReview:{flags:['REVIEW_REQUIRED','TEACHER_PAIRED'],locations:[{page:1,bbox:[40,100,180,136]},{page:1,bbox:[330,100,470,116]}]}});
     assert.ok(!/UNSELECTED_EN_SENTINEL|PRIVATE_TOKEN_SENTINEL|PRIVATE_FONT_SENTINEL|LOCAL_SOURCE_HASH|LOCAL_SOURCE_FILE|passageColumns|rawText|sourceRows/.test(JSON.stringify(sent)));
     assert.equal(ui.get().JOB.draft.words.length,74);assert.equal(ui.get().JOB.review['words:w-0001'].note,'원본 대조 완료');
@@ -449,9 +469,9 @@ function chunk(ui,index,en,ko){for(const [side,value] of [['en',en],['ko',ko]]){
       ui.setFetch(url=>((phase==='post'&&url.endsWith('/job/review'))||(phase==='get'&&url.includes('/job?id=')))?new Promise(r=>{resolve=r;}):response({ok:true}));
       const pending=mode==='one'?ui.review('words:own-1','ok'):ui.bulkOk();await new Promise(r=>setImmediate(r));assert.equal(typeof resolve,'function');
       if(change==='logout')ui.renderLogin();else{if(change==='token')ui.setToken('different-self-admin-token');ui.set(job('job-self000002'));ui.renderJob();}
-      const current=ui.get().JOB,markup=ui.node('#app').innerHTML,review=JSON.stringify(current.review),g=JSON.stringify(ui.get().GATE),banner=ui.node('#bannerMsg').textContent;
+      const current=ui.get().JOB,markup=ui.node('#app').innerHTML,review=JSON.stringify(current&&current.review),g=JSON.stringify(ui.get().GATE),banner=ui.node('#bannerMsg').textContent;
       resolve(status===200?(phase==='get'?response({job:own,gate:gate(own),sources:{}}):response({ok:true})):response({error:'이전 요청 실패'},status));await pending;
-      assert.equal(ui.get().JOB,current);assert.equal(ui.node('#app').innerHTML,markup);assert.equal(JSON.stringify(ui.get().JOB.review),review);assert.equal(JSON.stringify(ui.get().GATE),g);assert.equal(ui.node('#bannerMsg').textContent,banner);
+      assert.equal(ui.get().JOB,current);assert.equal(ui.node('#app').innerHTML,markup);assert.equal(JSON.stringify(ui.get().JOB&&ui.get().JOB.review),review);assert.equal(JSON.stringify(ui.get().GATE),g);assert.equal(ui.node('#bannerMsg').textContent,banner);
     }
   });
 
@@ -473,6 +493,103 @@ function chunk(ui,index,en,ko){for(const [side,value] of [['en',en],['ko',ko]]){
     const ui=screen();await loadPassage(ui);pair(ui);field(ui,'pdfSentenceDay','1');chunk(ui,0,'A toy is blue.','장난감은 파랗다.');
     const current=ui.get().JOB,form=JSON.stringify(ui.get().PDF_LOCAL.sentence);ui.setFetch(()=>response({error:'자체 조회 실패'},503));await ui.openJob(current.jobId);
     assert.equal(ui.get().JOB,current);assert.equal(JSON.stringify(ui.get().PDF_LOCAL.sentence),form);assert.match(ui.node('#bannerMsg').textContent,/자체 조회 실패/);
+  });
+
+  await t('PDF 단어 편집만 일반 입력으로 열고 섹션은 추정하지 않으며 다른 행의 JSON 편집은 유지한다',async()=>{
+    const ui=screen();await loadPassage(ui);const before=ui.requests.length;editRow(ui,'words:w-0001');
+    const markup=ui.node('#rowList').innerHTML;assert.match(markup,/표제어/);assert.match(markup,/품사/);assert.match(markup,/뜻 · 한 줄에 하나/);assert.match(markup,/id="pdfWordReading"/);assert.match(markup,/id="pdfWordConversation"/);
+    assert.ok(!ui.get().PDF_WORD_EDIT.reading);assert.ok(!ui.get().PDF_WORD_EDIT.conversation);assert.equal(ui.requests.length,before);assert.equal(ui.get().JOB.review['words:w-0001'],undefined);
+    assert.ok(!markup.includes('data-ed="words:w-0001"'));assert.ok(!markup.includes('PRIVATE_TOKEN_SENTINEL'));
+    const own=job();own.draft.words=[{id:'own-1',headword:'own'}];own.draft.sentences=[{seq:1,en:'Go!',ko:'가자!'}];ui.setStored(own);ui.set(own);ui.showAll();
+    for(const key of ['words:own-1','sentences:s1']){editRow(ui,key);assert.ok(ui.node('#rowList').innerHTML.includes('data-ed="'+key+'"'));assert.ok(!ui.node('#rowList').innerHTML.includes('id="pdfWordFields"'));}
+  });
+
+  await t('PDF 단어의 명시 교정 저장은 ID·원본 위치·기존 추가필드·교정·메모를 보존하고 네 입력만 고친다',async()=>{
+    const ui=screen();await loadPassage(ui);const row=ui.get().JOB.draft.words[0],key='words:'+row.id;
+    row.example={en:'An own example.',ko:'자체 예문.'};row.level=2;
+    ui.get().JOB.review[key]={state:'pending',patch:{id:'own-corrected-id',definition:{en:'An own definition.',ko:'자체 정의.'},senses:[{meaningKo:'기존 다른 뜻'}],level:3},note:'보존할 교사 메모'};
+    const source=JSON.stringify(row),baseUpdatedAt=ui.get().JOB.updatedAt;ui.renderJob();editRow(ui,key);wordInput(ui);wordSection(ui,'Reading',true);wordSection(ui,'Conversation',true);
+    const before=ui.requests.length;await ui.savePdfWord();
+    const body=JSON.parse(ui.requests.slice(before).find(r=>r.url.endsWith('/job/review')).body);
+    assert.equal(body.baseUpdatedAt,baseUpdatedAt);assert.equal(body.key,key);assert.equal(body.state,'fixed');assert.equal(body.note,undefined);
+    assert.deepEqual(body.patch,{id:'own-corrected-id',definition:{en:'An own definition.',ko:'자체 정의.'},senses:[{meaningKo:'기존 다른 뜻'}],level:3,headword:'own fixed word',pos:'adj.',meaningKo:['뜻 하나','뜻 둘'],sections:['reading','conversation']});
+    assert.equal(body.patch.id,'own-corrected-id');assert.ok(!('_pdfReview'in body.patch));assert.equal(JSON.stringify(ui.get().JOB.draft.words[0]),source);
+    assert.equal(ui.get().JOB.review[key].note,'보존할 교사 메모');assert.equal(ui.get().JOB.review[key].patch.level,3);assert.equal(ui.get().JOB.review[key].state,'fixed');
+    assert.equal(ui.get().PDF_WORD_EDIT,null);assert.equal(ui.get().EDIT,null);assert.equal(ui.get().JOB.draft.words.length,74);
+  });
+
+  await t('PDF 단어 입력·선택·체크박스 레이블 클릭은 행 재렌더 없이 값을 유지한다',async()=>{
+    const ui=screen();await loadPassage(ui);editRow(ui,'words:w-0001');wordInput(ui);
+    const row=ui.node('#rowList').querySelectorAll('.row').find(el=>el.dataset.key==='words:w-0001');assert.ok(row.onclick);
+    for(const tag of ['input','select','textarea','label','fieldset','button']){
+      const before=ui.rowRenders();row.onclick({target:{closest:selector=>selector.split(',').includes(tag)?{}:null}});assert.equal(ui.rowRenders(),before);
+    }
+    const checkbox=ui.node('#pdfWordReading');checkbox.checked=true;row.onclick({target:{closest:selector=>selector.split(',').includes('label')?{}:null}});checkbox.onchange();
+    assert.ok(ui.get().PDF_WORD_EDIT.reading);assert.equal(ui.node('#pdfWordHead').value,' own fixed word ');assert.equal(ui.node('#pdfWordMean').value,' 뜻 하나\n\n 뜻 둘 ');
+  });
+
+  await t('PDF 단어는 표제어·뜻·명시 섹션이 없으면 쓰지 않고 버전이 바뀌어도 입력을 유지하며 재대조를 안내한다',async()=>{
+    const ui=screen();await loadPassage(ui);editRow(ui,'words:w-0001');const before=ui.requests.length;wordInput(ui,'','','');await ui.savePdfWord();
+    assert.equal(ui.requests.length,before);assert.match(ui.node('#pdfWordOut').textContent,/직접 선택/);
+    wordInput(ui);await ui.savePdfWord();assert.equal(ui.requests.length,before);assert.ok(!ui.get().PDF_WORD_EDIT.reading);assert.ok(!ui.get().PDF_WORD_EDIT.conversation);
+    wordSection(ui,'Reading',true);ui.get().JOB.updatedAt='2026-01-01T00:00:00.120Z';await ui.savePdfWord();
+    assert.equal(ui.requests.length,before);assert.match(ui.node('#pdfWordOut').textContent,/입력을 유지.*취소.*다시 편집/);assert.equal(ui.node('#pdfWordHead').value,' own fixed word ');
+  });
+
+  await t('PDF 단어 POST실패·409·저장후 조회실패는 native 입력·체크·편집을 남기며 중복 제출하지 않는다',async()=>{
+    for(const phase of ['post-error','conflict','get-error']){
+      const ui=screen();await loadPassage(ui);const key='words:w-0001';ui.get().JOB.review[key]={state:'pending',patch:{level:3},note:'기존 메모'};ui.renderJob();editRow(ui,key);wordInput(ui);wordSection(ui,'Conversation',true);
+      const before=ui.requests.length,baseUpdatedAt=ui.get().JOB.updatedAt;let resolve;
+      ui.setFetch(url=>url.endsWith('/job/review')?new Promise(r=>{resolve=r;}):response({error:'자체 재조회 실패'},500));
+      const pending=ui.savePdfWord();assert.ok(ui.get().PDF_WORD_EDIT.busy);assert.ok(ui.node('#pdfWordFields').disabled);await ui.savePdfWord();assert.equal(ui.requests.length,before+1);
+      resolve(phase==='get-error'?response({ok:true}):response({error:'자체 저장 실패'},phase==='conflict'?409:500));await pending;
+      assert.equal(ui.get().EDIT,key);assert.equal(ui.node('#pdfWordHead').value,' own fixed word ');assert.equal(ui.node('#pdfWordPos').value,' adj. ');assert.equal(ui.node('#pdfWordMean').value,' 뜻 하나\n\n 뜻 둘 ');
+      assert.ok(ui.node('#pdfWordConversation').checked);assert.ok(!ui.node('#pdfWordReading').checked);assert.ok(!ui.node('#pdfWordFields').disabled);assert.equal(ui.get().JOB.updatedAt,baseUpdatedAt);assert.equal(ui.get().JOB.review[key].note,'기존 메모');
+      if(phase==='get-error')assert.match(ui.node('#bannerMsg').textContent,/저장은 끝났지만/);else{assert.equal(ui.get().JOB.review[key].state,'pending');assert.equal(ui.get().JOB.review[key].patch.level,3);}
+    }
+  });
+
+  await t('로그아웃·인증 만료는 선택·원천·단어 버퍼까지 비우고 키보드로 이전 구매 후보를 되살리지 않는다',async()=>{
+    for(const authFailure of [false,true]){
+      const ui=screen();await loadPassage(ui);editRow(ui,'words:w-0001');wordInput(ui);wordSection(ui,'Reading',true);
+      if(authFailure){ui.setFetch(()=>response({error:'자체 만료'},401));await ui.savePdfWord();}else{ui.setToken(null);ui.renderLogin();}
+      const login=ui.node('#app').innerHTML,before=ui.requests.length;
+      for(const key of ['j','e','a'])ui.events.get('keydown')({key,target:{tagName:'BODY'},preventDefault(){}});
+      const state=ui.get();assert.equal(state.VIEW,'login');assert.equal(state.JOB,null);assert.equal(state.GATE,null);assert.equal(state.PDF_LOCAL,null);assert.equal(state.PDF_WORD_EDIT,null);assert.equal(state.SEL,null);assert.equal(state.EDIT,null);assert.deepEqual(clone(state.SRC),{});
+      assert.equal(ui.node('#app').innerHTML,login);assert.equal(ui.requests.length,before);assert.ok(!login.includes('ownword'));
+    }
+  });
+
+  await t('교사 핵심어는 빈 상태로 시작하고 직접 입력한 en/ko쌍만 후보에 넣으며 빈 추가행은 제외한다',async()=>{
+    const ui=screen();await loadPassage(ui);pair(ui);field(ui,'pdfSentenceDay','1');chunk(ui,0,'A toy is blue.','장난감은 파랗다.');
+    assert.deepEqual(clone(ui.get().PDF_LOCAL.sentence.keywords),[{en:'',ko:''}]);assert.match(ui.node('#app').innerHTML,/영어 핵심어는 문장 안의 표현/);assert.match(ui.node('#app').innerHTML,/직독직해 청크 안의 표현/);
+    keyword(ui,0,' blue ',' 파랗다 ');ui.node('#btnPdfKeywordAdd').onclick();const before=ui.requests.length;await ui.savePdfSentence();
+    const body=JSON.parse(ui.requests.slice(before).find(r=>r.url.endsWith('/job/draft')).body),row=body.draft.sentences[0];
+    assert.deepEqual(row.keywords,[{en:'blue',ko:'파랗다'}]);assert.deepEqual(row.chunks,[{en:'A toy is blue.',ko:'장난감은 파랗다.'}]);assert.equal(row.en,'A toy is blue.');
+    assert.deepEqual(Object.keys(body.draft),['sentences']);assert.equal(ui.get().JOB.review['sentences:s1'],undefined);assert.ok(!/PRIVATE_TOKEN|LOCAL_SOURCE|UNSELECTED_EN/.test(JSON.stringify(body)));
+  });
+
+  await t('핵심어의 한쪽만 입력하면 문장과 입력을 유지하며 저장하지 않는다',async()=>{
+    for(const values of [['blue',''],['','파랗다']]){
+      const ui=screen();await loadPassage(ui);pair(ui);field(ui,'pdfSentenceDay','1');chunk(ui,0,'A toy is blue.','장난감은 파랗다.');keyword(ui,0,...values);
+      const before=ui.requests.length,form=JSON.stringify(ui.get().PDF_LOCAL.sentence);await ui.savePdfSentence();
+      assert.equal(ui.requests.length,before+1);assert.equal(ui.requests.at(-1).url,'/api/health');assert.equal(JSON.stringify(ui.get().PDF_LOCAL.sentence),form);assert.match(ui.node('#pdfSentenceOut').textContent,/각 핵심어.*짝으로 입력/);
+    }
+  });
+
+  await t('다른 줄 범위로 새 문장을 채우면 이전 청크·핵심어는 새 문장에 섞이지 않는다',async()=>{
+    const ui=screen();await loadPassage(ui);pair(ui);field(ui,'pdfSentenceDay','1');chunk(ui,0,'A toy is blue.','장난감은 파랗다.');keyword(ui,0,'blue','파랗다');ui.node('#btnPdfKeywordAdd').onclick();keyword(ui,1,'toy','장난감');
+    pair(ui,'2','1','1','3','1','1');assert.equal(ui.get().PDF_LOCAL.sentence.en,'Go!');assert.equal(ui.get().PDF_LOCAL.sentence.ko,'가자!');
+    assert.deepEqual(clone(ui.get().PDF_LOCAL.sentence.chunks),[{en:'',ko:''}]);assert.deepEqual(clone(ui.get().PDF_LOCAL.sentence.keywords),[{en:'',ko:''}]);
+    assert.equal(ui.chunks('[data-pdf-keyword-en]')[0].value,'');assert.equal(ui.chunks('[data-pdf-keyword-ko]')[0].value,'');assert.equal(ui.chunks('[data-pdf-keyword-en]').length,1);
+  });
+
+  await t('본문 저장 충돌·실패·재조회 실패에도 교사가 입력한 핵심어쌍은 유지된다',async()=>{
+    for(const phase of ['conflict','post-error','get-error']){
+      const ui=screen();await loadPassage(ui);pair(ui);field(ui,'pdfSentenceDay','1');chunk(ui,0,'A toy is blue.','장난감은 파랗다.');keyword(ui,0,'blue','파랗다');
+      const form=JSON.stringify(ui.get().PDF_LOCAL.sentence);ui.setFetch(url=>url.endsWith('/health')?response({localPdfReview:true}):url.endsWith('/job/draft')&&phase==='get-error'?response({ok:true}):response({error:'자체 저장·조회 오류'},phase==='conflict'?409:500));
+      await ui.savePdfSentence();assert.equal(JSON.stringify(ui.get().PDF_LOCAL.sentence),form);assert.equal(ui.chunks('[data-pdf-keyword-en]')[0].value,'blue');assert.equal(ui.chunks('[data-pdf-keyword-ko]')[0].value,'파랗다');assert.ok(!ui.node('#pdfSentenceFields').disabled);
+    }
   });
 
   await t('PDF 문장 메타는 일반 붙여넣기 경로와 경고 없는 일괄 승인을 통해 우회하지 않는다',async()=>{
