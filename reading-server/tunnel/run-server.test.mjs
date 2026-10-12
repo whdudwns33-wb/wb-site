@@ -38,7 +38,10 @@ const freePort = () => new Promise((resolve, reject) => {
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'wbr-run-'));
 const PORT = await freePort();
 const PASSWORD = 'file-password-not-real-123';
-const writeEnv = (name, lines) => { const f = path.join(TMP, name); fs.writeFileSync(f, lines.join('\r\n')); return f; };
+/* 설정 파일은 자료 폴더와 겹치지 않는 별도 폴더에(실행기가 겹침을 거절한다) */
+const CONF = path.join(TMP, 'conf');
+fs.mkdirSync(CONF);
+const writeEnv = (name, lines) => { const f = path.join(CONF, name); fs.writeFileSync(f, lines.join('\r\n')); return f; };
 
 let launcher = null;
 let serverPid = 0;
@@ -57,7 +60,7 @@ try {
   ok(!fs.existsSync(path.join(TMP, 'data-bad')), '틀린 설정인데 자료 폴더를 만들었다');
   ok(!(await canConnect(PORT)), '틀린 설정인데 서버가 떠 있다');
   ok(!rp.stdout.includes(SHORT) && !rp.stderr.includes(SHORT), '실제 실행 출력에 PIN 값이 찍혔다');
-  const errLog = path.join(TMP, 'run-server-error.log');
+  const errLog = path.join(CONF, 'run-server-error.log');
   const errText = fs.existsSync(errLog) ? fs.readFileSync(errLog, 'utf8') : '';
   ok(/ADMIN_PIN/.test(errText), '서버 로그가 생기기 전의 실패를 설정 파일 옆 run-server-error.log 에 남기지 않는다 — 화면 없는 PC 에서 아무도 모른다');
   ok(!errText.includes(SHORT), 'run-server-error.log 에 PIN 값이 찍혔다');
@@ -76,7 +79,7 @@ try {
   ok(rm.status === 2, `자료 폴더를 못 만들었는데 종료 코드가 ${rm.status}`);
   ok(fs.existsSync(errLog) && /폴더를 만들지 못했습니다/.test(fs.readFileSync(errLog, 'utf8')), '자료 폴더를 못 만든 이유를 남기지 않는다');
 
-  const missing = spawnSync(process.execPath, [RUN, '--env', path.join(TMP, 'none.env'), '--check'], { encoding: 'utf8' });
+  const missing = spawnSync(process.execPath, [RUN, '--env', path.join(CONF, 'none.env'), '--check'], { encoding: 'utf8' });
   ok(missing.status === 1 && /setup\.mjs env/.test(missing.stderr), '설정 파일이 없을 때 견본 만드는 법을 알려주지 않는다');
 
   /* ── 깨진 db.json 이면 띄우지 않는다(빈 DB 가 원본을 덮어쓰는 길을 막는다) ── */

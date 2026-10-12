@@ -25,7 +25,7 @@ import { fileURLToPath } from 'node:url';
 import {
   TASK_NAME, LOOPBACK, envTemplate, taskXml, utf16leWithBom, classifyProbe, isHostname, isInside,
   cloudflaredOk, MIN_CLOUDFLARED, METRICS_PORTS, inOneDrive, nodeMajor, MIN_NODE_MAJOR, APP_NODE,
-  sharedFolderReason, folderState, ENV_DIR_OWN, DATA_DIR_OWN, APP_DIRS, APP_MARKER, appCopyKeep,
+  sharedFolderReason, folderState, ENV_DIR_OWN, DATA_DIR_OWN, APP_DIRS, APP_MARKER, APP_PKG, APP_PKG_BODY, appCopyKeep,
   ACL_SCRIPT, aclProblems, driveLetter,
 } from './kit.mjs';
 import { defaultEnvFile, loadConfig, resolveEnvArg, isWinAbs } from './run-server.mjs';
@@ -99,10 +99,16 @@ export function planDeployApp({ repo = REPO, appDir, nodeSrc }) {
 const dataSteps = (dataDir) => [{ mkdir: dataDir, why: '자료 폴더' }, ...lockSteps(dataDir, '자료 폴더 잠그기(학생 기록·라이선스 팩)')];
 /* 설정 폴더가 잠겨 있는지 — SYSTEM 이 부팅마다 읽는 비밀번호 파일이고, 코드 사본도 그 안에 있다 */
 const envGuard = (envFile) => [{ noLinks: dirOf(envFile), why: '설정 폴더에 링크가 없는지' }, { verifyAcl: dirOf(envFile), why: '설정 폴더가 잠겨 있는지(아니면 먼저 setup.mjs env)' }];
-/* 바꾸는 동안 5분 감시가 사본을 띄우지 않게 작업을 잠시 끈다(없으면 1 — 괜찮다) */
+/* 바꾸는 동안 5분 감시가 사본을 띄우지 않게 작업을 잠시 끈다(없으면 1 — 괜찮다). 이 뒤에 실패하면 작업이 꺼진 채
+   남으므로(execute 가 그렇게 알린다), 거절할 수 있는 검사는 모두 이 앞에 둔다. */
 const pauseTask = [
-  { run: ['schtasks', '/Change', '/TN', TASK_NAME, '/DISABLE'], why: '작업 잠시 끄기(바꾸는 동안 5분 감시가 띄우지 않게)', okCodes: [0, 1] },
+  { run: ['schtasks', '/Change', '/TN', TASK_NAME, '/DISABLE'], why: '작업 잠시 끄기(바꾸는 동안 5분 감시가 띄우지 않게)', okCodes: [0, 1], pause: true },
   { run: ['schtasks', '/End', '/TN', TASK_NAME], why: '돌고 있으면 멈추기(서버도 같이 끝난다)', okCodes: [0, 1] },
+];
+/* 서버를 멈추기 전에 하는 검사 — 원본 폴더·링크, 사본 자리가 비었거나 우리 것인지 */
+const preDeployChecks = (repo, appDir) => [
+  { checkSource: repo, why: '저장소의 서버 폴더가 다 있고 링크가 없는지' },
+  { checkAppDir: appDir, why: '사본 자리가 비었거나 이 도구가 만든 자리인지' },
 ];
 
 export function planInstallServer({ envFile, dataDir, appDir, nodeSrc, tmpDir = os.tmpdir(), repo = REPO, platform = process.platform }) {
@@ -110,11 +116,13 @@ export function planInstallServer({ envFile, dataDir, appDir, nodeSrc, tmpDir = 
   const xmlFile = p.join(tmpDir, 'wb-admin-server-task.xml');
   /* 작업 폴더는 설정 폴더 — 코드 사본을 작업 폴더로 잡으면 다음 restart-server 가 사본을 못 지운다 */
   const xml = taskXml({ nodeExe: APP_NODE(appDir), runScript: p.join(appDir, 'reading-server', 'tunnel', 'run-server.mjs'), envFile, workDir: dirOf(envFile) });
+  const deploy = planDeployApp({ repo, appDir, nodeSrc });
   return [
     ...envGuard(envFile),
-    ...pauseTask,
     ...dataSteps(dataDir),
-    ...planDeployApp({ repo, appDir, nodeSrc }),
+    ...preDeployChecks(repo, appDir),
+    ...pauseTask,
+    ...deploy,
     { write: xmlFile, data: utf16leWithBom(xml), why: '작업 정의(UTF-16)' },
     /* /RU SYSTEM 을 같이 준다 — /XML 과 함께 쓸 수 있고(문서), XML 의 주체가 무시되더라도 SYSTEM 으로 못 박는다 */
     { run: ['schtasks', '/Create', '/TN', TASK_NAME, '/XML', xmlFile, '/RU', 'SYSTEM', '/F'], why: `작업 스케줄러에 ${TASK_NAME} 등록(부팅 + 5분마다 살아 있는지)` },
@@ -126,11 +134,13 @@ export function planInstallServer({ envFile, dataDir, appDir, nodeSrc, tmpDir = 
 
 /* 다시 띄우기 — install-server 와 같은 검사(설정·자료 폴더 잠금)를 거쳐 새 코드를 복사한다 */
 export function planRestartServer({ envFile, dataDir, appDir, nodeSrc, repo = REPO }) {
+  const deploy = planDeployApp({ repo, appDir, nodeSrc });
   return [
     ...envGuard(envFile),
-    ...pauseTask,
     ...dataSteps(dataDir),
-    ...planDeployApp({ repo, appDir, nodeSrc }),
+    ...preDeployChecks(repo, appDir),
+    ...pauseTask,
+    ...deploy,
     { run: ['schtasks', '/Change', '/TN', TASK_NAME, '/ENABLE'], why: '작업 다시 켜기' },
     { run: ['schtasks', '/Run', '/TN', TASK_NAME], why: '다시 띄우기' },
   ];
@@ -180,10 +190,22 @@ const show = (step) => {
   if (step.verifyAcl) return `> 권한 확인 ${step.verifyAcl}`;
   if (step.noLinks) return `> 링크 확인 ${step.noLinks}`;
   if (step.resetChildren) return `> icacls "${step.resetChildren}\\<안의 항목>" /reset /T /C /Q`;
+  if (step.checkSource) return `> 원본 확인 ${step.checkSource}`;
+  if (step.checkAppDir) return `> 사본 자리 확인 ${step.checkAppDir}`;
   return '';
 };
 
 export function execute(steps, { dryRun = false, runner = defaultRunner, out = console.log, ops = defaultOps } = {}) {
+  let paused = false;
+  try {
+    runSteps(steps, { dryRun, runner, out, ops, onPause: () => { paused = true; } });
+  } catch (e) {
+    /* 작업을 끈 뒤에 멈췄으면 그렇다고 말한다 — 서버는 꺼져 있고 부팅·5분 자동 시작도 안 한다 */
+    if (paused) e.message += `\n  ⚠ 작업 ${TASK_NAME} 을 꺼 둔 채 멈췄습니다(서버 꺼짐 · 부팅/5분 자동 시작 안 함) — 원인을 고친 뒤 setup.mjs restart-server`;
+    throw e;
+  }
+}
+function runSteps(steps, { dryRun, runner, out, ops, onPause }) {
   for (const step of steps) {
     if (step.note) { out('  · ' + step.note); continue; }
     out(`${dryRun ? '[할 일] ' : ''}${step.why ? step.why + '\n  ' : ''}${show(step)}`);
@@ -197,7 +219,10 @@ export function execute(steps, { dryRun = false, runner = defaultRunner, out = c
     if (step.verifyAcl) { ops.verifyAcl(step.verifyAcl, runner); continue; }
     if (step.noLinks) { ops.noLinks(step.noLinks); continue; }
     if (step.resetChildren) { ops.resetChildren(step.resetChildren, runner); continue; }
+    if (step.checkSource) { ops.checkSource(step.checkSource); continue; }
+    if (step.checkAppDir) { ops.checkAppDir(step.checkAppDir); continue; }
     if (step.run) {
+      if (step.pause) onPause();
       const code = runner(step.run);
       if (!(step.okCodes || [0]).includes(code)) throw new Error(`실패(종료 코드 ${code}): ${step.why || step.run[0]}`);
     }
@@ -318,15 +343,21 @@ const RM = { recursive: true, force: true, maxRetries: 10, retryDelay: 300 };
 function clearApp(to, fsx) {
   for (const e of fsx.readdirSync(to)) if (e !== APP_MARKER) fsx.rmSync(path.join(to, e), RM);
 }
-export function deployApp(from, to, { fsx = fs } = {}) {
+export function checkSource(from, { fsx = fs } = {}) {
   for (const d of APP_DIRS) if (!fsx.existsSync(path.join(from, d))) throw new Error(`저장소에 ${d} 폴더가 없습니다 — 저장소 전체를 받았는지 확인하세요`);
   const links = APP_DIRS.flatMap((d) => findLinks(path.join(from, d), { fsx, ancestors: false, keep: (f) => appCopyKeep(path.relative(from, f)) })
     .concat(fsx.lstatSync(path.join(from, d)).isSymbolicLink() ? [path.join(from, d)] : []));
   if (links.length) throw new Error(`저장소에 링크(심볼릭 링크·정션)가 있어 복사하지 않습니다 — 사본이 저장소 밖을 가리키게 됩니다: ${links.slice(0, 3).join(', ')}`);
-  if (fsx.existsSync(to)) {
-    const entries = fsx.readdirSync(to);
-    if (entries.length && !entries.includes(APP_MARKER)) throw new Error(`코드 사본 자리에 다른 파일이 있습니다: ${to} — 빈 폴더이거나 이 도구가 만든 자리여야 합니다`);
-  }
+}
+export function checkAppDir(to, { fsx = fs } = {}) {
+  if (!fsx.existsSync(to)) return;
+  const entries = fsx.readdirSync(to);
+  if (entries.length && !entries.includes(APP_MARKER)) throw new Error(`코드 사본 자리에 다른 파일이 있습니다: ${to} — 빈 폴더이거나 이 도구가 만든 자리여야 합니다`);
+}
+export function deployApp(from, to, { fsx = fs } = {}) {
+  /* 계획에서는 서버를 멈추기 전에 이미 봤지만(checkSource·checkAppDir), 그사이 바뀌었을 수 있어 한 번 더 */
+  checkSource(from, { fsx });
+  checkAppDir(to, { fsx });
   fsx.mkdirSync(to, { recursive: true });
   const marker = path.join(to, APP_MARKER);
   fsx.writeFileSync(marker, JSON.stringify({ from, complete: false, at: new Date().toISOString() }, null, 2));
@@ -334,6 +365,7 @@ export function deployApp(from, to, { fsx = fs } = {}) {
   for (const d of APP_DIRS) {
     fsx.cpSync(path.join(from, d), path.join(to, d), { recursive: true, filter: (s) => appCopyKeep(path.relative(from, s)) });
   }
+  fsx.writeFileSync(path.join(to, APP_PKG), APP_PKG_BODY);
   fsx.writeFileSync(marker, JSON.stringify({ from, complete: true, commit: gitHead(from), hash: treeHash(to, { fsx }), at: new Date().toISOString() }, null, 2));
 }
 /* node.exe 를 사본 안으로 — 버전은 main 에서 확인했다 */
@@ -343,6 +375,8 @@ export function copyNode(from, to, { fsx = fs } = {}) {
 }
 export function removeApp(to, { fsx = fs } = {}) {
   if (!fsx.existsSync(to)) return;
+  /* 앞선 실행이 안을 다 지우고 마지막 폴더 지우기에서 멈춘 경우 — 빈 폴더는 잃을 것이 없다(비재귀로만 지운다) */
+  if (fsx.readdirSync(to).length === 0) { fsx.rmdirSync(to); return; }
   if (!fsx.existsSync(path.join(to, APP_MARKER))) throw new Error(`이 도구가 만든 코드 사본이 아닙니다: ${to} — 지우지 않습니다`);
   clearApp(to, fsx);
   fsx.rmSync(path.join(to, APP_MARKER), RM);
@@ -364,6 +398,7 @@ export function gitHead(repo) {
 const defaultOps = {
   deployApp: (f, t) => deployApp(f, t), copyNode: (f, t) => copyNode(f, t), removeApp: (t) => removeApp(t),
   verifyAcl: (d, r) => verifyAcl(d, r), noLinks: (d) => noLinks(d), resetChildren: (d, r) => resetChildren(d, r),
+  checkSource: (d) => checkSource(d), checkAppDir: (d) => checkAppDir(d),
 };
 
 /* 관리자 권한인지 — 무결성 수준 SID 로 본다(언어와 무관): 높음 S-1-16-12288, 시스템 S-1-16-16384.
@@ -441,7 +476,7 @@ export async function doctor({ envFile, host, appDir } = {}, deps = {}) {
     const lan = lanAddresses(interfaces);
     const open = [];
     for (const a of lan) if (await connect(a, port)) open.push(a);
-    if (open.length) add('fail', 'LAN 차단', `${open.join(', ')}:${port} 로 열려 있습니다 — 터널을 거치지 않는 입구입니다. 실행기로 띄웠는지 확인(HOST=127.0.0.1)`);
+    if (open.length) add('fail', 'LAN 차단', `${open.join(', ')}:${port} 로 열려 있습니다 — 터널을 거치지 않는 입구입니다. server.mjs 를 실행기 없이 직접 띄운 창이 있으면 닫고 restart-server`);
     else add('ok', 'LAN 차단', lan.length ? `${lan.join(', ')} 에서 닫힘` : 'LAN 주소 없음');
   }
 
@@ -474,10 +509,17 @@ export async function doctor({ envFile, host, appDir } = {}, deps = {}) {
     if (marker) {
       if (!marker.complete) add('fail', '코드 사본', `${app} 의 복사가 끝나지 않았습니다(도중에 멈춤) — restart-server`);
       else {
+        /* 비교를 실제로 마쳤을 때만 ✓ — 못 읽었거나 지문이 없으면 · (README: 이 줄이 경고하면 restart 전에 확인) */
         let rh = '';
-        try { rh = repoHash(); } catch { /* 저장소를 못 읽으면 비교를 건너뛴다 */ }
-        if (rh && marker.hash && rh !== marker.hash) add('warn', '코드 사본', `저장소의 서버 코드가 돌고 있는 사본과 다릅니다 — 바뀐 내용을 확인(git status·git log)한 뒤 restart-server`);
+        let herr = null;
+        try { rh = repoHash(); } catch (e) { herr = e; }
+        if (herr) add('warn', '코드 사본', `저장소의 서버 코드를 읽지 못해 사본과 비교하지 못했습니다(${(herr && herr.code) || 'error'}) — git pull·편집이 끝난 뒤 doctor 를 다시`);
+        else if (!marker.hash) add('warn', '코드 사본', `${app} 의 사본 표식에 지문이 없습니다 — 바뀐 내용을 확인한 뒤 restart-server`);
+        else if (rh !== marker.hash) add('warn', '코드 사본', `저장소의 서버 코드가 돌고 있는 사본과 다릅니다 — 바뀐 내용을 확인(git status·git log)한 뒤 restart-server`);
         else add('ok', '코드 사본', `${app}${marker.commit ? ' · ' + marker.commit.slice(0, 7) : ''}`);
+      }
+      if (marker.complete && !exists(pathFor(app).join(app, APP_PKG))) {
+        add('fail', '코드 사본', `${app}\\package.json 이 없습니다 — 위쪽 폴더의 package.json 이 서버 모듈 형식을 바꿀 수 있습니다. restart-server`);
       }
       /* 작업이 실제로 돌리는 node(사본 안의 node.exe)의 버전 */
       const nodeExe = APP_NODE(app);
@@ -487,12 +529,26 @@ export async function doctor({ envFile, host, appDir } = {}, deps = {}) {
       else add('fail', 'Node.js (작업)', `${nodeExe} ${v ? 'v' + v + ' — ' + MIN_NODE_MAJOR + ' 이상이 필요합니다' : '를 실행하지 못했습니다'} — Node 22 LTS 로 restart-server`);
     }
 
-    const t = run(['schtasks', '/Query', '/TN', TASK_NAME]);
-    add(!t.error && t.status === 0 ? 'ok' : 'fail', '작업 스케줄러', !t.error && t.status === 0 ? `${TASK_NAME} 등록됨` : `${TASK_NAME} 이 없습니다 — install-server`);
+    /* 작업 상태 — 영어 열거값(Ready·Running·Disabled)이라 Windows 표시 언어와 무관하다 */
+    const t = run(['powershell', '-NoProfile', '-NonInteractive', '-Command', `(Get-ScheduledTask -TaskName '${TASK_NAME}' -ErrorAction SilentlyContinue).State`]);
+    const tstate = String((t && t.stdout) || '').trim();
+    if (!tstate) add('fail', '작업 스케줄러', `${TASK_NAME} 이 없습니다 — install-server`);
+    else if (tstate === 'Disabled') add('fail', '작업 스케줄러', `${TASK_NAME} 이 꺼져 있습니다(부팅·5분 자동 시작 안 함) — restart-server`);
+    else add('ok', '작업 스케줄러', `${TASK_NAME} ${tstate}`);
     const s = run(['powershell', '-NoProfile', '-NonInteractive', '-Command', '(Get-Service -Name cloudflared -ErrorAction SilentlyContinue).Status']);
     const status = String((s && s.stdout) || '').trim();
     if (status === 'Running') add('ok', 'cloudflared 서비스', '실행 중');
     else add('fail', 'cloudflared 서비스', status ? `상태 ${status} — 서비스 앱에서 Cloudflared 를 시작하세요` : '설치되지 않았습니다 — README 3단계(tunnel)');
+    /* 서비스가 실제로 돌리는 파일 — Program Files 밖이면 일반 사용자가 바꿔 끼울 수 있고, 실행 줄에 토큰이 보이면
+       옛 방식(레지스트리 평문)이다. 실행 줄은 토큰을 품을 수 있어 화면에 찍지 않는다. */
+    if (status) {
+      const pn = run(['powershell', '-NoProfile', '-NonInteractive', '-Command', "(Get-CimInstance Win32_Service -Filter \"Name='cloudflared'\").PathName"]);
+      const line = String((pn && pn.stdout) || '').trim();
+      const bin = ((/^"([^"]+)"/.exec(line) || /^(\S+?\.exe)\b/i.exec(line) || [])[1] || '').toLowerCase();
+      const okBin = cloudflaredCandidates(env).some((c) => path.win32.normalize(c).toLowerCase() === path.win32.normalize(bin || ' ').toLowerCase());
+      if (line && /--token(\s|=)/.test(line)) add('fail', 'cloudflared 서비스', '서비스 실행 줄에 토큰이 평문으로 있습니다(옛 설치) — cloudflared service uninstall 뒤 setup.mjs tunnel 로 다시, 그리고 대시보드에서 토큰 교체');
+      else if (line && !okBin) add('fail', 'cloudflared 서비스', `서비스가 Program Files 밖의 cloudflared 를 돌립니다(${path.win32.dirname(bin)}) — cloudflared service uninstall 뒤 MSI 설치본으로 setup.mjs tunnel`);
+    }
     const exe = findCloudflared({ exists, env });
     if (!exe) add('fail', 'cloudflared 설치', 'Program Files 아래에 cloudflared 가 없습니다 — README 2단계의 공식 설치 파일(MSI)로');
     else {
@@ -564,7 +620,8 @@ export function envDirProblem({ envFile, entries, repo = REPO, platform = proces
   if (isInside(repo, dir, platform)) return '설정 폴더가 저장소를 품고 있습니다 — 잠그면 저장소까지 잠깁니다';
   const shared = sharedFolderReason(dir, platform);
   if (shared) return `설정 폴더로 ${shared} 는 쓰지 않습니다`;
-  if (folderState(entries, ENV_DIR_OWN) === 'foreign') return `${dir} 에 다른 파일이 있습니다 — 설정 전용 폴더(기본 C:\\ProgramData\\WB)를 쓰세요`;
+  const own = p.basename(envFile).toLowerCase();
+  if (folderState(entries, (n) => ENV_DIR_OWN(n) || n.toLowerCase() === own) === 'foreign') return `${dir} 에 다른 파일이 있습니다 — 설정 전용 폴더(기본 C:\\ProgramData\\WB)를 쓰세요`;
   return '';
 }
 export function dataDirProblem({ dataDir, entries }) {

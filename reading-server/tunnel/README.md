@@ -128,7 +128,7 @@ node reading-server\tunnel\setup.mjs tunnel --token-file C:\ProgramData\WB\tunne
 메모장이 "새로 만들까요?" 하면 예 → 복사한 명령을 통째로 붙여 넣고 저장 → 닫는다. (**"문서 폴더에 저장할까요?"** 가 뜨면
 거절한다 — 관리자 터미널에서 연 메모장이 아니라는 뜻이고, 문서 폴더는 OneDrive 로 올라갈 수 있다.)
 `tunnel` 은 cloudflared 버전을 확인하고(2026.7.3 미만이면 멈춘다), 토큰을 화면에 찍지 않고 서비스를 설치한 뒤
-**토큰 파일을 지운다**. 이미 터미널에 붙여 넣었다면: `Remove-Item (Get-PSReadLineOption).HistorySavePath` 로 기록 파일을 지우고,
+**토큰 파일을 지운다**. 이미 터미널에 붙여 넣었다면: (PowerShell 에서) `Remove-Item (Get-PSReadLineOption).HistorySavePath` 로 기록 파일을 지우고,
 아래 5절 "토큰이 샜다고 의심될 때" 대로 토큰을 바꾼다.
 
 대시보드에 커넥터가 연결됨(Connected/Healthy)으로 보이면 다음으로.
@@ -170,13 +170,14 @@ node reading-server\tunnel\setup.mjs doctor
 |---|---|
 | 설정 파일이 없습니다 / 권한이 없습니다 | 1단계 `env` · 관리자 터미널에서 다시 |
 | 이 서버가 쓰지 않는 키입니다 | 그 줄을 지운다(1단계 표의 키만) |
-| 로컬 서버 응답 없음 | `DATA_DIR\logs` 의 오늘 로그 맨 아래, 없으면 `C:\ProgramData\WB\run-server-error.log` → 고친 뒤 `restart-server` |
-| db.json 이 JSON 으로 읽히지 않습니다 | 서버가 원본을 지키려고 멈춘 것이다. NAS 백업의 `db.json` 으로 바꾼 뒤 `restart-server` |
+| 로컬 서버 응답 없음 | `DATA_DIR\logs` 의 오늘 로그 맨 아래, 없으면 `C:\ProgramData\WB\run-server-error.log` → 고친 뒤 `restart-server`. 로그에 "db.json 이 JSON 으로 읽히지 않습니다" 가 있으면 아래 그 줄을 따른다 |
+| 작업 스케줄러: 꺼져 있습니다 | install/restart 가 도중에 실패해 작업을 꺼 둔 채 멈춘 것이다(그때 화면에 ⚠ 로 나온다) — 원인을 고친 뒤 `restart-server` |
+| (서버 로그·`run-server-error.log` 에만 보인다 — doctor 에는 "로컬 서버 응답 없음") db.json 이 JSON 으로 읽히지 않습니다 | 실행기가 원본을 지키려고 서버를 띄우지 않은 것이다. ① `db.json` 을 지우거나 고치지 말고 그대로 둔다 ② `DATA_DIR\backups\db-날짜.json` 을 그 자리에 복사하지 **않는다** — 일일 스냅샷은 팩 본문·로그인 토큰·가족 링크·브레인레터·하루브레인·청크브레인 기록이 빠진 모양이라, 오류 없이 떠서 그대로 덮어쓴다 ③ NAS 백업이 정해지기 전(5절)에는 원장에게 알리고 멈춘다. NAS 백업이 생긴 뒤에는 그 `db.json` 으로 바꾸고 `restart-server` |
 | 관리 전용: 학생 로그인이 401(403 이 아닌 값) | 누군가 `server.mjs` 를 직접 띄운 창이 있다 — 닫고 `restart-server` |
 | 권한: … 관리자·SYSTEM 말고도 열 수 있습니다 | 설정 폴더면 `env`, 자료 폴더·코드 사본이면 `install-server` 를 다시. 그래도 남으면 그 폴더를 비우고 다시 |
 | 코드 사본이 없습니다 / 저장소와 다릅니다 | `install-server`(처음) 또는 `restart-server`(업데이트 뒤) |
 | 자료 드라이브: Network/Removable | `DATA_DIR` 을 이 PC 디스크(예: `C:\WB_server_data`)로 |
-| LAN 차단 실패 | 위와 같다(실행기 없이 띄운 서버는 모든 주소에 묶인다) |
+| LAN 차단 실패 | 누군가 `server.mjs` 를 직접 띄운 창이 있다(`WB_ADMIN_ONLY=1` 을 줬어도 HOST 없이 띄우면 모든 주소에 묶인다) — 닫고 `restart-server` |
 | cloudflared 서비스 없음/멈춤 | 3-4 다시, 또는 서비스 앱에서 Cloudflared 시작 |
 | 터널 연결 실패(/ready 503) | 인터넷·방화벽 — 바깥으로 7844 포트(UDP·TCP)가 나가야 한다 |
 | 호스트 이름이 DNS 에 없습니다 | 3-5 의 경로가 없거나 도메인이 아직 Active 가 아니다 |
@@ -191,7 +192,9 @@ node reading-server\tunnel\setup.mjs uninstall-server
 cloudflared service uninstall
 ```
 첫 줄은 자동 시작과 코드 사본을 지운다(자료·설정 파일은 남는다). 둘째 줄은 터널 서비스와 토큰 파일을 지운다.
-그다음 대시보드에서 경로(Route)·터널·Access 응용을 지운다. (이 문서의 명령은 PowerShell·명령 프롬프트 어느 쪽에서나 같다.)
+그다음 대시보드에서 경로(Route)·터널·Access 응용을 지운다. (1~7절의 명령은 PowerShell·명령 프롬프트 어느 쪽에서나 같다 —
+3-4 의 `Remove-Item` 줄만 PowerShell 전용이다. 도구가 화면에 보여 주는 `> icacls …` 줄을 PowerShell 에 그대로 붙여 넣을 때는
+`*S-1-5-32-544:(OI)(CI)F` 를 따옴표로 감싼다.)
 
 ## 8. 하지 말 것
 
@@ -225,7 +228,7 @@ cloudflared service uninstall
    실패하면 `kit.mjs taskXml` 의 Description 을 ASCII 로, 그래도 안 되면 PowerShell `Register-ScheduledTask -Xml (Get-Content …)` 로
 2. 잠금(`icacls <폴더> /setowner *S-1-5-32-544 /T /C` → `icacls <폴더> /inheritance:r /grant:r *S-1-5-32-544:(OI)(CI)F /grant:r *S-1-5-18:(OI)(CI)F`
    → 안의 항목마다 `icacls <항목> /reset /T /C /Q`)이 통하는지, 그 뒤 권한 확인(PowerShell `Get-Acl`, 경로는 환경 변수 `WB_ACL_TARGET`
-   — `kit.mjs ACL_SCRIPT`)이 `OWNER|S-1-5-32-544`·관리자·SYSTEM 만으로 읽히는지. 정션(`mklink /J`)을 하나 만들어 두고 `env` 가 거절하는지
+   — `kit.mjs ACL_SCRIPT`)이 `OWNER|S-1-5-32-544`·관리자·SYSTEM 만으로 읽히는지. 정션을 하나 만들어 두고(PowerShell: `New-Item -ItemType Junction -Path <링크> -Target <대상>`) `env` 가 거절하는지
 3. SYSTEM 으로 뜬 실행기가 코드 사본(`C:\ProgramData\WB\app`, node 는 `app\node\node.exe`)에서 뜨는지, 5분 트리거가 죽은 서버를 살리는지(작업 스케줄러의
    '실패 시 다시 시작'은 프로그램이 오류 코드로 끝난 경우를 늘 잡지 않는다는 보고가 있어 5분 트리거를 같이 둔 것이다)
 4. 작업 스케줄러에서 "끝내기" 하면 서버(자식)도 같이 꺼지는지(`exit-with-parent.mjs`) — `doctor` 의 로컬 서버가 ✗ 가 되면 정상

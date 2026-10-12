@@ -10,7 +10,8 @@
    4. 서버가 죽으면 간격을 늘려 가며 다시 띄운다(kit.mjs nextRestart).
    5. 띄우기 전마다 <DATA_DIR>\db.json 이 읽히는지 본다. store.mjs 는 db.json 을 못 읽으면 빈 DB 로 시작하고
       첫 저장 때 그 빈 DB 로 원본을 덮어쓴다 — 화면 없는 PC 에서 그대로 두면 학생 기록·팩이 조용히 사라진다.
-      그래서 깨져 있으면 서버를 띄우지 않고 로그에 남긴다(원본은 손대지 않는다 — NAS 백업으로 되살린다).
+      그래서 깨져 있으면 서버를 띄우지 않고 로그에 남긴다(원본은 손대지 않는다 — README 6절의 그 줄을 따른다.
+      backups\db-날짜.json 은 팩·토큰·가족 링크 등이 빠진 스냅샷이라 그것으로 바꾸면 안 된다).
       사본을 따로 만들지는 않는다: db.json 에는 라이선스 팩 본문이 들어 있고, store.mjs 도 같은 이유로
       백업 스냅샷에서 팩을 뺀다.
    6. 서버 로그를 쓰기 전에 실패하면(설정 오류·드라이브가 안 보임·Node 가 낡음) 설정 파일 옆
@@ -133,7 +134,7 @@ async function main() {
     const bad = dbProblem(cfg.dataDir);
     if (bad) {
       /* 원본을 지키는 쪽을 고른다 — 띄우지 않고 끝낸다. 작업 스케줄러가 5분마다 다시 불러도 같은 이유로 멈춘다. */
-      stamp(`서버를 띄우지 않습니다: ${bad}. ${path.join(cfg.dataDir, 'db.json')} 을 NAS 백업으로 되살린 뒤 restart-server`);
+      stamp(`서버를 띄우지 않습니다: ${bad}. ${path.join(cfg.dataDir, 'db.json')} 은 그대로 두고 README 6절을 보세요(backups 의 일일 스냅샷으로 바꾸지 마세요 — 빠진 칸이 있습니다)`);
       console.error(`✗ ${bad}`);
       process.exit(2);
     }
