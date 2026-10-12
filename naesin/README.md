@@ -3,6 +3,10 @@
 이그잼포유(EXAM4YOU) 구매 자료를 구조화해 재원생에게 무료 제공하는 원내 전용 학습 앱.
 정본 기획서: `docs/영어내신-학습웹앱-기획서-v1.md` (v1.2 — §14 혁신안 5가지 포함).
 
+**2026-10-12 운영 기준**: 사용자가 학원 내 사용·반출 금지를 확인했다. 중2 → 중3 → 중1 순서로 도입한다.
+새 PC 정본 운영과 실제 자료 반입·검증 기준은 `docs/내신브레인-원내PC-실운영-계획.md`를 따른다.
+아래의 기존 Drive·Claude·KV 제작 설명은 이전 구성이다. 원내 보관 모드에서는 구매 원천을 외부 AI로 보내지 않고 로컬 JSON을 검수·등록한다.
+
 **최종 도달 목표 3가지** — 모든 설계가 여기로 정렬된다:
 ① 본문 영→한 해석 ② 백지에 영어 지문 전체 쓰기 ③ 시험 전 단어 100% 완성(안정화).
 
@@ -21,6 +25,7 @@ naesin/
   pack-validate.mjs 팩 검증기 CLI (파일 병합 + pack-check.js 위임)
   pack-sample.json  자체 창작 체험 팩 — 테스트 픽스처 겸 미연동 데모 (커밋 가능한 유일한 팩)
   coverage.js       팩 커버리지 — 재원생 교과서·학년 조합 ↔ 보유 팩 (관리 웹 전용)  [WBNaesinCoverage]
+  readiness.js      시험 준비도 — 반 성취도에서 70% 이상 학생 비율·평균·확정 미달·학생별 축을 표시 [WBNAESINREADY]
   *.test.cjs        각 모듈 테스트 (node로 바로 실행)
 reading-server/
   naesin-api.mjs    /api/naesin/* 라우트 (worker.mjs·server.mjs 양쪽에 등록)
@@ -33,8 +38,8 @@ reading-server/
   public/naesin-live.html    관리 웹(수업) — 반 현황·타임박스·투사 모드 (강사 노트북)
 ```
 
-핵심 데이터 흐름: **PDF(구매 자료) → [추출·검증] → 팩 JSON → 관리 웹 업로드 → KV
-(`naesin:pack:<id>`) → 학생 앱이 인증 후 로드**. 팩은 저장소·정적 자산에 절대 없다.
+핵심 데이터 흐름: **PDF(구매 자료) → 로컬 추출·검증 → 팩 JSON → 관리 웹 업로드 → PC DB → 원내 학생 앱이 인증 후 로드**.
+워커의 기존 KV 어댑터도 호환되지만 PC 운영 전환 후 두 서버에 학생 기록을 동시에 쓰지 않는다. 팩은 저장소·정적 자산에 절대 없다.
 
 ## 학생 앱 동작 요약
 
@@ -55,18 +60,21 @@ reading-server/
 - **브레인덤프**: 매일 2분, 판정 없는 자유 인출(diff만 표시)
 - **성취도 탭**: 단어 안정화·해석 통과·백지 암송 문장별 체크 + **종이 백지시험 ○× 입력**
   (○는 암송 기록으로 환류) + 시험일 설정
-- 상태는 localStorage(`wbn.v1`) 정본 + 연동 학생은 서버 백업(`state.summary`가 관리
-  overview의 원천). 미연동 기기는 `pack-sample.json` 체험 모드.
+- 학습 중 기록은 학생별 localStorage(`wbn.v1:<학생코드>`)에 저장하고 서버와 과별 최신 시각으로 병합한다.
+  `state.summary`가 관리 overview의 원천이다. 구매 팩 본문은 기기에 영구 캐시하지 않으며, 연결 이탈·계정 변경 시 화면에서 회수한다.
+  미연동 기기는 자체 창작 `pack-sample.json` 체험 모드다.
 
 ## 서버 API (naesin-api.mjs)
 
 학생(토큰)
 - `GET /pack?id=` → `{pack, updatedAt}` — **자기 유효 시험의 `packIds`에 든 팩만**, 아니면 403
-- `GET/PUT /state` → `{state, updatedAt}` — 300KB(UTF-8 바이트). `state.summary`는 서버가
+- `GET/PUT /state` → `{state, updatedAt}` — 요청 300KB, 병합 후 256KB(UTF-8 바이트).
+  다른 학생 owner는 거절하고, 같은 과는 최신 `savedAt`을 유지한다(동률은 기존 기록). 서버가 보존한 기록이 있으면 PUT 응답의 `state`를 기기가 반영한다. `state.summary`는 서버가
   화이트리스트로 정규화해 저장·출력한다(숫자 강제·문자열 길이 제한) — 학생 기기가 올린 값이
   강사 화면에 그대로 그려지지 않게 하는 관문
-- `GET /exam` → `{exam:{examDate, packIds, wordDeadlineDays?}, scope}` — 개별 배정(만료 전) →
-  반 공통(`default`) → 빈 값. **만료 = `examDate < 오늘(KST)`** (`resolveExam`)
+- `GET /exam` → `{exam:{examDate, packIds, wordDeadlineDays?}, scope}` — 학생 배정(만료 전) →
+  반 배정(`cls:<반>`, 만료 전) → 공통(`default`, 지난 날짜도 유지) → 빈 값.
+  응답 scope는 `student`·`class`·`default`·null이다. **만료 = `examDate < 오늘(KST)`** (`resolveExam`).
 - `GET /task` → `{task, scope}` — `task.updatedAt`이 학생 앱 완료 기록의 `taskAt` 원천
 
 관리(PIN)
@@ -74,6 +82,7 @@ reading-server/
   `DELETE /admin/pack {id}` — 배정에 쓰이는 팩이면 409 + `scopes`
 - 시험: `POST /admin/exam {scope, examDate, packIds, wordDeadlineDays?}` (실제 달력 날짜 검증) ·
   `GET /admin/exams` → `{exams:[{scope, examDate, packIds, expired, …}]}` · `DELETE /admin/exam {scope}`
+  scope는 기존 학생 코드·`default`와 `cls:<반>`을 받는다. 반 이름은 NFC·앞뒤 공백만 정규화하며 1~80자, 제어문자는 금지한다. 학생 코드 `cls`는 기존 개별 배정이다.
 - 과제: `GET/POST /admin/task` — `typeKeys`는 서버 화이트리스트(`TASK_TYPE_KEYS` + `g-<n>`),
   학생 앱 `quizTypes()`·관리 웹 `TYPE_LIST`와 같은 목록이어야 한다
 - `GET /admin/overview` → 학생별 `summary`(정규화본) + 과제 완료 열

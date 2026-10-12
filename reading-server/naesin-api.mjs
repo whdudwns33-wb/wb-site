@@ -10,6 +10,8 @@
    /api/* 응답에 붙인다(§10-3) — 여기서 따로 붙일 헤더가 없다. */
 
 import { resultStats, predictScore, reachOf } from './naesin-results.mjs';
+import coverage from '../naesin/coverage.js';
+import CHECK from '../naesin/pack-check.js';
 import {
   normalizeLive, normalizePhase, normalizeProjector, publicLive, isLive,
   boardRows, weakest, tally, putVote, PHASE_KEYS,
@@ -19,6 +21,13 @@ const STATE_MAX_BYTES = 262_144;    // 학생 학습 기록 1건 최대 크기 (
 const PACK_MAX_BYTES = 4_194_304;   // 팩 1건 최대 크기 (4MB) — 단어 77·문장 25·문항·해설이 다 들어간다
 const PACK_ID_RE = /^[A-Za-z0-9-]{3,60}$/;
 const CODE_RE = /^[A-Za-z0-9-]{3,20}$/;          // 학생 코드 — 호스트 등록 규칙과 동일
+const { classScope } = coverage;
+function examScope(value) {
+  const scope = String(value || '').trimStart();
+  if (scope.startsWith('cls:')) return classScope(scope.slice(4));
+  const key = scope.trim();
+  return key === 'default' || CODE_RE.test(key) ? key : '';
+}
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const EXAM_PACKS_MAX = 20;          // 한 시험 범위에 담는 팩 수 — 한 학기 시험이 이걸 넘지 않는다
 const WORD_DEADLINE_MIN = 3, WORD_DEADLINE_MAX = 30;   // 단어 초회 도달 마감(D-n) 허용 범위, 기본 7은 클라이언트가 안다
@@ -249,10 +258,10 @@ export async function naesinNightDueFor(store, code, now) {
 }
 
 /* ── 학생의 유효 시험 (계약 0.2) ──
-   개별 배정(scope=학생 코드)이 있고 만료되지 않았으면 그것, 아니면 반 공통(default), 아니면 빈 값.
+   개별 배정 → 학생의 현재 반(cls:<반>) → 전체 공통(default) → 빈 값.
    만료 = examDate < 오늘(KST). 전에는 개별 배정이 영구히 default 를 이겨서, 지난 학기에
    한 번 따로 잡아 준 학생은 반 전체의 새 시험을 영영 못 받았다.
-   반 공통은 지난 날짜여도 그대로 준다 — 학생 앱이 '시험 종료 · 자율 학습'으로 보여 준다.
+   학생·반 배정은 만료되면 다음 배정으로 넘어간다. 전체 공통은 지난 날짜여도 그대로 준다.
    팩 서빙 제한(GET /pack)도 같은 해석을 써야 화면과 서버가 같은 교재를 가리킨다. */
 export async function resolveExam(store, code, now) {
   const today = todayKst(now);
@@ -260,6 +269,12 @@ export async function resolveExam(store, code, now) {
   if (typeof code === 'string' && CODE_RE.test(code)) {
     const mine = await store.getExam(code);
     if (live(mine)) return { exam: mine, scope: 'student' };
+    const stu = typeof store.getStudent === 'function' ? await store.getStudent(code) : null;
+    const scope = classScope(stu && stu.cls);
+    if (scope) {
+      const byClass = await store.getExam(scope);
+      if (live(byClass)) return { exam: byClass, scope: 'class' };
+    }
   }
   const def = await store.getExam('default');
   if (isObj(def)) return { exam: def, scope: 'default' };
@@ -274,6 +289,7 @@ function examRow(scope, rec, stu, today) {
   row.updatedAt = rec.updatedAt || null;
   row.expired = typeof rec.examDate === 'string' && rec.examDate < today;
   row.name = scope === 'default' ? '' : ((stu && stu.name) || '');
+  if (scope.startsWith('cls:')) row.cls = scope.slice(4);
   return row;
 }
 
@@ -332,7 +348,7 @@ async function scopesUsingPack(store, id) {
        getPackIds(), putPackIds(ids),   // naesin:packs — 저장된 팩 id 배열
        getBooks(), putBooks(map),       // naesin:books — { 학생코드: 교과서코드 } (팩 커버리지용)
        getState(code), putState(code, rec), listStateCodes(),
-       getExam(scope), putExam(scope, rec), deleteExam(scope), listExamScopes(),   // scope: 'default' | 학생코드
+       getExam(scope), putExam(scope, rec), deleteExam(scope), listExamScopes(),   // scope: 'default' | 'cls:<반>' | 학생코드
        getTask(scope), putTask(scope, rec),   // 수업 과제 — 현재는 'default'만 사용
        getReports(packId), putReports(packId, list),   // 문항 신고 — 팩별 배열(최근 200건)
        getLive(scope), putLive(scope, rec), deleteLive(scope),   // 수업 라이브 세션 (계약 L1)
@@ -386,8 +402,29 @@ export async function handleNaesin(ctx) {
   if (p === '/api/naesin/state' && method === 'PUT' && !who.admin) {
     const b = await body();
     const bad = badBody(b); if (bad) return bad;
-    const state = b.state;
+    let state = b.state;
     if (!isObj(state)) return j(400, { error: 'state 필요' });
+    if (state.owner != null && state.owner !== who.code) return j(403, { error: '다른 학생의 학습 기록은 저장할 수 없어요.' });
+    const stampLimit = (ctx.now == null ? Date.now() : +ctx.now) + 5 * 60e3;
+    const validStamp = (v) => v == null || (Number.isSafeInteger(v) && v >= 0 && v <= stampLimit);
+    if (!validStamp(state.savedAt)) return j(400, { error: 'savedAt 학습 시각이 올바르지 않아요. 기기 시간을 확인해 주세요.' });
+    if (state.packs != null && !isObj(state.packs)) return j(400, { error: 'packs는 과별 학습 기록 객체' });
+    for (const [id, pd] of Object.entries(state.packs || {})) {
+      if (!PACK_ID_RE.test(id) || !isObj(pd) || !validStamp(pd.savedAt))
+        return j(400, { error: '과별 기록에는 올바른 팩 id와 savedAt이 필요해요. 기기 시간을 확인해 주세요.' });
+    }
+    const prev = (await store.getState(who.code))?.state;
+    let merged = false;
+    if (isObj(state.packs) || isObj(prev && prev.packs)) {
+      const packs = { ...(prev && prev.packs) };
+      for (const [id, pd] of Object.entries(state.packs || {})) {
+        /* shortcut: 같은 과는 최신 savedAt 하나(동률은 기존)를 보존한다, 같은 과의 동시 학습을 합칠 때 문항별 병합으로 변경. */
+        if (!isObj(packs[id]) || !validStamp(packs[id].savedAt) || (pd.savedAt || 0) > (packs[id].savedAt || 0)) packs[id] = pd;
+      }
+      merged = JSON.stringify(packs) !== JSON.stringify(state.packs || {});
+      const newest = !validStamp(prev && prev.savedAt) || (state.savedAt || 0) >= ((prev && prev.savedAt) || 0) ? state : prev;
+      state = { ...newest, packs };
+    }
     /* 요약은 저장 시점에 정규화해 둔다 — 읽는 쪽(overview)도 한 번 더 거르지만,
        저장본부터 깨끗해야 백업·다른 소비자도 안전하다. */
     if (state.summary !== undefined) {
@@ -397,10 +434,10 @@ export async function handleNaesin(ctx) {
     const rec = { state, updatedAt: nowIso() };
     if (byteLen(rec) > STATE_MAX_BYTES) return j(413, { error: '기록이 너무 커서 저장할 수 없어요.' });
     await store.putState(who.code, rec);
-    return j(200, { ok: true, updatedAt: rec.updatedAt });
+    return j(200, { ok: true, updatedAt: rec.updatedAt, ...(merged ? { state } : {}) });
   }
 
-  /* 시험 설정 — 내 것(만료 전) → 반 공통(default) → 빈 값 (resolveExam).
+  /* 시험 설정 — 내 것(만료 전) → 현재 반(만료 전) → 전체 공통(default) → 빈 값 (resolveExam).
      빈 값도 200이다 — 시험이 아직 안 잡힌 것은 오류가 아니라 평시다. */
   if (p === '/api/naesin/exam' && method === 'GET' && !who.admin) {
     return j(200, await resolveExam(store, who.code, ctx.now));
@@ -563,8 +600,7 @@ export async function handleNaesin(ctx) {
     return j(200, { ok: true, task: rec });
   }
 
-  /* 팩 업로드 — 업로드 파이프라인의 종착지(§7). 검증은 최소로:
-     구조 검증은 업로드 도구·검수 화면 몫이고, 서버는 id 일치와 크기만 지킨다.
+  /* 팩 업로드 — CLI·검수 화면과 같은 관문을 통과해야 직접 API로도 깨진 팩을 올리지 못한다.
      같은 id 재업로드는 덮어쓴다(검수 후 재업로드) — 되묻는 것은 관리 웹의 confirm 몫. */
   if (p === '/api/naesin/admin/pack' && method === 'POST') {
     const b = await body();
@@ -576,6 +612,9 @@ export async function handleNaesin(ctx) {
     /* id와 pack.packId가 다르면 저장을 거절한다 — 다른 팩을 덮어쓰는 사고의 마지막 방어선 */
     if (pack.packId !== id) return j(400, { error: 'pack.packId가 id와 달라요.' });
     if (byteLen(pack) > PACK_MAX_BYTES) return j(413, { error: '팩이 너무 커요 (4MB 이내).' });
+    const checked = CHECK.checkPack(pack);
+    if (checked.errors.length) return j(400, { error: '팩 검사 오류가 남아 있어요. ' + checked.errors[0].message,
+      errors: checked.errors, warns: checked.warns });
     const rec = { pack, updatedAt: nowIso() };
     await store.putPack(id, rec);
     const ids = (await store.getPackIds()) || [];
@@ -641,15 +680,15 @@ export async function handleNaesin(ctx) {
     return j(200, { ok: true, id });
   }
 
-  /* 시험 배정 — scope가 'default'면 반 공통, 학생 코드면 그 학생만 (학생 쪽 폴백 참고).
+  /* 시험 배정 — default는 전체 공통, cls:<반>은 반별, 학생 코드는 개별 (학생 쪽 폴백 참고).
      없는 팩 id를 배정하면 학생 앱이 404를 만나고서야 안다 — 저장 전에 걸러 준다.
      지난 날짜도 저장은 한다(관리 웹이 confirm 으로 되묻는다) — 시험 뒤에 자율 복습 범위로 남겨 두는 용도가 있다. */
   if (p === '/api/naesin/admin/exam' && method === 'POST') {
     const b = await body();
     const bad = badBody(b); if (bad) return bad;
-    const scope = String(b.scope || '').trim();
-    if (scope !== 'default' && !CODE_RE.test(scope)) return j(400, { error: "scope는 'default' 또는 학생 코드" });
-    if (scope !== 'default' && !(await store.getStudent(scope))) return j(404, { error: '등록되지 않은 학생 코드예요.' });
+    const scope = examScope(b.scope);
+    if (!scope) return j(400, { error: "scope는 'default', 'cls:<반 이름>' 또는 학생 코드 (반 이름은 1~80자)" });
+    if (scope !== 'default' && !scope.startsWith('cls:') && !(await store.getStudent(scope))) return j(404, { error: '등록되지 않은 학생 코드예요.' });
     const examDate = String(b.examDate || '').trim();
     if (!isValidDate(examDate)) return j(400, { error: 'examDate는 실제 날짜(YYYY-MM-DD)' });
     const packIds = Array.isArray(b.packIds) ? b.packIds.map((x) => String(x || '').trim()) : [];
@@ -669,25 +708,26 @@ export async function handleNaesin(ctx) {
     await store.putExam(scope, rec);
     return j(200, { ok: true, scope, exam: rec });
   }
-  /* 배정 현황 — 반 공통 + 학생별 전부. 관리 웹이 만료 표시·해제 버튼을 붙인다. */
+  /* 배정 현황 — 전체 공통 + 반별 + 학생별. 관리 웹이 만료 표시·해제 버튼을 붙인다. */
   if (p === '/api/naesin/admin/exams' && method === 'GET') {
     const today = todayKst(ctx.now);
     const exams = [];
     for (const scope of (await store.listExamScopes()) || []) {
       const rec = await store.getExam(scope);
       if (!isObj(rec)) continue;
-      exams.push(examRow(scope, rec, scope === 'default' ? null : await store.getStudent(scope), today));
+      exams.push(examRow(scope, rec, scope === 'default' || scope.startsWith('cls:') ? null : await store.getStudent(scope), today));
     }
-    /* 반 공통이 맨 위, 학생별은 코드순 — 화면이 정렬을 다시 할 필요가 없게 */
-    exams.sort((a, b) => (a.scope === 'default' ? -1 : b.scope === 'default' ? 1 : a.scope.localeCompare(b.scope)));
+    /* 전체 공통 → 반별 → 학생별, 같은 종류는 키순 */
+    const rank = (scope) => scope === 'default' ? 0 : scope.startsWith('cls:') ? 1 : 2;
+    exams.sort((a, b) => rank(a.scope) - rank(b.scope) || a.scope.localeCompare(b.scope));
     return j(200, { exams, today, time: nowIso() });
   }
   /* 배정 해제 — 없는 scope 도 ok (두 번 눌러도 오류가 아니다) */
   if (p === '/api/naesin/admin/exam' && method === 'DELETE') {
     const b = await body();
     const bad = badBody(b); if (bad) return bad;
-    const scope = String(b.scope || '').trim();
-    if (scope !== 'default' && !CODE_RE.test(scope)) return j(400, { error: "scope는 'default' 또는 학생 코드" });
+    const scope = examScope(b.scope);
+    if (!scope) return j(400, { error: "scope는 'default', 'cls:<반 이름>' 또는 학생 코드 (반 이름은 1~80자)" });
     await store.deleteExam(scope);
     return j(200, { ok: true, scope });
   }

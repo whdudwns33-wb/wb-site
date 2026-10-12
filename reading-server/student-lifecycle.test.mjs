@@ -83,17 +83,37 @@ try {
   const PACK_ID = 'life-dummy-pack';
   const KO = '더미 문장 — 자체 창작 한글 본문. '.repeat(20000);
   const up = await req('/api/naesin/admin/pack', { method: 'POST', token: admin,
-    body: { id: PACK_ID, pack: { packId: PACK_ID, words: [], sentences: [{ en: 'dummy', ko: KO }] } } });
+    body: { id: PACK_ID, pack: { packId: PACK_ID,
+      words: [{ id: 'w-dummy', headword: 'dummy', meaningKo: ['더미'], sections: ['reading'] }],
+      sentences: [{ seq: 1, dayGroup: '첫 단락', en: 'Dummy sentence.', ko: KO }] } } });
   ok(up.body.ok, '⑥-2 내신 팩 업로드 실패: ' + JSON.stringify(up.body).slice(0, 200));
   const back = await req('/api/naesin/pack?id=' + PACK_ID, { token: admin });
   ok(back.status === 200 && back.body.pack && back.body.pack.sentences[0].ko === KO,
     '⑥-2 큰 한글 팩이 올린 그대로 돌아오지 않는다 — 조각 경계에서 글자가 깨졌다');
   ok((await req('/api/naesin/pack?id=' + PACK_ID, { token: stuTok })).status === 403, '⑥-2 배정 전인데 학생이 팩을 받는다');
+  const setExam = (scope, wordDeadlineDays) => req('/api/naesin/admin/exam', { method: 'POST', token: admin,
+    body: { scope, examDate: '2099-12-31', packIds: [PACK_ID], wordDeadlineDays } });
+  const delExam = (scope) => req('/api/naesin/admin/exam', { method: 'DELETE', token: admin, body: { scope } });
+  ok((await setExam('default', 8)).body.ok, '⑥-2 전체 공통 시험 배정 실패');
+  ok((await setExam('cls: A ', 6)).body.scope === 'cls:A', '⑥-2 반 시험 키 정규화 실패');
+  const classExam = (await req('/api/naesin/exam', { token: stuTok })).body;
+  ok(classExam.scope === 'class' && classExam.exam.wordDeadlineDays === 6, '⑥-2 반 시험이 공통보다 우선하지 않는다');
+  ok((await req('/api/naesin/pack?id=' + PACK_ID, { token: stuTok })).status === 200, '⑥-2 반 배정된 팩을 학생이 못 받는다');
   ok((await req('/api/naesin/admin/exam', { method: 'POST', token: admin,
     body: { scope: CODE, examDate: '2099-12-31', packIds: [PACK_ID], wordDeadlineDays: 10 } })).body.ok, '⑥-2 개별 시험 배정 실패');
   const exam = (await req('/api/naesin/exam', { token: stuTok })).body;
   ok(exam.scope === 'student' && exam.exam.wordDeadlineDays === 10, '⑥-2 개별 배정이 학생에게 안 보인다: ' + JSON.stringify(exam));
   ok((await req('/api/naesin/pack?id=' + PACK_ID, { token: stuTok })).status === 200, '⑥-2 배정된 팩을 학생이 못 받는다');
+  await delExam(CODE);
+  ok((await req('/api/naesin/exam', { token: stuTok })).body.scope === 'class', '⑥-2 개별 해제 후 반 시험으로 폴백하지 않는다');
+  await delExam('cls:A');
+  const commonExam = (await req('/api/naesin/exam', { token: stuTok })).body;
+  ok(commonExam.scope === 'default' && commonExam.exam.wordDeadlineDays === 8, '⑥-2 반 해제 후 공통 시험으로 폴백하지 않는다');
+  await delExam('default');
+  ok((await req('/api/naesin/exam', { token: stuTok })).body.scope === null, '⑥-2 배정 전체 해제 후에도 시험이 남는다');
+  ok((await req('/api/naesin/pack?id=' + PACK_ID, { token: stuTok })).status === 403, '⑥-2 배정 전체 해제 후에도 팩을 받는다');
+  await setExam('cls:A', 6);
+  await setExam(CODE, 10);
   ok((await req('/api/naesin/state', { method: 'PUT', token: stuTok,
     body: { state: { marker: 'naesin-life', summary: { packId: PACK_ID, word: { total: 1, reached: 1 } } } } })).body.ok, '⑥-2 내신 기록 저장 실패');
   ok((await req('/api/naesin/state', { token: stuTok })).body.state?.marker === 'naesin-life', '⑥-2 내신 기록을 다시 못 읽는다');
@@ -193,6 +213,8 @@ try {
     '⑨ 지운 학생의 상세가 아직 200 이다 — 관리 화면이 빈 상세 창을 열다 터진다');
   ok(!((await req('/api/naesin/admin/exams', { token: admin })).body.exams || []).some(e => e.scope === CODE),
     '⑨ 퇴원했는데 내신 개별 시험 배정이 남아 있다');
+  ok(((await req('/api/naesin/admin/exams', { token: admin })).body.exams || []).some(e => e.scope === 'cls:A' && e.cls === 'A'),
+    '⑨ 학생 퇴원이 반 전체 시험 배정도 지웠다');
   ok(!((await req('/api/naesin/admin/overview', { token: admin })).body.students || []).some(s => s.code === CODE),
     '⑨ 퇴원했는데 내신 성취도 목록에 남아 있다');
 
@@ -207,6 +229,7 @@ try {
   ok((await req('/api/naesin/exam', { token: newTok })).body.scope !== 'student', '⑩ 새 학생에게 앞 학생의 개별 시험 배정이 따라왔다');
   ok((await req('/api/naesin/pack?id=' + PACK_ID, { token: newTok })).status === 403, '⑩ 새 학생이 앞 학생의 팩을 받는다');
   await req('/api/admin/students', { method: 'DELETE', token: admin, body: { code: CODE } });
+  await delExam('cls:A');
   /* 배정이 없어졌으니 팩도 지워진다 — 목록에서도 빠진다 */
   ok((await req('/api/naesin/admin/pack', { method: 'DELETE', token: admin, body: { id: PACK_ID } })).body.ok, '⑩ 배정 해제 뒤에도 팩이 안 지워진다');
   ok(!((await req('/api/naesin/admin/packs', { token: admin })).body.packs || []).includes(PACK_ID), '⑩ 지운 팩이 목록에 남아 있다');

@@ -64,6 +64,10 @@ jobs:
         run: node naesin/gen.test.cjs
       - name: 내신브레인 팩 검사 규칙 테스트
         run: node naesin/pack-check.test.cjs
+      - name: 내신브레인 준비도·관리 현황판 검증
+        run: node naesin/readiness.test.cjs && node naesin/admin-readiness.test.cjs
+      - name: 내신브레인 반별 배정·학생 자료 보호 검증
+        run: node naesin/admin-class-exam.test.cjs && node naesin/student-access.test.cjs
       - name: 내신브레인 체험 팩 검증 (pack-validate)
         # 검증기는 팩 디렉터리(words.json·sentences.json…)를 받는다. 저장소의 유일한 팩인 pack-sample.json 은
         # 관리 웹이 병합한 형태라, 업로드 전 형태로 도로 쪼개 같은 검증 게이트를 통과시킨다 — 체험 팩이
@@ -103,6 +107,8 @@ jobs:
         run: node reading-server/letter-api.test.mjs
       - name: 관리 로그인 판정 테스트
         run: node reading-server/admin-auth.test.mjs
+      - name: 로컬 저장·원내 접근 경계 검증
+        run: node reading-server/store.test.mjs && node reading-server/admin-import.test.mjs && node reading-server/inhouse-access.test.mjs && node reading-server/inhouse-server.test.mjs
       - name: 브레인레터 호 검증 (저장소의 파일럿·샘플)
         run: node letter/issue-validate.test.mjs
       - name: 브레인레터 앱 부팅 배선 (링크 세 갈래)
