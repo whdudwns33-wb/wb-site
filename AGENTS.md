@@ -39,6 +39,7 @@ node <앱>/<이름>.test.cjs           # 단위 테스트 (의존성 없음, 파
 node reading-server/<이름>.test.mjs # 서버 테스트
 node reading-server/build-dist.mjs  # dist 조립 (+ SW 캐시 이름 스탬프)
 PORT=8890 ADMIN_PIN=<pin> DATA_DIR=<dir> node reading-server/server.mjs  # 로컬 서버
+WB_ADMIN_ONLY=1 PORT=8890 ADMIN_PIN=<pin> DATA_DIR=<dir> node reading-server/server.mjs  # 터널로 외부 공개할 때(결정 A — 학생 로그인을 내주지 않는다. 기동 로그에 [관리 전용] 이 뜨는지 눈으로 확인)
 node naesin/pack-validate.mjs <팩 디렉터리>     # 영어 레슨 팩 검증
 node naesin-ko/pack-validate.mjs <팩 디렉터리>  # 국어 단원 팩 검증
 node naesin-ko/extract/build-pack.mjs <단원 폴더>       # 국어: 폴더 하나 → 팩 초안 (시리즈 자동 판별)
@@ -101,6 +102,9 @@ CI 둘: `.github/workflows/checks.yml` — **PR·작업 브랜치 푸시**에서
 3. **인증 없이 콘텐츠를 내보내지 않는다.** 학생 토큰(`wbr.auth`) 또는 관리 토큰(PIN 또는 아이디·비밀번호 — 판정은 `reading-server/admin-auth.mjs` 하나, 시크릿 등록은 `admin-secrets.yml`).
    배포되는 `_headers`는 `reading/_headers` 하나다(noindex + 앱 경로 no-store) — `naesin/_headers`·
    `vocab/_headers`·`naesin-ko/_headers`·`haru/_headers`는 그리로 안내하는 주석 파일이다.
+   **Node 로컬 서버도 같은 파일을 읽어 붙인다** — `reading-server/sec-headers.mjs` 가 `reading/_headers` 를
+   파싱해 모든 응답에 얹고(`server.mjs` 핸들러 맨 앞 한 곳), `/*` 블록에 noindex 가 없으면 **서버 기동을
+   거부한다**. 터널로 공개할 때 헤더 한 벌을 두 번 관리하지 않기 위해서다(`docs/로컬-서버-외부공개-터널.md` §2).
    내신 팩은 자기 시험 범위에 배정된 것만 받는다.
    하루브레인은 `GET /api/haru/pack`·`/gen`이 정답·해설·오답 태그를 뺀다(정답은 `/answer` 응답에만). 외부 초6 학생
    (`student.apps:['haru']`)은 호스트가 `who` 검증 직후 한 곳에서 거는 `allowedApp` 게이트로 다른 앱(브레인레터 포함)을 열지 못한다.
