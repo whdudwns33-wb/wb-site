@@ -108,7 +108,7 @@ jobs:
       - name: 관리 로그인 판정 테스트
         run: node reading-server/admin-auth.test.mjs
       - name: 로컬 저장·원내 접근 경계 검증
-        run: node reading-server/store.test.mjs && node reading-server/admin-import.test.mjs && node reading-server/inhouse-access.test.mjs && node reading-server/inhouse-server.test.mjs && node reading-server/local-node.test.mjs
+        run: node reading-server/store.test.mjs && node reading-server/admin-import.test.mjs && node reading-server/inhouse-access.test.mjs && node reading-server/inhouse-server.test.mjs && node reading-server/local-node.test.mjs && node reading-server/local-setup.test.mjs
       - name: 브레인레터 호 검증 (저장소의 파일럿·샘플)
         run: node letter/issue-validate.test.mjs
       - name: 브레인레터 앱 부팅 배선 (링크 세 갈래)
