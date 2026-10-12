@@ -27,7 +27,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 async function boot(adminOnly) {
   const tempRoot = fs.realpathSync(os.tmpdir());
   const data = fs.mkdtempSync(path.join(tempRoot, 'wbr-ao-'));
-  const env = { ...process.env, HOST: '127.0.0.1', PORT: '0', DATA_DIR: data, ADMIN_PIN: PIN,
+  const env = { ...process.env, HOST: '127.0.0.1', PORT: '0', DATA_DIR: data, ADMIN_PIN: PIN, ADMIN_ID: '', ADMIN_PASSWORD: '',
     WB_INHOUSE_ONLY: '0', WB_ADMIN_ONLY: adminOnly ? '1' : '0' };
   const srv = spawn(process.execPath, [path.join(DIR, 'server.mjs')], { env, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
   let output = '', stderr = '', spawnError = null;
@@ -111,10 +111,23 @@ try {
       { code: 'AOTEST02', name: '기본모드시험', grade: '중2', cls: 'A', level: 'L3' }, admin.token);
     assert.equal(registered.status, 200, '기본 모드 시험 학생 등록 실패');
     assert.equal((await registered.json()).student?.code, 'AOTEST02');
+    const overview = await (await fetch(off.base + '/api/admin/overview', { headers: { Authorization: 'Bearer ' + admin.token }, signal: AbortSignal.timeout(5000) })).json();
+    assert.ok(!Object.prototype.hasOwnProperty.call(overview, 'studentApp'), '일반 Node는 영어 전용 QR 메타를 추가하지 않는다');
+    assert.ok(!Object.prototype.hasOwnProperty.call(overview, 'localPdfReview'), '일반 Node 기존 현황 계약 유지');
     const login = await post(off.base, '/api/login', { code: 'AOTEST02', device: '테스트' });
     ok(login.status === 200, `기본 모드에서 학생 로그인이 ${login.status} — 원내 사용이 막혔다`);
     const b = await login.json().catch(() => ({}));
     ok(b.pending === true && b.nonce, '기본 모드의 연동 요청 응답이 달라졌다');
+    assert.equal((await post(off.base, '/api/admin/pending', { nonce: b.nonce, action: 'approve' }, admin.token)).status, 200);
+    const approved = await (await fetch(off.base + '/api/login/status?n=' + b.nonce, { signal: AbortSignal.timeout(5000) })).json();
+    assert.ok(approved.token, '기본 모드 교사 승인 뒤 토큰 발급');
+    const headers = { Authorization: 'Bearer ' + approved.token, 'Content-Type': 'application/json' };
+    const own = { books: [], ownReading: 'generic Node compatibility' };
+    const written = await fetch(off.base + '/api/state', { method: 'PUT', headers, body: JSON.stringify({ state: own }), signal: AbortSignal.timeout(5000) });
+    assert.equal(written.status, 200, 'WB_INHOUSE_ONLY=0은 기존 독해 쓰기를 유지');
+    const pulled = await fetch(off.base + '/api/pull', { headers, signal: AbortSignal.timeout(5000) });
+    assert.equal(pulled.status, 200); assert.deepEqual((await pulled.json()).state, own);
+    assert.equal((await fetch(off.base + '/api/vocab/pull', { headers, signal: AbortSignal.timeout(5000) })).status, 200, '기본 Node 다른 앱 접근 유지');
   } finally { await off.stop(); }
 } catch (e) {
   errors.push('예외: ' + (e && e.message));

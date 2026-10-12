@@ -40,6 +40,8 @@ jobs:
         run: node reading/split.test.cjs
       - name: 저장된 기록 복원 검증
         run: node reading/state.test.cjs
+      - name: 영어 학생 연동·독서 기록 분리 검증
+        run: node reading/naesin-link.test.cjs
       - name: 학생 앱 뒤로 가기 검증
         run: node reading/back-nav.test.cjs
       - name: 두 학생 앱 사이 이동 검증

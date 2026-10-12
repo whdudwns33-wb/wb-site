@@ -1122,11 +1122,11 @@
   });
   /* 이름 탭 → 다른 학생으로 연동 (공용 태블릿에서 학생이 바뀔 때) */
   $('whoLine').onclick = function () {
-    if (!authed) return;
+    if (!authed || !checkAccount()) return;
     if (!confirm('다른 학생으로 연동할까요?\n이 기기의 연동이 해제되고 학원 QR 연동 화면으로 이동합니다.')) return;
     try { localStorage.removeItem('wbr.auth'); } catch (e) {}
     stopStudy('account-changed');
-    location.href = '/';
+    location.href = '/?app=naesin';
   };
   $('offBadge').onclick = function () { location.reload(); };
 
@@ -1295,7 +1295,7 @@
     if (!demoMode) return '';
     return authed
       ? '<div class="notice">배정 전 연습 — 체험 교재입니다. 선생님이 시험 범위를 배정하면 새로고침 때 내 학교 교재가 열립니다.</div>'
-      : '<div class="notice">체험 모드 — 예시 교재입니다. 학원 QR로 연동하면 내 학교 교재와 기록 저장이 열립니다.</div>';
+      : '<div class="notice">체험 모드 — 예시 교재입니다. 학원 QR로 연동하면 내 학교 교재와 기록 저장이 열립니다. <a class="btn p" href="/?app=naesin">학생 코드로 연동</a></div>';
   }
   /* 시험 범위가 여러 팩이면 전환 링크 — 진단 전 화면에도 있어야 다른 교재로 돌아갈 수 있다 */
   function packListHtml() {
@@ -3990,8 +3990,8 @@
     var msg = (e && e.message) || '';
     if (msg === 'api-401') {
       fatal('<h2>연동이 만료되었습니다</h2><p class="muted">학원 QR로 다시 연동해 주세요.</p>' +
-        '<div class="row2" style="margin-top:10px"><a class="btn p" href="/">연동 화면으로</a><button class="btn" id="unlinkBtn">이 기기의 연동 해제</button></div>');
-      $('unlinkBtn').onclick = function () { try { localStorage.removeItem('wbr.auth'); } catch (x) {} clearPackCache(); location.href = '/'; };
+        '<div class="row2" style="margin-top:10px"><a class="btn p" href="/?app=naesin">연동 화면으로</a><button class="btn" id="unlinkBtn">이 기기의 연동 해제</button></div>');
+      $('unlinkBtn').onclick = function () { if (!checkAccount()) return; try { localStorage.removeItem('wbr.auth'); } catch (x) {} clearPackCache(); location.href = '/?app=naesin'; };
       return;
     }
     if (msg === 'no-pack') {
