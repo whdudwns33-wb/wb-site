@@ -172,7 +172,8 @@ async function test(name, fn) { await fn(); console.log('통과:', name); count+
       const entry = data.directory.find(i => i.id === id);
       assert.deepEqual(entry.events, []);
       assert.match(entry.target, /2027.*미확인/);
-      assert.equal(data.sources.find(s => s.id === entry.source).status, '전년도 참고');
+      assert.equal(data.sources.find(s => s.id === entry.source).status, '확인 필요');
+      assert.equal(data.sources.find(s => s.id === id + '-2026-1012').status, '전년도 참고');
     }
     const je = data.directory.find(i => i.id === 'jeongeup');
     assert.match(je.target, /본원 초6 수료예정/);
@@ -217,6 +218,67 @@ async function test(name, fn) { await fn(); console.log('통과:', name); count+
     for (const entry of data.directory.filter(e => e.source.startsWith('roster-'))) {
       assert.deepEqual(entry.events, []);
       assert.match(entry.target, /2027.*미확인/);
+    }
+  });
+  await test('새 요강과 기관별 추천·증빙은 학교 자격·제출 경로·미확인 시각을 구분', () => {
+    const entry = id => data.directory.find(e => e.id === id);
+    const arts = entry('roster-jb-11212013001');
+    assert.equal(arts.source, 'arts-high-2027-1012');
+    assert.equal(arts.kind, '학교부설');
+    assert.match(arts.target, /2027 교육연도.*중1~3/);
+    assert.match(arts.process, /학교추천위원회 11\/23 17시.*오전 10시/);
+    assert.match(arts.limits, /추천 대체.*미확인|추천 대체.*추가 확인/);
+    assert.equal(arts.events[0].end, '2026-11-17T17:00');
+    const school = entry('roster-jb-11212142002');
+    assert.equal(school.kind, '학교 영재학급');
+    assert.match(school.target, /백산중학교 중1~2 재학생만/);
+    assert.match(school.limits, /12\/5 검사 당일 직접 제출.*1개월/);
+    assert.equal(school.events[0].end, '2026-11-17');
+    assert.ok(!school.events.some(e => e.kind === '등록' || e.kind === '개강'));
+    const jangsu = entry('roster-jb-11212103001');
+    assert.match(jangsu.process, /기관 추천심사.*GED 일괄/);
+    assert.match(jangsu.limits, /서류 목록.*여전히 미확인/);
+    assert.equal(jangsu.events.find(e => e.kind === '면접').end, '2026-12-05T12:50');
+    assert.match(entry('gunsan').process, /학교.*15시.*공문.*17시/);
+    assert.match(entry('jb-25970').process, /등기우편 도착분/);
+    assert.match(entry('jb-25952').process, /사전 메일.*면접/);
+    assert.match(entry('jb-25849').limits, /선발 요약.*전체 요강/);
+    assert.match(entry('jb-25831').limits, /GED 첨부파일.*좁히지 않음/);
+    assert.match(entry('jb-25919').limits, /2026 보유기간.*2027 선발/);
+    const jangheung = entry('roster-jn-11313123001');
+    assert.equal(jangheung.kind, '교육지원청 계열');
+    assert.equal(jangheung.source, 'jangheung-2027-1012');
+    assert.equal(jangheung.events[0].end, '2026-11-16');
+    assert.equal(jangheung.events[1].end, '2026-11-23');
+    assert.match(jangheung.events[1].note, /소속기관 없는 학교 밖.*연장/);
+    assert.match(jangheung.limits, /1개월.*7일/);
+    const jindo = entry('roster-jn-11313213001');
+    assert.equal(jindo.kind, '교육지원청 계열');
+    assert.match(jindo.target, /도내 전 지역.*학교 밖은 진도 거주/);
+    assert.match(jindo.limits, /기악.*차이는 기관 재확인/);
+    assert.equal(jindo.events[0].end, '2026-11-19');
+    assert.match(jindo.events.find(e => e.kind === '면접').note, /성적우수 특별전형/);
+    const lists = data.sources.filter(s => s.id.endsWith('-official-list-1012'));
+    assert.equal(lists.length, 17);
+    for (const source of lists) {
+      const institution = data.directory.find(e => e.source === source.id);
+      assert.equal(source.status, '확인 필요');
+      assert.deepEqual(institution.events, []);
+      assert.match(institution.limits, /첫 페이지.*미확인.*단정하지 않음/);
+    }
+    for (const id of ['jn-cyber', 'jb-cyber']) {
+      assert.match(entry(id).limits, /13건.*2026.*IP영재기업인/);
+      assert.deepEqual(entry(id).events, []);
+    }
+    for (const host of ['jhed.jge.go.kr.evil.example', 'junior.kaist.ac.kr.evil.example']) {
+      const fake = structuredClone(data);
+      fake.sources.find(s => s.id === 'jangheung-2027-1012').url = 'https://' + host + '/';
+      assert.throws(() => catalog.validate(fake));
+    }
+    for (const id of ['gunsan', 'jb-art', 'jn-25978', 'jb-25849', 'jb-25945', 'jb-25810', 'jb-25952', 'jb-25970', 'jb-25911', 'jb-25857', 'jb-25919', 'jb-25831', 'jb-25930']) {
+      const source = data.sources.find(s => s.id === entry(id).source);
+      assert.equal(source.checkedAt, '2026-10-11');
+      assert.match(source.note, /10\/12.*재대조/);
     }
   });
   console.log('새 공개 안내:', count, '개 통과');
