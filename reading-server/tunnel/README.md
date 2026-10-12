@@ -14,6 +14,10 @@
   학생 기록의 정본은 운영 워커에 있고, 여기에 학생이 붙으면 진도가 두 곳에 갈라진다.
 - **두 겹으로 잠근다.** Cloudflare Access(허용한 이메일만) → 관리 로그인(아이디·비밀번호).
 - **이 PC 바깥에서는 터널로만 들어온다.** 서버는 127.0.0.1 에만 묶여 같은 와이파이의 다른 기기도 못 붙는다.
+- **이 관리 웹은 운영 관리 웹이 아니다.** 자료는 이 PC 의 `DATA_DIR\db.json` 에만 있고(처음엔 비어 있다)
+  운영 워커의 학생 기록과 섞이지 않는다. 원장 PC 에서 하는 일(팩 제작·검수, 자료 정리)에 쓴다.
+  **학생 등록·진도 확인·가정 발송은 지금처럼 운영 주소의 `/admin` 에서** 한다. 여기서 만든 가족 링크·안내 링크는
+  이 잠긴 주소를 가리키므로 **가정에 보내지 않는다**(가정에 나가는 링크는 사람 확인 사항 — 저장소 규칙 7).
 - **금고(A.5, 국어 자료를 원장 PC 2대로)는 이 키트에 들어 있지 않다.** 원장 확인 4건이 끝나기 전에는
   코드를 쓰지 않기로 했다(정본 문서 §1.5 「남은 것」). 금고를 만들 때도 이 터널에 경로를 더하는 식이다.
 
@@ -37,9 +41,14 @@
    (CNAME 부분 설정은 Business 이상).
    - 옮기기 전에 도메인을 산 곳에서 **DNSSEC 를 끈다** — 켠 채로 옮기면 도메인이 한동안 안 열릴 수 있다.
    - 그 도메인으로 **메일·홈페이지를 쓰고 있다면** Cloudflare 가 가져온 DNS 레코드(MX 등)가 다 있는지 확인하고 옮긴다.
-3. **Node.js 22 이상**을 설치한다 — nodejs.org 의 LTS 설치 파일(기본 위치 `C:\Program Files\nodejs\node.exe`).
-4. **저장소를 받아 둔다** — 예: `C:\WB\wb-site` (경로에 한글·공백이 없으면 문제가 덜 생긴다).
-5. **절전을 끈다** — 설정 → 시스템 → 전원 → 화면·절전 시간 "안 함". 절전에 들어가면 바깥에서 안 열린다.
+3. **Node.js 22 이상**을 **설치 파일(MSI)로** 설치한다 — nodejs.org 의 LTS `.msi`, 또는
+   `winget install --id OpenJS.NodeJS.LTS -e --installer-type wix --scope machine`.
+   그래야 `C:\Program Files\nodejs\node.exe` 에 고정된다. winget 휴대용(zip)·nvm 은 버전마다 폴더가 바뀌어
+   Node 를 올리는 순간 자동 시작이 조용히 깨진다(`install-server` 가 그런 자리를 보면 경고한다).
+4. **저장소를 받아 둔다** — 예: `C:\WB\wb-site`. **OneDrive 안(바탕 화면·문서 폴더가 OneDrive 로 옮겨진 PC)은 피한다** —
+   서버는 SYSTEM 계정으로 돌아 그런 자리의 파일을 못 읽을 수 있다. 자료 폴더(`DATA_DIR`)는 OneDrive·NAS 경로면 실행기가 거절한다.
+5. **절전을 끈다** — 관리자 터미널에서 `powercfg /change standby-timeout-ac 0` · `powercfg /change hibernate-timeout-ac 0`
+   (지금 쓰는 전원 계획에만 적용된다 — 계획을 바꾸면 다시). 노트북이면 전원을 꽂아 둔다. 절전에 들어가면 바깥에서 안 열린다.
 6. 아래 명령은 전부 **관리자 권한 터미널**에서 저장소 폴더로 가서 친다
    (시작 메뉴 → "터미널" 오른쪽 클릭 → 관리자 권한으로 실행 → `cd C:\WB\wb-site`).
 
@@ -68,7 +77,9 @@ node reading-server\tunnel\setup.mjs install-server
 ```
 
 `서버가 떴습니다 ✓` 가 나오면 이 PC 브라우저에서 `http://127.0.0.1:8890/admin` 이 열린다.
-작업 스케줄러에 `WB-Admin-Server` 가 생기고, **부팅 때 + 5분마다**(죽어 있으면) 자동으로 뜬다 — 로그인하지 않아도.
+작업 스케줄러에 `WB-Admin-Server` 가 생기고, **부팅 30초 뒤 + 5분마다**(죽어 있으면) 자동으로 뜬다 — 로그인하지 않아도.
+`schtasks /Query /TN WB-Admin-Server /V /FO LIST` 로 실행 사용자 SYSTEM·시간 제한 없음을 볼 수 있다.
+한 번은 **재부팅한 뒤 로그인하지 않은 채** 다른 기기에서 열리는지(또는 로그인 후 `doctor`) 확인해 둔다.
 
 ## 2. cloudflared 설치
 
@@ -162,7 +173,9 @@ cloudflared service uninstall                            & rem 터널 서비스�
 
 - 퀵 터널(`cloudflared tunnel --url ...`)로 운영하지 않는다 — 재시작마다 주소가 바뀌고 잠글 수 없다.
 - `server.mjs` 를 직접 띄워 터널에 붙이지 않는다 — 관리 전용·127.0.0.1 이 빠진다. 늘 실행기로.
-- 학생·학부모에게 이 주소를 주지 않는다.
+- 학생·학부모에게 이 주소를 주지 않는다. 이 관리 웹에서 만든 가족 링크도 보내지 않는다.
+- **같은 터널 토큰을 다른 PC 에 설치하지 않는다** — 같은 토큰을 깐 PC 는 그 터널의 "복제본"이 되어 바깥 요청이 두 PC 로
+  나뉜다(한쪽에는 관리 서버가 없거나 자료가 다르다). 관리 서버·터널은 한 PC 에만. 금고 PC 가 생기면 그때 따로 설계한다.
 - 설정 파일·터널 토큰을 저장소·채팅·스크린숏에 남기지 않는다. `--loglevel debug` 로 돌리지 않는다(헤더째 기록된다).
 - 실제 도메인·팀 이름·이메일을 이 저장소 문서에 적지 않는다(공개 저장소다).
 
@@ -173,11 +186,13 @@ cloudflared service uninstall                            & rem 터널 서비스�
 **지금 상태 (2026-10-12)** — 키트 코드·테스트는 들어갔다. Linux CI 에서 실행기·점검 로직·작업 정의 생성까지
 돌려 봤지만 **Windows 실기에서는 아직 한 번도 돌려 보지 않았다.** 아래가 실기에서 처음 확인할 것들이다.
 
-1. `schtasks /Create /XML` 이 UTF-16 작업 정의(한글 설명 포함)를 받는지 — 실패하면 `kit.mjs taskXml` 의 Description 을 ASCII 로
-2. `icacls ... /inheritance:r /grant:r *S-1-5-32-544:(OI)(CI)F /grant:r *S-1-5-18:(OI)(CI)F` 가 한 번에 통하는지
-3. SYSTEM 으로 뜬 실행기가 저장소(`C:\Users\...` 아래라면)를 읽는지, 5분 트리거가 죽은 서버를 살리는지
+1. `schtasks /Create /XML … /RU SYSTEM` 이 UTF-16 작업 정의(한글 설명 포함)를 받는지 — 파일 인코딩 규칙은 공식 문서에 없다.
+   실패하면 `kit.mjs taskXml` 의 Description 을 ASCII 로, 그래도 안 되면 PowerShell `Register-ScheduledTask -Xml (Get-Content …)` 로
+2. `icacls … /inheritance:r /grant:r *S-1-5-32-544:(OI)(CI)F /grant:r *S-1-5-18:(OI)(CI)F` 가 한 번에 통하는지
+3. SYSTEM 으로 뜬 실행기가 저장소를 읽는지, 5분 트리거가 죽은 서버를 살리는지(작업 스케줄러의 '실패 시 다시 시작'은
+   프로그램이 오류 코드로 끝난 경우를 늘 잡지 않는다는 보고가 있어 5분 트리거를 같이 둔 것이다)
 4. 작업 스케줄러에서 "끝내기" 하면 서버(자식)도 같이 꺼지는지(`exit-with-parent.mjs`) — `doctor` 의 로컬 서버가 ✗ 가 되면 정상
-5. `doctor` 의 `powershell (Get-Service cloudflared).Status` 와 metrics `/ready`(127.0.0.1:20241~20245)가 실제로 읽히는지
+5. `doctor` 의 `whoami /groups`(관리자 판정)·`powershell (Get-Service cloudflared).Status`·metrics `/ready`(127.0.0.1:20241~20245)가 실제로 읽히는지
 
 **코덱스가 하는 것 / 원장이 하는 것**
 

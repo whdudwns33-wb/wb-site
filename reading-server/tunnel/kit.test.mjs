@@ -10,7 +10,7 @@
  */
 import {
   parseEnvFile, isInside, validateServerEnv, buildChildEnv, nextRestart, logFileName, logsToPrune,
-  envTemplate, classifyProbe, MIN_PIN, LOOPBACK, parseCloudflaredVersion, cloudflaredOk,
+  envTemplate, classifyProbe, MIN_PIN, LOOPBACK, parseCloudflaredVersion, cloudflaredOk, pickNodeExe, inOneDrive, STABLE_NODE,
 } from './kit.mjs';
 
 const errors = [];
@@ -74,6 +74,9 @@ const v = (vars, envFile = ENVF) => validateServerEnv({ vars, envFile, repoRoot:
   ok(v({ ...good, PORT: 'abc' }).errors.some((e) => /PORT/.test(e)), '숫자 아닌 포트를 받았다');
   eq(v({ ...good, PORT: '9000' }).port, 9000, '포트 지정');
   ok(v({ ...good, LOG_DIR: 'logs' }).errors.some((e) => /LOG_DIR/.test(e)), '상대 경로 LOG_DIR 을 받았다');
+  ok(v({ ...good, DATA_DIR: '\\\\nas\\wb' }).errors.some((e) => /네트워크 경로/.test(e)), 'NAS(UNC) 경로를 DATA_DIR 로 받았다 — SYSTEM 은 NAS 에 못 붙는다');
+  ok(v({ ...good, DATA_DIR: 'C:\\Users\\wb\\OneDrive - 학원\\data' }).errors.some((e) => /OneDrive/.test(e)), 'OneDrive 폴더를 DATA_DIR 로 받았다 — 라이선스 팩이 클라우드로 간다');
+  eq(v({ ...good, DATA_DIR: 'C:\\WB_onedrive_free' }).errors, [], 'OneDrive 가 이름 일부에만 든 폴더를 막았다');
   eq(v({ ...good, PUBLIC_HOST: 'WB.Example.com' }).publicHost, 'wb.example.com', 'PUBLIC_HOST 소문자화');
   ok(v({ ...good, PUBLIC_HOST: 'https://wb.example.com/' }).errors.some((e) => /PUBLIC_HOST/.test(e)), 'https:// 가 붙은 PUBLIC_HOST 를 받았다');
   ok(v({ ...good, PUBLIC_HOST: 'localhost' }).errors.some((e) => /PUBLIC_HOST/.test(e)), '점 없는 PUBLIC_HOST 를 받았다');
@@ -142,6 +145,17 @@ const v = (vars, envFile = ENVF) => validateServerEnv({ vars, envFile, repoRoot:
   eq(classifyProbe({ status: 302, location: 'https://evil.example/x.cloudflareaccess.com/' }).state, 'unknown', 'cloudflareaccess.com 을 경로에 넣은 가짜 리디렉트를 Access 로 봤다');
   eq(classifyProbe({ status: 302, location: 'https://wb.cloudflareaccess.com.evil.example/' }).state, 'unknown', 'cloudflareaccess.com 뒤에 붙인 가짜 호스트를 Access 로 봤다');
   eq(classifyProbe({ status: 200, robots: '' }).state, 'unknown', '우리 서버가 아닌 200 을 위험으로 단정했다');
+}
+
+/* ── 작업에 적을 node.exe ── */
+{
+  eq(pickNodeExe('C:\\Program Files\\nodejs\\node.exe', () => true).nodeExe, 'C:\\Program Files\\nodejs\\node.exe', 'MSI 자리는 그대로');
+  const z = 'C:\\Users\\wb\\AppData\\Local\\Microsoft\\WinGet\\Packages\\OpenJS\\node-v24.20.0-win-x64\\node.exe';
+  const a = pickNodeExe(z, (p) => p === STABLE_NODE);
+  ok(a.nodeExe === STABLE_NODE && a.warning, '버전 붙은 자리 대신 MSI 자리를 고르지 않는다');
+  const b = pickNodeExe(z, () => false);
+  ok(b.nodeExe === z && /MSI/.test(b.warning), 'MSI 자리가 없을 때 경고하지 않는다');
+  ok(inOneDrive('C:\\Users\\wb\\OneDrive\\Desktop\\wb-site') && !inOneDrive('C:\\WB\\wb-site'), 'OneDrive 판정');
 }
 
 /* ── cloudflared 버전 ── */

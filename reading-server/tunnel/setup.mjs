@@ -23,7 +23,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   TASK_NAME, LOOPBACK, envTemplate, taskXml, utf16leWithBom, classifyProbe, isHostname,
-  cloudflaredOk, MIN_CLOUDFLARED, METRICS_PORTS,
+  cloudflaredOk, MIN_CLOUDFLARED, METRICS_PORTS, pickNodeExe, inOneDrive,
 } from './kit.mjs';
 import { defaultEnvFile, loadConfig } from './run-server.mjs';
 
@@ -65,9 +65,11 @@ export function planInstallServer({ envFile, dataDir, nodeExe = process.execPath
     { mkdir: dataDir, why: '자료 폴더' },
     { run: ['icacls', dataDir, ...ACL_ADMINS_SYSTEM], why: '자료 폴더(학생 기록·팩)를 관리자·SYSTEM 만 읽게' },
     { write: xmlFile, data: utf16leWithBom(xml), why: '작업 정의(UTF-16)' },
-    { run: ['schtasks', '/Create', '/TN', TASK_NAME, '/XML', xmlFile, '/F'], why: `작업 스케줄러에 ${TASK_NAME} 등록(부팅 + 5분마다 살아 있는지)` },
+    /* /RU SYSTEM 을 같이 준다 — /XML 과 함께 쓸 수 있고(문서), XML 의 주체가 무시되더라도 SYSTEM 으로 못 박는다 */
+    { run: ['schtasks', '/Create', '/TN', TASK_NAME, '/XML', xmlFile, '/RU', 'SYSTEM', '/F'], why: `작업 스케줄러에 ${TASK_NAME} 등록(부팅 + 5분마다 살아 있는지)` },
     { remove: xmlFile, why: '작업 정의 임시 파일 지우기' },
     { run: ['schtasks', '/Run', '/TN', TASK_NAME], why: '지금 바로 띄우기' },
+    { note: `확인: schtasks /Query /TN ${TASK_NAME} /V /FO LIST — 실행 사용자 SYSTEM, 중지 시간 제한 없음` },
   ];
 }
 
@@ -133,8 +135,12 @@ function defaultRunner(argv) {
 }
 const quiet = (argv) => spawnSync(argv[0], argv.slice(1), { encoding: 'utf8', windowsHide: true });
 
-/* 관리자 권한인지 — "net session" 은 관리자 권한에서만 성공한다(출력은 언어마다 달라 종료 코드만 본다) */
+/* 관리자 권한인지 — 무결성 수준 SID 로 본다(언어와 무관): 높음 S-1-16-12288, 시스템 S-1-16-16384.
+   UAC 아래 관리자 계정이라도 "관리자 권한으로 실행" 하지 않은 터미널은 중간(S-1-16-8192)이다.
+   whoami 를 못 쓰는 경우에만 예전 방법(net session — 서버 서비스가 꺼져 있으면 틀릴 수 있다)으로 본다. */
 export function isElevated(run = quiet) {
+  const w = run(['whoami', '/groups', '/fo', 'csv', '/nh']);
+  if (!w.error && w.status === 0 && w.stdout) return /S-1-16-(12288|16384)\b/.test(String(w.stdout));
   const r = run(['net', 'session']);
   return !r.error && r.status === 0;
 }
@@ -287,7 +293,10 @@ export async function main(argv = process.argv.slice(2)) {
       needWindowsAdmin();
       const cfg = loadConfig(envFile);
       if (cfg.errors.length) throw new Error('설정 파일을 먼저 고치세요:\n  - ' + cfg.errors.join('\n  - '));
-      execute(planInstallServer({ envFile, dataDir: cfg.dataDir }), { dryRun });
+      const { nodeExe, warning } = pickNodeExe(process.execPath, fs.existsSync);
+      if (warning) console.log('[참고] ' + warning);
+      if (inOneDrive(REPO)) console.log(`[주의] 저장소가 OneDrive 폴더 안입니다(${REPO}) — SYSTEM 이 못 읽거나 클라우드 전용 파일일 수 있습니다. C:\\WB\\wb-site 처럼 밖으로 옮기길 권합니다`);
+      execute(planInstallServer({ envFile, dataDir: cfg.dataDir, nodeExe }), { dryRun });
       if (!dryRun) {
         for (let i = 0; i < 30; i++) {
           try { if ((await fetch(`http://${LOOPBACK}:${cfg.port}/api/health`)).ok) { console.log(`\n서버가 떴습니다 ✓ http://${LOOPBACK}:${cfg.port}`); return 0; } } catch { /* 아직 */ }
