@@ -57,6 +57,8 @@ const TOKEN_TTL = 1000 * 60 * 60 * 24 * 30;            // 30일
    관리 로그인과 관리 화면이 쓰는 공용 모듈(/naesin/gen.js 등)은 그대로 둔다 — 막으면 관리 웹이 깨진다. */
 const ADMIN_ONLY = /^(1|true|yes|on)$/i.test(process.env.WB_ADMIN_ONLY || '');
 const INHOUSE_ONLY = /^(1|true|yes|on)$/i.test(process.env.WB_INHOUSE_ONLY || '');
+const INHOUSE_SHARED_APIS = new Set(['/api/login', '/api/login/status', '/api/admin/login', '/api/token/refresh',
+  '/api/vocab/push/key', '/api/vocab/push/subscribe', '/api/vocab/push/unsubscribe']);
 const inhouseAccess = INHOUSE_ONLY ? createInhouseAccess(process.env.WB_INHOUSE_NETWORKS || '') : () => true;
 
 load();
@@ -522,6 +524,13 @@ const server = http.createServer(async (req, res) => {
          키를 넣으면 다음 접속부터 버튼이 저절로 돌아온다. 값이 아니라 있고 없음만 알린다. */
       if (p === '/api/health') return json(res, 200, { ok: true, service: 'wb-reading', runtime: 'node', localPdfReview: INHOUSE_ONLY && inhouseAccess(req), time: nowIso(), ai: !!process.env.ANTHROPIC_API_KEY });
 
+      /* PC는 영어 학생 기록의 정본이다. 가족·서비스 키는 별도 계약이며 학생 Bearer로 겸용하지 않는다. */
+      const who = auth(req);
+      if (INHOUSE_ONLY && who && !who.admin && appOfPath(p) !== 'naesin' && !INHOUSE_SHARED_APIS.has(p)) {
+        req.resume();
+        return json(res, 403, { error: '이 PC의 학생 접속은 영어 내신브레인 전용이에요. 다른 앱은 학원에서 안내한 주소를 쓰세요.' });
+      }
+
       if (p === '/api/portal/family-link') {
         const out = await handlePortalFamilyLink({ method: req.method,
           authorization: req.headers.authorization, secret: process.env.WB_PARENT_PORTAL_LINK_SECRET,
@@ -603,11 +612,11 @@ const server = http.createServer(async (req, res) => {
         return json(res, out.status, out.body);
       }
 
-      const who = auth(req);
       if (!who) return json(res, 401, { error: '로그인이 필요합니다.' });
 
       /* apps 게이트(기획서 D-6) — who 검증 직후 한 곳 (워커와 동일). apps null 은 재원생(전부), 배열은 그 목록만 */
-      if (!who.admin && !allowedApp(db.students[who.code] || null, appOfPath(p))) return json(res, 403, { error: '이 앱의 이용 대상이 아니에요.' });
+      if (!who.admin && !allowedApp(db.students[who.code] || null,
+        INHOUSE_ONLY && INHOUSE_SHARED_APIS.has(p) ? null : appOfPath(p))) return json(res, 403, { error: '이 앱의 이용 대상이 아니에요.' });
       /* 토큰 재발급 — 구 토큰은 만료 시각까지 유효 (워커와 동일) */
       if (p === '/api/token/refresh' && req.method === 'POST') return json(res, 200, { token: await newToken(who.code, who.admin), exp: new Date(Date.now() + TOKEN_TTL).toISOString() });
 
@@ -741,7 +750,8 @@ const server = http.createServer(async (req, res) => {
       }
       if (p === '/api/admin/overview' && req.method === 'GET') {
         const codes = new Set([...Object.keys(db.students), ...Object.keys(db.states)]);
-        return json(res, 200, { students: [...codes].map(summarize), time: nowIso() });
+        return json(res, 200, { students: [...codes].map(summarize), time: nowIso(),
+          ...(INHOUSE_ONLY ? { studentApp: 'naesin', localPdfReview: inhouseAccess(req) } : {}) });
       }
       if (p === '/api/admin/students' && req.method === 'POST') {
         const { code, name, grade, cls, level } = await readBody(req);

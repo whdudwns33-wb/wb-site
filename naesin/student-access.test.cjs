@@ -41,7 +41,7 @@ function screen() {
     document: { getElementById: node, addEventListener: (type, fn) => documentEvents.set(type, fn), body: { style: {} }, contains: () => false,
       createElement: () => ({ textContent: '', attrs: {}, setAttribute(key, value) { this.attrs[key] = value; }, getAttribute(key) { return this.attrs[key]; } }) },
     window: { addEventListener: (type, fn) => windowEvents.set(type, fn), speechSynthesis: voiceEngine },
-    SpeechSynthesisUtterance: function (text) { this.text = text; }, navigator: {}, location: { reload() {} },
+    SpeechSynthesisUtterance: function (text) { this.text = text; }, navigator: {}, location: { reload() {} }, confirm: () => true,
     WBNAESIN: require('./engine.js'), WBGRADE: require('./grade.js'), WBGEN: require('./gen.js'), AbortController,
     setTimeout: (fn, ms) => { const id = ++nextTimer; timers.set(id, { fn, ms }); return id; },
     setInterval: (fn, ms) => { const id = ++nextTimer; timers.set(id, { fn, ms }); return id; },
@@ -50,7 +50,7 @@ function screen() {
   });
   const exportUi = `
   globalThis.ui={boot,api,checkAccount,checkAccess,stopStudy,clearPackCache,migrateLegacy,pullAdopt,pushState,persist,openDemo,renderItem,recoverStateStamps,loadDB,
-    ttsOptions,wireTtsBtn,wireChunkWork,wireDialogueWork,wireSentenceWork,openPack,renderHeader,
+    ttsOptions,wireTtsBtn,wireChunkWork,wireDialogueWork,wireSentenceWork,openPack,renderHeader,demoNotice,bootError,
     projector:(scope,pj)=>{liveScope=scope;liveState={projector:pj};pjApply(pj);},
     projectile:()=>({pjPick,pjSent,pjSeen}),
     addPack:(p,inRange)=>{PACKS[p.packId]=normPack(p);if(inRange)packList.push(p.packId);packDB(p.packId);},
@@ -65,12 +65,31 @@ function screen() {
   ctx.window.WBVoice = ctx.WBVoice;
   vm.runInContext(inline.replace('  boot();', exportUi), ctx);
   ctx.ui.setup(account, clone(sample));
-  return { ...ctx.ui, store, node, requests, timers, documentEvents, windowEvents, voiceEngine,
+  return { ...ctx.ui, store, node, requests, timers, documentEvents, windowEvents, voiceEngine, location: ctx.location,
     disableVoice: () => { ctx.SpeechSynthesisUtterance = undefined; },
     setFetch: fn => { fetchImpl = fn; }, changeAccount: a => store.set('wbr.auth', JSON.stringify(a)) };
 }
 
 (async () => {
+  await t('체험·만료·학생 교대의 연동 링크는 영어 입구로 고정되고 늦은 이전 버튼은 새 인증을 지우지 않는다', async () => {
+    const ui = screen();ui.demo();ui.renderOff();ui.setFetch(() => ({ json: async () => clone(sample) }));await ui.openDemo();
+    assert.match(ui.demoNotice(), /href="\/\?app=naesin">학생 코드로 연동/);
+    for (const changed of [false, true]) {
+      const switched = screen(), savedKey = 'wbn.v1:' + account.code, before = '{"owner":"ST1","ownPractice":1}';
+      switched.store.set(savedKey, before);
+      if (changed) switched.changeAccount({ code: 'ST2', token: 'own-other-token' });
+      switched.node('whoLine').onclick();
+      assert.equal(switched.location.href, changed ? undefined : '/?app=naesin');
+      assert.equal(switched.store.has('wbr.auth'), changed);assert.equal(switched.store.get(savedKey), before);
+      const expired = screen();expired.bootError(new Error('api-401'));
+      expired.store.set(savedKey, before);
+      assert.match(expired.node('wrap').innerHTML, /href="\/\?app=naesin"/);
+      if (changed) expired.changeAccount({ code: 'ST2', token: 'own-other-token' });
+      expired.node('unlinkBtn').onclick();
+      assert.equal(expired.store.has('wbr.auth'), changed);assert.equal(expired.location.href, changed ? undefined : '/?app=naesin');
+      assert.equal(expired.store.get(savedKey), before);
+    }
+  });
   await t('학생 헤더는 과 번호 없는 팩에 Lundefined·Lnull을 붙이지 않고 교재와 실제 과 번호만 표시한다', () => {
     for (const lesson of [undefined, null, '', 6, '<own>']) {
       const ui = screen(), pack = { ...clone(sample), textbook: '자체 <교재>', lesson };

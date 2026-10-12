@@ -6,7 +6,6 @@ import { once } from 'node:events';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { createServer } from 'node:net';
 import { request } from 'node:http';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
@@ -20,11 +19,14 @@ const pack = JSON.parse(fs.readFileSync(path.join(DIR, '..', 'naesin', 'pack-sam
 const otherPack = { ...pack, packId: 'inhouse-pack-B' };
 const code = 'INHOUSE01', otherCode = 'INHOUSE02', a = 'cls:시험 A반', b = 'cls:시험 B반';
 const studentToken = randomUUID(), otherToken = randomUUID(), adminToken = randomUUID();
+const parentToken = randomUUID().replace(/-/g, '');
+const portalSecret = 'own-inhouse-portal-secret-not-real-32';
 const exp = Date.now() + 3600e3;
 fs.writeFileSync(path.join(data, 'db.json'), JSON.stringify({
   students: { [code]: { code, name: '원내 시험 A학생', cls: '시험 A반', grade: '중2', level: 'L3' },
-    [otherCode]: { code: otherCode, name: '원내 시험 B학생', cls: '시험 B반', grade: '중2', level: 'L3' } },
-  states: {}, tokens: { [studentToken]: { code, admin: false, exp }, [otherToken]: { code: otherCode, admin: false, exp },
+    [otherCode]: { code: otherCode, name: '원내 시험 B학생', cls: '시험 B반', grade: '중2', level: 'L3', apps: ['naesin'] } },
+  parents: { [parentToken]: code },
+  states: { [code]: { state: { ownReadingSentinel: 'preserve' }, updatedAt: new Date().toISOString() } }, tokens: { [studentToken]: { code, admin: false, exp }, [otherToken]: { code: otherCode, admin: false, exp },
     [adminToken]: { code: '__admin__', admin: true, exp } },
   pending: { 'test-nonce': { code, state: 'approved', token: studentToken, exp } },
   naesin: { packs: { [pack.packId]: { pack, updatedAt: new Date().toISOString() }, [otherPack.packId]: { pack: otherPack } },
@@ -34,20 +36,17 @@ fs.writeFileSync(path.join(data, 'db.json'), JSON.stringify({
       [a]: { examDate: '2099-12-31', packIds: [pack.packId] }, [b]: { examDate: '2099-12-31', packIds: [otherPack.packId] } } },
 }));
 
-const reserve = createServer();
-reserve.listen(0, '127.0.0.1');
-await once(reserve, 'listening');
-const port = reserve.address().port;
-await new Promise(resolve => reserve.close(resolve));
-const env = { ...process.env, HOST: '127.0.0.1', PORT: String(port), DATA_DIR: data,
+const env = { ...process.env, HOST: '127.0.0.1', PORT: '0', DATA_DIR: data, ADMIN_ID: '', ADMIN_PASSWORD: '',
   ADMIN_PIN: 'test-inhouse-pin-not-real', WB_INHOUSE_ONLY: '1', WB_INHOUSE_NETWORKS: '198.51.100.10',
-  ANTHROPIC_API_KEY: 'test-inhouse-ai-key-not-real' };
+  ANTHROPIC_API_KEY: 'test-inhouse-ai-key-not-real', WB_PARENT_PORTAL_LINK_SECRET: portalSecret,
+  VAPID_PUBLIC_KEY: '', VAPID_PRIVATE_JWK: '' };
 delete env.WB_ADMIN_ONLY;
-const server = spawn(process.execPath, [path.join(DIR, 'server.mjs')], { env, stdio: ['ignore', 'ignore', 'pipe'] });
+const server = spawn(process.execPath, [path.join(DIR, 'server.mjs')], { env, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
 const exited = once(server, 'exit');
-let stderr = '';
+let stderr = '', stdout = '';
 server.stderr.on('data', chunk => { stderr += chunk; });
-const base = `http://127.0.0.1:${port}`;
+server.stdout.on('data', chunk => { stdout += chunk; });
+let base;
 const outside = { host: 'academy.example', 'cf-connecting-ip': '203.0.113.99' };
 const inside = { host: 'academy.example', 'cf-connecting-ip': '198.51.100.10' };
 let passed = 0;
@@ -79,7 +78,12 @@ try {
   let ready = false;
   for (let i = 0; i < 100; i++) {
     if (server.exitCode != null) throw new Error('원내 서버 기동 실패: ' + stderr);
-    try { ready = (await req('/api/health', { token: null })).status === 200; if (ready) break; } catch { /* 기동 대기 */ }
+    const listening = stdout.match(/WB 진로독서 서버 http:\/\/localhost:(\d+)\r?\n/);
+    if (listening) {
+      assert.ok(Number(listening[1]) > 0 && Number(listening[1]) <= 65535);
+      base = `http://127.0.0.1:${listening[1]}`;
+      try { ready = (await req('/api/health', { token: null })).status === 200; if (ready) break; } catch { /* 기동 대기 */ }
+    }
     await sleep(50);
   }
   assert.ok(ready, '원내 서버가 제한 시간 내 기동하지 않았다: ' + stderr);
@@ -95,6 +99,78 @@ try {
     assert.equal(content.status, 200);
     assert.deepEqual(content.json.pack, pack);
     assert.equal((await req('/api/naesin/pack?id=' + pack.packId, { token: null })).status, 401, '로컬이어도 인증은 필요');
+  });
+
+  await t('영어 PC도 학생 연동은 교사 승인 후 토큰을 내고 영어 기록만 저장한다', async () => {
+    const login = await req('/api/login', { token: null, method: 'POST', body: { code, device: '자체 시험 기기' } });
+    assert.equal(login.status, 200); assert.equal(login.json.pending, true);
+    assert.equal((await req('/api/login/status?n=' + login.json.nonce, { token: null })).json.pending, true);
+    assert.equal((await req('/api/admin/pending', { token: adminToken, method: 'POST', body: { nonce: login.json.nonce, action: 'approve' } })).status, 200);
+    const approved = await req('/api/login/status?n=' + login.json.nonce, { token: null });
+    assert.equal(approved.status, 200); assert.ok(approved.json.token); assert.equal(approved.json.student.code, code);
+    assert.equal((await req('/api/naesin/exam', { token: approved.json.token })).status, 200);
+    const state = { owner: code, savedAt: Date.now(), packs: { [pack.packId]: { savedAt: Date.now(), states: {}, own: 'English only' } } };
+    assert.equal((await req('/api/naesin/state', { token: approved.json.token, method: 'PUT', body: { state } })).status, 200);
+    assert.deepEqual((await req('/api/naesin/state', { token: approved.json.token })).json.state, state);
+    const saved = JSON.parse(fs.readFileSync(path.join(data, 'db.json'), 'utf8'));
+    assert.deepEqual(saved.states[code].state, { ownReadingSentinel: 'preserve' });
+    assert.deepEqual(saved.naesin.states[code].state, state);
+  });
+
+  await t('앱 제한 없는 학생 Bearer도 영어 PC의 독해·다른 앱·가족 경로를 읽거나 쓰지 못하고 DB가 그대로다', async () => {
+    const before = fs.readFileSync(path.join(data, 'db.json'), 'utf8');
+    const routes = [
+      ['/api/pull'], ['/api/state', 'PUT', { state: { ownReadingSentinel: 'must not replace' } }], ['/api/league'], ['/api/pub'],
+      ['/api/vocab/pull'], ['/api/vocab/state', 'PUT', { state: { own: true } }],
+      ['/api/hanja/pull'], ['/api/hanja/state', 'PUT', { state: { own: true } }],
+      ['/api/haru/state'], ['/api/haru/attempt', 'POST', { own: true }],
+      ['/api/naesin-ko/state'], ['/api/naesin-ko/state', 'PUT', { state: { own: true } }],
+      ['/api/chunk/state'], ['/api/chunk/state', 'PUT', { state: { own: true } }],
+      ['/api/letter/state'], ['/api/letter/state', 'PUT', { state: { own: true } }],
+      ['/api/parent/summary?t=' + parentToken], ['/api/haru/parent?t=' + parentToken],
+      ['/api/chunk/parent?t=' + parentToken], ['/api/chunk/parent/state?t=' + parentToken, 'PUT', { state: { own: true } }],
+      ['/api/letter/parent?t=' + parentToken], ['/api/letter/parent/state?t=' + parentToken, 'PUT', { state: { own: true } }],
+      ['/api/letter/img/own-picture'], ['/api/portal/family-link', 'POST', { token: randomUUID().replace(/-/g, ''), name: '자체 가족' }],
+    ];
+    for (const [p, method = 'GET', body] of routes) {
+      const blocked = await req(p, { method, body });
+      assert.equal(blocked.status, 403, p); assert.match(blocked.json.error, /영어 내신브레인 전용/);
+      assert.equal(fs.readFileSync(path.join(data, 'db.json'), 'utf8'), before, p + ' 이후 DB 무변이');
+    }
+  });
+
+  await t('가족·포털 서비스 자격은 학생 Bearer와 구분하며 기존 독립 계약은 유지한다', async () => {
+    assert.equal((await req('/api/parent/summary?t=' + parentToken, { token: null })).status, 200);
+    const family = randomUUID().replace(/-/g, '');
+    const linked = await req('/api/portal/family-link', { token: portalSecret, method: 'POST', body: { token: family, name: '자체 포털 가족' } });
+    assert.equal(linked.status, 200); assert.equal(linked.json.token, family);
+    const saved = JSON.parse(fs.readFileSync(path.join(data, 'db.json'), 'utf8'));
+    assert.deepEqual(saved.portalFamilies[family].apps, ['letter', 'chunk']);
+  });
+
+  await t('영어 전용 apps 학생도 토큰 갱신과 공용 알림 구독만 쓰고 어휘 기록은 받지 못한다', async () => {
+    assert.equal((await req('/api/naesin/exam', { token: otherToken })).status, 200);
+    const refreshed = await req('/api/token/refresh', { token: otherToken, method: 'POST', body: {} });
+    assert.equal(refreshed.status, 200); assert.ok(refreshed.json.token);
+    assert.equal((await req('/api/naesin/exam', { token: refreshed.json.token })).status, 200);
+    assert.equal((await req('/api/vocab/push/key', { token: otherToken })).status, 200);
+    assert.equal((await req('/api/vocab/push/subscribe', { token: otherToken, method: 'POST', body: { subscription: { endpoint: 'https://push.example/own-not-real' } } })).status, 200);
+    assert.equal((await req('/api/vocab/push/unsubscribe', { token: otherToken, method: 'POST', body: {} })).status, 200);
+    assert.equal((await req('/api/vocab/pull', { token: otherToken })).status, 403);
+  });
+
+  await t('관리자는 영어 PC에서도 기존 다른 앱의 관리 API를 유지한다', async () => {
+    for (const p of ['/api/admin/overview', '/api/vocab/admin/overview', '/api/chunk/admin/overview', '/api/letter/admin/issues', '/api/naesin-ko/admin/packs'])
+      assert.equal((await req(p, { token: adminToken })).status, 200, p);
+  });
+
+  await t('원내 관리 현황의 고정 영어 앱 메타는 접속망별 capability를 주며 외부 학생 QR을 만들 근거로 쓰지 않는다', async () => {
+    for (const [headers, allowed] of [[{}, true], [inside, true], [outside, false]]) {
+      const overview = await req('/api/admin/overview', { token: adminToken, headers });
+      assert.equal(overview.status, 200); assert.equal(overview.json.studentApp, 'naesin');
+      assert.equal(overview.json.localPdfReview, allowed);
+      assert.ok(Array.isArray(overview.json.students));
+    }
   });
 
   await t('CF 외부 학생은 로그인·승인 토큰·시험·팩이 403, 관리 토큰도 우회하지 못한다', async () => {

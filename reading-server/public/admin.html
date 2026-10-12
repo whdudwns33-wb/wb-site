@@ -97,6 +97,10 @@ const esc=t=>String(t==null?'':t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;'
 let TOKEN=localStorage.getItem('wbr.admin.token')||null;
 let DATA=null,FILTER='전체',ARTS=null;
 const LV={L1:'7세~초2',L2:'초3~6',L3:'중1~3',L4:'고1~3'};
+function studentLink(code){
+  if(DATA&&DATA.studentApp==='naesin'&&DATA.localPdfReview!==true)return null;
+  return location.origin+'/?c='+encodeURIComponent(code)+(DATA&&DATA.studentApp==='naesin'?'&app=naesin':'');
+}
 
 async function api(path,opt){
   const r=await fetch('/api'+path,Object.assign({headers:{'Content-Type':'application/json',...(TOKEN?{Authorization:'Bearer '+TOKEN}:{})}},opt||{}));
@@ -319,14 +323,15 @@ function render(){
     if(!window.WBQR){alert('QR을 만들지 못했어요 — 새로고침해 보세요.');return;}
     const box=$('#qrAllBox');
     if(box.dataset.on==='1'){box.innerHTML='';box.dataset.on='';return;}
+    if(studentLink('')===null){box.innerHTML='<p class="muted">학생 QR은 원내 관리 주소에서 생성해 주세요.</p>';return;}
     try{
       box.dataset.on='1';
       box.innerHTML=`<div id="qrSheetAll">
-        <p style="font-weight:900;color:#173957;margin:14px 0 0">WB 워드브레인 — ${esc(FILTER)} 연동 QR</p>
+        <p style="font-weight:900;color:#173957;margin:14px 0 0">WB ${DATA.studentApp==='naesin'?'내신브레인':'워드브레인'} — ${esc(FILTER)} 연동 QR</p>
         <p class="muted" style="margin:2px 0 0">학생 기기 카메라로 자기 QR을 찍으면 앱이 열리고 연동 요청이 걸립니다.
           그다음 위쪽 <b>연동 승인 대기</b>에서 승인하면 끝이에요.</p>
         <div class="qrgrid">${list.map(s=>`<div class="qrcard">
-          ${WBQR.svg(location.origin+'/?c='+encodeURIComponent(s.code),{size:150})}
+          ${WBQR.svg(studentLink(s.code),{size:150})}
           <b>${esc(s.name||'(미등록)')}</b><span>${esc(s.code)}</span></div>`).join('')}</div></div>
         <div class="filters" style="margin:10px 0 0"><button class="btn sm" id="qrAllPrint">인쇄</button>
         <button class="btn sm ghost" id="qrAllHide">닫기</button></div>`;
@@ -474,11 +479,12 @@ async function openDetail(code){
   /* 연동 QR — 학생이 코드를 손으로 칠 필요가 없다. 찍으면 요청이 걸리고 강사가 승인하면 끝. */
   const qb=$('#qrBox');
   if(qb&&window.WBQR){
-    const link=location.origin+'/?c='+encodeURIComponent(code);
-    try{
+    const link=studentLink(code);
+    if(link===null)qb.innerHTML='<p class="muted">학생 QR은 원내 관리 주소에서 생성해 주세요.</p>';
+    else try{
       qb.innerHTML=`<div id="qrSheet" style="text-align:center">${WBQR.svg(link,{size:200})}
         <div style="margin-top:8px;font-weight:900;color:#173957">${esc(stu.name||'')} <span style="font-weight:600;color:#647784">${esc(code)}</span></div>
-        <div style="font-size:12px;color:#647784">WB 진로독서 — 카메라로 찍으면 연결돼요</div></div>
+        <div style="font-size:12px;color:#647784">WB ${DATA.studentApp==='naesin'?'내신브레인':'진로독서'} — 카메라로 찍으면 연결돼요</div></div>
         <div style="flex:1;min-width:200px">
           <p class="muted" style="margin:0 0 8px">학생 기기 카메라로 이 QR을 찍으면 앱이 열리고 연동 요청이 걸립니다. 그다음 위쪽 <b>연동 승인 대기</b>에서 승인하면 끝이에요.</p>
           <div class="linkrow"><input readonly value="${esc(link)}"><button class="btn sm ghost" id="qrCopy">링크 복사</button>
