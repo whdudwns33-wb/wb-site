@@ -92,6 +92,8 @@ const v = (vars, envFile = ENVF) => validateServerEnv({ vars, envFile, repoRoot:
   eq(v({ ...good, ANTHROPIC_API_KEY: 'k' }).errors, [], '서버가 쓰는 선택 키(AI)를 거절했다');
   ok(v({ ...good, DATA_DIR: 'C:\\Users\\wb' }).errors.some((e) => /저장소를 품고|사용자 폴더/.test(e)), '저장소를 품은 DATA_DIR 을 받았다 — 잠그면 저장소까지 잠긴다');
   ok(v({ ...good, DATA_DIR: 'D:\\' }).errors.some((e) => /드라이브 뿌리/.test(e)), '드라이브 뿌리를 DATA_DIR 로 받았다');
+  ok(v({ ...good, DATA_DIR: 'C:\\ProgramData\\WB\\data' }).errors.some((e) => /설정 폴더/.test(e)), '설정 폴더 안의 DATA_DIR 을 받았다 — 다음 restart 부터 막히고, app 아래면 복사 때 지워진다');
+  ok(v({ ...good, DATA_DIR: 'C:\\ProgramData\\WB\\app\\data' }).errors.some((e) => /설정 폴더/.test(e)), '코드 사본 안의 DATA_DIR 을 받았다 — restart 때 학생 기록이 지워진다');
   ok(v({ ...good, DATA_DIR: 'C:\\Users\\other\\Desktop' }).errors.some((e) => /사용자 폴더/.test(e)), '바탕 화면을 DATA_DIR 로 받았다 — 원장 파일이 잠긴다');
   ok(v({ ...good, DATA_DIR: 'C:\\Windows\\Temp\\wb' }).errors.some((e) => /시스템 폴더/.test(e)), 'Windows 폴더를 받았다');
   eq(v({ ...good, DATA_DIR: 'C:\\Users\\wb\\WB_data\\server' }).errors, [], '사용자 폴더 아래의 전용 폴더(저장소와 별개)를 거절했다');

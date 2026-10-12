@@ -17,7 +17,7 @@ import path from 'node:path';
 import {
   planEnv, planInstallServer, planRestartServer, planUninstallServer, planDeployApp, planTunnel, readToken, execute, doctor, printDoctor,
   findCloudflared, cloudflaredCandidates, isElevated, envDirProblem, dataDirProblem, sysTool, verifyAcl, readAcl, deployApp, removeApp,
-  lockSteps, resetChildren, findLinks, noLinks, treeHash,
+  lockSteps, resetChildren, findLinks, noLinks, treeHash, checkSource, checkAppDir,
 } from './setup.mjs';
 import { APP_DIRS, APP_MARKER } from './kit.mjs';
 
@@ -72,6 +72,8 @@ const idx = (steps, pred) => steps.findIndex(pred);
   ok(/다른 파일/.test(envDirProblem({ envFile: 'C:\\WBconf\\server.env', entries: ['메모.txt'], repo: REPO_W, platform: 'win32' })), '남의 파일이 든 폴더를 설정 폴더로 받았다');
   ok(/네트워크 경로/.test(envDirProblem({ envFile: '\\\\nas\\share\\server.env', entries: null, repo: REPO_W, platform: 'win32' })), 'NAS 를 설정 폴더로 받았다 — SYSTEM 이 못 읽는다');
   ok(/OneDrive/.test(envDirProblem({ envFile: 'C:\\Users\\wb\\OneDrive\\WB\\server.env', entries: null, repo: REPO_W, platform: 'win32' })), 'OneDrive 를 설정 폴더로 받았다');
+  eq(envDirProblem({ envFile: 'C:\\ProgramData\\WB\\wb.env', entries: ['wb.env', 'app', 'run-server-error.log'], repo: REPO_W, platform: 'win32' }), '', '--env 로 준 다른 이름의 설정 파일을 "다른 파일" 로 봤다 — env 가 만든 파일을 install 이 거절한다');
+  ok(envDirProblem({ envFile: 'C:\\ProgramData\\WB\\wb.env', entries: ['wb.env', '메모.txt'], repo: REPO_W, platform: 'win32' }), '다른 이름 설정 파일 옆의 남의 파일을 받았다');
   eq(dataDirProblem({ dataDir: DATA, entries: null }), '', '새 자료 폴더를 거절했다');
   eq(dataDirProblem({ dataDir: DATA, entries: ['db.json', 'backups', 'logs'] }), '', '서버 자료만 든 폴더(다시 설치)를 거절했다');
   ok(dataDirProblem({ dataDir: 'D:\\학원자료', entries: ['db.json', '수업.hwp'] }), '원장 파일이 든 폴더를 자료 폴더로 받았다 — 잠기면 원장이 못 연다');
@@ -103,6 +105,11 @@ const idx = (steps, pred) => steps.findIndex(pred);
   const iEnd = idx(steps, (s) => isRun(s, 'schtasks') && s.run[1] === '/End');
   const iDeploy = idx(steps, (s) => s.deployApp);
   ok(iDisable >= 0 && iDisable < iEnd && iEnd < iDeploy, '사본을 바꾸기 전에 작업을 끄고 멈추지 않는다 — 5분 감시가 복사 도중에 띄운다');
+  /* 거절할 수 있는 검사는 모두 작업을 끄기 전에 — 뒤에서 실패하면 서버가 꺼진 채 남는다 */
+  for (const [name, pred] of [['원본 확인', (s) => s.checkSource === REPO_W], ['사본 자리 확인', (s) => s.checkAppDir === APP], ['자료 폴더 잠금 확인', (s) => s.verifyAcl === DATA], ['자료 폴더 링크', (s) => s.noLinks === DATA]]) {
+    const i = idx(steps, pred);
+    ok(i >= 0 && i < iDisable, `${name}을(를) 작업을 끈 뒤에 한다 — 거기서 실패하면 서버가 꺼진 채 남는다`);
+  }
   ok(idx(steps, (s) => s.copyNode) > iDeploy && steps.find((s) => s.copyNode).copyNode.to === 'C:\\ProgramData\\WB\\app\\node\\node.exe', 'node.exe 를 사본 안으로 복사하지 않는다');
   const iAppGrant = idx(steps, (s) => s.run && s.run.includes('/inheritance:r') && s.run[1] === APP);
   ok(iAppGrant > idx(steps, (s) => s.copyNode) && iAppGrant < steps.indexOf(create), '사본(node 포함)을 다 넣은 뒤 잠그고 그다음 작업을 등록해야 한다');
@@ -123,6 +130,8 @@ const idx = (steps, pred) => steps.findIndex(pred);
 {
   const r = planRestartServer({ envFile: ENVF, dataDir: DATA, appDir: APP, nodeSrc: NODE_SRC, repo: REPO_W });
   ok(r[0].noLinks === ENVD && r[1].verifyAcl === ENVD, 'restart-server 가 설정 폴더 잠금을 보지 않는다');
+  const rDisable = idx(r, (s) => isRun(s, 'schtasks') && s.run.includes('/DISABLE'));
+  ok(idx(r, (s) => s.checkSource) < rDisable && idx(r, (s) => s.checkAppDir) < rDisable && idx(r, (s) => s.verifyAcl === DATA) < rDisable, 'restart-server 가 거절할 수 있는 검사를 작업을 끈 뒤에 한다');
   ok(r.some((s) => s.resetChildren === DATA && true) && r.some((s) => s.verifyAcl === DATA), 'restart-server 가 자료 폴더를 잠그지 않는다 — DATA_DIR 을 바꾸면 새 폴더가 열린 채로 생긴다');
   ok(r.some((s) => s.deployApp) && r.some((s) => s.copyNode), 'restart-server 가 새 코드·node 를 복사하지 않는다');
   const iEnable = idx(r, (s) => isRun(s, 'schtasks') && s.run.includes('/ENABLE'));
@@ -186,6 +195,19 @@ const idx = (steps, pred) => steps.findIndex(pred);
   ok(ran === 2, 'okCodes 에 있는 종료 코드에서 멈췄다');
 }
 
+/* ── 작업을 끈 뒤에 실패하면 그렇다고 말한다 ── */
+{
+  const plan = planRestartServer({ envFile: ENVF, dataDir: DATA, appDir: APP, nodeSrc: NODE_SRC, repo: REPO_W });
+  const noop = () => {};
+  const okOps = { deployApp: noop, copyNode: noop, removeApp: noop, verifyAcl: noop, noLinks: noop, resetChildren: noop, checkSource: noop, checkAppDir: noop };
+  let msg = '';
+  try { execute(plan, { runner: () => 0, out: noop, ops: { ...okOps, deployApp: () => { throw new Error('EBUSY'); } } }); } catch (e) { msg = e.message; }
+  ok(/꺼 둔 채/.test(msg) && /restart-server/.test(msg), '작업을 끈 뒤에 실패했는데 서버가 꺼진 채라는 것을 알리지 않는다');
+  msg = '';
+  try { execute(plan, { runner: () => 0, out: noop, ops: { ...okOps, checkSource: () => { throw new Error('링크'); } } }); } catch (e) { msg = e.message; }
+  ok(msg && !/꺼 둔 채/.test(msg), '작업을 끄기 전의 실패인데 꺼 뒀다고 말한다');
+}
+
 /* ── 권한 확인 — 경로는 환경 변수로, 남은 권한은 지우고, 그래도 남으면 멈춘다 ── */
 {
   const goodAcl = 'OWNER|S-1-5-32-544\nACE|S-1-5-32-544|Allow|2032127|False\nACE|S-1-5-18|Allow|2032127|False';
@@ -242,6 +264,7 @@ const idx = (steps, pred) => steps.findIndex(pred);
   const m = JSON.parse(fs.readFileSync(path.join(to, APP_MARKER), 'utf8'));
   ok(m.complete === true && /^[0-9a-f]{64}$/.test(m.hash), '사본 표식에 완료·지문이 없다');
   eq(m.hash, treeHash(src), '사본 지문이 저장소 지문과 다르다(같은 내용인데)');
+  eq(fs.readFileSync(path.join(to, 'package.json'), 'utf8').trim(), '{"type":"commonjs"}', '사본 뿌리에 package.json(commonjs)이 없다 — 위쪽 폴더의 package.json 이 모듈 형식을 바꿀 수 있다');
   fs.writeFileSync(path.join(src, 'reading', 'a.txt'), 'changed');
   ok(treeHash(src) !== m.hash, '커밋하지 않은 수정을 지문이 잡지 못한다');
   fs.writeFileSync(path.join(to, 'reading', 'stale.txt'), 'old');
@@ -277,6 +300,9 @@ const idx = (steps, pred) => steps.findIndex(pred);
   ok(fs.existsSync(path.join(to, APP_MARKER)), '지우기 도중에 표식부터 지웠다 — 다시 돌린 uninstall 이 남은 사본을 못 지운다');
   removeApp(to);
   ok(!fs.existsSync(to), '코드 사본을 지우지 못했다');
+  fs.mkdirSync(to);
+  removeApp(to);
+  ok(!fs.existsSync(to), '앞선 지우기가 남긴 빈 폴더(표식 없음)를 지우지 못한다 — uninstall 을 다시 돌려도 끝나지 않는다');
   fs.rmSync(tmp, { recursive: true, force: true });
   fs.rmSync(outside, { recursive: true, force: true });
 }
@@ -307,7 +333,7 @@ function fakeDeps(over = {}) {
     'https://wb.example.com/admin/': res(302, { location: 'https://wbteam.cloudflareaccess.com/cdn-cgi/access/login/wb.example.com?kid=a&redirect_url=%2Fadmin%2F' }),
     ...(over.routes || {}),
   };
-  const ps = { acl: GOOD_ACL, drive: 'Fixed\r\n', service: 'Running\r\n', ...(over.ps || {}) };
+  const ps = { acl: GOOD_ACL, drive: 'Fixed\r\n', service: 'Running\r\n', task: 'Ready\r\n', svcPath: '"C:\\Program Files (x86)\\cloudflared\\cloudflared.exe" tunnel run --token-file C:\\ProgramData\\cloudflared\\token\r\n', ...(over.ps || {}) };
   const runOut = {
     schtasks: { status: 0, stdout: '' },
     whoami: { status: 0, stdout: '"Mandatory Label\\High Mandatory Level","레이블","S-1-16-12288",""' },
@@ -323,7 +349,7 @@ function fakeDeps(over = {}) {
     connect: async (host) => (over.lanOpen ? host === '192.168.0.10' : false),
     readMarker: over.readMarker || (() => ({ complete: true, commit: 'abc1234def', hash: HASH })),
     repoHash: over.repoHash || (() => HASH),
-    exists: over.exists || ((p) => p === 'C:\\Program Files (x86)\\cloudflared\\cloudflared.exe'),
+    exists: over.exists || ((p) => p === 'C:\\Program Files (x86)\\cloudflared\\cloudflared.exe' || p === APP + '\\package.json'),
     env: { ProgramFiles: 'C:\\Program Files', 'ProgramFiles(x86)': 'C:\\Program Files (x86)' },
     run: (argv, opts) => {
       if (argv[0] === 'powershell') {
@@ -331,6 +357,8 @@ function fakeDeps(over = {}) {
         if (/Get-Acl/.test(c)) return { status: 0, stdout: typeof ps.acl === 'function' ? ps.acl((opts && opts.env && opts.env.WB_ACL_TARGET) || '') : ps.acl };
         if (/DriveInfo/.test(c)) return { status: 0, stdout: ps.drive };
         if (/Get-Service/.test(c)) return { status: 0, stdout: ps.service };
+        if (/Get-ScheduledTask/.test(c)) return { status: 0, stdout: ps.task };
+        if (/Win32_Service/.test(c)) return { status: 0, stdout: ps.svcPath };
       }
       if (/app\\node\\node\.exe$/.test(argv[0])) return runOut.appnode;
       const key = /cloudflared/i.test(argv[0]) ? 'cloudflared' : argv[0];
@@ -348,6 +376,8 @@ function fakeDeps(over = {}) {
 }
 const level = (rs, name) => (rs.find((r) => r.name === name) || {}).level;
 const fails = (rs) => rs.filter((r) => r.level === 'fail').map((r) => r.name);
+/* 같은 이름의 줄이 여럿일 수 있다(예: 서비스 실행 중 ✓ + 실행 파일 자리 ✗) — 하나라도 ✗ 인가 */
+const anyFail = (rs, name) => rs.some((r) => r.name === name && r.level === 'fail');
 const run = (over) => doctor({ envFile: ENVF, appDir: APP }, fakeDeps(over));
 {
   const good = await run();
@@ -363,7 +393,7 @@ const run = (over) => doctor({ envFile: ENVF, appDir: APP }, fakeDeps(over));
   eq(level(await run({ routes: { 'http://127.0.0.1:8890/api/health': new TypeError('fetch failed') } }), '로컬 서버'), 'fail', '서버가 안 떠 있는데 통과시켰다');
   eq(level(await run({ run: { cloudflared: { status: 0, stdout: 'cloudflared version 2025.11.1' } } }), 'cloudflared 버전'), 'fail', '토큰을 레지스트리에 남기는 옛 cloudflared 를 통과시켰다');
   eq(level(await run({ exists: () => false }), 'cloudflared 설치'), 'fail', 'Program Files 에 cloudflared 가 없는데 알려주지 않는다');
-  const noSvc = await run({ ps: { service: '' }, run: { schtasks: { status: 1, stdout: '' } } });
+  const noSvc = await run({ ps: { service: '', task: '' } });
   eq(level(noSvc, 'cloudflared 서비스'), 'fail', '설치되지 않은 cloudflared 서비스를 통과시켰다');
   eq(level(noSvc, '작업 스케줄러'), 'fail', '등록되지 않은 작업을 통과시켰다');
   eq(level(await run({ routes: { 'http://127.0.0.1:20241/ready': res(503) } }), '터널 연결'), 'fail', '/ready 503 을 통과시켰다');
@@ -383,6 +413,15 @@ const run = (over) => doctor({ envFile: ENVF, appDir: APP }, fakeDeps(over));
   eq(level(await run({ readMarker: () => { const e = new Error('ENOENT'); e.code = 'ENOENT'; throw e; } }), '코드 사본'), 'fail', '코드 사본이 없는데 통과시켰다');
   const eacces = await run({ readMarker: () => { const e = new Error('EPERM'); e.code = 'EPERM'; throw e; } });
   eq(level(eacces, '코드 사본'), 'warn', '권한이 없어 못 읽은 것을 "사본이 없다"(재설치하라)로 말한다');
+  eq(level(await run({ repoHash: () => { const e = new Error('EBUSY'); e.code = 'EBUSY'; throw e; } }), '코드 사본'), 'warn', '저장소를 못 읽어 비교하지 못했는데 ✓ 로 보인다');
+  eq(level(await run({ readMarker: () => ({ complete: true, commit: 'x' }) }), '코드 사본'), 'warn', '지문 없는 사본 표식을 ✓ 로 본다');
+  ok(anyFail(await run({ exists: (p) => p.includes('cloudflared') }), '코드 사본'), '사본에 package.json 이 없는데 통과시켰다');
+  eq(level(await run({ ps: { task: 'Disabled\r\n' } }), '작업 스케줄러'), 'fail', '꺼진 작업(부팅·5분 자동 시작 안 함)을 통과시켰다');
+  ok(anyFail(await run({ ps: { svcPath: '"C:\\Cloudflared\\bin\\cloudflared.exe" tunnel run --token-file x\r\n' } }), 'cloudflared 서비스'), 'Program Files 밖의 cloudflared 를 돌리는 서비스를 통과시켰다');
+  const tokSvc = await run({ ps: { svcPath: `"C:\\Program Files (x86)\\cloudflared\\cloudflared.exe" tunnel run --token ${TOKEN}\r\n` } });
+  const ts = tokSvc.filter((r) => r.name === 'cloudflared 서비스');
+  ok(ts.some((r) => r.level === 'fail' && /평문/.test(r.msg)), '서비스 실행 줄에 토큰이 평문으로 있는데 잡지 못한다(옛 설치)');
+  ok(!JSON.stringify(tokSvc).includes(TOKEN), '점검 결과에 서비스 실행 줄의 토큰이 찍혔다');
 
   const notAdmin = await run({ run: { whoami: { status: 0, stdout: '"Mandatory Label\\Medium Mandatory Level","레이블","S-1-16-8192",""' } } });
   eq(level(notAdmin, '관리자 권한'), 'warn', '관리자 권한이 아닌 터미널을 알려주지 않는다');

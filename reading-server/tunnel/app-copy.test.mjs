@@ -52,7 +52,9 @@ try {
   ok(!fs.existsSync(path.join(APP, 'workbench')) && !fs.existsSync(path.join(APP, '.git')), '서버와 무관한 폴더가 사본에 들어갔다');
 
   const port = await freePort();
-  const envFile = path.join(TMP, 'server.env');
+  /* 설정 폴더와 자료 폴더는 겹치면 안 된다(실행기가 거절한다) — 따로 둔다 */
+  fs.mkdirSync(path.join(TMP, 'conf'));
+  const envFile = path.join(TMP, 'conf', 'server.env');
   fs.writeFileSync(envFile, ['ADMIN_PIN=app-copy-test-pin-123456', `DATA_DIR=${path.join(TMP, 'data')}`, `PORT=${port}`].join('\n'));
   /* 사본의 실행기를 돌린다 — 저장소 쪽 파일을 하나도 쓰지 않아야 한다 */
   srv = spawn(process.execPath, [path.join(APP, 'reading-server', 'tunnel', 'run-server.mjs'), '--env', envFile], { stdio: 'ignore', cwd: APP });

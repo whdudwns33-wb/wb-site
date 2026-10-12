@@ -103,6 +103,7 @@ export function validateServerEnv({ vars, envFile, repoRoot, platform = process.
   else if (repoRoot && isInside(dataDir, repoRoot, platform)) errors.push('DATA_DIR 이 저장소 폴더 안입니다 — git 정리 한 번에 지워질 수 있고 커밋될 수 있습니다. 저장소 밖으로 옮기세요');
   else if (/^\\\\|^\/\//.test(dataDir)) errors.push('DATA_DIR 에 네트워크 경로(\\\\NAS\\…)를 쓰지 않습니다 — SYSTEM 으로 도는 서버는 NAS 에 붙지 못하고, 끊기면 저장이 실패합니다. 이 PC 디스크에 두고 NAS 는 백업 대상으로만');
   else if (/[\\/]onedrive[^\\/]*([\\/]|$)/i.test(dataDir)) errors.push('DATA_DIR 이 OneDrive 폴더 안입니다 — 학생 기록·라이선스 팩이 클라우드로 동기화됩니다(원장 결정: 클라우드 동기화 폴더 금지). C:\\WB_server_data 처럼 밖으로');
+  else if (envFile && (isInside(dataDir, p.dirname(envFile), platform) || isInside(p.dirname(envFile), dataDir, platform))) errors.push(`DATA_DIR 이 설정 폴더(${p.dirname(envFile)})와 겹칩니다 — 설정 폴더는 server.env·코드 사본(app, restart 때마다 지우고 다시 복사) 전용입니다. C:\\WB_server_data 처럼 따로 두세요`);
   else if (repoRoot && isInside(repoRoot, dataDir, platform)) errors.push('DATA_DIR 이 저장소를 품고 있습니다 — 자료 폴더를 잠그면(관리자만) 저장소까지 잠깁니다. C:\\WB_server_data 처럼 따로 두세요');
   else if (sharedFolderReason(dataDir, platform)) errors.push(`DATA_DIR 로 ${sharedFolderReason(dataDir, platform)} 는 쓰지 않습니다 — 관리자만 열리게 잠그는 폴더라 서버 전용 새 폴더여야 합니다(예: C:\\WB_server_data)`);
 
@@ -388,6 +389,11 @@ export function folderState(entries, isOwn) {
    목록은 server.mjs 가 서빙·import 하는 폴더다 — app-copy 테스트가 server.mjs 와 대조한다. */
 export const APP_DIRS = ['reading-server', 'reading', 'vocab', 'shared', 'chunk', 'vocab-age', 'naesin', 'haru', 'naesin-ko', 'hanja', 'letter'];
 export const APP_MARKER = '.wb-app-copy.json';
+/* 사본 뿌리에 두는 package.json — 서버가 불러 쓰는 .js(haru/·hanja/·letter/…)는 CommonJS 다. 사본 위쪽 폴더
+   (C:\ProgramData 는 일반 사용자도 파일을 만들 수 있다)에 {"type":"module"} 이 놓이면 Node 가 그것을 따라 모듈 형식을
+   바꿔 서버가 뜨지 않는다 — 사본 안에 가장 가까운 package.json 을 두어 못 박는다. */
+export const APP_PKG = 'package.json';
+export const APP_PKG_BODY = '{"type":"commonjs"}\n';
 /* 복사에서 뺄 것 — 로컬 자료(학생 기록)·빌드 산출물·남의 코드 */
 export function appCopyKeep(rel) {
   const parts = String(rel).split(/[\\/]/).filter(Boolean);
