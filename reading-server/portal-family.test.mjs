@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
+import { createServer } from 'node:net';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -19,7 +20,8 @@ const CODE = 'portal-' + TOKEN;
 const legacyStudent = { code: 'SYNTH01', name: '합성 기존학생', grade: '초3', ptoken: LEGACY };
 const conflictingStudent = { code: 'portal-' + COLLISION, name: '합성 이전원장', ptoken: LEGACY_LONG };
 const ENDPOINT = '/api/portal/family-link';
-const dbSeed = { students: { SYNTH01: legacyStudent, [conflictingStudent.code]: conflictingStudent }, parents: { [LEGACY]: 'SYNTH01', [LEGACY_LONG]: conflictingStudent.code } };
+const dbSeed = { students: { SYNTH01: legacyStudent, SYNTH02: { code: 'SYNTH02', name: '합성 미연결학생' },
+  [conflictingStudent.code]: conflictingStudent }, parents: { [LEGACY]: 'SYNTH01', [LEGACY_LONG]: conflictingStudent.code } };
 
 class FakeKV {
   constructor() {
@@ -132,36 +134,83 @@ const unavailable = await handlePortalFamilyLink({ method: 'POST', authorization
   getBody: async () => ({ token: TOKEN, name: '합성' }), store: { getParentCode: () => { throw Error(TOKEN + SECRET); } } });
 assert.deepEqual(unavailable, { status: 503, body: { error: 'family_link_unavailable' } });
 
-const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'wb-portal-family-'));
-fs.writeFileSync(path.join(dataDir, 'db.json'), JSON.stringify(dbSeed));
-const port = 18000 + process.pid % 10000;
+const tempRoot = fs.realpathSync(os.tmpdir());
+const dataDir = fs.mkdtempSync(path.join(tempRoot, 'wb-portal-family-'));
+assert.equal(path.dirname(fs.realpathSync(dataDir)), tempRoot, '시험 저장소는 임시 폴더 바로 아래에만 만든다');
+const file = path.join(dataDir, 'db.json');
+fs.writeFileSync(file, JSON.stringify(dbSeed));
+const reserve = createServer();
+reserve.listen(0, '127.0.0.1');
+await once(reserve, 'listening');
+const port = reserve.address().port;
+await new Promise(resolve => reserve.close(resolve));
 const server = spawn(process.execPath, [path.join(DIR, 'server.mjs')], {
-  env: { ...process.env, PORT: String(port), DATA_DIR: dataDir, ADMIN_PIN: PIN,
+  env: { ...process.env, HOST: '127.0.0.1', PORT: String(port), DATA_DIR: dataDir, ADMIN_PIN: PIN,
+    WB_ADMIN_ONLY: '', WB_INHOUSE_ONLY: '',
     WB_PARENT_PORTAL_LINK_SECRET: SECRET, VAPID_PUBLIC_KEY: '', VAPID_PRIVATE_JWK: '' },
-  windowsHide: true, stdio: 'ignore',
+  windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'],
 });
+let serverErrors = '', serverOutput = '';
+server.stderr.setEncoding('utf8').on('data', (text) => { serverErrors += text; });
+server.stdout.setEncoding('utf8').on('data', (text) => { serverOutput += text; });
 const exited = once(server, 'exit');
+const callNode = async (p, opt = {}) => decoded(await fetch('http://127.0.0.1:' + port + p, requestOptions(opt)));
 try {
   let ready = false;
   for (let n = 0; n < 100 && !ready; n++) {
-    try { ready = (await fetch('http://127.0.0.1:' + port + '/api/health')).ok; }
-    catch { await new Promise(resolve => setTimeout(resolve, 50)); }
+    assert.equal(server.exitCode, null, '소유한 시험 서버가 기동 중 종료됨: ' + serverErrors);
+    try { ready = serverOutput.includes('WB 진로독서 서버 http://localhost:' + port)
+      && (await fetch('http://127.0.0.1:' + port + '/api/health')).ok; }
+    catch { /* 소유 서버가 listen한 뒤 health 응답까지 기다린다. */ }
+    if (!ready) await new Promise(resolve => setTimeout(resolve, 50));
   }
-  assert.ok(ready, 'local server startup');
-  await contract(async (p, opt = {}) => decoded(await fetch('http://127.0.0.1:' + port + p, requestOptions(opt))), 'Node');
-  // persist()는 300ms 뒤 원자적으로 저장하므로 실제 파일 반영을 최대 5초 기다린다.
-  let saved;
-  for (let n = 0; n < 100; n++) {
-    saved = JSON.parse(fs.readFileSync(path.join(dataDir, 'db.json'), 'utf8'));
-    if (saved.portalFamilies?.[TOKEN]?.letterTier === 'K' && saved.portalFamilies?.[OTHER]) break;
-    await new Promise(resolve => setTimeout(resolve, 50));
-  }
+  assert.ok(ready, 'local server startup: ' + serverErrors);
+  await contract(async (p, opt = {}) => {
+    const response = await callNode(p, opt);
+    if (response.status === 200 && p === ENDPOINT) {
+      assert.ok(JSON.parse(fs.readFileSync(file, 'utf8')).portalFamilies?.[opt.body.token], '가족 생성 200 응답 전에 파일 저장을 완료해야 한다');
+    }
+    if (response.status === 200 && p === '/api/letter/admin/tier') {
+      const disk = JSON.parse(fs.readFileSync(file, 'utf8'));
+      const student = disk.students[opt.body.code] || disk.portalFamilies?.[opt.body.code.slice(7)];
+      assert.equal(student?.letterTier, opt.body.tier, '관리 변경 200 응답 전에 파일 저장을 완료해야 한다');
+    }
+    return response;
+  }, 'Node');
+  const saved = JSON.parse(fs.readFileSync(file, 'utf8'));
   assert.equal(saved.portalFamilies?.[TOKEN]?.letterTier, 'K', '가족 생성·관리 변경의 파일 저장 완료');
   assert.equal(saved.students[CODE], undefined);
   assert.equal(saved.parents[TOKEN], undefined);
   assert.equal(Object.keys(saved.portalFamilies).length, 2);
+
+  const admin = (await callNode('/api/admin/login', { method: 'POST', body: { pin: PIN } })).body.token;
+  const beforeFailure = fs.readFileSync(file, 'utf8');
+  const blocked = file + '.tmp';
+  fs.mkdirSync(blocked);
+  const failedBody = { token: '1'.repeat(32), name: '합성 저장 실패 가족' };
+  const failedLink = () => callNode(ENDPOINT, { method: 'POST', bearer: SECRET, body: failedBody });
+  try {
+    for (const response of await Promise.all([failedLink(), failedLink()])) {
+      assert.equal(response.status, 503, '동시 연결도 저장 실패를 200으로 응답하지 않는다');
+      assert.deepEqual(response.body, { error: 'family_link_unavailable' });
+    }
+    assert.equal((await failedLink()).status, 503, '실패 뒤 메모리 가족을 발견해도 파일 저장 없이 200을 내지 않는다');
+    for (const code of [CODE, conflictingStudent.code]) {
+      const response = await callNode('/api/letter/admin/tier', { method: 'POST', bearer: admin, body: { code, tier: 'E1' } });
+      assert.equal(response.status, 500);
+      assert.equal(response.body.code, 'STORE_WRITE_FAILED');
+    }
+    const parent = await callNode('/api/chunk/admin/parentlink/SYNTH02', { method: 'POST', bearer: admin, body: {} });
+    assert.equal(parent.status, 500);
+    assert.equal(parent.body.code, 'STORE_WRITE_FAILED');
+    assert.equal(fs.readFileSync(file, 'utf8'), beforeFailure, '저장 실패에서 원래 파일을 보존한다');
+  } finally { fs.rmdirSync(blocked); }
+  assert.equal((await failedLink()).status, 200, '같은 연결 요청은 디스크 복구 뒤 성공한다');
+  assert.equal(JSON.parse(fs.readFileSync(file, 'utf8')).portalFamilies[failedBody.token].name, failedBody.name, '복구 200 응답도 이미 파일에 저장되어야 한다');
+  console.log('OK — Node 저장 완료 응답·동시/재시도 실패·원본 보존·복구');
 } finally {
   server.kill();
   await exited;
+  assert.equal(path.dirname(fs.realpathSync(dataDir)), tempRoot, '정리 대상은 시험 임시 폴더 안이어야 한다');
   fs.rmSync(dataDir, { recursive: true, force: true });
 }

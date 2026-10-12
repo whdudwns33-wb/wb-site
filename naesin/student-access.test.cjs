@@ -7,6 +7,7 @@ const vm = require('node:vm');
 const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
 const inline = html.split('<script>')[1].split('</script>')[0];
 const elementIds = new Set(Array.from(html.matchAll(/\bid=["']([^"']+)["']/g), match => match[1]));
+for (const match of inline.matchAll(/(?:ttsBtnHtml|wireTtsBtn)\([^;\n]*,\s*'([^']+)'\)/g)) elementIds.add(match[1]);
 const sample = require('./pack-sample.json');
 const clone = value => JSON.parse(JSON.stringify(value));
 const account = { code: 'ST1', token: 'self-created-token-1', name: '체험 학생' };
@@ -16,16 +17,21 @@ const t = async (name, fn) => { await fn(); passed++; console.log('  ✓ ' + nam
 function screen() {
   const store = new Map([['wbr.auth', JSON.stringify(account)]]), nodes = new Map();
   const documentEvents = new Map(), windowEvents = new Map(), timers = new Map(), requests = [];
+  const voiceEngine = { voices: [], sent: [], cancels: 0, getVoices() { return this.voices; },
+    speak(u) { this.sent.push(u); }, cancel() { this.cancels++; }, resume() {} };
   let nextTimer = 0, fetchImpl = async () => ({ ok: true, status: 200, json: async () => ({}) });
   function node(id) {
     if (!elementIds.has(id)) return null;
     if (!nodes.has(id)) {
       const classes = new Set();
       const events = new Map();
+      const selectors = new Map();
       nodes.set(id, { innerHTML: '', textContent: '', value: '', hidden: false, style: {}, dataset: {}, events,
         children: [], appendChild(child) { this.children.push(child); },
         classList: { contains: value => classes.has(value), add: value => classes.add(value), remove: value => classes.delete(value), toggle() {} },
-        addEventListener: (type, fn) => events.set(type, fn), focus() {}, querySelector: () => ({ textContent: '' }), querySelectorAll: () => [],
+        addEventListener: (type, fn) => events.set(type, fn), focus() {}, querySelector: selector => {
+          if (!selectors.has(selector)) selectors.set(selector, { textContent: '' });return selectors.get(selector);
+        }, querySelectorAll: () => [],
       });
     }
     return nodes.get(id);
@@ -34,7 +40,8 @@ function screen() {
     localStorage: { getItem: key => store.get(key) || null, setItem: (key, value) => store.set(key, value), removeItem: key => store.delete(key) },
     document: { getElementById: node, addEventListener: (type, fn) => documentEvents.set(type, fn), body: { style: {} }, contains: () => false,
       createElement: () => ({ textContent: '', attrs: {}, setAttribute(key, value) { this.attrs[key] = value; }, getAttribute(key) { return this.attrs[key]; } }) },
-    window: { addEventListener: (type, fn) => windowEvents.set(type, fn) }, navigator: {}, location: { reload() {} },
+    window: { addEventListener: (type, fn) => windowEvents.set(type, fn), speechSynthesis: voiceEngine },
+    SpeechSynthesisUtterance: function (text) { this.text = text; }, navigator: {}, location: { reload() {} },
     WBNAESIN: require('./engine.js'), WBGRADE: require('./grade.js'), WBGEN: require('./gen.js'), AbortController,
     setTimeout: (fn, ms) => { const id = ++nextTimer; timers.set(id, { fn, ms }); return id; },
     setInterval: (fn, ms) => { const id = ++nextTimer; timers.set(id, { fn, ms }); return id; },
@@ -43,6 +50,7 @@ function screen() {
   });
   const exportUi = `
   globalThis.ui={boot,api,checkAccount,checkAccess,stopStudy,clearPackCache,migrateLegacy,pullAdopt,pushState,persist,openDemo,renderItem,recoverStateStamps,loadDB,
+    ttsOptions,wireTtsBtn,wireChunkWork,wireDialogueWork,wireSentenceWork,openPack,
     projector:(scope,pj)=>{liveScope=scope;liveState={projector:pj};pjApply(pj);},
     projectile:()=>({pjPick,pjSent,pjSeen}),
     addPack:(p,inRange)=>{PACKS[p.packId]=normPack(p);if(inRange)packList.push(p.packId);packDB(p.packId);},
@@ -53,13 +61,72 @@ function screen() {
     demo:()=>{sessionCode=null;sessionToken=null;KEY='wbn.v1:demo';DB={v:1,packs:{},savedAt:0};authed=false;},
     runner:value=>{RQ=value;},renderOff:()=>{render=function(){};}};`;
   assert.match(inline, /  boot\(\);/);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../shared/voice.js'), 'utf8'), ctx);
+  ctx.window.WBVoice = ctx.WBVoice;
   vm.runInContext(inline.replace('  boot();', exportUi), ctx);
   ctx.ui.setup(account, clone(sample));
-  return { ...ctx.ui, store, node, requests, timers, documentEvents, windowEvents,
+  return { ...ctx.ui, store, node, requests, timers, documentEvents, windowEvents, voiceEngine,
+    disableVoice: () => { ctx.SpeechSynthesisUtterance = undefined; },
     setFetch: fn => { fetchImpl = fn; }, changeAccount: a => store.set('wbr.auth', JSON.stringify(a)) };
 }
 
 (async () => {
+  await t('내신의 청크·대화·문장·러너·짝맞추기 듣기는 구매 자료의 원격 음성을 막고 로컬 영어만 쓴다', () => {
+    const actions = [
+      ui => { ui.wireChunkWork(sample.sentences[0].dayGroup);return () => ui.node('ckTts').onclick(); },
+      ui => { ui.wireDialogueWork(sample.dialogues[0].id);return () => ui.node('dlgTts').onclick(); },
+      ui => { ui.wireSentenceWork(sample.sentences[0].seq);return () => ui.node('ttsBtn').onclick(); },
+      ui => { ui.wireTtsBtn({ ttsText: 'A toy is blue.' }, 'chTts');return () => ui.node('chTts').onclick(); },
+      ui => { const root = ui.node('rBody');ui.renderItem({ type: 'ckmatch', pairs: [{ en: 'A toy', ko: '장난감' }] }, root);
+        return () => root.querySelector('.pairs').onclick({ target: { closest: () => ({ disabled: false, hasAttribute: () => true, getAttribute: () => '0', classList: { add() {} } }) } }); },
+    ];
+    assert.equal((inline.match(/WBVoice\.(?:speak|speakSeq)\(/g) || []).length, actions.length);
+    for (const action of actions) {
+      const ui = screen(), before = JSON.stringify(ui.get().DB), remote = { lang: 'en-US', default: true, localService: false };
+      const click = action(ui);ui.voiceEngine.voices = [remote];click();
+      assert.equal(ui.voiceEngine.sent.length, 0);assert.match(ui.node('topBanner').textContent, /기기의 영어 음성 설정/);
+      const local = { lang: 'en-GB', localService: true };ui.voiceEngine.voices = [remote, local];click();
+      assert.equal(ui.voiceEngine.sent.length, 1);assert.equal(ui.voiceEngine.sent[0].voice, local);
+      ui.voiceEngine.sent[0].onstart();assert.equal(ui.node('topBanner').hidden, true);
+      assert.equal(JSON.stringify(ui.get().DB), before, '읽기 실패·성공은 학습 기록을 바꾸지 않는다');
+    }
+  });
+
+  await t('체험은 기존 음성 선택을 유지하고 구매 자료의 엔진 미지원도 학생에게 알린다', async () => {
+    const ui = screen();ui.demo();ui.renderOff();
+    ui.setFetch(() => ({ json: async () => clone(sample) }));await ui.openDemo();
+    const remote = { lang: 'en-US', default: true, localService: false };ui.voiceEngine.voices = [remote];
+    ui.wireTtsBtn({ ttsText: 'A toy is blue.' }, 'chTts');ui.node('chTts').onclick();
+    assert.equal(ui.ttsOptions().localOnly, false);assert.equal(ui.voiceEngine.sent[0].voice, remote);
+    const unsupported = screen();unsupported.disableVoice();
+    unsupported.voiceEngine.voices = [];unsupported.wireTtsBtn({ ttsText: 'A toy is blue.' }, 'chTts');unsupported.node('chTts').onclick();
+    assert.equal(unsupported.voiceEngine.sent.length, 0);assert.match(unsupported.node('topBanner').textContent, /영어 읽기 음성/);
+  });
+
+  await t('체험 뒤 다른 교재를 열면 남은 체험 플래그로 구매 자료의 원격 음성을 허용하지 않는다', async () => {
+    const ui = screen();ui.renderOff();ui.setFetch(() => ({ json: async () => clone(sample) }));await ui.openDemo();
+    assert.equal(ui.ttsOptions().localOnly, false);
+    const assigned = { ...clone(sample), packId: 'own-assigned-L1' };
+    ui.addPack(assigned, true);ui.openPack(assigned, assigned.packId);
+    ui.voiceEngine.voices = [{ lang: 'en-US', localService: false, default: true }];
+    ui.wireTtsBtn({ ttsText: 'A self-created assigned sentence.' }, 'chTts');ui.node('chTts').onclick();
+    assert.equal(ui.ttsOptions().localOnly, true);assert.equal(ui.voiceEngine.sent.length, 0);
+    assert.match(ui.node('topBanner').textContent, /영어 읽기 음성/);
+  });
+
+  await t('계정 변경·원내 연결 이탈은 연속 듣기를 취소하고 늦은 종료·이전 듣기 버튼으로 재발화하지 않는다', () => {
+    for (const reason of ['account', 'offline']) {
+      const ui = screen();ui.voiceEngine.voices = [{ lang: 'en-US', localService: true }];
+      ui.wireChunkWork(sample.sentences[0].dayGroup);const click = ui.node('ckTts').onclick;click();
+      const first = ui.voiceEngine.sent[0];assert.ok(first);
+      if (reason === 'account') ui.changeAccount({ code: 'ST2', token: 'own-changed-token' });
+      else ui.windowEvents.get('offline')();
+      click();first.onend();
+      assert.equal(ui.get().studyStopped, true);assert.equal(ui.voiceEngine.sent.length, 1);
+      assert.ok(ui.voiceEngine.cancels > 0);assert.equal(ui.get().pack, null);
+    }
+  });
+
   await t('실제 진단 문항의 모름 보기는 한 번만 나오고 기존 문항의 추가·일반 보기 동작도 유지한다', () => {
     const item = require('./gen.js').diagnosticSet(sample, () => 0.5)[0];
     for (const q of [item, { ...item, choices: item.choices.filter(c => c.key !== item.unknownKey) }, { ...item, unknownKey: undefined, choices: item.choices.filter(c => c.key !== item.unknownKey) }]) {
