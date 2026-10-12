@@ -122,4 +122,62 @@ export function persist() {
   }, 300);
 }
 
+/* export 스냅샷을 되읽어 db 에 올린다 — 운영(KV)에서 뜬 자료를 이 PC 서버로 가져와 **보기만** 할 때
+   쓴다(docs/로컬-서버-외부공개-터널.md 의 결정 ㄱ). 터널 결정 A 는 이 서버를 원장·강사 전용으로
+   좁혔지만, 그래도 데이터가 KV 와 db.json 으로 갈린 채였다 — export 는 양쪽에 있는데 되읽는 길이
+   없었다. 그 한쪽을 메운다.
+
+   **반드시 제자리에서 고친다(재할당 금지).** server.mjs 가 기동 때 `const db = getDb()` 로 이
+   객체의 참조를 붙들고, haruRoot()·letterRoot() 같은 어댑터도 전부 그 참조를 닫아 두었다.
+   여기서 `db = next` 로 바꿔치우면 모듈 안의 db 만 새 객체가 되고 **서버는 옛 객체를 계속 본다** —
+   import 가 성공했다고 답하는데 화면은 아무것도 안 바뀌는, 가장 알아채기 어려운 고장이 된다.
+
+   **되읽을 수 있는 칸만 올린다.** export 의 일부 칸은 저장 모양과 꼴이 달라서(아래 SKIP) 그대로
+   넣으면 그 앱이 깨진다. 모르는 것을 밀어 넣지 않고 skipped 로 돌려준다 — 조용히 넘기면
+   "가져왔다"는 응답을 받고도 그 앱만 비어 있는 상태가 된다. */
+
+/* 꼴이 같아 그대로 올릴 수 있는 칸 */
+const IMPORT_DIRECT = ['students', 'states', 'vocab', 'portalFamilies', 'textbook', 'textbookSrc', 'pubmap'];
+/* 스냅샷이 본문을 뺀 칸 — 있는 본문(packs·books)은 지우지 않고 나머지만 덮는다 */
+const IMPORT_MERGE = {
+  naesin: ['packIds', 'states', 'exams', 'tasks', 'results'],
+  hanja: ['index', 'states', 'summaries', 'assigns', 'tasks', 'remaps', 'strokes'],
+};
+/* 되읽지 않는 칸과 그 이유 — dump 가 저장 모양과 다르다. 넣으면 그 앱이 깨진다.
+   되읽으려면 역방향 매퍼를 먼저 만들어야 한다(haru 는 paperkeyIds·planIds 가 없고,
+   letter 는 images 가 배열인데 저장은 맵이다). */
+const IMPORT_SKIP = {
+  haru: 'dumpHaru 에 paperkeyIds·planIds 가 없어 getPaperKeyIds()·getPlanIds() 가 빈다',
+  letter: 'dumpLetter 의 images 는 배열인데 저장은 맵이다 (issues 레코드 꼴도 다르다)',
+};
+
+export function importSnapshot(next) {
+  if (!next || typeof next !== 'object') return { ok: false, error: '스냅샷이 객체가 아닙니다.' };
+  if (next.service && next.service !== 'wb-reading') {
+    return { ok: false, error: '이 서버의 스냅샷이 아닙니다: ' + String(next.service).slice(0, 40) };
+  }
+  const applied = [], skipped = [], absent = [];
+  IMPORT_DIRECT.forEach((k) => {
+    if (next[k] == null) { absent.push(k); return; }
+    db[k] = next[k]; applied.push(k);
+  });
+  Object.keys(IMPORT_MERGE).forEach((root) => {
+    const src = next[root];
+    if (src == null || typeof src !== 'object') { absent.push(root); return; }
+    db[root] = db[root] || {};
+    /* 본문(packs·books)은 건드리지 않는다 — 스냅샷에 없을 뿐 지울 이유가 없다 */
+    IMPORT_MERGE[root].forEach((k) => { if (src[k] != null) db[root][k] = src[k]; });
+    applied.push(root);
+  });
+  Object.keys(IMPORT_SKIP).forEach((k) => {
+    if (next[k] != null) skipped.push({ section: k, why: IMPORT_SKIP[k] });
+  });
+  persist();
+  return { ok: true, applied, skipped, absent, savedAt: next.savedAt || null };
+}
+
+export function importSections() {
+  return { direct: IMPORT_DIRECT.slice(), merge: Object.keys(IMPORT_MERGE), skip: Object.assign({}, IMPORT_SKIP) };
+}
+
 export function getDb() { return db; }
