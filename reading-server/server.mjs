@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { load, persist, getDb, listBackups, getBackup, snapshotNow, naesinSnapshot } from './store.mjs';
+import { load, persist, getDb, listBackups, getBackup, snapshotNow, naesinSnapshot, importSnapshot, importSections } from './store.mjs';
 import { handleVocab, sendNightPushes, vocabSummary } from './vocab-api.mjs';
 import { handleNaesin, isReservedCode, dropReservedRows, naesinBodyLimit } from './naesin-api.mjs';
 import { handleStudio } from './naesin-studio.mjs';
@@ -334,7 +334,9 @@ const json = (res, code, obj) => {
    남은 몸통은 resume() 으로 흘려보내야 응답이 정상으로 나간다 — 안 읽고 응답하면 큰 몸통은 RST 로 끝난다. */
 const BODY_LIMIT_DEFAULT = 2_000_000;
 const BODY_LIMIT_TEXTBOOK = 5_500_000;
-const bodyLimit = (p) => (p.startsWith('/api/naesin-ko/') ? naesinKoBodyLimit(p) : p.startsWith('/api/naesin/') ? naesinBodyLimit(p) : p.startsWith('/api/haru/') ? haruBodyLimit(p) : p.startsWith('/api/hanja/') ? hanjaBodyLimit(p) : p.startsWith('/api/letter/') ? letterBodyLimit(p) : p === '/api/admin/textbook-src' ? BODY_LIMIT_TEXTBOOK : BODY_LIMIT_DEFAULT);
+/* 가져오기는 export 스냅샷 전체를 받는다 — 교재 원문·학생 기록이 다 들어와 기본 2MB 로는 못 받는다 */
+const BODY_LIMIT_IMPORT = 24_000_000;
+const bodyLimit = (p) => (p.startsWith('/api/naesin-ko/') ? naesinKoBodyLimit(p) : p.startsWith('/api/naesin/') ? naesinBodyLimit(p) : p.startsWith('/api/haru/') ? haruBodyLimit(p) : p.startsWith('/api/hanja/') ? hanjaBodyLimit(p) : p.startsWith('/api/letter/') ? letterBodyLimit(p) : p === '/api/admin/textbook-src' ? BODY_LIMIT_TEXTBOOK : p === '/api/admin/import' ? BODY_LIMIT_IMPORT : BODY_LIMIT_DEFAULT);
 const tooLarge = () => { const e = new Error('too large'); e.status = 413; return e; };
 const readBody = (req, limit = BODY_LIMIT_DEFAULT) => new Promise((resolve, reject) => {
   /* 조각을 Buffer 로 모아 한 번에 디코딩한다 — 조각마다 문자열로 바꾸면 조각 경계에 걸린 한글(3바이트)이 깨진다.
@@ -852,6 +854,29 @@ const server = http.createServer(async (req, res) => {
            팩은 라이선스 원문이라 백업 파일로 흩어지지 않게 한다(store.naesinSnapshot). */
         return json(res, 200, { service: 'wb-reading', savedAt: nowIso(), students: db.students, states: db.states, vocab: db.vocab,
           portalFamilies: db.portalFamilies || {}, textbook: db.textbook || {}, pubmap: db.pubmap || {}, naesin: naesinSnapshot(db.naesin), textbookSrc: db.textbookSrc || {}, haru: await dumpHaru(haruStore), letter: await dumpLetter(letterStore), hanja: await dumpHanja(hanjaStore) });
+      }
+      /* 가져오기 — 운영(KV)에서 뜬 export 를 이 PC 서버로 되읽는다. **읽기 전용 검토용**이다
+         (docs/로컬-서버-외부공개-터널.md 결정 ㄱ). 워커에는 이 라우트를 만들지 않는다 —
+         운영 데이터를 덮어쓰는 길을 열면 그게 가장 큰 사고다. 여기는 로컬 서버 파일이라
+         구조적으로 로컬 전용이다.
+         덮어쓰기는 되돌릴 수 없으므로 셋을 요구한다: ① 관리 인증(이 게이트) ② confirm:'replace'
+         ③ 덮기 전에 스냅샷. 스냅샷이 실패하면 덮지 않는다 — 되돌릴 길 없이 지우지 않는다. */
+      if (p === '/api/admin/import' && req.method === 'POST') {
+        const body = await readBody(req, BODY_LIMIT_IMPORT);
+        if (!body || typeof body !== 'object') return json(res, 400, { error: '스냅샷 JSON 이 필요합니다.' });
+        if (body.confirm !== 'replace') {
+          return json(res, 400, { error: "덮어쓰기 확인이 필요합니다 — confirm:'replace' 를 함께 보내세요.", sections: importSections() });
+        }
+        const snap = body.snapshot && typeof body.snapshot === 'object' ? body.snapshot : body;
+        /* 먼저 되돌릴 자리를 만든다. 못 만들면 덮지 않는다. */
+        const backupDay = snapshotNow();
+        if (!backupDay) return json(res, 500, { error: '덮기 전 스냅샷을 만들지 못해 중단했습니다. data/backups 쓰기 권한을 확인하세요.' });
+        const out = importSnapshot(snap);
+        if (!out.ok) return json(res, 400, { error: out.error, backupDay });
+        console.log('[import] ' + out.applied.length + '칸 적용 · 건너뜀 ' + out.skipped.length + ' · 되돌릴 스냅샷 ' + backupDay);
+        return json(res, 200, { ok: true, applied: out.applied, skipped: out.skipped, absent: out.absent,
+          snapshotSavedAt: out.savedAt, backupDay,
+          note: '되돌리려면 GET /api/admin/export?backup=' + backupDay + ' 로 받아 다시 가져오세요.' });
       }
       if (p === '/api/admin/backups' && req.method === 'GET') {
         return json(res, 200, { backups: listBackups() });
