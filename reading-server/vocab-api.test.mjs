@@ -817,6 +817,14 @@ await t('밤 푸시 — 워드브레인이 비어도 내신이 남았으면 보�
   assert.deepStrictEqual([r.sent, r.skipped, r.naesinOnly], [1, 0, 1]);
 });
 
+await t('밤 푸시 — 반 시험만 배정된 학생도 내신 알림을 받는다', async () => {
+  const naesin = naesinAdapter({ exam: null, summary: NAESIN_LEFT, savedAt: '2026-09-19T10:00:00Z' });
+  naesin.getStudent = async () => ({ cls: ' A반 ' });
+  naesin.getExam = async (scope) => scope === 'cls:A반' ? EXAM_LIVE : null;
+  const r = await sendNightPushes({ store: pushStore({ vocabDue: false }), push: pushEnv, fetchFn: okFetch, naesin, now: T_NOW });
+  assert.deepStrictEqual([r.sent, r.skipped, r.naesinOnly], [1, 0, 1]);
+});
+
 await t('밤 푸시 — 둘 다 비었으면 안 보낸다', async () => {
   const done = { ...NAESIN_LEFT, word: { total: 10, stable: 10 }, sentence: { total: 5, memorized: 5 } };
   const r = await sendNightPushes({ store: pushStore({ vocabDue: false }), push: pushEnv, fetchFn: okFetch,

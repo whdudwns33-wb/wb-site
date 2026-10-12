@@ -87,8 +87,10 @@ try {
 
   /* ── 가져오기 전에 팩 본문을 하나 올려 둔다 (④ 검증용) ── */
   const packId = '2022-ne-kimgitaek-m2-L6';
+  const pack = JSON.parse(fs.readFileSync(path.join(DIR, '..', 'naesin', 'pack-sample.json'), 'utf8'));
+  pack.packId = packId;
   const up = await post(s.base, '/api/naesin/admin/pack',
-    { id: packId, pack: { packId, words: [], sentences: [] } }, token);
+    { id: packId, pack }, token);
   ok(up.ok, `팩 업로드 실패 (${up.status})`);
 
   /* ── 본 가져오기 ── */
@@ -98,7 +100,7 @@ try {
   ok(out.ok === true, '가져오기가 ok 를 주지 않았다');
 
   /* ② 되돌릴 스냅샷을 먼저 만들었는가 */
-  ok(/^\d{4}-\d{2}-\d{2}$/.test(out.backupDay || ''), `되돌릴 스냅샷 날짜가 없다: ${out.backupDay}`);
+  ok(/^\d{4}-\d{2}-\d{2}-\d{9}-[a-f0-9]{8}$/.test(out.backupDay || ''), `되돌릴 스냅샷 ID가 없다: ${out.backupDay}`);
   const back = await get(s.base, '/api/admin/export?backup=' + out.backupDay, token);
   ok(back.status === 200, '되돌릴 스냅샷을 받을 수 없다 — 되돌릴 길 없이 덮었다');
 
