@@ -1,12 +1,15 @@
 param(
     [string]$HostAddress = '127.0.0.1',
     [string]$InhouseNetworks = '',
-    [string]$DataDir = (Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'WB\naesin-server')
+    [string]$DataDir = (Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'WB\naesin-server'),
+    [PSCredential]$AdminCredential
 )
 $ErrorActionPreference = 'Stop'
 
 function Protect-LocalPath($Path, $Directory) {
-    $acl = Get-Acl -LiteralPath $Path
+    $existingAcl = Get-Acl -LiteralPath $Path
+    $acl = if ($Directory) { New-Object Security.AccessControl.DirectorySecurity } else { New-Object Security.AccessControl.FileSecurity }
+    $acl.SetSecurityDescriptorSddlForm($existingAcl.GetSecurityDescriptorSddlForm([Security.AccessControl.AccessControlSections]::Access), [Security.AccessControl.AccessControlSections]::Access)
     $acl.SetAccessRuleProtection($true, $false)
     foreach ($rule in @($acl.GetAccessRules($true, $false, [Security.Principal.SecurityIdentifier]))) {
         $acl.RemoveAccessRuleSpecific($rule)
@@ -17,7 +20,10 @@ function Protect-LocalPath($Path, $Directory) {
         $rule = New-Object Security.AccessControl.FileSystemAccessRule ($identity, 'FullControl', $inherit, 'None', 'Allow')
         $acl.AddAccessRule($rule)
     }
-    Set-Acl -LiteralPath $Path -AclObject $acl
+    # Set-Acl copies audit/owner sections; only the changed DACL needs to be persisted.
+    $target = Get-Item -LiteralPath $Path
+    if ($target.PSObject.Methods['SetAccessControl']) { $target.SetAccessControl($acl) }
+    else { [IO.FileSystemAclExtensions]::SetAccessControl($target, $acl) }
 }
 
 function Write-SetupStatus($State, $Stage, $ErrorType = '') {
@@ -68,10 +74,20 @@ Import-Module -Name (Join-Path $PSHOME 'Modules\Microsoft.PowerShell.Security\Mi
 Write-SetupStatus 'working' 'protect-data-dir'
 Protect-LocalPath $DataDir $true
 $credentialPath = Join-Path $DataDir 'admin.credential.xml'
+if ($PSBoundParameters.ContainsKey('AdminCredential') -and (Test-Path -LiteralPath $credentialPath)) {
+    Write-SetupStatus 'working' 'validate-admin-credential'
+    throw 'An administrator credential already exists; the supplied credential was not applied.'
+}
 if (!(Test-Path -LiteralPath $credentialPath)) {
-    Write-SetupStatus 'waiting-admin' 'get-admin-credential'
-    $credential = Get-Credential -Message 'Create the local Naesin administrator login. Values stay on this PC.'
-    if (!$credential -or !$credential.UserName -or $credential.Password.Length -lt 12) { throw 'An administrator login with a password of at least 12 characters is required.' }
+    $credential = if ($PSBoundParameters.ContainsKey('AdminCredential')) {
+        Write-SetupStatus 'working' 'use-admin-credential'
+        $AdminCredential
+    } else {
+        Write-SetupStatus 'waiting-admin' 'get-admin-credential'
+        Get-Credential -Message 'Create the local Naesin administrator login. Values stay on this PC.'
+    }
+    Write-SetupStatus 'working' 'validate-admin-credential'
+    if (!$credential -or [string]::IsNullOrWhiteSpace($credential.UserName) -or $credential.Password.Length -lt 12) { throw 'An administrator login with a password of at least 12 characters is required.' }
     Write-SetupStatus 'working' 'write-admin-credential'
     $credential | Export-Clixml -LiteralPath $credentialPath
     $credential.Password.Dispose()
