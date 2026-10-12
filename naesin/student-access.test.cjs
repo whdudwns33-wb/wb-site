@@ -21,10 +21,11 @@ function screen() {
     if (!elementIds.has(id)) return null;
     if (!nodes.has(id)) {
       const classes = new Set();
-      nodes.set(id, { innerHTML: '', textContent: '', value: '', hidden: false, style: {}, dataset: {},
+      const events = new Map();
+      nodes.set(id, { innerHTML: '', textContent: '', value: '', hidden: false, style: {}, dataset: {}, events,
         children: [], appendChild(child) { this.children.push(child); },
         classList: { contains: value => classes.has(value), add: value => classes.add(value), remove: value => classes.delete(value), toggle() {} },
-        addEventListener() {}, focus() {}, querySelector: () => ({ textContent: '' }), querySelectorAll: () => [],
+        addEventListener: (type, fn) => events.set(type, fn), focus() {}, querySelector: () => ({ textContent: '' }), querySelectorAll: () => [],
       });
     }
     return nodes.get(id);
@@ -42,6 +43,9 @@ function screen() {
   });
   const exportUi = `
   globalThis.ui={boot,api,checkAccount,checkAccess,stopStudy,clearPackCache,migrateLegacy,pullAdopt,pushState,persist,openDemo,renderItem,recoverStateStamps,loadDB,
+    projector:(scope,pj)=>{liveScope=scope;liveState={projector:pj};pjApply(pj);},
+    projectile:()=>({pjPick,pjSent,pjSeen}),
+    addPack:(p,inRange)=>{PACKS[p.packId]=normPack(p);if(inRange)packList.push(p.packId);packDB(p.packId);},
     clock:now=>{Date.now=()=>now;},
     get:()=>({pack,PACKS,DB,studyStopped,pendingRemote}),
     setup:(a,p)=>{sessionCode=a.code;sessionToken=a.token;KEY='wbn.v1:'+a.code;DB={v:1,owner:a.code,packs:{},savedAt:100};
@@ -174,6 +178,43 @@ function screen() {
     assert.equal(demo.requests.length, count);
     demo.windowEvents.get('offline')();
     assert.ok(demo.get().pack, '자체 창작 체험은 오프라인에서 닫지 않는다');
+  });
+
+  await t('투사 결과는 실제로 로드한 배정 과에만 기록하고 현재 다른 과와 미로드·범위 밖 과는 건드리지 않는다', () => {
+    const other = { ...clone(sample), packId: 'own-class-projector' };
+    const it = { ref: 'w-e2k:' + sample.words[0].id, choices: [{ key: '1', text: '자체 창작 답' }], answerKey: '2' };
+    for (const loaded of ['assigned', 'outside', 'missing', 'legacy']) {
+      const ui = screen(), current = ui.get().DB.packs[sample.packId];
+      current.savedAt = 111;
+      if (loaded === 'assigned' || loaded === 'outside') ui.addPack(other, loaded === 'assigned');
+      const pj = { packId: loaded === 'legacy' ? undefined : other.packId, startedAt: 'class-session', index: 0, count: 1, item: it };
+      ui.projector('cls:가반', pj);
+      ui.node('pjCh').events.get('click')({ target: { closest: () => ({ disabled: false, getAttribute: () => '1' }) } });
+      ui.projector('cls:가반', { ...pj, revealed: true });
+      ui.projector('cls:가반', { ...pj, revealed: true });
+      assert.equal(current.log.length, 0);assert.equal(Object.keys(current.wrong).length, 0);assert.equal(current.savedAt, 111);
+      const pd = ui.get().DB.packs[other.packId];
+      if (loaded === 'assigned') {
+        assert.equal(pd.log.length, 1);assert.equal(Object.keys(pd.wrong).length, 1);assert.ok(pd.savedAt > 111);
+      } else if (pd) { assert.equal(pd.log.length, 0);assert.equal(Object.keys(pd.wrong).length, 0);assert.equal(pd.savedAt, 0); }
+      else assert.equal(pd, undefined);
+    }
+  });
+
+  await t('학생 응답은 실제 반 scope를 보내고 이전 반의 늦은 응답이 새 반 선택을 바꾸지 않는다', async () => {
+    const ui = screen();
+    const pj = { packId: sample.packId, startedAt: 'session', index: 0, count: 1,
+      item: { ref: 'w-e2k:' + sample.words[0].id, choices: [{ key: '1', text: '자체 창작 답' }] } };
+    let resolve;ui.setFetch(() => new Promise(r => { resolve = r; }));
+    ui.projector('cls:가반', pj);
+    ui.node('pjCh').events.get('click')({ target: { closest: () => ({ disabled: false, getAttribute: () => '1' }) } });
+    assert.equal(JSON.parse(ui.requests[0].body).scope, 'cls:가반');
+    assert.equal(ui.projectile().pjPick, '1');
+    ui.projector('default', pj);
+    assert.equal(ui.projectile().pjPick, null);
+    resolve({ ok: true, status: 200, json: async () => ({ ok: true }) });
+    await new Promise(r => setImmediate(r));
+    assert.equal(ui.projectile().pjSent, false);assert.equal(ui.projectile().pjPick, null);
   });
 
   await t('서버 동률 확정은 채택하고 요청 뒤 새 학습 기록은 지키며 요약을 한 번 갱신한다', async () => {

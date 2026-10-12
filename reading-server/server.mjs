@@ -520,7 +520,7 @@ const server = http.createServer(async (req, res) => {
       /* ai: AI 연상을 쓸 수 있는지. 키가 없으면 앱이 「AI 연상 만들기」 버튼을 감춘다 —
          눌러도 안 되는 버튼은 학생에게 앱이 고장 난 것처럼 보인다.
          키를 넣으면 다음 접속부터 버튼이 저절로 돌아온다. 값이 아니라 있고 없음만 알린다. */
-      if (p === '/api/health') return json(res, 200, { ok: true, service: 'wb-reading', time: nowIso(), ai: !!process.env.ANTHROPIC_API_KEY });
+      if (p === '/api/health') return json(res, 200, { ok: true, service: 'wb-reading', runtime: 'node', localPdfReview: INHOUSE_ONLY && inhouseAccess(req), time: nowIso(), ai: !!process.env.ANTHROPIC_API_KEY });
 
       if (p === '/api/portal/family-link') {
         const out = await handlePortalFamilyLink({ method: req.method,
@@ -676,6 +676,7 @@ const server = http.createServer(async (req, res) => {
         /* 팩 제작 스튜디오가 먼저 본다 — 자기 경로가 아니면 null 을 돌려 다음 라우터로 넘긴다 */
         const st = await handleStudio({
           ...ctx,
+          localPdfReview: INHOUSE_ONLY && inhouseAccess(req),
           ai: { apiKey: INHOUSE_ONLY ? '' : process.env.ANTHROPIC_API_KEY || '', model: process.env.NAESIN_AI_MODEL || '', env: process.env },
         });
         if (st) return json(res, st.status, st.body);

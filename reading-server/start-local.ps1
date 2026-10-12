@@ -2,6 +2,7 @@ param(
     [string]$DataDir = (Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'WB\naesin-server')
 )
 $ErrorActionPreference = 'Stop'
+# Invoke with -ExecutionPolicy RemoteSigned for this process; Windows and organization policies stay unchanged.
 
 try {
     $DataDir = [IO.Path]::GetFullPath($DataDir)
@@ -14,7 +15,7 @@ try {
     if ($settings.Port -ne 8890 -or !($settings.Host -is [string]) -or !$settings.Host -or !($settings.InhouseNetworks -is [string])) {
         throw 'Local server settings are invalid.'
     }
-    $node = (Get-Command node.exe -CommandType Application -ErrorAction Stop).Source
+    $node = (Get-Command node.exe -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
     $server = Join-Path $PSScriptRoot 'server.mjs'
     $logs = Join-Path $DataDir 'logs'
     New-Item -ItemType Directory -Path $logs -Force | Out-Null

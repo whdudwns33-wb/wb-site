@@ -46,7 +46,7 @@ const call = (store, path, method, body, opts = {}) => handleStudio({
   path, method, who: opts.who === undefined ? WHO : opts.who, store,
   query: new URLSearchParams(opts.query || ''),
   getBody: async () => body,
-  ai: opts.ai, rnd: opts.rnd,
+  ai: opts.ai, rnd: opts.rnd, localPdfReview: opts.localPdfReview,
 });
 
 /* 샘플 팩을 초안 형태로 — 자체 창작 팩만 픽스처로 쓴다(라이선스 자료 금지) */
@@ -63,6 +63,11 @@ function approveAll(job) {
     job.draft[kind].forEach((row, i) => { job.review[rowKey(kind, row, i)] = { state: 'ok', at: 'x' }; });
   }
 }
+const pdfWord = () => {
+  const w = SAMPLE.words[0];
+  return { id: w.id, headword: w.headword, pos: w.pos, meaningKo: clone(w.meaningKo), sections: clone(w.sections),
+    _pdfReview: { flags: ['원본 대조 필요'], locations: [{ page: 1, bbox: [10, 20, 30, 40] }] } };
+};
 
 console.log('naesin-studio — 팩 제작 스튜디오');
 
@@ -197,12 +202,232 @@ await t('초안 직접 넣기 — 키 없이도 스튜디오를 쓸 수 있다',
   const cr = await call(s, '/api/naesin/admin/job', 'POST', { packId: '2022-ne-test-m2-L6' });
   const r = await call(s, '/api/naesin/admin/job/draft', 'POST', {
     jobId: cr.body.jobId,
-    draft: { words: [{ id: 'w-001', headword: 'sea', meaningKo: ['바다'], sections: ['reading'] }], empty: [] },
+    draft: { words: [{ id: 'w-001', headword: 'sea', meaningKo: ['바다'], sections: ['reading'] }], sentences: [] },
   });
   assert.strictEqual(r.status, 200);
   assert.strictEqual(r.body.job.counts.words, 1);
-  assert.ok(!('empty' in r.body.job.counts), '빈 배열은 안 담는다');
+  assert.ok(!('sentences' in r.body.job.counts), '빈 배열은 안 담는다');
   assert.strictEqual((await call(s, '/api/naesin/admin/job/draft', 'POST', { jobId: cr.body.jobId, draft: {} })).status, 400);
+});
+
+await t('초안 종류·행 형태를 검사하고 거절 시 기존 초안·승인을 보존한다', async () => {
+  const s = memStore();
+  const cr = await call(s, '/api/naesin/admin/job', 'POST', { packId: SAMPLE.packId });
+  const id = cr.body.jobId;
+  await call(s, '/api/naesin/admin/job/draft', 'POST', { jobId: id, draft: draftFromSample() });
+  const job = await s.getJob(id); approveAll(job);
+  const before = JSON.stringify(job);
+  for (const draft of [{ unknown: [{}] }, { unknown: [] }, { words: {} }, { words: [null] },
+    { kind: 'naesin-pdf-review-draft', version: 1, wordCandidates: [{}] }]) {
+    assert.strictEqual((await call(s, '/api/naesin/admin/job/draft', 'POST', { jobId: id, draft })).status, 400);
+    assert.strictEqual(JSON.stringify(await s.getJob(id)), before);
+  }
+});
+
+await t('PDF 후보 DTO는 원내 권한이 확인된 PC만 받고 워커에서는 거절한다', async () => {
+  const s = memStore();
+  const cr = await call(s, '/api/naesin/admin/job', 'POST', { packId: SAMPLE.packId });
+  const b = { jobId: cr.body.jobId, draft: { words: [pdfWord()] } };
+  for (const localPdfReview of [undefined, false, 'true'])
+    assert.strictEqual((await call(s, '/api/naesin/admin/job/draft', 'POST', b, { localPdfReview })).status, 403);
+  const r = await call(s, '/api/naesin/admin/job/draft', 'POST', b, { localPdfReview: true });
+  assert.strictEqual(r.status, 200);
+  assert.strictEqual(r.body.gate.pending, 1);
+  assert.ok(r.body.gate.warns.some((w) => /^words\[0\].*PDF/.test(w.message)), '일괄 승인이 제외할 행 경고');
+  assert.deepStrictEqual((await s.getJob(b.jobId)).draft.words[0]._pdfReview, b.draft.words[0]._pdfReview);
+});
+
+await t('PDF DTO에는 원문 부속물·다른 종류·잘못된 좌표가 들어오지 못한다', async () => {
+  const s = memStore();
+  const cr = await call(s, '/api/naesin/admin/job', 'POST', { packId: SAMPLE.packId });
+  const mutations = [
+    (w) => { w.raw = '합성'; }, (w) => { w.evidence = '합성'; },
+    (w) => { w._pdfReview.raw = '합성'; }, (w) => { w._pdfReview.flags = 'pending'; },
+    (w) => { w._pdfReview.locations[0].page = 0; },
+    (w) => { w._pdfReview.locations[0].bbox = [1, 2, 0, 3]; },
+    (w) => { w._pdfReview.locations[0].bbox = [1, 2, 3]; },
+    (w) => { w._pdfReview.locations[0].bbox[0] = -1; },
+    (w) => { w._pdfReview.locations[0].bbox[0] = '1'; },
+    (w) => { w._pdfReview.locations[0].tokens = ['합성']; },
+  ];
+  for (const mutate of mutations) {
+    const w = pdfWord(); mutate(w);
+    const r = await call(s, '/api/naesin/admin/job/draft', 'POST', { jobId: cr.body.jobId, draft: { words: [w] } }, { localPdfReview: true });
+    assert.strictEqual(r.status, 400);
+    assert.deepStrictEqual((await s.getJob(cr.body.jobId)).draft, {});
+  }
+  assert.strictEqual((await call(s, '/api/naesin/admin/job/draft', 'POST', {
+    jobId: cr.body.jobId, draft: { sentences: [pdfWord()] },
+  }, { localPdfReview: true })).status, 400);
+});
+
+await t('PDF 원본 메타는 편집으로 지워지지 않고 개별 검수 후 학생 팩에서 제거된다', async () => {
+  const s = memStore();
+  const cr = await call(s, '/api/naesin/admin/job', 'POST', { packId: SAMPLE.packId });
+  const id = cr.body.jobId;
+  await call(s, '/api/naesin/admin/job/draft', 'POST', {
+    jobId: id, draft: { words: [pdfWord()], sentences: clone(SAMPLE.sentences) },
+  }, { localPdfReview: true });
+  const job = await s.getJob(id);
+  for (const [i, row] of job.draft.sentences.entries()) job.review[rowKey('sentences', row, i)] = { state: 'ok' };
+  const key = rowKey('words', job.draft.words[0], 0), original = clone(job.draft.words[0]._pdfReview);
+  const pending = await call(s, '/api/naesin/admin/job/review', 'POST', {
+    jobId: id, key, state: 'pending', patch: { _pdfReview: null },
+  });
+  assert.strictEqual(pending.body.gate.ok, false);
+  assert.ok(pending.body.gate.warns.some((w) => /PDF/.test(w.message)));
+  assert.deepStrictEqual(job.draft.words[0]._pdfReview, original);
+  assert.ok(!Object.prototype.hasOwnProperty.call(job.review[key].patch, '_pdfReview'));
+  const fixed = await call(s, '/api/naesin/admin/job/review', 'POST', {
+    jobId: id, key, state: 'fixed', patch: { headword: job.draft.words[0].headword, _pdfReview: { flags: [] } },
+  });
+  assert.strictEqual(fixed.body.gate.ok, true, JSON.stringify(fixed.body.gate));
+  assert.ok(!fixed.body.gate.warns.some((w) => /PDF/.test(w.message)));
+  assert.deepStrictEqual(job.draft.words[0]._pdfReview, original);
+  const published = await call(s, '/api/naesin/admin/job/publish', 'POST', { jobId: id });
+  assert.strictEqual(published.status, 200);
+  const pack = (await s.getPack(SAMPLE.packId)).pack;
+  assert.ok(!JSON.stringify(pack).includes('_pdfReview'));
+  assert.ok(!JSON.stringify(pack).includes('locations'));
+  assert.strictEqual(pack.words[0].headword, job.draft.words[0].headword);
+});
+
+await t('행 인덱스 경고는 버린 앞 행을 뺀 조립 순서에 맞고 승인 행은 사라진다', () => {
+  const a = pdfWord(), b = pdfWord(), c = pdfWord(); b.id = 'w-pdf-b'; c.id = 'w-pdf-c';
+  const job = { packId: SAMPLE.packId, draft: { words: [a, b, c], sentences: clone(SAMPLE.sentences) }, review: {} };
+  job.review[rowKey('words', a, 0)] = { state: 'dropped' };
+  job.review[rowKey('words', c, 2)] = { state: 'ok' };
+  const warns = publishGate(job).warns.filter((w) => /PDF/.test(w.message));
+  assert.strictEqual(warns.length, 1);
+  assert.match(warns[0].message, /^words\[0\]/);
+  assert.ok(!JSON.stringify(assemble(job)).includes('_pdfReview'));
+  job.review[rowKey('words', b, 1)] = { state: 'unknown' };
+  const unresolved = publishGate(job);
+  assert.ok(unresolved.pending > 0);
+  assert.ok(unresolved.warns.some((w) => /^words\[0\].*PDF/.test(w.message)));
+});
+
+await t('옛 승인 초안도 unknown 배열·미검수 표시·중첩 원천이 있으면 배포되지 않는다', () => {
+  for (const mutate of [
+    (job) => { job.draft.extraRaw = [{ raw: '합성' }]; },
+    (job) => { job.draft.words[0].reviewed = false; },
+    (job) => { job.draft.words[0].example.evidence = '합성'; },
+  ]) {
+    const job = { packId: SAMPLE.packId, draft: draftFromSample(), review: {} };
+    mutate(job); approveAll(job);
+    const gate = publishGate(job);
+    assert.strictEqual(gate.ok, false);
+    assert.ok(gate.errors.length);
+    assert.ok(!Object.prototype.hasOwnProperty.call(assemble(job), 'extraRaw'));
+  }
+});
+
+await t('편집에서 지운 원천 부속물의 null patch는 학생 팩에서 실제로 제거한다', async () => {
+  const s = memStore();
+  const cr = await call(s, '/api/naesin/admin/job', 'POST', { packId: SAMPLE.packId });
+  const id = cr.body.jobId, draft = draftFromSample();
+  draft.words[0].raw = '합성 원천'; draft.words[0].reviewed = false;
+  await call(s, '/api/naesin/admin/job/draft', 'POST', { jobId: id, draft });
+  const job = await s.getJob(id); approveAll(job);
+  assert.strictEqual(publishGate(job).ok, false);
+  const key = rowKey('words', job.draft.words[0], 0);
+  const r = await call(s, '/api/naesin/admin/job/review', 'POST', {
+    jobId: id, key, state: 'fixed', patch: { raw: null, reviewed: null },
+  });
+  assert.strictEqual(r.body.gate.ok, true);
+  const out = assemble(job).words[0];
+  assert.ok(!Object.prototype.hasOwnProperty.call(out, 'raw'));
+  assert.ok(!Object.prototype.hasOwnProperty.call(out, 'reviewed'));
+  assert.strictEqual(job.draft.words[0].raw, '합성 원천', '검수 원본은 유지한다');
+});
+
+await t('교정 후 승인·버림·되돌리기는 patch/note를 보존하고 명시 null/빈 note만 지운다', async () => {
+  const s = memStore();
+  const cr = await call(s, '/api/naesin/admin/job', 'POST', { packId: SAMPLE.packId });
+  const id = cr.body.jobId, w = pdfWord(); w.sections = [];
+  await call(s, '/api/naesin/admin/job/draft', 'POST', {
+    jobId: id, draft: { words: [w], sentences: clone(SAMPLE.sentences) },
+  }, { localPdfReview: true });
+  const job = await s.getJob(id);
+  for (const [i, row] of job.draft.sentences.entries()) job.review[rowKey('sentences', row, i)] = { state: 'ok' };
+  const key = rowKey('words', w, 0);
+  const fixed = await call(s, '/api/naesin/admin/job/review', 'POST', {
+    jobId: id, key, state: 'fixed', patch: { sections: ['reading'], _pdfReview: null }, note: '원본 확인',
+  });
+  assert.strictEqual(fixed.body.gate.ok, true);
+  for (const state of ['ok', 'dropped', 'pending', 'ok']) {
+    await call(s, '/api/naesin/admin/job/review', 'POST', { jobId: id, key, state });
+    assert.deepStrictEqual(job.review[key].patch, { sections: ['reading'] });
+    assert.strictEqual(job.review[key].note, '원본 확인');
+  }
+  assert.strictEqual(publishGate(job).ok, true);
+  assert.strictEqual((await call(s, '/api/naesin/admin/job/publish', 'POST', { jobId: id })).status, 200);
+  const pack = (await s.getPack(SAMPLE.packId)).pack;
+  assert.deepStrictEqual(pack.words[0].sections, ['reading']);
+  assert.ok(!Object.prototype.hasOwnProperty.call(pack.words[0], '_pdfReview'));
+  await call(s, '/api/naesin/admin/job/review', 'POST', { jobId: id, key, state: 'pending', patch: null, note: '' });
+  assert.ok(!Object.prototype.hasOwnProperty.call(job.review[key], 'patch'));
+  assert.ok(!Object.prototype.hasOwnProperty.call(job.review[key], 'note'));
+  assert.strictEqual(publishGate(job).ok, false);
+  assert.deepStrictEqual((await s.getPack(SAMPLE.packId)).pack, pack);
+});
+
+await t('잘못된 검수 상태는 PDF 후보를 승인하지 않고 누락·오타 요청을 거절한다', async () => {
+  const s = memStore();
+  const cr = await call(s, '/api/naesin/admin/job', 'POST', { packId: SAMPLE.packId });
+  const id = cr.body.jobId, w = pdfWord();
+  await call(s, '/api/naesin/admin/job/draft', 'POST', {
+    jobId: id, draft: { words: [w], sentences: clone(SAMPLE.sentences) },
+  }, { localPdfReview: true });
+  const job = await s.getJob(id);
+  for (const [i, row] of job.draft.sentences.entries()) job.review[rowKey('sentences', row, i)] = { state: 'ok' };
+  const before = JSON.stringify(job), key = rowKey('words', w, 0);
+  for (const state of [undefined, 'typo', '', 0]) {
+    assert.strictEqual((await call(s, '/api/naesin/admin/job/review', 'POST', { jobId: id, key, state })).status, 400);
+    assert.strictEqual(JSON.stringify(await s.getJob(id)), before);
+    assert.strictEqual(publishGate(job).ok, false);
+    assert.strictEqual(publishGate(job).pending, 1);
+  }
+});
+
+await t('잘못된 patch·메모·일괄 요청의 뒤 행은 기존 교정본을 부분 변경하지 않는다', async () => {
+  const s = memStore();
+  const cr = await call(s, '/api/naesin/admin/job', 'POST', { packId: SAMPLE.packId });
+  const id = cr.body.jobId;
+  await call(s, '/api/naesin/admin/job/draft', 'POST', { jobId: id, draft: draftFromSample() });
+  const job = await s.getJob(id); approveAll(job);
+  const first = rowKey('words', job.draft.words[0], 0), last = rowKey('words', job.draft.words[1], 1);
+  job.review[first] = { state: 'fixed', patch: { headword: 'fixed' }, note: '보존할 메모', at: 'x' };
+  const before = JSON.stringify(job);
+  for (const invalid of [
+    { state: 'typo' }, { state: 'pending', patch: [] }, { state: 'pending', patch: 'wrong' },
+    { state: 'pending', patch: false }, { state: 'pending', patch: 1 },
+    { state: 'pending', note: null }, { state: 'pending', note: {} },
+  ]) {
+    const single = { jobId: id, key: first, ...invalid };
+    assert.strictEqual((await call(s, '/api/naesin/admin/job/review', 'POST', single)).status, 400);
+    assert.strictEqual(JSON.stringify(await s.getJob(id)), before);
+    const batch = { jobId: id, rows: [
+      { key: first, state: 'pending', patch: { headword: 'should-not-change' }, note: '바뀌면 안 됨' },
+      { key: last, ...invalid },
+    ] };
+    assert.strictEqual((await call(s, '/api/naesin/admin/job/review', 'POST', batch)).status, 400);
+    assert.strictEqual(JSON.stringify(await s.getJob(id)), before);
+  }
+});
+
+await t('검수·내용 오류가 있으면 이전 발행 팩을 덮지 않는다', async () => {
+  const s = memStore(), original = { pack: clone(SAMPLE), updatedAt: 'original' };
+  await s.putPack(SAMPLE.packId, original); await s.putPackIds([SAMPLE.packId]);
+  const cr = await call(s, '/api/naesin/admin/job', 'POST', { packId: SAMPLE.packId });
+  const id = cr.body.jobId;
+  const draft = draftFromSample();
+  await call(s, '/api/naesin/admin/job/draft', 'POST', { jobId: id, draft });
+  assert.strictEqual((await call(s, '/api/naesin/admin/job/publish', 'POST', { jobId: id })).status, 400);
+  const job = await s.getJob(id); approveAll(job); job.draft.words[0].headword = '';
+  assert.strictEqual((await call(s, '/api/naesin/admin/job/publish', 'POST', { jobId: id })).status, 400);
+  assert.deepStrictEqual(await s.getPack(SAMPLE.packId), original);
+  assert.deepStrictEqual(await s.getPackIds(), [SAMPLE.packId]);
 });
 
 /* ── 비용 한도 (기획서 §13-8) ──

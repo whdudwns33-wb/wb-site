@@ -735,6 +735,49 @@ await t('수업 과제 — 없으면 빈 값, 등록·조회 왕복, 검증(실�
   assert.strictEqual(r.status, 403, '학생은 과제를 등록할 수 없다');
 });
 
+await t('반 과제는 query scope로 분리 — 오늘의 현재 반 → 공통, 과제 해제도 해당 반만', async () => {
+  const store = memStore(), cls = 'cls:중2 A반';
+  store._raw.students['st-2'].cls = '중3 B반';
+  const manage = (scope, method, body) => call(store, { path: '/api/naesin/admin/task', method, who: ADMIN, now: NOW,
+    query: new URLSearchParams({ scope }), getBody: async () => body });
+  const body = { date: TODAY, title: '공통 과제', typeKeys: ['w-e2k'] };
+  assert.strictEqual((await manage('default', 'POST', body)).status, 200);
+  const own = await manage('cls: ' + '중2 A반'.normalize('NFD') + ' ', 'POST', { ...body, title: 'A반 과제' });
+  assert.strictEqual(own.body.scope, cls);
+  assert.strictEqual((await manage(cls, 'GET')).body.task.title, 'A반 과제');
+  const student = (code) => call(store, { path: '/api/naesin/task', now: NOW, who: { code, admin: false } });
+  assert.strictEqual((await student('st-1')).body.scope, 'class');
+  assert.strictEqual((await student('st-1')).body.task.title, 'A반 과제');
+  assert.strictEqual((await student('st-2')).body.task.title, '공통 과제', 'B반에는 A반 과제가 가지 않는다');
+  for (const date of [YESTERDAY, TOMORROW]) {
+    await manage(cls, 'POST', { ...body, date });
+    assert.strictEqual((await student('st-1')).body.scope, 'default', '지난·예정 반 과제는 오늘 공통 과제를 가리지 않는다');
+  }
+  await manage(cls, 'POST', body);
+  assert.strictEqual((await manage(cls, 'DELETE')).status, 200);
+  assert.strictEqual(store.getTask(cls), null);
+  assert.strictEqual(store.getTask('default').title, '공통 과제');
+  assert.strictEqual((await student('st-1')).body.scope, 'default');
+  assert.strictEqual((await manage('st-1', 'POST', body)).status, 400, '과제 scope는 학생 코드가 아니다');
+});
+
+await t('반별 assignedTask는 overview 학생마다 실제 과제를 표시 — 없으면 명시 null', async () => {
+  const store = memStore();
+  store._raw.students['st-2'].cls = '중3 B반';
+  for (const code of ['st-1', 'st-2']) store.putState(code, { state: {}, updatedAt: 'x' });
+  const common = { date: TODAY, title: '공통 과제', typeKeys: ['w-e2k'], updatedAt: 'common-at' };
+  const own = { ...common, title: 'A반 과제', updatedAt: 'class-at' };
+  store.putTask('default', common);
+  store.putTask('cls:중2 A반', own);
+  const overview = () => call(store, { path: '/api/naesin/admin/overview', who: ADMIN, now: NOW });
+  let rows = (await overview()).body.students;
+  assert.deepStrictEqual(rows[0].assignedTask, { date: TODAY, title: 'A반 과제', updatedAt: 'class-at' });
+  assert.deepStrictEqual(rows[1].assignedTask, { date: TODAY, title: '공통 과제', updatedAt: 'common-at' });
+  store.putTask('default', null);
+  rows = (await overview()).body.students;
+  assert.strictEqual(rows[1].assignedTask, null);
+});
+
 /* ── R1 범위 요약 · R2 시험 결과 회고 ── */
 
 await t('[R1] normalizeSummary range — 범위 합계도 화이트리스트(팩 id 형식·개수 상한·숫자 강제)', () => {
@@ -1085,8 +1128,105 @@ const PJ_ITEMS = [
   { ref: 'q2', prompt: 'run 의 과거형은?', choices: [{ key: 'a', text: 'runned' }, { key: 'b', text: 'ran' }], answerKey: 'b' },
 ];
 const setPhase = (store, phase) => call(store, { path: '/api/naesin/admin/live/phase', method: 'POST', who: ADMIN, getBody: async () => ({ phase }) });
-const setProj = (store, b) => call(store, { path: '/api/naesin/admin/live/projector', method: 'POST', who: ADMIN, getBody: async () => b });
+const setProj = async (store, b) => {
+  if (Array.isArray(b.items) && !store.getPack(PACK.packId)) await seedAssigned(store);
+  return call(store, { path: '/api/naesin/admin/live/projector', method: 'POST', who: ADMIN,
+    getBody: async () => ({ packId: PACK.packId, ...b }) });
+};
 const getLive = (store, over) => call(store, { path: '/api/naesin/live', ...over });
+const scopedLive = (store, scope, path = '/api/naesin/admin/live', method = 'GET', body = {}) => call(store, {
+  path, method, who: ADMIN, query: new URLSearchParams({ scope }), getBody: async () => body,
+});
+
+await t('반 라이브 단계·보드·투표 격리 — 자기 반만 전달, 다른 반 scope 응답 위조는 403', async () => {
+  const store = memStore(), a = 'cls:중2 A반', b = 'cls:중3 B반';
+  store._raw.students['st-2'].cls = '중3 B반';
+  await seedAssigned(store);
+  for (const code of ['st-1', 'st-2']) store.putState(code, { state: {}, updatedAt: new Date().toISOString() });
+  const phasePath = '/api/naesin/admin/live/phase', projPath = '/api/naesin/admin/live/projector';
+  await scopedLive(store, 'default', phasePath, 'POST', { phase: { key: 'free' } });
+  await scopedLive(store, a, phasePath, 'POST', { phase: { key: 'words' } });
+  await scopedLive(store, b, phasePath, 'POST', { phase: { key: 'passage' } });
+  for (const scope of [a, b]) await scopedLive(store, scope, projPath, 'POST', { packId: PACK.packId, items: PJ_ITEMS });
+  assert.strictEqual((await getLive(store)).body.scope, a);
+  assert.strictEqual((await getLive(store)).body.live.phase.key, 'words');
+  assert.strictEqual((await getLive(store, { who: { code: 'st-2', admin: false } })).body.live.phase.key, 'passage');
+  assert.deepStrictEqual((await scopedLive(store, a)).body.board.map(r => r.code), ['st-1']);
+  assert.deepStrictEqual((await scopedLive(store, b)).body.board.map(r => r.code), ['st-2']);
+  assert.strictEqual((await scopedLive(store, 'default')).body.board.length, 2, '기존 공통 보드는 전체');
+  const answer = (code, scope) => call(store, { path: '/api/naesin/live/answer', method: 'POST', who: { code, admin: false },
+    getBody: async () => ({ ref: 'q1', key: 'a', scope }) });
+  assert.strictEqual((await answer('st-1', a)).status, 200);
+  assert.strictEqual((await answer('st-2', b)).status, 200);
+  assert.strictEqual((await answer('st-1', b)).status, 403);
+  assert.strictEqual((await answer('st-1', 'default')).status, 403);
+  assert.strictEqual((await getLive(store, { query: new URLSearchParams({ scope: b }) })).status, 403);
+  assert.deepStrictEqual(store._raw.votes[a], { q1: { 'st-1': 'a' } });
+  assert.deepStrictEqual(store._raw.votes[b], { q1: { 'st-2': 'a' } });
+  store._raw.votes[a].q1['st-2'] = 'b';
+  assert.strictEqual((await scopedLive(store, a)).body.votes[0].answered, 1, '다른 반의 옛 응답이 집계에 섞이지 않는다');
+  store._raw.students['st-1'].cls = '중3 B반';
+  const moved = await scopedLive(store, a);
+  assert.deepStrictEqual(moved.body.board, []);
+  assert.strictEqual(moved.body.votes[0].answered, 0, '반 이동 뒤에는 앞 반의 집계에서 빠진다');
+});
+
+await t('반 라이브 종료·만료는 그 반만 — 나머지 반 보존, 빈 반 세션은 공통 폴백', async () => {
+  const store = memStore(), a = 'cls:중2 A반', b = 'cls:중3 B반';
+  store._raw.students['st-2'].cls = '중3 B반';
+  await seedAssigned(store);
+  for (const scope of ['default', a, b]) await scopedLive(store, scope, '/api/naesin/admin/live/phase', 'POST', { phase: { key: 'words' } });
+  for (const scope of [a, b]) await scopedLive(store, scope, '/api/naesin/admin/live/projector', 'POST', { packId: PACK.packId, items: PJ_ITEMS });
+  store.putVotes(a, { q1: { 'st-1': 'a' } });
+  store.putVotes(b, { q1: { 'st-2': 'b' } });
+  await scopedLive(store, a, '/api/naesin/admin/live/projector', 'POST', { items: null });
+  assert.deepStrictEqual(store.getVotes(a), {});
+  assert.deepStrictEqual(store.getVotes(b), { q1: { 'st-2': 'b' } });
+  assert.ok(store.getLive(b).projector);
+  await scopedLive(store, a, '/api/naesin/admin/live/phase', 'POST', { phase: null });
+  assert.strictEqual((await getLive(store)).body.scope, 'default', '반 단계·투사 모두 비우면 공통으로');
+  await scopedLive(store, a, '/api/naesin/admin/live/phase', 'POST', { phase: { key: 'quiz' } });
+  await scopedLive(store, a, '/api/naesin/admin/live', 'DELETE');
+  assert.strictEqual(store.getLive(a), null);
+  assert.ok(store.getLive(b));
+  assert.ok(store.getLive('default'));
+  store.putLive(a, { phase: { key: 'quiz' }, updatedAt: new Date(Date.now() - 5 * 3600e3).toISOString() });
+  assert.strictEqual((await getLive(store)).body.scope, 'default', '4시간 만료 뒤에는 공통으로');
+  assert.strictEqual((await scopedLive(store, 'st-1')).status, 400);
+});
+
+await t('투사 새 세트는 실존 packId 필수, 학생 시험 범위 밖이면 본문·정답·응답 모두 차단', async () => {
+  const store = memStore();
+  await seedAssigned(store);
+  store.putPack('another-pack', { pack: { ...PACK, packId: 'another-pack' } });
+  store.putExam('st-2', { examDate: TOMORROW, packIds: ['another-pack'] });
+  const post = (body) => scopedLive(store, 'default', '/api/naesin/admin/live/projector', 'POST', body);
+  assert.strictEqual((await post({ items: PJ_ITEMS })).status, 400, '팩을 모르면 투사하지 않는다');
+  assert.strictEqual((await post({ items: PJ_ITEMS, packId: 'no-such-pack' })).status, 400);
+  await setPhase(store, { key: 'words' });
+  assert.strictEqual((await post({ items: PJ_ITEMS, packId: PACK.packId, revealed: true })).status, 200);
+  assert.strictEqual((await getLive(store)).body.live.projector.packId, PACK.packId);
+  const denied = await getLive(store, { who: { code: 'st-2', admin: false } });
+  assert.strictEqual(denied.body.live.projector, null);
+  assert.strictEqual(denied.body.live.phase.key, 'words', '수업 단계는 자기 반에 전달');
+  assert.ok(!JSON.stringify(denied.body).includes('apple'), '본문 보기도 범위 밖 학생에게 나가지 않는다');
+  assert.strictEqual((await call(store, { path: '/api/naesin/live/answer', method: 'POST', who: { code: 'st-2', admin: false },
+    getBody: async () => ({ ref: 'q1', key: 'a' }) })).status, 403);
+  await post({ index: 1, revealed: false });
+  assert.strictEqual(store.getLive('default').projector.packId, PACK.packId, '이동·공개도 팩 소속을 잃지 않는다');
+});
+
+await t('packId 없는 기존 투사는 학생에게 phase만 — 관리자 검토·재시작은 가능', async () => {
+  const store = memStore();
+  store.putLive('default', { phase: { key: 'words' }, updatedAt: new Date().toISOString(),
+    projector: { items: PJ_ITEMS, index: 0, revealed: true, startedAt: new Date().toISOString() } });
+  const student = await getLive(store);
+  assert.strictEqual(student.body.live.phase.key, 'words');
+  assert.strictEqual(student.body.live.projector, null);
+  assert.ok(!JSON.stringify(student.body).includes('apple'));
+  assert.strictEqual((await call(store, { path: '/api/naesin/live/answer', method: 'POST', getBody: async () => ({ ref: 'q1', key: 'a' }) })).status, 403);
+  assert.ok((await scopedLive(store, 'default')).body.live.projector.items.length, '강사는 옛 세트를 확인하고 올바른 팩으로 재시작할 수 있다');
+});
 
 await t('[L1] 단계는 강사만 세우고, 학생은 읽는다 — endsAt 은 서버가 계산한다', async () => {
   const store = memStore();

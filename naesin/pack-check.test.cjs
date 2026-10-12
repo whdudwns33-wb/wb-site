@@ -368,4 +368,65 @@ t('문장만 따로 검사할 때는 wordIds 를 대조하지 않는다(단어 �
   assert.ok(!has(c.errors, 'words 에 없는 id'), JSON.stringify(c.errors));
 });
 
+t('학생 팩은 최상위·행·중첩 행의 검수 원천을 거부한다', () => {
+  const mutations = [
+    (p) => { p.reviewed = false; }, (p) => { p.publishable = false; },
+    (p) => { p.raw = '합성 원천'; }, (p) => { p.wordCandidates = [{}]; },
+    (p) => { p.words[0].reviewed = false; }, (p) => { p.words[0].source = { path: '합성' }; },
+    (p) => { p.words[0]._pdfReview = { flags: [], locations: [] }; },
+    (p) => { p.words[0].example.raw = '합성'; },
+    (p) => { p.sentences[0].chunks[0].evidence = '합성'; },
+    (p) => { p.items[0].stimulus.parts[0].flags = []; },
+    (p) => { p.words[0].meaningKo = [{ raw: '합성' }]; },
+  ];
+  mutations.forEach((mutate) => {
+    const p = clone(SAMPLE); mutate(p);
+    const r = CHECK.checkPack(p);
+    assert.ok(r.errors.length, '부속물이 통과하면 안 된다');
+  });
+});
+
+t('기존 메타·선택 배열·중첩 학습 필드는 보존한다', () => {
+  const p = clone(SAMPLE);
+  p.source = '자체 창작'; p.notes = ['검수 완료'];
+  p.school = '합성학교'; p.gradeSem = '2-1'; p.exam = '연습';
+  p.keyExpressions = [{ en: 'Good morning.', ko: '좋은 아침.', blankAnswer: 'morning' }];
+  p.functions = [{ name: '인사', pattern: 'Good morning.', explainKo: '아침 인사' }];
+  p.vocabSidebar = [{ en: 'sun', ko: '해' }]; p.readingQA = [{ q: 'When?', a: 'Morning.' }];
+  p.words[0].senses = null; p.words[0].irregularForms = null;
+  p.items[0].source = '자체 창작'; p.items[0].section = '연습';
+  assert.deepStrictEqual(CHECK.checkPack(p).errors, []);
+});
+
+t('학생 생성기를 깨뜨리는 truthy 배열·중첩 형태는 throw 없이 오류로 막는다', () => {
+  const mutations = [
+    (p) => { p.words[0].synonyms = {}; }, (p) => { p.words[0].senses = {}; },
+    (p) => { p.words[0].antonyms = 'wrong'; }, (p) => { p.sentences[0].chunks = {}; },
+    (p) => { p.sentences[0].keywords = {}; }, (p) => { p.sentences.find((s) => s.grammarChoices && s.grammarChoices.length).grammarChoices[0].options = {}; },
+    (p) => { p.patterns[0].grammarPoint = [{}]; }, (p) => { p.dialogues[0].lines = {}; },
+    (p) => { p.source = { raw: '합성' }; },
+  ];
+  mutations.forEach((mutate) => {
+    const p = clone(SAMPLE); mutate(p);
+    let r; assert.doesNotThrow(() => { r = CHECK.checkPack(p); });
+    assert.ok(r.errors.length);
+  });
+});
+
+t('대화문 lines와 핵심표현 en/정답 누락은 학생 화면이 멈추기 전에 차단한다', () => {
+  const mutations = [
+    (p) => { delete p.dialogues[0].lines; }, (p) => { p.dialogues[0].lines = null; },
+    (p) => { p.dialogues[0].lines = []; },
+    (p) => { p.keyExpressions = [{ ko: '합성', blankAnswer: 'morning' }]; },
+    (p) => { p.keyExpressions = [{ en: null, ko: '합성', blankAnswer: 'morning' }]; },
+    (p) => { p.keyExpressions = [{ en: 'Good morning.', ko: '좋은 아침.' }]; },
+    (p) => { p.keyExpressions = [{ en: 'Good morning.', ko: '좋은 아침.', blankAnswer: 'night' }]; },
+  ];
+  mutations.forEach((mutate) => {
+    const p = clone(SAMPLE); mutate(p);
+    let r; assert.doesNotThrow(() => { r = CHECK.checkPack(p); });
+    assert.ok(r.errors.length);
+  });
+});
+
 console.log('\n통과 ' + n + '개 — 팩 검사 규칙 검증 완료');

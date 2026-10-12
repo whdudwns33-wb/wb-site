@@ -33,7 +33,7 @@ if (Test-Path -LiteralPath $settingsPath) {
 }
 $ip = $null
 if (![Net.IPAddress]::TryParse($localSettings.Host, [ref]$ip) -or $ip.ToString() -ne $localSettings.Host) { throw 'HostAddress must be an exact IP address.' }
-$node = (Get-Command node.exe -CommandType Application -ErrorAction Stop).Source
+$node = (Get-Command node.exe -CommandType Application -ErrorAction Stop | Select-Object -First 1).Source
 $accessModule = ([Uri](Join-Path $PSScriptRoot 'inhouse-access.mjs')).AbsoluteUri
 & $node --input-type=module -e 'const {createInhouseAccess}=await import(process.argv[1]);createInhouseAccess(process.argv[2]);' $accessModule $localSettings.InhouseNetworks
 if ($LASTEXITCODE -ne 0) { throw 'Local network settings failed the server access check.' }
@@ -41,7 +41,7 @@ $user = [Security.Principal.WindowsIdentity]::GetCurrent().Name
 $launcher = Join-Path $PSScriptRoot 'start-local.ps1'
 $powershell = Join-Path ([Environment]::SystemDirectory) 'WindowsPowerShell\v1.0\powershell.exe'
 if ($launcher -match '[%"\r\n]' -or $DataDir -match '[%"\r\n]') { throw 'Unsafe scheduled task path.' }
-$taskArguments = '-NoProfile -WindowStyle Hidden -File "{0}" -DataDir "{1}"' -f $launcher, $DataDir
+$taskArguments = '-NoProfile -ExecutionPolicy RemoteSigned -WindowStyle Hidden -File "{0}" -DataDir "{1}"' -f $launcher, $DataDir
 $existing = Get-ScheduledTask -TaskPath '\' -TaskName 'WB Naesin Local Server' -ErrorAction SilentlyContinue
 if ($existing -and (@($existing.Actions).Count -ne 1 -or $existing.Actions[0].Execute -ne $powershell -or $existing.Actions[0].Arguments -ne $taskArguments -or $existing.Actions[0].WorkingDirectory -ne $PSScriptRoot)) {
     throw 'A different service uses this task name. It was not replaced.'

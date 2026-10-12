@@ -45,6 +45,7 @@
     .chip{min-height:36px;padding:5px 13px;border-radius:999px;border:1.5px solid #bfd7e1;background:#fff;font-weight:800;color:var(--navy)}
     .chip[aria-pressed="true"]{background:var(--sky);border-color:var(--blue)}
     .grid-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;align-items:end}
+    .grid-form input,.grid-form select{min-width:0;max-width:100%}
     .grid-form label[hidden]{display:none}
     .err{color:var(--bad);font-weight:700;font-size:13px;margin-top:8px}
     .muted{color:var(--muted);font-size:12.5px}
@@ -123,6 +124,7 @@ const $=s=>document.querySelector(s);
 const esc=t=>String(t==null?'':t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let TOKEN=localStorage.getItem('wbr.admin.token')||null;
 let OV=null,PACKS=[],FILTER='전체',TASK=null,EXAMS=null,ROSTER=[],REPORTS=null;
+let TASK_SCOPE='default',TASK_LOADING=false,TASK_BUSY=false,TASK_READ=0;
 /* 교과서 지정표(계약: /naesin/admin/books → {books}) — null 은 '아직 못 받았다'로 {} 와 구분한다.
    BOOK_DRAFT 는 아직 저장 안 한 입력칸 내용 — 다른 카드가 다시 그려져도 치던 글이 날아가지 않게 한다. */
 let BOOKS=null,BOOK_DRAFT=null,BOOK_FLASH='';
@@ -352,7 +354,8 @@ function studentRow(s){
   const warn=stale(s)||risky(s);
   /* 과제 완료 = 지금 배정된 과제(날짜+updatedAt)에 대한 기록일 때만(계약 0.4) — 어제 과제나 같은 날
      재배정 전의 기록은 '—'. 학생 앱의 '완료' 표시와 같은 기준이라 두 화면이 어긋나지 않는다. */
-  const done=!!(tk&&TASK&&tk.date===TASK.date&&tk.taskAt===TASK.updatedAt);
+  const assigned=s.assignedTask;
+  const done=!!(tk&&assigned&&tk.date===assigned.date&&tk.taskAt===assigned.updatedAt);
   const spell=num(w.needsSpellCheck)||0;
   return `<tr>
     <td><b>${esc(s.name||s.code)}</b>${warn?' <span class="tag bad">확인</span>':''}</td>
@@ -382,7 +385,7 @@ function renderOverview(){
     <div class="filters">${classes.map(c=>`<button class="chip" data-cls="${esc(c)}" aria-pressed="${c===FILTER}">${esc(c)}</button>`).join('')}</div>
     ${readinessStats(list)}
     <div class="tbl"><table><thead><tr>
-      <th>이름</th><th>반</th><th>팩 · 시험 범위</th><th>시험 준비도</th><th>단어 (도달·안정화)</th><th>해석 통과 · 문장×단계</th><th>백지 암송</th><th>본문 진행</th><th>${TASK?'과제 '+esc(TASK.date):'오늘 과제'}</th><th>마지막 학습</th></tr></thead>
+      <th>이름</th><th>반</th><th>팩 · 시험 범위</th><th>시험 준비도</th><th>단어 (도달·안정화)</th><th>해석 통과 · 문장×단계</th><th>백지 암송</th><th>본문 진행</th><th>배정 과제</th><th>마지막 학습</th></tr></thead>
       <tbody>${list.length?list.map(studentRow).join(''):`<tr><td colspan="10" class="muted">아직 학습 기록이 있는 학생이 없어요 — 학생이 앱에서 훈련을 시작하면 여기 나타납니다.</td></tr>`}</tbody></table></div>
     <p class="muted" style="margin:8px 0 0">문장×단계 ${STAGE_NAMES.map((nm,i)=>'①②③④⑤⑥'[i]+' '+esc(nm)).join(' · ')} — 칸이 진할수록 그 단계에 머문 문장이 많아요.</p>
     <p class="muted" style="margin:2px 0 0">본문 진행 — 청크 뜻 세우기 통과 단락 · 단락 백지 통과 · 누적 백지가 이어 붙인 단락 · 종합 Check 점수. 범위가 있으면 범위 전체 합계예요.</p>
@@ -393,7 +396,10 @@ function renderOverview(){
 /* ── 수업 과제 ── */
 function renderTask(){
   const today=kstToday();
-  let head='<p class="muted" style="margin:4px 0 10px">배정된 과제가 없습니다.</p>';
+  const roster=ROSTER.length?ROSTER:(OV&&Array.isArray(OV.students)?OV.students:[]);
+  const scopes=[...new Set(roster.map(s=>COV&&COV.classScope(s.cls)).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ko'));
+  if(TASK_SCOPE!=='default'&&!scopes.includes(TASK_SCOPE))scopes.push(TASK_SCOPE);
+  let head='<p class="muted" style="margin:4px 0 10px">'+(TASK_LOADING?'과제를 불러오는 중…':'배정된 과제가 없습니다.')+'</p>';
   if(TASK){
     const d=String(TASK.date||'');
     const past=d<today,future=d>today;
@@ -406,19 +412,34 @@ function renderTask(){
     <p class="muted">배정하면 학생 앱 홈 최상단에 「오늘 수업 과제」로 뜨고, 완료 결과가 위 표의 「과제」 열에 모입니다. 같은 날 다시 배정하면 완료 표시가 초기화돼요.</p>
     ${head}
     <div class="grid-form">
+      <label>대상<br><select id="tkScope" ${TASK_BUSY?'disabled':''}><option value="default">전체 공통</option>${scopes.map(scope=>`<option value="${esc(scope)}">${esc(scopeLabel(scope))}</option>`).join('')}</select></label>
       <label>날짜<br><input type="date" id="tkDate"></label>
       <label>과제 이름<br><input id="tkTitle" placeholder="예: 4교시 — 본문 클로즈 + 어법" maxlength="80"></label>
       <label>본문 문장 범위 (선택)<br><span style="display:flex;gap:6px"><input type="number" id="tkFrom" min="1" placeholder="시작" style="width:80px"><input type="number" id="tkTo" min="1" placeholder="끝" style="width:80px"></span></label>
       <label>문법 패턴 번호 (선택)<br><input id="tkPat" placeholder="예: 1,2" autocomplete="off"></label>
-      <button class="btn" id="btnTask">과제 배정</button>
+      <button class="btn" id="btnTask" ${TASK_BUSY||TASK_LOADING?'disabled':''}>${TASK_LOADING?'불러오는 중…':'과제 배정'}</button>
     </div>
     <div style="margin-top:10px">${TYPE_LIST.map(([k,l])=>`<label class="ck"><input type="checkbox" name="tkType" value="${k}">${esc(l)}</label>`).join('')}</div>
     <div id="taskOut"></div>
   </div>`;
   $('#tkDate').value=today;
+  $('#tkScope').value=TASK_SCOPE;
+  $('#tkScope').onchange=()=>loadTask($('#tkScope').value);
   $('#btnTask').onclick=saveTask;
 }
+async function loadTask(scope){
+  if(TASK_BUSY){$('#tkScope').value=TASK_SCOPE;return;}
+  const read=++TASK_READ;
+  TASK_SCOPE=scope;TASK_LOADING=true;TASK=null;renderTask();
+  try{
+    const j=await api('/naesin/admin/task?scope='+encodeURIComponent(scope));
+    if(scope!==TASK_SCOPE||read!==TASK_READ)return;
+    TASK=j.task&&j.task.date?j.task:null;TASK_LOADING=false;renderTask();
+  }catch(e){if(scope!==TASK_SCOPE||read!==TASK_READ||isAuth(e))return;$('#taskOut').innerHTML='<p class="err">'+esc(e.message)+' — 대상을 다시 선택해 불러오세요.</p>';}
+}
 async function saveTask(){
+  if(TASK_BUSY||TASK_LOADING)return;
+  const scope=TASK_SCOPE;
   const out=h=>{$('#taskOut').innerHTML=h;};
   const date=$('#tkDate').value, title=$('#tkTitle').value.trim();
   const typeKeys=[...document.querySelectorAll('input[name=tkType]:checked')].map(i=>i.value);
@@ -436,11 +457,16 @@ async function saveTask(){
   if(!typeKeys.length)return out('<p class="err">학습 유형을 하나 이상 선택하세요.</p>');
   /* 지난 날짜의 과제는 학생 앱 홈에 뜨지 않는다 — 날짜 입력 실수를 여기서 잡는다 */
   if(date<kstToday()&&!confirm(`과제 날짜 ${date}은(는) 이미 지났어요. 학생 앱에는 오늘 날짜의 과제만 뜹니다. 그래도 배정할까요?`))return;
+  TASK_BUSY=true;$('#btnTask').disabled=true;$('#tkScope').disabled=true;
   try{
-    const j=await api('/naesin/admin/task',{method:'POST',body:JSON.stringify(body)});
-    TASK=j.task;renderOverview();renderTask();
-    out(`<div class="issues ok">배정 완료 — ${esc(j.task.date)} · ${esc(j.task.title)} · 유형 ${(j.task.typeKeys||[]).length}종</div>`);
+    const j=await api('/naesin/admin/task?scope='+encodeURIComponent(scope),{method:'POST',body:JSON.stringify(body)});
+    if(scope!==TASK_SCOPE)return;
+    TASK=j.task;renderTask();
+    try{OV=await api('/naesin/admin/overview');renderOverview();}
+    catch(e){if(isAuth(e))return;out('<p class="err">과제는 배정됐어요. 완료 현황을 새로 받지 못했습니다 — '+esc(e.message)+'</p>');return;}
+    out(`<div class="issues ok">배정 완료 — ${esc(scopeLabel(scope))} · ${esc(j.task.date)} · ${esc(j.task.title)} · 유형 ${(j.task.typeKeys||[]).length}종</div>`);
   }catch(e){if(isAuth(e))return;out('<p class="err">'+esc(e.message)+'</p>');}
+  finally{TASK_BUSY=false;const button=$('#btnTask'),pick=$('#tkScope');if(button)button.disabled=TASK_LOADING;if(pick)pick.disabled=false;}
 }
 
 /* ── 레슨 팩 ── */
@@ -1178,16 +1204,18 @@ async function resolveReport(packId,itemRef){
 
 async function refresh(){
   hideBanner();
+  const taskScope=TASK_SCOPE;
+  const taskRead=++TASK_READ;
   try{
     const [ov,pk,tk,ex,ro,rs,rp,bk]=await Promise.all([
       api('/naesin/admin/overview'),api('/naesin/admin/packs'),
-      api('/naesin/admin/task').catch(optional),api('/naesin/admin/exams').catch(optional),
+      api('/naesin/admin/task?scope='+encodeURIComponent(taskScope)).catch(optional),api('/naesin/admin/exams').catch(optional),
       api('/admin/overview').catch(optional),     // 호스트 명부 전체 — 개별 배정 대상 목록
       api('/naesin/admin/results').catch(optional),   // 시험 결과 + 성과 분석 (계약 R2)
       api('/naesin/admin/reports').catch(optional),   // 문항 신고 — 팩 정오표의 원천
       api('/naesin/admin/books').catch(optional)]);   // 교과서 지정표 — 커버리지 카드의 입력
     OV=ov;PACKS=(Array.isArray(pk.packs)?pk.packs:[]).map(String);
-    TASK=(tk&&tk.task&&tk.task.date)?tk.task:null;
+    if(taskScope===TASK_SCOPE&&taskRead===TASK_READ){TASK=(tk&&tk.task&&tk.task.date)?tk.task:null;TASK_LOADING=!tk;}
     EXAMS=ex&&Array.isArray(ex.exams)?ex.exams:null;
     if(EXAMS&&typeof ex.today==='string')EXAMS.today=ex.today;
     ROSTER=ro&&Array.isArray(ro.students)?ro.students.filter(s=>s&&s.code):[];
