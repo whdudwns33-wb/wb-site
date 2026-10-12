@@ -1134,7 +1134,7 @@ setInterval(async () => {
 }, 60000).unref();
 
 server.listen(PORT, process.env.HOST || undefined, () => {
-  console.log(`WB 진로독서 서버 http://localhost:${PORT}`);
+  console.log(`WB 진로독서 서버 http://localhost:${server.address().port}`);
   console.log(`  학생 앱: /   워드브레인: /vocab/   관리 웹: /admin   연상 검수함: /admin/vocab-review.html`);
   /* 어느 모드로 떴는지 한 줄로 알린다 — 터널을 붙인 뒤 이 줄을 보고 확인한다. */
   if (ADMIN_ONLY) console.log('  [관리 전용] WB_ADMIN_ONLY=on — 학생 로그인(/api/login·/api/login/status)을 내주지 않습니다');
