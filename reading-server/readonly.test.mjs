@@ -20,6 +20,7 @@
  */
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
+import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -30,14 +31,35 @@ const errors = [];
 const ok = (c, m) => { if (!c) errors.push(m); };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function boot(port, extra, data) {
+/* 빈 포트를 OS 에서 받는다 — 테스트마다 포트 띠를 손으로 나누면 언젠가 겹친다.
+   실제로 겹쳤다: 이 파일이 쓰던 8700·8740·8780 띠가 sec-headers.test.mjs 의 8700+(pid%90)
+   안에 있어서, 같은 pid 로 두 테스트가 동시에 돌면 늦게 bind 한 자식이 EADDRINUSE 로 죽고 —
+   둘 다 stdio:'ignore' 라 기동 실패를 확인하지 않으므로 — **상대 테스트의 서버에 붙어**
+   엉뚱한 결과를 냈다(ADMIN_PIN 이 같아 로그인까지 통과한다. 읽기 전용 아닌 서버에 붙으면
+   이 파일의 403 단정이 전부 깨지고, 반대로 붙으면 상대가 깨진다). check.mjs 가 8레인
+   병렬이라 두 파일은 거의 항상 동시에 산다. */
+const freePort = () => new Promise((resolve, reject) => {
+  const probe = net.createServer();
+  probe.on('error', reject);
+  probe.listen(0, '127.0.0.1', () => {
+    const { port } = probe.address();
+    probe.close(() => resolve(port));
+  });
+});
+
+async function boot(extra, data) {
+  const port = await freePort();
   const dir = data || fs.mkdtempSync(path.join(os.tmpdir(), 'wbr-ro-'));
   const env = { ...process.env, PORT: String(port), DATA_DIR: dir, ADMIN_PIN: PIN, ...extra };
   delete env.WB_ADMIN_ONLY;
   if (!extra || !extra.WB_READONLY) delete env.WB_READONLY;
   const srv = spawn(process.execPath, [path.join(DIR, 'server.mjs')], { env, stdio: 'ignore' });
+  /* 자식이 조기 종료하면 **침묵하지 않는다** — 안 보면 남의 서버에 붙어 시험이 거짓으로 통과한다 */
+  let died = null;
+  srv.on('exit', (code, sig) => { died = `code=${code} signal=${sig}`; });
   const base = `http://127.0.0.1:${port}`;
   for (let i = 0; i < 100; i++) {
+    if (died) throw new Error('서버가 기동 중에 죽었다: ' + died);
     try { await fetch(base + '/api/health'); break; } catch { await sleep(100); }
   }
   return { srv, base, dir, stop() { srv.kill(); } };
@@ -49,8 +71,10 @@ const login = async (base) => (await (await send(base, 'POST', '/api/admin/login
 /* 자체 창작 스냅샷 — 실명·실제 학교명 없이(절대 규칙 1) */
 const snapshot = () => ({
   service: 'wb-reading', savedAt: '2026-10-12T00:00:00.000Z',
+  /* ptoken 이 **없는** 학생이다 — 가족 링크를 찍어내는 GET 라우트를 시험하려면 그래야 한다 */
   students: { RR1: { code: 'RR1', name: '가학생', grade: '중2', cls: 'A' } },
-  states: {}, vocab: { states: {}, mnemos: {}, push: {}, assigns: {} },
+  states: { RR1: { state: { note: '앱 연동' }, updatedAt: '2026-10-11T00:00:00.000Z' } },
+  vocab: { states: {}, mnemos: {}, push: {}, assigns: {} },
   portalFamilies: {}, textbook: {}, pubmap: {}, textbookSrc: {},
   naesin: { packIds: [], states: {}, exams: {}, tasks: {}, results: {} },
   hanja: { index: [], states: {}, summaries: {}, assigns: {}, tasks: {}, remaps: {}, strokes: null },
@@ -70,7 +94,7 @@ const WRITES = [
 let open = null, ro = null;
 try {
   /* ── ① 모드를 안 켜면 쓰기가 된다 ── */
-  open = await boot(8700 + (process.pid % 30));
+  open = await boot();
   const t0 = await login(open.base);
   ok(!!t0, '모드를 끈 서버에서 관리 로그인을 못 했다');
   const made = await send(open.base, 'POST', '/api/admin/students', { code: 'ZZ9', name: '다학생', grade: '중2' }, t0);
@@ -80,7 +104,7 @@ try {
   open.stop(); open = null;
 
   /* ── 모드를 켠 서버 ── */
-  ro = await boot(8740 + (process.pid % 30), { WB_READONLY: '1' });
+  ro = await boot({ WB_READONLY: '1' });
   const h1 = await (await fetch(ro.base + '/api/health')).json();
   ok(h1.readonly === true, 'health 가 읽기 전용임을 알리지 않는다 — 어느 주소인지 사람이 가릴 수 없다');
 
@@ -126,9 +150,27 @@ try {
   const codes = ((await (await send(ro.base, 'GET', '/api/admin/overview', undefined, t)).json()).students || []).map((x) => x.code);
   ok(codes.includes('RR1'), `가져온 학생이 안 보인다: ${JSON.stringify(codes)}`);
 
+  /* ── GET 이 가족 링크 토큰을 **찍어내지 않는가** ──
+     메서드 게이트는 GET 을 통과시킨다. 이 라우트는 ptoken 이 없는 학생마다 새 토큰을 만들어
+     db.parents 에 넣는데, 검토용 서버에서 찍은 토큰은 다음 가져오기의 persistNow() 가 디스크에
+     영구 기록한다 — 가정에 나갈 링크를 검토용 서버가 새로 만드는 것은 결정 ㄱ 밖이다. */
+  const pm = await send(ro.base, 'GET', '/api/admin/parent-messages', undefined, t);
+  ok(pm.status === 200, `학부모 문구 라우트가 막혔다 (${pm.status}) — 읽기는 되어야 한다`);
+  const pmBody = await pm.json();
+  ok((pmBody.noLink || []).includes('RR1'),
+    `링크 없는 학생을 알려 주지 않는다: ${JSON.stringify(pmBody.noLink)}`);
+  ok(!(pmBody.messages || []).some((m) => /\?t=/.test(m.text || '')),
+    `읽기 전용인데 가족 링크를 새로 찍었다: ${JSON.stringify(pmBody.messages).slice(0, 200)}`);
+
+  /* ── 밖으로 아무것도 보내지 않는가 ── 타이머는 요청이 아니라 시계가 깨우므로 게이트가 못 본다.
+     등록 자체를 막았는지 소스로 확인한다(시각을 조작해 21:00 을 만들 수는 없다). */
+  const srvSrc = fs.readFileSync(path.join(DIR, 'server.mjs'), 'utf8');
+  ok(/if \(!READONLY\) \{\s*\nsetInterval/.test(srvSrc),
+    '푸시 타이머가 읽기 전용 모드에서도 등록된다 — 가져온 운영 구독자에게 중복 알림이 나간다');
+
   /* 재기동해도 남아야 한다 — persist() 가 모드에 잠겨 있어 가장 그럴듯한 고장이 여기다 */
   ro.stop();
-  const again = await boot(8780 + (process.pid % 30), { WB_READONLY: '1' }, ro.dir);
+  const again = await boot({ WB_READONLY: '1' }, ro.dir);
   const t2 = await login(again.base);
   const after = ((await (await send(again.base, 'GET', '/api/admin/overview', undefined, t2)).json()).students || []).map((x) => x.code);
   again.stop();

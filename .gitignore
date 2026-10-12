@@ -30,3 +30,8 @@ task/private-names.json
 # 세일즈데스크(crm/) — dist는 배포 워크플로우가 조립, .local은 로컬 실행용 SQLite(가정 정보 포함 가능, 커밋 금지)
 crm/dist/
 crm/.local/
+
+# 운영 export 스냅샷 — 학생 실명 전원과 교재 코칭 원문이 들어 있다. 원칙은 저장소 밖
+# (docs/로컬-서버-외부공개-터널.md §1-ㄱ 가 ~/wb-snap 에 받으라고 적는다)이고, 이건 보강이다.
+snap*.json
+*-export.json
