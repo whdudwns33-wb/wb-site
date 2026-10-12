@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { load, persist, getDb, listBackups, getBackup, snapshotNow, naesinSnapshot, importSnapshot, importSections, setReadOnly } from './store.mjs';
+import { load, persist, getDb, listBackups, getBackup, snapshotNow, snapshotBeforeImport, naesinSnapshot, naesinKoSnapshot, chunkSnapshot, importSnapshot, importPrecheck, importSections, setReadOnly } from './store.mjs';
 import { handleVocab, sendNightPushes, vocabSummary } from './vocab-api.mjs';
 import { handleNaesin, isReservedCode, dropReservedRows, naesinBodyLimit } from './naesin-api.mjs';
 import { handleStudio } from './naesin-studio.mjs';
@@ -627,7 +627,9 @@ const server = http.createServer(async (req, res) => {
         const out = await handleLetter({ path: p, method: req.method, who, query: url.searchParams, getBody: () => readBody(req, letterBodyLimit(p)), store: letterStore,
           origin: 'http://' + (req.headers.host || ('localhost:' + PORT)), push: VOCAB_PUSH_ENV,
           ai: { apiKey: process.env.ANTHROPIC_API_KEY || '', model: process.env.LETTER_AI_MODEL || '', env: process.env, imageKey: process.env.GEMINI_API_KEY || '', imageModel: process.env.LETTER_IMAGE_MODEL || '' },
-          randomToken: () => crypto.randomUUID().replace(/-/g, '') });
+          randomToken: () => crypto.randomUUID().replace(/-/g, ''),
+          /* 읽기 전용(검토용)에서는 가족 토큰을 새로 찍지 않는다 — 위 parent-messages 와 같은 이유 */
+          readOnly: READONLY });
         return json(res, out.status, out.body);
       }
 
@@ -717,10 +719,15 @@ const server = http.createServer(async (req, res) => {
       if (p === '/api/admin/parent-messages' && req.method === 'GET') {
         const origin = (req.headers['x-forwarded-proto'] || 'http') + '://' + (req.headers.host || 'localhost:' + PORT);
         db.parents = db.parents || {};
-        const messages = [];
+        const messages = [], noLink = [];
         for (const stu of Object.values(db.students)) {
           if (!stu.name || !db.states[stu.code]) continue; /* 앱 연동 학생만 */
           if (!stu.ptoken) {
+            /* 읽기 전용(검토용) 서버에서는 **만들지 않는다.** 이 라우트는 GET 이라 쓰기 메서드
+               게이트를 그냥 지나가고, 여기서 찍은 토큰은 다음 가져오기의 persistNow() 가
+               디스크에 영구 기록한다 — 검토용 서버가 가정에 나갈 링크를 새로 만드는 것은
+               결정 ㄱ 밖이다. 누가 빠졌는지는 noLink 로 알린다(조용히 빼지 않는다). */
+            if (READONLY) { noLink.push(stu.code); continue; }
             stu.ptoken = crypto.randomUUID().replace(/-/g, '');
             db.parents[stu.ptoken] = stu.code;
             persist();
@@ -731,7 +738,7 @@ const server = http.createServer(async (req, res) => {
             text: `[WB 진로독서] ${stu.name} 학생 주간 리포트입니다.\n이번 주 ${s.week}회 완독 · ${s.streak}일 연속 읽는 중${s.acc != null ? ` · 문제 정답률 ${s.acc}%` : ''}입니다.\n자세한 내용: ${origin}/parent.html?t=${stu.ptoken}\n— WB 독해력학원 · 웩슬러브레인센터`,
           });
         }
-        return json(res, 200, { messages });
+        return json(res, 200, { messages, noLink });
       }
       if (p === '/api/admin/overview' && req.method === 'GET') {
         const codes = new Set([...Object.keys(db.students), ...Object.keys(db.states)]);
@@ -866,10 +873,14 @@ const server = http.createServer(async (req, res) => {
           if (!snap) return json(res, 404, { error: '해당 날짜의 스냅샷이 없습니다.' });
           return json(res, 200, snap);
         }
-        /* 워커 fullDump 와 같은 모양 — 내신은 팩 본문 없이(packIds 만), 교재 원문(textbookSrc)은 포함.
-           팩은 라이선스 원문이라 백업 파일로 흩어지지 않게 한다(store.naesinSnapshot). */
+        /* 워커 fullDump 와 같은 모양 — 내신·국어는 팩 본문 없이(packIds 만), 교재 원문(textbookSrc)은 포함.
+           팩은 라이선스 원문이라 백업 파일로 흩어지지 않게 한다(store.naesinSnapshot).
+           naesinKo·chunk 가 빠져 있었다 — 워커 dump 에는 있어서 「같은 모양」이 거짓이었고,
+           그 상태로는 가져오기가 덮는 칸을 이 export 로 되돌릴 수 없었다. */
         return json(res, 200, { service: 'wb-reading', savedAt: nowIso(), students: db.students, states: db.states, vocab: db.vocab,
-          portalFamilies: db.portalFamilies || {}, textbook: db.textbook || {}, pubmap: db.pubmap || {}, naesin: naesinSnapshot(db.naesin), textbookSrc: db.textbookSrc || {}, haru: await dumpHaru(haruStore), letter: await dumpLetter(letterStore), hanja: await dumpHanja(hanjaStore) });
+          portalFamilies: db.portalFamilies || {}, textbook: db.textbook || {}, pubmap: db.pubmap || {}, naesin: naesinSnapshot(db.naesin),
+          naesinKo: naesinKoSnapshot(db.naesinKo), chunk: chunkSnapshot(db.chunk),
+          textbookSrc: db.textbookSrc || {}, haru: await dumpHaru(haruStore), letter: await dumpLetter(letterStore), hanja: await dumpHanja(hanjaStore) });
       }
       /* 가져오기 — 운영(KV)에서 뜬 export 를 이 PC 서버로 되읽는다. **읽기 전용 검토용**이다
          (docs/로컬-서버-외부공개-터널.md 결정 ㄱ). 워커에는 이 라우트를 만들지 않는다 —
@@ -884,15 +895,30 @@ const server = http.createServer(async (req, res) => {
           return json(res, 400, { error: "덮어쓰기 확인이 필요합니다 — confirm:'replace' 를 함께 보내세요.", sections: importSections() });
         }
         const snap = body.snapshot && typeof body.snapshot === 'object' ? body.snapshot : body;
-        /* 먼저 되돌릴 자리를 만든다. 못 만들면 덮지 않는다. */
-        const backupDay = snapshotNow();
-        if (!backupDay) return json(res, 500, { error: '덮기 전 스냅샷을 만들지 못해 중단했습니다. data/backups 쓰기 권한을 확인하세요.' });
-        const out = importSnapshot(snap);
-        if (!out.ok) return json(res, 400, { error: out.error, backupDay });
-        console.log('[import] ' + out.applied.length + '칸 적용 · 건너뜀 ' + out.skipped.length + ' · 되돌릴 스냅샷 ' + backupDay);
+        /* **검증을 스냅샷보다 먼저.** 받지도 않을 파일(다른 서비스의 export 를 잘못 고르는 일이
+           가장 흔하다) 때문에 되돌릴 자리를 희생하지 않는다. */
+        const pre = importPrecheck(snap);
+        if (!pre.ok) return json(res, 400, { error: pre.error });
+        /* 되돌릴 자리를 만든다. 못 만들면 덮지 않는다.
+           **일일 슬롯(db-<날짜>.json)이 아니라 가져오기 전용 파일**에 쓴다 — 같은 날 두 번
+           가져오면 슬롯 하나를 서로 덮어, 두 번째의 '되돌릴 자리'가 첫 번째 결과가 된다.
+           되돌릴 수 있다고 안내하면서 원본을 지우는 셈이라 가장 나쁜 고장이다. */
+        const backup = snapshotBeforeImport();
+        if (!backup) return json(res, 500, { error: '덮기 전 스냅샷을 만들지 못해 중단했습니다. data/backups 쓰기 권한을 확인하세요.' });
+        /* 칸의 기본 꼴은 어댑터가 정본이다 — 넘기지 않으면 db.naesin 이 packs 없이 만들어져
+           팩 라우트가 영구 500 이 된다(store.importSnapshot 머리말). */
+        const out = importSnapshot(snap, { roots: { naesin: naesinRoot, naesinKo: naesinKoRoot, chunk: chunkRoot, hanja: hanjaRoot } });
+        if (!out.ok) return json(res, 400, { error: out.error, backup });
+        console.log('[import] ' + out.applied.length + '칸 적용 · 건너뜀 ' + out.skipped.length
+          + (out.unknown.length ? ' · 모르는 칸 ' + out.unknown.join(',') : '')
+          + ' · 되돌릴 스냅샷 ' + backup);
         return json(res, 200, { ok: true, applied: out.applied, skipped: out.skipped, absent: out.absent,
-          snapshotSavedAt: out.savedAt, backupDay,
-          note: '되돌리려면 GET /api/admin/export?backup=' + backupDay + ' 로 받아 다시 가져오세요.' });
+          /* 세 목록 어디에도 없던 칸 — 조용히 버리지 않는다(워커 dump 에 칸이 늘면 여기 뜬다) */
+          unknown: out.unknown, parentsLinked: out.parentsLinked,
+          snapshotSavedAt: out.savedAt, backup,
+          note: '되돌리려면 GET /api/admin/export?backup=' + backup + ' 로 받아 다시 가져오세요.'
+            + (out.unknown.length ? ' 되읽지 않은 칸: ' + out.unknown.join(', ') + '.' : '')
+            + ' 팩·단어장 본문과 하루·레터 칸은 스냅샷에 없어 되돌림에 포함되지 않습니다.' });
       }
       if (p === '/api/admin/backups' && req.method === 'GET') {
         return json(res, 200, { backups: listBackups() });
@@ -1102,6 +1128,11 @@ const server = http.createServer(async (req, res) => {
 let lastPushDay = null;
 /* 브레인레터 07:00 새 호 알림 — 로컬 서버용 1분 폴링(운영 워커는 22:00 UTC 크론) */
 let lastLetterPushDay = null;
+/* **읽기 전용(검토용) 서버는 밖으로 아무것도 보내지 않는다.** 가져온 운영 구독자에게 밤 9시·
+   아침 7시 알림이 한 번 더 가면 가정에는 중복 알림이고, 발송은 되돌릴 수 없다(규칙 7 — 가정에
+   나가는 것은 사람 확인 자리다). 타이머는 요청이 아니라 시계가 깨우므로 메서드 게이트가 보지
+   못한다 — 그래서 등록 자체를 막는다. */
+if (!READONLY) {
 setInterval(async () => {
   const d = new Date();
   if (d.getHours() !== 7 || d.getMinutes() !== 0) return;
@@ -1122,6 +1153,7 @@ setInterval(async () => {
     if (r.sent || r.removed) console.log('[push] 밤 9시 알림(워드브레인+내신):', JSON.stringify(r));
   } catch (e) { console.error('[push] 발송 실패:', e.message); }
 }, 60000).unref();
+}
 
 server.listen(PORT, () => {
   console.log(`WB 진로독서 서버 http://localhost:${PORT}`);
