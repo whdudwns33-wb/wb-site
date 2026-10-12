@@ -2120,7 +2120,7 @@
     var tts = $('ckTts');
     if (tts) tts.onclick = function () {
       var list = chunksOfGroup(gr).map(function (c) { return c.en; });
-      if (window.WBVoice && WBVoice.ttsSupported() && list.length) WBVoice.speakSeq(list, { lang: 'en' });
+      if (checkAccount() && window.WBVoice && list.length) WBVoice.speakSeq(list, ttsOptions());
     };
     var go = $('ckGo');
     if (go) go.onclick = function () { runChunkSession(day); };
@@ -2313,7 +2313,7 @@
     var tts = $('dlgTts');
     if (tts) tts.onclick = function () {
       /* speakSeq(list, opt)는 문자열 배열을 받는다(shared/voice.js) — 줄마다 영어 목소리로 차례 읽기 */
-      if (window.WBVoice && WBVoice.ttsSupported()) WBVoice.speakSeq(d.lines.map(function (l) { return l.en; }), { lang: 'en' });
+      if (checkAccount() && window.WBVoice) WBVoice.speakSeq(d.lines.map(function (l) { return l.en; }), ttsOptions());
     };
     if (go) go.onclick = function () { trainDialogue(d, st); };
   }
@@ -2429,7 +2429,7 @@
     var s = senBySeq(seq), st = senState(seq);
     if (!s || !st) return;
     var tts = $('ttsBtn');
-    if (tts) tts.onclick = function () { if (window.WBVoice && WBVoice.ttsSupported()) WBVoice.speak(s.en, { lang: 'en' }); };
+    if (tts) tts.onclick = function () { if (checkAccount() && window.WBVoice) WBVoice.speak(s.en, ttsOptions()); };
     var go = $('stageGo');
     if (go) go.onclick = function () { trainSentence(seq); };
   }
@@ -3444,9 +3444,23 @@
     if (!item.ttsText) return '';
     return ' <button id="' + id + '" class="tag t-ind tb" aria-label="영어 듣기">듣기</button>';
   }
+  function ttsOptions() {
+    var isDemo = demoMode && pack && pack.packId === DEMO_PACK_ID;
+    var opt = { lang: 'en', localOnly: !isDemo };
+    if (!isDemo) {
+      opt.onstart = function () { if (checkAccount()) clearBanner('tts'); };
+      opt.onerror = function (why) {
+        if (!checkAccount()) return;
+        showBanner(why === 'local-voice-unavailable' || why === 'language-unavailable' || why === 'unsupported'
+          ? '이 기기에는 영어 읽기 음성이 없습니다. 기기의 영어 음성 설정을 확인해 주세요.'
+          : '음성을 재생하지 못했습니다. 다시 듣기를 눌러 주세요.', 'tts');
+      };
+    }
+    return opt;
+  }
   function wireTtsBtn(item, id) {
     var b = $(id);
-    if (b) b.onclick = function () { if (window.WBVoice && WBVoice.ttsSupported()) WBVoice.speak(item.ttsText, { lang: 'en' }); };
+    if (b) b.onclick = function () { if (checkAccount() && window.WBVoice) WBVoice.speak(item.ttsText, ttsOptions()); };
   }
   /* 전사(cue 3) 화면에 보여 줄 답 — 생성기는 showAnswer(불리언)+given(전문)으로 준다.
      옛 판·앱 대체본은 showAnswer 에 문자열을 담기도 해서 둘 다 받는다. */
@@ -3508,7 +3522,7 @@
         if (!b || b.disabled) return;
         if (b.hasAttribute('data-en')) {
           clearSel(); pickedEn = Number(b.getAttribute('data-en')); b.classList.add('sel');
-          if (window.WBVoice && WBVoice.ttsSupported()) WBVoice.speak(pairs[pickedEn].en, { lang: 'en' });
+          if (checkAccount() && window.WBVoice) WBVoice.speak(pairs[pickedEn].en, ttsOptions());
           return;
         }
         var ki = Number(b.getAttribute('data-ko'));

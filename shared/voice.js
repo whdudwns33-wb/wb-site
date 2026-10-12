@@ -46,15 +46,17 @@ var WBVoice = (function () {
     return lat ? 'en' : 'ko';                // 라틴만 있을 때만 영어
   }
 
-  function voiceFor(lang) {
+  function voiceFor(lang, opt) {
     var want = (lang || 'ko').slice(0, 2).toLowerCase();
-    var vs = allVoices().filter(function (v) { return (v.lang || '').slice(0, 2).toLowerCase() === want; });
+    var vs = allVoices().filter(function (v) {
+      return (v.lang || '').slice(0, 2).toLowerCase() === want && (!(opt && opt.localOnly) || v.localService === true);
+    });
     if (!vs.length) return null;
     var def = vs.filter(function (v) { return v.default; })[0];
     return def || vs[0];
   }
 
-  function hasVoice(lang) { return !!voiceFor(lang); }
+  function hasVoice(lang, opt) { return !!voiceFor(lang, opt); }
 
   var current = null, startWatch = null;
 
@@ -85,8 +87,10 @@ var WBVoice = (function () {
     var lang = opt.lang || langOf(body);
     var u;
     try {
+      var v = voiceFor(lang, opt);
+      /* 구매 자료 호출은 로컬 음성 없을 때 기본(원격일 수 있는) 음성으로 넘기지 않는다. */
+      if (opt.localOnly && !v) { ttsError(opt, 'local-voice-unavailable'); return null; }
       u = new SpeechSynthesisUtterance(body);
-      var v = voiceFor(lang);
       if (v) { u.voice = v; u.lang = v.lang; } else { u.lang = lang === 'en' ? 'en-US' : lang === 'ko' ? 'ko-KR' : lang; }
       u.rate = Math.min(2, Math.max(0.5, opt.rate == null ? 1 : opt.rate));
       u.pitch = opt.pitch == null ? 1 : opt.pitch;
@@ -136,7 +140,7 @@ var WBVoice = (function () {
       if (cancelled) return;
       if (i >= items.length) { if (opt.onend) opt.onend(); return; }
       utterance = speak(items[i++], {
-        rate: opt.rate, lang: opt.lang, startTimeout: opt.startTimeout, onstart: opt.onstart, onend: step,
+        rate: opt.rate, lang: opt.lang, localOnly: opt.localOnly, startTimeout: opt.startTimeout, onstart: opt.onstart, onend: step,
         onerror: function (why) { cancelled = true; ttsError(opt, why); },
       });
     }

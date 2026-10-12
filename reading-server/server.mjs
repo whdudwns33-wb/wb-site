@@ -63,12 +63,12 @@ load();
 const db = getDb();
 const portalFamilyStore = {
   getFamily: (t) => db.portalFamilies?.[t] || null,
-  putFamily: (t, rec) => { db.portalFamilies = db.portalFamilies || {}; db.portalFamilies[t] = rec; persist(); },
+  putFamily: (t, rec) => { db.portalFamilies = db.portalFamilies || {}; db.portalFamilies[t] = rec; return persist(); },
   listFamilyTokens: () => Object.keys(db.portalFamilies || {}),
   getParentCode: (t) => db.parents?.[t] || null,
-  putParent: (t, c) => { db.parents = db.parents || {}; db.parents[t] = c; persist(); },
+  putParent: (t, c) => { db.parents = db.parents || {}; db.parents[t] = c; return persist(); },
   getStudent: (c) => db.students[c] || null,
-  putStudent: (c, rec) => { db.students[c] = rec; persist(); },
+  putStudent: (c, rec) => { db.students[c] = rec; return persist(); },
   listStudentCodes: () => Object.keys(db.students),
 };
 
@@ -525,7 +525,10 @@ const server = http.createServer(async (req, res) => {
       if (p === '/api/portal/family-link') {
         const out = await handlePortalFamilyLink({ method: req.method,
           authorization: req.headers.authorization, secret: process.env.WB_PARENT_PORTAL_LINK_SECRET,
-          getBody: () => readBody(req, PORTAL_LINK_BODY_LIMIT), store: portalFamilyStore });
+          getBody: () => readBody(req, PORTAL_LINK_BODY_LIMIT), store: { ...portalFamilyStore,
+            /* 기존 가족 재시도도 메모리 기록만으로 성공하지 않게 디스크 저장을 확인한다. */
+            getFamily: async (t) => { const record = portalFamilyStore.getFamily(t); if (record) await persist(); return record; },
+          } });
         req.resume();
         return json(res, out.status, out.body);
       }
