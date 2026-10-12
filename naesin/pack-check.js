@@ -29,6 +29,66 @@ var WBPACKCHECK = (function () {
   function nonEmpty(s) { return typeof s === 'string' && s.trim().length > 0; }
   function isArr(a) { return Array.isArray(a); }
 
+  var pair = { en: 'string', ko: 'string' };
+  var strings = ['string'];
+  var rowShapes = {
+    words: { id: 'string', headword: 'string', pos: 'string', meaningKo: strings, sections: strings,
+      irregularForms: strings, example: pair, definition: pair,
+      senses: [{ senseNo: 'scalar', pos: 'string', meaningKo: 'string', example: pair }],
+      synonyms: strings, antonyms: strings, level: 'scalar', notes: 'texts' },
+    sentences: { seq: 'scalar', dayGroup: 'string', dayHeaderEn: 'string', dayHeaderKo: 'string', en: 'string', ko: 'string',
+      chunks: [pair], keywords: [pair], tokens: strings, verbForms: [{ base: 'string', answer: 'string' }],
+      grammarChoices: [{ options: strings, answerIdx: 'scalar' }], writingKeywords: strings, wordIds: strings,
+      grammarNotes: [{ target: 'string', note: 'string' }], notes: 'texts' },
+    oddOneItems: { id: 'string', dayGroup: 'string', kind: 'string', instructionKo: 'string',
+      sentences: [{ seq: 'scalar', text: 'string' }], options: strings, answerIdx: 'scalar', correction: 'string', explanationKo: 'string', notes: 'texts' },
+    checkItems: { id: 'string', slot: 'string', seq: 'scalar', promptKo: 'string', explanationKo: 'string',
+      choices: strings, answerIdx: 'scalar', textEn: 'string', blanks: [{ answers: 'texts', hintKo: 'string' }],
+      ko: 'string', answers: strings, keywords: strings, tokens: strings, notes: 'texts' },
+    dialogues: { id: 'string', title: 'string', section: 'string', lines: [{ speaker: 'string', en: 'string', ko: 'string' }], notes: 'texts' },
+    keyExpressions: { en: 'string', ko: 'string', blankAnswer: 'string' },
+    functions: { name: 'string', pattern: 'string', explainKo: 'string' },
+    vocabSidebar: pair,
+    readingQA: { q: 'string', a: 'string' },
+    patterns: { patternNo: 'scalar', title: 'string', conceptKo: 'string', grammarPoint: [strings],
+      textbookExamples: [{ en: 'string', ko: 'string', origin: 'string' }],
+      letsUseIt: [{ no: 'scalar', stem: 'string', ko: 'string', wordBank: strings, answers: strings }], notes: 'texts' },
+    items: { no: 'scalar', footnoteNo: 'scalar', source: 'string', section: 'string', formatType: 'string', instructionKo: 'string',
+      promptKo: 'string', stem: 'string', questionKo: 'string', question: 'string', isNegative: 'scalar', answerCount: 'scalar',
+      stimulus: { type: 'string', parts: [{ text: 'string' }] }, choices: [{ label: 'scalar', text: 'string', tuple: strings }],
+      answer: ['scalar'], explanationKo: 'string', targetRefs: [{ wordId: 'string', sentenceSeq: 'scalar', patternNo: 'scalar', dialogueId: 'string' }], notes: 'texts' },
+  };
+  var PACK_ARRAYS = Object.keys(rowShapes);
+  var packShape = { packId: 'string', curriculum: 'string', textbook: 'string', grade: 'string', school: 'string', gradeSem: 'string', exam: 'string', lesson: 'scalar',
+    lessonTitle: 'string', source: 'string', notes: 'texts', passage: { titleEn: 'string', titleKo: 'string' }, counts: {} };
+  PACK_ARRAYS.forEach(function (k) { packShape[k] = [rowShapes[k]]; packShape.counts[k] = 'scalar'; });
+  ['examples', 'definitions', 'polysemy', 'synAnt'].forEach(function (k) { packShape.counts[k] = 'scalar'; });
+
+  /* 검수 원천은 초안에만 산다 — 알려진 학생 필드 안에 감춰도 배포 관문에서 막는다. */
+  function checkShape(value, shape, at, c) {
+    if (value == null) return true;
+    var ok = true;
+    function bad(msg) { c.err('(공통)', at + ' ' + msg); ok = false; }
+    if (shape === 'texts' && typeof value === 'string') return true;
+    if (shape === 'texts') shape = strings;
+    if (typeof shape === 'string') {
+      if (shape === 'scalar' ? !(/^(string|number|boolean)$/.test(typeof value)) : typeof value !== shape)
+        bad('잘못된 필드 형태');
+    } else if (isArr(shape)) {
+      if (!isArr(value)) bad('는 배열이어야 함');
+      else value.forEach(function (v, i) {
+        if (v == null) { c.err('(공통)', at + '[' + i + '] 빈 행/값'); ok = false; }
+        else if (!checkShape(v, shape[0], at + '[' + i + ']', c)) ok = false;
+      });
+    } else if (!value || typeof value !== 'object' || isArr(value)) bad('객체이어야 함');
+    else Object.keys(value).forEach(function (key) {
+      if (!Object.prototype.hasOwnProperty.call(shape, key)) {
+        c.err('(공통)', (at ? at + '.' : '') + key + ' 학생 팩에 허용되지 않는 필드'); ok = false;
+      } else if (!checkShape(value[key], shape[key], at ? at + '.' + key : key, c)) ok = false;
+    });
+    return ok;
+  }
+
   /* 표기 비교용 정규화 — 굽은 따옴표·공백·대소문자를 지운다.
      원본 워크북은 인쇄 그대로 대소문자·구두점이 섞여 있어(예: 'soobin', 'big,')
      이 차이로 오류를 내면 정상 팩이 통과하지 못한다. */
@@ -311,12 +371,20 @@ var WBPACKCHECK = (function () {
 
   /* ── 대화문 ── */
   function checkDialogues(pack, c) {
+    (isArr(pack.keyExpressions) ? pack.keyExpressions : []).forEach(function (k, i) {
+      var at = 'keyExpressions[' + i + ']';
+      if (!(nonEmpty(k && k.en) && nonEmpty(k && k.ko))) c.err('keyExpressions', at + ' en/ko 불완전');
+      if (!nonEmpty(k && k.blankAnswer)) c.err('keyExpressions', at + ' blankAnswer 없음');
+      else if (nonEmpty(k.en) && k.en.toLowerCase().indexOf(k.blankAnswer.toLowerCase()) < 0)
+        c.err('keyExpressions', at + ' blankAnswer가 en에 없음');
+    });
     var list = pack.dialogues;
     if (!isArr(list)) return;
     var S = 'dialogues';
     if (!list.length) c.err(S, 'dialogues 비었음');
     var lines = 0;
     list.forEach(function (d, i) {
+      if (!isArr(d && d.lines) || !d.lines.length) c.err(S, 'dialogues[' + i + '] lines 비었음');
       (isArr(d && d.lines) ? d.lines : []).forEach(function (l, j) {
         lines += 1;
         if (!(nonEmpty(l && l.speaker) && nonEmpty(l && l.en) && nonEmpty(l && l.ko)))
@@ -376,10 +444,12 @@ var WBPACKCHECK = (function () {
   /* ── 전체 ── */
   function checkPack(pack, opts) {
     var c = collector(opts);
-    if (!pack || typeof pack !== 'object') {
+    if (!pack || typeof pack !== 'object' || isArr(pack)) {
       c.err('(공통)', '팩이 객체가 아님');
       return { errors: c.errors, warns: c.warns, summary: c.summary };
     }
+    if (!checkShape(pack, packShape, '', c))
+      return { errors: c.errors, warns: c.warns, summary: c.summary };
     checkWords(pack, c);
     checkSentences(pack, c);
     checkOddOne(pack, c);
@@ -409,6 +479,7 @@ var WBPACKCHECK = (function () {
     collector: collector, flat: flat, words1: words1, nonEmpty: nonEmpty,
     CHECK_SLOTS: CHECK_SLOTS, STAGE_DAYGROUP_MAX: STAGE_DAYGROUP_MAX,
     REQUIRED_SECTIONS: REQUIRED_SECTIONS,
+    PACK_ARRAYS: PACK_ARRAYS,
   };
 })();
 

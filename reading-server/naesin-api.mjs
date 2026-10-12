@@ -28,6 +28,11 @@ function examScope(value) {
   const key = scope.trim();
   return key === 'default' || CODE_RE.test(key) ? key : '';
 }
+function classOrDefaultScope(value) {
+  if (value == null) return 'default';
+  const scope = examScope(value);
+  return scope === 'default' || scope.startsWith('cls:') ? scope : '';
+}
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const EXAM_PACKS_MAX = 20;          // 한 시험 범위에 담는 팩 수 — 한 학기 시험이 이걸 넘지 않는다
 const WORD_DEADLINE_MIN = 3, WORD_DEADLINE_MAX = 30;   // 단어 초회 도달 마감(D-n) 허용 범위, 기본 7은 클라이언트가 안다
@@ -38,8 +43,6 @@ const SCORE_MAX = 100;
 const WRONG_MAX = 50;
 const RESULT_MEMO_MAX = 200;
 export const WRONG_TYPE_KEYS = ['word', 'grammar', 'passage', 'writing'];
-/* 수업 라이브 세션의 범위 — 지금은 반 공통 하나다(과제와 같은 결). 반별로 나눌 때 이 값만 넓힌다. */
-const LIVE_SCOPE = 'default';
 
 /* 호스트가 몸통을 파싱하기 전에 content-length 로 끊는 상한 — 저장 상한보다 조금 크다(JSON 래핑 여유).
    워커는 req.json()이 몸통을 다 읽고서야 크기를 아는데, 그 전에 끊어야 메모리도 시간도 안 쓴다. */
@@ -269,8 +272,7 @@ export async function resolveExam(store, code, now) {
   if (typeof code === 'string' && CODE_RE.test(code)) {
     const mine = await store.getExam(code);
     if (live(mine)) return { exam: mine, scope: 'student' };
-    const stu = typeof store.getStudent === 'function' ? await store.getStudent(code) : null;
-    const scope = classScope(stu && stu.cls);
+    const scope = await studentClassScope(store, code);
     if (scope) {
       const byClass = await store.getExam(scope);
       if (live(byClass)) return { exam: byClass, scope: 'class' };
@@ -279,6 +281,36 @@ export async function resolveExam(store, code, now) {
   const def = await store.getExam('default');
   if (isObj(def)) return { exam: def, scope: 'default' };
   return { exam: {}, scope: null };
+}
+
+async function studentClassScope(store, code) {
+  const stu = typeof code === 'string' && CODE_RE.test(code) && typeof store.getStudent === 'function' ? await store.getStudent(code) : null;
+  return classScope(stu && stu.cls);
+}
+
+async function resolveTask(store, code, now) {
+  const key = await studentClassScope(store, code);
+  if (key) {
+    const task = await store.getTask(key);
+    if (isObj(task) && task.date === todayKst(now)) return { task, scope: 'class' };
+  }
+  const task = await store.getTask('default');
+  return { task: task || {}, scope: task ? 'default' : null };
+}
+
+async function resolveLive(store, code, now) {
+  const scope = await studentClassScope(store, code);
+  if (scope) {
+    const rec = await store.getLive(scope);
+    if (isLive(rec, now) && (rec.phase || rec.projector)) return { rec, scope };
+  }
+  return { rec: await store.getLive('default'), scope: 'default' };
+}
+
+async function assignedProjector(store, code, projector, now) {
+  if (!projector || !PACK_ID_RE.test(projector.packId || '')) return false;
+  const { exam } = await resolveExam(store, code, now);
+  return Array.isArray(exam.packIds) && exam.packIds.includes(projector.packId);
 }
 
 /* 시험 배정 목록 한 줄 — 관리 웹의 「현재 배정 현황」이 그린다.
@@ -349,7 +381,7 @@ async function scopesUsingPack(store, id) {
        getBooks(), putBooks(map),       // naesin:books — { 학생코드: 교과서코드 } (팩 커버리지용)
        getState(code), putState(code, rec), listStateCodes(),
        getExam(scope), putExam(scope, rec), deleteExam(scope), listExamScopes(),   // scope: 'default' | 'cls:<반>' | 학생코드
-       getTask(scope), putTask(scope, rec),   // 수업 과제 — 현재는 'default'만 사용
+       getTask(scope), putTask(scope, rec),   // 수업 과제 — 'default' | 'cls:<반>', null은 해제
        getReports(packId), putReports(packId, list),   // 문항 신고 — 팩별 배열(최근 200건)
        getLive(scope), putLive(scope, rec), deleteLive(scope),   // 수업 라이브 세션 (계약 L1)
        getVotes(scope), putVotes(scope, rec),                    // 투사 문제 응답 {[ref]:{[code]:key}}
@@ -443,10 +475,9 @@ export async function handleNaesin(ctx) {
     return j(200, await resolveExam(store, who.code, ctx.now));
   }
 
-  /* 오늘 수업 과제 — 강사가 배정한 반 공통 과제(수업 모드). 없으면 빈 값(평시). */
+  /* 오늘 수업 과제 — 현재 반의 오늘 과제 → 공통. 지난·예정 반 과제는 오늘 공통 과제를 가리지 않는다. */
   if (p === '/api/naesin/task' && method === 'GET' && !who.admin) {
-    const rec = await store.getTask('default');
-    return j(200, { task: rec || {}, scope: rec ? 'default' : null });
+    return j(200, await resolveTask(store, who.code, ctx.now));
   }
 
   /* 내 시험 결과 + 예상 점수대 (계약 R2).
@@ -496,20 +527,27 @@ export async function handleNaesin(ctx) {
      5초 폴링으로 굴린다 — 수업 운영에 5초 지연은 영향이 없고, 워커에서 WebSocket 을
      띄우는 비용·복잡도가 그 값보다 크다.
 
-     scope 는 지금 'default' 하나다(과제와 같은 결). 반별로 나눌 때 이 값만 넓히면 된다. */
+     현재 반의 활성 세션 → 공통 세션. 강사는 반별 세션·투표를 별도 키로 저장한다. */
   if (p === '/api/naesin/live' && method === 'GET' && !who.admin) {
-    const rec = await store.getLive(LIVE_SCOPE);
-    /* publicLive 가 answerKey 를 지운다 — 이 기능의 유일한 보안 지점이다.
-       TV에 문제를 띄우고 답만 태블릿에서 받는 구조라 정답이 내려가면 의미가 없어진다. */
-    return j(200, { live: publicLive(rec, ctx.now), scope: LIVE_SCOPE });
+    const { rec, scope } = await resolveLive(store, who.code, ctx.now);
+    const want = ctx.query && ctx.query.get('scope');
+    if (want != null && classOrDefaultScope(want) !== scope) return j(403, { error: '다른 반의 수업을 열 수 없어요.' });
+    const live = publicLive(rec, ctx.now);
+    if (live && live.projector) {
+      if (await assignedProjector(store, who.code, rec.projector, ctx.now)) live.projector.packId = rec.projector.packId;
+      else live.projector = null;
+    }
+    return j(200, { live, scope });
   }
 
   /* 투사 문제 응답 — 정답 여부를 돌려주지 않는다(강사가 공개할 때 다 같이 본다) */
   if (p === '/api/naesin/live/answer' && method === 'POST' && !who.admin) {
     const b = await body();
     const bad = badBody(b); if (bad) return bad;
-    const rec = await store.getLive(LIVE_SCOPE);
+    const { rec, scope } = await resolveLive(store, who.code, ctx.now);
+    if (Object.hasOwn(b, 'scope') && classOrDefaultScope(b.scope) !== scope) return j(403, { error: '다른 반의 수업에 응답할 수 없어요.' });
     if (!isLive(rec, ctx.now) || !rec.projector) return j(409, { error: '지금 진행 중인 투사 문제가 없어요.' });
+    if (!(await assignedProjector(store, who.code, rec.projector, ctx.now))) return j(403, { error: '배정되지 않은 교재의 수업 문제예요.' });
     const ref = String(b.ref || '').trim().slice(0, 80);
     const key = String(b.key || '').trim().slice(0, 8);
     const item = (rec.projector.items || []).find((it) => it.ref === ref);
@@ -517,13 +555,16 @@ export async function handleNaesin(ctx) {
     if (!item.choices.some((c) => c.key === key)) return j(400, { error: '보기에 없는 답이에요.' });
     /* 지금 띄운 문제만 받는다 — 뒤 문제를 미리 찍어 두는 것을 막는다(응답에도 안 내려간다) */
     if (rec.projector.items[rec.projector.index] !== item) return j(409, { error: '지금 화면의 문제가 아니에요.' });
-    const votes = putVote(await store.getVotes(LIVE_SCOPE), ref, who.code, key);
-    await store.putVotes(LIVE_SCOPE, votes);
+    const votes = putVote(await store.getVotes(scope), ref, who.code, key);
+    await store.putVotes(scope, votes);
     return j(200, { ok: true });
   }
 
   /* ── 관리자 (원장·강사 — 관리 PIN 토큰) ── */
   if (!who.admin) return j(403, { error: '권한이 없습니다.' });
+  const scopedPath = p === '/api/naesin/admin/task' || p.startsWith('/api/naesin/admin/live');
+  const scope = scopedPath ? classOrDefaultScope(ctx.query && ctx.query.get('scope')) : null;
+  if (scopedPath && !scope) return j(400, { error: "scope는 'default' 또는 'cls:<반 이름>'이어야 해요." });
 
   /* 팩별 신고 목록 — 같은 문항에 여러 건이면 묶어서 건수로 준다(그게 정오표의 우선순위다) */
   if (p === '/api/naesin/admin/reports' && method === 'GET') {
@@ -576,7 +617,7 @@ export async function handleNaesin(ctx) {
 
   /* 수업 과제 등록·조회 — 수업시간에 전원이 같은 범위를 진행하게 하는 배정 */
   if (p === '/api/naesin/admin/task' && method === 'GET') {
-    return j(200, { task: (await store.getTask('default')) || {} });
+    return j(200, { task: (await store.getTask(scope)) || {}, scope });
   }
   if (p === '/api/naesin/admin/task' && method === 'POST') {
     const b = await body();
@@ -596,8 +637,12 @@ export async function handleNaesin(ctx) {
       if (!Number.isInteger(f) || !Number.isInteger(to) || f < 1 || to < f) return j(400, { error: '문장 범위가 올바르지 않아요.' });
       rec.seqFrom = f; rec.seqTo = to;
     }
-    await store.putTask('default', rec);
-    return j(200, { ok: true, task: rec });
+    await store.putTask(scope, rec);
+    return j(200, { ok: true, task: rec, scope });
+  }
+  if (p === '/api/naesin/admin/task' && method === 'DELETE') {
+    await store.putTask(scope, null);
+    return j(200, { ok: true, scope });
   }
 
   /* 팩 업로드 — CLI·검수 화면과 같은 관문을 통과해야 직접 API로도 깨진 팩을 올리지 못한다.
@@ -809,26 +854,37 @@ export async function handleNaesin(ctx) {
     const students = [];
     for (const code of await store.listStateCodes()) {
       const [stu, st] = await Promise.all([store.getStudent(code), store.getState(code)]);
-      students.push(naesinSummary(code, stu, st));
+      const { task } = await resolveTask(store, code, ctx.now);
+      students.push({ ...naesinSummary(code, stu, st),
+        assignedTask: task.date ? { date: task.date, title: task.title || '', updatedAt: task.updatedAt || null } : null });
     }
     return j(200, { students, time: nowIso() });
   }
 
   /* 강사 화면 한 번의 폴링으로 필요한 것을 다 준다 — 세션·응답 집계·반 현황 */
   if (p === '/api/naesin/admin/live' && method === 'GET') {
-    const rec = await store.getLive(LIVE_SCOPE);
+    const rec = await store.getLive(scope);
     const alive = isLive(rec, ctx.now);
     const students = [];
+    const membership = new Map();
     for (const code of await store.listStateCodes()) {
       const [stu, st] = await Promise.all([store.getStudent(code), store.getState(code)]);
+      membership.set(code, classScope(stu && stu.cls) === scope);
+      if (scope !== 'default' && !membership.get(code)) continue;
       students.push(naesinSummary(code, stu, st));
     }
     const board = boardRows(students, ctx.now);
-    const votes = alive ? await store.getVotes(LIVE_SCOPE) : null;
+    let votes = alive ? await store.getVotes(scope) : null;
+    if (scope !== 'default' && isObj(votes)) {
+      const codes = new Set(Object.values(votes).filter(isObj).flatMap(picks => Object.keys(picks)));
+      for (const code of codes) if (!membership.has(code)) membership.set(code, classScope((await store.getStudent(code))?.cls) === scope);
+      votes = Object.fromEntries(Object.entries(votes).map(([ref, picks]) => [ref,
+        Object.fromEntries(Object.entries(isObj(picks) ? picks : {}).filter(([code]) => membership.get(code)))]));
+    }
     return j(200, {
       live: alive ? { phase: rec.phase || null, projector: rec.projector || null, updatedAt: rec.updatedAt } : null,
       votes: alive && rec.projector ? tally(votes, rec.projector) : [],
-      board, weakest: weakest(board, 3), scope: LIVE_SCOPE, time: nowIso(),
+      board, weakest: weakest(board, 3), scope, time: nowIso(),
     });
   }
 
@@ -836,7 +892,7 @@ export async function handleNaesin(ctx) {
   if (p === '/api/naesin/admin/live/phase' && method === 'POST') {
     const b = await body();
     const bad = badBody(b); if (bad) return bad;
-    const prev = (await store.getLive(LIVE_SCOPE)) || {};
+    const prev = (await store.getLive(scope)) || {};
     const alive = isLive(prev, ctx.now);
     let phase = null;
     if (b.phase !== null && b.phase !== undefined) {
@@ -844,11 +900,11 @@ export async function handleNaesin(ctx) {
       if (!phase) return j(400, { error: "단계는 " + PHASE_KEYS.join('·') + " 중 하나여야 해요." });
     }
     const rec = {
-      scope: LIVE_SCOPE, phase,
+      scope, phase,
       projector: alive ? (prev.projector || null) : null,
       updatedAt: nowIso(),
     };
-    await store.putLive(LIVE_SCOPE, rec);
+    await store.putLive(scope, rec);
     return j(200, { ok: true, live: { phase: rec.phase, projector: rec.projector, updatedAt: rec.updatedAt } });
   }
 
@@ -856,16 +912,20 @@ export async function handleNaesin(ctx) {
   if (p === '/api/naesin/admin/live/projector' && method === 'POST') {
     const b = await body();
     const bad = badBody(b); if (bad) return bad;
-    const prev = (await store.getLive(LIVE_SCOPE)) || {};
+    const prev = (await store.getLive(scope)) || {};
     const alive = isLive(prev, ctx.now);
     let projector = null;
     if (b.items === null) {
       projector = null;                       /* 종료 */
-      await store.putVotes(LIVE_SCOPE, {});
+      await store.putVotes(scope, {});
     } else if (Array.isArray(b.items)) {
+      const packId = String(b.packId || '').trim();
+      if (!PACK_ID_RE.test(packId)) return j(400, { error: '투사 문제의 packId가 필요해요.' });
+      if (!(await store.getPack(packId))) return j(400, { error: '없는 팩이에요: ' + packId });
       projector = normalizeProjector(b, ctx.now);
       if (!projector) return j(400, { error: '띄울 수 있는 문제가 없어요 (보기 2개 이상 + 정답이 보기 안).' });
-      await store.putVotes(LIVE_SCOPE, {});   /* 새 세트면 앞 응답을 남기지 않는다 */
+      projector.packId = packId;
+      await store.putVotes(scope, {});   /* 새 세트면 앞 응답을 남기지 않는다 */
     } else {
       /* 이동·공개 — 문제는 그대로 두고 index·revealed 만 바꾼다 */
       const cur = alive ? prev.projector : null;
@@ -875,17 +935,18 @@ export async function handleNaesin(ctx) {
         index: b.index != null ? b.index : cur.index,
         revealed: b.revealed != null ? !!b.revealed : cur.revealed,
       }, ctx.now);
+      projector.packId = cur.packId;
     }
     const rec = {
-      scope: LIVE_SCOPE, phase: alive ? (prev.phase || null) : null,
+      scope, phase: alive ? (prev.phase || null) : null,
       projector, updatedAt: nowIso(),
     };
-    await store.putLive(LIVE_SCOPE, rec);
+    await store.putLive(scope, rec);
     return j(200, { ok: true, live: { phase: rec.phase, projector: rec.projector, updatedAt: rec.updatedAt } });
   }
 
   if (p === '/api/naesin/admin/live' && method === 'DELETE') {
-    await store.deleteLive(LIVE_SCOPE);
+    await store.deleteLive(scope);
     return j(200, { ok: true });
   }
 

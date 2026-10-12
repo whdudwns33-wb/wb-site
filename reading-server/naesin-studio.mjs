@@ -42,6 +42,17 @@ const nowIso = () => new Date().toISOString();
 const isObj = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
 const strMax = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 const arrayKeyOf = (kind) => (kind === 'items' ? 'items' : kind);
+const DRAFT_KINDS = CHECK.PACK_ARRAYS;
+const PDF_WORD_KEYS = ['id', 'headword', 'pos', 'meaningKo', 'sections', '_pdfReview'];
+const ownKeys = (v, keys) => isObj(v) && Object.keys(v).every((k) => keys.includes(k));
+function validPdfReview(v) {
+  return ownKeys(v, ['flags', 'locations'])
+    && Array.isArray(v.flags) && v.flags.length <= 100 && v.flags.every((f) => typeof f === 'string' && f.length <= 200)
+    && Array.isArray(v.locations) && v.locations.length <= 100 && v.locations.every((loc) =>
+      ownKeys(loc, ['page', 'bbox']) && Number.isInteger(loc.page) && loc.page > 0 && loc.page <= 1_000_000
+      && Array.isArray(loc.bbox) && loc.bbox.length === 4 && loc.bbox.every((n) => Number.isFinite(n) && n >= 0)
+      && loc.bbox[0] <= loc.bbox[2] && loc.bbox[1] <= loc.bbox[3]);
+}
 
 export function newJobId(rnd) {
   const r = rnd || Math.random;
@@ -73,13 +84,18 @@ export function assemble(job) {
     if (meta[k] != null && meta[k] !== '') pack[k] = meta[k];
   }
   for (const kind of Object.keys(draft)) {
+    if (!DRAFT_KINDS.includes(kind)) continue;
     const rows = Array.isArray(draft[kind]) ? draft[kind] : null;
     if (!rows) continue;
     const kept = [];
     rows.forEach((row, i) => {
       const rv = review[rowKey(kind, row, i)];
       if (rv && rv.state === 'dropped') return;
-      kept.push(rv && isObj(rv.patch) ? { ...row, ...rv.patch } : row);
+      const value = rv && isObj(rv.patch) ? { ...row, ...rv.patch } : { ...row };
+      /* 기존 편집 화면은 지운 키를 null로 보낸다. */
+      if (rv && isObj(rv.patch)) for (const k of Object.keys(rv.patch)) if (rv.patch[k] === null) delete value[k];
+      delete value._pdfReview;
+      kept.push(value);
     });
     if (kept.length) pack[arrayKeyOf(kind)] = kept;
   }
@@ -96,11 +112,22 @@ export function publishGate(job) {
   const review = isObj(job && job.review) ? job.review : {};
   let pending = 0, total = 0;
   for (const kind of Object.keys(draft)) {
+    if (!DRAFT_KINDS.includes(kind)) res.errors.push({ where: '(공통)', message: kind + ' 허용되지 않는 초안 종류' });
     const rows = Array.isArray(draft[kind]) ? draft[kind] : [];
+    let kept = 0;
     rows.forEach((row, i) => {
       total += 1;
       const rv = review[rowKey(kind, row, i)];
-      if (!rv || rv.state === 'pending') pending += 1;
+      const resolved = rv && ['ok', 'fixed', 'dropped'].includes(rv.state);
+      if (!resolved) pending += 1;
+      if (rv && rv.state === 'dropped') return;
+      const at = kind + '[' + kept++ + ']';
+      if (isObj(row) && Object.prototype.hasOwnProperty.call(row, '_pdfReview')) {
+        if (kind !== 'words' || !validPdfReview(row._pdfReview))
+          res.errors.push({ where: kind, message: at + ' PDF 검수 메타 형태가 올바르지 않음' });
+        if (!resolved)
+          res.warns.push({ where: kind, message: at + ' PDF 후보 — 원본 위치를 대조해 개별 검수해야 함' });
+      }
     });
   }
   return {
@@ -122,7 +149,7 @@ export function jobBrief(job) {
     rows.forEach((row, i) => {
       total += 1;
       const rv = review[rowKey(kind, row, i)];
-      if (!rv || rv.state === 'pending') pending += 1;
+      if (!rv || !['ok', 'fixed', 'dropped'].includes(rv.state)) pending += 1;
     });
   }
   return {
@@ -285,7 +312,16 @@ export async function handleStudio(ctx) {
     if (!src) return j(400, { error: 'draft 객체가 필요해요.' });
     const next = {};
     for (const [k, v] of Object.entries(src)) {
-      if (!Array.isArray(v) || !v.length) continue;
+      if (!DRAFT_KINDS.includes(k)) return j(400, { error: '허용되지 않는 초안 종류: ' + k });
+      if (!Array.isArray(v)) return j(400, { error: k + ' 초안은 배열이어야 해요.' });
+      for (const row of v) {
+        if (!isObj(row)) return j(400, { error: k + ' 행은 객체이어야 해요.' });
+        if (!Object.prototype.hasOwnProperty.call(row, '_pdfReview')) continue;
+        if (ctx.localPdfReview !== true) return j(403, { error: 'PDF 후보는 원내 PC에서만 검수할 수 있어요.' });
+        if (k !== 'words' || !ownKeys(row, PDF_WORD_KEYS) || !validPdfReview(row._pdfReview))
+          return j(400, { error: 'PDF 후보의 필드·위치 정보가 올바르지 않아요.' });
+      }
+      if (!v.length) continue;
       next[k] = v;
     }
     if (!Object.keys(next).length) return j(400, { error: '넣을 행이 없어요.' });
@@ -316,16 +352,32 @@ export async function handleStudio(ctx) {
     for (const kind of Object.keys(draft)) {
       (Array.isArray(draft[kind]) ? draft[kind] : []).forEach((row, i) => known.add(rowKey(kind, row, i)));
     }
+    /* 뒤 행이 틀려도 앞 행의 교정본이 바뀌지 않도록 전체 요청을 먼저 검사한다. */
+    for (const e of entries) {
+      if (!isObj(e) || !known.has(strMax(e.key, 80))) continue;
+      if (!REVIEW_STATES.includes(e.state)) return j(400, { error: '검수 상태가 올바르지 않아요.' });
+      if (e.patch !== undefined && e.patch !== null && !isObj(e.patch))
+        return j(400, { error: 'patch는 행 객체 또는 null이어야 해요.' });
+      if (e.note !== undefined && typeof e.note !== 'string') return j(400, { error: '검수 메모는 문자열이어야 해요.' });
+    }
     job.review = isObj(job.review) ? job.review : {};
     let hit = 0;
     for (const e of entries) {
       if (!isObj(e)) continue;
       const key = strMax(e.key, 80);
       if (!known.has(key)) continue;
-      const state = REVIEW_STATES.includes(e.state) ? e.state : 'ok';
-      const rec = { state, at: nowIso() };
-      if (isObj(e.patch)) rec.patch = e.patch;
-      if (typeof e.note === 'string' && e.note.trim()) rec.note = strMax(e.note, NOTE_MAX);
+      const state = e.state;
+      const rec = { ...(isObj(job.review[key]) ? job.review[key] : {}), state, at: nowIso() };
+      if (e.patch !== undefined) {
+        if (isObj(e.patch)) rec.patch = { ...e.patch };
+        else delete rec.patch;
+      }
+      /* 검수 위치는 원본 행에 고정한다 — 편집으로 개별 검수 경고를 우회하지 못한다. */
+      if (isObj(rec.patch)) { rec.patch = { ...rec.patch }; delete rec.patch._pdfReview; }
+      if (e.note !== undefined) {
+        if (typeof e.note === 'string' && e.note.trim()) rec.note = strMax(e.note, NOTE_MAX);
+        else delete rec.note;
+      }
       job.review[key] = rec;
       hit += 1;
     }

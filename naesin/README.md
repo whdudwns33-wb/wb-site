@@ -75,7 +75,7 @@ reading-server/
 - `GET /exam` → `{exam:{examDate, packIds, wordDeadlineDays?}, scope}` — 학생 배정(만료 전) →
   반 배정(`cls:<반>`, 만료 전) → 공통(`default`, 지난 날짜도 유지) → 빈 값.
   응답 scope는 `student`·`class`·`default`·null이다. **만료 = `examDate < 오늘(KST)`** (`resolveExam`).
-- `GET /task` → `{task, scope}` — `task.updatedAt`이 학생 앱 완료 기록의 `taskAt` 원천
+- `GET /task` → `{task, scope}` — 오늘의 반 과제 → 공통 과제 순서. `task.updatedAt`이 학생 앱 완료 기록의 `taskAt` 원천
 
 관리(PIN)
 - 팩: `POST /admin/pack {id, pack}` (4.5MB, packId 일치) · `GET /admin/packs` ·
@@ -83,9 +83,9 @@ reading-server/
 - 시험: `POST /admin/exam {scope, examDate, packIds, wordDeadlineDays?}` (실제 달력 날짜 검증) ·
   `GET /admin/exams` → `{exams:[{scope, examDate, packIds, expired, …}]}` · `DELETE /admin/exam {scope}`
   scope는 기존 학생 코드·`default`와 `cls:<반>`을 받는다. 반 이름은 NFC·앞뒤 공백만 정규화하며 1~80자, 제어문자는 금지한다. 학생 코드 `cls`는 기존 개별 배정이다.
-- 과제: `GET/POST /admin/task` — `typeKeys`는 서버 화이트리스트(`TASK_TYPE_KEYS` + `g-<n>`),
+- 과제: `GET/POST/DELETE /admin/task?scope=cls:<반>` — scope 생략은 기존 `default`. `typeKeys`는 서버 화이트리스트(`TASK_TYPE_KEYS` + `g-<n>`),
   학생 앱 `quizTypes()`·관리 웹 `TYPE_LIST`와 같은 목록이어야 한다
-- `GET /admin/overview` → 학생별 `summary`(정규화본) + 과제 완료 열
+- `GET /admin/overview` → 학생별 `summary`(정규화본) + 과제 완료 열 + 적용 과제 `assignedTask`(없으면 null)
 - 교과서 지정표: `GET /admin/books` → `{books, updatedAt}` · `PUT /admin/books {books}` →
   `{books, count, updatedAt}`. `books` 는 `{학생코드: 교과서코드}` 한 칸짜리 표이고 **PUT 은 전체
   교체**다(빈 값 = 지정 해제, 한 줄이라도 형식이 틀리면 전부 거절). 교과서 코드 목록과 대조하지
@@ -100,10 +100,12 @@ reading-server/
   `GET /admin/reports?packId=` → 문항별로 묶어 건수 내림차순 · `POST /admin/reports/resolve {packId, id|itemRef}`
 - 수업 라이브(naesin-live.mjs, 계약 L1): 학생 `GET /live` → `{live:{phase, projector}, scope}` —
   **투사 문제의 `answerKey`는 공개(revealed) 전까지 응답에 없고, 지금 띄운 문제 하나만 내려간다** ·
-  학생 `POST /live/answer {ref, key}` (지금 화면의 문제만, 정답 여부는 돌려주지 않는다) · 관리
+  학생 `POST /live/answer {ref, key, scope?}` (지금 화면의 문제만, scope 지정 시 자기 적용 세션과 일치해야 한다; 정답 여부는 돌려주지 않는다) · 관리
   `GET /admin/live` → `{live, votes, board, weakest}` (폴링 한 번으로 세션·응답 분포·반 현황) ·
   `POST /admin/live/phase {phase|null}` (endsAt 은 서버가 분 입력에서 계산 — 강사 노트북 시계를 믿지 않는다) ·
-  `POST /admin/live/projector {items|null, index?, revealed?}` · `DELETE /admin/live`.
+  `POST /admin/live/projector {packId, items|null, index?, revealed?}` · `DELETE /admin/live`.
+  관리 라이브 요청은 모두 `?scope=cls:<반>`을 받으며 생략은 기존 `default`. 반별 응답·현황·삭제를 분리하고 학생은 현재 반 세션 → 공통 순서로 받는다.
+  투사 내용은 학생의 시험 범위 packId와 대조한다. packId 없는 기존 투사 문제는 학생에게 숨기며 강사가 다시 시작해야 한다.
   세션은 `updatedAt` 이 4시간을 넘으면 없는 것으로 본다 — 방치된 단계가 다음 날 학생 화면에 남지 않게.
 - 팩 단건: `GET /admin/pack?id=` → `{pack, updatedAt}` — 강사 화면이 즉석 문제를 만들 때 쓴다
   (문제 생성은 학생 앱과 같은 `gen.js` 로 화면에서 한다)
@@ -113,6 +115,8 @@ reading-server/
   `POST /admin/job/publish {jobId}` · `DELETE /admin/job {jobId}`.
   **배포 관문은 CLI 검증기와 같은 함수**(`pack-check.js`)를 쓴다 — 규칙을 복제하면 "검증기는
   통과인데 배포가 막히는" 상태가 생긴다. 원천은 `naesin:jobsrc:*`에만 있고 작업을 지우면 함께 지운다.
+  로컬 PDF 후보는 원내 PC의 `localPdfReview` capability가 있을 때만 전용 입력에서 받는다. 원본 위치·검토 표시로 개별 대조하며 학생 팩에서는 해당 메타를 제거한다. 본문 미대응 열은 브라우저 메모리에만 표시하고 영·한 대응을 자동 승인하지 않는다.
+  학생 필드·배열 형태와 필수 내용을 공용 관문에서 검증한다. 검수 원천·알 수 없는 배열은 새 업로드/발행에서 거절하며 기존 저장 팩을 자동 변경하지 않는다.
 
 공통: 몸통은 파싱 전 `content-length`로 끊는다(팩 4.5MB / 그 외 300KB). 학생 삭제(퇴원)는
 `naesin:state:<코드>`·`naesin:exam:<코드>`까지 지운다 — 같은 코드를 재사용해도 앞 학생 기록이
