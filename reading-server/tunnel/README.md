@@ -14,6 +14,9 @@
   학생 기록의 정본은 운영 워커에 있고, 여기에 학생이 붙으면 진도가 두 곳에 갈라진다.
 - **두 겹으로 잠근다.** Cloudflare Access(허용한 이메일만) → 관리 로그인(아이디·비밀번호).
 - **이 PC 바깥에서는 터널로만 들어온다.** 서버는 127.0.0.1 에만 묶여 같은 와이파이의 다른 기기도 못 붙는다.
+- **서버는 저장소가 아니라 관리자 전용 사본을 돌린다.** 작업 스케줄러가 SYSTEM 으로 띄우는 코드를 저장소(일반 사용자도
+  고칠 수 있는 자리)에서 바로 읽으면, 누구든 파일 한 줄로 SYSTEM 권한을 얻는다. 그래서 `install-server`·`restart-server` 가
+  서버에 필요한 폴더만 `C:\ProgramData\WB\app` 에 복사해 잠그고 그것을 돌린다. 저장소는 원장·코덱스가 평소처럼 고친다.
 - **이 관리 웹은 운영 관리 웹이 아니다.** 자료는 이 PC 의 `DATA_DIR\db.json` 에만 있고(처음엔 비어 있다)
   운영 워커의 학생 기록과 섞이지 않는다. 원장 PC 에서 하는 일(팩 제작·검수, 자료 정리)에 쓴다.
   **학생 등록·진도 확인·가정 발송은 지금처럼 운영 주소의 `/admin` 에서** 한다. 여기서 만든 가족 링크·안내 링크는
@@ -26,10 +29,10 @@
 | 파일 | 하는 일 |
 |---|---|
 | `setup.mjs` | 설치·점검 도구. `env` · `install-server` · `restart-server` · `uninstall-server` · `tunnel` · `doctor` |
-| `run-server.mjs` | 서버 실행기. 저장소 밖 설정 파일을 검사하고, 관리 전용·127.0.0.1 로 `server.mjs` 를 띄우고, 로그를 남기고, 죽으면 다시 띄운다 |
+| `run-server.mjs` | 서버 실행기. 저장소 밖 설정 파일을 검사하고, 관리 전용·127.0.0.1 로 `server.mjs` 를 띄우고, 로그를 남기고, 죽으면 다시 띄운다. 깨진 `db.json` 이면 띄우지 않는다(빈 DB 가 원본을 덮어쓰지 않게). 로그를 쓰기 전에 실패하면 설정 파일 옆 `run-server-error.log` 에 이유를 남긴다 |
 | `exit-with-parent.mjs` | 실행기가 꺼지면 서버도 같이 꺼지게(Windows 는 부모를 꺼도 자식이 남는다) |
 | `kit.mjs` | 위 둘이 쓰는 판단 로직(부작용 없음) — 테스트가 여기를 본다 |
-| `*.test.mjs` | `node scripts/check.mjs --only tunnel` |
+| `*.test.mjs` | `node scripts/check.mjs --only tunnel` (`app-copy.test.mjs` 는 실제로 사본을 만들어 서버를 띄워 본다) |
 
 ---
 
@@ -59,24 +62,28 @@ node reading-server\tunnel\setup.mjs env
 notepad C:\ProgramData\WB\server.env
 ```
 
+`env` 는 설정 폴더 `C:\ProgramData\WB` 를 **먼저 관리자·SYSTEM 만 열리게 잠그고**(주인도 관리자로) 그다음 견본을 만든다.
+잠근 뒤 실제 권한을 다시 읽어 남의 권한이 남아 있으면 지우고, 그래도 남으면 멈춘다. 그래서 메모장도 **같은 관리자 터미널**에서 연다.
 메모장에서 채운다(값은 **원장이 직접** — 채팅·에이전트에게 알려 주지 않는다):
 
 | 키 | 넣을 것 |
 |---|---|
 | `ADMIN_ID` / `ADMIN_PASSWORD` | 관리 로그인. 비밀번호 12자 이상. **운영 워커와 다른 값**으로 — 한쪽이 새도 다른 쪽은 지킨다 |
-| `DATA_DIR` | 자료 폴더(저장소 **밖**). 기본 `C:\WB_server_data` |
+| `DATA_DIR` | 자료 폴더 — **서버 전용 새 폴더**, 이 PC 디스크. 기본 `C:\WB_server_data`. 관리자만 열리게 잠그므로 기존 자료 폴더·바탕 화면·문서·드라이브 뿌리·OneDrive·NAS(`\\NAS\…`, 매핑된 `Z:` 같은 네트워크 드라이브)는 거절한다 |
 | `PORT` | 그대로 8890 |
 | `PUBLIC_HOST` | 바깥 주소 이름만 — 예 `wb.내도메인.com` (점검 도구가 Access 확인에 쓴다) |
 
 `WB_ADMIN_ONLY`·`HOST` 는 적지 않는다(실행기가 강제한다. 다르게 적으면 서버가 안 뜬다).
-설정 폴더 `C:\ProgramData\WB` 는 관리자·SYSTEM 만 읽게 잠긴다 — 그래서 메모장도 관리자 터미널에서 연다.
+**위 표에 없는 키는 받지 않는다**(AI 초안을 쓸 때의 `ANTHROPIC_API_KEY` 처럼 서버가 읽는 선택 키만 예외) — 이 파일의 값은
+SYSTEM 으로 도는 서버에 그대로 넘어가므로, `NODE_OPTIONS`·`PATH` 같은 값이 끼면 SYSTEM 으로 코드를 싣는 길이 된다.
 
 ```bat
 node reading-server\tunnel\run-server.mjs --check
 node reading-server\tunnel\setup.mjs install-server
 ```
 
-`서버가 떴습니다 ✓` 가 나오면 이 PC 브라우저에서 `http://127.0.0.1:8890/admin` 이 열린다.
+`install-server` 는 서버 코드를 `C:\ProgramData\WB\app` 에 복사해 잠그고, 자료 폴더를 잠그고(둘 다 잠근 뒤 실제 권한을 다시 읽는다),
+작업 스케줄러에 등록한다. `서버가 떴습니다 ✓` 가 나오면 이 PC 브라우저에서 `http://127.0.0.1:8890/admin` 이 열린다.
 작업 스케줄러에 `WB-Admin-Server` 가 생기고, **부팅 30초 뒤 + 5분마다**(죽어 있으면) 자동으로 뜬다 — 로그인하지 않아도.
 `schtasks /Query /TN WB-Admin-Server /V /FO LIST` 로 실행 사용자 SYSTEM·시간 제한 없음을 볼 수 있다.
 한 번은 **재부팅한 뒤 로그인하지 않은 채** 다른 기기에서 열리는지(또는 로그인 후 `doctor`) 확인해 둔다.
@@ -108,12 +115,19 @@ node reading-server\tunnel\setup.mjs install-server
 
 **3-4. 터널 만들기** — Cloudflare 대시보드 → **Networking → Tunnels** → Create Tunnel → 이름 `wb-admin` →
 환경 **Windows 64-bit** → "Install and run" 에 보이는 명령(`cloudflared.exe service install eyJ...`)을 복사한다.
-그 긴 값이 **터널 토큰(비밀)** 이다. 둘 중 하나로 설치한다:
+그 긴 값이 **터널 토큰(비밀)** 이다. **터미널에 직접 붙여 넣지 않는다** — Windows 터미널(PowerShell)은 친 명령을
+사용자 폴더의 기록 파일(ConsoleHost_history.txt)에 평문으로 남긴다. 대신 같은 관리자 터미널에서:
 
-- (가) 관리자 터미널에 그 명령을 그대로 붙여 넣는다.
-- (나) 메모장에 붙여 `C:\ProgramData\WB\tunnel-token.txt` 로 저장 →
-  `node reading-server\tunnel\setup.mjs tunnel --token-file C:\ProgramData\WB\tunnel-token.txt` → 끝나면 그 파일을 지운다.
-  (버전을 확인하고, 토큰을 화면에 찍지 않는다.)
+```bat
+notepad C:\ProgramData\WB\tunnel-token.txt
+node reading-server\tunnel\setup.mjs tunnel --token-file C:\ProgramData\WB\tunnel-token.txt
+```
+
+메모장이 "새로 만들까요?" 하면 예 → 복사한 명령을 통째로 붙여 넣고 저장 → 닫는다. (**"문서 폴더에 저장할까요?"** 가 뜨면
+거절한다 — 관리자 터미널에서 연 메모장이 아니라는 뜻이고, 문서 폴더는 OneDrive 로 올라갈 수 있다.)
+`tunnel` 은 cloudflared 버전을 확인하고(2026.7.3 미만이면 멈춘다), 토큰을 화면에 찍지 않고 서비스를 설치한 뒤
+**토큰 파일을 지운다**. 이미 터미널에 붙여 넣었다면: `Remove-Item (Get-PSReadLineOption).HistorySavePath` 로 기록 파일을 지우고,
+아래 5절 "토큰이 샜다고 의심될 때" 대로 토큰을 바꾼다.
 
 대시보드에 커넥터가 연결됨(Connected/Healthy)으로 보이면 다음으로.
 
@@ -127,7 +141,9 @@ node reading-server\tunnel\setup.mjs install-server
 node reading-server\tunnel\setup.mjs doctor
 ```
 
-전부 `✓` 여야 한다. 특히 **바깥 주소 `/`·`/admin/` 이 "Access 가 로그인을 요구합니다"** 인지 본다.
+**`✗` 가 하나도 없어야 하고, 바깥 주소 `/`·`/admin/` 두 줄이 `✓`("Access 가 로그인을 요구합니다")** 여야 한다.
+`·` 는 "확인하지 못한 항목"이다(관리자 터미널이 아니라 권한을 못 읽었다 등) — 읽어 보고 넘어가도 되는지 판단한다.
+점검은 관리자 터미널에서 해야 폴더 권한(설정·자료·코드 사본)까지 본다.
 `위험: Access 없이 서버가 그대로 열려 있습니다` 가 나오면 **즉시** 3-5 의 경로를 지우고 3-3 을 다시 확인한다.
 
 마지막으로 와이파이를 끈 휴대폰(LTE)으로 `https://wb.<내도메인>/admin` → Cloudflare 이메일 코드 화면 →
@@ -137,13 +153,13 @@ node reading-server\tunnel\setup.mjs doctor
 
 | 할 일 | 방법 |
 |---|---|
-| 코드 업데이트 | `git pull` → `node reading-server\tunnel\setup.mjs restart-server` |
-| 서버 로그 | `DATA_DIR\logs\server-날짜.log` (14일치) |
+| 코드 업데이트 | `git pull` → (관리자 터미널) `node reading-server\tunnel\setup.mjs restart-server` — **지금 저장소의 코드를 사본으로 복사**해 다시 띄운다. 시험 중인 수정이 있으면 그것도 들어가니 커밋된 상태에서 한다. `doctor` 의 "코드 사본" 줄이 저장소와 다르다고 하면 이것을 잊은 것이다 |
+| 서버 로그 | `DATA_DIR\logs\server-날짜.log` (14일치). 서버가 아예 안 뜨면 `C:\ProgramData\WB\run-server-error.log`. 둘 다 관리자만 열린다 — 관리자 터미널에서 `notepad <경로>` |
 | 터널 상태·로그 | 대시보드 Networking → Tunnels → `wb-admin` (Live logs). ⚠ "Healthy" 는 서버가 살아 있다는 뜻이 아니다 — `doctor` 로 본다 |
 | 자료 백업 | `DATA_DIR` 을 **NAS** 로(원장 결정 — 클라우드 동기화 폴더는 쓰지 않는다). 방법은 아직 정하지 않았다(아래 남은 일) |
 | cloudflared 업데이트 | **자동 갱신이 없다.** 분기마다 최신 MSI 를 다시 설치 → `net stop cloudflared` → `net start cloudflared` → `doctor` |
 | 강사 추가·퇴사 | Access 정책의 Emails 목록을 고친다. 퇴사하면 Users 에서 Revoke + Remove(자리를 비운다) |
-| 토큰이 샜다고 의심될 때 | 대시보드에서 터널 → Rotate token → `cloudflared service uninstall` → 새 명령으로 다시 설치 |
+| 토큰이 샜다고 의심될 때 | 대시보드에서 터널 → Rotate token → `cloudflared service uninstall` → 새 명령을 3-4 처럼 토큰 파일로 `setup.mjs tunnel` |
 | 관리 웹 저장이 갑자기 안 될 때 | Access 세션(24시간)이 끝난 것일 수 있다 — 새로고침하면 다시 이메일 코드를 묻는다 |
 
 ## 6. 문제 해결 — `doctor` 메시지별
@@ -151,8 +167,13 @@ node reading-server\tunnel\setup.mjs doctor
 | 메시지 | 할 일 |
 |---|---|
 | 설정 파일이 없습니다 / 권한이 없습니다 | 1단계 `env` · 관리자 터미널에서 다시 |
-| 로컬 서버 응답 없음 | `DATA_DIR\logs` 의 오늘 로그 맨 아래를 본다 → 설정 고친 뒤 `restart-server` |
-| 관리 전용: 학생 로그인 200 | 누군가 `server.mjs` 를 직접 띄운 창이 있다 — 닫고 `restart-server` |
+| 이 서버가 쓰지 않는 키입니다 | 그 줄을 지운다(1단계 표의 키만) |
+| 로컬 서버 응답 없음 | `DATA_DIR\logs` 의 오늘 로그 맨 아래, 없으면 `C:\ProgramData\WB\run-server-error.log` → 고친 뒤 `restart-server` |
+| db.json 이 JSON 으로 읽히지 않습니다 | 서버가 원본을 지키려고 멈춘 것이다. NAS 백업의 `db.json` 으로 바꾼 뒤 `restart-server` |
+| 관리 전용: 학생 로그인이 401(403 이 아닌 값) | 누군가 `server.mjs` 를 직접 띄운 창이 있다 — 닫고 `restart-server` |
+| 권한: … 관리자·SYSTEM 말고도 열 수 있습니다 | 설정 폴더면 `env`, 자료 폴더·코드 사본이면 `install-server` 를 다시. 그래도 남으면 그 폴더를 비우고 다시 |
+| 코드 사본이 없습니다 / 저장소와 다릅니다 | `install-server`(처음) 또는 `restart-server`(업데이트 뒤) |
+| 자료 드라이브: Network/Removable | `DATA_DIR` 을 이 PC 디스크(예: `C:\WB_server_data`)로 |
 | LAN 차단 실패 | 위와 같다(실행기 없이 띄운 서버는 모든 주소에 묶인다) |
 | cloudflared 서비스 없음/멈춤 | 3-4 다시, 또는 서비스 앱에서 Cloudflared 시작 |
 | 터널 연결 실패(/ready 503) | 인터넷·방화벽 — 바깥으로 7844 포트(UDP·TCP)가 나가야 한다 |
@@ -164,10 +185,11 @@ node reading-server\tunnel\setup.mjs doctor
 ## 7. 되돌리기
 
 ```bat
-node reading-server\tunnel\setup.mjs uninstall-server   & rem 자동 시작 해제(자료·설정 파일은 남는다)
-cloudflared service uninstall                            & rem 터널 서비스·토큰 파일 삭제
+node reading-server\tunnel\setup.mjs uninstall-server
+cloudflared service uninstall
 ```
-그다음 대시보드에서 경로(Route)·터널·Access 응용을 지운다.
+첫 줄은 자동 시작과 코드 사본을 지운다(자료·설정 파일은 남는다). 둘째 줄은 터널 서비스와 토큰 파일을 지운다.
+그다음 대시보드에서 경로(Route)·터널·Access 응용을 지운다. (이 문서의 명령은 PowerShell·명령 프롬프트 어느 쪽에서나 같다.)
 
 ## 8. 하지 말 것
 
@@ -176,7 +198,9 @@ cloudflared service uninstall                            & rem 터널 서비스�
 - 학생·학부모에게 이 주소를 주지 않는다. 이 관리 웹에서 만든 가족 링크도 보내지 않는다.
 - **같은 터널 토큰을 다른 PC 에 설치하지 않는다** — 같은 토큰을 깐 PC 는 그 터널의 "복제본"이 되어 바깥 요청이 두 PC 로
   나뉜다(한쪽에는 관리 서버가 없거나 자료가 다르다). 관리 서버·터널은 한 PC 에만. 금고 PC 가 생기면 그때 따로 설계한다.
-- 설정 파일·터널 토큰을 저장소·채팅·스크린숏에 남기지 않는다. `--loglevel debug` 로 돌리지 않는다(헤더째 기록된다).
+- 설정 파일·터널 토큰을 저장소·채팅·스크린숏에 남기지 않는다. **터널 토큰을 터미널(PowerShell)에 붙여 넣지 않는다**(기록 파일에 남는다).
+  `--loglevel debug` 로 돌리지 않는다(헤더째 기록된다).
+- 코드 사본(`C:\ProgramData\WB\app`)을 손으로 고치지 않는다 — 다음 `restart-server` 가 저장소 코드로 덮어쓴다.
 - 실제 도메인·팀 이름·이메일을 이 저장소 문서에 적지 않는다(공개 저장소다).
 
 ---
@@ -188,11 +212,14 @@ cloudflared service uninstall                            & rem 터널 서비스�
 
 1. `schtasks /Create /XML … /RU SYSTEM` 이 UTF-16 작업 정의(한글 설명 포함)를 받는지 — 파일 인코딩 규칙은 공식 문서에 없다.
    실패하면 `kit.mjs taskXml` 의 Description 을 ASCII 로, 그래도 안 되면 PowerShell `Register-ScheduledTask -Xml (Get-Content …)` 로
-2. `icacls … /inheritance:r /grant:r *S-1-5-32-544:(OI)(CI)F /grant:r *S-1-5-18:(OI)(CI)F` 가 한 번에 통하는지
-3. SYSTEM 으로 뜬 실행기가 저장소를 읽는지, 5분 트리거가 죽은 서버를 살리는지(작업 스케줄러의 '실패 시 다시 시작'은
-   프로그램이 오류 코드로 끝난 경우를 늘 잡지 않는다는 보고가 있어 5분 트리거를 같이 둔 것이다)
+2. 잠금 두 줄(`icacls <폴더> /setowner *S-1-5-32-544 /T /C` → `icacls <폴더> /inheritance:r /grant:r *S-1-5-32-544:(OI)(CI)F /grant:r *S-1-5-18:(OI)(CI)F`)이
+   통하는지, 그 뒤 권한 확인(PowerShell `Get-Acl` → `OWNER|…`·`ACE|…` 줄, `kit.mjs aclScript`)이 관리자·SYSTEM 만으로 읽히는지
+3. SYSTEM 으로 뜬 실행기가 코드 사본(`C:\ProgramData\WB\app`)에서 뜨는지, 5분 트리거가 죽은 서버를 살리는지(작업 스케줄러의
+   '실패 시 다시 시작'은 프로그램이 오류 코드로 끝난 경우를 늘 잡지 않는다는 보고가 있어 5분 트리거를 같이 둔 것이다)
 4. 작업 스케줄러에서 "끝내기" 하면 서버(자식)도 같이 꺼지는지(`exit-with-parent.mjs`) — `doctor` 의 로컬 서버가 ✗ 가 되면 정상
-5. `doctor` 의 `whoami /groups`(관리자 판정)·`powershell (Get-Service cloudflared).Status`·metrics `/ready`(127.0.0.1:20241~20245)가 실제로 읽히는지
+5. 관리자 판정(`whoami /groups` — `env`·`install-server` 가 쓰고 `doctor` 의 "관리자 권한" 줄에 보인다)·드라이브 종류
+   (`[IO.DriveInfo]`)·`(Get-Service cloudflared).Status`·metrics `/ready`(127.0.0.1:20241~20245)가 실제로 읽히는지
+6. 일반(관리자 아님) 터미널에서 `setup.mjs restart-server` 가 "관리자 권한 터미널에서 실행하세요" 로 멈추는지
 
 **코덱스가 하는 것 / 원장이 하는 것**
 
@@ -205,7 +232,7 @@ cloudflared service uninstall                            & rem 터널 서비스�
 
 > `reading-server/tunnel/README.md` 를 읽고 원장 PC 에서 1단계부터 진행해 줘. 관리자 터미널이야.
 > 비밀번호는 내가 메모장에 직접 넣을게. 각 단계 뒤에 `setup.mjs doctor` 결과를 보여 주고,
-> Windows 실기에서 처음 확인할 5가지를 확인한 결과를 README 에 적어 줘. 금고(A.5) 코드는 쓰지 마.
+> Windows 실기에서 처음 확인할 6가지를 확인한 결과를 README 에 적어 줘. 금고(A.5) 코드는 쓰지 마.
 
 **남은 일(키트 밖)**
 
@@ -214,3 +241,6 @@ cloudflared service uninstall                            & rem 터널 서비스�
   `X-Requested-With: XMLHttpRequest` 를 붙이면 401 로 바뀐다(Cloudflare 문서). 401 이면 새로고침 안내.
 - (선택) 터널 경로의 "Protect with Access"(cloudflared 가 Access 토큰을 한 번 더 검사) — 원격 관리 터널에서
   설정 화면 위치가 공식 문서에 없다. 화면에서 찾으면 켜고 이 문서에 위치를 적는다.
+- 로컬 서버의 관리 로그인에는 횟수 제한이 없다(운영 워커에만 있다). 지금은 Access 와 127.0.0.1 묶기가 앞을 막는다 —
+  둘 중 하나가 빠지는 날을 대비해 `server.mjs` 에도 같은 제한을 둘지 정한다.
+- `store.mjs` 는 종료 신호 때 300ms 지연 저장을 비우지 않는다 — 작업 끝내기·재부팅 직전 저장 한 번이 빠질 수 있다.

@@ -26,8 +26,20 @@ const TRUE_RE = /^(1|true|yes|on)$/i;
    KEY=VALUE 한 줄에 하나. # 으로 시작하는 줄은 주석. 값은 따옴표로 감쌀 수 있다(감싸면 앞뒤 공백 보존).
    변수 치환·여러 줄 값은 없다 — 비밀번호에 $ 나 # 이 들어가도 그대로 읽혀야 해서 일부러 단순하게 둔다.
    같은 키가 두 번 나오면 오류다: 어느 쪽이 쓰였는지 사람이 알 수 없으면 비밀번호를 바꿔도 안 바뀐 줄 모른다. */
+/* 설정 파일에 적을 수 있는 키. 여기 없는 키는 받지 않는다 — 서버(SYSTEM)로 넘어가는 환경이라
+   NODE_OPTIONS·PATH 같은 값이 섞이면 SYSTEM 으로 임의 코드를 싣는 길이 된다. 서버가 읽는 선택 키(AI·알림)는 허용한다. */
+export const ALLOWED_KEYS = new Set([
+  'ADMIN_PIN', 'ADMIN_ID', 'ADMIN_PASSWORD', 'DATA_DIR', 'PORT', 'LOG_DIR', 'PUBLIC_HOST', 'WB_ADMIN_ONLY', 'HOST',
+  'ANTHROPIC_API_KEY', 'GEMINI_API_KEY', 'LETTER_AI_MODEL', 'LETTER_IMAGE_MODEL', 'VOCAB_AI_MODEL', 'NAESIN_AI_MODEL',
+  'AI_DAILY_PER_STUDENT', 'AI_DAILY_TOTAL', 'LETTER_AI_DAILY', 'NAESIN_AI_DAILY', 'ARENA_ON',
+  'VAPID_PUBLIC_KEY', 'VAPID_PRIVATE_JWK', 'VAPID_SUBJECT',
+]);
+/* 실행기만 쓰는 키 — 서버 자식에게는 넘기지 않는다 */
+const LAUNCHER_ONLY = new Set(['LOG_DIR', 'PUBLIC_HOST']);
+
 export function parseEnvFile(text) {
   const vars = {};
+  const lineOf = {};
   const errors = [];
   const lines = String(text).replace(/^\uFEFF/, '').split(/\r?\n/);
   lines.forEach((raw, i) => {
@@ -37,12 +49,19 @@ export function parseEnvFile(text) {
     if (eq <= 0) { errors.push(`${i + 1}번째 줄: KEY=값 모양이 아닙니다`); return; }
     const key = line.slice(0, eq).trim();
     let val = line.slice(eq + 1).trim();
-    if (!KEY_RE.test(key)) { errors.push(`${i + 1}번째 줄: 키 이름 "${key}" 은 영문 대문자·숫자·밑줄만 씁니다`); return; }
+    /* 틀린 키의 글자는 화면에 되풀이하지 않는다 — '=' 를 빠뜨린 비밀번호 줄이면 그 글자가 곧 비밀이다.
+       알려진 키를 소문자로 적은 경우만 바른 이름을 알려 준다(사용자가 쓴 글자가 아니라 목록의 이름으로). */
+    if (!KEY_RE.test(key)) {
+      const known = ALLOWED_KEYS.has(key.toUpperCase()) ? ` — ${key.toUpperCase()} 처럼 대문자로` : '';
+      errors.push(`${i + 1}번째 줄: 키 이름이 올바르지 않습니다(영문 대문자·숫자·밑줄, 예: ADMIN_PASSWORD=값)${known}`);
+      return;
+    }
     if (val.length >= 2 && (val[0] === '"' || val[0] === "'") && val[val.length - 1] === val[0]) val = val.slice(1, -1);
     if (Object.prototype.hasOwnProperty.call(vars, key)) { errors.push(`${i + 1}번째 줄: ${key} 가 두 번 적혀 있습니다 — 하나만 남기세요`); return; }
     vars[key] = val;
+    lineOf[key] = i + 1;
   });
-  return { vars, errors };
+  return { vars, errors, lineOf };
 }
 
 /* 경로 비교는 운영체제 규칙을 따른다 — Windows 는 대소문자를 가리지 않고 구분자가 \ 다.
@@ -59,11 +78,15 @@ export function isInside(child, parent, platform = process.platform) {
 
 /* 실행기가 서버를 띄우기 전에 보는 것. 값(비밀)은 메시지에 절대 싣지 않는다 — 로그·화면에 남는다.
    돌려주는 errors 가 하나라도 있으면 띄우지 않는다. */
-export function validateServerEnv({ vars, envFile, repoRoot, platform = process.platform }) {
+export function validateServerEnv({ vars, envFile, repoRoot, platform = process.platform, lineOf = {} }) {
   const p = pathFor(platform);
   const v = vars || {};
   const errors = [];
   const warnings = [];
+
+  for (const k of Object.keys(v)) {
+    if (!ALLOWED_KEYS.has(k)) errors.push(`${lineOf[k] ? lineOf[k] + '번째 줄' : '설정 파일'}: 이 서버가 쓰지 않는 키입니다 — 지우세요(쓸 수 있는 키는 README 1단계 표)`);
+  }
 
   if (envFile && repoRoot && isInside(envFile, repoRoot, platform)) {
     errors.push('설정 파일이 저장소 폴더 안에 있습니다 — 비밀번호가 커밋될 수 있습니다. 저장소 밖(예: C:\\ProgramData\\WB\\server.env)으로 옮기세요');
@@ -75,6 +98,8 @@ export function validateServerEnv({ vars, envFile, repoRoot, platform = process.
   else if (repoRoot && isInside(dataDir, repoRoot, platform)) errors.push('DATA_DIR 이 저장소 폴더 안입니다 — git 정리 한 번에 지워질 수 있고 커밋될 수 있습니다. 저장소 밖으로 옮기세요');
   else if (/^\\\\|^\/\//.test(dataDir)) errors.push('DATA_DIR 에 네트워크 경로(\\\\NAS\\…)를 쓰지 않습니다 — SYSTEM 으로 도는 서버는 NAS 에 붙지 못하고, 끊기면 저장이 실패합니다. 이 PC 디스크에 두고 NAS 는 백업 대상으로만');
   else if (/[\\/]onedrive[^\\/]*([\\/]|$)/i.test(dataDir)) errors.push('DATA_DIR 이 OneDrive 폴더 안입니다 — 학생 기록·라이선스 팩이 클라우드로 동기화됩니다(원장 결정: 클라우드 동기화 폴더 금지). C:\\WB_server_data 처럼 밖으로');
+  else if (repoRoot && isInside(repoRoot, dataDir, platform)) errors.push('DATA_DIR 이 저장소를 품고 있습니다 — 자료 폴더를 잠그면(관리자만) 저장소까지 잠깁니다. C:\\WB_server_data 처럼 따로 두세요');
+  else if (sharedFolderReason(dataDir, platform)) errors.push(`DATA_DIR 로 ${sharedFolderReason(dataDir, platform)} 는 쓰지 않습니다 — 관리자만 열리게 잠그는 폴더라 서버 전용 새 폴더여야 합니다(예: C:\\WB_server_data)`);
 
   const pin = v.ADMIN_PIN || '';
   const id = v.ADMIN_ID || '';
@@ -110,13 +135,17 @@ export function validateServerEnv({ vars, envFile, repoRoot, platform = process.
 
 /* 서버 자식 프로세스에 줄 환경. 실행기를 띄운 셸에 남아 있던 관리 비밀·HOST 는 버리고 파일 값만 쓴다
    — 셸에 예전 PIN 이 남아 있으면 파일을 고쳐도 옛 값으로 뜨는 사고가 난다. */
+/* Windows 의 환경 변수 이름은 대소문자를 가리지 않는다 — 셸의 admin_pin 이 자식에서 ADMIN_PIN 으로 읽힌다.
+   그래서 이름을 대문자로 바꿔 비교하고, 설정 파일이 정하는 키와 겹치는 셸 값은 모두 버린다. */
 export function buildChildEnv(baseEnv, vars, port) {
   const env = {};
+  const fileKeys = new Set(Object.keys(vars || {}).map((k) => k.toUpperCase()));
   for (const [k, val] of Object.entries(baseEnv || {})) {
-    if (/^ADMIN_/.test(k) || k === 'HOST' || k === 'WB_ADMIN_ONLY' || k === 'PORT' || k === 'DATA_DIR') continue;
+    const K = k.toUpperCase();
+    if (K.startsWith('ADMIN_') || ALLOWED_KEYS.has(K) || fileKeys.has(K)) continue;
     env[k] = val;
   }
-  for (const [k, val] of Object.entries(vars || {})) if (k !== 'LOG_DIR' && k !== 'PUBLIC_HOST') env[k] = val;
+  for (const [k, val] of Object.entries(vars || {})) if (ALLOWED_KEYS.has(k) && !LAUNCHER_ONLY.has(k)) env[k] = val;
   env.WB_ADMIN_ONLY = '1';
   env.HOST = LOOPBACK;
   env.PORT = String(port || DEFAULT_PORT);
@@ -228,6 +257,8 @@ const quoteArg = (s) => `"${String(s).replace(/"/g, '')}"`;
 export function taskXml({ nodeExe, runScript, envFile, workDir }) {
   for (const [k, val] of Object.entries({ nodeExe, runScript, envFile, workDir })) {
     if (!val || /["\r\n]/.test(val)) throw new Error(`작업 스케줄러 경로가 비었거나 따옴표·줄바꿈이 들어 있습니다: ${k}`);
+    /* 작업은 저장소가 아닌 자리에서 SYSTEM 으로 돈다 — 상대 경로면 엉뚱한 파일을 찾고 로그도 없이 죽는다 */
+    if (!path.win32.isAbsolute(val)) throw new Error(`작업 스케줄러 경로는 전체 경로여야 합니다: ${k}`);
   }
   const args = `${quoteArg(runScript)} --env ${quoteArg(envFile)}`;
   return [
@@ -312,11 +343,19 @@ export const METRICS_PORTS = [20241, 20242, 20243, 20244, 20245];
    Node 를 올리는 순간 그 경로가 사라져 부팅 작업이 조용히 깨진다. 설치 프로그램(MSI)의 자리
    C:\Program Files\nodejs\node.exe 가 있으면 그것을 쓰고, 없으면 지금 것을 쓰되 경고한다. */
 export const STABLE_NODE = 'C:\\Program Files\\nodejs\\node.exe';
-export function pickNodeExe(execPath, exists) {
+export const MIN_NODE_MAJOR = 22;
+export const nodeMajor = (v) => Number(String(v || '').replace(/^v/, '').split('.')[0]) || 0;
+/* versionOf(exe) → '22.11.0' 같은 문자열(못 읽으면 ''). 바꿔 끼우는 쪽(MSI 자리)도 22 이상일 때만 고른다 —
+   예전에 깔아 둔 Node 18 MSI 가 남아 있으면 작업이 18 로 돌아 관리 로그인이 깨진다. */
+export function pickNodeExe(execPath, exists, versionOf = () => '') {
   const p = String(execPath || '');
   const unstable = /\\users\\|\\winget\\packages\\|\\nvm\\|node-v\d+/i.test(p);
   if (/^c:\\program files\\nodejs\\node\.exe$/i.test(p)) return { nodeExe: p, warning: '' };
-  if (exists(STABLE_NODE)) return { nodeExe: STABLE_NODE, warning: unstable ? `지금 쓰는 node(${p}) 대신 설치 프로그램 자리(${STABLE_NODE})를 작업에 적습니다` : '' };
+  if (unstable && exists(STABLE_NODE)) {
+    const sv = versionOf(STABLE_NODE);
+    if (nodeMajor(sv) >= MIN_NODE_MAJOR) return { nodeExe: STABLE_NODE, warning: `지금 쓰는 node(${p}) 대신 설치 프로그램 자리(${STABLE_NODE}, v${sv})를 작업에 적습니다` };
+    return { nodeExe: p, warning: `${STABLE_NODE} 는 v${sv || '?'} 라 쓰지 않습니다 — nodejs.org 의 22 LTS 설치 파일(MSI)로 올린 뒤 install-server 를 다시 하세요. 지금은 ${p} 를 적습니다(버전이 바뀌면 사라지는 자리)` };
+  }
   return {
     nodeExe: p,
     warning: unstable ? `node 가 버전이 바뀌면 사라지는 자리에 있습니다(${p}) — nodejs.org 의 LTS 설치 파일(MSI)로 깔면 ${STABLE_NODE} 에 고정됩니다. 업그레이드 뒤 install-server 를 다시 하세요` : '',
@@ -326,3 +365,76 @@ export function pickNodeExe(execPath, exists) {
 /* 저장소가 OneDrive 안이면(바탕 화면·문서 폴더가 OneDrive 로 옮겨진 PC) 파일이 클라우드 전용 자리표시로
    바뀌거나 SYSTEM 이 못 읽을 수 있다 — 설치 때 경고한다. */
 export const inOneDrive = (p) => /[\\/]onedrive[^\\/]*([\\/]|$)/i.test(String(p || ''));
+
+/* ── 잠그면 안 되는 자리 ───────────────────────────────────────────────
+   설정 폴더·자료 폴더는 관리자·SYSTEM 만 열리게 잠근다. 그래서 이미 다른 용도로 쓰는 폴더를 가리키면
+   원장이 자기 파일을 못 여는 사고가 난다 — 드라이브 뿌리·사용자 폴더·시스템 폴더는 처음부터 거절한다. */
+const SHELL_DIRS = /^(desktop|documents|downloads|pictures|music|videos|onedrive.*|appdata|바탕 화면|문서|다운로드)$/i;
+export function sharedFolderReason(dir, platform = process.platform) {
+  const p = pathFor(platform);
+  const abs = p.resolve(dir);
+  if (p.parse(abs).root.toLowerCase() === abs.toLowerCase() || abs === '/') return '드라이브 뿌리';
+  if (platform === 'win32') {
+    const parts = abs.split('\\').filter(Boolean).map((x) => x.toLowerCase());
+    if (parts[1] === 'users' && parts.length <= 3) return '사용자 폴더';
+    if (parts[1] === 'users' && parts.length === 4 && SHELL_DIRS.test(parts[3])) return '사용자 폴더(바탕 화면·문서 등)';
+    if (parts.length === 2 && /^(windows|program files|program files \(x86\)|programdata|users)$/.test(parts[1])) return '시스템 폴더';
+    if (parts[1] === 'windows') return '시스템 폴더';
+  }
+  return '';
+}
+
+/* 폴더가 지금 어떤 상태인가 — 없음 / 비었음 / 우리 것만 / 남의 것이 섞임. 남의 것이 섞였으면 잠그지 않는다. */
+export const ENV_DIR_OWN = (n) => /^(server\.env|tunnel-token.*\.txt|run-server-error\.log|app)$/i.test(n);
+export const DATA_DIR_OWN = (n) => /^(db\.json|db\.json\.tmp|backups|logs|letter-img)$/i.test(n);
+export function folderState(entries, isOwn) {
+  if (entries == null) return 'absent';
+  if (!entries.length) return 'empty';
+  return entries.every((n) => isOwn(n)) ? 'ours' : 'foreign';
+}
+
+/* ── 서버 코드 사본 ────────────────────────────────────────────────────
+   작업 스케줄러는 SYSTEM 으로 서버를 띄운다. 그 코드를 저장소(일반 사용자가 고칠 수 있는 자리)에서 바로
+   읽으면, 누구든 server.mjs 한 줄을 고쳐 다음 재시작 때 SYSTEM 으로 실행시킬 수 있다 — 설정 파일·자료
+   폴더를 잠근 것이 무의미해진다. 그래서 install-server·restart-server 가 서버에 필요한 폴더만 관리자 전용
+   자리(기본 C:\ProgramData\WB\app)로 복사하고 작업은 그 사본을 돌린다. 저장소는 원장·코덱스가 평소처럼 고친다.
+   목록은 server.mjs 가 서빙·import 하는 폴더다 — app-copy 테스트가 server.mjs 와 대조한다. */
+export const APP_DIRS = ['reading-server', 'reading', 'vocab', 'shared', 'chunk', 'vocab-age', 'naesin', 'haru', 'naesin-ko', 'hanja', 'letter'];
+export const APP_MARKER = '.wb-app-copy.json';
+/* 복사에서 뺄 것 — 로컬 자료(학생 기록)·빌드 산출물·남의 코드 */
+export function appCopyKeep(rel) {
+  const parts = String(rel).split(/[\\/]/).filter(Boolean);
+  if (parts.some((x) => x === '.git' || x === 'node_modules' || x === '.wrangler')) return false;
+  if (parts[0] === 'reading-server' && (parts[1] === 'data' || parts[1] === 'dist')) return false;
+  return true;
+}
+
+/* ── 폴더 권한 확인 ────────────────────────────────────────────────────
+   잠근 뒤 실제로 잠겼는지 본다(icacls 가 오류 없이 끝나도 남의 명시 권한은 남을 수 있다).
+   PowerShell 이 내보내는 줄: "OWNER|<SID>" 하나와 "ACE|<SID>|Allow|<권한 숫자>|<상속 여부>" 여러 줄.
+   주인은 관리자·SYSTEM 이어야 하고, 허용(Allow) 항목도 관리자·SYSTEM 뿐이어야 한다. */
+export const SID_ADMINS = 'S-1-5-32-544';
+export const SID_SYSTEM = 'S-1-5-18';
+export function aclScript(target) {
+  const lit = `'${String(target).replace(/'/g, "''")}'`;
+  return [
+    `$a = Get-Acl -LiteralPath ${lit};`,
+    `'OWNER|' + $a.GetOwner([Security.Principal.SecurityIdentifier]).Value;`,
+    `foreach ($r in $a.Access) { try { $sid = $r.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value } catch { $sid = [string]$r.IdentityReference };`,
+    `'ACE|' + $sid + '|' + $r.AccessControlType + '|' + [int]$r.FileSystemRights + '|' + $r.IsInherited }`,
+  ].join(' ');
+}
+export function aclProblems(text) {
+  const lines = String(text || '').split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
+  const owner = (lines.find((l) => l.startsWith('OWNER|')) || '').slice(6);
+  const ok = (sid) => sid === SID_ADMINS || sid === SID_SYSTEM;
+  const foreign = [];
+  for (const l of lines.filter((x) => x.startsWith('ACE|'))) {
+    const [, sid, type] = l.split('|');
+    if (/^allow$/i.test(type) && !ok(sid) && !foreign.includes(sid)) foreign.push(sid);
+  }
+  return { readable: !!owner, ownerOk: ok(owner), owner, foreign };
+}
+
+/* 드라이브 글자 — 매핑된 네트워크 드라이브(Z: 같은)는 SYSTEM 에게 보이지 않는다 */
+export const driveLetter = (p) => (/^([a-z]):/i.exec(String(p || '')) || [])[1] || '';
