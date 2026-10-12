@@ -1,7 +1,8 @@
 'use strict';
 /* WB 진로독서 백엔드 — 학생 동기화 API + 관리 웹 + 학생 앱 서빙 (Node 22 무의존성)
    실행: node reading-server/server.mjs   (기본 http://localhost:8890)
-   환경: PORT, ADMIN_PIN 또는 ADMIN_ID·ADMIN_PASSWORD(관리 로그인 — 둘 다 없으면 뜨지 않는다), DATA_DIR,
+   환경: PORT, HOST(묶을 주소 — 비우면 모든 주소, 터널 뒤에서는 127.0.0.1),
+         ADMIN_PIN 또는 ADMIN_ID·ADMIN_PASSWORD(관리 로그인 — 둘 다 없으면 뜨지 않는다), DATA_DIR,
          GEMINI_API_KEY(브레인레터 AI 삽화, 선택) */
 import http from 'node:http';
 import fs from 'node:fs';
@@ -36,6 +37,10 @@ const HANJA_DIR = path.join(ROOT, '..', 'hanja');      // 어휘브레인 앱 �
 const LETTER_DIR = path.join(ROOT, '..', 'letter');     // 브레인레터 앱 정적 파일 (호 본문은 여기 없다 — db.letter 전용, 체험 호는 자체 창작)
 const PUB_DIR = path.join(ROOT, 'public');             // 관리 웹
 const PORT = +(process.env.PORT || 8890);
+/* 묶을 주소. 비우면 예전처럼 모든 주소(원내 LAN 의 다른 기기가 http://<PC>:8890 으로 연다).
+   터널로 외부에 열 때는 127.0.0.1 로 둔다 — 유일한 손님이 같은 PC 의 cloudflared 라서, 모든 주소에
+   묶으면 터널·Access 를 거치지 않는 LAN 입구가 하나 더 생긴다(docs/로컬-서버-외부공개-터널.md §1.5 경계). */
+const HOST = (process.env.HOST || '').trim();
 /* 관리 로그인에 기본값을 두지 않는다. 저장소가 public 이라 소스에 적은 기본 PIN 은 곧 공개된 관리자
    비밀번호이고, 그 하나로 학생 기록 전체가 열린다. 빠뜨린 채 뜨는 것보다 뜨지 않는 편이 안전하다.
    두 갈래(PIN / 아이디·비밀번호) 중 하나만 있으면 된다 — 판정은 admin-auth.mjs 가 한다. */
@@ -1082,9 +1087,12 @@ setInterval(async () => {
   } catch (e) { console.error('[push] 발송 실패:', e.message); }
 }, 60000).unref();
 
-server.listen(PORT, () => {
-  console.log(`WB 진로독서 서버 http://localhost:${PORT}`);
+const onListen = () => {
+  /* HOST 를 줬으면 그 주소를 그대로 찍는다 — Windows 에서 localhost 는 ::1 로 먼저 풀려 127.0.0.1 에만
+     묶인 서버와 어긋날 수 있다. 터널 설정(service)에도 이 줄의 주소를 그대로 쓴다. */
+  console.log(`WB 진로독서 서버 http://${HOST || 'localhost'}:${PORT}`);
   console.log(`  학생 앱: /   워드브레인: /vocab/   관리 웹: /admin   연상 검수함: /admin/vocab-review.html`);
   /* 어느 모드로 떴는지 한 줄로 알린다 — 터널을 붙인 뒤 이 줄을 보고 확인한다. */
   if (ADMIN_ONLY) console.log('  [관리 전용] WB_ADMIN_ONLY=on — 학생 로그인(/api/login·/api/login/status)을 내주지 않습니다');
-});
+};
+if (HOST) server.listen(PORT, HOST, onListen); else server.listen(PORT, onListen);

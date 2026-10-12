@@ -19,7 +19,7 @@ WB 독해력학원·웩슬러브레인센터의 원내 학습 웹앱 모음. 어
 | `naesin/` | 내신브레인 — 영어 내신 시험대비 앱. **상세: `naesin/README.md`** |
 | `naesin-ko/` | 국어브레인 — 국어 내신 시험대비 앱. **상세: `naesin-ko/README.md`** |
 | `haru/` | 하루브레인 — 삼육중 대비 3년 학습 앱(학생 `/haru/`·부모 `parent.html`) + 순수 로직(좌표·SRS·원인·페이스·생성기·리포트) + `atoms.json`(원자 목록, 문항 0). 팩·대응표·플랜·시험지는 저장소에 없다(KV·관리 웹 업로드). **상세: `haru/README.md`**, 인수인계·고칠 때 깨지는 자리: `haru/AGENTS.md` |
-| `reading-server/` | Cloudflare Worker(운영) + Node 로컬 서버 + 관리 웹(`public/`) + dist 조립 |
+| `reading-server/` | Cloudflare Worker(운영) + Node 로컬 서버 + 관리 웹(`public/`) + dist 조립. **`tunnel/`** = 원장 PC(Windows)를 관리 전용 서버로 띄우고 Cloudflare 터널·Access 로 여는 키트(실행기·설치·점검 도구) — 따라 하는 순서·코덱스 이어받기: `reading-server/tunnel/README.md` |
 | `shared/` | 공용 모듈 (voice.js TTS, qr.js) |
 | `docs/` | 기획서 + 자료 폴더 표준(`자료-폴더-표준.md`) — 내신 영어: `docs/영어내신-학습웹앱-기획서-v1.md` (v1.2) · 내신 국어: `docs/국어내신-학습웹앱-기획서-v1.md` (v1.1) · 프로그램데스크: `docs/외부프로그램-자료운영-직원웹앱-기획제안-3안-v0.md` (§8 방향 변경·구현 현황) · v1 3안(직원의 관리자): `docs/프로그램데스크-기획서-v1.md` · 삼육중 대비(코드는 `haru/`): `docs/삼육중-*.md` — 정본은 `삼육중-대비-학습웹앱-기획서-v1.md`, 기술 명세는 `삼육중-대비-앱-설계안-v1.md`, 전형 사실은 `삼육중-전형-사실-정본-v1.md`만 인용. `삼육중-정보수집-로그.md`는 주간 자동 스윕이 쓴다(원장이 정본 후보를 체크해야 정본이 바뀐다) · 영재원 트랙(하루브레인 확장, 초안·원장 결정 대기): `영재원-대비-기획서-v0.md`, 사실은 `광주전남-영재원-선발-사실-조사-v0.md`만 인용 · 원내 PC 를 서버로 외부 공개(Cloudflare Tunnel): `로컬-서버-외부공개-터널.md` — 결정 **A**(터널은 원장·강사 전용, 학생은 워커) + **A.5 「금고」**(국어 라이선스 자료만 원장 PC 2대로, 학생 기록은 KV 그대로 · 2026-10-11 원장 결정). 금고 착수 전에 §1.5 의 「착수 전에 정해 둔 네 줄」(Access 서비스 토큰·503 경로·쓰기 1대+지연 복제·버전＋포인터 2단 커밋)과 「남은 것」(원장 확인 4건)을 읽는다 |
 | `hanja/` | 어휘브레인(옛 한자브레인 — 폴더·주소 `/hanja/`·KV 키 `hanja:*`·API는 유지) — 추천 교재의 어휘를 **단원 시험 → 부족한 낱말 학습 → 재확인**하는 앱(영어 없음). 문제집 한 권 = 단어장 하나(관리 웹 업로드·KV 전용, 낱말 id는 내용 기반). 주메뉴는 **오늘 할 일·내 교재·복습·학습 기록·한자 집중**. 어휘 시험은 뜻·문맥·회상 결과를 구분하며, 검수된 상황 자료가 있는 낱말은 별도 상황과 해설을 학습한다. 한자 집중은 어휘 교재 선택을 유지한 채 훈음·획순 수업·혼자 쓰기·한자 시험을 공부하는 별도 영역이다. 종이 교재로 공부한 학생은 앱 학습 기록 없이 바로 시험 볼 수 있고, 실제 출제 범위·스스로 정답·힌트 정답을 구별한다. 보조 한자·오답 재확인은 원래 단원 시험 점수를 덮지 않는다. 이번 주 단원(반·학생)·교사 현황·종이 시험지·밤 9시 알림. AI 연상은 자체(`own`) 단어장만 허용하고 교재(`textbook`) 뜻은 외부 AI로 보내지 않는다. 순수 로직 `book-check.js`·`srs.js`·`quiz.js`·`trace.js`·`bridge.js`, 도구 `extract/draft.mjs`·`strokes-convert.mjs`. `book-sample.json`은 자체 창작 체험, `books/`는 자체 교과 어휘 초3~초6(각 80낱말·8단원) + 급수 8급 50자·7급 추가 100자(공식 목록 대조 완료). `books.test.cjs`는 업로드 관문과 같은 검사·재검사 왕복에서 오류·경고 0을 요구한다. **상세: `hanja/README.md`**, 인수인계: `hanja/AGENTS.md` |
@@ -39,7 +39,10 @@ node <앱>/<이름>.test.cjs           # 단위 테스트 (의존성 없음, 파
 node reading-server/<이름>.test.mjs # 서버 테스트
 node reading-server/build-dist.mjs  # dist 조립 (+ SW 캐시 이름 스탬프)
 PORT=8890 ADMIN_PIN=<pin> DATA_DIR=<dir> node reading-server/server.mjs  # 로컬 서버
-WB_ADMIN_ONLY=1 PORT=8890 ADMIN_PIN=<pin> DATA_DIR=<dir> node reading-server/server.mjs  # 터널로 외부 공개할 때(결정 A — 학생 로그인을 내주지 않는다. 기동 로그에 [관리 전용] 이 뜨는지 눈으로 확인)
+WB_ADMIN_ONLY=1 HOST=127.0.0.1 PORT=8890 ADMIN_PIN=<pin> DATA_DIR=<dir> node reading-server/server.mjs  # 터널로 외부 공개할 때(결정 A — 학생 로그인을 내주지 않는다. 기동 로그에 [관리 전용] 이 뜨는지 눈으로 확인)
+node reading-server/tunnel/run-server.mjs --env <저장소 밖 server.env>   # 원장 PC 에서는 이것으로 — 관리 전용·127.0.0.1 강제, 로그, 재시작, 깨진 db.json 이면 안 띄움
+node reading-server/tunnel/setup.mjs doctor   # 원장 PC 점검(로컬 서버·관리 전용·LAN 차단·cloudflared·바깥 주소의 Access). 설치 명령은 같은 파일 머리말
+node scripts/check.mjs --only tunnel          # 키트 테스트(Windows 명령은 가짜 실행기로 — CI 는 Linux)
 node naesin/pack-validate.mjs <팩 디렉터리>     # 영어 레슨 팩 검증
 node naesin-ko/pack-validate.mjs <팩 디렉터리>  # 국어 단원 팩 검증
 node naesin-ko/extract/build-pack.mjs <단원 폴더>       # 국어: 폴더 하나 → 팩 초안 (시리즈 자동 판별)
