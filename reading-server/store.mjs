@@ -107,19 +107,38 @@ export function snapshotNow() {
   } catch (e) { return null; }
 }
 
+/* 읽기 전용 모드 — 터널로 외부에 연 검토용 서버(docs/로컬-서버-외부공개-터널.md 의 결정 ㄱ).
+   server.mjs 가 쓰기 메서드를 HTTP 자리에서 먼저 막지만, 이 자리까지 잠가야 **GET 라우트가
+   몰래 쓰는 길**이 남지 않는다(연동 nonce 정리처럼 GET 이면서 persist() 를 부르는 자리가 있다).
+   화면을 눌러 생긴 변경은 메모리에만 남고 프로세스와 함께 사라진다 — 가져온 스냅샷이 그대로
+   남는 쪽이 검토용 서버의 조건이다. 가져오기(import)는 이 모드의 **목적**이라 제 손으로 쓴다. */
+let readOnly = false;
+export function setReadOnly(on) { readOnly = !!on; }
+export function isReadOnly() { return readOnly; }
+
+function writeDb() {
+  try {
+    fs.mkdirSync(DIR, { recursive: true });
+    const tmp = FILE + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(db));
+    fs.renameSync(tmp, FILE);
+    snapshotIfNeeded();
+  } catch (e) { console.error('[store] 저장 실패:', e.message); }
+}
+
 let saveTimer = null;
 export function persist() {
+  if (readOnly) return;            // 검토용 서버에서는 화면 조작이 db.json 에 닿지 않는다
   if (saveTimer) return;
-  saveTimer = setTimeout(() => {
-    saveTimer = null;
-    try {
-      fs.mkdirSync(DIR, { recursive: true });
-      const tmp = FILE + '.tmp';
-      fs.writeFileSync(tmp, JSON.stringify(db));
-      fs.renameSync(tmp, FILE);
-      snapshotIfNeeded();
-    } catch (e) { console.error('[store] 저장 실패:', e.message); }
-  }, 300);
+  saveTimer = setTimeout(() => { saveTimer = null; writeDb(); }, 300);
+}
+
+/* 읽기 전용 모드에서도 디스크에 써야 하는 단 하나 — 가져오기. 디바운스를 거치지 않는 이유는
+   둘이다: ① 모드 판정을 우회해야 한다 ② 라우트가 200 을 돌려준 뒤 저장이 끝나 있어야
+   "가져왔다는데 재기동하니 없다"가 생기지 않는다. */
+function persistNow() {
+  if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
+  writeDb();
 }
 
 /* export 스냅샷을 되읽어 db 에 올린다 — 운영(KV)에서 뜬 자료를 이 PC 서버로 가져와 **보기만** 할 때
@@ -172,7 +191,7 @@ export function importSnapshot(next) {
   Object.keys(IMPORT_SKIP).forEach((k) => {
     if (next[k] != null) skipped.push({ section: k, why: IMPORT_SKIP[k] });
   });
-  persist();
+  persistNow();      // 읽기 전용 모드에서도 저장한다 — 가져오기가 그 모드의 목적이다
   return { ok: true, applied, skipped, absent, savedAt: next.savedAt || null };
 }
 

@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { load, persist, getDb, listBackups, getBackup, snapshotNow, naesinSnapshot, importSnapshot, importSections } from './store.mjs';
+import { load, persist, getDb, listBackups, getBackup, snapshotNow, naesinSnapshot, importSnapshot, importSections, setReadOnly } from './store.mjs';
 import { handleVocab, sendNightPushes, vocabSummary } from './vocab-api.mjs';
 import { handleNaesin, isReservedCode, dropReservedRows, naesinBodyLimit } from './naesin-api.mjs';
 import { handleStudio } from './naesin-studio.mjs';
@@ -55,8 +55,14 @@ const TOKEN_TTL = 1000 * 60 * 60 * 24 * 30;            // 30일
    토큰은 서명이 아니라 각 저장소에 든 난수라, 토큰 발급 자리만 닫으면 로컬에 학생 기록이 생길 길이 없다.
    관리 로그인과 관리 화면이 쓰는 공용 모듈(/naesin/gen.js 등)은 그대로 둔다 — 막으면 관리 웹이 깨진다. */
 const ADMIN_ONLY = /^(1|true|yes|on)$/i.test(process.env.WB_ADMIN_ONLY || '');
+/* 읽기 전용 모드 — 같은 문서의 결정 ㄱ. 이 서버는 운영(KV)에서 뜬 자료를 가져와 **보기만** 한다.
+   WB_ADMIN_ONLY 가 '누가 들어오나'를 좁히는 반면 이쪽은 '무엇을 할 수 있나'를 좁힌다 — 둘이
+   필요한 이유: 원장·강사도 이 주소에서 팩을 올리면 그 순간 운영(KV)과 db.json 이 갈리고,
+   어느 쪽이 정본인지 아무도 모르게 된다. 되돌리기 어려운 쪽은 사람이 아니라 데이터다. */
+const READONLY = /^(1|true|yes|on)$/i.test(process.env.WB_READONLY || '');
 
 load();
+setReadOnly(READONLY);
 const db = getDb();
 const portalFamilyStore = {
   getFamily: (t) => db.portalFamilies?.[t] || null,
@@ -502,7 +508,17 @@ const server = http.createServer(async (req, res) => {
       /* ai: AI 연상을 쓸 수 있는지. 키가 없으면 앱이 「AI 연상 만들기」 버튼을 감춘다 —
          눌러도 안 되는 버튼은 학생에게 앱이 고장 난 것처럼 보인다.
          키를 넣으면 다음 접속부터 버튼이 저절로 돌아온다. 값이 아니라 있고 없음만 알린다. */
-      if (p === '/api/health') return json(res, 200, { ok: true, service: 'wb-reading', time: nowIso(), ai: !!process.env.ANTHROPIC_API_KEY });
+      if (p === '/api/health') return json(res, 200, { ok: true, service: 'wb-reading', time: nowIso(), ai: !!process.env.ANTHROPIC_API_KEY, readonly: READONLY || undefined });
+
+      /* 읽기 전용 게이트 — 라우트마다 거는 대신 **메서드로** 막는다. 라우트는 계속 늘어나고,
+         새로 만든 쓰기 하나를 빠뜨리면 그 길로 데이터가 갈린다. 여는 것은 둘뿐이다:
+         관리 로그인(열지 않으면 화면을 볼 수 없다)과 가져오기(이 모드의 목적).
+         GET 라우트가 몰래 쓰는 길은 store 의 setReadOnly 가 따로 막는다. */
+      if (READONLY && !/^(GET|HEAD)$/.test(req.method || '')
+          && p !== '/api/admin/login' && p !== '/api/admin/import') {
+        req.resume();                 // 본문을 비워 소켓을 붙들지 않는다
+        return json(res, 403, { error: '이 주소는 읽기 전용 검토용이에요. 자료를 바꾸는 일은 운영 주소에서 하세요.' });
+      }
 
       if (p === '/api/portal/family-link') {
         const out = await handlePortalFamilyLink({ method: req.method,
@@ -1112,4 +1128,5 @@ server.listen(PORT, () => {
   console.log(`  학생 앱: /   워드브레인: /vocab/   관리 웹: /admin   연상 검수함: /admin/vocab-review.html`);
   /* 어느 모드로 떴는지 한 줄로 알린다 — 터널을 붙인 뒤 이 줄을 보고 확인한다. */
   if (ADMIN_ONLY) console.log('  [관리 전용] WB_ADMIN_ONLY=on — 학생 로그인(/api/login·/api/login/status)을 내주지 않습니다');
+  if (READONLY) console.log('  [읽기 전용] WB_READONLY=on — 자료를 바꾸는 요청을 받지 않습니다 (관리 로그인·가져오기만 예외, db.json 도 가져오기 때만 씁니다)');
 });
