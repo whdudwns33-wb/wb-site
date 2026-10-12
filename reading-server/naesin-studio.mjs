@@ -27,6 +27,7 @@ import { extract, makeQuota, readExtractLimit, KINDS } from './naesin-extract.mj
    배포 자체가 실패한다(nodejs_compat 이 없고, 있어도 런타임 require 는 번들러가 못 푼다).
    기본 import 는 Node 의 CJS 상호운용과 esbuild 양쪽에서 module.exports 를 그대로 준다. */
 import CHECK from '../naesin/pack-check.js';
+import GEN from '../naesin/gen.js';
 
 const PACK_ID_RE = /^[A-Za-z0-9-]{3,60}$/;
 const JOB_ID_RE = /^job-[a-z0-9]{6,20}$/;
@@ -48,7 +49,7 @@ const arrayKeyOf = (kind) => (kind === 'items' ? 'items' : kind);
 const DRAFT_KINDS = CHECK.PACK_ARRAYS;
 const PDF_ROW_KEYS = {
   words: ['id', 'headword', 'pos', 'meaningKo', 'sections', '_pdfReview'],
-  sentences: ['seq', 'dayGroup', 'en', 'ko', 'chunks', '_pdfReview'],
+  sentences: ['seq', 'dayGroup', 'en', 'ko', 'chunks', 'keywords', '_pdfReview'],
 };
 const ownKeys = (v, keys) => isObj(v) && Object.keys(v).every((k) => keys.includes(k));
 function validPdfReview(v) {
@@ -64,6 +65,8 @@ function validPdfSentence(row) {
     && ['dayGroup', 'en', 'ko'].every((k) => CHECK.nonEmpty(row[k]))
     && Array.isArray(row.chunks) && row.chunks.length >= 1
     && row.chunks.every((chunk) => ownKeys(chunk, ['en', 'ko']) && CHECK.nonEmpty(chunk.en) && CHECK.nonEmpty(chunk.ko))
+    && (row.keywords === undefined || (Array.isArray(row.keywords)
+      && row.keywords.every((kw) => ownKeys(kw, ['en', 'ko']) && CHECK.nonEmpty(kw.en) && CHECK.nonEmpty(kw.ko))))
     && CHECK.flat(row.chunks.map((chunk) => chunk.en).join(' ')) === CHECK.flat(row.en);
 }
 
@@ -157,8 +160,16 @@ export function publishGate(job) {
       if (pdf) {
         if (!PDF_ROW_KEYS[kind] || !validPdfReview(row._pdfReview))
           res.errors.push({ where: kind, message: at + ' PDF 검수 메타 형태가 올바르지 않음' });
-        if (kind === 'sentences' && !validPdfSentence(pack.sentences[kept - 1]))
-          res.errors.push({ where: kind, message: at + ' PDF 본문은 영·한 문장과 대응하는 청크가 필요함' });
+        if (kind === 'sentences') {
+          const sentence = pack.sentences[kept - 1];
+          if (!validPdfSentence(sentence))
+            res.errors.push({ where: kind, message: at + ' PDF 본문은 영·한 문장과 대응하는 청크가 필요함' });
+          else if (!sentence.keywords || !sentence.keywords.length || sentence.keywords.some((keyword) => {
+            const single = { ...sentence, keywords: [keyword] };
+            return !GEN.koBlanks(single, 0) || !GEN.keywordBlanks(single, 'en', 0);
+          }))
+            res.errors.push({ where: kind, message: at + ' PDF 본문의 1·3단계 문항을 만들 핵심어가 필요함 — 영어 원문과 청크 한글에서 en/ko 쌍을 대조하세요.' });
+        }
         if (!resolved)
           res.warns.push({ where: kind, message: at + ' PDF 후보 — 원본 위치를 대조해 개별 검수해야 함' });
       }
