@@ -21,7 +21,7 @@ WB 독해력학원·웩슬러브레인센터의 원내 학습 웹앱 모음. 어
 | `haru/` | 하루브레인 — 삼육중 대비 3년 학습 앱(학생 `/haru/`·부모 `parent.html`) + 순수 로직(좌표·SRS·원인·페이스·생성기·리포트) + `atoms.json`(원자 목록, 문항 0). 팩·대응표·플랜·시험지는 저장소에 없다(KV·관리 웹 업로드). **상세: `haru/README.md`**, 인수인계·고칠 때 깨지는 자리: `haru/AGENTS.md` |
 | `reading-server/` | Cloudflare Worker(운영) + Node 로컬 서버 + 관리 웹(`public/`) + dist 조립 |
 | `shared/` | 공용 모듈 (voice.js TTS, qr.js) |
-| `docs/` | 기획서 + 자료 폴더 표준(`자료-폴더-표준.md`) — 내신 영어: `docs/영어내신-학습웹앱-기획서-v1.md` (v1.2) · 내신 국어: `docs/국어내신-학습웹앱-기획서-v1.md` (v1.1) · 프로그램데스크: `docs/외부프로그램-자료운영-직원웹앱-기획제안-3안-v0.md` (§8 방향 변경·구현 현황) · v1 3안(직원의 관리자): `docs/프로그램데스크-기획서-v1.md` · 삼육중 대비(코드는 `haru/`): `docs/삼육중-*.md` — 정본은 `삼육중-대비-학습웹앱-기획서-v1.md`, 기술 명세는 `삼육중-대비-앱-설계안-v1.md`, 전형 사실은 `삼육중-전형-사실-정본-v1.md`만 인용. `삼육중-정보수집-로그.md`는 주간 자동 스윕이 쓴다(원장이 정본 후보를 체크해야 정본이 바뀐다) · 영재원 트랙(하루브레인 확장, 초안·원장 결정 대기): `영재원-대비-기획서-v0.md`, 사실은 `광주전남-영재원-선발-사실-조사-v0.md`만 인용 · 원내 PC 를 서버로 외부 공개(Cloudflare Tunnel): `로컬-서버-외부공개-터널.md` — **데이터가 KV 와 로컬 db.json 으로 갈리는 결정이 선행**이다 |
+| `docs/` | 기획서 + 자료 폴더 표준(`자료-폴더-표준.md`) — 내신 영어: `docs/영어내신-학습웹앱-기획서-v1.md` (v1.2) · 내신 국어: `docs/국어내신-학습웹앱-기획서-v1.md` (v1.1) · 프로그램데스크: `docs/외부프로그램-자료운영-직원웹앱-기획제안-3안-v0.md` (§8 방향 변경·구현 현황) · v1 3안(직원의 관리자): `docs/프로그램데스크-기획서-v1.md` · 삼육중 대비(코드는 `haru/`): `docs/삼육중-*.md` — 정본은 `삼육중-대비-학습웹앱-기획서-v1.md`, 기술 명세는 `삼육중-대비-앱-설계안-v1.md`, 전형 사실은 `삼육중-전형-사실-정본-v1.md`만 인용. `삼육중-정보수집-로그.md`는 주간 자동 스윕이 쓴다(원장이 정본 후보를 체크해야 정본이 바뀐다) · 영재원 트랙(하루브레인 확장, 초안·원장 결정 대기): `영재원-대비-기획서-v0.md`, 사실은 `광주전남-영재원-선발-사실-조사-v0.md`만 인용 · 원내 PC 를 서버로 외부 공개(Cloudflare Tunnel): `로컬-서버-외부공개-터널.md` — 결정 **A**(터널은 원장·강사 전용, 학생은 워커) + **A.5 「금고」**(국어 라이선스 자료만 원장 PC 2대로, 학생 기록은 KV 그대로 · 2026-10-11 원장 결정). 금고 착수 전에 §1.5 의 「착수 전에 정해 둔 네 줄」(Access 서비스 토큰·503 경로·쓰기 1대+지연 복제·버전＋포인터 2단 커밋)과 「남은 것」(원장 확인 4건)을 읽는다 |
 | `hanja/` | 어휘브레인(옛 한자브레인 — 폴더·주소 `/hanja/`·KV 키 `hanja:*`·API는 유지) — 추천 교재의 어휘를 **단원 시험 → 부족한 낱말 학습 → 재확인**하는 앱(영어 없음). 문제집 한 권 = 단어장 하나(관리 웹 업로드·KV 전용, 낱말 id는 내용 기반). 주메뉴는 **오늘 할 일·내 교재·복습·학습 기록·한자 집중**. 어휘 시험은 뜻·문맥·회상 결과를 구분하며, 검수된 상황 자료가 있는 낱말은 별도 상황과 해설을 학습한다. 한자 집중은 어휘 교재 선택을 유지한 채 훈음·획순 수업·혼자 쓰기·한자 시험을 공부하는 별도 영역이다. 종이 교재로 공부한 학생은 앱 학습 기록 없이 바로 시험 볼 수 있고, 실제 출제 범위·스스로 정답·힌트 정답을 구별한다. 보조 한자·오답 재확인은 원래 단원 시험 점수를 덮지 않는다. 이번 주 단원(반·학생)·교사 현황·종이 시험지·밤 9시 알림. AI 연상은 자체(`own`) 단어장만 허용하고 교재(`textbook`) 뜻은 외부 AI로 보내지 않는다. 순수 로직 `book-check.js`·`srs.js`·`quiz.js`·`trace.js`·`bridge.js`, 도구 `extract/draft.mjs`·`strokes-convert.mjs`. `book-sample.json`은 자체 창작 체험, `books/`는 자체 교과 어휘 초3~초6(각 80낱말·8단원) + 급수 8급 50자·7급 추가 100자(공식 목록 대조 완료). `books.test.cjs`는 업로드 관문과 같은 검사·재검사 왕복에서 오류·경고 0을 요구한다. **상세: `hanja/README.md`**, 인수인계: `hanja/AGENTS.md` |
 | `chunk/` | 청크브레인 — 의미단위 끊어읽기 학습 앱(유치 + 초1~고3 학년별 13단계: 배우기·연습·복습 + `print.html` 로 PDF 교재 + `class.html` 프로젝터 수업). 지문·카드는 자체 창작이라 저장소에 있다. **상세: `chunk/README.md`**, 고칠 때 깨지는 자리: `chunk/AGENTS.md`, 근거: `docs/의미단위-끊어읽기-앱-연구노트-v1.md` |
 | `letter/` | **브레인레터** — 유치~중등 다섯 학년대 주간 뉴스레터(신문 짜임, 가족 링크 `/letter/?t=`·학생 앱·PDF 인쇄·새 호 푸시). 순수 로직 `letter.js`(검증기·렌더러·지표 순환·하루 한 장 7일 리듬 하나) + `shapes.js`(시공간 도형 생성기) + `drills.js`(나머지 네 지표 5분 놀이 생성기·오늘의 5분) + 자체 창작 체험 호 `issue-sample.json` + 주제 달력 `calendar.json` + 자체 제작 삽화 `img/` + 글꼴 `fonts/`(Noto Sans/Serif KR 조각, OFL — `fetch-fonts.mjs` 가 받는다). 읽어 주기·한자 따라쓰기는 `shared/voice.js`·`vocab/trace.js` 를 배급받아 쓴다. 호 본문·올린 사진은 KV 에만 — 단 **파일럿**은 편집실이 만든 자체 창작 호를 `issues/<주차>.json` + 목록 `issues.json` 으로 저장소에 두고 `/letter/` 가 링크만으로 연다(발행일이 되면 그 호로 자동 전환). **상세: `letter/README.md`**, 고칠 때 깨지는 자리·인수인계: `letter/AGENTS.md`, 기획 `docs/브레인레터-주간뉴스레터-기획서-v1.md` |
@@ -29,6 +29,10 @@ WB 독해력학원·웩슬러브레인센터의 원내 학습 웹앱 모음. 어
 | `desk/` | **프로그램데스크** — 학원과 별개 사업(구독 학생의 프로그램·자료 운영) 앱. 새 워커 `wb-desk` + 새 D1. **상세: `desk/README.md`** |
 | `desk-ext/` | 프로그램데스크 크롬 확장(표 캡처, MV3). 학생 정보 없음. `desk/build.mjs`가 `dist/ext/`로 복사 |
 | `crm/` | **세일즈데스크** — 상담·CS 가 끝난 가정의 전환 CRM(문의 → 검사 → 해석 → D+3·7·14 팔로업 → 등록/보류/이탈+사유 → 월 KPI) + **HubSpot 연동**(원장 승인 큐 → 연락처·딜·노트, 변경분 가져오기, 단계 자동 매핑, `wb_*` 속성) + **파트너 학원 연계**(포털 `/partner/`, `partner-api.mjs` — 같은 워커·D1 이지만 출입구·API·표를 분리해 둠, 기획 `docs/파트너학원-연계-기획서-v0.md`). 새 워커 `wb-crm` + 새 D1. 순수 로직 `crm-core.js` 를 브라우저·서버가 같이 쓴다. HubSpot 토큰은 워커 시크릿 `HUBSPOT_ACCESS_TOKEN` 뿐. **상세: `crm/README.md`**, 인수인계(지금 상태·다음 할 일·깨지는 자리): `crm/AGENTS.md` |
+
+영어 내신브레인의 2026-10-12 사용자 결정은 **PC 정본·학생 원내 LAN 학습·인증된 외부 관리**다.
+실행 기준은 `docs/내신브레인-원내PC-실운영-계획.md`이며 `setup-local.ps1`·`start-local.ps1`의
+`WB_INHOUSE_ONLY`를 사용한다. 국어 A.5 금고 설계와 기존 다른 앱의 워커 운영 결정은 별도로 유지한다.
 
 ## 명령
 
@@ -39,6 +43,7 @@ node <앱>/<이름>.test.cjs           # 단위 테스트 (의존성 없음, 파
 node reading-server/<이름>.test.mjs # 서버 테스트
 node reading-server/build-dist.mjs  # dist 조립 (+ SW 캐시 이름 스탬프)
 PORT=8890 ADMIN_PIN=<pin> DATA_DIR=<dir> node reading-server/server.mjs  # 로컬 서버
+WB_ADMIN_ONLY=1 PORT=8890 ADMIN_PIN=<pin> DATA_DIR=<dir> node reading-server/server.mjs  # 터널로 외부 공개할 때(결정 A — 학생 로그인을 내주지 않는다. 기동 로그에 [관리 전용] 이 뜨는지 눈으로 확인)
 node naesin/pack-validate.mjs <팩 디렉터리>     # 영어 레슨 팩 검증
 node naesin-ko/pack-validate.mjs <팩 디렉터리>  # 국어 단원 팩 검증
 node naesin-ko/extract/build-pack.mjs <단원 폴더>       # 국어: 폴더 하나 → 팩 초안 (시리즈 자동 판별)
@@ -101,6 +106,9 @@ CI 둘: `.github/workflows/checks.yml` — **PR·작업 브랜치 푸시**에서
 3. **인증 없이 콘텐츠를 내보내지 않는다.** 학생 토큰(`wbr.auth`) 또는 관리 토큰(PIN 또는 아이디·비밀번호 — 판정은 `reading-server/admin-auth.mjs` 하나, 시크릿 등록은 `admin-secrets.yml`).
    배포되는 `_headers`는 `reading/_headers` 하나다(noindex + 앱 경로 no-store) — `naesin/_headers`·
    `vocab/_headers`·`naesin-ko/_headers`·`haru/_headers`는 그리로 안내하는 주석 파일이다.
+   **Node 로컬 서버도 같은 파일을 읽어 붙인다** — `reading-server/sec-headers.mjs` 가 `reading/_headers` 를
+   파싱해 모든 응답에 얹고(`server.mjs` 핸들러 맨 앞 한 곳), `/*` 블록에 noindex 가 없으면 **서버 기동을
+   거부한다**. 터널로 공개할 때 헤더 한 벌을 두 번 관리하지 않기 위해서다(`docs/로컬-서버-외부공개-터널.md` §2).
    내신 팩은 자기 시험 범위에 배정된 것만 받는다.
    하루브레인은 `GET /api/haru/pack`·`/gen`이 정답·해설·오답 태그를 뺀다(정답은 `/answer` 응답에만). 외부 초6 학생
    (`student.apps:['haru']`)은 호스트가 `who` 검증 직후 한 곳에서 거는 `allowedApp` 게이트로 다른 앱(브레인레터 포함)을 열지 못한다.

@@ -1,5 +1,5 @@
 {
-  "version": "2026-10-05.1",
+  "version": "2026-10-12.1",
   "articles": [
     {
       "id": "nuri-space",
@@ -50641,6 +50641,4157 @@
               "word": "coexistence",
               "ko": "공존 (명사)",
               "base": "coexist [ˌkoʊɪɡˈzɪst]"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "gdm-cohort",
+      "category": "science",
+      "careers": [
+        "med",
+        "bio",
+        "it"
+      ],
+      "issue": true,
+      "publishedAt": "2026-10-12",
+      "status": "published",
+      "sources": [
+        {
+          "title": "질병관리청 국립보건연구원 보도자료 — 임신당뇨병 산모의 자녀, 당뇨병 위험 최대 4배 이상 높아 (2026.10.7)",
+          "url": "https://www.kdca.go.kr/bbs/kdca/42/312868/artclView.do"
+        }
+      ],
+      "levels": {
+        "L1": {
+          "title": "오래 보면 보여요",
+          "minutes": 3,
+          "paragraphs": [
+            [
+              "한 사람만 보고는 ",
+              "알 수 없는 것이 있어요. ",
+              "열 사람을 봐도 ",
+              "모를 때가 있어요. ",
+              "아주 많은 사람을 ",
+              "아주 오래 지켜보면 ",
+              "몰랐던 것이 보여요. ",
+              "우리나라에서 그런 일을 했어요."
+            ],
+            [
+              "엄마가 아기를 품은 동안 ",
+              "몸을 자주 살펴요. ",
+              "그때 핏속에 ",
+              "당이 높아지는 엄마가 많아요. ",
+              "흔한 일이고 ",
+              "누구의 잘못도 아니에요. ",
+              "잘 먹고 운동하며 돌보고, ",
+              "그래도 높으면 약으로 도와요."
+            ],
+            [
+              "오래 지켜보니 알게 되었어요. ",
+              "엄마와 아기의 건강은 이어져 있어요. ",
+              "그래서 아기가 자란 뒤에도 ",
+              "몸을 살피면 좋아요. ",
+              "우리도 할 수 있는 일이 있어요. ",
+              "골고루 먹고 많이 움직여요. ",
+              "병원에서 재 보자고 하면 ",
+              "같이 가요."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "건강",
+              "easy": "몸과 마음이 튼튼한 것이에요.",
+              "hanja": null
+            },
+            {
+              "word": "운동",
+              "easy": "몸을 움직여 튼튼하게 하는 일이에요.",
+              "hanja": null
+            },
+            {
+              "word": "병원",
+              "easy": "아픈 곳을 살펴보고 고쳐 주는 곳이에요.",
+              "hanja": null
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글이 알려 주는 것은 무엇인가요?",
+              "choices": [
+                "약을 만드는 방법",
+                "아주 많은 사람을 아주 오래 지켜보면 몰랐던 것을 알게 된다는 것",
+                "병원을 찾아가는 길",
+                "운동을 잘하는 방법"
+              ],
+              "answer": 1,
+              "explain": "아주 많은 사람을 아주 오래 지켜보면 몰랐던 것이 보인다고 했어요.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "엄마가 아기를 품은 동안 핏속에 당이 높아지는 일은 어떤 일인가요?",
+              "choices": [
+                "아주 드문 일이에요",
+                "흔한 일이고 누구의 잘못도 아니에요",
+                "엄마가 잘못해서 생기는 일이에요",
+                "아무도 모르는 일이에요"
+              ],
+              "answer": 1,
+              "explain": "흔한 일이고 누구의 잘못도 아니라고 했어요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「병원」은 어떤 곳인가요?",
+              "choices": [
+                "아픈 곳을 살펴보고 고쳐 주는 곳",
+                "밥을 먹는 곳",
+                "책을 읽는 곳",
+                "운동만 하는 곳"
+              ],
+              "answer": 0,
+              "explain": "병원은 아픈 곳을 살펴보고 고쳐 주는 곳이에요.",
+              "evidencePara": 2
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "한 사람만 보고는 알 수 없는 까닭은 무엇일까요?",
+              "choices": [
+                "사람이 너무 커서",
+                "한 사람만 보면 보이지 않는 것이 있어서",
+                "숫자를 셀 수 없어서",
+                "글자가 어려워서"
+              ],
+              "answer": 1,
+              "explain": "한 사람, 열 사람만 봐도 모를 때가 있다고 했어요. 아주 많이, 아주 오래 봐야 보여요.",
+              "evidencePara": 0
+            },
+            {
+              "type": "apply",
+              "q": "엄마와 아기의 건강이 이어져 있다면, 우리가 할 수 있는 일은 무엇인가요?",
+              "choices": [
+                "혼자 걱정만 해요",
+                "골고루 먹고 많이 움직이고, 병원에서 재 보자고 하면 같이 가요",
+                "아무것도 하지 않아요",
+                "운동을 그만둬요"
+              ],
+              "answer": 1,
+              "explain": "글은 마지막에 우리가 할 수 있는 일을 알려 줘요. 골고루 먹고 많이 움직이고, 재 보러 같이 가요.",
+              "evidencePara": 2
+            }
+          ]
+        },
+        "L2": {
+          "title": "349만 쌍을 14년 동안",
+          "minutes": 4,
+          "paragraphs": [
+            [
+              "알고 싶은 것이 있어도 ",
+              "한 사람만 보고는 ",
+              "답을 얻기 어렵다. ",
+              "사람마다 사정이 다르기 때문이다. ",
+              "그래서 연구자들은 ",
+              "아주 많은 사람을 모아 ",
+              "여러 해 동안 따라가며 지켜본다. ",
+              "이렇게 오래 따라가며 ",
+              "지켜보는 연구를 코호트 연구라고 한다."
+            ],
+            [
+              "질병관리청 국립보건연구원이 그런 연구를 했다. ",
+              "2009년부터 2018년까지 태어난 ",
+              "아기와 그 엄마 349만 1,680쌍을 ",
+              "2022년 끝까지 따라갔다. ",
+              "가장 긴 경우는 14년이었다. ",
+              "태어날 무렵만 본 것이 아니라 ",
+              "그 아이가 중학생이 될 나이까지 ",
+              "지켜본 것이다."
+            ],
+            [
+              "왜 그렇게 오래 봐야 할까. ",
+              "짧게 보면 ",
+              "보이지 않는 것이 있다. ",
+              "그동안 밝혀진 것은 ",
+              "아기가 태어날 무렵까지였다. ",
+              "아이가 자란 뒤의 건강은 근거가 부족했다. ",
+              "오래 지켜본 덕분에 ",
+              "그 빈칸이 조금 채워졌다."
+            ],
+            [
+              "이 연구가 살핀 것은 임신당뇨병이다. ",
+              "임신 전에는 당뇨병이 없었는데 ",
+              "임신 중에 처음 발견되는 ",
+              "높은 혈당 상태를 말한다. ",
+              "전 세계 임신 열 건 가운데 ",
+              "한 건보다 많이 나타난다. ",
+              "드문 일이 아니고 ",
+              "누구의 잘못도 아니다. ",
+              "식사와 운동으로 혈당을 관리하고, ",
+              "그래도 잘 조절되지 않으면 ",
+              "인슐린 같은 약을 쓴다."
+            ],
+            [
+              "오래 따라가 보니, ",
+              "임신당뇨병을 겪은 엄마의 자녀는 ",
+              "자란 뒤 당뇨병 위험이 ",
+              "조금 더 높았다. ",
+              "인슐린 치료가 필요했던 엄마의 자녀에게서 ",
+              "그 차이가 더 컸다. ",
+              "김원호 부장은 ",
+              "임신 중 혈당 관리가 ",
+              "아이의 평생 건강과도 이어진다고 말했다. ",
+              "그래서 그 아이들은 자라면서 ",
+              "체중과 혈당을 주기적으로 확인하면 좋다. ",
+              "겁낼 일이 아니라 ",
+              "미리 살필 일이다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "코호트",
+              "easy": "같은 사람들을 여러 해 동안 따라가며 지켜보는 연구 방식",
+              "hanja": null
+            },
+            {
+              "word": "혈당",
+              "easy": "핏속에 들어 있는 당의 양",
+              "hanja": "血(피 혈)+糖(사탕 당)"
+            },
+            {
+              "word": "인슐린",
+              "easy": "혈당을 낮추는 일을 하는 몸속 물질. 약으로도 쓴다.",
+              "hanja": null
+            },
+            {
+              "word": "근거",
+              "easy": "어떤 말이나 판단이 기댈 수 있는 바탕",
+              "hanja": "根(뿌리 근)+據(의거할 거)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 알맞은 것은?",
+              "choices": [
+                "임신당뇨병은 치료할 수 없다",
+                "같은 사람들을 아주 오래 따라가며 지켜보니 전에는 몰랐던 것이 보였다",
+                "연구는 짧게 하는 것이 좋다",
+                "엄마의 잘못으로 병이 생긴다"
+              ],
+              "answer": 1,
+              "explain": "아주 많은 사람을 여러 해 동안 따라가며 지켜보는 코호트 연구가 이 글의 주인공이다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "이 연구가 따라간 대상과 기간으로 알맞은 것은?",
+              "choices": [
+                "아기 349만 1,680명을 한 해 동안",
+                "아기와 그 엄마 349만 1,680쌍을 가장 긴 경우 14년 동안",
+                "엄마 14명을 349년 동안",
+                "아기 1,680명을 두 해 동안"
+              ],
+              "answer": 1,
+              "explain": "아기와 그 엄마 349만 1,680쌍을 따라갔고, 가장 긴 경우는 14년이었다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "임신당뇨병에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "전 세계 임신 열 건 가운데 한 건보다 많이 나타난다",
+                "아주 드물게 나타난다",
+                "임신 전부터 있던 당뇨병만 가리킨다",
+                "약으로는 도울 수 없다"
+              ],
+              "answer": 0,
+              "explain": "전 세계 임신 열 건 가운데 한 건보다 많이 나타나는, 드물지 않은 일이라고 했다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "vocab",
+              "q": "「코호트 연구」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "한 사람을 짧게 살펴보는 연구",
+                "같은 사람들을 오래 따라가며 지켜보는 연구",
+                "약을 새로 만드는 연구",
+                "동물만 살펴보는 연구"
+              ],
+              "answer": 1,
+              "explain": "이렇게 오래 따라가며 지켜보는 연구를 코호트 연구라고 한다고 했다.",
+              "evidencePara": 0
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "「오래 지켜본 덕분에 그 빈칸이 조금 채워졌다」고 한 까닭으로 알맞은 것은?",
+              "choices": [
+                "연구자 수가 늘었기 때문",
+                "아이가 자란 뒤의 건강은 짧게 보면 알 수 없었기 때문",
+                "병원이 많아졌기 때문",
+                "숫자를 다시 세었기 때문"
+              ],
+              "answer": 1,
+              "explain": "그동안 밝혀진 것은 태어날 무렵까지였고, 자란 뒤의 건강은 근거가 부족했다고 했다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "apply",
+              "q": "임신당뇨병을 겪은 엄마의 자녀가 할 일로 이 글에 가장 맞는 것은?",
+              "choices": [
+                "겁을 내며 기다린다",
+                "자라면서 체중과 혈당을 주기적으로 확인한다",
+                "운동을 하지 않는다",
+                "아무것도 확인하지 않는다"
+              ],
+              "answer": 1,
+              "explain": "겁낼 일이 아니라 미리 살필 일이라며, 체중과 혈당을 주기적으로 확인하면 좋다고 했다.",
+              "evidencePara": 4
+            }
+          ],
+          "en": [
+            "You cannot answer a big question by looking at only one person. Every person has a different story. So researchers gather very many people and follow them for many years. A study that follows the same people for a long time is called a cohort study.",
+            "Korea's national health research institute did such a study. It followed 3,491,680 pairs of mothers and babies born from 2009 to 2018. The team watched them until the end of 2022. The longest follow-up was 14 years. They did not look only at the day of birth. They watched until the child was old enough for middle school.",
+            "Why watch for such a long time? Some things do not show up in a short time. Until now, doctors knew about the weeks around birth. What happened to the child years later was hard to know. Watching long filled part of that empty space.",
+            "This study looked at gestational diabetes. It means high blood sugar found for the first time during pregnancy. More than one in ten pregnancies in the world has it. It is not rare, and it is nobody's fault. Mothers manage it with food and exercise. If that is not enough, they use medicine such as insulin.",
+            "After many years, the team found a small difference. These mothers' children had a little more risk of diabetes later. The difference was larger when the mother had needed insulin. Dr. Kim Won-ho said that blood sugar care during pregnancy is linked to the child's whole life. So these children should check their weight and blood sugar from time to time. This is not a reason to be afraid. It is a reason to look after each other early."
+          ],
+          "enseg": [
+            [
+              "You cannot answer a big question ",
+              "by looking at only one person. ",
+              "Every person has a different story. ",
+              "So researchers gather very many people ",
+              "and follow them for many years. ",
+              "A study that follows the same people ",
+              "for a long time ",
+              "is called a cohort study."
+            ],
+            [
+              "Korea's national health research institute ",
+              "did such a study. ",
+              "It followed 3,491,680 pairs of mothers and babies ",
+              "born from 2009 to 2018. ",
+              "The team watched them ",
+              "until the end of 2022. ",
+              "The longest follow-up was 14 years. ",
+              "They did not look only at the day of birth. ",
+              "They watched until the child ",
+              "was old enough for middle school."
+            ],
+            [
+              "Why watch for such a long time? ",
+              "Some things do not show up in a short time. ",
+              "Until now, doctors knew about the weeks around birth. ",
+              "What happened to the child years later ",
+              "was hard to know. ",
+              "Watching long filled part of that empty space."
+            ],
+            [
+              "This study looked at gestational diabetes. ",
+              "It means high blood sugar ",
+              "found for the first time during pregnancy. ",
+              "More than one in ten pregnancies in the world has it. ",
+              "It is not rare, and it is nobody's fault. ",
+              "Mothers manage it with food and exercise. ",
+              "If that is not enough, ",
+              "they use medicine such as insulin."
+            ],
+            [
+              "After many years, the team found a small difference. ",
+              "These mothers' children had a little more risk ",
+              "of diabetes later. ",
+              "The difference was larger ",
+              "when the mother had needed insulin. ",
+              "Dr. Kim Won-ho said ",
+              "that blood sugar care during pregnancy ",
+              "is linked to the child's whole life. ",
+              "So these children should check ",
+              "their weight and blood sugar from time to time. ",
+              "This is not a reason to be afraid. ",
+              "It is a reason to look after each other early."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "cohort",
+              "ko": "코호트, 같은 집단 (명사)",
+              "base": "cohort [ˈkoʊhɔːrt]"
+            },
+            {
+              "word": "researchers",
+              "ko": "연구자들 (명사 researcher의 복수)",
+              "base": "researcher [rɪˈsɜːrtʃər]"
+            },
+            {
+              "word": "pregnancy",
+              "ko": "임신 (명사)",
+              "base": "pregnancy [ˈpreɡnənsi]"
+            },
+            {
+              "word": "insulin",
+              "ko": "인슐린 (명사)",
+              "base": "insulin [ˈɪnsəlɪn]"
+            },
+            {
+              "word": "risk",
+              "ko": "위험 (명사)",
+              "base": "risk [rɪsk]"
+            },
+            {
+              "word": "exercise",
+              "ko": "운동 (명사)",
+              "base": "exercise [ˈeksərsaɪz]"
+            }
+          ]
+        },
+        "L3": {
+          "title": "셋으로 나누어 본 까닭",
+          "minutes": 5,
+          "paragraphs": [
+            [
+              "어떤 일이 다른 일의 원인인지 ",
+              "알아내는 것은 쉽지 않다. ",
+              "한 사람을 자세히 들여다보아도 ",
+              "그 사람만의 사정인지 ",
+              "많은 사람에게 공통된 흐름인지 ",
+              "가릴 수 없다. ",
+              "그래서 의학 연구는 ",
+              "아주 많은 사람을 모아 ",
+              "오랫동안 같은 방식으로 따라가며 기록한다. ",
+              "이런 방식을 코호트 연구라고 한다."
+            ],
+            [
+              "질병관리청 국립보건연구원은 임산부의 날인 ",
+              "10월 10일을 앞두고 ",
+              "그런 연구 결과를 발표했다. ",
+              "국민건강보험공단 자료를 활용해 ",
+              "2009년부터 2018년까지 태어난 ",
+              "349만 1,680쌍의 산모와 자녀를 ",
+              "2022년 말까지 최대 14년간 추적한 연구다. ",
+              "그간 조산이나 거대아 출산처럼 ",
+              "출산 전후의 위험은 ",
+              "비교적 잘 알려져 있었으나, ",
+              "자녀가 자란 뒤의 건강에 대한 ",
+              "근거는 충분하지 않았다. ",
+              "오래 따라가는 설계가 그 빈칸을 겨냥했다."
+            ],
+            [
+              "연구가 살핀 것은 임신당뇨병이다. ",
+              "임신 전에는 당뇨병이 없었으나 ",
+              "임신 중 처음 발견되는 고혈당 상태로, ",
+              "전 세계 임신 ",
+              "10건 중 1건 이상에서 나타난다. ",
+              "식사요법과 신체활동으로 혈당을 관리하고, ",
+              "충분히 조절되지 않으면 ",
+              "인슐린 등 약물 치료를 시행한다. ",
+              "드문 일이 아니며 ",
+              "누구의 잘못으로 생기는 일도 아니다."
+            ],
+            [
+              "이 연구의 핵심은 ",
+              "산모를 세 그룹으로 나눈 설계다. ",
+              "임신당뇨병이 없는 경우, ",
+              "인슐린 치료 없이 관리한 경우, ",
+              "인슐린 치료를 받은 경우다. ",
+              "셋으로 나눈 까닭은 임신당뇨병이 있었는지만 묻고는 ",
+              "혈당이 얼마나 높았는지를 ",
+              "구별할 수 없기 때문이다. ",
+              "결과를 보면 ",
+              "인슐린 치료 없이 관리한 산모의 자녀는 ",
+              "임신당뇨병이 없던 산모의 자녀보다 ",
+              "2형당뇨병 위험이 1.28배였고, ",
+              "인슐린 치료가 필요했던 산모의 자녀는 4.3배였다. ",
+              "같은 임신당뇨병이라도 그 안의 차이가 드러난 셈이다."
+            ],
+            [
+              "숫자가 가리키는 곳은 돌봄의 자리다. ",
+              "김원호 만성질환융복합연구부장은 ",
+              "임신 중 혈당 관리가 ",
+              "산모 본인의 건강뿐 아니라 ",
+              "아이의 평생 건강과도 이어진다고 말했다. ",
+              "또 인슐린 치료가 필요했던 ",
+              "산모의 자녀는 성장 과정에서 ",
+              "체중과 혈당을 주기적으로 확인하는 ",
+              "지속적인 관리가 필요하다고 덧붙였다. ",
+              "349만 쌍을 14년 지켜본 결과가 ",
+              "가리키는 쪽은 탓할 사람이 아니라 ",
+              "함께 살필 일이다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "코호트",
+              "easy": "같은 사람들을 오랫동안 같은 방식으로 따라가며 기록하는 연구",
+              "hanja": null
+            },
+            {
+              "word": "추적",
+              "easy": "뒤를 따라가며 살핌",
+              "hanja": "追(쫓을 추)+跡(자취 적)"
+            },
+            {
+              "word": "고혈당",
+              "easy": "핏속 당의 양이 정상보다 높은 상태",
+              "hanja": "高(높을 고)+血(피 혈)+糖(사탕 당)"
+            },
+            {
+              "word": "설계",
+              "easy": "어떤 일을 어떤 방법으로 할지 미리 짜 놓은 틀",
+              "hanja": "設(베풀 설)+計(셀 계)"
+            },
+            {
+              "word": "구별",
+              "easy": "서로 다른 것을 가려 나눔",
+              "hanja": "區(구분할 구)+別(나눌 별)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글이 설명하는 연구 방법의 핵심은?",
+              "choices": [
+                "한 사람을 자세히 들여다보는 것",
+                "아주 많은 사람을 모아 오랫동안 같은 방식으로 따라가며 기록하는 것",
+                "짧은 기간에 검사를 많이 하는 것",
+                "환자의 기억에 의존하는 것"
+              ],
+              "answer": 1,
+              "explain": "한 사람만 보아서는 가릴 수 없으므로, 많은 사람을 모아 오랫동안 같은 방식으로 기록한다고 했다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "이 연구가 산모를 나눈 세 그룹에 해당하지 않는 것은?",
+              "choices": [
+                "임신당뇨병이 없는 경우",
+                "인슐린 치료 없이 관리한 경우",
+                "인슐린 치료를 받은 경우",
+                "출산 뒤 혈당이 회복된 경우"
+              ],
+              "answer": 3,
+              "explain": "세 그룹은 임신당뇨병이 없는 경우, 인슐린 치료 없이 관리한 경우, 인슐린 치료를 받은 경우다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "detail",
+              "q": "연구 결과를 그룹과 바르게 짝지은 것은?",
+              "choices": [
+                "인슐린 치료 없이 관리한 산모의 자녀 — 2형당뇨병 위험 1.28배",
+                "인슐린 치료를 받은 산모의 자녀 — 2형당뇨병 위험 1.28배",
+                "임신당뇨병이 없는 산모의 자녀 — 2형당뇨병 위험 4.3배",
+                "인슐린 치료 없이 관리한 산모의 자녀 — 2형당뇨병 위험 4.3배"
+              ],
+              "answer": 0,
+              "explain": "인슐린 치료 없이 관리한 산모의 자녀는 1.28배, 인슐린 치료가 필요했던 산모의 자녀는 4.3배였다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "vocab",
+              "q": "「설계」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "어떤 일을 어떤 방법으로 할지 미리 짜 놓은 틀",
+                "결과를 적어 둔 표",
+                "사람을 치료하는 방법",
+                "숫자를 세는 일"
+              ],
+              "answer": 0,
+              "explain": "산모를 세 그룹으로 나눈 것이 이 연구의 설계, 곧 미리 짜 놓은 틀이다.",
+              "evidencePara": 3
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "산모를 세 그룹으로 나눈 까닭으로 가장 알맞은 것은?",
+              "choices": [
+                "연구 기간을 줄이려고",
+                "임신당뇨병이 있었는지만 묻고는 혈당이 얼마나 높았는지를 구별할 수 없어서",
+                "자녀 수를 세려고",
+                "병원을 고르려고"
+              ],
+              "answer": 1,
+              "explain": "있었는지만 묻는 것으로는 혈당이 얼마나 높았는지 구별할 수 없기 때문이라고 글이 직접 밝힌다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "apply",
+              "q": "이 연구를 읽은 뒤의 태도로 이 글에 가장 맞는 것은?",
+              "choices": [
+                "임신당뇨병을 겪은 산모를 탓한다",
+                "고위험 산모의 자녀가 성장 과정에서 체중과 혈당을 주기적으로 확인하도록 돕는다",
+                "결과를 아무에게도 알리지 않는다",
+                "자녀의 당뇨병은 이미 정해졌다고 본다"
+              ],
+              "answer": 1,
+              "explain": "글은 탓할 사람이 아니라 함께 살필 일을 가리키며, 체중과 혈당의 주기적 확인을 말한다.",
+              "evidencePara": 4
+            }
+          ],
+          "en": [
+            "It is not easy to find out whether one thing causes another. Even a close look at a single person cannot tell us whether we are seeing that person's own situation or a pattern shared by many. So medical research gathers very many people and records them in the same way over a long time. This design is called a cohort study.",
+            "Korea's National Institute of Health announced such a study ahead of the day for pregnant women on October 10. Using national health insurance records, it tracked 3,491,680 mother-child pairs born between 2009 and 2018 until the end of 2022, for up to 14 years. Risks around the time of birth, such as early birth or a very large baby, were already fairly well known. The evidence about the child's health years later was not enough. A long follow-up aimed at that gap.",
+            "The study looked at gestational diabetes. It is a state of high blood sugar found for the first time during pregnancy in a woman who did not have diabetes before. More than one in ten pregnancies in the world shows it. It is managed with diet and physical activity, and when that is not enough, with medicine such as insulin. It is not rare, and it is not anyone's fault.",
+            "The heart of this study is the design that split mothers into three groups: those without gestational diabetes, those who managed it without insulin, and those who received insulin treatment. Asking only whether a mother had gestational diabetes cannot show how high her blood sugar was. In the results, children of mothers who managed without insulin had 1.28 times the risk of type 2 diabetes, while children of mothers who needed insulin had 4.3 times the risk. Differences inside the same condition came into view.",
+            "What the numbers point to is care. Dr. Kim Won-ho said that managing blood sugar during pregnancy is linked not only to the mother's own health but also to the child's whole life. He added that children of mothers who needed insulin should have their weight and blood sugar checked regularly as they grow. After 14 years of watching 3.49 million pairs, the finding points not to someone to blame but to something to watch over together."
+          ],
+          "enseg": [
+            [
+              "It is not easy to find out ",
+              "whether one thing causes another. ",
+              "Even a close look at a single person ",
+              "cannot tell us whether we are seeing ",
+              "that person's own situation ",
+              "or a pattern shared by many. ",
+              "So medical research gathers very many people ",
+              "and records them in the same way ",
+              "over a long time. ",
+              "This design is called a cohort study."
+            ],
+            [
+              "Korea's National Institute of Health announced such a study ",
+              "ahead of the day for pregnant women on October 10. ",
+              "Using national health insurance records, ",
+              "it tracked 3,491,680 mother-child pairs ",
+              "born between 2009 and 2018 ",
+              "until the end of 2022, for up to 14 years. ",
+              "Risks around the time of birth, ",
+              "such as early birth or a very large baby, ",
+              "were already fairly well known. ",
+              "The evidence about the child's health years later was not enough. ",
+              "A long follow-up aimed at that gap."
+            ],
+            [
+              "The study looked at gestational diabetes. ",
+              "It is a state of high blood sugar ",
+              "found for the first time during pregnancy ",
+              "in a woman who did not have diabetes before. ",
+              "More than one in ten pregnancies in the world shows it. ",
+              "It is managed with diet and physical activity, ",
+              "and when that is not enough, ",
+              "with medicine such as insulin. ",
+              "It is not rare, and it is not anyone's fault."
+            ],
+            [
+              "The heart of this study is the design ",
+              "that split mothers into three groups: ",
+              "those without gestational diabetes, ",
+              "those who managed it without insulin, ",
+              "and those who received insulin treatment. ",
+              "Asking only whether a mother had gestational diabetes ",
+              "cannot show how high her blood sugar was. ",
+              "In the results, children of mothers who managed without insulin ",
+              "had 1.28 times the risk of type 2 diabetes, ",
+              "while children of mothers who needed insulin ",
+              "had 4.3 times the risk. ",
+              "Differences inside the same condition came into view."
+            ],
+            [
+              "What the numbers point to is care. ",
+              "Dr. Kim Won-ho said ",
+              "that managing blood sugar during pregnancy ",
+              "is linked not only to the mother's own health ",
+              "but also to the child's whole life. ",
+              "He added that children of mothers who needed insulin ",
+              "should have their weight and blood sugar checked regularly ",
+              "as they grow. ",
+              "After 14 years of watching 3.49 million pairs, ",
+              "the finding points not to someone to blame ",
+              "but to something to watch over together."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "cohort",
+              "ko": "코호트, 같은 집단 (명사)",
+              "base": "cohort [ˈkoʊhɔːrt]"
+            },
+            {
+              "word": "gestational",
+              "ko": "임신의, 임신 중의 (형용사)",
+              "base": "gestation [dʒeˈsteɪʃn]"
+            },
+            {
+              "word": "pattern",
+              "ko": "유형, 양상 (명사)",
+              "base": "pattern [ˈpætərn]"
+            },
+            {
+              "word": "evidence",
+              "ko": "근거, 증거 (명사)",
+              "base": "evidence [ˈevɪdəns]"
+            },
+            {
+              "word": "regularly",
+              "ko": "주기적으로 (부사)",
+              "base": "regular [ˈreɡjələr]"
+            },
+            {
+              "word": "insulin",
+              "ko": "인슐린 (명사)",
+              "base": "insulin [ˈɪnsəlɪn]"
+            }
+          ]
+        },
+        "L4": {
+          "title": "규모와 시간이 드러낸 것",
+          "minutes": 6,
+          "paragraphs": [
+            [
+              "연구를 얼마나 믿을 수 있는지 ",
+              "가르는 기준 가운데 둘은 규모와 시간이다. ",
+              "질병관리청 국립보건연구원이 2026년 10월 발표한 연구는 ",
+              "그 두 축을 함께 늘렸다. ",
+              "국민건강보험공단 자료를 활용해 ",
+              "2009년부터 2018년까지 태어난 ",
+              "349만 1,680쌍의 산모와 자녀를 ",
+              "2022년 말까지 최대 14년, ",
+              "중앙값 9.5년간 추적했다. ",
+              "349만이라는 수는 ",
+              "특정 병원을 찾은 사람들만 모은 것이 아니라 ",
+              "전국의 건강보험 기록에서 온 것이고, ",
+              "중앙값 9.5년은 절반 이상이 ",
+              "초등학교 중간 학년에 이를 때까지 ",
+              "관찰되었다는 뜻이다. ",
+              "아시아 인구에서 1형당뇨병과 2형당뇨병을 구분해 ",
+              "분석한 연구 가운데 가장 큰 규모다."
+            ],
+            [
+              "연구가 겨냥한 빈칸은 분명했다. ",
+              "조산이나 제왕절개, 거대아 출산처럼 ",
+              "출산 전후의 위험은 ",
+              "비교적 잘 알려져 있었지만, ",
+              "자녀가 자란 뒤의 건강에 대한 근거는 부족했다. ",
+              "출산 직후의 결과는 ",
+              "몇 달만 보면 확인되지만, ",
+              "성장기 건강은 십 년을 기다려야 보인다. ",
+              "코호트 연구가 하는 일은 ",
+              "그 기다림을 설계로 바꾸는 것이다."
+            ],
+            [
+              "임신당뇨병은 임신 전에는 당뇨병이 없었으나 ",
+              "임신 중 처음 발견되는 고혈당 상태로, ",
+              "전 세계 임신 10건 중 1건 이상에서 ",
+              "나타나는 임신 합병증이다. ",
+              "식사요법과 신체활동으로 혈당을 관리하고, ",
+              "조절이 충분하지 않으면 ",
+              "인슐린 등 약물 치료를 한다. ",
+              "출산 후에는 대부분 혈당이 정상으로 회복되지만, ",
+              "산모 본인은 이후 2형당뇨병 위험이 높아 ",
+              "지속적인 건강관리가 필요하다. ",
+              "흔히 일어나는 일이며 ",
+              "누구의 잘못으로 생기는 일이 아니다."
+            ],
+            [
+              "연구팀은 산모를 ",
+              "임신당뇨병이 없는 경우, ",
+              "인슐린 치료 없이 관리한 경우, ",
+              "인슐린 치료를 받은 경우의 ",
+              "세 그룹으로 나누었다. ",
+              "인슐린 치료 없이 관리한 산모의 자녀는 ",
+              "임신당뇨병이 없던 산모의 자녀보다 ",
+              "2형당뇨병 위험이 1.28배였고, ",
+              "인슐린 치료가 필요했던 산모의 자녀는 4.3배였다. ",
+              "더 눈에 띄는 결과는 1형당뇨병 쪽이다. ",
+              "인슐린 치료 없이 관리된 경우에는 ",
+              "1형당뇨병과 뚜렷한 관련이 없었으나, ",
+              "인슐린 치료가 필요했던 산모의 자녀에게서는 1.9배로 나타났다. ",
+              "1형당뇨병은 유전력이 거의 없다고 알려져 있었기 때문에 ",
+              "이 1.9배는 기존 설명으로 ",
+              "예상하기 어려운 값이었다. ",
+              "많은 사람을 오래 따라가지 않았다면 ",
+              "보이지 않았을 결과다."
+            ],
+            [
+              "다만 위험이 몇 배라는 표현은 ",
+              "읽는 법을 알아야 한다. ",
+              "집단과 집단의 발생 비율을 견준 값이지, ",
+              "한 아이의 앞날을 정해 놓은 값이 아니다. ",
+              "1.9배라는 말은 ",
+              "그 집단에서 1형당뇨병이 생기는 비율이 ",
+              "비교 집단보다 그만큼 높다는 뜻일 뿐, ",
+              "누군가 반드시 걸린다는 예고가 아니다. ",
+              "보도자료가 이 숫자 뒤에 붙인 말도 ",
+              "진단이 아니라 관리였다. ",
+              "김원호 만성질환융복합연구부장은 ",
+              "임신 중 혈당 관리가 ",
+              "산모 본인의 건강뿐 아니라 ",
+              "아이의 평생 건강과도 이어진다며, ",
+              "고위험 산모의 자녀는 성장 과정에서 ",
+              "체중과 혈당을 주기적으로 확인하는 ",
+              "개별적·지속적 관리가 필요하다고 밝혔다. ",
+              "이 연구가 가리키는 쪽은 ",
+              "탓할 사람이 아니라 함께 설계할 돌봄이다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "중앙값",
+              "easy": "자료를 크기 순으로 늘어놓았을 때 가운데 오는 값",
+              "hanja": "中(가운데 중)+央(가운데 앙)"
+            },
+            {
+              "word": "추적",
+              "easy": "뒤를 따라가며 살핌",
+              "hanja": "追(쫓을 추)+跡(자취 적)"
+            },
+            {
+              "word": "합병증",
+              "easy": "어떤 병에 곁들여 생기는 다른 병이나 증상",
+              "hanja": "合(합할 합)+倂(아우를 병)+症(증세 증)"
+            },
+            {
+              "word": "유전력",
+              "easy": "부모에게서 자손에게 전해지는 성질의 힘",
+              "hanja": "遺(남길 유)+傳(전할 전)+力(힘 력)"
+            },
+            {
+              "word": "코호트",
+              "easy": "같은 사람들을 오랫동안 같은 방식으로 따라가며 기록하는 연구",
+              "hanja": null
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글이 가장 힘주어 말하는 것은?",
+              "choices": [
+                "임신당뇨병은 드문 병이라는 것",
+                "아주 많은 사람을 아주 오래 따라가는 설계가 전에는 보이지 않던 것을 드러냈다는 것",
+                "1형당뇨병은 유전으로만 생긴다는 것",
+                "출산 전후의 위험만 중요하다는 것"
+              ],
+              "answer": 1,
+              "explain": "코호트 연구가 하는 일은 기다림을 설계로 바꾸는 것이며, 그 설계가 공백을 메웠다고 했다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "이 연구의 규모와 기간에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "349만 1,680쌍을 최대 14년, 중앙값 9.5년간 추적했다",
+                "349만 1,680쌍을 9.5개월간 추적했다",
+                "1,680쌍을 14년간 추적했다",
+                "349만 명의 산모만 추적했다"
+              ],
+              "answer": 0,
+              "explain": "국민건강보험공단 자료로 349만 1,680쌍을 2022년 말까지 최대 14년, 중앙값 9.5년간 추적했다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "1형당뇨병에 관한 결과로 알맞은 것은?",
+              "choices": [
+                "인슐린 치료 없이 관리된 경우에도 1.9배로 나타났다",
+                "인슐린 치료가 필요했던 산모의 자녀에게서 1.9배로 나타났다",
+                "두 그룹 모두에서 4.3배로 나타났다",
+                "어떤 그룹에서도 관련이 없었다"
+              ],
+              "answer": 1,
+              "explain": "인슐린 치료 없이 관리된 경우에는 뚜렷한 관련이 없었고, 인슐린 치료가 필요했던 산모의 자녀에게서 1.9배였다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "vocab",
+              "q": "「중앙값」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "가장 큰 값",
+                "모든 값을 더한 값",
+                "자료를 크기 순으로 늘어놓았을 때 가운데 오는 값",
+                "가장 자주 나온 값"
+              ],
+              "answer": 2,
+              "explain": "중앙값 9.5년은 절반 이상이 그만큼 이상 관찰되었다는 뜻이다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "critical",
+              "q": "「위험이 1.9배」라는 표현을 이 글의 관점에서 바르게 읽은 것은?",
+              "choices": [
+                "그 집단의 자녀는 반드시 1형당뇨병에 걸린다",
+                "집단과 집단의 발생 비율을 견준 값이며 한 아이의 앞날을 정한 값은 아니다",
+                "유전력이 1.9배라는 뜻이다",
+                "1.9명이 걸린다는 뜻이다"
+              ],
+              "answer": 1,
+              "explain": "글은 집단 사이의 비율을 견준 값일 뿐 누군가 반드시 걸린다는 예고가 아니라고 못 박는다.",
+              "evidencePara": 4
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "1.9배라는 결과가 뜻밖으로 받아들여진 까닭은?",
+              "choices": [
+                "1형당뇨병은 유전력이 거의 없다고 알려져 있었기 때문",
+                "1형당뇨병이 가장 흔한 병이기 때문",
+                "연구 기간이 짧았기 때문",
+                "인슐린이 새로 개발되었기 때문"
+              ],
+              "answer": 0,
+              "explain": "유전력이 거의 없다고 알려진 1형당뇨병이라 기존 설명으로는 예상하기 어려운 값이었다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "apply",
+              "q": "이 연구가 가리키는 다음 행동으로 가장 알맞은 것은?",
+              "choices": [
+                "임신당뇨병을 겪은 산모를 찾아 책임을 묻는다",
+                "고위험 산모의 자녀가 자라는 동안 체중과 혈당을 주기적으로 확인하는 관리를 설계한다",
+                "연구 결과를 공개하지 않는다",
+                "출산 직후의 위험만 계속 살핀다"
+              ],
+              "answer": 1,
+              "explain": "보도자료가 숫자 뒤에 붙인 말은 진단이 아니라 관리였다. 글의 결론도 탓이 아니라 돌봄의 설계다.",
+              "evidencePara": 4
+            }
+          ],
+          "en": [
+            "Two of the measures that decide how much a study can be trusted are scale and time. The study announced by Korea's National Institute of Health in October 2026 stretched both. Using national health insurance records, it tracked 3,491,680 mother-child pairs born between 2009 and 2018 until the end of 2022, for up to 14 years with a median of 9.5 years. The figure of 3.49 million comes from nationwide health insurance records, not from a group that happened to visit one hospital, and a median of 9.5 years means more than half were observed into the middle of elementary school. It is the largest study to analyze type 1 and type 2 diabetes separately in an Asian population.",
+            "The gap it aimed at was clear. Risks around birth, such as early birth, cesarean delivery, or a very large baby, were already fairly well known, but evidence about the health of these children years later was thin. Outcomes right after birth can be checked within months, while health during the growing years only becomes visible after a decade. What a cohort study does is turn that waiting into a design.",
+            "Gestational diabetes is a state of high blood sugar found for the first time during pregnancy in a woman who did not have diabetes before, and it appears in more than one in ten pregnancies worldwide. It is managed with diet and physical activity, and medicine such as insulin is used when control is not enough. Blood sugar usually returns to normal after birth, but the mother herself carries a higher risk of type 2 diabetes afterward and needs continuing care. It is a common condition, and it is not anyone's fault.",
+            "The team divided mothers into three groups: no gestational diabetes, gestational diabetes managed without insulin, and gestational diabetes treated with insulin. Children of mothers who managed without insulin had 1.28 times the risk of type 2 diabetes compared with children of mothers without the condition, and children of mothers who needed insulin had 4.3 times the risk. The more striking result concerns type 1 diabetes. No clear link appeared where insulin was not needed, but children of mothers who needed insulin showed 1.9 times the risk. Because type 1 diabetes has been understood to have almost no inherited component, that 1.9 was hard to predict from existing explanations. Without following many people for a long time, the result would not have appeared.",
+            "Still, a phrase like \"the risk is several times higher\" has to be read carefully. It compares rates between groups; it does not fix one child's future. Saying 1.9 times means that the rate of type 1 diabetes in that group is that much higher than in the comparison group, not that anyone is certain to develop it. What the press release placed after the number was not a diagnosis but management. Dr. Kim Won-ho said that managing blood sugar during pregnancy is linked not only to the mother's own health but also to the child's lifelong health, and that children of high-risk mothers need individual, continuing care, with weight and blood sugar checked regularly as they grow. What this study points to is not someone to blame but care to design together."
+          ],
+          "enseg": [
+            [
+              "Two of the measures that decide ",
+              "how much a study can be trusted ",
+              "are scale and time. ",
+              "The study announced by Korea's National Institute of Health ",
+              "in October 2026 stretched both. ",
+              "Using national health insurance records, ",
+              "it tracked 3,491,680 mother-child pairs ",
+              "born between 2009 and 2018 until the end of 2022, ",
+              "for up to 14 years with a median of 9.5 years. ",
+              "The figure of 3.49 million comes ",
+              "from nationwide health insurance records, ",
+              "not from a group that happened to visit one hospital, ",
+              "and a median of 9.5 years means ",
+              "more than half were observed ",
+              "into the middle of elementary school. ",
+              "It is the largest study to analyze ",
+              "type 1 and type 2 diabetes separately ",
+              "in an Asian population."
+            ],
+            [
+              "The gap it aimed at was clear. ",
+              "Risks around birth, such as early birth, ",
+              "cesarean delivery, or a very large baby, ",
+              "were already fairly well known, ",
+              "but evidence about the health of these children ",
+              "years later was thin. ",
+              "Outcomes right after birth can be checked within months, ",
+              "while health during the growing years ",
+              "only becomes visible after a decade. ",
+              "What a cohort study does ",
+              "is turn that waiting into a design."
+            ],
+            [
+              "Gestational diabetes is a state of high blood sugar ",
+              "found for the first time during pregnancy ",
+              "in a woman who did not have diabetes before, ",
+              "and it appears in more than one in ten pregnancies worldwide. ",
+              "It is managed with diet and physical activity, ",
+              "and medicine such as insulin is used ",
+              "when control is not enough. ",
+              "Blood sugar usually returns to normal after birth, ",
+              "but the mother herself carries a higher risk ",
+              "of type 2 diabetes afterward ",
+              "and needs continuing care. ",
+              "It is a common condition, ",
+              "and it is not anyone's fault."
+            ],
+            [
+              "The team divided mothers into three groups: ",
+              "no gestational diabetes, ",
+              "gestational diabetes managed without insulin, ",
+              "and gestational diabetes treated with insulin. ",
+              "Children of mothers who managed without insulin ",
+              "had 1.28 times the risk of type 2 diabetes ",
+              "compared with children of mothers without the condition, ",
+              "and children of mothers who needed insulin ",
+              "had 4.3 times the risk. ",
+              "The more striking result concerns type 1 diabetes. ",
+              "No clear link appeared where insulin was not needed, ",
+              "but children of mothers who needed insulin ",
+              "showed 1.9 times the risk. ",
+              "Because type 1 diabetes has been understood ",
+              "to have almost no inherited component, ",
+              "that 1.9 was hard to predict from existing explanations. ",
+              "Without following many people for a long time, ",
+              "the result would not have appeared."
+            ],
+            [
+              "Still, a phrase like \"the risk is several times higher\" ",
+              "has to be read carefully. ",
+              "It compares rates between groups; ",
+              "it does not fix one child's future. ",
+              "Saying 1.9 times means ",
+              "that the rate of type 1 diabetes in that group ",
+              "is that much higher than in the comparison group, ",
+              "not that anyone is certain to develop it. ",
+              "What the press release placed after the number ",
+              "was not a diagnosis but management. ",
+              "Dr. Kim Won-ho said that managing blood sugar during pregnancy ",
+              "is linked not only to the mother's own health ",
+              "but also to the child's lifelong health, ",
+              "and that children of high-risk mothers ",
+              "need individual, continuing care, ",
+              "with weight and blood sugar checked regularly as they grow. ",
+              "What this study points to ",
+              "is not someone to blame ",
+              "but care to design together."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "median",
+              "ko": "중앙값 (명사)",
+              "base": "median [ˈmiːdiən]"
+            },
+            {
+              "word": "cesarean",
+              "ko": "제왕절개의 (형용사)",
+              "base": "cesarean [sɪˈzeriən]"
+            },
+            {
+              "word": "inherited",
+              "ko": "유전된, 물려받은 (형용사)",
+              "base": "inherit [ɪnˈherɪt]"
+            },
+            {
+              "word": "striking",
+              "ko": "눈에 띄는 (형용사)",
+              "base": "strike [straɪk]"
+            },
+            {
+              "word": "continuing",
+              "ko": "지속적인 (형용사)",
+              "base": "continue [kənˈtɪnjuː]"
+            },
+            {
+              "word": "cohort",
+              "ko": "코호트, 같은 집단 (명사)",
+              "base": "cohort [ˈkoʊhɔːrt]"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "suncheon-maesan",
+      "category": "history",
+      "careers": [
+        "hum",
+        "med",
+        "biz"
+      ],
+      "publishedAt": "2026-10-12",
+      "status": "published",
+      "issue": true,
+      "sources": [
+        {
+          "title": "국가유산청 보도자료 — 「순천 매산등 근현대역사문화공간」 국가등록문화유산 등록 예고 (2026.10.7)",
+          "url": "https://www.khs.go.kr/newsBbz/selectNewsBbzView.do?newsItemId=155706404&sectionId=b_sec_1&mn=NS_01_02"
+        }
+      ],
+      "levels": {
+        "L1": {
+          "title": "동네를 함께 지켜요",
+          "minutes": 3,
+          "paragraphs": [
+            [
+              "순천에 매산등이라는 동네가 있어요. ",
+              "아주 오래전에 미국에서 온 사람들이 ",
+              "이곳에 자리를 잡았어요. ",
+              "그리고 학교와 병원과 집을 ",
+              "나란히 지었어요."
+            ],
+            [
+              "나라에서 이 동네를 ",
+              "함께 지키려고 해요. ",
+              "오래된 집 한 채만 ",
+              "고르지 않아요. ",
+              "길과 담장과 빈 터까지 ",
+              "한 덩어리로 묶어요. ",
+              "학교와 병원과 집이 ",
+              "함께 있어야 ",
+              "이 동네 이야기를 ",
+              "알 수 있기 때문이에요."
+            ],
+            [
+              "동네 안에서 ",
+              "일곱 곳도 같이 뽑았어요. ",
+              "아픈 사람을 돌보던 ",
+              "병동도 있고, ",
+              "아주 오래된 담장도 있어요. ",
+              "아직 다 정해진 것은 아니에요. ",
+              "먼저 널리 알리고, ",
+              "사람들 생각을 들어 본 뒤에 정해요."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "동네",
+              "easy": "집들이 모여 있어 사람들이 함께 사는 곳이에요."
+            },
+            {
+              "word": "담장",
+              "easy": "집이나 마당의 둘레를 둘러 막은 벽이에요."
+            },
+            {
+              "word": "병동",
+              "easy": "병원에서 아픈 사람이 지내는 건물이에요."
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글은 무엇에 대한 이야기인가요?",
+              "choices": [
+                "오래된 집 한 채만이 아니라 동네를 한 덩어리로 지키는 일",
+                "순천에서 가장 높은 건물을 찾는 일",
+                "병을 빨리 낫게 하는 약을 만드는 일",
+                "배를 타고 먼 나라로 떠나는 일"
+              ],
+              "answer": 0,
+              "explain": "집 한 채만 고르지 않고 길과 담장과 빈 터까지 한 덩어리로 묶는다고 했어요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "이 동네를 지킬 때 함께 묶는 것으로 글에 나온 것은 무엇인가요?",
+              "choices": [
+                "학교 책상만",
+                "길과 담장과 빈 터까지",
+                "병원에 있는 약만",
+                "길에 서 있는 나무 한 그루만"
+              ],
+              "answer": 1,
+              "explain": "길과 담장과 빈 터까지 한 덩어리로 묶는다고 했어요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「병동」은 무엇인가요?",
+              "choices": [
+                "병원에서 아픈 사람이 지내는 건물",
+                "공부를 하는 교실",
+                "길에 세워 둔 큰 돌",
+                "마당에 심은 나무"
+              ],
+              "answer": 0,
+              "explain": "아픈 사람을 돌보던 병동이라고 했어요.",
+              "evidencePara": 2
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "학교와 병원과 집을 따로따로 지키지 않고 함께 지키려는 까닭은 무엇일까요?",
+              "choices": [
+                "건물이 모두 똑같이 생겼기 때문",
+                "셋이 함께 있어야 이 동네 이야기를 알 수 있기 때문",
+                "학교가 가장 크기 때문",
+                "집이 가장 오래되었기 때문"
+              ],
+              "answer": 1,
+              "explain": "학교와 병원과 집이 함께 있어야 이 동네 이야기를 알 수 있다고 했어요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "apply",
+              "q": "우리 반 모둠 작품을 남기는 방법으로 이 글과 가장 비슷한 것은 무엇인가요?",
+              "choices": [
+                "가장 잘 만든 작품 하나만 골라 둔다",
+                "작품과 작품을 놓은 자리와 그 사이에 쓴 글까지 함께 둔다",
+                "작품을 모두 치운다",
+                "작품 이름만 적어 둔다"
+              ],
+              "answer": 1,
+              "explain": "하나만 고르지 않고 사이의 자리까지 함께 묶는 방법이에요.",
+              "evidencePara": 1
+            }
+          ]
+        },
+        "L2": {
+          "title": "점이 아니라 선과 면으로",
+          "minutes": 4,
+          "paragraphs": [
+            [
+              "오래된 것을 지킨다고 하면 ",
+              "우리는 보통 건물 한 채를 떠올린다. ",
+              "기와집 한 채, 탑 하나. ",
+              "그런데 국가유산청은 10월 12일, ",
+              "순천의 매산등이라는 동네를 ",
+              "통째로 국가등록문화유산으로 ",
+              "등록 예고한다."
+            ],
+            [
+              "매산등은 20세기 초에 ",
+              "미국 남장로교 선교부가 ",
+              "호남 지역의 선교 활동을 위해 ",
+              "조성한 거점 공간이다. ",
+              "선교와 교육과 의료와 주거, ",
+              "네 가지 기능에 따라 ",
+              "건물이 들어섰다. ",
+              "그래서 근현대문화유산이 공간 곳곳에 흩어져 있다."
+            ],
+            [
+              "이런 동네는 ",
+              "건물 하나만 떼어 내면 뜻이 흐려진다. ",
+              "그래서 국가유산청은 ",
+              "근대역사문화공간이라는 방식을 쓴다. ",
+              "가치가 높은 건축물과 ",
+              "가로와 공간을 ",
+              "점이 아니라 선과 면 단위로 묶어 ",
+              "등록하는 것이다. ",
+              "건물만이 아니라 ",
+              "길과 담장과 그 사이의 빈 자리까지 ",
+              "함께 센다."
+            ],
+            [
+              "이번에는 공간과 함께 ",
+              "그 안의 개별 유산 7건도 ",
+              "등록 예고된다. ",
+              "로저스 선교사 가옥, ",
+              "매산등 선교마을 옛 담장, ",
+              "안력산병원 격리병동, ",
+              "재활직업보도소 석조 교사, ",
+              "우부자집 한옥 사랑채와 안채, 고산의원장 가옥이다. ",
+              "담장과 병동이 한 목록에 ",
+              "나란히 오른 것이 ",
+              "이 방식의 특징이다."
+            ],
+            [
+              "다만 등록 예고는 ",
+              "아직 등록이 아니다. ",
+              "30일 동안 널리 알려 ",
+              "국민 의견을 모으고, ",
+              "국가유산위원회 심의를 거쳐야 최종 등록이 된다."
+            ]
+          ],
+          "en": [
+            "When we talk about protecting something old, we usually picture a single building: one tiled-roof house, one pagoda. On 12 October, however, the Korea Heritage Service gives advance notice that a whole neighbourhood in Suncheon, called Maesandeung, will be listed as National Registered Cultural Heritage.",
+            "Maesandeung was a base created in the early twentieth century by the American Southern Presbyterian mission for its work in the Honam region. Buildings went up according to four functions: mission work, education, medicine and housing. Modern heritage is therefore scattered all over the space.",
+            "In a neighbourhood like this, taking one building out blurs the meaning. So the Korea Heritage Service uses a method called a modern historic and cultural space. Valuable buildings, streets and spaces are listed not as points but as lines and areas. Not only buildings but roads, walls and the empty ground between them are counted together.",
+            "This time seven individual heritage items inside the space receive advance notice as well: the Rogers missionary house, the old wall of the Maesandeung mission village, the isolation ward of Allyeoksan Hospital, the stone schoolhouse of the rehabilitation vocational centre, the sarangchae and anchae of the Ubuja hanok, and the house of the Gosan clinic director. A wall and a hospital ward side by side on one list is what marks this method.",
+            "Advance notice is not yet registration. For thirty days the plan is made public so that citizens' opinions can be gathered, and the final registration follows only after review by the National Heritage Committee."
+          ],
+          "enseg": [
+            [
+              "When we talk about protecting something old, ",
+              "we usually picture a single building: ",
+              "one tiled-roof house, one pagoda. ",
+              "On 12 October, however, ",
+              "the Korea Heritage Service gives advance notice ",
+              "that a whole neighbourhood in Suncheon, ",
+              "called Maesandeung, ",
+              "will be listed as National Registered Cultural Heritage."
+            ],
+            [
+              "Maesandeung was a base created in the early twentieth century ",
+              "by the American Southern Presbyterian mission ",
+              "for its work in the Honam region. ",
+              "Buildings went up according to four functions: ",
+              "mission work, education, medicine and housing. ",
+              "Modern heritage is therefore scattered all over the space."
+            ],
+            [
+              "In a neighbourhood like this, ",
+              "taking one building out blurs the meaning. ",
+              "So the Korea Heritage Service uses a method ",
+              "called a modern historic and cultural space. ",
+              "Valuable buildings, streets and spaces ",
+              "are listed not as points but as lines and areas. ",
+              "Not only buildings but roads, walls ",
+              "and the empty ground between them are counted together."
+            ],
+            [
+              "This time seven individual heritage items inside the space ",
+              "receive advance notice as well: ",
+              "the Rogers missionary house, ",
+              "the old wall of the Maesandeung mission village, ",
+              "the isolation ward of Allyeoksan Hospital, ",
+              "the stone schoolhouse of the rehabilitation vocational centre, ",
+              "the sarangchae and anchae of the Ubuja hanok, ",
+              "and the house of the Gosan clinic director. ",
+              "A wall and a hospital ward side by side on one list ",
+              "is what marks this method."
+            ],
+            [
+              "Advance notice is not yet registration. ",
+              "For thirty days the plan is made public ",
+              "so that citizens' opinions can be gathered, ",
+              "and the final registration follows ",
+              "only after review by the National Heritage Committee."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "neighbourhood",
+              "ko": "동네, 인근 (명사)",
+              "base": "neighbourhood [ˈneɪbəhʊd]"
+            },
+            {
+              "word": "mission",
+              "ko": "선교, 임무 (명사)",
+              "base": "mission [ˈmɪʃn]"
+            },
+            {
+              "word": "medicine",
+              "ko": "의료, 의학 (명사)",
+              "base": "medicine [ˈmedsn]"
+            },
+            {
+              "word": "registration",
+              "ko": "등록 (명사)",
+              "base": "registration [ˌredʒɪˈstreɪʃn]"
+            },
+            {
+              "word": "isolation",
+              "ko": "격리 (명사)",
+              "base": "isolation [ˌaɪsəˈleɪʃn]"
+            },
+            {
+              "word": "individual",
+              "ko": "개별의, 개개의 (형용사)",
+              "base": "individual [ˌɪndɪˈvɪdʒuəl]"
+            }
+          ],
+          "vocab": [
+            {
+              "word": "거점",
+              "easy": "어떤 일을 하려고 마련한 중심 자리",
+              "hanja": "據(의거할 거)+點(점 점)"
+            },
+            {
+              "word": "등록 예고",
+              "easy": "국가유산으로 등록하기 전에 그렇게 하겠다고 미리 널리 알리는 절차",
+              "hanja": "登(오를 등)+錄(적을 록)+豫(미리 예)+告(알릴 고)"
+            },
+            {
+              "word": "면 단위",
+              "easy": "점 하나가 아니라 넓은 면을 하나의 덩어리로 보는 기준",
+              "hanja": "面(낯 면)+單(홑 단)+位(자리 위)"
+            },
+            {
+              "word": "격리병동",
+              "easy": "다른 환자와 떨어뜨려 돌보려고 따로 지은 병동",
+              "hanja": "隔(사이뜰 격)+離(떠날 리)+病(병 병)+棟(마룻대 동)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 알맞은 것은?",
+              "choices": [
+                "매산등에서 가장 오래된 건물이 무엇인지 밝혀졌다",
+                "국가유산청이 건물 한 채가 아니라 매산등이라는 공간을 선과 면 단위로 묶어 등록 예고한다",
+                "순천에 큰 병원이 새로 세워졌다",
+                "기와집과 탑을 고치는 방법이 바뀌었다"
+              ],
+              "answer": 1,
+              "explain": "건축물과 가로와 공간을 점이 아니라 선과 면 단위로 묶어 등록한다고 했다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "detail",
+              "q": "매산등에 건물이 들어선 기능으로 글에 나온 것은?",
+              "choices": [
+                "선교와 교육과 의료와 주거",
+                "농사와 고기잡이",
+                "군사와 교통",
+                "무역과 금융"
+              ],
+              "answer": 0,
+              "explain": "선교와 교육과 의료와 주거, 네 가지 기능에 따라 건물이 들어섰다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「거점」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "담을 둘러 막은 벽",
+                "병을 치료하는 약",
+                "어떤 일을 하려고 마련한 중심 자리",
+                "건물을 짓는 데 쓰는 돌"
+              ],
+              "answer": 2,
+              "explain": "선교 활동을 위해 조성한 거점 공간이라고 했다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "infer",
+              "q": "건물 하나만 떼어 내면 뜻이 흐려진다고 한 까닭은?",
+              "choices": [
+                "건물이 너무 낡았기 때문",
+                "기능별로 모여 한 덩어리로 만들어진 공간이기 때문",
+                "건물값이 아주 비싸기 때문",
+                "건물이 너무 작기 때문"
+              ],
+              "answer": 1,
+              "explain": "선교·교육·의료·주거 기능에 따라 건물이 들어서 한 덩어리를 이룬 공간이다.",
+              "evidencePara": 2
+            }
+          ],
+          "challenge": [
+            {
+              "type": "detail",
+              "q": "이번에 공간과 함께 등록 예고되는 개별 유산은 몇 건인가?",
+              "choices": [
+                "3건",
+                "5건",
+                "7건",
+                "10건"
+              ],
+              "answer": 2,
+              "explain": "공간과 함께 그 안의 개별 유산 7건도 등록 예고된다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "apply",
+              "q": "「선과 면 단위로 묶는다」는 생각을 학교에 옮기면 어떤 모습일까?",
+              "choices": [
+                "가장 오래된 교실 하나만 보존한다",
+                "교실과 복도와 운동장으로 가는 길까지 한 덩어리로 묶어 보존한다",
+                "교실 사진만 모아 둔다",
+                "낡은 교실을 허물고 새로 짓는다"
+              ],
+              "answer": 1,
+              "explain": "건물만이 아니라 길과 담장과 그 사이의 빈 자리까지 함께 세는 방식이다.",
+              "evidencePara": 2
+            }
+          ]
+        },
+        "L3": {
+          "title": "왜 한 채가 아니라 한 동네인가",
+          "minutes": 5,
+          "paragraphs": [
+            [
+              "문화유산을 지키는 가장 익숙한 방법은 ",
+              "하나를 고르는 것이다. ",
+              "건물 한 채, 탑 하나에 ",
+              "이름을 붙여 보호한다. ",
+              "분명하고 관리하기도 쉽다. ",
+              "그러나 지켜야 할 것이 ",
+              "한 채가 아니라 한 동네일 때는 ",
+              "사정이 달라진다."
+            ],
+            [
+              "국가유산청은 10월 12일 ",
+              "「순천 매산등 근현대역사문화공간」과 ",
+              "그 안의 개별 유산 7건을 ",
+              "국가등록문화유산으로 등록 예고한다. ",
+              "매산등은 20세기 초 미국 남장로교 선교부가 ",
+              "호남 지역의 선교 활동을 위해 ",
+              "조성한 거점 공간이다. ",
+              "선교·교육·의료·주거라는 기능에 따라 ",
+              "여러 건물이 자리를 잡았고, ",
+              "그 결과 근현대문화유산이 공간 곳곳에 분포한다."
+            ],
+            [
+              "왜 면 단위여야 하는지는 ",
+              "기능의 배치를 보면 알 수 있다. ",
+              "예배 공간과 학교와 병원과 집이 ",
+              "서로 가까이 놓인 것은 우연이 아니다. ",
+              "거점 하나를 운영하려고 ",
+              "기능을 나누어 배치한 결과다. ",
+              "그중 하나만 떼어 내면 ",
+              "남는 것은 오래된 ",
+              "건물 한 채일 뿐, ",
+              "그 건물이 왜 ",
+              "거기에 서 있었는지는 사라진다. ",
+              "국가유산청의 근대역사문화공간 제도는 그래서 ",
+              "건축물과 가로와 공간을 ",
+              "선과 면 단위로 묶어 등록한다."
+            ],
+            [
+              "이 공간에 의료가 들어 있다는 점도 ",
+              "눈여겨볼 만하다. ",
+              "등록 예고된 7건에는 ",
+              "안력산병원 격리병동이 있다. ",
+              "안력산병원과 관련해 ",
+              "유일하게 남은 시설물로, ",
+              "근대 의료의 역사적 가치를 지녔다고 평가됐다. ",
+              "난치병 치료와 장애인 직업 교육에 쓰인 ",
+              "재활직업보도소 석조 교사도 함께 올랐다."
+            ],
+            [
+              "매산등은 기존의 순천부읍성과 ",
+              "공간적·기능적으로 이어지며 형성됐다. ",
+              "서양 근대 건축 기술과 ",
+              "지역 건축 재료가 함께 쓰였고, ",
+              "초기 도시의 계획적 배치가 남아 있다. ",
+              "7건 가운데 ",
+              "「매산등 선교마을 옛 담장」은 ",
+              "전통 공간과 선교부 공간의 ",
+              "경계를 이루는 시설물이다. ",
+              "담장 하나가 두 공간의 ",
+              "관계를 보여 주는 셈이다."
+            ],
+            [
+              "다만 등록 예고는 등록이 아니다. ",
+              "국가유산청은 30일간 등록 예고를 해 ",
+              "국민 의견을 수렴하고, ",
+              "국가유산위원회 심의를 거친 뒤에 ",
+              "최종 등록할 예정이다. ",
+              "예고는 결정이 아니라, ",
+              "결정에 앞서 의견을 묻는 절차다."
+            ]
+          ],
+          "en": [
+            "The most familiar way of protecting cultural heritage is to choose one thing. A single building or a single pagoda is given a name and placed under protection. That is clear, and it is easy to manage. But when what must be protected is not one house but one neighbourhood, the situation changes.",
+            "On 12 October the Korea Heritage Service gives advance notice that the Suncheon Maesandeung Modern and Contemporary Historic and Cultural Space, together with seven individual heritage items inside it, will be listed as National Registered Cultural Heritage. Maesandeung was a base created in the early twentieth century by the American Southern Presbyterian mission for its work in the Honam region. Buildings took their places according to the functions of mission work, education, medicine and housing, and as a result modern heritage is distributed all through the space.",
+            "Why the unit has to be an area becomes clear from the arrangement of those functions. That a place of worship, a school, a hospital and houses stand close to one another is no accident. It is the result of dividing functions in order to run a single base. Pull one of them out and what remains is merely an old building; why it stood in that spot disappears. The modern historic space scheme of the Korea Heritage Service therefore lists buildings, streets and spaces together as lines and areas.",
+            "It is worth noticing that medicine belongs inside this space. Among the seven items under advance notice is the isolation ward of Allyeoksan Hospital. It is the only surviving facility connected with that hospital, and it was judged to hold historical value for modern medicine. The stone schoolhouse of the rehabilitation vocational centre, used for treating intractable illness and for vocational education of disabled people, is on the list as well.",
+            "Maesandeung was also formed in spatial and functional connection with the earlier Suncheon town wall. Western modern building technology was used alongside local materials, and the planned layout of an early city survives. Among the seven items, the old wall of the Maesandeung mission village is the structure that forms the boundary between the traditional space and the mission space. A single wall thus shows the relation between the two.",
+            "Advance notice, however, is not registration. The Korea Heritage Service will give notice for thirty days, gather public opinion, and complete the listing only after review by the National Heritage Committee. Notice is not a decision but a procedure for asking opinions before one is made."
+          ],
+          "enseg": [
+            [
+              "The most familiar way of protecting cultural heritage ",
+              "is to choose one thing. ",
+              "A single building or a single pagoda ",
+              "is given a name and placed under protection. ",
+              "That is clear, and it is easy to manage. ",
+              "But when what must be protected ",
+              "is not one house but one neighbourhood, ",
+              "the situation changes."
+            ],
+            [
+              "On 12 October the Korea Heritage Service gives advance notice ",
+              "that the Suncheon Maesandeung Modern and Contemporary Historic and Cultural Space, ",
+              "together with seven individual heritage items inside it, ",
+              "will be listed as National Registered Cultural Heritage. ",
+              "Maesandeung was a base created in the early twentieth century ",
+              "by the American Southern Presbyterian mission ",
+              "for its work in the Honam region. ",
+              "Buildings took their places according to the functions ",
+              "of mission work, education, medicine and housing, ",
+              "and as a result modern heritage is distributed all through the space."
+            ],
+            [
+              "Why the unit has to be an area ",
+              "becomes clear from the arrangement of those functions. ",
+              "That a place of worship, a school, ",
+              "a hospital and houses stand close to one another ",
+              "is no accident. ",
+              "It is the result of dividing functions ",
+              "in order to run a single base. ",
+              "Pull one of them out ",
+              "and what remains is merely an old building; ",
+              "why it stood in that spot disappears. ",
+              "The modern historic space scheme of the Korea Heritage Service ",
+              "therefore lists buildings, streets and spaces ",
+              "together as lines and areas."
+            ],
+            [
+              "It is worth noticing ",
+              "that medicine belongs inside this space. ",
+              "Among the seven items under advance notice ",
+              "is the isolation ward of Allyeoksan Hospital. ",
+              "It is the only surviving facility ",
+              "connected with that hospital, ",
+              "and it was judged to hold historical value for modern medicine. ",
+              "The stone schoolhouse of the rehabilitation vocational centre, ",
+              "used for treating intractable illness ",
+              "and for vocational education of disabled people, ",
+              "is on the list as well."
+            ],
+            [
+              "Maesandeung was also formed ",
+              "in spatial and functional connection ",
+              "with the earlier Suncheon town wall. ",
+              "Western modern building technology ",
+              "was used alongside local materials, ",
+              "and the planned layout of an early city survives. ",
+              "Among the seven items, ",
+              "the old wall of the Maesandeung mission village ",
+              "is the structure that forms the boundary ",
+              "between the traditional space and the mission space. ",
+              "A single wall thus shows the relation between the two."
+            ],
+            [
+              "Advance notice, however, is not registration. ",
+              "The Korea Heritage Service will give notice for thirty days, ",
+              "gather public opinion, ",
+              "and complete the listing ",
+              "only after review by the National Heritage Committee. ",
+              "Notice is not a decision ",
+              "but a procedure for asking opinions before one is made."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "arrangement",
+              "ko": "배치, 배열 (명사)",
+              "base": "arrangement [əˈreɪndʒmənt]"
+            },
+            {
+              "word": "distributed",
+              "ko": "분포된, 흩어져 있는 (형용사)",
+              "base": "distribute [dɪˈstrɪbjuːt]"
+            },
+            {
+              "word": "boundary",
+              "ko": "경계 (명사)",
+              "base": "boundary [ˈbaʊndri]"
+            },
+            {
+              "word": "facility",
+              "ko": "시설(물) (명사)",
+              "base": "facility [fəˈsɪləti]"
+            },
+            {
+              "word": "procedure",
+              "ko": "절차 (명사)",
+              "base": "procedure [prəˈsiːdʒə]"
+            },
+            {
+              "word": "intractable",
+              "ko": "낫기 어려운, 다루기 힘든 (형용사)",
+              "base": "intractable [ɪnˈtræktəbl]"
+            }
+          ],
+          "vocab": [
+            {
+              "word": "분포",
+              "easy": "여기저기 흩어져 퍼져 있음",
+              "hanja": "分(나눌 분)+布(베 포)"
+            },
+            {
+              "word": "면 단위",
+              "easy": "점 하나가 아니라 넓은 면을 하나의 덩어리로 보는 기준",
+              "hanja": "面(낯 면)+單(홑 단)+位(자리 위)"
+            },
+            {
+              "word": "격리병동",
+              "easy": "다른 환자와 떨어뜨려 돌보려고 따로 지은 병동",
+              "hanja": "隔(사이뜰 격)+離(떠날 리)+病(병 병)+棟(마룻대 동)"
+            },
+            {
+              "word": "경계",
+              "easy": "서로 다른 두 곳이 맞닿아 갈리는 자리",
+              "hanja": "境(지경 경)+界(지경 계)"
+            },
+            {
+              "word": "수렴",
+              "easy": "여러 사람의 의견을 모아 받아들임",
+              "hanja": "收(거둘 수)+斂(거둘 렴)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 알맞은 것은?",
+              "choices": [
+                "매산등의 건물은 모두 서양에서 가져온 재료로 지었다",
+                "기능이 모여 만들어진 공간이기 때문에 매산등은 점이 아니라 면 단위로 등록된다",
+                "안력산병원은 지금도 환자를 받고 있다",
+                "순천부읍성이 매산등보다 먼저 사라졌다"
+              ],
+              "answer": 1,
+              "explain": "기능을 나누어 배치한 결과 만들어진 공간이라 선과 면 단위로 묶어 등록한다고 했다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "detail",
+              "q": "등록 예고된 7건에 들어 있는 것으로 글에 나온 것은?",
+              "choices": [
+                "안력산병원 격리병동",
+                "순천부읍성 성벽",
+                "초기 도시의 계획 도면",
+                "서양 근대 건축 기술 설명서"
+              ],
+              "answer": 0,
+              "explain": "등록 예고된 7건에는 안력산병원 격리병동이 있다고 했다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "vocab",
+              "q": "「분포」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "한곳에 모아 쌓음",
+                "차례대로 줄을 세움",
+                "둘로 나누어 가름",
+                "여기저기 흩어져 퍼져 있음"
+              ],
+              "answer": 3,
+              "explain": "근현대문화유산이 공간 곳곳에 분포한다고 했다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "infer",
+              "q": "글에 따르면 「등록 예고」와 「등록」은 어떻게 다른가?",
+              "choices": [
+                "둘은 같은 말이다",
+                "등록 예고는 30일간 의견을 수렴하고 심의를 거쳐야 등록이 되는 앞 단계다",
+                "등록 예고는 등록이 끝난 뒤에 알리는 절차다",
+                "등록 예고는 주민이 하고 등록은 학교가 한다"
+              ],
+              "answer": 1,
+              "explain": "30일간 국민 의견을 수렴하고 국가유산위원회 심의를 거친 뒤에 최종 등록할 예정이다.",
+              "evidencePara": 5
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "담장 하나가 등록 대상에 오른 까닭을 글에서 찾으면?",
+              "choices": [
+                "담장이 그 일대에서 가장 오래된 건축물이기 때문",
+                "담장이 전통 공간과 선교부 공간의 경계를 이루는 시설물이기 때문",
+                "담장이 가장 튼튼하게 지어졌기 때문",
+                "담장이 병원과 학교를 이어 주는 길이기 때문"
+              ],
+              "answer": 1,
+              "explain": "「매산등 선교마을 옛 담장」은 전통 공간과 선교부 공간의 경계를 이루는 시설물이다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "apply",
+              "q": "면 단위로 묶어 지키는 방식의 성격을 가장 잘 설명한 것은?",
+              "choices": [
+                "건물이 왜 거기 있었는지가 남지만 지켜야 할 범위는 넓어진다",
+                "건물 하나만 남겨도 공간의 뜻이 그대로 남는다",
+                "길과 담장은 보존 대상이 될 수 없다",
+                "등록이 끝난 뒤에 의견을 묻는다"
+              ],
+              "answer": 0,
+              "explain": "하나만 떼어 내면 왜 거기 서 있었는지가 사라지므로 건축물과 가로와 공간을 함께 묶는다.",
+              "evidencePara": 2
+            }
+          ]
+        },
+        "L4": {
+          "title": "보존의 단위를 넓힌다는 것",
+          "minutes": 7,
+          "paragraphs": [
+            [
+              "보존은 무엇을 지킬지 묻지만, ",
+              "그에 앞서 어느 크기로 지킬지를 정해야 한다. ",
+              "단위가 작으면 관리는 쉬워지고 맥락은 잘린다. ",
+              "단위가 커지면 맥락은 살아나지만 ",
+              "책임도 함께 넓어진다. ",
+              "10월 12일 국가유산청이 ",
+              "「순천 매산등 근현대역사문화공간」과 ",
+              "그 안의 개별 유산 7건을 ",
+              "국가등록문화유산으로 등록 예고하는 일은, ",
+              "그 단위를 어디까지 넓힐 수 있는지 보여 준다."
+            ],
+            [
+              "매산등은 20세기 초 미국 남장로교 선교부가 ",
+              "호남 지역의 선교 활동을 위해 ",
+              "조성한 거점 공간이다. ",
+              "여기서 읽을 것은 종교에 대한 평가가 아니라 ",
+              "공간이 만들어진 방식이다. ",
+              "선교·교육·의료·주거라는 기능이 각각 ",
+              "자리를 배정받아 한 덩어리로 형성됐고, ",
+              "그래서 근현대문화유산이 공간 곳곳에 분포한다. ",
+              "국가유산청은 이 공간을 면 단위 유산으로서 ",
+              "역사적·건축적 가치가 높다고 평가했다."
+            ],
+            [
+              "근대역사문화공간은 가치가 높은 건축물·가로·공간 등을 ",
+              "선·면 단위의 국가등록문화유산으로 등록하는 제도다. ",
+              "점이 아니라 선과 면을 단위로 삼으면 ",
+              "목록의 성격이 바뀐다. ",
+              "건물 사이의 거리, 길의 방향, ",
+              "담장이 그은 경계처럼 ",
+              "그 자체로는 작품이 아닌 것들이 ",
+              "보존 대상에 들어온다. ",
+              "등록 예고된 7건에 「매산등 선교마을 옛 담장」이 ",
+              "들어 있는 것이 그 예다. ",
+              "이 담장은 순천부읍성 쪽 전통 공간과 ",
+              "선교부 공간의 경계를 이루는 ",
+              "시설물로 평가됐다."
+            ],
+            [
+              "기능의 흔적은 의료에서 특히 또렷하다. ",
+              "등록 예고 대상에는 ",
+              "안력산병원 격리병동이 포함된다. ",
+              "안력산병원과 관련해 유일하게 남은 시설물로, ",
+              "근대 의료의 역사적 가치를 지닌다. ",
+              "난치병 치료와 장애인 직업 교육에 사용된 ",
+              "재활직업보도소 석조 교사도 함께 올랐고, ",
+              "안력산병원 제2대 원장 로저스 선교사가 ",
+              "생활한 가옥은 순천 지역의 석재로 지은 ",
+              "서양식 주거 건축물이다. ",
+              "치료와 교육과 주거가 각각 다른 건물로 남아, ",
+              "세 기능이 한 공간에서 ",
+              "맞물렸음을 보여 준다."
+            ],
+            [
+              "이 제도는 보존만을 목적으로 두지 않는다. ",
+              "근대역사문화공간은 종합정비지원 등을 통해 ",
+              "지역 활성화의 핵심축으로 조성·운영되고 있다. ",
+              "매산등 일대에는 ",
+              "「순천 구 남장로교회 조지와츠 기념관」 등 ",
+              "5건의 지정·등록문화유산을 비롯한 근현대건축유산이 집적되어 있고, ",
+              "국가유산 야행 같은 활용 사업이 열려 ",
+              "지역의 대표 관광 명소로 자리매김해 왔다. ",
+              "보존과 활용을 함께 거는 설계는 ",
+              "공간을 쓰이게 하지만, ",
+              "쓰임이 공간의 성격을 바꾸지 않게 ",
+              "할 과제도 남긴다."
+            ],
+            [
+              "절차도 함께 읽어야 한다. ",
+              "국가유산청은 2018년부터 추진한 ",
+              "근대역사문화공간 활성화 사업을 ",
+              "올해 2월 공모 방식에서 상시 접수로 바꾸었고, ",
+              "매산등은 개편 이후 상시 등록으로 예고되는 ",
+              "첫 사례이자 10번째 공간이다. ",
+              "그리고 이번 발표는 등록이 아니라 예고다. ",
+              "30일간 국민 의견을 수렴하고 ",
+              "국가유산위원회 심의를 거쳐야 최종 등록된다. ",
+              "예고와 등록 사이의 30일은 ",
+              "비어 있는 시간이 아니라, ",
+              "면 단위 보존이 지역의 동의를 얻는 자리다."
+            ]
+          ],
+          "en": [
+            "Preservation asks what is to be protected, but before that it has to settle at what size. A small unit is easier to manage and cuts away context. A larger unit keeps the context alive but widens the responsibility as well. On 12 October the Korea Heritage Service gives advance notice that the Suncheon Maesandeung Modern and Contemporary Historic and Cultural Space, together with seven individual heritage items inside it, will be listed as National Registered Cultural Heritage, and that act shows how far the unit can be widened.",
+            "Maesandeung was a base created in the early twentieth century by the American Southern Presbyterian mission for its work in the Honam region. What has to be read here is not a judgement about religion but the way the space was made. The functions of mission work, education, medicine and housing were each given a place and formed as one body, and modern heritage is therefore distributed all through the space. The Korea Heritage Service judged this space to hold high historical and architectural value as an area-unit heritage.",
+            "A modern historic and cultural space is a scheme for listing valuable buildings, streets and spaces as National Registered Cultural Heritage in units of lines and areas. Once lines and areas rather than points become the unit, the character of the list changes. Distances between buildings, the direction of a road, the boundary drawn by a wall, things that are not works of art in themselves, enter the field of preservation. The old wall of the Maesandeung mission village, among the seven items under advance notice, is one example. That wall was judged to be the structure forming the boundary between the traditional space around the Suncheon town wall and the mission space.",
+            "The trace of function is clearest in medicine. The isolation ward of Allyeoksan Hospital is included in the advance notice. It is the only surviving facility connected with that hospital and holds historical value for modern medicine. The stone schoolhouse of the rehabilitation vocational centre, used for treating intractable illness and for vocational education of disabled people, is listed too, and the house where the missionary Rogers, the second director of that hospital, lived is a Western-style dwelling built with stone from the Suncheon area. Treatment, education and housing survive as separate buildings, which shows how the three functions were locked together inside one space.",
+            "The scheme does not aim at preservation alone. Modern historic and cultural spaces are built and run as a core axis of regional revitalisation, with comprehensive repair support among the measures. The Maesandeung area already holds modern architectural heritage, including five designated and registered items such as the George Watts Memorial Hall of the former Southern Presbyterian church in Suncheon, and programmes like the Heritage Night Walk have made it a leading tourist site for the region. A design that stakes preservation and use together keeps the space in service, yet it leaves the task of not letting that use change the character of the space.",
+            "The procedure has to be read along with it. The Korea Heritage Service changed the revitalisation project for modern historic and cultural spaces, pursued since 2018, from a fixed-period open call to year-round intake this February, and Maesandeung is the first case to receive advance notice through year-round registration since that reform, as well as the tenth such space. This announcement is notice, not registration. Public opinion is gathered for thirty days, and review by the National Heritage Committee has to follow before the final listing. The thirty days between notice and registration are not empty time but the place where area-unit preservation earns the consent of the region."
+          ],
+          "enseg": [
+            [
+              "Preservation asks what is to be protected, ",
+              "but before that it has to settle at what size. ",
+              "A small unit is easier to manage ",
+              "and cuts away context. ",
+              "A larger unit keeps the context alive ",
+              "but widens the responsibility as well. ",
+              "On 12 October the Korea Heritage Service gives advance notice ",
+              "that the Suncheon Maesandeung Modern and Contemporary Historic and Cultural Space, ",
+              "together with seven individual heritage items inside it, ",
+              "will be listed as National Registered Cultural Heritage, ",
+              "and that act shows how far the unit can be widened."
+            ],
+            [
+              "Maesandeung was a base created in the early twentieth century ",
+              "by the American Southern Presbyterian mission ",
+              "for its work in the Honam region. ",
+              "What has to be read here ",
+              "is not a judgement about religion ",
+              "but the way the space was made. ",
+              "The functions of mission work, education, medicine and housing ",
+              "were each given a place and formed as one body, ",
+              "and modern heritage is therefore distributed all through the space. ",
+              "The Korea Heritage Service judged this space ",
+              "to hold high historical and architectural value ",
+              "as an area-unit heritage."
+            ],
+            [
+              "A modern historic and cultural space is a scheme ",
+              "for listing valuable buildings, streets and spaces ",
+              "as National Registered Cultural Heritage ",
+              "in units of lines and areas. ",
+              "Once lines and areas rather than points become the unit, ",
+              "the character of the list changes. ",
+              "Distances between buildings, the direction of a road, ",
+              "the boundary drawn by a wall, ",
+              "things that are not works of art in themselves, ",
+              "enter the field of preservation. ",
+              "The old wall of the Maesandeung mission village, ",
+              "among the seven items under advance notice, ",
+              "is one example. ",
+              "That wall was judged to be the structure ",
+              "forming the boundary between the traditional space ",
+              "around the Suncheon town wall and the mission space."
+            ],
+            [
+              "The trace of function is clearest in medicine. ",
+              "The isolation ward of Allyeoksan Hospital ",
+              "is included in the advance notice. ",
+              "It is the only surviving facility connected with that hospital ",
+              "and holds historical value for modern medicine. ",
+              "The stone schoolhouse of the rehabilitation vocational centre, ",
+              "used for treating intractable illness ",
+              "and for vocational education of disabled people, ",
+              "is listed too, ",
+              "and the house where the missionary Rogers, ",
+              "the second director of that hospital, lived ",
+              "is a Western-style dwelling ",
+              "built with stone from the Suncheon area. ",
+              "Treatment, education and housing survive as separate buildings, ",
+              "which shows how the three functions ",
+              "were locked together inside one space."
+            ],
+            [
+              "The scheme does not aim at preservation alone. ",
+              "Modern historic and cultural spaces are built and run ",
+              "as a core axis of regional revitalisation, ",
+              "with comprehensive repair support among the measures. ",
+              "The Maesandeung area already holds modern architectural heritage, ",
+              "including five designated and registered items ",
+              "such as the George Watts Memorial Hall ",
+              "of the former Southern Presbyterian church in Suncheon, ",
+              "and programmes like the Heritage Night Walk ",
+              "have made it a leading tourist site for the region. ",
+              "A design that stakes preservation and use together ",
+              "keeps the space in service, ",
+              "yet it leaves the task of not letting that use ",
+              "change the character of the space."
+            ],
+            [
+              "The procedure has to be read along with it. ",
+              "The Korea Heritage Service changed the revitalisation project ",
+              "for modern historic and cultural spaces, pursued since 2018, ",
+              "from a fixed-period open call to year-round intake this February, ",
+              "and Maesandeung is the first case ",
+              "to receive advance notice through year-round registration ",
+              "since that reform, as well as the tenth such space. ",
+              "This announcement is notice, not registration. ",
+              "Public opinion is gathered for thirty days, ",
+              "and review by the National Heritage Committee ",
+              "has to follow before the final listing. ",
+              "The thirty days between notice and registration ",
+              "are not empty time ",
+              "but the place where area-unit preservation earns the consent of the region."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "preservation",
+              "ko": "보존 (명사)",
+              "base": "preservation [ˌprezəˈveɪʃn]"
+            },
+            {
+              "word": "context",
+              "ko": "맥락, 문맥 (명사)",
+              "base": "context [ˈkɒntekst]"
+            },
+            {
+              "word": "responsibility",
+              "ko": "책임 (명사)",
+              "base": "responsibility [rɪˌspɒnsəˈbɪləti]"
+            },
+            {
+              "word": "architectural",
+              "ko": "건축의, 건축적 (형용사)",
+              "base": "architectural [ˌɑːkɪˈtektʃərəl]"
+            },
+            {
+              "word": "boundary",
+              "ko": "경계 (명사)",
+              "base": "boundary [ˈbaʊndri]"
+            },
+            {
+              "word": "revitalisation",
+              "ko": "활성화 (명사)",
+              "base": "revitalise [ˌriːˈvaɪtəlaɪz]"
+            },
+            {
+              "word": "consent",
+              "ko": "동의, 승낙 (명사)",
+              "base": "consent [kənˈsent]"
+            }
+          ],
+          "vocab": [
+            {
+              "word": "맥락",
+              "easy": "앞뒤가 이어져 뜻을 만들어 내는 흐름",
+              "hanja": "脈(줄기 맥)+絡(이을 락)"
+            },
+            {
+              "word": "가로",
+              "easy": "도시의 길과 그 길에 면한 공간",
+              "hanja": "街(거리 가)+路(길 로)"
+            },
+            {
+              "word": "집적",
+              "easy": "한곳에 여럿이 모여 쌓임",
+              "hanja": "集(모을 집)+積(쌓을 적)"
+            },
+            {
+              "word": "핵심축",
+              "easy": "전체를 돌아가게 하는 가장 중요한 중심",
+              "hanja": "核(씨 핵)+心(마음 심)+軸(굴대 축)"
+            },
+            {
+              "word": "활성화",
+              "easy": "활발하게 움직이도록 만드는 일",
+              "hanja": "活(살 활)+性(성품 성)+化(될 화)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 핵심 주장으로 가장 알맞은 것은?",
+              "choices": [
+                "근현대 건축물은 오래된 유산보다 가치가 낮다",
+                "보존의 단위를 점에서 선·면으로 넓히면 기능이 얽힌 공간의 맥락까지 지킬 수 있다",
+                "관광객이 많은 곳부터 유산으로 등록해야 한다",
+                "종합정비지원은 보존과 관계가 없는 사업이다"
+              ],
+              "answer": 1,
+              "explain": "단위가 작으면 맥락이 잘리고, 커지면 맥락이 살아나지만 책임도 넓어진다는 틀로 이 사례를 읽는다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "글에 따른 매산등에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "제도 개편 이전의 공모를 통해 등록이 확정됐다",
+                "개편 이후 상시 등록으로 예고되는 첫 사례이자 10번째 공간이다",
+                "등록 예고 없이 곧바로 등록됐다",
+                "개별 유산 없이 공간만 등록 예고됐다"
+              ],
+              "answer": 1,
+              "explain": "상시 접수로 바뀐 뒤 상시 등록으로 예고되는 첫 사례이자 10번째 공간이라고 했다.",
+              "evidencePara": 5
+            },
+            {
+              "type": "vocab",
+              "q": "이 글에서 「가로」가 뜻하는 것은?",
+              "choices": [
+                "건물의 너비",
+                "담장의 높이",
+                "도시의 길과 그 길에 면한 공간",
+                "지도에 그은 가로줄"
+              ],
+              "answer": 2,
+              "explain": "가치가 높은 건축물·가로·공간을 선·면 단위로 등록한다고 했다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "infer",
+              "q": "「그 자체로는 작품이 아닌 것들이 보존 대상에 들어온다」는 말의 뜻은?",
+              "choices": [
+                "건물의 예술성만을 기준으로 삼는다는 뜻",
+                "건물 사이의 거리나 담장이 그은 경계처럼 관계를 보여 주는 요소도 함께 지킨다는 뜻",
+                "작품이 아닌 것은 목록에서 빼야 한다는 뜻",
+                "모든 길과 담장을 빠짐없이 등록해야 한다는 뜻"
+              ],
+              "answer": 1,
+              "explain": "건물 사이의 거리, 길의 방향, 담장이 그은 경계가 보존 대상에 들어온다고 했다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "critical",
+              "q": "보존과 활용을 함께 거는 설계에 대해 이 글이 남긴 과제는?",
+              "choices": [
+                "관광객 수를 늘려 사업비를 더 많이 확보하는 일",
+                "쓰임이 공간의 성격을 바꾸지 않게 하는 일",
+                "개별 유산을 공간에서 떼어 따로 관리하는 일",
+                "등록 예고 기간을 없애 절차를 줄이는 일"
+              ],
+              "answer": 1,
+              "explain": "공간을 쓰이게 하지만 쓰임이 공간의 성격을 바꾸지 않게 할 과제도 남긴다고 했다.",
+              "evidencePara": 4
+            }
+          ],
+          "challenge": [
+            {
+              "type": "critical",
+              "q": "「예고와 등록 사이의 30일」을 이 글은 어떻게 평가하는가?",
+              "choices": [
+                "절차가 늦어져 낭비되는 기간",
+                "면 단위 보존이 지역의 동의를 얻는 자리",
+                "심의 결과를 알리기만 하는 형식적 기간",
+                "등록이 사실상 끝난 뒤의 유예 기간"
+              ],
+              "answer": 1,
+              "explain": "비어 있는 시간이 아니라 면 단위 보존이 지역의 동의를 얻는 자리라고 했다.",
+              "evidencePara": 5
+            },
+            {
+              "type": "apply",
+              "q": "의료와 교육과 주거가 각각 다른 건물로 남은 것이 중요한 까닭을 가장 잘 설명한 것은?",
+              "choices": [
+                "세 기능이 한 공간 안에서 맞물려 있었음을 건물 배치로 확인할 수 있기 때문",
+                "가장 큰 건물을 찾기 쉬워지기 때문",
+                "건물 수가 많을수록 등록이 쉬워지기 때문",
+                "서양식 건축만 남아 비교가 쉬워지기 때문"
+              ],
+              "answer": 0,
+              "explain": "치료와 교육과 주거가 각각 다른 건물로 남아 세 기능이 한 공간에서 맞물렸음을 보여 준다.",
+              "evidencePara": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "stone-knot-master",
+      "category": "humanities",
+      "careers": [
+        "art",
+        "edu",
+        "eng"
+      ],
+      "publishedAt": "2026-10-12",
+      "status": "published",
+      "issue": true,
+      "sources": [
+        {
+          "title": "국가유산청 보도자료 — 국가무형유산 「석장」 보유자로 윤만걸, 임동조 씨, 「매듭장」 보유자로 박선경, 임금희 씨 인정 예고 (2026.10.7)",
+          "url": "https://www.khs.go.kr/newsBbz/selectNewsBbzView.do?newsItemId=155706405&sectionId=b_sec_1&mn=NS_01_02"
+        }
+      ],
+      "levels": {
+        "L1": {
+          "title": "돌과 끈을 오래 익힌 사람들",
+          "minutes": 3,
+          "paragraphs": [
+            [
+              "돌을 다루는 기술이 있어요. ",
+              "돌을 다듬어 쌓아서 ",
+              "담을 만들고, ",
+              "돌로 다리를 놓아요. ",
+              "이 기술을 ",
+              "아주 오래 익힌 사람들이 있어요. ",
+              "열 몇 살 때 ",
+              "배우기 시작해서 ",
+              "오십 년이 넘었어요."
+            ],
+            [
+              "끈을 묶는 기술도 있어요. ",
+              "고운 끈으로 ",
+              "여러 가지 매듭을 지어요. ",
+              "이 기술을 익힌 사람들도 있어요. ",
+              "한 분은 사십 년 동안 ",
+              "가르치며 이어 왔어요."
+            ],
+            [
+              "이분들은 배운 것을 ",
+              "혼자 두지 않아요. ",
+              "다른 사람에게 하나하나 가르쳐 줘요. ",
+              "그래서 기술이 ",
+              "사람에서 사람으로 건너가요. ",
+              "나라는 이런 사람을 보유자라고 불러요."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "기술",
+              "easy": "무엇을 잘 만들거나 잘 다루는 솜씨예요.",
+              "hanja": null
+            },
+            {
+              "word": "매듭",
+              "easy": "끈을 얽어 묶어 놓은 자리예요.",
+              "hanja": null
+            },
+            {
+              "word": "보유자",
+              "easy": "나라가 「이 사람이 그 기술을 가졌다」고 인정한 사람이에요.",
+              "hanja": null
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글은 무엇을 알려 주나요?",
+              "choices": [
+                "돌을 파는 가게",
+                "오래 익힌 기술을 다른 사람에게 가르쳐 준다는 것",
+                "매듭을 묶는 순서",
+                "다리를 건너는 방법"
+              ],
+              "answer": 1,
+              "explain": "돌을 다루는 기술과 끈을 묶는 기술을 오래 익힌 사람들이, 그 기술을 다른 사람에게 가르쳐 준다는 이야기예요.",
+              "evidencePara": 2
+            },
+            {
+              "type": "detail",
+              "q": "돌을 다루는 기술을 익힌 사람들은 얼마나 오래 배웠나요?",
+              "choices": [
+                "하루",
+                "한 해",
+                "오십 년이 넘었어요",
+                "아직 안 배웠어요"
+              ],
+              "answer": 2,
+              "explain": "「열 몇 살 때 배우기 시작해서 오십 년이 넘었어요」라고 나와요.",
+              "evidencePara": 0
+            },
+            {
+              "type": "vocab",
+              "q": "「보유자」는 어떤 사람인가요?",
+              "choices": [
+                "돌을 파는 사람",
+                "나라가 그 기술을 가졌다고 인정한 사람",
+                "다리를 지키는 사람",
+                "끈을 파는 가게 주인"
+              ],
+              "answer": 1,
+              "explain": "마지막 문단에서 나라는 이런 사람을 보유자라고 부른다고 했어요. 기술을 오래 익히고 다른 사람에게 가르쳐 주는 사람이에요.",
+              "evidencePara": 2
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "이분들이 다른 사람에게 가르쳐 주지 않으면 어떻게 될까요?",
+              "choices": [
+                "돌이 모두 없어져요",
+                "기술이 다음 사람에게 건너가지 못해요",
+                "끈이 짧아져요",
+                "나라가 사라져요"
+              ],
+              "answer": 1,
+              "explain": "글은 가르쳐 주기 때문에 기술이 사람에서 사람으로 건너간다고 했어요. 가르쳐 주지 않으면 건너갈 길이 없어요.",
+              "evidencePara": 2
+            },
+            {
+              "type": "apply",
+              "q": "나는 종이배 접는 법을 잘 알아요. 이 글에 나온 사람들처럼 하려면 어떻게 하면 좋을까요?",
+              "choices": [
+                "혼자만 알고 있어요",
+                "친구에게 하나하나 가르쳐 줘요",
+                "종이를 숨겨 둬요",
+                "다음에 생각해요"
+              ],
+              "answer": 1,
+              "explain": "글에 나온 사람들은 배운 것을 혼자 두지 않고 다른 사람에게 하나하나 가르쳐 주었어요.",
+              "evidencePara": 2
+            }
+          ]
+        },
+        "L2": {
+          "title": "물건이 아니라 할 수 있는 힘",
+          "minutes": 4,
+          "paragraphs": [
+            [
+              "유산이라고 하면 ",
+              "보통 물건을 떠올린다. ",
+              "오래된 그릇이나 탑 같은 것이다. ",
+              "그런데 물건이 아닌 유산도 있다. ",
+              "돌을 다루는 솜씨, ",
+              "끈을 묶는 솜씨처럼 ",
+              "사람이 할 수 있는 힘이다. ",
+              "이것을 기능이라고 하고, ",
+              "기능을 유산으로 삼은 것이 무형유산이다."
+            ],
+            [
+              "2026년 10월 7일, ",
+              "국가유산청은 국가무형유산 석장 보유자로 ",
+              "윤만걸 씨와 임동조 씨를, ",
+              "매듭장 보유자로 ",
+              "박선경 씨와 임금희 씨를 인정 예고했다. ",
+              "인정 예고는 ",
+              "이렇게 정하려 한다고 ",
+              "미리 알리는 단계다. ",
+              "아직 확정된 것은 아니다."
+            ],
+            [
+              "석장은 돌로 된 것을 다루는 기술이다. ",
+              "그중 석 구조물 분야는 ",
+              "돌로 벽을 쌓고 ",
+              "성을 두르고 ",
+              "돌다리를 놓는 일이다. ",
+              "토목과 건축의 기반을 닦는 모든 과정이 ",
+              "여기에 든다. ",
+              "인정 예고된 두 사람은 ",
+              "모두 50년 넘게 ",
+              "석공 기술을 지키고 전해 왔다."
+            ],
+            [
+              "매듭장은 끈목으로 ",
+              "여러 종류의 매듭을 짓고 ",
+              "술을 만드는 기술이다. ",
+              "박선경 씨는 10대 후반에 ",
+              "전수생으로 시작해 ",
+              "지금까지 40년 동안 ",
+              "전수교육과 전승활동을 이어 왔다. ",
+              "임금희 씨는 1980년대 후반부터 ",
+              "궁중 매듭을 비롯한 기술을 전수받았다."
+            ],
+            [
+              "50년, 40년이라는 시간이 ",
+              "곧 이 유산의 모습이다. ",
+              "물건은 창고에 넣어 두면 남지만, ",
+              "기능은 누가 가르치고 ",
+              "누가 배워야 남는다. ",
+              "그래서 나라는 ",
+              "물건이 아니라 사람을 인정한다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "무형유산",
+              "easy": "모양이 없는 유산. 물건이 아니라 사람이 할 수 있는 기능을 유산으로 삼은 것",
+              "hanja": "無(없을 무)+形(모양 형)+遺(남길 유)+産(낳을 산)"
+            },
+            {
+              "word": "기능",
+              "easy": "무엇을 해낼 수 있는 힘이나 솜씨",
+              "hanja": "技(재주 기)+能(능할 능)"
+            },
+            {
+              "word": "보유자",
+              "easy": "나라가 그 기능을 지녔다고 인정한 사람",
+              "hanja": "保(지킬 보)+有(있을 유)+者(놈 자)"
+            },
+            {
+              "word": "전수생",
+              "easy": "기능을 가진 사람 밑에서 처음 배우기 시작한 사람",
+              "hanja": "傳(전할 전)+授(줄 수)+生(날 생)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 알맞은 것은?",
+              "choices": [
+                "돌과 끈을 싸게 사는 방법",
+                "무형유산은 물건이 아니라 사람이 할 수 있는 힘이라는 것",
+                "석장과 매듭장 작품의 값",
+                "창고에 물건을 넣어 두는 방법"
+              ],
+              "answer": 1,
+              "explain": "글은 유산 가운데 물건이 아닌 것, 곧 기능을 유산으로 삼은 무형유산을 설명하고, 그래서 나라가 물건이 아니라 사람을 인정한다고 맺는다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "석장의 「석 구조물」 분야에 들어가는 일로 알맞은 것은?",
+              "choices": [
+                "그릇을 굽는 일",
+                "돌로 벽을 쌓고 돌다리를 놓는 일",
+                "끈으로 술을 만드는 일",
+                "탑을 그림으로 그리는 일"
+              ],
+              "answer": 1,
+              "explain": "셋째 문단에서 석 구조물 분야는 돌로 벽을 쌓고 성을 두르고 돌다리를 놓는 일이라고 했다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "vocab",
+              "q": "「인정 예고」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "인정을 취소한다는 뜻",
+                "이미 확정되었다는 뜻",
+                "이렇게 정하려 한다고 미리 알리는 단계",
+                "상을 주겠다는 뜻"
+              ],
+              "answer": 2,
+              "explain": "둘째 문단은 인정 예고를 「이렇게 정하려 한다고 미리 알리는 단계」라고 풀이하고, 아직 확정된 것은 아니라고 덧붙였다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "박선경 씨에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "돌을 다루는 기술을 익혔다",
+                "10대 후반에 전수생으로 시작했다",
+                "50년 넘게 석공 기술을 전해 왔다",
+                "1980년대 후반부터 궁중 매듭을 배웠다"
+              ],
+              "answer": 1,
+              "explain": "넷째 문단에서 박선경 씨는 10대 후반에 전수생으로 시작해 40년 동안 전수교육과 전승활동을 이어 왔다고 했다. 1980년대 후반부터 궁중 매듭을 전수받은 사람은 임금희 씨다.",
+              "evidencePara": 3
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "글쓴이가 「물건은 창고에 넣어 두면 남지만」이라고 쓴 까닭으로 가장 알맞은 것은?",
+              "choices": [
+                "창고가 넓다는 것을 말하려고",
+                "기능은 가르치고 배우지 않으면 남지 않는다는 것을 보이려고",
+                "물건이 기능보다 값지다는 것을 말하려고",
+                "창고를 더 지어야 한다고 말하려고"
+              ],
+              "answer": 1,
+              "explain": "물건과 기능을 나란히 놓아 차이를 드러낸 문장이다. 물건은 보관만으로 남지만 기능은 사람을 거쳐야 남는다는 뜻이다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "apply",
+              "q": "우리 반에 해마다 이어 오는 응원 동작이 있다. 이 글의 생각을 따르면 어떻게 해야 오래 남을까?",
+              "choices": [
+                "동작을 사진으로만 찍어 둔다",
+                "아는 사람만 하고 알리지 않는다",
+                "후배들에게 직접 보여 주며 가르친다",
+                "동작 이름을 공책에 적어 둔다"
+              ],
+              "answer": 2,
+              "explain": "글은 기능은 누가 가르치고 누가 배워야 남는다고 했다. 몸으로 하는 것은 기록만으로는 이어지지 않는다.",
+              "evidencePara": 4
+            }
+          ],
+          "en": [
+            "When people hear the word heritage, they usually picture an object, like an old bowl or a stone tower. But some heritage is not an object. The skill of shaping stone, or the skill of tying cord, is something a person is able to do. Korea calls such an ability a craft skill, and heritage made of ability like this is called intangible heritage.",
+            "On October 7, 2026, the Korea Heritage Service gave advance notice that it would recognize Yun Man-geol and Im Dong-jo as holders of the stone craft, and Park Seon-gyeong and Im Geum-hui as holders of the knot craft. Advance notice means telling people beforehand what the service plans to decide. Nothing is final yet.",
+            "The stone craft works with things made of stone. Its stone structure field means building walls of stone, ringing a fortress with them, and laying stone bridges. Every step that prepares the ground for civil engineering and architecture belongs here. Both men named in the notice have protected and passed on stone work for more than fifty years.",
+            "The knot craft uses woven cord to tie many kinds of knots and to make tassels. Park Seon-gyeong began as a trainee in her late teens and has taught and carried on the craft for forty years. Im Geum-hui learned court knotting and related skills from the late 1980s.",
+            "Fifty years and forty years are the true shape of this heritage. An object survives if you put it in a storeroom, but a skill survives only if someone teaches it and someone learns it. That is why the country recognizes people rather than objects."
+          ],
+          "enseg": [
+            [
+              "When people hear the word heritage, ",
+              "they usually picture an object, ",
+              "like an old bowl or a stone tower. ",
+              "But some heritage is not an object. ",
+              "The skill of shaping stone, ",
+              "or the skill of tying cord, ",
+              "is something a person is able to do. ",
+              "Korea calls such an ability a craft skill, ",
+              "and heritage made of ability like this is called intangible heritage."
+            ],
+            [
+              "On October 7, 2026, ",
+              "the Korea Heritage Service gave advance notice ",
+              "that it would recognize Yun Man-geol and Im Dong-jo ",
+              "as holders of the stone craft, ",
+              "and Park Seon-gyeong and Im Geum-hui as holders of the knot craft. ",
+              "Advance notice means telling people beforehand what the service plans to decide. ",
+              "Nothing is final yet."
+            ],
+            [
+              "The stone craft works with things made of stone. ",
+              "Its stone structure field means building walls of stone, ",
+              "ringing a fortress with them, and laying stone bridges. ",
+              "Every step that prepares the ground",
+              " for civil engineering and architecture belongs here. ",
+              "Both men named in the notice have protected",
+              " and passed on stone work for more than fifty years."
+            ],
+            [
+              "The knot craft uses woven cord",
+              " to tie many kinds of knots and to make tassels. ",
+              "Park Seon-gyeong began as a trainee in her late teens",
+              " and has taught and carried on the craft for forty years. ",
+              "Im Geum-hui learned court knotting",
+              " and related skills from the late 1980s."
+            ],
+            [
+              "Fifty years and forty years are the true shape of this heritage. ",
+              "An object survives if you put it in a storeroom, ",
+              "but a skill survives only if someone teaches it",
+              " and someone learns it. ",
+              "That is why the country recognizes people rather than objects."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "heritage",
+              "ko": "유산 (명사)",
+              "base": "heritage [ˈherɪtɪdʒ]"
+            },
+            {
+              "word": "intangible",
+              "ko": "형태가 없는, 무형의 (형용사)",
+              "base": "intangible [ɪnˈtændʒəbl]"
+            },
+            {
+              "word": "object",
+              "ko": "물건, 물체 (명사)",
+              "base": "object [ˈɑːbdʒekt]"
+            },
+            {
+              "word": "skill",
+              "ko": "기능, 솜씨 (명사)",
+              "base": "skill [skɪl]"
+            },
+            {
+              "word": "trainee",
+              "ko": "배우기 시작한 사람, 전수생 (명사)",
+              "base": "trainee [ˌtreɪˈniː]"
+            },
+            {
+              "word": "tassels",
+              "ko": "술, 장식 끈 (명사)",
+              "base": "tassel [ˈtæsl]"
+            }
+          ]
+        },
+        "L3": {
+          "title": "기술이 건너가는 길에는 이름이 있다",
+          "minutes": 5,
+          "paragraphs": [
+            [
+              "기술은 사람에게서 사람에게로 건너간다. ",
+              "책으로 옮겨 적을 수 없는 손의 감각은 ",
+              "곁에서 보고 따라 하며 익히는 수밖에 없다. ",
+              "그래서 무형유산 제도는 ",
+              "그 건너가는 길에 ",
+              "단계와 이름을 붙여 두었다. ",
+              "전수생, 이수자, ",
+              "전승교육사, 그리고 보유자다."
+            ],
+            [
+              "2026년 10월 7일 국가유산청은 ",
+              "국가무형유산 석장 보유자로 ",
+              "윤만걸 씨와 임동조 씨를, ",
+              "매듭장 보유자로 ",
+              "박선경 씨와 임금희 씨를 인정 예고했다. ",
+              "유기장 보유자 김수영 씨는 ",
+              "명예보유자로 인정 예고했다. ",
+              "인정 예고는 확정이 아니라 ",
+              "이렇게 인정하려 한다고 미리 알리는 단계다."
+            ],
+            [
+              "박선경 씨가 걸어온 길은 ",
+              "그 단계를 그대로 보여 준다. ",
+              "10대 후반에 고 최은순 매듭장 보유자의 ",
+              "전수생으로 시작해 ",
+              "1987년 이수자가 되었고, ",
+              "1993년 전승교육사가 되었다. ",
+              "지금까지 정봉섭 명예보유자와 함께 ",
+              "40년 동안 전수교육과 전승활동을 ",
+              "이어 오고 있다."
+            ],
+            [
+              "석장은 석조물을 다루는 전통기술 종목이다. ",
+              "그중 석 구조물 분야는 ",
+              "석축과 성곽, 석교 등 ",
+              "토목 및 건축의 기반을 닦는 ",
+              "모든 과정을 포함한다. ",
+              "손으로 돌을 다듬는 공예이면서, ",
+              "구조물을 세우는 토목인 것이다. ",
+              "윤만걸 씨는 10대 후반부터 ",
+              "석가공과 드잡이 기술을 연마해 ",
+              "1980년대부터 경주의 석조 문화유산 보수와 복원에 ",
+              "참여해 왔고, ",
+              "임동조 씨는 창경궁과 경복궁 등 ",
+              "궁궐 석구조물 복원사업에 참여해 왔다."
+            ],
+            [
+              "보유자를 정하는 일에도 절차가 있다. ",
+              "석장은 지난해 보유자 공모를 한 뒤 ",
+              "서면심사와 현장조사, ",
+              "국가유산위원회 검토를 거쳤다. ",
+              "매듭장은 올해 2월부터 ",
+              "인정조사 공모를 통해 ",
+              "전승기량과 전승활동 노력을 확인한 뒤 ",
+              "위원회 검토를 거쳤다. ",
+              "길목마다 이름이 붙은 까닭도 여기에 있다. ",
+              "누가 어디까지 왔는지 ",
+              "서로 확인할 수 있어야 ",
+              "가르치고 배우는 일이 끊기지 않는다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "전수생",
+              "easy": "보유자 밑에서 기능을 처음 배우기 시작한 사람. 전승 단계의 첫 자리다.",
+              "hanja": "傳(전할 전)+授(줄 수)+生(날 생)"
+            },
+            {
+              "word": "이수자",
+              "easy": "전수교육을 마쳤다고 인정받은 사람. 전수생 다음 단계다.",
+              "hanja": "履(밟을 이)+修(닦을 수)+者(놈 자)"
+            },
+            {
+              "word": "전승교육사",
+              "easy": "보유자를 도와 다음 세대를 가르치는 자리. 이수자 다음 단계다.",
+              "hanja": "傳(전할 전)+承(이을 승)+敎(가르칠 교)+育(기를 육)+師(스승 사)"
+            },
+            {
+              "word": "토목",
+              "easy": "흙과 돌로 길·다리·성처럼 구조물의 기반을 만드는 일",
+              "hanja": "土(흙 토)+木(나무 목)"
+            },
+            {
+              "word": "복원",
+              "easy": "허물어지거나 사라진 것을 본디 모습으로 되돌리는 일",
+              "hanja": "復(회복할 복)+原(근원 원)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 가장 알맞은 것은?",
+              "choices": [
+                "석장과 매듭장 작품의 값",
+                "무형유산 제도가 기술이 건너가는 길에 단계와 이름을 붙여 두었다는 것",
+                "국가유산위원회의 조직 구성",
+                "경주와 서울의 문화유산 수"
+              ],
+              "answer": 1,
+              "explain": "글은 전수생·이수자·전승교육사·보유자라는 단계를 먼저 제시하고, 박선경 씨가 걸어온 길과 보유자 선정 절차로 그 단계를 보여 준다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "박선경 씨가 1993년에 된 것은?",
+              "choices": [
+                "전수생",
+                "이수자",
+                "전승교육사",
+                "명예보유자"
+              ],
+              "answer": 2,
+              "explain": "10대 후반에 전수생, 1987년 이수자, 1993년 전승교육사의 순서로 나온다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "vocab",
+              "q": "문맥상 「토목」의 뜻으로 가장 알맞은 것은?",
+              "choices": [
+                "돌을 조각해 꾸미는 일",
+                "흙과 돌로 구조물의 기반을 만드는 일",
+                "나무로 가구를 짜는 일",
+                "끈으로 매듭을 짓는 일"
+              ],
+              "answer": 1,
+              "explain": "글은 석 구조물 분야가 「토목 및 건축의 기반을 닦는 모든 과정」을 포함하며, 그것이 「구조물을 세우는 토목」이라고 했다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "detail",
+              "q": "석장 보유자를 정하는 절차에 들어가지 않는 것은?",
+              "choices": [
+                "보유자 공모",
+                "서면심사",
+                "현장조사",
+                "주민 투표"
+              ],
+              "answer": 3,
+              "explain": "다섯째 문단은 지난해의 보유자 공모와 서면심사, 현장조사, 국가유산위원회 검토를 들었다.",
+              "evidencePara": 4
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "글쓴이가 석장을 「공예이면서 토목」이라고 한 까닭으로 가장 알맞은 것은?",
+              "choices": [
+                "돌값이 비싸기 때문에",
+                "손으로 돌을 다듬는 동시에 석축·성곽·석교처럼 구조물의 기반을 세우기 때문에",
+                "경주와 서울에서 모두 일하기 때문에",
+                "명장 칭호를 함께 받았기 때문에"
+              ],
+              "answer": 1,
+              "explain": "석 구조물 분야가 토목 및 건축의 기반을 닦는 모든 과정을 포함한다는 서술이 근거다. 다듬는 손기술과 세우는 토목이 한 종목 안에 들어 있다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "apply",
+              "q": "어떤 종목에 보유자는 한 사람뿐이고 전수생이 없다고 한다. 이 글의 단계 개념을 적용한 설명으로 가장 알맞은 것은?",
+              "choices": [
+                "보유자가 있으니 전승에는 문제가 없다",
+                "이수자와 전승교육사가 나올 자리가 비어 다음 단계가 이어지지 않는다",
+                "공모를 열면 곧바로 보유자가 늘어난다",
+                "명예보유자를 지정하면 해결된다"
+              ],
+              "answer": 1,
+              "explain": "글의 단계는 전수생에서 시작해 이수자와 전승교육사를 거쳐 보유자에 이른다. 첫 자리가 비면 그 뒤 자리도 채워지지 않는다.",
+              "evidencePara": 0
+            }
+          ],
+          "en": [
+            "A skill passes from one person to another. The feel of a trained hand cannot be copied into a book, so it is learned by watching and imitating at close range. For that reason Korea's intangible heritage system has given names to the stages along that passage: trainee, certified learner, teaching instructor, and holder.",
+            "On October 7, 2026, the Korea Heritage Service gave advance notice of two holders of the stone craft, Yun Man-geol and Im Dong-jo, and two holders of the knot craft, Park Seon-gyeong and Im Geum-hui. It also gave notice that Kim Su-yeong, a holder of the bronzeware craft, would become an honorary holder. Advance notice is not a final decision; it announces what the service intends to recognize.",
+            "The path Park Seon-gyeong walked shows the stages exactly. In her late teens she began as a trainee under the late Choe Eun-sun, a holder of the knot craft. She became a certified learner in 1987 and a teaching instructor in 1993. Together with honorary holder Jeong Bong-seop she has carried on teaching and transmission for forty years.",
+            "The stone craft is a traditional technique for working stone. Its stone structure field covers every step that prepares the ground for civil engineering and architecture, including stone embankments, fortress walls, and stone bridges. It is a craft of dressing stone by hand, and at the same time it is engineering that raises structures. Yun Man-geol trained in stone cutting and heavy lifting from his late teens and joined the repair and restoration of the stone heritage of Gyeongju from the 1980s, while Im Dong-jo worked on restoring palace stonework at Changgyeonggung and Gyeongbokgung.",
+            "Choosing a holder also follows a procedure. For the stone craft, an open call last year was followed by a document review, a field survey, and examination by the Korea Heritage Committee. For the knot craft, an open call for the recognition survey began in February this year and confirmed each candidate's command of the craft and effort in passing it on, and then the committee reviewed them. This is why each stage carries a name. Teaching and learning continue only when everyone can see how far a person has come."
+          ],
+          "enseg": [
+            [
+              "A skill passes from one person to another. ",
+              "The feel of a trained hand cannot be copied into a book, ",
+              "so it is learned by watching and imitating at close range. ",
+              "For that reason Korea's intangible heritage system has given names",
+              " to the stages along that passage: ",
+              "trainee, certified learner, teaching instructor, and holder."
+            ],
+            [
+              "On October 7, 2026, the Korea Heritage Service gave advance notice ",
+              "of two holders of the stone craft, ",
+              "Yun Man-geol and Im Dong-jo, ",
+              "and two holders of the knot craft, Park Seon-gyeong and Im Geum-hui. ",
+              "It also gave notice that Kim Su-yeong, ",
+              "a holder of the bronzeware craft, would become an honorary holder. ",
+              "Advance notice is not a final decision; ",
+              "it announces what the service intends to recognize."
+            ],
+            [
+              "The path Park Seon-gyeong walked shows the stages exactly. ",
+              "In her late teens she began as a trainee under the late Choe Eun-sun, ",
+              "a holder of the knot craft. ",
+              "She became a certified learner in 1987",
+              " and a teaching instructor in 1993. ",
+              "Together with honorary holder Jeong Bong-seop she has carried on teaching",
+              " and transmission for forty years."
+            ],
+            [
+              "The stone craft is a traditional technique for working stone. ",
+              "Its stone structure field covers every step ",
+              "that prepares the ground for civil engineering and architecture, ",
+              "including stone embankments, fortress walls, and stone bridges. ",
+              "It is a craft of dressing stone by hand, ",
+              "and at the same time it is engineering that raises structures. ",
+              "Yun Man-geol trained in stone cutting and heavy lifting from his late teens ",
+              "and joined the repair and restoration of the stone heritage of Gyeongju ",
+              "from the 1980s, ",
+              "while Im Dong-jo worked on restoring palace stonework at Changgyeonggung and Gyeongbokgung."
+            ],
+            [
+              "Choosing a holder also follows a procedure. ",
+              "For the stone craft, an open call last year ",
+              "was followed by a document review, ",
+              "a field survey, and examination by the Korea Heritage Committee. ",
+              "For the knot craft, an open call for the recognition survey ",
+              "began in February this year ",
+              "and confirmed each candidate's command of the craft ",
+              "and effort in passing it on, ",
+              "and then the committee reviewed them. ",
+              "This is why each stage carries a name. ",
+              "Teaching and learning continue ",
+              "only when everyone can see how far a person has come."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "transmission",
+              "ko": "전승, 전해 내려감 (명사)",
+              "base": "transmission [trænsˈmɪʃn]"
+            },
+            {
+              "word": "trainee",
+              "ko": "전수생, 배우는 사람 (명사)",
+              "base": "trainee [ˌtreɪˈniː]"
+            },
+            {
+              "word": "procedure",
+              "ko": "절차 (명사)",
+              "base": "procedure [prəˈsiːdʒər]"
+            },
+            {
+              "word": "restoration",
+              "ko": "복원 (명사)",
+              "base": "restoration [ˌrestəˈreɪʃn]"
+            },
+            {
+              "word": "embankments",
+              "ko": "축대, 석축 (명사)",
+              "base": "embankment [ɪmˈbæŋkmənt]"
+            },
+            {
+              "word": "honorary",
+              "ko": "명예의 (형용사)",
+              "base": "honorary [ˈɑːnəreri]"
+            }
+          ]
+        },
+        "L4": {
+          "title": "나라가 사람을 유산으로 인정할 때",
+          "minutes": 6,
+          "paragraphs": [
+            [
+              "유산의 목록에 사람의 이름이 오르는 일이 있다. ",
+              "2026년 10월 7일 국가유산청은 ",
+              "국가무형유산 석장 가운데 ",
+              "석 구조물 분야의 보유자로 ",
+              "윤만걸 씨와 임동조 씨를, ",
+              "매듭장 보유자로 박선경 씨와 임금희 씨를 ",
+              "인정 예고했다. ",
+              "무형유산은 물건이 아니라 기능이므로, ",
+              "보존해야 할 것이 ",
+              "사람의 몸과 손에 들어 있다. ",
+              "그래서 제도는 물건을 지정하는 대신 사람을 인정한다."
+            ],
+            [
+              "인정은 선언으로 끝나지 않고 절차를 거친다. ",
+              "석장은 지난해 보유자 공모를 한 뒤 ",
+              "서면심사와 현장조사, ",
+              "국가유산위원회 검토를 밟았다. ",
+              "매듭장은 올해 2월부터 ",
+              "보유자 인정조사 공모를 통해 ",
+              "전승기량과 전승활동 노력을 확인한 뒤 ",
+              "국가유산위원회 검토를 거쳤다. ",
+              "서면으로 적어 낸 것을 ",
+              "현장에서 다시 보는 단계가 ",
+              "절차 안에 들어 있다. ",
+              "손에 남은 기능은 서류만으로 드러나지 않기 때문이다."
+            ],
+            [
+              "인정 예고라는 이름도 눈여겨볼 만하다. ",
+              "이것은 확정이 아니라 이렇게 인정하려 한다고 ",
+              "미리 알리는 단계다. ",
+              "결정을 내리기 전에 ",
+              "그 결정을 밖으로 내놓는 자리가 ",
+              "절차 안에 마련되어 있는 것이다."
+            ],
+            [
+              "이번에 인정 예고된 석장 두 사람은 ",
+              "모두 50년 넘게 ",
+              "석공 기술 보존과 전승에 힘써 왔다. ",
+              "윤만걸 씨는 10대 후반부터 ",
+              "석가공과 드잡이 기술을 연마해 ",
+              "1980년대부터 경주의 석조 문화유산 보수와 복원에 ",
+              "주도적으로 참여했고, 1995년 대한민국 석공예 명장, ",
+              "2023년 경상북도 무형유산 보유자로 인정되었다. ",
+              "임동조 씨 또한 10대 후반부터 ",
+              "석공 일을 배워 ",
+              "창경궁과 경복궁 등 궁궐 석구조물 복원사업에 ",
+              "주도적으로 참여했고, ",
+              "2007년 대한민국 석공예 명장, ",
+              "2013년부터 경기도 무형유산 보유자로 인정되었다. ",
+              "석 구조물 분야가 ",
+              "석축과 성곽, 석교 등 ",
+              "토목 및 건축의 기반을 닦는 ",
+              "모든 과정을 포함한다는 점에서, ",
+              "이 기능은 공예와 토목에 함께 걸쳐 있다."
+            ],
+            [
+              "매듭장 박선경 씨는 10대 후반에 ",
+              "고 최은순 매듭장 보유자의 전수생으로 출발해 ",
+              "1987년 이수자, 1993년 전승교육사를 거쳤고, ",
+              "지금까지 정봉섭 명예보유자와 함께 ",
+              "40년 동안 전수교육과 전승활동을 ",
+              "이어 오고 있다. ",
+              "임금희 씨는 1980년대 후반부터 ",
+              "고 조일순 씨에게 ",
+              "궁중 매듭을 비롯해 다회와 망수 기술을 전수받았고, ",
+              "여러 박물관의 매듭과 궁중 유물을 조사하고 연구해 ",
+              "전통기법을 재현하는 데 힘써 왔다. ",
+              "한편 유기장 보유자 김수영 씨는 ",
+              "2008년 보유자로 인정된 뒤 ",
+              "주물 유기 제작의 전수교육과 전승활동에 ",
+              "힘써 온 공로로 ",
+              "명예보유자로 인정 예고되었다."
+            ],
+            [
+              "국가유산청은 앞으로도 지속적인 전승자 충원을 통해 ",
+              "전승기반을 확충하겠다고 밝혔다. ",
+              "이 말이 과제로 읽히는 까닭은 ",
+              "앞의 숫자들에 있다. ",
+              "보유자가 되기까지 40년, 50년이 걸린다면, ",
+              "지금 전수생으로 들어오는 사람이 없는 종목은 ",
+              "수십 년 뒤에 비게 된다. ",
+              "무형유산의 보존은 완성된 물건을 지키는 일이 아니라, ",
+              "아직 끝나지 않은 배움을 ",
+              "끊기지 않게 하는 일이다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "공모",
+              "easy": "자격을 갖춘 사람을 널리 알려 모으는 일. 보유자 인정은 여기서 시작한다.",
+              "hanja": "公(공평할 공)+募(모을 모)"
+            },
+            {
+              "word": "현장조사",
+              "easy": "서류가 아니라 일이 이루어지는 자리에 가서 직접 확인하는 조사",
+              "hanja": "現(나타날 현)+場(마당 장)+調(고를 조)+査(조사할 사)"
+            },
+            {
+              "word": "명예보유자",
+              "easy": "보유자로 인정받았던 사람의 공로를 기려 따로 두는 자리",
+              "hanja": "名(이름 명)+譽(기릴 예)+保(지킬 보)+有(있을 유)+者(놈 자)"
+            },
+            {
+              "word": "충원",
+              "easy": "비거나 모자란 자리를 사람으로 채워 넣는 일",
+              "hanja": "充(채울 충)+員(인원 원)"
+            },
+            {
+              "word": "기반",
+              "easy": "위에 놓이는 것을 받치는 바탕. 구조물의 밑바탕을 가리키기도 한다.",
+              "hanja": "基(터 기)+盤(소반 반)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 논지로 가장 적절한 것은?",
+              "choices": [
+                "무형유산은 물건보다 보존 비용이 적게 든다.",
+                "무형유산 제도는 기능이 사람에게 있기에 사람을 인정하며, 그래서 전승자 충원이 제도의 과제가 된다.",
+                "석장과 매듭장은 공예 종목이므로 토목과는 무관하다.",
+                "인정 예고는 확정과 같은 효력을 가진다."
+              ],
+              "answer": 1,
+              "explain": "글은 사람을 인정하는 제도의 근거를 밝히고 절차를 짚은 뒤, 40~50년이 걸리는 기능에서 전승자 충원이 왜 과제인지로 맺는다.",
+              "evidencePara": 5
+            },
+            {
+              "type": "detail",
+              "q": "이 글의 내용과 일치하지 않는 것은?",
+              "choices": [
+                "석장 보유자 공모는 지난해 있었다.",
+                "매듭장 인정조사 공모는 올해 2월부터였다.",
+                "김수영 씨는 2008년에 명예보유자로 인정되었다.",
+                "임동조 씨는 2013년부터 경기도 무형유산 보유자다."
+              ],
+              "answer": 2,
+              "explain": "김수영 씨는 2008년에 보유자로 인정되었고, 이번에 명예보유자로 인정 예고되었다. 2008년에 명예보유자가 된 것이 아니다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "vocab",
+              "q": "문맥상 「충원」의 뜻으로 가장 적절한 것은?",
+              "choices": [
+                "모자란 자리를 사람으로 채워 넣는 일",
+                "맡은 자리에서 물러나게 하는 일",
+                "이미 인정된 사람을 다시 심사하는 일",
+                "심사 기록을 공개하는 일"
+              ],
+              "answer": 0,
+              "explain": "「지속적인 전승자 충원을 통해 전승기반을 확충」한다는 문맥에서, 충원은 전승자의 수를 채워 넣는 일을 가리킨다.",
+              "evidencePara": 5
+            },
+            {
+              "type": "infer",
+              "q": "절차에 「현장조사」가 들어 있는 까닭으로 이 글에서 끌어낼 수 있는 것은?",
+              "choices": [
+                "서류 작성 비용을 줄이기 위해서",
+                "손에 남은 기능은 서류만으로 드러나지 않기 때문에",
+                "위원회의 일정을 맞추기 위해서",
+                "지역마다 심사 기준이 다르기 때문에"
+              ],
+              "answer": 1,
+              "explain": "둘째 문단은 서면으로 적어 낸 것을 현장에서 다시 보는 단계가 절차 안에 있다고 하고, 그 까닭을 기능이 서류만으로 드러나지 않는 데서 찾는다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "critical",
+              "q": "이 글의 논지를 약화하는 진술로 가장 적절한 것은?",
+              "choices": [
+                "석 구조물 분야가 토목 및 건축의 기반을 닦는 과정을 포함한다.",
+                "보유자 인정 절차에 공모와 현장조사가 들어 있다.",
+                "여러 전통기술 종목에서 열 해 안에 보유자 수준에 이르는 짧은 교육 과정이 마련되어 널리 쓰이고 있다.",
+                "국가유산청이 전승기반 확충 방침을 밝혔다."
+              ],
+              "answer": 2,
+              "explain": "글의 논지는 기능을 익히는 데 수십 년이 걸리므로 지금의 충원이 수십 년 뒤를 결정한다는 것이다. 열 해 안에 보유자 수준에 이르는 길이 널리 쓰인다면 그 전제가 흔들린다. 나머지는 글의 사실 서술이거나 논지를 뒷받침한다.",
+              "evidencePara": 5
+            }
+          ],
+          "challenge": [
+            {
+              "type": "critical",
+              "q": "「인정 예고」 단계를 절차에 둔 데 전제된 생각으로 가장 적절한 것은?",
+              "choices": [
+                "결정은 공개하지 않을수록 공정해진다.",
+                "결정을 내리기 전에 밖으로 내놓아 살펴볼 여지를 두는 편이 낫다.",
+                "보유자 인정은 행정 내부의 문제일 뿐이다.",
+                "예고는 기관을 알리는 홍보 수단이다."
+              ],
+              "answer": 1,
+              "explain": "글은 예고를 「결정을 내리기 전에 그 결정을 밖으로 내놓는 자리」로 읽는다. 확정 전에 드러내는 편이 낫다는 판단이 그 전제다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "apply",
+              "q": "어느 전통기술 종목의 보유자 두 사람이 모두 일흔을 넘겼고 이수자가 없다고 한다. 이 글의 관점에서 가장 알맞은 대응은?",
+              "choices": [
+                "보유자의 작품을 모아 전시관을 세운다.",
+                "종목의 기록 영상을 만들어 보관한다.",
+                "전수생을 받아 이수자·전승교육사로 올라가는 단계를 지금 채운다.",
+                "보유자를 명예보유자로 바꾸어 예우한다."
+              ],
+              "answer": 2,
+              "explain": "글은 완성된 물건을 지키는 일과 아직 끝나지 않은 배움을 잇는 일을 갈라 놓고, 전승자 충원을 과제로 든다. 전시·기록·예우는 기능이 사람에게 이어지게 하지는 못한다.",
+              "evidencePara": 5
+            }
+          ],
+          "en": [
+            "Sometimes a person's name is entered on a list of heritage. On October 7, 2026, the Korea Heritage Service gave advance notice that Yun Man-geol and Im Dong-jo would be recognized as holders of the stone structure field within the stone craft, and that Park Seon-gyeong and Im Geum-hui would be recognized as holders of the knot craft. Because intangible heritage is not an object but an ability, what must be preserved sits in a person's body and hands. So the system recognizes people instead of designating things.",
+            "Recognition does not end with an announcement; it moves through a procedure. For the stone craft, an open call for holders last year was followed by a document review, a field survey, and examination by the Korea Heritage Committee. For the knot craft, an open call for the recognition survey opened in February of this year and confirmed each candidate's command of the craft and effort in passing it on, after which the committee reviewed the case. A stage that goes out and looks again in the field at what was written on paper is built into the procedure, because an ability held in the hands does not show itself on paper alone.",
+            "The phrase advance notice is worth noticing too. It is not a final decision but a statement that the service intends to recognize these people. A place for setting a decision out in the open before it is made is written into the process.",
+            "The two stone craftsmen named in the notice have each worked to preserve and pass on stone masonry for more than fifty years. Yun Man-geol trained in stone cutting and heavy lifting from his late teens, led repair and restoration work on the stone heritage of Gyeongju from the 1980s, was named a master of stone craft in 1995, and became a holder of Gyeongsangbuk-do intangible heritage in 2023. Im Dong-jo likewise learned stonework from his late teens, led the restoration of palace stonework at Changgyeonggung and Gyeongbokgung, was named a master of stone craft in 2007, and has been a holder of Gyeonggi-do intangible heritage since 2013. Since the stone structure field covers every step that prepares the ground for civil engineering and architecture, from stone embankments and fortress walls to stone bridges, this ability straddles craft and engineering.",
+            "Park Seon-gyeong of the knot craft began in her late teens as a trainee under the late Choe Eun-sun, became a certified learner in 1987 and a teaching instructor in 1993, and has carried on teaching and transmission for forty years alongside honorary holder Jeong Bong-seop. Im Geum-hui learned court knotting along with braiding and netting techniques from the late Jo Il-sun from the late 1980s, and has worked to recreate traditional methods by surveying and studying knots and court objects in several museums. Kim Su-yeong, a holder of the bronzeware craft recognized in 2008, received advance notice of honorary holder status for his work in teaching and transmitting cast bronzeware.",
+            "The Korea Heritage Service said it would keep widening the base of transmission by steadily recruiting new bearers of these skills. The reason this reads as a task lies in the numbers above. If becoming a holder takes forty or fifty years, a field that no one enters as a trainee today will stand empty decades from now. Preserving intangible heritage is not guarding a finished object; it is keeping an unfinished course of learning from breaking off."
+          ],
+          "enseg": [
+            [
+              "Sometimes a person's name is entered on a list of heritage. ",
+              "On October 7, 2026, the Korea Heritage Service gave advance notice ",
+              "that Yun Man-geol and Im Dong-jo would be recognized ",
+              "as holders of the stone structure field within the stone craft, ",
+              "and that Park Seon-gyeong and Im Geum-hui ",
+              "would be recognized as holders of the knot craft. ",
+              "Because intangible heritage is not an object but an ability, ",
+              "what must be preserved sits in a person's body and hands. ",
+              "So the system recognizes people instead of designating things."
+            ],
+            [
+              "Recognition does not end with an announcement; ",
+              "it moves through a procedure. ",
+              "For the stone craft, an open call for holders last year ",
+              "was followed by a document review, ",
+              "a field survey, and examination by the Korea Heritage Committee. ",
+              "For the knot craft, an open call for the recognition survey ",
+              "opened in February of this year ",
+              "and confirmed each candidate's command of the craft and effort in passing it on, ",
+              "after which the committee reviewed the case. ",
+              "A stage that goes out and looks again in the field ",
+              "at what was written on paper ",
+              "is built into the procedure, ",
+              "because an ability held in the hands does not show itself on paper alone."
+            ],
+            [
+              "The phrase advance notice is worth noticing too. ",
+              "It is not a final decision but a statement ",
+              "that the service intends to recognize these people. ",
+              "A place for setting a decision out in the open ",
+              "before it is made is written into the process."
+            ],
+            [
+              "The two stone craftsmen named in the notice have each worked to preserve",
+              " and pass on stone masonry for more than fifty years. ",
+              "Yun Man-geol trained in stone cutting and heavy lifting from his late teens, ",
+              "led repair and restoration work on the stone heritage of Gyeongju from the 1980s, ",
+              "was named a master of stone craft in 1995, ",
+              "and became a holder of Gyeongsangbuk-do intangible heritage in 2023. ",
+              "Im Dong-jo likewise learned stonework from his late teens, ",
+              "led the restoration of palace stonework at Changgyeonggung and Gyeongbokgung, ",
+              "was named a master of stone craft in 2007, ",
+              "and has been a holder of Gyeonggi-do intangible heritage since 2013. ",
+              "Since the stone structure field covers every step",
+              " that prepares the ground for civil engineering and architecture, ",
+              "from stone embankments and fortress walls to stone bridges, ",
+              "this ability straddles craft and engineering."
+            ],
+            [
+              "Park Seon-gyeong of the knot craft began in her late teens ",
+              "as a trainee under the late Choe Eun-sun, ",
+              "became a certified learner in 1987 and a teaching instructor in 1993, ",
+              "and has carried on teaching and transmission ",
+              "for forty years alongside honorary holder Jeong Bong-seop. ",
+              "Im Geum-hui learned court knotting along with braiding and netting techniques ",
+              "from the late Jo Il-sun from the late 1980s, ",
+              "and has worked to recreate traditional methods by surveying ",
+              "and studying knots and court objects in several museums. ",
+              "Kim Su-yeong, a holder of the bronzeware craft recognized in 2008, ",
+              "received advance notice of honorary holder status ",
+              "for his work in teaching and transmitting cast bronzeware."
+            ],
+            [
+              "The Korea Heritage Service said it would keep widening the base of transmission ",
+              "by steadily recruiting new bearers of these skills. ",
+              "The reason this reads as a task lies in the numbers above. ",
+              "If becoming a holder takes forty or fifty years, ",
+              "a field that no one enters as a trainee today ",
+              "will stand empty decades from now. ",
+              "Preserving intangible heritage is not guarding a finished object; ",
+              "it is keeping an unfinished course of learning from breaking off."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "intangible",
+              "ko": "형태가 없는, 무형의 (형용사)",
+              "base": "intangible [ɪnˈtændʒəbl]"
+            },
+            {
+              "word": "designating",
+              "ko": "지정하다 (동사)",
+              "base": "designate [ˈdezɪɡneɪt]"
+            },
+            {
+              "word": "procedure",
+              "ko": "절차 (명사)",
+              "base": "procedure [prəˈsiːdʒər]"
+            },
+            {
+              "word": "straddles",
+              "ko": "두 영역에 걸쳐 있다 (동사)",
+              "base": "straddle [ˈstrædl]"
+            },
+            {
+              "word": "transmission",
+              "ko": "전승 (명사)",
+              "base": "transmission [trænsˈmɪʃn]"
+            },
+            {
+              "word": "recruiting",
+              "ko": "새로 사람을 뽑아 채우다 (동사)",
+              "base": "recruit [rɪˈkruːt]"
+            },
+            {
+              "word": "honorary",
+              "ko": "명예의 (형용사)",
+              "base": "honorary [ˈɑːnəreri]"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "youth-work-rights",
+      "category": "society",
+      "careers": [
+        "law",
+        "edu",
+        "biz"
+      ],
+      "issue": true,
+      "publishedAt": "2026-10-12",
+      "status": "published",
+      "sources": [
+        {
+          "title": "고용노동부 보도자료 — 학교 밖 청소년의 일하는 권리, 노동교육으로 지킨다",
+          "url": "https://www.moel.go.kr/news/enews/report/enewsView.do?news_seq=20060"
+        },
+        {
+          "title": "찾기쉬운 생활법령정보 — 근로청소년 > 청소년의 근로 가능 연령",
+          "url": "https://www.easylaw.go.kr/CSP/CnpClsMain.laf?popMenu=ov&csmSeq=1381&ccfNo=1&cciNo=1&cnpClsNo=1"
+        },
+        {
+          "title": "찾기쉬운 생활법령정보 — 근로청소년 > 근로시간",
+          "url": "https://www.easylaw.go.kr/CSP/CnpClsMain.laf?popMenu=ov&csmSeq=1381&ccfNo=3&cciNo=1&cnpClsNo=1"
+        },
+        {
+          "title": "찾기쉬운 생활법령정보 — 근로청소년 > 임금 및 주휴수당",
+          "url": "https://www.easylaw.go.kr/CSP/CnpClsMain.laf?popMenu=ov&csmSeq=1381&ccfNo=4&cciNo=1&cnpClsNo=1"
+        }
+      ],
+      "levels": {
+        "L1": {
+          "title": "일터의 약속",
+          "minutes": 3,
+          "paragraphs": [
+            [
+              "어른들은 일을 하고 ",
+              "돈을 받아요. ",
+              "일을 하는 곳을 일터라고 해요. ",
+              "일터에는 지켜야 할 약속이 있어요. ",
+              "그 약속은 법에 적혀 있어요."
+            ],
+            [
+              "일하는 사람에게는 권리가 있어요. ",
+              "권리는 내가 당연히 누릴 몫이에요. ",
+              "나이가 어린 사람에게는 ",
+              "약속이 더 많아요. ",
+              "늦은 밤에는 ",
+              "일하지 않아요. ",
+              "쉬는 날에도 일하지 않아요. ",
+              "하루에 일하는 시간도 정해져 있어요."
+            ],
+            [
+              "어린 사람이 일을 하려면 ",
+              "집 어른이 적어 준 ",
+              "종이가 있어야 해요. ",
+              "어른이 한 번 더 ",
+              "보아 주는 거예요. ",
+              "모르는 것이 생기면 ",
+              "물어볼 곳도 있어요. ",
+              "나라에서는 이 약속을 ",
+              "미리 가르쳐 줘요. ",
+              "알고 있어야 지킬 수 있으니까요."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "일터",
+              "easy": "일을 하는 곳이에요.",
+              "hanja": null
+            },
+            {
+              "word": "권리",
+              "easy": "내가 당연히 누릴 수 있는 몫이에요.",
+              "hanja": null
+            },
+            {
+              "word": "법",
+              "easy": "모두가 함께 지키기로 적어 둔 약속이에요.",
+              "hanja": null
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글이 알려 주는 것은 무엇인가요?",
+              "choices": [
+                "일터에는 지켜야 할 약속이 있고 어린 사람은 더 많이 지켜 준다는 것",
+                "일을 많이 하면 돈을 많이 받는다는 것",
+                "밤에 잠을 잘 자는 방법",
+                "종이를 예쁘게 접는 방법"
+              ],
+              "answer": 0,
+              "explain": "일터에 지켜야 할 약속이 있고, 나이가 어린 사람에게는 그 약속이 더 많다고 했어요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "나이가 어린 사람이 일할 때 하지 않는 것은 무엇인가요?",
+              "choices": [
+                "아침에 일어나는 것",
+                "밥을 먹는 것",
+                "늦은 밤에 일하는 것",
+                "물을 마시는 것"
+              ],
+              "answer": 2,
+              "explain": "늦은 밤에는 일하지 않고, 쉬는 날에도 일하지 않는다고 했어요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「일터」는 어떤 곳인가요?",
+              "choices": [
+                "잠을 자는 곳",
+                "일을 하는 곳",
+                "놀이 기구가 있는 곳",
+                "책만 있는 곳"
+              ],
+              "answer": 1,
+              "explain": "일을 하는 곳을 일터라고 해요.",
+              "evidencePara": 0
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "어린 사람이 일할 때 집 어른이 적어 준 종이가 있어야 하는 까닭은 무엇일까요?",
+              "choices": [
+                "종이가 예뻐서",
+                "어른이 한 번 더 보아 주려고",
+                "종이가 많이 남아서",
+                "글씨를 쓰고 싶어서"
+              ],
+              "answer": 1,
+              "explain": "어른이 한 번 더 보아 주는 것이라고 했어요.",
+              "evidencePara": 2
+            },
+            {
+              "type": "apply",
+              "q": "일터에서 모르는 것이 생겼어요. 이 글에 따르면 어떻게 하면 좋을까요?",
+              "choices": [
+                "그냥 참아요",
+                "물어볼 곳에 물어봐요",
+                "일을 더 많이 해요",
+                "아무에게도 말하지 않아요"
+              ],
+              "answer": 1,
+              "explain": "모르는 것이 생기면 물어볼 곳도 있다고 했어요.",
+              "evidencePara": 2
+            }
+          ]
+        },
+        "L2": {
+          "title": "법이 쳐 둔 울타리 셋",
+          "minutes": 4,
+          "paragraphs": [
+            [
+              "아르바이트를 하는 형이나 누나를 ",
+              "본 적이 있을 것이다. ",
+              "일을 하고 ",
+              "그만큼 돈을 받는 일은 ",
+              "어른만의 것이 아니다. ",
+              "다만 나이가 어린 사람이 일할 때에는 ",
+              "법이 미리 쳐 둔 ",
+              "울타리가 있다. ",
+              "울타리는 세 가지다. ",
+              "나이, ",
+              "어른의 동의서, ",
+              "그리고 시간이다."
+            ],
+            [
+              "첫째는 나이다. ",
+              "법은 15세가 되지 않은 사람은 ",
+              "원칙적으로 일할 수 없다고 정해 두었다. ",
+              "다만 13세 이상 15세 미만인 청소년은 ",
+              "고용노동부장관이 발급한 취직인허증을 받으면 ",
+              "일할 수 있다. ",
+              "취직인허증은 취직이 막혀 있는 사람에게 ",
+              "나라가 따로 허락해 주는 증명서다."
+            ],
+            [
+              "둘째는 동의서다. ",
+              "18세가 되지 않은 사람을 고용하는 가게는 ",
+              "그 사람의 나이를 증명하는 서류와 ",
+              "친권자나 후견인의 동의서를 ",
+              "사업장에 갖추어 두어야 한다. ",
+              "일을 할지 말지를 ",
+              "어린 사람 혼자 정하지 않도록, ",
+              "집 어른이 한 번 더 ",
+              "보게 하는 장치다."
+            ],
+            [
+              "셋째는 시간이다. ",
+              "18세가 되지 않은 사람은 ",
+              "오후 10시부터 다음 날 오전 6시까지, ",
+              "그리고 휴일에는 ",
+              "일할 수 없다. ",
+              "이 문은 가게 주인의 말만으로는 ",
+              "열리지 않는다. ",
+              "청소년이 동의하고, ",
+              "그 지역을 맡은 지방고용노동관서의 장이 ",
+              "인가해야 비로소 열린다."
+            ],
+            [
+              "울타리가 있어도 모르면 ",
+              "쓸 수 없다. ",
+              "그래서 가르친다. ",
+              "지난 9월 30일 한국고용노동교육원은 ",
+              "경기도에서 열린 꿈울림 축제에 ",
+              "부스를 차리고 ",
+              "학교 밖 청소년 약 150명을 만났다. ",
+              "노동 상식 퀴즈에서는 휴일과 최저임금처럼 ",
+              "일터에서 바로 쓰는 것들이 ",
+              "문제로 나왔다."
+            ]
+          ],
+          "en": [
+            "You have probably seen an older brother or sister working a part-time job. Doing work and being paid for it is not something only adults do. But when a young person works, the law has already put up a fence. The fence has three parts: age, a consent form from an adult, and time.",
+            "The first is age. The law says that, as a rule, a person under fifteen may not take a job. A young person of thirteen or over but under fifteen, however, may work if the Minister of Employment and Labor has issued an employment permit. The permit is a certificate by which the state gives special permission to someone whose way into a job is otherwise closed.",
+            "The second is the consent form. A shop that employs a person under eighteen must keep at the workplace a document proving that person’s age together with a letter of consent from a parent with parental authority or from a guardian. It is a device that makes an adult at home look once more, so that a young person does not decide alone whether to work.",
+            "The third is time. A person under eighteen may not work from ten at night until six the next morning, nor on holidays. This door does not open on the shop owner’s word alone. It opens only when the young person agrees and the head of the local labor office in charge gives permission.",
+            "A fence you do not know about is a fence you cannot use. That is why it is taught. On the thirtieth of September the Korea Employment and Labor Education Institute set up a booth at the Kkumullim festival held in Gyeonggi Province and met about one hundred and fifty young people outside school. In the quiz on labor basics, holidays and the minimum wage, the things used straight away at work, came up as the questions."
+          ],
+          "enseg": [
+            [
+              "You have probably seen ",
+              "an older brother or sister ",
+              "working a part-time job. ",
+              "Doing work and being paid for it ",
+              "is not something only adults do. ",
+              "But when a young person works, ",
+              "the law has already put up a fence. ",
+              "The fence has three parts: ",
+              "age, a consent form from an adult, and time."
+            ],
+            [
+              "The first is age. ",
+              "The law says that, as a rule, ",
+              "a person under fifteen may not take a job. ",
+              "A young person of thirteen or over but under fifteen, ",
+              "however, may work ",
+              "if the Minister of Employment and Labor ",
+              "has issued an employment permit. ",
+              "The permit is a certificate ",
+              "by which the state gives special permission ",
+              "to someone whose way into a job ",
+              "is otherwise closed."
+            ],
+            [
+              "The second is the consent form. ",
+              "A shop that employs a person under eighteen ",
+              "must keep at the workplace ",
+              "a document proving that person’s age ",
+              "together with a letter of consent ",
+              "from a parent with parental authority ",
+              "or from a guardian. ",
+              "It is a device ",
+              "that makes an adult at home look once more, ",
+              "so that a young person ",
+              "does not decide alone whether to work."
+            ],
+            [
+              "The third is time. ",
+              "A person under eighteen may not work ",
+              "from ten at night until six the next morning, ",
+              "nor on holidays. ",
+              "This door does not open ",
+              "on the shop owner’s word alone. ",
+              "It opens only ",
+              "when the young person agrees ",
+              "and the head of the local labor office in charge ",
+              "gives permission."
+            ],
+            [
+              "A fence you do not know about ",
+              "is a fence you cannot use. ",
+              "That is why it is taught. ",
+              "On the thirtieth of September ",
+              "the Korea Employment and Labor Education Institute ",
+              "set up a booth at the Kkumullim festival ",
+              "held in Gyeonggi Province ",
+              "and met about one hundred and fifty young people outside school. ",
+              "In the quiz on labor basics, ",
+              "holidays and the minimum wage, ",
+              "the things used straight away at work, ",
+              "came up as the questions."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "취직인허증",
+              "easy": "취직이 막혀 있는 어린 사람에게 나라가 따로 일해도 된다고 허락해 주는 증명서",
+              "hanja": "就(나아갈 취)+職(직분 직)+認(알 인)+許(허락할 허)+證(증거 증)"
+            },
+            {
+              "word": "동의서",
+              "easy": "그렇게 해도 좋다는 뜻을 적어서 건네는 종이",
+              "hanja": "同(한가지 동)+意(뜻 의)+書(글 서)"
+            },
+            {
+              "word": "후견인",
+              "easy": "친권자가 없을 때 어린 사람을 대신 돌보고 챙겨 주도록 정해진 사람",
+              "hanja": "後(뒤 후)+見(볼 견)+人(사람 인)"
+            },
+            {
+              "word": "인가",
+              "easy": "나라나 관청이 해도 된다고 허락해 주는 것",
+              "hanja": "認(알 인)+可(옳을 가)"
+            }
+          ],
+          "envocab": [
+            {
+              "word": "fence",
+              "ko": "울타리 (명사)",
+              "base": "fence [fens]"
+            },
+            {
+              "word": "consent",
+              "ko": "동의 (명사)",
+              "base": "consent [kənˈsent]"
+            },
+            {
+              "word": "guardian",
+              "ko": "후견인 (명사)",
+              "base": "guardian [ˈɡɑːrdiən]"
+            },
+            {
+              "word": "permit",
+              "ko": "허가증, 인허증 (명사)",
+              "base": "permit [ˈpɜːrmɪt]"
+            },
+            {
+              "word": "permission",
+              "ko": "허락, 인가 (명사)",
+              "base": "permission [pərˈmɪʃn]"
+            },
+            {
+              "word": "wage",
+              "ko": "임금 (명사)",
+              "base": "wage [weɪdʒ]"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용은 무엇인가?",
+              "choices": [
+                "아르바이트로 돈을 많이 버는 방법",
+                "나이가 어린 사람이 일할 때 법이 미리 정해 둔 세 가지 울타리",
+                "축제에서 퀴즈를 잘 푸는 방법",
+                "가게 주인이 가게를 꾸미는 방법"
+              ],
+              "answer": 1,
+              "explain": "나이, 어른의 동의서, 시간이라는 세 가지 울타리를 차례로 설명한 글이다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "13세 이상 15세 미만인 청소년이 일하려면 무엇이 있어야 하는가?",
+              "choices": [
+                "고용노동부장관이 발급한 취직인허증",
+                "학교에서 받은 상장",
+                "가게 주인이 쓴 편지",
+                "퀴즈 대회 참가증"
+              ],
+              "answer": 0,
+              "explain": "13세 이상 15세 미만인 청소년은 취직인허증을 받으면 일할 수 있다고 했다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「인가」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "일을 그만두는 것",
+                "돈을 미리 받는 것",
+                "나라나 관청이 해도 된다고 허락해 주는 것",
+                "약속을 어기는 것"
+              ],
+              "answer": 2,
+              "explain": "관청이 해도 된다고 허락해 주는 것을 인가라고 한다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "infer",
+              "q": "18세가 되지 않은 사람이 오후 10시 뒤에도 일할 수 있게 되는 경우는?",
+              "choices": [
+                "가게 주인이 그렇게 하자고 할 때",
+                "손님이 많을 때",
+                "청소년이 동의하고 지방고용노동관서의 장이 인가할 때",
+                "하루 일이 늦게 끝날 때"
+              ],
+              "answer": 2,
+              "explain": "이 문은 가게 주인의 말만으로는 열리지 않고, 청소년의 동의와 관서장의 인가가 있어야 열린다.",
+              "evidencePara": 3
+            }
+          ],
+          "challenge": [
+            {
+              "type": "apply",
+              "q": "열일곱 살인 형이 가게에서 일하기로 했다. 이 글에 따르면 가게가 갖추어 두어야 하는 것은?",
+              "choices": [
+                "형의 학교 성적표",
+                "나이를 증명하는 서류와 친권자나 후견인의 동의서",
+                "형이 쓴 자기소개서",
+                "가게 주인의 사진"
+              ],
+              "answer": 1,
+              "explain": "18세가 되지 않은 사람을 고용하는 가게는 나이를 증명하는 서류와 친권자나 후견인의 동의서를 사업장에 갖추어야 한다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "infer",
+              "q": "교육원이 축제에서 노동 상식 퀴즈를 낸 까닭으로 가장 알맞은 것은?",
+              "choices": [
+                "울타리가 있어도 모르면 쓸 수 없기 때문에",
+                "퀴즈를 잘 푸는 사람을 뽑으려고",
+                "축제에 사람이 많이 오게 하려고",
+                "상품을 나누어 주려고"
+              ],
+              "answer": 0,
+              "explain": "울타리가 있어도 모르면 쓸 수 없다고 한 뒤에 「그래서 가르친다」고 이어진다.",
+              "evidencePara": 4
+            }
+          ]
+        },
+        "L3": {
+          "title": "알아야 쓸 수 있는 울타리",
+          "minutes": 5,
+          "paragraphs": [
+            [
+              "아르바이트는 지금 중학생에게도 ",
+              "몇 해 안의 일이다. ",
+              "일터에서 생기는 문제에는 임금체불이나 부당처우처럼 ",
+              "이미 이름이 붙어 있고, ",
+              "법은 그런 일을 미리 막으려고 ",
+              "청소년의 노동 조건에 울타리를 쳐 두었다. ",
+              "문제는 이 울타리가 ",
+              "그것을 알고 있는 사람에게만 ",
+              "쓸모 있다는 점이다."
+            ],
+            [
+              "먼저 시간이다. ",
+              "15세 이상 18세 미만인 청소년은 ",
+              "1일 7시간, 1주 35시간을 ",
+              "넘겨 일할 수 없다. ",
+              "사용자와 청소년이 합의하면 ",
+              "1일 1시간, ",
+              "1주 5시간을 한도로 ",
+              "연장할 수 있고 거기까지가 끝이다. ",
+              "또 18세 미만인 청소년은 ",
+              "오후 10시부터 오전 6시까지와 ",
+              "휴일에는 일하지 못한다. ",
+              "청소년이 동의하고 관할 지방고용노동관서의 장이 ",
+              "인가한 경우만 예외다."
+            ],
+            [
+              "다음은 임금이다. ",
+              "최저임금은 고용노동부장관이 매년 8월 5일까지 ",
+              "최저임금위원회의 심의를 거쳐 결정해 고시한다. ",
+              "2026년 1월 1일부터 12월 31일까지의 ",
+              "최저임금은 시간급 10,320원이다. ",
+              "사용자는 최저임금액을 ",
+              "청소년이 쉽게 볼 수 있는 곳에 ",
+              "게시해야 한다. ",
+              "알려 주지 않는 것 자체가 ",
+              "법을 어기는 일이다."
+            ],
+            [
+              "그래서 가르치는 일도 울타리의 한 부분이다. ",
+              "지난 9월 30일 한국고용노동교육원은 ",
+              "경기도 꿈울림 축제에 ",
+              "체험 부스를 열고 ",
+              "학교 밖 청소년 약 150명을 만났다. ",
+              "노동법 교수진은 근로계약서 작성과 임금, ",
+              "근로환경을 중심으로 1:1 상담을 했고, ",
+              "필요한 경우에는 ",
+              "청소년근로권익센터와 관할 고용노동지청 같은 ",
+              "공공 권리구제기관의 이용 절차를 안내했다."
+            ],
+            [
+              "이종선 원장은 학교 밖 청소년들이 ",
+              "노동시장에 비교적 일찍 ",
+              "들어설 수 있는 만큼 ",
+              "자신의 권리를 알고 ",
+              "어려움이 생겼을 때 어디에서 ",
+              "도움을 받을 수 있는지 ",
+              "아는 것이 중요하다고 말했다. ",
+              "울타리의 위치를 아는 사람만 ",
+              "그 안에 서 있을 수 있다."
+            ]
+          ],
+          "en": [
+            "For a middle school student today, a part-time job is only a few years away. The troubles that arise at work already have names of their own, such as unpaid wages or unfair treatment, and the law has drawn a fence around the working conditions of young people in order to keep such things from happening. The difficulty is that the fence is of use only to someone who knows it is there.",
+            "Time comes first. A young person of fifteen or over but under eighteen may not work more than seven hours a day or thirty-five hours a week. If the employer and the young person agree, the hours may be extended by one hour a day and five hours a week, and that is as far as it goes. A person under eighteen also may not work from ten at night until six in the morning, or on holidays. The only exception is where the young person consents and the head of the competent local labor office grants permission.",
+            "Pay comes next. The minimum wage is decided and announced by the Minister of Employment and Labor by the fifth of August each year, after deliberation by the Minimum Wage Council. From the first of January to the thirty-first of December 2026 the minimum wage is 10,320 won an hour. The employer must post the amount where a young worker can easily see it. Not telling them is itself a breach of the law.",
+            "Teaching, then, is part of the fence as well. On the thirtieth of September the Korea Employment and Labor Education Institute opened a hands-on booth at the Kkumullim festival in Gyeonggi Province and met about one hundred and fifty young people outside school. Professors of labor law held one-to-one consultations centred on drawing up an employment contract, pay and working conditions, and where it was needed they explained how to use public remedy bodies such as the Youth Labor Rights Centre or the competent district labor office.",
+            "Lee Jong-seon, the head of the institute, said that because young people outside school may enter the labor market comparatively early, it matters that they know their own rights and know where help can be found when trouble comes. Only someone who knows where the fence stands can stand inside it."
+          ],
+          "enseg": [
+            [
+              "For a middle school student today, ",
+              "a part-time job is only a few years away. ",
+              "The troubles that arise at work ",
+              "already have names of their own, ",
+              "such as unpaid wages or unfair treatment, ",
+              "and the law has drawn a fence ",
+              "around the working conditions of young people ",
+              "in order to keep such things from happening. ",
+              "The difficulty is that the fence ",
+              "is of use only to someone ",
+              "who knows it is there."
+            ],
+            [
+              "Time comes first. ",
+              "A young person of fifteen or over but under eighteen ",
+              "may not work more than seven hours a day ",
+              "or thirty-five hours a week. ",
+              "If the employer and the young person agree, ",
+              "the hours may be extended ",
+              "by one hour a day and five hours a week, ",
+              "and that is as far as it goes. ",
+              "A person under eighteen also may not work ",
+              "from ten at night until six in the morning, ",
+              "or on holidays. ",
+              "The only exception is ",
+              "where the young person consents ",
+              "and the head of the competent local labor office ",
+              "grants permission."
+            ],
+            [
+              "Pay comes next. ",
+              "The minimum wage is decided and announced ",
+              "by the Minister of Employment and Labor ",
+              "by the fifth of August each year, ",
+              "after deliberation by the Minimum Wage Council. ",
+              "From the first of January to the thirty-first of December 2026 ",
+              "the minimum wage is 10,320 won an hour. ",
+              "The employer must post the amount ",
+              "where a young worker can easily see it. ",
+              "Not telling them ",
+              "is itself a breach of the law."
+            ],
+            [
+              "Teaching, then, is part of the fence as well. ",
+              "On the thirtieth of September ",
+              "the Korea Employment and Labor Education Institute ",
+              "opened a hands-on booth ",
+              "at the Kkumullim festival in Gyeonggi Province ",
+              "and met about one hundred and fifty young people outside school. ",
+              "Professors of labor law ",
+              "held one-to-one consultations ",
+              "centred on drawing up an employment contract, ",
+              "pay and working conditions, ",
+              "and where it was needed ",
+              "they explained how to use public remedy bodies ",
+              "such as the Youth Labor Rights Centre ",
+              "or the competent district labor office."
+            ],
+            [
+              "Lee Jong-seon, the head of the institute, said ",
+              "that because young people outside school ",
+              "may enter the labor market comparatively early, ",
+              "it matters that they know their own rights ",
+              "and know where help can be found ",
+              "when trouble comes. ",
+              "Only someone who knows where the fence stands ",
+              "can stand inside it."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "임금체불",
+              "easy": "일한 대가로 받아야 할 돈을 정해진 날까지 받지 못하는 일",
+              "hanja": "賃(품삯 임)+金(쇠 금)+滯(막힐 체)+拂(떨칠 불)"
+            },
+            {
+              "word": "사용자",
+              "easy": "사람을 고용해 일을 시키는 쪽. 가게 주인이나 회사가 여기에 든다",
+              "hanja": "使(부릴 사)+用(쓸 용)+者(놈 자)"
+            },
+            {
+              "word": "최저임금",
+              "easy": "나라가 정해 그보다 적게 주면 안 되도록 한 임금의 가장 낮은 선",
+              "hanja": "最(가장 최)+低(낮을 저)+賃(품삯 임)+金(쇠 금)"
+            },
+            {
+              "word": "인가",
+              "easy": "관청이 해도 된다고 공식으로 허락해 주는 것",
+              "hanja": "認(알 인)+可(옳을 가)"
+            },
+            {
+              "word": "게시",
+              "easy": "여러 사람이 볼 수 있는 곳에 내걸어 알리는 일",
+              "hanja": "揭(걸 게)+示(보일 시)"
+            }
+          ],
+          "envocab": [
+            {
+              "word": "employer",
+              "ko": "사용자, 고용하는 쪽 (명사)",
+              "base": "employer [ɪmˈplɔɪər]"
+            },
+            {
+              "word": "consents",
+              "ko": "동의하다 (동사 consent의 3인칭 단수형)",
+              "base": "consent [kənˈsent]"
+            },
+            {
+              "word": "deliberation",
+              "ko": "심의 (명사)",
+              "base": "deliberation [dɪˌlɪbəˈreɪʃn]"
+            },
+            {
+              "word": "remedy",
+              "ko": "구제 (명사)",
+              "base": "remedy [ˈremədi]"
+            },
+            {
+              "word": "contract",
+              "ko": "계약 (명사)",
+              "base": "contract [ˈkɑːntrækt]"
+            },
+            {
+              "word": "treatment",
+              "ko": "처우, 대우 (명사)",
+              "base": "treatment [ˈtriːtmənt]"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 가장 알맞은 것은?",
+              "choices": [
+                "아르바이트를 구하는 방법",
+                "최저임금을 올리는 절차",
+                "법이 청소년의 노동에 쳐 둔 울타리와, 그것을 알아야 쓸 수 있다는 점",
+                "축제를 준비하는 과정"
+              ],
+              "answer": 2,
+              "explain": "시간과 임금의 울타리를 설명한 뒤, 알고 있어야 쓸 수 있으므로 가르치는 일도 울타리의 한 부분이라고 했다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "15세 이상 18세 미만인 청소년의 노동시간에 대한 설명으로 옳은 것은?",
+              "choices": [
+                "1일 7시간, 1주 35시간을 넘길 수 없고 합의해도 1일 1시간, 1주 5시간까지만 연장된다",
+                "1일 8시간까지는 언제나 일할 수 있다",
+                "합의하면 시간 제한이 모두 없어진다",
+                "1주 40시간까지 일할 수 있다"
+              ],
+              "answer": 0,
+              "explain": "1일 7시간·1주 35시간이 한도이고, 합의가 있어도 1일 1시간·1주 5시간을 한도로만 연장할 수 있다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「게시」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "남이 못 보게 숨겨 두는 일",
+                "값을 깎아 주는 일",
+                "여러 사람이 볼 수 있는 곳에 내걸어 알리는 일",
+                "서류를 관청에 내는 일"
+              ],
+              "answer": 2,
+              "explain": "사용자는 최저임금액을 청소년이 쉽게 볼 수 있는 곳에 내걸어 알려야 한다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "infer",
+              "q": "사용자에게 최저임금액을 게시할 의무까지 지운 까닭을 이 글에서 추론하면?",
+              "choices": [
+                "가게를 꾸미는 데 도움이 되기 때문에",
+                "권리는 당사자가 알고 있어야 쓸 수 있기 때문에",
+                "종이값이 싸기 때문에",
+                "손님이 좋아하기 때문에"
+              ],
+              "answer": 1,
+              "explain": "알려 주지 않는 것 자체가 법을 어기는 일이라고 했고, 글 전체가 알아야 쓸 수 있다는 점을 말한다.",
+              "evidencePara": 2
+            }
+          ],
+          "challenge": [
+            {
+              "type": "apply",
+              "q": "아르바이트를 시작한 가게 어디에도 최저임금액이 붙어 있지 않다. 이 글에 따른 판단으로 옳은 것은?",
+              "choices": [
+                "붙이지 않아도 상관없다",
+                "청소년이 직접 붙여야 한다",
+                "알려 주지 않는 것 자체가 법을 어기는 일이다",
+                "최저임금을 받지 않겠다는 뜻이 된다"
+              ],
+              "answer": 2,
+              "explain": "사용자는 최저임금액을 쉽게 볼 수 있는 곳에 게시해야 하고, 알려 주지 않는 것 자체가 법을 어기는 일이다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "infer",
+              "q": "이 글이 든 「도움을 받을 수 있는 곳」의 예로 알맞은 것은?",
+              "choices": [
+                "청소년근로권익센터와 관할 고용노동지청",
+                "최저임금위원회와 학교",
+                "경기도 꿈울림 축제와 체험 부스",
+                "가게 주인과 손님"
+              ],
+              "answer": 0,
+              "explain": "상담에서 필요한 경우 청소년근로권익센터와 관할 고용노동지청 같은 공공 권리구제기관의 이용 절차를 안내했다.",
+              "evidencePara": 3
+            }
+          ]
+        },
+        "L4": {
+          "title": "금지, 예외, 그리고 알릴 의무",
+          "minutes": 7,
+          "paragraphs": [
+            [
+              "청소년의 노동을 다루는 조문은 ",
+              "대개 같은 모양을 띤다. ",
+              "먼저 넓게 금지하고, ",
+              "그다음 좁은 예외를 열고, ",
+              "그 예외에 다시 조건을 붙인다. ",
+              "금지만 있으면 현실이 들어올 틈이 없고, ",
+              "예외만 있으면 금지가 허물어진다. ",
+              "근로기준법과 최저임금법을 세 자리에서 보면 ",
+              "그 구조가 그대로 드러난다."
+            ],
+            [
+              "첫 자리는 연령이다. ",
+              "원칙적으로 15세 미만인 사람의 취직은 금지된다. ",
+              "예외는 좁다. ",
+              "13세 이상 15세 미만인 청소년은 ",
+              "고용노동부장관이 발급한 취직인허증을 받아야 일할 수 있고, ",
+              "예술공연 참가를 위한 경우에는 ",
+              "13세 미만인 사람도 인허증을 받을 수 있다. ",
+              "조건도 따라온다. ",
+              "18세 미만인 사람을 고용하는 사용자는 ",
+              "연령을 증명하는 가족관계기록사항 증명서와 ",
+              "친권자 또는 후견인의 동의서를 ",
+              "사업장에 갖추어야 하고, ",
+              "갖추지 않으면 500만원 이하의 과태료를 물게 된다."
+            ],
+            [
+              "둘째 자리는 시간이다. ",
+              "15세 이상 18세 미만인 청소년의 노동은 ",
+              "1일 7시간, 1주 35시간이 한도이고, ",
+              "사용자와 청소년의 합의가 있어도 ",
+              "1일 1시간, 1주 5시간까지만 연장된다. ",
+              "18세 미만인 청소년은 ",
+              "오후 10시부터 오전 6시까지와 휴일에 ",
+              "일할 수 없으며, ",
+              "그 예외는 청소년의 동의와 ",
+              "관할 지방고용노동관서장의 인가가 ",
+              "함께 있을 때에만 열린다. ",
+              "인가를 받아 오는 쪽은 청소년이 아니라 사용자다. ",
+              "이 제한을 어기면 ",
+              "2년 이하의 징역 또는 2천만원 이하의 벌금이다."
+            ],
+            [
+              "셋째 자리는 임금이다. ",
+              "최저임금은 고용노동부장관이 매년 8월 5일까지 ",
+              "최저임금위원회의 심의를 거쳐 결정해 고시하고, ",
+              "2026년 한 해의 최저임금은 시간급 10,320원이다. ",
+              "그보다 적게 주면 ",
+              "3년 이하의 징역 또는 2천만원 이하의 벌금이고, ",
+              "경우에 따라 징역과 벌금이 ",
+              "함께 부과될 수 있다. ",
+              "처벌보다 눈여겨볼 조항이 하나 더 있다. ",
+              "사용자는 최저임금액을 ",
+              "청소년이 쉽게 볼 수 있는 장소에 ",
+              "게시해야 하고, ",
+              "알려 주지 않으면 ",
+              "100만원 이하의 과태료를 물게 된다. ",
+              "법은 권리를 정해 두는 데서 ",
+              "멈추지 않고 그것이 알려지도록 ",
+              "의무를 하나 더 얹었다."
+            ],
+            [
+              "같은 생각이 임금 청구에도 들어 있다. ",
+              "19세 미만의 미성년자라도 법정대리인의 동의 없이 ",
+              "독자적으로 임금을 청구할 수 있다. ",
+              "일을 시작할 때에는 ",
+              "친권자나 후견인의 동의서가 필요하지만, ",
+              "일한 대가를 달라고 말하는 자리는 ",
+              "본인의 손에 남겨 두었다. ",
+              "권리를 가진 사람과 ",
+              "그 권리를 행사할 수 있는 사람이 어긋나면, ",
+              "권리는 문서 위에만 남는다."
+            ],
+            [
+              "그래서 노동교육은 제도의 바깥에 있는 친절이 아니다. ",
+              "지난 9월 30일 한국고용노동교육원은 ",
+              "경기도 꿈울림 축제에서 ",
+              "학교 밖 청소년 약 150명을 만나 ",
+              "노동권 상담존을 운영했다. ",
+              "노동법 전문 교수진이 근로계약서 작성과 임금, ",
+              "근로환경을 중심으로 1:1 상담을 하고, ",
+              "필요하면 청소년근로권익센터와 ",
+              "관할 고용노동지청 같은 공공 권리구제기관의 ",
+              "이용 절차를 안내했다. ",
+              "임금체불과 부당처우를 미리 막으려는 자리였다. ",
+              "게시 의무와 노동교육은 ",
+              "결국 같은 곳을 가리킨다. ",
+              "권리는 알고 있어야 쓸 수 있다."
+            ]
+          ],
+          "en": [
+            "The provisions that deal with young people’s work tend to take the same shape. First they forbid broadly; then they open a narrow exception; then they attach conditions to that exception again. A prohibition alone leaves no room for real life to enter, while an exception alone pulls the prohibition down. Look at the Labor Standards Act and the Minimum Wage Act in three places and the structure shows itself plainly.",
+            "The first place is age. As a rule a person under fifteen is forbidden to take a job. The exception is narrow. A young person of thirteen or over but under fifteen may work only with an employment permit issued by the Minister of Employment and Labor, and someone under thirteen may receive the permit in order to take part in an artistic performance. Conditions follow as well. An employer who hires a person under eighteen must keep at the workplace a family relation certificate proving the person’s age and a letter of consent from a person with parental authority or from a guardian, and failing to keep them brings an administrative fine of up to five million won.",
+            "The second place is time. Work by a young person of fifteen or over but under eighteen is limited to seven hours a day and thirty-five hours a week, and even with an agreement between employer and worker it may be extended only by one hour a day and five hours a week. A person under eighteen may not work between ten at night and six in the morning, or on holidays, and that exception opens only where the consent of the young person and the permission of the head of the competent local labor office are both present. The one who must go and obtain the permission is not the young person but the employer. Breaking this limit brings up to two years in prison or a fine of up to twenty million won.",
+            "The third place is pay. The minimum wage is decided and announced by the Minister of Employment and Labor by the fifth of August each year, after deliberation by the Minimum Wage Council, and for the year 2026 it is 10,320 won an hour. Paying less than that brings up to three years in prison or a fine of up to twenty million won, and in some cases prison and fine may be imposed together. There is one provision worth more attention than the punishments. The employer must post the amount of the minimum wage where a young worker can easily see it, and failing to tell them brings an administrative fine of up to one million won. The law does not stop at laying a right down; it adds one more duty, that the right be made known.",
+            "The same thought runs through the claiming of wages. A minor under nineteen may claim wages independently, without the consent of a legal representative. A letter of consent from a parent or a guardian is needed in order to begin working, yet the moment of asking to be paid for work already done was left in the worker’s own hands. When the person who holds a right and the person who may exercise it come apart, the right stays only on paper.",
+            "Labor education, then, is not a kindness lying outside the system. On the thirtieth of September the Korea Employment and Labor Education Institute met about one hundred and fifty young people outside school at the Kkumullim festival in Gyeonggi Province and ran a labor rights consultation zone. Professors of labor law held one-to-one consultations centred on drawing up an employment contract, pay and working conditions, and where it was needed they explained how to use public remedy bodies such as the Youth Labor Rights Centre or the competent district labor office. It was a place meant to head off unpaid wages and unfair treatment before they happen. The duty to post and the work of labor education point to the same place in the end. A right can be used only by someone who knows it."
+          ],
+          "enseg": [
+            [
+              "The provisions that deal with young people’s work ",
+              "tend to take the same shape. ",
+              "First they forbid broadly; ",
+              "then they open a narrow exception; ",
+              "then they attach conditions to that exception again. ",
+              "A prohibition alone ",
+              "leaves no room for real life to enter, ",
+              "while an exception alone ",
+              "pulls the prohibition down. ",
+              "Look at the Labor Standards Act and the Minimum Wage Act ",
+              "in three places ",
+              "and the structure shows itself plainly."
+            ],
+            [
+              "The first place is age. ",
+              "As a rule a person under fifteen ",
+              "is forbidden to take a job. ",
+              "The exception is narrow. ",
+              "A young person of thirteen or over but under fifteen ",
+              "may work only with an employment permit ",
+              "issued by the Minister of Employment and Labor, ",
+              "and someone under thirteen may receive the permit ",
+              "in order to take part in an artistic performance. ",
+              "Conditions follow as well. ",
+              "An employer who hires a person under eighteen ",
+              "must keep at the workplace ",
+              "a family relation certificate proving the person’s age ",
+              "and a letter of consent ",
+              "from a person with parental authority or from a guardian, ",
+              "and failing to keep them ",
+              "brings an administrative fine of up to five million won."
+            ],
+            [
+              "The second place is time. ",
+              "Work by a young person of fifteen or over but under eighteen ",
+              "is limited to seven hours a day and thirty-five hours a week, ",
+              "and even with an agreement between employer and worker ",
+              "it may be extended only ",
+              "by one hour a day and five hours a week. ",
+              "A person under eighteen may not work ",
+              "between ten at night and six in the morning, ",
+              "or on holidays, ",
+              "and that exception opens only ",
+              "where the consent of the young person ",
+              "and the permission of the head of the competent local labor office ",
+              "are both present. ",
+              "The one who must go and obtain the permission ",
+              "is not the young person but the employer. ",
+              "Breaking this limit ",
+              "brings up to two years in prison ",
+              "or a fine of up to twenty million won."
+            ],
+            [
+              "The third place is pay. ",
+              "The minimum wage is decided and announced ",
+              "by the Minister of Employment and Labor ",
+              "by the fifth of August each year, ",
+              "after deliberation by the Minimum Wage Council, ",
+              "and for the year 2026 it is 10,320 won an hour. ",
+              "Paying less than that ",
+              "brings up to three years in prison ",
+              "or a fine of up to twenty million won, ",
+              "and in some cases ",
+              "prison and fine may be imposed together. ",
+              "There is one provision ",
+              "worth more attention than the punishments. ",
+              "The employer must post the amount of the minimum wage ",
+              "where a young worker can easily see it, ",
+              "and failing to tell them ",
+              "brings an administrative fine of up to one million won. ",
+              "The law does not stop at laying a right down; ",
+              "it adds one more duty, ",
+              "that the right be made known."
+            ],
+            [
+              "The same thought runs through the claiming of wages. ",
+              "A minor under nineteen may claim wages independently, ",
+              "without the consent of a legal representative. ",
+              "A letter of consent from a parent or a guardian ",
+              "is needed in order to begin working, ",
+              "yet the moment of asking to be paid ",
+              "for work already done ",
+              "was left in the worker’s own hands. ",
+              "When the person who holds a right ",
+              "and the person who may exercise it come apart, ",
+              "the right stays only on paper."
+            ],
+            [
+              "Labor education, then, ",
+              "is not a kindness lying outside the system. ",
+              "On the thirtieth of September ",
+              "the Korea Employment and Labor Education Institute ",
+              "met about one hundred and fifty young people outside school ",
+              "at the Kkumullim festival in Gyeonggi Province ",
+              "and ran a labor rights consultation zone. ",
+              "Professors of labor law held one-to-one consultations ",
+              "centred on drawing up an employment contract, ",
+              "pay and working conditions, ",
+              "and where it was needed ",
+              "they explained how to use public remedy bodies ",
+              "such as the Youth Labor Rights Centre ",
+              "or the competent district labor office. ",
+              "It was a place meant to head off ",
+              "unpaid wages and unfair treatment ",
+              "before they happen. ",
+              "The duty to post and the work of labor education ",
+              "point to the same place in the end. ",
+              "A right can be used only by someone who knows it."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "조문",
+              "easy": "법에서 내용을 한 조씩 나누어 적어 둔 조항의 글",
+              "hanja": "條(가지 조)+文(글월 문)"
+            },
+            {
+              "word": "과태료",
+              "easy": "행정상의 의무를 지키지 않았을 때 행정기관이 물리는 돈",
+              "hanja": "過(지날 과)+怠(게으를 태)+料(헤아릴 료)"
+            },
+            {
+              "word": "인가",
+              "easy": "관청이 그 행위를 해도 된다고 공식으로 허락해 주는 것",
+              "hanja": "認(알 인)+可(옳을 가)"
+            },
+            {
+              "word": "게시",
+              "easy": "여러 사람이 볼 수 있는 곳에 내걸어 널리 알리는 일",
+              "hanja": "揭(걸 게)+示(보일 시)"
+            },
+            {
+              "word": "법정대리인",
+              "easy": "법이 정해 미성년자 등을 대신해 법률행위를 하도록 한 사람",
+              "hanja": "法(법 법)+定(정할 정)+代(대신할 대)+理(다스릴 리)+人(사람 인)"
+            }
+          ],
+          "envocab": [
+            {
+              "word": "provisions",
+              "ko": "조문, 조항 (명사 provision의 복수형)",
+              "base": "provision [prəˈvɪʒn]"
+            },
+            {
+              "word": "prohibition",
+              "ko": "금지 (명사)",
+              "base": "prohibition [ˌproʊəˈbɪʃn]"
+            },
+            {
+              "word": "exception",
+              "ko": "예외 (명사)",
+              "base": "exception [ɪkˈsepʃn]"
+            },
+            {
+              "word": "representative",
+              "ko": "대리인 (명사)",
+              "base": "representative [ˌreprɪˈzentətɪv]"
+            },
+            {
+              "word": "deliberation",
+              "ko": "심의 (명사)",
+              "base": "deliberation [dɪˌlɪbəˈreɪʃn]"
+            },
+            {
+              "word": "exercise",
+              "ko": "행사하다 (동사)",
+              "base": "exercise [ˈeksərsaɪz]"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글이 세 자리에서 보여 주려는 법의 구조는?",
+              "choices": [
+                "금지 없이 예외만 두는 구조",
+                "예외 없이 금지만 두는 구조",
+                "넓게 금지한 뒤 좁은 예외를 열고 그 예외에 조건을 붙이는 구조",
+                "처벌의 양을 차례로 올려 가는 구조"
+              ],
+              "answer": 2,
+              "explain": "먼저 넓게 금지하고, 좁은 예외를 열고, 그 예외에 다시 조건을 붙인다고 했다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "18세 미만 청소년의 야간·휴일 근로 인가를 받아 와야 하는 쪽은 누구인가?",
+              "choices": [
+                "사용자",
+                "청소년 본인",
+                "친권자",
+                "최저임금위원회"
+              ],
+              "answer": 0,
+              "explain": "인가를 받아 오는 쪽은 청소년이 아니라 사용자다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "vocab",
+              "q": "「법정대리인」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "재판을 맡아 진행하는 사람",
+                "법을 만드는 일을 맡은 사람",
+                "사업장을 대신 운영하는 사람",
+                "법이 정해 미성년자 등을 대신해 법률행위를 하도록 한 사람"
+              ],
+              "answer": 3,
+              "explain": "법이 정해 미성년자 등을 대신해 법률행위를 하도록 한 사람을 법정대리인이라고 한다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "infer",
+              "q": "최저임금액 게시 의무를 「처벌보다 눈여겨볼 조항」이라고 한 까닭은?",
+              "choices": [
+                "과태료 금액이 가장 크기 때문에",
+                "권리가 당사자에게 알려져야 작동하기 때문에",
+                "게시가 가장 지키기 쉬운 의무이기 때문에",
+                "최저임금이 매년 바뀌기 때문에"
+              ],
+              "answer": 1,
+              "explain": "법이 권리를 정해 두는 데서 멈추지 않고 그것이 알려지도록 의무를 하나 더 얹었다고 했다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "critical",
+              "q": "19세 미만의 미성년자도 법정대리인의 동의 없이 임금을 청구할 수 있도록 한 것의 의미로 가장 적절한 것은?",
+              "choices": [
+                "미성년자에게 모든 계약을 혼자 맺을 자유를 준 것이다",
+                "권리를 가진 사람이 그 권리를 직접 행사할 수 있게 해 권리가 문서에만 남지 않도록 한 것이다",
+                "친권자나 후견인의 동의서를 받지 않아도 일을 시작할 수 있게 한 것이다",
+                "임금을 청구하면 반드시 받을 수 있게 보장한 것이다"
+              ],
+              "answer": 1,
+              "explain": "일을 시작할 때는 동의서가 필요하지만 임금을 청구하는 자리는 본인의 손에 남겨 두었고, 권리자와 행사자가 어긋나면 권리는 문서 위에만 남는다고 했다.",
+              "evidencePara": 4
+            }
+          ],
+          "challenge": [
+            {
+              "type": "apply",
+              "q": "열여덟 살인 학생이 일한 달의 임금을 받지 못했는데, 사장이 「부모님이 직접 와서 요구해야 준다」고 말했다. 이 글에 따른 판단으로 옳은 것은?",
+              "choices": [
+                "19세 미만이므로 법정대리인이 와야 한다",
+                "친권자 동의서를 다시 써야 한다",
+                "19세 미만의 미성년자라도 법정대리인의 동의 없이 스스로 임금을 청구할 수 있다",
+                "임금을 받으려면 취직인허증이 필요하다"
+              ],
+              "answer": 2,
+              "explain": "19세 미만의 미성년자라도 법정대리인의 동의 없이 독자적으로 임금을 청구할 수 있다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "critical",
+              "q": "이 글이 보여 주는 법의 방식에 대한 평가로 가장 적절한 것은?",
+              "choices": [
+                "금지를 넓게 두되 예외에 동의·인가·게시 같은 조건을 붙여, 현실을 받아들이면서도 보호가 허물어지지 않게 한다",
+                "처벌을 무겁게 하는 것만으로 청소년을 보호한다",
+                "사용자의 사정을 전혀 고려하지 않고 금지만 쌓아 둔다",
+                "청소년 본인의 판단에 모든 것을 맡겨 둔다"
+              ],
+              "answer": 0,
+              "explain": "예외는 청소년의 동의와 관서장의 인가, 증명서 비치, 게시 의무 같은 조건을 달고서야 열린다.",
+              "evidencePara": 0
             }
           ]
         }
