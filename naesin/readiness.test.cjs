@@ -33,12 +33,28 @@ t('engine 과 상수가 같다 — 안정화 판정이 둘이 되면 안 된다'
     'engine.RELEARN_TARGET 이 바뀌었다 — readiness 의 값도 같이 고쳐야 안정화 판정이 하나로 남는다');
 });
 
-t('축 가중치 합이 1 이고, 축마다 "오늘 무엇을 할지"가 붙어 있다', () => {
-  const sum = R.AXES.reduce((a, x) => a + x.w, 0);
-  assert.ok(Math.abs(sum - 1) < 1e-9, '가중치 합이 1 이 아니다: ' + sum);
+t('점수 축은 셋(합 1), 진단 축은 가중치 0 — 진단 축이 완성률을 흔들면 안 된다', () => {
+  const score = R.AXES.filter((a) => !a.diagnostic);
+  const diag = R.AXES.filter((a) => a.diagnostic);
+  const sum = score.reduce((a, x) => a + x.w, 0);
+  assert.ok(Math.abs(sum - 1) < 1e-9, '점수 축 가중치 합이 1 이 아니다: ' + sum);
+  assert.deepStrictEqual(score.map((a) => a.key), ['word', 'interpret', 'memorize'],
+    '점수 축이 바뀌었다 — naesin-results.mjs 의 복합 도달률 m 과 같은 세 축이어야 한다');
+  assert.ok(diag.length, '진단 축이 사라졌다 — 본문 진행·점검·단어 도달을 볼 자리가 없어진다');
+  diag.forEach((a) => {
+    assert.strictEqual(a.w, 0, a.key + ' 는 진단 축인데 가중치가 남아 있다 — 완성률을 흔든다');
+  });
   R.AXES.forEach((a) => {
     assert.ok(a.act && a.label && a.hint, a.key + ' 에 행동(act)·라벨·설명이 없다');
   });
+});
+
+t('내보낸 가중치가 축 가중치와 같다 — 화면이 둘 중 아무 쪽을 읽어도 같아야 한다', () => {
+  const by = {};
+  R.AXES.forEach((a) => { by[a.key] = a.w; });
+  assert.strictEqual(R.W_STABLE, by.word, 'W_STABLE 과 word 축 가중치가 다르다');
+  assert.strictEqual(R.W_INTERPRET, by.interpret, 'W_INTERPRET 과 interpret 축 가중치가 다르다');
+  assert.strictEqual(R.W_BLANK, by.memorize, 'W_BLANK 과 memorize 축 가중치가 다르다');
 });
 
 t('아무것도 안 한 학생은 0%, 다 한 학생은 100%', () => {
@@ -51,26 +67,72 @@ t('아무것도 안 한 학생은 0%, 다 한 학생은 100%', () => {
   assert.strictEqual(R.readiness(done).score, 100);
 });
 
-t('단어는 도달이 절반·안정화가 만점 — 철자 재검증이 남은 도달은 reached 가 아니다', () => {
-  /* reached 는 engine 의 isDone(도달 && 철자 재검증 없음)이라, 이 모듈은 그 값을 그대로 믿는다 */
-  const half = summary({ word: { total: 100, reached: 100, stable: 0, risky: 0, needsSpellCheck: 0 } });
-  const r = R.readiness(half);
+t('단어 완성은 **안정화**다 — 도달만 채운 학생을 완성으로 세지 않는다', () => {
+  /* reachOf(naesin-results.mjs)가 stable 을 보므로 이쪽도 stable 이어야 한다.
+     도달(reached)을 섞으면 같은 화면의 「복합 도달률」과 숫자가 어긋난다.
+     도달은 진행 상황이라 진단 축으로 따로 보여 주되 점수에 넣지 않는다. */
+  const reachedOnly = summary({ word: { total: 100, reached: 100, stable: 0, risky: 0, needsSpellCheck: 0 } });
+  const r = R.readiness(reachedOnly);
   const word = r.axes.find((a) => a.key === 'word');
-  assert.strictEqual(word.ratio, 0.5, '도달만 채웠으면 단어 축은 절반이어야 한다');
+  assert.strictEqual(word.ratio, 0, '도달만 채운 단어를 완성으로 셌다 — 안정화 비율이어야 한다');
+  assert.strictEqual(r.score, 0, '도달만으로 완성률이 올라갔다');
+  const reached = r.axes.find((a) => a.key === 'reached');
+  assert.strictEqual(reached.ratio, 1, '도달 진단 축이 진행 상황을 보여 주지 않는다');
+  assert.strictEqual(reached.weight, 0, '도달 축에 가중치가 붙어 완성률을 흔든다');
+  /* 안정화를 채우면 그때 W_STABLE 몫만큼 오른다 */
+  const stable = summary({ word: { total: 100, reached: 100, stable: 100, risky: 0, needsSpellCheck: 0 } });
+  const rs = R.readiness(stable);
+  assert.strictEqual(rs.axes.find((a) => a.key === 'word').ratio, 1);
+  assert.strictEqual(rs.score, 40, '단어만 완성이면 W_STABLE 몫(40%)이어야 한다');
 });
 
-t('재료가 없는 축은 0점이 아니라 축에서 빠진다 — 거짓 미달 금지', () => {
-  /* 내용정리 점검 문항이 없는 팩(check: null)에서 check 를 0 으로 깔면 그 반은 영원히 70% 를 못 넘는다 */
-  const noCheck = summary({
+t('범위 합계(summary.range)가 있으면 그것으로 센다 — 팩 하나로 재면 범위의 일부만 센다', () => {
+  /* 저장된 state.summary 는 팩 값과 범위 합계를 둘 다 담는다. reachOf·naesinNightDue 가
+     `sum.range || sum` 으로 보므로 이쪽도 같아야 한다. 어긋나면 같은 화면의 두 숫자가
+     **서로 다른 분량**을 두고 말한다. */
+  const stored = {
+    packId: '2022-ne-kimgitaek-m2-L6',
+    /* 팩 하나(1과)는 다 했다 */
+    word: { total: 40, reached: 40, stable: 40 },
+    sentence: { total: 20, interpreted: 20, memorized: 20 },
+    /* 범위(3과)로는 1/3 만 했다 */
+    range: {
+      packIds: ['a', 'b', 'c'],
+      word: { total: 120, reached: 40, stable: 40 },
+      sentence: { total: 60, interpreted: 20, memorized: 20 },
+      passage: { chunkDone: 0, chunkTotal: 9, paraBlank: 0, paraTotal: 9, cumulative: 0, check: null }
+    }
+  };
+  assert.strictEqual(R.readiness(stored).score, 33,
+    '팩 값으로 재서 100% 가 나왔다 — 범위 합계(range)를 봐야 한다');
+  /* 미착수 단어도 범위 기준이어야 한다 — 팩 값으로 보면 0 이 되어 미달을 놓친다 */
+  assert.strictEqual(R.needDays(stored).untouched, 80, '미착수 단어를 범위 기준으로 세지 않았다');
+  /* range 가 없는 옛 저장본·engine.rangeSummary() 반환값은 그대로 본다 */
+  assert.strictEqual(R.src({ word: { total: 1 } }).word.total, 1);
+});
+
+t('재료가 없는 **점수 축**은 0점이 아니라 축에서 빠진다 — 거짓 미달 금지', () => {
+  /* 문장이 없는 팩(sentence.total 0)에서 해석·백지를 0 으로 깔면 단어를 다 해도 40% 가 천장이다 */
+  const noSentence = {
+    packIds: ['x'], packs: {},
     word: { total: 100, reached: 100, stable: 100, risky: 0, needsSpellCheck: 0 },
-    sentence: { total: 60, interpreted: 60, memorized: 60, byStage: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 60 } },
+    sentence: { total: 0, interpreted: 0, memorized: 0, byStage: {} },
     passage: { chunkDone: 8, chunkTotal: 8, paraBlank: 8, paraTotal: 8, cumulative: 8, check: null }
+  };
+  const r = R.readiness(noSentence);
+  assert.strictEqual(r.score, 100,
+    '문장이 없는 팩에서 단어를 다 한 학생이 100% 가 아니면 빠진 축을 0 으로 깔고 있다');
+  ['interpret', 'memorize'].forEach((k) => {
+    const a = r.axes.find((x) => x.key === k);
+    assert.strictEqual(a.absent, true, k + ': 빠진 축임을 화면이 구분할 수 있어야 한다');
+    assert.strictEqual(a.weight, 0, k + ': 빠진 축에 가중치가 남아 있다');
   });
-  assert.strictEqual(R.readiness(noCheck).score, 100,
-    '점검 문항이 없는 팩에서 다 한 학생이 100% 가 아니면 그 축을 0 으로 깔고 있다');
-  const axis = R.readiness(noCheck).axes.find((a) => a.key === 'check');
-  assert.strictEqual(axis.absent, true, '빠진 축임을 화면이 구분할 수 있어야 한다');
-  assert.strictEqual(axis.weight, 0, '빠진 축에 가중치가 남아 있다');
+  assert.strictEqual(r.axes.find((x) => x.key === 'word').weight, 1,
+    '남은 점수 축 하나로 정규화해야 한다');
+  /* 점검 문항이 없는 팩(check: null)도 거짓 미달을 만들지 않는다 — 진단 축이라 애초에 점수 밖이다 */
+  const check = r.axes.find((x) => x.key === 'check');
+  assert.strictEqual(check.absent, true, '없는 점검을 0% 로 그리면 거짓이다');
+  assert.strictEqual(check.weight, 0);
 });
 
 t('문장도 본문도 재료가 없으면(팩이 단어만) 남은 축으로 정규화한다', () => {
@@ -164,8 +226,10 @@ t('학교 배점으로 가중치를 덮어쓸 수 있다 — 합이 1 이 아니
     sentence: { total: 10, interpreted: 0, memorized: 0, byStage: {} },
     passage: { chunkDone: 0, chunkTotal: 2, paraBlank: 0, paraTotal: 2, cumulative: 0, check: null }
   });
-  /* 단어만 다 한 학생: 기본 가중치에서는 30/92, 단어 배점을 크게 주면 더 높아야 한다 */
+  /* 단어만 다 한 학생: 기본 가중치에서는 W_STABLE 몫(40%), 단어 배점을 크게 주면 더 높아야 한다 */
   const base = R.readiness(s).score;
+  assert.strictEqual(base, 40,
+    '기본 가중치가 바뀌었다 — naesin-results.mjs 의 W_STABLE 과 같이 바꿨는지 확인한다');
   const heavy = R.readiness(s, { weights: { word: 0.9 } }).score;
   assert.ok(heavy > base, '가중치를 올렸는데 점수가 안 올랐다: ' + base + ' → ' + heavy);
 });

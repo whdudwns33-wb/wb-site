@@ -10,6 +10,17 @@
    국어는 5단계(읽기→개념빈칸→구절적용→주석복원→서술형), 영어는 단어 게이트 + 문장 6단계 +
    본문 세 층이다. 그래서 축을 베끼지 않고 영어 사다리에서 다시 세운다.
 
+   **완성률의 정본은 이미 있다.** `reading-server/naesin-results.mjs:15` 의 복합 도달률 `m`
+   (W_STABLE 0.4 · W_INTERPRET 0.3 · W_BLANK 0.3)이 세 최종 목표(① 해석 ② 백지 ③ 단어 100%)를
+   가중 합한 값이고, 시험 결과 분석이 그 숫자로 점수와의 상관을 낸다. 여기서 다른 가중치를
+   쓰면 **같은 관리 화면에서 「반 완성률 68%」와 「복합 도달률 0.74」가 서로 다른 말을 한다.**
+   그래서 완성률은 그 가중치를 그대로 따르고, 본문 진행·내용정리 점검은 **점수를 바꾸지 않는
+   진단 축**으로만 둔다(무엇을 먼저 할지 고르는 데만 쓴다).
+   모듈이 둘로 갈린 이유는 하나뿐이다 — 이쪽은 브라우저 IIFE, 저쪽은 서버 ESM 이라 import 가
+   안 된다. 그래서 값을 복제하되 **`readiness-reach.test.mjs` 가 두 모듈을 같이 불러
+   같은 요약에서 같은 숫자가 나오는지 고정한다** — 상수만 견주면 축을 바꿔 끼운 변경
+   (단어를 stable 대신 reached 로 세는 것 같은)을 놓친다.
+
    설계 원칙 넷:
    1. 축은 학생이 **오늘 무엇을 할지**와 1:1 이다. "준비도 62%" 만 있는 지표는 행동을 안 바꾼다.
    2. engine.js 의 상수를 다시 적지 않고 주입받는다. 기본값이 engine 과 어긋나면 테스트가 잡는다.
@@ -29,21 +40,27 @@ var WBNAESINREADY = (function () {
   var PASS_RATE = 0.7;       // 기획서 §12 파일럿 판정 임계 — 범위 완성률 70%
   var START_DAYS = 14;       // "시험 2주 전 시작한 반" — 판정 대상 여부를 재는 기준
 
-  /* 축 = 영어 사다리. 합 1.00.
-     가중치 근거: 단어 게이트는 범위 전체를 여는 관문이라 가장 무겁다(게이트가 닫히면 본문이
-     안 열린다). 해석과 암송은 시험 지면에서 각각 묻는 것이 달라 따로 센다. 본문 세 층(청크·
-     단락 백지)은 암송의 재료라 그 아래. 내용정리 점검은 팩에 있을 때만 쓴다(원칙 4). */
+  /* 완성률 가중치 — naesin-results.mjs 의 W_STABLE·W_INTERPRET·W_BLANK 와 **같은 값이어야 한다**.
+     테스트가 두 파일을 읽어 고정한다. 바꿀 일이 있으면 양쪽을 같이 바꾼다. */
+  var W_STABLE = 0.4, W_INTERPRET = 0.3, W_BLANK = 0.3;
+
+  /* 완성률을 만드는 세 축(합 1.00) + 점수를 바꾸지 않는 진단 축 둘.
+     단어는 **안정화(stable)** 로 센다 — 기획서의 '시험 전 단어 100% 완성'이 안정화를 말하고,
+     reachOf 도 stable 을 본다. 도달(reached)은 진행 상황이라 따로 보여 주되 점수에 넣지 않는다. */
   var AXES = [
-    { key: 'word', label: '단어 게이트', w: 0.30, act: '오늘 탭의 단어 큐',
-      hint: '도달하면 절반, 서로 다른 날 3회전으로 안정화되면 만점' },
-    { key: 'interpret', label: '문장 해석', w: 0.25, act: '본문 탭 1~2단계',
+    { key: 'word', label: '단어 안정화', w: W_STABLE, act: '오늘 탭의 단어 큐',
+      hint: '서로 다른 날 3회전으로 안정화된 단어 비율 (도달만으로는 완성이 아니다)' },
+    { key: 'interpret', label: '문장 해석', w: W_INTERPRET, act: '본문 탭 1~2단계',
       hint: '줄 해석(1단계)을 통과한 문장 비율' },
-    { key: 'memorize', label: '백지 암송', w: 0.22, act: '본문 탭 6단계 단락 백지',
+    { key: 'memorize', label: '백지 암송', w: W_BLANK, act: '본문 탭 6단계 단락 백지',
       hint: '6단계(단락 백지)까지 통과한 문장 비율' },
-    { key: 'passage', label: '본문 진행', w: 0.15, act: '본문 탭 청크·단락 관문',
-      hint: '청크 트랙과 단락 백지를 통과한 단락 비율' },
-    { key: 'check', label: '내용정리 점검', w: 0.08, act: '문제 탭 내용정리',
-      hint: '점검 문항 정답률. 팩에 점검 문항이 없으면 이 축은 빠진다' }
+    /* ── 아래는 진단 축: 점수를 바꾸지 않는다(w: 0). 무엇을 먼저 할지 고르는 데만 쓴다 ── */
+    { key: 'passage', label: '본문 진행', w: 0, act: '본문 탭 청크·단락 관문', diagnostic: true,
+      hint: '청크 트랙과 단락 백지를 통과한 단락 비율 (완성률에는 넣지 않는다)' },
+    { key: 'check', label: '내용정리 점검', w: 0, act: '문제 탭 내용정리', diagnostic: true,
+      hint: '점검 문항 정답률 (완성률에는 넣지 않는다)' },
+    { key: 'reached', label: '단어 도달', w: 0, act: '오늘 탭의 단어 큐', diagnostic: true,
+      hint: '한 번 도달한 단어 비율 — 진행 상황. 완성은 안정화다' }
   ];
 
   function num(v) { var n = +v; return isFinite(n) && n > 0 ? n : 0; }
@@ -51,8 +68,9 @@ var WBNAESINREADY = (function () {
   function pct(x) { return Math.round(x * 100); }
 
   /* 축별 가중치 — 재료가 없는 축(ratio === null)은 빼고 남은 축으로 정규화한다(원칙 4).
-     over 로 학교 배점을 덮어쓸 수 있다(국어판 ESSAY_BASE 와 같은 뜻) — 합이 1이 아니어도
-     정규화하므로 '서술형 40% 학교' 처럼 한 축만 조정해도 된다. */
+     진단 축은 w: 0 이라 여기서 저절로 빠진다 — 점수를 바꾸지 않는다.
+     over 로 학교 배점을 덮어쓸 수 있다 — 합이 1이 아니어도 정규화한다. 다만 완성률을
+     결과 분석의 m 과 견주려면 기본값을 그대로 쓰는 쪽이 맞다. */
   function weights(ratios, over) {
     var o = over && typeof over === 'object' ? over : {};
     var live = [], sum = 0;
@@ -67,15 +85,25 @@ var WBNAESINREADY = (function () {
     return out;
   }
 
+  /* 요약 어디를 보는가 — 저장된 state.summary 는 팩 하나짜리 값(summary.word)과 범위 합계
+     (summary.range, 계약 R1)를 **둘 다** 담는다. 시험 범위는 보통 2~3과라 팩 값으로 재면
+     범위의 일부만 센다. naesin-results.mjs 의 reachOf·naesin-api 의 naesinNightDue 가
+     모두 `sum.range || sum` 으로 보므로 여기도 같아야 한다 — 어긋나면 같은 화면의
+     「완성률」과 「복합 도달률」이 서로 다른 분량을 두고 말한다.
+     engine.rangeSummary() 의 반환값을 그대로 넘기는 호출(관리 웹의 즉석 계산)은 range 키가
+     없으니 그대로 쓰인다. */
+  function src(summary) {
+    var s = summary && typeof summary === 'object' ? summary : {};
+    return (s.range && typeof s.range === 'object') ? s.range : s;
+  }
+
   /* rangeSummary(engine) → 축별 비율 0~1. 재료가 없으면 null(0 이 아니다 — 원칙 4). */
   function ratios(summary) {
-    var s = summary && typeof summary === 'object' ? summary : {};
+    var s = src(summary);
     var w = s.word || {}, sen = s.sentence || {}, p = s.passage || {};
-    /* 단어: 도달이 절반, 안정화가 만점. 안정화는 engine 의 isStable(relearnCount >= 3) 이다 */
-    var wordTotal = num(w.total);
-    var word = wordTotal
-      ? Math.min(1, (num(w.reached) * 0.5 + num(w.stable) * 0.5) / wordTotal)
-      : null;
+    /* 단어 완성 = 안정화 비율. reachOf(naesin-results.mjs)와 같은 눈이어야 한다 —
+       도달(reached)을 섞으면 같은 화면의 복합 도달률과 어긋난다. 도달은 진단 축으로 따로 낸다. */
+    var word = rate(w.stable, w.total);
     /* 본문 진행: 청크와 단락 백지를 각각 비율로 보고 평균. 둘 다 재료가 없으면 null */
     var chunk = rate(p.chunkDone, p.chunkTotal);
     var para = rate(p.paraBlank, p.paraTotal);
@@ -88,7 +116,8 @@ var WBNAESINREADY = (function () {
       interpret: rate(sen.interpreted, sen.total),
       memorize: rate(sen.memorized, sen.total),
       passage: passage,
-      check: p.check ? rate(p.check.correct, p.check.total) : null
+      check: p.check ? rate(p.check.correct, p.check.total) : null,
+      reached: rate(w.reached, w.total)
     };
   }
 
@@ -96,8 +125,7 @@ var WBNAESINREADY = (function () {
      안정화는 서로 다른 날 RELEARN_TARGET 회라, 아직 도달하지 못한 단어는 최소 그만큼의
      '다른 날'이 필요하다. 남은 날이 그보다 적으면 그 몫은 확정된 미달이다. */
   function needDays(summary, opts) {
-    var s = summary && typeof summary === 'object' ? summary : {};
-    var w = s.word || {};
+    var w = src(summary).word || {};
     var target = (opts && opts.relearnTarget != null) ? num(opts.relearnTarget) : RELEARN_TARGET;
     var untouched = Math.max(0, num(w.total) - num(w.reached));
     return { untouched: untouched, minDays: untouched ? target : 0 };
@@ -135,6 +163,7 @@ var WBNAESINREADY = (function () {
     };
   }
 
+  /* 가장 낮은 축 = 다음 할 일. **진단 축은 고르지 않는다** — 그걸 해도 완성률이 안 오른다 */
   function weakest(axes) {
     var best = null;
     (axes || []).forEach(function (a) {
@@ -210,7 +239,8 @@ var WBNAESINREADY = (function () {
 
   return {
     AXES: AXES, RELEARN_TARGET: RELEARN_TARGET, PASS_RATE: PASS_RATE, START_DAYS: START_DAYS,
-    weights: weights, ratios: ratios, needDays: needDays,
+    W_STABLE: W_STABLE, W_INTERPRET: W_INTERPRET, W_BLANK: W_BLANK,
+    weights: weights, ratios: ratios, needDays: needDays, src: src,
     readiness: readiness, classReadiness: classReadiness,
     pilotVerdict: pilotVerdict, grade: grade, line: line
   };
