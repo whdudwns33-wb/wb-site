@@ -92,6 +92,7 @@
 <div class="banner" id="banner" role="alert" hidden><span id="bannerMsg"></span><span class="sp"></span><button class="btn sm ghost" id="bannerClose">닫기</button></div>
 <main id="app"></main>
 <script src="/admin/admin-login.js"></script>
+<script src="/admin/pack-check.js"></script>
 <script>
 'use strict';
 /* WB 내신브레인 팩 제작 스튜디오 — 원장·강사용 (기획서 §15-2).
@@ -133,11 +134,11 @@ let BUSY=false;
 let PDF_LOCAL=null,JOB_READ=0;   // 본문 미대응 열은 현재 작업의 브라우저 메모리에만 둔다
 
 async function api(path,opt){
-  let r;
+  let r;const token=TOKEN,read=JOB_READ;
   try{r=await fetch('/api'+path,Object.assign({headers:{'Content-Type':'application/json',...(TOKEN?{Authorization:'Bearer '+TOKEN}:{})}},opt||{}));}
   catch(e){const err=new Error('네트워크 오류 — 연결을 확인하고 다시 시도하세요.');err.network=true;throw err;}
   const j=await r.json().catch(()=>({}));
-  if(r.status===401&&TOKEN){TOKEN=null;localStorage.removeItem('wbr.admin.token');renderLogin('세션이 만료됐어요. 다시 로그인해 주세요.');throw new Error('auth');}
+  if(r.status===401&&token){if(TOKEN===token&&JOB_READ===read){TOKEN=null;localStorage.removeItem('wbr.admin.token');renderLogin('세션이 만료됐어요. 다시 로그인해 주세요.');}throw new Error('auth');}
   if(!r.ok){const err=new Error(j.error||('HTTP '+r.status));err.status=r.status;err.body=j;throw err;}
   return j;
 }
@@ -358,15 +359,20 @@ async function delJob(id){
 }
 
 /* ── 검수 화면 ── */
+async function readJob(id,read,token){
+  const j=await api('/naesin/admin/job?id='+encodeURIComponent(id)+'&src=1');
+  if(read!==JOB_READ||TOKEN!==token||VIEW!=='job')return false;
+  if(!j.job||j.job.jobId!==id)throw new Error('작업 재조회에 실패했어요.');
+  if(JOB&&JOB.jobId===id&&Date.parse(j.job.updatedAt)<Date.parse(JOB.updatedAt))return true;
+  JOB=j.job;GATE=j.gate;SRC=j.sources||{};hideBanner();return true;
+}
 async function openJob(id){
-  const read=++JOB_READ;
+  const read=++JOB_READ,token=TOKEN;
   if(PDF_LOCAL&&PDF_LOCAL.jobId!==id)PDF_LOCAL=null;
   VIEW='job';EDIT=null;SEL=null;FKIND='all';FONLY='issue';
   try{
-    const j=await api('/naesin/admin/job?id='+encodeURIComponent(id)+'&src=1');
-    if(read!==JOB_READ||VIEW!=='job')return;
-    JOB=j.job;GATE=j.gate;SRC=j.sources||{};hideBanner();
-  }catch(e){if(read!==JOB_READ||isAuth(e))return;fail(e);openList();return;}
+    if(!await readJob(id,read,token))return;
+  }catch(e){if(read!==JOB_READ||TOKEN!==token||VIEW!=='job'||isAuth(e))return;fail(e);if(!JOB||JOB.jobId!==id)openList();return;}
   renderJob();
 }
 function renderJob(){
@@ -379,10 +385,10 @@ function renderJob(){
   const done=(GATE.total||0)-(GATE.pending||0);
   const srcKinds=(JOB.sources||[]).map(s=>s.kind).filter((k,i,a)=>a.indexOf(k)===i);
   const kinds=Object.keys(JOB.draft||{});
-  const hasPdf=(JOB.draft.words||[]).some(row=>row&&row._pdfReview);
+  const hasPdf=kinds.some(k=>(JOB.draft[k]||[]).some(row=>row&&row._pdfReview));
   const clean=(()=>{const r=(JOB.review)||{};let n=0;
     for(const kind of kinds)(JOB.draft[kind]||[]).forEach((row,i)=>{const k=rowKey(kind,row,i);
-      if(!(byKey[k]||[]).length&&!(r[k]&&r[k].state!=='pending'))n+=1;});
+      if(!(row&&row._pdfReview)&&!(byKey[k]||[]).length&&!(r[k]&&r[k].state!=='pending'))n+=1;});
     return n;})();
 
   $('#app').innerHTML=`
@@ -419,6 +425,7 @@ function renderJob(){
       <button class="btn ghost" id="btnPdfReview" ${BUSY?'disabled':''}>로컬 검수 초안 넣기</button></div>
     <div id="pdfReviewOut"></div>
     ${pdfColumnsHtml()}
+    ${pdfSentenceHtml()}
     <h3>초안 JSON 넣기 <small class="muted">기본 경로</small></h3>
     <p class="muted">검수자가 구성한 학습 팩 JSON을 여기 넣습니다.
       파일 여러 개(<code>words.json</code>·<code>sentences.json</code>…)를 한 번에 골라도 되고,
@@ -473,6 +480,7 @@ function renderJob(){
   $('#btnDraft').onclick=()=>putDraft($('#draftJson').value, '붙여넣기');
   $('#btnDraftFile').onclick=putDraftFiles;
   $('#btnPdfReview').onclick=putPdfReviewFile;
+  bindPdfSentence();
   $('#draftFile').onchange=()=>{
     const fs2=[...$('#draftFile').files];
     $('#draftPick').textContent=fs2.length?('고른 파일 '+fs2.length+'개: '+fs2.map(f=>f.name).join(', ')):'';
@@ -536,9 +544,11 @@ function renderSrc(rows){
   if(pdf){
     if(who)who.textContent='PDF 후보 · 원본은 이 PC에서 별도로 열어 대조';
     const row=cur.patch?{...cur.row,...cur.patch}:cur.row;
-    el.textContent=['단어 후보: '+String(row.headword||''),'뜻 후보: '+(Array.isArray(row.meaningKo)?row.meaningKo.join(' · '):'형식 확인 필요'),'품사: '+String(row.pos||'미지정'),
+    const content=kind==='sentences'?['영어 문장: '+String(row.en||''),'한글 해석: '+String(row.ko||''),'단락: '+String(row.dayGroup||''),'영어 순서대로 청크·직독직해 뜻을 대조하세요.']
+      :['단어 후보: '+String(row.headword||''),'뜻 후보: '+(Array.isArray(row.meaningKo)?row.meaningKo.join(' · '):'형식 확인 필요'),'품사: '+String(row.pos||'미지정'),'sections를 원본과 대조해 reading 또는 conversation으로 지정하세요.'];
+    el.textContent=[...content,
       '원천 위치: '+(pdf.locations||[]).map(p=>p.page+'쪽 ['+(p.bbox||[]).join(', ')+']').join(' · '),
-      '검토 표시: '+(pdf.flags||[]).join(', '),'sections를 원본과 대조해 reading 또는 conversation으로 지정하세요.'].join('\n');
+      '검토 표시: '+(pdf.flags||[]).join(', ')].join('\n');
     return;
   }
   el.innerHTML=srcHtml(srcKind?SRC[srcKind]:'',cur?anchorOf(cur.kind,cur.patch?{...cur.row,...cur.patch}:cur.row):'');
@@ -551,45 +561,57 @@ function renderSrc(rows){
    실패하면 되돌리고 배너를 띄운다 — 조용히 넘기면 승인한 줄 알고 배포를 누른다. */
 async function review(key,state,patch,note){
   if(!JOB)return;
-  const before=JOB.review?{...JOB.review}:{};
-  const rec={...before[key],state};
+  const target=JOB,jobId=JOB.jobId,read=JOB_READ,token=TOKEN,baseUpdatedAt=JOB.updatedAt,before=JOB.review&&JOB.review[key];
+  if(typeof baseUpdatedAt!=='string'||!baseUpdatedAt){showBanner('작업 버전이 없어요. 상단 새로고침으로 최신 작업을 읽은 뒤 다시 검수하세요.');return;}
+  const current=()=>JOB&&JOB.jobId===jobId&&read===JOB_READ&&TOKEN===token&&VIEW==='job';
+  const rec={...before,state};
   if(patch!==undefined){if(patch)rec.patch=patch;else delete rec.patch;}
   if(note!==undefined){if(note)rec.note=note;else delete rec.note;}
-  JOB.review={...before,[key]:rec};
+  JOB.review={...JOB.review,[key]:rec};
   EDIT=null;SEL=key;renderJob();
+  let saved=false;
   try{
-    const body={jobId:JOB.jobId,key,state};
+    const body={jobId,baseUpdatedAt,key,state};
     if(patch!==undefined)body.patch=patch;
     if(note!==undefined)body.note=note;
-    const j=await api('/naesin/admin/job/review',{method:'POST',body:JSON.stringify(body)});
-    GATE=j.gate;JOB.status=(j.job&&j.job.status)||JOB.status;hideBanner();renderJob();
+    await api('/naesin/admin/job/review',{method:'POST',body:JSON.stringify(body)});saved=true;
+    if(!current()||!await readJob(jobId,read,token))return;
+    renderJob();
   }catch(e){
-    if(isAuth(e))return;
-    JOB.review=before;renderJob();
-    showBanner('검수를 저장하지 못했어요 — '+(e.message||''));
+    if(isAuth(e)||!current())return;
+    if(!saved&&JOB===target&&JOB.review[key]===rec){
+      JOB.review={...JOB.review};if(before)JOB.review[key]=before;else delete JOB.review[key];renderJob();
+    }
+    showBanner(saved?'검수 저장은 끝났지만 결과를 다시 읽지 못했어요. 입력을 유지했습니다. 상단 새로고침으로 최신 작업을 확인하세요.'
+      :e.status===409?'다른 곳에서 작업이 바뀌었어요. 검수와 입력을 유지했습니다. 상단 새로고침으로 최신 작업을 읽고 확인한 뒤 다시 검수하세요.':'검수를 저장하지 못했어요 — '+(e.message||''));
   }
 }
 async function bulkOk(){
   if(!JOB)return;
+  const jobId=JOB.jobId,read=JOB_READ,token=TOKEN,baseUpdatedAt=JOB.updatedAt;
+  if(typeof baseUpdatedAt!=='string'||!baseUpdatedAt){showBanner('작업 버전이 없어요. 상단 새로고침으로 최신 작업을 읽은 뒤 다시 검수하세요.');return;}
+  const current=()=>JOB&&JOB.jobId===jobId&&read===JOB_READ&&TOKEN===token&&VIEW==='job';
   const {byKey}=issueIndex();
   const review=JOB.review||{};
   const keys=[];
   for(const kind of Object.keys(JOB.draft||{}))
     (JOB.draft[kind]||[]).forEach((row,i)=>{
       const k=rowKey(kind,row,i);
+      if(row&&row._pdfReview)return;
       if((byKey[k]||[]).length)return;                 /* 문제 있는 행은 사람이 본다 */
       if(review[k]&&review[k].state!=='pending')return;
       keys.push(k);
     });
   if(!keys.length)return;
   if(!confirm('자동 대조에서 문제가 없던 '+keys.length+'행을 승인합니다. 계속할까요?'))return;
+  let saved=false;
   try{
-    const j=await api('/naesin/admin/job/review',{method:'POST',
-      body:JSON.stringify({jobId:JOB.jobId,rows:keys.map(k=>({key:k,state:'ok'}))})});
-    GATE=j.gate;
-    keys.forEach(k=>{JOB.review=JOB.review||{};JOB.review[k]={...JOB.review[k],state:'ok'};});
-    JOB.status=(j.job&&j.job.status)||JOB.status;hideBanner();renderJob();
-  }catch(e){fail(e);}
+    await api('/naesin/admin/job/review',{method:'POST',
+      body:JSON.stringify({jobId,baseUpdatedAt,rows:keys.map(k=>({key:k,state:'ok'}))})});saved=true;
+    if(!current()||!await readJob(jobId,read,token))return;
+    renderJob();
+  }catch(e){if(isAuth(e)||!current())return;showBanner(saved?'검수 저장은 끝났지만 결과를 다시 읽지 못했어요. 입력을 유지했습니다. 상단 새로고침으로 최신 작업을 확인하세요.'
+    :e.status===409?'다른 곳에서 작업이 바뀌었어요. 검수와 입력을 유지했습니다. 상단 새로고침으로 최신 작업을 읽고 확인한 뒤 다시 검수하세요.':e.message);}
 }
 function saveEdit(key){
   const ta=document.querySelector('textarea[data-ed="'+key.replace(/"/g,'\\"')+'"]');
@@ -677,7 +699,7 @@ function putDraft(raw, how){
   return sendDraft(draft, how);
 }
 function regularDraft(obj){
-  if(obj.kind==='naesin-pdf-review-draft'||(Array.isArray(obj.words)&&obj.words.some(w=>w&&w._pdfReview)))
+  if(obj.kind==='naesin-pdf-review-draft'||DRAFT_KINDS.some(k=>Array.isArray(obj[k])&&obj[k].some(r=>r&&r._pdfReview)))
     throw new Error('PDF 검수 초안은 위 「로컬 검수 초안 넣기」에서 선택하세요.');
   const draft={};
   for(const [k,v] of Object.entries(obj))if(Array.isArray(v)){
@@ -714,17 +736,114 @@ function pdfReviewDraft(obj){
       meaningKo:c.meanings.slice(),sections:[],_pdfReview:{flags,locations}};
   });
   const columns=obj.passageColumns.map(c=>{
-    if(!c||!Number.isInteger(c.page)||c.page<1||!['EN','KO'].includes(c.column)||typeof c.rawText!=='string')
+    if(!c||!Number.isInteger(c.page)||c.page<1||c.page>1000000||!['EN','KO'].includes(c.column)||typeof c.rawText!=='string')
       throw new Error('본문 원천 열 형식이 올바르지 않아요.');
-    return{page:c.page,column:c.column,rawText:c.rawText};
+    if(c.lines!==undefined&&!Array.isArray(c.lines))throw new Error('본문 줄 정보는 배열이어야 해요.');
+    const lines=(c.lines||[]).map(line=>{
+      if(!line||typeof line.text!=='string'||!line.text.trim()||!Array.isArray(line.tokens)||!line.tokens.length)
+        throw new Error('본문 줄의 글자와 위치 정보가 필요해요.');
+      const boxes=line.tokens.map(t=>{
+        const b=t&&[t.x0,t.top,t.x1,t.bottom];
+        if(!b||b.some(v=>typeof v!=='number'||!Number.isFinite(v)||v<0)||b[0]>b[2]||b[1]>b[3])
+          throw new Error('본문 줄 위치가 올바르지 않아요.');
+        return b;
+      });
+      return{text:line.text,bbox:[Math.min(...boxes.map(b=>b[0])),Math.min(...boxes.map(b=>b[1])),Math.max(...boxes.map(b=>b[2])),Math.max(...boxes.map(b=>b[3]))]};
+    });
+    return{page:c.page,column:c.column,rawText:c.rawText,lines};
   });
   return{words,columns};
 }
 function pdfColumnsHtml(){
   if(!PDF_LOCAL||!JOB||PDF_LOCAL.jobId!==JOB.jobId)return'';
   return'<details style="margin-top:8px"><summary style="cursor:pointer;font-weight:800;color:var(--navy)">본문 원천 '+PDF_LOCAL.columns.length+'열 · 문장 대응 전</summary>'
-    +'<p class="muted">이 내용은 현재 브라우저에만 있습니다. 작업 변경·로그아웃·새로고침 뒤에는 검수 초안 파일을 다시 선택해야 합니다. 서버나 AI로 보내지 않습니다.</p>'
-    +PDF_LOCAL.columns.map(c=>'<h3>'+c.page+'쪽 · '+esc(c.column)+'</h3><pre style="white-space:pre-wrap;word-break:break-word">'+esc(c.rawText)+'</pre>').join('')+'</details>';
+    +'<p class="muted">원천 열 전체는 현재 브라우저에만 있습니다. 작업 변경·로그아웃·새로고침 뒤에는 검수 초안 파일을 다시 선택하세요. 아래에서 직접 대응한 문장 후보와 선택 위치만 PC에 저장합니다.</p>'
+    +PDF_LOCAL.columns.map(c=>'<h3>'+c.page+'쪽 · '+esc(c.column)+'</h3><pre style="white-space:pre-wrap;word-break:break-word">'+esc(c.lines&&c.lines.length?c.lines.map((l,i)=>(i+1)+'. '+l.text).join('\n'):c.rawText)+'</pre>').join('')+'</details>';
+}
+function pdfSentenceHtml(){
+  if(!PDF_LOCAL||!JOB||PDF_LOCAL.jobId!==JOB.jobId)return'';
+  const columns=PDF_LOCAL.columns;
+  if(!['EN','KO'].every(side=>columns.some(c=>c.column===side&&c.lines&&c.lines.length)))
+    return'<p class="muted">본문 줄 위치 정보가 없는 초안입니다. 로컬 추출 도구로 새 검수 초안을 만들어 선택해야 문장을 대응할 수 있어요.</p>';
+  const f=PDF_LOCAL.sentence||(PDF_LOCAL.sentence={enColumn:'',enStart:'',enEnd:'',koColumn:'',koStart:'',koEnd:'',en:'',ko:'',dayGroup:'',chunks:[{en:'',ko:''}],loaded:null});
+  const ranges=['en','ko'].map(side=>`<div class="grid-form">
+    <label class="fld">${side==='en'?'영어':'한글'} 원천 열<select id="pdf${side==='en'?'En':'Ko'}Column"><option value="">쪽·열 선택</option>${columns.map((c,i)=>c.column===side.toUpperCase()&&c.lines&&c.lines.length?`<option value="${i}" ${f[side+'Column']===String(i)?'selected':''}>${c.page}쪽 · ${c.column} · ${c.lines.length}줄</option>`:'').join('')}</select></label>
+    <label class="fld">시작 줄<input id="pdf${side==='en'?'En':'Ko'}Start" type="number" min="1" step="1" value="${esc(f[side+'Start'])}"></label>
+    <label class="fld">끝 줄<input id="pdf${side==='en'?'En':'Ko'}End" type="number" min="1" step="1" value="${esc(f[side+'End'])}"></label></div>`).join('');
+  return`<h3>본문 문장 대응</h3>
+    <p class="muted">원본 PDF와 위 줄 번호를 대조해 영어·한글 범위를 각각 고르세요. 문장 수가 같아도 자동 대응하지 않습니다. 채운 문장을 고친 뒤 영어 순서대로 청크와 직독직해 뜻을 직접 입력하세요.</p>
+    <fieldset id="pdfSentenceFields" aria-label="본문 문장 대응" style="border:0;padding:0;margin:0;min-width:0" ${BUSY?'disabled':''}>
+      ${ranges}
+      <div class="filters" style="margin-top:8px"><button class="btn sm ghost" id="btnPdfSentenceLoad">선택 줄로 문장 채우기</button></div>
+      <label class="fld">영어 문장<textarea id="pdfSentenceEn" rows="2" spellcheck="false">${esc(f.en)}</textarea></label>
+      <label class="fld">한글 해석<textarea id="pdfSentenceKo" rows="2">${esc(f.ko)}</textarea></label>
+      <label class="fld">단락<input id="pdfSentenceDay" value="${esc(f.dayGroup)}" placeholder="예: 1"></label>
+      <p class="muted">청크는 위에서 아래로 영어 순서입니다. 빈 두 칸은 제외하며 한쪽만 비면 저장할 수 없어요.</p>
+      ${f.chunks.map((c,i)=>`<div class="grid-form"><label class="fld">청크 ${i+1} · 영어<textarea data-pdf-chunk-en="${i}" rows="2" spellcheck="false">${esc(c.en)}</textarea></label><label class="fld">청크 ${i+1} · 직독직해 뜻<textarea data-pdf-chunk-ko="${i}" rows="2">${esc(c.ko)}</textarea></label></div>`).join('')}
+      <div class="filters" style="margin-top:8px"><button class="btn sm ghost" id="btnPdfChunkAdd">청크 한 줄 추가</button>
+        <button class="btn" id="btnPdfSentenceSave" ${f.loaded?'':'disabled'}>문장 후보를 미검토로 저장</button></div>
+    </fieldset><div id="pdfSentenceOut" class="err" role="status" aria-live="polite"></div>`;
+}
+function bindPdfSentence(){
+  if(!$('#pdfSentenceFields')||!PDF_LOCAL||!PDF_LOCAL.sentence)return;
+  const f=PDF_LOCAL.sentence;
+  for(const side of ['en','ko'])for(const key of ['Column','Start','End']){
+    const el=$('#pdf'+(side==='en'?'En':'Ko')+key);
+    el.oninput=()=>{f[side+key]=el.value;f.loaded=null;$('#btnPdfSentenceSave').disabled=true;$('#pdfSentenceOut').textContent='줄 선택을 바꿨어요. 선택 줄로 문장을 다시 채워 주세요.';};
+  }
+  for(const [id,key] of [['pdfSentenceEn','en'],['pdfSentenceKo','ko'],['pdfSentenceDay','dayGroup']]){
+    const el=$('#'+id);el.oninput=()=>{f[key]=el.value;$('#pdfSentenceOut').textContent='';};
+  }
+  for(const side of ['en','ko'])document.querySelectorAll('[data-pdf-chunk-'+side+']').forEach(el=>{
+    el.oninput=()=>{f.chunks[Number(el.dataset[side==='en'?'pdfChunkEn':'pdfChunkKo'])][side]=el.value;$('#pdfSentenceOut').textContent='';};
+  });
+  $('#btnPdfChunkAdd').onclick=()=>{if(BUSY)return;f.chunks.push({en:'',ko:''});renderJob();};
+  $('#btnPdfSentenceLoad').onclick=loadPdfSentence;
+  $('#btnPdfSentenceSave').onclick=savePdfSentence;
+}
+function pdfLineRange(side,f){
+  const columns=PDF_LOCAL&&PDF_LOCAL.columns,col=f[side+'Column'],start=Number(f[side+'Start']),end=Number(f[side+'End']);
+  const c=columns&&col!==''&&columns[Number(col)];
+  if(!/^\d+$/.test(col)||!c||c.column!==side.toUpperCase()||!Array.isArray(c.lines)||!Number.isInteger(start)||!Number.isInteger(end)||start<1||end<start||end>c.lines.length)
+    throw new Error((side==='en'?'영어':'한글')+' 원천 열과 시작·끝 줄을 확인하세요.');
+  const lines=c.lines.slice(start-1,end);
+  return{text:lines.map(l=>l.text).join(' '),location:{page:c.page,bbox:[Math.min(...lines.map(l=>l.bbox[0])),Math.min(...lines.map(l=>l.bbox[1])),Math.max(...lines.map(l=>l.bbox[2])),Math.max(...lines.map(l=>l.bbox[3]))]}};
+}
+function loadPdfSentence(){
+  if(BUSY||!JOB||!PDF_LOCAL||PDF_LOCAL.jobId!==JOB.jobId||!PDF_LOCAL.sentence)return;
+  const f=PDF_LOCAL.sentence;
+  try{
+    const en=pdfLineRange('en',f),ko=pdfLineRange('ko',f);
+    f.en=en.text;f.ko=ko.text;f.chunks=[{en:'',ko:''}];f.loaded=true;renderJob();
+    $('#pdfSentenceOut').textContent='선택한 문장을 채웠어요. 원문을 대조하고 단락·직독직해 청크를 입력하세요.';
+  }catch(e){$('#pdfSentenceOut').textContent=e.message;}
+}
+async function savePdfSentence(){
+  if(BUSY||!JOB||!PDF_LOCAL||PDF_LOCAL.jobId!==JOB.jobId||!PDF_LOCAL.sentence)return;
+  const local=PDF_LOCAL,f=local.sentence,jobId=JOB.jobId,token=TOKEN,read=JOB_READ;
+  const current=()=>JOB&&JOB.jobId===jobId&&TOKEN===token&&VIEW==='job'&&PDF_LOCAL===local;
+  BUSY=true;$('#pdfSentenceFields').disabled=true;
+  try{
+    const health=await api('/health');
+    if(!current()||JOB_READ!==read)return;
+    if(health.localPdfReview!==true)throw new Error('로컬 PDF 검수는 이 PC 서버의 학원 내 주소에서만 열 수 있어요.');
+    if(!f.loaded)throw new Error('영어·한글 줄 범위를 골라 문장을 먼저 채워 주세요.');
+    const en=pdfLineRange('en',f),ko=pdfLineRange('ko',f),chunks=f.chunks.map(c=>({en:c.en.trim(),ko:c.ko.trim()})).filter(c=>c.en||c.ko);
+    if(!f.en.trim()||!f.ko.trim()||!f.dayGroup.trim())throw new Error('영어 문장·한글 해석·단락을 모두 입력하세요.');
+    if(!chunks.length||chunks.some(c=>!c.en||!c.ko))throw new Error('각 청크의 영어와 직독직해 뜻을 짝으로 입력하세요.');
+    if(WBPACKCHECK.flat(chunks.map(c=>c.en).join(' '))!==WBPACKCHECK.flat(f.en))throw new Error('청크 영어를 순서대로 이으면 영어 문장 전체와 같아야 해요.');
+    const sentences=(JOB.draft.sentences||[]),seq=Math.max(0,...sentences.filter(s=>Number.isSafeInteger(s.seq)).map(s=>s.seq))+1;
+    if(!Number.isSafeInteger(seq))throw new Error('기존 문장 순번을 확인하세요.');
+    const row={seq,dayGroup:f.dayGroup.trim(),en:f.en.trim(),ko:f.ko.trim(),chunks,
+      _pdfReview:{flags:['REVIEW_REQUIRED','TEACHER_PAIRED'],locations:[en.location,ko.location]}};
+    if(await sendDraft({sentences:[...sentences,row]},'교사 대응 문장',jobId,'#pdfSentenceOut')){
+      if(!current())return;
+      local.sentence=null;renderJob();$('#pdfSentenceOut').textContent='문장 '+seq+'번을 미검토로 저장했어요. 검수에서 원본을 대조해 승인하세요.';
+    }
+  }catch(e){if(current()&&JOB_READ===read&&!isAuth(e))$('#pdfSentenceOut').textContent=e.message;}
+  finally{BUSY=false;if(current()){
+    const fields=$('#pdfSentenceFields'),button=$('#btnPdfReview');if(fields)fields.disabled=false;if(button)button.disabled=false;
+  }}
 }
 async function putPdfReviewFile(){
   if(BUSY||!JOB)return;
@@ -732,32 +851,48 @@ async function putPdfReviewFile(){
   if(!file){$('#pdfReviewOut').textContent='검수 초안 JSON 파일을 선택하세요.';return;}
   const current=()=>JOB&&JOB.jobId===jobId&&TOKEN===token&&VIEW==='job'&&JOB_READ===read;
   BUSY=true;$('#btnPdfReview').disabled=true;
+  const fields=$('#pdfSentenceFields');if(fields)fields.disabled=true;
   try{
     const health=await api('/health');
     if(!current())return;
     if(health.localPdfReview!==true)throw new Error('로컬 PDF 검수는 이 PC 서버의 학원 내 주소에서만 열 수 있어요.');
     const raw=await file.text();if(!current())return;
     const data=pdfReviewDraft(JSON.parse(raw));
-    if(await sendDraft({words:data.words},'로컬 PDF 검수 초안',jobId)){
+    const existing=JOB.draft.words||[];
+    if(existing.length){
+      if(JSON.stringify(existing)!==JSON.stringify(data.words))throw new Error('현재 작업의 단어 후보와 달라요. 기존 검수를 지키려면 별도 작업에 새 초안을 넣으세요.');
+      PDF_LOCAL={jobId,columns:data.columns};renderJob();
+      $('#pdfReviewOut').textContent='기존 단어 '+data.words.length+'개와 검수를 유지하고 본문 '+data.columns.length+'열을 다시 열었어요.';
+    }else if(await sendDraft({words:data.words},'로컬 PDF 검수 초안',jobId,'#pdfReviewOut')){
       PDF_LOCAL={jobId,columns:data.columns};renderJob();
       $('#pdfReviewOut').textContent='단어 후보 '+data.words.length+'개를 미검토로 넣었어요. 본문 '+data.columns.length+'열은 문장 대응 전입니다.';
     }
   }catch(e){if(current()&&!isAuth(e))$('#pdfReviewOut').textContent=e.message;}
-  finally{BUSY=false;const button=$('#btnPdfReview');if(button)button.disabled=false;}
+  finally{BUSY=false;const button=$('#btnPdfReview');if(button)button.disabled=false;if(current()&&$('#pdfSentenceFields'))$('#pdfSentenceFields').disabled=false;}
 }
-async function sendDraft(draft, how, jobId){
-  const id=jobId||(JOB&&JOB.jobId),read=JOB_READ;
+async function sendDraft(draft, how, jobId, errorSelector){
+  const id=jobId||(JOB&&JOB.jobId),read=JOB_READ,token=TOKEN,baseUpdatedAt=JOB&&JOB.updatedAt;
+  if(!JOB||JOB.jobId!==id||VIEW!=='job')return false;
   if(!Object.keys(draft).length){$('#draftOut').innerHTML='<p class="err">넣을 배열이 없어요.</p>';return;}
   $('#draftOut').innerHTML='<p class="muted">넣는 중…</p>';
+  let saved=false;
   try{
-    await api('/naesin/admin/job/draft',{method:'POST',body:JSON.stringify({jobId:id,draft})});
-    if(!JOB||JOB.jobId!==id||read!==JOB_READ||VIEW!=='job')return false;
-    await openJob(id);
-    if(!JOB||JOB.jobId!==id||VIEW!=='job')return false;
+    if(typeof baseUpdatedAt!=='string'||!baseUpdatedAt)throw new Error('작업 버전이 없어요. 상단 새로고침으로 최신 작업을 읽은 뒤 다시 저장하세요.');
+    await api('/naesin/admin/job/draft',{method:'POST',body:JSON.stringify({jobId:id,baseUpdatedAt,draft})});saved=true;
+    if(!JOB||JOB.jobId!==id||read!==JOB_READ||TOKEN!==token||VIEW!=='job')return false;
+    if(!await readJob(id,read,token))return false;
+    EDIT=null;SEL=null;FKIND='all';FONLY='issue';renderJob();
     $('#exOut').innerHTML='<div class="issues ok">'+esc(how)+' 에서 '
       +esc(Object.keys(draft).map(k=>kindKo(k)+' '+draft[k].length+'행').join(' · '))+' 을 초안으로 넣었어요.</div>';
     return true;
-  }catch(e){if(isAuth(e)||!JOB||JOB.jobId!==id||read!==JOB_READ)return false;$('#draftOut').innerHTML='<p class="err">'+esc(e.message)+'</p>';return false;}
+  }catch(e){
+    if(isAuth(e)||!JOB||JOB.jobId!==id||read!==JOB_READ||TOKEN!==token||VIEW!=='job')return false;
+    const message=saved?'초안 저장은 끝났지만 결과를 다시 읽지 못했어요. 입력을 유지했습니다. 상단 새로고침으로 저장 결과를 확인한 뒤 이어서 진행하세요.'
+      :e.status===409?'다른 곳에서 작업이 바뀌었어요. 입력을 유지했습니다. 상단 새로고침으로 최신 작업을 읽고 확인한 뒤 다시 저장하세요.':e.message;
+    $('#draftOut').innerHTML='<p class="err">'+esc(message)+'</p>';
+    const out=errorSelector&&$(errorSelector);if(out)out.textContent=message;
+    return false;
+  }
 }
 async function publish(){
   if(!JOB)return;

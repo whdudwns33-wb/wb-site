@@ -50,7 +50,7 @@ function screen() {
   });
   const exportUi = `
   globalThis.ui={boot,api,checkAccount,checkAccess,stopStudy,clearPackCache,migrateLegacy,pullAdopt,pushState,persist,openDemo,renderItem,recoverStateStamps,loadDB,
-    ttsOptions,wireTtsBtn,wireChunkWork,wireDialogueWork,wireSentenceWork,openPack,
+    ttsOptions,wireTtsBtn,wireChunkWork,wireDialogueWork,wireSentenceWork,openPack,renderHeader,
     projector:(scope,pj)=>{liveScope=scope;liveState={projector:pj};pjApply(pj);},
     projectile:()=>({pjPick,pjSent,pjSeen}),
     addPack:(p,inRange)=>{PACKS[p.packId]=normPack(p);if(inRange)packList.push(p.packId);packDB(p.packId);},
@@ -71,6 +71,18 @@ function screen() {
 }
 
 (async () => {
+  await t('학생 헤더는 과 번호 없는 팩에 Lundefined·Lnull을 붙이지 않고 교재와 실제 과 번호만 표시한다', () => {
+    for (const lesson of [undefined, null, '', 6, '<own>']) {
+      const ui = screen(), pack = { ...clone(sample), textbook: '자체 <교재>', lesson };
+      ui.setup(account, pack);ui.renderHeader();
+      const header = ui.node('whoLine').innerHTML;
+      assert.match(header, /체험 학생/);assert.match(header, /자체 &lt;교재&gt;/);
+      if (lesson == null || lesson === '') assert.ok(!/ L|Lundefined|Lnull/.test(header));
+      else assert.ok(header.includes(lesson === 6 ? ' L6' : ' L&lt;own&gt;'));
+      assert.ok(!header.includes('<own>'));assert.match(header, /다른 학생으로 연동/);
+    }
+  });
+
   await t('내신의 청크·대화·문장·러너·짝맞추기 듣기는 구매 자료의 원격 음성을 막고 로컬 영어만 쓴다', () => {
     const actions = [
       ui => { ui.wireChunkWork(sample.sentences[0].dayGroup);return () => ui.node('ckTts').onclick(); },
