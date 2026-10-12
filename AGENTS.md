@@ -40,7 +40,7 @@ node reading-server/<이름>.test.mjs # 서버 테스트
 node reading-server/build-dist.mjs  # dist 조립 (+ SW 캐시 이름 스탬프)
 PORT=8890 ADMIN_PIN=<pin> DATA_DIR=<dir> node reading-server/server.mjs  # 로컬 서버
 WB_ADMIN_ONLY=1 HOST=127.0.0.1 PORT=8890 ADMIN_PIN=<pin> DATA_DIR=<dir> node reading-server/server.mjs  # 터널로 외부 공개할 때(결정 A — 학생 로그인을 내주지 않는다. 기동 로그에 [관리 전용] 이 뜨는지 눈으로 확인)
-node reading-server/tunnel/run-server.mjs --env <저장소 밖 server.env>   # 원장 PC 에서는 이것으로 — 관리 전용·127.0.0.1 강제, 로그, 재시작, 깨진 db.json 이면 안 띄움
+node reading-server/tunnel/run-server.mjs --env <저장소 밖 server.env> --check   # 원장 PC 설정 확인. 실제 운영은 setup.mjs install-server 가 코드를 관리자 전용 사본으로 복사해 작업 스케줄러(SYSTEM)로 띄운다 — 관리 전용·127.0.0.1 강제, 로그, 재시작, 깨진 db.json 이면 안 띄움
 node reading-server/tunnel/setup.mjs doctor   # 원장 PC 점검(로컬 서버·관리 전용·LAN 차단·cloudflared·바깥 주소의 Access). 설치 명령은 같은 파일 머리말
 node scripts/check.mjs --only tunnel          # 키트 테스트(Windows 명령은 가짜 실행기로 — CI 는 Linux)
 node naesin/pack-validate.mjs <팩 디렉터리>     # 영어 레슨 팩 검증

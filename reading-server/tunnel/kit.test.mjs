@@ -11,6 +11,7 @@
 import {
   parseEnvFile, isInside, validateServerEnv, buildChildEnv, nextRestart, logFileName, logsToPrune,
   envTemplate, classifyProbe, MIN_PIN, LOOPBACK, parseCloudflaredVersion, cloudflaredOk, pickNodeExe, inOneDrive, STABLE_NODE,
+  taskXml, sharedFolderReason, folderState, ENV_DIR_OWN, DATA_DIR_OWN, appCopyKeep, aclProblems, aclScript, driveLetter,
 } from './kit.mjs';
 
 const errors = [];
@@ -29,6 +30,13 @@ const eq = (a, b, m) => ok(JSON.stringify(a) === JSON.stringify(b), `${m}: ${JSO
   const d2 = parseEnvFile('ADMIN_PIN=secret-value-1\nADMIN_PIN=secret-value-2\n');
   ok(!/secret-value/.test(d2.errors.join(' ')), '오류 문구에 값이 실렸다');
   ok(parseEnvFile('admin_pin=x').errors.length === 1, '소문자 키를 받았다');
+  ok(/ADMIN_PIN 처럼 대문자로/.test(parseEnvFile('admin_pin=x').errors[0]), '알려진 키를 소문자로 적었을 때 바른 이름을 알려주지 않는다');
+  /* '=' 를 빠뜨리거나 비밀번호만 따로 적은 줄 — 키 자리에 비밀이 들어간다. 그 글자를 되풀이하면 안 된다 */
+  for (const bad of ['ADMIN_PASSWORD Tr0ub4dor&3xyzq=', 'Wb7xQ=2026!', 'Kx9#pQ2zLm7wR4v==']) {
+    const r = parseEnvFile(bad);
+    ok(r.errors.length === 1, `틀린 줄을 오류로 잡지 않았다: ${bad.length}자`);
+    ok(!/Tr0ub4dor|Wb7xQ|Kx9#pQ2z/.test(r.errors.join(' ')), '틀린 키 이름 자리의 글자(비밀일 수 있다)를 오류에 실었다');
+  }
   ok(parseEnvFile('그냥 문장').errors.length === 1, 'KEY=값 이 아닌 줄을 받았다');
   ok(parseEnvFile('=x').errors.length === 1, '빈 키를 받았다');
 }
@@ -74,6 +82,15 @@ const v = (vars, envFile = ENVF) => validateServerEnv({ vars, envFile, repoRoot:
   ok(v({ ...good, PORT: 'abc' }).errors.some((e) => /PORT/.test(e)), '숫자 아닌 포트를 받았다');
   eq(v({ ...good, PORT: '9000' }).port, 9000, '포트 지정');
   ok(v({ ...good, LOG_DIR: 'logs' }).errors.some((e) => /LOG_DIR/.test(e)), '상대 경로 LOG_DIR 을 받았다');
+  ok(validateServerEnv({ vars: { ...good, NODE_OPTIONS: '--require x' }, envFile: ENVF, repoRoot: REPO, platform: 'win32', lineOf: { NODE_OPTIONS: 7 } })
+    .errors.some((e) => /7번째 줄/.test(e) && /쓰지 않는 키/.test(e)), 'NODE_OPTIONS 를 받았다 — SYSTEM 으로 도는 서버에 임의 코드를 싣는 길');
+  ok(v({ ...good, PATH: 'C:\\evil' }).errors.some((e) => /쓰지 않는 키/.test(e)), 'PATH 를 받았다');
+  eq(v({ ...good, ANTHROPIC_API_KEY: 'k' }).errors, [], '서버가 쓰는 선택 키(AI)를 거절했다');
+  ok(v({ ...good, DATA_DIR: 'C:\\Users\\wb' }).errors.some((e) => /저장소를 품고|사용자 폴더/.test(e)), '저장소를 품은 DATA_DIR 을 받았다 — 잠그면 저장소까지 잠긴다');
+  ok(v({ ...good, DATA_DIR: 'D:\\' }).errors.some((e) => /드라이브 뿌리/.test(e)), '드라이브 뿌리를 DATA_DIR 로 받았다');
+  ok(v({ ...good, DATA_DIR: 'C:\\Users\\other\\Desktop' }).errors.some((e) => /사용자 폴더/.test(e)), '바탕 화면을 DATA_DIR 로 받았다 — 원장 파일이 잠긴다');
+  ok(v({ ...good, DATA_DIR: 'C:\\Windows\\Temp\\wb' }).errors.some((e) => /시스템 폴더/.test(e)), 'Windows 폴더를 받았다');
+  eq(v({ ...good, DATA_DIR: 'C:\\Users\\wb\\WB_data\\server' }).errors, [], '사용자 폴더 아래의 전용 폴더(저장소와 별개)를 거절했다');
   ok(v({ ...good, DATA_DIR: '\\\\nas\\wb' }).errors.some((e) => /네트워크 경로/.test(e)), 'NAS(UNC) 경로를 DATA_DIR 로 받았다 — SYSTEM 은 NAS 에 못 붙는다');
   ok(v({ ...good, DATA_DIR: 'C:\\Users\\wb\\OneDrive - 학원\\data' }).errors.some((e) => /OneDrive/.test(e)), 'OneDrive 폴더를 DATA_DIR 로 받았다 — 라이선스 팩이 클라우드로 간다');
   eq(v({ ...good, DATA_DIR: 'C:\\WB_onedrive_free' }).errors, [], 'OneDrive 가 이름 일부에만 든 폴더를 막았다');
@@ -83,6 +100,16 @@ const v = (vars, envFile = ENVF) => validateServerEnv({ vars, envFile, repoRoot:
 }
 
 /* ── buildChildEnv ── */
+{
+  /* Windows 는 환경 변수 이름의 대소문자를 가리지 않는다 — 셸의 admin_pin 이 자식에서 ADMIN_PIN 으로 읽힌다 */
+  const ci = buildChildEnv({ admin_pin: '1234', Admin_Password: 'old', Host: '0.0.0.0', wb_admin_only: '0', Port: '1', data_dir: 'C:\\evil', Path: 'C:\\Windows' },
+    { ADMIN_ID: 'a', ADMIN_PASSWORD: 'b', DATA_DIR: 'C:\\d' }, 8890);
+  ok(!Object.keys(ci).some((k) => /^admin_/i.test(k) && ci[k] !== ({ ADMIN_ID: 'a', ADMIN_PASSWORD: 'b' })[k]), '셸에 남은 소문자 admin_* 가 서버로 넘어갔다 — Windows 에서는 ADMIN_PIN 으로 읽힌다');
+  ok(!('Host' in ci) && !('wb_admin_only' in ci) && !('Port' in ci) && !('data_dir' in ci), '대소문자만 다른 HOST·WB_ADMIN_ONLY·PORT·DATA_DIR 이 넘어갔다');
+  eq(ci.Path, 'C:\\Windows', 'Windows 의 Path 를 버렸다');
+  const nodeOpt = buildChildEnv({}, { ADMIN_PIN: 'x'.repeat(20), DATA_DIR: 'C:\\d', NODE_OPTIONS: '--require evil' }, 8890);
+  ok(!('NODE_OPTIONS' in nodeOpt), '설정 파일의 NODE_OPTIONS 가 서버로 넘어갔다');
+}
 {
   const env = buildChildEnv({ PATH: 'p', ADMIN_PIN: 'old-shell-pin', HOST: '0.0.0.0', WB_ADMIN_ONLY: '0', SystemRoot: 'C:\\Windows' },
     { ADMIN_ID: 'a', ADMIN_PASSWORD: 'b', DATA_DIR: 'C:\\d', LOG_DIR: 'C:\\l' }, 8890);
@@ -151,11 +178,57 @@ const v = (vars, envFile = ENVF) => validateServerEnv({ vars, envFile, repoRoot:
 {
   eq(pickNodeExe('C:\\Program Files\\nodejs\\node.exe', () => true).nodeExe, 'C:\\Program Files\\nodejs\\node.exe', 'MSI 자리는 그대로');
   const z = 'C:\\Users\\wb\\AppData\\Local\\Microsoft\\WinGet\\Packages\\OpenJS\\node-v24.20.0-win-x64\\node.exe';
-  const a = pickNodeExe(z, (p) => p === STABLE_NODE);
+  const a = pickNodeExe(z, (p) => p === STABLE_NODE, () => '22.11.0');
   ok(a.nodeExe === STABLE_NODE && a.warning, '버전 붙은 자리 대신 MSI 자리를 고르지 않는다');
+  const old = pickNodeExe(z, (p) => p === STABLE_NODE, () => '18.20.4');
+  ok(old.nodeExe === z && /v18/.test(old.warning), 'MSI 자리의 Node 18 을 골랐다 — 작업이 18 로 돌아 관리 로그인이 깨진다');
+  const custom = pickNodeExe('D:\\tools\\node22\\node.exe', () => true, () => '18.0.0');
+  eq(custom.nodeExe, 'D:\\tools\\node22\\node.exe', '버전 안 붙은 자리를 몰래 MSI 자리로 바꿨다');
   const b = pickNodeExe(z, () => false);
   ok(b.nodeExe === z && /MSI/.test(b.warning), 'MSI 자리가 없을 때 경고하지 않는다');
   ok(inOneDrive('C:\\Users\\wb\\OneDrive\\Desktop\\wb-site') && !inOneDrive('C:\\WB\\wb-site'), 'OneDrive 판정');
+}
+
+/* ── 작업 정의는 전체 경로만 ── */
+{
+  let threw = false;
+  try { taskXml({ nodeExe: 'C:\\Program Files\\nodejs\\node.exe', runScript: 'C:\\a\\run-server.mjs', envFile: 'server.env', workDir: 'C:\\a' }); } catch { threw = true; }
+  ok(threw, '상대 경로 설정 파일을 작업 정의에 적었다 — SYSTEM 이 엉뚱한 자리에서 찾고 로그도 없이 죽는다');
+}
+
+/* ── 잠그면 안 되는 자리·폴더 상태 ── */
+{
+  eq(sharedFolderReason('C:\\ProgramData\\WB', 'win32'), '', '기본 설정 폴더를 막았다');
+  ok(sharedFolderReason('C:\\ProgramData', 'win32'), 'ProgramData 자체를 받았다');
+  ok(sharedFolderReason('C:\\Users\\wb\\Documents', 'win32'), '문서 폴더를 받았다');
+  ok(sharedFolderReason('C:\\', 'win32'), 'C:\\ 를 받았다');
+  eq(folderState(null, ENV_DIR_OWN), 'absent', '없는 폴더');
+  eq(folderState([], ENV_DIR_OWN), 'empty', '빈 폴더');
+  eq(folderState(['server.env', 'app', 'tunnel-token.txt', 'run-server-error.log'], ENV_DIR_OWN), 'ours', '우리 것만');
+  eq(folderState(['server.env', '학원자료.hwp'], ENV_DIR_OWN), 'foreign', '남의 파일이 섞인 설정 폴더');
+  eq(folderState(['db.json', 'backups', 'logs', 'letter-img'], DATA_DIR_OWN), 'ours', '서버 자료만');
+  eq(folderState(['db.json', '수업계획.xlsx'], DATA_DIR_OWN), 'foreign', '남의 파일이 섞인 자료 폴더');
+}
+
+/* ── 코드 사본에서 뺄 것 ── */
+{
+  ok(appCopyKeep('reading-server/server.mjs') && appCopyKeep('letter/img/a.svg'), '필요한 파일을 뺐다');
+  ok(!appCopyKeep('reading-server/data/db.json'), '로컬 학생 기록(reading-server/data)을 사본에 넣었다');
+  ok(!appCopyKeep('reading-server/dist/x.js') && !appCopyKeep('reading-server\\dist'), '빌드 산출물을 넣었다');
+  ok(!appCopyKeep('reading/.git/HEAD') && !appCopyKeep('letter/node_modules/x'), '.git·node_modules 를 넣었다');
+}
+
+/* ── 폴더 권한 읽기 ── */
+{
+  const good2 = aclProblems('OWNER|S-1-5-32-544\r\nACE|S-1-5-32-544|Allow|2032127|False\r\nACE|S-1-5-18|Allow|2032127|False\r\n');
+  ok(good2.readable && good2.ownerOk && !good2.foreign.length, '관리자·SYSTEM 만인 권한을 문제로 봤다');
+  const leak = aclProblems('OWNER|S-1-5-21-1-2-3-1001\nACE|S-1-5-32-544|Allow|2032127|False\nACE|S-1-5-32-545|Allow|1179817|True\nACE|S-1-5-11|Deny|1|False');
+  ok(!leak.ownerOk, '일반 사용자가 주인인 폴더를 통과시켰다 — 그 사람이 권한을 되돌릴 수 있다');
+  eq(leak.foreign, ['S-1-5-32-545'], 'Users 의 허용 항목을 잡지 못했다(거부 항목은 문제가 아니다)');
+  ok(!aclProblems('').readable, '빈 출력을 읽힌 것으로 봤다');
+  ok(/-LiteralPath 'C:\\it''s'/.test(aclScript("C:\\it's")), 'PowerShell 경로의 작은따옴표를 이스케이프하지 않았다');
+  eq(driveLetter('Z:\\WB'), 'Z', '드라이브 글자');
+  eq(driveLetter('\\\\nas\\wb'), '', 'UNC 는 드라이브 글자가 없다');
 }
 
 /* ── cloudflared 버전 ── */

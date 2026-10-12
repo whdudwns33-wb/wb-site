@@ -41,15 +41,40 @@ const PASSWORD = 'file-password-not-real-123';
 const writeEnv = (name, lines) => { const f = path.join(TMP, name); fs.writeFileSync(f, lines.join('\r\n')); return f; };
 
 let launcher = null;
+let serverPid = 0;
 try {
   /* ── 틀린 설정은 띄우지 않는다 ── */
   const SHORT = 'shortpin-xyz';
-  const bad = writeEnv('bad.env', [`ADMIN_PIN=${SHORT}`, `DATA_DIR=${path.join(TMP, 'data-bad')}`, 'HOST=0.0.0.0']);
+  const bad = writeEnv('bad.env', [`ADMIN_PIN=${SHORT}`, `DATA_DIR=${path.join(TMP, 'data-bad')}`, 'HOST=0.0.0.0', `PORT=${PORT}`]);
   const rb = spawnSync(process.execPath, [RUN, '--env', bad, '--check'], { encoding: 'utf8' });
   ok(rb.status === 1, `틀린 설정인데 종료 코드가 ${rb.status}`);
   ok(/ADMIN_PIN/.test(rb.stderr) && /HOST/.test(rb.stderr), '무엇이 틀렸는지 알려주지 않는다: ' + rb.stderr);
   ok(!rb.stderr.includes(SHORT) && !rb.stdout.includes(SHORT), '오류 출력에 PIN 값이 찍혔다');
+
+  /* 작업 스케줄러가 실제로 쓰는 길(--check 없이)에서도 띄우지 않고, 이유를 설정 파일 옆에 남긴다 */
+  const rp = spawnSync(process.execPath, [RUN, '--env', bad], { encoding: 'utf8', timeout: 15000 });
+  ok(rp.status === 1, `틀린 설정으로 실제 실행했는데 종료 코드가 ${rp.status}(${rp.signal || ''}) — 서버를 띄웠을 수 있다`);
   ok(!fs.existsSync(path.join(TMP, 'data-bad')), '틀린 설정인데 자료 폴더를 만들었다');
+  ok(!(await canConnect(PORT)), '틀린 설정인데 서버가 떠 있다');
+  ok(!rp.stdout.includes(SHORT) && !rp.stderr.includes(SHORT), '실제 실행 출력에 PIN 값이 찍혔다');
+  const errLog = path.join(TMP, 'run-server-error.log');
+  const errText = fs.existsSync(errLog) ? fs.readFileSync(errLog, 'utf8') : '';
+  ok(/ADMIN_PIN/.test(errText), '서버 로그가 생기기 전의 실패를 설정 파일 옆 run-server-error.log 에 남기지 않는다 — 화면 없는 PC 에서 아무도 모른다');
+  ok(!errText.includes(SHORT), 'run-server-error.log 에 PIN 값이 찍혔다');
+
+  /* 서버가 쓰지 않는 키(NODE_OPTIONS 등)는 받지 않는다 — SYSTEM 으로 도는 서버에 코드를 싣는 길 */
+  const inj = writeEnv('inject.env', ['ADMIN_PIN=pin-long-enough-1234567', `DATA_DIR=${path.join(TMP, 'data-inj')}`, 'NODE_OPTIONS=--require ./evil.js']);
+  const ri = spawnSync(process.execPath, [RUN, '--env', inj, '--check'], { encoding: 'utf8' });
+  ok(ri.status === 1 && /쓰지 않는 키/.test(ri.stderr), 'NODE_OPTIONS 가 든 설정을 받았다');
+
+  /* 자료 폴더를 못 만들면(드라이브가 안 보임 등) 로그 없이 죽지 않고 이유를 남긴다 */
+  const blocker = path.join(TMP, 'not-a-dir');
+  fs.writeFileSync(blocker, 'x');
+  const mk = writeEnv('mkfail.env', ['ADMIN_PIN=pin-long-enough-1234567', `DATA_DIR=${path.join(blocker, 'data')}`, `PORT=${PORT}`]);
+  fs.rmSync(errLog, { force: true });
+  const rm = spawnSync(process.execPath, [RUN, '--env', mk], { encoding: 'utf8', timeout: 15000 });
+  ok(rm.status === 2, `자료 폴더를 못 만들었는데 종료 코드가 ${rm.status}`);
+  ok(fs.existsSync(errLog) && /폴더를 만들지 못했습니다/.test(fs.readFileSync(errLog, 'utf8')), '자료 폴더를 못 만든 이유를 남기지 않는다');
 
   const missing = spawnSync(process.execPath, [RUN, '--env', path.join(TMP, 'none.env'), '--check'], { encoding: 'utf8' });
   ok(missing.status === 1 && /setup\.mjs env/.test(missing.stderr), '설정 파일이 없을 때 견본 만드는 법을 알려주지 않는다');
@@ -98,6 +123,9 @@ try {
     ok(/\[관리 전용\]/.test(text), '로그에 [관리 전용] 줄이 없다');
     ok(text.includes(`http://127.0.0.1:${PORT}`), '로그에 묶은 주소가 없다');
     ok(!text.includes(PASSWORD) && !text.includes(STALE_PIN), '로그에 비밀이 찍혔다');
+    /* 실패해도 서버를 남기지 않게 pid 를 알아 둔다(실행기가 로그에 적는다) */
+    serverPid = Number((text.match(/pid (\d+)/) || [])[1]) || 0;
+    ok(serverPid > 0, '실행기가 서버 pid 를 로그에 적지 않는다');
 
     /* 실행기를 강제로 죽인다(작업 끝내기·비정상 종료 흉내) — 서버도 같이 사라져야 한다 */
     launcher.kill('SIGKILL');
@@ -109,6 +137,7 @@ try {
   errors.push('예외: ' + (e && e.message));
 } finally {
   if (launcher && launcher.exitCode == null) launcher.kill('SIGKILL');
+  if (serverPid) { try { process.kill(serverPid, 'SIGKILL'); } catch { /* 이미 끝났다 — 정상 */ } }
   await sleep(200);
   fs.rmSync(TMP, { recursive: true, force: true });
 }
@@ -118,4 +147,4 @@ if (errors.length) {
   errors.forEach((m) => console.error('  - ' + m));
   process.exit(1);
 }
-console.log('OK — 실행기: 틀린 설정 거절(값 비노출) · 깨진 db.json 이면 띄우지 않음(원본 보존) · 관리 전용·127.0.0.1 강제 · 셸의 옛 비밀 무시 · 날짜별 로그 · 실행기가 죽으면 서버도 정리');
+console.log('OK — 실행기: 틀린 설정 거절(실제 실행 길·값 비노출·이유를 run-server-error.log 에) · 모르는 키 거절 · 폴더 실패 기록 · 깨진 db.json 이면 띄우지 않음(원본 보존) · 관리 전용·127.0.0.1 강제 · 셸의 옛 비밀 무시 · 날짜별 로그 · 실행기가 죽으면 서버도 정리');
