@@ -145,9 +145,9 @@ test('lesson and order prefixes stay in stored data but are hidden from display 
 test('lesson display grade uses the stable student roster school without changing original values', () => {
   const core = titleDisplayCore();
   const roster = { students: [
-    { id: '10000001', school: '치평중', grade: '2' },
-    { id: '10000002', school: '서석고등학교', grade: '1학년' },
-    { id: '10000003', school: '유안초', grade: '초 4학년' }
+    { id: '10000001', school: '가나중', grade: '2' },
+    { id: '10000002', school: '예시고등학교', grade: '1학년' },
+    { id: '10000003', school: '가나초', grade: '초 4학년' }
   ] };
   core.setRoster(roster);
   assert.equal(core.taskDisplayTitle({
@@ -166,7 +166,7 @@ test('grade display does not guess a school level when school information is una
   const core = titleDisplayCore();
   assert.equal(core.schoolGradeDisplayLabel('', '2'), '2');
   assert.equal(core.schoolGradeDisplayLabel('학교급 확인 필요', '2'), '2');
-  assert.equal(core.schoolGradeDisplayLabel('치평중', '중 2학년'), '중2');
+  assert.equal(core.schoolGradeDisplayLabel('가나중', '중 2학년'), '중2');
 });
 
 test('staff student labels use stable studentId and show school level with grade', () => {
