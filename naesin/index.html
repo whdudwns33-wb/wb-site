@@ -1133,7 +1133,7 @@
   function renderHeader() {
     var a = auth(), who = $('whoLine');
     who.innerHTML = '<span>' + (authed && a && a.name ? '<b>' + esc(a.name) + '</b> · ' : (authed ? '' : '체험 모드 · ')) +
-      (pack ? esc((pack.textbook || '') + ' L' + pack.lesson) : '') +
+      (pack ? esc((pack.textbook || '') + (pack.lesson != null && pack.lesson !== '' ? ' L' + pack.lesson : '')) : '') +
       (authed ? '<small style="display:block;font-size:10.5px;font-weight:400">다른 학생으로 연동 ↻</small>' : '') + '</span>';
     who.className = 'who' + (authed ? ' linked' : '');
     who.title = authed ? '누르면 다른 학생으로 연동합니다' : '';
