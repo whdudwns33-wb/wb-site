@@ -81,3 +81,5 @@ ADMIN_PIN=원하는PIN node reading-server/server.mjs   # 기본 포트 8890 (�
    재배포는 자동: `reading/**`·`reading-server/**` 변경이 main에 머지되면 GitHub Actions가 배포. 수동은 `node build-dist.mjs && CLOUDFLARE_API_TOKEN=... npx wrangler deploy` (reading-server/ 에서)
 
 ⚠ 운영 전 필수: `ADMIN_PIN`(또는 `ADMIN_ID`·`ADMIN_PASSWORD`) 설정 — **기본값이 없어 없으면 아예 뜨지 않는다**. HTTPS(터널/워커) 뒤에서만 외부 노출.
+3. **원장 PC + Cloudflare 터널(원장·강사 전용, 결정 A)**: `tunnel/` 키트 — 저장소 밖 설정 파일로 관리 전용·`HOST=127.0.0.1` 을 강제해 띄우고,
+   작업 스케줄러 등록·cloudflared 서비스·점검까지. 순서는 [`tunnel/README.md`](tunnel/README.md). `HOST` 를 비우면 예전처럼 모든 주소(원내 LAN 용).
