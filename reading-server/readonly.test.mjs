@@ -101,6 +101,21 @@ try {
   const anon = await send(ro.base, 'POST', '/api/admin/students', { code: 'ZZ8', name: '라학생' });
   ok(anon.status === 403, `인증 없는 쓰기가 통과했다 (${anon.status})`);
 
+  /* ── 예외로 열어 둔 가져오기가 **인증을 우회하지 않는가** ──
+     읽기 전용 게이트는 인증보다 앞이라 /api/admin/import 를 그냥 통과시킨다. 그 뒤의 관리
+     게이트가 받아야 한다 — 안 받으면 터널 주소를 아는 누구나 검토용 자료를 덮어쓸 수 있다.
+     터널에 생길 수 있는 구멍 중 가장 큰 자리라 세 가지 토큰 꼴로 모두 확인한다. */
+  const forged = [['토큰 없음', undefined], ['엉뚱한 토큰', 'deadbeefdeadbeefdeadbeefdeadbeef'], ['빈 토큰', '']];
+  for (const [label, tok] of forged) {
+    const r = await send(ro.base, 'POST', '/api/admin/import',
+      { confirm: 'replace', snapshot: snapshot() }, tok);
+    ok(r.status === 401 || r.status === 403,
+      `읽기 전용 예외가 인증까지 열었다 — ${label}: ${r.status}`);
+  }
+  /* 관리 로그인 예외도 같다 — 틀린 PIN 은 받지 않는다 */
+  const badPin = await send(ro.base, 'POST', '/api/admin/login', { pin: 'wrong-pin' });
+  ok(badPin.status === 401 || badPin.status === 403, `틀린 PIN 이 통과했다 (${badPin.status})`);
+
   /* ── ⑤ 읽기는 그대로 ── */
   const ovr = await send(ro.base, 'GET', '/api/admin/overview', undefined, t);
   ok(ovr.status === 200, `읽기 전용 모드에서 읽기가 막혔다 (${ovr.status}) — 보기 위해 켠 모드다`);

@@ -170,20 +170,30 @@ const IMPORT_SKIP = {
   letter: 'dumpLetter 의 images 는 배열인데 저장은 맵이다 (issues 레코드 꼴도 다르다)',
 };
 
+/* 이 칸들은 전부 맵·객체다(students 는 코드→레코드, vocab 은 하위 맵 묶음…).
+   꼴 검사가 없으면 잘린 파일 하나로 `db.students = "..."` 같은 상태가 되고, 그대로
+   디스크에 저장돼 **재기동으로도 안 돌아온다**(백업을 꺼내 와야 한다). 관리 인증이 걸려
+   있어 아무나 보낼 수는 없지만, 사람이 잘못된 파일을 고르는 일은 인증이 막아 주지 않는다. */
+const WRONG_SHAPE = '꼴이 달라 받지 않았다 — 객체(맵)여야 하는 칸이다';
+const isMap = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
+
 export function importSnapshot(next) {
-  if (!next || typeof next !== 'object') return { ok: false, error: '스냅샷이 객체가 아닙니다.' };
+  if (!isMap(next)) return { ok: false, error: '스냅샷이 객체가 아닙니다.' };
   if (next.service && next.service !== 'wb-reading') {
     return { ok: false, error: '이 서버의 스냅샷이 아닙니다: ' + String(next.service).slice(0, 40) };
   }
   const applied = [], skipped = [], absent = [];
   IMPORT_DIRECT.forEach((k) => {
     if (next[k] == null) { absent.push(k); return; }
+    /* 꼴이 다르면 **덮지 않고** 알린다 — 조용히 넣으면 그 칸을 쓰는 라우트가 전부 깨진다 */
+    if (!isMap(next[k])) { skipped.push({ section: k, why: WRONG_SHAPE }); return; }
     db[k] = next[k]; applied.push(k);
   });
   Object.keys(IMPORT_MERGE).forEach((root) => {
     const src = next[root];
-    if (src == null || typeof src !== 'object') { absent.push(root); return; }
-    db[root] = db[root] || {};
+    if (src == null) { absent.push(root); return; }
+    if (!isMap(src)) { skipped.push({ section: root, why: WRONG_SHAPE }); return; }
+    db[root] = isMap(db[root]) ? db[root] : {};
     /* 본문(packs·books)은 건드리지 않는다 — 스냅샷에 없을 뿐 지울 이유가 없다 */
     IMPORT_MERGE[root].forEach((k) => { if (src[k] != null) db[root][k] = src[k]; });
     applied.push(root);
