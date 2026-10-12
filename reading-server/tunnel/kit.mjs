@@ -29,13 +29,14 @@ const TRUE_RE = /^(1|true|yes|on)$/i;
 /* 설정 파일에 적을 수 있는 키. 여기 없는 키는 받지 않는다 — 서버(SYSTEM)로 넘어가는 환경이라
    NODE_OPTIONS·PATH 같은 값이 섞이면 SYSTEM 으로 임의 코드를 싣는 길이 된다. 서버가 읽는 선택 키(AI·알림)는 허용한다. */
 export const ALLOWED_KEYS = new Set([
-  'ADMIN_PIN', 'ADMIN_ID', 'ADMIN_PASSWORD', 'DATA_DIR', 'PORT', 'LOG_DIR', 'PUBLIC_HOST', 'WB_ADMIN_ONLY', 'HOST',
+  'ADMIN_PIN', 'ADMIN_ID', 'ADMIN_PASSWORD', 'DATA_DIR', 'PORT', 'PUBLIC_HOST', 'WB_ADMIN_ONLY', 'HOST',
   'ANTHROPIC_API_KEY', 'GEMINI_API_KEY', 'LETTER_AI_MODEL', 'LETTER_IMAGE_MODEL', 'VOCAB_AI_MODEL', 'NAESIN_AI_MODEL',
   'AI_DAILY_PER_STUDENT', 'AI_DAILY_TOTAL', 'LETTER_AI_DAILY', 'NAESIN_AI_DAILY', 'ARENA_ON',
   'VAPID_PUBLIC_KEY', 'VAPID_PRIVATE_JWK', 'VAPID_SUBJECT',
 ]);
-/* 실행기만 쓰는 키 — 서버 자식에게는 넘기지 않는다 */
-const LAUNCHER_ONLY = new Set(['LOG_DIR', 'PUBLIC_HOST']);
+/* 실행기·점검 도구만 쓰는 키 — 서버 자식에게는 넘기지 않는다.
+   로그 폴더는 따로 정하지 않는다(늘 DATA_DIR\logs) — 잠그고 확인하는 폴더 밖에 SYSTEM 이 쓰는 자리를 만들지 않으려고. */
+const LAUNCHER_ONLY = new Set(['PUBLIC_HOST']);
 
 export function parseEnvFile(text) {
   const vars = {};
@@ -57,7 +58,11 @@ export function parseEnvFile(text) {
       return;
     }
     if (val.length >= 2 && (val[0] === '"' || val[0] === "'") && val[val.length - 1] === val[0]) val = val.slice(1, -1);
-    if (Object.prototype.hasOwnProperty.call(vars, key)) { errors.push(`${i + 1}번째 줄: ${key} 가 두 번 적혀 있습니다 — 하나만 남기세요`); return; }
+    /* 알려진 키일 때만 이름을 적는다 — 대문자 모양의 비밀(= 로 끝나는 base32 등)이 두 줄 들어간 경우를 위해 */
+    if (Object.prototype.hasOwnProperty.call(vars, key)) {
+      errors.push(`${i + 1}번째 줄: ${ALLOWED_KEYS.has(key) ? key : `${lineOf[key]}번째 줄과 같은 키`} 가 두 번 적혀 있습니다 — 하나만 남기세요`);
+      return;
+    }
     vars[key] = val;
     lineOf[key] = i + 1;
   });
@@ -124,9 +129,7 @@ export function validateServerEnv({ vars, envFile, repoRoot, platform = process.
   const publicHost = (v.PUBLIC_HOST || '').trim().toLowerCase();
   if (publicHost && !HOST_RE.test(publicHost)) errors.push('PUBLIC_HOST 는 주소 이름만 적습니다(예: wb.내도메인.com — https:// 나 / 없이)');
 
-  let logDir = (v.LOG_DIR || '').trim();
-  if (logDir && !p.isAbsolute(logDir)) errors.push('LOG_DIR 은 전체 경로로 적습니다');
-  if (!logDir && dataDir && p.isAbsolute(dataDir)) logDir = p.join(dataDir, 'logs');
+  const logDir = dataDir && p.isAbsolute(dataDir) ? p.join(dataDir, 'logs') : '';
 
   if (v.ANTHROPIC_API_KEY || v.GEMINI_API_KEY) warnings.push('AI 키가 들어 있습니다 — 관리 웹의 AI 초안 기능이 이 PC 에서 그 키로 호출합니다(국어 교재 원문은 외부 AI 로 보내지 않는 규칙은 그대로)');
 
@@ -337,30 +340,14 @@ export function cloudflaredOk(text, min = MIN_CLOUDFLARED) {
    로컬 서버 점검과 따로 본다. */
 export const METRICS_PORTS = [20241, 20242, 20243, 20244, 20245];
 
-/* ── 작업에 적을 node.exe ─────────────────────────────────────────────
-   작업 스케줄러는 SYSTEM 으로 돌아 사용자 PATH 를 모른다 — node.exe 를 전체 경로로 적는다.
-   그런데 지금 이 명령을 돌린 node 가 winget 휴대용(zip)·nvm 처럼 버전 붙은 폴더에 있으면
-   Node 를 올리는 순간 그 경로가 사라져 부팅 작업이 조용히 깨진다. 설치 프로그램(MSI)의 자리
-   C:\Program Files\nodejs\node.exe 가 있으면 그것을 쓰고, 없으면 지금 것을 쓰되 경고한다. */
-export const STABLE_NODE = 'C:\\Program Files\\nodejs\\node.exe';
+/* ── 작업이 돌릴 node.exe ──────────────────────────────────────────────
+   작업은 코드 사본 안에 복사해 둔 node.exe(<사본>\node\node.exe)를 돌린다. 설치된 자리(nvm·winget 휴대용·
+   C:\ 아래 폴더)의 node.exe 는 일반 사용자가 바꿔 끼울 수 있는 경우가 많고, 그러면 SYSTEM 작업이 그 파일을
+   실행한다. 사본 폴더와 같이 잠기므로 Node 를 올릴 때도 코드처럼 restart-server 한 번이면 반영된다. */
 export const MIN_NODE_MAJOR = 22;
 export const nodeMajor = (v) => Number(String(v || '').replace(/^v/, '').split('.')[0]) || 0;
-/* versionOf(exe) → '22.11.0' 같은 문자열(못 읽으면 ''). 바꿔 끼우는 쪽(MSI 자리)도 22 이상일 때만 고른다 —
-   예전에 깔아 둔 Node 18 MSI 가 남아 있으면 작업이 18 로 돌아 관리 로그인이 깨진다. */
-export function pickNodeExe(execPath, exists, versionOf = () => '') {
-  const p = String(execPath || '');
-  const unstable = /\\users\\|\\winget\\packages\\|\\nvm\\|node-v\d+/i.test(p);
-  if (/^c:\\program files\\nodejs\\node\.exe$/i.test(p)) return { nodeExe: p, warning: '' };
-  if (unstable && exists(STABLE_NODE)) {
-    const sv = versionOf(STABLE_NODE);
-    if (nodeMajor(sv) >= MIN_NODE_MAJOR) return { nodeExe: STABLE_NODE, warning: `지금 쓰는 node(${p}) 대신 설치 프로그램 자리(${STABLE_NODE}, v${sv})를 작업에 적습니다` };
-    return { nodeExe: p, warning: `${STABLE_NODE} 는 v${sv || '?'} 라 쓰지 않습니다 — nodejs.org 의 22 LTS 설치 파일(MSI)로 올린 뒤 install-server 를 다시 하세요. 지금은 ${p} 를 적습니다(버전이 바뀌면 사라지는 자리)` };
-  }
-  return {
-    nodeExe: p,
-    warning: unstable ? `node 가 버전이 바뀌면 사라지는 자리에 있습니다(${p}) — nodejs.org 의 LTS 설치 파일(MSI)로 깔면 ${STABLE_NODE} 에 고정됩니다. 업그레이드 뒤 install-server 를 다시 하세요` : '',
-  };
-}
+export const APP_NODE = (appDir) => (isWinPath(appDir) ? path.win32 : path.posix).join(appDir, 'node', 'node.exe');
+const isWinPath = (p) => /^[a-z]:[\\/]|^\\\\/i.test(String(p || ''));
 
 /* 저장소가 OneDrive 안이면(바탕 화면·문서 폴더가 OneDrive 로 옮겨진 PC) 파일이 클라우드 전용 자리표시로
    바뀌거나 SYSTEM 이 못 읽을 수 있다 — 설치 때 경고한다. */
@@ -415,15 +402,14 @@ export function appCopyKeep(rel) {
    주인은 관리자·SYSTEM 이어야 하고, 허용(Allow) 항목도 관리자·SYSTEM 뿐이어야 한다. */
 export const SID_ADMINS = 'S-1-5-32-544';
 export const SID_SYSTEM = 'S-1-5-18';
-export function aclScript(target) {
-  const lit = `'${String(target).replace(/'/g, "''")}'`;
-  return [
-    `$a = Get-Acl -LiteralPath ${lit};`,
-    `'OWNER|' + $a.GetOwner([Security.Principal.SecurityIdentifier]).Value;`,
-    `foreach ($r in $a.Access) { try { $sid = $r.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value } catch { $sid = [string]$r.IdentityReference };`,
-    `'ACE|' + $sid + '|' + $r.AccessControlType + '|' + [int]$r.FileSystemRights + '|' + $r.IsInherited }`,
-  ].join(' ');
-}
+/* 경로는 스크립트 글자에 넣지 않고 환경 변수(WB_ACL_TARGET)로 넘긴다 — PowerShell 은 ' 말고도 ‘ ’ ‚ ‛ 를
+   작은따옴표로 읽어서, 경로를 글자로 넣으면 이름 하나로 관리자 PowerShell 에 명령을 끼울 수 있다. */
+export const ACL_SCRIPT = [
+  '$a = Get-Acl -LiteralPath $env:WB_ACL_TARGET;',
+  "'OWNER|' + $a.GetOwner([Security.Principal.SecurityIdentifier]).Value;",
+  'foreach ($r in $a.Access) { try { $sid = $r.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value } catch { $sid = [string]$r.IdentityReference };',
+  "'ACE|' + $sid + '|' + $r.AccessControlType + '|' + [int]$r.FileSystemRights + '|' + $r.IsInherited }",
+].join(' ');
 export function aclProblems(text) {
   const lines = String(text || '').split(/\r?\n/).map((x) => x.trim()).filter(Boolean);
   const owner = (lines.find((l) => l.startsWith('OWNER|')) || '').slice(6);

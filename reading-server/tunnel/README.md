@@ -16,7 +16,8 @@
 - **이 PC 바깥에서는 터널로만 들어온다.** 서버는 127.0.0.1 에만 묶여 같은 와이파이의 다른 기기도 못 붙는다.
 - **서버는 저장소가 아니라 관리자 전용 사본을 돌린다.** 작업 스케줄러가 SYSTEM 으로 띄우는 코드를 저장소(일반 사용자도
   고칠 수 있는 자리)에서 바로 읽으면, 누구든 파일 한 줄로 SYSTEM 권한을 얻는다. 그래서 `install-server`·`restart-server` 가
-  서버에 필요한 폴더만 `C:\ProgramData\WB\app` 에 복사해 잠그고 그것을 돌린다. 저장소는 원장·코덱스가 평소처럼 고친다.
+  서버에 필요한 폴더와 **지금 쓰는 node.exe 까지** `C:\ProgramData\WB\app` 에 복사해 잠그고 그것을 돌린다(저장소에 링크가 있으면
+  복사하지 않는다). 저장소는 원장·코덱스가 평소처럼 고친다.
 - **이 관리 웹은 운영 관리 웹이 아니다.** 자료는 이 PC 의 `DATA_DIR\db.json` 에만 있고(처음엔 비어 있다)
   운영 워커의 학생 기록과 섞이지 않는다. 원장 PC 에서 하는 일(팩 제작·검수, 자료 정리)에 쓴다.
   **학생 등록·진도 확인·가정 발송은 지금처럼 운영 주소의 `/admin` 에서** 한다. 여기서 만든 가족 링크·안내 링크는
@@ -44,10 +45,9 @@
    (CNAME 부분 설정은 Business 이상).
    - 옮기기 전에 도메인을 산 곳에서 **DNSSEC 를 끈다** — 켠 채로 옮기면 도메인이 한동안 안 열릴 수 있다.
    - 그 도메인으로 **메일·홈페이지를 쓰고 있다면** Cloudflare 가 가져온 DNS 레코드(MX 등)가 다 있는지 확인하고 옮긴다.
-3. **Node.js 22 이상**을 **설치 파일(MSI)로** 설치한다 — nodejs.org 의 LTS `.msi`, 또는
-   `winget install --id OpenJS.NodeJS.LTS -e --installer-type wix --scope machine`.
-   그래야 `C:\Program Files\nodejs\node.exe` 에 고정된다. winget 휴대용(zip)·nvm 은 버전마다 폴더가 바뀌어
-   Node 를 올리는 순간 자동 시작이 조용히 깨진다(`install-server` 가 그런 자리를 보면 경고한다).
+3. **Node.js 22 이상**을 설치한다 — nodejs.org 의 LTS `.msi` 를 권한다(또는
+   `winget install --id OpenJS.NodeJS.LTS -e --installer-type wix --scope machine`). 작업은 설치된 node 가 아니라
+   `install-server` 때 사본 안에 복사한 `node.exe` 를 돌리므로, Node 를 올린 뒤에는 `restart-server` 한 번이면 반영된다.
 4. **저장소를 받아 둔다** — 예: `C:\WB\wb-site`. **OneDrive 안(바탕 화면·문서 폴더가 OneDrive 로 옮겨진 PC)은 피한다** —
    서버는 SYSTEM 계정으로 돌아 그런 자리의 파일을 못 읽을 수 있다. 자료 폴더(`DATA_DIR`)는 OneDrive·NAS 경로면 실행기가 거절한다.
 5. **절전을 끈다** — 관리자 터미널에서 `powercfg /change standby-timeout-ac 0` · `powercfg /change hibernate-timeout-ac 0`
@@ -93,6 +93,8 @@ node reading-server\tunnel\setup.mjs install-server
 공식 설치 파일만 쓴다: <https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.msi>
 설치 뒤 새 관리자 터미널에서 `cloudflared --version` — **2026.7.3 이상**이어야 한다
 (그보다 옛 버전은 서비스 설치 때 터널 토큰을 레지스트리에 평문으로 남긴다. `setup.mjs tunnel` 이 옛 버전을 거절한다).
+키트는 **Program Files 아래의 cloudflared 만** 쓴다 — `C:\` 바로 아래나 사용자 폴더에 둔 cloudflared.exe 는 일반 사용자가
+바꿔 끼울 수 있고, 그 파일이 토큰을 받고 SYSTEM 서비스로 등록되기 때문이다.
 
 ## 3. Cloudflare — **Access 를 먼저, 터널 경로는 맨 나중에**
 
@@ -153,7 +155,7 @@ node reading-server\tunnel\setup.mjs doctor
 
 | 할 일 | 방법 |
 |---|---|
-| 코드 업데이트 | `git pull` → (관리자 터미널) `node reading-server\tunnel\setup.mjs restart-server` — **지금 저장소의 코드를 사본으로 복사**해 다시 띄운다. 시험 중인 수정이 있으면 그것도 들어가니 커밋된 상태에서 한다. `doctor` 의 "코드 사본" 줄이 저장소와 다르다고 하면 이것을 잊은 것이다 |
+| 코드 업데이트 | `git pull` → `git status` 가 깨끗한지 본다 → (관리자 터미널) `node reading-server\tunnel\setup.mjs restart-server` — install-server 와 같은 검사(설정·자료 폴더 잠금)를 거쳐 **지금 저장소의 코드와 node.exe 를 사본으로 복사**해 다시 띄우고 45초 안에 떴는지 본다. `doctor` 의 "코드 사본" 줄이 "저장소와 다르다" 고 하면 이것을 잊었거나, 누가 저장소를 고친 것이다 — 무엇이 바뀌었는지 보고 나서 restart |
 | 서버 로그 | `DATA_DIR\logs\server-날짜.log` (14일치). 서버가 아예 안 뜨면 `C:\ProgramData\WB\run-server-error.log`. 둘 다 관리자만 열린다 — 관리자 터미널에서 `notepad <경로>` |
 | 터널 상태·로그 | 대시보드 Networking → Tunnels → `wb-admin` (Live logs). ⚠ "Healthy" 는 서버가 살아 있다는 뜻이 아니다 — `doctor` 로 본다 |
 | 자료 백업 | `DATA_DIR` 을 **NAS** 로(원장 결정 — 클라우드 동기화 폴더는 쓰지 않는다). 방법은 아직 정하지 않았다(아래 남은 일) |
@@ -201,6 +203,15 @@ cloudflared service uninstall
 - 설정 파일·터널 토큰을 저장소·채팅·스크린숏에 남기지 않는다. **터널 토큰을 터미널(PowerShell)에 붙여 넣지 않는다**(기록 파일에 남는다).
   `--loglevel debug` 로 돌리지 않는다(헤더째 기록된다).
 - 코드 사본(`C:\ProgramData\WB\app`)을 손으로 고치지 않는다 — 다음 `restart-server` 가 저장소 코드로 덮어쓴다.
+- 코드 사본 안에서 `setup.mjs` 를 돌리지 않는다(원본과 사본이 겹치면 시작하지 않는다 — 늘 저장소 폴더에서).
+
+### 남는 위험 — 관리자 터미널은 저장소 코드를 관리자로 실행한다
+
+`setup.mjs` 를 관리자 터미널에서 돌리는 순간 저장소의 그 파일이 관리자 권한으로 실행되고, `restart-server` 는 저장소의 지금
+코드를 SYSTEM 사본으로 올린다. 사본·잠금은 "올린 뒤에 바꿔치기"를 막을 뿐, **올리기 전의 저장소**를 지켜 주지는 않는다.
+그래서: ① 이 PC 를 다른 사람이 자기 계정으로 쓰지 않게 한다 ② 관리자 명령 전에 `git status` 가 깨끗한지·`git log` 가
+기억나는 변경인지 본다 ③ `doctor` 의 "코드 사본" 줄이 경고하면 이유를 확인하기 전에는 restart 하지 않는다.
+(저장소를 관리자만 쓰게 잠그는 방법도 있지만, 그러면 코덱스·원장이 평소 저장소를 고칠 때마다 관리자 권한이 필요해진다 — 채택하지 않았다.)
 - 실제 도메인·팀 이름·이메일을 이 저장소 문서에 적지 않는다(공개 저장소다).
 
 ---
@@ -212,9 +223,10 @@ cloudflared service uninstall
 
 1. `schtasks /Create /XML … /RU SYSTEM` 이 UTF-16 작업 정의(한글 설명 포함)를 받는지 — 파일 인코딩 규칙은 공식 문서에 없다.
    실패하면 `kit.mjs taskXml` 의 Description 을 ASCII 로, 그래도 안 되면 PowerShell `Register-ScheduledTask -Xml (Get-Content …)` 로
-2. 잠금 두 줄(`icacls <폴더> /setowner *S-1-5-32-544 /T /C` → `icacls <폴더> /inheritance:r /grant:r *S-1-5-32-544:(OI)(CI)F /grant:r *S-1-5-18:(OI)(CI)F`)이
-   통하는지, 그 뒤 권한 확인(PowerShell `Get-Acl` → `OWNER|…`·`ACE|…` 줄, `kit.mjs aclScript`)이 관리자·SYSTEM 만으로 읽히는지
-3. SYSTEM 으로 뜬 실행기가 코드 사본(`C:\ProgramData\WB\app`)에서 뜨는지, 5분 트리거가 죽은 서버를 살리는지(작업 스케줄러의
+2. 잠금(`icacls <폴더> /setowner *S-1-5-32-544 /T /C` → `icacls <폴더> /inheritance:r /grant:r *S-1-5-32-544:(OI)(CI)F /grant:r *S-1-5-18:(OI)(CI)F`
+   → 안의 항목마다 `icacls <항목> /reset /T /C /Q`)이 통하는지, 그 뒤 권한 확인(PowerShell `Get-Acl`, 경로는 환경 변수 `WB_ACL_TARGET`
+   — `kit.mjs ACL_SCRIPT`)이 `OWNER|S-1-5-32-544`·관리자·SYSTEM 만으로 읽히는지. 정션(`mklink /J`)을 하나 만들어 두고 `env` 가 거절하는지
+3. SYSTEM 으로 뜬 실행기가 코드 사본(`C:\ProgramData\WB\app`, node 는 `app\node\node.exe`)에서 뜨는지, 5분 트리거가 죽은 서버를 살리는지(작업 스케줄러의
    '실패 시 다시 시작'은 프로그램이 오류 코드로 끝난 경우를 늘 잡지 않는다는 보고가 있어 5분 트리거를 같이 둔 것이다)
 4. 작업 스케줄러에서 "끝내기" 하면 서버(자식)도 같이 꺼지는지(`exit-with-parent.mjs`) — `doctor` 의 로컬 서버가 ✗ 가 되면 정상
 5. 관리자 판정(`whoami /groups` — `env`·`install-server` 가 쓰고 `doctor` 의 "관리자 권한" 줄에 보인다)·드라이브 종류
