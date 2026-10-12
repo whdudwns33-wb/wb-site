@@ -10,8 +10,8 @@
  */
 import {
   parseEnvFile, isInside, validateServerEnv, buildChildEnv, nextRestart, logFileName, logsToPrune,
-  envTemplate, classifyProbe, MIN_PIN, LOOPBACK, parseCloudflaredVersion, cloudflaredOk, pickNodeExe, inOneDrive, STABLE_NODE,
-  taskXml, sharedFolderReason, folderState, ENV_DIR_OWN, DATA_DIR_OWN, appCopyKeep, aclProblems, aclScript, driveLetter,
+  envTemplate, classifyProbe, MIN_PIN, LOOPBACK, parseCloudflaredVersion, cloudflaredOk, inOneDrive, APP_NODE,
+  taskXml, sharedFolderReason, folderState, ENV_DIR_OWN, DATA_DIR_OWN, appCopyKeep, aclProblems, ACL_SCRIPT, driveLetter,
 } from './kit.mjs';
 
 const errors = [];
@@ -29,6 +29,10 @@ const eq = (a, b, m) => ok(JSON.stringify(a) === JSON.stringify(b), `${m}: ${JSO
   ok(d.errors.length === 1 && /두 번/.test(d.errors[0]), '같은 키 두 번을 오류로 잡지 않는다');
   const d2 = parseEnvFile('ADMIN_PIN=secret-value-1\nADMIN_PIN=secret-value-2\n');
   ok(!/secret-value/.test(d2.errors.join(' ')), '오류 문구에 값이 실렸다');
+  ok(/ADMIN_PIN 가 두 번/.test(d2.errors[0]), '알려진 키가 두 번일 때 어느 키인지 알려주지 않는다');
+  /* 대문자 모양의 비밀(= 로 끝나는 base32)이 두 줄 들어간 경우 — 그 글자를 되풀이하면 안 된다 */
+  const d3 = parseEnvFile('MZXW6YTBOIQWE33VSECRET=\nMZXW6YTBOIQWE33VSECRET=\n');
+  ok(d3.errors.length === 1 && !/MZXW6YTB/.test(d3.errors.join(' ')) && /1번째 줄과 같은 키/.test(d3.errors[0]), '모르는 키가 두 번일 때 그 글자(비밀일 수 있다)를 오류에 실었다');
   ok(parseEnvFile('admin_pin=x').errors.length === 1, '소문자 키를 받았다');
   ok(/ADMIN_PIN 처럼 대문자로/.test(parseEnvFile('admin_pin=x').errors[0]), '알려진 키를 소문자로 적었을 때 바른 이름을 알려주지 않는다');
   /* '=' 를 빠뜨리거나 비밀번호만 따로 적은 줄 — 키 자리에 비밀이 들어간다. 그 글자를 되풀이하면 안 된다 */
@@ -61,7 +65,7 @@ const v = (vars, envFile = ENVF) => validateServerEnv({ vars, envFile, repoRoot:
   const r = v(good);
   eq(r.errors, [], '정상 설정이 거절됐다');
   eq(r.port, 8890, '기본 포트');
-  eq(r.logDir, 'C:\\WB_server_data\\logs', '기본 로그 폴더');
+  eq(r.logDir, 'C:\\WB_server_data\\logs', '로그 폴더는 늘 DATA_DIR\\logs');
   ok(v(good, REPO + '\\server.env').errors.some((e) => /저장소 폴더 안/.test(e)), '저장소 안 설정 파일을 받았다');
   ok(v({ ...good, DATA_DIR: REPO + '\\reading-server\\data' }).errors.some((e) => /DATA_DIR 이 저장소/.test(e)), '저장소 안 DATA_DIR 을 받았다');
   ok(v({ ...good, DATA_DIR: 'data' }).errors.some((e) => /전체 경로/.test(e)), '상대 경로 DATA_DIR 을 받았다');
@@ -81,7 +85,7 @@ const v = (vars, envFile = ENVF) => validateServerEnv({ vars, envFile, repoRoot:
   ok(v({ ...good, PORT: '80' }).errors.some((e) => /PORT/.test(e)), '1024 미만 포트를 받았다');
   ok(v({ ...good, PORT: 'abc' }).errors.some((e) => /PORT/.test(e)), '숫자 아닌 포트를 받았다');
   eq(v({ ...good, PORT: '9000' }).port, 9000, '포트 지정');
-  ok(v({ ...good, LOG_DIR: 'logs' }).errors.some((e) => /LOG_DIR/.test(e)), '상대 경로 LOG_DIR 을 받았다');
+  ok(v({ ...good, LOG_DIR: 'C:\\anywhere' }).errors.some((e) => /쓰지 않는 키/.test(e)), 'LOG_DIR 을 받았다 — 잠그지 않는 자리에 SYSTEM 이 로그를 쓰고 지운다');
   ok(validateServerEnv({ vars: { ...good, NODE_OPTIONS: '--require x' }, envFile: ENVF, repoRoot: REPO, platform: 'win32', lineOf: { NODE_OPTIONS: 7 } })
     .errors.some((e) => /7번째 줄/.test(e) && /쓰지 않는 키/.test(e)), 'NODE_OPTIONS 를 받았다 — SYSTEM 으로 도는 서버에 임의 코드를 싣는 길');
   ok(v({ ...good, PATH: 'C:\\evil' }).errors.some((e) => /쓰지 않는 키/.test(e)), 'PATH 를 받았다');
@@ -112,14 +116,14 @@ const v = (vars, envFile = ENVF) => validateServerEnv({ vars, envFile, repoRoot:
 }
 {
   const env = buildChildEnv({ PATH: 'p', ADMIN_PIN: 'old-shell-pin', HOST: '0.0.0.0', WB_ADMIN_ONLY: '0', SystemRoot: 'C:\\Windows' },
-    { ADMIN_ID: 'a', ADMIN_PASSWORD: 'b', DATA_DIR: 'C:\\d', LOG_DIR: 'C:\\l' }, 8890);
+    { ADMIN_ID: 'a', ADMIN_PASSWORD: 'b', DATA_DIR: 'C:\\d', PUBLIC_HOST: 'wb.example.com' }, 8890);
   eq(env.PATH, 'p', 'PATH 를 넘기지 않았다');
   eq(env.SystemRoot, 'C:\\Windows', 'Windows 가 필요한 SystemRoot 를 버렸다');
   ok(!('ADMIN_PIN' in env), '셸에 남은 옛 PIN 이 서버로 넘어갔다');
   eq(env.WB_ADMIN_ONLY, '1', '관리 전용이 강제되지 않았다');
   eq(env.HOST, LOOPBACK, '루프백이 강제되지 않았다');
   eq(env.PORT, '8890', '포트');
-  ok(!('LOG_DIR' in env), '실행기 전용 LOG_DIR 이 서버로 넘어갔다');
+  ok(!('PUBLIC_HOST' in env), '점검 도구 전용 PUBLIC_HOST 가 서버로 넘어갔다');
 }
 
 /* ── nextRestart ── */
@@ -174,18 +178,9 @@ const v = (vars, envFile = ENVF) => validateServerEnv({ vars, envFile, repoRoot:
   eq(classifyProbe({ status: 200, robots: '' }).state, 'unknown', '우리 서버가 아닌 200 을 위험으로 단정했다');
 }
 
-/* ── 작업에 적을 node.exe ── */
+/* ── 작업이 돌릴 node.exe 는 사본 안 ── */
 {
-  eq(pickNodeExe('C:\\Program Files\\nodejs\\node.exe', () => true).nodeExe, 'C:\\Program Files\\nodejs\\node.exe', 'MSI 자리는 그대로');
-  const z = 'C:\\Users\\wb\\AppData\\Local\\Microsoft\\WinGet\\Packages\\OpenJS\\node-v24.20.0-win-x64\\node.exe';
-  const a = pickNodeExe(z, (p) => p === STABLE_NODE, () => '22.11.0');
-  ok(a.nodeExe === STABLE_NODE && a.warning, '버전 붙은 자리 대신 MSI 자리를 고르지 않는다');
-  const old = pickNodeExe(z, (p) => p === STABLE_NODE, () => '18.20.4');
-  ok(old.nodeExe === z && /v18/.test(old.warning), 'MSI 자리의 Node 18 을 골랐다 — 작업이 18 로 돌아 관리 로그인이 깨진다');
-  const custom = pickNodeExe('D:\\tools\\node22\\node.exe', () => true, () => '18.0.0');
-  eq(custom.nodeExe, 'D:\\tools\\node22\\node.exe', '버전 안 붙은 자리를 몰래 MSI 자리로 바꿨다');
-  const b = pickNodeExe(z, () => false);
-  ok(b.nodeExe === z && /MSI/.test(b.warning), 'MSI 자리가 없을 때 경고하지 않는다');
+  eq(APP_NODE('C:\\ProgramData\\WB\\app'), 'C:\\ProgramData\\WB\\app\\node\\node.exe', '사본 안 node.exe 자리');
   ok(inOneDrive('C:\\Users\\wb\\OneDrive\\Desktop\\wb-site') && !inOneDrive('C:\\WB\\wb-site'), 'OneDrive 판정');
 }
 
@@ -226,7 +221,8 @@ const v = (vars, envFile = ENVF) => validateServerEnv({ vars, envFile, repoRoot:
   ok(!leak.ownerOk, '일반 사용자가 주인인 폴더를 통과시켰다 — 그 사람이 권한을 되돌릴 수 있다');
   eq(leak.foreign, ['S-1-5-32-545'], 'Users 의 허용 항목을 잡지 못했다(거부 항목은 문제가 아니다)');
   ok(!aclProblems('').readable, '빈 출력을 읽힌 것으로 봤다');
-  ok(/-LiteralPath 'C:\\it''s'/.test(aclScript("C:\\it's")), 'PowerShell 경로의 작은따옴표를 이스케이프하지 않았다');
+  /* 경로는 스크립트 글자가 아니라 환경 변수로 — ‘ ’ 같은 문자도 PowerShell 은 따옴표로 읽는다 */
+  ok(/\$env:WB_ACL_TARGET/.test(ACL_SCRIPT) && !/LiteralPath '/.test(ACL_SCRIPT), '권한 확인 스크립트가 경로를 글자로 품는다 — 이름 하나로 관리자 PowerShell 에 명령을 끼울 수 있다');
   eq(driveLetter('Z:\\WB'), 'Z', '드라이브 글자');
   eq(driveLetter('\\\\nas\\wb'), '', 'UNC 는 드라이브 글자가 없다');
 }

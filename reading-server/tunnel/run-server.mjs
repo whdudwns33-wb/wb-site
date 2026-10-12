@@ -140,7 +140,9 @@ async function main() {
     const startedAt = Date.now();
     /* 'ipc' 통로 + exit-with-parent.mjs — 실행기가 어떻게 끝나든 서버가 고아로 남지 않게 */
     child = spawn(process.execPath, ['--import', pathToFileURL(EXIT_WITH_PARENT).href, SERVER],
-      { env: childEnv, cwd: REPO, stdio: ['ignore', 'pipe', 'pipe', 'ipc'], windowsHide: true });
+      /* 작업 폴더는 자료 폴더 — 코드 사본을 작업 폴더로 잡고 있으면 restart-server 가 사본을 지우고 다시 복사할 때
+         Windows 가 "사용 중" 으로 막는다. 서버 코드는 자기 위치에서 경로를 풀므로 동작은 같다. */
+      { env: childEnv, cwd: cfg.dataDir, stdio: ['ignore', 'pipe', 'pipe', 'ipc'], windowsHide: true });
     stamp(`서버 시작 — 포트 ${cfg.port}, 관리 전용, 127.0.0.1, pid ${child.pid}, node ${process.versions.node}, 코드 ${REPO}`);
     child.stdout.on('data', (b) => { write(b); if (process.stdout.isTTY) process.stdout.write(b); });
     child.stderr.on('data', (b) => { write(b); if (process.stderr.isTTY) process.stderr.write(b); });

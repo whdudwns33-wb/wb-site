@@ -4,8 +4,8 @@
 
    명령 (★ = 관리자 권한 터미널에서)
      env                설정 폴더를 잠그고 설정 파일 견본을 만든다(이미 있으면 내용은 건드리지 않는다) ★
-     install-server     서버 코드를 관리자 전용 자리에 복사하고, 작업 스케줄러에 등록하고, 띄운다     ★
-     restart-server     지금 저장소의 코드를 다시 복사해 서버를 다시 띄운다(git pull 뒤)              ★
+     install-server     서버 코드·node.exe 를 관리자 전용 자리에 복사·잠그고, 작업 스케줄러에 등록하고, 띄운다 ★
+     restart-server     같은 검사를 거쳐 지금 저장소의 코드·node.exe 를 다시 복사해 다시 띄운다(git pull 뒤) ★
      uninstall-server   작업 스케줄러와 코드 사본을 지운다(자료·설정 파일은 그대로)                  ★
      tunnel             cloudflared 를 Windows 서비스로 설치 — --token-file <파일>(끝나면 지운다)     ★
      doctor             전부 점검한다(로컬 서버·관리 전용·LAN 차단·폴더 권한·서비스·바깥 주소의 Access)
@@ -16,6 +16,7 @@
    비밀(관리 비밀번호·터널 토큰)은 화면·로그에 찍지 않는다. 할 일은 plan* 함수가 목록으로 만들고(테스트가 본다)
    실행은 execute 하나가 한다 — Windows 에서만 도는 부분을 얇게 두려는 것이다. */
 import { spawnSync } from 'node:child_process';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import net from 'node:net';
 import os from 'node:os';
@@ -23,30 +24,36 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   TASK_NAME, LOOPBACK, envTemplate, taskXml, utf16leWithBom, classifyProbe, isHostname, isInside,
-  cloudflaredOk, MIN_CLOUDFLARED, METRICS_PORTS, pickNodeExe, inOneDrive, nodeMajor, MIN_NODE_MAJOR,
+  cloudflaredOk, MIN_CLOUDFLARED, METRICS_PORTS, inOneDrive, nodeMajor, MIN_NODE_MAJOR, APP_NODE,
   sharedFolderReason, folderState, ENV_DIR_OWN, DATA_DIR_OWN, APP_DIRS, APP_MARKER, appCopyKeep,
-  aclScript, aclProblems, driveLetter,
+  ACL_SCRIPT, aclProblems, driveLetter,
 } from './kit.mjs';
 import { defaultEnvFile, loadConfig, resolveEnvArg, isWinAbs } from './run-server.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const REPO = path.resolve(HERE, '..', '..');
+/* 저장소 자리는 실제 경로(8.3 짧은 이름·링크를 푼 것)로 — 안/밖 비교가 짧은 이름으로 비켜 가지 않게 */
+const REPO = (() => { const r = path.resolve(HERE, '..', '..'); try { return fs.realpathSync.native(r); } catch { return r; } })();
 
 /* SID 로 적는다 — 한국어 Windows 에서 그룹 이름은 "Administrators" 가 아니라 번역된 이름일 수 있다.
-   S-1-5-32-544 = Administrators, S-1-5-18 = SYSTEM. 주인을 관리자로 바꾸고, 상속을 끊고, 이 둘만 남긴다
-   (일반 사용자는 읽지도 고치지도 못한다). 주인부터 바꾸는 것은 일반 사용자가 폴더를 미리 만들어 두면
-   그 사람이 주인으로 남아 권한을 되돌릴 수 있어서다. */
+   S-1-5-32-544 = Administrators, S-1-5-18 = SYSTEM. 순서:
+   ① 폴더 안팎에 링크(심볼릭 링크·정션)가 없는지 — 있으면 잠금·확인이 링크 너머의 다른 폴더에 걸린다
+   ② 주인을 관리자로(일반 사용자가 폴더를 미리 만들어 두면 그 사람이 주인으로 남아 권한을 되돌릴 수 있다)
+   ③ 상속을 끊고 관리자·SYSTEM 만  ④ 안에 이미 있던 파일·폴더의 따로 붙은 권한을 지워 위 권한을 물려받게
+   ⑤ 다시 읽어 확인(verifyAcl) — 남의 허용 항목이 남으면 멈춘다. */
 export const lockSteps = (dir, why) => [
+  { noLinks: dir, why: `${why} — 링크가 없는지` },
   { run: ['icacls', dir, '/setowner', '*S-1-5-32-544', '/T', '/C'], why: `${why} — 주인을 관리자로` },
   { run: ['icacls', dir, '/inheritance:r', '/grant:r', '*S-1-5-32-544:(OI)(CI)F', '/grant:r', '*S-1-5-18:(OI)(CI)F'], why: `${why} — 관리자·SYSTEM 만` },
+  { resetChildren: dir, why: `${why} — 안의 파일도 같은 권한으로` },
+  { verifyAcl: dir, why: `${why} — 확인` },
 ];
 
-/* cloudflared 를 찾을 자리 — 설치 프로그램(MSI)의 기본 위치가 먼저다. PATH(where)는 그다음이고,
-   지금 폴더·저장소 안에 놓인 cloudflared.exe 는 믿지 않는다(관리자 터미널이 토큰을 넘겨 주는 프로그램이다). */
-export const CLOUDFLARED_CANDIDATES = [
-  'C:\\Program Files (x86)\\cloudflared\\cloudflared.exe',
-  'C:\\Program Files\\cloudflared\\cloudflared.exe',
-  'C:\\Cloudflared\\bin\\cloudflared.exe',
+/* cloudflared 는 설치 프로그램(MSI)이 까는 Program Files 아래만 믿는다(관리자만 쓸 수 있는 자리).
+   C:\ 바로 아래 폴더·사용자 PATH 에 놓인 cloudflared.exe 는 일반 사용자가 바꿔 끼울 수 있고, 그 파일이
+   토큰을 받고 SYSTEM 서비스로 등록된다. */
+export const cloudflaredCandidates = (env = process.env) => [
+  path.win32.join(env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)', 'cloudflared', 'cloudflared.exe'),
+  path.win32.join(env.ProgramFiles || 'C:\\Program Files', 'cloudflared', 'cloudflared.exe'),
 ];
 
 /* 코드 사본 자리 — 설정 파일 옆 app 폴더(기본 C:\ProgramData\WB\app). 설정 폴더와 같이 잠긴다. */
@@ -56,6 +63,7 @@ export const defaultAppDir = (envFile) => {
   return p.join(p.dirname(f), 'app');
 };
 const dirOf = (f) => (isWinAbs(f) ? path.win32 : path.posix).dirname(f);
+const pathFor = (f) => (isWinAbs(f) ? path.win32 : path.posix);
 
 /* ── 할 일 목록 만들기 (부작용 없음) ─────────────────────────────────── */
 
@@ -68,29 +76,45 @@ export function planEnv({ envFile, platform = process.platform, fileExists = fal
   if (platform === 'win32') steps.push(...lockSteps(dir, '설정 폴더 잠그기(비밀번호가 들어간다)'));
   if (fileExists) steps.push({ note: `설정 파일이 이미 있습니다 — 내용은 건드리지 않습니다: ${envFile}` });
   else steps.push({ write: envFile, data: envTemplate({ dataDir: platform === 'win32' ? 'C:\\WB_server_data' : '' }), why: '설정 파일 견본(값은 비어 있음)' });
-  steps.push({ verifyAcl: dir, why: '설정 폴더가 관리자·SYSTEM 만인지 확인' });
+  if (platform === 'win32') steps.push({ verifyAcl: dir, why: '설정 폴더가 관리자·SYSTEM 만인지 다시 확인' });
   steps.push({ note: `이제 이 관리자 터미널에서 메모장으로 채우세요: notepad "${envFile}"` });
   return steps;
 }
 
-export function planDeployApp({ repo = REPO, appDir }) {
+/* 코드 사본 — 저장소의 서버 폴더와 지금 쓰는 node.exe 를 관리자 전용 자리로 복사하고 잠근다.
+   저장소 안에서(또는 사본 안에서) 이 도구를 돌리면 원본과 사본이 겹친다 — 사본을 지우는 순간 원본이 사라진다. */
+export function planDeployApp({ repo = REPO, appDir, nodeSrc }) {
+  const plat = isWinAbs(appDir) ? 'win32' : process.platform;
+  if (isInside(appDir, repo, plat) || isInside(repo, appDir, plat)) {
+    throw new Error(`코드 사본(${appDir})과 저장소(${repo})가 겹칩니다 — 저장소 폴더(예: C:\\WB\\wb-site)에서 node reading-server\\tunnel\\setup.mjs 로 다시 실행하세요`);
+  }
   return [
     { deployApp: { from: repo, to: appDir }, why: `서버 코드를 관리자 전용 자리로 복사(${APP_DIRS.length}개 폴더)` },
+    ...(nodeSrc ? [{ copyNode: { from: nodeSrc, to: APP_NODE(appDir) }, why: 'node.exe 도 사본 안으로(작업이 일반 사용자가 바꿀 수 있는 node 를 돌리지 않게)' }] : []),
     ...lockSteps(appDir, '코드 사본 잠그기(SYSTEM 이 실행하는 코드를 일반 사용자가 못 고치게)'),
-    { verifyAcl: appDir, why: '코드 사본이 관리자·SYSTEM 만인지 확인' },
   ];
 }
 
-export function planInstallServer({ envFile, dataDir, appDir, nodeExe = process.execPath, tmpDir = os.tmpdir(), repo = REPO, platform = process.platform }) {
+/* 자료 폴더 — 만들고, 잠그고, 확인 */
+const dataSteps = (dataDir) => [{ mkdir: dataDir, why: '자료 폴더' }, ...lockSteps(dataDir, '자료 폴더 잠그기(학생 기록·라이선스 팩)')];
+/* 설정 폴더가 잠겨 있는지 — SYSTEM 이 부팅마다 읽는 비밀번호 파일이고, 코드 사본도 그 안에 있다 */
+const envGuard = (envFile) => [{ noLinks: dirOf(envFile), why: '설정 폴더에 링크가 없는지' }, { verifyAcl: dirOf(envFile), why: '설정 폴더가 잠겨 있는지(아니면 먼저 setup.mjs env)' }];
+/* 바꾸는 동안 5분 감시가 사본을 띄우지 않게 작업을 잠시 끈다(없으면 1 — 괜찮다) */
+const pauseTask = [
+  { run: ['schtasks', '/Change', '/TN', TASK_NAME, '/DISABLE'], why: '작업 잠시 끄기(바꾸는 동안 5분 감시가 띄우지 않게)', okCodes: [0, 1] },
+  { run: ['schtasks', '/End', '/TN', TASK_NAME], why: '돌고 있으면 멈추기(서버도 같이 끝난다)', okCodes: [0, 1] },
+];
+
+export function planInstallServer({ envFile, dataDir, appDir, nodeSrc, tmpDir = os.tmpdir(), repo = REPO, platform = process.platform }) {
   const p = platform === 'win32' ? path.win32 : path.posix;
   const xmlFile = p.join(tmpDir, 'wb-admin-server-task.xml');
-  const xml = taskXml({ nodeExe, runScript: p.join(appDir, 'reading-server', 'tunnel', 'run-server.mjs'), envFile, workDir: appDir });
+  /* 작업 폴더는 설정 폴더 — 코드 사본을 작업 폴더로 잡으면 다음 restart-server 가 사본을 못 지운다 */
+  const xml = taskXml({ nodeExe: APP_NODE(appDir), runScript: p.join(appDir, 'reading-server', 'tunnel', 'run-server.mjs'), envFile, workDir: dirOf(envFile) });
   return [
-    { run: ['schtasks', '/End', '/TN', TASK_NAME], why: '이미 돌고 있으면 멈추기(처음이면 없다고 나온다 — 괜찮다)', okCodes: [0, 1] },
-    { mkdir: dataDir, why: '자료 폴더' },
-    ...lockSteps(dataDir, '자료 폴더 잠그기(학생 기록·라이선스 팩)'),
-    { verifyAcl: dataDir, why: '자료 폴더가 관리자·SYSTEM 만인지 확인' },
-    ...planDeployApp({ repo, appDir }),
+    ...envGuard(envFile),
+    ...pauseTask,
+    ...dataSteps(dataDir),
+    ...planDeployApp({ repo, appDir, nodeSrc }),
     { write: xmlFile, data: utf16leWithBom(xml), why: '작업 정의(UTF-16)' },
     /* /RU SYSTEM 을 같이 준다 — /XML 과 함께 쓸 수 있고(문서), XML 의 주체가 무시되더라도 SYSTEM 으로 못 박는다 */
     { run: ['schtasks', '/Create', '/TN', TASK_NAME, '/XML', xmlFile, '/RU', 'SYSTEM', '/F'], why: `작업 스케줄러에 ${TASK_NAME} 등록(부팅 + 5분마다 살아 있는지)` },
@@ -100,18 +124,23 @@ export function planInstallServer({ envFile, dataDir, appDir, nodeExe = process.
   ];
 }
 
-export function planRestartServer({ repo = REPO, appDir }) {
+/* 다시 띄우기 — install-server 와 같은 검사(설정·자료 폴더 잠금)를 거쳐 새 코드를 복사한다 */
+export function planRestartServer({ envFile, dataDir, appDir, nodeSrc, repo = REPO }) {
   return [
-    { run: ['schtasks', '/End', '/TN', TASK_NAME], why: '멈추기(서버도 같이 끝난다)', okCodes: [0, 1] },
-    ...planDeployApp({ repo, appDir }),
+    ...envGuard(envFile),
+    ...pauseTask,
+    ...dataSteps(dataDir),
+    ...planDeployApp({ repo, appDir, nodeSrc }),
+    { run: ['schtasks', '/Change', '/TN', TASK_NAME, '/ENABLE'], why: '작업 다시 켜기' },
     { run: ['schtasks', '/Run', '/TN', TASK_NAME], why: '다시 띄우기' },
   ];
 }
 
+/* 지우기 — 여러 번 돌려도 끝까지 간다(작업이 이미 없으면 1 — 괜찮다) */
 export function planUninstallServer({ appDir }) {
   return [
-    { run: ['schtasks', '/End', '/TN', TASK_NAME], why: '멈추기', okCodes: [0, 1] },
-    { run: ['schtasks', '/Delete', '/TN', TASK_NAME, '/F'], why: '작업 지우기' },
+    ...pauseTask,
+    { run: ['schtasks', '/Delete', '/TN', TASK_NAME, '/F'], why: '작업 지우기', okCodes: [0, 1] },
     { removeApp: appDir, why: '코드 사본 지우기(자료·설정 파일은 그대로)' },
   ];
 }
@@ -146,8 +175,11 @@ const show = (step) => {
   if (step.write) return `> 파일 쓰기 ${step.write}`;
   if (step.remove) return `> 파일 지우기 ${step.remove}`;
   if (step.deployApp) return `> 복사 ${step.deployApp.from} → ${step.deployApp.to}`;
+  if (step.copyNode) return `> 복사 ${step.copyNode.from} → ${step.copyNode.to}`;
   if (step.removeApp) return `> 코드 사본 지우기 ${step.removeApp}`;
   if (step.verifyAcl) return `> 권한 확인 ${step.verifyAcl}`;
+  if (step.noLinks) return `> 링크 확인 ${step.noLinks}`;
+  if (step.resetChildren) return `> icacls "${step.resetChildren}\\<안의 항목>" /reset /T /C /Q`;
   return '';
 };
 
@@ -160,8 +192,11 @@ export function execute(steps, { dryRun = false, runner = defaultRunner, out = c
     if (step.write) { fs.writeFileSync(step.write, step.data); continue; }
     if (step.remove) { fs.rmSync(step.remove, { force: true }); continue; }
     if (step.deployApp) { ops.deployApp(step.deployApp.from, step.deployApp.to); continue; }
+    if (step.copyNode) { ops.copyNode(step.copyNode.from, step.copyNode.to); continue; }
     if (step.removeApp) { ops.removeApp(step.removeApp); continue; }
     if (step.verifyAcl) { ops.verifyAcl(step.verifyAcl, runner); continue; }
+    if (step.noLinks) { ops.noLinks(step.noLinks); continue; }
+    if (step.resetChildren) { ops.resetChildren(step.resetChildren, runner); continue; }
     if (step.run) {
       const code = runner(step.run);
       if (!(step.okCodes || [0]).includes(code)) throw new Error(`실패(종료 코드 ${code}): ${step.why || step.run[0]}`);
@@ -187,12 +222,15 @@ function defaultRunner(argv) {
   if (r.error) throw new Error(`${argv[0]} 을(를) 실행하지 못했습니다: ${r.error.code || r.error.message}`);
   return r.status;
 }
-const quiet = (argv) => { const a = resolveArgv(argv); return spawnSync(a[0], a.slice(1), { encoding: 'utf8', windowsHide: true }); };
+const quiet = (argv, opts = {}) => {
+  const a = resolveArgv(argv);
+  return spawnSync(a[0], a.slice(1), { encoding: 'utf8', windowsHide: true, ...(opts.env ? { env: { ...process.env, ...opts.env } } : {}) });
+};
 
-/* 폴더 권한을 PowerShell 로 읽는다 — 이름이 아니라 SID 로(언어와 무관). 남의 허용 항목이 남아 있으면
-   하나씩 지우고 다시 읽는다. 그래도 남으면 멈춘다(잠기지 않은 채로 비밀·학생 기록을 두지 않는다). */
-export function readAcl(dir, run = quiet) {
-  const r = run(['powershell', '-NoProfile', '-NonInteractive', '-Command', aclScript(dir)]);
+/* 폴더 권한을 PowerShell 로 읽는다 — 이름이 아니라 SID 로(언어와 무관), 경로는 환경 변수로 넘긴다.
+   남의 허용 항목이 남아 있으면 하나씩 지우고 다시 읽는다. 그래도 남으면 멈춘다. */
+export function readAcl(target, run = quiet) {
+  const r = run(['powershell', '-NoProfile', '-NonInteractive', '-Command', ACL_SCRIPT], { env: { WB_ACL_TARGET: target } });
   return aclProblems(r && r.stdout);
 }
 export function verifyAcl(dir, runner = defaultRunner, run = quiet) {
@@ -207,28 +245,110 @@ export function verifyAcl(dir, runner = defaultRunner, run = quiet) {
   }
 }
 
-/* 저장소의 서버 코드를 사본 자리로. 사본 자리에 우리 표식이 없는데 무언가 들어 있으면 지우지 않는다 —
-   잘못 적은 경로가 원장의 폴더를 지우는 일이 없게. */
+/* 안에 이미 있던 항목의 따로 붙은 권한을 지운다 — 폴더 꼭대기만 잠그면, 누가 미리 넣어 둔 server.env·backups 에
+   붙은 "Everyone 허용" 같은 권한이 그대로 남는다. 꼭대기를 먼저 잠근 뒤라 지운 항목은 관리자·SYSTEM 만 물려받는다. */
+export function resetChildren(dir, runner = defaultRunner, { fsx = fs } = {}) {
+  let entries = [];
+  try { entries = fsx.readdirSync(dir); } catch (e) { if (e && e.code === 'ENOENT') return; throw e; }
+  for (const e of entries) {
+    const code = runner(['icacls', path.join(dir, e), '/reset', '/T', '/C', '/Q']);
+    if (code !== 0) throw new Error(`안의 항목 권한을 되돌리지 못했습니다(종료 코드 ${code}): ${path.join(dir, e)}`);
+  }
+}
+
+/* 링크(심볼릭 링크·정션) 찾기 — Windows 의 정션은 권한 없이 만들 수 있고, Node 는 그것도 링크로 본다.
+   target 자신과 그 위 폴더들(드라이브 뿌리 아래부터)도 본다: C:\ProgramData\WB 가 정션이면 잠금·확인이 그 너머에 걸린다. */
+export function findLinks(target, { fsx = fs, ancestors = true, keep = () => true } = {}) {
+  const found = [];
+  const p = pathFor(target);
+  const abs = p.resolve(target);
+  if (ancestors) {
+    const root = p.parse(abs).root;
+    const parts = abs.slice(root.length).split(/[\\/]/).filter(Boolean);
+    let cur = root;
+    for (const part of parts) {
+      cur = p.join(cur, part);
+      try { if (fsx.lstatSync(cur).isSymbolicLink()) found.push(cur); } catch (e) { if (e && e.code === 'ENOENT') break; throw e; }
+    }
+  }
+  const walk = (dir) => {
+    let entries;
+    try { entries = fsx.readdirSync(dir, { withFileTypes: true }); } catch (e) { if (e && e.code === 'ENOENT') return; throw e; }
+    for (const ent of entries) {
+      const full = p.join(dir, ent.name);
+      if (!keep(full)) continue;
+      const st = fsx.lstatSync(full);
+      if (st.isSymbolicLink()) found.push(full);
+      else if (st.isDirectory()) walk(full);
+    }
+  };
+  try { if (!fsx.lstatSync(abs).isSymbolicLink()) walk(abs); } catch (e) { if (!(e && e.code === 'ENOENT')) throw e; }
+  return found;
+}
+export function noLinks(target, opts) {
+  const links = findLinks(target, opts);
+  if (links.length) throw new Error(`링크(심볼릭 링크·정션)가 있습니다 — 잠금·복사가 다른 폴더에 걸립니다. 지우고 다시 하세요: ${links.slice(0, 3).join(', ')}${links.length > 3 ? ' 외 ' + (links.length - 3) + '개' : ''}`);
+}
+
+/* 서버 코드의 지문 — 복사한 파일들의 경로·내용으로 만든 SHA-256. doctor 가 저장소와 사본이 같은지 본다
+   (커밋 번호만 보면 커밋하지 않은 수정·되돌린 수정이 같다고 나온다). */
+export function treeHash(root, { fsx = fs } = {}) {
+  const h = crypto.createHash('sha256');
+  const walk = (dir) => {
+    const entries = fsx.readdirSync(dir, { withFileTypes: true }).sort((x, y) => (x.name < y.name ? -1 : x.name > y.name ? 1 : 0));
+    for (const ent of entries) {
+      const full = path.join(dir, ent.name);
+      const rel = path.relative(root, full).split(path.sep).join('/');
+      if (!appCopyKeep(rel)) continue;
+      const st = fsx.lstatSync(full);
+      if (st.isSymbolicLink()) continue;
+      if (st.isDirectory()) walk(full);
+      else { h.update(rel + '\0'); h.update(fsx.readFileSync(full)); h.update('\0'); }
+    }
+  };
+  for (const d of APP_DIRS) if (fsx.existsSync(path.join(root, d))) walk(path.join(root, d));
+  return h.digest('hex');
+}
+
+/* 저장소의 서버 코드를 사본 자리로.
+   - 원본 폴더가 다 있는지, 원본에 링크가 없는지 먼저 본다(지우기 전에 — 실패하면 기존 사본이 그대로 남는다)
+   - 사본 표식(.wb-app-copy.json)을 맨 먼저 쓰고 맨 나중에 지운다 — 복사가 도중에 끊겨도 다음 실행이 우리 폴더로 알아본다
+   - 표식 없는 폴더에 무언가 들어 있으면 지우지 않는다(잘못 적은 경로가 원장의 폴더를 지우지 않게) */
+const RM = { recursive: true, force: true, maxRetries: 10, retryDelay: 300 };
+function clearApp(to, fsx) {
+  for (const e of fsx.readdirSync(to)) if (e !== APP_MARKER) fsx.rmSync(path.join(to, e), RM);
+}
 export function deployApp(from, to, { fsx = fs } = {}) {
+  for (const d of APP_DIRS) if (!fsx.existsSync(path.join(from, d))) throw new Error(`저장소에 ${d} 폴더가 없습니다 — 저장소 전체를 받았는지 확인하세요`);
+  const links = APP_DIRS.flatMap((d) => findLinks(path.join(from, d), { fsx, ancestors: false, keep: (f) => appCopyKeep(path.relative(from, f)) })
+    .concat(fsx.lstatSync(path.join(from, d)).isSymbolicLink() ? [path.join(from, d)] : []));
+  if (links.length) throw new Error(`저장소에 링크(심볼릭 링크·정션)가 있어 복사하지 않습니다 — 사본이 저장소 밖을 가리키게 됩니다: ${links.slice(0, 3).join(', ')}`);
   if (fsx.existsSync(to)) {
     const entries = fsx.readdirSync(to);
     if (entries.length && !entries.includes(APP_MARKER)) throw new Error(`코드 사본 자리에 다른 파일이 있습니다: ${to} — 빈 폴더이거나 이 도구가 만든 자리여야 합니다`);
-    fsx.rmSync(to, { recursive: true, force: true });
   }
   fsx.mkdirSync(to, { recursive: true });
+  const marker = path.join(to, APP_MARKER);
+  fsx.writeFileSync(marker, JSON.stringify({ from, complete: false, at: new Date().toISOString() }, null, 2));
+  clearApp(to, fsx);
   for (const d of APP_DIRS) {
-    const src = path.join(from, d);
-    if (!fsx.existsSync(src)) throw new Error(`저장소에 ${d} 폴더가 없습니다 — 저장소 전체를 받았는지 확인하세요`);
-    fsx.cpSync(src, path.join(to, d), { recursive: true, filter: (s) => appCopyKeep(path.relative(from, s)) });
+    fsx.cpSync(path.join(from, d), path.join(to, d), { recursive: true, filter: (s) => appCopyKeep(path.relative(from, s)) });
   }
-  fsx.writeFileSync(path.join(to, APP_MARKER), JSON.stringify({ from, commit: gitHead(from), at: new Date().toISOString() }, null, 2));
+  fsx.writeFileSync(marker, JSON.stringify({ from, complete: true, commit: gitHead(from), hash: treeHash(to, { fsx }), at: new Date().toISOString() }, null, 2));
+}
+/* node.exe 를 사본 안으로 — 버전은 main 에서 확인했다 */
+export function copyNode(from, to, { fsx = fs } = {}) {
+  fsx.mkdirSync(path.dirname(to), { recursive: true });
+  fsx.copyFileSync(from, to);
 }
 export function removeApp(to, { fsx = fs } = {}) {
   if (!fsx.existsSync(to)) return;
   if (!fsx.existsSync(path.join(to, APP_MARKER))) throw new Error(`이 도구가 만든 코드 사본이 아닙니다: ${to} — 지우지 않습니다`);
-  fsx.rmSync(to, { recursive: true, force: true });
+  clearApp(to, fsx);
+  fsx.rmSync(path.join(to, APP_MARKER), RM);
+  fsx.rmSync(to, RM);
 }
-/* 저장소의 지금 커밋 — git 이 없어도 읽히게 .git 을 직접 본다(못 읽으면 빈 값) */
+/* 저장소의 지금 커밋 — git 이 없어도 읽히게 .git 을 직접 본다(못 읽으면 빈 값). 표시용일 뿐 판정은 treeHash 로 한다 */
 export function gitHead(repo) {
   try {
     const head = fs.readFileSync(path.join(repo, '.git', 'HEAD'), 'utf8').trim();
@@ -241,7 +361,10 @@ export function gitHead(repo) {
     return m ? m.split(' ')[0] : '';
   } catch { return ''; }
 }
-const defaultOps = { deployApp: (f, t) => deployApp(f, t), removeApp: (t) => removeApp(t), verifyAcl: (d, r) => verifyAcl(d, r) };
+const defaultOps = {
+  deployApp: (f, t) => deployApp(f, t), copyNode: (f, t) => copyNode(f, t), removeApp: (t) => removeApp(t),
+  verifyAcl: (d, r) => verifyAcl(d, r), noLinks: (d) => noLinks(d), resetChildren: (d, r) => resetChildren(d, r),
+};
 
 /* 관리자 권한인지 — 무결성 수준 SID 로 본다(언어와 무관): 높음 S-1-16-12288, 시스템 S-1-16-16384.
    UAC 아래 관리자 계정이라도 "관리자 권한으로 실행" 하지 않은 터미널은 중간(S-1-16-8192)이다.
@@ -253,16 +376,8 @@ export function isElevated(run = quiet) {
   return !r.error && r.status === 0;
 }
 
-export function findCloudflared({ run = quiet, exists = fs.existsSync, cwd = process.cwd(), repo = REPO } = {}) {
-  const installed = CLOUDFLARED_CANDIDATES.find((c) => exists(c));
-  if (installed) return installed;
-  const w = run(['where', 'cloudflared']);
-  if (!w.error && w.status === 0) {
-    const ok = String(w.stdout || '').split(/\r?\n/).map((s) => s.trim()).filter(Boolean)
-      .find((p) => !isInside(p, cwd, 'win32') && !isInside(p, repo, 'win32'));
-    if (ok) return ok;
-  }
-  return '';
+export function findCloudflared({ exists = fs.existsSync, env = process.env } = {}) {
+  return cloudflaredCandidates(env).find((c) => exists(c)) || '';
 }
 
 /* 드라이브 종류 — Fixed(이 PC 디스크)만 받는다. 매핑된 네트워크 드라이브는 SYSTEM 에게 안 보인다. */
@@ -288,7 +403,7 @@ export async function doctor({ envFile, host, appDir } = {}, deps = {}) {
   const {
     platform = process.platform, fetchFn = fetch, run = quiet, connect = canConnect, interfaces = os.networkInterfaces(),
     nodeVersion = process.versions.node, load = loadConfig, readMarker = (d) => JSON.parse(fs.readFileSync(path.join(d, APP_MARKER), 'utf8')),
-    repoHead = () => gitHead(REPO),
+    repoHash = () => treeHash(REPO), exists = fs.existsSync, env = process.env,
   } = deps;
   const results = [];
   const add = (level, name, msg) => results.push({ level, name, msg });
@@ -347,12 +462,30 @@ export async function doctor({ envFile, host, appDir } = {}, deps = {}) {
       const dt = driveType(cfg.dataDir, run);
       if (dt && dt !== 'Fixed') add('fail', '자료 드라이브', `${driveLetter(cfg.dataDir)}: 는 ${dt} 드라이브입니다 — 서버(SYSTEM)에게 안 보이거나 빠질 수 있습니다. 이 PC 디스크로`);
     }
-    try {
-      const m = readMarker(app);
-      const head = repoHead();
-      if (head && m.commit && head !== m.commit) add('warn', '코드 사본', `저장소(${head.slice(0, 7)})와 서버가 돌리는 사본(${m.commit.slice(0, 7)})이 다릅니다 — restart-server 로 반영`);
-      else add('ok', '코드 사본', `${app}${m.commit ? ' · ' + m.commit.slice(0, 7) : ''}`);
-    } catch { add('fail', '코드 사본', `${app} 에 코드 사본이 없습니다 — install-server`); }
+    /* 코드 사본 — 표식을 읽고, 저장소의 서버 코드 지문과 사본의 지문을 비교한다(커밋하지 않은 수정까지) */
+    let marker = null;
+    try { marker = readMarker(app); }
+    catch (e) {
+      const code = e && e.code;
+      if (code === 'EACCES' || code === 'EPERM' || (!admin && code !== 'ENOENT')) add('warn', '코드 사본', `${app} 의 사본 표식을 읽지 못했습니다(관리자 터미널에서 다시)`);
+      else if (e instanceof SyntaxError) add('fail', '코드 사본', `${app} 의 사본 표식이 깨졌습니다 — restart-server`);
+      else add('fail', '코드 사본', `${app} 에 코드 사본이 없습니다 — install-server`);
+    }
+    if (marker) {
+      if (!marker.complete) add('fail', '코드 사본', `${app} 의 복사가 끝나지 않았습니다(도중에 멈춤) — restart-server`);
+      else {
+        let rh = '';
+        try { rh = repoHash(); } catch { /* 저장소를 못 읽으면 비교를 건너뛴다 */ }
+        if (rh && marker.hash && rh !== marker.hash) add('warn', '코드 사본', `저장소의 서버 코드가 돌고 있는 사본과 다릅니다 — 바뀐 내용을 확인(git status·git log)한 뒤 restart-server`);
+        else add('ok', '코드 사본', `${app}${marker.commit ? ' · ' + marker.commit.slice(0, 7) : ''}`);
+      }
+      /* 작업이 실제로 돌리는 node(사본 안의 node.exe)의 버전 */
+      const nodeExe = APP_NODE(app);
+      const nv = run([nodeExe, '-p', 'process.versions.node']);
+      const v = String((nv && nv.stdout) || '').trim();
+      if (nv && !nv.error && nodeMajor(v) >= MIN_NODE_MAJOR) add('ok', 'Node.js (작업)', `${nodeExe} v${v}`);
+      else add('fail', 'Node.js (작업)', `${nodeExe} ${v ? 'v' + v + ' — ' + MIN_NODE_MAJOR + ' 이상이 필요합니다' : '를 실행하지 못했습니다'} — Node 22 LTS 로 restart-server`);
+    }
 
     const t = run(['schtasks', '/Query', '/TN', TASK_NAME]);
     add(!t.error && t.status === 0 ? 'ok' : 'fail', '작업 스케줄러', !t.error && t.status === 0 ? `${TASK_NAME} 등록됨` : `${TASK_NAME} 이 없습니다 — install-server`);
@@ -360,8 +493,9 @@ export async function doctor({ envFile, host, appDir } = {}, deps = {}) {
     const status = String((s && s.stdout) || '').trim();
     if (status === 'Running') add('ok', 'cloudflared 서비스', '실행 중');
     else add('fail', 'cloudflared 서비스', status ? `상태 ${status} — 서비스 앱에서 Cloudflared 를 시작하세요` : '설치되지 않았습니다 — README 3단계(tunnel)');
-    const exe = findCloudflared({ run });
-    if (exe) {
+    const exe = findCloudflared({ exists, env });
+    if (!exe) add('fail', 'cloudflared 설치', 'Program Files 아래에 cloudflared 가 없습니다 — README 2단계의 공식 설치 파일(MSI)로');
+    else {
       const vt = String((run([exe, '--version']).stdout) || '').trim();
       if (cloudflaredOk(vt)) add('ok', 'cloudflared 버전', `${vt} (자동 갱신 없음 — 분기마다 README 5절)`);
       else add('fail', 'cloudflared 버전', `${vt || '알 수 없음'} — ${MIN_CLOUDFLARED} 보다 옛 버전은 서비스 설치 때 토큰을 레지스트리에 평문으로 남깁니다. 업데이트 후 서비스를 다시 설치하세요`);
@@ -424,6 +558,8 @@ function argValue(args, flag) { const i = args.indexOf(flag); return i >= 0 ? ar
 export function envDirProblem({ envFile, entries, repo = REPO, platform = process.platform }) {
   const p = platform === 'win32' ? path.win32 : path.posix;
   const dir = p.dirname(envFile);
+  if (/^\\\\|^\/\//.test(dir)) return '설정 폴더에 네트워크 경로(\\\\NAS\\…)를 쓰지 않습니다 — SYSTEM 이 못 읽습니다';
+  if (inOneDrive(dir)) return '설정 폴더가 OneDrive 안입니다 — 비밀번호가 클라우드로 올라갑니다';
   if (isInside(envFile, repo, platform)) return '설정 파일이 저장소 안입니다 — 비밀번호가 커밋될 수 있습니다';
   if (isInside(repo, dir, platform)) return '설정 폴더가 저장소를 품고 있습니다 — 잠그면 저장소까지 잠깁니다';
   const shared = sharedFolderReason(dir, platform);
@@ -435,7 +571,45 @@ export function dataDirProblem({ dataDir, entries }) {
   if (folderState(entries, DATA_DIR_OWN) === 'foreign') return `${dataDir} 에 서버 것이 아닌 파일이 있습니다 — 관리자만 열리게 잠그는 폴더라 서버 전용 새 폴더여야 합니다(예: C:\\WB_server_data)`;
   return '';
 }
-const listDir = (d) => { try { return fs.readdirSync(d); } catch (e) { return e && e.code === 'ENOENT' ? null : []; } };
+/* 없으면 null. 읽지 못하면(권한 등) "비었다"로 치지 않고 멈춘다 — 무엇이 들었는지 모르는 폴더를 잠그지 않는다 */
+const listDir = (d) => {
+  try { return fs.readdirSync(d); }
+  catch (e) {
+    if (e && e.code === 'ENOENT') return null;
+    throw new Error(`${d} 를 읽지 못했습니다(${e && e.code}) — 관리자 터미널에서 다시 하세요`);
+  }
+};
+
+/* install-server·restart-server 가 같이 쓰는 사전 점검 — 하나라도 틀리면 서버를 멈추기 전에 끝낸다 */
+function preflight(envFile, { dryRun }) {
+  const cfg = loadConfig(envFile);
+  if (cfg.errors.length) throw new Error('설정 파일을 먼저 고치세요:\n  - ' + cfg.errors.join('\n  - '));
+  const ep = envDirProblem({ envFile, entries: listDir(dirOf(envFile)), platform: isWinAbs(envFile) ? 'win32' : process.platform });
+  if (ep) throw new Error(ep);
+  const dp = dataDirProblem({ dataDir: cfg.dataDir, entries: listDir(cfg.dataDir) });
+  if (dp) throw new Error(dp);
+  if (!dryRun) {
+    for (const [name, d] of [['설정 폴더', dirOf(envFile)], ['DATA_DIR', cfg.dataDir]]) {
+      const dt = driveType(d);
+      if (dt && dt !== 'Fixed') throw new Error(`${name}(${driveLetter(d)}:)는 ${dt} 드라이브입니다 — 서버(SYSTEM)에게 안 보이거나 빠질 수 있습니다. 이 PC 디스크로`);
+    }
+  }
+  /* 작업은 사본 안의 node.exe 를 돌린다 — 지금 이 명령을 돌리는 node 를 실제 파일 경로로 풀어 복사한다
+     (nvm 처럼 링크로 걸린 자리를 그대로 적으면 링크 너머가 바뀔 때 SYSTEM 이 그것을 돌린다) */
+  if (nodeMajor(process.versions.node) < MIN_NODE_MAJOR) throw new Error(`Node ${process.versions.node} — ${MIN_NODE_MAJOR} 이상으로 이 명령을 실행하세요(그 node 가 사본에 들어간다)`);
+  let nodeSrc = process.execPath;
+  try { nodeSrc = fs.realpathSync.native(process.execPath); } catch { /* 그대로 */ }
+  return { cfg, nodeSrc };
+}
+
+async function waitHealthy(cfg, envFile) {
+  for (let i = 0; i < 45; i++) {
+    try { if ((await fetch(`http://${LOOPBACK}:${cfg.port}/api/health`)).ok) { console.log(`\n서버가 떴습니다 ✓ http://${LOOPBACK}:${cfg.port}`); return 0; } } catch { /* 아직 */ }
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+  console.log(`\n45초 안에 서버가 응답하지 않았습니다 — 로그를 보세요(관리자 터미널에서 notepad): ${cfg.logDir} · ${path.join(dirOf(envFile), 'run-server-error.log')}`);
+  return 1;
+}
 
 export async function main(argv = process.argv.slice(2)) {
   const [cmd] = argv;
@@ -448,6 +622,7 @@ export async function main(argv = process.argv.slice(2)) {
     if (!isElevated()) throw new Error('관리자 권한 터미널에서 실행하세요(시작 메뉴 → 터미널 오른쪽 클릭 → 관리자 권한으로 실행)');
   };
   const planPlatform = process.platform === 'win32' || dryRun ? 'win32' : process.platform;
+  if (inOneDrive(REPO) && /server$/.test(cmd || '')) console.log(`[주의] 저장소가 OneDrive 폴더 안입니다(${REPO}) — C:\\WB\\wb-site 처럼 밖에 두길 권합니다`);
 
   switch (cmd) {
     case 'env': {
@@ -455,36 +630,26 @@ export async function main(argv = process.argv.slice(2)) {
       if (!envFile) throw new Error('--env <경로> 를 주세요');
       const problem = envDirProblem({ envFile, entries: listDir(dirOf(envFile)), platform: isWinAbs(envFile) ? 'win32' : process.platform });
       if (problem) throw new Error(problem);
+      if (!dryRun) {
+        const dt = driveType(dirOf(envFile));
+        if (dt && dt !== 'Fixed') throw new Error(`설정 폴더(${driveLetter(envFile)}:)는 ${dt} 드라이브입니다 — 이 PC 디스크로`);
+      }
       execute(planEnv({ envFile, fileExists: fs.existsSync(envFile), platform: isWinAbs(envFile) ? 'win32' : planPlatform }), { dryRun });
       return 0;
     }
     case 'install-server': {
       needWindowsAdmin();
-      const cfg = loadConfig(envFile);
-      if (cfg.errors.length) throw new Error('설정 파일을 먼저 고치세요:\n  - ' + cfg.errors.join('\n  - '));
-      const dp = dataDirProblem({ dataDir: cfg.dataDir, entries: listDir(cfg.dataDir) });
-      if (dp) throw new Error(dp);
-      if (!dryRun) {
-        const dt = driveType(cfg.dataDir);
-        if (dt && dt !== 'Fixed') throw new Error(`${driveLetter(cfg.dataDir)}: 는 ${dt} 드라이브입니다 — 서버(SYSTEM)에게 안 보이거나 빠질 수 있습니다. DATA_DIR 을 이 PC 디스크로`);
-      }
-      const versionOf = (exe) => String(quiet([exe, '-p', 'process.versions.node']).stdout || '').trim();
-      const { nodeExe, warning } = pickNodeExe(process.execPath, fs.existsSync, versionOf);
-      if (warning) console.log('[참고] ' + warning);
-      if (!dryRun && nodeMajor(versionOf(nodeExe)) < MIN_NODE_MAJOR) throw new Error(`작업에 적을 node(${nodeExe})가 ${MIN_NODE_MAJOR} 보다 낮습니다 — LTS 설치 파일로 올린 뒤 다시`);
-      if (inOneDrive(REPO)) console.log(`[주의] 저장소가 OneDrive 폴더 안입니다(${REPO}) — 사본은 OneDrive 밖에 만들지만, 저장소도 C:\\WB\\wb-site 처럼 밖에 두길 권합니다`);
-      execute(planInstallServer({ envFile, dataDir: cfg.dataDir, appDir, nodeExe, platform: planPlatform }), { dryRun });
-      if (!dryRun) {
-        for (let i = 0; i < 45; i++) {
-          try { if ((await fetch(`http://${LOOPBACK}:${cfg.port}/api/health`)).ok) { console.log(`\n서버가 떴습니다 ✓ http://${LOOPBACK}:${cfg.port}`); return 0; } } catch { /* 아직 */ }
-          await new Promise((r) => setTimeout(r, 1000));
-        }
-        console.log(`\n45초 안에 서버가 응답하지 않았습니다 — 로그를 보세요: ${cfg.logDir} · ${path.join(dirOf(envFile), 'run-server-error.log')}`);
-        return 1;
-      }
-      return 0;
+      const { cfg, nodeSrc } = preflight(envFile, { dryRun });
+      execute(planInstallServer({ envFile, dataDir: cfg.dataDir, appDir, nodeSrc, platform: planPlatform }), { dryRun });
+      return dryRun ? 0 : waitHealthy(cfg, envFile);
     }
-    case 'restart-server': needWindowsAdmin(); execute(planRestartServer({ appDir }), { dryRun }); return 0;
+    case 'restart-server': {
+      needWindowsAdmin();
+      const { cfg, nodeSrc } = preflight(envFile, { dryRun });
+      if (!dryRun && quiet(['schtasks', '/Query', '/TN', TASK_NAME]).status !== 0) throw new Error(`${TASK_NAME} 이 없습니다 — 처음이면 install-server`);
+      execute(planRestartServer({ envFile, dataDir: cfg.dataDir, appDir, nodeSrc }), { dryRun });
+      return dryRun ? 0 : waitHealthy(cfg, envFile);
+    }
     case 'uninstall-server': needWindowsAdmin(); execute(planUninstallServer({ appDir }), { dryRun }); return 0;
     case 'tunnel': {
       needWindowsAdmin();
@@ -498,8 +663,8 @@ export async function main(argv = process.argv.slice(2)) {
         throw new Error(`토큰 파일이 없습니다: ${tokenFile} — 같은 관리자 터미널에서 notepad "${tokenFile}" 로 만들어 저장하세요(문서 폴더로 저장하라는 창이 뜨면 거절)`);
       }
       const token = readToken(text);
-      const cloudflared = findCloudflared() || (dryRun ? 'cloudflared.exe' : '');
-      if (!cloudflared) throw new Error('cloudflared 를 찾지 못했습니다 — README 2단계의 공식 설치 파일(cloudflared-windows-amd64.msi)로 먼저 설치하세요');
+      const cloudflared = findCloudflared() || (dryRun ? 'C:\\Program Files (x86)\\cloudflared\\cloudflared.exe' : '');
+      if (!cloudflared) throw new Error('Program Files 아래에서 cloudflared 를 찾지 못했습니다 — README 2단계의 공식 설치 파일(cloudflared-windows-amd64.msi)로 먼저 설치하세요');
       const versionText = dryRun ? '' : String(quiet([cloudflared, '--version']).stdout || '').trim();
       execute(planTunnel({ cloudflared, token, versionText, tokenFile, dryRun }), { dryRun });
       return 0;
