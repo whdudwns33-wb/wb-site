@@ -46,8 +46,8 @@ test('교재 학생 표시는 중복 학교급만 숨기고 실제 학교명과 
   assert.equal(core.bookOrderStudentSchoolGradeLabel({ school: ' 초등학교 ', grade: '초 3학년' }), '초3');
   assert.equal(core.bookOrderStudentSchoolGradeLabel({ school: '중', grade: '2학년' }), '중2');
   assert.equal(core.bookOrderStudentSchoolGradeLabel({ school: '고교', grade: '1' }), '고1');
-  assert.equal(core.bookOrderStudentSchoolGradeLabel({ school: '유안초', grade: '6' }), '유안초 · 초6');
-  assert.equal(core.bookOrderStudentSchoolGradeLabel({ school: '치평중학교', grade: '2' }), '치평중학교 · 중2');
+  assert.equal(core.bookOrderStudentSchoolGradeLabel({ school: '가나초', grade: '6' }), '가나초 · 초6');
+  assert.equal(core.bookOrderStudentSchoolGradeLabel({ school: '예시중학교', grade: '2' }), '예시중학교 · 중2');
   assert.equal(core.bookOrderStudentSchoolGradeLabel({ school: '초', grade: '중3' }), '초 · 중3');
   assert.equal(core.bookOrderStudentSchoolGradeLabel({ school: '', grade: '3' }), '3');
   assert.equal(core.bookOrderStudentSchoolGradeLabel({ school: '초', grade: '' }), '초');
