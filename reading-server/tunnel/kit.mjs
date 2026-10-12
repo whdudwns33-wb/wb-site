@@ -73,6 +73,8 @@ export function validateServerEnv({ vars, envFile, repoRoot, platform = process.
   if (!dataDir) errors.push('DATA_DIR 이 비어 있습니다 — 학생 기록·팩이 저장될 폴더(저장소 밖)를 적으세요');
   else if (!p.isAbsolute(dataDir)) errors.push('DATA_DIR 은 전체 경로로 적습니다(예: C:\\WB_server_data)');
   else if (repoRoot && isInside(dataDir, repoRoot, platform)) errors.push('DATA_DIR 이 저장소 폴더 안입니다 — git 정리 한 번에 지워질 수 있고 커밋될 수 있습니다. 저장소 밖으로 옮기세요');
+  else if (/^\\\\|^\/\//.test(dataDir)) errors.push('DATA_DIR 에 네트워크 경로(\\\\NAS\\…)를 쓰지 않습니다 — SYSTEM 으로 도는 서버는 NAS 에 붙지 못하고, 끊기면 저장이 실패합니다. 이 PC 디스크에 두고 NAS 는 백업 대상으로만');
+  else if (/[\\/]onedrive[^\\/]*([\\/]|$)/i.test(dataDir)) errors.push('DATA_DIR 이 OneDrive 폴더 안입니다 — 학생 기록·라이선스 팩이 클라우드로 동기화됩니다(원장 결정: 클라우드 동기화 폴더 금지). C:\\WB_server_data 처럼 밖으로');
 
   const pin = v.ADMIN_PIN || '';
   const id = v.ADMIN_ID || '';
@@ -235,11 +237,13 @@ export function taskXml({ nodeExe, runScript, envFile, workDir }) {
     '    <Description>WB 관리 서버 — reading-server/tunnel/run-server.mjs (관리 전용, 127.0.0.1). 설치·제거: node reading-server/tunnel/setup.mjs</Description>',
     '  </RegistrationInfo>',
     '  <Triggers>',
-    '    <BootTrigger><Enabled>true</Enabled></BootTrigger>',
+    /* 트리거 안의 순서는 스키마가 정한 순서(Enabled → StartBoundary → Repetition)대로 — 부팅 직후 30초는
+       네트워크가 올라오기를 기다린다 */
+    '    <BootTrigger><Enabled>true</Enabled><Delay>PT30S</Delay></BootTrigger>',
     '    <TimeTrigger>',
-    '      <Repetition><Interval>PT5M</Interval><StopAtDurationEnd>false</StopAtDurationEnd></Repetition>',
-    '      <StartBoundary>2026-01-01T00:00:00</StartBoundary>',
     '      <Enabled>true</Enabled>',
+    '      <StartBoundary>2026-01-01T00:00:00</StartBoundary>',
+    '      <Repetition><Interval>PT5M</Interval><StopAtDurationEnd>false</StopAtDurationEnd></Repetition>',
     '    </TimeTrigger>',
     '  </Triggers>',
     '  <Principals>',
@@ -259,8 +263,10 @@ export function taskXml({ nodeExe, runScript, envFile, workDir }) {
     '    <RunOnlyIfIdle>false</RunOnlyIfIdle>',
     '    <WakeToRun>false</WakeToRun>',
     '    <ExecutionTimeLimit>PT0S</ExecutionTimeLimit>',
-    '    <Priority>7</Priority>',
-    '    <RestartOnFailure><Interval>PT1M</Interval><Count>999</Count></RestartOnFailure>',
+    /* 기본값 7 은 '보통 아래' 우선순위라 실행기와 그 자식(서버)이 느려진다 — 5 가 보통 */
+    '    <Priority>5</Priority>',
+    /* Count 는 스키마상 1~255(unsignedByte) */
+    '    <RestartOnFailure><Interval>PT1M</Interval><Count>255</Count></RestartOnFailure>',
     '  </Settings>',
     '  <Actions Context="Author">',
     '    <Exec>',
@@ -299,3 +305,24 @@ export function cloudflaredOk(text, min = MIN_CLOUDFLARED) {
    연결이 하나라도 있으면 200, 없으면 503 이다. 대시보드의 Healthy 는 "서버가 응답하는지"는 말해 주지 않으므로
    로컬 서버 점검과 따로 본다. */
 export const METRICS_PORTS = [20241, 20242, 20243, 20244, 20245];
+
+/* ── 작업에 적을 node.exe ─────────────────────────────────────────────
+   작업 스케줄러는 SYSTEM 으로 돌아 사용자 PATH 를 모른다 — node.exe 를 전체 경로로 적는다.
+   그런데 지금 이 명령을 돌린 node 가 winget 휴대용(zip)·nvm 처럼 버전 붙은 폴더에 있으면
+   Node 를 올리는 순간 그 경로가 사라져 부팅 작업이 조용히 깨진다. 설치 프로그램(MSI)의 자리
+   C:\Program Files\nodejs\node.exe 가 있으면 그것을 쓰고, 없으면 지금 것을 쓰되 경고한다. */
+export const STABLE_NODE = 'C:\\Program Files\\nodejs\\node.exe';
+export function pickNodeExe(execPath, exists) {
+  const p = String(execPath || '');
+  const unstable = /\\users\\|\\winget\\packages\\|\\nvm\\|node-v\d+/i.test(p);
+  if (/^c:\\program files\\nodejs\\node\.exe$/i.test(p)) return { nodeExe: p, warning: '' };
+  if (exists(STABLE_NODE)) return { nodeExe: STABLE_NODE, warning: unstable ? `지금 쓰는 node(${p}) 대신 설치 프로그램 자리(${STABLE_NODE})를 작업에 적습니다` : '' };
+  return {
+    nodeExe: p,
+    warning: unstable ? `node 가 버전이 바뀌면 사라지는 자리에 있습니다(${p}) — nodejs.org 의 LTS 설치 파일(MSI)로 깔면 ${STABLE_NODE} 에 고정됩니다. 업그레이드 뒤 install-server 를 다시 하세요` : '',
+  };
+}
+
+/* 저장소가 OneDrive 안이면(바탕 화면·문서 폴더가 OneDrive 로 옮겨진 PC) 파일이 클라우드 전용 자리표시로
+   바뀌거나 SYSTEM 이 못 읽을 수 있다 — 설치 때 경고한다. */
+export const inOneDrive = (p) => /[\\/]onedrive[^\\/]*([\\/]|$)/i.test(String(p || ''));

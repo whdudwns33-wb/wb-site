@@ -10,7 +10,7 @@
  *  - 점검이 "Access 없이 열림"·"LAN 에 열림"·"학생 로그인이 열림"·"옛 cloudflared" 를 실패로 잡는다
  */
 import {
-  planEnv, planInstallServer, planRestartServer, planUninstallServer, planTunnel, readToken, execute, doctor, findCloudflared,
+  planEnv, planInstallServer, planRestartServer, planUninstallServer, planTunnel, readToken, execute, doctor, findCloudflared, isElevated,
 } from './setup.mjs';
 
 const errors = [];
@@ -55,10 +55,17 @@ const TOKEN = 'FAKE_TUNNEL_TOKEN_FOR_TESTS_ONLY_' + 'x'.repeat(80);
   ok(xml.includes('&quot;C:\\Users\\wb\\wb-site\\reading-server\\tunnel\\run-server.mjs&quot; --env &quot;C:\\ProgramData\\WB\\server.env&quot;'), '실행기·설정 파일 경로 인자가 틀렸다');
   ok(!xml.includes('reading-server\\server.mjs'), 'server.mjs 를 실행기 없이 직접 띄운다 — 관리 전용 강제가 빠진다');
   const create = steps.find((s) => s.run && s.run[0] === 'schtasks' && s.run[1] === '/Create');
-  eq(create && create.run.slice(1), ['/Create', '/TN', 'WB-Admin-Server', '/XML', 'C:\\Windows\\Temp\\wb-admin-server-task.xml', '/F'], 'schtasks /Create 인자');
+  eq(create && create.run.slice(1), ['/Create', '/TN', 'WB-Admin-Server', '/XML', 'C:\\Windows\\Temp\\wb-admin-server-task.xml', '/RU', 'SYSTEM', '/F'], 'schtasks /Create 인자');
+  ok(/<Priority>5<\/Priority>/.test(xml), '우선순위가 보통(5)이 아니다 — 7 이면 서버가 느려진다');
+  const cnt = Number((/<Count>(\d+)<\/Count>/.exec(xml) || [])[1]);
+  ok(cnt >= 1 && cnt <= 255, `RestartOnFailure Count 가 스키마 범위(1~255) 밖이다: ${cnt}`);
+  const tt = (/<TimeTrigger>([\s\S]*?)<\/TimeTrigger>/.exec(xml) || [])[1] || '';
+  ok(tt.indexOf('<Enabled>') < tt.indexOf('<StartBoundary>') && tt.indexOf('<StartBoundary>') < tt.indexOf('<Repetition>'), '트리거 안 순서가 스키마(Enabled → StartBoundary → Repetition)와 다르다');
+  ok(/<BootTrigger><Enabled>true<\/Enabled><Delay>PT\d+S<\/Delay><\/BootTrigger>/.test(xml), '부팅 트리거에 지연(Delay)이 없거나 순서가 틀렸다');
   ok(steps.findIndex((s) => s.remove) > steps.indexOf(create), '등록하기 전에 작업 정의를 지운다');
   ok(steps.some((s) => s.run && s.run[0] === 'icacls' && s.run[1] === 'C:\\WB_server_data'), '자료 폴더(학생 기록)를 잠그지 않는다');
-  ok(steps[steps.length - 1].run && steps[steps.length - 1].run[1] === '/Run', '등록 뒤 바로 띄우지 않는다');
+  const runs = steps.filter((s) => s.run);
+  ok(runs[runs.length - 1].run[1] === '/Run', '등록 뒤 바로 띄우지 않는다');
 }
 
 /* ── 다시 띄우기·지우기 ── */
@@ -98,6 +105,14 @@ const TOKEN = 'FAKE_TUNNEL_TOKEN_FOR_TESTS_ONLY_' + 'x'.repeat(80);
   let ran = 0;
   execute([{ run: ['schtasks', '/End'], okCodes: [0, 1] }, { run: ['x'] }], { runner: () => { ran++; return ran === 1 ? 1 : 0; }, out: () => {} });
   ok(ran === 2, 'okCodes 에 있는 종료 코드에서 멈췄다');
+}
+
+/* ── 관리자 권한 판정 ── */
+{
+  const who = (out) => (argv) => (argv[0] === 'whoami' ? { status: 0, stdout: out } : { status: 2, stdout: '' });
+  ok(isElevated(who('"BUILTIN\\Administrators","별칭","S-1-5-32-544","필수 그룹"\r\n"Mandatory Label\\High Mandatory Level","레이블","S-1-16-12288",""')), '높은 무결성(S-1-16-12288)을 관리자 권한으로 보지 않는다');
+  ok(!isElevated(who('"BUILTIN\\Administrators","별칭","S-1-5-32-544","거부 전용 그룹"\r\n"Mandatory Label\\Medium Mandatory Level","레이블","S-1-16-8192",""')), 'UAC 로 걸러진(중간 무결성) 터미널을 관리자 권한으로 봤다');
+  ok(isElevated((argv) => (argv[0] === 'whoami' ? { error: new Error('ENOENT') } : { status: 0 })), 'whoami 가 없을 때 net session 으로 넘어가지 않는다');
 }
 
 /* ── findCloudflared ── */
