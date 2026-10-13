@@ -596,6 +596,7 @@ var WBNAESIN = (function () {
     states = states || {};
     var g = groupOf(pack, day);
     if (!hasChunks(g)) return { open: true, reason: 'no-chunk', day: day, stage: 0, total: g ? g.sentences.length : 0 };
+    if (g.sentences.some(function (sen) { return !Array.isArray(sen.chunks) || !sen.chunks.length; })) return { open: true, reason: 'partial-chunk', day: day, stage: 0, total: g.sentences.length };
     var s = states[chunkId(g.day)];
     var st = s ? stageOf(s) : 1;
     if (s && s.reached) return { open: true, reason: 'reached', day: g.day, stage: st, total: g.sentences.length };
