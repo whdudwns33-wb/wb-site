@@ -89,6 +89,52 @@ function validateFolderCandidates(draft) {
         && Array.isArray(item.wordBank) && item.wordBank.length <= 50 && item.wordBank.every(word => shortText(word,200))
         && Array.isArray(item.answers) && item.answers.length >= 1 && item.answers.length <= 20 && item.answers.every(answer => shortText(answer,300)))
       && common(row))) return false;
+  const itemKeys = ['candidateId','source','section','patternNo','no','formatType','rawText','choices','answerLabels','answerTexts','explanationKo','sourceRefs','reviewFlags'];
+  const itemSources = {'04':64,'05':30,'06':30,'08':142,'09':163};
+  const labels = ['①','②','③','④','⑤'];
+  if (!Array.isArray(draft.examItemCandidates) || draft.examItemCandidates.length > 429
+    || !draft.examItemCandidates.every(row => exactKeys(row,itemKeys) && /^ic-(04|05|06|08|09)-(00|01|02)-\d{3}$/.test(row.candidateId)
+      && Object.hasOwn(itemSources,row.source) && shortText(row.section,120) && (row.patternNo === null || [1,2].includes(row.patternNo))
+      && ((row.source==='08'||row.source==='09') ? [1,2].includes(row.patternNo) : row.patternNo===null)
+      && Number.isInteger(row.no) && row.no>=1 && row.no<=99 && ['mcq','multi-select','subjective','unknown'].includes(row.formatType)
+      && shortText(row.rawText,12000,true) && !/(?:[A-Za-z]:[\\/]|\\\\)/.test(row.rawText) && Array.isArray(row.choices) && row.choices.length<=5
+      && row.choices.every(choice=>exactKeys(choice,['label','text'])&&labels.includes(choice.label)&&shortText(choice.text,2000))
+      && new Set(row.choices.map(choice=>choice.label)).size===row.choices.length
+      && Array.isArray(row.answerLabels)&&row.answerLabels.length<=5&&row.answerLabels.every(label=>labels.includes(label))
+      && new Set(row.answerLabels).size===row.answerLabels.length
+      && Array.isArray(row.answerTexts)&&row.answerTexts.length<=20&&row.answerTexts.every(text=>shortText(text,8000))
+      && shortText(row.explanationKo,8000,true)&&common(row)&&row.reviewFlags.includes('REVIEW_REQUIRED')
+      && row.sourceRefs.some(ref=>ref.sourceDocumentId===`${row.source}s`||ref.sourceDocumentId===row.source)
+      && row.sourceRefs.some(ref=>ref.sourceDocumentId===`${row.source}t`||ref.sourceDocumentId===row.source))) return false;
+  const unmatchedItemKeys=['candidateId','source','section','patternNo','no','field','reason','sourceRefs'];
+  if(!Array.isArray(draft.unmatchedItems)||draft.unmatchedItems.length>429||!draft.unmatchedItems.every(row=>exactKeys(row,unmatchedItemKeys)
+    &&/^ic-(04|05|06|08|09)-(00|01|02)-\d{3}$/.test(row.candidateId)&&Object.hasOwn(itemSources,row.source)&&shortText(row.section,120)
+    &&(row.patternNo===null||[1,2].includes(row.patternNo))&&Number.isInteger(row.no)&&row.no>=1&&row.no<=99
+    &&row.field==='examItemCandidates'&&['STEM_MISSING','ANSWER_MISSING','CHOICES_MISSING','BOUNDARY_AMBIGUOUS'].includes(row.reason)&&refsValid(row.sourceRefs)))return false;
+  const itemSummary=draft.itemSummary,itemSummaryKeys=['expected','found','answerMatched','unresolved','bySource','byType','typeCountWarnings'];
+  if(!exactKeys(itemSummary,itemSummaryKeys)||!['expected','found','answerMatched','unresolved'].every(key=>Number.isInteger(itemSummary[key])&&itemSummary[key]>=0&&itemSummary[key]<=429)
+    ||!exactKeys(itemSummary.bySource,Object.keys(itemSources))||!exactKeys(itemSummary.byType,['mcq','multi-select','subjective','unknown']))return false;
+  const typeKeys=['mcq','multi-select','subjective','unknown'];let expectedTotal=0,foundTotal=0,answerTotal=0,unresolvedTotal=0;const typeTotals={mcq:0,'multi-select':0,subjective:0,unknown:0};
+  for(const [source,expected] of Object.entries(itemSources)){
+    const stats=itemSummary.bySource[source];if(!exactKeys(stats,['expected','found','answerMatched','unresolved','byType','expectedByType','foundByType'])
+      ||stats.expected!==expected||!['found','answerMatched','unresolved'].every(key=>Number.isInteger(stats[key])&&stats[key]>=0&&stats[key]<=expected)
+      ||!exactKeys(stats.byType,typeKeys)||!Object.values(stats.byType).every(n=>Number.isInteger(n)&&n>=0&&n<=expected)
+      ||!exactKeys(stats.expectedByType,['objective','subjective'])||!exactKeys(stats.foundByType,['objective','subjective'])
+      ||![...Object.values(stats.expectedByType),...Object.values(stats.foundByType)].every(n=>Number.isInteger(n)&&n>=0&&n<=expected))return false;
+    expectedTotal+=stats.expected;foundTotal+=stats.found;answerTotal+=stats.answerMatched;unresolvedTotal+=stats.unresolved;
+    for(const type of typeKeys)typeTotals[type]+=stats.byType[type];
+    if(stats.found!==draft.examItemCandidates.filter(row=>row.source===source).length
+      ||stats.unresolved!==draft.unmatchedItems.filter(row=>row.source===source).length
+      ||stats.answerMatched!==draft.examItemCandidates.filter(row=>row.source===source&&(row.answerLabels.length||row.answerTexts.length)).length
+      ||Object.values(stats.byType).reduce((a,b)=>a+b,0)!==stats.found
+      ||stats.foundByType.objective!==stats.byType.mcq+stats.byType['multi-select']||stats.foundByType.subjective!==stats.byType.subjective)return false;
+  }
+  if(expectedTotal!==itemSummary.expected||foundTotal!==itemSummary.found||answerTotal!==itemSummary.answerMatched||unresolvedTotal!==itemSummary.unresolved
+    ||draft.examItemCandidates.length!==itemSummary.found||Object.entries(typeTotals).some(([key,value])=>itemSummary.byType[key]!==value))return false;
+  if(!Array.isArray(itemSummary.typeCountWarnings)||itemSummary.typeCountWarnings.length>10||!itemSummary.typeCountWarnings.every(row=>exactKeys(row,['source','field','reason','expected','found'])
+    &&Object.hasOwn(itemSources,row.source)&&row.field==='formatType'&&row.reason==='EXPECTED_TYPE_COUNT_MISMATCH'
+    &&exactKeys(row.expected,['objective','subjective'])&&exactKeys(row.found,['objective','subjective'])
+    &&[...Object.values(row.expected),...Object.values(row.found)].every(n=>Number.isInteger(n)&&n>=0&&n<=429)))return false;
   const unmatchedKeys = ['candidateId','field','reason','sourceRefs','expectedQuestionNo','baseCount','answerCount','groupIndex','expectedGroups','pairIndex'];
   const numericDetails = ['expectedQuestionNo','baseCount','answerCount','groupIndex','expectedGroups','pairIndex'];
   if (!Array.isArray(draft.unmatched) || draft.unmatched.length > 500 || !draft.unmatched.every(row =>
