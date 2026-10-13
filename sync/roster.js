@@ -22,8 +22,8 @@ const MAX_BOOK_STUDENTS = 5000;
 const ROSTER_SUBJECTS = new Set([
   '국어', '영어', '수학', '사회', '과학', '독해사고력', '독해력수업', '독해력훈련', '사고력수학', '질답', '클리닉'
 ]);
-const SUBSCRIPTION_TYPES = new Set(['assessment', 'studyforce']);
-const SUBSCRIPTION_LABELS = Object.freeze({ assessment: '검사구독', studyforce: '스터디포스구독' });
+const SUBSCRIPTION_TYPES = new Set(['assessment', 'studyforce', 'readers']);
+const SUBSCRIPTION_LABELS = Object.freeze({ assessment: '검사구독', studyforce: '스터디포스구독', readers: '리더스 구독' });
 const HHMM = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
 
 function nextMonthForDate(value) {
