@@ -19,7 +19,7 @@ function screen() {
   const documentEvents = new Map(), windowEvents = new Map(), timers = new Map(), requests = [];
   const voiceEngine = { voices: [], sent: [], cancels: 0, getVoices() { return this.voices; },
     speak(u) { this.sent.push(u); }, cancel() { this.cancels++; }, resume() {} };
-  let nextTimer = 0, fetchImpl = async () => ({ ok: true, status: 200, json: async () => ({}) });
+  let nextTimer = 0, failLocalWrite = false, fetchImpl = async () => ({ ok: true, status: 200, json: async () => ({}) });
   function node(id) {
     if (!elementIds.has(id)) return null;
     if (!nodes.has(id)) {
@@ -37,7 +37,7 @@ function screen() {
     return nodes.get(id);
   }
   const ctx = vm.createContext({
-    localStorage: { getItem: key => store.get(key) || null, setItem: (key, value) => store.set(key, value), removeItem: key => store.delete(key) },
+    localStorage: { getItem: key => store.get(key) || null, setItem: (key, value) => { if (failLocalWrite) throw new Error('quota'); store.set(key, value); }, removeItem: key => store.delete(key) },
     document: { getElementById: node, addEventListener: (type, fn) => documentEvents.set(type, fn), body: { style: {} }, contains: () => false,
       createElement: () => ({ textContent: '', attrs: {}, setAttribute(key, value) { this.attrs[key] = value; }, getAttribute(key) { return this.attrs[key]; } }) },
     window: { addEventListener: (type, fn) => windowEvents.set(type, fn), speechSynthesis: voiceEngine },
@@ -49,7 +49,7 @@ function screen() {
     fetch: async (url, opt) => { requests.push({ url, ...opt }); return fetchImpl(url, opt); },
   });
   const exportUi = `
-  globalThis.ui={boot,api,checkAccount,checkAccess,stopStudy,clearPackCache,migrateLegacy,pullAdopt,pushState,persist,openDemo,renderItem,recoverStateStamps,loadDB,
+  globalThis.ui={boot,api,checkAccount,checkAccess,stopStudy,clearPackCache,migrateLegacy,pullAdopt,pushState,persist,save,openDemo,renderItem,recoverStateStamps,loadDB,
     ttsOptions,wireTtsBtn,wireChunkWork,wireDialogueWork,wireSentenceWork,openPack,renderHeader,demoNotice,bootError,
     projector:(scope,pj)=>{liveScope=scope;liveState={projector:pj};pjApply(pj);},
     projectile:()=>({pjPick,pjSent,pjSeen}),
@@ -67,10 +67,39 @@ function screen() {
   ctx.ui.setup(account, clone(sample));
   return { ...ctx.ui, store, node, requests, timers, documentEvents, windowEvents, voiceEngine, location: ctx.location,
     disableVoice: () => { ctx.SpeechSynthesisUtterance = undefined; },
-    setFetch: fn => { fetchImpl = fn; }, changeAccount: a => store.set('wbr.auth', JSON.stringify(a)) };
+    setFetch: fn => { fetchImpl = fn; }, failLocal: value => { failLocalWrite = value; }, changeAccount: a => store.set('wbr.auth', JSON.stringify(a)) };
 }
 
 (async () => {
+  await t('철자 오답은 교정 대기에서 일반 다음을 숨기고, 복수 정답 채점·IME Enter·접근성 레이블을 유지한다', async () => {
+    const start = inline.indexOf("if (!ok && item.type === 'spell')");
+    const end = inline.indexOf("var nb = document.createElement('div');", start);
+    assert.ok(start >= 0 && end > start, '오답 철자 교정 전용 가지가 일반 다음 버튼보다 앞에 있다');
+    const correction = inline.slice(start, end);
+    assert.match(correction, /gradeAnswer\(correctionInput\.value, item\.answers\)/);
+    assert.match(correction, /교정 완료/);
+    assert.match(correction, /aria-label', '정답 철자 다시 입력/);
+    assert.match(correction, /e\.key === 'Enter' && !e\.isComposing/);
+    assert.match(correction, /if \(RQ === q0 && RQ\.onGrade\) \{ RQ\.onGrade\(item, ok, answerKey, \{\}\); correctionRecorded = true; \}/, '정확한 교정 시 원래 오답만 1회 기록한다');
+    assert.match(correction, /if \(correction\.getAttribute\('data-correct'\) === '1'\) \{ next\(\); return; \}/);
+    const nextMatch = inline.match(/function next\(\) \{[\s\S]*?\n    \}/);
+    const nextBody = nextMatch ? nextMatch[0] : '';
+    assert.match(nextBody, /!correctionRecorded && RQ\.onGrade/, 'next avoids duplicate grade callback');
+    assert.match(nextBody, /RQ\.i \+= 1; stepRunner\(\)/);
+  });
+
+  await t('localStorage 실패는 안내하고 서버 동기화 예약을 유지하며 다음 성공 때 로컬 오류를 해제한다', async () => {
+    const ui = screen();
+    ui.failLocal(true);
+    assert.equal(ui.save(), false);
+    assert.equal(ui.node('topBanner').textContent, '이 기기에 저장하지 못했어요. 서버 동기화를 확인하세요.');
+    ui.persist();
+    assert.ok(Array.from(ui.timers.values()).some(timer => timer.ms === 3000), '로컬 저장 실패에도 인증 서버 push 예약을 유지한다');
+    assert.equal(ui.requests.length, 0, '실제 네트워크 요청은 하지 않는다');
+    ui.failLocal(false);
+    assert.equal(ui.save(), true);
+    assert.equal(ui.node('topBanner').hidden, true, '로컬 저장 성공 시 로컬 오류 배너를 해제한다');
+  });
   await t('체험·만료·학생 교대의 연동 링크는 영어 입구로 고정되고 늦은 이전 버튼은 새 인증을 지우지 않는다', async () => {
     const ui = screen();ui.demo();ui.renderOff();ui.setFetch(() => ({ json: async () => clone(sample) }));await ui.openDemo();
     assert.match(ui.demoNotice(), /href="\/\?app=naesin">학생 코드로 연동/);
