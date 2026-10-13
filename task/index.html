@@ -1230,6 +1230,14 @@
 
 <nav class="tabs"><div class="wrap" id="tabs"></div></nav>
 <section class="wrap" id="staffWorkControls" hidden></section>
+<section class="wrap" id="taskPushPanel" hidden>
+  <details class="card"><summary>기기 요청 알림 설정</summary>
+    <p class="small muted">화면이 꺼졌을 때 받는 알림입니다. 학생 정보는 표시하지 않습니다. 화면 자동 점등은 기기 설정에 따라 다릅니다.</p>
+    <button type="button" class="btn btn-sm btn-primary" data-task-push="on">요청 알림 켜기</button>
+    <button type="button" class="btn btn-sm btn-ghost" data-task-push="off">이 기기 알림 끄기</button>
+    <p class="small" id="taskPushStatus" role="status" aria-live="polite"></p>
+  </details>
+</section>
 
 <section class="wrap" id="syncRecoveryNotice" aria-live="polite" hidden></section>
 <main class="wrap" id="view"></main>
@@ -1238,16 +1246,17 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-10-01.1"></script>
-<script src="./schedule-board-core.js?v=2026-10-01.1"></script>
-<script src="./asset-core.js?v=2026-10-01.1"></script>
-<script src="./qr-core.js?v=2026-10-01.1"></script>
-<script src="./acaflow-import-core.js?v=2026-10-01.1"></script>
-<script src="./feedback-subject-catalog.js?v=2026-10-01.1"></script>
-<script src="./sync-recovery-core.js?v=2026-10-01.1"></script>
-<script src="./staff-work-session-core.js?v=2026-10-01.1"></script>
-<script src="./staff-attendance-history-core.js?v=2026-10-01.1"></script>
-<script src="./makeup-recovery-core.js?v=2026-10-01.1"></script>
+<script src="./lesson-form-core.js?v=2026-10-13.1"></script>
+<script src="./task-push-client.js?v=2026-10-13.1"></script>
+<script src="./schedule-board-core.js?v=2026-10-13.1"></script>
+<script src="./asset-core.js?v=2026-10-13.1"></script>
+<script src="./qr-core.js?v=2026-10-13.1"></script>
+<script src="./acaflow-import-core.js?v=2026-10-13.1"></script>
+<script src="./feedback-subject-catalog.js?v=2026-10-13.1"></script>
+<script src="./sync-recovery-core.js?v=2026-10-13.1"></script>
+<script src="./staff-work-session-core.js?v=2026-10-13.1"></script>
+<script src="./staff-attendance-history-core.js?v=2026-10-13.1"></script>
+<script src="./makeup-recovery-core.js?v=2026-10-13.1"></script>
 <script>
 "use strict";
 
@@ -2184,7 +2193,7 @@ const sync = {
       throw error;
     }
     // 인증을 겸하는 동기화만 제한한다. 발송·AI 처리의 제한 시간은 각 기능이 관리한다.
-    const controller = ['/sync', '/staff-work-session', '/staff-profile', '/manager-inspection-session'].includes(path) ? new AbortController() : null;
+    const controller = ['/sync', '/staff-work-session', '/staff-profile', '/manager-inspection-session', '/task-push'].includes(path) ? new AbortController() : null;
     const timeout = controller ? setTimeout(() => controller.abort(), 20000) : null;
     try {
       const res = await fetch(SYNC_URL + path, {
@@ -3658,6 +3667,7 @@ function renderMarkupFingerprint(value) {
    7. 뷰
    ══════════════════════════════════════════════════════ */
 function render() {
+  if (window.WBTaskPush) window.WBTaskPush.refresh();
   if (sync.recovering && !shouldGateStaffWork()) { renderSyncRecoveryNotice(); return; }
   syncRenderPending = false;
   lessonHandoffVisibleDates.clear();
@@ -25260,6 +25270,15 @@ async function startSyncSession() {
   return verified;
 }
 startSyncSession();
+if (window.WBTaskPush) window.WBTaskPush.init({
+  auth: () => session.isStaffLink && shouldGateStaffWork() ? null : sync.auth(),
+  post: body => sync.post('/task-push', { app: SYNC_APP, ...body }),
+  refreshRequests: () => {
+    if (session.isStaffLink && shouldGateStaffWork()) return;
+    loadAdminDirectives(true, true);
+    if (session.isAdmin) loadTeacherLiveRequests(true, true);
+  }
+});
 setInterval(() => {
   const auth = sync.auth();
   if (session.isStaffLink && shouldGateStaffWork()) {
@@ -25286,7 +25305,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-10-01.1';
+const APP_VER = '2026-10-13.1';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);

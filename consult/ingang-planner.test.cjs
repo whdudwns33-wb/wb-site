@@ -3,7 +3,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 
-const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
+// Windows checkout의 CRLF도 같은 소스 경계로 검사한다.
+const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8').replace(/\r\n/g, '\n');
 const between = (start, end) => {
   const from = html.indexOf(start);
   const to = html.indexOf(end, from + start.length);
