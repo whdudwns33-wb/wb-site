@@ -141,9 +141,19 @@ function validateFolderCandidates(draft) {
     objectRecord(row) && Object.keys(row).every(key => unmatchedKeys.includes(key)) && shortText(row.candidateId,100)
       && shortText(row.field,80) && shortText(row.reason,120) && refsValid(row.sourceRefs)
       && numericDetails.every(key => !Object.hasOwn(row,key) || (Number.isInteger(row[key]) && row[key] >= 0 && row[key] <= 1000)))) return false;
-  const keywordRows=Array.isArray(draft.sentenceCandidates)?draft.sentenceCandidates.filter(row=>objectRecord(row)&&Object.hasOwn(row,'keywords')):[];
+  const sentenceRows=Array.isArray(draft.sentenceCandidates)?draft.sentenceCandidates:[];
+  const keywordRows=sentenceRows.filter(row=>objectRecord(row)&&(Object.hasOwn(row,'keywords')||Object.hasOwn(row,'keywordKoCandidates')||Object.hasOwn(row,'keywordEnCandidates')));
+  const hasSeparateKeywordCandidates=sentenceRows.some(row=>objectRecord(row)&&(Object.hasOwn(row,'keywordKoCandidates')||Object.hasOwn(row,'keywordEnCandidates')));
+  const originalKeywordCandidate=value=>shortText(value,1000)&&!value.includes('\\')&&!/^(?:[A-Za-z]:[\\/]|\/|[A-Za-z][A-Za-z0-9+.-]*:\/\/)/i.test(value);
+  const keywordRefsValid=(row)=>Array.isArray(row.enrichmentSourceRefs?.keywords)&&row.enrichmentSourceRefs.keywords.length===2
+    &&row.enrichmentSourceRefs.keywords.every((ref,i)=>exactKeys(ref,['sourceDocumentId','page','printedPage','section','questionNo'])
+      &&ref.sourceDocumentId==='02'&&ref.page===29&&ref.printedPage===29&&ref.questionNo===row.seq
+      &&ref.section===(i===0?'workbook-2-answer':'workbook-3-answer'))&&refsValid(row.enrichmentSourceRefs.keywords);
   if(keywordRows.some(row=>!Array.isArray(row.keywords)||row.keywords.length>50||row.keywords.some(pair=>!exactKeys(pair,['en','ko'])||!shortText(pair.en,1000)||!shortText(pair.ko,1000))
     ||!objectRecord(row.enrichmentSourceRefs)||Object.keys(row.enrichmentSourceRefs).some(key=>!['verbForms','grammarChoices','tokens','writingKeywords','keywords'].includes(key)||!refsValid(row.enrichmentSourceRefs[key]))))return false;
+  if(hasSeparateKeywordCandidates&&sentenceRows.some(row=>!objectRecord(row)||!Array.isArray(row.keywordKoCandidates)||row.keywordKoCandidates.length>50||row.keywordKoCandidates.some(value=>!originalKeywordCandidate(value))
+    ||!Array.isArray(row.keywordEnCandidates)||row.keywordEnCandidates.length>50||row.keywordEnCandidates.some(value=>!originalKeywordCandidate(value))
+    ||!keywordRefsValid(row)||!Array.isArray(row.keywords)||row.keywords.length!==0||!Array.isArray(row.reviewFlags)||!row.reviewFlags.includes('KEYWORD_ALIGNMENT_REVIEW_REQUIRED')))return false;
   const hasKeywords=Object.hasOwn(draft.enrichmentSummary||{},'keywords');
   const summaryKeys = ['verbForms','grammarChoices','tokens','writingKeywords',...(hasKeywords?['keywords']:[]),'dialogues','functions','keyExpressions','patterns'];
   if (!exactKeys(draft.enrichmentSummary,summaryKeys)) return false;
@@ -152,7 +162,11 @@ function validateFolderCandidates(draft) {
   for (const [key,keys] of [['dialogues',['matched','unmatched','lines']],['functions',['matched','unmatched']],['keyExpressions',['matched','unmatched']],['patterns',['matched','unmatched','examples','letsUseIt']]])
     if (!exactKeys(draft.enrichmentSummary[key],keys) || !Object.values(draft.enrichmentSummary[key]).every(n => Number.isInteger(n) && n >= 0 && n <= 1000)) return false;
   const totals = draft.enrichmentSummary;
+  const alignmentUnmatched=draft.unmatched.filter(row=>row.field==='keywords'&&row.reason==='KEYWORD_ALIGNMENT_REVIEW_REQUIRED');
   return (!hasKeywords||totals.keywords.matched + totals.keywords.unmatched === draft.sentenceCandidates.length)
+    && (!hasSeparateKeywordCandidates||(totals.keywords.matched===0&&totals.keywords.unmatched===draft.sentenceCandidates.length
+      &&alignmentUnmatched.length===draft.sentenceCandidates.length&&draft.sentenceCandidates.every(sentence=>alignmentUnmatched.some(row=>row.candidateId===sentence.candidateId
+        &&JSON.stringify(row.sourceRefs)===JSON.stringify(sentence.enrichmentSourceRefs.keywords)))))
     && totals.dialogues.matched + totals.dialogues.unmatched === draft.dialogueCandidates.length
     && totals.dialogues.lines === draft.dialogueCandidates.reduce((n,row) => n + row.lines.length,0)
     && totals.functions.matched + totals.functions.unmatched === draft.functionCandidates.length
