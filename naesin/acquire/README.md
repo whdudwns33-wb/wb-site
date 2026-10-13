@@ -1,7 +1,8 @@
 # EXAM4YOU 로컬 획득 기록
 
 Node 20+ 내장 모듈만 사용. 앱·서버·추출기와 연결하지 않은 별도 운영 도구다.
-브라우저, 로그인, 다운로드, 네트워크, 정리/이동/삭제 기능이 없다. PDF는 읽기만 한다.
+브라우저, 로그인, 다운로드, 네트워크, 정리/이동/삭제 기능이 없다. acquire.mjs는 PDF를 읽기만 한다.
+별도 stage-downloads.mjs는 명시한 파일만 복사한다. 입력·정본 이름·안전성·영수증·한계는 [STAGING.md](STAGING.md)를 참고한다.
 실제 manifest·백업·목록은 저장소 밖에 보관한다. 테스트는 임시 폴더의 자체 제작 바이트만 쓴다.
 
 ## 현재 PC 명령 (PowerShell)
@@ -80,10 +81,14 @@ PDF/심볼릭 링크를 쓰지 않으며 스캔은 링크를 따라가지 않는
 
 1. 사이트에서 교육과정·출판사·단원·자료 목록을 확인한다. 다운로드 URL/쿠키 없이 목록 JSON을 만든다.
 2. inventory로 조금씩 병합한다. 미확인과 실제 없음(not_available)을 구분한다.
-3. 브라우저에서 Downloads로 다운로드한다. **이 CLI는 Downloads를 읽지 않는다.**
-4. 별도 승인된 작업으로 원본 보존하며 raw archive 또는 현재 단원 폴더에 복사/정리한다.
-5. scan → verify → report. 충돌·오류·unknown을 검토하고 다음 배치를 이어간다.
-Downloads를 --root로 명시하지 않는 한 접근하지 않는다. 정리 기능은 명시 옵션으로도 제공하지 않는다.
+3. 브라우저에서 Downloads로 다운로드하고 실제 절대 경로와 suggestedFilename을 배치 JSON에 기록한다.
+4. `node naesin/acquire/stage-downloads.mjs --input batch.json --root "$root"`로 명시한 파일만 복사한다. 원본 보존.
+5. **stage → acquire scan → verify → report**. stage 종료코드 0 확인 후 아래 명령을 별도로 실행한다.
+   `node naesin/acquire/acquire.mjs scan --root "$root"`
+   → `node naesin/acquire/acquire.mjs verify --root "$root"`
+   → `node naesin/acquire/acquire.mjs report --root "$root"`.
+   충돌·오류·unknown을 검토하고 다음 배치를 이어간다.
+acquire.mjs는 Downloads를 --root로 명시하지 않는 한 접근하지 않는다. stage-downloads.mjs도 명시한 src만 접근한다. 두 도구 모두 정리/이동/삭제 기능은 제공하지 않는다.
 
 목록 입력 예시(저장소 밖 inventory.json):
 ~~~json
