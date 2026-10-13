@@ -30,10 +30,18 @@ fs.mkdirSync(data); fs.mkdirSync(olderDir, { recursive: true }); fs.mkdirSync(la
 const writeDraft = value => fs.writeFileSync(draftPath, JSON.stringify(value));
 const reset = () => { writeDraft(draft); for (const key of ['02', '03']) fs.writeFileSync(path.join(packDir, draft.sources[key].file), pdfs[key]); };
 reset(); fs.writeFileSync(path.join(olderDir, 'review-draft.json'), JSON.stringify({ ...draft, wordCandidates: [] }));
+const folderPackId='own-folder-source', folderPack=path.join(materials,folderPackId), folderAnalysis=path.join(folderPack,'analysis');
+const folderSpecs=[['00','textbook','00_교과서본문.pdf'],['01','content_summary','01_내용정리.pdf'],['02','passage_workbook','02_본문워크북.pdf'],['03','vocabulary','03_단어시험.pdf'],['04s','pre_step_student','04_예상문제_PRE-STEP.pdf'],['04t','pre_step_teacher','04_예상문제_PRE-STEP_교사용.pdf'],['05s','exam_1_student','05_예상문제_1회.pdf'],['05t','exam_1_teacher','05_예상문제_1회_교사용.pdf'],['06s','exam_2_student','06_예상문제_2회.pdf'],['06t','exam_2_teacher','06_예상문제_2회_교사용.pdf'],['07','grammar_workbook','07_문법워크북.pdf'],['08','grammar_mcq','08_문법객관식.pdf'],['09','grammar_subjective','09_문법주관식.pdf']];
+fs.mkdirSync(folderPack,{recursive:true});
+const folderBytes=new Map(), folderDocs=[];
+for(const [source,role,file] of folderSpecs){const bytes=Buffer.from('%PDF-1.4\\n% fixture '+source+'\\n');folderBytes.set(source,bytes);fs.writeFileSync(path.join(folderPack,file),bytes);folderDocs.push({sourceDocumentId:source,role,file,bytes:bytes.length,sha256:sha(bytes),pageCount:source==='00'?2:source==='01'?44:source==='02'?31:source==='03'?26:source==='04s'||source==='04t'?14:source==='05s'||source==='05t'?10:source==='06s'||source==='06t'?12:source==='07'?25:source==='08'?23:25});}
+const folderLatest=path.join(folderAnalysis,'draft-20261013-120000-cccccc');fs.mkdirSync(folderLatest,{recursive:true});
+const folderDraft={kind:'naesin-folder-review-draft',version:1,status:'needs-review',publishable:false,rights:{basis:'licensed',holder:'fixture',evidenceRef:'fixture',studentUseAllowed:true,derivativeUseAllowed:true,externalAiAllowed:false,notes:'원내 전용'},sourceDocuments:folderDocs,wordCandidates:[{candidateId:'wc-0001'}],sentenceCandidates:[{seq:1}]};
+fs.writeFileSync(path.join(folderLatest,'review-draft.json'),JSON.stringify(folderDraft));
 const jobId = 'job-ownpdf01', adminToken = randomUUID(), studentToken = randomUUID();
 const originalDb = JSON.stringify({ students: { OWN01: { code: 'OWN01', name: '자체 시험 학생' } }, states: {},
   tokens: { [adminToken]: { admin: true, code: '__admin__', exp: Date.now() + 3600e3 }, [studentToken]: { admin: false, code: 'OWN01', exp: Date.now() + 3600e3 } },
-  naesin: { jobs: { [jobId]: { jobId, packId, meta: { rights: { basis: 'self_authored', holder: '합성 원내 테스트', evidenceRef: 'fixture', studentUseAllowed: true, derivativeUseAllowed: true, externalAiAllowed: false } }, status: 'review', draft: { words: [] }, review: {}, updatedAt: '2026-10-12T12:00:00.000Z' } } } });
+  naesin: { jobs: { [jobId]: { jobId, packId, meta: { rights: { basis: 'self_authored', holder: '합성 원내 테스트', evidenceRef: 'fixture', studentUseAllowed: true, derivativeUseAllowed: true, externalAiAllowed: false } }, status: 'review', draft: { words: [] }, review: {}, updatedAt: '2026-10-12T12:00:00.000Z' }, 'job-folder01': { jobId:'job-folder01', packId:folderPackId, meta:{rights:folderDraft.rights}, status:'review', draft:{words:[]}, review:{}, updatedAt:'2026-10-13T12:00:00.000Z' } } } });
 const inside = { host: 'academy.example', 'cf-connecting-ip': '198.51.100.10' };
 const outside = { host: 'academy.example', 'cf-connecting-ip': '203.0.113.99' };
 let passed = 0;
@@ -70,6 +78,15 @@ async function withServer(mode, fn) {
 }
 
 try {
+  await t('13문서 folder manifest를 모두 해시 검증하고 요청한 문서만 반환한다', () => {
+    const loaded=readLocalMaterials(data,folderPackId);
+    assert.equal(loaded.draft.sourceDocuments.length,13);
+    assert.equal(loaded.pdfs.length,13);
+    assert.equal(loaded.pdfs.reduce((n,p)=>n+p.pageCount,0),248);
+    assert.deepEqual(readLocalMaterials(data,folderPackId,'00',folderDocs[0].sha256).bytes,folderBytes.get('00'));
+    assert.deepEqual(readLocalMaterials(data,folderPackId,'09',folderDocs.at(-1).sha256).bytes,folderBytes.get('09'));
+    assert.throws(()=>readLocalMaterials(data,folderPackId,'08','0'.repeat(64)));
+  });
   await t('최신 정규 이름의 미검수 초안과 원본 메타를 읽고 파일은 변경하지 않는다', () => {
     const before = fs.readFileSync(draftPath);
     const result = readLocalMaterials(data, packId);
@@ -162,6 +179,12 @@ try {
   await withServer('inhouse', async req => {
     const reviewRoute = '/api/naesin/admin/job/local-review?id=' + jobId;
     const pdfRoute = '/api/naesin/admin/job/local-pdf?id=' + jobId + '&source=03&sha256=' + draft.sources['03'].sha256;
+    await t('실제 HTTP 관리자 응답에 13문서 manifest와 개별 source key PDF가 나온다', async () => {
+      const review=await req('/api/naesin/admin/job/local-review?id=job-folder01',{headers:inside});
+      assert.equal(review.status,200);assert.equal(review.json.pdfs.length,13);assert.equal(review.json.draft.sourceDocuments.length,13);
+      const last=folderDocs.at(-1);const pdf=await req('/api/naesin/admin/job/local-pdf?id=job-folder01&source=09&sha256='+last.sha256,{headers:inside});
+      assert.equal(pdf.status,200);assert.deepEqual(pdf.bytes,folderBytes.get('09'));
+    });
     await t('실제 원내 관리자 GET은 초안과 PDF를 no-store로 내고 DB·검수 상태는 보존한다', async () => {
       const before = fs.readFileSync(path.join(data, 'db.json'), 'utf8');
       for (const headers of [{}, inside]) {

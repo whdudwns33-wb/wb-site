@@ -574,6 +574,7 @@ await t('PDF DTO에는 원문 부속물·다른 종류·잘못된 좌표가 들�
     (w) => { w._pdfReview.locations[0].bbox[0] = -1; },
     (w) => { w._pdfReview.locations[0].bbox[0] = '1'; },
     (w) => { w._pdfReview.locations[0].tokens = ['합성']; },
+    (w) => { w._pdfReview.locations[0].sourceDocumentId = 'not-in-manifest'; },
   ];
   for (const mutate of mutations) {
     const w = pdfWord(); mutate(w);
@@ -584,6 +585,14 @@ await t('PDF DTO에는 원문 부속물·다른 종류·잘못된 좌표가 들�
   assert.strictEqual((await call(s, '/api/naesin/admin/job/draft', 'POST', {
     jobId: cr.body.jobId, draft: { sentences: [pdfWord()] },
   }, { localPdfReview: true })).status, 400);
+});
+
+await t('manifest 기반 PDF sourceDocumentId·인쇄 쪽·섹션을 검수 메타로 보존한다', async () => {
+  const s=memStore();const cr=await call(s,'/api/naesin/admin/job','POST',{packId:SAMPLE.packId});
+  const row=pdfWord();row._pdfReview.locations[0]={page:2,bbox:[0,0,0,0],sourceDocumentId:'03',printedPage:2,section:'word-list',questionNo:null};
+  assert.equal((await call(s,'/api/naesin/admin/job/draft','POST',{jobId:cr.body.jobId,draft:{words:[row]}},{localPdfReview:true})).status,200);
+  const saved=(await s.getJob(cr.body.jobId)).draft.words[0]._pdfReview.locations[0];
+  assert.deepEqual(saved,{page:2,bbox:[0,0,0,0],sourceDocumentId:'03',printedPage:2,section:'word-list',questionNo:null});
 });
 
 await t('PDF 원본 메타는 편집으로 지워지지 않고 개별 검수 후 학생 팩에서 제거된다', async () => {

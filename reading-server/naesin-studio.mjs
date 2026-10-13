@@ -56,9 +56,13 @@ function validPdfReview(v) {
   return ownKeys(v, ['flags', 'locations'])
     && Array.isArray(v.flags) && v.flags.length <= 100 && v.flags.every((f) => typeof f === 'string' && f.length <= 200)
     && Array.isArray(v.locations) && v.locations.length <= 100 && v.locations.every((loc) =>
-      ownKeys(loc, ['page', 'bbox']) && Number.isInteger(loc.page) && loc.page > 0 && loc.page <= 1_000_000
+      ownKeys(loc, ['page', 'bbox', 'sourceDocumentId', 'printedPage', 'section', 'questionNo']) && Number.isInteger(loc.page) && loc.page > 0 && loc.page <= 1_000_000
       && Array.isArray(loc.bbox) && loc.bbox.length === 4 && loc.bbox.every((n) => Number.isFinite(n) && n >= 0)
-      && loc.bbox[0] <= loc.bbox[2] && loc.bbox[1] <= loc.bbox[3]);
+      && loc.bbox[0] <= loc.bbox[2] && loc.bbox[1] <= loc.bbox[3]
+      && (loc.sourceDocumentId === undefined || /^(?:00|01|02|03|04s|04t|05s|05t|06s|06t|07|08|09)$/.test(loc.sourceDocumentId))
+      && (loc.printedPage === undefined || Number.isInteger(loc.printedPage) && loc.printedPage > 0)
+      && (loc.section === undefined || loc.section === null || typeof loc.section === 'string' && loc.section.length <= 120)
+      && (loc.questionNo === undefined || loc.questionNo === null || Number.isInteger(loc.questionNo) && loc.questionNo > 0));
 }
 function validPdfSentence(row) {
   return isObj(row) && Number.isInteger(row.seq) && row.seq > 0

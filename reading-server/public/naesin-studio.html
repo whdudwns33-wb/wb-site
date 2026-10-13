@@ -500,6 +500,12 @@ function renderJob(){
   $('#btnPdfReview').onclick=()=>putPdfReviewFile();
   $('#btnPcReview').onclick=()=>putPdfReviewFile(true);
   bindPdfSentence();
+  document.querySelectorAll('[data-folder-sentence]').forEach(button=>button.onclick=()=>{
+    if(!PDF_LOCAL||!JOB||PDF_LOCAL.jobId!==JOB.jobId)return;
+    const candidate=PDF_LOCAL.sentenceCandidates.find(s=>String(s.seq)===button.dataset.folderSentence);if(!candidate)return;
+    const row={kind:'sentences',key:'folder-sentence-'+candidate.seq,row:{_pdfReview:{locations:[{page:candidate.sourceRefs[0].page,bbox:[0,0,0,0]}]}}};
+    clearPdfView();PDF_VIEW={jobId:JOB.jobId,token:TOKEN,source:'02',rowKey:row.key,url:null,busy:false,message:''};renderPdfPreview(row);
+  });
   $('#draftFile').onchange=()=>{
     const fs2=[...$('#draftFile').files];
     $('#draftPick').textContent=fs2.length?('고른 파일 '+fs2.length+'개: '+fs2.map(f=>f.name).join(', ')):'';
@@ -628,16 +634,17 @@ function renderPdfPreview(row){
   if(PDF_VIEW&&(!JOB||PDF_VIEW.jobId!==JOB.jobId||PDF_VIEW.token!==TOKEN))clearPdfView();
   $('#srcText').hidden=!!(row&&pdfs&&pdfs.length);
   if(!row||!pdfs||!pdfs.length){host.innerHTML=row?'<p class="muted" style="padding:0 12px">원본 PDF는 「PC 자료 불러오기」로 연결하세요. 다른 서버에서는 기존 파일 입력을 사용할 수 있어요.</p>':'';return;}
-  const wanted=row.kind==='words'?'03':'02';
+  const where=row&&row.row&&row.row._pdfReview&&row.row._pdfReview.locations&&row.row._pdfReview.locations[0];
+  const wanted=where&&where.sourceDocumentId|| (row.kind==='words'?'03':'02');
   const source=PDF_VIEW&&PDF_VIEW.rowKey===row.key?PDF_VIEW.source:pdfs.some(p=>p.source===wanted)?wanted:pdfs[0].source;
   if(PDF_VIEW&&PDF_VIEW.source!==source)clearPdfView();
   if(!PDF_VIEW)PDF_VIEW={jobId:JOB.jobId,token:TOKEN,source,rowKey:row.key,url:null,busy:false,message:''};
   const view=PDF_VIEW;view.rowKey=row.key;
-  const info=pdfs.find(p=>p.source===source),where=row.row._pdfReview.locations&&row.row._pdfReview.locations[0];
+  const info=pdfs.find(p=>p.source===source);
   const page=where&&Number.isInteger(where.page)&&where.page>=1&&where.page<=info.pageCount?where.page:1;
   const url=view.url&&view.url+'#page='+page;
   host.innerHTML='<div style="padding:8px 12px"><label class="fld">원본 자료<select id="pdfSource">'
-    +pdfs.map(p=>'<option value="'+p.source+'"'+(p.source===source?' selected':'')+'>'+esc(p.source==='03'?'단어 자료':'본문 자료')+'</option>').join('')+'</select></label>'
+    +pdfs.map(p=>'<option value="'+esc(p.source)+'"'+(p.source===source?' selected':'')+'>'+esc(p.source+' · '+p.file)+'</option>').join('')+'</select></label>'
     +'<p class="muted">'+esc(info.file)+' · '+page+'쪽'+(url?' · <a href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">PDF 크게 보기</a>':'')+'</p>'
     +(view.message?'<p class="err" role="status">'+esc(view.message)+'</p><button class="btn sm ghost" id="btnPdfRetry">PDF 다시 열기</button>':view.busy?'<p class="muted" role="status">원본 PDF를 여는 중…</p>':'')+'</div>'
     +(url?'<iframe title="검수할 원본 PDF" src="'+esc(url)+'" style="display:block;width:100%;height:66vh;min-height:360px;border:0"></iframe>':'');
@@ -818,7 +825,27 @@ function regularDraft(obj){
   }
   return draft;
 }
-function pdfReviewDraft(obj){
+function pdfReviewDraft(obj, trustedLocal=false){
+  let folderDocs=null,folderSentences=null;
+  if(obj&&obj.kind==='naesin-folder-review-draft'&&obj.version===1&&obj.status==='needs-review'&&obj.publishable===false){
+    if(!trustedLocal)throw new Error('이 폴더 초안은 원내 PC 자료 연결로만 열 수 있어요.');
+    folderDocs=obj.sourceDocuments;folderSentences=obj.sentenceCandidates;
+    const sourceIds=['00','01','02','03','04s','04t','05s','05t','06s','06t','07','08','09'];
+    if(!obj.rights||obj.rights.basis!=='licensed'||obj.rights.studentUseAllowed!==true||obj.rights.derivativeUseAllowed!==true||obj.rights.externalAiAllowed!==false
+      ||!Array.isArray(folderDocs)||folderDocs.length!==13||new Set(folderDocs.map(d=>d.sourceDocumentId)).size!==13
+      ||folderDocs.some(d=>!sourceIds.includes(d.sourceDocumentId)||typeof d.file!=='string'||typeof d.role!=='string'||!Number.isInteger(d.pageCount)||!Number.isInteger(d.bytes)||!/^[a-f0-9]{64}$/.test(d.sha256))
+      ||!Array.isArray(folderSentences)||folderSentences.length!==25)throw new Error('13개 원본 manifest 또는 권리·문장 후보가 올바르지 않아요.');
+    const sourceMap=new Map(folderDocs.map(d=>[d.sourceDocumentId,d]));
+    if(!Array.isArray(obj.wordCandidates)||!obj.wordCandidates.length||obj.wordCandidates.some(c=>!Array.isArray(c.sourceRefs)||!c.sourceRefs.length||c.sourceRefs.some(r=>r.sourceDocumentId!=='03'||!Number.isInteger(r.page)||r.page<1||r.page>sourceMap.get('03').pageCount)))throw new Error('단어 후보의 원본 위치가 올바르지 않아요.');
+    if(folderSentences.some(s=>!s||!Number.isInteger(s.seq)||typeof s.en!=='string'||typeof s.ko!=='string'||!s.en||!s.ko||!Array.isArray(s.sourceRefs)||s.sourceRefs.length<2||s.sourceRefs.some(r=>!sourceMap.has(r.sourceDocumentId)||!Number.isInteger(r.page)||r.page<1||r.page>sourceMap.get(r.sourceDocumentId).pageCount)))throw new Error('문장 출처 manifest가 올바르지 않아요.');
+    const passageColumns=[];
+    for(const [side,field,refIndex] of [['EN','en',0],['KO','ko',1]])for(const page of [...new Set(folderSentences.map(s=>s.sourceRefs[refIndex].page))]){
+      const rows=folderSentences.filter(s=>s.sourceRefs[refIndex].page===page);
+      const lines=rows.map(s=>({text:s[field],tokens:[{x0:0,top:0,x1:0,bottom:0}]}));
+      passageColumns.push({page,column:side,sourceDocumentId:'02',section:side==='EN'?'workbook-4':'workbook-4-answer',rawText:lines.map(l=>l.text).join(String.fromCharCode(10)),lines});
+    }
+    obj={...obj,kind:'naesin-pdf-review-draft',wordCandidates:obj.wordCandidates.map(c=>({...c,sourceRows:c.sourceRefs.map(r=>({page:r.page,bbox:Array.isArray(r.bbox)?r.bbox:[0,0,0,0],sourceDocumentId:r.sourceDocumentId,printedPage:r.printedPage,section:r.section,questionNo:r.questionNo}))})),passageColumns,unmatchedWordRows:[]};
+  }
   if(!obj||obj.kind!=='naesin-pdf-review-draft'||obj.version!==1||obj.status!=='needs-review'||obj.publishable!==false)
     throw new Error('미검수 상태의 로컬 PDF 검수 초안(v1)이 필요해요.');
   if(!Array.isArray(obj.wordCandidates)||!obj.wordCandidates.length||!Array.isArray(obj.passageColumns))
@@ -840,7 +867,7 @@ function pdfReviewDraft(obj){
       if(!r||!Number.isInteger(r.page)||r.page<1||r.page>1000000||!Array.isArray(r.bbox)||r.bbox.length!==4
         ||r.bbox.some(v=>typeof v!=='number'||!Number.isFinite(v)||v<0)||r.bbox[0]>r.bbox[2]||r.bbox[1]>r.bbox[3])
         throw new Error('PDF 원천 위치가 올바르지 않아요.');
-      return{page:r.page,bbox:r.bbox.slice()};
+      return{page:r.page,bbox:r.bbox.slice(),...(r.sourceDocumentId?{sourceDocumentId:r.sourceDocumentId}:{}),...(r.printedPage?{printedPage:r.printedPage}:{}),...(r.section!==undefined?{section:r.section}:{}),...(r.questionNo!==undefined?{questionNo:r.questionNo}:{})};
     });
     return{id:c.candidateId.replace(/^wc-/,'w-'),headword:c.headCandidate,pos:c.posCandidates.length===1?c.posCandidates[0]:'',
       meaningKo:c.meanings.slice(),sections:[],_pdfReview:{flags,locations}};
@@ -860,14 +887,17 @@ function pdfReviewDraft(obj){
       });
       return{text:line.text,bbox:[Math.min(...boxes.map(b=>b[0])),Math.min(...boxes.map(b=>b[1])),Math.max(...boxes.map(b=>b[2])),Math.max(...boxes.map(b=>b[3]))]};
     });
-    return{page:c.page,column:c.column,rawText:c.rawText,lines};
+    return{page:c.page,column:c.column,rawText:c.rawText,lines,sourceDocumentId:c.sourceDocumentId,section:c.section};
   });
-  return{words,columns};
+  return{words,columns,sentenceCandidates:folderSentences||[],sourceDocuments:folderDocs||[]};
 }
 function pdfColumnsHtml(){
   if(!PDF_LOCAL||!JOB||PDF_LOCAL.jobId!==JOB.jobId)return'';
-  return'<details style="margin-top:8px"><summary style="cursor:pointer;font-weight:800;color:var(--navy)">본문 원천 '+PDF_LOCAL.columns.length+'열 · 문장 대응 전</summary>'
+  const manifest=PDF_LOCAL.sourceDocuments||[];
+  return (manifest.length?'<details style="margin-top:8px"><summary style="cursor:pointer;font-weight:800;color:var(--navy)">원본 자료 manifest '+manifest.length+'개</summary><ul>'+manifest.map(d=>'<li>'+esc(d.sourceDocumentId)+' · '+esc(d.role)+' · '+esc(d.file)+' · '+d.pageCount+'쪽 · '+esc(d.sha256)+'</li>').join('')+'</ul></details>':'')
+    +'<details style="margin-top:8px"><summary style="cursor:pointer;font-weight:800;color:var(--navy)">본문 원천 '+PDF_LOCAL.columns.length+'열 · 문장 후보 '+(PDF_LOCAL.sentenceCandidates||[]).length+'개</summary>'
     +'<p class="muted">원천 열 전체는 현재 브라우저에만 있습니다. 작업 변경·로그아웃·새로고침 뒤에는 PC 자료를 다시 불러오세요. 아래에서 직접 대응한 문장 후보와 선택 위치만 PC에 저장합니다.</p>'
+    +((PDF_LOCAL.sentenceCandidates||[]).length?'<h3>문장 후보 · 클릭하면 원본 위치 열기</h3>'+PDF_LOCAL.sentenceCandidates.map(s=>'<p><button class="btn sm ghost" type="button" data-folder-sentence="'+s.seq+'">'+s.seq+'번 원본 보기</button> '+esc(s.en)+'<br>'+esc(s.ko)+' · 원본 02 p'+s.sourceRefs[0].page+' / p'+s.sourceRefs[1].page+' · 검수 필요</p>').join(''):'')
     +PDF_LOCAL.columns.map(c=>'<h3>'+c.page+'쪽 · '+esc(c.column)+'</h3><pre style="white-space:pre-wrap;word-break:break-word">'+esc(c.lines&&c.lines.length?c.lines.map((l,i)=>(i+1)+'. '+l.text).join('\n'):c.rawText)+'</pre>').join('')+'</details>';
 }
 function pdfSentenceHtml(){
@@ -923,7 +953,7 @@ function pdfLineRange(side,f){
   if(!/^\d+$/.test(col)||!c||c.column!==side.toUpperCase()||!Array.isArray(c.lines)||!Number.isInteger(start)||!Number.isInteger(end)||start<1||end<start||end>c.lines.length)
     throw new Error((side==='en'?'영어':'한글')+' 원천 열과 시작·끝 줄을 확인하세요.');
   const lines=c.lines.slice(start-1,end);
-  return{text:lines.map(l=>l.text).join(' '),location:{page:c.page,bbox:[Math.min(...lines.map(l=>l.bbox[0])),Math.min(...lines.map(l=>l.bbox[1])),Math.max(...lines.map(l=>l.bbox[2])),Math.max(...lines.map(l=>l.bbox[3]))]}};
+  return{text:lines.map(l=>l.text).join(' '),location:{page:c.page,bbox:[Math.min(...lines.map(l=>l.bbox[0])),Math.min(...lines.map(l=>l.bbox[1])),Math.max(...lines.map(l=>l.bbox[2])),Math.max(...lines.map(l=>l.bbox[3]))],...(c.sourceDocumentId?{sourceDocumentId:c.sourceDocumentId,printedPage:c.page,section:c.section||null,questionNo:null}:{})}};
 }
 function loadPdfSentence(){
   if(BUSY||!JOB||!PDF_LOCAL||PDF_LOCAL.jobId!==JOB.jobId||!PDF_LOCAL.sentence)return;
@@ -975,18 +1005,19 @@ async function putPdfReviewFile(fromPC=false){
     if(!current())return;
     if(health.localPdfReview!==true)throw new Error('로컬 PDF 검수는 이 PC 서버의 학원 내 주소에서만 열 수 있어요.');
     const source=fromPC?await api('/naesin/admin/job/local-review?id='+encodeURIComponent(jobId)):{draft:JSON.parse(await file.text())};if(!current())return;
-    const data=pdfReviewDraft(source.draft),pdfs=fromPC?source.pdfs:null;
+    const data=pdfReviewDraft(source.draft,fromPC),pdfs=fromPC?source.pdfs:null;
     if(fromPC&&(!Array.isArray(pdfs)||!pdfs.length||new Set(pdfs.map(p=>p&&p.source)).size!==pdfs.length
-      ||pdfs.some(p=>!p||!['02','03'].includes(p.source)||typeof p.file!=='string'||!p.file||!Number.isInteger(p.pageCount)||p.pageCount<1||p.pageCount>1000000||typeof p.sha256!=='string'||!/^[a-f0-9]{64}$/.test(p.sha256))))
+      ||pdfs.some(p=>!p||!['00','01','02','03','04s','04t','05s','05t','06s','06t','07','08','09'].includes(p.source)||typeof p.file!=='string'||!p.file||!Number.isInteger(p.pageCount)||p.pageCount<1||p.pageCount>1000000||typeof p.sha256!=='string'||!/^[a-f0-9]{64}$/.test(p.sha256))
+      ||(source.draft.kind==='naesin-folder-review-draft'&&pdfs.length!==13)))
       throw new Error('원본 PDF 정보가 올바르지 않아요. PC 자료를 확인하세요.');
     const existing=JOB.draft.words||[];
     if(existing.length){
       if(JSON.stringify(existing)!==JSON.stringify(data.words))throw new Error('현재 작업의 단어 후보와 달라요. 기존 검수를 지키려면 별도 작업에 새 초안을 넣으세요.');
       const same=PDF_LOCAL&&PDF_LOCAL.jobId===jobId&&JSON.stringify(PDF_LOCAL.columns)===JSON.stringify(data.columns);
-      const sentence=same?PDF_LOCAL.sentence:null;clearPdfView();PDF_LOCAL={jobId,token,columns:data.columns,pdfs,sentence};renderJob();
+      const sentence=same?PDF_LOCAL.sentence:null;clearPdfView();PDF_LOCAL={jobId,token,columns:data.columns,pdfs,sentence,sentenceCandidates:data.sentenceCandidates,sourceDocuments:data.sourceDocuments};renderJob();
       $('#pdfReviewOut').textContent='기존 단어 '+data.words.length+'개와 검수를 유지하고 본문 '+data.columns.length+'열을 다시 열었어요.';
     }else if(await sendDraft({words:data.words},'로컬 PDF 검수 초안',jobId,'#pdfReviewOut')){
-      if(!current())return;clearPdfView();PDF_LOCAL={jobId,token,columns:data.columns,pdfs};renderJob();
+      if(!current())return;clearPdfView();PDF_LOCAL={jobId,token,columns:data.columns,pdfs,sentenceCandidates:data.sentenceCandidates,sourceDocuments:data.sourceDocuments};renderJob();
       $('#pdfReviewOut').textContent='단어 후보 '+data.words.length+'개를 미검토로 넣었어요. 본문 '+data.columns.length+'열은 문장 대응 전입니다.';
     }
   }catch(e){if(current()&&!isAuth(e))$('#pdfReviewOut').textContent=e.message;}

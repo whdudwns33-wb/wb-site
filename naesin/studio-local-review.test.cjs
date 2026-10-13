@@ -708,6 +708,18 @@ function wordSection(ui,section,checked){const el=ui.node('#pdfWord'+section);el
     }
   });
 
+  await t('원내 folder bundle 13문서 manifest·문장 위치를 변환하고 일반 파일 입력은 차단한다',async()=>{
+    const ids=['00','01','02','03','04s','04t','05s','05t','06s','06t','07','08','09'];
+    const docs=ids.map((sourceDocumentId,i)=>({sourceDocumentId,role:'fixture-role',file:`${sourceDocumentId}_fixture.pdf`,sha256:String(i).padStart(64,'0'),bytes:10,pageCount:sourceDocumentId==='02'?31:26}));
+    const sentences=Array.from({length:25},(_,i)=>({seq:i+1,en:'Own sentence '+(i+1),ko:'자체 문장 '+(i+1),dayGroup:'8/1',sourceRefs:[{sourceDocumentId:'02',page:i<12?9:i<20?10:29,printedPage:i<12?9:i<20?10:29,section:'fixture',questionNo:i+1},{sourceDocumentId:'02',page:29,printedPage:29,section:'answer',questionNo:i+1}]}));
+    const folder={kind:'naesin-folder-review-draft',version:1,status:'needs-review',publishable:false,rights:{basis:'licensed',studentUseAllowed:true,derivativeUseAllowed:true,externalAiAllowed:false},sourceDocuments:docs,
+      wordCandidates:Array.from({length:74},(_,i)=>({candidateId:'wc-'+String(i+1).padStart(4,'0'),headCandidate:'ownword'+i,meanings:['자체 뜻'],posCandidates:['n.'],reviewFlags:['REVIEW_REQUIRED'],sourceRefs:[{sourceDocumentId:'03',page:1,printedPage:1,section:null,questionNo:null,bbox:[1,2,3,4]}]})),sentenceCandidates:sentences};
+    const ui=screen();assert.throws(()=>ui.pdfReviewDraft(folder));const converted=ui.pdfReviewDraft(folder,true);
+    assert.equal(converted.words.length,74);assert.equal(converted.sentenceCandidates.length,25);assert.equal(converted.sourceDocuments.length,13);
+    assert.deepEqual(JSON.parse(JSON.stringify(converted.words[0]._pdfReview.locations[0])),{page:1,bbox:[1,2,3,4],sourceDocumentId:'03',printedPage:1,section:null,questionNo:null});
+    assert.equal(converted.columns.length,4);assert.equal(converted.columns.some(c=>c.page===9&&c.column==='EN'),true);
+  });
+
   await t('PDF 문장 메타는 일반 붙여넣기 경로와 경고 없는 일괄 승인을 통해 우회하지 않는다',async()=>{
     const ui=screen(),own=job();own.draft.sentences=[{seq:1,en:'Go!',ko:'가자!',dayGroup:'1',chunks:[{en:'Go!',ko:'가자!'}],_pdfReview:{flags:['REVIEW_REQUIRED'],locations:[{page:1,bbox:[1,2,3,4]}]}}];
     ui.setStored(own);ui.set(own);ui.renderJob();await ui.bulkOk();assert.equal(ui.requests.length,0);assert.match(ui.node('#app').innerHTML,/PDF 후보는 원본을 대조해 한 행씩 검수/);
