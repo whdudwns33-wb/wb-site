@@ -25,7 +25,17 @@ WB 독해력학원·웩슬러브레인센터의 원내 학습 웹앱 모음. 어
 | `hanja/` | 어휘브레인(옛 한자브레인 — 폴더·주소 `/hanja/`·KV 키 `hanja:*`·API는 유지) — 추천 교재의 어휘를 **단원 시험 → 부족한 낱말 학습 → 재확인**하는 앱(영어 없음). 문제집 한 권 = 단어장 하나(관리 웹 업로드·KV 전용, 낱말 id는 내용 기반). 주메뉴는 **오늘 할 일·내 교재·복습·학습 기록·한자 집중**. 어휘 시험은 뜻·문맥·회상 결과를 구분하며, 검수된 상황 자료가 있는 낱말은 별도 상황과 해설을 학습한다. 한자 집중은 어휘 교재 선택을 유지한 채 훈음·획순 수업·혼자 쓰기·한자 시험을 공부하는 별도 영역이다. 종이 교재로 공부한 학생은 앱 학습 기록 없이 바로 시험 볼 수 있고, 실제 출제 범위·스스로 정답·힌트 정답을 구별한다. 보조 한자·오답 재확인은 원래 단원 시험 점수를 덮지 않는다. 이번 주 단원(반·학생)·교사 현황·종이 시험지·밤 9시 알림. AI 연상은 자체(`own`) 단어장만 허용하고 교재(`textbook`) 뜻은 외부 AI로 보내지 않는다. 순수 로직 `book-check.js`·`srs.js`·`quiz.js`·`trace.js`·`bridge.js`, 도구 `extract/draft.mjs`·`strokes-convert.mjs`. `book-sample.json`은 자체 창작 체험, `books/`는 자체 교과 어휘 초3~초6(각 80낱말·8단원) + 급수 8급 50자·7급 추가 100자(공식 목록 대조 완료). `books.test.cjs`는 업로드 관문과 같은 검사·재검사 왕복에서 오류·경고 0을 요구한다. **상세: `hanja/README.md`**, 인수인계: `hanja/AGENTS.md` |
 | `chunk/` | 청크브레인 — 의미단위 끊어읽기 학습 앱(유치 + 초1~고3 학년별 13단계: 배우기·연습·복습 + `print.html` 로 PDF 교재 + `class.html` 프로젝터 수업). 지문·카드는 자체 창작이라 저장소에 있다. **상세: `chunk/README.md`**, 고칠 때 깨지는 자리: `chunk/AGENTS.md`, 근거: `docs/의미단위-끊어읽기-앱-연구노트-v1.md` |
 | `letter/` | **브레인레터** — 유치~중등 다섯 학년대 주간 뉴스레터(신문 짜임, 가족 링크 `/letter/?t=`·학생 앱·PDF 인쇄·새 호 푸시). 순수 로직 `letter.js`(검증기·렌더러·지표 순환·하루 한 장 7일 리듬 하나) + `shapes.js`(시공간 도형 생성기) + `drills.js`(나머지 네 지표 5분 놀이 생성기·오늘의 5분) + 자체 창작 체험 호 `issue-sample.json` + 주제 달력 `calendar.json` + 자체 제작 삽화 `img/` + 글꼴 `fonts/`(Noto Sans/Serif KR 조각, OFL — `fetch-fonts.mjs` 가 받는다). 읽어 주기·한자 따라쓰기는 `shared/voice.js`·`vocab/trace.js` 를 배급받아 쓴다. 호 본문·올린 사진은 KV 에만 — 단 **파일럿**은 편집실이 만든 자체 창작 호를 `issues/<주차>.json` + 목록 `issues.json` 으로 저장소에 두고 `/letter/` 가 링크만으로 연다(발행일이 되면 그 호로 자동 전환). **상세: `letter/README.md`**, 고칠 때 깨지는 자리·인수인계: `letter/AGENTS.md`, 기획 `docs/브레인레터-주간뉴스레터-기획서-v1.md` |
-| `vocab-age/` | 어휘 나이 진단 (유일한 공개 페이지) |
+| `vocab-age/` | 어휘 나이 진단 (공개 체험 페이지) |
+| `task/` | **업무지시서** — 직원 업무·수업·출결·교재·차량·기기 운영. GitHub Pages 화면 + `wb-sync` Worker/D1, 직원별 개인 기기 인증. **상세: `task/README.md`** |
+| `consult/` | **컨설팅 플래너** — 학생의 오늘·주간·월간·학사·인강·학습·로드맵과 원장 배부·현황·결과지·보호자 공유. `wb-sync`의 `app:consult`로 task와 데이터를 분리한다. **상세: `consult/README.md`** |
+| `sync/` | **학원 운영 백엔드** — `wb-sync`(직원·보호자·consult) + 별도 origin의 `wb-student`(학생), 같은 D1 + private R2. 마이그레이션 → Worker → Pages를 수동 배포한다. **상세: `sync/README.md`**, 포털 배포: `sync/PORTAL_RELEASE_RUNBOOK.md` |
+| `parent/` | **보호자 포털** — task 자녀 운영 현황(`/`)과 별도 consult 학습 리포트(`/consult-guardian/`). `wb-sync` assets로 제공하고 같은 origin의 세션 쿠키를 쓴다. **상세: `parent/README.md`** |
+| `student/` | **학생 포털** — 내 수업·출결·공개 숙제·준비물·차량·교재·시간표, 공개된 오늘 할 일의 완료/도움 필요. `wb-student` assets + 학생 세션 쿠키. **상세: `student/README.md`** |
+| `backend/` | **그림검사 AI 해석 백엔드 MVP** — Node 서버·mock/Claude 파이프라인·발행/동의 게이트. 운영 인증·저장소는 별도 전환이 필요하다. **상세: `backend/README.md`** |
+| `calc/` | **연산 체험** — 공개 Pages 페이지, 기록은 기기 안에만. 원장 PC 원본의 복사본이라 직접 수정하지 않는다. **상세: `calc/README.md`** |
+| `workbench/` | **컨설팅 워크벤치** — 원장 전용, `src/app.html` → 암호화 `index.html` 빌드. 배포본과 소스 버전 차이를 먼저 확인하고 비밀번호 없이 재빌드하지 않는다. **상세: `workbench/src/README.md`** |
+| `apps/` | **별도 프로토타입·전략 보드** — 그림검사 데모와 수완 신규 학원 준비 보드/브리핑. 학습 앱·운영 백엔드와 별개다. **상세: `apps/README.md`** |
+| `scripts/` | 저장소 전체 검사·에이전트 문서 정합·Pages HTML 색인 차단 관문 (`check.mjs`·`docs-sync.test.mjs`·`pages-noindex.test.mjs`) |
 | `desk/` | **프로그램데스크** — 학원과 별개 사업(구독 학생의 프로그램·자료 운영) 앱. 새 워커 `wb-desk` + 새 D1. **상세: `desk/README.md`** |
 | `desk-ext/` | 프로그램데스크 크롬 확장(표 캡처, MV3). 학생 정보 없음. `desk/build.mjs`가 `dist/ext/`로 복사 |
 | `crm/` | **세일즈데스크** — 상담·CS 가 끝난 가정의 전환 CRM(문의 → 검사 → 해석 → D+3·7·14 팔로업 → 등록/보류/이탈+사유 → 월 KPI) + **HubSpot 연동**(원장 승인 큐 → 연락처·딜·노트, 변경분 가져오기, 단계 자동 매핑, `wb_*` 속성) + **파트너 학원 연계**(포털 `/partner/`, `partner-api.mjs` — 같은 워커·D1 이지만 출입구·API·표를 분리해 둠, 기획 `docs/파트너학원-연계-기획서-v0.md`). 새 워커 `wb-crm` + 새 D1. 순수 로직 `crm-core.js` 를 브라우저·서버가 같이 쓴다. HubSpot 토큰은 워커 시크릿 `HUBSPOT_ACCESS_TOKEN` 뿐. **상세: `crm/README.md`**, 인수인계(지금 상태·다음 할 일·깨지는 자리): `crm/AGENTS.md` |
@@ -61,10 +71,14 @@ PORT=8892 node crm/dev-server.mjs            # 세일즈데스크 로컬 서버 
 ```
 
 CI 둘: `.github/workflows/checks.yml` — **PR·작업 브랜치 푸시**에서 `node scripts/check.mjs`(저장소 전체
-테스트) + 워커 번들 dry-run. 시크릿을 쓰지 않는다. `.github/workflows/deploy-reading.yml` — **main 푸시가
+테스트) + reading·desk·crm 자산 조립/워커 번들 dry-run/Node 잔류 검사. 시크릿을 쓰지 않는다. `.github/workflows/deploy-reading.yml` — **main 푸시가
 곧 배포**다(그 앱 몫 테스트 통과 시 Cloudflare Workers `wb-reading`으로). 별도 워커는 자기 워크플로우가 배포한다
 (`deploy-desk.yml` → `wb-desk`, `deploy-crm.yml` → `wb-crm` — HubSpot 토큰도 여기서 저장소 시크릿 → 워커 시크릿으로 복사). PR은 스쿼시 머지, 제목에
 `(#번호)`가 남는 관례.
+
+`wb-sync`·`wb-student`에는 배포 워크플로우가 없다. `sync/README.md`의 마이그레이션 → Worker →
+Pages 순서를 수동으로 따른다. task·consult 화면은 Pages, parent·student 화면은 각 Worker의 assets로 제공한다.
+GitHub Pages는 `main/root`를 서비스하므로 main에 합친 정적 파일도 공개된다.
 
 ## 에이전트 작업 규칙 (Codex · Claude Code 공통)
 
@@ -123,7 +137,14 @@ CI 둘: `.github/workflows/checks.yml` — **PR·작업 브랜치 푸시**에서
 5. 배포 자산 캐시는 `build-dist.mjs`가 내용 해시로 스탬프한다 — SW `VERSION`을 손으로
    만지지 않는다.
 
-## 운영 주소 (원내 전용 — 링크 외부 공유 금지)
+## 운영 주소 (학습·관리 링크는 원내 전용 — 외부 공유 금지)
+
+- GitHub Pages: `https://whdudwns33-wb.github.io/wb-site/` — 뿌리 `index.html`은 공개 마케팅 페이지,
+  `vocab-age/`·`calc/`는 공개 체험이다. task·consult·workbench·apps 등의 화면도 이 면에서 서비스된다.
+  **Pages에는 `reading/_headers`나 `build-dist.mjs`가 적용되지 않는다.** 내부 HTML은 `meta robots noindex`를
+  유지한다(`scripts/pages-noindex.test.mjs`). noindex는 색인 차단이며 접근 인증을 대신하지 않는다.
+- 학원 운영: Pages `/task/`·`/consult/` → `wb-sync` API. 보호자 `/`·`/consult-guardian/`는 `wb-sync`,
+  학생 `/`는 별도 `wb-student` origin에서 제공한다. 정확한 배포 주소와 포털 활성 조건은 `sync/wrangler*.toml`·`sync/README.md`를 읽는다.
 
 - 학생: `/` 진로독서 · `/vocab/` 워드브레인 · `/naesin/` 내신브레인(영어) · `/naesin-ko/` 국어브레인 · `/haru/` 하루브레인(부모 `/haru/parent.html?t=`) · `/chunk/` 청크브레인(교재 `/chunk/print.html`, 화면 수업 `/chunk/class.html`, 가족 `/chunk/?t=` — 브레인레터와 같은 학부모 토큰) ·
   `/letter/` 브레인레터(가족 `/letter/?t=`) · `/hanja/` 어휘브레인

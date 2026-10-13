@@ -1,6 +1,7 @@
 'use strict';
 /* 부모 포털 가족은 학생 계정이 아니다. 레터·청크에서만 기존 가족 기록 어댑터로 읽는다. */
 import { safeEqual } from './admin-auth.mjs';
+import { readJsonBody } from './request-body.mjs';
 
 export const PORTAL_LINK_BODY_LIMIT = 1024;
 const TOKEN_RE = /^[a-f0-9]{32}$/;
@@ -8,23 +9,7 @@ export const portalFamilyToken = (code) => /^portal-([a-f0-9]{32})$/.exec(String
 const reply = (status, body) => ({ status, body });
 
 /* Content-Length 없는 요청도 같은 상한으로 읽는다(Worker Web Stream). */
-export async function readPortalLinkBody(request) {
-  const reader = request.body?.getReader();
-  const chunks = []; let size = 0;
-  if (reader) while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    size += value.byteLength;
-    if (size > PORTAL_LINK_BODY_LIMIT) {
-      await reader.cancel();
-      throw Object.assign(new Error('body limit'), { status: 413 });
-    }
-    chunks.push(value);
-  }
-  const bytes = new Uint8Array(size); let offset = 0;
-  for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.byteLength; }
-  return JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
-}
+export const readPortalLinkBody = request => readJsonBody(request, PORTAL_LINK_BODY_LIMIT);
 
 export async function handlePortalFamilyLink({ method, authorization, secret, getBody, store }) {
   if (method !== 'POST') return reply(405, { error: 'method_not_allowed' });

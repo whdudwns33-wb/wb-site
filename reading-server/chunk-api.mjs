@@ -138,7 +138,7 @@ export function chunkOverviewRow(code, stu, rec, assignRec) {
 
 export async function handleChunk({ path: p, method, who, getBody, store, query, ...ctx }) {
   const j = (status, body) => ({ status, body });
-  const body = async () => { try { return await getBody(); } catch (e) { return null; } };
+  const body = async () => { try { return await getBody(); } catch (e) { if (e && e.status === 413) throw e; return null; } };
 
   /* ── 가족 링크 — 로그인 없음, ?t= 가 자격. 호스트가 who 검증 전에 여기로 보낸다(브레인레터 parent 와 같은 자리) ── */
   if (p === '/api/chunk/parent' || p.startsWith('/api/chunk/parent/')) {

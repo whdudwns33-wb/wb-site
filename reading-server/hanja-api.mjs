@@ -238,7 +238,7 @@ export async function handleHanja(ctx) {
   const { path: p, method, who, store } = ctx;
   const j = (status, body) => ({ status, body });
   if (!who) return j(401, { error: '로그인이 필요합니다.' });
-  const body = async () => { try { const b = await ctx.getBody(); return isObj(b) ? b : {}; } catch (e) { return null; } };
+  const body = async () => { try { const b = await ctx.getBody(); return isObj(b) ? b : {}; } catch (e) { if (e && e.status === 413) throw e; return null; } };
   const q = (k) => String((ctx.query && ctx.query.get && ctx.query.get(k)) || '').trim();
 
   /* ── 학생 ── */
