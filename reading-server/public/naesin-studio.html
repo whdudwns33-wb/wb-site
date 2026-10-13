@@ -13,6 +13,7 @@
     header b{font-size:17px}header small{opacity:.75}
     header .sp{flex:1}
     .hbtn{min-height:38px;padding:6px 14px;border:1px solid #ffffff55;border-radius:10px;background:transparent;color:#fff;font-weight:800;cursor:pointer}
+    @media (max-width:600px){header{flex-wrap:wrap;gap:8px}header b,header small{flex-basis:100%}header .sp{display:none}header .hbtn{flex:0 0 auto}}
     main{max-width:1180px;margin:auto;padding:18px 14px 60px}
     .card{margin-bottom:14px;padding:16px 18px;border:1px solid var(--line);border-radius:14px;background:#fff}
     h2{margin:0 0 6px;color:var(--navy);font-size:17px}
@@ -75,7 +76,7 @@
     .row .ri.bad{color:var(--bad)}.row .ri.warn{color:var(--warn)}
     .row .ra{display:flex;gap:5px;margin-top:6px;flex-wrap:wrap}
     .row.dropped .rt,.row.dropped .rs{text-decoration:line-through;color:var(--muted)}
-    .row textarea{margin-top:6px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;min-height:190px}
+    .row textarea[data-ed]{margin-top:6px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px;min-height:190px}
     .keys{font-size:12px;color:var(--muted);font-weight:700}
     .keys kbd{display:inline-block;min-width:17px;padding:0 4px;border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;background:#fff;font:inherit;font-weight:800;text-align:center}
     .srcrow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:7px 0;border-top:1px solid var(--line)}
@@ -83,7 +84,7 @@
   </style>
 </head>
 <body>
-<header><b>WB 내신브레인 · 팩 제작</b><small>원천 → AI 추출 → 검수 → 배포</small><span class="sp"></span>
+<header><b>WB 내신브레인 · 팩 제작</b><small>원천·초안 → 검수 → 배포</small><span class="sp"></span>
   <button class="hbtn" onclick="location.href='/admin/naesin-admin.html'">운영 관리</button>
   <button class="hbtn" onclick="location.href='/admin/naesin-live.html'">수업 화면</button>
   <button class="hbtn" id="btnRefresh" hidden>새로고침</button>
@@ -92,6 +93,7 @@
 <div class="banner" id="banner" role="alert" hidden><span id="bannerMsg"></span><span class="sp"></span><button class="btn sm ghost" id="bannerClose">닫기</button></div>
 <main id="app"></main>
 <script src="/admin/admin-login.js"></script>
+<script src="/admin/pack-check.js"></script>
 <script>
 'use strict';
 /* WB 내신브레인 팩 제작 스튜디오 — 원장·강사용 (기획서 §15-2).
@@ -109,6 +111,7 @@ let TOKEN=localStorage.getItem('wbr.admin.token')||null;
 /* 서버가 아는 추출 종류(naesin-extract.mjs KINDS)와 그 종류가 함께 만들어 내는 곁딸린 배열.
    words 추출은 단어만, sentences 추출은 문장 + 어색한 문장 찾기 + 종합 Check 까지 낸다. */
 const KINDS=['words','sentences','dialogues','patterns','items'];
+const DRAFT_KINDS=KINDS.concat(['oddOneItems','checkItems','keyExpressions','functions','vocabSidebar','readingQA']);
 const KIND_KO={words:'단어',sentences:'본문 문장',dialogues:'대화문',patterns:'문법 패턴',items:'저장 문항',
   oddOneItems:'어색한 문장 찾기',checkItems:'종합 Check'};
 const kindKo=k=>KIND_KO[k]||k;
@@ -126,16 +129,20 @@ let JOBS=null;          // 작업 목록 (null = 아직 못 받음)
 let JOB=null,GATE=null,SRC={};   // 열어 둔 작업 하나
 let SEL=null;           // 선택된 행의 검수 키 — 키보드 조작과 원천 강조의 기준
 let EDIT=null;          // 편집 중인 행의 검수 키
+let PDF_WORD_EDIT=null; // 일반 단어 교정 입력은 현재 작업의 브라우저에만 둔다
 let FKIND='all',FONLY='issue';   // 필터: 종류 · 무엇만 볼지('issue'|'pending'|'all')
 let NEWSRC=[];          // 새 작업에 붙인 원천 [{name,kind,text}] — 만들기 전까지 화면에만 있다
 let BUSY=false;
+let PDF_LOCAL=null,JOB_READ=0;   // 본문 미대응 열은 현재 작업의 브라우저 메모리에만 둔다
+let PDF_VIEW=null,PDF_READ=0;
+function clearPdfView(){PDF_READ++;if(PDF_VIEW&&PDF_VIEW.url)URL.revokeObjectURL(PDF_VIEW.url);PDF_VIEW=null;}
 
 async function api(path,opt){
-  let r;
+  let r;const token=TOKEN,read=JOB_READ;
   try{r=await fetch('/api'+path,Object.assign({headers:{'Content-Type':'application/json',...(TOKEN?{Authorization:'Bearer '+TOKEN}:{})}},opt||{}));}
   catch(e){const err=new Error('네트워크 오류 — 연결을 확인하고 다시 시도하세요.');err.network=true;throw err;}
   const j=await r.json().catch(()=>({}));
-  if(r.status===401&&TOKEN){TOKEN=null;localStorage.removeItem('wbr.admin.token');renderLogin('세션이 만료됐어요. 다시 로그인해 주세요.');throw new Error('auth');}
+  if(r.status===401&&token){if(TOKEN===token&&JOB_READ===read){TOKEN=null;localStorage.removeItem('wbr.admin.token');renderLogin('세션이 만료됐어요. 다시 로그인해 주세요.');}throw new Error('auth');}
   if(!r.ok){const err=new Error(j.error||('HTTP '+r.status));err.status=r.status;err.body=j;throw err;}
   return j;
 }
@@ -147,6 +154,8 @@ function fmtLast(t){if(!t)return '—';const d=(Date.now()-new Date(t))/60000;if
   if(d<2)return '방금';if(d<60)return Math.round(d)+'분 전';if(d<1440)return Math.round(d/60)+'시간 전';return Math.round(d/1440)+'일 전';}
 
 function renderLogin(msg){
+  clearPdfView();
+  VIEW='login';JOB=null;GATE=null;SRC={};SEL=null;EDIT=null;PDF_WORD_EDIT=null;PDF_LOCAL=null;NEWSRC=[];JOBS=null;JOB_READ++;
   $('#btnRefresh').hidden=true;$('#btnLogout').hidden=true;hideBanner();
   /* 로그인 폼은 공용 모듈이 그린다(아이디·비밀번호 기본, PIN 갈래로 전환) — reading-server/public/admin-login.js */
   $('#app').innerHTML='<div class="card" id="loginCard"><h2>강사 로그인</h2><div id="loginHost"></div></div>';
@@ -256,6 +265,8 @@ function srcHtml(text,anchor){
 
 /* ── 목록 화면 ── */
 async function openList(){
+  clearPdfView();
+  PDF_LOCAL=null;PDF_WORD_EDIT=null;JOB_READ++;
   VIEW='list';JOB=null;GATE=null;SRC={};SEL=null;EDIT=null;
   $('#btnRefresh').hidden=false;$('#btnLogout').hidden=false;
   try{JOBS=(await api('/naesin/admin/jobs')).jobs||[];hideBanner();}
@@ -354,16 +365,28 @@ async function delJob(id){
 }
 
 /* ── 검수 화면 ── */
+async function readJob(id,read,token){
+  const j=await api('/naesin/admin/job?id='+encodeURIComponent(id)+'&src=1');
+  if(read!==JOB_READ||TOKEN!==token||VIEW!=='job')return false;
+  if(!j.job||j.job.jobId!==id)throw new Error('작업 재조회에 실패했어요.');
+  if(JOB&&JOB.jobId===id&&Date.parse(j.job.updatedAt)<Date.parse(JOB.updatedAt))return true;
+  JOB=j.job;GATE=j.gate;SRC=j.sources||{};hideBanner();return true;
+}
 async function openJob(id){
+  const read=++JOB_READ,token=TOKEN;
+  if(PDF_VIEW&&(PDF_VIEW.jobId!==id||PDF_VIEW.token!==token||PDF_VIEW.busy))clearPdfView();
+  if(PDF_LOCAL&&PDF_LOCAL.jobId!==id)PDF_LOCAL=null;
+  if(PDF_WORD_EDIT&&PDF_WORD_EDIT.jobId!==id)PDF_WORD_EDIT=null;
   VIEW='job';EDIT=null;SEL=null;FKIND='all';FONLY='issue';
   try{
-    const j=await api('/naesin/admin/job?id='+encodeURIComponent(id)+'&src=1');
-    JOB=j.job;GATE=j.gate;SRC=j.sources||{};hideBanner();
-  }catch(e){if(isAuth(e))return;fail(e);openList();return;}
+    if(!await readJob(id,read,token))return;
+  }catch(e){if(read!==JOB_READ||TOKEN!==token||VIEW!=='job'||isAuth(e))return;fail(e);if(!JOB||JOB.jobId!==id)openList();return;}
   renderJob();
 }
 function renderJob(){
   if(!JOB){openList();return;}
+  if(PDF_VIEW&&(PDF_VIEW.jobId!==JOB.jobId||PDF_VIEW.token!==TOKEN))clearPdfView();
+  const advancedOpen=$('#advancedInput')&&$('#advancedInput').open;
   const {byKey,loose}=issueIndex();
   const rows=visibleRows(byKey);
   if(SEL&&!rows.some(r=>r.key===SEL))SEL=null;
@@ -372,9 +395,10 @@ function renderJob(){
   const done=(GATE.total||0)-(GATE.pending||0);
   const srcKinds=(JOB.sources||[]).map(s=>s.kind).filter((k,i,a)=>a.indexOf(k)===i);
   const kinds=Object.keys(JOB.draft||{});
+  const hasPdf=kinds.some(k=>(JOB.draft[k]||[]).some(row=>row&&row._pdfReview));
   const clean=(()=>{const r=(JOB.review)||{};let n=0;
     for(const kind of kinds)(JOB.draft[kind]||[]).forEach((row,i)=>{const k=rowKey(kind,row,i);
-      if(!(byKey[k]||[]).length&&!(r[k]&&r[k].state!=='pending'))n+=1;});
+      if(!(row&&row._pdfReview)&&!(byKey[k]||[]).length&&!(r[k]&&r[k].state!=='pending'))n+=1;});
     return n;})();
 
   $('#app').innerHTML=`
@@ -402,10 +426,20 @@ function renderJob(){
     <div id="pubOut"></div>
   </div>
 
-  <div class="card"><h2>초안 만들기</h2>
+  <div class="card"><h2>자료 준비</h2>
     <div id="exOut"></div>
-    <h3>초안 JSON 넣기 <small class="muted">기본 경로</small></h3>
-    <p class="muted">Claude Code 세션에서 교재 PDF 를 읽어 만든 팩 JSON 을 여기 넣습니다.
+    <p class="muted">이 PC에 준비된 자료를 불러오면 원본 PDF와 후보를 나란히 볼 수 있어요. 원본을 보고 오류를 수정한 뒤 승인하세요. 본문은 영어·한글 대응과 끊어읽기 뜻을 확인해야 합니다.</p>
+    <div class="filters"><button class="btn" id="btnPcReview" ${BUSY?'disabled':''}>PC 자료 불러오기</button></div>
+    <div id="pdfReviewOut" role="status" aria-live="polite"></div>
+    <details id="advancedInput" style="margin-top:8px" ${advancedOpen?'open':''}><summary style="cursor:pointer;font-weight:800;color:var(--navy)">고급 입력</summary>
+    <h3>다른 검수 초안 파일 연결</h3>
+    <p class="muted">준비된 PC 자료가 없거나 별도 초안을 쓰는 경우 검수 파일을 선택하세요. 모든 후보는 원본 대조가 필요합니다.</p>
+    <div class="filters"><input type="file" id="pdfReviewFile" accept=".json,application/json">
+      <button class="btn ghost" id="btnPdfReview" ${BUSY?'disabled':''}>로컬 검수 초안 넣기</button></div>
+    ${pdfColumnsHtml()}
+    ${pdfSentenceHtml()}
+    <h3>학습 팩 JSON 넣기</h3>
+    <p class="muted">검수자가 구성한 학습 팩 JSON을 여기 넣습니다.
       파일 여러 개(<code>words.json</code>·<code>sentences.json</code>…)를 한 번에 골라도 되고,
       통짜 팩 하나여도 됩니다 — 배열이 아닌 키(<code>packId</code>·<code>textbook</code> 등)는 알아서 버립니다.</p>
     <div class="filters">
@@ -418,12 +452,20 @@ function renderJob(){
       <textarea id="draftJson" rows="7" placeholder='{"words":[...],"sentences":[...]}' spellcheck="false"></textarea>
       <div style="margin-top:8px"><button class="btn ghost" id="btnDraft">붙여넣은 것으로 넣기</button></div>
     </details>
+    <details style="margin-top:8px"><summary style="cursor:pointer;font-weight:800;color:var(--navy)">본문 문장 수동 입력 안내</summary>
+      <p class="muted">원본 PDF의 영어·한글 문장을 직접 대조한 뒤 <code>sentences</code> 배열을 위 붙여넣기 칸에 넣으세요.
+        <code>seq</code>는 1부터 순서대로, <code>dayGroup</code>은 단락, <code>chunks[].ko</code>는 영어 순서대로 뜻을 적습니다.
+        원천 열이 화면에 있어도 문장 대응을 완료한 것은 아닙니다. 모든 문장을 대조·검수해야 배포할 수 있습니다.</p>
+      <pre style="white-space:pre-wrap;word-break:break-word">${esc(JSON.stringify({sentences:[{seq:1,dayGroup:'1',en:'A toy is blue.',ko:'장난감이 파랗다.',chunks:[{en:'A toy',ko:'장난감은'},{en:'is blue.',ko:'파랗다.'}]}]},null,2))}</pre>
+      <p class="muted">위 문장은 자체 창작 형식 예시입니다. 실제 교재 문장을 대신하지 않습니다.</p>
+    </details>
     <div id="draftOut"></div>
     ${srcKinds.length?`<details style="margin-top:10px"><summary style="cursor:pointer;font-weight:800;color:var(--navy)">서버에서 AI 추출 (선택 — 서버에 API 키가 있을 때만)</summary>
       <p class="muted">원장 구독(Claude Max)으로 만드는 것이 기본 경로라 평소에는 쓰지 않습니다.
         무인으로 돌려야 할 때만 서버에 키를 넣고 씁니다 — 그때는 호출마다 요금이 따로 나갑니다.</p>
       <div class="filters">${srcKinds.map(k=>`<button class="btn sm ghost" data-ex="${esc(k)}">${esc(kindKo(k))} 추출</button>`).join('')}</div>
     </details>`:''}
+    </details>
   </div>
 
   ${kinds.length?`<div class="card"><h2>검수 <small>${num(rows.length)||0}행 보임</small></h2>
@@ -437,19 +479,22 @@ function renderJob(){
       <span class="sp" style="flex:1"></span>
       <button class="btn sm ghost" id="btnBulk" ${clean?'':'disabled'}>문제 없는 ${num(clean)||0}행 일괄 승인</button>
     </div>
-    <p class="keys">전수 검토는 현실적으로 불가능합니다 — 자동 대조가 잡은 행만 사람이 보고, 나머지는 일괄 승인하세요.
+    <p class="keys">${hasPdf?'PDF 후보는 원본을 대조해 한 행씩 검수하세요. 자동 검사만으로 승인하지 않습니다.':'전수 검토는 현실적으로 불가능합니다 — 자동 대조가 잡은 행만 사람이 보고, 나머지는 일괄 승인하세요.'}
       키보드: <kbd>j</kbd>/<kbd>k</kbd> 이동 · <kbd>a</kbd> 승인 · <kbd>x</kbd> 버림 · <kbd>e</kbd> 편집 · <kbd>Esc</kbd> 취소</p>
     <div class="panes">
-      <div class="pane"><h3>원천 <span class="muted" id="srcWho"></span></h3><pre id="srcText"></pre></div>
+      <div class="pane"><h3>원본 <span class="muted" id="srcWho"></span></h3><div id="pdfPreview"></div><pre id="srcText"></pre></div>
       <div class="pane"><h3>추출 행</h3><div id="rowList"></div></div>
     </div>
-  </div>`:'<div class="card"><p class="muted">아직 초안이 없어요. 위에서 AI 추출을 돌리거나 초안 JSON을 넣으세요.</p></div>'}`;
+  </div>`:'<div class="card"><p class="muted">아직 초안이 없어요. 위에서 로컬 검수 초안이나 학습 팩 JSON을 넣으세요.</p></div>'}`;
 
   $('#btnBack').onclick=openList;
   $('#btnPub').onclick=publish;
   document.querySelectorAll('[data-ex]').forEach(b=>b.onclick=()=>runExtract(b.dataset.ex,b));
   $('#btnDraft').onclick=()=>putDraft($('#draftJson').value, '붙여넣기');
   $('#btnDraftFile').onclick=putDraftFiles;
+  $('#btnPdfReview').onclick=()=>putPdfReviewFile();
+  $('#btnPcReview').onclick=()=>putPdfReviewFile(true);
+  bindPdfSentence();
   $('#draftFile').onchange=()=>{
     const fs2=[...$('#draftFile').files];
     $('#draftPick').textContent=fs2.length?('고른 파일 '+fs2.length+'개: '+fs2.map(f=>f.name).join(', ')):'';
@@ -473,7 +518,7 @@ function renderRows(rows){
       ${sm.s?`<div class="rs">${esc(sm.s)}</div>`:''}
       ${r.issues.map(x=>`<div class="ri ${x.sev}">${x.sev==='bad'?'✕':'!'} ${esc(x.message)}</div>`).join('')}
       ${r.note?`<div class="rs">메모: ${esc(r.note)}</div>`:''}
-      ${editing?`<textarea data-ed="${esc(r.key)}" spellcheck="false">${esc(JSON.stringify(r.patch?{...r.row,...r.patch}:r.row,null,2))}</textarea>
+      ${editing&&r.kind==='words'&&r.row&&r.row._pdfReview?pdfWordEditHtml(r):editing?`<textarea data-ed="${esc(r.key)}" spellcheck="false">${esc(JSON.stringify(r.patch?{...r.row,...r.patch}:r.row,null,2))}</textarea>
         <div class="ra"><button class="btn sm" data-save="${esc(r.key)}">저장</button>
           <button class="btn sm ghost" data-cancel="1">취소</button>
           <span class="muted">지운 키는 비운 값으로 저장됩니다.</span></div>`
@@ -486,7 +531,7 @@ function renderRows(rows){
   }).join(''):'<p class="muted" style="padding:10px">이 필터에 걸리는 행이 없어요. 「전체」로 바꿔 보세요.</p>';
 
   el.querySelectorAll('.row').forEach(d=>d.onclick=e=>{
-    if(e.target.closest('button')||e.target.closest('textarea'))return;
+    if(e.target.closest('button,textarea,input,select,label,fieldset'))return;
     SEL=d.dataset.key;renderJob();
   });
   el.querySelectorAll('[data-ok]').forEach(b=>b.onclick=()=>review(b.dataset.ok,'ok'));
@@ -495,11 +540,57 @@ function renderRows(rows){
     review(b.dataset.drop,r&&r.state==='dropped'?'pending':'dropped');
   });
   el.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>{EDIT=b.dataset.edit;SEL=b.dataset.edit;renderJob();});
-  el.querySelectorAll('[data-cancel]').forEach(b=>b.onclick=()=>{EDIT=null;renderJob();});
+  el.querySelectorAll('[data-cancel]').forEach(b=>b.onclick=()=>{EDIT=null;PDF_WORD_EDIT=null;renderJob();});
   el.querySelectorAll('[data-save]').forEach(b=>b.onclick=()=>saveEdit(b.dataset.save));
   const sel=el.querySelector('.row[aria-selected="true"]');
   if(sel&&sel.scrollIntoView)sel.scrollIntoView({block:'nearest'});
-  const ta=el.querySelector('textarea[data-ed]');if(ta)ta.focus();
+  const ta=el.querySelector('textarea[data-ed]')||(PDF_WORD_EDIT&&EDIT===PDF_WORD_EDIT.key?$('#pdfWordHead'):null);if(ta)ta.focus();
+  bindPdfWordEdit();
+}
+function pdfWordEditHtml(r){
+  const row=r.patch?{...r.row,...r.patch}:r.row;
+  if(!PDF_WORD_EDIT||PDF_WORD_EDIT.jobId!==JOB.jobId||PDF_WORD_EDIT.key!==r.key)
+    PDF_WORD_EDIT={jobId:JOB.jobId,key:r.key,baseUpdatedAt:JOB.updatedAt,headword:String(row.headword||''),pos:String(row.pos||''),
+      meaningKo:Array.isArray(row.meaningKo)?row.meaningKo.join('\n'):'',reading:Array.isArray(row.sections)&&row.sections.includes('reading'),
+      conversation:Array.isArray(row.sections)&&row.sections.includes('conversation'),busy:false,message:''};
+  const f=PDF_WORD_EDIT;
+  return`<fieldset id="pdfWordFields" aria-label="PDF 단어 교정" style="border:0;padding:0;margin:0;min-width:0" ${f.busy?'disabled':''}>
+    <div class="grid-form"><label class="fld">표제어<input id="pdfWordHead" value="${esc(f.headword)}" spellcheck="false"></label>
+      <label class="fld">품사<input id="pdfWordPos" value="${esc(f.pos)}" placeholder="예: n. / v. / adj."></label></div>
+    <label class="fld">뜻 · 한 줄에 하나<textarea id="pdfWordMean" rows="3">${esc(f.meaningKo)}</textarea></label>
+    <p class="muted">원본 PDF를 대조해 단어가 나온 곳을 직접 고르세요.</p>
+    <div class="filters"><label><input id="pdfWordReading" type="checkbox" ${f.reading?'checked':''}> 본문</label>
+      <label><input id="pdfWordConversation" type="checkbox" ${f.conversation?'checked':''}> 대화</label></div>
+    <div class="ra"><button class="btn sm" id="btnPdfWordSave">대조한 교정 저장</button><button class="btn sm ghost" data-cancel="1">취소</button></div>
+    <p class="muted">ID와 원본 위치는 유지합니다. 저장하면 이 행은 수정 검수로 표시됩니다.</p>
+  </fieldset><div id="pdfWordOut" class="err" role="status" aria-live="polite">${esc(f.message)}</div>`;
+}
+function bindPdfWordEdit(){
+  if(!$('#pdfWordFields')||!PDF_WORD_EDIT||EDIT!==PDF_WORD_EDIT.key)return;
+  const f=PDF_WORD_EDIT;
+  for(const [id,key] of [['pdfWordHead','headword'],['pdfWordPos','pos'],['pdfWordMean','meaningKo']]){
+    const el=$('#'+id);el.oninput=()=>{f[key]=el.value;f.message='';$('#pdfWordOut').textContent='';};
+  }
+  for(const [id,key] of [['pdfWordReading','reading'],['pdfWordConversation','conversation']]){
+    const el=$('#'+id);el.onchange=()=>{f[key]=el.checked;f.message='';$('#pdfWordOut').textContent='';};
+  }
+  $('#btnPdfWordSave').onclick=savePdfWord;
+}
+async function savePdfWord(){
+  const f=PDF_WORD_EDIT;if(!JOB||!f||f.busy||EDIT!==f.key||JOB.jobId!==f.jobId)return;
+  const read=JOB_READ,token=TOKEN,current=()=>JOB&&JOB.jobId===f.jobId&&JOB_READ===read&&TOKEN===token&&VIEW==='job'&&PDF_WORD_EDIT===f;
+  const meaningKo=f.meaningKo.split(/\r?\n/).map(s=>s.trim()).filter(Boolean),sections=[];
+  if(f.reading)sections.push('reading');if(f.conversation)sections.push('conversation');
+  if(!f.headword.trim()||!meaningKo.length||!sections.length){f.message='표제어·뜻을 입력하고 본문 또는 대화를 직접 선택하세요.';$('#pdfWordOut').textContent=f.message;return;}
+  if(f.baseUpdatedAt!==JOB.updatedAt){f.message='작업이 바뀌었어요. 입력을 유지했습니다. 입력을 확인한 뒤 취소하고 최신 원문을 대조해 다시 편집하세요.';$('#pdfWordOut').textContent=f.message;return;}
+  const patch={...((JOB.review||{})[f.key]||{}).patch,headword:f.headword.trim(),pos:f.pos.trim(),meaningKo,sections};
+  delete patch._pdfReview;
+  f.busy=true;$('#pdfWordFields').disabled=true;
+  try{
+    if(await review(f.key,'fixed',patch)){
+      if(!current())return;PDF_WORD_EDIT=null;EDIT=null;renderJob();
+    }
+  }finally{f.busy=false;if(current()){EDIT=f.key;renderJob();}}
 }
 function renderSrc(rows){
   const cur=rows.find(r=>r.key===SEL)||rows[0]||null;
@@ -509,9 +600,62 @@ function renderSrc(rows){
   const who=$('#srcWho');
   if(who)who.textContent=srcKind?(kindKo(srcKind)+(SRC[srcKind]?'':' · 없음')):'';
   const el=$('#srcText');if(!el)return;
+  const pdf=cur&&cur.row&&cur.row._pdfReview;
+  renderPdfPreview(pdf?cur:null);
+  if(pdf){
+    if(who)who.textContent='PDF 후보 · 원본 대조';
+    const row=cur.patch?{...cur.row,...cur.patch}:cur.row;
+    const content=kind==='sentences'?['영어 문장: '+String(row.en||''),'한글 해석: '+String(row.ko||''),'단락: '+String(row.dayGroup||''),'영어 순서대로 청크·직독직해 뜻을 대조하세요.']
+      :['단어 후보: '+String(row.headword||''),'뜻 후보: '+(Array.isArray(row.meaningKo)?row.meaningKo.join(' · '):'형식 확인 필요'),'품사: '+String(row.pos||'미지정'),'sections를 원본과 대조해 reading 또는 conversation으로 지정하세요.'];
+    el.textContent=[...content,
+      '원천 위치: '+(pdf.locations||[]).map(p=>p.page+'쪽 ['+(p.bbox||[]).join(', ')+']').join(' · '),
+      '검토 표시: '+(pdf.flags||[]).join(', ')].join('\n');
+    return;
+  }
   el.innerHTML=srcHtml(srcKind?SRC[srcKind]:'',cur?anchorOf(cur.kind,cur.patch?{...cur.row,...cur.patch}:cur.row):'');
   const hit=el.querySelector('#srcHit');
   if(hit&&hit.scrollIntoView)hit.scrollIntoView({block:'center'});
+}
+function renderPdfPreview(row){
+  const host=$('#pdfPreview');if(!host)return;
+  const pdfs=PDF_LOCAL&&JOB&&PDF_LOCAL.jobId===JOB.jobId&&PDF_LOCAL.token===TOKEN&&PDF_LOCAL.pdfs;
+  if(PDF_VIEW&&(!JOB||PDF_VIEW.jobId!==JOB.jobId||PDF_VIEW.token!==TOKEN))clearPdfView();
+  $('#srcText').hidden=!!(row&&pdfs&&pdfs.length);
+  if(!row||!pdfs||!pdfs.length){host.innerHTML=row?'<p class="muted" style="padding:0 12px">원본 PDF는 「PC 자료 불러오기」로 연결하세요. 다른 서버에서는 기존 파일 입력을 사용할 수 있어요.</p>':'';return;}
+  const wanted=row.kind==='words'?'03':'02';
+  const source=PDF_VIEW&&PDF_VIEW.rowKey===row.key?PDF_VIEW.source:pdfs.some(p=>p.source===wanted)?wanted:pdfs[0].source;
+  if(PDF_VIEW&&PDF_VIEW.source!==source)clearPdfView();
+  if(!PDF_VIEW)PDF_VIEW={jobId:JOB.jobId,token:TOKEN,source,rowKey:row.key,url:null,busy:false,message:''};
+  const view=PDF_VIEW;view.rowKey=row.key;
+  const info=pdfs.find(p=>p.source===source),where=row.row._pdfReview.locations&&row.row._pdfReview.locations[0];
+  const page=where&&Number.isInteger(where.page)&&where.page>=1&&where.page<=info.pageCount?where.page:1;
+  const url=view.url&&view.url+'#page='+page;
+  host.innerHTML='<div style="padding:8px 12px"><label class="fld">원본 자료<select id="pdfSource">'
+    +pdfs.map(p=>'<option value="'+p.source+'"'+(p.source===source?' selected':'')+'>'+esc(p.source==='03'?'단어 자료':'본문 자료')+'</option>').join('')+'</select></label>'
+    +'<p class="muted">'+esc(info.file)+' · '+page+'쪽'+(url?' · <a href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">PDF 크게 보기</a>':'')+'</p>'
+    +(view.message?'<p class="err" role="status">'+esc(view.message)+'</p><button class="btn sm ghost" id="btnPdfRetry">PDF 다시 열기</button>':view.busy?'<p class="muted" role="status">원본 PDF를 여는 중…</p>':'')+'</div>'
+    +(url?'<iframe title="검수할 원본 PDF" src="'+esc(url)+'" style="display:block;width:100%;height:66vh;min-height:360px;border:0"></iframe>':'');
+  $('#pdfSource').onchange=()=>{const next=$('#pdfSource').value;if(!pdfs.some(p=>p.source===next))return;clearPdfView();PDF_VIEW={jobId:JOB.jobId,token:TOKEN,source:next,rowKey:row.key,url:null,busy:false,message:''};renderPdfPreview(row);};
+  const retry=$('#btnPdfRetry');if(retry)retry.onclick=()=>{view.message='';renderPdfPreview(row);};
+  if(!view.url&&!view.busy&&!view.message)loadLocalPdf();
+}
+async function loadLocalPdf(){
+  const view=PDF_VIEW,local=PDF_LOCAL,read=JOB_READ,request=++PDF_READ;
+  if(!view||!local||!TOKEN)return;
+  const current=()=>PDF_VIEW===view&&PDF_LOCAL===local&&TOKEN===view.token&&JOB&&JOB.jobId===view.jobId&&VIEW==='job'&&JOB_READ===read&&PDF_READ===request;
+  const info=local.pdfs.find(p=>p.source===view.source);
+  view.busy=true;
+  renderSrc(visibleRows(issueIndex().byKey));
+  try{
+    const r=await fetch('/api/naesin/admin/job/local-pdf?id='+encodeURIComponent(view.jobId)+'&source='+view.source+'&sha256='+info.sha256,{headers:{Authorization:'Bearer '+view.token},cache:'no-store'});
+    if(!current())return;
+    if(r.status===401){TOKEN=null;localStorage.removeItem('wbr.admin.token');renderLogin('세션이 만료됐어요. 다시 로그인해 주세요.');return;}
+    if(!r.ok){const body=await r.json().catch(()=>({}));throw new Error(body.error||'원본 PDF를 열지 못했어요. PC 자료를 다시 불러오세요.');}
+    if(!/^application\/pdf(?:;|$)/i.test(r.headers.get('content-type')||''))throw new Error('원본 PDF 응답이 아니에요. PC 자료를 다시 불러오세요.');
+    const blob=await r.blob();if(!current())return;
+    view.url=URL.createObjectURL(blob);
+  }catch(e){if(current())view.message=e.message||'원본 PDF를 열지 못했어요. 다시 시도하세요.';}
+  finally{if(current()){view.busy=false;renderSrc(visibleRows(issueIndex().byKey));}}
 }
 
 /* ── 검수 저장 ──
@@ -519,42 +663,59 @@ function renderSrc(rows){
    실패하면 되돌리고 배너를 띄운다 — 조용히 넘기면 승인한 줄 알고 배포를 누른다. */
 async function review(key,state,patch,note){
   if(!JOB)return;
-  const before=JOB.review?{...JOB.review}:{};
-  JOB.review={...before,[key]:{state,...(patch?{patch}:{}),...(note?{note}:{})}};
-  EDIT=null;SEL=key;renderJob();
+  const target=JOB,jobId=JOB.jobId,read=JOB_READ,token=TOKEN,baseUpdatedAt=JOB.updatedAt,before=JOB.review&&JOB.review[key];
+  if(typeof baseUpdatedAt!=='string'||!baseUpdatedAt){showBanner('작업 버전이 없어요. 상단 새로고침으로 최신 작업을 읽은 뒤 다시 검수하세요.');return;}
+  const current=()=>JOB&&JOB.jobId===jobId&&read===JOB_READ&&TOKEN===token&&VIEW==='job';
+  const rec={...before,state};
+  if(patch!==undefined){if(patch)rec.patch=patch;else delete rec.patch;}
+  if(note!==undefined){if(note)rec.note=note;else delete rec.note;}
+  JOB.review={...JOB.review,[key]:rec};
+  if(!PDF_WORD_EDIT||PDF_WORD_EDIT.key!==key||EDIT!==key)EDIT=null;
+  SEL=key;renderJob();
+  let saved=false;
   try{
-    const body={jobId:JOB.jobId,key,state};
-    if(patch)body.patch=patch;
-    if(note)body.note=note;
-    const j=await api('/naesin/admin/job/review',{method:'POST',body:JSON.stringify(body)});
-    GATE=j.gate;JOB.status=(j.job&&j.job.status)||JOB.status;hideBanner();renderJob();
+    const body={jobId,baseUpdatedAt,key,state};
+    if(patch!==undefined)body.patch=patch;
+    if(note!==undefined)body.note=note;
+    await api('/naesin/admin/job/review',{method:'POST',body:JSON.stringify(body)});saved=true;
+    if(!current()||!await readJob(jobId,read,token))return;
+    renderJob();
+    return true;
   }catch(e){
-    if(isAuth(e))return;
-    JOB.review=before;renderJob();
-    showBanner('검수를 저장하지 못했어요 — '+(e.message||''));
+    if(isAuth(e)||!current())return;
+    if(!saved&&JOB===target&&JOB.review[key]===rec){
+      JOB.review={...JOB.review};if(before)JOB.review[key]=before;else delete JOB.review[key];renderJob();
+    }
+    showBanner(saved?'검수 저장은 끝났지만 결과를 다시 읽지 못했어요. 입력을 유지했습니다. 상단 새로고침으로 최신 작업을 확인하세요.'
+      :e.status===409?'다른 곳에서 작업이 바뀌었어요. 검수와 입력을 유지했습니다. 상단 새로고침으로 최신 작업을 읽고 확인한 뒤 다시 검수하세요.':'검수를 저장하지 못했어요 — '+(e.message||''));
   }
 }
 async function bulkOk(){
   if(!JOB)return;
+  const jobId=JOB.jobId,read=JOB_READ,token=TOKEN,baseUpdatedAt=JOB.updatedAt;
+  if(typeof baseUpdatedAt!=='string'||!baseUpdatedAt){showBanner('작업 버전이 없어요. 상단 새로고침으로 최신 작업을 읽은 뒤 다시 검수하세요.');return;}
+  const current=()=>JOB&&JOB.jobId===jobId&&read===JOB_READ&&TOKEN===token&&VIEW==='job';
   const {byKey}=issueIndex();
   const review=JOB.review||{};
   const keys=[];
   for(const kind of Object.keys(JOB.draft||{}))
     (JOB.draft[kind]||[]).forEach((row,i)=>{
       const k=rowKey(kind,row,i);
+      if(row&&row._pdfReview)return;
       if((byKey[k]||[]).length)return;                 /* 문제 있는 행은 사람이 본다 */
       if(review[k]&&review[k].state!=='pending')return;
       keys.push(k);
     });
   if(!keys.length)return;
   if(!confirm('자동 대조에서 문제가 없던 '+keys.length+'행을 승인합니다. 계속할까요?'))return;
+  let saved=false;
   try{
-    const j=await api('/naesin/admin/job/review',{method:'POST',
-      body:JSON.stringify({jobId:JOB.jobId,rows:keys.map(k=>({key:k,state:'ok'}))})});
-    GATE=j.gate;
-    keys.forEach(k=>{JOB.review=JOB.review||{};JOB.review[k]={state:'ok'};});
-    JOB.status=(j.job&&j.job.status)||JOB.status;hideBanner();renderJob();
-  }catch(e){fail(e);}
+    await api('/naesin/admin/job/review',{method:'POST',
+      body:JSON.stringify({jobId,baseUpdatedAt,rows:keys.map(k=>({key:k,state:'ok'}))})});saved=true;
+    if(!current()||!await readJob(jobId,read,token))return;
+    renderJob();
+  }catch(e){if(isAuth(e)||!current())return;showBanner(saved?'검수 저장은 끝났지만 결과를 다시 읽지 못했어요. 입력을 유지했습니다. 상단 새로고침으로 최신 작업을 확인하세요.'
+    :e.status===409?'다른 곳에서 작업이 바뀌었어요. 검수와 입력을 유지했습니다. 상단 새로고침으로 최신 작업을 읽고 확인한 뒤 다시 검수하세요.':e.message);}
 }
 function saveEdit(key){
   const ta=document.querySelector('textarea[data-ed="'+key.replace(/"/g,'\\"')+'"]');
@@ -613,6 +774,8 @@ function aiLeftHtml(j){
 /* 파일 여러 개를 한 초안으로 병합한다 — 관리 웹의 팩 업로드와 같은 결이다.
    같은 종류가 두 파일에 나뉘어 있으면 이어 붙인다(단어를 나눠 만든 경우). */
 async function putDraftFiles(){
+  if(BUSY||!JOB)return;
+  const jobId=JOB.jobId,read=JOB_READ;
   const files=[...$('#draftFile').files];
   if(!files.length){$('#draftOut').innerHTML='<p class="err">파일을 고르세요.</p>';return;}
   const merged={};const bad=[];
@@ -620,31 +783,232 @@ async function putDraftFiles(){
     let obj;
     try{obj=JSON.parse(await f.text());}
     catch(e){bad.push(f.name+' — JSON 을 읽지 못했어요');continue;}
+    if(!JOB||JOB.jobId!==jobId||read!==JOB_READ)return;
     if(!obj||typeof obj!=='object'||Array.isArray(obj)){bad.push(f.name+' — 최상위가 객체가 아니에요');continue;}
-    for(const [k,v] of Object.entries(obj))if(Array.isArray(v)&&v.length)merged[k]=(merged[k]||[]).concat(v);
+    try{for(const [k,v] of Object.entries(regularDraft(obj)))merged[k]=(merged[k]||[]).concat(v);}
+    catch(e){bad.push(f.name+' — '+e.message);}
   }
   if(bad.length){$('#draftOut').innerHTML='<div class="issues bad">'+bad.map(esc).join('<br>')+'</div>';return;}
-  sendDraft(merged, files.length+'개 파일');
+  return sendDraft(merged, files.length+'개 파일',jobId);
 }
 function putDraft(raw, how){
+  if(BUSY||!JOB)return;
   let obj;
   try{obj=JSON.parse(raw);}
   catch(e){$('#draftOut').innerHTML='<p class="err">JSON 을 읽지 못했어요 — '+esc(e.message)+'</p>';return;}
   if(!obj||typeof obj!=='object'||Array.isArray(obj)){$('#draftOut').innerHTML='<p class="err">최상위는 객체여야 해요.</p>';return;}
   /* 팩 통짜 JSON을 그대로 붙여도 되게 — 배열이 아닌 최상위 키(packId·textbook 등)는 버린다 */
-  const draft={};
-  for(const [k,v] of Object.entries(obj))if(Array.isArray(v)&&v.length)draft[k]=v;
-  sendDraft(draft, how);
+  let draft;
+  try{draft=regularDraft(obj);}catch(e){$('#draftOut').innerHTML='<p class="err">'+esc(e.message)+'</p>';return;}
+  return sendDraft(draft, how);
 }
-async function sendDraft(draft, how){
+function regularDraft(obj){
+  if(obj.kind==='naesin-pdf-review-draft'||DRAFT_KINDS.some(k=>Array.isArray(obj[k])&&obj[k].some(r=>r&&r._pdfReview)))
+    throw new Error('PDF 검수 초안은 위 「로컬 검수 초안 넣기」에서 선택하세요.');
+  const draft={};
+  for(const [k,v] of Object.entries(obj))if(Array.isArray(v)){
+    if(!DRAFT_KINDS.includes(k))throw new Error('지원하지 않는 초안 배열: '+k);
+    if(v.length)draft[k]=v;
+  }
+  return draft;
+}
+function pdfReviewDraft(obj){
+  if(!obj||obj.kind!=='naesin-pdf-review-draft'||obj.version!==1||obj.status!=='needs-review'||obj.publishable!==false)
+    throw new Error('미검수 상태의 로컬 PDF 검수 초안(v1)이 필요해요.');
+  if(!Array.isArray(obj.wordCandidates)||!obj.wordCandidates.length||!Array.isArray(obj.passageColumns))
+    throw new Error('단어 후보와 본문 원천 열 배열이 필요해요.');
+  if(!Array.isArray(obj.unmatchedWordRows)||obj.unmatchedWordRows.length)
+    throw new Error('대응하지 못한 단어 원천 행이 있어요. 원본을 대조해 추출 초안을 먼저 보완하세요.');
+  const ids=new Set();
+  const words=obj.wordCandidates.map(c=>{
+    if(!c||typeof c.candidateId!=='string'||!/^wc-\d+$/.test(c.candidateId)||ids.has(c.candidateId)
+      ||typeof c.headCandidate!=='string'||!Array.isArray(c.meanings)||c.meanings.some(m=>typeof m!=='string')
+      ||!Array.isArray(c.posCandidates)||c.posCandidates.some(p=>typeof p!=='string')
+      ||!Array.isArray(c.reviewFlags)||c.reviewFlags.some(f=>typeof f!=='string'||!f||f.length>200)
+      ||!Array.isArray(c.sourceRows)||!c.sourceRows.length||c.sourceRows.length>100)
+      throw new Error('단어 후보 형식이나 후보 ID가 올바르지 않아요.');
+    ids.add(c.candidateId);
+    const flags=[...new Set(['REVIEW_REQUIRED',...c.reviewFlags])];
+    if(flags.length>100)throw new Error('검토 표시가 너무 많아요.');
+    const locations=c.sourceRows.map(r=>{
+      if(!r||!Number.isInteger(r.page)||r.page<1||r.page>1000000||!Array.isArray(r.bbox)||r.bbox.length!==4
+        ||r.bbox.some(v=>typeof v!=='number'||!Number.isFinite(v)||v<0)||r.bbox[0]>r.bbox[2]||r.bbox[1]>r.bbox[3])
+        throw new Error('PDF 원천 위치가 올바르지 않아요.');
+      return{page:r.page,bbox:r.bbox.slice()};
+    });
+    return{id:c.candidateId.replace(/^wc-/,'w-'),headword:c.headCandidate,pos:c.posCandidates.length===1?c.posCandidates[0]:'',
+      meaningKo:c.meanings.slice(),sections:[],_pdfReview:{flags,locations}};
+  });
+  const columns=obj.passageColumns.map(c=>{
+    if(!c||!Number.isInteger(c.page)||c.page<1||c.page>1000000||!['EN','KO'].includes(c.column)||typeof c.rawText!=='string')
+      throw new Error('본문 원천 열 형식이 올바르지 않아요.');
+    if(c.lines!==undefined&&!Array.isArray(c.lines))throw new Error('본문 줄 정보는 배열이어야 해요.');
+    const lines=(c.lines||[]).map(line=>{
+      if(!line||typeof line.text!=='string'||!line.text.trim()||!Array.isArray(line.tokens)||!line.tokens.length)
+        throw new Error('본문 줄의 글자와 위치 정보가 필요해요.');
+      const boxes=line.tokens.map(t=>{
+        const b=t&&[t.x0,t.top,t.x1,t.bottom];
+        if(!b||b.some(v=>typeof v!=='number'||!Number.isFinite(v)||v<0)||b[0]>b[2]||b[1]>b[3])
+          throw new Error('본문 줄 위치가 올바르지 않아요.');
+        return b;
+      });
+      return{text:line.text,bbox:[Math.min(...boxes.map(b=>b[0])),Math.min(...boxes.map(b=>b[1])),Math.max(...boxes.map(b=>b[2])),Math.max(...boxes.map(b=>b[3]))]};
+    });
+    return{page:c.page,column:c.column,rawText:c.rawText,lines};
+  });
+  return{words,columns};
+}
+function pdfColumnsHtml(){
+  if(!PDF_LOCAL||!JOB||PDF_LOCAL.jobId!==JOB.jobId)return'';
+  return'<details style="margin-top:8px"><summary style="cursor:pointer;font-weight:800;color:var(--navy)">본문 원천 '+PDF_LOCAL.columns.length+'열 · 문장 대응 전</summary>'
+    +'<p class="muted">원천 열 전체는 현재 브라우저에만 있습니다. 작업 변경·로그아웃·새로고침 뒤에는 PC 자료를 다시 불러오세요. 아래에서 직접 대응한 문장 후보와 선택 위치만 PC에 저장합니다.</p>'
+    +PDF_LOCAL.columns.map(c=>'<h3>'+c.page+'쪽 · '+esc(c.column)+'</h3><pre style="white-space:pre-wrap;word-break:break-word">'+esc(c.lines&&c.lines.length?c.lines.map((l,i)=>(i+1)+'. '+l.text).join('\n'):c.rawText)+'</pre>').join('')+'</details>';
+}
+function pdfSentenceHtml(){
+  if(!PDF_LOCAL||!JOB||PDF_LOCAL.jobId!==JOB.jobId)return'';
+  const columns=PDF_LOCAL.columns;
+  if(!['EN','KO'].every(side=>columns.some(c=>c.column===side&&c.lines&&c.lines.length)))
+    return'<p class="muted">본문 줄 위치 정보가 없는 초안입니다. 로컬 추출 도구로 새 검수 초안을 만들어 선택해야 문장을 대응할 수 있어요.</p>';
+  const f=PDF_LOCAL.sentence||(PDF_LOCAL.sentence={enColumn:'',enStart:'',enEnd:'',koColumn:'',koStart:'',koEnd:'',en:'',ko:'',dayGroup:'',chunks:[{en:'',ko:''}],keywords:[{en:'',ko:''}],loaded:null});
+  const ranges=['en','ko'].map(side=>`<div class="grid-form">
+    <label class="fld">${side==='en'?'영어':'한글'} 원천 열<select id="pdf${side==='en'?'En':'Ko'}Column"><option value="">쪽·열 선택</option>${columns.map((c,i)=>c.column===side.toUpperCase()&&c.lines&&c.lines.length?`<option value="${i}" ${f[side+'Column']===String(i)?'selected':''}>${c.page}쪽 · ${c.column} · ${c.lines.length}줄</option>`:'').join('')}</select></label>
+    <label class="fld">시작 줄<input id="pdf${side==='en'?'En':'Ko'}Start" type="number" min="1" step="1" value="${esc(f[side+'Start'])}"></label>
+    <label class="fld">끝 줄<input id="pdf${side==='en'?'En':'Ko'}End" type="number" min="1" step="1" value="${esc(f[side+'End'])}"></label></div>`).join('');
+  return`<h3>본문 문장 대응</h3>
+    <p class="muted">원본 PDF와 위 줄 번호를 대조해 영어·한글 범위를 각각 고르세요. 문장 수가 같아도 자동 대응하지 않습니다. 채운 문장을 고친 뒤 영어 순서대로 청크와 직독직해 뜻을 직접 입력하세요.</p>
+    <fieldset id="pdfSentenceFields" aria-label="본문 문장 대응" style="border:0;padding:0;margin:0;min-width:0" ${BUSY?'disabled':''}>
+      ${ranges}
+      <div class="filters" style="margin-top:8px"><button class="btn sm ghost" id="btnPdfSentenceLoad">선택 줄로 문장 채우기</button></div>
+      <label class="fld">영어 문장<textarea id="pdfSentenceEn" rows="2" spellcheck="false">${esc(f.en)}</textarea></label>
+      <label class="fld">한글 해석<textarea id="pdfSentenceKo" rows="2">${esc(f.ko)}</textarea></label>
+      <label class="fld">단락<input id="pdfSentenceDay" value="${esc(f.dayGroup)}" placeholder="예: 1"></label>
+      <p class="muted">청크는 위에서 아래로 영어 순서입니다. 빈 두 칸은 제외하며 한쪽만 비면 저장할 수 없어요.</p>
+      ${f.chunks.map((c,i)=>`<div class="grid-form"><label class="fld">청크 ${i+1} · 영어<textarea data-pdf-chunk-en="${i}" rows="2" spellcheck="false">${esc(c.en)}</textarea></label><label class="fld">청크 ${i+1} · 직독직해 뜻<textarea data-pdf-chunk-ko="${i}" rows="2">${esc(c.ko)}</textarea></label></div>`).join('')}
+      <div class="filters" style="margin-top:8px"><button class="btn sm ghost" id="btnPdfChunkAdd">청크 한 줄 추가</button></div>
+      <h3>핵심어 · 뜻 인출과 영어 빈칸 훈련</h3>
+      <p class="muted">영어 핵심어는 문장 안의 표현, 한글 뜻은 직독직해 청크 안의 표현을 직접 입력하세요. 배포 전에 이 쌍을 대조해야 두 훈련을 만들 수 있어요. 빈 두 칸은 제외하며 한쪽만 비면 저장할 수 없습니다.</p>
+      ${f.keywords.map((k,i)=>`<div class="grid-form"><label class="fld">핵심어 ${i+1} · 영어<textarea data-pdf-keyword-en="${i}" rows="2" spellcheck="false">${esc(k.en)}</textarea></label><label class="fld">핵심어 ${i+1} · 청크 안 한글 뜻<textarea data-pdf-keyword-ko="${i}" rows="2">${esc(k.ko)}</textarea></label></div>`).join('')}
+      <div class="filters" style="margin-top:8px"><button class="btn sm ghost" id="btnPdfKeywordAdd">핵심어 한 줄 추가</button>
+        <button class="btn" id="btnPdfSentenceSave" ${f.loaded?'':'disabled'}>문장 후보를 미검토로 저장</button></div>
+    </fieldset><div id="pdfSentenceOut" class="err" role="status" aria-live="polite"></div>`;
+}
+function bindPdfSentence(){
+  if(!$('#pdfSentenceFields')||!PDF_LOCAL||!PDF_LOCAL.sentence)return;
+  const f=PDF_LOCAL.sentence;
+  for(const side of ['en','ko'])for(const key of ['Column','Start','End']){
+    const el=$('#pdf'+(side==='en'?'En':'Ko')+key);
+    el.oninput=()=>{f[side+key]=el.value;f.loaded=null;$('#btnPdfSentenceSave').disabled=true;$('#pdfSentenceOut').textContent='줄 선택을 바꿨어요. 선택 줄로 문장을 다시 채워 주세요.';};
+  }
+  for(const [id,key] of [['pdfSentenceEn','en'],['pdfSentenceKo','ko'],['pdfSentenceDay','dayGroup']]){
+    const el=$('#'+id);el.oninput=()=>{f[key]=el.value;$('#pdfSentenceOut').textContent='';};
+  }
+  for(const kind of ['chunk','keyword'])for(const side of ['en','ko'])document.querySelectorAll('[data-pdf-'+kind+'-'+side+']').forEach(el=>{
+    const key='pdf'+(kind==='chunk'?'Chunk':'Keyword')+(side==='en'?'En':'Ko');
+    el.oninput=()=>{f[kind+'s'][Number(el.dataset[key])][side]=el.value;$('#pdfSentenceOut').textContent='';};
+  });
+  $('#btnPdfChunkAdd').onclick=()=>{if(BUSY)return;f.chunks.push({en:'',ko:''});renderJob();};
+  $('#btnPdfKeywordAdd').onclick=()=>{if(BUSY)return;f.keywords.push({en:'',ko:''});renderJob();};
+  $('#btnPdfSentenceLoad').onclick=loadPdfSentence;
+  $('#btnPdfSentenceSave').onclick=savePdfSentence;
+}
+function pdfLineRange(side,f){
+  const columns=PDF_LOCAL&&PDF_LOCAL.columns,col=f[side+'Column'],start=Number(f[side+'Start']),end=Number(f[side+'End']);
+  const c=columns&&col!==''&&columns[Number(col)];
+  if(!/^\d+$/.test(col)||!c||c.column!==side.toUpperCase()||!Array.isArray(c.lines)||!Number.isInteger(start)||!Number.isInteger(end)||start<1||end<start||end>c.lines.length)
+    throw new Error((side==='en'?'영어':'한글')+' 원천 열과 시작·끝 줄을 확인하세요.');
+  const lines=c.lines.slice(start-1,end);
+  return{text:lines.map(l=>l.text).join(' '),location:{page:c.page,bbox:[Math.min(...lines.map(l=>l.bbox[0])),Math.min(...lines.map(l=>l.bbox[1])),Math.max(...lines.map(l=>l.bbox[2])),Math.max(...lines.map(l=>l.bbox[3]))]}};
+}
+function loadPdfSentence(){
+  if(BUSY||!JOB||!PDF_LOCAL||PDF_LOCAL.jobId!==JOB.jobId||!PDF_LOCAL.sentence)return;
+  const f=PDF_LOCAL.sentence;
+  try{
+    const en=pdfLineRange('en',f),ko=pdfLineRange('ko',f);
+    f.en=en.text;f.ko=ko.text;f.chunks=[{en:'',ko:''}];f.keywords=[{en:'',ko:''}];f.loaded=true;renderJob();
+    $('#pdfSentenceOut').textContent='선택한 문장을 채웠어요. 원문을 대조하고 단락·직독직해 청크·핵심어를 입력하세요.';
+  }catch(e){$('#pdfSentenceOut').textContent=e.message;}
+}
+async function savePdfSentence(){
+  if(BUSY||!JOB||!PDF_LOCAL||PDF_LOCAL.jobId!==JOB.jobId||!PDF_LOCAL.sentence)return;
+  const local=PDF_LOCAL,f=local.sentence,jobId=JOB.jobId,token=TOKEN,read=JOB_READ;
+  const current=()=>JOB&&JOB.jobId===jobId&&TOKEN===token&&VIEW==='job'&&PDF_LOCAL===local;
+  BUSY=true;$('#pdfSentenceFields').disabled=true;
+  try{
+    const health=await api('/health');
+    if(!current()||JOB_READ!==read)return;
+    if(health.localPdfReview!==true)throw new Error('로컬 PDF 검수는 이 PC 서버의 학원 내 주소에서만 열 수 있어요.');
+    if(!f.loaded)throw new Error('영어·한글 줄 범위를 골라 문장을 먼저 채워 주세요.');
+    const en=pdfLineRange('en',f),ko=pdfLineRange('ko',f),chunks=f.chunks.map(c=>({en:c.en.trim(),ko:c.ko.trim()})).filter(c=>c.en||c.ko);
+    const keywords=f.keywords.map(k=>({en:k.en.trim(),ko:k.ko.trim()})).filter(k=>k.en||k.ko);
+    if(!f.en.trim()||!f.ko.trim()||!f.dayGroup.trim())throw new Error('영어 문장·한글 해석·단락을 모두 입력하세요.');
+    if(!chunks.length||chunks.some(c=>!c.en||!c.ko))throw new Error('각 청크의 영어와 직독직해 뜻을 짝으로 입력하세요.');
+    if(keywords.some(k=>!k.en||!k.ko))throw new Error('각 핵심어의 영어와 청크 안 한글 뜻을 짝으로 입력하세요.');
+    if(WBPACKCHECK.flat(chunks.map(c=>c.en).join(' '))!==WBPACKCHECK.flat(f.en))throw new Error('청크 영어를 순서대로 이으면 영어 문장 전체와 같아야 해요.');
+    const sentences=(JOB.draft.sentences||[]),seq=Math.max(0,...sentences.filter(s=>Number.isSafeInteger(s.seq)).map(s=>s.seq))+1;
+    if(!Number.isSafeInteger(seq))throw new Error('기존 문장 순번을 확인하세요.');
+    const row={seq,dayGroup:f.dayGroup.trim(),en:f.en.trim(),ko:f.ko.trim(),chunks,keywords,
+      _pdfReview:{flags:['REVIEW_REQUIRED','TEACHER_PAIRED'],locations:[en.location,ko.location]}};
+    if(await sendDraft({sentences:[...sentences,row]},'교사 대응 문장',jobId,'#pdfSentenceOut')){
+      if(!current())return;
+      local.sentence=null;renderJob();$('#pdfSentenceOut').textContent='문장 '+seq+'번을 미검토로 저장했어요. 검수에서 원본을 대조해 승인하세요.';
+    }
+  }catch(e){if(current()&&JOB_READ===read&&!isAuth(e))$('#pdfSentenceOut').textContent=e.message;}
+  finally{BUSY=false;if(current()){
+    const fields=$('#pdfSentenceFields'),button=$('#btnPdfReview');if(fields)fields.disabled=false;if(button)button.disabled=false;
+  }}
+}
+async function putPdfReviewFile(fromPC=false){
+  if(BUSY||!JOB)return;
+  const file=fromPC?null:$('#pdfReviewFile').files[0],jobId=JOB.jobId,token=TOKEN,read=JOB_READ;
+  if(!fromPC&&!file){$('#pdfReviewOut').textContent='검수 초안 JSON 파일을 선택하세요.';return;}
+  const current=()=>JOB&&JOB.jobId===jobId&&TOKEN===token&&VIEW==='job'&&JOB_READ===read;
+  BUSY=true;$('#btnPdfReview').disabled=true;$('#btnPcReview').disabled=true;
+  const fields=$('#pdfSentenceFields');if(fields)fields.disabled=true;
+  try{
+    const health=await api('/health');
+    if(!current())return;
+    if(health.localPdfReview!==true)throw new Error('로컬 PDF 검수는 이 PC 서버의 학원 내 주소에서만 열 수 있어요.');
+    const source=fromPC?await api('/naesin/admin/job/local-review?id='+encodeURIComponent(jobId)):{draft:JSON.parse(await file.text())};if(!current())return;
+    const data=pdfReviewDraft(source.draft),pdfs=fromPC?source.pdfs:null;
+    if(fromPC&&(!Array.isArray(pdfs)||!pdfs.length||new Set(pdfs.map(p=>p&&p.source)).size!==pdfs.length
+      ||pdfs.some(p=>!p||!['02','03'].includes(p.source)||typeof p.file!=='string'||!p.file||!Number.isInteger(p.pageCount)||p.pageCount<1||p.pageCount>1000000||typeof p.sha256!=='string'||!/^[a-f0-9]{64}$/.test(p.sha256))))
+      throw new Error('원본 PDF 정보가 올바르지 않아요. PC 자료를 확인하세요.');
+    const existing=JOB.draft.words||[];
+    if(existing.length){
+      if(JSON.stringify(existing)!==JSON.stringify(data.words))throw new Error('현재 작업의 단어 후보와 달라요. 기존 검수를 지키려면 별도 작업에 새 초안을 넣으세요.');
+      const same=PDF_LOCAL&&PDF_LOCAL.jobId===jobId&&JSON.stringify(PDF_LOCAL.columns)===JSON.stringify(data.columns);
+      const sentence=same?PDF_LOCAL.sentence:null;clearPdfView();PDF_LOCAL={jobId,token,columns:data.columns,pdfs,sentence};renderJob();
+      $('#pdfReviewOut').textContent='기존 단어 '+data.words.length+'개와 검수를 유지하고 본문 '+data.columns.length+'열을 다시 열었어요.';
+    }else if(await sendDraft({words:data.words},'로컬 PDF 검수 초안',jobId,'#pdfReviewOut')){
+      if(!current())return;clearPdfView();PDF_LOCAL={jobId,token,columns:data.columns,pdfs};renderJob();
+      $('#pdfReviewOut').textContent='단어 후보 '+data.words.length+'개를 미검토로 넣었어요. 본문 '+data.columns.length+'열은 문장 대응 전입니다.';
+    }
+  }catch(e){if(current()&&!isAuth(e))$('#pdfReviewOut').textContent=e.message;}
+  finally{BUSY=false;for(const id of ['btnPdfReview','btnPcReview']){const button=$('#'+id);if(button)button.disabled=false;}if(current()&&$('#pdfSentenceFields'))$('#pdfSentenceFields').disabled=false;}
+}
+async function sendDraft(draft, how, jobId, errorSelector){
+  const id=jobId||(JOB&&JOB.jobId),read=JOB_READ,token=TOKEN,baseUpdatedAt=JOB&&JOB.updatedAt;
+  if(!JOB||JOB.jobId!==id||VIEW!=='job')return false;
   if(!Object.keys(draft).length){$('#draftOut').innerHTML='<p class="err">넣을 배열이 없어요.</p>';return;}
   $('#draftOut').innerHTML='<p class="muted">넣는 중…</p>';
+  let saved=false;
   try{
-    await api('/naesin/admin/job/draft',{method:'POST',body:JSON.stringify({jobId:JOB.jobId,draft})});
-    await openJob(JOB.jobId);
+    if(typeof baseUpdatedAt!=='string'||!baseUpdatedAt)throw new Error('작업 버전이 없어요. 상단 새로고침으로 최신 작업을 읽은 뒤 다시 저장하세요.');
+    await api('/naesin/admin/job/draft',{method:'POST',body:JSON.stringify({jobId:id,baseUpdatedAt,draft})});saved=true;
+    if(!JOB||JOB.jobId!==id||read!==JOB_READ||TOKEN!==token||VIEW!=='job')return false;
+    if(!await readJob(id,read,token))return false;
+    EDIT=null;SEL=null;FKIND='all';FONLY='issue';renderJob();
     $('#exOut').innerHTML='<div class="issues ok">'+esc(how)+' 에서 '
       +esc(Object.keys(draft).map(k=>kindKo(k)+' '+draft[k].length+'행').join(' · '))+' 을 초안으로 넣었어요.</div>';
-  }catch(e){if(isAuth(e))return;$('#draftOut').innerHTML='<p class="err">'+esc(e.message)+'</p>';}
+    return true;
+  }catch(e){
+    if(isAuth(e)||!JOB||JOB.jobId!==id||read!==JOB_READ||TOKEN!==token||VIEW!=='job')return false;
+    const message=saved?'초안 저장은 끝났지만 결과를 다시 읽지 못했어요. 입력을 유지했습니다. 상단 새로고침으로 저장 결과를 확인한 뒤 이어서 진행하세요.'
+      :e.status===409?'다른 곳에서 작업이 바뀌었어요. 입력을 유지했습니다. 상단 새로고침으로 최신 작업을 읽고 확인한 뒤 다시 저장하세요.':e.message;
+    $('#draftOut').innerHTML='<p class="err">'+esc(message)+'</p>';
+    const out=errorSelector&&$(errorSelector);if(out)out.textContent=message;
+    return false;
+  }
 }
 async function publish(){
   if(!JOB)return;
@@ -670,10 +1034,10 @@ async function publish(){
    검수는 같은 동작을 수백 번 반복한다 — 마우스로만 하면 팩 하나에 반나절이 그대로 돌아온다.
    입력 칸에 있을 때는 가로채지 않는다(팩 id 에 'a'를 못 치면 안 된다). */
 document.addEventListener('keydown',e=>{
-  if(VIEW!=='job'||!JOB)return;
+  if(VIEW!=='job'||!JOB||!TOKEN)return;
   const t=e.target,tag=t&&t.tagName;
   if(tag==='INPUT'||tag==='SELECT'||tag==='TEXTAREA'){
-    if(e.key==='Escape'&&tag==='TEXTAREA'&&t.dataset.ed){EDIT=null;renderJob();}
+    if(e.key==='Escape'&&((tag==='TEXTAREA'&&t.dataset.ed)||(PDF_WORD_EDIT&&EDIT===PDF_WORD_EDIT.key))){EDIT=null;PDF_WORD_EDIT=null;renderJob();}
     return;
   }
   if(e.metaKey||e.ctrlKey||e.altKey)return;

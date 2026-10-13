@@ -47,18 +47,25 @@
   function str(v) { return v == null ? '' : String(v).trim(); }
   function arr(v) { return Array.isArray(v) ? v : []; }
 
+  /* 자유 입력 반 이름이 학생 코드·default와 충돌하지 않게 서버와 같은 키를 쓴다. */
+  function classScope(cls) {
+    if (typeof cls !== 'string' || /[\u0000-\u001f\u007f]/.test(cls)) return '';
+    var name = cls.normalize('NFC').trim();
+    return name && name.length <= 80 ? 'cls:' + name : '';
+  }
+
   /* 학생에게 실제로 걸린 배정 — reading-server/naesin-api.mjs 의 resolveExam 과 **같은 해석**이어야 한다.
-     그쪽은 만료를 **개별 배정에만** 걸고 반 공통은 지난 날짜여도 그대로 준다('시험 종료 · 자율 학습').
-     한때 여기서 반 공통도 만료면 null 로 봤는데, 그러면 서버가 아직 그 팩을 주고 있는 학생의
-     교과서 불일치를 **조용히 넘긴다** — 경고를 놓치는 쪽이라 '모르면 침묵' 원칙이 아니라 버그였다. */
-  function examFor(exams, code) {
-    var mine = null, def = null;
+     학생 → 반 → 전체 공통. 학생·반 배정은 만료되면 폴백하고 전체 공통은 지난 날짜여도 준다. */
+  function examFor(exams, code, cls) {
+    var mine = null, group = null, def = null, key = classScope(cls);
     arr(exams).forEach(function (ex) {
       if (!ex) return;
       if (str(ex.scope) === str(code)) mine = ex;
+      else if (key && str(ex.scope) === key) group = ex;
       else if (str(ex.scope) === 'default') def = ex;
     });
     if (mine && !mine.expired) return mine;
+    if (group && !group.expired) return group;
     return def || null;
   }
 
@@ -108,7 +115,7 @@
       var book = str((books || {})[code]);
       var g = gradeToken(s.grade);
       if (!book) return;                      /* 모르면 경고하지 않는다 */
-      var ex = examFor(exams, code);
+      var ex = examFor(exams, code, s.cls);
       if (!ex) return;
       var bad = [];
       arr(ex.packIds).forEach(function (id) {
@@ -154,7 +161,7 @@
 
   return {
     GRADE_TOKEN: GRADE_TOKEN, PACK_RE: PACK_RE, REVISION: REVISION,
-    gradeToken: gradeToken, splitPackId: splitPackId, examFor: examFor,
+    gradeToken: gradeToken, splitPackId: splitPackId, classScope: classScope, examFor: examFor,
     combos: combos, mismatches: mismatches, folderPrefix: folderPrefix, report: report,
   };
 });

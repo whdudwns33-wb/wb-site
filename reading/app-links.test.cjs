@@ -10,6 +10,8 @@
  */
 const fs = require('fs');
 const path = require('path');
+const assert = require('node:assert/strict');
+const vm = require('node:vm');
 
 const reading = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
 const vocab = fs.readFileSync(path.join(__dirname, '..', 'vocab', 'index.html'), 'utf8');
@@ -36,6 +38,28 @@ if (!/@media \(max-width: 430px\)[\s\S]{0,220}\.swap \.lbl \{ display: none/.tes
 /* 링크가 아니라 버튼+JS로 바뀌면 새 탭·뒤로 가기가 달라진다. 앵커여야 한다. */
 if (!/<a class="swap"/.test(reading) || !/<a class="swap"/.test(vocab))
   E('앱 사이 이동은 <a> 여야 합니다 — 버튼+JS로 바꾸면 뒤로 가기가 달라집니다');
+
+/* 같은 QR caller: 원내 영어 PC는 영어 입구, 외부 관리 주소는 학생 QR을 만들지 않는다. */
+const admin = fs.readFileSync(path.join(__dirname, '../reading-server/public/admin.html'), 'utf8');
+const linkSource = admin.match(/function studentLink\(code\)\{[\s\S]*?\n\}/);
+assert.ok(linkSource);
+for (const fixture of [
+  { data: { studentApp: 'naesin', localPdfReview: true }, origin: 'http://own-academy.test:8890', result: 'http://own-academy.test:8890/?c=OWN%20A%26&app=naesin' },
+  { data: { studentApp: 'naesin', localPdfReview: false }, origin: 'https://own-admin.test', result: null },
+  { data: { studentApp: 'naesin' }, origin: 'https://own-admin.test', result: null },
+  { data: {}, origin: 'https://own-worker.test', result: 'https://own-worker.test/?c=OWN%20A%26' },
+  { data: { localPdfReview: false }, origin: 'http://own-node.test', result: 'http://own-node.test/?c=OWN%20A%26' },
+]) {
+  const ctx = vm.createContext({ DATA: fixture.data, location: { origin: fixture.origin } });
+  vm.runInContext(linkSource[0] + ';globalThis.link=studentLink("OWN A&");', ctx);
+  assert.equal(ctx.link, fixture.result);
+}
+assert.match(admin, /WBQR\.svg\(studentLink\(s\.code\)/);
+assert.match(admin, /const link=studentLink\(code\)/);
+assert.match(admin, /if\(studentLink\(''\)===null\)\{box\.innerHTML=/);
+assert.match(admin, /if\(link===null\)qb\.innerHTML=/);
+assert.equal((admin.match(/학생 QR은 원내 관리 주소에서 생성/g) || []).length, 2);
+assert.ok(!/WBQR\.svg\(location\.origin/.test(admin));
 
 if (errors.length) {
   errors.forEach((e) => console.error('ERROR:', e));

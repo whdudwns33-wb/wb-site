@@ -45,6 +45,7 @@
     .chip{min-height:36px;padding:5px 13px;border-radius:999px;border:1.5px solid #bfd7e1;background:#fff;font-weight:800;color:var(--navy)}
     .chip[aria-pressed="true"]{background:var(--sky);border-color:var(--blue)}
     .grid-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;align-items:end}
+    .grid-form input,.grid-form select{min-width:0;max-width:100%}
     .grid-form label[hidden]{display:none}
     .err{color:var(--bad);font-weight:700;font-size:13px;margin-top:8px}
     .muted{color:var(--muted);font-size:12.5px}
@@ -74,6 +75,7 @@
        '청크'와 '5/6'이 갈라져 다른 줄에 놓이는 일이 없다. */
     .pgcell{white-space:normal;min-width:186px}
     .pgcell .nw{white-space:nowrap}
+    .rdcell{white-space:normal;min-width:190px}
     /* 문장×단계 매트릭스 — 칸 하나가 사다리 한 단계(계약 3.2), 진하기가 그 단계에 머문 문장 수.
        해석·백지 두 숫자만으로는 "어디서 막혔나"가 안 보인다 — 서버가 늘 보내던 byStage 를 여기서 쓴다. */
     .mtx6{display:inline-grid;grid-template-columns:repeat(6,9px);gap:2px;margin-left:6px;vertical-align:middle}
@@ -93,6 +95,7 @@
     .scatter .fit{stroke:var(--coral);stroke-width:1.5;stroke-dasharray:5 4;opacity:.8}
     .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--muted);font-weight:800;margin:2px 0 0}
     .legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:5px;vertical-align:middle}
+    @media(max-width:600px){header{flex-wrap:wrap}header b,header small{flex-basis:100%}header .sp{display:none}.grid-form input{max-width:100%}}
   </style>
 </head>
 <body>
@@ -106,7 +109,9 @@
 <div class="banner" id="banner" role="alert" hidden><span id="bannerMsg"></span><span class="sp"></span><button class="btn sm ghost" id="bannerRetry">다시 시도</button></div>
 <main id="app"></main>
 <script src="/admin/admin-login.js"></script>
+<script src="/admin/pack-check.js"></script>
 <script src="/admin/coverage.js"></script>
+<script src="/admin/readiness.js"></script>
 <script>
 'use strict';
 /* WB 내신브레인 관리 웹 — 원장·강사용.
@@ -119,6 +124,7 @@ const $=s=>document.querySelector(s);
 const esc=t=>String(t==null?'':t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let TOKEN=localStorage.getItem('wbr.admin.token')||null;
 let OV=null,PACKS=[],FILTER='전체',TASK=null,EXAMS=null,ROSTER=[],REPORTS=null;
+let TASK_SCOPE='default',TASK_LOADING=false,TASK_BUSY=false,TASK_READ=0;
 /* 교과서 지정표(계약: /naesin/admin/books → {books}) — null 은 '아직 못 받았다'로 {} 와 구분한다.
    BOOK_DRAFT 는 아직 저장 안 한 입력칸 내용 — 다른 카드가 다시 그려져도 치던 글이 날아가지 않게 한다. */
 let BOOKS=null,BOOK_DRAFT=null,BOOK_FLASH='';
@@ -209,34 +215,11 @@ function assemble(files){
   return {pack:out,errors};
 }
 
-/* ── 클라이언트 검증 — naesin/pack-validate.mjs의 핵심 검사를 화면용으로 축약 ── */
-const flat=t=>String(t||'').replace(/[‘’]/g,"'").replace(/[“”]/g,'"').replace(/\s+/g,'');
+/* CLI·직접 업로드·제작 스튜디오와 같은 검사 관문을 쓴다. */
 function validatePack(p){
-  const errors=[],warns=[];
+  const checked=WBPACKCHECK.checkPack(p);
+  const errors=checked.errors.map(e=>e.where+': '+e.message),warns=checked.warns.map(e=>e.where+': '+e.message);
   if(!/^[A-Za-z0-9-]{3,60}$/.test(p.packId||''))errors.push('packId 형식 오류 (영문/숫자/하이픈 3~60자): '+p.packId);
-  const W=p.words||[];
-  if(!W.length)warns.push('단어가 없어요');
-  const wid=new Set();
-  W.forEach((w,i)=>{
-    if(!w.id)errors.push(`words[${i}] id 없음`);else if(wid.has(w.id))errors.push(`words[${i}] id 중복: ${w.id}`);else wid.add(w.id);
-    if(!w.headword)errors.push(`words[${i}] headword 없음`);
-    if(!(Array.isArray(w.meaningKo)&&w.meaningKo.length))errors.push(`words[${i}](${w.headword}) meaningKo 비었음`);
-  });
-  const S=p.sentences||[];
-  if(!S.length)warns.push('본문 문장이 없어요');
-  S.forEach((s,i)=>{
-    if(s.seq!==i+1)errors.push(`sentences[${i}] seq가 순번(${i+1})과 다름`);
-    if(!s.en||!s.ko)errors.push(`문장 ${s.seq} en/ko 누락`);
-    if(!(Array.isArray(s.keywords)&&s.keywords.length))warns.push(`문장 ${s.seq} keywords 없음 (빈칸 훈련 불가)`);
-    if(s.chunks&&flat(s.chunks.map(c=>c.en).join(' '))!==flat(s.en))errors.push(`문장 ${s.seq} chunks 연결이 en과 불일치`);
-  });
-  (p.items||[]).forEach((it,i)=>{
-    if(!Array.isArray(it.answer)||!it.answer.length){errors.push(`items[${i}](no ${it.no}) answer 비었음`);return;}
-    if(Array.isArray(it.choices)&&it.choices.length){
-      const labels=new Set(it.choices.map(c=>String(c.label)));
-      it.answer.forEach(a=>{if(!labels.has(String(a)))errors.push(`items[${i}](no ${it.no}) 정답 "${a}"가 보기에 없음`);});
-    }
-  });
   return {errors,warns};
 }
 function packCounts(p){
@@ -331,6 +314,38 @@ function stageCell(sn){
     +vals.map((v,i)=>`<i class="${v?'':'z'}" style="opacity:${v?(0.35+0.65*v/top).toFixed(2):'1'}" title="${esc((i+1)+'단계 '+STAGE_NAMES[i])} · ${esc(v+'문장')}"></i>`).join('')
     +'</span>';
 }
+const READY=(typeof WBNAESINREADY!=='undefined')?WBNAESINREADY:null;
+function readinessRow(s){
+  const m=(s.summary&&typeof s.summary==='object'&&!Array.isArray(s.summary))?s.summary:{};
+  const ex=COV&&COV.examFor(EXAMS,s.code,s.cls);
+  const rg=rangeOf(m),ids=rg?rg.packIds:(m.packId?[m.packId]:[]);
+  /* 이전 범위 기록을 새 시험 날짜와 합치면 거짓 확정 미달이 된다. */
+  const mismatch=!!(ex&&Array.isArray(ex.packIds)&&(ex.packIds.length!==ids.length||ex.packIds.some(id=>!ids.includes(id))));
+  const dd=ex?daysUntil(ex.examDate,EXAMS&&EXAMS.today):null;
+  return {code:s.code,name:s.name,cls:s.cls,summary:rg||m,dday:!mismatch&&dd!=null&&dd>=0?dd:null,mismatch};
+}
+function readinessCell(s){
+  if(!READY)return '<span class="tag muted">—</span>';
+  const row=readinessRow(s);
+  const rd=READY.readiness(row.summary,{dday:row.dday});
+  if(rd.axes.every(a=>a.absent))return '<span class="tag muted">미집계 · 자료·기록 없음</span>';
+  if(row.mismatch)return '<span class="tag warn">시험 범위 불일치 · 학생 앱 갱신 필요</span>';
+  const short=rd.shortfall;
+  return `<details class="rng"><summary><b>${numStr(rd.score)}%</b> <span class="muted">축별 보기</span></summary>`
+    +rd.axes.map(a=>`<div class="ppk">${esc(a.label)} · ${a.absent?'자료·기록 없음 (집계 제외)':numStr(a.ratio*100)+'%'}</div>`).join('')
+    +(rd.weakest&&rd.score<100?`<div class="ppk">다음: ${esc(rd.weakest.act)}</div>`:'')+'</details>'
+    +(short?`<div class="err">확정 미달<br>미착수 단어 ${numStr(short.untouched)}개<br>안정화 최소 ${numStr(short.minDays)}일 / 남은 ${numStr(short.dday)}일</div>`:'');
+}
+function readinessStats(list){
+  if(!READY)return '<p class="err">준비도 모듈을 불러오지 못했어요 — 새로고침으로 다시 시도하세요.</p>';
+  const rows=list.map(readinessRow).filter(s=>!s.mismatch&&READY.readiness(s.summary).axes.some(a=>!a.absent));
+  const cls=READY.classReadiness(rows);
+  return `<h3>시험 준비도 · ${esc(FILTER)}</h3><div class="stats">
+    <div class="stat"><b>${cls.rate==null?'—':numStr(cls.rate)+'%'}</b><span>준비도 ${numStr(cls.threshold)}% 이상 · ${numStr(cls.reached)}/${numStr(cls.n)}명</span></div>
+    <div class="stat"><b>${cls.average==null?'—':numStr(cls.average)+'%'}</b><span>평균 준비도</span></div>
+    <div class="stat ${cls.shortfall?'warn':''}"><b>${cls.n?numStr(cls.shortfall)+'명':'—'}</b><span>확정 미달 · 단어 안정화</span></div>
+  </div><p class="muted">준비도 집계 ${numStr(cls.n)}/${numStr(list.length)}명 · 미집계 ${numStr(list.length-cls.n)}명 (자료·기록 없음 또는 시험 범위 불일치). 범위 합계 우선, 재료 없는 축은 집계에서 제외합니다. 반의 시작 시점이 확인되지 않아 파일럿 통과 여부는 판정하지 않습니다.</p>`;
+}
 function studentRow(s){
   const m=(s.summary&&typeof s.summary==='object'&&!Array.isArray(s.summary))?s.summary:{};
   /* 범위 합계가 있으면 그것이 표의 기준값 — 팩 하나 값으로는 '시험 전 100%'를 잴 수 없다 */
@@ -339,12 +354,14 @@ function studentRow(s){
   const warn=stale(s)||risky(s);
   /* 과제 완료 = 지금 배정된 과제(날짜+updatedAt)에 대한 기록일 때만(계약 0.4) — 어제 과제나 같은 날
      재배정 전의 기록은 '—'. 학생 앱의 '완료' 표시와 같은 기준이라 두 화면이 어긋나지 않는다. */
-  const done=!!(tk&&TASK&&tk.date===TASK.date&&tk.taskAt===TASK.updatedAt);
+  const assigned=s.assignedTask;
+  const done=!!(tk&&assigned&&tk.date===assigned.date&&tk.taskAt===assigned.updatedAt);
   const spell=num(w.needsSpellCheck)||0;
   return `<tr>
     <td><b>${esc(s.name||s.code)}</b>${warn?' <span class="tag bad">확인</span>':''}</td>
     <td>${esc(s.cls||'—')}</td>
     <td class="muted${rg?' pkcell':''}">${rg?rangeCell(rg):esc(m.packId||'—')}</td>
+    <td class="rdcell">${readinessCell(s)}</td>
     <td><span class="minibar"><i style="width:${pct(w.reached,w.total)}%"></i></span>${numStr(w.reached)}/${numStr(w.total)} · 안정 ${numStr(w.stable)}${spell?` · <span class="tag warn">철자 확인 ${spell}</span>`:''}</td>
     <td><span class="minibar"><i style="width:${pct(sn.interpreted,sn.total)}%"></i></span>${numStr(sn.interpreted)}/${numStr(sn.total)}${stageCell(sn)}</td>
     <td><span class="minibar"><i class="g" style="width:${pct(sn.memorized,sn.total)}%"></i></span>${numStr(sn.memorized)}/${numStr(sn.total)}</td>
@@ -366,9 +383,10 @@ function renderOverview(){
       <div class="stat"><b>${PACKS.length}</b><span>업로드된 팩</span></div>
     </div>
     <div class="filters">${classes.map(c=>`<button class="chip" data-cls="${esc(c)}" aria-pressed="${c===FILTER}">${esc(c)}</button>`).join('')}</div>
+    ${readinessStats(list)}
     <div class="tbl"><table><thead><tr>
-      <th>이름</th><th>반</th><th>팩 · 시험 범위</th><th>단어 (도달·안정화)</th><th>해석 통과 · 문장×단계</th><th>백지 암송</th><th>본문 진행</th><th>${TASK?'과제 '+esc(TASK.date):'오늘 과제'}</th><th>마지막 학습</th></tr></thead>
-      <tbody>${list.length?list.map(studentRow).join(''):`<tr><td colspan="9" class="muted">아직 학습 기록이 있는 학생이 없어요 — 학생이 앱에서 훈련을 시작하면 여기 나타납니다.</td></tr>`}</tbody></table></div>
+      <th>이름</th><th>반</th><th>팩 · 시험 범위</th><th>시험 준비도</th><th>단어 (도달·안정화)</th><th>해석 통과 · 문장×단계</th><th>백지 암송</th><th>본문 진행</th><th>배정 과제</th><th>마지막 학습</th></tr></thead>
+      <tbody>${list.length?list.map(studentRow).join(''):`<tr><td colspan="10" class="muted">아직 학습 기록이 있는 학생이 없어요 — 학생이 앱에서 훈련을 시작하면 여기 나타납니다.</td></tr>`}</tbody></table></div>
     <p class="muted" style="margin:8px 0 0">문장×단계 ${STAGE_NAMES.map((nm,i)=>'①②③④⑤⑥'[i]+' '+esc(nm)).join(' · ')} — 칸이 진할수록 그 단계에 머문 문장이 많아요.</p>
     <p class="muted" style="margin:2px 0 0">본문 진행 — 청크 뜻 세우기 통과 단락 · 단락 백지 통과 · 누적 백지가 이어 붙인 단락 · 종합 Check 점수. 범위가 있으면 범위 전체 합계예요.</p>
   </div>`;
@@ -378,7 +396,10 @@ function renderOverview(){
 /* ── 수업 과제 ── */
 function renderTask(){
   const today=kstToday();
-  let head='<p class="muted" style="margin:4px 0 10px">배정된 과제가 없습니다.</p>';
+  const roster=ROSTER.length?ROSTER:(OV&&Array.isArray(OV.students)?OV.students:[]);
+  const scopes=[...new Set(roster.map(s=>COV&&COV.classScope(s.cls)).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ko'));
+  if(TASK_SCOPE!=='default'&&!scopes.includes(TASK_SCOPE))scopes.push(TASK_SCOPE);
+  let head='<p class="muted" style="margin:4px 0 10px">'+(TASK_LOADING?'과제를 불러오는 중…':'배정된 과제가 없습니다.')+'</p>';
   if(TASK){
     const d=String(TASK.date||'');
     const past=d<today,future=d>today;
@@ -391,19 +412,34 @@ function renderTask(){
     <p class="muted">배정하면 학생 앱 홈 최상단에 「오늘 수업 과제」로 뜨고, 완료 결과가 위 표의 「과제」 열에 모입니다. 같은 날 다시 배정하면 완료 표시가 초기화돼요.</p>
     ${head}
     <div class="grid-form">
+      <label>대상<br><select id="tkScope" ${TASK_BUSY?'disabled':''}><option value="default">전체 공통</option>${scopes.map(scope=>`<option value="${esc(scope)}">${esc(scopeLabel(scope))}</option>`).join('')}</select></label>
       <label>날짜<br><input type="date" id="tkDate"></label>
       <label>과제 이름<br><input id="tkTitle" placeholder="예: 4교시 — 본문 클로즈 + 어법" maxlength="80"></label>
       <label>본문 문장 범위 (선택)<br><span style="display:flex;gap:6px"><input type="number" id="tkFrom" min="1" placeholder="시작" style="width:80px"><input type="number" id="tkTo" min="1" placeholder="끝" style="width:80px"></span></label>
       <label>문법 패턴 번호 (선택)<br><input id="tkPat" placeholder="예: 1,2" autocomplete="off"></label>
-      <button class="btn" id="btnTask">과제 배정</button>
+      <button class="btn" id="btnTask" ${TASK_BUSY||TASK_LOADING?'disabled':''}>${TASK_LOADING?'불러오는 중…':'과제 배정'}</button>
     </div>
     <div style="margin-top:10px">${TYPE_LIST.map(([k,l])=>`<label class="ck"><input type="checkbox" name="tkType" value="${k}">${esc(l)}</label>`).join('')}</div>
     <div id="taskOut"></div>
   </div>`;
   $('#tkDate').value=today;
+  $('#tkScope').value=TASK_SCOPE;
+  $('#tkScope').onchange=()=>loadTask($('#tkScope').value);
   $('#btnTask').onclick=saveTask;
 }
+async function loadTask(scope){
+  if(TASK_BUSY){$('#tkScope').value=TASK_SCOPE;return;}
+  const read=++TASK_READ;
+  TASK_SCOPE=scope;TASK_LOADING=true;TASK=null;renderTask();
+  try{
+    const j=await api('/naesin/admin/task?scope='+encodeURIComponent(scope));
+    if(scope!==TASK_SCOPE||read!==TASK_READ)return;
+    TASK=j.task&&j.task.date?j.task:null;TASK_LOADING=false;renderTask();
+  }catch(e){if(scope!==TASK_SCOPE||read!==TASK_READ||isAuth(e))return;$('#taskOut').innerHTML='<p class="err">'+esc(e.message)+' — 대상을 다시 선택해 불러오세요.</p>';}
+}
 async function saveTask(){
+  if(TASK_BUSY||TASK_LOADING)return;
+  const scope=TASK_SCOPE;
   const out=h=>{$('#taskOut').innerHTML=h;};
   const date=$('#tkDate').value, title=$('#tkTitle').value.trim();
   const typeKeys=[...document.querySelectorAll('input[name=tkType]:checked')].map(i=>i.value);
@@ -421,11 +457,16 @@ async function saveTask(){
   if(!typeKeys.length)return out('<p class="err">학습 유형을 하나 이상 선택하세요.</p>');
   /* 지난 날짜의 과제는 학생 앱 홈에 뜨지 않는다 — 날짜 입력 실수를 여기서 잡는다 */
   if(date<kstToday()&&!confirm(`과제 날짜 ${date}은(는) 이미 지났어요. 학생 앱에는 오늘 날짜의 과제만 뜹니다. 그래도 배정할까요?`))return;
+  TASK_BUSY=true;$('#btnTask').disabled=true;$('#tkScope').disabled=true;
   try{
-    const j=await api('/naesin/admin/task',{method:'POST',body:JSON.stringify(body)});
-    TASK=j.task;renderOverview();renderTask();
-    out(`<div class="issues ok">배정 완료 — ${esc(j.task.date)} · ${esc(j.task.title)} · 유형 ${(j.task.typeKeys||[]).length}종</div>`);
+    const j=await api('/naesin/admin/task?scope='+encodeURIComponent(scope),{method:'POST',body:JSON.stringify(body)});
+    if(scope!==TASK_SCOPE)return;
+    TASK=j.task;renderTask();
+    try{OV=await api('/naesin/admin/overview');renderOverview();}
+    catch(e){if(isAuth(e))return;out('<p class="err">과제는 배정됐어요. 완료 현황을 새로 받지 못했습니다 — '+esc(e.message)+'</p>');return;}
+    out(`<div class="issues ok">배정 완료 — ${esc(scopeLabel(scope))} · ${esc(j.task.date)} · ${esc(j.task.title)} · 유형 ${(j.task.typeKeys||[]).length}종</div>`);
   }catch(e){if(isAuth(e))return;out('<p class="err">'+esc(e.message)+'</p>');}
+  finally{TASK_BUSY=false;const button=$('#btnTask'),pick=$('#tkScope');if(button)button.disabled=TASK_LOADING;if(pick)pick.disabled=false;}
 }
 
 /* ── 레슨 팩 ── */
@@ -497,7 +538,8 @@ async function deletePack(id){
 
 /* ── 시험 등록·배정 현황 ── */
 function scopeLabel(scope){
-  if(scope==='default')return '반 공통';
+  if(scope==='default')return '전체 공통';
+  if(String(scope).startsWith('cls:'))return String(scope).slice(4)+' · 반 배정';
   const s=ROSTER.find(x=>x.code===scope)||(OV&&Array.isArray(OV.students)?OV.students:[]).find(x=>x&&x.code===scope)
     ||(Array.isArray(EXAMS)?EXAMS:[]).find(x=>x.scope===scope);
   return s&&s.name?`${s.name} (${scope})`:String(scope);
@@ -507,11 +549,13 @@ function renderExamForm(){
      명부에 없는 코드는 직접 입력으로 — 서버가 등록 여부를 검사한다(404). */
   const roster=(ROSTER.length?ROSTER:(OV&&Array.isArray(OV.students)?OV.students:[])).filter(s=>s&&s.code).slice()
     .sort((a,b)=>String(a.cls||'').localeCompare(String(b.cls||''),'ko')||String(a.name||'').localeCompare(String(b.name||''),'ko'));
+  const classes=[...new Set(roster.map(s=>COV&&COV.classScope(s.cls)).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ko'));
   $('#examArea').innerHTML=`<div class="card"><h2>시험 등록</h2>
-    <p class="muted">시험일과 범위(팩)를 등록하면 해당 학생 앱이 <b>시험 모드</b>(D-day 플랜·단어 선행 게이트)로 바뀝니다. 학생 앱은 첫 번째 팩을 엽니다. 학생 개별 배정은 시험일이 지나기 전까지 반 공통보다 우선해요.</p>
+    <p class="muted">시험일과 범위(팩)를 등록하면 해당 학생 앱이 <b>시험 모드</b>(D-day 플랜·단어 선행 게이트)로 바뀝니다. 학생 앱은 첫 번째 팩을 엽니다. <b>학생 개별 → 반 배정 → 전체 공통</b> 순서로 적용하고, 학생·반 배정은 시험일이 지나면 다음 배정을 따라요.</p>
     <div class="grid-form">
-      <label>대상<br><select id="exScope"><option value="default">반 공통 (전체 기본)</option>
-        ${roster.map(s=>`<option value="${esc(s.code)}">${esc(s.name||s.code)} (${esc(s.cls||'-')})</option>`).join('')}
+      <label>대상<br><select id="exScope"><option value="default">전체 공통 (기본)</option>
+        ${classes.length?'<optgroup label="반 배정">'+classes.map(scope=>`<option value="${esc(scope)}">${esc(scopeLabel(scope))}</option>`).join('')+'</optgroup>':''}
+        <optgroup label="학생 개별 배정">${roster.map(s=>`<option value="${esc(s.code)}">${esc(s.name||s.code)} (${esc(s.cls||'-')})</option>`).join('')}</optgroup>
         <option value="__code">학생 코드 직접 입력…</option></select></label>
       <label id="exCodeWrap" hidden>학생 코드<br><input id="exCode" placeholder="예: stu-0123" autocapitalize="off" autocomplete="off" spellcheck="false"></label>
       <label>시험일<br><input type="date" id="exDate"></label>
@@ -530,7 +574,8 @@ function renderExamForm(){
 async function loadExams(){
   const r=await api('/naesin/admin/exams').catch(optional);
   EXAMS=r&&Array.isArray(r.exams)?r.exams:null;
-  if(r&&typeof r.today==='string')EXAMS.today=r.today;   // 서버의 KST 오늘 — 만료 표시를 서버 판정과 맞춘다
+  if(EXAMS&&typeof r.today==='string')EXAMS.today=r.today;   // 서버의 KST 오늘 — 만료 표시를 서버 판정과 맞춘다
+  renderOverview();
 }
 function renderExamList(){
   const el=$('#examList');if(!el)return;
@@ -542,12 +587,13 @@ function renderExamList(){
   el.innerHTML=`<div class="tbl"><table><thead><tr><th>대상</th><th>시험일</th><th>D-day</th><th>범위 팩</th><th>단어 마감</th><th>등록</th><th></th></tr></thead><tbody>
     ${rows.map(ex=>{
       const dd=daysUntil(ex.examDate,today);
-      /* 만료 = examDate < KST 오늘(계약 0.2) — 개별 배정은 만료되면 학생 앱이 무시하고 반 공통으로 돌아간다 */
+      /* 만료된 학생·반 배정은 다음 배정으로 내려가고, 전체 공통은 자율 복습 범위로 남는다. */
       const expired=ex.expired===true||(dd!=null&&dd<0);
       const ddTag=dd==null?'<span class="tag muted">?</span>':expired?`<span class="tag bad">만료 (${-dd}일 지남)</span>`:dd===0?'<span class="tag warn">오늘</span>':`<span class="tag">D-${dd}</span>`;
       const wdd=num(ex.wordDeadlineDays);
       const packs=Array.isArray(ex.packIds)?ex.packIds:[];
-      return `<tr class="${expired?'expired':''}" data-scope="${esc(ex.scope)}"><td><b>${esc(scopeLabel(ex.scope))}</b>${ex.scope==='default'?'':'<br><span class="muted">개별 배정 — '+(expired?'만료되어 반 공통을 따름':'반 공통보다 우선')+'</span>'}</td>
+      const note=ex.scope==='default'?'':String(ex.scope).startsWith('cls:')?(expired?'만료되어 전체 공통을 따름':'학생 개별 다음 · 전체 공통보다 우선'):(expired?'만료되어 반 배정 → 전체 공통을 따름':'반 배정·전체 공통보다 우선');
+      return `<tr class="${expired?'expired':''}" data-scope="${esc(ex.scope)}"><td><b>${esc(scopeLabel(ex.scope))}</b>${note?'<br><span class="muted">'+esc(note)+'</span>':''}</td>
         <td>${esc(ex.examDate)}</td><td>${ddTag}</td>
         <td style="white-space:normal">${packs.map(id=>`<span class="tag muted">${esc(id)}</span>`).join(' ')||'—'}</td>
         <td>D-${wdd==null?WDD_DEFAULT+' <span class="muted">(기본)</span>':wdd}</td>
@@ -563,7 +609,9 @@ async function saveExam(){
   const examDate=$('#exDate').value;
   const packIds=[...document.querySelectorAll('#exPacks input:checked')].map(i=>i.value);
   const wddRaw=$('#exWdd').value.trim();
-  if(scope!=='default'&&!CODE_RE.test(scope))return out('<p class="err">학생 코드는 영문/숫자/하이픈 3~20자예요.</p>');
+  const isClass=scope.startsWith('cls:');
+  if(isClass&&(!COV||COV.classScope(scope.slice(4))!==scope))return out('<p class="err">반 이름을 확인하고 다시 선택하세요.</p>');
+  if(scope!=='default'&&!isClass&&!CODE_RE.test(scope))return out('<p class="err">학생 코드는 영문/숫자/하이픈 3~20자예요.</p>');
   if(!examDate)return out('<p class="err">시험일을 선택하세요.</p>');
   if(!packIds.length)return out('<p class="err">시험 범위 팩을 하나 이상 선택하세요.</p>');
   const body={scope,examDate,packIds};
@@ -574,7 +622,7 @@ async function saveExam(){
   }
   /* 지난 시험일도 저장은 된다(계약 0.2 — 시험 뒤 자율 복습 범위로 남기는 용도) — 날짜 실수라면 여기서 잡는다 */
   const dd=daysUntil(examDate);
-  if(dd!=null&&dd<0&&!confirm(`시험일 ${examDate}은(는) 이미 ${-dd}일 지났어요. 학생 앱은 지난 시험을 '시험 종료 · 자율 학습'으로 보여 주고, 개별 배정이면 무시합니다. 그래도 등록할까요?`))return;
+  if(dd!=null&&dd<0&&!confirm(`시험일 ${examDate}은(는) 이미 ${-dd}일 지났어요. 전체 공통은 '시험 종료 · 자율 학습'으로 남고, 학생·반 배정은 무시합니다. 그래도 등록할까요?`))return;
   try{
     const j=await api('/naesin/admin/exam',{method:'POST',body:JSON.stringify(body)});
     await loadExams();renderExamList();
@@ -584,7 +632,8 @@ async function saveExam(){
 }
 async function deleteExam(scope){
   const label=scopeLabel(scope);
-  if(!confirm(`${label} 시험 배정을 해제할까요?${scope==='default'?' 개별 배정이 없는 학생은 자율 학습으로 돌아갑니다.':' 이 학생은 반 공통 배정을 따르게 됩니다.'}`))return;
+  const after=scope==='default'?' 학생·반 배정도 없는 학생은 배정된 교재가 없어집니다.':String(scope).startsWith('cls:')?' 이 반의 학생은 개별 배정이 있으면 그것을, 없으면 전체 공통을 따릅니다.':' 이 학생은 반 배정 → 전체 공통을 따릅니다.';
+  if(!confirm(`${label} 시험 배정을 해제할까요?${after}`))return;
   try{
     await api('/naesin/admin/exam',{method:'DELETE',body:JSON.stringify({scope})});
     await loadExams();renderExamList();
@@ -625,15 +674,15 @@ function studentIndex(){
 }
 /* 이 시험일에 점수를 넣을 학생들.
    만료 여부는 보지 않는다 — 결과는 시험이 끝난 뒤에 넣으므로 그 개별 배정은 이미 만료돼 있다.
-   개별 배정이 있는 학생은 자기 시험일에만, 나머지는 반 공통 시험일에 뜬다. */
+   학생 → 반 → 전체 공통을 따르되 지난 배정도 결과 입력 대상으로 남긴다. */
 function resultRoster(date){
   const idx=studentIndex();
-  const exams=(Array.isArray(EXAMS)?EXAMS:[]).filter(e=>e&&typeof e==='object');
-  const own=new Set(exams.filter(e=>e.scope&&e.scope!=='default').map(e=>e.scope));
+  const exams=(Array.isArray(EXAMS)?EXAMS:[]).filter(e=>e&&typeof e==='object').map(e=>Object.assign({},e,{expired:false}));
   const codes=[];
   const add=c=>{if(c&&codes.indexOf(c)<0)codes.push(c);};
-  exams.filter(e=>e.examDate===date&&e.scope&&e.scope!=='default').forEach(e=>add(e.scope));
-  if(exams.some(e=>e.examDate===date&&e.scope==='default'))[...idx.keys()].forEach(c=>{if(!own.has(c))add(c);});
+  /* 명부에서 빠진 기존 개별 배정은 유지하고 반 키를 가짜 학생으로 만들지 않는다. */
+  exams.filter(e=>e.examDate===date&&e.scope&&e.scope!=='default'&&!String(e.scope).startsWith('cls:')&&!idx.has(e.scope)).forEach(e=>add(e.scope));
+  idx.forEach(s=>{const ex=COV&&COV.examFor(exams,s.code,s.cls);if(ex&&ex.examDate===date)add(s.code);});
   /* 이미 결과가 있는 학생은 배정이 어떻게 바뀌었든 늘 보인다 — 배정을 지웠다고 넣어 둔 점수가 화면에서 사라지면 안 된다 */
   resultsFor(date).forEach(r=>add(r.code));
   let fallback=false;
@@ -1155,16 +1204,18 @@ async function resolveReport(packId,itemRef){
 
 async function refresh(){
   hideBanner();
+  const taskScope=TASK_SCOPE;
+  const taskRead=++TASK_READ;
   try{
     const [ov,pk,tk,ex,ro,rs,rp,bk]=await Promise.all([
       api('/naesin/admin/overview'),api('/naesin/admin/packs'),
-      api('/naesin/admin/task').catch(optional),api('/naesin/admin/exams').catch(optional),
+      api('/naesin/admin/task?scope='+encodeURIComponent(taskScope)).catch(optional),api('/naesin/admin/exams').catch(optional),
       api('/admin/overview').catch(optional),     // 호스트 명부 전체 — 개별 배정 대상 목록
       api('/naesin/admin/results').catch(optional),   // 시험 결과 + 성과 분석 (계약 R2)
       api('/naesin/admin/reports').catch(optional),   // 문항 신고 — 팩 정오표의 원천
       api('/naesin/admin/books').catch(optional)]);   // 교과서 지정표 — 커버리지 카드의 입력
     OV=ov;PACKS=(Array.isArray(pk.packs)?pk.packs:[]).map(String);
-    TASK=(tk&&tk.task&&tk.task.date)?tk.task:null;
+    if(taskScope===TASK_SCOPE&&taskRead===TASK_READ){TASK=(tk&&tk.task&&tk.task.date)?tk.task:null;TASK_LOADING=!tk;}
     EXAMS=ex&&Array.isArray(ex.exams)?ex.exams:null;
     if(EXAMS&&typeof ex.today==='string')EXAMS.today=ex.today;
     ROSTER=ro&&Array.isArray(ro.students)?ro.students.filter(s=>s&&s.code):[];

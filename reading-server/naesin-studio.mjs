@@ -27,6 +27,7 @@ import { extract, makeQuota, readExtractLimit, KINDS } from './naesin-extract.mj
    배포 자체가 실패한다(nodejs_compat 이 없고, 있어도 런타임 require 는 번들러가 못 푼다).
    기본 import 는 Node 의 CJS 상호운용과 esbuild 양쪽에서 module.exports 를 그대로 준다. */
 import CHECK from '../naesin/pack-check.js';
+import GEN from '../naesin/gen.js';
 
 const PACK_ID_RE = /^[A-Za-z0-9-]{3,60}$/;
 const JOB_ID_RE = /^job-[a-z0-9]{6,20}$/;
@@ -39,9 +40,35 @@ export const JOB_STATUS = ['draft', 'review', 'ready', 'published', 'failed'];
 export const REVIEW_STATES = ['pending', 'ok', 'fixed', 'dropped'];
 
 const nowIso = () => new Date().toISOString();
+const nextJobVersion = (job) => new Date(Math.max(Date.now(), (Date.parse(job && job.updatedAt) || 0) + 1)).toISOString();
+// shortcut: KV 읽기/쓰기는 원자적이지 않다. PC 정본의 원행 버전을 확인하며, 다중 서버 쓰기는 직렬화가 필요하다.
+const staleJob = (b, job) => Object.prototype.hasOwnProperty.call(b, 'baseUpdatedAt') && b.baseUpdatedAt !== (job.updatedAt || null);
 const isObj = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
 const strMax = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
 const arrayKeyOf = (kind) => (kind === 'items' ? 'items' : kind);
+const DRAFT_KINDS = CHECK.PACK_ARRAYS;
+const PDF_ROW_KEYS = {
+  words: ['id', 'headword', 'pos', 'meaningKo', 'sections', '_pdfReview'],
+  sentences: ['seq', 'dayGroup', 'en', 'ko', 'chunks', 'keywords', '_pdfReview'],
+};
+const ownKeys = (v, keys) => isObj(v) && Object.keys(v).every((k) => keys.includes(k));
+function validPdfReview(v) {
+  return ownKeys(v, ['flags', 'locations'])
+    && Array.isArray(v.flags) && v.flags.length <= 100 && v.flags.every((f) => typeof f === 'string' && f.length <= 200)
+    && Array.isArray(v.locations) && v.locations.length <= 100 && v.locations.every((loc) =>
+      ownKeys(loc, ['page', 'bbox']) && Number.isInteger(loc.page) && loc.page > 0 && loc.page <= 1_000_000
+      && Array.isArray(loc.bbox) && loc.bbox.length === 4 && loc.bbox.every((n) => Number.isFinite(n) && n >= 0)
+      && loc.bbox[0] <= loc.bbox[2] && loc.bbox[1] <= loc.bbox[3]);
+}
+function validPdfSentence(row) {
+  return isObj(row) && Number.isInteger(row.seq) && row.seq > 0
+    && ['dayGroup', 'en', 'ko'].every((k) => CHECK.nonEmpty(row[k]))
+    && Array.isArray(row.chunks) && row.chunks.length >= 1
+    && row.chunks.every((chunk) => ownKeys(chunk, ['en', 'ko']) && CHECK.nonEmpty(chunk.en) && CHECK.nonEmpty(chunk.ko))
+    && (row.keywords === undefined || (Array.isArray(row.keywords)
+      && row.keywords.every((kw) => ownKeys(kw, ['en', 'ko']) && CHECK.nonEmpty(kw.en) && CHECK.nonEmpty(kw.ko))))
+    && CHECK.flat(row.chunks.map((chunk) => chunk.en).join(' ')) === CHECK.flat(row.en);
+}
 
 export function newJobId(rnd) {
   const r = rnd || Math.random;
@@ -61,6 +88,18 @@ export function rowKey(kind, row, index) {
     : 'i' + index;
   return kind + ':' + own;
 }
+function reviewedRow(row, rv) {
+  const value = rv && isObj(rv.patch) ? { ...row, ...rv.patch } : { ...row };
+  /* 기존 편집 화면은 지운 키를 null로 보낸다. */
+  if (rv && isObj(rv.patch)) for (const k of Object.keys(rv.patch)) if (rv.patch[k] === null) delete value[k];
+  delete value._pdfReview;
+  return value;
+}
+function rowKeyCounts(kind, rows) {
+  const counts = new Map();
+  rows.forEach((row, i) => { const key = rowKey(kind, row, i); counts.set(key, (counts.get(key) || 0) + 1); });
+  return counts;
+}
 
 /* 초안을 하나의 팩으로 조립 — 버린 행은 빼고, 고친 행은 고친 값으로.
    조립 결과가 곧 배포될 팩이라 검사도 이것으로 한다. */
@@ -73,13 +112,14 @@ export function assemble(job) {
     if (meta[k] != null && meta[k] !== '') pack[k] = meta[k];
   }
   for (const kind of Object.keys(draft)) {
+    if (!DRAFT_KINDS.includes(kind)) continue;
     const rows = Array.isArray(draft[kind]) ? draft[kind] : null;
     if (!rows) continue;
     const kept = [];
     rows.forEach((row, i) => {
       const rv = review[rowKey(kind, row, i)];
       if (rv && rv.state === 'dropped') return;
-      kept.push(rv && isObj(rv.patch) ? { ...row, ...rv.patch } : row);
+      kept.push(reviewedRow(row, rv));
     });
     if (kept.length) pack[arrayKeyOf(kind)] = kept;
   }
@@ -96,11 +136,43 @@ export function publishGate(job) {
   const review = isObj(job && job.review) ? job.review : {};
   let pending = 0, total = 0;
   for (const kind of Object.keys(draft)) {
+    if (!DRAFT_KINDS.includes(kind)) res.errors.push({ where: '(공통)', message: kind + ' 허용되지 않는 초안 종류' });
     const rows = Array.isArray(draft[kind]) ? draft[kind] : [];
+    const originalKeys = rowKeyCounts(kind, rows), effectiveKeys = new Map();
+    rows.forEach((row, i) => {
+      const rv = review[rowKey(kind, row, i)];
+      if (rv && rv.state === 'dropped') return;
+      const key = rowKey(kind, reviewedRow(row, rv), i);
+      effectiveKeys.set(key, (effectiveKeys.get(key) || 0) + 1);
+    });
+    let kept = 0;
     rows.forEach((row, i) => {
       total += 1;
       const rv = review[rowKey(kind, row, i)];
-      if (!rv || rv.state === 'pending') pending += 1;
+      const resolved = rv && ['ok', 'fixed', 'dropped'].includes(rv.state);
+      if (!resolved) pending += 1;
+      const pdf = isObj(row) && Object.prototype.hasOwnProperty.call(row, '_pdfReview');
+      if (pdf && (originalKeys.get(rowKey(kind, row, i)) !== 1
+        || (!(rv && rv.state === 'dropped') && effectiveKeys.get(rowKey(kind, reviewedRow(row, rv), i)) !== 1)))
+        res.errors.push({ where: kind, message: kind + '[' + i + '] PDF 후보의 검수 키가 중복되어 개별 대조할 수 없음' });
+      if (rv && rv.state === 'dropped') return;
+      const at = kind + '[' + kept++ + ']';
+      if (pdf) {
+        if (!PDF_ROW_KEYS[kind] || !validPdfReview(row._pdfReview))
+          res.errors.push({ where: kind, message: at + ' PDF 검수 메타 형태가 올바르지 않음' });
+        if (kind === 'sentences') {
+          const sentence = pack.sentences[kept - 1];
+          if (!validPdfSentence(sentence))
+            res.errors.push({ where: kind, message: at + ' PDF 본문은 영·한 문장과 대응하는 청크가 필요함' });
+          else if (!sentence.keywords || !sentence.keywords.length || sentence.keywords.some((keyword) => {
+            const single = { ...sentence, keywords: [keyword] };
+            return !GEN.koBlanks(single, 0) || !GEN.keywordBlanks(single, 'en', 0);
+          }))
+            res.errors.push({ where: kind, message: at + ' PDF 본문의 1·3단계 문항을 만들 핵심어가 필요함 — 영어 원문과 청크 한글에서 en/ko 쌍을 대조하세요.' });
+        }
+        if (!resolved)
+          res.warns.push({ where: kind, message: at + ' PDF 후보 — 원본 위치를 대조해 개별 검수해야 함' });
+      }
     });
   }
   return {
@@ -122,7 +194,7 @@ export function jobBrief(job) {
     rows.forEach((row, i) => {
       total += 1;
       const rv = review[rowKey(kind, row, i)];
-      if (!rv || rv.state === 'pending') pending += 1;
+      if (!rv || !['ok', 'fixed', 'dropped'].includes(rv.state)) pending += 1;
     });
   }
   return {
@@ -250,7 +322,7 @@ export async function handleStudio(ctx) {
     const aiLeft = typeof quota.left === 'function' ? quota.left() : null;
     if (!res.ok) {
       job.error = kind + ' 추출 실패: ' + res.reason;
-      job.updatedAt = nowIso();
+      job.updatedAt = nextJobVersion(job);
       await store.putJob(job.jobId, job);
       return j(200, { ok: false, reason: res.reason, parts: res.parts || [], job: jobBrief(job), aiLeft, aiCap: limits.total });
     }
@@ -262,7 +334,7 @@ export async function handleStudio(ctx) {
       .filter(([key]) => key.split(':')[0] !== kind));
     job.status = 'review';
     job.error = null;
-    job.updatedAt = nowIso();
+    job.updatedAt = nextJobVersion(job);
     const gate = publishGate(job);
     job.issues = gate.errors.concat(gate.warns);
     await store.putJob(job.jobId, job);
@@ -281,20 +353,53 @@ export async function handleStudio(ctx) {
     const bad = badBody(b); if (bad) return bad;
     const job = await jobOf(strMax(b.jobId, 40));
     if (!job) return j(404, { error: '작업을 찾을 수 없어요.' });
+    if (staleJob(b, job))
+      return j(409, { error: '다른 곳에서 작업이 바뀌었어요. 최신 작업을 조회한 뒤 다시 넣으세요.' });
     const src = isObj(b.draft) ? b.draft : null;
     if (!src) return j(400, { error: 'draft 객체가 필요해요.' });
     const next = {};
     for (const [k, v] of Object.entries(src)) {
-      if (!Array.isArray(v) || !v.length) continue;
+      if (!DRAFT_KINDS.includes(k)) return j(400, { error: '허용되지 않는 초안 종류: ' + k });
+      if (!Array.isArray(v)) return j(400, { error: k + ' 초안은 배열이어야 해요.' });
+      for (const row of v) {
+        if (!isObj(row)) return j(400, { error: k + ' 행은 객체이어야 해요.' });
+        if (!Object.prototype.hasOwnProperty.call(row, '_pdfReview')) continue;
+        if (ctx.localPdfReview !== true) return j(403, { error: 'PDF 후보는 원내 PC에서만 검수할 수 있어요.' });
+        if (!PDF_ROW_KEYS[k] || !ownKeys(row, PDF_ROW_KEYS[k]) || !validPdfReview(row._pdfReview)
+          || (k === 'sentences' && !validPdfSentence(row)))
+          return j(400, { error: 'PDF 후보의 필드·위치 정보가 올바르지 않아요.' });
+      }
+      const keys = rowKeyCounts(k, v);
+      if (v.some((row, i) => Object.prototype.hasOwnProperty.call(row, '_pdfReview') && keys.get(rowKey(k, row, i)) !== 1))
+        return j(400, { error: 'PDF 후보의 검수 키가 중복되어 개별 대조할 수 없어요.' });
+      if (!v.length) continue;
       next[k] = v;
     }
     if (!Object.keys(next).length) return j(400, { error: '넣을 행이 없어요.' });
+    /* 같은 원행만 옛 교정을 이어 쓴다 — 중복 키나 순번 fallback에는 승인을 옮기지 않는다. */
+    const unchanged = new Set();
+    for (const [kind, rows] of Object.entries(next)) {
+      const originals = (list) => {
+        const byKey = new Map();
+        list.forEach((row, i) => {
+          const r = isObj(row) ? row : {};
+          const id = r.id != null ? r.id : r.seq != null ? r.seq : r.no != null ? r.no : r.patternNo;
+          const stable = (typeof id === 'string' && id.trim()) || (typeof id === 'number' && Number.isFinite(id));
+          const key = rowKey(kind, row, i);
+          byKey.set(key, byKey.has(key) || !stable ? null : JSON.stringify(row));
+        });
+        return byKey;
+      };
+      const before = originals(Array.isArray(job.draft && job.draft[kind]) ? job.draft[kind] : []);
+      for (const [key, original] of originals(rows))
+        if (original !== null && before.get(key) === original) unchanged.add(key);
+    }
     job.draft = { ...(isObj(job.draft) ? job.draft : {}), ...next };
     job.review = Object.fromEntries(Object.entries(isObj(job.review) ? job.review : {})
-      .filter(([key]) => !Object.prototype.hasOwnProperty.call(next, key.split(':')[0])));
+      .filter(([key]) => !Object.prototype.hasOwnProperty.call(next, key.split(':')[0]) || unchanged.has(key)));
     job.status = 'review';
     job.error = null;
-    job.updatedAt = nowIso();
+    job.updatedAt = nextJobVersion(job);
     const gate = publishGate(job);
     job.issues = gate.errors.concat(gate.warns);
     await store.putJob(job.jobId, job);
@@ -310,11 +415,21 @@ export async function handleStudio(ctx) {
     const bad = badBody(b); if (bad) return bad;
     const job = await jobOf(strMax(b.jobId, 40));
     if (!job) return j(404, { error: '작업을 찾을 수 없어요.' });
+    if (staleJob(b, job))
+      return j(409, { error: '다른 곳에서 작업이 바뀌었어요. 최신 작업을 조회하고 원문을 대조한 뒤 다시 검수하세요.' });
     const entries = Array.isArray(b.rows) ? b.rows : [{ key: b.key, state: b.state, patch: b.patch, note: b.note }];
     const known = new Set();
     const draft = isObj(job.draft) ? job.draft : {};
     for (const kind of Object.keys(draft)) {
       (Array.isArray(draft[kind]) ? draft[kind] : []).forEach((row, i) => known.add(rowKey(kind, row, i)));
+    }
+    /* 뒤 행이 틀려도 앞 행의 교정본이 바뀌지 않도록 전체 요청을 먼저 검사한다. */
+    for (const e of entries) {
+      if (!isObj(e) || !known.has(strMax(e.key, 80))) continue;
+      if (!REVIEW_STATES.includes(e.state)) return j(400, { error: '검수 상태가 올바르지 않아요.' });
+      if (e.patch !== undefined && e.patch !== null && !isObj(e.patch))
+        return j(400, { error: 'patch는 행 객체 또는 null이어야 해요.' });
+      if (e.note !== undefined && typeof e.note !== 'string') return j(400, { error: '검수 메모는 문자열이어야 해요.' });
     }
     job.review = isObj(job.review) ? job.review : {};
     let hit = 0;
@@ -322,15 +437,23 @@ export async function handleStudio(ctx) {
       if (!isObj(e)) continue;
       const key = strMax(e.key, 80);
       if (!known.has(key)) continue;
-      const state = REVIEW_STATES.includes(e.state) ? e.state : 'ok';
-      const rec = { state, at: nowIso() };
-      if (isObj(e.patch)) rec.patch = e.patch;
-      if (typeof e.note === 'string' && e.note.trim()) rec.note = strMax(e.note, NOTE_MAX);
+      const state = e.state;
+      const rec = { ...(isObj(job.review[key]) ? job.review[key] : {}), state, at: nowIso() };
+      if (e.patch !== undefined) {
+        if (isObj(e.patch)) rec.patch = { ...e.patch };
+        else delete rec.patch;
+      }
+      /* 검수 위치는 원본 행에 고정한다 — 편집으로 개별 검수 경고를 우회하지 못한다. */
+      if (isObj(rec.patch)) { rec.patch = { ...rec.patch }; delete rec.patch._pdfReview; }
+      if (e.note !== undefined) {
+        if (typeof e.note === 'string' && e.note.trim()) rec.note = strMax(e.note, NOTE_MAX);
+        else delete rec.note;
+      }
       job.review[key] = rec;
       hit += 1;
     }
     if (!hit) return j(400, { error: '검수할 행을 찾지 못했어요.' });
-    job.updatedAt = nowIso();
+    job.updatedAt = nextJobVersion(job);
     const gate = publishGate(job);
     job.issues = gate.errors.concat(gate.warns);
     job.status = gate.ok ? 'ready' : 'review';
@@ -361,7 +484,7 @@ export async function handleStudio(ctx) {
     if (!ids.includes(job.packId)) await store.putPackIds(ids.concat([job.packId]));
     job.status = 'published';
     job.publishedAt = rec.updatedAt;
-    job.updatedAt = rec.updatedAt;
+    job.updatedAt = nextJobVersion(job);
     await store.putJob(job.jobId, job);
     return j(200, { ok: true, packId: job.packId, updatedAt: rec.updatedAt, summary: gate.summary, warns: gate.warns });
   }

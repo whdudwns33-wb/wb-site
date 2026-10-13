@@ -68,7 +68,7 @@
     .proj .ch div{padding:12px 14px;border:2px solid var(--line);border-radius:12px;font-size:22px;font-weight:800;background:#fbfdfe}
     .proj .ch div.ans{border-color:var(--ok);background:#e7f6f0;color:var(--ok)}
     .grid2{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:14px;align-items:start}
-    @media (max-width:1100px){.grid2{grid-template-columns:1fr}}
+    @media (max-width:1100px){.grid2{grid-template-columns:minmax(0,1fr)}}
   </style>
 </head>
 <body>
@@ -82,6 +82,7 @@
 <main id="app"></main>
 <!-- 문항 생성은 학생 앱과 같은 모듈을 쓴다 — 규칙을 복제하면 학생이 푸는 문제와 TV에 띄우는 문제가 갈라진다 -->
 <script src="/naesin/gen.js"></script>
+<script src="/admin/coverage.js"></script>
 <script src="/admin/admin-login.js"></script>
 <script>
 'use strict';
@@ -109,6 +110,8 @@ const PROJ_N_DEFAULT=10;
 
 let LIVE=null,VOTES=[],BOARD=null,WEAK=[],PACKS=[];
 let TICK=null,POLL=null,PROJWIN=null,BUSY=false;
+let SCOPE='default',ROSTER=[],LOADING=true,GENERATION=0,POLL_PENDING=0;
+const COV=(typeof WBNaesinCoverage!=='undefined')?WBNaesinCoverage:null;
 let genPack=null;              /* 투사 문제를 만들 팩 — 고른 뒤에만 받아 둔다(팩은 구매 자료다) */
 
 async function api(path,opt){
@@ -137,33 +140,45 @@ function renderLogin(msg){
 /* ── 폴링 ──
    화면 전체를 다시 그리면 강사가 입력 중인 분(分) 값이 날아간다 — 표와 시계만 갈아 끼운다. */
 async function poll(){
+  if(BUSY||(POLL_PENDING&&POLL_PENDING===GENERATION))return;
+  const scope=SCOPE,generation=++GENERATION;
+  POLL_PENDING=generation;
   try{
-    const j=await api('/naesin/admin/live');
+    const j=await api('/naesin/admin/live?scope='+encodeURIComponent(scope));
+    if(scope!==SCOPE||generation!==GENERATION)return;
     LIVE=j.live;VOTES=j.votes||[];BOARD=j.board||[];WEAK=j.weakest||[];
+    LOADING=false;
     hideBanner();
-    paintPhase();paintBoard();paintVotes();paintProjWin();
+    paintPhase();paintBoard();paintVotes();paintProjWin();updateControls();
   }catch(e){
+    if(scope!==SCOPE||generation!==GENERATION)return;
     if(isAuth(e))return;
     BOARD=null;
     /* 폴링 실패는 배너로만 알린다 — 화면을 비우면 수업이 끊긴다 */
     showBanner('현황을 갱신하지 못했어요 — '+(e.message||''));
     paintBoard();
-  }
+  }finally{if(POLL_PENDING===generation)POLL_PENDING=0;}
 }
 function startPoll(){stopPoll();POLL=setInterval(poll,POLL_MS);TICK=setInterval(paintClock,1000);}
 function stopPoll(){if(POLL)clearInterval(POLL);if(TICK)clearInterval(TICK);POLL=null;TICK=null;}
 
 async function start(){
+  LOADING=true;GENERATION++;LIVE=null;BOARD=null;VOTES=[];WEAK=[];
   $('#btnLogout').hidden=false;$('#pollTag').hidden=false;
   renderShell();
-  try{PACKS=((await api('/naesin/admin/packs')).packs||[]).map(String);}catch(e){if(isAuth(e))return;PACKS=[];}
-  paintPackPick();
+  try{
+    const [packs,roster]=await Promise.all([api('/naesin/admin/packs'),api('/admin/overview')]);
+    PACKS=(packs.packs||[]).map(String);ROSTER=Array.isArray(roster.students)?roster.students:[];
+  }catch(e){if(isAuth(e))return;PACKS=[];ROSTER=[];fail(e);}
+  paintPackPick();paintScopePick();
   await poll();
   startPoll();
 }
 
 function renderShell(){
   $('#app').innerHTML=`
+  <div class="filters"><label class="fld">수업 대상 <select id="liveScope"></select></label>
+    <span class="muted">선택한 반의 단계·투사·응답을 관리합니다. 전체 공통은 별도 반 수업이 없는 학생에게 적용됩니다.</span></div>
   <div class="card"><h2>수업 타임박스 <small>지금 이 단계</small></h2>
     <p class="muted">단계를 세우면 학생 태블릿 상단에 띠가 뜹니다. <b>화면을 대신 넘기지는 않습니다</b> —
       학생이 「시작」을 눌러야 이동합니다(잘못 눌린 단계가 학습을 망치지 않게).</p>
@@ -172,10 +187,10 @@ function renderShell(){
       <div id="phaseNow" style="flex:1"></div>
     </div>
     <div class="filters" style="margin-top:10px">
-      ${PHASES.map(([k,ko])=>`<button class="btn sm ghost" data-ph="${k}">${esc(ko)}</button>`).join('')}
+      ${PHASES.map(([k,ko])=>`<button class="btn sm ghost" data-live-action data-ph="${k}">${esc(ko)}</button>`).join('')}
       <label class="fld" style="margin-left:6px">분<input id="phMin" type="number" min="1" max="180" value="10" style="width:80px"></label>
-      <button class="btn sm" id="btnExt">연장 5분</button>
-      <button class="btn sm danger" id="btnEnd">단계 종료</button>
+      <button class="btn sm" id="btnExt" data-live-action>연장 5분</button>
+      <button class="btn sm danger" id="btnEnd" data-live-action>단계 종료</button>
     </div>
     <div id="phOut"></div>
   </div>
@@ -194,7 +209,7 @@ function renderShell(){
         <select id="pjPack"></select>
         <select id="pjKind">${PROJ_KINDS.map(([k,ko])=>`<option value="${k}">${esc(ko)}</option>`).join('')}</select>
         <label class="fld">문항<input id="pjN" type="number" min="2" max="20" value="${PROJ_N_DEFAULT}" style="width:74px"></label>
-        <button class="btn" id="btnProj">띄우기</button>
+        <button class="btn" id="btnProj" data-live-action>띄우기</button>
       </div>
       <div id="pjOut"></div>
       <div id="pjPanel"></div>
@@ -204,7 +219,30 @@ function renderShell(){
   $('#btnExt').onclick=extend;
   $('#btnEnd').onclick=()=>setPhase(null);
   $('#btnProj').onclick=startProj;
-  paintPhase();paintBoard();paintVotes();
+  paintScopePick();paintPhase();paintBoard();paintVotes();updateControls();
+}
+function paintScopePick(){
+  const picker=$('#liveScope');if(!picker)return;
+  const scopes=[...new Set(ROSTER.map(s=>COV&&COV.classScope(s.cls)).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ko'));
+  if(SCOPE!=='default'&&!scopes.includes(SCOPE))scopes.push(SCOPE);
+  picker.innerHTML='<option value="default">전체 공통</option>'+scopes.map(scope=>`<option value="${esc(scope)}">${esc(scope.slice(4))}</option>`).join('');
+  picker.value=SCOPE;picker.onchange=()=>changeScope(picker.value);
+}
+function updateControls(){
+  const picker=$('#liveScope');if(picker)picker.disabled=BUSY;
+  document.querySelectorAll('[data-live-action]').forEach(button=>{button.disabled=BUSY||LOADING||button.dataset.edge==='1';});
+}
+async function changeScope(scope){
+  if(BUSY){$('#liveScope').value=SCOPE;return;}
+  SCOPE=scope;GENERATION++;LOADING=true;stopPoll();closeProjWin();
+  LIVE=null;VOTES=[];BOARD=null;WEAK=[];genPack=null;
+  renderShell();paintPackPick();
+  await poll();startPoll();
+}
+async function liveWrite(action){
+  if(BUSY||LOADING)return;
+  const scope=SCOPE;BUSY=true;GENERATION++;updateControls();
+  try{await action(scope);}finally{BUSY=false;updateControls();}
 }
 function paintPackPick(){
   const el=$('#pjPack');if(!el)return;
@@ -216,7 +254,7 @@ function paintPackPick(){
 function paintPhase(){
   const el=$('#phaseNow');if(!el)return;
   const ph=LIVE&&LIVE.phase;
-  el.innerHTML=ph
+  el.innerHTML=LOADING?'<span class="muted">선택한 반의 수업을 불러오는 중…</span>':ph
     ? `<div><span class="tag">${esc((PHASES.find(p=>p[0]===ph.key)||[,ph.key])[1])}</span>
         <b style="margin-left:6px;font-size:16px">${esc(ph.label||'')}</b></div>
        <div class="muted">시작 ${esc(String(ph.startedAt||'').slice(11,16))}${ph.endsAt?(' · 종료 예정 '+esc(String(ph.endsAt).slice(11,16))):' · 시간 제한 없음'}</div>`
@@ -233,32 +271,34 @@ function paintClock(){
   el.textContent=s?mmss(s):'끝';
 }
 async function setPhase(key){
-  if(BUSY)return;BUSY=true;
+  return liveWrite(async scope=>{
   const mins=Number($('#phMin').value);
   const body=key===null?{phase:null}
     :{phase:{key,label:(PHASES.find(p=>p[0]===key)||[,key])[1]+(mins>0?(' '+mins+'분'):''),minutes:mins>0?mins:null}};
   try{
-    const j=await api('/naesin/admin/live/phase',{method:'POST',body:JSON.stringify(body)});
+    const j=await api('/naesin/admin/live/phase?scope='+encodeURIComponent(scope),{method:'POST',body:JSON.stringify(body)});
     LIVE=j.live;hideBanner();$('#phOut').innerHTML='';paintPhase();
   }catch(e){if(!isAuth(e))$('#phOut').innerHTML='<p class="err">'+esc(e.message)+'</p>';}
-  BUSY=false;
+  });
 }
 async function extend(){
+  return liveWrite(async scope=>{
   const ph=LIVE&&LIVE.phase;
   if(!ph){$('#phOut').innerHTML='<p class="err">세운 단계가 없어요.</p>';return;}
   /* 남은 시간에 5분을 더한다 — 이미 끝난 단계는 지금부터 5분 */
   const left=ph.endsAt?Math.max(0,(Date.parse(ph.endsAt)-Date.now())/60000):0;
   try{
-    const j=await api('/naesin/admin/live/phase',{method:'POST',
+    const j=await api('/naesin/admin/live/phase?scope='+encodeURIComponent(scope),{method:'POST',
       body:JSON.stringify({phase:{key:ph.key,label:ph.label,startedAt:ph.startedAt,minutes:Math.round(left+5)}})});
     LIVE=j.live;paintPhase();
   }catch(e){fail(e);}
+  });
 }
 
 /* ── 반 현황 ── */
 function paintBoard(){
   const el=$('#boardArea');if(!el)return;
-  if(BOARD===null){el.innerHTML='<p class="err">현황을 불러오지 못했어요 — 자동으로 다시 시도합니다.</p>';return;}
+  if(BOARD===null){el.innerHTML=LOADING?'<p class="muted">선택한 반의 현황을 불러오는 중…</p>':'<p class="err">현황을 불러오지 못했어요 — 자동으로 다시 시도합니다.</p>';return;}
   const on=BOARD.filter(r=>!r.stale).length;
   const who=$('#boardWho');if(who)who.textContent='접속 '+on+'명 / '+BOARD.length+'명';
   if(!BOARD.length){el.innerHTML='<p class="muted">연동된 학생이 없어요.</p>';return;}
@@ -286,6 +326,7 @@ function fmtLastIso(t){if(!t)return '—';const d=(Date.now()-new Date(t))/1000;
    문제를 만드는 것은 학생 앱과 같은 gen.js 다. 서버에 생성 규칙을 복제하면 학생이 푸는
    문제와 TV에 띄우는 문제가 조용히 갈라진다 — 팩 검사 규칙에서 이미 치른 비용이다. */
 async function startProj(){
+  return liveWrite(async scope=>{
   const packId=$('#pjPack').value;
   if(!packId){$('#pjOut').innerHTML='<p class="err">먼저 팩을 올리세요.</p>';return;}
   const n=Math.max(2,Math.min(20,Number($('#pjN').value)||PROJ_N_DEFAULT));
@@ -295,10 +336,11 @@ async function startProj(){
     if(!genPack||genPack.packId!==packId)genPack=(await api('/naesin/admin/pack?id='+encodeURIComponent(packId))).pack;
     const items=makeItems(genPack,kind,n);
     if(!items.length){$('#pjOut').innerHTML='<p class="err">이 팩에서 그 유형의 문제를 만들 수 없어요 (단어가 4개 이상이어야 합니다).</p>';return;}
-    const j=await api('/naesin/admin/live/projector',{method:'POST',body:JSON.stringify({items})});
+    const j=await api('/naesin/admin/live/projector?scope='+encodeURIComponent(scope),{method:'POST',body:JSON.stringify({items,packId})});
     LIVE=j.live;VOTES=[];$('#pjOut').innerHTML='<div class="issues ok">'+esc(items.length)+'문항을 띄웠어요. 학생 태블릿이 응답 화면으로 바뀝니다.</div>';
     paintVotes();openProjWin();
   }catch(e){if(!isAuth(e))$('#pjOut').innerHTML='<p class="err">'+esc(e.message)+'</p>';}
+  });
 }
 function makeItems(pack,kind,n){
   const words=(pack&&Array.isArray(pack.words))?pack.words:[];
@@ -323,12 +365,12 @@ function paintVotes(){
   const v=VOTES[pj.index]||null;
   const on=BOARD?BOARD.filter(r=>!r.stale).length:0;
   el.innerHTML=`<div class="filters" style="margin-top:10px">
-      <button class="btn sm ghost" id="pjPrev" ${pj.index<=0?'disabled':''}>← 앞</button>
+      <button class="btn sm ghost" id="pjPrev" data-live-action data-edge="${pj.index<=0?'1':'0'}" ${pj.index<=0?'disabled':''}>← 앞</button>
       <b>${num(pj.index+1)} / ${num(pj.items.length)}</b>
-      <button class="btn sm ghost" id="pjNext" ${pj.index>=pj.items.length-1?'disabled':''}>다음 →</button>
-      <button class="btn sm ${pj.revealed?'ghost':'go'}" id="pjRev">${pj.revealed?'정답 가리기':'정답 공개'}</button>
+      <button class="btn sm ghost" id="pjNext" data-live-action data-edge="${pj.index>=pj.items.length-1?'1':'0'}" ${pj.index>=pj.items.length-1?'disabled':''}>다음 →</button>
+      <button class="btn sm ${pj.revealed?'ghost':'go'}" id="pjRev" data-live-action>${pj.revealed?'정답 가리기':'정답 공개'}</button>
       <button class="btn sm ghost" id="pjWin">TV 창 열기</button>
-      <button class="btn sm danger" id="pjStop">종료</button>
+      <button class="btn sm danger" id="pjStop" data-live-action>종료</button>
     </div>
     ${cur?`<div style="margin-top:8px"><div class="muted">${esc(cur.prompt)}</div>
       <div class="dist">${cur.choices.map(c=>{
@@ -351,18 +393,24 @@ function paintVotes(){
 }
 const nameOf=code=>{const r=(BOARD||[]).find(x=>x.code===code);return (r&&(r.name||r.code))||code;};
 async function moveProj(i){
+  return liveWrite(async scope=>{
   /* 문제를 넘기면 공개는 내린다 — 앞 문제의 공개 상태가 새 문제에 붙으면 답을 보여 준 채 시작한다 */
-  try{const j=await api('/naesin/admin/live/projector',{method:'POST',body:JSON.stringify({index:i,revealed:false})});
+  try{const j=await api('/naesin/admin/live/projector?scope='+encodeURIComponent(scope),{method:'POST',body:JSON.stringify({index:i,revealed:false})});
     LIVE=j.live;paintVotes();paintProjWin();}catch(e){fail(e);}
+  });
 }
 async function revealProj(on){
-  try{const j=await api('/naesin/admin/live/projector',{method:'POST',body:JSON.stringify({revealed:!!on})});
+  return liveWrite(async scope=>{
+  try{const j=await api('/naesin/admin/live/projector?scope='+encodeURIComponent(scope),{method:'POST',body:JSON.stringify({revealed:!!on})});
     LIVE=j.live;paintVotes();paintProjWin();}catch(e){fail(e);}
+  });
 }
 async function stopProj(){
+  return liveWrite(async scope=>{
   if(!confirm('투사를 종료합니다. 응답 분포는 사라집니다. 계속할까요?'))return;
-  try{const j=await api('/naesin/admin/live/projector',{method:'POST',body:JSON.stringify({items:null})});
+  try{const j=await api('/naesin/admin/live/projector?scope='+encodeURIComponent(scope),{method:'POST',body:JSON.stringify({items:null})});
     LIVE=j.live;VOTES=[];paintVotes();closeProjWin();}catch(e){fail(e);}
+  });
 }
 
 /* ── TV 창 ──

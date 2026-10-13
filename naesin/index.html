@@ -389,37 +389,44 @@
   /* 저장 키는 학생 코드별이다 — 공용 태블릿에서 앞 학생의 기록이 다음 학생에게 섞이지 않게.
      미연동 기기는 'wbn.v1:demo'. 옛 단일 키 'wbn.v1'은 부팅 때 1회 이관한다. */
   var KEY = 'wbn.v1:demo', LEGACY_KEY = 'wbn.v1';
-  /* 팩 캐시는 시험 범위 전체다 — 실제 시험은 보통 2~3개 과라 '마지막 교재' 하나만 캐시하면
-     오프라인에서 범위의 나머지 과가 통째로 사라진다. 옛 단일 키('wbn.pack')는 부팅 때 이관한다. */
-  var PACKS_CACHE_KEY = 'wbn.packs', LEGACY_PACK_CACHE_KEY = 'wbn.pack';
   var DEMO_PACK_ID = 'sample-demo-L0';
   var $ = function (id) { return document.getElementById(id); };
   var pack = null, DB = null, view = 'home';
   var PACKS = {};              // 시험 범위 팩 전부 {packId: pack} — pack 은 그중 '지금 보는 과'
   var authed = false, examServer = null, packList = [];
+  var sessionCode = null, sessionToken = null, studyStopped = false, accessTimer = null, pendingRemote = null;
   var selSeq = null, selWordId = null, selType = null, selDlg = null;
   /* 본문 탭에서 문장이 아닌 항목을 고른 상태 — {kind:'chunk'|'para'|'cum'|'check', day, i}.
      null 이면 selSeq(문장)가 지면의 주인이다. */
   var selPass = null;
   var wordFilter = 'all';      // 단어 목록 필터 — 'unfinished' 는 회고 칩에서 들어온 미완성만 보기
   var taskServer = null, resultServer = null;
-  var offlineMode = false;     // 연동 기기인데 서버가 닿지 않아 마지막 교재 캐시로 여는 중
   var demoMode = false;        // 체험 교재(pack-sample)로 열린 상태 — 미연동 기기 또는 배정 전 연습
   var DUMP_MAX = 20, LOG_MAX = 50;   // 기록 상한 — state 256KB 계약을 넘기지 않기 위해
 
   /* ── 저장소·동기화 ──
      save()   : 로컬 쓰기만(savedAt 안 올림) — 원격에서 받아 적거나 서버 값 반영 같은 '내 학습이 아닌' 변경
      persist(): 학습 결과 — savedAt 갱신 + 팩별 savedAt + 서버 push 예약 */
-  function loadDB() { try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { return null; } }
-  function save() { try { localStorage.setItem(KEY, JSON.stringify(DB)); } catch (e) {} }
+  function recoverStateStamps(state) {
+    if (!state || typeof state !== 'object') return state;
+    var limit = Date.now() + 5 * 60e3;
+    /* 시계 교정 전의 저장 시각은 모름(0)으로만 바꾼다. 학습 내용·due·last는 그대로 보존한다. */
+    [state].concat(Object.values(state.packs || {})).forEach(function (rec) {
+      if (rec && typeof rec.savedAt === 'number' && rec.savedAt > limit) rec.savedAt = 0;
+    });
+    return state;
+  }
+  function loadDB() { try { return recoverStateStamps(JSON.parse(localStorage.getItem(KEY) || 'null')); } catch (e) { return null; } }
+  function save() { if (!checkAccount()) return; try { localStorage.setItem(KEY, JSON.stringify(DB)); } catch (e) {} }
   /* 이번 persist 에서 savedAt 을 올려야 할 과들. 통합 범위 학습은 한 세션에서 여러 과의 단어를
      같이 푼다 — 현재 과만 올리면 다른 과의 기록이 '오래된 것'으로 남아 다른 기기의 옛 기록에
      덮인다(pullAdopt 는 팩별 savedAt 으로 병합한다). */
   var touchedPacks = {};
   function touchPack(pid) { if (pid != null) touchedPacks[pid] = 1; }
-  function persist() {
+  function persist(pid) {
+    if (!checkAccount()) return;
     DB.savedAt = Date.now();
-    if (pack) touchPack(pack.packId);
+    if (pid != null) touchPack(pid); else if (pack) touchPack(pack.packId);
     Object.keys(touchedPacks).forEach(function (pid) {
       var pd = DB.packs[pid];
       if (!pd) return;
@@ -468,6 +475,34 @@
   }
   function setLast(label, resume) { DB.last = { packId: pack.packId, label: label, resume: resume || null, at: Date.now() }; }
   function auth() { try { return JSON.parse(localStorage.getItem('wbr.auth') || 'null'); } catch (e) { return null; } }
+  function checkAccount() {
+    if (studyStopped) return false;
+    if (!sessionCode) return true;
+    var a = auth();
+    if (a && String(a.code || '') === sessionCode && a.token === sessionToken && DB && DB.owner === sessionCode) return true;
+    stopStudy('account-changed');
+    return false;
+  }
+  function stopStudy(reason) {
+    if (studyStopped) return;
+    studyStopped = true;
+    clearTimeout(syncTimer); clearInterval(accessTimer); clearTimeout(liveAutoId);
+    accessTimer = null; pendingRemote = null;
+    if (RQ && RQ.timerId) clearInterval(RQ.timerId);
+    RQ = null; liveStop(); liveState = null;
+    closeRunner(); pjClose();
+    if (window.WBVoice) WBVoice.stop();
+    pack = null; PACKS = {}; packList = []; examServer = null; taskServer = null; resultServer = null;
+    authed = false;
+    ['rBody', 'rCount', 'pjNo', 'pjCh', 'pjMsg', 'whoLine'].forEach(function (id) { $(id).innerHTML = ''; });
+    $('liveBar').hidden = true; $('saveDot').hidden = true;
+    $('ddayBadge').textContent = '';
+    clearPackCache();
+    fatal('<h2>' + (reason === 'account-changed' ? '연동 학생이 바뀌었습니다' : '학원 연결을 확인해 주세요') + '</h2>' +
+      '<p class="muted">교재를 닫았습니다. 학습 기록은 보존됩니다. ' + (reason === 'account-changed' ? '새로고침해 현재 학생으로 다시 시작하세요.' : '학원 학습존에 연결한 뒤 다시 시작하세요.') + '</p>' +
+      '<button class="btn p" id="retryBtn">다시 시작</button>');
+    $('retryBtn').onclick = function () { location.reload(); };
+  }
   /* ── 학원 달력 (KST) ──
      서버는 시험 만료·과제 날짜를 늘 KST 로 판정하고(naesin-api todayKst), 관리 웹도 KST 로 적는다.
      학생 앱만 기기 시간대로 견주면 시간대가 어긋난 태블릿에서 배정된 과제가 조용히 안 뜨고
@@ -484,46 +519,35 @@
   }
 
   function api(path, opt) {
-    var a = auth();
-    if (!a || !a.token) return Promise.reject(new Error('no-auth'));
+    if (!checkAccount()) return Promise.reject(new Error('account-changed'));
+    if (!sessionToken) return Promise.reject(new Error('no-auth'));
     return fetch('/api/naesin' + path, Object.assign({
-      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + a.token }
+      cache: 'no-store', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + sessionToken }
     }, opt || {})).then(function (r) {
-      if (!r.ok) throw new Error('api-' + r.status);
+      if (!checkAccount()) throw new Error('account-changed');
+      if (!r.ok) return r.json().catch(function () { return {}; }).then(function (body) {
+        var error = new Error('api-' + r.status);
+        error.detail = body && body.error;
+        throw error;
+      });
       return r.json();
+    }).then(function (r) {
+      if (!checkAccount()) throw new Error('account-changed');
+      return r;
     });
   }
-  /* 네트워크 단절(fetch 자체 실패)과 서버가 답한 오류(api-NNN)를 가른다 — 오프라인 캐시는 전자에만 쓴다 */
+  /* 구매 교재는 연결 확인이 필요하다. 자체 창작 체험 팩만 서비스 워커의 오프라인 셸로 열린다. */
   function isNetErr(e) { return !(e && /^api-\d+$/.test(String(e.message || ''))); }
-
-  /* 시험 범위 팩 캐시 — 연동 기기에서 팩 로드에 성공할 때마다 갱신. 연동 해제 시 함께 지운다.
-     담는 것은 '지금 범위'뿐이다: 지난 학기 팩까지 쌓으면 localStorage 를 몇 MB씩 먹는다. */
-  function cachePacks(entries) {
-    var out = {};
-    entries.forEach(function (e) { if (e && e.pack && e.pack.packId) out[e.id] = { pack: e.pack, updatedAt: e.updatedAt || null }; });
-    try {
-      localStorage.setItem(PACKS_CACHE_KEY, JSON.stringify(out));
-      /* 옛 단일 캐시는 여기서 끝난다 — 남겨 두면 팩 하나(수백 KB~MB)가 영영 자리를 차지한다 */
-      localStorage.removeItem(LEGACY_PACK_CACHE_KEY);
-    } catch (e) {}
-  }
-  /* 캐시 읽기 — 옛 단일 키('wbn.pack')는 여기서 한 번 이관하고 지운다(업그레이드 직후 오프라인) */
-  function loadPacksCache() {
-    var out = null;
-    try { out = JSON.parse(localStorage.getItem(PACKS_CACHE_KEY) || 'null'); } catch (e) { out = null; }
-    if (!out || typeof out !== 'object') out = {};
-    var legacy = null;
-    try { legacy = JSON.parse(localStorage.getItem(LEGACY_PACK_CACHE_KEY) || 'null'); } catch (e) {}
-    if (legacy && legacy.pack && legacy.pack.packId && !out[legacy.id || legacy.pack.packId]) {
-      out[legacy.id || legacy.pack.packId] = { pack: legacy.pack, updatedAt: legacy.updatedAt || null };
-      try { localStorage.setItem(PACKS_CACHE_KEY, JSON.stringify(out)); } catch (e) {}
-    }
-    try { localStorage.removeItem(LEGACY_PACK_CACHE_KEY); } catch (e) {}
-    var ids = Object.keys(out).filter(function (id) { return out[id] && out[id].pack && out[id].pack.packId; });
-    return ids.length ? out : null;
-  }
   function clearPackCache() {
-    try { localStorage.removeItem(PACKS_CACHE_KEY); localStorage.removeItem(LEGACY_PACK_CACHE_KEY); } catch (e) {}
+    try { localStorage.removeItem('wbn.packs'); localStorage.removeItem('wbn.pack'); } catch (e) {}
+  }
+  function checkAccess() {
+    if (!checkAccount() || !authed || demoMode || !pack) return Promise.resolve(false);
+    var controller = new AbortController();
+    var timeout = setTimeout(function () { controller.abort(); stopStudy('connection'); }, 10000);
+    return api('/exam', { signal: controller.signal }).then(function () { return true; }).catch(function () {
+      stopStudy('connection'); return false;
+    }).finally(function () { clearTimeout(timeout); });
   }
 
   /* 저장 상태 표시 — 실패는 다음 persist 때 자연히 재시도된다(push는 늘 전체 상태) */
@@ -556,7 +580,7 @@
   var syncTimer = null;
   /* 체험 교재(배정 전 연습)는 서버에 올리지 않는다 — 관리 overview에 예시 교재 요약이 학생 기록으로 뜨면 안 된다 */
   function scheduleSync() {
-    if (!authed || demoMode) return;
+    if (!checkAccount() || !authed || demoMode) return;
     setSaveStatus('pending');
     clearTimeout(syncTimer);
     syncTimer = setTimeout(pushState, 3000);
@@ -627,14 +651,27 @@
     if (!r.passage) r.passage = passageSummaryRange();
     return r;
   }
-  function pushState() {
-    if (!authed || !pack || demoMode) return;
+  function pushState(repair) {
+    if (!checkAccount() || !authed || !pack || demoMode) return;
+    recoverStateStamps(DB);
+    if (pendingRemote && !RQ) {
+      pullAdopt(pendingRemote.state, pendingRemote.sent);
+      pendingRemote = null;
+    }
     var sentAt = DB.savedAt;
     var body = { state: { v: 1, owner: DB.owner || null, packs: DB.packs, last: DB.last || null, summary: summaryOf(), savedAt: DB.savedAt } };
-    api('/state', { method: 'PUT', body: JSON.stringify(body) }).then(function () {
+    var payload = JSON.stringify(body), sent = JSON.parse(payload).state;
+    return api('/state', { method: 'PUT', body: payload }).then(function (r) {
+      if (r && r.state) {
+        if (RQ) pendingRemote = { state: r.state, sent: sent };
+        else if (pullAdopt(r.state, sent) && repair !== true) { render(); return pushState(true); }
+      }
       if (DB.savedAt === sentAt) setSaveStatus('saved');   // 그 사이 새 persist가 있었으면 '대기'가 맞다
     }).catch(function (e) {
-      setSaveStatus(e && e.message === 'api-413' ? 'toobig' : 'failed');
+      if (!studyStopped) {
+        setSaveStatus(e && e.message === 'api-413' ? 'toobig' : 'failed');
+        if (e && typeof e.detail === 'string' && /기기 시간/.test(e.detail)) showBanner(e.detail, 'save');
+      }
     });
   }
   /* 원격 채택은 팩 단위 — 팩별 savedAt이 더 새로운 것만 받는다. 다른 기기에서 다른 팩을
@@ -652,7 +689,8 @@
   /* 앱으로 돌아올 때(다른 탭·기기에서 공부하고 온 경우) 원격을 다시 받는다 — 러너 중엔 안 한다 */
   var lastWake = 0;
   function onWake() {
-    if (!authed || !pack || offlineMode) return;
+    if (!checkAccount() || !authed || !pack || demoMode) return;
+    checkAccess();
     if ($('runner').classList.contains('open')) return;
     if (Date.now() - lastWake < 5000) return;
     lastWake = Date.now();
@@ -667,6 +705,8 @@
   }
   document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') onWake(); });
   window.addEventListener('focus', onWake);
+  window.addEventListener('storage', function (e) { if (e.key === 'wbr.auth' || e.key == null) checkAccount(); });
+  window.addEventListener('offline', function () { if (authed && !demoMode) stopStudy('connection'); });
 
   /* ── 상태 접근 ── */
   function mkDialogueState(id, now) {
@@ -1047,8 +1087,11 @@
      강사 화면의 「정체」가 이 값에서 나온다. 화면을 켜 두고 딴짓하는 것과 열심히 푸는 것을
      서버가 가릴 방법이 이것뿐이다(state 는 3초 디바운스로만 올라간다). */
   var lastAct = Date.now();
-  ['pointerdown', 'keydown', 'input'].forEach(function (ev) {
-    document.addEventListener(ev, function () { lastAct = Date.now(); }, { passive: true, capture: true });
+  ['pointerdown', 'keydown', 'input', 'click'].forEach(function (ev) {
+    document.addEventListener(ev, function (e) {
+      if (!studyStopped && !checkAccount()) { e.preventDefault(); e.stopImmediatePropagation(); return; }
+      lastAct = Date.now();
+    }, { capture: true });
   });
 
   /* ── 탭 ── */
@@ -1079,22 +1122,22 @@
   });
   /* 이름 탭 → 다른 학생으로 연동 (공용 태블릿에서 학생이 바뀔 때) */
   $('whoLine').onclick = function () {
-    if (!authed) return;
+    if (!authed || !checkAccount()) return;
     if (!confirm('다른 학생으로 연동할까요?\n이 기기의 연동이 해제되고 학원 QR 연동 화면으로 이동합니다.')) return;
     try { localStorage.removeItem('wbr.auth'); } catch (e) {}
-    clearPackCache();
-    location.href = '/';
+    stopStudy('account-changed');
+    location.href = '/?app=naesin';
   };
   $('offBadge').onclick = function () { location.reload(); };
 
   function renderHeader() {
     var a = auth(), who = $('whoLine');
     who.innerHTML = '<span>' + (authed && a && a.name ? '<b>' + esc(a.name) + '</b> · ' : (authed ? '' : '체험 모드 · ')) +
-      (pack ? esc((pack.textbook || '') + ' L' + pack.lesson) : '') +
+      (pack ? esc((pack.textbook || '') + (pack.lesson != null && pack.lesson !== '' ? ' L' + pack.lesson : '')) : '') +
       (authed ? '<small style="display:block;font-size:10.5px;font-weight:400">다른 학생으로 연동 ↻</small>' : '') + '</span>';
     who.className = 'who' + (authed ? ' linked' : '');
     who.title = authed ? '누르면 다른 학생으로 연동합니다' : '';
-    $('offBadge').hidden = !offlineMode;
+    $('offBadge').hidden = true;
     setSaveStatus(saveStatus);
     var ex = exam(), b = $('ddayBadge');
     if (ex && ex.examDate) {
@@ -1252,7 +1295,7 @@
     if (!demoMode) return '';
     return authed
       ? '<div class="notice">배정 전 연습 — 체험 교재입니다. 선생님이 시험 범위를 배정하면 새로고침 때 내 학교 교재가 열립니다.</div>'
-      : '<div class="notice">체험 모드 — 예시 교재입니다. 학원 QR로 연동하면 내 학교 교재와 기록 저장이 열립니다.</div>';
+      : '<div class="notice">체험 모드 — 예시 교재입니다. 학원 QR로 연동하면 내 학교 교재와 기록 저장이 열립니다. <a class="btn p" href="/?app=naesin">학생 코드로 연동</a></div>';
   }
   /* 시험 범위가 여러 팩이면 전환 링크 — 진단 전 화면에도 있어야 다른 교재로 돌아갈 수 있다 */
   function packListHtml() {
@@ -1462,6 +1505,7 @@
   /* 과 전환 — 범위 팩은 부팅 때 전부 받아 두므로 대개 즉시다. 캐시에 없을 때만(옛 기록의
      last, 배정이 방금 바뀐 경우) 서버에서 받아 온다. */
   function openPack(p, pid, opt) {
+    if (!checkAccount()) return;
     opt = opt || {};
     pack = normPack(p);
     PACKS[pid] = pack;
@@ -1479,17 +1523,7 @@
     if (PACKS[pid]) { openPack(PACKS[pid], pid); return; }
     api('/pack?id=' + encodeURIComponent(pid)).then(function (r) {
       openPack(r.pack, pid);
-      cacheCurrentRange(pid, r.updatedAt);
     }).catch(function () { alert('교재를 불러오지 못했습니다.'); });
-  }
-  /* 지금 열린 범위 팩 전부를 캐시에 다시 쓴다 — 오프라인에서도 범위 전체가 열려야 한다 */
-  function cacheCurrentRange(newId, newUpdatedAt) {
-    if (!authed || demoMode || offlineMode) return;
-    var known = {};
-    try { known = JSON.parse(localStorage.getItem(PACKS_CACHE_KEY) || '{}') || {}; } catch (e) { known = {}; }
-    cachePacks(rangeIds().map(function (id) {
-      return { id: id, pack: PACKS[id], updatedAt: id === newId ? (newUpdatedAt || null) : ((known[id] && known[id].updatedAt) || null) };
-    }));
   }
   function doResume(r) {
     if (!r) return;
@@ -2086,7 +2120,7 @@
     var tts = $('ckTts');
     if (tts) tts.onclick = function () {
       var list = chunksOfGroup(gr).map(function (c) { return c.en; });
-      if (window.WBVoice && WBVoice.ttsSupported() && list.length) WBVoice.speakSeq(list, { lang: 'en' });
+      if (checkAccount() && window.WBVoice && list.length) WBVoice.speakSeq(list, ttsOptions());
     };
     var go = $('ckGo');
     if (go) go.onclick = function () { runChunkSession(day); };
@@ -2279,7 +2313,7 @@
     var tts = $('dlgTts');
     if (tts) tts.onclick = function () {
       /* speakSeq(list, opt)는 문자열 배열을 받는다(shared/voice.js) — 줄마다 영어 목소리로 차례 읽기 */
-      if (window.WBVoice && WBVoice.ttsSupported()) WBVoice.speakSeq(d.lines.map(function (l) { return l.en; }), { lang: 'en' });
+      if (checkAccount() && window.WBVoice) WBVoice.speakSeq(d.lines.map(function (l) { return l.en; }), ttsOptions());
     };
     if (go) go.onclick = function () { trainDialogue(d, st); };
   }
@@ -2395,7 +2429,7 @@
     var s = senBySeq(seq), st = senState(seq);
     if (!s || !st) return;
     var tts = $('ttsBtn');
-    if (tts) tts.onclick = function () { if (window.WBVoice && WBVoice.ttsSupported()) WBVoice.speak(s.en, { lang: 'en' }); };
+    if (tts) tts.onclick = function () { if (checkAccount() && window.WBVoice) WBVoice.speak(s.en, ttsOptions()); };
     var go = $('stageGo');
     if (go) go.onclick = function () { trainSentence(seq); };
   }
@@ -3239,6 +3273,7 @@
     document.body.style.overflow = '';
     if (lastFocus && lastFocus.focus && document.contains(lastFocus)) { try { lastFocus.focus(); } catch (e) {} }
     lastFocus = null;
+    if (pendingRemote) setTimeout(function () { if (!RQ) pushState(); }, 0);
   }
   /* 러너 종료 계약(0.7): finished=true 는 마지막 문항까지 채점됨(또는 모의 시간 종료), false 는 ✕ 중단 */
   function endQueue(finished) {
@@ -3409,9 +3444,23 @@
     if (!item.ttsText) return '';
     return ' <button id="' + id + '" class="tag t-ind tb" aria-label="영어 듣기">듣기</button>';
   }
+  function ttsOptions() {
+    var isDemo = demoMode && pack && pack.packId === DEMO_PACK_ID;
+    var opt = { lang: 'en', localOnly: !isDemo };
+    if (!isDemo) {
+      opt.onstart = function () { if (checkAccount()) clearBanner('tts'); };
+      opt.onerror = function (why) {
+        if (!checkAccount()) return;
+        showBanner(why === 'local-voice-unavailable' || why === 'language-unavailable' || why === 'unsupported'
+          ? '이 기기에는 영어 읽기 음성이 없습니다. 기기의 영어 음성 설정을 확인해 주세요.'
+          : '음성을 재생하지 못했습니다. 다시 듣기를 눌러 주세요.', 'tts');
+      };
+    }
+    return opt;
+  }
   function wireTtsBtn(item, id) {
     var b = $(id);
-    if (b) b.onclick = function () { if (window.WBVoice && WBVoice.ttsSupported()) WBVoice.speak(item.ttsText, { lang: 'en' }); };
+    if (b) b.onclick = function () { if (checkAccount() && window.WBVoice) WBVoice.speak(item.ttsText, ttsOptions()); };
   }
   /* 전사(cue 3) 화면에 보여 줄 답 — 생성기는 showAnswer(불리언)+given(전문)으로 준다.
      옛 판·앱 대체본은 showAnswer 에 문자열을 담기도 해서 둘 다 받는다. */
@@ -3473,7 +3522,7 @@
         if (!b || b.disabled) return;
         if (b.hasAttribute('data-en')) {
           clearSel(); pickedEn = Number(b.getAttribute('data-en')); b.classList.add('sel');
-          if (window.WBVoice && WBVoice.ttsSupported()) WBVoice.speak(pairs[pickedEn].en, { lang: 'en' });
+          if (checkAccount() && window.WBVoice) WBVoice.speak(pairs[pickedEn].en, ttsOptions());
           return;
         }
         var ki = Number(b.getAttribute('data-ko'));
@@ -3500,7 +3549,7 @@
       wireTtsBtn(item, 'chTts');
       var chs = $('chs');
       var list = item.choices.slice();
-      if (item.unknownKey) list.push({ key: item.unknownKey, text: '모름 (진단용 — 감점 없음)' });
+      if (item.unknownKey && !list.some(function (c) { return c.key === item.unknownKey; })) list.push({ key: item.unknownKey, text: '모름 (진단용 — 감점 없음)' });
       list.forEach(function (c) {
         var b = document.createElement('button');
         b.textContent = c.text; b.setAttribute('data-k', c.key);
@@ -3718,7 +3767,7 @@
      쪽지시험은 반 전체가 같은 순간에 같은 문제를 봐야 성립한다. */
   var LIVE_POLL_MS = 5000, LIVE_POLL_BUSY_MS = 10000;   /* 러너가 열려 있으면 네트워크를 덜 쓴다 */
   var LIVE_AUTO_MS = 3000;                              /* 홈에 있으면 이만큼 뒤 스스로 이동 */
-  var liveState = null, livePollId = null, liveClockId = null;
+  var liveState = null, liveScope = null, livePollId = null, liveClockId = null;
   var liveSeen = '';          /* 이미 안내한 단계 — 같은 단계로 계속 자동 이동하지 않게 */
   var liveAutoId = null;
   var pjSeen = '';            /* 이미 본 투사 문제(ref) — 문제가 넘어가면 응답 화면을 새로 그린다 */
@@ -3747,10 +3796,11 @@
     if (!authed) return;
     api('/live').then(function (r) {
       liveState = (r && r.live) || null;
+      liveScope = (r && r.scope) || null;
       liveApply();
     }).catch(function () {
       /* 수업 신호를 못 받는 것은 학습을 막을 일이 아니다 — 띠만 내리고 조용히 다음 폴링을 기다린다 */
-      liveState = null; liveApply();
+      liveState = null; liveScope = null; liveApply();
     });
   }
   function liveApply() {
@@ -3804,10 +3854,13 @@
   /* ── 투사 응답 ──
      화면(TV)에 문제가 있고 태블릿에는 보기 버튼만 있다. 정답은 서버가 공개할 때까지
      응답에 실려 오지 않는다(계약 L1) — 여기서 정답을 알 방법이 없어야 맞다. */
+  function projectorSession(pj) { return String(liveScope||'')+'|'+String(pj.packId||'')+'|'+String(pj.startedAt||''); }
   function pjApply(pj) {
     var it = pj.item;
     var box = $('pjv');
-    if (pjSeen !== it.ref) { pjSeen = it.ref; pjPick = null; pjSent = false; }
+    var session=projectorSession(pj),seen=session+'|'+it.ref;
+    if(pjSession!==session){pjSession=session;pjDone={};}
+    if (pjSeen !== seen) { pjSeen = seen; pjPick = null; pjSent = false; }
     $('pjNo').textContent = (pj.index + 1) + ' / ' + pj.count;
     $('pjSub').textContent = pj.revealed ? '정답이 공개됐어요.' : '문제는 앞 화면에 있어요. 답만 고르세요.';
     var ch = $('pjCh');
@@ -3826,7 +3879,7 @@
       else if (pjPick === it.answerKey) { msg.className = 'pmsg ok'; msg.textContent = '맞았어요.'; }
       else { msg.className = 'pmsg bad'; msg.textContent = '틀렸어요 — 정답은 ' + esc(it.answerKey) + '번이에요.'; }
       /* 결과는 오답노트로 들어간다 — 별도 통계를 만들지 않는다(계약 L3) */
-      pjRecord(it, pjPick === it.answerKey);
+      pjRecord(it, pjPick === it.answerKey, pj.packId);
     } else {
       msg.className = 'pmsg' + (pjSent ? ' ok' : '');
       msg.textContent = pjSent ? '제출했어요. 다음 문제를 기다리세요.' : '';
@@ -3850,13 +3903,15 @@
     var b = e.target.closest('button[data-pjk]');
     if (!b || b.disabled) return;
     var pj = liveState && liveState.projector;
-    if (!pj || !pj.item || pj.revealed) return;
+    if (!pj || !pj.item || pj.revealed || !liveScope) return;
+    var scope=liveScope,seen=projectorSession(pj)+'|'+pj.item.ref;
     pjPick = b.getAttribute('data-pjk');
     pjSent = false;
     pjApply(pj);                       /* 고른 것을 먼저 보여 준다 — 왕복을 기다리면 눌렸는지 알 수 없다 */
-    api('/live/answer', { method: 'POST', body: JSON.stringify({ ref: pj.item.ref, key: pjPick }) })
-      .then(function () { pjSent = true; if (liveState && liveState.projector) pjApply(liveState.projector); })
+    api('/live/answer', { method: 'POST', body: JSON.stringify({ scope:scope,ref: pj.item.ref, key: pjPick }) })
+      .then(function () { if(pjSeen!==seen)return;pjSent = true; if (liveState && liveState.projector) pjApply(liveState.projector); })
       .catch(function () {
+        if(pjSeen!==seen)return;
         /* 제출이 실패하면 고른 표시를 지운다 — 낸 줄 알고 기다리는 것이 가장 나쁘다 */
         pjPick = null; pjSent = false;
         if (liveState && liveState.projector) pjApply(liveState.projector);
@@ -3864,20 +3919,22 @@
       });
   });
   /* 투사 문제의 오답노트 키 — ref 가 '<유형>:<단어id>' 라 그 유형의 재시험 생성기로 이어진다 */
-  var pjDone = {};
-  function pjRecord(it, ok) {
-    if (!it || pjPick == null || pjDone[it.ref]) return;
+  var pjDone = {},pjSession='';
+  function pjRecord(it, ok, pid) {
+    if (!checkAccount() || !it || !pid || !PACKS[pid] || rangeIds().indexOf(pid)<0 || pjPick == null || pjDone[it.ref]) return;
     pjDone[it.ref] = true;
     var parts = String(it.ref || '').split(':');
     var type = parts[0], ref = parts[1];
     if (GEN_KEYS.indexOf(type) < 0 || !ref) return;
-    markWrong('gen:' + type + ':' + ref, { kind: 'gen', type: type, ref: ref }, ok, Date.now(), curPackId());
-    logEvent('projector', type, ref, ok);
-    persist();
+    markWrong('gen:' + type + ':' + ref, { kind: 'gen', type: type, ref: ref }, ok, Date.now(), pid);
+    logEvent('projector', type, ref, ok, pid);
+    touchPack(pid);
+    persist(pid);
   }
 
   /* ── 렌더 루트 ── */
   function render() {
+    if (!checkAccount()) return;
     renderHeader();
     if (!pack) { layoutFull('<p class="muted">교재를 불러오는 중…</p>'); return; }
     if (view === 'home') renderHome();
@@ -3894,12 +3951,13 @@
     return fetch('./pack-sample.json').then(function (r) { return r.json(); });
   }
   function openLoaded() {
+    if (!checkAccount()) return;
     var n = ensureStatesAll();       // 범위 전체 — 아직 안 연 과의 단어·문장도 합계에 들어가야 한다
     if (n) persist(); else save();   // 실제로 상태를 만들었을 때만 서버 push — 열기만으로 savedAt을 올리지 않는다
     setTab('home');
   }
   function openDemo() {
-    return loadDemo().then(function (p) { pack = normPack(p); PACKS[p.packId] = pack; demoMode = true; openLoaded(); });
+    return loadDemo().then(function (p) { if (!checkAccount()) return; pack = normPack(p); PACKS[p.packId] = pack; demoMode = true; openLoaded(); });
   }
   /* 시험 범위 팩 전부 로드 — 실제 시험 범위는 보통 2~3개 과다. 하나라도 열리면 학습을 시작한다:
      한 과의 팩이 삭제·오류여도 나머지 범위까지 막을 이유가 없다. 전부 실패해야 부팅 오류다. */
@@ -3911,6 +3969,7 @@
         .then(function (r) { return { id: id, pack: r.pack, updatedAt: r.updatedAt || null }; })
         .catch(function (e) { errs.push(e); return null; });
     })).then(function (list) {
+      if (!checkAccount()) throw new Error('account-changed');
       var got = list.filter(function (x) { return x && x.pack && x.pack.packId; });
       if (!got.length) {
         /* 배정 밖(403)만이면 '아직 배정되지 않음'이다 — 서버 오류가 아니라 A7 안내 화면 */
@@ -3918,7 +3977,6 @@
         throw errs[0] || new Error('no-pack');
       }
       got.forEach(function (g) { PACKS[g.id] = normPack(g.pack); });
-      cachePacks(got);
       /* 지금 열 과 — 마지막으로 보던 과가 범위에 남아 있으면 그것, 아니면 범위의 첫 과 */
       var pid = (DB.last && PACKS[DB.last.packId]) ? DB.last.packId : got[0].id;
       pack = PACKS[pid];
@@ -3928,11 +3986,12 @@
   }
   function fatal(html) { layoutFull('<div class="card" style="max-width:560px;margin:40px auto">' + html + '</div>'); }
   function bootError(e) {
+    if (studyStopped) return;
     var msg = (e && e.message) || '';
     if (msg === 'api-401') {
       fatal('<h2>연동이 만료되었습니다</h2><p class="muted">학원 QR로 다시 연동해 주세요.</p>' +
-        '<div class="row2" style="margin-top:10px"><a class="btn p" href="/">연동 화면으로</a><button class="btn" id="unlinkBtn">이 기기의 연동 해제</button></div>');
-      $('unlinkBtn').onclick = function () { try { localStorage.removeItem('wbr.auth'); } catch (x) {} clearPackCache(); location.href = '/'; };
+        '<div class="row2" style="margin-top:10px"><a class="btn p" href="/?app=naesin">연동 화면으로</a><button class="btn" id="unlinkBtn">이 기기의 연동 해제</button></div>');
+      $('unlinkBtn').onclick = function () { if (!checkAccount()) return; try { localStorage.removeItem('wbr.auth'); } catch (x) {} clearPackCache(); location.href = '/?app=naesin'; };
       return;
     }
     if (msg === 'no-pack') {
@@ -3943,22 +4002,6 @@
       return;
     }
     if (isNetErr(e)) {
-      var c = loadPacksCache();
-      if (c) {
-        /* 오프라인 — 캐시된 시험 범위 전체를 연다. 기록은 로컬에 쌓이고 다음 연결 때 push된다
-           (팩별 savedAt 병합). 범위가 여러 과면 오프라인에서도 과 전환이 그대로 된다. */
-        Object.keys(c).forEach(function (id) { if (c[id] && c[id].pack) PACKS[id] = normPack(c[id].pack); });
-        var ids = packList.filter(function (id) { return !!PACKS[id]; });
-        if (!ids.length) ids = Object.keys(PACKS);
-        /* /exam 도 못 받은 상태다 — 캐시에 담긴 팩 목록이 곧 마지막으로 아는 시험 범위다.
-           이걸 안 채우면 범위를 캐시해 두고도 과 선택이 사라져 한 과만 열린다. */
-        packList = ids.slice();
-        var pid = (DB.last && PACKS[DB.last.packId]) ? DB.last.packId : ids[0];
-        pack = PACKS[pid];
-        offlineMode = true;
-        openLoaded();
-        return;
-      }
       fatal('<h2>연결 실패</h2><p class="muted">서버에 연결할 수 없습니다. 인터넷 연결을 확인하고 다시 시도하세요.</p>' +
         '<button class="btn p" id="retryBtn" style="margin-top:10px">다시 시도</button>');
       $('retryBtn').onclick = function () { location.reload(); };
@@ -3972,6 +4015,7 @@
   function migrateLegacy() {
     var legacy = null;
     try { legacy = JSON.parse(localStorage.getItem(LEGACY_KEY) || 'null'); } catch (e) {}
+    if (sessionCode && (!legacy || legacy.owner !== sessionCode)) return false;
     if (!legacy || !legacy.packs || Object.keys(legacy.packs).length === 0) return false;
     if (Object.keys(DB.packs).length) return false;
     DB.packs = legacy.packs;
@@ -3981,8 +4025,10 @@
     return true;
   }
   function boot() {
+    clearPackCache();
     var a = auth();
     var code = (a && a.token && a.code) ? String(a.code) : null;
+    sessionCode = code; sessionToken = code ? a.token : null;
     KEY = 'wbn.v1:' + (code || 'demo');
     DB = loadDB();
     if (!DB || (code && DB.owner && DB.owner !== code)) DB = { v: 1, packs: {}, savedAt: 0 };
@@ -4005,9 +4051,11 @@
         if (!pulled && !(remote && remote.packs && Object.keys(remote.packs).length)) {
           if (migrateLegacy()) { save(); scheduleSync(); }
         }
-        /* pull이 됐으면 옛 단일 키는 이 기기에서 역할이 끝났다 — 남겨 두면 공용 태블릿에서 다음 학생이
-           부팅할 때 남의 레거시 기록이 이관되어 그 학생의 서버 상태로 올라간다. */
-        try { localStorage.removeItem(LEGACY_KEY); } catch (e) {}
+        /* 소유자 불명 레거시는 학생에게 섞거나 원본을 삭제하지 않는다. */
+        try {
+          var legacy = JSON.parse(localStorage.getItem(LEGACY_KEY) || 'null');
+          if (legacy && legacy.owner === sessionCode && remote && remote.packs && Object.keys(remote.packs).length) localStorage.removeItem(LEGACY_KEY);
+        } catch (e) {}
         /* 오프라인에서 공부한 분량 — 로컬이 더 새로운 팩이 하나라도 있으면 다음 학습 행동을 기다리지 않고
            지금 올린다(관리 현황판이 재부팅 후에도 뒤처지지 않게). */
         var localNewer = Object.keys(DB.packs).some(function (pid) {
@@ -4024,16 +4072,28 @@
       }).then(function () {
         return loadRangePacks();
       });
-    }).then(function () { openLoaded(); liveStart(); }).catch(bootError);
+    }).then(function () {
+      openLoaded();
+      if (!checkAccount()) return;
+      liveStart();
+      accessTimer = setInterval(checkAccess, 30000);
+    }).catch(bootError);
   }
   /* 원격 상태를 팩별 savedAt 비교로 받아 적는다(pullState와 같은 규칙, 부팅용 동기 버전) */
-  function pullAdopt(remote) {
+  function pullAdopt(remote, sent) {
+    if (!checkAccount()) return false;
+    if (remote && remote.owner != null && remote.owner !== DB.owner) return false;
     if (!remote || !remote.packs || typeof remote.packs !== 'object') return false;
+    recoverStateStamps(DB); recoverStateStamps(remote);
     var changed = false;
     Object.keys(remote.packs).forEach(function (pid) {
       var rp = remote.packs[pid], lp = DB.packs[pid];
       if (!rp || typeof rp !== 'object') return;
-      if (!lp || (rp.savedAt || 0) > (lp.savedAt || 0)) { DB.packs[pid] = rp; changed = true; }
+      /* 동률 충돌은 서버 확정을 받되, 요청 뒤 새로 공부한 이 기기 기록은 덮지 않는다. */
+      var acknowledged = sent && sent.packs && sent.packs[pid] && JSON.stringify(lp) === JSON.stringify(sent.packs[pid]);
+      if (!lp || (rp.savedAt || 0) > (lp.savedAt || 0) || (acknowledged && (rp.savedAt || 0) === (lp.savedAt || 0) && JSON.stringify(rp) !== JSON.stringify(lp))) {
+        DB.packs[pid] = rp; changed = true;
+      }
     });
     if ((remote.savedAt || 0) > (DB.savedAt || 0)) {
       if (remote.last) DB.last = remote.last;

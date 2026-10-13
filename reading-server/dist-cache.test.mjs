@@ -200,7 +200,7 @@ t('관리 화면들이 dist/admin/ 에 실린다 — 하나 빠지면 그 화면
   }
   /* 관리 화면이 불러 쓰는 스크립트도 같이 실려야 한다 — 빠지면 그 카드만 조용히 비고,
      로컬 서버는 각 앱 디렉터리에서 직접 서빙해 티가 안 난다(server.mjs 의 /admin/*.js 라우트). */
-  for (const f of ['admin-login.js', 'qr.js', 'coverage.js']) {
+  for (const f of ['admin-login.js', 'qr.js', 'coverage.js', 'readiness.js', 'pack-check.js']) {
     const fp = path.join(DIST, 'admin', f);
     assert.ok(fs.existsSync(fp), 'dist/admin/' + f + ' 가 없다 — build-dist.mjs 에 복사를 추가하세요');
     assert.ok(fs.statSync(fp).size > 500, 'dist/admin/' + f + ' 가 비었다');
