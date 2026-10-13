@@ -923,6 +923,11 @@
       return !!(st && st.reached);
     });
   }
+  function cumRecordPassed(record) {
+    if (!record || typeof record !== 'object') return false;
+    if (typeof record.passed === 'boolean') return record.passed;
+    return record.score === 100 && record.okCount === record.total && record.total > 0;
+  }
   /* 누적 백지 단계 — 1일차 → 1+2일차 → … → 전체. 앞 칸을 밟아야 다음 칸이 열린다. */
   function cumSteps(pid) {
     var gs = dayGroupsOf(packOf(pid) || pack), pd = packDB(pid), rec = pd.cumulative || {};
@@ -930,13 +935,16 @@
     for (var i = 0; i < gs.length; i++) {
       var lastDay = gs[i].day;
       out.push({ i: i, lastDay: lastDay, days: gs.slice(0, i + 1).map(function (g) { return g.day; }),
-        rec: rec[lastDay] || null, open: i === 0 ? true : !!rec[gs[i - 1].day] });
+        rec: rec[lastDay] || null, open: i === 0 ? true : cumRecordPassed(rec[gs[i - 1].day]) });
     }
     return out;
   }
   function cumReachedCount(pid) {
     var steps = cumSteps(pid), n = 0;
-    steps.forEach(function (s, i) { if (s.rec) n = i + 1; });
+    for (var i = 0; i < steps.length; i++) {
+      if (!cumRecordPassed(steps[i].rec)) break;
+      n += 1;
+    }
     return n;
   }
   /* 상태 요약의 passage(§3.6) — 엔진판이 있으면 그것을 쓰고, 없으면 같은 모양을 앱이 만든다 */
@@ -2628,7 +2636,7 @@
   /* ── 누적 백지 — 1일차 → 1+2일차 → … → 전체 ── */
   function startCumulative(i) {
     var steps = cumSteps(), cs = steps[i];
-    if (!cs) return;
+    if (!cs || !cs.open) return;
     var targets = [], pid = curPackId();
     cs.days.forEach(function (d) { var gr = groupOfDay(d); if (gr) targets = targets.concat(gr.sentences); });
     if (!targets.length) return;
@@ -2643,7 +2651,8 @@
           var v = $('cmIn').value;
           var d = WBGRADE.diffPassage(v, targets.map(function (s) { return { seq: s.seq, en: s.en }; }));
           var score = targets.length ? Math.round(d.okCount / targets.length * 100) : 0;
-          var html = '<div class="result ' + (score >= 80 ? 'good' : 'bad') + '">정확 ' + d.okCount + ' / ' + targets.length + ' (' + score + '%)' +
+          var passed = targets.length > 0 && d.okCount === targets.length && d.missingCount === 0 && d.partialCount === 0 && d.orderOk === true && !(d.extras || []).length;
+          var html = '<div class="result ' + (passed ? 'good' : 'bad') + '">정확 ' + d.okCount + ' / ' + targets.length + ' (' + score + '%)' +
             ' · 부분 ' + d.partialCount + ' · 누락 ' + d.missingCount + '</div>';
           d.perSentence.forEach(function (ps) { html += diffLineHtml(ps, senBySeq(ps.seq)); });
           html += '<div class="rnext"><button class="btn p big" id="cmDone">기록하고 닫기</button></div>';
@@ -2651,9 +2660,9 @@
           $('cmDone').onclick = function () {
             var pd = packDB(pid);
             d.perSentence.forEach(function (ps) { if (ps.status !== 'ok') pd.senMiss[ps.seq] = n0(pd.senMiss[ps.seq]) + 1; });
-            pd.cumulative[cs.lastDay] = { at: new Date().toISOString(), okCount: d.okCount, total: targets.length, score: score };
+            pd.cumulative[cs.lastDay] = { at: new Date().toISOString(), okCount: d.okCount, total: targets.length, score: score, passed: passed };
             pd.dump.push({ at: new Date().toISOString(), scope: 'cum:' + cs.lastDay, ok: d.okCount, partial: d.partialCount, missing: d.missingCount });
-            logEvent('cumulative', 'blank', cs.lastDay, d.missingCount === 0 && d.partialCount === 0, pid);
+            logEvent('cumulative', 'blank', cs.lastDay, passed, pid);
             touchPack(pid); closeCustom(); persist(); render();
           };
         };
@@ -3395,7 +3404,7 @@
       return;
     }
     /* 모의 모드 — 시험처럼 정답을 보여 주지 않고 즉시 다음 문항으로 */
-    if (RQ.opts.mock && (ok || item.type !== 'spell')) {
+    if (RQ.opts.mock) {
       if (RQ.onGrade) RQ.onGrade(item, ok, answerKey, {});
       RQ.i += 1; stepRunner();
       return;

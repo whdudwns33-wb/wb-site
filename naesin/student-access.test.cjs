@@ -88,6 +88,19 @@ function screen() {
     assert.match(nextBody, /RQ\.i \+= 1; stepRunner\(\)/);
   });
 
+  await t('누적 관문은 passed/legacy 100%만 열고, 백지 통과·모의 즉시 다음 계약을 지킨다', async () => {
+    assert.match(inline, /function cumRecordPassed\(record\)[\s\S]*?typeof record\.passed === 'boolean'[\s\S]*?record\.score === 100[\s\S]*?record\.okCount === record\.total[\s\S]*?record\.total > 0/);
+    assert.match(inline, /open: i === 0 \? true : cumRecordPassed\(rec\[gs\[i - 1\]\.day\]\)/);
+    assert.match(inline, /if \(!cumRecordPassed\(steps\[i\]\.rec\)\) break;/, '누적 카운트는 앞에서부터 연속 통과만 센다');
+    assert.match(inline, /d\.okCount === targets\.length && d\.missingCount === 0 && d\.partialCount === 0 && d\.orderOk === true && !\(d\.extras \|\| \[\]\)\.length/);
+    assert.match(inline, /passed: passed/, '각 시도에 명시 통과값을 저장한다');
+    assert.match(inline, /\(passed \? 'good' : 'bad'\)/, '화면 통과 표시도 엄격한 passed 값만 사용한다');
+    const start = inline.indexOf('function finishItem(');
+    const mock = inline.indexOf('if (RQ.opts.mock)', start);
+    const correction = inline.indexOf("if (!ok && item.type === 'spell')", start);
+    assert.ok(start >= 0 && mock > start && correction > mock, '모의 분기는 철자 교정보다 먼저다');
+    assert.match(inline.slice(mock, correction), /RQ\.i \+= 1; stepRunner\(\);\s*return;/, '모의 시험은 유형·정오답 무관하게 즉시 다음으로');
+  });
   await t('localStorage 실패는 안내하고 서버 동기화 예약을 유지하며 다음 성공 때 로컬 오류를 해제한다', async () => {
     const ui = screen();
     ui.failLocal(true);

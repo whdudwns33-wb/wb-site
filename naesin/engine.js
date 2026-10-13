@@ -581,6 +581,12 @@ var WBNAESIN = (function () {
       done: done, total: ids.length, day: day == null ? '' : String(day) };
   }
 
+  /* 누적 백지는 새 기록의 passed 또는 검증 가능한 legacy 100%만 완료로 친다. */
+  function isCumulativeComplete(record) {
+    if (!record || typeof record !== 'object') return false;
+    if (typeof record.passed === 'boolean') return record.passed;
+    return record.score === 100 && record.okCount === record.total && record.total > 0;
+  }
   /* 청크 트랙을 돌릴 재료가 있는 단락인가 — 직독직해 청크(chunks[])가 정본이다 */
   function hasChunks(g) {
     return !!g && g.sentences.some(function (sen) {
@@ -691,7 +697,7 @@ var WBNAESIN = (function () {
     if (allPara && open) {
       var cum = (rec && rec.cumulative) || null;
       var i = 0;
-      while (i < groups.length && cum && Object.prototype.hasOwnProperty.call(cum, groups[i].day)) i += 1;
+      while (i < groups.length && cum && isCumulativeComplete(cum[groups[i].day])) i += 1;
       if (i < groups.length) out.tail.push({ kind: 'cumulative', lastDay: groups[i].day });
       else if (!(rec && rec.check)) out.tail.push({ kind: 'check' });   // 최종 점검은 누적을 다 밟은 뒤
     }
@@ -737,8 +743,8 @@ var WBNAESIN = (function () {
     });
     if (!groups.length) return out;
     var cum = rec && rec.cumulative, i = 0;
-    while (i < groups.length && cum && Object.prototype.hasOwnProperty.call(cum, groups[i].day)) i += 1;
-    out.tailDays = (groups.length - i) + ((rec && rec.check) ? 0 : 1);
+    while (i < groups.length && cum && isCumulativeComplete(cum[groups[i].day])) i += 1;
+    out.tailDays = (groups.length - i) + ((i === groups.length && rec && rec.check) ? 0 : 1);
     return out;
   }
 
@@ -1082,11 +1088,11 @@ var WBNAESIN = (function () {
       /* 누적은 1일차 → 1+2일차 → … 이므로 앞에서부터 이어진 기록만 센다 — 중간이 비면
          거기서 멈춘다(뒤 기록만 있는 것은 순서를 건너뛴 값이라 진행으로 안 본다). */
       for (var i = 0; i < groups.length; i++) {
-        if (!Object.prototype.hasOwnProperty.call(cum, groups[i].day)) break;
+        if (!isCumulativeComplete(cum[groups[i].day])) break;
         out.cumulative = i + 1;
       }
     }
-    if (rec && rec.check) out.check = { correct: intOf(rec.check.correct), total: intOf(rec.check.total) };
+    if (out.cumulative === groups.length && groups.length > 0 && rec && rec.check) out.check = { correct: intOf(rec.check.correct), total: intOf(rec.check.total) };
     return out;
   }
 
@@ -1177,7 +1183,7 @@ var WBNAESIN = (function () {
     STAGE_MAX: STAGE_MAX, RELEARN_TARGET: RELEARN_TARGET,
     CUE_MAX: CUE_MAX, PARA_STEPS: PARA_STEPS,
     localDate: localDate, daysUntil: daysUntil, sentenceId: sentenceId,
-    chunkId: chunkId, paraId: paraId, dayGroups: dayGroups,
+    chunkId: chunkId, paraId: paraId, dayGroups: dayGroups, isCumulativeComplete: isCumulativeComplete,
     createState: createState, recordQuiz: recordQuiz, recordCriterion: recordCriterion,
     stability: stability, isStable: isStable, isDone: isDone,
     stageOf: stageOf, stageMaxOf: stageMaxOf, cueOf: cueOf, isCueStage: isCueStage,
