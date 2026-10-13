@@ -122,24 +122,35 @@ test('students manage only their own open request while director-only actions ch
   }
 });
 
-test('the worksheet form requires grade, semester and unit and enforces bounded text fields', () => {
+test('the worksheet form requires grade, semester, difficulty and unit and enforces bounded text fields', () => {
   const modal = functionSource('metamathRequestModal');
   const save = eventCase('metamathrequestsave');
 
   assert.match(modal, /id="metamathGrade"/);
   assert.match(modal, /id="metamathSemester"/);
+  assert.match(modal, /id="metamathDifficulty"/);
+  assert.match(html, /const METAMATH_DIFFICULTIES = Object\.freeze\(\['기본', '발전', '심화'\]\)/);
   assert.match(modal, /id="metamathUnit"[^>]*maxlength="160"/);
   assert.match(modal, /id="metamathNote"[^>]*maxlength="500"/);
   assert.match(modal, /학년/);
   assert.match(modal, /학기/);
+  assert.match(modal, /난이도/);
   assert.match(modal, /단원/);
   assert.match(modal, /기타[^<]*(?:메모|선택)/);
 
-  assert.match(save, /!grade\s*\|\|\s*!semester\s*\|\|\s*!unit/);
+  assert.match(save, /!grade\s*\|\|\s*!semester\s*\|\|\s*!difficulty\s*\|\|\s*!unit/);
+  assert.match(save, /METAMATH_DIFFICULTIES\.includes\(difficulty\)/);
+  assert.match(save, /difficulty:\s*difficulty/);
   assert.match(save, /grade\.length\s*>\s*20/);
   assert.match(save, /semester\.length\s*>\s*20/);
   assert.match(save, /unit\.length\s*>\s*160/);
   assert.match(save, /note\.length\s*>\s*500/);
+});
+
+test('request summaries show the selected difficulty and keep legacy requests readable', () => {
+  const build = Function(functionSource('buildMetamathRequestSummary') + '\nreturn buildMetamathRequestSummary;')();
+  assert.match(build({ grade: '중2', semester: '2학기', difficulty: '심화', unit: '일차함수' }), /난이도: 심화/);
+  assert.match(build({ grade: '중2', semester: '2학기', unit: '일차함수' }), /난이도: 미지정\(기존 요청\)/);
 });
 
 test('equivalent open requests are rejected before a second task is created', () => {
@@ -147,12 +158,13 @@ test('equivalent open requests are rejected before a second task is created', ()
   const fingerprint = Function(fingerprintSource + '\nreturn metamathRequestFingerprint;')();
   const base = {
     staffId: 'student-a', processingDate: '2026-09-02', grade: '중2', semester: '2학기',
-    unit: '3단원 일차함수', note: '기본 문제 위주'
+    difficulty: '기본', unit: '3단원 일차함수', note: '기본 문제 위주'
   };
   assert.equal(fingerprint(base), fingerprint({
     ...base, grade: '  중2 ', semester: '2학기  ', unit: '  3단원   일차함수 ', note: '다른 메모'
   }), 'whitespace and memo must not create a duplicate request');
   assert.notEqual(fingerprint(base), fingerprint({ ...base, unit: '4단원 연립방정식' }));
+  assert.notEqual(fingerprint(base), fingerprint({ ...base, difficulty: '심화' }));
   assert.notEqual(fingerprint(base), fingerprint({ ...base, processingDate: '2026-09-09' }));
 
   const save = eventCase('metamathrequestsave');
@@ -180,6 +192,7 @@ test('assignment creates one admin MetaMath math response linked to the request'
   assert.match(assign, /start:/);
   assert.match(assign, /LEARNING_SOURCES\.metamath\.steps/);
   assert.match(assign, /save\(\);\s*queueSync\(\)/);
+  assert.match(functionSource('learningTaskModal'), /request\.difficulty/);
   assert.doesNotMatch(assign, /req\.(?:status|source|studySubject|origin)\s*=/,
     'director state must remain in the admin-owned response row');
 });
