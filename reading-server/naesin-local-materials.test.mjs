@@ -36,8 +36,9 @@ fs.mkdirSync(folderPack,{recursive:true});
 const folderBytes=new Map(), folderDocs=[];
 for(const [source,role,file] of folderSpecs){const bytes=Buffer.from('%PDF-1.4\\n% fixture '+source+'\\n');folderBytes.set(source,bytes);fs.writeFileSync(path.join(folderPack,file),bytes);folderDocs.push({sourceDocumentId:source,role,file,bytes:bytes.length,sha256:sha(bytes),pageCount:source==='00'?2:source==='01'?44:source==='02'?31:source==='03'?26:source==='04s'||source==='04t'?14:source==='05s'||source==='05t'?10:source==='06s'||source==='06t'?12:source==='07'?25:source==='08'?23:25});}
 const folderLatest=path.join(folderAnalysis,'draft-20261013-120000-cccccc');fs.mkdirSync(folderLatest,{recursive:true});
-const folderDraft={kind:'naesin-folder-review-draft',version:1,status:'needs-review',publishable:false,rights:{basis:'licensed',holder:'fixture',evidenceRef:'fixture',studentUseAllowed:true,derivativeUseAllowed:true,externalAiAllowed:false,notes:'원내 전용'},sourceDocuments:folderDocs,wordCandidates:[{candidateId:'wc-0001'}],sentenceCandidates:[{seq:1}]};
-fs.writeFileSync(path.join(folderLatest,'review-draft.json'),JSON.stringify(folderDraft));
+const folderRef=(sourceDocumentId,page,section,extra={})=>({sourceDocumentId,page,printedPage:page,section,...extra});
+const folderDraft={kind:'naesin-folder-review-draft',version:1,status:'needs-review',publishable:false,rights:{basis:'licensed',holder:'fixture',evidenceRef:'fixture',studentUseAllowed:true,derivativeUseAllowed:true,externalAiAllowed:false,notes:'원내 전용'},sourceDocuments:folderDocs,wordCandidates:[{candidateId:'wc-0001'}],sentenceCandidates:[{seq:1}],dialogueCandidates:[{candidateId:'dc-0001',id:'d-0001',title:'Synthetic dialogue',section:'A. Listen and Check',lines:[{speaker:'G',en:'Hello there.',ko:'안녕하세요.'}],sourceRefs:[folderRef('01',1,'A. Listen and Check',{side:'EN'}),folderRef('01',1,'A. Listen and Check',{side:'KO'})],reviewFlags:['REVIEW_REQUIRED']}],functionCandidates:[{candidateId:'fc-0001',id:'fn-0001',name:'Synthetic function',pattern:'would like to',explainKo:'~하고 싶다',exampleEn:'I would like to go.',exampleKo:'가고 싶다.',sourceRefs:[folderRef('01',1,'Functions')],reviewFlags:['REVIEW_REQUIRED']}],keyExpressionCandidates:[{candidateId:'kc-0001',en:'I would like to go.',ko:'가고 싶다.',blankAnswer:'would like to',sourceRefs:[folderRef('01',1,'Functions')],reviewFlags:['REVIEW_REQUIRED']}],patternCandidates:[{candidateId:'pc-01',patternNo:1,title:'Synthetic pattern',conceptKo:'개념 설명',grammarPoint:['개념 설명'],textbookExamples:[{en:'We saw a fish.',ko:'물고기를 보았다.',origin:'교과서 본문'}],letsUseIt:[{no:1,stem:'Choose the answer.',ko:'답을 고르세요.',wordBank:['see'],answers:['seeing']}],sourceRefs:[folderRef('07',1,'Pattern 1')],reviewFlags:['REVIEW_REQUIRED']}],unmatched:[],enrichmentSummary:{verbForms:{matched:0,unmatched:0},grammarChoices:{matched:0,unmatched:0},tokens:{matched:0,unmatched:0},writingKeywords:{matched:0,unmatched:0},dialogues:{matched:1,unmatched:0,lines:1},functions:{matched:1,unmatched:0},keyExpressions:{matched:1,unmatched:0},patterns:{matched:1,unmatched:0,examples:1,letsUseIt:1}}};
+const writeFolderDraft=value=>fs.writeFileSync(path.join(folderLatest,'review-draft.json'),JSON.stringify(value));writeFolderDraft(folderDraft);
 const jobId = 'job-ownpdf01', adminToken = randomUUID(), studentToken = randomUUID();
 const originalDb = JSON.stringify({ students: { OWN01: { code: 'OWN01', name: '자체 시험 학생' } }, states: {},
   tokens: { [adminToken]: { admin: true, code: '__admin__', exp: Date.now() + 3600e3 }, [studentToken]: { admin: false, code: 'OWN01', exp: Date.now() + 3600e3 } },
@@ -81,11 +82,24 @@ try {
   await t('13문서 folder manifest를 모두 해시 검증하고 요청한 문서만 반환한다', () => {
     const loaded=readLocalMaterials(data,folderPackId);
     assert.equal(loaded.draft.sourceDocuments.length,13);
+    assert.equal(loaded.draft.dialogueCandidates.length,1);assert.equal(loaded.draft.functionCandidates.length,1);assert.equal(loaded.draft.keyExpressionCandidates.length,1);assert.equal(loaded.draft.patternCandidates.length,1);
     assert.equal(loaded.pdfs.length,13);
     assert.equal(loaded.pdfs.reduce((n,p)=>n+p.pageCount,0),248);
     assert.deepEqual(readLocalMaterials(data,folderPackId,'00',folderDocs[0].sha256).bytes,folderBytes.get('00'));
     assert.deepEqual(readLocalMaterials(data,folderPackId,'09',folderDocs.at(-1).sha256).bytes,folderBytes.get('09'));
     assert.throws(()=>readLocalMaterials(data,folderPackId,'08','0'.repeat(64)));
+  });
+  await t('Phase 2B 후보·sourceRefs·요약은 허용된 구조만 읽고 원문·경로·초과페이지를 거부한다',()=>{
+    const mutations=[
+      value=>{value.dialogueCandidates[0].rawPageText='PRIVATE_PAGE_TEXT';},
+      value=>{value.functionCandidates[0].sourceRefs[0].absolutePath='C:\\private\\source.pdf';},
+      value=>{value.keyExpressionCandidates[0].sourceRefs[0].page=999;},
+      value=>{value.patternCandidates[0].letsUseIt[0].answers=[];},
+      value=>{value.unmatched=[{candidateId:'pc-01',field:'dialogues',reason:'SOURCE_NOT_PRESENT',sourceRefs:[folderRef('01',1,'dialogue')],expectedQuestionNo:'raw'}];},
+      value=>{value.enrichmentSummary.dialogues.lines=99;}
+    ];
+    for(const mutate of mutations){const bad=structuredClone(folderDraft);mutate(bad);writeFolderDraft(bad);assert.throws(()=>readLocalMaterials(data,folderPackId));}
+    writeFolderDraft(folderDraft);
   });
   await t('최신 정규 이름의 미검수 초안과 원본 메타를 읽고 파일은 변경하지 않는다', () => {
     const before = fs.readFileSync(draftPath);

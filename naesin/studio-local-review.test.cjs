@@ -48,7 +48,7 @@ function screen(){
         });
       };nodes.set(s,el);
     }return nodes.get(s);}
-  function chunks(selector){const m=/^\[data-pdf-(chunk|keyword)-(en|ko)\]$/.exec(selector);if(!m)return[];
+  function chunks(selector){const folder=/^\[data-folder-(source|sentence)\]$/.exec(selector);if(folder){const source=folder[1]==='source';const pattern=source?/<button[^>]*data-folder-source="([^"]+)"[^>]*data-folder-page="([^"]+)"[^>]*>/g:/<button[^>]*data-folder-sentence="([^"]+)"[^>]*>/g;return Array.from(node('#app').innerHTML.matchAll(pattern),(m,i)=>{const key=selector+i;if(!nodes.has(key))nodes.set(key,{dataset:source?{folderSource:decode(m[1]),folderPage:decode(m[2])}:{folderSentence:decode(m[1])}});return nodes.get(key);});}const m=/^\[data-pdf-(chunk|keyword)-(en|ko)\]$/.exec(selector);if(!m)return[];
     return Array.from(node('#app').innerHTML.matchAll(new RegExp('<textarea data-pdf-'+m[1]+'-'+m[2]+'="(\\d+)"[^>]*>([\\s\\S]*?)<\\/textarea>','g')),x=>{
       const key=selector+x[1],dataset='pdf'+(m[1]==='chunk'?'Chunk':'Keyword')+(m[2]==='en'?'En':'Ko');
       if(!nodes.has(key))nodes.set(key,{dataset:{[dataset]:x[1]}});const el=nodes.get(key);
@@ -708,16 +708,41 @@ function wordSection(ui,section,checked){const el=ui.node('#pdfWord'+section);el
     }
   });
 
-  await t('원내 folder bundle 13문서 manifest·문장 위치를 변환하고 일반 파일 입력은 차단한다',async()=>{
+  await t('원내 folder bundle 13문서 manifest·문장 위치와 검수 전용 후보를 변환하고 원본 쪽 버튼을 연다',async()=>{
     const ids=['00','01','02','03','04s','04t','05s','05t','06s','06t','07','08','09'];
     const docs=ids.map((sourceDocumentId,i)=>({sourceDocumentId,role:'fixture-role',file:`${sourceDocumentId}_fixture.pdf`,sha256:String(i).padStart(64,'0'),bytes:10,pageCount:sourceDocumentId==='02'?31:26}));
     const sentences=Array.from({length:25},(_,i)=>({seq:i+1,en:'Own sentence '+(i+1),ko:'자체 문장 '+(i+1),dayGroup:'8/1',sourceRefs:[{sourceDocumentId:'02',page:i<12?9:i<20?10:29,printedPage:i<12?9:i<20?10:29,section:'fixture',questionNo:i+1},{sourceDocumentId:'02',page:29,printedPage:29,section:'answer',questionNo:i+1}]}));
-    const folder={kind:'naesin-folder-review-draft',version:1,status:'needs-review',publishable:false,rights:{basis:'licensed',studentUseAllowed:true,derivativeUseAllowed:true,externalAiAllowed:false},sourceDocuments:docs,
-      wordCandidates:Array.from({length:74},(_,i)=>({candidateId:'wc-'+String(i+1).padStart(4,'0'),headCandidate:'ownword'+i,meanings:['자체 뜻'],posCandidates:['n.'],reviewFlags:['REVIEW_REQUIRED'],sourceRefs:[{sourceDocumentId:'03',page:1,printedPage:1,section:null,questionNo:null,bbox:[1,2,3,4]}]})),sentenceCandidates:sentences};
+    const ref=(sourceDocumentId,page,section,extra={})=>({sourceDocumentId,page,printedPage:page,section,...extra});
+    const folder={kind:'naesin-folder-review-draft',version:1,status:'needs-review',publishable:false,rights:{basis:'licensed',holder:'fixture',evidenceRef:'fixture',studentUseAllowed:true,derivativeUseAllowed:true,externalAiAllowed:false},sourceDocuments:docs,
+      wordCandidates:Array.from({length:74},(_,i)=>({candidateId:'wc-'+String(i+1).padStart(4,'0'),headCandidate:'ownword'+i,meanings:['자체 뜻'],posCandidates:['n.'],reviewFlags:['REVIEW_REQUIRED'],sourceRefs:[{sourceDocumentId:'03',page:1,printedPage:1,section:null,questionNo:null,bbox:[1,2,3,4]}]})),sentenceCandidates:sentences,
+      dialogueCandidates:[{candidateId:'dc-0001',id:'d-0001',title:'Own dialogue',section:'A. Listen and Check',lines:[{speaker:'G',en:'Hello there.',ko:'안녕하세요.'}],sourceRefs:[ref('01',1,'A. Listen and Check',{side:'EN'}),ref('01',1,'A. Listen and Check',{side:'KO'})],reviewFlags:['REVIEW_REQUIRED']}],
+      functionCandidates:[{candidateId:'fc-0001',id:'fn-0001',name:'Own function',pattern:'would like to',explainKo:'~하고 싶다',exampleEn:'I would like to go.',exampleKo:'가고 싶다.',sourceRefs:[ref('01',1,'Functions')],reviewFlags:['REVIEW_REQUIRED']}],
+      keyExpressionCandidates:[{candidateId:'kc-0001',en:'I would like to go.',ko:'가고 싶다.',blankAnswer:'would like to',sourceRefs:[ref('01',1,'Functions')],reviewFlags:['REVIEW_REQUIRED']}],
+      patternCandidates:[{candidateId:'pc-01',patternNo:1,title:'Own pattern',conceptKo:'자체 설명',grammarPoint:['자체 설명'],textbookExamples:[{en:'We saw a fish.',ko:'물고기를 보았다.',origin:'교과서 본문'}],letsUseIt:[{no:1,stem:'Choose the answer.',ko:'답을 고르세요.',wordBank:['see'],answers:['seeing']}],sourceRefs:[ref('07',1,'Pattern 1')],reviewFlags:['REVIEW_REQUIRED']}],unmatched:[],
+      enrichmentSummary:{verbForms:{matched:0,unmatched:0},grammarChoices:{matched:0,unmatched:0},tokens:{matched:0,unmatched:0},writingKeywords:{matched:0,unmatched:0},dialogues:{matched:1,unmatched:0,lines:1},functions:{matched:1,unmatched:0},keyExpressions:{matched:1,unmatched:0},patterns:{matched:1,unmatched:0,examples:1,letsUseIt:1}}};
     const ui=screen();assert.throws(()=>ui.pdfReviewDraft(folder));const converted=ui.pdfReviewDraft(folder,true);
     assert.equal(converted.words.length,74);assert.equal(converted.sentenceCandidates.length,25);assert.equal(converted.sourceDocuments.length,13);
+    assert.deepEqual(Object.keys(converted.reviewCandidates),['dialogueCandidates','functionCandidates','keyExpressionCandidates','patternCandidates','unmatched','enrichmentSummary']);assert.equal(converted.reviewCandidates.dialogueCandidates.length,1);
     assert.deepEqual(JSON.parse(JSON.stringify(converted.words[0]._pdfReview.locations[0])),{page:1,bbox:[1,2,3,4],sourceDocumentId:'03',printedPage:1,section:null,questionNo:null});
     assert.equal(converted.columns.length,4);assert.equal(converted.columns.some(c=>c.page===9&&c.column==='EN'),true);
+    const uiPreview=screen();uiPreview.setLocal({jobId:uiPreview.get().JOB.jobId,token:'own-test-admin-token',columns:converted.columns,pdfs:docs.map(d=>({source:d.sourceDocumentId,file:d.file,pageCount:d.pageCount,sha256:d.sha256})),sentenceCandidates:sentences,sourceDocuments:docs,reviewCandidates:converted.reviewCandidates});
+    const markup=uiPreview.pdfColumnsHtml();assert.match(markup,/내용정리·문법워크북 검수 후보 4개/);assert.match(markup,/원본 01 p1/);assert.match(markup,/원본 07 p1/);assert.match(markup,/학생 팩에 저장·게시하지 않습니다/);assert.ok(!markup.includes('C:\\Users\\'));
+    const unsafe=clone(folder);unsafe.dialogueCandidates[0].rawPageText='PRIVATE_PAGE_TEXT';assert.throws(()=>ui.pdfReviewDraft(unsafe,true));
+    const unsafeRef=clone(folder);unsafeRef.patternCandidates[0].sourceRefs[0].absolutePath='C:\\private\\source.pdf';assert.throws(()=>ui.pdfReviewDraft(unsafeRef,true));
+    uiPreview.setFetch(url=>url.startsWith('/api/naesin/admin/job/local-pdf?id=')?pdfResponse():response({localPdfReview:true}));uiPreview.renderJob();
+    const buttons=uiPreview.chunks('[data-folder-source]');assert.equal(buttons.length,4);buttons[0].onclick();await new Promise(r=>setImmediate(r));assert.equal(uiPreview.get().PDF_VIEW.source,'01');assert.ok(uiPreview.requests.some(r=>r.url.includes('source=01')));
+    buttons[3].onclick();await new Promise(r=>setImmediate(r));assert.equal(uiPreview.get().PDF_VIEW.source,'07');assert.ok(uiPreview.requests.some(r=>r.url.includes('source=07')));
+    const uploadUi=screen(),uploadJob=job();uploadUi.setStored(uploadJob);uploadUi.set(uploadJob);let postedDraft=null;let savedJob=uploadJob;
+    uploadUi.setFetch((url,opt)=>{
+      if(url==='/api/health')return response({localPdfReview:true});
+      if(url.startsWith('/api/naesin/admin/job/local-review?id='))return response({draft:folder,pdfs:docs.map(d=>({source:d.sourceDocumentId,file:d.file,pageCount:d.pageCount,sha256:d.sha256}))});
+      if(url==='/api/naesin/admin/job/draft'){postedDraft=JSON.parse(opt.body).draft;savedJob={...savedJob,draft:{...savedJob.draft,...postedDraft},updatedAt:'2026-01-01T00:00:01.000Z'};return response({job:savedJob,gate:gate(savedJob)});}
+      if(url.startsWith('/api/naesin/admin/job?id='))return response({job:savedJob,gate:gate(savedJob),sources:{}});
+      if(url.startsWith('/api/naesin/admin/job/local-pdf?id='))return pdfResponse();
+      throw new Error('unexpected upload URL '+url);
+    });
+    await uploadUi.putPdfReviewFile(true);await new Promise(r=>setImmediate(r));assert.deepEqual(Object.keys(postedDraft),['words']);assert.equal(postedDraft.words.length,74);
+    assert.equal(uploadUi.get().PDF_LOCAL.reviewCandidates.dialogueCandidates.length,1);assert.ok(!JSON.stringify(postedDraft).includes('sourceRefs'));assert.match(uploadUi.pdfColumnsHtml(),/내용정리·문법워크북 검수 후보 4개/);
   });
 
   await t('PDF 문장 메타는 일반 붙여넣기 경로와 경고 없는 일괄 승인을 통해 우회하지 않는다',async()=>{

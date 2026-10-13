@@ -45,6 +45,72 @@ function readRegular(p, max) {
   } finally { fs.closeSync(fd); }
 }
 
+const objectRecord = value => value && typeof value === 'object' && !Array.isArray(value);
+const exactKeys = (value, keys) => objectRecord(value) && Object.keys(value).length === keys.length && Object.keys(value).every(key => keys.includes(key));
+const shortText = (value, max = 1200, empty = false) => typeof value === 'string' && value.length <= max && (empty || value.trim().length > 0);
+const flagsValid = value => Array.isArray(value) && value.length <= 20 && value.every(flag => shortText(flag, 80));
+function validateFolderCandidates(draft) {
+  const docs = new Map(draft.sourceDocuments.map(doc => [doc.sourceDocumentId, doc]));
+  const refKeys = ['sourceDocumentId','page','printedPage','section','side','lineStart','lineEnd','questionNo'];
+  const refsValid = refs => Array.isArray(refs) && refs.length > 0 && refs.length <= 40 && refs.every(ref => {
+    if (!exactKeys(ref, Object.keys(ref).filter(key => refKeys.includes(key)))
+      || !['sourceDocumentId','page','printedPage','section'].every(key => Object.hasOwn(ref, key))) return false;
+    const doc = docs.get(ref.sourceDocumentId);
+    return !!doc && Number.isInteger(ref.page) && ref.page >= 1 && ref.page <= doc.pageCount
+      && ref.printedPage === ref.page && shortText(ref.section, 120) && !/[\\\\:]/.test(ref.section) && !ref.section.includes('/')
+      && (!Object.hasOwn(ref,'side') || ['EN','KO'].includes(ref.side))
+      && (!Object.hasOwn(ref,'lineStart') || (Number.isInteger(ref.lineStart) && ref.lineStart >= 1 && ref.lineStart <= 1000))
+      && (!Object.hasOwn(ref,'lineEnd') || (Number.isInteger(ref.lineEnd) && ref.lineEnd >= (ref.lineStart || 1) && ref.lineEnd <= 1000))
+      && (!Object.hasOwn(ref,'questionNo') || ref.questionNo === null || (Number.isInteger(ref.questionNo) && ref.questionNo >= 1 && ref.questionNo <= 99));
+  });
+  const common = row => refsValid(row.sourceRefs) && flagsValid(row.reviewFlags);
+  const dialogueKeys = ['candidateId','id','title','section','lines','sourceRefs','reviewFlags'];
+  if (!Array.isArray(draft.dialogueCandidates) || draft.dialogueCandidates.length > 20
+    || !draft.dialogueCandidates.every(row => exactKeys(row, dialogueKeys) && /^dc-\d{4}$/.test(row.candidateId) && /^d-\d{4}$/.test(row.id)
+      && shortText(row.title,200) && shortText(row.section,120) && Array.isArray(row.lines) && row.lines.length <= 40 && common(row)
+      && row.lines.every(line => exactKeys(line,['speaker','en','ko']) && ['G','B','M','W'].includes(line.speaker) && shortText(line.en) && shortText(line.ko)))) return false;
+  const functionKeys = ['candidateId','id','name','pattern','explainKo','exampleEn','exampleKo','sourceRefs','reviewFlags'];
+  if (!Array.isArray(draft.functionCandidates) || draft.functionCandidates.length > 20
+    || !draft.functionCandidates.every(row => exactKeys(row,functionKeys) && /^fc-\d{4}$/.test(row.candidateId) && /^fn-\d{4}$/.test(row.id)
+      && shortText(row.name,200) && shortText(row.pattern,500,true) && shortText(row.explainKo,500,true)
+      && shortText(row.exampleEn) && shortText(row.exampleKo) && common(row))) return false;
+  const keyKeys = ['candidateId','en','ko','blankAnswer','sourceRefs','reviewFlags'];
+  if (!Array.isArray(draft.keyExpressionCandidates) || draft.keyExpressionCandidates.length > 20
+    || !draft.keyExpressionCandidates.every(row => exactKeys(row,keyKeys) && /^kc-\d{4}$/.test(row.candidateId)
+      && shortText(row.en) && shortText(row.ko) && shortText(row.blankAnswer,300) && common(row))) return false;
+  const patternKeys = ['candidateId','patternNo','title','conceptKo','grammarPoint','textbookExamples','letsUseIt','sourceRefs','reviewFlags'];
+  if (!Array.isArray(draft.patternCandidates) || draft.patternCandidates.length > 20
+    || !draft.patternCandidates.every(row => exactKeys(row,patternKeys) && /^pc-\d{2}$/.test(row.candidateId) && [1,2].includes(row.patternNo)
+      && shortText(row.title,300) && shortText(row.conceptKo,2000,true) && Array.isArray(row.grammarPoint) && row.grammarPoint.length <= 20
+      && row.grammarPoint.every(item => shortText(item,1000)) && Array.isArray(row.textbookExamples) && row.textbookExamples.length <= 40
+      && row.textbookExamples.every(item => exactKeys(item,['en','ko','origin']) && shortText(item.en) && shortText(item.ko) && ['교과서 본문','워크북 예문'].includes(item.origin))
+      && Array.isArray(row.letsUseIt) && row.letsUseIt.length <= 40 && row.letsUseIt.every(item => exactKeys(item,['no','stem','ko','wordBank','answers'])
+        && Number.isInteger(item.no) && item.no >= 1 && item.no <= 20 && shortText(item.stem) && shortText(item.ko)
+        && Array.isArray(item.wordBank) && item.wordBank.length <= 50 && item.wordBank.every(word => shortText(word,200))
+        && Array.isArray(item.answers) && item.answers.length >= 1 && item.answers.length <= 20 && item.answers.every(answer => shortText(answer,300)))
+      && common(row))) return false;
+  const unmatchedKeys = ['candidateId','field','reason','sourceRefs','expectedQuestionNo','baseCount','answerCount','groupIndex','expectedGroups','pairIndex'];
+  const numericDetails = ['expectedQuestionNo','baseCount','answerCount','groupIndex','expectedGroups','pairIndex'];
+  if (!Array.isArray(draft.unmatched) || draft.unmatched.length > 500 || !draft.unmatched.every(row =>
+    objectRecord(row) && Object.keys(row).every(key => unmatchedKeys.includes(key)) && shortText(row.candidateId,100)
+      && shortText(row.field,80) && shortText(row.reason,120) && refsValid(row.sourceRefs)
+      && numericDetails.every(key => !Object.hasOwn(row,key) || (Number.isInteger(row[key]) && row[key] >= 0 && row[key] <= 1000)))) return false;
+  const summaryKeys = ['verbForms','grammarChoices','tokens','writingKeywords','dialogues','functions','keyExpressions','patterns'];
+  if (!exactKeys(draft.enrichmentSummary,summaryKeys)) return false;
+  for (const key of summaryKeys.slice(0,4)) if (!exactKeys(draft.enrichmentSummary[key],['matched','unmatched'])
+    || !Object.values(draft.enrichmentSummary[key]).every(n => Number.isInteger(n) && n >= 0 && n <= 1000)) return false;
+  for (const [key,keys] of [['dialogues',['matched','unmatched','lines']],['functions',['matched','unmatched']],['keyExpressions',['matched','unmatched']],['patterns',['matched','unmatched','examples','letsUseIt']]])
+    if (!exactKeys(draft.enrichmentSummary[key],keys) || !Object.values(draft.enrichmentSummary[key]).every(n => Number.isInteger(n) && n >= 0 && n <= 1000)) return false;
+  const totals = draft.enrichmentSummary;
+  return totals.dialogues.matched + totals.dialogues.unmatched === draft.dialogueCandidates.length
+    && totals.dialogues.lines === draft.dialogueCandidates.reduce((n,row) => n + row.lines.length,0)
+    && totals.functions.matched + totals.functions.unmatched === draft.functionCandidates.length
+    && totals.keyExpressions.matched + totals.keyExpressions.unmatched === draft.keyExpressionCandidates.length
+    && totals.patterns.matched + totals.patterns.unmatched === draft.patternCandidates.length
+    && totals.patterns.examples === draft.patternCandidates.reduce((n,row) => n + row.textbookExamples.length,0)
+    && totals.patterns.letsUseIt === draft.patternCandidates.reduce((n,row) => n + row.letsUseIt.length,0);
+}
+
 export function readLocalMaterials(dataDir, packId, source, expectedSha256) {
   if (!/^[A-Za-z0-9-]{3,60}$/.test(packId) || (source !== undefined && (!(SOURCES.includes(source) || Object.hasOwn(FOLDER_SOURCES, source)) || !/^[a-f0-9]{64}$/.test(expectedSha256)))) fail();
   const parent = directory(path.dirname(path.resolve(dataDir)));
@@ -77,7 +143,7 @@ export function readLocalMaterials(dataDir, packId, source, expectedSha256) {
       pdfs.push({ source: meta.sourceDocumentId, file: meta.file, pageCount: meta.pageCount, sha256: meta.sha256 });
       if (source === meta.sourceDocumentId) bytes = pdf;
     }
-    if (seen.size !== Object.keys(FOLDER_SOURCES).length) fail();
+    if (seen.size !== Object.keys(FOLDER_SOURCES).length || !validateFolderCandidates(draft)) fail();
     return source === undefined ? { draft, pdfs } : { bytes };
   }
   if (draft?.kind !== 'naesin-pdf-review-draft' || draft.version !== 1 || draft.status !== 'needs-review'
