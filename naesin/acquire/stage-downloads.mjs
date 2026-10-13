@@ -85,17 +85,18 @@ export function classifyDownload(name) {
   return {filename: NAMES[rule[1]+(teacher ? 1 : 0)], stage: null};
 }
 function validateScope(s) {
-  keys(s, ['curriculum','grade','publisher','unitRawLabel','unitCode','folderName'], 'scope');
-  for (const k of ['curriculum','grade','publisher','unitRawLabel','unitCode','folderName']) text(s[k], 'scope');
+  keys(s, ['curriculum','grade','publisher','publisherLabel','unitRawLabel','unitCode','folderName'], 'scope');
+  for (const k of ['curriculum','grade','publisher','publisherLabel','unitRawLabel','unitCode','folderName']) text(s[k], 'scope');
+  if (!s.publisherLabel.trim()) reject('Missing publisherLabel');
   if (!['2022','2015'].includes(s.curriculum) || !/^m[123]$/.test(s.grade) || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(s.publisher)) reject('Invalid scope');
   basename(s.folderName);
   if (normalizeUnit(s.unitRawLabel) !== s.unitCode || !/^(?:L(?:[1-9]|1[0-2])|S[LR][12]?)$/.test(s.unitCode)) reject('Unit scope mismatch');
   const f = folderScope(s.folderName);
   if (!f || ['curriculum','grade','publisher','unitCode'].some(k => f[k] !== s[k])) reject('Folder scope mismatch');
 }
-// 미등록 출판사 표기는 추측하지 않는다. 확인한 대응표와 테스트를 추가한 뒤 허용한다.
-const publisherAliases = {'NE능률(김기택)': 'ne-kimgitaek'};
-export function checkFilenameScope(name, scope) {
+// 출판사 표기와 안정 슬러그의 연결은 호출자가 확인한다. 음역·대응표를 추측하지 않는다.
+const publisherText = value => value.normalize('NFC').trim();
+export function checkFilenameScope(name, scope, requirePublisher = false) {
   const s = compareName(name);
   const curriculum = s.match(/\((2022|2015)개정\)/);
   const grade = s.match(/(?:^|_)중([123])(?:_|$)/);
@@ -104,10 +105,8 @@ export function checkFilenameScope(name, scope) {
   const units = s.split('_').map(x => normalizeUnit(x)).filter(Boolean);
   if (units.some(x => x !== scope.unitCode)) reject('Filename unit mismatch');
   const pub = s.match(/(?:^|_)중[123]_([^_]+)_/);
-  if (pub) {
-    const observed = publisherAliases[pub[1]] || (/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(pub[1]) ? pub[1] : null);
-    if (!observed || observed !== scope.publisher) reject('Filename publisher mismatch or unsupported publisher alias');
-  }
+  if (!pub && requirePublisher) reject('Filename publisher missing');
+  if (pub && publisherText(pub[1]) !== publisherText(scope.publisherLabel)) reject('Filename publisher label mismatch');
 }
 async function digest(file) {
   const stat = await inspectPath(file);
@@ -160,7 +159,7 @@ export async function preflight(input, options = {}) {
     const src = inside(sourceRoot, absolute(item.src, 'src'));
     basename(path.basename(src));
     const classification = classifyDownload(item.suggestedFilename);
-    checkFilenameScope(item.suggestedFilename, input.scope);
+    checkFilenameScope(item.suggestedFilename, input.scope, true);
     checkFilenameScope(path.basename(src), input.scope);
     const destination = inside(folder, path.join(folder, classification.filename));
     const info = await digest(src);

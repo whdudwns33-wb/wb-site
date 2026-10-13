@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {NAMES,classifyDownload,stageDownloads,runStage} from './stage-downloads.mjs';
-const scope = {curriculum:'2022',grade:'m2',publisher:'ne-kimgitaek',unitRawLabel:'1과',unitCode:'L1',folderName:'2022-ne-kimgitaek-m2-L1'};
+const scope = {curriculum:'2022',grade:'m2',publisher:'ne-kimgitaek',publisherLabel:'NE능률(김기택)',unitRawLabel:'1과',unitCode:'L1',folderName:'2022-ne-kimgitaek-m2-L1'};
 const prefix = '(2022개정)2026년_중2_NE능률(김기택)_1과_';
 const titles = ['본문','[01]내용정리 플러스','[02]본문10단계 워크북 통합본(1~10)','[03]WORD TEST',
   '[04]예상문제 PRE-STEP','[04]예상문제 PRE-STEP(교사용)','[05]예상문제 1회','[05]예상문제 1회(교사용)',
@@ -168,4 +168,53 @@ test('CLI input and root override, no implicit source listing',async t=>{
   const r=await runStage(['--input',input,'--root',f.root,'--source-root',f.sourceRoot]);assert.equal(r.status,'complete');
   assert.equal(r.files.length,1);await assert.rejects(fs.stat(path.join(f.dir,'unused')),{code:'ENOENT'});
   await assert.rejects(runStage(['--unknown','x']));await assert.rejects(runStage([]));
+});
+
+// 모든 파일은 이 테스트의 임시 폴더에 만든 합성 바이트다. 실제 PDF에는 접근하지 않는다.
+async function publisherFixture(t, publisherLabel='YBM(김은형)', publisher='ybm-kimeunhyeong') {
+  const f=await fixture(t);
+  Object.assign(f.input.scope,{publisher,publisherLabel,folderName:'2022-'+publisher+'-m2-L1'});
+  for(const title of titles.slice(0,2)) {
+    const e=await f.add(title);
+    const filename=e.suggestedFilename.replace('NE능률(김기택)',publisherLabel);
+    const next=path.join(f.sourceRoot,filename);
+    await fs.rename(e.src,next);e.src=next;e.suggestedFilename=filename;
+  }
+  return f;
+}
+test('explicit YBM publisher label and caller stable slug succeed without aliases',async t=>{
+  const f=await publisherFixture(t);
+  const r=await stageDownloads(f.input,f.options);
+  assert.equal(r.status,'complete');assert.ok(r.files.every(e=>e.outcome==='copied'));
+  assert.equal(r.files[0].destination,'2022-ybm-kimeunhyeong-m2-L1/00_교과서본문.pdf');
+  const receipt=JSON.parse(await fs.readFile(path.join(f.root,r.receipt)));
+  assert.equal(receipt.scope.publisherLabel,'YBM(김은형)');assert.equal(receipt.scope.publisher,'ybm-kimeunhyeong');
+});
+test('arbitrary verified publisher is accepted; label matching uses NFC and trim only',async t=>{
+  const f=await publisherFixture(t,'검증 출판사(가)','verified-publisher');
+  f.input.scope.publisherLabel='  '+f.input.scope.publisherLabel.normalize('NFD')+'  ';
+  const r=await stageDownloads(f.input,f.options);assert.equal(r.status,'complete');
+  for(const wrong of ['ybm(김은형)','YBM (김은형)','YBM(김은혜)','ybm-kimeunhyeong']) {
+    const g=await publisherFixture(t);g.input.scope.publisherLabel=wrong;await noWrite(g);
+  }
+});
+test('publisher label mismatch in any entry and folder slug mismatch preflight with zero writes',async t=>{
+  const f=await publisherFixture(t);
+  f.input.files[1].suggestedFilename=f.input.files[1].suggestedFilename.replace('YBM(김은형)','NE능률(김기택)');
+  await noWrite(f);
+  const g=await publisherFixture(t);g.input.scope.folderName=scope.folderName;await noWrite(g);
+  const h=await publisherFixture(t);h.input.scope.publisher='different-slug';await noWrite(h);
+  const j=await publisherFixture(t);j.input.scope.folderName='2022-YBM(김은형)-m2-L1';await noWrite(j);
+  const k=await publisherFixture(t);k.input.files[1].src=path.join(k.sourceRoot,'중2_NE능률(김기택)_1과_본문.pdf');
+  await fs.writeFile(k.input.files[1].src,pdf('source mismatch'));await noWrite(k);
+});
+test('publisherLabel required for every batch; missing suggested publisher cannot bypass check',async t=>{
+  for(const invalid of [undefined,null,'','   ',42,'https://invalid/publisher']) {
+    const f=await fixture(t);await f.add(titles[0]);
+    if(invalid===undefined)delete f.input.scope.publisherLabel;else f.input.scope.publisherLabel=invalid;
+    await noWrite(f);
+  }
+  const f=await fixture(t);await f.add(titles[0]);f.input.files[0].suggestedFilename='본문.pdf';await noWrite(f);
+  const g=await fixture(t);await g.add(titles[0]);
+  delete g.input.scope.publisherLabel;g.input.scope.sourcePublisherLabel='NE능률(김기택)';await noWrite(g);
 });
