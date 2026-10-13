@@ -196,6 +196,11 @@ await t('직접 팩 업로드도 공용 검사 관문 — 단어·본문 누락�
     assert.ok(r.body.error.includes(r.body.errors[0].message), '직접 API 오류도 고칠 위치와 이유를 알려 준다');
     assert.deepStrictEqual(store.getPack(PACK.packId).pack, PACK, '거절된 덮어쓰기는 원본에 손대지 않는다');
   }
+  const legacy = { ...PACK }; delete legacy.rights;
+  const blocked = await up(legacy);
+  assert.equal(blocked.status, 400, 'rights 없는 기존팩 업로드는 거절');
+  assert.equal(JSON.stringify(blocked.body).includes('Dummy sentence'), false, '오류 응답에 팩 원문을 싣지 않는다');
+  assert.deepStrictEqual(store.getPack(PACK.packId).pack, PACK);
 });
 
 await t('관리 웹 validatePack도 공용 관문을 호출 — 비어 있거나 틀린 구문은 업로드 전에 막는다', () => {

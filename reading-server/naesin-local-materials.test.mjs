@@ -33,7 +33,7 @@ reset(); fs.writeFileSync(path.join(olderDir, 'review-draft.json'), JSON.stringi
 const jobId = 'job-ownpdf01', adminToken = randomUUID(), studentToken = randomUUID();
 const originalDb = JSON.stringify({ students: { OWN01: { code: 'OWN01', name: '자체 시험 학생' } }, states: {},
   tokens: { [adminToken]: { admin: true, code: '__admin__', exp: Date.now() + 3600e3 }, [studentToken]: { admin: false, code: 'OWN01', exp: Date.now() + 3600e3 } },
-  naesin: { jobs: { [jobId]: { jobId, packId, status: 'review', draft: { words: [] }, review: {}, updatedAt: '2026-10-12T12:00:00.000Z' } } } });
+  naesin: { jobs: { [jobId]: { jobId, packId, meta: { rights: { basis: 'self_authored', holder: '합성 원내 테스트', evidenceRef: 'fixture', studentUseAllowed: true, derivativeUseAllowed: true, externalAiAllowed: false } }, status: 'review', draft: { words: [] }, review: {}, updatedAt: '2026-10-12T12:00:00.000Z' } } } });
 const inside = { host: 'academy.example', 'cf-connecting-ip': '198.51.100.10' };
 const outside = { host: 'academy.example', 'cf-connecting-ip': '203.0.113.99' };
 let passed = 0;

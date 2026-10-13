@@ -682,14 +682,14 @@ const server = http.createServer(async (req, res) => {
          json()이 모든 응답에 no-store를 붙인다 — 기획서 §10-3. */
       if (p.startsWith('/api/naesin/')) {
         /* 파일 선택 없이 기존 원내 보관본을 연결한다. 워커·외부 관리·학생에게는 원본을 내주지 않는다. */
-        if ((p === '/api/naesin/admin/job/local-review' || p === '/api/naesin/admin/job/local-pdf') && PACKCHECK.rightsErrors((naesinStore.getJob(url.searchParams.get('id') || '') || {}).meta?.rights).length) { req.resume(); return json(res, 403, { error: '권리 확인이 없어 자료를 열 수 없습니다.' }); }
-          if (p === '/api/naesin/admin/job/local-review' || p === '/api/naesin/admin/job/local-pdf') {
+        if (p === '/api/naesin/admin/job/local-review' || p === '/api/naesin/admin/job/local-pdf') {
           if (!INHOUSE_ONLY || !inhouseAccess(req) || !who.admin) return json(res, 403, { error: '원내 PC 관리자만 원본 자료를 열 수 있습니다.' });
           if (req.method !== 'GET') { req.resume(); return json(res, 405, { error: 'GET 요청만 가능합니다.' }); }
           const id = url.searchParams.get('id') || '', source = url.searchParams.get('source'), expectedSha256 = url.searchParams.get('sha256');
           if (!/^job-[a-z0-9]{6,20}$/.test(id) || (p.endsWith('/local-pdf') && (!['02', '03'].includes(source) || !/^[a-f0-9]{64}$/.test(expectedSha256)))) return json(res, 400, { error: '작업 또는 자료 번호·원본 확인값이 올바르지 않습니다.' });
           const job = naesinStore.getJob(id);
           if (!job) return json(res, 404, { error: '검수 작업을 찾을 수 없습니다.' });
+          if (PACKCHECK.rightsErrors((job.meta || {}).rights).length) { req.resume(); return json(res, 403, { error: '권리 확인이 없어 자료를 열 수 없습니다.' }); }
           try {
             const material = readLocalMaterials(process.env.DATA_DIR || path.join(ROOT, 'data'), job.packId, p.endsWith('/local-pdf') ? source : undefined, expectedSha256);
             if (!material.bytes) return json(res, 200, material);

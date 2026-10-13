@@ -288,7 +288,7 @@ function renderList(){
       <label class="fld">과 제목<input id="nTitle" placeholder="Wonders of the World"></label>
     </div>
     <fieldset><legend>권리 근거 확인</legend><p class="muted">운영자가 증빙을 직접 확인해야 합니다. 구매는 2차 제작·학생 제공 허가를 뜻하지 않습니다.</p><div class="grid-form"><label class="fld">근거<select id="nRightsBasis"><option value="">선택</option><option value="self_authored">자체 제작</option><option value="open_license">공개 라이선스</option><option value="licensed">별도 계약</option></select></label><label class="fld">권리자<input id="nRightsHolder"></label><label class="fld">증빙 참조<input id="nRightsEvidence"></label><label class="fld">만료일<input id="nRightsExpiry" type="date"></label></div><label><input id="nStudentAllowed" type="checkbox"> 학생 이용 허용</label> <label><input id="nDerivativeAllowed" type="checkbox"> 2차 제작 허용</label> <label><input id="nAiAllowed" type="checkbox"> 외부 AI 전송 허용</label></fieldset>
-    <h3>허가 확인 자료에서 원천 붙이기</h3>
+    <h3>허가 확인된 자료에서 원천 붙이기</h3>
     <div class="filters">
       <select id="nKind">${KINDS.map(k=>`<option value="${k}">${esc(kindKo(k))}</option>`).join('')}</select>
       <input type="file" id="nFile" accept=".txt,.json,.md,text/plain,application/json">
@@ -428,7 +428,7 @@ function renderJob(){
     <div id="pubOut"></div>
   </div>
 
-  <div class="card"><h2>권리 근거 확인</h2><p class="muted">구매는 변환·학생 제공 권리를 뜻하지 않습니다. 자체 제작·공개 라이선스·학생 이용이 명시된 별도 계약만 선택하세요. 증빙은 운영자가 직접 확인해야 합니다.</p><label>근거 <select id="rBasis"><option value="">선택</option><option value="self_authored">자체 제작</option><option value="open_license">공개 라이선스</option><option value="licensed">별도 계약</option></select></label> 권리자 <input id="rHolder"> 증빙 참조 <input id="rEvidence"> 만료일 <input type="date" id="rExpiry"><br><label><input type="checkbox" id="rStudent"> 학생 이용 허용</label> <label><input type="checkbox" id="rDerivative"> 2차 제작 허용</label> <label><input type="checkbox" id="rAi"> 외부 AI 전송 허용</label> <button class="btn sm" id="btnRights">권리 확인 저장</button></div>
+  <div class="card"><h2>권리 근거 확인</h2><p class="muted">구매는 변환·학생 제공 권리를 뜻하지 않습니다. 자체 제작·공개 라이선스·학생 이용이 명시된 별도 계약만 선택하세요. 증빙은 운영자가 직접 확인해야 합니다. 권리 미확인 상태에서는 PC PDF 불러오기·AI 추출·배포가 차단되며, 이미 입력된 초안 열람과 수동 편집은 가능합니다.</p><label>근거 <select id="rBasis"><option value="">선택</option><option value="self_authored">자체 제작</option><option value="open_license">공개 라이선스</option><option value="licensed">별도 계약</option></select></label> 권리자 <input id="rHolder"> 증빙 참조 <input id="rEvidence"> 만료일 <input type="date" id="rExpiry"><br><label><input type="checkbox" id="rStudent"> 학생 이용 허용</label> <label><input type="checkbox" id="rDerivative"> 2차 제작 허용</label> <label><input type="checkbox" id="rAi"> 외부 AI 전송 허용</label> <button class="btn sm" id="btnRights">권리 확인 저장</button></div>
   <div class="card"><h2>자료 준비</h2>
     <div id="exOut"></div>
     <p class="muted">이 PC에 준비된 자료를 불러오면 원본 PDF와 후보를 나란히 볼 수 있어요. 원본을 보고 오류를 수정한 뒤 승인하세요. 본문은 영어·한글 대응과 끊어읽기 뜻을 확인해야 합니다.</p>
@@ -490,7 +490,6 @@ function renderJob(){
     </div>
   </div>`:'<div class="card"><p class="muted">아직 초안이 없어요. 위에서 로컬 검수 초안이나 학습 팩 JSON을 넣으세요.</p></div>'}`;
 
-  const rr=meta.rights||{}; if($('#rBasis'))$('#rBasis').value=rr.basis||''; if($('#rHolder'))$('#rHolder').value=rr.holder||''; if($('#rEvidence'))$('#rEvidence').value=rr.evidenceRef||''; if($('#rExpiry'))$('#rExpiry').value=rr.expiresAt||''; if($('#rStudent'))$('#rStudent').checked=rr.studentUseAllowed===true; if($('#rDerivative'))$('#rDerivative').checked=rr.derivativeUseAllowed===true; if($('#rAi'))$('#rAi').checked=rr.externalAiAllowed===true;
   $('#btnRights').onclick=saveRights;
   $('#btnBack').onclick=openList;
   $('#btnPub').onclick=publish;

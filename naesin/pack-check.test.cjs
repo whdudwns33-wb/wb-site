@@ -25,7 +25,8 @@ t('빈 팩은 "검사할 내용 없음" + 필수 배열 둘', () => {
   assert.ok(has(r.errors, '검사할 팩 내용이 하나도 없음'));
   assert.ok(has(r.errors, 'words 가 비었음'));
   assert.ok(has(r.errors, 'sentences 가 비었음'));
-  assert.strictEqual(r.errors.length, 3);
+  assert.equal(r.errors.filter((e) => e.message.includes('권리 확인')).length, 1);
+  assert.equal(r.errors.filter((e) => /words 가 비었음|sentences 가 비었음|검사할 팩 내용/.test(e.message)).length, 3);
 });
 
 /* ── 필수 배열 (2026-09-03 결함) ──
@@ -35,7 +36,7 @@ t('빈 팩은 "검사할 내용 없음" + 필수 배열 둘', () => {
    오류 메시지도 없이 '교재를 불러오는 중…' 에 멈춘다.
    전에는 이런 팩이 오류 0·경고 0 으로 배포 관문을 통과했다. */
 t('문장만 있는 팩은 배포를 막는다 — words 없이는 학생 앱이 안 뜬다', () => {
-  const p = { packId: SAMPLE.packId, sentences: clone(SAMPLE.sentences) };
+  const p = { packId: SAMPLE.packId, rights: clone(SAMPLE.rights), sentences: clone(SAMPLE.sentences) };
   const r = CHECK.checkPack(p);
   assert.ok(has(r.errors, 'words 가 비었음'), '막지 못했다: ' + JSON.stringify(r.errors));
   assert.ok(has(r.errors, 'WORD TEST'), '어느 자료가 필요한지 알려 줘야 한다');
@@ -43,7 +44,7 @@ t('문장만 있는 팩은 배포를 막는다 — words 없이는 학생 앱이
 });
 
 t('단어만 있는 팩도 막는다 — sentences 없이는 본문·홈·성취도가 죽는다', () => {
-  const p = { packId: SAMPLE.packId, words: clone(SAMPLE.words) };
+  const p = { packId: SAMPLE.packId, rights: clone(SAMPLE.rights), words: clone(SAMPLE.words) };
   const r = CHECK.checkPack(p);
   assert.ok(has(r.errors, 'sentences 가 비었음'), '막지 못했다: ' + JSON.stringify(r.errors));
   assert.ok(has(r.errors, '본문 워크북'));
@@ -57,9 +58,9 @@ t('배열이 있어도 비면 막는다 — 검수에서 전 행을 버린 경�
 });
 
 t('둘 다 있으면 통과 — 나머지 종류는 없어도 된다', () => {
-  const p = { packId: SAMPLE.packId, words: clone(SAMPLE.words), sentences: clone(SAMPLE.sentences) };
+  const p = { packId: SAMPLE.packId, rights: clone(SAMPLE.rights), words: clone(SAMPLE.words), sentences: clone(SAMPLE.sentences) };
   const r = CHECK.checkPack(p);
-  assert.deepStrictEqual(r.errors, [], '대화문·패턴·문항이 없다고 막으면 안 된다: ' + JSON.stringify(r.errors));
+  assert.deepStrictEqual(r.errors, [], '자체 제작 권리를 명시한 팩은 통과해야 한다: ' + JSON.stringify(r.errors));
 });
 
 t('팩이 객체가 아니면 오류', () => {
@@ -312,7 +313,8 @@ t('섹션 함수를 따로 부를 수 있다', () => {
    (필수 배열 관문은 별개로 걸리므로, 그 한 줄만 남는 것이 정상) */
 t('없는 섹션의 내용은 검사하지 않는다', () => {
   const r = CHECK.checkPack({ words: [{ id: 'w1', headword: 'sea', meaningKo: ['바다'], sections: ['reading'] }] });
-  assert.strictEqual(r.errors.length, 1, JSON.stringify(r.errors));
+  assert.equal(r.errors.filter((e) => e.where === 'rights').length, 1, JSON.stringify(r.errors));
+  assert.ok(r.errors.some((e) => e.message.includes('sentences 가 비었음')), JSON.stringify(r.errors));
   assert.ok(has(r.errors, 'sentences 가 비었음'), JSON.stringify(r.errors));
   assert.strictEqual(r.summary.length, 1);
 });

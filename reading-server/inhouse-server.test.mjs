@@ -290,6 +290,20 @@ try {
     const created = await req('/api/naesin/admin/job', { ...options, body: { packId: 'local-review-fixture' } });
     assert.equal(created.status, 200);
     const jobId = created.json.jobId;
+    const localHeaders = { ...inside };
+    const localReviewPath = '/api/naesin/admin/job/local-review?id=' + jobId;
+    const localPdfPath = '/api/naesin/admin/job/local-pdf?id=' + jobId + '&source=03&sha256=' + 'a'.repeat(64);
+    assert.equal((await req(localReviewPath, { token: adminToken, headers: localHeaders })).status, 403, '권리 없는 PC 초안 열기 차단');
+    assert.equal((await req(localPdfPath, { token: adminToken, headers: localHeaders })).status, 403, '권리 없는 PDF 원본 열기 차단');
+    const rights = { basis:'self_authored', holder:'합성 테스트 전용', evidenceRef:'fixture', studentUseAllowed:true, derivativeUseAllowed:true, externalAiAllowed:false };
+    for (const restricted of [{ ...rights, studentUseAllowed:false }, { ...rights, derivativeUseAllowed:false }, { ...rights, expiresAt:'2000-01-01' }]) {
+      assert.equal((await req('/api/naesin/admin/job/rights', { token: adminToken, method:'POST', body:{jobId,rights:restricted} })).status, 200);
+      assert.equal((await req(localReviewPath, { token: adminToken, headers: localHeaders })).status, 403);
+      assert.equal((await req(localPdfPath, { token: adminToken, headers: localHeaders })).status, 403);
+    }
+    assert.equal((await req('/api/naesin/admin/job/rights', { token: adminToken, method:'POST', body:{jobId,rights} })).status, 200);
+    const allowedReview = await req(localReviewPath, { token: adminToken, headers: localHeaders });
+    assert.notEqual(allowedReview.status, 403, '권리확인 자료는 파일 부재 등 후속 검사까지 도달');
     const first = pack.words[0];
     const word = Object.fromEntries(['id', 'headword', 'pos', 'meaningKo', 'sections'].map(k => [k, first[k]]));
     word._pdfReview = { flags: ['REVIEW_REQUIRED'], locations: [{ page: 1, bbox: [57, 130, 215, 150] }] };

@@ -442,15 +442,25 @@ var WBPACKCHECK = (function () {
   }
 
   /* ── 전체 ── */
+  function validIsoDay(value) {
+    if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+    var d = new Date(value + 'T00:00:00Z');
+    return Number.isFinite(d.getTime()) && d.toISOString().slice(0, 10) === value;
+  }
+
   function rightsErrors(rights, today) {
     var errors = [];
     if (!rights || typeof rights !== 'object' || isArr(rights)) return ['권리 확인이 필요합니다.'];
+    var allowed = ['basis', 'holder', 'evidenceRef', 'studentUseAllowed', 'derivativeUseAllowed', 'externalAiAllowed', 'expiresAt', 'notes'];
+    Object.keys(rights).forEach(function (key) { if (allowed.indexOf(key) < 0) errors.push('권리 메타데이터에 허용되지 않는 필드가 있습니다.'); });
     if (!['self_authored','open_license','licensed'].includes(rights.basis)) errors.push('권리 근거를 확인해야 합니다.');
-    if (!nonEmpty(rights.holder)) errors.push('권리자 확인이 필요합니다.');
+    if (typeof rights.holder !== 'string' || !nonEmpty(rights.holder) || rights.holder.length > 120) errors.push('권리자 확인이 필요합니다.');
     if (rights.studentUseAllowed !== true || rights.derivativeUseAllowed !== true) errors.push('학생 이용 및 2차 제작 허용 확인이 필요합니다.');
     if (typeof rights.externalAiAllowed !== 'boolean') errors.push('외부 AI 이용 여부를 확인해야 합니다.');
+    if (rights.evidenceRef !== undefined && (typeof rights.evidenceRef !== 'string' || rights.evidenceRef.length > 300)) errors.push('증빙 참조 형식이 올바르지 않습니다.');
+    if (rights.notes !== undefined && (typeof rights.notes !== 'string' || rights.notes.length > 500)) errors.push('권리 메모 형식이 올바르지 않습니다.');
     if (['open_license','licensed'].includes(rights.basis) && !nonEmpty(rights.evidenceRef)) errors.push('증빙 참조가 필요합니다.');
-    if (rights.expiresAt && (!/^\d{4}-\d{2}-\d{2}$/.test(rights.expiresAt) || rights.expiresAt < (today || new Date().toISOString().slice(0,10)))) errors.push('권리 증빙이 만료되었습니다.');
+    if (rights.expiresAt !== undefined && rights.expiresAt !== '' && (typeof rights.expiresAt !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(rights.expiresAt) || !validIsoDay(rights.expiresAt) || rights.expiresAt < (today || new Date().toISOString().slice(0,10)))) errors.push('권리 증빙이 만료되었거나 날짜 형식이 올바르지 않습니다.');
     return errors;
   }
 
@@ -462,7 +472,6 @@ var WBPACKCHECK = (function () {
     }
     if (!checkShape(pack, packShape, '', c))
       return { errors: c.errors, warns: c.warns, summary: c.summary };
-    rightsErrors(pack.rights).forEach(function (m) { c.err("rights", m); });
     rightsErrors(pack.rights).forEach(function (msg) { c.err("rights", msg); });
     checkWords(pack, c);
     checkSentences(pack, c);
