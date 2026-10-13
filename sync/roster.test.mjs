@@ -185,25 +185,27 @@ test('schema and migration add one private JSON document table without destructi
   assert.doesNotMatch(source, /fetch\s*\(|roster\.json|textbooks\.json/);
 });
 
-test('구독 프로그램 시작일을 저장하고 날짜 지정 1회성 구독 수업을 멱등적으로 생성한다', async () => {
+for (const subscriptionType of ['assessment', 'studyforce', 'readers']) test(subscriptionType + ': 구독 저장 및 날짜 지정 1회성 수업 멱등 생성', async () => {
   const db = new TestD1();
   seedAuth(db);
   const document = documentFixture();
   document.roster.students[0].subscriptions = [
     { type: 'assessment', startDate: '2026-09-01' },
-    { type: 'studyforce', startDate: '2026-09-10' }
+    { type: 'studyforce', startDate: '2026-09-10' },
+    { type: 'readers', startDate: '2026-09-10' }
   ];
   assert.equal((await replace(db, document)).status, 200);
 
   const payload = {
     auth: admin, action: 'subscription_session_create', requestId: 'request-subscription-1',
-    studentId: 'student-a', subscriptionType: 'assessment', staffId: 'teacher-a',
+    studentId: 'student-a', subscriptionType, staffId: 'teacher-a',
     date: '2026-09-26', startTime: '14:00', endTime: '15:20', memo: '검사 결과 확인'
   };
   const created = await call(db, payload);
   assert.equal(created.status, 200);
   assert.equal(created.body.task.lessonInstanceType, 'subscription');
-  assert.equal(created.body.task.subscriptionType, 'assessment');
+  assert.equal(created.body.task.subscriptionType, subscriptionType);
+  if (subscriptionType === 'readers') assert.match(created.body.task.title, /리더스 구독/);
   assert.equal(created.body.task.repeat, 'once');
   assert.equal(created.body.task.start, '2026-09-26');
   assert.equal(created.body.task.staffId, 'teacher-a');

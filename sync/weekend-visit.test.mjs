@@ -239,12 +239,12 @@ test('projected makeup lessons cannot be configured or used as recurring weekend
   assert.equal(db.sqlite.prepare('SELECT COUNT(*) count FROM weekend_actual_visits').get().count, 0);
 });
 
-test('one-off subscription lessons record actual arrival and departure on their exact date', async () => {
+for (const subscriptionType of ['assessment', 'studyforce', 'readers']) test(subscriptionType + ': one-off subscription lessons record actual arrival and departure on their exact date', async () => {
   const db = new D1Database(); db.seed();
   db.seedTask({
     id: 'subscription_session_a', staffId: 'teacher-1', studentId: 'student-a', studentName: '학생A',
     title: '[수업] 학생A — 스터디포스 구독 수업', taskKind: 'lesson_instruction', lessonFormVersion: 1,
-    lessonInstanceType: 'subscription', subscriptionType: 'studyforce', repeat: 'once', days: [1],
+    lessonInstanceType: 'subscription', subscriptionType, repeat: 'once', days: [1],
     start: '2026-08-24', end: '2026-08-24',
     scheduleSlots: [{ days: [1], startTime: '14:00', endTime: '15:00', validFrom: '2026-08-24', validTo: '2026-08-24' }]
   });

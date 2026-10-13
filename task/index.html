@@ -1246,17 +1246,17 @@
 <div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
 <div id="modalHost" class="modal" data-act="closemodal" role="dialog" aria-modal="true" aria-labelledby="modalTitle" hidden></div>
 
-<script src="./lesson-form-core.js?v=2026-10-13.1"></script>
-<script src="./task-push-client.js?v=2026-10-13.1"></script>
-<script src="./schedule-board-core.js?v=2026-10-13.1"></script>
-<script src="./asset-core.js?v=2026-10-13.1"></script>
-<script src="./qr-core.js?v=2026-10-13.1"></script>
-<script src="./acaflow-import-core.js?v=2026-10-13.1"></script>
-<script src="./feedback-subject-catalog.js?v=2026-10-13.1"></script>
-<script src="./sync-recovery-core.js?v=2026-10-13.1"></script>
-<script src="./staff-work-session-core.js?v=2026-10-13.1"></script>
-<script src="./staff-attendance-history-core.js?v=2026-10-13.1"></script>
-<script src="./makeup-recovery-core.js?v=2026-10-13.1"></script>
+<script src="./lesson-form-core.js?v=2026-10-13.2"></script>
+<script src="./task-push-client.js?v=2026-10-13.2"></script>
+<script src="./schedule-board-core.js?v=2026-10-13.2"></script>
+<script src="./asset-core.js?v=2026-10-13.2"></script>
+<script src="./qr-core.js?v=2026-10-13.2"></script>
+<script src="./acaflow-import-core.js?v=2026-10-13.2"></script>
+<script src="./feedback-subject-catalog.js?v=2026-10-13.2"></script>
+<script src="./sync-recovery-core.js?v=2026-10-13.2"></script>
+<script src="./staff-work-session-core.js?v=2026-10-13.2"></script>
+<script src="./staff-attendance-history-core.js?v=2026-10-13.2"></script>
+<script src="./makeup-recovery-core.js?v=2026-10-13.2"></script>
 <script>
 "use strict";
 
@@ -3915,7 +3915,7 @@ function plannedWeekendOccurrence(task, date) {
 function weekendVisitSourceDate(task, row) {
   const actualDate = String(row && row.visitDate || '');
   if (task && !task.deleted && task.lessonInstanceType === 'subscription' &&
-      ['assessment', 'studyforce'].includes(String(task.subscriptionType || '')) && String(task.repeat || '') === 'once') {
+      ['assessment', 'studyforce', 'readers'].includes(String(task.subscriptionType || '')) && String(task.repeat || '') === 'once') {
     return row && String(row.lessonTaskId || '') === String(task.id || '') &&
       String(row.studentId || '') === String(task.studentId || '') &&
       actualDate === String(task.start || '') && (!row.sourceDate || String(row.sourceDate) === actualDate)
@@ -6433,7 +6433,7 @@ const isLesson = t => /^\[(수업|컨설팅)\]/.test(t.title || '');
 const isScheduledMakeupTask = t => !!(t && !t.deleted && (t.lessonInstanceType === 'makeup' ||
   t.makeupCaseId || t.makeupSourceTaskId));
 const isSubscriptionSessionTask = t => !!(t && !t.deleted && t.lessonInstanceType === 'subscription' &&
-  ['assessment', 'studyforce'].includes(String(t.subscriptionType || '')));
+  ['assessment', 'studyforce', 'readers'].includes(String(t.subscriptionType || '')));
 /** 정규 수업 관리 화면에는 보강 원장이 투영한 1회성 수업을 섞지 않는다. */
 const isRegularLessonTask = t => !!(t && !t.deleted && isLesson(t) && !isScheduledMakeupTask(t) &&
   !isSubscriptionSessionTask(t));
@@ -7788,7 +7788,8 @@ const ROSTER_SUBJECT_OPTIONS = [
 ];
 const SUBSCRIPTION_PROGRAMS = Object.freeze([
   { type: 'assessment', label: '검사구독' },
-  { type: 'studyforce', label: '스터디포스구독' }
+  { type: 'studyforce', label: '스터디포스구독' },
+  { type: 'readers', label: '리더스 구독' }
 ]);
 function subscriptionProgramLabel(type) {
   const found = SUBSCRIPTION_PROGRAMS.find(item => item.type === String(type || ''));
@@ -25305,7 +25306,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-10-13.1';
+const APP_VER = '2026-10-13.2';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
