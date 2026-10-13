@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Offline, fail-closed folder draft builder for a verified local page-text bundle."""
-import argparse, hashlib, json, os, re, stat, sys
+import argparse, hashlib, json, os, re, stat, sys, unicodedata
 from pathlib import Path
 ROLES={'00':('textbook','00_교과서본문.pdf'),'01':('content_summary','01_내용정리.pdf'),'02':('passage_workbook','02_본문워크북.pdf'),'03':('vocabulary','03_단어시험.pdf'),'04s':('pre_step_student','04_예상문제_PRE-STEP.pdf'),'04t':('pre_step_teacher','04_예상문제_PRE-STEP_교사용.pdf'),'05s':('exam_1_student','05_예상문제_1회.pdf'),'05t':('exam_1_teacher','05_예상문제_1회_교사용.pdf'),'06s':('exam_2_student','06_예상문제_2회.pdf'),'06t':('exam_2_teacher','06_예상문제_2회_교사용.pdf'),'07':('grammar_workbook','07_문법워크북.pdf'),'08':('grammar_mcq','08_문법객관식.pdf'),'09':('grammar_subjective','09_문법주관식.pdf')}
 REPO=Path(__file__).resolve().parents[2]
@@ -24,6 +24,132 @@ def marked(text, endmark):
   n=int(m.group(1)); value=norm(m.group(2))
   if 1<=n<=25 and value: out.setdefault(n,[]).append(value)
  return out
+def numbered_pages(src, page_numbers):
+ rows={}
+ for pn in page_numbers:
+  page=next((p for p in src['pages'] if p['page']==pn),None)
+  if page is None: continue
+  for n,values in numbered(page.get('text','')).items():
+   rows.setdefault(n,[]).extend({'text':value,'page':pn} for value in values)
+ return rows
+def numbered_page_blocks(src, page_numbers):
+ rows={}
+ for pn in page_numbers:
+  page=next((p for p in src['pages'] if p['page']==pn),None)
+  if page is None: continue
+  text=page.get('text',''); marks=list(re.finditer(r'(?<!\d)(\d{1,2})\)',text))
+  for i,mark in enumerate(marks):
+   n=int(mark.group(1)); value=text[mark.end():marks[i+1].start() if i+1<len(marks) else len(text)].strip()
+   if 1<=n<=25 and value: rows.setdefault(n,[]).append({'text':value,'page':pn})
+ return rows
+def exercise_answers(text, number, next_number):
+ start=re.search(r'워크북\s*'+str(number)+r'\b',text)
+ if not start: return {}
+ tail=text[start.end():]
+ if next_number is not None:
+  end=re.search(r'워크북\s*'+str(next_number)+r'\b',tail)
+  if end: tail=tail[:end.start()]
+ return {n:[{'text':value,'page':30} for value in values] for n,values in numbered(tail).items()}
+def page_ref(page, section, question_no=None):
+ return {'sourceDocumentId':'02','page':page,'printedPage':page,'section':section,'questionNo':question_no}
+def compare_text(value):
+ return re.sub(r'\s+',' ',unicodedata.normalize('NFKC',value)).strip().casefold().strip('.,!?;:')
+def slash_parts(value):
+ parts=[norm(x).strip('.,!?;:') for x in value.split('/')]
+ return parts if parts and all(parts) else None
+def writing_keywords(text):
+ strict=[]; suspicious=False
+ for index,line in enumerate(text.splitlines()):
+  value=line.strip()
+  if not value or ',' not in value or re.search(r'[.!?]',value): continue
+  if re.fullmatch(r"[A-Za-z][A-Za-z'’\- ]*(?:,\s*[A-Za-z][A-Za-z'’\- ]*)+",value):
+   strict.append((index,[x.strip() for x in value.split(',')]))
+  elif re.search(r'[A-Za-z]',value): suspicious=True
+ if not strict or suspicious: return None,'AMBIGUOUS_KEYWORD_LIST' if suspicious else 'NO_DETERMINISTIC_MATCH'
+ runs=[]; current=[]; previous=None
+ for index,values in strict:
+  if previous is not None and index!=previous+1:
+   runs.append(current);current=[]
+  current.extend(values);previous=index
+ if current:runs.append(current)
+ if len(runs)!=1 or not all(runs[0]): return None,'AMBIGUOUS_KEYWORD_LIST'
+ return runs[0],None
+def attach_unmatched(row, field, reason, refs, **details):
+ row['unmatchedEnrichment'].append({'field':field,'reason':reason,'sourceRefs':refs,**details})
+ row['reviewFlags'].append(field.upper()+'_UNMATCHED')
+def enrich_sentences(sentences, source):
+ pages={p['page']:p['text'] for p in source['pages']}
+ verb_prompts=numbered_pages(source,[11,12,13]); grammar_prompts=numbered_pages(source,[14,15,16])
+ token_prompts=numbered_pages(source,[20,21,22]); writing_prompts=numbered_page_blocks(source,[23,24,25,26])
+ verb_answers=exercise_answers(pages.get(30,''),5,6); grammar_answers=exercise_answers(pages.get(30,''),6,7)
+ summary={field:{'matched':0,'unmatched':0} for field in ('verbForms','grammarChoices','tokens','writingKeywords')}
+ for row in sentences:
+  n=row['seq']; row['unmatchedEnrichment']=[]; row['enrichmentSourceRefs']={}; row['tokenGroups']=[]
+  row['tokens']=[]; row['verbForms']=[]; row['grammarChoices']=[]; row['writingKeywords']=[]
+  prompt=verb_prompts.get(n,[]); answers=verb_answers.get(n,[])
+  vpage=prompt[0]['page'] if len(prompt)==1 else (11 if n<=9 else 12 if n<=19 else 13)
+  vrefs=[page_ref(vpage,'verb-form',n),page_ref(30,'verb-form-answer',n)]
+  bases=re.findall(r'\(([^()]*)\)',prompt[0]['text']) if len(prompt)==1 else []
+  answer_parts=slash_parts(answers[0]['text']) if len(answers)==1 else None
+  bases=[norm(x) for x in bases]
+  if len(prompt)==1 and len(answers)==1 and bases and all(bases) and answer_parts and len(bases)==len(answer_parts):
+   row['verbForms']=[{'base':base,'answer':answer} for base,answer in zip(bases,answer_parts)]
+   row['enrichmentSourceRefs']['verbForms']=vrefs; summary['verbForms']['matched']+=1
+  else:
+   attach_unmatched(row,'verbForms','COUNT_MISMATCH' if prompt and answers else 'NO_DETERMINISTIC_MATCH',vrefs,baseCount=len(bases),answerCount=len(answer_parts or [])); summary['verbForms']['unmatched']+=1
+  gp=grammar_prompts.get(n,[]); ga=grammar_answers.get(n,[])
+  if n>23:
+   grefs=[page_ref(16,'grammar-choice-source-range',None),page_ref(30,'grammar-choice-answer-range',None)]
+   attach_unmatched(row,'grammarChoices','SOURCE_NOT_PRESENT',grefs,expectedQuestionNo=n); summary['grammarChoices']['unmatched']+=1
+  else:
+   gpage=gp[0]['page'] if len(gp)==1 else (14 if n<=9 else 15 if n<=18 else 16)
+   grefs=[page_ref(gpage,'grammar-choice',n),page_ref(30,'grammar-choice-answer',n)]
+   groups=re.findall(r'\[([^\]]*)\]',gp[0]['text']) if len(gp)==1 else []
+   answers_flat=[]
+   for arow in ga: answers_flat.extend(slash_parts(arow['text']) or [])
+   valid=[]; issues=[]
+   if len(gp)!=1 or len(ga)!=1 or not groups or len(groups)!=len(answers_flat):
+    issues.append({'reason':'COUNT_MISMATCH','expectedGroups':len(groups),'answerCount':len(answers_flat)})
+   else:
+    for i,(group,answer) in enumerate(zip(groups,answers_flat),1):
+     options=[norm(x) for x in group.split('/')]
+     if len(options)<2 or any(not x for x in options): issues.append({'reason':'INVALID_OPTIONS','groupIndex':i}); continue
+     hits=[j for j,option in enumerate(options) if compare_text(option)==compare_text(answer)]
+     if len(hits)!=1: issues.append({'reason':'ANSWER_NOT_UNIQUE_OPTION','groupIndex':i}); continue
+     valid.append({'options':options,'answerIdx':hits[0]})
+   row['grammarChoices']=valid
+   if valid: row['enrichmentSourceRefs']['grammarChoices']=grefs
+   if issues:
+    for issue in issues: attach_unmatched(row,'grammarChoices',issue.pop('reason'),grefs,**issue)
+    summary['grammarChoices']['unmatched']+=1
+   else: summary['grammarChoices']['matched']+=1
+  tp=token_prompts.get(n,[]); tpage=tp[0]['page'] if len(tp)==1 else (20 if n<=8 else 21 if n<=17 else 22)
+  trefs=[page_ref(tpage,'token-choice-groups',n)]; groups=[]; invalid=False
+  if len(tp)==1:
+   for raw in re.findall(r'\(([^()]*)\)',tp[0]['text']):
+    if '/' not in raw: continue
+    values=slash_parts(raw)
+    if not values or len(values)<2: invalid=True
+    else: groups.append(values)
+  if len(tp)==1 and groups:
+   outside=norm(re.sub(r'\([^()]*\)',' ',tp[0]['text']))
+   row['tokenGroups']=groups; row['tokens']=[]
+   row['tokensSafety']='TOKEN_GROUPS_ONLY_FIXED_TEXT_OUTSIDE' if outside else 'TOKEN_GROUPS_ONLY_ALTERNATIVES_NOT_SENTENCE_TOKENS'
+   row['enrichmentSourceRefs']['tokens']=trefs
+   if invalid:
+    attach_unmatched(row,'tokens','INVALID_TOKEN_GROUP',trefs); summary['tokens']['unmatched']+=1
+   else: summary['tokens']['matched']+=1
+  else:
+   attach_unmatched(row,'tokens','INVALID_TOKEN_GROUP' if invalid else 'NO_DETERMINISTIC_MATCH',trefs); summary['tokens']['unmatched']+=1
+  wp=writing_prompts.get(n,[]); wpage=wp[0]['page'] if len(wp)==1 else (23 if n<=6 else 24 if n<=12 else 25 if n<=19 else 26)
+  wrefs=[page_ref(wpage,'writing-keywords',n),page_ref(31,'writing-keywords-answer-crosscheck',n)]
+  keywords,why=writing_keywords(wp[0]['text']) if len(wp)==1 else (None,'NO_DETERMINISTIC_MATCH')
+  if keywords:
+   row['writingKeywords']=keywords; row['enrichmentSourceRefs']['writingKeywords']=wrefs; summary['writingKeywords']['matched']+=1
+  else:
+   attach_unmatched(row,'writingKeywords',why or 'NO_DETERMINISTIC_MATCH',wrefs); summary['writingKeywords']['unmatched']+=1
+  if row['unmatchedEnrichment']: row['reviewFlags']=sorted(set(row['reviewFlags']+['ENRICHMENT_UNMATCHED']))
+ return summary
 def words(src):
  rows=[]
  seen=set()
@@ -104,10 +230,11 @@ def main():
    m=re.match(r'(?i)^(monday|tuesday|wednesday)\s*,?\s*august\s+(1|2|3)\b[,:]?\s*',e)
    if m and n in (1,11,20):
     header=m.group(0).strip(' ,:'); e=e[m.end():].strip()
-   if n in (1,11,20):
-    e=re.sub(r'(?i)^(monday|tuesday|wednesday)\s*,?\s*august\s+(1|2|3)\b[,:]?\s*','',e).strip()
-   sent.append({'candidateId':f'sc-{n:04d}','seq':n,'en':e,'ko':k,'passageTitle':a.passage_title_en,'passageTitleEn':a.passage_title_en,'passageTitleKo':a.passage_title_ko,'dayHeaderEn':header,'dayHeaderKo':header_ko,'dayGroup':('8/1' if n<11 else '8/2' if n<20 else '8/3'),'chunks':[],'verbForms':[],'grammarChoices':[],'tokens':[],'writingKeywords':[],'sourceRefs':[{'sourceDocumentId':'02','page':ep,'printedPage':ep,'section':'workbook-4','questionNo':n},{'sourceDocumentId':'02','page':kp,'printedPage':kp,'section':'workbook-4-answer','questionNo':n}],'unmatchedEnrichment':[{'field':'verbForms','sourceRefs':[{'sourceDocumentId':'02','page':(11 if n<=9 else 12 if n<=19 else 13),'printedPage':(11 if n<=9 else 12 if n<=19 else 13),'section':'verb-form','questionNo':n},{'sourceDocumentId':'02','page':30,'printedPage':30,'section':'verb-form-answer','questionNo':n}]},{'field':'grammarChoices','sourceRefs':[{'sourceDocumentId':'02','page':(14 if n<=9 else 15 if n<=18 else 16),'printedPage':(14 if n<=9 else 15 if n<=18 else 16),'section':'grammar-choice','questionNo':n},{'sourceDocumentId':'02','page':30,'printedPage':30,'section':'grammar-choice-answer','questionNo':n}]},{'field':'tokens','sourceRefs':[{'sourceDocumentId':'02','page':(20 if n<=8 else 21 if n<=17 else 22),'printedPage':(20 if n<=8 else 21 if n<=17 else 22),'section':'tokens','questionNo':n}]},{'field':'writingKeywords','sourceRefs':[{'sourceDocumentId':'02','page':(23 if n<=6 else 24 if n<=12 else 25 if n<=19 else 26),'printedPage':(23 if n<=6 else 24 if n<=12 else 25 if n<=19 else 26),'section':'writing-keywords','questionNo':n},{'sourceDocumentId':'02','page':31,'printedPage':31,'section':'writing-keywords-answer','questionNo':n}]}],'reviewFlags':['REVIEW_REQUIRED','PLAIN_TEXT_NO_COORDINATES','ENRICHMENT_UNMATCHED']+([] if e else ['EN_UNRESOLVED'])+([] if k else ['KO_UNRESOLVED'])})
-  draft={'kind':'naesin-folder-review-draft','version':1,'status':'needs-review','publishable':False,'rights':{k:rights[k] for k in ['basis','holder','evidenceRef','studentUseAllowed','derivativeUseAllowed','externalAiAllowed','notes']},'revision':'2022','wordSeedUsed':seed_used,'sourceDocuments':docs,'wordCandidates':wr,'sentenceCandidates':sent,'unmatched':[{'candidateId':r['candidateId'],'field':u['field'],'sourceRefs':u['sourceRefs'],'reason':'NO_DETERMINISTIC_MATCH'} for r in sent for u in r['unmatchedEnrichment']],'enrichmentSummary':{'verbForms':{'matched':0,'unmatched':25},'grammarChoices':{'matched':0,'unmatched':25},'tokens':{'matched':0,'unmatched':25},'writingKeywords':{'matched':0,'unmatched':25}},'reviewFlags':['REVIEW_REQUIRED','PLAIN_TEXT_NO_COORDINATES','NO_EXTERNAL_AI']+([] if a.passage_title_en and a.passage_title_ko else ['PASSAGE_TITLE_REVIEW'])}
+   if n in (1,11,20): e=re.sub(r'(?i)^(monday|tuesday|wednesday)\s*,?\s*august\s+(1|2|3)\b[,:]?\s*','',e).strip()
+   sent.append({'candidateId':f'sc-{n:04d}','seq':n,'en':e,'ko':k,'passageTitle':a.passage_title_en,'passageTitleEn':a.passage_title_en,'passageTitleKo':a.passage_title_ko,'dayHeaderEn':header,'dayHeaderKo':header_ko,'dayGroup':('8/1' if n<11 else '8/2' if n<20 else '8/3'),'chunks':[],'verbForms':[],'grammarChoices':[],'tokens':[],'writingKeywords':[],'sourceRefs':[page_ref(ep,'workbook-4',n),page_ref(kp,'workbook-4-answer',n)],'reviewFlags':['REVIEW_REQUIRED','PLAIN_TEXT_NO_COORDINATES']+([] if e else ['EN_UNRESOLVED'])+([] if k else ['KO_UNRESOLVED'])})
+  enrichment_summary=enrich_sentences(sent,srcs['02'])
+  unmatched=[{'candidateId':row['candidateId'],'field':item['field'],'sourceRefs':item['sourceRefs'],'reason':item['reason'],**{key:value for key,value in item.items() if key not in ('field','sourceRefs','reason')}} for row in sent for item in row['unmatchedEnrichment']]
+  draft={'kind':'naesin-folder-review-draft','version':1,'status':'needs-review','publishable':False,'rights':{k:rights[k] for k in ['basis','holder','evidenceRef','studentUseAllowed','derivativeUseAllowed','externalAiAllowed','notes']},'revision':'2022','wordSeedUsed':seed_used,'sourceDocuments':docs,'wordCandidates':wr,'sentenceCandidates':sent,'unmatched':unmatched,'enrichmentSummary':enrichment_summary,'reviewFlags':['REVIEW_REQUIRED','PLAIN_TEXT_NO_COORDINATES','NO_EXTERNAL_AI']+(['UNMATCHED_ENRICHMENT_REVIEW'] if unmatched else [])+([] if a.passage_title_en and a.passage_title_ko else ['PASSAGE_TITLE_REVIEW'])}
   out.parent.mkdir(parents=True,exist_ok=True); out.mkdir(mode=0o700,exist_ok=False)
   target=out/'review-draft.json'
   with target.open('x',encoding='utf-8') as f: json.dump(draft,f,ensure_ascii=False,indent=2); f.write('\n')
@@ -131,7 +258,7 @@ def main():
    review=analysis/f'draft-{stamp}-{hashlib.sha256(target.read_bytes()).hexdigest()[:6]}'
    review.mkdir(exist_ok=False)
    with (review/'review-draft.json').open('x',encoding='utf-8') as f: f.write(target.read_text(encoding='utf-8'))
-  print(json.dumps({'ok':True,'publishable':False,'sourceDocuments':len(docs),'sourcePages':total,'words':len(wr),'sentences':len(sent),'enNonempty':sum(bool(x['en']) for x in sent),'koNonempty':sum(bool(x['ko']) for x in sent),'wordSeedUsed':seed_used,'unmatchedEnrichment':len(draft['unmatched']),'installed':a.install_sources},ensure_ascii=True))
+  print(json.dumps({'ok':True,'publishable':False,'sourceDocuments':len(docs),'sourcePages':total,'words':len(wr),'sentences':len(sent),'enNonempty':sum(bool(x['en']) for x in sent),'koNonempty':sum(bool(x['ko']) for x in sent),'wordSeedUsed':seed_used,'unmatchedEnrichment':len(draft['unmatched']),'enrichmentSummary':draft['enrichmentSummary'],'installed':a.install_sources},ensure_ascii=True))
  except DraftError as e: print(json.dumps({'ok':False,'error':str(e)})); return 1
  except Exception: print(json.dumps({'ok':False,'error':'SOURCE_OR_OUTPUT_FAILED'})); return 1
  return 0
