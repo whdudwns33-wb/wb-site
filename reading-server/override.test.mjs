@@ -135,13 +135,55 @@ for (const f of pages) {
 
 /* ── 라우트가 쓰는 저장 어댑터가 워커·로컬 양쪽에 다 있는가 ──
    naesin-ko-api.mjs 는 워커(KV)와 로컬 서버(파일)가 함께 쓴다. 한쪽 어댑터에만 메서드를
-   더하면 로컬에서 다 확인하고 배포한 뒤 운영에서만 500이 난다 — 이 파일이 막으려는 바로 그 일이다. */
-for (const api of ['naesin-ko-api.mjs', 'naesin-api.mjs', 'vocab-api.mjs', 'chunk-api.mjs']) {
+   더하면 로컬에서 다 확인하고 배포한 뒤 운영에서만 500이 난다 — 이 파일이 막으려는 바로 그 일이다.
+
+   **그 어댑터 블록 안에서만 찾는다.** 전에는 파일 전체에서 `이름:` 를 찾았는데, 앱마다 같은 이름을
+   쓰는 메서드가 많아(`getPack`·`putPack`·`getPackIds`·`putPackIds` 는 영어 내신·국어·하루에 다 있다)
+   국어 어댑터에서 한 줄을 지워도 영어 쪽 이름이 걸려 **초록이었다**. 2026-10-13 에 실측으로 확인했다 —
+   국어 어댑터의 `getPack:` 을 지우고 돌려도 통과했다. 라이선스 자료를 원장 PC 로 빼는 금고 작업이
+   건드리는 것이 바로 그 네 칸이라, 이 관문이 정작 그 작업에서 아무것도 지켜 주지 못하는 상태였다. */
+const adapterBody = (src, name, kind) => {
+  /* 워커는 `function xStore(env) {`, 로컬은 `const xStore = {` — 여는 중괄호부터 균형이 맞는 곳까지 */
+  const at = kind === 'fn' ? src.indexOf(`function ${name}(`) : src.indexOf(`const ${name} =`);
+  if (at < 0) return null;
+  let depth = 0;
+  for (let i = src.indexOf('{', at); i < src.length; i += 1) {
+    if (src[i] === '{') depth += 1;
+    else if (src[i] === '}') { depth -= 1; if (!depth) return src.slice(at, i + 1); }
+  }
+  return null;
+};
+const ADAPTERS = {
+  'naesin-ko-api.mjs': 'naesinKoStore', 'naesin-api.mjs': 'naesinStore',
+  'vocab-api.mjs': 'vocabStore', 'chunk-api.mjs': 'chunkStore',
+};
+for (const [api, adapter] of Object.entries(ADAPTERS)) {
   const src = fs.readFileSync(path.join(DIR, api), 'utf8');
   const used = new Set([...src.matchAll(/store\.([a-zA-Z]\w*)\s*\(/g)].map((m) => m[1]));
-  for (const fn of [...used].sort()) {
-    if (!worker.includes(fn + ':')) E(`${api} 가 store.${fn} 를 쓰는데 worker.mjs 어댑터에 없습니다 — 배포 후 운영에서만 실패합니다`);
-    if (!server.includes(fn + ':')) E(`${api} 가 store.${fn} 를 쓰는데 server.mjs 어댑터에 없습니다 — 로컬 확인이 운영과 달라집니다`);
+  /* 옵셔널 호출(store.x?.()) 과 구조분해(const {x} = store) 는 위 정규식이 못 본다 — 그 모양으로
+     쓰면 이 관문을 통째로 피하므로, 라우터가 그렇게 쓰지 않는지도 같이 본다 */
+  if (new RegExp('store\\.[a-zA-Z]\\w*\\?\\.\\(').test(src))
+    E(`${api} 가 store.x?.() 꼴 옵셔널 호출을 씁니다 — 어댑터 짝 검사가 그 호출을 못 봅니다`);
+  if (/(?:const|let|var)\s*\{[^}]*\}\s*=\s*(?:ctx\.)?store\b/.test(src))
+    E(`${api} 가 store 를 구조분해해 씁니다 — 어댑터 짝 검사가 그 호출을 못 봅니다`);
+  const bodies = { 'worker.mjs': adapterBody(worker, adapter, 'fn'), 'server.mjs': adapterBody(server, adapter, 'obj') };
+  for (const [host, body] of Object.entries(bodies)) {
+    if (!body) { E(`${host} 에서 ${adapter} 어댑터 블록을 찾지 못했습니다 — 이 검사가 헛돌고 있습니다`); continue; }
+    /* 어댑터가 `...withPortalFamilies(...)` 처럼 **스프레드로 메서드를 받는** 자리가 있다(청크가 그렇다).
+       그 헬퍼가 내보내는 이름까지 더해야 한다 — 안 그러면 멀쩡한 어댑터를 없다고 잡는다. */
+    let have = body;
+    for (const m of body.matchAll(/\.\.\.\s*([A-Za-z_$][\w$]*)\s*\(/g)) {
+      const helper = m[1];
+      const where = ['portal-family.mjs', 'worker.mjs', 'server.mjs']
+        .map((f) => fs.readFileSync(path.join(DIR, f), 'utf8'))
+        .find((src) => new RegExp('(?:export )?(?:function|const) ' + helper + '\\b').test(src));
+      if (!where) { E(`${host} 의 ${adapter} 가 ...${helper}() 를 펼치는데 그 정의를 찾지 못했습니다 — 이 검사가 헛돌고 있습니다`); continue; }
+      have += adapterBody(where, helper, /function /.test(where.slice(where.indexOf(helper) - 10, where.indexOf(helper))) ? 'fn' : 'obj') || where;
+    }
+    for (const fn of [...used].sort()) {
+      if (!new RegExp('\\b' + fn + '\\s*:').test(have))
+        E(`${api} 가 store.${fn} 를 쓰는데 ${host} 의 ${adapter} 에 없습니다 — ${host === 'worker.mjs' ? '배포 후 운영에서만 실패합니다' : '로컬 확인이 운영과 달라집니다'}`);
+    }
   }
 }
 

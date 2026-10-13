@@ -170,7 +170,7 @@ t('배포본 _headers — /naesin/*·/vocab/*·/haru/*·/hanja/*·/letter/*·/ad
   const distText = fs.readFileSync(path.join(DIST, '_headers'), 'utf8');
   assert.strictEqual(distText, fs.readFileSync(path.join(HERE, '..', 'reading', '_headers'), 'utf8'), 'dist/_headers 는 reading/_headers 그대로여야 한다');
   const rules = parseHeaders(distText);
-  for (const p of ['/naesin/*', '/vocab/*', '/haru/*', '/hanja/*', '/letter/*', '/admin/*']) {
+  for (const p of ['/naesin/*', '/naesin-ko/*', '/vocab/*', '/haru/*', '/hanja/*', '/chunk/*', '/letter/*', '/admin/*']) {
     assert.ok(rules[p], p + ' 규칙이 없다 — 그 앱의 옛 화면이 브라우저 캐시에 굳는다');
     assert.strictEqual(rules[p]['Cache-Control'], 'no-store', p);
   }
@@ -182,7 +182,10 @@ t('배포본 _headers — /naesin/*·/vocab/*·/haru/*·/hanja/*·/letter/*·/ad
   assert.strictEqual(rules['/*']['Cache-Control'], undefined, '/* 에 Cache-Control 을 두면 분할본의 max-age 와 합쳐져 캐시가 통째로 무력화된다');
   assert.strictEqual(rules['/articles-L1.json']['Cache-Control'], 'public, max-age=604800', '분할본 캐시 규칙은 그대로');
   /* 원본 자리의 두 파일은 안내 주석만 남는다 — 규칙이 두 곳에 있으면 한 곳만 고치는 사고가 난다 */
-  for (const app of ['naesin', 'vocab', 'haru', 'letter', 'hanja']) {
+  /* 앱 폴더의 _headers 는 일곱 개 전부 안내 주석만 남아야 한다. 국어·청크가 이 목록에서 빠져
+     있던 동안 naesin-ko/_headers 에 '살아 보이는' 규칙 8줄이 남아 있었다 — 어디서도 읽지 않는데
+     CSP 는 reading/_headers 보다 낡아서, 그걸 고치면 효과가 있다고 믿게 만드는 자리였다. */
+  for (const app of ['naesin', 'naesin-ko', 'vocab', 'haru', 'chunk', 'letter', 'hanja']) {
     const own = fs.readFileSync(path.join(HERE, '..', app, '_headers'), 'utf8');
     assert.ok(own.split(/\r?\n/).every((l) => !l.trim() || l.trim().startsWith('#')), app + '/_headers 에 규칙이 남아 있다 — reading/_headers 로 옮기세요');
     assert.ok(!fs.existsSync(path.join(DIST, app, '_headers')), app + '/_headers 가 dist 에 실렸다');
