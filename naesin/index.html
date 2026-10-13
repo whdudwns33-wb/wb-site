@@ -2145,7 +2145,7 @@
     runQueue(items, ZONE_MEAN + ' ' + stage + '/3 · ' + CK_STAGES[stage],
       function (it, ok) { if (ok) okN += 1; logEvent('chunk', it.type, day, ok, pid); },
       function (finished) {
-        var passed = finished && items.length > 0 && (okN / items.length) >= 0.8;
+        var passed = finished && items.length > 0 && (okN / items.length) === 1;
         trackAdvance(st, passed, CK_MAX, Date.now());
         touchPack(pid); persist(); render();
       });
@@ -2643,7 +2643,7 @@
             d.perSentence.forEach(function (ps) { if (ps.status !== 'ok') pd.senMiss[ps.seq] = n0(pd.senMiss[ps.seq]) + 1; });
             pd.cumulative[cs.lastDay] = { at: new Date().toISOString(), okCount: d.okCount, total: targets.length, score: score };
             pd.dump.push({ at: new Date().toISOString(), scope: 'cum:' + cs.lastDay, ok: d.okCount, partial: d.partialCount, missing: d.missingCount });
-            logEvent('cumulative', 'blank', cs.lastDay, score >= 80, pid);
+            logEvent('cumulative', 'blank', cs.lastDay, d.missingCount === 0 && d.partialCount === 0, pid);
             touchPack(pid); closeCustom(); persist(); render();
           };
         };
