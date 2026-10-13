@@ -24,17 +24,32 @@ const sources=specs.map(([id,role,file])=>{
  let count=id==='00'?2:id==='01'?44:id==='02'?31:id==='03'?26:id==='04s'||id==='04t'?14:id==='05s'||id==='05t'?10:id==='06s'||id==='06t'?12:id==='07'?25:id==='08'?23:25;totalPages+=count;
  let p=pages(count);
  if(id==='03')p[0].text=wordText;
- if(id==='02'){p[8].text=en(1,12);p[9].text=en(13,25);p[28].text='워크북 4 해석 연습 '+ko(1,20);p[29].text=ko(21,25)+' 워크북 5 동사형 연습';}
+ if(id==='02'){
+  p[8].text=en(1,12);p[9].text=en(13,25);p[10].text='1) Read (can, often, see) (go) 2) Stay (stay) 3) Drink (eat) (drink)';
+  p[13].text='1) She [go / goes] [is / are] 2) We [was / are]';
+  p[19].text='1) We (can / could) move (now / then) 2) I (up / down) ( / ) go';
+  p[22].text='1) Prompt\nblue, sky, water\n2) Prompt without a comma list.';
+  p[28].text='워크북 4 해석 연습 '+ko(1,20);
+  p[29].text=ko(21,25)+' 워크북 5 동사형 연습\n1) can, often, see / went\n2) stayed\n3) ate\n워크북 6 어법 선택형 연습\n1) goes / are\n2) unknown';
+ }
  return{id,role,file,bytes:content.length,sha256:crypto.createHash('sha256').update(content).digest('hex'),pageCount:count,pages:p};
 });
 const bundle=path.join(temp,'bundle.json');fs.writeFileSync(bundle,JSON.stringify({kind:'wb-naesin-page-text-bundle',version:1,sources}));
 const out=path.join(temp,'output');const result=spawnSync(python,[script,'--text-bundle',bundle,'--folder',folder,'--passage-title-en','Fixture Title','--passage-title-ko','시험 제목',out],{encoding:'utf8',env:{...process.env,PYTHONHOME:''}});assert.equal(result.status,0,result.stdout+result.stderr);
 const summary=JSON.parse(result.stdout);assert.equal(summary.sourceDocuments,13);assert.equal(summary.sourcePages,totalPages);assert.equal(summary.words,74);assert.equal(summary.sentences,25);assert.equal(summary.enNonempty,25);assert.equal(summary.koNonempty,25);
-const draft=JSON.parse(fs.readFileSync(path.join(out,'review-draft.json'),'utf8'));assert.equal(draft.publishable,false);assert.deepEqual(draft.rights,rights);assert.deepEqual(draft.sentenceCandidates.map(x=>x.seq),Array.from({length:25},(_,i)=>i+1));assert(draft.sourceDocuments.every(x=>x.sha256&&x.pageCount));assert(draft.wordCandidates.every(x=>x.sourceRefs.length&&x.reviewFlags.includes('REVIEW_REQUIRED')));assert.equal(draft.unmatched.length,100);assert(draft.unmatched.every(x=>x.reason==='NO_DETERMINISTIC_MATCH'&&x.sourceRefs.every(r=>r.sourceDocumentId==='02'&&r.printedPage===r.page&&r.section&&r.questionNo)));assert.equal(draft.sentenceCandidates[0].passageTitleKo,'시험 제목');
+const draft=JSON.parse(fs.readFileSync(path.join(out,'review-draft.json'),'utf8'));assert.deepEqual(summary.enrichmentSummary,draft.enrichmentSummary);assert.equal(draft.publishable,false);assert.deepEqual(draft.rights,rights);assert.deepEqual(draft.sentenceCandidates.map(x=>x.seq),Array.from({length:25},(_,i)=>i+1));assert(draft.sourceDocuments.every(x=>x.sha256&&x.pageCount));assert(draft.wordCandidates.every(x=>x.sourceRefs.length&&x.reviewFlags.includes('REVIEW_REQUIRED')));assert.equal(draft.unmatched.length,95);assert(draft.unmatched.every(x=>x.sourceRefs.every(r=>r.sourceDocumentId==='02'&&r.printedPage===r.page&&r.section)));assert.equal(draft.sentenceCandidates[0].passageTitleKo,'시험 제목');
+const s1=draft.sentenceCandidates[0],s2=draft.sentenceCandidates[1],s3=draft.sentenceCandidates[2];
+assert.deepEqual(s1.verbForms,[{base:'can, often, see',answer:'can, often, see'},{base:'go',answer:'went'}]);assert.deepEqual(s1.enrichmentSourceRefs.verbForms,[{sourceDocumentId:'02',page:11,printedPage:11,section:'verb-form',questionNo:1},{sourceDocumentId:'02',page:30,printedPage:30,section:'verb-form-answer',questionNo:1}]);
+assert.deepEqual(s1.grammarChoices,[{options:['go','goes'],answerIdx:1},{options:['is','are'],answerIdx:1}]);assert.equal(s2.grammarChoices.length,0);assert(draft.unmatched.some(x=>x.candidateId==='sc-0002'&&x.field==='grammarChoices'&&x.reason==='ANSWER_NOT_UNIQUE_OPTION'));
+assert.deepEqual(s1.tokenGroups,[['can','could'],['now','then']]);assert.deepEqual(s1.tokens,[]);assert.equal(s1.tokensSafety,'TOKEN_GROUPS_ONLY_FIXED_TEXT_OUTSIDE');assert.deepEqual(s1.enrichmentSourceRefs.tokens,[{sourceDocumentId:'02',page:20,printedPage:20,section:'token-choice-groups',questionNo:1}]);
+assert.deepEqual(s1.writingKeywords,['blue','sky','water']);assert.equal(s2.writingKeywords.length,0);assert.equal(s1.enrichmentSourceRefs.writingKeywords[1].page,31);
+assert(draft.unmatched.some(x=>x.candidateId==='sc-0003'&&x.field==='verbForms'&&x.reason==='COUNT_MISMATCH'&&x.baseCount===2&&x.answerCount===1));
+for(const seq of [24,25])assert(draft.unmatched.some(x=>x.candidateId===`sc-${String(seq).padStart(4,'0')}`&&x.field==='grammarChoices'&&x.reason==='SOURCE_NOT_PRESENT'&&x.expectedQuestionNo===seq));
+assert.deepEqual(s2.tokenGroups,[['up','down']]);assert(s2.unmatchedEnrichment.some(x=>x.field==='tokens'&&x.reason==='INVALID_TOKEN_GROUP'));assert.deepEqual(draft.enrichmentSummary,{verbForms:{matched:2,unmatched:23},grammarChoices:{matched:1,unmatched:24},tokens:{matched:1,unmatched:24},writingKeywords:{matched:1,unmatched:24}});
 const seed=path.join(temp,'seed.json');fs.writeFileSync(seed,JSON.stringify({draft:{sources:{'03':{sha256:fileInfo.get('03').sha256,pageCount:26}},wordCandidates:Array.from({length:74},(_,i)=>({candidateId:`seed-${i+1}`,headCandidate:`lemma${i+1}`,meanings:['뜻'],posCandidates:['n.'],sourceRows:[{sha256:fileInfo.get('03').sha256,page:1,bbox:[1,1,2,2]}]}))}}));
 const seededOut=path.join(temp,'seeded-output');const seeded=spawnSync(python,[script,'--text-bundle',bundle,'--folder',folder,'--passage-title-en','Fixture Title','--passage-title-ko','시험 제목','--word-seed',seed,seededOut],{encoding:'utf8',env:{...process.env,PYTHONHOME:''}});assert.equal(seeded.status,0,seeded.stdout+seeded.stderr);assert.equal(JSON.parse(fs.readFileSync(path.join(seededOut,'review-draft.json'),'utf8')).wordSeedUsed,true);
 const overwrite=spawnSync(python,[script,'--text-bundle',bundle,'--folder',folder,'--passage-title-en','Fixture Title','--passage-title-ko','시험 제목',out],{encoding:'utf8',env:{...process.env,PYTHONHOME:''}});assert.notEqual(overwrite.status,0);
 const linked=path.join(temp,'source-hardlink.pdf'),blocked=path.join(temp,'hardlink-output');fs.linkSync(path.join(folder,specs[0][2]),linked);
 const hardlink=spawnSync(python,[script,'--text-bundle',bundle,'--folder',folder,'--passage-title-en','Fixture Title','--passage-title-ko','시험 제목',blocked],{encoding:'utf8',env:{...process.env,PYTHONHOME:''}});assert.notEqual(hardlink.status,0);assert.equal(fs.existsSync(blocked),false);fs.unlinkSync(linked);
-console.log('folder bundle synthetic fixture: 12 assertions passed');
+console.log('folder bundle synthetic Phase 2A fixture passed');
 fs.rmSync(temp,{recursive:true,force:true});
