@@ -353,6 +353,12 @@ EXAM_SECTION_BOILERPLATE_RE=re.compile(r'^\s*(?:중2\s+NE능률\(김기택\)\s+L
 CONTEXT_MARKER_046_RE=re.compile(r'^\s*v\s+(?=(?:다음\s*(?:대화|글|지문|내용|문장|그림|표)|Read\s+(?:the\s+)?(?:following|next)\s+(?:dialogue|passage|text)|Look\s+at\s+(?:the\s+)?(?:following\s+)?(?:dialogue|passage|picture)))',re.I)
 CONTEXT_MARKER_09_RE=re.compile(r'^\s*n\s+(?=(?:다음\b|What\s+did\b|Look\s+at\b|Rewrite\b|Fill\b|Complete\b|Choose\b|Use\b|Put\b|Read\b|The\s+following\b))',re.I)
 
+# Only strip exact printed-page section labels that leak past a question; never run this on context or answer fields.
+TERMINAL_SECTION_LABEL_RE=re.compile(r'(?:\s+(?:대화문|의사소통|본문))+\s*$')
+
+def strip_terminal_section_labels(value):
+ return TERMINAL_SECTION_LABEL_RE.sub('',value).rstrip()
+
 def is_exam_boilerplate(line):
  return bool(PAGE_BOILERPLATE_RE.match(line) or EXAM_SECTION_BOILERPLATE_RE.match(line))
 
@@ -596,6 +602,7 @@ def extract_exam_item_candidates(sources):
     next_context=[marker['start'] for marker in context_markers if marker['start'] in valid_context_markers and item['start']<marker['start']<raw_end]
     if next_context:raw_end=min(raw_end,min(next_context))
     raw,problem_lines=clean_exam_span(flat,rows,offsets,item['start'],raw_end,no=no)
+    raw=strip_terminal_section_labels(raw)
     shared_context=context_by_start.get(item['start']);context_text=shared_context['text'] if shared_context else ''
     shared_refs=shared_context['refs'][:] if shared_context else []
     choices=parse_exam_choices(raw)
