@@ -296,6 +296,244 @@ def extract_candidate_sets(src01,src07):
  dialogues,du,ds=extract_dialogue_candidates(src01); functions,keyexpressions,fu,fs,ks=extract_functions(src01,dialogues);patterns,pu,ps=extract_pattern_candidates(src07)
  summary={'dialogues':ds,'functions':fs,'keyExpressions':ks,'patterns':ps}
  return dialogues,functions,keyexpressions,patterns,du+fu+pu,summary
+
+EXAM_CONTRACTS=[
+ {'source':'04','student':'04s','teacher':'04t','section':'PRE-STEP','problemRanges':[(1,12,1,64,None)],'answerPages':(13,14),'summaryPage':13,'expected':64,'expectedByType':{'objective':41,'subjective':23}},
+ {'source':'05','student':'05s','teacher':'05t','section':'1회','problemRanges':[(1,6,1,30,None)],'answerPages':(7,10),'summaryPage':7,'expected':30,'expectedByType':{'objective':23,'subjective':7}},
+ {'source':'06','student':'06s','teacher':'06t','section':'2회','problemRanges':[(1,8,1,30,None)],'answerPages':(9,12),'summaryPage':9,'expected':30,'expectedByType':{'objective':23,'subjective':7}},
+ {'source':'08','student':'08','teacher':None,'section':'Grammar Build Up','problemRanges':[(2,6,1,45,1),(8,18,1,97,2)],'answerPages':(19,23),'expected':142,'expectedByType':{'objective':142,'subjective':0}},
+ {'source':'09','student':'09','teacher':None,'section':'Grammar Build Up','problemRanges':[(2,10,1,79,1),(12,20,1,84,2)],'answerPages':(21,25),'expected':163,'expectedByType':{'objective':0,'subjective':163}},
+]
+QUESTION_MARKER_RE=re.compile(r'(?<!\d)(\d{1,3})\.\s*')
+ANSWER_MARKER_RE=re.compile(r'(?<![\d(])(\d{1,3})\)\s*')
+SUMMARY_ANSWER_RE=re.compile(r'(?<![\d(])(\d{1,3})\.\s*(주관식|[①②③④⑤](?:\s*[,，]\s*[①②③④⑤])*)')
+PAGE_BOILERPLATE_RE=re.compile(r'^\s*(?:NE능률\(김기택\).*|Lesson\s*6\s*Answer Key.*|중2(?:\s+정답)?|교사용|-\s*\d+\s*-|Pattern\s*[12]\b.*|PATTERN\s*[12]\b.*|Grammar Build Up.*|정답 및 해설.*|본 콘텐츠는 해당 출판사.*|이그잼포유에서 제작.*|무단 전재하거나 배포.*|을 물을 수 있습니다.*|저작권 침해 행위 또한 금지.*)\s*$',re.I)
+
+def exam_stream(source,p1,p2):
+ pages={p['page']:p for p in source.get('pages',[]) if p1<=p.get('page',0)<=p2}
+ rows=[]; offsets=[]; parts=[]; pos=0
+ for pn in range(p1,p2+1):
+  page=pages.get(pn)
+  if not page: continue
+  for line_no,line in enumerate(page.get('text','').splitlines(),1):
+   offsets.append(pos); rows.append({'page':pn,'line':line_no,'text':line})
+   parts.append(line); pos+=len(line)+1
+ text='\n'.join(parts)
+ return text,rows,offsets
+
+def exam_line_at(rows,offsets,pos):
+ import bisect
+ i=max(0,bisect.bisect_right(offsets,pos)-1)
+ return rows[min(i,len(rows)-1)] if rows else {'page':1,'line':1,'text':''}
+
+def question_markers(source,p1,p2,lo,hi,pattern_no=None):
+ text,rows,offsets=exam_stream(source,p1,p2); marks=list(QUESTION_MARKER_RE.finditer(text)); accepted=[]; boundaries=[]
+ for i,m in enumerate(marks):
+  no=int(m.group(1)); next_pos=marks[i+1].start() if i+1<len(marks) else len(text)
+  if not lo<=no<=hi: continue
+  line_start=text.rfind('\n',0,m.start())+1
+  inline=m.start()>line_start and text[line_start:m.start()].strip()!=''
+  missing08stem=source.get('id')=='08' and pattern_no==2 and no==55
+  if inline and source.get('id')!='09' and not missing08stem and not (source.get('id') in ('05s','05t') and no==8 and re.match(r'\s*(?:위\s*대화|다음\s*대화)',text[m.end():m.end()+80])): continue
+  # A numbered item must own an unparenthesized n) footnote before the next n. marker.
+  if not re.search(r'(?<![\d(])'+str(no)+r'\)',text[m.end():next_pos]): continue
+  line=exam_line_at(rows,offsets,m.start())
+  marker={'no':no,'start':m.start(),'end':m.end(),'page':line['page'],'line':line['line'],'patternNo':pattern_no}
+  boundaries.append(marker)
+  # The extracted 08 Pattern 2 text has a 55. inline inside #54's final option. Keep
+  # it as a segment delimiter, but do not turn it into an item candidate.
+  if source.get('id')=='08' and pattern_no==2 and no==55: continue
+  accepted.append(marker)
+ ordered=sorted(boundaries,key=lambda item:item['start'])
+ for mark in accepted:
+  idx=next(i for i,item in enumerate(ordered) if item is mark)
+  mark['endStart']=ordered[idx+1]['start'] if idx+1<len(ordered) else len(text)
+  mark['segment']=text[mark['start']:mark['endStart']]
+  mark['endPage']=exam_line_at(rows,offsets,max(mark['start'],mark['endStart']-1))['page']
+  mark['endLine']=exam_line_at(rows,offsets,max(mark['start'],mark['endStart']-1))['line']
+ return accepted,text,rows,offsets
+
+def clean_exam_text(value,no):
+ lines=[]
+ for line in value.splitlines():
+  if PAGE_BOILERPLATE_RE.match(line): continue
+  line=re.sub(r'(?<![\d(])'+str(no)+r'\)\s*$','',line).strip()
+  if line: lines.append(line)
+ return norm(' '.join(lines))
+
+def parse_exam_choices(value,teacher=False):
+ label_map={'❶':'①','❷':'②','❸':'③','❹':'④','❺':'⑤'}
+ rx=re.compile(r'([①②③④⑤❶❷❸❹❺])\s*')
+ if teacher:
+  cut=re.search(r'^\s*(?:해설|정답 및 해설)\b',value,re.M)
+  if cut: value=value[:cut.start()]
+ marks=list(rx.finditer(value)); choices=[]; seen=set()
+ for i,m in enumerate(marks):
+  label=label_map.get(m.group(1),m.group(1))
+  if label in seen: continue
+  seen.add(label); end=marks[i+1].start() if i+1<len(marks) else len(value)
+  text=norm(value[m.end():end])
+  if text: choices.append({'label':label,'text':text[:2000]})
+ return choices
+
+def summary_exam_answers(source,page_no,max_no):
+ text,rows,offsets=exam_stream(source,page_no,page_no); out={}
+ for m in SUMMARY_ANSWER_RE.finditer(text):
+  no=int(m.group(1))
+  if not 1<=no<=max_no or no in out: continue
+  token=m.group(2); labels=re.findall(r'[①②③④⑤]',token)
+  line=exam_line_at(rows,offsets,m.start())
+  out[no]={'type':'subjective' if token=='주관식' else ('multi-select' if len(labels)>1 else 'mcq'),'answerLabels':labels,'answerTexts':[],'explanationKo':'','refs':[candidate_ref(source['id'],line['page'],'answer-key-summary',line_start=line['line'],line_end=line['line'],question_no=no)]}
+ return out
+
+def answer_detail_records(source,p1,p2,max_no,marker_pattern=ANSWER_MARKER_RE):
+ text,rows,offsets=exam_stream(source,p1,p2); markers=list(marker_pattern.finditer(text)); records=[]
+ for i,m in enumerate(markers):
+  no=int(m.group(1))
+  if not 1<=no<=max_no: continue
+  end=markers[i+1].start() if i+1<len(markers) else len(text)
+  tail=text[m.end():end].strip()
+  line=exam_line_at(rows,offsets,m.start())
+  records.append({'no':no,'tail':tail,'page':line['page'],'line':line['line'],'endPage':exam_line_at(rows,offsets,max(m.start(),end-1))['page']})
+ return records
+
+def clean_answer_text(value):
+ out=[]
+ for line in value.splitlines():
+  if PAGE_BOILERPLATE_RE.match(line): continue
+  if re.match(r'^\s*(?::|제시문\b|질문\b|요약문\b|오답\b|해설\b|정답 및 해설\b)',line): break
+  line=re.sub(r'^\s*(?:본문|어휘|의사소통)\s*[┃|].*$','',line).strip()
+  if line: out.append(line)
+ return norm(' '.join(out))[:8000]
+
+def build_exam_answer_map(source,contract):
+ p1,p2=contract['answerPages']; max_no=max(r[3] for r in contract['problemRanges']); out={}
+ if contract['source'] in ('04','05','06'):
+  out=summary_exam_answers(source,contract['summaryPage'],max_no)
+  detail_records=answer_detail_records(source,p1,p2,max_no,re.compile(r'(?<![\d(])(\d{1,3})[.)]\s*'))
+  for no,row in out.items():
+   candidates=[r for r in detail_records if r['no']==no]
+   for record in candidates:
+    tail=record['tail'].strip()
+    if re.match(r'^[①②③④⑤](?:\s*[,，]\s*[①②③④⑤])*\s*:?',tail):
+     colon=tail.find(':'); explanation=tail[colon+1:].strip() if colon>=0 else ''
+     if explanation: row['explanationKo']=clean_answer_text(explanation)
+     row['refs'].append(candidate_ref(source['id'],record['page'],'answer-explanation',line_start=record['line'],line_end=record['line'],question_no=no))
+    elif row['type']=='subjective':
+     answer=clean_answer_text(tail)
+     if answer and not re.fullmatch(r'주관식|[①②③④⑤](?:\s*[,，]\s*[①②③④⑤])*',answer):
+      row['answerTexts']=[answer]
+      row['refs'].append(candidate_ref(source['id'],record['page'],'answer-text',line_start=record['line'],line_end=record['line'],question_no=no))
+  return out
+ pattern_max={1:45,2:97} if contract['source']=='08' else {1:79,2:84}
+ text_by_pattern={1:[],2:[]}; rows_by_pattern={1:[],2:[]}; active=None
+ for pn in range(p1,p2+1):
+  page=next((p for p in source.get('pages',[]) if p.get('page')==pn),None)
+  if not page: continue
+  for line_no,line in enumerate(page.get('text','').splitlines(),1):
+   h=re.search(r'Pattern\s*([12])',line,re.I)
+   if h: active=int(h.group(1))
+   if active:
+    rows_by_pattern[active].append({'page':pn,'line':line_no,'text':line})
+    text_by_pattern[active].append(line)
+ for pattern_no in (1,2):
+  text='\n'.join(text_by_pattern[pattern_no]); rows=rows_by_pattern[pattern_no]; offsets=[]; pos=0
+  for row in rows: offsets.append(pos);pos+=len(row['text'])+1
+  markers=list(ANSWER_MARKER_RE.finditer(text)); expected=1; accepted=[]
+  for m in markers:
+   no=int(m.group(1))
+   if no!=expected or no>pattern_max[pattern_no]: continue
+   line=exam_line_at(rows,offsets,m.start()); accepted.append({'no':no,'start':m.start(),'end':m.end(),'page':line['page'],'line':line['line']});expected+=1
+  for i,marker in enumerate(accepted):
+   end=accepted[i+1]['start'] if i+1<len(accepted) else len(text); tail=text[marker['end']:end].strip()
+   labels=[]; explanation=''; answer_text=''
+   match=re.match(r'\s*([①②③④⑤](?:\s*[,，]\s*[①②③④⑤])*)',tail)
+   if match:
+    labels=re.findall(r'[①②③④⑤]',match.group(1)); rest=tail[match.end():]
+    colon=rest.find(':'); explanation=clean_answer_text(rest[colon+1:]) if colon>=0 else ''
+   else: answer_text=clean_answer_text(tail)
+   refs=[candidate_ref(source['id'],marker['page'],'answer-key',line_start=marker['line'],line_end=marker['line'],question_no=marker['no'])]
+   out[(pattern_no,marker['no'])]={'type':'mcq' if contract['source']=='08' else 'subjective','answerLabels':labels,'answerTexts':[answer_text] if answer_text else [],'explanationKo':explanation,'refs':refs}
+ return out
+
+def teacher_crosscheck(source,contract):
+ if not contract.get('teacher'): return {}
+ rows={}
+ for p1,p2,lo,hi,pattern_no in contract['problemRanges']:
+  found,_,_,_=question_markers(source,p1,p2,lo,hi,pattern_no)
+  for item in found:
+   choices=parse_exam_choices(item['segment'],teacher=True)
+   rows[(pattern_no,item['no'])]={'choiceLabels':{x['label'] for x in choices}}
+ return rows
+
+def exam_item_unmatched(source,section,pattern_no,no,reason,refs,field='examItemCandidates'):
+ return {'candidateId':f'ic-{source}-{pattern_no or 0:02d}-{no:03d}','source':source,'section':section,'patternNo':pattern_no,'no':no,'field':field,'reason':reason,'sourceRefs':refs}
+
+def extract_exam_item_candidates(sources):
+ by_id={s['id']:s for s in sources}; candidates=[]; unmatched=[]; by_source={}; by_type={'mcq':0,'multi-select':0,'subjective':0,'unknown':0}; expected_total=0
+ for contract in EXAM_CONTRACTS:
+  source_name=contract['source']; student=by_id[contract['student']]; answers=build_exam_answer_map(by_id[contract['teacher']] if contract.get('teacher') else student,contract)
+  teacher=teacher_crosscheck(by_id[contract['teacher']],contract) if contract.get('teacher') else {}
+  expected_total+=contract['expected']; source_rows=[]; source_unresolved=0; answer_matched=0; source_types={'mcq':0,'multi-select':0,'subjective':0,'unknown':0}
+  all_found={}
+  for p1,p2,lo,hi,pattern_no in contract['problemRanges']:
+   found,flat,rows,offsets=question_markers(student,p1,p2,lo,hi,pattern_no)
+   grouped={}
+   for item in found: grouped.setdefault(item['no'],[]).append(item)
+   all_found.update({(pattern_no,no):items for no,items in grouped.items()})
+   for no,items in grouped.items():
+    if len(items)>1:
+     refs=[candidate_ref(student['id'],x['page'],'problem-boundary',line_start=x['line'],line_end=x['line'],question_no=no) for x in items]
+     unmatched.append(exam_item_unmatched(source_name,contract['section'],pattern_no,no,'BOUNDARY_AMBIGUOUS',refs));source_unresolved+=1;continue
+    item=items[0]; answer_key=(pattern_no,no) if source_name in ('08','09') else no; answer=answers.get(answer_key)
+    raw=clean_exam_text(item['segment'],no); choices=parse_exam_choices(item['segment'])
+    if source_name=='09': format_type='subjective'
+    elif answer and answer['type']=='subjective': format_type='subjective'
+    elif source_name=='06' and no in (3,7): format_type='multi-select'
+    elif (answer and len(answer.get('answerLabels',[]))>1) or re.search(r'정답\s*2\s*개|두\s*개\s*고르|모두\s*(?:고르|선택)|여러\s*개\s*(?:고르|선택)|해당하는\s*것을\s*모두',raw): format_type='multi-select'
+    elif len(choices)>=2: format_type='mcq'
+    else: format_type='unknown'
+    flags=['REVIEW_REQUIRED']; problem_refs=[]
+    problem_pages=[]
+    for pn in range(item['page'],item['endPage']+1):
+     start_line=item['line'] if pn==item['page'] else 1; end_line=item['endLine'] if pn==item['endPage'] else 1000
+     problem_pages.append(candidate_ref(student['id'],pn,'problem',line_start=start_line,line_end=end_line,question_no=no))
+    problem_refs.extend(problem_pages)
+    answer_refs=answer['refs'][:] if answer else []
+    refs=problem_refs+answer_refs
+    if not answer or (not answer.get('answerLabels') and not answer.get('answerTexts')):
+     flags.append('ANSWER_UNRESOLVED');unmatched.append(exam_item_unmatched(source_name,contract['section'],pattern_no,no,'ANSWER_MISSING',refs));source_unresolved+=1
+    else: answer_matched+=1
+    if format_type in ('mcq','multi-select') and len(choices)<2:
+     flags.append('CHOICES_UNRESOLVED');unmatched.append(exam_item_unmatched(source_name,contract['section'],pattern_no,no,'CHOICES_MISSING',refs));source_unresolved+=1
+    cross=teacher.get((pattern_no,no))
+    if contract.get('teacher') and (cross is None or (choices and cross['choiceLabels']!=set(x['label'] for x in choices))):
+     flags.append('TEACHER_CROSSCHECK_UNRESOLVED')
+     # Cross-check issues stay review flags; canonical student stems and answer-key data remain the candidate source.
+    row={'candidateId':f'ic-{source_name}-{pattern_no or 0:02d}-{no:03d}','source':source_name,'section':contract['section'],'patternNo':pattern_no,'no':no,'formatType':format_type,'rawText':raw[:12000],'choices':choices,'answerLabels':answer.get('answerLabels',[]) if answer else [],'answerTexts':answer.get('answerTexts',[]) if answer else [],'explanationKo':answer.get('explanationKo','') if answer else '','sourceRefs':refs,'reviewFlags':sorted(set(flags))}
+    candidates.append(row);source_rows.append(row);source_types[format_type]+=1;by_type[format_type]+=1
+  for p1,p2,lo,hi,pattern_no in contract['problemRanges']:
+   present={no for pn,no in all_found if pn==pattern_no}
+   for no in range(lo,hi+1):
+    if no in present: continue
+    answer_key=(pattern_no,no) if source_name in ('08','09') else no; answer=answers.get(answer_key)
+    nearest=[]
+    for neighbor_no in (no-1,no+1):
+     for neighbor in all_found.get((pattern_no,neighbor_no),[]):
+      nearest.append(candidate_ref(student['id'],neighbor['page'],'problem-boundary-gap',line_start=neighbor['line'],line_end=neighbor['endLine'],question_no=no))
+    if not nearest: nearest=[candidate_ref(student['id'],p1,'problem-boundary-gap',question_no=no)]
+    refs=nearest+(answer['refs'][:] if answer else [])
+    reason='STEM_MISSING' if source_name=='08' and pattern_no==2 and no==55 else 'STEM_MISSING'
+    unmatched.append(exam_item_unmatched(source_name,contract['section'],pattern_no,no,reason,refs));source_unresolved+=1
+  found_by_type={'objective':source_types['mcq']+source_types['multi-select'],'subjective':source_types['subjective']}
+  by_source[source_name]={'expected':contract['expected'],'found':len(source_rows),'answerMatched':answer_matched,'unresolved':source_unresolved,'byType':source_types,'expectedByType':contract['expectedByType'],'foundByType':found_by_type}
+ type_warnings=[]
+ for source_name,stats in by_source.items():
+  if stats['found']==stats['expected'] and stats['foundByType']!=stats['expectedByType']:
+   type_warnings.append({'source':source_name,'field':'formatType','reason':'EXPECTED_TYPE_COUNT_MISMATCH','expected':stats['expectedByType'],'found':stats['foundByType']})
+ summary={'expected':expected_total,'found':len(candidates),'answerMatched':sum(x['answerMatched'] for x in by_source.values()),'unresolved':len(unmatched),'bySource':by_source,'byType':by_type,'typeCountWarnings':type_warnings}
+ return candidates,unmatched,summary
+
 def attach_unmatched(row, field, reason, refs, **details):
  row['unmatchedEnrichment'].append({'field':field,'reason':reason,'sourceRefs':refs,**details})
  row['reviewFlags'].append(field.upper()+'_UNMATCHED')
@@ -465,9 +703,10 @@ def main():
    sent.append({'candidateId':f'sc-{n:04d}','seq':n,'en':e,'ko':k,'passageTitle':a.passage_title_en,'passageTitleEn':a.passage_title_en,'passageTitleKo':a.passage_title_ko,'dayHeaderEn':header,'dayHeaderKo':header_ko,'dayGroup':('8/1' if n<11 else '8/2' if n<20 else '8/3'),'chunks':[],'verbForms':[],'grammarChoices':[],'tokens':[],'writingKeywords':[],'sourceRefs':[page_ref(ep,'workbook-4',n),page_ref(kp,'workbook-4-answer',n)],'reviewFlags':['REVIEW_REQUIRED','PLAIN_TEXT_NO_COORDINATES']+([] if e else ['EN_UNRESOLVED'])+([] if k else ['KO_UNRESOLVED'])})
   enrichment_summary=enrich_sentences(sent,srcs['02'])
   dialogues,functions,key_expressions,patterns,structure_unmatched,structure_summary=extract_candidate_sets(srcs['01'],srcs['07'])
+  exam_items,unmatched_items,item_summary=extract_exam_item_candidates(bundle['sources'])
   enrichment_summary.update(structure_summary)
   unmatched=[{'candidateId':row['candidateId'],'field':item['field'],'sourceRefs':item['sourceRefs'],'reason':item['reason'],**{key:value for key,value in item.items() if key not in ('field','sourceRefs','reason')}} for row in sent for item in row['unmatchedEnrichment']]+structure_unmatched
-  draft={'kind':'naesin-folder-review-draft','version':1,'status':'needs-review','publishable':False,'rights':{k:rights[k] for k in ['basis','holder','evidenceRef','studentUseAllowed','derivativeUseAllowed','externalAiAllowed','notes']},'revision':'2022','wordSeedUsed':seed_used,'sourceDocuments':docs,'wordCandidates':wr,'sentenceCandidates':sent,'dialogueCandidates':dialogues,'functionCandidates':functions,'keyExpressionCandidates':key_expressions,'patternCandidates':patterns,'unmatched':unmatched,'enrichmentSummary':enrichment_summary,'reviewFlags':['REVIEW_REQUIRED','PLAIN_TEXT_NO_COORDINATES','NO_EXTERNAL_AI']+(['UNMATCHED_ENRICHMENT_REVIEW'] if unmatched else [])+([] if a.passage_title_en and a.passage_title_ko else ['PASSAGE_TITLE_REVIEW'])}
+  draft={'kind':'naesin-folder-review-draft','version':1,'status':'needs-review','publishable':False,'rights':{k:rights[k] for k in ['basis','holder','evidenceRef','studentUseAllowed','derivativeUseAllowed','externalAiAllowed','notes']},'revision':'2022','wordSeedUsed':seed_used,'sourceDocuments':docs,'wordCandidates':wr,'sentenceCandidates':sent,'dialogueCandidates':dialogues,'functionCandidates':functions,'keyExpressionCandidates':key_expressions,'patternCandidates':patterns,'examItemCandidates':exam_items,'unmatchedItems':unmatched_items,'itemSummary':item_summary,'unmatched':unmatched,'enrichmentSummary':enrichment_summary,'reviewFlags':['REVIEW_REQUIRED','PLAIN_TEXT_NO_COORDINATES','NO_EXTERNAL_AI']+(['UNMATCHED_ENRICHMENT_REVIEW'] if unmatched else [])+(['UNMATCHED_ITEMS_REVIEW'] if unmatched_items else [])+([] if a.passage_title_en and a.passage_title_ko else ['PASSAGE_TITLE_REVIEW'])}
   out.parent.mkdir(parents=True,exist_ok=True); out.mkdir(mode=0o700,exist_ok=False)
   target=out/'review-draft.json'
   with target.open('x',encoding='utf-8') as f: json.dump(draft,f,ensure_ascii=False,indent=2); f.write('\n')
