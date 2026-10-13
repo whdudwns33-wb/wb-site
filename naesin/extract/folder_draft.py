@@ -817,9 +817,9 @@ def master_entries(src):
   if not 1<=pn<=4: continue
   section='conversation' if pn<=2 else 'reading'
   for line in page.get('text','').splitlines():
-   upper=line.upper()
-   if 'CONVERSATION' in upper and '│' in line: section='conversation' if pn<=2 else None
-   if 'READING' in upper and '│' in line: section='reading' if pn>=3 else None
+   if re.match(r'^\s*CONVERSATION\s*[│|]',line,re.I): section='conversation'
+   elif re.match(r'^\s*READING\s*[│|]',line,re.I): section='reading'
+   elif re.match(r'^\s*필수\s*단어\s*예문\s*$',line): section=None
    m=re.match(r'^\s*□\s*(.*?)\s*$',line)
    if section and m and m.group(1): entries.append({'page':pn,'section':section,'entry':norm(m.group(1))})
  return entries
@@ -905,7 +905,13 @@ def attach_keyword_candidates(sentences, source):
 def word_master_rows(src):
  page=next((p for p in src.get('pages',[]) if p.get('page')==1),None)
  if not page: fail('WORD_MASTER_PAGE_MISSING')
- lines=page.get('text','').splitlines(); starts=[i for i,line in enumerate(lines) if re.match(r'^\s*□\s*',line)]
+ lines=page.get('text','').splitlines(); active_section=None; section_at_line=[]
+ for line in lines:
+  if re.match(r'^\s*CONVERSATION\s*[│|]',line,re.I): active_section='conversation'
+  elif re.match(r'^\s*READING\s*[│|]',line,re.I): active_section='reading'
+  elif re.match(r'^\s*필수\s*단어\s*예문\s*$',line): active_section=None
+  section_at_line.append(active_section)
+ starts=[i for i,line in enumerate(lines) if re.match(r'^\s*□\s*',line)]
  rows=[]
  irregular=re.compile(r'^\s*\([A-Za-z]+(?:-[A-Za-z]+){1,5}\)\s*$')
  heading=re.compile(r'^\s*(?:CONVERSATION|READING)\s*[│|]|^\s*필수\s*단어\s*예문\s*$|^\s*(?:교과서\s*)?어휘\s*목록\s*$|^\s*\d+\s*WORD\s*TEST\b',re.I)
@@ -919,6 +925,8 @@ def word_master_rows(src):
    if irregular.fullmatch(value): line_end=offset+1; continue
    if not re.search('[가-힣]',value) or re.search('[A-Za-z]',value): break
    block.append(raw); line_end=offset+1
+  section=section_at_line[start]
+  if section not in ('conversation','reading'): fail('WORD_MASTER_SECTION_MISSING')
   joined=norm(source_line_join(block))
   match=pos_rx.match(joined)
   if match:
@@ -936,7 +944,7 @@ def word_master_rows(src):
     prefix=re.sub(r'\s*\($','',prefix).rstrip(); meaning='('+meaning
    head=norm(prefix)
   if not head or not meaning or not re.search('[A-Za-z]',head) or not re.search('[가-힣]',meaning): fail('WORD_MASTER_ENTRY_UNPARSED')
-  rows.append({'head':head,'pos':pos,'meaning':meaning,'lineStart':start+1,'lineEnd':line_end})
+  rows.append({'head':head,'pos':pos,'meaning':meaning,'section':section,'lineStart':start+1,'lineEnd':line_end})
  if len(rows)!=79: fail('WORD_MASTER_SOURCE_ROW_COUNT_MISMATCH')
  return rows
 def numbered_word_senses(src):
@@ -992,7 +1000,7 @@ def words(src):
  for item in source_rows:
   head=item['head']; key=exact_head(head)
   if not key: fail('WORD_MASTER_HEAD_EMPTY')
-  ref=candidate_ref('03',1,'master-list',line_start=item['lineStart'],line_end=item['lineEnd'])
+  ref=candidate_ref('03',1,item['section'],line_start=item['lineStart'],line_end=item['lineEnd'])
   if key in by_head:
    row=by_head[key]; row['sourceRefs'].append(ref)
    if item['pos'] and item['pos'] not in row['posCandidates']: row['posCandidates'].append(item['pos'])
@@ -1014,7 +1022,7 @@ def words(src):
   row['sourceRefs'].append(candidate_ref('03',group['page'],'numbered-senses',line_start=group['lineStart'],line_end=group['lineEnd']))
   row['reviewFlags'].append('MULTIPLE_MEANINGS_SOURCE_CONFIRMED')
  for row in rows:
-  if sum(ref['section']=='master-list' for ref in row['sourceRefs'])>1: row['reviewFlags'].append('DUPLICATE_SOURCE_ROWS')
+  if sum(ref['sourceDocumentId']=='03' and ref['page']==1 and ref['section'] in ('conversation','reading') for ref in row['sourceRefs'])>1: row['reviewFlags'].append('DUPLICATE_SOURCE_ROWS')
   row['reviewFlags']=sorted(set(row['reviewFlags']))
   if not all(isinstance(ref.get('lineStart'),int) and isinstance(ref.get('lineEnd'),int) and ref['lineStart']<=ref['lineEnd'] for ref in row['sourceRefs']): fail('WORD_SOURCE_LINE_REF_INVALID')
  return rows
