@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { handleHanja, hanjaSummary, dumpHanja, dropStudentHanja, hanjaBodyLimit, BODY_LIMIT_BOOK, BODY_LIMIT_DEFAULT, buildRemap, hanjaNightDue, resolveTask, unitItemIds, unitProgress, normCheck, checkList, unitCheck } from './hanja-api.mjs';
+import { allowedApp, appOfPath } from './haru-api.mjs';
 import { sendNightPushes } from './vocab-api.mjs';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -96,6 +97,22 @@ await t('단어장 업로드 — dryRun 은 저장하지 않고 검사 결과만
   assert.strictEqual(store._raw.index().length, 1);
   assert.strictEqual(store._raw.index()[0].title, '고친 제목');
   assert.strictEqual(store._raw.index()[0].scope, 'assigned', '재업로드가 공개 범위를 되돌렸다');
+});
+
+await t('신규 단어장 공개 범위 — 교재는 assigned, 자체는 all, 명시·기존 범위는 유지한다', async () => {
+  const store = memStore();
+  const textbook = { ...sample(), id: 'scope-textbook' }; delete textbook.source;
+  const own = { ...sample(), id: 'scope-own', source: 'own' };
+  const post = (bodyObj) => call(store, { path: '/api/hanja/admin/book', method: 'POST', who: ADMIN, getBody: async () => bodyObj });
+  assert.strictEqual((await post({ books: [textbook, own] })).status, 200);
+  assert.deepStrictEqual(store._raw.index().map((entry) => [entry.id, entry.scope]), [['scope-textbook', 'assigned'], ['scope-own', 'all']]);
+  assert.strictEqual((await post({ book: { ...textbook, id: 'scope-explicit' }, scope: 'all' })).status, 200);
+  assert.strictEqual(store._raw.index().find((entry) => entry.id === 'scope-explicit').scope, 'all');
+  delete store._raw.index().find((entry) => entry.id === 'scope-explicit').scope; // 옛 목록은 scope 없음 = all 이었다.
+  assert.strictEqual((await post({ book: { ...textbook, id: 'scope-explicit' } })).status, 200);
+  assert.strictEqual(store._raw.index().find((entry) => entry.id === 'scope-explicit').scope, 'all', '옛 단어장의 유효 범위를 좁혔다');
+  assert.strictEqual((await post({ book: { ...textbook, title: '다시 올린 교재' }, scope: 'all' })).status, 200);
+  assert.strictEqual(store._raw.index().find((entry) => entry.id === textbook.id).scope, 'assigned', '재업로드가 기존 제한 범위를 넓혔다');
 });
 
 await t('단어장 업로드 — 오류가 있으면 400 과 함께 위치·이유를 돌려주고, 너무 크면 413', async () => {
@@ -212,6 +229,44 @@ await t('학생 목록·본문 — 공개 범위 all 은 모두, assigned 는 �
   assert.strictEqual((await call(store, { path: '/api/hanja/admin/scope', method: 'POST', who: ADMIN, getBody: async () => ({ id: 'wb-hanja-starter', scope: 'secret' }) })).status, 400);
 });
 
+await t('AI 연상 — 서버가 배정·저장된 source·낱말을 확인하고 자체 단어장만 공용 생성기로 넘긴다', async () => {
+  const store = memStore(), forwarded = [], checked = [];
+  await upload(store, sample());
+  const textbook = { ...sample(), id: 'ai-textbook', source: 'textbook' };
+  const restrictedOwn = { ...sample(), id: 'ai-own-restricted', source: 'own' };
+  assert.strictEqual((await upload(store, textbook)).status, 200);
+  assert.strictEqual((await upload(store, restrictedOwn, { scope: 'assigned' })).status, 200);
+  await call(store, { path: '/api/hanja/admin/assign', method: 'POST', who: ADMIN, getBody: async () => ({ codes: ['s1'], bookIds: [textbook.id, restrictedOwn.id] }) });
+  const mnemonic = async (bodyObj) => { forwarded.push(bodyObj); return { status: 200, body: { ok: true, candidates: [] } }; };
+  const mnemonicCheck = async (bodyObj) => { checked.push(bodyObj); return { status: 200, body: { items: [{ word: '관측', status: 'approved' }] } }; };
+  const ask = (bodyObj, who = S1) => call(store, { path: '/api/hanja/mnemonic', method: 'POST', who, mnemonic, getBody: async () => bodyObj });
+  const word = store._raw.books['wb-hanja-starter'].book.words[0];
+  const ok = await ask({ bookId: 'wb-hanja-starter', wordId: word.id, word: '보내면 안 되는 요청값', meaning: '보내면 안 되는 요청값' });
+  assert.strictEqual(ok.status, 200);
+  assert.strictEqual(forwarded.length, 1);
+  assert.deepStrictEqual(forwarded[0], {
+    word: word.word, meaning: word.meaning, type: word.type,
+    hanja: word.parts.map((part) => part.ch + '(' + part.hun + ' ' + part.eum + ')').join('+'),
+  }, '외부 생성기에는 요청값이 아니라 저장된 자체 단어장 값만 보내야 한다');
+  assert.strictEqual((await ask({ bookId: 'wb-hanja-starter', wordId: '없는-id' })).status, 400);
+  assert.strictEqual((await ask({ bookId: textbook.id, wordId: word.id })).status, 403);
+  assert.strictEqual((await ask({ bookId: textbook.id, wordId: word.id }, S2)).status, 403, '배정 밖 교재를 source 검사 전에 열었다');
+  assert.strictEqual((await ask({ bookId: restrictedOwn.id, wordId: restrictedOwn.words[0].id }, S2)).status, 403, '배정 밖 자체 단어장을 AI 생성기에 넘겼다');
+  assert.strictEqual((await ask({ wordId: word.id })).status, 400);
+  assert.strictEqual((await ask({ bookId: 'missing-book', wordId: word.id })).status, 404);
+  assert.strictEqual(forwarded.length, 1, '거절한 교재 뜻을 공용 AI 생성기로 넘겼다');
+  const check = await call(store, { path: '/api/hanja/mnemonic/check', method: 'POST', mnemonicCheck, getBody: async () => ({ words: ['관측'] }) });
+  assert.deepStrictEqual(check.body.items, [{ word: '관측', status: 'approved' }]);
+  assert.deepStrictEqual(checked, [{ words: ['관측'] }]);
+  assert.strictEqual(allowedApp({ apps: ['hanja'] }, appOfPath('/api/hanja/mnemonic/check')), true, '한자 전용 학생의 검수 확인이 앱 게이트에 막힌다');
+  assert.strictEqual(allowedApp({ apps: ['hanja'] }, appOfPath('/api/vocab/mnemonic/check')), false, '회귀 검사가 잘못된 워드브레인 경로도 허용한다');
+  for (const file of ['worker.mjs', 'server.mjs']) {
+    const source = fs.readFileSync(path.join(DIR, file), 'utf8');
+    assert.match(source, /mnemonic:\s*\(body\)\s*=>\s*handleVocab/, file + ' 에 AI 생성기 연결이 없다');
+    assert.match(source, /mnemonicCheck:\s*\(body\)\s*=>\s*handleVocab/, file + ' 에 AI 검수 확인 연결이 없다');
+  }
+});
+
 await t('삭제 — 본문·목록·모든 학생의 배정에서 빠지고, 학생 기록은 남는다', async () => {
   const store = memStore();
   await upload(store, sample());
@@ -290,17 +345,17 @@ await t('몸통 상한 — 단어장 업로드만 2MB, 나머지는 450KB', asyn
 await t('재업로드 — 낱말 텍스트가 같으면 옛 id 를 새 id 로 잇고(remap), 학생 앱이 /book 에서 받는다', async () => {
   const store = memStore();
   /* 옛 단어장: 순번 id (예전 파서가 만들던 모양) */
-  const old = { id: 'remap-book', title: '책', words: [{ id: 'w001', word: '관측', meaning: '뜻', hanja: '觀測' }, { id: 'w002', word: '여태', meaning: '지금까지' }] };
+  const old = { id: 'remap-book', title: '책', source: 'own', words: [{ id: 'w001', word: '관측', meaning: '뜻', hanja: '觀測' }, { id: 'w002', word: '여태', meaning: '지금까지' }] };
   assert.strictEqual((await upload(store, old)).status, 200);
   assert.strictEqual((await call(store, { path: '/api/hanja/book', qs: 'id=remap-book' })).body.remap, null, '처음 올린 단어장에 대응이 있다');
   /* 다시 올리기: id 를 안 적어 내용 기반 id 가 되고, 낱말 하나를 앞에 끼웠다 */
-  const next = { id: 'remap-book', title: '책', words: [{ word: '관점', meaning: '뜻', hanja: '觀點' }, { word: '관측', meaning: '뜻', hanja: '觀測' }, { word: '여태', meaning: '지금까지' }] };
+  const next = { id: 'remap-book', title: '책', source: 'own', words: [{ word: '관점', meaning: '뜻', hanja: '觀點' }, { word: '관측', meaning: '뜻', hanja: '觀測' }, { word: '여태', meaning: '지금까지' }] };
   const r = await upload(store, next);
   assert.strictEqual(r.body.remapped, 2, JSON.stringify(r.body));
   const got = await call(store, { path: '/api/hanja/book', qs: 'id=remap-book' });
   assert.deepStrictEqual(got.body.remap, { w001: '관측|觀測', w002: '여태' });
   /* 한 번 더 바꾸면(명시 id) 옛 대응이 새 목적지로 이어진다 */
-  const third = { id: 'remap-book', title: '책', words: [{ id: 'gwan', word: '관측', meaning: '뜻', hanja: '觀測' }, { word: '여태', meaning: '지금까지' }] };
+  const third = { id: 'remap-book', title: '책', source: 'own', words: [{ id: 'gwan', word: '관측', meaning: '뜻', hanja: '觀測' }, { word: '여태', meaning: '지금까지' }] };
   await upload(store, third);
   const got3 = await call(store, { path: '/api/hanja/book', qs: 'id=remap-book' });
   assert.deepStrictEqual(got3.body.remap, { w001: 'gwan', '관측|觀測': 'gwan', w002: '여태' });
@@ -451,7 +506,7 @@ await t('단어장 종류 — 기본은 교재, 붙여넣기·JSON 모두 받고
   const store = memStore();
   const text = '# 1일차\n관측 | 보고 재는 것 | 觀測\n';
   const post = (bodyObj) => call(store, { path: '/api/hanja/admin/book', method: 'POST', who: ADMIN, getBody: async () => bodyObj });
-  const up = await post({ text, id: 'src-text', title: '교재' });
+  const up = await post({ text, id: 'src-text', title: '교재', scope: 'all' });
   assert.ok(up.body.ok, JSON.stringify(up.body));
   assert.strictEqual(up.body.meta.source, 'textbook', '종류를 안 적으면 교재');
   assert.strictEqual((await store.getBook('src-text')).book.source, 'textbook');

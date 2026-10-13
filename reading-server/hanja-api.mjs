@@ -154,6 +154,18 @@ async function readIndex(store) {
   return Array.isArray(idx) ? idx.filter((e) => isObj(e) && ID_RE.test(String(e.id || ''))) : [];
 }
 
+/* 학생이 단어장 본문을 쓰는 모든 경로는 같은 공개 범위 판정을 지난다. */
+async function readStudentBook(store, code, id) {
+  const entry = (await readIndex(store)).find((e) => e.id === id);
+  const rec = entry && await store.getBook(id);
+  if (!entry || !rec) return { status: 404, error: '없는 단어장이에요.' };
+  if (entry.scope === 'assigned') {
+    const mine = ((await store.getAssign(code)) || {}).bookIds || [];
+    if (!mine.includes(id)) return { status: 403, error: '이 단어장은 배정받은 학생만 열 수 있어요.' };
+  }
+  return { status: 200, rec };
+}
+
 /* 목록(hanja:books) 고치기 — 읽고 고쳐 다시 쓴다. 이 구조에는 두 가지 함정이 있고 둘을 갈라 다뤄야 한다.
    ① 읽기가 옛 값일 수 있다 — KV 는 지역마다 최대 60초쯤 앞의 쓰기를 못 본 값을 돌려준다. 이것은 화면 문제다:
       바꾼 직후 목록이 옛 범위를 보여 줄 수 있고, 잠시 뒤 새로 고치면 맞다. 되읽기로 확인해 봐도 그 읽기가 옛 값이면
@@ -228,7 +240,7 @@ export async function resolveTask(store, code, stu) {
   return { task: {}, scope: null };
 }
 
-/* ctx = { path, method, who:{code,admin}|null, query?, getBody(), store, push? }
+/* ctx = { path, method, who:{code,admin}|null, query?, getBody(), store, push?, mnemonic?(body), mnemonicCheck?(body) }
    store 계약: getBook·putBook·deleteBook·getBookIds·putBookIds · getRemap·putRemap·deleteRemap
               getState·putState·deleteState·listStateCodes · getSummary·putSummary·deleteSummary·listSummaryCodes
               getAssign·putAssign·deleteAssign·listAssignCodes · getTask·putTask·deleteTask·listTaskScopes
@@ -271,15 +283,36 @@ export async function handleHanja(ctx) {
     if (p === '/api/hanja/book' && method === 'GET') {
       const id = q('id');
       if (!ID_RE.test(id)) return j(400, { error: '단어장 id 가 필요해요.' });
-      const entry = (await readIndex(store)).find((e) => e.id === id);
-      const rec = entry && await store.getBook(id);
-      if (!entry || !rec) return j(404, { error: '없는 단어장이에요.' });
-      if (entry.scope === 'assigned') {
-        const mine = ((await store.getAssign(who.code)) || {}).bookIds || [];
-        if (!mine.includes(id)) return j(403, { error: '이 단어장은 배정받은 학생만 열 수 있어요.' });
-      }
+      const access = await readStudentBook(store, who.code, id);
+      if (access.status !== 200) return j(access.status, { error: access.error });
+      const { rec } = access;
       const remap = (await store.getRemap(id)) || null;
       return j(200, { book: rec.book, updatedAt: rec.updatedAt || null, remap: remap && isObj(remap.map) && Object.keys(remap.map).length ? remap.map : null });
+    }
+    /* 어휘브레인 AI 연상 — 저장된 자체 단어장의 실제 낱말만 공용 생성기로 넘긴다.
+       요청의 source·뜻을 믿으면 교재 뜻을 own bookId 로 가장해 외부 AI 로 보낼 수 있다. */
+    if (p === '/api/hanja/mnemonic' && method === 'POST') {
+      const b = await body();
+      if (!b) return j(400, { error: '요청 본문이 JSON 이 아니에요.' });
+      const id = String(b.bookId || '').trim();
+      if (!ID_RE.test(id)) return j(400, { error: '단어장 id 가 필요해요.' });
+      const access = await readStudentBook(store, who.code, id);
+      if (access.status !== 200) return j(access.status, { error: access.error });
+      if (!CHECK.aiAllowed(access.rec.book)) return j(403, { error: '교재 단어장의 뜻은 AI로 보내지 않아요.' });
+      const wordId = String(b.wordId || '').trim();
+      const word = (access.rec.book.words || []).find((w) => w.id === wordId);
+      if (!word) return j(400, { error: '이 단어장에 없는 낱말이에요.' });
+      if (typeof ctx.mnemonic !== 'function') return j(503, { error: 'AI 연상이 아직 준비되지 않았어요.' });
+      return ctx.mnemonic({
+        word: word.word, meaning: word.meaning, type: word.type,
+        hanja: word.parts ? word.parts.map((part) => part.ch + (part.hun ? '(' + part.hun + ' ' + part.eum + ')' : '')).join('+') : undefined,
+      });
+    }
+    if (p === '/api/hanja/mnemonic/check' && method === 'POST') {
+      const b = await body();
+      if (!b) return j(400, { error: '요청 본문이 JSON 이 아니에요.' });
+      if (typeof ctx.mnemonicCheck !== 'function') return j(503, { error: 'AI 연상 확인이 아직 준비되지 않았어요.' });
+      return ctx.mnemonicCheck(b);
     }
     if (p === '/api/hanja/task' && method === 'GET') {
       const stu = await store.getStudent(who.code);
@@ -345,7 +378,7 @@ export async function handleHanja(ctx) {
       const prevRec = prev ? await store.getBook(book.id) : null;
       const prevRemap = prevRec && prevRec.book ? await store.getRemap(book.id) : null;
       const map = prevRec && prevRec.book ? buildRemap(prevRec.book, book, prevRemap && prevRemap.map) : {};
-      const scope = prev && SCOPES.includes(prev.scope) ? prev.scope : (SCOPES.includes(b.scope) ? b.scope : 'all');
+      const scope = prev ? (prev.scope === 'assigned' ? 'assigned' : 'all') : (SCOPES.includes(b.scope) ? b.scope : (book.source === 'own' ? 'all' : 'assigned'));
       plans.push({ book, prev, prevRemap, map, entry: indexEntry(book, scope, updatedAt) });
     }
     /* 전권 검사·읽기가 끝난 뒤 쓴다. KV는 다중 키 트랜잭션이 아니므로 저장 중 장애까지 원자적으로 묶지는 못한다. */

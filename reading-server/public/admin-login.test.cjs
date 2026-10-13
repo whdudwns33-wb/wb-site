@@ -72,6 +72,11 @@ t('관리 화면이 한 장도 빠짐없이 공용 로그인을 쓴다 (PIN 폼�
   assert.deepEqual(bespoke, [], '자기 PIN 폼이 남은 화면: ' + bespoke.join(', '));
 });
 
+t('공용 로그인 위에 옛 관리자 PIN 제목을 남기지 않는다', () => {
+  const stale = PAGES.filter((f) => /<(?:label|h2)[^>]*>\s*관리자 PIN\s*</.test(fs.readFileSync(path.join(DIR, f), 'utf8')));
+  assert.deepEqual(stale, [], '아이디·비밀번호 폼과 어긋난 제목: ' + stale.join(', '));
+});
+
 t('admin-login.js 가 배포본 복사 목록에 있다 (없으면 운영에서 404 로 로그인 자체가 막힌다)', () => {
   const build = fs.readFileSync(path.join(DIR, '..', 'build-dist.mjs'), 'utf8');
   assert.match(build, /'admin-login\.js'/);
