@@ -885,22 +885,120 @@ def attach_keyword_candidates(sentences, source):
   attach_unmatched(row,'keywords','KEYWORD_ALIGNMENT_REVIEW_REQUIRED',refs,baseCount=len(eparts or []),answerCount=len(kparts or []))
   summary['unmatched']+=1
  return summary
-def words(src):
+def word_master_rows(src):
+ page=next((p for p in src.get('pages',[]) if p.get('page')==1),None)
+ if not page: fail('WORD_MASTER_PAGE_MISSING')
+ lines=page.get('text','').splitlines(); starts=[i for i,line in enumerate(lines) if re.match(r'^\s*□\s*',line)]
  rows=[]
- seen=set()
- for page in src['pages']:
-  if page['page']>7: continue
-  for line in page.get('text','').splitlines():
-   line=norm(line)
-   if '□' not in line: continue
-   m=re.search(r'□\s*(.+?)\s+((?:n|v|a|adj|adv|prep|pron|conj|int|phr|aux)\.?)\s+(.+)$',line,re.I)
-   if not m: continue
-   head,pos,meaning=map(norm,m.groups())
-   if not re.search('[A-Za-z]',head) or not re.search('[가-힣]',meaning): continue
-   key=re.sub(r'\s+',' ',head).casefold()
-   if key in seen: continue
-   seen.add(key)
-   pn=page['page']; rows.append({'candidateId':f'wc-{len(rows)+1:04d}','headCandidate':head,'meanings':[meaning],'posCandidates':[pos],'sourceRefs':[{'sourceDocumentId':'03','page':pn,'printedPage':pn,'section':None,'questionNo':None}],'reviewFlags':['REVIEW_REQUIRED','PLAIN_TEXT_NO_COORDINATES']})
+ irregular=re.compile(r'^\s*\([A-Za-z]+(?:-[A-Za-z]+){1,5}\)\s*$')
+ heading=re.compile(r'^\s*(?:CONVERSATION|READING)\s*[│|]|^\s*필수\s*단어\s*예문\s*$|^\s*(?:교과서\s*)?어휘\s*목록\s*$|^\s*\d+\s*WORD\s*TEST\b',re.I)
+ pos_rx=re.compile(r'^(.*?)\s+(n|v|a|adv|pron)\.\s*(.*)$',re.I)
+ for index,start in enumerate(starts):
+  stop=starts[index+1] if index+1<len(starts) else len(lines)
+  block=[re.sub(r'^\s*□\s*','',lines[start],count=1).strip()]; line_end=start+1
+  for offset,raw in enumerate(lines[start+1:stop],start+1):
+   value=raw.strip()
+   if not value or heading.match(raw): break
+   if irregular.fullmatch(value): line_end=offset+1; continue
+   if not re.search('[가-힣]',value) or re.search('[A-Za-z]',value): break
+   block.append(value); line_end=offset+1
+  joined=norm(' '.join(block))
+  match=pos_rx.match(joined)
+  if match:
+   head=norm(match.group(1)); pos=match.group(2).lower()+'.'; meaning=norm(match.group(3))
+  else:
+   boundary=re.search('[가-힣]',joined)
+   if not boundary: fail('WORD_MASTER_ENTRY_UNPARSED')
+   prefix=joined[:boundary.start()].rstrip(); meaning=norm(joined[boundary.start():]); pos=''
+   tilde_count=prefix.count('~')
+   if prefix.endswith('~') and tilde_count>=2:
+    prefix=prefix[:-1].rstrip(); meaning='~'+meaning
+   elif prefix.endswith('~') and tilde_count==1:
+    meaning='~'+meaning
+   prefix=re.sub(r'\s*\($','',prefix).rstrip()
+   head=norm(prefix)
+  if not head or not meaning or not re.search('[A-Za-z]',head) or not re.search('[가-힣]',meaning): fail('WORD_MASTER_ENTRY_UNPARSED')
+  rows.append({'head':head,'pos':pos,'meaning':meaning,'lineStart':start+1,'lineEnd':line_end})
+ if len(rows)!=79: fail('WORD_MASTER_SOURCE_ROW_COUNT_MISMATCH')
+ return rows
+def numbered_word_senses(src):
+ expected={'state':2,'come through':2,'gate':2,'diamond':2,'name':2,'view':3,'hawaiian':2,'movement':2,'raise':3,'head':3,'harm':2,'touch':3}
+ parsed={}
+ for pn in (7,8):
+  page=next((p for p in src.get('pages',[]) if p.get('page')==pn),None)
+  if not page: fail('WORD_SENSE_PAGE_MISSING')
+  lines=page.get('text','').splitlines(); active=None; current=None
+  def finish_group():
+   nonlocal active,current
+   if active and active.get('senses'):
+    key=exact_head(active['head'])
+    if key in expected:
+     if key in parsed: fail('WORD_SENSE_DUPLICATE_HEAD')
+     active['lineEnd']=active['lastSenseEnd']
+     parsed[key]=active
+   active=None; current=None
+  def add_sense(number,body,line_no):
+   nonlocal current
+   match=re.match(r'^\s*(n|v|a|adv|pron)\.\s*(.*)$',body,re.I)
+   pos=(match.group(1).lower()+'.') if match else ''
+   meaning=norm(match.group(2) if match else body)
+   if not meaning: fail('WORD_SENSE_EMPTY')
+   current={'number':number,'meaning':meaning,'pos':pos,'lineStart':line_no,'lineEnd':line_no}
+   active['senses'].append(current); active['lastSenseEnd']=line_no
+  for offset,raw in enumerate(lines):
+   line_no=offset+1
+   box=re.match(r'^\s*□\s*(.*?)\s*$',raw)
+   if box:
+    finish_group()
+    body=box.group(1)
+    first=re.match(r'^(.*?)\s+1\.\s*(.*)$',body)
+    head=norm(first.group(1) if first else body)
+    active={'head':head,'page':pn,'lineStart':line_no,'lineEnd':line_no,'lastSenseEnd':line_no,'senses':[]}
+    current=None
+    if first: add_sense(1,first.group(2),line_no)
+    continue
+   if not active: continue
+   numbered_match=re.match(r'^\s*(\d{1,2})\.\s*(.*)$',raw)
+   if numbered_match and 1<=int(numbered_match.group(1))<=3:
+    add_sense(int(numbered_match.group(1)),numbered_match.group(2),line_no)
+    continue
+   if current and raw[:1].isspace() and re.search('[가-힣]',raw) and not re.search('[A-Za-z]',raw):
+    current['meaning']=norm(current['meaning']+' '+raw.strip()); current['lineEnd']=line_no; active['lastSenseEnd']=line_no
+   else: current=None
+  finish_group()
+ if set(parsed)!=set(expected) or any(len(parsed[k]['senses'])!=count for k,count in expected.items()): fail('WORD_SENSE_SOURCE_MISMATCH')
+ return parsed
+def words(src):
+ source_rows=word_master_rows(src)
+ rows=[]; by_head={}
+ for item in source_rows:
+  head=item['head']; key=exact_head(head)
+  if not key: fail('WORD_MASTER_HEAD_EMPTY')
+  ref=candidate_ref('03',1,'master-list',line_start=item['lineStart'],line_end=item['lineEnd'])
+  if key in by_head:
+   row=by_head[key]; row['sourceRefs'].append(ref)
+   if item['pos'] and item['pos'] not in row['posCandidates']: row['posCandidates'].append(item['pos'])
+   continue
+  flags=['REVIEW_REQUIRED']
+  if not item['pos']: flags.append('PHRASE_POS_NOT_PRINTED')
+  row={'candidateId':f'wc-{len(rows)+1:04d}','headCandidate':head,'meanings':[item['meaning']],'posCandidates':[item['pos']] if item['pos'] else [],'sourceRefs':[ref],'reviewFlags':flags}
+  by_head[key]=row; rows.append(row)
+ if len(rows)!=74: fail('WORD_MASTER_UNIQUE_COUNT_MISMATCH')
+ required={'australia','thailand','take a tour of','look for','send ~ away','mistake ~ for ...','learn about','stand for'}
+ keys=set(by_head)
+ if not required.issubset(keys): fail('WORD_MASTER_REQUIRED_HEAD_MISSING')
+ senses=numbered_word_senses(src)
+ for key,group in senses.items():
+  row=by_head.get(key)
+  if not row: fail('WORD_SENSE_HEAD_NOT_IN_MASTER')
+  row['meanings']=[sense['meaning'] for sense in group['senses']]
+  row['posCandidates']=list(dict.fromkeys(row['posCandidates']+[sense['pos'] for sense in group['senses'] if sense['pos']]))
+  row['sourceRefs'].append(candidate_ref('03',group['page'],'numbered-senses',line_start=group['lineStart'],line_end=group['lineEnd']))
+  row['reviewFlags'].append('MULTIPLE_MEANINGS_SOURCE_CONFIRMED')
+ for row in rows:
+  if sum(ref['section']=='master-list' for ref in row['sourceRefs'])>1: row['reviewFlags'].append('DUPLICATE_SOURCE_ROWS')
+  row['reviewFlags']=sorted(set(row['reviewFlags']))
+  if not all(isinstance(ref.get('lineStart'),int) and isinstance(ref.get('lineEnd'),int) and ref['lineStart']<=ref['lineEnd'] for ref in row['sourceRefs']): fail('WORD_SOURCE_LINE_REF_INVALID')
  return rows
 def main():
  ap=argparse.ArgumentParser(); ap.add_argument('--text-bundle',required=True); ap.add_argument('--folder',required=True); ap.add_argument('--word-seed'); ap.add_argument('--passage-title-en'); ap.add_argument('--passage-title-ko'); ap.add_argument('--install-sources',action='store_true'); ap.add_argument('outdir'); a=ap.parse_args()
@@ -934,18 +1032,7 @@ def main():
    seed=json.loads(seed_path.read_text(encoding='utf-8')); sd=seed.get('draft',seed)
    meta03=next(d for d in docs if d['sourceDocumentId']=='03')
    s03=sd.get('sources',{}).get('03',{})
-   if s03.get('sha256')!=meta03['sha256'] or s03.get('pageCount')!=meta03['pageCount'] or not isinstance(sd.get('wordCandidates'),list) or not sd['wordCandidates']: fail('WORD_SEED_SOURCE_MISMATCH')
-   seeded=[]
-   for item in sd['wordCandidates']:
-    refs=[]
-    for row in item.get('sourceRows',[]):
-     if row.get('sha256')!=meta03['sha256'] or not isinstance(row.get('page'),int) or not 1<=row['page']<=meta03['pageCount']: fail('WORD_SEED_ROW_MISMATCH')
-     bbox=row.get('bbox')
-     if not isinstance(bbox,list) or len(bbox)!=4 or any(not isinstance(v,(int,float)) or v<0 for v in bbox) or bbox[0]>bbox[2] or bbox[1]>bbox[3]: fail('WORD_SEED_BBOX_INVALID')
-     refs.append({'sourceDocumentId':'03','page':row['page'],'printedPage':row['page'],'section':None,'questionNo':None,'bbox':bbox})
-    if not refs: fail('WORD_SEED_ROW_MISSING')
-    seeded.append({'candidateId':item['candidateId'],'headCandidate':item['headCandidate'],'meanings':item.get('meanings',[]),'posCandidates':item.get('posCandidates',[]),'sourceRefs':refs,'reviewFlags':sorted(set(item.get('reviewFlags',[])+['REVIEW_REQUIRED']))})
-   wr=seeded; seed_used=True
+   if s03.get('sha256')!=meta03['sha256'] or s03.get('pageCount')!=meta03['pageCount']: fail('WORD_SEED_SOURCE_MISMATCH')
   en={}
   for pn in (9,10): en.update(marked(next(p['text'] for p in srcs['02']['pages'] if p['page']==pn),r'\.'))
   ko={}; ko_headers={}
@@ -969,7 +1056,6 @@ def main():
    sent.append({'candidateId':f'sc-{n:04d}','seq':n,'en':e,'ko':k,'passageTitle':a.passage_title_en,'passageTitleEn':a.passage_title_en,'passageTitleKo':a.passage_title_ko,'dayHeaderEn':header,'dayHeaderKo':header_ko,'dayGroup':('8/1' if n<11 else '8/2' if n<20 else '8/3'),'chunks':[],'keywords':[],'verbForms':[],'grammarChoices':[],'tokens':[],'writingKeywords':[],'sourceRefs':[page_ref(ep,'workbook-4',n),page_ref(kp,'workbook-4-answer',n)],'reviewFlags':['REVIEW_REQUIRED','PLAIN_TEXT_NO_COORDINATES']+([] if e else ['EN_UNRESOLVED'])+([] if k else ['KO_UNRESOLVED'])})
   enrichment_summary=enrich_sentences(sent,srcs['02'])
   keyword_summary=attach_keyword_candidates(sent,srcs['02']); enrichment_summary['keywords']=keyword_summary
-  attach_word_sections(wr,srcs['03'],sent)
   dialogues,functions,key_expressions,patterns,structure_unmatched,structure_summary=extract_candidate_sets(srcs['01'],srcs['07'])
   exam_items,unmatched_items,item_summary=extract_exam_item_candidates(bundle['sources'])
   enrichment_summary.update(structure_summary)
