@@ -162,7 +162,7 @@ export async function handleStudio(ctx) {
   if (!who) return j(401, { error: '로그인이 필요합니다.' });
   if (!who.admin) return j(403, { error: '권한이 없습니다.' });
 
-  const body = async () => { try { return await ctx.getBody(); } catch (e) { return null; } };
+  const body = async () => { try { return await ctx.getBody(); } catch (e) { if (e && e.status === 413) throw e; return null; } };
   const badBody = (b) => (isObj(b) ? null : j(400, { error: '올바른 JSON이 아니에요.' }));
   const jobOf = async (id) => (JOB_ID_RE.test(id) ? await store.getJob(id) : null);
 

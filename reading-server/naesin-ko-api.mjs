@@ -141,7 +141,7 @@ export async function handleNaesinKo(ctx) {
 
   /* 호스트마다 JSON 파싱 실패의 모양이 다르다(로컬 reject, 워커 throw) — 여기서 400으로 통일 */
   const body = async () => {
-    try { return await ctx.getBody(); } catch (e) { return null; }
+    try { return await ctx.getBody(); } catch (e) { if (e && e.status === 413) throw e; return null; }
   };
 
   /* ── 학생 (관리자 토큰도 통과) ── */
@@ -410,7 +410,8 @@ export async function handleNaesinKo(ctx) {
      overrides[]: {targetRef, answers[], note} · notes[]: {workId, text} */
   if (p === '/api/naesin-ko/admin/overlay' && method === 'GET') {
     const scope = String((ctx.query && ctx.query.get('scope')) || 'default').trim();
-    return j(200, { overlay: (await store.getOverlay(scope)) || {}, scope });
+    const overlay = await store.getOverlay(scope);
+    return j(200, { overlay: overlay || {}, scope, found: !!overlay });
   }
   if (p === '/api/naesin-ko/admin/overlay' && method === 'POST') {
     const b = await body();

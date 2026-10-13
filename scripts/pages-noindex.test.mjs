@@ -22,7 +22,7 @@ let passed = 0;
 const t = (name, fn) => { fn(); passed += 1; console.log('  ✓ ' + name); };
 
 /* 공개가 의도된 것 — 이 셋만 noindex 가 없어도 된다.
-   `/` 랜딩, 어휘 나이 진단(CLAUDE.md 가 "유일한 공개 페이지"로 적는다), 계산기. */
+   `/` 랜딩, 어휘 나이 진단, 계산기. */
 const PUBLIC_OK = new Set(['index.html', 'vocab-age/index.html', 'calc/index.html']);
 
 /* 훑지 않는 곳: 빌드 산출물·의존성·데이터. dist 는 Cloudflare 전용이라 _headers 가 듣는다. */
