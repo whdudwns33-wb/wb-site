@@ -949,18 +949,55 @@ def word_master_rows(src):
  return rows
 def numbered_word_senses(src):
  expected={'state':2,'come through':2,'gate':2,'diamond':2,'name':2,'view':3,'hawaiian':2,'movement':2,'raise':3,'head':3,'harm':2,'touch':3}
+ # Explicit word-internal wraps read from source 03's fixed PDF lines; other Korean line wraps are word boundaries.
+ korean_word_wrap_lines={7:{18,22,28,43,49,51,57},8:{9,24}}
  parsed={}
  for pn in (7,8):
   page=next((p for p in src.get('pages',[]) if p.get('page')==pn),None)
   if not page: fail('WORD_SENSE_PAGE_MISSING')
   lines=page.get('text','').splitlines(); active=None; current=None
+  def parse_examples(raw_lines,count):
+   starts=re.compile(r"^\s*[A-Z][A-Za-z’']*(?:\.?)(?:\s|$)")
+   groups=[]; sample=None
+   for line_no,raw in raw_lines:
+    text=raw.strip()
+    if not text: continue
+    if starts.match(text):
+     if sample is not None: groups.append(sample)
+     sample=[]
+    if sample is None: fail('WORD_SENSE_EXAMPLE_START_MISSING')
+    sample.append((line_no,text))
+   if sample is not None: groups.append(sample)
+   if len(groups)!=count: fail('WORD_SENSE_EXAMPLE_COUNT_MISMATCH')
+   examples=[]
+   for group in groups:
+    en_parts=[]; ko=''; korean_started=False
+    for line_no,text in group:
+     if korean_started:
+      ko+=('' if line_no in korean_word_wrap_lines.get(pn,set()) else ' ')+text
+      continue
+     first_hangul=re.search('[가-힣]',text)
+     if not first_hangul:
+      en_parts.append(text); continue
+     en=text[:first_hangul.start()].strip(); korean=text[first_hangul.start():].strip()
+     if en: en_parts.append(en)
+     if korean: ko+=korean; korean_started=True
+    example={'en':norm(' '.join(en_parts)),'ko':norm(ko)}
+    if not example['en'] or not example['ko'] or not re.search('[A-Za-z]',example['en']) or not re.search('[가-힣]',example['ko']): fail('WORD_SENSE_EXAMPLE_INVALID')
+    examples.append(example)
+   return examples
   def finish_group():
    nonlocal active,current
    if active and active.get('senses'):
     key=exact_head(active['head'])
     if key in expected:
      if key in parsed: fail('WORD_SENSE_DUPLICATE_HEAD')
-     active['lineEnd']=active['lastSenseEnd']
+     raw_examples=active['exampleLines']
+     examples=parse_examples(raw_examples,expected[key])
+     if [sense['number'] for sense in active['senses']]!=list(range(1,expected[key]+1)): fail('WORD_SENSE_SEQUENCE_INVALID')
+     active['senses']=[{'senseNo':sense['number'],'pos':sense['pos'],'meaningKo':sense['meaning'],'example':example} for sense,example in zip(active['senses'],examples)]
+     if len(active['senses'])!=expected[key]: fail('WORD_SENSE_SOURCE_MISMATCH')
+     active['lineEnd']=raw_examples[-1][0]
      parsed[key]=active
    active=None; current=None
   def add_sense(number,body,line_no):
@@ -979,7 +1016,7 @@ def numbered_word_senses(src):
     body=box.group(1)
     first=re.match(r'^(.*?)\s+1\.\s*(.*)$',body)
     head=norm(first.group(1) if first else body)
-    active={'head':head,'page':pn,'lineStart':line_no,'lineEnd':line_no,'lastSenseEnd':line_no,'senses':[]}
+    active={'head':head,'page':pn,'lineStart':line_no,'lineEnd':line_no,'lastSenseEnd':line_no,'senses':[],'exampleLines':[]}
     current=None
     if first: add_sense(1,first.group(2),line_no)
     continue
@@ -991,8 +1028,9 @@ def numbered_word_senses(src):
    if current and raw[:1].isspace() and re.search('[가-힣]',raw) and not re.search('[A-Za-z]',raw):
     current['meaning']=norm(current['meaning']+' '+raw.strip()); current['lineEnd']=line_no; active['lastSenseEnd']=line_no
    else: current=None
+   if line_no>active['lastSenseEnd']: active['exampleLines'].append((line_no,raw))
   finish_group()
- if set(parsed)!=set(expected) or any(len(parsed[k]['senses'])!=count for k,count in expected.items()): fail('WORD_SENSE_SOURCE_MISMATCH')
+ if set(parsed)!=set(expected) or any(len(parsed[k]['senses'])!=count for k,count in expected.items()) or sum(map(len,(group['senses'] for group in parsed.values())))!=28: fail('WORD_SENSE_SOURCE_MISMATCH')
  return parsed
 def words(src):
  source_rows=word_master_rows(src)
@@ -1007,7 +1045,7 @@ def words(src):
    continue
   flags=['REVIEW_REQUIRED']
   if not item['pos']: flags.append('PHRASE_POS_NOT_PRINTED')
-  row={'candidateId':f'wc-{len(rows)+1:04d}','headCandidate':head,'meanings':[item['meaning']],'posCandidates':[item['pos']] if item['pos'] else [],'sourceRefs':[ref],'reviewFlags':flags}
+  row={'candidateId':f'wc-{len(rows)+1:04d}','headCandidate':head,'meanings':[item['meaning']],'posCandidates':[item['pos']] if item['pos'] else [],'senses':[],'sourceRefs':[ref],'reviewFlags':flags}
   by_head[key]=row; rows.append(row)
  if len(rows)!=74: fail('WORD_MASTER_UNIQUE_COUNT_MISMATCH')
  required={'australia','thailand','take a tour of','look for','send ~ away','mistake ~ for ...','learn about','stand for'}
@@ -1017,7 +1055,8 @@ def words(src):
  for key,group in senses.items():
   row=by_head.get(key)
   if not row: fail('WORD_SENSE_HEAD_NOT_IN_MASTER')
-  row['meanings']=[sense['meaning'] for sense in group['senses']]
+  row['senses']=group['senses']
+  row['meanings']=[sense['meaningKo'] for sense in group['senses']]
   row['posCandidates']=list(dict.fromkeys(row['posCandidates']+[sense['pos'] for sense in group['senses'] if sense['pos']]))
   row['sourceRefs'].append(candidate_ref('03',group['page'],'numbered-senses',line_start=group['lineStart'],line_end=group['lineEnd']))
   row['reviewFlags'].append('MULTIPLE_MEANINGS_SOURCE_CONFIRMED')

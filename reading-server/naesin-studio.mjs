@@ -48,7 +48,7 @@ const strMax = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : '')
 const arrayKeyOf = (kind) => (kind === 'items' ? 'items' : kind);
 const DRAFT_KINDS = CHECK.PACK_ARRAYS;
 const PDF_ROW_KEYS = {
-  words: ['id', 'headword', 'pos', 'meaningKo', 'sections', 'irregularForms', 'notes', '_pdfReview'],
+  words: ['id', 'headword', 'pos', 'meaningKo', 'sections', 'irregularForms', 'senses', 'notes', '_pdfReview'],
   sentences: ['seq', 'dayGroup', 'dayHeaderEn', 'dayHeaderKo', 'en', 'ko', 'chunks', 'keywords', 'tokens', 'verbForms', 'grammarChoices', 'writingKeywords', 'wordIds', 'grammarNotes', 'notes', '_pdfReview'],
   dialogues: ['id', 'title', 'section', 'lines', 'notes', '_pdfReview'],
   functions: ['name', 'pattern', 'explainKo', '_pdfReview'],
@@ -68,6 +68,21 @@ function validPdfReview(v) {
       && (loc.printedPage === undefined || Number.isInteger(loc.printedPage) && loc.printedPage > 0)
       && (loc.section === undefined || loc.section === null || typeof loc.section === 'string' && loc.section.length <= 120)
       && (loc.questionNo === undefined || loc.questionNo === null || Number.isInteger(loc.questionNo) && loc.questionNo > 0));
+}
+function validPdfSenses(senses, meanings) {
+  if (senses === null) return true;
+  const keys = ['senseNo', 'pos', 'meaningKo', 'example'];
+  if (!Array.isArray(senses) || senses.length > 3 || senses.some((sense, i) => !isObj(sense)
+    || Object.keys(sense).length !== keys.length || Object.keys(sense).some((key) => !keys.includes(key))
+    || !keys.every((key) => Object.prototype.hasOwnProperty.call(sense, key))
+    || !Number.isInteger(sense.senseNo) || sense.senseNo !== i + 1 || sense.senseNo > 3
+    || typeof sense.pos !== 'string' || sense.pos.length > 20
+    || !CHECK.nonEmpty(sense.meaningKo) || sense.meaningKo.length > 1200
+    || !isObj(sense.example) || Object.keys(sense.example).length !== 2
+    || !Object.prototype.hasOwnProperty.call(sense.example, 'en') || !Object.prototype.hasOwnProperty.call(sense.example, 'ko')
+    || !CHECK.nonEmpty(sense.example.en) || sense.example.en.length > 1200
+    || !CHECK.nonEmpty(sense.example.ko) || sense.example.ko.length > 1200)) return false;
+  return senses.length === 0 || Array.isArray(meanings) && JSON.stringify(meanings) === JSON.stringify(senses.map((sense) => sense.meaningKo));
 }
 function validPdfSentence(row, allowUnresolved = false) {
   const emptyChunks = Array.isArray(row && row.chunks) && row.chunks.length === 0;
@@ -416,6 +431,7 @@ export async function handleStudio(ctx) {
         if (!Object.prototype.hasOwnProperty.call(row, '_pdfReview')) continue;
         if (ctx.localPdfReview !== true) return j(403, { error: 'PDF 후보는 원내 PC에서만 검수할 수 있어요.' });
         if (!PDF_ROW_KEYS[k] || !ownKeys(row, PDF_ROW_KEYS[k]) || !validPdfReview(row._pdfReview)
+          || (k === 'words' && row.senses !== undefined && !validPdfSenses(row.senses, row.meaningKo))
           || (k === 'sentences' && !validPdfSentence(row, true)))
           return j(400, { error: 'PDF 후보의 필드·위치 정보가 올바르지 않아요.' });
       }

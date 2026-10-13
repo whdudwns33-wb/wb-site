@@ -148,9 +148,26 @@ var WBPACKCHECK = (function () {
          '2'나 4가 들어오면 엔진이 조용히 보통으로 눌러 읽어 태그가 없는 것과 같아진다. */
       if (w.level != null && w.level !== 1 && w.level !== 2 && w.level !== 3)
         c.err(S, at + ' level 은 1(기초)·2(보통)·3(심화) 중 하나여야 함 — 받은 값: ' + JSON.stringify(w.level));
-      if (isArr(w.senses)) w.senses.forEach(function (s, j) {
-        if (!nonEmpty(s && s.meaningKo)) c.err(S, at + ' senses[' + j + '] meaningKo 없음');
-      });
+      if (w.senses !== undefined && w.senses !== null) {
+        if (!isArr(w.senses) || w.senses.length > 3) c.err(S, at + ' senses 는 최대 3개 배열이어야 함');
+        else {
+          w.senses.forEach(function (s, j) {
+            var senseKeys = ['senseNo', 'pos', 'meaningKo', 'example'];
+            var exampleKeys = ['en', 'ko'];
+            if (!s || typeof s !== 'object' || isArr(s) || Object.keys(s).length !== senseKeys.length
+              || !senseKeys.every(function (key) { return Object.prototype.hasOwnProperty.call(s, key); })
+              || Object.keys(s).some(function (key) { return senseKeys.indexOf(key) < 0; })
+              || !Number.isInteger(s.senseNo) || s.senseNo !== j + 1 || s.senseNo > 3
+              || typeof s.pos !== 'string' || s.pos.length > 20 || !nonEmpty(s.meaningKo) || s.meaningKo.length > 1200
+              || !s.example || typeof s.example !== 'object' || isArr(s.example) || Object.keys(s.example).length !== exampleKeys.length
+              || !exampleKeys.every(function (key) { return Object.prototype.hasOwnProperty.call(s.example, key); })
+              || Object.keys(s.example).some(function (key) { return exampleKeys.indexOf(key) < 0; })
+              || !nonEmpty(s.example.en) || s.example.en.length > 1200 || !nonEmpty(s.example.ko) || s.example.ko.length > 1200) {
+              c.err(S, at + ' senses[' + j + '] 구조·순번·뜻·영한 예문이 올바르지 않음');
+            }
+          });
+        }
+      }
       /* 예문에 표제어가 안 보이면 예문 빈칸 문항이 만들어지지 않는다 — 굴절형까지 보므로 경고만 */
       if (w.example && nonEmpty(w.example.en) && nonEmpty(w.headword)) {
         var head = words1(w.headword).split(' ')[0];
