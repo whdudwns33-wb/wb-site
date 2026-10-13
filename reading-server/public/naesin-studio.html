@@ -394,6 +394,7 @@ function renderJob(){
   if(SEL&&!rows.some(r=>r.key===SEL))SEL=null;
   if(!SEL&&rows.length)SEL=rows[0].key;
   const meta=JOB.meta||{};
+  const rights=meta.rights||{};
   const done=(GATE.total||0)-(GATE.pending||0);
   const srcKinds=(JOB.sources||[]).map(s=>s.kind).filter((k,i,a)=>a.indexOf(k)===i);
   const kinds=Object.keys(JOB.draft||{});
@@ -428,7 +429,7 @@ function renderJob(){
     <div id="pubOut"></div>
   </div>
 
-  <div class="card"><h2>권리 근거 확인</h2><p class="muted">구매는 변환·학생 제공 권리를 뜻하지 않습니다. 자체 제작·공개 라이선스·학생 이용이 명시된 별도 계약만 선택하세요. 증빙은 운영자가 직접 확인해야 합니다. 권리 미확인 상태에서는 PC PDF 불러오기·AI 추출·배포가 차단되며, 이미 입력된 초안 열람과 수동 편집은 가능합니다.</p><label>근거 <select id="rBasis"><option value="">선택</option><option value="self_authored">자체 제작</option><option value="open_license">공개 라이선스</option><option value="licensed">별도 계약</option></select></label> 권리자 <input id="rHolder"> 증빙 참조 <input id="rEvidence"> 만료일 <input type="date" id="rExpiry"><br><label><input type="checkbox" id="rStudent"> 학생 이용 허용</label> <label><input type="checkbox" id="rDerivative"> 2차 제작 허용</label> <label><input type="checkbox" id="rAi"> 외부 AI 전송 허용</label> <button class="btn sm" id="btnRights">권리 확인 저장</button></div>
+  <div class="card"><h2>권리 근거 확인</h2><p class="muted">구매는 변환·학생 제공 권리를 뜻하지 않습니다. 자체 제작·공개 라이선스·학생 이용이 명시된 별도 계약만 선택하세요. 증빙은 운영자가 직접 확인해야 합니다. 권리 미확인 상태에서는 PC PDF 불러오기·AI 추출·배포가 차단되며, 이미 입력된 초안 열람과 수동 편집은 가능합니다.</p><label>근거 <select id="rBasis"><option value="">선택</option><option value="self_authored" ${rights.basis==='self_authored'?'selected':''}>자체 제작</option><option value="open_license" ${rights.basis==='open_license'?'selected':''}>공개 라이선스</option><option value="licensed" ${rights.basis==='licensed'?'selected':''}>별도 계약</option></select></label> 권리자 <input id="rHolder" value="${esc(rights.holder||'')}"> 증빙 참조 <input id="rEvidence" value="${esc(rights.evidenceRef||'')}"> 만료일 <input type="date" id="rExpiry" value="${esc(rights.expiresAt||'')}"><br><label><input type="checkbox" id="rStudent" ${rights.studentUseAllowed===true?'checked':''}> 학생 이용 허용</label> <label><input type="checkbox" id="rDerivative" ${rights.derivativeUseAllowed===true?'checked':''}> 2차 제작 허용</label> <label><input type="checkbox" id="rAi" ${rights.externalAiAllowed===true?'checked':''}> 외부 AI 전송 허용</label> <button class="btn sm" id="btnRights">권리 확인 저장</button></div>
   <div class="card"><h2>자료 준비</h2>
     <div id="exOut"></div>
     <p class="muted">이 PC에 준비된 자료를 불러오면 원본 PDF와 후보를 나란히 볼 수 있어요. 원본을 보고 오류를 수정한 뒤 승인하세요. 본문은 영어·한글 대응과 끊어읽기 뜻을 확인해야 합니다.</p>
