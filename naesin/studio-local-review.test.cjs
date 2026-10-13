@@ -137,7 +137,7 @@ function wordSection(ui,section,checked){const el=ui.node('#pdfWord'+section);el
     assert.equal(ui.requests.at(-1).cache,'no-store');assert.ok(!ui.requests.some(r=>r.url.includes('token')));
     assert.equal(ui.created.length,1);assert.equal(ui.get().PDF_VIEW.source,'03');assert.match(ui.node('#pdfPreview').innerHTML,/iframe[^>]*title="검수할 원본 PDF"[^>]*src="blob:own-1#page=1"/);
     assert.match(ui.node('#pdfPreview').innerHTML,/PDF 크게 보기/);assert.ok(ui.node('#srcText').hidden);
-    assert.match(ui.node('#pdfReviewOut').textContent,/기존 단어 74개와 검수를 유지/);
+    assert.match(ui.node('#pdfReviewOut').textContent,/검수용 배열 불러오기 완료: 단어 74개/);
   });
 
   await t('PC 원천을 다시 연결해도 같은 단어·본문 입력을 보존하며 새 후보의 뜻·섹션은 추정하지 않는다',async()=>{
@@ -244,7 +244,7 @@ function wordSection(ui,section,checked){const el=ui.node('#pdfWord'+section);el
     assert.equal(posted.draft.words[0].pos,'');assert.equal(posted.draft.words[1].pos,'n.');assert.equal(posted.draft.words[73].id,'w-0074');
     assert.deepEqual(posted.draft.words[0]._pdfReview.flags,['REVIEW_REQUIRED','SELF_WRITTEN_FLAG']);
     const body=JSON.stringify(posted);assert.ok(!/LOCAL_COLUMN|RAW_ROW_SENTINEL|RAW_TOKEN_SENTINEL|LOCAL_SOURCE_HASH|LOCAL_SOURCE_FILE|passageColumns|sourceRows/.test(body));
-    assert.equal(ui.get().PDF_LOCAL.columns.length,4);assert.match(ui.node('#pdfReviewOut').textContent,/74개.*4열/);
+    assert.equal(ui.get().PDF_LOCAL.columns.length,4);assert.match(ui.node('#pdfReviewOut').textContent,/검수용 배열 불러오기 완료: 단어 74개/);
     assert.match(ui.pdfColumnsHtml(),/&lt;script&gt;sentinel&lt;\/script&gt;/);assert.ok(!ui.pdfColumnsHtml().includes('<script>'));
   });
 
@@ -483,7 +483,7 @@ function wordSection(ui,section,checked){const el=ui.node('#pdfWord'+section);el
   await t('동일 PDF 초안의 본문 다시 열기는 단어·기존 검수를 재전송하지 않으며 다른 후보로 덮지 않는다',async()=>{
     const ui=screen();await loadPassage(ui);ui.get().JOB.review['words:w-0001']={state:'fixed',patch:{meaningKo:['검수 교정']},note:'보존할 메모'};
     const before=ui.requests.length;ui.setLocal(null);await loadPassage(ui);
-    assert.equal(ui.requests.length,before+1);assert.equal(ui.requests.at(-1).url,'/api/health');assert.match(ui.node('#pdfReviewOut').textContent,/기존 단어 74개와 검수를 유지/);
+    assert.equal(ui.requests.length,before+1);assert.equal(ui.requests.at(-1).url,'/api/health');assert.match(ui.node('#pdfReviewOut').textContent,/검수용 배열 불러오기 완료: 단어 74개/);
     assert.equal(ui.get().JOB.review['words:w-0001'].patch.meaningKo[0],'검수 교정');assert.equal(ui.get().PDF_LOCAL.columns.length,4);
     const own=passageDraft();own.wordCandidates[0].headCandidate='different-own-word';ui.node('#pdfReviewFile').files=[{text:async()=>JSON.stringify(own)}];
     const second=ui.requests.length;await ui.putPdfReviewFile();assert.equal(ui.requests.length,second+1);assert.match(ui.node('#pdfReviewOut').textContent,/별도 작업/);
@@ -710,10 +710,10 @@ function wordSection(ui,section,checked){const el=ui.node('#pdfWord'+section);el
 
   await t('원내 folder bundle 13문서 manifest·문장 위치와 검수 전용 후보를 변환하고 원본 쪽 버튼을 연다',async()=>{
     const ids=['00','01','02','03','04s','04t','05s','05t','06s','06t','07','08','09'];
-    const docs=ids.map((sourceDocumentId,i)=>({sourceDocumentId,role:'fixture-role',file:`${sourceDocumentId}_fixture.pdf`,sha256:String(i).padStart(64,'0'),bytes:10,pageCount:sourceDocumentId==='02'?31:26}));
+    const docs=ids.map((sourceDocumentId,i)=>({sourceDocumentId,role:'fixture-role',file:`${sourceDocumentId}_fixture.pdf`,sha256:String(i).padStart(64,'0'),bytes:10,pageCount:sourceDocumentId==='02'?31:sourceDocumentId==='01'?19:sourceDocumentId==='08'?26:['00','03'].includes(sourceDocumentId)?18:17}));
     const sentences=Array.from({length:25},(_,i)=>({seq:i+1,en:'Own sentence '+(i+1),ko:'자체 문장 '+(i+1),dayGroup:'8/1',sourceRefs:[{sourceDocumentId:'02',page:i<12?9:i<20?10:29,printedPage:i<12?9:i<20?10:29,section:'fixture',questionNo:i+1},{sourceDocumentId:'02',page:29,printedPage:29,section:'answer',questionNo:i+1}]}));
     const ref=(sourceDocumentId,page,section,extra={})=>({sourceDocumentId,page,printedPage:page,section,...extra});
-    const examItemCandidates=[{candidateId:'ic-04-00-001',source:'04',section:'PRE-STEP',patternNo:null,no:1,formatType:'multi-select',rawText:'1. Choose two answers.',choices:[{label:'①',text:'first'},{label:'②',text:'second'},{label:'③',text:'third'}],answerLabels:['①','③'],answerTexts:[],explanationKo:'',sourceRefs:[ref('04s',1,'problem',{questionNo:1,lineStart:1,lineEnd:2}),ref('04t',13,'answer-key-summary',{questionNo:1,lineStart:11,lineEnd:11})],reviewFlags:['REVIEW_REQUIRED']}];
+    const examItemCandidates=[{candidateId:'ic-04-00-001',source:'04',section:'PRE-STEP',patternNo:null,no:1,formatType:'multi-select',rawText:'1. Choose two answers. ①first ②second ③third',choices:[{label:'①',text:'first'},{label:'②',text:'second'},{label:'③',text:'third'}],answerLabels:['①','③'],answerTexts:[],explanationKo:'',sourceRefs:[ref('04s',1,'problem',{questionNo:1,lineStart:1,lineEnd:2}),ref('04t',13,'answer-key-summary',{questionNo:1,lineStart:11,lineEnd:11})],reviewFlags:['REVIEW_REQUIRED']}];
     const expectedByType={'04':{objective:41,subjective:23},'05':{objective:23,subjective:7},'06':{objective:23,subjective:7},'08':{objective:142,subjective:0},'09':{objective:0,subjective:163}};
     const itemSources={'04':64,'05':30,'06':30,'08':142,'09':163};
     const itemBySource=Object.fromEntries(Object.entries(itemSources).map(([source,expected])=>[source,{expected,found:source==='04'?1:0,answerMatched:source==='04'?1:0,unresolved:source==='08'?1:0,byType:{mcq:0,'multi-select':source==='04'?1:0,subjective:0,unknown:0},expectedByType:expectedByType[source],foundByType:{objective:source==='04'?1:0,subjective:0}}]));
@@ -749,8 +749,13 @@ function wordSection(ui,section,checked){const el=ui.node('#pdfWord'+section);el
       if(url.startsWith('/api/naesin/admin/job/local-pdf?id='))return pdfResponse();
       throw new Error('unexpected upload URL '+url);
     });
-    await uploadUi.putPdfReviewFile(true);await new Promise(r=>setImmediate(r));assert.deepEqual(Object.keys(postedDraft),['words']);assert.equal(postedDraft.words.length,74);
+    await uploadUi.putPdfReviewFile(true);await new Promise(r=>setImmediate(r));assert.deepEqual(Object.keys(postedDraft),['words','sentences','dialogues','functions','keyExpressions','patterns','items']);assert.equal(postedDraft.words.length,74);assert.equal(postedDraft.sentences.length,25);assert.match(uploadUi.node('#pdfReviewOut').textContent,/시험 문항 1\/429개/);assert.match(uploadUi.node('#pdfReviewOut').textContent,/원본 PDF 13개·248쪽, 미대응 1개 \(08 Pattern 2 #55\)/);assert.equal(postedDraft.items.length,1);assert.equal(postedDraft.items[0].no,1);assert.deepEqual(clone(postedDraft.items[0].answer),['1','3']);assert.deepEqual(clone(postedDraft.items[0].choices.map(c=>c.label)),['1','2','3']);assert.ok(postedDraft.items.every(r=>r._pdfReview.flags.includes('REVIEW_REQUIRED')));
     assert.equal(uploadUi.get().PDF_LOCAL.reviewCandidates.dialogueCandidates.length,1);assert.equal(uploadUi.get().PDF_LOCAL.reviewCandidates.examItemCandidates.length,1);assert.ok(!JSON.stringify(postedDraft).includes('sourceRefs'));assert.ok(!JSON.stringify(postedDraft).includes('examItemCandidates'));assert.match(uploadUi.pdfColumnsHtml(),/내용정리·문법워크북 검수 후보 4개/);assert.match(uploadUi.pdfColumnsHtml(),/시험 문항 후보 1\/429개/);
+    const preserved=job(),wordKey='words:w-0001';preserved.draft=clone(postedDraft);preserved.review[wordKey]={state:'fixed',patch:{meaningKo:['검수한 뜻']},note:'검수 유지'};
+    const keepUi=screen();keepUi.setStored(preserved);keepUi.set(preserved);keepUi.setFetch((url,opt)=>url==='/api/health'?response({localPdfReview:true}):url.startsWith('/api/naesin/admin/job/local-review?id=')?response({draft:folder,pdfs:docs.map(d=>({source:d.sourceDocumentId,file:d.file,pageCount:d.pageCount,sha256:d.sha256}))}):url.startsWith('/api/naesin/admin/job/local-pdf?id=')?pdfResponse():response({job:preserved,gate:gate(preserved),sources:{}}));
+    await keepUi.putPdfReviewFile(true);assert.ok(!keepUi.requests.some(r=>r.url==='/api/naesin/admin/job/draft'));assert.deepEqual(clone(keepUi.get().JOB.review[wordKey]),{state:'fixed',patch:{meaningKo:['검수한 뜻']},note:'검수 유지'});
+    const mismatch=clone(preserved);mismatch.draft.items[0].instructionKo='다른 후보 내용';const refuseUi=screen();refuseUi.setStored(mismatch);refuseUi.set(mismatch);refuseUi.setFetch((url)=>url==='/api/health'?response({localPdfReview:true}):url.startsWith('/api/naesin/admin/job/local-review?id=')?response({draft:folder,pdfs:docs.map(d=>({source:d.sourceDocumentId,file:d.file,pageCount:d.pageCount,sha256:d.sha256}))}):response({job:mismatch,gate:gate(mismatch),sources:{}}));
+    await refuseUi.putPdfReviewFile(true);assert.ok(!refuseUi.requests.some(r=>r.url==='/api/naesin/admin/job/draft'));assert.match(refuseUi.node('#pdfReviewOut').textContent,/현재 작업의 저장 문항 후보 내용이 달라요/);
   });
 
   await t('PDF 문장 메타는 일반 붙여넣기 경로와 경고 없는 일괄 승인을 통해 우회하지 않는다',async()=>{

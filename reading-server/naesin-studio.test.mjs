@@ -366,6 +366,17 @@ await t('PDF 본문 후보는 원내 PC만 받고 개별 대조 전에는 게시
   assert.ok(!JSON.stringify(published).includes('locations'));
 });
 
+await t('folder-v4 최종 배열은 미검토로 저장되고 publish payload에서 출처 메타를 제거하며 빈 청크는 보완 전 게시하지 않는다', async () => {
+  const s=memStore(),created=await call(s,'/api/naesin/admin/job','POST',{packId:SAMPLE.packId}),id=created.body.jobId;
+  const meta={flags:['REVIEW_REQUIRED'],locations:[{page:1,bbox:[0,0,0,0],sourceDocumentId:'01',printedPage:1,section:'fixture'}]};
+  const draft={dialogues:[{id:'d-own',title:'자체 대화',section:'A',lines:[{speaker:'G',en:'Hello.',ko:'안녕.'}],notes:[],_pdfReview:clone(meta)}],functions:[{name:'기능',pattern:'would like',explainKo:'원함',_pdfReview:clone(meta)}],keyExpressions:[{en:'Hello.',ko:'안녕.',blankAnswer:'Hello',_pdfReview:clone(meta)}],patterns:[{patternNo:1,title:'패턴',conceptKo:'개념',grammarPoint:[],textbookExamples:[],letsUseIt:[],notes:[],_pdfReview:clone(meta)}],items:[{no:1,footnoteNo:55,source:'08',section:'Pattern 1',formatType:'short',instructionKo:'Write the answer.',isNegative:false,answerCount:1,stimulus:{type:'text',parts:[]},choices:[],answer:['The original answer'],explanationKo:'',targetRefs:[{patternNo:1}],notes:[],_pdfReview:clone(meta)}]};
+  const saved=await call(s,'/api/naesin/admin/job/draft','POST',{jobId:id,draft},{localPdfReview:true});assert.equal(saved.status,200);assert.equal(saved.body.gate.pending,5);
+  const job=await s.getJob(id),pack=assemble(job);for(const kind of Object.keys(draft))assert.ok(!JSON.stringify(pack[kind]).includes('_pdfReview'));
+  const empty={seq:1,dayGroup:'1',en:'A toy is blue.',ko:'장난감이 파랗다.',chunks:[],keywords:[],tokens:[],verbForms:[],grammarChoices:[],writingKeywords:[],wordIds:[],grammarNotes:[],notes:[],_pdfReview:clone(meta)};
+  const second=await call(s,'/api/naesin/admin/job','POST',{packId:'own-empty-review'}),emptySaved=await call(s,'/api/naesin/admin/job/draft','POST',{jobId:second.body.jobId,draft:{sentences:[empty]}},{localPdfReview:true});assert.equal(emptySaved.status,200);
+  const emptyJob=await s.getJob(second.body.jobId);approveAll(emptyJob);assert.ok(publishGate(emptyJob).errors.some(e=>/PDF 본문/.test(e.message)));
+});
+
 await t('PDF 본문 필드·청크·좌표 오류는 기존 작업을 변경하지 않고 거절한다', async () => {
   const s = memStore();
   const cr = await call(s, '/api/naesin/admin/job', 'POST', { packId: SAMPLE.packId });
@@ -373,9 +384,9 @@ await t('PDF 본문 필드·청크·좌표 오류는 기존 작업을 변경하�
   await call(s, '/api/naesin/admin/job/draft', 'POST', { jobId: id, draft: { words: clone(SAMPLE.words) } });
   const job = await s.getJob(id); approveAll(job); const before = JSON.stringify(job);
   for (const mutate of [
-    (r) => { r.raw = '합성 원천'; }, (r) => { r.tokens = []; }, (r) => { r.seq = 0; }, (r) => { r.seq = '1'; },
+    (r) => { r.raw = '합성 원천'; }, (r) => { r.tokens = 'invalid'; }, (r) => { r.seq = 0; }, (r) => { r.seq = '1'; },
     (r) => { r.dayGroup = ''; }, (r) => { r.en = ' '; }, (r) => { r.ko = []; },
-    (r) => { r.chunks = []; }, (r) => { r.chunks[0].raw = '합성'; }, (r) => { r.chunks[0].ko = ''; },
+    (r) => { r.chunks = [{ en: '', ko: '' }]; }, (r) => { r.chunks[0].raw = '합성'; }, (r) => { r.chunks[0].ko = ''; },
     (r) => { r.chunks[0].en = 'Different'; }, (r) => { r._pdfReview.locations[0].bbox[1] = -1; },
     (r) => { r._pdfReview.locations[0].page = 0; }, (r) => { r._pdfReview.rawText = '합성'; },
     (r) => { r.keywords = 'blue'; }, (r) => { r.keywords = null; }, (r) => { r.keywords = [null]; },

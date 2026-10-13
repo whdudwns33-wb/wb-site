@@ -48,8 +48,13 @@ const strMax = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : '')
 const arrayKeyOf = (kind) => (kind === 'items' ? 'items' : kind);
 const DRAFT_KINDS = CHECK.PACK_ARRAYS;
 const PDF_ROW_KEYS = {
-  words: ['id', 'headword', 'pos', 'meaningKo', 'sections', '_pdfReview'],
-  sentences: ['seq', 'dayGroup', 'en', 'ko', 'chunks', 'keywords', '_pdfReview'],
+  words: ['id', 'headword', 'pos', 'meaningKo', 'sections', 'irregularForms', 'notes', '_pdfReview'],
+  sentences: ['seq', 'dayGroup', 'dayHeaderEn', 'dayHeaderKo', 'en', 'ko', 'chunks', 'keywords', 'tokens', 'verbForms', 'grammarChoices', 'writingKeywords', 'wordIds', 'grammarNotes', 'notes', '_pdfReview'],
+  dialogues: ['id', 'title', 'section', 'lines', 'notes', '_pdfReview'],
+  functions: ['name', 'pattern', 'explainKo', '_pdfReview'],
+  keyExpressions: ['en', 'ko', 'blankAnswer', '_pdfReview'],
+  patterns: ['patternNo', 'title', 'conceptKo', 'grammarPoint', 'textbookExamples', 'letsUseIt', 'notes', '_pdfReview'],
+  items: ['no', 'footnoteNo', 'source', 'section', 'formatType', 'instructionKo', 'isNegative', 'answerCount', 'stimulus', 'choices', 'answer', 'explanationKo', 'targetRefs', 'notes', '_pdfReview'],
 };
 const ownKeys = (v, keys) => isObj(v) && Object.keys(v).every((k) => keys.includes(k));
 function validPdfReview(v) {
@@ -64,14 +69,20 @@ function validPdfReview(v) {
       && (loc.section === undefined || loc.section === null || typeof loc.section === 'string' && loc.section.length <= 120)
       && (loc.questionNo === undefined || loc.questionNo === null || Number.isInteger(loc.questionNo) && loc.questionNo > 0));
 }
-function validPdfSentence(row) {
+function validPdfSentence(row, allowUnresolved = false) {
+  const emptyChunks = Array.isArray(row && row.chunks) && row.chunks.length === 0;
   return isObj(row) && Number.isInteger(row.seq) && row.seq > 0
     && ['dayGroup', 'en', 'ko'].every((k) => CHECK.nonEmpty(row[k]))
-    && Array.isArray(row.chunks) && row.chunks.length >= 1
+    && Array.isArray(row.chunks) && (row.chunks.length >= 1 || (allowUnresolved && emptyChunks && row._pdfReview))
     && row.chunks.every((chunk) => ownKeys(chunk, ['en', 'ko']) && CHECK.nonEmpty(chunk.en) && CHECK.nonEmpty(chunk.ko))
+    && ['dayHeaderEn', 'dayHeaderKo'].every((k) => row[k] === undefined || typeof row[k] === 'string')
     && (row.keywords === undefined || (Array.isArray(row.keywords)
       && row.keywords.every((kw) => ownKeys(kw, ['en', 'ko']) && CHECK.nonEmpty(kw.en) && CHECK.nonEmpty(kw.ko))))
-    && CHECK.flat(row.chunks.map((chunk) => chunk.en).join(' ')) === CHECK.flat(row.en);
+    && ['tokens', 'writingKeywords', 'wordIds', 'notes'].every((k) => row[k] === undefined || (Array.isArray(row[k]) && row[k].every((v) => typeof v === 'string')))
+    && (row.verbForms === undefined || (Array.isArray(row.verbForms) && row.verbForms.every((v) => ownKeys(v, ['base', 'answer']) && typeof v.base === 'string' && typeof v.answer === 'string')))
+    && (row.grammarChoices === undefined || (Array.isArray(row.grammarChoices) && row.grammarChoices.every((v) => ownKeys(v, ['options', 'answerIdx']) && Array.isArray(v.options) && v.options.every((x) => typeof x === 'string') && Number.isInteger(v.answerIdx))))
+    && (row.grammarNotes === undefined || (Array.isArray(row.grammarNotes) && row.grammarNotes.every((v) => ownKeys(v, ['target', 'note']) && typeof v.target === 'string' && typeof v.note === 'string')))
+    && (emptyChunks || CHECK.flat(row.chunks.map((chunk) => chunk.en).join(' ')) === CHECK.flat(row.en));
 }
 
 export function newJobId(rnd) {
@@ -405,7 +416,7 @@ export async function handleStudio(ctx) {
         if (!Object.prototype.hasOwnProperty.call(row, '_pdfReview')) continue;
         if (ctx.localPdfReview !== true) return j(403, { error: 'PDF 후보는 원내 PC에서만 검수할 수 있어요.' });
         if (!PDF_ROW_KEYS[k] || !ownKeys(row, PDF_ROW_KEYS[k]) || !validPdfReview(row._pdfReview)
-          || (k === 'sentences' && !validPdfSentence(row)))
+          || (k === 'sentences' && !validPdfSentence(row, true)))
           return j(400, { error: 'PDF 후보의 필드·위치 정보가 올바르지 않아요.' });
       }
       const keys = rowKeyCounts(k, v);
