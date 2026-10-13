@@ -87,6 +87,7 @@ import { handleRoster } from './roster.js';
 import { handleStudentChange } from './student-change.js';
 import { handleAdminDirective } from './admin-directive.js';
 import { handleTeacherLiveRequest } from './teacher-live-request.js';
+import { handleTaskPush, dispatchTaskPush } from './task-push.js';
 import { handleTuitionAlert, handleStudentAttendance } from './tuition-alert.js';
 import { handleBookIssue } from './book-issue.js';
 import { handleBookCatalog } from './completed-book-catalog.js';
@@ -3284,15 +3285,28 @@ export default {
         if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
         return await handleStudentChange(env, app, body, okOrigin, auth, json);
       }
+      if (url.pathname === '/task-push') {
+        const auth = await resolveAuth(env, app, body.auth);
+        if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+        return await handleTaskPush(env, app, body, okOrigin, auth, json);
+      }
       if (url.pathname === '/admin-directive') {
         const auth = await resolveAuth(env, app, body.auth);
         if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
-        return await handleAdminDirective(env, app, body, okOrigin, auth, json);
+        const response = await handleAdminDirective(env, app, body, okOrigin, auth, json);
+        if (response.ok && body.action === 'save' && ctx?.waitUntil) {
+          ctx.waitUntil(dispatchTaskPush(env).catch(() => {}));
+        }
+        return response;
       }
       if (url.pathname === '/teacher-live-request') {
         const auth = await resolveAuth(env, app, body.auth);
         if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
-        return await handleTeacherLiveRequest(env, app, body, okOrigin, auth, json);
+        const response = await handleTeacherLiveRequest(env, app, body, okOrigin, auth, json);
+        if (response.ok && body.action === 'send' && ctx?.waitUntil) {
+          ctx.waitUntil(dispatchTaskPush(env).catch(() => {}));
+        }
+        return response;
       }
       if (url.pathname === '/tuition-alert') {
         const auth = await resolveAuth(env, app, body.auth);

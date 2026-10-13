@@ -31,7 +31,8 @@ if (!missing.length) {
     names.forEach(n => {
       const fresh = fs.readFileSync(path.join(tmp, n), 'utf8');
       const kept = fs.readFileSync(path.join(DIR, n), 'utf8');
-      if (fresh !== kept) E(`${n} 이 articles.json 과 어긋납니다 — node reading/build-split.mjs 를 실행하고 커밋하세요`);
+      // Git의 Windows 줄바꿈 변환은 데이터 변경이 아니다. JSON 내용·서식 검사는 유지한다.
+      if (fresh.replace(/\r\n/g, '\n') !== kept.replace(/\r\n/g, '\n')) E(`${n} 이 articles.json 과 어긋납니다 — node reading/build-split.mjs 를 실행하고 커밋하세요`);
     });
   } finally {
     fs.rmSync(tmp, { recursive: true, force: true });

@@ -98,7 +98,7 @@ function isLesson(task) {
 
 function isSubscriptionSession(task) {
   return !!(task && !task.deleted && String(task.lessonInstanceType || '') === 'subscription' &&
-    ['assessment', 'studyforce'].includes(String(task.subscriptionType || '')) &&
+    ['assessment', 'studyforce', 'readers'].includes(String(task.subscriptionType || '')) &&
     String(task.repeat || '') === 'once' && validDate(String(task.start || '')));
 }
 
