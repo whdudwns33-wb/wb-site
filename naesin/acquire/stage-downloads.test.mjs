@@ -218,3 +218,55 @@ test('publisherLabel required for every batch; missing suggested publisher canno
   const g=await fixture(t);await g.add(titles[0]);
   delete g.input.scope.publisherLabel;g.input.scope.sourcePublisherLabel='NE능률(김기택)';await noWrite(g);
 });
+
+const revisionSuffixes = [
+  '_(20260219수정)', '  _ ( 20260219 수정 )  ',
+  '_(20260219수정) (1)', '_(20260219수정)(2)',
+  ' (1)_(20260219수정)', '(2)  _ (20260219수정)  '
+];
+test('verified revision suffix handles integrated, grammar 07/08, textbook and both duplicate orders',()=>{
+  for(const [title,index] of [[titles[2],2],[titles[10],10],[titles[11],11],[titles[0],0]]) {
+    for(const suffix of revisionSuffixes) {
+      const r=classifyDownload(prefix+title+suffix+'.pdf');
+      assert.deepEqual(r,{filename:NAMES[index],stage:null});
+    }
+  }
+  assert.equal(classifyDownload(prefix+titles[10]+'_(20260526수정).pdf').filename,NAMES[10]);
+});
+test('revision stage1/10 classification preserves exact raw name with either duplicate order',()=>{
+  for(const n of [1,10])for(const suffix of revisionSuffixes) {
+    const name=prefix+'본문10단계 워크북 '+n+' 본문영작_단계별'+suffix+'.pdf';
+    assert.deepEqual(classifyDownload(name),{filename:'_raw/'+name,stage:n});
+  }
+});
+test('synthetic revision staging keeps suggested names and raw basenames byte-for-byte',async t=>{
+  const f=await fixture(t);
+  for(const title of [titles[2],titles[10],titles[11],titles[0]])await f.add(title+'_(20260219수정) (1)');
+  for(const n of [1,10])for(const suffix of revisionSuffixes)await f.add('본문10단계 워크북 '+n+' 본문영작_단계별'+suffix);
+  const originals=await Promise.all(f.input.files.map(e=>fs.readFile(e.src)));
+  const result=await stageDownloads(f.input,f.options);
+  assert.equal(result.status,'complete');assert.ok(result.files.every(e=>e.outcome==='copied'));
+  const receipt=JSON.parse(await fs.readFile(path.join(f.root,result.receipt)));
+  for(let i=0;i<f.input.files.length;i++) {
+    const source=f.input.files[i],record=receipt.files[i];
+    assert.equal(record.suggestedFilename,source.suggestedFilename);
+    assert.equal(record.sourceName,path.basename(source.src));
+    if(i>=4)assert.equal(record.destination,scope.folderName+'/_raw/'+source.suggestedFilename);
+    assert.deepEqual(await fs.readFile(path.join(f.root,record.destination)),originals[i]);
+    assert.deepEqual(await fs.readFile(source.src),originals[i]);
+  }
+  assert.deepEqual((await fs.readdir(path.join(f.root,scope.folderName,'_raw'))).sort(),f.input.files.slice(4).map(e=>e.suggestedFilename).sort());
+});
+test('malformed revisions and arbitrary parentheses are rejected with zero preflight writes',async t=>{
+  const malformed=['_(2026021수정)','_(202602190수정)','_(2026A219수정)',
+    '_(2026 0219수정)','_(20260219정정)','_(20260219수정본)','_(20260219)',
+    '_(수정)','(20260219수정)','_(20260219수정','_(20260219수정) tail',
+    '_(20260219수정)_(20260526수정)','_(임의 괄호)'];
+  const checkedTitles=[titles[2],titles[10],titles[11],titles[0],'본문10단계 워크북 1 본문_단계별','본문10단계 워크북 10 본문_단계별'];
+  for(const suffix of malformed) {
+    for(const title of checkedTitles)for(const withDuplicate of [suffix,suffix+' (1)',' (2)'+suffix]) {
+      assert.throws(()=>classifyDownload(prefix+title+withDuplicate+'.pdf'),/Unclassified/);
+    }
+    const f=await fixture(t);await f.add(titles[0]);await f.add(titles[2]+suffix);await noWrite(f);
+  }
+});
