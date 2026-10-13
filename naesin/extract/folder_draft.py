@@ -348,7 +348,7 @@ EXAM_CONTRACTS=[
 QUESTION_MARKER_RE=re.compile(r'(?<!\d)(\d{1,3})\.\s*')
 ANSWER_MARKER_RE=re.compile(r'(?<![\d(])(\d{1,3})\)\s*')
 SUMMARY_ANSWER_RE=re.compile(r'(?<![\d(])(\d{1,3})\.\s*(주관식|[①②③④⑤](?:\s*[,，]\s*[①②③④⑤])*)')
-PAGE_BOILERPLATE_RE=re.compile(r'^\s*(?:NE능률\(김기택\).*|Lesson\s*6\s*Answer Key.*|중2(?:\s+정답)?|교사용|-\s*\d+\s*-|Pattern\s*[12]\b.*|PATTERN\s*[12]\b.*|Grammar Build Up.*|정답 및 해설.*|본 콘텐츠는 해당 출판사.*|이그잼포유에서 제작.*|무단 전재하거나 배포.*|을 물을 수 있습니다.*|저작권 침해 행위 또한 금지.*)\s*$',re.I)
+PAGE_BOILERPLATE_RE=re.compile(r'^\s*(?:중2\s+NE능률\(김기택\)\s+6과\s+예상문제.*|NE능률\(김기택\).*|Lesson\s*6\s*Answer Key.*|중2(?:\s+정답)?|교사용|-\s*\d+\s*-|Pattern\s*[12]\b.*|PATTERN\s*[12]\b.*|Grammar Build Up.*|정답 및 해설.*|본 콘텐츠는 해당 출판사.*|이그잼포유에서 제작.*|무단 전재하거나 배포.*|을 물을 수 있습니다.*|저작권 침해 행위 또한 금지.*)\s*$',re.I)
 EXAM_SECTION_BOILERPLATE_RE=re.compile(r'^\s*(?:중2\s+NE능률\(김기택\)\s+Lesson\s*6|PRE-STEP(?:\s+\d+)?|실전편|(?:본문|어휘|의사소통|대화문)\s*[┃|]\s*(?:객관식|주관식)\s*[┃|]?)\s*$',re.I)
 CONTEXT_MARKER_046_RE=re.compile(r'^\s*v\s+(?=(?:다음\s*(?:대화|글|지문|내용|문장|그림|표)|Read\s+(?:the\s+)?(?:following|next)\s+(?:dialogue|passage|text)|Look\s+at\s+(?:the\s+)?(?:following\s+)?(?:dialogue|passage|picture)))',re.I)
 CONTEXT_MARKER_09_RE=re.compile(r'^\s*n\s+(?=(?:다음\b|What\s+did\b|Look\s+at\b|Rewrite\b|Fill\b|Complete\b|Choose\b|Use\b|Put\b|Read\b|The\s+following\b))',re.I)
@@ -397,6 +397,10 @@ def exam_refs(source_id,section,lines,question_no=None):
    group={'page':key[0],'start':key[1],'end':key[1]}
  if group:refs.append(candidate_ref(source_id,group['page'],section,line_start=group['start'],line_end=group['end'],question_no=question_no))
  return refs
+
+def exam_span_refs(source_id,rows,offsets,start,end,section,question_no=None):
+ used=[row for row,piece in exam_span_rows(rows,offsets,start,end) if piece.strip()]
+ return exam_refs(source_id,section,used,question_no)
 
 def exam_context_markers(source_id,pattern_no,rows,offsets):
  markers=[]
@@ -496,16 +500,57 @@ def summary_exam_answers(source,page_no,max_no):
   out[no]={'type':'subjective' if token=='주관식' else ('multi-select' if len(labels)>1 else 'mcq'),'answerLabels':labels,'answerTexts':[],'explanationKo':'','refs':[candidate_ref(source['id'],line['page'],'answer-key-summary',line_start=line['line'],line_end=line['line'],question_no=no)]}
  return out
 
+def explicit_page_continuation(text,rows,offsets,start,end,start_page):
+ end_line=exam_line_at(rows,offsets,max(start,end-1))
+ if end_line['page']!=start_page: return None
+ footer=any(row['page']==start_page and row_start>=start and row_start<end and PAGE_BOILERPLATE_RE.match(row['text']) for row,row_start in zip(rows,offsets))
+ if not footer: return None
+ next_page=start_page+1; seen_content=False; continuation_start=None; continuation_end_line=None
+ for row,row_start in zip(rows,offsets):
+  if row['page']!=next_page: continue
+  line=row['text']
+  if PAGE_BOILERPLATE_RE.match(line) or not line.strip(): continue
+  stop=bool(re.match(r'^\s*(?:오답\b|제시문\b|질문\b|요약문\b|해설\b|정답 및 해설\b|\d{1,3}[.)]\s*)',line))
+  if stop:
+   if seen_content:
+    return {'startOffset':continuation_start,'endOffset':row_start,'startPage':next_page,'endPage':next_page,'endLine':continuation_end_line,'text':text[continuation_start:row_start]}
+   return None
+  if continuation_start is None: continuation_start=row_start
+  seen_content=True; continuation_end_line=row['line']
+ return None
+
 def answer_detail_records(source,p1,p2,max_no,marker_pattern=ANSWER_MARKER_RE):
  text,rows,offsets=exam_stream(source,p1,p2); markers=list(marker_pattern.finditer(text)); records=[]
  for i,m in enumerate(markers):
   no=int(m.group(1))
   if not 1<=no<=max_no: continue
   end=markers[i+1].start() if i+1<len(markers) else len(text)
-  tail=text[m.end():end].strip()
   line=exam_line_at(rows,offsets,m.start())
-  records.append({'no':no,'tail':tail,'page':line['page'],'line':line['line'],'endPage':exam_line_at(rows,offsets,max(m.start(),end-1))['page']})
+  continuation=explicit_page_continuation(text,rows,offsets,m.start(),end,line['page'])
+  tail=text[m.end():end]
+  end_line=exam_line_at(rows,offsets,max(m.start(),end-1))
+  if continuation: tail+='\n'+continuation['text']
+  records.append({'no':no,'tail':tail.strip(),'page':line['page'],'line':line['line'],'endPage':continuation['endPage'] if continuation else end_line['page'],'endLine':continuation['endLine'] if continuation else end_line['line'],'startOffset':m.start(),'markerEnd':m.end(),'tailStart':m.end(),'endOffset':end,'continuation':continuation,'rows':rows,'offsets':offsets})
  return records
+
+def answer_detail_continuation_refs(source_id,record,question_no,section='answer-explanation'):
+ rows=record['rows']; offsets=record['offsets']; start=record['startOffset']; end=record['endOffset']
+ continuation=record.get('continuation')
+ if not continuation and record['endPage']<=record['page']: return []
+ crossed=[row for row,row_start in zip(rows,offsets) if row['page']==record['page'] and row_start+len(row['text'])>start and row_start<end]
+ if not any(PAGE_BOILERPLATE_RE.match(row['text']) for row in crossed): return []
+ spans=[(start,end)]
+ if continuation: spans.append((continuation['startOffset'],continuation['endOffset']))
+ used=[]
+ for span_start,span_end in spans:
+  for row,row_start in zip(rows,offsets):
+   row_end=row_start+len(row['text'])
+   if row_end<=span_start or row_start>=span_end: continue
+   if re.match(r'^\s*(?::|제시문\b|질문\b|요약문\b|오답\b|해설\b|정답 및 해설\b)',row['text']): break
+   if PAGE_BOILERPLATE_RE.match(row['text']): continue
+   if row['text'].strip(): used.append(row)
+ if not any(row['page']>record['page'] for row in used): return []
+ return exam_refs(source_id,section,used,question_no)
 
 def clean_answer_text(value,normalize_wrapped_hangul=False):
  out=[]
@@ -528,7 +573,12 @@ def build_exam_answer_map(source,contract):
     if re.match(r'^[①②③④⑤](?:\s*[,，]\s*[①②③④⑤])*\s*:?',tail):
      colon=tail.find(':'); explanation=tail[colon+1:].strip() if colon>=0 else ''
      if explanation: row['explanationKo']=clean_answer_text(explanation,normalize_wrapped_hangul=True)
-     row['refs'].append(candidate_ref(source['id'],record['page'],'answer-explanation',line_start=record['line'],line_end=record['line'],question_no=no))
+     continuation_refs=answer_detail_continuation_refs(source['id'],record,no)
+     if continuation_refs:
+      row['refs']=[ref for ref in row['refs'] if not (ref.get('section')=='answer-explanation' and ref.get('questionNo')==no)]
+      row['refs'].extend(continuation_refs)
+     else:
+      row['refs'].append(candidate_ref(source['id'],record['page'],'answer-explanation',line_start=record['line'],line_end=record['line'],question_no=no))
     elif row['type']=='subjective':
      answer=clean_answer_text(tail)
      if answer and not re.fullmatch(r'주관식|[①②③④⑤](?:\s*[,，]\s*[①②③④⑤])*',answer):
@@ -555,14 +605,17 @@ def build_exam_answer_map(source,contract):
    if no!=expected or no>pattern_max[pattern_no]: continue
    line=exam_line_at(rows,offsets,m.start()); accepted.append({'no':no,'start':m.start(),'end':m.end(),'page':line['page'],'line':line['line']});expected+=1
   for i,marker in enumerate(accepted):
-   end=accepted[i+1]['start'] if i+1<len(accepted) else len(text); tail=text[marker['end']:end].strip()
+   end=accepted[i+1]['start'] if i+1<len(accepted) else len(text)
+   end_line=exam_line_at(rows,offsets,max(marker['start'],end-1))
+   marker['endOffset']=end; marker['endPage']=end_line['page']; marker['endLine']=end_line['line']
+   tail=text[marker['end']:end].strip()
    labels=[]; explanation=''; answer_text=''
    match=re.match(r'\s*([①②③④⑤](?:\s*[,，]\s*[①②③④⑤])*)',tail)
    if match:
     labels=re.findall(r'[①②③④⑤]',match.group(1)); rest=tail[match.end():]
     colon=rest.find(':'); explanation=clean_answer_text(rest[colon+1:],normalize_wrapped_hangul=True) if colon>=0 else ''
    else: answer_text=clean_answer_text(tail)
-   refs=[candidate_ref(source['id'],marker['page'],'answer-key',line_start=marker['line'],line_end=marker['line'],question_no=marker['no'])]
+   refs=exam_span_refs(source['id'],rows,offsets,marker['start'],end,'answer-key',marker['no'])
    out[(pattern_no,marker['no'])]={'type':'mcq' if contract['source']=='08' else 'subjective','answerLabels':labels,'answerTexts':[answer_text] if answer_text else [],'explanationKo':explanation,'refs':refs}
  return out
 
