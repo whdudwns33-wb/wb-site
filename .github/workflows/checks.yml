@@ -34,7 +34,33 @@ jobs:
       - name: 전체 테스트
         run: node scripts/check.mjs
 
-      # 워커가 실제로 번들되는지 — 배포 직전에야 알게 되는 실패를 여기서 잡는다. 시크릿 불필요.
-      - name: 워커 번들 점검 (dry-run)
+      # 배포와 같은 자산을 만든 뒤 번들한다. dry-run 은 시크릿·원격 DB 없이 돈다.
+      - name: 진로독서 워커 번들 점검 (dry-run)
         working-directory: reading-server
-        run: npx --yes --prefer-offline $WRANGLER deploy --dry-run --outdir=/tmp/wb-bundle
+        run: |
+          node build-dist.mjs
+          npx --yes --prefer-offline $WRANGLER deploy --dry-run --outdir=/tmp/wb-bundle
+          if grep -l 'node:' /tmp/wb-bundle/*.js; then
+            echo "::error::워커 번들에 node: 내장 모듈이 남아 있습니다 — Cloudflare 에서 로드되지 않습니다"
+            exit 1
+          fi
+
+      - name: 프로그램데스크 워커 번들 점검 (dry-run)
+        working-directory: desk
+        run: |
+          node build.mjs
+          npx --yes --prefer-offline $WRANGLER deploy --dry-run --outdir=/tmp/wb-desk-bundle
+          if grep -l 'node:' /tmp/wb-desk-bundle/*.js; then
+            echo "::error::워커 번들에 node: 내장 모듈이 남아 있습니다 — Cloudflare 에서 로드되지 않습니다"
+            exit 1
+          fi
+
+      - name: 세일즈데스크 워커 번들 점검 (dry-run)
+        working-directory: crm
+        run: |
+          node build.mjs
+          npx --yes --prefer-offline $WRANGLER deploy --dry-run --outdir=/tmp/wb-crm-bundle
+          if grep -l 'node:' /tmp/wb-crm-bundle/*.js; then
+            echo "::error::워커 번들에 node: 내장 모듈이 남아 있습니다 — Cloudflare 에서 로드되지 않습니다"
+            exit 1
+          fi

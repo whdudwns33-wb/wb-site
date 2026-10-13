@@ -209,6 +209,19 @@ await t('학생은 오버레이를 내 것 → 반 공통 순으로 받는다', 
   assert.strictEqual(mine.body.overlay.overrides[0].answers[0], '내것');
 });
 
+await t('관리 오버레이 조회는 미등록과 등록된 빈 값을 구분해 학생 폴백을 그대로 따른다', async () => {
+  const s = memStore();
+  await s.putOverlay('default', { notes: [{ workId: 'w-1', text: '공통 강조' }] });
+  const options = { path: '/api/naesin-ko/admin/overlay', who: ADMIN, query: new URLSearchParams('scope=st-1') };
+  assert.strictEqual((await call(s, options)).body.found, false);
+  assert.strictEqual((await call(s, { path: '/api/naesin-ko/overlay' })).body.scope, 'default');
+  await s.putOverlay('st-1', {});
+  assert.strictEqual((await call(s, options)).body.found, true);
+  const student = await call(s, { path: '/api/naesin-ko/overlay' });
+  assert.strictEqual(student.body.scope, 'student');
+  assert.deepStrictEqual(student.body.overlay, {});
+});
+
 await t('수업 과제는 유형이 하나 이상이어야 하고 없는 팩은 거절한다', async () => {
   const s = memStore();
   const noType = await call(s, { path: '/api/naesin-ko/admin/task', method: 'POST', who: ADMIN,

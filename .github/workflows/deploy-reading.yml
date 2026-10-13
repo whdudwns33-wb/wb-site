@@ -44,8 +44,16 @@ jobs:
         run: node reading/back-nav.test.cjs
       - name: 두 학생 앱 사이 이동 검증
         run: node reading/app-links.test.cjs
+      - name: 관리 전용 서버 학생·가족 차단 테스트
+        run: node reading-server/admin-only.test.mjs
+      - name: 워커 요청 몸통 스트림 상한 테스트
+        run: node reading-server/worker-body.test.mjs
       - name: 공통 음성 모듈 테스트
         run: node shared/voice.test.cjs
+      - name: 앱별 오프라인 캐시 격리 테스트
+        run: node shared/sw-cache.test.cjs
+      - name: 로컬 데이터 보존·백업 테스트
+        run: node reading-server/store.test.mjs
       - name: QR 인코더 테스트
         run: node shared/qr.test.cjs
       - name: 워드브레인 엔진·데이터 테스트
@@ -129,6 +137,12 @@ jobs:
         run: node naesin-ko/concepts.test.cjs
       - name: 국어브레인 준비도 테스트
         run: node naesin-ko/readiness.test.cjs
+      - name: 국어브레인 공용 렌더러 테스트
+        run: node naesin-ko/render.test.cjs
+      - name: 국어브레인 관리 화면 테스트
+        run: node naesin-ko/admin.test.cjs
+      - name: 국어브레인 학생 기기 청소 테스트
+        run: node naesin-ko/device-cleanup.test.cjs
       - name: 국어브레인 추출 공용층 테스트
         run: node naesin-ko/extract/spans-util.test.mjs
       - name: 국어브레인 이해완성 추출기 테스트

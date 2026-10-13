@@ -8,15 +8,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { load, persist, getDb, listBackups, getBackup, snapshotNow, naesinSnapshot } from './store.mjs';
+import { load, persist, getDb, listBackups, getBackup, snapshotNow, snapshotBody } from './store.mjs';
 import { handleVocab, sendNightPushes, vocabSummary } from './vocab-api.mjs';
 import { handleNaesin, isReservedCode, dropReservedRows, naesinBodyLimit } from './naesin-api.mjs';
 import { handleStudio } from './naesin-studio.mjs';
-import { handleHaru, haruBodyLimit, allowedApp, appOfPath, dropStudentHaru, dumpHaru } from './haru-api.mjs';
+import { handleHaru, haruBodyLimit, allowedApp, appOfPath, dropStudentHaru } from './haru-api.mjs';
 import { handleNaesinKo, naesinKoBodyLimit } from './naesin-ko-api.mjs';
-import { handleHanja, hanjaBodyLimit, dropStudentHanja, dumpHanja } from './hanja-api.mjs';
+import { handleHanja, hanjaBodyLimit, dropStudentHanja } from './hanja-api.mjs';
 import { handleChunk, dropStudentChunk } from './chunk-api.mjs';
-import { handleLetter, letterBodyLimit, dropStudentLetter, dumpLetter, pushDueIssues } from './letter-api.mjs';
+import { handleLetter, letterBodyLimit, dropStudentLetter, pushDueIssues } from './letter-api.mjs';
 import { checkAdminLogin } from './admin-auth.mjs';
 import { applySecurityHeaders } from './sec-headers.mjs';
 import { handlePortalFamilyLink, PORTAL_LINK_BODY_LIMIT, withPortalFamilies } from './portal-family.mjs';
@@ -52,9 +52,10 @@ const TOKEN_TTL = 1000 * 60 * 60 * 24 * 30;            // 30일
 /* 관리 전용 모드 — 이 서버를 터널·포트포워딩으로 외부에 열 때 쓴다(docs/로컬-서버-외부공개-터널.md §1-A).
    학생 기록의 정본은 운영 워커의 KV 다. 이 서버는 db.json 이라 둘은 섞이지 않는데, 학생이 어쩌다
    외부 주소를 열어 로그인하면 그 순간부터 같은 학생의 진도가 두 곳에 따로 쌓인다 — 되돌리기 어렵다.
-   토큰은 서명이 아니라 각 저장소에 든 난수라, 토큰 발급 자리만 닫으면 로컬에 학생 기록이 생길 길이 없다.
+   이전 원내 모드에서 받은 학생 토큰·가족 링크도 이 모드에서는 사용할 수 없다.
    관리 로그인과 관리 화면이 쓰는 공용 모듈(/naesin/gen.js 등)은 그대로 둔다 — 막으면 관리 웹이 깨진다. */
 const ADMIN_ONLY = /^(1|true|yes|on)$/i.test(process.env.WB_ADMIN_ONLY || '');
+const HOST = process.env.HOST || (ADMIN_ONLY ? '127.0.0.1' : '0.0.0.0');
 
 load();
 const db = getDb();
@@ -503,6 +504,15 @@ const server = http.createServer(async (req, res) => {
          키를 넣으면 다음 접속부터 버튼이 저절로 돌아온다. 값이 아니라 있고 없음만 알린다. */
       if (p === '/api/health') return json(res, 200, { ok: true, service: 'wb-reading', time: nowIso(), ai: !!process.env.ANTHROPIC_API_KEY });
 
+      /* 기존 가족 링크·서비스 키도 로컬 학생 기록을 만들 수 있다. 인증 전 경로까지 함께 닫는다.
+         발행 상태 지도·128비트 사진 주소는 관리 화면의 정적 보조자료라 그대로 둔다. */
+      if (ADMIN_ONLY && (p === '/api/login' || p === '/api/login/status' || p.startsWith('/api/parent/')
+          || p === '/api/haru/parent' || p === '/api/chunk/parent' || p.startsWith('/api/chunk/parent/')
+          || p === '/api/letter/parent' || p.startsWith('/api/letter/parent/') || p === '/api/portal/family-link')) {
+        req.resume();
+        return json(res, 403, { error: '이 주소는 관리 전용이에요. 학생·가족 앱은 학원에서 안내한 주소를 쓰세요.' });
+      }
+
       if (p === '/api/portal/family-link') {
         const out = await handlePortalFamilyLink({ method: req.method,
           authorization: req.headers.authorization, secret: process.env.WB_PARENT_PORTAL_LINK_SECRET,
@@ -519,13 +529,6 @@ const server = http.createServer(async (req, res) => {
         const stu = code && db.students[code];
         if (!stu) return json(res, 404, { error: '유효하지 않은 링크예요. 학원에 문의해 주세요.' });
         return json(res, 200, parentSummary(stu, db.states[code] || null, vocabStore.getState(code), vocabStore.getAssign(code)));
-      }
-
-      /* 관리 전용 모드에서는 학생 토큰을 내주지 않는다. 두 자리를 함께 닫는다 —
-         /api/login 이 연동 요청을 만들고, 토큰이 실제로 나가는 곳은 /api/login/status 다.
-         하나만 닫으면 남아 있던 nonce 로 토큰이 한 번 더 나갈 수 있다. */
-      if (ADMIN_ONLY && (p === '/api/login' || p === '/api/login/status')) {
-        return json(res, 403, { error: '이 주소는 관리 전용이에요. 학생 앱은 학원에서 안내한 주소를 쓰세요.' });
       }
 
       /* 학생 연동은 '요청 → 강사 승인' 두 단계 (워커와 동일) */
@@ -583,6 +586,10 @@ const server = http.createServer(async (req, res) => {
 
       const who = auth(req);
       if (!who) return json(res, 401, { error: '로그인이 필요합니다.' });
+      if (ADMIN_ONLY && !who.admin) {
+        req.resume();
+        return json(res, 403, { error: '이 주소는 관리 전용이에요. 학생 앱은 학원에서 안내한 주소를 쓰세요.' });
+      }
 
       /* apps 게이트(기획서 D-6) — who 검증 직후 한 곳 (워커와 동일). apps null 은 재원생(전부), 배열은 그 목록만 */
       if (!who.admin && !allowedApp(db.students[who.code] || null, appOfPath(p))) return json(res, 403, { error: '이 앱의 이용 대상이 아니에요.' });
@@ -849,10 +856,8 @@ const server = http.createServer(async (req, res) => {
           if (!snap) return json(res, 404, { error: '해당 날짜의 스냅샷이 없습니다.' });
           return json(res, 200, snap);
         }
-        /* 워커 fullDump 와 같은 모양 — 내신은 팩 본문 없이(packIds 만), 교재 원문(textbookSrc)은 포함.
-           팩은 라이선스 원문이라 백업 파일로 흩어지지 않게 한다(store.naesinSnapshot). */
-        return json(res, 200, { service: 'wb-reading', savedAt: nowIso(), students: db.students, states: db.states, vocab: db.vocab,
-          portalFamilies: db.portalFamilies || {}, textbook: db.textbook || {}, pubmap: db.pubmap || {}, naesin: naesinSnapshot(db.naesin), textbookSrc: db.textbookSrc || {}, haru: await dumpHaru(haruStore), letter: await dumpLetter(letterStore), hanja: await dumpHanja(hanjaStore) });
+        /* 내려받기와 자동 스냅샷이 같은 기록을 담는다 — 구매 팩 본문은 제외한다. */
+        return json(res, 200, snapshotBody());
       }
       if (p === '/api/admin/backups' && req.method === 'GET') {
         return json(res, 200, { backups: listBackups() });
@@ -1083,9 +1088,9 @@ setInterval(async () => {
   } catch (e) { console.error('[push] 발송 실패:', e.message); }
 }, 60000).unref();
 
-server.listen(PORT, () => {
+server.listen(PORT, HOST, () => {
   console.log(`WB 진로독서 서버 http://localhost:${PORT}`);
   console.log(`  학생 앱: /   워드브레인: /vocab/   관리 웹: /admin   연상 검수함: /admin/vocab-review.html`);
   /* 어느 모드로 떴는지 한 줄로 알린다 — 터널을 붙인 뒤 이 줄을 보고 확인한다. */
-  if (ADMIN_ONLY) console.log('  [관리 전용] WB_ADMIN_ONLY=on — 학생 로그인(/api/login·/api/login/status)을 내주지 않습니다');
+  if (ADMIN_ONLY) console.log('  [관리 전용] WB_ADMIN_ONLY=on — 학생 로그인·기존 학생 토큰·가족 API를 허용하지 않습니다');
 });
