@@ -11,6 +11,44 @@ def regular(p):
  if not stat.S_ISREG(s.st_mode) or s.st_nlink!=1 or p.resolve(strict=True)!=p.absolute(): fail('INVALID_FILE')
  return s
 def norm(s): return re.sub(r'\s+',' ',s).strip()
+def is_hangul_syllable(char):
+ return len(char)==1 and 0xac00<=ord(char)<=0xd7a3
+def is_structural_line_start(line):
+ value=line.strip()
+ if not value:return False
+ if re.match(r'^\d{1,3}\s*[.)]',value) or re.match(r'^\(\s*\d{1,2}\s*\)',value):return True
+ first=ord(value[0])
+ if 0x2460<=first<=0x2473 or 0x2776<=first<=0x277f:return True
+ if value[0] in 'GBMW' and len(value)>1 and value[1]==':':return True
+ if first in {0x2022,0x25e6,0x25aa,0x25a0,0x25a1,0x25ab,0x25cf,0x25cb,0x25c6,0x25c7,0x25b6,0x25b9,0x25bc,0x25b8,0x203b,0x27a4,0x2713,0x2714}:return True
+ if value[0] in 'nvNV' and len(value)>1 and value[1].isspace() and value[2:].lstrip().startswith(('다음','Look','Rewrite')):return True
+ if value.startswith(('중2','중등 2022','NE능률','Lesson 6 Answer Key','실전편')) or re.match(r'^-\s*\d+\s*-$',value):return True
+ if re.match(r'^[A-Z]\.\s',value) or re.match(r'(?i)^(?:PRE-STEP|PATTERN\s*\d+|Grammar\s+Build\s+Up|Let.s\s+Use\s+It|Functions\b|Topic\s+\d|Q\s*:|A\s*:)',value):return True
+ compact=''.join(value.split())
+ headers=('단어','어휘','어법','대화문','의사소통','본문','문법','실전편')
+ if any(compact.startswith(header) and ('┃' in compact or '|' in compact) for header in headers):return True
+ labels=tuple(sorted(headers+('객관식','주관식'),key=len,reverse=True)); pos=0
+ while pos<len(compact):
+  token=next((x for x in labels if compact.startswith(x,pos)),None)
+  if token is None:break
+  pos+=len(token)
+ if pos==len(compact):return True
+ return False
+def source_line_separator(previous_content,previous_raw_line,next_raw_line):
+ next_content=next_raw_line.strip()
+ no_separator=bool(previous_content and previous_raw_line and not previous_raw_line[-1].isspace() and is_hangul_syllable(previous_content[-1]) and next_content and is_hangul_syllable(next_content[0]) and not is_structural_line_start(next_content))
+ return '' if no_separator else ' '
+def source_line_join(lines):
+ result=''; previous_raw=None; previous_content=''
+ for raw in lines:
+  if not isinstance(raw,str): continue
+  content=raw.strip()
+  if not content:
+   previous_raw=raw; previous_content=''; continue
+  if result: result+=source_line_separator(previous_content,previous_raw,raw)
+  result+=content
+  previous_raw=raw; previous_content=content
+ return result
 def numbered(text):
  ms=list(re.finditer(r'(?<!\d)(\d{1,2})\)',text)); out={}
  for i,m in enumerate(ms):
@@ -18,6 +56,7 @@ def numbered(text):
   if 1<=n<=25 and v: out.setdefault(n,[]).append(v)
  return out
 def marked(text, endmark):
+ text=source_line_join(text.splitlines())
  text=re.sub(r'\s+',' ',text).strip(); out={}
  rx=re.compile(r'(?<!\S)(\d{1,2})'+endmark+r'\s+(.*?)(?=\s+\d{1,2}'+endmark+r'\s|$)')
  for m in rx.finditer(text):
@@ -99,11 +138,11 @@ def dialogue_turns(lines,offset=0):
   match=re.match(r'^\s*([GBMW]):\s*(.*)$',line)
   if match:
    body=re.sub(r'^\s*\d+\s+','',match.group(2)).strip()
-   current={'speaker':match.group(1),'text':body,'startLine':offset+index+1,'endLine':offset+index+1};turns.append(current)
+   current={'speaker':match.group(1),'text':body,'lastRawLine':line,'startLine':offset+index+1,'endLine':offset+index+1};turns.append(current)
    continue
   if stop.match(value): current=None;continue
   if current and re.search(r'[A-Za-z\uac00-\ud7a3]',value):
-   current['text']=norm(current['text']+' '+value);current['endLine']=offset+index+1
+   current['text']+=source_line_separator(current['text'],current['lastRawLine'],line)+value;current['endLine']=offset+index+1;current['lastRawLine']=line
  return [{'speaker':x['speaker'],'text':norm(x['text']),'startLine':x['startLine'],'endLine':x['endLine']} for x in turns]
 def matched_dialogue_candidate(candidate_id,title,section,page,en_turns,ko_turns,en_section,ko_section,question_no=None):
  en_speakers=[x['speaker'] for x in en_turns];ko_speakers=[x['speaker'] for x in ko_turns]
@@ -146,7 +185,7 @@ def extract_functions(src,dialogues):
  annotations=[(i,line) for i,line in enumerate(lines[:start or 0]) if '↳' in line]
  for j,(idx,title) in enumerate(bullets):
   stop=bullets[j+1][0] if j+1<len(bullets) else end
-  example=norm(' '.join(lines[idx+1:stop]));direct=[]
+  example=norm(source_line_join(lines[idx+1:stop]));direct=[]
   for ai,line in annotations:
    labels=[norm(x) for x in re.findall(r'\(([^()]*)\)',line)]
    if any(compare_text(x)==compare_text(title) for x in labels): direct.append((ai,line))
@@ -209,6 +248,7 @@ def find_pattern_blank(pattern_options,example):
  if len({(x[2],x[3].casefold()) for x in matches})!=1:return '',None
  return matches[0][2],matches[0][3]
 def numbered_dot_items(text,limit=4):
+ text=source_line_join(text.splitlines())
  marks=[(m.start(),int(m.group(1)),m.end()) for m in re.finditer(r'(?<!\d)([1-9])\.\s*',text) if int(m.group(1))<=limit]
  out={}
  for j,(start,n,end) in enumerate(marks):
@@ -232,7 +272,7 @@ def parse_pattern_examples(lines,page_no):
   first=re.search(r'[\uac00-\ud7a3]',clean)
   if not first:
    issues.append((index,'PATTERN_EXAMPLE_PAIR_MISMATCH'));continue
-  en=norm(clean[:first.start()]);ko=norm(clean[first.start():])
+  en=norm(source_line_join(clean[:first.start()].splitlines()));ko=norm(source_line_join(clean[first.start():].splitlines()))
   if en and ko:pairs.append({'en':en,'ko':ko,'origin':origin})
   else:issues.append((index,'PATTERN_EXAMPLE_PAIR_MISMATCH'))
  return pairs,issues
@@ -243,7 +283,7 @@ def extract_pattern_candidate(src,page_no):
  pattern_no=int(re.search(r'Pattern\s*([12])',lines[h],re.I).group(1));title=norm(lines[0])
  marker=re.search(r'▼\s*교과서\s*예문',text);concept=''
  if marker:
-  prefix=text[:marker.start()];head_pos=next(m.start() for m in re.finditer(r'Pattern\s*'+str(pattern_no),prefix,re.I));concept=norm(prefix[head_pos+len(re.search(r'Pattern\s*'+str(pattern_no),prefix,re.I).group(0)):].split('\n',1)[-1])
+  prefix=text[:marker.start()];head_pos=next(m.start() for m in re.finditer(r'Pattern\s*'+str(pattern_no),prefix,re.I));concept_tail=prefix[head_pos+len(re.search(r'Pattern\s*'+str(pattern_no),prefix,re.I).group(0)):].split('\n',1)[-1];concept=norm(source_line_join(concept_tail.splitlines()))
  concept=norm(re.sub(r'^\|+|\|+$','',concept))
  points=[norm(x) for x in re.split(r'(?<=[.!?])\s+',concept) if norm(x)] or ([concept] if concept else [])
  examples,exissues=parse_pattern_examples(lines,page_no);unmatched=[]
@@ -357,9 +397,10 @@ def clean_exam_text(value,no):
  lines=[]
  for line in value.splitlines():
   if PAGE_BOILERPLATE_RE.match(line): continue
-  line=re.sub(r'(?<![\d(])'+str(no)+r'\)\s*$','',line).strip()
-  if line: lines.append(line)
- return norm(' '.join(lines))
+  had_trailing_space=bool(line and line[-1].isspace())
+  line=re.sub(r'(?<![\d(])'+str(no)+r'\)\s*$','',line)
+  if line.strip(): lines.append(line.rstrip()+(' ' if had_trailing_space else ''))
+ return norm(source_line_join(lines))
 
 def parse_exam_choices(value,teacher=False):
  label_map={'❶':'①','❷':'②','❸':'③','❹':'④','❺':'⑤'}
@@ -367,6 +408,7 @@ def parse_exam_choices(value,teacher=False):
  if teacher:
   cut=re.search(r'^\s*(?:해설|정답 및 해설)\b',value,re.M)
   if cut: value=value[:cut.start()]
+ value=source_line_join(value.splitlines())
  marks=list(rx.finditer(value)); choices=[]; seen=set()
  for i,m in enumerate(marks):
   label=label_map.get(m.group(1),m.group(1))
@@ -397,14 +439,14 @@ def answer_detail_records(source,p1,p2,max_no,marker_pattern=ANSWER_MARKER_RE):
   records.append({'no':no,'tail':tail,'page':line['page'],'line':line['line'],'endPage':exam_line_at(rows,offsets,max(m.start(),end-1))['page']})
  return records
 
-def clean_answer_text(value):
+def clean_answer_text(value,normalize_wrapped_hangul=False):
  out=[]
  for line in value.splitlines():
   if PAGE_BOILERPLATE_RE.match(line): continue
   if re.match(r'^\s*(?::|제시문\b|질문\b|요약문\b|오답\b|해설\b|정답 및 해설\b)',line): break
-  line=re.sub(r'^\s*(?:본문|어휘|의사소통)\s*[┃|].*$','',line).strip()
-  if line: out.append(line)
- return norm(' '.join(out))[:8000]
+  line=re.sub(r'^\s*(?:본문|어휘|의사소통)\s*[┃|].*$','',line)
+  if line.strip(): out.append(line)
+ return norm(source_line_join(out) if normalize_wrapped_hangul else ' '.join(out))[:8000]
 
 def build_exam_answer_map(source,contract):
  p1,p2=contract['answerPages']; max_no=max(r[3] for r in contract['problemRanges']); out={}
@@ -417,7 +459,7 @@ def build_exam_answer_map(source,contract):
     tail=record['tail'].strip()
     if re.match(r'^[①②③④⑤](?:\s*[,，]\s*[①②③④⑤])*\s*:?',tail):
      colon=tail.find(':'); explanation=tail[colon+1:].strip() if colon>=0 else ''
-     if explanation: row['explanationKo']=clean_answer_text(explanation)
+     if explanation: row['explanationKo']=clean_answer_text(explanation,normalize_wrapped_hangul=True)
      row['refs'].append(candidate_ref(source['id'],record['page'],'answer-explanation',line_start=record['line'],line_end=record['line'],question_no=no))
     elif row['type']=='subjective':
      answer=clean_answer_text(tail)
@@ -450,7 +492,7 @@ def build_exam_answer_map(source,contract):
    match=re.match(r'\s*([①②③④⑤](?:\s*[,，]\s*[①②③④⑤])*)',tail)
    if match:
     labels=re.findall(r'[①②③④⑤]',match.group(1)); rest=tail[match.end():]
-    colon=rest.find(':'); explanation=clean_answer_text(rest[colon+1:]) if colon>=0 else ''
+    colon=rest.find(':'); explanation=clean_answer_text(rest[colon+1:],normalize_wrapped_hangul=True) if colon>=0 else ''
    else: answer_text=clean_answer_text(tail)
    refs=[candidate_ref(source['id'],marker['page'],'answer-key',line_start=marker['line'],line_end=marker['line'],question_no=marker['no'])]
    out[(pattern_no,marker['no'])]={'type':'mcq' if contract['source']=='08' else 'subjective','answerLabels':labels,'answerTexts':[answer_text] if answer_text else [],'explanationKo':explanation,'refs':refs}
@@ -486,7 +528,7 @@ def extract_exam_item_candidates(sources):
      refs=[candidate_ref(student['id'],x['page'],'problem-boundary',line_start=x['line'],line_end=x['line'],question_no=no) for x in items]
      unmatched.append(exam_item_unmatched(source_name,contract['section'],pattern_no,no,'BOUNDARY_AMBIGUOUS',refs));source_unresolved+=1;continue
     item=items[0]; answer_key=(pattern_no,no) if source_name in ('08','09') else no; answer=answers.get(answer_key)
-    raw=clean_exam_text(item['segment'],no); choices=parse_exam_choices(item['segment'])
+    raw=clean_exam_text(item['segment'],no); choices=parse_exam_choices(raw)
     if source_name=='09': format_type='subjective'
     elif answer and answer['type']=='subjective': format_type='subjective'
     elif source_name=='06' and no in (3,7): format_type='multi-select'
