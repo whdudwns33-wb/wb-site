@@ -1150,6 +1150,28 @@ t('chunkGate — 청크 트랙을 통과해야 그 단락 문장 사다리가 1�
     [1, 2, 3, 4, 5]);
 });
 
+t('청크 데이터 경계 0·부분 1·완전 2+ — 청크 후보와 문장 잠금이 분리된다', () => {
+  const mk = (chunks) => ({ words: [], sentences: [
+    { seq: 1, dayGroup: 'D1', en: 'One sentence.', ko: '한 문장.', chunks: chunks[0] },
+    { seq: 2, dayGroup: 'D1', en: 'Another sentence.', ko: '또 한 문장.', chunks: chunks[1] }
+  ] });
+  const zero = mk([[], []]);
+  assert.strictEqual(E.chunkGate(zero, {}, 'D1').reason, 'no-chunk');
+  assert.ok(E.planDay(zero, {}, null, d1, { maxSentences: 10 }).sentences.some((x) => x.kind === 'sentence'));
+
+  const one = mk([[{ en: 'One', ko: '하나' }], []]);
+  assert.deepStrictEqual([E.chunkGate(one, {}, 'D1').open, E.chunkGate(one, {}, 'D1').reason], [true, 'partial-chunk']);
+  const partialPlan = E.planDay(one, {}, null, d1, { maxSentences: 10 });
+  assert.ok(partialPlan.sentences.some((x) => x.kind === 'chunk'), '가능한 청크 학습 후보는 남긴다');
+  assert.deepStrictEqual(partialPlan.sentences.filter((x) => x.kind === 'sentence').map((x) => x.seq), [1, 2],
+    '혼합 단락의 가능한 문장도 사다리에 바로 들어간다');
+
+  const complete = mk([[{ en: 'One', ko: '하나' }], [{ en: 'Another', ko: '또' }]]);
+  assert.strictEqual(E.chunkGate(complete, {}, 'D1').reason, 'chunk-gate');
+  const completePlan = E.planDay(complete, {}, null, d1, { maxSentences: 10 });
+  assert.ok(completePlan.sentences.some((x) => x.kind === 'chunk'));
+  assert.ok(!completePlan.sentences.some((x) => x.kind === 'sentence'), '청크 2문장 이상은 기존 게이트 유지');
+});
 t('청크 트랙은 단어 게이트를 받지 않는다 — 못 읽는 학생의 첫 자리가 여기다', () => {
   const states = { 'w-001': E.createState('w-001', 'word', d1) };   // 단어 미도달 → 게이트 잠김
   const plan = E.planDay(pack, states, EXAM, d1, { maxSentences: 10 });
@@ -1279,7 +1301,7 @@ t('passageSummary — 청크·단락 백지·누적·종합 (§3.6)', () => {
     check: { at: d1, correct: '7', total: 8 }
   };
   assert.deepStrictEqual(E.passageSummary(pack, states, rec),
-    { chunkDone: 2, chunkTotal: 2, paraBlank: 1, paraTotal: 2, cumulative: 1, check: { correct: 7, total: 8 } },
+    { chunkDone: 2, chunkTotal: 2, paraBlank: 1, paraTotal: 2, cumulative: 1, check: null },
     '문자열 숫자도 정수로 눌러 담는다(요약은 서버·강사 화면으로 간다)');
   assert.strictEqual(E.passageSummary(pack, states, { cumulative: { '8/2': {} } }).cumulative, 0,
     '앞을 건너뛴 누적 기록은 진행으로 안 본다');
@@ -1325,9 +1347,9 @@ t('planDay — 본문 후보는 청크 → 문장 → 단락 관문 → 누적 �
   });
   const run = (rec) => E.planDay(pack, done, null, d1, { maxSentences: 10, rec: rec }).sentences;
   assert.deepStrictEqual(run(null), [{ kind: 'cumulative', lastDay: '8/1' }], '누적은 1일차부터');
-  assert.deepStrictEqual(run({ cumulative: { '8/1': { at: d1 } } }), [{ kind: 'cumulative', lastDay: '8/2' }],
+  assert.deepStrictEqual(run({ cumulative: { '8/1': { at: d1, okCount: 1, total: 1, score: 100 } } }), [{ kind: 'cumulative', lastDay: '8/2' }],
     '1일차를 밟아야 1+2일차가 열린다');
-  const full = { cumulative: { '8/1': {}, '8/2': {} } };
+  const full = { cumulative: { '8/1': { passed: true }, '8/2': { passed: true } } };
   assert.deepStrictEqual(run(full), [{ kind: 'check' }], '누적을 다 밟아야 종합 Check');
   full.check = { at: d1, correct: 8, total: 8 };
   assert.deepStrictEqual(run(full), [], '끝난 뒤엔 더 부르지 않는다');
@@ -1336,6 +1358,35 @@ t('planDay — 본문 후보는 청크 → 문장 → 단락 관문 → 누적 �
   assert.ok(run(null).every((x) => x.kind !== 'cumulative' && x.kind !== 'check'));
 });
 
+t('누적 백지 완료는 passed 또는 검증된 legacy 100%만 인정한다', () => {
+  const legacy = { at: d1, okCount: 2, total: 2, score: 100 };
+  assert.strictEqual(E.isCumulativeComplete({ passed: true }), true);
+  assert.strictEqual(E.isCumulativeComplete(legacy), true);
+  [null, {}, { passed: false, score: 100, okCount: 2, total: 2 },
+    { score: 80, okCount: 8, total: 10 }, { score: 100, okCount: 9, total: 10 },
+    { score: 100, okCount: 0, total: 0 }].forEach((r) => assert.strictEqual(E.isCumulativeComplete(r), false, JSON.stringify(r)));
+
+  const done = passChunks({}, pack, d1);
+  E.dayGroups(pack).forEach((g) => {
+    const pg = E.createState(E.paraId(g.day), 'para', d1);
+    pg.stage = 3; E.advanceStage(pg, true, d1, { fromStage: 3 }); done[pg.id] = pg;
+  });
+  pack.sentences.forEach((sn) => {
+    const st = E.createState(E.sentenceId(sn.seq), 'sentence', d1);
+    st.stage = 6; E.advanceStage(st, true, d1, { fromStage: 6 }); done[st.id] = st;
+  });
+  const plan = (cum, check) => E.planDay(pack, done, null, d1, { maxSentences: 20, rec: { cumulative: cum, check } });
+  const failure = { '8/1': { passed: false, score: 100, okCount: 2, total: 2 }, '8/2': { passed: true } };
+  assert.deepStrictEqual(plan(failure, { correct: 5, total: 5 }).sentences, [{ kind: 'cumulative', lastDay: '8/1' }]);
+  assert.deepStrictEqual(E.passageSummary(pack, done, { cumulative: failure, check: { correct: 5, total: 5 } }),
+    { chunkDone: 2, chunkTotal: 2, paraBlank: 2, paraTotal: 2, cumulative: 0, check: null });
+  const legacyIncomplete = { '8/1': { score: 80, okCount: 8, total: 10 }, '8/2': legacy };
+  assert.strictEqual(E.passageSummary(pack, done, { cumulative: legacyIncomplete }).cumulative, 0);
+  const passed = { '8/1': legacy, '8/2': { passed: true } };
+  assert.deepStrictEqual(plan(passed, null).sentences, [{ kind: 'check' }]);
+  assert.deepStrictEqual(E.passageSummary(pack, done, { cumulative: passed, check: { correct: 5, total: 5 } }),
+    { chunkDone: 2, chunkTotal: 2, paraBlank: 2, paraTotal: 2, cumulative: 2, check: { correct: 5, total: 5 } });
+});
 t('planDay — 본문 상한은 시험 모드에서 잔여 작업량 ÷ 잔여일로 자동 산정한다', () => {
   /* 픽스처: 2단락·5문장. 잔여 = 청크 2×3 + 문장 5×6 + 관문 2×3 = 42.
      누적·종합은 하루 한 칸씩 직렬이라 날짜를 먼저 뗀다: tailDays = 단락 2 + 종합 1 = 3.
