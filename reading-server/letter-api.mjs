@@ -613,7 +613,7 @@ export async function handleLetter(ctx) {
     const rec = ISSUE_ID_RE.test(id) ? await store.getIssue(id) : null;
     if (!rec || !rec.issue) return j(404, { error: '그 호를 찾을 수 없어요.' });
     const origin = ctx.origin || '';
-    const messages = [];
+    const messages = [], noLink = [];
     for (const c of await store.listStudentCodes()) {
       const s = await store.getStudent(c);
       if (!s || !s.name) continue;
@@ -622,6 +622,10 @@ export async function handleLetter(ctx) {
       /* 가족 링크가 없으면 여기서 만든다 — 진로독서 parent-messages 와 같은 토큰(parent:<t>)이라 링크가 가정마다 하나다 */
       let ptoken = s.ptoken;
       if (!ptoken) {
+        /* 읽기 전용(검토용) 로컬 서버에서는 만들지 않는다 — 이 라우트는 GET 이라 쓰기 메서드
+           게이트를 지나가고, 여기서 찍은 토큰은 다음 가져오기가 디스크에 남긴다. 검토용 서버가
+           가정에 나갈 링크를 새로 만드는 것은 터널 결정 ㄱ 밖이다(워커는 이 값을 주지 않는다). */
+        if (ctx.readOnly) { noLink.push(c); continue; }
         ptoken = ctx.randomToken ? ctx.randomToken() : crypto.randomUUID().replace(/-/g, '');
         await store.putParent(ptoken, c);
         await store.putStudent(c, { ...s, ptoken });
@@ -630,7 +634,7 @@ export async function handleLetter(ctx) {
       messages.push({ code: c, name: s.name, cls: s.cls || '', tier: tt, link, text: familyMessage(s, rec.issue, link, tt) });
     }
     messages.sort((a, b) => L.TIER_IDS.indexOf(a.tier) - L.TIER_IDS.indexOf(b.tier) || a.name.localeCompare(b.name, 'ko'));
-    return j(200, { messages, issue: L.brief(rec.issue) });
+    return j(200, { messages, noLink, issue: L.brief(rec.issue) });
   }
   if (p === '/api/letter/admin/stats' && method === 'GET') {
     const id = q('id');

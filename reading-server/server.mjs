@@ -8,7 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { load, persist, getDb, listBackups, getBackup, snapshotNow, naesinSnapshot } from './store.mjs';
+import { load, persist, getDb, listBackups, getBackup, snapshotNow, snapshotBeforeImport, naesinSnapshot, naesinKoSnapshot, chunkSnapshot, importSnapshot, importPrecheck, importSections, setReadOnly } from './store.mjs';
 import { handleVocab, sendNightPushes, vocabSummary } from './vocab-api.mjs';
 import { handleNaesin, isReservedCode, dropReservedRows, naesinBodyLimit } from './naesin-api.mjs';
 import { handleStudio } from './naesin-studio.mjs';
@@ -55,8 +55,14 @@ const TOKEN_TTL = 1000 * 60 * 60 * 24 * 30;            // 30일
    토큰은 서명이 아니라 각 저장소에 든 난수라, 토큰 발급 자리만 닫으면 로컬에 학생 기록이 생길 길이 없다.
    관리 로그인과 관리 화면이 쓰는 공용 모듈(/naesin/gen.js 등)은 그대로 둔다 — 막으면 관리 웹이 깨진다. */
 const ADMIN_ONLY = /^(1|true|yes|on)$/i.test(process.env.WB_ADMIN_ONLY || '');
+/* 읽기 전용 모드 — 같은 문서의 결정 ㄱ. 이 서버는 운영(KV)에서 뜬 자료를 가져와 **보기만** 한다.
+   WB_ADMIN_ONLY 가 '누가 들어오나'를 좁히는 반면 이쪽은 '무엇을 할 수 있나'를 좁힌다 — 둘이
+   필요한 이유: 원장·강사도 이 주소에서 팩을 올리면 그 순간 운영(KV)과 db.json 이 갈리고,
+   어느 쪽이 정본인지 아무도 모르게 된다. 되돌리기 어려운 쪽은 사람이 아니라 데이터다. */
+const READONLY = /^(1|true|yes|on)$/i.test(process.env.WB_READONLY || '');
 
 load();
+setReadOnly(READONLY);
 const db = getDb();
 const portalFamilyStore = {
   getFamily: (t) => db.portalFamilies?.[t] || null,
@@ -334,7 +340,9 @@ const json = (res, code, obj) => {
    남은 몸통은 resume() 으로 흘려보내야 응답이 정상으로 나간다 — 안 읽고 응답하면 큰 몸통은 RST 로 끝난다. */
 const BODY_LIMIT_DEFAULT = 2_000_000;
 const BODY_LIMIT_TEXTBOOK = 5_500_000;
-const bodyLimit = (p) => (p.startsWith('/api/naesin-ko/') ? naesinKoBodyLimit(p) : p.startsWith('/api/naesin/') ? naesinBodyLimit(p) : p.startsWith('/api/haru/') ? haruBodyLimit(p) : p.startsWith('/api/hanja/') ? hanjaBodyLimit(p) : p.startsWith('/api/letter/') ? letterBodyLimit(p) : p === '/api/admin/textbook-src' ? BODY_LIMIT_TEXTBOOK : BODY_LIMIT_DEFAULT);
+/* 가져오기는 export 스냅샷 전체를 받는다 — 교재 원문·학생 기록이 다 들어와 기본 2MB 로는 못 받는다 */
+const BODY_LIMIT_IMPORT = 24_000_000;
+const bodyLimit = (p) => (p.startsWith('/api/naesin-ko/') ? naesinKoBodyLimit(p) : p.startsWith('/api/naesin/') ? naesinBodyLimit(p) : p.startsWith('/api/haru/') ? haruBodyLimit(p) : p.startsWith('/api/hanja/') ? hanjaBodyLimit(p) : p.startsWith('/api/letter/') ? letterBodyLimit(p) : p === '/api/admin/textbook-src' ? BODY_LIMIT_TEXTBOOK : p === '/api/admin/import' ? BODY_LIMIT_IMPORT : BODY_LIMIT_DEFAULT);
 const tooLarge = () => { const e = new Error('too large'); e.status = 413; return e; };
 const readBody = (req, limit = BODY_LIMIT_DEFAULT) => new Promise((resolve, reject) => {
   /* 조각을 Buffer 로 모아 한 번에 디코딩한다 — 조각마다 문자열로 바꾸면 조각 경계에 걸린 한글(3바이트)이 깨진다.
@@ -501,7 +509,17 @@ const server = http.createServer(async (req, res) => {
       /* ai: AI 연상을 쓸 수 있는지. 키가 없으면 앱이 「AI 연상 만들기」 버튼을 감춘다 —
          눌러도 안 되는 버튼은 학생에게 앱이 고장 난 것처럼 보인다.
          키를 넣으면 다음 접속부터 버튼이 저절로 돌아온다. 값이 아니라 있고 없음만 알린다. */
-      if (p === '/api/health') return json(res, 200, { ok: true, service: 'wb-reading', time: nowIso(), ai: !!process.env.ANTHROPIC_API_KEY });
+      if (p === '/api/health') return json(res, 200, { ok: true, service: 'wb-reading', time: nowIso(), ai: !!process.env.ANTHROPIC_API_KEY, readonly: READONLY || undefined });
+
+      /* 읽기 전용 게이트 — 라우트마다 거는 대신 **메서드로** 막는다. 라우트는 계속 늘어나고,
+         새로 만든 쓰기 하나를 빠뜨리면 그 길로 데이터가 갈린다. 여는 것은 둘뿐이다:
+         관리 로그인(열지 않으면 화면을 볼 수 없다)과 가져오기(이 모드의 목적).
+         GET 라우트가 몰래 쓰는 길은 store 의 setReadOnly 가 따로 막는다. */
+      if (READONLY && !/^(GET|HEAD)$/.test(req.method || '')
+          && p !== '/api/admin/login' && p !== '/api/admin/import') {
+        req.resume();                 // 본문을 비워 소켓을 붙들지 않는다
+        return json(res, 403, { error: '이 주소는 읽기 전용 검토용이에요. 자료를 바꾸는 일은 운영 주소에서 하세요.' });
+      }
 
       if (p === '/api/portal/family-link') {
         const out = await handlePortalFamilyLink({ method: req.method,
@@ -610,7 +628,9 @@ const server = http.createServer(async (req, res) => {
         const out = await handleLetter({ path: p, method: req.method, who, query: url.searchParams, getBody: () => readBody(req, letterBodyLimit(p)), store: letterStore,
           origin: 'http://' + (req.headers.host || ('localhost:' + PORT)), push: VOCAB_PUSH_ENV,
           ai: { apiKey: process.env.ANTHROPIC_API_KEY || '', model: process.env.LETTER_AI_MODEL || '', env: process.env, imageKey: process.env.GEMINI_API_KEY || '', imageModel: process.env.LETTER_IMAGE_MODEL || '' },
-          randomToken: () => crypto.randomUUID().replace(/-/g, '') });
+          randomToken: () => crypto.randomUUID().replace(/-/g, ''),
+          /* 읽기 전용(검토용)에서는 가족 토큰을 새로 찍지 않는다 — 위 parent-messages 와 같은 이유 */
+          readOnly: READONLY });
         return json(res, out.status, out.body);
       }
 
@@ -700,10 +720,15 @@ const server = http.createServer(async (req, res) => {
       if (p === '/api/admin/parent-messages' && req.method === 'GET') {
         const origin = (req.headers['x-forwarded-proto'] || 'http') + '://' + (req.headers.host || 'localhost:' + PORT);
         db.parents = db.parents || {};
-        const messages = [];
+        const messages = [], noLink = [];
         for (const stu of Object.values(db.students)) {
           if (!stu.name || !db.states[stu.code]) continue; /* 앱 연동 학생만 */
           if (!stu.ptoken) {
+            /* 읽기 전용(검토용) 서버에서는 **만들지 않는다.** 이 라우트는 GET 이라 쓰기 메서드
+               게이트를 그냥 지나가고, 여기서 찍은 토큰은 다음 가져오기의 persistNow() 가
+               디스크에 영구 기록한다 — 검토용 서버가 가정에 나갈 링크를 새로 만드는 것은
+               결정 ㄱ 밖이다. 누가 빠졌는지는 noLink 로 알린다(조용히 빼지 않는다). */
+            if (READONLY) { noLink.push(stu.code); continue; }
             stu.ptoken = crypto.randomUUID().replace(/-/g, '');
             db.parents[stu.ptoken] = stu.code;
             persist();
@@ -714,7 +739,7 @@ const server = http.createServer(async (req, res) => {
             text: `[WB 진로독서] ${stu.name} 학생 주간 리포트입니다.\n이번 주 ${s.week}회 완독 · ${s.streak}일 연속 읽는 중${s.acc != null ? ` · 문제 정답률 ${s.acc}%` : ''}입니다.\n자세한 내용: ${origin}/parent.html?t=${stu.ptoken}\n— WB 독해력학원 · 웩슬러브레인센터`,
           });
         }
-        return json(res, 200, { messages });
+        return json(res, 200, { messages, noLink });
       }
       if (p === '/api/admin/overview' && req.method === 'GET') {
         const codes = new Set([...Object.keys(db.students), ...Object.keys(db.states)]);
@@ -849,10 +874,52 @@ const server = http.createServer(async (req, res) => {
           if (!snap) return json(res, 404, { error: '해당 날짜의 스냅샷이 없습니다.' });
           return json(res, 200, snap);
         }
-        /* 워커 fullDump 와 같은 모양 — 내신은 팩 본문 없이(packIds 만), 교재 원문(textbookSrc)은 포함.
-           팩은 라이선스 원문이라 백업 파일로 흩어지지 않게 한다(store.naesinSnapshot). */
+        /* 워커 fullDump 와 같은 모양 — 내신·국어는 팩 본문 없이(packIds 만), 교재 원문(textbookSrc)은 포함.
+           팩은 라이선스 원문이라 백업 파일로 흩어지지 않게 한다(store.naesinSnapshot).
+           naesinKo·chunk 가 빠져 있었다 — 워커 dump 에는 있어서 「같은 모양」이 거짓이었고,
+           그 상태로는 가져오기가 덮는 칸을 이 export 로 되돌릴 수 없었다. */
         return json(res, 200, { service: 'wb-reading', savedAt: nowIso(), students: db.students, states: db.states, vocab: db.vocab,
-          portalFamilies: db.portalFamilies || {}, textbook: db.textbook || {}, pubmap: db.pubmap || {}, naesin: naesinSnapshot(db.naesin), textbookSrc: db.textbookSrc || {}, haru: await dumpHaru(haruStore), letter: await dumpLetter(letterStore), hanja: await dumpHanja(hanjaStore) });
+          portalFamilies: db.portalFamilies || {}, textbook: db.textbook || {}, pubmap: db.pubmap || {}, naesin: naesinSnapshot(db.naesin),
+          naesinKo: naesinKoSnapshot(db.naesinKo), chunk: chunkSnapshot(db.chunk),
+          textbookSrc: db.textbookSrc || {}, haru: await dumpHaru(haruStore), letter: await dumpLetter(letterStore), hanja: await dumpHanja(hanjaStore) });
+      }
+      /* 가져오기 — 운영(KV)에서 뜬 export 를 이 PC 서버로 되읽는다. **읽기 전용 검토용**이다
+         (docs/로컬-서버-외부공개-터널.md 결정 ㄱ). 워커에는 이 라우트를 만들지 않는다 —
+         운영 데이터를 덮어쓰는 길을 열면 그게 가장 큰 사고다. 여기는 로컬 서버 파일이라
+         구조적으로 로컬 전용이다.
+         덮어쓰기는 되돌릴 수 없으므로 셋을 요구한다: ① 관리 인증(이 게이트) ② confirm:'replace'
+         ③ 덮기 전에 스냅샷. 스냅샷이 실패하면 덮지 않는다 — 되돌릴 길 없이 지우지 않는다. */
+      if (p === '/api/admin/import' && req.method === 'POST') {
+        const body = await readBody(req, BODY_LIMIT_IMPORT);
+        if (!body || typeof body !== 'object') return json(res, 400, { error: '스냅샷 JSON 이 필요합니다.' });
+        if (body.confirm !== 'replace') {
+          return json(res, 400, { error: "덮어쓰기 확인이 필요합니다 — confirm:'replace' 를 함께 보내세요.", sections: importSections() });
+        }
+        const snap = body.snapshot && typeof body.snapshot === 'object' ? body.snapshot : body;
+        /* **검증을 스냅샷보다 먼저.** 받지도 않을 파일(다른 서비스의 export 를 잘못 고르는 일이
+           가장 흔하다) 때문에 되돌릴 자리를 희생하지 않는다. */
+        const pre = importPrecheck(snap);
+        if (!pre.ok) return json(res, 400, { error: pre.error });
+        /* 되돌릴 자리를 만든다. 못 만들면 덮지 않는다.
+           **일일 슬롯(db-<날짜>.json)이 아니라 가져오기 전용 파일**에 쓴다 — 같은 날 두 번
+           가져오면 슬롯 하나를 서로 덮어, 두 번째의 '되돌릴 자리'가 첫 번째 결과가 된다.
+           되돌릴 수 있다고 안내하면서 원본을 지우는 셈이라 가장 나쁜 고장이다. */
+        const backup = snapshotBeforeImport();
+        if (!backup) return json(res, 500, { error: '덮기 전 스냅샷을 만들지 못해 중단했습니다. data/backups 쓰기 권한을 확인하세요.' });
+        /* 칸의 기본 꼴은 어댑터가 정본이다 — 넘기지 않으면 db.naesin 이 packs 없이 만들어져
+           팩 라우트가 영구 500 이 된다(store.importSnapshot 머리말). */
+        const out = importSnapshot(snap, { roots: { naesin: naesinRoot, naesinKo: naesinKoRoot, chunk: chunkRoot, hanja: hanjaRoot } });
+        if (!out.ok) return json(res, 400, { error: out.error, backup });
+        console.log('[import] ' + out.applied.length + '칸 적용 · 건너뜀 ' + out.skipped.length
+          + (out.unknown.length ? ' · 모르는 칸 ' + out.unknown.join(',') : '')
+          + ' · 되돌릴 스냅샷 ' + backup);
+        return json(res, 200, { ok: true, applied: out.applied, skipped: out.skipped, absent: out.absent,
+          /* 세 목록 어디에도 없던 칸 — 조용히 버리지 않는다(워커 dump 에 칸이 늘면 여기 뜬다) */
+          unknown: out.unknown, parentsLinked: out.parentsLinked,
+          snapshotSavedAt: out.savedAt, backup,
+          note: '되돌리려면 GET /api/admin/export?backup=' + backup + ' 로 받아 다시 가져오세요.'
+            + (out.unknown.length ? ' 되읽지 않은 칸: ' + out.unknown.join(', ') + '.' : '')
+            + ' 팩·단어장 본문과 하루·레터 칸은 스냅샷에 없어 되돌림에 포함되지 않습니다.' });
       }
       if (p === '/api/admin/backups' && req.method === 'GET') {
         return json(res, 200, { backups: listBackups() });
@@ -1062,6 +1129,11 @@ const server = http.createServer(async (req, res) => {
 let lastPushDay = null;
 /* 브레인레터 07:00 새 호 알림 — 로컬 서버용 1분 폴링(운영 워커는 22:00 UTC 크론) */
 let lastLetterPushDay = null;
+/* **읽기 전용(검토용) 서버는 밖으로 아무것도 보내지 않는다.** 가져온 운영 구독자에게 밤 9시·
+   아침 7시 알림이 한 번 더 가면 가정에는 중복 알림이고, 발송은 되돌릴 수 없다(규칙 7 — 가정에
+   나가는 것은 사람 확인 자리다). 타이머는 요청이 아니라 시계가 깨우므로 메서드 게이트가 보지
+   못한다 — 그래서 등록 자체를 막는다. */
+if (!READONLY) {
 setInterval(async () => {
   const d = new Date();
   if (d.getHours() !== 7 || d.getMinutes() !== 0) return;
@@ -1082,10 +1154,12 @@ setInterval(async () => {
     if (r.sent || r.removed) console.log('[push] 밤 9시 알림(워드브레인+내신):', JSON.stringify(r));
   } catch (e) { console.error('[push] 발송 실패:', e.message); }
 }, 60000).unref();
+}
 
 server.listen(PORT, () => {
   console.log(`WB 진로독서 서버 http://localhost:${PORT}`);
   console.log(`  학생 앱: /   워드브레인: /vocab/   관리 웹: /admin   연상 검수함: /admin/vocab-review.html`);
   /* 어느 모드로 떴는지 한 줄로 알린다 — 터널을 붙인 뒤 이 줄을 보고 확인한다. */
   if (ADMIN_ONLY) console.log('  [관리 전용] WB_ADMIN_ONLY=on — 학생 로그인(/api/login·/api/login/status)을 내주지 않습니다');
+  if (READONLY) console.log('  [읽기 전용] WB_READONLY=on — 자료를 바꾸는 요청을 받지 않습니다 (관리 로그인·가져오기만 예외, db.json 도 가져오기 때만 씁니다)');
 });
