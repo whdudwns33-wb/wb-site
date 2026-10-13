@@ -875,12 +875,12 @@ function pdfReviewDraft(obj, trustedLocal=false){
     const pkeys=['candidateId','patternNo','title','conceptKo','grammarPoint','textbookExamples','letsUseIt','sourceRefs','reviewFlags'];
     if(obj.patternCandidates.some(row=>!exact(row,pkeys)||!/^pc-\d{2}$/.test(row.candidateId)||![1,2].includes(row.patternNo)||!textOk(row.title,300)||!textOk(row.conceptKo,2000,true)||!Array.isArray(row.grammarPoint)||row.grammarPoint.length>20||row.grammarPoint.some(x=>typeof x!=='string'||x.length>1000)||!Array.isArray(row.textbookExamples)||row.textbookExamples.length>40||row.textbookExamples.some(x=>!exact(x,['en','ko','origin'])||!textOk(x.en)||!textOk(x.ko)||!['교과서 본문','워크북 예문'].includes(x.origin))||!Array.isArray(row.letsUseIt)||row.letsUseIt.length>40||row.letsUseIt.some(x=>!exact(x,['no','stem','ko','wordBank','answers'])||!Number.isInteger(x.no)||x.no<1||x.no>20||!textOk(x.stem)||!textOk(x.ko)||!Array.isArray(x.wordBank)||x.wordBank.length>50||x.wordBank.some(v=>!textOk(v,200))||!Array.isArray(x.answers)||!x.answers.length||x.answers.length>20||x.answers.some(v=>!textOk(v,300)))||!common(row)))throw new Error('문법 패턴 후보 형식 또는 출처가 올바르지 않아요.');
     const itemSources={'04':64,'05':30,'06':30,'08':142,'09':163},itemLabels=['①','②','③','④','⑤'];
-    const itemKeys=['candidateId','source','section','patternNo','no','formatType','rawText','choices','answerLabels','answerTexts','explanationKo','sourceRefs','reviewFlags'];
+    const itemKeys=['candidateId','source','section','patternNo','no','formatType','rawText','contextText','choices','answerLabels','answerTexts','explanationKo','sourceRefs','reviewFlags'];
     if(!Array.isArray(obj.examItemCandidates)||obj.examItemCandidates.length>429||obj.examItemCandidates.some(row=>!exact(row,itemKeys)||!/^ic-(04|05|06|08|09)-(00|01|02)-\d{3}$/.test(row.candidateId)
       ||!Object.hasOwn(itemSources,row.source)||!textOk(row.section,120)||(row.patternNo!==null&&![1,2].includes(row.patternNo))
       ||((row.source==='08'||row.source==='09')?![1,2].includes(row.patternNo):row.patternNo!==null)
       ||!Number.isInteger(row.no)||row.no<1||row.no>99||!['mcq','multi-select','subjective','unknown'].includes(row.formatType)
-      ||!textOk(row.rawText,12000,true)||/(?:[A-Za-z]:[\\/]|\\\\)/.test(row.rawText)||!Array.isArray(row.choices)||row.choices.length>5
+      ||!textOk(row.rawText,12000,true)||/(?:[A-Za-z]:[\\/]|\\\\)/.test(row.rawText)||!textOk(row.contextText,12000,true)||/(?:[A-Za-z]:[\\/]|\\\\)/.test(row.contextText)||!Array.isArray(row.choices)||row.choices.length>5
       ||row.choices.some(choice=>!exact(choice,['label','text'])||!itemLabels.includes(choice.label)||!textOk(choice.text,2000))
       ||new Set(row.choices.map(choice=>choice.label)).size!==row.choices.length||!Array.isArray(row.answerLabels)||row.answerLabels.length>5
       ||row.answerLabels.some(label=>!itemLabels.includes(label))||new Set(row.answerLabels).size!==row.answerLabels.length
@@ -1061,7 +1061,7 @@ function pdfReviewDraft(obj, trustedLocal=false){
       else {const parsed=parseChoiceStem(r);instructionKo=parsed.stem;choices=parsed.choices;answer=r.answerLabels.map(label=>labelToNo[label]);if(parsed.variance)flags.push('CHOICE_TEXT_SOURCE_VARIANCE');if(!answer.length||answer.some(x=>!x))throw new Error('객관식 정답 라벨을 숫자 문자열로 바꿀 수 없어요.');}
       globalNo++;
       const refs=r.sourceRefs.map(ref=>({...ref,bbox:ref.bbox||[0,0,0,0]}));
-      return{no:globalNo,footnoteNo:r.no,source:r.source,section:r.section,formatType:short?'short':r.formatType==='multi-select'?'mcq_multi':'mcq',instructionKo,isNegative:/(?:\bnot\b|\bnever\b|\bexcept\b|않는|아닌|제외)/i.test(instructionKo),answerCount:answer.length,stimulus:{type:'text',parts:[]},choices,answer,explanationKo:r.explanationKo,targetRefs:r.patternNo?[{patternNo:r.patternNo}]:[],notes:[],...review(refs,flags)};
+      return{no:globalNo,footnoteNo:r.no,source:r.source,section:r.section,formatType:short?'short':r.formatType==='multi-select'?'mcq_multi':'mcq',instructionKo,isNegative:/(?:\bnot\b|\bnever\b|\bexcept\b|않는|아닌|제외)/i.test(instructionKo),answerCount:answer.length,stimulus:{type:'text',parts:r.contextText?[{text:r.contextText}]:[]},choices,answer,explanationKo:r.explanationKo,targetRefs:r.patternNo?[{patternNo:r.patternNo}]:[],notes:[],...review(refs,flags)};
     });
     rows.words=wordRows;rows.sentences=sentenceRows;rows.dialogues=dialogues;rows.functions=functions;rows.keyExpressions=keyExpressions;rows.patterns=patterns;rows.items=items;
   }
@@ -1090,7 +1090,8 @@ function folderCandidatePreviewHtml(){
       const choices=row.choices.length?'<div><strong>선택지</strong><ol>'+row.choices.map(choice=>'<li>'+esc(choice.label)+' '+esc(choice.text)+'</li>').join('')+'</ol></div>':'';
       const answer=row.answerLabels.length?row.answerLabels.map(esc).join(', '):(row.answerTexts.length?row.answerTexts.map(esc).join(' / '):'미대응');
       const explanation=row.explanationKo?'<p><strong>해설</strong> '+esc(row.explanationKo)+'</p>':'';
-      return '<details class="card" style="margin:6px 0;padding:8px"><summary><strong>'+esc(title)+'</strong></summary><div class="muted">검수 전용 · REVIEW_REQUIRED · 자동 승인·게시 없음</div><div class="filters" style="margin-top:6px">'+pages+'</div><p><strong>정답 후보</strong> '+answer+'</p>'+choices+explanation+'<details><summary>문항 구간 보기</summary><pre style="white-space:pre-wrap;word-break:break-word">'+esc(row.rawText)+'</pre></details></details>';
+      const context=row.contextText?'<p><strong>공유 문맥</strong> '+esc(row.contextText)+'</p>':'';
+      return '<details class="card" style="margin:6px 0;padding:8px"><summary><strong>'+esc(title)+'</strong></summary><div class="muted">검수 전용 · REVIEW_REQUIRED · 자동 승인·게시 없음</div><div class="filters" style="margin-top:6px">'+pages+'</div>'+context+'<p><strong>정답 후보</strong> '+answer+'</p>'+choices+explanation+'<details><summary>문항 구간 보기</summary><pre style="white-space:pre-wrap;word-break:break-word">'+esc(row.rawText)+'</pre></details></details>';
     }).join('');
     const stats=items.bySource&&items.bySource[source]||{};
     examGroups.push('<details style="margin:6px 0"><summary>'+esc(sourceNames[source])+' · '+(stats.found||0)+'/'+(stats.expected||0)+'개 · 객관식/복수 '+(stats.foundByType?.objective||0)+' · 주관식 '+(stats.foundByType?.subjective||0)+'</summary>'+detailCards+'</details>');
