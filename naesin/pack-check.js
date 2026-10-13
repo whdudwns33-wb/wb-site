@@ -59,7 +59,7 @@ var WBPACKCHECK = (function () {
       answer: ['scalar'], explanationKo: 'string', targetRefs: [{ wordId: 'string', sentenceSeq: 'scalar', patternNo: 'scalar', dialogueId: 'string' }], notes: 'texts' },
   };
   var PACK_ARRAYS = Object.keys(rowShapes);
-  var packShape = { packId: 'string', curriculum: 'string', textbook: 'string', grade: 'string', school: 'string', gradeSem: 'string', exam: 'string', lesson: 'scalar',
+  var packShape = { rights: { basis: 'string', holder: 'string', evidenceRef: 'string', studentUseAllowed: 'boolean', derivativeUseAllowed: 'boolean', externalAiAllowed: 'boolean', expiresAt: 'string', notes: 'string' }, packId: 'string', curriculum: 'string', textbook: 'string', grade: 'string', school: 'string', gradeSem: 'string', exam: 'string', lesson: 'scalar',
     lessonTitle: 'string', source: 'string', notes: 'texts', passage: { titleEn: 'string', titleKo: 'string' }, counts: {} };
   PACK_ARRAYS.forEach(function (k) { packShape[k] = [rowShapes[k]]; packShape.counts[k] = 'scalar'; });
   ['examples', 'definitions', 'polysemy', 'synAnt'].forEach(function (k) { packShape.counts[k] = 'scalar'; });
@@ -442,6 +442,18 @@ var WBPACKCHECK = (function () {
   }
 
   /* ── 전체 ── */
+  function rightsErrors(rights, today) {
+    var errors = [];
+    if (!rights || typeof rights !== 'object' || isArr(rights)) return ['권리 확인이 필요합니다.'];
+    if (!['self_authored','open_license','licensed'].includes(rights.basis)) errors.push('권리 근거를 확인해야 합니다.');
+    if (!nonEmpty(rights.holder)) errors.push('권리자 확인이 필요합니다.');
+    if (rights.studentUseAllowed !== true || rights.derivativeUseAllowed !== true) errors.push('학생 이용 및 2차 제작 허용 확인이 필요합니다.');
+    if (typeof rights.externalAiAllowed !== 'boolean') errors.push('외부 AI 이용 여부를 확인해야 합니다.');
+    if (['open_license','licensed'].includes(rights.basis) && !nonEmpty(rights.evidenceRef)) errors.push('증빙 참조가 필요합니다.');
+    if (rights.expiresAt && (!/^\d{4}-\d{2}-\d{2}$/.test(rights.expiresAt) || rights.expiresAt < (today || new Date().toISOString().slice(0,10)))) errors.push('권리 증빙이 만료되었습니다.');
+    return errors;
+  }
+
   function checkPack(pack, opts) {
     var c = collector(opts);
     if (!pack || typeof pack !== 'object' || isArr(pack)) {
@@ -450,6 +462,8 @@ var WBPACKCHECK = (function () {
     }
     if (!checkShape(pack, packShape, '', c))
       return { errors: c.errors, warns: c.warns, summary: c.summary };
+    rightsErrors(pack.rights).forEach(function (m) { c.err("rights", m); });
+    rightsErrors(pack.rights).forEach(function (msg) { c.err("rights", msg); });
     checkWords(pack, c);
     checkSentences(pack, c);
     checkOddOne(pack, c);
@@ -471,7 +485,7 @@ var WBPACKCHECK = (function () {
   }
 
   return {
-    checkPack: checkPack,
+    checkPack: checkPack, rightsErrors: rightsErrors,
     /* 섹션별 검사도 노출한다 — 스튜디오 검수 화면이 한 종류만 다시 검사할 때 쓴다 */
     checkWords: checkWords, checkSentences: checkSentences, checkOddOne: checkOddOne,
     checkCheckItems: checkCheckItems, checkDialogues: checkDialogues, checkPatterns: checkPatterns,

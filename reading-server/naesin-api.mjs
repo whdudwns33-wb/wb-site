@@ -424,6 +424,8 @@ export async function handleNaesin(ctx) {
     }
     const rec = await store.getPack(id);
     if (!rec) return j(404, { error: '팩을 찾을 수 없어요.' });
+    if (!who.admin && CHECK.rightsErrors(rec.pack && rec.pack.rights).length)
+      return j(403, { error: '권리 확인이 완료되지 않은 자료입니다.' });
     return j(200, { pack: rec.pack, updatedAt: rec.updatedAt || null });
   }
 

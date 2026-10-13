@@ -46,7 +46,9 @@ function memStore() {
 const call = (store, path, method, body, opts = {}) => handleStudio({
   path, method, who: opts.who === undefined ? WHO : opts.who, store,
   query: new URLSearchParams(opts.query || ''),
-  getBody: async () => body,
+  getBody: async () => path === '/api/naesin/admin/job' && method === 'POST' && !opts.noRights
+    ? { ...body, rights: body && body.rights || { basis: 'self_authored', holder: 'Synthetic test fixture', evidenceRef: 'fixture-only', studentUseAllowed: true, derivativeUseAllowed: true, externalAiAllowed: true } }
+    : body,
   ai: opts.ai, rnd: opts.rnd, localPdfReview: opts.localPdfReview,
 });
 
