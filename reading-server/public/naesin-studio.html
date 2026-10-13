@@ -1013,6 +1013,7 @@ function pdfReviewDraft(obj, trustedLocal=false){
       if(c.posCandidates.length>1)flags.push('POS_UNRESOLVED');
       return{id:c.candidateId.replace(/^wc-/,'w-'),headword:head,pos:c.posCandidates.length===1?c.posCandidates[0]:'',meaningKo:c.meanings.slice(),sections,irregularForms,notes:[],...review(c.sourceRefs.map(r=>({sourceDocumentId:r.sourceDocumentId,page:r.page,printedPage:r.printedPage||r.page,section:r.section||null,questionNo:r.questionNo===undefined?null:r.questionNo,bbox:r.bbox})),flags)};
     });
+    const copyJsonArray=value=>Array.isArray(value)?JSON.parse(JSON.stringify(value)):[];
     const sentenceRows=folderSentences.map(s=>{
       const refs=(s.sourceRefs||[]).concat(...Object.values(s.enrichmentSourceRefs||{}).filter(Array.isArray));
       const flags=[...(s.reviewFlags||[])];
@@ -1026,7 +1027,7 @@ function pdfReviewDraft(obj, trustedLocal=false){
       const keywordFallback=confirmedKeywords.length===0;
       if(keywordFallback)flags.push('FULL_SENTENCE_KEYWORD_FALLBACK','KEYWORD_ALIGNMENT_REVIEW_REQUIRED');
       const keywords=keywordFallback?[{en:s.en,ko:s.ko}]:confirmedKeywords;
-      return{seq:s.seq,dayGroup:s.dayGroup,dayHeaderEn:s.dayHeaderEn||'',dayHeaderKo:s.dayHeaderKo||'',en:s.en,ko:s.ko,chunks:chunks.map(chunk=>({...chunk})),keywords,tokens,verbForms:[],grammarChoices:[],writingKeywords:[],wordIds:[],grammarNotes:[],notes:[],...review(refs,flags)};
+      return{seq:s.seq,dayGroup:s.dayGroup,dayHeaderEn:s.dayHeaderEn||'',dayHeaderKo:s.dayHeaderKo||'',en:s.en,ko:s.ko,chunks:chunks.map(chunk=>({...chunk})),keywords,tokens,verbForms:copyJsonArray(s.verbForms),grammarChoices:copyJsonArray(s.grammarChoices),writingKeywords:copyJsonArray(s.writingKeywords),wordIds:[],grammarNotes:[],notes:[],...review(refs,flags)};
     });
     const dialogues=folderReviewCandidates.dialogueCandidates.map(r=>({id:r.id,title:r.title,section:r.section,lines:r.lines.map(x=>({...x})),notes:[],...review(r.sourceRefs,r.reviewFlags)}));
     const functions=folderReviewCandidates.functionCandidates.map(r=>({name:r.name,pattern:r.pattern,explainKo:r.explainKo,...review(r.sourceRefs,r.reviewFlags)}));
