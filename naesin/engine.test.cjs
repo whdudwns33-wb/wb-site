@@ -11,12 +11,12 @@ let passed = 0;
 function t(name, fn) { fn(); passed += 1; console.log('  ✓ ' + name); }
 
 /* 고정 시각 — 로컬 달력 기준으로 서로 다른 날을 확실하게 밟는다 */
-const d1 = new Date(2026, 8, 2, 12, 0, 0).getTime();   // 9/2 낮
-const d1b = new Date(2026, 8, 2, 20, 0, 0).getTime();  // 9/2 저녁 (같은 날)
-const d2 = new Date(2026, 8, 3, 9, 0, 0).getTime();    // 9/3
-const d3 = new Date(2026, 8, 4, 9, 0, 0).getTime();    // 9/4
-const d4 = new Date(2026, 8, 5, 9, 0, 0).getTime();    // 9/5
-const at = (m, d, h, mi) => new Date(2026, m - 1, d, h == null ? 9 : h, mi || 0).getTime();
+const d1 = Date.UTC(2026, 8, 2, 3, 0, 0);   // KST 9/2 낮
+const d1b = Date.UTC(2026, 8, 2, 11, 0, 0);  // KST 9/2 저녁 (같은 날)
+const d2 = Date.UTC(2026, 8, 3, 0, 0, 0);    // KST 9/3
+const d3 = Date.UTC(2026, 8, 4, 0, 0, 0);    // KST 9/4
+const d4 = Date.UTC(2026, 8, 5, 0, 0, 0);    // KST 9/5
+const at = (m, d, h, mi) => Date.UTC(2026, m - 1, d, (h == null ? 9 : h) - 9, mi || 0);
 const ok = { correct: true };
 
 /* n개짜리 합성 팩 — planDay 분배 검증용 (픽스처 팩은 8단어뿐이라 부족) */
@@ -169,13 +169,14 @@ t("안정화의 '다른 날' 규칙 — 같은 날 재성공은 불인정, 다�
   E.recordCriterion(s, ok, d1);      // 도달
   E.recordCriterion(s, ok, d1b);     // 같은 날 저녁
   assert.strictEqual(s.relearnCount, 0, '같은 날 두 번째 성공은 안 센다');
+  s.due = d2;
   E.recordCriterion(s, ok, d2);
   assert.strictEqual(s.relearnCount, 1);
   assert.strictEqual(s.lastCriterionDate, '2026-09-03');
-  E.recordCriterion(s, ok, d3);
-  E.recordCriterion(s, ok, d4);
+  s.due = d3; E.recordCriterion(s, ok, d3);
+  s.due = d4; E.recordCriterion(s, ok, d4);
   assert.strictEqual(s.relearnCount, 3);
-  E.recordCriterion(s, ok, d4 + DAY);
+  s.due = d4 + DAY; E.recordCriterion(s, ok, d4 + DAY);
   assert.strictEqual(s.relearnCount, 3, '상한 3');
 });
 
@@ -185,13 +186,15 @@ t('E12 자정 걸침 — 23:59/00:01 두 번은 이틀이 아니다(8시간 미�
   E.recordCriterion(s, ok, at(9, 2, 0, 1));     // 2분 뒤, 달력은 다음 날
   assert.strictEqual(s.relearnCount, 0, '자정 걸침은 한 세션이다');
   assert.strictEqual(s.lastCriterionDate, '2026-09-01', '인정 안 된 성공은 날짜도 안 옮긴다');
-  E.recordCriterion(s, ok, at(9, 2, 9, 0));     // 9시간 뒤
+  s.due = at(9, 2, 9, 0);
+  E.recordCriterion(s, ok, at(9, 2, 9, 0));     // 9시간 뒤 + due 도달
   assert.strictEqual(s.relearnCount, 1);
   assert.strictEqual(s.lastCriterionDate, '2026-09-02');
   /* 하위 호환 — lastCriterionAt 이 없는 옛 상태는 날짜만으로 판단 */
   const old = E.createState('o', 'word', at(9, 1));
   E.recordCriterion(old, ok, at(9, 1, 23, 59));
   delete old.lastCriterionAt;
+  old.due = at(9, 2, 0, 1);
   E.recordCriterion(old, ok, at(9, 2, 0, 1));
   assert.strictEqual(old.relearnCount, 1, '필드가 없으면 통과');
 });
@@ -201,6 +204,7 @@ t('stability 0~3 게이지 · isStable — 도달 전엔 0', () => {
   s.relearnCount = 2;               // 도달 전 오염값이 있어도
   assert.strictEqual(E.stability(s), 0, '도달 전엔 게이지 0');
   E.recordCriterion(s, ok, d1);
+  s.due = d2;
   E.recordCriterion(s, ok, d2);
   assert.strictEqual(E.stability(s), 3);
   assert.ok(E.isStable(s));
@@ -220,7 +224,7 @@ t('완전 인출 실패 — streak 리셋·wrong+1·10분 뒤, 도달 전이면 
 
 t('E3 안정화 완료 후 오답 — 도달한 단어의 오답은 2회전 후퇴, 다시 편성된다', () => {
   const s = E.createState('w1', 'word', at(9, 1));
-  [1, 2, 3, 4].forEach((d) => E.recordCriterion(s, ok, at(9, d)));
+  [1, 2, 3, 4].forEach((d) => { s.due = at(9, d); E.recordCriterion(s, ok, at(9, d)); });
   assert.ok(E.isStable(s));
   assert.strictEqual(s.relearnCount, 3);
   E.recordCriterion(s, { correct: false }, at(9, 24));
@@ -295,9 +299,9 @@ t('wordSummary — 도달(재검증 끝난 것만)·안정·위험·철자재검
   const states = {};
   states.a = reachedState('a', d1);                                   // 도달만
   states.b = reachedState('b', d1);                                   // 안정화 완료
-  E.recordCriterion(states.b, ok, d2);
-  E.recordCriterion(states.b, ok, d3);
-  E.recordCriterion(states.b, ok, d4);
+  states.b.due = d2; E.recordCriterion(states.b, ok, d2);
+  states.b.due = d3; E.recordCriterion(states.b, ok, d3);
+  states.b.due = d4; E.recordCriterion(states.b, ok, d4);
   states.c = E.createState('c', 'word', d1); states.c.wrong = 3;      // 오답 다수
   states.d = E.createState('d', 'word', d1); states.d.overconfident = 1; // 과신
   states.e = E.createState('e', 'word', d1); states.e.needsSpellCheck = true;
@@ -316,7 +320,7 @@ t('E20 위험 표시는 안정화가 끝나면 해제된다 — 과신 1회가 �
   E.recordCriterion(s, ok, at(9, 1));                  // 한 번 외웠다(도달)
   E.recordCriterion(s, { correct: false }, at(9, 1));  // 그런데 틀렸다 = 과신(v1.3 기록 판정)
   assert.strictEqual(E.wordSummary({ w: s }).risky, 1);
-  [1, 2, 3, 4].forEach((d) => E.recordCriterion(s, ok, at(9, d)));
+  [1, 2, 3, 4].forEach((d) => { s.due = at(9, d); E.recordCriterion(s, ok, at(9, d)); });
   assert.ok(E.isStable(s));
   assert.strictEqual(E.wordSummary({ w: s }).risky, 0, '안정화 완료 → 위험 해제');
   E.recordCriterion(s, { correct: false }, at(9, 10));
@@ -552,14 +556,14 @@ t('E2 77단어 완주 — D-14 시작·매일 출석·전답이면 D-1 에 77/77
     plan.words.review.forEach((id) => {
       if (!states[id].reached) E.recordCriterion(states[id], ok, now); else E.recordQuiz(states[id], ok, now);
     });
-    plan.words.relearn.forEach((id) => E.recordCriterion(states[id], ok, now));
+    plan.words.relearn.forEach((id) => { states[id].due = now; E.recordCriterion(states[id], ok, now); });
     assert.ok(plan.words.relearn.length <= 47, 'D-' + plan.dday + ' 안정화 상한(77×3÷5): ' + plan.words.relearn.length);
     assert.ok(plan.words.review.length <= 20, '복습 상한');
   }
   assert.strictEqual(firstRelearnDay, 7, '안정화 회전은 D-7 부터');
   const sum = E.wordSummary(states);
   assert.strictEqual(sum.reached, 77);
-  assert.strictEqual(sum.stable, 77, '전원 안정화: ' + JSON.stringify(sum));
+  assert.ok(sum.stable < 77, 'due 간격을 무시해 시험 전 안정화를 허위 완주시키지 않는다: ' + JSON.stringify(sum));
 });
 
 t('E1 신규일 철자 실패 단어 — 복습 레인으로 계속 나오고 도달 기회(완전 인출)가 이어진다', () => {
@@ -850,7 +854,7 @@ t('gateRange — 범위 전체 단어 합산, 완료 기준은 isDone(철자 재
 
 t('rangeSummary — 범위 합계 + 과별 값(계약 R1 summary.range)', () => {
   const A = seedEntry('L6', 6), B = seedEntry('L7', 7);
-  [d1, d2, d3, d4].forEach((n) => E.recordCriterion(A.states['w-001'], ok, n));   // 안정화 3회전
+  [d1, d2, d3, d4].forEach((n) => { A.states['w-001'].due = n; E.recordCriterion(A.states['w-001'], ok, n); });   // due에 도달한 안정화 3회전
   E.applyDiagnostic(A.states, [{ id: 'w-002', known: true }], d1);                // 철자 재검증 대기
   A.states[E.sentenceId(1)].stage = 3;
   B.states[E.sentenceId(1)].stage = 6;
@@ -922,7 +926,7 @@ t('E-R 2과 범위 완주 — D-14 시작·매일 출석·전답이면 두 과�
       pp.words.review.forEach((id) => {
         if (!e.states[id].reached) E.recordCriterion(e.states[id], ok, now); else E.recordQuiz(e.states[id], ok, now);
       });
-      pp.words.relearn.forEach((id) => E.recordCriterion(e.states[id], ok, now));
+      pp.words.relearn.forEach((id) => { e.states[id].due = now; E.recordCriterion(e.states[id], ok, now); });
       pp.sentences.forEach((x) => runItem(e, x, now));
     });
     const sum = E.rangeSummary(entries);
@@ -932,15 +936,15 @@ t('E-R 2과 범위 완주 — D-14 시작·매일 출석·전답이면 두 과�
   assert.strictEqual(firstRelearn, 7, '안정화 회전은 범위 전체가 D-7 부터');
   assert.ok(maxGap <= 2, '한 과가 다른 과를 굶기지 않는다(하루 몫 차이 ' + maxGap + ')');
   const sum = E.rangeSummary(entries);
-  assert.deepStrictEqual(sum.word, { total: 16, reached: 16, stable: 16, risky: 0, needsSpellCheck: 0 },
-    '두 과 단어 전량 안정화: ' + JSON.stringify(sum.word));
+  assert.strictEqual(sum.word.reached, 16, '두 과 단어 도달: ' + JSON.stringify(sum.word));
+  assert.ok(sum.word.stable < 16, 'due·날짜·간격을 충족하지 않은 빠른 회전을 완료로 집계하지 않는다: ' + JSON.stringify(sum.word));
   assert.strictEqual(sum.sentence.memorized, 10, '두 과 문장 전량 백지 통과');
   /* 본문 세 층이 모두 끝난다: 청크 트랙 4단락 · 단락 백지 4단락 · 누적 2+2 · 종합 Check */
   assert.deepStrictEqual(sum.passage,
     { chunkDone: 4, chunkTotal: 4, paraBlank: 4, paraTotal: 4, cumulative: 4, check: { correct: 16, total: 16 } },
     JSON.stringify(sum.passage));
   assert.ok(reachDay >= 7, '마감(D-7)까지 두 과 전량 도달 — 실제 D-' + reachDay);
-  assert.strictEqual(stableDay, 1, 'D-1 에 전량 안정화');
+  assert.strictEqual(stableDay, null, 'due·8시간·다른 날 요건상 짧은 기간에 전량 안정화로 오인하지 않는다');
 });
 
 t('E-R 2과 77단어 범위(154) — 자동 산정 상한이 마감을 지킨다(고정 상한 10이면 130개에서 멈췄다)', () => {
@@ -972,16 +976,16 @@ t('E-R 2과 77단어 범위(154) — 자동 산정 상한이 마감을 지킨다
       pp.words.review.forEach((id) => {
         if (!e.states[id].reached) E.recordCriterion(e.states[id], ok, now); else E.recordQuiz(e.states[id], ok, now);
       });
-      pp.words.relearn.forEach((id) => E.recordCriterion(e.states[id], ok, now));
+      pp.words.relearn.forEach((id) => { e.states[id].due = now; E.recordCriterion(e.states[id], ok, now); });
     });
     const sum = E.rangeSummary(entries);
     if (reachDay == null && sum.word.reached === sum.word.total) reachDay = plan.dday;
     if (stableDay == null && sum.word.stable === sum.word.total) stableDay = plan.dday;
   }
   assert.ok(reachDay >= 7, '마감(D-7)까지 154개 전량 도달 — 실제 D-' + reachDay);
-  assert.strictEqual(stableDay, 1, 'D-1 에 전량 안정화');
-  assert.deepStrictEqual(E.rangeSummary(entries).word,
-    { total: 154, reached: 154, stable: 154, risky: 0, needsSpellCheck: 0 });
+  assert.strictEqual(stableDay, null, 'due·8시간·다른 날 요건상 짧은 기간에 전량 안정화로 오인하지 않는다');
+  assert.strictEqual(E.rangeSummary(entries).word.reached, 154);
+  assert.ok(E.rangeSummary(entries).word.stable < 154, 'due 조건 없는 안정화 완주를 허용하지 않는다');
   assert.deepStrictEqual([maxNew, maxRev], [22, 22], '하루 신규·복습 최대 (154 ÷ 7일)');
   assert.ok(maxRe <= 93, '안정화 상한(154×3÷5) 안: ' + maxRe);
   assert.ok(gap <= 2, '두 과의 하루 부담이 갈린다(최대 차 ' + gap + ')');
@@ -1064,8 +1068,9 @@ t('advanceStage — 6단계(백지) 통과 = 도달, 이후는 단어와 같은 
   assert.strictEqual(s.stage, 6);
   E.advanceStage(s, true, d1b);
   assert.strictEqual(s.relearnCount, 0, '같은 날 재통과는 불인정');
+  s.due = d2;
   E.advanceStage(s, true, d2);
-  assert.strictEqual(s.relearnCount, 1, '다른 날 재통과만 +1');
+  assert.strictEqual(s.relearnCount, 1, '다른 날+due 도달 재통과만 +1');
 });
 
 t('sentenceSummary — 단계 분포·해석 통과(stage≥2)·암송 완료, 본문 문장만', () => {
@@ -1457,7 +1462,7 @@ t('E-P 25문장·5단락 완주 — D-14 시작이면 누적 백지·종합 Chec
     plan.words.review.forEach((id) => {
       if (!e.states[id].reached) E.recordCriterion(e.states[id], ok, now); else E.recordQuiz(e.states[id], ok, now);
     });
-    plan.words.relearn.forEach((id) => E.recordCriterion(e.states[id], ok, now));
+    plan.words.relearn.forEach((id) => { e.states[id].due = now; E.recordCriterion(e.states[id], ok, now); });
     let did = 0;
     for (let tick = 1; did < budget && tick < 300; tick++) {
       const x = E.planDay(big, e.states, EX, now + tick * 60000, { rec: e.rec }).sentences[0];
@@ -1568,4 +1573,60 @@ t('본문에 안 나오는 단어는 맨 뒤 — 대화문 어휘가 본문 진�
     '팩 맨 앞에 있어도 순서는 맨 뒤');
 });
 
+t('KST 날짜·daysUntil은 기기 시간대와 무관하고 자정 경계를 지킨다', () => {
+  const before = Date.UTC(2026, 0, 1, 14, 59);
+  const after = before + 2 * 60 * 1000;
+  assert.strictEqual(E.localDate(before), '2026-01-01');
+  assert.strictEqual(E.localDate(after), '2026-01-02');
+  assert.strictEqual(E.daysUntil('2026-01-02', before), 1);
+  assert.strictEqual(E.daysUntil('2026-01-02', after), 0);
+  assert.strictEqual(E.daysUntil('2025-12-31', after), -2);
+});
+
+t('relearn은 다른 KST날이어도 due 전에는 늘지 않고 due+8시간 이후에만 증가한다', () => {
+  const first = Date.UTC(2026, 0, 1, 14, 0); // KST 1/1 23:00
+  const s = reachedState('contract', first);
+  const scheduledDue = first + 8 * 3600000;
+  s.due = scheduledDue;
+  E.recordCriterion(s, ok, scheduledDue - 3600000); // KST 1/2, due 한 시간 전
+  assert.strictEqual(s.relearnCount, 0);
+  assert.strictEqual(s.due, scheduledDue - 3600000 + 2 * DAY, 'due 전 성공도 step 증가에 따른 다음 due를 갱신한다');
+  s.due = scheduledDue;
+  E.recordCriterion(s, ok, scheduledDue);
+  assert.strictEqual(s.relearnCount, 1);
+  assert.strictEqual(s.lastCriterionDate, '2026-01-02');
+  assert.strictEqual(s.lastCriterionAt, scheduledDue);
+  assert.strictEqual(s.due, scheduledDue + 3 * DAY, '성공 시 증가한 step의 간격으로 due가 갱신된다');
+});
+
+t('기존 저장 상태에 due 필드가 없어도 기록 갱신·안정화 판정이 호환된다', () => {
+  const first = Date.UTC(2026, 0, 1, 3, 0);
+  const s = reachedState('legacy', first);
+  delete s.due;
+  delete s.lastCriterionAt;
+  delete s.lastCriterionDate;
+  const next = Date.UTC(2026, 0, 2, 3, 0);
+  E.recordCriterion(s, ok, next);
+  assert.strictEqual(s.relearnCount, 1);
+  assert.strictEqual(s.lastCriterionDate, '2026-01-02');
+  assert.strictEqual(s.due, next + 2 * DAY, '구형 상태도 새 성공의 due 필드는 정상 생성');
+});
+t('시험 window에서도 due 미래 안정화 후보는 회전 편성되지 않는다', () => {
+  const now = Date.UTC(2026, 0, 1, 3, 0); // KST 1/1 12:00
+  const s = reachedState('w1', now - DAY);
+  s.due = now + DAY;
+  const plan = E.planDay(mkPack(1), { w1: s }, { examDate: '2026-01-04', wordDeadlineDays: 7 }, now, {});
+  assert.strictEqual(plan.words.relearn.length, 0);
+  assert.strictEqual(plan.words.review.length, 0);
+});
+
+t('오답은 10분 뒤 due로 재편성되고 그 전에는 review에 나타나지 않는다', () => {
+  const now = Date.UTC(2026, 0, 1, 3, 0);
+  const s = E.createState('w1', 'word', now);
+  E.recordCriterion(s, { correct: false }, now);
+  assert.strictEqual(s.due, now + 10 * 60 * 1000);
+  const p = mkPack(1);
+  assert.strictEqual(E.planDay(p, { w1: s }, null, s.due - 1, {}).words.review.length, 0);
+  assert.strictEqual(E.planDay(p, { w1: s }, null, s.due, {}).words.review.length, 1);
+});
 console.log('\n통과 ' + passed + '개 — naesin 암기 엔진 검증 완료');

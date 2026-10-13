@@ -36,17 +36,16 @@ var WBNAESIN = (function () {
 
   /* 로컬 달력 날짜 'YYYY-MM-DD' — '다른 날' 판정은 전부 이 문자열 비교로 한다 */
   function localDate(now) {
-    var d = new Date(ms(now));
-    var m = d.getMonth() + 1, day = d.getDate();
-    return d.getFullYear() + '-' + (m < 10 ? '0' + m : m) + '-' + (day < 10 ? '0' + day : day);
+    var d = new Date(ms(now) + 9 * 3600000);
+    var m = d.getUTCMonth() + 1, day = d.getUTCDate();
+    return d.getUTCFullYear() + '-' + (m < 10 ? '0' + m : m) + '-' + (day < 10 ? '0' + day : day);
   }
 
-  /* 'YYYY-MM-DD'까지 남은 로컬 일수 (오늘=0, 내일=1, 지났으면 음수) */
+  /* 남은 일수는 KST 달력 날짜 간 UTC 자정 경계 차이로 계산한다. */
   function daysUntil(ymd, now) {
     var p = String(ymd).split('-');
-    var target = new Date(+p[0], +p[1] - 1, +p[2]).getTime();
-    var d = new Date(ms(now));
-    var today = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+    var target = Date.UTC(+p[0], +p[1] - 1, +p[2]);
+    var today = Date.parse(localDate(now) + 'T00:00:00Z');
     return Math.round((target - today) / DAY);
   }
 
@@ -139,7 +138,7 @@ var WBNAESIN = (function () {
     s.needsSpellCheck = false;   // 철자까지 쳐냈으면 재검증 끝
     if (!s.reached) {
       s.reached = true; s.reachedAt = now; s.lastCriterionDate = d; s.lastCriterionAt = now;
-    } else if (s.lastCriterionDate !== d &&
+    } else if ((s.due == null || now >= s.due) && s.lastCriterionDate !== d &&
       (s.lastCriterionAt == null || now - s.lastCriterionAt >= CRITERION_GAP_MS)) {
       s.relearnCount = Math.min(RELEARN_TARGET, s.relearnCount + 1);
       s.lastCriterionDate = d; s.lastCriterionAt = now;
@@ -349,7 +348,7 @@ var WBNAESIN = (function () {
         if (s.due <= now) out.review.push(c);                  // D-7 전 — 만기면 복습(SRS 유지)
         return;
       }
-      if (ctx.mode !== 'exam' && s.due > now) return;           // 연습·시험 후는 due 기준
+      if (s.due > now) return;                                  // 모든 모드에서 due 전 안정화 금지
       out.relearn.push(c);
       out.rotations += RELEARN_TARGET - s.relearnCount;
     });
