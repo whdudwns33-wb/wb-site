@@ -13,7 +13,7 @@ async function test(name, fn) { await fn(); console.log('통과:', name); count+
   await test('입학연도·현재학년·출처 버전과 이전 확인 이력 보존', () => {
     catalog.validate(data);
     assert.equal(data.sources.find(s => s.id === 'gnue-2027-1007').checkedAt, '2026-10-07');
-    const changes = [d => d.educationYear = 2028, d => d.sources[0].url = 'javascript:alert(1)', d => d.sources[0].checkedAt = '2026-10-13', d => d.sources[0].checkedAt = '2026-02-30', d => d.institutions[0].source = '없는 출처', d => d.courses[0].grades = [7], d => d.courses.push(d.courses[0]), d => d.events[0].end = '2026-10-01', d => d.admissions[0].year = 2026];
+    const changes = [d => d.educationYear = 2028, d => d.sources[0].url = 'javascript:alert(1)', d => d.sources[0].checkedAt = '2026-10-14', d => d.sources[0].checkedAt = '2026-02-30', d => d.institutions[0].source = '없는 출처', d => d.courses[0].grades = [7], d => d.courses.push(d.courses[0]), d => d.events[0].end = '2026-10-01', d => d.admissions[0].year = 2026];
     for (const mutate of changes) { const copy = structuredClone(data); mutate(copy); assert.throws(() => catalog.validate(copy)); }
   });
   await test('한국시간 접수 시작·마감 경계와 미확정 마감 시각', () => {
@@ -22,6 +22,7 @@ async function test(name, fn) { await fn(); console.log('통과:', name); count+
     assert.equal(catalog.phase(event, Date.parse('2026-10-15T10:00:00+09:00')), '기간 내');
     assert.equal(catalog.phase(event, Date.parse('2026-10-30T17:00:00+09:00')), '기간 내');
     assert.equal(catalog.phase(event, Date.parse('2026-10-30T17:00:01+09:00')), '마감');
+    assert.equal(catalog.phase({kind:'수험표 출력 시작',start:'2026-10-21T12:00',end:'2026-10-21T12:00'}, catalog.instant('2026-10-25')), '출력 시작 이후 · 종료일 확인');
     const day = data.events.find(e => e.institution === 'gice' && e.kind === '원서');
     assert.equal(catalog.phase(day, Date.parse('2026-10-26T20:00:00+09:00')), '기간 내 · 시각 확인');
     assert.equal(catalog.phase(day, Date.parse('2026-10-27T00:00:00+09:00')), '마감');
@@ -63,7 +64,7 @@ async function test(name, fn) { await fn(); console.log('통과:', name); count+
     assert.equal((gifted.match(/data-course=/g) || []).length, data.courses.length);
     assert.match(gifted, /교육청 계열/); assert.match(gifted, /대학부설/);
     assert.match(gifted, /확인 필요/);
-    assert.match(gifted, /2026-10-11/); assert.match(gifted, /<noscript>/);
+    assert.match(gifted, /2026-10-13/); assert.match(gifted, /<noscript>/);
     assert.doesNotMatch(read('public.js'), /fetch\s*\(|localStorage|sessionStorage|serviceWorker|\/api\/|innerHTML/);
   });
   await test('기관마다 원서·추천·시험·등록이 연결되어 GED와 대학 자체 접수를 혼합하지 않음', () => {
@@ -279,6 +280,47 @@ async function test(name, fn) { await fn(); console.log('통과:', name); count+
       const source = data.sources.find(s => s.id === entry(id).source);
       assert.equal(source.checkedAt, '2026-10-11');
       assert.match(source.note, /10\/12.*재대조/);
+    }
+  });
+  await test('삼육 최신 안내는 전형별 추가 서류·평가·공식 시각을 구분하고 학습 정본을 바꾸지 않음', () => {
+    const a = data.admissions.find(a => a.institution === 'samyook');
+    assert.equal(a.tracks.length, 6);
+    assert.match(a.assessment, /일반·국제·사회통합.*330.*SDAⅠ·SDAⅡ·삼육리더.*430/);
+    assert.match(a.documents, /최근 한 달.*별도 종이 제출 없음/);
+    assert.match(a.subjects.math, /초6 1학기까지 전 과정.*고학년.*다수/);
+    const html = read('samyook/index.html');
+    assert.match(html, /2026-11-04T16:30/);
+    assert.match(html, /10\/15 우체국 소인.*도착 기준 아님/);
+    assert.match(html, /출력 시작 시각만 공고.*종료일.*추정/);
+    assert.doesNotMatch(html, /수험표[\s\S]*2026-11-02T16:00/);
+    assert.match(html, /SDAⅠ·SDAⅡ·삼육리더 제출서류/);
+    assert.match(html, /2028학년도 이후 요강은 미공고/);
+    const invalid = structuredClone(data); invalid.admissions[0].tracks[0].documents = '';
+    assert.throws(() => catalog.validate(invalid));
+  });
+  await test('광주 명부·추가 공지는 해당 대상과 출처가 연결되고 모든 로컬 앵커가 존재', async () => {
+    const html = read('gwangju-gifted/index.html');
+    assert.match(html, /5기관.*94학급/);
+    assert.match(html, /2027 운영 승인 학교/);
+    assert.match(html, /중등 주중2.*중3사사.*대상만/);
+    assert.match(html, /10\/16까지 등록예정자.*담임교사에게 서면 제출/);
+    const ai = html.slice(html.indexOf('id="ai"'), html.indexOf('id="gnue"'));
+    assert.ok(ai.indexOf('2026-12-21') < ai.indexOf('2026-12-24'), '발표를 등록보다 먼저 안내');
+    assert.match(html, /SW·AI.*초2~5.*교육 초3~6/);
+    assert.match(html, /실제 추천서·학생 산출물·증빙자료.*요구하지 않습니다/);
+    assert.match(html, /시간·횟수·수강료·담당·개설일은 모두 미정/);
+    const invalid = structuredClone(data); invalid.institutions[0].notices = ['잘못된 출처'];
+    assert.throws(() => catalog.validate(invalid));
+    const { outputs } = await import(pathToFileURL(path.join(__dirname, 'build.mjs')).href);
+    for (const [file, body] of Object.entries(outputs)) {
+      for (const m of body.matchAll(/href="([^"#]*#[^"]+)"/g)) {
+        const link = m[1]; if (link.startsWith('https:')) continue;
+        const [route, id] = link.split('#');
+        const root = path.resolve(__dirname, '../..');
+        let target = route ? path.join(root, route) : path.join(__dirname, file);
+        if (fs.statSync(target).isDirectory()) target = path.join(target, 'index.html');
+        assert.ok(fs.readFileSync(target, 'utf8').includes('id="' + id + '"'), file + ' 앵커 누락: ' + link);
+      }
     }
   });
   console.log('새 공개 안내:', count, '개 통과');
