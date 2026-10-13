@@ -72,7 +72,7 @@ fs.copyFileSync(SHARED, path.join(DIST, 'naesin', 'voice.js'));
 const NAESINKO = path.join(ROOT, '..', 'naesin-ko');
 fs.mkdirSync(path.join(DIST, 'naesin-ko'), { recursive: true });
 const NAESINKO_FILES = ['index.html', 'engine.js', 'grade.js', 'gen.js', 'pack-check.js',
-  'readiness.js', 'concepts.json', 'pack-sample.json', 'sw.js', 'manifest.webmanifest', 'icon.svg'];
+  'readiness.js', 'render.js', 'concepts.json', 'pack-sample.json', 'sw.js', 'manifest.webmanifest', 'icon.svg'];
 for (const f of NAESINKO_FILES) fs.copyFileSync(path.join(NAESINKO, f), path.join(DIST, 'naesin-ko', f));
 fs.copyFileSync(SHARED, path.join(DIST, 'naesin-ko', 'voice.js'));
 /* 하루브레인 (haru/) — 같은 오리진 /haru/ 에서 서빙해야 학생 코드·API가 공유된다.
@@ -181,7 +181,7 @@ const nTag = stampSW(path.join(DIST, 'naesin', 'sw.js'),
   ['index.html', 'voice.js', 'engine.js', 'grade.js', 'gen.js', 'pack-sample.json', 'manifest.webmanifest', 'icon.svg']
     .map(f => path.join(DIST, 'naesin', f)), 'wbn-shell');
 const kTag = stampSW(path.join(DIST, 'naesin-ko', 'sw.js'),
-  ['index.html', 'voice.js', 'engine.js', 'grade.js', 'gen.js', 'pack-check.js', 'readiness.js',
+  ['index.html', 'voice.js', 'engine.js', 'grade.js', 'gen.js', 'pack-check.js', 'readiness.js', 'render.js',
     'concepts.json', 'pack-sample.json', 'manifest.webmanifest', 'icon.svg']
     .map(f => path.join(DIST, 'naesin-ko', f)), 'wbk-shell');
 

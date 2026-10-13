@@ -17,6 +17,7 @@ import { checkAdminLogin } from './admin-auth.mjs';
 import { handlePortalFamilyLink, readPortalLinkBody, withPortalFamilies } from './portal-family.mjs';
 import { bookIndex, cleanWords, coachingCard, confirmAllPlan, findBook, readyToConfirm, sourceSummary, validProgress, withOverlay } from './textbook.mjs';
 import { parseRoster } from './roster.mjs';
+import { readJsonBody } from './request-body.mjs';
 
 const TOKEN_TTL_S = 60 * 60 * 24 * 30;
 const STATE_MAX_BYTES = 900_000;   // 학생 기록 1건 최대 크기
@@ -684,18 +685,18 @@ export default {
 
       /* 하루브레인 부모 화면 — ptoken 으로만, 로그인 없음 (진로독서 /api/parent/summary 와 같은 자리) */
       if (p === '/api/haru/parent' && req.method === 'GET') {
-        const out = await handleHaru({ path: p, method: 'GET', who: null, query: url.searchParams, getBody: () => req.json(), store: haruStore(env) });
+        const out = await handleHaru({ path: p, method: 'GET', who: null, query: url.searchParams, getBody: () => readJsonBody(req, haruBodyLimit(p)), store: haruStore(env) });
         return json(out.status, out.body);
       }
       /* 브레인레터 무인증 경로 — 가족 링크(parent, 진로독서 학부모 토큰)·가족 알림 구독(parent/push/*)·사진(img/<id>, id 가 곧 열쇠) */
       /* 청크브레인 가족 링크 — 진로독서 학부모 토큰(parent:<t>)으로, 로그인 없음. 라우트 모듈이 토큰을 풀고 apps 게이트를 건다 */
       if (p === '/api/chunk/parent' || p.startsWith('/api/chunk/parent/')) {
         if (Number(req.headers.get('content-length') || 0) > 300_000) return json(413, { error: '요청이 너무 커서 받을 수 없어요.' });
-        const out = await handleChunk({ path: p, method: req.method, who: null, query: url.searchParams, getBody: () => req.json(), store: chunkStore(env), push: vocabPushEnv(env) });
+        const out = await handleChunk({ path: p, method: req.method, who: null, query: url.searchParams, getBody: () => readJsonBody(req, 300_000), store: chunkStore(env), push: vocabPushEnv(env) });
         return json(out.status, out.body);
       }
       if (p === '/api/letter/parent' || p.startsWith('/api/letter/parent/') || p.startsWith('/api/letter/img/')) {
-        const out = await handleLetter({ path: p, method: req.method, who: null, query: url.searchParams, getBody: () => req.json(), store: letterStore(env), push: vocabPushEnv(env) });
+        const out = await handleLetter({ path: p, method: req.method, who: null, query: url.searchParams, getBody: () => readJsonBody(req, letterBodyLimit(p)), store: letterStore(env), push: vocabPushEnv(env) });
         if (out.bytes) return new Response(out.bytes, { status: out.status, headers: out.headers });
         return json(out.status, out.body);
       }
@@ -719,7 +720,7 @@ export default {
         const len = Number(req.headers.get('content-length') || 0);
         if (len > haruBodyLimit(p)) return json(413, { error: '요청이 너무 커서 받을 수 없어요.' });
         const out = await handleHaru({
-          path: p, method: req.method, who, query: url.searchParams, getBody: () => req.json(), store: haruStore(env),
+          path: p, method: req.method, who, query: url.searchParams, getBody: () => readJsonBody(req, haruBodyLimit(p)), store: haruStore(env),
           /* 원자 목록 기본값은 배포본의 haru/atoms.json — KV 에 올린 것이 있으면 그것이 이긴다 */
           atomsFallback: async () => { try { return await (await env.ASSETS.fetch(new Request(url.origin + '/haru/atoms.json'))).json(); } catch (e) { return null; } },
           randomToken: () => crypto.randomUUID().replace(/-/g, ''),
@@ -731,7 +732,7 @@ export default {
       if (p.startsWith('/api/hanja/')) {
         const len = Number(req.headers.get('content-length') || 0);
         if (len > hanjaBodyLimit(p)) return json(413, { error: '요청이 너무 커서 받을 수 없어요.' });
-        const out = await handleHanja({ path: p, method: req.method, who, query: url.searchParams, getBody: () => req.json(), store: hanjaStore(env), push: vocabPushEnv(env) });
+        const out = await handleHanja({ path: p, method: req.method, who, query: url.searchParams, getBody: () => readJsonBody(req, hanjaBodyLimit(p)), store: hanjaStore(env), push: vocabPushEnv(env) });
         return json(out.status, out.body);
       }
 
@@ -740,7 +741,7 @@ export default {
         const len = Number(req.headers.get('content-length') || 0);
         if (len > letterBodyLimit(p)) return json(413, { error: '요청이 너무 커서 받을 수 없어요.' });
         const out = await handleLetter({
-          path: p, method: req.method, who, query: url.searchParams, getBody: () => req.json(), store: letterStore(env), origin: url.origin,
+          path: p, method: req.method, who, query: url.searchParams, getBody: () => readJsonBody(req, letterBodyLimit(p)), store: letterStore(env), origin: url.origin,
           ai: { apiKey: env.ANTHROPIC_API_KEY || '', model: env.LETTER_AI_MODEL || '', env, imageKey: env.GEMINI_API_KEY || '', imageModel: env.LETTER_IMAGE_MODEL || '' },
           push: vocabPushEnv(env),
           /* 발행 즉시 알림은 응답 뒤에 이어서 보낸다 — 구독자 수만큼 걸리는 일을 원장이 기다리지 않게 */
@@ -765,12 +766,12 @@ export default {
          json()이 모든 응답에 no-store를 붙인다 — 기획서 §10-3. */
       if (p.startsWith('/api/naesin/')) {
         /* 몸통을 읽기 전에 content-length 로 거른다 — 팩은 4.5MB, 나머지는 300KB.
-           req.json() 은 다 읽고서야 크기를 알아서, 기기 하나가 수십 MB 를 보내면 그만큼 워커 메모리·시간을 쓴다. */
+           길이 헤더가 없거나 작게 적혔어도 getBody 의 스트림 검사가 같은 상한을 적용한다. */
         const len = Number(req.headers.get('content-length') || 0);
         if (len > naesinBodyLimit(p)) return json(413, { error: '요청이 너무 커서 받을 수 없어요.' });
         const ctx = {
           path: p, method: req.method, who, query: url.searchParams,
-          getBody: () => req.json(), store: naesinStore(env),
+          getBody: () => readJsonBody(req, naesinBodyLimit(p)), store: naesinStore(env),
         };
         /* 팩 제작 스튜디오가 먼저 본다 — 자기 경로가 아니면 null 을 돌려 다음 라우터로 넘긴다 */
         const st = await handleStudio({
@@ -786,7 +787,7 @@ export default {
       if (p.startsWith('/api/chunk/')) {
         const len = Number(req.headers.get('content-length') || 0);
         if (len > 300_000) return json(413, { error: '요청이 너무 커서 받을 수 없어요.' });
-        const out = await handleChunk({ path: p, method: req.method, who, getBody: () => req.json(), store: chunkStore(env) });
+        const out = await handleChunk({ path: p, method: req.method, who, getBody: () => readJsonBody(req, 300_000), store: chunkStore(env) });
         return json(out.status, out.body);
       }
 
@@ -796,7 +797,7 @@ export default {
         if (len > naesinKoBodyLimit(p)) return json(413, { error: '요청이 너무 커서 받을 수 없어요.' });
         const out = await handleNaesinKo({
           path: p, method: req.method, who, query: url.searchParams,
-          getBody: () => req.json(), store: naesinKoStore(env),
+          getBody: () => readJsonBody(req, naesinKoBodyLimit(p)), store: naesinKoStore(env),
         });
         return json(out.status, out.body);
       }
@@ -1148,6 +1149,7 @@ export default {
       }
       return json(404, { error: 'unknown api' });
     } catch (e) {
+      if (e && e.status === 413) return json(413, { error: '요청이 너무 커서 받을 수 없어요.' });
       return json(500, { error: '서버 오류', detail: String(e && e.message || e) });
     }
   },

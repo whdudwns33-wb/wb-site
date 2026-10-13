@@ -90,6 +90,19 @@
     label.ck input{width:auto;min-height:auto}
     .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
     .ans{background:#f7fbf7;border-left:3px solid var(--acc);padding:8px 11px;border-radius:0 8px 8px 0;white-space:pre-wrap}
+    .btn.danger{background:var(--bad)}
+    #boardOut{overflow-wrap:anywhere}
+    #boardOut .poem{max-width:75ch;margin:14px 0;font-size:17px;line-height:1.9}
+    #boardOut .st{margin-bottom:22px}
+    #boardOut .note{display:block;margin:4px 0 8px;color:var(--acc);font-size:14px;line-height:1.6}
+    #boardOut .sym{color:var(--acc);font-weight:800;margin-right:4px}
+    #boardOut mark{background:var(--soft);color:inherit;text-decoration:underline;text-underline-offset:4px}
+    #boardOut .school-note{padding:10px 12px;border:1px solid #d6e4d5;border-radius:10px;background:var(--soft);white-space:pre-wrap}
+    #boardOut h3{font-size:16px;margin-top:20px}
+    .board-options{margin-top:10px}
+    .board-options .ck{font-size:14px}
+    #boardCard :focus-visible,#scrubCard :focus-visible{outline:2px solid var(--acc);outline-offset:3px}
+    #boardOut ::selection{background:var(--acc);color:#fff}
   </style>
 </head>
 <body>
@@ -105,6 +118,7 @@
 <script src="/naesin-ko/readiness.js"></script>
 <script src="/naesin-ko/grade.js"></script>
 <script src="/naesin-ko/gen.js"></script>
+<script src="/naesin-ko/render.js"></script>
 <script src="/admin/qr.js"></script>
 <script src="/admin/admin-login.js"></script>
 <script>
@@ -115,24 +129,28 @@ let TOKEN = localStorage.getItem('wbr.admin.token') || null;
 let PACKS = [], OVERVIEW = [], REVIEWS = [], ASSEMBLED = null, CONCEPTS = null;
 /* 팩과 함께 고른 검수 파일 — 팩이 아니라 루브릭 저작 대기 목록으로 간다 */
 let PENDING_UP = null;
+let ADMIN_EPOCH = 0, SCRUB = null, BOARD_LOAD = 0;
+let BOARD = { pack: null, overlay: null, scope: '' };
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 async function api(path, opt) {
+  const requestToken = TOKEN;
   const r = await fetch('/api' + path, Object.assign({
-    headers: { 'Content-Type': 'application/json', ...(TOKEN ? { Authorization: 'Bearer ' + TOKEN } : {}) }
+    headers: { 'Content-Type': 'application/json', ...(requestToken ? { Authorization: 'Bearer ' + requestToken } : {}) }
   }, opt || {}));
   const j = await r.json().catch(() => ({}));
-  if (r.status === 401 && TOKEN) {
+  if (r.status === 401 && TOKEN && TOKEN === requestToken) {
     TOKEN = null; localStorage.removeItem('wbr.admin.token');
     renderLogin('세션이 만료됐어요. 다시 로그인해 주세요.');
     throw new Error('auth');
   }
-  if (!r.ok) throw new Error(j.error || ('오류 ' + r.status));
+  if (!r.ok) { const e = new Error(j.error || ('오류 ' + r.status)); e.status = r.status; throw e; }
   return j;
 }
 
 function renderLogin(msg){
+  resetAdminCards();
   
   /* 로그인 폼은 공용 모듈이 그린다(아이디·비밀번호 기본, PIN 갈래로 전환) — reading-server/public/admin-login.js */
   $('#app').innerHTML='<div class="card" id="loginCard"><h2>강사 로그인</h2><div id="loginHost"></div></div>';
@@ -140,12 +158,17 @@ function renderLogin(msg){
 }
 
 async function refresh() {
+  resetAdminCards();
+  const epoch = ADMIN_EPOCH;
   try {
     const [ov, pk] = await Promise.all([api('/naesin-ko/admin/overview'), api('/naesin-ko/admin/packs')]);
-    OVERVIEW = ov.students || []; PACKS = pk.packs || [];
-    try { REVIEWS = (await api('/naesin-ko/admin/review')).reviews || []; } catch (e) { REVIEWS = []; }
+    if (epoch !== ADMIN_EPOCH || !TOKEN) return;
+    let reviews = [];
+    try { reviews = (await api('/naesin-ko/admin/review')).reviews || []; } catch (e) { reviews = []; }
+    if (epoch !== ADMIN_EPOCH || !TOKEN) return;
+    OVERVIEW = ov.students || []; PACKS = pk.packs || []; REVIEWS = reviews;
     render();
-  } catch (e) { if (e.message !== 'auth') $('#app').innerHTML = `<div class="card err">${esc(e.message)}</div>`; }
+  } catch (e) { if (epoch === ADMIN_EPOCH && e.message !== 'auth') $('#app').innerHTML = `<div class="card err">${esc(e.message)}</div>`; }
 }
 
 /* 학생 요약만 보고 반 그림을 만든다 — 학생 state는 서버가 통째로 읽지 않는다(§8).
@@ -179,6 +202,7 @@ function renderClass() {
 }
 
 function render() {
+  resetAdminCards();
   const linked = OVERVIEW.filter((s) => s.linked);
   CLS = window.WBKOREADY ? WBKOREADY.classReadiness(linked) : CLS;
   /* 목록과 같은 기준으로 센다 — 규칙이 통과시킨 답안도 표본 감사(§5.3 self)를 위해
@@ -288,6 +312,37 @@ function render() {
       <span class="muted" id="prMsg"></span>
     </div>
     <div id="prPrev" class="muted" style="margin-top:10px">작품을 고르면 미리보기가 여기 나옵니다.</div>
+  </div>
+
+  <div class="card" id="boardCard">
+    <h2>지문 보드</h2>
+    <p class="muted">작품 본문과 세트 발췌를 수업 화면으로 봅니다. 세트를 고르면 그 세트의 ㉠ 기호를 표시합니다.</p>
+    <div class="grid-form">
+      <div><label class="muted" for="boardPack">팩</label><select id="boardPack">${PACKS.map((p) => `<option>${esc(p)}</option>`).join('')}</select></div>
+      <div><label class="muted" for="boardScope">학교 강조 대상</label><input id="boardScope" value="default" placeholder="default 또는 학생 코드"></div>
+      <div><button class="btn ghost" id="btnBoardLoad">불러오기</button></div>
+    </div>
+    <div class="grid-form" style="margin-top:10px">
+      <div><label class="muted" for="boardWork">작품</label><select id="boardWork" disabled><option value="">먼저 팩을 불러오세요</option></select></div>
+      <div><label class="muted" for="boardSet">지문 범위</label><select id="boardSet" disabled><option value="">작품 본문</option></select></div>
+    </div>
+    <div class="row board-options">
+      <label class="ck"><input type="checkbox" id="boardWings"> 날개풀이</label>
+      <label class="ck"><input type="checkbox" id="boardStanzas"> 연별 내용</label>
+      <span class="muted" id="boardMsg" role="status" aria-live="polite"></span>
+    </div>
+    <div id="boardOut"><p class="muted">팩을 고르고 불러오기를 누르세요.</p></div>
+  </div>
+
+  <div class="card" id="scrubCard">
+    <h2>옛 오답 발문 청소</h2>
+    <p class="muted">오답 기록에 남은 교재 발문만 지웁니다. <b>지우기는 되돌릴 수 없습니다.</b>
+      먼저 세어 보기로 대상 규모를 확인하세요. 학습 진도와 기록 시각은 유지됩니다.</p>
+    <div class="row">
+      <button class="btn ghost" id="btnScrubCount">먼저 세어 보기</button>
+      <button class="btn danger" id="btnScrubRun" disabled>발문 지우기 — 되돌릴 수 없음</button>
+    </div>
+    <p class="muted" id="scrubMsg" role="status" aria-live="polite">세어 본 뒤에만 지울 수 있어요.</p>
   </div>
 
   <div class="card">
@@ -752,8 +807,163 @@ function rbBind() {
   });
 }
 
+function resetAdminCards() {
+  ADMIN_EPOCH += 1;
+  SCRUB = null;
+  clearBoard();
+  const run = $('#btnScrubRun');
+  if (run) run.disabled = true;
+  const count = $('#btnScrubCount');
+  if (count) count.disabled = false;
+  const msg = $('#scrubMsg');
+  if (msg) msg.textContent = '세어 본 뒤에만 지울 수 있어요.';
+}
+
+function adminCardError(e) {
+  return e.status === 403 ? '관리 권한이 없어 실행하지 못했어요. 관리자 계정으로 다시 로그인해 주세요.'
+    : (e.message || '요청에 실패했어요. 다시 시도해 주세요.');
+}
+
+function scrubCounts(j, dry) {
+  if (j.dryRun !== dry || !['records', 'touched', 'labels'].every((k) => Number.isSafeInteger(j[k]) && j[k] >= 0)
+      || j.touched > j.records || j.touched > j.labels) {
+    throw new Error('세어 본 결과를 확인하지 못했어요. 다시 세어 주세요.');
+  }
+  return `전체 기록 ${j.records}건 · 발문이 남은 기록 ${j.touched}건 · 발문 ${j.labels}개`;
+}
+
+async function scrubCount() {
+  const epoch = ADMIN_EPOCH;
+  SCRUB = null;
+  $('#btnScrubCount').disabled = true;
+  $('#btnScrubRun').disabled = true;
+  $('#scrubMsg').textContent = '세는 중… 데이터는 바꾸지 않습니다.';
+  try {
+    const j = await api('/naesin-ko/admin/scrub');
+    if (epoch !== ADMIN_EPOCH || !TOKEN) return;
+    $('#scrubMsg').textContent = scrubCounts(j, true) + (j.labels ? ' — 확인 후 지울 수 있어요.' : ' — 지울 발문이 없어요.');
+    SCRUB = j.labels ? j : null;
+    $('#btnScrubRun').disabled = !SCRUB;
+  } catch (e) {
+    if (epoch === ADMIN_EPOCH) $('#scrubMsg').textContent = adminCardError(e);
+  } finally {
+    if (epoch === ADMIN_EPOCH) $('#btnScrubCount').disabled = false;
+  }
+}
+
+async function scrubRun() {
+  if (!SCRUB || $('#btnScrubRun').disabled) return;
+  if (!confirm(`오답 기록 ${SCRUB.touched}건에 남은 교재 발문 ${SCRUB.labels}개를 지웁니다.\n\n되돌릴 수 없습니다. 학습 진도는 유지되며, 실제 대상 수는 세어 본 뒤 달라질 수 있습니다.\n\n발문을 지울까요?`)) return;
+  const epoch = ADMIN_EPOCH;
+  SCRUB = null;
+  $('#btnScrubCount').disabled = true;
+  $('#btnScrubRun').disabled = true;
+  $('#scrubMsg').textContent = '지우는 중…';
+  try {
+    const j = await api('/naesin-ko/admin/scrub', { method: 'POST' });
+    if (epoch === ADMIN_EPOCH && TOKEN) $('#scrubMsg').textContent = '청소 완료 — ' + scrubCounts(j, false);
+  } catch (e) {
+    if (epoch === ADMIN_EPOCH) $('#scrubMsg').textContent = adminCardError(e) + ' 일부는 이미 지워졌을 수 있어요. 다시 세어 본 뒤 확인하세요.';
+  } finally {
+    if (epoch === ADMIN_EPOCH) $('#btnScrubCount').disabled = false;
+  }
+}
+
+function clearBoard() {
+  BOARD_LOAD += 1;
+  BOARD = { pack: null, overlay: null, scope: '' };
+  ['boardWork', 'boardSet'].forEach((id) => { const el = $('#' + id); if (el) el.disabled = true; });
+  const load = $('#btnBoardLoad');
+  if (load) load.disabled = false;
+  const out = $('#boardOut');
+  if (out) out.innerHTML = '<p class="muted">팩과 학교 강조 대상을 고르고 불러오기를 누르세요.</p>';
+  const msg = $('#boardMsg');
+  if (msg) msg.textContent = '';
+}
+
+async function boardLoad() {
+  const id = $('#boardPack').value, scope = $('#boardScope').value.trim() || 'default';
+  clearBoard();
+  if (!id) { $('#boardMsg').textContent = '먼저 팩을 올려 주세요.'; return; }
+  const epoch = ADMIN_EPOCH, request = BOARD_LOAD;
+  $('#btnBoardLoad').disabled = true;
+  $('#boardMsg').textContent = '본문과 학교 강조를 불러오는 중…';
+  try {
+    const [p, own] = await Promise.all([
+      api('/naesin-ko/pack?id=' + encodeURIComponent(id)),
+      api('/naesin-ko/admin/overlay?scope=' + encodeURIComponent(scope))
+    ]);
+    if (epoch !== ADMIN_EPOCH || request !== BOARD_LOAD || !TOKEN) return;
+    const o = scope !== 'default' && own.found === false
+      ? await api('/naesin-ko/admin/overlay?scope=default') : own;
+    if (epoch !== ADMIN_EPOCH || request !== BOARD_LOAD || !TOKEN) return;
+    if (!p.pack || !Array.isArray(p.pack.works)) throw new Error('팩의 작품 목록을 확인하지 못했어요. 다시 불러와 주세요.');
+    const source = o === own ? scope : 'default';
+    BOARD = { pack: p.pack, overlay: o.overlay || {}, scope: source };
+    const works = p.pack.works;
+    $('#boardWork').innerHTML = works.length
+      ? works.map((w) => `<option value="${esc(w.workId)}">${esc(w.title || w.workId)}</option>`).join('')
+      : '<option value="">작품이 없어요</option>';
+    $('#boardWork').disabled = !works.length;
+    $('#boardMsg').textContent = `${works.length}편 · 학교 강조 ${source}${source !== scope ? ' (반 공통)' : ''}`;
+    boardWorkChanged();
+  } catch (e) {
+    if (epoch === ADMIN_EPOCH && request === BOARD_LOAD) $('#boardMsg').textContent = adminCardError(e);
+  } finally {
+    if (epoch === ADMIN_EPOCH && request === BOARD_LOAD) $('#btnBoardLoad').disabled = false;
+  }
+}
+
+function boardWorkChanged() {
+  if (!BOARD.pack) return;
+  const id = $('#boardWork').value;
+  const sets = (BOARD.pack.sets || []).filter((s) => (s.works || []).some((w) => w.workId === id));
+  $('#boardSet').innerHTML = '<option value="">작품 본문</option>' + sets.map((s) => `<option value="${esc(s.setId)}">세트 · ${esc(s.title || s.setId)}</option>`).join('');
+  $('#boardSet').disabled = !id;
+  boardRender();
+}
+
+function boardRender() {
+  if (!BOARD.pack) return;
+  const p = BOARD.pack, setId = $('#boardSet').value;
+  const w = (p.works || []).find((x) => x.workId === $('#boardWork').value);
+  if (!w) { $('#boardOut').innerHTML = '<p class="muted">표시할 작품이 없어요.</p>'; return; }
+  const set = (p.sets || []).find((s) => s.setId === setId);
+  const works = set ? (p.works || []).filter((x) => (set.works || []).some((r) => r.workId === x.workId)) : [w];
+  const wings = $('#boardWings').checked;
+  let body = !set && w.text
+    ? '<div class="poem">' + WBKORENDER.poemHtml(w, wings) + '</div>'
+    : WBKORENDER.passageHtml(p, set ? { setId } : { workId: w.workId });
+  if (!body) body = '<p class="muted">이 작품은 본문을 싣지 않습니다. 교과서를 옆에 두고 위치 표시로 수업하세요.</p>';
+  const detail = works.map((wk) => {
+    const notes = (BOARD.overlay.notes || []).filter((n) => n.workId === wk.workId);
+    const overrides = (BOARD.overlay.overrides || []).map((o) => ({ o, blank: (wk.blanks || []).find((b) => 'b-' + b.id === o.targetRef) })).filter((x) => x.blank);
+    const school = notes.map((n) => `<div>${esc(n.text)}</div>`).concat(overrides.map((x) => `<div><b>${esc(x.blank.label || x.o.targetRef)}</b>: ${esc((x.o.answers || []).join(' / '))}${x.o.note ? ' — ' + esc(x.o.note) : ''}</div>`)).join('');
+    return `${set ? `<h3>${esc(wk.title || wk.workId)}</h3>` : ''}
+      ${wings && set && (wk.lineNotes || []).length ? '<h3>날개풀이</h3>' + wk.lineNotes.map((n) => `<p class="note"><b>${esc(n.anchor)}</b> — ${esc(n.note)}</p>`).join('') : ''}
+      ${$('#boardStanzas').checked && (wk.composition || []).length ? '<h3>연별 내용</h3>' + wk.composition.map((c) => `<div><b>${esc(c.range)}</b> — ${esc(c.summary)}</div>`).join('') : ''}
+      ${wk.structureMap ? '<h3>구조도</h3>' + WBKORENDER.structureHtml(wk.structureMap) : ''}
+      <h3>학교 선생님 강조 · ${esc(BOARD.scope)}</h3>
+      ${school ? `<div class="school-note">${school}</div>` : '<p class="muted">이 작품에 등록된 학교 강조가 없어요.</p>'}`;
+  }).join('');
+  $('#boardOut').innerHTML = `<h3>${esc(set ? (set.title || set.setId) : (w.title || w.workId))}${!set && w.author ? ' · ' + esc(w.author) : ''}</h3>` + body + detail;
+}
+
+function bindAdminCards() {
+  $('#btnScrubCount').onclick = scrubCount;
+  $('#btnScrubRun').onclick = scrubRun;
+  $('#btnBoardLoad').onclick = boardLoad;
+  $('#boardPack').onchange = clearBoard;
+  $('#boardScope').oninput = clearBoard;
+  $('#boardWork').onchange = boardWorkChanged;
+  $('#boardSet').onchange = boardRender;
+  $('#boardWings').onchange = boardRender;
+  $('#boardStanzas').onchange = boardRender;
+}
+
 function bind() {
   rbBind();
+  bindAdminCards();
   $('#files').onchange = async (e) => {
     const files = [...e.target.files];
     const out = $('#checkOut');

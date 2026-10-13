@@ -25,13 +25,13 @@ let db = empty();
    복원은 관리 export/import 로 사람이 한다. db.json 에 팩이 있든 없든 스냅샷과는 무관하다. */
 export function load() {
   try {
-    if (fs.existsSync(FILE)) {
-      const raw = JSON.parse(fs.readFileSync(FILE, 'utf8'));
-      db = Object.assign(empty(), raw);
-    }
+    const raw = JSON.parse(fs.readFileSync(FILE, 'utf8'));
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new Error('invalid database');
+    db = Object.assign(empty(), raw);
   } catch (e) {
-    console.error('[store] db.json 파싱 실패 — 빈 DB로 시작:', e.message);
-    db = empty();
+    if (e.code === 'ENOENT') db = empty();
+    /* 빈 DB로 계속 쓰면 읽지 못한 원본을 다음 저장에서 덮어쓴다. */
+    else throw new Error('[store] db.json을 읽지 못해 서버를 시작하지 않습니다. 원본 파일과 백업을 확인해 주세요.');
   }
   return db;
 }
@@ -59,11 +59,19 @@ export function hanjaSnapshot(h) {
 
 /* 스냅샷에 담을 것 — 학생 기록만이 아니라 강사가 손으로 만든 것(교재 검수·발행 상태)까지.
    이게 빠지면 복구했을 때 낱말 검수를 처음부터 다시 해야 한다. */
-function snapshotBody() {
+export function snapshotBody() {
+  const ko = db.naesinKo || {}, haru = db.haru || {}, chunk = db.chunk || {}, letter = db.letter || {};
   return { service: 'wb-reading', savedAt: new Date().toISOString(),
     students: db.students, portalFamilies: db.portalFamilies || {}, states: db.states, vocab: db.vocab,
     textbook: db.textbook || {}, pubmap: db.pubmap || {}, naesin: naesinSnapshot(db.naesin),
-    textbookSrc: db.textbookSrc || {}, hanja: hanjaSnapshot(db.hanja) };
+    naesinKo: { packIds: ko.packIds || Object.keys(ko.packs || {}), states: ko.states || {}, summaries: ko.summaries || {},
+      reviews: ko.reviews || {}, overlays: ko.overlays || {}, exams: ko.exams || {}, tasks: ko.tasks || {} },
+    textbookSrc: db.textbookSrc || {}, hanja: hanjaSnapshot(db.hanja),
+    haru: { packIds: haru.packIds || Object.keys(haru.packs || {}), paperkeys: haru.paperkeys || {}, plans: haru.plans || {},
+      states: haru.states || {}, mocks: haru.mocks || {}, paper: haru.paper || {}, atoms: haru.atoms || null },
+    chunk: { states: chunk.states || {}, summaries: chunk.summaries || {}, assigns: chunk.assigns || {}, customs: chunk.customs || null },
+    letter: { issues: letter.issues || {}, states: letter.states || {}, push: letter.push || {}, calendar: letter.calendar || null,
+      images: Object.values(letter.images || {}) } };
 }
 
 function dayKey() {

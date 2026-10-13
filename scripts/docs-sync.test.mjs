@@ -39,12 +39,25 @@ t('앱별 작업 문서(AGENTS.md)가 루트 지도에서 가리키는 자리에
 
 t('앱 지도의 경로가 전부 존재한다', () => {
   const doc = read('CLAUDE.md');
-  const rows = doc.split('\n').filter((l) => /^\| `[a-z-]+\/` \|/.test(l));
+  const rows = doc.split('\n').filter((l) => /^\| `[^`]+\/` \|/.test(l));
   assert.ok(rows.length >= 10, '지도 행이 ' + rows.length + '개뿐 — 표 형식이 바뀌었나');
   for (const r of rows) {
-    const dir = r.match(/^\| `([a-z-]+)\/` \|/)[1];
+    const dir = r.match(/^\| `([^`]+)\/` \|/)[1];
     assert.ok(fs.existsSync(path.join(ROOT, dir)), '지도에 있는 ' + dir + '/ 가 저장소에 없다');
   }
+});
+
+t('최상위 작업 폴더가 루트 지도에서 빠지지 않는다', () => {
+  const doc = read('CLAUDE.md');
+  const mapped = new Set([...doc.matchAll(/^\| `([^`]+)\/` \|/gm)].map(m => m[1]));
+  /* 전체 검사와 같은 제외 기준을 읽는다 — 로컬 데이터·빌드 폴더는 작업 지도가 아니다. */
+  const skipLine = read('scripts/check.mjs').match(/const SKIP_DIRS = new Set\(\[(.*?)\]\)/);
+  assert.ok(skipLine, 'check.mjs 의 제외 목록을 찾을 수 없다');
+  const skipped = new Set([...skipLine[1].matchAll(/'([^']+)'/g)].map(m => m[1]));
+  skipped.add('.github'); skipped.add('scripts');
+  const missing = fs.readdirSync(ROOT, { withFileTypes: true })
+    .filter(e => e.isDirectory() && !skipped.has(e.name) && !mapped.has(e.name)).map(e => e.name + '/');
+  assert.deepEqual(missing, [], '최상위 작업 폴더를 CLAUDE.md 지도에 추가하고 AGENTS.md 와 맞추세요');
 });
 
 console.log(`docs-sync: ${passed} passed`);
