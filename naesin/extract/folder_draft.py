@@ -895,14 +895,14 @@ def word_master_rows(src):
  pos_rx=re.compile(r'^(.*?)\s+(n|v|a|adv|pron)\.\s*(.*)$',re.I)
  for index,start in enumerate(starts):
   stop=starts[index+1] if index+1<len(starts) else len(lines)
-  block=[re.sub(r'^\s*□\s*','',lines[start],count=1).strip()]; line_end=start+1
+  block=[re.sub(r'^\s*□\s*','',lines[start],count=1)]; line_end=start+1
   for offset,raw in enumerate(lines[start+1:stop],start+1):
    value=raw.strip()
    if not value or heading.match(raw): break
    if irregular.fullmatch(value): line_end=offset+1; continue
    if not re.search('[가-힣]',value) or re.search('[A-Za-z]',value): break
-   block.append(value); line_end=offset+1
-  joined=norm(' '.join(block))
+   block.append(raw); line_end=offset+1
+  joined=norm(source_line_join(block))
   match=pos_rx.match(joined)
   if match:
    head=norm(match.group(1)); pos=match.group(2).lower()+'.'; meaning=norm(match.group(3))
@@ -915,7 +915,8 @@ def word_master_rows(src):
     prefix=prefix[:-1].rstrip(); meaning='~'+meaning
    elif prefix.endswith('~') and tilde_count==1:
     meaning='~'+meaning
-   prefix=re.sub(r'\s*\($','',prefix).rstrip()
+   if re.search(r'\($',prefix):
+    prefix=re.sub(r'\s*\($','',prefix).rstrip(); meaning='('+meaning
    head=norm(prefix)
   if not head or not meaning or not re.search('[A-Za-z]',head) or not re.search('[가-힣]',meaning): fail('WORD_MASTER_ENTRY_UNPARSED')
   rows.append({'head':head,'pos':pos,'meaning':meaning,'lineStart':start+1,'lineEnd':line_end})
