@@ -109,12 +109,20 @@ def balanced_parentheses(value):
    if depth<0: return False
  return depth==0
 def writing_keywords(text):
- boundaries=list(re.finditer(r'_{5,}|(?i:Monday|Tuesday|Wednesday)\s*,?\s*August\s+(?:[1-9]|[12]\d|3[01])\b',text))
- if not boundaries: return None,'NO_DETERMINISTIC_MATCH'
- prefix=text[:boundaries[0].start()]
- values=[norm(value) for value in prefix.split(',')]
- values=[value for value in values if value]
- return (values,None) if values else (None,'NO_DETERMINISTIC_MATCH')
+ date_boundary=re.compile(r'(?i)(?:Monday|Tuesday|Wednesday)\s*,?\s*August\s+(?:[1-9]|[12]\d|3[01])\b')
+ sentence_boundary=re.compile(r'\s+(?=(?:We visited\b|So,|When\b|Then\b|In the past\b|First,|“Aloha”\b|For example\b|Soobin\b|Before\b|It is\b|I’m\b))')
+ token_rx=re.compile(r"^[A-Za-z]+(?:[ '-][A-Za-z]+)*$")
+ for raw in text.splitlines():
+  line=raw.strip()
+  if not line or not re.match(r'^[a-z][A-Za-z]*(?:\s+[A-Za-z]+)*\s*,',line): continue
+  stops=[m.start() for rx in (re.compile(r'_{5,}'),date_boundary) for m in [rx.search(line)] if m]
+  sentence=sentence_boundary.search(line)
+  if sentence: stops.append(sentence.start())
+  prefix=line[:min(stops)] if stops else line
+  values=[norm(value) for value in prefix.split(',')]
+  if len(values)<2 or any(not token_rx.fullmatch(value) for value in values): continue
+  return values,None
+ return None,'NO_DETERMINISTIC_MATCH'
 def candidate_ref(source_id,page,section,side=None,line_start=None,line_end=None,question_no=None):
  ref={'sourceDocumentId':source_id,'page':page,'printedPage':page,'section':section}
  if side is not None: ref['side']=side
@@ -706,6 +714,10 @@ def extract_exam_item_candidates(sources):
 def attach_unmatched(row, field, reason, refs, **details):
  row['unmatchedEnrichment'].append({'field':field,'reason':reason,'sourceRefs':refs,**details})
  row['reviewFlags'].append(field.upper()+'_UNMATCHED')
+# Workbook exercise numbers do not align 1:1 with sentence sequences: exercise 11
+# brackets only seq11, and exercise 19 brackets only seq20. Keep this source map explicit.
+GRAMMAR_EXERCISE_FOR_SEQUENCE={1:1,2:2,3:3,4:4,5:5,6:6,7:7,8:8,9:9,10:10,11:11,13:12,14:13,15:14,16:15,17:16,18:17,19:18,20:19,22:20,23:21,24:22,25:23}
+GRAMMAR_SOURCE_GAP_FOR_SEQUENCE={12:11,21:19}
 def enrich_sentences(sentences, source):
  pages={p['page']:p['text'] for p in source['pages']}
  verb_prompts=numbered_pages(source,[11,12,13]); grammar_prompts=numbered_pages(source,[14,15,16])
@@ -734,13 +746,18 @@ def enrich_sentences(sentences, source):
    row['enrichmentSourceRefs']['verbForms']=vrefs; summary['verbForms']['matched']+=1
   else:
    attach_unmatched(row,'verbForms','COUNT_MISMATCH' if prompt and answers else 'NO_DETERMINISTIC_MATCH',vrefs,baseCount=len(bases),answerCount=len(answer_parts or [])); summary['verbForms']['unmatched']+=1
-  gp=grammar_prompts.get(n,[]); ga=grammar_answers.get(n,[])
-  if n>23:
-   grefs=[page_ref(16,'grammar-choice-source-range',None),page_ref(30,'grammar-choice-answer-range',None)]
-   attach_unmatched(row,'grammarChoices','SOURCE_NOT_PRESENT',grefs,expectedQuestionNo=n); summary['grammarChoices']['unmatched']+=1
+  grammar_question=GRAMMAR_EXERCISE_FOR_SEQUENCE.get(n)
+  if grammar_question is None:
+   grammar_question=GRAMMAR_SOURCE_GAP_FOR_SEQUENCE.get(n)
+   if grammar_question is None: fail('GRAMMAR_SENTENCE_MAPPING_MISSING')
+   gp=grammar_prompts.get(grammar_question,[])
+   gpage=gp[0]['page'] if len(gp)==1 else (15 if grammar_question==11 else 16)
+   grefs=[page_ref(gpage,'grammar-choice-source-range',grammar_question),page_ref(30,'grammar-choice-answer-range',grammar_question)]
+   attach_unmatched(row,'grammarChoices','SOURCE_NOT_PRESENT',grefs,expectedQuestionNo=grammar_question); summary['grammarChoices']['unmatched']+=1
   else:
-   gpage=gp[0]['page'] if len(gp)==1 else (14 if n<=9 else 15 if n<=18 else 16)
-   grefs=[page_ref(gpage,'grammar-choice',n),page_ref(30,'grammar-choice-answer',n)]
+   gp=grammar_prompts.get(grammar_question,[]); ga=grammar_answers.get(grammar_question,[])
+   gpage=gp[0]['page'] if len(gp)==1 else (14 if grammar_question<=9 else 15 if grammar_question<=18 else 16)
+   grefs=[page_ref(gpage,'grammar-choice',grammar_question),page_ref(30,'grammar-choice-answer',grammar_question)]
    groups=re.findall(r'\[([^\]]*)\]',gp[0]['text']) if len(gp)==1 else []
    answers_flat=[]
    for arow in ga: answers_flat.extend(slash_parts(arow['text']) or [])

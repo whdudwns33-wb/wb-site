@@ -1020,7 +1020,7 @@ function pdfReviewDraft(obj, trustedLocal=false){
       const tokens=Array.isArray(s.tokens)&&s.tokens.length?s.tokens.slice():String(s.en||'').trim().split(/\s+/);
       if(!(Array.isArray(s.chunks)&&s.chunks.length))flags.push('FULL_SENTENCE_CHUNK_REVIEW');
       if(!(Array.isArray(s.tokens)&&s.tokens.length))flags.push('CANONICAL_WHITESPACE_TOKENS');
-      if((s.seq===24||s.seq===25)&&!(s.enrichmentSourceRefs&&s.enrichmentSourceRefs.grammarChoices&&s.enrichmentSourceRefs.grammarChoices.length))flags.push('GRAMMAR_SOURCE_MISSING');
+      if((s.seq===12||s.seq===21)&&!(s.enrichmentSourceRefs&&s.enrichmentSourceRefs.grammarChoices&&s.enrichmentSourceRefs.grammarChoices.length))flags.push('GRAMMAR_SOURCE_MISSING');
       const alignmentUnconfirmed=flags.includes('KEYWORD_ALIGNMENT_REVIEW_REQUIRED')||flags.includes('KEYWORD_PAIR_REVIEW_REQUIRED');
       const confirmedKeywords=alignmentUnconfirmed?[]:(Array.isArray(s.keywords)?s.keywords:[]).map(pair=>({en:pair.en,ko:pair.ko}));
       const keywordFallback=confirmedKeywords.length===0;
