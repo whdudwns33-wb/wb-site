@@ -37,6 +37,7 @@ def is_structural_line_start(line):
 def source_line_separator(previous_content,previous_raw_line,next_raw_line):
  next_content=next_raw_line.strip()
  no_separator=bool(previous_content and previous_raw_line and not previous_raw_line[-1].isspace() and is_hangul_syllable(previous_content[-1]) and next_content and is_hangul_syllable(next_content[0]) and not is_structural_line_start(next_content))
+ if no_separator and (next_content.startswith('것') or next_content.startswith('많은')):return ' '
  return '' if no_separator else ' '
 def source_line_join(lines):
  result=''; previous_raw=None; previous_content=''
