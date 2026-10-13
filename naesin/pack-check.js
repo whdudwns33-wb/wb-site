@@ -460,7 +460,9 @@ var WBPACKCHECK = (function () {
     if (rights.evidenceRef !== undefined && (typeof rights.evidenceRef !== 'string' || rights.evidenceRef.length > 300)) errors.push('증빙 참조 형식이 올바르지 않습니다.');
     if (rights.notes !== undefined && (typeof rights.notes !== 'string' || rights.notes.length > 500)) errors.push('권리 메모 형식이 올바르지 않습니다.');
     if (['open_license','licensed'].includes(rights.basis) && !nonEmpty(rights.evidenceRef)) errors.push('증빙 참조가 필요합니다.');
-    if (rights.expiresAt !== undefined && rights.expiresAt !== '' && (typeof rights.expiresAt !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(rights.expiresAt) || !validIsoDay(rights.expiresAt) || rights.expiresAt < (today || new Date().toISOString().slice(0,10)))) errors.push('권리 증빙이 만료되었거나 날짜 형식이 올바르지 않습니다.');
+    // Expiration is a calendar-day contract; compare against KST when not explicitly injected.
+    var todayKst = today || new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    if (rights.expiresAt !== undefined && rights.expiresAt !== '' && (typeof rights.expiresAt !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(rights.expiresAt) || !validIsoDay(rights.expiresAt) || rights.expiresAt < todayKst)) errors.push('권리 증빙이 만료되었거나 날짜 형식이 올바르지 않습니다.');
     return errors;
   }
 

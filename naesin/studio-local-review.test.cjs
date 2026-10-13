@@ -103,6 +103,21 @@ function wordSection(ui,section,checked){const el=ui.node('#pdfWord'+section);el
     assert.match(html,/권리 미확인 상태에서는 PC PDF 불러오기·AI 추출·배포가 차단되며/);
     assert.match(html,/허가 확인된 자료에서 원천 붙이기/);
   });
+  await t('기존 작업의 rights 값을 권리 입력 전체에 정확히 prefill하고 HTML 이스케이프한다',()=>{
+    const ui=screen(),own=job();own.meta.rights={basis:'licensed',holder:'Synthetic rights holder',evidenceRef:'contract-fixture-2026',expiresAt:'2027-03-31',studentUseAllowed:true,derivativeUseAllowed:true,externalAiAllowed:false};
+    ui.set(own);ui.renderJob();const markup=ui.node('#app').innerHTML;
+    assert.match(markup,/<option value="licensed" selected>별도 계약<\/option>/);
+    assert.match(markup,/<input id="rHolder" value="Synthetic rights holder">/);
+    assert.match(markup,/<input id="rEvidence" value="contract-fixture-2026">/);
+    assert.match(markup,/<input type="date" id="rExpiry" value="2027-03-31">/);
+    assert.match(markup,/<input type="checkbox" id="rStudent" checked>/);
+    assert.match(markup,/<input type="checkbox" id="rDerivative" checked>/);
+    assert.match(markup,/<input type="checkbox" id="rAi"\s*>/);
+    own.meta.rights.holder='<img src=x onerror=alert(1)>';ui.set(own);ui.renderJob();
+    assert.ok(!ui.node('#app').innerHTML.includes('<input id="rHolder" value="<img'));
+    assert.match(ui.node('#app').innerHTML,/&lt;img src=x onerror=alert\(1\)&gt;/);
+  });
+
   await t('PDF 검수의 기본 진입은 PC 자료 불러오기 하나이고 파일·JSON·줄 대응은 고급 입력에서 유지한다',()=>{
     const ui=screen();ui.renderJob();const markup=ui.node('#app').innerHTML;
     assert.match(markup,/id="btnPcReview"[^>]*>PC 자료 불러오기/);

@@ -7,6 +7,8 @@ assert.equal(C.rightsErrors({ ...base, studentUseAllowed: false }).length, 1);
 assert.equal(C.rightsErrors({ ...base, expiresAt: '2000-01-01' }).length, 1);
 assert.equal(C.rightsErrors({ ...base, evidenceRef: '' }).length, 1);
 assert.deepEqual(C.rightsErrors(base, '2026-10-13'), []);
+assert.deepEqual(C.rightsErrors({ ...base, expiresAt: '2026-10-13' }, '2026-10-13'), [], '만료일 당일은 명시 today 기준 유효');
+assert.equal(C.rightsErrors({ ...base, expiresAt: '2026-10-12' }, '2026-10-13').length, 1, '주입한 today 이전 만료일은 차단');
 const sample = require('./pack-sample.json');
 assert.deepEqual(C.checkPack(sample).errors, []);
 const legacy = { ...sample }; delete legacy.rights;
