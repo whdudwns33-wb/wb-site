@@ -30,7 +30,7 @@ function setup() {
       return Promise.resolve({ status: 200, json() { return Promise.resolve({}); } });
     }
   };
-  vm.runInNewContext(script.replace(/  boot\(\);\s*\}\)\(\);/, 'summary = function () { return {}; };\nglobalThis.app = { S, selectPack, backupState, persist, push, flush, loadPack, online };\n})();'), env);
+  vm.runInNewContext(script.replace(/  boot\(\);\s*\}\)\(\);/, 'summary = function () { return {}; };\nrender = function () {};\nglobalThis.app = { S, selectPack, backupState, persist, push, flush, loadPack, online };\n})();'), env);
   env.app.S.data = { v: 1, packs: { old: { states: { progress: 3 } } }, savedAt: 10 };
   env.app.S.packId = 'old';
   env.app.S.backupSavedAt = 10;
@@ -62,6 +62,34 @@ function setup() {
   await t.app.online();
   assert.equal(t.app.backupState().packs.remote.states.progress, 7, '기기 기록이 더 최신이어도 다른 단원의 서버 진도는 보존한다');
   assert.equal(JSON.parse(t.storage.get('wbk.v1')).packs.remote.states.progress, 7, '백업 미확인 상태에서는 원본을 기기에 유지한다');
+
+  t = setup();
+  t.app.S.token = 'synthetic-test-token'; t.app.persist(); t.app.selectPack('new');
+  const local = t.storage.get('wbk.v1');
+  t.env.fetch = function () { return Promise.resolve({ status: 400, json() { return Promise.resolve({ error: '형식 오류 — 기록 보존' }); } }); };
+  await t.app.push();
+  assert.equal(t.app.S.err, '형식 오류 — 기록 보존', '저장 거절을 학생에게 알려야 한다');
+  assert.equal(t.app.S.backupSavedAt, 10);
+  assert.equal(t.storage.get('wbk.v1'), local);
+
+  t = setup();
+  t.app.S.token = 'synthetic-test-token'; t.app.persist();
+  const original = t.storage.get('wbk.v1');
+  t.env.fetch = function (url, opts) {
+    t.calls.push({ url, opts });
+    const status = url.endsWith('/state') ? 409 : 200;
+    return Promise.resolve({ status, json() { return Promise.resolve(status === 409 ? { error: '서버 백업 확인' } : {}); } });
+  };
+  await t.app.online();
+  assert.equal(t.app.S.backupBlocked, true);
+  assert.equal(t.app.S.err, '서버 백업 확인');
+  t.app.S.demo = false; // 늦게 도착한 팩도 백업 보류를 풀 수 없다.
+  await t.app.push(); t.app.flush(); await t.nodes.get('clearDevice').onclick();
+  assert.ok(!t.calls.some(c => c.opts && c.opts.method === 'PUT'), '깨진 서버 원본을 덮어썼다');
+  assert.equal(t.storage.get('wbk.v1'), original, '서버 확인 전 유일한 기기 진도를 지웠다');
+  assert.equal(t.storage.get('wbr.auth'), 'other-app-login');
+  assert.ok(t.calls.some(c => c.alert));
+  assert.ok(!t.calls.some(c => c.redirect));
 
   t = setup();
   t.env.confirm = function () { return false; };

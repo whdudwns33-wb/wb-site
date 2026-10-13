@@ -185,7 +185,7 @@
     tab: 'home', token: null, code: null,
     pack: null, packIds: [], packId: null, demo: false,
     exam: null, task: null, overlay: null, concepts: [],
-    data: null, backupPacks: {}, backupSavedAt: 0, // 이전 단원은 백업 확인 뒤 기기 저장에서 뺀다
+    data: null, backupPacks: {}, backupSavedAt: 0, backupBlocked: false, // 이전 단원은 백업 확인 뒤 기기 저장에서 뺀다
     workId: null, session: null, // 현재 세션
     err: null, saving: false
   };
@@ -245,7 +245,7 @@
     saveTimer = setTimeout(push, 3000);   // 3초 디바운스 — 타이핑마다 올리지 않는다
   }
 
-  /* 관리 화면이 보는 요약. 서버는 이 값을 해석하지 않고 그대로 저장한다. */
+  /* 관리 화면이 보는 요약. 서버는 허용 필드와 형식만 검증하고 성취도는 해석하지 않는다. */
   function summary() {
     var p = pk(), sum = E.workSummary(p.states);
     var v = E.kindSummary(p.states, 'vocab'), b = E.kindSummary(p.states, 'blank');
@@ -287,7 +287,7 @@
      3초 디바운스 중에 탭을 닫으면 로컬에는 남아도 서버 백업이 빠지고,
      강사 화면이 옛 값을 본다. keepalive라야 언로드 중에도 요청이 산다. */
   function flush() {
-    if (deviceCleared || deviceClearing || !S.token || S.demo || !saveTimer) return;
+    if (deviceCleared || deviceClearing || S.backupBlocked || !S.token || S.demo || !saveTimer) return;
     clearTimeout(saveTimer); saveTimer = null;
     try {
       fetch(API + '/state', {
@@ -303,7 +303,7 @@
   window.addEventListener('pagehide', flush);
 
   function push() {
-    if (deviceCleared || deviceClearing || !S.token || S.demo) return;
+    if (deviceCleared || deviceClearing || S.backupBlocked || !S.token || S.demo) return;
     if (S.saving) { saveTimer = setTimeout(push, 3000); return; }
     saveTimer = null;
     S.saving = true;
@@ -312,13 +312,17 @@
       .then(function (r) {
         S.saving = false;
         if (r.status === 200) { S.backupSavedAt = Math.max(S.backupSavedAt, savedAt); saveLocal(); }
-        if (r.status === 413) { S.err = '학습 기록이 서버 한도를 넘었어요. 선생님께 알려 주세요.'; render(); }
+        if (r.status === 400 || r.status === 413) {
+          S.err = (r.body && r.body.error) || '학습 기록을 서버에 보관하지 못했어요. 기록을 지우지 말고 선생님께 알려 주세요.';
+          render();
+        }
       })
       .catch(function () { S.saving = false; });
     return saveRequest;
   }
 
   $('clearDevice').onclick = async function () {
+    if (S.backupBlocked) { alert('서버 백업을 확인하기 전에는 이 기기의 기록을 비울 수 없어요. 선생님께 알려 주세요.'); return; }
     if (!confirm('이 기기에 저장된 국어브레인 기록을 지울까요? 서버에 보관된 학습 기록과 다른 앱 로그인은 유지됩니다. 다시 열면 학습 기록을 불러옵니다.')) return;
     deviceClearing = true;
     $('clearDevice').disabled = true; $('wrap').inert = true; $('tabs').inert = true;
@@ -473,6 +477,11 @@
       .then(function (rs) {
         if (deviceCleared || deviceClearing) return false;
         if (rs[0].status === 401) return demo('로그인이 만료됐어요 — 체험 모드로 보고 있어요.');
+        /* 깨진 백업을 새 기기의 빈 진도로 덮거나, 유일한 기기 원본을 비우지 않는다. */
+        if (rs[3].status === 409) {
+          S.backupBlocked = true;
+          return demo((rs[3].body && rs[3].body.error) || '서버 백업을 확인해야 해요. 선생님께 알려 주세요.');
+        }
         S.exam = (rs[0].body && rs[0].body.exam && rs[0].body.exam.examDate) ? rs[0].body.exam : null;
         S.task = (rs[1].body && rs[1].body.task && rs[1].body.task.title) ? rs[1].body.task : null;
         S.overlay = (rs[2].body && rs[2].body.overlay) || null;

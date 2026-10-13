@@ -19,6 +19,7 @@ if (process.platform !== 'win32') {
   { env: { ...env, WB_TEST_CREDENTIAL: credential }, windowsHide: true, stdio: 'ignore' });
   const server = spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'RemoteSigned', '-File', entry,
     '-DataDir', tmp, '-CredentialPath', credential, '-Port', String(port)], { env, windowsHide: true, stdio: 'ignore' });
+  const exited = new Promise(resolve => server.once('exit', resolve));
   const base = 'http://127.0.0.1:' + port;
   try {
     let ready = false;
@@ -40,7 +41,14 @@ if (process.platform !== 'win32') {
     }
     console.log('OK — Windows 기동·기존 자격증명·관리전용·로그 암호 미노출');
   } finally {
-    execFileSync('taskkill.exe', ['/PID', String(server.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' });
+    try {
+      execFileSync('taskkill.exe', ['/PID', String(server.pid), '/T', '/F'], { windowsHide: true, stdio: 'ignore' });
+    } catch (e) {
+      // 자식 종료 뒤 PowerShell도 스스로 끝나면 taskkill이 이미 사라진 부모를 못 찾는다.
+      assert.throws(() => process.kill(server.pid, 0), gone => gone.code === 'ESRCH', e.message);
+    }
+    await exited;
+    await assert.rejects(fetch(base + '/api/health'), '시험 서버가 남아 있으면 임시 원본을 지우지 않는다');
     assert.equal(path.dirname(tmp), path.resolve(os.tmpdir()));
     assert.ok(path.basename(tmp).startsWith('wb-admin-start-'));
     fs.rmSync(tmp, { recursive: true, force: true });
