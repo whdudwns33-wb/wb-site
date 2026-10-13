@@ -619,6 +619,103 @@ def enrich_sentences(sentences, source):
    attach_unmatched(row,'writingKeywords',why or 'NO_DETERMINISTIC_MATCH',wrefs); summary['writingKeywords']['unmatched']+=1
   if row['unmatchedEnrichment']: row['reviewFlags']=sorted(set(row['reviewFlags']+['ENRICHMENT_UNMATCHED']))
  return summary
+def exact_head(value):
+ value=unicodedata.normalize('NFKC',norm(str(value))).casefold()
+ value=re.sub(r'\s*\([a-z]+(?:-[a-z]+){1,5}\)\s*$','',value,flags=re.I)
+ value=re.sub(r'\s*~\s*$','',value)
+ return norm(value)
+def master_entries(src):
+ entries=[]
+ for page in src['pages']:
+  pn=page['page']
+  if not 1<=pn<=4: continue
+  section='conversation' if pn<=2 else 'reading'
+  for line in page.get('text','').splitlines():
+   upper=line.upper()
+   if 'CONVERSATION' in upper and '│' in line: section='conversation' if pn<=2 else None
+   if 'READING' in upper and '│' in line: section='reading' if pn>=3 else None
+   m=re.match(r'^\s*□\s*(.*?)\s*$',line)
+   if section and m and m.group(1): entries.append({'page':pn,'section':section,'entry':norm(m.group(1))})
+ return entries
+def master_entry_matches(head, entry):
+ target=exact_head(head)
+ raw=norm(entry)
+ pos=re.search(r'\s+(?:n|v|a|adj|adv|prep|pron|conj|int|phr|aux)\.\s',raw,re.I)
+ if pos and exact_head(raw[:pos.start()])==target: return True
+ if exact_head(raw)==target: return True
+ if not pos:
+  for delimiter in (r'\s+\(',r'\s+\.\.\.',r'(?=[가-힣])'):
+   match=re.search(delimiter,raw)
+   if match and exact_head(raw[:match.start()])==target: return True
+  for mark in re.finditer('~',raw):
+   prefix=raw[:mark.start()].strip()
+   tail=raw[mark.end():].lstrip()
+   if (tail.startswith('~') or (tail and re.match(r'[가-힣]',tail))) and exact_head(prefix)==target: return True
+ return False
+def passage_word_refs(head, sentences):
+ target=exact_head(head)
+ if not target: return []
+ pieces=target.split()
+ pattern=re.compile(r'(?<![A-Za-z])'+'\\s+'.join(re.escape(x) for x in pieces)+r'(?![A-Za-z])',re.I)
+ refs=[]
+ for row in sentences:
+  if not pattern.search(norm(row.get('en',''))): continue
+  ref=next((r for r in row.get('sourceRefs',[]) if r.get('sourceDocumentId')=='02' and r.get('section')=='workbook-4' and r.get('questionNo')==row.get('seq')),None)
+  if ref:
+   refs.append(page_ref(ref['page'],'reading',ref['questionNo']))
+ return refs
+def attach_word_sections(candidates, source, sentences):
+ entries=master_entries(source)
+ for row in candidates:
+  matches=[entry for entry in entries if master_entry_matches(row.get('headCandidate',''),entry['entry'])]
+  if matches:
+   for entry in matches:
+    ref={'sourceDocumentId':'03','page':entry['page'],'printedPage':entry['page'],'section':entry['section'],'questionNo':None}
+    if ref not in row['sourceRefs']: row['sourceRefs'].append(ref)
+   row['reviewFlags']=sorted(set(row.get('reviewFlags',[])+['PLAIN_TEXT_MASTER_SECTION_REF']))
+   continue
+  refs=passage_word_refs(row.get('headCandidate',''),sentences)
+  if refs:
+   for ref in refs:
+    if ref not in row['sourceRefs']: row['sourceRefs'].append(ref)
+   row['reviewFlags']=sorted(set(row.get('reviewFlags',[])+['PASSAGE_SECTION_REF']))
+def numbered_answer_blocks(text):
+ lines=text.splitlines(); marks=[]
+ for i,line in enumerate(lines):
+  m=re.match(r'^\s*(\d{1,2})\)\s*(.*)$',line)
+  if m: marks.append((i,int(m.group(1)),m.group(2)))
+ out={}
+ for j,(start,n,first) in enumerate(marks):
+  end=marks[j+1][0] if j+1<len(marks) else len(lines)
+  value=norm(' '.join([first]+lines[start+1:end]))
+  if 1<=n<=25: out.setdefault(n,[]).append(value)
+ return out
+def answer_section(text, start_header, end_header):
+ start=text.find(start_header)
+ if start<0: return ''
+ tail=text[start+len(start_header):]
+ end=tail.find(end_header)
+ return tail[:end] if end>=0 else tail
+def exact_answer_parts(value):
+ parts=[norm(part) for part in value.split('/')]
+ return parts if parts and all(parts) else None
+def attach_keyword_pairs(sentences, source):
+ p29=next((p['text'] for p in source['pages'] if p['page']==29),'')
+ ko_text=answer_section(p29,'워크북 2 빈칸 연습 (한글)','워크북 3 빈칸 연습 (영문)')
+ en_text=answer_section(p29,'워크북 3 빈칸 연습 (영문)','워크북 4 해석 연습')
+ ko=numbered_answer_blocks(ko_text); en=numbered_answer_blocks(en_text); summary={'matched':0,'unmatched':0}
+ for row in sentences:
+  n=row['seq']; ko_rows=ko.get(n,[]); en_rows=en.get(n,[])
+  kparts=exact_answer_parts(ko_rows[0]) if len(ko_rows)==1 else None
+  eparts=exact_answer_parts(en_rows[0]) if len(en_rows)==1 else None
+  refs=[page_ref(29,'workbook-2-answer',n),page_ref(29,'workbook-3-answer',n)]
+  row['keywords']=[]; row['reviewFlags']=sorted(set(row['reviewFlags']+['KEYWORD_PAIR_REVIEW_REQUIRED']))
+  row.setdefault('enrichmentSourceRefs',{})['keywords']=refs
+  if kparts and eparts and len(kparts)==len(eparts):
+   row['keywords']=[{'en':e,'ko':k} for e,k in zip(eparts,kparts)]; summary['matched']+=1
+  else:
+   attach_unmatched(row,'keywords','KEYWORD_COUNT_MISMATCH',refs,baseCount=len(eparts or []),answerCount=len(kparts or [])); summary['unmatched']+=1
+ return summary
 def words(src):
  rows=[]
  seen=set()
@@ -700,8 +797,10 @@ def main():
    if m and n in (1,11,20):
     header=m.group(0).strip(' ,:'); e=e[m.end():].strip()
    if n in (1,11,20): e=re.sub(r'(?i)^(monday|tuesday|wednesday)\s*,?\s*august\s+(1|2|3)\b[,:]?\s*','',e).strip()
-   sent.append({'candidateId':f'sc-{n:04d}','seq':n,'en':e,'ko':k,'passageTitle':a.passage_title_en,'passageTitleEn':a.passage_title_en,'passageTitleKo':a.passage_title_ko,'dayHeaderEn':header,'dayHeaderKo':header_ko,'dayGroup':('8/1' if n<11 else '8/2' if n<20 else '8/3'),'chunks':[],'verbForms':[],'grammarChoices':[],'tokens':[],'writingKeywords':[],'sourceRefs':[page_ref(ep,'workbook-4',n),page_ref(kp,'workbook-4-answer',n)],'reviewFlags':['REVIEW_REQUIRED','PLAIN_TEXT_NO_COORDINATES']+([] if e else ['EN_UNRESOLVED'])+([] if k else ['KO_UNRESOLVED'])})
+   sent.append({'candidateId':f'sc-{n:04d}','seq':n,'en':e,'ko':k,'passageTitle':a.passage_title_en,'passageTitleEn':a.passage_title_en,'passageTitleKo':a.passage_title_ko,'dayHeaderEn':header,'dayHeaderKo':header_ko,'dayGroup':('8/1' if n<11 else '8/2' if n<20 else '8/3'),'chunks':[],'keywords':[],'verbForms':[],'grammarChoices':[],'tokens':[],'writingKeywords':[],'sourceRefs':[page_ref(ep,'workbook-4',n),page_ref(kp,'workbook-4-answer',n)],'reviewFlags':['REVIEW_REQUIRED','PLAIN_TEXT_NO_COORDINATES']+([] if e else ['EN_UNRESOLVED'])+([] if k else ['KO_UNRESOLVED'])})
   enrichment_summary=enrich_sentences(sent,srcs['02'])
+  keyword_summary=attach_keyword_pairs(sent,srcs['02']); enrichment_summary['keywords']=keyword_summary
+  attach_word_sections(wr,srcs['03'],sent)
   dialogues,functions,key_expressions,patterns,structure_unmatched,structure_summary=extract_candidate_sets(srcs['01'],srcs['07'])
   exam_items,unmatched_items,item_summary=extract_exam_item_candidates(bundle['sources'])
   enrichment_summary.update(structure_summary)

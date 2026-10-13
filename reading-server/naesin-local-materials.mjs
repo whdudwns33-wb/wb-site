@@ -141,14 +141,19 @@ function validateFolderCandidates(draft) {
     objectRecord(row) && Object.keys(row).every(key => unmatchedKeys.includes(key)) && shortText(row.candidateId,100)
       && shortText(row.field,80) && shortText(row.reason,120) && refsValid(row.sourceRefs)
       && numericDetails.every(key => !Object.hasOwn(row,key) || (Number.isInteger(row[key]) && row[key] >= 0 && row[key] <= 1000)))) return false;
-  const summaryKeys = ['verbForms','grammarChoices','tokens','writingKeywords','dialogues','functions','keyExpressions','patterns'];
+  const keywordRows=Array.isArray(draft.sentenceCandidates)?draft.sentenceCandidates.filter(row=>objectRecord(row)&&Object.hasOwn(row,'keywords')):[];
+  if(keywordRows.some(row=>!Array.isArray(row.keywords)||row.keywords.length>50||row.keywords.some(pair=>!exactKeys(pair,['en','ko'])||!shortText(pair.en,1000)||!shortText(pair.ko,1000))
+    ||!objectRecord(row.enrichmentSourceRefs)||Object.keys(row.enrichmentSourceRefs).some(key=>!['verbForms','grammarChoices','tokens','writingKeywords','keywords'].includes(key)||!refsValid(row.enrichmentSourceRefs[key]))))return false;
+  const hasKeywords=Object.hasOwn(draft.enrichmentSummary||{},'keywords');
+  const summaryKeys = ['verbForms','grammarChoices','tokens','writingKeywords',...(hasKeywords?['keywords']:[]),'dialogues','functions','keyExpressions','patterns'];
   if (!exactKeys(draft.enrichmentSummary,summaryKeys)) return false;
-  for (const key of summaryKeys.slice(0,4)) if (!exactKeys(draft.enrichmentSummary[key],['matched','unmatched'])
+  for (const key of summaryKeys.slice(0,hasKeywords?5:4)) if (!exactKeys(draft.enrichmentSummary[key],['matched','unmatched'])
     || !Object.values(draft.enrichmentSummary[key]).every(n => Number.isInteger(n) && n >= 0 && n <= 1000)) return false;
   for (const [key,keys] of [['dialogues',['matched','unmatched','lines']],['functions',['matched','unmatched']],['keyExpressions',['matched','unmatched']],['patterns',['matched','unmatched','examples','letsUseIt']]])
     if (!exactKeys(draft.enrichmentSummary[key],keys) || !Object.values(draft.enrichmentSummary[key]).every(n => Number.isInteger(n) && n >= 0 && n <= 1000)) return false;
   const totals = draft.enrichmentSummary;
-  return totals.dialogues.matched + totals.dialogues.unmatched === draft.dialogueCandidates.length
+  return (!hasKeywords||totals.keywords.matched + totals.keywords.unmatched === draft.sentenceCandidates.length)
+    && totals.dialogues.matched + totals.dialogues.unmatched === draft.dialogueCandidates.length
     && totals.dialogues.lines === draft.dialogueCandidates.reduce((n,row) => n + row.lines.length,0)
     && totals.functions.matched + totals.functions.unmatched === draft.functionCandidates.length
     && totals.keyExpressions.matched + totals.keyExpressions.unmatched === draft.keyExpressionCandidates.length
