@@ -417,7 +417,17 @@
     return state;
   }
   function loadDB() { try { return recoverStateStamps(JSON.parse(localStorage.getItem(KEY) || 'null')); } catch (e) { return null; } }
-  function save() { if (!checkAccount()) return; try { localStorage.setItem(KEY, JSON.stringify(DB)); } catch (e) {} }
+  function save() {
+    if (!checkAccount()) return false;
+    try {
+      localStorage.setItem(KEY, JSON.stringify(DB));
+      clearBanner('local-save');
+      return true;
+    } catch (e) {
+      showBanner('이 기기에 저장하지 못했어요. 서버 동기화를 확인하세요.', 'local-save');
+      return false;
+    }
+  }
   /* 이번 persist 에서 savedAt 을 올려야 할 과들. 통합 범위 학습은 한 세션에서 여러 과의 단어를
      같이 푼다 — 현재 과만 올리면 다른 과의 기록이 '오래된 것'으로 남아 다른 기기의 옛 기록에
      덮인다(pullAdopt 는 팩별 savedAt 으로 병합한다). */
@@ -3385,7 +3395,7 @@
       return;
     }
     /* 모의 모드 — 시험처럼 정답을 보여 주지 않고 즉시 다음 문항으로 */
-    if (RQ.opts.mock) {
+    if (RQ.opts.mock && (ok || item.type !== 'spell')) {
       if (RQ.onGrade) RQ.onGrade(item, ok, answerKey, {});
       RQ.i += 1; stepRunner();
       return;
@@ -3402,10 +3412,53 @@
        ③ 같은 판단을 기록으로 더 정확하게 할 수 있다 — 이미 외운 단어를 틀리면 그것이 과신이고,
           찍어서 맞히는 것은 철자 인출(완전 인출) 자리에서 걸러진다. 엔진이 그렇게 읽는다.
        탭도 문항당 하나씩 줄었다 — 30문항이면 30번이다. */
+    var correctionRecorded = false;
     function next() {
       if (RQ !== q0) return;
-      if (RQ.onGrade) RQ.onGrade(item, ok, answerKey, {});
+      if (!correctionRecorded && RQ.onGrade) RQ.onGrade(item, ok, answerKey, {});
       RQ.i += 1; stepRunner();
+    }
+    if (!ok && item.type === 'spell') {
+      var correction = document.createElement('div');
+      correction.className = 'correction';
+      var correctionLabel = document.createElement('p');
+      correctionLabel.className = 'muted';
+      correctionLabel.textContent = '정답 철자를 보고 한 번 정확히 입력해 주세요.';
+      var correctionInput = document.createElement('input');
+      correctionInput.className = 'ans'; correctionInput.type = 'text';
+      correctionInput.setAttribute('aria-label', '정답 철자 다시 입력');
+      correctionInput.setAttribute('autocorrect', 'off'); correctionInput.setAttribute('spellcheck', 'false');
+      correctionInput.setAttribute('autocomplete', 'off'); correctionInput.setAttribute('autocapitalize', 'off');
+      correctionInput.setAttribute('enterkeyhint', 'done');
+      var correctionHint = document.createElement('p');
+      correctionHint.className = 'muted'; correctionHint.setAttribute('role', 'status');
+      var correctionSubmit = document.createElement('button');
+      correctionSubmit.className = 'btn p big'; correctionSubmit.textContent = '철자 확인';
+      correctionSubmit.setAttribute('aria-label', '정답 철자 확인');
+      correction.appendChild(correctionLabel); correction.appendChild(correctionInput);
+      correction.appendChild(correctionHint); correction.appendChild(correctionSubmit);
+      q.appendChild(correction);
+      correctionSubmit.onclick = function () {
+        if (correction.getAttribute('data-correct') === '1') { next(); return; }
+        var checked = WBGRADE.gradeAnswer(correctionInput.value, item.answers);
+        if (!checked.correct) {
+          correctionHint.textContent = '철자가 아직 달라요. 정답을 다시 보고 정확히 입력해 주세요.';
+          correctionInput.focus(); return;
+        }
+        correction.setAttribute('data-correct', '1');
+        if (RQ === q0 && RQ.onGrade) { RQ.onGrade(item, ok, answerKey, {}); correctionRecorded = true; }
+        correctionHint.textContent = '교정 완료. 다음을 눌러 계속하세요.';
+        correctionSubmit.textContent = '다음';
+        correctionSubmit.setAttribute('aria-label', '교정 완료 후 다음 문항');
+        correctionInput.disabled = true;
+        try { correctionSubmit.focus({ preventScroll: true }); } catch (e) { correctionSubmit.focus(); }
+      };
+      correctionInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); correctionSubmit.click(); }
+      });
+      try { correctionInput.focus({ preventScroll: true }); } catch (e) { correctionInput.focus(); }
+      try { box.scrollIntoView({ block: 'nearest' }); } catch (e) {}
+      return;
     }
     var nb = document.createElement('div');
     nb.className = 'rnext';
