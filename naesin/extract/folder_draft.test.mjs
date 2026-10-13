@@ -105,7 +105,7 @@ assert.deepEqual(mismatchDraft.enrichmentSummary.patterns,{matched:1,unmatched:1
 const lineJoinPairs=[
 ['국제공','항에','국제공항에'],['의미한','다고','의미한다고'],['하이','킹','하이킹'],['착각','했다','착각했다'],['자연','의','자연의'],['무지','개를','무지개를'],
 ['흥미','로운','흥미로운'],['간다','면','간다면'],['방문하','고','방문하고'],['가족이','랑','가족이랑'],['전통적','인','전통적인'],['거기','에','거기에'],['보내','고','보내고'],['파란색이','야','파란색이야'],['하우','스','하우스'],['건물','의','건물의'],['싶어','요','싶어요'],['시간','을','시간을'],['샀','어','샀어'],['생각','에','생각에'],['두드리','는','두드리는'],['노래','를','노래를'],['알맞','은','알맞은'],['들어','갈','들어갈'],
-['유명한 ','조각상을','유명한 조각상을'],['있는 ','장소에 머물면서','있는 장소에 머물면서'],
+['유명한 ','조각상을','유명한 조각상을'],['있는 ','장소에 머물면서','있는 장소에 머물면서'],['한다는','것을 배웠다','한다는 것을 배웠다'],['뜨는','것을 보았다','뜨는 것을 보았다'],['거기서','많은 사진을 찍었다!','거기서 많은 사진을 찍었다!'],['거기서 ','많은 사진을 찍었다!','거기서 많은 사진을 찍었다!'],
 ['흥','① 보기','흥 ① 보기'],['흥','(1) 보기','흥 (1) 보기'],['흥','2. 다음 문항','흥 2. 다음 문항'],['흥','G: 미','흥 G: 미'],['흥','W: 대화','흥 W: 대화'],['흥','• 항목','흥 • 항목'],['흥','□ 선택','흥 □ 선택'],['흥','n 다음 글','흥 n 다음 글'],['흥','v 다음 글','흥 v 다음 글'],['흥','본문┃객관식┃','흥 본문┃객관식┃'],['구체','중2 NE능률(김기택) Lesson 6','구체 중2 NE능률(김기택) Lesson 6'],['구체','- 7 -','구체 - 7 -'],['구체','PATTERN 2│간접의문문','구체 PATTERN 2│간접의문문'],['inter','national','inter national']
 ];
 const joinProbe=spawnSync(python,['-c',"import folder_draft as m,json,sys; x=json.load(sys.stdin); print(json.dumps([m.source_line_join(pair[:2]) for pair in x],ensure_ascii=False))"],{cwd:path.dirname(script),input:JSON.stringify(lineJoinPairs),encoding:'utf8',env:{...process.env,PYTHONHOME:'',PYTHONUTF8:'1'}});assert.equal(joinProbe.status,0,joinProbe.stdout+joinProbe.stderr);const joined=JSON.parse(joinProbe.stdout);assert.deepEqual(joined,lineJoinPairs.map(x=>x[2]));
