@@ -5,6 +5,8 @@ const html=fs.readFileSync(path.join(__dirname,'../reading-server/public/naesin-
 const inline=html.split('<script>')[1].split('</script>')[0],ids=new Set(Array.from(html.matchAll(/\bid=["']([^"']+)["']/g),m=>m[1]));
 for(const side of ['En','Ko'])for(const range of ['Column','Start','End'])ids.add('pdf'+side+range);
 const clone=v=>JSON.parse(JSON.stringify(v)),response=(body,status=200)=>({ok:status<400,status,json:async()=>body});
+const pdfResponse=()=>({ok:true,status:200,headers:{get:()=> 'application/pdf'},blob:async()=>({type:'application/pdf',own:'SELF_WRITTEN_PDF'})});
+const ownPdfSha='a'.repeat(64);
 let passed=0;const t=async(name,fn)=>{await fn();passed++;console.log('  ✓ '+name);};
 function draft(){return{kind:'naesin-pdf-review-draft',version:1,status:'needs-review',publishable:false,unmatchedWordRows:[],
   sources:{private:{file:'LOCAL_SOURCE_FILE',sha256:'LOCAL_SOURCE_HASH'}},
@@ -24,7 +26,7 @@ function gate(j){let pending=0,total=0;const warns=[];
     if(!j.review[key]){pending++;if(r._pdfReview)warns.push({where:kind,message:kind+'['+i+'] PDF 원천 대조 필요'});}});
   return{ok:false,pending,total,errors:[],warns,summary:[]};}
 function screen(){
-  const nodes=new Map(),rendered=new Map(),events=new Map(),requests=[],storage=new Map([['wbr.admin.token','own-test-admin-token']]);let stored=job(),rowRenders=0,appGeneration=0;
+  const nodes=new Map(),rendered=new Map(),events=new Map(),requests=[],created=[],revoked=[],storage=new Map([['wbr.admin.token','own-test-admin-token']]);let stored=job(),rowRenders=0,appGeneration=0;
   const decode=s=>s.replace(/&(amp|lt|gt|quot|#39);/g,(_,key)=>({amp:'&',lt:'<',gt:'>',quot:'"','#39':"'"}[key]));
   function node(s){if(!s.startsWith('#')||!ids.has(s.slice(1)))return null;
     if(!nodes.has(s)){
@@ -53,6 +55,8 @@ function screen(){
       if(el.generation!==appGeneration){el.value=decode(x[2]);el.generation=appGeneration;}return el;});}
   let fetchImpl=async(url,opt)=>{
     if(url==='/api/health')return response({localPdfReview:true});
+    if(url.startsWith('/api/naesin/admin/job/local-review?id='))return response({draft:passageDraft(),pdfs:[{source:'02',file:'02_own.pdf',pageCount:2,sha256:ownPdfSha},{source:'03',file:'03_own.pdf',pageCount:26,sha256:ownPdfSha}]});
+    if(url.startsWith('/api/naesin/admin/job/local-pdf?id='))return pdfResponse();
     if(url==='/api/naesin/admin/job/draft'){stored={...stored,draft:{...stored.draft,...JSON.parse(opt.body).draft},updatedAt:new Date(Date.parse(stored.updatedAt)+1).toISOString()};return response({job:stored,gate:gate(stored)});}
     if(url.startsWith('/api/naesin/admin/job?id='))return response({job:stored,gate:gate(stored),sources:{}});
     if(url==='/api/naesin/admin/jobs')return response({jobs:[]});
@@ -71,14 +75,15 @@ function screen(){
   const ctx=vm.createContext({document:{querySelector:node,querySelectorAll:chunks,addEventListener:(type,fn)=>events.set(type,fn)},
     localStorage:{getItem:k=>storage.get(k)||null,removeItem:k=>storage.delete(k),setItem:(k,v)=>storage.set(k,v)},
     WBAdminLogin:{mount(){}},WBPACKCHECK:require('./pack-check.js'),confirm:()=>true,
+    URL:{createObjectURL:b=>{const url='blob:own-'+(created.length+1);created.push({url,blob:b});return url;},revokeObjectURL:url=>revoked.push(url)},
     fetch:async(url,opt)=>{requests.push({url,...opt});return fetchImpl(url,opt);}});
   const stop=inline.indexOf("$('#bannerClose').onclick=hideBanner;");assert.ok(stop>1000);
   vm.runInContext(inline.slice(0,stop)+`
     this.ui={putPdfReviewFile,putDraftFiles,putDraft,pdfReviewDraft,regularDraft,pdfColumnsHtml,pdfSentenceHtml,loadPdfSentence,savePdfSentence,savePdfWord,renderSrc,renderJob,review,bulkOk,openJob,openList,renderLogin,
-      get:()=>({JOB,GATE,PDF_LOCAL,PDF_WORD_EDIT,VIEW,SEL,EDIT,SRC,BUSY}),set:j=>{JOB=j;GATE={ok:false,pending:0,total:0,errors:[],warns:[],summary:[]};VIEW='job';JOB_READ++;},
+      get:()=>({JOB,GATE,PDF_LOCAL,PDF_VIEW,PDF_WORD_EDIT,VIEW,SEL,EDIT,SRC,BUSY}),set:j=>{JOB=j;GATE={ok:false,pending:0,total:0,errors:[],warns:[],summary:[]};VIEW='job';JOB_READ++;},
       setGate:g=>{GATE=g;},setLocal:p=>{PDF_LOCAL=p;},setToken:t=>{TOKEN=t;},showAll:()=>{FONLY='all';renderJob();}};`,ctx);
   ctx.ui.set(stored);
-  return{...ctx.ui,node,chunks,events,requests,rowRenders:()=>rowRenders,setStored:j=>{stored=j;},setFetch:f=>{fetchImpl=f;}};
+  return{...ctx.ui,node,chunks,events,requests,created,revoked,rowRenders:()=>rowRenders,setStored:j=>{stored=j;},setFetch:f=>{fetchImpl=f;}};
 }
 async function loadPassage(ui){ui.node('#pdfReviewFile').files=[{text:async()=>JSON.stringify(passageDraft())}];await ui.putPdfReviewFile();}
 function field(ui,id,value){const el=ui.node('#'+id);el.value=value;el.oninput();}
@@ -92,6 +97,96 @@ function wordInput(ui,head=' own fixed word ',pos=' adj. ',meanings=' 뜻 하나
 function wordSection(ui,section,checked){const el=ui.node('#pdfWord'+section);el.checked=checked;el.onchange();}
 
 (async()=>{
+  await t('PDF 검수의 기본 진입은 PC 자료 불러오기 하나이고 파일·JSON·줄 대응은 고급 입력에서 유지한다',()=>{
+    const ui=screen();ui.renderJob();const markup=ui.node('#app').innerHTML;
+    assert.match(markup,/id="btnPcReview"[^>]*>PC 자료 불러오기/);
+    assert.match(markup,/<details[^>]*id="advancedInput"[^>]*><summary[^>]*>고급 입력<\/summary>[\s\S]*id="pdfReviewFile"[\s\S]*id="draftFile"/);
+    assert.ok(!/<details[^>]*id="advancedInput"[^>]*\bopen\b/.test(markup));ui.node('#advancedInput').open=true;ui.renderJob();assert.match(ui.node('#app').innerHTML,/<details[^>]*id="advancedInput"[^>]*\bopen\b/);
+    assert.ok(markup.indexOf('id="btnPcReview"')<markup.indexOf('고급 입력'));
+    assert.match(markup,/원본을 보고 오류를 수정한 뒤 승인/);
+  });
+
+  await t('PC 자료 연결은 기존 74행·교정·검수·메모·버전을 쓰지 않고 원본 PDF를 Bearer로만 연다',async()=>{
+    const ui=screen(),own=job();own.draft.words=clone(ui.pdfReviewDraft(passageDraft()).words);
+    own.review['words:w-0001']={state:'fixed',patch:{headword:'corrected own word',sections:['reading']},note:'대조한 자체 메모'};
+    ui.setStored(own);ui.set(own);ui.showAll();const before=JSON.stringify(own);await ui.node('#btnPcReview').onclick();await new Promise(r=>setImmediate(r));
+    assert.equal(JSON.stringify(ui.get().JOB),before);assert.equal(ui.get().JOB,own);assert.equal(ui.get().PDF_LOCAL.columns.length,4);
+    assert.deepEqual(ui.requests.map(r=>r.url),['/api/health','/api/naesin/admin/job/local-review?id=job-self000001','/api/naesin/admin/job/local-pdf?id=job-self000001&source=03&sha256='+ownPdfSha]);
+    assert.ok(ui.requests.every(r=>!r.method||r.method==='GET'));assert.equal(ui.requests.at(-1).headers.Authorization,'Bearer own-test-admin-token');
+    assert.equal(ui.requests.at(-1).cache,'no-store');assert.ok(!ui.requests.some(r=>r.url.includes('token')));
+    assert.equal(ui.created.length,1);assert.equal(ui.get().PDF_VIEW.source,'03');assert.match(ui.node('#pdfPreview').innerHTML,/iframe[^>]*title="검수할 원본 PDF"[^>]*src="blob:own-1#page=1"/);
+    assert.match(ui.node('#pdfPreview').innerHTML,/PDF 크게 보기/);assert.ok(ui.node('#srcText').hidden);
+    assert.match(ui.node('#pdfReviewOut').textContent,/기존 단어 74개와 검수를 유지/);
+  });
+
+  await t('PC 원천을 다시 연결해도 같은 단어·본문 입력을 보존하며 새 후보의 뜻·섹션은 추정하지 않는다',async()=>{
+    const ui=screen();ui.renderJob();await ui.putPdfReviewFile(true);await new Promise(r=>setImmediate(r));
+    assert.equal(ui.requests.filter(r=>r.method==='POST').length,1);assert.equal(ui.get().JOB.draft.words.length,74);assert.deepEqual(clone(ui.get().JOB.draft.words[0].sections),[]);
+    assert.deepEqual(clone(ui.get().JOB.review),{});pair(ui);field(ui,'pdfSentenceDay','own-1');chunk(ui,0,'A toy is blue.','장난감은 파랗다.');keyword(ui,0,'blue','파랗다');
+    editRow(ui,'words:w-0001');wordInput(ui);wordSection(ui,'Reading',true);const form=JSON.stringify(ui.get().PDF_LOCAL.sentence),word=JSON.stringify(ui.get().PDF_WORD_EDIT),before=JSON.stringify(ui.get().JOB);
+    await ui.putPdfReviewFile(true);await new Promise(r=>setImmediate(r));assert.equal(JSON.stringify(ui.get().PDF_LOCAL.sentence),form);assert.equal(JSON.stringify(ui.get().PDF_WORD_EDIT),word);
+    assert.equal(JSON.stringify(ui.get().JOB),before);assert.equal(ui.requests.filter(r=>r.method==='POST').length,1);assert.equal(ui.node('#pdfWordHead').value,' own fixed word ');
+  });
+
+  await t('다른 PC 후보·원본 정보 오류·서버 실패는 검수와 입력·연결한 PDF를 바꾸지 않는다',async()=>{
+    for(const kind of ['mismatch','metadata','server']){
+      const ui=screen();ui.renderJob();await ui.putPdfReviewFile(true);await new Promise(r=>setImmediate(r));pair(ui);field(ui,'pdfSentenceDay','own-1');chunk(ui,0,'A toy is blue.','장난감은 파랗다.');
+      editRow(ui,'words:w-0001');wordInput(ui);wordSection(ui,'Reading',true);
+      const before=JSON.stringify(ui.get().JOB),local=JSON.stringify(ui.get().PDF_LOCAL),word=JSON.stringify(ui.get().PDF_WORD_EDIT),url=ui.get().PDF_VIEW.url,writes=ui.requests.filter(r=>r.method==='POST').length;
+      ui.setFetch(url=>{if(url==='/api/health')return response({localPdfReview:true});const raw=passageDraft();if(kind==='mismatch')raw.wordCandidates[0].headCandidate='different own word';
+        return kind==='server'?response({error:'자체 원천 없음'},404):response({draft:raw,pdfs:[{source:kind==='mismatch'?'03':'04',file:'own.pdf',pageCount:2,sha256:ownPdfSha}]});});
+      await ui.putPdfReviewFile(true);assert.equal(JSON.stringify(ui.get().JOB),before);assert.equal(JSON.stringify(ui.get().PDF_LOCAL),local);assert.equal(JSON.stringify(ui.get().PDF_WORD_EDIT),word);
+      assert.equal(ui.get().PDF_VIEW.url,url);assert.equal(ui.requests.filter(r=>r.method==='POST').length,writes);assert.ok(ui.node('#pdfReviewOut').textContent);assert.equal(ui.revoked.length,0);
+    }
+  });
+
+  await t('직접 원본은 단어03·문장02와 위치의 쪽으로 이동하고 자료 선택·목록·로그아웃 시 이전 blob을 회수한다',async()=>{
+    const ui=screen(),own=job();own.draft.words=clone(ui.pdfReviewDraft(passageDraft()).words);
+    ui.setStored(own);ui.set(own);ui.showAll();await ui.putPdfReviewFile(true);await new Promise(r=>setImmediate(r));
+    ui.get().JOB.draft.words[0]._pdfReview.locations[0].page=4;ui.renderJob();assert.match(ui.node('#pdfPreview').innerHTML,/#page=4/);assert.equal(ui.created.length,1);
+    ui.get().JOB.draft.sentences=[{seq:1,en:'Go!',ko:'가자!',_pdfReview:{flags:['REVIEW_REQUIRED'],locations:[{page:2,bbox:[1,2,3,4]}]}}];ui.showAll();editRow(ui,'sentences:s1');await new Promise(r=>setImmediate(r));
+    assert.equal(ui.get().PDF_VIEW.source,'02');assert.match(ui.node('#pdfPreview').innerHTML,/#page=2/);assert.deepEqual(ui.revoked,['blob:own-1']);
+    ui.node('#pdfSource').value='03';ui.node('#pdfSource').onchange();await new Promise(r=>setImmediate(r));assert.equal(ui.get().PDF_VIEW.source,'03');assert.deepEqual(ui.revoked,['blob:own-1','blob:own-2']);
+    await ui.openList();assert.equal(ui.get().PDF_VIEW,null);assert.deepEqual(ui.revoked,['blob:own-1','blob:own-2','blob:own-3']);
+    own.draft.words[0]._pdfReview.locations[0].page=1;ui.setStored(own);await ui.openJob(own.jobId);await ui.putPdfReviewFile(true);await new Promise(r=>setImmediate(r));
+    ui.renderLogin();assert.equal(ui.get().PDF_VIEW,null);assert.ok(ui.revoked.includes('blob:own-4'));
+  });
+
+  await t('PC 초안 응답 대기 중 작업·계정·로그아웃이 바뀌면 원천·PDF를 새 화면에 연결하지 않는다',async()=>{
+    for(const change of ['job','token','logout']){
+      const ui=screen();ui.renderJob();let resolve;ui.setFetch(url=>url==='/api/health'?response({localPdfReview:true}):new Promise(r=>{resolve=r;}));
+      const pending=ui.putPdfReviewFile(true);await new Promise(r=>setImmediate(r));
+      if(change==='job'){ui.set(job('job-self000002'));ui.renderJob();}else if(change==='token'){ui.setToken('new-own-token');ui.renderJob();}else ui.renderLogin();
+      const markup=ui.node('#app').innerHTML;resolve(response({draft:passageDraft(),pdfs:[{source:'03',file:'03_own.pdf',pageCount:26,sha256:ownPdfSha}]}));await pending;
+      assert.equal(ui.get().PDF_LOCAL,null);assert.equal(ui.get().PDF_VIEW,null);assert.equal(ui.created.length,0);assert.equal(ui.node('#app').innerHTML,markup);assert.equal(ui.requests.filter(r=>r.method==='POST').length,0);
+    }
+  });
+
+  await t('늦은 PDF 응답·blob·401은 작업·계정·로그아웃 뒤 원본을 노출하거나 새 계정을 만료시키지 않는다',async()=>{
+    for(const phase of ['response','blob','401'])for(const change of ['job','token','logout']){
+      const ui=screen(),own=job();own.draft.words=clone(ui.pdfReviewDraft(passageDraft()).words);ui.setStored(own);ui.set(own);ui.showAll();let resolve;
+      ui.setFetch(url=>url==='/api/health'?response({localPdfReview:true}):url.includes('/local-review?')?response({draft:passageDraft(),pdfs:[{source:'03',file:'03_own.pdf',pageCount:26,sha256:ownPdfSha}]}):
+        phase==='blob'?{ok:true,status:200,headers:{get:()=> 'application/pdf'},blob:()=>new Promise(r=>{resolve=r;})}:new Promise(r=>{resolve=r;}));
+      await ui.putPdfReviewFile(true);await new Promise(r=>setImmediate(r));assert.equal(typeof resolve,'function');
+      if(change==='job'){ui.set(job('job-self000002'));ui.setLocal(null);ui.renderJob();}else if(change==='token'){ui.setToken('new-own-token');ui.setLocal(null);ui.renderJob();}else ui.renderLogin();
+      const markup=ui.node('#app').innerHTML;resolve(phase==='blob'?{type:'application/pdf',own:'SELF_WRITTEN_PDF'}:phase==='401'?response({error:'자체 만료'},401):pdfResponse());await new Promise(r=>setImmediate(r));
+      assert.equal(ui.created.length,0);assert.equal(ui.get().PDF_VIEW,null);assert.equal(ui.node('#app').innerHTML,markup);if(change==='token')assert.equal(ui.get().VIEW,'job');
+    }
+  });
+
+  await t('PDF 오류와 잘못된 응답은 승인·입력을 건드리지 않고 재시도하며 현재401은 원천을 회수한다',async()=>{
+    for(const failure of ['server','type','401','lineage']){
+      const ui=screen(),own=job();own.draft.words=clone(ui.pdfReviewDraft(passageDraft()).words);own.review['words:w-0001']={state:'pending',note:'자체 메모'};ui.setStored(own);ui.set(own);ui.showAll();const before=JSON.stringify(own);
+      ui.setFetch(url=>{if(url==='/api/health')return response({localPdfReview:true});if(url.includes('/local-review?'))return response({draft:passageDraft(),pdfs:[{source:'03',file:'03_own.pdf',pageCount:26,sha256:ownPdfSha}]});
+        assert.ok(url.endsWith('&sha256='+ownPdfSha));return failure==='type'?{...pdfResponse(),headers:{get:()=> 'text/html'}}:response({error:failure==='lineage'?'원본이 바뀌었어요. PC 자료를 다시 불러오세요.':'자체 PDF 오류'},failure==='401'?401:failure==='lineage'?409:500);});
+      await ui.putPdfReviewFile(true);await new Promise(r=>setImmediate(r));assert.equal(ui.created.length,0);
+      if(failure==='401'){assert.equal(ui.get().VIEW,'login');assert.equal(ui.get().PDF_LOCAL,null);assert.equal(ui.get().PDF_VIEW,null);}else{
+        assert.equal(JSON.stringify(ui.get().JOB),before);assert.match(ui.node('#pdfPreview').innerHTML,/PDF 다시 열기/);assert.ok(ui.get().PDF_VIEW.message);
+        ui.setFetch(()=>pdfResponse());ui.node('#btnPdfRetry').onclick();await new Promise(r=>setImmediate(r));assert.equal(ui.created.length,1);assert.ok(ui.get().PDF_VIEW.url);
+      }
+    }
+  });
+
   await t('학원 내 PC capability가 false·없음·네트워크 오류면 구매 검수 파일을 읽거나 올리지 않는다',async()=>{
     for(const h of [{localPdfReview:false},{runtime:'workers'},null]){
       const ui=screen();let reads=0;
