@@ -69,6 +69,7 @@ function approveAll(job) {
 const pdfWord = () => {
   const w = SAMPLE.words[0];
   return { id: w.id, headword: w.headword, pos: w.pos, meaningKo: clone(w.meaningKo), sections: clone(w.sections),
+    senses: [{ senseNo: 1, pos: w.pos || '', meaningKo: w.meaningKo[0], example: { en: 'A sample ' + w.headword + ' appears.', ko: '갈매기가 보인다.' } }],
     _pdfReview: { flags: ['원본 대조 필요'], locations: [{ page: 1, bbox: [10, 20, 30, 40] }] } };
 };
 const pdfSentence = () => ({ seq: 1, dayGroup: '1', en: 'A toy is blue.', ko: '장난감이 파랗다.',
@@ -600,6 +601,12 @@ await t('PDF DTO에는 원문 부속물·다른 종류·잘못된 좌표가 들�
     (w) => { w._pdfReview.locations[0].bbox[0] = '1'; },
     (w) => { w._pdfReview.locations[0].tokens = ['합성']; },
     (w) => { w._pdfReview.locations[0].sourceDocumentId = 'not-in-manifest'; },
+    (w) => { w.senses[0].extra = 'forbidden'; },
+    (w) => { w.senses[0].senseNo = 2; },
+    (w) => { w.senses[0].example.en = ''; },
+    (w) => { delete w.senses[0].example.ko; },
+    (w) => { w.senses[0].meaningKo = 'meaning mismatch'; },
+    (w) => { w.senses.push({ senseNo: 2, pos: 'n.', meaningKo: 'more', example: { en: 'More.', ko: '더.' }, extra: 'x' }, { senseNo: 3, pos: 'n.', meaningKo: 'more', example: { en: 'More.', ko: '더.' } }, { senseNo: 4, pos: 'n.', meaningKo: 'more', example: { en: 'More.', ko: '더.' } }); },
   ];
   for (const mutate of mutations) {
     const w = pdfWord(); mutate(w);
@@ -649,6 +656,7 @@ await t('PDF 원본 메타는 편집으로 지워지지 않고 개별 검수 후
   assert.ok(!JSON.stringify(pack).includes('_pdfReview'));
   assert.ok(!JSON.stringify(pack).includes('locations'));
   assert.strictEqual(pack.words[0].headword, job.draft.words[0].headword);
+  assert.deepStrictEqual(pack.words[0].senses, job.draft.words[0].senses);
 });
 
 await t('행 인덱스 경고는 버린 앞 행을 뺀 조립 순서에 맞고 승인 행은 사라진다', () => {

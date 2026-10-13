@@ -24,8 +24,117 @@ const wordMasterRows=[
 ];
 const wordMasterUnique=[...wordMasterRows,...Array.from({length:74-wordMasterRows.length},(_,i)=>`□ extra${String(i+1).padStart(3,'0')} n. 뜻${i+1}`)];
 const wordMasterDuplicate=['□ picture n. 사진','□ interesting a. 흥미로운','□ traditional a. 전통적인','□ finally adv. 드디어, 마침내','□ already adv. 이미, 벌써'];
-const wordSensesP7=`□ state 1. n. (미국 등의) 주(州)\n2. n. (정신적·신체적) 상태\n□ come through ~\n1. (장소)를 통과하다,\n  지나오다\n2. (난관·위험 등)을 이겨내다\n□ gate 1. n. (공항의) 탑승구\n2. n. 문, 출입구\n□ diamond 1. n. 다이아몬드\n2. n. 마름모\n□ name 1. v. ~의 이름을 짓다\n2. n. 이름, 성명\n□ view 1. n. 경관, 전망\n2. n. 견해, 의견\n3. v. ~을 보다, 생각하다\n□ Hawaiian 1. a. 하와이의\n2. n. 하와이인\n□ movement 1. n. 동작, 움직임\n2. n. (사회적·정치적) 운동\n□ raise 1. v. ~을 들어 올리다\n2. v. (아이·동물 등)을 기르다\n3. v. (돈·기금 등)을 모으다`;
-const wordSensesP8=`□ head 1. v. (특정 장소로) 가다,\n  향하다\n2. n. 머리\n3. n. 책임자\n□ harm 1. v. ~을 다치게 하다\n2. n. 손해, 위해\n□ touch 1. v. ~을 만지다, ~에 손대다\n2. v. ~을 감동시키다\n3. n. 손길, 접촉`;
+const wordSensesP7=`6 WORD TES 2022 개정│NE능률(김기택) 중2 T
+- 7 -
+다의어 & 유의어/반의어
+1│다의어
+□ state 1. n. (미국 등의) 주(州)
+2. n. (정신적·신체적) 상태
+The company has opened a new store in another state. 그 회사는 다른
+주에 새 매장을 열었다.
+My room was in a terrible state after I searched for my missing
+watch. 잃어버린 시계를 찾고 난 후 내 방은 엉망인 상태였다.
+□ come through ~
+1. (장소)를 통과하다,
+ 지나오다
+2. (난관·위험 등)을 이겨내다
+We came through the long tunnel and finally saw the ocean. 우리는 긴
+터널을 지나와 마침내 바다를 보았다.
+She came through the hard time with help from her family. 그녀는 가
+족의 도움으로 힘든 시기를 이겨 냈다.
+□ gate 1. n. (공항의) 탑승구
+2. n. 문, 출입구
+Our plane will leave from Gate 18 at noon. 우리 비행기는 정오에 18번 탑
+승구에서 출발할 것이다.
+The farmer closed the gate before the cows entered the road. 농부는
+소들이 도로로 들어가기 전에 문을 닫았다.
+□ diamond 1. n. 다이아몬드
+2. n. 마름모
+Each of her earrings has a tiny diamond in the center. 그녀의 귀걸이에
+는 각각 중앙에 작은 다이아몬드가 하나씩 있다.
+Four blue lines formed a diamond on the classroom wall. 네 개의 파란
+선이 교실 벽에 마름모를 만들었다.
+□ name 1. v. ~의 이름을 짓다
+2. n. 이름, 성명
+The writer named the main character Luna. 그 작가는 주인공의 이름을
+Luna라고 지었다.
+Please write your name at the top of the paper. 종이 맨 위에 이름을 써
+주세요.
+□ view 1. n. 경관, 전망
+2. n. 견해, 의견
+3. v. ~을 보다, 생각하다
+The view of the snowy mountains from our hotel room was clear. 우리
+호텔 방에서 바라본 눈 덮인 산들의 경치는 선명했다.
+Everyone listened carefully to Jisu’s view on the new school rule. 모두
+가 새로운 교칙에 대한 지수의 견해를 주의 깊게 들었다.
+She views mistakes as a chance to learn something new. 그녀는 실수를
+새로운 것을 배울 기회로 생각한다.
+□ Hawaiian 1. a. 하와이의
+2. n. 하와이인
+My uncle taught me several Hawaiian words during the trip. 삼촌은 여
+행 중에 나에게 몇 가지 하와이 단어를 가르쳐 주셨다.
+We talked with a Hawaiian about the history of the island. 우리는 한 하
+와이인과 그 섬의 역사에 관해 이야기했다.
+□ movement 1. n. 동작, 움직임
+2. n. (사회적·정치적) 운동
+The camera detected a slight movement near the back door. 카메라는
+뒷문 근처에서 작은 움직임을 감지했다.
+Many students joined a movement against school violence. 많은 학생들
+이 학교 폭력에 반대하는 운동에 참여했다.
+□ raise 1. v. ~을 들어 올리다
+2. v. (아이·동물 등)을 기르다
+3. v. (돈·기금 등)을 모으다
+The conductor raised both arms before the orchestra began. 지휘자는
+오케스트라가 연주를 시작하기 전에 두 팔을 올렸다.
+My aunt raises chickens on a small farm outside the city. 우리 이모는
+도시 외곽의 작은 농장에서 닭을 기른다.
+Our club held a bake sale to raise money for an animal shelter. 우리
+동아리는 동물 보호소를 위한 돈을 모으기 위해 빵 판매 행사를 열었다.`;
+const wordSensesP8=`6 WORD TES 2022 개정│NE능률(김기택) 중2 T
+- 8 -
+2│유의어/반의어
+□ head 1. v. (특정 장소로) 가다,
+ 향하다
+2. n. 머리
+3. n. 책임자
+After lunch, we headed east along the river. 점심 식사 후 우리는 강을 따
+라 동쪽으로 향했다.
+Sora rested her head on a soft pillow. 소라는 부드러운 베개 위에 머리를
+기댔다.
+Ms. Park is the head of our school’s art club. 박 선생님은 우리 학교 미술
+동아리의 책임자이다.
+□ harm 1. v. ~을 다치게 하다
+2. n. 손해, 위해
+The sharp rock may harm your foot if you step on it. 그 날카로운 돌을
+밟으면 발을 다칠 수 있다.
+The chemicals may cause harm to plants and animals. 그 화학 물질들은
+식물과 동물에게 해를 끼칠 수 있다.
+□ touch 1. v. ~을 만지다, ~에 손대다
+2. v. ~을 감동시키다
+3. n. 손길, 접촉
+Don’t touch the hot pan with your bare hands. 맨손으로 뜨거운 팬에 손
+대지 마라.
+The song touched her and brought tears to her eyes. 그 노래는 그녀를
+감동시켜 눈물을 글썽이게 했다.
+The screen responds quickly to a light touch. 그 화면은 가벼운 접촉에도
+빠르게 반응한다.
+□ trip n. 여행 유의어 journey
+□ finally adv. 마침내, 드디어 유의어 eventually, at last
+□ arrive v. 도착하다 유의어 reach, get to ~
+□ international a. 국제적인 반의어 domestic 국내의
+□ each other pron. 서로 유의어 one another
+□ hug v. ~을 껴안다, 포옹하다 유의어 embrace
+□ view n. 경관, 전망 유의어 scenery
+□ traditional a. 전통적인 반의어 modern 현대적인
+□ movement n. 동작, 움직임 유의어 motion
+□ stand for ~ ~을 상징하다 유의어 symbolize, represent
+□ for example 예를 들어 유의어 for instance
+□ raise v. ~을 들어 올리다 유의어 lift 반의어 lower ~을 내리다
+□ harm v. ~을 다치게 하다 유의어 hurt, damage 반의어 protect ~을 보호하다
+□ colorful a. 다채로운, 형형색색의 반의어 colorless 색이 없는
+□ last a. 맨 마지막의, 최종의 반의어 first 첫 번째의, 처음의
+□ always adv. 늘, 항상 유의어 all the time
+□ remember v. ~을 기억하다 반의어 forget ~을 잊다`;
 const expectedWritingKeywords=['finally|arrive|international|airport','come|through|the gate|hear|someone|call','cousin|wait','see|each|other|hug|jump|a circle','put|pretty|necklace|around|neck','call|it|say|mean|warm|welcome','it|famous|hiking|place|tell|how|get','mistake|shiny|rock','name|how|interest','the view|the top|amaze|take|many|picture','go|culture','learn|traditional','what|some|word|mean','use|say','many|the movement|stand|thing|nature','raise|arm|above|a circle|it|stand|the moon','dance|can|feel|the|Hawaiian|people|love','the way|back|see|big|beautiful|rainbow','often|see|call','head|snorkeling','watch|educational|video','learn|not|harm|the sea animal|touch|the coral','underwater|wonderful|see|lots of|colorful|a turtle|swim','already|last|trip','sad|go|home|always|remember'].map(value=>value.split('|'));
 const grammarPromptForExercise=n=>n===1?'1) She [go / goes] [is / are]':n===2?'2) We [was / are]':n===11?'11) Today we [went to / went] a culture center. We learned about traditional Hawaiian culture there.':n===12?'12) First, we learned what [some Hawaiian words mean / do some Hawaiian words mean].':n===19?'19) Today, we headed to Hanauma Bay [going / to go] snorkeling. Before snorkeling, we watched an educational video.':n===22?'22) It [is already / already is] the last day of our trip.':n===23?'23) I’m sad [going / to go] home, but I [will always / always will] remember Hawaii.':`${n}) Sample sentence [wrong${n} / right${n}].`;
 const grammarAnswerForExercise=n=>n===1?'1) goes / are':n===2?'2) unknown':n===11?'11) went to':n===12?'12) some Hawaiian words mean':n===19?'19) to go':n===22?'22) is already':n===23?'23) to go / will always':`${n}) right${n}`;
@@ -108,7 +217,7 @@ const failBundle=(mutate,name,expected)=>{const copy=JSON.parse(JSON.stringify(s
 failBundle(src=>{const p=src.pages.find(x=>x.page===1);p.text=p.text.replace(/^□ extra001 n\. 뜻1\n/m,'');},'bad-word-count','WORD_MASTER_SOURCE_ROW_COUNT_MISMATCH');failBundle(src=>{const p=src.pages.find(x=>x.page===7);p.text=p.text.replace('□ state 1. n. (미국 등의) 주(州)','□ wrong 1. n. (미국 등의) 주(州)');},'bad-sense-head','WORD_SENSE_SOURCE_MISMATCH');
 assert.deepEqual(draft.enrichmentSummary.keywords,{matched:0,unmatched:25});assert.deepEqual(draft.sentenceCandidates[0].keywords,[]);assert.deepEqual(draft.sentenceCandidates[0].keywordKoCandidates,['비행','마침내']);assert.deepEqual(draft.sentenceCandidates[0].keywordEnCandidates,['flight','finally']);assert.deepEqual(draft.sentenceCandidates[1].keywords,[]);assert.deepEqual(draft.sentenceCandidates[1].keywordKoCandidates,['게이트']);assert.deepEqual(draft.sentenceCandidates[1].keywordEnCandidates,['gate','heard']);assert(draft.sentenceCandidates.every(x=>x.reviewFlags.includes('KEYWORD_ALIGNMENT_REVIEW_REQUIRED')));assert(draft.unmatched.filter(x=>x.field==='keywords'&&x.reason==='KEYWORD_ALIGNMENT_REVIEW_REQUIRED').length===25);assert(draft.unmatched.some(x=>x.candidateId==='sc-0002'&&x.field==='keywords'&&x.reason==='KEYWORD_ALIGNMENT_REVIEW_REQUIRED'&&x.baseCount===2&&x.answerCount===1));
 const word=head=>draft.wordCandidates.find(row=>row.headCandidate===head);assert.equal(draft.wordCandidates.length,74);assert.deepEqual(draft.wordCandidates.map(x=>x.candidateId),Array.from({length:74},(_,i)=>`wc-${String(i+1).padStart(4,'0')}`));const normalizedHeads=draft.wordCandidates.map(x=>x.headCandidate.normalize('NFKC').toLocaleLowerCase().replace(/\s*~\s*$/,'').replace(/\s+/g,' ').trim());assert.equal(new Set(normalizedHeads).size,74);const primaryWordRefs=row=>row.sourceRefs.filter(r=>r.sourceDocumentId==='03'&&r.page===1&&['conversation','reading'].includes(r.section)),memberships=draft.wordCandidates.map(row=>({head:row.headCandidate,sections:[...new Set(primaryWordRefs(row).map(r=>r.section))]}));assert.equal(draft.wordCandidates.reduce((n,row)=>n+primaryWordRefs(row).length,0),79);assert(draft.wordCandidates.every(row=>primaryWordRefs(row).length>0));assert.equal(memberships.filter(row=>row.sections.includes('conversation')).length,30);assert.equal(memberships.filter(row=>row.sections.includes('reading')).length,47);assert.deepEqual(memberships.filter(row=>row.sections.length===2).map(row=>row.head).sort(),['already','finally','traditional']);for(const head of ['picture','interesting']){const row=word(head);assert.deepEqual(memberships.find(x=>x.head===head).sections,['conversation']);assert.equal(primaryWordRefs(row).length,2);assert(row.reviewFlags.includes('DUPLICATE_SOURCE_ROWS'));}assert.deepEqual(draft.wordCandidates.filter(x=>x.reviewFlags.includes('DUPLICATE_SOURCE_ROWS')).map(x=>x.headCandidate),['picture','interesting','traditional','finally','already']);assert(draft.wordCandidates.every(x=>x.sourceRefs.every(r=>r.sourceDocumentId==='03'&&r.printedPage===r.page&&Number.isInteger(r.lineStart)&&Number.isInteger(r.lineEnd)&&r.lineStart<=r.lineEnd)));const allowedWordFlags=new Set(['REVIEW_REQUIRED','DUPLICATE_SOURCE_ROWS','MULTIPLE_MEANINGS_SOURCE_CONFIRMED','PHRASE_POS_NOT_PRINTED']);assert(draft.wordCandidates.every(x=>x.reviewFlags.every(flag=>allowedWordFlags.has(flag))));assert(!draft.wordCandidates.some(x=>/\r|\n|(?:spend-spent-spent|fly-flew-flown|mean-meant-meant)/i.test([x.headCandidate,...x.meanings].join(' '))));for(const key of ['spend','mean','come through','stand for'])assert.equal(draft.wordCandidates.filter(x=>x.headCandidate.normalize('NFKC').toLocaleLowerCase().replace(/\s*~\s*$/,'').trim()===key).length,1);assert.deepEqual(word('Australia').meanings,['호주']);assert.deepEqual(word('Thailand').meanings,['태국']);assert.deepEqual(word('come true').meanings,['(꿈 등이) 실현되다']);assert.deepEqual(word('hug').meanings,['~을 껴안다, 포옹하다']);const balanced=value=>{let depth=0;for(const ch of value){if(ch==='(')depth++;else if(ch===')'&&--depth<0)return false;}return depth===0;};assert(draft.wordCandidates.every(x=>x.meanings.every(balanced)));for(const [head,meaning] of [['take a tour of ~','~을 둘러보다, 투어를 하다'],['look for ~','~을 찾다'],['send ~ away','~을 떠나보내다'],['mistake ~ for ...','~를 ...로 오해하다'],['learn about ~','~에 대해 배우다'],['stand for ~','~을 상징하다']]){const row=word(head);assert(row);assert.deepEqual(row.meanings,[meaning]);assert.deepEqual(row.posCandidates,[]);assert(row.reviewFlags.includes('PHRASE_POS_NOT_PRINTED'));assert(primaryWordRefs(row).length>0);}
-const expectedSenses={state:['(미국 등의) 주(州)','(정신적·신체적) 상태'],'come through':['(장소)를 통과하다, 지나오다','(난관·위험 등)을 이겨내다'],gate:['(공항의) 탑승구','문, 출입구'],diamond:['다이아몬드','마름모'],name:['~의 이름을 짓다','이름, 성명'],view:['경관, 전망','견해, 의견','~을 보다, 생각하다'],Hawaiian:['하와이의','하와이인'],movement:['동작, 움직임','(사회적·정치적) 운동'],raise:['~을 들어 올리다','(아이·동물 등)을 기르다','(돈·기금 등)을 모으다'],head:['(특정 장소로) 가다, 향하다','머리','책임자'],harm:['~을 다치게 하다','손해, 위해'],touch:['~을 만지다, ~에 손대다','~을 감동시키다','손길, 접촉']};const expectedPos={state:['n.'],'come through':[],'gate':['n.'],'diamond':['n.'],'name':['v.','n.'],'view':['n.','v.'],'Hawaiian':['a.','n.'],'movement':['n.'],'raise':['v.'],'head':['v.','n.'],'harm':['v.','n.'],'touch':['v.','n.']};for(const [head,meanings] of Object.entries(expectedSenses)){const row=word(head);assert.deepEqual(row.meanings,meanings);assert.deepEqual(row.posCandidates,expectedPos[head]);assert(row.reviewFlags.includes('MULTIPLE_MEANINGS_SOURCE_CONFIRMED'));assert(row.sourceRefs.some(r=>r.section==='numbered-senses'&&r.page===(['head','harm','touch'].includes(head)?8:7)));}assert.equal(word('come through').headCandidate,'come through');assert(word('come through').sourceRefs.some(r=>r.section==='numbered-senses'&&r.lineStart<=r.lineEnd));
+const expectedSenses={state:['(미국 등의) 주(州)','(정신적·신체적) 상태'],'come through':['(장소)를 통과하다, 지나오다','(난관·위험 등)을 이겨내다'],gate:['(공항의) 탑승구','문, 출입구'],diamond:['다이아몬드','마름모'],name:['~의 이름을 짓다','이름, 성명'],view:['경관, 전망','견해, 의견','~을 보다, 생각하다'],Hawaiian:['하와이의','하와이인'],movement:['동작, 움직임','(사회적·정치적) 운동'],raise:['~을 들어 올리다','(아이·동물 등)을 기르다','(돈·기금 등)을 모으다'],head:['(특정 장소로) 가다, 향하다','머리','책임자'],harm:['~을 다치게 하다','손해, 위해'],touch:['~을 만지다, ~에 손대다','~을 감동시키다','손길, 접촉']};const expectedExamples={state:[['The company has opened a new store in another state.','그 회사는 다른 주에 새 매장을 열었다.'],['My room was in a terrible state after I searched for my missing watch.','잃어버린 시계를 찾고 난 후 내 방은 엉망인 상태였다.']], 'come through':[['We came through the long tunnel and finally saw the ocean.','우리는 긴 터널을 지나와 마침내 바다를 보았다.'],['She came through the hard time with help from her family.','그녀는 가족의 도움으로 힘든 시기를 이겨 냈다.']],gate:[['Our plane will leave from Gate 18 at noon.','우리 비행기는 정오에 18번 탑승구에서 출발할 것이다.'],['The farmer closed the gate before the cows entered the road.','농부는 소들이 도로로 들어가기 전에 문을 닫았다.']],diamond:[['Each of her earrings has a tiny diamond in the center.','그녀의 귀걸이에는 각각 중앙에 작은 다이아몬드가 하나씩 있다.'],['Four blue lines formed a diamond on the classroom wall.','네 개의 파란 선이 교실 벽에 마름모를 만들었다.']],name:[['The writer named the main character Luna.','그 작가는 주인공의 이름을 Luna라고 지었다.'],['Please write your name at the top of the paper.','종이 맨 위에 이름을 써 주세요.']],view:[['The view of the snowy mountains from our hotel room was clear.','우리 호텔 방에서 바라본 눈 덮인 산들의 경치는 선명했다.'],['Everyone listened carefully to Jisu’s view on the new school rule.','모두가 새로운 교칙에 대한 지수의 견해를 주의 깊게 들었다.'],['She views mistakes as a chance to learn something new.','그녀는 실수를 새로운 것을 배울 기회로 생각한다.']],Hawaiian:[['My uncle taught me several Hawaiian words during the trip.','삼촌은 여행 중에 나에게 몇 가지 하와이 단어를 가르쳐 주셨다.'],['We talked with a Hawaiian about the history of the island.','우리는 한 하와이인과 그 섬의 역사에 관해 이야기했다.']],movement:[['The camera detected a slight movement near the back door.','카메라는 뒷문 근처에서 작은 움직임을 감지했다.'],['Many students joined a movement against school violence.','많은 학생들이 학교 폭력에 반대하는 운동에 참여했다.']],raise:[['The conductor raised both arms before the orchestra began.','지휘자는 오케스트라가 연주를 시작하기 전에 두 팔을 올렸다.'],['My aunt raises chickens on a small farm outside the city.','우리 이모는 도시 외곽의 작은 농장에서 닭을 기른다.'],['Our club held a bake sale to raise money for an animal shelter.','우리 동아리는 동물 보호소를 위한 돈을 모으기 위해 빵 판매 행사를 열었다.']],head:[['After lunch, we headed east along the river.','점심 식사 후 우리는 강을 따라 동쪽으로 향했다.'],['Sora rested her head on a soft pillow.','소라는 부드러운 베개 위에 머리를 기댔다.'],['Ms. Park is the head of our school’s art club.','박 선생님은 우리 학교 미술 동아리의 책임자이다.']],harm:[['The sharp rock may harm your foot if you step on it.','그 날카로운 돌을 밟으면 발을 다칠 수 있다.'],['The chemicals may cause harm to plants and animals.','그 화학 물질들은 식물과 동물에게 해를 끼칠 수 있다.']],touch:[['Don’t touch the hot pan with your bare hands.','맨손으로 뜨거운 팬에 손대지 마라.'],['The song touched her and brought tears to her eyes.','그 노래는 그녀를 감동시켜 눈물을 글썽이게 했다.'],['The screen responds quickly to a light touch.','그 화면은 가벼운 접촉에도 빠르게 반응한다.']]};for(const [head,examples] of Object.entries(expectedExamples))assert.deepEqual(word(head).senses.map(s=>[s.example.en,s.example.ko]),examples);const expectedPos={state:['n.'],'come through':[],'gate':['n.'],'diamond':['n.'],'name':['v.','n.'],'view':['n.','v.'],'Hawaiian':['a.','n.'],'movement':['n.'],'raise':['v.'],'head':['v.','n.'],'harm':['v.','n.'],'touch':['v.','n.']};for(const [head,meanings] of Object.entries(expectedSenses)){const row=word(head);assert.deepEqual(row.meanings,meanings);assert.deepEqual(row.posCandidates,expectedPos[head]);assert(row.reviewFlags.includes('MULTIPLE_MEANINGS_SOURCE_CONFIRMED'));assert(row.sourceRefs.some(r=>r.section==='numbered-senses'&&r.page===(['head','harm','touch'].includes(head)?8:7)));}assert.equal(word('come through').headCandidate,'come through');assert(word('come through').sourceRefs.some(r=>r.section==='numbered-senses'&&r.lineStart<=r.lineEnd));assert(draft.wordCandidates.every(row=>Array.isArray(row.senses)&&!Object.hasOwn(row,'example')&&!Object.hasOwn(row,'definition')));assert.equal(draft.wordCandidates.filter(row=>row.senses.length).length,12);assert.equal(draft.wordCandidates.reduce((n,row)=>n+row.senses.length,0),28);for(const [head,meanings] of Object.entries(expectedSenses)){const row=word(head);assert.deepEqual(row.senses.map(s=>s.senseNo),Array.from({length:meanings.length},(_,i)=>i+1));assert.deepEqual(row.senses.map(s=>s.meaningKo),meanings);assert.deepEqual(row.meanings,row.senses.map(s=>s.meaningKo));assert(row.senses.every(s=>Object.keys(s).length===4&&['senseNo','pos','meaningKo','example'].every(k=>Object.hasOwn(s,k))&&typeof s.pos==='string'&&s.meaningKo.length>0&&Object.keys(s.example).length===2&&typeof s.example.en==='string'&&s.example.en.length>0&&typeof s.example.ko==='string'&&s.example.ko.length>0));assert(row.senses.every(s=>!s.pos||row.posCandidates.includes(s.pos)));}for(const [head,senseNo,enText,koText] of [['state',1,'The company has opened a new store in another state.','그 회사는 다른 주에 새 매장을 열었다.'],['come through',1,'We came through the long tunnel and finally saw the ocean.','우리는 긴 터널을 지나와 마침내 바다를 보았다.'],['view',3,'She views mistakes as a chance to learn something new.','그녀는 실수를 새로운 것을 배울 기회로 생각한다.'],['raise',3,'Our club held a bake sale to raise money for an animal shelter.','우리 동아리는 동물 보호소를 위한 돈을 모으기 위해 빵 판매 행사를 열었다.'],['head',1,'After lunch, we headed east along the river.','점심 식사 후 우리는 강을 따라 동쪽으로 향했다.'],['touch',3,'The screen responds quickly to a light touch.','그 화면은 가벼운 접촉에도 빠르게 반응한다.']])assert.deepEqual(word(head).senses[senseNo-1].example,{en:enText,ko:koText});for(const [head,lineEnd] of [['state',10],['come through',18],['gate',24],['diamond',30],['name',36],['view',45],['Hawaiian',51],['movement',57],['raise',66],['head',13],['harm',19],['touch',28]])assert.equal(word(head).sourceRefs.find(r=>r.section==='numbered-senses').lineEnd,lineEnd);
 const overwrite=spawnSync(python,[script,'--text-bundle',bundle,'--folder',folder,'--passage-title-en','Fixture Title','--passage-title-ko','시험 제목',out],{encoding:'utf8',env:{...process.env,PYTHONHOME:''}});assert.notEqual(overwrite.status,0);
 const linked=path.join(temp,'source-hardlink.pdf'),blocked=path.join(temp,'hardlink-output');fs.linkSync(path.join(folder,specs[0][2]),linked);
 const hardlink=spawnSync(python,[script,'--text-bundle',bundle,'--folder',folder,'--passage-title-en','Fixture Title','--passage-title-ko','시험 제목',blocked],{encoding:'utf8',env:{...process.env,PYTHONHOME:''}});assert.notEqual(hardlink.status,0);assert.equal(fs.existsSync(blocked),false);fs.unlinkSync(linked);

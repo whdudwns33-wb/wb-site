@@ -321,6 +321,25 @@ t('없는 섹션의 내용은 검사하지 않는다', () => {
 
 /* ── 본문 단어 · 난이도 (§4.4 v1.3) ── */
 
+t('구조화된 다의어는 순번·정확한 필드·영한 예문·뜻 배열이 모두 맞아야 통과한다', () => {
+  const valid = { id: 'w-sense', headword: 'gate', meaningKo: ['탑승구', '문'], sections: ['reading'], senses: [
+    { senseNo: 1, pos: 'n.', meaningKo: '탑승구', example: { en: 'Our plane will leave from Gate 18.', ko: '우리 비행기는 18번 탑승구에서 출발한다.' } },
+    { senseNo: 2, pos: 'n.', meaningKo: '문', example: { en: 'The farmer closed the gate.', ko: '농부는 문을 닫았다.' } },
+  ] };
+  const validCollector = CHECK.collector({}); CHECK.checkWords({ words: [valid] }, validCollector);
+  assert.deepStrictEqual(validCollector.errors, []); assert.ok(validCollector.summary[0].includes('다의어 1'), validCollector.summary[0]);
+  const mutations = [
+    (w) => { w.senses[0].senseNo = 2; },
+    (w) => { w.senses[0].pos = 7; },
+    (w) => { w.senses[0].extra = 'forbidden'; },
+    (w) => { w.senses[0].example.extra = 'forbidden'; },
+    (w) => { w.senses[0].example.en = ''; },
+    (w) => { w.senses[0].meaningKo = ''; },
+    (w) => { w.senses.push({ senseNo: 3, pos: 'n.', meaningKo: '더', example: { en: 'More.', ko: '더.' } }, { senseNo: 4, pos: 'n.', meaningKo: '더', example: { en: 'More.', ko: '더.' } }); },
+  ];
+  for (const mutate of mutations) { const row = clone(valid); mutate(row); const c = CHECK.collector({}); CHECK.checkWords({ words: [row] }, c); assert.ok(c.errors.length, JSON.stringify(row)); }
+});
+
 t('단어 난이도 — 1·2·3만 통과, 그 밖의 값은 오류', () => {
   const mk = (level) => ({ words: [{ id: 'w1', headword: 'sea', meaningKo: ['바다'], sections: ['reading'], level: level }] });
   [1, 2, 3, undefined, null].forEach((v) => {

@@ -925,11 +925,19 @@ function pdfReviewDraft(obj, trustedLocal=false){
     const unmatchedKeys=['candidateId','field','reason','sourceRefs','expectedQuestionNo','baseCount','answerCount','groupIndex','expectedGroups','pairIndex'],numericDetails=['expectedQuestionNo','baseCount','answerCount','groupIndex','expectedGroups','pairIndex'];
     if(obj.unmatched.some(row=>!row||Object.keys(row).some(key=>!unmatchedKeys.includes(key))||!textOk(row.candidateId,100)||!textOk(row.field,80)||!textOk(row.reason,120)||!safeRefs(row.sourceRefs)||numericDetails.some(key=>Object.hasOwn(row,key)&&(!Number.isInteger(row[key])||row[key]<0||row[key]>1000))))throw new Error('미대응 후보 형식 또는 출처가 올바르지 않아요.');
     folderReviewCandidates={dialogueCandidates:obj.dialogueCandidates,functionCandidates:obj.functionCandidates,keyExpressionCandidates:obj.keyExpressionCandidates,patternCandidates:obj.patternCandidates,examItemCandidates:obj.examItemCandidates,unmatchedItems:obj.unmatchedItems,itemSummary:obj.itemSummary,unmatched:obj.unmatched,enrichmentSummary:obj.enrichmentSummary};
-    if(!Array.isArray(obj.wordCandidates)||!obj.wordCandidates.length||obj.wordCandidates.some(c=>!Array.isArray(c.sourceRefs)||!c.sourceRefs.length||c.sourceRefs.some(r=>{
+    const expectedSenseCounts={'state':2,'come through':2,'gate':2,'diamond':2,'name':2,'view':3,'hawaiian':2,'movement':2,'raise':3,'head':3,'harm':2,'touch':3};
+    const hasSenseFields=Array.isArray(obj.wordCandidates)&&obj.wordCandidates.some(c=>c&&typeof c==='object'&&Object.hasOwn(c,'senses'));
+    const validSense=(sense,index)=>exact(sense,['senseNo','pos','meaningKo','example'])&&Number.isInteger(sense.senseNo)&&sense.senseNo===index+1&&sense.senseNo<=3&&textOk(sense.pos,20,true)&&textOk(sense.meaningKo,1200)&&exact(sense.example,['en','ko'])&&textOk(sense.example.en,1200)&&textOk(sense.example.ko,1200);
+    const structuredSenseFieldsValid=!hasSenseFields||(obj.wordCandidates.every(c=>c&&Array.isArray(c.senses)&&c.senses.length<=3&&c.senses.every(validSense))&&obj.wordCandidates.filter(c=>c.senses.length).length===12&&obj.wordCandidates.reduce((n,c)=>n+c.senses.length,0)===28&&obj.wordCandidates.every(c=>{
+      const head=typeof c.headCandidate==='string'?c.headCandidate.normalize('NFKC').toLocaleLowerCase().replace(/\s+/g,' ').trim():'';
+      const expected=expectedSenseCounts[head]||0;
+      return c.senses.length===expected&&Array.isArray(c.reviewFlags)&&c.reviewFlags.includes('MULTIPLE_MEANINGS_SOURCE_CONFIRMED')===(expected>0)&&(!expected||Array.isArray(c.meanings)&&JSON.stringify(c.meanings)===JSON.stringify(c.senses.map(s=>s.meaningKo))&&Array.isArray(c.posCandidates)&&c.senses.every(s=>!s.pos||c.posCandidates.includes(s.pos)));
+    }));
+    if(!Array.isArray(obj.wordCandidates)||!obj.wordCandidates.length||!structuredSenseFieldsValid||obj.wordCandidates.some(c=>!Array.isArray(c.sourceRefs)||!c.sourceRefs.length||c.sourceRefs.some(r=>{
       const valid03=r.sourceDocumentId==='03'&&Number.isInteger(r.page)&&r.page>=1&&r.page<=sourceMap.get('03').pageCount;
       const validPassage=r.sourceDocumentId==='02'&&r.section==='reading'&&c.reviewFlags?.includes('PASSAGE_SECTION_REF')&&Number.isInteger(r.page)&&r.page>=1&&r.page<=sourceMap.get('02').pageCount&&Number.isInteger(r.questionNo)&&r.questionNo>=1&&r.questionNo<=25;
       return !valid03&&!validPassage;
-    })))throw new Error('단어 후보의 원본 위치가 올바르지 않아요.');
+    })))throw new Error('단어 후보의 원본 위치 또는 다의어 후보 형식이 올바르지 않아요.');
     const sentenceKeys=['candidateId','seq','en','ko','passageTitle','passageTitleEn','passageTitleKo','dayHeaderEn','dayHeaderKo','dayGroup','chunks','keywords','keywordKoCandidates','keywordEnCandidates','verbForms','grammarChoices','tokens','writingKeywords','sourceRefs','reviewFlags','unmatchedEnrichment','enrichmentSourceRefs','tokenGroups','tokensSafety'];
     if(folderSentences.some(s=>!s||Object.keys(s).some(key=>!sentenceKeys.includes(key))||!Number.isInteger(s.seq)||typeof s.en!=='string'||typeof s.ko!=='string'||!s.en||!s.ko
       ||!safeRefs(s.sourceRefs)||s.sourceRefs.length<2||s.sourceRefs.some(r=>!sourceMap.has(r.sourceDocumentId)||r.page>sourceMap.get(r.sourceDocumentId).pageCount)
@@ -1002,6 +1010,7 @@ function pdfReviewDraft(obj, trustedLocal=false){
   if(folderReviewCandidates){
     const location=ref=>({page:ref.page,bbox:Array.isArray(ref.bbox)?ref.bbox.slice():[0,0,0,0],...(ref.sourceDocumentId?{sourceDocumentId:ref.sourceDocumentId}:{}),...(ref.printedPage?{printedPage:ref.printedPage}:{}),...(ref.section!==undefined?{section:ref.section}:{}),...(ref.questionNo!==undefined?{questionNo:ref.questionNo}:{})});
     const review=(refs,flags=[])=>({_pdfReview:{flags:Array.from(new Set(['REVIEW_REQUIRED',...flags])),locations:(refs||[]).map(location)}});
+    const copyJsonArray=value=>Array.isArray(value)?JSON.parse(JSON.stringify(value)):[];
     const wordRows=obj.wordCandidates.map(c=>{
       let head=c.headCandidate.trim(),irregularForms=[],flags=[...(c.reviewFlags||[])];
       const note=head.match(/^([^\r\n]+)\s*[\r\n]+\s*\(([A-Za-z]+-[A-Za-z]+-[A-Za-z]+)\)\s*$/);
@@ -1011,9 +1020,8 @@ function pdfReviewDraft(obj, trustedLocal=false){
         ||r.sourceDocumentId==='02'&&r.section==='reading'&&flags.includes('PASSAGE_SECTION_REF')).map(r=>r.section)));
       if(!sections.length)flags.push('SECTION_UNRESOLVED');
       if(c.posCandidates.length>1)flags.push('POS_UNRESOLVED');
-      return{id:c.candidateId.replace(/^wc-/,'w-'),headword:head,pos:c.posCandidates.length===1?c.posCandidates[0]:'',meaningKo:c.meanings.slice(),sections,irregularForms,notes:[],...review(c.sourceRefs.map(r=>({sourceDocumentId:r.sourceDocumentId,page:r.page,printedPage:r.printedPage||r.page,section:r.section||null,questionNo:r.questionNo===undefined?null:r.questionNo,bbox:r.bbox})),flags)};
+      return{id:c.candidateId.replace(/^wc-/,'w-'),headword:head,pos:c.posCandidates.length===1?c.posCandidates[0]:'',meaningKo:c.meanings.slice(),sections,irregularForms,senses:copyJsonArray(c.senses),notes:[],...review(c.sourceRefs.map(r=>({sourceDocumentId:r.sourceDocumentId,page:r.page,printedPage:r.printedPage||r.page,section:r.section||null,questionNo:r.questionNo===undefined?null:r.questionNo,bbox:r.bbox})),flags)};
     });
-    const copyJsonArray=value=>Array.isArray(value)?JSON.parse(JSON.stringify(value)):[];
     const sentenceRows=folderSentences.map(s=>{
       const refs=(s.sourceRefs||[]).concat(...Object.values(s.enrichmentSourceRefs||{}).filter(Array.isArray));
       const flags=[...(s.reviewFlags||[])];
