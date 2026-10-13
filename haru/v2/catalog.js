@@ -12,6 +12,7 @@
     const start = instant(event.start), end = instant(event.end);
     const past = event.kind && ['시험', '면접', '관찰평가', '설명회', '요강 공지 예정', '발표', '학교 안내'].includes(event.kind) ? '지난 일정' : '마감';
     if (now < start) return '예정';
+    if (event.kind === '수험표 출력 시작') return '출력 시작 이후 · 종료일 확인';
     // 날짜만 있는 마감은 임의의 마감 시각을 확정하지 않는다.
     if (!event.end.includes('T')) return now >= end + 86400000 ? past : '기간 내 · 시각 확인';
     return now > end ? past : '기간 내';
@@ -32,11 +33,17 @@
       if (!states.includes(source.status) || !['성공', '수집 실패'].includes(source.retrieval)) throw new Error('출처 상태 오류');
       if (instant(source.checkedAt) > instant(data.referenceDate)) throw new Error('확인일이 기준일 이후');
     }
-    for (const institution of data.institutions) if (!sources.has(institution.source)) throw new Error('출처 연결 오류');
+    for (const institution of data.institutions) {
+      if (!sources.has(institution.source) || (institution.notices || []).some(id => !sources.has(id))) throw new Error('출처 연결 오류');
+    }
     for (const course of data.courses) {
       if (!institutions.has(course.institution) || !course.grades.length || !course.fields.length || course.grades.some(g => !Number.isInteger(g) || g < 1 || g > 6)) throw new Error('과정 조건 오류');
     }
-    for (const admission of data.admissions) if (!institutions.has(admission.institution) || admission.year !== data.educationYear) throw new Error('전형 학년도 오류');
+    for (const admission of data.admissions) {
+      if (!institutions.has(admission.institution) || admission.year !== data.educationYear) throw new Error('전형 학년도 오류');
+      if (admission.tracks && (!Array.isArray(admission.tracks) || admission.tracks.some(t => !t.name || !t.target || !t.documents))) throw new Error('전형별 안내 오류');
+      if (admission.subjects && ['kor','math','eng','bible'].some(key => !admission.subjects[key])) throw new Error('교과 범위 오류');
+    }
     for (const event of data.events) if (!institutions.has(event.institution) || instant(event.end) < instant(event.start)) throw new Error('일정 연결·순서 오류');
     for (const entry of data.directory) {
       if (!sources.has(entry.source) || entry.year !== data.educationYear || !['전남', '전북'].includes(entry.region) || !entry.name || !Array.isArray(entry.events)) throw new Error('보조 기관 안내 오류');
