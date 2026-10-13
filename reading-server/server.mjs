@@ -20,6 +20,7 @@ import { handleLetter, letterBodyLimit, dropStudentLetter, dumpLetter, pushDueIs
 import { checkAdminLogin } from './admin-auth.mjs';
 import { applySecurityHeaders } from './sec-headers.mjs';
 import { createInhouseAccess } from './inhouse-access.mjs';
+import { readLocalMaterials } from './naesin-local-materials.mjs';
 import { handlePortalFamilyLink, PORTAL_LINK_BODY_LIMIT, withPortalFamilies } from './portal-family.mjs';
 import { bookIndex, cleanWords, coachingCard, confirmAllPlan, findBook, readyToConfirm, sourceSummary, validProgress, withOverlay } from './textbook.mjs';
 import { parseRoster } from './roster.mjs';
@@ -679,6 +680,24 @@ const server = http.createServer(async (req, res) => {
       /* 내신 (/api/naesin/*) — 인증만 공유, 저장·라우트는 격리 (vocab 선례).
          json()이 모든 응답에 no-store를 붙인다 — 기획서 §10-3. */
       if (p.startsWith('/api/naesin/')) {
+        /* 파일 선택 없이 기존 원내 보관본을 연결한다. 워커·외부 관리·학생에게는 원본을 내주지 않는다. */
+        if (p === '/api/naesin/admin/job/local-review' || p === '/api/naesin/admin/job/local-pdf') {
+          if (!INHOUSE_ONLY || !inhouseAccess(req) || !who.admin) return json(res, 403, { error: '원내 PC 관리자만 원본 자료를 열 수 있습니다.' });
+          if (req.method !== 'GET') { req.resume(); return json(res, 405, { error: 'GET 요청만 가능합니다.' }); }
+          const id = url.searchParams.get('id') || '', source = url.searchParams.get('source'), expectedSha256 = url.searchParams.get('sha256');
+          if (!/^job-[a-z0-9]{6,20}$/.test(id) || (p.endsWith('/local-pdf') && (!['02', '03'].includes(source) || !/^[a-f0-9]{64}$/.test(expectedSha256)))) return json(res, 400, { error: '작업 또는 자료 번호·원본 확인값이 올바르지 않습니다.' });
+          const job = naesinStore.getJob(id);
+          if (!job) return json(res, 404, { error: '검수 작업을 찾을 수 없습니다.' });
+          try {
+            const material = readLocalMaterials(process.env.DATA_DIR || path.join(ROOT, 'data'), job.packId, p.endsWith('/local-pdf') ? source : undefined, expectedSha256);
+            if (!material.bytes) return json(res, 200, material);
+            res.writeHead(200, { 'Content-Type': 'application/pdf', 'Cache-Control': 'no-store', 'Content-Disposition': 'inline; filename="source-' + source + '.pdf"' });
+            return res.end(material.bytes);
+          } catch (error) {
+            if (error.message === 'LOCAL_SOURCE_CHANGED') return json(res, 409, { error: '원본 자료가 바뀌었습니다. PC 자료를 다시 연결해 확인하세요.' });
+            return json(res, 404, { error: '원내 보관 원본과 검수 초안을 확인할 수 없습니다. 자료 반입 상태를 확인하세요.' });
+          }
+        }
         /* content-length 가 오면 읽기 전에 거른다(워커와 동일) — 없으면(chunked) readBody 의 스트림 상한이 잡는다 */
         if (Number(req.headers['content-length'] || 0) > naesinBodyLimit(p)) { req.resume(); return json(res, 413, { error: '요청이 너무 커서 받을 수 없어요.' }); }
         const ctx = {
