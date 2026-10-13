@@ -699,7 +699,7 @@ def answer_section(text, start_header, end_header):
 def exact_answer_parts(value):
  parts=[norm(part) for part in value.split('/')]
  return parts if parts and all(parts) else None
-def attach_keyword_pairs(sentences, source):
+def attach_keyword_candidates(sentences, source):
  p29=next((p['text'] for p in source['pages'] if p['page']==29),'')
  ko_text=answer_section(p29,'워크북 2 빈칸 연습 (한글)','워크북 3 빈칸 연습 (영문)')
  en_text=answer_section(p29,'워크북 3 빈칸 연습 (영문)','워크북 4 해석 연습')
@@ -709,12 +709,12 @@ def attach_keyword_pairs(sentences, source):
   kparts=exact_answer_parts(ko_rows[0]) if len(ko_rows)==1 else None
   eparts=exact_answer_parts(en_rows[0]) if len(en_rows)==1 else None
   refs=[page_ref(29,'workbook-2-answer',n),page_ref(29,'workbook-3-answer',n)]
-  row['keywords']=[]; row['reviewFlags']=sorted(set(row['reviewFlags']+['KEYWORD_PAIR_REVIEW_REQUIRED']))
+  row['keywordKoCandidates']=kparts or []; row['keywordEnCandidates']=eparts or []
+  row['keywords']=[]
+  row['reviewFlags']=sorted(set(row['reviewFlags']+['KEYWORD_ALIGNMENT_REVIEW_REQUIRED']))
   row.setdefault('enrichmentSourceRefs',{})['keywords']=refs
-  if kparts and eparts and len(kparts)==len(eparts):
-   row['keywords']=[{'en':e,'ko':k} for e,k in zip(eparts,kparts)]; summary['matched']+=1
-  else:
-   attach_unmatched(row,'keywords','KEYWORD_COUNT_MISMATCH',refs,baseCount=len(eparts or []),answerCount=len(kparts or [])); summary['unmatched']+=1
+  attach_unmatched(row,'keywords','KEYWORD_ALIGNMENT_REVIEW_REQUIRED',refs,baseCount=len(eparts or []),answerCount=len(kparts or []))
+  summary['unmatched']+=1
  return summary
 def words(src):
  rows=[]
@@ -799,7 +799,7 @@ def main():
    if n in (1,11,20): e=re.sub(r'(?i)^(monday|tuesday|wednesday)\s*,?\s*august\s+(1|2|3)\b[,:]?\s*','',e).strip()
    sent.append({'candidateId':f'sc-{n:04d}','seq':n,'en':e,'ko':k,'passageTitle':a.passage_title_en,'passageTitleEn':a.passage_title_en,'passageTitleKo':a.passage_title_ko,'dayHeaderEn':header,'dayHeaderKo':header_ko,'dayGroup':('8/1' if n<11 else '8/2' if n<20 else '8/3'),'chunks':[],'keywords':[],'verbForms':[],'grammarChoices':[],'tokens':[],'writingKeywords':[],'sourceRefs':[page_ref(ep,'workbook-4',n),page_ref(kp,'workbook-4-answer',n)],'reviewFlags':['REVIEW_REQUIRED','PLAIN_TEXT_NO_COORDINATES']+([] if e else ['EN_UNRESOLVED'])+([] if k else ['KO_UNRESOLVED'])})
   enrichment_summary=enrich_sentences(sent,srcs['02'])
-  keyword_summary=attach_keyword_pairs(sent,srcs['02']); enrichment_summary['keywords']=keyword_summary
+  keyword_summary=attach_keyword_candidates(sent,srcs['02']); enrichment_summary['keywords']=keyword_summary
   attach_word_sections(wr,srcs['03'],sent)
   dialogues,functions,key_expressions,patterns,structure_unmatched,structure_summary=extract_candidate_sets(srcs['01'],srcs['07'])
   exam_items,unmatched_items,item_summary=extract_exam_item_candidates(bundle['sources'])
