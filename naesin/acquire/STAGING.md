@@ -8,12 +8,13 @@
 {
   "root": "C:\\Users\\wb\\WB 학습자료\\naesin\\2026-2",
   "scope": {
-    "curriculum": "2022", "grade": "m2", "publisher": "ne-kimgitaek",
-    "unitRawLabel": "1과", "unitCode": "L1", "folderName": "2022-ne-kimgitaek-m2-L1"
+    "curriculum": "2022", "grade": "m2",
+    "publisher": "ybm-kimeunhyeong", "publisherLabel": "YBM(김은형)",
+    "unitRawLabel": "1과", "unitCode": "L1", "folderName": "2022-ybm-kimeunhyeong-m2-L1"
   },
   "files": [{
     "src": "C:\\Users\\wb\\Downloads\\explicit-downloaded-file.pdf",
-    "suggestedFilename": "(2022개정)2026년_중2_NE능률(김기택)_1과_[01]내용정리 플러스.pdf"
+    "suggestedFilename": "(2022개정)2026년_중2_YBM(김은형)_1과_[01]내용정리 플러스.pdf"
   }],
   "source": {"listingId": null, "title": "목록 관찰", "catalogLabel": null, "observedAt": null}
 }
@@ -22,8 +23,21 @@
 source는 선택이며 위 네 키만 허용한다. 임의 필드, URL 형식, credential 관련 key/value 표기는 거부한다.
 어떤 필드에도 비밀번호·쿠키·토큰·URL을 넣지 않는다. 자유 텍스트의 모든 비밀값은 자동 식별할 수 없으므로 작성자도 지켜야 한다.
 폴더는 `<curriculum>-<publisher>-<grade>-<unit>`이며 scope와 일치해야 한다.
-교육과정 2022/2015, 학년 m1/m2/m3, 안정 슬러그, 원본 단원명, 정규화 코드, 단일 폴더명은 모두 필수다.
+교육과정 2022/2015, 학년 m1/m2/m3, 안정 슬러그 publisher, 원본 출판사 표기 publisherLabel,
+원본 단원명, 정규화 코드, 단일 폴더명은 모두 필수다. publisherLabel 없는 예전 배치는 사전검사에서 거부한다.
 Special Lesson/Reading과 번호 1/2는 각각 SL/SL1/SL2, SR/SR1/SR2로 구분한다.
+
+### 출판사 검증 계약
+
+- publisherLabel은 사용자가 사이트에서 확인한 정확한 출판사/저자 표기다. 예: `YBM(김은형)`, `NE능률(김기택)`.
+- 모든 suggestedFilename의 `_중N_<출판사>_`에서 출판사 문자열을 추출한다. 추출 불가 또는 label 불일치면 배치 전체 무쓰기 실패.
+- 비교는 양쪽 문자열에 **NFC 정규화 + 앞뒤 trim만** 적용한다. 대소문자/내부 공백/괄호는 바꾸지 않으며 음역이나 하드코딩 대응표가 없다.
+- 실제 src basename에도 출판사 표기가 추출되면 같은 검사를 한다. 브라우저가 부여한 일반 파일명이라 추출되지 않으면 suggestedFilename으로 검증한다.
+- publisher는 호출자가 확인해 제공하는 안정 슬러그다. folderName의 publisher 부분은 이 슬러그와 정확히 일치해야 한다.
+  label과 slug의 의미상 연결은 호출자가 확인한다. 이 도구는 label에서 slug를 추측하거나 둘을 자동 변환하지 않는다.
+- 영수증 scope에는 publisherLabel도 원래 입력값으로 보존한다. 이후 acquire scan/manifest의 publisher는 폴더의 안정 슬러그를 계속 사용한다.
+- NE 배치는 `publisher: "ne-kimgitaek"`, `publisherLabel: "NE능률(김기택)"`,
+  `folderName: "2022-ne-kimgitaek-m2-L1"`처럼 두 필드를 함께 제공한다.
 
 ## 실행 순서
 
@@ -92,8 +106,7 @@ src와 절대 원본 경로는 기록하지 않는다. 이전 영수증은 수�
 
 ## 한계
 
-- 확인된 한글 출판사 대응은 NE능률(김기택) → ne-kimgitaek. 원본에 안정 슬러그가 직접 있으면 대조 가능.
-  다른 한글 표기는 대응표와 테스트를 추가하기 전까지 추측하지 않고 거부한다.
+- 임의 출판사도 명시한 publisherLabel과 실제 원본 파일명이 일치하면 허용한다. 출판사/저자 표기와 안정 슬러그의 의미상 연결은 호출자가 사전에 확인해야 한다.
 - PDF 전체 파싱·암호화·페이지 수·교육 내용·구매 권한 검증은 하지 않는다.
 - 신뢰할 수 있는 로컬 root/source-root에서 실행해야 한다. 검사와 쓰기 사이에 외부 프로세스가
   디렉터리를 악의적으로 교체하는 공격까지 막는 OS sandbox는 아니다. 실행 중 트리를 변경하지 않는다.

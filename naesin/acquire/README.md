@@ -2,7 +2,8 @@
 
 Node 20+ 내장 모듈만 사용. 앱·서버·추출기와 연결하지 않은 별도 운영 도구다.
 브라우저, 로그인, 다운로드, 네트워크, 정리/이동/삭제 기능이 없다. acquire.mjs는 PDF를 읽기만 한다.
-별도 stage-downloads.mjs는 명시한 파일만 복사한다. 입력·정본 이름·안전성·영수증·한계는 [STAGING.md](STAGING.md)를 참고한다.
+별도 stage-downloads.mjs는 명시한 파일만 복사한다. 모든 배치 scope에 안정 슬러그 publisher와 정확한 원본 표기 publisherLabel을 함께 넣는다(둘 다 필수, 출판사 대응표 없음).
+입력·정본 이름·안전성·영수증·한계는 [STAGING.md](STAGING.md)를 참고한다.
 실제 manifest·백업·목록은 저장소 밖에 보관한다. 테스트는 임시 폴더의 자체 제작 바이트만 쓴다.
 
 ## 현재 PC 명령 (PowerShell)
