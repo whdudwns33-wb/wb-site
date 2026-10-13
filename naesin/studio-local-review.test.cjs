@@ -97,6 +97,12 @@ function wordInput(ui,head=' own fixed word ',pos=' adj. ',meanings=' 뜻 하나
 function wordSection(ui,section,checked){const el=ui.node('#pdfWord'+section);el.checked=checked;el.onchange();}
 
 (async()=>{
+  await t('새 작업·기존 작업 상세에 권리 근거 입력과 구매 비허가 안내를 보인다',()=>{
+    for(const id of ['nRightsBasis','nRightsHolder','nRightsEvidence','nRightsExpiry','nStudentAllowed','nDerivativeAllowed','nAiAllowed','rBasis','rHolder','rEvidence','rExpiry','rStudent','rDerivative','rAi','btnRights']) assert.ok(ids.has(id),'권리 입력 누락 '+id);
+    assert.match(html,/구매했다는 사실만으로 변환·학생 제공 권리가 생기지 않습니다/);
+    assert.match(html,/권리 미확인 상태에서는 PC PDF 불러오기·AI 추출·배포가 차단되며/);
+    assert.match(html,/허가 확인된 자료에서 원천 붙이기/);
+  });
   await t('PDF 검수의 기본 진입은 PC 자료 불러오기 하나이고 파일·JSON·줄 대응은 고급 입력에서 유지한다',()=>{
     const ui=screen();ui.renderJob();const markup=ui.node('#app').innerHTML;
     assert.match(markup,/id="btnPcReview"[^>]*>PC 자료 불러오기/);

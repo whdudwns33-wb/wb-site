@@ -208,6 +208,18 @@ export function jobBrief(job) {
   };
 }
 
+function rightsInputValid(r) {
+  if (r == null) return true;
+  if (!isObj(r)) return false;
+  const allowed = ['basis','holder','evidenceRef','studentUseAllowed','derivativeUseAllowed','externalAiAllowed','expiresAt','notes'];
+  if (Object.keys(r).some((k) => !allowed.includes(k))) return false;
+  if (r.basis !== undefined && !['self_authored','open_license','licensed'].includes(r.basis)) return false;
+  for (const k of ['holder','evidenceRef','expiresAt','notes']) if (r[k] !== undefined && typeof r[k] !== 'string') return false;
+  for (const k of ['studentUseAllowed','derivativeUseAllowed','externalAiAllowed']) if (r[k] !== undefined && typeof r[k] !== 'boolean') return false;
+  if ((r.holder || '').length > 120 || (r.evidenceRef || '').length > 300 || (r.expiresAt || '').length > 10 || (r.notes || '').length > 500) return false;
+  return true;
+}
+
 function normalizeRights(r) {
   if (!isObj(r)) return null;
   return { basis: ['self_authored','open_license','licensed'].includes(r.basis) ? r.basis : '',
@@ -252,6 +264,7 @@ export async function handleStudio(ctx) {
   if (p === '/api/naesin/admin/job' && method === 'POST') {
     const b = await body();
     const bad = badBody(b); if (bad) return bad;
+    if (b.rights !== undefined && !rightsInputValid(b.rights)) return j(400, { error: '권리 메타데이터 형식이 올바르지 않습니다.' });
     const packId = strMax(b.packId, 60);
     if (!PACK_ID_RE.test(packId)) return j(400, { error: '팩 id 규칙: 영문·숫자·하이픈 3~60자' });
     const list = (await store.listJobs()) || [];
@@ -305,6 +318,7 @@ export async function handleStudio(ctx) {
   if (p === '/api/naesin/admin/job/rights' && method === 'POST') {
     const b = await body(); const bad = badBody(b); if (bad) return bad;
     const job = await jobOf(strMax(b.jobId, 40)); if (!job) return j(404, { error: '작업을 찾을 수 없어요.' });
+    if (!rightsInputValid(b.rights)) return j(400, { error: '권리 메타데이터 형식이 올바르지 않습니다.' });
     job.meta = { ...(job.meta || {}), rights: normalizeRights(b.rights) };
     job.updatedAt = nextJobVersion(job); await store.putJob(job.jobId, job);
     const gate = publishGate(job); return j(200, { ok: true, job: jobBrief(job), gate: { ok: gate.ok, errors: gate.errors, warns: gate.warns } });

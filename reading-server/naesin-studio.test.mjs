@@ -115,6 +115,10 @@ await t('작업 만들기 — 팩 id 규칙과 원천 종류를 검사한다', a
   assert.strictEqual(r.body.job.meta.lesson, 6);
   const src = await s.getJobSrc(r.body.jobId);
   assert.strictEqual(src.parts.words, '원천 A');
+  for (const rights of [{ ...r.body.job.meta.rights, forged: 'extra' }, { ...r.body.job.meta.rights, externalAiAllowed: 'false' }, { ...r.body.job.meta.rights, basis: 'purchased' }]) {
+    const bad = await call(s, '/api/naesin/admin/job/rights', 'POST', { jobId: r.body.jobId, rights });
+    assert.equal(bad.status, 400, '권리 메타의 추가 키·타입·열거값은 서버가 거절');
+  }
 });
 
 await t('원천은 목록에 담기지 않는다(수 MB 조회 방지)', async () => {
@@ -135,7 +139,31 @@ await t('없는 작업은 404', async () => {
   assert.strictEqual((await call(s, '/api/naesin/admin/job/extract', 'POST', { jobId: 'job-nope00', kind: 'words' })).status, 404);
 });
 
-console.log('\n== 추출 (fetch를 갈아 끼운다 — 실제 API 호출 금지)');
+await t('권리 미확인 작업은 추출 API 호출 전에 차단한다', async () => {
+  const s = memStore();
+  const cr = await call(s, '/api/naesin/admin/job', 'POST', { packId: 'rights-test-m2-L1', sources: [{ kind: 'words', text: 'synthetic fixture' }] }, { noRights: true });
+  let fetched = false;
+  const r = await call(s, '/api/naesin/admin/job/extract', 'POST', { jobId: cr.body.jobId, kind: 'words' }, { ai: { apiKey: 'fake', fetchImpl: async () => { fetched = true; throw new Error('should not call'); } } });
+  assert.equal(r.status, 400); assert.equal(fetched, false); assert.equal(r.body.error.includes('synthetic'), false);
+  const blockedAiRights = { basis:'self_authored', holder:'Synthetic fixture', studentUseAllowed:true, derivativeUseAllowed:true, externalAiAllowed:false };
+  const noAi = await call(s, '/api/naesin/admin/job', 'POST', { packId:'rights-noai-m2-L1', rights:blockedAiRights, sources:[{kind:'words',text:'synthetic'}] });
+  let noAiFetch = false;
+  const noAiResult = await call(s, '/api/naesin/admin/job/extract', 'POST', { jobId:noAi.body.jobId, kind:'words' }, { ai:{apiKey:'fake',fetchImpl:async()=>{noAiFetch=true;throw Error('blocked');}} });
+  assert.equal(noAiResult.status,400); assert.equal(noAiFetch,false,'외부 AI 비허용은 호출 전 차단');
+  const draft = await call(s, '/api/naesin/admin/job/draft', 'POST', { jobId: cr.body.jobId, draft: draftFromSample() });
+  assert.equal(draft.status, 200);
+  const job = await s.getJob(cr.body.jobId); approveAll(job); await s.putJob(job.jobId, job);
+  const published = await call(s, '/api/naesin/admin/job/publish', 'POST', { jobId: job.jobId });
+  assert.equal(published.status, 400); assert.equal(await s.getPack(job.packId), null, '미확인 권리의 배포 저장 금지');
+  const expiredRights = { basis:'licensed', holder:'Synthetic fixture', evidenceRef:'contract-fixture', studentUseAllowed:true, derivativeUseAllowed:true, externalAiAllowed:true, expiresAt:'2000-01-01' };
+  const expired = await call(s, '/api/naesin/admin/job', 'POST', { packId:'rights-expired-m2-L1', rights:expiredRights });
+  await call(s, '/api/naesin/admin/job/draft', 'POST', { jobId:expired.body.jobId, draft:draftFromSample() });
+  const expiredJob=await s.getJob(expired.body.jobId); approveAll(expiredJob); await s.putJob(expiredJob.jobId,expiredJob);
+  assert.equal((await call(s,'/api/naesin/admin/job/publish','POST',{jobId:expiredJob.jobId})).status,400,'만료 권리 증빙으로 발행 불가');
+  assert.equal(await s.getPack(expiredJob.packId),null);
+});
+
+console.log('\\n== 추출 (fetch를 갈아 끼운다 — 실제 API 호출 금지)');
 
 const fakeAi = (rows) => ({
   apiKey: 'k',
@@ -397,7 +425,7 @@ await t('교차 미대응 핵심어나 정상 쌍에 섞인 미대응 쌍은 전
   for (const keywords of [[{ en: 'absent', ko: '파랗다' }, { en: 'blue', ko: '없는뜻' }],
     [{ en: 'blue', ko: '파랗다' }, { en: 'absent', ko: '파랗다' }]]) {
     const row = pdfSentence(); row.keywords = keywords;
-    const job = { packId: SAMPLE.packId, draft: { words: clone(SAMPLE.words), sentences: [row] }, review: {} }; approveAll(job);
+    const job = { meta: { rights: clone(SAMPLE.rights) }, packId: SAMPLE.packId, draft: { words: clone(SAMPLE.words), sentences: [row] }, review: {} }; approveAll(job);
     assert.ok(GEN.koBlanks(row, 0)); assert.ok(GEN.keywordBlanks(row, 'en', 0));
     assert.strictEqual(publishGate(job).ok, false, '각 en/ko 쌍이 두 문항 모두를 만들 수 있어야 한다');
     assert.ok(publishGate(job).errors.some((e) => /1·3단계/.test(e.message)));
@@ -431,7 +459,7 @@ await t('같은 검수 키의 PDF 후보·일반 행 충돌은 반입을 거절�
     const sentences = [pdfSentence(), duplicate];
     assert.strictEqual((await call(s, '/api/naesin/admin/job/draft', 'POST', { jobId: id, draft: { sentences } }, { localPdfReview: true })).status, 400);
     assert.strictEqual(JSON.stringify(job), before);
-    const old = { packId: SAMPLE.packId, draft: { words: clone(SAMPLE.words), sentences }, review: {} }; approveAll(old);
+    const old = { meta: { rights: clone(SAMPLE.rights) }, packId: SAMPLE.packId, draft: { words: clone(SAMPLE.words), sentences }, review: {} }; approveAll(old);
     const gate = publishGate(old);
     assert.strictEqual(gate.pending, 0, '하나의 키로 두 행을 승인한 기존 데이터');
     assert.strictEqual(gate.ok, false);
@@ -440,7 +468,7 @@ await t('같은 검수 키의 PDF 후보·일반 행 충돌은 반입을 거절�
   for (const plain of [false, true]) {
     const first = pdfSentence(), second = pdfSentence(); second.seq = 2;
     if (plain) delete second._pdfReview;
-    const old = { packId: SAMPLE.packId, draft: { words: clone(SAMPLE.words), sentences: [first, second] }, review: {} }; approveAll(old);
+    const old = { meta: { rights: clone(SAMPLE.rights) }, packId: SAMPLE.packId, draft: { words: clone(SAMPLE.words), sentences: [first, second] }, review: {} }; approveAll(old);
     assert.strictEqual(publishGate(old).ok, true);
     old.review['sentences:s1'] = { state: 'fixed', patch: { seq: 2 } };
     assert.strictEqual(CHECK.checkPack(assemble(old)).errors.length, 0, '조립기의 재번호가 충돌을 가리면 안 된다');
@@ -453,7 +481,7 @@ await t('같은 검수 키의 PDF 후보·일반 행 충돌은 반입을 거절�
 });
 
 await t('PDF 문장 교정의 표준 학습 필드는 허용하고 원천·비공개 필드만 공통 관문으로 차단한다', () => {
-  const job = { packId: SAMPLE.packId, draft: { words: clone(SAMPLE.words), sentences: [pdfSentence()] }, review: {} }; approveAll(job);
+  const job = { meta: { rights: clone(SAMPLE.rights) }, packId: SAMPLE.packId, draft: { words: clone(SAMPLE.words), sentences: [pdfSentence()] }, review: {} }; approveAll(job);
   const patch = { keywords: [{ en: 'toy', ko: '장난감' }], tokens: ['A toy', 'is blue.'], grammarNotes: [{ target: 'is', note: '자체 문법 주석' }] };
   job.review['sentences:s1'] = { state: 'fixed', patch, note: '교사 추가' };
   assert.strictEqual(CHECK.checkPack(assemble(job)).errors.length, 0);
@@ -591,7 +619,7 @@ await t('PDF 원본 메타는 편집으로 지워지지 않고 개별 검수 후
 
 await t('행 인덱스 경고는 버린 앞 행을 뺀 조립 순서에 맞고 승인 행은 사라진다', () => {
   const a = pdfWord(), b = pdfWord(), c = pdfWord(); b.id = 'w-pdf-b'; c.id = 'w-pdf-c';
-  const job = { packId: SAMPLE.packId, draft: { words: [a, b, c], sentences: clone(SAMPLE.sentences) }, review: {} };
+  const job = { meta: { rights: clone(SAMPLE.rights) }, packId: SAMPLE.packId, draft: { words: [a, b, c], sentences: clone(SAMPLE.sentences) }, review: {} };
   job.review[rowKey('words', a, 0)] = { state: 'dropped' };
   job.review[rowKey('words', c, 2)] = { state: 'ok' };
   const warns = publishGate(job).warns.filter((w) => /PDF/.test(w.message));
@@ -610,7 +638,7 @@ await t('옛 승인 초안도 unknown 배열·미검수 표시·중첩 원천이
     (job) => { job.draft.words[0].reviewed = false; },
     (job) => { job.draft.words[0].example.evidence = '합성'; },
   ]) {
-    const job = { packId: SAMPLE.packId, draft: draftFromSample(), review: {} };
+    const job = { meta: { rights: clone(SAMPLE.rights) }, packId: SAMPLE.packId, draft: draftFromSample(), review: {} };
     mutate(job); approveAll(job);
     const gate = publishGate(job);
     assert.strictEqual(gate.ok, false);
@@ -787,7 +815,7 @@ await t('검수 — 승인·수정·버림, 모르는 키는 무시', async () =
 });
 
 await t('버린 행은 조립에서 빠지고 문장 seq 는 다시 매겨진다', async () => {
-  const job = { packId: 'p-1', draft: { sentences: clone(SAMPLE.sentences) }, review: {} };
+  const job = { meta: { rights: clone(SAMPLE.rights) }, packId: 'p-1', draft: { sentences: clone(SAMPLE.sentences) }, review: {} };
   job.review[rowKey('sentences', job.draft.sentences[1], 1)] = { state: 'dropped', at: 'x' };
   const pack = assemble(job);
   assert.strictEqual(pack.sentences.length, SAMPLE.sentences.length - 1);
@@ -806,7 +834,7 @@ await t('rowKey 는 배열 순서가 바뀌어도 같은 행을 가리킨다', (
 console.log('\n== 배포 — CLI 검증기와 같은 판정');
 
 await t('검증기와 판정이 같다(같은 팩을 두 경로에 걸어 비교)', async () => {
-  const job = { packId: SAMPLE.packId, meta: {}, draft: draftFromSample(), review: {} };
+  const job = { packId: SAMPLE.packId, meta: { rights: clone(SAMPLE.rights) }, draft: draftFromSample(), review: {} };
   approveAll(job);
   const gate = publishGate(job);
   const direct = CHECK.checkPack(gate.pack);
@@ -823,7 +851,7 @@ await t('CLI 검증기(pack-validate)와 같은 결과를 낸다', async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'wb-studio-cmp-'));
   const p = clone(SAMPLE);
   p.sentences[0].chunks[0].en = '어긋난 청크';       // 오류를 하나 심는다
-  const hdr = { packId: p.packId, textbook: p.textbook, grade: p.grade, lesson: p.lesson };
+  const hdr = { rights: clone(SAMPLE.rights), packId: p.packId, textbook: p.textbook, grade: p.grade, lesson: p.lesson };
   fs.writeFileSync(path.join(dir, 'words.json'), JSON.stringify({ ...hdr, words: p.words }));
   fs.writeFileSync(path.join(dir, 'sentences.json'), JSON.stringify({ ...hdr, sentences: p.sentences, oddOneItems: p.oddOneItems, checkItems: p.checkItems }));
   const { execFileSync } = await import('node:child_process');
@@ -834,7 +862,7 @@ await t('CLI 검증기(pack-validate)와 같은 결과를 낸다', async () => {
   /* CLI 를 못 돌렸으면 비교가 아니라 통과가 된다 — 그 조용한 통과를 막는다(이 테스트의 존재 이유다) */
   assert.ok(cliErrors != null, 'CLI 검증기를 돌리지 못했다 — 비교가 성립하지 않는다:\n' + cliOut);
 
-  const job = { packId: p.packId, meta: {}, draft: { words: p.words, sentences: p.sentences, oddOneItems: p.oddOneItems, checkItems: p.checkItems }, review: {} };
+  const job = { packId: p.packId, meta: { rights: clone(SAMPLE.rights) }, draft: { words: p.words, sentences: p.sentences, oddOneItems: p.oddOneItems, checkItems: p.checkItems }, review: {} };
   approveAll(job);
   const gate = publishGate(job);
   assert.strictEqual(String(gate.errors.length), cliErrors, 'CLI ' + cliErrors + '건 vs 스튜디오 ' + gate.errors.length + '건\n' + cliOut);

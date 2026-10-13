@@ -67,8 +67,13 @@ for (const { data } of sources) {
   if (Array.isArray(data.items) && data.items.length && !(Array.isArray(pack.items) && pack.items.length)) pack.items = data.items;
   if (data.counts && !pack.counts) pack.counts = data.counts;
   if (data.passage && !pack.passage) pack.passage = data.passage;
+  if (data.rights && !pack.rights) pack.rights = data.rights;
   if (data.packId && !pack.packId) pack.packId = data.packId;
 }
+/* 권리 메타데이터는 어느 종류의 분할 JSON에도 함께 들어올 수 있으므로 전체 파일에서 수집한다. */
+const rightsSource = sources.find(({ data }) => data.rights);
+if (rightsSource) pack.rights = rightsSource.data.rights;
+
 /* 문항 파일이 여러 개면 합쳐서 한 번에 본다 — 파일별로 나눠 보면 번호 중복을 못 잡는다 */
 const allItems = [];
 for (const { data } of sources) if (Array.isArray(data.items)) allItems.push(...data.items);
