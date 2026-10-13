@@ -8,6 +8,7 @@ const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
 const inline = html.split('<script>')[1].split('</script>')[0];
 const elementIds = new Set(Array.from(html.matchAll(/\bid=["']([^"']+)["']/g), match => match[1]));
 for (const match of inline.matchAll(/(?:ttsBtnHtml|wireTtsBtn)\([^;\n]*,\s*'([^']+)'\)/g)) elementIds.add(match[1]);
+elementIds.add('storedShortIn');elementIds.add('subBtn');elementIds.add('nextBtn');
 const sample = require('./pack-sample.json');
 const clone = value => JSON.parse(JSON.stringify(value));
 const account = { code: 'ST1', token: 'self-created-token-1', name: '체험 학생' };
@@ -27,10 +28,11 @@ function screen() {
       const events = new Map();
       const selectors = new Map();
       nodes.set(id, { innerHTML: '', textContent: '', value: '', hidden: false, style: {}, dataset: {}, events,
-        children: [], appendChild(child) { this.children.push(child); },
+        children: [], attrs:{}, appendChild(child) { this.children.push(child); },
+        setAttribute(key,value){this.attrs[key]=String(value);},getAttribute(key){return Object.prototype.hasOwnProperty.call(this.attrs,key)?this.attrs[key]:null;},
         classList: { contains: value => classes.has(value), add: value => classes.add(value), remove: value => classes.delete(value), toggle() {} },
         addEventListener: (type, fn) => events.set(type, fn), focus() {}, querySelector: selector => {
-          if (!selectors.has(selector)) selectors.set(selector, { textContent: '' });return selectors.get(selector);
+          if (!selectors.has(selector)) selectors.set(selector, { textContent: '',children:[],appendChild(child){this.children.push(child);} });return selectors.get(selector);
         }, querySelectorAll: () => [],
       });
     }
@@ -39,7 +41,7 @@ function screen() {
   const ctx = vm.createContext({
     localStorage: { getItem: key => store.get(key) || null, setItem: (key, value) => { if (failLocalWrite) throw new Error('quota'); store.set(key, value); }, removeItem: key => store.delete(key) },
     document: { getElementById: node, addEventListener: (type, fn) => documentEvents.set(type, fn), body: { style: {} }, contains: () => false,
-      createElement: () => ({ textContent: '', attrs: {}, setAttribute(key, value) { this.attrs[key] = value; }, getAttribute(key) { return this.attrs[key]; } }) },
+      createElement: () => ({ textContent: '', attrs: {},setAttribute(key, value) { this.attrs[key] = value; },getAttribute(key) { return this.attrs[key]; },querySelector(){return node('nextBtn');},scrollIntoView(){},appendChild(){},addEventListener(){} }) },
     window: { addEventListener: (type, fn) => windowEvents.set(type, fn), speechSynthesis: voiceEngine },
     SpeechSynthesisUtterance: function (text) { this.text = text; }, navigator: {}, location: { reload() {} }, confirm: () => true,
     WBNAESIN: require('./engine.js'), WBGRADE: require('./grade.js'), WBGEN: require('./gen.js'), AbortController,
@@ -49,7 +51,7 @@ function screen() {
     fetch: async (url, opt) => { requests.push({ url, ...opt }); return fetchImpl(url, opt); },
   });
   const exportUi = `
-  globalThis.ui={boot,api,checkAccount,checkAccess,stopStudy,clearPackCache,migrateLegacy,pullAdopt,pushState,persist,save,openDemo,renderItem,recoverStateStamps,loadDB,
+  globalThis.ui={boot,api,checkAccount,checkAccess,stopStudy,clearPackCache,migrateLegacy,pullAdopt,pushState,persist,save,openDemo,renderItem,storedToRunner,wrongRetryItems,gradeItem,normalizeStoredAnswer,recoverStateStamps,loadDB,
     ttsOptions,wireTtsBtn,wireChunkWork,wireDialogueWork,wireSentenceWork,openPack,renderHeader,demoNotice,bootError,
     projector:(scope,pj)=>{liveScope=scope;liveState={projector:pj};pjApply(pj);},
     projectile:()=>({pjPick,pjSent,pjSeen}),
@@ -86,6 +88,16 @@ function screen() {
     const nextBody = nextMatch ? nextMatch[0] : '';
     assert.match(nextBody, /!correctionRecorded && RQ\.onGrade/, 'next avoids duplicate grade callback');
     assert.match(nextBody, /RQ\.i \+= 1; stepRunner\(\)/);
+  });
+
+  await t('저장형 주관식은 한 칸 답변·채점·오답 재시험 경로를 쓰고 잘못된 저장행은 건너뛴다', async () => {
+    const ui=screen(),pack=clone(sample);pack.items=[{no:501,formatType:'short',instructionKo:'Write the missing word.',stimulus:{type:'text',parts:[{text:'The sky is blue.'}]},choices:[],answer:['A fully accepted answer'],answerCount:1,explanationKo:'자체 설명'}];ui.setup(account,pack);
+    const converted=ui.storedToRunner(pack.items.concat([{no:502,formatType:'short',choices:[],answer:[]}])) ;assert.equal(converted.length,1);assert.equal(converted[0].type,'storedshort');assert.match(converted[0].prompt,/Write the missing word/);assert.match(converted[0].prompt,/The sky is blue/);
+    assert.equal(ui.normalizeStoredAnswer(' A   fully accepted ANSWER '),ui.normalizeStoredAnswer('a fully accepted answer'));
+    ui.gradeItem(converted[0],false,{},1700000000000,null);const retry=ui.wrongRetryItems(['i-501']);assert.equal(retry.length,1);assert.equal(retry[0].type,'storedshort');
+    const root={innerHTML:''};ui.renderItem(retry[0],root);assert.match(root.innerHTML,/id="storedShortIn"/);assert.match(root.innerHTML,/id="subBtn"/);assert.match(root.innerHTML,/The sky is blue/);
+    const grades=[];ui.runner({opts:{},i:0,items:[retry[0],retry[0]],onGrade:(item,ok)=>{grades.push(ok);ui.gradeItem(item,ok,{},1700000001000,null);}});
+    ui.node('storedShortIn').value='  A fully accepted answer  ';ui.node('subBtn').onclick();ui.node('nextBtn').onclick();assert.deepEqual(grades,[true]);assert.equal(ui.get().DB.packs[pack.packId].wrong['i-501'].cleared,false);
   });
 
   await t('누적 관문은 passed/legacy 100%만 열고, 백지 통과·모의 즉시 다음 계약을 지킨다', async () => {

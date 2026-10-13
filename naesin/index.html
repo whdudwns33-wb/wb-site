@@ -2836,16 +2836,25 @@
     return WBGEN.shuffle(out, Math.random);
   }
   function storedToRunner(items) {
-    return items.map(function (it) {
-      var stim = ((it.stimulus && it.stimulus.parts) || []).map(function (p) { return p.text; }).join(' ').trim();
-      return {
-        stored: it, no: it.no, type: 'storedmcq',
-        prompt: (it.instructionKo || '') + (stim ? '\n' + stim : ''),
-        choices: it.choices.map(function (c) { return { key: String(c.label), text: c.text || (c.tuple || []).join(' - ') }; }),
-        answerKeys: it.answer.map(String), answerCount: it.answerCount || 1,
-        explanation: it.explanationKo || ''
-      };
-    });
+    return (Array.isArray(items)?items:[]).map(function (it) {
+      if(!it||!Number.isInteger(it.no)||!Array.isArray(it.choices)||!Array.isArray(it.answer))return null;
+      var stim = ((it.stimulus && Array.isArray(it.stimulus.parts)?it.stimulus.parts:[]) || []).map(function (p) { return p&&typeof p.text==='string'?p.text:''; }).filter(Boolean).join(' ').trim();
+      if(it.answer.some(function(a){return typeof a!=='string'&&typeof a!=='number';}))return null;
+      var prompt=(it.instructionKo || '') + (stim ? '\n' + stim : ''), answers=it.answer.map(String).filter(function(a){return !!a.trim();});
+      if(it.formatType==='short'){
+        if(it.choices.length!==0||!answers.length||answers.some(function(a){return !a.trim();})||!prompt.trim())return null;
+        return{stored:it,no:it.no,type:'storedshort',prompt,answerTexts:answers,explanation:it.explanationKo||''};
+      }
+      if(it.choices.length<2||!answers.length)return null;
+      var choices=it.choices.map(function (c) {
+        if(!c||c.label==null)return null;
+        var text=typeof c.text==='string'?c.text:Array.isArray(c.tuple)&&c.tuple.every(function(x){return typeof x==='string';})?c.tuple.join(' - '):'';
+        return text.trim()?{key:String(c.label),text}:null;
+      });
+      var answerCount=it.answerCount||answers.length;
+      if(choices.some(function(c){return !c||!c.key||!c.text;})||new Set(choices.map(function(c){return c.key;})).size!==choices.length||answers.some(function(a){return !choices.some(function(c){return c.key===a;});})||!Number.isInteger(answerCount)||answerCount!==answers.length)return null;
+      return {stored:it,no:it.no,type:'storedmcq',prompt,choices,answerKeys:answers,answerCount,explanation:it.explanationKo||''};
+    }).filter(Boolean);
   }
   function runQuizType(key) {
     var tdef = quizTypes().filter(function (t) { return t.key === key; })[0];
@@ -3005,6 +3014,7 @@
       return c ? c.text : '';
     }
     if (item.parts) return item.parts.filter(function (p) { return p.blank; }).map(function (p) { return p.blank.answers[0]; }).join(', ');
+    if (item.answerTexts) return item.answerTexts.join(' / ');
     if (item.answers) return item.answers[0];
     if (item.answer) return item.answer.join(' ');
     return '';
@@ -3240,7 +3250,7 @@
     var pid = item.packId != null ? item.packId : curPackId();
     var pd = packDB(pid);
     touchPack(pid);
-    if (item.type === 'storedmcq') { recordStoredResult(item, ok, now, pid); return; }
+    if (item.type === 'storedmcq' || item.type === 'storedshort') { recordStoredResult(item, ok, now, pid); return; }
     if (item.kind === 'sentence' || (item.seq != null && item.stage != null)) {
       var st = senState(item.seq, pid);
       if (st && seqRes) {
@@ -3558,6 +3568,7 @@
       (item.roundNote ? '<div class="cuebar"><span>' + esc(item.roundNote) + '</span></div>' : '');
 
     if (item.type === 'storedmcq') return renderStored(item, root);
+    if (item.type === 'storedshort') return renderStoredShort(item, root);
 
     /* 청크 짝 맞추기 — 왼쪽 영어를 누르면 소리가 나고, 오른쪽 한글을 눌러 잇는다.
        틀리면 표시만 하고 다시 고를 수 있다(여기서 막히면 첫날이 끝난다). 다 이으면 통과. */
@@ -3814,6 +3825,16 @@
       };
     }
   }
+  function renderStoredShort(item, root) {
+    root.innerHTML='<div class="q"><div class="qmeta">문항 '+item.no+' · 주관식</div><div class="prompt sm" style="white-space:pre-line">'+esc(item.prompt)+'</div><input class="ans" id="storedShortIn" type="text" aria-label="주관식 답 입력" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="done" placeholder="답을 입력하세요"><div class="rnext"><button class="btn p big" id="subBtn">확인</button></div></div>';
+    var input=$('storedShortIn');
+    function grade(){var got=normalizeStoredAnswer(input.value),ok=!!got&&item.answerTexts.some(function(a){return normalizeStoredAnswer(a)===got;});input.disabled=true;
+      var feedback=(item.answerTexts.length?'<div class="exp">정답: '+item.answerTexts.map(esc).join(' / ')+'</div>':'')+(item.explanation?'<div class="exp">'+esc(item.explanation)+'</div>':'');
+      finishItem(item,ok,input.value,feedback);}
+    bindSubmit(grade);
+    input.onkeydown=function(e){if(e.key==='Enter'&&!e.isComposing){e.preventDefault();var b=$('subBtn');if(b&&!b.getAttribute('data-done'))b.onclick();}};
+  }
+  function normalizeStoredAnswer(value){return String(value==null?'':value).normalize('NFKC').trim().replace(/\s+/g,' ').toLowerCase();}
   function bindSubmit(fn) {
     var b = $('subBtn');
     b.onclick = function () { if (!b.getAttribute('data-done')) { b.setAttribute('data-done', '1'); fn(); } };
