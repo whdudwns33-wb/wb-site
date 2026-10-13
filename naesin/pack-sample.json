@@ -1,6 +1,7 @@
 {
   "packId": "sample-demo-L0",
   "source": "WB 자체 제작 체험 팩 — 실제 교재·구매 자료와 무관한 창작 콘텐츠 (테스트·데모 전용)",
+  "rights": { "basis": "self_authored", "holder": "WB 자체 창작", "evidenceRef": "저장소 자체 제작 데모", "studentUseAllowed": true, "derivativeUseAllowed": true, "externalAiAllowed": false, "notes": "합성·자체 제작 데모" },
   "curriculum": "데모", "textbook": "체험", "grade": "중2", "lesson": 0,
   "lessonTitle": "A Morning by the Sea",
   "counts": { "words": 8, "examples": 6, "definitions": 3, "polysemy": 1, "synAnt": 2, "oddOneItems": 2, "checkItems": 8 },

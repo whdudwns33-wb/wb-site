@@ -120,3 +120,8 @@ node naesin/pack-validate.mjs <팩 디렉터리>
 청크 연결과 `en` 일치 · 정답-보기 정합 · packId 일치. 오류는 배포 차단, 경고는 검수 화면 확인 대상.
 `oddOneItems`·`checkItems`는 개수만 요약에 나온다 — 내용 정합(조각을 지면에서 찾을 수 있는가,
 보기가 겹치지 않는가)은 생성기가 `null`로 걸러 내고 `naesin/gen.test.cjs`가 지킨다.
+
+
+## 권리 메타데이터 (필수)
+
+팩 루트에 `rights`를 둔다: `basis`는 `self_authored|open_license|licensed`, `holder`, `evidenceRef`, `studentUseAllowed`, `derivativeUseAllowed`, `externalAiAllowed`, 선택 `expiresAt`(YYYY-MM-DD)와 `notes`. 학생 배포에는 권리자와 학생 이용·2차 제작 허용이 확인되어야 하며, 공개 라이선스·별도 계약은 증빙 참조가 필수다. 만료일이 지난 권리는 차단한다. 외부 AI 전송은 `externalAiAllowed: true`인 경우에만 가능하다. 기존 팩은 자동 인정하지 않는다. 운영자가 실제 약관·라이선스·계약 증빙을 확인하며, 이 코드는 법률 판단을 대신하지 않는다. 자체 제작 데모는 이를 명시한다.

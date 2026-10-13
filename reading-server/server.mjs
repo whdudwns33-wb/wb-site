@@ -12,6 +12,7 @@ import { load, persist, getDb, listBackups, getBackup, snapshotNow, naesinSnapsh
 import { handleVocab, sendNightPushes, vocabSummary } from './vocab-api.mjs';
 import { handleNaesin, isReservedCode, dropReservedRows, naesinBodyLimit } from './naesin-api.mjs';
 import { handleStudio } from './naesin-studio.mjs';
+import PACKCHECK from '../naesin/pack-check.js';
 import { handleHaru, haruBodyLimit, allowedApp, appOfPath, dropStudentHaru, dumpHaru } from './haru-api.mjs';
 import { handleNaesinKo, naesinKoBodyLimit } from './naesin-ko-api.mjs';
 import { handleHanja, hanjaBodyLimit, dropStudentHanja, dumpHanja } from './hanja-api.mjs';
@@ -681,7 +682,8 @@ const server = http.createServer(async (req, res) => {
          json()이 모든 응답에 no-store를 붙인다 — 기획서 §10-3. */
       if (p.startsWith('/api/naesin/')) {
         /* 파일 선택 없이 기존 원내 보관본을 연결한다. 워커·외부 관리·학생에게는 원본을 내주지 않는다. */
-        if (p === '/api/naesin/admin/job/local-review' || p === '/api/naesin/admin/job/local-pdf') {
+        if ((p === '/api/naesin/admin/job/local-review' || p === '/api/naesin/admin/job/local-pdf') && PACKCHECK.rightsErrors((naesinStore.getJob(url.searchParams.get('id') || '') || {}).meta?.rights).length) { req.resume(); return json(res, 403, { error: '권리 확인이 없어 자료를 열 수 없습니다.' }); }
+          if (p === '/api/naesin/admin/job/local-review' || p === '/api/naesin/admin/job/local-pdf') {
           if (!INHOUSE_ONLY || !inhouseAccess(req) || !who.admin) return json(res, 403, { error: '원내 PC 관리자만 원본 자료를 열 수 있습니다.' });
           if (req.method !== 'GET') { req.resume(); return json(res, 405, { error: 'GET 요청만 가능합니다.' }); }
           const id = url.searchParams.get('id') || '', source = url.searchParams.get('source'), expectedSha256 = url.searchParams.get('sha256');

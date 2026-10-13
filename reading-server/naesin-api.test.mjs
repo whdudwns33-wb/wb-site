@@ -66,6 +66,7 @@ const YESTERDAY = kstDay(-1), TOMORROW = kstDay(1), TODAY = kstDay(0);
 /* 시드는 자체 제작 더미다 — 기획서 §9.3: 교과서·이그잼포유 문구를 테스트에 쓰지 않는다 */
 const PACK = {
   packId: 'dummy-e2-mid1',
+  rights: { basis: 'self_authored', holder: 'Synthetic test fixture', evidenceRef: 'fixture-only', studentUseAllowed: true, derivativeUseAllowed: true, externalAiAllowed: false },
   school: '더미중', gradeSem: '2-1', exam: '중간',
   words: [{ id: 'w-observe', headword: 'observe', meaningKo: ['관찰하다'], sections: ['reading'] },
     { id: 'w-orbit', headword: 'orbit', meaningKo: ['궤도'], sections: ['reading'] }],

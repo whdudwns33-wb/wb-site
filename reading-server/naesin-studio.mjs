@@ -111,6 +111,7 @@ export function assemble(job) {
   for (const k of ['curriculum', 'textbook', 'grade', 'lesson', 'lessonTitle', 'source']) {
     if (meta[k] != null && meta[k] !== '') pack[k] = meta[k];
   }
+  pack.rights = meta.rights || null;
   for (const kind of Object.keys(draft)) {
     if (!DRAFT_KINDS.includes(kind)) continue;
     const rows = Array.isArray(draft[kind]) ? draft[kind] : null;
@@ -207,6 +208,14 @@ export function jobBrief(job) {
   };
 }
 
+function normalizeRights(r) {
+  if (!isObj(r)) return null;
+  return { basis: ['self_authored','open_license','licensed'].includes(r.basis) ? r.basis : '',
+    holder: strMax(r.holder, 120), evidenceRef: strMax(r.evidenceRef, 300),
+    studentUseAllowed: r.studentUseAllowed === true, derivativeUseAllowed: r.derivativeUseAllowed === true,
+    externalAiAllowed: r.externalAiAllowed === true, expiresAt: strMax(r.expiresAt, 10), notes: strMax(r.notes, 500) };
+}
+
 function metaOf(b) {
   const m = isObj(b && b.meta) ? b.meta : {};
   const lesson = Number(m.lesson);
@@ -217,6 +226,7 @@ function metaOf(b) {
     lesson: Number.isFinite(lesson) ? Math.trunc(lesson) : null,
     lessonTitle: strMax(m.lessonTitle, NAME_MAX),
     source: strMax(m.source, NOTE_MAX),
+    rights: normalizeRights(b.rights || m.rights),
   };
 }
 
@@ -292,6 +302,14 @@ export async function handleStudio(ctx) {
     return j(200, out);
   }
 
+  if (p === '/api/naesin/admin/job/rights' && method === 'POST') {
+    const b = await body(); const bad = badBody(b); if (bad) return bad;
+    const job = await jobOf(strMax(b.jobId, 40)); if (!job) return j(404, { error: '작업을 찾을 수 없어요.' });
+    job.meta = { ...(job.meta || {}), rights: normalizeRights(b.rights) };
+    job.updatedAt = nextJobVersion(job); await store.putJob(job.jobId, job);
+    const gate = publishGate(job); return j(200, { ok: true, job: jobBrief(job), gate: { ok: gate.ok, errors: gate.errors, warns: gate.warns } });
+  }
+
   /* 추출 — 종류 하나씩. 워커의 CPU 시간 한도가 있어 한 번에 다 돌리지 않는다.
      실패해도 작업을 못 쓰게 만들지 않는다(status 를 failed 로 굳히지 않고 error 만 남긴다). */
   if (p === '/api/naesin/admin/job/extract' && method === 'POST') {
@@ -299,6 +317,9 @@ export async function handleStudio(ctx) {
     const bad = badBody(b); if (bad) return bad;
     const job = await jobOf(strMax(b.jobId, 40));
     if (!job) return j(404, { error: '작업을 찾을 수 없어요.' });
+    const rights = job.meta && job.meta.rights;
+    if (CHECK.rightsErrors(rights).length || rights.externalAiAllowed !== true)
+      return j(400, { error: '권리 확인 또는 외부 AI 이용 허용이 없어 추출할 수 없습니다.' });
     const kind = KINDS.includes(b.kind) ? b.kind : null;
     if (!kind) return j(400, { error: '추출 종류가 올바르지 않아요.' });
     const src = await store.getJobSrc(job.jobId);
