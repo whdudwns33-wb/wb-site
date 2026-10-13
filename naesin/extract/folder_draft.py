@@ -57,23 +57,24 @@ def compare_text(value):
 def slash_parts(value):
  parts=[norm(x).strip('.,!?;:') for x in value.split('/')]
  return parts if parts and all(parts) else None
+def token_group_parts(value):
+ parts=[norm(x) for x in value.split('/')]
+ return parts if len(parts)>=2 and all(parts) else None
+def balanced_parentheses(value):
+ depth=0
+ for char in value:
+  if char=='(': depth+=1
+  elif char==')':
+   depth-=1
+   if depth<0: return False
+ return depth==0
 def writing_keywords(text):
- strict=[]; suspicious=False
- for index,line in enumerate(text.splitlines()):
-  value=line.strip()
-  if not value or ',' not in value or re.search(r'[.!?]',value): continue
-  if re.fullmatch(r"[A-Za-z][A-Za-z'’\- ]*(?:,\s*[A-Za-z][A-Za-z'’\- ]*)+",value):
-   strict.append((index,[x.strip() for x in value.split(',')]))
-  elif re.search(r'[A-Za-z]',value): suspicious=True
- if not strict or suspicious: return None,'AMBIGUOUS_KEYWORD_LIST' if suspicious else 'NO_DETERMINISTIC_MATCH'
- runs=[]; current=[]; previous=None
- for index,values in strict:
-  if previous is not None and index!=previous+1:
-   runs.append(current);current=[]
-  current.extend(values);previous=index
- if current:runs.append(current)
- if len(runs)!=1 or not all(runs[0]): return None,'AMBIGUOUS_KEYWORD_LIST'
- return runs[0],None
+ boundaries=list(re.finditer(r'_{5,}|(?i:Monday|Tuesday|Wednesday)\s*,?\s*August\s+(?:[1-9]|[12]\d|3[01])\b',text))
+ if not boundaries: return None,'NO_DETERMINISTIC_MATCH'
+ prefix=text[:boundaries[0].start()]
+ values=[norm(value) for value in prefix.split(',')]
+ values=[value for value in values if value]
+ return (values,None) if values else (None,'NO_DETERMINISTIC_MATCH')
 def attach_unmatched(row, field, reason, refs, **details):
  row['unmatchedEnrichment'].append({'field':field,'reason':reason,'sourceRefs':refs,**details})
  row['reviewFlags'].append(field.upper()+'_UNMATCHED')
@@ -92,6 +93,14 @@ def enrich_sentences(sentences, source):
   bases=re.findall(r'\(([^()]*)\)',prompt[0]['text']) if len(prompt)==1 else []
   answer_parts=slash_parts(answers[0]['text']) if len(answers)==1 else None
   bases=[norm(x) for x in bases]
+  if answer_parts and len(bases)!=len(answer_parts):
+   sentence_bases=[]; used=set()
+   for answer in answer_parts:
+    hits=[i for i,base in enumerate(bases) if i not in used and compare_text(base)==compare_text(answer)
+      and re.search(r'(?<![A-Za-z])'+re.escape(base)+r'(?![A-Za-z])',row['en'],re.I)]
+    if len(hits)!=1: sentence_bases=[]; break
+    used.add(hits[0]); sentence_bases.append(bases[hits[0]])
+   if sentence_bases: bases=sentence_bases
   if len(prompt)==1 and len(answers)==1 and bases and all(bases) and answer_parts and len(bases)==len(answer_parts):
    row['verbForms']=[{'base':base,'answer':answer} for base,answer in zip(bases,answer_parts)]
    row['enrichmentSourceRefs']['verbForms']=vrefs; summary['verbForms']['matched']+=1
@@ -126,10 +135,11 @@ def enrich_sentences(sentences, source):
   tp=token_prompts.get(n,[]); tpage=tp[0]['page'] if len(tp)==1 else (20 if n<=8 else 21 if n<=17 else 22)
   trefs=[page_ref(tpage,'token-choice-groups',n)]; groups=[]; invalid=False
   if len(tp)==1:
+   if not balanced_parentheses(tp[0]['text']): invalid=True
    for raw in re.findall(r'\(([^()]*)\)',tp[0]['text']):
     if '/' not in raw: continue
-    values=slash_parts(raw)
-    if not values or len(values)<2: invalid=True
+    values=token_group_parts(raw)
+    if not values: invalid=True
     else: groups.append(values)
   if len(tp)==1 and groups:
    outside=norm(re.sub(r'\([^()]*\)',' ',tp[0]['text']))
