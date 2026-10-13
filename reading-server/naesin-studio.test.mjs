@@ -366,6 +366,20 @@ await t('PDF 본문 후보는 원내 PC만 받고 개별 대조 전에는 게시
   assert.ok(!JSON.stringify(published).includes('locations'));
 });
 
+await t('Phase 2E fresh review job removes all 28 chunk/grammarPoint structural errors without approving rows', async () => {
+  const s=memStore(),created=await call(s,'/api/naesin/admin/job','POST',{packId:SAMPLE.packId}),id=created.body.jobId;
+  const meta={flags:['REVIEW_REQUIRED','FULL_SENTENCE_CHUNK_REVIEW','CANONICAL_WHITESPACE_TOKENS'],locations:[{page:1,bbox:[0,0,0,0],sourceDocumentId:'02',printedPage:1,section:'fixture'}]};
+  const words=Array.from({length:74},(_,i)=>({id:`w-source-${i+1}`,headword:`sourceword${i+1}`,pos:'n.',meaningKo:[`원문 뜻 ${i+1}`],sections:i<41?['conversation']:i<69?['reading']:[],irregularForms:[],notes:[],_pdfReview:{...clone(meta),flags:i<69?clone(meta.flags):[...meta.flags,'SECTION_UNRESOLVED']}}));
+  const sentences=Array.from({length:25},(_,i)=>{const en=`Own source sentence ${i+1}.`,ko=`자체 원문 문장 ${i+1}.`;return{seq:i+1,dayGroup:'8/1',en,ko,chunks:[{en,ko}],keywords:[],tokens:en.trim().split(' '),verbForms:[],grammarChoices:[],writingKeywords:[],wordIds:[],grammarNotes:[],notes:[],_pdfReview:clone(meta)};});
+  const patterns=Array.from({length:3},(_,i)=>({patternNo:i+1,title:`Pattern ${i+1}`,conceptKo:'원문 개념',grammarPoint:[['핵심 1',`원문 문법 설명 ${i+1}`]],textbookExamples:[{en:'We saw a fish.',ko:'물고기를 보았다.',origin:'교과서 본문'}],letsUseIt:[],notes:[],_pdfReview:clone(meta)}));
+  const saved=await call(s,'/api/naesin/admin/job/draft','POST',{jobId:id,draft:{words,sentences,patterns}},{localPdfReview:true});assert.equal(saved.status,200);assert.equal(saved.body.gate.pending,102);
+  const structural=saved.body.gate.errors.filter(e=>/grammarPoint|PDF 본문은 영·한 문장과 대응하는 청크가 필요함/.test(e.message));assert.deepStrictEqual(structural,[]);
+  const residual=saved.body.gate.errors.map(e=>e.message),keywordErrors=residual.filter(message=>message.includes('1·3단계 문항을 만들 핵심어가 필요함')),unresolvedSections=residual.filter(message=>/sections 비었음$/.test(message));
+  assert.equal(keywordErrors.length,25);assert.deepStrictEqual(unresolvedSections,Array.from({length:5},(_,i)=>`words[${69+i}](sourceword${70+i}) sections 비었음`));
+  assert.deepStrictEqual(residual.filter(message=>!message.includes('1·3단계 문항을 만들 핵심어가 필요함')&&!/sections 비었음$/.test(message)),[]);
+  const stored=await s.getJob(id);assert.equal(Object.keys(stored.review).length,0);assert.equal(stored.draft.words.length,74);assert.equal(stored.draft.words.filter(row=>row._pdfReview.flags.includes('SECTION_UNRESOLVED')).length,5);assert.ok(stored.draft.sentences.every(row=>row._pdfReview.flags.includes('REVIEW_REQUIRED')&&row._pdfReview.flags.includes('FULL_SENTENCE_CHUNK_REVIEW')&&row._pdfReview.flags.includes('CANONICAL_WHITESPACE_TOKENS')));
+});
+
 await t('folder-v4 최종 배열은 미검토로 저장되고 publish payload에서 출처 메타를 제거하며 빈 청크는 보완 전 게시하지 않는다', async () => {
   const s=memStore(),created=await call(s,'/api/naesin/admin/job','POST',{packId:SAMPLE.packId}),id=created.body.jobId;
   const meta={flags:['REVIEW_REQUIRED'],locations:[{page:1,bbox:[0,0,0,0],sourceDocumentId:'01',printedPage:1,section:'fixture'}]};
