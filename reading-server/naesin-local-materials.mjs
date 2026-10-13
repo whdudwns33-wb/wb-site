@@ -89,7 +89,7 @@ function validateFolderCandidates(draft) {
         && Array.isArray(item.wordBank) && item.wordBank.length <= 50 && item.wordBank.every(word => shortText(word,200))
         && Array.isArray(item.answers) && item.answers.length >= 1 && item.answers.length <= 20 && item.answers.every(answer => shortText(answer,300)))
       && common(row))) return false;
-  const itemKeys = ['candidateId','source','section','patternNo','no','formatType','rawText','choices','answerLabels','answerTexts','explanationKo','sourceRefs','reviewFlags'];
+  const itemKeys = ['candidateId','source','section','patternNo','no','formatType','rawText','contextText','choices','answerLabels','answerTexts','explanationKo','sourceRefs','reviewFlags'];
   const itemSources = {'04':64,'05':30,'06':30,'08':142,'09':163};
   const labels = ['①','②','③','④','⑤'];
   if (!Array.isArray(draft.examItemCandidates) || draft.examItemCandidates.length > 429
@@ -97,7 +97,8 @@ function validateFolderCandidates(draft) {
       && Object.hasOwn(itemSources,row.source) && shortText(row.section,120) && (row.patternNo === null || [1,2].includes(row.patternNo))
       && ((row.source==='08'||row.source==='09') ? [1,2].includes(row.patternNo) : row.patternNo===null)
       && Number.isInteger(row.no) && row.no>=1 && row.no<=99 && ['mcq','multi-select','subjective','unknown'].includes(row.formatType)
-      && shortText(row.rawText,12000,true) && !/(?:[A-Za-z]:[\\/]|\\\\)/.test(row.rawText) && Array.isArray(row.choices) && row.choices.length<=5
+      && shortText(row.rawText,12000,true) && !/(?:[A-Za-z]:[\\/]|\\\\)/.test(row.rawText)
+       && shortText(row.contextText,12000,true) && !/(?:[A-Za-z]:[\\/]|\\\\)/.test(row.contextText) && Array.isArray(row.choices) && row.choices.length<=5
       && row.choices.every(choice=>exactKeys(choice,['label','text'])&&labels.includes(choice.label)&&shortText(choice.text,2000))
       && new Set(row.choices.map(choice=>choice.label)).size===row.choices.length
       && Array.isArray(row.answerLabels)&&row.answerLabels.length<=5&&row.answerLabels.every(label=>labels.includes(label))

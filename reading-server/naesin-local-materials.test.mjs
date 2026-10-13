@@ -37,7 +37,7 @@ const folderBytes=new Map(), folderDocs=[];
 for(const [source,role,file] of folderSpecs){const bytes=Buffer.from('%PDF-1.4\\n% fixture '+source+'\\n');folderBytes.set(source,bytes);fs.writeFileSync(path.join(folderPack,file),bytes);folderDocs.push({sourceDocumentId:source,role,file,bytes:bytes.length,sha256:sha(bytes),pageCount:source==='00'?2:source==='01'?44:source==='02'?31:source==='03'?26:source==='04s'||source==='04t'?14:source==='05s'||source==='05t'?10:source==='06s'||source==='06t'?12:source==='07'?25:source==='08'?23:25});}
 const folderLatest=path.join(folderAnalysis,'draft-20261013-120000-cccccc');fs.mkdirSync(folderLatest,{recursive:true});
 const folderRef=(sourceDocumentId,page,section,extra={})=>({sourceDocumentId,page,printedPage:page,section,...extra});
-const examItemCandidates=[{candidateId:'ic-04-00-001',source:'04',section:'PRE-STEP',patternNo:null,no:1,formatType:'mcq',rawText:'1. Choose the correct answer.',choices:[{label:'①',text:'first'},{label:'②',text:'second'}],answerLabels:['①'],answerTexts:[],explanationKo:'',sourceRefs:[folderRef('04s',1,'problem',{questionNo:1,lineStart:1,lineEnd:2}),folderRef('04t',13,'answer-key-summary',{questionNo:1,lineStart:11,lineEnd:11})],reviewFlags:['REVIEW_REQUIRED']}];
+const examItemCandidates=[{candidateId:'ic-04-00-001',source:'04',section:'PRE-STEP',patternNo:null,no:1,formatType:'mcq',rawText:'1. Choose the correct answer.',contextText:'Shared context for the question.',choices:[{label:'①',text:'first'},{label:'②',text:'second'}],answerLabels:['①'],answerTexts:[],explanationKo:'',sourceRefs:[folderRef('04s',1,'problem',{questionNo:1,lineStart:2,lineEnd:3}),folderRef('04s',1,'shared-context',{lineStart:1,lineEnd:1}),folderRef('04t',13,'answer-key-summary',{questionNo:1,lineStart:11,lineEnd:11})],reviewFlags:['REVIEW_REQUIRED']}];
 const expectedByType={'04':{objective:41,subjective:23},'05':{objective:23,subjective:7},'06':{objective:23,subjective:7},'08':{objective:142,subjective:0},'09':{objective:0,subjective:163}};
 const expectedItemSources={'04':64,'05':30,'06':30,'08':142,'09':163};
 const itemBySource=Object.fromEntries(Object.entries(expectedItemSources).map(([source,expected])=>[source,{expected,found:source==='04'?1:0,answerMatched:source==='04'?1:0,unresolved:source==='08'?1:0,byType:{mcq:source==='04'?1:0,'multi-select':0,subjective:0,unknown:0},expectedByType:expectedByType[source],foundByType:{objective:source==='04'?1:0,subjective:0}}]));
@@ -103,6 +103,9 @@ try {
       value=>{value.patternCandidates[0].letsUseIt[0].answers=[];},
       value=>{value.examItemCandidates[0].rawPageText='PRIVATE_PAGE_TEXT';},
       value=>{value.examItemCandidates[0].rawText='C:\\private\\page.pdf';},
+      value=>{value.examItemCandidates[0].contextText='C:\\private\\shared-context.pdf';},
+      value=>{value.examItemCandidates[0].contextText='x'.repeat(12001);},
+      value=>{delete value.examItemCandidates[0].contextText;},
       value=>{value.examItemCandidates[0].sourceRefs[0].absolutePath='C:\\private\\source.pdf';},
       value=>{value.itemSummary.found=2;},
       value=>{value.unmatchedItems[0].reason='RAW_PAGE_TEXT';},
