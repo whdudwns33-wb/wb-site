@@ -686,7 +686,7 @@ const server = http.createServer(async (req, res) => {
           if (!INHOUSE_ONLY || !inhouseAccess(req) || !who.admin) return json(res, 403, { error: '원내 PC 관리자만 원본 자료를 열 수 있습니다.' });
           if (req.method !== 'GET') { req.resume(); return json(res, 405, { error: 'GET 요청만 가능합니다.' }); }
           const id = url.searchParams.get('id') || '', source = url.searchParams.get('source'), expectedSha256 = url.searchParams.get('sha256');
-          if (!/^job-[a-z0-9]{6,20}$/.test(id) || (p.endsWith('/local-pdf') && (!['02', '03'].includes(source) || !/^[a-f0-9]{64}$/.test(expectedSha256)))) return json(res, 400, { error: '작업 또는 자료 번호·원본 확인값이 올바르지 않습니다.' });
+          if (!/^job-[a-z0-9]{6,20}$/.test(id) || (p.endsWith('/local-pdf') && (!/^(?:00|01|02|03|04s|04t|05s|05t|06s|06t|07|08|09)$/.test(source) || !/^[a-f0-9]{64}$/.test(expectedSha256)))) return json(res, 400, { error: '작업 또는 자료 번호·원본 확인값이 올바르지 않습니다.' });
           const job = naesinStore.getJob(id);
           if (!job) return json(res, 404, { error: '검수 작업을 찾을 수 없습니다.' });
           if (PACKCHECK.rightsErrors((job.meta || {}).rights).length) { req.resume(); return json(res, 403, { error: '권리 확인이 없어 자료를 열 수 없습니다.' }); }

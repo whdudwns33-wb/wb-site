@@ -1,0 +1,40 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import crypto from 'node:crypto';
+
+const script=fileURLToPath(new URL('./folder_draft.py',import.meta.url));
+const python=process.env.WB_NAESIN_PYTHON||'python3';
+const temp=fs.mkdtempSync(path.join(os.tmpdir(),'wb-naesin-folder-'));
+const folder=path.join(temp,'source');fs.mkdirSync(folder);
+const rights={basis:'licensed',holder:'fixture license holder',evidenceRef:'fixture evidence',studentUseAllowed:true,derivativeUseAllowed:true,externalAiAllowed:false,notes:'WB 원내 네트워크 전용. 외부 배포 및 외부 AI 전송 금지.'};
+fs.writeFileSync(path.join(folder,'_meta.txt'),'revision: 2022\n');fs.writeFileSync(path.join(folder,'_rights.json'),JSON.stringify(rights));
+const specs=[['00','textbook','00_교과서본문.pdf'],['01','content_summary','01_내용정리.pdf'],['02','passage_workbook','02_본문워크북.pdf'],['03','vocabulary','03_단어시험.pdf'],['04s','pre_step_student','04_예상문제_PRE-STEP.pdf'],['04t','pre_step_teacher','04_예상문제_PRE-STEP_교사용.pdf'],['05s','exam_1_student','05_예상문제_1회.pdf'],['05t','exam_1_teacher','05_예상문제_1회_교사용.pdf'],['06s','exam_2_student','06_예상문제_2회.pdf'],['06t','exam_2_teacher','06_예상문제_2회_교사용.pdf'],['07','grammar_workbook','07_문법워크북.pdf'],['08','grammar_mcq','08_문법객관식.pdf'],['09','grammar_subjective','09_문법주관식.pdf']];
+const pages=(n,fn=()=> '')=>Array.from({length:n},(_,i)=>({page:i+1,text:fn(i+1)}));
+const wordText=Array.from({length:74},(_,i)=>`□ word${i+1} n. 뜻${i+1}`).join('\n');
+const en=(start,end)=>Array.from({length:end-start+1},(_,i)=>`${start+i}. Sentence ${start+i} is complete.${start+i})`).join('\n');
+const ko=(start,end)=>Array.from({length:end-start+1},(_,i)=>`${start+i}) 한글 문장 ${start+i} 완성`).join('\n');
+let totalPages=0;
+const fileInfo=new Map();
+const sources=specs.map(([id,role,file])=>{
+ const content=Buffer.from(`fixture-${id}`);fs.writeFileSync(path.join(folder,file),content);fileInfo.set(id,{file,bytes:content.length,sha256:crypto.createHash('sha256').update(content).digest('hex')});
+ let count=id==='00'?2:id==='01'?44:id==='02'?31:id==='03'?26:id==='04s'||id==='04t'?14:id==='05s'||id==='05t'?10:id==='06s'||id==='06t'?12:id==='07'?25:id==='08'?23:25;totalPages+=count;
+ let p=pages(count);
+ if(id==='03')p[0].text=wordText;
+ if(id==='02'){p[8].text=en(1,12);p[9].text=en(13,25);p[28].text='워크북 4 해석 연습 '+ko(1,20);p[29].text=ko(21,25)+' 워크북 5 동사형 연습';}
+ return{id,role,file,bytes:content.length,sha256:crypto.createHash('sha256').update(content).digest('hex'),pageCount:count,pages:p};
+});
+const bundle=path.join(temp,'bundle.json');fs.writeFileSync(bundle,JSON.stringify({kind:'wb-naesin-page-text-bundle',version:1,sources}));
+const out=path.join(temp,'output');const result=spawnSync(python,[script,'--text-bundle',bundle,'--folder',folder,'--passage-title-en','Fixture Title','--passage-title-ko','시험 제목',out],{encoding:'utf8',env:{...process.env,PYTHONHOME:''}});assert.equal(result.status,0,result.stdout+result.stderr);
+const summary=JSON.parse(result.stdout);assert.equal(summary.sourceDocuments,13);assert.equal(summary.sourcePages,totalPages);assert.equal(summary.words,74);assert.equal(summary.sentences,25);assert.equal(summary.enNonempty,25);assert.equal(summary.koNonempty,25);
+const draft=JSON.parse(fs.readFileSync(path.join(out,'review-draft.json'),'utf8'));assert.equal(draft.publishable,false);assert.deepEqual(draft.rights,rights);assert.deepEqual(draft.sentenceCandidates.map(x=>x.seq),Array.from({length:25},(_,i)=>i+1));assert(draft.sourceDocuments.every(x=>x.sha256&&x.pageCount));assert(draft.wordCandidates.every(x=>x.sourceRefs.length&&x.reviewFlags.includes('REVIEW_REQUIRED')));assert.equal(draft.unmatched.length,100);assert(draft.unmatched.every(x=>x.reason==='NO_DETERMINISTIC_MATCH'&&x.sourceRefs.every(r=>r.sourceDocumentId==='02'&&r.printedPage===r.page&&r.section&&r.questionNo)));assert.equal(draft.sentenceCandidates[0].passageTitleKo,'시험 제목');
+const seed=path.join(temp,'seed.json');fs.writeFileSync(seed,JSON.stringify({draft:{sources:{'03':{sha256:fileInfo.get('03').sha256,pageCount:26}},wordCandidates:Array.from({length:74},(_,i)=>({candidateId:`seed-${i+1}`,headCandidate:`lemma${i+1}`,meanings:['뜻'],posCandidates:['n.'],sourceRows:[{sha256:fileInfo.get('03').sha256,page:1,bbox:[1,1,2,2]}]}))}}));
+const seededOut=path.join(temp,'seeded-output');const seeded=spawnSync(python,[script,'--text-bundle',bundle,'--folder',folder,'--passage-title-en','Fixture Title','--passage-title-ko','시험 제목','--word-seed',seed,seededOut],{encoding:'utf8',env:{...process.env,PYTHONHOME:''}});assert.equal(seeded.status,0,seeded.stdout+seeded.stderr);assert.equal(JSON.parse(fs.readFileSync(path.join(seededOut,'review-draft.json'),'utf8')).wordSeedUsed,true);
+const overwrite=spawnSync(python,[script,'--text-bundle',bundle,'--folder',folder,'--passage-title-en','Fixture Title','--passage-title-ko','시험 제목',out],{encoding:'utf8',env:{...process.env,PYTHONHOME:''}});assert.notEqual(overwrite.status,0);
+const linked=path.join(temp,'source-hardlink.pdf'),blocked=path.join(temp,'hardlink-output');fs.linkSync(path.join(folder,specs[0][2]),linked);
+const hardlink=spawnSync(python,[script,'--text-bundle',bundle,'--folder',folder,'--passage-title-en','Fixture Title','--passage-title-ko','시험 제목',blocked],{encoding:'utf8',env:{...process.env,PYTHONHOME:''}});assert.notEqual(hardlink.status,0);assert.equal(fs.existsSync(blocked),false);fs.unlinkSync(linked);
+console.log('folder bundle synthetic fixture: 12 assertions passed');
+fs.rmSync(temp,{recursive:true,force:true});

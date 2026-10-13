@@ -7,6 +7,14 @@ import crypto from 'node:crypto';
 const DRAFT_MAX = 8 * 1024 * 1024;
 const PDF_MAX = 32 * 1024 * 1024;
 const SOURCES = ['02', '03'];
+const FOLDER_SOURCES = {
+  '00':'00_교과서본문.pdf','01':'01_내용정리.pdf','02':'02_본문워크북.pdf','03':'03_단어시험.pdf',
+  '04s':'04_예상문제_PRE-STEP.pdf','04t':'04_예상문제_PRE-STEP_교사용.pdf',
+  '05s':'05_예상문제_1회.pdf','05t':'05_예상문제_1회_교사용.pdf',
+  '06s':'06_예상문제_2회.pdf','06t':'06_예상문제_2회_교사용.pdf',
+  '07':'07_문법워크북.pdf','08':'08_문법객관식.pdf','09':'09_문법주관식.pdf'
+};
+const FOLDER_ROLES = {'00':'textbook','01':'content_summary','02':'passage_workbook','03':'vocabulary','04s':'pre_step_student','04t':'pre_step_teacher','05s':'exam_1_student','05t':'exam_1_teacher','06s':'exam_2_student','06t':'exam_2_teacher','07':'grammar_workbook','08':'grammar_mcq','09':'grammar_subjective'};
 const CANONICAL_FILES = { '02': '02_본문워크북.pdf', '03': '03_단어시험.pdf' };
 const fail = () => { throw new Error('LOCAL_SOURCE_UNAVAILABLE'); };
 const samePath = (a, b) => !path.relative(a, b);
@@ -38,7 +46,7 @@ function readRegular(p, max) {
 }
 
 export function readLocalMaterials(dataDir, packId, source, expectedSha256) {
-  if (!/^[A-Za-z0-9-]{3,60}$/.test(packId) || (source !== undefined && (!SOURCES.includes(source) || !/^[a-f0-9]{64}$/.test(expectedSha256)))) fail();
+  if (!/^[A-Za-z0-9-]{3,60}$/.test(packId) || (source !== undefined && (!(SOURCES.includes(source) || Object.hasOwn(FOLDER_SOURCES, source)) || !/^[a-f0-9]{64}$/.test(expectedSha256)))) fail();
   const parent = directory(path.dirname(path.resolve(dataDir)));
   const root = directory(path.join(parent, 'naesin-materials'));
   const pack = directory(path.join(root, packId));
@@ -47,6 +55,31 @@ export function readLocalMaterials(dataDir, packId, source, expectedSha256) {
   if (!latest) fail();
   const draftDir = directory(path.join(analysis, latest));
   const draft = JSON.parse(readRegular(path.join(draftDir, 'review-draft.json'), DRAFT_MAX).toString('utf8'));
+  if (draft?.kind === 'naesin-folder-review-draft') {
+    if (draft.version !== 1 || draft.status !== 'needs-review' || draft.publishable !== false
+      || !Array.isArray(draft.sourceDocuments) || draft.sourceDocuments.length !== 13
+      || !Array.isArray(draft.wordCandidates) || !Array.isArray(draft.sentenceCandidates)
+      || draft.rights?.externalAiAllowed !== false || draft.rights?.studentUseAllowed !== true
+      || draft.rights?.derivativeUseAllowed !== true || draft.rights?.basis !== 'licensed'
+      || typeof draft.rights?.holder !== 'string' || !draft.rights.holder
+      || typeof draft.rights?.evidenceRef !== 'string' || !draft.rights.evidenceRef) fail();
+    const seen = new Set(), pdfs = []; let bytes;
+    for (const meta of draft.sourceDocuments) {
+      const expectedFile = FOLDER_SOURCES[meta?.sourceDocumentId];
+      if (!expectedFile || seen.has(meta.sourceDocumentId) || meta.role !== FOLDER_ROLES[meta.sourceDocumentId] || meta.file !== expectedFile
+        || !/^[a-f0-9]{64}$/.test(meta.sha256) || !Number.isInteger(meta.bytes) || meta.bytes < 1
+        || !Number.isInteger(meta.pageCount) || meta.pageCount < 1 || meta.pageCount > 1000) fail();
+      seen.add(meta.sourceDocumentId);
+      if (source === meta.sourceDocumentId && expectedSha256 !== meta.sha256) throw new Error('LOCAL_SOURCE_CHANGED');
+      const pdf = readRegular(path.join(pack, meta.file), PDF_MAX);
+      if (pdf.length !== meta.bytes || pdf.subarray(0, 5).toString('ascii') !== '%PDF-'
+        || crypto.createHash('sha256').update(pdf).digest('hex') !== meta.sha256) fail();
+      pdfs.push({ source: meta.sourceDocumentId, file: meta.file, pageCount: meta.pageCount, sha256: meta.sha256 });
+      if (source === meta.sourceDocumentId) bytes = pdf;
+    }
+    if (seen.size !== Object.keys(FOLDER_SOURCES).length) fail();
+    return source === undefined ? { draft, pdfs } : { bytes };
+  }
   if (draft?.kind !== 'naesin-pdf-review-draft' || draft.version !== 1 || draft.status !== 'needs-review'
     || draft.publishable !== false || !Array.isArray(draft.wordCandidates) || !Array.isArray(draft.passageColumns)) fail();
   const pdfs = [];
