@@ -75,6 +75,227 @@ def writing_keywords(text):
  values=[norm(value) for value in prefix.split(',')]
  values=[value for value in values if value]
  return (values,None) if values else (None,'NO_DETERMINISTIC_MATCH')
+def candidate_ref(source_id,page,section,side=None,line_start=None,line_end=None,question_no=None):
+ ref={'sourceDocumentId':source_id,'page':page,'printedPage':page,'section':section}
+ if side is not None: ref['side']=side
+ if line_start is not None: ref['lineStart']=line_start
+ if line_end is not None: ref['lineEnd']=line_end
+ if question_no is not None: ref['questionNo']=question_no
+ return ref
+def numbered_sections(lines,offset=0,limit=3):
+ marks=[(i,int(m.group(1))) for i,line in enumerate(lines) if (m:=re.fullmatch(r'\s*([1-9])\.\s*',line)) and int(m.group(1))<=limit]
+ out={}
+ for j,(i,n) in enumerate(marks):
+  end=marks[j+1][0] if j+1<len(marks) else len(lines)
+  out.setdefault(n,[]).append((lines[i+1:end],offset+i+1))
+ return out
+def dialogue_turns(lines,offset=0):
+ turns=[]; current=None
+ stop=re.compile(r'^\s*(?:\d+\s*\.\s|[A-D]\.\s|Q\s*:|\[|Let.s\s+Use\s+It|Topic\s+\d|◗|▌|❙|Functions\b)',re.I)
+ for index,line in enumerate(lines):
+  value=line.strip()
+  if not value: continue
+  if '↳' in value or '↲' in value or re.match(r'^\s*TIP\b',value,re.I): continue
+  match=re.match(r'^\s*([GBMW]):\s*(.*)$',line)
+  if match:
+   body=re.sub(r'^\s*\d+\s+','',match.group(2)).strip()
+   current={'speaker':match.group(1),'text':body,'startLine':offset+index+1,'endLine':offset+index+1};turns.append(current)
+   continue
+  if stop.match(value): current=None;continue
+  if current and re.search(r'[A-Za-z\uac00-\ud7a3]',value):
+   current['text']=norm(current['text']+' '+value);current['endLine']=offset+index+1
+ return [{'speaker':x['speaker'],'text':norm(x['text']),'startLine':x['startLine'],'endLine':x['endLine']} for x in turns]
+def matched_dialogue_candidate(candidate_id,title,section,page,en_turns,ko_turns,en_section,ko_section,question_no=None):
+ en_speakers=[x['speaker'] for x in en_turns];ko_speakers=[x['speaker'] for x in ko_turns]
+ refs=[en_section,ko_section]
+ if en_speakers!=ko_speakers:
+  return {'candidateId':candidate_id,'id':candidate_id.replace('dc-','d-'),'title':title,'section':section,'lines':[],'sourceRefs':refs,'reviewFlags':['REVIEW_REQUIRED','SPEAKER_SEQUENCE_UNRESOLVED']},'SPEAKER_SEQUENCE_MISMATCH'
+ if not en_turns or any(not x['text'] for x in en_turns+ko_turns):
+  return {'candidateId':candidate_id,'id':candidate_id.replace('dc-','d-'),'title':title,'section':section,'lines':[],'sourceRefs':refs,'reviewFlags':['REVIEW_REQUIRED','EMPTY_DIALOGUE_LINE']},'EMPTY_OR_MISSING_DIALOGUE'
+ lines=[{'speaker':e['speaker'],'en':e['text'],'ko':k['text']} for e,k in zip(en_turns,ko_turns)]
+ return {'candidateId':candidate_id,'id':candidate_id.replace('dc-','d-'),'title':title,'section':section,'lines':lines,'sourceRefs':refs,'reviewFlags':['REVIEW_REQUIRED']},None
+def extract_dialogue_candidates(src):
+ pages={p['page']:p['text'].splitlines() for p in src['pages']}; candidates=[];unmatched=[]
+ p1=pages.get(1,[]); split=max((i for i,line in enumerate(p1) if '의사소통 기능' in line or '우리말 해석' in line),default=len(p1))
+ en1=p1[:split];ko_header=max((i for i,line in enumerate(p1[split:],split) if re.search(r'A\.\s*Listen and Check',line,re.I)),default=None)
+ en_sections=numbered_sections(en1,0,3);ko_sections=numbered_sections(p1[ko_header+1:],ko_header+1,3) if ko_header is not None else {}
+ for n in (1,2,3):
+  er=en_sections.get(n,[]);kr=ko_sections.get(n,[]); et,kt=(dialogue_turns(er[0][0],er[0][1]) if len(er)==1 else []),(dialogue_turns(kr[0][0],kr[0][1]) if len(kr)==1 else [])
+  eref=candidate_ref('01',1,'A. Listen and Check','EN',min((x['startLine'] for x in et),default=1),max((x['endLine'] for x in et),default=split),n)
+  kref=candidate_ref('01',1,'A. Listen and Check','KO',min((x['startLine'] for x in kt),default=(ko_header or 0)+1),max((x['endLine'] for x in kt),default=len(p1)),n)
+  row,reason=matched_dialogue_candidate(f'dc-{len(candidates)+1:04d}',f'A. Listen and Check {n}','A. Listen and Check',1,et,kt,eref,kref,n);candidates.append(row)
+  if reason: unmatched.append({'candidateId':row['candidateId'],'field':'dialogueCandidates','reason':reason,'sourceRefs':[eref,kref]})
+ for pn,section,heading in ((2,'C. Listen Up',r'C\.\s*Listen Up'),(3,'Real-Life Communication',r'Real-Life Communication')):
+  lines=pages.get(pn,[]); marker=next((i for i,x in enumerate(lines) if '우리말 해석' in x),None)
+  if marker is None: en_block=lines;ko_block=[];koff=0
+  else: en_block=lines[:marker];ko_block=lines[marker+1:];koff=marker+1
+  et=dialogue_turns(en_block,0);kt=dialogue_turns(ko_block,koff)
+  anchor=next((i for i,x in enumerate(lines) if re.search(heading,x,re.I)),0)
+  title=re.sub(r'^\s*[◗▌\s]+|\s*[┃|].*$','',lines[anchor]).strip() if lines else section
+  eref=candidate_ref('01',pn,section,'EN',min((x['startLine'] for x in et),default=anchor+1),max((x['endLine'] for x in et),default=marker or len(lines)))
+  kref=candidate_ref('01',pn,section,'KO',min((x['startLine'] for x in kt),default=koff+1),max((x['endLine'] for x in kt),default=len(lines)))
+  row,reason=matched_dialogue_candidate(f'dc-{len(candidates)+1:04d}',title,section,pn,et,kt,eref,kref);candidates.append(row)
+  if reason: unmatched.append({'candidateId':row['candidateId'],'field':'dialogueCandidates','reason':reason,'sourceRefs':[eref,kref]})
+ line_count=sum(len(x['lines']) for x in candidates);summary={'matched':sum(bool(x['lines']) for x in candidates),'unmatched':sum(not bool(x['lines']) for x in candidates),'lines':line_count}
+ return candidates,unmatched,summary
+def extract_functions(src,dialogues):
+ p=next((x for x in src['pages'] if x['page']==1),None);lines=p['text'].splitlines() if p else [];unmatched=[];out=[]
+ start=next((i for i,x in enumerate(lines) if re.search(r'Functions\b',x,re.I)),None)
+ end=next((i for i in range((start or 0)+1,len(lines)) if re.search(r'Topic\s+\d|A\.\s*Listen and Check',lines[i],re.I)),len(lines)) if start is not None else len(lines)
+ bullets=[(i,re.sub(r'^\s*•\s*','',lines[i]).strip()) for i in range((start or 0)+1,end) if re.match(r'^\s*•\s*\S',lines[i])]
+ annotations=[(i,line) for i,line in enumerate(lines[:start or 0]) if '↳' in line]
+ for j,(idx,title) in enumerate(bullets):
+  stop=bullets[j+1][0] if j+1<len(bullets) else end
+  example=norm(' '.join(lines[idx+1:stop]));direct=[]
+  for ai,line in annotations:
+   labels=[norm(x) for x in re.findall(r'\(([^()]*)\)',line)]
+   if any(compare_text(x)==compare_text(title) for x in labels): direct.append((ai,line))
+  explain='';direct_patterns=[]
+  for ai,line in direct:
+   quoted=[x.strip() for x in re.findall(r'[‘’](.*?)[‘’]',line) if re.search(r'[\uac00-\ud7a3]',x)]
+   if quoted and not explain: explain=quoted[-1]
+   direct_patterns.extend([x for x in annotation_pattern_segments(line)])
+  pattern_options=[]
+  if explain:
+   for ai,line in annotations:
+    quoted=[x.strip() for x in re.findall(r'[‘’](.*?)[‘’]',line)]
+    if any(compare_text(q)==compare_text(explain) for q in quoted):
+     pattern_options.extend((x,ai) for x in annotation_pattern_segments(line))
+  if not pattern_options: pattern_options=[(x,ai) for ai,_ in direct for x in annotation_pattern_segments(_)]
+  best_pattern,blank=find_pattern_blank(pattern_options,example)
+  if not best_pattern: best_pattern=direct_patterns[0] if direct_patterns else ''
+  pair=[]
+  for d in dialogues:
+   for ln in d['lines']:
+    if norm(ln['en'])==example and ln['ko'].strip(): pair.append((ln,d))
+  refs=[candidate_ref('01',1,'Functions',None,idx+1,stop)]
+  refs.extend(candidate_ref('01',1,'function-annotation',None,ai+1,ai+1) for ai,_ in direct)
+  if len(pair)==1:
+   matched_line,dialogue=pair[0];example_ko=matched_line['ko']
+   ref_match=next((r for r in dialogue['sourceRefs'] if r.get('side')=='EN'),None)
+   if ref_match: refs.append(ref_match)
+   ref_match=next((r for r in dialogue['sourceRefs'] if r.get('side')=='KO'),None)
+   if ref_match: refs.append(ref_match)
+  else: example_ko=''
+  cid=f'fc-{len(out)+1:04d}';flags=['REVIEW_REQUIRED']
+  if len(pair)!=1: flags.append('FUNCTION_EXAMPLE_UNPAIRED')
+  row={'candidateId':cid,'id':cid.replace('fc-','fn-'),'name':title,'pattern':best_pattern,'explainKo':explain,'exampleEn':example,'exampleKo':example_ko,'sourceRefs':refs,'reviewFlags':flags};out.append(row)
+  if len(pair)!=1 or not best_pattern or not explain: unmatched.append({'candidateId':cid,'field':'functionCandidates','reason':'FUNCTION_EXAMPLE_OR_ANNOTATION_UNRESOLVED','sourceRefs':refs})
+ key_candidates=[]
+ for i,row in enumerate(out):
+  phrase_blank=find_pattern_blank([(row['pattern'],0)],row['exampleEn'])[1]
+  if row['exampleEn'] and row['exampleKo'] and phrase_blank and re.search(r'(?<![A-Za-z])'+re.escape(phrase_blank)+r'(?![A-Za-z])',row['exampleEn'],re.I):
+   refs=list(row['sourceRefs']);key_candidates.append({'candidateId':f'kc-{i+1:04d}','en':row['exampleEn'],'ko':row['exampleKo'],'blankAnswer':phrase_blank,'sourceRefs':refs,'reviewFlags':['REVIEW_REQUIRED']})
+  else:
+   unmatched.append({'candidateId':row['candidateId'],'field':'keyExpressionCandidates','reason':'BLANK_ANSWER_OR_EXACT_PAIR_UNRESOLVED','sourceRefs':row['sourceRefs']})
+ return out,key_candidates,unmatched,{'matched':len(out)-sum(x['field']=='functionCandidates' for x in unmatched),'unmatched':sum(x['field']=='functionCandidates' for x in unmatched)}, {'matched':len(key_candidates),'unmatched':sum(x['field']=='keyExpressionCandidates' for x in unmatched)}
+def annotation_pattern_segments(line):
+ pieces=re.split(r'[‘’]',line);out=[]
+ for piece in pieces:
+  value=norm(piece.replace('↳','').strip(' =:'))
+  if re.search(r'[A-Za-z]',value): out.append(value)
+ return out
+def find_pattern_blank(pattern_options,example):
+ choices=[]
+ for pattern,idx in pattern_options:
+  phrase=re.split(r'[+~]',pattern,maxsplit=1)[0].strip()
+  words=re.findall(r"[A-Za-z]+(?:['’][A-Za-z]+)?",phrase)
+  for start in range(len(words)):
+   suffix=' '.join(words[start:])
+   hit=re.search(r'(?<![A-Za-z])'+re.escape(suffix)+r'(?![A-Za-z])',example,re.I)
+   if hit: choices.append((len(words)-start,len(hit.group()),pattern,hit.group()))
+ if not choices:return '',None
+ best=max(x[:2] for x in choices);matches=[x for x in choices if x[:2]==best]
+ if len({(x[2],x[3].casefold()) for x in matches})!=1:return '',None
+ return matches[0][2],matches[0][3]
+def numbered_dot_items(text,limit=4):
+ marks=[(m.start(),int(m.group(1)),m.end()) for m in re.finditer(r'(?<!\d)([1-9])\.\s*',text) if int(m.group(1))<=limit]
+ out={}
+ for j,(start,n,end) in enumerate(marks):
+  stop=marks[j+1][0] if j+1<len(marks) else len(text)
+  out.setdefault(n,[]).append(norm(text[end:stop]))
+ return out
+def parse_answers(value):
+ value=norm(value)
+ m=re.fullmatch(r'(.+?)\s*\[([^\]]+)\]',value)
+ if m:return [norm(m.group(1)),norm(m.group(2))]
+ return [value] if value else []
+def parse_pattern_examples(lines,page_no):
+ text='\n'.join(lines);mark=re.search(r'▼\s*교과서\s*예문',text)
+ if not mark:return [],[]
+ after=text[mark.end():];stop=re.search(r'(?m)^\s*(?:[A-B]\.\s|Let.s\s+Use\s+It)',after,re.I)
+ region=after[:stop.start()] if stop else after
+ blocks=[x for x in re.split(r'•',region) if x.strip()]
+ pairs=[];issues=[]
+ for index,block in enumerate(blocks,1):
+  origin='교과서 본문' if '교과서 본문' in block else '워크북 예문';clean=block.replace('교과서 본문','')
+  first=re.search(r'[\uac00-\ud7a3]',clean)
+  if not first:
+   issues.append((index,'PATTERN_EXAMPLE_PAIR_MISMATCH'));continue
+  en=norm(clean[:first.start()]);ko=norm(clean[first.start():])
+  if en and ko:pairs.append({'en':en,'ko':ko,'origin':origin})
+  else:issues.append((index,'PATTERN_EXAMPLE_PAIR_MISMATCH'))
+ return pairs,issues
+def extract_pattern_candidate(src,page_no):
+ page=next((x for x in src['pages'] if x['page']==page_no),None);lines=page['text'].splitlines() if page else [];text='\n'.join(lines)
+ h=next((i for i,line in enumerate(lines) if (m:=re.search(r'Pattern\s*([12])',line,re.I))),None)
+ if h is None:return None,[{'field':'patternCandidates','reason':'PATTERN_HEADER_NOT_FOUND'}]
+ pattern_no=int(re.search(r'Pattern\s*([12])',lines[h],re.I).group(1));title=norm(lines[0])
+ marker=re.search(r'▼\s*교과서\s*예문',text);concept=''
+ if marker:
+  prefix=text[:marker.start()];head_pos=next(m.start() for m in re.finditer(r'Pattern\s*'+str(pattern_no),prefix,re.I));concept=norm(prefix[head_pos+len(re.search(r'Pattern\s*'+str(pattern_no),prefix,re.I).group(0)):].split('\n',1)[-1])
+ concept=norm(re.sub(r'^\|+|\|+$','',concept))
+ points=[norm(x) for x in re.split(r'(?<=[.!?])\s+',concept) if norm(x)] or ([concept] if concept else [])
+ examples,exissues=parse_pattern_examples(lines,page_no);unmatched=[]
+ for index,reason in exissues: unmatched.append({'candidateId':f'pc-{pattern_no:02d}','field':'textbookExamples','reason':reason,'sourceRefs':[candidate_ref('07',page_no,'textbook-examples',line_start=1,line_end=len(lines))],'pairIndex':index})
+ marker1=re.search(r'Let.s\s+Use\s+It',text,re.I); translation=re.search(r'우리말\s*해석',text)
+ translation_line_start=text.rfind('\n',0,translation.start())+1 if translation else len(text)
+ qtext=text[marker1.end():translation_line_start] if marker1 and translation else ''
+ en_items=numbered_dot_items(qtext,4)
+ marker2=re.search(r'Let.s\s+Use\s+It',text[translation.end():],re.I) if translation else None
+ ko_region=text[translation.end()+marker2.end():] if translation and marker2 else ''
+ ansmark=re.search(r'❙\s*정답\s*❙',ko_region)
+ ko_text=ko_region[:ansmark.start()] if ansmark else ko_region
+ ans_text=ko_region[ansmark.end():] if ansmark else ''
+ ko_items=numbered_dot_items(ko_text,4);answer_items=numbered_dot_items(ans_text,4)
+ global_bank=[];uses=[]
+ last_question=en_items.get(4,[])
+ if len(last_question)==1 and not re.search(r'\s*\([^()]*/[^()]*\)\s*$',last_question[0]):
+  tail_bank=re.search(r'(?<=[.!?])\s+([A-Za-z][A-Za-z0-9\'’\-]*(?:\s+[A-Za-z][A-Za-z0-9\'’\-]*)*)\s*$',last_question[0])
+  if tail_bank: global_bank=[norm(x) for x in tail_bank.group(1).split() if norm(x)]
+ for no in range(1,5):
+  qrows=en_items.get(no,[]);krows=ko_items.get(no,[]);arows=answer_items.get(no,[])
+  q=qrows[0] if len(qrows)==1 else '';ko=krows[0] if len(krows)==1 else '';answer=arows[0] if len(arows)==1 else ''
+  bank=[];inline=re.search(r'\s*\(([^()]*/[^()]*)\)\s*$',q)
+  if inline:
+   bank=[norm(x) for x in inline.group(1).split('/') if norm(x)];q=norm(q[:inline.start()])
+  elif no==4:
+   m=re.search(r'(?<=[.!?])\s+([A-Za-z][A-Za-z0-9\'’\-]*(?:\s+[A-Za-z][A-Za-z0-9\'’\-]*)*)\s*$',q)
+   if m:
+    global_bank=[norm(x) for x in m.group(1).split() if norm(x)];q=norm(q[:m.start()])
+  if not bank:bank=list(global_bank)
+  if q and ko and answer and bank:
+   uses.append({'no':no,'stem':q,'ko':ko,'wordBank':bank,'answers':parse_answers(answer)})
+  else:
+   refs=[candidate_ref('07',page_no,'lets-use-it-prompt',side='EN',question_no=no),candidate_ref('07',page_no,'lets-use-it-answer',side='KO',question_no=no)]
+   unmatched.append({'candidateId':f'pc-{pattern_no:02d}','field':'letsUseIt','reason':'COUNT_MISMATCH_OR_SOURCE_MISSING','sourceRefs':refs,'expectedQuestionNo':no})
+ refs=[candidate_ref('07',page_no,'pattern-title-concept',line_start=1,line_end=(h+1 if h is not None else 1)),candidate_ref('07',page_no,'textbook-examples',line_start=1,line_end=len(lines)),candidate_ref('07',page_no,'lets-use-it',line_start=1,line_end=len(lines))]
+ row={'candidateId':f'pc-{pattern_no:02d}','patternNo':pattern_no,'title':title,'conceptKo':concept,'grammarPoint':points,'textbookExamples':examples,'letsUseIt':uses,'sourceRefs':refs,'reviewFlags':['REVIEW_REQUIRED']+(['PAIRING_UNRESOLVED'] if unmatched else [])}
+ if not concept:unmatched.append({'candidateId':row['candidateId'],'field':'patternCandidates','reason':'PATTERN_CONCEPT_UNRESOLVED','sourceRefs':[refs[0]]})
+ return row,unmatched
+def extract_pattern_candidates(src):
+ rows=[];unmatched=[]
+ for page_no in (1,9):
+  row,issues=extract_pattern_candidate(src,page_no)
+  if row:rows.append(row)
+  for issue in issues:
+   if 'sourceRefs' not in issue:issue['sourceRefs']=[candidate_ref('07',page_no,'pattern-page')]
+   unmatched.append(issue)
+ return rows,unmatched,{'matched':len(rows)-sum(x['candidateId'] in {u['candidateId'] for u in unmatched} for x in rows),'unmatched':len({u['candidateId'] for u in unmatched}),'examples':sum(len(x['textbookExamples']) for x in rows),'letsUseIt':sum(len(x['letsUseIt']) for x in rows)}
+def extract_candidate_sets(src01,src07):
+ dialogues,du,ds=extract_dialogue_candidates(src01); functions,keyexpressions,fu,fs,ks=extract_functions(src01,dialogues);patterns,pu,ps=extract_pattern_candidates(src07)
+ summary={'dialogues':ds,'functions':fs,'keyExpressions':ks,'patterns':ps}
+ return dialogues,functions,keyexpressions,patterns,du+fu+pu,summary
 def attach_unmatched(row, field, reason, refs, **details):
  row['unmatchedEnrichment'].append({'field':field,'reason':reason,'sourceRefs':refs,**details})
  row['reviewFlags'].append(field.upper()+'_UNMATCHED')
@@ -243,8 +464,10 @@ def main():
    if n in (1,11,20): e=re.sub(r'(?i)^(monday|tuesday|wednesday)\s*,?\s*august\s+(1|2|3)\b[,:]?\s*','',e).strip()
    sent.append({'candidateId':f'sc-{n:04d}','seq':n,'en':e,'ko':k,'passageTitle':a.passage_title_en,'passageTitleEn':a.passage_title_en,'passageTitleKo':a.passage_title_ko,'dayHeaderEn':header,'dayHeaderKo':header_ko,'dayGroup':('8/1' if n<11 else '8/2' if n<20 else '8/3'),'chunks':[],'verbForms':[],'grammarChoices':[],'tokens':[],'writingKeywords':[],'sourceRefs':[page_ref(ep,'workbook-4',n),page_ref(kp,'workbook-4-answer',n)],'reviewFlags':['REVIEW_REQUIRED','PLAIN_TEXT_NO_COORDINATES']+([] if e else ['EN_UNRESOLVED'])+([] if k else ['KO_UNRESOLVED'])})
   enrichment_summary=enrich_sentences(sent,srcs['02'])
-  unmatched=[{'candidateId':row['candidateId'],'field':item['field'],'sourceRefs':item['sourceRefs'],'reason':item['reason'],**{key:value for key,value in item.items() if key not in ('field','sourceRefs','reason')}} for row in sent for item in row['unmatchedEnrichment']]
-  draft={'kind':'naesin-folder-review-draft','version':1,'status':'needs-review','publishable':False,'rights':{k:rights[k] for k in ['basis','holder','evidenceRef','studentUseAllowed','derivativeUseAllowed','externalAiAllowed','notes']},'revision':'2022','wordSeedUsed':seed_used,'sourceDocuments':docs,'wordCandidates':wr,'sentenceCandidates':sent,'unmatched':unmatched,'enrichmentSummary':enrichment_summary,'reviewFlags':['REVIEW_REQUIRED','PLAIN_TEXT_NO_COORDINATES','NO_EXTERNAL_AI']+(['UNMATCHED_ENRICHMENT_REVIEW'] if unmatched else [])+([] if a.passage_title_en and a.passage_title_ko else ['PASSAGE_TITLE_REVIEW'])}
+  dialogues,functions,key_expressions,patterns,structure_unmatched,structure_summary=extract_candidate_sets(srcs['01'],srcs['07'])
+  enrichment_summary.update(structure_summary)
+  unmatched=[{'candidateId':row['candidateId'],'field':item['field'],'sourceRefs':item['sourceRefs'],'reason':item['reason'],**{key:value for key,value in item.items() if key not in ('field','sourceRefs','reason')}} for row in sent for item in row['unmatchedEnrichment']]+structure_unmatched
+  draft={'kind':'naesin-folder-review-draft','version':1,'status':'needs-review','publishable':False,'rights':{k:rights[k] for k in ['basis','holder','evidenceRef','studentUseAllowed','derivativeUseAllowed','externalAiAllowed','notes']},'revision':'2022','wordSeedUsed':seed_used,'sourceDocuments':docs,'wordCandidates':wr,'sentenceCandidates':sent,'dialogueCandidates':dialogues,'functionCandidates':functions,'keyExpressionCandidates':key_expressions,'patternCandidates':patterns,'unmatched':unmatched,'enrichmentSummary':enrichment_summary,'reviewFlags':['REVIEW_REQUIRED','PLAIN_TEXT_NO_COORDINATES','NO_EXTERNAL_AI']+(['UNMATCHED_ENRICHMENT_REVIEW'] if unmatched else [])+([] if a.passage_title_en and a.passage_title_ko else ['PASSAGE_TITLE_REVIEW'])}
   out.parent.mkdir(parents=True,exist_ok=True); out.mkdir(mode=0o700,exist_ok=False)
   target=out/'review-draft.json'
   with target.open('x',encoding='utf-8') as f: json.dump(draft,f,ensure_ascii=False,indent=2); f.write('\n')
