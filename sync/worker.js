@@ -5,6 +5,7 @@ import { handleScheduledParentFeedbackStatusRefresh } from './parent-feedback-se
 import { handleScheduledSessionPackAttendance } from './session-pack.js';
 import { handleScheduledTuitionAlerts } from './tuition-alert.js';
 import { applyTestStaffNextDayAttendance } from './test-staff-attendance.js';
+import { dispatchTaskPush } from './task-push.js';
 
 const BOOK_ORDER_CRON = '0 11 * * *';
 const BOOK_ORDER_STATUS_CRON = '*/10 * * * *';
@@ -44,6 +45,7 @@ export default {
   },
 
   async scheduled(controller, env, ctx) {
+    ctx.waitUntil(dispatchTaskPush(env, controller.scheduledTime).catch(() => {}));
     if (controller.cron === BOOK_ORDER_STATUS_CRON) {
       ctx.waitUntil(Promise.all([
         handleScheduledBookOrderStatusRefresh(env, controller.scheduledTime),
