@@ -5,6 +5,8 @@ const assert = require('assert');
 const C = require('./pack-check.js');
 const sample = require('./pack-sample.json');
 const dict = require('./concepts.json');
+const GEN = require('./gen.js');
+const G = require('./grade.js');
 
 let passed = 0;
 function t(name, fn) { fn(); passed += 1; console.log('  ✓ ' + name); }
@@ -18,6 +20,25 @@ t('체험 팩은 오류·경고 없이 통과한다', () => {
   const r = C.checkPack(sample, { concepts: dict });
   assert.strictEqual(r.ok, true, r.errors.join(' / '));
   assert.deepStrictEqual(r.warns, []);
+});
+
+t('기말 체험의 새 정본은 적용·복원·서술형 학습이 성립한다', () => {
+  const works = sample.works.slice(2);
+  assert.strictEqual(works.length, 4);
+  assert.strictEqual(works.filter((w) => w.kind === 'poem').length, 2);
+  assert.strictEqual(works.filter((w) => w.kind === 'novel').length, 2);
+  works.forEach((w) => {
+    assert.strictEqual(w.hasCanon, true, w.title);
+    assert.strictEqual(GEN.applySet(w, dict.concepts, 6, () => 0.37).length, 6, w.title + ' 적용');
+    assert.ok(GEN.restoreTargets(w).length > 0, w.title + ' 복원');
+    const essays = sample.items.filter((it) => it.format === 'essay' && it.workId === w.workId);
+    assert.strictEqual(essays.length, 1, w.title + ' 서술형');
+    essays.forEach((it) => {
+      it.modelAnswers.forEach((answer) => {
+        assert.strictEqual(G.gradeRubric(answer, it).verdict, 'pass', it.id + ' 모범답안');
+      });
+    });
+  });
 });
 
 t('packId 형식을 지킨다', () => {
@@ -48,7 +69,7 @@ t('같은 핵심어 빈칸 중복은 병합 경고(§2.2-2)', () => {
 });
 
 t('정본 보유 작품에 빈칸이 없으면 오류 — 2·4단계가 성립하지 않는다', () => {
-  const p = clone(sample); p.works[0].blanks = []; p.counts.blanks = 0;
+  const p = clone(sample); p.counts.blanks -= p.works[0].blanks.length; p.works[0].blanks = [];
   assert.ok(hasErr(C.checkPack(p), 'blanks가 없어요'));
 });
 
@@ -128,8 +149,8 @@ t('assemble은 분리 파일을 하나로 합치고 counts를 다시 센다', ()
   const meta = { packId: 'x-y-z', publisher: '체험' };
   const w1 = { work: clone(sample.works[0]) };
   const w2 = { work: clone(sample.works[1]) };
-  const sets = { sets: clone(sample.sets) };
-  const items = { items: clone(sample.items) };
+  const sets = { sets: clone(sample.sets.slice(0, 2)) };
+  const items = { items: clone(sample.items.slice(0, 5)) };
   const { pack } = C.assemble([
     { name: 'meta.json', json: meta }, { name: 'w1.json', json: w1 },
     { name: 'w2.json', json: w2 }, { name: 'sets.json', json: sets }, { name: 'items.json', json: items }
@@ -145,8 +166,8 @@ t('assemble 결과도 같은 규칙으로 검증된다', () => {
     { name: 'meta.json', json: { packId: sample.packId, source: sample.source, revision: '데모', publisher: '체험', grade: '중2', unit: '0. 체험 단원' } },
     { name: 'w1.json', json: { work: clone(sample.works[0]) } },
     { name: 'w2.json', json: { work: clone(sample.works[1]) } },
-    { name: 'sets.json', json: { sets: clone(sample.sets) } },
-    { name: 'items.json', json: { items: clone(sample.items) } }
+    { name: 'sets.json', json: { sets: clone(sample.sets.slice(0, 2)) } },
+    { name: 'items.json', json: { items: clone(sample.items.slice(0, 5)) } }
   ]);
   const r = C.checkPack(pack, { concepts: dict });
   assert.strictEqual(r.ok, true, r.errors.join(' / '));
