@@ -1059,7 +1059,8 @@ const server = http.createServer(async (req, res) => {
   } catch (e) {
     /* readBody 의 상한 초과는 서버 오류가 아니다 — 413 으로 답하고 남은 몸통은 흘려보낸다 */
     if (e && e.status === 413) { req.resume(); return json(res, 413, { error: '요청이 너무 커서 받을 수 없어요.' }); }
-    json(res, 500, { error: '서버 오류', detail: String(e.message || e) });
+    /* 파싱 예외에는 요청·저장 원문이 섞일 수 있어 응답에 싣지 않는다. */
+    json(res, 500, { error: '서버 오류' });
   }
 });
 
