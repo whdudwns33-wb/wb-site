@@ -47,10 +47,6 @@ function addDays(date, amount) {
   return value.toISOString().slice(0, 10);
 }
 
-function dowOf(date) {
-  return new Date(date + 'T12:00:00Z').getUTCDay();
-}
-
 test('MetaMath keeps the consult identity and adds a worksheet request beside its learning link', () => {
   assert.match(html, /const LS_KEY = 'wb_consult_v1'/);
   assert.match(html, /const SYNC_APP = 'consult'/);
@@ -64,17 +60,34 @@ test('MetaMath keeps the consult identity and adds a worksheet request beside it
   assert.match(functionSource('metamathRequestPanel'), /metamathRequestCard\(req, false\)/);
 });
 
-test('the processing date is the coming Wednesday on Monday or Tuesday and next Wednesday from Wednesday', () => {
-  const source = functionSource('nextMetamathRequestWednesday');
-  const nextWednesday = Function('addDays', 'dowOf', source + '\nreturn nextMetamathRequestWednesday;')(addDays, dowOf);
+test('the processing date follows the daily 6 PM Korea cutoff including weekends', () => {
+  const source = functionSource('metamathRequestProcessingDate');
+  const processingDate = Function('addDays', source + '\nreturn metamathRequestProcessingDate;')(addDays);
   const cases = [
-    ['2026-08-31', '2026-09-02'], // Monday
-    ['2026-09-01', '2026-09-02'], // Tuesday
-    ['2026-09-02', '2026-09-09'], // Wednesday
-    ['2026-09-03', '2026-09-09'], // Thursday
-    ['2026-09-06', '2026-09-09']  // Sunday
+    ['2026-10-14T08:59:59.000Z', '2026-10-14'], // 17:59:59 KST
+    ['2026-10-14T09:00:00.000Z', '2026-10-15'], // 18:00:00 KST
+    ['2026-10-14T14:59:59.000Z', '2026-10-15'], // 23:59:59 KST
+    ['2026-10-14T15:00:00.000Z', '2026-10-15'], // next day 00:00 KST
+    ['2026-10-16T09:00:00.000Z', '2026-10-17']  // Friday 18:00 KST → Saturday
   ];
-  for (const [date, expected] of cases) assert.equal(nextWednesday(date), expected, date);
+  for (const [timestamp, expected] of cases) {
+    assert.equal(processingDate(Date.parse(timestamp)), expected, timestamp);
+  }
+});
+
+test('student and director guidance consistently explains the daily 6 PM request cycle', () => {
+  const panel = functionSource('metamathRequestPanel');
+  const modal = functionSource('metamathRequestModal');
+  const inbox = functionSource('metamathRequestInbox');
+  const staleWeeklyCopy = /화요일까지|가까운 수요일|다음 수요일|매주 수요일|수요일 제작 대기|수요일 메타수학|같은 수요일/;
+
+  assert.match(panel, /매일 오후 6시/);
+  assert.match(panel, /오후 6시 전에 접수하면 당일/);
+  assert.match(panel, /오후 6시부터 접수하면 다음 날/);
+  assert.match(modal, /매일 오후 6시/);
+  assert.match(inbox, /매일 오후 6시/);
+  assert.match(html, /메타수학 문제지 요청은 매일 오후 6시에 확인합니다/);
+  assert.doesNotMatch(html, staleWeeklyCopy);
 });
 
 test('worksheet requests and director responses are separate student-scoped task rows', () => {
@@ -95,7 +108,9 @@ test('worksheet requests and director responses are separate student-scoped task
   assert.match(save, /kind:\s*'metamath_request'/);
   assert.match(save, /staffId:\s*me\.id/);
   assert.match(save, /origin:\s*'staff'/);
-  assert.match(save, /processingDate:\s*nextMetamathRequestWednesday\(today\(\)\)/);
+  assert.match(save, /const processingDate = metamathRequestProcessingDate\(now\(\)\)/);
+  assert.match(save, /processingDate:\s*processingDate/);
+  assert.match(save, /start:\s*processingDate/);
   assert.doesNotMatch(save, /kind:\s*'metamath_response'|origin:\s*'admin'/);
 });
 
