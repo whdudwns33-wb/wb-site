@@ -459,16 +459,15 @@ def question_markers(source,p1,p2,lo,hi,pattern_no=None):
   if not lo<=no<=hi: continue
   line_start=text.rfind('\n',0,m.start())+1
   inline=m.start()>line_start and text[line_start:m.start()].strip()!=''
-  missing08stem=source.get('id')=='08' and pattern_no==2 and no==55
+  missing08stem=source.get('id')=='08' and pattern_no==2 and no==55 and inline
   if inline and source.get('id')!='09' and not missing08stem and not (source.get('id') in ('05s','05t') and no==8 and re.match(r'\s*(?:위\s*대화|다음\s*대화)',text[m.end():m.end()+80])): continue
   # A numbered item must own an unparenthesized n) footnote before the next n. marker.
   if not re.search(r'(?<![\d(])'+str(no)+r'\)',text[m.end():next_pos]): continue
   line=exam_line_at(rows,offsets,m.start())
   marker={'no':no,'start':m.start(),'end':m.end(),'page':line['page'],'line':line['line'],'patternNo':pattern_no}
   boundaries.append(marker)
-  # The extracted 08 Pattern 2 text has a 55. inline inside #54's final option. Keep
-  # it as a segment delimiter, but do not turn it into an item candidate.
-  if source.get('id')=='08' and pattern_no==2 and no==55: continue
+  # A known inline 55. is a delimiter; a recovered standalone 55. must remain reviewable.
+  if missing08stem: continue
   accepted.append(marker)
  ordered=sorted(boundaries,key=lambda item:item['start'])
  for mark in accepted:
