@@ -3,6 +3,8 @@
    정본: 국어 기획서 §9.2 라우트·§8 저장 예산·§10-4 접근 통제 */
 import assert from 'node:assert';
 import { handleNaesinKo, naesinKoSummary, naesinKoBodyLimit } from './naesin-ko-api.mjs';
+import E from '../naesin-ko/engine.js';
+import RD from '../naesin-ko/readiness.js';
 
 let passed = 0;
 const t = async (name, fn) => { await fn(); passed += 1; console.log('  ✓ ' + name); };
@@ -131,7 +133,7 @@ await t('시험 프로파일은 범위를 벗어나면 null로 떨군다', async
 await t('요약은 state와 별도 키에 저장되고, overview는 요약만 읽는다(§8 저장 예산)', async () => {
   const s = memStore();
   await call(s, { path: '/api/naesin-ko/state', method: 'PUT',
-    getBody: async () => ({ state: { v: 1, big: 'x'.repeat(1000) }, summary: { works: 3, complete: 1 } }) });
+    getBody: async () => ({ state: { v: 1, packs: {}, big: 'x'.repeat(1000) }, summary: { works: 3, complete: 1 } }) });
   assert.ok(s._raw.states['st-1'], 'state 저장');
   assert.deepStrictEqual(s._raw.summaries['st-1'].summary, { works: 3, complete: 1 });
   const ov = await call(s, { path: '/api/naesin-ko/admin/overview', method: 'GET', who: ADMIN });
@@ -143,7 +145,8 @@ await t('요약은 state와 별도 키에 저장되고, overview는 요약만 �
 await t('state가 256KB를 넘으면 413 — 조용히 실패하지 않는다', async () => {
   const s = memStore();
   const r = await call(s, { path: '/api/naesin-ko/state', method: 'PUT',
-    getBody: async () => ({ state: { v: 1, blob: 'x'.repeat(300000) } }) });
+    getBody: async () => ({ state: { v: 1, packs: { 'dummy-ko-u1': { log:
+      Array.from({ length: 6000 }, () => ({ kind: 'paper', workId: 'w-1', at: 1, coverage: 0.5 })) } } } }) });
   assert.strictEqual(r.status, 413);
   assert.ok(!s._raw.states['st-1'], '거절된 기록은 저장되지 않는다');
 });
@@ -503,6 +506,123 @@ const dirtyState = () => ({
   },
 });
 const stemsIn = (o) => JSON.stringify(o).includes(STEM);
+
+function progressState() {
+  const now = Date.UTC(2026, 9, 14);
+  const workId = 'w-작품-' + '가'.repeat(70);
+  const vocab = E.createState('v-어휘', 'vocab', now);
+  E.recordQuiz(vocab, { correct: false, confidence: 'sure' }, now);
+  E.recordCriterion(vocab, { correct: true, confidence: 'sure' }, now + 86400000);
+  const diagnostic = E.createState('진단', 'blank', now);
+  E.applyDiagnostic({ 'b-진단': diagnostic }, [{ key: 'b-진단', known: true }], now);
+  const work = E.createState('w-' + workId, 'work', now);
+  E.recordApply(work, true, now); E.recordApply(work, false, now);
+  work.stage = 5; work.essayDone = true; work.wrongClearDates = ['2026-10-12', '2026-10-14'];
+  return { v: 1, savedAt: now + 1, packs: { 'dummy-ko-u1': {
+    states: { 'v-어휘': vocab, 'b-진단': diagnostic, ['w-' + workId]: work }, diagDone: true,
+    wrong: { ['rt-' + workId]: { key: 'rt-' + workId, n: 2, cleared: true,
+      dates: ['2026-10-12', '2026-10-14'], workId, kind: 'composition', mark: '2번째', no: '7' },
+    'legacy-item': { key: 'legacy-item', n: 1, cleared: false, dates: [] } },
+    essays: { '서술형': { verdict: 'hold', score: 0.5, total: 1.5, at: now } },
+    dump: Array.from({ length: 201 }, () => ({ workId, at: now, present: 2, total: 3 })),
+    log: Array.from({ length: 250 }, () => ({ kind: 'paper', workId, at: now, coverage: 2 / 3 })),
+    mistakes: { negative: 1, bogi: 2, concept: 3, guess: 4 },
+  } } };
+}
+function progressSummary(st) {
+  const p = st.packs['dummy-ko-u1'];
+  const pack = { works: [{ workId: Object.values(p.states).find(x => x.kind === 'work').id.slice(2),
+    vocab: [{ id: '어휘' }], blanks: [{ id: '진단' }] }] };
+  const rd = RD.readiness(pack, p.states, { dday: -2, wrongOpen: 1 });
+  const w = E.workSummary(p.states);
+  return { packId: 'dummy-ko-u1', works: w.total, complete: w.complete, restored: w.restored,
+    applied: w.applied, byStage: w.byStage,
+    vocabReached: 1, vocabStable: 0, vocabTotal: 1, blankReached: 1, blankStable: 0, blankTotal: 1,
+    wrongOpen: 1, essayPass: 0, essayHold: 1,
+    ready: { score: rd.score, grade: rd.grade, weak: rd.weak,
+      axes: Object.fromEntries(rd.parts.filter(x => x.weight > 0).map(x => [x.key, Math.round(x.rate * 100)])),
+      alert: rd.alert, pace: rd.pace, untouched: rd.totals.untouched }, lastAt: '2026-10-14T00:00:00.000Z' };
+}
+
+await t('실제 엔진 진도·진단·소수 배점·긴 한글 좌표·전체 기록은 왕복해도 같다', async () => {
+  const s = memStore(), state = progressState(), summary = progressSummary(state);
+  const r = await call(s, { method: 'PUT', getBody: async () => ({ state, summary }) });
+  assert.strictEqual(r.status, 200);
+  assert.deepStrictEqual((await call(s)).body.state, state);
+  assert.deepStrictEqual(s._raw.summaries['st-1'].summary, summary);
+  assert.deepStrictEqual(naesinKoSummary('st-1', {}, await s.getSummary('st-1')).summary, summary);
+});
+
+await t('모든 state·summary 층의 허용 밖 필드를 제거하고 입력·저장 원본은 고치지 않는다', async () => {
+  const s = memStore(), state = progressState(), summary = progressSummary(state);
+  const expectedState = structuredClone(state), expectedSummary = structuredClone(summary);
+  function inject(o) {
+    if (!o || typeof o !== 'object') return;
+    Object.values(o).forEach(inject);
+    if (!Array.isArray(o)) o.text = STEM;
+  }
+  // 맵의 키는 좌표이므로 레코드 층에만 본문을 붙인다.
+  for (const o of [state, state.packs['dummy-ko-u1'], ...Object.values(state.packs['dummy-ko-u1'].states),
+    ...Object.values(state.packs['dummy-ko-u1'].wrong), ...Object.values(state.packs['dummy-ko-u1'].essays),
+    ...state.packs['dummy-ko-u1'].dump, ...state.packs['dummy-ko-u1'].log, state.packs['dummy-ko-u1'].mistakes]) o.text = STEM;
+  inject(summary);
+  const input = structuredClone({ state, summary });
+  assert.strictEqual((await call(s, { method: 'PUT', getBody: async () => ({ state, summary }) })).status, 200);
+  assert.deepStrictEqual({ state, summary }, input);
+  assert.deepStrictEqual(s._raw.states['st-1'].state, expectedState);
+  assert.deepStrictEqual(s._raw.summaries['st-1'].summary, expectedSummary);
+  s._raw.states['st-1'].state = state; s._raw.summaries['st-1'].summary = summary;
+  assert.deepStrictEqual((await call(s)).body.state, expectedState);
+  assert.deepStrictEqual(naesinKoSummary('st-1', {}, await s.getSummary('st-1')).summary, expectedSummary);
+  assert.deepStrictEqual({ state: s._raw.states['st-1'].state, summary: s._raw.summaries['st-1'].summary }, input);
+});
+
+await t('잘못된 알려진 필드는 400 — state·summary 기존 기록을 둘 다 보존한다', async () => {
+  const s = memStore();
+  const good = { state: dirtyState(), summary: { works: 3, complete: 1 } };
+  assert.strictEqual((await call(s, { method: 'PUT', getBody: async () => good })).status, 200);
+  const before = structuredClone(s._raw);
+  for (const bad of [
+    { state: [] }, { state: { v: 2, packs: {} } }, { state: { v: 1, packs: [] } },
+    { state: { v: 1, packs: {}, savedAt: -1 } },
+    { state: { v: 1, packs: { 'dummy-ko-u1': { states: { 'b-1': { kind: 'blank', due: '내일' } } } } } },
+    { state: { v: 1, packs: { 'dummy-ko-u1': { wrong: { x: { n: 1, dates: ['본문'] } } } } } },
+    { state: { v: 1, packs: { 'dummy-ko-u1': { log: [{ kind: 'paper', coverage: 2 }] } } } },
+    { state: JSON.parse('{"v":1,"packs":{"dummy-ko-u1":{"essays":{"__proto__":{"verdict":"pass"}}}}}') },
+    { state: good.state, summary: { complete: '<img src=x onerror=alert(1)>' } },
+    { state: good.state, summary: { ready: { score: 101 } } },
+    { state: good.state, summary: { ready: { axes: { read: 'HTML' } } } },
+  ]) {
+    const r = await call(s, { method: 'PUT', getBody: async () => bad });
+    assert.strictEqual(r.status, 400, JSON.stringify(bad));
+    assert.deepStrictEqual(s._raw, before, '거절 전에 기록을 덮어썼다');
+  }
+  s._raw.states['st-1'].state = { v: 2, packs: {} };
+  const original = structuredClone(s._raw.states['st-1']);
+  assert.strictEqual((await call(s)).status, 409);
+  assert.deepStrictEqual(s._raw.states['st-1'], original);
+  assert.ok(!('summary' in naesinKoSummary('st-1', {}, { summary: { complete: 'HTML' } })));
+});
+
+await t('학생 기록 크기는 UTF-8 바이트로 잰다 — 한글도 256KB 상한을 지킨다', async () => {
+  const s = memStore();
+  const state = { v: 1, packs: { 'dummy-ko-u1': { wrong: { x: { key: '가'.repeat(90000), n: 1 } } } } };
+  assert.ok(JSON.stringify(state).length < 262144);
+  assert.strictEqual((await call(s, { method: 'PUT', getBody: async () => ({ state }) })).status, 413);
+  assert.ok(!s._raw.states['st-1']);
+});
+
+await t('빈 기록·부분 요약·null은 호환되고 큰 요약 거절은 state도 덮어쓰지 않는다', async () => {
+  const s = memStore(), state = { v: 1, packs: { none: {} }, savedAt: 0 };
+  for (const summary of [null, { packId: null, ready: null }, { works: 3, complete: 1 }]) {
+    assert.strictEqual((await call(s, { method: 'PUT', getBody: async () => ({ state, summary }) })).status, 200);
+  }
+  const before = structuredClone(s._raw);
+  const summary = { ready: { alert: { level: 'watch', why: '가'.repeat(3000) } } };
+  assert.ok(JSON.stringify(summary).length < 8192);
+  assert.strictEqual((await call(s, { method: 'PUT', getBody: async () => ({ state: dirtyState(), summary }) })).status, 413);
+  assert.deepStrictEqual(s._raw, before);
+});
 
 await t('학생이 올린 발문은 저장되지 않는다 — 좌표는 남는다', async () => {
   const s = memStore();

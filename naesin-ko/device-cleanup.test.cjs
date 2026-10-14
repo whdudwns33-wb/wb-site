@@ -30,7 +30,7 @@ function setup() {
       return Promise.resolve({ status: 200, json() { return Promise.resolve({}); } });
     }
   };
-  vm.runInNewContext(script.replace(/  boot\(\);\s*\}\)\(\);/, 'summary = function () { return {}; };\nglobalThis.app = { S, selectPack, backupState, persist, push, flush, loadPack, online };\n})();'), env);
+  vm.runInNewContext(script.replace(/  boot\(\);\s*\}\)\(\);/, 'summary = function () { return {}; };\nrender = function () { globalThis.redraws = (globalThis.redraws || 0) + 1; };\nglobalThis.app = { S, selectPack, backupState, persist, push, flush, loadPack, online };\n})();'), env);
   env.app.S.data = { v: 1, packs: { old: { states: { progress: 3 } } }, savedAt: 10 };
   env.app.S.packId = 'old';
   env.app.S.backupSavedAt = 10;
@@ -62,6 +62,50 @@ function setup() {
   await t.app.online();
   assert.equal(t.app.backupState().packs.remote.states.progress, 7, '기기 기록이 더 최신이어도 다른 단원의 서버 진도는 보존한다');
   assert.equal(JSON.parse(t.storage.get('wbk.v1')).packs.remote.states.progress, 7, '백업 미확인 상태에서는 원본을 기기에 유지한다');
+
+  t = setup();
+  t.app.S.token = 'synthetic-test-token'; t.app.persist(); t.app.selectPack('new');
+  const local = t.storage.get('wbk.v1');
+  t.app.S.session = { kind: 'blank' };
+  t.nodes.get('wrap').innerHTML = '진행 중 문제와 입력';
+  t.env.fetch = function () { return Promise.resolve({ status: 400, json() { return Promise.resolve({ error: '형식 오류 — 기록 보존' }); } }); };
+  await t.app.push();
+  assert.equal(t.nodes.get('backupNotice').textContent, '형식 오류 — 기록 보존', '학습 세션에서도 저장 거절이 바로 보여야 한다');
+  assert.equal(t.nodes.get('backupNotice').hidden, false);
+  assert.equal(t.env.redraws || 0, 0, '오류를 알리면서 문제·입력 화면을 다시 그리지 않는다');
+  assert.equal(t.nodes.get('wrap').innerHTML, '진행 중 문제와 입력');
+  assert.equal(t.app.S.backupSavedAt, 10);
+  assert.equal(t.storage.get('wbk.v1'), local);
+  t.env.fetch = function () { return Promise.resolve({ status: 200, json() { return Promise.resolve({}); } }); };
+  await t.app.push();
+  assert.equal(t.nodes.get('backupNotice').hidden, true, '실제 백업 성공 뒤에만 저장 오류 안내를 해제한다');
+
+  t = setup();
+  t.app.S.token = 'synthetic-test-token'; t.app.persist();
+  const original = t.storage.get('wbk.v1');
+  let resolveSave;
+  t.env.fetch = function (url, opts) {
+    t.calls.push({ url, opts });
+    if (opts && opts.method === 'PUT') return new Promise(resolve => { resolveSave = resolve; });
+    const status = url.endsWith('/state') ? 409 : 200;
+    return Promise.resolve({ status, json() { return Promise.resolve(status === 409 ? { error: '서버 백업 확인' } : {}); } });
+  };
+  const oldSave = t.app.push();
+  await t.app.online();
+  assert.equal(t.app.S.backupBlocked, true);
+  assert.equal(t.nodes.get('backupNotice').textContent, '서버 백업 확인');
+  assert.equal(t.nodes.get('backupNotice').hidden, false);
+  resolveSave({ status: 200, json() { return Promise.resolve({}); } });
+  await oldSave;
+  assert.equal(t.app.S.backupSavedAt, 10, '늦은 저장 성공 응답도 백업 확인 대기를 풀거나 기기 원본을 줄이지 않는다');
+  assert.equal(t.nodes.get('backupNotice').textContent, '서버 백업 확인');
+  t.app.S.demo = false; // 늦게 도착한 팩도 백업 보류를 풀 수 없다.
+  await t.app.push(); t.app.flush(); await t.nodes.get('clearDevice').onclick();
+  assert.equal(t.calls.filter(c => c.opts && c.opts.method === 'PUT').length, 1, '409를 확인한 뒤에는 추가로 서버 원본을 덮어쓰지 않는다');
+  assert.equal(t.storage.get('wbk.v1'), original, '서버 확인 전 유일한 기기 진도를 지웠다');
+  assert.equal(t.storage.get('wbr.auth'), 'other-app-login');
+  assert.ok(t.calls.some(c => c.alert));
+  assert.ok(!t.calls.some(c => c.redirect));
 
   t = setup();
   t.env.confirm = function () { return false; };
