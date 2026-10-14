@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { stampServiceWorker } from './sw-version.mjs';
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url));
 const APP = path.join(ROOT, '..', 'reading');
@@ -164,14 +165,8 @@ fs.copyFileSync(path.join(LETTER, 'drills.js'), path.join(DIST, 'admin', 'drills
    VERSION 으로 박는다. 파일이 한 글자라도 바뀌면 캐시 이름이 달라지고,
    안 바뀌면 그대로다. 잊을 수가 없다. */
 function stampSW(swPath, shellPaths, prefix) {
-  const src = fs.readFileSync(swPath, 'utf8');
-  const h = crypto.createHash('sha256');
-  for (const f of shellPaths.slice().sort()) h.update(fs.readFileSync(f));
-  h.update(src);                                   /* sw.js 자신도 포함 */
-  const tag = prefix + '-' + h.digest('hex').slice(0, 10);
-  const out = src.replace(/const VERSION = '[^']*';/, `const VERSION = '${tag}';`);
-  if (out === src) throw new Error(`${swPath}: VERSION 을 못 바꿨습니다 — sw.js 의 선언 형태가 바뀌었나 봅니다`);
-  fs.writeFileSync(swPath, out);
+  const { tag, source } = stampServiceWorker(swPath, shellPaths, prefix);
+  fs.writeFileSync(swPath, source);
   return tag;
 }
 const rTag = stampSW(path.join(DIST, 'sw.js'),

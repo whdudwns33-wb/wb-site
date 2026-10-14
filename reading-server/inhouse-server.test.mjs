@@ -9,6 +9,7 @@ import path from 'node:path';
 import { request } from 'node:http';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { stampServiceWorker } from './sw-version.mjs';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
 const tempRoot = fs.realpathSync(os.tmpdir());
@@ -65,7 +66,7 @@ async function req(p, { token = studentToken, headers = {}, method = 'GET', body
       response.on('end', () => {
         let json = null;
         try { json = JSON.parse(text); } catch { /* 정적 HTML·JS도 같은 입구로 읽는다. */ }
-        resolve({ status: response.statusCode, text, json });
+        resolve({ status: response.statusCode, text, json, headers: response.headers });
       });
     });
     send.on('error', reject);
@@ -87,6 +88,22 @@ try {
     await sleep(50);
   }
   assert.ok(ready, '원내 서버가 제한 시간 내 기동하지 않았다: ' + stderr);
+
+  await t('PC 영어 서비스 워커는 현재 셸 내용으로 버전을 응답하며 원본과 다른 앱은 변경하지 않는다', async () => {
+    const app = path.join(DIR, '..', 'naesin'), sw = path.join(app, 'sw.js'), original = fs.readFileSync(sw, 'utf8');
+    const shell = ['index.html', 'engine.js', 'grade.js', 'gen.js', 'pack-sample.json', 'manifest.webmanifest', 'icon.svg'].map(file => path.join(app, file));
+    const expected = stampServiceWorker(sw, shell.concat(path.join(DIR, '..', 'shared', 'voice.js')), 'wbn-shell');
+    for (const headers of [{}, outside]) {
+      const response = await req('/naesin/sw.js', { token: null, headers });
+      assert.equal(response.status, 200); assert.equal(response.headers['cache-control'], 'no-store');
+      assert.match(response.headers['content-type'], /javascript/);
+      assert.equal(response.text, expected.source); assert.match(expected.tag, /^wbn-shell-[a-f0-9]{10}$/);
+      assert.ok(!response.text.includes("const VERSION = 'wbn-shell-dev';"));
+    }
+    assert.equal(fs.readFileSync(sw, 'utf8'), original);
+    const vocab = await req('/vocab/sw.js', { token: null });
+    assert.equal(vocab.status, 200); assert.equal(vocab.text, fs.readFileSync(path.join(DIR, '..', 'vocab', 'sw.js'), 'utf8'));
+  });
 
   await t('로컬 학생은 시험·자체 창작 팩을 인증 후 학습한다', async () => {
     const health = (await req('/api/health', { token: null })).json;
