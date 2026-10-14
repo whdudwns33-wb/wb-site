@@ -47,6 +47,18 @@ const roster = [
 ];
 
 (async () => {
+  await t('학습용 반 배정은 날짜·단어 마감 없이 저장하고 미정으로 표시한다', async () => {
+    const ui = screen(roster);
+    ui.renderExamForm();
+    ui.node('#exMode').value = 'practice'; ui.node('#exMode').onchange();
+    assert.equal(ui.node('#exDate').disabled, true); assert.equal(ui.node('#exWdd').disabled, true);
+    ui.node('#exScope').value = 'cls:가반'; ui.node('#exDate').value = '2027-01-01'; ui.node('#exWdd').value = '7';
+    await ui.saveExam();
+    const body = JSON.parse(ui.requests.find(r => r.method === 'POST').body);
+    assert.equal(body.mode, 'practice'); assert.equal(body.examDate, ''); assert.ok(!Object.hasOwn(body, 'wordDeadlineDays'));
+    assert.match(ui.node('#examList').innerHTML, /미정/); assert.match(ui.node('#examList').innerHTML, /마감 없음/);
+    ui.node('#exMode').value = 'exam'; ui.node('#exMode').onchange(); assert.equal(ui.node('#exDate').disabled, false);
+  });
   await t('명부의 반만 선택지로 만들고 정규화·중복 제거·이스케이프한다', () => {
     const ui = screen([...roster, { code: 'ST5', cls: '<img src=x onerror=alert(1)>' }, { code: 'ST6', cls: '잘못\n반' }]);
     ui.renderExamForm();

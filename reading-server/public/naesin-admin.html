@@ -550,9 +550,10 @@ function renderExamForm(){
   const roster=(ROSTER.length?ROSTER:(OV&&Array.isArray(OV.students)?OV.students:[])).filter(s=>s&&s.code).slice()
     .sort((a,b)=>String(a.cls||'').localeCompare(String(b.cls||''),'ko')||String(a.name||'').localeCompare(String(b.name||''),'ko'));
   const classes=[...new Set(roster.map(s=>COV&&COV.classScope(s.cls)).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ko'));
-  $('#examArea').innerHTML=`<div class="card"><h2>시험 등록</h2>
-    <p class="muted">시험일과 범위(팩)를 등록하면 해당 학생 앱이 <b>시험 모드</b>(D-day 플랜·단어 선행 게이트)로 바뀝니다. 학생 앱은 첫 번째 팩을 엽니다. <b>학생 개별 → 반 배정 → 전체 공통</b> 순서로 적용하고, 학생·반 배정은 시험일이 지나면 다음 배정을 따라요.</p>
+  $('#examArea').innerHTML=`<div class="card"><h2>학습·시험 배정</h2>
+    <p class="muted">시험일이 미정이면 <b>학습용</b>을 선택하세요. 마감 없이 배정한 자료로 학습합니다. 시험 대비는 D-day 플랜·단어 선행 게이트를 적용합니다. <b>학생 개별 → 반 배정 → 전체 공통</b> 순서로 적용하고, 시험 대비 배정은 시험일이 지나면 다음 배정을 따라요. 같은 대상에 저장하면 기존 배정을 바꿉니다.</p>
     <div class="grid-form">
+      <label>배정 방식<br><select id="exMode"><option value="exam">시험 대비</option><option value="practice">학습용 · 시험일 미정</option></select></label>
       <label>대상<br><select id="exScope"><option value="default">전체 공통 (기본)</option>
         ${classes.length?'<optgroup label="반 배정">'+classes.map(scope=>`<option value="${esc(scope)}">${esc(scopeLabel(scope))}</option>`).join('')+'</optgroup>':''}
         <optgroup label="학생 개별 배정">${roster.map(s=>`<option value="${esc(s.code)}">${esc(s.name||s.code)} (${esc(s.cls||'-')})</option>`).join('')}</optgroup>
@@ -562,13 +563,14 @@ function renderExamForm(){
       <label>단어 마감 (시험 D-n)<br><input type="number" id="exWdd" min="${WDD_MIN}" max="${WDD_MAX}" value="${WDD_DEFAULT}" style="width:90px"></label>
       <div style="grid-column:span 2"><span class="muted">시험 범위 팩</span><br><span id="exPacks">
         ${PACKS.length?PACKS.map(id=>`<label class="ck"><input type="checkbox" value="${esc(id)}">${esc(id)}</label>`).join(''):'<span class="muted">먼저 팩을 업로드하세요</span>'}</span></div>
-      <button class="btn" id="btnExam" ${PACKS.length?'':'disabled'}>시험 등록</button>
+      <button class="btn" id="btnExam" ${PACKS.length?'':'disabled'}>배정 저장</button>
     </div>
-    <div id="examOut"></div>
+    <div id="examOut" role="status" aria-live="polite"></div>
     <h3>현재 배정 현황</h3>
     <div id="examList"></div>
   </div>`;
   $('#exScope').onchange=()=>{const w=$('#exCodeWrap');w.hidden=$('#exScope').value!=='__code';if(!w.hidden)$('#exCode').focus();};
+  $('#exMode').onchange=()=>{const practice=$('#exMode').value==='practice';$('#exDate').disabled=practice;$('#exWdd').disabled=practice;};
   $('#btnExam').onclick=saveExam;
 }
 async function loadExams(){
@@ -580,7 +582,7 @@ async function loadExams(){
 function renderExamList(){
   const el=$('#examList');if(!el)return;
   if(EXAMS===null){el.innerHTML='<p class="muted">배정 현황을 불러오지 못했어요 (서버가 목록 조회를 지원하지 않거나 일시 오류) — 새로고침으로 다시 시도하세요.</p>';return;}
-  if(!EXAMS.length){el.innerHTML='<p class="muted">등록된 시험이 없어요.</p>';return;}
+  if(!EXAMS.length){el.innerHTML='<p class="muted">등록된 배정이 없어요.</p>';return;}
   const today=EXAMS.today||kstToday();
   const rows=EXAMS.filter(ex=>ex&&typeof ex==='object').slice()
     .sort((a,b)=>(a.scope==='default'?-1:b.scope==='default'?1:scopeLabel(a.scope).localeCompare(scopeLabel(b.scope),'ko')));
@@ -589,14 +591,14 @@ function renderExamList(){
       const dd=daysUntil(ex.examDate,today);
       /* 만료된 학생·반 배정은 다음 배정으로 내려가고, 전체 공통은 자율 복습 범위로 남는다. */
       const expired=ex.expired===true||(dd!=null&&dd<0);
-      const ddTag=dd==null?'<span class="tag muted">?</span>':expired?`<span class="tag bad">만료 (${-dd}일 지남)</span>`:dd===0?'<span class="tag warn">오늘</span>':`<span class="tag">D-${dd}</span>`;
+      const ddTag=ex.mode==='practice'?'<span class="tag">학습용</span>':dd==null?'<span class="tag muted">?</span>':expired?`<span class="tag bad">만료 (${-dd}일 지남)</span>`:dd===0?'<span class="tag warn">오늘</span>':`<span class="tag">D-${dd}</span>`;
       const wdd=num(ex.wordDeadlineDays);
       const packs=Array.isArray(ex.packIds)?ex.packIds:[];
       const note=ex.scope==='default'?'':String(ex.scope).startsWith('cls:')?(expired?'만료되어 전체 공통을 따름':'학생 개별 다음 · 전체 공통보다 우선'):(expired?'만료되어 반 배정 → 전체 공통을 따름':'반 배정·전체 공통보다 우선');
       return `<tr class="${expired?'expired':''}" data-scope="${esc(ex.scope)}"><td><b>${esc(scopeLabel(ex.scope))}</b>${note?'<br><span class="muted">'+esc(note)+'</span>':''}</td>
-        <td>${esc(ex.examDate)}</td><td>${ddTag}</td>
+        <td>${ex.mode==='practice'?'미정':esc(ex.examDate)}</td><td>${ddTag}</td>
         <td style="white-space:normal">${packs.map(id=>`<span class="tag muted">${esc(id)}</span>`).join(' ')||'—'}</td>
-        <td>D-${wdd==null?WDD_DEFAULT+' <span class="muted">(기본)</span>':wdd}</td>
+        <td>${ex.mode==='practice'?'마감 없음':'D-'+(wdd==null?WDD_DEFAULT+' <span class="muted">(기본)</span>':wdd)}</td>
         <td class="muted">${fmtLast(ex.updatedAt)}</td>
         <td><button class="btn sm danger" data-unassign="${esc(ex.scope)}">해제</button></td></tr>`;}).join('')}
   </tbody></table></div>`;
@@ -606,16 +608,18 @@ async function saveExam(){
   const out=h=>{$('#examOut').innerHTML=h;};
   const sel=$('#exScope').value;
   const scope=sel==='__code'?$('#exCode').value.trim():sel;
-  const examDate=$('#exDate').value;
+  const practice=$('#exMode').value==='practice';
+  const examDate=practice?'':$('#exDate').value;
   const packIds=[...document.querySelectorAll('#exPacks input:checked')].map(i=>i.value);
   const wddRaw=$('#exWdd').value.trim();
   const isClass=scope.startsWith('cls:');
   if(isClass&&(!COV||COV.classScope(scope.slice(4))!==scope))return out('<p class="err">반 이름을 확인하고 다시 선택하세요.</p>');
   if(scope!=='default'&&!isClass&&!CODE_RE.test(scope))return out('<p class="err">학생 코드는 영문/숫자/하이픈 3~20자예요.</p>');
-  if(!examDate)return out('<p class="err">시험일을 선택하세요.</p>');
+  if(!practice&&!examDate)return out('<p class="err">시험일을 선택하거나 학습용 배정을 선택하세요.</p>');
   if(!packIds.length)return out('<p class="err">시험 범위 팩을 하나 이상 선택하세요.</p>');
   const body={scope,examDate,packIds};
-  if(wddRaw){
+  if(practice)body.mode='practice';
+  if(!practice&&wddRaw){
     const w=Number(wddRaw);
     if(!Number.isInteger(w)||w<WDD_MIN||w>WDD_MAX)return out(`<p class="err">단어 마감은 시험 ${WDD_MIN}~${WDD_MAX}일 전 사이로 정하세요.</p>`);
     body.wordDeadlineDays=w;
@@ -627,7 +631,7 @@ async function saveExam(){
     const j=await api('/naesin/admin/exam',{method:'POST',body:JSON.stringify(body)});
     await loadExams();renderExamList();
     const ex=j.exam||{};
-    out(`<div class="issues ok">등록 완료 — ${esc(scopeLabel(j.scope))} · ${esc(ex.examDate)} · [${(Array.isArray(ex.packIds)?ex.packIds:[]).map(esc).join(', ')}] · 단어 마감 D-${num(ex.wordDeadlineDays)??WDD_DEFAULT}${dd!=null&&dd<0?' · <b>지난 날짜</b>':''}</div>`);
+    out(`<div class="issues ok">등록 완료 — ${esc(scopeLabel(j.scope))} · ${practice?'학습용 · 시험일 미정':esc(ex.examDate)} · [${(Array.isArray(ex.packIds)?ex.packIds:[]).map(esc).join(', ')}]${practice?' · 마감 없음':' · 단어 마감 D-'+(num(ex.wordDeadlineDays)??WDD_DEFAULT)}${dd!=null&&dd<0?' · <b>지난 날짜</b>':''}</div>`);
   }catch(e){if(isAuth(e))return;out('<p class="err">'+esc(e.message)+'</p>');}
 }
 async function deleteExam(scope){
