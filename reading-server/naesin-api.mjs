@@ -268,7 +268,7 @@ export async function naesinNightDueFor(store, code, now) {
    팩 서빙 제한(GET /pack)도 같은 해석을 써야 화면과 서버가 같은 교재를 가리킨다. */
 export async function resolveExam(store, code, now) {
   const today = todayKst(now);
-  const live = (rec) => isObj(rec) && !(typeof rec.examDate === 'string' && rec.examDate < today);
+  const live = (rec) => isObj(rec) && (rec.mode === 'practice' || !(typeof rec.examDate === 'string' && rec.examDate < today));
   if (typeof code === 'string' && CODE_RE.test(code)) {
     const mine = await store.getExam(code);
     if (live(mine)) return { exam: mine, scope: 'student' };
@@ -317,9 +317,10 @@ async function assignedProjector(store, code, projector, now) {
    expired·name 은 계약 밖의 편의 필드(관리 웹이 만료 표시·이름 표시에 쓴다). */
 function examRow(scope, rec, stu, today) {
   const row = { scope, examDate: rec.examDate || '', packIds: Array.isArray(rec.packIds) ? rec.packIds : [] };
+  if (rec.mode === 'practice') row.mode = 'practice';
   if (rec.wordDeadlineDays != null) row.wordDeadlineDays = rec.wordDeadlineDays;
   row.updatedAt = rec.updatedAt || null;
-  row.expired = typeof rec.examDate === 'string' && rec.examDate < today;
+  row.expired = rec.mode !== 'practice' && typeof rec.examDate === 'string' && rec.examDate < today;
   row.name = scope === 'default' ? '' : ((stu && stu.name) || '');
   if (scope.startsWith('cls:')) row.cls = scope.slice(4);
   return row;
@@ -738,7 +739,9 @@ export async function handleNaesin(ctx) {
     if (!scope) return j(400, { error: "scope는 'default', 'cls:<반 이름>' 또는 학생 코드 (반 이름은 1~80자)" });
     if (scope !== 'default' && !scope.startsWith('cls:') && !(await store.getStudent(scope))) return j(404, { error: '등록되지 않은 학생 코드예요.' });
     const examDate = String(b.examDate || '').trim();
-    if (!isValidDate(examDate)) return j(400, { error: 'examDate는 실제 날짜(YYYY-MM-DD)' });
+    if (b.mode !== undefined && b.mode !== 'practice' && b.mode !== 'exam') return j(400, { error: 'mode는 exam 또는 practice' });
+    const practice = b.mode === 'practice';
+    if (practice ? !!examDate : !isValidDate(examDate)) return j(400, { error: practice ? '학습용 배정은 시험일을 비워 주세요.' : 'examDate는 실제 날짜(YYYY-MM-DD)' });
     const packIds = Array.isArray(b.packIds) ? b.packIds.map((x) => String(x || '').trim()) : [];
     if (!packIds.length || packIds.length > EXAM_PACKS_MAX) return j(400, { error: 'packIds 필요 (1~' + EXAM_PACKS_MAX + '개)' });
     for (const pid of packIds) {
@@ -746,7 +749,9 @@ export async function handleNaesin(ctx) {
       if (!(await store.getPack(pid))) return j(400, { error: '없는 팩이에요: ' + pid });
     }
     const rec = { examDate, packIds, updatedAt: nowIso() };
+    if (practice) rec.mode = 'practice';
     /* 단어 초회 도달 마감(시험 D-n). 비우면 필드를 생략해 클라이언트 기본값(7)을 따른다. */
+    if (practice && b.wordDeadlineDays != null && b.wordDeadlineDays !== '') return j(400, { error: '학습용 배정에는 단어 마감을 정하지 않아요.' });
     if (b.wordDeadlineDays != null && b.wordDeadlineDays !== '') {
       const w = Number(b.wordDeadlineDays);
       if (!Number.isInteger(w) || w < WORD_DEADLINE_MIN || w > WORD_DEADLINE_MAX)

@@ -53,6 +53,7 @@ function screen() {
   });
   const exportUi = `
   globalThis.ui={boot,api,checkAccount,checkAccess,stopStudy,clearPackCache,migrateLegacy,pullAdopt,pushState,persist,save,openDemo,renderItem,storedToRunner,storedItemKey,itemRefOf,wrongRetryItems,gradeItem,normalizeStoredAnswer,recoverStateStamps,loadDB,quizTypes,renderQuiz,runTask,mockItems,
+    serverExam:value=>{examServer=value;applyServerExamAll();},effectiveExam:exam,
     ttsOptions,wireTtsBtn,wireChunkWork,wireDialogueWork,wireSentenceWork,openPack,renderHeader,demoNotice,bootError,
     projector:(scope,pj)=>{liveScope=scope;liveState={projector:pj};pjApply(pj);},
     projectile:()=>({pjPick,pjSent,pjSeen}),
@@ -75,6 +76,17 @@ function screen() {
 }
 
 (async () => {
+  await t('학습용 배정은 지난 로컬 시험일·오버라이드를 지우고 학습 기록을 보존한다', () => {
+    const ui = screen(); ui.setup({code:'own-student',token:'own-token'}, sample);
+    const pd = ui.get().DB.packs[sample.packId];
+    pd.exam={examDate:'2027-01-01'};pd.examOverride='practice';pd.examOverrideFor='2027-01-01';
+    const states=JSON.stringify(pd.states);
+    ui.serverExam({mode:'practice',examDate:'',packIds:[sample.packId]});
+    assert.equal(ui.effectiveExam(sample.packId),null);assert.equal(JSON.stringify(pd.states),states);
+    assert.ok(!Object.hasOwn(pd,'examOverride'));
+    ui.serverExam({examDate:'2027-02-01',packIds:[sample.packId]});
+    assert.equal(ui.effectiveExam(sample.packId).examDate,'2027-02-01');
+  });
   await t('철자 오답은 교정 대기에서 일반 다음을 숨기고, 복수 정답 채점·IME Enter·접근성 레이블을 유지한다', async () => {
     const start = inline.indexOf("if (!ok && item.type === 'spell')");
     const end = inline.indexOf("var nb = document.createElement('div');", start);

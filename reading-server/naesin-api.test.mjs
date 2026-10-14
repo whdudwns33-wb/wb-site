@@ -63,6 +63,8 @@ const NOW = Date.now();
 const kstDay = (off) => todayKst(NOW + off * 86400e3);
 const YESTERDAY = kstDay(-1), TOMORROW = kstDay(1), TODAY = kstDay(0);
 
+
+
 /* 시드는 자체 제작 더미다 — 기획서 §9.3: 교과서·이그잼포유 문구를 테스트에 쓰지 않는다 */
 const PACK = {
   packId: 'dummy-e2-mid1',
@@ -80,6 +82,29 @@ async function seedAssigned(store, ids = ['dummy-e2-mid1'], scope = 'default', e
     getBody: async () => ({ scope, examDate, packIds: ids }) });
   assert.strictEqual(r.status, 200, '시드 배정 실패: ' + JSON.stringify(r.body));
 }
+
+await t('시험일 미정 학습용 반 배정 — 기존 폴백·팩 접근·입력 검증 유지', async () => {
+  const store = memStore();
+  await seedAssigned(store, ['own-practice']);
+  const set = b => call(store, { path: '/api/naesin/admin/exam', method: 'POST', who: ADMIN, getBody: async () => b });
+  const b = { scope: 'cls:중2 A반', mode: 'practice', examDate: '', packIds: ['own-practice'] };
+  assert.equal((await set(b)).status, 200);
+  store.putExam('default', { examDate: TOMORROW, packIds: ['common'] });
+  store.putExam('st-1', { examDate: YESTERDAY, packIds: ['old'] });
+  const resolved = await resolveExam(store, 'st-1', NOW);
+  assert.equal(resolved.scope, 'class');
+  assert.equal(resolved.exam.mode, 'practice');
+  const list = await call(store, { path: '/api/naesin/admin/exams', who: ADMIN });
+  const row = list.body.exams.find(r => r.scope === b.scope);
+  assert.equal(row.expired, false); assert.equal(row.mode, 'practice'); assert.equal(row.examDate, '');
+  assert.equal((await call(store, { path: '/api/naesin/pack', query: new URLSearchParams('id=own-practice') })).status, 200);
+  store.putExam('st-1', { examDate: TOMORROW, packIds: ['individual'] });
+  assert.equal((await resolveExam(store, 'st-1', NOW)).scope, 'student');
+  for (const patch of [{ mode: undefined }, { mode: 'other' }, { examDate: TOMORROW }, { wordDeadlineDays: 7 }, { packIds: ['missing'] }])
+    assert.equal((await set({ ...b, ...patch })).status, 400);
+  store.deleteExam('st-1'); store.deleteExam(b.scope);
+  assert.equal((await resolveExam(store, 'st-1', NOW)).scope, 'default');
+});
 
 await t('인증 없으면 401 — 팩·기록·시험 어느 것도 내용이 나가지 않는다(§10)', async () => {
   const store = memStore();

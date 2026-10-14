@@ -998,6 +998,11 @@
   /* 서버 시험 배정을 팩 기록에 반영 — 시험일이 바뀌었으면 학생의 자율 학습 오버라이드는 풀린다 */
   function applyServerExam(pid) {
     var ex = examServer;
+    if (ex && ex.mode === 'practice') {
+      var practiceDB = packDB(pid);
+      delete practiceDB.exam; delete practiceDB.examOverride; delete practiceDB.examOverrideFor;
+      return;
+    }
     if (!ex || !ex.examDate) return;
     var pd = packDB(pid);
     if (pd.examOverride && pd.examOverrideFor !== ex.examDate) { delete pd.examOverride; delete pd.examOverrideFor; }
