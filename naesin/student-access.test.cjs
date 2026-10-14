@@ -11,6 +11,7 @@ for (const match of inline.matchAll(/(?:ttsBtnHtml|wireTtsBtn)\([^;\n]*,\s*'([^'
 elementIds.add('storedShortIn');elementIds.add('subBtn');elementIds.add('nextBtn');
 const sample = require('./pack-sample.json');
 const clone = value => JSON.parse(JSON.stringify(value));
+const storedBase = () => { const item=clone(sample.items[0]);delete item.id;return item; };
 const account = { code: 'ST1', token: 'self-created-token-1', name: '체험 학생' };
 let passed = 0;
 const t = async (name, fn) => { await fn(); passed++; console.log('  ✓ ' + name); };
@@ -51,13 +52,14 @@ function screen() {
     fetch: async (url, opt) => { requests.push({ url, ...opt }); return fetchImpl(url, opt); },
   });
   const exportUi = `
-  globalThis.ui={boot,api,checkAccount,checkAccess,stopStudy,clearPackCache,migrateLegacy,pullAdopt,pushState,persist,save,openDemo,renderItem,storedToRunner,wrongRetryItems,gradeItem,normalizeStoredAnswer,recoverStateStamps,loadDB,
+  globalThis.ui={boot,api,checkAccount,checkAccess,stopStudy,clearPackCache,migrateLegacy,pullAdopt,pushState,persist,save,openDemo,renderItem,storedToRunner,storedItemKey,itemRefOf,wrongRetryItems,gradeItem,normalizeStoredAnswer,recoverStateStamps,loadDB,quizTypes,renderQuiz,runTask,mockItems,
     ttsOptions,wireTtsBtn,wireChunkWork,wireDialogueWork,wireSentenceWork,openPack,renderHeader,demoNotice,bootError,
     projector:(scope,pj)=>{liveScope=scope;liveState={projector:pj};pjApply(pj);},
     projectile:()=>({pjPick,pjSent,pjSeen}),
     addPack:(p,inRange)=>{PACKS[p.packId]=normPack(p);if(inRange)packList.push(p.packId);packDB(p.packId);},
     clock:now=>{Date.now=()=>now;},
-    get:()=>({pack,PACKS,DB,studyStopped,pendingRemote}),
+    get:()=>({pack,PACKS,DB,studyStopped,pendingRemote,quizSource,selType,RQ}),
+    quizSelection:(source,key)=>{quizSource=source;selType=key;view='quiz';},
     setup:(a,p)=>{sessionCode=a.code;sessionToken=a.token;KEY='wbn.v1:'+a.code;DB={v:1,owner:a.code,packs:{},savedAt:100};
       pack=normPack(p);PACKS={[p.packId]:pack};packList=[p.packId];authed=true;demoMode=false;ensureStatesAll();},
     demo:()=>{sessionCode=null;sessionToken=null;KEY='wbn.v1:demo';DB={v:1,packs:{},savedAt:0};authed=false;},
@@ -98,6 +100,111 @@ function screen() {
     const root={innerHTML:''};ui.renderItem(retry[0],root);assert.match(root.innerHTML,/id="storedShortIn"/);assert.match(root.innerHTML,/id="subBtn"/);assert.match(root.innerHTML,/The sky is blue/);
     const grades=[];ui.runner({opts:{},i:0,items:[retry[0],retry[0]],onGrade:(item,ok)=>{grades.push(ok);ui.gradeItem(item,ok,{},1700000001000,null);}});
     ui.node('storedShortIn').value='  A fully accepted answer  ';ui.node('subBtn').onclick();ui.node('nextBtn').onclick();assert.deepEqual(grades,[true]);assert.equal(ui.get().DB.packs[pack.packId].wrong['i-501'].cleared,false);
+  });
+
+  await t('저장 문제는 자료·객관/복수/주관을 분리하고 실제로 풀 수 있는 문항·해설 수만 보여 준다', () => {
+    const ui=screen(),pack=clone(sample),base=storedBase();
+    const make=(id,no,source,extra={})=>({...clone(base),id,no,source,footnoteNo:9,...extra});
+    pack.items=[make('own-pre',1,'04'),make('own-first',1,'05',{explanationKo:''}),
+      make('own-second',2,'06',{formatType:'mcq_multi',answer:['1','2'],answerCount:2}),
+      make('own-grammar',3,'08'),make('own-written',4,'09',{formatType:'short',choices:[],answer:['blue','azure'],answerCount:1,explanationKo:''}),
+      make('own-other',5,'자체 자료'),make('own-unrunnable',6,'04',{choices:[]})];
+    ui.setup(account,pack);
+    const byKey=()=>new Map(ui.quizTypes().map(type=>[type.key,type]));
+    assert.equal(byKey().get('i-mcq').make().length,4);assert.equal(byKey().get('i-multi').make().length,1);
+    assert.equal(byKey().get('i-short').make().length,1);assert.equal(byKey().get('i-short').make()[0].answerTexts.length,2,'주관식 허용 답 둘은 복수 선택 문제가 아니다');
+    assert.equal(byKey().get('i-mcq').desc,'4문항 · 해설 3문항');assert.equal(byKey().get('i-short').desc,'1문항');
+    const words=byKey().get('w-spell').make().length;
+    ui.quizSelection('','i-mcq');ui.renderQuiz();
+    assert.match(ui.node('wrap').innerHTML,/전체 자료 \(6문항\)/);assert.match(ui.node('wrap').innerHTML,/PRE-STEP \(1문항\)/);
+    assert.match(ui.node('wrap').innerHTML,/for="qSource"/);assert.match(ui.node('wrap').innerHTML,/min-height:44px/);
+    ui.node('qSource').value='09';ui.node('qSource').onchange();
+    assert.equal(ui.get().quizSource,'09');assert.equal(ui.get().selType,'i-short');assert.equal(byKey().has('i-mcq'),false);
+    ui.quizSelection('','w-e2k');ui.renderQuiz();ui.node('qSource').value='09';ui.node('qSource').onchange();
+    assert.equal(ui.get().selType,'i-short','문제 자료를 고르면 단어 메뉴에서 바로 해당 교재 문제로 이동한다');
+    assert.equal(byKey().get('w-spell').make().length,words,'자료 선택은 단어 문제를 좁히지 않는다');
+    assert.equal(ui.quizTypes(true).find(type=>type.key==='i-mcq').make().length,4);
+    ui.runTask({date:'2099-01-01',title:'자체 과제',typeKeys:['i-mcq']});
+    assert.equal(ui.get().RQ.items.length,4,'강사 배정은 화면의 자료 선택과 관계없이 전체 자료다');
+    assert.equal(ui.mockItems().filter(q=>q.stored).length,5,'모의 시험도 원래 범위 전체의 단일 정답 풀을 쓴다');
+    ui.renderOff();ui.openPack({...clone(sample),packId:'own-second-pack'},'own-second-pack');assert.equal(ui.get().quizSource,'');
+  });
+
+  await t('잘못된 옛 저장 문항은 유형·번호·정답 경계에서 제외하며 정상 문제 수에 넣지 않는다', () => {
+    const ui=screen(),base=storedBase();
+    const invalid=[{...clone(base),formatType:'unsupported'}, {...clone(base),no:0},
+      {...clone(base),answer:['1','1'],answerCount:2},
+      {...clone(base),formatType:'short',choices:[],answer:[123]},
+      {...clone(base),choices:[{label:' ',text:'Own answer'},{label:'2',text:'Another'}],answer:[' ']}];
+    assert.equal(ui.storedToRunner(invalid,invalid).length,0);
+    const valid={...clone(base),no:19};
+    assert.equal(ui.storedToRunner([valid], [valid]).length,1);
+  });
+
+  await t('동번호 저장 문항은 자료·섹션·각주별 오답과 신고를 구분하고 모호한 옛 i-no를 재시험으로 넘기지 않는다', () => {
+    const ui=screen(),pack=clone(sample),base=storedBase();
+    pack.items=[['04','연습',1],['05','연습',1],['05','다른 단락',1],['05','연습',2]].map(([source,section,footnoteNo])=>({...clone(base),no:7,source,section,footnoteNo}));
+    ui.setup(account,pack);const converted=ui.storedToRunner(pack.items),keys=converted.map(q=>q.itemKey);
+    assert.equal(converted.length,4);assert.equal(new Set(keys).size,4);assert.ok(keys.every(key=>key.startsWith('i:loc:')));
+    assert.equal(new Set(converted.map(ui.itemRefOf)).size,4);assert.ok(keys.every(key=>key.length<=2048));
+    ui.gradeItem(converted[1],false,{},1700000000000,null);
+    assert.deepEqual(Object.keys(ui.get().DB.packs[pack.packId].wrong),[keys[1]]);
+    assert.equal(ui.wrongRetryItems([keys[1]]).length,1);assert.equal(ui.wrongRetryItems([keys[1]])[0].stored.source,'05');
+    ui.get().DB.packs[pack.packId].wrong['i-7']={kind:'item',no:7,cleared:false};
+    assert.equal(ui.wrongRetryItems(['i-7']).length,0,'자료를 잃은 옛 기록을 동번호 문항에 임의 연결하지 않는다');
+    ui.gradeItem(converted[0],true,{},1700100000000,null);assert.equal(ui.get().DB.packs[pack.packId].wrong['i-7'].cleared,false);
+    const root={innerHTML:''};ui.renderItem(converted[0],root);assert.match(root.innerHTML,/PRE-STEP · 문항 1/);
+    const duplicate={...clone(pack.items[0])};assert.equal(ui.storedToRunner([pack.items[0],duplicate],[pack.items[0],duplicate]).length,0,'동일한 위치 중복도 임의로 고르지 않는다');
+    const namespaced=[{...clone(base),no:7,source:'04',section:'unit',footnoteNo:1},{...clone(base),no:7,source:'05',section:'unit',footnoteNo:1},{...clone(base),id:'loc:04:unit:7:1',no:99}];
+    assert.equal(new Set(ui.storedToRunner(namespaced,namespaced).map(q=>q.itemKey)).size,3,'새 id를 옛 위치 키 모양으로 지어도 같은 식별자가 되지 않는다');
+    const tooLong=pack.items.map(item=>({...item,section:'한'.repeat(230)}));
+    assert.equal(ui.storedToRunner(tooLong,tooLong).length,0,'상한을 넘은 옛 위치는 잘라서 식별하지 않는다');
+    const malformed=pack.items.map(item=>({...item,section:'\uD800'}));assert.equal(ui.storedToRunner(malformed,malformed).length,0);
+  });
+
+  await t('새 고정 id는 문항 연번이 바뀌어도 오답을 찾고 서로 다른 날 두 번만 해결하며 진짜 옛 팩 키는 보존한다', () => {
+    const ui=screen(),pack=clone(sample),base=storedBase(),day=1700000000000;
+    pack.items=[{...clone(base),id:'ic-04-00-001',no:1,source:'04',footnoteNo:1},{...clone(base),no:99}];
+    ui.setup(account,pack);const items=ui.storedToRunner(pack.items),key='i:id:ic-04-00-001';
+    assert.equal(items[0].itemKey,key);assert.equal(items[1].itemKey,'i-99');
+    ui.gradeItem(items[0],false,{},day,null);ui.gradeItem(items[1],false,{},day,null);
+    assert.equal(ui.wrongRetryItems(['i-99'])[0].no,99);assert.equal(ui.wrongRetryItems(['i-1']).length,0);
+    pack.items[0].no=27;assert.equal(ui.wrongRetryItems([key])[0].no,27);assert.equal(ui.itemRefOf(ui.wrongRetryItems([key])[0]),key);
+    ui.gradeItem(items[0],true,{},day+1000,null);ui.gradeItem(items[0],true,{},day+2000,null);
+    assert.equal(ui.get().DB.packs[pack.packId].wrong[key].cleared,false);
+    ui.gradeItem(items[0],true,{},day+86400000,null);assert.equal(ui.get().DB.packs[pack.packId].wrong[key].cleared,true);
+    ui.gradeItem(items[0],false,{},day+86401000,null);assert.equal(ui.get().DB.packs[pack.packId].wrong[key].cleared,false,'다시 오답이면 해결 날짜를 초기화한다');
+    for(const id of ['bad space','a'.repeat(61),'<script>'])assert.equal(ui.storedToRunner([{...clone(base),id}],[]).length,0);
+    const duplicate=pack.items.map(item=>({...item,id:'same-own-id'}));assert.equal(ui.storedToRunner(duplicate,duplicate).length,0);
+  });
+
+  await t('저장형 복수 선택은 정답 전부를 정확히 골라야 맞고 실제 오답 기록과 해설 표시를 유지한다', () => {
+    for(const picked of [['1'],['1','2'],['1','2','3']]){
+      const ui=screen(),pack=clone(sample),base=storedBase(),grades=[];
+      pack.items=[{...base,id:'own-multiple',source:'06',no:1,formatType:'mcq_multi',answer:['1','2'],answerCount:2,explanationKo:'자체 <설명>'}];
+      ui.setup(account,pack);const item=ui.storedToRunner(pack.items)[0];assert.ok(item);
+      ui.renderItem(item,ui.node('rBody'));ui.runner({opts:{},i:0,items:[item,item],onGrade:(q,ok)=>{grades.push(ok);ui.gradeItem(q,ok,{},1700000000000,null);}});
+      for(const key of picked)ui.node('chs').onclick({target:{closest:()=>({getAttribute:()=>key,classList:{add(){},remove(){}}})}});
+      ui.node('subBtn').onclick();const result=ui.node('rBody').querySelector('.q').children[0].innerHTML;
+      assert.ok(result.includes('자체 &lt;설명&gt;'));assert.ok(!result.includes('<설명>'));
+      ui.node('nextBtn').onclick();const correct=picked.length===2;assert.deepEqual(grades,[correct]);
+      assert.equal(Object.keys(ui.get().DB.packs[pack.packId].wrong).length,correct?0:1);
+    }
+  });
+
+  await t('기존 promptKo+stem과 주관식 복수 허용 답을 온전히 표시·채점하고 위험한 지문·해설은 이스케이프한다', () => {
+    const ui=screen(),pack=clone(sample),base=storedBase();
+    pack.items=[{...clone(base),no:10,id:'own-alias',instructionKo:'',promptKo:'Choose the word.',stem:'The sky is <blue>.',stimulus:{parts:[{text:'A self-created shared passage.'}]},explanationKo:'<script>own()</script>'},
+      {no:11,id:'own-short',formatType:'short',promptKo:'Write the colour.',stem:'The sky is _____.',choices:null,answer:['blue','azure'],answerCount:1}];
+    ui.setup(account,pack);const items=ui.storedToRunner(pack.items);assert.equal(items.length,2);
+    assert.match(items[0].prompt,/Choose the word\.\nThe sky is <blue>\.\nA self-created shared passage\./);assert.match(items[1].prompt,/Write the colour\.\nThe sky is _____\./);
+    const root=ui.node('rBody');ui.renderItem(items[0],root);assert.match(root.innerHTML,/&lt;blue&gt;/);assert.ok(!root.innerHTML.includes('<blue>'));
+    ui.runner({opts:{},i:0,items:[items[0],items[0]]});
+    ui.node('chs').onclick({target:{closest:()=>({getAttribute:()=>items[0].answerKeys[0]})}});
+    const feedback=ui.node('rBody').querySelector('.q').children[0].innerHTML;assert.match(feedback,/&lt;script&gt;own\(\)&lt;\/script&gt;/);assert.ok(!feedback.includes('<script>'));
+    const grades=[];ui.renderItem(items[1],root);ui.runner({opts:{},i:0,items:[items[1],items[1]],onGrade:(item,ok)=>grades.push(ok)});
+    ui.node('storedShortIn').value=' AZURE ';ui.node('subBtn').onclick();ui.node('nextBtn').onclick();assert.deepEqual(grades,[true]);
+    assert.equal(ui.storedToRunner([{...clone(base),instructionKo:'',stimulus:{parts:[]}}],[]).length,0);
   });
 
   await t('누적 관문은 passed/legacy 100%만 열고, 백지 통과·모의 즉시 다음 계약을 지킨다', async () => {

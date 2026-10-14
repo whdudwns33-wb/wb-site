@@ -1070,7 +1070,7 @@ function pdfReviewDraft(obj, trustedLocal=false){
       else {const parsed=parseChoiceStem(r);instructionKo=parsed.stem;choices=parsed.choices;answer=r.answerLabels.map(label=>labelToNo[label]);if(parsed.variance)flags.push('CHOICE_TEXT_SOURCE_VARIANCE');if(!answer.length||answer.some(x=>!x))throw new Error('객관식 정답 라벨을 숫자 문자열로 바꿀 수 없어요.');}
       globalNo++;
       const refs=r.sourceRefs.map(ref=>({...ref,bbox:ref.bbox||[0,0,0,0]}));
-      return{no:globalNo,footnoteNo:r.no,source:r.source,section:r.section,formatType:short?'short':r.formatType==='multi-select'?'mcq_multi':'mcq',instructionKo,isNegative:/(?:\bnot\b|\bnever\b|\bexcept\b|않는|아닌|제외)/i.test(instructionKo),answerCount:answer.length,stimulus:{type:'text',parts:r.contextText?[{text:r.contextText}]:[]},choices,answer,explanationKo:r.explanationKo,targetRefs:r.patternNo?[{patternNo:r.patternNo}]:[],notes:[],...review(refs,flags)};
+      return{id:r.candidateId,no:globalNo,footnoteNo:r.no,source:r.source,section:r.section,formatType:short?'short':r.formatType==='multi-select'?'mcq_multi':'mcq',instructionKo,isNegative:/(?:\bnot\b|\bnever\b|\bexcept\b|않는|아닌|제외)/i.test(instructionKo),answerCount:short?1:answer.length,stimulus:{type:'text',parts:r.contextText?[{text:r.contextText}]:[]},choices,answer,explanationKo:r.explanationKo,targetRefs:r.patternNo?[{patternNo:r.patternNo}]:[],notes:[],...review(refs,flags)};
     });
     rows.words=wordRows;rows.sentences=sentenceRows;rows.dialogues=dialogues;rows.functions=functions;rows.keyExpressions=keyExpressions;rows.patterns=patterns;rows.items=items;
   }

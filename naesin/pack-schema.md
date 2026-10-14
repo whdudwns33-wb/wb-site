@@ -42,8 +42,19 @@
   + `functions[]` + `vocabSidebar[]` + `readingQA[]`
 - `patterns.json` → `patterns[]: { patternNo, title, conceptKo, grammarPoint[][]?,
   textbookExamples[{en,ko,origin}], letsUseIt[] }`
-- `items-*.json` → `items[]: { no, footnoteNo, formatType, instructionKo, isNegative,
+- `items-*.json` → `items[]: { id?, source?, section?, no, footnoteNo?, formatType, instructionKo, isNegative,
   answerCount, stimulus{type,parts[]}, choices[{label,text|tuple}], answer[], explanationKo }`
+
+저장 문항의 `formatType`은 `mcq`(객관식), `mcq_multi`(복수 선택), `short`(주관식)이다. `no`와
+있는 경우의 `footnoteNo`는 양의 정수다. 선택지는 고유 라벨과 텍스트 또는 문자열 `tuple`을 가지며,
+정답 라벨은 선택지에 있어야 한다. 주관식 `answer[]`는 허용 답안 문자열들로, `answerCount`를
+허용 답안 개수로 해석하지 않는다. `choices`는 생략하거나 빈 배열로 둔다. 문항문은
+`instructionKo`와 기존 별칭(`promptKo`·`stem`·`questionKo`·`question`), 지문은 `stimulus.parts[].text`를 쓴다.
+
+선택 `id`는 영숫자로 시작하는 1~60자의 영숫자·`.`·`_`·`:`·`-`이고 팩 안에서 고유해야 한다.
+로컬 시험 문항의 후보 ID를 그대로 보존하여 누락 문항을 보완하거나 순서를 바꿔도 검수·오답 기록이
+다른 문항으로 이동하지 않게 한다. `id`가 없는 기존 문항은 `(source, section, no, footnoteNo)`
+복합키로 구분하며, 서로 다른 자료의 같은 번호는 허용한다. 기존 저장 팩은 자동 변경하지 않는다.
 
 ## 본문 문장 상세 (`sentences.json`)
 

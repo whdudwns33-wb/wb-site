@@ -137,7 +137,7 @@ let RESULTS=null,ANALYSIS=null,RES_DATE='',RES_CUSTOM=false,RES_DRAFT={},RES_FLA
    번호 입력(#tkPat)으로 받는다. */
 const TYPE_LIST=[['w-e2k','영어→뜻'],['w-k2e','뜻→영어'],['w-spell','철자 쓰기'],['w-cloze','예문 빈칸'],['w-def','영영풀이'],
  ['w-poly','다의어'],['w-syn','유의·반의'],['s-gram','어법 선택'],['s-verb','동사 형태'],['s-order','어순 배열'],
- ['s-kw','핵심어 빈칸'],['i-mcq','객관식(단일)'],['i-multi','객관식(복수)'],['mock','실전 모의']];
+ ['s-kw','핵심어 빈칸'],['i-mcq','객관식(단일)'],['i-multi','객관식(복수)'],['i-short','주관식 답 쓰기'],['mock','실전 모의']];
 const CODE_RE=/^[A-Za-z0-9-]{3,20}$/;   // 학생 코드 — 서버 등록 규칙과 동일
 const DATE_RE=/^\d{4}-\d{2}-\d{2}$/;
 /* 본문 사다리 6단의 이름(계약 3.2) — 단계 수는 6 그대로고 내용만 바뀌었다.

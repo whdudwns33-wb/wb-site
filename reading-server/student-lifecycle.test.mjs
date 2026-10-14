@@ -84,6 +84,7 @@ try {
   const KO = '더미 문장 — 자체 창작 한글 본문. '.repeat(20000);
   const up = await req('/api/naesin/admin/pack', { method: 'POST', token: admin,
     body: { id: PACK_ID, pack: { packId: PACK_ID,
+      rights: { basis: 'self_authored', holder: 'WB 자체 테스트', studentUseAllowed: true, derivativeUseAllowed: true, externalAiAllowed: false },
       words: [{ id: 'w-dummy', headword: 'dummy', meaningKo: ['더미'], sections: ['reading'] }],
       sentences: [{ seq: 1, dayGroup: '첫 단락', en: 'Dummy sentence.', ko: KO }] } } });
   ok(up.body.ok, '⑥-2 내신 팩 업로드 실패: ' + JSON.stringify(up.body).slice(0, 200));

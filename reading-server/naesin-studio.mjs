@@ -54,7 +54,7 @@ const PDF_ROW_KEYS = {
   functions: ['name', 'pattern', 'explainKo', '_pdfReview'],
   keyExpressions: ['en', 'ko', 'blankAnswer', '_pdfReview'],
   patterns: ['patternNo', 'title', 'conceptKo', 'grammarPoint', 'textbookExamples', 'letsUseIt', 'notes', '_pdfReview'],
-  items: ['no', 'footnoteNo', 'source', 'section', 'formatType', 'instructionKo', 'isNegative', 'answerCount', 'stimulus', 'choices', 'answer', 'explanationKo', 'targetRefs', 'notes', '_pdfReview'],
+  items: ['id', 'no', 'footnoteNo', 'source', 'section', 'formatType', 'instructionKo', 'isNegative', 'answerCount', 'stimulus', 'choices', 'answer', 'explanationKo', 'targetRefs', 'notes', '_pdfReview'],
 };
 const ownKeys = (v, keys) => isObj(v) && Object.keys(v).every((k) => keys.includes(k));
 function validPdfReview(v) {
@@ -432,6 +432,7 @@ export async function handleStudio(ctx) {
         if (ctx.localPdfReview !== true) return j(403, { error: 'PDF 후보는 원내 PC에서만 검수할 수 있어요.' });
         if (!PDF_ROW_KEYS[k] || !ownKeys(row, PDF_ROW_KEYS[k]) || !validPdfReview(row._pdfReview)
           || (k === 'words' && row.senses !== undefined && !validPdfSenses(row.senses, row.meaningKo))
+          || (k === 'items' && Object.prototype.hasOwnProperty.call(row, 'id') && (typeof row.id !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,59}$/.test(row.id)))
           || (k === 'sentences' && !validPdfSentence(row, true)))
           return j(400, { error: 'PDF 후보의 필드·위치 정보가 올바르지 않아요.' });
       }

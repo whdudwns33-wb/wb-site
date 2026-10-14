@@ -652,6 +652,30 @@ await t('[B2] GET /admin/exams 목록(default 먼저·만료 표시·이름) + D
   assert.deepStrictEqual((await call(store, { path: '/api/naesin/exam', who: { code: 'st-2', admin: false } })).body, { exam: {}, scope: null }, '해제되면 학생에게도 빈 값');
 });
 
+await t('자료별 긴 문항 신고 식별자는 자르지 않고 구분하며, 상한 밖 입력은 저장 전에 거절한다', async () => {
+  const store = memStore();
+  store.putExam('default', { examDate: '2099-12-31', packIds: ['self-questions'] });
+  const prefix = 'i-pos:' + encodeURIComponent('자체 제작 문법 문제 '.repeat(12));
+  const post = itemRef => call(store, { path: '/api/naesin/report', method: 'POST',
+    getBody: async () => ({ packId: 'self-questions', itemRef, reason: 'answer' }) });
+  for (const suffix of ['1', '2']) assert.strictEqual((await post(prefix + suffix)).status, 200);
+  const stored = store.getReports('self-questions');
+  assert.deepStrictEqual(stored.map(r => r.itemRef).sort(), [prefix + '1', prefix + '2']);
+  assert.strictEqual((await post('x'.repeat(2049))).status, 400);
+  assert.strictEqual((await post({ broken: true })).status, 400);
+  assert.strictEqual(store.getReports('self-questions').length, 2);
+});
+
+await t('주관식 과제는 관리자 선택 목록과 같은 키로 등록·조회되며 기존 객관식도 유지한다', async () => {
+  const store = memStore();
+  const request = await call(store, { path: '/api/naesin/admin/task', method: 'POST', who: ADMIN,
+    getBody: async () => ({ date: todayKst(), title: '자체 문제 과제', typeKeys: ['i-short', 'i-mcq', 'i-multi'] }) });
+  assert.strictEqual(request.status, 200);
+  assert.deepStrictEqual((await call(store, { path: '/api/naesin/task' })).body.task.typeKeys, ['i-short', 'i-mcq', 'i-multi']);
+  const admin = fs.readFileSync(new URL('./public/naesin-admin.html', import.meta.url), 'utf8');
+  assert.ok(admin.includes("['i-short','주관식 답 쓰기']"));
+});
+
 await t('[B8] isValidDate·TASK_TYPE_KEYS·isReservedCode·naesinBodyLimit 헬퍼', () => {
   assert.ok(isValidDate('2026-09-03'));
   assert.ok(isValidDate('2028-02-29'), '윤년');
@@ -665,7 +689,7 @@ await t('[B8] isValidDate·TASK_TYPE_KEYS·isReservedCode·naesinBodyLimit 헬�
   assert.strictEqual(todayKst(Date.UTC(2026, 8, 3, 14, 59)), '2026-09-03');
 
   /* 학생 앱 quizTypes()·관리 웹 TYPE_LIST 의 고정 키 전부가 들어 있어야 한다 */
-  for (const k of ['w-e2k', 'w-k2e', 'w-spell', 'w-cloze', 'w-def', 'w-poly', 'w-syn', 's-gram', 's-verb', 's-order', 's-kw', 'i-mcq', 'i-multi', 'mock'])
+  for (const k of ['w-e2k', 'w-k2e', 'w-spell', 'w-cloze', 'w-def', 'w-poly', 'w-syn', 's-gram', 's-verb', 's-order', 's-kw', 'i-mcq', 'i-multi', 'i-short', 'mock'])
     assert.ok(TASK_TYPE_KEYS.includes(k) && isTaskTypeKey(k), k);
   assert.ok(isTaskTypeKey('g-1') && isTaskTypeKey('g-12'), '문법 패턴 동적 키');
   assert.ok(!isTaskTypeKey('g-') && !isTaskTypeKey('g-x') && !isTaskTypeKey('x-e2k') && !isTaskTypeKey(''));
