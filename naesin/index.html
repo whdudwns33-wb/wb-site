@@ -13,9 +13,9 @@
     /* 중학생 전용 학습 시스템 — D(스플릿 워크스페이스) 골격 + E(프로그레스 보드) 홈.
        주 기기 태블릿 가로, 보조 노트북. 놀이 요소 없이 목록·지면·숫자로만 말한다. */
     :root {
-      --bg: #F2F4F7; --panel: #FFFFFF; --ink: #1C2430; --soft: #667382; --line: #E2E6EC;
+      --bg: #F2F4F7; --panel: #FFFFFF; --ink: #1C2430; --soft: #5F6E7E; --line: #E2E6EC;
       --ind: #4A56C9; --ind-soft: #EDEFFB; --green: #218358; --green-soft: #E8F4EE;
-      --red: #C2402E; --red-soft: #FBEBE8; --amber: #B27B16; --amber-soft: #F8F1DF;
+      --red: #B93B29; --red-soft: #FBEBE8; --amber: #805911; --amber-soft: #F8F1DF;
       --b1: #DCE9F7; --b2: #A9CBEF; --b3: #5E9BE0; --b4: #1F6BC4;
       --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Consolas, monospace;
     }
@@ -37,6 +37,8 @@
     .seg { display: flex; background: var(--bg); border-radius: 9px; padding: 3px; }
     .seg button { padding: 7px 16px; border-radius: 7px; font-size: 13.5px; font-weight: 700; color: var(--soft); white-space: nowrap; }
     .seg button.on { background: var(--panel); color: var(--ind); box-shadow: 0 1px 3px rgba(20,30,60,.12); }
+    .bar .seg { min-width: 0; max-width: 100%; overflow-x: auto; }
+    .bar .seg button { flex: none; min-width: 44px; min-height: 44px; }
     .bar .who { margin-left: auto; font-size: 12.5px; color: var(--soft); text-align: right; line-height: 1.35;
       padding: 4px 6px; border-radius: 6px; min-height: 44px; display: inline-flex; align-items: center; }
     .bar .who b { color: var(--ink); }
@@ -395,7 +397,7 @@
   var PACKS = {};              // 시험 범위 팩 전부 {packId: pack} — pack 은 그중 '지금 보는 과'
   var authed = false, examServer = null, packList = [];
   var sessionCode = null, sessionToken = null, studyStopped = false, accessTimer = null, pendingRemote = null;
-  var selSeq = null, selWordId = null, selType = null, selDlg = null;
+  var selSeq = null, selWordId = null, selType = null, selDlg = null, quizSource = '';
   /* 본문 탭에서 문장이 아닌 항목을 고른 상태 — {kind:'chunk'|'para'|'cum'|'check', day, i}.
      null 이면 selSeq(문장)가 지면의 주인이다. */
   var selPass = null;
@@ -503,7 +505,7 @@
     closeRunner(); pjClose();
     if (window.WBVoice) WBVoice.stop();
     pack = null; PACKS = {}; packList = []; examServer = null; taskServer = null; resultServer = null;
-    authed = false;
+    authed = false; quizSource = ''; selType = null;
     ['rBody', 'rCount', 'pjNo', 'pjCh', 'pjMsg', 'whoLine'].forEach(function (id) { $(id).innerHTML = ''; });
     $('liveBar').hidden = true; $('saveDot').hidden = true;
     $('ddayBadge').textContent = '';
@@ -1489,7 +1491,7 @@
     return pat ? luiItems(pat) : [];
   }
   function runTask(task) {
-    var items = [], types = quizTypes();
+    var items = [], types = quizTypes(true);
     (task.typeKeys || []).forEach(function (k) {
       var t = types.filter(function (x) { return x.key === k; })[0];
       var made = t ? t.make() : (/^g-\d+$/.test(k) ? patternItems(k) : []);
@@ -1529,7 +1531,7 @@
     PACKS[pid] = pack;
     /* 교재가 바뀌면 이전 교재의 선택(문장·단어·유형·대화·종이 입력 모드)은 무의미하다 */
     selSeq = opt.seq != null ? Number(opt.seq) : null;
-    selWordId = null; selType = null; selDlg = null; selPass = null; paperMode = false; wordFilter = 'all';
+    selWordId = null; selType = null; selDlg = null; selPass = null; paperMode = false; wordFilter = 'all'; quizSource = '';
     applyServerExam(pid);
     ensureStates(pid);
     setLast('교재 ' + pid, null);
@@ -2718,7 +2720,16 @@
     return a.slice(0, n);
   }
   function tagWord(q) { if (q) q.kind = 'word'; return q; }
-  function quizTypes() {
+  var QUIZ_SOURCES = [['04', 'PRE-STEP'], ['05', '예상문제 1회'], ['06', '예상문제 2회'], ['08', '문법 객관식'], ['09', '문법 주관식']];
+  function storedSourceLabel(source) {
+    var match = QUIZ_SOURCES.filter(function (entry) { return entry[0] === source; })[0];
+    return match ? match[1] : String(source || '');
+  }
+  function storedQuizDesc(items) {
+    var explained = items.filter(function (q) { return q.explanation.trim(); }).length;
+    return items.length + '문항' + (explained ? ' · 해설 ' + explained + '문항' : '');
+  }
+  function quizTypes(allSources) {
     var types = [];
     var W = pack.words || [], S = pack.sentences || [];
     types.push({ key: 'w-e2k', group: '단어 시험', name: '영어 → 뜻 고르기', desc: '4지선다 · 10문항 무작위',
@@ -2746,13 +2757,16 @@
     if (W.some(function (w) { return (w.synonyms || []).length || (w.antonyms || []).length; }))
       types.push({ key: 'w-syn', group: '단어 시험 · 심화', name: '유의어·반의어', desc: '짝 고르기',
         make: synItems });
-    var items = pack.items || [];
-    var single = items.filter(function (it) { return (it.answerCount || 1) === 1; });
-    var multi = items.filter(function (it) { return (it.answerCount || 1) > 1; });
-    if (single.length) types.push({ key: 'i-mcq', group: '문법·실전', name: '객관식 (단일 정답)', desc: single.length + '문항 · 해설 포함',
-      make: function () { return storedToRunner(single); } });
-    if (multi.length) types.push({ key: 'i-multi', group: '문법·실전', name: '객관식 (복수 정답)', desc: multi.length + '문항 · 해설 포함',
-      make: function () { return storedToRunner(multi); } });
+    var items = storedToRunner(pack.items || []).filter(function (q) { return allSources || !quizSource || q.stored.source === quizSource; });
+    var single = items.filter(function (q) { return q.type === 'storedmcq' && q.answerCount === 1; });
+    var multi = items.filter(function (q) { return q.type === 'storedmcq' && q.answerCount > 1; });
+    var short = items.filter(function (q) { return q.type === 'storedshort'; });
+    if (single.length) types.push({ key: 'i-mcq', group: '교재 문제', name: '객관식 (단일 정답)', desc: storedQuizDesc(single),
+      make: function () { return single; } });
+    if (multi.length) types.push({ key: 'i-multi', group: '교재 문제', name: '객관식 (복수 정답)', desc: storedQuizDesc(multi),
+      make: function () { return multi; } });
+    if (short.length) types.push({ key: 'i-short', group: '교재 문제', name: '주관식', desc: storedQuizDesc(short),
+      make: function () { return short; } });
     /* 세션 ④ 실전 모의 — 유형 혼합·시간 제한·종료 후 일괄 채점 */
     types.push({ key: 'mock', group: '실전 모의', name: '모의 시험 (유형 혼합)', desc: '10분 제한 · 즉시 채점 없음 · 종료 후 결과',
       make: mockItems });
@@ -2820,8 +2834,8 @@
       if (!p) return;
       (p.words || []).forEach(function (w) { wordRefs.push({ pid: pid, w: w, W: p.words }); });
       (p.sentences || []).forEach(function (sn) { senRefs.push({ pid: pid, s: sn }); });
-      (p.items || []).filter(function (it) { return (it.answerCount || 1) === 1; })
-        .forEach(function (it) { storedRefs.push({ pid: pid, it: it }); });
+      storedToRunner(p.items || [], p.items || []).filter(function (q) { return q.type === 'storedshort' || q.answerCount === 1; })
+        .forEach(function (q) { storedRefs.push({ pid: pid, q: q }); });
     });
     var out = [];
     var take = function (q, pid) { if (q) { q.packId = pid; out.push(q); } };
@@ -2832,28 +2846,55 @@
       (WBGEN.grammarChoiceDrill(r.s) || []).forEach(function (q) { q.packId = r.pid; gram.push(q); });
     });
     rndPick(gram, 3).forEach(function (q) { out.push(q); });
-    rndPick(storedRefs, 5).forEach(function (r) { storedToRunner([r.it]).forEach(function (q) { take(q, r.pid); }); });
+    rndPick(storedRefs, 5).forEach(function (r) { take(r.q, r.pid); });
     return WBGEN.shuffle(out, Math.random);
   }
-  function storedToRunner(items) {
+  function storedItemKey(it, sourceItems) {
+    if (it.id != null) {
+      if (typeof it.id !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,59}$/.test(it.id)) return null;
+      if (sourceItems.filter(function (other) { return other && other.id === it.id; }).length > 1) return null;
+      return 'i:id:' + it.id;
+    }
+    if (sourceItems.filter(function (other) { return other && other.no === it.no; }).length <= 1) return 'i-' + it.no;
+    var tuple = [it.source || '', it.section || '', it.no, it.footnoteNo == null ? '' : it.footnoteNo];
+    var key;
+    try { key = 'i:loc:' + tuple.map(function (part) { return encodeURIComponent(String(part)); }).join(':'); }
+    catch (e) { return null; }
+    // shortcut: 2048자를 넘는 옛 위치 식별자는 제외한다. 이런 팩은 안정적인 id를 붙여 재검수한다.
+    if (key.length > 2048 || sourceItems.filter(function (other) {
+      return other && other.id == null && other.no === it.no && (other.source || '') === tuple[0] && (other.section || '') === tuple[1]
+        && String(other.footnoteNo == null ? '' : other.footnoteNo) === String(tuple[3]);
+    }).length > 1) return null;
+    return key;
+  }
+  function storedToRunner(items, sourceItems) {
+    sourceItems = Array.isArray(sourceItems) ? sourceItems : (pack && Array.isArray(pack.items) ? pack.items : items || []);
     return (Array.isArray(items)?items:[]).map(function (it) {
-      if(!it||!Number.isInteger(it.no)||!Array.isArray(it.choices)||!Array.isArray(it.answer))return null;
+      if(!it||!Number.isInteger(it.no)||it.no<1||!Array.isArray(it.answer)||['mcq','mcq_multi','short'].indexOf(it.formatType)<0)return null;
+      var sourceChoices = it.formatType === 'short' && it.choices == null ? [] : it.choices;
+      if (!Array.isArray(sourceChoices)) return null;
+      var itemKey = storedItemKey(it, sourceItems);
+      if (!itemKey) return null;
       var stim = ((it.stimulus && Array.isArray(it.stimulus.parts)?it.stimulus.parts:[]) || []).map(function (p) { return p&&typeof p.text==='string'?p.text:''; }).filter(Boolean).join(' ').trim();
-      if(it.answer.some(function(a){return typeof a!=='string'&&typeof a!=='number';}))return null;
-      var prompt=(it.instructionKo || '') + (stim ? '\n' + stim : ''), answers=it.answer.map(String).filter(function(a){return !!a.trim();});
+      if(it.answer.some(function(a){return (typeof a!=='string'&&typeof a!=='number')||(typeof a==='number'&&!Number.isFinite(a))||!String(a).trim();}))return null;
+      var instruction = [it.instructionKo, it.promptKo].filter(function (value) { return typeof value === 'string' && value.trim(); })[0] || '';
+      var stem = [it.stem, it.questionKo, it.question].filter(function (value) { return typeof value === 'string' && value.trim(); })[0] || '';
+      var prompt = [instruction, stem, stim].filter(function (value, i, parts) { return value.trim() && parts.indexOf(value) === i; }).join('\n');
+      var answers=it.answer.map(String).filter(function(a){return !!a.trim();});
+      if (!prompt.trim()) return null;
       if(it.formatType==='short'){
-        if(it.choices.length!==0||!answers.length||answers.some(function(a){return !a.trim();})||!prompt.trim())return null;
-        return{stored:it,no:it.no,type:'storedshort',prompt,answerTexts:answers,explanation:it.explanationKo||''};
+        if(sourceChoices.length!==0||!answers.length||it.answer.some(function(a){return typeof a!=='string';})||!prompt.trim())return null;
+        return{stored:it,no:it.no,itemKey:itemKey,type:'storedshort',prompt,answerTexts:answers,explanation:typeof it.explanationKo==='string'?it.explanationKo:''};
       }
-      if(it.choices.length<2||!answers.length)return null;
-      var choices=it.choices.map(function (c) {
-        if(!c||c.label==null)return null;
+      if(sourceChoices.length<2||!answers.length)return null;
+      var choices=sourceChoices.map(function (c) {
+        if(!c||(typeof c.label!=='string'&&typeof c.label!=='number')||(typeof c.label==='number'&&!Number.isFinite(c.label)))return null;
         var text=typeof c.text==='string'?c.text:Array.isArray(c.tuple)&&c.tuple.every(function(x){return typeof x==='string';})?c.tuple.join(' - '):'';
         return text.trim()?{key:String(c.label),text}:null;
       });
       var answerCount=it.answerCount||answers.length;
-      if(choices.some(function(c){return !c||!c.key||!c.text;})||new Set(choices.map(function(c){return c.key;})).size!==choices.length||answers.some(function(a){return !choices.some(function(c){return c.key===a;});})||!Number.isInteger(answerCount)||answerCount!==answers.length)return null;
-      return {stored:it,no:it.no,type:'storedmcq',prompt,choices,answerKeys:answers,answerCount,explanation:it.explanationKo||''};
+      if(choices.some(function(c){return !c||!c.key.trim()||!c.text;})||new Set(choices.map(function(c){return c.key;})).size!==choices.length||new Set(answers).size!==answers.length||answers.some(function(a){return !choices.some(function(c){return c.key===a;});})||!Number.isInteger(answerCount)||answerCount!==answers.length)return null;
+      return {stored:it,no:it.no,itemKey:itemKey,type:'storedmcq',prompt,choices,answerKeys:answers,answerCount,explanation:typeof it.explanationKo==='string'?it.explanationKo:''};
     }).filter(Boolean);
   }
   function runQuizType(key) {
@@ -2894,8 +2935,7 @@
   }
   function wrongRetryItems(keys) {
     var pd = packDB(), out = [];
-    var stored = (pack.items || []).filter(function (it) { return keys.indexOf('i-' + it.no) >= 0; });
-    storedToRunner(stored).forEach(function (q) { out.push(q); });
+    storedToRunner(pack.items || []).forEach(function (q) { if (keys.indexOf(q.itemKey) >= 0) out.push(q); });
     keys.forEach(function (k) {
       var e = pd.wrong[k];
       if (e && e.kind === 'gen') regenWrong(e).forEach(function (q) { out.push(q); });
@@ -2904,16 +2944,23 @@
   }
   function renderQuiz() {
     var pd = packDB();
+    var stored = storedToRunner(pack.items || []);
+    if (quizSource && !stored.some(function (q) { return q.stored.source === quizSource; })) quizSource = '';
     var types = quizTypes();
     var wrongs = Object.keys(pd.wrong).filter(function (k) { return !pd.wrong[k].cleared; });
-    if (!selType) selType = types[0].key;
+    if (!selType || (selType !== 'wrong' && selType.slice(0, 2) !== 'g-' && !types.some(function (t) { return t.key === selType; }))) selType = types[0].key;
     var groups = [];
     types.forEach(function (t) {
       var g = groups.filter(function (x) { return x.name === t.group; })[0];
       if (!g) { g = { name: t.group, types: [] }; groups.push(g); }
       g.types.push(t);
     });
-    var listHtml = packSegHtml() +
+    var sourceHtml = stored.length ? '<div style="padding:8px 14px 12px"><label class="muted" for="qSource">문제 자료</label><select id="qSource" style="width:100%;min-height:44px;margin-top:6px;padding:8px;border:1px solid var(--line);border-radius:9px;background:var(--panel)"><option value="">전체 자료 (' + stored.length + '문항)</option>' +
+      QUIZ_SOURCES.map(function (entry) {
+        var count = stored.filter(function (q) { return q.stored.source === entry[0]; }).length;
+        return count ? '<option value="' + entry[0] + '"' + (quizSource === entry[0] ? ' selected' : '') + '>' + entry[1] + ' (' + count + '문항)</option>' : '';
+      }).join('') + '</select></div>' : '';
+    var listHtml = packSegHtml() + sourceHtml +
       '<div class="lh"><span>문제 유형 ' + types.length + '종</span><span>오답 <b>' + wrongs.length + '</b> 미해결</span></div><div class="rows" id="qRows">';
     /* 세션 ② 문법 개념 — 문제 앞에 개념 학습이 온다 */
     if ((pack.patterns || []).length) {
@@ -2970,6 +3017,13 @@
         '<button class="btn p big" id="qGo"' + (mg && !mg.open ? ' disabled' : '') + '>시작</button></div>';
     }
     layoutSplit(listHtml, workHtml);
+    var sourceSelect = $('qSource');
+    if (sourceSelect) sourceSelect.onchange = function () {
+      quizSource = QUIZ_SOURCES.some(function (entry) { return entry[0] === sourceSelect.value; }) ? sourceSelect.value : '';
+      var savedType = quizTypes().filter(function (t) { return t.key.slice(0, 2) === 'i-'; })[0];
+      selType = savedType ? savedType.key : null;
+      render();
+    };
     $('qRows').onclick = function (e) {
       var r = e.target.closest('.row[data-qt]');
       if (r) { selType = r.getAttribute('data-qt'); render(); }
@@ -3068,7 +3122,8 @@
     }
   }
   function recordStoredResult(q, ok, now, pid) {
-    markWrong('i-' + q.no, { kind: 'item', no: q.no }, ok, now, pid);
+    var key = q.itemKey || (q.stored && storedItemKey(q.stored, (packOf(pid) || {}).items || []));
+    if (key) markWrong(key, { kind: 'item', no: q.no }, ok, now, pid);
   }
   /* 생성형 문항의 오답 노트 키 유형 — 재시험 생성기가 있는 유형만(REGEN). 유형 태그가 없으면 문항 모양에서 유추. */
   var GEN_KEYS = ['w-e2k', 'w-k2e', 'w-spell', 'w-cloze', 'w-def', 's-gram', 's-verb', 's-order', 's-kw', 'w-poly', 'w-syn'];
@@ -3355,6 +3410,7 @@
   }
   /* 신고 식별자 — 오답노트 키(gen:<유형>:<대상>)와 같은 결로 만들어 강사가 같은 문항을 찾을 수 있게 */
   function itemRefOf(it) {
+    if (it.type === 'storedmcq' || it.type === 'storedshort') return it.itemKey || '';
     var type = it.type || it.kind || 'item';
     var ref = it.wordId || (it.checkId ? 'chk:' + it.checkId : null) || (it.id ? String(it.id) : null)
       || (it.seq != null ? 's' + it.seq : null) || (it.day ? 'd' + it.day : null) || '?';
@@ -3788,7 +3844,7 @@
   }
   function renderStored(item, root) {
     var multi = item.answerCount > 1;
-    root.innerHTML = '<div class="q"><div class="qmeta">문항 ' + item.no + (multi ? ' · 정답 ' + item.answerCount + '개 선택' : '') + '</div>' +
+    root.innerHTML = '<div class="q"><div class="qmeta">' + storedItemMeta(item) + (multi ? ' · 정답 ' + item.answerCount + '개 선택' : '') + '</div>' +
       '<div class="prompt sm" style="white-space:pre-line">' + esc(item.prompt) + '</div><div class="choices" id="chs"></div>' +
       (multi ? '<div class="rnext"><button class="btn p big" id="subBtn">확인</button></div>' : '') + '</div>';
     var chs = $('chs');
@@ -3826,7 +3882,7 @@
     }
   }
   function renderStoredShort(item, root) {
-    root.innerHTML='<div class="q"><div class="qmeta">문항 '+item.no+' · 주관식</div><div class="prompt sm" style="white-space:pre-line">'+esc(item.prompt)+'</div><input class="ans" id="storedShortIn" type="text" aria-label="주관식 답 입력" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="done" placeholder="답을 입력하세요"><div class="rnext"><button class="btn p big" id="subBtn">확인</button></div></div>';
+    root.innerHTML='<div class="q"><div class="qmeta">'+storedItemMeta(item)+' · 주관식</div><div class="prompt sm" style="white-space:pre-line">'+esc(item.prompt)+'</div><input class="ans" id="storedShortIn" type="text" aria-label="주관식 답 입력" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="done" placeholder="답을 입력하세요"><div class="rnext"><button class="btn p big" id="subBtn">확인</button></div></div>';
     var input=$('storedShortIn');
     function grade(){var got=normalizeStoredAnswer(input.value),ok=!!got&&item.answerTexts.some(function(a){return normalizeStoredAnswer(a)===got;});input.disabled=true;
       var feedback=(item.answerTexts.length?'<div class="exp">정답: '+item.answerTexts.map(esc).join(' / ')+'</div>':'')+(item.explanation?'<div class="exp">'+esc(item.explanation)+'</div>':'');
@@ -3835,6 +3891,10 @@
     input.onkeydown=function(e){if(e.key==='Enter'&&!e.isComposing){e.preventDefault();var b=$('subBtn');if(b&&!b.getAttribute('data-done'))b.onclick();}};
   }
   function normalizeStoredAnswer(value){return String(value==null?'':value).normalize('NFKC').trim().replace(/\s+/g,' ').toLowerCase();}
+  function storedItemMeta(item) {
+    var stored = item.stored || {}, source = storedSourceLabel(stored.source);
+    return (source ? esc(source) + ' · ' : '') + '문항 ' + esc(stored.footnoteNo != null ? stored.footnoteNo : item.no);
+  }
   function bindSubmit(fn) {
     var b = $('subBtn');
     b.onclick = function () { if (!b.getAttribute('data-done')) { b.setAttribute('data-done', '1'); fn(); } };
@@ -4040,7 +4100,7 @@
     setTab('home');
   }
   function openDemo() {
-    return loadDemo().then(function (p) { if (!checkAccount()) return; pack = normPack(p); PACKS[p.packId] = pack; demoMode = true; openLoaded(); });
+    return loadDemo().then(function (p) { if (!checkAccount()) return; pack = normPack(p); PACKS[p.packId] = pack; quizSource = ''; selType = null; demoMode = true; openLoaded(); });
   }
   /* 시험 범위 팩 전부 로드 — 실제 시험 범위는 보통 2~3개 과다. 하나라도 열리면 학습을 시작한다:
      한 과의 팩이 삭제·오류여도 나머지 범위까지 막을 이유가 없다. 전부 실패해야 부팅 오류다. */

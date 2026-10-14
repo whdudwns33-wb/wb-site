@@ -392,6 +392,34 @@ await t('folder-v4 최종 배열은 미검토로 저장되고 publish payload에
   const emptyJob=await s.getJob(second.body.jobId);approveAll(emptyJob);assert.ok(publishGate(emptyJob).errors.some(e=>/PDF 본문/.test(e.message)));
 });
 
+await t('로컬 시험 문항 id는 번호·순서 변경에도 같은 검수 키를 쓰며 변경한 원행은 재검수한다', async () => {
+  const s = memStore(), created = await call(s, '/api/naesin/admin/job', 'POST', { packId: SAMPLE.packId }), id = created.body.jobId;
+  const first = { ...clone(SAMPLE.items[0]), id: 'ic-05-00-001', source: '05', _pdfReview: { flags: ['REVIEW_REQUIRED'], locations: [{ page: 1, bbox: [0, 0, 0, 0], sourceDocumentId: '05s' }] } };
+  assert.equal((await call(s, '/api/naesin/admin/job/draft', 'POST', { jobId: id, draft: { items: [first] } }, { localPdfReview: true })).status, 200);
+  const job = await s.getJob(id), key = rowKey('items', first, 0); job.review[key] = { state: 'ok', note: 'own review' };
+  const inserted = { ...clone(first), id: 'ic-04-00-001', source: '04' }, renumbered = { ...clone(first), no: 2 };
+  assert.equal(rowKey('items', renumbered, 1), key);
+  const saved = await call(s, '/api/naesin/admin/job/draft', 'POST', { jobId: id, draft: { items: [inserted, renumbered] } }, { localPdfReview: true });
+  assert.equal(saved.status, 200); assert.deepStrictEqual((await s.getJob(id)).review, {}, '번호가 바뀐 원행도 새 자료에 승인되지 않는다');
+  assert.equal(assemble(await s.getJob(id)).items[1].id, first.id);
+  const before = JSON.stringify(await s.getJob(id));
+  for (const invalid of ['', '../private', 'x'.repeat(61), null]) {
+    const bad = await call(s, '/api/naesin/admin/job/draft', 'POST', { jobId: id, draft: { items: [{ ...first, id: invalid }] } }, { localPdfReview: true });
+    assert.equal(bad.status, 400); assert.equal(JSON.stringify(await s.getJob(id)), before);
+  }
+});
+
+await t('스튜디오 게시도 공용 문항 관문을 쓰며 승인된 잘못된 문항이 이전 팩을 덮지 않는다', async () => {
+  const s = memStore(), created = await call(s, '/api/naesin/admin/job', 'POST', { packId: SAMPLE.packId }), id = created.body.jobId;
+  const original = { pack: clone(SAMPLE), updatedAt: 'own original' }; await s.putPack(SAMPLE.packId, original);
+  await call(s, '/api/naesin/admin/job/draft', 'POST', { jobId: id, draft: draftFromSample() });
+  const job = await s.getJob(id); job.draft.items[0].answer = ['']; approveAll(job);
+  const gate = publishGate(job), common = CHECK.checkPack(assemble(job));
+  assert.equal(gate.ok, false); assert.deepStrictEqual(gate.errors, common.errors);
+  assert.equal((await call(s, '/api/naesin/admin/job/publish', 'POST', { jobId: id })).status, 400);
+  assert.deepStrictEqual(await s.getPack(SAMPLE.packId), original);
+});
+
 await t('PDF 본문 필드·청크·좌표 오류는 기존 작업을 변경하지 않고 거절한다', async () => {
   const s = memStore();
   const cr = await call(s, '/api/naesin/admin/job', 'POST', { packId: SAMPLE.packId });

@@ -56,7 +56,7 @@ export const naesinBodyLimit = (p) => (BIG_BODY_PATHS.includes(p) ? BODY_LIMIT_P
    세 곳이 어긋나면 강사가 고른 유형이 학생 화면에서 조용히 빠진다. 여기서 모르는 키는 400으로 돌려
    보내 등록 단계에서 드러나게 한다. 문법 개념은 팩의 패턴 번호별 동적 키(g-<n>)라 정규식으로 받는다. */
 export const TASK_TYPE_KEYS = ['w-e2k', 'w-k2e', 'w-spell', 'w-cloze', 'w-def', 'w-poly', 'w-syn',
-  's-gram', 's-verb', 's-order', 's-kw', 'i-mcq', 'i-multi', 'mock', 'g-concept'];
+  's-gram', 's-verb', 's-order', 's-kw', 'i-mcq', 'i-multi', 'i-short', 'mock', 'g-concept'];
 export const TASK_TYPE_KEY_RE = /^g-\d{1,3}$/;
 export const isTaskTypeKey = (k) => TASK_TYPE_KEYS.includes(k) || TASK_TYPE_KEY_RE.test(k);
 
@@ -101,7 +101,7 @@ const SUMMARY_TITLE_MAX = 80;
    그 이상은 같은 오류의 반복이라 오래된 것부터 버려도 잃는 것이 없다. */
 export const REPORT_REASONS = ['answer', 'broken', 'meaning', 'other'];
 const REPORT_MEMO_MAX = 200;
-const REPORT_REF_MAX = 80;
+const REPORT_REF_MAX = 2048;
 const REPORTS_MAX = 200;
 const isReport = (r) => !!r && typeof r === 'object' && typeof r.id === 'string' && typeof r.itemRef === 'string';
 export function normalizeReport(r) {
@@ -507,7 +507,8 @@ export async function handleNaesin(ctx) {
     const { exam } = await resolveExam(store, who.code, ctx.now);
     const allowed = Array.isArray(exam && exam.packIds) ? exam.packIds : [];
     if (!allowed.includes(packId)) return j(403, { error: '배정되지 않은 교재예요.' });
-    const itemRef = strMax(String(b.itemRef || '').trim(), REPORT_REF_MAX);
+    const itemRef = typeof b.itemRef === 'string' ? b.itemRef.trim() : '';
+    if (itemRef.length > REPORT_REF_MAX) return j(400, { error: '문항 식별자가 너무 길어요.' });
     if (!itemRef) return j(400, { error: '어느 문항인지 알 수 없어요.' });
     const reason = REPORT_REASONS.includes(b.reason) ? b.reason : 'other';
     const rec = {

@@ -79,7 +79,7 @@ function screen(){
     fetch:async(url,opt)=>{requests.push({url,...opt});return fetchImpl(url,opt);}});
   const stop=inline.indexOf("$('#bannerClose').onclick=hideBanner;");assert.ok(stop>1000);
   vm.runInContext(inline.slice(0,stop)+`
-    this.ui={putPdfReviewFile,putDraftFiles,putDraft,pdfReviewDraft,regularDraft,pdfColumnsHtml,pdfSentenceHtml,loadPdfSentence,savePdfSentence,savePdfWord,renderSrc,renderJob,review,bulkOk,openJob,openList,renderLogin,
+    this.ui={putPdfReviewFile,putDraftFiles,putDraft,pdfReviewDraft,regularDraft,pdfColumnsHtml,pdfSentenceHtml,loadPdfSentence,savePdfSentence,savePdfWord,renderSrc,renderJob,review,bulkOk,openJob,openList,renderLogin,rowKey,
       get:()=>({JOB,GATE,PDF_LOCAL,PDF_VIEW,PDF_WORD_EDIT,VIEW,SEL,EDIT,SRC,BUSY}),set:j=>{JOB=j;GATE={ok:false,pending:0,total:0,errors:[],warns:[],summary:[]};VIEW='job';JOB_READ++;},
       setGate:g=>{GATE=g;},setLocal:p=>{PDF_LOCAL=p;},setToken:t=>{TOKEN=t;},showAll:()=>{FONLY='all';renderJob();}};`,ctx);
   ctx.ui.set(stored);
@@ -749,6 +749,22 @@ function wordSection(ui,section,checked){const el=ui.node('#pdfWord'+section);el
     const kept=ui.pdfReviewDraft(withExisting,true).rows.sentences[0];assert.deepEqual(clone(kept.chunks),[{en:'Own sentence 1.',ko:'기존 청크'}]);assert.deepEqual(clone(kept.tokens),['kept','tokens']);assert.ok(!Object.hasOwn(kept,'tokenGroups'));assert.ok(!kept._pdfReview.flags.includes('FULL_SENTENCE_CHUNK_REVIEW'));assert.ok(!kept._pdfReview.flags.includes('CANONICAL_WHITESPACE_TOKENS'));
     const groupsOnly=clone(folder);groupsOnly.sentenceCandidates[0].tokenGroups=[['MIXED','SOURCE']];const tokenFallback=ui.pdfReviewDraft(groupsOnly,true).rows.sentences[0];assert.deepEqual(clone(tokenFallback.tokens),['The','family','finally','arrived','at','the','international','airport.']);assert.ok(tokenFallback._pdfReview.flags.includes('CANONICAL_WHITESPACE_TOKENS'));
     assert.deepEqual(Object.keys(converted.reviewCandidates),['dialogueCandidates','functionCandidates','keyExpressionCandidates','patternCandidates','examItemCandidates','unmatchedItems','itemSummary','unmatched','enrichmentSummary']);assert.equal(converted.reviewCandidates.dialogueCandidates.length,1);assert.equal(converted.reviewCandidates.examItemCandidates.length,1);assert.equal(converted.reviewCandidates.itemSummary.found,1);
+    assert.equal(converted.rows.items[0].id, examItemCandidates[0].candidateId);
+    const stable = clone(folder), originalItem = { ...clone(examItemCandidates[0]), candidateId: 'ic-08-02-001', source: '08', section: 'Grammar Build Up', patternNo: 2, sourceRefs: [ref('08', 8, 'problem', { questionNo: 1 }), ref('08', 19, 'answer-key', { questionNo: 1 })] };
+    const setItems = rows => {
+      stable.examItemCandidates = rows; stable.itemSummary.found = rows.length; stable.itemSummary.answerMatched = rows.length;
+      stable.itemSummary.byType = { mcq: 0, 'multi-select': rows.length, subjective: 0, unknown: 0 };
+      for (const [source, stats] of Object.entries(stable.itemSummary.bySource)) {
+        stats.found = stats.answerMatched = rows.filter(row => row.source === source).length;
+        stats.byType = { mcq: 0, 'multi-select': stats.found, subjective: 0, unknown: 0 }; stats.foundByType = { objective: stats.found, subjective: 0 };
+      }
+    };
+    setItems([originalItem]); const beforeInsertion = ui.pdfReviewDraft(stable, true).rows.items[0];
+    setItems([originalItem, clone(examItemCandidates[0])]); const afterInsertion = ui.pdfReviewDraft(stable, true).rows.items.find(row => row.source === '08');
+    assert.equal(beforeInsertion.no, 1); assert.equal(afterInsertion.no, 2); assert.equal(beforeInsertion.id, afterInsertion.id);
+    assert.equal(ui.rowKey('items', beforeInsertion, 0), ui.rowKey('items', afterInsertion, 1));
+    const usable = clone(require('./pack-sample.json')); usable.items = ui.pdfReviewDraft(stable, true).rows.items.map(row => { const copy = clone(row); delete copy._pdfReview; return copy; });
+    assert.deepEqual(CHECK.checkPack(usable).errors, [], '변환한 문항의 공통 지문·보기·정답·id가 게시 관문에서도 유효하다');
     assert.deepEqual(JSON.parse(JSON.stringify(converted.words[0]._pdfReview.locations[0])),{page:1,bbox:[1,2,3,4],sourceDocumentId:'03',printedPage:1,section:'conversation',questionNo:null});
     assert.equal(converted.columns.length,4);assert.equal(converted.columns.some(c=>c.page===9&&c.column==='EN'),true);
     const uiPreview=screen();uiPreview.setLocal({jobId:uiPreview.get().JOB.jobId,token:'own-test-admin-token',columns:converted.columns,pdfs:docs.map(d=>({source:d.sourceDocumentId,file:d.file,pageCount:d.pageCount,sha256:d.sha256})),sentenceCandidates:sentences,sourceDocuments:docs,reviewCandidates:converted.reviewCandidates});

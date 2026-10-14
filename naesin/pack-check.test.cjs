@@ -290,9 +290,81 @@ t('저장 문항 — 정답이 보기 label에 없으면 오류', () => {
 
 t('저장 문항 — 보기 없는 낱말 정답은 단어 마스터와 대조(경고)', () => {
   const p = clone(SAMPLE);
-  p.items = [{ no: 1, formatType: 'short', answer: ['zzzznotaword'] }];
+  p.items = [{ no: 1, formatType: 'short', instructionKo: 'Write the answer.', answer: ['zzzznotaword'] }];
   const r = CHECK.checkPack(p);
+  assert.deepStrictEqual(r.errors, []);
   assert.ok(has(r.warns, '단어 마스터에 없음'));
+});
+
+t('저장 문항 — 고유 id와 기존 자료별 복합키를 구분한다', () => {
+  const p = clone(SAMPLE), item = clone(p.items[0]);
+  delete item.id;
+  p.items = [{ ...item, source: '04', section: 'own' }, { ...item, source: '05', section: 'own' }];
+  assert.deepStrictEqual(CHECK.checkPack(p).errors, [], '다른 자료의 같은 번호는 허용한다');
+  p.items[1].source = '04';
+  assert.ok(has(CHECK.checkPack(p).errors, '복합키 중복'));
+  p.items = [{ ...item, id: 'ic-04-00-001' }, { ...item, id: 'ic-05-00-001' }];
+  assert.deepStrictEqual(CHECK.checkPack(p).errors, [], '새 id가 원행을 구분한다');
+  p.items[1].id = p.items[0].id;
+  assert.ok(has(CHECK.checkPack(p).errors, 'id 중복'));
+  for (const id of ['', null, '../private', 'x'.repeat(61), '한글']) {
+    p.items = [{ ...item, id }];
+    assert.ok(has(CHECK.checkPack(p).errors, 'id 형식'), String(id));
+  }
+});
+
+t('저장 문항 — 번호가 겹친 기존 문항의 위치 키가 학생 러너의 길이·인코딩 제한을 지킨다', () => {
+  const p = clone(SAMPLE), item = clone(p.items[0]); delete item.id; delete item.footnoteNo; item.no = 7;
+  const pair = section => [{ ...item, source: '04', section }, { ...item, source: '05', section }];
+  p.items = pair('한글 원문'); assert.deepStrictEqual(CHECK.checkPack(p).errors, []);
+  p.items = pair('x'.repeat(2036)); assert.deepStrictEqual(CHECK.checkPack(p).errors, [], '2048자 키는 허용한다');
+  for (const section of ['x'.repeat(2037), '한'.repeat(230)]) {
+    p.items = pair(section); assert.ok(has(CHECK.checkPack(p).errors, '2048자'), '긴 중복 번호 위치는 게시하지 않는다');
+  }
+  p.items = pair('\ud800'); assert.ok(has(CHECK.checkPack(p).errors, '인코딩할 수 없음'));
+  p.items = [{ ...item, source: '04', section: '한'.repeat(230) }]; assert.deepStrictEqual(CHECK.checkPack(p).errors, [], '고유 번호의 i-7 기존 키는 바꾸지 않는다');
+  p.items = pair('한'.repeat(230)).map((row, i) => ({ ...row, id: 'own-' + i })); assert.deepStrictEqual(CHECK.checkPack(p).errors, [], '새 id 문항은 위치 키를 쓰지 않는다');
+});
+
+t('저장 문항 — 번호·출처·유형·문항문 없는 문항은 게시하지 않는다', () => {
+  for (const mutate of [
+    row => { row.no = 0; }, row => { row.no = '1'; }, row => { row.footnoteNo = -1; },
+    row => { row.source = ''; }, row => { row.section = ' '; }, row => { row.formatType = 'unknown'; },
+    row => { row.instructionKo = ''; row.stimulus = { type: 'text', parts: [] }; },
+  ]) {
+    const p = clone(SAMPLE); p.items = [clone(p.items[0])]; mutate(p.items[0]);
+    assert.ok(CHECK.checkPack(p).errors.length > 0, JSON.stringify(p.items[0]));
+  }
+  const p = clone(SAMPLE); p.items = [{ ...p.items[0], instructionKo: '', stimulus: { type: 'text', parts: [{ text: 'Own context.' }] }, footnoteNo: null }];
+  assert.deepStrictEqual(CHECK.checkPack(p).errors, [], '지문만 있는 기존 문항과 null 각주는 유지한다');
+});
+
+t('저장 문항 — 객관식 보기·정답·선택 개수는 실제 채점 가능해야 한다', () => {
+  for (const mutate of [
+    row => { row.choices = []; }, row => { row.choices[0].text = ''; },
+    row => { row.choices[0].label = true; }, row => { row.choices[1].label = row.choices[0].label; },
+    row => { row.answer = ['']; }, row => { row.answer = [true]; },
+    row => { row.answer = [row.answer[0], row.answer[0]]; row.answerCount = 2; },
+    row => { row.answerCount = 2; }, row => { row.answerCount = 0; },
+  ]) {
+    const p = clone(SAMPLE); p.items = [clone(p.items[0])]; mutate(p.items[0]);
+    assert.ok(CHECK.checkPack(p).errors.length > 0, JSON.stringify(p.items[0]));
+  }
+  const p = clone(SAMPLE), row = clone(p.items[0]);
+  row.choices[0] = { label: 1, tuple: ['Own', 'tuple'] }; row.answer = [1]; row.promptKo = row.instructionKo; delete row.instructionKo;
+  p.items = [row]; assert.deepStrictEqual(CHECK.checkPack(p).errors, [], '숫자 라벨·tuple·기존 문항문 별칭을 유지한다');
+});
+
+t('저장 문항 — 주관식 허용 답안은 선택 개수와 별개이며 빈 답·보기를 막는다', () => {
+  const own = { no: 1, formatType: 'short', stem: 'Write the answer.', answer: ['Own first answer', 'Own second answer'], answerCount: 1 };
+  for (const choices of [undefined, null, []]) {
+    const p = clone(SAMPLE); p.items = [{ ...own, choices }];
+    assert.deepStrictEqual(CHECK.checkPack(p).errors, []);
+  }
+  for (const patch of [{ answer: [''] }, { answer: [true] }, { answer: ['Own answer', '  OWN   ANSWER '] }, { choices: [{ label: '1', text: 'Own choice' }] }, { answerCount: -1 }]) {
+    const p = clone(SAMPLE); p.items = [{ ...own, ...patch }];
+    assert.ok(CHECK.checkPack(p).errors.length > 0, JSON.stringify(patch));
+  }
 });
 
 t('itemsLabel 로 문항 섹션 이름을 바꿀 수 있다', () => {

@@ -53,7 +53,7 @@ var WBPACKCHECK = (function () {
     patterns: { patternNo: 'scalar', title: 'string', conceptKo: 'string', grammarPoint: [strings],
       textbookExamples: [{ en: 'string', ko: 'string', origin: 'string' }],
       letsUseIt: [{ no: 'scalar', stem: 'string', ko: 'string', wordBank: strings, answers: strings }], notes: 'texts' },
-    items: { no: 'scalar', footnoteNo: 'scalar', source: 'string', section: 'string', formatType: 'string', instructionKo: 'string',
+    items: { id: 'string', no: 'scalar', footnoteNo: 'scalar', source: 'string', section: 'string', formatType: 'string', instructionKo: 'string',
       promptKo: 'string', stem: 'string', questionKo: 'string', question: 'string', isNegative: 'scalar', answerCount: 'scalar',
       stimulus: { type: 'string', parts: [{ text: 'string' }] }, choices: [{ label: 'scalar', text: 'string', tuple: strings }],
       answer: ['scalar'], explanationKo: 'string', targetRefs: [{ wordId: 'string', sentenceSeq: 'scalar', patternNo: 'scalar', dialogueId: 'string' }], notes: 'texts' },
@@ -432,21 +432,68 @@ var WBPACKCHECK = (function () {
     if (!isArr(list)) return;
     var S = sectionName || 'items';
     var heads = {};
+    var ids = new Set(), legacyKeys = new Set(), numberCounts = new Map();
+    list.forEach(function (it) { if (it) numberCounts.set(it.no, (numberCounts.get(it.no) || 0) + 1); });
+    var choiceKey = function (v) {
+      return typeof v === 'string' && v.trim() ? v : typeof v === 'number' && Number.isFinite(v) ? String(v) : null;
+    };
     (isArr(pack.words) ? pack.words : []).forEach(function (w) { if (w && nonEmpty(w.headword)) heads[words1(w.headword)] = true; });
     list.forEach(function (it, i) {
       var at = 'items[' + i + '](no ' + (it && it.no != null ? it.no : '?') + ')';
-      if (!it || typeof it !== 'object') { c.err(S, at + ' 객체가 아님'); return; }
-      if (!nonEmpty(it.formatType)) c.err(S, at + ' formatType 없음');
+      if (!it || typeof it !== 'object' || isArr(it)) { c.err(S, at + ' 객체가 아님'); return; }
+      if (Object.prototype.hasOwnProperty.call(it, 'id')) {
+        if (typeof it.id !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,59}$/.test(it.id)) c.err(S, at + ' id 형식이 올바르지 않음');
+        else if (ids.has(it.id)) c.err(S, at + ' id 중복: ' + it.id);
+        else ids.add(it.id);
+      } else {
+        var locator = JSON.stringify([it.source || '', it.section || '', it.no, it.footnoteNo == null ? null : it.footnoteNo]);
+        if (legacyKeys.has(locator)) c.err(S, at + ' 기존 문항 위치 복합키 중복');
+        legacyKeys.add(locator);
+        if (numberCounts.get(it.no) > 1) {
+          try {
+            var key = 'i:loc:' + [it.source || '', it.section || '', it.no, it.footnoteNo == null ? '' : it.footnoteNo].map(function (part) { return encodeURIComponent(String(part)); }).join(':');
+            if (key.length > 2048) c.err(S, at + ' 기존 문항 위치 식별자는 2048자 이하여야 함 — 고유 id를 붙여 재검수');
+          } catch (e) { c.err(S, at + ' 기존 문항 위치 식별자를 인코딩할 수 없음 — 고유 id를 붙여 재검수'); }
+        }
+      }
+      if (!Number.isInteger(it.no) || it.no < 1) c.err(S, at + ' no 는 양의 정수여야 함');
+      if (it.footnoteNo != null && (!Number.isInteger(it.footnoteNo) || it.footnoteNo < 1)) c.err(S, at + ' footnoteNo 는 양의 정수여야 함');
+      ['source', 'section'].forEach(function (key) { if (it[key] != null && !nonEmpty(it[key])) c.err(S, at + ' ' + key + ' 비었음'); });
+      if (!['mcq', 'mcq_multi', 'short'].includes(it.formatType)) c.err(S, at + ' 지원하지 않는 formatType');
+      var hasPrompt = ['instructionKo', 'promptKo', 'stem', 'questionKo', 'question'].some(function (key) { return nonEmpty(it[key]); });
+      var parts = it.stimulus && isArr(it.stimulus.parts) ? it.stimulus.parts : [];
+      if (!hasPrompt && !parts.some(function (part) { return part && nonEmpty(part.text); })) c.err(S, at + ' 문항문 또는 지문이 필요함');
       if (!isArr(it.answer) || !it.answer.length) { c.err(S, at + ' answer 비었음'); return; }
-      if (isArr(it.choices) && it.choices.length) {
-        var labels = {};
-        it.choices.forEach(function (ch) { labels[String(ch && ch.label)] = true; });
+      if (it.answerCount != null && (!Number.isInteger(it.answerCount) || it.answerCount < 1)) c.err(S, at + ' answerCount 는 양의 정수여야 함');
+      if (it.formatType === 'short') {
+        if (it.choices != null && (!isArr(it.choices) || it.choices.length)) c.err(S, at + ' 주관식 choices 는 비어 있어야 함');
+        var accepted = new Set();
         it.answer.forEach(function (a) {
-          if (!labels[String(a)]) c.err(S, at + ' 정답 "' + a + '"가 보기 label에 없음');
+          if (!nonEmpty(a)) { c.err(S, at + ' 주관식 answer 는 비어 있지 않은 문자열이어야 함'); return; }
+          var normalized = a.normalize('NFKC').trim().replace(/\s+/g, ' ').toLowerCase();
+          if (accepted.has(normalized)) c.err(S, at + ' 주관식 허용 답안 중복');
+          accepted.add(normalized);
+        });
+      } else {
+        if (!isArr(it.choices) || it.choices.length < 2) { c.err(S, at + ' choices 부족'); return; }
+        var labels = new Set(), answers = new Set();
+        it.choices.forEach(function (ch) {
+          var key = ch && choiceKey(ch.label);
+          var text = ch && (typeof ch.text === 'string' ? ch.text : isArr(ch.tuple) && ch.tuple.length && ch.tuple.every(nonEmpty) ? ch.tuple.join(' - ') : '');
+          if (key === null || !nonEmpty(text)) c.err(S, at + ' 보기 label/text 불완전');
+          if (labels.has(key)) c.err(S, at + ' 보기 label 중복');
+          labels.add(key);
+        });
+        it.answer.forEach(function (a) {
+          var key = choiceKey(a);
+          if (key === null || !labels.has(key)) c.err(S, at + ' 정답 "' + a + '"가 보기 label에 없음');
+          if (answers.has(key)) c.err(S, at + ' 정답 중복');
+          answers.add(key);
         });
         if (it.answerCount != null && it.answer.length !== it.answerCount)
           c.err(S, at + ' answerCount(' + it.answerCount + ') ≠ 정답 수(' + it.answer.length + ')');
-      } else if (Object.keys(heads).length) {
+      }
+      if (it.formatType === 'short' && Object.keys(heads).length) {
         /* 보기 없는 주관식 정답이 낱말 하나면 단어 마스터와 대조한다 — 정답지 오탈자를 여기서 잡는다 */
         it.answer.forEach(function (a) {
           var k = words1(a);
