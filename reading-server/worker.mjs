@@ -1150,7 +1150,8 @@ export default {
       return json(404, { error: 'unknown api' });
     } catch (e) {
       if (e && e.status === 413) return json(413, { error: '요청이 너무 커서 받을 수 없어요.' });
-      return json(500, { error: '서버 오류', detail: String(e && e.message || e) });
+      /* 파싱 예외에는 요청·저장 원문이 섞일 수 있어 응답에 싣지 않는다. */
+      return json(500, { error: '서버 오류' });
     }
   },
 };
