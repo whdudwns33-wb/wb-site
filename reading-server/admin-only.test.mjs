@@ -58,6 +58,13 @@ try {
   /* ── 관리 전용 모드 ── */
   const on = await boot(true, 8610 + (process.pid % 40));
   try {
+    const broken = await fetch(on.base + '/api/admin/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: 'WB_SYNTHETIC_PRIVATE_TEXT',
+    });
+    ok(broken.status === 500, '관리 전용 JSON 예외의 기존 상태 코드가 달라졌다');
+    ok(JSON.stringify(await broken.json()) === JSON.stringify({ error: '서버 오류' }), '로컬 오류 응답에 요청 원문·내부 예외가 실렸다');
+    ok(fs.readFileSync(path.join(on.data, 'db.json'), 'utf8') === JSON.stringify(seed), '잘못된 요청이 원본 파일을 바꿨다');
+
     const admin = await (await post(on.base, '/api/admin/login', { pin: PIN })).json();
     ok(admin.token, '관리 전용 모드에서 관리 로그인이 막혔다 — 관리 웹을 쓸 수 없다');
 
