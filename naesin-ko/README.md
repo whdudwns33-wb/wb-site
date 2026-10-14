@@ -67,6 +67,30 @@ reading-server/
 · `GET /exam` → `{exam, scope}` · `GET /task` → `{task, scope}` · `GET /overlay` → `{overlay, scope}`
 · `GET/POST /review` → `{reviews, updatedAt}`
 
+`state`·별도 `summary`는 서버에서 허용 필드만 골라 저장하고 조회 때도 출력 복사만 거른다.
+알려진 필드의 형식이 틀리면 쓰기 전 400, UTF-8 저장 예산을 넘으면 413이다. 둘 다 기존
+서버 기록과 기기 진도를 보존한다. 형식이 깨진 서버 백업은 GET 409로 알리고 원본을 그대로 둔다.
+학생 앱은 그 경우 체험 모드로 안내하고 재접속 전까지 서버 저장·기기 청소를 막는다.
+저장 오류는 문제·입력을 다시 그리지 않는 상단 알림으로 표시하고 실제 백업 성공 뒤에만 해제한다.
+409 안내는 탭 이동·체험 학습 뒤에도 남으며, 늦은 저장 성공 응답도 백업 보류를 풀지 못한다.
+필드 누락은 옛 기록과 호환하기 위해 그대로 두며, 숫자 변환·잘라내기·목록 상한을 추가하지 않는다.
+
+| 기록 위치 | 허용 필드 |
+| --- | --- |
+| 최상위 | `v:1`, `packs`, `savedAt` |
+| 단원 | `states`, `wrong`, `essays`, `dump`, `log`, `diagDone`, `mistakes` |
+| SRS 상태 | `id`, `kind`, `reached`, `reachedAt`, `relearnCount`, `lastCriterionDate`, `step`, `due`, `streak`, `wrong`, `lapses`, `needsRecheck`, `overconfident`, `last`, `stage`, `applyRight`, `applyTotal`, `essayDone`, `wrongClearDates` |
+| 오답 좌표 | `key`, `n`, `cleared`, `dates`, `workId`, `kind`, `mark`, `no` |
+| 서술형 판정 | `verdict`, `score`, `total`, `at` — 답안 원문은 별도 `/review` |
+| 브레인덤프·종이 학습 | `workId`, `at`, `present`·`total` 또는 `kind:'paper'`·`coverage` |
+| 실수 유형 | `negative`, `bogi`, `concept`, `guess` |
+| 관리자 요약 | `packId`, `works`, `complete`, `restored`, `applied`, `byStage(1~5)`, `vocabReached/Stable/Total`, `blankReached/Stable/Total`, `wrongOpen`, `essayPass`, `essayHold`, `ready`, `lastAt` |
+| 준비도 요약 | `score`, `grade(key,label)`, `weak`, `axes(read,blank,vocab,apply,restore,essay)`, `alert(level,why)`, `pace(dday,minDays,rotations,perDay,onTrack)`, `untouched` |
+
+진단 상태의 접두 없는 `id`, 긴 한글 좌표, 오답 지면 번호 문자열, 서술형 소수 배점,
+시험 이후 음수 `dday`, `ready:null`과 부분 요약도 보존한다. 팩 id는 기존 형식을 따르고,
+기록 맵의 `__proto__` 키는 받지 않는다. 본문 등 허용 밖 필드는 기록의 모든 층에서 제외한다.
+
 관리(PIN): `POST /admin/pack {id, pack}` (4MB, packId 일치 검증) · `GET /admin/packs`
 · `POST /admin/exam {scope, examDate, packIds, profile}` · `GET/POST /admin/task`
 · `GET/POST /admin/overlay` (GET의 `found`는 해당 scope 레코드 존재 여부) · `GET/POST /admin/review` · `GET /admin/overview`
