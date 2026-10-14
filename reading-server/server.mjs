@@ -22,6 +22,7 @@ import { checkAdminLogin } from './admin-auth.mjs';
 import { applySecurityHeaders } from './sec-headers.mjs';
 import { createInhouseAccess } from './inhouse-access.mjs';
 import { readLocalMaterials } from './naesin-local-materials.mjs';
+import { stampServiceWorker } from './sw-version.mjs';
 import { handlePortalFamilyLink, PORTAL_LINK_BODY_LIMIT, withPortalFamilies } from './portal-family.mjs';
 import { bookIndex, cleanWords, coachingCard, confirmAllPlan, findBook, readyToConfirm, sourceSummary, validProgress, withOverlay } from './textbook.mjs';
 import { parseRoster } from './roster.mjs';
@@ -1049,6 +1050,12 @@ const server = http.createServer(async (req, res) => {
     if (p.startsWith('/letter/')) return serveFile(res, LETTER_DIR, p.slice('/letter/'.length));
 
     /* 내신브레인 앱 — 팩 콘텐츠는 여기 없다(/api/naesin/pack, KV·db 전용) */
+    if (p === '/naesin/sw.js') {
+      const shell = ['index.html', 'engine.js', 'grade.js', 'gen.js', 'pack-sample.json', 'manifest.webmanifest', 'icon.svg'].map(file => path.join(NAESIN_DIR, file));
+      const { source } = stampServiceWorker(path.join(NAESIN_DIR, 'sw.js'), shell.concat(path.join(SHARED_DIR, 'voice.js')), 'wbn-shell');
+      res.writeHead(200, { 'Content-Type': MIME['.js'], 'Cache-Control': 'no-store' });
+      return res.end(source);
+    }
     if (p === '/naesin/voice.js') return serveFile(res, SHARED_DIR, 'voice.js');
     if (p === '/naesin' || p === '/naesin/') return serveFile(res, NAESIN_DIR, 'index.html');
     if (p.startsWith('/naesin/')) return serveFile(res, NAESIN_DIR, p.slice('/naesin/'.length));
