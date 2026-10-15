@@ -124,6 +124,13 @@ const unannotatedPdfSentence = () => { const row = pdfSentence(); delete row.key
 
 console.log('naesin-studio — 팩 제작 스튜디오');
 
+await t('원내 PC는 기존 작업을 보존하며 다출판사 작업 500개까지 만들고 워커는 60개 상한을 지킨다',async()=>{
+  const s=memStore();let count=60;s.listJobs=async()=>Array.from({length:count},()=>({}));
+  assert.equal((await call(s,'/api/naesin/admin/job','POST',{packId:'own-many-jobs'})).status,409);
+  assert.equal((await call(s,'/api/naesin/admin/job','POST',{packId:'own-many-jobs'},{localPdfReview:true})).status,200);
+  count=500;assert.equal((await call(s,'/api/naesin/admin/job','POST',{packId:'own-many-jobs'},{localPdfReview:true})).status,409);
+});
+
 await t('인증·권한 — 학생 토큰은 403, 없으면 401', async () => {
   const s = memStore();
   assert.strictEqual((await call(s, '/api/naesin/admin/jobs', 'GET', null, { who: null })).status, 401);
