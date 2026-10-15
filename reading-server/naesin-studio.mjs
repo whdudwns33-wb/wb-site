@@ -304,7 +304,7 @@ export async function handleStudio(ctx) {
     const packId = strMax(b.packId, 60);
     if (!PACK_ID_RE.test(packId)) return j(400, { error: '팩 id 규칙: 영문·숫자·하이픈 3~60자' });
     const list = (await store.listJobs()) || [];
-    if (list.length >= JOBS_MAX) return j(409, { error: '작업이 너무 많아요. 끝난 작업을 지우고 다시 만드세요.' });
+    if (list.length >= (ctx.localPdfReview === true ? PRACTICE_PACKS_MAX : JOBS_MAX)) return j(409, { error: '작업이 너무 많아요. 끝난 작업을 지우고 다시 만드세요.' });
     const parts = {};
     const sources = [];
     const raw = Array.isArray(b.sources) ? b.sources.slice(0, SRC_KINDS_MAX) : [];
