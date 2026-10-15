@@ -12,6 +12,16 @@ const clone = (o) => JSON.parse(JSON.stringify(o));
 const has = (list, frag) => list.some((x) => (x.where + ': ' + x.message).indexOf(frag) >= 0);
 
 console.log('pack-check — 팩 검사 규칙');
+t('명시한 문제 전용 팩만 빈 단어·본문을 허용하고 빈 문항·잘못된 정답은 거절한다',()=>{
+  const pack={...clone(SAMPLE),contentMode:'questions',words:[],sentences:[]};
+  for(const key of CHECK.PACK_ARRAYS)if(!['items','words','sentences'].includes(key))delete pack[key];
+  delete pack.counts;
+  assert.deepStrictEqual(CHECK.checkPack(pack).errors,[]);
+  assert.ok(CHECK.checkPack({...pack,items:[]}).errors.length);
+  assert.ok(CHECK.checkPack({...pack,contentMode:'other'}).errors.length);
+  assert.ok(CHECK.checkPack({...pack,words:undefined}).errors.length);
+  const bad=clone(pack);bad.items[0].answer=[];assert.ok(CHECK.checkPack(bad).errors.length);
+});
 
 /* ── 기준선 ── */
 t('자체 창작 샘플 팩은 오류 0', () => {

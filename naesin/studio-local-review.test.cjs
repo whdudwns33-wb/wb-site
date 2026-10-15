@@ -4,6 +4,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
 const html=fs.readFileSync(path.join(__dirname,'../reading-server/public/naesin-studio.html'),'utf8');
 const inline=html.split('<script>')[1].split('</script>')[0],ids=new Set(Array.from(html.matchAll(/\bid=["']([^"']+)["']/g),m=>m[1]));
 for(const side of ['En','Ko'])for(const range of ['Column','Start','End'])ids.add('pdf'+side+range);
+for(let n=1;n<=5;n++)ids.add('pdfItemChoice'+n);
 const clone=v=>JSON.parse(JSON.stringify(v)),response=(body,status=200)=>({ok:status<400,status,json:async()=>body});
 const pdfResponse=()=>({ok:true,status:200,headers:{get:()=> 'application/pdf'},blob:async()=>({type:'application/pdf',own:'SELF_WRITTEN_PDF'})});
 const ownPdfSha='a'.repeat(64);
@@ -79,8 +80,8 @@ function screen(){
     fetch:async(url,opt)=>{requests.push({url,...opt});return fetchImpl(url,opt);}});
   const stop=inline.indexOf("$('#bannerClose').onclick=hideBanner;");assert.ok(stop>1000);
   vm.runInContext(inline.slice(0,stop)+`
-    this.ui={loadSourceLibrary,list:()=>{VIEW='list';},putPdfReviewFile,putDraftFiles,putDraft,pdfReviewDraft,regularDraft,pdfColumnsHtml,pdfSentenceHtml,loadPdfSentence,savePdfSentence,savePdfWord,renderSrc,renderJob,review,bulkOk,openJob,openList,renderLogin,rowKey,
-      get:()=>({JOB,GATE,PDF_LOCAL,PDF_VIEW,PDF_WORD_EDIT,VIEW,SEL,EDIT,SRC,BUSY}),set:j=>{JOB=j;GATE={ok:false,pending:0,total:0,errors:[],warns:[],summary:[]};VIEW='job';JOB_READ++;},
+    this.ui={publishReviewed,connectQuestionSources,savePdfItem,loadSourceLibrary,list:()=>{VIEW='list';},putPdfReviewFile,putDraftFiles,putDraft,pdfReviewDraft,regularDraft,pdfColumnsHtml,pdfSentenceHtml,loadPdfSentence,savePdfSentence,savePdfWord,renderSrc,renderJob,review,bulkOk,openJob,openList,renderLogin,rowKey,
+      get:()=>({JOB,GATE,PDF_LOCAL,PDF_VIEW,PDF_WORD_EDIT,PDF_ITEM_EDIT,VIEW,SEL,EDIT,SRC,BUSY}),set:j=>{JOB=j;GATE={ok:false,pending:0,total:0,errors:[],warns:[],summary:[]};VIEW='job';JOB_READ++;},
       setGate:g=>{GATE=g;},setLocal:p=>{PDF_LOCAL=p;},setToken:t=>{TOKEN=t;},showAll:()=>{FONLY='all';renderJob();}};`,ctx);
   ctx.ui.set(stored);
   return{...ctx.ui,node,chunks,events,requests,created,revoked,rowRenders:()=>rowRenders,setStored:j=>{stored=j;},setFetch:f=>{fetchImpl=f;}};
@@ -97,6 +98,34 @@ function wordInput(ui,head=' own fixed word ',pos=' adj. ',meanings=' 뜻 하나
 function wordSection(ui,section,checked){const el=ui.node('#pdfWord'+section);el.checked=checked;el.onchange();}
 
 (async()=>{
+  await t('확인 문항 게시 버튼은 선택 반과 현재 버전을 보내고 검수 기록을 새로 만들지 않는다',async()=>{
+    const ui=screen(),own=job();own.draft={items:[{id:'own-approved',no:1,formatType:'short',instructionKo:'Own question',choices:[],answer:['Own answer']},{id:'own-pending',no:2,formatType:'short',instructionKo:'Own question two',choices:[],answer:['Own answer two']}]};own.review={'items:own-approved':{state:'ok'}};
+    ui.setStored(own);ui.set(own);ui.showAll();ui.node('#reviewClass').value='월수금';
+    ui.setFetch(async url=>url.endsWith('/publish-reviewed')?response({publishedItems:1,remainingItems:1,packId:'own-published'}):response({job:own,gate:gate(own)}));
+    await ui.publishReviewed();const body=JSON.parse(ui.requests.find(r=>r.url.endsWith('/publish-reviewed')).body);
+    assert.equal(body.scope,'cls:월수금');assert.equal(body.baseUpdatedAt,own.updatedAt);
+    assert.ok(!ui.requests.some(r=>r.url.endsWith('/job/review')));assert.match(ui.node('#pubOut').textContent,/1문항/);assert.match(ui.node('#pubOut').textContent,/미검토 1문항/);
+  });
+  await t('문항에 기록한 원본 해시가 달라지면 다른 PDF로 조용히 연결하지 않는다',async()=>{
+    const ui=screen(),own=job();own.meta={contentMode:'questions'};own.draft={items:[{id:'own-source-changed',no:1,_pdfReview:{flags:['REVIEW_REQUIRED'],locations:[{libraryId:'src-000001',librarySha256:'b'.repeat(64),page:1,bbox:[30,45,300,800]}]}}]};ui.set(own);
+    ui.setFetch(async()=>response({documents:[{id:'src-000001',packId:own.packId,title:'Own changed source',pageCount:1,sha256:ownPdfSha}]}));
+    await ui.connectQuestionSources();assert.equal(ui.get().PDF_LOCAL,null);assert.match(ui.node('#bannerMsg').textContent,/변경됐습니다/);
+  });
+  await t('단원 문제 원본 연결과 일반 교정 — 소문항 답을 나누지 않고 실패 입력을 보존한다',async()=>{
+    const ui=screen(),own=job(),item={id:'own-item',no:1,source:'04',formatType:'short',instructionKo:'Own question',stimulus:{type:'text',parts:[]},choices:[],answer:[],_pdfReview:{flags:['REVIEW_REQUIRED'],locations:[{libraryId:'src-000001',page:2,bbox:[30,45,300,800]}]}};
+    own.meta={contentMode:'questions'};own.draft={items:[item]};ui.setStored(own);ui.set(own);
+    ui.setFetch(async url=>url==='/api/naesin/admin/source-library'?response({documents:[{id:'src-000001',packId:own.packId,title:'Own PDF',pageCount:3,sha256:ownPdfSha}]}):url.includes('source-library?id=')?pdfResponse():response({error:'own failure'},500));
+    await ui.connectQuestionSources();ui.showAll();await new Promise(r=>setImmediate(r));
+    assert.equal(ui.get().PDF_VIEW.source,'src-000001');assert.ok(ui.requests.some(r=>r.url.includes('source-library?id=src-000001')));
+    editRow(ui,'items:own-item');assert.match(ui.node('#rowList').innerHTML,/문제 교정/);
+    ui.node('#pdfItemType').value='short';ui.node('#pdfItemStem').value='Own corrected question';ui.node('#pdfItemContext').value='Own context';ui.node('#pdfItemAnswer').value='(1) First required part\n(2) Second required part';
+    await ui.savePdfItem();
+    const body=JSON.parse(ui.requests.find(r=>r.url.endsWith('/job/review')).body);
+    assert.deepEqual(clone(body.patch.answer),['(1) First required part\n(2) Second required part']);assert.ok(!Object.hasOwn(body.patch,'_pdfReview'));
+    assert.equal(ui.get().JOB.review['items:own-item'],undefined);
+    assert.equal(ui.node('#pdfItemStem').value,'Own corrected question');assert.ok(ui.get().PDF_ITEM_EDIT);
+    assert.equal(ui.get().PDF_ITEM_EDIT.busy,false);ui.renderLogin();assert.equal(ui.get().PDF_ITEM_EDIT,null);
+  });
   await t('원본 자료실은 학년·단원으로 묶고 인증 PDF만 열며 검수·게시를 쓰지 않는다',async()=>{
     const ui=screen();ui.list();
     const own={id:'src-000001',packId:'own-pack',grade:'m1',unit:'1과',title:'Own <title>',sha256:ownPdfSha,pageCount:1};

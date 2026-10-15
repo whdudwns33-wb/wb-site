@@ -60,7 +60,7 @@ var WBPACKCHECK = (function () {
   };
   var PACK_ARRAYS = Object.keys(rowShapes);
   var packShape = { rights: { basis: 'string', holder: 'string', evidenceRef: 'string', studentUseAllowed: 'boolean', derivativeUseAllowed: 'boolean', externalAiAllowed: 'boolean', expiresAt: 'string', notes: 'string' }, packId: 'string', curriculum: 'string', textbook: 'string', grade: 'string', school: 'string', gradeSem: 'string', exam: 'string', lesson: 'scalar',
-    lessonTitle: 'string', source: 'string', notes: 'texts', passage: { titleEn: 'string', titleKo: 'string' }, counts: {} };
+    lessonTitle: 'string', source: 'string', contentMode: 'string', notes: 'texts', passage: { titleEn: 'string', titleKo: 'string' }, counts: {} };
   PACK_ARRAYS.forEach(function (k) { packShape[k] = [rowShapes[k]]; packShape.counts[k] = 'scalar'; });
   ['examples', 'definitions', 'polysemy', 'synAnt'].forEach(function (k) { packShape.counts[k] = 'scalar'; });
 
@@ -553,9 +553,12 @@ var WBPACKCHECK = (function () {
        (스튜디오 assemble 은 행이 0인 종류를 팩에서 아예 빼므로, 한 종류만 넣고 만들면
         정확히 이 상태가 나온다 — 실제로 오류 0·경고 0 으로 통과하던 구멍이다.) */
     REQUIRED_SECTIONS.forEach(function (r) {
+      if (pack.contentMode === 'questions' && isArr(pack[r.key])) return;
       if (!isArr(pack[r.key]) || !pack[r.key].length)
         c.err('(공통)', r.key + ' 가 비었음 — ' + r.why + ' (' + r.need + ' 자료가 필요하다)');
     });
+    if (pack.contentMode != null && pack.contentMode !== 'questions') c.err('(공통)', '알 수 없는 contentMode');
+    if (pack.contentMode === 'questions' && (!isArr(pack.items) || !pack.items.length)) c.err('items', '문제 전용 팩에는 검수된 문항이 필요함');
     return { errors: c.errors, warns: c.warns, summary: c.summary };
   }
 
