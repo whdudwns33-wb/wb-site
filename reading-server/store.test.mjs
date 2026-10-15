@@ -65,6 +65,17 @@ try {
   await sleep(400);
   fs.writeFileSync = originalWrite;
 
+  // 당일 수동 복구점이 보존되면 지워진 일일 파일을 매 저장마다 다시 만들 필요가 없다.
+  let currentDay;
+  for(let i=0;i<12;i++){const id=store.snapshotNow();assert.ok(id);currentDay=id.slice(0,10);}
+  let dailyCreates=0;
+  try {
+    fs.openSync=(target,...args)=>{if(target===path.join(data,'private-backups','db-'+currentDay+'.json'))dailyCreates++;return originalOpen(target,...args);};
+    db.students.SYN001.level='L2';await store.persist();
+    assert.equal(JSON.parse(fs.readFileSync(file,'utf8')).students.SYN001.level,'L2');
+    assert.equal(dailyCreates,0,'보존된 당일 복구점이 있는데 전체 스냅샷을 매번 만들면 안 된다');
+  } finally {fs.openSync=originalOpen;}
+
   // 공개 파일을 일부 쓴 뒤 실패해도 두 부분 파일을 지우고 같은 날 다음 저장에서 다시 만든다.
   const retryDay = '2099-01-01';
   const retryPublic = path.join(data, 'backups', 'db-' + retryDay + '.json');
