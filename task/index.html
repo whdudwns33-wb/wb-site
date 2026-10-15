@@ -57,8 +57,16 @@
 
   /* ─── 탭 ─── */
   .tabs { background: var(--white); border-bottom: 1px solid var(--line); position: sticky; top: 55px; z-index: 40; }
-  .tabs .wrap { display: flex; gap: 2px; overflow-x: auto; scrollbar-width: none; }
-  .tabs .wrap::-webkit-scrollbar { display: none; }
+  .tabs .tab-shell { display: flex; align-items: center; gap: 4px; }
+  .tabs #tabs { display: flex; gap: 2px; overflow-x: auto; min-width: 0; flex: 1; scrollbar-width: auto; scrollbar-color: #839CAB #EDF2F5; }
+  .tabs #tabs::-webkit-scrollbar { height: 10px; }
+  .tabs #tabs::-webkit-scrollbar-track { background: #EDF2F5; }
+  .tabs #tabs::-webkit-scrollbar-thumb { background: #839CAB; border-radius: 8px; }
+  .tabs #tabs .tab { flex-shrink: 0; }
+  .tab-scroll-button { flex: 0 0 36px; height: 44px; border: 1px solid var(--line); border-radius: 8px; color: var(--deep-blue); background: #F3F8FB; }
+  .tab-scroll-button[hidden] { display: none; }
+  .tab-scroll-button:disabled { visibility: hidden; }
+  .tab-scroll-button:focus-visible { outline: 2px solid var(--deep-blue); outline-offset: 1px; }
   .tab {
     padding: 13px 14px; font-size: 14px; font-weight: 700; color: var(--mid-gray);
     border-bottom: 3px solid transparent; white-space: nowrap; display: flex; align-items: center; gap: 5px;
@@ -1218,6 +1226,7 @@
   .pill.bad { background: #FEF2F2; color: var(--coral); }
   .sect { font-size: 12px; font-weight: 900; color: var(--mid-gray); letter-spacing: .04em; margin: 18px 0 8px; }
 </style>
+<script src="tab-scroll.js" defer></script>
 </head>
 <body>
 
@@ -1228,7 +1237,7 @@
   </div>
 </header>
 
-<nav class="tabs"><div class="wrap" id="tabs"></div></nav>
+<nav class="tabs" aria-label="업무 메뉴"><div class="wrap tab-shell"><button type="button" class="tab-scroll-button" id="tabScrollLeft" aria-label="왼쪽 메뉴 보기" aria-controls="tabs" hidden>◀</button><div id="tabs"></div><button type="button" class="tab-scroll-button" id="tabScrollRight" aria-label="오른쪽 메뉴 보기" aria-controls="tabs" hidden>▶</button></div></nav>
 <section class="wrap" id="staffWorkControls" hidden></section>
 <section class="wrap" id="taskPushPanel" hidden>
   <details class="card"><summary>기기 요청 알림 설정</summary>
