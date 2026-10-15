@@ -2,6 +2,8 @@
 
 새 컴퓨터에서 이 저장소만 클론하면, **워크벤치 접속 비밀번호 하나로** 아래 두 파일을 복원해
 전체 빌드·배포가 가능하다. 두 파일 모두 gzip 후 **AES-256-GCM + PBKDF2(SHA-256, 310,000회)** 암호화.
+백업은 재암호화마다 파일별로 새 무작위 salt·12바이트 IV를 사용한다. 앱의 기기 기억을 위한
+`workbench/src/encryption-config.json` 고정 KDF 설정은 백업에 적용하지 않으며, 아래 복원 명령은 각 백업 안의 salt를 그대로 사용한다.
 
 | 파일 | 내용 | 복원 위치 |
 |---|---|---|
@@ -13,8 +15,10 @@ seed: 학생 개인정보. 두 복원 대상 경로는 `.gitignore`에 있어 �
 
 ## 복원 ① bulk-data
 
+비밀번호는 가려진 로컬 입력으로 준비한 현재 프로세스의 `WB_PASSWORD`를 사용한다. 값은 채팅·명령문·파일·로그에 적지 않는다.
+
 ```bash
-WB_PASSWORD='<비밀번호>' node -e '
+node -e '
 const c=require("crypto"),f=require("fs"),z=require("zlib");
 const e=JSON.parse(f.readFileSync("workbench/backup/bulk-data.enc.json"));
 const k=c.pbkdf2Sync(process.env.WB_PASSWORD,Buffer.from(e.s,"base64"),310000,32,"sha256");
@@ -28,7 +32,7 @@ console.log("복원 완료");'
 ## 복원 ② private-seed
 
 ```bash
-WB_PASSWORD='<비밀번호>' node -e '
+node -e '
 const c=require("crypto"),f=require("fs"),z=require("zlib");
 const e=JSON.parse(f.readFileSync("workbench/backup/private-seed.enc.json"));
 const k=c.pbkdf2Sync(process.env.WB_PASSWORD,Buffer.from(e.s,"base64"),310000,32,"sha256");
@@ -39,13 +43,14 @@ f.writeFileSync("workbench/src/private-seed.json",z.gunzipSync(Buffer.concat([d.
 console.log("복원 완료");'
 ```
 
-두 파일을 복원한 뒤 `WB_PASSWORD='<비밀번호>' node workbench/src/build.mjs` 로 재빌드한다.
+두 파일을 복원한 뒤 `node workbench/src/check-password.mjs`와 `node workbench/src/check-names.mjs`를 통과하고 `node workbench/src/build.mjs`로 재빌드한다.
 
 ## 재암호화 (평문을 바꾼 뒤 — 배포보다 먼저)
 
 ```bash
-WB_PASSWORD='<비밀번호>' node workbench/src/backup-encrypt.mjs        # all | bulk | seed
+node workbench/src/backup-encrypt.mjs        # all | bulk | seed
 git add workbench/backup/*.enc.json && git commit -m "workbench: 백업 재암호화 — <무엇을 바꿨나>"
+git push origin claude/agent-performance-optimization-rj8ql6
 ```
 
 지금 백업이 그 비밀번호로 열리지 않으면 덮어쓰지 않고, 쓴 직후 다시 복호화해 원본과 바이트 단위로 대조한다.
