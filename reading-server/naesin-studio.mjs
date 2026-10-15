@@ -28,6 +28,8 @@ import { extract, makeQuota, readExtractLimit, KINDS } from './naesin-extract.mj
    기본 import 는 Node 의 CJS 상호운용과 esbuild 양쪽에서 module.exports 를 그대로 준다. */
 import CHECK from '../naesin/pack-check.js';
 import GEN from '../naesin/gen.js';
+import COVERAGE from '../naesin/coverage.js';
+import { handleNaesin } from './naesin-api.mjs';
 
 const PACK_ID_RE = /^[A-Za-z0-9-]{3,60}$/;
 const JOB_ID_RE = /^job-[a-z0-9]{6,20}$/;
@@ -61,7 +63,9 @@ function validPdfReview(v) {
   return ownKeys(v, ['flags', 'locations'])
     && Array.isArray(v.flags) && v.flags.length <= 100 && v.flags.every((f) => typeof f === 'string' && f.length <= 200)
     && Array.isArray(v.locations) && v.locations.length <= 100 && v.locations.every((loc) =>
-      ownKeys(loc, ['page', 'bbox', 'sourceDocumentId', 'printedPage', 'section', 'questionNo']) && Number.isInteger(loc.page) && loc.page > 0 && loc.page <= 1_000_000
+      ownKeys(loc, ['page', 'bbox', 'sourceDocumentId', 'printedPage', 'section', 'questionNo', 'libraryId', 'librarySha256']) && Number.isInteger(loc.page) && loc.page > 0 && loc.page <= 1_000_000
+      && (loc.libraryId === undefined || /^src-\d{6}$/.test(loc.libraryId))
+      && (loc.librarySha256 === undefined || loc.libraryId !== undefined && /^[a-f0-9]{64}$/.test(loc.librarySha256))
       && Array.isArray(loc.bbox) && loc.bbox.length === 4 && loc.bbox.every((n) => Number.isFinite(n) && n >= 0)
       && loc.bbox[0] <= loc.bbox[2] && loc.bbox[1] <= loc.bbox[3]
       && (loc.sourceDocumentId === undefined || /^(?:00|01|02|03|04s|04t|05s|05t|06s|06t|07|08|09)$/.test(loc.sourceDocumentId))
@@ -138,9 +142,10 @@ export function assemble(job) {
   const review = isObj(job && job.review) ? job.review : {};
   const meta = isObj(job && job.meta) ? job.meta : {};
   const pack = { packId: (job && job.packId) || '' };
-  for (const k of ['curriculum', 'textbook', 'grade', 'lesson', 'lessonTitle', 'source']) {
+  for (const k of ['curriculum', 'textbook', 'grade', 'lesson', 'lessonTitle', 'source', 'contentMode']) {
     if (meta[k] != null && meta[k] !== '') pack[k] = meta[k];
   }
+  if (pack.contentMode === 'questions') { pack.words = pack.words || []; pack.sentences = pack.sentences || []; }
   pack.rights = meta.rights || null;
   for (const kind of Object.keys(draft)) {
     if (!DRAFT_KINDS.includes(kind)) continue;
@@ -268,6 +273,7 @@ function metaOf(b) {
     lesson: Number.isFinite(lesson) ? Math.trunc(lesson) : null,
     lessonTitle: strMax(m.lessonTitle, NAME_MAX),
     source: strMax(m.source, NOTE_MAX),
+    ...(m.contentMode === 'questions' ? {contentMode:'questions'} : {}),
     rights: normalizeRights(b.rights || m.rights),
   };
 }
@@ -532,6 +538,28 @@ export async function handleStudio(ctx) {
   }
 
   /* 배포 — 검사기와 같은 판정을 통과했을 때만 팩 저장소로 넘긴다 */
+  if (p === '/api/naesin/admin/job/publish-reviewed' && method === 'POST') {
+    const b = await body(); const bad = badBody(b); if (bad) return bad;
+    const job = await jobOf(strMax(b.jobId,40)); if (!job) return j(404,{error:'작업을 찾을 수 없어요.'});
+    if (typeof b.baseUpdatedAt !== 'string' || staleJob(b,job)) return j(409,{error:'최신 검수 작업을 다시 읽고 게시하세요.'});
+    const scope=strMax(b.scope,84),packId=job.packId+'-questions';
+    if (!scope.startsWith('cls:') || COVERAGE.classScope(scope.slice(4))!==scope || !PACK_ID_RE.test(packId)) return j(400,{error:'반 배정 대상 또는 팩 id를 확인하세요.'});
+    const reviews=job.review||{};
+    const items=(job.draft.items||[]).flatMap((row,i)=>{const review=reviews[rowKey('items',row,i)];return review&&['ok','fixed'].includes(review.state)?[reviewedRow(row,review)]:[];});
+    if (!items.length) return j(400,{error:'교사가 검수 완료한 문항이 없어요.'});
+    const pack=assemble({...job,packId,meta:{...job.meta,contentMode:'questions'},draft:{items},review:{}});
+    const check=CHECK.checkPack(pack);if(check.errors.length)return j(400,{error:'검수 완료 문항에도 검사 오류가 남아 있어요.',errors:check.errors});
+    const previous=await store.getExam(scope),packIds=[...new Set([...(previous&&previous.packIds||[]),packId])];
+    if(packIds.length>20)return j(400,{error:'반에 배정된 팩이 20개를 넘습니다. 기존 범위를 먼저 정리하세요.'});
+    const updatedAt=nowIso();await store.putPack(packId,{pack,updatedAt});
+    const ids=(await store.getPackIds())||[];if(!ids.includes(packId))await store.putPackIds(ids.concat(packId));
+    const assignment=previous&&previous.examDate?{examDate:previous.examDate,...(previous.wordDeadlineDays!=null?{wordDeadlineDays:previous.wordDeadlineDays}:{})}:{mode:'practice',examDate:''};
+    const assigned=await handleNaesin({path:'/api/naesin/admin/exam',method:'POST',who,query:new URLSearchParams(),store,getBody:async()=>({scope,packIds,...assignment})});
+    if(assigned.status!==200)return j(assigned.status,{error:'문항은 게시했지만 반 배정에 실패했어요. 배정 상태를 확인한 뒤 다시 시도하세요.',packId});
+    job.updatedAt=nextJobVersion(job);await store.putJob(job.jobId,job);
+    const remainingItems=(job.draft.items||[]).filter((row,i)=>!['ok','fixed','dropped'].includes((reviews[rowKey('items',row,i)]||{}).state)).length;
+    return j(200,{ok:true,packId,scope,publishedItems:items.length,remainingItems,updatedAt});
+  }
   if (p === '/api/naesin/admin/job/publish' && method === 'POST') {
     const b = await body();
     const bad = badBody(b); if (bad) return bad;

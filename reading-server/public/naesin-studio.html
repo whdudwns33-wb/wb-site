@@ -130,6 +130,7 @@ let JOB=null,GATE=null,SRC={};   // 열어 둔 작업 하나
 let SEL=null;           // 선택된 행의 검수 키 — 키보드 조작과 원천 강조의 기준
 let EDIT=null;          // 편집 중인 행의 검수 키
 let PDF_WORD_EDIT=null; // 일반 단어 교정 입력은 현재 작업의 브라우저에만 둔다
+let PDF_ITEM_EDIT=null;
 let FKIND='all',FONLY='issue';   // 필터: 종류 · 무엇만 볼지('issue'|'pending'|'all')
 let NEWSRC=[];          // 새 작업에 붙인 원천 [{name,kind,text}] — 만들기 전까지 화면에만 있다
 let BUSY=false;
@@ -155,7 +156,7 @@ function fmtLast(t){if(!t)return '—';const d=(Date.now()-new Date(t))/60000;if
 
 function renderLogin(msg){
   clearPdfView();
-  VIEW='login';JOB=null;GATE=null;SRC={};SEL=null;EDIT=null;PDF_WORD_EDIT=null;PDF_LOCAL=null;NEWSRC=[];JOBS=null;JOB_READ++;
+  VIEW='login';JOB=null;GATE=null;SRC={};SEL=null;EDIT=null;PDF_WORD_EDIT=null;PDF_ITEM_EDIT=null;PDF_LOCAL=null;NEWSRC=[];JOBS=null;JOB_READ++;
   $('#btnRefresh').hidden=true;$('#btnLogout').hidden=true;hideBanner();
   /* 로그인 폼은 공용 모듈이 그린다(아이디·비밀번호 기본, PIN 갈래로 전환) — reading-server/public/admin-login.js */
   $('#app').innerHTML='<div class="card" id="loginCard"><h2>강사 로그인</h2><div id="loginHost"></div></div>';
@@ -236,6 +237,7 @@ function visibleRows(byKey){
       const iss=byKey[key]||[];
       if(FONLY==='issue'&&!iss.length)return;
       if(FONLY==='pending'&&rv.state!=='pending')return;
+      if(FONLY==='answer'&&(kind!=='items'||rv.state!=='pending'||({...row,...rv.patch}.answer||[]).length))return;
       out.push({kind,row,i,key,state:rv.state,note:rv.note||'',patch:rv.patch||null,issues:iss});
     });
   }
@@ -270,7 +272,7 @@ function srcHtml(text,anchor){
 /* ── 목록 화면 ── */
 async function openList(){
   clearPdfView();
-  PDF_LOCAL=null;PDF_WORD_EDIT=null;JOB_READ++;
+  PDF_LOCAL=null;PDF_WORD_EDIT=null;PDF_ITEM_EDIT=null;JOB_READ++;
   VIEW='list';JOB=null;GATE=null;SRC={};SEL=null;EDIT=null;
   $('#btnRefresh').hidden=false;$('#btnLogout').hidden=false;
   try{JOBS=(await api('/naesin/admin/jobs')).jobs||[];hideBanner();}
@@ -414,11 +416,24 @@ async function openJob(id){
   if(PDF_VIEW&&(PDF_VIEW.jobId!==id||PDF_VIEW.token!==token||PDF_VIEW.busy))clearPdfView();
   if(PDF_LOCAL&&PDF_LOCAL.jobId!==id)PDF_LOCAL=null;
   if(PDF_WORD_EDIT&&PDF_WORD_EDIT.jobId!==id)PDF_WORD_EDIT=null;
+  if(PDF_ITEM_EDIT&&PDF_ITEM_EDIT.jobId!==id)PDF_ITEM_EDIT=null;
   VIEW='job';EDIT=null;SEL=null;FKIND='all';FONLY='issue';
   try{
     if(!await readJob(id,read,token))return;
   }catch(e){if(read!==JOB_READ||TOKEN!==token||VIEW!=='job'||isAuth(e))return;fail(e);if(!JOB||JOB.jobId!==id)openList();return;}
+  if(JOB.meta&&JOB.meta.contentMode==='questions')await connectQuestionSources(id,read,token);
   renderJob();
+}
+async function connectQuestionSources(id=JOB&&JOB.jobId,read=JOB_READ,token=TOKEN){
+  try{
+    const data=await api('/naesin/admin/source-library');
+    if(!JOB||JOB.jobId!==id||read!==JOB_READ||token!==TOKEN||VIEW!=='job')return;
+    const docs=(data.documents||[]).filter(d=>d.packId===JOB.packId);
+    if(!docs.length)throw new Error('이 단원의 원본 자료가 없습니다. 반입 목록을 확인하세요.');
+    const ids=new Set(docs.map(d=>d.id));
+    if((JOB.draft.items||[]).some(row=>(row._pdfReview&&row._pdfReview.locations||[]).some(loc=>loc.libraryId&&(!ids.has(loc.libraryId)||loc.librarySha256&&docs.find(d=>d.id===loc.libraryId).sha256!==loc.librarySha256))))throw new Error('문항 원본이 이 단원과 다르거나 변경됐습니다. 변환 기록을 확인하세요.');
+    clearPdfView();PDF_LOCAL={jobId:id,token,pdfs:docs.map(d=>({source:d.id,file:d.title,pageCount:d.pageCount,sha256:d.sha256})),columns:[]};
+  }catch(e){if(JOB&&JOB.jobId===id&&read===JOB_READ&&token===TOKEN)fail(e);}
 }
 function renderJob(){
   if(!JOB){openList();return;}
@@ -434,6 +449,7 @@ function renderJob(){
   const srcKinds=(JOB.sources||[]).map(s=>s.kind).filter((k,i,a)=>a.indexOf(k)===i);
   const kinds=Object.keys(JOB.draft||{});
   const hasPdf=kinds.some(k=>(JOB.draft[k]||[]).some(row=>row&&row._pdfReview));
+  const approvedItems=(JOB.draft.items||[]).filter((row,i)=>['ok','fixed'].includes(((JOB.review||{})[rowKey('items',row,i)]||{}).state)).length;
   const clean=(()=>{const r=(JOB.review)||{};let n=0;
     for(const kind of kinds)(JOB.draft[kind]||[]).forEach((row,i)=>{const k=rowKey(kind,row,i);
       if(!(row&&row._pdfReview)&&!(byKey[k]||[]).length&&!(r[k]&&r[k].state!=='pending'))n+=1;});
@@ -461,7 +477,8 @@ function renderJob(){
     ${loose.length?`<div class="issues ${loose.some(x=>x.sev==='bad')?'bad':'warn'}"><b>행에 붙이지 못한 문제 ${num(loose.length)}건</b> — 팩 전체에 관한 것이라 개별 행에서 못 고칩니다.
       ${loose.slice(0,8).map(x=>'<div>'+(x.sev==='bad'?'✕':'!')+' ['+esc(x.where)+'] '+esc(x.message)+'</div>').join('')}</div>`:''}
     ${GATE.summary&&GATE.summary.length?`<p class="muted" style="margin-top:8px">${GATE.summary.map(esc).join(' · ')}</p>`:''}
-    <div id="pubOut"></div>
+    ${(JOB.draft.items||[]).length?'<div class="filters"><label class="fld">문항을 배정할 반<input id="reviewClass" value="'+esc(localStorage.getItem('wbn.review.class')||'월수금')+'"></label><button class="btn" id="btnPubReviewed" '+(approvedItems?'':'disabled')+'>검수 완료 '+approvedItems+'문항 게시·반 배정</button></div><p class="muted">승인·교정 완료한 문항만 공개합니다. 미검토·버림 문항은 제외하고, 다른 배정 팩은 유지합니다.</p>':''}
+    <div id="pubOut" role="status"></div>
   </div>
 
   <div class="card"><h2>권리 근거 확인</h2><p class="muted">구매는 변환·학생 제공 권리를 뜻하지 않습니다. 자체 제작·공개 라이선스·학생 이용이 명시된 별도 계약만 선택하세요. 증빙은 운영자가 직접 확인해야 합니다. 권리 미확인 상태에서는 PC PDF 불러오기·AI 추출·배포가 차단되며, 이미 입력된 초안 열람과 수동 편집은 가능합니다.</p><label>근거 <select id="rBasis"><option value="">선택</option><option value="self_authored" ${rights.basis==='self_authored'?'selected':''}>자체 제작</option><option value="open_license" ${rights.basis==='open_license'?'selected':''}>공개 라이선스</option><option value="licensed" ${rights.basis==='licensed'?'selected':''}>별도 계약</option></select></label> 권리자 <input id="rHolder" value="${esc(rights.holder||'')}"> 증빙 참조 <input id="rEvidence" value="${esc(rights.evidenceRef||'')}"> 만료일 <input type="date" id="rExpiry" value="${esc(rights.expiresAt||'')}"><br><label><input type="checkbox" id="rStudent" ${rights.studentUseAllowed===true?'checked':''}> 학생 이용 허용</label> <label><input type="checkbox" id="rDerivative" ${rights.derivativeUseAllowed===true?'checked':''}> 2차 제작 허용</label> <label><input type="checkbox" id="rAi" ${rights.externalAiAllowed===true?'checked':''}> 외부 AI 전송 허용</label> <button class="btn sm" id="btnRights">권리 확인 저장</button></div>
@@ -511,6 +528,7 @@ function renderJob(){
     <div class="filters">
       <button class="chip" data-only="issue" aria-pressed="${FONLY==='issue'}">문제 있는 행만</button>
       <button class="chip" data-only="pending" aria-pressed="${FONLY==='pending'}">미검토만</button>
+      <button class="chip" data-only="answer" aria-pressed="${FONLY==='answer'}">정답 미대응</button>
       <button class="chip" data-only="all" aria-pressed="${FONLY==='all'}">전체</button>
       <span style="width:10px"></span>
       <button class="chip" data-kind="all" aria-pressed="${FKIND==='all'}">모든 종류</button>
@@ -529,11 +547,13 @@ function renderJob(){
   $('#btnRights').onclick=saveRights;
   $('#btnBack').onclick=openList;
   $('#btnPub').onclick=publish;
+  if($('#btnPubReviewed'))$('#btnPubReviewed').onclick=publishReviewed;
+  if($('#reviewClass'))$('#reviewClass').onchange=()=>localStorage.setItem('wbn.review.class',$('#reviewClass').value);
   document.querySelectorAll('[data-ex]').forEach(b=>b.onclick=()=>runExtract(b.dataset.ex,b));
   $('#btnDraft').onclick=()=>putDraft($('#draftJson').value, '붙여넣기');
   $('#btnDraftFile').onclick=putDraftFiles;
   $('#btnPdfReview').onclick=()=>putPdfReviewFile();
-  $('#btnPcReview').onclick=()=>putPdfReviewFile(true);
+  $('#btnPcReview').onclick=async()=>{if(JOB.meta&&JOB.meta.contentMode==='questions'){await connectQuestionSources();renderJob();}else putPdfReviewFile(true);};
   bindPdfSentence();
   document.querySelectorAll('[data-folder-sentence]').forEach(button=>button.onclick=()=>{
     if(!PDF_LOCAL||!JOB||PDF_LOCAL.jobId!==JOB.jobId)return;
@@ -572,7 +592,7 @@ function renderRows(rows){
       ${sm.s?`<div class="rs">${esc(sm.s)}</div>`:''}
       ${r.issues.map(x=>`<div class="ri ${x.sev}">${x.sev==='bad'?'✕':'!'} ${esc(x.message)}</div>`).join('')}
       ${r.note?`<div class="rs">메모: ${esc(r.note)}</div>`:''}
-      ${editing&&r.kind==='words'&&r.row&&r.row._pdfReview?pdfWordEditHtml(r):editing?`<textarea data-ed="${esc(r.key)}" spellcheck="false">${esc(JSON.stringify(r.patch?{...r.row,...r.patch}:r.row,null,2))}</textarea>
+      ${editing&&r.kind==='items'&&r.row&&r.row._pdfReview&&r.row._pdfReview.locations.some(loc=>loc.libraryId)?pdfItemEditHtml(r):editing&&r.kind==='words'&&r.row&&r.row._pdfReview?pdfWordEditHtml(r):editing?`<textarea data-ed="${esc(r.key)}" spellcheck="false">${esc(JSON.stringify(r.patch?{...r.row,...r.patch}:r.row,null,2))}</textarea>
         <div class="ra"><button class="btn sm" data-save="${esc(r.key)}">저장</button>
           <button class="btn sm ghost" data-cancel="1">취소</button>
           <span class="muted">지운 키는 비운 값으로 저장됩니다.</span></div>`
@@ -589,12 +609,14 @@ function renderRows(rows){
     SEL=d.dataset.key;renderJob();
   });
   el.querySelectorAll('[data-ok]').forEach(b=>b.onclick=()=>review(b.dataset.ok,'ok'));
+  if($('#pdfItemSave'))$('#pdfItemSave').onclick=savePdfItem;
+  if(EDIT&&PDF_ITEM_EDIT&&PDF_ITEM_EDIT.key===EDIT&&$('#pdfItemFields'))['pdfItemType','pdfItemStem','pdfItemContext','pdfItemAnswer','pdfItemExplanation',...Array.from({length:5},(_,i)=>'pdfItemChoice'+(i+1))].forEach(id=>{$('#'+id).oninput=capturePdfItem;$('#'+id).onchange=capturePdfItem;});
   el.querySelectorAll('[data-drop]').forEach(b=>b.onclick=()=>{
     const r=rows.find(x=>x.key===b.dataset.drop);
     review(b.dataset.drop,r&&r.state==='dropped'?'pending':'dropped');
   });
   el.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>{EDIT=b.dataset.edit;SEL=b.dataset.edit;renderJob();});
-  el.querySelectorAll('[data-cancel]').forEach(b=>b.onclick=()=>{EDIT=null;PDF_WORD_EDIT=null;renderJob();});
+  el.querySelectorAll('[data-cancel]').forEach(b=>b.onclick=()=>{EDIT=null;PDF_WORD_EDIT=null;PDF_ITEM_EDIT=null;renderJob();});
   el.querySelectorAll('[data-save]').forEach(b=>b.onclick=()=>saveEdit(b.dataset.save));
   const sel=el.querySelector('.row[aria-selected="true"]');
   if(sel&&sel.scrollIntoView)sel.scrollIntoView({block:'nearest'});
@@ -646,6 +668,37 @@ async function savePdfWord(){
     }
   }finally{f.busy=false;if(current()){EDIT=f.key;renderJob();}}
 }
+function pdfItemEditHtml(r){
+  const original=r.patch?{...r.row,...r.patch}:r.row;
+  if(!PDF_ITEM_EDIT||PDF_ITEM_EDIT.jobId!==JOB.jobId||PDF_ITEM_EDIT.key!==r.key)PDF_ITEM_EDIT={jobId:JOB.jobId,key:r.key,source:JSON.stringify(original),row:JSON.parse(JSON.stringify(original)),answerText:(original.answer||[]).join(original.formatType==='short'?'\n':', '),busy:false};
+  const row=PDF_ITEM_EDIT.row;
+  return '<fieldset id="pdfItemFields"'+(PDF_ITEM_EDIT.busy?' disabled':'')+'><legend>문제 교정 · 원본과 비교하세요</legend>'
+    +'<label class="fld">유형<select id="pdfItemType">'+[['mcq','객관식'],['mcq_multi','복수 정답'],['short','주관식']].map(([v,label])=>'<option value="'+v+'"'+(v===row.formatType?' selected':'')+'>'+label+'</option>').join('')+'</select></label>'
+    +'<label class="fld">문제<textarea id="pdfItemStem">'+esc(row.instructionKo||'')+'</textarea></label>'
+    +'<label class="fld">지문<textarea id="pdfItemContext">'+esc((row.stimulus&&row.stimulus.parts||[]).map(p=>p.text||'').join('\n'))+'</textarea></label>'
+    +[1,2,3,4,5].map(n=>'<label class="fld">보기 '+n+' (주관식은 사용하지 않음)<textarea id="pdfItemChoice'+n+'">'+esc(((row.choices||[]).find(c=>c.label===String(n))||{}).text||'')+'</textarea></label>').join('')
+    +'<label class="fld">정답<textarea id="pdfItemAnswer">'+esc(PDF_ITEM_EDIT.answerText)+'</textarea></label>'
+    +'<p class="muted">객관식: 번호를 쉼표로 구분하세요. 주관식: 소문항의 필수 답을 모두 함께 적으세요. 여러 줄을 서로 바꿔 쓸 수 있는 정답으로 나누지 않습니다.</p>'
+    +'<label class="fld">해설<textarea id="pdfItemExplanation">'+esc(row.explanationKo||'')+'</textarea></label>'
+    +'<p id="pdfItemOut" role="status"></p><button class="btn sm" id="pdfItemSave">교정 저장</button><button class="btn sm ghost" data-cancel="1">취소</button></fieldset>';
+}
+function capturePdfItem(){
+  if(!PDF_ITEM_EDIT||!$('#pdfItemFields'))return;
+  const f=PDF_ITEM_EDIT,r=f.row;r.formatType=$('#pdfItemType').value;r.instructionKo=$('#pdfItemStem').value;r.stimulus={type:'text',parts:[{text:$('#pdfItemContext').value}]};r.choices=[1,2,3,4,5].map(n=>({label:String(n),text:$('#pdfItemChoice'+n).value}));r.explanationKo=$('#pdfItemExplanation').value;f.answerText=$('#pdfItemAnswer').value;
+}
+async function savePdfItem(){
+  if(!PDF_ITEM_EDIT||PDF_ITEM_EDIT.busy)return;
+  capturePdfItem();const form=PDF_ITEM_EDIT,jobId=JOB.jobId,token=TOKEN;
+  const current=visibleRows(issueIndex().byKey).find(r=>r.key===EDIT);
+  if(!current||JSON.stringify(current.patch?{...current.row,...current.patch}:current.row)!==form.source){$('#pdfItemOut').textContent='원본 행이 바뀌었어요. 교정 내용을 보관한 뒤 취소하고 원본을 다시 확인하세요.';return;}
+  const key=EDIT,type=$('#pdfItemType').value,stem=$('#pdfItemStem').value.trim(),context=$('#pdfItemContext').value.trim(),rawAnswer=$('#pdfItemAnswer').value.trim();
+  const choices=type==='short'?[]:[1,2,3,4,5].map(n=>({label:String(n),text:$('#pdfItemChoice'+n).value.trim()})).filter(c=>c.text);
+  const answer=type==='short'?[rawAnswer]:rawAnswer.split(/[,，]/).map(s=>s.trim()).filter(Boolean);
+  if(!stem||!rawAnswer||type!=='short'&&(choices.length<2||!answer.length||new Set(answer).size!==answer.length||answer.some(a=>!choices.some(c=>c.label===a))||type==='mcq'&&answer.length!==1)){$('#pdfItemOut').textContent='문제·정답을 확인하세요. 객관식 정답은 입력한 보기 번호여야 합니다.';return;}
+  form.busy=true;$('#pdfItemFields').disabled=true;
+  try{const saved=await review(key,'fixed',{formatType:type,instructionKo:stem,stimulus:{type:'text',parts:context?[{text:context}]:[]},choices,answer,answerCount:type==='short'?1:answer.length,explanationKo:$('#pdfItemExplanation').value.trim()});if(saved&&JOB&&JOB.jobId===jobId&&TOKEN===token&&PDF_ITEM_EDIT===form){PDF_ITEM_EDIT=null;EDIT=null;renderJob();}}
+  finally{form.busy=false;if(PDF_ITEM_EDIT===form&&JOB&&JOB.jobId===jobId&&TOKEN===token)renderJob();}
+}
 function renderSrc(rows){
   const cur=rows.find(r=>r.key===SEL)||rows[0]||null;
   const kind=cur?cur.kind:null;
@@ -682,21 +735,26 @@ function renderPdfPreview(row){
   if(PDF_VIEW&&(!JOB||PDF_VIEW.jobId!==JOB.jobId||PDF_VIEW.token!==TOKEN))clearPdfView();
   $('#srcText').hidden=!!(row&&pdfs&&pdfs.length);
   if(!row||!pdfs||!pdfs.length){host.innerHTML=row?'<p class="muted" style="padding:0 12px">원본 PDF는 「PC 자료 불러오기」로 연결하세요. 다른 서버에서는 기존 파일 입력을 사용할 수 있어요.</p>':'';return;}
-  const where=row&&row.row&&row.row._pdfReview&&row.row._pdfReview.locations&&row.row._pdfReview.locations[0];
-  const wanted=where&&where.sourceDocumentId|| (row.kind==='words'?'03':'02');
+  const locations=row&&row.row&&row.row._pdfReview&&row.row._pdfReview.locations||[];
+  const firstWhere=locations[0];
+  const wanted=firstWhere&&(firstWhere.libraryId||firstWhere.sourceDocumentId)|| (row.kind==='words'?'03':'02');
   const source=PDF_VIEW&&PDF_VIEW.rowKey===row.key?PDF_VIEW.source:pdfs.some(p=>p.source===wanted)?wanted:pdfs[0].source;
   if(PDF_VIEW&&PDF_VIEW.source!==source)clearPdfView();
   if(!PDF_VIEW)PDF_VIEW={jobId:JOB.jobId,token:TOKEN,source,rowKey:row.key,url:null,busy:false,message:''};
-  const view=PDF_VIEW;view.rowKey=row.key;
+  const view=PDF_VIEW;if(view.rowKey!==row.key)delete view.page;view.rowKey=row.key;
   const info=pdfs.find(p=>p.source===source);
-  const page=where&&Number.isInteger(where.page)&&where.page>=1&&where.page<=info.pageCount?where.page:1;
+  const where=locations.find(loc=>(loc.libraryId||loc.sourceDocumentId)===source)||firstWhere;
+  const requestedPage=view.page||(where&&where.page);
+  const page=Number.isInteger(requestedPage)&&requestedPage>=1&&requestedPage<=info.pageCount?requestedPage:1;
   const url=view.url&&view.url+'#page='+page;
   host.innerHTML='<div style="padding:8px 12px"><label class="fld">원본 자료<select id="pdfSource">'
     +pdfs.map(p=>'<option value="'+esc(p.source)+'"'+(p.source===source?' selected':'')+'>'+esc(p.source+' · '+p.file)+'</option>').join('')+'</select></label>'
     +'<p class="muted">'+esc(info.file)+' · '+page+'쪽'+(url?' · <a href="'+esc(url)+'" target="_blank" rel="noopener noreferrer">PDF 크게 보기</a>':'')+'</p>'
+    +locations.map((loc,i)=>'<button class="btn sm ghost" data-source-location="'+i+'">원본 위치 '+(i+1)+' · '+loc.page+'쪽</button>').join(' ')
     +(view.message?'<p class="err" role="status">'+esc(view.message)+'</p><button class="btn sm ghost" id="btnPdfRetry">PDF 다시 열기</button>':view.busy?'<p class="muted" role="status">원본 PDF를 여는 중…</p>':'')+'</div>'
     +(url?'<iframe title="검수할 원본 PDF" src="'+esc(url)+'" style="display:block;width:100%;height:66vh;min-height:360px;border:0"></iframe>':'');
   $('#pdfSource').onchange=()=>{const next=$('#pdfSource').value;if(!pdfs.some(p=>p.source===next))return;clearPdfView();PDF_VIEW={jobId:JOB.jobId,token:TOKEN,source:next,rowKey:row.key,url:null,busy:false,message:''};renderPdfPreview(row);};
+  host.querySelectorAll('[data-source-location]').forEach(button=>button.onclick=()=>{const loc=locations[Number(button.dataset.sourceLocation)],next=loc.libraryId||loc.sourceDocumentId||source;if(!pdfs.some(p=>p.source===next))return;clearPdfView();PDF_VIEW={jobId:JOB.jobId,token:TOKEN,source:next,rowKey:row.key,page:loc.page,url:null,busy:false,message:''};renderPdfPreview(row);});
   const retry=$('#btnPdfRetry');if(retry)retry.onclick=()=>{view.message='';renderPdfPreview(row);};
   if(!view.url&&!view.busy&&!view.message)loadLocalPdf();
 }
@@ -708,7 +766,8 @@ async function loadLocalPdf(){
   view.busy=true;
   renderSrc(visibleRows(issueIndex().byKey));
   try{
-    const r=await fetch('/api/naesin/admin/job/local-pdf?id='+encodeURIComponent(view.jobId)+'&source='+view.source+'&sha256='+info.sha256,{headers:{Authorization:'Bearer '+view.token},cache:'no-store'});
+    const pdfPath=/^src-\d{6}$/.test(view.source)?'/api/naesin/admin/source-library?id='+view.source+'&sha256='+info.sha256:'/api/naesin/admin/job/local-pdf?id='+encodeURIComponent(view.jobId)+'&source='+view.source+'&sha256='+info.sha256;
+    const r=await fetch(pdfPath,{headers:{Authorization:'Bearer '+view.token},cache:'no-store'});
     if(!current())return;
     if(r.status===401){TOKEN=null;localStorage.removeItem('wbr.admin.token');renderLogin('세션이 만료됐어요. 다시 로그인해 주세요.');return;}
     if(!r.ok){const body=await r.json().catch(()=>({}));throw new Error(body.error||'원본 PDF를 열지 못했어요. PC 자료를 다시 불러오세요.');}
@@ -731,7 +790,7 @@ async function review(key,state,patch,note){
   if(patch!==undefined){if(patch)rec.patch=patch;else delete rec.patch;}
   if(note!==undefined){if(note)rec.note=note;else delete rec.note;}
   JOB.review={...JOB.review,[key]:rec};
-  if(!PDF_WORD_EDIT||PDF_WORD_EDIT.key!==key||EDIT!==key)EDIT=null;
+  if((!PDF_WORD_EDIT||PDF_WORD_EDIT.key!==key||EDIT!==key)&&(!PDF_ITEM_EDIT||PDF_ITEM_EDIT.key!==key||EDIT!==key))EDIT=null;
   SEL=key;renderJob();
   let saved=false;
   try{
@@ -1314,6 +1373,17 @@ async function sendDraft(draft, how, jobId, errorSelector){
     const out=errorSelector&&$(errorSelector);if(out)out.textContent=message;
     return false;
   }
+}
+async function publishReviewed(){
+  const jobId=JOB.jobId,read=JOB_READ,token=TOKEN,scope='cls:'+$('#reviewClass').value.normalize('NFC').trim();
+  if(!confirm('검수 완료 문항을 '+scope.slice(4)+' 반 학생에게 공개하고 배정합니다. 미검토 문항은 공개하지 않습니다.'))return;
+  $('#btnPubReviewed').disabled=true;
+  try{
+    const result=await api('/naesin/admin/job/publish-reviewed',{method:'POST',body:JSON.stringify({jobId,baseUpdatedAt:JOB.updatedAt,scope})});
+    if(!JOB||JOB.jobId!==jobId||read!==JOB_READ||token!==TOKEN)return;
+    if(!await readJob(jobId,read,token))return;renderJob();
+    $('#pubOut').textContent=result.publishedItems+'문항을 '+scope.slice(4)+' 반에 배정했어요. 학생 화면을 새로 열면 받을 수 있습니다. 미검토 '+result.remainingItems+'문항은 검수를 계속하세요.';
+  }catch(e){if(JOB&&JOB.jobId===jobId&&read===JOB_READ&&token===TOKEN){$('#pubOut').textContent=e.message;$('#btnPubReviewed').disabled=false;}}
 }
 async function publish(){
   if(!JOB)return;

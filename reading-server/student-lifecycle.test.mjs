@@ -95,6 +95,12 @@ try {
   const setExam = (scope, wordDeadlineDays) => req('/api/naesin/admin/exam', { method: 'POST', token: admin,
     body: { scope, examDate: '2099-12-31', packIds: [PACK_ID], wordDeadlineDays } });
   const delExam = (scope) => req('/api/naesin/admin/exam', { method: 'DELETE', token: admin, body: { scope } });
+  const questionPack={packId:'life-question-pack',contentMode:'questions',rights:{basis:'self_authored',holder:'Own fixture',evidenceRef:'Synthetic only',studentUseAllowed:true,derivativeUseAllowed:true,externalAiAllowed:false},words:[],sentences:[],items:[{id:'own-question',no:1,source:'00',formatType:'short',instructionKo:'Fill in the blank.',stimulus:{type:'text',parts:[{text:'The sky is ____.'}]},choices:[],answer:['blue'],answerCount:1}]};
+  ok((await req('/api/naesin/admin/pack',{method:'POST',token:admin,body:{id:questionPack.packId,pack:questionPack}})).body.ok,'문제 전용 팩 등록 실패');
+  ok((await req('/api/naesin/admin/exam',{method:'POST',token:admin,body:{scope:'cls:A',mode:'practice',examDate:'',packIds:[questionPack.packId]}})).body.ok,'시험일 없는 문제 팩 반 배정 실패');
+  const assignedQuestions=(await req('/api/naesin/pack?id='+questionPack.packId,{token:stuTok}));
+  ok(assignedQuestions.status===200&&assignedQuestions.body.pack?.contentMode==='questions'&&assignedQuestions.body.pack?.items.length===1,'학생 문제 전용 팩 수신 실패');
+  await delExam('cls:A');
   ok((await setExam('default', 8)).body.ok, '⑥-2 전체 공통 시험 배정 실패');
   ok((await setExam('cls: A ', 6)).body.scope === 'cls:A', '⑥-2 반 시험 키 정규화 실패');
   const classExam = (await req('/api/naesin/exam', { token: stuTok })).body;
@@ -118,6 +124,10 @@ try {
   ok((await req('/api/naesin/state', { method: 'PUT', token: stuTok,
     body: { state: { marker: 'naesin-life', summary: { packId: PACK_ID, word: { total: 1, reached: 1 } } } } })).body.ok, '⑥-2 내신 기록 저장 실패');
   ok((await req('/api/naesin/state', { token: stuTok })).body.state?.marker === 'naesin-life', '⑥-2 내신 기록을 다시 못 읽는다');
+  const beforeQuestions=(await req('/api/naesin/state',{token:stuTok})).body.state;
+  ok((await req('/api/naesin/state',{method:'PUT',token:stuTok,body:{state:{...beforeQuestions,owner:CODE,packs:{...beforeQuestions.packs,[questionPack.packId]:{savedAt:Date.now(),wrong:{'i:id:own-question':{cleared:false}}}},savedAt:Date.now()}}})).body.ok,'문제 전용 학습 기록 저장 실패');
+  const questionState=(await req('/api/naesin/state',{token:stuTok})).body.state;
+  ok(questionState?.packs?.[questionPack.packId]?.wrong?.['i:id:own-question']?.cleared===false,'문제 전용 오답 기록 왕복 실패');
   const exams = (await req('/api/naesin/admin/exams', { token: admin })).body.exams || [];
   ok(exams.some(e => e.scope === CODE && e.name === '수명시험' && e.expired === false), '⑥-2 배정 현황에 학생별 배정이 없다');
   ok((await req('/api/naesin/admin/pack', { method: 'DELETE', token: admin, body: { id: PACK_ID } })).status === 409,

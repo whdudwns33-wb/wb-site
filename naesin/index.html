@@ -1341,6 +1341,11 @@
     });
   }
   function renderHome() {
+    if (pack.contentMode === 'questions') {
+      var questionTask=todayTask();
+      layoutFull(demoNotice()+packSegHtml()+packListHtml()+(questionTask?taskCardHtml(questionTask):'')+'<div class="card"><h2>문제 학습</h2><p>배정된 '+(pack.items||[]).length+'문항을 풀고 틀린 문제를 다시 확인하세요.</p><button class="btn p big" id="startQuestions">문제 풀이 시작</button></div>');
+      $('startQuestions').onclick=function(){setTab('quiz');};wireTaskCard(questionTask);wireHomeLinks();return;
+    }
     var pd = packDB();
     var task = todayTask();
     if (!pd.diagDone) {
@@ -2725,7 +2730,7 @@
     return a.slice(0, n);
   }
   function tagWord(q) { if (q) q.kind = 'word'; return q; }
-  var QUIZ_SOURCES = [['04', 'PRE-STEP'], ['05', '예상문제 1회'], ['06', '예상문제 2회'], ['08', '문법 객관식'], ['09', '문법 주관식']];
+  var QUIZ_SOURCES = [['00', '본문 빈칸'], ['04', 'PRE-STEP'], ['05', '예상문제 1회'], ['06', '예상문제 2회'], ['08', '문법 객관식'], ['09', '문법 주관식']];
   function storedSourceLabel(source) {
     var match = QUIZ_SOURCES.filter(function (entry) { return entry[0] === source; })[0];
     return match ? match[1] : String(source || '');
@@ -4085,6 +4090,8 @@
     if (!checkAccount()) return;
     renderHeader();
     if (!pack) { layoutFull('<p class="muted">교재를 불러오는 중…</p>'); return; }
+    $('tabs').querySelectorAll('button').forEach(function(button){button.hidden=pack.contentMode==='questions'&&['words','passage'].indexOf(button.getAttribute('data-tab'))>=0;});
+    if (pack.contentMode==='questions' && (view==='words'||view==='passage')) view='quiz';
     if (view === 'home') renderHome();
     else if (view === 'words') renderWords();
     else if (view === 'passage') renderPassage();

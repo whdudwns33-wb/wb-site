@@ -53,7 +53,7 @@ function screen() {
   });
   const exportUi = `
   globalThis.ui={boot,api,checkAccount,checkAccess,stopStudy,clearPackCache,migrateLegacy,pullAdopt,pushState,persist,save,openDemo,renderItem,storedToRunner,storedItemKey,itemRefOf,wrongRetryItems,gradeItem,normalizeStoredAnswer,recoverStateStamps,loadDB,quizTypes,renderQuiz,runTask,mockItems,
-    serverExam:value=>{examServer=value;applyServerExamAll();},effectiveExam:exam,
+    serverExam:value=>{examServer=value;applyServerExamAll();},effectiveExam:exam,renderHome,render,
     ttsOptions,wireTtsBtn,wireChunkWork,wireDialogueWork,wireSentenceWork,openPack,renderHeader,demoNotice,bootError,
     projector:(scope,pj)=>{liveScope=scope;liveState={projector:pj};pjApply(pj);},
     projectile:()=>({pjPick,pjSent,pjSeen}),
@@ -76,6 +76,19 @@ function screen() {
 }
 
 (async () => {
+  await t('문제 전용 팩은 진단 없이 시작하고 채점·오답 재풀이·저장을 유지한다',()=>{
+    const ui=screen(),pack={...clone(sample),contentMode:'questions',words:[],sentences:[],items:[{...clone(sample.items[0]),id:'own-question-only'}]};
+    ui.setup(account,pack);ui.renderHome();
+    assert.equal(typeof ui.node('startQuestions').onclick,'function');
+    ui.node('startQuestions').onclick();assert.ok(ui.get().selType);
+    const item=ui.storedToRunner(pack.items)[0];assert.ok(item);
+    ui.gradeItem(item,false,{},1700000000000,null);
+    const wrongKey=Object.keys(ui.get().DB.packs[pack.packId].wrong)[0];assert.ok(wrongKey);
+    assert.equal(ui.wrongRetryItems([wrongKey]).length,1);
+    ui.gradeItem(item,true,{},1700000001000,null);ui.gradeItem(item,true,{},1700000001000+86400000,null);ui.persist();
+    assert.equal(ui.get().DB.packs[pack.packId].wrong[wrongKey].cleared,true);
+    assert.ok(ui.store.get('wbn.v1:'+account.code));
+  });
   await t('학습용 배정은 지난 로컬 시험일·오버라이드를 지우고 학습 기록을 보존한다', () => {
     const ui = screen(); ui.setup({code:'own-student',token:'own-token'}, sample);
     const pd = ui.get().DB.packs[sample.packId];

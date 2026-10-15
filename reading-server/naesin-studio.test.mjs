@@ -66,6 +66,45 @@ function approveAll(job) {
     job.draft[kind].forEach((row, i) => { job.review[rowKey(kind, row, i)] = { state: 'ok', at: 'x' }; });
   }
 }
+await t('문제 전용 PDF 팩은 개별 교사 검수 후에만 게시하고 원본 위치는 학생 팩에서 제거한다',async()=>{
+  const s=memStore();
+  const cr=await call(s,'/api/naesin/admin/job','POST',{packId:'own-question-only',meta:{contentMode:'questions'}});
+  const item={...clone(SAMPLE.items[0]),id:'own-question-1',_pdfReview:{flags:['REVIEW_REQUIRED'],locations:[{libraryId:'src-000001',page:1,bbox:[30,45,300,800]}]}};
+  const body={jobId:cr.body.jobId,draft:{items:[item]}};
+  assert.equal((await call(s,'/api/naesin/admin/job/draft','POST',body)).status,403);
+  assert.equal((await call(s,'/api/naesin/admin/job/draft','POST',body,{localPdfReview:true})).status,200);
+  assert.equal((await call(s,'/api/naesin/admin/job/publish','POST',{jobId:cr.body.jobId})).status,400);
+  const job=await s.getJob(cr.body.jobId);approveAll(job);await s.putJob(job.jobId,job);
+  assert.equal((await call(s,'/api/naesin/admin/job/publish','POST',{jobId:job.jobId})).status,200);
+  const pack=(await s.getPack(job.packId)).pack;
+  assert.equal(pack.contentMode,'questions');assert.deepEqual(pack.words,[]);assert.deepEqual(pack.sentences,[]);
+  assert.equal(pack.items.length,1);assert.ok(!JSON.stringify(pack).includes('libraryId'));
+  const wrong=clone(job);wrong.review={};wrong.draft.items[0]._pdfReview.locations[0].libraryId='../file';
+  assert.equal(publishGate(wrong).ok,false);
+});
+await t('검수 완료 문항만 게시·반 배정 — 미검토·버림 제외, 기존 범위·권리·버전 보호',async()=>{
+  const s=memStore(),exams=new Map();s.getExam=async key=>exams.get(key)||null;s.putExam=async(key,value)=>exams.set(key,value);
+  const rights={basis:'self_authored',holder:'Own fixture',evidenceRef:'Synthetic only',studentUseAllowed:true,derivativeUseAllowed:true,externalAiAllowed:false};
+  await s.putPack('own-existing',{pack:{...clone(SAMPLE),packId:'own-existing'},updatedAt:'x'});
+  exams.set('cls:월수금',{mode:'practice',examDate:'',packIds:['own-existing']});
+  const cr=await call(s,'/api/naesin/admin/job','POST',{packId:'own-reviewed',rights,meta:{contentMode:'questions'}});
+  const items=[1,2,3,4].map(i=>({id:'own-'+i,no:i,formatType:'short',instructionKo:'Own question '+i,choices:[],answer:['Own answer '+i],_pdfReview:{flags:['REVIEW_REQUIRED'],locations:[{libraryId:'src-000001',page:1,bbox:[30,45,300,800]}]}}));
+  await call(s,'/api/naesin/admin/job/draft','POST',{jobId:cr.body.jobId,draft:{items}},{localPdfReview:true});
+  let job=await s.getJob(cr.body.jobId);const oldVersion=job.updatedAt;
+  const publish=body=>call(s,'/api/naesin/admin/job/publish-reviewed','POST',{jobId:job.jobId,baseUpdatedAt:job.updatedAt,scope:'cls:월수금',...body});
+  assert.equal((await publish({})).status,400,'미검수 0문항은 게시 금지');
+  await call(s,'/api/naesin/admin/job/review','POST',{jobId:job.jobId,baseUpdatedAt:job.updatedAt,rows:[{key:'items:own-1',state:'ok'},{key:'items:own-3',state:'dropped'},{key:'items:own-4',state:'fixed',patch:{answer:['Corrected own answer']}}]});
+  job=await s.getJob(job.jobId);
+  assert.equal((await publish({baseUpdatedAt:oldVersion})).status,409);
+  assert.equal((await publish({scope:'default'})).status,400);
+  const result=await publish({});assert.equal(result.status,200);assert.equal(result.body.publishedItems,2);assert.equal(result.body.remainingItems,1);
+  const pack=(await s.getPack(result.body.packId)).pack;
+  assert.deepEqual(pack.items.map(i=>i.id),['own-1','own-4']);assert.deepEqual(pack.items[1].answer,['Corrected own answer']);
+  assert.ok(!JSON.stringify(pack).includes('libraryId'));assert.equal(pack.rights.externalAiAllowed,false);
+  assert.deepEqual(exams.get('cls:월수금').packIds,['own-existing',result.body.packId]);assert.equal(exams.get('cls:월수금').mode,'practice');assert.equal(exams.get('cls:월수금').examDate,'');
+  job=await s.getJob(job.jobId);const before=await s.getPack(result.body.packId);job.review['items:own-1'].patch={answer:[]};
+  assert.equal((await publish({})).status,400);assert.deepEqual(await s.getPack(result.body.packId),before,'오류 문항이 기존 게시본을 덮으면 안 된다');
+});
 const pdfWord = () => {
   const w = SAMPLE.words[0];
   return { id: w.id, headword: w.headword, pos: w.pos, meaningKo: clone(w.meaningKo), sections: clone(w.sections),
