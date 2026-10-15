@@ -29,7 +29,7 @@ import { extract, makeQuota, readExtractLimit, KINDS } from './naesin-extract.mj
 import CHECK from '../naesin/pack-check.js';
 import GEN from '../naesin/gen.js';
 import COVERAGE from '../naesin/coverage.js';
-import { handleNaesin } from './naesin-api.mjs';
+import { handleNaesin, PRACTICE_PACKS_MAX } from './naesin-api.mjs';
 
 const PACK_ID_RE = /^[A-Za-z0-9-]{3,60}$/;
 const JOB_ID_RE = /^job-[a-z0-9]{6,20}$/;
@@ -551,7 +551,7 @@ export async function handleStudio(ctx) {
     const pack=assemble({...job,packId,meta:{...job.meta,contentMode:'questions'},draft:{items,sentences},review:{}});
     const check=CHECK.checkPack(pack);if(check.errors.length)return j(400,{error:'검수 완료 문항에도 검사 오류가 남아 있어요.',errors:check.errors});
     const previous=await store.getExam(scope),packIds=[...new Set([...(previous&&previous.packIds||[]),packId])];
-    if(packIds.length>20)return j(400,{error:'반에 배정된 팩이 20개를 넘습니다. 기존 범위를 먼저 정리하세요.'});
+    if(packIds.length>(previous&&previous.examDate?20:PRACTICE_PACKS_MAX))return j(400,{error:'반에 배정된 팩이 허용 개수를 넘습니다. 기존 범위를 먼저 정리하세요.'});
     const updatedAt=nowIso();await store.putPack(packId,{pack,updatedAt});
     const ids=(await store.getPackIds())||[];if(!ids.includes(packId))await store.putPackIds(ids.concat(packId));
     const assignment=previous&&previous.examDate?{examDate:previous.examDate,...(previous.wordDeadlineDays!=null?{wordDeadlineDays:previous.wordDeadlineDays}:{})}:{mode:'practice',examDate:''};

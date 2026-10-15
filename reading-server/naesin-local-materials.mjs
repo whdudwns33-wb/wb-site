@@ -24,7 +24,7 @@ export function readSourceLibrary(dataDir, id, expectedSha256) {
   const root = directory(path.join(directory(path.dirname(path.resolve(dataDir))), 'naesin-materials', 'library'));
   const index = JSON.parse(readRegular(path.join(root, 'index.json'), DRAFT_MAX).toString('utf8'));
   if (index.version !== 1 || CHECK.rightsErrors(index.rights).length || index.rights.externalAiAllowed !== false
-    || !Array.isArray(index.documents) || index.documents.length > 5000) fail();
+    || !Array.isArray(index.documents) || index.documents.length > 10000) fail();
   const seen = new Set();
   for (const doc of index.documents) {
     if (!doc || !/^src-\d{6}$/.test(doc.id) || seen.has(doc.id) || !/^[A-Za-z0-9-]{3,60}$/.test(doc.packId)

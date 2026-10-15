@@ -148,7 +148,7 @@ def reading_cloze(doc, pages):
 def build_unit(library,pack_id,out):
     private=Path(os.environ['LOCALAPPDATA'])/'WB'/'naesin-materials'
     if not library.resolve().is_relative_to(private.resolve()) or not out.resolve().is_relative_to(private.resolve()):raise ValueError('PRIVATE_ROOT_REQUIRED')
-    if not re.fullmatch(r'2022-ne-kimgitaek-m[12]-(?:L[1-8]|SL[12])',pack_id):raise ValueError('UNIT_ID_INVALID')
+    if not re.fullmatch(r'(?:2022|2015)-[a-z0-9-]+-m[123]-(?:L(?:[1-9]|1[0-2])|S[LR][12]?)',pack_id):raise ValueError('UNIT_ID_INVALID')
     index=json.loads((library/'index.json').read_text(encoding='utf8'))
     if index['rights'].get('externalAiAllowed') is not False or index['rights'].get('studentUseAllowed') is not True or index['rights'].get('derivativeUseAllowed') is not True:raise ValueError('RIGHTS_POLICY_MISMATCH')
     documents=[d for d in index['documents'] if d['packId']==pack_id]
@@ -174,7 +174,7 @@ def build_unit(library,pack_id,out):
         rows,report=parse_document(doc,extract_pages(library/doc['file'],doc,cache))
         for row in rows:row['no']=len(items)+1;items.append(row)
         reports.append(report)
-    payload={'packId':pack_id,'meta':{'curriculum':'2022','textbook':'NE능률(김기택)','grade':documents[0]['grade'],
+    payload={'packId':pack_id,'meta':{'curriculum':documents[0].get('curriculum',pack_id[:4]),'textbook':documents[0].get('textbook','NE능률(김기택)'),'grade':documents[0]['grade'],
         'lesson':int(re.search(r'-L(\d+)$',pack_id)[1]) if re.search(r'-L(\d+)$',pack_id) else None,
         'lessonTitle':documents[0]['unit'],'contentMode':'questions','source':'원내 PC 변환 · 교사 원본 대조 필요'},
         'rights':index['rights'],'draft':{'items':items}}

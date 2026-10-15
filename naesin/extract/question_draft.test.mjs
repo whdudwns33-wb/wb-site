@@ -39,6 +39,20 @@ assert [r['answer'] for r in rows]==[['1'],['2'],['Own answer']], 'Full-page hea
 rows,_=m.parse_document(doc,[page(1,'1. Write an answer. 1)'),page(2,'1) ①',True)])
 assert rows[0]['answer']==[] and rows[0]['_pdfReview']['locations'][-1]['page']==2, 'Type mismatches retain the answer-page link without guessing'
 print('question boundaries, answer mapping, subparts, missing anchors, duplicate IDs, continued patterns and local reading cloze passed')
+import tempfile,os,json
+from pathlib import Path
+with tempfile.TemporaryDirectory() as temp:
+ old=os.environ.get('LOCALAPPDATA');os.environ['LOCALAPPDATA']=temp
+ try:
+  library=Path(temp)/'WB/naesin-materials/library';library.mkdir(parents=True)
+  out=library.parent/'out';pack='2015-own-publisher-m3-L1'
+  index={'rights':{'externalAiAllowed':False,'studentUseAllowed':True,'derivativeUseAllowed':True},'documents':[{**doc,'packId':pack,'file':pack+'/05_예상문제_1회.pdf','grade':'m3','unit':'1과','curriculum':'2015','textbook':'Own publisher'}]}
+  (library/'index.json').write_text(json.dumps(index),encoding='utf8');m.extract_pages=lambda *args:[]
+  m.build_unit(library,pack,out);payload=json.loads((out/(pack+'.pending.json')).read_text(encoding='utf8'))
+  assert payload['meta']['curriculum']=='2015' and payload['meta']['textbook']=='Own publisher' and payload['meta']['grade']=='m3'
+ finally:
+  if old is None:os.environ.pop('LOCALAPPDATA',None)
+  else:os.environ['LOCALAPPDATA']=old
 `;
 const result=spawnSync(process.env.WB_NAESIN_PYTHON||'python',['-X','utf8','-c',script],{encoding:'utf8',cwd:new URL('../../',import.meta.url)});
 assert.equal(result.status,0,result.stderr);console.log(result.stdout.trim());

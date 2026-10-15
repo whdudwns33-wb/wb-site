@@ -395,7 +395,7 @@
   var $ = function (id) { return document.getElementById(id); };
   var pack = null, DB = null, view = 'home';
   var PACKS = {};              // 시험 범위 팩 전부 {packId: pack} — pack 은 그중 '지금 보는 과'
-  var authed = false, examServer = null, packList = [];
+  var authed = false, examServer = null, packList = [], packCatalog = [], packRead = 0;
   var sessionCode = null, sessionToken = null, studyStopped = false, accessTimer = null, pendingRemote = null;
   var selSeq = null, selWordId = null, selType = null, selDlg = null, quizSource = '';
   /* 본문 탭에서 문장이 아닌 항목을 고른 상태 — {kind:'chunk'|'para'|'cum'|'check', day, i}.
@@ -504,7 +504,7 @@
     RQ = null; liveStop(); liveState = null;
     closeRunner(); pjClose();
     if (window.WBVoice) WBVoice.stop();
-    pack = null; PACKS = {}; packList = []; examServer = null; taskServer = null; resultServer = null;
+    packRead++;pack = null; PACKS = {}; packList = []; packCatalog = []; examServer = null; taskServer = null; resultServer = null;
     authed = false; quizSource = ''; selType = null;
     ['rBody', 'rCount', 'pjNo', 'pjCh', 'pjMsg', 'whoLine'].forEach(function (id) { $(id).innerHTML = ''; });
     $('liveBar').hidden = true; $('saveDot').hidden = true;
@@ -1029,6 +1029,7 @@
     return (pack && pack.packId === pid) ? pack : null;
   }
   function rangeIds() {
+    if (isLibrary()) return pack ? [curPackId()] : [];
     var ids = packList.filter(function (id) { return !!PACKS[id]; });
     var cur = curPackId();
     if (cur && ids.indexOf(cur) < 0) ids.push(cur);
@@ -1044,12 +1045,13 @@
     }).filter(function (e) { return !!e.pack; });
   }
   function isRange() { return rangeIds().length > 1; }
+  function isLibrary() { return !!(examServer&&examServer.mode==='practice'&&packList.length>20); }
   /* 과 표시명 — 학생이 아는 단위는 packId 가 아니라 'L6' 이다 */
   function lessonLabel(pid) {
-    var p = packOf(pid);
+    var p = packOf(pid)||packCatalog.filter(function(p){return p.packId===pid;})[0];
     var l = p && p.lesson;
     var label=p&&/^Special (?:Lesson|Reading)/i.test(p.lessonTitle||'')?p.lessonTitle:(l != null && l !== '') ? ('L' + l) : String(pid);
-    return p&&p.contentMode==='questions'?String(p.grade||'').replace(/^m([123])$/,'중$1')+' · '+label:label;
+    return isLibrary()&&p?(p.textbook+' · '+String(p.grade||'').replace(/^m([123])$/,'중$1')+' · '+label):p&&p.contentMode==='questions'?String(p.grade||'').replace(/^m([123])$/,'중$1')+' · '+label:label;
   }
   function lessonTitle(pid) {
     var p = packOf(pid);
@@ -1057,6 +1059,7 @@
   }
   /* 세 탭의 목록 창 맨 위 과 선택 — 통합 범위에서 '지금 보는 과'를 바꾸는 유일한 상시 입구 */
   function packSegHtml() {
+    if(isLibrary())return '<label class="fld">내 교재 선택<select data-library-pack aria-label="교과서와 단원 선택" style="width:100%;min-height:44px">'+packCatalog.map(function(p){return '<option value="'+esc(p.packId)+'"'+(p.packId===curPackId()?' selected':'')+'>'+esc(lessonLabel(p.packId))+'</option>';}).join('')+'</select></label>';
     var ids = rangeIds();
     if (ids.length <= 1) return '';
     return '<div class="packseg" role="group" aria-label="시험 범위 과 선택">' + ids.map(function (id) {
@@ -1139,6 +1142,7 @@
     e.preventDefault();
     switchPack(b.getAttribute('data-pks'));
   });
+  $('wrap').addEventListener('change',function(e){if(e.target&&e.target.hasAttribute('data-library-pack'))switchPack(e.target.value);});
   /* 목록 행은 role=button — 키보드(Enter/Space)로도 누른다 */
   $('wrap').addEventListener('keydown', function (e) {
     if (e.key !== 'Enter' && e.key !== ' ') return;
@@ -1325,6 +1329,7 @@
   }
   /* 시험 범위가 여러 팩이면 전환 링크 — 진단 전 화면에도 있어야 다른 교재로 돌아갈 수 있다 */
   function packListHtml() {
+    if(isLibrary())return '<p class="muted">배정된 '+packCatalog.length+'개 단원 중 내 교과서를 선택하세요.</p>';
     if (packList.length <= 1) return '';
     /* 학생이 아는 단위는 packId 가 아니라 'L6' 이다 — 팩 id 는 title 로만 남긴다 */
     return '<p class="muted" style="margin:0 0 10px">시험 범위: ' + packList.map(function (id) {
@@ -1540,6 +1545,7 @@
     if (!checkAccount()) return;
     opt = opt || {};
     pack = normPack(p);
+    if(isLibrary())PACKS={};
     PACKS[pid] = pack;
     /* 교재가 바뀌면 이전 교재의 선택(문장·단어·유형·대화·종이 입력 모드)은 무의미하다 */
     selSeq = opt.seq != null ? Number(opt.seq) : null;
@@ -1551,11 +1557,13 @@
     if (opt.tab) setTab(opt.tab); else render();
   }
   function switchPack(pid) {
+    var read=++packRead;
     if (!pid || pid === curPackId()) return;
     if (PACKS[pid]) { openPack(PACKS[pid], pid); return; }
-    api('/pack?id=' + encodeURIComponent(pid)).then(function (r) {
+    return api('/pack?id=' + encodeURIComponent(pid)).then(function (r) {
+      if(read!==packRead)return;
       openPack(r.pack, pid);
-    }).catch(function () { alert('교재를 불러오지 못했습니다.'); });
+    }).catch(function () { if(read===packRead)alert('교재를 불러오지 못했습니다.'); });
   }
   function doResume(r) {
     if (!r) return;
@@ -2452,6 +2460,7 @@
       '<p class="enline">' + esc(s.en) +
       ' <button id="ttsBtn" class="tag t-ind tb" aria-label="문장 듣기">듣기</button></p>' +
       '<p class="muted" style="font-size:13.5px;margin:0 0 10px">' + esc(s.ko) + '</p>' +
+      (s.notes||[]).filter(function(note){return note==='원문 한 쪽을 통째로 암기하는 학습 단위입니다.';}).map(function(note){return '<p class="notice">'+esc(note)+'</p>';}).join('')+
       (stage <= 2 || st.reached ? chunks + notes : '<p class="muted">청크·구문 해설은 2단계(영어 청크 배열)까지 표시됩니다.</p>') +
       '</div>' +
       (!ckg.open
@@ -4124,6 +4133,16 @@
      한 과의 팩이 삭제·오류여도 나머지 범위까지 막을 이유가 없다. 전부 실패해야 부팅 오류다. */
   function loadRangePacks() {
     if (!packList.length) return Promise.reject(new Error('no-pack'));
+    if(isLibrary())return api('/catalog').then(function(r){
+      if(!checkAccount())throw new Error('account-changed');
+      packCatalog=(r.packs||[]).filter(function(p){return packList.indexOf(p.packId)>=0;});
+      if(!packCatalog.length)throw new Error('no-pack');
+      var pid=DB.last&&packCatalog.some(function(p){return p.packId===DB.last.packId;})?DB.last.packId:packCatalog[0].packId;
+      return api('/pack?id='+encodeURIComponent(pid)).then(function(r){
+        if(!checkAccount())throw new Error('account-changed');
+        pack=normPack(r.pack);PACKS={};PACKS[pid]=pack;applyServerExamAll();return [{id:pid,pack:pack}];
+      });
+    });
     var errs = [];
     return Promise.all(packList.map(function (id) {
       return api('/pack?id=' + encodeURIComponent(id))
