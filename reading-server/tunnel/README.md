@@ -38,12 +38,16 @@
 
 그래서 **원장이 "이 키트로 옮긴다"고 정하기 전에는 어느 PC 에도 설치하지 않는다.** WB1 에서는 특히:
 
-- `setup.mjs tunnel` 을 돌리지 않는다(기존 Cloudflared 서비스가 있으면 이제 도구가 거절하고 토큰 파일을 지운다).
+- 대시보드에서 새 터널을 만들지 않고, `setup.mjs tunnel` 을 돌리지 않는다. 도구는 기존 **Windows 서비스** `Cloudflared` 가
+  보이면 토큰 파일을 요구하기 전에 거절하고(확인이 실패해도 설치하지 않는다), 토큰이 든 파일은 지운다 — 하지만 WB1 의 연결기가
+  로그온 예약 작업으로 돈다면 서비스로 보이지 않아 이 거절이 걸리지 않는다. 도구를 믿지 말고 치지 않는다.
   **`cloudflared service uninstall` 을 치지 않는다** — 그 PC 의 기존 관리 주소가 모두 끊긴다. 새 주소가 필요하면 원장이
   대시보드에서 기존 터널에 경로(Published application)를 더한다.
-- `install-server` 의 `DATA_DIR` 에 다른 서버의 자료 폴더를 적지 않는다(잠그면 그 서버가 자기 `db.json` 을 못 연다 — AppData 아래는 이제 거절한다).
-- `doctor` 는 이 키트의 설치를 기준으로 본다. WB1 에서 "작업 없음·서비스 없음" 은 예상된 결과이고, "직접 띄운 `server.mjs` 창을 닫으라"는
-  권고를 WB1 에서 따르지 않는다 — 8890 의 영어 서버(또는 다른 개발 서버)를 끄게 된다.
+- `install-server` 의 `DATA_DIR` 에 다른 서버의 자료 폴더를 적지 않는다(잠그면 그 서버가 자기 `db.json` 을 못 연다). 사용자 AppData 아래는
+  도구가 거절하지만, 그 밖의 다른 서버 자료 폴더(다른 clone 의 `reading-server\data` 등)는 구별하지 못한다 — 늘 새 빈 폴더(`C:\WB_server_data`)만 쓴다.
+- `doctor` 는 이 키트의 설치를 기준으로 본다. WB1 에서는 그 권고를 **하나도** 따르지 않는다 — "작업 없음 → install-server",
+  "cloudflared 서비스 없음 → 3단계(tunnel)", "직접 띄운 `server.mjs` 창을 닫으라" 모두. 앞의 둘은 키트를 새로 깔게 하고,
+  셋째는 8890 의 영어 서버(또는 다른 개발 서버)를 끄게 한다.
 
 옮기기로 정했을 때의 순서는 맨 아래 「WB1 을 이 키트로 옮길 때」를 따른다.
 
@@ -149,8 +153,9 @@ node reading-server\tunnel\setup.mjs tunnel --token-file C:\ProgramData\WB\tunne
 
 메모장이 "새로 만들까요?" 하면 예 → 복사한 명령을 통째로 붙여 넣고 저장 → 닫는다. (**"문서 폴더에 저장할까요?"** 가 뜨면
 거절한다 — 관리자 터미널에서 연 메모장이 아니라는 뜻이고, 문서 폴더는 OneDrive 로 올라갈 수 있다.)
-`tunnel` 은 cloudflared 버전을 확인하고(2026.7.3 미만이면 멈춘다), 토큰을 화면에 찍지 않고 서비스를 설치한 뒤
-**토큰 파일을 지운다**. 이미 터미널에 붙여 넣었다면: (PowerShell 에서) `Remove-Item (Get-PSReadLineOption).HistorySavePath` 로 기록 파일을 지우고,
+`tunnel` 은 먼저 이 PC 에 Cloudflared 서비스가 있는지 보고(있거나 확인이 안 되면 멈춘다), cloudflared 버전을 확인하고
+(2026.7.3 미만이면 멈춘다), 토큰을 화면에 찍지 않고 서비스를 설치한다. 토큰이 든 파일은 **성공·실패와 관계없이 지운다**
+(토큰이 없는 파일 — 경로를 잘못 준 `server.env` 등 — 은 지우지 않는다). `--dry-run` 은 지우지 않으니 직접 지운다. 이미 터미널에 붙여 넣었다면: (PowerShell 에서) `Remove-Item (Get-PSReadLineOption).HistorySavePath` 로 기록 파일을 지우고,
 아래 5절 "토큰이 샜다고 의심될 때" 대로 토큰을 바꾼다.
 
 대시보드에 커넥터가 연결됨(Connected/Healthy)으로 보이면 다음으로.
@@ -200,7 +205,7 @@ node reading-server\tunnel\setup.mjs doctor
 | 코드 사본이 없습니다 / 저장소와 다릅니다 | `install-server`(처음) 또는 `restart-server`(업데이트 뒤) |
 | 자료 드라이브: Network/Removable | `DATA_DIR` 을 이 PC 디스크(예: `C:\WB_server_data`)로 |
 | LAN 차단 실패 | 누군가 `server.mjs` 를 직접 띄운 창이 있다(`WB_ADMIN_ONLY=1` 을 줬어도 HOST 없이 띄우면 모든 주소에 묶인다) — 닫고 `restart-server` |
-| cloudflared 서비스 없음/멈춤 | 3-4 다시, 또는 서비스 앱에서 Cloudflared 시작 |
+| cloudflared 서비스 없음/멈춤 | (이 키트를 쓰기로 한 PC 에서만 — WB1 에서는 따르지 않는다) 3-4 다시, 또는 서비스 앱에서 Cloudflared 시작 |
 | 터널 연결 실패(/ready 503) | 인터넷·방화벽 — 바깥으로 7844 포트(UDP·TCP)가 나가야 한다 |
 | 호스트 이름이 DNS 에 없습니다 | 3-5 의 경로가 없거나 도메인이 아직 Active 가 아니다 |
 | 터널이 연결되어 있지 않습니다(530/1033) | cloudflared 서비스가 꺼져 있다 |
@@ -259,6 +264,8 @@ WB1 에는 다른 체계가 이미 돌고 있어, 설치·이관은 원장 결�
 5. 관리자 판정(`whoami /groups` — `env`·`install-server` 가 쓰고 `doctor` 의 "관리자 권한" 줄에 보인다)·드라이브 종류
    (`[IO.DriveInfo]`)·`(Get-Service cloudflared).Status`·metrics `/ready`(127.0.0.1:20241~20245)가 실제로 읽히는지
 6. 일반(관리자 아님) 터미널에서 `setup.mjs restart-server` 가 "관리자 권한 터미널에서 실행하세요" 로 멈추는지
+7. `setup.mjs tunnel --dry-run` 이 이 PC 의 Cloudflared 서비스 유무를 맞게 말하는지(`detectCloudflaredService` — 테스트는 가짜 실행기로만 확인했다),
+   `host-bind.test.mjs`·서버를 띄우는 테스트들이 Windows 방화벽 아래에서 통과하는지(허용 창이 뜨면 허용하지 말고 닫는다 — 원내 모드 LAN 연결 검사만 실패하면 그 사실을 적는다)
 
 **코덱스가 하는 것 / 원장이 하는 것**
 
@@ -274,7 +281,7 @@ WB1 에는 다른 체계가 이미 돌고 있어, 설치·이관은 원장 결�
 
 > `reading-server/tunnel/README.md` 를 읽고 원장 PC 에서 1단계부터 진행해 줘. 관리자 터미널이야.
 > 비밀번호는 내가 메모장에 직접 넣을게. 각 단계 뒤에 `setup.mjs doctor` 결과를 보여 주고,
-> Windows 실기에서 처음 확인할 6가지를 확인한 결과를 README 에 적어 줘. 금고(A.5) 코드는 쓰지 마.
+> Windows 실기에서 처음 확인할 7가지를 확인한 결과를 README 에 적어 줘. 금고(A.5) 코드는 쓰지 마.
 
 **남은 일(키트 밖)**
 

@@ -16,7 +16,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   planEnv, planInstallServer, planRestartServer, planUninstallServer, planDeployApp, planTunnel, readToken, execute, doctor, printDoctor,
-  runTunnel, EXISTING_SERVICE_MSG,
+  runTunnel, EXISTING_SERVICE_MSG, detectCloudflaredService,
   findCloudflared, cloudflaredCandidates, isElevated, envDirProblem, dataDirProblem, sysTool, verifyAcl, readAcl, deployApp, removeApp,
   lockSteps, resetChildren, findLinks, noLinks, treeHash, checkSource, checkAppDir,
 } from './setup.mjs';
@@ -177,12 +177,13 @@ const idx = (steps, pred) => steps.findIndex(pred);
   let argv = null;
   execute(planTunnel({ cloudflared: 'cf.exe', token: TOKEN, versionText: 'cloudflared version 2026.10.0', tokenFile: tf }), { runner: (a) => { argv = a; return 0; }, out: () => {} });
   eq(argv, ['cf.exe', 'service', 'install', TOKEN], '실제 실행 인자');
-  ok(!fs.existsSync(tf), '설치가 끝났는데 토큰 파일을 남겼다');
+  fs.rmSync(tf, { force: true }); // 할 일 목록은 지우지 않는다 — 지우기는 runTunnel 이 끝에서 한 번(아래)
 
-  /* runTunnel — 어떤 길로 끝나든 토큰 파일이 디스크에 남지 않는다 */
+  /* runTunnel — 토큰이 든 파일은 어떤 길로 끝나든 디스크에 남지 않고, 토큰이 아닌 파일은 지우지 않는다 */
   const VT = 'cloudflared version 2026.10.0';
-  const fresh = () => { fs.writeFileSync(tf, TOKEN); return tf; };
-  const tryRun = (opts) => { try { runTunnel(opts); return ''; } catch (e) { return e.message; } };
+  const fresh = (body = TOKEN) => { fs.writeFileSync(tf, body); return tf; };
+  let printed = [];
+  const tryRun = (opts) => { printed = []; try { runTunnel({ out: (l) => printed.push(l), ...opts }); return ''; } catch (e) { return e.message; } };
   // ① 기존 Cloudflared 서비스가 있는 PC(WB1) — 설치하지 않고, uninstall 을 권하지 않는다
   let ran = false;
   let msg = tryRun({ tokenFile: fresh(), cloudflared: 'cf.exe', versionText: VT, serviceExists: true, exec: () => { ran = true; } });
@@ -190,9 +191,10 @@ const idx = (steps, pred) => steps.findIndex(pred);
   ok(!/uninstall 뒤|uninstall 후/.test(msg) && /실행하지 마세요/.test(msg), '기존 서비스가 있을 때 uninstall 을 권한다');
   ok(!fs.existsSync(tf) && /지웠습니다/.test(msg), '설치를 거절하고 토큰 파일을 남겼다');
   ok(!msg.includes(TOKEN), '오류에 토큰이 실렸다');
-  // ② 서비스 설치가 실패해도(이미 설치됨·권한 등) 토큰 파일은 지운다
+  // ② 서비스 설치가 실패해도(이미 설치됨·권한 등) 토큰 파일은 지우고, cloudflared 의 uninstall 권고를 따르지 말라고 한다
   msg = tryRun({ tokenFile: fresh(), cloudflared: 'cf.exe', versionText: VT, exec: () => { throw new Error('종료 코드 1'); } });
   ok(/종료 코드 1/.test(msg) && !fs.existsSync(tf), '서비스 설치가 실패하자 토큰 파일이 디스크에 남았다');
+  ok(/따르지 마세요/.test(msg), '설치가 실패했을 때 cloudflared 의 uninstall 권고를 막는 말이 없다');
   // ③ cloudflared 를 못 찾아도 지운다
   msg = tryRun({ tokenFile: fresh(), cloudflared: '', versionText: '' });
   ok(/찾지 못했습니다/.test(msg) && !fs.existsSync(tf), 'cloudflared 가 없을 때 토큰 파일을 남겼다');
@@ -200,9 +202,25 @@ const idx = (steps, pred) => steps.findIndex(pred);
   let planned = null;
   msg = tryRun({ tokenFile: fresh(), cloudflared: 'cf.exe', versionText: VT, exec: (steps) => { planned = steps; } });
   ok(!msg && planned && planned.some((x) => x.secret === TOKEN) && !fs.existsSync(tf), '성공한 뒤 토큰 파일을 남겼다');
-  // ⑤ --dry-run 은 아무것도 지우지 않는다
+  // ⑤ --dry-run 은 아무것도 지우지 않고, 남았다고 말한다 · 서비스가 있으면 실제 실행은 거절된다고 미리 말한다
   msg = tryRun({ tokenFile: fresh(), dryRun: true, cloudflared: 'cf.exe', serviceExists: true, exec: () => {} });
   ok(!msg && fs.existsSync(tf), '--dry-run 이 토큰 파일을 지웠거나 실패했다');
+  ok(printed.some((l) => /지우지 않았습니다/.test(l)) && printed.some((l) => /거절합니다/.test(l)), '--dry-run 이 토큰 파일이 남았다는 것·실제 실행이 거절된다는 것을 말하지 않는다');
+  // ⑥ 토큰이 아닌 파일(경로를 잘못 준 server.env 등)은 지우지 않는다
+  const notToken = 'ADMIN_PIN=not-a-real-pin-just-a-test\r\nDATA_DIR=C:\\WB_server_data\r\n';
+  msg = tryRun({ tokenFile: fresh(notToken), cloudflared: 'cf.exe', versionText: VT, exec: () => { ran = true; } });
+  ok(/토큰 파일이 아니라서 지우지 않았습니다/.test(msg) && fs.existsSync(tf) && fs.readFileSync(tf, 'utf8') === notToken, '--token-file 로 잘못 준 설정 파일을 지웠다');
+  msg = tryRun({ tokenFile: fresh(notToken), cloudflared: 'cf.exe', versionText: VT, serviceExists: true });
+  ok(msg.startsWith(EXISTING_SERVICE_MSG.slice(0, 20)) && fs.existsSync(tf), '서비스가 있어 거절할 때 토큰이 아닌 파일을 지웠다');
+  // ⑦ 설치는 됐는데 토큰 파일만 못 지우면 — 실패로 보고하지 않고(다시 돌리면 자기 서비스를 '기존 터널'로 본다) 손으로 지우라고 한다
+  const stuck = { ...fs, rmSync: () => { throw Object.assign(new Error('EBUSY'), { code: 'EBUSY' }); } };
+  msg = tryRun({ tokenFile: fresh(), cloudflared: 'cf.exe', versionText: VT, exec: () => {}, fsx: stuck });
+  ok(!msg && printed.some((l) => /설치는 끝났습니다/.test(l) && l.includes(tf)), '설치 뒤 토큰 파일만 못 지웠는데 실패로 보고하거나 안내가 없다');
+  // ⑧ 서비스 감지 — 모르면 '없다'로 치지 않는다
+  eq(detectCloudflaredService(() => ({ status: 0, stdout: 'Running\r\n' })), true, '서비스가 있는데 없다고 봤다');
+  eq(detectCloudflaredService(() => ({ status: 0, stdout: '' })), false, '서비스가 없는데 있다고 봤다');
+  ok(throwsWith(() => detectCloudflaredService(() => ({ error: new Error('spawn ENOENT') })), /확인하지 못했습니다/), 'PowerShell 을 못 띄웠는데 서비스 없음으로 봤다(설치를 진행한다)');
+  ok(throwsWith(() => detectCloudflaredService(() => ({ status: 1, stdout: '' })), /확인하지 못했습니다/), 'PowerShell 이 오류로 끝났는데 서비스 없음으로 봤다');
   fs.rmSync(tmp, { recursive: true, force: true });
 }
 
