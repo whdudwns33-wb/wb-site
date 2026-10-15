@@ -6,7 +6,9 @@
  * — 같은 와이파이에 붙은 기기는 http://<PC 주소>:8890 으로 관리 로그인 화면까지 바로 온다.
  * 그래서 HOST=127.0.0.1 이면 정말로 루프백에서만 받는지 실제 소켓으로 확인한다.
  *
- * 함께 지키는 것: HOST 를 비우면 예전 그대로 모든 주소에서 받는다(원내 LAN 사용이 깨지면 안 된다).
+ * 함께 지키는 것: 관리 전용(WB_ADMIN_ONLY)인데 HOST 를 빠뜨려도 127.0.0.1 로 묶인다(#454 의 기본값 —
+ * 원장 PC 의 start-admin.ps1·터널 키트 실행기 둘 다 HOST 를 주지만, 손으로 띄울 때 빠뜨리기 쉽다).
+ * 원내 모드에서 HOST 를 비우면 예전 그대로 모든 주소에서 받는다(원내 LAN 사용이 깨지면 안 된다).
  * 이 PC(또는 CI)에 루프백 말고 IPv4 주소가 하나도 없으면 "LAN 에서 막히는가"는 확인할 수 없으니
  * 그 부분만 건너뛰고 그렇다고 출력한다 — 조용히 통과시키지 않는다.
  */
@@ -49,15 +51,17 @@ const freePort = () => new Promise((resolve, reject) => {
   srv.listen(0, '127.0.0.1', () => { const { port } = srv.address(); srv.close(() => resolve(port)); });
 });
 
-async function boot(host, port) {
+async function boot(host, port, adminOnly = true) {
   const data = fs.mkdtempSync(path.join(os.tmpdir(), 'wbr-host-'));
-  const env = { ...process.env, PORT: String(port), DATA_DIR: data, ADMIN_PIN: PIN, WB_ADMIN_ONLY: '1' };
+  const env = { ...process.env, PORT: String(port), DATA_DIR: data, ADMIN_PIN: PIN };
+  if (adminOnly) env.WB_ADMIN_ONLY = '1'; else delete env.WB_ADMIN_ONLY;
   if (host) env.HOST = host; else delete env.HOST;
   const srv = spawn(process.execPath, [path.join(DIR, 'server.mjs')], { env, stdio: ['ignore', 'pipe', 'pipe'] });
   let log = '';
   srv.stdout.on('data', (b) => { log += b; });
   srv.stderr.on('data', (b) => { log += b; });
-  for (let i = 0; i < 100 && !/관리 전용/.test(log); i++) await sleep(100);
+  const ready = adminOnly ? /관리 전용/ : /학생 앱:/;
+  for (let i = 0; i < 100 && !ready.test(log); i++) await sleep(100);
   return { srv, log: () => log, stop() { srv.kill(); fs.rmSync(data, { recursive: true, force: true }); } };
 }
 
@@ -75,16 +79,26 @@ try {
     else notes.push('루프백 말고 IPv4 가 없어 "LAN 에서 막히는가"는 확인하지 못했다');
   } finally { a.stop(); }
 
-  /* ── HOST 없음 — 예전 그대로 모든 주소 ── */
+  /* ── 관리 전용인데 HOST 없음 — 그래도 루프백만 ── */
   const p2 = await freePort();
   const b = await boot('', p2);
   try {
-    ok(/관리 전용/.test(b.log()), '기본 모드 서버가 뜨지 않았다: ' + b.log().slice(0, 300));
-    ok(b.log().includes(`http://localhost:${p2}`), '기본 모드 기동 로그가 바뀌었다');
-    ok(await canConnect('127.0.0.1', p2), 'HOST 를 비웠는데 127.0.0.1 에서 연결되지 않는다');
-    /* 위의 "막혔다" 판정이 진짜인지 — 같은 방법으로 열려 있을 때는 붙는다는 것을 보인다 */
-    if (lan) ok(await canConnect(lan, p2), `HOST 를 비웠는데 LAN 주소 ${lan} 에서 연결되지 않는다 — 원내 LAN 사용이 깨졌다`);
+    ok(/관리 전용/.test(b.log()), 'HOST 없는 관리 전용 서버가 뜨지 않았다: ' + b.log().slice(0, 300));
+    ok(b.log().includes(`http://127.0.0.1:${p2}`), '관리 전용인데 HOST 를 빠뜨리면 127.0.0.1 로 묶여야 한다(기동 로그)');
+    ok(await canConnect('127.0.0.1', p2), 'HOST 없는 관리 전용 서버에 127.0.0.1 로 연결되지 않는다');
+    if (lan) ok(!(await canConnect(lan, p2)), `관리 전용인데 HOST 를 빠뜨리자 LAN 주소 ${lan} 에서 연결된다 — 터널을 거치지 않는 입구가 남는다`);
   } finally { b.stop(); }
+
+  /* ── 원내 모드 + HOST 없음 — 예전 그대로 모든 주소 ── */
+  const p3 = await freePort();
+  const c = await boot('', p3, false);
+  try {
+    ok(/학생 앱:/.test(c.log()), '원내 모드 서버가 뜨지 않았다: ' + c.log().slice(0, 300));
+    ok(c.log().includes(`http://localhost:${p3}`), '원내 모드 기동 로그가 바뀌었다');
+    ok(await canConnect('127.0.0.1', p3), '원내 모드인데 127.0.0.1 에서 연결되지 않는다');
+    /* 위의 "막혔다" 판정이 진짜인지 — 같은 방법으로 열려 있을 때는 붙는다는 것을 보인다 */
+    if (lan) ok(await canConnect(lan, p3), `원내 모드에서 HOST 를 비웠는데 LAN 주소 ${lan} 에서 연결되지 않는다 — 원내 LAN 사용이 깨졌다`);
+  } finally { c.stop(); }
 } catch (e) {
   errors.push('예외: ' + (e && e.message));
 }
@@ -94,4 +108,4 @@ if (errors.length) {
   errors.forEach((m) => console.error('  - ' + m));
   process.exit(1);
 }
-console.log('OK — HOST=127.0.0.1 이면 루프백에서만 받고, 비우면 예전처럼 모든 주소' + (notes.length ? ' (참고: ' + notes.join(' / ') + ')' : ''));
+console.log('OK — HOST=127.0.0.1·관리 전용 기본값은 루프백에서만 받고, 원내 모드에서 비우면 예전처럼 모든 주소' + (notes.length ? ' (참고: ' + notes.join(' / ') + ')' : ''));

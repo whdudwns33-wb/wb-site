@@ -9,7 +9,7 @@ self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', (e) => {
-  e.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => k !== VERSION).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
+  e.waitUntil(caches.keys().then((keys) => Promise.all(keys.filter((k) => k.startsWith('wbhj-shell-') && k !== VERSION).map((k) => caches.delete(k)))).then(() => self.clients.claim()));
 });
 /* 밤 9시 알림 — 페이로드 없는 푸시(내용은 늘 같다). 첫 복습이 밤 9시라 이 알림이 학생을 다시 앉힌다 */
 self.addEventListener('push', (e) => {

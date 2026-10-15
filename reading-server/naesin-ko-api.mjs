@@ -109,9 +109,87 @@ const missingIds = (curPack, nextPack) => ['works', 'sets', 'items'].flatMap((k)
 });
 const size = (o) => JSON.stringify(o).length;
 
+/* 기록은 값을 바꾸거나 줄이지 않는다. 모르는 본문 필드는 빼고, 알려진 필드가 깨졌으면
+   저장 전체를 거절한다 — 일부 진도만 남긴 채 성공했다고 답하면 원본을 잃는다. */
+const koObject = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
+const koValue = (test) => (v) => {
+  if (!test(v)) throw new TypeError('국어 학습 기록 형식 오류');
+  return v;
+};
+const koNumber = koValue((v) => Number.isFinite(v) && v >= 0);
+const koCount = koValue((v) => Number.isInteger(v) && v >= 0);
+const koBool = koValue((v) => typeof v === 'boolean');
+const koString = koValue((v) => typeof v === 'string');
+const koDate = koValue((v) => typeof v === 'string' && DATE_RE.test(v));
+const koEnum = (values) => koValue((v) => values.includes(v));
+const koNullable = (check) => (v) => v === null ? null : check(v);
+const koList = (check) => (v) => {
+  if (!Array.isArray(v)) throw new TypeError('국어 학습 기록 형식 오류');
+  return v.map(check);
+};
+const koFields = (checks) => (v) => {
+  if (!koObject(v)) throw new TypeError('국어 학습 기록 형식 오류');
+  return Object.fromEntries(Object.entries(checks).filter(([k]) => Object.hasOwn(v, k))
+    .map(([k, check]) => [k, check(v[k])]));
+};
+const koMap = (check, validKey = (k) => k.length > 0 && k !== '__proto__') => (v) => {
+  if (!koObject(v)) throw new TypeError('국어 학습 기록 형식 오류');
+  return Object.fromEntries(Object.entries(v).map(([k, x]) => {
+    if (!validKey(k)) throw new TypeError('국어 학습 좌표 형식 오류');
+    return [k, check(x)];
+  }));
+};
+const koMastery = koFields({
+  id: koString, kind: koEnum(['vocab', 'blank', 'work']), reached: koBool,
+  reachedAt: koNullable(koNumber), relearnCount: koCount, lastCriterionDate: koNullable(koDate),
+  step: koCount, due: koNumber, streak: koCount, wrong: koCount, lapses: koCount,
+  needsRecheck: koBool, overconfident: koCount, last: koNullable(koNumber),
+  stage: koValue((v) => Number.isInteger(v) && v >= 1 && v <= 5),
+  applyRight: koCount, applyTotal: koCount, essayDone: koBool, wrongClearDates: koList(koDate),
+});
+const koWrong = koFields({
+  key: koString, n: koCount, cleared: koBool, dates: koList(koDate),
+  workId: koNullable(koString), kind: koNullable(koString), mark: koNullable(koString),
+  no: koNullable(koValue((v) => typeof v === 'string' || Number.isFinite(v))),
+});
+const koPackState = koFields({
+  states: koMap(koMastery, (k) => /^(v|b|w)-./s.test(k)), wrong: koMap(koWrong),
+  essays: koMap(koFields({ verdict: koEnum(VERDICTS), score: koNumber, total: koNumber, at: koNumber })),
+  dump: koList(koFields({ workId: koString, at: koNumber, present: koCount, total: koCount })),
+  log: koList(koFields({ workId: koString, at: koNumber, kind: koEnum(['paper']),
+    coverage: koValue((v) => Number.isFinite(v) && v >= 0 && v <= 1) })),
+  diagDone: koBool, mistakes: koFields({ negative: koCount, bogi: koCount, concept: koCount, guess: koCount }),
+});
+const koStateFields = koFields({ v: koEnum([1]), packs: koMap(koPackState, (k) => PACK_ID_RE.test(k)), savedAt: koNumber });
+export function normalizeKoState(state) {
+  const out = koStateFields(state);
+  if (out.v !== 1 || !out.packs) throw new TypeError('국어 학습 기록 버전·팩 형식 오류');
+  return out;
+}
+
+/* 별도 요약 키도 같은 저장 경계다. 숫자 칸에 학생 입력 HTML이 들어가면 관리 표에 꽂힌다. */
+const KO_AXES = ['read', 'blank', 'vocab', 'apply', 'restore', 'essay'];
+const koPercent = koValue((v) => Number.isFinite(v) && v >= 0 && v <= 100);
+const koReady = koFields({
+  score: koPercent, grade: koFields({ key: koEnum(['ready', 'ontrack', 'building', 'start']), label: koString }),
+  weak: koNullable(koEnum(KO_AXES)), axes: koFields(Object.fromEntries(KO_AXES.map((k) => [k, koPercent]))),
+  alert: koNullable(koFields({ level: koEnum(['risk', 'watch']), why: koString })),
+  pace: koNullable(koFields({ dday: koValue(Number.isInteger), minDays: koCount,
+    rotations: koCount, perDay: koCount, onTrack: koBool })), untouched: koCount,
+});
+export const normalizeKoSummary = koFields({
+  packId: koNullable(koValue((v) => typeof v === 'string' && PACK_ID_RE.test(v))),
+  works: koCount, complete: koCount, restored: koCount, applied: koCount,
+  byStage: koFields({ 1: koCount, 2: koCount, 3: koCount, 4: koCount, 5: koCount }),
+  vocabReached: koCount, vocabStable: koCount, vocabTotal: koCount,
+  blankReached: koCount, blankStable: koCount, blankTotal: koCount,
+  wrongOpen: koCount, essayPass: koCount, essayHold: koCount, ready: koNullable(koReady),
+  lastAt: koValue((v) => typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(v) && Number.isFinite(Date.parse(v))),
+});
+
 /* 성취도 대시보드 한 줄.
    영어 앱과 같은 원칙: 서버는 학습 기록 속을 해석하지 않는다. 클라이언트가
-   summary를 따로 올리고 서버는 그것을 그대로 내보낸다. 국어는 요약을 state에서
+   summary를 따로 올리고 서버는 허용 필드만 내보낸다. 국어는 요약을 state에서
    분리해 별도 키에 두었으므로(§8 저장 예산) overview가 state를 읽지 않는다 —
    반 15명 조회에 256KB × 15를 읽던 비용이 사라진다. */
 export function naesinKoSummary(code, stu, sumRec) {
@@ -123,7 +201,9 @@ export function naesinKoSummary(code, stu, sumRec) {
     lastActive: sumRec ? sumRec.updatedAt : null,
   };
   const s = sumRec && sumRec.summary;
-  if (s && typeof s === 'object' && !Array.isArray(s)) row.summary = s;
+  if (s) {
+    try { row.summary = normalizeKoSummary(s); } catch { /* 깨진 옛 요약은 관리 표에 꽂지 않는다. */ }
+  }
   return row;
 }
 
@@ -141,7 +221,7 @@ export async function handleNaesinKo(ctx) {
 
   /* 호스트마다 JSON 파싱 실패의 모양이 다르다(로컬 reject, 워커 throw) — 여기서 400으로 통일 */
   const body = async () => {
-    try { return await ctx.getBody(); } catch (e) { return null; }
+    try { return await ctx.getBody(); } catch (e) { if (e && e.status === 413) throw e; return null; }
   };
 
   /* ── 학생 (관리자 토큰도 통과) ── */
@@ -165,30 +245,35 @@ export async function handleNaesinKo(ctx) {
 
   if (p === '/api/naesin-ko/state' && method === 'GET' && !who.admin) {
     const rec = await store.getState(who.code);
-    /* 옛 기록에 남은 발문은 내보내지 않는다 — 기기를 바꿔도 다시 퍼지지 않게 */
-    if (rec && rec.state) scrubWrongLabels(rec.state);
-    return j(200, { state: rec ? rec.state : {}, updatedAt: rec ? rec.updatedAt : null });
+    /* 출력 복사만 거른다 — GET이 파일 어댑터의 저장 원본을 바꾸면 안 된다. */
+    try {
+      return j(200, { state: rec ? normalizeKoState(rec.state) : {}, updatedAt: rec ? rec.updatedAt : null });
+    } catch {
+      return j(409, { error: '서버 백업의 학습 기록 형식을 확인해 주세요. 기기의 기록은 그대로 두세요.' });
+    }
   }
   if (p === '/api/naesin-ko/state' && method === 'PUT' && !who.admin) {
     const b = await body();
     if (!b) return j(400, { error: '올바른 JSON이 아니에요.' });
-    const state = b.state;
-    if (!state || typeof state !== 'object') return j(400, { error: 'state 필요' });
-    /* 상한 검사보다 **먼저** 지운다 — 발문을 뺀 뒤의 크기로 재야 옛 기기가 상한에 걸려
-       기록을 아예 못 올리는 일이 없다 */
-    scrubWrongLabels(state);
+    let state, summary;
+    try {
+      state = normalizeKoState(b.state);
+      if (b.summary != null) summary = normalizeKoSummary(b.summary);
+    } catch {
+      return j(400, { error: '학습 기록 형식이 맞지 않아 저장하지 않았어요. 기기의 기록을 지우지 말고 선생님께 알려 주세요.' });
+    }
+    /* 상한보다 먼저 본문을 뺀다 — 옛 기기의 정당한 진도는 계속 저장할 수 있게. */
     const rec = { state, updatedAt: nowIso() };
     /* 상한을 넘으면 조용히 실패하지 않고 413으로 알린다 — 학생 화면이 경고를 띄운다.
        서술형 답안은 여기 오지 않는다(/review로 간다) — state가 부푸는 주범이었다. */
-    if (size(rec) > STATE_MAX_BYTES) return j(413, { error: '학습 기록이 너무 커서 저장할 수 없어요. 선생님께 알려 주세요.' });
+    if (new TextEncoder().encode(JSON.stringify(rec)).length > STATE_MAX_BYTES) return j(413, { error: '학습 기록이 너무 커서 저장할 수 없어요. 선생님께 알려 주세요.' });
+    const srec = summary ? { summary, updatedAt: rec.updatedAt } : null;
+    if (srec && new TextEncoder().encode(JSON.stringify(srec)).length > SUMMARY_MAX_BYTES) return j(413, { error: '학습 요약이 너무 커서 저장할 수 없어요. 선생님께 알려 주세요.' });
     await store.putState(who.code, rec);
 
     /* 요약은 같은 요청에서 별도 키로 함께 저장한다 — 관리 화면이 state를 안 읽게 하려면
        요약이 항상 최신이어야 하고, 왕복을 두 번 하면 어긋날 틈이 생긴다. */
-    if (b.summary && typeof b.summary === 'object' && !Array.isArray(b.summary)) {
-      const srec = { summary: b.summary, updatedAt: rec.updatedAt };
-      if (size(srec) <= SUMMARY_MAX_BYTES) await store.putSummary(who.code, srec);
-    }
+    if (srec) await store.putSummary(who.code, srec);
     return j(200, { ok: true, updatedAt: rec.updatedAt });
   }
 
@@ -410,7 +495,8 @@ export async function handleNaesinKo(ctx) {
      overrides[]: {targetRef, answers[], note} · notes[]: {workId, text} */
   if (p === '/api/naesin-ko/admin/overlay' && method === 'GET') {
     const scope = String((ctx.query && ctx.query.get('scope')) || 'default').trim();
-    return j(200, { overlay: (await store.getOverlay(scope)) || {}, scope });
+    const overlay = await store.getOverlay(scope);
+    return j(200, { overlay: overlay || {}, scope, found: !!overlay });
   }
   if (p === '/api/naesin-ko/admin/overlay' && method === 'POST') {
     const b = await body();

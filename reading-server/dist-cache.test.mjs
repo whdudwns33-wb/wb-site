@@ -35,6 +35,19 @@ build();
 const before = { r: swVer(R_SW), v: swVer(V_SW), n: swVer(N_SW), k: swVer(K_SW), h: swVer(H_SW), c: swVer(C_SW), l: swVer(L_SW), j: swVer(J_SW) };
 const jAssetsBefore = hanjaAssets(), jHtmlBefore = fs.readFileSync(J_HTML, 'utf8'), jSwBefore = fs.readFileSync(J_SW, 'utf8');
 
+t('국어브레인 학생·강사 렌더러가 배포되고 학생 오프라인 셸에 미리 담긴다', () => {
+  const html = fs.readFileSync(path.join(DIST, 'naesin-ko', 'index.html'), 'utf8');
+  const sw = fs.readFileSync(K_SW, 'utf8');
+  const shell = (sw.match(/const SHELL = (\[[^\]]+\]);/) || [])[1];
+  assert.ok(shell, '국어브레인 SHELL을 찾지 못했다');
+  for (const src of [...html.matchAll(/<script\b[^>]*\bsrc="\.\/([^"]+)"/g)].map(m => m[1])) {
+    assert.ok(fs.existsSync(path.join(DIST, 'naesin-ko', src)), '배포본에 학생 모듈이 없다: ' + src);
+    assert.ok(shell.includes("'./" + src + "'"), '오프라인 셸에 학생 모듈이 없다: ' + src);
+  }
+  assert.strictEqual(fs.readFileSync(path.join(DIST, 'naesin-ko', 'render.js'), 'utf8'),
+    fs.readFileSync(path.join(HERE, '..', 'naesin-ko', 'render.js'), 'utf8'), '배포된 렌더러가 원본과 다르다');
+});
+
 t('어휘브레인 HTML과 오프라인 SHELL은 같은 내용 해시 스크립트·체험 단어장 URL을 쓴다', () => {
   const shell = (jSwBefore.match(/const SHELL = (\[[^\]]+\]);/) || [])[1];
   assert.ok(shell, '어휘브레인 SHELL을 찾지 못했다');
@@ -82,6 +95,7 @@ t('껍데기 파일이 바뀌면 캐시 이름이 바뀐다 — 학생이 새 �
     { file: path.join(HERE, '..', 'naesin', 'icon.svg'), sw: N_SW, was: before.n, what: '내신브레인 앱' },
     /* 국어는 개념어 사전도 셸에 실린다 — 사전을 고치면 학생이 새 사전을 받아야 한다 */
     { file: path.join(HERE, '..', 'naesin-ko', 'concepts.json'), sw: K_SW, was: before.k, what: '국어브레인 개념어 사전' },
+    { file: path.join(HERE, '..', 'naesin-ko', 'render.js'), sw: K_SW, was: before.k, what: '국어브레인 공용 렌더러' },
     { file: path.join(HERE, '..', 'haru', 'icon.svg'), sw: H_SW, was: before.h, what: '하루브레인 앱' },
     { file: path.join(HERE, '..', 'haru', 'preview.js'), sw: H_SW, was: before.h, what: '삼육중 및 영재원 대비 자체 샘플' },
     /* 한자는 체험 단어장도 셸에 실린다 — 단어장을 고치면 학생이 새 단어장을 받아야 한다 */
@@ -170,7 +184,7 @@ t('배포본 _headers — /naesin/*·/vocab/*·/haru/*·/hanja/*·/letter/*·/ad
   const distText = fs.readFileSync(path.join(DIST, '_headers'), 'utf8');
   assert.strictEqual(distText, fs.readFileSync(path.join(HERE, '..', 'reading', '_headers'), 'utf8'), 'dist/_headers 는 reading/_headers 그대로여야 한다');
   const rules = parseHeaders(distText);
-  for (const p of ['/naesin/*', '/vocab/*', '/haru/*', '/hanja/*', '/letter/*', '/admin/*']) {
+  for (const p of ['/naesin/*', '/naesin-ko/*', '/vocab/*', '/haru/*', '/hanja/*', '/chunk/*', '/letter/*', '/admin/*']) {
     assert.ok(rules[p], p + ' 규칙이 없다 — 그 앱의 옛 화면이 브라우저 캐시에 굳는다');
     assert.strictEqual(rules[p]['Cache-Control'], 'no-store', p);
   }
@@ -182,7 +196,10 @@ t('배포본 _headers — /naesin/*·/vocab/*·/haru/*·/hanja/*·/letter/*·/ad
   assert.strictEqual(rules['/*']['Cache-Control'], undefined, '/* 에 Cache-Control 을 두면 분할본의 max-age 와 합쳐져 캐시가 통째로 무력화된다');
   assert.strictEqual(rules['/articles-L1.json']['Cache-Control'], 'public, max-age=604800', '분할본 캐시 규칙은 그대로');
   /* 원본 자리의 두 파일은 안내 주석만 남는다 — 규칙이 두 곳에 있으면 한 곳만 고치는 사고가 난다 */
-  for (const app of ['naesin', 'vocab', 'haru', 'letter', 'hanja']) {
+  /* 앱 폴더의 _headers 는 일곱 개 전부 안내 주석만 남아야 한다. 국어·청크가 이 목록에서 빠져
+     있던 동안 naesin-ko/_headers 에 '살아 보이는' 규칙 8줄이 남아 있었다 — 어디서도 읽지 않는데
+     CSP 는 reading/_headers 보다 낡아서, 그걸 고치면 효과가 있다고 믿게 만드는 자리였다. */
+  for (const app of ['naesin', 'naesin-ko', 'vocab', 'haru', 'chunk', 'letter', 'hanja']) {
     const own = fs.readFileSync(path.join(HERE, '..', app, '_headers'), 'utf8');
     assert.ok(own.split(/\r?\n/).every((l) => !l.trim() || l.trim().startsWith('#')), app + '/_headers 에 규칙이 남아 있다 — reading/_headers 로 옮기세요');
     assert.ok(!fs.existsSync(path.join(DIST, app, '_headers')), app + '/_headers 가 dist 에 실렸다');

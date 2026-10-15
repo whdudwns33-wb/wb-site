@@ -2818,7 +2818,7 @@ function viewStudentGuide() {
         '<div class="student-guide-step"><div class="student-guide-step-top"><span class="student-guide-number">6</span><b>오늘 할 일 확인</b></div><p>오늘 체크리스트가 완료로 바뀌었는지 확인하고, 마지막에 하루 마감과 수행 보고를 끝냅니다.</p></div>' +
       '</div><div class="student-guide-tip"><b>로그인 메모 보안</b> 입력한 아이디와 비밀번호는 현재 학생 기기에만 저장되고 서버·원장 화면·백업으로 전송되지 않습니다. 공용 기기에서는 저장하지 말고, 기기 저장공간을 지우면 메모도 사라집니다.</div>' +
       '<div class="student-guide-tip"><b>온라인 학습 포인트</b> 배정된 서비스가 여러 개면 하루 온라인 학습 30P를 서비스 수대로 나누며, 완료한 서비스 몫만 실제 완료한 날짜에 적립됩니다. 이월 공부도 원래 날짜가 아니라 마친 날에 반영됩니다.</div>' +
-      '<div class="student-guide-tip"><b>서비스별 안내</b> 브레인레터는 주간 글 읽기, 청크브레인은 의미 단위 끊어읽기, 어휘브레인은 어휘 학습에 사용합니다. 리더스아이는 학습 결과에 따라 1주일마다 레벨이 자동 조정됩니다. 메타수학 문제지 요청은 화요일까지 보내면 가까운 수요일에, 수요일 이후에는 다음 수요일에 제작·배정됩니다.</div>' +
+      '<div class="student-guide-tip"><b>서비스별 안내</b> 브레인레터는 주간 글 읽기, 청크브레인은 의미 단위 끊어읽기, 어휘브레인은 어휘 학습에 사용합니다. 리더스아이는 학습 결과에 따라 1주일마다 레벨이 자동 조정됩니다. 메타수학 문제지 요청은 매일 오후 6시에 확인합니다. 오후 6시 전에 접수하면 당일, 오후 6시부터 접수하면 다음 날 오후 6시에 제작·배정됩니다.</div>' +
     '</details>' +
 
     '<details class="card student-guide-section"><summary class="student-guide-head"><span class="student-guide-summary-copy"><span class="card-title">🎯 목표 학교와 교재 로드맵</span>' +
@@ -6054,14 +6054,16 @@ function learningLoginMemoCard(me, sourceKey) {
 }
 
 const METAMATH_REQUEST_STATUS = Object.freeze({
-  requested: '수요일 제작 대기', changed: '변경 내용 확인', preparing: '제작 중', assigned: '배정 완료', cancelled: '취소됨'
+  requested: '오후 6시 제작 대기', changed: '변경 내용 확인', preparing: '제작 중', assigned: '배정 완료', cancelled: '취소됨'
 });
 const METAMATH_GRADES = Object.freeze(['초1', '초2', '초3', '초4', '초5', '초6', '중1', '중2', '중3', '고1', '고2', '고3']);
 const METAMATH_SEMESTERS = Object.freeze(['1학기', '2학기']);
+const METAMATH_DIFFICULTIES = Object.freeze(['기본', '발전', '심화']);
 
-function nextMetamathRequestWednesday(date) {
-  const offset = (3 - dowOf(date) + 7) % 7;
-  return addDays(date, offset === 0 ? 7 : offset);
+function metamathRequestProcessingDate(timestamp) {
+  const kst = new Date(Number(timestamp) + 9 * 60 * 60 * 1000).toISOString();
+  const date = kst.slice(0, 10);
+  return kst.slice(11, 16) < '18:00' ? date : addDays(date, 1);
 }
 
 function metamathRequestsFor(staffId) {
@@ -6113,11 +6115,12 @@ function metamathRequestStatus(req) {
 
 function metamathRequestFingerprint(req) {
   const norm = value => String(value || '').trim().toLowerCase().replace(/\s+/g, ' ');
-  return [req.staffId, req.processingDate, req.grade, req.semester, req.unit].map(norm).join('|');
+  return [req.staffId, req.processingDate, req.grade, req.semester, req.difficulty, req.unit].map(norm).join('|');
 }
 
 function buildMetamathRequestSummary(req) {
-  return [req.grade, req.semester, req.unit, req.note ? '메모: ' + req.note : ''].filter(Boolean).join(' · ');
+  return [req.grade, req.semester, req.unit, '난이도: ' + (req.difficulty || '미지정(기존 요청)'),
+    req.note ? '메모: ' + req.note : ''].filter(Boolean).join(' · ');
 }
 
 function setMetamathResponse(req, status, note) {
@@ -6162,7 +6165,7 @@ function metamathRequestCard(req, admin) {
   return '<div class="material-request ' + status + (overdue ? ' overdue' : '') + '"><div class="request-queue-head"><div>' +
     '<div class="row wraprow" style="gap:6px"><b>' + esc(admin && staff ? staff.name + ' · ' : '') + esc(req.unit || '단원 미입력') + '</b>' +
       '<span class="pill ' + (status === 'assigned' ? '' : overdue ? 'bad' : 'warn') + '">' + esc(overdue ? '처리 지연' : METAMATH_REQUEST_STATUS[status]) + '</span></div>' +
-    '<div class="small muted">' + esc(req.grade || '') + ' · ' + esc(req.semester || '') + ' · 제작일 ' + esc(req.processingDate ? label(req.processingDate) : '미정') + '</div></div>' +
+    '<div class="small muted">' + esc(req.grade || '') + ' · ' + esc(req.semester || '') + ' · 제작 예정 ' + esc(req.processingDate ? label(req.processingDate) + ' 오후 6시' : '미정') + '</div></div>' +
     '<span class="pill">수학</span></div>' +
     '<div class="material-summary">' + esc(buildMetamathRequestSummary(req)) + '</div>' +
     (overdue ? '<div class="small muted mt8">제작 예정일이 지나 최신 처리 상태를 확인해 주세요.</div>' : '') +
@@ -6183,7 +6186,7 @@ function metamathRequestPanel(me) {
   const requests = metamathRequestsFor(me.id).slice(-8).reverse();
   const canRequest = session.isStaffLink && !isManager() && me.id === session.staffId;
   return '<div class="guide mb14"><b>문제지가 필요할 때 요청하세요.</b><br>' +
-    '메타수학은 자동 출제가 아닙니다. 화요일까지 요청하면 가까운 수요일에, 수요일 이후 요청하면 다음 수요일에 선생님이 직접 제작·배정합니다.' +
+    '메타수학은 자동 출제가 아닙니다. 매일 오후 6시에 요청을 확인해 선생님이 직접 제작·배정합니다. 오후 6시 전에 접수하면 당일, 오후 6시부터 접수하면 다음 날 처리됩니다.' +
     (canRequest ? '<div class="mt8"><button class="btn btn-sm btn-ghost" data-act="syncnow">↻ 최신 상태 확인</button></div>' : '') + '</div>' +
     (requests.length ? '<div class="fl mb8">문제지 요청 현황</div>' + requests.map(req => metamathRequestCard(req, false)).join('') :
       '<div class="small muted mb14">' + (canRequest ? '아직 요청한 문제지가 없습니다.' : '등록된 문제지 요청이 없습니다.') + '</div>');
@@ -6199,8 +6202,8 @@ function metamathRequestInbox() {
   const recent = requests.filter(req => metamathRequestStatus(req) === 'assigned')
     .sort((a, b) => Number((metamathResponseFor(b.id) || {}).updatedAt || b.updatedAt || 0) -
       Number((metamathResponseFor(a.id) || {}).updatedAt || a.updatedAt || 0)).slice(0, 10);
-  return '<div class="card"><div class="between mb8"><div><div class="card-title">🧮 수요일 메타수학 문제지 큐</div>' +
-    '<div class="card-sub">요청 정보를 확인해 메타수학 교실홈에서 직접 제작한 뒤, 학습 예정일을 정해 배정하세요.</div></div>' +
+  return '<div class="card"><div class="between mb8"><div><div class="card-title">🧮 메타수학 문제지 요청 큐</div>' +
+    '<div class="card-sub">매일 오후 6시에 요청 정보를 확인해 메타수학 교실홈에서 직접 제작한 뒤, 학습 예정일을 정해 배정하세요.</div></div>' +
     '<span class="pill ' + (queue.length ? 'warn' : '') + '">' + queue.length + '건</span></div>' +
     (queue.length ? queue.map(req => metamathRequestCard(req, true)).join('') : '<div class="small muted">처리할 문제지 요청이 없습니다.</div>') +
     (recent.length ? '<details class="study-completed mt14"><summary>최근 배정 완료 ' + recent.length + '건 보기</summary>' +
@@ -6214,18 +6217,21 @@ function metamathRequestModal(existing) {
     return toast('본인의 대기 중인 문제지 요청만 작성할 수 있어요');
   }
   const req = existing || {};
-  const processingDate = req.processingDate || nextMetamathRequestWednesday(today());
+  const processingDate = metamathRequestProcessingDate(now());
   const gradeOptions = '<option value="">학년 선택</option>' + METAMATH_GRADES.map(value =>
     '<option value="' + value + '"' + (req.grade === value ? ' selected' : '') + '>' + value + '</option>').join('');
   const semesterOptions = '<option value="">학기 선택</option>' + METAMATH_SEMESTERS.map(value =>
     '<option value="' + value + '"' + (req.semester === value ? ' selected' : '') + '>' + value + '</option>').join('');
+  const difficultyOptions = '<option value="">난이도 선택</option>' + METAMATH_DIFFICULTIES.map(value =>
+    '<option value="' + value + '"' + (req.difficulty === value ? ' selected' : '') + '>' + value + '</option>').join('');
   modal('🧮 메타수학 문제지 요청',
     '<input type="hidden" id="metamathRequestId" value="' + esc(req.id || '') + '">' +
-    '<div class="guide mb14"><b>제작 예정: ' + esc(label(processingDate)) + '</b><br>선생님이 매주 수요일 요청 내용을 보고 문제지를 직접 만들어 배정합니다. 자동 출제 요청이 아닙니다.</div>' +
+    '<div class="guide mb14"><b>제작 예정: ' + esc(label(processingDate)) + ' 오후 6시</b><br>매일 오후 6시에 요청 내용을 확인해 선생님이 직접 문제지를 만들어 배정합니다. 오후 6시 전에 접수하면 당일, 오후 6시부터 접수하면 다음 날 처리됩니다.</div>' +
     '<div class="grid2"><div class="field"><label class="fl">학년</label><select class="in" id="metamathGrade">' + gradeOptions + '</select></div>' +
       '<div class="field"><label class="fl">학기</label><select class="in" id="metamathSemester">' + semesterOptions + '</select></div></div>' +
+    '<div class="field"><label class="fl">난이도</label><select class="in" id="metamathDifficulty">' + difficultyOptions + '</select></div>' +
     '<div class="field"><label class="fl">단원</label><input class="in" id="metamathUnit" maxlength="160" value="' + esc(req.unit || '') + '" placeholder="예: 3단원 일차함수"></div>' +
-    '<div class="field"><label class="fl">기타(메모) <span class="muted">(선택)</span></label><textarea class="in" id="metamathNote" maxlength="500" rows="4" placeholder="난이도, 문항 수, 특히 어려운 유형 등을 적어주세요">' + esc(req.note || '') + '</textarea></div>',
+    '<div class="field"><label class="fl">기타(메모) <span class="muted">(선택)</span></label><textarea class="in" id="metamathNote" maxlength="500" rows="4" placeholder="문항 수, 특히 어려운 유형 등을 적어주세요">' + esc(req.note || '') + '</textarea></div>',
     '<button class="btn btn-primary btn-block" data-act="metamathrequestsave">' + (existing ? '요청 수정하기' : '문제지 요청하기') + '</button>');
 }
 
@@ -6496,7 +6502,7 @@ function learningTaskModal(sourceKey, requestId) {
     return toast('배정할 메타수학 요청을 다시 확인해 주세요');
   }
   const planned = request ? (request.processingDate >= today() ? request.processingDate : today()) : addDays(today(), 1);
-  const defaultTitle = request ? [request.grade, request.semester, request.unit, '문제지'].filter(Boolean).join(' ') : '';
+  const defaultTitle = request ? [request.grade, request.semester, request.unit, request.difficulty, '문제지'].filter(Boolean).join(' ') : '';
   modal(me.name + ' — ' + source.icon + ' ' + source.label,
     '<input type="hidden" id="learnSource" value="' + esc(sourceKey) + '">' +
     '<input type="hidden" id="learnRequestId" value="' + esc(request ? request.id : '') + '">' +
@@ -11735,39 +11741,42 @@ document.addEventListener('click', ev => {
       if (existing && metamathRequestStatus(existing) !== 'requested') return toast('제작이 시작된 요청은 수정할 수 없어요');
       const grade = (($('#metamathGrade') && $('#metamathGrade').value) || '').trim();
       const semester = (($('#metamathSemester') && $('#metamathSemester').value) || '').trim();
+      const difficulty = (($('#metamathDifficulty') && $('#metamathDifficulty').value) || '').trim();
       const unit = (($('#metamathUnit') && $('#metamathUnit').value) || '').trim();
       const note = (($('#metamathNote') && $('#metamathNote').value) || '').trim();
-      if (!grade || !semester || !unit) return toast('학년·학기·단원을 모두 입력해 주세요');
+      if (!grade || !semester || !difficulty || !unit) return toast('학년·학기·난이도·단원을 모두 입력해 주세요');
       if (!METAMATH_GRADES.includes(grade) || grade.length > 20) return toast('학년을 다시 선택해 주세요');
       if (!METAMATH_SEMESTERS.includes(semester) || semester.length > 20) return toast('학기를 다시 선택해 주세요');
+      if (!METAMATH_DIFFICULTIES.includes(difficulty)) return toast('난이도를 다시 선택해 주세요');
       if (unit.length > 160) return toast('단원은 160자 이내로 입력해 주세요');
       if (note.length > 500) return toast('기타 메모는 500자 이내로 입력해 주세요');
-      const processingDate = existing && existing.processingDate ? existing.processingDate : nextMetamathRequestWednesday(today());
-      const probe = { staffId: me.id, processingDate: processingDate, grade: grade, semester: semester, unit: unit };
+      const processingDate = metamathRequestProcessingDate(now());
+      const probe = { staffId: me.id, processingDate: processingDate, grade: grade, semester: semester,
+        difficulty: difficulty, unit: unit };
       const duplicate = metamathRequestsFor(me.id).find(req => req.id !== existingId &&
         ['requested', 'changed', 'preparing'].includes(metamathRequestStatus(req)) &&
         metamathRequestFingerprint(req) === metamathRequestFingerprint(probe));
-      if (duplicate) return toast('같은 수요일에 같은 범위로 처리 중인 문제지 요청이 있습니다');
+      if (duplicate) return toast('같은 제작일에 같은 범위로 처리 중인 문제지 요청이 있습니다');
       let req = existing;
       if (!req) {
         req = {
           id: uid(), groupId: 'metamath-request-' + now(), kind: 'metamath_request',
-          staffId: me.id, origin: 'staff', processingDate: nextMetamathRequestWednesday(today()),
+          staffId: me.id, origin: 'staff', processingDate: processingDate,
           repeat: 'request', days: [], end: '', carry: false,
           createdAt: now(), requestedAt: now(), deleted: false
         };
         state.tasks.push(req);
       }
       Object.assign(req, {
-        grade: grade, semester: semester, unit: unit, note: note,
+        grade: grade, semester: semester, difficulty: difficulty, unit: unit, note: note,
         title: '메타수학 문제지 요청 · ' + [grade, semester, unit].join(' '),
-        studySubject: 'math', detail: buildMetamathRequestSummary({ grade: grade, semester: semester, unit: unit, note: note }),
-        guide: '', steps: [], target: 0, time: '', priority: 'normal', start: req.processingDate || processingDate,
+        studySubject: 'math', detail: buildMetamathRequestSummary({ grade: grade, semester: semester, difficulty: difficulty, unit: unit, note: note }),
+        guide: '', steps: [], target: 0, time: '', priority: 'normal', processingDate: processingDate, start: processingDate,
         requestRevision: (req.requestRevision || 0) + 1, cancelledAt: null, updatedAt: now()
       });
       req.requestKey = metamathRequestFingerprint(req);
       save(); queueSync(); closeModal(); render();
-      toast(existing ? '문제지 요청을 수정했습니다' : '문제지 요청을 보냈습니다');
+      toast((existing ? '문제지 요청을 수정했습니다' : '문제지 요청을 보냈습니다') + ' · 제작 예정 ' + label(processingDate) + ' 오후 6시');
       break;
     }
     case 'metamathrequestcancel': {
@@ -14766,7 +14775,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-10-05.1';
+const APP_VER = '2026-10-14.1';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)

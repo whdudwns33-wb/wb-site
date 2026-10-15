@@ -55,7 +55,7 @@ test('학생 정보 팝업은 학교·연락처·등록일을 포함하고 모�
 test('구독 프로그램은 시작일과 함께 저장하고 관리자만 날짜 지정 1회성 수업을 생성한다', () => {
   const editor = block('let rosterStudentEditor = null;', '/* ── 신규 학생 30일 적응 관리');
   const info = block('function rosterStudentSubscriptions(', 'function rosterStudentInfoHtml(');
-  for (const label of ['검사구독', '스터디포스구독']) assert.match(source, new RegExp(label));
+  for (const label of ['검사구독', '스터디포스구독', '리더스 구독']) assert.match(source, new RegExp(label));
   assert.match(editor, /data-rse-subscription/);
   assert.match(editor, /data-rse-subscription-date/);
   assert.match(editor, /subscriptions: subscriptions/);
@@ -69,6 +69,16 @@ test('구독 프로그램은 시작일과 함께 저장하고 관리자만 날�
   assert.match(source, /const isRegularLessonTask = t =>[\s\S]{0,260}!isSubscriptionSessionTask\(t\)/);
   assert.match(source, /function sessionModeLessonTask\(task\)[\s\S]{0,120}!isSubscriptionSessionTask\(task\)/);
   assert.match(source, /\.task\.is-subscription-session/);
+});
+
+test('리더스 구독은 구독 수업으로 분류하고 정규 수업과 구분한다', () => {
+  const programs = new Function(block('const SUBSCRIPTION_PROGRAMS', 'function subscriptionVisitRows') + '; return SUBSCRIPTION_PROGRAMS;')();
+  assert.deepEqual(programs.map(p => p.type), ['assessment', 'studyforce', 'readers']);
+  assert.equal(programs.find(p => p.type === 'readers').label, '리더스 구독');
+  const classify = new Function(block('const isSubscriptionSessionTask', '/** 정규 수업 관리 화면') + '; return isSubscriptionSessionTask;')();
+  assert.equal(classify({ lessonInstanceType: 'subscription', subscriptionType: 'readers' }), true);
+  assert.equal(classify({ lessonInstanceType: 'subscription', subscriptionType: 'readers', deleted: true }), false);
+  assert.equal(classify({ lessonInstanceType: 'regular', subscriptionType: 'readers' }), false);
 });
 
 test('원생 탭은 휴원생과 퇴원생을 한 줄 요약의 접힌 목록으로 분리한다', () => {
