@@ -210,9 +210,11 @@ function runSteps(steps, { dryRun, runner, out, ops, onPause }) {
     if (step.note) { out('  · ' + step.note); continue; }
     out(`${dryRun ? '[할 일] ' : ''}${step.why ? step.why + '\n  ' : ''}${show(step)}`);
     if (dryRun) continue;
-    if (step.mkdir) { fs.mkdirSync(step.mkdir, { recursive: true }); continue; }
-    if (step.write) { fs.writeFileSync(step.write, step.data); continue; }
-    if (step.remove) { fs.rmSync(step.remove, { force: true }); continue; }
+    /* 파일 일도 ops 로 — 시험이 가짜 ops 를 주면 디스크를 건드리지 않는다(Linux 에서 'C:\\…' 는 상대 경로라
+       예전에는 저장소 맨 위에 그 이름의 폴더가 생겼다) */
+    if (step.mkdir) { ops.mkdir(step.mkdir); continue; }
+    if (step.write) { ops.write(step.write, step.data); continue; }
+    if (step.remove) { ops.remove(step.remove); continue; }
     if (step.deployApp) { ops.deployApp(step.deployApp.from, step.deployApp.to); continue; }
     if (step.copyNode) { ops.copyNode(step.copyNode.from, step.copyNode.to); continue; }
     if (step.removeApp) { ops.removeApp(step.removeApp); continue; }
@@ -396,6 +398,7 @@ export function gitHead(repo) {
   } catch { return ''; }
 }
 const defaultOps = {
+  mkdir: (d) => fs.mkdirSync(d, { recursive: true }), write: (f, data) => fs.writeFileSync(f, data), remove: (f) => fs.rmSync(f, { force: true }),
   deployApp: (f, t) => deployApp(f, t), copyNode: (f, t) => copyNode(f, t), removeApp: (t) => removeApp(t),
   verifyAcl: (d, r) => verifyAcl(d, r), noLinks: (d) => noLinks(d), resetChildren: (d, r) => resetChildren(d, r),
   checkSource: (d) => checkSource(d), checkAppDir: (d) => checkAppDir(d),

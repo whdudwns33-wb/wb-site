@@ -199,13 +199,16 @@ const idx = (steps, pred) => steps.findIndex(pred);
 {
   const plan = planRestartServer({ envFile: ENVF, dataDir: DATA, appDir: APP, nodeSrc: NODE_SRC, repo: REPO_W });
   const noop = () => {};
-  const okOps = { deployApp: noop, copyNode: noop, removeApp: noop, verifyAcl: noop, noLinks: noop, resetChildren: noop, checkSource: noop, checkAppDir: noop };
+  const okOps = { mkdir: noop, write: noop, remove: noop, deployApp: noop, copyNode: noop, removeApp: noop, verifyAcl: noop, noLinks: noop, resetChildren: noop, checkSource: noop, checkAppDir: noop };
   let msg = '';
   try { execute(plan, { runner: () => 0, out: noop, ops: { ...okOps, deployApp: () => { throw new Error('EBUSY'); } } }); } catch (e) { msg = e.message; }
   ok(/꺼 둔 채/.test(msg) && /restart-server/.test(msg), '작업을 끈 뒤에 실패했는데 서버가 꺼진 채라는 것을 알리지 않는다');
   msg = '';
   try { execute(plan, { runner: () => 0, out: noop, ops: { ...okOps, checkSource: () => { throw new Error('링크'); } } }); } catch (e) { msg = e.message; }
   ok(msg && !/꺼 둔 채/.test(msg), '작업을 끄기 전의 실패인데 꺼 뒀다고 말한다');
+  /* Linux 에서 'C:\\…' 는 상대 경로다 — 가짜 ops 를 줬는데도 디스크에 만들면 저장소 맨 위에 그 이름의 폴더가
+     생기고 docs-sync(최상위 폴더 지도)가 병렬 순서에 따라 가끔 빨간다 */
+  ok(!fs.existsSync(DATA) && !fs.existsSync(ENVF), '가짜 ops 로 돌렸는데 자료·설정 폴더를 실제 디스크(현재 폴더)에 만들었다');
 }
 
 /* ── 권한 확인 — 경로는 환경 변수로, 남은 권한은 지우고, 그래도 남으면 멈춘다 ── */
