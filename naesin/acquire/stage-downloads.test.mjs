@@ -38,6 +38,20 @@ test('13 exact canonical names, stage 1/10 and integrated not stage',()=>{
   assert.equal(classifyDownload(prefix+titles[2]+'.pdf').stage,null);
   for(const title of ['본문10단계 워크북 통합본(1~10)','본문10단계 워크북 11 본문_단계별','본문10단계 워크북 1English_단계별','[02]본문10단계 워크북 통합본(1~10)_단계별','[08]unknown','[01]내용정리 플러스(교사용)']) assert.throws(()=>classifyDownload(prefix+title+'.pdf'));
 });
+
+test('2015 filenames retain their original numbering under raw with all scope and PDF guards',async t=>{
+  const f=await fixture(t);
+  f.input.scope={curriculum:'2015',grade:'m3',publisher:'own-publisher',publisherLabel:'자체출판(가상)',unitRawLabel:'1과',unitCode:'L1',folderName:'2015-own-publisher-m3-L1'};
+  const name='2021년_중3_자체출판(가상)_1과_[09]형성평가 0단계 PRE-STEP 문항_OK.pdf';
+  const src=path.join(f.sourceRoot,name);await fs.writeFile(src,pdf('Own legacy fixture'));
+  f.input.files=[{src,suggestedFilename:name}];
+  const result=await stageDownloads(f.input,f.options);assert.equal(result.status,'complete');
+  assert.equal(result.files[0].destination,f.input.scope.folderName+'/_raw/'+name);
+  assert.deepEqual(await fs.readFile(path.join(f.root,result.files[0].destination)),await fs.readFile(src));
+  f.input.files[0].suggestedFilename=name.replace('중3','중2');await assert.rejects(stageDownloads(f.input,f.options));
+  f.input.files[0].suggestedFilename=name.replace(/\.pdf$/,'.hwp');await assert.rejects(stageDownloads(f.input,f.options));
+  f.input.files[0].suggestedFilename='../'+name;await assert.rejects(stageDownloads(f.input,f.options));
+});
 test('duplicate suffixes are comparison only, raw exact name preserved',()=>{
   for(const suffix of [' (1)','(2)']) {
     assert.equal(classifyDownload(prefix+titles[2]+suffix+'.pdf').filename,NAMES[2]);

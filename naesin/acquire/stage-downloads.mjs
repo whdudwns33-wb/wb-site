@@ -172,9 +172,13 @@ export async function preflight(input, options = {}) {
     keys(item, ['src','suggestedFilename'], 'file');
     const src = inside(sourceRoot, absolute(item.src, 'src'));
     basename(path.basename(src));
-    const classification = classifyDownload(item.suggestedFilename);
     checkFilenameScope(item.suggestedFilename, input.scope, true);
     checkFilenameScope(path.basename(src), input.scope);
+    // Legacy material numbers have different meanings; preserve the original name without guessing roles.
+    const classification = input.scope.curriculum === '2015'
+      ? {filename: '_raw/' + basename(item.suggestedFilename)}
+      : classifyDownload(item.suggestedFilename);
+    if (input.scope.curriculum === '2015' && !/\.pdf$/i.test(item.suggestedFilename)) reject('Non-PDF extension');
     const destination = inside(folder, path.join(folder, classification.filename));
     const info = await digest(src);
     const same = destinations.get(destination.normalize('NFC').toLowerCase());
