@@ -73,7 +73,8 @@ export function classifyDownload(name) {
   if (!/\.pdf$/i.test(name)) reject('Non-PDF extension');
   const s = compareName(name);
   // 통합본의 (1~10)은 단계 번호가 아니다. 코드가 있더라도 분리 단계 검사를 먼저 한다.
-  const stage = s.match(/본문\s*10\s*단계\s*워크북\s*(10|[1-9])(?=\s|_).*_단계별$/u);
+  const stage = s.match(/본문\s*10\s*단계\s*워크북\s*(10|[1-9])(?=\s|_).*_단계별$/u)
+    || s.match(/본문\s*10\s*단계\s*워크북\s*(2|3)\s+빈칸연습\s*\((?:우리말|영문)\)$/u);
   if (stage && !/통합본/u.test(s)) return {filename: '_raw/'+name, stage: Number(stage[1])};
   const code = s.match(/(?:^|_)(\[0[1-9]\])\s*(.*)$/u);
   if (!code) {
