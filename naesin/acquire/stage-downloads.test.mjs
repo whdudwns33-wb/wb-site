@@ -30,6 +30,10 @@ async function noWrite(f) {
   await assert.rejects(fs.stat(f.root),{code:'ENOENT'});
 }
 test('13 exact canonical names, stage 1/10 and integrated not stage',()=>{
+  for(const [n,label] of [[2,'우리말'],[3,'영문']]){
+    const name=prefix+'본문10단계 워크북 '+n+' 빈칸연습('+label+')_(20250328수정).pdf';
+    assert.deepEqual(classifyDownload(name),{filename:'_raw/'+name,stage:n});
+  }
   titles.forEach((title,i)=>assert.equal(classifyDownload(prefix+title+'.pdf').filename,NAMES[i]));
   for(const n of [1,10]) {
     const name=prefix+'본문10단계 워크북 '+n+' 본문영작_단계별.pdf';
