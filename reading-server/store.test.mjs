@@ -15,6 +15,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 let server;
 const originalWrite = fs.writeFileSync;
 const originalOpen = fs.openSync;
+const originalRename = fs.renameSync;
 const originalNow = Date.now;
 try {
   fs.writeFileSync(file, '{"students":');
@@ -35,6 +36,22 @@ try {
   const first = store.persist();
   assert.equal(first, store.persist(), '300ms 일괄 저장을 재사용해야 한다');
   await first;
+  const platform = Object.getOwnPropertyDescriptor(process, 'platform');
+  try {
+    Object.defineProperty(process, 'platform', { ...platform, value: 'win32' });
+    let calls = 0;
+    fs.renameSync = (...args) => {
+      if (++calls === 1) throw Object.assign(new Error('synthetic short reader lock'), { code: 'EPERM' });
+      return originalRename(...args);
+    };
+    db.students.SYN001.level = 'L1';
+    await store.persist();
+    assert.equal(calls, 2); assert.equal(JSON.parse(fs.readFileSync(file, 'utf8')).students.SYN001.level, 'L1');
+    const before = fs.readFileSync(file, 'utf8'); calls = 0;
+    fs.renameSync = () => { calls++; throw Object.assign(new Error('synthetic lasting lock'), { code: 'EPERM' }); };
+    await assert.rejects(store.persist(), { code: 'STORE_WRITE_FAILED' });
+    assert.equal(calls, 5); assert.equal(fs.readFileSync(file, 'utf8'), before, '지속 잠금에도 기존 DB를 보존한다');
+  } finally { fs.renameSync = originalRename; Object.defineProperty(process, 'platform', platform); }
   const saved = fs.readFileSync(file, 'utf8');
   assert.equal(JSON.parse(saved).students.SYN001.name, '저장시험');
 

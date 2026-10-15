@@ -165,7 +165,14 @@ export function persist() {
       fs.mkdirSync(DIR, { recursive: true });
       const tmp = FILE + '.tmp';
       fs.writeFileSync(tmp, JSON.stringify(db));
-      fs.renameSync(tmp, FILE);
+      // Windows의 짧은 읽기 잠금만 기다린다. 기존 DB를 지우는 우회는 하지 않는다.
+      for (let attempt = 0; ; attempt++) {
+        try { fs.renameSync(tmp, FILE); break; }
+        catch (e) {
+          if (process.platform !== 'win32' || !['EPERM', 'EACCES', 'EBUSY'].includes(e.code) || attempt >= 4) throw e;
+          Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 25 * (attempt + 1));
+        }
+      }
       snapshotIfNeeded();
       resolve();
     } catch (e) {
