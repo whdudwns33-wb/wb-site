@@ -183,7 +183,7 @@ const NO_UNINSTALL = ' · cloudflared 가 "service uninstall 뒤 다시" 를 권
 export function detectCloudflaredService(run = quiet) {
   const r = run(['powershell', '-NoProfile', '-NonInteractive', '-Command', '(Get-Service -Name cloudflared -ErrorAction SilentlyContinue).Status']);
   if (!r || r.error || r.status !== 0) {
-    throw new Error('Cloudflared 서비스가 이미 있는지 확인하지 못했습니다(PowerShell 실행 실패) — 기존 터널을 덮을 수 있어 설치하지 않습니다. 관리자 터미널에서 (Get-Service cloudflared).Status 가 도는지 보고 다시');
+    throw new Error(DETECT_FAIL_MSG);
   }
   return !!String(r.stdout || '').trim();
 }
@@ -191,10 +191,23 @@ export function detectCloudflaredService(run = quiet) {
 /* 터널 설치 한 번. 순서: 기존 서비스 확인 → 토큰 파일 읽기 → 설치. 토큰 파일은 그 안에 토큰이 **확인된 경우에만**
    성공·실패와 관계없이 마지막에 지운다 — 예전에는 서비스 설치가 실패하면 지우는 단계까지 가지 못해 토큰이 남았고,
    거꾸로 '실패하면 무조건 지우기'는 --token-file 에 경로를 잘못 준 파일(예: server.env)까지 지운다. */
-export function runTunnel({ tokenFile, dryRun = false, cloudflared, versionText = '', serviceExists = false, exec = execute, fsx = fs, out = console.log }) {
+export const DETECT_FAIL_MSG = 'Cloudflared 서비스가 이미 있는지 확인하지 못했습니다(PowerShell 실행 실패) — 기존 터널을 덮을 수 있어 설치하지 않습니다. 관리자 터미널에서 (Get-Service cloudflared).Status 가 도는지 보고 다시';
+
+/* 설치된 cloudflared 서비스가 쓰는 토큰 자리 — 여기 있는 파일은 읽지도 지우지도 않는다(지우면 기존 터널이 다음 시작 때 끊긴다) */
+export function serviceTokenDir(env = process.env) {
+  return path.win32.join(env.ProgramData || 'C:\\ProgramData', 'cloudflared');
+}
+
+export function runTunnel({ tokenFile, dryRun = false, cloudflared, versionText = '', serviceExists = false, exec = execute, fsx = fs, out = console.log, env = process.env }) {
+  if (isInside(tokenFile, serviceTokenDir(env), 'win32')) {
+    throw new Error(`이 파일(${tokenFile})은 설치된 cloudflared 서비스가 쓰는 자리입니다 — 읽지도 지우지도 않습니다(지우면 기존 터널이 다음 시작 때 끊깁니다). 대시보드에서 새로 복사한 설치 명령을 C:\\ProgramData\\WB\\tunnel-token.txt 에 저장해 그 파일을 주세요`);
+  }
   let text = null;
   let readErr = null;
-  try { text = fsx.readFileSync(tokenFile, 'utf8'); } catch (e) { readErr = e; }
+  try {
+    if (fsx.statSync(tokenFile).size > TOKEN_FILE_MAX) readErr = Object.assign(new Error('too big'), { code: 'TOOBIG' });
+    else text = fsx.readFileSync(tokenFile, 'utf8');
+  } catch (e) { readErr = e; }
   let token = null;
   let tokenErr = null;
   if (text != null) { try { token = readToken(text); } catch (e) { tokenErr = e; } }
@@ -207,12 +220,14 @@ export function runTunnel({ tokenFile, dryRun = false, cloudflared, versionText 
   };
   let failure = null;
   try {
-    if (serviceExists && !dryRun) throw new Error(EXISTING_SERVICE_MSG);
+    if (serviceExists === 'unknown' && !dryRun) throw new Error(DETECT_FAIL_MSG);
+    if (serviceExists === true && !dryRun) throw new Error(EXISTING_SERVICE_MSG);
+    if (readErr && readErr.code === 'TOOBIG') throw new Error(`이 파일(${tokenFile})은 토큰 파일로 보기에 너무 큽니다 — 지우지 않았습니다. 경로를 확인하세요`);
     if (readErr) {
       if (readErr.code === 'EACCES' || readErr.code === 'EPERM') throw new Error(`토큰 파일을 읽을 권한이 없습니다: ${tokenFile} — 관리자 터미널에서 실행하세요`);
       throw new Error(`토큰 파일이 없습니다: ${tokenFile} — 같은 관리자 터미널에서 notepad "${tokenFile}" 로 만들어 저장하세요(문서 폴더로 저장하라는 창이 뜨면 거절)`);
     }
-    if (tokenErr) throw new Error(tokenErr.message + ` — 이 파일(${tokenFile})은 토큰 파일이 아니라서 지우지 않았습니다. 경로를 확인하세요`);
+    if (tokenErr) throw new Error(`이 파일(${tokenFile})에서 대시보드 토큰 모양을 찾지 못해 지우지 않았습니다 — 토큰을 붙여 넣은 파일이면 직접 지우고, 설치 명령 한 줄만 다시 저장하세요. 엉뚱한 파일을 줬다면 경로를 확인하세요`);
     if (!cloudflared) throw new Error('Program Files 아래에서 cloudflared 를 찾지 못했습니다 — README 2단계의 공식 설치 파일(cloudflared-windows-amd64.msi)로 먼저 설치하세요');
     try { exec(planTunnel({ cloudflared, token, versionText, tokenFile, dryRun }), { dryRun }); }
     catch (e) { if (!/^cloudflared .* 이상이 필요합니다/.test(e.message)) e.message += NO_UNINSTALL; throw e; }
@@ -225,17 +240,23 @@ export function runTunnel({ tokenFile, dryRun = false, cloudflared, versionText 
   }
   /* 설치는 끝났는데 토큰 파일만 못 지운 경우 — 실패로 보고하면 다시 실행했을 때 방금 깐 자기 서비스를 '기존 터널'로 보고 거절한다 */
   if (dropped === 'failed') out(`⚠ 서비스 설치는 끝났습니다 — 토큰 파일만 지우지 못했습니다. 관리자 터미널에서 직접 지우세요: ${tokenFile}`);
-  if (dryRun) {
-    if (serviceExists) out('⚠ 이 PC 에는 Cloudflared 서비스가 이미 있습니다 — 실제로 실행하면 거절합니다(기존 터널 보호)');
-    if (isTokenFile) out(`(--dry-run — 토큰 파일은 지우지 않았습니다. 설치하지 않을 거면 바로 지우세요: ${tokenFile})`);
-  }
+  if (dryRun && isTokenFile) out(`(--dry-run — 토큰 파일은 지우지 않았습니다. 설치하지 않을 거면 바로 지우세요: ${tokenFile})`);
 }
 
+/* 대시보드 토큰은 base64 로 싼 JSON {a: 계정, t: 터널, s: 비밀} 이다('eyJ' 로 시작). 이 모양이 **파일 전체**와 맞을 때만
+   토큰으로 본다 — 예전 판정(끝의 80자 덩어리)은 긴 KEY=VALUE 줄·base64 한 줄·URL 꼬리도 토큰으로 봐서, 그런 파일을
+   서비스 설치 인자로 넘기거나 지웠다. 큰 파일은 정규식을 돌리기 전에 거른다(토큰 파일은 1KB 안쪽이다). */
+const TOKEN_FILE_MAX = 4096;
+const TOKEN_RE = /^(?:\S*cloudflared(?:\.exe)?\s+service\s+install\s+)?(eyJ[A-Za-z0-9+/_-]{60,}={0,2})$/;
 export function readToken(text) {
+  const bad = () => new Error('토큰 파일에서 대시보드 토큰 모양(eyJ… 로 시작하는 한 덩어리)을 찾지 못했습니다 — 대시보드의 설치 명령 한 줄(service install 뒤의 긴 값)만 그대로 붙여 넣으세요');
   const t = String(text || '').trim();
-  /* 대시보드의 설치 명령을 통째로 붙여 넣은 경우도 받는다: "cloudflared.exe service install eyJ..." */
-  const m = t.match(/(?:service\s+install\s+)?([A-Za-z0-9_\-=+/.]{80,})\s*$/);
-  if (!m || /\s/.test(m[1])) throw new Error('토큰 파일에서 터널 토큰을 찾지 못했습니다 — 대시보드의 설치 명령(service install 뒤의 긴 값)을 그대로 붙여 넣으세요');
+  if (!t || t.length > TOKEN_FILE_MAX) throw bad();
+  const m = t.match(TOKEN_RE);
+  if (!m) throw bad();
+  let j = null;
+  try { j = JSON.parse(Buffer.from(m[1], 'base64').toString('utf8')); } catch { /* 아래에서 거절 */ }
+  if (!j || typeof j !== 'object' || typeof j.a !== 'string' || typeof j.t !== 'string' || typeof j.s !== 'string') throw bad();
   return m[1];
 }
 
@@ -777,9 +798,19 @@ export async function main(argv = process.argv.slice(2)) {
       needWindowsAdmin();
       /* 기존 서비스부터 본다 — 토큰 파일을 요구하기 전에(WB1 에서 새 터널을 만들고 토큰을 다룬 뒤에야 거절하지 않게).
          --dry-run 도 읽기 전용이라 같이 본다(실제 실행이 거절될지 미리 보여 준다). */
-      const serviceExists = detectCloudflaredService();
+      /* 확인이 실패해도 여기서 바로 던지지 않는다 — 이미 만들어 둔 토큰 파일을 runTunnel 이 지우고 끝내게('unknown' 은 거절) */
+      let serviceExists;
+      if (process.platform !== 'win32') serviceExists = null;
+      else { try { serviceExists = detectCloudflaredService(); } catch { serviceExists = 'unknown'; } }
+      if (dryRun) {
+        console.log('Cloudflared 서비스: ' + (serviceExists === null ? '(Windows 가 아니라 확인을 건너뜀)'
+          : serviceExists === 'unknown' ? '확인 실패 — 실제로 실행하면 설치하지 않습니다'
+          : serviceExists ? '있음 — 실제로 실행하면 거절합니다(기존 터널 보호)' : '없음'));
+      }
       const raw = argValue(argv, '--token-file');
-      if (!raw && serviceExists && !dryRun) throw new Error(EXISTING_SERVICE_MSG);
+      if (!raw && dryRun) return 0;   // 서비스 유무만 보는 용도(실기 확인 7번) — 토큰 없이도 끝낸다
+      if (!raw && serviceExists === 'unknown') throw new Error(DETECT_FAIL_MSG);
+      if (!raw && serviceExists === true) throw new Error(EXISTING_SERVICE_MSG);
       if (!raw) throw new Error('--token-file <파일> 을 주세요 — 대시보드의 설치 명령을 메모장에 붙여 넣어 저장한 파일');
       const tokenFile = path.resolve(raw);
       const cloudflared = findCloudflared() || (dryRun ? 'C:\\Program Files (x86)\\cloudflared\\cloudflared.exe' : '');

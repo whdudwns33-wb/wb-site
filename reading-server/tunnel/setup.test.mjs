@@ -11,12 +11,14 @@
  *  - 복사가 도중에 끊겨도 다음 실행이 끝까지 간다(표식을 먼저 쓰고 나중에 지운다), 지우기는 여러 번 돌려도 된다
  *  - 점검이 "Access 없이 열림"·"LAN 에 열림"·"학생 로그인이 열림"·"옛 cloudflared"·"권한 새는 폴더"·"낡은 사본" 을 잡는다
  */
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   planEnv, planInstallServer, planRestartServer, planUninstallServer, planDeployApp, planTunnel, readToken, execute, doctor, printDoctor,
-  runTunnel, EXISTING_SERVICE_MSG, detectCloudflaredService,
+  runTunnel, EXISTING_SERVICE_MSG, DETECT_FAIL_MSG, detectCloudflaredService,
   findCloudflared, cloudflaredCandidates, isElevated, envDirProblem, dataDirProblem, sysTool, verifyAcl, readAcl, deployApp, removeApp,
   lockSteps, resetChildren, findLinks, noLinks, treeHash, checkSource, checkAppDir,
 } from './setup.mjs';
@@ -34,7 +36,8 @@ const DATA = 'C:\\WB_server_data';
 const REPO_W = 'C:\\WB\\wb-site';
 const NODE_SRC = 'C:\\Program Files\\nodejs\\node.exe';
 /* 누가 봐도 가짜인 값 — 진짜 토큰 모양(eyJ… base64 JSON)으로 두면 비밀 검사기가 진짜로 오인한다 */
-const TOKEN = 'FAKE_TUNNEL_TOKEN_FOR_TESTS_ONLY_' + 'x'.repeat(80);
+/* 대시보드 토큰과 같은 모양(base64 로 싼 JSON {a,t,s})의 가짜 — 실행할 때 만들어 저장소에 토큰 같은 글자열이 남지 않게 */
+const TOKEN = Buffer.from(JSON.stringify({ a: 'FAKE_ACCOUNT_FOR_TESTS_ONLY', t: 'FAKE-TUNNEL-FOR-TESTS-ONLY', s: Buffer.from('FAKE_SECRET_FOR_TESTS_ONLY_' + 'x'.repeat(40)).toString('base64') })).toString('base64');
 const isRun = (s, tool, dir) => s.run && s.run[0] === tool && (dir == null || s.run[1] === dir);
 const idx = (steps, pred) => steps.findIndex(pred);
 
@@ -161,6 +164,14 @@ const idx = (steps, pred) => steps.findIndex(pred);
   eq(readToken(TOKEN + '\r\n'), TOKEN, '토큰만 붙여 넣은 파일');
   eq(readToken(`cloudflared.exe service install ${TOKEN}`), TOKEN, '대시보드 명령을 통째로 붙여 넣은 파일');
   ok(throwsWith(() => readToken('여기에 토큰'), /찾지 못했습니다/), '토큰이 아닌 내용을 받았다');
+  /* 토큰 모양이 아닌 긴 덩어리는 토큰이 아니다 — 예전 판정은 이런 파일을 설치 인자로 넘기거나 지웠다 */
+  for (const [what, body] of [
+    ['긴 KEY=VALUE 줄', 'ADMIN_ID=wb\r\nLONG_SECRET_NAME=' + 'ab12'.repeat(16)],
+    ['base64 한 줄(JSON 아님)', Buffer.from('z'.repeat(90)).toString('base64')],
+    ['체크섬 줄', 'checksum: ' + 'f'.repeat(128)],
+    ['토큰 뒤 메모 줄', TOKEN + '\r\n메모: wb-admin 터널'],
+    ['eyJ 로 시작하지만 a·t·s 가 없는 JSON', Buffer.from(JSON.stringify({ x: 'y'.repeat(60) })).toString('base64')],
+  ]) ok(throwsWith(() => readToken(body), /찾지 못했습니다/), `토큰이 아닌 내용(${what})을 토큰으로 봤다`);
   for (const vt of ['cloudflared version 2026.7.2', '']) {
     let msg = '';
     let ran = false;
@@ -205,22 +216,39 @@ const idx = (steps, pred) => steps.findIndex(pred);
   // ⑤ --dry-run 은 아무것도 지우지 않고, 남았다고 말한다 · 서비스가 있으면 실제 실행은 거절된다고 미리 말한다
   msg = tryRun({ tokenFile: fresh(), dryRun: true, cloudflared: 'cf.exe', serviceExists: true, exec: () => {} });
   ok(!msg && fs.existsSync(tf), '--dry-run 이 토큰 파일을 지웠거나 실패했다');
-  ok(printed.some((l) => /지우지 않았습니다/.test(l)) && printed.some((l) => /거절합니다/.test(l)), '--dry-run 이 토큰 파일이 남았다는 것·실제 실행이 거절된다는 것을 말하지 않는다');
+  ok(printed.some((l) => /지우지 않았습니다/.test(l)), '--dry-run 이 토큰 파일이 남았다는 것을 말하지 않는다');
   // ⑥ 토큰이 아닌 파일(경로를 잘못 준 server.env 등)은 지우지 않는다
   const notToken = 'ADMIN_PIN=not-a-real-pin-just-a-test\r\nDATA_DIR=C:\\WB_server_data\r\n';
   msg = tryRun({ tokenFile: fresh(notToken), cloudflared: 'cf.exe', versionText: VT, exec: () => { ran = true; } });
-  ok(/토큰 파일이 아니라서 지우지 않았습니다/.test(msg) && fs.existsSync(tf) && fs.readFileSync(tf, 'utf8') === notToken, '--token-file 로 잘못 준 설정 파일을 지웠다');
+  ok(/찾지 못해 지우지 않았습니다/.test(msg) && fs.existsSync(tf) && fs.readFileSync(tf, 'utf8') === notToken, '--token-file 로 잘못 준 설정 파일을 지웠다');
   msg = tryRun({ tokenFile: fresh(notToken), cloudflared: 'cf.exe', versionText: VT, serviceExists: true });
   ok(msg.startsWith(EXISTING_SERVICE_MSG.slice(0, 20)) && fs.existsSync(tf), '서비스가 있어 거절할 때 토큰이 아닌 파일을 지웠다');
   // ⑦ 설치는 됐는데 토큰 파일만 못 지우면 — 실패로 보고하지 않고(다시 돌리면 자기 서비스를 '기존 터널'로 본다) 손으로 지우라고 한다
   const stuck = { ...fs, rmSync: () => { throw Object.assign(new Error('EBUSY'), { code: 'EBUSY' }); } };
   msg = tryRun({ tokenFile: fresh(), cloudflared: 'cf.exe', versionText: VT, exec: () => {}, fsx: stuck });
   ok(!msg && printed.some((l) => /설치는 끝났습니다/.test(l) && l.includes(tf)), '설치 뒤 토큰 파일만 못 지웠는데 실패로 보고하거나 안내가 없다');
+  // ⑨ 토큰 모양이 아닌 긴 비밀 줄·큰 파일은 지우지 않는다
+  msg = tryRun({ tokenFile: fresh('LONG_SECRET_NAME=' + 'ab12'.repeat(16)), cloudflared: 'cf.exe', versionText: VT, exec: () => { ran = true; } });
+  ok(/찾지 못해 지우지 않았습니다/.test(msg) && fs.existsSync(tf), '토큰 모양이 아닌 긴 비밀 줄을 토큰으로 보고 지웠다');
+  msg = tryRun({ tokenFile: fresh('x'.repeat(5000)), cloudflared: 'cf.exe', versionText: VT, serviceExists: true });
+  ok(/너무 큽니다/.test(msg) === false && fs.existsSync(tf), '큰 파일을 지웠다');
+  msg = tryRun({ tokenFile: fresh('x'.repeat(5000)), cloudflared: 'cf.exe', versionText: VT });
+  ok(/너무 큽니다/.test(msg) && fs.existsSync(tf), '큰 파일을 토큰 파일로 읽으려 했거나 지웠다');
+  // ⑩ 설치된 서비스의 토큰 자리는 읽지도 지우지도 않는다
+  const untouchable = new Proxy({}, { get: () => () => { throw new Error('서비스 토큰 자리에 손댔다'); } });
+  msg = tryRun({ tokenFile: 'C:\\ProgramData\\cloudflared\\token', cloudflared: 'cf.exe', versionText: VT, serviceExists: true, fsx: untouchable, env: { ProgramData: 'C:\\ProgramData' } });
+  ok(/서비스가 쓰는 자리/.test(msg), '설치된 cloudflared 서비스의 토큰 파일에 손댔다 — 지우면 기존 터널이 다음 시작 때 끊긴다');
+  // ⑪ 서비스 확인이 실패하면 거절하되, 이미 만든 토큰 파일은 지운다
+  msg = tryRun({ tokenFile: fresh(), cloudflared: 'cf.exe', versionText: VT, serviceExists: 'unknown', exec: () => { ran = true; } });
+  ok(msg.startsWith(DETECT_FAIL_MSG.slice(0, 20)) && !fs.existsSync(tf), '서비스 확인이 실패했는데 설치하려 했거나 토큰 파일을 남겼다');
   // ⑧ 서비스 감지 — 모르면 '없다'로 치지 않는다
   eq(detectCloudflaredService(() => ({ status: 0, stdout: 'Running\r\n' })), true, '서비스가 있는데 없다고 봤다');
   eq(detectCloudflaredService(() => ({ status: 0, stdout: '' })), false, '서비스가 없는데 있다고 봤다');
   ok(throwsWith(() => detectCloudflaredService(() => ({ error: new Error('spawn ENOENT') })), /확인하지 못했습니다/), 'PowerShell 을 못 띄웠는데 서비스 없음으로 봤다(설치를 진행한다)');
   ok(throwsWith(() => detectCloudflaredService(() => ({ status: 1, stdout: '' })), /확인하지 못했습니다/), 'PowerShell 이 오류로 끝났는데 서비스 없음으로 봤다');
+  // ⑫ Windows 가 아닌 곳의 --dry-run 은 서비스 확인을 건너뛰고, 토큰 파일 없이도 서비스 유무 줄만 내고 끝난다
+  const dry = spawnSync(process.execPath, [path.join(path.dirname(fileURLToPath(import.meta.url)), 'setup.mjs'), 'tunnel', '--dry-run'], { encoding: 'utf8' });
+  if (process.platform !== 'win32') ok(dry.status === 0 && /Cloudflared 서비스: \(Windows 가 아니라/.test(dry.stdout), `tunnel --dry-run 이 Windows 밖에서 실패했다: ${(dry.stdout + dry.stderr).slice(0, 200)}`);
   fs.rmSync(tmp, { recursive: true, force: true });
 }
 
