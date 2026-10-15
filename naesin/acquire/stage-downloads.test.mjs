@@ -222,7 +222,9 @@ test('publisherLabel required for every batch; missing suggested publisher canno
 const revisionSuffixes = [
   '_(20260219수정)', '  _ ( 20260219 수정 )  ',
   '_(20260219수정) (1)', '_(20260219수정)(2)',
-  ' (1)_(20260219수정)', '(2)  _ (20260219수정)  '
+  ' (1)_(20260219수정)', '(2)  _ (20260219수정)  ',
+  '_(260109수정)', '  _ ( 260109 수정 )  ',
+  '_(260109수정) (1)', ' (2)_(260109수정)'
 ];
 test('verified revision suffix handles integrated, grammar 07/08, textbook and both duplicate orders',()=>{
   for(const [title,index] of [[titles[2],2],[titles[10],10],[titles[11],11],[titles[0],0]]) {
@@ -232,6 +234,7 @@ test('verified revision suffix handles integrated, grammar 07/08, textbook and b
     }
   }
   assert.equal(classifyDownload(prefix+titles[10]+'_(20260526수정).pdf').filename,NAMES[10]);
+  assert.equal(classifyDownload('(2022개정)2025년_중1_동아(윤정미)_4과_[04]예상문제 PRE-STEP(교사용)_(260109수정).pdf').filename,NAMES[5]);
 });
 test('revision stage1/10 classification preserves exact raw name with either duplicate order',()=>{
   for(const n of [1,10])for(const suffix of revisionSuffixes) {
@@ -258,7 +261,7 @@ test('synthetic revision staging keeps suggested names and raw basenames byte-fo
   assert.deepEqual((await fs.readdir(path.join(f.root,scope.folderName,'_raw'))).sort(),f.input.files.slice(4).map(e=>e.suggestedFilename).sort());
 });
 test('malformed revisions and arbitrary parentheses are rejected with zero preflight writes',async t=>{
-  const malformed=['_(2026021수정)','_(202602190수정)','_(2026A219수정)',
+  const malformed=['_(26010수정)','_(2601090수정)','_(2026021수정)','_(202602190수정)','_(2026A219수정)',
     '_(2026 0219수정)','_(20260219정정)','_(20260219수정본)','_(20260219)',
     '_(수정)','(20260219수정)','_(20260219수정','_(20260219수정) tail',
     '_(20260219수정)_(20260526수정)','_(임의 괄호)'];
