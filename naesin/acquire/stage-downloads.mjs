@@ -56,8 +56,8 @@ async function inspectPath(target, allowMissing = false) {
 function compareName(name) {
   let s = name.normalize('NFC').replace(/\.pdf$/i, '').trimEnd();
   let revisionRemoved = false, duplicateRemoved = false;
-  // 원본에는 손대지 않는다. 확인된 수정일과 다운로드 중복 번호를 순서와 무관하게 각 한 번만 제외한다.
-  const revision = /\s*_\s*\(\s*\d{8}\s*수정\s*\)\s*$/u;
+  // 원본에는 손대지 않는다. 확인된 6/8자리 수정일과 다운로드 중복 번호를 순서와 무관하게 각 한 번만 제외한다.
+  const revision = /\s*_\s*\(\s*(?:\d{8}|\d{6})\s*수정\s*\)\s*$/u;
   const duplicate = /\s*\(\d+\)\s*$/u;
   for (let i = 0; i < 2; i++) {
     if (!revisionRemoved && revision.test(s)) {
