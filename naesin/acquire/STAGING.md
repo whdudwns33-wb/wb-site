@@ -54,6 +54,8 @@ node --test naesin/acquire/stage-downloads.test.mjs naesin/acquire/acquire.test.
 
 ## 이름 규칙
 
+2015 개정은 같은 자료 번호가 2022 개정과 다른 종류를 뜻하므로 정본 번호로 추측하지 않는다. 범위·원본 경로·PDF 확장자·헤더·해시·목적지 충돌 검사를 그대로 통과한 파일만 `_raw/<원래 파일명>`에 보존한다. 종류별 변환은 실제 자료 목록을 대조한 별도 단계다.
+
 정본 이름은 실제 L1 폴더 목록을 Node UTF-8로 읽어 확인했다. 실제 PDF는 복사/수정하지 않았다.
 
 - 번호 없는 `_본문.pdf` → `00_교과서본문.pdf` (Special Lesson/Reading 포함)
