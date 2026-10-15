@@ -22,7 +22,23 @@ assert all('DUPLICATE_QUESTION_NUMBER' in r['_pdfReview']['flags'] and not r['an
 reading=[{'page':1,'width':595,'height':842,'fullText':'Own children enjoy reading wonderful stories.\n원문 교사 확인'}]
 rows=m.reading_cloze(doc,reading);assert len(rows)==1 and rows[0]['answer']==['wonderful']
 assert '________' in rows[0]['stimulus']['parts'][0]['text'] and rows[0]['_pdfReview']['flags']==['REVIEW_REQUIRED','CLOZE_SOURCE_REVIEW']
-print('question boundaries, answer mapping, subparts, missing anchors, duplicate IDs and local reading cloze passed')
+b1=page(1,body.split('2. Write')[0],header='Pattern 1')
+b2=page(2,body.split('2. Write')[0],header='Pattern 2')
+b2['columns'][0]['text']+='\n2. Own second question. 2)'
+k1=page(3,'Pattern 1\n1) ①',True,header='Pattern 1')
+k1['columns'].append({'bbox':[300,45,570,800],'text':'Pattern 2\n1) ②'})
+k2=page(4,'2) Own continued answer',True)
+rows,_=m.parse_document(doc,[b1,b2,k1,k2])
+assert [r['answer'] for r in rows]==[['1'],['2'],['Own continued answer']], 'Right-column pattern must persist across pages'
+assert rows[-1]['_pdfReview']['locations'][-1]['page']==4
+k1=page(3,'Pattern 1\n1) ①',True,header='Pattern 1')
+k2=page(4,'1) ①',True,header='Pattern 2')
+k2['columns'].append({'bbox':[300,45,570,800],'text':'Pattern 2\n1) ②\n2) Own answer\n: Own explanation'})
+rows,_=m.parse_document(doc,[b1,b2,k1,k2])
+assert [r['answer'] for r in rows]==[['1'],['2'],['Own answer']], 'Full-page header must not apply a later right-column pattern early'
+rows,_=m.parse_document(doc,[page(1,'1. Write an answer. 1)'),page(2,'1) ①',True)])
+assert rows[0]['answer']==[] and rows[0]['_pdfReview']['locations'][-1]['page']==2, 'Type mismatches retain the answer-page link without guessing'
+print('question boundaries, answer mapping, subparts, missing anchors, duplicate IDs, continued patterns and local reading cloze passed')
 `;
 const result=spawnSync(process.env.WB_NAESIN_PYTHON||'python',['-X','utf8','-c',script],{encoding:'utf8',cwd:new URL('../../',import.meta.url)});
 assert.equal(result.status,0,result.stderr);console.log(result.stdout.trim());
