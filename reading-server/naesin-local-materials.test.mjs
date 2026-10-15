@@ -9,7 +9,7 @@ import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { request } from 'node:http';
 import { fileURLToPath } from 'node:url';
-import { readLocalMaterials } from './naesin-local-materials.mjs';
+import { readLocalMaterials, readQuestionImage } from './naesin-local-materials.mjs';
 
 const DIR = path.dirname(fileURLToPath(import.meta.url));
 const tempRoot = fs.realpathSync(os.tmpdir());
@@ -30,6 +30,12 @@ fs.mkdirSync(data); fs.mkdirSync(olderDir, { recursive: true }); fs.mkdirSync(la
 const writeDraft = value => fs.writeFileSync(draftPath, JSON.stringify(value));
 const reset = () => { writeDraft(draft); for (const key of ['02', '03']) fs.writeFileSync(path.join(packDir, draft.sources[key].file), pdfs[key]); };
 reset(); fs.writeFileSync(path.join(olderDir, 'review-draft.json'), JSON.stringify({ ...draft, wordCandidates: [] }));
+const imageBytes=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jRZkAAAAASUVORK5CYII=','base64'), imageHash=sha(imageBytes);
+const imageDir=path.join(materials,'question-images');fs.mkdirSync(imageDir);fs.writeFileSync(path.join(imageDir,imageHash+'.png'),imageBytes);
+assert.deepEqual(readQuestionImage(data,imageHash),imageBytes);
+assert.throws(()=>readQuestionImage(data,'../db'));
+fs.writeFileSync(path.join(imageDir,imageHash+'.png'),Buffer.from('wrong'));
+assert.throws(()=>readQuestionImage(data,imageHash));fs.writeFileSync(path.join(imageDir,imageHash+'.png'),imageBytes);
 const folderPackId='own-folder-source', folderPack=path.join(materials,folderPackId), folderAnalysis=path.join(folderPack,'analysis');
 const folderSpecs=[['00','textbook','00_교과서본문.pdf'],['01','content_summary','01_내용정리.pdf'],['02','passage_workbook','02_본문워크북.pdf'],['03','vocabulary','03_단어시험.pdf'],['04s','pre_step_student','04_예상문제_PRE-STEP.pdf'],['04t','pre_step_teacher','04_예상문제_PRE-STEP_교사용.pdf'],['05s','exam_1_student','05_예상문제_1회.pdf'],['05t','exam_1_teacher','05_예상문제_1회_교사용.pdf'],['06s','exam_2_student','06_예상문제_2회.pdf'],['06t','exam_2_teacher','06_예상문제_2회_교사용.pdf'],['07','grammar_workbook','07_문법워크북.pdf'],['08','grammar_mcq','08_문법객관식.pdf'],['09','grammar_subjective','09_문법주관식.pdf']];
 fs.mkdirSync(folderPack,{recursive:true});
@@ -56,7 +62,10 @@ const t = async (name, fn) => { await fn(); passed++; console.log('  ✓ ' + nam
 const unavailable = () => assert.throws(() => readLocalMaterials(data, packId));
 
 async function withServer(mode, fn) {
-  fs.writeFileSync(path.join(data, 'db.json'), originalDb);
+  const imageDb=JSON.parse(originalDb);
+  imageDb.naesin.packs={ownimages:{pack:{rights:folderDraft.rights,items:[{id:'own-item',source:'04',sourceImages:[imageHash]},{id:'cloze',source:'00',sourceImages:[imageHash]}]}}};
+  imageDb.naesin.exams={default:{mode:'practice',packIds:['ownimages']}};
+  fs.writeFileSync(path.join(data, 'db.json'),JSON.stringify(imageDb));
   const env = { ...process.env, PORT: '0', HOST: '127.0.0.1', DATA_DIR: data, ADMIN_PIN: 'own-source-test-pin', ADMIN_ID: '', ADMIN_PASSWORD: '',
     WB_INHOUSE_ONLY: mode === 'inhouse' ? '1' : '', WB_INHOUSE_NETWORKS: '198.51.100.10', WB_ADMIN_ONLY: mode === 'admin-only' ? '1' : '',
     ANTHROPIC_API_KEY: '', VAPID_PUBLIC_KEY: '', VAPID_PRIVATE_JWK: '', WB_PARENT_PORTAL_LINK_SECRET: '' };
@@ -210,6 +219,15 @@ try {
     }
   });
   await withServer('inhouse', async req => {
+    await t('배정된 학생만 문제 원문 PNG를 받고 경로·외부·본문 정답 노출을 차단한다',async()=>{
+      const route='/api/naesin/item-image?id=ownimages&item=own-item';
+      const own=await req(route,{token:studentToken});assert.equal(own.status,200);assert.deepEqual(own.bytes,imageBytes);assert.equal(own.headers['cache-control'],'no-store');
+      assert.equal((await req(route,{token:null})).status,401);
+      assert.equal((await req(route,{token:studentToken,headers:outside})).status,403);
+      assert.equal((await req(route.replace('ownimages','unassigned'),{token:studentToken})).status,403);
+      assert.equal((await req(route.replace('own-item','cloze'),{token:studentToken})).status,404);
+      assert.equal((await req(route+'&index=../db',{token:studentToken})).status,404);
+    });
     const reviewRoute = '/api/naesin/admin/job/local-review?id=' + jobId;
     const pdfRoute = '/api/naesin/admin/job/local-pdf?id=' + jobId + '&source=03&sha256=' + draft.sources['03'].sha256;
     await t('실제 HTTP 관리자 응답에 13문서 manifest와 개별 source key PDF가 나온다', async () => {
@@ -283,11 +301,11 @@ try {
     });
   });
   for (const mode of ['generic', 'admin-only']) await withServer(mode, req => t(mode + ' Node에서는 관리자도 로컬 원본 경로를 사용할 수 없다', async () => {
-    for (const route of ['/api/naesin/admin/job/local-review?id=' + jobId, '/api/naesin/admin/job/local-pdf?id=' + jobId + '&source=02&sha256=' + draft.sources['02'].sha256]) assert.equal((await req(route)).status, 403);
+    for (const route of ['/api/naesin/item-image?id=ownimages&item=own-item','/api/naesin/admin/job/local-review?id=' + jobId, '/api/naesin/admin/job/local-pdf?id=' + jobId + '&source=02&sha256=' + draft.sources['02'].sha256]) assert.equal((await req(route)).status, 403);
   }));
   await t('워커에는 Node 파일 로더나 로컬 원본 경로가 등록되지 않는다', () => {
     const worker = fs.readFileSync(path.join(DIR, 'worker.mjs'), 'utf8');
-    assert.equal(worker.includes('naesin-local-materials'), false); assert.equal(worker.includes('/local-review'), false); assert.equal(worker.includes('/local-pdf'), false);
+    assert.equal(worker.includes('naesin-local-materials'), false); assert.equal(worker.includes('/item-image'), false); assert.equal(worker.includes('/local-review'), false); assert.equal(worker.includes('/local-pdf'), false);
   });
 } finally {
   assert.equal(path.dirname(fs.realpathSync(root)), tempRoot);

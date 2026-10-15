@@ -41,7 +41,7 @@ function screen() {
   }
   const ctx = vm.createContext({
     localStorage: { getItem: key => store.get(key) || null, setItem: (key, value) => { if (failLocalWrite) throw new Error('quota'); store.set(key, value); }, removeItem: key => store.delete(key) },
-    document: { getElementById: node, addEventListener: (type, fn) => documentEvents.set(type, fn), body: { style: {} }, contains: () => false,
+    document: { getElementById: node, querySelectorAll: () => [], addEventListener: (type, fn) => documentEvents.set(type, fn), body: { style: {} }, contains: () => false,
       createElement: () => ({ textContent: '', attrs: {},setAttribute(key, value) { this.attrs[key] = value; },getAttribute(key) { return this.attrs[key]; },querySelector(){return node('nextBtn');},scrollIntoView(){},appendChild(){},addEventListener(){} }) },
     window: { addEventListener: (type, fn) => windowEvents.set(type, fn), speechSynthesis: voiceEngine },
     SpeechSynthesisUtterance: function (text) { this.text = text; }, navigator: {}, location: { reload() {} }, confirm: () => true,

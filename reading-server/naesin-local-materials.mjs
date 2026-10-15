@@ -20,6 +20,15 @@ const CANONICAL_FILES = { '02': '02_본문워크북.pdf', '03': '03_단어시험
 const fail = () => { throw new Error('LOCAL_SOURCE_UNAVAILABLE'); };
 const samePath = (a, b) => !path.relative(a, b);
 
+export function readQuestionImage(dataDir, hash) {
+  if (!/^[a-f0-9]{64}$/.test(hash || '')) fail();
+  const root = directory(path.join(directory(path.dirname(path.resolve(dataDir))), 'naesin-materials', 'question-images'));
+  const bytes = readRegular(path.join(root, hash + '.png'), PDF_MAX);
+  if (!bytes.subarray(0,8).equals(Buffer.from('89504e470d0a1a0a','hex'))
+    || crypto.createHash('sha256').update(bytes).digest('hex') !== hash) throw new Error('LOCAL_SOURCE_CHANGED');
+  return bytes;
+}
+
 export function readSourceLibrary(dataDir, id, expectedSha256) {
   const root = directory(path.join(directory(path.dirname(path.resolve(dataDir))), 'naesin-materials', 'library'));
   const index = JSON.parse(readRegular(path.join(root, 'index.json'), DRAFT_MAX).toString('utf8'));

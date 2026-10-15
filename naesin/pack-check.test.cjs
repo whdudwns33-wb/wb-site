@@ -12,6 +12,13 @@ const clone = (o) => JSON.parse(JSON.stringify(o));
 const has = (list, frag) => list.some((x) => (x.where + ': ' + x.message).indexOf(frag) >= 0);
 
 console.log('pack-check — 팩 검사 규칙');
+t('원문 이미지는 해시만 받고 정답이 드러나는 본문 빈칸 원본은 거절한다',()=>{
+  const pack=clone(SAMPLE),row=pack.items[0];row.sourceImages=['a'.repeat(64)];row.sourceImageRequired=true;
+  assert.deepStrictEqual(CHECK.checkPack(pack).errors,[]);
+  for(const value of [[],['../db.json'],Array(4).fill('a'.repeat(64))]){row.sourceImages=value;assert.ok(CHECK.checkPack(pack).errors.length);}
+  row.sourceImages=['a'.repeat(64)];row.source='00';assert.ok(CHECK.checkPack(pack).errors.length);
+  delete row.sourceImages;assert.ok(CHECK.checkPack(pack).errors.length);
+});
 t('명시한 문제 전용 팩만 빈 단어·본문을 허용하고 빈 문항·잘못된 정답은 거절한다',()=>{
   const pack={...clone(SAMPLE),contentMode:'questions',words:[],sentences:[]};
   for(const key of CHECK.PACK_ARRAYS)if(!['items','words','sentences'].includes(key))delete pack[key];
