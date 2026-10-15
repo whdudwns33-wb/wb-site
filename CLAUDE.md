@@ -33,7 +33,7 @@ WB 독해력학원·웩슬러브레인센터의 원내 학습 웹앱 모음. 어
 | `student/` | **학생 포털** — 내 수업·출결·공개 숙제·준비물·차량·교재·시간표, 공개된 오늘 할 일의 완료/도움 필요. `wb-student` assets + 학생 세션 쿠키. **상세: `student/README.md`** |
 | `backend/` | **그림검사 AI 해석 백엔드 MVP** — Node 서버·mock/Claude 파이프라인·발행/동의 게이트. 운영 인증·저장소는 별도 전환이 필요하다. **상세: `backend/README.md`** |
 | `calc/` | **연산 체험** — 공개 Pages 페이지, 기록은 기기 안에만. 원장 PC 원본의 복사본이라 직접 수정하지 않는다. **상세: `calc/README.md`** |
-| `workbench/` | **컨설팅 워크벤치** — 원장 전용, `src/app.html` → 암호화 `index.html` 빌드. 배포본과 소스 버전 차이를 먼저 확인하고 비밀번호 없이 재빌드하지 않는다. **상세: `workbench/src/README.md`** |
+| `workbench/` | **컨설팅 워크벤치** — 원장 전용, `src/app.html` → 암호화 `index.html`+`bulk.enc.json` 짝 빌드. 소스·문서는 브랜치 `claude/agent-performance-optimization-rj8ql6` 에만 있다 — main 의 `workbench/src/*`·`app.html` 은 낡은 사본(그 README 의 배포 명령을 따르지 않는다). 비밀번호 없이 재빌드하지 않는다. **상세: 그 브랜치의 `workbench/HANDOFF.md`** |
 | `apps/` | **별도 프로토타입·전략 보드** — 그림검사 데모와 수완 신규 학원 준비 보드/브리핑. 학습 앱·운영 백엔드와 별개다. **상세: `apps/README.md`** |
 | `scripts/` | 저장소 전체 검사·에이전트 문서 정합·Pages HTML 색인 차단 관문 (`check.mjs`·`docs-sync.test.mjs`·`pages-noindex.test.mjs`) |
 | `desk/` | **프로그램데스크** — 학원과 별개 사업(구독 학생의 프로그램·자료 운영) 앱. 새 워커 `wb-desk` + 새 D1. **상세: `desk/README.md`** |
@@ -49,7 +49,7 @@ node <앱>/<이름>.test.cjs           # 단위 테스트 (의존성 없음, 파
 node reading-server/<이름>.test.mjs # 서버 테스트
 node reading-server/build-dist.mjs  # dist 조립 (+ SW 캐시 이름 스탬프)
 PORT=8890 ADMIN_PIN=<pin> DATA_DIR=<dir> node reading-server/server.mjs  # 로컬 서버
-WB_ADMIN_ONLY=1 PORT=8890 ADMIN_PIN=<pin> DATA_DIR=<dir> node reading-server/server.mjs  # 터널로 외부 공개할 때(결정 A — 학생 로그인을 내주지 않는다. 기동 로그에 [관리 전용] 이 뜨는지 눈으로 확인)
+WB_ADMIN_ONLY=1 HOST=127.0.0.1 PORT=8890 ADMIN_PIN=<pin> DATA_DIR=<dir> node reading-server/server.mjs  # 관리 전용 모드 개발 확인(로컬 시험용). WB1 운영 관리 서버는 이 줄이 아니라 start-admin.ps1(8891·예약 작업, docs/코덱스-외부작업-인수인계-2026-10-14.md §3). WB1 에서 8890·8891 로 띄우지 않는다 — 운영 서버와 부딪힌다
 node naesin/pack-validate.mjs <팩 디렉터리>     # 영어 레슨 팩 검증
 node naesin-ko/pack-validate.mjs <팩 디렉터리>  # 국어 단원 팩 검증
 node naesin-ko/extract/build-pack.mjs <단원 폴더>       # 국어: 폴더 하나 → 팩 초안 (시리즈 자동 판별)
@@ -83,6 +83,7 @@ GitHub Pages는 `main/root`를 서비스하므로 main에 합친 정적 파일�
 ## 에이전트 작업 규칙 (Codex · Claude Code 공통)
 
 사람이 보지 않는 사이에 고치는 일이 많다. 아래는 **어느 에이전트든** 지키는 순서다.
+**처음 이어받으면** `docs/코덱스-업무인계서-2026-10-15.md`(자료 위치·접속·시크릿 이름·PC·워크벤치·급한 일 총람)부터 읽는다.
 
 1. **고치기 전에 읽는다**: 이 문서 + 그 앱의 `README.md`(위 지도의 "상세"). 규칙은 앱마다 다르다.
 2. **고친 뒤 `node scripts/check.mjs`** — 저장소의 모든 테스트를 돌린다(1분 안쪽, 외부 의존성·망 없음).
