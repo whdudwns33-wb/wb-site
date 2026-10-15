@@ -127,9 +127,9 @@ function writeSnapshot(id) {
 /* 하루 1회 자동 스냅샷 — data/backups/db-<날짜>.json, 최근 10개 보관 */
 function snapshotIfNeeded() {
   try {
-    const f = path.join(BDIR, 'db-' + dayKey() + '.json');
-    if (fs.existsSync(f)) return;
-    writeSnapshot(dayKey());
+    const day = dayKey();
+    if (listBackups().some(id => id === day || id.startsWith(day + '-'))) return;
+    writeSnapshot(day);
   } catch (e) { console.error('[store] 스냅샷 실패:', e.message); }
 }
 
