@@ -67,6 +67,7 @@ ADMIN_PIN=원하는PIN node reading-server/server.mjs   # 기본 포트 8890 (�
 - 학생: `POST /api/login {code}` → `{token, student}` / `GET /api/pull` / `PUT /api/state {state}` (Bearer, 900KB 제한) / `GET /api/league`(같은 반 스트릭 리그 — 성적 비공개)
 - 관리(Bearer, PIN 로그인): `POST /api/admin/login {pin}` / `GET /api/admin/overview` / `POST /api/admin/students` / `POST /api/admin/level` / `GET /api/admin/student/:code` / `GET /api/admin/export[?backup=날짜]` / `GET /api/admin/backups` / `POST /api/admin/backup-now` / `POST /api/admin/pub {id,status}` / `POST /api/admin/parentlink {code,reset?}` / `GET /api/admin/parent-messages`(학부모 주간 발송 문구 일괄 생성)
 - 로그인 실패는 IP당 15분 20회로 제한(무차별 대입 완화, 워커).
+- Worker·로컬 서버의 처리하지 못한 예외는 `500 {error:'서버 오류'}`만 반환한다. 파싱 예외에 섞인 요청·저장 원문이나 내부 경로를 `detail`로 내보내지 않는다. 각 API의 형식 오류·인증 실패·요청 크기 초과 판정은 유지한다.
 
 ## 저장소·백업
 

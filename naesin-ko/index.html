@@ -68,7 +68,12 @@
     section.full { flex: 1; overflow-y: auto; }
     .wpad { padding: 16px; max-width: 900px; margin: 0 auto; }
     .spad { padding: 12px; }
-    @media (max-width: 780px) { section.side { display: none; } }
+    @media (max-width: 780px) {
+      #wrap { display: block; overflow-y: auto; }
+      section.side { width: auto; min-width: 0; max-width: none; overflow: visible;
+        border-right: 0; border-bottom: 1px solid var(--line); }
+      section.work, section.full { overflow: visible; }
+    }
 
     .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-bottom: 12px; }
     .card h3 { margin: 0 0 8px; font-size: 15px; }
@@ -142,6 +147,7 @@
     .banner.info { background: var(--ind-soft); color: var(--ind); }
     .banner.warn { background: var(--amber-soft); color: var(--amber); }
     .banner.err { background: var(--red-soft); color: var(--red); }
+    #backupNotice { margin: 0; border-radius: 0; padding: 10px 16px; flex-shrink: 0; overflow-wrap: anywhere; }
     .src { font-size: 11.5px; color: var(--soft); border-top: 1px solid var(--line); padding-top: 8px; margin-top: 14px; }
     .wm { position: fixed; inset: 0; pointer-events: none; z-index: 5; opacity: .022; overflow: hidden;
       font-size: 15px; font-weight: 700; color: #000; line-height: 3.2; white-space: pre; transform: rotate(-24deg) scale(1.6); }
@@ -152,6 +158,7 @@
   <header>
     <div class="brand">WB <em>국어브레인</em></div>
     <div class="hstat" id="hstat"></div>
+    <button class="btn sm ghost" id="clearDevice" type="button">이 기기에서 지우기</button>
   </header>
   <nav class="seg" id="tabs">
     <button data-tab="home">오늘</button>
@@ -160,6 +167,7 @@
     <button data-tab="quiz">문제</button>
     <button data-tab="progress">성취도</button>
   </nav>
+  <div class="banner err" id="backupNotice" role="alert" aria-atomic="true" hidden></div>
   <div id="wrap"></div>
 
 <script src="./engine.js"></script>
@@ -167,6 +175,7 @@
 <script src="./gen.js"></script>
 <script src="./pack-check.js"></script>
 <script src="./readiness.js"></script>
+<script src="./render.js"></script>
 <script src="./voice.js"></script>
 <script>
 'use strict';
@@ -174,7 +183,7 @@
    localStorage(wbk.v1)가 정본이고 서버는 백업이다. 요약(summary)은 state와 함께
    올리되 서버에서는 별도 키에 저장된다 — 관리 화면이 state를 통째로 읽지 않게(§8). */
 (function () {
-  var E = window.WBKOENGINE, G = window.WBKOGRADE, GEN = window.WBKOGEN, RD = window.WBKOREADY;
+  var E = window.WBKOENGINE, G = window.WBKOGRADE, GEN = window.WBKOGEN, RD = window.WBKOREADY, R = window.WBKORENDER;
   var LS = 'wbk.v1';
   var AUTH = 'wbr.auth';
   var API = '/api/naesin-ko';
@@ -183,7 +192,7 @@
     tab: 'home', token: null, code: null,
     pack: null, packIds: [], packId: null, demo: false,
     exam: null, task: null, overlay: null, concepts: [],
-    data: null,                 // 로컬 정본
+    data: null, backupPacks: {}, backupSavedAt: 0, backupBlocked: false, // 이전 단원은 백업 확인 뒤 기기 저장에서 뺀다
     workId: null, session: null, // 현재 세션
     err: null, saving: false
   };
@@ -197,6 +206,25 @@
       if (scrubWrong(j)) S.scrubbed = true;
       return j;
     } catch (e) { return blank(); }
+  }
+  function selectPack(id) {
+    if (deviceCleared) return;
+    Object.keys(S.data.packs).forEach(function (old) {
+      if (old !== id) { S.backupPacks[old] = S.data.packs[old]; delete S.data.packs[old]; }
+    });
+    if (!S.data.packs[id] && S.backupPacks[id]) S.data.packs[id] = S.backupPacks[id];
+    delete S.backupPacks[id];
+    S.packId = id;
+    saveLocal();
+  }
+  function backupState() {
+    return { v: S.data.v, packs: Object.assign({}, S.backupPacks, S.data.packs), savedAt: S.data.savedAt };
+  }
+  function saveLocal() {
+    if (deviceCleared) return;
+    /* 연결이 끊긴 단원 기록은 서버가 받은 뒤에만 기기에서 비운다. */
+    var data = S.data.savedAt > S.backupSavedAt ? backupState() : S.data;
+    try { localStorage.setItem(LS, JSON.stringify(data)); } catch (e) {}
   }
   function pk() {
     var id = S.packId || 'none';
@@ -214,15 +242,17 @@
   }
 
   var saveTimer = null;
+  var deviceCleared = false, deviceClearing = false, saveRequest = null;
   function persist() {
-    S.data.savedAt = Date.now();
-    try { localStorage.setItem(LS, JSON.stringify(S.data)); } catch (e) {}
+    if (deviceCleared || deviceClearing) return;
+    S.data.savedAt = Math.max(Date.now(), S.data.savedAt + 1);
+    saveLocal();
     if (!S.token || S.demo) return;
     clearTimeout(saveTimer);
     saveTimer = setTimeout(push, 3000);   // 3초 디바운스 — 타이핑마다 올리지 않는다
   }
 
-  /* 관리 화면이 보는 요약. 서버는 이 값을 해석하지 않고 그대로 저장한다. */
+  /* 관리 화면이 보는 요약. 서버는 허용 필드와 형식만 검증하고 성취도는 해석하지 않는다. */
   function summary() {
     var p = pk(), sum = E.workSummary(p.states);
     var v = E.kindSummary(p.states, 'vocab'), b = E.kindSummary(p.states, 'blank');
@@ -264,13 +294,13 @@
      3초 디바운스 중에 탭을 닫으면 로컬에는 남아도 서버 백업이 빠지고,
      강사 화면이 옛 값을 본다. keepalive라야 언로드 중에도 요청이 산다. */
   function flush() {
-    if (!S.token || S.demo || !saveTimer) return;
+    if (deviceCleared || deviceClearing || S.backupBlocked || !S.token || S.demo || !saveTimer) return;
     clearTimeout(saveTimer); saveTimer = null;
     try {
       fetch(API + '/state', {
         method: 'PUT', keepalive: true,
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + S.token },
-        body: JSON.stringify({ state: S.data, summary: summary() })
+        body: JSON.stringify({ state: backupState(), summary: summary() })
       });
     } catch (e) {}
   }
@@ -280,16 +310,48 @@
   window.addEventListener('pagehide', flush);
 
   function push() {
-    if (!S.token || S.demo) return;
+    if (deviceCleared || deviceClearing || S.backupBlocked || !S.token || S.demo) return;
+    if (S.saving) { saveTimer = setTimeout(push, 3000); return; }
     saveTimer = null;
     S.saving = true;
-    api('/state', { method: 'PUT', body: { state: S.data, summary: summary() } })
+    var savedAt = S.data.savedAt;
+    saveRequest = api('/state', { method: 'PUT', body: { state: backupState(), summary: summary() } })
       .then(function (r) {
         S.saving = false;
-        if (r.status === 413) { S.err = '학습 기록이 서버 한도를 넘었어요. 선생님께 알려 주세요.'; render(); }
+        if (r.status === 200 && !S.backupBlocked) {
+          S.backupSavedAt = Math.max(S.backupSavedAt, savedAt); saveLocal(); backupNotice(null);
+        }
+        if (r.status === 400 || r.status === 413) {
+          backupNotice((r.body && r.body.error) || '학습 기록을 서버에 보관하지 못했어요. 기록을 지우지 말고 선생님께 알려 주세요.');
+        }
       })
       .catch(function () { S.saving = false; });
+    return saveRequest;
   }
+
+  $('clearDevice').onclick = async function () {
+    if (S.backupBlocked) { alert('서버 백업을 확인하기 전에는 이 기기의 기록을 비울 수 없어요. 선생님께 알려 주세요.'); return; }
+    if (!confirm('이 기기에 저장된 국어브레인 기록을 지울까요? 서버에 보관된 학습 기록과 다른 앱 로그인은 유지됩니다. 다시 열면 학습 기록을 불러옵니다.')) return;
+    deviceClearing = true;
+    $('clearDevice').disabled = true; $('wrap').inert = true; $('tabs').inert = true;
+    clearTimeout(saveTimer); saveTimer = null;
+    try {
+      if (saveRequest) await saveRequest;
+      if (S.token && S.data.savedAt > S.backupSavedAt) {
+        var r = await api('/state', { method: 'PUT', body: { state: backupState(), summary: summary() } });
+        if (r.status !== 200) throw new Error('backup');
+        S.backupSavedAt = S.data.savedAt;
+      }
+      localStorage.removeItem(LS);
+      deviceCleared = true;
+      if (window.WBVOICE) window.WBVOICE.stop();
+      location.replace('/');
+    } catch (e) {
+      alert('최근 학습 기록을 보관하거나 이 기기의 저장 공간을 비우지 못했어요. 기록은 그대로 두었습니다. 연결과 브라우저 설정을 확인하고 다시 시도해 주세요.');
+    } finally {
+      if (!deviceCleared) { deviceClearing = false; $('clearDevice').disabled = false; $('wrap').inert = false; $('tabs').inert = false; }
+    }
+  };
 
   /* ── 오버레이(§3) — 학교 선생님이 강조한 해석이 정본 정답을 덮어쓴다 ── */
   function ovAnswers(ref, fallback) {
@@ -336,7 +398,7 @@
   }
 
   function demo(msg, assigned) {
-    S.demo = true; S.packId = 'sample-demo-U0';
+    S.demo = true; selectPack('sample-demo-U0');
     /* 범위가 이미 배정됐는데 받아 오기만 실패한 경우를 구분한다 — 그때 "시험 범위가 배정되면
        바뀝니다"라고 하면 거짓말이 된다(선생님은 이미 배정하셨다). */
     S.assigned = !!assigned;
@@ -352,6 +414,7 @@
      (render 는 S.session 이면 되돌아간다) 기록은 실제 단원 칸(pk())에 쌓이고 서버로도 올라간다. */
   function loadPack(id, now) {
     return api('/pack?id=' + encodeURIComponent(id)).then(function (r) {
+      if (deviceCleared || deviceClearing) return false;
       if (r.status === 200) {
         S.pending = { id: id, pack: r.body.pack };
         return now ? applyPack() : applyPending(false);
@@ -381,7 +444,7 @@
     var p = S.pending;
     S.pending = null; S.retryId = null;
     S.demo = false; S.err = null; S.retries = 0; S.retries403 = 0;
-    S.packId = p.id; S.pack = p.pack;
+    selectPack(p.id); S.pack = p.pack;
     /* 작품 선택·종이 채점은 팩 안의 id 를 가리킨다 — 팩이 갈리면 가리킬 곳이 없어진다 */
     S.workId = null; S.paper = null;
     return true;
@@ -392,6 +455,7 @@
      체험 팩에 머물렀다. 학생은 앱을 껐다 켤 생각을 안 한다. */
   var RETRY_MS = [30000, 120000, 600000, 1800000];
   function packFail(status, id) {
+    if (deviceCleared || deviceClearing) return false;
     var why = status === 403 ? '이 단원은 아직 나에게 배정되지 않았어요 — 선생님께 말씀드려 주세요.'
       : status === 404 ? '선생님이 이 단원 자료를 아직 올리지 않으셨어요.'
         : '시험 범위 자료를 지금 받지 못했어요 — 잠시 뒤 저절로 다시 받아 올게요.';
@@ -419,16 +483,25 @@
   function online() {
     return Promise.all([api('/exam'), api('/task'), api('/overlay'), api('/state')])
       .then(function (rs) {
+        if (deviceCleared || deviceClearing) return false;
         if (rs[0].status === 401) return demo('로그인이 만료됐어요 — 체험 모드로 보고 있어요.');
+        /* 깨진 백업을 새 기기의 빈 진도로 덮거나, 유일한 기기 원본을 비우지 않는다. */
+        if (rs[3].status === 409) {
+          S.backupBlocked = true;
+          backupNotice((rs[3].body && rs[3].body.error) || '서버 백업을 확인해야 해요. 선생님께 알려 주세요.');
+          return demo();
+        }
         S.exam = (rs[0].body && rs[0].body.exam && rs[0].body.exam.examDate) ? rs[0].body.exam : null;
         S.task = (rs[1].body && rs[1].body.task && rs[1].body.task.title) ? rs[1].body.task : null;
         S.overlay = (rs[2].body && rs[2].body.overlay) || null;
         /* 서버 기록이 더 최신이면 그것을 쓴다 — 기기를 바꿔도 이어진다 */
         var sv = rs[3].body && rs[3].body.state;
-        if (sv && sv.v === 1 && (sv.savedAt || 0) > (S.data.savedAt || 0)) {
+        if (sv && sv.v === 1) {
           /* 서버 기록에도 옛 발문이 들어 있다 — 받아 쓰기 전에 지우고, 지웠으면 올려 보낸다 */
           if (scrubWrong(sv)) S.scrubbed = true;
-          S.data = sv;
+          S.backupPacks = Object.assign({}, sv.packs);
+          S.backupSavedAt = sv.savedAt || 0;
+          if ((sv.savedAt || 0) > (S.data.savedAt || 0)) S.data = sv;
         }
         S.packIds = (S.exam && S.exam.packIds) || [];
         if (!S.packIds.length) return demo('아직 시험 범위가 등록되지 않았어요 — 체험 팩으로 연습할 수 있어요.');
@@ -467,6 +540,11 @@
     }) };
   }
   function $(id) { return document.getElementById(id); }
+  /* 문제·답안을 다시 그리지 않고 저장 오류를 알린다. 안내는 실제 백업 성공 뒤에만 푼다. */
+  function backupNotice(message) {
+    $('backupNotice').textContent = message || '';
+    $('backupNotice').hidden = !message;
+  }
   function rnd() { return Math.random(); }
 
   /* planDay가 먹는 모양으로 팩을 줄여 넘긴다 */
@@ -533,6 +611,7 @@
     if (S.err) out += '<div class="banner warn">' + esc(S.err) + '</div>';
     if (S.demo) {
       out += '<div class="banner info">체험 팩(자체 창작 작품)으로 연습 중이에요. ' +
+        (S.pack ? '<b>' + esc(S.pack.unit) + '</b> · 작품 ' + (S.pack.works || []).length + '편 · 문항 ' + (S.pack.items || []).length + '개.<br>' : '') +
         (S.assigned ? '우리 학교 작품은 받는 대로 바뀝니다.' : '시험 범위가 배정되면 우리 학교 작품으로 바뀝니다.') + '</div>';
     }
     /* 시험 범위가 여러 단원이면 고를 수 있어야 한다 — 예전에는 첫 단원만 받아서 2단원이
@@ -746,8 +825,8 @@
     var m = ['<div class="card"><div class="spread"><h3 style="margin:0">' + esc(w.title) + ' — 읽기</h3>' +
       '<button class="btn sm mut" data-back="1">닫기</button></div></div>'];
     m.push('<div class="card"><h3>본문</h3>');
-    if (w.text && w.text.stanzas) {
-      m.push('<div class="poem" id="poem">' + poemHtml(w, true) + '</div>');
+    if (w.text && (w.text.stanzas || w.text.paragraphs)) {
+      m.push('<div class="poem" id="poem">' + R.poemHtml(w, true) + '</div>');
       m.push('<div class="row" style="margin-top:10px">' +
         '<button class="btn sm ghost" data-note="1">날개풀이 보기</button>' +
         '<button class="btn sm ghost" data-tts="1">낭독</button></div>');
@@ -761,11 +840,7 @@
         row2('성격', (w.overview.tone || []).join('·')) + row2('주제', w.overview.theme) + '</table></div>');
     }
     if (w.structureMap) {
-      m.push('<div class="card"><h3>구조도</h3>');
-      (w.structureMap.branches || []).forEach(function (b) {
-        m.push('<div style="margin-bottom:6px"><b>' + esc(b.category) + '</b> — ' + esc((b.children || []).join(', ')) + '</div>');
-      });
-      m.push('</div>');
+      m.push('<div class="card"><h3>구조도</h3>' + R.structureHtml(w.structureMap) + '</div>');
     }
     if ((w.appreciationPoints || []).length) {
       m.push('<div class="card"><h3>감상 Point</h3><ul class="small">' +
@@ -783,7 +858,8 @@
       }
       if (e.target.closest('[data-tts]')) {
         if (window.WBVOICE && WBVOICE.speak) {
-          var txt = (w.text.stanzas || []).map(function (s) { return (s.lines || []).join(' '); }).join(' ');
+          var txt = w.text.paragraphs ? w.text.paragraphs.join(' ') :
+            (w.text.stanzas || []).map(function (s) { return (s.lines || []).join(' '); }).join(' ');
           WBVOICE.speak(txt, { lang: 'ko-KR' });
         }
         return;
@@ -797,35 +873,6 @@
     document.querySelectorAll('#poem .note').forEach(function (n) { n.style.display = 'none'; });
   }
   function row2(k, v) { return '<tr><th style="width:90px">' + esc(k) + '</th><td class="t">' + esc(v || '') + '</td></tr>'; }
-
-  /* showNotes: 날개풀이를 붙일지. 기본은 붙이지 않는다 —
-     3단계(구절 적용)·4단계(주석 복원)에서 날개풀이가 보이면 그게 곧 정답이라
-     힌트 없는 인출이 성립하지 않는다. 1단계 읽기에서만 토글로 연다. */
-  /* marks 를 밖에서 받을 수 있다 — ㉠ 기호는 **세트 스코프**라서다(§2.2-5).
-     같은 기호가 세트마다 다른 구절을 가리키므로, 세트가 있으면 세트 것을 쓴다.
-     이걸 안 쓰면 '㉠와 ㉡의 공통점을 쓰시오' 같은 문항이 지문에 표시가 없어 풀 수 없다. */
-  /* 구절에 기호를 얹는다 — 지문 본문과 발췌 문단이 같은 규칙을 쓰게 한 군데로 모은다 */
-  function markUp(line, marks) {
-    var html = esc(line);
-    (marks || []).forEach(function (mk) {
-      if (mk.anchorText && line.indexOf(mk.anchorText) >= 0) {
-        html = html.replace(esc(mk.anchorText), '<span class="sym">' + esc(mk.symbol) + '</span><mark>' + esc(mk.anchorText) + '</mark>');
-      }
-    });
-    return html;
-  }
-  function poemHtml(w, showNotes, overrideMarks) {
-    var marks = overrideMarks || w.marks || [], notes = showNotes ? (w.lineNotes || []) : [];
-    return (w.text.stanzas || []).map(function (stz) {
-      return '<div class="st">' + (stz.lines || []).map(function (ln) {
-        var html = markUp(ln, marks), added = '';
-        notes.forEach(function (nt) {
-          if (ln.indexOf(nt.anchor) >= 0) added += '<span class="note">↳ ' + esc(nt.note) + '</span>';
-        });
-        return '<div class="ln">' + html + added + '</div>';
-      }).join('') + '</div>';
-    }).join('');
-  }
 
   /* 2단계 개념 빈칸 — SRS 큐. 정답은 오버레이가 덮어쓸 수 있다. */
   function startBlank(onlyWork) {
@@ -1035,7 +1082,7 @@
     var sess = S.session, it = sess.items[sess.i];
     if (!it) return finishApply();
     var w = work(sess.workId);
-    var side = w.text ? '<div class="poem">' + poemHtml(w) + '</div>' : '<div class="small muted">본문 미수록 팩</div>';
+    var side = w.text ? '<div class="poem">' + R.poemHtml(w) + '</div>' : '<div class="small muted">본문 미수록 팩</div>';
     var m = ['<div class="card"><div class="spread"><h3 style="margin:0">' + esc(sess.title) + '</h3>' +
       '<span class="small muted">' + (sess.i + 1) + ' / ' + sess.items.length + '</span></div></div>'];
     m.push('<div class="q">');
@@ -1131,9 +1178,9 @@
       return t;
     });
     if (!targets.length) { S.err = '이 작품은 복원할 항목이 없어요.'; render(); return; }
-    var side = w.text ? '<div class="poem">' + poemHtml(w) + '</div>' : '<div class="small muted">본문 미수록 팩</div>';
+    var side = w.text ? '<div class="poem">' + R.poemHtml(w) + '</div>' : '<div class="small muted">본문 미수록 팩</div>';
     var m = ['<div class="card"><h3>' + esc(w.title) + ' — 주석 복원</h3>' +
-      '<div class="small muted">지문을 보고, 표시된 구절의 주석과 각 연의 내용을 힌트 없이 써 보세요.</div></div>'];
+      '<div class="small muted">지문을 보고, 표시된 구절의 주석과 구성별 내용을 힌트 없이 써 보세요.</div></div>'];
     targets.forEach(function (t) {
       m.push('<div class="card"><div class="small" style="font-weight:700;margin-bottom:6px">' + esc(t.label) + '</div>' +
         (t.quote ? '<div class="quote small">' + esc(t.quote) + '</div>' : '') +
@@ -1189,9 +1236,7 @@
   function drawEssay() {
     var sess = S.session, it = sess.items[sess.i];
     if (!it) { S.session = null; setTab('home'); return; }
-    var w = work(it.workId);
-    var set = ((S.pack && S.pack.sets) || []).filter(function (s) { return s.setId === it.setId; })[0];
-    var side = passageHtml(set, w);
+    var side = R.passageHtml(S.pack, it);
     var m = ['<div class="card"><div class="spread"><h3 style="margin:0">서술형</h3>' +
       '<span class="small muted">' + (sess.i + 1) + ' / ' + sess.items.length + '</span></div></div>'];
     m.push('<div class="q"><div class="stem">' + it.stem + '</div>');
@@ -1227,29 +1272,6 @@
       if (e.target.closest('[data-egrade]')) gradeEssay(it, ta.value);
       if (e.target.closest('[data-enext]')) { sess.i += 1; drawEssay(); }
     });
-  }
-  function passageHtml(set, w) {
-    if (set) {
-      return (set.works || []).map(function (ref) {
-        var wk = work(ref.workId) || {};
-        var body = '';
-        /* 이 세트가 이 작품에 대해 따로 갖고 있는 기호를 쓴다. 없으면 정본의 것으로 떨어진다. */
-        var sm = (set.marks || []).filter(function (mk) { return !mk.workId || mk.workId === ref.workId; });
-        /* 발췌 본문은 산문(문단)일 수도 시(연·행)일 수도 있다 — 시조 발췌가 실제로 그렇다.
-           연·행 쪽을 안 그리면 지문이 통째로 빈 채 문항만 뜬다. */
-        var refText = ref.text || null;
-        if (refText && refText.paragraphs) {
-          body = refText.paragraphs.map(function (para) { return '<p>' + markUp(para, sm) + '</p>'; }).join('');
-        } else if (refText && refText.stanzas) {
-          body = poemHtml({ text: refText }, false, sm.length ? sm : null);
-        } else if (wk.text) body = poemHtml(wk, false, sm.length ? sm : null);
-        return '<div class="poem" style="margin-bottom:10px">' +
-          '<div class="small muted">' + esc(ref.label || '') + ' ' + esc(wk.title || '') + ' · ' + esc(wk.author || '') + '</div>' +
-          (ref.prefaceSummary ? '<div class="small muted" style="margin:6px 0">' + esc(ref.prefaceSummary) + '</div>' : '') +
-          body + '</div>';
-      }).join('');
-    }
-    return w && w.text ? '<div class="poem">' + poemHtml(w) + '</div>' : '';
   }
   function gradeEssay(it, text) {
     var r = G.gradeRubric(text, it);
@@ -1490,8 +1512,6 @@
       $('pane').addEventListener('click', function () { setTab('quiz'); });
       return;
     }
-    var w = work(it.workId);
-    var set = ((S.pack && S.pack.sets) || []).filter(function (s) { return s.setId === it.setId; })[0];
     var m = ['<div class="card"><div class="spread"><h3 style="margin:0">' + esc(sess.title) + '</h3>' +
       '<span class="small muted">' + (sess.i + 1) + ' / ' + sess.items.length + '</span></div></div>'];
     m.push('<div class="q"><div class="stem">' + it.stem + '</div>');
@@ -1514,7 +1534,7 @@
       }).join('') + '<button class="btn sm" data-msub="1">확인</button></div>');
     }
     m.push('<div id="fb"></div></div>');
-    split(passageHtml(set, w), m.join(''));
+    split(R.passageHtml(S.pack, it), m.join(''));
     $('pane').addEventListener('click', function (e) {
       var c = e.target.closest('[data-no]');
       if (c && !sess.answered) judgeStored(it, c.getAttribute('data-no'));

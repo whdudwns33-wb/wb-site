@@ -21,8 +21,9 @@ naesin-ko/
   gen.js            문항 생성 — 정본 → 5지선다·부정발문·<보기>·OX 런타임 생성 [WBKOGEN]
   pack-check.js     팩 검증 규칙 (CLI·관리 웹 공용 — 스키마의 실행 가능한 정의) [WBKOCHECK]
   readiness.js      준비도 — 사다리 축 가중 합 0~100 · 반 집계 · 페이스 제약      [WBKOREADY]
+  render.js         학생 앱·강사 지문 보드 공용 본문·기호·구조도 렌더러      [WBKORENDER]
   concepts.json     공용 개념어 사전 55개 (자체 창작 — 정의·예시·혼동 쌍)
-  pack-sample.json  자체 창작 체험 팩 (가상 시 「빈 의자」) — 테스트 픽스처 겸 미연동 데모
+  pack-sample.json  기말 대비 자체 창작 체험 팩 (시 3편·소설 3편, 21문항) — 미연동 데모
   pack-schema.md    팩 스키마 정의
   pack-validate.mjs 팩 검증기 CLI
   extract/          출판사 PDF → 팩 초안 (오프라인 도구 — README.md가 절차 정본)
@@ -42,7 +43,13 @@ reading-server/
 
 핵심 데이터 흐름: **자료 → [추출·검증] → 팩 JSON → 관리 웹 업로드 → KV(`naesinko:pack:<id>`)
 → 학생 앱이 인증 후 로드**. 팩은 저장소·정적 자산에 절대 없다.
-`concepts.json`만 예외 — 자체 창작이라 커밋하고 정적으로 서빙한다(`concepts.test.cjs`가 그 전제를 지킨다).
+자체 창작인 `concepts.json`과 `pack-sample.json`만 예외로 커밋하고 정적으로 서빙한다.
+
+기말 대비 체험은 특정 학교·교과서·시험일을 가정하지 않는다. 기존 「빈 의자」 정본과
+「골목의 끝」 발췌를 유지하고, 시 2편·소설 2편의 정본을 추가했다(정본 총 5편).
+새 작품마다 읽기·개념 빈칸·구절 적용·주석 복원·서술형과 객관식·OX 문제를 연습할 수 있다.
+`sample-demo-U0`와 기존 작품·문항 ID를 유지하므로 기존 체험 학습 기록은 이어진다.
+실제 학교 범위는 별도로 검수한 팩과 시험 등록으로 배정해야 한다.
 
 ## 학생 앱 동작 요약
 
@@ -66,9 +73,34 @@ reading-server/
 · `GET /exam` → `{exam, scope}` · `GET /task` → `{task, scope}` · `GET /overlay` → `{overlay, scope}`
 · `GET/POST /review` → `{reviews, updatedAt}`
 
+`state`·별도 `summary`는 서버에서 허용 필드만 골라 저장하고 조회 때도 출력 복사만 거른다.
+알려진 필드의 형식이 틀리면 쓰기 전 400, UTF-8 저장 예산을 넘으면 413이다. 둘 다 기존
+서버 기록과 기기 진도를 보존한다. 형식이 깨진 서버 백업은 GET 409로 알리고 원본을 그대로 둔다.
+학생 앱은 그 경우 체험 모드로 안내하고 재접속 전까지 서버 저장·기기 청소를 막는다.
+저장 오류는 문제·입력을 다시 그리지 않는 상단 알림으로 표시하고 실제 백업 성공 뒤에만 해제한다.
+409 안내는 탭 이동·체험 학습 뒤에도 남으며, 늦은 저장 성공 응답도 백업 보류를 풀지 못한다.
+필드 누락은 옛 기록과 호환하기 위해 그대로 두며, 숫자 변환·잘라내기·목록 상한을 추가하지 않는다.
+
+| 기록 위치 | 허용 필드 |
+| --- | --- |
+| 최상위 | `v:1`, `packs`, `savedAt` |
+| 단원 | `states`, `wrong`, `essays`, `dump`, `log`, `diagDone`, `mistakes` |
+| SRS 상태 | `id`, `kind`, `reached`, `reachedAt`, `relearnCount`, `lastCriterionDate`, `step`, `due`, `streak`, `wrong`, `lapses`, `needsRecheck`, `overconfident`, `last`, `stage`, `applyRight`, `applyTotal`, `essayDone`, `wrongClearDates` |
+| 오답 좌표 | `key`, `n`, `cleared`, `dates`, `workId`, `kind`, `mark`, `no` |
+| 서술형 판정 | `verdict`, `score`, `total`, `at` — 답안 원문은 별도 `/review` |
+| 브레인덤프·종이 학습 | `workId`, `at`, `present`·`total` 또는 `kind:'paper'`·`coverage` |
+| 실수 유형 | `negative`, `bogi`, `concept`, `guess` |
+| 관리자 요약 | `packId`, `works`, `complete`, `restored`, `applied`, `byStage(1~5)`, `vocabReached/Stable/Total`, `blankReached/Stable/Total`, `wrongOpen`, `essayPass`, `essayHold`, `ready`, `lastAt` |
+| 준비도 요약 | `score`, `grade(key,label)`, `weak`, `axes(read,blank,vocab,apply,restore,essay)`, `alert(level,why)`, `pace(dday,minDays,rotations,perDay,onTrack)`, `untouched` |
+
+진단 상태의 접두 없는 `id`, 긴 한글 좌표, 오답 지면 번호 문자열, 서술형 소수 배점,
+시험 이후 음수 `dday`, `ready:null`과 부분 요약도 보존한다. 팩 id는 기존 형식을 따르고,
+기록 맵의 `__proto__` 키는 받지 않는다. 본문 등 허용 밖 필드는 기록의 모든 층에서 제외한다.
+
 관리(PIN): `POST /admin/pack {id, pack}` (4MB, packId 일치 검증) · `GET /admin/packs`
 · `POST /admin/exam {scope, examDate, packIds, profile}` · `GET/POST /admin/task`
-· `GET/POST /admin/overlay` · `GET/POST /admin/review` · `GET /admin/overview`
+· `GET/POST /admin/overlay` (GET의 `found`는 해당 scope 레코드 존재 여부) · `GET/POST /admin/review` · `GET /admin/overview`
+· `GET/POST /admin/scrub` (조회 후 확인해야 삭제 가능)
 · `GET/POST /admin/pending {id, pending}` (1MB) → `{pending, updatedAt}`
 · `POST /admin/rubric {id, pack?, doneItemId}` — 루브릭 저작 결과 반영
 
@@ -164,21 +196,31 @@ node naesin-ko/pack-validate.mjs "<단원 폴더>/_build/pack"   # 오류 0 → 
 
 ## 현재 상태 (Phase 1a 완료)
 
-**완료**: 기획서 v1.1 · 순수 로직 5모듈 + 추출 도구 6종 + 테스트 11종(200개 이상 검증) · 학생 앱(사다리 5단계·세션·오답노트·
+**완료**: 기획서 v1.1 · 순수 로직 6모듈 + 추출 도구 6종 + 국어 관련 테스트 17종 · 학생 앱(사다리 5단계·세션·오답노트·
 실수 유형·성취도·**준비도**·**출발선 진단**·**종이 ○△× 입력**) · 서버 API(저장 예산 분리) · 관리 웹(팩 업로드·시험·과제·오버레이·
-서술형 검토·**서술형 루브릭 저작**·**회복 편성 안전판**·**주석 복원 시험지 인쇄**·**반 준비도 분포와 위험 학생**) · 공용 개념어 사전 55개 · 자체 창작 체험 팩 ·
+서술형 검토·**서술형 루브릭 저작**·**회복 편성 안전판**·**주석 복원 시험지 인쇄**·**반 준비도 분포와 위험 학생**·**지문 보드**·**기존 발문 청소**) · 공용 개념어 사전 55개 · 자체 창작 체험 팩 ·
 **PDF 추출 파이프라인**(`extract/`) · CI·백업·`_headers`·dist 조립 등록.
+
+**2026-10-13 후속 구현**: 관리 청소 카드는 먼저 GET으로 규모를 확인하고 되돌릴 수 없는 삭제를
+확인한 뒤 POST를 실행한다. 실제 운영 발문 삭제는 별도 승인 사항이며 이번 작업에서는 실행하지 않았다.
+지문 보드는 전문·세트 기호·날개풀이·연별 내용·구조도·학교 강조를 같은 렌더러로 그린다.
+학생별 오버레이가 없으면 학생 앱처럼 반 공통으로 돌아가고, 늦은 이전 세션 응답은 새 로그인을 지우지 않는다.
+
+학생 앱의 「이 기기에서 지우기」는 최근 답안을 서버가 받았는지 확인한 뒤 기기 저장만 비우고
+첫 화면으로 돌아간다. 연결·저장에 실패하면 원본을 유지한다. 단원을 바꾸면 이전 칸은 기기 저장에서
+빠지지만 진도는 서버 백업에 유지하며, 아직 백업되지 않은 칸은 확인 전까지 기기에 남긴다.
+`render.js`는 배포 파일·SW 셸 해시·설치 미리 담기·배포 검사에 모두 등록돼 있다.
 
 **2026-10-11 에 들어간 것** (금고 설계 심사에서 나온 운영 결함들 — 기획서 단계가 아니라 지금 코드의 구멍이었다)
 
 | | 무엇 | PR |
 |---|---|---|
 | 팩 **시험 범위 게이트** | `GET /pack` 이 인증만 보고 내줬다 — 재원생이면 누구나 팩 id 하나로 남의 범위를 받을 수 있었다(영어에는 있던 검사다). 폴백 순서는 `examPackIds()` 하나로 모았다. 관리자는 통과한다(검수·루브릭 저작이 같은 라우트로 되읽는다) | #439 |
-| 몸통 상한 | `naesinKoBodyLimit` — 관리 4.5MB / 나머지 300KB. **워커·로컬 양쪽**에 건다(`override.test.mjs` 가 내보낸 `*BodyLimit` 이 두 호스트에 다 걸렸는지 본다) | #439·#441 |
-| 팩을 못 받을 때 | 403·404·네트워크를 갈라 말하고 조용히 재시도(30초·2분·10분·30분). 받은 팩은 `S.pending` 에 두고 `applyPack()` 한 곳에서만 끼운다 — 공부 도중에 갈면 화면은 체험 문항을 내면서 기록은 실제 단원 칸에 쌓인다 | #439·#441 |
-| 단원 전환 | 시험 범위에 단원이 둘이면 버튼으로 고른다(예전에는 첫 단원만 열렸다). 체험 모드에서도 버튼을 남긴다 — 전환이 실패해 체험 팩으로 떨어졌을 때 되돌아갈 길이 그것뿐이다 | #439·#441 |
+| 몸통 상한 | `naesinKoBodyLimit` — 관리 4.5MB / 나머지 300KB. **워커·로컬 양쪽**에 건다 — 가드는 `worker.mjs:796`·`server.mjs:640`, `getBody` 상한은 `server.mjs:643`. `override.test.mjs` 가 내보낸 `*BodyLimit` 이 두 호스트에 다 걸렸는지 본다 | #439 |
+| 팩을 못 받을 때 | 403·404·네트워크를 갈라 말하고 조용히 재시도(30초·2분·10분·30분). 받은 팩은 `S.pending` 에 두고 `applyPack()` 한 곳에서만 끼운다 — 공부 도중에 갈면 화면은 체험 문항을 내면서 기록은 실제 단원 칸에 쌓인다 | #439 |
+| 단원 전환 | 시험 범위에 단원이 둘이면 버튼으로 고른다(예전에는 첫 단원만 열렸다). 체험 모드에서도 버튼을 남긴다 — 전환이 실패해 체험 팩으로 떨어졌을 때 되돌아갈 길이 그것뿐이다 | #439 |
 | **오답노트가 발문을 베끼던 것** | `markWrong` 이 `label: it.stem` 으로 팩 발문을 담아 localStorage·KV `naesinko:state:*`·야간 백업까지 복제했다. 지금은 좌표만 남긴다(`workId`·`kind`·`mark`·`no`)고 이름은 `wrongLabel()` 이 팩에서 만든다. 불러올 때 옛 발문을 지우고(`scrubWrong`) 올려 보내며, 서버도 `/state` 쓰기·읽기 양쪽에서 뗀다(`scrubWrongLabels`) | #441 |
-| 관리 청소 라우트 | `GET/POST /api/naesin-ko/admin/scrub` — 이미 쌓인 발문을 한 번 청소한다. GET 은 세어만 보고 POST 가 지운다(`countOnly` — 로컬 파일 어댑터는 저장된 객체를 그대로 돌려줘서 세어 보려다 지워 버린다). `updatedAt` 은 올리지 않는다(올리면 학생 기기의 더 새 기록이 밀린다). **관리 웹 UI 는 아직 없다 — 지금은 PIN 으로 직접 호출한다** | #441 |
+| 관리 청소 라우트 | `GET/POST /api/naesin-ko/admin/scrub` — 이미 쌓인 발문을 한 번 청소한다. GET 은 세어만 보고 POST 가 지운다(`countOnly` — 로컬 파일 어댑터는 저장된 객체를 그대로 돌려줘서 세어 보려다 지워 버린다). `updatedAt` 은 올리지 않는다(올리면 학생 기기의 더 새 기록이 밀린다). **2026-10-13 관리 웹 조회·확인 카드 추가** | #441 |
 | 루브릭 초안 | 브라우저 초안에 2주 기한(`rbSweep`). 내려받기는 남기고 **경고 두 겹**(누르기 전 고정 안내 + 누른 뒤 확인) — 원장 결정 | #441 |
 | 새 검사 | `naesin-ko/app.test.cjs`(학생 화면 설계 정적 검사 8개) · `override.test.mjs` 의 몸통 상한 양쪽 검사. 테스트는 **13종 → 14종** | #441 |
 

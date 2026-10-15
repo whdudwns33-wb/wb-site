@@ -8,6 +8,8 @@
 const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
+const vm = require('node:vm');
+const R = require('./render.js');
 
 let passed = 0;
 const t = (name, fn) => { fn(); passed += 1; console.log('  ✓ ' + name); };
@@ -30,6 +32,23 @@ t('인라인 코드가 파싱되고 화면 틀이 다 있다', () => {
   assert.ok(js.length > 20000, '스크립트를 제대로 못 떼어 냈다(' + js.length + '자)');
   new Function(js);   /* 문법 오류면 여기서 던진다 */
   ['tabs', 'wrap', 'hstat', 'wm'].forEach((id) => assert.ok(app.includes('id="' + id + '"'), id + ' 가 없다'));
+});
+
+t('소설 읽기는 문단을 안전하게 표시하고 낭독한다', () => {
+  const paragraphs = ['지도에 <새 길>을 그렸다.', '친구와 길을 다시 확인했다.'];
+  let html, click, spoken;
+  const voice = { speak: (text) => { spoken = text; } };
+  vm.runInNewContext('function startRead() ' + body('startRead') + '; startRead();', {
+    S: { workId: 'novel' }, work: () => ({ title: '체험 소설', text: { paragraphs } }), R,
+    esc: (text) => String(text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'),
+    full: (text) => { html = text; }, $: () => ({ addEventListener: (_, fn) => { click = fn; } }),
+    document: { querySelectorAll: () => [] }, window: { WBVOICE: voice }, WBVOICE: voice
+  });
+  assert.ok(html.includes('지도에 &lt;새 길&gt;을 그렸다.'), '소설 문단이 표시되지 않는다');
+  assert.ok(html.includes('친구와 길을 다시 확인했다.'));
+  assert.ok(!html.includes('이 팩은 본문을 싣지 않습니다'));
+  click({ target: { closest: (selector) => selector === '[data-tts]' } });
+  assert.strictEqual(spoken, paragraphs.join(' '));
 });
 
 t('팩은 applyPack 한 곳에서만 끼운다 — 받아 온 자리에서 바로 갈지 않는다', () => {

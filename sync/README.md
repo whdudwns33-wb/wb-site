@@ -1,5 +1,14 @@
 # WB 동기화 백엔드 (Cloudflare Workers + D1)
 
+## 직원 실시간 요청 기기 알림
+
+- 배포: 비공개 DB 백업·복원 시험 → `082_task_live_push.sql` → Worker → task Pages.
+- 전용 `TASK_PUSH_PUBLIC_KEY`·`TASK_PUSH_PRIVATE_JWK`는 GitHub 저장소 시크릿에서 `admin-secrets.yml`의 `task_push`로 공급한다. 기존 학생 앱 VAPID 키를 교체하지 않는다. 키가 없으면 요청 저장·화면 팝업은 종전처럼 동작하며 기기 알림만 비활성이다.
+- 실제 요청 INSERT와 함께 기기별 큐를 기록한다. 저장 응답 후 waitUntil에서 최대 50건 병렬 처리하며 기존 10분 cron은 잔여·실패 건을 재시도한다. 24시간 지난 건은 건너뛰고 최대 3회 시도한다. 푸시 제공자 접수는 사용자의 수신·확인과 다르다. 확인은 기존 요청 확인 버튼으로만 기록한다.
+- 전송 전 직원·기기 토큰·관리 권한·요청 대상·확인 상태를 재검증한다. 404/410 기기는 비활성 처리한다. 기기당 일반 알림만 전송하며 요청 본문·학생 정보·연락처·개인 링크는 푸시로 보내지 않는다.
+- `request-sw.js`는 /task/ 범위 전용이며 페이지 캐시·로그인 토큰을 저장하지 않는다. 알림을 누르면 /task/로 돌아오고 기존 인증으로 요청을 읽는다. 화면 점등·소리·절전 중 도착 시간은 OS가 결정한다.
+- 최초 기기별 알림 허용이 필요하다. Windows Chrome/Edge·Android 태블릿 잠금 상태·알림 차단·로그아웃·토큰 해지·복수 관리자 수신을 운영 기기에서 확인한 뒤 완료로 보고한다.
+
 ## 교재 아카등록과 배송 분리 (2026-09-29)
 
 - `080_book_order_academy.sql` → Worker → Pages 순서로 배포한다.
@@ -140,13 +149,35 @@ npx wrangler d1 execute wb-sync --remote --file=./migrations/076_makeup_absence_
 npx wrangler d1 execute wb-sync --remote --file=./migrations/077_weekend_open_visit_per_day.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/078_makeup_instructions.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/079_book_order_received_student_cancellations.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/080_book_order_academy.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/082_task_live_push.sql
+```
+
+운영 DB에는 **미적용 파일만** 백업·복원 확인 후 위 순서로 적용한다. `081` 파일은 없으며 번호를
+채우거나 기존 파일명을 바꾸지 않는다. 새 DB의 `schema.sql`에 포함된 스키마를 재적용하지 않는다.
 
 > `076`은 보강 수업 자체가 결석된 뒤 새 일정을 잡는 재보강 경로를 추가한다. 기존 결석
 > 출결과 원래 보강 일정은 append-only 이력으로 보존하고, 재보강 일정만 새로 저장한다.
 
-> `077`은 실제 주말 등·하원 기록의 열린 상태를 학생·방문일별로 제한한다. 이전 날짜의
+> `077_weekend_open_visit_per_day.sql`은 실제 주말 등·하원 기록의 열린 상태를 학생·방문일별로 제한한다. 이전 날짜의
 > 하원 누락은 오늘 등원을 막지 않고 관리자 보정 목록에 날짜와 함께 표시하며, 같은 날짜의
 > 열린 중복 기록은 계속 차단한다.
+
+**동일한 077 번호의 금액 정정은 별도 1회성 운영 작업이다.**
+`077_book_order_amount_correction_100ball_3_2.sql`은 스키마가 아니라 이미 배부한 특정 교재의
+14,400원 → 16,000원 정정을 불변 원장에 기록한다. 번호만으로 적용 여부를 판단하지 말고 두 파일을
+파일명으로 구분한다. 이미 운영에 적용됐을 수 있으므로 **파일명을 바꾸지 않고**, 원장이 기존 정정 이력과
+대상 주문을 확인한 뒤 미적용인 경우에만 실행한다. `031_book_order_fulfillments.sql`과
+`044_book_order_item_price_corrections.sql`이 먼저 적용돼 있어야 한다. 새 빈 DB에서는 대상 주문이
+없으므로 이 데이터 정정을 설치 절차에 자동으로 넣지 않는다.
+
+```bash
+# 원장 확인 후 해당 데이터 정정이 필요한 기존 DB에서만 1회 실행
+npx wrangler d1 execute wb-sync --remote --file=./migrations/077_book_order_amount_correction_100ball_3_2.sql
+```
+
+`080`은 아카등록과 배송 원장을 분리하고, `082`는 요청 기기 알림의 구독·발송 큐를 만든다.
+새 DB는 `schema.sql`에 두 스키마가 포함됐는지 확인한다. 알림 전용 키·허용 절차는 문서 첫 절을 따른다.
 
 > `070`은 이미 적용된 `069` 이력을 되돌리지 않고, 그 migration이 만든 JSON 전개 view·trigger만
 > 제거한 뒤 학생별 일정 revision 원장과 경량 보강 revision trigger를 설치한다. 운영 DB에는 반드시
@@ -159,6 +190,7 @@ npx wrangler d1 execute wb-sync --remote --file=./migrations/079_book_order_rece
 > `072`는 consult 학생용 연락처에 학생 번호·엄마 번호 구분을 추가한다. 기존 번호는 추측하지
 > 않고 `unknown`으로 유지하며, 새 consult 화면에서 종류와 전체 번호를 한 번 다시 확인한다.
 
+```bash
 # 3) 비밀키 등록 — 코드나 wrangler.toml에 적지 않는다
 npx wrangler secret put TASK_ADMIN_SECRET
 npx wrangler secret put CONSULT_ADMIN_SECRET
@@ -907,5 +939,15 @@ Worker의 사전 검사와 D1 트리거를 함께 사용해 교환 선점과 학
 
 ## 검증
 
-`scratchpad/test-worker.mjs` — 인메모리 SQLite로 D1을 흉내 내 20개 시나리오를 돌린다
-(인증·출처·델타·분할·위조 토큰·LWW·앱 격리·토큰 해지·전송 상한·100명 규모 조회).
+저장소 뿌리의 공통 입구가 `*.test.mjs`·`*.test.cjs`를 찾아 실행한다.
+
+```bash
+node scripts/check.mjs --only sync
+node scripts/check.mjs --only task
+node scripts/check.mjs --only consult
+node scripts/check.mjs
+```
+
+sync 테스트는 인증·출처·델타·앱/소유자 격리·개인 토큰·수업/교재/포털 계약 등을 검증한다.
+개별 파일은 `node sync/<이름>.test.mjs`로 실행한다. PR 전에는 전체 검사를 통과시키며,
+실제 운영 DB의 마이그레이션 적용·쿠키·기기 연결·발송은 테스트와 구분해 배포 절차대로 확인한다.
