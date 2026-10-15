@@ -33,7 +33,7 @@ function screen() {
         setAttribute(key,value){this.attrs[key]=String(value);},getAttribute(key){return Object.prototype.hasOwnProperty.call(this.attrs,key)?this.attrs[key]:null;},
         classList: { contains: value => classes.has(value), add: value => classes.add(value), remove: value => classes.delete(value), toggle() {} },
         addEventListener: (type, fn) => events.set(type, fn), focus() {}, querySelector: selector => {
-          if (!selectors.has(selector)) selectors.set(selector, { textContent: '',children:[],appendChild(child){this.children.push(child);} });return selectors.get(selector);
+          if (!selectors.has(selector)) selectors.set(selector, { textContent: '',children:[],focus(){},appendChild(child){this.children.push(child);} });return selectors.get(selector);
         }, querySelectorAll: () => [],
       });
     }
@@ -44,7 +44,7 @@ function screen() {
     document: { getElementById: node, querySelectorAll: () => [], addEventListener: (type, fn) => documentEvents.set(type, fn), body: { style: {} }, contains: () => false,
       createElement: () => ({ textContent: '', attrs: {},setAttribute(key, value) { this.attrs[key] = value; },getAttribute(key) { return this.attrs[key]; },querySelector(){return node('nextBtn');},scrollIntoView(){},appendChild(){},addEventListener(){} }) },
     window: { addEventListener: (type, fn) => windowEvents.set(type, fn), speechSynthesis: voiceEngine },
-    SpeechSynthesisUtterance: function (text) { this.text = text; }, navigator: {}, location: { reload() {} }, confirm: () => true,
+    SpeechSynthesisUtterance: function (text) { this.text = text; }, navigator: {}, location: { reload() {} }, confirm: () => true, alert: () => {},
     WBNAESIN: require('./engine.js'), WBGRADE: require('./grade.js'), WBGEN: require('./gen.js'), AbortController,
     setTimeout: (fn, ms) => { const id = ++nextTimer; timers.set(id, { fn, ms }); return id; },
     setInterval: (fn, ms) => { const id = ++nextTimer; timers.set(id, { fn, ms }); return id; },
@@ -55,7 +55,7 @@ function screen() {
   globalThis.ui={boot,api,checkAccount,checkAccess,stopStudy,clearPackCache,migrateLegacy,pullAdopt,pushState,persist,save,openDemo,renderItem,storedToRunner,storedItemKey,itemRefOf,wrongRetryItems,gradeItem,normalizeStoredAnswer,recoverStateStamps,loadDB,quizTypes,renderQuiz,runTask,mockItems,
     serverExam:value=>{examServer=value;applyServerExamAll();},effectiveExam:exam,renderHome,render,lessonLabel,enChunkOrderItem,koBlankItem,kwBlankItem,writeItem,formItems,loadRangePacks,switchPack,
     library:ids=>{examServer={mode:'practice',examDate:'',packIds:ids};packList=ids;packCatalog=[];PACKS={};pack=null;},
-    ttsOptions,wireTtsBtn,wireChunkWork,wireDialogueWork,wireSentenceWork,openPack,renderHeader,demoNotice,bootError,
+    ttsOptions,wireTtsBtn,wireChunkWork,wireDialogueWork,wireSentenceWork,runChunkSession,ckGate,openPack,renderHeader,demoNotice,bootError,
     projector:(scope,pj)=>{liveScope=scope;liveState={projector:pj};pjApply(pj);},
     projectile:()=>({pjPick,pjSent,pjSeen}),
     addPack:(p,inRange)=>{PACKS[p.packId]=normPack(p);if(inRange)packList.push(p.packId);packDB(p.packId);},
@@ -98,6 +98,14 @@ function screen() {
     assert.ok(ui.koBlankItem(s,2).parts.some(p=>p.blank));assert.ok(ui.kwBlankItem(s,2).parts.some(p=>p.blank));
     assert.equal(ui.writeItem(s,1).answers[0],s.en);assert.ok(ui.formItems(s).length);
     ui.node('startPassage').onclick();assert.match(ui.node('wrap').innerHTML,/문장 1/);
+  });
+  await t('청크 한 개짜리 본문은 안내 한 번 뒤 문장 학습을 바로 시작한다',()=>{
+    const ui=screen(),s={seq:1,dayGroup:'1',en:'A toy is blue.',ko:'장난감이 파랗다.',tokens:['A','toy','is','blue.'],chunks:[{en:'A toy is blue.',ko:'장난감이 파랗다.'}],keywords:[{en:'A toy is blue.',ko:'장난감이 파랗다.'}],verbForms:[],grammarChoices:[]};
+    ui.setup(account,{...clone(sample),contentMode:'questions',words:[],sentences:[s]});
+    ui.renderHome();ui.node('startPassage').onclick();
+    assert.equal(ui.ckGate('1').open,false);ui.runChunkSession('1');
+    assert.equal(ui.ckGate('1').open,true);assert.equal(typeof ui.node('stageGo').onclick,'function');
+    ui.node('stageGo').onclick();assert.ok(ui.get().RQ.items.length);
   });
   await t('문제 전용 팩은 진단 없이 시작하고 채점·오답 재풀이·저장을 유지한다',()=>{
     const ui=screen(),pack={...clone(sample),contentMode:'questions',words:[],sentences:[],items:[{...clone(sample.items[0]),id:'own-question-only'}]};

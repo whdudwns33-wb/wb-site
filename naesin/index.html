@@ -2179,7 +2179,9 @@
     var items = stage === 1 ? ckMatchItems(gr) : (stage === 2 ? ckMeanItems(gr) : ckOrderItems(gr));
     if (!items.length) {
       alert('이 단락의 ' + CK_STAGES[stage] + ' 문항을 만들 수 없습니다 (청크 데이터 부족). 문장 사다리로 바로 진행합니다.');
+      st.stage = CK_MAX;
       trackAdvance(st, true, CK_MAX, Date.now());
+      selPass = null; selDlg = null; selSeq = gr.sentences[0].seq;
       persist(); render();
       return;
     }
