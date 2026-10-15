@@ -1344,7 +1344,8 @@
   function renderHome() {
     if (pack.contentMode === 'questions') {
       var questionTask=todayTask();
-      layoutFull(demoNotice()+packSegHtml()+packListHtml()+(questionTask?taskCardHtml(questionTask):'')+'<div class="card"><h2>문제 학습</h2><p>배정된 '+(pack.items||[]).length+'문항을 풀고 틀린 문제를 다시 확인하세요.</p><button class="btn p big" id="startQuestions">문제 풀이 시작</button></div>');
+      layoutFull(demoNotice()+packSegHtml()+packListHtml()+(questionTask?taskCardHtml(questionTask):'')+'<div class="card"><h2>문제 학습</h2><p>배정된 '+(pack.items||[]).length+'문항을 풀고 틀린 문제를 다시 확인하세요.</p><button class="btn p big" id="startQuestions">문제 풀이 시작</button></div>'+((pack.sentences||[]).length?'<div class="card"><h2>본문 암기</h2><p>'+pack.sentences.length+'문장 · 읽고 듣기, 문장 연습, 백지 쓰기</p><button class="btn p big" id="startPassage">본문 암기 시작</button></div>':''));
+      if($('startPassage'))$('startPassage').onclick=function(){setTab('passage');};
       $('startQuestions').onclick=function(){setTab('quiz');};wireTaskCard(questionTask);wireHomeLinks();return;
     }
     var pd = packDB();
@@ -1813,7 +1814,11 @@
     var kos = (s.chunks || []).map(function (c) { return c.ko; }).filter(Boolean);
     if (!q || !Array.isArray(q.answer) || q.answer.length < 2) {
       if (WBGEN.enChunkOrder) genNote('enChunkOrder');
-      if (ens.length < 2) return null;
+      if (ens.length < 2) {
+        var tokens=(s.tokens||[]).filter(Boolean);
+        if(tokens.length<2)return null;
+        return {type:'order',seq:s.seq,shuffled:shuffleNot(tokens),answer:tokens,hintText:s.ko,hintLabel:'문장 뜻'};
+      }
       q = { shuffled: shuffleNot(ens), answer: ens, koChunks: kos };
     }
     return { type: 'order', seq: s.seq, shuffled: (q.shuffled && q.shuffled.length ? q.shuffled : shuffleNot(q.answer)),
@@ -4091,8 +4096,8 @@
     if (!checkAccount()) return;
     renderHeader();
     if (!pack) { layoutFull('<p class="muted">교재를 불러오는 중…</p>'); return; }
-    $('tabs').querySelectorAll('button').forEach(function(button){button.hidden=pack.contentMode==='questions'&&['words','passage'].indexOf(button.getAttribute('data-tab'))>=0;});
-    if (pack.contentMode==='questions' && (view==='words'||view==='passage')) view='quiz';
+    $('tabs').querySelectorAll('button').forEach(function(button){var tab=button.getAttribute('data-tab');button.hidden=pack.contentMode==='questions'&&(tab==='words'||tab==='passage'&&!pack.sentences.length);});
+    if (pack.contentMode==='questions' && (view==='words'||view==='passage'&&!pack.sentences.length)) view='quiz';
     if (view === 'home') renderHome();
     else if (view === 'words') renderWords();
     else if (view === 'passage') renderPassage();

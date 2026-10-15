@@ -547,7 +547,8 @@ export async function handleStudio(ctx) {
     const reviews=job.review||{};
     const items=(job.draft.items||[]).flatMap((row,i)=>{const review=reviews[rowKey('items',row,i)];return review&&['ok','fixed'].includes(review.state)?[reviewedRow(row,review)]:[];});
     if (!items.length) return j(400,{error:'교사가 검수 완료한 문항이 없어요.'});
-    const pack=assemble({...job,packId,meta:{...job.meta,contentMode:'questions'},draft:{items},review:{}});
+    const sentences=(job.draft.sentences||[]).flatMap((row,i)=>{const review=reviews[rowKey('sentences',row,i)];return review&&['ok','fixed'].includes(review.state)?[reviewedRow(row,review)]:[];});
+    const pack=assemble({...job,packId,meta:{...job.meta,contentMode:'questions'},draft:{items,sentences},review:{}});
     const check=CHECK.checkPack(pack);if(check.errors.length)return j(400,{error:'검수 완료 문항에도 검사 오류가 남아 있어요.',errors:check.errors});
     const previous=await store.getExam(scope),packIds=[...new Set([...(previous&&previous.packIds||[]),packId])];
     if(packIds.length>20)return j(400,{error:'반에 배정된 팩이 20개를 넘습니다. 기존 범위를 먼저 정리하세요.'});
@@ -558,7 +559,7 @@ export async function handleStudio(ctx) {
     if(assigned.status!==200)return j(assigned.status,{error:'문항은 게시했지만 반 배정에 실패했어요. 배정 상태를 확인한 뒤 다시 시도하세요.',packId});
     job.updatedAt=nextJobVersion(job);await store.putJob(job.jobId,job);
     const remainingItems=(job.draft.items||[]).filter((row,i)=>!['ok','fixed','dropped'].includes((reviews[rowKey('items',row,i)]||{}).state)).length;
-    return j(200,{ok:true,packId,scope,publishedItems:items.length,remainingItems,updatedAt});
+    return j(200,{ok:true,packId,scope,publishedItems:items.length,publishedSentences:sentences.length,remainingItems,updatedAt});
   }
   if (p === '/api/naesin/admin/job/publish' && method === 'POST') {
     const b = await body();

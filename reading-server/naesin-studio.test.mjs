@@ -102,6 +102,11 @@ await t('검수 완료 문항만 게시·반 배정 — 미검토·버림 제외
   assert.deepEqual(pack.items.map(i=>i.id),['own-1','own-4']);assert.deepEqual(pack.items[1].answer,['Corrected own answer']);
   assert.ok(!JSON.stringify(pack).includes('libraryId'));assert.equal(pack.rights.externalAiAllowed,false);
   assert.deepEqual(exams.get('cls:월수금').packIds,['own-existing',result.body.packId]);assert.equal(exams.get('cls:월수금').mode,'practice');assert.equal(exams.get('cls:월수금').examDate,'');
+  job=await s.getJob(job.jobId);
+  job.draft.sentences=clone(SAMPLE.sentences.slice(0,2));job.draft.sentences.forEach(s=>{s._pdfReview={flags:['SOURCE_NUMBER_PAIRED'],locations:[{page:1,bbox:[30,45,300,800]}]};delete s.wordIds;});
+  job.review['sentences:s1']={state:'ok'};await s.putJob(job.jobId,job);
+  const combined=await publish({});assert.equal(combined.status,200);assert.equal(combined.body.publishedSentences,1);
+  const combinedPack=(await s.getPack(result.body.packId)).pack;assert.equal(combinedPack.sentences.length,1);assert.ok(!combinedPack.sentences[0]._pdfReview);assert.equal(combinedPack.items.length,2);
   job=await s.getJob(job.jobId);const before=await s.getPack(result.body.packId);job.review['items:own-1'].patch={answer:[]};
   assert.equal((await publish({})).status,400);assert.deepEqual(await s.getPack(result.body.packId),before,'오류 문항이 기존 게시본을 덮으면 안 된다');
 });
