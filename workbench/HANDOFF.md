@@ -31,6 +31,9 @@
 
 ## 1. 시작하기 (첫 30분)
 
+> **원장 PC(Windows)에서 할 때**는 main 의 `docs/코덱스-업무인계서-2026-10-15.md` §6 을 먼저 본다 — PowerShell 로 비밀번호 넣기,
+> Python UTF-8(`py -X utf8`), 배포 PR 은 worktree 에서, 줄바꿈(autocrlf) 때문에 해시가 어긋나는 문제가 거기 있다.
+
 필요: Node 18+, Python 3.9+, (선택) Playwright. 비밀번호는 **원장에게 직접** 받는다 — 환경변수로만 쓴다.
 
 ```bash
@@ -188,6 +191,7 @@ node workbench/src/backup-encrypt.mjs bulk && git add workbench/backup/bulk-data
 | 2026-09-04 | 아티팩트 발행 거부 | 소스에 리터럴 U+FFFD | 정규식에서 `�` 이스케이프로만 쓴다 |
 | 2026-10-06 | 공개 문서에 학생 실명 12명 노출 + 2명 검사 누락 | 실명 검사 명령에 이름 목록을 직접 적음 | `check-names.mjs`가 비공개 시드에서 이름을 읽음 · **과거 커밋 기록에는 남아 있음** |
 | 2026-10-07 | 학생 공유 플래너 페이지의 글자 크기가 무시됨(v38에서 생김 · v39에서 수정) | v38 일괄 치환이 독립 HTML 문자열(`genSharePage`) 안의 px까지 `var(--fs-*)`로 바꿈 — 그 문서엔 토큰이 없다 | 공유 페이지 `<style>`에 토큰 정의 · 일괄 치환 때 독립 문서 문자열은 제외 |
+| 2026-10-15 | Windows 에서 실명 검사가 "파일 0개" 로 통과(발견만, 사고 전) | `check-names.mjs` 가 경로를 작은따옴표로 감싸 셸에 넘겼는데 cmd.exe 는 작은따옴표를 따옴표로 안 본다 | 셸 없이 인자 배열(`execFileSync`)로 · 파일 0개면 실패로 |
 
 ---
 

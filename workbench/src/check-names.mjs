@@ -8,7 +8,7 @@
 import { readFileSync, existsSync } from "fs";
 import { dirname, join } from "path";
 import { fileURLToPath } from "url";
-import { execSync } from "child_process";
+import { execFileSync } from "child_process";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, "..", "..");
@@ -19,10 +19,14 @@ const names = [...new Set((seed.students || []).map(s => (s.name || "").trim()).
 if (!names.length) { console.error("시드에 학생 이름이 없습니다"); process.exit(2); }
 
 const scope = process.argv.includes("--all") ? [] : ["workbench", "AGENTS.md"];
-const files = execSync(`git ls-files -z ${scope.map(s => `'${s}'`).join(" ")}`, { cwd: ROOT })
+/* 셸을 거치지 않고 인자 배열로 넘긴다 — 예전에는 '경로' 를 작은따옴표로 감싸 셸에 줬는데, Windows(cmd.exe)는 작은따옴표를
+   따옴표로 보지 않아 git 이 따옴표째 경로를 받고 아무 파일도 못 찾았다 → "파일 0개" 로 거짓 통과(2026-10-15 발견). */
+const files = execFileSync("git", ["ls-files", "-z", ...scope], { cwd: ROOT })
   .toString().split("\0").filter(Boolean)
   .filter(f => !/\.(enc\.json|png|jpe?g|gif|webp|pdf|ico|woff2?|zip)$/i.test(f))
   .filter(f => !/^workbench\/(index\.html|bulk\.enc\.json)$/.test(f));   // 암호문
+/* 검사할 파일이 하나도 없으면 통과가 아니다 — 경로 지정이 틀렸거나 저장소 밖에서 돌린 것이다 */
+if (!files.length) { console.error("실명 검사 ✗ — 검사할 파일이 0개입니다(경로 지정·작업 폴더 확인). 통과로 치지 않습니다"); process.exit(2); }
 let hits = 0;
 for (const f of files) {
   let txt; try { txt = readFileSync(join(ROOT, f), "utf8"); } catch { continue; }
