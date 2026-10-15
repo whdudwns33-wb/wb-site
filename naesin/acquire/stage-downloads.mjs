@@ -61,7 +61,7 @@ function compareName(name) {
   const duplicate = /\s*\(\d+\)\s*$/u;
   for (let i = 0; i < 2; i++) {
     if (!revisionRemoved && revision.test(s)) {
-      s = s.replace(revision, '').trimEnd(); revisionRemoved = true;
+      s = s.replace(revision, '').replace(/_수정$/u, '').trimEnd(); revisionRemoved = true;
     } else if (!duplicateRemoved && duplicate.test(s)) {
       s = s.replace(duplicate, '').trimEnd(); duplicateRemoved = true;
     } else break;

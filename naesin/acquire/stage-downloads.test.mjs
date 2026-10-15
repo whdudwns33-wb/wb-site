@@ -57,6 +57,8 @@ test('2015 filenames retain their original numbering under raw with all scope an
   f.input.files[0].suggestedFilename='../'+name;await assert.rejects(stageDownloads(f.input,f.options));
 });
 test('duplicate suffixes are comparison only, raw exact name preserved',()=>{
+  for(const i of [8,9])assert.equal(classifyDownload(prefix+titles[i]+'_수정_(20250522수정).pdf').filename,NAMES[i]);
+  assert.throws(()=>classifyDownload(prefix+titles[8]+'_수정.pdf'));
   for(const suffix of [' (1)','(2)']) {
     assert.equal(classifyDownload(prefix+titles[2]+suffix+'.pdf').filename,NAMES[2]);
     assert.equal(classifyDownload(prefix+titles[5]+suffix+'.pdf').filename,NAMES[5]);
