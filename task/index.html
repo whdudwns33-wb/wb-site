@@ -2308,7 +2308,8 @@ const sync = {
         const managerCacheDowngraded = responseAccessRole === 'staff' &&
           (hasSensitiveManagerCache(previousAccessRole) || nextAccessRole === 'manager');
         const scopedCacheUpgraded = responseAccessRole === 'manager' &&
-          !hasSensitiveManagerCache(previousAccessRole) && Number(state.settings.pullAt) > 0;
+          // 같은 동기화의 다음 페이지는 권한 승격이 아니다. 이전 직원 캐시만 첫 응답에서 비운다.
+          !nextAccessRole && !hasSensitiveManagerCache(previousAccessRole) && Number(state.settings.pullAt) > 0;
         const roleChangedDuringSync = !!nextAccessRole && nextAccessRole !== responseAccessRole;
         if (managerCacheDowngraded || scopedCacheUpgraded || roleChangedDuringSync) {
           resetPersonCache(auth.token);

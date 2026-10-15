@@ -270,6 +270,29 @@ test('staff cache is reloaded from zero when the server promotes it to manager',
   assert.ok(run.indexOf('scopedCacheUpgraded') < run.indexOf('applied += this.apply(d.changes)'));
 });
 
+test('manager pagination keeps the same authenticated role without repeated cache resets', () => {
+  const run = html.match(/async run\(\) \{[\s\S]*?\n  \},/)?.[0] || '';
+  const block = run.slice(run.indexOf('const managerCacheDowngraded ='),
+    run.indexOf('if (managerCacheDowngraded ||'));
+  assert.ok(block.includes('const scopedCacheUpgraded'));
+  const check = new Function('responseAccessRole', 'nextAccessRole', 'previousAccessRole', 'state',
+    'hasSensitiveManagerCache', block +
+    'return managerCacheDowngraded || scopedCacheUpgraded || roleChangedDuringSync;');
+  let pullAt = 0, nextRole = '';
+  for (let page = 0; page < 3; page++) {
+    assert.equal(check('manager', nextRole, '', { settings: { pullAt } }, () => false), false);
+    nextRole = 'manager';
+    pullAt = 100 + page;
+  }
+  // 직원 캐시의 실제 승격과 페이지 도중 권한 변경은 계속 초기화한다.
+  assert.equal(check('manager', '', 'staff', { settings: { pullAt: 100 } }, () => false), true);
+  assert.equal(check('staff', 'manager', '', { settings: { pullAt: 100 } }, () => false), true);
+  assert.equal(check('manager', 'staff', '', { settings: { pullAt: 100 } }, () => false), true);
+  assert.equal(check('staff', '', '', { settings: { pullAt: 100 } }, () => true), true);
+  assert.equal(check('manager', '', '', { settings: { pullAt: 100 } }, () => true), false);
+  assert.equal(check('staff', 'staff', 'staff', { settings: { pullAt: 100 } }, () => false), false);
+});
+
 test('reload then 401 purges every person cache, including a persisted manager cache', () => {
   const helper = html.match(/function hasSensitiveManagerCache\(previousRole\) \{[\s\S]*?\n}/)?.[0] || '';
   const detectsPersistedCache = new Function('sync', 'state',
