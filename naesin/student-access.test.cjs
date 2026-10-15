@@ -53,7 +53,7 @@ function screen() {
   });
   const exportUi = `
   globalThis.ui={boot,api,checkAccount,checkAccess,stopStudy,clearPackCache,migrateLegacy,pullAdopt,pushState,persist,save,openDemo,renderItem,storedToRunner,storedItemKey,itemRefOf,wrongRetryItems,gradeItem,normalizeStoredAnswer,recoverStateStamps,loadDB,quizTypes,renderQuiz,runTask,mockItems,
-    serverExam:value=>{examServer=value;applyServerExamAll();},effectiveExam:exam,renderHome,render,lessonLabel,
+    serverExam:value=>{examServer=value;applyServerExamAll();},effectiveExam:exam,renderHome,render,lessonLabel,enChunkOrderItem,koBlankItem,kwBlankItem,writeItem,formItems,
     ttsOptions,wireTtsBtn,wireChunkWork,wireDialogueWork,wireSentenceWork,openPack,renderHeader,demoNotice,bootError,
     projector:(scope,pj)=>{liveScope=scope;liveState={projector:pj};pjApply(pj);},
     projectile:()=>({pjPick,pjSent,pjSeen}),
@@ -76,6 +76,15 @@ function screen() {
 }
 
 (async () => {
+  await t('문제 팩의 본문을 열고 청크가 없는 원문도 어순·해석·영작 연습을 만든다',()=>{
+    const ui=screen(),s={seq:1,dayGroup:'1',en:'A toy is blue.',ko:'장난감이 파랗다.',tokens:['A','toy','is','blue.'],chunks:[],keywords:[{en:'A toy is blue.',ko:'장난감이 파랗다.'}],verbForms:[],grammarChoices:[]};
+    const p={...clone(sample),contentMode:'questions',words:[],sentences:[s]};ui.setup(account,p);ui.renderHome();
+    assert.match(ui.node('wrap').innerHTML,/본문 암기 시작/);assert.equal(typeof ui.node('startPassage').onclick,'function');
+    const order=ui.enChunkOrderItem(s);assert.equal(order.answer.join(' '),s.en);assert.equal(order.hintText,s.ko);
+    assert.ok(ui.koBlankItem(s,2).parts.some(p=>p.blank));assert.ok(ui.kwBlankItem(s,2).parts.some(p=>p.blank));
+    assert.equal(ui.writeItem(s,1).answers[0],s.en);assert.ok(ui.formItems(s).length);
+    ui.node('startPassage').onclick();assert.match(ui.node('wrap').innerHTML,/문장 1/);
+  });
   await t('문제 전용 팩은 진단 없이 시작하고 채점·오답 재풀이·저장을 유지한다',()=>{
     const ui=screen(),pack={...clone(sample),contentMode:'questions',words:[],sentences:[],items:[{...clone(sample.items[0]),id:'own-question-only'}]};
     ui.setup(account,pack);ui.renderHome();
