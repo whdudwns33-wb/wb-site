@@ -223,6 +223,7 @@ try {
       ['/api/naesin/admin/pack?id=' + pack.packId], ['/api/naesin/admin/pack', 'POST'],
       ['/api/naesin/admin/job?id=test-job'], ['/api/naesin/admin/jobs'], ['/api/naesin/admin/job', 'POST'],
       ['/api/naesin/admin/job/draft', 'POST'], ['/api/naesin/admin/live'], ['/api/naesin/admin/live/projector', 'POST'],
+      ['/api/naesin/admin/source-library'],
     ];
     for (const [p, method = 'GET'] of paths) {
       const r = await req(p, { token: adminToken, headers: outside, method, ...(method === 'POST' ? { body: {} } : {}) });

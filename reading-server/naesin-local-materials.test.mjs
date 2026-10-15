@@ -243,7 +243,7 @@ try {
       } finally { for (const key of ['02', '03']) fs.unlinkSync(path.join(packDir, aliases[key])); reset(); }
     });
     await t('외부·학생·인증 없음·공개 호스트의 CF 헤더 없음은 원본을 받을 수 없다', async () => {
-      for (const route of [reviewRoute, pdfRoute]) {
+      for (const route of [reviewRoute, pdfRoute, '/api/naesin/admin/source-library']) {
         assert.equal((await req(route, { headers: outside })).status, 403);
         assert.equal((await req(route, { headers: { host: 'academy.example' } })).status, 403);
         assert.equal((await req(route, { token: studentToken })).status, 403);
