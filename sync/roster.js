@@ -1,4 +1,5 @@
 import { studentChangeActorKey, studentChangeEventId, studentChangeEventStatement } from './student-change.js';
+import { renamedLessonTask } from './student-name-sync.js';
 import { buildLessonTask } from './lesson-create.js';
 import { bookOrderStudentIdsForAuth } from './book-order-student-scope.js';
 import { isTaskWriteCasConflict, taskWriteCasGuardStatement } from './task-write-cas.js';
@@ -1102,9 +1103,28 @@ export async function handleRoster(env, app, body, origin, auth, json) {
     const updatedAt = Date.now();
     let changed;
     try {
-      changed = await env.DB.prepare('UPDATE private_rosters SET data=?,updated_at=? WHERE app=? AND updated_at=?')
-        .bind(JSON.stringify(document), updatedAt, app, expectedUpdatedAt).run();
+      const rosterWrite = env.DB.prepare('UPDATE private_rosters SET data=?,updated_at=? WHERE app=? AND updated_at=?')
+        .bind(JSON.stringify(document), updatedAt, app, expectedUpdatedAt);
+      if (previousStudent && previousStudent.name !== nextStudent.name) {
+        const statements = [rosterWrite, await taskWriteCasGuardStatement(env, app, 'student_rename_roster',
+          nextStudent.id + ':' + expectedUpdatedAt + ':' + updatedAt, updatedAt)];
+        const lessons = await env.DB.prepare("SELECT id,owner,data,updated_at FROM tasks WHERE app=? AND json_extract(data,'$.studentId')=?")
+          .bind(app, nextStudent.id).all();
+        for (const lessonRow of lessons.results || []) {
+          const taskAt = Math.max(updatedAt, Number(lessonRow.updated_at) + 1);
+          const task = renamedLessonTask(JSON.parse(lessonRow.data), nextStudent.id,
+            previousStudent.name, nextStudent.name, taskAt);
+          if (!task) continue;
+          statements.push(env.DB.prepare('UPDATE tasks SET data=?,updated_at=?,srv_at=? WHERE app=? AND id=? AND owner=? AND updated_at=?')
+            .bind(JSON.stringify(task), taskAt, taskAt, app, lessonRow.id, lessonRow.owner, lessonRow.updated_at));
+          statements.push(await taskWriteCasGuardStatement(env, app, 'student_rename_task',
+            lessonRow.id + ':' + lessonRow.updated_at + ':' + taskAt, taskAt));
+        }
+        changed = (await env.DB.batch(statements))[0];
+      } else changed = await rosterWrite.run();
     } catch (error) {
+      if (isTaskWriteCasConflict(error)) return json({ ok: false, code: 'ROSTER_REVISION_CONFLICT',
+        error: '학생 또는 수업 정보가 변경되었습니다. 새로고침 후 다시 저장해 주세요' }, 409, origin);
       if (isActiveBookOrderConflictError(error)) {
         return json({ ok: false, code: 'ACTIVE_BOOK_ORDER_CONFLICT',
           error: '미완료 교재 주문이 있어 학생 이름이나 재원 상태를 지금 변경할 수 없습니다' }, 409, origin);

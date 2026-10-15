@@ -313,6 +313,35 @@ test('director adds an existing student and edits one record with roster CAS', a
   assert.equal(stale.body.code, 'ROSTER_REVISION_CONFLICT');
 });
 
+test('student rename updates linked lesson snapshots atomically without touching checks', async () => {
+  for (const concurrent of [false, true]) {
+    const db = new TestD1(); seedAuth(db); await replace(db);
+    seedLesson(db, 'rename-lesson', 'teacher-a', 'student-a', {
+      studentName: '가학생', title: '[수업] 가학생 (중1) — 수학', memo: '이전 메모'
+    });
+    const before = db.prepare("SELECT * FROM tasks WHERE id='rename-lesson'").first();
+    const detail = await call(db, { auth: admin, action: 'student_get', studentId: 'student-a' });
+    if (concurrent) db.beforeBatch = sql => sql.exec("UPDATE tasks SET updated_at=updated_at+1 WHERE id='rename-lesson'");
+    const result = await call(db, { auth: admin, action: 'student_update',
+      expectedUpdatedAt: detail.body.updatedAt, student: { ...detail.body.student, name: '다학생' } });
+    const after = db.prepare("SELECT * FROM tasks WHERE id='rename-lesson'").first();
+    const roster = JSON.parse(db.prepare("SELECT data FROM private_rosters WHERE app='task'").first().data);
+    if (concurrent) {
+      assert.equal(result.status, 409);
+      assert.equal(after.data, before.data);
+      assert.equal(roster.roster.students.find(s => s.id === 'student-a').name, '가학생');
+    } else {
+      assert.equal(result.status, 200);
+      const expected = JSON.parse(before.data);
+      assert.deepEqual(JSON.parse(after.data), { ...expected, studentName: '다학생',
+        title: '[수업] 다학생 (중1) — 수학', updatedAt: after.updated_at });
+      assert.equal(after.owner, before.owner);
+      assert.equal(after.srv_at, after.updated_at);
+      assert.equal(db.batchStatements.flat().some(s => /UPDATE checks|UPDATE feedback_requests/.test(s.sql)), false);
+    }
+  }
+});
+
 test('student billing mode is validated, legacy updates preserve it, and monthly clears the cycle date', async () => {
   const db = new TestD1(); seedAuth(db); await replace(db);
   let current = await call(db, { auth: admin, action: 'get' });
