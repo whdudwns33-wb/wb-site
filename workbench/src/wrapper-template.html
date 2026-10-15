@@ -8,7 +8,7 @@
 @media(prefers-color-scheme:dark){:root{--bg:#0F141B;--panel:#171E28;--ink:#E6EAF0;--ink2:#9AA5B5;--line:#263040;--accent:#3552C4;--on-accent:#FFFFFF;--danger:#F0928B;color-scheme:dark}}
 body{margin:0;min-height:100vh;display:grid;place-items:center;background:var(--bg);
  font-family:"Pretendard Variable",Pretendard,"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif;color:var(--ink)}
-.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:34px 30px;width:min(340px,88vw);text-align:center}
+.card{box-sizing:border-box;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:34px 30px;width:min(340px,88vw);text-align:center}
 .mark{width:46px;height:46px;border-radius:8px;background:var(--accent);color:var(--on-accent);display:inline-grid;place-items:center;
  font-weight:800;font-size:18px;margin-bottom:12px}
 h1{font-size:17px;margin:0 0 4px}
@@ -26,10 +26,11 @@ button:disabled{opacity:.6}
  <h1>컨설팅 워크벤치</h1>
  <p>비밀번호를 입력하세요</p>
  <form id="f">
-  <input type="password" id="pw" autocomplete="current-password" autofocus>
+  <input type="password" id="pw" aria-label="워크벤치 비밀번호" autocomplete="current-password" autofocus required>
   <label><input type="checkbox" id="rm" checked> 이 기기에서 기억하기</label>
+  <p>개인 기기에서만 선택하세요. 앱 안에서 기억을 해제할 수 있습니다.</p>
   <button id="btn">열기</button>
-  <div class="err" id="err"></div>
+  <div class="err" id="err" role="status"></div>
  </form>
 </div>
 <script>
@@ -39,33 +40,47 @@ async function derive(pw){
  const km=await crypto.subtle.importKey("raw",new TextEncoder().encode(pw),"PBKDF2",false,["deriveKey"]);
  return crypto.subtle.deriveKey({name:"PBKDF2",salt:b2a(P.s),iterations:P.it,hash:"SHA-256"},km,
   {name:"AES-GCM",length:256},true,["decrypt"]);}
-async function open_(key){
+async function unlock(key){
  const pt=await crypto.subtle.decrypt({name:"AES-GCM",iv:b2a(P.i)},key,b2a(P.c));
- const html=new TextDecoder().decode(pt);
- // 대량 데이터 지연 로딩용 — document.write 후에도 window 전역은 유지되므로 앱이 이 키로 bulk.enc.json 을 복호화한다
- try{const raw=new Uint8Array(await crypto.subtle.exportKey("raw",key));
-  window.__wbKey=btoa(String.fromCharCode(...raw));}catch(e){}
- // 파싱이 끝나기 전 document.open()은 무시되어 앱이 로그인 화면 뒤에 덧붙는다 — 반드시 로드 완료 후 교체
+ const raw=new Uint8Array(await crypto.subtle.exportKey("raw",key));
+ return {html:new TextDecoder().decode(pt),raw:btoa(String.fromCharCode(...raw))};}
+async function open_({html,raw},remember){
+ // 현재 세션의 대량 데이터 복호화 키는 기기 기억 해제 후에도 유지한다.
+ window.__wbKey=raw;
+ try{
+  if(remember===true)localStorage.setItem("wb-wb-key",raw);
+  else if(remember===false)localStorage.removeItem("wb-wb-key");
+ }catch{
+  window.__wbRememberWarning=remember?"기기 기억을 저장하지 못했습니다. 다음 접속 때 비밀번호가 필요합니다.":"기기 기억을 해제하지 못했습니다. 브라우저 저장 설정을 확인하세요.";
+ }
+ // 파싱 중 document.open()은 무시될 수 있으므로 로드 완료 후 교체한다.
  if(document.readyState==="loading")
   await new Promise(r=>document.addEventListener("DOMContentLoaded",r,{once:true}));
  document.open();document.write(html);document.close();}
-async function tryStored(){
- const raw=localStorage.getItem("wb-wb-key");if(!raw)return;
- try{const key=await crypto.subtle.importKey("raw",b2a(raw),{name:"AES-GCM"},true,["decrypt"]);
-  await open_(key);}catch(e){localStorage.removeItem("wb-wb-key");}}
-tryStored();
+const btn=document.getElementById("btn"),pw=document.getElementById("pw"),rm=document.getElementById("rm"),err=document.getElementById("err");
+let busy=true;btn.disabled=true;
 document.getElementById("f").addEventListener("submit",async ev=>{
  ev.preventDefault();
- const btn=document.getElementById("btn");btn.disabled=true;
- document.getElementById("err").textContent="";
+ if(busy)return;
+ busy=true;btn.disabled=true;err.textContent="";
+ let decoded;
  try{
-  const key=await derive(document.getElementById("pw").value);
-  if(document.getElementById("rm").checked){
-   const raw=new Uint8Array(await crypto.subtle.exportKey("raw",key));
-   localStorage.setItem("wb-wb-key",btoa(String.fromCharCode(...raw)));}
-  await open_(key);
- }catch(e){
-  document.getElementById("err").textContent="비밀번호가 올바르지 않습니다";
-  localStorage.removeItem("wb-wb-key");btn.disabled=false;}
+  decoded=await unlock(await derive(pw.value));
+ }catch{
+  err.textContent="비밀번호가 올바르지 않거나 암호화 파일을 열 수 없습니다";
+  busy=false;btn.disabled=false;return;
+ }
+ pw.value="";
+ await open_(decoded,rm.checked);
 });
+async function tryStored(){
+ let decoded,raw;
+ try{
+  raw=localStorage.getItem("wb-wb-key");
+  if(raw)decoded=await unlock(await crypto.subtle.importKey("raw",b2a(raw),{name:"AES-GCM"},true,["decrypt"]));
+ }catch{try{if(raw&&localStorage.getItem("wb-wb-key")===raw)localStorage.removeItem("wb-wb-key");}catch{}}
+ if(decoded){await open_(decoded);return;}
+ busy=false;btn.disabled=false;
+}
+tryStored();
 </script></body></html>

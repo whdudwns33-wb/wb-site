@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /* 워크벤치 빌드 — app.html 을 비밀번호로 암호화해 ../index.html 로 출력한다.
-   사용법:  WB_PASSWORD='비밀번호' node build.mjs
+   사용법: 비공개 입력으로 WB_PASSWORD 환경변수를 설정한 뒤 node build.mjs
    비밀번호는 절대 이 파일이나 저장소에 적지 않는다. */
 import { readFileSync, writeFileSync } from "fs";
 import { dirname, join } from "path";
@@ -9,10 +9,21 @@ import crypto from "crypto";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PASSWORD = process.env.WB_PASSWORD;
-const ITER = 310000;
 
 if (!PASSWORD) {
-  console.error("WB_PASSWORD 환경변수가 필요합니다.\n예: WB_PASSWORD='...' node build.mjs");
+  console.error("WB_PASSWORD 환경변수가 필요합니다. 비공개 입력창에서 설정하세요.");
+  process.exit(1);
+}
+
+// 공개 KDF 설정을 유지해야 이 기기에 기억한 키가 다음 빌드에서도 유효하다.
+let salt, ITER;
+try {
+  const config = JSON.parse(readFileSync(join(HERE, "encryption-config.json"), "utf8"));
+  salt = Buffer.from(config.salt, "base64");
+  if (config.v !== 1 || salt.length !== 16 || salt.toString("base64") !== config.salt || config.iterations !== 310000) throw Error();
+  ITER = config.iterations;
+} catch {
+  console.error("공개 암호화 설정이 없거나 잘못되었습니다 — encryption-config.json을 확인하세요. 임의 재생성하지 마세요.");
   process.exit(1);
 }
 
@@ -26,7 +37,7 @@ try {
     console.log("비공개 시드 주입됨");
   }
 } catch { console.log("비공개 시드 없음 — 빈 상태로 빌드"); }
-// 빌드 태그 — index 와 bulk 가 같은 빌드인지 앱이 대조한다 (키가 빌드마다 바뀌므로 짝이 어긋나면 복호화 불가)
+// 빌드 태그 — 같은 키로 복호화되더라도 index 와 bulk 는 같은 빌드끼리만 사용한다.
 const TAG = crypto.randomBytes(4).toString("hex");
 {
   const tm = 'const BUILD_TAG="dev"; /*BUILD:TAG*/';
@@ -35,7 +46,7 @@ const TAG = crypto.randomBytes(4).toString("hex");
 }
 // 대량 데이터(입결·학교)는 앱에 넣지 않는다 — 지연 로딩용 bulk.enc.json 으로 별도 암호화 (아래)
 const html = Buffer.from(htmlStr, "utf8");
-const salt = crypto.randomBytes(16), iv = crypto.randomBytes(12);
+const iv = crypto.randomBytes(12);
 const key = crypto.pbkdf2Sync(PASSWORD, salt, ITER, 32, "sha256");
 const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
 // WebCrypto 는 인증 태그가 암호문 뒤에 붙어 있기를 기대한다
@@ -89,4 +100,4 @@ const sha = f => { try { return crypto.createHash("sha256").update(readFileSync(
 console.log(`빌드 태그 ${TAG}`);
 console.log(`sha256 index.html    ${sha("index.html")}`);
 console.log(`sha256 bulk.enc.json ${sha("bulk.enc.json")}`);
-console.log("⚠ 배포 시 index.html 과 bulk.enc.json 을 반드시 함께 main 에 올릴 것 — 하나만 올리면 전 기기에서 대량 데이터 로드가 실패한다.");
+console.log("⚠ 배포 승인 후 index.html 과 bulk.enc.json 두 파일을 같은 PR로 반영할 것 — 하나만 반영하면 대량 데이터 로드가 실패한다.");

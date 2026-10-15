@@ -7,6 +7,7 @@
 |---|---|
 | `app.html` | **앱 원본 (공개, 개인정보 0).** 기능 수정은 전부 이 파일에서 (단일 HTML, 의존성 없음) |
 | `wrapper-template.html` | 비밀번호 입력 화면 + WebCrypto 복호화 로직 |
+| `encryption-config.json` | 앱 빌드의 공개 KDF 설정(v1·salt·PBKDF2 반복 횟수). 비밀번호·복호화 키는 포함하지 않음 |
 | `check-password.mjs` | **빌드 전 필수** — 백업을 실제로 복호화해 비밀번호가 맞는지 확인 |
 | `check-names.mjs` | 공개 파일 실명 검사 — 이름은 비공개 시드에서 읽는다 |
 | `backup-encrypt.mjs` | 평문 → `../backup/*.enc.json` 재암호화 (틀린 비밀번호 거부 + 되읽기 대조) |
@@ -19,32 +20,34 @@
 ## 새 기기에서 시작 (한 번만)
 
 ```bash
-git clone https://github.com/whdudwns33-wb/wb-site && cd wb-site
-git checkout claude/agent-performance-optimization-rj8ql6   # 워크벤치 소스는 이 브랜치
-# workbench/backup/README.md 의 복원 명령 2개 실행 (비밀번호 필요)
+git clone --branch claude/agent-performance-optimization-rj8ql6 https://github.com/whdudwns33-wb/wb-site wb-site-workbench
+cd wb-site-workbench
+node workbench/src/check-password.mjs
+# 통과 후 workbench/backup/README.md 의 복원 명령 2개 실행 (기존 WB_PASSWORD 사용)
 ```
 
 ## 수정 → 빌드 → 배포
 
+모든 명령은 이미 준비된 `WB_PASSWORD` 환경변수를 사용한다. 비어 있으면 중단하고 알린다.
+비밀번호를 채팅으로 묻거나 명령 문자열·파일·로그·화면에 쓰지 않는다.
+
 ```bash
-# 1) workbench/src/app.html 수정
-# 2) 빌드 (비밀번호는 원장에게 확인, 저장소·코드에 절대 적지 않는다)
-WB_PASSWORD='<비밀번호>' node workbench/src/check-password.mjs  # 먼저 이게 ✓ 여야 한다
-WB_PASSWORD='<비밀번호>' node workbench/src/build.mjs   # "복호화 검증: 일치 ✓" 확인
-# ⚠ build.mjs 의 "일치 ✓" 는 비밀번호가 틀려도 뜬다 — 진짜 검증은 check-password.mjs 뿐이다.
-# 3) 실명 검사 (공개 파일에 학생 실명 0건이어야 함 — 통과 못 하면 커밋 금지)
+# 1) 비밀번호 확인 후 workbench/src/app.html 또는 데이터 수정
+node workbench/src/check-password.mjs  # 먼저 "비밀번호 확인 ✓" 여야 한다
+# 2) 실명 검사 (공개 파일에 학생 실명 0건이어야 함 — 통과 못 하면 커밋 금지)
 node workbench/src/check-names.mjs   # → "실명 검사 ✓ — 0건" (이름은 비공개 시드에서 읽음)
-# 4) 소스 커밋: 작업 브랜치에 app.html + index.html
-git add workbench/src/app.html workbench/index.html workbench/bulk.enc.json && git commit && git push origin claude/agent-performance-optimization-rj8ql6
-# 5) 배포: main에는 index.html + bulk.enc.json 두 파일만, 반드시 함께 (Pages가 main을 서비스)
-git worktree add /tmp/wt-main origin/main && cd /tmp/wt-main \
-  && git checkout -b deploy-$(date +%s) origin/main \
-  && cp <저장소>/workbench/index.html <저장소>/workbench/bulk.enc.json workbench/ \
-  && git add workbench/index.html workbench/bulk.enc.json && git commit -m "workbench: ... 배포" && git push origin HEAD:main
-# 6) 라이브 확인: 배포 후 1~2분 뒤 — 반드시 두 파일 모두 대조 (하나만 배포되면 전 기기 데이터 로드 실패)
-curl -sS https://whdudwns33-wb.github.io/wb-site/workbench/ | sha256sum                # = 로컬 index.html
-curl -sS https://whdudwns33-wb.github.io/wb-site/workbench/bulk.enc.json | sha256sum  # = 로컬 bulk.enc.json
+# 3) 평문 데이터를 바꿨다면 아래 백업 절차의 재암호화·커밋·푸시를 먼저 완료
+# 4) 빌드 후 로컬 화면 확인 (아직 배포하지 않음)
+node workbench/src/build.mjs   # "복호화 검증: 일치 ✓" 확인
+# ⚠ build.mjs 의 "일치 ✓" 는 비밀번호가 틀려도 뜬다 — 진짜 검증은 check-password.mjs 뿐이다.
 ```
+
+원장이 명시적으로 **"배포해"라고 한 뒤에만** 다음을 진행한다:
+
+1. 작업 브랜치에 변경 소스와 `workbench/index.html`·`workbench/bulk.enc.json`을 커밋·푸시한다.
+2. 최신 `origin/main`을 가져와 별도 배포 브랜치(worktree 사용 권장)를 만든다. 빌드 산출물 **두 파일만** 복사하고 PR의 변경 파일도 두 개뿐인지 확인한다.
+3. PR을 열어 checks가 모두 통과하면 스쿼시 병합한다. **main에 직접 푸시하지 않는다.** 병합 권한이 없으면 PR 주소만 보고한다.
+4. 병합 1~2분 뒤 라이브 `index.html`과 `bulk.enc.json?v=<빌드 태그>`의 SHA-256을 로컬 두 파일과 대조한다. 둘 다 일치해야 배포 완료다.
 
 ## 원장 백업 자동 반영 (Drive → 시드 → 재배포)
 
@@ -52,17 +55,23 @@ curl -sS https://whdudwns33-wb.github.io/wb-site/workbench/bulk.enc.json | sha25
 폴더에 올리면, 매일 아침 루틴이 새 파일을 감지해 반영한다. 수동으로 할 때:
 
 ```bash
+node workbench/src/check-password.mjs
 node workbench/src/seed-from-backup.mjs <백업파일.json>   # private-seed.json 전체 갱신 (학생 전체 상태 + 수동 DB extras)
-WB_PASSWORD='...' node workbench/src/build.mjs             # 재빌드
-# 이후 위 4)~6) 배포 절차 + backup/private-seed.enc.json 재암호화(backup/README) + backup/last-drive-import.json 갱신
+node workbench/src/check-names.mjs
+node workbench/src/backup-encrypt.mjs seed
+git add workbench/backup/private-seed.enc.json
+git commit -m "workbench: 학생 시드 백업 갱신"
+git push origin claude/agent-performance-optimization-rj8ql6
+node workbench/src/build.mjs   # 백업 푸시 후 재빌드
+# 화면 확인 → "배포해" 승인 → 위 두 파일 PR 절차 → backup/last-drive-import.json 갱신
 ```
 
 시드는 새 기기(또는 로그아웃 상태 기기)에 전체 상태를 채워 주고, 이미 쓰던 기기에는 신규 학생·신규
 DB 항목만 추가된다(로컬 입력 보호). 이미 쓰던 기기를 백업 시점으로 완전히 맞추려면 앱의
 "가져오기 → 전체 복원"으로 백업 파일을 직접 읽힌다.
 
-`private-seed.json`·`bulk-data.json`을 수정했다면 **배포보다 먼저** 재암호화해 커밋한다:
-`WB_PASSWORD='...' node workbench/src/backup-encrypt.mjs` → `git add workbench/backup/*.enc.json`.
+`private-seed.json`·`bulk-data.json`을 수정했다면 **재빌드보다 먼저** `node workbench/src/backup-encrypt.mjs`를
+변경 대상에 맞춰 `seed`·`bulk`·`all`로 실행하고, 해당 `workbench/backup/*.enc.json`을 작업 브랜치에 커밋·푸시한다.
 평문은 gitignored라 기기·컨테이너가 초기화되면 사라진다 (2026-09-16 실제 소실).
 
 ## 설계 원칙
@@ -70,7 +79,7 @@ DB 항목만 추가된다(로컬 입력 보호). 이미 쓰던 기기를 백업 
 - **단일 HTML.** 프레임워크·외부 CDN 없음 (CSP·오프라인 안정성).
 - **공개 소스에 개인정보 0.** 학생 데이터는 빌드 때 주입되어 암호문으로만 나간다.
   런타임 데이터 정본은 사용자 브라우저 `localStorage`(키 `wb-consulting-v1`).
-- **비밀번호는 코드에 없다.** 빌드 시 환경변수로만. 비밀번호 변경 = 재빌드+재배포+백업 재암호화.
+- **비밀번호는 코드에 없다.** 이미 준비된 `WB_PASSWORD` 환경변수로만 사용하며 값을 문서·명령 문자열에 넣지 않는다.
 - 외부 서비스(Perplexity·Gamma·진학사·어디가)는 앱이 직접 호출하지 않는다 — 앱은 프롬프트를 조립만 한다.
 - 입결 대량 데이터는 약관상 평문 재배포 금지 — 암호문 밖으로 꺼내지 않는다.
 
@@ -81,3 +90,97 @@ DB 항목만 추가된다(로컬 입력 보호). 이미 쓰던 기기를 백업 
 - 수시 지원 현황(전체 보드): 고3 대학별고사·발표 일정, 학생별 지원 장수·수능최저·결과
 - 학생별 9탭: 프로파일(성적기록·성장 궤적) · 수시 지원(고3 또는 지원 기록 있을 때) · 학업 관리 · 생기부 · 수행평가 · 탐구보고서 · 상담 관리 · 진학사 통 · 월간 계획
 - 데이터 계층: `SEED_PRIV`(학생 시드) / `BULK`(입결·고교 대량) / `ipGroups()`(대학|학과|전형 그룹 캐시, `save()`가 무효화)
+
+## 수시 상담 로컬 구현 (2026-10-15 · 미배포)
+
+`수시 상담·가능권 분석`은 학생 선택 → 모집학년도·내신 체계/평균·성적 근거 입력 → 조건별 후보와 제외 사유 → 지원안 저장으로 이어진다.
+기존 6장 카드·일정·최저·상담 기록 복사를 재사용한다. 전형·학년도가 다른 지원안은 별도 카드이며, 동일 카드를 다시 추가해도 원장 입력을 덮어쓰지 않는다.
+
+| 저장 위치 | 내용·보존 기준 |
+|---|---|
+| `student.consult.susi` / `susiDecisions` | 상담 입력, 학년도·대학·학과·전형별 검토/제외 사유. 병합 가져오기는 현재 입력 우선 |
+| `student.apply[]` | `admissionYear`, `evidence`, `consultation` 추가. 기존 학년도 없는 카드는 별도 선택으로 유지 |
+| `db.adiga[]` | 기존 메모에 학년도·출처·확인일·원문과 전형 조건 추가. 이전 필드와 작성일 보존 |
+
+입결의 5/9등급 체계는 자료 자체 또는 같은 학과·전형·결과학년도의 명시적 근거로만 확인한다. 미확인/불일치/범위 오류는 수치 비교하지 않는다.
+교과의 등급 차이도 대학별 환산이나 합격 판정이 아니다. 종합·논술·실기 평가는 등급 차이로 판정하지 않으며, 지원자격·최저는 원장이 별도로 확인한다.
+외부 데이터 자동 수집·재게시를 추가하지 않았다. 수시와 정시를 묶는 통합 상담 보고서는 아래 로컬 구현 절을 따른다.
+
+합성 브라우저에서는 학생/학년도 분리·지원 저장/중복·제외/해제·노트 편집·URL 검증·재접속과 390/1280px 문서 넘침을 확인했다. 실제 화면 확인은 원장이 한다.
+
+## 정시 상담 로컬 구현 (2026-10-15 · 미배포)
+
+`정시 상담`은 별도 실제 시험 입력 → 대학 반영 근거 확인 → 후보 비교·저장 → 가나다군 지원안·변경 이력으로 이어진다.
+학평·모평·수능, 가채점/확정 성적을 구분하고 각 과목의 원점수·표준점수·백분위·등급을 입력한다. 내신이나 다른 지표로 과목 점수를 추정하지 않는다.
+
+| 저장 위치 | 내용·보존 기준 |
+|---|---|
+| `student.consult.jeongsi` | 선택한 `admissionYear`·`examId`, 별도 `exams[]`·`plans[]`·`history[]`. 기존 수시 입력과 분리 |
+| `plans[]` | 대학·학과·전형·학년도·시험·모집군별 후보/지원안/제외. `examSnapshot`·`ruleSnapshot`·`resultSnapshot`과 판단 사유 보존 |
+| `history[]` | 시험 저장/수정·지원안 지정/전환/제외·명시 재계산의 `before`/`after`를 독립 복사. 이후 편집으로 과거 기록을 바꾸지 않음 |
+| `db.adiga[].regular` | 모집군, 확인한 반영방법·지표·비율·탐구 방식·영어/한국사 등급별 가감점·미지원 조건. 기존 노트 필드 보존, 수시 자동 근거에서는 제외 |
+
+계산은 **백분위 또는 표준점수 한 지표의 국어·수학·탐구 단순 가중합**, 탐구 상위 1과목/2과목 평균, 영어·한국사 등급별 가감점만 지원한다.
+결과는 입력 반영식의 상담용 참고점수이며 대학 공식 환산점수·합격 판정이 아니다. 선택과목 가산점·변환표준점수·대학별 반올림 등 미지원 조건,
+반영방법/필수 성적/출처·원문·확인일이 미확인이면 계산을 보류하고 사유를 표시한다. 계산 보류 상태도 후보로 저장할 수 있다.
+
+같은 학년도·시험·군에는 지원안 하나만 두며, 변경 시 기존 지원안을 후보로 돌린 이력을 남긴다. 다른 시험의 지원안을 한 조합으로 섞지 않는다.
+시험·반영 근거 수정은 저장 당시 스냅샷을 보존한다. 변경된 근거로 지원안을 지정하려면 사유를 적어 명시적으로 재계산해야 하며, 기존 지원안은 후보로 돌아간다.
+지원 기록이 연결된 시험의 모집학년도는 수정할 수 없고 새 시험으로 등록한다. 백업 내보내기·전체 복원은 정시 상태를 포함하며,
+병합 가져오기는 현재 설정·같은 ID 기록을 우선하고 새 ID 기록을 더한다. 같은 시험·군의 중복 지원안은 기존 것을 유지하고 가져온 쪽의 후보 전환 이력을 남긴다.
+
+정시 기능 단계에서는 합성 자동 검증 **61개(7파일)**, 통합 보고서 구현 단계에서는 **92개(10파일)**를 통과했다. 전체 상담 흐름 재점검은 **109개(11파일)**, 기기 기억 개선 후에는 **117개(12파일)**를 통과했다. 실행 명령은 다음과 같다.
+
+```bash
+node --test workbench/src/achievement.test.mjs workbench/src/adiga.test.mjs workbench/src/susi.test.mjs workbench/src/check-names.test.mjs workbench/src/jeongsi-core.test.mjs workbench/src/jeongsi-store.test.mjs workbench/src/jeongsi-ui.test.mjs workbench/src/report-core.test.mjs workbench/src/report-store.test.mjs workbench/src/report-ui.test.mjs workbench/src/persistence.test.mjs workbench/src/remember.test.mjs
+```
+
+합성 브라우저의 정시 주요 흐름도 통과했고 추가 모집군·빈 선택·손상 기록 확인도 통과했다. 실제 학생 데이터와 스크린샷은 사용하지 않았다.
+정시까지 포함한 이전 로컬 빌드 태그는 `e379335f`다. 당시 비밀번호·비공개 백업 일치·실명 0건·복호화 검증과 로컬 두 파일 해시 대조를 통과했다. 수시 빌드 `b7aa839c`도 이전 기록으로 유지한다. 통합 보고서를 포함한 최신 빌드 검증은 아래 절에 기록한다. 원장 화면 확인은 대기 중이며, 라이브는 v39 그대로다.
+원장 화면 확인과 별도 “배포해” 이후의 두 파일 PR 절차는 위 배포 규칙을 따른다.
+
+## 통합 상담 보고서 로컬 구현 (2026-10-15 · 로컬 빌드 완료·미배포)
+
+학생·모집학년도와 선택 시험을 정해 수시/정시 기록을 수집하고, 원장 결론·다음 할 일을 적어 미리보기 후 저장한다.
+선택한 학년도의 수시 카드와 검토/제외 사유를 포함하며 학년도 없는 기존 카드는 별도로 둔다. 정시는 선택 시험의 지원안과 같은 학년도의 다른 시험 지원안을 나눠 표시한다.
+다른 학년도 자료는 이번 내용에 섞지 않고 제외 건수만 알린다. 시험 미선택은 수시 중심 보고서이며 정시 점수를 임의로 가져오지 않는다.
+
+| 저장·검증 항목 | 계약 |
+|---|---|
+| `student.consult.reports[]` | 보고서 제목·결론·다음 할 일과 당시 수집 자료를 독립 사본으로 추가한다. 재저장도 새 버전이며 과거 보고서를 수정하지 않는다. |
+| `rptCollect` | 원자료를 변경하지 않는 순수 수집. 원장 판단·기존 내신·시험/근거/점수 사본을 보존하고 새 합격 판정·정시 재계산을 하지 않는다. |
+| 출처·최저 | 학년도·출처·확인일·원문 주소의 누락/오류는 미확인. 수시 최저는 별도 `mockRef`와 대조하며 선택한 실제 정시 시험과 동일한 기준으로 취급하지 않는다. 원장 확인 상태 없는 기존 최저는 미확인이다. |
+| 변경 검사 | 저장 당시 근거와 현재 시험·노트의 차이를 표시한다. 미리보기 이후에는 `sourceState`까지 포함한 현재 자료를 다시 수집해 비교하므로 이미 변경 표시가 있던 근거의 재변경도 저장 전에 잡는다. `sourceState`는 본문·복사에 표시하지 않는다. |
+| 저장 실패 | 브라우저 저장이 실패하면 추가한 보고서를 메모리에서도 되돌리고 성공으로 표시하지 않는다. 원자료와 기존 보고서를 유지한다. |
+| 백업·가져오기 | 내보내기·전체 복원에 보고서를 포함한다. 병합 시 같은 ID·다른 내용의 충돌도 한쪽을 덮어쓰지 않고 양쪽 기록을 보존한다. |
+
+데이터 수집·저장·UI 합성 회귀와 합성 DOM 검증을 통과했다. 학생·학년도·시험 분리, 저장·재로드, 합성 백업을 실제 가져오기 경로로 병합한 충돌 보존을 확인했다.
+390/1280px 라이트·다크에서 가로 넘침과 실행 오류는 0건이었다. 실제 개인정보·비공개 JSON과 스크린샷은 테스트에 사용하지 않았다.
+**통합 보고서 구현 단계의 이전 로컬 빌드 태그는 `0e8aea68`**다. 당시 비밀번호 확인·비공개 백업 바이트 일치·실명 0건·앱/대량 데이터 복호화·소스 SHA-256 일치와 로컬 HTTP 두 파일 해시 대조를 통과했다. 비공개 원본과 `src` 경로는 404였다.
+SHA-256: index `52bac7976a3a9f33cba68bf397153a4adc81ff93885b6eb17aae277530d95081`, bulk `b76daef971ec70f9815e4685f974f2663ab64236162ab92bfdbb416c375e5380`.
+**원장 실제 화면 확인은 대기 중**이다. 기존 빌드 기록과 최신 빌드 검증을 구분하며, 배포는 아직 하지 않았다. 라이브는 v39다.
+
+## 전체 상담 흐름 점검 후속 (2026-10-15 · 로컬 빌드 완료·미배포)
+
+- 수시: 저장·가져온 내신도 범위·숫자 형식을 검사해 오류/NaN 비교와 지원안 추가를 막는다. 가나다군 전형은 수시 후보에서 제외한다. 기존 최저의 확인 상태가 없으면 원본을 바꾸지 않고 미확인으로 표시하며, 기준등급은 1~9 정수만 사용한다. 잘못된 입력을 임의 반올림하거나 범위 안으로 보정하지 않는다.
+- 초안: 수시 조건은 학생별로 보관하고 후보 비교는 저장된 조건만 사용한다. 정시 시험·반영방법도 입력 초안을 유지한다. 화면 갱신이나 저장 실패 후 입력을 잃지 않고 다시 시도할 수 있다.
+- 저장·백업: `save(next=db)`는 브라우저에 실제 저장한 뒤 확정하며, 실패 시 마지막 저장 상태로 되돌린다. 노트 편집 재시도도 지원한다. 병합 가져오기는 원본 사본에 적용한 뒤 저장하고, 전체 복원은 자료 구조를 먼저 검증한다. 저장 공간 부족으로 앱 저장이 실패해도 JSON 백업 내보내기는 가능하다.
+- 데이터: `allIpRows()`에서 백분위 0을 빈값으로 바꾸지 않는다. 기존 지원안·변경 이력·과거 보고서를 보존한다.
+
+**109개 자동 테스트(11파일)**와 합성 DOM의 빈 학생 성적 입력 → 수시 → 정시 → 통합 보고서 연속 흐름, 공통 저장 실패·재시도, 다른 학생·과거 보고서 보존, 모바일 라이트·다크 점검을 통과했다. 실제 개인정보와 스크린샷은 사용하지 않았다.
+**전체 상담 흐름 점검 단계의 이전 로컬 빌드 태그는 `0706f59b`**다. 비밀번호 확인·비공개 백업 바이트 일치·실명 0건·앱/대량 데이터 복호화·소스 SHA-256 일치와 로컬 HTTP 두 파일 해시 대조를 통과했다. 비공개 원본과 `src` 경로는 404다.
+SHA-256: index `45d79cd2638e48c6cf7ffaa1d6ff2ab00a94d2e5ee8de63928bdb91fa6ef5d17`, bulk `404bc8c8372466f71c0d7139ff8335b4601b52f453e5dee80dc08f0ac188d7b3`.
+`0e8aea68`은 이전 보고서 빌드로 유지한다. 원장 실제 화면 확인은 대기 중이고 배포하지 않았다. 라이브는 v39다.
+
+## 기기 기억 유지 후속 (2026-10-15 · 로컬 빌드 완료·미배포)
+
+앱 빌드는 `encryption-config.json`의 공개 salt와 PBKDF2-SHA256 310,000회 설정을 유지한다. 최초 설정은 로컬 빌드 `0706f59b`의 salt를 사용한다. 같은 비밀번호·설정이면 재빌드 후에도 같은 복호화 키를 사용한다. 앱과 bulk의 AES-256-GCM IV는 암호화할 때마다 각각 새 무작위 12바이트(96비트)로 생성한다. 두 파일의 빌드 태그 대조·동시 배포·SHA-256 대조는 계속 필수다. 백업 암호화의 무작위 salt·IV는 이 설정과 별개다.
+
+‘이 기기에서 기억하기’는 복호화 성공 후 키만 `wb-wb-key`에 보관하며 비밀번호 문자열은 저장하지 않는다. 키 저장 실패는 비밀번호 오류와 구분한다. 기억은 해당 개인 기기의 브라우저·접속 주소(origin)별로 적용되며, 키도 복호화 권한이므로 기밀로 취급한다. 사이드바 ‘이 기기 기억 해제’는 `wb-wb-key`만 삭제하고 현재 열린 세션은 유지한다. 상담 기록 `wb-consulting-v1`은 삭제하지 않는다.
+
+다른 salt를 사용한 구버전(현재 라이브 v39 포함)은 처음 한 번 다시 입력해야 한다. 비밀번호나 KDF 설정이 바뀌거나 기억을 해제하면 다음 접속 때도 재입력한다. 자동 테스트 **117개(12파일)**와 합성 브라우저에서 새 빌드 자동 열기·bulk 복호화, 비밀번호 변경, 기억 취소/해제, 저장 차단·공간 부족, 교차 탭 키 보존, 상담 기록·보고서 보존을 검증했다. 로그인 화면은 320/390/1280px 라이트·다크에서 가로 넘침이 없다.
+
+새 로컬 빌드 태그는 **`3905d3b9`**다. 비밀번호 확인·기존 비공개 백업 일치·실명 0건·앱/bulk 복호화·이전 로컬 기억 키 호환을 확인했다. 빌드 입력 4파일 해시와 로컬 HTTP 두 파일 해시가 일치하며 비공개 원본·소스 경로는 404다. 원장 실제 화면 확인은 대기이며 커밋·푸시·배포하지 않았다.
+SHA-256: index `725864cb9eb66634f9b78d7168c34b6ac9d86174d1de753349fd8d939444689a`, bulk `cd83762a5d4e9c993362707929d3e080f3406f05ae3f20df768012e8af1b2ee1`.
+
+저장 공간이 부족한 첫 접속에서는 비밀번호 확인 후 원본 보존·저장 권한 안내를 표시하고 시작을 중단한다. 비밀번호나 공개 salt를 변경하고 두 파일을 다시 빌드하면 이전 기억 키는 새 빌드에 사용할 수 없다. 기기에서 기억을 해제하는 동작은 해당 브라우저에만 적용된다.

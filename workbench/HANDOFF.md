@@ -15,8 +15,46 @@
 - `index.html` sha256 `c4cb32c389a98f6d…` · `bulk.enc.json` sha256 `b395f34892025adc…` · 빌드 태그 `56c35f7b`
 - 학생 14명 · 입결 46,656행(어디가 5개년) · 학교 3,951곳 · 학교 성취도 내장 74개교(광주 중학교)
 
+**로컬 준비 상태(2026-10-15)** — v40 539개교·36,507행 검증 및 빌드 완료, 태그 `c8ae2fd1`.
+고실중학교 기존 90행 일치·공개 파일 실명 검사 0건·앱/대량 데이터 복호화 일치를 확인했다.
+암호화 백업만 작업 브랜치에 커밋·푸시했다(`658fd3f`). 화면 확인과 별도 “배포해” 지시는 아직 대기 중이며, 라이브 상태 표기는 배포 후 갱신한다.
+
+**수시 상담 후속(2026-10-15 · 로컬 작업)** — 학생별 모집학년도·5/9등급 입력 → 후보/제외 사유 → 전형별 지원 카드 → 상담 근거 요약을 구현했다.
+기존 어디가 노트에 모집·결과학년도, 출처·확인일·원문 링크, 모집인원·자격·평가·최저를 추가하고 편집·기존 필드 보존을 지원한다.
+노트의 대학·학과·전형·모집학년도가 모두 일치해야 후보의 전형 근거로 사용한다. 미확인 값과 다른 등급 체계는 비교 보류하며, 자격·최저는 원장 확인 전 미확인이다.
+당시 합성 자동 테스트 24개, 학교 변환 회귀 4개와 합성 브라우저 저장·재접속 검증을 통과했다. 수시 기능 포함 로컬 빌드 태그는 `b7aa839c`다.
+비밀번호·백업 일치·실명 0건·앱/대량 데이터 복호화 검증을 통과했고, 로컬 서버가 제공하는 두 파일의 SHA-256도 빌드와 일치했다. 원장 화면 확인은 대기 중이다.
+`/consult/`는 수정하지 않았고 배포하지 않았다.
+
+**정시 상담 후속(2026-10-15 · 로컬 빌드)** — 학평·모평·수능의 실제 성적을 별도 시험으로 입력하고, 가채점/확정·원점수/표준점수/백분위/등급을 구분한다. 과목 점수를 추정하지 않는다.
+대학 노트의 `regular`에 확인한 반영방법을 기록한다. 한 지표의 단순 가중합, 탐구 상위 1과목/2과목 평균, 영어·한국사 등급별 가감점만 지원하며 공식 대학 환산점수가 아니다. 미지원 조건·필수 자료 미확인은 계산을 보류한다.
+학생별 `consult.jeongsi`의 `exams`·`plans`·`history`에 시험, 가나다군 후보/지원안, 변경 전후 복사본을 보존한다. 시험·근거가 바뀌면 명시적 재계산 후 지원안을 다시 확인하며, 정시 `regular` 노트는 수시 자동 근거에서 제외한다. 백업·복원·병합은 기존 수시와 정시 기록을 보존한다.
+당시 합성 자동 테스트 **61개(7파일)**와 합성 브라우저 주요 흐름을 통과했다. 추가 모집군·빈 선택·손상 기록 화면 검증도 통과했다. 실행 명령과 저장 계약은 `src/README.md`를 따른다.
+**정시까지 포함한 이전 로컬 빌드 태그는 `e379335f`**다. 당시 비밀번호·백업 일치·실명 0건·앱/대량 데이터 복호화와 소스 일치, 로컬 두 파일 SHA-256 일치를 확인했다. `b7aa839c`는 이전 수시 빌드 기록이며, 두 태그의 검증을 아래 통합 보고서 빌드 검증으로 대신하지 않는다.
+
+**통합 상담 보고서(2026-10-15 · 로컬 빌드)** — 학생·모집학년도·선택 시험을 기준으로 수시 카드·검토/제외 사유, 정시 지원안·저장 당시 시험/점수/근거, 미확인 사항을 묶고 원장 결론·다음 할 일을 기록한다. 학년도 없는 수시 카드와 같은 학년도의 다른 시험 정시안은 별도로 표시하고 다른 학년도 기록은 건수만 알린다. 시험을 선택하지 않으면 수시 중심 보고서를 만든다.
+`student.consult.reports[]`에 보고서 사본을 새 항목으로 추가하며 원자료·과거 보고서를 덮어쓰지 않는다. 근거 변경 여부와 비교용 `sourceState`를 재수집해 미리보기 이후 변경을 감지하고, 변경됐으면 다시 확인하기 전 저장하지 않는다. 가져오기 충돌은 양쪽 보고서를 보존하고, 브라우저 저장 실패 시 메모리의 추가분도 되돌린다.
+수시 최저는 별도 `mockRef` 기준이며 선택 정시 시험과 섞지 않는다. 최저 확인 상태가 없는 기존 기록은 미확인으로 표시한다. 출처·학년도·확인일·원문 주소 미확인은 그대로 알리고 새 합격 판정·정시 점수 재계산은 하지 않는다.
+당시 합성 자동 테스트 **92개(10파일)**와 합성 DOM의 학생·학년도·시험 분리, 저장·재로드, 실제 가져오기 경로의 충돌 보존을 통과했다. 390/1280px 라이트·다크에서 가로 넘침과 실행 오류는 0건이었다.
+**통합 보고서 구현 단계의 이전 로컬 빌드 태그는 `0e8aea68`**다. 당시 비밀번호 확인·비공개 백업 바이트 일치·실명 0건·앱/대량 데이터 복호화·소스 SHA-256 일치와 로컬 HTTP 두 파일 해시 대조를 통과했다. 비공개 원본과 `src` 경로는 404였다.
+SHA-256: index `52bac7976a3a9f33cba68bf397153a4adc81ff93885b6eb17aae277530d95081`, bulk `b76daef971ec70f9815e4685f974f2663ab64236162ab92bfdbb416c375e5380`.
+
+**전체 상담 흐름 점검 후속(2026-10-15 · 로컬 빌드 완료)** — 성적 입력 → 수시·정시 후보 비교 → 지원안 → 통합 보고서를 다시 점검했다.
+저장·가져온 수시 내신의 범위 오류/NaN 비교와 가나다군 전형의 수시 혼입을 막았다. 확인 상태 없는 기존 최저는 원본을 유지하며 미확인으로 표시하고, 잘못된 등급으로 최저를 판정하거나 입력값을 임의 반올림·보정하지 않는다. 수시 학생별 조건과 정시 입력 초안은 화면 갱신·저장 실패에도 유지한다.
+공통 저장은 실제 브라우저 저장 성공 후에만 확정하며, 실패하면 마지막 저장 상태로 돌아간다. 노트 편집은 실패 후 재시도할 수 있다. 가져오기는 사본에 병합한 뒤 저장하고 전체 복원은 자료 구조를 먼저 검증한다. 저장 공간 부족 중에도 JSON 백업을 내보낼 수 있고, 입결 백분위 0도 보존한다.
+최종 합성 자동 테스트 **109개(11파일)** 및 합성 DOM의 빈 학생 연속 입력부터 수시·정시·보고서 저장, 저장 실패·재시도, 다른 학생·과거 보고서 보존, 모바일 라이트·다크 점검을 통과했다. 실행 명령은 `src/README.md`에 있다.
+**전체 상담 흐름 점검 단계의 이전 로컬 빌드 태그는 `0706f59b`**다. 비밀번호 확인·비공개 백업 바이트 일치·실명 0건·앱/대량 데이터 복호화·소스 SHA-256 일치와 로컬 HTTP 두 파일 해시 대조를 통과했다. 비공개 원본과 `src` 경로는 404다. 이전 `0e8aea68`의 기록과 구분한다.
+SHA-256: index `45d79cd2638e48c6cf7ffaa1d6ff2ab00a94d2e5ee8de63928bdb91fa6ef5d17`, bulk `404bc8c8372466f71c0d7139ff8335b4601b52f453e5dee80dc08f0ac188d7b3`.
+**원장 실제 화면 확인은 대기**다. 배포하지 않았고 라이브는 계속 v39다.
+
+**기기 기억 유지 후속(2026-10-15 · 로컬 빌드 완료)** — 공개 KDF 설정 `src/encryption-config.json`에 로컬 `0706f59b`의 salt와 반복 횟수를 유지한다. 같은 비밀번호·설정이면 다음 빌드에서도 기억 키를 사용하며, 앱·bulk IV는 매 암호화마다 새로 생성한다. 다른 salt의 구버전이나 비밀번호·설정 변경 후에는 한 번 다시 입력해야 한다.
+기억하기는 성공적으로 복호화한 키만 해당 브라우저·접속 주소(origin)에 보관한다. 비밀번호 문자열을 저장하지 않으며, 키 저장 실패는 비밀번호 오류와 구분한다. 키도 복호화 권한이므로 개인 기기에서만 기억한다. 사이드바의 ‘이 기기 기억 해제’는 기억 키만 삭제하고 현재 세션과 상담 기록은 유지한다. 세부 계약은 `src/README.md`를 따른다.
+자동 테스트 **117개(12파일)**와 합성 브라우저에서 새 빌드 자동 열기·bulk 복호화, 비밀번호 변경, 기억 취소/해제, 저장 차단·공간 부족, 교차 탭 키 보존, 상담 기록·보고서 보존을 검증했다. 로그인 화면은 320/390/1280px 라이트·다크에서 가로 넘침이 없다.
+새 로컬 빌드 태그는 **`3905d3b9`**다. 비밀번호 확인·기존 비공개 백업 일치·실명 0건·앱/bulk 복호화·이전 로컬 기억 키 호환을 확인했다. 빌드 입력 4파일 해시와 로컬 HTTP 두 파일 해시가 일치하며 비공개 원본·소스 경로는 404다. 원장 실제 화면 확인은 대기이며 커밋·푸시·배포하지 않았다.
+SHA-256: index `725864cb9eb66634f9b78d7168c34b6ac9d86174d1de753349fd8d939444689a`, bulk `cd83762a5d4e9c993362707929d3e080f3406f05ae3f20df768012e8af1b2ee1`.
+
 **바로 할 일**
-1. **v40 — 학교 성취도 74 → 538개교** (데이터·변환기 준비 완료, 원본 CSV만 받으면 됨 → §5-1)
+1. 기기 기억 유지 빌드 `3905d3b9` 원장 화면 확인. 앞선 전체 흐름 점검 빌드는 `0706f59b`이며 v40 539개교 변환·백업 절차 기록은 §5-1에 보존한다.
 2. 수시 지원 현황 후속 — 원장 입력이 쌓이는 대로 다듬기 (→ §5-2)
 3. 백로그 (→ §5-3)
 
@@ -31,27 +69,33 @@
 
 ## 1. 시작하기 (첫 30분)
 
-> **원장 PC(Windows)에서 할 때**는 main 의 `docs/코덱스-업무인계서-2026-10-15.md` §6 을 먼저 본다 — PowerShell 로 비밀번호 넣기,
-> Python UTF-8(`py -X utf8`), 배포 PR 은 worktree 에서, 줄바꿈(autocrlf) 때문에 해시가 어긋나는 문제가 거기 있다.
+> **원장 PC(Windows)에서 할 때**는 비밀번호를 가려진 로컬 입력으로 받아 프로세스 환경변수로만 전달하고,
+> Python은 `py -X utf8`을 사용한다. 배포 PR은 별도 worktree에서 준비하며 커밋된 두 파일의 바이트/해시도 대조한다.
+> 다른 세션이 안내한 main의 `docs/코덱스-업무인계서-2026-10-15.md`는 2026-10-15 조회 시 찾지 못했다. 현재 절차는 이 문서와 `src/README.md`를 따른다.
 
-필요: Node 18+, Python 3.9+, (선택) Playwright. 비밀번호는 **원장에게 직접** 받는다 — 환경변수로만 쓴다.
+필요: Node 18+, Python 3.9+, (선택) Playwright. 비밀번호는 가려진 로컬 입력창에서 받는다 — 채팅·명령문·파일·로그에 적지 않고 환경변수로만 쓴다.
 
 ```bash
 git clone https://github.com/whdudwns33-wb/wb-site && cd wb-site
 git checkout claude/agent-performance-optimization-rj8ql6        # ⚠ main 이 아니다
 git pull origin claude/agent-performance-optimization-rj8ql6
-export WB_PASSWORD='<원장에게 받은 비밀번호>'                       # 셸에만. 파일에 쓰지 말 것
+# WB_PASSWORD는 가려진 로컬 입력으로 이미 준비된 현재 프로세스 값을 사용한다.
 
 node workbench/src/check-password.mjs     # "비밀번호 확인 ✓" 가 나와야 다음으로
 # workbench/backup/README.md 의 복원 명령 2개 실행 → src/private-seed.json, src/bulk-data.json 생성
 node workbench/src/check-names.mjs        # "실명 검사 ✓ — 0건"
 node workbench/src/build.mjs              # index.html + bulk.enc.json 생성, "복호화 검증: 일치 ✓"
 
-cd workbench && python3 -m http.server 8899   # http://localhost:8899/ 에서 로그인해 확인
+# 비공개 src가 노출되지 않도록 암호화 파일 두 개만 별도 폴더에서 서비스한다.
+preview_dir="$(mktemp -d)"
+mkdir "$preview_dir/workbench"
+cp workbench/index.html workbench/bulk.enc.json "$preview_dir/workbench/"
+python3 -m http.server 8899 --bind 127.0.0.1 --directory "$preview_dir"
+# http://127.0.0.1:8899/workbench/ 에서 원장이 로그인해 확인 (스크린샷 금지)
 ```
 
-로컬 빌드는 작업 트리의 `workbench/index.html`·`bulk.enc.json`을 바꾼다. 배포하지 않을 거면
-`git checkout -- workbench/index.html workbench/bulk.enc.json`으로 되돌린다.
+로컬 빌드는 작업 트리의 `workbench/index.html`·`bulk.enc.json`을 바꾼다. 원장 확인 중인 두 파일은 보존하며,
+배포 지시가 없으면 로컬 확인 단계에서 멈춘다. 배포 승인과 화면 확인을 같은 뜻으로 간주하지 않는다.
 
 ---
 
@@ -69,7 +113,7 @@ cd workbench && python3 -m http.server 8899   # http://localhost:8899/ 에서 �
 private-seed.json (gitignored) ─┐
 app.html ───────────────────────┼─ build.mjs ─→ index.html     (앱+학생 시드, AES-256-GCM)
 bulk-data.json (gitignored) ────┘            └→ bulk.enc.json  (입결·학교·성취도, 같은 키·다른 IV, gzip)
-                                  매 빌드마다 새 키 + BUILD_TAG → 두 파일은 반드시 짝으로 배포
+                                  같은 비밀번호·KDF면 키 유지 / 새 IV·BUILD_TAG → 두 파일은 반드시 짝으로 배포
 ```
 
 - **런타임 데이터의 정본은 원장 브라우저의 `localStorage`**(키 `wb-consulting-v1`). 시드는 빈 기기를 채울 뿐, 이미 쓰던 기기에는 신규 항목만 더한다.
@@ -89,6 +133,8 @@ bulk-data.json (gitignored) ────┘            └→ bulk.enc.json  (�
 | 학생 화면 | `renderStu()` + 탭 함수: `tabOverview` `tabApply` `tabAcad` `tabSaenggibu` `tabTasks` `tabInquiry` `tabRecords` `tabAdm` `tabPlan` |
 | 수시 지원 현황 (v37) | `aplList` `minCheck`(수능최저 판정) `aplConflicts`(일정 겹침) `tabApply` `aplCard` `renderApply`(전체 보드) `openApl` |
 | 진학 가능권 분석 | `renderIpsi` · 판정 `classify`(수시, 등급) `classifyPct`(정시, 백분위) · 변환 `gradeToTopPct` `topPctToGrade` |
+| 정시 상담 (로컬 소스) | `renderJeongsi` · `jExam` `jRule` `jCalc` · `jState` `jSaveExam` `jSavePlan` `jIsStale` `jRefreshPlan` `jSetPlan` · `mergeSusiStudent`(백업 병합) |
+| 통합 상담 보고서 (로컬 소스) | `rptCollect`(원자료 불변 수집) · `rptSave`(사본 추가·미리보기 변경 검사). `REPORT_CORE`·`REPORT_STORE`·보고서 UI 구역 |
 | 입결·학교 데이터 | `allIpRows()` `ipGroups()`(캐시) `allHsRows()` |
 | 고교 선택 + 성취도 보정 | `renderHsSim` · `achFor` `achBulkIdx` `achDistFor` `achCorrect` `achEff` |
 | 모의지원 · 입시 검색 · 파트너십 · 어디가 | `renderMock` `renderSearch` `renderPartner` `renderAdiga` |
@@ -101,6 +147,7 @@ bulk-data.json (gitignored) ────┘            └→ bulk.enc.json  (�
 - 학생: `name grade school career targetUniv lcsi narrative notes profileMd saenggibu tasks records planners grades inquiries exams subjectsMgmt univs tongLogs commLogs consult` + v37 `apply` `mockRef`
 - `apply[]`: `{id, univ, major, track, kind(교과|종합|논술|실기|기타), free(6장 제외), status, wait, memo, ex:{date,time,kind}, res:{date}, min:{on, areas[국수영탐], n, sum, must, tam(1|2|2t), hist, note}}`
 - `mockRef`: `{exam, 국, 수, 영, 탐1, 탐2, 한}` — 수능최저 판정의 기준 등급
+- `consult.reports[]`: 선택 범위·원장 결론·다음 할 일·당시 수시/정시 자료의 독립 사본. 새 버전 추가 방식이며 현재 원자료와 과거 저장본을 분리한다. `sourceState`는 저장 직전 변경 비교용으로만 사용하고 보고서 본문·복사에는 노출하지 않는다.
 - `BULK.ach = {s:[학교명], j:[과목], r:[[학교idx, 고교여부, 학년도-2000, 학년, 학기, 과목idx, 평균, A,B,C,D,E], …]}`
 
 **코드 규칙** — 단일 HTML + 바닐라 JS, 외부 CDN·프레임워크 금지. 색은 CSS 토큰만(라이트 `:root` + 다크 2블록).
@@ -127,7 +174,7 @@ bulk-data.json (gitignored) ────┘            └→ bulk.enc.json  (�
 
 ## 5. 해야 할 일
 
-### 5-1. v40 — 학교 성취도 538개교 (가장 먼저)
+### 5-1. v40 — 학교 성취도 539개교 (가장 먼저)
 
 변환기와 검증 기준은 준비돼 있다. Claude 쪽에서는 Drive 도구가 10MB 넘는 파일을 못 받아 원장의 링크 공유가 필요했다.
 **원장 컴퓨터에서 Codex가 작업하면 원장이 Drive에서 그냥 내려받으면 된다** — 공유 설정 불필요.
@@ -135,19 +182,34 @@ bulk-data.json (gitignored) ────┘            └→ bulk.enc.json  (�
 ```bash
 # 1) 원장이 Drive 에서 학교학업성취DB_v1.0.csv (19,117,704 바이트 · 123,489행) 을 내려받는다
 python3 workbench/src/schoolinfo/build_ach.py ~/Downloads/학교학업성취DB_v1.0.csv /tmp/ach.json
-#    기대 출력: 원본 123,488행 → 채택 38,841행 → 병합 36,454행 / 학교 538곳 (고 210 · 중 328)
+#    기대 출력: 원본 123,488행 → 채택 38,841행 → 병합 36,507행 / 학교 539곳 (고 210 · 중 329)
 # 2) bulk-data.json 의 "ach" 키만 통째로 교체
-python3 -c "import json;p='workbench/src/bulk-data.json';d=json.load(open(p));d['ach']=json.load(open('/tmp/ach.json'));json.dump(d,open(p,'w'),ensure_ascii=False,separators=(',',':'))"
+python3 -c "import json;p='workbench/src/bulk-data.json';d=json.load(open(p,encoding='utf-8'));d['ach']=json.load(open('/tmp/ach.json',encoding='utf-8'));json.dump(d,open(p,'w',encoding='utf-8'),ensure_ascii=False,separators=(',',':'))"
 # 3) ★ 배포보다 먼저 백업 재암호화 + 커밋 (평문은 gitignored)
-node workbench/src/backup-encrypt.mjs bulk && git add workbench/backup/bulk-data.enc.json && git commit -m "workbench: 성취도 538개교 백업"
-# 4) 빌드 → 검증 → 배포 (§9)
+node workbench/src/backup-encrypt.mjs bulk && git add workbench/backup/bulk-data.enc.json && git commit -m "workbench: 성취도 539개교 백업"
+git push origin claude/agent-performance-optimization-rj8ql6
+# 4) 빌드 → 로컬 검증. 별도 “배포해” 이후에만 두 파일 PR (§9)
 ```
 
-**검증 기준** (2026-09-09 실측, 맞지 않으면 배포하지 말 것)
+Windows에서는 아래 명령을 사용한다. 변환 후 아래 검증 기준을 모두 통과한 뒤에만 `ach`를 교체한다.
+경로를 Python 인자로 넘겨 역슬래시 해석을 피하고, 두 JSON 모두 UTF-8로 읽고 쓴다.
+
+```powershell
+$achPath = Join-Path $env:TEMP 'wb-ach.json'
+py -X utf8 workbench/src/schoolinfo/build_ach.py "$env:USERPROFILE\Downloads\학교학업성취DB_v1.0.csv" $achPath
+# 검증 통과 후에만 실행
+py -X utf8 -c "import json,sys;p='workbench/src/bulk-data.json';d=json.load(open(p,encoding='utf-8'));d['ach']=json.load(open(sys.argv[1],encoding='utf-8'));json.dump(d,open(p,'w',encoding='utf-8'),ensure_ascii=False,separators=(',',':'))" $achPath
+```
+
+**검증 기준** (2026-10-15 동명 학교 분리 재검증, 원장 승인으로 기존 538개교·36,454행에서 변경. 맞지 않으면 배포하지 말 것)
+- 학교 식별자 기준 **539개교(고 210·중 329), 36,507행**. 광주·전남의 금당중학교를 학교명만으로 합쳤던 오류를 수정했다.
+- 금당중학교는 광주 88행·전남 55행으로 구분하며, 두 학교가 겹치는 53개 항목도 섞지 않는다. 나머지 537개교는 이전 변환 결과와 완전히 같아야 한다.
+- `BULK.ach.ambiguous`는 동명 학교의 지역 포함 표시명을 제공한다. 지역 없는 이름으로는 내장·기존 수동 분포를 적용하거나 저장하지 않는다. 기존 수동 기록은 삭제하지 않는다.
 - 광주 중 74/74 · 광주 고 67/68 · 전남 중 255/255 · 전남 고 143/143
 - **광주과학고 1곳 제외는 정상** — 1학년 행은 있지만 A~E 분포가 비어 있다(평균만 공시)
 - 고교 행은 **1학년만**, 중학교는 1~3학년. 연도 2023·2024·2025 각 약 1.2만 행
-- 회귀: 고실중학교 90행이 v36과 완전히 같아야 한다. 수학 A비율 수완하나중 39.4% · 신광중 15.2%, 올A 학생 중심 추정 각각 상위 5.2% · 2.1%
+- 회귀: 고실중학교 90행이 v36과 완전히 같아야 한다. **2025학년도 수학 A비율의 학년·학기 평균(소수 첫째 자리)**은 수완하나중 39.4% · 신광중 15.2%다.
+  **중2-1 국·영·수·사·과 올A** 입력의 중심 추정은 각각 상위 5.2% · 2.1%다(각 과목 최신 공시 분포 사용).
 - 소규모 특성화고는 수학 A비율 0%인 곳이 있다 — 밴드가 넓어 자동으로 정성 표기로 넘어가면 정상
 - 화면: 고교 카드 "📊 공시 성취도 … (1학년 공통 n과목)", 성취도 칸에 **고교명**을 넣으면 보정 안 됨(배지도 안 뜸)이 정상 — 보정은 중학교 성적용이다
 
@@ -156,8 +218,9 @@ node workbench/src/backup-encrypt.mjs bulk && git add workbench/backup/bulk-data
 원장이 고3 학생별로 기준 등급·지원 카드를 입력하기 시작하면 다듬는다. 판정 로직은 9개 사례로 검증돼 있다
 (경계·여유·미충족·한국사 미달·탐구 2과목 평균·평균 절사·미입력·최저 없음). 다음 후보:
 - **면접 예상 질문 프롬프트** — 생기부·세특 데이터로 학종 면접 대비 (10~11월 수요)
-- **수능 가채점 입력 → 최저 재판정** — 11월 19일 수능 직후. 지금은 `mockRef` 하나라 "가채점"을 별도 슬롯으로 둘지 결정 필요
-- **정시 가·나·다군 판단 화면** — 11월 말, `classifyPct` 재사용
+- **수능 가채점 입력 → 수시 최저 재판정 연결** — 정시 별도 시험 입력은 구현했다. 기존 `mockRef` 기반 최저와의 연결은 후속이며 자동 전환하지 않는다.
+- **정시 가·나·다군 판단 화면** — 로컬 소스·자동 검증·암호화 빌드 완료. 원장 화면 확인 대기(§0).
+- **통합 상담 보고서** — 로컬 구현·자동 회귀·합성 DOM·암호화 빌드 검증 완료. 원장 실제 화면 확인 대기(§0, `src/README.md`).
 
 ### 5-3. 백로그
 
@@ -202,7 +265,8 @@ node workbench/src/backup-encrypt.mjs bulk && git add workbench/backup/bulk-data
 - 공시 회차: N년 4월 **1차** = (N−1)학년도 1·2학기 / N년 9월 **3차** = N학년도 1학기만. 통합 CSV는 이미 학년도로 정리돼 있다.
 - **고교 성취도는 1학년 공통과목만 쓴다.** 2·3학년 선택과목은 수강 집단이 갈려 학교 분포로 못 쓴다. `과제·연구·실험` 붙은 과목(과학탐구실험 등)도 제외.
 - 성취도 보정 게이트: 과목 4개 미만 → 숫자 없음, 대체값 비중 30% 초과 → 분포 약함, 밴드 45%p 초과 → 정성 표기만. 밴드가 넓을 때 고정표로 되돌리지 않는다.
-- 어디가 입결: 수치 인용 + "출처: 한국대학교육협의회 어디가"는 가능, 화면·PDF 통째 복제·대량 크롤링·평문 재배포는 금지.
+- 진학통은 화면·업무 흐름만 참고한다. 예측 결과·계산식·DB를 복제하지 않는다.
+- 어디가는 공식 원문 연결과 학년도·출처·확인일 표시를 우선 검토한다. 데이터 재게시·자동 수집은 이용 권한 확인 전 진행하지 않는다. 출처 표시만으로 이용 허락이 확인된 것으로 보지 않는다.
 - 수능최저: 탐구 반영(상위 1과목/2과목 평균/평균 절사)·영어·한국사 조건이 대학마다 다르다. 판정은 참고치로 표기한다.
 - 수시 6장에 들지 않는 대학: 과학기술원(KAIST·GIST·DGIST·UNIST 등)·사관학교·경찰대·산업대·전문대 → 카드의 "6장 제외".
 - 수능일은 `db.meta.suneung`(2026-11-19). 대시보드에서 바꿀 수 있다.
@@ -214,11 +278,14 @@ node workbench/src/backup-encrypt.mjs bulk && git add workbench/backup/bulk-data
 ```
 [ ] node workbench/src/check-password.mjs            → ✓
 [ ] node workbench/src/check-names.mjs               → ✓ 0건
-[ ] (평문을 바꿨다면) node workbench/src/backup-encrypt.mjs → 커밋까지
+[ ] (평문을 바꿨다면) node workbench/src/backup-encrypt.mjs → 백업 커밋·작업 브랜치 푸시까지
 [ ] node workbench/src/build.mjs                     → 복호화 검증 일치 ✓
-[ ] 브라우저: 로그인 → 학생 14명 → 바꾼 화면 동작 → 콘솔 오류 0 → 다크모드 한 번
-[ ] 작업 브랜치에 app.html + index.html + bulk.enc.json 커밋·푸시
-[ ] 최신 origin/main worktree 에 두 파일만 복사 → 커밋 → main 푸시
+[ ] 원장 화면 확인: 로그인 → 학생 14명 → 바꾼 화면 동작 → 다크모드 한 번 (스크린샷 금지)
+[ ] 사용자의 별도 “배포해” 지시 확인
+[ ] 작업 브랜치에 수정된 소스·검증·문서와 index.html + bulk.enc.json 커밋·푸시
+[ ] 최신 origin/main에서 별도 배포 브랜치/worktree → 두 파일만 복사·커밋 (커밋 바이트/해시 대조)
+[ ] PR 변경 목록이 workbench/index.html·workbench/bulk.enc.json 두 파일뿐인지 확인 → checks 통과 → 스쿼시 병합
+[ ] 병합 권한이 없으면 PR 주소를 원장에게 전달 (main 직접 푸시 금지)
 [ ] 1~2분 뒤 라이브 해시 2개 대조 (index · bulk?v=<태그>) — 둘 다 일치할 때까지 다른 주체 배포 금지
 ```
 
