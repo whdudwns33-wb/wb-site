@@ -21,5 +21,10 @@ pair[0]['parts'][1]=col('장난감이 파랗다.')
 try:m.pair_bilingual(pair,d);raise AssertionError('Unequal source sentences accepted')
 except ValueError:pass
 print('Local source numbering, continued translations, source locations, footer removal and bilingual count guards passed')
+blocks=[{'page':3,'parts':[col('A child reads a wonderful story. Another child listens carefully.'),col('한 아이가 멋진 이야기를 읽습니다. 다른 아이는 조용히 이야기를 듣고 있습니다.')]}]
+b=m.pair_page_blocks(blocks,d);assert len(b)==1 and b[0]['_pdfReview']['locations'][0]['page']==3 and 'SOURCE_PAGE_PAIRED' in b[0]['_pdfReview']['flags']
+blocks[0]['parts'][1]=col('Only English')
+try:m.pair_page_blocks(blocks,d);raise AssertionError('Nonparallel page accepted')
+except ValueError:pass
 `],{encoding:'utf8',cwd:new URL('../../',import.meta.url)});
 assert.equal(result.status,0,result.stderr);console.log(result.stdout.trim());

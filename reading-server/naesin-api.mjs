@@ -35,6 +35,7 @@ function classOrDefaultScope(value) {
 }
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const EXAM_PACKS_MAX = 20;          // 한 시험 범위에 담는 팩 수 — 한 학기 시험이 이걸 넘지 않는다
+export const PRACTICE_PACKS_MAX = 500;
 const WORD_DEADLINE_MIN = 3, WORD_DEADLINE_MAX = 30;   // 단어 초회 도달 마감(D-n) 허용 범위, 기본 7은 클라이언트가 안다
 const TASK_TYPES_MAX = 30;          // 과제 한 건의 학습 유형 수 — 고정 키 15개 + 문법 패턴 키 몇 개면 충분하다
 /* 시험 결과(계약 R2) — 학교 시험 점수는 100점 만점, 틀린 문항 수는 한 유형에 50문항을 넘지 않는다.
@@ -478,6 +479,15 @@ export async function handleNaesin(ctx) {
     return j(200, await resolveExam(store, who.code, ctx.now));
   }
 
+  if (p === '/api/naesin/catalog' && method === 'GET' && !who.admin) {
+    const {exam}=await resolveExam(store,who.code,ctx.now),packs=[];
+    for(const id of (exam&&exam.packIds||[]).slice(0,PRACTICE_PACKS_MAX)) {
+      const rec=await store.getPack(id),pack=rec&&rec.pack;
+      if(pack)packs.push({packId:id,textbook:pack.textbook||'',grade:pack.grade||'',lesson:pack.lesson,lessonTitle:pack.lessonTitle||''});
+    }
+    return j(200,{packs});
+  }
+
   /* 오늘 수업 과제 — 현재 반의 오늘 과제 → 공통. 지난·예정 반 과제는 오늘 공통 과제를 가리지 않는다. */
   if (p === '/api/naesin/task' && method === 'GET' && !who.admin) {
     return j(200, await resolveTask(store, who.code, ctx.now));
@@ -743,7 +753,8 @@ export async function handleNaesin(ctx) {
     const practice = b.mode === 'practice';
     if (practice ? !!examDate : !isValidDate(examDate)) return j(400, { error: practice ? '학습용 배정은 시험일을 비워 주세요.' : 'examDate는 실제 날짜(YYYY-MM-DD)' });
     const packIds = Array.isArray(b.packIds) ? b.packIds.map((x) => String(x || '').trim()) : [];
-    if (!packIds.length || packIds.length > EXAM_PACKS_MAX) return j(400, { error: 'packIds 필요 (1~' + EXAM_PACKS_MAX + '개)' });
+    const maxPacks=practice?PRACTICE_PACKS_MAX:EXAM_PACKS_MAX;
+    if (!packIds.length || packIds.length > maxPacks) return j(400, { error: 'packIds 필요 (1~' + maxPacks + '개)' });
     for (const pid of packIds) {
       if (!PACK_ID_RE.test(pid)) return j(400, { error: '팩 id 형식 오류: ' + pid.slice(0, 60) });
       if (!(await store.getPack(pid))) return j(400, { error: '없는 팩이에요: ' + pid });

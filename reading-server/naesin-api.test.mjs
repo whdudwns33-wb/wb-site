@@ -63,6 +63,20 @@ const NOW = Date.now();
 const kstDay = (off) => todayKst(NOW + off * 86400e3);
 const YESTERDAY = kstDay(-1), TOMORROW = kstDay(1), TODAY = kstDay(0);
 
+await t('학습 자료실은 20개 넘는 반 배정을 허용하고 학생 목록에는 자기 교재 메타만 준다',async()=>{
+  const s=memStore(),ids=Array.from({length:21},(_,i)=>'own-library-'+i);
+  for(const id of ids)s.putPack(id,{pack:{packId:id,textbook:'자체 교과서',grade:'m2',lesson:1,items:[{secret:'Own fixture body'}],sentences:[]}});
+  s.putPack('own-unassigned',{pack:{packId:'own-unassigned',textbook:'다른 반'}});
+  const assign=body=>call(s,{path:'/api/naesin/admin/exam',method:'POST',who:ADMIN,getBody:async()=>body});
+  assert.equal((await assign({scope:'cls:중2 A반',examDate:TOMORROW,packIds:ids})).status,400);
+  assert.equal((await assign({scope:'cls:중2 A반',mode:'practice',examDate:'',packIds:ids})).status,200);
+  const catalog=await call(s,{path:'/api/naesin/catalog'});assert.equal(catalog.status,200);assert.equal(catalog.body.packs.length,21);
+  assert.ok(catalog.body.packs.every(p=>ids.includes(p.packId)&&!p.items&&!p.sentences));assert.ok(!JSON.stringify(catalog.body).includes('Own fixture body'));
+  assert.equal((await assign({scope:'cls:중2 A반',mode:'practice',examDate:'',packIds:Array(501).fill(ids[0])})).status,400);
+  s.putExam('st-1',{mode:'practice',examDate:'',packIds:[ids[0]]});assert.equal((await call(s,{path:'/api/naesin/catalog'})).body.packs.length,1);
+  assert.equal((await call(s,{path:'/api/naesin/catalog',who:null})).status,401);
+});
+
 
 
 /* 시드는 자체 제작 더미다 — 기획서 §9.3: 교과서·이그잼포유 문구를 테스트에 쓰지 않는다 */

@@ -60,3 +60,18 @@ def pair_bilingual(pages,doc):
                 '_pdfReview':{'flags':['PAGE_SENTENCE_PAIRED','NO_EXTERNAL_AI'],'locations':[{'libraryId':doc['id'],'librarySha256':doc['sha256'],'page':page['page'],'bbox':p['bbox']} for p in page['parts']]}})
     if not rows:raise ValueError('EMPTY_BILINGUAL_SOURCE')
     return rows
+
+def pair_page_blocks(pages,doc):
+    """Preserve parallel source columns when sentence punctuation does not correspond."""
+    rows=[]
+    for page in pages:
+        en,ko=[clean(part['text']) for part in page['parts']]
+        latin=len(re.findall('[A-Za-z]',en));hangul=len(re.findall('[가-힣]',en))
+        if latin<30 or hangul>latin/2 or len(re.findall('[가-힣]',ko))<20:raise ValueError('PARALLEL_PAGE_LANGUAGE_MISMATCH')
+        no=len(rows)+1
+        rows.append({'seq':no,'dayGroup':str(no),'dayHeaderKo':'원문 '+str(page['page'])+'쪽','en':en,'ko':ko,
+            'chunks':[{'en':en,'ko':ko}],'keywords':[{'en':en,'ko':ko}],'tokens':en.split(),'verbForms':[],'grammarChoices':[],'writingKeywords':[],
+            'notes':['원문 한 쪽을 통째로 암기하는 학습 단위입니다.'],
+            '_pdfReview':{'flags':['SOURCE_PAGE_PAIRED','NO_EXTERNAL_AI'],'locations':[{'libraryId':doc['id'],'librarySha256':doc['sha256'],'page':page['page'],'bbox':p['bbox']} for p in page['parts']]}})
+    if not rows:raise ValueError('EMPTY_BILINGUAL_SOURCE')
+    return rows

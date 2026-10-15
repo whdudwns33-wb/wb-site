@@ -53,7 +53,8 @@ function screen() {
   });
   const exportUi = `
   globalThis.ui={boot,api,checkAccount,checkAccess,stopStudy,clearPackCache,migrateLegacy,pullAdopt,pushState,persist,save,openDemo,renderItem,storedToRunner,storedItemKey,itemRefOf,wrongRetryItems,gradeItem,normalizeStoredAnswer,recoverStateStamps,loadDB,quizTypes,renderQuiz,runTask,mockItems,
-    serverExam:value=>{examServer=value;applyServerExamAll();},effectiveExam:exam,renderHome,render,lessonLabel,enChunkOrderItem,koBlankItem,kwBlankItem,writeItem,formItems,
+    serverExam:value=>{examServer=value;applyServerExamAll();},effectiveExam:exam,renderHome,render,lessonLabel,enChunkOrderItem,koBlankItem,kwBlankItem,writeItem,formItems,loadRangePacks,switchPack,
+    library:ids=>{examServer={mode:'practice',examDate:'',packIds:ids};packList=ids;packCatalog=[];PACKS={};pack=null;},
     ttsOptions,wireTtsBtn,wireChunkWork,wireDialogueWork,wireSentenceWork,openPack,renderHeader,demoNotice,bootError,
     projector:(scope,pj)=>{liveScope=scope;liveState={projector:pj};pjApply(pj);},
     projectile:()=>({pjPick,pjSent,pjSeen}),
@@ -76,6 +77,19 @@ function screen() {
 }
 
 (async () => {
+  await t('다출판사 자료실은 본문을 한 단원만 받고 선택 목록에 교과서·학년을 표시한다',async()=>{
+    const ui=screen(),ids=Array.from({length:25},(_,i)=>'own-library-'+i),catalog=ids.map((id,i)=>({packId:id,textbook:i?'자체 B':'자체 A',grade:'m2',lesson:i+1,lessonTitle:''}));
+    ui.library(ids);ui.setFetch(url=>({ok:true,status:200,json:async()=>url.endsWith('/catalog')?{packs:catalog}:{pack:{...clone(sample),packId:new URL('http://test'+url).searchParams.get('id')}}}));
+    await ui.loadRangePacks();assert.equal(Object.keys(ui.get().PACKS).length,1);assert.equal(ui.requests.filter(r=>r.url.includes('/pack?')).length,1);
+    ui.renderHome();assert.match(ui.node('wrap').innerHTML,/교과서와 단원 선택/);assert.match(ui.node('wrap').innerHTML,/자체 B · 중2 · L25/);
+    ui.switchPack(ids[1]);await new Promise(resolve=>setImmediate(resolve));assert.deepEqual(Object.keys(ui.get().PACKS),[ids[1]]);
+    assert.equal(ui.requests.filter(r=>r.url.includes('/pack?')).length,2);
+    const pending=new Map();ui.setFetch(url=>new Promise(resolve=>pending.set(new URL('http://test'+url).searchParams.get('id'),resolve)));
+    const earlier=ui.switchPack(ids[2]),later=ui.switchPack(ids[3]);
+    pending.get(ids[3])({ok:true,status:200,json:async()=>({pack:{...clone(sample),packId:ids[3]}})});await later;
+    pending.get(ids[2])({ok:true,status:200,json:async()=>({pack:{...clone(sample),packId:ids[2]}})});await earlier;
+    assert.equal(ui.get().pack.packId,ids[3],'늦게 도착한 이전 선택이 현재 교재를 바꾸지 않는다');
+  });
   await t('문제 팩의 본문을 열고 청크가 없는 원문도 어순·해석·영작 연습을 만든다',()=>{
     const ui=screen(),s={seq:1,dayGroup:'1',en:'A toy is blue.',ko:'장난감이 파랗다.',tokens:['A','toy','is','blue.'],chunks:[],keywords:[{en:'A toy is blue.',ko:'장난감이 파랗다.'}],verbForms:[],grammarChoices:[]};
     const p={...clone(sample),contentMode:'questions',words:[],sentences:[s]};ui.setup(account,p);ui.renderHome();
