@@ -53,7 +53,7 @@ function screen() {
   });
   const exportUi = `
   globalThis.ui={boot,api,checkAccount,checkAccess,stopStudy,clearPackCache,migrateLegacy,pullAdopt,pushState,persist,save,openDemo,renderItem,storedToRunner,storedItemKey,itemRefOf,wrongRetryItems,gradeItem,normalizeStoredAnswer,recoverStateStamps,loadDB,quizTypes,renderQuiz,runTask,mockItems,
-    serverExam:value=>{examServer=value;applyServerExamAll();},effectiveExam:exam,renderHome,render,
+    serverExam:value=>{examServer=value;applyServerExamAll();},effectiveExam:exam,renderHome,render,lessonLabel,
     ttsOptions,wireTtsBtn,wireChunkWork,wireDialogueWork,wireSentenceWork,openPack,renderHeader,demoNotice,bootError,
     projector:(scope,pj)=>{liveScope=scope;liveState={projector:pj};pjApply(pj);},
     projectile:()=>({pjPick,pjSent,pjSeen}),
@@ -79,6 +79,9 @@ function screen() {
   await t('문제 전용 팩은 진단 없이 시작하고 채점·오답 재풀이·저장을 유지한다',()=>{
     const ui=screen(),pack={...clone(sample),contentMode:'questions',words:[],sentences:[],items:[{...clone(sample.items[0]),id:'own-question-only'}]};
     ui.setup(account,pack);ui.renderHome();
+    assert.match(ui.lessonLabel(pack.packId),/중[123] · L/);
+    ui.addPack({...pack,packId:'own-special',grade:'m2',lesson:0,lessonTitle:'Special Lesson1'},false);
+    assert.equal(ui.lessonLabel('own-special'),'중2 · Special Lesson1');
     assert.equal(typeof ui.node('startQuestions').onclick,'function');
     ui.node('startQuestions').onclick();assert.ok(ui.get().selType);
     const item=ui.storedToRunner(pack.items)[0];assert.ok(item);

@@ -1048,7 +1048,8 @@
   function lessonLabel(pid) {
     var p = packOf(pid);
     var l = p && p.lesson;
-    return (l != null && l !== '') ? ('L' + l) : String(pid);
+    var label=p&&/^Special (?:Lesson|Reading)/i.test(p.lessonTitle||'')?p.lessonTitle:(l != null && l !== '') ? ('L' + l) : String(pid);
+    return p&&p.contentMode==='questions'?String(p.grade||'').replace(/^m([123])$/,'중$1')+' · '+label:label;
   }
   function lessonTitle(pid) {
     var p = packOf(pid);

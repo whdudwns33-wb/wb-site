@@ -317,7 +317,7 @@ function renderList(){
           const st=STATUS_KO[jb.status]||jb.status||'—';
           const cls=jb.status==='published'?'ok':jb.status==='failed'?'bad':jb.status==='ready'?'ok':'';
           return `<tr><td><b>${esc(jb.packId)}</b>${jb.error?'<br><span class="muted">'+esc(jb.error)+'</span>':''}</td>
-            <td>${esc((jb.meta&&jb.meta.textbook)||'—')}${jb.meta&&jb.meta.lesson!=null?' L'+num(jb.meta.lesson):''}</td>
+            <td>${esc((jb.meta&&jb.meta.textbook)||'—')}${jb.meta&&jb.meta.lesson>0?' L'+num(jb.meta.lesson):jb.meta&&jb.meta.lessonTitle?' · '+esc(jb.meta.lessonTitle):''}</td>
             <td><span class="tag ${cls}">${esc(st)}</span></td>
             <td style="white-space:normal">${kinds.length?kinds.map(k=>`<span class="tag muted">${esc(kindKo(k))} ${num(jb.counts[k])}</span>`).join(' '):'—'}</td>
             <td>${num(done)||0}/${num(jb.total)||0}${jb.issueCount?' <span class="tag warn">문제 '+num(jb.issueCount)+'</span>':''}</td>
