@@ -22,8 +22,8 @@ def parse_document(doc, pages):
     problems=[]; answers={}; key_mode=False; pattern=0; expected=set(); expected_locations={}; unresolved=[]
     for page in pages:
         patterns=PATTERN.findall(page['header'])
-        if patterns: pattern=int(patterns[0])
         if page.get('answerKey') or KEY.search(page['header']): key_mode=True
+        if patterns and (not key_mode or not any(PATTERN.search(c['text']) for c in page['columns'])): pattern=int(patterns[0])
         for column in page['columns']:
             text=column['text']; loc=location(doc,page['page'],column['bbox'])
             if key_mode:
@@ -43,11 +43,14 @@ def parse_document(doc, pages):
                     first=re.match(r'^([①②③④⑤](?:\s*[,，]\s*[①②③④⑤])*)',tail)
                     if first:value=[str(CHOICES.index(c)+1) for c in re.findall('[①②③④⑤]',first[1])];kind='objective'
                     else:
-                        value=[re.split(r'(?m)^\s*(?:해설|정답 및 해설|오답|제시문|질문)\b',tail)[0].strip()[:8000]];kind='short'
+                        value=[re.split(r'(?mi)^\s*(?::|(?:해설|정답 및 해설|오답|제시문|질문)\b|pattern\s*[1-9]\b)',tail)[0].strip()[:8000]];kind='short'
                         if not value[0]:continue
                     key=(local_pattern,int(match[1]));record={'answer':value,'locations':[loc],'kind':kind}
                     if key not in answers:answers[key]=record
                     elif answers[key]['answer']!=value and answers[key]['kind']==kind:answers[key]={'answer':[],'locations':[loc],'kind':'conflict'}
+                # Answer sections can change pattern in the right column and continue on later pages.
+                remaining=PATTERN.findall(text)
+                if remaining: pattern=int(remaining[-1])
                 continue
             markers=list(QUESTION.finditer(text))
             # Footnotes give an independent count even if a question heading did not extract.
@@ -93,7 +96,9 @@ def parse_document(doc, pages):
             row['_pdfReview']['locations']+=answer['locations']
         elif answer and answer['kind']=='short' and not row['choices']:
             row['answer']=answer['answer'];row['_pdfReview']['locations']+=answer['locations']
-        else: flags.append('ANSWER_UNRESOLVED')
+        else:
+            flags.append('ANSWER_UNRESOLVED')
+            if answer and answer['answer']:row['_pdfReview']['locations']+=answer['locations']
     found={p['key'] for p in problems}
     for pat,no in sorted(expected-found):
         problems.append({'key':(pat,no),'row':{'id':f'ic-{doc["id"]}-p{pat}-q{no}-missing','no':len(problems)+1,'footnoteNo':no,'source':doc['source'],
