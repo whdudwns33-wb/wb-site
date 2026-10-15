@@ -56,7 +56,7 @@ const PDF_ROW_KEYS = {
   functions: ['name', 'pattern', 'explainKo', '_pdfReview'],
   keyExpressions: ['en', 'ko', 'blankAnswer', '_pdfReview'],
   patterns: ['patternNo', 'title', 'conceptKo', 'grammarPoint', 'textbookExamples', 'letsUseIt', 'notes', '_pdfReview'],
-  items: ['id', 'no', 'footnoteNo', 'source', 'section', 'formatType', 'instructionKo', 'isNegative', 'answerCount', 'stimulus', 'choices', 'answer', 'explanationKo', 'targetRefs', 'notes', '_pdfReview'],
+  items: ['id', 'no', 'footnoteNo', 'source', 'section', 'formatType', 'instructionKo', 'isNegative', 'answerCount', 'stimulus', 'choices', 'answer', 'explanationKo', 'targetRefs', 'notes', 'sourceImages', 'sourceImageRequired', '_pdfReview'],
 };
 const ownKeys = (v, keys) => isObj(v) && Object.keys(v).every((k) => keys.includes(k));
 function validPdfReview(v) {

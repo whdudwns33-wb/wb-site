@@ -54,7 +54,7 @@ var WBPACKCHECK = (function () {
       textbookExamples: [{ en: 'string', ko: 'string', origin: 'string' }],
       letsUseIt: [{ no: 'scalar', stem: 'string', ko: 'string', wordBank: strings, answers: strings }], notes: 'texts' },
     items: { id: 'string', no: 'scalar', footnoteNo: 'scalar', source: 'string', section: 'string', formatType: 'string', instructionKo: 'string',
-      promptKo: 'string', stem: 'string', questionKo: 'string', question: 'string', isNegative: 'scalar', answerCount: 'scalar',
+      promptKo: 'string', stem: 'string', questionKo: 'string', question: 'string', isNegative: 'scalar', answerCount: 'scalar', sourceImages: strings, sourceImageRequired: 'boolean',
       stimulus: { type: 'string', parts: [{ text: 'string' }] }, choices: [{ label: 'scalar', text: 'string', tuple: strings }],
       answer: ['scalar'], explanationKo: 'string', targetRefs: [{ wordId: 'string', sentenceSeq: 'scalar', patternNo: 'scalar', dialogueId: 'string' }], notes: 'texts' },
   };
@@ -441,6 +441,8 @@ var WBPACKCHECK = (function () {
     list.forEach(function (it, i) {
       var at = 'items[' + i + '](no ' + (it && it.no != null ? it.no : '?') + ')';
       if (!it || typeof it !== 'object' || isArr(it)) { c.err(S, at + ' 객체가 아님'); return; }
+      if (it.sourceImages !== undefined && (!isArr(it.sourceImages) || !it.sourceImages.length || it.sourceImages.length > 3 || it.sourceImages.some(function(h){return typeof h !== 'string' || !/^[a-f0-9]{64}$/.test(h);}) || it.source === '00')) c.err(S, at + ' 원문 이미지 형식이 올바르지 않음');
+      if (it.sourceImageRequired && (!isArr(it.sourceImages) || !it.sourceImages.length)) c.err(S, at + ' 필수 원문 이미지가 없음');
       if (Object.prototype.hasOwnProperty.call(it, 'id')) {
         if (typeof it.id !== 'string' || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,59}$/.test(it.id)) c.err(S, at + ' id 형식이 올바르지 않음');
         else if (ids.has(it.id)) c.err(S, at + ' id 중복: ' + it.id);

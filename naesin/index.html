@@ -551,6 +551,8 @@
   /* 구매 교재는 연결 확인이 필요하다. 자체 창작 체험 팩만 서비스 워커의 오프라인 셸로 열린다. */
   function isNetErr(e) { return !(e && /^api-\d+$/.test(String(e.message || ''))); }
   function clearPackCache() {
+    sourceImageRead++;
+    document.querySelectorAll('#rBody img').forEach(function(image){image.removeAttribute('src');});
     try { localStorage.removeItem('wbn.packs'); localStorage.removeItem('wbn.pack'); } catch (e) {}
   }
   function checkAccess() {
@@ -3375,6 +3377,7 @@
     try { r.focus(); } catch (e) {}
   }
   function closeRunner() {
+    sourceImageRead++;
     $('runner').classList.remove('open');
     if (livePollId) setTimeout(liveTimers, 0);   /* RQ 가 비워진 뒤 주기를 되돌린다 */
     /* 신고 창을 열어 둔 채 세션이 끝나면 다음 세션에 남의 문항 신고가 열려 있다 */
@@ -3638,6 +3641,7 @@
     return { allCorrect: all, perBlank: per };
   }
   function renderItem(item, root) {
+    sourceImageRead++;
     var stageLabel = item.track === 'chunk' ? ZONE_MEAN + (item.day ? ' · ' + item.day : '')
       : item.stage ? '본문 ' + Math.floor(item.stage) + '단계 · ' + (STAGE_NAMES[Math.floor(item.stage)] || '')
       : (item.kind === 'word' || item.wordId ? '단어'
@@ -3710,7 +3714,7 @@
         chs.appendChild(b);
       });
       chs.onclick = function (e) {
-        var b = e.target.closest('button'); if (!b || chs.getAttribute('data-done')) return;
+        var b = e.target.closest('button'); if (!b || b.disabled || chs.getAttribute('data-done')) return;
         chs.setAttribute('data-done', '1');
         var k = b.getAttribute('data-k');
         var ok = k === item.answerKey;
@@ -3892,7 +3896,7 @@
     if (multi) {
       var picked = [];
       chs.onclick = function (e) {
-        var b = e.target.closest('button'); if (!b || chs.getAttribute('data-done')) return;
+        var b = e.target.closest('button'); if (!b || b.disabled || chs.getAttribute('data-done')) return;
         var k = b.getAttribute('data-k'), i = picked.indexOf(k);
         if (i >= 0) { picked.splice(i, 1); b.classList.remove('sel'); }
         else { picked.push(k); b.classList.add('sel'); }
@@ -3905,6 +3909,7 @@
         grade([b.getAttribute('data-k')]);
       };
     }
+    renderSourceImages(item,root);
   }
   function renderStoredShort(item, root) {
     root.innerHTML='<div class="q"><div class="qmeta">'+storedItemMeta(item)+' · 주관식</div><div class="prompt sm" style="white-space:pre-line">'+esc(item.prompt)+'</div><input class="ans" id="storedShortIn" type="text" aria-label="주관식 답 입력" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="done" placeholder="답을 입력하세요"><div class="rnext"><button class="btn p big" id="subBtn">확인</button></div></div>';
@@ -3914,6 +3919,37 @@
       finishItem(item,ok,input.value,feedback);}
     bindSubmit(grade);
     input.onkeydown=function(e){if(e.key==='Enter'&&!e.isComposing){e.preventDefault();var b=$('subBtn');if(b&&!b.getAttribute('data-done'))b.onclick();}};
+    renderSourceImages(item,root);
+  }
+  var sourceImageRead = 0;
+  function renderSourceImages(item,root) {
+    var stored=item.stored || {}, hashes=stored.sourceImages;
+    if (!hashes || !hashes.length || stored.source==='00') return;
+    var serial=sourceImageRead, owner=sessionCode, token=sessionToken;
+    var controls=root.querySelectorAll('.choices button,#subBtn,#storedShortIn');
+    if (stored.sourceImageRequired) controls.forEach(function(el){el.disabled=true;});
+    hashes.forEach(function(hash,index){
+      var panel=document.createElement('details'),label=document.createElement('summary'),status=document.createElement('p'),image=document.createElement('img');
+      label.textContent=index ? '관련 원문 '+(index+1) : '문제 원문 보기 · 문항 '+(stored.footnoteNo || item.no);
+      panel.appendChild(label);panel.appendChild(status);panel.appendChild(image);
+      image.alt='문제 원문 '+(stored.footnoteNo || item.no);image.style.cssText='display:block;width:100%;height:auto';
+      panel.style.cssText='margin:16px 0;padding:12px;border:1px solid var(--line);border-radius:8px';
+      root.querySelector('.prompt').insertAdjacentElement('afterend',panel);
+      function current(){return serial===sourceImageRead && owner===sessionCode && token===sessionToken && document.contains(panel);}
+      var loading=false,loaded=false;
+      panel.ontoggle=function(){
+        if(!panel.open || loading || loaded || !current())return;
+        loading=true;status.textContent='원문을 불러오는 중…';
+        fetch('/api/naesin/item-image?id='+encodeURIComponent(item.packId || curPackId())+'&item='+encodeURIComponent(stored.id)+'&index='+index,{cache:'no-store',headers:{Authorization:'Bearer '+token}})
+          .then(function(r){if(!r.ok)throw Error('image');return r.blob();})
+          .then(function(blob){if(!current())return;var reader=new FileReader();reader.onerror=failed;reader.onload=function(){if(!current())return;
+            image.onload=function(){if(!current())return;loaded=true;loading=false;status.textContent='원문에서 해당 문항 번호를 확인하세요.';
+              if(index===0 && stored.sourceImageRequired)controls.forEach(function(el){el.disabled=false;});};
+            image.onerror=failed;image.src=reader.result;};reader.readAsDataURL(blob);}).catch(failed);
+      };
+      function failed(){if(!current())return;loading=false;status.textContent='원문을 불러오지 못했습니다. 접었다 다시 열어 주세요.';}
+      if(index===0 && stored.sourceImageRequired)panel.open=true;
+    });
   }
   function normalizeStoredAnswer(value){return String(value==null?'':value).normalize('NFKC').trim().replace(/\s+/g,' ').toLowerCase();}
   function storedItemMeta(item) {
@@ -3922,7 +3958,7 @@
   }
   function bindSubmit(fn) {
     var b = $('subBtn');
-    b.onclick = function () { if (!b.getAttribute('data-done')) { b.setAttribute('data-done', '1'); fn(); } };
+    b.onclick = function () { if (!b.disabled && !b.getAttribute('data-done')) { b.setAttribute('data-done', '1'); fn(); } };
   }
 
   /* ════════ 수업 라이브 (계약 L3 · 기획서 §15-3) ════════
