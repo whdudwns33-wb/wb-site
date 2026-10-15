@@ -154,8 +154,9 @@ node reading-server\tunnel\setup.mjs tunnel --token-file C:\ProgramData\WB\tunne
 메모장이 "새로 만들까요?" 하면 예 → 복사한 명령을 통째로 붙여 넣고 저장 → 닫는다. (**"문서 폴더에 저장할까요?"** 가 뜨면
 거절한다 — 관리자 터미널에서 연 메모장이 아니라는 뜻이고, 문서 폴더는 OneDrive 로 올라갈 수 있다.)
 `tunnel` 은 먼저 이 PC 에 Cloudflared 서비스가 있는지 보고(있거나 확인이 안 되면 멈춘다), cloudflared 버전을 확인하고
-(2026.7.3 미만이면 멈춘다), 토큰을 화면에 찍지 않고 서비스를 설치한다. 토큰이 든 파일은 **성공·실패와 관계없이 지운다**
-(토큰이 없는 파일 — 경로를 잘못 준 `server.env` 등 — 은 지우지 않는다). `--dry-run` 은 지우지 않으니 직접 지운다. 이미 터미널에 붙여 넣었다면: (PowerShell 에서) `Remove-Item (Get-PSReadLineOption).HistorySavePath` 로 기록 파일을 지우고,
+(2026.7.3 미만이면 멈춘다), 토큰을 화면에 찍지 않고 서비스를 설치한다. 대시보드 토큰 모양(`eyJ…` 로 시작, 풀면 계정·터널·비밀 세 칸)이
+확인된 파일은 **성공·실패와 관계없이 지운다**. 그 모양이 아닌 파일(경로를 잘못 준 `server.env` 등)과 설치된 서비스의 토큰 자리
+(`C:\ProgramData\cloudflared\`)는 읽거나 지우지 않는다. `--dry-run` 은 지우지 않으니 직접 지운다. 이미 터미널에 붙여 넣었다면: (PowerShell 에서) `Remove-Item (Get-PSReadLineOption).HistorySavePath` 로 기록 파일을 지우고,
 아래 5절 "토큰이 샜다고 의심될 때" 대로 토큰을 바꾼다.
 
 대시보드에 커넥터가 연결됨(Connected/Healthy)으로 보이면 다음으로.
@@ -264,7 +265,7 @@ WB1 에는 다른 체계가 이미 돌고 있어, 설치·이관은 원장 결�
 5. 관리자 판정(`whoami /groups` — `env`·`install-server` 가 쓰고 `doctor` 의 "관리자 권한" 줄에 보인다)·드라이브 종류
    (`[IO.DriveInfo]`)·`(Get-Service cloudflared).Status`·metrics `/ready`(127.0.0.1:20241~20245)가 실제로 읽히는지
 6. 일반(관리자 아님) 터미널에서 `setup.mjs restart-server` 가 "관리자 권한 터미널에서 실행하세요" 로 멈추는지
-7. `setup.mjs tunnel --dry-run` 이 이 PC 의 Cloudflared 서비스 유무를 맞게 말하는지(`detectCloudflaredService` — 테스트는 가짜 실행기로만 확인했다),
+7. `setup.mjs tunnel --dry-run`(토큰 파일 없이 — 관리자 아님도 된다)이 "Cloudflared 서비스: 있음/없음" 을 맞게 말하는지(`detectCloudflaredService` — 테스트는 가짜 실행기로만 확인했다),
    `host-bind.test.mjs`·서버를 띄우는 테스트들이 Windows 방화벽 아래에서 통과하는지(허용 창이 뜨면 허용하지 말고 닫는다 — 원내 모드 LAN 연결 검사만 실패하면 그 사실을 적는다)
 
 **코덱스가 하는 것 / 원장이 하는 것**
