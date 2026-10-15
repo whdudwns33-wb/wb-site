@@ -21,7 +21,7 @@ import { handleLetter, letterBodyLimit, dropStudentLetter, dumpLetter, pushDueIs
 import { checkAdminLogin } from './admin-auth.mjs';
 import { applySecurityHeaders } from './sec-headers.mjs';
 import { createInhouseAccess } from './inhouse-access.mjs';
-import { readLocalMaterials } from './naesin-local-materials.mjs';
+import { readLocalMaterials, readSourceLibrary } from './naesin-local-materials.mjs';
 import { stampServiceWorker } from './sw-version.mjs';
 import { handlePortalFamilyLink, PORTAL_LINK_BODY_LIMIT, withPortalFamilies } from './portal-family.mjs';
 import { bookIndex, cleanWords, coachingCard, confirmAllPlan, findBook, readyToConfirm, sourceSummary, validProgress, withOverlay } from './textbook.mjs';
@@ -682,6 +682,18 @@ const server = http.createServer(async (req, res) => {
       /* 내신 (/api/naesin/*) — 인증만 공유, 저장·라우트는 격리 (vocab 선례).
          json()이 모든 응답에 no-store를 붙인다 — 기획서 §10-3. */
       if (p.startsWith('/api/naesin/')) {
+        if (p === '/api/naesin/admin/source-library') {
+          if (!INHOUSE_ONLY || !inhouseAccess(req) || !who.admin) return json(res, 403, { error: '원내 PC 관리자만 원본 자료를 열 수 있습니다.' });
+          if (req.method !== 'GET') { req.resume(); return json(res, 405, { error: 'GET 요청만 가능합니다.' }); }
+          try {
+            const material = readSourceLibrary(process.env.DATA_DIR || path.join(ROOT, 'data'), url.searchParams.has('id') ? url.searchParams.get('id') : undefined, url.searchParams.get('sha256'));
+            if (!material.bytes) return json(res, 200, material);
+            res.writeHead(200, { 'Content-Type': 'application/pdf', 'Cache-Control': 'no-store', 'Content-Disposition': 'inline; filename="source.pdf"' });
+            return res.end(material.bytes);
+          } catch (error) {
+            return json(res, error.message === 'LOCAL_SOURCE_CHANGED' ? 409 : 404, { error: '원본 보관 상태를 확인하고 목록을 다시 여세요.' });
+          }
+        }
         /* 파일 선택 없이 기존 원내 보관본을 연결한다. 워커·외부 관리·학생에게는 원본을 내주지 않는다. */
         if (p === '/api/naesin/admin/job/local-review' || p === '/api/naesin/admin/job/local-pdf') {
           if (!INHOUSE_ONLY || !inhouseAccess(req) || !who.admin) return json(res, 403, { error: '원내 PC 관리자만 원본 자료를 열 수 있습니다.' });

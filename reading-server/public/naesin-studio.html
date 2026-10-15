@@ -280,6 +280,7 @@ async function openList(){
 function renderList(){
   const rows=Array.isArray(JOBS)?JOBS:[];
   $('#app').innerHTML=`
+  <div class="card"><h2>확보한 원본 자료</h2><p class="muted">학년·단원별 PDF 원본을 확인합니다. 원본 확보와 문제 팩 검수·학생 공개는 별도입니다.</p><button class="btn ghost" id="btnLibrary">학년별 원본 목록 열기</button><div id="sourceLibrary" aria-live="polite"></div></div>
   <div class="card"><h2>새 작업 <small>원천 텍스트를 붙여넣기</small></h2>
     <p class="muted">허가 확인된 자료만 사용하세요. 구매했다는 사실만으로 변환·학생 제공 권리가 생기지 않습니다. 자체 제작·공개 라이선스·학생 이용이 명시된 별도 계약만 가능합니다.
       원천과 초안은 서버의 작업 저장소에만 있고 작업을 지우면 함께 지워집니다 — 저장소에 커밋되지 않습니다.</p>
@@ -325,6 +326,7 @@ function renderList(){
   </div>`;
   renderNewSrc();
   $('#btnAddSrc').onclick=addSrc;
+  $('#btnLibrary').onclick=loadSourceLibrary;
   $('#btnCreate').onclick=createJob;
   $('#nFile').onchange=async()=>{
     const f=$('#nFile').files[0];if(!f)return;
@@ -333,6 +335,35 @@ function renderList(){
   };
   document.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>openJob(b.dataset.open));
   document.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>delJob(b.dataset.del));
+}
+async function loadSourceLibrary(){
+  const host=$('#sourceLibrary'),token=TOKEN;
+  host.textContent='원본 목록을 불러오는 중…';
+  try{
+    const data=await api('/naesin/admin/source-library');
+    if(TOKEN!==token||VIEW!=='list'||$('#sourceLibrary')!==host)return;
+    const docs=data.documents||[],groups=new Map();
+    docs.forEach(d=>{const key=d.grade+' · '+d.unit;if(!groups.has(key))groups.set(key,[]);groups.get(key).push(d);});
+    host.innerHTML='<p class="muted">확보 '+docs.length+'개 · 학생 공개 전. 원본 대조 후 문제 팩 검수를 진행하세요.</p>'
+      +[...groups].map(([key,items])=>'<details><summary style="padding:12px 0;cursor:pointer">'+esc(key.replace(/^m/,'중'))+' · '+items.length+'개</summary>'
+        +items.map(d=>'<p><button class="btn sm ghost" data-library="'+esc(d.id)+'">원본 열기</button> '+esc(d.title)+' <span class="muted">'+d.pageCount+'쪽</span></p>').join('')+'</details>').join('')
+      +'<p id="libraryStatus" role="status"></p><div id="libraryPdf"></div>';
+    host.querySelectorAll('[data-library]').forEach(button=>button.onclick=async()=>{
+      const doc=docs.find(d=>d.id===button.dataset.library),status=$('#libraryStatus');
+      const request=++PDF_READ;
+      button.disabled=true;status.textContent='원본 PDF를 여는 중…';
+      try{
+        const response=await fetch('/api/naesin/admin/source-library?id='+encodeURIComponent(doc.id)+'&sha256='+doc.sha256,{headers:{Authorization:'Bearer '+token},cache:'no-store'});
+        if(!response.ok||!/^application\/pdf(?:;|$)/i.test(response.headers.get('content-type')||''))throw new Error('원본을 열지 못했어요. 목록을 다시 열고 로그인 상태를 확인하세요.');
+        const blob=await response.blob();
+        if(TOKEN!==token||VIEW!=='list'||$('#sourceLibrary')!==host||request!==PDF_READ)return;
+        clearPdfView();PDF_VIEW={url:URL.createObjectURL(blob)};
+        $('#libraryPdf').innerHTML='<p><a target="_blank" rel="noopener noreferrer" href="'+esc(PDF_VIEW.url)+'">PDF 크게 보기</a></p><iframe title="확보한 원본 PDF" style="width:100%;height:70vh;border:0" src="'+esc(PDF_VIEW.url)+'"></iframe>';
+        status.textContent=doc.unit+' · '+doc.title;status.scrollIntoView({block:'start'});
+      }catch(e){if(TOKEN===token&&$('#sourceLibrary')===host)status.textContent=e.message;}
+      finally{button.disabled=false;}
+    });
+  }catch(e){if(TOKEN===token&&$('#sourceLibrary')===host)host.textContent=e.message;}
 }
 function renderNewSrc(){
   $('#nList').innerHTML=NEWSRC.length

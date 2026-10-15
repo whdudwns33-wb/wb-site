@@ -30,7 +30,7 @@ function screen(){
   const decode=s=>s.replace(/&(amp|lt|gt|quot|#39);/g,(_,key)=>({amp:'&',lt:'<',gt:'>',quot:'"','#39':"'"}[key]));
   function node(s){if(!s.startsWith('#')||!ids.has(s.slice(1)))return null;
     if(!nodes.has(s)){
-      const el={textContent:'',value:'',files:[],...(rendered.get(s)||{disabled:false}),hidden:false,focus(){},querySelectorAll:()=>[],querySelector:()=>null};let markup='';
+      const el={textContent:'',value:'',files:[],...(rendered.get(s)||{disabled:false}),hidden:false,focus(){},scrollIntoView(){},querySelectorAll:()=>[],querySelector:()=>null};let markup='';
       Object.defineProperty(el,'innerHTML',{get:()=>markup,set:value=>{markup=value;if(s==='#app'||s==='#rowList'){
         if(s==='#app'){rendered.clear();appGeneration++;}else rowRenders++;
         for(const m of value.matchAll(/<[^>]+\bid="([^"]+)"[^>]*>/g)){
@@ -40,7 +40,7 @@ function screen(){
           rendered.set(selector,attrs);if(nodes.has(selector))Object.assign(nodes.get(selector),attrs);
         }
       }}});
-      if(s==='#rowList')el.querySelectorAll=selector=>{
+      if(s==='#rowList'||s==='#sourceLibrary')el.querySelectorAll=selector=>{
         const rows=selector==='.row'?/\bdata-key="([^"]+)"/g:/^\[data-[a-z]+\]$/.test(selector)?new RegExp('\\b'+selector.slice(1,-1)+'="([^"]+)"','g'):null;
         if(!rows)return[];return Array.from(markup.matchAll(rows),m=>{
           const attr=selector==='.row'?'key':selector.slice(6,-1),key=selector+decode(m[1]);
@@ -79,7 +79,7 @@ function screen(){
     fetch:async(url,opt)=>{requests.push({url,...opt});return fetchImpl(url,opt);}});
   const stop=inline.indexOf("$('#bannerClose').onclick=hideBanner;");assert.ok(stop>1000);
   vm.runInContext(inline.slice(0,stop)+`
-    this.ui={putPdfReviewFile,putDraftFiles,putDraft,pdfReviewDraft,regularDraft,pdfColumnsHtml,pdfSentenceHtml,loadPdfSentence,savePdfSentence,savePdfWord,renderSrc,renderJob,review,bulkOk,openJob,openList,renderLogin,rowKey,
+    this.ui={loadSourceLibrary,list:()=>{VIEW='list';},putPdfReviewFile,putDraftFiles,putDraft,pdfReviewDraft,regularDraft,pdfColumnsHtml,pdfSentenceHtml,loadPdfSentence,savePdfSentence,savePdfWord,renderSrc,renderJob,review,bulkOk,openJob,openList,renderLogin,rowKey,
       get:()=>({JOB,GATE,PDF_LOCAL,PDF_VIEW,PDF_WORD_EDIT,VIEW,SEL,EDIT,SRC,BUSY}),set:j=>{JOB=j;GATE={ok:false,pending:0,total:0,errors:[],warns:[],summary:[]};VIEW='job';JOB_READ++;},
       setGate:g=>{GATE=g;},setLocal:p=>{PDF_LOCAL=p;},setToken:t=>{TOKEN=t;},showAll:()=>{FONLY='all';renderJob();}};`,ctx);
   ctx.ui.set(stored);
@@ -97,6 +97,18 @@ function wordInput(ui,head=' own fixed word ',pos=' adj. ',meanings=' 뜻 하나
 function wordSection(ui,section,checked){const el=ui.node('#pdfWord'+section);el.checked=checked;el.onchange();}
 
 (async()=>{
+  await t('원본 자료실은 학년·단원으로 묶고 인증 PDF만 열며 검수·게시를 쓰지 않는다',async()=>{
+    const ui=screen();ui.list();
+    const own={id:'src-000001',packId:'own-pack',grade:'m1',unit:'1과',title:'Own <title>',sha256:ownPdfSha,pageCount:1};
+    ui.setFetch(async url=>url.includes('?id=')?pdfResponse():response({documents:[own]}));
+    await ui.loadSourceLibrary();
+    assert.match(ui.node('#sourceLibrary').innerHTML,/중1 · 1과/);assert.match(ui.node('#sourceLibrary').innerHTML,/Own &lt;title&gt;/);
+    await ui.node('#sourceLibrary').querySelectorAll('[data-library]')[0].onclick();
+    assert.match(ui.node('#libraryPdf').innerHTML,/<iframe/);assert.equal(ui.created.length,1);
+    assert.ok(ui.requests.every(r=>!r.method||r.method==='GET'));
+    assert.ok(ui.requests.every(r=>r.headers.Authorization==='Bearer own-test-admin-token'));
+    ui.renderLogin();assert.equal(ui.revoked.length,1);
+  });
   await t('새 작업·기존 작업 상세에 권리 근거 입력과 구매 비허가 안내를 보인다',()=>{
     for(const id of ['nRightsBasis','nRightsHolder','nRightsEvidence','nRightsExpiry','nStudentAllowed','nDerivativeAllowed','nAiAllowed','rBasis','rHolder','rEvidence','rExpiry','rStudent','rDerivative','rAi','btnRights']) assert.ok(ids.has(id),'권리 입력 누락 '+id);
     assert.match(html,/구매했다는 사실만으로 변환·학생 제공 권리가 생기지 않습니다/);

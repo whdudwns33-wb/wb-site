@@ -3,6 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import CHECK from '../naesin/pack-check.js';
 
 const DRAFT_MAX = 8 * 1024 * 1024;
 const PDF_MAX = 32 * 1024 * 1024;
@@ -18,6 +19,35 @@ const FOLDER_ROLES = {'00':'textbook','01':'content_summary','02':'passage_workb
 const CANONICAL_FILES = { '02': '02_본문워크북.pdf', '03': '03_단어시험.pdf' };
 const fail = () => { throw new Error('LOCAL_SOURCE_UNAVAILABLE'); };
 const samePath = (a, b) => !path.relative(a, b);
+
+export function readSourceLibrary(dataDir, id, expectedSha256) {
+  const root = directory(path.join(directory(path.dirname(path.resolve(dataDir))), 'naesin-materials', 'library'));
+  const index = JSON.parse(readRegular(path.join(root, 'index.json'), DRAFT_MAX).toString('utf8'));
+  if (index.version !== 1 || CHECK.rightsErrors(index.rights).length || index.rights.externalAiAllowed !== false
+    || !Array.isArray(index.documents) || index.documents.length > 5000) fail();
+  const seen = new Set();
+  for (const doc of index.documents) {
+    if (!doc || !/^src-\d{6}$/.test(doc.id) || seen.has(doc.id) || !/^[A-Za-z0-9-]{3,60}$/.test(doc.packId)
+      || !['m1','m2','m3'].includes(doc.grade) || !['unit','title'].every(k => typeof doc[k] === 'string' && doc[k].length > 0 && doc[k].length <= 500)
+      || typeof doc.file !== 'string' || doc.file.length > 1000 || !doc.file.startsWith(doc.packId + '/')
+      || doc.file.split('/').some(s => !s || s === '.' || s === '..' || /[\\:\x00-\x1f]/.test(s)) || !doc.file.endsWith('.pdf')
+      || !Number.isInteger(doc.bytes) || doc.bytes < 5 || doc.bytes > PDF_MAX || !/^[a-f0-9]{64}$/.test(doc.sha256)
+      || !Number.isInteger(doc.pageCount) || doc.pageCount < 1 || doc.pageCount > 1000000) fail();
+    seen.add(doc.id);
+  }
+  if (id === undefined) return { documents: index.documents.map(({id,packId,grade,unit,title,bytes,sha256,pageCount}) => ({id,packId,grade,unit,title,bytes,sha256,pageCount})), studentPublished: false };
+  if (!/^src-\d{6}$/.test(id) || !/^[a-f0-9]{64}$/.test(expectedSha256)) fail();
+  const doc = index.documents.find(d => d.id === id);
+  if (!doc) fail();
+  if (doc.sha256 !== expectedSha256) throw new Error('LOCAL_SOURCE_CHANGED');
+  const parts = doc.file.split('/');
+  let dir = root;
+  for (const part of parts.slice(0,-1)) dir = directory(path.join(dir,part));
+  const bytes = readRegular(path.join(dir,parts.at(-1)),PDF_MAX);
+  if (bytes.length !== doc.bytes || bytes.subarray(0,5).toString('ascii') !== '%PDF-'
+    || crypto.createHash('sha256').update(bytes).digest('hex') !== doc.sha256) throw new Error('LOCAL_SOURCE_CHANGED');
+  return { bytes };
+}
 
 function directory(p) {
   const stat = fs.lstatSync(p);
