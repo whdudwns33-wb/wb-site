@@ -25,6 +25,28 @@
 - **금고(A.5, 국어 자료를 원장 PC 2대로)는 이 키트에 들어 있지 않다.** 원장 확인 4건이 끝나기 전에는
   코드를 쓰지 않기로 했다(정본 문서 §1.5 「남은 것」). 금고를 만들 때도 이 터널에 경로를 더하는 식이다.
 
+## ⚠ 먼저 읽기 — WB1 에는 이미 다른 체계가 돌고 있다 (2026-10-15)
+
+이 키트는 2026-10-12 에 "원장 PC 에 **처음** 까는" 전제로 만들었다. 그 사이 WB1 에는 다른 방식의 관리 서버·터널이
+이미 운영 중이다(키트는 아직 어느 PC 에도 설치되지 않았다).
+
+| WB1 에 이미 있는 것 | 근거 |
+|---|---|
+| 국어 관리 서버 — `reading-server/start-admin.ps1` → `127.0.0.1:8891`, 예약 작업(사용자 로그온), 자료 `%LOCALAPPDATA%\WB\korean-admin-server` | `docs/코덱스-외부작업-인수인계-2026-10-14.md` §3 |
+| 기존 Cloudflare 터널(이 PC 의 cloudflared) + Access(원장 1명 허용) | 같은 문서 §3 |
+| 영어 내신 서버가 **8890**(= 이 키트의 기본 포트)을 쓰고, 같은 터널에 경로가 붙어 있다 | 미병합 브랜치 `codex/naesin-practice-assignment` 의 `docs/내신브레인-원내PC-실운영-계획.md` |
+
+그래서 **원장이 "이 키트로 옮긴다"고 정하기 전에는 어느 PC 에도 설치하지 않는다.** WB1 에서는 특히:
+
+- `setup.mjs tunnel` 을 돌리지 않는다(기존 Cloudflared 서비스가 있으면 이제 도구가 거절하고 토큰 파일을 지운다).
+  **`cloudflared service uninstall` 을 치지 않는다** — 그 PC 의 기존 관리 주소가 모두 끊긴다. 새 주소가 필요하면 원장이
+  대시보드에서 기존 터널에 경로(Published application)를 더한다.
+- `install-server` 의 `DATA_DIR` 에 다른 서버의 자료 폴더를 적지 않는다(잠그면 그 서버가 자기 `db.json` 을 못 연다 — AppData 아래는 이제 거절한다).
+- `doctor` 는 이 키트의 설치를 기준으로 본다. WB1 에서 "작업 없음·서비스 없음" 은 예상된 결과이고, "직접 띄운 `server.mjs` 창을 닫으라"는
+  권고를 WB1 에서 따르지 않는다 — 8890 의 영어 서버(또는 다른 개발 서버)를 끄게 된다.
+
+옮기기로 정했을 때의 순서는 맨 아래 「WB1 을 이 키트로 옮길 때」를 따른다.
+
 ## 들어 있는 것
 
 | 파일 | 하는 일 |
@@ -161,7 +183,7 @@ node reading-server\tunnel\setup.mjs doctor
 | 자료 백업 | `DATA_DIR` 을 **NAS** 로(원장 결정 — 클라우드 동기화 폴더는 쓰지 않는다). 방법은 아직 정하지 않았다(아래 남은 일) |
 | cloudflared 업데이트 | **자동 갱신이 없다.** 분기마다 최신 MSI 를 다시 설치 → `net stop cloudflared` → `net start cloudflared` → `doctor` |
 | 강사 추가·퇴사 | Access 정책의 Emails 목록을 고친다. 퇴사하면 Users 에서 Revoke + Remove(자리를 비운다) |
-| 토큰이 샜다고 의심될 때 | 대시보드에서 터널 → Rotate token → `cloudflared service uninstall` → 새 명령을 3-4 처럼 토큰 파일로 `setup.mjs tunnel` |
+| 토큰이 샜다고 의심될 때 | 대시보드에서 터널 → Rotate token → (**이 키트로 깐 서비스일 때만**) `cloudflared service uninstall` → 새 명령을 3-4 처럼 토큰 파일로 `setup.mjs tunnel`. 기존 터널이 함께 돌던 PC 라면 uninstall 이 그 경로까지 끊으니 원장과 순서를 정한다 |
 | 관리 웹 저장이 갑자기 안 될 때 | Access 세션(24시간)이 끝난 것일 수 있다 — 새로고침하면 다시 이메일 코드를 묻는다 |
 
 ## 6. 문제 해결 — `doctor` 메시지별
@@ -191,7 +213,8 @@ node reading-server\tunnel\setup.mjs doctor
 node reading-server\tunnel\setup.mjs uninstall-server
 cloudflared service uninstall
 ```
-첫 줄은 자동 시작과 코드 사본을 지운다(자료·설정 파일은 남는다). 둘째 줄은 터널 서비스와 토큰 파일을 지운다.
+첫 줄은 자동 시작과 코드 사본을 지운다(자료·설정 파일은 남는다). 둘째 줄은 터널 서비스와 토큰 파일을 지운다 —
+**이 키트로 깐 서비스일 때만** 친다(서비스는 PC 당 하나라, 기존 터널이 돌던 PC 에서 치면 그 경로까지 끊긴다).
 그다음 대시보드에서 경로(Route)·터널·Access 응용을 지운다. (1~7절의 명령은 PowerShell·명령 프롬프트 어느 쪽에서나 같다 —
 3-4 의 `Remove-Item` 줄만 PowerShell 전용이다. 도구가 화면에 보여 주는 `> icacls …` 줄을 PowerShell 에 그대로 붙여 넣을 때는
 `*S-1-5-32-544:(OI)(CI)F` 를 따옴표로 감싼다.)
@@ -221,7 +244,8 @@ cloudflared service uninstall
 
 ## 코덱스가 이어받을 때 (원장 PC 에서)
 
-**지금 상태 (2026-10-12)** — 키트 코드·테스트는 들어갔다. Linux CI 에서 실행기·점검 로직·작업 정의 생성까지
+**지금 상태 (2026-10-15)** — 키트는 PR #447(미병합)에만 있고 **어느 PC 에도 설치하지 않았다.** 맨 위 「먼저 읽기」대로
+WB1 에는 다른 체계가 이미 돌고 있어, 설치·이관은 원장 결정이 먼저다. 키트 코드·테스트는 들어갔다. Linux CI 에서 실행기·점검 로직·작업 정의 생성까지
 돌려 봤지만 **Windows 실기에서는 아직 한 번도 돌려 보지 않았다.** 아래가 실기에서 처음 확인할 것들이다.
 
 1. `schtasks /Create /XML … /RU SYSTEM` 이 UTF-16 작업 정의(한글 설명 포함)를 받는지 — 파일 인코딩 규칙은 공식 문서에 없다.
@@ -243,7 +267,10 @@ cloudflared service uninstall
 - 원장: 설정 파일의 **비밀번호 입력**, Cloudflare **대시보드 클릭 전부**(Zero Trust·Access·터널·경로), 터널 토큰 다루기.
   코덱스는 비밀 값을 받거나 출력하지 않는다.
 
-**첫 프롬프트 예시**
+코덱스의 Windows 샌드박스는 명령을 관리자 권한 없이 돌린다 — `env`·`install-server`·`restart-server` 는 샌드박스 밖 실행을
+승인하거나, 원장이 관리자 터미널에서 직접 친다. 터널 토큰과 비밀번호는 어느 쪽이든 코덱스에게 주지 않는다.
+
+**첫 프롬프트 예시** (원장이 설치·이관을 정한 뒤에만)
 
 > `reading-server/tunnel/README.md` 를 읽고 원장 PC 에서 1단계부터 진행해 줘. 관리자 터미널이야.
 > 비밀번호는 내가 메모장에 직접 넣을게. 각 단계 뒤에 `setup.mjs doctor` 결과를 보여 주고,
@@ -259,3 +286,19 @@ cloudflared service uninstall
 - 로컬 서버의 관리 로그인에는 횟수 제한이 없다(운영 워커에만 있다). 지금은 Access 와 127.0.0.1 묶기가 앞을 막는다 —
   둘 중 하나가 빠지는 날을 대비해 `server.mjs` 에도 같은 제한을 둘지 정한다.
 - `store.mjs` 는 종료 신호 때 300ms 지연 저장을 비우지 않는다 — 작업 끝내기·재부팅 직전 저장 한 번이 빠질 수 있다.
+
+### WB1 을 이 키트로 옮길 때 (원장이 정한 경우에만)
+
+옮길지·말지는 원장 결정이다. 옮기면 얻는 것: 로그인하지 않아도 뜨는 서버(SYSTEM), 관리자 전용 코드 사본, 날짜별 로그·14일 정리,
+깨진 `db.json` 보호, `doctor`. 옮기기 전에 정할 것: 포트(기존 경로를 살리려면 8891), Access 범위(지금 원장 1명), 자료 이전 방식.
+
+1. 원장 결정과 확인 — 기존 터널의 연결기가 Windows 서비스인지(`Get-Service cloudflared`), 예약 작업 정의(`Get-ScheduledTask -TaskPath '\WB 앱\'`)
+2. 기존 예약 작업 `\WB 앱\WB 국어 관리자 서버` 를 **끄고** 서버가 내려갔는지 확인한다(되돌릴 때 다시 켠다)
+3. `%LOCALAPPDATA%\WB\korean-admin-server\db.json` 을 새 `DATA_DIR`(예: `C:\WB_server_data`)로 **복사**한다 — 옮기지 않는다, 원본은 그대로
+4. 원장이 `server.env` 에 비밀번호를 직접 넣는다 — 기존 `admin.credential.xml` 은 그 Windows 사용자에게 묶여 있어 SYSTEM 이 풀지 못한다.
+   기존 경로를 그대로 쓰려면 `PORT=8891`
+5. **병합된 main** 의 clone 에서 `setup.mjs env` → `install-server` (작업 브랜치 폴더에서 돌리면 미병합 코드가 SYSTEM 사본으로 올라간다)
+6. 터널은 **새로 깔지 않는다** — 기존 터널을 그대로 두고, 포트를 바꿨다면 원장이 대시보드에서 그 경로의 Service URL 만 고친다
+7. `setup.mjs doctor --host <기존 관리 호스트>` — "cloudflared 서비스 ✗" 는 연결기가 서비스가 아닐 때 예상된 결과다.
+   연결기가 로그온 작업이면 "로그인하지 않아도 바깥에서 열린다" 는 여전히 성립하지 않는다(연결기도 옮겨야 한다 — 원장과)
+

@@ -366,6 +366,10 @@ export function sharedFolderReason(dir, platform = process.platform) {
     const parts = abs.split('\\').filter(Boolean).map((x) => x.toLowerCase());
     if (parts[1] === 'users' && parts.length <= 3) return '사용자 폴더';
     if (parts[1] === 'users' && parts.length === 4 && SHELL_DIRS.test(parts[3])) return '사용자 폴더(바탕 화면·문서 등)';
+    /* AppData 아래는 그 사용자로 도는 프로그램의 자료 자리다 — WB1 의 국어 관리 서버(start-admin.ps1)도
+       %LOCALAPPDATA%\WB\… 에 db.json 을 둔다. 그 폴더를 관리자 전용으로 잠그면 그 서버가 자기 db.json 을 못 열고,
+       둘이 같이 뜨면 같은 db.json 을 서로 덮어쓴다. 폴더 안 이름(db.json·logs·backups)만으로는 '우리 것'과 구별되지 않는다. */
+    if (parts[1] === 'users' && parts[3] === 'appdata') return '사용자 프로그램 자료 폴더(AppData — 다른 서버의 db.json 이 있을 수 있는 자리)';
     if (parts.length === 2 && /^(windows|program files|program files \(x86\)|programdata|users)$/.test(parts[1])) return '시스템 폴더';
     if (parts[1] === 'windows') return '시스템 폴더';
   }
