@@ -54,3 +54,14 @@ test('migration retains both rows when inventory source metadata conflicts',asyn
   await scan(m);assert.equal(legacy.error,'MIGRATION_METADATA_CONFLICT');assert.equal(slot.rawPath,null);
   assert.equal(legacy.source.title,'다른 목록 제목');assert.equal(slot.source.title,'단계 목록');
 });
+
+test('held scopes stay on disk but are excluded from active manifest until released',async t=>{
+  const root=await fixture(t),folder='2015-m3-p01-m3-L1',full=path.join(root,folder,'_raw','01_자료.pdf');
+  await fs.mkdir(path.dirname(full),{recursive:true});await fs.writeFile(full,pdf('held'));
+  await fs.mkdir(path.join(root,'_acquisition'),{recursive:true});
+  await fs.writeFile(path.join(root,'_acquisition','holds.json'),JSON.stringify({version:1,folders:[{folderName:folder,reason:'out-of-order'}]}));
+  const m=fresh(root);await scan(m);await verify(m);
+  assert.equal(report(m).files,0);assert.equal(m.rows.length,0);assert.equal(await fs.readFile(full,'utf8'),pdf('held'));
+  await fs.unlink(path.join(root,'_acquisition','holds.json'));await scan(m);await verify(m);
+  assert.equal(report(m).files,1);assert.equal(report(m).statusCounts.verified,1);assert.equal(await fs.readFile(full,'utf8'),pdf('held'));
+});
