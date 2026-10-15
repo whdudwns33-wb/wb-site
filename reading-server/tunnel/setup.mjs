@@ -165,8 +165,42 @@ export function planTunnel({ cloudflared, token, versionText, tokenFile, dryRun 
   return [
     { run: [cloudflared, 'service', 'install', token], secret: token, why: 'cloudflared 를 Windows 서비스로 설치(부팅 때 자동 시작 · 토큰은 C:\\ProgramData\\cloudflared\\token 에 관리자·SYSTEM 만)' },
     ...(tokenFile ? [{ remove: tokenFile, why: '토큰 파일 지우기(서비스가 따로 보관한다)' }] : []),
-    { note: '"already installed" 가 나오면 먼저 cloudflared service uninstall 뒤 다시' },
   ];
+}
+
+/* 이 PC 에 Cloudflared 서비스가 이미 있으면 새로 깔지 않는다. 서비스는 PC 당 하나뿐이고, 그때 cloudflared 가
+   내는 안내('service uninstall 뒤 다시')를 따르면 그 PC 에서 돌던 기존 터널이 끊긴다 — WB1 에는 국어·영어 관리
+   경로가 붙은 기존 터널이 있다(docs/코덱스-외부작업-인수인계-2026-10-14.md §3). 새 주소가 필요하면 기존 터널에
+   경로(Published application)를 더한다. */
+export const EXISTING_SERVICE_MSG = '이 PC 에는 Cloudflared 서비스가 이미 있습니다(기존 터널이 돌고 있습니다). 새 토큰을 설치하지 않습니다 — '
+  + '새 주소가 필요하면 원장이 대시보드에서 기존 터널에 경로(Published application)를 더합니다. '
+  + '`cloudflared service uninstall` 은 실행하지 마세요 — 그 PC 의 기존 관리 주소가 모두 끊깁니다';
+
+/* 터널 설치 한 번. 토큰 파일은 성공·실패와 관계없이 마지막에 지운다 — 예전에는 서비스 설치가 실패하면 지우는
+   단계까지 가지 못해 토큰이 디스크에 남았다. 다시 할 때는 대시보드의 설치 명령을 새로 복사한다. */
+export function runTunnel({ tokenFile, dryRun = false, cloudflared, versionText = '', serviceExists = false, exec = execute, fsx = fs }) {
+  const drop = () => { if (!dryRun) { try { fsx.rmSync(tokenFile, { force: true }); } catch { /* 지울 수 없으면 아래 안내대로 손으로 */ } } };
+  try {
+    let text;
+    try { text = fsx.readFileSync(tokenFile, 'utf8'); }
+    catch (e) {
+      if (e && (e.code === 'EACCES' || e.code === 'EPERM')) throw new Error(`토큰 파일을 읽을 권한이 없습니다: ${tokenFile} — 관리자 터미널에서 실행하세요`);
+      throw new Error(`토큰 파일이 없습니다: ${tokenFile} — 같은 관리자 터미널에서 notepad "${tokenFile}" 로 만들어 저장하세요(문서 폴더로 저장하라는 창이 뜨면 거절)`);
+    }
+    if (serviceExists && !dryRun) throw new Error(EXISTING_SERVICE_MSG);
+    if (!cloudflared) throw new Error('Program Files 아래에서 cloudflared 를 찾지 못했습니다 — README 2단계의 공식 설치 파일(cloudflared-windows-amd64.msi)로 먼저 설치하세요');
+    const token = readToken(text);
+    exec(planTunnel({ cloudflared, token, versionText, tokenFile, dryRun }), { dryRun });
+  } catch (e) {
+    if (!dryRun && fsx.existsSync(tokenFile)) {
+      drop();
+      if (!fsx.existsSync(tokenFile)) e.message += ' · 토큰 파일은 지웠습니다(디스크에 남기지 않습니다) — 다시 할 때는 대시보드의 설치 명령을 새로 복사해 저장하세요';
+      else e.message += ` · ⚠ 토큰 파일을 지우지 못했습니다 — 관리자 터미널에서 직접 지우세요: ${tokenFile}`;
+    }
+    throw e;
+  } finally {
+    drop();
+  }
 }
 
 export function readToken(text) {
@@ -549,8 +583,8 @@ export async function doctor({ envFile, host, appDir } = {}, deps = {}) {
       const line = String((pn && pn.stdout) || '').trim();
       const bin = ((/^"([^"]+)"/.exec(line) || /^(\S+?\.exe)\b/i.exec(line) || [])[1] || '').toLowerCase();
       const okBin = cloudflaredCandidates(env).some((c) => path.win32.normalize(c).toLowerCase() === path.win32.normalize(bin || ' ').toLowerCase());
-      if (line && /--token(\s|=)/.test(line)) add('fail', 'cloudflared 서비스', '서비스 실행 줄에 토큰이 평문으로 있습니다(옛 설치) — cloudflared service uninstall 뒤 setup.mjs tunnel 로 다시, 그리고 대시보드에서 토큰 교체');
-      else if (line && !okBin) add('fail', 'cloudflared 서비스', `서비스가 Program Files 밖의 cloudflared 를 돌립니다(${path.win32.dirname(bin)}) — cloudflared service uninstall 뒤 MSI 설치본으로 setup.mjs tunnel`);
+      if (line && /--token(\s|=)/.test(line)) add('fail', 'cloudflared 서비스', '서비스 실행 줄에 토큰이 평문으로 있습니다(옛 설치) — 원장과 정할 일: uninstall 하면 이 서비스에 붙은 기존 관리 주소가 모두 끊깁니다. 다시 깔 때는 대시보드에서 토큰 교체 → 새 토큰으로 setup.mjs tunnel');
+      else if (line && !okBin) add('fail', 'cloudflared 서비스', `서비스가 Program Files 밖의 cloudflared 를 돌립니다(${path.win32.dirname(bin)}) — 원장과 정할 일: uninstall 하면 이 서비스에 붙은 기존 관리 주소가 모두 끊깁니다. 다시 깔 때는 MSI 설치본으로 setup.mjs tunnel`);
     }
     const exe = findCloudflared({ exists, env });
     if (!exe) add('fail', 'cloudflared 설치', 'Program Files 아래에 cloudflared 가 없습니다 — README 2단계의 공식 설치 파일(MSI)로');
@@ -716,17 +750,11 @@ export async function main(argv = process.argv.slice(2)) {
       const raw = argValue(argv, '--token-file');
       if (!raw) throw new Error('--token-file <파일> 을 주세요 — 대시보드의 설치 명령을 메모장에 붙여 넣어 저장한 파일');
       const tokenFile = path.resolve(raw);
-      let text;
-      try { text = fs.readFileSync(tokenFile, 'utf8'); }
-      catch (e) {
-        if (e && (e.code === 'EACCES' || e.code === 'EPERM')) throw new Error(`토큰 파일을 읽을 권한이 없습니다: ${tokenFile} — 관리자 터미널에서 실행하세요`);
-        throw new Error(`토큰 파일이 없습니다: ${tokenFile} — 같은 관리자 터미널에서 notepad "${tokenFile}" 로 만들어 저장하세요(문서 폴더로 저장하라는 창이 뜨면 거절)`);
-      }
-      const token = readToken(text);
       const cloudflared = findCloudflared() || (dryRun ? 'C:\\Program Files (x86)\\cloudflared\\cloudflared.exe' : '');
-      if (!cloudflared) throw new Error('Program Files 아래에서 cloudflared 를 찾지 못했습니다 — README 2단계의 공식 설치 파일(cloudflared-windows-amd64.msi)로 먼저 설치하세요');
-      const versionText = dryRun ? '' : String(quiet([cloudflared, '--version']).stdout || '').trim();
-      execute(planTunnel({ cloudflared, token, versionText, tokenFile, dryRun }), { dryRun });
+      const versionText = dryRun || !cloudflared ? '' : String(quiet([cloudflared, '--version']).stdout || '').trim();
+      /* doctor 와 같은 방법으로 본다 — 서비스 이름은 대소문자를 가리지 않는다 */
+      const serviceExists = !dryRun && !!String(quiet(['powershell', '-NoProfile', '-NonInteractive', '-Command', '(Get-Service -Name cloudflared -ErrorAction SilentlyContinue).Status']).stdout || '').trim();
+      runTunnel({ tokenFile, dryRun, cloudflared, versionText, serviceExists });
       return 0;
     }
     case 'doctor': {

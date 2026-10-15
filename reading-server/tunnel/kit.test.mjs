@@ -198,6 +198,9 @@ const v = (vars, envFile = ENVF) => validateServerEnv({ vars, envFile, repoRoot:
   eq(sharedFolderReason('C:\\ProgramData\\WB', 'win32'), '', '기본 설정 폴더를 막았다');
   ok(sharedFolderReason('C:\\ProgramData', 'win32'), 'ProgramData 자체를 받았다');
   ok(sharedFolderReason('C:\\Users\\wb\\Documents', 'win32'), '문서 폴더를 받았다');
+  /* WB1 의 국어 관리 서버(start-admin.ps1)가 쓰는 자리 — 잠그면 그 서버가 자기 db.json 을 못 연다 */
+  ok(/AppData/.test(sharedFolderReason('C:\\Users\\wb\\AppData\\Local\\WB\\korean-admin-server', 'win32')), 'AppData 깊은 곳(다른 서버의 자료 폴더)을 받았다');
+  ok(v({ ...good, DATA_DIR: 'C:\\Users\\wb\\AppData\\Local\\WB\\korean-admin-server' }).errors.some((e) => /AppData/.test(e)), 'WB1 국어 관리 서버의 자료 폴더를 DATA_DIR 로 받았다 — 잠그면 운영 서버가 멈춘다');
   ok(sharedFolderReason('C:\\', 'win32'), 'C:\\ 를 받았다');
   eq(folderState(null, ENV_DIR_OWN), 'absent', '없는 폴더');
   eq(folderState([], ENV_DIR_OWN), 'empty', '빈 폴더');
