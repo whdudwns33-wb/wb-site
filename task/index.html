@@ -8513,7 +8513,8 @@ function lessonDraftFromTask(t) {
     scheduleText: t.scheduleText || '',
     scheduleSlots: Array.isArray(t.scheduleSlots) && t.scheduleSlots.length
       ? t.scheduleSlots.map(slot => ({ days: (slot.days || []).slice(), startTime: slot.startTime || '', endTime: slot.endTime || '',
-          lessonHours: lessonHoursValue(slot.lessonHours) || lessonHoursValue(t.lessonHours) }))
+          lessonHours: lessonHoursValue(slot.lessonHours) || lessonHoursValue(t.lessonHours),
+          slotId: slot.slotId || '', validFrom: slot.validFrom || t.start || '', validTo: slot.validTo || '' }))
       : [{ days: [], startTime: '', endTime: '', lessonHours: lessonHoursValue(t.lessonHours) }],
     materials: t.materials || '', onlineProgram: t.onlineProgram || (t.onlinePrograms || []).join(', '),
     homework: t.homework || '', studentTraits: t.studentTraits || '', goal: t.goal || '',
@@ -8547,8 +8548,14 @@ function lessonClockSummary(slot) {
 
 function lessonSlotHtml(slot, index) {
   slot = slot || { days: [], startTime: '', endTime: '', lessonHours: '' };
+  if (slot.validTo && slot.validTo < today()) {
+    return '<details class="lesson-slot"><summary>지난 시간표 · ' + esc(slot.validTo) + '까지 (기록 보존)</summary><div class="hint">' +
+      esc((slot.days || []).map(day => DOW[day]).join('·') + ' ' + slot.startTime + '–' + slot.endTime + ' · ' + (slot.lessonHours || '')) +
+      '</div></details>';
+  }
   return '<div class="lesson-slot"><div class="between mb8"><b>확정 시간 ' + (index + 1) + '</b>' +
     '<button class="btn btn-sm btn-danger" data-act="lessonslotdel" data-i="' + index + '">삭제</button></div>' +
+    (slot.validFrom ? '<div class="hint mb8">적용 기간: ' + esc(slot.validFrom) + '부터' + (slot.validTo ? ' ' + esc(slot.validTo) + '까지' : '') + '</div>' : '') +
     '<div class="chips">' + DOW_DISPLAY_ORDER.map(dayIndex =>
       '<button type="button" class="chip dow ' + ((slot.days || []).includes(dayIndex) ? 'on' : '') + '" data-act="lessonday" data-i="' + index + '" data-d="' + dayIndex + '">' + DOW[dayIndex] + '</button>'
     ).join('') + '</div>' +

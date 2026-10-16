@@ -116,12 +116,17 @@ function normalizeSlots(rawSlots, validFrom, lessonRole, fallbackLessonHours) {
     if (!days.length || startMinute === null || endMinute === null || endMinute <= startMinute || !LESSON_HOURS.has(lessonHours)) {
       throw new Error((index + 1) + '번째 확정 시간의 요일·시작·종료·수업시수를 확인해 주세요');
     }
+    const slotFrom = raw && raw.validFrom ? dateValue(raw.validFrom) : validFrom;
+    const slotTo = raw && raw.validTo ? dateValue(raw.validTo) : '';
+    if (slotTo && slotTo < slotFrom) throw new Error('시간대 적용 기간을 확인해 주세요');
     return {
       days,
       startTime: clockText(startMinute),
       endTime: clockText(endMinute),
       lessonHours,
-      validFrom,
+      validFrom: slotFrom,
+      ...(slotTo ? { validTo: slotTo } : {}),
+      ...(raw && /^[A-Za-z0-9_-]{1,128}$/.test(raw.slotId || '') ? { slotId: raw.slotId } : {}),
       lessonRole,
       status: 'normal'
     };
@@ -129,7 +134,7 @@ function normalizeSlots(rawSlots, validFrom, lessonRole, fallbackLessonHours) {
 
   const seen = new Set();
   const canonical = normalized.filter(slot => {
-    const key = [slot.days.join(','), slot.startTime, slot.endTime, slot.lessonHours].join('|');
+    const key = [slot.days.join(','), slot.startTime, slot.endTime, slot.lessonHours, slot.validFrom, slot.validTo || ''].join('|');
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -145,6 +150,7 @@ function normalizeSlots(rawSlots, validFrom, lessonRole, fallbackLessonHours) {
       const left = canonical[leftIndex];
       const right = canonical[rightIndex];
       if (!left.days.some(day => right.days.includes(day))) continue;
+      if ((left.validTo && left.validTo < right.validFrom) || (right.validTo && right.validTo < left.validFrom)) continue;
       if (clockMinute(left.startTime) < clockMinute(right.endTime) &&
           clockMinute(right.startTime) < clockMinute(left.endTime)) {
         throw new Error('같은 요일에 겹치는 확정 시간이 있습니다');
@@ -152,7 +158,14 @@ function normalizeSlots(rawSlots, validFrom, lessonRole, fallbackLessonHours) {
     }
   }
 
-  return canonical.map((slot, index) => ({ ...slot, slotId: 'slot-' + (index + 1) }));
+  const ids = new Set(canonical.map(slot => slot.slotId).filter(Boolean));
+  return canonical.map((slot, index) => {
+    if (slot.slotId) return slot;
+    let id = 'slot-' + (index + 1);
+    while (ids.has(id)) id += '-new';
+    ids.add(id);
+    return { ...slot, slotId: id };
+  });
 }
 
 function scheduleTextFromSlots(slots) {
