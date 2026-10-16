@@ -84,17 +84,43 @@ test("candidate notes from another admission year and future DB rows are exclude
   const groups=c.jGroups("2027");assert.equal(groups.length,1);assert.equal(groups[0].note,current);
   assert.equal(c.jRuleFor({...groups[0],admissionYear:"2028"}),null);
 });
-test("clearing exam selection clears selected state and rendered result while retaining saved exams",()=>{
+test("clearing exam selection hides results while preserving that exam's comparison selection",()=>{
   const {c,s,main}=fixture([rule()]),e=c.jSaveExam(s,exam());c.view.jTab="candidates";
-  c.view.jExamDraft=plain(e);c.view.jRuleDraft=rule();c.view.jCompare=["stale-key"];c.renderJeongsi();
+  c.view.jExamDraft=plain(e);c.view.jRuleDraft=rule();c.renderJeongsi();c.jToggleCompare(0,true);
+  const keys=Array.from(c.jCompareKeys(s,e));assert.equal(keys.length,1);
   assert.ok(main().includes("합성 원본 시험 기준 후보"));
   c.jChooseExam("");assert.equal(c.jState(s).examId,"");assert.equal(c.jActiveExam(s),null);
-  assert.equal(c.view.jExamDraft,null);assert.equal(c.view.jRuleDraft,null);assert.equal(c.view.jCompare.length,0);
+  assert.equal(c.view.jExamDraft,null);assert.equal(c.view.jRuleDraft,null);assert.deepEqual(Array.from(c.jCompareKeys(s,e)),keys);
   assert.equal(c.view.jTab,"exam");assert.equal(c.jState(s).exams.length,1);assert.equal(c.saveCount,1);
   assert.ok(!main().includes("합성 원본 시험 기준 후보"));
   assert.match(main(),/id="je_label"[^>]*value=""/);
   const selected=main().match(/<select id="j_exam"[\s\S]*?<\/select>/)[0];
   assert.ok(!/<option[^>]*\bselected\b/.test(selected));
+  c.jChooseExam(e.id);c.view.jTab="candidates";c.render();assert.match(main(),/비교 선택 1\/6/);
+});
+
+test("comparison selections isolate student, year and exam, survive navigation, and do not save or edit plans",()=>{
+  const notes=Array.from({length:7},(_,i)=>rule({major:"합성학과 "+i})),{c,s,main}=fixture(notes);
+  const first=c.jSaveExam(s,exam()),second=c.jSaveExam(s,exam({label:"다른 시험"}));
+  const other={id:"other",name:"합성 다른 학생",consult:{}};c.db.students.push(other);
+  const otherExam=c.jSaveExam(other,exam());c.jChooseExam(first.id);c.view.jTab="candidates";c.render();
+  const before=JSON.stringify(c.db),saves=c.saveCount,history=JSON.stringify(c.jState(s).history);
+  for(let i=0;i<7;i++)c.jToggleCompare(i,true);
+  assert.equal(c.jCompareKeys(s,first).length,6);assert.match(main(),/비교 선택 6\/6/);
+  c.jToggleCompare(0,true);assert.equal(c.jCompareKeys(s,first).length,6);
+  c.jToggleCompare(0,false);assert.equal(c.jCompareKeys(s,first).length,5);
+  assert.equal(JSON.stringify(c.db),before);assert.equal(c.saveCount,saves);
+  c.jChooseExam(second.id);c.view.jTab="candidates";c.render();assert.match(main(),/비교 선택 0\/6/);
+  c.jToggleCompare(1,true);assert.equal(c.jCompareKeys(s,second).length,1);
+  c.jChooseStudent(other.id);c.view.jTab="candidates";c.render();assert.match(main(),/비교 선택 0\/6/);
+  c.jToggleCompare(2,true);assert.equal(c.jCompareKeys(other,otherExam).length,1);
+  c.jChooseStudent(s.id);c.jChooseExam(first.id);c.view.jTab="candidates";c.render();assert.match(main(),/비교 선택 5\/6/);
+  c.go=()=>c.render();c.openJeongsi(s.id);c.view.jTab="candidates";c.render();assert.match(main(),/비교 선택 5\/6/);
+  assert.equal(c.jCompareKeys(s,{...first,admissionYear:"2028"}).length,0);
+  c.jClearCompare();assert.equal(c.jCompareKeys(s,first).length,0);
+  assert.equal(c.jCompareKeys(s,second).length,1);assert.equal(c.jCompareKeys(other,otherExam).length,1);
+  assert.match(main(),/새로고침하면 초기화/);
+  assert.equal(c.jState(s).plans.length,0);assert.equal(JSON.stringify(c.jState(s).history),history);
 });
 test("summary and plan details keep the used exam snapshot and mark subsequent exam changes",()=>{
   const n=rule({},{englishMode:"table",englishTable:[0,0,-1,-2,-3,-4,-5,-6,-7]}),{c,s}=fixture([n]),e=c.jSaveExam(s,exam()),p=plan(c,s,e,n);

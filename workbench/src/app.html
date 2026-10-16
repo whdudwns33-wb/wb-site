@@ -464,7 +464,7 @@ function ipGroups(){
     const c=parseCut(r.cut70)!=null?parseCut(r.cut70):parseCut(r.cut50);
     if(c!=null&&c>=1&&c<=9&&g.years[y]==null)g.years[y]=c;
     if(r.cut50&&!g.y50[y])g.y50[y]=r.cut50;
-    if(r.pct&&g.pcts[y]==null){const p=parseFloat(r.pct);if(p>0&&p<=100)g.pcts[y]=p;}
+    if(r.pct!=null&&String(r.pct).trim()!==""&&g.pcts[y]==null){const p=parseFloat(r.pct);if(p>=0&&p<=100)g.pcts[y]=p;}
     if(r.rate&&!g.rates[y])g.rates[y]=r.rate;
   }
   for(const g of m.values()){
@@ -479,6 +479,7 @@ function ipGroups(){
   }
   _IPG=[...m.values()];
   return _IPG;}
+function ipGroupRows(g){return allIpRows().filter(r=>uniNorm(r.univ)===g.univ&&r.major===g.major&&(r.track||"")===g.track);}
 function ttypeIdx(t){t=String(t||"");return t.startsWith("교과")?0:t.startsWith("종합")?1:t.startsWith("논술")?2:3;}
 function fmtCut(n){return n==null||isNaN(n)?"—":(Math.round(n*100)/100).toFixed(2).replace(/0$/,"").replace(/\.$/,".0");}
 const _UCPAL=["#2F6DB5","#6C4BB0","#0E7A6A","#B0487E","#B26A2A","#4A7A2F","#8A5A3A","#3E7C8A","#A04545","#5B5FA8"];
@@ -1693,7 +1694,18 @@ function doDeepDive(){const topic=$("#dd_topic").value.trim()||"고등 컨설팅
    다음 달 상담 아젠다에 반영할 1개를 고른다`);}
 
 /* ═══════════ 입시 검색 (어디가식 대학·고교 검색) ═══════════ */
+function searchOpenUniv(index){const univ=view.sUnivShown?.[index];if(!univ)return;
+  view.sUniv=univ;view.sKey=null;view.sDPage=0;render();}
+function searchToggleGroup(index){const g=view.sGroupsShown?.[index];if(!g)return;
+  view.sKey=view.sKey===g.key?null:g.key;render();}
+function searchIpRow(g){
+  const pct=!!g.pctYear&&(g.isJ||!g.latestYear),year=pct?g.pctYear:g.latestYear;
+  if(!year)return null;
+  return ipGroupRows(g).find(r=>String(r.year||"")===year&&
+    (pct?parseFloat(r.pct)===g.pct:(parseCut(r.cut70)??parseCut(r.cut50))===g.latest))||null;
+}
 function renderSearch(){
+  view.sUnivShown=[];view.sGroupsShown=[];view.sHsShown=[];
   const tab=view.searchTab||"univ";
   const q=(view.sq||"").trim();
   let body="";
@@ -1707,11 +1719,11 @@ function renderSearch(){
     const filters=`
     <form onsubmit="event.preventDefault();view.sq=$('#sq').value;view.sUniv=null;view.sUPage=0;view.sDPage=0;render()">
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
-      <input id="sq" value="${esc(view.sq||"")}" placeholder="대학·학과 검색 (예: 전남대, 의예, 화학공)" style="flex:1;min-width:200px">
+      <input id="sq" value="${esc(view.sq||"")}" oninput="view.sq=this.value;view.sUPage=0;view.sDPage=0" placeholder="대학·학과 검색 (예: 전남대, 의예, 화학공)" style="flex:1;min-width:200px">
       ${["","교과","종합","논술","수능"].map(t=>`<button type="button" class="fchip ${((view.sTrack||"")===t)?"on":""}"
         onclick="view.sTrack='${t}';view.sUPage=0;view.sDPage=0;render()">${t||"전형 전체"}</button>`).join("")}
       <select onchange="view.sRegion=this.value;view.sUniv=null;view.sUPage=0;render()" style="width:96px">
-        <option value="">지역 전체</option>${regions.map(x=>`<option ${view.sRegion===x?"selected":""}>${x}</option>`).join("")}</select>
+        <option value="">지역 전체</option>${regions.map(x=>`<option ${view.sRegion===x?"selected":""}>${esc(x)}</option>`).join("")}</select>
       <button class="btn sm pri">검색</button>
     </div></form>`;
     if(view.sUniv){
@@ -1722,12 +1734,12 @@ function renderSearch(){
         <div class="uinit" style="background:${uColor(view.sUniv)}">${esc(view.sUniv.slice(0,2))}</div>
         <div><b style="font-size:var(--fs-lg)">${esc(view.sUniv)}</b>
         <div style="font-size:var(--fs-sm);color:var(--ink2)">${esc(ug[0]?.region||"")} · 학과·전형 ${ug.length}건 — 행을 누르면 연도별 추이가 펼쳐집니다</div></div></div>
-      ${(()=>{const per=120,cur=pageClamp(ug.length,per,"sDPage");return ug.slice(cur*per,cur*per+per);})().map(g=>{
+      ${(()=>{const per=120,cur=pageClamp(ug.length,per,"sDPage");return view.sGroupsShown=ug.slice(cur*per,cur*per+per);})().map((g,i)=>{
         const open=view.sKey===g.key;
         const ys=g.isJ?Object.keys(g.pcts).sort():g.ys;
         const cutTxt=g.isJ?(g.pct!=null?`백분위 ${g.pct}`:"환산점수만"):(g.latest!=null?fmtCut(g.latest):"—");
         return `<div class="mrow ${open?"open":""}">
-        <button class="mbtn" onclick="view.sKey=view.sKey==='${esc(g.key)}'?null:'${esc(g.key)}';render()">
+        <button class="mbtn" onclick="searchToggleGroup(${i})">
           <span class="marr">▶</span><span class="mname">${esc(g.major)}</span>
           <span class="tchip tk${ttypeIdx(g.track)}">${esc(g.track||"")}</span>
           <span class="mcut">${cutTxt}<span style="color:var(--ink2);font-weight:400;font-size:var(--fs-xs)"> ${esc(g.isJ?g.pctYear:g.latestYear)}</span></span></button>
@@ -1736,10 +1748,10 @@ function renderSearch(){
           const d=p!=null?+(c-p).toFixed(2):null;
           const harder=g.isJ?(d!=null&&d>0.5):(d!=null&&d<-0.05);
           const easier=g.isJ?(d!=null&&d<-0.5):(d!=null&&d>0.05);
-          return `<div class="ycell" title="경쟁률 ${esc(g.rates[y]||"-")}"><div class="yy">${y}</div><div class="yc">${g.isJ?c:fmtCut(c)}</div>
+          return `<div class="ycell" title="경쟁률 ${esc(g.rates[y]||"-")}"><div class="yy">${esc(y)}</div><div class="yc">${g.isJ?c:fmtCut(c)}</div>
             <div class="yd ${harder?"up":easier?"dn":"fl"}">${d==null?"·":harder?"▲ 강화":easier?"▼ 완화":"— 유지"}</div></div>`;}).join("")
           :`<span style="font-size:var(--fs-sm);color:var(--ink2)">연도별 수치 없음 (환산점수 전용 전형)</span>`}
-          <button class="btn ghost sm" title="수동 분석 DB에 추가" onclick='addBulkToIpdb(${JSON.stringify(JSON.stringify([g.univ,g.major,g.track,g.isJ?g.pctYear:g.latestYear,g.y50[g.latestYear]||"",g.isJ?"":String(g.latest??""),g.rates[g.latestYear]||""]))})'>＋ DB</button>
+          <button class="btn ghost sm" title="원본 지표·출처를 보존해 수동 분석 DB에 추가" onclick="addBulkToIpdb(${i})">＋ DB</button>
         </div></div>`;}).join("")||`<div class="empty"><b>조건에 맞는 학과가 없습니다</b></div>`}
       ${pager(ug.length,120,"sDPage",view.sDPage||0)}`;
     }else{
@@ -1747,11 +1759,12 @@ function renderSearch(){
       for(const g of f){if(!byU.has(g.univ))byU.set(g.univ,[]);byU.get(g.univ).push(g);}
       const us=[...byU.entries()].sort((a,b)=>a[0].localeCompare(b[0],"ko"));
       const perU=72,curU=pageClamp(us.length,perU,"sUPage");
+      view.sUnivShown=us.slice(curU*perU,curU*perU+perU).map(([u])=>u);
       body=filters+`
       <p style="font-size:var(--fs-sm);color:var(--ink2);margin:0 0 12px">대학 ${us.length}곳 · 학과·전형 ${f.length.toLocaleString()}건 — 카드를 누르면 학과·연도 추이로 들어갑니다</p>
-      <div class="ugrid">${us.slice(curU*perU,curU*perU+perU).map(([u,list])=>{
+      <div class="ugrid">${us.slice(curU*perU,curU*perU+perU).map(([u,list],i)=>{
         const cuts=list.map(g=>g.cutG).filter(n=>n!=null).sort((a,b)=>a-b);
-        return `<button class="ucard" onclick="view.sUniv='${esc(u)}';view.sKey=null;view.sDPage=0;render()">
+        return `<button class="ucard" onclick="searchOpenUniv(${i})">
           <div class="utop"><div class="uinit" style="background:${uColor(u)}">${esc(u.slice(0,2))}</div>
           <div><div class="uname">${esc(u)}</div><div class="ureg">${esc(list[0].region||"")}</div></div></div>
           <div class="umeta"><span>학과·전형 ${list.length}건</span>
@@ -1783,16 +1796,17 @@ function renderSearch(){
     else f.sort((a,b)=>(a.bulk===b.bulk?0:a.bulk?1:-1)||a.name.localeCompare(b.name,"ko"));
     const perH=300,curH=pageClamp(f.length,perH,"sHsPage");
     const shown=f.slice(curH*perH,curH*perH+perH);
+    view.sHsShown=shown;
     body=`
     <form onsubmit="event.preventDefault();view.sq=$('#sq').value;view.sHsPage=0;render()">
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
-      <input id="sq" value="${esc(view.sq||"")}" placeholder="학교명 검색 (예: 순천, 여고)" style="flex:1;min-width:200px">
+      <input id="sq" value="${esc(view.sq||"")}" oninput="view.sq=this.value;view.sHsPage=0" placeholder="학교명 검색 (예: 순천, 여고)" style="flex:1;min-width:200px">
       <select onchange="view.sLevel=this.value;view.sHsType='';view.sHsPage=0;render()" style="width:92px">
         <option value="">학교급 전체</option>${[["고","고등학교"],["중","중학교(호남)"],["초","초등학교(호남)"]].map(([v,l])=>`<option value="${v}" ${lv===v?"selected":""}>${l}</option>`).join("")}</select>
       <select onchange="view.sSido=this.value;view.sGungu='';view.sHsPage=0;render()" style="width:110px">
-        <option value="">시도 전체</option>${sidos.map(x=>`<option ${view.sSido===x?"selected":""}>${x}</option>`).join("")}</select>
+        <option value="">시도 전체</option>${sidos.map(x=>`<option ${view.sSido===x?"selected":""}>${esc(x)}</option>`).join("")}</select>
       ${view.sSido?`<select onchange="view.sGungu=this.value;view.sHsPage=0;render()" style="width:104px">
-        <option value="">시군구 전체</option>${gungus.map(x=>`<option ${view.sGungu===x?"selected":""}>${x}</option>`).join("")}</select>`:""}
+        <option value="">시군구 전체</option>${gungus.map(x=>`<option ${view.sGungu===x?"selected":""}>${esc(x)}</option>`).join("")}</select>`:""}
       ${lv!=="초"&&lv!=="중"?`<select onchange="view.sHsType=this.value;view.sHsPage=0;render()" style="width:100px">
         <option value="">유형 전체</option>${["일반고","자율고","특목고","특성화","자사고","외고","과학고"].map(x=>`<option ${view.sHsType===x?"selected":""}>${x}</option>`).join("")}</select>`:""}
       <select onchange="view.sEstab=this.value;view.sHsPage=0;render()" style="width:88px">
@@ -1805,11 +1819,11 @@ function renderSearch(){
     <p style="font-size:var(--fs-sm);color:var(--ink2);margin:0 0 8px">${f.length.toLocaleString()}건${f.length>perH?` — ${curH*perH+1}~${Math.min(f.length,(curH+1)*perH)}건 표시`:""} · 총 ${rows.length.toLocaleString()}개교 (WB 평가 보유 ${rows.filter(r=>!r.bulk).length}곳)</p>
     ${shown.length?`<div class="tablewrap"><table class="t">
       <tr><th>학교</th><th>유형</th><th>지역</th><th>내신경쟁</th><th>진학 실적</th><th>비고</th><th></th></tr>
-      ${shown.map(r=>`<tr><td><b>${esc(r.name)}</b></td><td>${esc(r.type||"")}</td><td>${esc(r.region||"")}</td>
+      ${shown.map((r,i)=>`<tr><td><b>${esc(r.name)}</b></td><td>${esc(r.type||"")}</td><td>${esc(r.region||"")}</td>
         <td>${r.level?`<span class="chip ${r.level==="상"?"warn":""}">${esc(r.level)}</span>`:""}</td>
         <td style="font-size:var(--fs-xs);white-space:nowrap" title="${r.met&&r.met[0]>0?`2025년 2월 졸업 ${r.met[0]}명 · 진학 ${r.met[1]} (4년제 ${r.met[2]}) · 재적 ${r.met[3]||"-"} · 연간 전출 ${r.met[4]||0} — 학교알리미`:""}">${hsMetHtml(r.met)}</td>
         <td style="font-size:var(--fs-xs);color:var(--ink2)">${esc(r.feature||"")}</td>
-        <td>${r.bulk?`<button class="btn ghost sm" title="고교 DB에 추가 (고교 추천에 반영)" onclick='addBulkToHsdb(${JSON.stringify(JSON.stringify([r.name,r.type,r.region]))})'>＋</button>`:`<span class="chip acc" style="font-size:var(--fs-xs)">보유</span>`}</td></tr>`).join("")}
+        <td>${r.bulk?`<button class="btn ghost sm" title="고교 DB에 추가 (고교 추천에 반영)" onclick="addBulkToHsdb(${i})">＋</button>`:`<span class="chip acc" style="font-size:var(--fs-xs)">보유</span>`}</td></tr>`).join("")}
     </table></div>${pager(f.length,perH,"sHsPage",curH)}`
     :`<div class="empty"><b>결과 없음</b>${rows.length<100?(window.__bulkStatus==="loading"?"학교 데이터를 불러오는 중입니다 — 잠시 후 자동으로 나타납니다.":"학교 데이터가 아직 로드되지 않았습니다 — 새로고침 해보세요."):"검색어를 바꿔보세요."}</div>`}`;
   }
@@ -1822,11 +1836,13 @@ function renderSearch(){
   </div>
   <div class="card">${body}</div>
   <p style="font-size:var(--fs-xs);color:var(--ink2);margin:12px 2px 0">출처: 한국대학교육협의회 어디가 공식 발표(재정리본)·나이스 학교기본정보·학교알리미 공시(졸업생 진로 2025년 2월 졸업 기준, 재적·전출 2026 공시) — 내부 상담 참고용. 최신 수치는 어디가·대학 입학처에서 최종 확인.</p>`;}
-function addBulkToIpdb(j){const r=JSON.parse(j);db.ipdb=db.ipdb||[];
-  db.ipdb.push({univ:r[0],major:r[1],track:r[2],year:String(r[3]),cut50:r[4],cut70:r[5],rate:r[6],source:"어디가 발표"});
+function addBulkToIpdb(index){const g=view.sGroupsShown?.[index],r=g&&searchIpRow(g);if(!r){toast("추가할 원본 입결을 찾지 못했습니다. 검색 결과를 다시 확인하세요.");return;}
+  if((db.ipdb||[]).some(x=>uniNorm(x.univ)===uniNorm(r.univ)&&x.major===r.major&&(x.track||"")===(r.track||"")&&String(x.year||"")===String(r.year||""))){toast("같은 대학·학과·전형·학년도의 분석 DB가 있습니다. 기존 입력은 유지했습니다.");return;}
+  const record=jCopy(r);delete record.bulk;db.ipdb=db.ipdb||[];db.ipdb.push(record);
   save();render();toast("분석 DB에 추가");}
-function addBulkToHsdb(j){const r=JSON.parse(j);db.hsdb=db.hsdb||[];
-  db.hsdb.push({name:r[0],type:r[1]||"일반고",region:r[2]||"",level:"중",feature:"검색에서 추가 — 경쟁도 미평가",source:"나이스"});
+function addBulkToHsdb(index){const r=view.sHsShown?.[index];if(!r||!r.bulk)return;db.hsdb=db.hsdb||[];
+  if(db.hsdb.some(x=>x.name===r.name)){toast("이미 고교 DB에 있는 학교입니다.");return;}
+  db.hsdb.push({name:r.name,type:r.type||"일반고",region:r.region||"",level:"중",feature:"검색에서 추가 — 경쟁도 미평가",source:"나이스"});
   save();render();toast("고교 DB에 추가");}
 
 /* ═══════════ 진학 가능권 분석 (웩슬러·중학·고교 → 입결 대조) ═══════════ */
@@ -2081,6 +2097,47 @@ function susiDraft(s){
   return view.susiDrafts[s.id]||(view.susiDrafts[s.id]={admissionYear:"",gradeScale:"",gradeAverage:"",gradeLabel:"",kind:"전체",field:"전체",region:"",query:"",...s.consult?.susi});
 }
 function susiDraftSet(k,v){const s=susiStudent();if(s)susiDraft(s)[k]=v;}
+function susiCompareKeys(s,year){
+  const contexts=view.susiComparisons||(view.susiComparisons=Object.create(null)),key=JSON.stringify([String(s.id),String(year||"")]);
+  return contexts[key]||(contexts[key]=[]);
+}
+function susiReasonDrafts(s,year){
+  const contexts=view.susiReasons||(view.susiReasons=Object.create(null)),key=JSON.stringify([String(s.id),String(year||"")]);
+  return contexts[key]||(contexts[key]=Object.create(null));
+}
+function susiReason(item,s){const drafts=susiReasonDrafts(s,s.consult.susi.admissionYear),key=susiKey(item.g,s.consult.susi.admissionYear);
+  return Object.hasOwn(drafts,key)?drafts[key]:item.decision.reason||"";}
+function susiReasonSet(index,value){const s=susiStudent(),item=view.susiShown?.[index];if(s&&item)susiReasonDrafts(s,s.consult.susi.admissionYear)[susiKey(item.g,s.consult.susi.admissionYear)]=value;}
+function susiToggleCompare(index,on){
+  const s=susiStudent(),item=view.susiShown?.[index];if(!s||!item)return;
+  const year=s.consult.susi.admissionYear,keys=susiCompareKeys(s,year),key=susiKey(item.g,year),at=keys.indexOf(key);
+  if(on&&at<0){if(keys.length>=3){toast("수시 비교 후보는 최대 3개까지 선택하세요.");render();return;}keys.push(key);}
+  else if(!on&&at>=0)keys.splice(at,1);
+  render();
+}
+function susiClearCompare(index){const s=susiStudent();if(!s)return;const keys=susiCompareKeys(s,s.consult.susi.admissionYear);
+  if(index==null)keys.length=0;else keys.splice(index,1);render();}
+function susiCompareHtml(items,s,p){
+  const keys=susiCompareKeys(s,p.admissionYear),byKey=new Map(items.map(x=>[susiKey(x.g,p.admissionYear),x]));
+  for(let i=keys.length-1;i>=0;i--)if(!byKey.has(keys[i]))keys.splice(i,1);
+  const compared=keys.map(k=>byKey.get(k));
+  const value=v=>v==null||String(v).trim()===""?"미확인":String(v);
+  const rows=[
+    ["모집학년도·전형",x=>`${p.admissionYear}학년도 / ${x.kind}\n${x.note?.admissionYear?"근거 노트 모집학년도: "+x.note.admissionYear:"올해 모집 근거 미확인"}`],
+    ["모집인원",x=>value(x.note?.seats)],
+    ["지원자격",x=>value(x.note?.eligibility)+"\n학생별 자격은 원장 확인 필요"],
+    ["평가방법",x=>value(x.note?.evaluation)],
+    ["수능최저 원문",x=>value(x.note?.minimum)+"\n최저 충족 여부는 지원 카드의 별도 기준으로 확인"],
+    ["성적 비교",x=>`${x.comparison}\n학생: ${p.gradeScale||"체계 미확인"}등급제 / ${value(p.gradeAverage)} / ${value(p.gradeLabel)}`],
+    ["과거 입결·등급 체계",x=>`DB 표기학년도: ${value(x.record?.year)}\n근거 노트 결과학년도: ${value(x.note?.resultYear)}\n${x.cut?x.cut.metric+": "+x.cut.value:"비교 가능한 등급 입결 없음"}\n입결 체계: ${x.confirmedScale?x.confirmedScale+"등급":"미확인"}`],
+    ["검토·제외 사유",x=>`${x.excluded.length?x.excluded.join(" · "):"검토 후보"}\n저장 사유: ${x.decision.reason||"미기록"}${susiReason(x,s)!==(x.decision.reason||"")?"\n입력 중 (미저장): "+(susiReason(x,s)||"빈 입력"):""}`],
+    ["공식 근거·확인일",x=>x.note?adigaMetaText(x.note):"해당 모집학년도 근거 노트 없음"],
+    ["입결 출처·확인일",x=>`출처: ${value(x.record?.source)}\n확인일: ${adigaDate(x.record?.checked)?x.record.checked:"미확인"}`],
+    ["미확인·적용 한계",x=>[...x.missing,...x.limitations].join("\n")||"추가 기록 없음"]
+  ];
+  return `<div style="display:flex;gap:var(--sp-2);align-items:center;flex-wrap:wrap"><h3>수시 후보 비교 · ${keys.length}/3</h3><button class="btn sm" ${keys.length?"":"disabled"} onclick="susiClearCompare()">비교 초기화</button></div><p class="aplnote">${esc(s.name)} · ${esc(p.admissionYear)}학년도 기준. 비교 선택은 이 창에서 학생·학년도별로 유지되며 새로고침하면 초기화됩니다. 지원안은 별도로 저장하세요.</p>
+    ${compared.length?`<div class="tablewrap"><table class="t" id="susi_compare_table" aria-label="같은 학생·학년도 수시 후보 비교"><thead><tr><th scope="col">확인 항목</th>${compared.map((x,i)=>`<th scope="col" style="white-space:normal;min-width:24ch">${esc(x.g.univ)}<br>${esc(x.g.major)}<br>${esc(x.g.track)}<br><button class="btn ghost sm" onclick="susiClearCompare(${i})">비교에서 빼기</button></th>`).join("")}</tr></thead><tbody>${rows.map(([label,read])=>`<tr><th scope="row">${label}</th>${compared.map(x=>`<td style="white-space:pre-wrap;overflow-wrap:anywhere">${esc(read(x))}${label==="공식 근거·확인일"&&x.note?"<br>"+adigaLinkHtml(x.note):label==="입결 출처·확인일"?"<br>"+adigaLinkHtml(x.record||{}):""}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`:""}`;
+}
 function openSusi(id){view.ipsiStu=id||null;view.ipsiFlow="susi";view.susiPage=0;go("ipsi");}
 function susiRun(){
   const s=susiStudent();if(!s){toast("학생을 선택하세요.");return;}
@@ -2096,11 +2153,19 @@ function susiReview(index,excluded){
   const reason=$("#susi_reason_"+index).value.trim();if(excluded&&!reason){toast("제외 사유를 입력하세요.");return;}
   s.consult=s.consult||{};s.consult.susiDecisions=s.consult.susiDecisions||{};
   s.consult.susiDecisions[susiKey(item.g,s.consult.susi.admissionYear)]={excluded,reason,checked:today()};
-  save();render();toast(excluded?"후보 제외 사유 저장":"후보 검토 메모 저장");
+  save();delete susiReasonDrafts(s,s.consult.susi.admissionYear)[susiKey(item.g,s.consult.susi.admissionYear)];render();toast(excluded?"후보 제외 사유 저장":"후보 검토 메모 저장");
 }
 function susiNote(index){
   const item=view.susiShown?.[index],s=susiStudent();if(!item||!s)return;
-  view.adigaDraft={univ:item.g.univ,major:item.g.major,track:item.g.track,admissionYear:s.consult.susi.admissionYear};
+  const note=adigaFor({...item.g,admissionYear:s.consult.susi.admissionYear}).find(n=>!n.regular&&String(n.major||"").trim()===String(item.g.major).trim()&&String(n.track||"").trim()===String(item.g.track).trim())||null;
+  const draft=view.adigaDraft;
+  if(view.adigaReturn?.studentId===s.id&&draft&&uniNorm(draft.univ)===uniNorm(item.g.univ)&&draft.major===item.g.major&&draft.track===item.g.track&&String(draft.admissionYear)===String(s.consult.susi.admissionYear)){
+    if(view.adigaEdit&&note&&JSON.stringify(view.adigaEdit.note)===JSON.stringify(note))view.adigaEdit.note=note;
+    go("adiga");return;
+  }
+  view.adigaReturn={studentId:s.id,admissionYear:s.consult.susi.admissionYear};
+  view.adigaDraft=note?{...note}:{univ:item.g.univ,major:item.g.major,track:item.g.track,admissionYear:s.consult.susi.admissionYear};
+  view.adigaEdit=note?{note,draft:view.adigaDraft}:null;
   go("adiga");
 }
 function susiSave(index){
@@ -2348,11 +2413,16 @@ function jMergeState(current={},incoming={}){
 // JEONGSI_UI_START
 function jStudent(){return db.students.find(s=>s.id===view.jStuId)||null;}
 function jActiveExam(s){const z=jState(s);return z.exams.find(e=>String(e.id)===String(z.examId))||null;}
-function openJeongsi(id){view.jStuId=id||view.jStuId;view.jTab=null;view.jExamDraft=null;view.jRuleDraft=null;view.jCompare=[];view.jError="";go("jeongsi");}
-function jChooseStudent(id){view.jStuId=id;view.jTab=null;view.jExamDraft=null;view.jRuleDraft=null;view.jCompare=[];view.jError="";render();}
+function jCompareKeys(s,e){
+  if(!s||!e)return [];
+  const contexts=view.jComparisons||(view.jComparisons=Object.create(null)),key=JSON.stringify([String(s.id),String(e.admissionYear),String(e.id)]);
+  return contexts[key]||(contexts[key]=[]);
+}
+function openJeongsi(id){view.jStuId=id||view.jStuId;view.jTab=null;view.jExamDraft=null;view.jRuleDraft=null;view.jError="";go("jeongsi");}
+function jChooseStudent(id){view.jStuId=id;view.jTab=null;view.jExamDraft=null;view.jRuleDraft=null;view.jError="";render();}
 function jChooseExam(id){const s=jStudent();if(!s)return;const z=jState(s),e=z.exams.find(e=>String(e.id)===String(id));
-  if(!id){z.examId="";view.jExamDraft=null;view.jRuleDraft=null;view.jCompare=[];view.jTab="exam";view.jError="";save();render();return;}if(!e)return;
-  z.examId=e.id;z.admissionYear=e.admissionYear;view.jExamDraft=null;view.jRuleDraft=null;view.jCompare=[];view.jPage=0;view.jError="";save();render();}
+  if(!id){z.examId="";view.jExamDraft=null;view.jRuleDraft=null;view.jTab="exam";view.jError="";save();render();return;}if(!e)return;
+  z.examId=e.id;z.admissionYear=e.admissionYear;view.jExamDraft=null;view.jRuleDraft=null;view.jPage=0;view.jError="";save();render();}
 function jNewExam(){const s=jStudent();view.jExamDraft={label:"",type:"",status:"",date:"",admissionYear:jState(s).admissionYear||s.consult?.susi?.admissionYear||"",source:"",checked:"",scores:{}};view.jTab="exam";view.jError="";render();}
 function jSubmitExam(){
   const s=jStudent();if(!s)return;
@@ -2360,7 +2430,7 @@ function jSubmitExam(){
   for(const k of ["label","type","status","date","admissionYear","source","checked"])d[k]=$("#je_"+k).value;
   for(const k of Object.keys(J_SUBJECTS)){d.scores[k]={};for(const f of ["subject","raw","standard","percentile","grade"])d.scores[k][f]=$("#je_"+k+"_"+f)?.value||"";}
   view.jExamDraft=d;
-  try{jSaveExam(s,d);save();view.jExamDraft=null;view.jCompare=[];view.jTab="candidates";view.jError="";render();toast("실제 시험 성적 저장 — 기존 지원안의 근거는 그대로 보존했습니다.");}
+  try{jSaveExam(s,d);save();view.jExamDraft=null;view.jTab="candidates";view.jError="";render();toast("실제 시험 성적 저장 — 기존 지원안의 근거는 그대로 보존했습니다.");}
   catch(e){view.jError=e.message;render();}
 }
 function jRuleFor(target){
@@ -2402,9 +2472,10 @@ function jSubmitRule(){
   }catch(e){if(oldIndex>=0)view.jRuleOriginal=db.adiga?.[oldIndex]||null;view.jError=e.message;render();}
 }
 function jApplyFilter(){view.jQuery=$("#j_query").value.trim();view.jGroup=$("#j_group").value;view.jPage=0;render();}
-function jToggleCompare(index,on){const g=view.jShown?.[index];if(!g)return;const keys=view.jCompare||[];
+function jToggleCompare(index,on){const s=jStudent(),e=s&&jActiveExam(s),g=view.jShown?.[index];if(!e||!g)return;const keys=jCompareKeys(s,e);
   if(on&&!keys.includes(g.key)){if(keys.length>=6){toast("비교 후보는 최대 6개까지 선택하세요.");render();return;}keys.push(g.key);}
-  view.jCompare=on?keys:keys.filter(k=>k!==g.key);render();}
+  else if(!on){const i=keys.indexOf(g.key);if(i>=0)keys.splice(i,1);}render();}
+function jClearCompare(){const s=jStudent();if(s)jCompareKeys(s,jActiveExam(s)).length=0;render();}
 function jAddCandidate(index){
   const s=jStudent(),exam=s&&jActiveExam(s),g=view.jShown?.[index];if(!exam||!g)return;
   try{const r=jSavePlan(s,{univ:g.univ,major:g.major,track:g.track,group:g.group,admissionYear:exam.admissionYear,examId:exam.id,ruleSnapshot:g.note});
@@ -2480,13 +2551,16 @@ function jRenderCandidates(e){
   const query=(view.jQuery||"").toLowerCase(),group=view.jGroup||"";
   const pool=all.filter(g=>(!group||g.group===group)&&(!query||`${g.univ} ${g.major} ${g.track}`.toLowerCase().includes(query))).sort((a,b)=>a.group.localeCompare(b.group)||a.univ.localeCompare(b.univ));
   const page=Math.max(0,Math.min(view.jPage||0,Math.max(0,Math.ceil(pool.length/20)-1)));view.jPage=page;view.jShown=pool.slice(page*20,page*20+20);
-  const compared=all.filter(g=>(view.jCompare||[]).includes(g.key));
+  const keys=jCompareKeys(jStudent(),e),available=new Set(all.map(g=>g.key));
+  for(let i=keys.length-1;i>=0;i--)if(!available.has(keys[i]))keys.splice(i,1);
+  const compared=all.filter(g=>keys.includes(g.key));
   return `<section class="sec"><h2>${esc(e.admissionYear)}학년도 · ${esc(e.label)} 기준 후보</h2><p class="aplnote">기존 DB의 전형명이 올해 모집군·모집 여부를 보증하지 않습니다. 확인한 반영방법 노트가 있어야 군을 지정하고 후보를 저장할 수 있습니다. 대학마다 산식과 단위가 달라 참고점수 크기로 대학 간 순위·합격 가능성을 판단하지 않습니다.</p>
     <div class="formgrid"><div class="frow"><label for="j_query">대학·학과·전형 검색</label><input id="j_query" value="${esc(view.jQuery||"")}"></div><div class="frow"><label for="j_group">모집군</label><select id="j_group">${[["","전체"],["가","가군"],["나","나군"],["다","다군"],["미확인","군 미확인"]].map(([v,t])=>`<option value="${v}" ${group===v?"selected":""}>${t}</option>`).join("")}</select></div></div>
     <button class="btn" onclick="jApplyFilter()">후보 찾기</button> <button class="btn" onclick="jOpenRule()">전형 직접 등록</button>
     ${jRenderRule()}
+    <p>비교 선택 ${keys.length}/6 <button class="btn sm" ${keys.length?"":"disabled"} onclick="jClearCompare()">비교 초기화</button></p><p class="aplnote">비교 선택은 이 창에서 학생·학년도·시험별로 유지되며 새로고침하면 초기화됩니다. 후보·지원안 저장과 변경 이력은 별도로 보존됩니다.</p>
     ${compared.length?`<h2>선택 후보 비교 · 같은 시험 기준</h2><div class="tablewrap"><table class="t"><thead><tr><th>군·후보</th><th>참고점수·계산식</th><th>미확인·제약</th></tr></thead><tbody>${compared.map(g=>`<tr><td>${esc(g.group)}군 · ${esc(g.univ)}<br>${esc(g.major)} / ${esc(g.track)}</td><td>${esc(jScoreText(g.result))}<br>${esc(g.result.formula||"산식 미확인")}</td><td style="white-space:normal">${esc([...g.result.missing,...g.result.limitations].join(" · "))}</td></tr>`).join("")}</tbody></table></div>`:""}
-    <p>${pool.length}개 후보 · 비교 선택 최대 6개</p>${pool.length?`<div class="tablewrap"><table class="t"><thead><tr><th>비교</th><th>군·대학·학과·전형</th><th>실제 시험 기준 결과</th><th>자료 근거·저장</th></tr></thead><tbody>${view.jShown.map((g,i)=>`<tr><td><input type="checkbox" aria-label="후보 ${i+1} 비교 선택" ${(view.jCompare||[]).includes(g.key)?"checked":""} onchange="jToggleCompare(${i},this.checked)"></td>
+    <p>${pool.length}개 후보 · 비교 선택 최대 6개</p>${pool.length?`<div class="tablewrap"><table class="t" id="j_candidates"><thead><tr><th>비교</th><th>군·대학·학과·전형</th><th>실제 시험 기준 결과</th><th>자료 근거·저장</th></tr></thead><tbody>${view.jShown.map((g,i)=>`<tr><td><input type="checkbox" aria-label="후보 ${i+1} 비교 선택" ${keys.includes(g.key)?"checked":""} onchange="jToggleCompare(${i},this.checked)"></td>
       <td>${esc(g.group)}${g.group==="미확인"?"":"군"}<br><b>${esc(g.univ)}</b><br>${esc(g.major)}<br>${esc(g.track)}</td><td style="white-space:normal;min-width:22ch">${esc(jScoreText(g.result))}<details><summary>계산 근거·미확인</summary><p>${esc(g.result.formula||"반영방법 미확인")}</p><p>${esc((g.result.parts||[]).join(" · "))}</p><p>${esc([...g.result.missing,...g.result.limitations].join(" · "))}</p></details></td>
       <td style="white-space:normal;min-width:26ch"><details><summary>학년도·출처·원문</summary><p style="white-space:pre-wrap">${g.note?esc(adigaMetaText(g.note)):"현재 모집학년도 근거 노트 없음"}</p>${g.note?adigaLinkHtml(g.note):""}<p>DB 표기학년도 ${esc(g.record?.year||"미확인")} · 발표 백분위 ${esc(g.record?.pct===0?0:g.record?.pct||"미확인")} · 출처 ${esc(g.record?.source||"미확인")} · 확인일 ${esc(adigaDate(g.record?.checked)?g.record.checked:"미확인")}</p><p class="aplnote">DB 백분위의 반영 영역·산식이 확인되지 않으면 현재 참고점수와 직접 대조하지 않습니다.</p></details>
       <button class="btn sm" onclick="jOpenRule(${i})">반영방법 ${g.note?"편집":"등록"}</button> <button class="btn sm pri" ${g.group==="미확인"?"disabled":""} onclick="jAddCandidate(${i})">후보 저장</button></td></tr>`).join("")}</tbody></table></div>
@@ -2839,8 +2913,9 @@ function renderSusi(){
       <button class="btn sm" onclick="view.aplYear=susiStudent().consult.susi.admissionYear;openApl(susiStudent().id)">저장한 지원안·최저·일정</button>
       <button class="btn sm" onclick="copySusiSummary()">수시 상담 기록 복사</button></div>
       <p class="aplnote">과거 입결만으로 올해 모집·지원자격을 확정하지 않습니다. DB 표기학년도와 실제 결과학년도를 구분하고, 확인한 노트가 없으면 미확인으로 남깁니다. 정시·수능 전형은 이 목록에서 다루지 않습니다.</p>
-      ${pool.length?`<div class="tablewrap"><table class="t"><thead><tr><th>대학·학과·전형</th><th>성적 비교</th><th>전형 근거</th><th>검토·지원안</th></tr></thead><tbody>${view.susiShown.map((x,i)=>{
-        const n=x.note;return `<tr><td><b>${esc(x.g.univ)}</b><br>${esc(x.g.major)}<br>${esc(x.g.track||"전형 미확인")}<br><span class="chip">${esc(x.kind)}</span></td>
+      ${susiCompareHtml(items,s,p)}
+      ${pool.length?`<div class="tablewrap"><table class="t" id="susi_candidates"><thead><tr><th>비교</th><th>대학·학과·전형</th><th>성적 비교</th><th>전형 근거</th><th>검토·지원안</th></tr></thead><tbody>${view.susiShown.map((x,i)=>{
+        const n=x.note;return `<tr><td><input type="checkbox" aria-label="수시 후보 ${i+1} 비교 선택" ${susiCompareKeys(s,p.admissionYear).includes(susiKey(x.g,p.admissionYear))?"checked":""} onchange="susiToggleCompare(${i},this.checked)"></td><td><b>${esc(x.g.univ)}</b><br>${esc(x.g.major)}<br>${esc(x.g.track||"전형 미확인")}<br><span class="chip">${esc(x.kind)}</span></td>
         <td style="white-space:normal;min-width:20ch">${esc(x.comparison)}<br><small>DB 표기학년도 ${esc(x.record?.year||"미확인")} · ${x.cut?`${esc(x.cut.metric)} ${x.cut.value}`:"등급 입결 없음"}<br>입결 체계 ${esc(x.confirmedScale?x.confirmedScale+"등급":"미확인")} · 출처 ${esc(x.record?.source||"미확인")}<br>확인일 ${esc(adigaDate(x.record?.checked)?x.record.checked:"미확인")}</small><br>${adigaLinkHtml(x.record||{})}</td>
         <td style="white-space:normal;min-width:24ch"><details><summary>근거·미확인 ${x.missing.length}개</summary>
           <dl>${[["모집인원",n?.seats],["지원자격",n?.eligibility],["평가방법",n?.evaluation],["수능최저 원문",n?.minimum]].map(([label,val])=>`<dt>${label}</dt><dd>${esc(val==null||String(val)===""?"미확인":val)}</dd>`).join("")}</dl>
@@ -2848,7 +2923,7 @@ function renderSusi(){
           <p>${esc(x.limitations.join(" · "))}</p><p>${esc(x.missing.join(" · "))}</p></details>
           <button class="btn ghost sm" onclick="susiNote(${i})">근거 노트 등록·확인</button></td>
         <td style="white-space:normal;min-width:24ch">${x.excluded.length?`<p>${esc(x.excluded.join(" · "))}</p>`:"지원자격: 학생별 확인 필요"}
-          <label for="susi_reason_${i}">검토·제외 사유</label><input id="susi_reason_${i}" value="${esc(x.decision.reason||"")}" placeholder="원장이 판단한 이유">
+          <label for="susi_reason_${i}">검토·제외 사유</label><input id="susi_reason_${i}" value="${esc(susiReason(x,s))}" oninput="susiReasonSet(${i},this.value)" placeholder="원장이 판단한 이유">
           <div style="display:flex;gap:var(--sp-1);flex-wrap:wrap;margin-top:var(--sp-2)"><button class="btn sm" onclick="susiReview(${i},false)">${x.decision.excluded?"제외 해제":"메모 저장"}</button>
           ${!x.decision.excluded?`<button class="btn ghost sm" onclick="susiReview(${i},true)">후보 제외</button>`:""}<button class="btn sm pri" ${x.excluded.length?"disabled":""} onclick="susiSave(${i})">지원안에 추가</button></div></td></tr>`;}).join("")}</tbody></table></div>
         <div style="display:flex;gap:var(--sp-2);align-items:center;margin-top:var(--sp-3)"><button class="btn sm" ${page?"":"disabled"} onclick="view.susiPage--;render()">이전</button><span>${page+1} / ${Math.ceil(pool.length/25)}</span><button class="btn sm" ${(page+1)*25<pool.length?"":"disabled"} onclick="view.susiPage++;render()">다음</button></div>`:`<div class="empty">${view.susiExcluded?"조건이나 원장 판단으로 제외한 후보가 없습니다.":"현재 조건에 맞는 후보가 없습니다. 조건을 조정하거나 어디가 노트에 확인한 전형을 기록하세요."}</div>`}</div>`:""}`;
@@ -3885,19 +3960,20 @@ function g5to9(g5){return topPctToGrade(Math.max(0.1,g5ToTopPct(g5)));}
 /* 대학·학과·전형 상세 모달 — 어디서든 눌러서 확인 */
 function ipDetail(key){
   const g=ipGroups().find(x=>x.key===key);if(!g)return;
-  const ys=[...new Set([...g.ys,...Object.keys(g.pcts)])].sort().reverse();
+  const records=ipGroupRows(g),ys=[...new Set(records.map(r=>String(r.year||"")))].sort().reverse();
+  const value=(year,field)=>records.find(r=>String(r.year||"")===year&&r[field]!=null&&String(r[field]).trim()!=="")?.[field]??"—";
   modal(`<h2>${esc(g.univ)} ${esc(g.major)}</h2>
   <p style="font-size:var(--fs-sm);color:var(--ink2);margin:4px 0 12px">
     <span class="tchip tk${ttypeIdx(g.track)}">${esc(g.track||"")}</span> ${g.region?" · "+esc(g.region):""} · ${ys.length}개 연도</p>
   <div class="tablewrap"><table class="t">
     <tr><th>연도</th><th>70%컷</th><th>50%컷</th><th>수능백분위</th><th>경쟁률</th></tr>
-    ${ys.map(y=>`<tr><td>${y}</td><td>${g.years[y]!=null?fmtCut(g.years[y]):"—"}</td>
-      <td>${esc(g.y50[y]||"—")}</td><td>${g.pcts[y]!=null?g.pcts[y]:"—"}</td><td>${esc(g.rates[y]||"—")}</td></tr>`).join("")}
+    ${ys.map(y=>`<tr><td>${esc(y||"학년도 미확인")}</td><td>${esc(value(y,"cut70"))}</td>
+      <td>${esc(value(y,"cut50"))}</td><td>${esc(value(y,"pct"))}</td><td>${esc(value(y,"rate"))}</td></tr>`).join("")}
   </table></div>
-  <p style="font-size:var(--fs-xs);color:var(--ink2);margin:8px 0 0">출처: 한국대학교육협의회 어디가 발표(재정리본)·수동 입력분 — 수시 컷=최종등록자 교과등급, 정시=백분위·환산점수. ▲연도별 추이로 강화·완화를 읽으세요.</p>
+  <p style="font-size:var(--fs-xs);color:var(--ink2);margin:8px 0 0">출처: 한국대학교육협의회 어디가 발표(재정리본)·수동 입력분 — 원본 필드의 값을 그대로 표시하며 50%컷을 70%컷으로 대체하지 않습니다. 단위·반영기준은 원문에서 확인하세요.</p>
   <div class="mfoot">
-    <button class="btn sm" onclick="closeModal();view.mkSel='${esc(g.univ)}|${esc(g.major)}';view.mkQ='${esc(g.univ)} ${esc(g.major)}';go('mock')">🧾 모의지원으로</button>
-    <button class="btn sm" onclick="closeModal();view.sUniv='${esc(g.univ)}';view.sq='';view.searchTab='univ';go('search')">🔍 검색에서 보기</button>
+    <button class="btn sm" onclick="closeModal();view.mkSel=${esc(JSON.stringify(g.univ+'|'+g.major))};view.mkQ=${esc(JSON.stringify(g.univ+' '+g.major))};go('mock')">🧾 모의지원으로</button>
+    <button class="btn sm" onclick="closeModal();view.sUniv=${esc(JSON.stringify(g.univ))};view.sq='';view.searchTab='univ';go('search')">🔍 검색에서 보기</button>
     <button class="btn" onclick="closeModal()">닫기</button>
   </div>`);}
 /* 진학사식 반원 게이지 — d=여유(+)/부족(−), unit "등급"|"백분위" */
@@ -4125,6 +4201,7 @@ function renderAdiga(){
  $("#main").innerHTML=`
  <div class="pagehead"><div><h1>어디가 데이터</h1><div class="sub">원문에서 확인한 조건과 자체 상담 메모를 기록합니다.</div></div>
  <a class="btn sm" href="https://www.adiga.kr" target="_blank" rel="noopener noreferrer">어디가 열기</a></div>
+ ${view.adigaReturn?'<p><button class="btn sm" onclick="returnAdigaCandidate()">수시 후보로 돌아가기</button> <span style="font-size:var(--fs-sm);color:var(--ink2)">노트 저장 후 후보 비교에 반영됩니다. 입력 중인 노트는 자동 저장되지 않습니다.</span></p>':""}
  <p style="font-size:var(--fs-sm);color:var(--ink2)">출처 표시는 이용 허락을 뜻하지 않습니다. 자료별 이용 조건과 허락 범위를 확인하세요.
  <a href="https://www.adiga.kr/mbs/cop/copyrightPolicyView.do?menuId=PCMBSCOP1000" target="_blank" rel="noopener noreferrer">어디가 저작권정책</a></p>
  <div class="sec"><h2>${editing?"대학 노트 편집":"대학 노트 추가"}</h2></div>
@@ -4155,6 +4232,13 @@ function renderAdiga(){
 function openAdiga(i){
  const n=(db.adiga||[])[i];if(!n||typeof n!=="object")return;
  view.adigaDraft={...n};view.adigaEdit={note:n,draft:view.adigaDraft};renderAdiga();$("#ad_univ").focus();
+}
+function returnAdigaCandidate(){
+ const origin=view.adigaReturn,s=db.students.find(s=>s.id===origin?.studentId);
+ if(!s||String(s.consult?.susi?.admissionYear)!==String(origin.admissionYear)){
+   delete view.adigaReturn;renderAdiga();toast("이전 상담 대상을 찾을 수 없습니다. 수시 상담에서 학생과 학년도를 다시 선택하세요.");return;
+ }
+ view.ipsiStu=s.id;view.ipsiFlow="susi";go("ipsi");
 }
 function cancelAdiga(){view.adigaDraft={};delete view.adigaEdit;renderAdiga();}
 function deleteAdiga(i){
