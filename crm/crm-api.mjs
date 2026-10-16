@@ -925,7 +925,13 @@ async function pullContactsLocked(env, body) {
       const ids = await client.dealIdsForContacts(contacts.map(c => c.id));
       const allIds = Object.values(ids).flat(), deals = allIds.length ? await client.readDeals(allIds) : [];
       const byId = new Map(deals.map(d => [d.id, d]));
-      for (const contact of contacts) count(await importContact(contact, (ids[contact.id] || []).map(id => byId.get(id)).filter(Boolean)));
+      for (let start = 0; start < contacts.length; start += 3) {
+        const settled = await Promise.allSettled(contacts.slice(start, start + 3).map(async contact => {
+          count(await importContact(contact, (ids[contact.id] || []).map(id => byId.get(id)).filter(Boolean)));
+        }));
+        const failed = settled.find(result => result.status === 'rejected');
+        if (failed) throw failed.reason;
+      }
     };
     // 전체 목록은 딜도 함께 읽으므로 순환·재시도 조회는 완주 뒤 재개해 같은 고객을 두 번 읽지 않는다.
     const lastId = String(saved.linkedAfter || '');
@@ -940,7 +946,7 @@ async function pullContactsLocked(env, body) {
       linkedAfter = linked.length ? String(linked[linked.length - 1].contact_id) : '';
     }
     for (let page = 0; page < PULL_PAGES_PER_CALL; page++) {
-      const result = fullRun ? await client.listContacts(after, available, 25) : await client.contactsModifiedSince(since, after, available, until, 25);
+      const result = fullRun ? await client.listContacts(after, available, 25) : await client.contactsModifiedSince(since, after, available, until, 10);
       total = result.total;
       if (total > 10000) return fail('SEARCH_LIMIT', '검색 범위가 HubSpot 한도를 넘었습니다. 시간 범위를 나누어 가져와야 합니다', 409);
       await importBatch(result.results);
@@ -983,7 +989,7 @@ async function validateSyncMapping(env, settings) {
 export async function runHubspotSync(env) {
   return withSyncLease(env, async scoped => {
     const settings = await loadSettings(scoped);
-    if (!settings.hubspot.autoSync) return flushQueueLocked(scoped, 5);
+    if (!settings.hubspot.autoSync) return flushQueueLocked(scoped, 2);
     const previous = await kvGet(scoped, 'hs:automation') || {}, lastRunAt = Date.now();
     await kvSet(scoped, 'hs:automation', { ...previous, lastRunAt, error: '' });
     let lastResult, error = '';
@@ -992,7 +998,7 @@ export async function runHubspotSync(env) {
       if (invalid) throw Object.assign(new Error(invalid), { code: invalid });
       const pull = await (await pullContactsLocked(scoped, {})).json();
       if (!pull.ok) throw Object.assign(new Error(pull.code), { code: pull.code });
-      const push = await flushQueueLocked(scoped, 5);
+      const push = await flushQueueLocked(scoped, 2);
       if (!push.ok) throw Object.assign(new Error(push.code), { code: push.code });
       const portalHeld = await scoped.DB.prepare("SELECT COUNT(*) AS total, COALESCE(SUM(q.status='pending'),0) AS pending FROM crm_sync_queue q JOIN crm_portal_links p ON p.lead_id=q.lead_id WHERE q.status IN ('pending','approved')").first();
       lastResult = { pull: { created: pull.created, updated: pull.updated, conflicts: pull.conflicts, invalid: pull.invalid, retry: pull.retry, more: pull.more, portalSkipped: pull.portalSkipped },
