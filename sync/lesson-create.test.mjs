@@ -9,6 +9,22 @@ const json = (body, status = 200) => new Response(JSON.stringify(body), {
   headers: { 'Content-Type': 'application/json' }
 });
 
+test('editing a versioned timetable preserves slot periods and ids across nonoverlapping dates', async () => {
+  const slots = [
+    { slotId: 'old', days: [1], startTime: '16:00', endTime: '16:50', validFrom: '2026-08-04', validTo: '2026-09-28' },
+    { slotId: 'current', days: [1], startTime: '15:30', endTime: '16:20', validFrom: '2026-09-29', validTo: '2026-10-18' },
+    { slotId: 'future', days: [1], startTime: '16:00', endTime: '16:50', validFrom: '2026-10-19' }
+  ];
+  const built = await buildLessonTask(validLesson({ scheduleSlots: slots }), 'teacher-1', 'admin', Date.now());
+  for (const slot of slots) {
+    const actual = built.scheduleSlots.find(item => item.slotId === slot.slotId);
+    assert.equal(actual.validFrom, slot.validFrom);
+    assert.equal(actual.validTo, slot.validTo);
+  }
+  await assert.rejects(() => buildLessonTask(validLesson({ scheduleSlots: [slots[0], { ...slots[1], validFrom: '2026-09-28' }] }), 'teacher-1', 'admin', Date.now()), /겹치는/);
+  await assert.rejects(() => buildLessonTask(validLesson({ scheduleSlots: [{ ...slots[0], validTo: '2026-07-01' }] }), 'teacher-1', 'admin', Date.now()), /기간/);
+});
+
 function validLesson(overrides = {}) {
   return Object.assign({
     studentName: '테스트학생',
