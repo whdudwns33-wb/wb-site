@@ -24,7 +24,7 @@ const ui = {
   pipe: 'inspection', q: '', status: 'open', channel: '', owner: '', phoneShown: {}, ym: C.ymOf(C.ymdOf(new Date())),
   listPipeline: '', listStage: '', listFollowup: '', listSort: 'newest', listView: 'open', listPage: 1, listPageSize: 25,
   hs: { status: null, pipelines: null, suggested: null, props: null, queue: [], counts: null, busy: '', err: '', filter: 'pending', map: null },
-  leadQueue: {}, portal: {}, linkBusy: false, detect: null,
+  leadQueue: {}, portal: {}, leadConflicts: {}, linkBusy: false, detect: null,
   relationships: { tab: 'friend', q: '', month: C.ymOf(C.ymdOf(new Date())), status: '' }
 };
 const boot = { health: null, err: '', busy: false };
@@ -33,6 +33,7 @@ let syncErr = '', lastSync = 0, flushTimer = null, flushing = false, pollTimer =
 let modalInitialValues = '';
 let relationshipEdit = null, relationshipSaving = false;
 let portalEdit = null, portalSaving = false;
+let leadEdit = null, conflictEdit = null;
 
 /* ── 도우미 ─────────────────────────────────────────── */
 const $ = sel => document.querySelector(sel);
@@ -78,6 +79,7 @@ function modalDirty() {
   return !!host && !host.hidden && modalValues() !== modalInitialValues;
 }
 function modal(title, bodyHtml, footHtml) {
+  leadEdit = null; conflictEdit = null;
   relationshipEdit = null;
   portalEdit = null;
   const host = $('#modalHost'); if (!host) return;
@@ -94,6 +96,7 @@ function closeModal(saved) {
   if (saved !== true && modalDirty() && !confirm('작성 중인 내용이 있습니다. 저장하지 않고 닫을까요?')) return;
   host.hidden = true; host.innerHTML = ''; setInert(false);
   modalInitialValues = '';
+  leadEdit = null; conflictEdit = null;
   relationshipEdit = null;
   portalEdit = null;
   const target = modalReturnFocus; modalReturnFocus = null;
@@ -139,7 +142,8 @@ async function api(path, body, opts) {
 function onAuthLost() {
   if (!session && !getToken()) return;
   closeModal(true);
-  ui.portal = {}; setLeadView('open');
+  ui.portal = {}; ui.leadConflicts = {}; setLeadView('open');
+  resetHubspotUi();
   setToken(''); session = null; stopPolling(); outbox.clear(); state = C.emptyState(); route = 'login'; render(); toast('다시 로그인해 주세요');
 }
 
@@ -151,11 +155,18 @@ function localUpsert(c, id, data) {
   const item = Object.assign({}, data, { id: String(id) });
   if (i >= 0) list[i] = item; else list.push(item);
 }
-function queueChange(c, id, data, deleted) {
+function queueChange(c, id, data, deleted, expectedUpdatedAt, base) {
+  const key = C.docKey(c, id);
+  if (c === 'leads' && ui.leadConflicts[key]) {
+    ui.leadConflicts[key].draft = JSON.parse(JSON.stringify(data));
+    ui.leadConflicts[key].deleted = !!deleted;
+    toast('저장 충돌이 남아 있습니다 — 상단에서 내 입력을 검토해 주세요'); patchSyncBar(); return;
+  }
   if (deleted) { const list = state[c]; const i = Array.isArray(list) ? list.findIndex(x => String(x.id) === String(id)) : -1; if (i >= 0) list.splice(i, 1); }
   else if (c === 'settings') state.settings = Object.assign({}, data);
   else localUpsert(c, id, data);
-  outbox.put(c, id, data, deleted);
+  outbox.put(c, id, data, deleted, expectedUpdatedAt === undefined ? Number(state.meta[key]) || 0 : expectedUpdatedAt,
+    JSON.parse(JSON.stringify(base || state.base[key] || {})));
   scheduleFlush(FLUSH_MS);
   patchSyncBar();
 }
@@ -167,8 +178,8 @@ async function flush() {
   const sent = outbox.snapshot(200);
   const changes = sent.map(e => {
     const ch = { c: e.c, id: e.id, data: e.data };
-    const at = state.meta[C.docKey(e.c, e.id)];
-    if (at) ch.expectedUpdatedAt = at;
+    const at = e.expectedUpdatedAt;
+    if (e.c === 'leads' || at) ch.expectedUpdatedAt = Number(at) || 0;
     if (e.deleted) ch.deleted = true;
     return ch;
   });
@@ -181,12 +192,22 @@ async function flush() {
     let dirty = false;
     if (r.stale.length) {
       r.stale.forEach(s => {
+        if (s.c === 'leads') {
+          const draft = outbox.snapshot().find(e => C.docKey(e.c, e.id) === s.key) || sent.find(e => C.docKey(e.c, e.id) === s.key);
+          if (draft) ui.leadConflicts[s.key] = { id: s.id, draft: JSON.parse(JSON.stringify(draft.data)), deleted: draft.deleted,
+            base: JSON.parse(JSON.stringify(draft.base || state.base[s.key] || {})) };
+          outbox.remove(s.key);
+          if (s.current) forceDoc(currentToDoc(s));
+          else forceDoc({ c: 'leads', id: s.id, data: null, deleted: true, updatedAt: Number(state.meta[s.key]) || 0 });
+          return;
+        }
         if (s.current) { forceDoc(currentToDoc(s)); return; }
         delete state.meta[s.key];
         const e = sent.find(x => C.docKey(x.c, x.id) === s.key);
         if (e && !outbox.has(s.key)) outbox.put(e.c, e.id, e.data, e.deleted);
       });
-      if (r.stale.some(s => s.current)) toast('다른 기기에서 먼저 바뀐 항목이 있어 최신 값으로 갱신했습니다');
+      if (r.stale.some(s => s.c === 'leads')) toast('고객 저장이 겹쳤습니다 — 내 입력을 보관했으니 상단에서 검토해 주세요');
+      else if (r.stale.some(s => s.current)) toast('다른 기기에서 먼저 바뀐 항목이 있어 최신 값으로 갱신했습니다');
       dirty = true;
     }
     if (r.failed.length) {
@@ -198,7 +219,7 @@ async function flush() {
     if (res.results && res.results.some(x => x.queued)) { ui.hs.counts = null; }
     if (dirty && !typingInView()) render();
     syncErr = '';
-    if (outbox.size()) scheduleFlush(50);
+    if (outbox.size()) scheduleFlush(r.failed.some(f => f.code === 'SYNC_BUSY') ? 5000 : 50);
     else if (r.ok.length) await poll();   // 서버가 hubspot 필드·stageAt 을 고쳐 두었을 수 있다 — 바로 받아 온다
   } catch (e) { if (e.code !== 'AUTH') syncErr = e.message; }
   finally { flushing = false; patchSyncBar(); }
@@ -244,6 +265,7 @@ async function afterAuth() {
   startPolling();
   applyRoute(C.routeOf(location.hash));
   render();
+  if (route === 'hubspot') loadHubspotPanel();
   if (route === 'lead' && leadId) loadPortalLink(leadId);
 }
 function applyRoute(r) {
@@ -316,10 +338,12 @@ async function doSetup(btn) {
   finally { boot.busy = false; if (btn) btn.disabled = false; }
 }
 async function doLogout() {
-  if (outbox.size() && !confirm('저장되지 않은 변경 ' + outbox.size() + '건이 있습니다. 그래도 로그아웃할까요?')) return;
+  const unsaved = outbox.size() + Object.keys(ui.leadConflicts).length;
+  if (unsaved && !confirm('저장되지 않은 변경 ' + unsaved + '건이 있습니다. 그래도 로그아웃할까요?')) return;
   try { await api('/api/logout', {}); } catch (e) { /* 토큰은 버린다 */ }
   setToken(''); session = null; stopPolling(); outbox.clear(); state = C.emptyState();
-  ui.portal = {}; setLeadView('open');
+  ui.portal = {}; ui.leadConflicts = {}; setLeadView('open');
+  resetHubspotUi();
   await loadHealth(); route = 'login'; history.replaceState(null, '', '#/login'); render();
 }
 
@@ -368,8 +392,9 @@ function updateTabs() {
 }
 function syncBanner() {
   const n = outbox.size();
-  if (!syncErr && !n) return '<div id="syncBar"></div>';
-  return '<div id="syncBar">' + (syncErr ? '<div class="banner bad">저장 보류 ' + n + '건 — ' + esc(syncErr) + ' <button class="btn btn-sm btn-ghost" data-act="retry-sync">다시 시도</button></div>' : '') + '</div>';
+  const conflicts = Object.values(ui.leadConflicts);
+  return '<div id="syncBar">' + (syncErr ? '<div class="banner bad">저장 보류 ' + n + '건 — ' + esc(syncErr) + ' <button class="btn btn-sm btn-ghost" data-act="retry-sync">다시 시도</button></div>' : '') +
+    conflicts.map(c => '<div class="banner warn">' + esc(c.draft.name || '고객') + ' — 다른 곳의 수정과 겹쳐 내 입력을 보관 중입니다. 새로고침 전에 확인해 주세요. <button class="btn btn-sm btn-ghost" data-act="lead-conflict" data-id="' + esc(c.id) + '">내 입력 검토</button></div>').join('') + '</div>';
 }
 function patchSyncBar() { const bar = $('#syncBar'); if (!bar) return; const tmp = document.createElement('div'); tmp.innerHTML = syncBanner(); bar.replaceWith(tmp.firstChild); updateTabs(); }
 
@@ -773,20 +798,29 @@ function viewStats() {
 }
 
 /* ── 화면: 허브스팟(원장) ──────────────────────────── */
+function resetHubspotUi() {
+  ui.hs = { status: null, pipelines: null, suggested: null, props: null, queue: [], counts: null, busy: '', err: '', filter: 'pending', map: null };
+  ui.leadQueue = {};
+}
 async function loadHubspotPanel(force) {
-  if (ui.hs.busy && !force) return;
+  if (ui.hs.busy || !session || !session.canApprove) return;
+  const activeSession = session;
   ui.hs.busy = 'status'; ui.hs.err = '';
   try {
     const s = await api('/api/hubspot/status');
+    if (session !== activeSession) return;
     ui.hs.status = s; ui.hs.counts = s.queue;
     const q = await api('/api/hubspot/queue?limit=200');
+    if (session !== activeSession) return;
     ui.hs.queue = q.items; ui.hs.counts = q.counts;
-    if (s.connected && !ui.hs.props) { try { ui.hs.props = await api('/api/hubspot/properties'); } catch (e) { ui.hs.props = { error: e.message }; } }
-  } catch (e) { ui.hs.err = e.message; }
+    if (s.connected && !ui.hs.props) { try { const props = await api('/api/hubspot/properties'); if (session === activeSession) ui.hs.props = props; } catch (e) { if (session === activeSession) ui.hs.props = { error: e.message }; } }
+  } catch (e) { if (session === activeSession) ui.hs.err = e.message; }
   finally {
-    ui.hs.busy = '';
-    try { await poll(); } catch (e) { /* 상태 확인이 설정 문서(포털 정보)를 고쳤을 수 있어 meta 를 맞춘다 */ }
-    if (route === 'hubspot' && !typingInView()) render(); else updateTabs();
+    if (session === activeSession) {
+      ui.hs.busy = '';
+      try { await poll(); } catch (e) { /* 상태 확인이 설정 문서(포털 정보)를 고쳤을 수 있어 meta 를 맞춘다 */ }
+      if (session === activeSession) { if (route === 'hubspot' && !typingInView()) render(); else updateTabs(); }
+    }
   }
 }
 function viewHubspot() {
@@ -801,6 +835,7 @@ function viewHubspot() {
   else if (s.reason === 'no_token') h += '<div class="banner warn" style="margin:8px 0 0">토큰이 없습니다</div><div class="guide"><b>연결 방법</b>1. HubSpot → 설정 → 통합 → 비공개 앱(Private Apps) → 앱 만들기\n2. 스코프: crm.objects.contacts (읽기·쓰기) · crm.objects.deals (읽기·쓰기) · crm.schemas.contacts (읽기·쓰기) · crm.objects.owners (읽기)\n3. 토큰을 GitHub 저장소 Settings → Secrets → Actions 에 <b>HUBSPOT_ACCESS_TOKEN</b> 으로 저장\n4. Actions → "Deploy wb-crm worker" 를 한 번 실행(Run workflow) → 워커 시크릿으로 복사됩니다\n토큰은 저장소·화면·로그 어디에도 적지 않습니다.</div>';
   else h += '<div class="banner bad" style="margin:8px 0 0">연결 실패 — ' + esc(s.error || s.reason) + '</div><div class="hint mt8">토큰이 만료·폐기됐거나 스코프가 모자랍니다. 새 토큰을 저장소 시크릿에 넣고 배포 워크플로우를 다시 돌리세요.</div>';
   h += '</div>';
+  h += autoSyncHtml(s);
   if (s && s.connected) {
     // 속성
     const p = ui.hs.props;
@@ -839,8 +874,8 @@ function viewHubspot() {
   const filter = ui.hs.filter;
   const items = ui.hs.queue.filter(i => filter === 'all' ? true : filter === 'open' ? (i.status === 'pending' || i.status === 'approved' || i.status === 'failed') : i.status === filter);
   h += '<div class="card"><div class="between wraprow"><div class="card-title">반영 큐</div><div class="row wraprow">' +
-    '<label class="check small"><input type="checkbox" id="f-autoquick"' + (hsS.autoApproveQuick ? ' checked' : '') + '> 빠른 입력(연락처·기록)은 자동 승인</label></div></div>' +
-    '<div class="card-sub">리드·기록이 바뀌면 여기 줄이 생기고, 승인한 것만 HubSpot 으로 갑니다. 딜 단계 전이는 항상 원장 승인. 승인된 줄은 15분마다 자동 반영되고 [지금 반영]으로 바로 보낼 수도 있습니다.</div>' +
+    '<label class="check small"><input type="checkbox" id="f-autoquick"' + (hsS.autoApproveQuick ? ' checked' : '') + (s && s.automation && s.automation.enabled ? ' disabled' : '') + '> 수동 모드의 빠른 입력 자동 승인</label></div></div>' +
+    '<div class="card-sub">자동 동기화를 켜면 이후 새 변경은 영업 단계까지 자동 반영합니다. 켜기 전에 남아 있던 승인 대기는 직접 검토해 주세요. 수동 모드에서는 기존 승인 규칙을 유지합니다. 실패·수정 충돌·결과 미확정은 자동으로 덮어쓰거나 다시 생성하지 않습니다.</div>' +
     '<div class="chips mt8">' + [['pending', '승인 대기 ' + (counts.pending || 0)], ['approved', '반영 대기 ' + (counts.approved || 0)], ['failed', '실패 ' + (counts.failed || 0)], ['done', '반영됨 ' + (counts.done || 0)], ['rejected', '반려 ' + (counts.rejected || 0)]].map(([k, l]) => '<button class="chip' + (filter === k ? ' on' : '') + '" data-act="hs-filter" data-f="' + k + '">' + esc(l) + '</button>').join('') + '</div>' +
     '<div class="row wraprow mt8">' + (counts.pending ? '<button class="btn btn-sm btn-good" data-act="hs-approve-all">전체 승인 (' + counts.pending + ')</button>' : '') +
     (counts.approved ? '<button class="btn btn-sm btn-primary" data-act="hs-push"' + (ui.hs.busy || !(s && s.connected) ? ' disabled' : '') + '>지금 반영 (' + counts.approved + ')</button>' : '') + '</div>';
@@ -851,12 +886,50 @@ function viewHubspot() {
       '<div class="small">' + esc(C.SYNC_KIND_LABEL[i.kind]) + ' · ' + what + ' <span class="muted">· ' + esc(staffName(i.createdBy)) + ' · ' + esc(new Date(i.createdAt).toLocaleString('ko-KR')) + '</span></div>' + (i.error ? '<div class="err">' + esc(i.error) + '</div>' : '') + '</div>' +
       '<div class="row">' + (i.status === 'pending' ? '<button class="btn btn-sm btn-good" data-act="hs-q" data-op="approve" data-id="' + esc(i.id) + '">승인</button><button class="btn btn-sm btn-danger" data-act="hs-q" data-op="reject" data-id="' + esc(i.id) + '">반려</button>' : '') +
       (i.status === 'approved' ? '<button class="btn btn-sm btn-ghost" data-act="hs-q" data-op="unapprove" data-id="' + esc(i.id) + '">승인 취소</button>' : '') +
-      (i.status === 'failed' ? '<button class="btn btn-sm btn-warn" data-act="hs-q" data-op="retry" data-id="' + esc(i.id) + '">다시 시도</button>' : '') + '</div></div>';
+      (i.status === 'failed' ? (/^UNCERTAIN/.test(i.error || '') ? '' : '<button class="btn btn-sm btn-warn" data-act="hs-q" data-op="retry" data-id="' + esc(i.id) + '">다시 시도</button>') + '<button class="btn btn-sm btn-ghost" data-act="hs-q" data-op="reject" data-id="' + esc(i.id) + '">이 전송 취소</button>' : '') + '</div></div>';
   }).join('') : '<div class="hint mt8">해당 상태의 줄이 없습니다.</div>';
   return h + '</div>';
 }
+function autoSyncHtml(status) {
+  const a = status && status.automation;
+  const busy = !!ui.hs.busy || !!(a && a.running);
+  const stamp = value => value ? new Date(value).toLocaleString('ko-KR') : '아직 없음';
+  let h = '<section class="card" aria-label="자동 양방향 동기화"><div class="between wraprow"><h2 class="card-title">자동 양방향 동기화</h2><span class="tag' + (a && a.enabled ? ' ok' : '') + '">' + (a ? a.enabled ? '켜짐' : '꺼짐' : '상태 확인 필요') + '</span></div>' +
+    '<p class="card-sub mt8">15분마다 고객 기본정보·영업 단계의 변경을 양쪽에 반영합니다. 즉시 반영이 필요하면 [지금 동기화]를 누르세요.</p>' +
+    '<p class="hint mt8">센터앱 연결 고객은 센터앱이 관리합니다. 상담 기록은 세일즈데스크에서 HubSpot으로 보내며, 삭제·관계관리·검사 점수는 자동 반영 대상이 아닙니다.</p>';
+  if (a) {
+    const r = a.lastResult || {}, pull = r.pull || {}, push = r.push || {};
+    h += '<dl class="kv mt14"><dt>마지막 실행</dt><dd>' + esc(stamp(a.lastRunAt)) + '</dd><dt>마지막 완료</dt><dd>' + esc(stamp(a.lastSuccessAt)) + '</dd></dl>';
+    if (a.running) h += '<div class="banner mt8" role="status">동기화 중입니다. [다시 확인]으로 결과를 확인하세요.</div>';
+    if (a.lastResult) h += '<p class="hint mt8">최근 결과 — 가져오기 신규 ' + (Number(pull.created) || 0) + ' · 갱신 ' + (Number(pull.updated) || 0) + ' · 충돌 ' + (Number(pull.conflicts) || 0) + ' / 보내기 완료 ' + (Number(push.done) || 0) + ' · 실패 ' + (Number(push.failed) || 0) + ((pull.more || push.remaining) ? ' · 다음 주기에 이어서 처리' : '') + '</p>';
+    if (a.error) h += '<div class="banner bad mt8">' + esc(a.error) + '</div>';
+  }
+  if (session && session.canApprove) h += '<div class="row wraprow mt14"><button class="btn btn-primary" data-act="hs-auto-toggle" data-enabled="' + (a && a.enabled ? '0' : '1') + '"' + (!a || busy || (!a.enabled && !(status && status.connected)) ? ' disabled' : '') + '>' + (a && a.enabled ? '자동 동기화 끄기' : '자동 동기화 켜기') + '</button><button class="btn btn-ghost" data-act="hs-auto-run"' + (!a || !a.enabled || busy ? ' disabled' : '') + '>지금 동기화</button></div>';
+  return h + '</section>';
+}
+function setAutoSync(enabled) { return autoSyncAction({ enabled: !!enabled }); }
+function runAutoSync() { return autoSyncAction({ run: true }); }
+async function autoSyncAction(body) {
+  if (!session || !session.canApprove || ui.hs.busy) return;
+  const activeSession = session;
+  ui.hs.busy = 'auto-sync'; ui.hs.err = ''; render();
+  try {
+    const r = await api('/api/hubspot/sync', body);
+    if (session !== activeSession) return;
+    if (!r.automation || typeof r.automation.enabled !== 'boolean') throw new Error('동기화 설정 응답을 확인하지 못했습니다. 다시 확인해 주세요.');
+    ui.hs.status = Object.assign({}, ui.hs.status, { automation: r.automation });
+    await loadAll();
+    if (session !== activeSession) return;
+    toast(body.run ? '동기화 결과를 확인해 주세요' : r.automation.enabled ? '자동 동기화를 켰습니다' : '자동 동기화를 껐습니다');
+  } catch (e) { if (session === activeSession) ui.hs.err = e.message; }
+  finally { if (session === activeSession) { ui.hs.busy = ''; render(); } }
+}
 async function hsAction(kind, arg) {
   if (ui.hs.busy) return;
+  if (kind === 'queue' && arg.op === 'reject' && ui.hs.queue.some(i => arg.ids.includes(i.id) && i.status === 'failed')) {
+    if (!confirm('HubSpot 원본에서 실제 반영 여부를 확인했나요? 이 전송을 취소하면 다음 가져오기 때 HubSpot 값이 적용될 수 있습니다. 취소한 전송 기록은 반려 목록에 남습니다.')) return;
+    arg.reviewed = true;
+  }
   ui.hs.busy = kind; render();
   try {
     if (kind === 'pipelines') {
@@ -1259,6 +1332,7 @@ function openLeadForm(id) {
   const l = id ? leadById(id) : null;
   if (id && !l) return;
   modal(l ? '리드 수정' : '새 문의', leadFormHtml(l), '<button class="btn btn-primary btn-block mt8" data-act="lead-save" data-id="' + esc(id || '') + '">' + (l ? '저장' : '등록') + '</button>');
+  leadEdit = { id: id || '', base: l ? JSON.parse(JSON.stringify(l)) : null, at: Number(state.meta[C.docKey('leads', id)]) || 0 };
   if (!l) { const src = $('#f-source'); if (src) src.addEventListener('input', onSourceInput); }
 }
 function onSourceInput() {
@@ -1270,8 +1344,66 @@ function onSourceInput() {
   if (hint) hint.innerHTML = text ? '감지: 채널 <b>' + esc(ch.channel) + '</b>' + (ch.confidence === 'low' ? ' (단서 부족)' : ch.hits.length ? ' (' + esc(ch.hits.map(x => x.keyword).join(', ')) + ')' : '') + ' · HOT ' + (hot.confidence === 'high' ? '<b style="color:var(--hot)">예</b>' : hot.confidence === 'medium' ? '애매(' + esc(hot.hits.map(x => x.keyword).join(', ')) + ')' : '아니오') : '';
 }
 function togglePartnerField() { const w = $('#f-partner-wrap'); if (w) w.hidden = val('f-channel2') !== '파트너'; }
+const LEAD_EDIT_FIELDS = {
+  name: '보호자 이름', relation: '관계', phone: '전화', email: '이메일',
+  'child.name': '아이 이름', 'child.birth': '생년월일', 'child.grade': '학년', 'child.school': '학교',
+  channel: '유입 채널', channelNote: '채널 메모', referrerLeadId: '소개자', partnerId: '파트너',
+  interests: '관심', hot: '핫 리드', memo: '메모', owner: '담당', source: '문의 원문',
+  'inspection.type': '검사 종류', 'inspection.date': '검사일', consultedAt: '상담 완료일',
+  strength: '강점', academyStatus: '학원 상태', retestDue: '재검사 일정', followups: '다음 연락',
+  pipeline: '파이프라인', stage: '단계', status: '상태', stageAt: '단계 변경일',
+  'outcome.status': '판정', 'outcome.reason': '판정 사유', 'outcome.note': '판정 메모', 'outcome.at': '판정일'
+};
+function leadField(data, path) { return path.split('.').reduce((v, k) => v && v[k], data); }
+function leadChanges(conflict) {
+  return Object.keys(LEAD_EDIT_FIELDS).filter(path => JSON.stringify(leadField(conflict.base, path)) !== JSON.stringify(leadField(conflict.draft, path)));
+}
+function leadFieldText(data, path) {
+  const v = leadField(data, path);
+  if (path === 'stage') return C.STAGE_LABEL[v] || v || '—';
+  if (path === 'pipeline') return C.PIPELINE_LABEL[v] || v || '—';
+  if (path === 'owner') return staffName(v);
+  if (path === 'referrerLeadId') { const l = leadById(v); return l ? C.leadLabel(l) : v || '—'; }
+  if (path === 'partnerId') { const p = partnerById(v); return p ? p.name : v || '—'; }
+  if (typeof v === 'boolean') return v ? '예' : '아니오';
+  if (path === 'followups' && Array.isArray(v)) return v.map(x => ['D+' + x.day, x.due, ({ done: '완료', skipped: '건너뜀', pending: '예정' })[x.status] || x.status, x.doneAt, C.RESULT_LABEL[x.result] || x.result, x.note].filter(Boolean).join(' · ')).join('\n') || '—';
+  if (Array.isArray(v)) return v.map(x => typeof x === 'object' ? [x.due || x.date, x.status === 'done' ? '완료' : '예정'].filter(Boolean).join(' ') : x).join(', ') || '—';
+  return v == null || v === '' ? '—' : typeof v === 'object' ? JSON.stringify(v) : String(v);
+}
+function openLeadConflict(id) {
+  const key = C.docKey('leads', id), conflict = ui.leadConflicts[key];
+  if (!conflict) return;
+  const current = leadById(id), fields = leadChanges(conflict);
+  const body = '<p class="hint">내가 바꾼 항목만 비교합니다. 다시 저장하면 아래 항목에 내 입력을 적용합니다.</p>' +
+    (!current || conflict.deleted ? '<div class="banner bad mt8">삭제된 고객 또는 삭제 요청은 여기서 복원하지 않습니다. 내 입력을 확인한 뒤 최신 내용을 사용해 주세요.</div>' : '') +
+    '<div class="table-wrap mt14"><table><thead><tr><th>항목</th><th>최근 서버값</th><th>내 입력</th></tr></thead><tbody>' +
+    fields.map(path => '<tr><th>' + esc(LEAD_EDIT_FIELDS[path]) + '</th><td>' + esc(leadFieldText(current, path)) + '</td><td>' + esc(leadFieldText(conflict.draft, path)) + '</td></tr>').join('') + '</tbody></table></div>';
+  modal('겹친 고객 수정 확인', body, '<div class="row wraprow mt14"><button class="btn btn-ghost" data-act="lead-conflict-discard" data-id="' + esc(id) + '">최신 내용 사용</button>' +
+    (current && !conflict.deleted && fields.length ? '<button class="btn btn-primary" data-act="lead-conflict-save" data-id="' + esc(id) + '">위 변경 다시 저장</button>' : '') + '</div>');
+  conflictEdit = { id, at: Number(state.meta[key]) || 0 };
+}
+function resolveLeadConflict(id, keepMine) {
+  const key = C.docKey('leads', id), conflict = ui.leadConflicts[key], current = leadById(id);
+  if (!conflict) return;
+  if (!keepMine) { delete ui.leadConflicts[key]; closeModal(true); render(); return; }
+  if (!current || conflict.deleted) return toast('삭제된 고객은 다시 저장할 수 없습니다');
+  if (!conflictEdit || conflictEdit.id !== id || conflictEdit.at !== (Number(state.meta[key]) || 0)) {
+    openLeadConflict(id); return toast('그동안 서버 내용이 바뀌었습니다. 비교 내용을 다시 확인해 주세요');
+  }
+  const data = JSON.parse(JSON.stringify(current));
+  leadChanges(conflict).forEach(path => {
+    const parts = path.split('.'), field = parts.pop();
+    const target = parts.reduce((v, k) => v[k] || (v[k] = {}), data);
+    const value = leadField(conflict.draft, path);
+    if (value === undefined) delete target[field]; else target[field] = JSON.parse(JSON.stringify(value));
+  });
+  delete ui.leadConflicts[key];
+  queueChange('leads', id, data, false, conflictEdit.at, current);
+  closeModal(true); render(); toast('검토한 변경을 저장 중입니다');
+}
 function saveLeadForm(id) {
-  const prev = id ? leadById(id) : null;
+  const edit = leadEdit && leadEdit.id === (id || '') ? leadEdit : null;
+  const prev = edit ? edit.base : id ? leadById(id) : null;
   const base = prev ? JSON.parse(JSON.stringify(prev)) : { pipeline: 'inspection', stage: 'inquiry', status: 'open', followups: [], createdAt: today(), stageAt: today() };
   const data = Object.assign(base, {
     name: val('f-name'), relation: val('f-rel'), phone: val('f-phone'), email: val('f-email'),
@@ -1294,7 +1426,7 @@ function saveLeadForm(id) {
   if (pii) return toast((pii === 'source' ? '문의 원문' : pii === 'memo' ? '메모' : pii) + '에 전화번호·이메일이 있습니다 — 전화는 전화 칸에만 적고 본문에서는 지워 주세요');
   const out = Object.assign(v.data, { hubspot: prev ? prev.hubspot : {} });
   const newId = id || uid('ld');
-  queueChange('leads', newId, out);
+  queueChange('leads', newId, out, false, edit ? edit.at : undefined, prev);
   if (!prev && out.source) addActivity(newId, { type: 'note', text: '문의 원문\n' + out.source, at: today() });
   closeModal(true);
   toast(prev ? '저장했습니다' : '등록했습니다' + (out.hot ? ' — 핫 리드' : ''));
@@ -1488,6 +1620,9 @@ document.addEventListener('click', async e => {
     case 'new-lead': return openLeadForm('');
     case 'edit-lead': return openLeadForm(id);
     case 'lead-save': return saveLeadForm(id);
+    case 'lead-conflict': return openLeadConflict(id);
+    case 'lead-conflict-save': return resolveLeadConflict(id, true);
+    case 'lead-conflict-discard': return resolveLeadConflict(id, false);
     case 'delete-lead': if (confirm('이 리드와 연결된 화면 기록이 보이지 않게 됩니다(HubSpot 쪽은 그대로). 삭제할까요?')) { queueChange('leads', id, {}, true); go('leads'); } return;
     case 'show-phone': ui.phoneShown[id] = true; return render();
     case 'pipe': ui.pipe = el.dataset.p; return render();
@@ -1523,6 +1658,8 @@ document.addEventListener('click', async e => {
     case 'credit-form': return openCreditForm(id, el.dataset.type);
     case 'credit-save': return saveCredit(id, el.dataset.type);
     case 'hs-refresh': ui.hs.props = null; return loadHubspotPanel(true);
+    case 'hs-auto-toggle': return setAutoSync(el.dataset.enabled === '1');
+    case 'hs-auto-run': return runAutoSync();
     case 'hs-pipelines': return hsAction('pipelines');
     case 'hs-props-create': return hsAction('props');
     case 'hs-pull': return hsAction('pull', !!el.dataset.full);
@@ -1631,6 +1768,6 @@ document.addEventListener('keydown', e => {
 });
 window.addEventListener('hashchange', onHash);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); });
-window.addEventListener('beforeunload', e => { if (outbox.size() || relationshipSaving || portalSaving || modalDirty()) { e.preventDefault(); e.returnValue = ''; } });
+window.addEventListener('beforeunload', e => { if (outbox.size() || Object.keys(ui.leadConflicts).length || relationshipSaving || portalSaving || modalDirty()) { e.preventDefault(); e.returnValue = ''; } });
 
 startApp();

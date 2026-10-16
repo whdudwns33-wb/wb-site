@@ -78,7 +78,7 @@ export async function loadSettings(env) {
   const d = doc ? doc.data : {};
   const hs = isPlainObject(d.hubspot) ? d.hubspot : {};
   return { orgName: String(d.orgName || ''), followupOffsets: Array.isArray(d.followupOffsets) ? d.followupOffsets : CORE.FOLLOWUP_OFFSETS,
-    hubspot: { enabled: hs.enabled !== false, autoApproveQuick: !!hs.autoApproveQuick, map: isPlainObject(hs.map) ? hs.map : {}, portal: isPlainObject(hs.portal) ? hs.portal : {} } };
+    hubspot: { enabled: hs.enabled !== false, autoApproveQuick: !!hs.autoApproveQuick, autoSync: hs.autoSync === true, map: isPlainObject(hs.map) ? hs.map : {}, portal: isPlainObject(hs.portal) ? hs.portal : {} } };
 }
 /** 서버(hubspot)가 문서를 쓴다 — 규칙 검사 없이 값을 그대로. updated_at 은 반드시 커진다. */
 /** 문서의 일부 필드만 고친다 — 현재 행을 다시 읽어 patchFn(data) 를 적용하고 updated_at 이 그대로일 때만 쓴다(CAS, 3회).
@@ -127,7 +127,7 @@ export async function enqueueFor(env, auth, settings, c, id, previous, data) {
   let tick = Math.max(now, Number(last && last.m || 0) + 1);
   const put = async (leadId, kind, payload) => {
     const track = CORE.syncTrack(kind, payload);
-    const status = track === 'quick' && settings.hubspot.autoApproveQuick ? 'approved' : 'pending';
+    const status = settings.hubspot.autoSync || (track === 'quick' && settings.hubspot.autoApproveQuick) ? 'approved' : 'pending';
     if (kind !== 'note') {
       // 같은 리드·같은 종류(딜은 같은 파이프라인)의 열린 줄이 있으면 그 줄을 갈아 끼운다 — 한 리드에 종류당 한 줄.
       const open = kind === 'deal'
@@ -140,8 +140,8 @@ export async function enqueueFor(env, auth, settings, c, id, previous, data) {
         const mergedTrack = CORE.syncTrack(kind, merged);
         // 원장이 이미 승인한 줄의 내용이 바뀌면(다른 단계로) 승인은 무효다 — 검토 트랙은 다시 승인 대기로. 빠른 입력은 자동 승인 설정을 따른다.
         let mergedStatus = open.status;
-        if (mergedTrack === 'review') mergedStatus = (open.status === 'approved' && prevPayload.stage !== merged.stage) || open.track !== 'review' ? 'pending' : open.status;
-        await env.DB.prepare('UPDATE crm_sync_queue SET payload=?,track=?,status=?,updated_at=MAX(?,created_at) WHERE id=?')
+        if (mergedTrack === 'review' && !settings.hubspot.autoSync) mergedStatus = (open.status === 'approved' && prevPayload.stage !== merged.stage) || open.track !== 'review' ? 'pending' : open.status;
+        await env.DB.prepare('UPDATE crm_sync_queue SET payload=?,track=?,status=?,updated_at=MAX(?,updated_at+1,created_at) WHERE id=?')
           .bind(JSON.stringify(merged), mergedTrack, mergedStatus, now, open.id).run();
         n++;
         return;

@@ -3,11 +3,11 @@
 //
 // 인증: 원장 비밀번호(PBKDF2) → Bearer 토큰, 직원은 1회용 링크 코드 → Bearer 토큰. 토큰은 sha256 만 저장한다(desk 와 같은 방식).
 // 문서(crm_documents): leads(리드)·activities(상담·CS·통화 기록, append-only)·credits(소개 크레딧, 원장·append-only)·settings(원장).
-// HubSpot: 리드·기록이 바뀌면 서버가 반영 큐(crm_sync_queue)에 한 줄을 만들고, 원장이 승인한 것만 push 가 HubSpot 에 쓴다.
-//   빠른 입력(연락처·노트)은 설정으로 자동 승인할 수 있고, 딜 단계 전이는 항상 원장 승인이다(원장 CRM 운영 규칙 P4-A/B).
+// HubSpot: 자동 모드는 새 반영 큐를 승인하고 15분마다 양방향으로 반영한다. 기존 대기 줄은 그대로 보존한다.
+//   자동 모드가 꺼져 있으면 빠른 입력 자동 승인 설정·딜 단계 수동 승인 규칙을 따른다.
 //   HubSpot 토큰은 env.HUBSPOT_ACCESS_TOKEN(워커 시크릿)으로만 들어온다 — 응답·로그·문서에 넣지 않는다.
 import CORE from './crm-core.js';
-import { createClient, contactProperties, leadFromContact, applyDealsToLead, dealName, noteBody, HubSpotError } from './hubspot.mjs';
+import { createClient, contactProperties, contactPatchProperties, leadFromContact, applyDealsToLead, dealName, noteBody, HubSpotError } from './hubspot.mjs';
 import { SYSTEM_ID, SETTINGS_ID, DOC_ID, PII_ALLOWED_PATHS, json, fail, hasPii, isPlainObject, absent, parseJson, byteLength, changesOf, kstToday, readJson,
   safeEqual, hex, hexBytes, sha256Hex, passwordHash, randomOpaqueValue, randomSlug, loadDoc, loadCollection, loadSettings, writeDocRaw, patchDocFields, enqueueFor, same, findPii, LINK_CODE, CODE_TTL_MS } from './crm-shared.mjs';
 import { handlePartnerApi, partnerOp } from './partner-api.mjs';
@@ -31,7 +31,7 @@ const MAX_CHANGES = 200;
 const MAX_DOC_BYTES = 64 * 1024;
 const PUSH_LIMIT_DEFAULT = 10;
 const PUSH_LIMIT_MAX = 25;
-const PULL_PAGES_PER_CALL = 3;
+const PULL_PAGES_PER_CALL = 1;
 const PROPS_CACHE_MS = 60 * 60 * 1000;
 
 
@@ -276,6 +276,7 @@ function ruleSettings(data, ctx) {
     hubspot: {
       enabled: hs.enabled !== false,
       autoApproveQuick: !!hs.autoApproveQuick,
+      autoSync: prevHs.autoSync === true,
       map: { inspection: sanitizeMap(isPlainObject(hs.map) ? hs.map.inspection : null, 'inspection'), academy: sanitizeMap(isPlainObject(hs.map) ? hs.map.academy : null, 'academy') },
       // 포털 정보는 /api/hubspot/status 가 채운다 — 클라이언트 값은 무시
       portal: isPlainObject(prevHs.portal) ? prevHs.portal : {}
@@ -379,6 +380,15 @@ function currentView(row) {
 }
 
 async function applyChange(env, auth, change, settings) {
+  const leadId = change.c === 'leads' ? change.id : ['activities', 'credits'].includes(change.c) ? change.data?.leadId : '';
+  if (!leadId || !DOC_ID.test(leadId) || await portalLinked(env, leadId)) return applyChangeLocked(env, auth, change, settings);
+  const token = await claimHubspot(env, leadId);
+  if (!token) return { status: 409, result: { c: change.c, id: change.id, code: 'SYNC_BUSY', error: '동기화 중입니다. 잠시 후 다시 저장해 주세요' } };
+  try { return await applyChangeLocked(env, auth, change, settings); }
+  finally { await releaseHubspot(env, leadId, token); }
+}
+
+async function applyChangeLocked(env, auth, change, settings) {
   const c = change && typeof change.c === 'string' ? change.c : '';
   const id = change && typeof change.id === 'string' ? change.id : '';
   const item = { c, id };
@@ -392,7 +402,7 @@ async function applyChange(env, auth, change, settings) {
   const row = await env.DB.prepare('SELECT data,updated_at,updated_by,deleted FROM crm_documents WHERE collection=? AND id=? LIMIT 1').bind(c, id).first();
   const currentAt = row ? Number(row.updated_at) : 0;
   const relationship = Object.prototype.hasOwnProperty.call(RELATIONSHIP_VALIDATORS, c);
-  if (relationship && (typeof change.expectedUpdatedAt !== 'number' || !Number.isSafeInteger(change.expectedUpdatedAt) || change.expectedUpdatedAt < 0)) return reject('INVALID', '관계 기록은 expectedUpdatedAt 숫자가 필요합니다 — 새 기록은 0');
+  if ((relationship || (c === 'leads' && settings.hubspot.autoSync)) && (typeof change.expectedUpdatedAt !== 'number' || !Number.isSafeInteger(change.expectedUpdatedAt) || change.expectedUpdatedAt < 0)) return reject('INVALID', '저장 버전 expectedUpdatedAt 숫자가 필요합니다 — 새 기록은 0');
   if (!absent(change.expectedUpdatedAt)) {
     const expected = Number(change.expectedUpdatedAt);
     if (!Number.isFinite(expected) || expected !== currentAt) return reject('STALE', '다른 기기에서 먼저 바뀌었습니다', 409, { current: currentView(row) });
@@ -435,10 +445,16 @@ async function applyChange(env, auth, change, settings) {
       const current = await env.DB.prepare('SELECT data,updated_at,updated_by,deleted FROM crm_documents WHERE collection=? AND id=? LIMIT 1').bind(c, id).first();
       return reject('STALE', '다른 기기에서 관계 기록 또는 참조 고객이 바뀌었습니다. 새로고침 후 확인해 주세요', 409, { current: currentView(current) });
     }
-  } else await env.DB.prepare(
-    'INSERT INTO crm_documents(collection,id,data,updated_at,updated_by,deleted) VALUES(?,?,?,?,?,?) ' +
-    'ON CONFLICT(collection,id) DO UPDATE SET data=excluded.data,updated_at=excluded.updated_at,updated_by=excluded.updated_by,deleted=excluded.deleted'
-  ).bind(c, id, JSON.stringify(data), updatedAt, auth.staffId, wantDelete ? 1 : 0).run();
+  } else {
+    const saved = row ? await env.DB.prepare('UPDATE crm_documents SET data=?,updated_at=?,updated_by=?,deleted=? WHERE collection=? AND id=? AND updated_at=?')
+      .bind(JSON.stringify(data), updatedAt, auth.staffId, wantDelete ? 1 : 0, c, id, currentAt).run() :
+      await env.DB.prepare('INSERT INTO crm_documents(collection,id,data,updated_at,updated_by,deleted) VALUES(?,?,?,?,?,?) ON CONFLICT(collection,id) DO NOTHING')
+        .bind(c, id, JSON.stringify(data), updatedAt, auth.staffId, wantDelete ? 1 : 0).run();
+    if (!changesOf(saved)) {
+      const current = await env.DB.prepare('SELECT data,updated_at,updated_by,deleted FROM crm_documents WHERE collection=? AND id=? LIMIT 1').bind(c, id).first();
+      return reject('STALE', '다른 기기에서 먼저 바뀌었습니다. 다시 확인해 주세요', 409, { current: currentView(current) });
+    }
+  }
   if (wantDelete) {
     // 지운 리드의 반영 줄은 더 보낼 것이 없다 — 반려로 닫는다. 연결표는 남겨 둔다(가져오기가 같은 연락처를 새 리드로 되살리지 않게).
     await env.DB.prepare('UPDATE crm_sync_queue SET status=\'rejected\',error=?,decided_at=?,decided_by=?,updated_at=MAX(?,created_at) WHERE lead_id=? AND status IN (\'pending\',\'approved\')')
@@ -502,14 +518,16 @@ async function queueOp(env, auth, body) {
   }
   const ids = (body && Array.isArray(body.ids) ? body.ids : []).map(String).filter(x => QUEUE_ID.test(x)).slice(0, 200);
   if (!ids.length) return fail('INVALID', '대상 id 가 없습니다');
+  if (op === 'retry' && await env.DB.prepare("SELECT id FROM crm_sync_queue WHERE id IN (" + ids.map(() => '?').join(',') + ") AND error LIKE 'UNCERTAIN%' LIMIT 1").bind(...ids).first()) return fail('UNCERTAIN', '외부 반영 결과가 미확정입니다. HubSpot 원본을 확인한 뒤 처리해 주세요', 409);
+  if (op === 'reject' && body.reviewed !== true && await env.DB.prepare("SELECT id FROM crm_sync_queue WHERE id IN (" + ids.map(() => '?').join(',') + ") AND status='failed' LIMIT 1").bind(...ids).first()) return fail('REVIEW_REQUIRED', 'HubSpot 원본과 로컬 변경을 확인한 뒤 반영 취소를 확인해 주세요', 409);
   const TRANSITION = { approve: ['pending', 'approved'], reject: ['pending', 'rejected'], retry: ['failed', 'approved'], unapprove: ['approved', 'pending'] };
   const t = TRANSITION[op];
   if (!t) return fail('INVALID', '지원하지 않는 작업입니다');
   if (t[1] === 'approved' && await env.DB.prepare('SELECT q.id FROM crm_sync_queue q JOIN crm_portal_links p ON p.lead_id=q.lead_id WHERE q.id IN (' + ids.map(() => '?').join(',') + ') LIMIT 1').bind(...ids).first()) return fail('PORTAL_LINKED', PORTAL_HOLD, 409);
   let changed = 0;
   for (const id of ids) {
-    const r = await env.DB.prepare('UPDATE crm_sync_queue SET status=?,decided_at=?,decided_by=?,error=CASE WHEN ?=\'approved\' THEN NULL ELSE error END,updated_at=MAX(?,created_at) WHERE id=? AND status=?')
-      .bind(t[1], now, auth.staffId, t[1], now, id, t[0]).run();
+    const r = await env.DB.prepare('UPDATE crm_sync_queue SET status=?,decided_at=?,decided_by=?,error=CASE WHEN ?=\'approved\' THEN NULL ELSE error END,updated_at=MAX(?,created_at) WHERE id=? AND (status=? OR (?=1 AND status=\'failed\')) AND NOT EXISTS (SELECT 1 FROM crm_hs_inflight h WHERE h.lead_id=crm_sync_queue.lead_id AND h.expires_at>?)')
+      .bind(t[1], now, auth.staffId, t[1], now, id, t[0], op === 'reject' ? 1 : 0, now).run();
     changed += changesOf(r);
   }
   return json({ ok: true, changed, counts: await queueCounts(env) });
@@ -517,16 +535,49 @@ async function queueOp(env, auth, body) {
 
 /* ── HubSpot 호출 ─────────────────────────────────────────────────────── */
 
+const SYNC_LEASE = '$hubspot-sync';
+const SYNC_INTERVAL_MINUTES = 15;
+async function holdsSyncLease(env) {
+  const guard = env.HUBSPOT_SYNC_GUARD;
+  return !!guard && !guard.signal.aborted && await canWriteHubspot(env, SYNC_LEASE, guard.token);
+}
+async function withSyncLease(env, fn) {
+  if (env.HUBSPOT_SYNC_GUARD) return fn(env);
+  const token = await claimHubspot(env, SYNC_LEASE);
+  if (!token) return { ok: false, code: 'SYNC_BUSY', error: '동기화가 이미 진행 중입니다' };
+  const guarded = { ...env, HUBSPOT_SYNC_GUARD: { token, signal: AbortSignal.timeout(90000), lastRequestAt: 0, requests: 0 } };
+  try { return await fn(guarded); }
+  finally { await releaseHubspot(env, SYNC_LEASE, token); }
+}
 function hubspotClient(env, guarded) {
   if (!env.HUBSPOT_ACCESS_TOKEN) return null;
-  // env.HUBSPOT_FETCH 는 테스트·로컬에서만 넣는 가짜 fetch. 운영 워커에는 없다(globalThis.fetch).
   const fetchImpl = typeof env.HUBSPOT_FETCH === 'function' ? env.HUBSPOT_FETCH : globalThis.fetch;
-  return createClient({ token: env.HUBSPOT_ACCESS_TOKEN, fetch: guarded ? async (url, init) => {
-    guarded.signal.throwIfAborted();
-    if (!await canWriteHubspot(env, guarded.leadId, guarded.token)) throw new Error(PORTAL_HOLD);
-    return fetchImpl(url, { ...init, signal: guarded.signal });
-  } : fetchImpl, base: env.HUBSPOT_API_BASE || undefined });
+  return createClient({ token: env.HUBSPOT_ACCESS_TOKEN, fetch: async (url, init) => {
+    const globalGuard = env.HUBSPOT_SYNC_GUARD;
+    if (globalGuard) {
+      globalGuard.signal.throwIfAborted();
+      if (globalGuard.requests >= 40) throw Object.assign(new Error('TIME_BUDGET'), { code: 'TIME_BUDGET' });
+      globalGuard.requests++;
+      const renewed = await env.DB.prepare('UPDATE crm_hs_inflight SET expires_at=? WHERE lead_id=? AND token=? AND expires_at>?')
+        .bind(Date.now() + 120000, SYNC_LEASE, globalGuard.token, Date.now()).run();
+      if (!changesOf(renewed)) throw new Error('SYNC_BUSY');
+      if (!env.HUBSPOT_FETCH) await new Promise(resolve => setTimeout(resolve, Math.max(0, 220 - (Date.now() - globalGuard.lastRequestAt))));
+      globalGuard.lastRequestAt = Date.now();
+    }
+    if (guarded) {
+      guarded.signal.throwIfAborted();
+      if (!await canWriteHubspot(env, guarded.leadId, guarded.token)) throw new Error(PORTAL_HOLD);
+      const isWrite = (init.method === 'POST' && /\/crm\/v3\/objects\/(contacts|deals|notes)$/.test(new URL(url).pathname)) || (init.method === 'PATCH' && /\/crm\/v3\/objects\/(contacts|deals|notes)\/[^/]+$/.test(new URL(url).pathname));
+      if (isWrite) guarded.didWrite = true;
+      guarded.currentWrite = isWrite;
+    }
+    const signals = [init.signal, globalGuard?.signal, guarded?.signal].filter(Boolean);
+    const response = await fetchImpl(url, { ...init, signal: AbortSignal.any(signals) });
+    if (guarded?.currentWrite && response.ok) guarded.writeSucceeded = true;
+    return response;
+  }, base: env.HUBSPOT_API_BASE || undefined });
 }
+
 async function kvGet(env, key) {
   const row = await env.DB.prepare('SELECT value FROM crm_kv WHERE key=?').bind(key).first();
   return row ? parseJson(row.value) : null;
@@ -544,8 +595,14 @@ async function availableProperties(env, client, force) {
   return check.available;
 }
 function hsError(error) {
-  if (error instanceof HubSpotError) return { code: error.status === 401 ? 'HUBSPOT_AUTH' : error.status === 429 ? 'HUBSPOT_RATE' : 'HUBSPOT', error: error.message, status: error.status };
-  return { code: 'HUBSPOT', error: String(error && error.message || error), status: 0 };
+  const code = error?.code || (error?.status === 401 || error?.status === 403 ? 'HUBSPOT_AUTH' : error?.status === 429 ? 'HUBSPOT_RATE' : 'HUBSPOT');
+  const known = ['PORTAL_LINKED', 'UNMAPPED', 'LINKED', 'REMOTE_CONFLICT', 'REMOTE_BASELINE', 'SYNC_BUSY', 'UNCERTAIN'];
+  const prefix = known.find(k => String(error?.message || '').startsWith(k));
+  const safe = prefix || code;
+  const messages = { HUBSPOT_AUTH: 'HubSpot 연결 권한을 확인해 주세요', HUBSPOT_RATE: 'HubSpot 호출 한도로 다음 주기에 다시 확인합니다',
+    PORTAL_LINKED: PORTAL_HOLD, UNMAPPED: '단계 매핑을 확인해 주세요', LINKED: '다른 고객에 연결된 연락처입니다', REMOTE_CONFLICT: 'HubSpot에도 변경이 있습니다. 원본을 대조해 주세요',
+    REMOTE_BASELINE: '동기화 기준이 없습니다. 기존 큐 검토 후 먼저 가져오기를 실행해 주세요', SYNC_BUSY: '동기화가 이미 진행 중입니다', UNCERTAIN: '외부 반영 결과가 미확정입니다. 원본 확인이 필요합니다' };
+  return { code: safe, error: messages[safe] || 'HubSpot 요청을 완료하지 못했습니다', status: Number(error?.status) || 0 };
 }
 
 async function hubspotStatus(env) {
@@ -553,7 +610,8 @@ async function hubspotStatus(env) {
   const counts = await queueCounts(env);
   const pull = await kvGet(env, 'hs:pull');
   const settings = await loadSettings(env);
-  if (!client) return json({ ok: true, connected: false, reason: 'no_token', queue: counts, pull, portal: settings.hubspot.portal, map: settings.hubspot.map });
+  const automation = await automationStatus(env, settings);
+  if (!client) return json({ ok: true, connected: false, reason: 'no_token', queue: counts, pull, automation, portal: settings.hubspot.portal, map: settings.hubspot.map });
   try {
     const s = await client.status();
     const portal = { portalId: s.portalId, uiDomain: s.uiDomain, timeZone: s.timeZone, checkedAt: Date.now() };
@@ -562,11 +620,12 @@ async function hubspotStatus(env) {
     const cur = doc ? doc.data : { orgName: '', followupOffsets: CORE.FOLLOWUP_OFFSETS.slice(), hubspot: { enabled: true, autoApproveQuick: false, map: {} } };
     const hs = Object.assign({}, isPlainObject(cur.hubspot) ? cur.hubspot : {});
     const strip = x => (isPlainObject(x) ? { portalId: x.portalId, uiDomain: x.uiDomain, timeZone: x.timeZone } : null);
-    if (!doc || !same(strip(hs.portal), strip(portal))) { hs.portal = portal; await writeDocRaw(env, 'settings', SETTINGS_ID, Object.assign({}, cur, { hubspot: hs }), SYSTEM_ID); }
-    return json({ ok: true, connected: true, portal, via: s.via, queue: counts, pull, map: settings.hubspot.map });
+    if (!doc) await writeDocRaw(env, 'settings', SETTINGS_ID, { ...cur, hubspot: { ...hs, portal } }, SYSTEM_ID);
+    else if (!same(strip(hs.portal), strip(portal))) await patchDocFields(env, 'settings', SETTINGS_ID, current => ({ ...current, hubspot: { ...current.hubspot, portal } }), SYSTEM_ID);
+    return json({ ok: true, connected: true, portal, via: s.via, queue: counts, pull, automation, map: settings.hubspot.map });
   } catch (error) {
     const e = hsError(error);
-    return json({ ok: true, connected: false, reason: e.code, error: e.error, queue: counts, pull, portal: settings.hubspot.portal, map: settings.hubspot.map });
+    return json({ ok: true, connected: false, reason: e.code, error: e.error, queue: counts, pull, automation, portal: settings.hubspot.portal, map: settings.hubspot.map });
   }
 }
 
@@ -613,7 +672,7 @@ async function creditBalanceOf(env, leadId) {
   return CORE.creditBalance(credits, leadId);
 }
 async function contactExtra(env, lead) {
-  const extra = { creditBalance: await creditBalanceOf(env, lead.id) };
+  const extra = { creditBalance: await creditBalanceOf(env, lead.id), referrerContactId: '' };
   if (lead.referrerLeadId) extra.referrerContactId = await linkOf(env, String(lead.referrerLeadId));
   if (lead.partnerId) { const p = await loadDoc(env, 'partners', String(lead.partnerId)); extra.partnerName = p ? String(p.data.name || '') : ''; }
   else if (lead.channel === '파트너' || (lead.hubspot && lead.hubspot.contactId)) extra.partnerName = lead.partnerId ? undefined : '';
@@ -640,6 +699,7 @@ async function ensureContact(env, client, lead, available) {
   let created = false;
   const patch = {};
   if (found) {
+    if ((await loadSettings(env)).hubspot.autoSync) throw new Error('REMOTE_BASELINE');
     if (await portalOwnsContact(env, found.id)) throw new Error(PORTAL_HOLD);
     // 같은 전화·이메일의 연락처가 이미 다른 리드에 연결돼 있으면(형제 등) 조용히 가로채지 않는다 — 원장이 보고 정한다.
     const owner = await leadOfContact(env, found.id);
@@ -670,7 +730,8 @@ async function processItem(env, client, settings, available, item) {
   const contactId = ensured.contactId;
   if (item.kind === 'contact') {
     if (ensured.created) return { contactId, action: 'created' };
-    await client.updateContact(contactId, contactProperties(lead, await contactExtra(env, lead), available));
+    const properties = contactPatchProperties(lead, await contactExtra(env, lead), available, item.payload.fields);
+    if (Object.keys(properties).length) await client.updateContact(contactId, properties);
     await patchLeadHubspot(env, lead, {});
     return { contactId, action: 'updated' };
   }
@@ -710,45 +771,80 @@ async function processItem(env, client, settings, available, item) {
   throw new Error('모르는 큐 종류');
 }
 
-/** 승인된 큐를 만든 순서대로 HubSpot 에 쓴다. 429(속도 제한)면 멈추고 다음 번에. */
+async function remoteSnapshot(client, contactId, available) {
+  const contact = (await client.readContacts([contactId], available))[0];
+  if (!contact) throw new Error('REMOTE_CONFLICT');
+  const ids = (await client.dealIdsForContacts([contactId]))[contactId] || [];
+  const deals = ids.length ? await client.readDeals(ids) : [];
+  return { contact, deals };
+}
+async function fingerprints(contact, deals) {
+  const sorted = value => Object.fromEntries(Object.keys(value || {}).sort().map(key => [key, value[key]]));
+  return { contactFingerprint: await sha256Hex(JSON.stringify(sorted(contact.properties))),
+    dealsFingerprint: await sha256Hex(JSON.stringify(deals.map(d => ({ id: d.id, properties: sorted(d.properties) })).sort((a, b) => a.id.localeCompare(b.id)))) };
+}
+async function verifyRemoteBaseline(env, client, available, item) {
+  const doc = await loadDoc(env, 'leads', item.leadId), hs = doc?.data?.hubspot || {};
+  const contactId = await linkOf(env, item.leadId) || hs.contactId;
+  if (!contactId) return;
+  if (!hs.contactFingerprint || !hs.dealsFingerprint) throw new Error('REMOTE_BASELINE');
+  const remote = await remoteSnapshot(client, contactId, available), current = await fingerprints(remote.contact, remote.deals);
+  if (current.contactFingerprint !== hs.contactFingerprint || current.dealsFingerprint !== hs.dealsFingerprint) throw new Error('REMOTE_CONFLICT');
+}
+
+/** 승인된 줄만 처리하며, 결과를 받기 전에 작업을 미확정 보류해 워커 중단 뒤 중복 생성하지 않는다. */
 export async function flushQueue(env, limit) {
+  return withSyncLease(env, scoped => flushQueueLocked(scoped, limit));
+}
+async function flushQueueLocked(env, limit) {
   const client = hubspotClient(env);
   if (!client) return { ok: false, code: 'HUBSPOT_NO_TOKEN', error: 'HubSpot 토큰이 등록되지 않았습니다', done: 0, failed: 0, remaining: 0 };
-  const n = Math.min(Math.max(Number(limit) || PUSH_LIMIT_DEFAULT, 1), PUSH_LIMIT_MAX);
   const settings = await loadSettings(env);
+  if (!settings.hubspot.enabled) return { ok: true, done: 0, failed: 0, remaining: 0, paused: true };
+  const n = Math.min(Math.max(Number(limit) || PUSH_LIMIT_DEFAULT, 1), PUSH_LIMIT_MAX);
   let available;
   try { available = await availableProperties(env, client, false); }
-  catch (error) { const e = hsError(error); return Object.assign({ ok: false, done: 0, failed: 0, remaining: 0 }, e); }
-  const rows = await env.DB.prepare('SELECT * FROM crm_sync_queue WHERE status=\'approved\' ORDER BY created_at LIMIT ?').bind(n).all();
-  const items = (rows.results || []).map(queueView);
+  catch (error) { return { ok: false, done: 0, failed: 0, remaining: 0, ...hsError(error) }; }
+  const rows = await env.DB.prepare("SELECT * FROM crm_sync_queue q WHERE status='approved' AND NOT EXISTS (SELECT 1 FROM crm_sync_queue older WHERE older.lead_id=q.lead_id AND older.created_at<q.created_at AND older.status IN ('pending','failed')) ORDER BY created_at LIMIT ?").bind(n).all();
   let done = 0, failed = 0, stopped = '';
   const results = [];
-  for (const item of items) {
-    const now = Date.now();
-    const token = await claimHubspot(env, item.leadId);
+  for (const row of rows.results || []) {
+    if (env.HUBSPOT_SYNC_GUARD.signal.aborted || env.HUBSPOT_SYNC_GUARD.requests > 32) { stopped = 'TIME_BUDGET'; break; }
+    const item = queueView(row), now = Date.now(), token = await claimHubspot(env, item.leadId);
     if (!token) {
       if (await portalLinked(env, item.leadId)) {
-        await env.DB.prepare('UPDATE crm_sync_queue SET status=\'failed\',error=?,updated_at=MAX(?,created_at) WHERE id=? AND status=\'approved\'').bind(PORTAL_HOLD, now, item.id).run();
+        await env.DB.prepare("UPDATE crm_sync_queue SET status='failed',error=?,updated_at=MAX(?,updated_at+1) WHERE id=? AND status='approved' AND updated_at=?")
+          .bind(PORTAL_HOLD, now, item.id, row.updated_at).run();
         failed++;
-        results.push({ id: item.id, ok: false, error: PORTAL_HOLD });
       }
       continue;
     }
+    const claimAt = Math.max(now, Number(row.updated_at) + 1);
+    const guard = { leadId: item.leadId, token, signal: AbortSignal.timeout(45000), didWrite: false, writeSucceeded: false };
     try {
-      // 다른 flush가 같은 목록을 읽었더라도 앞선 작업이 끝난 줄을 다시 보내지 않는다.
-      const live = await env.DB.prepare('SELECT status FROM crm_sync_queue WHERE id=?').bind(item.id).first();
-      if (!live || live.status !== 'approved') continue;
-      const guardedClient = hubspotClient(env, { leadId: item.leadId, token, signal: AbortSignal.timeout(45000) });
+      const claimed = await env.DB.prepare("UPDATE crm_sync_queue SET status='failed',error='UNCERTAIN: 작업 결과 확인 필요',updated_at=? WHERE id=? AND status='approved' AND updated_at=? AND NOT EXISTS (SELECT 1 FROM crm_sync_queue older WHERE older.lead_id=crm_sync_queue.lead_id AND older.created_at<crm_sync_queue.created_at AND older.status IN ('pending','failed'))")
+        .bind(claimAt, item.id, row.updated_at).run();
+      if (!changesOf(claimed)) continue;
+      const guardedClient = hubspotClient(env, guard);
+      const baselineRequired = settings.hubspot.autoSync || !!(await loadDoc(env, 'leads', item.leadId))?.data?.hubspot?.contactFingerprint;
+      if (baselineRequired) await verifyRemoteBaseline(env, guardedClient, available, item);
       const result = await processItem(env, guardedClient, settings, available, item);
-      await env.DB.prepare('UPDATE crm_sync_queue SET status=\'done\',result=?,error=NULL,attempts=attempts+1,done_at=?,updated_at=MAX(?,created_at) WHERE id=?').bind(JSON.stringify(result), now, now, item.id).run();
-      done++;
-      results.push({ id: item.id, ok: true, result });
+      if (baselineRequired) {
+        const remote = await remoteSnapshot(guardedClient, result.contactId, available);
+        const fp = await fingerprints(remote.contact, remote.deals);
+        await patchDocFields(env, 'leads', item.leadId, cur => ({ ...cur, hubspot: { ...cur.hubspot, ...fp } }), SYSTEM_ID);
+      }
+      const finished = await env.DB.prepare("UPDATE crm_sync_queue SET status='done',result=?,error=NULL,attempts=attempts+1,done_at=?,updated_at=? WHERE id=? AND status='failed' AND updated_at=?")
+        .bind(JSON.stringify(result), Date.now(), Math.max(Date.now(), claimAt + 1), item.id, claimAt).run();
+      if (changesOf(finished)) { done++; results.push({ id: item.id, ok: true, result }); }
     } catch (error) {
       const e = hsError(error);
-      if (e.code === 'HUBSPOT_RATE' || e.code === 'HUBSPOT_AUTH') { stopped = e.code; results.push({ id: item.id, ok: false, error: e.error }); break; }
-      await env.DB.prepare('UPDATE crm_sync_queue SET status=\'failed\',error=?,attempts=attempts+1,updated_at=MAX(?,created_at) WHERE id=?').bind(String(e.error).slice(0, 500), now, item.id).run();
-      failed++;
-      results.push({ id: item.id, ok: false, error: e.error });
+      const uncertain = guard.writeSucceeded || (guard.didWrite && (!e.status || e.status >= 500));
+      const retryable = !uncertain && ['HUBSPOT_RATE', 'HUBSPOT_AUTH'].includes(e.code);
+      await env.DB.prepare("UPDATE crm_sync_queue SET status=?,error=?,attempts=attempts+1,updated_at=? WHERE id=? AND status='failed' AND updated_at=?")
+        .bind(retryable ? 'approved' : 'failed', uncertain ? 'UNCERTAIN: 외부 반영 결과 확인 필요' : e.code + ': ' + e.error, Math.max(Date.now(), claimAt + 1), item.id, claimAt).run();
+      if (!retryable) failed++; results.push({ id: item.id, ok: false, code: uncertain ? 'UNCERTAIN' : e.code, error: e.error });
+      if (retryable) { stopped = e.code; break; }
     } finally { await releaseHubspot(env, item.leadId, token); }
   }
   const counts = await queueCounts(env);
@@ -758,106 +854,165 @@ export async function flushQueue(env, limit) {
 /* ── pull: HubSpot 변경분 → 리드 ────────────────────────────────────────── */
 
 async function pullContacts(env, body) {
+  const result = await withSyncLease(env, scoped => pullContactsLocked(scoped, body));
+  return result instanceof Response ? result : json(result, result.ok ? 200 : 409);
+}
+async function pullContactsLocked(env, body) {
   const client = hubspotClient(env);
   if (!client) return fail('HUBSPOT_NO_TOKEN', 'HubSpot 토큰이 등록되지 않았습니다', 409);
-  const full = !!(body && body.full);
-  const settings = await loadSettings(env);
-  const today = kstToday();
+  const settings = await loadSettings(env), today = kstToday();
   try {
-    const available = await availableProperties(env, client, false);
-    const saved = (await kvGet(env, 'hs:pull')) || {};
-    let since = full ? 0 : Number(saved.since) || 0, after = full ? '' : String(saved.after || '');
-    const startedAt = Date.now();
-    const stat = { created: 0, updated: 0, conflicts: 0, invalid: 0, deleted: 0, portalSkipped: 0, seen: 0 };
-    let maxWritten = since, more = false, total = 0, pageSeen = 0;
-    const links = await env.DB.prepare('SELECT contact_id,lead_id FROM crm_hs_links').all();
-    const linkByContact = {};
-    (links.results || []).forEach(r => { linkByContact[String(r.contact_id)] = String(r.lead_id); });
-    const openQueue = await env.DB.prepare('SELECT DISTINCT lead_id FROM crm_sync_queue WHERE status IN (\'pending\',\'approved\')').all();
-    const busy = new Set((openQueue.results || []).map(r => String(r.lead_id)));
-    // 지난번에 미반영 변경 때문에 건너뛴 연락처 — 커서는 지나갔으므로 id 로 따로 다시 읽는다(안 그러면 그 수정은 영영 안 들어온다).
-    const retry = new Set((Array.isArray(saved.retry) ? saved.retry : []).map(String));
-
-    /** 연락처 한 건 → 리드. 돌려주는 값: 'created'|'updated'|'conflict'|'invalid'|'deleted' */
+    const available = await availableProperties(env, client, false), saved = await kvGet(env, 'hs:pull') || {}, startedAt = Date.now();
+    const full = !!body?.full || (!saved.after && settings.hubspot.autoSync && startedAt - Number(saved.lastFullAt || 0) >= 86400000);
+    // 검색 인덱스 지연을 겹쳐 읽고, 진행 중 페이지는 같은 시간 창으로 끝까지 읽는다.
+    const continuing = !full && !!saved.after;
+    const fullRun = full || (continuing && saved.fullRun === true);
+    const since = full ? 0 : continuing ? Number(saved.windowSince ?? saved.since) || 0 : Math.max(0, (Number(saved.since) || 0) - 300000);
+    const until = continuing ? Number(saved.windowUntil) || startedAt : startedAt;
+    let after = continuing ? String(saved.after) : '', total = 0;
+    const retry = new Set((saved.retry || []).map(String));
+    const stat = { created: 0, updated: 0, conflicts: 0, invalid: 0, deleted: 0, portalSkipped: 0, unchanged: 0, seen: 0 };
+    const count = result => { stat.seen++; const key = { conflict: 'conflicts', portal: 'portalSkipped' }[result] || result; if (key in stat) stat[key]++; };
     const importContact = async (contact, deals) => {
+      if (!await holdsSyncLease(env)) throw new Error('SYNC_BUSY');
       if (await portalOwnsContact(env, contact.id)) { retry.delete(contact.id); return 'portal'; }
-      let leadId = linkByContact[contact.id] || '';
-      if (!leadId && contact.properties.wb_crm_lead_id && DOC_ID.test(String(contact.properties.wb_crm_lead_id))) {
-        const byId = await loadDoc(env, 'leads', String(contact.properties.wb_crm_lead_id));
-        if (byId) leadId = String(contact.properties.wb_crm_lead_id);
-      }
-      if (leadId) {
-        const row = await env.DB.prepare('SELECT deleted FROM crm_documents WHERE collection=? AND id=? LIMIT 1').bind('leads', leadId).first();
-        if (row && Number(row.deleted)) return 'deleted';          // 원장이 지운 리드는 되살리지 않는다
-        if (await portalLinked(env, leadId)) { retry.delete(contact.id); return 'portal'; }
-        if (busy.has(leadId)) { retry.add(contact.id); return 'conflict'; }   // 우리 쪽 미반영 변경이 있으면 덮지 않고 다음에 다시
-      }
-      const existing = leadId ? await loadDoc(env, 'leads', leadId) : null;
+      let leadId = await leadOfContact(env, contact.id);
+      const claimedId = String(contact.properties.wb_crm_lead_id || '');
+      if (!leadId && DOC_ID.test(claimedId) && await loadDoc(env, 'leads', claimedId)) leadId = claimedId;
       if (!leadId) leadId = 'hs_' + contact.id;
-      let lead = leadFromContact(contact, existing ? existing.data : null, { today });
-      lead = applyDealsToLead(lead, deals, settings.hubspot.map);
-      const v = CORE.validateLead(Object.assign({}, lead, { id: leadId }), { today });
-      if (!v.ok) return 'invalid';
-      const data = v.data;
-      // HubSpot 쪽 이름·메모에 전화 패턴이 섞여 있으면 그 리드는 우리 규칙으로 다시 저장할 수 없다 — 들여오지 않고 센다.
-      if (findPii(data, '', LEAD_PII_SKIP)) return 'invalid';
-      if (!data.owner) data.owner = existing && existing.data.owner ? existing.data.owner : ADMIN_ID;
-      if (lead.creditBalanceHs !== undefined) data.creditBalanceHs = lead.creditBalanceHs;
+      if (!DOC_ID.test(leadId)) return 'invalid';
       const token = await claimHubspot(env, leadId);
-      if (!token) {
-        if (await portalLinked(env, leadId)) { retry.delete(contact.id); return 'portal'; }
-        retry.add(contact.id); return 'conflict';
-      }
+      if (!token) { if (await portalLinked(env, leadId)) { retry.delete(contact.id); return 'portal'; } retry.add(contact.id); return 'conflict'; }
       try {
-        await writeDocRaw(env, 'leads', leadId, data, SYSTEM_ID);
+        const row = await env.DB.prepare("SELECT data,updated_at,deleted FROM crm_documents WHERE collection='leads' AND id=?").bind(leadId).first();
+        if (row && Number(row.deleted)) { retry.delete(contact.id); return 'deleted'; }
+        const existing = row ? parseJson(row.data) : null;
+        const linkedContact = await linkOf(env, leadId) || existing?.hubspot?.contactId;
+        const busy = await env.DB.prepare("SELECT id FROM crm_sync_queue WHERE lead_id=? AND status IN ('pending','approved','failed') LIMIT 1").bind(leadId).first();
+        if (busy || (linkedContact && linkedContact !== contact.id)) { retry.add(contact.id); return 'conflict'; }
+        let lead = applyDealsToLead(leadFromContact(contact, existing, { today }), deals, settings.hubspot.map);
+        lead.hubspot = { ...lead.hubspot, ...await fingerprints(contact, deals) };
+        const v = CORE.validateLead({ ...lead, id: leadId }, { today });
+        if (!v.ok || findPii(v.data, '', LEAD_PII_SKIP)) { retry.add(contact.id); return 'invalid'; }
+        const data = v.data;
+        if (!data.owner) data.owner = existing?.owner || ADMIN_ID;
+        if (lead.creditBalanceHs !== undefined) data.creditBalanceHs = lead.creditBalanceHs;
+        const comparable = { ...data, hubspot: { ...data.hubspot, syncedAt: existing?.hubspot?.syncedAt } };
+        if (existing && same(comparable, existing)) { retry.delete(contact.id); return 'unchanged'; }
+        const now = Math.max(Date.now(), Number(row?.updated_at || 0) + 1);
+        const guards = "NOT EXISTS (SELECT 1 FROM crm_sync_queue WHERE lead_id=? AND status IN ('pending','approved','failed')) AND NOT EXISTS (SELECT 1 FROM crm_portal_links WHERE lead_id=?) AND EXISTS (SELECT 1 FROM crm_hs_inflight WHERE lead_id=? AND token=? AND expires_at>?)";
+        const args = [leadId, leadId, leadId, token, Date.now()];
+        const result = row ? await env.DB.prepare("UPDATE crm_documents SET data=?,updated_at=?,updated_by=? WHERE collection='leads' AND id=? AND updated_at=? AND deleted=0 AND " + guards)
+          .bind(JSON.stringify(data), now, SYSTEM_ID, leadId, row.updated_at, ...args).run() :
+          await env.DB.prepare("INSERT INTO crm_documents(collection,id,data,updated_at,updated_by,deleted) SELECT 'leads',?,?,?,?,0 WHERE " + guards + ' ON CONFLICT(collection,id) DO NOTHING')
+            .bind(leadId, JSON.stringify(data), now, SYSTEM_ID, ...args).run();
+        if (!changesOf(result)) { retry.add(contact.id); return 'conflict'; }
         await saveLink(env, contact.id, leadId);
+        retry.delete(contact.id);
+        return existing ? 'updated' : 'created';
       } finally { await releaseHubspot(env, leadId, token); }
-      linkByContact[contact.id] = leadId;
-      retry.delete(contact.id);
-      return existing ? 'updated' : 'created';
     };
-    const dealsFor = async contacts => {
-      const dealIds = await client.dealIdsForContacts(contacts.map(c => c.id));
-      const allDealIds = Object.values(dealIds).flat();
-      const deals = allDealIds.length ? await client.readDeals(allDealIds) : [];
-      const dealById = {};
-      deals.forEach(d => { dealById[d.id] = d; });
-      return c => (dealIds[c.id] || []).map(id => dealById[id]).filter(Boolean);
+    const importBatch = async contacts => {
+      const ids = await client.dealIdsForContacts(contacts.map(c => c.id));
+      const allIds = Object.values(ids).flat(), deals = allIds.length ? await client.readDeals(allIds) : [];
+      const byId = new Map(deals.map(d => [d.id, d]));
+      for (const contact of contacts) count(await importContact(contact, (ids[contact.id] || []).map(id => byId.get(id)).filter(Boolean)));
     };
-    const count = r => { stat.seen++; if (r === 'conflict') stat.conflicts++; else if (r === 'created') stat.created++; else if (r === 'updated') stat.updated++; else if (r === 'invalid') stat.invalid++; else if (r === 'deleted') stat.deleted++; else if (r === 'portal') stat.portalSkipped++; };
-
-    // 1) 지난번 건너뛴 연락처 먼저
-    if (retry.size && !after) {
-      const ids = [...retry];
-      const contacts = await client.readContacts(ids, available);
-      const lookup = await dealsFor(contacts);
-      ids.forEach(id => { if (!contacts.some(c => c.id === id)) retry.delete(id); });   // HubSpot 에서 사라진 연락처
-      for (const contact of contacts) count(await importContact(contact, lookup(contact)));
-    }
-    // 2) 변경분
+    // 재시도 및 연결된 연락처 20개를 순환 조회해 연락처 수정시각이 그대로인 딜 변경도 읽는다.
+    const lastId = String(saved.linkedAfter || '');
+    let linked = (await env.DB.prepare('SELECT contact_id FROM crm_hs_links WHERE contact_id>? ORDER BY contact_id LIMIT 20').bind(lastId).all()).results || [];
+    if (!linked.length && lastId) linked = (await env.DB.prepare('SELECT contact_id FROM crm_hs_links ORDER BY contact_id LIMIT 20').all()).results || [];
+    const retryIds = [...retry].slice(0, 10);
+    retryIds.forEach(id => { retry.delete(id); retry.add(id); });
+    const ids = [...new Set(retryIds.concat(linked.map(r => String(r.contact_id))))];
+    if (ids.length) await importBatch(await client.readContacts(ids, available));
     for (let page = 0; page < PULL_PAGES_PER_CALL; page++) {
-      const res = await client.contactsModifiedSince(since, after, available);
-      total = res.total;
-      const contacts = res.results;
-      if (!contacts.length) { after = ''; break; }
-      const lookup = await dealsFor(contacts);
-      for (const contact of contacts) {
-        const r = await importContact(contact, lookup(contact));
-        count(r); pageSeen++;
-        // 커서는 실제로 처리한(쓴·지워진·무효) 연락처까지만 — 건너뛴 것은 retry 목록이 맡는다
-        const modified = Number(contact.properties.lastmodifieddate) || new Date(contact.updatedAt || 0).getTime() || 0;
-        if (modified > maxWritten) maxWritten = modified;
-      }
-      after = res.after;
+      const result = fullRun ? await client.listContacts(after, available, 25) : await client.contactsModifiedSince(since, after, available, until, 25);
+      total = result.total;
+      if (total > 10000) return fail('SEARCH_LIMIT', '검색 범위가 HubSpot 한도를 넘었습니다. 시간 범위를 나누어 가져와야 합니다', 409);
+      await importBatch(result.results);
+      after = result.after;
       if (!after) break;
-      if (page === PULL_PAGES_PER_CALL - 1) more = true;
     }
-    // 커서: 페이지가 남았으면 after 를 이어 가고, 끝났으면 다음엔 "이번에 본 마지막 수정 시각" 이후만 본다. retry 는 커서와 따로 간다.
-    const cursor = after ? { since, after, at: startedAt, retry: [...retry], lastFullAt: saved.lastFullAt || 0 }
-      : { since: pageSeen ? Math.max(maxWritten + 1, since) : since, after: '', at: startedAt, retry: [...retry], lastFullAt: full ? startedAt : saved.lastFullAt || 0 };
+    const cursor = { since: after ? since : until, after, windowSince: since, windowUntil: until, at: startedAt,
+      retry: [...retry], linkedAfter: linked.length ? String(linked[linked.length - 1].contact_id) : '', fullRun: !!after && fullRun, lastFullAt: fullRun && !after ? startedAt : saved.lastFullAt || 0 };
+    if (!await holdsSyncLease(env)) throw new Error('SYNC_BUSY');
     await kvSet(env, 'hs:pull', cursor);
-    return json(Object.assign({ ok: true, total, more, retry: retry.size, cursor }, stat));
+    return json({ ok: true, total, more: !!after, retry: retry.size, cursor, ...stat });
   } catch (error) { const e = hsError(error); return fail(e.code, e.error, 502); }
+}
+
+async function automationStatus(env, settings) {
+  const saved = await kvGet(env, 'hs:automation') || {};
+  const running = !!await env.DB.prepare('SELECT lead_id FROM crm_hs_inflight WHERE lead_id=? AND expires_at>?').bind(SYNC_LEASE, Date.now()).first();
+  return { enabled: settings.hubspot.autoSync === true, intervalMinutes: SYNC_INTERVAL_MINUTES, lastRunAt: saved.lastRunAt || 0,
+    lastSuccessAt: saved.lastSuccessAt || 0, lastResult: saved.lastResult || null, error: saved.error || '', running };
+}
+async function validateSyncMapping(env, settings) {
+  const client = hubspotClient(env);
+  if (!client) return 'HUBSPOT_NO_TOKEN';
+  if (!settings.hubspot.enabled) return 'HUBSPOT_DISABLED';
+  const pipelines = await client.pipelines();
+  const used = new Set();
+  for (const pipeline of CORE.PIPELINES) {
+    const map = settings.hubspot.map[pipeline], remote = pipelines.find(p => p.id === map?.pipelineId);
+    if (!remote || used.has(remote.id)) return 'UNMAPPED';
+    used.add(remote.id);
+    const stages = new Set();
+    for (const stage of CORE.stagesOf(pipeline)) {
+      const id = map.stageMap?.[stage];
+      if (!id || !remote.stages.some(s => s.id === id) || stages.has(id)) return 'UNMAPPED';
+      stages.add(id);
+    }
+  }
+  return '';
+}
+export async function runHubspotSync(env) {
+  return withSyncLease(env, async scoped => {
+    const settings = await loadSettings(scoped);
+    if (!settings.hubspot.autoSync) return flushQueueLocked(scoped, 5);
+    const previous = await kvGet(scoped, 'hs:automation') || {}, lastRunAt = Date.now();
+    await kvSet(scoped, 'hs:automation', { ...previous, lastRunAt, error: '' });
+    let lastResult, error = '';
+    try {
+      const invalid = await validateSyncMapping(scoped, settings);
+      if (invalid) throw Object.assign(new Error(invalid), { code: invalid });
+      const pull = await (await pullContactsLocked(scoped, {})).json();
+      if (!pull.ok) throw Object.assign(new Error(pull.code), { code: pull.code });
+      const push = await flushQueueLocked(scoped, 5);
+      if (!push.ok) throw Object.assign(new Error(push.code), { code: push.code });
+      lastResult = { pull: { created: pull.created, updated: pull.updated, conflicts: pull.conflicts, invalid: pull.invalid, retry: pull.retry, more: pull.more, portalSkipped: pull.portalSkipped },
+        push: { done: push.done, failed: push.failed, remaining: push.remaining, stopped: push.stopped } };
+      if (push.failed || push.stopped || pull.invalid || push.counts?.pending || push.counts?.failed || (pull.conflicts && !push.done)) error = '확인이 필요한 동기화 기록이 있습니다';
+    } catch (caught) { error = hsError(caught).error; }
+    const saved = { lastRunAt, lastSuccessAt: error ? previous.lastSuccessAt || 0 : Date.now(), lastResult: lastResult || previous.lastResult || null, error };
+    if (!await canWriteHubspot(scoped, SYNC_LEASE, scoped.HUBSPOT_SYNC_GUARD.token)) return { ok: false, code: 'SYNC_BUSY', error: '동기화 실행 시간이 끝났습니다. 다음 주기에 이어갑니다' };
+    await kvSet(scoped, 'hs:automation', saved);
+    return { ok: !error, automation: { enabled: true, intervalMinutes: SYNC_INTERVAL_MINUTES, ...saved, running: false } };
+  });
+}
+async function configureHubspotSync(env, body) {
+  if (!body || (body.enabled !== undefined && typeof body.enabled !== 'boolean') || (body.run !== undefined && typeof body.run !== 'boolean')) return fail('INVALID', 'enabled·run 은 참 또는 거짓입니다');
+  const result = await withSyncLease(env, async scoped => {
+    let settings = await loadSettings(scoped);
+    if (body.enabled !== undefined) {
+      if (body.enabled) {
+        const code = await validateSyncMapping(scoped, settings);
+        if (code) return fail(code, code === 'UNMAPPED' ? '모든 파이프라인과 상담 단계의 매핑을 확인해 주세요' : 'HubSpot 연결을 먼저 확인해 주세요', 409);
+      }
+      const doc = await loadDoc(scoped, 'settings', SETTINGS_ID);
+      if (!doc) return fail('UNMAPPED', '매핑 설정을 먼저 저장해 주세요', 409);
+      await patchDocFields(scoped, 'settings', SETTINGS_ID, cur => ({ ...cur, hubspot: { ...cur.hubspot, autoSync: body.enabled } }), SYSTEM_ID);
+      settings = await loadSettings(scoped);
+    }
+    if (body.run) {
+      const run = await runHubspotSync(scoped);
+      if (run.automation) return json({ ok: true, automation: run.automation });
+    }
+    const automation = await automationStatus(scoped, settings);
+    return json({ ok: true, automation: { ...automation, running: false } });
+  });
+  return result instanceof Response ? result : json(result, result.ok ? 200 : 409);
 }
 
 /* ── 내보내기 ─────────────────────────────────────────────────────────── */
@@ -933,6 +1088,7 @@ export async function handleApi(request, env, ctx) {
     if (path.startsWith('/api/hubspot/')) {
       const denied = adminOnly(auth);
       if (denied) return denied;
+      if (path === '/api/hubspot/sync') return method === 'POST' ? configureHubspotSync(env, await readJson(request)) : methodNotAllowed();
       if (path === '/api/hubspot/status') return method === 'GET' ? hubspotStatus(env) : methodNotAllowed();
       if (path === '/api/hubspot/pipelines') return method === 'GET' ? hubspotPipelines(env) : methodNotAllowed();
       if (path === '/api/hubspot/properties') return method === 'GET' || method === 'POST' ? hubspotProperties(env, method) : methodNotAllowed();
