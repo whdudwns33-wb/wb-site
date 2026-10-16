@@ -927,14 +927,18 @@ async function pullContactsLocked(env, body) {
       const byId = new Map(deals.map(d => [d.id, d]));
       for (const contact of contacts) count(await importContact(contact, (ids[contact.id] || []).map(id => byId.get(id)).filter(Boolean)));
     };
-    // 재시도 및 연결된 연락처 20개를 순환 조회해 연락처 수정시각이 그대로인 딜 변경도 읽는다.
+    // 전체 목록은 딜도 함께 읽으므로 순환·재시도 조회는 완주 뒤 재개해 같은 고객을 두 번 읽지 않는다.
     const lastId = String(saved.linkedAfter || '');
-    let linked = (await env.DB.prepare('SELECT contact_id FROM crm_hs_links WHERE contact_id>? ORDER BY contact_id LIMIT 20').bind(lastId).all()).results || [];
-    if (!linked.length && lastId) linked = (await env.DB.prepare('SELECT contact_id FROM crm_hs_links ORDER BY contact_id LIMIT 20').all()).results || [];
-    const retryIds = [...retry].slice(0, 10);
-    retryIds.forEach(id => { retry.delete(id); retry.add(id); });
-    const ids = [...new Set(retryIds.concat(linked.map(r => String(r.contact_id))))];
-    if (ids.length) await importBatch(await client.readContacts(ids, available));
+    let linkedAfter = lastId;
+    if (!fullRun) {
+      let linked = (await env.DB.prepare('SELECT contact_id FROM crm_hs_links WHERE contact_id>? ORDER BY contact_id LIMIT 20').bind(lastId).all()).results || [];
+      if (!linked.length && lastId) linked = (await env.DB.prepare('SELECT contact_id FROM crm_hs_links ORDER BY contact_id LIMIT 20').all()).results || [];
+      const retryIds = [...retry].slice(0, 10);
+      retryIds.forEach(id => { retry.delete(id); retry.add(id); });
+      const ids = [...new Set(retryIds.concat(linked.map(r => String(r.contact_id))))];
+      if (ids.length) await importBatch(await client.readContacts(ids, available));
+      linkedAfter = linked.length ? String(linked[linked.length - 1].contact_id) : '';
+    }
     for (let page = 0; page < PULL_PAGES_PER_CALL; page++) {
       const result = fullRun ? await client.listContacts(after, available, 25) : await client.contactsModifiedSince(since, after, available, until, 25);
       total = result.total;
@@ -944,7 +948,7 @@ async function pullContactsLocked(env, body) {
       if (!after) break;
     }
     const cursor = { since: after ? since : until, after, windowSince: since, windowUntil: until, at: startedAt,
-      retry: [...retry], linkedAfter: linked.length ? String(linked[linked.length - 1].contact_id) : '', fullRun: !!after && fullRun, lastFullAt: fullRun && !after ? startedAt : saved.lastFullAt || 0 };
+      retry: [...retry], linkedAfter, fullRun: !!after && fullRun, lastFullAt: fullRun && !after ? startedAt : saved.lastFullAt || 0 };
     if (!await holdsSyncLease(env)) throw new Error('SYNC_BUSY');
     await kvSet(env, 'hs:pull', cursor);
     return json({ ok: true, total, more: !!after, retry: retry.size, cursor, ...stat });
