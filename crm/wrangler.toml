@@ -17,7 +17,7 @@ binding = "DB"
 database_name = "wb-crm"
 database_id = "__CRM_D1_ID__"
 
-# 15분마다 — 원장이 승인한 HubSpot 반영 큐를 밀어 넣는다(worker.mjs scheduled). 토큰이 없으면 아무것도 안 한다.
+# 15분마다 — 자동 모드는 변경분 가져오기 + 반영 큐, 꺼져 있으면 승인한 큐만 보낸다(worker.mjs scheduled). 토큰이 없으면 아무것도 안 한다.
 [triggers]
 crons = ["*/15 * * * *"]
 

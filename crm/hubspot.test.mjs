@@ -221,3 +221,19 @@ test('노트 본문·딜 이름', () => {
   assert.ok(noteBody({ type: 'stage', from: 'inquiry', to: 'booked' }, '').includes('신규문의 → 예약확정'));
   assert.equal(dealName({ name: '보호자A', child: { name: '아이' } }, 'inspection'), '보호자A · 아이 · 검사 여정');
 });
+
+test('양방향 빈값과 이름 변경 — 선택한 전화 원본만 지우고 다른 번호·단계 시각은 보존', () => {
+  const initial = leadFromContact({ id: 'test', properties: { firstname: '가상', lastname: '김', phone: '01000001234', mobilephone: '01000005678', email: 'test@example.test', wb_child_name: '아이', wb_child_birth: '2020-01-01', wb_inspection_date: '2026-10-01' } }, null, { today: '2026-10-16' });
+  initial.name = '이가상'; initial.phone = ''; initial.email = '';
+  const outbound = contactProperties(initial);
+  assert.equal(outbound.firstname, '이가상'); assert.equal(outbound.lastname, '');
+  assert.equal(outbound.phone, ''); assert.equal(outbound.email, '');
+  assert.equal(outbound.mobilephone, undefined, '별도의 보조 전화는 지우지 않는다');
+  const cleared = leadFromContact({ id: 'test', properties: { phone: '', mobilephone: '01000005678', email: '', wb_child_name: '', wb_child_birth: '', wb_inspection_date: '' } }, initial, { today: '2026-10-16' });
+  assert.deepEqual([cleared.phone, cleared.email, cleared.child.name, cleared.child.birth, cleared.inspection.date], ['', '', '', '', '']);
+  const mobile = leadFromContact({ id: 'mobile', properties: { mobilephone: '01000005678' } }, null, { today: '2026-10-16' });
+  mobile.phone = '';
+  assert.equal(contactProperties(mobile).mobilephone, ''); assert.equal(contactProperties(mobile).phone, undefined);
+  const unchanged = applyDealsToLead({ pipeline: 'inspection', stage: 'inquiry', stageAt: '2026-09-01' }, [{ id: 'd', properties: { pipeline: 'p', dealstage: 's', hs_lastmodifieddate: '2026-10-16' } }], { inspection: { pipelineId: 'p', stageMap: { inquiry: 's' } } });
+  assert.equal(unchanged.stageAt, '2026-09-01');
+});

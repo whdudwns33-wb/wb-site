@@ -799,7 +799,13 @@
     const map = new Map();
     let seq = 0;
     return {
-      put: function (c, id, data, deleted) { map.set(docKey(c, id), { c: str(c), id: str(id), data: data, deleted: !!deleted, seq: ++seq }); },
+      put: function (c, id, data, deleted, expectedUpdatedAt, base) {
+        const key = docKey(c, id), previous = map.get(key);
+        map.set(key, { c: str(c), id: str(id), data: data, deleted: !!deleted, seq: ++seq,
+          expectedUpdatedAt: previous ? previous.expectedUpdatedAt : expectedUpdatedAt,
+          base: previous ? previous.base : base });
+      },
+      remove: function (key) { map.delete(str(key)); },
       keys: function () { return Array.from(map.keys()); },
       size: function () { return map.size; },
       has: function (key) { return map.has(str(key)); },
@@ -814,9 +820,13 @@
           const s = sentBy[key];
           const cur = map.get(key);
           const settled = !!(cur && s && cur.seq === s.seq);
-          if (!r.error && !r.code) { ok.push({ key: key, c: str(r.c), id: str(r.id), updatedAt: Number(r.updatedAt) || 0 }); if (settled) map.delete(key); }
+          if (!r.error && !r.code) {
+            ok.push({ key: key, c: str(r.c), id: str(r.id), updatedAt: Number(r.updatedAt) || 0 });
+            if (settled) map.delete(key);
+            else if (cur && s && r.updatedAt) { cur.expectedUpdatedAt = Number(r.updatedAt); cur.base = s.data; }
+          }
           else if (r.code === 'STALE') { stale.push({ key: key, c: str(r.c), id: str(r.id), current: r.current || null }); if (settled) map.delete(key); }
-          else { failed.push({ key: key, c: str(r.c), id: str(r.id), error: str(r.error || r.code), code: str(r.code) }); if (settled) map.delete(key); }
+          else { failed.push({ key: key, c: str(r.c), id: str(r.id), error: str(r.error || r.code), code: str(r.code) }); if (settled && r.code !== 'SYNC_BUSY') map.delete(key); }
         });
         return { ok: ok, stale: stale, failed: failed };
       },
