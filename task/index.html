@@ -15012,9 +15012,10 @@ function openReceivedBookOrderCancellation(button) {
   const taskId = String(button.dataset.task || '');
   const itemIndex = Number(button.dataset.item);
   const row = bookOrderRows.find(item => String(item.taskId) === taskId && Number(item.itemIndex) === itemIndex);
-  if (!row || row.stage !== 'teacher_received' ||
-      !['bound_print_v1', 'internal_book_v1'].includes(String(row.orderDelivery || ''))) {
-    return toast('3단계 내부·제본교재 주문만 취소할 수 있습니다');
+  const ordered = row && row.stage === 'ordered';
+  if (!row || (!ordered && (row.stage !== 'teacher_received' ||
+      !['bound_print_v1', 'internal_book_v1'].includes(String(row.orderDelivery || ''))))) {
+    return toast('2단계 주문 또는 3단계 내부·제본교재만 취소할 수 있습니다');
   }
   const students = Array.isArray(row.students) ? row.students : [];
   if (!students.length) return toast('취소할 학생 연결을 찾을 수 없습니다');
@@ -15023,15 +15024,20 @@ function openReceivedBookOrderCancellation(button) {
     ? unitPrice.toLocaleString('ko-KR') + '원/권' : '금액 미입력';
   modal('주문취소 — ' + row.title,
     '<div class="hint mb14"><b>교재</b> · ' + esc(row.title) + '<br><b>가격</b> · ' + esc(priceText) +
-      '<br>취소할 학생만 선택해 주세요. 선택하지 않은 학생의 주문은 3단계에 그대로 남습니다.</div>' +
+      '<br><b>주문처</b> · ' + esc(bookVendorDisplayName(row.vendorName || '')) +
+      '<br>취소할 학생만 선택해 주세요. 선택하지 않은 학생의 주문은 그대로 남습니다.</div>' +
     '<div class="book-order-picker-list">' + students.map(student =>
       '<label class="book-order-picker-option"><input type="checkbox" data-received-order-cancel-student value="' + esc(student.id) + '">' +
       '<span>' + esc(staffStudentCompactLabel(student, '이름 미입력')) + '</span></label>').join('') + '</div>' +
-    '<label class="field mt14"><span class="fl">취소 사유 (필수)</span>' +
+    (ordered ? '<label class="field mt14"><span class="fl">취소 사유 선택</span><select class="in" data-ordered-cancel-kind>' +
+      ['해당 총판 미취급','잘못 주문함','중복 주문','기타'].map(label => '<option>' + label + '</option>').join('') + '</select></label>' +
+      '<label class="hint"><input type="checkbox" data-ordered-vendor-confirmed> 총판과 취소 확인을 마쳤습니다</label>' : '') +
+    (row.academyRegisteredAt ? '<div class="hint bad">아카 등록 취소 필요 — 아카플로우에서 직접 취소 후 확인해야 합니다.</div>' : '') +
+    '<label class="field mt14"><span class="fl">취소 사유 ' + (ordered ? '(추가 설명)' : '(필수)') + '</span>' +
       '<textarea class="in" rows="3" maxlength="300" data-received-order-cancel-reason ' +
         'placeholder="예: 교재 종류를 잘못 선택함"></textarea></label>',
     '<button class="btn btn-danger btn-block" data-act="bookorderreceivedcancelsave" data-task="' + esc(taskId) +
-      '" data-item="' + itemIndex + '" data-rev="' + Number(row.revision || 0) + '">선택 학생 주문취소 확인</button>');
+      '" data-item="' + itemIndex + '" data-ordered="' + (ordered ? '1' : '0') + '" data-rev="' + Number(row.revision || 0) + '">선택 학생 주문취소 확인</button>');
 }
 
 async function saveReceivedBookOrderCancellation(button) {
@@ -15044,7 +15050,11 @@ async function saveReceivedBookOrderCancellation(button) {
   const studentIds = Array.from(document.querySelectorAll('[data-received-order-cancel-student]:checked'))
     .map(input => String(input.value || '')).filter(Boolean);
   const reasonInput = document.querySelector('[data-received-order-cancel-reason]');
-  const reason = String(reasonInput && reasonInput.value || '').trim();
+  const ordered = button.dataset.ordered === '1';
+  const kind = document.querySelector('[data-ordered-cancel-kind]');
+  const vendorConfirmed = !!(document.querySelector('[data-ordered-vendor-confirmed]') || {}).checked;
+  const reason = ((ordered ? String(kind && kind.value || '') + ' ' : '') + String(reasonInput && reasonInput.value || '')).trim();
+  if (ordered && !vendorConfirmed) return toast('총판과 취소 확인을 마쳤는지 체크해 주세요');
   if (!studentIds.length) return toast('취소할 학생을 한 명 이상 선택해 주세요');
   if (!reason) return toast('주문취소 사유를 입력해 주세요');
 
@@ -15052,8 +15062,8 @@ async function saveReceivedBookOrderCancellation(button) {
   button.disabled = true;
   try {
     await sync.post('/book-issue', {
-      app: SYNC_APP, auth, action: 'order_cancel_received_students', taskId, itemIndex,
-      revision: Number(button.dataset.rev || 0), studentIds, reason
+      app: SYNC_APP, auth, action: ordered ? 'order_cancel_ordered_students' : 'order_cancel_received_students', taskId, itemIndex,
+      revision: Number(button.dataset.rev || 0), studentIds, reason, vendorConfirmed
     });
     closeModal();
     await loadBookIssues(true);
@@ -15788,7 +15798,8 @@ function bookOrderDeliveryButtons(row) {
       cancelButton;
   }
   if (cancelButton) return cancelButton;
-  if (row.stage === 'ordered' && canTeacherAct) return '<button class="btn btn-sm btn-primary" data-act="bookordertransition" data-next="receive"' + base + '>수령완료</button>';
+  if (row.stage === 'ordered' && canTeacherAct) return '<button class="btn btn-sm btn-primary" data-act="bookordertransition" data-next="receive"' + base + '>수령완료</button>' +
+    '<button class="btn btn-sm btn-danger" data-act="bookorderreceivedcancelopen"' + base + '>주문취소</button>';
   if (row.stage === 'teacher_received' && canTeacherAct) return '<button class="btn btn-sm btn-primary" data-act="bookordertransition" data-next="hand"' + base + '>배부완료</button>' +
     (['bound_print_v1', 'internal_book_v1'].includes(String(row.orderDelivery || ''))
       ? '<button class="btn btn-sm btn-danger" data-act="bookorderreceivedcancelopen"' + base + '>주문취소</button>' : '');
@@ -15866,8 +15877,33 @@ function bookOrderCancellationHistoryHtml() {
       '<div class="between"><div><div class="card-title">' + esc(row.title) + '</div>' +
       '<div class="card-sub">주문 ' + esc(row.teacherName || '담당 미지정') + '</div></div><span class="pill bad">취소됨</span></div>' +
       row.cancelledStudents.map(student => '<div class="hint mt8"><b>' + esc(staffStudentCompactLabel(student, '삭제된 원생')) + '</b>' +
-        '<br>취소일 · ' + esc(bookOrderDateText(student.cancelledAt)) + '<br>사유 · ' + esc(student.reason || '사유 미입력') + '</div>').join('') +
+        '<br>취소일 · ' + esc(bookOrderDateText(student.cancelledAt)) + '<br>처리자 · ' + esc(student.cancelledByName || '관리자') + '<br>사유 · ' + esc(student.reason || '사유 미입력') + '</div>').join('') +
+      (row.academyCorrectionNeeded ? '<div class="hint bad">아카 등록 취소·수정 필요 (외부 아카플로우에서 직접 처리)</div>' + bookOrderAcademyButtons(row) : '') +
+      (['scheduled_batch_v1', 'manual_online_v1'].includes(row.orderDelivery) && (session.isAdmin || row.owner === session.staffId)
+        ? '<button class="btn btn-ghost mt8" data-act="bookorderreorderopen" data-task="' + esc(row.taskId) + '" data-item="' + Number(row.itemIndex) + '">다른 주문처로 다시 주문</button>' : '') +
       '</article>').join('') + '</div></details>';
+}
+
+function openCancelledBookReorder(button) {
+  const row = bookOrderRows.find(item => item.taskId === button.dataset.task && Number(item.itemIndex) === Number(button.dataset.item));
+  if (!row || !(row.cancelledStudents || []).length) return toast('취소 기록을 다시 확인해 주세요');
+  modal('다른 주문처로 다시 주문', '<div class="hint">' + esc(row.title) + ' · ' + Number(row.unitPrice || 0).toLocaleString('ko-KR') + '원/권</div>' +
+    '<label class="field"><span class="fl">새 주문처</span><select class="in" data-reorder-vendor><option value="">주문처 선택</option>' +
+    ['천재출판사','동아출판사','청암출판사','상형출판사','쿠팡'].filter(v => v !== row.vendorName).map(v => '<option value="' + esc(v) + '">' + esc(bookVendorDisplayName(v)) + '</option>').join('') + '</select></label>' +
+    row.cancelledStudents.map(s => '<label class="book-order-picker-option"><input type="checkbox" data-reorder-student value="' + esc(s.id) + '"> ' + esc(staffStudentCompactLabel(s)) + '</label>').join('') +
+    '<div class="hint">새 주문은 1단계에 등록됩니다. 문자 주문은 기존 예약 발송 흐름을 따릅니다.</div>',
+    '<button class="btn btn-primary" data-act="bookorderreorderprepare" data-task="' + esc(row.taskId) + '" data-item="' + Number(row.itemIndex) + '">주문 내용 확인</button>');
+}
+
+function prepareCancelledBookReorder(button) {
+  const row = bookOrderRows.find(item => item.taskId === button.dataset.task && Number(item.itemIndex) === Number(button.dataset.item));
+  const vendor = String((document.querySelector('[data-reorder-vendor]') || {}).value || '');
+  const ids = Array.from(document.querySelectorAll('[data-reorder-student]:checked')).map(el => String(el.value));
+  if (!row || !vendor || !ids.length || ids.some(id => !(row.cancelledStudents || []).some(s => s.id === id))) return toast('새 주문처와 학생을 선택해 주세요');
+  if (!(Number(row.unitPrice) > 0)) return toast('원 주문의 교재 금액을 먼저 확인해 주세요');
+  batchVendorName = vendor; batchOrderTaskId = 'ord_' + uid(); batchOrderDraftMode = ''; batchOrderDraftVendorKey = '';
+  openBookOrderFinalConfirmation('standard', [{bookId:row.bookId,title:row.title,unitPrice:row.unitPrice,studentIds:ids,
+    ...(vendor === '쿠팡' ? {publisherName:''} : {})}]);
 }
 
 function viewBookIssues() {
@@ -23207,6 +23243,8 @@ document.addEventListener('click', async ev => {
     case 'bookordertransition': transitionBookOrder(el); break;
     case 'bookordermanualresult': transitionManualOnlineOrder(el); break;
     case 'bookordercancel': cancelWaitingBookOrderItem(el); break;
+    case 'bookorderreorderopen': openCancelledBookReorder(el); break;
+    case 'bookorderreorderprepare': prepareCancelledBookReorder(el); break;
     case 'bookorderreceivedcancelopen': openReceivedBookOrderCancellation(el); break;
     case 'bookorderreceivedcancelsave': saveReceivedBookOrderCancellation(el); break;
     case 'externalbookorder': submitExternalBookOrder(el); break;

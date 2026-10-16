@@ -19,19 +19,29 @@ test('내부·제본교재 3단계 취소는 학생별 선택과 필수 사유�
   assert.match(open, /bound_print_v1/);
   assert.match(open, /internal_book_v1/);
   assert.match(open, /data-received-order-cancel-student/);
-  assert.match(open, /취소 사유 \(필수\)/);
-  assert.match(save, /action: 'order_cancel_received_students'/);
+  assert.match(open, /취소 사유/);
+  assert.match(save, /'order_cancel_received_students'/);
+  assert.match(save, /'order_cancel_ordered_students'/);
+  assert.match(save, /ordered && !vendorConfirmed/);
   assert.match(save, /studentIds, reason/);
   assert.match(save, /pendingReceivedBookOrderCancellations/);
   assert.doesNotMatch(save, /state\.tasks|queueSync\(\)|save\(\)/);
 });
 
-test('3단계에만 주문취소 버튼을 보이고 4단계에는 기존 아카등록 흐름만 유지한다', () => {
+test('2단계와 직접수령 3단계 취소, 4단계는 기존 아카등록 흐름을 유지한다', () => {
   const actions = block('function bookOrderActionButtons(', 'function bookOrderDateText(');
   assert.match(actions, /row\.stage === 'teacher_received'[\s\S]*bookorderreceivedcancelopen/);
   const buttons = Function('session','esc',actions+';return bookOrderActionButtons;')({isAdmin:true},String);
+  assert.match(buttons({stage:'ordered',unitPrice:1000}), /bookorderreceivedcancelopen/);
   assert.doesNotMatch(buttons({stage:'student_handed',unitPrice:1000}), /bookorderreceivedcancelopen/);
   assert.match(buttons({stage:'student_handed',unitPrice:1000}), /아카등록완료/);
+});
+
+test('취소 주문 재주문은 새 주문처·학생 선택 후 최종 확인으로 연결하며 자동 전송하지 않는다', () => {
+  const reorder=block('function openCancelledBookReorder(', 'function viewBookIssues(');
+  assert.match(reorder,/data-reorder-vendor/);
+  assert.match(reorder,/openBookOrderFinalConfirmation\('standard'/);
+  assert.doesNotMatch(reorder,/sync\.post|submitBookOrder\(/);
 });
 
 test('취소된 학생은 진행단계와 분리된 접기식 취소 기록에서 날짜와 사유를 확인한다', () => {
