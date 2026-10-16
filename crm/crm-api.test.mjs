@@ -1081,6 +1081,8 @@ test('자동 양방향 — 연락처·딜 단계 가져오기, 로컬 수정 전
   assert.equal(contacts.get('920').properties.wb_credit_balance, '15000');
   assert.equal(contacts.get('920').properties.wb_partner, '외부파트너');
   assert.equal(deals.get('d920').properties.dealstage, 'qualifiedtobuy');
+  assert.equal(pushed.automation.lastResult.push.remaining, 1, '두 건 처리 뒤 노트는 다음 실행으로 넘긴다');
+  assert.equal((await runHubspotSync(env)).ok, true);
   assert.equal(hs.calls.filter(c => c.path === '/crm/v3/objects/notes').length, 1);
   hs.routes['POST /crm/v3/objects/contacts/search'] = () => ({ total: 0, results: [] });
   deals.get('d920').properties.dealstage = 'presentationscheduled';
@@ -1176,7 +1178,7 @@ test('노트 생성 성공 뒤 상태 재조회 429도 미확정 보류하여 �
   assert.equal(sends, 1);
 });
 
-test('큰 가져오기는 25건·연결 재조회20·재시도10·전송5로 제한하고 paid D1 호출 예산 안에서 이어간다', async t => {
+test('전체25·변경분10·연결 재조회20·재시도10·전송2로 제한하고 paid D1 호출 예산 안에서 이어간다', async t => {
   const { env, admin, contacts, hs } = await syncSetup();
   const remoteRows = Array.from({ length: 120 }, (_, index) => ({ id: String(10000 + index), properties: { firstname: '가상가족' + index, lastmodifieddate: '1234' } }));
   remoteRows.forEach(row => contacts.set(row.id, row));
@@ -1196,12 +1198,19 @@ test('큰 가져오기는 25건·연결 재조회20·재시도10·전송5로 제
   env.DB.queries = 0;
   result = await runHubspotSync(env); used = env.DB.queries;
   assert.ok(used < 1000, '계속 가져오기+전송 D1 요청: ' + used); t.diagnostic('계속 가져오기+재조회+재시도+전송 D1 요청 ' + used);
-  assert.ok(result.automation.lastResult.push.done <= 5);
+  assert.equal(result.automation.lastResult.push.done, 2);
   const secondCursor = JSON.parse((await env.DB.prepare("SELECT value FROM crm_kv WHERE key='hs:pull'").first()).value);
   assert.equal(secondCursor.windowSince, firstCursor.windowSince);
   assert.equal(secondCursor.windowUntil, firstCursor.windowUntil);
   assert.equal(secondCursor.after, '50');
-  assert.ok(hs.calls.filter(c => c.path.endsWith('/contacts/search')).every(c => c.body.limit <= 25));
+  assert.ok(hs.calls.filter(c => c.path.endsWith('/contacts/search')).every(c => c.body.limit <= 10));
+  while (JSON.parse((await env.DB.prepare("SELECT value FROM crm_kv WHERE key='hs:pull'").first()).value).after) await runHubspotSync(env);
+  env.DB.database.prepare("UPDATE crm_kv SET value=json_set(value,'$.retry',json(?),'$.linkedAfter','10000') WHERE key='hs:pull'").run(JSON.stringify(remoteRows.slice(90, 100).map(r => r.id)));
+  hs.routes['POST /crm/v3/objects/contacts/search'] = () => ({ total: 0, results: [] });
+  const callsBefore = hs.calls.length;
+  await runHubspotSync(env);
+  const read = hs.calls.slice(callsBefore).find(c => c.path === '/crm/v3/objects/contacts/batch/read');
+  assert.equal(read.body.inputs.length, 30, '연결 재조회 20개와 재시도 10개');
 });
 
 test('전체 가져오기는 중복 순환 조회를 미루고 커서·재시도를 보존한 뒤 변경분에서 재개한다', async () => {
@@ -1243,6 +1252,100 @@ test('전체 가져오기는 중복 순환 조회를 미루고 커서·재시도
   assert.ok(batchIds.includes('9999') && batchIds.includes('2006') && batchIds.includes('2025') && !batchIds.includes('2000'));
   assert.deepEqual(resumed.body.cursor.retry, []);
   assert.equal(resumed.body.cursor.linkedAfter, '2025');
+});
+
+test('페이지 중간 선점 만료 뒤 같은 페이지를 재처리해 저장된 고객은 보존하고 커서만 정상 진행한다', async () => {
+  const { env, admin, hs } = await syncSetup();
+  const rows = Array.from({ length: 60 }, (_, i) => ({ id: String(3000 + i), properties: { firstname: '가상복구' + i, lastmodifieddate: '1234' } }));
+  hs.routes['GET /crm/v3/objects/contacts'] = (c, u) => {
+    const remaining = rows.filter(r => r.id > (u.searchParams.get('after') || '')), results = remaining.slice(0, Number(u.searchParams.get('limit')));
+    return { results, ...(remaining.length > results.length ? { paging: { next: { after: results.at(-1).id } } } : {}) };
+  };
+  const pull = body => call(env, 'POST', '/api/hubspot/pull', { token: admin, body });
+  assert.equal((await pull({ full: true })).body.created, 25);
+  const previousCursor = env.DB.database.prepare("SELECT value FROM crm_kv WHERE key='hs:pull'").get().value;
+  const prepare = env.DB.prepare.bind(env.DB);
+  let saved = 0;
+  env.DB.prepare = sql => {
+    const statement = prepare(sql);
+    if (sql.startsWith("INSERT INTO crm_documents(collection,id,data,updated_at,updated_by,deleted) SELECT 'leads'")) {
+      const run = statement.run.bind(statement);
+      statement.run = async () => {
+        const result = await run();
+        if (result.meta.changes && ++saved === 3) env.DB.database.prepare("DELETE FROM crm_hs_inflight WHERE lead_id='$hubspot-sync'").run();
+        return result;
+      };
+    }
+    return statement;
+  };
+  const partial = await pull({});
+  env.DB.prepare = prepare;
+  assert.deepEqual([partial.status, partial.body.code], [502, 'SYNC_BUSY']);
+  assert.equal(saved, 3);
+  assert.equal(env.DB.database.prepare("SELECT value FROM crm_kv WHERE key='hs:pull'").get().value, previousCursor);
+  assert.equal(env.DB.database.prepare("SELECT COUNT(*) AS n FROM crm_documents WHERE collection='leads'").get().n, 28);
+  const preserved = await storedLead(env, 'hs_3025');
+  const resumed = await pull({});
+  assert.deepEqual([resumed.body.seen, resumed.body.unchanged, resumed.body.created, resumed.body.updated], [25, 3, 22, 0]);
+  assert.equal(resumed.body.cursor.after, '3049');
+  assert.equal((await storedLead(env, 'hs_3025')).updated_at, preserved.updated_at);
+  assert.equal(env.DB.database.prepare("SELECT COUNT(*) AS n FROM crm_documents WHERE collection='leads'").get().n, 50);
+  assert.equal(env.DB.database.prepare('SELECT COUNT(*) AS n FROM crm_hs_links').get().n, 50);
+  const completed = await pull({});
+  assert.deepEqual([completed.body.created, completed.body.more, completed.body.cursor.after], [10, false, '']);
+});
+
+test('가져오기 병렬 저장은 최대 3명이며 실패한 묶음의 진행 중 저장을 마친 뒤 선점을 해제한다', async () => {
+  const { env, admin, hs } = await syncSetup();
+  const rows = Array.from({ length: 9 }, (_, i) => ({ id: String(4000 + i), properties: { firstname: '가상병렬' + i, lastmodifieddate: '1234' } }));
+  hs.routes['GET /crm/v3/objects/contacts'] = () => ({ results: rows });
+  const originalCursor = JSON.stringify({ since: 1, after: '', retry: [], linkedAfter: '3999' });
+  env.DB.database.prepare("INSERT INTO crm_kv(key,value,updated_at) VALUES('hs:pull',?,1)").run(originalCursor);
+  const prepare = env.DB.prepare.bind(env.DB), active = new Set(), attempted = [];
+  let maximum = 0, drained = false;
+  env.DB.prepare = sql => {
+    const statement = prepare(sql), run = statement.run.bind(statement);
+    statement.run = async () => {
+      const id = statement.args[0];
+      if (sql.startsWith("INSERT INTO crm_documents(collection,id,data,updated_at,updated_by,deleted) SELECT 'leads'")) {
+        attempted.push(id);
+        if (id === 'hs_4001') throw new Error('synthetic D1 failure');
+        await new Promise(resolve => setTimeout(resolve, 5));
+      }
+      if (sql.startsWith('DELETE FROM crm_hs_inflight') && id === '$hubspot-sync') { assert.equal(active.size, 0, '모든 진행 중 고객 선점을 해제한 뒤 전역 선점을 푼다'); drained = true; }
+      const result = await run();
+      if (sql.startsWith('INSERT INTO crm_hs_inflight') && id !== '$hubspot-sync' && result.meta.changes) { active.add(id); maximum = Math.max(maximum, active.size); }
+      if (sql.startsWith('DELETE FROM crm_hs_inflight')) active.delete(id);
+      return result;
+    };
+    return statement;
+  };
+  const failed = await call(env, 'POST', '/api/hubspot/pull', { token: admin, body: { full: true } });
+  env.DB.prepare = prepare;
+  assert.equal(failed.status, 502);
+  assert.equal(maximum, 3);
+  assert.equal(drained, true);
+  assert.deepEqual(attempted.sort(), ['hs_4000', 'hs_4001', 'hs_4002'], '실패 뒤 다음 묶음을 시작하지 않는다');
+  assert.equal(env.DB.database.prepare("SELECT value FROM crm_kv WHERE key='hs:pull'").get().value, originalCursor);
+  assert.equal(env.DB.database.prepare("SELECT COUNT(*) AS n FROM crm_documents WHERE collection='leads'").get().n, 2);
+  const recovered = await call(env, 'POST', '/api/hubspot/pull', { token: admin, body: { full: true } });
+  assert.deepEqual([recovered.body.created, recovered.body.unchanged, recovered.body.more], [7, 2, false]);
+  assert.equal(env.DB.database.prepare("SELECT COUNT(*) AS n FROM crm_documents WHERE collection='leads'").get().n, 9);
+});
+
+test('병렬로 같은 로컬 고객을 주장한 두 HubSpot 연락처는 고객별 선점으로 가로채지 않는다', async () => {
+  const { env, admin, hs } = await syncSetup();
+  await putDoc(env, admin, 'leads', 'shared-local', lead());
+  env.DB.database.prepare("DELETE FROM crm_sync_queue WHERE lead_id='shared-local'").run();
+  hs.routes['GET /crm/v3/objects/contacts'] = () => ({ results: ['5000', '5001'].map(id => ({ id, properties: { firstname: '가상중복', wb_crm_lead_id: 'shared-local', lastmodifieddate: '1234' } })) });
+  const result = await call(env, 'POST', '/api/hubspot/pull', { token: admin, body: { full: true } });
+  assert.equal(result.status, 200);
+  assert.deepEqual([result.body.updated, result.body.conflicts, result.body.retry], [1, 1, 1]);
+  const links = env.DB.database.prepare("SELECT contact_id FROM crm_hs_links WHERE lead_id='shared-local'").all();
+  assert.equal(links.length, 1);
+  assert.equal(JSON.parse((await storedLead(env, 'shared-local')).data).hubspot.contactId, links[0].contact_id);
+  assert.notEqual(result.body.cursor.retry[0], links[0].contact_id);
+  assert.equal(env.DB.database.prepare("SELECT COUNT(*) AS n FROM crm_documents WHERE collection='leads'").get().n, 1);
 });
 
 test('전체 보정은 기본 목록 커서를 유지해 완주하고 24시간 뒤 검색 누락 연락처도 다시 발견한다', async () => {
