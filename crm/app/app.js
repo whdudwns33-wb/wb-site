@@ -904,7 +904,7 @@ function autoSyncHtml(status) {
   const busy = !!ui.hs.busy || !!(a && a.running);
   const stamp = value => value ? new Date(value).toLocaleString('ko-KR') : '아직 없음';
   let h = '<section class="card" aria-label="자동 양방향 동기화"><div class="between wraprow"><h2 class="card-title">자동 양방향 동기화</h2><span class="tag' + (a && a.enabled ? ' ok' : '') + '">' + (a ? a.enabled ? '켜짐' : '꺼짐' : '상태 확인 필요') + '</span></div>' +
-    '<p class="card-sub mt8">15분마다 고객 기본정보·영업 단계의 변경을 양쪽에 반영합니다. 즉시 반영이 필요하면 [지금 동기화]를 누르세요.</p>' +
+    '<p class="card-sub mt8">15분마다 고객 기본정보·영업 단계의 변경을 양쪽에 순차 반영합니다. 한 차례 더 처리하려면 [지금 동기화]를 누르세요.</p>' +
     '<p class="hint mt8">센터앱 연결 고객은 센터앱이 관리합니다. 상담 기록은 세일즈데스크에서 HubSpot으로 보내며, 삭제·관계관리·검사 점수는 자동 반영 대상이 아닙니다.</p>';
   if (a) {
     const r = a.lastResult || {}, pull = r.pull || {}, push = r.push || {};
