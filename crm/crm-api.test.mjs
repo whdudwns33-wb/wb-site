@@ -1204,6 +1204,47 @@ test('큰 가져오기는 25건·연결 재조회20·재시도10·전송5로 제
   assert.ok(hs.calls.filter(c => c.path.endsWith('/contacts/search')).every(c => c.body.limit <= 25));
 });
 
+test('전체 가져오기는 중복 순환 조회를 미루고 커서·재시도를 보존한 뒤 변경분에서 재개한다', async () => {
+  const { env, admin, hs, contacts } = await syncSetup();
+  const rows = Array.from({ length: 30 }, (_, i) => ({ id: String(2000 + i), properties: { firstname: '가상가족' + i, lastmodifieddate: '1234' } }));
+  rows.forEach(row => contacts.set(row.id, row));
+  contacts.set('9999', { id: '9999', properties: { firstname: '다음변경분재시도', lastmodifieddate: '1234' } });
+  const list = (c, u) => {
+    const after = u.searchParams.get('after') || '', subset = rows.filter(row => row.id > after), results = subset.slice(0, Number(u.searchParams.get('limit')));
+    return { results, ...(subset.length > results.length ? { paging: { next: { after: results.at(-1).id } } } : {}) };
+  };
+  hs.routes['GET /crm/v3/objects/contacts'] = list;
+  hs.routes['POST /crm/v3/objects/contacts/search'] = () => ({ total: 0, results: [] });
+  const pull = body => call(env, 'POST', '/api/hubspot/pull', { token: admin, body });
+  const storedCursor = () => env.DB.database.prepare("SELECT value FROM crm_kv WHERE key='hs:pull'").get().value;
+  const first = await pull({ full: true });
+  assert.deepEqual([first.body.created, first.body.more, first.body.cursor.after], [25, true, '2024']);
+  env.DB.database.prepare("UPDATE crm_kv SET value=json_set(value,'$.linkedAfter','2005','$.retry',json(?)) WHERE key='hs:pull'").run(JSON.stringify(['2028', '9999']));
+  const original = storedCursor(), callsBefore = hs.calls.length;
+  hs.routes['GET /crm/v3/objects/contacts'] = () => new Response('{}', { status: 500 });
+  const failed = await pull({});
+  assert.equal(failed.status, 502);
+  assert.equal(storedCursor(), original, '실패한 페이지는 전체·순환·재시도 커서를 앞당기지 않는다');
+  hs.routes['GET /crm/v3/objects/contacts'] = list;
+  const completed = await pull({});
+  assert.deepEqual([completed.body.created, completed.body.seen, completed.body.more], [5, 5, false]);
+  assert.equal(hs.calls.slice(callsBefore).filter(c => c.path === '/crm/v3/objects/contacts/batch/read').length, 0, '전체 이어받기에서는 연결 고객·재시도 별도 읽기가 없다');
+  const fullCursor = JSON.parse(storedCursor());
+  assert.equal(fullCursor.linkedAfter, '2005');
+  assert.deepEqual(fullCursor.retry, ['9999'], '전체 목록에서 처리한 재시도만 해제한다');
+  assert.ok(fullCursor.lastFullAt > 0);
+  assert.equal(fullCursor.fullRun, false);
+  const callsAtResume = hs.calls.length;
+  const resumed = await pull({});
+  assert.equal(resumed.status, 200);
+  assert.equal(resumed.body.created, 1);
+  const batchIds = hs.calls.slice(callsAtResume).find(c => c.path === '/crm/v3/objects/contacts/batch/read').body.inputs.map(i => i.id);
+  assert.equal(batchIds.length, 21, '재시도 1건과 저장 위치 다음의 연결 고객 20건');
+  assert.ok(batchIds.includes('9999') && batchIds.includes('2006') && batchIds.includes('2025') && !batchIds.includes('2000'));
+  assert.deepEqual(resumed.body.cursor.retry, []);
+  assert.equal(resumed.body.cursor.linkedAfter, '2025');
+});
+
 test('전체 보정은 기본 목록 커서를 유지해 완주하고 24시간 뒤 검색 누락 연락처도 다시 발견한다', async () => {
   const { env, admin, hs, contacts } = await syncSetup();
   const rows = Array.from({ length: 30 }, (_, i) => ({ id: String(2000 + i), properties: { firstname: '보정가족' + i, lastmodifieddate: '1234' } }));
