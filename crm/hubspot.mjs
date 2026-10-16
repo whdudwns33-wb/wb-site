@@ -84,11 +84,11 @@ export function createClient(options) {
   if (!token) throw new HubSpotError('HubSpot 토큰이 없습니다 (HUBSPOT_ACCESS_TOKEN)', 0);
 
   async function request(method, path, body) {
-    const init = { method, headers: { Authorization: 'Bearer ' + token, Accept: 'application/json' } };
+    const init = { method, signal: AbortSignal.timeout(20000), redirect: 'manual', headers: { Authorization: 'Bearer ' + token, Accept: 'application/json' } };
     if (body !== undefined) { init.headers['Content-Type'] = 'application/json'; init.body = JSON.stringify(body); }
     let response;
     try { response = await fetchImpl(base + path, init); }
-    catch (error) { throw new HubSpotError('HubSpot 에 연결할 수 없습니다: ' + str(error && error.message || error), 0); }
+    catch (error) { throw new HubSpotError('HubSpot 연결 결과를 확인하지 못했습니다', 0); }
     const text = await response.text();
     let json = null;
     try { json = text ? JSON.parse(text) : null; } catch (error) { json = null; }
@@ -231,11 +231,21 @@ export function createClient(options) {
   }
 
   /** 변경분 가져오기 — sinceMs 이후 수정된 연락처 한 페이지. available 은 포털에 있는 속성 이름 집합(없는 속성을 청하면 400). */
-  async function contactsModifiedSince(sinceMs, after, available) {
+  async function contactsModifiedSince(sinceMs, after, available, untilMs, limit) {
     const props = STANDARD_PROPERTIES.concat(WB_PROPERTY_NAMES.filter(n => !available || available.has(n)));
     const filterGroups = sinceMs > 0 ? [{ filters: [{ propertyName: 'lastmodifieddate', operator: 'GTE', value: String(sinceMs) }] }]
       : [{ filters: [{ propertyName: 'hs_object_id', operator: 'HAS_PROPERTY' }] }];
-    return searchContacts(filterGroups, props, after, PAGE);
+    if (untilMs) filterGroups[0].filters.push({ propertyName: 'lastmodifieddate', operator: 'LTE', value: String(untilMs) });
+    return searchContacts(filterGroups, props, after, limit || PAGE);
+  }
+
+  /** 전체 보정은 검색 인덱스 대신 기본 목록의 객체 커서를 사용한다. */
+  async function listContacts(after, available, limit = 25) {
+    const properties = STANDARD_PROPERTIES.concat(WB_PROPERTY_NAMES.filter(n => !available || available.has(n)));
+    const query = new URLSearchParams({ limit: String(limit), properties: properties.join(',') });
+    if (after) query.set('after', str(after));
+    const result = await request('GET', '/crm/v3/objects/contacts?' + query);
+    return { total: 0, results: (Array.isArray(result?.results) ? result.results : []).map(normalizeObject), after: str(result?.paging?.next?.after) };
   }
 
   /** 연락처 id 들의 딜 — { contactId: [dealId] } */
@@ -263,7 +273,7 @@ export function createClient(options) {
   }
 
   return { request, status, pipelines, listContactProperties, checkProperties, ensureProperties, searchContacts, findContact, readContacts,
-    createContact, updateContact, createDeal, updateDeal, createNote, contactsModifiedSince, dealIdsForContacts, readDeals };
+    createContact, updateContact, createDeal, updateDeal, createNote, contactsModifiedSince, listContacts, dealIdsForContacts, readDeals };
 }
 
 function normalizeObject(obj) {
@@ -287,9 +297,9 @@ export function contactProperties(lead, extra, available) {
   const props = {};
   const parts = isObj(hs.nameParts) ? hs.nameParts : null;
   const combined = parts ? (str(parts.lastname) + str(parts.firstname)).replace(/\s+/g, '') : '';
-  if (!parts || combined !== str(L.name).replace(/\s+/g, '')) props.firstname = str(L.name);
-  if (L.phone) props.phone = CORE.normalizePhone(L.phone);
-  if (L.email) props.email = str(L.email).toLowerCase();
+  if (!parts || combined !== str(L.name).replace(/\s+/g, '')) { props.firstname = str(L.name); props.lastname = ''; }
+  props[hs.phoneSource === 'mobilephone' ? 'mobilephone' : 'phone'] = CORE.normalizePhone(L.phone);
+  props.email = str(L.email).toLowerCase();
   const wb = {
     wb_source_channel: CORE.CHANNELS.includes(L.channel) ? L.channel : '기타',
     wb_child_name: str(child.name), wb_child_birth: str(child.birth), wb_child_grade: str(child.grade),
@@ -298,13 +308,27 @@ export function contactProperties(lead, extra, available) {
     wb_lost_reason: L.status === 'lost' && isObj(L.outcome) && CORE.LOST_REASONS.includes(L.outcome.reason) ? L.outcome.reason : '',
     wb_crm_lead_id: str(L.id)
   };
-  if (ACADEMY_STATUS.has(str(L.academyStatus))) wb.wb_academy_status = L.academyStatus;
-  if (x.referrerContactId) wb.wb_referrer_contact_id = str(x.referrerContactId);
+  if (!L.academyStatus || ACADEMY_STATUS.has(str(L.academyStatus))) wb.wb_academy_status = str(L.academyStatus);
+  if (x.referrerContactId !== undefined) wb.wb_referrer_contact_id = str(x.referrerContactId);
   if (x.partnerName !== undefined) wb.wb_partner = str(x.partnerName);
   if (Number.isFinite(Number(x.creditBalance)) && x.creditBalance !== null && x.creditBalance !== undefined) wb.wb_credit_balance = String(Math.round(Number(x.creditBalance)));
   Object.keys(wb).forEach(k => { if (!available || available.has(k)) props[k] = wb[k]; });
   if (L.status === 'won') props.lifecyclestage = 'customer';   // 뒤로는 못 돌리는 값이라 성사 때만 올린다
   return props;
+}
+
+/** 변경한 필드만 보낸다 — 연락처 수정이 외부 크레딧·소개자·파트너 값을 덮지 않게 한다. */
+export function contactPatchProperties(lead, extra, available, fields) {
+  const properties = contactProperties(lead, extra, available);
+  const map = {
+    name: ['firstname', 'lastname'], phone: ['phone', 'mobilephone'], email: ['email'], channel: ['wb_source_channel'],
+    child: ['wb_child_name', 'wb_child_birth', 'wb_child_grade'], inspection: ['wb_inspection_type', 'wb_inspection_date'],
+    consultedAt: ['wb_consult_date'], retestDue: ['wb_retest_due_date'], academyStatus: ['wb_academy_status'],
+    status: ['wb_lost_reason', 'lifecyclestage'], outcome: ['wb_lost_reason'], referrerLeadId: ['wb_referrer_contact_id'],
+    partnerId: ['wb_partner'], creditBalance: ['wb_credit_balance']
+  };
+  const keys = new Set((Array.isArray(fields) ? fields : []).flatMap(field => map[field] || []));
+  return Object.fromEntries(Object.entries(properties).filter(([key]) => keys.has(key)));
 }
 
 /** 연락처 → 리드 필드. existing 이 있으면 그 위에 HubSpot 값이 이긴다(연락처·wb_* 만). 기록·팔로업·메모는 건드리지 않는다. */
@@ -318,25 +342,27 @@ export function leadFromContact(contact, existing, ctx) {
   const name = (last && first ? last + first : (first || last)).trim();
   if (name) lead.name = name.slice(0, 40);
   else if (!lead.name) lead.name = ('HubSpot 연락처 ' + c.id).slice(0, 40);   // 이메일·전화를 이름에 넣으면 PII 규칙이 그 리드의 저장을 막는다
-  const phone = CORE.normalizePhone(p.phone || p.mobilephone);
-  if (phone) lead.phone = phone;
-  if (CORE.validEmail(p.email)) lead.email = str(p.email).toLowerCase();
+  const phoneSource = ['phone', 'mobilephone'].includes(E?.hubspot?.phoneSource) ? E.hubspot.phoneSource : p.phone ? 'phone' : p.mobilephone ? 'mobilephone' : 'phone';
+  const phone = CORE.normalizePhone(p[phoneSource]);
+  if ('phone' in p || 'mobilephone' in p) lead.phone = phone;
+  if ('email' in p && (!p.email || CORE.validEmail(p.email))) lead.email = str(p.email).toLowerCase();
   if (CORE.CHANNELS.includes(p.wb_source_channel)) lead.channel = p.wb_source_channel;
   else if (!lead.channel) lead.channel = '기타';
   lead.child = Object.assign({ name: '', birth: '', grade: '', school: '' }, isObj(lead.child) ? lead.child : {});
-  if (p.wb_child_name) lead.child.name = str(p.wb_child_name).slice(0, 40);
-  if (hsDate(p.wb_child_birth)) lead.child.birth = hsDate(p.wb_child_birth);
-  if (p.wb_child_grade) lead.child.grade = str(p.wb_child_grade).slice(0, 20);
+  if ('wb_child_name' in p) lead.child.name = str(p.wb_child_name).slice(0, 40);
+  if ('wb_child_birth' in p) lead.child.birth = hsDate(p.wb_child_birth);
+  if ('wb_child_grade' in p) lead.child.grade = str(p.wb_child_grade).slice(0, 20);
   lead.inspection = Object.assign({ type: '', date: '' }, isObj(lead.inspection) ? lead.inspection : {});
-  if (CORE.INSPECTION_TYPES.includes(p.wb_inspection_type)) lead.inspection.type = p.wb_inspection_type;
-  if (hsDate(p.wb_inspection_date)) lead.inspection.date = hsDate(p.wb_inspection_date);
-  if (hsDate(p.wb_consult_date)) lead.consultedAt = hsDate(p.wb_consult_date);
-  if (hsDate(p.wb_retest_due_date)) lead.retestDue = hsDate(p.wb_retest_due_date);
-  if (ACADEMY_STATUS.has(str(p.wb_academy_status))) lead.academyStatus = p.wb_academy_status;
+  if ('wb_inspection_type' in p && (!p.wb_inspection_type || CORE.INSPECTION_TYPES.includes(p.wb_inspection_type))) lead.inspection.type = str(p.wb_inspection_type);
+  if ('wb_inspection_date' in p) lead.inspection.date = hsDate(p.wb_inspection_date);
+  if ('wb_consult_date' in p) lead.consultedAt = hsDate(p.wb_consult_date);
+  if ('wb_retest_due_date' in p) lead.retestDue = hsDate(p.wb_retest_due_date);
+  if ('wb_academy_status' in p && (!p.wb_academy_status || ACADEMY_STATUS.has(str(p.wb_academy_status)))) lead.academyStatus = str(p.wb_academy_status);
+  if (CORE.LOST_REASONS.includes(p.wb_lost_reason)) lead.outcome = { ...lead.outcome, reason: p.wb_lost_reason };
   if (p.wb_credit_balance !== undefined && p.wb_credit_balance !== null && p.wb_credit_balance !== '') lead.creditBalanceHs = Number(p.wb_credit_balance) || 0;
   if (!E) lead.createdAt = hsDate(p.createdate) || today;
   lead.hubspot = Object.assign({}, isObj(lead.hubspot) ? lead.hubspot : {}, {
-    contactId: c.id, nameParts: { firstname: first, lastname: last }, syncedAt: Date.now(), hsUpdatedAt: hsMs(p.lastmodifieddate || c.updatedAt),
+    contactId: c.id, phoneSource, nameParts: { firstname: first, lastname: last }, syncedAt: Date.now(), hsUpdatedAt: hsMs(p.lastmodifieddate || c.updatedAt),
     referrerContactId: str(p.wb_referrer_contact_id)
   });
   return lead;
@@ -361,9 +387,9 @@ export function applyDealsToLead(lead, deals, map) {
     if (stage) current = { pipeline: p, stage: stage, at: hsDate(d.properties.hs_lastmodifieddate || d.updatedAt) };
   });
   if (current) {
+    if (L.pipeline !== current.pipeline || L.stage !== current.stage) L.stageAt = current.at || L.stageAt;
     L.pipeline = current.pipeline;
     L.stage = current.stage;
-    L.stageAt = current.at || L.stageAt;
     L.status = CORE.statusOf(current.stage, L.status);
     if (L.status === 'open' && isObj(L.outcome) && L.outcome.status !== 'hold') L.outcome = null;
   }
