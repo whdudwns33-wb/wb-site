@@ -22,7 +22,7 @@ const PAGE = 100;
 /* WB 사용자 속성 — 포털에 없는 것만 만든다(원장이 [없는 속성 만들기]를 눌렀을 때). 이미 있는 속성의 옵션은 건드리지 않는다. */
 export const WB_PROPERTIES = [
   { name: 'wb_source_channel', label: 'WB 유입 채널', type: 'enumeration', fieldType: 'select', options: CORE.CHANNELS },
-  { name: 'wb_academy_status', label: 'WB 학원 등록 상태', type: 'enumeration', fieldType: 'select', options: ['미등록', '트라이얼', '재원', '이탈', '퇴원'] },
+  { name: 'wb_academy_status', label: 'WB 학원 등록 상태', type: 'enumeration', fieldType: 'select', options: CORE.ACADEMY_STATUS },
   { name: 'wb_credit_balance', label: 'WB 소개 크레딧 잔액', type: 'number', fieldType: 'number' },
   { name: 'wb_referrer_contact_id', label: 'WB 소개자 Contact ID', type: 'string', fieldType: 'text' },
   { name: 'wb_retest_due_date', label: 'WB 재검사 예정일', type: 'date', fieldType: 'date' },
@@ -42,7 +42,7 @@ export const WB_PROPERTY_NAMES = WB_PROPERTIES.map(p => p.name);
 /* 가져오기 때 읽는 표준 속성 */
 const STANDARD_PROPERTIES = ['firstname', 'lastname', 'phone', 'mobilephone', 'email', 'createdate', 'lastmodifieddate', 'lifecyclestage'];
 const DEAL_PROPERTIES = ['dealname', 'pipeline', 'dealstage', 'closedate', 'hs_lastmodifieddate'];
-const ACADEMY_STATUS = new Set(['미등록', '트라이얼', '재원', '이탈', '퇴원']);
+const ACADEMY_STATUS = new Set(CORE.ACADEMY_STATUS);
 
 export class HubSpotError extends Error {
   constructor(message, status, body) {
@@ -308,7 +308,8 @@ export function contactProperties(lead, extra, available) {
     wb_lost_reason: L.status === 'lost' && isObj(L.outcome) && CORE.LOST_REASONS.includes(L.outcome.reason) ? L.outcome.reason : '',
     wb_crm_lead_id: str(L.id)
   };
-  if (!L.academyStatus || ACADEMY_STATUS.has(str(L.academyStatus))) wb.wb_academy_status = str(L.academyStatus);
+  const academyStatus = CORE.academyStatusOf(L);
+  if (!academyStatus || ACADEMY_STATUS.has(academyStatus)) wb.wb_academy_status = academyStatus;
   if (x.referrerContactId !== undefined) wb.wb_referrer_contact_id = str(x.referrerContactId);
   if (x.partnerName !== undefined) wb.wb_partner = str(x.partnerName);
   if (Number.isFinite(Number(x.creditBalance)) && x.creditBalance !== null && x.creditBalance !== undefined) wb.wb_credit_balance = String(Math.round(Number(x.creditBalance)));
@@ -338,6 +339,8 @@ export function leadFromContact(contact, existing, ctx) {
   const E = isObj(existing) ? existing : null;
   const today = isObj(ctx) && ctx.today ? ctx.today : new Date().toISOString().slice(0, 10);
   const lead = E ? JSON.parse(JSON.stringify(E)) : { pipeline: 'inspection', stage: 'inquiry', status: 'open', followups: [], interests: [], memo: '', source: '' };
+  const legacyAcademy = lead.pipeline === 'academy' && CORE.isLegacyAcademyStage(lead.stage);
+  if (legacyAcademy) lead.academyStatus = CORE.academyStatusOf(lead);
   const first = str(p.firstname).trim(), last = str(p.lastname).trim();
   const name = (last && first ? last + first : (first || last)).trim();
   if (name) lead.name = name.slice(0, 40);
@@ -357,8 +360,8 @@ export function leadFromContact(contact, existing, ctx) {
   if ('wb_inspection_date' in p) lead.inspection.date = hsDate(p.wb_inspection_date);
   if ('wb_consult_date' in p) lead.consultedAt = hsDate(p.wb_consult_date);
   if ('wb_retest_due_date' in p) lead.retestDue = hsDate(p.wb_retest_due_date);
-  if ('wb_academy_status' in p && (!p.wb_academy_status || ACADEMY_STATUS.has(str(p.wb_academy_status)))) lead.academyStatus = str(p.wb_academy_status);
-  if (CORE.LOST_REASONS.includes(p.wb_lost_reason)) lead.outcome = { ...lead.outcome, reason: p.wb_lost_reason };
+  if ('wb_academy_status' in p && (!p.wb_academy_status || ACADEMY_STATUS.has(str(p.wb_academy_status))) && !(legacyAcademy && !p.wb_academy_status)) lead.academyStatus = str(p.wb_academy_status);
+  if (!legacyAcademy && CORE.LOST_REASONS.includes(p.wb_lost_reason)) lead.outcome = { ...lead.outcome, reason: p.wb_lost_reason };
   if (p.wb_credit_balance !== undefined && p.wb_credit_balance !== null && p.wb_credit_balance !== '') lead.creditBalanceHs = Number(p.wb_credit_balance) || 0;
   if (!E) lead.createdAt = hsDate(p.createdate) || today;
   lead.hubspot = Object.assign({}, isObj(lead.hubspot) ? lead.hubspot : {}, {
@@ -386,7 +389,8 @@ export function applyDealsToLead(lead, deals, map) {
     dealsBy[p] = { dealId: d.id, pipelineId: str(m.pipelineId), stageId: str(d.properties.dealstage), stage: stage, updatedAt: hsMs(d.properties.hs_lastmodifieddate || d.updatedAt) };
     if (stage) current = { pipeline: p, stage: stage, at: hsDate(d.properties.hs_lastmodifieddate || d.updatedAt) };
   });
-  if (current) {
+  // 이전 등록 후 단계를 신규 성사로 추측하지 않는다 — 담당자가 영업 단계를 확인하면 이후부터 양방향으로 움직인다.
+  if (current && !(L.pipeline === 'academy' && CORE.isLegacyAcademyStage(L.stage))) {
     if (L.pipeline !== current.pipeline || L.stage !== current.stage) L.stageAt = current.at || L.stageAt;
     L.pipeline = current.pipeline;
     L.stage = current.stage;

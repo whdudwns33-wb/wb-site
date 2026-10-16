@@ -99,7 +99,7 @@ t('validateLead — 정규화·필수값·날짜·상태 유도·outcome 보정'
   assert.deepEqual([lost.data.status, lost.data.outcome.reason, lost.data.outcome.at], ['lost', 'P', '2026-10-05']);
   const lostNoReason = C.validateLead({ name: 'B', stage: 'lost' }, { today: TODAY });
   assert.equal(lostNoReason.data.outcome.reason, 'U');
-  assert.equal(C.validateLead({ name: 'B', pipeline: 'academy', stage: 'inquiry' }).data.stage, 'trial');
+  assert.equal(C.validateLead({ name: 'B', pipeline: 'academy', stage: 'inquiry' }).data.stage, 'inquiry');
   assert.equal(C.validateLead({ name: 'B', phone: 'abc' }).ok, false);
   assert.equal(C.validateLead({ name: 'B', email: 'nope' }).ok, false);
   assert.equal(C.validateLead({ name: 'B', child: { birth: '2017-13-01' } }).ok, false);
@@ -141,8 +141,8 @@ t('HubSpot 파이프라인 자동 매핑 — 라벨·별칭 일치, 못 맞춘 �
       { id: 'decisionmakerboughtin', label: '검사완료' }, { id: 'contractsent', label: '해석완료' }, { id: 'closedwon', label: '성사된 거래' },
       { id: '3551668965', label: '업셀제안' }, { id: 'closedlost', label: '성사되지 않은 거래' }] },
     { id: '22069', label: '학원 등록', stages: [
-      { id: 'a1', label: '트라이얼' }, { id: 'a2', label: '트라이얼검토' }, { id: 'a3', label: '활성' }, { id: 'a4', label: '이탈위험' }, { id: 'a5', label: '이탈' },
-      { id: 'a6', label: '성사된 거래' }, { id: 'a7', label: '성사되지 않은 거래' }] }
+      { id: 'a0', label: '문의' }, { id: 'a1', label: '레벨테스트·체험' }, { id: 'a2', label: '등록 결정 대기' },
+      { id: 'a6', label: '등록(성사)' }, { id: 'a7', label: '미등록' }] }
   ];
   const m1 = C.autoMapPipeline(hs, 'inspection');
   assert.equal(m1.pipelineId, 'default');
@@ -151,13 +151,31 @@ t('HubSpot 파이프라인 자동 매핑 — 라벨·별칭 일치, 못 맞춘 �
   assert.equal(m1.stageMap.upsell, '3551668965');
   const m2 = C.autoMapPipeline(hs, 'academy');
   assert.equal(m2.pipelineId, '22069');
-  assert.deepEqual([m2.stageMap.trial, m2.stageMap.churned, m2.stageMap.lost], ['a1', 'a5', 'a7']);
+  assert.deepEqual(m2.stageMap, { inquiry: 'a0', trial: 'a1', trial_review: 'a2', won: 'a6', lost: 'a7' });
+  assert.deepEqual(m2.unmapped, []);
+  assert.equal(C.localStageFor({ academy: { stageMap: { active: 'old-active' } } }, 'academy', 'old-active'), '');
   const partial = C.autoMapPipeline([{ id: 'p', label: 'Sales', stages: [{ id: 's1', label: 'New Lead' }, { id: 's2', label: 'Closed Won' }] }], 'inspection');
   assert.deepEqual([partial.pipelineId, partial.stageMap.inquiry, partial.stageMap.won], ['p', 's1', 's2']);
   assert.ok(partial.unmapped.includes('booked'));
   assert.equal(C.localStageFor({ inspection: m1 }, 'inspection', 'contractsent'), 'interpreted');
   assert.equal(C.localStageFor({ inspection: m1 }, 'inspection', 'zzz'), '');
   assert.deepEqual(C.autoMapPipeline([], 'inspection').unmapped, C.stagesOf('inspection'));
+});
+
+t('학원 영업 단계와 등록 후 상태 — 이전 단계·판정·KPI는 추측해 성사로 바꾸지 않는다', () => {
+  assert.deepEqual(C.stagesOf('academy'), ['inquiry', 'trial', 'trial_review', 'won', 'lost']);
+  assert.deepEqual(C.stagesOf('academy').map(s => C.stageLabel('academy', s)), ['문의', '레벨테스트·체험', '등록 결정 대기', '등록(성사)', '미등록']);
+  assert.equal(C.stageLabel('inspection', 'inquiry'), '신규문의');
+  assert.equal(C.stageLabel('academy', 'at_risk'), '이탈위험');
+  assert.ok(C.ACADEMY_STATUS.includes('이탈위험'));
+  const old = ['active', 'at_risk', 'churned'].map(stage => ({ name: '이전 고객', pipeline: 'academy', stage, stageAt: '2026-09-01', status: C.statusOf(stage), consultedAt: '2026-09-01', createdAt: '2026-09-01', outcome: stage === 'churned' ? { status: 'lost', at: '2026-09-04', reason: 'P', note: '과거 판정' } : null }));
+  const after = old.map(l => C.validateLead(l, { today: TODAY }).data);
+  assert.deepEqual(after.map(l => l.academyStatus), ['재원', '이탈위험', '이탈']);
+  old.forEach((l, i) => ['stage', 'stageAt', 'status', 'outcome'].forEach(k => assert.deepEqual(after[i][k], l[k])));
+  assert.deepEqual(C.kpi(after, [], '2026-09', TODAY), C.kpi(old, [], '2026-09', TODAY));
+  after.forEach(l => assert.deepEqual(C.validateLead(l, { today: TODAY }).data, l));
+  assert.equal(C.academyStatusOf({ pipeline: 'academy', stage: 'at_risk', academyStatus: '퇴원' }), '퇴원');
+  assert.equal(C.validateLead({ name: '날짜 없음', pipeline: 'academy', stage: 'churned', status: 'lost', outcome: null }, { today: TODAY }).data.outcome, null);
 });
 
 t('동기화 트랙 — 딜 단계 전이만 review, 그 외는 quick', () => {

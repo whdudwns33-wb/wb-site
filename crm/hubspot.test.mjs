@@ -222,6 +222,20 @@ test('노트 본문·딜 이름', () => {
   assert.equal(dealName({ name: '보호자A', child: { name: '아이' } }, 'inspection'), '보호자A · 아이 · 검사 여정');
 });
 
+test('학원 등록 후 상태 — 이탈위험 왕복과 이전 영업 판정 보존', () => {
+  assert.equal(contactProperties({ name: '가상', academyStatus: '이탈위험' }, {}, null).wb_academy_status, '이탈위험');
+  const old = { name: '가상', pipeline: 'academy', stage: 'churned', stageAt: '2025-09-02', status: 'lost', outcome: { status: 'lost', at: '2025-09-02', reason: 'P', note: '이전 판정' }, academyStatus: '' };
+  const pulled = leadFromContact({ id: 'legacy', properties: { wb_academy_status: '', wb_lost_reason: 'T' } }, old);
+  assert.equal(pulled.academyStatus, '이탈');
+  const mapped = applyDealsToLead(pulled, [{ id: 'deal', properties: { pipeline: 'a', dealstage: 'registered', hs_lastmodifieddate: '2026-10-16T00:00:00Z' } }], { academy: { pipelineId: 'a', stageMap: { won: 'registered', churned: 'obsolete' } } });
+  ['pipeline', 'stage', 'stageAt', 'status', 'outcome'].forEach(k => assert.deepEqual(mapped[k], old[k]));
+  assert.equal(mapped.hubspot.deals.academy.stage, 'won', '원격 확인값은 연결 메타데이터에 남긴다');
+  assert.equal(old.academyStatus, '', '원본을 수정하지 않는다');
+  const risk = leadFromContact({ id: 'risk', properties: { wb_academy_status: '이탈위험' } }, { name: '가상', pipeline: 'academy', stage: 'won' });
+  assert.equal(risk.academyStatus, '이탈위험');
+  assert.equal(risk.stage, 'won');
+});
+
 test('양방향 빈값과 이름 변경 — 선택한 전화 원본만 지우고 다른 번호·단계 시각은 보존', () => {
   const initial = leadFromContact({ id: 'test', properties: { firstname: '가상', lastname: '김', phone: '01000001234', mobilephone: '01000005678', email: 'test@example.test', wb_child_name: '아이', wb_child_birth: '2020-01-01', wb_inspection_date: '2026-10-01' } }, null, { today: '2026-10-16' });
   initial.name = '이가상'; initial.phone = ''; initial.email = '';
