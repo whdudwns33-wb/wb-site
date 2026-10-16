@@ -200,6 +200,27 @@ details > summary { cursor: pointer; }
 .page-tools h1 small { font-size: 14px; }
 .crm-app .customer-list { padding: 0; overflow: hidden; }
 .customer-filters { padding: 18px; border-bottom: 1px solid var(--line); }
+.customer-views { display: flex; flex-wrap: wrap; gap: 4px; padding: 0 18px; border-bottom: 1px solid var(--line); }
+.customer-view { padding: 14px 12px 12px; min-height: 44px; border-bottom: 2px solid transparent; color: var(--muted); font-size: 13px; font-weight: 500; white-space: nowrap; }
+.customer-view:hover { background: var(--bg); color: var(--ink); }
+.customer-view.on { border-bottom-color: var(--accent); color: var(--accent); font-weight: 700; }
+.customer-filter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+.customer-filter-grid .field { margin: 0; min-width: 0; }
+.customer-search { grid-column: span 2; }
+.customer-status { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin-top: 16px; }
+.customer-status > .fl { margin: 0; }
+.customer-active-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
+.customer-filter-chip { display: inline-flex; align-items: center; gap: 10px; max-width: 100%; min-height: 36px; padding: 6px 10px; border: 1px solid var(--line-2); border-radius: var(--radius-s); background: var(--bg); font-size: 12px; text-align: left; }
+.customer-filter-chip > span:first-child { overflow-wrap: anywhere; min-width: 0; }
+.customer-filter-chip:hover { background: var(--ink-bg); }
+.customer-filter-remove { color: var(--muted); flex-shrink: 0; }
+.customer-results, .customer-pagination { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 14px 18px; }
+.customer-results { font-size: 13px; }
+.customer-results .in, .customer-pagination .in { width: auto; padding: 7px 10px; font-size: 13px; }
+.customer-results label, .customer-pagination label { white-space: nowrap; }
+.customer-pagination { border-top: 1px solid var(--line); }
+.customer-pagination nav { gap: 12px; }
+.customer-pagination .btn { min-width: 52px; }
 .customer-table-scroll { overflow-x: auto; }
 .customer-table { width: 100%; text-align: left; }
 .customer-table th { padding: 12px 16px; color: var(--muted); font-size: 12px; font-weight: 500; background: var(--bg); white-space: nowrap; }
@@ -247,6 +268,15 @@ details > summary { cursor: pointer; }
 @media (max-width: 719px) {
   .crm-app .customer-list { border: 0; box-shadow: none; background: transparent; overflow: visible; }
   .customer-filters { padding: 14px; margin-bottom: 12px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+  .customer-views { gap: 0; padding: 0 4px; margin-bottom: 12px; flex-wrap: nowrap; overflow-x: auto; background: var(--surface); scrollbar-width: thin; scrollbar-color: var(--line-2) var(--surface); }
+  .customer-view { padding-right: 10px; padding-left: 10px; }
+  .customer-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .customer-filter-grid .in { padding: 10px 8px; }
+  .customer-search { grid-column: 1 / -1; }
+  .customer-status .chip, .customer-active-filters .btn, .customer-filter-chip { min-height: 44px; }
+  .customer-results { padding: 2px 0 14px; }
+  .customer-pagination { padding: 14px 0; }
+  .customer-pagination .btn { min-height: 44px; }
   .customer-table-scroll { overflow: visible; }
   .customer-table, .customer-table tbody { display: block; }
   .customer-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }

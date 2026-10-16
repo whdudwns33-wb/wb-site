@@ -22,6 +22,7 @@ let route = 'login';
 let leadId = '';                 // route === 'lead'
 const ui = {
   pipe: 'inspection', q: '', status: 'open', channel: '', owner: '', phoneShown: {}, ym: C.ymOf(C.ymdOf(new Date())),
+  listPipeline: '', listStage: '', listFollowup: '', listSort: 'newest', listView: 'open', listPage: 1, listPageSize: 25,
   hs: { status: null, pipelines: null, suggested: null, props: null, queue: [], counts: null, busy: '', err: '', filter: 'pending', map: null },
   leadQueue: {}, portal: {}, linkBusy: false, detect: null,
   relationships: { tab: 'friend', q: '', month: C.ymOf(C.ymdOf(new Date())), status: '' }
@@ -138,7 +139,7 @@ async function api(path, body, opts) {
 function onAuthLost() {
   if (!session && !getToken()) return;
   closeModal(true);
-  ui.portal = {};
+  ui.portal = {}; setLeadView('open');
   setToken(''); session = null; stopPolling(); outbox.clear(); state = C.emptyState(); route = 'login'; render(); toast('다시 로그인해 주세요');
 }
 
@@ -318,7 +319,7 @@ async function doLogout() {
   if (outbox.size() && !confirm('저장되지 않은 변경 ' + outbox.size() + '건이 있습니다. 그래도 로그아웃할까요?')) return;
   try { await api('/api/logout', {}); } catch (e) { /* 토큰은 버린다 */ }
   setToken(''); session = null; stopPolling(); outbox.clear(); state = C.emptyState();
-  ui.portal = {};
+  ui.portal = {}; setLeadView('open');
   await loadHealth(); route = 'login'; history.replaceState(null, '', '#/login'); render();
 }
 
@@ -471,21 +472,51 @@ function viewPipeline() {
 }
 
 /* ── 화면: 리드 명단 ──────────────────────────────── */
+function setLeadView(view) {
+  clearTimeout(render._q);
+  Object.assign(ui, { q: '', status: 'all', channel: '', owner: '', listPipeline: '', listStage: '', listFollowup: '', listPage: 1, listView: view });
+  if (view === 'open') ui.status = 'open';
+  if (view === 'mine') ui.owner = session.staffId;
+  if (view === 'today' || view === 'overdue') ui.listFollowup = view;
+}
+function renderLeadList(focus) {
+  render();
+  const target = $(focus || '#lead-list-count');
+  if (target) target.focus();
+}
+function changeLeadFilter(key, value, focus) {
+  clearTimeout(render._q);
+  ui[key] = value; ui.listPage = 1; ui.listView = '';
+  if (key === 'listPipeline') ui.listStage = '';
+  renderLeadList(focus);
+}
 function viewLeads() {
   const q = ui.q;
-  let list = state.leads.filter(l => C.leadMatches(l, q));
-  if (ui.status !== 'all') list = list.filter(l => ui.status === 'open' ? (l.status === 'open' || l.status === 'hold') : l.status === ui.status);
-  if (ui.channel) list = list.filter(l => l.channel === ui.channel);
-  if (ui.owner) list = list.filter(l => String(l.owner) === ui.owner);
-  list.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)) || String(a.name).localeCompare(String(b.name)));
+  const list = C.queryLeads(state.leads, { q, status: ui.status, channel: ui.channel, owner: ui.owner, pipeline: ui.listPipeline, stage: ui.listStage, followup: ui.listFollowup, sort: ui.listSort }, today());
+  const pages = Math.max(1, Math.ceil(list.length / ui.listPageSize));
+  ui.listPage = Math.min(pages, Math.max(1, ui.listPage));
+  const start = (ui.listPage - 1) * ui.listPageSize, end = Math.min(start + ui.listPageSize, list.length);
+  const stages = ui.listPipeline ? C.stagesOf(ui.listPipeline) : Array.from(new Set(C.PIPELINES.flatMap(C.stagesOf)));
+  const active = [
+    ['q', '검색', q], ['status', '상태', ui.status === 'all' ? '' : ui.status === 'open' ? '진행·보류' : C.STATUS_LABEL[ui.status]],
+    ['channel', '유입 채널', ui.channel], ['owner', '담당자', ui.owner ? staffName(ui.owner) : ''],
+    ['pipeline', '파이프라인', C.PIPELINE_LABEL[ui.listPipeline]], ['stage', '단계', C.STAGE_LABEL[ui.listStage]],
+    ['followup', '팔로업', ui.listFollowup === 'today' ? '오늘' : ui.listFollowup === 'overdue' ? '지연' : '']
+  ].filter(item => item[2]);
   let h = '<div class="between page-tools"><div><h1 class="page">고객 <small class="muted">' + list.length + '명</small></h1><p class="card-sub">상담 진행 상황과 다음 연락 일정을 확인하세요.</p></div><button class="btn btn-primary" data-act="new-lead">새 문의</button></div>';
-  h += '<div class="card customer-list"><div class="customer-filters"><div class="row wraprow mb8"><input class="in" id="f-q" aria-label="고객 검색" placeholder="이름·아이·학교·전화 검색" value="' + esc(q) + '" style="flex:1;min-width:160px">' +
-    '<select class="in" id="f-channel" aria-label="유입 채널" style="width:auto"><option value="">채널 전체</option>' + opt(C.CHANNELS, ui.channel) + '</select>' +
-    (session.canApprove ? '<select class="in" id="f-owner" aria-label="담당자" style="width:auto"><option value="">담당 전체</option><option value="admin"' + (ui.owner === 'admin' ? ' selected' : '') + '>원장</option>' + liveStaff().map(s => '<option value="' + esc(s.id) + '"' + (ui.owner === String(s.id) ? ' selected' : '') + '>' + esc(s.name) + '</option>').join('') + '</select>' : '') + '</div>' +
-    '<div class="chips">' + [['open', '진행·보류'], ['won', '등록'], ['lost', '이탈'], ['all', '전체']].map(([k, l]) => '<button class="chip' + (ui.status === k ? ' on' : '') + '" aria-pressed="' + (ui.status === k) + '" data-act="status-filter" data-s="' + k + '">' + l + '</button>').join('') + '</div></div>';
-  h += list.length ? '<div class="customer-table-scroll"><table class="customer-table"><caption class="sr-only">고객별 상담 단계와 다음 연락 일정</caption><thead><tr>' + ['고객 · 학생', '상담 단계', '유입 채널', '담당자', '최근 기록', '다음 연락'].map(label => '<th scope="col">' + label + '</th>').join('') + '</tr></thead><tbody>' + list.slice(0, 200).map(l => {
+  h += '<div class="card customer-list"><div class="customer-views" role="group" aria-label="고객 빠른 보기">' + [['all', '전체 고객'], ['open', '진행·보류'], ['mine', '내 담당'], ['today', '오늘 팔로업'], ['overdue', '지연 팔로업']].map(([key, label]) => '<button class="customer-view' + (ui.listView === key ? ' on' : '') + '" data-act="lead-view" data-view="' + key + '" aria-pressed="' + (ui.listView === key) + '">' + label + '</button>').join('') + '</div>';
+  h += '<div class="customer-filters"><div class="customer-filter-grid"><div class="field customer-search"><label class="fl" for="f-q">고객 검색</label><input class="in" id="f-q" type="search" placeholder="이름·아이·학교·전화 검색" value="' + esc(q) + '"></div>' +
+    '<div class="field"><label class="fl" for="f-channel">유입 채널</label><select class="in" id="f-channel"><option value="">채널 전체</option>' + opt(C.CHANNELS, ui.channel) + '</select></div>' +
+    (session.canApprove ? '<div class="field"><label class="fl" for="f-owner">담당자</label><select class="in" id="f-owner"><option value="">담당 전체</option><option value="admin"' + (ui.owner === 'admin' ? ' selected' : '') + '>원장</option>' + liveStaff().map(s => '<option value="' + esc(s.id) + '"' + (ui.owner === String(s.id) ? ' selected' : '') + '>' + esc(s.name) + '</option>').join('') + '</select></div>' : '') +
+    '<div class="field"><label class="fl" for="f-list-pipeline">파이프라인</label><select class="in" id="f-list-pipeline"><option value="">파이프라인 전체</option>' + opt(C.PIPELINES, ui.listPipeline, p => C.PIPELINE_LABEL[p]) + '</select></div>' +
+    '<div class="field"><label class="fl" for="f-list-stage">상담 단계</label><select class="in" id="f-list-stage"><option value="">단계 전체</option>' + opt(stages, ui.listStage, s => C.STAGE_LABEL[s]) + '</select></div>' +
+    '<div class="field"><label class="fl" for="f-list-followup">다음 팔로업</label><select class="in" id="f-list-followup"><option value="">일정 전체</option>' + opt(['today', 'overdue'], ui.listFollowup, s => s === 'today' ? '오늘' : '지연') + '</select></div></div>' +
+    '<div class="customer-status"><span class="fl">상태</span><div class="chips" role="group" aria-label="고객 상태">' + [['open', '진행·보류'], ['won', '등록'], ['lost', '이탈'], ['all', '전체']].map(([k, l]) => '<button class="chip' + (ui.status === k ? ' on' : '') + '" aria-pressed="' + (ui.status === k) + '" data-act="status-filter" data-s="' + k + '">' + l + '</button>').join('') + '</div></div>';
+  if (active.length) h += '<div class="customer-active-filters" role="group" aria-label="적용한 조건">' + active.map(([key, label, value]) => '<button class="customer-filter-chip" data-act="lead-filter-clear" data-filter="' + key + '" aria-label="' + esc(label + ': ' + value + ' 조건 해제') + '"><span>' + esc(label + ': ' + value) + '</span><span class="customer-filter-remove" aria-hidden="true">해제</span></button>').join('') + '<button class="btn btn-sm btn-ghost" data-act="lead-filters-reset">전체 초기화</button></div>';
+  h += '</div><div class="customer-results"><p id="lead-list-count" tabindex="-1" role="status" aria-live="polite" aria-atomic="true">' + (list.length ? '전체 ' + list.length + '명 중 ' + (start + 1) + '–' + end + '명' : '조건에 맞는 고객 0명') + '</p><div class="row"><label class="small muted" for="f-list-sort">정렬</label><select class="in" id="f-list-sort">' + opt(['newest', 'oldest', 'name', 'next'], ui.listSort, s => ({ newest: '최신 등록순', oldest: '오래된 등록순', name: '이름순', next: '다음 팔로업순' }[s])) + '</select></div></div>';
+  h += list.length ? '<div class="customer-table-scroll"><table class="customer-table"><caption class="sr-only">고객별 상담 단계와 다음 연락 일정</caption><thead><tr>' + ['고객 · 학생', '상담 단계', '유입 채널', '담당자', '최근 기록', '다음 연락'].map(label => '<th scope="col">' + label + '</th>').join('') + '</tr></thead><tbody>' + list.slice(start, end).map(l => {
     const recent = activitiesOf(l.id)[0];
-    const next = l.status === 'open' ? C.nextFollowup(l) : null;
+    const next = C.nextLeadFollowup(l);
     const late = next ? C.daysBetween(next.due, today()) : 0;
     return '<tr><td class="customer-name"><a href="#/lead/' + esc(l.id) + '">' + esc(l.name) + '</a>' + (l.hot && l.status === 'open' ? ' <span class="pill hot">HOT</span>' : '') +
       '<div class="small muted">' + esc(l.child && l.child.name || '학생 미입력') + (l.child && l.child.grade ? ' · ' + esc(l.child.grade) : '') + '</div>' + (l.phone ? '<div class="small muted">' + esc(C.maskPhone(l.phone)) + '</div>' : '') + '</td>' +
@@ -493,8 +524,8 @@ function viewLeads() {
       '<td data-label="유입 채널">' + esc(l.channel || '기타') + '</td><td data-label="담당자">' + esc(staffName(l.owner)) + '</td>' +
       '<td data-label="최근 기록">' + (recent ? esc(recent.at) + '<div class="small muted">' + esc(C.ACTIVITY_LABEL[recent.type] || recent.type) + '</div>' : '<span class="muted">기록 없음</span>') + '</td>' +
       '<td data-label="다음 연락">' + (next ? '<span class="' + (late > 0 ? 'overdue' : '') + '">' + esc(next.due) + '</span><div class="small ' + (late > 0 ? 'overdue' : 'muted') + '">' + (late > 0 ? late + '일 지남' : late === 0 ? '오늘 연락' : 'D+' + next.day + ' 팔로업') + '</div>' : '<span class="muted">' + (l.status === 'hold' ? '보류 중' : C.isClosed(l.stage) ? '종료' : '일정 없음') + '</span>') + '</td></tr>';
-  }).join('') + '</tbody></table></div>' : '<div class="empty small">조건에 맞는 고객이 없습니다</div>';
-  if (list.length > 200) h += '<div class="hint mt8">200건까지만 보입니다 — 검색으로 좁혀 주세요</div>';
+  }).join('') + '</tbody></table></div>' : '<div class="empty small"><b>조건에 맞는 고객이 없습니다</b><p>검색어나 적용한 조건을 바꿔 보세요.</p>' + (active.length ? '<button class="btn btn-ghost mt8" data-act="lead-filters-reset">전체 고객 보기</button>' : '') + '</div>';
+  h += '<div class="customer-pagination"><div class="row"><label class="small muted" for="f-list-size">페이지당</label><select class="in" id="f-list-size">' + opt([25, 50, 100], ui.listPageSize, n => n + '명') + '</select></div><nav class="row" aria-label="고객 목록 페이지"><button class="btn btn-sm btn-ghost" data-act="lead-page" data-page="' + (ui.listPage - 1) + '"' + (ui.listPage <= 1 ? ' disabled' : '') + '>이전</button><span class="small">' + ui.listPage + ' / ' + pages + '</span><button class="btn btn-sm btn-ghost" data-act="lead-page" data-page="' + (ui.listPage + 1) + '"' + (ui.listPage >= pages ? ' disabled' : '') + '>다음</button></nav></div>';
   return h + '</div>';
 }
 
@@ -1460,7 +1491,24 @@ document.addEventListener('click', async e => {
     case 'delete-lead': if (confirm('이 리드와 연결된 화면 기록이 보이지 않게 됩니다(HubSpot 쪽은 그대로). 삭제할까요?')) { queueChange('leads', id, {}, true); go('leads'); } return;
     case 'show-phone': ui.phoneShown[id] = true; return render();
     case 'pipe': ui.pipe = el.dataset.p; return render();
-    case 'status-filter': ui.status = el.dataset.s; return render();
+    case 'status-filter': return changeLeadFilter('status', el.dataset.s, '[data-act="status-filter"][data-s="' + el.dataset.s + '"]');
+    case 'lead-view': {
+      const view = el.dataset.view;
+      if (!['all', 'open', 'mine', 'today', 'overdue'].includes(view)) return;
+      setLeadView(view); return renderLeadList('[data-act="lead-view"][data-view="' + view + '"]');
+    }
+    case 'lead-filter-clear': {
+      const fields = { q: 'q', status: 'status', channel: 'channel', owner: 'owner', pipeline: 'listPipeline', stage: 'listStage', followup: 'listFollowup' };
+      const key = el.dataset.filter;
+      if (!Object.prototype.hasOwnProperty.call(fields, key)) return;
+      return changeLeadFilter(fields[key], key === 'status' ? 'all' : '');
+    }
+    case 'lead-filters-reset': setLeadView('all'); return renderLeadList('#f-q');
+    case 'lead-page': {
+      const page = Number(el.dataset.page);
+      if (el.disabled || !Number.isInteger(page) || page < 1) return;
+      clearTimeout(render._q); ui.listPage = page; return renderLeadList();
+    }
     case 'ym': ui.ym = el.dataset.ym; return render();
     case 'new-activity': return openActivityForm(id);
     case 'activity-save': return saveActivityForm(id);
@@ -1527,8 +1575,17 @@ document.addEventListener('change', e => {
   if (t.id === 'f-stage') return moveStage(t.dataset.id, t.value, t);
   if (t.id === 'r-month') { ui.relationships.month = t.value || C.ymOf(today()); return render(); }
   if (t.id === 'r-status') { ui.relationships.status = t.value; return render(); }
-  if (t.id === 'f-channel') { ui.channel = t.value; return render(); }
-  if (t.id === 'f-owner') { ui.owner = t.value; return render(); }
+  if (t.id === 'f-channel') return changeLeadFilter('channel', t.value, '#f-channel');
+  if (t.id === 'f-owner' && session.canApprove) return changeLeadFilter('owner', t.value, '#f-owner');
+  if (t.id === 'f-list-pipeline') return changeLeadFilter('listPipeline', t.value, '#f-list-pipeline');
+  if (t.id === 'f-list-stage') return changeLeadFilter('listStage', t.value, '#f-list-stage');
+  if (t.id === 'f-list-followup') return changeLeadFilter('listFollowup', t.value, '#f-list-followup');
+  if (t.id === 'f-list-sort' && ['newest', 'oldest', 'name', 'next'].includes(t.value)) {
+    clearTimeout(render._q); ui.listSort = t.value; ui.listPage = 1; return renderLeadList('#f-list-sort');
+  }
+  if (t.id === 'f-list-size' && [25, 50, 100].includes(Number(t.value))) {
+    clearTimeout(render._q); ui.listPageSize = Number(t.value); ui.listPage = 1; return renderLeadList('#f-list-size');
+  }
   if (t.id === 'f-channel2' || t.id === 'f-hot') { t.dataset.touched = '1'; if (t.id === 'f-channel2') togglePartnerField(); return; }
   if (t.dataset.rid) return setReferralStatus(t.dataset.rid, t.value);
   if (t.id === 'f-autoquick') return setAutoQuick(t.checked);
@@ -1555,7 +1612,16 @@ document.addEventListener('input', e => {
     render._relationshipQuery = setTimeout(() => { const pos = e.target.selectionStart; render(); const input = $('#r-query'); if (input) { input.focus(); input.setSelectionRange(pos, pos); } }, 160);
     return;
   }
-  if (e.target && e.target.id === 'f-q') { ui.q = e.target.value; const card = e.target.closest('.card'); const list = card ? card.querySelectorAll('.lead') : []; void list; clearTimeout(render._q); render._q = setTimeout(() => { const pos = e.target.selectionStart; render(); const q = $('#f-q'); if (q) { q.focus(); try { q.setSelectionRange(pos, pos); } catch (err) { /* iOS */ } } }, 160); }
+  if (e.target && e.target.id === 'f-q') {
+    ui.q = e.target.value; ui.listPage = 1; ui.listView = ''; clearTimeout(render._q);
+    if (e.isComposing) return;
+    render._q = setTimeout(() => {
+      if (!session || route !== 'leads') return;
+      const start = e.target.selectionStart, end = e.target.selectionEnd;
+      renderLeadList('#f-q'); const q = $('#f-q');
+      if (q) { try { q.setSelectionRange(start, end); } catch (err) { /* iOS */ } }
+    }, 160);
+  }
 });
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && !$('#modalHost').hidden) return closeModal();
