@@ -247,6 +247,9 @@
         const right = slots[j];
         const sharedDay = left.days.some(day => right.days.includes(day));
         if (!sharedDay) continue;
+        // 지난 시간표와 다음 시간표는 요일·시각이 같아도 동시에 열리지 않는다.
+        if ((left.validTo && right.validFrom && left.validTo < right.validFrom) ||
+            (right.validTo && left.validFrom && right.validTo < left.validFrom)) continue;
         const leftStart = parseClockMinute(left.startTime);
         const leftEnd = parseClockMinute(left.endTime);
         const rightStart = parseClockMinute(right.startTime);
