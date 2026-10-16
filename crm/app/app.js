@@ -1376,8 +1376,7 @@ function openLeadConflict(id) {
   const current = leadById(id), fields = leadChanges(conflict);
   const body = '<p class="hint">내가 바꾼 항목만 비교합니다. 다시 저장하면 아래 항목에 내 입력을 적용합니다.</p>' +
     (!current || conflict.deleted ? '<div class="banner bad mt8">삭제된 고객 또는 삭제 요청은 여기서 복원하지 않습니다. 내 입력을 확인한 뒤 최신 내용을 사용해 주세요.</div>' : '') +
-    '<div class="table-wrap mt14"><table><thead><tr><th>항목</th><th>최근 서버값</th><th>내 입력</th></tr></thead><tbody>' +
-    fields.map(path => '<tr><th>' + esc(LEAD_EDIT_FIELDS[path]) + '</th><td>' + esc(leadFieldText(current, path)) + '</td><td>' + esc(leadFieldText(conflict.draft, path)) + '</td></tr>').join('') + '</tbody></table></div>';
+    fields.map(path => '<div class="sect">' + esc(LEAD_EDIT_FIELDS[path]) + '</div><dl class="kv"><dt>최근 서버값</dt><dd class="relationship-text">' + esc(leadFieldText(current, path)) + '</dd><dt>내 입력</dt><dd class="relationship-text">' + esc(leadFieldText(conflict.draft, path)) + '</dd></dl>').join('');
   modal('겹친 고객 수정 확인', body, '<div class="row wraprow mt14"><button class="btn btn-ghost" data-act="lead-conflict-discard" data-id="' + esc(id) + '">최신 내용 사용</button>' +
     (current && !conflict.deleted && fields.length ? '<button class="btn btn-primary" data-act="lead-conflict-save" data-id="' + esc(id) + '">위 변경 다시 저장</button>' : '') + '</div>');
   conflictEdit = { id, at: Number(state.meta[key]) || 0 };
