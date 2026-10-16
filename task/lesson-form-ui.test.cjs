@@ -285,7 +285,8 @@ test('existing lesson search finds editable tasks by teacher or student name and
   ];
   const staff = { 'teacher-a': { name: 'Teacher One' }, 'teacher-b': { name: 'Teacher Two' } };
   const helpers = new Function('session', 'rosterDb', 'state', 'isLesson', 'isRegularLessonTask', 'canEditLessonTask', 'staffById', 'studentOf',
-    'lessonAssignmentScheduleText', 'esc', studentLabelHelperSource() + html.slice(start, end) +
+    'lessonAssignmentScheduleText', 'esc', 'const today = () => "2026-10-16";\n' +
+    html.slice(html.indexOf('function lessonCurrentScheduleText('), html.indexOf('async function submitLessonAssignmentRequest(')) + studentLabelHelperSource() + html.slice(start, end) +
     '\nreturn { lessonExistingChangeRows, lessonExistingChangeResultsHtml };')(
       { isAdmin: true }, { students }, { tasks }, task => !!task.lessonFormVersion,
       task => !!task.lessonFormVersion && !task.deleted && task.lessonInstanceType !== 'makeup' && !task.makeupCaseId, task => !!task.lessonFormVersion,
