@@ -7988,6 +7988,22 @@ function prepareAdminLessonRoute(nextRoute) {
 
 function currentLessonDraft() {
   if (!lessonDraft) lessonDraft = restoreLessonDraft() || newLessonDraft();
+  // 구버전에서 보관한 수정 초안은 시간대의 적용 기간을 빠뜨렸으므로 원본과
+  // 정확히 일치하는 행만 복구한다. 사용자가 입력한 시간은 덮어쓰지 않는다.
+  if (lessonDraft._sourceTaskId) {
+    const source = taskById(lessonDraft._sourceTaskId);
+    (lessonDraft.scheduleSlots || []).forEach(slot => {
+      if (slot.validFrom || slot.validTo) return;
+      const matches = (source && source.scheduleSlots || []).filter(item =>
+        item.startTime === slot.startTime && item.endTime === slot.endTime &&
+        JSON.stringify(daysForDisplay(item.days)) === JSON.stringify(daysForDisplay(slot.days)));
+      if (matches.length === 1) {
+        slot.validFrom = matches[0].validFrom || source.start || '';
+        slot.validTo = matches[0].validTo || '';
+        slot.slotId = matches[0].slotId || '';
+      }
+    });
+  }
   if (session.isStaffLink && !session.isAdmin) lessonDraft.staffId = session.staffId;
   return lessonDraft;
 }
@@ -8276,6 +8292,20 @@ function assignmentCandidateLabel(student) {
 
 function lessonAssignmentScheduleText(slots, fallbackLessonHours) {
   return groupedScheduleSlotsForDisplay(slots, fallbackLessonHours).map(lessonScheduleSlotLabel).join(' / ');
+}
+
+function lessonCurrentScheduleText(task) {
+  const slots = Array.isArray(task.scheduleSlots) ? task.scheduleSlots : [];
+  if (!slots.length) return task.scheduleText || '요일·시간·시수 미지정';
+  const date = today();
+  const active = slots.filter(slot => (!slot.validFrom || slot.validFrom <= date) && (!slot.validTo || slot.validTo >= date));
+  const lines = ['현재: ' + (lessonAssignmentScheduleText(active, task.lessonHours) || '현재 적용 시간표 없음')];
+  const dates = [...new Set(slots.filter(slot => slot.validFrom > date).map(slot => slot.validFrom))].sort();
+  dates.forEach(from => {
+    const upcoming = slots.filter(slot => (!slot.validFrom || slot.validFrom <= from) && (!slot.validTo || slot.validTo >= from));
+    lines.push(from + '부터: ' + lessonAssignmentScheduleText(upcoming, task.lessonHours));
+  });
+  return lines.join(' / ');
 }
 
 async function submitLessonAssignmentRequest(button) {
@@ -8701,7 +8731,7 @@ function lessonExistingChangeRows(query) {
     return {
       task: task, studentName: studentName, studentLabel: studentLabel, teacherName: teacherName,
       subject: String(task.subject || task.className || task.lessonRole || '과목 미지정'),
-      schedule: lessonAssignmentScheduleText(task.scheduleSlots, task.lessonHours) || task.scheduleText || '요일·시간·시수 미지정'
+      schedule: lessonCurrentScheduleText(task)
     };
   }).filter(row => lessonExistingSearchKey(row.studentName).includes(key) || lessonExistingSearchKey(row.teacherName).includes(key))
     .sort((a, b) => a.studentLabel.localeCompare(b.studentLabel, 'ko') || a.teacherName.localeCompare(b.teacherName, 'ko') ||
@@ -19428,7 +19458,7 @@ function rosterStudentLessonsHtml(student) {
   if (!lessons.length) return '<div class="empty"><b>등록된 수업이 없습니다</b>수업 등록 및 변경 탭에서 이 학생의 수업을 등록해 주세요.</div>';
   return lessons.map((task, index) => {
     const teacher = staffById(task.staffId);
-    const schedule = lessonAssignmentScheduleText(task.scheduleSlots, task.lessonHours) || task.scheduleText || '요일·시간·시수 미지정';
+    const schedule = lessonCurrentScheduleText(task);
     const subject = task.subject || task.className || task.lessonRole || '과목 미지정';
     return '<section class="card' + (index ? ' mt14' : '') + '"><div class="between"><div><div class="card-title">' +
       esc(subject) + '</div><div class="card-sub">' + esc((teacher && teacher.name) || '담당 미지정') + ' 선생님</div></div>' +
