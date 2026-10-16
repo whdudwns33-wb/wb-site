@@ -7,6 +7,30 @@
 
 아래 구현 절의 미배포·화면 확인 대기는 각 개발 단계 당시의 기록이다. 최신 배포 상태는 이 문단과 `../HANDOFF.md`를 따른다.
 
+## 진학통·어디가 벤치마킹 후속 (2026-10-16 · 로컬)
+
+기존 수시 조건·6장 지원 카드, 정시 실제 시험·반영방법·지원안·이력, 통합 보고서를 재사용한다. `/consult/`, 비공개 원본, 기존 상담 기록의 구조는 변경하지 않는다. 새 외부 데이터 수집이나 예측식 복제는 하지 않는다.
+
+관찰과 추정의 범위:
+
+- **REA 실제 관찰:** 진학통 공개 첫 화면과 연간/정시 서비스 탭 전환을 Windows Chrome에서 실행했다. 탭 선택 후 같은 URL에서 설명 영역이 바뀌었다. Evidence `ev_3f604b8f04d96ad0d058461b43edfccc054fabf14a2a32221c983f8706eee224`, `ev_af30e37100e9dd28fcb3e52bd95ed6194dce7b6c63d30c797e174dd176a8a4a9`. 캡처는 DOM·접근성·URL·네트워크 메타데이터이며 스크린샷이나 요청/응답 본문·헤더 값은 요청하지 않았다.
+- **로그인 브라우저 관찰:** 진학통의 클래스 선택 → 학생/성적 등록 → 상담시작 → 수시 전형별·정시 추천 메뉴 → 관심 대학 → 진단리포트·상담일지 이동을 확인했다. 학생부 교과등급과 수능학평 백분위는 별도 영역이다. 확인 경로는 `/NewMyInfo/ViewInfo.aspx`, `/SAT/Nesin/SRecom/SRecomSearch.aspx`, `/SAT/EApply/ERecomUniv.aspx`, `/NewMyInfo/EApplyList.aspx`, `/JindanReport/ViewJindanReport.aspx`, `/MyInfo/ConsultingInfo.aspx`다. 수시 검색 후 결과 전환은 확인되지 않았고 관심 대학 목록은 비어 있었다. 입력·불러오기·저장·출력은 실행하지 않았다. 이 관찰은 Aside 브라우저 경로이며 REA에 로그인 세션을 연결한 결과로 표시하지 않는다.
+- **공식 공개 화면 관찰:** 어디가 [전형검색](https://www.adiga.kr/ucp/prc/uni/admssUnivView.do?menuId=PCPRCINF2000)에서 일반 Chrome으로 2027 모집학년도와 2026 경쟁률·전년도 결과, 적용필터·초기화·조건 저장·분석/비교 열을 확인했다. [대학검색](https://www.adiga.kr/ucp/uvt/uni/univView.do?menuId=PCUVTINF2000)의 `0/3` 비교 트레이는 공식 HTML 구조에서 확인했다.
+- **코드에서 추정:** REA로 관찰한 진학통 공개 HTML의 메뉴 이동 함수는 클래스·학생 수 조건을 확인한 뒤 상담 경로로 이동한다. 공개 페이지의 조건값으로 로그인 계정의 실제 권한이나 추천 계산을 추정하지 않는다.
+- **미확인:** 어디가 REA 직접 접근은 Windows와 Linux 모두 HTTP 404였다(대표 Evidence `ev_1a494e0ca49f475aa7b33344426e76c5e1cd053a89030451384db452add8b4e2`). 일반 Chrome과 응답이 다른 원인, 비교 선택 제한·유지·필터 결합의 실제 동작, 두 사이트의 내부 추천 계산은 확인하지 않았다. 원본 DB·성적·예측 결과를 수집하지 않았다.
+
+| 기존 기능과 차이 | 이번 적용 | 수용 기준 |
+|---|---|---|
+| 수시는 후보 목록만 제공 | 최대 3개를 항목별로 비교 | 같은 학생·모집학년도에서 모집인원·자격·평가·최저·입결 지표·출처·확인일·미확인을 표시. 선택/제외 사유를 함께 보고 4번째 선택은 거절 |
+| 정시 비교가 화면 재진입 때 초기화 | 학생·학년도·시험별 비교 선택 유지 | 다른 시험/학생의 선택과 섞이지 않고 해당 범위만 초기화. 최대 6개 및 기존 계산 재사용 |
+| 비교와 근거 노트 사이 이동 단절 | 후보에서 기존 노트 편집 후 복귀 | 새 노트 중복 생성 방지, 후보 검토 사유 초안 유지, 저장한 근거만 후보·지원안에 반영 |
+| 검색에서 대표값을 70%컷으로 재저장 | 원본 입결 행을 복사 | 50%·70%·백분위·0·원래 학년도·출처·URL·등급 체계와 추가 필드를 보존. 기존 동일 기록은 덮어쓰지 않음 |
+| 문자열 인라인 이벤트·검색 초안 유실 | 목록 인덱스 이벤트·입력 상태 유지 | 따옴표가 있는 대학/학과/학교도 작동하고 필터 변경 후 검색어가 유지됨 |
+
+비교 선택과 검토 사유 초안은 이 창의 메모리에만 유지한다. 새로고침하면 초기화되며, 최종 지원안과 사유는 기존 저장 버튼으로 확정한다. 원장이 고른 조건과 공식 근거를 보여 주는 상담용 참고 기능이며 새 합격 판정은 만들지 않는다. 이미 저장된 잘못된 과거 입결은 자동으로 고쳐 쓰지 않는다.
+
+신규 검색 회귀는 `node --test workbench/src/search.test.mjs`로 실행한다. 비교·근거 노트 회귀는 기존 `susi.test.mjs`, `jeongsi-ui.test.mjs`, `adiga.test.mjs`에 포함된다. 전체 검증과 로컬 빌드 결과는 `../HANDOFF.md`의 2026-10-16 후속 기록을 따른다.
+
 | 파일 | 역할 |
 |---|---|
 | `app.html` | **앱 원본 (공개, 개인정보 0).** 기능 수정은 전부 이 파일에서 (단일 HTML, 의존성 없음) |
@@ -136,7 +160,7 @@ DB 항목만 추가된다(로컬 입력 보호). 이미 쓰던 기기를 백업 
 정시 기능 단계에서는 합성 자동 검증 **61개(7파일)**, 통합 보고서 구현 단계에서는 **92개(10파일)**를 통과했다. 전체 상담 흐름 재점검은 **109개(11파일)**, 기기 기억 개선 후에는 **117개(12파일)**를 통과했다. 실행 명령은 다음과 같다.
 
 ```bash
-node --test workbench/src/achievement.test.mjs workbench/src/adiga.test.mjs workbench/src/susi.test.mjs workbench/src/check-names.test.mjs workbench/src/jeongsi-core.test.mjs workbench/src/jeongsi-store.test.mjs workbench/src/jeongsi-ui.test.mjs workbench/src/report-core.test.mjs workbench/src/report-store.test.mjs workbench/src/report-ui.test.mjs workbench/src/persistence.test.mjs workbench/src/remember.test.mjs
+node --test workbench/src/achievement.test.mjs workbench/src/adiga.test.mjs workbench/src/susi.test.mjs workbench/src/check-names.test.mjs workbench/src/jeongsi-core.test.mjs workbench/src/jeongsi-store.test.mjs workbench/src/jeongsi-ui.test.mjs workbench/src/report-core.test.mjs workbench/src/report-store.test.mjs workbench/src/report-ui.test.mjs workbench/src/persistence.test.mjs workbench/src/remember.test.mjs workbench/src/search.test.mjs
 ```
 
 합성 브라우저의 정시 주요 흐름도 통과했고 추가 모집군·빈 선택·손상 기록 확인도 통과했다. 실제 학생 데이터와 스크린샷은 사용하지 않았다.

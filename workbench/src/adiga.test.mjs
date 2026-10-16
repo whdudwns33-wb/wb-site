@@ -11,13 +11,15 @@ function section(start,end){
   return html.slice(a,b);
 }
 const source=[html.match(/^const esc=.*$/m)[0],html.match(/^function uniNorm.*$/m)[0],
+  section("function susiNote(index){","function susiSave(index){"),
   section("const ADIGA_FIELDS=","/* ═══════════ 프롬프트 조립기"),
   section("function copyAdmStrategy(){","function renderLab(){")].join("\n");
 function fixture(notes=[],student={}){
   const elements=new Map(),ctx={URL,db:{adiga:notes,students:[]},view:{},saved:0,copied:"",
     today:()=>"2026-10-15",stu:()=>student,stuContext:()=>"합성 학생 정보",
     susiSummaryText:()=>"내신: 9등급제 2.3 / 근거: 합성 성적표 / 지원안 상태: 준비",
-    toast:()=>{},save:()=>ctx.saved++,copy:text=>ctx.copied=text,
+    toast:()=>{},save:()=>ctx.saved++,copy:text=>ctx.copied=text,go:p=>ctx.view.page=p,
+    susiStudent:()=>ctx.db.students.find(s=>s.id===ctx.view.ipsiStu),
     $:selector=>{if(!elements.has(selector))elements.set(selector,{innerHTML:"",textContent:"",attributes:{},
       setAttribute(k,v){this.attributes[k]=v;},removeAttribute(k){delete this.attributes[k];},focus(){this.focused=true;}});
       return elements.get(selector);}};
@@ -104,6 +106,41 @@ test("render keeps explicit field labels, unknown metadata and safe links",()=>{
   assert.ok(rendered.includes('label for="ad_admissionYear"'));assert.ok(rendered.includes('role="alert"'));
   assert.ok(rendered.includes("출처 미확인"));assert.ok(rendered.includes("&lt;img src=x&gt;"));
   assert.ok(!rendered.includes('href="javascript:'));assert.ok(!rendered.includes("copyAdigaCollect"));
+});
+test("candidate evidence edits its matched note and returns to the same student and year without changing records",()=>{
+  const old=note({unknown:{keep:true}}),c=fixture([old]);
+  const s={id:"synthetic-a",consult:{susi:{admissionYear:"2027"}},apply:[{status:"확정"}]};
+  c.db.students=[s,{id:"synthetic-b",consult:{susi:{admissionYear:"2028"}}}];
+  c.view.ipsiStu=s.id;c.view.susiPage=2;c.view.susiShown=[{g:target,note:old}];
+  const before=JSON.stringify(c.db.students);c.susiNote(0);c.renderAdiga();
+  assert.equal(c.view.page,"adiga");assert.equal(c.view.adigaEdit.note,old);
+  assert.match(c.$("#main").innerHTML,/수시 후보로 돌아가기/);
+  c.view.adigaDraft.content="근거 재확인";c.addAdiga();
+  assert.equal(c.db.adiga.length,1);assert.equal(c.db.adiga[0].unknown.keep,true);
+  c.view.ipsiStu="synthetic-b";c.returnAdigaCandidate();
+  assert.equal(c.view.ipsiStu,s.id);assert.equal(c.view.page,"ipsi");assert.equal(c.view.susiPage,2);
+  assert.equal(JSON.stringify(c.db.students),before);assert.equal(c.saved,1);
+});
+test("evidence return preserves an unsaved note and refuses a changed admission-year context",()=>{
+  const c=fixture(),s={id:"synthetic-a",consult:{susi:{admissionYear:"2027"}}};
+  c.db.students=[s];c.view.ipsiStu=s.id;c.view.susiShown=[{g:target,note:null}];c.susiNote(0);
+  c.view.adigaDraft.content="작성 중";c.returnAdigaCandidate();
+  assert.equal(c.view.adigaDraft.content,"작성 중");assert.equal(c.saved,0);
+  c.susiNote(0);assert.equal(c.view.adigaDraft.content,"작성 중");
+  c.view.page="adiga";s.consult.susi.admissionYear="2028";c.returnAdigaCandidate();
+  assert.equal(c.view.page,"adiga");assert.equal(c.view.adigaReturn,undefined);assert.equal(c.saved,0);
+});
+test("candidate note editing resolves current records after storage rollback replaced object references",()=>{
+  const old=note(),c=fixture([old]),s={id:"synthetic-a",consult:{susi:{admissionYear:"2027"}}};
+  c.db.students=[s];c.view.ipsiStu=s.id;c.view.susiShown=[{g:target,note:old}];
+  c.db.adiga=JSON.parse(JSON.stringify(c.db.adiga));c.susiNote(0);
+  assert.equal(c.view.adigaEdit.note,c.db.adiga[0]);
+  c.view.adigaDraft.content="저장 실패 후 작성 중";c.returnAdigaCandidate();
+  c.db.adiga=JSON.parse(JSON.stringify(c.db.adiga));c.susiNote(0);
+  assert.equal(c.view.adigaEdit.note,c.db.adiga[0]);
+  assert.equal(c.view.adigaDraft.content,"저장 실패 후 작성 중");
+  c.addAdiga();assert.equal(c.saved,1);assert.equal(c.db.adiga.length,1);
+  assert.equal(c.db.adiga[0].content,"저장 실패 후 작성 중");
 });
 test("strategy includes current-year support-card notes and excludes cross-year and cross-major notes",()=>{
   const student={name:"합성 학생",grade:"고3",consult:{susi:{admissionYear:"2027"}},

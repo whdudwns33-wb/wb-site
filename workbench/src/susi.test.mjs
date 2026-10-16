@@ -163,6 +163,48 @@ test("susi drafts survive rerender and student changes without changing saved co
   assert.equal(s.consult.susi.gradeAverage,"4.5");
 });
 
+test("three-candidate comparison and unsaved reasons survive rerenders and isolate student and year", () => {
+  const c=setup(),s=c.stu();s.consult.susi=config();
+  c.rows=Array.from({length:4},(_,i)=>({...candidate({major:"합성학과 "+i}),year:"2026",cut70:"3.2",gradeScale:"9"}));
+  c.db.students.push({id:"two",name:"SYNTHETIC_OTHER",apply:[],consult:{susi:config()}});
+  c.render=()=>c.renderSusi();c.render();
+  const before=JSON.stringify(c.db),key=c.susiKey(c.view.susiShown[0].g,"2027");
+  const input=c.$("#main").innerHTML.match(/<input id="susi_reason_0"[^>]+>/)[0];
+  const handler=input.match(/oninput="([^"]+)"/)[1];
+  vm.runInContext('(function(){'+handler+'}).call({value:"미저장 사유 <합성>"})',c);
+  for(let i=0;i<4;i++)c.susiToggleCompare(i,true);
+  assert.equal(c.susiCompareKeys(s,"2027").length,3);assert.match(c.message,/최대 3개/);
+  assert.match(c.$("#main").innerHTML,/id="susi_reason_0"[^>]*value="미저장 사유 &lt;합성&gt;"/);
+  assert.match(c.$("#main").innerHTML,/입력 중 \(미저장\): 미저장 사유 &lt;합성&gt;/);
+  c.susiToggleCompare(0,true);assert.equal(c.susiCompareKeys(s,"2027").length,3);
+  c.view.ipsiStu="two";c.render();assert.equal(c.susiCompareKeys(c.db.students[1],"2027").length,0);
+  assert.equal(c.susiReason(c.view.susiShown[0],c.db.students[1]),"");c.susiToggleCompare(3,true);
+  c.view.ipsiStu="one";s.consult.susi=config({admissionYear:"2028"});c.render();
+  assert.equal(c.susiCompareKeys(s,"2028").length,0);c.susiToggleCompare(3,true);
+  s.consult.susi=config();c.render();assert.equal(c.susiReasonDrafts(s,"2027")[key],"미저장 사유 <합성>");
+  assert.equal(c.susiCompareKeys(s,"2027").length,3);assert.equal(JSON.stringify(c.db),before);assert.equal(c.saves,undefined);
+  c.susiClearCompare(1);assert.equal(c.susiCompareKeys(s,"2027").length,2);
+  c.susiClearCompare();assert.equal(c.susiCompareKeys(s,"2027").length,0);
+  assert.equal(c.susiCompareKeys(s,"2028").length,1);assert.equal(c.susiCompareKeys(c.db.students[1],"2027").length,1);
+  c.$("#susi_reason_0").value="사유 저장";c.susiReview(0,false);
+  assert.equal(s.consult.susiDecisions[key].reason,"사유 저장");assert.equal(Object.hasOwn(c.susiReasonDrafts(s,"2027"),key),false);
+  c.susiReasonSet(0,"");c.render();assert.equal(c.susiReason(c.view.susiShown[0],s),"");
+  assert.match(c.$("#main").innerHTML,/새로고침하면 초기화/);
+});
+
+test("comparison table retains exact provenance, unknowns, zero seats and safe links without new predictions", () => {
+  const c=setup(),s=c.stu(),p=config({gradeScale:"5"});s.consult.susi=p;
+  const g={...candidate({major:'합성 <img src=x> "학과"'}),records:[{year:"2026",cut70:"3.2",gradeScale:"9",source:"합성 DB",checked:"2026-10-15",url:"https://example.org/db"}]};
+  const note={...g,admissionYear:"2027",resultYear:"2025",seats:0,source:"합성 공식 원문",checked:"2026-10-15",url:"javascript:alert(1)",evaluation:"합성 평가",minimum:"원문 확인 필요"};
+  const assessed=c.susiAssess(g,p,[note],{excluded:true,reason:"합성 제외 사유"});
+  c.susiCompareKeys(s,p.admissionYear).push(c.susiKey(g,p.admissionYear));
+  const body=c.susiCompareHtml([assessed],s,p);
+  for(const text of ["DB 표기학년도: 2026","근거 노트 결과학년도: 2025","입결 체계: 9등급","5등급 입력 / 9등급 입결 — 직접 비교 안 함","지원자격 미확인","합성 제외 사유","합성 공식 원문","합성 DB","2026-10-15"])assert.ok(body.includes(text),text);
+  assert.match(body,/>모집인원<\/th><td[^>]*>0<\/td>/);
+  assert.ok(body.includes('href="https://example.org/db"'));assert.ok(!body.includes('href="javascript:'));assert.ok(!body.includes("<img"));
+  assert.match(body,/&lt;img/);assert.match(body,/원문 링크 미확인/);assert.equal(assessed.diff,null);
+});
+
 test("cards show both note and database provenance and track edits require rechecking", () => {
   const c = setup(), a = c.aplAddCandidate(c.stu(), candidate({ evidence: {
     dbYear: "2025", metric: "70%컷", cut: 3.2, source: "합성 입결 출처", checked: "2026-10-01",
