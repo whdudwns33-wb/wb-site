@@ -234,7 +234,7 @@ async function listOrderFulfillments(env, app, auth, document) {
     env.DB.prepare('SELECT id,data FROM staff WHERE app=?').bind(app).all(),
     env.DB.prepare('SELECT * FROM book_order_student_snapshots WHERE app=? ORDER BY task_id,item_index,student_id').bind(app).all(),
     env.DB.prepare('SELECT task_id,item_index,book_id,cancelled_at FROM book_order_item_cancellations WHERE app=?').bind(app).all(),
-    env.DB.prepare('SELECT task_id,item_index,book_id,student_id,reason,cancelled_at FROM book_order_received_student_cancellations WHERE app=? ORDER BY cancelled_at DESC').bind(app).all()
+    env.DB.prepare('SELECT task_id,item_index,book_id,student_id,reason,cancelled_at,cancelled_by FROM book_order_received_student_cancellations WHERE app=? ORDER BY cancelled_at DESC').bind(app).all()
   ]);
   const sendsById = new Map((sendsResult.results || []).map(row => [String(row.send_id), row]));
   const mappedSendIds = new Set((mappingsResult.results || []).map(row => String(row.send_id || '')));
@@ -317,6 +317,7 @@ async function listOrderFulfillments(env, app, auth, document) {
           school: student ? String(student.school || '') : '',
           grade: student ? String(student.grade || '') : '',
           reason: String(cancellationRow.reason || ''),
+          cancelledByName: staffNames.get(String(cancellationRow.cancelled_by || '')) || '관리자',
           cancelledAt: Number(cancellationRow.cancelled_at) || null
         };
       });
@@ -331,6 +332,13 @@ async function listOrderFulfillments(env, app, auth, document) {
   return rows.map(row => withAcademyState(row, academyByItem.get(row.taskId + '|' + row.itemIndex)));
 }
 
+async function cancelOrderedOrderStudents(env, app, body, auth, json, origin) {
+  const lock = await acquireBookOrderDispatchLock(env, app, 'cancel', Date.now());
+  if (!lock) return json({ok:false, error:'주문 발송 확인 중입니다. 잠시 후 취소해 주세요'},409,origin);
+  try { return await cancelReceivedOrderStudents(env, app, body, auth, json, origin); }
+  finally { await releaseBookOrderDispatchLockSafely(env, app, lock); }
+}
+
 async function cancelReceivedOrderStudents(env, app, body, auth, json, origin) {
   const taskId = String(body.taskId || '');
   const itemIndex = Number(body.itemIndex);
@@ -340,7 +348,7 @@ async function cancelReceivedOrderStudents(env, app, body, auth, json, origin) {
     ? Array.from(new Set(body.studentIds.map(value => String(value || '')).filter(id => SAFE_ID.test(id)))).sort()
     : [];
   if (!SAFE_ID.test(taskId) || !Number.isInteger(itemIndex) || itemIndex < 0 || itemIndex > 49 ||
-      !Number.isInteger(revision) || revision < 1 || !requestedStudentIds.length || requestedStudentIds.length > 200 ||
+      !Number.isInteger(revision) || revision < 0 || !requestedStudentIds.length || requestedStudentIds.length > 200 ||
       requestedStudentIds.length !== (Array.isArray(body.studentIds) ? body.studentIds.length : 0) || reason === null) {
     return json({ ok: false, error: '취소할 주문 학생과 사유를 확인해 주세요' }, 400, origin);
   }
@@ -355,7 +363,11 @@ async function cancelReceivedOrderStudents(env, app, body, auth, json, origin) {
   if (auth.scope === 'own' && String(taskRow.owner || '') !== auth.id) {
     return json({ ok: false, error: '본인이 주문한 교재만 취소할 수 있습니다' }, 403, origin);
   }
-  if (!IMMEDIATE_RECEIPT_DELIVERIES.has(String(task.orderDelivery || ''))) {
+  const orderedCancellation = body.action === 'order_cancel_ordered_students';
+  if (orderedCancellation && body.vendorConfirmed !== true) {
+    return json({ ok: false, error: '총판과 취소 확인을 마쳤는지 확인해 주세요' }, 400, origin);
+  }
+  if (!orderedCancellation && !IMMEDIATE_RECEIPT_DELIVERIES.has(String(task.orderDelivery || ''))) {
     return json({ ok: false, code: 'ORDER_CANCEL_NOT_DIRECT',
       error: '바로 3단계로 등록되는 내부·제본교재만 이 취소 기능을 사용할 수 있습니다' }, 409, origin);
   }
@@ -376,11 +388,13 @@ async function cancelReceivedOrderStudents(env, app, body, auth, json, origin) {
   if (!fulfillmentMatches(fulfillment, bookId, originalStudentIds)) {
     return json({ ok: false, code: 'ORDER_IDENTITY_MISMATCH', error: '주문 항목의 학생 또는 교재 정체성이 기존 이력과 다릅니다' }, 409, origin);
   }
-  if (!fulfillment || String(fulfillment.status) !== 'teacher_received') {
+  const send = orderedCancellation ? await latestOrderSend(env, app, taskId) : null;
+  if (orderedCancellation ? (!!fulfillment || !isBookOrderCompletedSend(send)) :
+      (!fulfillment || String(fulfillment.status) !== 'teacher_received')) {
     return json({ ok: false, code: 'ORDER_CANCEL_NOT_RECEIVED',
       error: '학생 배부 전인 3단계 교재만 주문취소할 수 있습니다' }, 409, origin);
   }
-  if (Number(fulfillment.revision) !== revision) {
+  if (Number(fulfillment && fulfillment.revision || 0) !== revision) {
     return json({ ok: false, code: 'REVISION_CONFLICT', error: '주문 상태가 먼저 변경되었습니다' }, 409, origin);
   }
 
@@ -397,8 +411,10 @@ async function cancelReceivedOrderStudents(env, app, body, auth, json, origin) {
   const actor = actorId(auth);
   const statements = pendingIds.map(studentId => env.DB.prepare(
     'INSERT INTO book_order_received_student_cancellations(' +
-      'app,task_id,item_index,book_id,student_id,reason,cancelled_at,cancelled_by) VALUES(?,?,?,?,?,?,?,?)'
-  ).bind(app, taskId, itemIndex, bookId, studentId, reason, now, actor));
+      'app,task_id,item_index,book_id,student_id,reason,cancelled_at,cancelled_by) SELECT ?,?,?,?,?,?,?,? ' +
+      'WHERE EXISTS (SELECT 1 FROM tasks WHERE app=? AND id=? AND data=?)'
+  ).bind(app, taskId, itemIndex, bookId, studentId,
+    orderedCancellation ? '[총판 취소 확인 완료] ' + reason.slice(0, 280) : reason, now, actor, app, taskId, taskRow.data));
   try {
     if (typeof env.DB.batch !== 'function') {
       for (const statement of statements) await statement.run();
@@ -425,6 +441,9 @@ async function cancelReceivedOrderStudents(env, app, body, auth, json, origin) {
     'WHERE app=? AND task_id=? AND item_index=? ORDER BY cancelled_at DESC'
   ).bind(app, taskId, itemIndex).all();
   const finalIds = new Set((finalResult.results || []).map(row => String(row.student_id)));
+  if (!requestedStudentIds.every(id => finalIds.has(id))) {
+    return json({ ok: false, code: 'REVISION_CONFLICT', error: '주문 내용이 변경되었습니다. 새로 확인해 주세요' }, 409, origin);
+  }
   return json({
     ok: true,
     idempotent: false,
@@ -1162,6 +1181,7 @@ export async function handleBookIssue(env, app, body, origin, auth, json, ctx) {
   if (action === 'order_price_set') return setLegacyOrderPrice(env, app, body, auth, json, origin);
   if (action === 'manual_online_result') return setManualOnlineResult(env, app, body, auth, json, origin);
   if (action === 'order_cancel_received_students') return cancelReceivedOrderStudents(env, app, body, auth, json, origin);
+  if (action === 'order_cancel_ordered_students') return cancelOrderedOrderStudents(env, app, body, auth, json, origin);
   if (action === 'order_transition') return transitionOrderFulfillment(env, app, body, auth, json, origin, ctx);
   return json({ ok: false, error: '지원하는 교재 처리 action을 확인해 주세요' }, 400, origin);
 }
