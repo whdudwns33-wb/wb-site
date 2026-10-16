@@ -227,6 +227,7 @@ test('관리자는 학생 정보 아래에서 stable studentId의 기존 수업�
   const staff = { 'teacher-a': { name: '김남기' }, 'teacher-b': { name: '김혜지' } };
   const helpers = new Function('state', 'isLesson', 'isRegularLessonTask', 'staffById', 'lessonAssignmentScheduleText', 'lessonHoursValue', 'canEditLessonTask', 'esc',
     'weekendFlexibleSettingsSummary', 'taskHasWeekendSchedule', 'isFlexibleWeekendLesson', 'session',
+    'const today = () => "2026-10-16";\n' + block('function lessonCurrentScheduleText(', 'async function submitLessonAssignmentRequest(') +
     `${code}\nreturn { rosterStudentLessonTasks, rosterStudentLessonsHtml };`)(
       { tasks }, task => !!task.lessonFormVersion, task => !!task.lessonFormVersion && !task.deleted && task.lessonInstanceType !== 'makeup' && !task.makeupCaseId, id => staff[id] || null,
       (slots, fallback) => (slots || []).map(slot => slot.days.join('·') + ' ' + slot.startTime + '-' + slot.endTime + ' · ' + (slot.lessonHours || fallback || '')).join(' / '),
