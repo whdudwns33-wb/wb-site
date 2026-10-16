@@ -601,6 +601,46 @@ test('internal orders continue through handoff and admin academy registration', 
     '내부 교재는 외부 교재 자동 DB 후보에 섞지 않는다');
 });
 
+test('stage-2 cancellation requires vendor confirmation, preserves sends, releases reorder and flags academy correction', async () => {
+  const db = new TestD1(); seed(db);
+  const body = createBody('ord_stage2_cancel');
+  const created = await call(db, body);
+  assert.equal(created.status,201);
+  const now=Date.now();
+  db.prepare('INSERT INTO book_order_sends(app,send_id,idempotency_key,task_id,vendor_name,item_count,message_hash,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)')
+    .bind('task','stage2-send','stage2-key',body.taskId,'문자출판사',1,'a'.repeat(64),'accepted',now,now).run();
+  const request={auth:person,action:'order_cancel_ordered_students',taskId:body.taskId,itemIndex:0,revision:0,studentIds:['student-a'],reason:'해당 총판 미취급'};
+  assert.equal((await call(db,request,'/book-issue')).status,400);
+  const registered=await call(db,{auth:admin,action:'academy_transition',taskId:body.taskId,itemIndex:0,next:'register',revision:0,academyRevision:0},'/book-issue');
+  assert.equal(registered.status,200,JSON.stringify(registered.body));
+  const cancelled=await call(db,{...request,vendorConfirmed:true},'/book-issue');
+  assert.equal(cancelled.status,200,JSON.stringify(cancelled.body));
+  assert.equal((await call(db,{...request,vendorConfirmed:true},'/book-issue')).body.idempotent,true);
+  const row=(await call(db,{auth:admin,action:'list'},'/book-issue')).body.orders.find(r=>r.taskId===body.taskId);
+  assert.equal(row.stage,'cancelled');
+  assert.equal(row.academyCorrectionNeeded,true);
+  assert.match(row.cancelledStudents[0].reason,/총판 취소 확인 완료/);
+  assert.equal(db.database.prepare("SELECT count(*) n FROM book_order_sends WHERE task_id=?").get(body.taskId).n,1);
+  assert.equal(JSON.parse(db.database.prepare('SELECT data FROM tasks WHERE id=?').get(body.taskId).data).deleted,false);
+  assert.equal((await call(db,createBody('ord_stage2_reorder'))).status,201);
+});
+
+test('stage-2 cancellation rejects another owner, pending send, or received order; migration is idempotent', async () => {
+  const db = new TestD1(); seed(db);
+  const sql=fs.readFileSync(new URL('./migrations/083_book_order_stage2_cancellation.sql',import.meta.url),'utf8');
+  db.database.exec(sql); db.database.exec(sql);
+  const body=createBody('ord_stage2_guard'); await call(db,body);
+  const request={auth:person,action:'order_cancel_ordered_students',taskId:body.taskId,itemIndex:0,revision:0,studentIds:['student-a'],reason:'미취급',vendorConfirmed:true};
+  assert.equal((await call(db,request,'/book-issue')).status,409);
+  const at=Date.now();
+  db.prepare('INSERT INTO book_order_sends(app,send_id,idempotency_key,task_id,vendor_name,item_count,message_hash,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,?)')
+    .bind('task','guard-send','guard-key',body.taskId,'문자출판사',1,'a'.repeat(64),'accepted',at,at).run();
+  const receive=await call(db,{auth:person,action:'order_transition',taskId:body.taskId,itemIndex:0,next:'receive',revision:0},'/book-issue');
+  assert.equal(receive.status,200);
+  assert.equal((await call(db,request,'/book-issue')).status,409);
+  assert.equal(db.database.prepare('SELECT count(*) n FROM book_order_received_student_cancellations').get().n,0);
+});
+
 test('direct stage-3 orders cancel selected students, preserve history, and block cancellation after handoff', async () => {
   const db = new TestD1(); seed(db);
   const grouped = boundBody('ord_bound_cancel01');

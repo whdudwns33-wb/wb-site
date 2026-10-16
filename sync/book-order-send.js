@@ -505,6 +505,9 @@ async function retryRejectedBookOrdersLocked(env, app, origin, json, now, lock) 
       error: '발송 전 예약 상태의 주문 원장을 먼저 확인해 주세요' }, 409, origin);
   }
   const retryDate = kstDate(now).replace(/-/g, '');
+  // 취소 확인 이후 원 주문을 재발송하지 않는다. 새 주문처 재주문은 새 주문 ID다.
+  const cancelledResult = await env.DB.prepare('SELECT DISTINCT task_id FROM book_order_received_student_cancellations WHERE app=?').bind(app).all();
+  const cancelledTasks = new Set((cancelledResult.results || []).map(row => String(row.task_id)));
   const retryPrefix = 'retry_' + retryDate + '_';
 
   const alreadyRetried = await env.DB.prepare(
@@ -549,6 +552,7 @@ async function retryRejectedBookOrdersLocked(env, app, origin, json, now, lock) 
   let identityFailures = 0;
   const cutoff = now;
   for (const row of selected.results || []) {
+    if (cancelledTasks.has(String(row.id))) continue;
     let task;
     try { task = JSON.parse(row.data || '{}'); } catch (error) { continue; }
     if (task.deleted || task.orderDelivery !== 'scheduled_batch_v1' || Number(task.createdAt) > cutoff) continue;
