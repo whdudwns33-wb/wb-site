@@ -700,6 +700,39 @@
       .map(x => str(x).toLowerCase()).join(' ');
     return hay.includes(t) || hay.includes(t.replace(/-/g, ''));
   }
+  function nextLeadFollowup(lead) {
+    if (!isObj(lead) || lead.status !== 'open' || !Array.isArray(lead.followups)) return null;
+    return nextFollowup({ followups: lead.followups.filter(f => isObj(f) && typeof f.due === 'string' && validYmd(f.due)) });
+  }
+  function queryLeads(leads, filters, today) {
+    const f = isObj(filters) ? filters : {};
+    const keys = ['q', 'status', 'channel', 'owner', 'pipeline', 'stage', 'followup', 'sort'];
+    if (keys.some(k => f[k] != null && typeof f[k] !== 'string' && typeof f[k] !== 'number')) return [];
+    const status = str(f.status).trim() || 'all';
+    const channel = str(f.channel).trim(), owner = str(f.owner).trim();
+    const pipeline = str(f.pipeline).trim(), stage = str(f.stage).trim();
+    const followup = str(f.followup).trim();
+    const sort = ['oldest', 'name', 'next'].includes(f.sort) ? f.sort : 'newest';
+    if (!['all', ...STATUSES].includes(status) || (channel && !CHANNELS.includes(channel)) ||
+      (pipeline && !PIPELINES.includes(pipeline)) || (stage && !Object.hasOwn(STAGE_LABEL, stage)) ||
+      !['', 'today', 'overdue'].includes(followup) || (followup && (typeof today !== 'string' || !validYmd(today)))) return [];
+    const rows = (Array.isArray(leads) ? leads : []).filter(isObj).filter(l =>
+      leadMatches(l, f.q) && (status === 'all' || (status === 'open' ? l.status === 'open' || l.status === 'hold' : l.status === status)) &&
+      (!channel || l.channel === channel) && (!owner || str(l.owner) === owner) &&
+      (!pipeline || l.pipeline === pipeline) && (!stage || l.stage === stage)
+    ).map(l => ({ lead: l, next: nextLeadFollowup(l) })).filter(row => !followup ||
+      (row.next && (followup === 'today' ? row.next.due === today : row.next.due < today)));
+    const newest = (a, b) => str(b.createdAt).localeCompare(str(a.createdAt));
+    const byName = (a, b) => str(a.name).localeCompare(str(b.name), 'ko');
+    rows.sort((a, b) => {
+      let order = 0;
+      if (sort === 'oldest') order = -newest(a.lead, b.lead);
+      else if (sort === 'name') order = byName(a.lead, b.lead);
+      else if (sort === 'next') order = a.next && b.next ? a.next.due.localeCompare(b.next.due) : a.next ? -1 : b.next ? 1 : 0;
+      return order || newest(a.lead, b.lead) || byName(a.lead, b.lead) || str(a.lead.id).localeCompare(str(b.lead.id));
+    });
+    return rows.map(row => row.lead);
+  }
   function leadLabel(lead) {
     const l = isObj(lead) ? lead : {};
     const child = isObj(l.child) ? clean(l.child.name, MAX_NAME) : '';
@@ -840,7 +873,7 @@
     stagesOf: stagesOf, isClosed: isClosed, statusOf: statusOf, daysInStage: daysInStage,
     validateLead: validateLead, validateActivity: validateActivity, validateCredit: validateCredit, creditBalance: creditBalance, creditEligibility: creditEligibility,
     autoMapPipeline: autoMapPipeline, localStageFor: localStageFor, syncTrack: syncTrack,
-    todayBoard: todayBoard, kpi: kpi, lastActivityAt: lastActivityAt, leadMatches: leadMatches, leadLabel: leadLabel,
+    todayBoard: todayBoard, kpi: kpi, lastActivityAt: lastActivityAt, leadMatches: leadMatches, nextLeadFollowup: nextLeadFollowup, queryLeads: queryLeads, leadLabel: leadLabel,
     docKey: docKey, emptyState: emptyState, mergeDocs: mergeDocs, revertDoc: revertDoc, createOutbox: createOutbox,
     routeOf: routeOf, inviteLink: inviteLink, hubspotRecordUrl: hubspotRecordUrl
   };
