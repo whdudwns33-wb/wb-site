@@ -420,12 +420,12 @@ function leadRow(l, extraHtml, actsHtml) {
   const dis = C.daysInStage(l, today());
   return '<div class="lead" data-act="open-lead" data-id="' + esc(l.id) + '"><div class="avatar' + (l.hot && l.status === 'open' ? ' hot' : l.status === 'won' ? ' ok' : '') + '">' + esc(initial(l.name)) + '</div><div class="grow"><div class="lead-name">' + esc(C.leadLabel(l)) +
     (l.hot && l.status === 'open' ? '<span class="pill hot">HOT</span>' : '') + statusPill(l) + '</div>' +
-    '<div class="lead-sub"><span class="tag">' + esc(l.channel || '기타') + (l.partnerId && partnerById(l.partnerId) ? ' · ' + esc(partnerById(l.partnerId).name) : '') + '</span><span>' + esc(C.PIPELINE_LABEL[l.pipeline] || '') + ' · ' + esc(C.STAGE_LABEL[l.stage] || l.stage) + (dis !== null ? ' ' + dis + '일' : '') + '</span>' +
+    '<div class="lead-sub"><span class="tag">' + esc(l.channel || '기타') + (l.partnerId && partnerById(l.partnerId) ? ' · ' + esc(partnerById(l.partnerId).name) : '') + '</span><span>' + esc(C.PIPELINE_LABEL[l.pipeline] || '') + ' · ' + esc(C.stageLabel(l.pipeline, l.stage)) + (dis !== null ? ' ' + dis + '일' : '') + '</span>' +
     (l.owner ? '<span>· ' + esc(staffName(l.owner)) + '</span>' : '') + (extraHtml || '') + '</div></div>' + (actsHtml ? '<div class="acts">' + actsHtml + '</div>' : '') + '</div>';
 }
 function statusPill(l) {
   if (l.status === 'won') return '<span class="pill ok">등록</span>';
-  if (l.status === 'lost') return '<span class="pill bad">이탈' + (l.outcome && l.outcome.reason ? ' ' + esc(l.outcome.reason) : '') + '</span>';
+  if (l.status === 'lost') return '<span class="pill bad">' + (l.pipeline === 'academy' && l.stage === 'lost' ? '미등록' : '이탈') + (l.outcome && l.outcome.reason ? ' ' + esc(l.outcome.reason) : '') + '</span>';
   if (l.status === 'hold') return '<span class="pill warn">보류</span>';
   return '';
 }
@@ -446,6 +446,7 @@ function viewToday() {
   if (b.decide.length) {
     h += '<div class="card"><div class="card-title">최종판정 대기 <span class="badge">' + b.decide.length + '</span></div><div class="card-sub mb8">상담 뒤 14일이 지났는데 아직 결정이 없습니다 — 등록 · 장기보류 · 이탈(사유) 중 하나로.</div>';
     h += b.decide.map(x => leadRow(x.lead, '<span class="tag warn">D+' + x.days + '</span>',
+      x.lead.pipeline === 'academy' && C.isLegacyAcademyStage(x.lead.stage) ? '<button class="btn btn-sm btn-ghost" data-act="open-lead" data-id="' + esc(x.lead.id) + '">영업 단계 확인</button>' :
       '<button class="btn btn-sm btn-good" data-act="outcome" data-id="' + esc(x.lead.id) + '" data-kind="won">등록</button><button class="btn btn-sm btn-warn" data-act="outcome" data-id="' + esc(x.lead.id) + '" data-kind="hold">보류</button><button class="btn btn-sm btn-danger" data-act="outcome" data-id="' + esc(x.lead.id) + '" data-kind="lost">이탈</button>')).join('');
     h += '</div>';
   }
@@ -483,7 +484,7 @@ function viewPipeline() {
   h += '<div class="board wide">' + C.stagesOf(p).map(s => {
     const closed = C.isClosed(s);
     const cards = leads.filter(l => l.stage === s).sort((a, b) => (b.hot ? 1 : 0) - (a.hot ? 1 : 0) || String(a.stageAt).localeCompare(String(b.stageAt)));
-    return '<div class="col' + (closed ? ' closed' : '') + '"><div class="col-head"><span>' + esc(C.STAGE_LABEL[s]) + '</span><span class="badge soft">' + cards.length + '</span></div>' +
+    return '<div class="col' + (closed ? ' closed' : '') + '"><div class="col-head"><span>' + esc(C.stageLabel(p, s)) + '</span><span class="badge soft">' + cards.length + '</span></div>' +
       (closed && cards.length > 5 ? '<details><summary class="small muted">' + cards.length + '건 보기</summary>' : '') +
       cards.map(l => {
         const d = C.daysInStage(l, t);
@@ -493,6 +494,9 @@ function viewPipeline() {
           (l.hubspot && l.hubspot.contactId ? '<span class="dot ok" title="HubSpot 연결됨"></span>' : '') + '</div></div>';
       }).join('') + (closed && cards.length > 5 ? '</details>' : '') + '</div>';
   }).join('') + '</div>';
+  const legacy = p === 'academy' ? leads.filter(l => C.isLegacyAcademyStage(l.stage)) : [];
+  if (legacy.length) h += '<section class="card mt14"><h2 class="card-title">이전 학원 상태 — 영업 단계 확인 필요 <span class="badge soft">' + legacy.length + '</span></h2><p class="card-sub mb8">기존 등록 후 관리 상태와 기록은 보존했습니다. 고객별 영업 단계를 확인해 위 다섯 단계 중 하나로 옮겨 주세요.</p>' +
+    legacy.map(l => leadRow(l, '<span class="tag">등록 후 관리 · ' + esc(C.academyStatusOf(l)) + '</span>')).join('') + '</section>';
   return h;
 }
 
@@ -521,11 +525,12 @@ function viewLeads() {
   const pages = Math.max(1, Math.ceil(list.length / ui.listPageSize));
   ui.listPage = Math.min(pages, Math.max(1, ui.listPage));
   const start = (ui.listPage - 1) * ui.listPageSize, end = Math.min(start + ui.listPageSize, list.length);
-  const stages = ui.listPipeline ? C.stagesOf(ui.listPipeline) : Array.from(new Set(C.PIPELINES.flatMap(C.stagesOf)));
+  const stages = ui.listPipeline ? C.stagesOf(ui.listPipeline).slice() : Array.from(new Set(C.PIPELINES.flatMap(C.stagesOf)));
+  state.leads.filter(l => l.pipeline === 'academy' && C.isLegacyAcademyStage(l.stage) && (!ui.listPipeline || ui.listPipeline === 'academy')).forEach(l => { if (!stages.includes(l.stage)) stages.push(l.stage); });
   const active = [
-    ['q', '검색', q], ['status', '상태', ui.status === 'all' ? '' : ui.status === 'open' ? '진행·보류' : C.STATUS_LABEL[ui.status]],
+    ['q', '검색', q], ['status', '상태', ui.status === 'all' ? '' : ui.status === 'open' ? '진행·보류' : ui.status === 'lost' && ui.listPipeline === 'academy' ? '미등록·이탈' : C.STATUS_LABEL[ui.status]],
     ['channel', '유입 채널', ui.channel], ['owner', '담당자', ui.owner ? staffName(ui.owner) : ''],
-    ['pipeline', '파이프라인', C.PIPELINE_LABEL[ui.listPipeline]], ['stage', '단계', C.STAGE_LABEL[ui.listStage]],
+    ['pipeline', '파이프라인', C.PIPELINE_LABEL[ui.listPipeline]], ['stage', '단계', C.stageLabel(ui.listPipeline, ui.listStage)],
     ['followup', '팔로업', ui.listFollowup === 'today' ? '오늘' : ui.listFollowup === 'overdue' ? '지연' : '']
   ].filter(item => item[2]);
   let h = '<div class="between page-tools"><div><h1 class="page">고객 <small class="muted">' + list.length + '명</small></h1><p class="card-sub">상담 진행 상황과 다음 연락 일정을 확인하세요.</p></div><button class="btn btn-primary" data-act="new-lead">새 문의</button></div>';
@@ -534,9 +539,9 @@ function viewLeads() {
     '<div class="field"><label class="fl" for="f-channel">유입 채널</label><select class="in" id="f-channel"><option value="">채널 전체</option>' + opt(C.CHANNELS, ui.channel) + '</select></div>' +
     (session.canApprove ? '<div class="field"><label class="fl" for="f-owner">담당자</label><select class="in" id="f-owner"><option value="">담당 전체</option><option value="admin"' + (ui.owner === 'admin' ? ' selected' : '') + '>원장</option>' + liveStaff().map(s => '<option value="' + esc(s.id) + '"' + (ui.owner === String(s.id) ? ' selected' : '') + '>' + esc(s.name) + '</option>').join('') + '</select></div>' : '') +
     '<div class="field"><label class="fl" for="f-list-pipeline">파이프라인</label><select class="in" id="f-list-pipeline"><option value="">파이프라인 전체</option>' + opt(C.PIPELINES, ui.listPipeline, p => C.PIPELINE_LABEL[p]) + '</select></div>' +
-    '<div class="field"><label class="fl" for="f-list-stage">상담 단계</label><select class="in" id="f-list-stage"><option value="">단계 전체</option>' + opt(stages, ui.listStage, s => C.STAGE_LABEL[s]) + '</select></div>' +
+    '<div class="field"><label class="fl" for="f-list-stage">상담 단계</label><select class="in" id="f-list-stage"><option value="">단계 전체</option>' + opt(stages, ui.listStage, s => C.stageLabel(ui.listPipeline, s)) + '</select></div>' +
     '<div class="field"><label class="fl" for="f-list-followup">다음 팔로업</label><select class="in" id="f-list-followup"><option value="">일정 전체</option>' + opt(['today', 'overdue'], ui.listFollowup, s => s === 'today' ? '오늘' : '지연') + '</select></div></div>' +
-    '<div class="customer-status"><span class="fl">상태</span><div class="chips" role="group" aria-label="고객 상태">' + [['open', '진행·보류'], ['won', '등록'], ['lost', '이탈'], ['all', '전체']].map(([k, l]) => '<button class="chip' + (ui.status === k ? ' on' : '') + '" aria-pressed="' + (ui.status === k) + '" data-act="status-filter" data-s="' + k + '">' + l + '</button>').join('') + '</div></div>';
+    '<div class="customer-status"><span class="fl">상태</span><div class="chips" role="group" aria-label="고객 상태">' + [['open', '진행·보류'], ['won', '등록'], ['lost', ui.listPipeline === 'academy' ? '미등록·이탈' : '이탈'], ['all', '전체']].map(([k, l]) => '<button class="chip' + (ui.status === k ? ' on' : '') + '" aria-pressed="' + (ui.status === k) + '" data-act="status-filter" data-s="' + k + '">' + l + '</button>').join('') + '</div></div>';
   if (active.length) h += '<div class="customer-active-filters" role="group" aria-label="적용한 조건">' + active.map(([key, label, value]) => '<button class="customer-filter-chip" data-act="lead-filter-clear" data-filter="' + key + '" aria-label="' + esc(label + ': ' + value + ' 조건 해제') + '"><span>' + esc(label + ': ' + value) + '</span><span class="customer-filter-remove" aria-hidden="true">해제</span></button>').join('') + '<button class="btn btn-sm btn-ghost" data-act="lead-filters-reset">전체 초기화</button></div>';
   h += '</div><div class="customer-results"><p id="lead-list-count" tabindex="-1" role="status" aria-live="polite" aria-atomic="true">' + (list.length ? '전체 ' + list.length + '명 중 ' + (start + 1) + '–' + end + '명' : '조건에 맞는 고객 0명') + '</p><div class="row"><label class="small muted" for="f-list-sort">정렬</label><select class="in" id="f-list-sort">' + opt(['newest', 'oldest', 'name', 'next'], ui.listSort, s => ({ newest: '최신 등록순', oldest: '오래된 등록순', name: '이름순', next: '다음 팔로업순' }[s])) + '</select></div></div>';
   h += list.length ? '<div class="customer-table-scroll"><table class="customer-table"><caption class="sr-only">고객별 상담 단계와 다음 연락 일정</caption><thead><tr>' + ['고객 · 학생', '상담 단계', '유입 채널', '담당자', '최근 기록', '다음 연락'].map(label => '<th scope="col">' + label + '</th>').join('') + '</tr></thead><tbody>' + list.slice(start, end).map(l => {
@@ -545,7 +550,7 @@ function viewLeads() {
     const late = next ? C.daysBetween(next.due, today()) : 0;
     return '<tr><td class="customer-name"><a href="#/lead/' + esc(l.id) + '">' + esc(l.name) + '</a>' + (l.hot && l.status === 'open' ? ' <span class="pill hot">HOT</span>' : '') +
       '<div class="small muted">' + esc(l.child && l.child.name || '학생 미입력') + (l.child && l.child.grade ? ' · ' + esc(l.child.grade) : '') + '</div>' + (l.phone ? '<div class="small muted">' + esc(C.maskPhone(l.phone)) + '</div>' : '') + '</td>' +
-      '<td data-label="상담 단계"><span>' + esc(C.STAGE_LABEL[l.stage] || l.stage) + '</span> ' + statusPill(l) + '<div class="small muted">' + esc(C.PIPELINE_LABEL[l.pipeline]) + '</div></td>' +
+      '<td data-label="상담 단계"><span>' + esc(C.stageLabel(l.pipeline, l.stage)) + '</span> ' + statusPill(l) + '<div class="small muted">' + esc(C.PIPELINE_LABEL[l.pipeline]) + '</div></td>' +
       '<td data-label="유입 채널">' + esc(l.channel || '기타') + '</td><td data-label="담당자">' + esc(staffName(l.owner)) + '</td>' +
       '<td data-label="최근 기록">' + (recent ? esc(recent.at) + '<div class="small muted">' + esc(C.ACTIVITY_LABEL[recent.type] || recent.type) + '</div>' : '<span class="muted">기록 없음</span>') + '</td>' +
       '<td data-label="다음 연락">' + (next ? '<span class="' + (late > 0 ? 'overdue' : '') + '">' + esc(next.due) + '</span><div class="small ' + (late > 0 ? 'overdue' : 'muted') + '">' + (late > 0 ? late + '일 지남' : late === 0 ? '오늘 연락' : 'D+' + next.day + ' 팔로업') + '</div>' : '<span class="muted">' + (l.status === 'hold' ? '보류 중' : C.isClosed(l.stage) ? '종료' : '일정 없음') + '</span>') + '</td></tr>';
@@ -560,18 +565,22 @@ function viewLead(id) {
   if (!l) return '<div class="empty"><b>리드를 찾을 수 없습니다</b><button class="btn btn-ghost btn-sm" data-act="go" data-r="leads">명단으로</button></div>';
   const t = today();
   const acts = activitiesOf(id);
-  const stages = C.stagesOf(l.pipeline);
+  const stages = C.stagesOf(l.pipeline).slice();
+  const legacy = l.pipeline === 'academy' && C.isLegacyAcademyStage(l.stage);
+  if (legacy) stages.unshift(l.stage);
+  const academyStatus = C.academyStatusOf(l);
   const portal = hsSettings().portal || {};
   const hs = l.hubspot || {};
   const dis = C.daysInStage(l, t);
   let h = '<div class="row mb8"><button class="btn btn-sm btn-ghost" data-act="back">‹ 뒤로</button></div>';
   h += '<div class="lead-layout"><section class="card lead-profile" aria-label="고객 정보"><div class="between wraprow"><div><h1 class="page">' + esc(l.name) + ' <span class="muted small">' + esc(C.RELATION_HONORIFIC[l.relation] || '') + '</span></h1>' + (l.child && l.child.name ? '<p class="card-sub">' + esc(l.child.name) + (l.child.grade ? ' · ' + esc(l.child.grade) : '') + '</p>' : '') +
-    '<div class="row wraprow mt8">' + (l.hot && l.status === 'open' ? '<span class="pill hot">HOT</span>' : '') + '<span class="pill acc">' + esc(C.PIPELINE_LABEL[l.pipeline]) + '</span><span class="pill">' + esc(C.STAGE_LABEL[l.stage] || l.stage) + (dis !== null ? ' · ' + dis + '일' : '') + '</span>' + statusPill(l) + '<span class="tag">' + esc(l.channel) + (l.channelNote ? ' · ' + esc(l.channelNote) : '') + '</span></div></div>' +
+    '<div class="row wraprow mt8">' + (l.hot && l.status === 'open' ? '<span class="pill hot">HOT</span>' : '') + '<span class="pill acc">' + esc(C.PIPELINE_LABEL[l.pipeline]) + '</span><span class="pill">' + esc(C.stageLabel(l.pipeline, l.stage)) + (dis !== null ? ' · ' + dis + '일' : '') + '</span>' + statusPill(l) + '<span class="tag">' + esc(l.channel) + (l.channelNote ? ' · ' + esc(l.channelNote) : '') + '</span></div></div>' +
     '<div class="row wraprow"><button class="btn btn-sm btn-ghost" data-act="edit-lead" data-id="' + esc(id) + '">정보 수정</button></div></div>';
-  h += '<div class="row wraprow mt14"><label class="fl" style="margin:0" for="f-stage">단계</label><select class="in" id="f-stage" data-id="' + esc(id) + '" style="width:auto">' + stages.map(s => '<option value="' + s + '"' + (s === l.stage ? ' selected' : '') + '>' + esc(C.STAGE_LABEL[s]) + '</option>').join('') +
-    (l.pipeline === 'inspection' ? '<option value="__academy">→ 학원 등록 파이프라인으로(트라이얼)</option>' : '') + '</select>' +
-    (l.status === 'open' ? '<button class="btn btn-sm btn-warn" data-act="outcome" data-id="' + esc(id) + '" data-kind="hold">장기보류</button>' : '') +
-    (l.status === 'hold' ? '<button class="btn btn-sm btn-ghost" data-act="unhold" data-id="' + esc(id) + '">보류 해제</button>' : '') + '</div>';
+  h += '<div class="row wraprow mt14"><label class="fl" style="margin:0" for="f-stage">단계</label><select class="in" id="f-stage" data-id="' + esc(id) + '" style="width:auto">' + stages.map(s => '<option value="' + s + '"' + (s === l.stage ? ' selected' : '') + '>' + esc(C.stageLabel(l.pipeline, s)) + (legacy && s === l.stage ? ' (이전 상태 · 영업 단계 확인 필요)' : '') + '</option>').join('') +
+    (l.pipeline === 'inspection' ? '<option value="__academy">→ 학원 등록 파이프라인으로(레벨테스트·체험)</option>' : '') + '</select>' +
+    (!legacy && l.status === 'open' ? '<button class="btn btn-sm btn-warn" data-act="outcome" data-id="' + esc(id) + '" data-kind="hold">장기보류</button>' : '') +
+    (!legacy && l.status === 'hold' ? '<button class="btn btn-sm btn-ghost" data-act="unhold" data-id="' + esc(id) + '">보류 해제</button>' : '') + '</div>' +
+    (legacy ? '<div class="hint mt8">이전 학원 상태입니다. 영업 단계를 확인해 선택한 뒤 보류·해제를 처리해 주세요.</div>' : '');
   h += '<dl class="kv mt14">' +
     '<dt>전화</dt><dd>' + (l.phone ? (ui.phoneShown[id] ? '<a class="tel" href="tel:' + esc(l.phone.replace(/-/g, '')) + '">' + esc(l.phone) + '</a>' : '<button class="btn btn-sm btn-ghost" data-act="show-phone" data-id="' + esc(id) + '">' + esc(C.maskPhone(l.phone)) + ' 보기</button>') : '<span class="muted">—</span>') + '</dd>' +
     (l.email ? '<dt>이메일</dt><dd>' + esc(l.email) + '</dd>' : '') +
@@ -584,8 +593,8 @@ function viewLead(id) {
     (l.strength ? '<dt>강점</dt><dd>' + esc(l.strength) + '</dd>' : '') +
     (l.partnerId ? '<dt>파트너</dt><dd>' + esc(partnerById(l.partnerId) ? partnerById(l.partnerId).name : '(삭제됨)') + ' <span class="muted small">소개로 접수</span></dd>' : '') +
     (l.referrerLeadId ? '<dt>소개자</dt><dd>' + (leadById(l.referrerLeadId) ? '<a href="#/lead/' + esc(l.referrerLeadId) + '">' + esc(C.leadLabel(leadById(l.referrerLeadId))) + '</a>' : '<span class="muted">(삭제됨)</span>') + '</dd>' : '') +
-    (l.academyStatus ? '<dt>학원 상태</dt><dd>' + esc(l.academyStatus) + '</dd>' : '') +
-    (l.outcome && l.status !== 'open' ? '<dt>판정</dt><dd>' + esc(C.STATUS_LABEL[l.status]) + ' · ' + esc(l.outcome.at || '') + (l.outcome.reason ? ' · ' + esc(l.outcome.reason + ' ' + (C.LOST_REASON_LABEL[l.outcome.reason] || '')) : '') + (l.outcome.note ? '<div class="small muted">' + esc(l.outcome.note) + '</div>' : '') + '</dd>' : '') +
+    (academyStatus ? '<dt>등록 후 관리 상태</dt><dd>' + esc(academyStatus) + '<div class="hint">영업 단계와 별도로 관리합니다.</div></dd>' : '') +
+    (l.outcome && l.status !== 'open' ? '<dt>판정</dt><dd>' + esc(l.pipeline === 'academy' && l.stage === 'lost' ? '미등록' : C.STATUS_LABEL[l.status]) + ' · ' + esc(l.outcome.at || '') + (l.outcome.reason ? ' · ' + esc(l.outcome.reason + ' ' + (C.LOST_REASON_LABEL[l.outcome.reason] || '')) : '') + (l.outcome.note ? '<div class="small muted">' + esc(l.outcome.note) + '</div>' : '') + '</dd>' : '') +
     (l.memo ? '<dt>메모</dt><dd style="white-space:pre-wrap">' + esc(l.memo) + '</dd>' : '') +
     '<dt>HubSpot</dt><dd>' + (hs.contactId ? '<span class="tag ok">연결됨</span> ' + (C.hubspotRecordUrl(portal, 'contact', hs.contactId) ? '<a href="' + esc(C.hubspotRecordUrl(portal, 'contact', hs.contactId)) + '" target="_blank" rel="noopener noreferrer">연락처 열기</a>' : '') +
       (hs.deals && hs.deals[l.pipeline] && C.hubspotRecordUrl(portal, 'deal', hs.deals[l.pipeline].dealId) ? ' · <a href="' + esc(C.hubspotRecordUrl(portal, 'deal', hs.deals[l.pipeline].dealId)) + '" target="_blank" rel="noopener noreferrer">딜 열기</a>' : '') : '<span class="tag">아직 안 보냄</span>') + leadQueueHtml(id) + '</dd></dl></section>';
@@ -792,7 +801,7 @@ function viewStats() {
     '<div class="tile"><div class="n">' + esc(pct(k.hotRate)) + '</div><div class="l">핫 리드 비율</div></div></div>';
   h += '<div class="grid2"><div class="card"><div class="card-title">채널별 유입</div><div class="card-sub mb8">이달 신규 문의</div>' + barList(k.channels) + '</div>' +
     '<div class="card"><div class="card-title">이탈 사유</div><div class="card-sub mb8">이달 이탈 확정</div>' + barList(k.lostReasons, c => c + ' ' + (C.LOST_REASON_LABEL[c] || ''), 'bad') + '</div></div>';
-  h += '<div class="grid2">' + C.PIPELINES.map(p => '<div class="card"><div class="card-title">' + esc(C.PIPELINE_LABEL[p]) + ' — 진행 중</div><div class="card-sub mb8">지금 열려 있는 리드</div>' + barList(k.stages[p], s => C.STAGE_LABEL[s] || s) + '</div>').join('') + '</div>';
+  h += '<div class="grid2">' + C.PIPELINES.map(p => '<div class="card"><div class="card-title">' + esc(C.PIPELINE_LABEL[p]) + ' — 진행 중</div><div class="card-sub mb8">지금 열려 있는 리드</div>' + barList(k.stages[p], s => C.stageLabel(p, s)) + '</div>').join('') + '</div>';
   h += '<div class="hint">전환율 = 그 달 상담 완료 코호트 중 등록 ÷ 코호트 전체. D+14 결정률은 상담 뒤 14일이 지난 리드만 센다.</div>';
   return h;
 }
@@ -839,7 +848,7 @@ function viewHubspot() {
   if (s && s.connected) {
     // 속성
     const p = ui.hs.props;
-    h += '<div class="card"><div class="between"><div class="card-title">WB 사용자 속성</div>' + (p && p.missing && p.missing.length ? '<button class="btn btn-sm btn-primary" data-act="hs-props-create"' + (ui.hs.busy ? ' disabled' : '') + '>없는 속성 ' + p.missing.length + '개 만들기</button>' : '') + '</div>';
+    h += '<div class="card"><div class="between"><div class="card-title">WB 사용자 속성</div>' + (p && !p.error && p.missing ? '<button class="btn btn-sm btn-primary" data-act="hs-props-create"' + (ui.hs.busy ? ' disabled' : '') + '>' + (p.missing.length ? '없는 속성 ' + p.missing.length + '개 만들기' : '속성 선택지 맞추기') + '</button>' : '') + '</div>';
     if (!p) h += '<div class="hint">확인 중…</div>';
     else if (p.error) h += '<div class="banner bad">' + esc(p.error) + '</div>';
     else h += '<div class="card-sub mt8">연락처 속성 — 있음 ' + p.present.length + ' · 없음 ' + p.missing.length + '</div><div class="row wraprow mt8">' + p.present.map(n => '<span class="tag ok">' + esc(n) + '</span>').join('') + p.missing.map(n => '<span class="tag warn">' + esc(n) + '</span>').join('') + '</div>' +
@@ -855,7 +864,7 @@ function viewHubspot() {
         const m = map[pk] || {};
         const chosen = pipes.find(x => x.id === m.pipelineId);
         return '<div class="sect">' + esc(C.PIPELINE_LABEL[pk]) + '</div><div class="maprow"><span>HubSpot 파이프라인</span><select class="in" data-act="hs-map-pipe" data-p="' + pk + '"><option value="">— 선택 —</option>' + pipes.map(x => '<option value="' + esc(x.id) + '"' + (x.id === m.pipelineId ? ' selected' : '') + '>' + esc(x.label) + '</option>').join('') + '</select></div>' +
-          (chosen ? C.stagesOf(pk).map(sk => '<div class="maprow"><span>' + esc(C.STAGE_LABEL[sk]) + '</span><select class="in" data-act="hs-map-stage" data-p="' + pk + '" data-s="' + sk + '"><option value="">— 없음 —</option>' + chosen.stages.map(st => '<option value="' + esc(st.id) + '"' + (m.stageMap && m.stageMap[sk] === st.id ? ' selected' : '') + '>' + esc(st.label) + '</option>').join('') + '</select></div>').join('') : '');
+          (chosen ? C.stagesOf(pk).map(sk => '<div class="maprow"><span>' + esc(C.stageLabel(pk, sk)) + '</span><select class="in" data-act="hs-map-stage" data-p="' + pk + '" data-s="' + sk + '"><option value="">— 없음 —</option>' + chosen.stages.map(st => '<option value="' + esc(st.id) + '"' + (m.stageMap && m.stageMap[sk] === st.id ? ' selected' : '') + '>' + esc(st.label) + '</option>').join('') + '</select></div>').join('') : '');
       }).join('') + '<button class="btn btn-primary btn-block mt14" data-act="hs-map-save">매핑 저장</button>';
     } else {
       const saved = hsS.map || {};
@@ -881,7 +890,7 @@ function viewHubspot() {
     (counts.approved ? '<button class="btn btn-sm btn-primary" data-act="hs-push"' + (ui.hs.busy || !(s && s.connected) ? ' disabled' : '') + '>지금 반영 (' + counts.approved + ')</button>' : '') + '</div>';
   h += items.length ? items.slice(0, 100).map(i => {
     const l = leadById(i.leadId);
-    const what = i.kind === 'deal' ? esc(C.PIPELINE_LABEL[i.payload.pipeline] || '') + ' → ' + esc(C.STAGE_LABEL[i.payload.stage] || i.payload.stage) : i.kind === 'contact' ? '연락처 ' + esc((i.payload.fields || []).join(', ')) : '기록(노트)';
+    const what = i.kind === 'deal' ? esc(C.PIPELINE_LABEL[i.payload.pipeline] || '') + ' → ' + esc(C.stageLabel(i.payload.pipeline, i.payload.stage)) : i.kind === 'contact' ? '연락처 ' + esc((i.payload.fields || []).join(', ')) : '기록(노트)';
     return '<div class="qitem"><div class="grow"><b data-act="open-lead" data-id="' + esc(i.leadId) + '" style="cursor:pointer">' + esc(l ? C.leadLabel(l) : i.leadId) + '</b> <span class="tag' + (i.track === 'review' ? ' warn' : '') + '">' + esc(C.SYNC_TRACK_LABEL[i.track]) + '</span> <span class="tag' + (i.status === 'done' ? ' ok' : i.status === 'failed' ? ' bad' : i.status === 'approved' ? ' acc' : '') + '">' + esc(C.SYNC_STATUS_LABEL[i.status]) + '</span>' +
       '<div class="small">' + esc(C.SYNC_KIND_LABEL[i.kind]) + ' · ' + what + ' <span class="muted">· ' + esc(staffName(i.createdBy)) + ' · ' + esc(new Date(i.createdAt).toLocaleString('ko-KR')) + '</span></div>' + (i.error ? '<div class="err">' + esc(i.error) + '</div>' : '') + '</div>' +
       '<div class="row">' + (i.status === 'pending' ? '<button class="btn btn-sm btn-good" data-act="hs-q" data-op="approve" data-id="' + esc(i.id) + '">승인</button><button class="btn btn-sm btn-danger" data-act="hs-q" data-op="reject" data-id="' + esc(i.id) + '">반려</button>' : '') +
@@ -901,7 +910,7 @@ function autoSyncHtml(status) {
     const r = a.lastResult || {}, pull = r.pull || {}, push = r.push || {};
     h += '<dl class="kv mt14"><dt>마지막 실행</dt><dd>' + esc(stamp(a.lastRunAt)) + '</dd><dt>마지막 완료</dt><dd>' + esc(stamp(a.lastSuccessAt)) + '</dd></dl>';
     if (a.running) h += '<div class="banner mt8" role="status">동기화 중입니다. [다시 확인]으로 결과를 확인하세요.</div>';
-    if (a.lastResult) h += '<p class="hint mt8">최근 결과 — 가져오기 신규 ' + (Number(pull.created) || 0) + ' · 갱신 ' + (Number(pull.updated) || 0) + ' · 충돌 ' + (Number(pull.conflicts) || 0) + ' / 보내기 완료 ' + (Number(push.done) || 0) + ' · 실패 ' + (Number(push.failed) || 0) + ((pull.more || push.remaining) ? ' · 다음 주기에 이어서 처리' : '') + '</p>';
+    if (a.lastResult) h += '<p class="hint mt8">최근 결과 — 가져오기 신규 ' + (Number(pull.created) || 0) + ' · 갱신 ' + (Number(pull.updated) || 0) + ' · 충돌 ' + (Number(pull.conflicts) || 0) + ' · 검증 실패 ' + (Number(pull.invalid) || 0) + ' · 재시도 대기 ' + (Number(pull.retry) || 0) + ' · 센터앱 관리 ' + (Number(pull.portalSkipped) || 0) + ' / 보내기 완료 ' + (Number(push.done) || 0) + ' · 실패 ' + (Number(push.failed) || 0) + (Number(push.portalHeld) > 0 ? ' · 센터앱 관리 대기 ' + Number(push.portalHeld) : '') + ((pull.more || push.remaining) ? ' · 다음 주기에 이어서 처리' : '') + '</p>';
     if (a.error) h += '<div class="banner bad mt8">' + esc(a.error) + '</div>';
   }
   if (session && session.canApprove) h += '<div class="row wraprow mt14"><button class="btn btn-primary" data-act="hs-auto-toggle" data-enabled="' + (a && a.enabled ? '0' : '1') + '"' + (!a || busy || (!a.enabled && !(status && status.connected)) ? ' disabled' : '') + '>' + (a && a.enabled ? '자동 동기화 끄기' : '자동 동기화 켜기') + '</button><button class="btn btn-ghost" data-act="hs-auto-run"' + (!a || !a.enabled || busy ? ' disabled' : '') + '>지금 동기화</button></div>';
@@ -945,7 +954,7 @@ async function hsAction(kind, arg) {
       toast('속성 ' + r.created.length + '개 만들었습니다' + (r.failed.length ? ' · 실패 ' + r.failed.length : ''));
     } else if (kind === 'pull') {
       const r = await api('/api/hubspot/pull', { full: !!arg });
-      ui.hs.pullMsg = '가져오기 — 새 리드 ' + r.created + ' · 갱신 ' + r.updated + ' · 건너뜀(미반영 변경) ' + r.conflicts + (r.portalSkipped ? ' · 센터앱 관리 ' + r.portalSkipped : '') + (r.more ? ' · 더 있음(다시 누르세요)' : '');
+      ui.hs.pullMsg = '가져오기 — 새 리드 ' + r.created + ' · 갱신 ' + r.updated + ' · 건너뜀(미반영 변경) ' + r.conflicts + ' · 검증 실패 ' + (Number(r.invalid) || 0) + ' · 재시도 대기 ' + (Number(r.retry) || 0) + ' · 센터앱 관리 ' + (Number(r.portalSkipped) || 0) + (r.more ? ' · 더 있음(다시 누르세요)' : '');
       await loadAll();
     } else if (kind === 'push') {
       const r = await api('/api/hubspot/push', { limit: 25 });
@@ -1304,6 +1313,8 @@ async function doExport() {
 function leadFormHtml(l) {
   const L = l || { relation: '모', channel: '기타', child: {}, inspection: {}, interests: [] };
   const isNew = !l;
+  const academyStatus = C.academyStatusOf(L);
+  const academyOptions = C.ACADEMY_STATUS.includes(academyStatus) || !academyStatus ? C.ACADEMY_STATUS : C.ACADEMY_STATUS.concat(academyStatus);
   const refOptions = state.leads.filter(x => !l || x.id !== l.id).sort((a, b) => String(a.name).localeCompare(String(b.name)));
   return '<div class="grid2"><div class="field"><label class="fl" for="f-name">보호자 이름 *</label><input class="in" id="f-name" value="' + esc(L.name || '') + '" maxlength="40"></div>' +
     '<div class="field"><label class="fl" for="f-rel">관계</label><select class="in" id="f-rel">' + opt(C.RELATIONS, L.relation, r => r + ' (' + C.RELATION_HONORIFIC[r] + ')') + '</select></div></div>' +
@@ -1323,7 +1334,7 @@ function leadFormHtml(l) {
       '<div class="field"><label class="fl" for="f-idate">검사일</label><input class="in" id="f-idate" type="date" value="' + esc(L.inspection && L.inspection.date || '') + '"></div></div>' +
       '<div class="grid2"><div class="field"><label class="fl" for="f-consulted">상담 완료일(팔로업 기준)</label><input class="in" id="f-consulted" type="date" value="' + esc(L.consultedAt || '') + '"></div>' +
       '<div class="field"><label class="fl" for="f-strength">검사에서 돋보인 강점</label><input class="in" id="f-strength" value="' + esc(L.strength || '') + '" maxlength="120" placeholder="처리속도 상위 20%"></div></div>' +
-      '<div class="field"><label class="fl" for="f-acad">학원 상태(HubSpot wb_academy_status)</label><select class="in" id="f-acad"><option value="">—</option>' + opt(['미등록', '트라이얼', '재원', '이탈', '퇴원'], L.academyStatus) + '</select></div>' : '') +
+      '<div class="field"><label class="fl" for="f-acad">등록 후 관리 상태</label><select class="in" id="f-acad" aria-describedby="f-acad-help"><option value="">—</option>' + opt(academyOptions, academyStatus) + '</select><div class="hint" id="f-acad-help">영업 단계와 별도로 관리합니다. 재원·이탈위험·이탈을 바꿔도 등록 단계는 유지됩니다.</div></div>' : '') +
     (session.canApprove ? '<div class="field"><label class="fl" for="f-owner2">담당</label><select class="in" id="f-owner2"><option value="admin"' + (!L.owner || L.owner === 'admin' ? ' selected' : '') + '>원장</option>' + liveStaff().map(x => '<option value="' + esc(x.id) + '"' + (L.owner === x.id ? ' selected' : '') + '>' + esc(x.name) + '</option>').join('') + '</select></div>' : '') +
     '<label class="check"><input type="checkbox" id="f-hot"' + (L.hot ? ' checked' : '') + '> 핫 리드(바로 연락)</label>' +
     '<div class="field"><label class="fl" for="f-memo">메모</label><textarea class="in" id="f-memo" rows="2">' + esc(L.memo || '') + '</textarea><div class="hint">전화번호는 전화 칸에만 — 문의 원문·메모·기록에 번호가 있으면 저장되지 않습니다.</div></div>';
@@ -1350,7 +1361,7 @@ const LEAD_EDIT_FIELDS = {
   channel: '유입 채널', channelNote: '채널 메모', referrerLeadId: '소개자', partnerId: '파트너',
   interests: '관심', hot: '핫 리드', memo: '메모', owner: '담당', source: '문의 원문',
   'inspection.type': '검사 종류', 'inspection.date': '검사일', consultedAt: '상담 완료일',
-  strength: '강점', academyStatus: '학원 상태', retestDue: '재검사 일정', followups: '다음 연락',
+  strength: '강점', academyStatus: '등록 후 관리 상태', retestDue: '재검사 일정', followups: '다음 연락',
   pipeline: '파이프라인', stage: '단계', status: '상태', stageAt: '단계 변경일',
   'outcome.status': '판정', 'outcome.reason': '판정 사유', 'outcome.note': '판정 메모', 'outcome.at': '판정일'
 };
@@ -1360,7 +1371,7 @@ function leadChanges(conflict) {
 }
 function leadFieldText(data, path) {
   const v = leadField(data, path);
-  if (path === 'stage') return C.STAGE_LABEL[v] || v || '—';
+  if (path === 'stage') return C.stageLabel(data && data.pipeline, v) || '—';
   if (path === 'pipeline') return C.PIPELINE_LABEL[v] || v || '—';
   if (path === 'owner') return staffName(v);
   if (path === 'referrerLeadId') { const l = leadById(v); return l ? C.leadLabel(l) : v || '—'; }
@@ -1441,7 +1452,10 @@ function addActivity(leadIdValue, fields) {
 }
 function updateLead(id, patch, note) {
   const l = leadById(id); if (!l) return null;
-  const next = Object.assign(JSON.parse(JSON.stringify(l)), patch);
+  if (l.pipeline === 'academy' && C.isLegacyAcademyStage(l.stage) && (!patch.stage || patch.stage === l.stage) && (Object.hasOwn(patch, 'status') || Object.hasOwn(patch, 'outcome'))) {
+    toast('영업 단계를 먼저 확인해 주세요'); return null;
+  }
+  const next = Object.assign(JSON.parse(JSON.stringify(l)), { academyStatus: C.academyStatusOf(l) }, patch);
   const v = C.validateLead(next, { today: today() });
   if (!v.ok) { toast(v.error); return null; }
   const out = Object.assign(v.data, { hubspot: l.hubspot || {} });
@@ -1454,18 +1468,20 @@ function moveStage(id, target, selectEl) {
   const reset = () => { if (selectEl) selectEl.value = l.stage; };   // 창을 닫거나 실패하면 select 가 실제 단계를 보여 줘야 같은 항목을 다시 고를 수 있다
   if (target === '__academy') { reset(); return openOutcome(id, 'won', true); }
   if (target === l.stage) return;
+  if (!C.stagesOf(l.pipeline).includes(target)) { reset(); return; }
   if (target === 'won') { reset(); return openOutcome(id, 'won'); }
-  if (target === 'lost' || target === 'churned') { reset(); return openOutcome(id, 'lost', false, target); }
+  if (target === 'lost') { reset(); return openOutcome(id, 'lost', false, target); }
   const from = l.stage;
   const patch = { stage: target, stageAt: today(), status: 'open', outcome: null };
   if (updateLead(id, patch)) { addActivity(id, { type: 'stage', from, to: target }); render(); } else reset();
 }
 function openOutcome(id, kind, toAcademy, lostStage) {
   const l = leadById(id); if (!l) return;
-  const title = kind === 'won' ? '등록 확정' : kind === 'lost' ? '이탈 확정' : '장기보류';
-  let body = '<div class="hint mb8">' + esc(C.leadLabel(l)) + ' · ' + esc(C.PIPELINE_LABEL[l.pipeline]) + ' / ' + esc(C.STAGE_LABEL[l.stage]) + '</div>';
-  if (kind === 'won' && l.pipeline === 'inspection') body += '<label class="check"><input type="checkbox" id="f-to-academy"' + (toAcademy ? ' checked' : '') + '> 학원 등록 파이프라인으로 이어가기(트라이얼) — HubSpot 에는 검사 여정 딜 성사 + 학원 등록 딜이 생깁니다</label>';
-  if (kind === 'lost') body += '<div class="fl">이탈 사유</div><div class="chips mb8">' + C.LOST_REASONS.map(r => '<label class="chip"><input type="radio" name="f-reason" value="' + r + '"' + (r === 'U' ? ' checked' : '') + ' style="width:14px;height:14px"> ' + r + ' ' + esc(C.LOST_REASON_LABEL[r]) + '</label>').join('') + '</div>';
+  if (kind === 'hold' && l.pipeline === 'academy' && C.isLegacyAcademyStage(l.stage)) return toast('영업 단계를 먼저 확인해 주세요');
+  const title = kind === 'won' ? '등록 확정' : kind === 'lost' ? (l.pipeline === 'academy' ? '미등록 확정' : '이탈 확정') : '장기보류';
+  let body = '<div class="hint mb8">' + esc(C.leadLabel(l)) + ' · ' + esc(C.PIPELINE_LABEL[l.pipeline]) + ' / ' + esc(C.stageLabel(l.pipeline, l.stage)) + '</div>';
+  if (kind === 'won' && l.pipeline === 'inspection') body += '<label class="check"><input type="checkbox" id="f-to-academy"' + (toAcademy ? ' checked' : '') + '> 학원 등록 파이프라인으로 이어가기(레벨테스트·체험) — HubSpot 에는 검사 여정 딜 성사 + 학원 등록 딜이 생깁니다</label>';
+  if (kind === 'lost') body += '<div class="fl">' + (l.pipeline === 'academy' ? '미등록 사유' : '이탈 사유') + '</div><div class="chips mb8">' + C.LOST_REASONS.map(r => '<label class="chip"><input type="radio" name="f-reason" value="' + r + '"' + (r === 'U' ? ' checked' : '') + ' style="width:14px;height:14px"> ' + r + ' ' + esc(C.LOST_REASON_LABEL[r]) + '</label>').join('') + '</div>';
   body += '<div class="field"><label class="fl" for="f-onote">한 줄 메모</label><input class="in" id="f-onote" maxlength="300" placeholder="' + (kind === 'lost' ? '왜 안 왔는지 — 분기 집계에 쓰입니다' : kind === 'won' ? '등록 과목·시작일 등' : '언제 다시 연락할지') + '"></div>';
   modal(title, body, '<button class="btn btn-block mt8 ' + (kind === 'won' ? 'btn-good' : kind === 'lost' ? 'btn-danger' : 'btn-warn') + '" data-act="outcome-save" data-id="' + esc(id) + '" data-kind="' + kind + '" data-lost="' + esc(lostStage || '') + '">' + title + '</button>');
 }
@@ -1487,10 +1503,10 @@ function saveOutcome(id, kind, lostStage) {
     patch = { status: 'hold', outcome: { status: 'hold', at: today(), note } };
   }
   if (!updateLead(id, patch)) return;
-  if (kind !== 'hold') addActivity(id, { type: 'stage', from, to: patch.stage, text: (kind === 'won' && patch.pipeline === 'academy' ? '등록 → 학원 등록(트라이얼)' : title(kind)) + (note ? ' · ' + note : '') });
+  if (kind !== 'hold') addActivity(id, { type: 'stage', from, to: patch.stage, text: (kind === 'won' && patch.pipeline === 'academy' ? '등록 → 학원 등록(레벨테스트·체험)' : title(kind)) + (note ? ' · ' + note : '') });
   else addActivity(id, { type: 'note', text: '장기보류' + (note ? ' · ' + note : '') });
   closeModal(true); toast(title(kind) + ' 처리했습니다'); render();
-  function title(k) { return k === 'won' ? '등록 확정' : k === 'lost' ? '이탈 확정' : '장기보류'; }
+  function title(k) { return k === 'won' ? '등록 확정' : k === 'lost' ? (l.pipeline === 'academy' ? '미등록 확정' : '이탈 확정') : '장기보류'; }
 }
 function unhold(id) {
   const l = leadById(id); if (!l) return;
@@ -1559,7 +1575,7 @@ function openCreditForm(id, type) {
   const l = leadById(id); if (!l) return;
   const referred = state.leads.filter(x => x.referrerLeadId === id);
   const body = type === 'accrue'
-    ? '<div class="field"><label class="fl" for="f-referred">피소개자(검사 완료한 리드)</label><select class="in" id="f-referred"><option value="">— 선택 —</option>' + referred.map(x => '<option value="' + esc(x.id) + '">' + esc(C.leadLabel(x)) + ' · ' + esc(C.STAGE_LABEL[x.stage]) + '</option>').join('') + '</select>' + (referred.length ? '' : '<div class="hint">이 리드를 소개자로 둔 리드가 없습니다 — 피소개자 리드의 "소개자" 칸을 먼저 채워 주세요.</div>') + '</div>' +
+    ? '<div class="field"><label class="fl" for="f-referred">피소개자(검사 완료한 리드)</label><select class="in" id="f-referred"><option value="">— 선택 —</option>' + referred.map(x => '<option value="' + esc(x.id) + '">' + esc(C.leadLabel(x)) + ' · ' + esc(C.stageLabel(x.pipeline, x.stage)) + '</option>').join('') + '</select>' + (referred.length ? '' : '<div class="hint">이 리드를 소개자로 둔 리드가 없습니다 — 피소개자 리드의 "소개자" 칸을 먼저 채워 주세요.</div>') + '</div>' +
       '<div class="field"><label class="fl" for="f-amount">금액</label><input class="in" id="f-amount" type="number" value="' + C.CREDIT_AMOUNT + '" step="1000"></div>'
     : '<div class="field"><label class="fl" for="f-amount">사용 금액(잔액 ' + esc(fmtWon(C.creditBalance(state.credits, id))) + ')</label><input class="in" id="f-amount" type="number" value="' + Math.min(C.CREDIT_AMOUNT, C.creditBalance(state.credits, id)) + '" step="1000"></div>';
   modal(type === 'accrue' ? '크레딧 적립' : '크레딧 사용', body + '<div class="field"><label class="fl" for="f-cnote">메모</label><input class="in" id="f-cnote" maxlength="200" placeholder="' + (type === 'accrue' ? '피소개자 검사 완료' : '학원 수강료 차감') + '"></div>',

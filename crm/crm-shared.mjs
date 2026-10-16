@@ -154,6 +154,7 @@ export async function enqueueFor(env, auth, settings, c, id, previous, data) {
     n++;
   };
   if (c === 'leads') {
+    if (previous) previous = { ...previous, academyStatus: CORE.academyStatusOf(previous) };
     const isNew = !previous;
     if (isNew || CONTACT_FIELDS.some(k => !same(pick(previous, [k])[k], data[k]))) await put(id, 'contact', { fields: CONTACT_FIELDS.filter(k => isNew || !same(previous[k], data[k])) });
     const stageChanged = isNew || previous.pipeline !== data.pipeline || previous.stage !== data.stage;
