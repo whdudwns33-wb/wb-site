@@ -217,10 +217,16 @@ const LEAD_PII_SKIP = new Set([...PII_ALLOWED_PATHS, 'hubspot', 'creditBalanceHs
 
 function ruleLeads(data, ctx) {
   const today = kstToday();
+  const prev = ctx.previous;
+  if (data.pipeline === 'academy' && CORE.isLegacyAcademyStage(data.stage) && (!prev || prev.pipeline !== 'academy' || prev.stage !== data.stage)) return bad('INVALID', '이전 학원 상태는 새 영업 단계로 선택할 수 없습니다');
+  if (prev?.pipeline === 'academy' && CORE.isLegacyAcademyStage(prev.stage) && !data.academyStatus) data = { ...data, academyStatus: CORE.academyStatusOf(prev) };
   const v = CORE.validateLead(data, { today });
   if (!v.ok) return bad('INVALID', v.error);
   const out = v.data;
-  const prev = ctx.previous;
+  if (prev?.pipeline === 'academy' && CORE.isLegacyAcademyStage(prev.stage) && out.pipeline === prev.pipeline && out.stage === prev.stage) {
+    out.status = prev.status;
+    out.outcome = prev.outcome;
+  }
   // hubspot(연결 id)·creditBalanceHs 는 서버가 가진다 — 클라이언트가 보낸 값은 버리고 이전 값을 잇는다. PII 검사도 이 둘은 보지 않는다(HubSpot id 는 숫자열).
   out.hubspot = prev && isPlainObject(prev.hubspot) ? prev.hubspot : {};
   if (prev && prev.creditBalanceHs !== undefined) out.creditBalanceHs = prev.creditBalanceHs;
@@ -257,11 +263,12 @@ function ruleCredits(data, ctx) {
   return { data: out };
 }
 
-function sanitizeMap(raw, pipeline) {
+function sanitizeMap(raw, pipeline, previous) {
   const m = isPlainObject(raw) ? raw : {};
   const stageMap = {};
   const src = isPlainObject(m.stageMap) ? m.stageMap : {};
   CORE.stagesOf(pipeline).forEach(k => { const v = String(src[k] || '').trim(); if (v && v.length <= 40 && /^[A-Za-z0-9_-]+$/.test(v)) stageMap[k] = v; });
+  if (pipeline === 'academy') Object.keys(previous?.stageMap || {}).filter(CORE.isLegacyAcademyStage).forEach(k => { stageMap[k] = previous.stageMap[k]; });
   const pipelineId = String(m.pipelineId || '').trim();
   return { pipelineId: /^[A-Za-z0-9_-]{1,40}$/.test(pipelineId) ? pipelineId : '', pipelineLabel: CORE.clean(m.pipelineLabel, 60), stageMap };
 }
@@ -277,7 +284,7 @@ function ruleSettings(data, ctx) {
       enabled: hs.enabled !== false,
       autoApproveQuick: !!hs.autoApproveQuick,
       autoSync: prevHs.autoSync === true,
-      map: { inspection: sanitizeMap(isPlainObject(hs.map) ? hs.map.inspection : null, 'inspection'), academy: sanitizeMap(isPlainObject(hs.map) ? hs.map.academy : null, 'academy') },
+      map: { inspection: sanitizeMap(isPlainObject(hs.map) ? hs.map.inspection : null, 'inspection'), academy: sanitizeMap(isPlainObject(hs.map) ? hs.map.academy : null, 'academy', prevHs.map?.academy) },
       // 포털 정보는 /api/hubspot/status 가 채운다 — 클라이언트 값은 무시
       portal: isPlainObject(prevHs.portal) ? prevHs.portal : {}
     }
@@ -596,11 +603,11 @@ async function availableProperties(env, client, force) {
 }
 function hsError(error) {
   const code = error?.code || (error?.status === 401 || error?.status === 403 ? 'HUBSPOT_AUTH' : error?.status === 429 ? 'HUBSPOT_RATE' : 'HUBSPOT');
-  const known = ['PORTAL_LINKED', 'UNMAPPED', 'LINKED', 'REMOTE_CONFLICT', 'REMOTE_BASELINE', 'SYNC_BUSY', 'UNCERTAIN'];
+  const known = ['PORTAL_LINKED', 'UNMAPPED', 'LEGACY_STAGE', 'LINKED', 'REMOTE_CONFLICT', 'REMOTE_BASELINE', 'SYNC_BUSY', 'UNCERTAIN'];
   const prefix = known.find(k => String(error?.message || '').startsWith(k));
   const safe = prefix || code;
   const messages = { HUBSPOT_AUTH: 'HubSpot 연결 권한을 확인해 주세요', HUBSPOT_RATE: 'HubSpot 호출 한도로 다음 주기에 다시 확인합니다',
-    PORTAL_LINKED: PORTAL_HOLD, UNMAPPED: '단계 매핑을 확인해 주세요', LINKED: '다른 고객에 연결된 연락처입니다', REMOTE_CONFLICT: 'HubSpot에도 변경이 있습니다. 원본을 대조해 주세요',
+    PORTAL_LINKED: PORTAL_HOLD, UNMAPPED: '단계 매핑을 확인해 주세요', LEGACY_STAGE: '이전 학원 상태입니다. 고객의 영업 단계와 기존 전송을 확인해 주세요', LINKED: '다른 고객에 연결된 연락처입니다', REMOTE_CONFLICT: 'HubSpot에도 변경이 있습니다. 원본을 대조해 주세요',
     REMOTE_BASELINE: '동기화 기준이 없습니다. 기존 큐 검토 후 먼저 가져오기를 실행해 주세요', SYNC_BUSY: '동기화가 이미 진행 중입니다', UNCERTAIN: '외부 반영 결과가 미확정입니다. 원본 확인이 필요합니다' };
   return { code: safe, error: messages[safe] || 'HubSpot 요청을 완료하지 못했습니다', status: Number(error?.status) || 0 };
 }
@@ -723,6 +730,7 @@ async function processItem(env, client, settings, available, item) {
   const lead = Object.assign({}, doc.data, { id: item.leadId });
   if (item.kind === 'deal') {
     const pipeline = CORE.PIPELINES.includes(item.payload.pipeline) ? item.payload.pipeline : lead.pipeline;
+    if (pipeline === 'academy' && (CORE.isLegacyAcademyStage(item.payload.stage) || (!CORE.stagesOf(pipeline).includes(item.payload.stage) && CORE.isLegacyAcademyStage(lead.stage)))) throw new Error('LEGACY_STAGE');
     const existing = lead.hubspot?.deals?.[pipeline]?.dealId;
     if (existing && await portalOwnsDeal(env, String(existing))) throw new Error(PORTAL_HOLD);
   }
@@ -741,7 +749,7 @@ async function processItem(env, client, settings, available, item) {
     const stage = CORE.stagesOf(pipeline).includes(p.stage) ? p.stage : lead.stage;
     const map = isPlainObject(settings.hubspot.map[pipeline]) ? settings.hubspot.map[pipeline] : {};
     const stageId = map.stageMap && map.stageMap[stage];
-    if (!map.pipelineId || !stageId) throw new Error('UNMAPPED: ' + CORE.PIPELINE_LABEL[pipeline] + ' / ' + (CORE.STAGE_LABEL[stage] || stage) + ' 단계가 HubSpot 파이프라인에 매핑되지 않았습니다 — 허브스팟 탭에서 매핑을 저장하세요');
+    if (!map.pipelineId || !stageId) throw new Error('UNMAPPED: ' + CORE.PIPELINE_LABEL[pipeline] + ' / ' + CORE.stageLabel(pipeline, stage) + ' 단계가 HubSpot 파이프라인에 매핑되지 않았습니다 — 허브스팟 탭에서 매핑을 저장하세요');
     const deals = Object.assign({}, lead.hubspot && lead.hubspot.deals);
     const existing = deals[pipeline] && deals[pipeline].dealId;
     const props = { pipeline: map.pipelineId, dealstage: stageId };
@@ -825,6 +833,7 @@ async function flushQueueLocked(env, limit) {
       const claimed = await env.DB.prepare("UPDATE crm_sync_queue SET status='failed',error='UNCERTAIN: 작업 결과 확인 필요',updated_at=? WHERE id=? AND status='approved' AND updated_at=? AND NOT EXISTS (SELECT 1 FROM crm_sync_queue older WHERE older.lead_id=crm_sync_queue.lead_id AND older.created_at<crm_sync_queue.created_at AND older.status IN ('pending','failed'))")
         .bind(claimAt, item.id, row.updated_at).run();
       if (!changesOf(claimed)) continue;
+      if (item.kind === 'deal' && item.payload.pipeline === 'academy' && CORE.isLegacyAcademyStage(item.payload.stage)) throw new Error('LEGACY_STAGE');
       const guardedClient = hubspotClient(env, guard);
       const baselineRequired = settings.hubspot.autoSync || !!(await loadDoc(env, 'leads', item.leadId))?.data?.hubspot?.contactFingerprint;
       if (baselineRequired) await verifyRemoteBaseline(env, guardedClient, available, item);
@@ -981,9 +990,10 @@ export async function runHubspotSync(env) {
       if (!pull.ok) throw Object.assign(new Error(pull.code), { code: pull.code });
       const push = await flushQueueLocked(scoped, 5);
       if (!push.ok) throw Object.assign(new Error(push.code), { code: push.code });
+      const portalHeld = await scoped.DB.prepare("SELECT COUNT(*) AS total, COALESCE(SUM(q.status='pending'),0) AS pending FROM crm_sync_queue q JOIN crm_portal_links p ON p.lead_id=q.lead_id WHERE q.status IN ('pending','approved')").first();
       lastResult = { pull: { created: pull.created, updated: pull.updated, conflicts: pull.conflicts, invalid: pull.invalid, retry: pull.retry, more: pull.more, portalSkipped: pull.portalSkipped },
-        push: { done: push.done, failed: push.failed, remaining: push.remaining, stopped: push.stopped } };
-      if (push.failed || push.stopped || pull.invalid || push.counts?.pending || push.counts?.failed || (pull.conflicts && !push.done)) error = '확인이 필요한 동기화 기록이 있습니다';
+        push: { done: push.done, failed: push.failed, remaining: push.remaining, stopped: push.stopped, portalHeld: Number(portalHeld.total) } };
+      if (push.failed || push.stopped || pull.invalid || (push.counts?.pending || 0) > Number(portalHeld.pending) || push.counts?.failed || (pull.conflicts && !push.done)) error = '확인이 필요한 동기화 기록이 있습니다';
     } catch (caught) { error = hsError(caught).error; }
     const saved = { lastRunAt, lastSuccessAt: error ? previous.lastSuccessAt || 0 : Date.now(), lastResult: lastResult || previous.lastResult || null, error };
     if (!await canWriteHubspot(scoped, SYNC_LEASE, scoped.HUBSPOT_SYNC_GUARD.token)) return { ok: false, code: 'SYNC_BUSY', error: '동기화 실행 시간이 끝났습니다. 다음 주기에 이어갑니다' };

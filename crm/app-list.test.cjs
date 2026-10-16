@@ -120,6 +120,31 @@ const fixture = () => [
 ];
 const many = count => Array.from({ length: count }, (_, i) => lead('qa_' + String(i + 1).padStart(3, '0')));
 
+test('학원 칸반은 HubSpot 다섯 영업 단계와 이전 학원 상태를 구분하고 원본을 바꾸지 않는다', () => {
+  const stages = ['inquiry', 'trial', 'trial_review', 'won', 'lost', 'active', 'at_risk', 'churned'];
+  const h = harness(stages.map(stage => lead('qa_' + stage, { pipeline: 'academy', stage, status: stage === 'won' ? 'won' : ['lost', 'churned'].includes(stage) ? 'lost' : 'open' })));
+  const before = h.read('state.leads');
+  h.run("ui.pipe='academy'; route='pipeline'; render();");
+  const labels = [...h.html.matchAll(/class="col-head"><span>(.*?)<\/span>/g)].map(m => m[1]);
+  assert.deepEqual(labels, ['문의', '레벨테스트·체험', '등록 결정 대기', '등록(성사)', '미등록']);
+  assert.ok(h.html.includes('이전 학원 상태 — 영업 단계 확인 필요'));
+  for (const stage of stages) assert.equal((h.html.match(new RegExp('data-id="qa_' + stage + '"', 'g')) || []).length, 1, stage);
+  assert.ok(h.html.includes('등록 후 관리 · 재원') && h.html.includes('등록 후 관리 · 이탈위험') && h.html.includes('등록 후 관리 · 이탈'));
+  assert.deepEqual(h.read('state.leads'), before);
+  assert.equal(h.run('outbox.size()'), 0);
+});
+
+test('학원 목록 필터는 새 단계 명칭을 쓰며 남아 있는 이전 학원 상태도 찾을 수 있다', () => {
+  const h = harness([lead('qa_inquiry', { pipeline: 'academy', stage: 'inquiry' }), lead('qa_old', { pipeline: 'academy', stage: 'at_risk' })]);
+  h.change('f-list-pipeline', 'academy');
+  assert.ok(h.html.includes('<option value="trial">레벨테스트·체험</option>'));
+  h.change('f-list-stage', 'at_risk');
+  assert.deepEqual(h.rows(), ['qa_old']);
+  h.change('f-list-stage', 'inquiry');
+  assert.deepEqual(h.rows(), ['qa_inquiry']);
+  assert.ok(h.html.includes('단계: 문의'));
+});
+
 test('205명도 마지막 고객까지 탐색하며 페이지당 개수·범위·이전/다음을 맞춘다', async () => {
   const h = harness(many(205));
   h.change('f-list-sort', 'name');
