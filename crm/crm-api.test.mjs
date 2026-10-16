@@ -44,8 +44,8 @@ function fakeHubspot(overrides) {
         { id: 'contractsent', label: '해석완료', displayOrder: 4 }, { id: 'closedwon', label: '성사된 거래', displayOrder: 5 },
         { id: '3551668965', label: '업셀제안', displayOrder: 6 }, { id: 'closedlost', label: '성사되지 않은 거래', displayOrder: 7 }] },
       { id: '2206970568', label: '학원 등록', displayOrder: 1, stages: [
-        { id: 'a1', label: '트라이얼', displayOrder: 0 }, { id: 'a2', label: '트라이얼검토', displayOrder: 1 }, { id: 'a3', label: '활성', displayOrder: 2 },
-        { id: 'a4', label: '이탈위험', displayOrder: 3 }, { id: 'a5', label: '이탈', displayOrder: 4 }, { id: 'a6', label: '성사된 거래', displayOrder: 5 }, { id: 'a7', label: '성사되지 않은 거래', displayOrder: 6 }] }
+        { id: 'a0', label: '문의', displayOrder: 0 }, { id: 'a1', label: '레벨테스트·체험', displayOrder: 1 }, { id: 'a2', label: '등록 결정 대기', displayOrder: 2 },
+        { id: 'a6', label: '등록(성사)', displayOrder: 3 }, { id: 'a7', label: '미등록', displayOrder: 4 }] }
     ] }),
     'GET /crm/v3/properties/contacts': () => ({ results: ['wb_source_channel', 'wb_academy_status', 'wb_credit_balance', 'wb_referrer_contact_id', 'wb_retest_due_date', 'wb_risk_signals'].map(n => ({ name: n })) }),
     'POST /crm/v3/properties/contacts': c => ({ name: c.body.name }),
@@ -509,7 +509,7 @@ test('파이프라인 제안·속성 점검·생성', async () => {
   const p = await call(env, 'GET', '/api/hubspot/pipelines', { token: admin });
   assert.equal(p.body.pipelines.length, 2);
   assert.equal(p.body.suggested.inspection.stageMap.upsell, '3551668965');
-  assert.equal(p.body.suggested.academy.stageMap.churned, 'a5');
+  assert.deepEqual(p.body.suggested.academy.stageMap, { inquiry: 'a0', trial: 'a1', trial_review: 'a2', won: 'a6', lost: 'a7' });
   const props = await call(env, 'GET', '/api/hubspot/properties', { token: admin });
   assert.ok(props.body.missing.includes('wb_child_name') && props.body.present.includes('wb_source_channel'));
   const made = await call(env, 'POST', '/api/hubspot/properties', { token: admin });
@@ -518,6 +518,57 @@ test('파이프라인 제안·속성 점검·생성', async () => {
   const noToken = envFor();
   const a2 = await setupAdmin(noToken);
   assert.equal((await call(noToken, 'GET', '/api/hubspot/pipelines', { token: a2 })).status, 409);
+});
+
+test('학원 단계 호환 — 읽기·일반 수정은 이전 판정과 버전을 보존하고 자동 전송을 만들지 않는다', async () => {
+  const hs = fakeHubspot(), env = envFor(hs), admin = await setupAdmin(env);
+  const mapping = await saveMapping(env, admin, hs);
+  await putDoc(env, admin, 'leads', 'old-academy', lead({ pipeline: 'academy', stage: 'trial' }));
+  env.DB.database.prepare("UPDATE crm_documents SET data=json_set(data,'$.stage','at_risk','$.stageAt','2025-09-01','$.status','hold','$.outcome',json(?),'$.academyStatus','') WHERE collection='leads' AND id='old-academy'")
+    .run(JSON.stringify({ status: 'hold', at: '2025-09-01', reason: '', note: '이전 판정' }));
+  env.DB.database.prepare("DELETE FROM crm_sync_queue WHERE lead_id='old-academy'").run();
+  const before = env.DB.database.prepare("SELECT data,updated_at FROM crm_documents WHERE collection='leads' AND id='old-academy'").get();
+  const old = JSON.parse(before.data);
+  const read = await call(env, 'GET', '/api/docs', { token: admin });
+  const viewed = read.body.docs.find(d => d.id === 'old-academy');
+  assert.equal(viewed.updatedAt, before.updated_at);
+  assert.deepEqual(viewed.data, old, '읽기만으로 저장 내용·버전을 바꾸지 않는다');
+  const edited = await putDoc(env, admin, 'leads', 'old-academy', { ...old, memo: '일반 메모 수정' }, { expectedUpdatedAt: before.updated_at });
+  assert.equal(edited.status, 200);
+  assert.equal(edited.body.results[0].queued, 0, '이전 상태 backfill은 전송 큐를 만들지 않는다');
+  const after = JSON.parse(env.DB.database.prepare("SELECT data FROM crm_documents WHERE collection='leads' AND id='old-academy'").get().data);
+  ['stage', 'stageAt', 'status', 'outcome'].forEach(k => assert.deepEqual(after[k], old[k]));
+  assert.equal(after.academyStatus, '이탈위험');
+  assert.deepEqual((await queue(env, admin, '?leadId=old-academy')).items, []);
+  assert.equal((await putDoc(env, admin, 'leads', 'invalid-legacy', lead({ pipeline: 'academy', stage: 'active' }))).status, 400);
+  const selected = await putDoc(env, admin, 'leads', 'old-academy', { ...old, stage: 'trial_review' });
+  assert.equal(selected.status, 200);
+  const changed = JSON.parse(env.DB.database.prepare("SELECT data FROM crm_documents WHERE collection='leads' AND id='old-academy'").get().data);
+  assert.equal(changed.academyStatus, '이탈위험', '담당자가 영업 단계를 선택해도 이전 등록 후 상태가 사라지지 않는다');
+  const items = (await queue(env, admin, '?leadId=old-academy')).items;
+  assert.ok(items.some(i => i.kind === 'deal' && i.payload.stage === 'trial_review'));
+  assert.ok(items.every(i => i.status === 'pending'));
+  env.DB.database.prepare("UPDATE crm_documents SET data=json_set(data,'$.hubspot.map.academy.stageMap.active','old-active') WHERE collection='settings' AND id='main'").run();
+  const settings = await putDoc(env, admin, 'settings', 'main', { hubspot: { map: mapping } });
+  assert.equal(settings.status, 200);
+  const savedMap = JSON.parse(env.DB.database.prepare("SELECT data FROM crm_documents WHERE collection='settings' AND id='main'").get().data).hubspot.map.academy.stageMap;
+  assert.equal(savedMap.active, 'old-active', '기존 매핑은 삭제하지 않지만 신규 단계 매핑으로 쓰지 않는다');
+});
+
+test('이전 학원 딜 큐는 현재 단계로 바꿔 보내지 않고 외부 쓰기 전에 보류한다', async () => {
+  const hs = fakeHubspot(), env = envFor(hs), admin = await setupAdmin(env);
+  await saveMapping(env, admin, hs);
+  await putDoc(env, admin, 'leads', 'old-queue', lead({ pipeline: 'academy', stage: 'won' }));
+  env.DB.database.prepare("DELETE FROM crm_sync_queue WHERE lead_id='old-queue' AND kind='contact'").run();
+  env.DB.database.prepare("UPDATE crm_sync_queue SET status='approved',payload=json_set(payload,'$.stage','active') WHERE lead_id='old-queue' AND kind='deal'").run();
+  const count = hs.calls.length;
+  const sent = await flushQueue(env, 5);
+  assert.deepEqual([sent.done, sent.failed, sent.results[0].code], [0, 1, 'LEGACY_STAGE']);
+  assert.equal(hs.calls.slice(count).filter(c => ['POST', 'PATCH', 'DELETE'].includes(c.method)).length, 0, '연락처 생성까지 포함해 원격 쓰기가 없다');
+  const item = (await queue(env, admin, '?leadId=old-queue')).items[0];
+  assert.equal(item.payload.stage, 'active');
+  assert.equal(item.status, 'failed');
+  assert.ok(item.error.startsWith('LEGACY_STAGE:'));
 });
 
 test('push — 승인된 큐를 HubSpot 에 쓴다: 연락처 생성(중복 검색 먼저)·딜 생성·노트, 리드에 id 가 심기고 연결표가 남는다', async () => {
@@ -976,6 +1027,42 @@ test('자동 동기화 설정 — 관리자·토큰·완전 매핑, 새 변경 �
   hs.routes['GET /crm/v3/pipelines/deals'] = () => ({ results: [] });
   assert.equal((await syncCall(env, admin, { enabled: true })).body.code, 'UNMAPPED');
   assert.equal((await syncCall(env, admin, { enabled: false })).body.automation.enabled, false);
+});
+
+test('자동 동기화 상태 — 센터앱 관리 대기는 별도 집계하고 일반 대기·실패는 계속 오류로 남긴다', async () => {
+  const { env, admin, hs } = await syncSetup();
+  await putDoc(env, admin, 'leads', 'portal-held', lead());
+  const linked = await call(env, 'POST', '/api/portal/link', { token: admin, body: { leadId: 'portal-held', familyId: '101', expectedUpdatedAt: 0 } });
+  assert.equal(linked.status, 200);
+  const before = (await queue(env, admin, '?leadId=portal-held')).items;
+  assert.equal(before.length, 2);
+  assert.ok(before.every(i => i.status === 'pending'));
+  await syncCall(env, admin, { enabled: true });
+  const first = await runHubspotSync(env);
+  assert.equal(first.ok, true, JSON.stringify(first));
+  assert.equal(first.automation.error, '');
+  assert.ok(first.automation.lastSuccessAt > 0);
+  assert.equal(first.automation.lastResult.push.portalHeld, 2);
+  assert.deepEqual((await queue(env, admin, '?leadId=portal-held')).items, before, '센터 관리 대기를 승인·반려·수정하지 않는다');
+  assert.equal(hs.calls.filter(c => ['POST', 'PATCH', 'DELETE'].includes(c.method) && /\/objects\/(contacts|deals|notes)(\/[^/]+)?$/.test(c.path)).length, 0, '센터 고객 원본에 쓰지 않는다');
+
+  env.DB.database.prepare("UPDATE crm_sync_queue SET status='failed',error='UNCERTAIN: 외부 반영 결과 확인 필요' WHERE id=?").run(before[0].id);
+  const failed = await runHubspotSync(env);
+  assert.equal(failed.ok, false);
+  assert.ok(failed.automation.error);
+  assert.equal(failed.automation.lastSuccessAt, first.automation.lastSuccessAt);
+  assert.equal(failed.automation.lastResult.push.portalHeld, 1, '실패·미확정을 센터 관리 대기 안에 숨기지 않는다');
+  env.DB.database.prepare("UPDATE crm_sync_queue SET status='pending',error=NULL WHERE id=?").run(before[0].id);
+
+  await syncCall(env, admin, { enabled: false });
+  await putDoc(env, admin, 'leads', 'ordinary-held', lead());
+  await syncCall(env, admin, { enabled: true });
+  const ordinary = await runHubspotSync(env);
+  assert.equal(ordinary.ok, false);
+  assert.ok(ordinary.automation.error);
+  assert.equal(ordinary.automation.lastSuccessAt, first.automation.lastSuccessAt);
+  assert.equal(ordinary.automation.lastResult.push.portalHeld, 2);
+  assert.equal((await queue(env, admin)).counts.pending, 4, '일반 승인 대기도 자동 승인하지 않는다');
 });
 
 test('자동 양방향 — 연락처·딜 단계 가져오기, 로컬 수정 전송, 딜만 수정해도 순환 읽기, 노트 단방향', async () => {

@@ -5,7 +5,7 @@
  *
  * 도메인(원장 CRM 운영 규칙, 2026-04 agent-crm 정리본을 코드로 옮김):
  *   · 파이프라인 2개 — 검사 여정(신규문의→연락완료→예약확정→검사완료→해석완료→업셀제안→성사/미성사),
- *     학원 등록(트라이얼→트라이얼검토→활성→이탈위험→이탈→성사/미성사). 이름은 원장의 HubSpot 딜 파이프라인과 같게 둬서
+ *     학원 등록(문의→레벨테스트·체험→등록 결정 대기→등록/미등록). 등록 후 상태는 academyStatus로 따로 관리한다. 이름은 HubSpot과 같게 둬서
  *     단계 자동 매핑(라벨 일치)이 바로 걸린다.
  *   · 상담·CS 가 끝난 날이 기준점 — D+3 팔로업1 · D+7 팔로업2 · D+14 최종판정(등록/보류/이탈+사유 P·T·C·W·N·U).
  *   · 유입 채널은 HubSpot 의 wb_source_channel 값 그대로(맘카페·블로그·인스타·당근·지인추천·센터폰·기타). 문의 원문의 낱말로 추정하되
@@ -26,7 +26,7 @@
   const PIPELINE_LABEL = { inspection: '검사 여정', academy: '학원 등록' };
   const STAGES = {
     inspection: ['inquiry', 'contacted', 'booked', 'tested', 'interpreted', 'upsell', 'won', 'lost'],
-    academy: ['trial', 'trial_review', 'active', 'at_risk', 'churned', 'won', 'lost']
+    academy: ['inquiry', 'trial', 'trial_review', 'won', 'lost']
   };
   const STAGE_LABEL = {
     inquiry: '신규문의', contacted: '연락완료', booked: '예약확정', tested: '검사완료', interpreted: '해석완료', upsell: '업셀제안',
@@ -44,6 +44,9 @@
     at_risk: ['이탈위험', '이탈 위험', 'at risk'], churned: ['이탈', 'churned']
   };
   const CLOSED_STAGES = ['won', 'lost', 'churned'];
+  const ACADEMY_STAGE_LABEL = { inquiry: '문의', trial: '레벨테스트·체험', trial_review: '등록 결정 대기', won: '등록(성사)', lost: '미등록' };
+  const ACADEMY_STATUS = ['미등록', '트라이얼', '재원', '이탈', '퇴원', '이탈위험'];
+  const LEGACY_ACADEMY_STATUS = { active: '재원', at_risk: '이탈위험', churned: '이탈' };
   const STATUSES = ['open', 'hold', 'won', 'lost'];
   const STATUS_LABEL = { open: '진행', hold: '장기보류', won: '등록', lost: '이탈' };
 
@@ -318,6 +321,12 @@
   /* ── 상태·단계 ───────────────────────────────────── */
 
   function stagesOf(pipeline) { return STAGES[str(pipeline)] || []; }
+  function stageLabel(pipeline, stage) { return (pipeline === 'academy' && ACADEMY_STAGE_LABEL[stage]) || STAGE_LABEL[stage] || str(stage); }
+  function isLegacyAcademyStage(stage) { return Object.hasOwn(LEGACY_ACADEMY_STATUS, str(stage)); }
+  function academyStatusOf(lead) {
+    const l = isObj(lead) ? lead : {};
+    return clean(l.academyStatus, 20) || (l.pipeline === 'academy' ? LEGACY_ACADEMY_STATUS[l.stage] || '' : '');
+  }
   function isClosed(stage) { return CLOSED_STAGES.includes(str(stage)); }
   /** 단계에서 상태를 유도한다 — 화면과 서버가 같은 답을 내야 한다. */
   function statusOf(stage, requested) {
@@ -343,7 +352,8 @@
     const name = clean(o.name, MAX_NAME);
     if (!name) return invalid('보호자 이름을 입력해 주세요');
     const pipeline = PIPELINES.includes(o.pipeline) ? o.pipeline : 'inspection';
-    const stage = stagesOf(pipeline).includes(o.stage) ? o.stage : stagesOf(pipeline)[0];
+    const legacy = pipeline === 'academy' && isLegacyAcademyStage(o.stage);
+    const stage = stagesOf(pipeline).includes(o.stage) || legacy ? o.stage : stagesOf(pipeline)[0];
     const phone = normalizePhone(o.phone);
     if (o.phone && !phone) return invalid('전화번호 형식이 올바르지 않습니다');
     const email = clean(o.email, 120).toLowerCase();
@@ -362,11 +372,11 @@
       doneAt: validYmd(f.doneAt) ? f.doneAt : '', result: FOLLOWUP_RESULTS.includes(f.result) ? f.result : '', note: clean(f.note, 300)
     })).filter(f => f.day > 0 && f.due);
     const outcomeIn = isObj(o.outcome) ? o.outcome : null;
-    const status = statusOf(stage, o.status);
+    const status = legacy && STATUSES.includes(o.status) ? o.status : statusOf(stage, o.status);
     let outcome = null;
-    if (status === 'won' || status === 'lost' || status === 'hold') {
+    if ((status === 'won' || status === 'lost' || status === 'hold') && (!legacy || outcomeIn)) {
       const reason = status === 'lost' ? (LOST_REASONS.includes(outcomeIn && outcomeIn.reason) ? outcomeIn.reason : 'U') : '';
-      outcome = { status: status, at: outcomeIn && validYmd(outcomeIn.at) ? outcomeIn.at : (c.today || ymdOf(new Date())), reason: reason, note: clean(outcomeIn && outcomeIn.note, 300) };
+      outcome = { status: status, at: outcomeIn && validYmd(outcomeIn.at) ? outcomeIn.at : legacy ? '' : (c.today || ymdOf(new Date())), reason: reason, note: clean(outcomeIn && outcomeIn.note, 300) };
     }
     const retest = validYmd(o.retestDue) ? o.retestDue : retestDue(ins.date, ins.type);
     const data = {
@@ -380,7 +390,7 @@
       inspection: { type: INSPECTION_TYPES.includes(ins.type) ? ins.type : '', date: validYmd(ins.date) ? ins.date : '' },
       retestDue: retest, consultedAt: validYmd(o.consultedAt) ? o.consultedAt : '',
       followups: followups,
-      academyStatus: clean(o.academyStatus, 20),
+      academyStatus: academyStatusOf(o),
       createdAt: validYmd(str(o.createdAt).slice(0, 10)) ? str(o.createdAt).slice(0, 10) : (c.today || ymdOf(new Date())),
       hubspot: isObj(o.hubspot) ? o.hubspot : {}
     };
@@ -507,15 +517,16 @@
     const list = (Array.isArray(hsPipelines) ? hsPipelines : []).filter(isObj);
     const ours = stagesOf(pipeline);
     if (!list.length || !ours.length) return { pipelineId: '', pipelineLabel: '', stageMap: {}, unmapped: ours.slice() };
+    const aliasesOf = k => (pipeline === 'academy' ? [stageLabel(pipeline, k)] : []).concat(STAGE_ALIASES[k] || [STAGE_LABEL[k]]);
     const score = p => {
       const labels = (Array.isArray(p.stages) ? p.stages : []).map(s => normLabel(s.label));
-      return ours.filter(k => (STAGE_ALIASES[k] || [STAGE_LABEL[k]]).some(a => labels.includes(normLabel(a)))).length;
+      return ours.filter(k => aliasesOf(k).some(a => labels.includes(normLabel(a)))).length;
     };
     const byName = list.find(p => normLabel(p.label) === normLabel(PIPELINE_LABEL[pipeline]));
     const pick = byName || list.slice().sort((a, b) => score(b) - score(a))[0];
     const stageMap = {}, unmapped = [];
     ours.forEach(k => {
-      const aliases = (STAGE_ALIASES[k] || [STAGE_LABEL[k]]).map(normLabel);
+      const aliases = aliasesOf(k).map(normLabel);
       const hit = (Array.isArray(pick.stages) ? pick.stages : []).find(s => aliases.includes(normLabel(s.label)) || aliases.includes(normLabel(s.id)));
       if (hit) stageMap[k] = str(hit.id); else unmapped.push(k);
     });
@@ -524,7 +535,7 @@
   /** 역방향 — hs 단계 id → 우리 단계 키. */
   function localStageFor(map, pipeline, hsStageId) {
     const m = isObj(map) && isObj(map[pipeline]) && isObj(map[pipeline].stageMap) ? map[pipeline].stageMap : {};
-    return Object.keys(m).find(k => str(m[k]) === str(hsStageId)) || '';
+    return stagesOf(pipeline).find(k => str(m[k]) === str(hsStageId)) || '';
   }
   function syncTrack(kind, payload) {
     if (kind === 'deal' && isObj(payload) && payload.transition) return 'review';
@@ -859,7 +870,8 @@
 
   return {
     PIPELINES: PIPELINES, PIPELINE_LABEL: PIPELINE_LABEL, STAGES: STAGES, STAGE_LABEL: STAGE_LABEL, STAGE_ALIASES: STAGE_ALIASES,
-    CLOSED_STAGES: CLOSED_STAGES, STATUSES: STATUSES, STATUS_LABEL: STATUS_LABEL,
+    CLOSED_STAGES: CLOSED_STAGES, STATUSES: STATUSES, STATUS_LABEL: STATUS_LABEL, ACADEMY_STATUS: ACADEMY_STATUS,
+    stageLabel: stageLabel, isLegacyAcademyStage: isLegacyAcademyStage, academyStatusOf: academyStatusOf,
     CHANNELS: CHANNELS, CHANNEL_KEYWORDS: CHANNEL_KEYWORDS, HOT_KEYWORDS: HOT_KEYWORDS,
     INSPECTION_TYPES: INSPECTION_TYPES, RETEST_WINDOWS: RETEST_WINDOWS,
     FOLLOWUP_OFFSETS: FOLLOWUP_OFFSETS, FOLLOWUP_LABEL: FOLLOWUP_LABEL, FOLLOWUP_RESULTS: FOLLOWUP_RESULTS, RESULT_LABEL: RESULT_LABEL,

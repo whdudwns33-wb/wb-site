@@ -151,11 +151,12 @@ test('로그아웃 뒤 도착한 이전 동기화 응답은 새 세션 상태에
 
 test('동기화 화면은 서버 상태·부분 결과·오류를 표시하고 실행 중 버튼을 잠근다', () => {
   const h = harness(); prepareAutomation(h, { enabled: true, running: true, error: '<가상 오류>', lastRunAt: 1, lastSuccessAt: 2,
-    lastResult: { pull: { created: 2, updated: 3, conflicts: 4, more: true }, push: { done: 5, failed: 6 } } });
+    lastResult: { pull: { created: 2, updated: 3, conflicts: 4, invalid: 7, retry: 8, portalSkipped: 9, more: true }, push: { done: 5, failed: 6 } } });
   let html = h.run('viewHubspot()');
   assert.ok(html.includes('자동 양방향 동기화') && html.includes('15분'));
   assert.ok(html.includes('동기화 중') && html.includes('다음 주기'));
   assert.ok(html.includes('신규 2') && html.includes('갱신 3') && html.includes('충돌 4') && html.includes('완료 5') && html.includes('실패 6'));
+  assert.ok(html.includes('검증 실패 7') && html.includes('재시도 대기 8') && html.includes('센터앱 관리 9'));
   assert.ok(html.includes('&lt;가상 오류&gt;') && !html.includes('<가상 오류>'));
   const controls = [...html.matchAll(/<button\b[^>]*data-act="hs-auto-(?:toggle|run)"[^>]*>/g)].map(x => x[0]);
   assert.equal(controls.length, 2);
@@ -165,11 +166,111 @@ test('동기화 화면은 서버 상태·부분 결과·오류를 표시하고 �
   assert.ok(!html.includes('data-act="hs-auto-'));
 });
 
+test('수동 가져오기는 검증 실패·재시도·센터앱 제외 수를 표시하고 다음 페이지 결과로 갱신한다', async () => {
+  const h = harness(); prepareAutomation(h);
+  h.run("api=async(path,body)=>{captureRequest(path,body); return body.full ? {created:1,updated:2,conflicts:3,invalid:4,retry:5,portalSkipped:6,more:true} : {created:7,updated:0,conflicts:0,invalid:0,retry:0,portalSkipped:0,more:false};};");
+  await h.run("hsAction('pull',true)");
+  let html = h.run('viewHubspot()');
+  assert.ok(html.includes('새 리드 1') && html.includes('갱신 2') && html.includes('건너뜀(미반영 변경) 3'));
+  assert.ok(html.includes('검증 실패 4') && html.includes('재시도 대기 5') && html.includes('센터앱 관리 6') && html.includes('더 있음'));
+  await h.run("hsAction('pull',false)");
+  html = h.run('viewHubspot()');
+  assert.ok(html.includes('새 리드 7') && html.includes('검증 실패 0') && html.includes('재시도 대기 0') && html.includes('센터앱 관리 0'));
+  assert.ok(!html.includes('더 있음'));
+  assert.deepEqual(h.requests, [{path:'/api/hubspot/pull',body:{full:true}}, {path:'/api/hubspot/pull',body:{full:false}}]);
+});
+
+test('센터앱이 맡은 전송 대기는 실제 실패·완료와 별도로 표시한다', () => {
+  const h = harness(); prepareAutomation(h, { enabled: true, lastSuccessAt: 21, lastResult: { push: { done: 0, failed: 0, portalHeld: 2 } } });
+  let html = h.run('autoSyncHtml(ui.hs.status)');
+  assert.ok(html.includes('보내기 완료 0 · 실패 0 · 센터앱 관리 대기 2'));
+  h.run('ui.hs.status.automation.lastResult.push={done:1,failed:3,portalHeld:0}');
+  html = h.run('autoSyncHtml(ui.hs.status)');
+  assert.ok(html.includes('보내기 완료 1 · 실패 3'));
+  assert.ok(!html.includes('센터앱 관리 대기'));
+});
+
 const lead = { id: 'qa_parent', name: '가상 보호자', phone: '', pipeline: 'inspection', stage: 'inquiry', status: 'open', memo: '기존 메모' };
 function prepareLead(h) {
   h.context.leadFixture = lead;
   h.run("applyDocs([{c:'leads',id:leadFixture.id,data:{...leadFixture},updatedAt:12}],12); route='lead'; leadId=leadFixture.id;");
 }
+
+test('기존 학원 상태는 상세에서 현재 값만 보존하고 새 영업 단계로 옮겨도 등록 후 상태를 유지한다', () => {
+  const h = harness(); prepareLead(h);
+  h.run("state.leads[0]={...state.leads[0],pipeline:'academy',stage:'active',stageAt:'2026-09-01'};");
+  const before = h.read('state.leads[0]');
+  let html = h.run('viewLead(leadFixture.id)');
+  let options = html.match(/id="f-stage"[\s\S]*?<\/select>/)[0];
+  assert.ok(options.includes('<option value="active" selected>활성 (이전 상태 · 영업 단계 확인 필요)</option>'));
+  assert.ok(!options.includes('value="at_risk"') && !options.includes('value="churned"'));
+  assert.ok(html.includes('등록 후 관리 상태</dt><dd>재원'));
+  assert.deepEqual(h.read('state.leads[0]'), before, '표시는 원본을 쓰지 않는다');
+  h.run("moveStage(leadFixture.id,'trial_review')");
+  assert.equal(h.run('leadById(leadFixture.id).stage'), 'trial_review');
+  assert.equal(h.run('leadById(leadFixture.id).academyStatus'), '재원');
+  assert.equal(h.run('leadById(leadFixture.id).outcome'), null);
+  html = h.run('viewLead(leadFixture.id)');
+  options = html.match(/id="f-stage"[\s\S]*?<\/select>/)[0];
+  assert.ok(!options.includes('value="active"') && !options.includes('value="at_risk"') && !options.includes('value="churned"'));
+  h.run("moveStage(leadFixture.id,'at_risk')");
+  assert.equal(h.run('leadById(leadFixture.id).stage'), 'trial_review', '이전 상태로 새 이동은 거절한다');
+});
+
+test('이전 학원 상태는 영업 단계 확인 전 보류·해제를 제안하거나 저장 완료로 처리하지 않는다', () => {
+  for (const status of ['open', 'hold']) {
+    const h = harness(); prepareLead(h);
+    h.context.legacyStatus = status;
+    h.run("today=()=> '2026-10-16'; state.leads[0]={...state.leads[0],pipeline:'academy',stage:'active',status:legacyStatus,consultedAt:'2026-09-01',outcome:legacyStatus==='hold'?{status:'hold',at:'2026-09-02'}:null};");
+    const before = h.read('state.leads[0]');
+    const detail = h.run('viewLead(leadFixture.id)');
+    assert.ok(!detail.includes('data-kind="hold"') && !detail.includes('data-act="unhold"'));
+    assert.ok(detail.includes('영업 단계를 확인해 선택한 뒤'));
+    const todayHtml = h.run('viewToday()');
+    assert.ok(!todayHtml.includes('data-kind="hold"'));
+    if (status === 'open') assert.ok(todayHtml.includes('영업 단계 확인</button>'));
+    h.run("openOutcome(leadFixture.id,'hold'); saveOutcome(leadFixture.id,'hold'); unhold(leadFixture.id);");
+    assert.equal(h.host.hidden, true, '처리할 수 없는 보류 폼을 열지 않는다');
+    assert.equal(h.run('outbox.size()'), 0, '리드·활동 쓰기를 만들지 않는다');
+    assert.deepEqual(h.read('state.leads[0]'), before);
+    assert.ok(h.messages.every(message => message === '영업 단계를 먼저 확인해 주세요'));
+  }
+});
+
+test('등록 후 관리 선택지는 기존 사용자 값을 보존하며 다른 정보 수정으로 지우지 않는다', () => {
+  const h = harness(); prepareLead(h);
+  h.run("state.leads[0]={...state.leads[0],pipeline:'academy',stage:'won',status:'won',outcome:{status:'won',at:'2026-09-01'},academyStatus:'휴원 상담중'};");
+  const html = h.run('leadFormHtml(leadById(leadFixture.id))');
+  const option = html.match(/<option value="([^"]+)" selected>휴원 상담중<\/option>/);
+  assert.ok(option, '알려지지 않은 기존 값도 선택된 선택지로 남긴다');
+  assert.ok(html.includes('<option value="이탈위험">이탈위험</option>'));
+  assert.ok(html.includes('등록 후 관리 상태') && html.includes('영업 단계와 별도로 관리'));
+  h.field('f-name', lead.name); h.field('f-acad', option[1]); h.field('f-memo', '관계 메모만 수정');
+  h.run('openLeadForm(leadFixture.id); saveLeadForm(leadFixture.id);');
+  assert.equal(h.run('leadById(leadFixture.id).academyStatus'), '휴원 상담중');
+  assert.equal(h.run('leadById(leadFixture.id).stage'), 'won');
+  assert.equal(h.run('leadById(leadFixture.id).outcome.at'), '2026-09-01');
+  assert.equal(h.run('leadById(leadFixture.id).memo'), '관계 메모만 수정');
+});
+
+test('이탈위험 관리 상태를 바꿔도 등록 성사와 판정일은 유지한다', () => {
+  const h = harness(); prepareLead(h);
+  h.run("state.leads[0]={...state.leads[0],pipeline:'academy',stage:'won',status:'won',outcome:{status:'won',at:'2026-09-01'},academyStatus:'재원'};");
+  h.field('f-name', lead.name); h.field('f-acad', '이탈위험');
+  h.run('openLeadForm(leadFixture.id); saveLeadForm(leadFixture.id);');
+  assert.equal(h.run('leadById(leadFixture.id).academyStatus'), '이탈위험');
+  assert.equal(h.run('leadById(leadFixture.id).stage'), 'won');
+  assert.equal(h.run('leadById(leadFixture.id).status'), 'won');
+  assert.equal(h.run('leadById(leadFixture.id).outcome.at'), '2026-09-01');
+});
+
+test('WB 속성이 모두 있어도 선택지 보강을 기존 속성 API로 실행할 수 있다', async () => {
+  const h = harness(); prepareAutomation(h);
+  assert.match(h.run('viewHubspot()'), /data-act="hs-props-create"[^>]*>속성 선택지 맞추기<\/button>/);
+  h.run("api=async(path,body)=>{captureRequest(path,body);return {created:[],updated:['wb_academy_status']};};");
+  await h.click('hs-props-create');
+  assert.deepEqual(h.requests, [{path:'/api/hubspot/properties',body:{}}, {path:'/api/hubspot/properties',body:undefined}]);
+});
 
 test('리드 저장은 최초 편집 버전을 보내고 새 기록은 버전 0을 보낸다', async () => {
   const h = harness(); prepareLead(h);
