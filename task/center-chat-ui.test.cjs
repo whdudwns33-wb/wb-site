@@ -7,13 +7,16 @@ const test = require('node:test');
 
 const source = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
 
-test('미등원 팝업은 관리자만, 확인 중 담당자 공유와 계정 전환 초기화를 지원한다', () => {
-  assert.match(source, /option value="missing">미등원/);
+test('미등원·등원·채팅만 표시하고 종료 버튼과 관리자 팝업을 제공한다', () => {
+  assert.doesNotMatch(source, /id="centerChatPresenceStatus"|id="centerChatSummary"/);
   assert.match(functionBlock('saveCenterChatPresence'), /action: 'missing'/);
   assert.match(functionBlock('renderCenterMissing'), /!centerChat.canHandleMissing/);
-  assert.match(functionBlock('renderCenterMissing'), /row.handlerName/);
+  assert.doesNotMatch(functionBlock('renderCenterMissing'), /row.handlerName|확인 중/);
+  assert.match(functionBlock('renderCenterMissing'), /등원 알림 보내기/);
+  assert.match(functionBlock('renderCenterMissing'), /알림 종료/);
   assert.match(functionBlock('renderCenterMissing'), /row.state !== 'resolved'/);
-  assert.match(functionBlock('handleCenterMissing'), /action: 'missing_handle'/);
+  assert.match(functionBlock('handleCenterMissing'), /'missing_arrived' : 'missing_close'/);
+  assert.match(functionBlock('handleCenterMissing'), /confirm\(/);
   assert.match(functionBlock('handleCenterMissing'), /epoch === centerChat.identityEpoch/);
   assert.match(functionBlock('resetCenterChatState'), /missingDismissed: new Set/);
   assert.match(functionBlock('resetCenterChatState'), /centerMissingPopup.*innerHTML = ''/);
@@ -56,7 +59,7 @@ test('버튼은 인증된 관리자·일반 직원·기사시설 화면에 공�
   assert.match(functionBlock('renderCenterChatChrome'), /launcher\.hidden\s*=\s*!show/);
 });
 
-test('한 창은 메시지와 등하원 이벤트를 같은 시간순 흐름으로 그리고 오늘 presence만 요약한다', () => {
+test('이전 기록은 보존하되 등하원 인원 집계는 제거한다', () => {
   const apply = functionBlock('applyCenterChatResult');
   const render = functionBlock('renderCenterChatPanel');
   const item = functionBlock('centerChatItemHtml');
@@ -64,8 +67,7 @@ test('한 창은 메시지와 등하원 이벤트를 같은 시간순 흐름으�
   assert.match(apply, /row && row\.kind === 'presence' \? 'presence' : 'message'/);
   assert.match(render, /centerChat\.items\.slice\(\)\.sort/);
   assert.match(render, /centerChat\.students\.map\(student => \[student\.id, student\.name, student\.grade\]\)/);
-  assert.match(render, /centerChat\.presence\.reduce/);
-  for (const status of ['arrived', 'left', 'absent']) assert.match(render, new RegExp(status));
+  assert.doesNotMatch(render, /centerChat\.presence\.reduce/);
   assert.match(item, /item\.kind === 'presence'/);
   assert.match(item, /item\.body/);
   assert.match(functionBlock('centerChatCreatedAt'), /day === centerChat\.date \? '' : parts\.month \+ '\/' \+ parts\.day/);
@@ -80,8 +82,9 @@ test('센터 소통 API 네 동작은 항상 task app과 현재 auth 및 stable 
   assert.match(list, /sync\.post\('\/center-chat', \{ app: SYNC_APP, auth, action: 'list' \}\)/);
   assert.match(source, /draftMessageId:\s*'ccm_' \+ uid\(\)/);
   assert.match(send, /sync\.post\('\/center-chat', \{ app: SYNC_APP, auth, action: 'send', messageId, body \}\)/);
-  assert.match(presence, /eventId:\s*'cpe_' \+ uid\(\)/);
-  assert.match(presence, /action: 'presence', eventId, studentId, status, expectedRevision/);
+  assert.match(presence, /eventId:\s*'ccm_' \+ uid\(\)/);
+  assert.match(presence, /action: 'missing', requestId, studentId/);
+  assert.doesNotMatch(presence, /action: 'presence'/);
   assert.match(read, /action: 'read', itemId/);
   assert.match(functionBlock('applyCenterChatResult'), /result && result\.lastItemId/);
 });
