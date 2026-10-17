@@ -40,9 +40,21 @@ function slotActiveOnDate(slot, date) {
  * 구형 업무는 repeat/days/time을 제한적으로 보완한다. 비정기 방문 기록은
  * 별도 원장의 실제 날짜와 정규 수업을 섞지 않도록 여기서 제외한다.
  */
-export function lessonOccurrencesOnDate(task, date) {
-  if (!activeOnDate(task, date) || task.scheduleStatus === 'needs_review' ||
-      task.lessonInstanceType === 'makeup' || task.makeupCaseId) return [];
+export function lessonOccurrencesOnDate(task, date, makeupCases = []) {
+  if (!activeOnDate(task, date) || task.scheduleStatus === 'needs_review') return [];
+  if (task.lessonInstanceType === 'makeup' || task.makeupCaseId) {
+    // 취소되거나 재예약된 보강 카드가 남아 있어도 확정 원장의 날짜만 안내한다.
+    const row = makeupCases.find(row => row.case_id === task.makeupCaseId &&
+      row.student_id === task.studentId && row.confirmed_staff_id === task.staffId &&
+      ['confirmed', 'completed'].includes(row.status));
+    if (!row || String(row.confirmed_start_at || '').slice(0, 10) !== date ||
+        String(row.confirmed_end_at || '').slice(0, 10) !== date) return [];
+    const startTime = row.confirmed_start_at.slice(11, 16);
+    const endTime = row.confirmed_end_at.slice(11, 16);
+    if (clockMinute(startTime) === null || clockMinute(endTime) === null ||
+        clockMinute(endTime) <= clockMinute(startTime)) return [];
+    return [{ slotId: '', startTime, endTime, lessonHours: String(task.lessonHours || '') }];
+  }
   const day = dayOf(date);
   const slots = Array.isArray(task.scheduleSlots) ? task.scheduleSlots : [];
   if (slots.length) {
@@ -88,11 +100,12 @@ function candidateSort(left, right) {
  * 한 건만 고른다. 이름으로 연결하지 않고 양쪽 모두 stable studentId가 있는
  * 경우에만 동작한다.
  */
-export function findNextStudentLesson(tasks, currentTaskId, date, teacherNames = {}) {
+function findAdjacentStudentLesson(tasks, currentTaskId, date, teacherNames, makeupCases, previous) {
   const current = (Array.isArray(tasks) ? tasks : []).find(task =>
     task && String(task.id || '') === String(currentTaskId || '') && isLessonTask(task));
   if (!current || !SAFE_ID.test(String(current.studentId || '')) || !validDate(date)) return null;
-  const currentOccurrences = lessonOccurrencesOnDate(current, date);
+  const currentOccurrences = lessonOccurrencesOnDate(current, date, makeupCases);
+  if (!currentOccurrences.length) return null;
   const currentStart = currentOccurrences.length
     ? Math.min(...currentOccurrences.map(slot => clockMinute(slot.startTime)))
     : clockMinute(current.time);
@@ -102,11 +115,13 @@ export function findNextStudentLesson(tasks, currentTaskId, date, teacherNames =
   for (const task of Array.isArray(tasks) ? tasks : []) {
     if (!isLessonTask(task) ||
         String(task.studentId || '') !== String(current.studentId || '')) continue;
-    const occurrences = lessonOccurrencesOnDate(task, date);
+    const occurrences = lessonOccurrencesOnDate(task, date, makeupCases);
     for (const slot of occurrences) {
       const startMinute = clockMinute(slot.startTime);
-      if (startMinute === null || startMinute <= currentStart) continue;
+      if (startMinute === null || (previous ? startMinute >= currentStart : startMinute <= currentStart)) continue;
       const endMinute = clockMinute(slot.endTime);
+      // 겹쳐 진행하는 수업은 직전 수업으로 오인하지 않게 한다.
+      if (previous && (endMinute === null || endMinute > currentStart)) continue;
       candidates.push({
         taskId: String(task.id), studentId: String(task.studentId),
         subject: String(task.subject || task.className || '').trim(),
@@ -119,8 +134,18 @@ export function findNextStudentLesson(tasks, currentTaskId, date, teacherNames =
       });
     }
   }
-  candidates.sort(candidateSort);
+  candidates.sort(previous
+    ? (left, right) => right.endMinute - left.endMinute || candidateSort(right, left)
+    : candidateSort);
   return candidates[0] || null;
+}
+
+export function findNextStudentLesson(tasks, currentTaskId, date, teacherNames = {}, makeupCases = []) {
+  return findAdjacentStudentLesson(tasks, currentTaskId, date, teacherNames, makeupCases, false);
+}
+
+export function findPreviousStudentLesson(tasks, currentTaskId, date, teacherNames = {}, makeupCases = []) {
+  return findAdjacentStudentLesson(tasks, currentTaskId, date, teacherNames, makeupCases, true);
 }
 
 /** API 응답으로 내보낼 허용 필드만 남긴다. 메모·출결·업무지시는 절대 포함하지 않는다. */
