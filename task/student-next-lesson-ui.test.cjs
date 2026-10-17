@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
+const vm = require('node:vm');
 
 const source = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
 
@@ -45,4 +46,27 @@ test('다음 수업 요약은 오늘 화면 렌더 뒤 자동 조회되고 폭�
   assert.match(source, /lesson-next-below/);
   assert.match(source, /\.lesson-next-compact \{ flex: 0 0 auto/);
   assert.match(source, /\.lesson-next-compact \{ flex-basis: 100%;/);
+});
+
+test('이전 수업은 초록색으로 접힌 카드에 표시하며 같은 요청의 최소 필드만 사용한다', () => {
+  const row = block('function taskRow(t, date, editable, isCarry)', 'const LESSON_MEMO_FIELDS');
+  assert.ok(row.indexOf('lessonAttendanceTag') < row.indexOf('studentPreviousLessonCompactHtml(t, date)'));
+  assert.match(source, /lesson-previous-compact \{[^}]*background: #EDF8F0/);
+  const loader = block('async function loadStudentNextLesson', 'function queueTodayNextLessonLoads');
+  assert.equal((loader.match(/sync\.post\(/g) || []).length, 1);
+  assert.match(loader, /previousStudentLessonRows.set\(key, normalizeNextStudentLessonResult\(result.previous, task, date\)\)/);
+  const html = block('function studentPreviousLessonCompactHtml', 'function arrangeLessonNextMeta');
+  const context = { previousStudentLessonRows: new Map(), nextStudentLessonKey: (id, date) => id + '|' + date,
+    esc: value => String(value).replace(/</g, '&lt;') };
+  vm.createContext(context);
+  vm.runInContext(html, context);
+  assert.equal(context.studentPreviousLessonCompactHtml({ id: 'current' }, '2026-10-17'), '');
+  context.previousStudentLessonRows.set('current|2026-10-17', {
+    subject: '<국어>', startTime: '12:00', endTime: '13:00', teacherName: '가상', note: 'SECRET'
+  });
+  const output = context.studentPreviousLessonCompactHtml({ id: 'current' }, '2026-10-17');
+  assert.match(output, /이전 수업/);
+  assert.match(output, /12:00–13:00/);
+  assert.match(output, /가상 선생님/);
+  assert.doesNotMatch(output, /SECRET|<국어>/);
 });
