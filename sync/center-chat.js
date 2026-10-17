@@ -396,6 +396,41 @@ async function missingArrival(env, app, body, origin, actor, json) {
   return json({ ok: true, missing: missingView(saved) }, 200, origin);
 }
 
+async function finishMissing(env, app, body, origin, actor, json) {
+  const requestId = String(body.requestId || '');
+  const studentId = String(body.studentId || '');
+  const outcome = body.action === 'missing_arrived' ? 'arrived' : 'closed';
+  if (!MESSAGE_ID.test(requestId) || !SAFE_ID.test(studentId)) return json({ ok: false, error: '알림을 다시 선택해 주세요' }, 400, origin);
+  // 요청별 종결 ID를 고정해 재시도·동시 클릭으로 등원 메시지가 두 번 나가지 않는다.
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(app + '\n' + requestId));
+  const itemId = 'ccm_' + Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('');
+  const row = await env.DB.prepare('SELECT * FROM center_chat_missing WHERE app=? AND request_id=? AND student_id=?')
+    .bind(app, requestId, studentId).first();
+  if (!row) return json({ ok: false, error: '미등원 알림을 찾을 수 없습니다' }, 404, origin);
+  const messageBody = row.student_name + (outcome === 'arrived' ? ' 등원하였습니다.' : ' 미등원 알림을 종료했습니다.');
+  const resultForClosed = async () => {
+    const saved = await env.DB.prepare('SELECT * FROM center_chat_events WHERE app=? AND item_id=?').bind(app, itemId).first();
+    return saved && saved.body === messageBody
+      ? json({ ok: true, idempotent: true, message: eventView(saved) }, 200, origin)
+      : json({ ok: false, error: '이미 다른 방식으로 마무리된 알림입니다. 최신 내용을 확인해 주세요.' }, 409, origin);
+  };
+  if (row.state === 'resolved') return resultForClosed();
+  const now = Date.now();
+  const guard = actorCondition(actor, app, 'finish_actor');
+  const update = env.DB.prepare("UPDATE center_chat_missing SET state='resolved',resolved_at=? " +
+    "WHERE app=? AND request_id=? AND student_id=? AND state IN ('open','handling') AND " + guard.sql)
+    .bind(now, app, requestId, studentId, ...guard.binds);
+  const cas = await taskWriteCasGuardStatement(env, app, 'center_chat_missing_finish', requestId + '\n' + outcome + '\n' + now, now);
+  const message = env.DB.prepare('INSERT INTO center_chat_events(app,kind,item_id,event_date,actor_staff_id,actor_name,body,created_at) ' +
+    "VALUES(?,'message',?,?,?,?,?,?)").bind(app, itemId, kstDate(now), actor.id, actor.name, messageBody, now);
+  try { await env.DB.batch([update, cas, message]); }
+  catch (error) {
+    if (!isTaskWriteCasConflict(error) && !/UNIQUE/i.test(String(error.message))) throw error;
+    return resultForClosed();
+  }
+  return json({ ok: true, idempotent: false }, 200, origin);
+}
+
 export async function handleCenterChat(env, app, body, origin, auth, json) {
   if (app !== 'task') return json({ ok: false, error: '센터 소통은 업무지시서에서만 사용할 수 있습니다' }, 400, origin);
   if (!await tablesReady(env)) return json({ ok: false, code: 'CENTER_CHAT_NOT_READY',
@@ -403,6 +438,7 @@ export async function handleCenterChat(env, app, body, origin, auth, json) {
   const actor = await actorFor(env, app, auth);
   if (!actor) return json({ ok: false, error: '현재 재직 중인 직원 인증으로 다시 열어 주세요' }, 403, origin);
   const action = String(body && body.action || 'list');
+  if (action === 'missing_arrived' || action === 'missing_close') return finishMissing(env, app, body, origin, actor, json);
   if (action === 'missing' || action === 'missing_handle') return missingArrival(env, app, body, origin, actor, json);
   if (action === 'list') return list(env, app, origin, actor, json);
   if (action === 'send') return send(env, app, body, origin, actor, json);
