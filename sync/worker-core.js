@@ -46,6 +46,7 @@
  *   POST /makeup { app, auth, action, ... }          → 모든 학생의 결석·보강 일정 원장
  *   POST /session-pack { app, auth, action, ... }    → 지정 수업의 회차권·사용 원장
  *   POST /teacher-live-request { app, auth, action, ... } → 담당 선생님→모든 관리자 실시간 요청
+ *   POST /center-chat { app:'task', auth, action, ... } → 전 직원 센터 소통·당일 등원 현황
  *   POST /tuition-alert { app, auth(admin), action, ... } → 학생 단위 4회제 3회 확정 알림
  *   POST /student-attendance { app, auth, studentId, month? } → 담당 학생 출결 달력·현재 4회 진행
  *   POST /student-next-lesson { app, auth, taskId, lessonDate } → 같은 학생의 해당 날짜 다음 수업 1건(최소 정보)
@@ -87,6 +88,7 @@ import { handleRoster } from './roster.js';
 import { handleStudentChange } from './student-change.js';
 import { handleAdminDirective } from './admin-directive.js';
 import { handleTeacherLiveRequest } from './teacher-live-request.js';
+import { handleCenterChat } from './center-chat.js';
 import { handleTaskPush, dispatchTaskPush } from './task-push.js';
 import { handleTuitionAlert, handleStudentAttendance } from './tuition-alert.js';
 import { handleBookIssue } from './book-issue.js';
@@ -3311,6 +3313,11 @@ export default {
           ctx.waitUntil(dispatchTaskPush(env).catch(() => {}));
         }
         return response;
+      }
+      if (url.pathname === '/center-chat') {
+        const auth = await resolveAuth(env, app, body.auth);
+        if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+        return await handleCenterChat(env, app, body, okOrigin, auth, json);
       }
       if (url.pathname === '/tuition-alert') {
         const auth = await resolveAuth(env, app, body.auth);
