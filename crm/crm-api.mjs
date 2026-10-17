@@ -786,9 +786,10 @@ async function remoteSnapshot(client, contactId, available) {
   const deals = ids.length ? await client.readDeals(ids) : [];
   return { contact, deals };
 }
-async function fingerprints(contact, deals) {
-  const sorted = value => Object.fromEntries(Object.keys(value || {}).sort().map(key => [key, value[key]]));
-  return { contactFingerprint: await sha256Hex(JSON.stringify(sorted(contact.properties))),
+async function fingerprints(contact, deals, version = 2) {
+  // HubSpot의 비동기 시각 갱신은 내용 충돌이 아니다. 저장된 v1 기준은 다음 정상 동기화까지 그대로 비교한다.
+  const sorted = value => Object.fromEntries(Object.keys(value || {}).filter(key => version === 1 || !['lastmodifieddate', 'hs_lastmodifieddate'].includes(key)).sort().map(key => [key, value[key]]));
+  return { fingerprintVersion: version, contactFingerprint: await sha256Hex(JSON.stringify(sorted(contact.properties))),
     dealsFingerprint: await sha256Hex(JSON.stringify(deals.map(d => ({ id: d.id, properties: sorted(d.properties) })).sort((a, b) => a.id.localeCompare(b.id)))) };
 }
 async function verifyRemoteBaseline(env, client, available, item) {
@@ -796,7 +797,7 @@ async function verifyRemoteBaseline(env, client, available, item) {
   const contactId = await linkOf(env, item.leadId) || hs.contactId;
   if (!contactId) return;
   if (!hs.contactFingerprint || !hs.dealsFingerprint) throw new Error('REMOTE_BASELINE');
-  const remote = await remoteSnapshot(client, contactId, available), current = await fingerprints(remote.contact, remote.deals);
+  const remote = await remoteSnapshot(client, contactId, available), current = await fingerprints(remote.contact, remote.deals, hs.fingerprintVersion || 1);
   if (current.contactFingerprint !== hs.contactFingerprint || current.dealsFingerprint !== hs.dealsFingerprint) throw new Error('REMOTE_CONFLICT');
 }
 
