@@ -43,9 +43,9 @@ function managerIds(env) {
 async function tablesReady(env) {
   const result = await env.DB.prepare(
     "SELECT name FROM sqlite_master WHERE type='table' AND name IN " +
-    "('center_chat_events','center_chat_presence','center_chat_reads')"
+    "('center_chat_events','center_chat_presence','center_chat_reads','center_chat_missing')"
   ).all();
-  return (result.results || []).length === 3;
+  return (result.results || []).length === 4;
 }
 
 function actorView(actor) {
@@ -173,7 +173,11 @@ async function list(env, app, origin, actor, json) {
   const unread = await unreadCount(env, app, date, actor.id, readSequence);
   const visibleUnread = descending.filter(row => Number(row.feed_seq) > readSequence &&
     String(row.actor_staff_id) !== actor.id).length;
+  const missingRows = await env.DB.prepare('SELECT * FROM center_chat_missing WHERE app=? AND request_date=? ORDER BY created_at DESC')
+    .bind(app, date).all();
+  const missing = (missingRows.results || []).filter(row => activeIds.has(row.student_id)).map(missingView);
   return json({
+    missing, canHandleMissing: actor.id === 'director' || managerIds(env).has(actor.id),
     ok: true, date, actor: actorView(actor), students: roster.students, presence, items,
     lastItemId: descending.length ? String(descending[0].item_id) : '',
     unreadCount: unread, hiddenUnreadCount: Math.max(0, unread - visibleUnread)
@@ -354,6 +358,44 @@ async function read(env, app, body, origin, actor, json) {
     unreadCount: await unreadCount(env, app, kstDate(requestNow), actor.id, saved.read_through_feed_seq) }, 200, origin);
 }
 
+function missingView(row) {
+  return { studentId: row.student_id, requestId: row.request_id, state: row.state,
+    actorName: row.actor_name, createdAt: row.created_at, handlerName: row.handler_name };
+}
+
+async function missingArrival(env, app, body, origin, actor, json) {
+  const studentId = String(body.studentId || '');
+  const now = Date.now(), date = kstDate(now);
+  const roster = await rosterContext(env, app, date);
+  const student = roster.students.find(row => row.id === studentId);
+  if (!student) return json({ ok: false, error: '현재 재원생을 다시 선택해 주세요' }, 409, origin);
+  const actorGuard = actorCondition(actor, app, 'missing_actor');
+  const rosterGuard = activeStudentCondition(app, roster.data, studentId, date, 'missing');
+  if (body.action === 'missing_handle') {
+    if (actor.id !== 'director' && !managerIds(env).has(actor.id)) {
+      return json({ ok: false, error: '관리자만 확인 중으로 변경할 수 있습니다' }, 403, origin);
+    }
+    await env.DB.prepare("UPDATE center_chat_missing SET state='handling',handler_id=?,handler_name=?,handled_at=? " +
+      "WHERE app=? AND request_date=? AND student_id=? AND request_id=? AND state='open' AND " + actorGuard.sql + ' AND ' + rosterGuard.sql)
+      .bind(actor.id, actor.name, now, app, date, studentId, String(body.requestId || ''), ...actorGuard.binds, ...rosterGuard.binds).run();
+  } else {
+    const requestId = String(body.requestId || '');
+    if (!MESSAGE_ID.test(requestId)) return json({ ok: false, error: '요청 ID를 확인해 주세요' }, 400, origin);
+    // INSERT와 알림 생성은 trigger 한 트랜잭션이다. 중복 클릭·동시 요청은 알림을 늘리지 않는다.
+    await env.DB.prepare('INSERT OR IGNORE INTO center_chat_missing ' +
+      '(app,request_date,student_id,request_id,student_name,actor_id,actor_name,created_at) ' +
+      'SELECT ?,?,?,?,?,?,?,? WHERE ' + actorGuard.sql + ' AND ' + rosterGuard.sql +
+      ' AND NOT EXISTS(SELECT 1 FROM center_chat_presence WHERE app=? AND presence_date=? AND student_id=?)')
+      .bind(app, date, studentId, requestId, student.name, actor.id, actor.name, now,
+        ...actorGuard.binds, ...rosterGuard.binds, app, date, studentId).run();
+  }
+  const saved = await env.DB.prepare('SELECT * FROM center_chat_missing WHERE app=? AND request_date=? AND student_id=?')
+    .bind(app, date, studentId).first();
+  if (!saved || saved.state === 'resolved') return json({ ok: false,
+    error: '이미 등원·하원·결석으로 처리되었거나 요청이 마무리되었습니다. 수업 간 이동은 메시지로 알려 주세요.' }, 409, origin);
+  return json({ ok: true, missing: missingView(saved) }, 200, origin);
+}
+
 export async function handleCenterChat(env, app, body, origin, auth, json) {
   if (app !== 'task') return json({ ok: false, error: '센터 소통은 업무지시서에서만 사용할 수 있습니다' }, 400, origin);
   if (!await tablesReady(env)) return json({ ok: false, code: 'CENTER_CHAT_NOT_READY',
@@ -361,6 +403,7 @@ export async function handleCenterChat(env, app, body, origin, auth, json) {
   const actor = await actorFor(env, app, auth);
   if (!actor) return json({ ok: false, error: '현재 재직 중인 직원 인증으로 다시 열어 주세요' }, 403, origin);
   const action = String(body && body.action || 'list');
+  if (action === 'missing' || action === 'missing_handle') return missingArrival(env, app, body, origin, actor, json);
   if (action === 'list') return list(env, app, origin, actor, json);
   if (action === 'send') return send(env, app, body, origin, actor, json);
   if (action === 'presence') return presence(env, app, body, origin, actor, json);
