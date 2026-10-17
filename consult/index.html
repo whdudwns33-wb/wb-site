@@ -193,6 +193,7 @@
   .tag.edit { background: #FFF7ED; color: var(--amber); }
   .tag.usage-today { background: #E7F7EE; color: #2E6E49; }
   .tag.usage-recent { background: #FFF7D7; color: #755E0A; }
+  .tag.usage-connected { background: #EAF3FF; color: #285F96; }
   .tag.usage-idle { background: #F0F2F4; color: #626B75; }
   .tag.subscription { background: #F1ECFF; color: #5B3E8D; }
   .tag.subscription-paid { background: #E7F7EE; color: #2E6E49; }
@@ -1588,7 +1589,8 @@ function setCheck(taskId, date, patch) {
     return null;
   }
   const cur = state.checks[k] || { taskId: taskId, date: date, done: false, note: '', steps: {}, count: 0, blocked: false };
-  const next = Object.assign({}, cur, patch, { updatedAt: now() });
+  const updatedAt = Math.max(now(), Number(cur.updatedAt || 0) + 1, Number(state.settings.pushAt || 0) + 1);
+  const next = Object.assign({}, cur, patch, { updatedAt: updatedAt });
   state.checks[k] = next;
   const stored = save();
   queueSync();
@@ -1870,6 +1872,7 @@ function restoreRewardProcessingLock(staffRows, rewardRows) {
 
 const sync = {
   busy: false, dirty: false, last: null, timer: null, loud: false, err: '', pendingRender: false,
+  confirmed: new Map(),
 
   url() { return SYNC_URL; },
 
@@ -1959,10 +1962,15 @@ const sync = {
   async run(duringStudentConnect) {
     const auth = this.auth();
     if (!auth || this.busy || (studentConnectBusy && !duringStudentConnect)) return;
+    this.confirmed = new Map();
     this.busy = true; paintStatus();
     try {
       const t0 = now();
       const pending = this.collect(Number(state.settings.pushAt) || 0);
+      const expected = new Map(pending.map(change => [
+        change.table + '\n' + String(change.table === 'checks' ? change.k : change.id),
+        { updatedAt: Number(change.updated_at) || 0, json: JSON.stringify(change.data) }
+      ]));
       let more = true, pullPages = 0, localCursorSaved = false, applied = 0;
       while (pending.length || more) {
         const batch = pending.splice(0, 400);
@@ -1971,6 +1979,13 @@ const sync = {
           dataGeneration: Number(state.settings.dataGeneration) || 0,
           since: Number(state.settings.pullAt) || 0,
           changes: batch
+        });
+        (d.changes || []).forEach(change => {
+          const key = String(change.table || '') + '\n' + String(change.key || '');
+          const wanted = expected.get(key);
+          if (wanted && Number(change.updated_at) === wanted.updatedAt && JSON.stringify(change.data) === wanted.json) {
+            this.confirmed.set(key, wanted.updatedAt);
+          }
         });
         if (Number.isSafeInteger(Number(d.dataGeneration))) state.settings.dataGeneration = Number(d.dataGeneration);
         applied += this.apply(d.changes);
@@ -2028,6 +2043,8 @@ const sync = {
         clearConsultLinkContacts();
         save(); session.lock(); render();
         toast('로그인 기간이 끝났습니다 · 다시 로그인해 주세요');
+      } else if (auth.mode === 'person' && e.status === 401) {
+        toast('학생 연결 인증이 만료되었거나 이 기기 인증이 해제되었습니다 · 원장님께 새 개인 링크를 요청해 주세요');
       }
       this.dirty = true; this.err = String(e && e.message || e);
       if (this.loud) toast('동기화 실패 — ' + this.err);
@@ -2250,6 +2267,57 @@ async function waitForSyncIdle(timeoutMs) {
   return !sync.busy;
 }
 
+/** 마감 완료는 서버 정본에 반영된 뒤에만 성공으로 처리한다. */
+async function saveStudentCloseout(taskId, date, nextClose, previousClose, label) {
+  clearTimeout(sync.timer);
+  if (!sync.enabled() || !(await waitForSyncIdle())) {
+    toast(label + '을 서버에 저장하지 못했습니다 · 학생 개인 링크를 다시 연결한 뒤 재시도해 주세요');
+    return false;
+  }
+  sync.err = '';
+  await sync.run();
+  if (sync.err) {
+    toast(label + ' 전 기록을 서버에 먼저 저장하지 못했습니다 · 새 개인 링크로 재연결한 뒤 다시 완료해 주세요');
+    return false;
+  }
+  const freshClose = Object.assign({}, ((getCheck(taskId, date) || {}).close) || {});
+  if (JSON.stringify(freshClose) !== JSON.stringify(previousClose)) {
+    if (['complete', 'overridden'].includes(freshClose.status)) return true;
+    toast(label + ' 기록이 다른 기기에서 변경되었습니다 · 최신 내용을 확인한 뒤 다시 완료해 주세요');
+    return false;
+  }
+  const saved = setCheck(taskId, date, { close: nextClose, done: true });
+  if (!saved) return false;
+  clearTimeout(sync.timer);
+  sync.err = '';
+  await sync.run();
+  const confirmKey = 'checks\n' + ckey(taskId, date);
+  const pushed = !sync.err && Number(sync.confirmed.get(confirmKey) || 0) === Number(saved.updatedAt || 0) &&
+    Number(state.settings.pushAt || 0) >= Number(saved.updatedAt || 0);
+  if (pushed) return true;
+  setCheck(taskId, date, { close: previousClose, done: true });
+  toast(label + '을 서버에 저장하지 못했습니다 · 기록은 이 기기에 보관 중이며 새 개인 링크로 재연결한 뒤 다시 완료해 주세요');
+  return false;
+}
+
+/** 첫 정상 학생 연결일을 한 번만 남겨 그 이전 과제를 소급 마감시키지 않는다. */
+async function ensureCloseoutActivation(duringStudentConnect) {
+  const staffId = session.isStaffLink ? session.staffId : '';
+  if (!staffId || !staffById(staffId) || closeoutActivationDate(staffId)) return closeoutActivationDate(staffId);
+  const saved = setCheck(closeoutActivationKey(staffId), 'all', {
+    kind: 'consult_closeout_activation', activatedOn: today()
+  });
+  if (!saved || !sync.enabled()) return '';
+  clearTimeout(sync.timer);
+  if (!(await waitForSyncIdle())) return '';
+  sync.err = '';
+  await sync.run(!!duringStudentConnect);
+  const confirmedAt = Number(sync.confirmed.get('checks\n' + ckey(closeoutActivationKey(staffId), 'all')) || 0);
+  if (sync.err || confirmedAt !== Number(saved.updatedAt || 0) ||
+      Number(state.settings.pushAt || 0) < Number(saved.updatedAt || 0)) return '';
+  return closeoutActivationDate(staffId);
+}
+
 async function connectStudentLink(allowExchange) {
   const code = pendingStudentCode;
   let staffId = session.staffId;
@@ -2267,6 +2335,7 @@ async function connectStudentLink(allowExchange) {
       sync.err = '';
       await sync.run(true);
       if (!sync.err && staffById(staffId) && studentCacheScopedTo(staffId)) {
+        await ensureCloseoutActivation(true);
         pendingStudentCode = '';
         studentConnectNeedsApproval = false;
         clearStudentCodeHash();
@@ -2282,8 +2351,10 @@ async function connectStudentLink(allowExchange) {
       studentConnectError = '';
       return;
     }
+    const cachedStaffId = staffId || ((state.staff || []).length === 1 ? String(state.staff[0].id || '') : '');
+    const canRecoverStudent = !!cachedStaffId && !!staffById(cachedStaffId) && studentCacheScopedTo(cachedStaffId);
     const unsent = sync.collect(Number(state.settings.pushAt) || 0);
-    if (unsent.length) {
+    if (unsent.length && !canRecoverStudent) {
       studentConnectError = '이 브라우저에 아직 동기화되지 않은 기록이 있습니다. 기존 원장 또는 학생 화면으로 돌아가 동기화한 뒤 같은 링크를 다시 열어 주세요.';
       return;
     }
@@ -2298,6 +2369,12 @@ async function connectStudentLink(allowExchange) {
       invalid.status = 422;
       throw invalid;
     }
+    if (unsent.length && canRecoverStudent && cachedStaffId !== resolvedStaffId) {
+      const mismatch = new Error('이 브라우저의 미전송 기록과 다른 학생 링크입니다');
+      mismatch.status = 409;
+      throw mismatch;
+    }
+    const recoveringSameStudent = canRecoverStudent && cachedStaffId === resolvedStaffId;
     if (!staffId) {
       const next = new URL(location.href);
       next.searchParams.set('u', resolvedStaffId);
@@ -2305,12 +2382,19 @@ async function connectStudentLink(allowExchange) {
       staffId = resolvedStaffId;
     }
     pendingStudentCode = '';
-    const stored = resetStudentLinkCache(d.token);
+    let stored = false;
+    if (recoveringSameStudent) {
+      state.settings.myToken = String(d.token || '');
+      stored = save();
+    } else {
+      stored = resetStudentLinkCache(d.token);
+    }
     clearStudentCodeHash();
     sessionStorage.removeItem(STUDENT_LINK_BLOCK_KEY);
     if (!stored) return;
     sync.loud = true;
     await sync.run(true);
+    if (!sync.err) await ensureCloseoutActivation(true);
     route = 'today';
     location.hash = '#/today';
     render();
@@ -2983,7 +3067,7 @@ function viewToday() {
   if (editable && cursor === today()) {
     h += '<button class="btn btn-ghost btn-block mb8" data-act="newtask">＋ 업무 추가</button>';
   }
-  if (cursor >= DAILY_CLOSE_START && cursor <= today()) h += dailyClosureCard(me, cursor);
+  if (cursor >= DAILY_CLOSE_START && cursor <= today() && closeoutDateApplies(me.id, cursor)) h += dailyClosureCard(me, cursor);
   return h;
 }
 
@@ -6546,6 +6630,19 @@ function weekPlanOf(staffId, anchor) {
   return Object.assign({ subjectGoals: {}, reflection: '', directorNote: '', nextFocus: '' }, (c && c.plan) || {});
 }
 const WEEK_CLOSE_START = '2026-08-17';
+const closeoutActivationKey = staffId => '__closeactive__' + staffId;
+function closeoutActivationDate(staffId) {
+  const row = getCheck(closeoutActivationKey(staffId), 'all');
+  const date = String((row && row.activatedOn) || '');
+  return /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : '';
+}
+function closeoutDateApplies(staffId, date) {
+  const activatedOn = closeoutActivationDate(staffId);
+  return !!activatedOn && date >= activatedOn;
+}
+function closeoutWeekApplies(staffId, anchor) {
+  return closeoutDateApplies(staffId, addDays(mondayOf(anchor), 6));
+}
 const weekCloseKey = staffId => '__weekclose__' + staffId;
 function weekCloseOf(staffId, anchor) {
   const mon = mondayOf(anchor);
@@ -6565,6 +6662,7 @@ function weekCloseDays(anchor) {
 function weekCloseFollowups(staffId, anchor) {
   const out = [];
   weekCloseDays(anchor).forEach(date => {
+    if (!closeoutDateApplies(staffId, date)) return;
     const daily = dailyCloseOf(staffId, date);
     const items = daily.itemSnapshot.length ? daily.itemSnapshot : dailyCloseStudyItems(staffId, date);
     items.filter(item => !item.done).forEach(item => {
@@ -6617,7 +6715,7 @@ function weekHadActivity(staffId, anchor) {
 }
 function weekCloseUnclosedDays(staffId, anchor) {
   return weekCloseDays(anchor).filter(date => {
-    if (date < DAILY_CLOSE_START) return false;
+    if (date < DAILY_CLOSE_START || !closeoutDateApplies(staffId, date)) return false;
     const close = dailyCloseOf(staffId, date);
     const active = dailyCloseStudyItems(staffId, date).length || stTotal(staffId, date) > 0 || close.reviewedAt;
     return active && !dailyCloseState(staffId, date).complete;
@@ -6631,13 +6729,14 @@ function weekCloseAvailable(anchor) {
   return mon >= WEEK_CLOSE_START && today() >= addDays(mon, 6);
 }
 function previousUnclosedWeek(staffId, date) {
+  if (!closeoutActivationDate(staffId)) return '';
   const currentMon = mondayOf(date);
   const weeks = [];
   for (let mon = addDays(currentMon, -7), guard = 0; mon >= WEEK_CLOSE_START && guard++ < 520; mon = addDays(mon, -7)) {
     weeks.unshift(mon);
   }
   for (const mon of weeks) {
-    if (weekHadActivity(staffId, mon) && !weekCloseComplete(staffId, mon)) return mon;
+    if (closeoutWeekApplies(staffId, mon) && weekHadActivity(staffId, mon) && !weekCloseComplete(staffId, mon)) return mon;
   }
   return '';
 }
@@ -6645,6 +6744,7 @@ function weekCloseStatusLabel(staffId, anchor) {
   const close = weekCloseOf(staffId, anchor);
   if (close.status === 'complete') return { key: 'complete', label: '주간 마감 완료' };
   if (close.status === 'overridden') return { key: 'complete', label: '원장 대신 마감' };
+  if (!closeoutWeekApplies(staffId, anchor)) return { key: 'legacy', label: '마감 적용 전' };
   if (!weekCloseAvailable(anchor)) return { key: 'future', label: '일요일 마감 예정' };
   if (close.status === 'reviewed') return { key: 'ready', label: '보고 전' };
   return { key: 'open', label: '주간 마감 필요' };
@@ -6713,19 +6813,20 @@ function weekCloseCard(student, mon) {
   const summary = close.summary || weekCloseSummary(student.id, mon);
   const studentMode = session.isStaffLink && session.staffId === student.id;
   const complete = weekCloseComplete(student.id, mon);
+  const applies = closeoutWeekApplies(student.id, mon);
   let action = '';
   if (studentMode) {
     if (complete) action = '<button class="btn btn-ghost btn-block" data-act="weekreportopen" data-mon="' + mon + '">주간 보고 다시 보기</button>';
-    else if (weekCloseAvailable(mon)) action = '<button class="btn btn-navy btn-block" data-act="weekcloseopen" data-mon="' + mon + '">주간 마무리 시작</button>';
+    else if (applies && weekCloseAvailable(mon)) action = '<button class="btn btn-navy btn-block" data-act="weekcloseopen" data-mon="' + mon + '">주간 마무리 시작</button>';
   } else if (session.isAdmin) {
     action = complete
       ? '<button class="btn btn-ghost btn-block" data-act="weekreportopen" data-mon="' + mon + '">주간 마감 기록 보기</button>'
-      : (weekCloseAvailable(mon) ? '<button class="btn btn-ghost btn-block" data-act="weekoverrideopen" data-mon="' + mon + '">원장이 대신 마감</button>' : '');
+      : (applies && weekCloseAvailable(mon) ? '<button class="btn btn-ghost btn-block" data-act="weekoverrideopen" data-mon="' + mon + '">원장이 대신 마감</button>' : '');
   }
-  return '<div class="card week-close-card' + (complete ? ' complete' : '') + '">' +
+  return '<div class="card week-close-card' + (complete || !applies ? ' complete' : '') + '">' +
     '<div class="between"><div><div class="card-title">🔐 이번 주 최종 마감</div>' +
       '<div class="card-sub">일요일 하루 마감 뒤 주간 회고와 보고 발송까지 완료합니다.</div></div>' +
-      '<span class="pill ' + (status.key === 'complete' ? '' : status.key === 'future' ? 'warn' : 'bad') + '">' + status.label + '</span></div>' +
+      '<span class="pill ' + (status.key === 'complete' || status.key === 'legacy' ? '' : status.key === 'future' ? 'warn' : 'bad') + '">' + status.label + '</span></div>' +
     '<div class="week-close-summary">' +
       '<div><span>학습 완료</span><b>' + summary.done + '/' + summary.total + ' · ' + summary.pct + '%</b></div>' +
       '<div><span>주간 순공</span><b>' + fmtDur(summary.totalSecs) + '</b></div>' +
@@ -6733,7 +6834,7 @@ function weekCloseCard(student, mon) {
       '<div><span>미완료 정리</span><b>' + (close.itemSnapshot.length || weekCloseFollowups(student.id, mon).length) + '건</b></div>' +
     '</div>' +
     (close.status === 'overridden' && close.overrideReason ? '<div class="hint mb14">원장 대신 처리 사유: ' + esc(close.overrideReason) + '</div>' : '') +
-    (action || '<div class="hint">일요일 학습을 마감한 뒤 이 단계가 열립니다.</div>') + '</div>';
+    (action || '<div class="hint">' + (!applies ? '마감 적용 전 기록이며 다시 마감할 필요가 없습니다.' : '일요일 학습을 마감한 뒤 이 단계가 열립니다.') + '</div>') + '</div>';
 }
 
 function weekCloseModal(staffId, mon) {
@@ -6968,6 +7069,9 @@ function monthPlanOf(staffId, ym) {
 const MONTH_CLOSE_START = '2026-08';
 const monthCloseKey = staffId => '__monthclose__' + staffId;
 const monthLastDate = ym => addDays(ymAdd(ym, 1) + '-01', -1);
+function closeoutMonthApplies(staffId, ym) {
+  return closeoutDateApplies(staffId, monthLastDate(ym));
+}
 function monthCloseOf(staffId, ym) {
   const check = state.checks[monthCloseKey(staffId) + '|' + ym];
   const close = Object.assign({
@@ -6981,6 +7085,7 @@ function monthCloseOf(staffId, ym) {
 function monthCloseFollowups(staffId, ym) {
   const out = [];
   monthDates(ym).forEach(date => {
+    if (!closeoutDateApplies(staffId, date)) return;
     const daily = dailyCloseOf(staffId, date);
     const items = daily.itemSnapshot.length ? daily.itemSnapshot : dailyCloseStudyItems(staffId, date);
     items.filter(item => !item.done).forEach(item => {
@@ -7030,7 +7135,7 @@ function monthHadActivity(staffId, ym) {
 }
 function monthCloseUnclosedDays(staffId, ym) {
   return monthDates(ym).filter(date => {
-    if (date < DAILY_CLOSE_START || date > today()) return false;
+    if (date < DAILY_CLOSE_START || date > today() || !closeoutDateApplies(staffId, date)) return false;
     const close = dailyCloseOf(staffId, date);
     const active = dailyCloseStudyItems(staffId, date).length || stTotal(staffId, date) > 0 || close.reviewedAt;
     return active && !dailyCloseState(staffId, date).complete;
@@ -7040,7 +7145,7 @@ function monthCloseUnclosedWeeks(staffId, ym) {
   const weeks = [];
   monthDates(ym).filter(date => dowOf(date) === 0 && date <= today()).forEach(sunday => {
     const mon = mondayOf(sunday);
-    if (mon >= WEEK_CLOSE_START && weekHadActivity(staffId, mon) && !weekCloseComplete(staffId, mon)) weeks.push(mon);
+    if (mon >= WEEK_CLOSE_START && closeoutWeekApplies(staffId, mon) && weekHadActivity(staffId, mon) && !weekCloseComplete(staffId, mon)) weeks.push(mon);
   });
   return weeks;
 }
@@ -7051,11 +7156,12 @@ function monthCloseAvailable(ym) {
   return ym >= MONTH_CLOSE_START && today() >= monthLastDate(ym);
 }
 function previousUnclosedMonth(staffId, date) {
+  if (!closeoutActivationDate(staffId)) return '';
   const currentYm = ymOf(date);
   const months = [];
   for (let ym = ymAdd(currentYm, -1), guard = 0; ym >= MONTH_CLOSE_START && guard++ < 120; ym = ymAdd(ym, -1)) months.unshift(ym);
   for (const ym of months) {
-    if (monthHadActivity(staffId, ym) && !monthCloseComplete(staffId, ym)) return ym;
+    if (closeoutMonthApplies(staffId, ym) && monthHadActivity(staffId, ym) && !monthCloseComplete(staffId, ym)) return ym;
   }
   return '';
 }
@@ -7063,6 +7169,7 @@ function monthCloseStatusLabel(staffId, ym) {
   const close = monthCloseOf(staffId, ym);
   if (close.status === 'complete') return { key: 'complete', label: '월간 마감 완료' };
   if (close.status === 'overridden') return { key: 'complete', label: '원장 대신 마감' };
+  if (!closeoutMonthApplies(staffId, ym)) return { key: 'legacy', label: '마감 적용 전' };
   if (!monthHadActivity(staffId, ym)) return { key: 'empty', label: '기록 없음 · 마감 제외' };
   if (!monthCloseAvailable(ym)) return { key: 'future', label: '말일 마감 예정' };
   if (close.status === 'reviewed') return { key: 'ready', label: '보고 전' };
@@ -7122,19 +7229,20 @@ function monthCloseCard(student, ym) {
   const studentMode = session.isStaffLink && session.staffId === student.id;
   const complete = monthCloseComplete(student.id, ym);
   const hasActivity = monthHadActivity(student.id, ym);
+  const applies = closeoutMonthApplies(student.id, ym);
   let action = '';
   if (studentMode) {
     if (complete) action = '<button class="btn btn-ghost btn-block" data-act="monthreportopen" data-ym="' + ym + '">월간 보고 다시 보기</button>';
-    else if (hasActivity && monthCloseAvailable(ym)) action = '<button class="btn btn-navy btn-block" data-act="monthcloseopen" data-ym="' + ym + '">월간 마무리 시작</button>';
+    else if (applies && hasActivity && monthCloseAvailable(ym)) action = '<button class="btn btn-navy btn-block" data-act="monthcloseopen" data-ym="' + ym + '">월간 마무리 시작</button>';
   } else if (session.isAdmin) {
     action = complete
       ? '<button class="btn btn-ghost btn-block" data-act="monthreportopen" data-ym="' + ym + '">월간 마감 기록 보기</button>'
-      : (hasActivity && monthCloseAvailable(ym) ? '<button class="btn btn-ghost btn-block" data-act="monthoverrideopen" data-ym="' + ym + '">원장이 대신 마감</button>' : '');
+      : (applies && hasActivity && monthCloseAvailable(ym) ? '<button class="btn btn-ghost btn-block" data-act="monthoverrideopen" data-ym="' + ym + '">원장이 대신 마감</button>' : '');
   }
-  return '<div class="card week-close-card month-close-card' + (complete || !hasActivity ? ' complete' : '') + '">' +
+  return '<div class="card week-close-card month-close-card' + (complete || !hasActivity || !applies ? ' complete' : '') + '">' +
     '<div class="between"><div><div class="card-title">🔐 이번 달 최종 마감</div>' +
       '<div class="card-sub">말일 하루 마감 뒤 월간 회고와 보고 발송까지 완료합니다.</div></div>' +
-      '<span class="pill ' + (status.key === 'complete' || status.key === 'empty' ? '' : status.key === 'future' ? 'warn' : 'bad') + '">' + status.label + '</span></div>' +
+      '<span class="pill ' + (status.key === 'complete' || status.key === 'empty' || status.key === 'legacy' ? '' : status.key === 'future' ? 'warn' : 'bad') + '">' + status.label + '</span></div>' +
     '<div class="week-close-summary">' +
       '<div><span>학습 완료</span><b>' + summary.done + '/' + summary.total + ' · ' + summary.pct + '%</b></div>' +
       '<div><span>월간 순공</span><b>' + fmtDur(summary.totalSecs) + '</b></div>' +
@@ -7142,7 +7250,7 @@ function monthCloseCard(student, ym) {
       '<div><span>월간 목표</span><b>' + summary.goalsDone + '/' + summary.goalsTotal + '개</b></div>' +
     '</div>' +
     (close.status === 'overridden' && close.overrideReason ? '<div class="hint mb14">원장 대신 처리 사유: ' + esc(close.overrideReason) + '</div>' : '') +
-    (action || '<div class="hint">' + (hasActivity ? '매월 말일 학습을 마감한 뒤 이 단계가 열립니다.' : '이 달에는 마감할 학습·목표·일정 기록이 없습니다.') + '</div>') + '</div>';
+    (action || '<div class="hint">' + (!applies ? '마감 적용 전 기록이며 다시 마감할 필요가 없습니다.' : hasActivity ? '매월 말일 학습을 마감한 뒤 이 단계가 열립니다.' : '이 달에는 마감할 학습·목표·일정 기록이 없습니다.') + '</div>') + '</div>';
 }
 
 function monthCloseModal(staffId, ym) {
@@ -7847,9 +7955,9 @@ function pointHistoryModal(staffId) {
 }
 
 function dailyCloseStatusLabel(staffId, date) {
-  if (date < DAILY_CLOSE_START) return { key: 'legacy', label: '도입 전' };
   const data = dailyCloseState(staffId, date);
   if (data.complete) return { key: 'complete', label: '마감 완료' };
+  if (date < DAILY_CLOSE_START || !closeoutDateApplies(staffId, date)) return { key: 'legacy', label: '마감 적용 전' };
   if (date > today()) return { key: 'future', label: '예정' };
   if (data.canReport) return { key: 'ready', label: '보고 전' };
   if (data.close.reviewedAt) return { key: 'changed', label: '재확인 필요' };
@@ -7858,10 +7966,11 @@ function dailyCloseStatusLabel(staffId, date) {
 }
 
 function dailyUnclosedDates(staffId, date) {
+  if (!closeoutActivationDate(staffId)) return [];
   const out = [];
   for (let offset = 7; offset >= 1; offset--) {
     const target = addDays(date, -offset);
-    if (target < DAILY_CLOSE_START) continue;
+    if (target < DAILY_CLOSE_START || !closeoutDateApplies(staffId, target)) continue;
     const close = dailyCloseOf(staffId, target);
     const hadStudy = dailyCloseStudyItems(staffId, target).length || stTotal(staffId, target) > 0 || close.reviewedAt;
     if (hadStudy && !dailyCloseState(staffId, target).complete) out.push(target);
@@ -10360,10 +10469,12 @@ function studentUsage(staffId) {
   });
   const date = lastAt ? ymd(new Date(lastAt)) : '';
   const days = date ? Math.max(0, Math.round((parseYmd(today()) - parseYmd(date)) / 86400000)) : Infinity;
+  const connectedOn = closeoutActivationDate(staffId);
   const p = progress(staffId, today());
   return {
-    status: days === 0 ? 'today' : days <= 7 ? 'recent' : 'idle',
-    lastLabel: !date ? '학습 기록 없음' : days === 0 ? '오늘' : days === 1 ? '어제' : shortDate(date) + ' · ' + days + '일 전',
+    status: days === 0 ? 'today' : days <= 7 ? 'recent' : connectedOn ? 'connected' : 'idle',
+    lastLabel: !date ? (connectedOn ? '연결 확인 · 학습 기록 없음' : '학습 기록 없음') :
+      days === 0 ? '오늘' : days === 1 ? '어제' : shortDate(date) + ' · ' + days + '일 전',
     done: p.done, total: p.total, secs: stTotal(staffId, today()),
     closed: dailyCloseState(staffId, today()).complete
   };
@@ -10372,7 +10483,8 @@ function studentUsage(staffId) {
 function studentUsageLine(student) {
   if (student.owner || student.manager) return '';
   const usage = studentUsage(student.id);
-  const label = usage.status === 'today' ? '● 오늘 학습' : usage.status === 'recent' ? '● 최근 학습' : '● 확인 필요';
+  const label = usage.status === 'today' ? '● 오늘 학습' : usage.status === 'recent' ? '● 최근 학습' :
+    usage.status === 'connected' ? '● 연결 완료' : '● 확인 필요';
   return '<div class="student-usage-line"><span class="tag usage-' + usage.status + '">' + label + '</span>' +
     '<span class="small muted">최근 기록 ' + usage.lastLabel + ' · 오늘 순공 ' + fmtDur(usage.secs) +
     ' · 체크 ' + usage.done + '/' + usage.total + ' · 하루 마감 ' + (usage.closed ? '완료' : '미완료') + '</span></div>';
@@ -11514,7 +11626,7 @@ function applyAssignments(input, preConfirmed) {
 /* ══════════════════════════════════════════════════════
    10. 이벤트
    ══════════════════════════════════════════════════════ */
-document.addEventListener('click', ev => {
+document.addEventListener('click', async ev => {
   const goEl = ev.target.closest('[data-go]');
   if (goEl) { go(goEl.dataset.go); return; }
 
@@ -13077,8 +13189,9 @@ document.addEventListener('click', ev => {
     case 'weekcloseopen': {
       const me = currentStaff();
       const mon = el.dataset.mon || mondayOf(cursor);
-      if (!session.isStaffLink || !me || me.id !== session.staffId || mon < WEEK_CLOSE_START) break;
+      if (!session.isStaffLink || !me || me.id !== session.staffId || mon < WEEK_CLOSE_START || !closeoutWeekApplies(me.id, mon)) break;
       if (weekCloseComplete(me.id, mon)) { weekReportModal(me.id, mon); break; }
+      if (weekCloseOf(me.id, mon).status === 'reviewed') { weekReportModal(me.id, mon); break; }
       if (!weekCloseAvailable(mon)) return toast('주간 마무리는 일요일부터 할 수 있습니다');
       const unclosedDays = weekCloseUnclosedDays(me.id, mon);
       if (unclosedDays.length) {
@@ -13091,7 +13204,7 @@ document.addEventListener('click', ev => {
     case 'weekclosesave': {
       const me = currentStaff();
       const mon = el.dataset.mon || mondayOf(cursor);
-      if (!session.isStaffLink || !me || me.id !== session.staffId || !weekCloseAvailable(mon)) break;
+      if (!session.isStaffLink || !me || me.id !== session.staffId || !weekCloseAvailable(mon) || !closeoutWeekApplies(me.id, mon)) break;
       if (weekCloseUnclosedDays(me.id, mon).length) return toast('남은 하루 마감부터 완료해 주세요');
       const reflection = (($('#weekCloseReflection') || {}).value || '').trim();
       const difficulty = (($('#weekCloseDifficulty') || {}).value || '').trim();
@@ -13159,7 +13272,7 @@ document.addEventListener('click', ev => {
       if (!close.reviewToken || close.copyToken !== close.reviewToken) return toast('주간 보고 문자를 먼저 복사해 주세요');
       if (weekCloseUnclosedDays(me.id, mon).length) return toast('하루 기록이 바뀌었습니다. 남은 마감부터 확인해 주세요');
       const nextClose = Object.assign({}, close, { status: 'complete', completedAt: now() });
-      setCheck(weekCloseKey(me.id), mon, { close: nextClose, done: true });
+      if (!(await saveStudentCloseout(weekCloseKey(me.id), mon, nextClose, close, '주간 마감'))) break;
       const weekEnd = addDays(mon, 6);
       const monthYm = ymOf(weekEnd);
       const needsMonthlyClose = weekEnd === monthLastDate(monthYm) && monthCloseAvailable(monthYm) &&
@@ -13399,8 +13512,9 @@ document.addEventListener('click', ev => {
     case 'monthcloseopen': {
       const me = currentStaff();
       const ym = el.dataset.ym || ymCursor;
-      if (!session.isStaffLink || !me || me.id !== session.staffId || ym < MONTH_CLOSE_START) break;
+      if (!session.isStaffLink || !me || me.id !== session.staffId || ym < MONTH_CLOSE_START || !closeoutMonthApplies(me.id, ym)) break;
       if (monthCloseComplete(me.id, ym)) { monthCloseReportModal(me.id, ym); break; }
+      if (monthCloseOf(me.id, ym).status === 'reviewed') { monthCloseReportModal(me.id, ym); break; }
       if (!monthHadActivity(me.id, ym)) return toast('이 달에는 마감할 학습 기록이 없습니다');
       if (!monthCloseAvailable(ym)) return toast('월간 마무리는 매월 말일부터 할 수 있습니다');
       const unclosedDays = monthCloseUnclosedDays(me.id, ym);
@@ -13419,7 +13533,7 @@ document.addEventListener('click', ev => {
     case 'monthclosesave': {
       const me = currentStaff();
       const ym = el.dataset.ym || ymCursor;
-      if (!session.isStaffLink || !me || me.id !== session.staffId || !monthCloseAvailable(ym)) break;
+      if (!session.isStaffLink || !me || me.id !== session.staffId || !monthCloseAvailable(ym) || !closeoutMonthApplies(me.id, ym)) break;
       if (!monthHadActivity(me.id, ym)) return toast('이 달에는 마감할 학습 기록이 없습니다');
       if (monthCloseUnclosedDays(me.id, ym).length) return toast('남은 하루 마감부터 완료해 주세요');
       if (monthCloseUnclosedWeeks(me.id, ym).length) return toast('남은 주간 마감부터 완료해 주세요');
@@ -13490,7 +13604,7 @@ document.addEventListener('click', ev => {
       if (monthCloseUnclosedDays(me.id, ym).length) return toast('하루 기록이 바뀌었습니다. 남은 마감부터 확인해 주세요');
       if (monthCloseUnclosedWeeks(me.id, ym).length) return toast('주간 기록이 바뀌었습니다. 남은 마감부터 확인해 주세요');
       const nextClose = Object.assign({}, close, { status: 'complete', completedAt: now() });
-      setCheck(monthCloseKey(me.id), ym, { close: nextClose, done: true });
+      if (!(await saveStudentCloseout(monthCloseKey(me.id), ym, nextClose, close, '월간 마감'))) break;
       closeModal(); cursor = agendaDate = today(); ymCursor = ymOf(cursor); cursorPinned = false; go('today');
       toast('이번 달 마감을 완료했습니다');
       break;
@@ -14104,13 +14218,13 @@ document.addEventListener('click', ev => {
     }
     case 'dailycloseopen': {
       const me = currentStaff();
-      if (!session.isStaffLink || !me || me.id !== session.staffId || cursor < DAILY_CLOSE_START || cursor > today()) break;
+      if (!session.isStaffLink || !me || me.id !== session.staffId || cursor < DAILY_CLOSE_START || cursor > today() || !closeoutDateApplies(me.id, cursor)) break;
       dailyCloseModal(me.id, cursor);
       break;
     }
     case 'dailyclosesave': {
       const me = currentStaff();
-      if (!session.isStaffLink || !me || me.id !== session.staffId || cursor < DAILY_CLOSE_START || cursor > today()) break;
+      if (!session.isStaffLink || !me || me.id !== session.staffId || cursor < DAILY_CLOSE_START || cursor > today() || !closeoutDateApplies(me.id, cursor)) break;
       const data = dailyCloseState(me.id, cursor);
       if (data.running) return toast('공부 타이머를 먼저 정지해 주세요');
       const resolutionEls = [...document.querySelectorAll('[data-daily-resolution]')];
@@ -14222,7 +14336,7 @@ document.addEventListener('click', ev => {
       const nextClose = Object.assign({}, data.close, {
         status: 'complete', finalizedAt: now(), signature: data.signature
       });
-      setCheck(dailyCloseKey(me.id), cursor, { close: nextClose, done: true });
+      if (!(await saveStudentCloseout(dailyCloseKey(me.id), cursor, nextClose, data.close, '하루 마감'))) break;
       const closedPastDate = cursor < today();
       const weekMon = mondayOf(closedDate);
       const needsWeeklyClose = closedDate === addDays(weekMon, 6) && weekCloseAvailable(weekMon) &&
@@ -14743,7 +14857,13 @@ connectAdminDevice();
 if (pendingStudentCode) {
   connectStudentLink();
 } else if (sync.enabled() && !studentConnectError) {
-  sync.run();
+  (async () => {
+    await sync.run();
+    if (!sync.err) {
+      const activatedOn = await ensureCloseoutActivation(false);
+      if (activatedOn) renderAfterSync();
+    }
+  })();
 }
 setInterval(() => sync.run(), 45000);
 
@@ -14775,7 +14895,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-10-14.1';
+const APP_VER = '2026-10-17.1';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)

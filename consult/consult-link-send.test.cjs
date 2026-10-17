@@ -181,7 +181,8 @@ test('새 학생 링크는 fragment 1회코드를 교환하고 기존 query 토�
   assert.match(reset, /state = Object\.assign\(blankState\(\), \{ staff: \[\], tasks: \[\], checks: \{\}, settings: settings \}\)/);
   assert.match(reset, /myToken: String\(token \|\| ''\), pullAt: 0, pushAt: 0/);
   assert.match(connect, /const unsent = sync\.collect\(Number\(state\.settings\.pushAt\) \|\| 0\)/);
-  assert.match(connect, /if \(unsent\.length\)/);
+  assert.match(connect, /if \(unsent\.length && !canRecoverStudent\)/);
+  assert.match(connect, /recoveringSameStudent/);
   assert.match(connect, /await waitForSyncIdle\(\)/);
   assert.match(connect, /sameStudentConnected/);
   assert.match(connect, /if \(!allowExchange\)/);
