@@ -9,9 +9,9 @@ function tabs(session, driver = false, gated = false) {
   const source = html.slice(html.indexOf('function renderTabs()'), html.indexOf('/* ── 링크로 들어온 지시서 확인'));
   Function('session', 'alertsToday', 'shouldGatePersonAccess', 'shouldGateStaffWork', 'isDriverFacilityStaff',
     'managerRequestInboxCount', 'onboardingAttentionCount', 'makeupAttentionCount', 'sessionPackAttentionCount',
-    'deviceAlertCount', '$', 'route', source + ';renderTabs();')(
+    'deviceAlertCount', '$', 'route', 'replaceView', source + ';renderTabs();')(
     session, () => ({ total: 0 }), () => gated, () => false, () => driver,
-    () => 0, () => 0, () => 0, () => 0, () => 0, () => element, 'question_bank');
+    () => 0, () => 0, () => 0, () => 0, () => 0, () => element, 'question_bank', (root, markup) => { root.innerHTML = markup; });
   return [...element.innerHTML.matchAll(/data-go="([^"]+)"/g)].map(match => match[1]);
 }
 test('문제은행은 관리자와 선생님의 오늘 바로 다음에 표시된다', () => {
