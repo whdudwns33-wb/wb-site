@@ -37,7 +37,7 @@ function runtime(options = {}) {
     const state = { settings: { myToken: 'synthetic-device', pushAt: 1 }, tasks: [], checks: {} };
     let personAccessProblem = null, pendingBootstrapCode = '', inputTimer = null, fbCtx = null;
     const seoulNowParts = () => ({ date: '${date}' });
-    const stats = { renders: 0, syncs: 0, flushes: 0 };
+    const stats = { renders: 0, syncs: 0, flushes: 0, centerChatResets: 0 };
     const render = () => stats.renders++;
     const setModalBackgroundInert = () => {};
     const lessonHandoffMemoDrafts = new Map(), lessonHandoffSourceDrafts = new Map();
@@ -47,6 +47,7 @@ function runtime(options = {}) {
     const flushReportInputs = () => stats.flushes++;
     const save = () => __save(state);
     const startSyncSession = async () => { stats.syncs++; return true; };
+    const resetCenterChatState = () => stats.centerChatResets++;
     ${source}
     const sync = { busy: false, err: '', problem: null, auth() {
       return { mode: 'person', id: SAFE_SCOPE_ID, token: state.settings.myToken,
@@ -120,6 +121,7 @@ test('logout saves and flushes before punching out, clears only daily token and 
   assert.equal(app.eval('state.settings.myToken'), 'synthetic-device');
   assert.equal(app.eval('state.checks.pending.note'), '보존한 창작 메모');
   assert.equal(app.eval('shouldGateStaffWork()'), true);
+  assert.equal(app.eval('stats.centerChatResets'), 1);
   assert.equal(app.storage.size, 0);
 });
 test('failed pending sync or cancelled confirmation never logs out or drops the daily session', async () => {
@@ -159,6 +161,7 @@ test('new work lock keeps recovery and lesson data, hides popups, and never revo
   assert.equal(app.eval('state.checks.pending.note'), '창작 메모');
   assert.equal(app.get('#modalHost').hidden, true);
   assert.equal(app.eval('shouldGateStaffWork()'), true);
+  assert.equal(app.eval('stats.centerChatResets'), 1);
 });
 test('all business requests carry the work token, daily lock precedes generic conflict recovery, and private profiles are separate', () => {
   const post = html.slice(html.indexOf('  async post(path, body)'), html.indexOf('  async run()'));

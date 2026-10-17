@@ -1,5 +1,17 @@
 # WB 동기화 백엔드 (Cloudflare Workers + D1)
 
+## 센터 소통과 당일 등원 현황
+
+- 배포: 비공개 운영 DB 백업·복원 시험 → `084_center_chat.sql` → Worker → task Pages.
+- `POST /center-chat`은 인증된 원장·관리 담당·활성 개인 직원만 사용한다. 메시지는 최근 기록을,
+  등원 이벤트와 현재 상태는 서버가 계산한 KST 오늘 기록만 반환한다.
+- 메시지·등원 이벤트의 작성자 이름은 요청값을 믿지 않고 현재 인증된 직원 정보에서 정한다.
+  원생 응답은 stable ID·이름·학년만 포함하며 원생 명단의 연락처·메모·검사정보는 복사하거나 반환하지
+  않는다. 자유 입력 메시지에는 이런 민감정보를 적지 않는다.
+- 메시지와 등원 이벤트는 공통 순번의 append-only 피드다. 등원 현재 상태만 revision CAS로 바꾸며,
+  읽음 표시는 전달받은 마지막 피드 항목까지만 단조 증가한다. 미확인 수는 본인이 쓴 항목을 제외한
+  메시지와 오늘 등원 이벤트를 센다.
+
 ## 2단계 교재 주문취소 (2026-10-16)
 
 - 백업·복원 시험 후 `083_book_order_stage2_cancellation.sql` → Worker → Pages 순서로 배포한다.
@@ -159,6 +171,8 @@ npx wrangler d1 execute wb-sync --remote --file=./migrations/078_makeup_instruct
 npx wrangler d1 execute wb-sync --remote --file=./migrations/079_book_order_received_student_cancellations.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/080_book_order_academy.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/082_task_live_push.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/083_book_order_stage2_cancellation.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/084_center_chat.sql
 ```
 
 운영 DB에는 **미적용 파일만** 백업·복원 확인 후 위 순서로 적용한다. `081` 파일은 없으며 번호를
@@ -184,8 +198,9 @@ npx wrangler d1 execute wb-sync --remote --file=./migrations/082_task_live_push.
 npx wrangler d1 execute wb-sync --remote --file=./migrations/077_book_order_amount_correction_100ball_3_2.sql
 ```
 
-`080`은 아카등록과 배송 원장을 분리하고, `082`는 요청 기기 알림의 구독·발송 큐를 만든다.
-새 DB는 `schema.sql`에 두 스키마가 포함됐는지 확인한다. 알림 전용 키·허용 절차는 문서 첫 절을 따른다.
+`080`은 아카등록과 배송 원장을 분리하고, `082`는 요청 기기 알림의 구독·발송 큐를 만들며,
+`084`는 센터 소통 메시지·당일 등원 상태·읽음 원장을 만든다. 새 DB는 `schema.sql`에 이 스키마들이
+포함됐는지 확인한다. 알림 전용 키·허용 절차는 문서 첫 절을 따른다.
 
 > `070`은 이미 적용된 `069` 이력을 되돌리지 않고, 그 migration이 만든 JSON 전개 view·trigger만
 > 제거한 뒤 학생별 일정 revision 원장과 경량 보강 revision trigger를 설치한다. 운영 DB에는 반드시
@@ -523,6 +538,53 @@ legacy 문서 호환 필드일 뿐 담당 권한의 정본이 아니다. 교재 
 { "app": "task", "auth": { "mode": "person", "id": "staff-kim", "token": "..." }, "action": "get" }
 → { "ok": true, "updatedAt": 178..., "roster": { ... }, "bookStudents": [ ... ] }
 ```
+
+### `/center-chat` — 전 직원 센터 소통·당일 등원 현황
+
+원장·관리 담당·활성 개인 직원이 같은 공용 흐름을 본다. `list`는 KST 오늘 날짜, 현재 재원생의
+`id/name/grade`, 오늘의 현재 등원 상태, 최근 메시지와 오늘 등원 이벤트를 합친 최신 100건을
+오래된 순서로 반환한다. `items`의 공통 식별자는 `kind`와 `id`이고, 마지막 피드 항목은
+`lastItemId`다. 미확인 수는 본인이 쓴 항목을 제외한 메시지와 오늘 등원 이벤트를 함께 센다.
+
+```jsonc
+// 목록
+{ "app":"task", "auth":{ /* admin | person */ }, "action":"list" }
+→ {
+  "ok":true, "date":"2026-10-17", "lastItemId":"cpe_example_001",
+  "unreadCount":1, "hiddenUnreadCount":0,
+  "students":[{ "id":"student-001", "name":"테스트 학생", "grade":"초4" }],
+  "presence":[{ "studentId":"student-001", "status":"arrived", "revision":1,
+    "updatedAt":179..., "actorId":"staff-a", "actorName":"테스트 선생님" }],
+  "items":[
+    { "kind":"message", "id":"ccm_example_001", "messageId":"ccm_example_001",
+      "messageDate":"2026-10-17", "body":"전달 내용", "actorId":"staff-a",
+      "actorName":"테스트 선생님", "createdAt":179... },
+    { "kind":"presence", "id":"cpe_example_001", "eventId":"cpe_example_001",
+      "studentId":"student-001", "status":"arrived", "revision":1,
+      "actorId":"staff-a", "actorName":"테스트 선생님", "createdAt":179... }
+  ]
+}
+
+// 메시지: client ID와 정규화한 본문이 같으면 멱등 재시도
+{ "app":"task", "auth":{ /* admin | person */ }, "action":"send",
+  "messageId":"ccm_example_003", "body":"  확인 부탁드립니다.  " }
+
+// 등원 상태: 서버 KST 오늘만, expectedRevision CAS
+{ "app":"task", "auth":{ /* admin | person */ }, "action":"presence",
+  "eventId":"cpe_example_002", "studentId":"student-001",
+  "status":"left", "expectedRevision":1 }
+
+// 현재 화면에서 받은 마지막 피드 항목까지만 읽음 처리
+{ "app":"task", "auth":{ /* admin | person */ }, "action":"read",
+  "itemId":"cpe_example_002" }
+```
+
+메시지 본문은 NFKC 정규화 후 1,000자까지다. 자유 입력이므로 전화번호·검사 결과 같은 민감정보를
+넣지 않는다. 상태는 `arrived | left | absent`만 허용한다.
+같은 `messageId`·`eventId`에 다른 내용을 재사용하면 409이며, 등원 revision 충돌도 최신
+`current`와 함께 409를 반환한다. actor ID·이름·서버 시각·날짜는 클라이언트 입력을 사용하지 않는다.
+미확인이 최신 100건의 표시 범위를 넘으면 `hiddenUnreadCount`로 알리고 화면은 자동 읽음 처리하지 않는다.
+사용자가 화면의 별도 확인 버튼을 눌렀을 때만 표시 밖의 이전 항목까지 읽은 것으로 처리한다.
 
 ### `/book-order` — 보호자 공개 가능한 봉인 주문
 
