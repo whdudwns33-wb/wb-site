@@ -133,6 +133,56 @@ function message(id, body = '센터 전달 내용') {
   return { action: 'send', messageId: id, body };
 }
 
+test('등원 알림과 종료는 요청만 종결하고 메시지는 재시도에도 한 번만 기록한다', async () => {
+  await atNow(fixedNow, async () => {
+    for (const action of ['missing_arrived', 'missing_close']) {
+      const db = new TestD1(); seed(db);
+      const request = { action: 'missing', studentId: 'student-active', requestId: 'ccm_simple1' };
+      await call(db, request);
+      assert.equal((await call(db, { ...request, action }, person('teacher-b'))).status, 200);
+      assert.equal((await call(db, { ...request, action })).body.idempotent, true);
+      const result = await call(db, { action: 'list' });
+      assert.equal(result.body.items.length, 2);
+      assert.equal(result.body.items[1].actorName, '이 선생');
+      assert.equal(result.body.items[1].body, action === 'missing_arrived' ? '재원 학생 등원하였습니다.' : '재원 학생 미등원 알림을 종료했습니다.');
+      assert.equal(result.body.missing[0].state, 'resolved');
+      assert.deepEqual(result.body.presence, []);
+      const opposite = action === 'missing_arrived' ? 'missing_close' : 'missing_arrived';
+      assert.equal((await call(db, { ...request, action: opposite })).status, 409);
+      assert.equal((await call(db, { ...request, action, studentId: 'student-ended' })).status, 404);
+    }
+  });
+});
+
+test('처리 중 직원 정보 변경은 알림 종결과 메시지를 모두 롤백한다', async () => {
+  await atNow(fixedNow, async () => {
+    const db = new TestD1(); seed(db);
+    const request = { action: 'missing', studentId: 'student-active', requestId: 'ccm_simple2' };
+    await call(db, request);
+    db.hookOnce(/UPDATE center_chat_missing SET state='resolved'/, database => {
+      database.prepare("UPDATE staff SET data=json_set(data,'$.deleted',1) WHERE id='teacher-a'").run();
+    });
+    assert.equal((await call(db, { ...request, action: 'missing_arrived' })).status, 409);
+    const result = await call(db, { action: 'list' }, director);
+    assert.equal(result.body.missing[0].state, 'open');
+    assert.equal(result.body.items.length, 1);
+  });
+});
+
+test('두 기기가 동시에 등원 알림을 보내도 종결 메시지는 하나다', async () => {
+  await atNow(fixedNow, async () => {
+    const db = new TestD1(); seed(db);
+    const request = { action: 'missing', studentId: 'student-active', requestId: 'ccm_parallel1' };
+    await call(db, request);
+    const results = await Promise.all([
+      call(db, { ...request, action: 'missing_arrived' }),
+      call(db, { ...request, action: 'missing_arrived' }, person('teacher-b'))
+    ]);
+    assert.ok(results.every(result => result.status === 200));
+    assert.equal((await call(db, { action: 'list' })).body.items.length, 2);
+  });
+});
+
 test('미등원은 학생·날짜당 한 알림이며 관리자 확인 후 등원으로 자동 종결한다', async () => {
   await atNow(fixedNow, async () => {
     const db = new TestD1(); seed(db);

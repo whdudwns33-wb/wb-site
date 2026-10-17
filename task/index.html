@@ -1268,7 +1268,7 @@
   .center-chat-unread-warning { margin-bottom: 10px; padding: 10px; border: 1px solid #F1C7A7; border-radius: 11px; background: #FFF8F1; color: #7A4A22; font-size: 11px; line-height: 1.45; }
   .center-chat-unread-warning .btn { width: 100%; margin-top: 7px; }
   .center-chat-compose { padding: 12px 14px calc(12px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: #fff; }
-  .center-chat-presence { display: grid; grid-template-columns: minmax(0,1fr) 92px auto; gap: 6px; margin-bottom: 10px; }
+  .center-chat-presence { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 6px; margin-bottom: 10px; }
   .center-chat-presence .in { min-width: 0; margin: 0; }
   .center-chat-presence .btn { min-width: 58px; padding-right: 10px; padding-left: 10px; }
   .center-chat-message-row { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: end; gap: 7px; }
@@ -1326,7 +1326,6 @@
     <header class="center-chat-head">
       <div class="between"><div><div class="center-chat-title" id="centerChatTitle">센터 소통</div><div class="center-chat-date" id="centerChatDate">오늘</div></div>
         <button type="button" class="btn btn-sm btn-ghost" data-act="centerchatclose" aria-label="센터 소통 닫기">닫기</button></div>
-      <div class="center-chat-summary" id="centerChatSummary"></div>
     </header>
     <p class="center-chat-state" id="centerChatState" role="status" aria-live="polite"></p>
     <div id="centerChatMissing" style="max-height:28vh;overflow:auto;padding:0 16px"></div>
@@ -1334,8 +1333,7 @@
     <div class="center-chat-compose">
       <div class="center-chat-presence">
         <label><span class="sr-only">학생</span><select class="in" id="centerChatStudent" data-center-chat-student><option value="">학생 선택</option></select></label>
-        <label><span class="sr-only">등원 상태</span><select class="in" id="centerChatPresenceStatus" data-center-chat-status><option value="arrived">등원</option><option value="left">하원</option><option value="absent">결석</option><option value="missing">미등원</option></select></label>
-        <button type="button" class="btn btn-ghost" data-act="centerchatpresence">상태 저장</button>
+        <button type="button" class="btn btn-ghost" data-act="centerchatpresence">미등원 알림</button>
       </div>
       <p class="center-chat-privacy">전화번호·검사 결과 등 민감정보는 적지 마세요.</p>
       <div class="center-chat-message-row">
@@ -1346,17 +1344,17 @@
   </section>
 </div>
 
-<script src="./lesson-form-core.js?v=2026-10-17.3"></script>
-<script src="./task-push-client.js?v=2026-10-17.3"></script>
-<script src="./schedule-board-core.js?v=2026-10-17.3"></script>
-<script src="./asset-core.js?v=2026-10-17.3"></script>
-<script src="./qr-core.js?v=2026-10-17.3"></script>
-<script src="./acaflow-import-core.js?v=2026-10-17.3"></script>
-<script src="./feedback-subject-catalog.js?v=2026-10-17.3"></script>
-<script src="./sync-recovery-core.js?v=2026-10-17.3"></script>
-<script src="./staff-work-session-core.js?v=2026-10-17.3"></script>
-<script src="./staff-attendance-history-core.js?v=2026-10-17.3"></script>
-<script src="./makeup-recovery-core.js?v=2026-10-17.3"></script>
+<script src="./lesson-form-core.js?v=2026-10-17.4"></script>
+<script src="./task-push-client.js?v=2026-10-17.4"></script>
+<script src="./schedule-board-core.js?v=2026-10-17.4"></script>
+<script src="./asset-core.js?v=2026-10-17.4"></script>
+<script src="./qr-core.js?v=2026-10-17.4"></script>
+<script src="./acaflow-import-core.js?v=2026-10-17.4"></script>
+<script src="./feedback-subject-catalog.js?v=2026-10-17.4"></script>
+<script src="./sync-recovery-core.js?v=2026-10-17.4"></script>
+<script src="./staff-work-session-core.js?v=2026-10-17.4"></script>
+<script src="./staff-attendance-history-core.js?v=2026-10-17.4"></script>
+<script src="./makeup-recovery-core.js?v=2026-10-17.4"></script>
 <script>
 "use strict";
 
@@ -3086,21 +3084,13 @@ function renderCenterChatPanel() {
   renderCenterChatChrome();
   renderCenterMissing();
   if (!centerChat.open) return;
-  const summary = centerChat.presence.reduce((out, row) => {
-    const status = String(row && row.status || '');
-    if (Object.prototype.hasOwnProperty.call(out, status)) out[status] += 1;
-    return out;
-  }, { arrived: 0, left: 0, absent: 0 });
-  $('#centerChatSummary').innerHTML = [
-    ['arrived', '현재 등원'], ['left', '오늘 하원'], ['absent', '결석']
-  ].map(row => '<div class="center-chat-stat"><b>' + summary[row[0]] + '</b><span>' + row[1] + '</span></div>').join('');
   $('#centerChatDate').textContent = centerChatDateLabel(centerChat.date);
 
   const stateLine = $('#centerChatState');
   stateLine.classList.toggle('bad', !!centerChat.error);
   stateLine.textContent = centerChat.error || (centerChat.loading ? '최신 내용을 불러오는 중입니다…' :
     (centerChat.hiddenUnreadCount ? '이전 미확인 ' + centerChat.hiddenUnreadCount + '건은 최근 100건 범위 밖이라 자동 확인하지 않습니다.' :
-      (centerChat.loaded ? '메시지와 등·하원 기록이 한 흐름에 표시됩니다.' : '소통 내용을 확인해 주세요.')));
+      (centerChat.loaded ? '미등원·등원 알림과 메시지를 공유합니다.' : '소통 내용을 확인해 주세요.')));
 
   const list = $('#centerChatItems');
   const wasNearBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 80;
@@ -3140,19 +3130,18 @@ function renderCenterChatPanel() {
     studentSelect.innerHTML = '<option value="">학생 선택</option>' + centerChat.students.map(student => {
       const current = centerChatPresenceFor(student.id);
       return '<option value="' + esc(student.id) + '">' + esc(student.name) +
-        (student.grade ? ' · ' + esc(student.grade) : '') + (current ? ' [' + esc(centerChatStatusLabel(current.status)) + ']' : '') + '</option>';
+        (student.grade ? ' · ' + esc(student.grade) : '') + '</option>';
     }).join('');
   }
   if (centerChat.students.some(student => student.id === centerChat.studentId)) studentSelect.value = centerChat.studentId;
   else { centerChat.studentId = ''; studentSelect.value = ''; }
-  $('#centerChatPresenceStatus').value = centerChat.presenceStatus;
   const draft = $('#centerChatDraft');
   if (draft.value !== centerChat.draft) draft.value = centerChat.draft;
   $('#centerChatPanel').setAttribute('aria-busy', centerChat.loading ? 'true' : 'false');
   const sendButton = document.querySelector('[data-act="centerchatsend"]');
   const presenceButton = document.querySelector('[data-act="centerchatpresence"]');
   if (sendButton) { sendButton.disabled = centerChat.sending; sendButton.textContent = centerChat.sending ? '보내는 중…' : '보내기'; }
-  if (presenceButton) { presenceButton.disabled = centerChat.presenceSaving || !centerChat.studentId; presenceButton.textContent = centerChat.presenceSaving ? '저장 중…' : '상태 저장'; }
+  if (presenceButton) { presenceButton.disabled = centerChat.presenceSaving || !centerChat.studentId; presenceButton.textContent = centerChat.presenceSaving ? '보내는 중…' : '미등원 알림'; }
 }
 
 function setCenterChatBackgroundInert(value) {
@@ -3300,46 +3289,29 @@ async function sendCenterChatMessage(button) {
 async function saveCenterChatPresence(button) {
   if (centerChat.presenceSaving) return;
   const studentId = String(centerChat.studentId || '');
-  const status = String(centerChat.presenceStatus || '');
   if (!studentId || !centerChat.students.some(student => student.id === studentId)) return toast('학생을 선택해 주세요');
-  if (!['arrived', 'left', 'absent', 'missing'].includes(status)) return toast('등·하원 상태를 확인해 주세요');
   const auth = sync.auth();
   if (!auth) return toast('동기화 인증을 확인해 주세요');
-  const authKey = JSON.stringify(auth);
-  const identityEpoch = centerChat.identityEpoch;
-  const current = centerChatPresenceFor(studentId);
-  const expectedRevision = Number(current && current.revision) || 0;
-  const attemptKey = [studentId, status, expectedRevision].join('|');
-  if (!centerChat.presenceAttempt || centerChat.presenceAttempt.key !== attemptKey) {
-    centerChat.presenceAttempt = { key: attemptKey, eventId: 'cpe_' + uid() };
+  const authKey = JSON.stringify(auth), identityEpoch = centerChat.identityEpoch;
+  if (!centerChat.presenceAttempt || centerChat.presenceAttempt.key !== studentId) {
+    centerChat.presenceAttempt = { key: studentId, eventId: 'ccm_' + uid() };
   }
-  const eventId = centerChat.presenceAttempt.eventId;
-  centerChat.presenceSaving = true; centerChat.error = ''; if (button) button.disabled = true; renderCenterChatPanel();
+  const requestId = centerChat.presenceAttempt.eventId;
+  centerChat.presenceSaving = true; centerChat.error = ''; renderCenterChatPanel();
   try {
-    if (status === 'missing') {
-      await sync.post('/center-chat', { app: SYNC_APP, auth, action: 'missing', requestId: eventId.replace(/^cpe_/, 'ccm_'), studentId });
-    } else {
-      await sync.post('/center-chat', { app: SYNC_APP, auth, action: 'presence', eventId, studentId, status, expectedRevision });
-    }
-    if (identityEpoch !== centerChat.identityEpoch || JSON.stringify(sync.auth()) !== authKey || !centerChatCanShow()) return;
+    await sync.post('/center-chat', { app: SYNC_APP, auth, action: 'missing', requestId, studentId });
+    if (identityEpoch !== centerChat.identityEpoch || JSON.stringify(sync.auth()) !== authKey) return;
     centerChat.presenceAttempt = null;
-    toast(centerChatStatusLabel(status) + ' 상태를 저장했습니다');
+    toast('미등원 알림을 보냈습니다');
     loadCenterChat(true);
   } catch (error) {
-    if (identityEpoch !== centerChat.identityEpoch || JSON.stringify(sync.auth()) !== authKey || !centerChatCanShow()) return;
-    if (error && error.current && String(error.current.studentId || '') === studentId &&
-        ['arrived', 'left', 'absent'].includes(String(error.current.status || ''))) {
-      centerChat.presence = centerChat.presence.filter(row => row.studentId !== studentId).concat({
-        studentId, status: String(error.current.status), revision: Number(error.current.revision) || 0
-      });
-      centerChat.presenceAttempt = null;
-    }
-    centerChat.error = String(error && error.message || '학생 상태를 저장하지 못했습니다');
+    if (identityEpoch !== centerChat.identityEpoch || JSON.stringify(sync.auth()) !== authKey) return;
+    centerChat.error = String(error.message || '알림을 보내지 못했습니다');
     toast(centerChat.error);
+    loadCenterChat(true);
   } finally {
     if (identityEpoch === centerChat.identityEpoch && JSON.stringify(sync.auth()) === authKey) {
-      centerChat.presenceSaving = false;
-      renderCenterChatPanel();
+      centerChat.presenceSaving = false; renderCenterChatPanel();
     }
   }
 }
@@ -3348,11 +3320,12 @@ function renderCenterMissing() {
   const active = centerChat.missing.filter(row => row.state !== 'resolved');
   const nameFor = row => (centerChat.students.find(student => student.id === row.studentId) || {}).name || '학생';
   $('#centerChatMissing').innerHTML = active.map(row => '<div class="center-chat-item" style="border-color:#c74615;background:#fff1e6">' +
-    '<b>' + esc(nameFor(row)) + ' · 미등원</b><div>' + esc(row.actorName || '') + ' · ' + esc(centerChatCreatedAt(row.createdAt).text) + '</div>' +
-    (row.state === 'handling' ? '<div>' + esc(row.handlerName) + ' · 확인 중</div>' :
-      (centerChat.canHandleMissing ? '<button class="btn btn-sm" data-act="centerchathandle" data-student="' + esc(row.studentId) + '" data-request="' + esc(row.requestId) + '"' +
-       (centerChat.handlingMissing ? ' disabled' : '') + '>확인 중</button>' : '<div>관리자 확인 대기</div>')) + '</div>').join('');
-  const pending = active.filter(row => row.state === 'open' && !centerChat.missingDismissed.has(row.requestId));
+    '<b>' + esc(nameFor(row)) + ' · 미등원 알림</b><div>' + esc(row.actorName || '') + ' · ' + esc(centerChatCreatedAt(row.createdAt).text) + '</div>' +
+    '<button class="btn btn-sm" data-act="centerchathandle" data-outcome="arrived" data-student="' + esc(row.studentId) + '" data-request="' + esc(row.requestId) + '"' +
+    (centerChat.handlingMissing ? ' disabled' : '') + '>등원 알림 보내기</button> ' +
+    '<button class="btn btn-sm btn-ghost" data-act="centerchathandle" data-outcome="closed" data-student="' + esc(row.studentId) + '" data-request="' + esc(row.requestId) + '"' +
+    (centerChat.handlingMissing ? ' disabled' : '') + '>알림 종료</button></div>').join('');
+  const pending = active.filter(row => !centerChat.missingDismissed.has(row.requestId));
   const popup = $('#centerMissingPopup');
   popup.hidden = !centerChatCanShow() || !centerChat.canHandleMissing || centerChat.open || !pending.length || !$('#modalHost').hidden;
   if (!popup.hidden) popup.innerHTML = '<b>미등원 확인 요청</b><p>' + pending.map(row => esc(nameFor(row)) + ' 학생이 아직 등원하지 않았습니다.').join('<br>') +
@@ -3360,17 +3333,29 @@ function renderCenterMissing() {
 }
 
 async function handleCenterMissing(button) {
-  if (centerChat.handlingMissing || !centerChat.canHandleMissing) return;
-  const auth = sync.auth(), epoch = centerChat.identityEpoch;
+  if (centerChat.handlingMissing) return;
+  const studentId = button.dataset.student, requestId = button.dataset.request;
+  const action = button.dataset.outcome === 'arrived' ? 'missing_arrived' : 'missing_close';
+  const name = (centerChat.students.find(row => row.id === studentId) || {}).name || '학생';
+  if (!confirm(action === 'missing_arrived' ? name + ' 등원 알림을 보내시겠습니까?' :
+      name + ' 미등원 알림을 종료하시겠습니까? 결석 안내는 채팅으로 남겨 주세요.')) return;
+  const auth = sync.auth(), epoch = centerChat.identityEpoch, authKey = JSON.stringify(auth);
   if (!auth) return;
   centerChat.handlingMissing = true; renderCenterChatPanel();
   try {
-    await sync.post('/center-chat', { app: SYNC_APP, auth, action: 'missing_handle', studentId: button.dataset.student, requestId: button.dataset.request });
-    if (epoch === centerChat.identityEpoch) await loadCenterChat(true);
+    await sync.post('/center-chat', { app: SYNC_APP, auth, action, studentId, requestId });
+    if (epoch === centerChat.identityEpoch && JSON.stringify(sync.auth()) === authKey) {
+      toast(action === 'missing_arrived' ? '등원 알림을 보냈습니다' : '알림을 종료했습니다');
+      await loadCenterChat(true);
+    }
   } catch (error) {
-    if (epoch === centerChat.identityEpoch) toast(error.message || '확인 중 상태를 저장하지 못했습니다');
+    if (epoch === centerChat.identityEpoch && JSON.stringify(sync.auth()) === authKey) {
+      toast(error.message || '알림을 처리하지 못했습니다'); loadCenterChat(true);
+    }
   } finally {
-    if (epoch === centerChat.identityEpoch) { centerChat.handlingMissing = false; renderCenterChatPanel(); }
+    if (epoch === centerChat.identityEpoch && JSON.stringify(sync.auth()) === authKey) {
+      centerChat.handlingMissing = false; renderCenterChatPanel();
+    }
   }
 }
 
@@ -25950,7 +25935,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-10-17.3';
+const APP_VER = '2026-10-17.4';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
