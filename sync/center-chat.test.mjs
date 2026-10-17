@@ -6,6 +6,7 @@ import { handleCenterChat } from './center-chat.js';
 
 const MIGRATION_SQL = readFileSync(new URL('./migrations/084_center_chat.sql', import.meta.url), 'utf8');
 const SCHEMA_SQL = readFileSync(new URL('./schema.sql', import.meta.url), 'utf8');
+const MISSING_SQL = readFileSync(new URL('./migrations/085_center_chat_missing.sql', import.meta.url), 'utf8');
 const BASE_SQL = `
 PRAGMA foreign_keys=ON;
 CREATE TABLE staff (
@@ -43,7 +44,7 @@ class TestD1 {
   constructor(ready = true) {
     this.database = new DatabaseSync(':memory:');
     this.database.exec(BASE_SQL);
-    if (ready) this.database.exec(MIGRATION_SQL);
+    if (ready) { this.database.exec(MIGRATION_SQL); this.database.exec(MISSING_SQL); }
     this.prepareHook = null;
   }
   hookOnce(matcher, action) { this.prepareHook = { matcher, action }; }
@@ -131,6 +132,61 @@ async function call(db, payload, auth = person('teacher-a'), app = 'task') {
 function message(id, body = '센터 전달 내용') {
   return { action: 'send', messageId: id, body };
 }
+
+test('미등원은 학생·날짜당 한 알림이며 관리자 확인 후 등원으로 자동 종결한다', async () => {
+  await atNow(fixedNow, async () => {
+    const db = new TestD1(); seed(db);
+    const request = { action: 'missing', studentId: 'student-active', requestId: 'ccm_missing1' };
+    assert.equal((await call(db, request)).status, 200);
+    assert.equal((await call(db, { ...request, requestId: 'ccm_missing2' }, person('teacher-b'))).status, 200);
+    let result = await call(db, { action: 'list' }, manager('manager-a'));
+    assert.equal(result.body.items.length, 1);
+    assert.equal(result.body.items[0].body, '재원 학생 학생이 아직 등원하지 않았습니다.');
+    assert.equal(result.body.presence.length, 0);
+    assert.equal(result.body.canHandleMissing, true);
+    const handle = { action: 'missing_handle', studentId: request.studentId, requestId: request.requestId };
+    assert.equal((await call(db, handle)).status, 403);
+    assert.equal((await call(db, handle, manager('manager-a'))).body.missing.handlerName, '관리 선생');
+    assert.equal((await call(db, handle, director)).body.missing.handlerName, '관리 선생');
+    assert.equal((await call(db, presence('cpe_arrival1', 'arrived', 0))).status, 200);
+    result = await call(db, { action: 'list' });
+    assert.equal(result.body.missing[0].state, 'resolved');
+    assert.equal((await call(db, request)).status, 409);
+    assert.equal(result.body.items.length, 2);
+    assert.equal(result.body.canHandleMissing, false);
+  });
+});
+
+test('결석·하원도 요청 종결, 이미 상태가 있는 학생은 미등원 재알림 금지', async () => {
+  await atNow(fixedNow, async () => {
+    for (const status of ['absent', 'left']) {
+      const db = new TestD1(); seed(db);
+      const request = { action: 'missing', studentId: 'student-active', requestId: 'ccm_missing1' };
+      await call(db, request);
+      await call(db, presence('cpe_resolve1', status, 0));
+      assert.equal((await call(db, { action: 'list' })).body.missing[0].state, 'resolved');
+      assert.equal((await call(db, request)).status, 409);
+    }
+    const db = new TestD1(); seed(db);
+    await call(db, presence('cpe_arrival1', 'arrived', 0));
+    assert.equal((await call(db, { action: 'missing', studentId: 'student-active', requestId: 'ccm_missing1' })).status, 409);
+    assert.equal((await call(db, { action: 'list' })).body.items.length, 1);
+  });
+});
+
+test('미등원은 당일만 표시하고 퇴원생·변경된 직원은 기록하지 않는다', async () => {
+  const db = new TestD1(); seed(db);
+  await atNow(fixedNow, async () => {
+    assert.equal((await call(db, { action: 'missing', studentId: 'student-ended', requestId: 'ccm_missing1' })).status, 409);
+    await call(db, { action: 'missing', studentId: 'student-active', requestId: 'ccm_missing1' });
+  });
+  await atNow(fixedNow + 86400000, async () => {
+    assert.deepEqual((await call(db, { action: 'list' })).body.missing, []);
+    assert.equal((await call(db, { action: 'missing', studentId: 'student-active', requestId: 'ccm_missing2' })).status, 200);
+  });
+  assert.doesNotThrow(() => db.database.exec(MISSING_SQL));
+  assert.ok(SCHEMA_SQL.replace(/\r\n/g, '\n').includes(MISSING_SQL.replace(/\r\n/g, '\n').trim()));
+});
 
 function presence(id, status, expectedRevision, studentId = 'student-active') {
   return { action: 'presence', eventId: id, studentId, status, expectedRevision };

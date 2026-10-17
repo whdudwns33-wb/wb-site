@@ -7,6 +7,18 @@ const test = require('node:test');
 
 const source = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
 
+test('미등원 팝업은 관리자만, 확인 중 담당자 공유와 계정 전환 초기화를 지원한다', () => {
+  assert.match(source, /option value="missing">미등원/);
+  assert.match(functionBlock('saveCenterChatPresence'), /action: 'missing'/);
+  assert.match(functionBlock('renderCenterMissing'), /!centerChat.canHandleMissing/);
+  assert.match(functionBlock('renderCenterMissing'), /row.handlerName/);
+  assert.match(functionBlock('renderCenterMissing'), /row.state !== 'resolved'/);
+  assert.match(functionBlock('handleCenterMissing'), /action: 'missing_handle'/);
+  assert.match(functionBlock('handleCenterMissing'), /epoch === centerChat.identityEpoch/);
+  assert.match(functionBlock('resetCenterChatState'), /missingDismissed: new Set/);
+  assert.match(functionBlock('resetCenterChatState'), /centerMissingPopup.*innerHTML = ''/);
+});
+
 function block(from, to) {
   const start = source.indexOf(from);
   const end = source.indexOf(to, start + from.length);
