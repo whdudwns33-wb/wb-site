@@ -120,6 +120,7 @@ function studentConnectionHarness({ existing, exchangeFails, initialRoute, linkS
     function go(next) { route = next; routes.push(next); }
     function toast(message) { toasts.push(String(message)); }
     function now() { return Date.now(); }
+    function closeoutActivationDate() { return '2026-10-17'; }
 
     ${source}
 
