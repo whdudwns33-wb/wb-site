@@ -107,7 +107,7 @@ import {
 } from './staff-work-login.js';
 import { handleWeekendVisit } from './weekend-visit.js';
 import { handleLessonHandoff } from './lesson-handoff.js';
-import { findNextStudentLesson, projectNextStudentLesson, validDate } from './student-next-schedule.js';
+import { findNextStudentLesson, findPreviousStudentLesson, projectNextStudentLesson, validDate } from './student-next-schedule.js';
 import { studentScheduleConflictPayload } from './student-schedule-conflict.js';
 import { isTaskWriteCasConflict } from './task-write-cas.js';
 import {
@@ -2335,9 +2335,13 @@ async function handleStudentNextLesson(env, app, body, origin, auth, json) {
       }
     } catch (error) { /* 손상된 직원 행은 이름 없이 표시한다 */ }
   }
-  const next = findNextStudentLesson(tasks, taskId, lessonDate, teacherNames);
+  const makeupResult = await env.DB.prepare('SELECT case_id,student_id,confirmed_staff_id,status,confirmed_start_at,confirmed_end_at FROM makeup_cases WHERE app=? AND student_id=? AND substr(confirmed_start_at,1,10)=?')
+    .bind(app, String(current.studentId), lessonDate).all();
+  const makeupCases = makeupResult.results || [];
+  const next = findNextStudentLesson(tasks, taskId, lessonDate, teacherNames, makeupCases);
+  const previous = findPreviousStudentLesson(tasks, taskId, lessonDate, teacherNames, makeupCases);
   return json({ ok: true, lessonDate, currentTaskId: taskId, studentId: String(current.studentId),
-    next: projectNextStudentLesson(next, lessonDate) }, 200, origin);
+    next: projectNextStudentLesson(next, lessonDate), previous: projectNextStudentLesson(previous, lessonDate) }, 200, origin);
 }
 
 function authoritativeStaffRecord(row) {
