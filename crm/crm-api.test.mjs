@@ -7,6 +7,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { handleApi, flushQueue, runHubspotSync } from './crm-api.mjs';
 import worker from './worker.mjs';
 import { portalSummary, claimHubspot, releaseHubspot } from './portal-api.mjs';
+import { sha256Hex } from './crm-shared.mjs';
 
 const migrationDir = new URL('./migrations/', import.meta.url);
 const migration = fs.readdirSync(migrationDir).filter(n => n.endsWith('.sql')).sort().map(n => fs.readFileSync(new URL(n, migrationDir), 'utf8')).join('\n');
@@ -1091,6 +1092,59 @@ test('자동 양방향 — 연락처·딜 단계 가져오기, 로컬 수정 전
   data = JSON.parse((await storedLead(env, 'hs_920')).data);
   assert.equal(data.stage, 'booked');
   assert.equal(hs.calls.filter(c => c.path === '/crm/v3/objects/notes').length, 1, '노트는 반복 전송되지 않는다');
+});
+
+test('연락처 생성 뒤 수정 시각만 바뀌어도 같은 실행의 딜 생성을 막지 않는다', async () => {
+  const { env, admin, contacts, deals, hs } = await syncSetup();
+  await syncCall(env, admin, { enabled: true });
+  await putDoc(env, admin, 'leads', 'metadata-new', lead(), { expectedUpdatedAt: 0 });
+  const read = hs.routes['POST /crm/v3/objects/contacts/batch/read'];
+  let reads = 0;
+  hs.routes['POST /crm/v3/objects/contacts/batch/read'] = c => {
+    if (++reads === 2) contacts.get(c.body.inputs[0].id).properties.lastmodifieddate = '9999999999999';
+    return read(c);
+  };
+  const pushed = await flushQueue(env, 2);
+  assert.deepEqual([pushed.done, pushed.failed], [2, 0]);
+  assert.equal(contacts.size, 1);
+  assert.equal(deals.size, 1);
+});
+
+test('원격 수정 시각만 바뀌면 연락처·딜 전송을 허용하고 실제 원격 내용 변경은 계속 막는다', async () => {
+  const { env, admin, contacts, deals } = await syncSetup();
+  contacts.set('metadata', { id: 'metadata', properties: { firstname: '가상기준', lastmodifieddate: '1234' } });
+  deals.set('dmetadata', { id: 'dmetadata', contactId: 'metadata', properties: { pipeline: 'default', dealstage: 'appointmentscheduled', hs_lastmodifieddate: '1234' } });
+  await syncCall(env, admin, { enabled: true, run: true });
+  const stored = await storedLead(env, 'hs_metadata');
+  await putDoc(env, admin, 'leads', 'hs_metadata', { ...JSON.parse(stored.data), name: '앱에서수정', stage: 'contacted' }, { expectedUpdatedAt: stored.updated_at });
+  contacts.get('metadata').properties.lastmodifieddate = '5678';
+  deals.get('dmetadata').properties.hs_lastmodifieddate = '5678';
+  const pushed = await runHubspotSync(env);
+  assert.equal(pushed.ok, true, JSON.stringify(pushed));
+  assert.equal(pushed.automation.lastResult.push.done, 2);
+  assert.equal(contacts.get('metadata').properties.firstname, '앱에서수정');
+  assert.equal(deals.get('dmetadata').properties.dealstage, 'qualifiedtobuy');
+  const latest = await storedLead(env, 'hs_metadata');
+  await putDoc(env, admin, 'leads', 'hs_metadata', { ...JSON.parse(latest.data), name: '앱에서다시수정' }, { expectedUpdatedAt: latest.updated_at });
+  contacts.get('metadata').properties.firstname = '허브스팟에서수정';
+  assert.equal((await runHubspotSync(env)).ok, false);
+  assert.match((await queue(env, admin, '?status=failed')).items[0].error, /^REMOTE_CONFLICT/);
+  assert.equal(contacts.get('metadata').properties.firstname, '허브스팟에서수정');
+});
+
+test('기존 v1 비교 기준은 그대로 검증한 뒤 정상 전송 후에만 v2로 갱신한다', async () => {
+  const { env, admin, contacts } = await syncSetup();
+  contacts.set('legacyfp', { id: 'legacyfp', properties: { firstname: '이전기준', lastmodifieddate: '1234' } });
+  await syncCall(env, admin, { enabled: true, run: true });
+  const stored = await storedLead(env, 'hs_legacyfp'), data = JSON.parse(stored.data);
+  delete data.hubspot.fingerprintVersion;
+  data.hubspot.contactFingerprint = await sha256Hex('{"firstname":"이전기준","lastmodifieddate":"1234"}');
+  data.hubspot.dealsFingerprint = await sha256Hex('[]');
+  env.DB.database.prepare("UPDATE crm_documents SET data=? WHERE collection='leads' AND id='hs_legacyfp'").run(JSON.stringify(data));
+  await putDoc(env, admin, 'leads', 'hs_legacyfp', { ...data, name: '정상수정' }, { expectedUpdatedAt: stored.updated_at });
+  assert.equal((await flushQueue(env, 2)).done, 1);
+  assert.equal(contacts.get('legacyfp').properties.firstname, '정상수정');
+  assert.equal(JSON.parse((await storedLead(env, 'hs_legacyfp')).data).hubspot.fingerprintVersion, 2);
 });
 
 test('양쪽 동시 수정은 실패 보류하며 확인 후 취소로만 가져오기 재개, 원격 오류 PII 없음', async () => {
