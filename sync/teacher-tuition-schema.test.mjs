@@ -22,8 +22,12 @@ test('057 migration is additive and schema.sql contains the same append-only led
     assert.match(source, /TEACHER_LIVE_REQUEST_RECEIPT_APPEND_ONLY/);
     assert.match(source, /TUITION_ALERT_APPEND_ONLY/);
     assert.match(source, /TUITION_CONFIRMATION_APPEND_ONLY/);
-    assert.doesNotMatch(source.slice(source.indexOf('CREATE TABLE IF NOT EXISTS teacher_live_requests')),
-      /student_name|teacher_name|recipient_name|phone|contact/i);
+    // 뒤에 추가된 다른 기능의 테이블이 아니라 이 원장의 네 테이블만 검사한다.
+    for (const table of tables) {
+      const definition = source.match(new RegExp(`CREATE TABLE IF NOT EXISTS ${table} \\([\\s\\S]*?\\n\\);`));
+      assert.ok(definition, table);
+      assert.doesNotMatch(definition[0], /student_name|teacher_name|recipient_name|phone|contact/i);
+    }
   }
 });
 
