@@ -352,14 +352,15 @@ test('student billing mode is validated, legacy updates preserve it, and monthly
       billingMode: 'session4', sessionCycleStartDate: ''
     }
   });
-  assert.equal(missingCycleStart.status, 400);
-  assert.match(missingCycleStart.body.error, /회차제 시작일/);
+  assert.equal(missingCycleStart.status, 200);
+  assert.equal(missingCycleStart.body.student.sessionCycleStartDate, '');
+  current = missingCycleStart;
 
   const created = await call(db, {
     auth: admin, action: 'student_create', expectedUpdatedAt: current.body.updatedAt,
     student: {
       id: 'client-id', name: '회차학생', grade: '', subject: '', start: '2026-08', end: '', reason: '',
-      billingMode: 'session4', sessionCycleStartDate: '2026-08-28'
+      billingMode: 'session4', sessionCycleStartDate: '2026-08-28', sessionBillingSubject: '독해사고력'
     }
   });
   assert.equal(created.status, 200);
@@ -369,12 +370,14 @@ test('student billing mode is validated, legacy updates preserve it, and monthly
   const legacyPayload = { ...created.body.student, memo: '구버전 수정 경로' };
   delete legacyPayload.billingMode;
   delete legacyPayload.sessionCycleStartDate;
+  delete legacyPayload.sessionBillingSubject;
   const preserved = await call(db, {
     auth: admin, action: 'student_update', expectedUpdatedAt: created.body.updatedAt, student: legacyPayload
   });
   assert.equal(preserved.status, 200);
   assert.equal(preserved.body.student.billingMode, 'session4');
   assert.equal(preserved.body.student.sessionCycleStartDate, '2026-08-28');
+  assert.equal(preserved.body.student.sessionBillingSubject, '독해사고력');
 
   const monthly = await call(db, {
     auth: admin, action: 'student_update', expectedUpdatedAt: preserved.body.updatedAt,
@@ -383,6 +386,7 @@ test('student billing mode is validated, legacy updates preserve it, and monthly
   assert.equal(monthly.status, 200);
   assert.equal(monthly.body.student.billingMode, 'monthly');
   assert.equal(monthly.body.student.sessionCycleStartDate, '');
+  assert.equal(monthly.body.student.sessionBillingSubject, '');
 });
 
 test('legacy roster defaults materialized by a lesson form do not notify every subject teacher', async () => {

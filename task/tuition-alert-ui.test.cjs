@@ -37,14 +37,14 @@ test('원생 정보 편집기는 월결제와 4회 회차제 및 회차 시작�
   assert.match(editor, /billingMode[^\n]{0,180}monthly/);
 });
 
-test('회차 시작일 입력은 회차제에서만 보이고 필수이며 월결제로 바꾸면 비운다', () => {
+test('회차 시작일은 나중에 입력할 수 있고 월결제로 바꾸면 비운다', () => {
   const toggle = functionBlock('updateRosterBillingFields');
 
   assert.match(toggle, /data-rse-billing-mode/);
   assert.match(toggle, /data-rse-session-cycle-start/);
   assert.match(toggle, /session4/);
   assert.match(toggle, /hidden/);
-  assert.match(toggle, /required/);
+  assert.match(toggle, /required = false/);
   assert.match(toggle, /value\s*=\s*''/);
   assert.match(source, /data-rse-billing-mode[\s\S]{0,500}(?:change|updateRosterBillingFields)/);
 });
@@ -57,7 +57,7 @@ test('원생 저장은 결제방식과 회차 시작일을 함께 보내고 잘�
   assert.match(save, /billingMode:/);
   assert.match(save, /sessionCycleStartDate:/);
   assert.match(save, /billingMode\s*===\s*'session4'/);
-  assert.match(save, /회차 시작일/);
+  assert.doesNotMatch(save, /return toast\('회차 시작일을 입력해 주세요'\)/);
   assert.match(save, /billingMode\s*===\s*'monthly'[\s\S]{0,180}(?:''|sessionCycleStartDate)/);
   assert.match(save, /expectedUpdatedAt:\s*Number\(rosterDb\.updatedAt\)/);
 });
@@ -70,6 +70,12 @@ test('학생 정보 팝업은 결제 구분과 회차 시작일을 escape해 표
   assert.match(info, /회차제[^<]*4회/);
   assert.match(info, /회차 시작일/);
   assert.match(info, /esc\([^)]*(?:billing|sessionCycleStartDate)[^)]*\)/i);
+});
+
+test('회차 원장의 시작일 미입력은 출결 오류 대신 계산 대기로 표시한다', () => {
+  const card = functionBlock('session4LedgerCardHtml');
+  assert.ok(card.indexOf('!student.sessionCycleStartDate') < card.indexOf('!summary'));
+  assert.match(card, /시작일 입력 대기 · 회차 계산\/수강료 안내 대기/);
 });
 
 test('관리자 수강료 알림은 서버 목록을 불러와 학생 단위 미확인 건을 표시한다', () => {

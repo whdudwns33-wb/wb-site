@@ -1,5 +1,13 @@
 # WB 동기화 백엔드 (Cloudflare Workers + D1)
 
+## 과목 한정 회차제 / 시작일 대기
+
+운영 백업·복원 검증 → `086_session_subject_scope.sql` → Worker → Pages → 원생 설정 변경.
+`sessionBillingSubject`가 있으면 해당 과목만 회차 집계·23:50 잠금 대상으로 삼는다.
+시작일 미입력은 회차 계산·수강료 알림 대기이며 출결 기록은 허용한다. 해당 과목의
+자동 결석보강은 시작일 미입력 상태에서도 만들지 않는다. 과거 출결·기존 보강은 삭제하지 않는다.
+
+
 ## 센터 소통과 당일 등원 현황
 
 - 2026-10-17 단순화: `missing_arrived` / `missing_close`가 요청 종결과 안내 메시지를 CAS batch로 저장한다.
