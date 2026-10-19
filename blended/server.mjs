@@ -8,6 +8,7 @@ import { plannerAssets } from './planner-build.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const files = new Map([
+  ['/blended/navigation.js', ['navigation.js','text/javascript']], ['/blended/ui.css', ['ui.css','text/css']],
   ['/blended/', ['index.html','text/html']], ['/blended/guardian/', ['index.html','text/html']],
   ['/blended/app.js', ['app.js','text/javascript']], ['/blended/style.css', ['style.css','text/css']],
   ['/blended/external-links.js', ['../shared/external-links.js','text/javascript']]

@@ -23,12 +23,15 @@ export function plannerAssets() {
     .replaceAll('하루 보고를 발송한 뒤','하루 학습 요약을 확인한 뒤').replaceAll('보고 발송','요약 확인')
     .replaceAll('발송했어요','내용을 확인했어요').replaceAll('문자를 먼저 복사','요약을 먼저 복사').replaceAll('보고 문자','학습 요약')
     .replaceAll('원장이 학습 기록을 확인해 기프트 카드를 별도로 발송합니다. 실제 발송이 완료되면 5,000P가 차감되고 <code>기프트 카드 교환 완료</code>로 기록됩니다.','학습 포인트와 스탬프를 기록합니다. 기프트 카드 교환과 실제 알림 발송은 연결 대기입니다.');
+  for(const [a,b] of Object.entries({'TOTAL PURE STUDY TIME':'오늘 순공시간','TODAY STUDY PLANNER':'오늘의 학습 플래너','PURE STUDY TIME':'순공시간','TODAY CHECK LIST':'오늘 체크리스트','TIME TABLE':'학습 시간표'}))js=js.replaceAll(a,b);
+  js=js.replaceAll('학생이 오늘 탭에서 직접 마무리하고 발송 완료를 확인합니다.','학생이 오늘 탭에서 학습을 마무리하고 요약 내용을 확인합니다.');
   js+='\n'+readFileSync(new URL('./planner-adapter.js',import.meta.url),'utf8');
   assert.ok(!js.includes('https://wb-sync.whdudwns33.workers.dev'));
   const css=styles[0].slice(7,-8)+`\n.blended-save{position:sticky;top:0;z-index:100;background:#fff4d9;padding:10px 18px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px}.blended-save[hidden]{display:none}.blended-save.error{background:#fff0ed;color:#952e23}.blended-save button{padding:7px;background:white;border:1px solid #d8c9bd;border-radius:5px;color:inherit}.blended-sections{display:flex;gap:8px;margin:16px 0;flex-wrap:wrap}.blended-review{display:flex;justify-content:space-between;gap:12px;padding:12px 0;border-bottom:1px solid #eee}.blended-review small{display:block;color:#727272}.tabs a.tab{display:inline-flex;text-decoration:none;align-items:center}.brand small{font-size:10px}@media(max-width:480px){.topbar .brand{font-size:16px}.topbar .brand small{display:none}.whoami{font-size:11px}.blended-review{flex-wrap:wrap}}`;
-  let html=source.replace(styles[0],'<link rel="stylesheet" href="/blended/planner/planner.css">')
+  let html=source.replace(styles[0],'<link rel="stylesheet" href="/blended/planner/planner.css"><link rel="stylesheet" href="/blended/ui.css">')
     .replace(/<link[^>]*href="https:\/\/fonts[^>]*>\n?/g,'')
-    .replace(scripts[0][0],'<script src="/blended/planner/planner.js" defer></script>')
+    .replace(scripts[0][0],'<script src="/blended/navigation.js" defer></script><script src="/blended/planner/planner.js" defer></script>')
+    .replace('<nav class="tabs"><div class="wrap" id="tabs"></div></nav>','<div class="tabs"><div class="wrap" id="tabs"></div></div>')
     .replace('../shared/qr.js?v=2026-09-20.2','/blended/planner/qr.js')
     .replace('컨설팅 플래너','블렌디드 플래너').replace('컨설팅 플래너','블렌디드 플래너').replace('Consulting Planner','Blended Planner')
     .replace('<main class="wrap" id="view"></main>','<div id="blended-save" class="blended-save" hidden></div><main class="wrap" id="view"><div class="card">내 플래너를 불러오고 있습니다…</div></main>');

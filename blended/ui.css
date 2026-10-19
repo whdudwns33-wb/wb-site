@@ -1,0 +1,25 @@
+:root{--blended-accent:#6d28d9;--blended-ink:#1b3a5c;--teal:var(--blended-accent);--ink:var(--blended-ink);--pale:#f0ebf8;--paper:#f7f7fa;--line:#d5d3df}
+body{color:var(--blended-ink);font-family:"Malgun Gothic","Apple SD Gothic Neo",sans-serif;background:#f7f7fa}
+.blended-navigation{margin:16px 0;color:var(--blended-ink);font-size:15px}
+.blended-primary{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;align-items:start}
+.blended-navigation a,.blended-navigation button,.blended-navigation summary{display:flex;align-items:center;justify-content:center;min-height:44px;padding:10px 8px;box-sizing:border-box;border:1px solid #d5d3df;background:#fff;border-radius:8px;color:inherit;font:inherit;text-decoration:none;cursor:pointer;text-align:center}
+.blended-navigation [aria-current=page]{background:#ede9fe;border-color:var(--blended-accent);color:#5420a5;font-weight:700}
+.blended-navigation summary{list-style:none}.blended-navigation summary::after{content:' ▾';margin-left:5px}
+.blended-menu-items{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;padding:12px;margin-top:8px;background:#f7f5fb;border:1px solid #d5d3df;border-radius:8px}
+.blended-menu[open]{grid-column:1/-1}.blended-menu[open] summary{justify-content:flex-start}
+:focus-visible{outline:3px solid #7c3aed;outline-offset:3px}
+.tabs:has(.blended-navigation){position:static}.tabs:has(.blended-navigation) .wrap{display:block;overflow:visible;white-space:normal;padding-top:0;padding-bottom:0}
+.blended-student-context{font-size:14px;padding:10px 0;margin:0;color:#4b5563}
+.blended-review{overflow-wrap:anywhere}.blended-review-card{border:1px solid #d5d3df}
+.blended-rewards{margin-top:16px}.blended-rewards>summary{min-height:44px;cursor:pointer;padding:12px;font-weight:700}
+.top,.topbar{color:var(--blended-ink);background:white;border-bottom:1px solid #d5d3df;box-shadow:none}.topbar .brand{font-size:20px}.topbar .brand span{color:var(--blended-accent)}.topbar .brand small{color:#526077;font-size:14px}.top .mark{background:var(--blended-accent);font:700 13px sans-serif;border-radius:6px;width:33px;height:33px}.topbar .whoami{color:var(--blended-ink);background:#f3effb;border-color:#d5d3df}.demo-bar{background:#f0ebf8;color:#574970;font-size:14px}
+.top .brand{font-size:20px}.top .brand-small{font-size:16px}body:has(#editor) main{max-width:1040px}body:has(#editor) h1{font-size:clamp(24px,3vw,32px);letter-spacing:-.025em}
+#editor{padding:0;max-height:90dvh}#dialog-content>h2{padding:20px 24px 12px;margin:0;background:white;position:sticky;top:0;z-index:1}
+.editor-fields{padding:0 24px 16px}.editor-actions{position:sticky;bottom:0;background:white;border-top:1px solid #d5d3df;padding:12px 24px;display:flex;gap:12px;flex-wrap:wrap}.editor-actions .error-box{flex-basis:100%}.editor-actions .error-box:empty{display:none}
+#editor fieldset{min-width:0;margin:16px 0;padding:16px;border:1px solid #d5d3df;border-radius:8px}#editor legend{font-size:16px;font-weight:700;padding:0 6px}#discard-editor{max-width:420px;padding:24px}
+.small,.hint,.fl,.tag,.study-timeline-hour,.study-timeline-minutes,.study-paper-col-title,.study-timer-note{font-size:14px!important;line-height:1.5}
+.planner-task-actions .btn,.study-timer-subjects .chip,.navbtn,.btn-sm{min-height:44px!important;min-width:44px!important;height:auto!important}.planner-check{width:44px!important;height:44px!important;min-width:44px}
+.planner-task-row{min-height:54px}.study-timeline-row{grid-template-columns:38px repeat(6,minmax(0,1fr))}.study-timeline-minutes{letter-spacing:-.04em}
+.planner-list-head,.planner-task-row{grid-template-columns:54px minmax(0,1fr) 48px!important}.planner-task-actions .btn,.study-timer-subjects .chip,.planner-task-desc,.planner-task-subject,.learning-status,.daily-close-step span,.daily-close-step b{font-size:14px}.planner-task-title{font-size:16px;overflow-wrap:anywhere;word-break:normal}.study-timeline-hour{color:#4b5563}.study-timeline-minutes{color:#4b5563}.blended-workflow{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}.blended-workflow .btn{min-height:44px}#studyPlanner,#blendedTimer,#dailyCloseCard{scroll-margin-top:95px}.tabs:not(:has(.blended-navigation)){flex-wrap:wrap;overflow:visible}.blended-navigation .blended-menu-items{white-space:normal}.blended-primary button{width:100%}
+.blended-quick-label{display:block;font-size:14px;font-weight:700;margin:12px 0 6px}
+@media(max-width:650px){.blended-primary{grid-template-columns:repeat(2,minmax(0,1fr))}.blended-menu{grid-column:1/-1}.blended-menu-items{grid-template-columns:repeat(2,minmax(0,1fr))}.blended-navigation{font-size:15px}input,select,textarea{font-size:16px!important}.top{padding:16px;gap:12px;flex-wrap:wrap}#dialog-content>h2{padding:16px}.editor-fields{padding:0 16px 12px}.editor-actions{padding:12px 16px}.study-paper-title{font-size:14px}.study-paper-total span{font-size:12px}.planner-task-actions{flex-wrap:wrap}.blended-review small{font-size:14px}}

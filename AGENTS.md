@@ -36,6 +36,7 @@ WB 독해력학원·웩슬러브레인센터의 원내 학습 웹앱 모음. 어
 | `calc/` | **연산 체험** — 공개 Pages 페이지, 기록은 기기 안에만. 원장 PC 원본의 복사본이라 직접 수정하지 않는다. **상세: `calc/README.md`** |
 | `workbench/` | **컨설팅 워크벤치** — 원장 전용, `src/app.html` → 암호화 `index.html` 빌드. 배포본과 소스 버전 차이를 먼저 확인하고 비밀번호 없이 재빌드하지 않는다. **상세: `workbench/src/README.md`** |
 | `apps/` | **별도 프로토타입·전략 보드** — 그림검사 데모와 수완 신규 학원 준비 보드/브리핑. 학습 앱·운영 백엔드와 별개다. **상세: `apps/README.md`** |
+| `.impeccable/` | 블렌디드 UI 검토 기록. 적용 전후 근거와 해결 상태를 보존한다. |
 | `scripts/` | 저장소 전체 검사·에이전트 문서 정합·Pages HTML 색인 차단 관문 (`check.mjs`·`docs-sync.test.mjs`·`pages-noindex.test.mjs`) |
 | `desk/` | **프로그램데스크** — 학원과 별개 사업(구독 학생의 프로그램·자료 운영) 앱. 새 워커 `wb-desk` + 새 D1. **상세: `desk/README.md`** |
 | `desk-ext/` | 프로그램데스크 크롬 확장(표 캡처, MV3). 학생 정보 없음. `desk/build.mjs`가 `dist/ext/`로 복사 |

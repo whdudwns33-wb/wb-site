@@ -19,6 +19,25 @@ const {chromium}=require('playwright');
   try {
     const owner=await login('owner'),student=await login('student-a',{width:390,height:844}),teacher=await login('teacher-a',{width:820,height:1180});
     for(const page of [owner,student,teacher]) {assert.ok(await page.getByRole('button',{name:'일정·학사',exact:true}).count());assert.equal(await page.locator('#tabs [data-go="academic"]').count(),0);}
+    for(const page of [student,teacher]) {
+      for(const width of [320,390,820,1365]) {
+        await page.setViewportSize({width,height:900});
+        assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),`${width}px page overflow`);
+        assert.equal(await page.locator('.blended-primary').evaluate(el=>el.scrollWidth<=el.clientWidth),true);
+        await page.locator('.blended-menu summary').press('Enter');
+        assert.equal(await page.locator('.blended-menu').getAttribute('open'),'');
+        assert.ok(await page.getByRole('button',{name:'로드맵',exact:true}).isVisible());
+        await page.locator('.blended-menu summary').press('Enter');
+        for(const selector of ['.navbtn','.planner-check','.study-timer-subjects .chip','.planner-task-actions .btn']) {
+          for(const box of await page.locator(selector).evaluateAll(els=>els.map(el=>({height:el.getBoundingClientRect().height,width:el.getBoundingClientRect().width}))))assert.ok(box.height>=44 && box.width>=44,selector+JSON.stringify(box));
+        }
+      }
+      assert.equal(await page.getByRole('button',{name:'이전 날짜',exact:true}).count(),1);
+      assert.equal(await page.getByLabel('오늘 할 공부 추가',{exact:true}).count(),1);
+    }
+    await student.setViewportSize({width:390,height:844});await teacher.setViewportSize({width:820,height:1180});
+    assert.ok(await student.evaluate(()=>document.querySelector('#studyPlanner').getBoundingClientRect().top<document.querySelector('.blended-rewards').getBoundingClientRect().top));
+    assert.ok(await teacher.evaluate(()=>document.querySelector('.blended-review-card').getBoundingClientRect().top<document.querySelector('#todayNextAction').getBoundingClientRect().top));
     await owner.getByRole('button',{name:'일정·학사',exact:true}).click();await owner.getByRole('button',{name:'시험·수행평가·자료 요청',exact:true}).click();
     await click(owner,'acadadd');await owner.locator('#academicTitle').fill('가상 중간시험');await owner.locator('#academicSubject').selectOption('math');
     for(const [id,value] of [['academicGrade','중2'],['academicUnit','일차함수'],['academicRange','교과서 10~30쪽']])await owner.locator('#'+id).fill(value);
@@ -36,19 +55,23 @@ const {chromium}=require('playwright');
     await student.locator(`[data-act="studyclaim"][data-id="${newTask}"]`).click();await synced(student);
     await student.locator(`[data-act="toggle"][data-id="${newTask}"]`).first().click();await synced(student);
     await teacher.reload();await teacher.locator('#tabs button').first().waitFor();
-    await teacher.locator(`[data-blended="check"][data-id="${newTask}"]`).click();await teacher.locator('#blendedFeedback').fill('풀이와 설명 확인');await teacher.locator('[data-blended="checksave"]').click();await synced(teacher);
+    await teacher.locator(`[data-blended="check"][data-id="${newTask}"]`).click();await teacher.locator('#blendedFeedback').fill(' 풀이와 설명 확인 ');
+    teacher.removeAllListeners('dialog');teacher.once('dialog',d=>d.dismiss());
+    await teacher.keyboard.press('Escape');
+    assert.equal(await teacher.locator('#blendedFeedback').inputValue(),' 풀이와 설명 확인 ');
+    teacher.on('dialog',d=>d.accept());await teacher.locator('[data-blended="checksave"]').click();await synced(teacher);
     await student.reload();await student.locator('#tabs button').first().waitFor();assert.equal(await student.evaluate(id=>getCheck(id,today()).checked,newTask),true);
-    await owner.getByRole('button',{name:'로드맵',exact:true}).click();await click(owner,'roadmapopen');
+    await owner.locator('.blended-menu summary').click();await owner.getByRole('button',{name:'로드맵',exact:true}).click();await click(owner,'roadmapopen');
     await owner.locator('#roadmapTargetSchool').fill('가상 목표 학교');await click(owner,'roadmaptargetsave');await synced(owner);
     await click(owner,'roadmapbookadd');await owner.locator('#roadmapSubject').selectOption('math');await owner.locator('#roadmapBook').fill('가상 교재');
     await owner.locator('#roadmapRangeStart').fill('1');await owner.locator('#roadmapRangeEnd').fill('20');await click(owner,'roadmapbooksave');await synced(owner);
     assert.ok(await owner.evaluate(()=>state.tasks.some(t=>t.auto==='study-roadmap-v1')));await click(owner,'closemodal');
-    await teacher.getByRole('button',{name:'인강',exact:true}).click();await click(teacher,'ingadd');
+    await teacher.locator('.blended-menu summary').click();await teacher.getByRole('button',{name:'인강',exact:true}).click();await click(teacher,'ingadd');
     await teacher.locator('#ingSubject').selectOption('math');await teacher.locator('#ingName').fill('가상 개념 강좌');await teacher.locator('#ingText').fill('1. 개념 정리 30분\n2. 예제 연습 40분');
     await click(teacher,'ingsave');await synced(teacher);
     await teacher.reload();await teacher.locator('#tabs button').first().waitFor();assert.ok(await teacher.getByText('가상 개념 강좌',{exact:true}).count());
     await student.getByRole('button',{name:'주간',exact:true}).click();await click(student,'weekgoal');await student.locator('[data-weekgoal="math"]').fill('120');await click(student,'weekgoalsave');await synced(student);
-    await student.getByRole('button',{name:'학습',exact:true}).click();await student.waitForFunction(()=>submissionCache.loaded && !submissionCache.loading);
+    await student.locator('.blended-menu summary').click();await student.getByRole('button',{name:'학습',exact:true}).click();await student.waitForFunction(()=>submissionCache.loaded && !submissionCache.loading);
     await student.locator('details').filter({has:student.locator('[data-act="submissionquestion"]')}).locator('summary').click();
     await click(student,'submissionquestion');await student.locator('#submissionSubject').selectOption('math');await student.locator('#submissionText').fill('가상 수학 질문입니다.');await click(student,'submissionsubmit');
     await student.getByText('가상 수학 질문입니다.',{exact:false}).first().waitFor();
@@ -57,7 +80,7 @@ const {chromium}=require('playwright');
     await guardian.getByLabel('아이디',{exact:true}).fill('guardian-a');await guardian.getByLabel('비밀번호',{exact:true}).fill('Demo-guardian-a-2026!');await guardian.getByRole('button',{name:'로그인',exact:true}).click();
     await guardian.getByRole('button',{name:'공개 학습 리포트 보기'}).click();await guardian.getByRole('heading',{name:'공개 학습 리포트',exact:true}).waitFor();
     await teacher.getByRole('link',{name:'상담·리포트',exact:true}).click();await teacher.locator('#student-filter').waitFor();assert.equal(await teacher.locator('#student-filter').inputValue(),'student-a');
-    await teacher.getByRole('link',{name:'전체 플래너',exact:true}).click();await teacher.locator('#tabs button').first().waitFor();
+    await teacher.getByRole('link',{name:'오늘',exact:true}).click();await teacher.locator('#tabs button').first().waitFor();
     // 저장 응답을 기다리는 동안 다른 기기가 바꾼 내용에 로컬 수정을 자동 덮어쓰지 않는다.
     let race=false;
     await student.route('**/blended/api',async route=>{
@@ -85,12 +108,14 @@ const {chromium}=require('playwright');
     // 원본 주요 화면과 반응형 조판, 브라우저 저장소 분리.
     for(const page of [owner,student,teacher]) {
       for(const name of ['오늘','주간','로드맵','일정·학사','인강','학습']) {
+        if(['로드맵','인강','학습'].includes(name))await page.locator('.blended-menu summary').click();
         await page.getByRole('button',{name,exact:true}).click();assert.ok((await page.locator('#view').innerText()).length>20);
         assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),`${name} overflow`);
       }
       assert.deepEqual(await page.evaluate(()=>Object.keys(localStorage)),[]);
     }
     await owner.getByRole('button',{name:'일정·학사',exact:true}).click();await owner.screenshot({path:path.join(evidence,'restored-schedule-desktop.png'),fullPage:true});
+    await teacher.getByRole('button',{name:'오늘',exact:true}).click();await teacher.screenshot({path:path.join(evidence,'design-teacher-tablet.png'),fullPage:true});
     await student.getByRole('button',{name:'오늘',exact:true}).click();await student.screenshot({path:path.join(evidence,'restored-today-phone.png'),fullPage:true});
     assert.ok(!requests.some(url=>url.includes('wb-sync.')));assert.deepEqual(errors,[]);
     console.log('PASS 원본 6개 화면·일정/학사 통합·시험 등록·과제 배정/수행/확인·로드맵 자동 분배·인강 목차·주간 목표·텍스트 질문·주간 발행/보호자 열람·선택 학생 상담 연결·1365/820/390px·원본 서버 호출 없음');
