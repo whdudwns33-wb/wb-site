@@ -26,7 +26,8 @@ test('회차제 학생 정보는 동적 시작일 다음에 현재 4회 중 출�
   assert.ok(start >= 0 && count > start, '회차 시작일 바로 다음에 현재 회차 출석이 있어야 한다');
   assert.match(source, /data-fallback="' \+ esc\(student\.sessionCycleStartDate \|\| '미지정'\)/);
   assert.match(source, /<b>현재 회차 출석<\/b>/);
-  assert.match(html, /element\.textContent = '현재 ' \+ size \+ '회 중 ' \+ count \+ '회 출석'/);
+  assert.match(html, /'현재 ' \+ size \+ '회 중 ' \+ count \+ '회 출석'/);
+  assert.match(html, /시작일 입력 대기 · 회차 계산\/수강료 안내 대기/);
   assert.match(html, /element\.textContent = String\(result\.cycleStartDate \|\| element\.dataset\.fallback \|\| '미지정'\)/);
 });
 
@@ -166,5 +167,11 @@ test('학생 단위 4회제는 설정 시작일 당일부터만 적용되고 그
   assert.equal(usesSession4({ studentId: student.id }, 'invalid-date'), true, '잘못된 선택값은 오늘로 안전하게 대체한다');
 
   student.sessionCycleStartDate = '';
-  assert.equal(usesSession4({ studentId: student.id }, '2026-09-04'), false, '유효한 시작일이 없으면 4회제로 추정하지 않는다');
+  assert.equal(usesSession4({ studentId: student.id }, '2026-09-04'), true, '시작일 대기 중에도 자동 결석보강은 생성하지 않는다');
+  student.sessionBillingSubject = '독해사고력';
+  assert.equal(usesSession4({ studentId: student.id, subject: '수학' }, '2026-09-04'), false);
+  assert.equal(usesSession4({ studentId: student.id, subject: '독해사고력' }, '2026-09-04'), true);
+  const attendanceState = block('function sessionPackAttendanceState(task, date)', 'function sessionPackAttendanceHintHtml(task, date, check, attendanceState)');
+  const getState = new Function('sessionPackForLessonTask', 'taskUsesSession4Billing', 'rosterStudentByStableId', `${attendanceState}\nreturn sessionPackAttendanceState;`)(() => null, usesSession4, () => student);
+  assert.equal(getState({ studentId: student.id, subject: '독해사고력' }, '2026-09-04'), null, '시작일 대기 중에는 출결을 잠그지 않는다');
 });
