@@ -27,6 +27,7 @@ WB 독해력학원·웩슬러브레인센터의 원내 학습 웹앱 모음. 어
 | `letter/` | **브레인레터** — 유치~중등 다섯 학년대 주간 뉴스레터(신문 짜임, 가족 링크 `/letter/?t=`·학생 앱·PDF 인쇄·새 호 푸시). 순수 로직 `letter.js`(검증기·렌더러·지표 순환·하루 한 장 7일 리듬 하나) + `shapes.js`(시공간 도형 생성기) + `drills.js`(나머지 네 지표 5분 놀이 생성기·오늘의 5분) + 자체 창작 체험 호 `issue-sample.json` + 주제 달력 `calendar.json` + 자체 제작 삽화 `img/` + 글꼴 `fonts/`(Noto Sans/Serif KR 조각, OFL — `fetch-fonts.mjs` 가 받는다). 읽어 주기·한자 따라쓰기는 `shared/voice.js`·`vocab/trace.js` 를 배급받아 쓴다. 호 본문·올린 사진은 KV 에만 — 단 **파일럿**은 편집실이 만든 자체 창작 호를 `issues/<주차>.json` + 목록 `issues.json` 으로 저장소에 두고 `/letter/` 가 링크만으로 연다(발행일이 되면 그 호로 자동 전환). **상세: `letter/README.md`**, 고칠 때 깨지는 자리·인수인계: `letter/AGENTS.md`, 기획 `docs/브레인레터-주간뉴스레터-기획서-v1.md` |
 | `vocab-age/` | 어휘 나이 진단 (공개 체험 페이지) |
 | `task/` | **업무지시서** — 직원 업무·수업·출결·교재·차량·기기 운영. GitHub Pages 화면 + `wb-sync` Worker/D1, 직원별 개인 기기 인증. **상세: `task/README.md`** |
+| `blended/` | **블렌디드 플래너** — 개별 계정·담당 과목/기간 권한, 학습·상담·약속·불변 리포트. 전용 Worker/SQLite Durable Object, 기존 consult와 분리. 학원 원본·메시지 발송 미연동. **상세: `blended/README.md`** |
 | `consult/` | **컨설팅 플래너** — 학생의 오늘·주간·월간·학사·인강·학습·로드맵과 원장 배부·현황·결과지·보호자 공유. `wb-sync`의 `app:consult`로 task와 데이터를 분리한다. **상세: `consult/README.md`** |
 | `sync/` | **학원 운영 백엔드** — `wb-sync`(직원·보호자·consult) + 별도 origin의 `wb-student`(학생), 같은 D1 + private R2. 마이그레이션 → Worker → Pages를 수동 배포한다. **상세: `sync/README.md`**, 포털 배포: `sync/PORTAL_RELEASE_RUNBOOK.md` |
 | `parent/` | **보호자 포털** — task 자녀 운영 현황(`/`)과 별도 consult 학습 리포트(`/consult-guardian/`). `wb-sync` assets로 제공하고 같은 origin의 세션 쿠키를 쓴다. **상세: `parent/README.md`** |

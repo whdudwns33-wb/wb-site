@@ -1,0 +1,35 @@
+name = "wb-blended"
+main = "worker.mjs"
+account_id = "378cf7d252bd8c717bda617614bbcf57"
+compatibility_date = "2026-09-01"
+workers_dev = false
+preview_urls = false
+
+[vars]
+PUBLIC_ORIGIN = "https://blended.wbcowork.com"
+OWNER_LOGIN = "whdudwns33"
+
+[[routes]]
+pattern = "blended.wbcowork.com"
+custom_domain = true
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+run_worker_first = true
+
+[[durable_objects.bindings]]
+name = "PLANNER"
+class_name = "BlendedPlanner"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["BlendedPlanner"]
+
+[[rules]]
+type = "Text"
+globs = ["**/*.sql"]
+fallthrough = true
+
+[observability]
+enabled = false
