@@ -2001,14 +2001,15 @@ async function createFromAbsence(env, app, body, auth, json, origin) {
   const document = await loadRoster(env, app);
   const student = rosterStudent(document, studentId, sourceDate);
   // 구형 화면은 creationMode를 보내지 않으므로 automatic으로 닫는다. 회차제 결석은
-  // 해당 학생의 유효한 회차 시작일 이후부터 자동 생성하지 않는다. 시작일 이전 결석은
+  // 해당 과목의 시작일 대기 중이거나 유효한 회차 시작일 이후부터 자동 생성하지 않는다. 시작일 이전 결석은
   // 당시 월제였던 기존 운영 규칙을 보존하고, 사용자가 보강 버튼을 직접 누른 경우는 허용한다.
   const cycleStartDate = String(student.sessionCycleStartDate || '');
   const parsedCycleStart = new Date(cycleStartDate + 'T00:00:00Z');
   const validCycleStart = ISO_DATE.test(cycleStartDate) && !Number.isNaN(parsedCycleStart.getTime()) &&
     parsedCycleStart.toISOString().slice(0, 10) === cycleStartDate;
-  if (String(student.billingMode || 'monthly') === 'session4' && validCycleStart &&
-      sourceDate >= cycleStartDate && creationMode !== 'manual') {
+  if (String(student.billingMode || 'monthly') === 'session4' &&
+      (!student.sessionBillingSubject || source.task.subject === student.sessionBillingSubject) &&
+      (!cycleStartDate || (validCycleStart && sourceDate >= cycleStartDate)) && creationMode !== 'manual') {
     problem('회차제 학생의 결석 보강은 자동 생성되지 않습니다. 필요하면 보강 버튼에서 직접 생성해 주세요',
       409, 'SESSION4_AUTOMATIC_MAKEUP_DISABLED');
   }

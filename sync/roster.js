@@ -342,7 +342,7 @@ function rosterStudent(value, index) {
     ['id', 'name', 'grade', 'subject', 'start', 'end', 'reason'],
     ['memo', 'entryType', 'school', 'phoneSelf', 'phoneFather', 'phoneMother',
       'registrationDate', 'firstClassDate', 'subjects', 'teacher', 'teacherIds',
-      'billingMode', 'sessionCycleStartDate', 'subscriptions'], path);
+      'billingMode', 'sessionCycleStartDate', 'sessionBillingSubject', 'subscriptions'], path);
   const start = month(value.start, path + '.start', false);
   const end = month(value.end, path + '.end', true);
   if (end && end < start) fail(path + '.end', '시작월보다 빠를 수 없습니다');
@@ -390,11 +390,14 @@ function rosterStudent(value, index) {
       fail(path + '.billingMode', 'monthly 또는 session4여야 합니다');
     }
     const cycleStart = optionalIsoDate(value.sessionCycleStartDate || '', path + '.sessionCycleStartDate');
-    if (billingMode === 'session4' && !cycleStart) {
-      fail(path + '.sessionCycleStartDate', '회차제 시작일을 입력해 주세요');
-    }
+    // 결제 기준일 확정 전에도 회차제로 분류한다. 날짜가 없으면 회차 원장·알림 집계는 대기한다.
     result.billingMode = billingMode;
     result.sessionCycleStartDate = billingMode === 'session4' ? cycleStart : '';
+  }
+  if (Object.prototype.hasOwnProperty.call(value, 'sessionBillingSubject')) {
+    const scope = String(value.sessionBillingSubject || '');
+    if (scope && !ROSTER_SUBJECTS.has(scope)) fail(path + '.sessionBillingSubject', '등록된 과목을 선택해 주세요');
+    result.sessionBillingSubject = result.billingMode === 'session4' ? scope : '';
   }
   return result;
 }
@@ -1047,7 +1050,7 @@ export async function handleRoster(env, app, body, origin, auth, json) {
         const storedStudent = document.roster.students.find(item => item.id === inputId);
         if (storedStudent) {
           input = { ...input };
-          for (const key of ['billingMode', 'sessionCycleStartDate', 'subscriptions']) {
+          for (const key of ['billingMode', 'sessionCycleStartDate', 'sessionBillingSubject', 'subscriptions']) {
             if (!Object.prototype.hasOwnProperty.call(input, key) && Object.prototype.hasOwnProperty.call(storedStudent, key)) {
               input[key] = storedStudent[key];
             }
@@ -1137,7 +1140,7 @@ export async function handleRoster(env, app, body, origin, auth, json) {
     if (action === 'student_update' && previousStudent) {
       const fields = ['name', 'school', 'grade', 'phoneSelf', 'phoneFather', 'phoneMother',
         'registrationDate', 'firstClassDate', 'subject', 'subjects', 'start', 'end', 'reason', 'memo',
-        'billingMode', 'sessionCycleStartDate', 'subscriptions'];
+        'billingMode', 'sessionCycleStartDate', 'sessionBillingSubject', 'subscriptions'];
       const changedFields = changedStudentFields(previousStudent, nextStudent, fields);
       if (changedFields.length) {
         const eventId = await studentChangeEventId('roster\n' + nextStudent.id + '\n' + expectedUpdatedAt + '\n' + updatedAt);

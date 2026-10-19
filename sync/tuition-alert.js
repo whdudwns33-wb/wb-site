@@ -79,7 +79,7 @@ function billingStudents(document, sourceDate, includeInactive = false) {
     if (result.has(studentId)) continue;
     result.set(studentId, {
       studentId, active,
-      cycleStartDate,
+      cycleStartDate, sessionBillingSubject: String(student.sessionBillingSubject || ''),
       name: String(student && student.name || '').slice(0, 80),
       school: String(student && student.school || '').slice(0, 100),
       grade: String(student && student.grade || '').slice(0, 40)
@@ -203,8 +203,8 @@ function attendanceEvidence(row, students, earliestDate, sourceDate) {
   return {
     studentId, cycleStartDate: student.cycleStartDate, taskId, date,
     status: String(check.att), checkKey: taskId + '|' + date,
-    sessionQualifies: regularIdentity ||
-      (makeupAssigneeMatches && makeupOriginAllowsSession(row.makeup_history)),
+    sessionQualifies: (!student.sessionBillingSubject || task.subject === student.sessionBillingSubject) &&
+      (regularIdentity || (makeupAssigneeMatches && makeupOriginAllowsSession(row.makeup_history))),
     makeupAssigneeMismatch: !!(makeupIdentity && !makeupAssigneeMatches),
     directAttested: !!(makeupAssigneeMatches && row.direct_attestation_case_id &&
       String(row.direct_attestation_case_id) === String(row.makeup_case_id || '')),
@@ -1434,7 +1434,8 @@ export async function handleStudentAttendance(env, app, body, origin, auth, json
   let rows = [];
   if (earliestDate <= sourceDate) rows = await qualifyingRows(env, earliestDate, sourceDate);
   const studentMap = new Map([[studentId, {
-    studentId, cycleStartDate: configuredCycleStartDate || earliestDate
+    studentId, cycleStartDate: configuredCycleStartDate || earliestDate,
+    sessionBillingSubject: String(student.sessionBillingSubject || '')
   }]]);
   const evidence = sortedUniqueEvidence(rows.map(row =>
     attendanceEvidence(row, studentMap, earliestDate, sourceDate)

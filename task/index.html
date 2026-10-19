@@ -1344,17 +1344,17 @@
   </section>
 </div>
 
-<script src="./lesson-form-core.js?v=2026-10-17.4"></script>
-<script src="./task-push-client.js?v=2026-10-17.4"></script>
-<script src="./schedule-board-core.js?v=2026-10-17.4"></script>
-<script src="./asset-core.js?v=2026-10-17.4"></script>
-<script src="./qr-core.js?v=2026-10-17.4"></script>
-<script src="./acaflow-import-core.js?v=2026-10-17.4"></script>
-<script src="./feedback-subject-catalog.js?v=2026-10-17.4"></script>
-<script src="./sync-recovery-core.js?v=2026-10-17.4"></script>
-<script src="./staff-work-session-core.js?v=2026-10-17.4"></script>
-<script src="./staff-attendance-history-core.js?v=2026-10-17.4"></script>
-<script src="./makeup-recovery-core.js?v=2026-10-17.4"></script>
+<script src="./lesson-form-core.js?v=2026-10-19.1"></script>
+<script src="./task-push-client.js?v=2026-10-19.1"></script>
+<script src="./schedule-board-core.js?v=2026-10-19.1"></script>
+<script src="./asset-core.js?v=2026-10-19.1"></script>
+<script src="./qr-core.js?v=2026-10-19.1"></script>
+<script src="./acaflow-import-core.js?v=2026-10-19.1"></script>
+<script src="./feedback-subject-catalog.js?v=2026-10-19.1"></script>
+<script src="./sync-recovery-core.js?v=2026-10-19.1"></script>
+<script src="./staff-work-session-core.js?v=2026-10-19.1"></script>
+<script src="./staff-attendance-history-core.js?v=2026-10-19.1"></script>
+<script src="./makeup-recovery-core.js?v=2026-10-19.1"></script>
 <script>
 "use strict";
 
@@ -6242,9 +6242,9 @@ function lessonBriefingEditorHtml(student, task) {
     '<div class="grid2"><label class="field"><span class="fl">결제 구분</span><select class="in" data-lesson-briefing-student="billingMode" data-roster-billing-mode onchange="updateRosterBillingFields(this)">' +
       '<option value="monthly"' + (billingMode === 'monthly' ? ' selected' : '') + '>월결제</option>' +
       '<option value="session4"' + (billingMode === 'session4' ? ' selected' : '') + '>회차제 · 4회</option></select></label>' +
-    '<label class="field" data-roster-cycle-start-wrap' + (billingMode === 'session4' ? '' : ' hidden') + '><span class="fl">회차 시작일 · 필수</span>' +
+    '<label class="field" data-roster-cycle-start-wrap' + (billingMode === 'session4' ? '' : ' hidden') + '><span class="fl">회차 시작일 · 나중에 입력 가능</span>' +
       '<input class="in" type="date" data-lesson-briefing-student="sessionCycleStartDate"' +
-      (billingMode === 'session4' ? ' required aria-required="true"' : '') + ' value="' + esc(student.sessionCycleStartDate || '') + '"></label></div>' +
+      ' value="' + esc(student.sessionCycleStartDate || '') + '"></label></div>' +
     '<label class="field"><span class="fl">명단 기준 시작월</span><input class="in" type="month" data-lesson-briefing-student="start" value="' + esc(student.start || today().slice(0, 7)) + '"></label>' +
     '<label class="field"><span class="fl">내부 메모</span><textarea class="in" rows="3" maxlength="1000" data-lesson-briefing-student="memo">' + esc(student.memo || '') + '</textarea></label></section>';
   const instructionEditorHtml = '<section class="card"><div class="card-title">이 수업의 업무지시</div>' +
@@ -6308,7 +6308,6 @@ function lessonBriefingStudentPayload() {
   };
   if (editor.student.entryType) student.entryType = editor.student.entryType;
   if (!student.name || !student.grade || !student.start) throw new Error('이름·학년·명단 기준 시작월을 입력해 주세요');
-  if (student.billingMode === 'session4' && !student.sessionCycleStartDate) throw new Error('회차제 시작일을 입력해 주세요');
   if (ROSTER_SUBJECT_OPTIONS.includes(String(editor.task.subject || '')) && !student.subjects.includes(String(editor.task.subject))) {
     throw new Error('현재 수업 과목을 학생 등록과목에서 유지해 주세요');
   }
@@ -8604,9 +8603,9 @@ function lessonRosterInformationHtml() {
     '<div class="grid2"><label class="field"><span class="fl">결제 구분</span><select class="in" data-lesson-roster-field="billingMode" data-roster-billing-mode onchange="updateRosterBillingFields(this)">' +
       '<option value="monthly"' + (info.billingMode === 'monthly' ? ' selected' : '') + '>월결제</option>' +
       '<option value="session4"' + (info.billingMode === 'session4' ? ' selected' : '') + '>회차제 · 4회</option></select></label>' +
-    '<label class="field" data-roster-cycle-start-wrap' + (info.billingMode === 'session4' ? '' : ' hidden') + '><span class="fl">회차 시작일 · 필수</span>' +
+    '<label class="field" data-roster-cycle-start-wrap' + (info.billingMode === 'session4' ? '' : ' hidden') + '><span class="fl">회차 시작일 · 나중에 입력 가능</span>' +
       '<input class="in" type="date" data-lesson-roster-field="sessionCycleStartDate"' +
-      (info.billingMode === 'session4' ? ' required aria-required="true"' : '') + ' value="' + esc(info.sessionCycleStartDate) + '"></label></div>' +
+      ' value="' + esc(info.sessionCycleStartDate) + '"></label></div>' +
     '<label class="field"><span class="fl">내부 메모</span><textarea class="in" data-lesson-roster-field="memo" maxlength="1000">' + esc(info.memo) + '</textarea></label>';
 }
 
@@ -8619,9 +8618,6 @@ function lessonRosterStudentPayload(selected, draft, lessons) {
   const subjects = [...new Set(rosterSubjects.concat(lessonSubjects))];
   if (!String(info.name || '').trim() || !String(info.grade || '').trim() || !subjects.length) {
     throw new Error('원생 이름·학년·수업 과목을 모두 확인해 주세요');
-  }
-  if (info.billingMode === 'session4' && !String(info.sessionCycleStartDate || '').trim()) {
-    throw new Error('회차제 시작일을 입력해 주세요');
   }
   return Object.assign({}, selected, {
     id: selected.id, name: String(info.name).normalize('NFKC').trim(), school: String(info.school || '').normalize('NFKC').trim(),
@@ -11151,6 +11147,9 @@ const SESSION_PACK_ABSENCE_OPTIONS = [
 function sessionPackAttendanceState(task, date) {
   const pack = sessionPackForLessonTask(task, date);
   const rosterSession4 = typeof taskUsesSession4Billing === 'function' && taskUsesSession4Billing(task, date);
+  const billingStudent = rosterSession4 ? rosterStudentByStableId(task && task.studentId) : null;
+  // 시작일 미입력은 계산 대기 상태이므로 서버처럼 과거 출결도 잠그지 않는다.
+  if (!pack && rosterSession4 && !billingStudent.sessionCycleStartDate) return null;
   if (!pack && !rosterSession4) return null;
   const sourceKey = String(task.id || '') + '|' + String(date || '');
   const reflected = !!pack && (pack.usage || []).some(row => row && row.sourceType === 'regular' && row.sourceKey === sourceKey);
@@ -11518,6 +11517,9 @@ function session4LedgerHistoryHtml(summary) {
 }
 
 function session4LedgerCardHtml(student) {
+  if (!student.sessionCycleStartDate) return '<article class="card session4-ledger-card"><div class="card-title">' + esc(student.name || '학생') + '</div>' +
+    '<div class="card-sub">' + esc(studentSchoolGradeDetailLabel(student) || '학교·학년 미지정') + '</div>' +
+    '<div class="small muted mt8">시작일 입력 대기 · 회차 계산/수강료 안내 대기</div></article>';
   const summary = session4LedgerRows.get(String(student.id));
   if (!summary) return '<article class="card session4-ledger-card"><div class="card-title">' + esc(student.name || '학생') + '</div>' +
     '<div class="card-sub">' + esc(studentSchoolGradeDetailLabel(student) || '학교·학년 미지정') + '</div>' +
@@ -11739,7 +11741,8 @@ function taskUsesSession4Billing(task, referenceDate) {
   const cycleStartDate = String(student && student.sessionCycleStartDate || '');
   const date = /^\d{4}-\d{2}-\d{2}$/.test(String(referenceDate || '')) ? String(referenceDate) : today();
   return !!student && String(student.billingMode || 'monthly') === 'session4' &&
-    /^\d{4}-\d{2}-\d{2}$/.test(cycleStartDate) && date >= cycleStartDate;
+    (!student.sessionBillingSubject || task.subject === student.sessionBillingSubject) &&
+    (!cycleStartDate || (/^\d{4}-\d{2}-\d{2}$/.test(cycleStartDate) && date >= cycleStartDate));
 }
 
 function makeupRequestHtml(task, date, check) {
@@ -19941,7 +19944,9 @@ function applyStudentCycleSummary(panel, result) {
     String(element.dataset.studentId || '') === studentId).forEach(element => {
       const size = Number(result.cycleSize) || 4;
       const count = Math.max(0, Math.min(size, Number(result.attendanceCount) || 0));
-      element.textContent = '현재 ' + size + '회 중 ' + count + '회 출석';
+      element.textContent = result.billingMode === 'session4' && !result.configuredCycleStartDate
+        ? '시작일 입력 대기 · 회차 계산/수강료 안내 대기'
+        : '현재 ' + size + '회 중 ' + count + '회 출석';
     });
 }
 
@@ -20050,7 +20055,7 @@ function rosterStudentInfoHtml(student, lessonReferences, taskId) {
     field('첫 등원일', student.firstClassDate, false, ['firstClassDate']) +
     rosterStudentSubscriptions(student).map(program => field(program.label + ' 시작일', program.startDate, false, ['subscriptions'])).join('') +
     '<div class="student-info-field"><b>결제 구분' + (changed.has('billingMode') ? marker('결제 구분') : '') +
-      '</b><span>' + esc(billingMode) + '</span></div>' +
+      '</b><span>' + esc(billingMode) + (student.sessionBillingSubject ? ' · ' + esc(student.sessionBillingSubject) + '만' : '') + '</span></div>' +
     (String(student.billingMode || 'monthly') === 'session4'
       ? '<div class="student-info-field"><b>회차 시작일' + (changed.has('sessionCycleStartDate') ? marker('회차 시작일') : '') +
         '</b><span data-student-cycle-start data-student-id="' + esc(student.id) + '" data-fallback="' + esc(student.sessionCycleStartDate || '미지정') + '">' +
@@ -20198,10 +20203,10 @@ function rosterStudentEditorHtml(student, assignment) {
     '<div class="grid2"><label class="field"><span class="fl">결제 구분</span><select class="in" data-rse-billing-mode onchange="updateRosterBillingFields(this)">' +
       '<option value="monthly"' + (billingMode === 'monthly' ? ' selected' : '') + '>월결제</option>' +
       '<option value="session4"' + (billingMode === 'session4' ? ' selected' : '') + '>회차제 · 4회</option></select></label>' +
-    '<label class="field" data-rse-cycle-start-wrap' + (billingMode === 'session4' ? '' : ' hidden') + '><span class="fl">회차 시작일 · 필수</span>' +
-      '<input class="in" type="date" data-rse-session-cycle-start' + (billingMode === 'session4' ? ' required aria-required="true"' : '') +
+    '<label class="field" data-rse-cycle-start-wrap' + (billingMode === 'session4' ? '' : ' hidden') + '><span class="fl">회차 시작일 · 나중에 입력 가능</span>' +
+      '<input class="in" type="date" data-rse-session-cycle-start' +
       ' value="' + esc(student.sessionCycleStartDate || '') + '"></label></div>' +
-    '<div class="small muted mb14">회차제는 시작일부터 출석·지각·조퇴를 합산하고, 3회 확정 시 관리자에게 수강료 생성 알림을 보냅니다.</div>' +
+    '<div class="small muted mb14">회차 대상: ' + esc(student.sessionBillingSubject || '전체 과목') + ' · 시작일 미입력 시 회차 계산과 수강료 안내는 대기합니다. 시작일부터 출석·지각·조퇴를 합산하고, 3회 확정 시 관리자에게 수강료 생성 알림을 보냅니다.</div>' +
     (isNew ? '' : '<label class="field"><span class="fl">명단 기준 시작월</span><input class="in" type="month" data-rse-start value="' + esc(student.start || today().slice(0, 7)) + '"></label>' +
     '<input type="hidden" data-rse-end value="' + esc(student.end || '') + '"><input type="hidden" data-rse-reason value="' + esc(student.reason || '') + '">' +
     (student._editing ? '<div class="hint mb14">현재 상태: <b>' + esc(transition ? transition.label + ' · ' + transition.effectiveDate : '재원') +
@@ -20221,8 +20226,8 @@ function updateRosterBillingFields(selectElement) {
   const sessionMode = select.value === 'session4';
   if (wrap) wrap.hidden = !sessionMode;
   if (input) {
-    input.required = sessionMode;
-    input.setAttribute('aria-required', sessionMode ? 'true' : 'false');
+    input.required = false;
+    input.setAttribute('aria-required', 'false');
     if (!sessionMode) input.value = '';
   }
 }
@@ -20408,7 +20413,6 @@ async function saveRosterStudent(button) {
   if (editor.student.entryType) student.entryType = editor.student.entryType;
   if (!student.name) return toast('이름을 입력해 주세요');
   if (!student.start) return toast('시작월을 입력해 주세요');
-  if (billingMode === 'session4' && !sessionCycleStartDate) return toast('회차 시작일을 입력해 주세요');
   if (subscriptions.some(item => !subscriptionProgramLabel(item.type) || !lessonRegistrationIsoDate(item.startDate))) {
     return toast('선택한 구독 프로그램의 구독 시작일을 입력해 주세요');
   }
@@ -25935,7 +25939,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-10-17.4';
+const APP_VER = '2026-10-19.1';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);

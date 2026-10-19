@@ -225,6 +225,27 @@ test('23:50 aggregation counts only final P/L/E across subjects and creates the 
   assert.equal(db.database.prepare('SELECT COUNT(*) count FROM tuition_generation_alerts').get().count, 1);
 });
 
+test('subject-scoped sessions exclude other subjects; pending start creates no tuition alert', async () => {
+  const db = new TestD1();
+  seedRoster(db, [rosterStudent('student-a', '범위학생', { sessionBillingSubject: '독해사고력' }),
+    rosterStudent('student-b', '시작대기', { sessionCycleStartDate: '', sessionBillingSubject: '독해사고력' })]);
+  seedTask(db, 'reading-a', 'student-a', 'teacher-a', { subject: '독해사고력' });
+  seedTask(db, 'math-a', 'student-a', 'teacher-a', { subject: '사고력수학' });
+  seedTask(db, 'reading-b', 'student-b', 'teacher-a', { subject: '독해사고력' });
+  for (const date of ['2026-08-01', '2026-08-08', '2026-08-15']) {
+    seedCheck(db, 'math-a', date, 'P'); seedCheck(db, 'reading-b', date, 'P');
+  }
+  seedCheck(db, 'reading-a', '2026-08-01', 'P');
+  seedCheck(db, 'reading-a', '2026-08-08', 'P');
+  const first = await handleScheduledTuitionAlerts({ DB: db }, CUTOFF);
+  assert.equal(first.eligibleStudents, 1);
+  assert.equal(first.created, 0);
+  seedCheck(db, 'reading-a', '2026-08-15', 'P');
+  const third = await handleScheduledTuitionAlerts({ DB: db }, CUTOFF);
+  assert.equal(third.created, 1);
+  assert.deepEqual(db.database.prepare('SELECT student_id FROM tuition_generation_alerts').all().map(r => r.student_id), ['student-a']);
+});
+
 test('same-name students stay separate by stable id and one task/date is counted at most once', async () => {
   const db = new TestD1();
   seedRoster(db, [
