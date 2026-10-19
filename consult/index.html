@@ -1960,6 +1960,7 @@ const sync = {
   },
 
   async run(duringStudentConnect) {
+    if (pendingAdminCode) return;
     const auth = this.auth();
     if (!auth || this.busy || (studentConnectBusy && !duringStudentConnect)) return;
     this.confirmed = new Map();
@@ -2167,7 +2168,21 @@ function resetStudentLinkCache(token) {
   const savedLogins = state.settings.localLearningLogins || {};
   const localLearningLogins = staffId && savedLogins[staffId] ? { [staffId]: savedLogins[staffId] } : {};
   const settings = Object.assign({}, state.settings || {}, {
-    myToken: String(token || ''), pullAt: 0, pushAt: 0, localLearningLogins: localLearningLogins
+    adminToken: '', syncSecret: '', myToken: String(token || ''), pullAt: 0, pushAt: 0,
+    localLearningLogins: localLearningLogins
+  });
+  state = Object.assign(blankState(), { staff: [], tasks: [], checks: {}, settings: settings });
+  viewStaff = '';
+  clearConsultLinkContacts();
+  clearStudentPhoneUi();
+  return save();
+}
+
+/** 학생으로 쓰던 패드를 관리자로 전환할 때 학생 캐시를 관리자 권한으로 다시 올리지 않는다. */
+function resetAdminDeviceCache(token) {
+  const settings = Object.assign({}, state.settings || {}, {
+    adminToken: String(token || ''), syncSecret: '', myToken: '', pullAt: 0, pushAt: 0,
+    localLearningLogins: {}
   });
   state = Object.assign(blankState(), { staff: [], tasks: [], checks: {}, settings: settings });
   viewStaff = '';
@@ -2420,18 +2435,39 @@ async function connectAdminDevice() {
   const code = pendingAdminCode;
   if (!code || adminConnectBusy) return;
   adminConnectBusy = true;
-  toast('새 컴퓨터 연결 중…');
+  toast('관리자 기기 연결 중…');
   try {
+    const replacingStudentCache = !!state.settings.myToken;
+    if (replacingStudentCache) {
+      // 과거 버전에서 함께 남았을 수 있는 관리자 자격이 학생 캐시를 전송하지 못하게 먼저 격리한다.
+      state.settings.adminToken = '';
+      state.settings.syncSecret = '';
+      session.lock();
+    }
+    if (!save()) {
+      toast('이 브라우저에 관리자 연결 정보를 저장할 수 없습니다. Safari 또는 Chrome의 일반 탭에서 QR을 다시 열어 주세요.');
+      return;
+    }
+    if (replacingStudentCache && sync.collect(Number(state.settings.pushAt) || 0).length) {
+      toast('이 패드에 아직 전송되지 않은 학생 기록이 있습니다. 기존 학생 링크에서 동기화한 뒤 같은 QR을 다시 스캔해 주세요.');
+      return;
+    }
     const d = await sync.exchangeAdmin(code);
     pendingAdminCode = '';
-    state.settings.adminToken = d.token;
-    state.settings.syncSecret = '';
-    state.settings.pullAt = 0;
-    state.settings.pushAt = 0; // 기존 컴퓨터의 미전송 데이터도 서버 LWW로 안전하게 다시 비교한다
-    save(); session.unlock(); render();
+    if (replacingStudentCache) {
+      if (!resetAdminDeviceCache(d.token)) { session.unlock(); render(); return; }
+    } else {
+      state.settings.adminToken = d.token;
+      state.settings.syncSecret = '';
+      state.settings.myToken = '';
+      state.settings.pullAt = 0;
+      state.settings.pushAt = 0; // 기존 관리자 기기의 미전송 데이터도 서버 LWW로 안전하게 다시 비교한다
+      if (!save()) { session.unlock(); render(); return; }
+    }
+    session.unlock(); render();
     sync.loud = true;
     await sync.run();
-    toast('새 컴퓨터 연결 완료');
+    toast('관리자 기기 연결 완료');
   } catch (e) {
     const terminal = [400, 401, 403, 404, 409, 410, 422].includes(Number(e && e.status));
     if (terminal) pendingAdminCode = '';
@@ -2650,7 +2686,7 @@ function viewPendingAdd() {
 
 /* ── 잠금 ── */
 function viewLock() {
-  return (pendingAdminCode ? '<div class="card alert mt14"><div class="card-title">새 컴퓨터 연결이 완료되지 않았습니다</div>' +
+  return (pendingAdminCode ? '<div class="card alert mt14"><div class="card-title">관리자 기기 연결이 완료되지 않았습니다</div>' +
     '<div class="card-sub mb14">인터넷 연결을 확인한 뒤 같은 연결 링크로 다시 시도할 수 있습니다.</div>' +
     '<button class="btn btn-primary btn-block" data-act="adminretry"' + (adminConnectBusy ? ' disabled' : '') + '>기기 연결 다시 시도</button></div>' : '') +
   '<div class="card mt14">' +
@@ -10976,16 +11012,17 @@ function viewSettings() {
   const lastTxt = sync.last ? new Date(sync.last).toLocaleString('ko-KR') : '아직 없음';
   const connected = !!(s.adminToken || s.syncSecret);
   return '<div class="card">' +
-    '<div class="card-title">새 컴퓨터 연결</div>' +
-    '<div class="card-sub mb14">아래 링크를 새 컴퓨터에서 한 번 열면 기존 데이터가 자동으로 연결됩니다. ' +
-      '비밀번호나 원장 비밀키를 입력할 필요가 없습니다.</div>' +
+    '<div class="card-title">관리자 기기 연결</div>' +
+    '<div class="card-sub mb14">관리 선생님이 사용할 패드에서는 QR을 스캔하고, 컴퓨터에서는 연결 링크를 한 번 열면 됩니다. ' +
+      '비밀번호나 원장 비밀키를 전달할 필요가 없습니다.</div>' +
     (connected
-      ? '<div class="row" style="gap:8px"><button class="btn btn-navy" data-act="adminlink">연결 링크 복사</button>' +
+      ? '<div class="row wraprow" style="gap:8px"><button class="btn btn-navy" data-act="adminqr">관리자 QR 만들기</button>' +
+        '<button class="btn btn-ghost" data-act="adminlink">연결 링크 복사</button>' +
         '<button class="btn btn-ghost" data-act="syncnow">지금 동기화</button></div>'
       : '<div class="hint" style="color:var(--coral)">이 기기의 동기화 연결을 먼저 복구해야 합니다.</div>') +
     '<div class="small muted mt14">마지막 동기화: ' + esc(lastTxt) +
       (sync.err ? ' · <span style="color:var(--coral)">' + esc(sync.err) + '</span>' : '') + '</div>' +
-    (connected ? '<div class="hint mt14">✓ 연결됨 · 링크는 10분 동안 한 번만 사용할 수 있습니다.</div>' : '') +
+    (connected ? '<div class="hint mt14">✓ 연결됨 · QR과 링크는 10분 동안 한 기기에서 한 번만 사용할 수 있습니다. 연결된 패드는 원장 모드 전체 권한을 가지며, 관리자 기기는 최대 5대입니다.</div>' : '') +
     '<details class="mt14"><summary class="small muted">비밀키로 긴급 연결</summary>' +
       '<div class="field mt14"><label class="fl">CONSULT_ADMIN_SECRET</label>' +
       '<input class="in" id="cfgSecret" type="password" value="' + esc(s.syncSecret) + '"></div>' +
@@ -11071,6 +11108,9 @@ function b64(str) { return btoa(unescape(encodeURIComponent(str))).replace(/\+/g
 function studentConnectLink(code) {
   return location.origin + location.pathname + '#c=' + encodeURIComponent(code);
 }
+function adminDeviceConnectLink(code) {
+  return location.origin + location.pathname + '#admin=' + encodeURIComponent(code);
+}
 async function createStudentLinks(ids) {
   if (sync.busy) throw new Error('동기화 중입니다. 잠시 후 다시 눌러 주세요');
   await sync.run();
@@ -11093,6 +11133,17 @@ function studentQrModal(staffId, link) {
     '<div class="student-link-qr">' + qr + '</div>' +
     '<div class="guide mt14"><b>연결 방법</b>학생 플래너를 실제 사용할 휴대폰이나 태블릿으로 QR을 스캔한 뒤, <b>이 기기에 학생 플래너 연결</b>을 눌러 주세요.</div>' +
     '<div class="hint mt14">이 QR은 24시간 안에 한 기기에서 한 번만 연결됩니다. 다시 만들었다면 가장 최근 QR이나 링크를 사용해 주세요.</div>',
+    '<button class="btn btn-primary btn-block mt14" data-act="closemodal">확인</button>');
+}
+
+function adminDeviceQrModal(link) {
+  if (typeof WBQR === 'undefined') throw new Error('QR 모듈을 불러오지 못했습니다');
+  const qr = WBQR.svg(link, { size: 280 });
+  modal('관리자 기기 연결 QR',
+    '<div class="student-link-qr">' + qr + '</div>' +
+    '<div class="guide mt14"><b>패드 연결 방법</b>관리 선생님이 사용할 패드의 카메라로 QR을 스캔하면 비밀번호 입력 없이 원장 모드로 연결됩니다.</div>' +
+    '<div class="guide bad mt14"><b>전체 관리자 권한</b>연결된 패드는 학생 정보·결과지·설정·계정 변경을 포함한 원장 모드 전체 기능을 사용할 수 있습니다. 신뢰하는 관리 선생님 기기에만 연결하고 QR을 촬영·전달하거나 단체방에 공유하지 마세요.</div>' +
+    '<div class="hint mt14">이 QR은 10분 안에 한 기기에서 한 번만 사용할 수 있습니다. 관리자 기기는 원장 기기를 포함해 최대 5대이며, 여섯 번째 기기를 연결하면 가장 오래된 기기 인증이 해제됩니다.</div>',
     '<button class="btn btn-primary btn-block mt14" data-act="closemodal">확인</button>');
 }
 
@@ -14202,10 +14253,21 @@ document.addEventListener('click', async ev => {
       break;
     }
     case 'adminlink': {
+      if (!session.isAdmin || session.isStaffLink) break;
       toast('10분 연결 링크 만드는 중…');
       sync.issueAdminHandoff()
-        .then(d => copy(location.origin + location.pathname + '#admin=' + encodeURIComponent(d.code)))
+        .then(d => copy(adminDeviceConnectLink(d.code)))
         .catch(e => toast('연결 링크를 만들지 못했습니다 — ' + e.message));
+      break;
+    }
+    case 'adminqr': {
+      if (!session.isAdmin || session.isStaffLink) break;
+      el.disabled = true;
+      toast('관리자 기기 QR을 만드는 중…');
+      sync.issueAdminHandoff()
+        .then(d => adminDeviceQrModal(adminDeviceConnectLink(d.code)))
+        .catch(e => toast('관리자 기기 QR을 만들지 못했습니다 — ' + e.message))
+        .finally(() => { if (el.isConnected) el.disabled = false; });
       break;
     }
     case 'orderText':
@@ -14895,7 +14957,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-10-17.1';
+const APP_VER = '2026-10-19.2';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
