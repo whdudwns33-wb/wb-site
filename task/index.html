@@ -1243,7 +1243,7 @@
   .center-chat-backdrop { position: absolute; inset: 0; background: rgba(17,40,61,.5); }
   .center-chat-panel {
     position: absolute; top: 0; right: 0; bottom: 0; display: grid;
-    grid-template-rows: auto auto auto minmax(0,1fr) auto; width: min(440px,100vw);
+    grid-template-rows: auto auto auto minmax(0,1fr) auto auto; width: min(440px,100vw); overflow: hidden;
     background: #F5F8FA; color: var(--navy); box-shadow: -8px 0 30px rgba(17,40,61,.22);
   }
   .center-chat-head { padding: 15px 16px 12px; border-bottom: 1px solid var(--line); background: #fff; }
@@ -1265,6 +1265,26 @@
   .center-chat-empty { padding: 34px 14px; color: var(--mid-gray); font-size: 13px; line-height: 1.6; text-align: center; }
   .center-chat-item { margin-top: 8px; padding: 11px 12px; border: 1px solid #DCE5EA; border-radius: 12px; background: #fff; overflow-wrap: anywhere; }
   .center-chat-item:first-child { margin-top: 0; }
+  .center-chat-items .center-chat-item { max-width: 88%; width: fit-content; border-radius: 3px 16px 16px 16px; }
+  .center-chat-items .center-chat-item.is-mine { margin-left: auto; background: #DDF2FF; border-radius: 16px 3px 16px 16px; }
+  .center-chat-day { text-align: center; color: #536674; font-size: 12px; margin: 16px 0 10px; }
+  #centerChatMissing { min-height: 0; max-height: 22vh; overflow-y: auto; padding: 0 12px 8px; border-bottom: 1px solid #e2c5b4; }
+  #centerChatMissing:empty { padding: 0; border: 0; }
+  #centerChatMissing .center-chat-item { margin-top: 5px; padding: 8px; }
+  #centerChatNew { justify-self: center; margin: 3px; }
+  #centerChatNew[hidden] { display: none; }
+  .quick-attendance { padding: 14px; }
+  .quick-attendance summary { cursor: pointer; font-weight: 800; }
+  .quick-attendance summary small { display: block; font-weight: 400; margin-top: 6px; }
+  .quick-att-row { display: grid; grid-template-columns: 28px minmax(110px,1fr) auto; align-items: center; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .quick-att-row input { width: 20px; height: 20px; }
+  .quick-att-actions { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
+  .quick-att-actions button, .quick-att-actions summary { min-height: 42px; padding: 9px; }
+  .quick-att-actions details { position: relative; }
+  .quick-att-actions details[open] > div { position: absolute; right: 0; z-index: 3; background: white; border: 1px solid var(--line); padding: 8px; width: 150px; box-shadow: 0 4px 16px #0002; }
+  .quick-att-error { grid-column: 2 / -1; color: #b42318; font-size: 12px; }
+  .quick-att-time { margin-top: 12px; background: #edf3fa; padding: 6px 10px; border-radius: 8px; font-weight: 700; }
+  @media(max-width:480px) { .quick-att-row { grid-template-columns: 24px minmax(0,1fr); } .quick-att-actions { grid-column: 2; } }
   .center-chat-item.is-presence { border-color: #C9E4D9; background: #F4FBF8; }
   .center-chat-item-meta { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; color: var(--mid-gray); font-size: 11px; }
   .center-chat-item-meta b { min-width: 0; color: var(--navy); font-size: 12px; }
@@ -1338,8 +1358,9 @@
       <p class="center-chat-access-note">각 앱의 이용 권한으로 접속합니다</p>
     </header>
     <p class="center-chat-state" id="centerChatState" role="status" aria-live="polite"></p>
-    <div id="centerChatMissing" style="max-height:28vh;overflow:auto;padding:0 16px"></div>
+    <div id="centerChatMissing" aria-label="미등원 학생 목록"></div>
     <div class="center-chat-items" id="centerChatItems" role="log" aria-live="polite" aria-relevant="additions text"></div>
+    <button type="button" id="centerChatNew" class="btn btn-sm btn-primary" data-act="centerchatlatest" hidden>새 메시지 ↓</button>
     <div class="center-chat-compose">
       <div class="center-chat-presence">
         <label><span class="sr-only">학생</span><select class="in" id="centerChatStudent" data-center-chat-student><option value="">학생 선택</option></select></label>
@@ -1354,17 +1375,17 @@
   </section>
 </div>
 
-<script src="./lesson-form-core.js?v=2026-10-19.1"></script>
-<script src="./task-push-client.js?v=2026-10-19.1"></script>
-<script src="./schedule-board-core.js?v=2026-10-19.1"></script>
-<script src="./asset-core.js?v=2026-10-19.1"></script>
-<script src="./qr-core.js?v=2026-10-19.1"></script>
-<script src="./acaflow-import-core.js?v=2026-10-19.1"></script>
-<script src="./feedback-subject-catalog.js?v=2026-10-19.1"></script>
-<script src="./sync-recovery-core.js?v=2026-10-19.1"></script>
-<script src="./staff-work-session-core.js?v=2026-10-19.1"></script>
-<script src="./staff-attendance-history-core.js?v=2026-10-19.1"></script>
-<script src="./makeup-recovery-core.js?v=2026-10-19.1"></script>
+<script src="./lesson-form-core.js?v=2026-10-19.3"></script>
+<script src="./task-push-client.js?v=2026-10-19.3"></script>
+<script src="./schedule-board-core.js?v=2026-10-19.3"></script>
+<script src="./asset-core.js?v=2026-10-19.3"></script>
+<script src="./qr-core.js?v=2026-10-19.3"></script>
+<script src="./acaflow-import-core.js?v=2026-10-19.3"></script>
+<script src="./feedback-subject-catalog.js?v=2026-10-19.3"></script>
+<script src="./sync-recovery-core.js?v=2026-10-19.3"></script>
+<script src="./staff-work-session-core.js?v=2026-10-19.3"></script>
+<script src="./staff-attendance-history-core.js?v=2026-10-19.3"></script>
+<script src="./makeup-recovery-core.js?v=2026-10-19.3"></script>
 <script>
 "use strict";
 
@@ -3092,6 +3113,8 @@ function centerChatBodyHtml(body) {
 function centerChatItemHtml(item) {
   const time = centerChatCreatedAt(item.createdAt).text;
   const actor = String(item.actorName || '선생님');
+  const auth = sync.auth() || {};
+  const mine = item.actorId && String(item.actorId) === String(auth.managerId || auth.id || '') ? ' is-mine' : '';
   if (item.kind === 'presence') {
     const student = String(item.studentName || (centerChat.students.find(row => row.id === item.studentId) || {}).name || '학생');
     const grade = String(item.grade || '');
@@ -3100,7 +3123,7 @@ function centerChatItemHtml(item) {
       '<div class="center-chat-item-body">' + esc(student) + (grade ? ' <span class="muted">· ' + esc(grade) + '</span>' : '') +
         ' · ' + esc(centerChatStatusLabel(item.status)) + '</div></article>';
   }
-  return '<article class="center-chat-item" data-center-chat-item="' + esc(item.id) + '">' +
+  return '<article class="center-chat-item' + mine + '" data-center-chat-item="' + esc(item.id) + '">' +
     '<div class="center-chat-item-meta"><b>' + esc(actor) + '</b><time>' + esc(time) + '</time></div>' +
     '<div class="center-chat-item-body">' + centerChatBodyHtml(item.body) + '</div></article>';
 }
@@ -3150,13 +3173,20 @@ function renderCenterChatPanel() {
       '아래 버튼은 보이지 않는 이전 항목까지 확인한 것으로 처리합니다.' +
       '<button type="button" class="btn btn-sm btn-ghost" data-act="centerchatreadall"' +
       (centerChat.markingRead ? ' disabled' : '') + '>최신 상태 기준으로 모두 확인</button></div>' : '';
-    list.innerHTML = hiddenWarning + (ordered.length ? ordered.map(centerChatItemHtml).join('') :
+    let previousDay = '';
+    list.innerHTML = hiddenWarning + (ordered.length ? ordered.map(item => {
+      const day = centerChatCreatedAt(item.createdAt).date;
+      const divider = day !== previousDay ? '<div class="center-chat-day">' + esc(day) + '</div>' : '';
+      previousDay = day;
+      return divider + centerChatItemHtml(item);
+    }).join('') :
       '<div class="center-chat-empty">아직 올라온 내용이 없습니다.<br>공유할 내용이나 학생 등원 상태를 남겨 보세요.</div>');
     if (centerChat.hiddenUnreadCount) list.scrollTop = 0;
     else if (wasNearBottom || !centerChat.loaded) requestAnimationFrame(() => {
       list.scrollTop = list.scrollHeight;
       maybeMarkCenterChatRead();
     });
+    $('#centerChatNew').hidden = wasNearBottom || !centerChat.loaded;
   }
 
   const studentSelect = $('#centerChatStudent');
@@ -3358,12 +3388,17 @@ async function saveCenterChatPresence(button) {
 function renderCenterMissing() {
   const active = centerChat.missing.filter(row => row.state !== 'resolved');
   const nameFor = row => (centerChat.students.find(student => student.id === row.studentId) || {}).name || '학생';
-  $('#centerChatMissing').innerHTML = active.map(row => '<div class="center-chat-item" style="border-color:#c74615;background:#fff1e6">' +
+  const missingHtml = (active.length ? '<b>미등원 학생 · ' + active.length + '명</b>' : '') + active.map(row => '<div class="center-chat-item" style="border-color:#c74615;background:#fff1e6">' +
     '<b>' + esc(nameFor(row)) + ' · 미등원 알림</b><div>' + esc(row.actorName || '') + ' · ' + esc(centerChatCreatedAt(row.createdAt).text) + '</div>' +
     '<button class="btn btn-sm" data-act="centerchathandle" data-outcome="arrived" data-student="' + esc(row.studentId) + '" data-request="' + esc(row.requestId) + '"' +
     (centerChat.handlingMissing ? ' disabled' : '') + '>등원 알림 보내기</button> ' +
     '<button class="btn btn-sm btn-ghost" data-act="centerchathandle" data-outcome="closed" data-student="' + esc(row.studentId) + '" data-request="' + esc(row.requestId) + '"' +
     (centerChat.handlingMissing ? ' disabled' : '') + '>알림 종료</button></div>').join('');
+  const missingList = $('#centerChatMissing');
+  if (missingList.dataset.signature !== missingHtml) {
+    missingList.dataset.signature = missingHtml;
+    missingList.innerHTML = missingHtml;
+  }
   const pending = active.filter(row => !centerChat.missingDismissed.has(row.requestId));
   const popup = $('#centerMissingPopup');
   popup.hidden = !centerChatCanShow() || !centerChat.canHandleMissing || centerChat.open || !pending.length || !$('#modalHost').hidden;
@@ -5907,6 +5942,70 @@ function captureLessonHandoffInput(target) {
   return false;
 }
 
+const quickAttendance = { scope: '', selected: new Set(), errors: new Map(), busy: false };
+function quickAttendanceRows(staffId, date) {
+  return teacherTaskCardsFor(staffId, date).filter(isLesson).map(task => {
+    const context = lessonRecordContext(task, date);
+    const recordDate = context.recordDate;
+    const check = recordDate ? getCheck(task.id, recordDate) : null;
+    const locked = recordDate && sessionPackAttendanceState(task, recordDate);
+    const reconcile = recordDate && makeupAttendanceReconcileStates.get(makeupCreateKey(task.id, recordDate));
+    const slots = lessonHandoffSlots(task, date);
+    const times = slots.map(slot => slot.startTime + '–' + slot.endTime).sort();
+    return { task, recordDate, att: String(check && check.att || ''), time: times.join(', ') || task.time || '시간 미지정',
+      issue: !context.inputEnabled || !recordDate ? context.issue || '실제 등원 기록 확인 중' :
+        locked && locked.locked ? '회차 출결 마감 · 관리자 정정 필요' :
+        reconcile && reconcile.status === 'pending' ? '보강 정리 처리 중' : '' };
+  }).sort((a, b) => a.time.localeCompare(b.time) || String(a.task.id).localeCompare(String(b.task.id)));
+}
+function quickAttendanceHtml(staffId, date) {
+  const scope = staffId + '|' + date;
+  if (quickAttendance.scope !== scope) {
+    quickAttendance.scope = scope; quickAttendance.selected.clear(); quickAttendance.errors.clear();
+  }
+  const rows = quickAttendanceRows(staffId, date);
+  if (!rows.length) return '';
+  const counts = { P: 0, A: 0, L: 0, E: 0, pending: 0 };
+  rows.forEach(row => counts[row.att in ATT_LABEL ? row.att : 'pending']++);
+  let lastTime = '';
+  return '<details open class="card quick-attendance" data-persist-key="quick-attendance|' + esc(staffId) + '"><summary>간편 출결 · ' + rows.length + '수업' +
+    '<small>출석 ' + counts.P + ' · 결석 ' + counts.A + ' · 지각 ' + counts.L + ' · 조퇴 ' + counts.E + ' · 미입력 ' + counts.pending + '</small></summary>' +
+    '<div class="small muted mt8">선택한 날짜의 본인 수업만 표시합니다. 체크한 미입력 수업만 일괄 출석 처리합니다.</div>' +
+    '<button class="btn btn-sm btn-primary mt8" data-act="quickattbulk"' + (quickAttendance.busy ? ' disabled' : '') + '>선택 학생 출석 처리</button>' +
+    rows.map(row => {
+      const t = row.task, disabled = quickAttendance.busy || !!row.issue;
+      const group = row.time !== lastTime ? '<div class="quick-att-time">' + esc(row.time) + '</div>' : '';
+      lastTime = row.time;
+      const attrs = ' data-act="latt" data-quick="1" data-id="' + esc(t.id) + '" data-date="' + esc(row.recordDate) + '"';
+      const button = (v, title) => '<button class="chip ' + (row.att === v ? 'on' : '') + '"' + attrs + ' data-v="' + v + '"' +
+        (disabled ? ' disabled' : '') + '>' + title + '</button>';
+      const student = taskRosterStudent(t);
+      return group + '<div class="quick-att-row"><input type="checkbox" data-act="quickattselect" data-id="' + esc(t.id) + '" aria-label="' +
+        esc((student && student.name || t.studentName || studentOf(t)) + ' 출석 처리 선택') + '"' +
+        (quickAttendance.selected.has(t.id) && !row.att ? ' checked' : '') + (disabled || row.att ? ' disabled' : '') + '>' +
+        '<div><b>' + esc(student && student.name || t.studentName || studentOf(t)) + '</b><div class="small">' + esc(t.subject || '') + ' · ' +
+        (isScheduledMakeupTask(t) ? '보강' : isFlexibleWeekendLesson(t, date) || isSubscriptionSessionTask(t) ? '비정기' : '정규') + '</div>' +
+        '<span class="tag ' + (ATT_LABEL[row.att] ? ATT_LABEL[row.att][1] : 'blk') + '">' + (ATT_LABEL[row.att] ? ATT_LABEL[row.att][0] : '미입력') + '</span>' +
+        (row.recordDate && row.recordDate !== date ? '<div class="small">실제 기록일 ' + esc(row.recordDate) + '</div>' : '') + '</div>' +
+        '<div class="quick-att-actions">' + button('P', '출석') + button('A', '결석') +
+        '<details><summary>기타</summary><div>' + button('L', '지각') + button('E', '조퇴') + '</div></details></div>' +
+        '<div class="quick-att-error" role="status">' + esc(row.issue || quickAttendance.errors.get(t.id) || '') + '</div></div>';
+    }).join('') + '</details>';
+}
+async function saveQuickAttendanceBatch() {
+  const me = currentStaff();
+  if (!me || quickAttendance.busy || !(session.isAdmin || session.isStaffLink) || shouldGateStaffWork() || shouldGatePersonAccess()) return;
+  const rows = quickAttendanceRows(me.id, cursor).filter(row => quickAttendance.selected.has(row.task.id) && !row.att && !row.issue);
+  if (!rows.length) return toast('미입력 수업을 선택해 주세요');
+  if (!confirm(rows.map(row => row.task.studentName || studentOf(row.task)).join(', ') + '\n' + rows.length + '수업을 출석 처리할까요?')) return;
+  quickAttendance.busy = true;
+  rows.forEach(row => { quickAttendance.errors.delete(row.task.id); setCheck(row.task.id, row.recordDate, { att: 'P', absenceType: '' }); });
+  quickAttendance.selected.clear(); render();
+  try { await settleSync(); toast(rows.length + '수업 출석 저장 완료'); }
+  catch (error) { rows.forEach(row => quickAttendance.errors.set(row.task.id, '기기 저장됨 · 서버 반영 확인 필요: ' + String(sync.err || error.message))); }
+  finally { quickAttendance.busy = false; render(); }
+}
+
 /* 오늘 수업 화면 */
 function viewToday() {
   const me = currentStaff();
@@ -5955,6 +6054,7 @@ function viewToday() {
     '<input class="in" type="date" data-today-date value="' + esc(cursor) + '"></label></div></details>';
 
   const counts = { todo: 0, doing: 0, done: 0, blocked: 0 };
+  h += quickAttendanceHtml(me.id, cursor);
   list.forEach(t => counts[teacherTaskCardStatus(t, cursor)]++);
 
   h += '<div class="card"><div class="prog">' +
@@ -23549,6 +23649,9 @@ document.addEventListener('click', async ev => {
     case 'centerchathandle': handleCenterMissing(el); break;
     case 'centermissingdismiss': centerChat.missing.forEach(row => centerChat.missingDismissed.add(row.requestId)); renderCenterMissing(); break;
     case 'centerchatreadall': markCenterChatRead(centerChat.lastItemId, true); break;
+    case 'centerchatlatest': $('#centerChatItems').scrollTop = $('#centerChatItems').scrollHeight; $('#centerChatNew').hidden = true; maybeMarkCenterChatRead(); break;
+    case 'quickattselect': if (el.checked) quickAttendance.selected.add(id); else quickAttendance.selected.delete(id); break;
+    case 'quickattbulk': await saveQuickAttendanceBatch(); break;
     case 'murecoveryaccept': acceptMakeupRecovery(); break;
 
     case 'nextlessonload': loadStudentNextLesson(id, date, el.dataset.force === '1'); break;
@@ -24519,6 +24622,13 @@ document.addEventListener('click', async ev => {
     }
     case 'latt': {
       const t = task(); if (!t) break;
+      const quick = el.dataset.quick === '1';
+      if (quick) {
+        const me = currentStaff();
+        const row = me && quickAttendanceRows(me.id, cursor).find(row => row.task.id === id && row.recordDate === date);
+        if (!row || row.issue || quickAttendance.busy || !(session.isAdmin || session.isStaffLink) || shouldGatePersonAccess()) break;
+        quickAttendance.errors.delete(id);
+      }
       const v = el.dataset.v;
       const attendanceLabel = ATT_LABEL[v] && ATT_LABEL[v][0];
       if (!attendanceLabel || !['P', 'L', 'A', 'E'].includes(v)) break;
@@ -24534,7 +24644,7 @@ document.addEventListener('click', async ev => {
         render();
         break;
       }
-      if (!confirm(attendanceLabel + '으로 저장하겠습니까?')) break;
+      if (!(quick && v === 'P' && !(getCheck(id, date) || {}).att) && !confirm(attendanceLabel + '으로 저장하겠습니까?')) break;
       const next = v;
       const previousAttendance = String((getCheck(id, date) || {}).att || '');
       const shouldReconcileMakeup = previousAttendance === 'A' && next === 'P' && isMakeupLessonTask(t);
@@ -24543,7 +24653,10 @@ document.addEventListener('click', async ev => {
       if (shouldReconcileMakeup) {
         reconcileMakeupAfterAttendanceCorrection(id, date, savedCheck.updatedAt);
       } else if (!(next === 'A' && isScheduledMakeupTask(t) && !isTestTeacherTask(t))) {
-        settleSync().catch(() => toast('출결은 이 기기에 저장됐지만 서버 동기화를 확인해 주세요'));
+        settleSync().catch(error => {
+          if (quick) { quickAttendance.errors.set(id, '기기 저장됨 · 서버 반영 확인 필요: ' + String(sync.err || error.message)); render(); }
+          toast('출결은 이 기기에 저장됐지만 서버 동기화를 확인해 주세요');
+        });
       }
       if (next !== 'A') makeupCreateStates.delete(sourceKey);
       if (shouldReconcileMakeup) {
@@ -25941,6 +26054,7 @@ setInterval(() => {
   if (document.visibilityState === 'visible' && centerChatCanRequest()) loadCenterChat(false);
 }, 5000);
 $('#centerChatItems').addEventListener('scroll', () => {
+  if (centerChatTimelineAtBottom()) $('#centerChatNew').hidden = true;
   if (centerChat.open) maybeMarkCenterChatRead();
 }, { passive: true });
 if (window.WBTaskPush) window.WBTaskPush.init({
@@ -25978,7 +26092,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-10-19.1';
+const APP_VER = '2026-10-19.3';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
