@@ -42,6 +42,18 @@ test('bulk only writes unchecked attendance at actual date, never overwrites abs
   assert.equal(c.writes.length,1);assert.equal(c.writes[0].id,'a');assert.equal(c.writes[0].date,'2026-10-18');
   assert.equal(c.checks.b.att,'A');assert.equal(c.qa.busy,false);
 });
+test('compact rows group time once and put attendance next to name',()=>{
+  const c=setup(); c.tasks[0].time='15:00';
+  const rendered=c.quickAttendanceHtml('teacher',c.cursor);
+  assert.match(rendered,/class="quick-att-grid"/);
+  assert.equal((rendered.match(/class="quick-att-time"/g)||[]).length,2);
+  assert.match(rendered,/class="quick-att-name"><b>나학생<\/b><span class="tag blk">결석<\/span><\/div>/);
+  assert.match(rendered,/class="quick-att-name"><b>가학생<\/b><span class="tag blk">미입력<\/span><\/div>/);
+  assert.doesNotMatch(rendered,/ · 정규/);
+  assert.match(html,/\.quick-att-grid \{[^}]*repeat\(auto-fit,minmax\(min\(100%,max\(330px/);
+  assert.match(html,/\.quick-att-error:empty \{ display: none; \}/);
+  assert.match(html,/min-height: 42px/);
+});
 test('bulk cancellation, gate, failure and repeat preserve safety',async()=>{
   const c=setup();c.qa.selected.add('a');c.confirm=()=>false;
   await c.saveQuickAttendanceBatch();assert.equal(c.writes.length,0);
