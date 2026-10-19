@@ -1,5 +1,6 @@
 import { randomBytes, randomUUID, scryptSync, timingSafeEqual, createHash } from 'node:crypto';
 import links from '../shared/external-links.js';
+import { createPlanner } from './planner-api.mjs';
 
 export const APP = 'blended';
 const staffRoles = ['owner', 'admin', 'teacher'];
@@ -58,6 +59,7 @@ export function createApi(db, options = {}) {
     return user.role === 'teacher' && !!one('SELECT 1 FROM assignments WHERE teacher_id=? AND student_id=? AND active=1 AND starts<=? AND ends>=? AND (?=\'\' OR subject=?)',user.id,studentId,today(),today(),subject,subject);
   }
   const access = (user, studentId, subject = '') => requireThat(canAccess(user,studentId,subject),403,'SCOPE','현재 담당 또는 열람 범위에 포함되지 않습니다.');
+  const planner = createPlanner({one,all,run,access,canAccess,requireThat,revision,today});
   function object(table, id, user, roles) {
     role(user,roles);
     const row = one(`SELECT * FROM ${table} WHERE id=?`,text(id,100,true));
@@ -83,7 +85,7 @@ export function createApi(db, options = {}) {
     access(user,studentId,subject);
     date(start); date(end);
     requireThat(start <= end,400,'PERIOD','집계 시작일과 종료일을 확인해 주세요.');
-    const rows = all('SELECT id,title,due,subject,self_done,checked FROM learning WHERE student_id=? AND subject=? AND due BETWEEN ? AND ?',studentId,subject,start,end);
+    const rows = all('SELECT id,title,due,subject,self_done,checked FROM learning WHERE student_id=? AND subject=? AND due BETWEEN ? AND ?',studentId,subject,start,end).concat(planner.summary(user,studentId,subject,start,end));
     return { source:'블렌디드 직접 기록', external:'미연동', periodStart:start, periodEnd:end, asOf:now(),
       total:rows.length, selfDone:rows.filter(r => r.self_done).length, checked:rows.filter(r => r.checked).length,
       hasRecords:rows.length > 0, rows };
@@ -94,7 +96,7 @@ export function createApi(db, options = {}) {
     const learning = user.role === 'guardian' ? [] : all('SELECT * FROM learning ORDER BY due,id').filter(r => canAccess(user,r.student_id,r.subject));
     const consultations = all('SELECT * FROM consultations ORDER BY held_at DESC,id').filter(r => canAccess(user,r.student_id,r.subject));
     const reports = consultations.flatMap(c => reportRows(c,isStaff));
-    return { app:APP, mode, me:publicUser(user), today:today(), students, learning, reports,
+    return { app:APP, mode, me:publicUser(user), today:today(), students, learning, reports,periodReports:planner.publicReports(user),
       consultations:isStaff ? consultations.map(c => ({...c, public:JSON.parse(c.public_json), public_json:undefined})) : [],
       assignments:isStaff ? all('SELECT * FROM assignments').filter(a => ['owner','admin'].includes(user.role) || a.teacher_id === user.id) : [],
       teachers:['owner','admin'].includes(user.role) ? all("SELECT * FROM users WHERE role IN ('teacher','admin')").map(publicUser) : [],
@@ -104,6 +106,8 @@ export function createApi(db, options = {}) {
   }
   function mutation(user, action, p) {
     switch (action) {
+      case 'planner_save': return planner.save(user,p);
+      case 'planner_question': return planner.questions(user,p);
       case 'password_change': {
         text(p.currentPassword,128,true);
         requireThat(passwordMatches(p.currentPassword,user.password),400,'PASSWORD','현재 비밀번호를 확인해 주세요.');
@@ -276,6 +280,9 @@ export function createApi(db, options = {}) {
     const user = userFor(token);
     if (action === 'logout') { run('DELETE FROM sessions WHERE hash=?',hash(token)); return {loggedOut:true}; }
     if (action === 'state') return overview(user);
+    if (action === 'planner_state') return planner.state(user);
+    if (action === 'planner_reports') return {reports:planner.publicReports(user)};
+    if (action === 'planner_questions') return planner.questions(user,{...p,action:'list'});
     if (action === 'summary') { role(user,staffRoles); return {summary:summary(user,text(p.studentId,100,true),text(p.subject,40,true),p.start,p.end)}; }
     if (action === 'consult_get') {
       const row = object('consultations',p.id,user,staffRoles);
@@ -287,15 +294,20 @@ export function createApi(db, options = {}) {
     }
     // 권한을 다시 확인한 뒤 재시도 결과를 돌려주며 영수증에는 본문을 넣지 않는다.
     const key = text(body.requestId,100,true);
-    requireThat(/^[\w-]{8,100}$/.test(key),400,'REQUEST_ID','再試行識別子が必要です。');
+    requireThat(/^[\w-]{8,100}$/.test(key),400,'REQUEST_ID','재시도 식별자가 필요합니다.');
     const digest = hash(JSON.stringify({action,p}));
     return transaction(() => {
       const receipt = one('SELECT * FROM receipts WHERE user_id=? AND key=?',user.id,key);
       if (receipt) {
-        requireThat(receipt.digest === digest,409,'KEY_REUSE','同じ再試行識別子に違う内容は保存できません。');
+        requireThat(receipt.digest === digest,409,'KEY_REUSE','같은 재시도 식별자로 다른 내용을 저장할 수 없습니다.');
+        if(action === 'planner_save') planner.accessReceipt(user,p);
+        if(action === 'planner_question') {
+          const q=one('SELECT * FROM planner_questions WHERE id=?',p.id || user.id+'-'+p.clientRequestId);
+          if(q)access(user,q.student_id,({math:'수학',english:'영어',korean:'국어',social:'사회',science:'과학',other:'기타'})[q.subject]);
+        }
         const result = JSON.parse(receipt.result);
-        const c = one('SELECT * FROM consultations WHERE id=?',result.consultationId || result.id);
-        const l = one('SELECT * FROM learning WHERE id=?',result.id);
+        const c = one('SELECT * FROM consultations WHERE id=?',result.consultationId || result.id || '');
+        const l = one('SELECT * FROM learning WHERE id=?',result.id || '');
         if (c || l) access(user,(c || l).student_id,(c || l).subject);
         return {...result,replayed:true};
       }

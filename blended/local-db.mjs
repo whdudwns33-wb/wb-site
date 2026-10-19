@@ -5,7 +5,7 @@ import { passwordHash,now,today } from './api.mjs';
 export function openDatabase(filename = ':memory:') {
   const db = new DatabaseSync(filename);
   db.exec('PRAGMA busy_timeout=3000;');
-  // shortcut: 이 스키마는 격리된 로컬 DB 전용, 운영 연결 승인 때 버전별 마이그레이션으로 전환한다.
+  // 운영과 같은 추가형 스키마를 사용하며 기존 가상 자료도 그대로 보존한다.
   db.exec(readFileSync(new URL('./schema.sql', import.meta.url), 'utf8'));
   return db;
 }
