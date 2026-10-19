@@ -159,3 +159,90 @@ test('개인 인증이나 관리자 점검 identity가 바뀌면 숨은 DOM과 �
   assert.doesNotMatch(functionBlock('sendCenterChatMessage'), /const requestSequence = centerChat\.requestSequence/);
   assert.doesNotMatch(functionBlock('saveCenterChatPresence'), /const requestSequence = centerChat\.requestSequence/);
 });
+
+// 실제 화면의 함수와 이스케이프를 실행해 문자열 검사만으로 놓칠 수 있는 삽입을 확인한다.
+const chatRender = new Function('centerChat',
+  functionBlock('esc') + functionBlock('centerChatStatusLabel') +
+  functionBlock('centerChatBodyHtml') + functionBlock('centerChatItemHtml') +
+  '\nfunction centerChatCreatedAt() { return { text: "12:34" }; }' +
+  '\nreturn { body: centerChatBodyHtml, item: centerChatItemHtml };')({ students: [] });
+const link = url => '<a href="' + url + '" target="_blank" rel="noopener noreferrer">' + url + '</a>';
+
+test('일반 메시지는 URL 없음·한글·개행을 보존하고 HTTP(S) 여러 주소를 연다', () => {
+  assert.equal(chatRender.body('한글 안내\n다음 줄 & 내용'), '한글 안내<br>다음 줄 &amp; 내용');
+  assert.equal(chatRender.body(''), '');
+  assert.equal(chatRender.body(null), '');
+  assert.equal(chatRender.body('자료 https://example.com/\n참고 http://example.org/path'),
+    '자료 ' + link('https://example.com/') + '<br>참고 ' + link('http://example.org/path'));
+  assert.equal(chatRender.body('HTTPS://example.com/'), link('HTTPS://example.com/'));
+  assert.equal(chatRender.body('www.example.com'), 'www.example.com');
+  assert.equal(chatRender.body('https://'), 'https://');
+  assert.equal(chatRender.body('http://[잘못된주소'), 'http://[잘못된주소');
+});
+
+test('쿼리·해시·한글 주소는 보존하고 문장부호와 바깥 괄호는 링크에서 뺀다', () => {
+  const query = 'https://example.com/자료?q=한글&amp;page=2#오늘';
+  assert.equal(chatRender.body('https://example.com/자료?q=한글&page=2#오늘'), link(query));
+  for (const [text, expected] of [
+    ['https://example.com/a.', link('https://example.com/a') + '.'],
+    ['https://example.com/a,', link('https://example.com/a') + ','],
+    ['https://example.com/a!?;:', link('https://example.com/a') + '!?;:'],
+    ['(https://example.com/a).', '(' + link('https://example.com/a') + ').'],
+    ['[https://example.com/a]', '[' + link('https://example.com/a') + ']'],
+    ['「https://example.com/a」。', '「' + link('https://example.com/a') + '」。'],
+    ['https://example.com/a_(b)', link('https://example.com/a_(b)')],
+    ['(https://example.com/a_(b)).', '(' + link('https://example.com/a_(b)') + ').'],
+    ['https://example.com/?q=(a)&x=[b]#part', link('https://example.com/?q=(a)&amp;x=[b]#part')]
+  ]) assert.equal(chatRender.body(text), expected, text);
+});
+
+test('HTML·속성 삽입과 실행형 스킴은 활성 코드가 되지 않는다', () => {
+  assert.equal(chatRender.body('<img src=x onerror=alert(1)>\n<script>alert(1)</script>'),
+    '&lt;img src=x onerror=alert(1)&gt;<br>&lt;script&gt;alert(1)&lt;/script&gt;');
+  for (const text of [
+    'javascript:alert(1)', 'JAVASCRIPT:alert(1)', 'data:text/html,<svg onload=alert(1)>',
+    'vbscript:msgbox(1)', 'file:///test', '//example.com',
+    'javascript:https://example.com/', 'xhttps://example.com/'
+  ]) assert.doesNotMatch(chatRender.body(text), /<a\b/, text);
+  assert.equal(chatRender.body('https://example.com/" onclick="alert(1)'),
+    link('https://example.com/') + '&quot; onclick=&quot;alert(1)');
+  assert.equal(chatRender.body("https://example.com/?a=1&b=&#39;<svg>"),
+    link('https://example.com/?a=1&amp;b=&amp;#39') + ';&lt;svg&gt;');
+  assert.equal(chatRender.body('https://example.com/\u0000javascript:alert(1)'),
+    link('https://example.com/') + '\u0000javascript:alert(1)');
+});
+
+test('일반 메시지만 링크화하고 기존 presence HTML과 원본 항목을 보존한다', () => {
+  const item = { id: 'virtual-1', kind: 'message', actorName: '가상 교직원', body: 'https://example.com/', createdAt: '' };
+  const before = JSON.stringify(item);
+  assert.ok(chatRender.item(item).includes(link(item.body)));
+  assert.equal(JSON.stringify(item), before);
+  const presence = { ...item, kind: 'presence', studentName: '가상 학생 <A>', grade: '가상 학년', status: 'arrived' };
+  assert.equal(chatRender.item(presence),
+    '<article class="center-chat-item is-presence" data-center-chat-item="virtual-1">' +
+    '<div class="center-chat-item-meta"><b>가상 교직원</b><time>12:34</time></div>' +
+    '<div class="center-chat-item-body">가상 학생 &lt;A&gt; <span class="muted">· 가상 학년</span> · 등원</div></article>');
+  assert.equal(presence.body, item.body);
+});
+
+test('고정 바로가기는 스크롤 밖 헤더에서 일반 주소·새 탭·권한 안내와 키보드 접근을 제공한다', () => {
+  const head = block('<header class="center-chat-head">', '</header>');
+  const anchors = [...head.matchAll(/<a\b([^>]+)>([^<]+)<\/a>/g)];
+  assert.equal(anchors.length, 2);
+  for (const [index, [url, title]] of [
+    ['https://staff.wbcowork.com/', '통합 데스크'],
+    ['https://whdudwns33-wb.github.io/wb-site/consult/', '컨설팅 플래너']
+  ].entries()) {
+    assert.ok(anchors[index][1].includes('href="' + url + '"'));
+    assert.match(anchors[index][1], /target="_blank" rel="noopener noreferrer"/);
+    assert.doesNotMatch(anchors[index][1], /data-act|data-go|onclick/);
+    assert.equal(anchors[index][2], title);
+  }
+  assert.match(head, /각 앱의 이용 권한으로 접속합니다/);
+  assert.match(source, /\.center-chat-shortcuts\s*\{[^}]*flex-wrap: wrap/);
+  assert.match(source, /grid-template-rows: auto auto auto minmax\(0,1fr\) auto/);
+  assert.match(source, /panel\.querySelectorAll\('a\[href\], button/);
+  assert.match(source, /\.center-chat-panel a:focus-visible/);
+  assert.doesNotMatch(functionBlock('centerChatBodyHtml'), /window\.open|sync\.|centerChat\.|data-act|onclick/);
+  assert.match(source, /const el = ev\.target\.closest\('\[data-act\]'\);\s*if \(!el\) return;/);
+});

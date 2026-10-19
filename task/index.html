@@ -1243,13 +1243,18 @@
   .center-chat-backdrop { position: absolute; inset: 0; background: rgba(17,40,61,.5); }
   .center-chat-panel {
     position: absolute; top: 0; right: 0; bottom: 0; display: grid;
-    grid-template-rows: auto auto minmax(0,1fr) auto; width: min(440px,100vw);
+    grid-template-rows: auto auto auto minmax(0,1fr) auto; width: min(440px,100vw);
     background: #F5F8FA; color: var(--navy); box-shadow: -8px 0 30px rgba(17,40,61,.22);
   }
   .center-chat-head { padding: 15px 16px 12px; border-bottom: 1px solid var(--line); background: #fff; }
   .center-chat-head .between { gap: 12px; }
   .center-chat-title { font-size: 18px; font-weight: 900; }
   .center-chat-date { margin-top: 3px; color: var(--mid-gray); font-size: 11px; font-weight: 800; }
+  .center-chat-shortcuts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .center-chat-shortcuts .btn { min-height: 44px; max-width: 100%; white-space: normal; text-align: center; }
+  .center-chat-access-note { margin: 7px 0 0; color: var(--mid-gray); font-size: 12px; line-height: 1.4; }
+  .center-chat-panel a:focus-visible { outline: 3px solid var(--navy); outline-offset: 2px; }
+  .center-chat-item-body a { color: var(--navy); text-decoration: underline; text-underline-offset: 2px; }
   .center-chat-summary { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 7px; margin-top: 12px; }
   .center-chat-stat { padding: 8px 5px; border: 1px solid #DCE5EA; border-radius: 10px; background: #F8FBFD; text-align: center; }
   .center-chat-stat b { display: block; font-size: 20px; line-height: 1.1; }
@@ -1326,6 +1331,11 @@
     <header class="center-chat-head">
       <div class="between"><div><div class="center-chat-title" id="centerChatTitle">센터 소통</div><div class="center-chat-date" id="centerChatDate">오늘</div></div>
         <button type="button" class="btn btn-sm btn-ghost" data-act="centerchatclose" aria-label="센터 소통 닫기">닫기</button></div>
+      <nav class="center-chat-shortcuts" aria-label="센터 소통 바로가기">
+        <a class="btn btn-sm btn-ghost" href="https://staff.wbcowork.com/" target="_blank" rel="noopener noreferrer">통합 데스크</a>
+        <a class="btn btn-sm btn-ghost" href="https://whdudwns33-wb.github.io/wb-site/consult/" target="_blank" rel="noopener noreferrer">컨설팅 플래너</a>
+      </nav>
+      <p class="center-chat-access-note">각 앱의 이용 권한으로 접속합니다</p>
     </header>
     <p class="center-chat-state" id="centerChatState" role="status" aria-live="polite"></p>
     <div id="centerChatMissing" style="max-height:28vh;overflow:auto;padding:0 16px"></div>
@@ -3050,6 +3060,35 @@ function centerChatPresenceFor(studentId) {
   return centerChat.presence.find(row => String(row && row.studentId || '') === String(studentId || '')) || null;
 }
 
+function centerChatBodyHtml(body) {
+  const text = String(body || '');
+  const urls = /https?:\/\/[^\s<>"'\u0000-\u001f\u007f]+/gi;
+  const pairs = { ')': '(', ']': '[', '}': '{', '）': '（', '】': '【', '」': '「', '』': '『' };
+  let html = '', cursor = 0, match;
+  while ((match = urls.exec(text))) {
+    const raw = match[0];
+    let url = raw;
+    // 문장의 끝 표시는 남기고, 주소 안에서 짝이 맞는 괄호는 보존한다.
+    while (url) {
+      const last = url.slice(-1), open = pairs[last];
+      if (/[.,!?;:。，、！？；：…]/.test(last) ||
+          (open && url.split(last).length > url.split(open).length)) url = url.slice(0, -1);
+      else break;
+    }
+    let linked = false;
+    try {
+      const parsed = new URL(url);
+      linked = (!match.index || !/[a-z0-9_:/@]/i.test(text[match.index - 1])) &&
+        (parsed.protocol === 'http:' || parsed.protocol === 'https:') && !!parsed.hostname;
+    } catch (_) { /* 올바르지 않은 주소도 원문으로 남긴다. */ }
+    html += esc(text.slice(cursor, match.index)) + (linked
+      ? '<a href="' + esc(url) + '" target="_blank" rel="noopener noreferrer">' + esc(url) + '</a>' + esc(raw.slice(url.length))
+      : esc(raw));
+    cursor = match.index + raw.length;
+  }
+  return (html + esc(text.slice(cursor))).replace(/\n/g, '<br>');
+}
+
 function centerChatItemHtml(item) {
   const time = centerChatCreatedAt(item.createdAt).text;
   const actor = String(item.actorName || '선생님');
@@ -3063,7 +3102,7 @@ function centerChatItemHtml(item) {
   }
   return '<article class="center-chat-item" data-center-chat-item="' + esc(item.id) + '">' +
     '<div class="center-chat-item-meta"><b>' + esc(actor) + '</b><time>' + esc(time) + '</time></div>' +
-    '<div class="center-chat-item-body">' + esc(String(item.body || '')).replace(/\n/g, '<br>') + '</div></article>';
+    '<div class="center-chat-item-body">' + centerChatBodyHtml(item.body) + '</div></article>';
 }
 
 function renderCenterChatChrome() {
@@ -25795,7 +25834,7 @@ document.addEventListener('change', ev => {
 document.addEventListener('keydown', ev => {
   if (centerChat.open && ev.key === 'Tab') {
     const panel = $('#centerChatPanel');
-    const focusable = [...panel.querySelectorAll('button:not(:disabled), textarea:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex="-1"])')]
+    const focusable = [...panel.querySelectorAll('a[href], button:not(:disabled), textarea:not(:disabled), select:not(:disabled), [tabindex]:not([tabindex="-1"])')]
       .filter(element => !element.hidden && element.offsetParent !== null);
     if (focusable.length) {
       const first = focusable[0], last = focusable[focusable.length - 1];
