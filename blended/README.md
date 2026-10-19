@@ -167,3 +167,7 @@ Cloudflare 실행 환경은 로컬 Worker를 먼저 띄운 뒤 `node blended/wor
 코드 문제는 이전 Worker 버전으로 rollback, DB 문제는 검증한 bookmark로 복원한다. 두 동작은 다르다.
 처음 배포는 빈 신규 저장소이며 기존 서비스의 DB 마이그레이션/복원을 수행하지 않는다.
 되돌릴 때 기존 consult나 도메인 루트를 바꾸지 말고 신규 `blended.wbcowork.com` 연결과 `wb-blended`만 대상으로 한다.
+
+### 학원 연결 시험 추가 (2026-10-20)
+
+실제 학생 바로가기는 RESULTS.md 최신 절을 따른다. 두 앱 가상 브라우저 시험은 ACADEMY_SOURCE를 별도 학원 작업본으로 지정하고 `node blended/academy-browser.cjs` 실행. 로컬 Worker의 worker-check.mjs는 기존 설정에 ACADEMY_BRIDGE_KEY를 합성값 `a` 64개로 추가한다. 운영 키를 개발 환경에 복사하지 않는다. 학원에는 기존 플래너 계정을 원장이 직접 연결하며 로그인/담당 검사는 플래너가 수행한다.

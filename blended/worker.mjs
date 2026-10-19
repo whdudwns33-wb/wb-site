@@ -18,7 +18,7 @@ export class BlendedPlanner extends DurableObject {
       all:(...args)=>ctx.storage.sql.exec(sql,...args).toArray(),
       run:(...args)=>{const cursor=ctx.storage.sql.exec(sql,...args);return {changes:cursor.rowsWritten};}
     })};
-    this.api=createApi(db,{mode:'production',ownerLogin:env.OWNER_LOGIN,bootstrapToken:env.BOOTSTRAP_TOKEN,transaction:fn=>ctx.storage.transactionSync(fn)});
+    this.api=createApi(db,{mode:'production',ownerLogin:env.OWNER_LOGIN,bootstrapToken:env.BOOTSTRAP_TOKEN,academyBridgeKey:env.ACADEMY_BRIDGE_KEY,transaction:fn=>ctx.storage.transactionSync(fn)});
   }
   async fetch(request) {
     try {
@@ -28,6 +28,7 @@ export class BlendedPlanner extends DurableObject {
       let body;
       try{body=JSON.parse(await new Blob(chunks).text());}catch{return json(400,{code:'JSON',error:'요청 형식을 확인해 주세요.'});}
       if(size>32768 && body.action!=='planner_save')return json(413,{code:'SIZE',error:'입력 크기를 줄여 주세요.'});
+      if(new URL(request.url).pathname==='/blended/academy-api') {if(size>4096)return json(413,{code:'SIZE'});return json(200,{ok:true,...this.api.academy(body,request.headers.get('Authorization')?.replace(/^Bearer /,''))});}
       const token=/(?:^|;\s*)__Host-wb_blended=([a-f0-9]{64})(?:;|$)/.exec(request.headers.get('Cookie')||'')?.[1]||'';
       const result=this.api.handle(body,token,request.headers.get('CF-Connecting-IP')||'unknown'),extra={};
       if(result.sessionToken){extra['Set-Cookie']=sessionCookie(result.sessionToken);delete result.sessionToken;}
@@ -41,6 +42,10 @@ export default {
     const url=new URL(request.url),origin=env.PUBLIC_ORIGIN;
     if(url.origin!==origin)return json(403,{code:'HOST',error:'전용 서비스 주소로 접속해 주세요.'});
     if(url.pathname==='/'||url.pathname==='/blended')return new Response(null,{status:302,headers:{...security,Location:origin+'/blended/'}});
+    if(url.pathname==='/blended/academy-api'){
+      if(request.method!=='POST'||request.headers.has('Origin')||!request.headers.get('Content-Type')?.startsWith('application/json'))return json(403,{code:'BRIDGE_ORIGIN'});
+      return env.PLANNER.get(env.PLANNER.idFromName('blended-production-v1')).fetch(request);
+    }
     if(url.pathname==='/blended/api'){
       if(request.method!=='POST'||request.headers.get('Origin')!==origin||request.headers.get('X-Blended-Request')!=='1'||!request.headers.get('Content-Type')?.startsWith('application/json'))return json(403,{code:'ORIGIN',error:'허용되지 않은 요청입니다.'});
       return env.PLANNER.get(env.PLANNER.idFromName('blended-production-v1')).fetch(request);

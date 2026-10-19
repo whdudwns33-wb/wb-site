@@ -39,7 +39,8 @@
     state = await api('state');
     if(!location.hash && state.me.role !== 'guardian') {location.replace('/blended/planner/'+(selected?'?student='+encodeURIComponent(selected):''));return;}
     day ||= state.today;
-    if (!state.students.some(s => s.id === selected)) selected = state.students[0]?.id || '';
+    if(selected && !state.students.some(s=>s.id===selected) && (state.me.role!=='guardian' || new URLSearchParams(location.search).get('student'))) {$('#main').innerHTML='<section class="sheet" role="alert"><h1>요청한 학생을 열 수 없습니다.</h1><p>현재 계정의 담당 권한이나 학원 연결을 확인해 주세요.</p><a href="/blended/">내 플래너로</a></section>';return;}
+    if(!state.students.some(s=>s.id===selected))selected = state.students[0]?.id || '';
     if (editing?.student_id && !state.students.some(s => s.id === editing.student_id)) { closeEditor(true); notice('담당 또는 열람 권한이 변경되어 편집을 닫았습니다.',true); }
     render();
   }

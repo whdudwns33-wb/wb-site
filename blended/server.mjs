@@ -14,8 +14,8 @@ const files = new Map([
   ['/blended/external-links.js', ['../shared/external-links.js','text/javascript']]
 ]);
 const cookie = (token = '') => `wb_blended_local=${token}; Path=/blended/; HttpOnly; SameSite=Strict; Max-Age=${token ? 28800 : 0}`;
-export function createLocalServer(db) {
-  const api = createApi(db);
+export function createLocalServer(db,options = {}) {
+  const api = createApi(db,options);
   const planner=plannerAssets();
   const server = http.createServer(async (req,res) => {
     const origin = `http://127.0.0.1:${server.address().port}`;
@@ -34,6 +34,12 @@ export function createLocalServer(db) {
         res.writeHead(200,{...headers,'Content-Type':type+'; charset=utf-8','Content-Security-Policy':headers['Content-Security-Policy'].replace("style-src 'self'","style-src 'self' 'unsafe-inline'")});return res.end(req.method==='HEAD'?undefined:planner[name]);
       }
       if (url.pathname === '/' || url.pathname === '/blended') return send(302,'',{Location:'/blended/'});
+      if(url.pathname==='/blended/academy-api') {
+        if(req.method!=='POST'||req.headers.origin||!String(req.headers['content-type']).startsWith('application/json'))return send(403,{code:'BRIDGE_ORIGIN'});
+        let input='';for await(const chunk of req){input+=chunk;if(Buffer.byteLength(input)>4096)return send(413,{code:'SIZE'});}
+        let data;try{data=JSON.parse(input);}catch{return send(400,{code:'JSON'});}
+        return send(200,{ok:true,...api.academy(data,req.headers.authorization?.replace(/^Bearer /,''))});
+      }
       if (url.pathname !== '/blended/api') {
         const asset = files.get(url.pathname);
         if (!asset || !['GET','HEAD'].includes(req.method)) return send(404,{code:'NOT_FOUND'});

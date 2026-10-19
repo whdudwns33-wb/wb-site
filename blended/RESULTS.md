@@ -200,3 +200,20 @@ DNS 조사 중 최초 설정 도구는 잠시 확인된 Cloudflare IP에만 이�
 SOLAPI 키는 가져오거나 복사하지 않았다. 향후에도 사용자 지정대로 운영 PC 중계기가 기존 환경변수를 사용해야 한다.
 사진·PDF 업로드 저장소, 목차 사진 인식/URL 자동 수집, 기프트 카드 교환, 오프라인 저장, 자동 초대는 미연동이다. 목차 직접 입력·텍스트 질문·월간/주간 리포트 발행·인쇄는 가능하다.
 대규모 부하, 실제 데이터 백업 복원, 실사용자 종단 시험은 미검증이다. 현재 구현은 단일 학원의 전용 저장소 기준이다.
+
+## 2026-10-20 학원 학생 상세 실제 연결
+
+이 절이 이전 ‘학원 API 미확정’ 상태보다 최신이다. 학원 상세에서 원장이 기존 플래너의 학생 ID·이름을 확인해 직접 연결하고 ‘플래너 열기’로 같은 ID를 연다. 두 앱의 별도 로그인·담당 권한을 유지하며 로그인 전후 대상 ID를 보존한다. 없는/담당 외 학생을 다른 학생으로 대체하지 않는다.
+
+- 작업본 C:/Users/wb/Projects/wb-site-blended-link-20261020, codex/blended-handoff-20261020. 원본 consult 파일은 수정하지 않았다.
+- 변경: api.mjs(학생 ID·이름 읽기 전용), worker.mjs/server.mjs(서버 연결 인증), planner-adapter.js/app.js(대상 보존·접근 오류), academy-api.test.mjs/academy-browser.cjs/worker-check.mjs(검증).
+- 학원 작업본 C:/Users/wb/CodexWork/wb-ops-blended-link-20261020의 lib/planner.mjs, lib/api.mjs, server.mjs, student.tsx, student-planner.tsx, 배포 검사/문서를 함께 반영했다. 실제 계약은 그 작업본 academy-app/블렌디드-플래너-연동계약.md 첫 절 참고.
+- 실행: node blended/server.mjs (가상 자료 로컬 서버). 새 양쪽 시험은 NODE_PATH와 PLAYWRIGHT_CHROMIUM_EXECUTABLE을 README대로 지정하고 ACADEMY_SOURCE를 위 학원 작업본으로 설정한 뒤 node blended/academy-browser.cjs.
+- API26/26, 저장소 전체322/322(직렬197초), 기존 planner-browser 및 browser-check 통과. 원본6화면·일정/학사 통합·과제/로드맵/목차·리포트/권한 회수 유지. 가상 동명이인 ID 선택·로그인 후 대상 유지·미존재/권한 외 대체 표시 방지·비활성 거부·390px 넘침0·브라우저 오류0. Cloudflare 로컬 런타임에서도 서비스 키/Origin/크기 경계 통과.
+- 보호자 동의 철회 후 빈 리포트 표시는 기존 흐름대로 유지했다. 외부 요청 학생을 명시한 경우에는 권한 오류를 표시한다.
+- Worker 현재 4bddba84-0988-4de4-b39d-3958b83016a3, 직전 기준8375714b-9580-47ce-8243-a8e645e46eed. 전용 ACADEMY_BRIDGE_KEY 추가(읽기 전용), 기존 로그인/자료/키 변경 없음.
+- 학원 현재61c0491ffbe3562f887377001eaabcb73fe27c77377cb82170eb8d9242cfabe5, 이전e92c6c032ed28335fa6fb0f8364f85e241d0f75f56df227f37506080fca6c360 보존. 전용 launcher에 보호 키 파일 경로만 추가, 서버 작업만 전환. 터널/기존 운영 앱/원본/DB 구조는 유지.
+- 외부 HTTPS 자산 SHA256 일치, 서버 health200, 직원 익명401·학생 호스트 직원404, 운영 읽기 전용 학생 계약200·미인증/브라우저Origin403 확인. 생산 학생 ID·이름은 로그에 출력하지 않았다.
+- 운영 명부가 비어 있어 실제 학생/계정/연결은 만들지 않았다. 기존 브라우저 직원 세션은 만료되어 로그인 화면 표시를 확인했다. 사용자 비밀번호를 읽거나 재설정하지 않았다.
+
+미연동: SSO, 상담·리포트 요약 수신, 강사 자동 배정/계정 복제, 메시지 발송. 실데이터 종단 시험·실기기/낭독기·재부팅 복구는 미검증. 공유 저장소 push/PR0.
