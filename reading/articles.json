@@ -1,5 +1,5 @@
 {
-  "version": "2026-10-12.1",
+  "version": "2026-10-19.1",
   "articles": [
     {
       "id": "nuri-space",
@@ -54792,6 +54792,3804 @@
               "answer": 0,
               "explain": "예외는 청소년의 동의와 관서장의 인가, 증명서 비치, 게시 의무 같은 조건을 달고서야 열린다.",
               "evidencePara": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "edna-diving-beetle",
+      "category": "environment",
+      "careers": [
+        "env",
+        "bio",
+        "it"
+      ],
+      "issue": true,
+      "publishedAt": "2026-10-19",
+      "status": "published",
+      "sources": [
+        {
+          "title": "기후에너지환경부 국립낙동강생물자원관 보도자료 — 환경유전자 분석으로 희귀 수서곤충 ‘배물방개붙이’ 새 서식지 찾았다 (2026.10.15)",
+          "url": "https://www.mcee.go.kr/home/web/board/read.do?menuId=10598&boardMasterId=939&boardId=1899650"
+        }
+      ],
+      "levels": {
+        "L1": {
+          "title": "물만 떠 봐도 알아요",
+          "minutes": 3,
+          "paragraphs": [
+            [
+              "물속에는 눈에 잘 띄지 않는 ",
+              "작은 곤충도 살아요. ",
+              "배물방개붙이도 그런 곤충이에요. ",
+              "사람이 찾아낸 곳이 아직 적고, ",
+              "새로 찾아내기도 어려워요."
+            ],
+            [
+              "그래서 연구하는 사람들은 ",
+              "그 물을 떠서 살펴보았어요. ",
+              "생물은 자기가 사는 물에 ",
+              "아주 작은 흔적을 남겨요. ",
+              "그 흔적을 찾아내면 ",
+              "무엇이 사는지 알 수 있어요. ",
+              "곤충을 잡지 않아도 돼요."
+            ],
+            [
+              "물을 떠 온 곳은 ",
+              "인제군 서화면 일대예요. ",
+              "여기 살고 있을 것 같다고 ",
+              "생각한 사람들은 ",
+              "그곳을 직접 찾아갔어요. ",
+              "정말로 다 자란 배물방개붙이 ",
+              "네 마리가 있었어요. ",
+              "이제 이곳을 오래 지켜보기로 했어요."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "곤충",
+              "easy": "다리가 여섯 개 달린 작은 동물이에요.",
+              "hanja": null
+            },
+            {
+              "word": "생물",
+              "easy": "살아 있는 것이에요. 동물도 식물도 생물이에요.",
+              "hanja": null
+            },
+            {
+              "word": "흔적",
+              "easy": "무엇이 지나가거나 머문 뒤에 남은 자국이에요.",
+              "hanja": null
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글은 무엇에 대한 이야기인가요?",
+              "choices": [
+                "곤충을 집에서 기르는 방법",
+                "물을 떠서 살펴보고 곤충이 사는 곳을 찾아낸 일",
+                "연못을 새로 만드는 방법",
+                "곤충을 그림으로 그리는 방법"
+              ],
+              "answer": 1,
+              "explain": "물을 떠서 살펴보고 곤충이 사는 곳을 찾아낸 이야기예요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "물속에서 무엇을 찾아보았나요?",
+              "choices": [
+                "생물이 남긴 아주 작은 흔적",
+                "돌멩이의 색깔",
+                "물의 깊이",
+                "물에 떠 있는 나뭇잎"
+              ],
+              "answer": 0,
+              "explain": "생물이 자기가 사는 물에 남긴 아주 작은 흔적을 찾아보았어요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「흔적」은 무엇인가요?",
+              "choices": [
+                "아주 큰 소리예요",
+                "물의 차가운 정도예요",
+                "무엇이 지나가거나 머문 뒤에 남은 자국이에요",
+                "동물이 먹는 먹이예요"
+              ],
+              "answer": 2,
+              "explain": "흔적은 무엇이 지나가거나 머문 뒤에 남은 자국이에요.",
+              "evidencePara": 1
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "곤충을 잡지 않아도 되었던 까닭은 무엇인가요?",
+              "choices": [
+                "곤충이 아주 크기 때문이에요",
+                "물에 남은 흔적만 살펴봐도 무엇이 사는지 알 수 있기 때문이에요",
+                "곤충이 소리를 내기 때문이에요",
+                "물이 아주 맑기 때문이에요"
+              ],
+              "answer": 1,
+              "explain": "물에 남은 흔적을 찾아내면 무엇이 사는지 알 수 있다고 했어요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "apply",
+              "q": "물을 살펴본 다음에 사람들은 무엇을 했나요?",
+              "choices": [
+                "물을 모두 퍼냈어요",
+                "다른 물을 또 떠 왔어요",
+                "그곳에 직접 찾아가 정말 있는지 보았어요",
+                "곤충을 집으로 데려왔어요"
+              ],
+              "answer": 2,
+              "explain": "여기 살고 있을 것 같다고 생각한 사람들이 그곳을 직접 찾아갔어요.",
+              "evidencePara": 2
+            }
+          ]
+        },
+        "L2": {
+          "title": "잡지 않고 찾는 법",
+          "minutes": 4,
+          "paragraphs": [
+            [
+              "물속에 사는 곤충 가운데 ",
+              "배물방개붙이가 있다. ",
+              "우리나라에서 확인된 서식지가 적고 ",
+              "발견하기도 어려운 희귀 수서곤충이다. ",
+              "국가생물적색목록에서는 위기 등급에 해당한다. ",
+              "수온이 낮고 수생식물이 잘 자란 ",
+              "연못이나 습지에 주로 산다. ",
+              "기후변화와 환경오염의 영향으로 ",
+              "서식지가 줄고 있다."
+            ],
+            [
+              "기후에너지환경부 산하 국립낙동강생물자원관은 ",
+              "강원특별자치도 인제군 서화면 일대에서 ",
+              "이 곤충의 새로운 서식지를 ",
+              "최근 확인했다고 밝혔다. ",
+              "곤충을 잡아서 찾아낸 것이 아니다. ",
+              "그 지역의 물을 떠서 분석했다."
+            ],
+            [
+              "이 방법을 환경유전자 분석이라고 한다. ",
+              "생물은 물이나 토양 같은 주변 환경에 ",
+              "아주 적은 양의 유전물질을 남긴다. ",
+              "그 유전물질을 분석하면 ",
+              "어떤 생물이 그곳에 있는지 ",
+              "알 수 있다. ",
+              "직접 포획하지 않아도 되기 때문에, ",
+              "개체수가 적거나 발견하기 어려운 ",
+              "희귀생물의 서식지를 찾을 때 ",
+              "쓸모가 크다."
+            ],
+            [
+              "연구진은 올해 9월부터 최근까지 ",
+              "인제군 서화면 일대에서 ",
+              "물 시료를 모아 분석했고, ",
+              "배물방개붙이의 유전정보를 확인했다. ",
+              "그리고 그곳을 ",
+              "새로운 서식 후보지로 제시했다. ",
+              "다음 차례는 두 발이었다. ",
+              "인제곤충바이오센터와 함께 ",
+              "후보지를 직접 찾아가 ",
+              "다 자란 네 마리를 발견했다. ",
+              "수컷 한 마리와 ",
+              "암컷 세 마리였다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "서식지",
+              "easy": "어떤 생물이 자리 잡고 사는 곳",
+              "hanja": "棲(깃들일 서)+息(쉴 식)+地(땅 지)"
+            },
+            {
+              "word": "유전물질",
+              "easy": "생물의 몸을 만드는 정보를 담고 있는 물질",
+              "hanja": "遺(남길 유)+傳(전할 전)+物(물건 물)+質(바탕 질)"
+            },
+            {
+              "word": "포획",
+              "easy": "짐승이나 물고기 같은 생물을 잡는 일",
+              "hanja": "捕(잡을 포)+獲(얻을 획)"
+            },
+            {
+              "word": "시료",
+              "easy": "조사하려고 떠 오거나 덜어 온 작은 양의 물질",
+              "hanja": "試(시험할 시)+料(헤아릴 료)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 알맞은 것은?",
+              "choices": [
+                "연못을 새로 만들어 곤충을 길렀다",
+                "곤충을 잡는 그물을 새로 개발했다",
+                "물을 분석해 희귀 곤충이 사는 새 장소를 찾아내고 직접 가서 확인했다",
+                "수생식물의 종류를 모두 조사했다"
+              ],
+              "answer": 2,
+              "explain": "물에 남은 유전물질을 분석해 후보지를 찾고, 그곳에 가서 실제 서식을 확인한 일이 중심 내용이다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "환경유전자 분석으로 알 수 있는 것은?",
+              "choices": [
+                "어떤 생물이 그곳에 있는지",
+                "물의 깊이가 얼마인지",
+                "연못이 언제 만들어졌는지",
+                "곤충이 무엇을 먹는지"
+              ],
+              "answer": 0,
+              "explain": "환경에 남은 유전물질을 분석하면 어떤 생물이 그곳에 있는지 알 수 있다고 했다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "detail",
+              "q": "후보지 현장에서 발견한 배물방개붙이는?",
+              "choices": [
+                "알만 여러 개 발견했다",
+                "다 자란 네 마리로, 수컷 한 마리와 암컷 세 마리였다",
+                "다 자란 열 마리였다",
+                "한 마리도 찾지 못했다"
+              ],
+              "answer": 1,
+              "explain": "다 자란 네 마리를 발견했고 수컷 한 마리와 암컷 세 마리였다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "vocab",
+              "q": "「시료」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "생물이 사는 곳",
+                "생물을 잡는 도구",
+                "조사하려고 떠 오거나 덜어 온 작은 양의 물질",
+                "물의 온도를 재는 기계"
+              ],
+              "answer": 2,
+              "explain": "시료는 조사하려고 떠 오거나 덜어 온 작은 양의 물질이다.",
+              "evidencePara": 3
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "곤충을 잡지 않고 조사하는 방법이 특히 쓸모 있는 경우는?",
+              "choices": [
+                "개체수가 적거나 발견하기 어려운 희귀생물을 찾을 때",
+                "아주 흔한 생물을 셀 때",
+                "물의 색을 바꿀 때",
+                "연못의 넓이를 잴 때"
+              ],
+              "answer": 0,
+              "explain": "직접 포획하지 않아도 되므로 개체수가 적거나 발견하기 어려운 희귀생물의 서식지를 찾을 때 쓸모가 크다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "apply",
+              "q": "물을 분석한 단계에서 바로 「서식지」라 하지 않고 「후보지」라고 한 까닭을 가장 알맞게 짐작한 것은?",
+              "choices": [
+                "물이 너무 차가웠기 때문이다",
+                "곤충의 이름이 아직 없었기 때문이다",
+                "그 지역이 너무 넓었기 때문이다",
+                "실제로 사는지 현장에서 확인하기 전이었기 때문이다"
+              ],
+              "answer": 3,
+              "explain": "유전정보를 확인한 뒤 후보지로 제시했고, 현장에서 네 마리를 발견하고 나서야 실제 서식이 확인됐다.",
+              "evidencePara": 3
+            }
+          ],
+          "en": [
+            "There is a rare water beetle that lives in ponds and wetlands in Korea. Only a few of its habitats have been confirmed, and it is hard to find. On the national red list of species it belongs to the endangered class. It usually lives where the water is cold and water plants grow well. Climate change and pollution are shrinking its habitats.",
+            "The Nakdonggang National Institute of Biological Resources said that it had recently confirmed a new habitat of this beetle in Seohwa-myeon, Inje-gun, Gangwon State. The researchers did not catch the beetle in order to find it. They collected water from the area and analyzed it.",
+            "This method is called environmental DNA analysis. Living things leave a very small amount of genetic material in the water or the soil around them. By analyzing that material, we can tell which species is there. Because there is no need to capture anything, the method is useful for finding the habitats of rare species that are few in number or hard to spot.",
+            "From September this year until recently, the team collected and analyzed water samples in Seohwa-myeon and confirmed the beetle genetic information. They then proposed the area as a new candidate habitat. The next step was taken on foot. Together with the Inje Insect Bio Center, they visited the candidate site and found four adults, one male and three females."
+          ],
+          "envocab": [
+            {
+              "word": "habitat",
+              "ko": "서식지 (명사)",
+              "base": "habitat [ˈhæbɪtæt]"
+            },
+            {
+              "word": "endangered",
+              "ko": "위기의 (형용사) — 적색목록 위기(EN) 등급",
+              "base": "endanger [ɪnˈdeɪndʒər]"
+            },
+            {
+              "word": "genetic material",
+              "ko": "유전물질 (명사구)",
+              "base": "genetic [dʒəˈnetɪk]"
+            },
+            {
+              "word": "capture",
+              "ko": "포획하다 (동사)",
+              "base": "capture [ˈkæptʃər]"
+            },
+            {
+              "word": "samples",
+              "ko": "시료 (명사 sample의 복수)",
+              "base": "sample [ˈsæmpl]"
+            },
+            {
+              "word": "candidate",
+              "ko": "후보의 (명사·형용사)",
+              "base": "candidate [ˈkændɪdət]"
+            }
+          ],
+          "enseg": [
+            [
+              "There is a rare water beetle that lives in ponds and wetlands in Korea. ",
+              "Only a few of its habitats have been confirmed, and it is hard to find. ",
+              "On the national red list of species it belongs to the endangered class. ",
+              "It usually lives where the water is cold and water plants grow well. ",
+              "Climate change and pollution are shrinking its habitats."
+            ],
+            [
+              "The Nakdonggang National Institute of Biological Resources said that it had recently confirmed a new habitat of this beetle in Seohwa-myeon, Inje-gun, Gangwon State. ",
+              "The researchers did not catch the beetle in order to find it. ",
+              "They collected water from the area and analyzed it."
+            ],
+            [
+              "This method is called environmental DNA analysis. ",
+              "Living things leave a very small amount of genetic material in the water or the soil around them. ",
+              "By analyzing that material, we can tell which species is there. ",
+              "Because there is no need to capture anything, the method is useful for finding the habitats of rare species that are few in number or hard to spot."
+            ],
+            [
+              "From September this year until recently, the team collected and analyzed water samples in Seohwa-myeon and confirmed the beetle genetic information. ",
+              "They then proposed the area as a new candidate habitat. ",
+              "The next step was taken on foot. ",
+              "Together with the Inje Insect Bio Center, they visited the candidate site and found four adults, one male and three females."
+            ]
+          ]
+        },
+        "L3": {
+          "title": "물이 가리킨 자리",
+          "minutes": 5,
+          "paragraphs": [
+            [
+              "물에 들어가 그물을 넣었는데 ",
+              "아무것도 잡히지 않았다고 하자. ",
+              "그 결과는 무엇을 뜻할까. ",
+              "그곳에 없다는 뜻일 수도 있고, ",
+              "있지만 아직 못 만났다는 ",
+              "뜻일 수도 있다. ",
+              "잡지 않고도 사는지 ",
+              "알 수 있다면 어떨까."
+            ],
+            [
+              "기후에너지환경부 산하 국립낙동강생물자원관은 ",
+              "환경유전자 분석 기법으로 ",
+              "강원특별자치도 인제군 서화면 일대에서 ",
+              "수서곤충 배물방개붙이의 신규 서식지를 ",
+              "최근 확인했다고 밝혔다. ",
+              "배물방개붙이는 국내에서 확인된 서식지가 적고 ",
+              "발견이 어려운 희귀 수서곤충으로, ",
+              "국가생물적색목록에서 위기(EN) 등급에 해당한다. ",
+              "수온이 낮고 수생식물이 발달한 ",
+              "연못과 습지에 주로 살며, ",
+              "기후변화와 환경오염의 영향으로 서식지가 줄고 있다."
+            ],
+            [
+              "환경유전자 분석은 ",
+              "생물이 물이나 토양 등 주변 환경에 남긴 ",
+              "미량의 유전물질을 분석해 ",
+              "생물의 존재 여부를 확인하는 기법이다. ",
+              "생물을 직접 포획하지 않고도 ",
+              "서식 여부를 파악할 수 있어서, ",
+              "개체수가 적거나 발견하기 어려운 희귀생물의 ",
+              "서식지 탐색과 관찰에 유용하다. ",
+              "생물을 눈으로 보지 않고도 ",
+              "남긴 자취를 읽는 셈이다."
+            ],
+            [
+              "다만 자취는 자취일 뿐이다. ",
+              "연구진은 올해 9월부터 최근까지 ",
+              "인제군 서화면 일대에서 채취한 ",
+              "물 시료를 분석해 ",
+              "배물방개붙이의 유전정보를 확인하고, ",
+              "그 지역을 신규 서식 후보지로 제시했다. ",
+              "제시는 결론이 아니라 가리킴이다. ",
+              "이후 연구진은 인제곤충바이오센터와 함께 ",
+              "후보지 현장을 조사했고, ",
+              "성체 네 개체를 발견했다. ",
+              "수컷 한 마리와 암컷 세 마리였다. ",
+              "추정과 확인이 이렇게 짝을 이루었다."
+            ],
+            [
+              "두 기관은 이번에 확인한 ",
+              "신규 서식지를 지속적으로 관찰하고 ",
+              "증식 연구를 추진하는 등, ",
+              "서식지 보호와 개체군 보전을 위한 ",
+              "협력을 이어 갈 예정이다. ",
+              "찾아내는 일과 지키는 일은 ",
+              "따로 있지 않다. ",
+              "어디에 사는지 알아야 ",
+              "무엇을 지킬지 정할 수 있기 때문이다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "기법",
+              "easy": "어떤 일을 해내는 짜임새 있는 방법",
+              "hanja": "技(재주 기)+法(법 법)"
+            },
+            {
+              "word": "미량",
+              "easy": "아주 적은 양",
+              "hanja": "微(작을 미)+量(헤아릴 량)"
+            },
+            {
+              "word": "포획",
+              "easy": "짐승이나 물고기 같은 생물을 잡는 일",
+              "hanja": "捕(잡을 포)+獲(얻을 획)"
+            },
+            {
+              "word": "탐색",
+              "easy": "드러나지 않은 것을 더듬어 찾는 일",
+              "hanja": "探(찾을 탐)+索(찾을 색)"
+            },
+            {
+              "word": "개체",
+              "easy": "따로 떨어져 하나로 살아가는 생물 하나하나",
+              "hanja": "個(낱 개)+體(몸 체)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글이 가장 힘주어 말하는 것은?",
+              "choices": [
+                "수서곤충의 생김새를 자세히 그려야 한다",
+                "연못과 습지를 새로 만들어야 한다",
+                "물에 남은 유전물질로 후보지를 찾아내고 현장에서 서식을 확인했다",
+                "그물로 잡는 조사를 아예 그만두어야 한다"
+              ],
+              "answer": 2,
+              "explain": "물 시료 분석으로 후보지를 제시하고, 현장 조사로 성체를 확인한 두 단계가 글의 뼈대다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "detail",
+              "q": "배물방개붙이에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "국가생물적색목록에서 위기 등급이며, 수온이 낮고 수생식물이 발달한 연못과 습지에 주로 산다",
+                "전국 어디서나 흔히 볼 수 있다",
+                "따뜻한 바닷물에서만 산다",
+                "수생식물이 없는 곳에서 더 잘 자란다"
+              ],
+              "answer": 0,
+              "explain": "위기(EN) 등급이고, 수온이 낮고 수생식물이 발달한 연못과 습지에 주로 산다고 했다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "연구진이 신규 서식지를 확인한 차례로 알맞은 것은?",
+              "choices": [
+                "현장에서 성체를 먼저 잡은 뒤 물을 떠 왔다",
+                "물 시료 분석으로 후보지를 제시한 뒤, 현장 조사에서 성체 네 개체를 발견했다",
+                "물만 분석하고 현장에는 가지 않았다",
+                "다른 기관의 기록만 모아 정리했다"
+              ],
+              "answer": 1,
+              "explain": "물 시료를 분석해 후보지를 제시하고, 이후 현장 조사에서 성체 네 개체를 발견했다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "vocab",
+              "q": "「미량」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "아주 무거운 무게",
+                "아주 적은 양",
+                "아주 넓은 자리",
+                "아주 긴 시간"
+              ],
+              "answer": 1,
+              "explain": "미량은 아주 적은 양을 뜻한다.",
+              "evidencePara": 2
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "「제시는 결론이 아니라 가리킴이다」라는 문장의 뜻으로 가장 알맞은 것은?",
+              "choices": [
+                "유전정보만으로는 아직 확정이 아니어서 현장 확인이 남아 있다는 뜻이다",
+                "연구진이 결론을 숨겼다는 뜻이다",
+                "후보지가 여러 곳이라는 뜻이다",
+                "분석이 틀렸다는 뜻이다"
+              ],
+              "answer": 0,
+              "explain": "물에서 유전정보를 확인한 것은 자리를 가리킨 것이고, 실제 서식은 현장에서 성체를 발견해 확인했다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "apply",
+              "q": "두 기관이 앞으로 하려는 일로 알맞은 것은?",
+              "choices": [
+                "신규 서식지의 물을 모두 다른 곳으로 옮긴다",
+                "확인한 곳을 공개하지 않고 조사를 끝낸다",
+                "성체를 모두 잡아 실험실로 옮긴다",
+                "신규 서식지를 지속적으로 관찰하고 증식 연구를 추진한다"
+              ],
+              "answer": 3,
+              "explain": "신규 서식지를 지속적으로 관찰하고 증식 연구를 추진하는 등 협력을 이어 갈 예정이라고 했다.",
+              "evidencePara": 4
+            }
+          ],
+          "en": [
+            "Suppose you put a net into the water and nothing is caught. What does that result mean? It can mean the species is not there, or that it is there and has not been met yet. What if you could tell that it lives there without catching it?",
+            "The Nakdonggang National Institute of Biological Resources, under the Ministry of Climate, Energy and Environment, announced that it had recently confirmed a new habitat of a rare water beetle in Seohwa-myeon, Inje-gun, Gangwon State, using environmental DNA analysis. Few habitats of the beetle have been confirmed in Korea and it is hard to find, and the national red list places it in the endangered class. It lives mainly in ponds and wetlands with cold water and well developed water plants, and its habitats are shrinking because of climate change and pollution.",
+            "Environmental DNA analysis tells whether a species is present by analyzing the trace amounts of genetic material it leaves in the surrounding water or soil. Because it can show that a species lives there without capturing it, the method is useful for searching and observing the habitats of rare species that are few in number or hard to find. It reads the mark an animal left instead of the animal itself.",
+            "Still, a mark is only a mark. From September this year until recently the team analyzed water samples collected in Seohwa-myeon, confirmed the beetle genetic information, and proposed the area as a new candidate habitat. A proposal is not a conclusion; it is a pointing finger. The team then surveyed the candidate site with the Inje Insect Bio Center and found four adults, one male and three females. Here estimation and confirmation worked as a pair.",
+            "The two organizations plan to keep observing the new habitat and to pursue breeding research, continuing their cooperation to protect the habitat and conserve the population. Finding and protecting are not separate tasks. You have to know where a species lives before you can decide what to protect."
+          ],
+          "envocab": [
+            {
+              "word": "habitat",
+              "ko": "서식지 (명사)",
+              "base": "habitat [ˈhæbɪtæt]"
+            },
+            {
+              "word": "trace amounts",
+              "ko": "미량 (명사구)",
+              "base": "trace [treɪs]"
+            },
+            {
+              "word": "capturing",
+              "ko": "포획하는 것 (동사 capture의 -ing형)",
+              "base": "capture [ˈkæptʃər]"
+            },
+            {
+              "word": "candidate",
+              "ko": "후보의 (명사·형용사)",
+              "base": "candidate [ˈkændɪdət]"
+            },
+            {
+              "word": "estimation",
+              "ko": "추정 (명사)",
+              "base": "estimate [ˈestɪmeɪt]"
+            },
+            {
+              "word": "conserve",
+              "ko": "보전하다 (동사)",
+              "base": "conserve [kənˈsɜːrv]"
+            }
+          ],
+          "enseg": [
+            [
+              "Suppose you put a net into the water and nothing is caught. ",
+              "What does that result mean? ",
+              "It can mean the species is not there, or that it is there and has not been met yet. ",
+              "What if you could tell that it lives there without catching it?"
+            ],
+            [
+              "The Nakdonggang National Institute of Biological Resources, under the Ministry of Climate, Energy and Environment, announced that it had recently confirmed a new habitat of a rare water beetle in Seohwa-myeon, Inje-gun, Gangwon State, using environmental DNA analysis. ",
+              "Few habitats of the beetle have been confirmed in Korea and it is hard to find, and the national red list places it in the endangered class. ",
+              "It lives mainly in ponds and wetlands with cold water and well developed water plants, and its habitats are shrinking because of climate change and pollution."
+            ],
+            [
+              "Environmental DNA analysis tells whether a species is present by analyzing the trace amounts of genetic material it leaves in the surrounding water or soil. ",
+              "Because it can show that a species lives there without capturing it, the method is useful for searching and observing the habitats of rare species that are few in number or hard to find. ",
+              "It reads the mark an animal left instead of the animal itself."
+            ],
+            [
+              "Still, a mark is only a mark. ",
+              "From September this year until recently the team analyzed water samples collected in Seohwa-myeon, confirmed the beetle genetic information, and proposed the area as a new candidate habitat. ",
+              "A proposal is not a conclusion; it is a pointing finger. ",
+              "The team then surveyed the candidate site with the Inje Insect Bio Center and found four adults, one male and three females. ",
+              "Here estimation and confirmation worked as a pair."
+            ],
+            [
+              "The two organizations plan to keep observing the new habitat and to pursue breeding research, continuing their cooperation to protect the habitat and conserve the population. ",
+              "Finding and protecting are not separate tasks. ",
+              "You have to know where a species lives before you can decide what to protect."
+            ]
+          ]
+        },
+        "L4": {
+          "title": "없다는 말과 못 만났다는 말 사이",
+          "minutes": 6,
+          "paragraphs": [
+            [
+              "배물방개붙이는 발견이 어려운 희귀 수서곤충이다. ",
+              "직접 포획해 확인하는 방식에서는 ",
+              "잡히지 않았다는 결과가 ",
+              "두 가지 뜻을 한꺼번에 갖는다. ",
+              "그곳에 없다는 뜻일 수도 있고, ",
+              "있지만 아직 손에 걸리지 않았다는 ",
+              "뜻일 수도 있다. ",
+              "이 모호함을 어떻게 줄일 수 있을까."
+            ],
+            [
+              "기후에너지환경부 산하 국립낙동강생물자원관은 ",
+              "환경유전자 분석 기법을 활용해 ",
+              "강원특별자치도 인제군 서화면 일대에서 ",
+              "수서곤충 배물방개붙이의 신규 서식지를 ",
+              "최근 확인했다고 밝혔다. ",
+              "배물방개붙이는 국내에서 확인된 서식지가 적고 ",
+              "발견이 어려운 희귀 수서곤충으로, ",
+              "국가생물적색목록에서 위기(EN) 등급에 해당한다. ",
+              "수온이 낮고 수생식물이 발달한 ",
+              "연못과 습지 등에서 주로 살며, ",
+              "기후변화와 환경오염의 영향으로 서식지가 감소하고 있어 ",
+              "보전의 필요성이 높다."
+            ],
+            [
+              "환경유전자 분석은 생물이 물이나 토양 등 ",
+              "주변 환경에 남긴 미량의 유전물질을 분석해 ",
+              "생물의 존재 여부를 확인하는 기법이다. ",
+              "핵심은 생물을 직접 포획하지 않는다는 데 있다. ",
+              "포획이 필요 없으므로 ",
+              "개체수가 적거나 발견하기 어려운 희귀생물의 ",
+              "서식지 탐색과 관찰에 유용하다. ",
+              "조사하는 쪽이 생물을 건드리지 않고도 ",
+              "자료를 얻는다."
+            ],
+            [
+              "그렇다고 유전물질 하나로 끝나는 것은 아니다. ",
+              "연구진은 올해 9월부터 최근까지 ",
+              "인제군 서화면 일대에서 채취한 물 시료를 분석해 ",
+              "배물방개붙이의 유전정보를 확인했고, ",
+              "그 지역을 신규 서식 후보지로 제시했다. ",
+              "제시라는 말이 정확하다. ",
+              "유전정보를 확인한 단계에서 ",
+              "그곳은 아직 후보지였고, ",
+              "실제 서식은 확인 전이었다. ",
+              "그래서 연구진은 인제곤충바이오센터와 함께 ",
+              "후보지 현장을 조사했고, ",
+              "성체 네 개체를 발견했다. ",
+              "수컷 한 마리와 암컷 세 마리였다. ",
+              "추정이 가리킨 곳에서 확인이 이루어진 것이다."
+            ],
+            [
+              "두 기관은 이번에 확인한 신규 서식지를 ",
+              "지속적으로 관찰하고 증식 연구를 추진하는 등 ",
+              "서식지 보호와 개체군 보전을 위한 ",
+              "협력을 이어 갈 예정이다. ",
+              "류시현 국립낙동강생물자원관 다양성보전연구실장은 ",
+              "이번 연구가 환경유전자 분석을 통해 ",
+              "직접 발견하기 어려운 희귀생물의 ",
+              "새로운 서식지를 찾아냈다는 점에서 ",
+              "의미가 있다고 말했다. ",
+              "또한 앞으로도 관련 기술을 활용해 ",
+              "담수생물의 서식지 조사를 지속하고, ",
+              "이를 보전으로 연계하는 연구를 ",
+              "확대해 나가겠다고 밝혔다. ",
+              "탐지는 목적이 아니라 입구다. ",
+              "어디에 사는지 알아내는 일이 끝나는 자리에서 ",
+              "무엇을 어떻게 지킬지 정하는 일이 시작된다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "추정",
+              "easy": "드러난 단서를 근거로 미루어 헤아려 판단하는 일",
+              "hanja": "推(밀 추)+定(정할 정)"
+            },
+            {
+              "word": "증식",
+              "easy": "생물의 수를 늘리는 일",
+              "hanja": "增(더할 증)+殖(불릴 식)"
+            },
+            {
+              "word": "개체군",
+              "easy": "한 지역에서 함께 살아가는 같은 종 생물의 무리",
+              "hanja": "個(낱 개)+體(몸 체)+群(무리 군)"
+            },
+            {
+              "word": "보전",
+              "easy": "온전한 상태로 지켜 내는 일",
+              "hanja": "保(지킬 보)+全(온전 전)"
+            },
+            {
+              "word": "담수",
+              "easy": "소금기가 거의 없는 물, 민물",
+              "hanja": "淡(맑을 담)+水(물 수)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 생각으로 가장 알맞은 것은?",
+              "choices": [
+                "그물 조사는 이제 쓸모가 전혀 없다",
+                "환경유전자 분석이 희귀생물 조사에서 추정의 자리를 만들어 주고, 현장 확인이 그 추정을 매듭짓는다",
+                "수서곤충은 연못보다 습지를 좋아한다",
+                "연구 기관은 조사보다 증식에 힘써야 한다"
+              ],
+              "answer": 1,
+              "explain": "포획 없이 후보지를 가리키는 추정과, 현장에서 성체를 발견한 확인이 짝을 이루는 것이 글의 뼈대다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "detail",
+              "q": "환경유전자 분석에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "생물을 잡아 몸에 표지를 붙여 추적하는 기법이다",
+                "물의 온도만으로 생물의 종류를 가려내는 기법이다",
+                "주변 환경에 남은 미량의 유전물질을 분석해 생물의 존재 여부를 확인하는 기법이다",
+                "사람이 눈으로 센 숫자를 모아 정리하는 기법이다"
+              ],
+              "answer": 2,
+              "explain": "물이나 토양 등 주변 환경에 남긴 미량의 유전물질을 분석해 생물의 존재 여부를 확인하는 기법이다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "detail",
+              "q": "현장 조사에서 확인한 사실로 알맞은 것은?",
+              "choices": [
+                "성체 네 개체를 발견했고, 수컷 한 마리와 암컷 세 마리였다",
+                "성체는 보이지 않고 알만 확인했다",
+                "수컷 세 마리와 암컷 한 마리를 발견했다",
+                "연구진이 혼자 조사해 두 마리를 발견했다"
+              ],
+              "answer": 0,
+              "explain": "인제곤충바이오센터와 함께 후보지 현장을 조사해 성체 네 개체, 수컷 한 마리와 암컷 세 마리를 발견했다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "vocab",
+              "q": "「개체군」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "서로 다른 종들이 섞여 사는 생태계 전체",
+                "한 지역에서 함께 살아가는 같은 종 생물의 무리",
+                "생물을 가두어 기르는 시설",
+                "생물 한 마리의 몸무게"
+              ],
+              "answer": 1,
+              "explain": "개체군은 한 지역에서 함께 살아가는 같은 종 생물의 무리를 뜻한다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "critical",
+              "q": "첫 문단이 말하는 「모호함」을 환경유전자 분석이 줄여 주는 방식으로 가장 알맞은 것은?",
+              "choices": [
+                "생물을 더 많이 잡아 표본 수를 늘려 준다",
+                "조사 기간을 줄여 비용을 아껴 준다",
+                "잡히지 않아도 유전물질이라는 단서를 남겨, 살펴볼 자리를 좁혀 준다",
+                "생물의 수를 정확히 세어 알려 준다"
+              ],
+              "answer": 2,
+              "explain": "포획에 성공하지 못해도 환경에 남은 유전물질로 존재 여부를 파악할 수 있어, 살펴볼 자리를 좁힐 수 있다.",
+              "evidencePara": 3
+            }
+          ],
+          "challenge": [
+            {
+              "type": "critical",
+              "q": "「제시라는 말이 정확하다」고 쓴 글쓴이의 뜻을 가장 알맞게 읽은 것은?",
+              "choices": [
+                "유전정보를 확인한 단계에서는 아직 후보지였고, 실제 서식은 현장 조사에서 확인됐다는 뜻이다",
+                "연구진의 발표가 지나치게 조심스러웠다는 뜻이다",
+                "후보지라는 말이 잘못 쓰였다는 뜻이다",
+                "분석 결과를 믿을 수 없다는 뜻이다"
+              ],
+              "answer": 0,
+              "explain": "유전정보를 확인해 후보지로 제시한 뒤, 현장에서 성체 네 개체를 발견하고 나서야 실제 서식이 확인됐다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "apply",
+              "q": "「탐지는 목적이 아니라 입구다」라는 말과 가장 잘 맞는 계획은?",
+              "choices": [
+                "후보지 목록을 많이 모으는 일로 연구를 마무리한다",
+                "찾아낸 신규 서식지를 지속적으로 관찰하고 증식 연구와 보전 협력으로 이어 간다",
+                "분석 장비를 늘려 물 시료 수만 늘린다",
+                "확인된 성체를 모두 다른 지역으로 옮긴다"
+              ],
+              "answer": 1,
+              "explain": "두 기관은 신규 서식지를 지속 관찰하고 증식 연구를 추진하는 등 서식지 보호와 개체군 보전 협력을 이어 갈 예정이다.",
+              "evidencePara": 4
+            }
+          ],
+          "en": [
+            "There is a rare water beetle that is hard to find. When the method is to catch the animal and check it, a result of catching nothing carries two meanings at once. It can mean the species is not there, or that it is there but has not yet come to hand. How can this ambiguity be reduced?",
+            "The Nakdonggang National Institute of Biological Resources, under the Ministry of Climate, Energy and Environment, announced that it had recently confirmed a new habitat of a rare water beetle in Seohwa-myeon, Inje-gun, Gangwon State, using environmental DNA analysis. Few habitats of this beetle have been confirmed in Korea and it is hard to find, and the national red list places it in the endangered class. It lives mainly in ponds and wetlands where the water is cold and water plants are well developed, and its habitats are decreasing because of climate change and pollution, so the need for conservation is high.",
+            "Environmental DNA analysis tells whether a species is present by analyzing the trace amounts of genetic material that living things leave in the surrounding water or soil. The key point is that nothing has to be captured. Because capture is unnecessary, the method is useful for searching and observing the habitats of rare species that are few in number or hard to find. The surveyor gathers data without touching the animal.",
+            "Still, genetic material alone does not finish the job. From September this year until recently, the team analyzed water samples collected in Seohwa-myeon, confirmed the beetle genetic information, and proposed the area as a new candidate habitat. Proposed is the right word. At that stage the site was still a candidate, and the actual presence of the beetle had not been confirmed yet. So the team surveyed the candidate site with the Inje Insect Bio Center and found four adults, one male and three females. Confirmation took place where the estimate had pointed.",
+            "The two organizations plan to keep observing the new habitat and to pursue breeding research as part of their cooperation to protect the habitat and conserve the population. The head of the biodiversity conservation research division at the institute said the study matters because environmental DNA analysis found a new habitat of a rare species that is hard to discover directly. The division head added that the institute will keep surveying the habitats of freshwater species with this technology and will expand research that links such surveys to conservation. Detection is not the goal but the entrance. Where the work of finding out ends, the work of deciding what to protect and how begins."
+          ],
+          "envocab": [
+            {
+              "word": "ambiguity",
+              "ko": "모호함 (명사)",
+              "base": "ambiguous [æmˈbɪɡjuəs]"
+            },
+            {
+              "word": "habitat",
+              "ko": "서식지 (명사)",
+              "base": "habitat [ˈhæbɪtæt]"
+            },
+            {
+              "word": "captured",
+              "ko": "포획된 (동사 capture의 과거분사)",
+              "base": "capture [ˈkæptʃər]"
+            },
+            {
+              "word": "candidate",
+              "ko": "후보의 (명사·형용사)",
+              "base": "candidate [ˈkændɪdət]"
+            },
+            {
+              "word": "conservation",
+              "ko": "보전 (명사)",
+              "base": "conserve [kənˈsɜːrv]"
+            },
+            {
+              "word": "freshwater",
+              "ko": "담수의 (형용사)",
+              "base": "fresh [freʃ]"
+            }
+          ],
+          "enseg": [
+            [
+              "There is a rare water beetle that is hard to find. ",
+              "When the method is to catch the animal and check it, a result of catching nothing carries two meanings at once. ",
+              "It can mean the species is not there, or that it is there but has not yet come to hand. ",
+              "How can this ambiguity be reduced?"
+            ],
+            [
+              "The Nakdonggang National Institute of Biological Resources, under the Ministry of Climate, Energy and Environment, announced that it had recently confirmed a new habitat of a rare water beetle in Seohwa-myeon, Inje-gun, Gangwon State, using environmental DNA analysis. ",
+              "Few habitats of this beetle have been confirmed in Korea and it is hard to find, and the national red list places it in the endangered class. ",
+              "It lives mainly in ponds and wetlands where the water is cold and water plants are well developed, and its habitats are decreasing because of climate change and pollution, so the need for conservation is high."
+            ],
+            [
+              "Environmental DNA analysis tells whether a species is present by analyzing the trace amounts of genetic material that living things leave in the surrounding water or soil. ",
+              "The key point is that nothing has to be captured. ",
+              "Because capture is unnecessary, the method is useful for searching and observing the habitats of rare species that are few in number or hard to find. ",
+              "The surveyor gathers data without touching the animal."
+            ],
+            [
+              "Still, genetic material alone does not finish the job. ",
+              "From September this year until recently, the team analyzed water samples collected in Seohwa-myeon, confirmed the beetle genetic information, and proposed the area as a new candidate habitat. ",
+              "Proposed is the right word. ",
+              "At that stage the site was still a candidate, and the actual presence of the beetle had not been confirmed yet. ",
+              "So the team surveyed the candidate site with the Inje Insect Bio Center and found four adults, one male and three females. ",
+              "Confirmation took place where the estimate had pointed."
+            ],
+            [
+              "The two organizations plan to keep observing the new habitat and to pursue breeding research as part of their cooperation to protect the habitat and conserve the population. ",
+              "The head of the biodiversity conservation research division at the institute said the study matters because environmental DNA analysis found a new habitat of a rare species that is hard to discover directly. ",
+              "The division head added that the institute will keep surveying the habitats of freshwater species with this technology and will expand research that links such surveys to conservation. ",
+              "Detection is not the goal but the entrance. ",
+              "Where the work of finding out ends, the work of deciding what to protect and how begins."
+            ]
+          ]
+        }
+      }
+    },
+    {
+      "id": "touch-paintings",
+      "category": "humanities",
+      "careers": [
+        "art",
+        "hum",
+        "media"
+      ],
+      "issue": true,
+      "publishedAt": "2026-10-19",
+      "status": "published",
+      "sources": [
+        {
+          "title": "국가유산청 세종대왕유적관리소 보도자료 — 마음으로 그린 그림, 손끝으로 만나는 세상 (2026.10.15)",
+          "url": "https://www.khs.go.kr/newsBbz/selectNewsBbzView.do?newsItemId=155706426&sectionId=b_sec_1&mn=NS_01_02"
+        }
+      ],
+      "levels": {
+        "L1": {
+          "title": "기억으로 그린 그림",
+          "minutes": 3,
+          "paragraphs": [
+            [
+              "눈이 잘 보이지 않는 화가들이 있어요. ",
+              "이 화가들이 그린 그림 ",
+              "열일곱 점을 모아 ",
+              "전시회를 열어요. ",
+              "이름은 「손끝으로 만나는 세상」이에요."
+            ],
+            [
+              "<금은모래>라는 작품에서는 ",
+              "진짜 모래를 써서 ",
+              "만졌을 때의 느낌을 살렸어요. ",
+              "지금은 사라진 모래사장을 그렸어요. ",
+              "작가의 기억 속에 ",
+              "남아 있는 곳이에요."
+            ],
+            [
+              "<그리운 얼굴>은 ",
+              "얼굴 그림 아홉 점이 모여 ",
+              "한 작품이 돼요. ",
+              "손으로 만져 본 얼굴을 ",
+              "떠올려서 그린 그림이에요."
+            ],
+            [
+              "전시장 가운데에서는 ",
+              "누구나 눈을 가리고 ",
+              "색을 칠해 볼 수 있어요. ",
+              "화가들이 어떻게 그렸는지 ",
+              "더 잘 알 수 있어요."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "전시회",
+              "easy": "여러 작품을 한곳에 모아 놓고 사람들이 볼 수 있게 한 자리예요.",
+              "hanja": null
+            },
+            {
+              "word": "모래사장",
+              "easy": "강가나 바닷가에 모래가 넓게 깔린 곳이에요.",
+              "hanja": null
+            },
+            {
+              "word": "기억",
+              "easy": "전에 보거나 느낀 것을 잊지 않고 머릿속에 두는 거예요.",
+              "hanja": null
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글은 무엇에 대한 이야기인가요?",
+              "choices": [
+                "새로 생긴 모래 놀이터",
+                "눈이 잘 보이지 않는 화가들이 그린 그림 전시회",
+                "색연필을 파는 가게",
+                "강에서 물고기를 잡는 방법"
+              ],
+              "answer": 1,
+              "explain": "눈이 잘 보이지 않는 화가들이 그린 그림 열일곱 점을 모아 전시회를 연다는 이야기예요.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "<금은모래>에서 만졌을 때의 느낌을 살리려고 쓴 것은 무엇인가요?",
+              "choices": [
+                "진짜 모래",
+                "진짜 물",
+                "진짜 나무",
+                "진짜 돌"
+              ],
+              "answer": 0,
+              "explain": "진짜 모래를 써서 만졌을 때의 느낌을 살렸다고 나와요. 지금은 사라지고 작가의 기억 속에 남은 모래사장을 그린 작품이에요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「전시회」는 어떤 자리인가요?",
+              "choices": [
+                "작품을 모아 놓고 볼 수 있게 한 자리",
+                "그림을 그리는 수업",
+                "밥을 먹는 곳",
+                "책을 빌리는 곳"
+              ],
+              "answer": 0,
+              "explain": "전시회는 여러 작품을 한곳에 모아 놓고 사람들이 볼 수 있게 한 자리예요.",
+              "evidencePara": 0
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "<그리운 얼굴>을 그린 화가들은 얼굴을 어떻게 떠올렸을까요?",
+              "choices": [
+                "사진을 보고",
+                "손으로 만져 본 것을 떠올리고",
+                "텔레비전에서 보고",
+                "책에서 읽고"
+              ],
+              "answer": 1,
+              "explain": "글은 손으로 만져 본 얼굴을 떠올려서 그린 그림이라고 했어요.",
+              "evidencePara": 2
+            },
+            {
+              "type": "apply",
+              "q": "전시장 가운데에서 눈을 가리고 색을 칠해 보면 무엇을 알게 되나요?",
+              "choices": [
+                "화가들이 어떻게 그렸는지",
+                "색연필 값이 얼마인지",
+                "전시장이 얼마나 넓은지",
+                "오늘 날씨가 어떤지"
+              ],
+              "answer": 0,
+              "explain": "마지막 문단에서 눈을 가리고 색을 칠해 보면 화가들이 어떻게 그렸는지 더 잘 알 수 있다고 했어요.",
+              "evidencePara": 3
+            }
+          ]
+        },
+        "L2": {
+          "title": "진짜 모래로 질감을 살린 그림",
+          "minutes": 4,
+          "paragraphs": [
+            [
+              "10월 20일부터 11월 22일까지 ",
+              "경기 여주시 세종대왕역사문화관에서 ",
+              "전시회 하나가 열린다. ",
+              "이름은 「손끝으로 만나는 세상」이다. ",
+              "눈이 잘 보이지 않는 작가들이 그린 ",
+              "그림 열일곱 점을 모았다."
+            ],
+            [
+              "작품은 「기억」, 「풍경과 흔적」, ",
+              "「어울림과 한마음」 세 주제로 나뉜다. ",
+              "「기억」에 놓인 <금은모래>는 ",
+              "지금은 사라진, 작가의 기억 속 ",
+              "여주 남한강 모래사장을 그린 작품이다. ",
+              "작가는 실제 모래를 써서 ",
+              "질감을 살려냈다."
+            ],
+            [
+              "같은 주제의 <그리운 얼굴>은 ",
+              "작가 아홉 명이 그린 ",
+              "초상화 아홉 점이 모여 ",
+              "하나의 작품을 이룬다. ",
+              "손으로 만져 본 감각만으로 ",
+              "기억된 남편과 아내의 얼굴처럼, ",
+              "마음속에 깊이 간직된 ",
+              "얼굴들을 그려낸 것이다."
+            ],
+            [
+              "「풍경과 흔적」에는 ",
+              "계절의 풍경을 담은 ",
+              "일곱 점이 걸린다. ",
+              "오일파스텔로 그린 작품 위에 ",
+              "실제 나뭇잎을 아크릴물감으로 찍어내 ",
+              "모양과 결을 살린 것도 있다."
+            ],
+            [
+              "전시장 가운데에는 ",
+              "촉각 미술 체험 공간이 있다. ",
+              "관람객은 직접 눈을 가리고 ",
+              "오일파스텔로 사물의 형태 안에 ",
+              "색을 채워 넣어 본다. ",
+              "작가들의 작업 과정을 더 깊이 ",
+              "이해할 수 있는 자리다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "질감",
+              "easy": "만졌을 때 느껴지는 표면의 느낌.",
+              "hanja": "質(바탕 질)感(느낄 감)"
+            },
+            {
+              "word": "초상화",
+              "easy": "사람의 얼굴이나 모습을 그린 그림.",
+              "hanja": "肖(닮을 초)像(모양 상)畫(그림 화)"
+            },
+            {
+              "word": "촉각",
+              "easy": "살갗이 닿아서 느끼는 감각.",
+              "hanja": "觸(닿을 촉)覺(깨달을 각)"
+            },
+            {
+              "word": "관람객",
+              "easy": "전시나 공연을 보러 온 사람.",
+              "hanja": "觀(볼 관)覽(볼 람)客(손 객)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 알맞은 것은?",
+              "choices": [
+                "모래사장을 되살리는 공사",
+                "눈이 잘 보이지 않는 작가들이 감각과 기억으로 그린 그림을 모은 전시",
+                "오일파스텔을 싸게 사는 방법",
+                "여주시의 인구 변화"
+              ],
+              "answer": 1,
+              "explain": "글은 눈이 잘 보이지 않는 작가들이 그린 그림 열일곱 점을 모은 전시와 그 작품들을 소개한다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "<금은모래>에서 작가가 질감을 살리려고 쓴 것은?",
+              "choices": [
+                "실제 모래",
+                "실제 나뭇잎",
+                "실제 물",
+                "실제 돌"
+              ],
+              "answer": 0,
+              "explain": "둘째 문단에서 작가는 실제 모래를 써서 질감을 살려냈다고 했다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「질감」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "그림의 크기",
+                "만졌을 때 느껴지는 표면의 느낌",
+                "그림을 그린 날짜",
+                "작품을 거는 자리"
+              ],
+              "answer": 1,
+              "explain": "질감은 만졌을 때 느껴지는 표면의 느낌이다. 작가는 실제 모래를 써서 그 느낌을 살려냈다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "infer",
+              "q": "전시장 가운데에 체험 공간을 마련한 까닭으로 가장 알맞은 것은?",
+              "choices": [
+                "그림을 더 빨리 보게 하려고",
+                "오일파스텔을 팔려고",
+                "작가들의 작업 과정을 관람객이 더 깊이 이해하게 하려고",
+                "전시장을 넓어 보이게 하려고"
+              ],
+              "answer": 2,
+              "explain": "마지막 문단은 관람객이 눈을 가리고 색을 채워 넣어 보며 작가들의 작업 과정을 더 깊이 이해할 수 있다고 설명한다.",
+              "evidencePara": 4
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "<그리운 얼굴>이 초상화 아홉 점을 하나의 작품으로 묶은 데서 읽을 수 있는 것은?",
+              "choices": [
+                "작품 수를 늘리려 했다는 것",
+                "서로 다른 기억들이 모여 하나를 이룬다는 것",
+                "그림이 작아서 붙였다는 것",
+                "액자가 하나뿐이었다는 것"
+              ],
+              "answer": 1,
+              "explain": "아홉 작가가 저마다 간직한 얼굴을 그렸고 그 아홉 점이 모여 하나의 작품이 된다. 서로 다른 기억이 모여 하나가 되는 짜임이다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "apply",
+              "q": "「손으로 만져 본 감각만으로 기억된 얼굴」을 그리는 일과 가장 비슷한 것은?",
+              "choices": [
+                "사진을 그대로 베껴 그리기",
+                "눈을 감고 외운 등굣길을 지도로 그려 보기",
+                "그림을 컴퓨터로 복사하기",
+                "남이 그린 그림을 그대로 따라 그리기"
+              ],
+              "answer": 1,
+              "explain": "눈앞의 것을 옮기는 것이 아니라, 손으로 만져 본 감각과 기억을 꺼내어 그리는 일이다.",
+              "evidencePara": 2
+            }
+          ],
+          "enseg": [
+            [
+              "From October 20 to November 22, ",
+              "an exhibition opens at the Sejong Daewang History and Culture Museum ",
+              "in Yeoju, Gyeonggi Province. ",
+              "Its name is Meeting the World with Fingertips. ",
+              "It gathers seventeen paintings ",
+              "made by visually impaired artists."
+            ],
+            [
+              "The works are divided into three themes: ",
+              "Memory, Scenery and Traces, and Harmony and One Heart. ",
+              "Geumeun-morae (Gold and Silver Sand), placed under Memory, ",
+              "paints a sandy bank of the Namhan River in Yeoju ",
+              "that no longer exists and lives in the artist’s memory. ",
+              "The artist used real sand ",
+              "to bring out its texture."
+            ],
+            [
+              "Under the same theme, ",
+              "Faces I Miss is one work ",
+              "made of nine portraits by nine artists. ",
+              "They drew faces kept deep in the heart, ",
+              "such as a husband or a wife ",
+              "remembered only through the sense of touch."
+            ],
+            [
+              "Scenery and Traces holds seven works about the seasons. ",
+              "In some of them, ",
+              "real leaves were pressed onto an oil pastel painting with acrylic paint ",
+              "so that their shape and grain would show."
+            ],
+            [
+              "At the center of the hall ",
+              "there is a space for touch art. ",
+              "People cover their own eyes ",
+              "and fill the shape of an object with oil pastel. ",
+              "It is a place to understand the artists’ process more deeply."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "exhibition",
+              "ko": "전시, 전시회 (명사)",
+              "base": "exhibition [ˌeksɪˈbɪʃn]"
+            },
+            {
+              "word": "texture",
+              "ko": "질감 (명사)",
+              "base": "texture [ˈtekstʃər]"
+            },
+            {
+              "word": "portraits",
+              "ko": "초상화 (명사)",
+              "base": "portrait [ˈpɔːrtrət]"
+            },
+            {
+              "word": "touch",
+              "ko": "촉각, 만짐 (명사)",
+              "base": "touch [tʌtʃ]"
+            },
+            {
+              "word": "grain",
+              "ko": "결, 무늬 (명사)",
+              "base": "grain [ɡreɪn]"
+            },
+            {
+              "word": "themes",
+              "ko": "주제 (명사)",
+              "base": "theme [θiːm]"
+            }
+          ],
+          "en": [
+            "From October 20 to November 22, an exhibition opens at the Sejong Daewang History and Culture Museum in Yeoju, Gyeonggi Province. Its name is Meeting the World with Fingertips. It gathers seventeen paintings made by visually impaired artists.",
+            "The works are divided into three themes: Memory, Scenery and Traces, and Harmony and One Heart. Geumeun-morae (Gold and Silver Sand), placed under Memory, paints a sandy bank of the Namhan River in Yeoju that no longer exists and lives in the artist’s memory. The artist used real sand to bring out its texture.",
+            "Under the same theme, Faces I Miss is one work made of nine portraits by nine artists. They drew faces kept deep in the heart, such as a husband or a wife remembered only through the sense of touch.",
+            "Scenery and Traces holds seven works about the seasons. In some of them, real leaves were pressed onto an oil pastel painting with acrylic paint so that their shape and grain would show.",
+            "At the center of the hall there is a space for touch art. People cover their own eyes and fill the shape of an object with oil pastel. It is a place to understand the artists’ process more deeply."
+          ]
+        },
+        "L3": {
+          "title": "세 주제로 만나는 열일곱 점",
+          "minutes": 6,
+          "paragraphs": [
+            [
+              "10월 20일부터 11월 22일까지 ",
+              "경기 여주시 세종대왕역사문화관에서 ",
+              "시각장애인 작가 회화작품전 ",
+              "「손끝으로 만나는 세상」이 열린다. ",
+              "국가유산청 궁능유적본부 세종대왕유적관리소와 ",
+              "시각장애인 예술 활동을 돕는 단체 공감더하기, ",
+              "여주시가 함께 주최한다. ",
+              "걸리는 작품은 열일곱 점이다."
+            ],
+            [
+              "작품은 세 주제로 나뉜다. ",
+              "첫째는 「기억」이다. ",
+              "<금은모래>는 지금은 사라진, ",
+              "작가의 기억 속 여주 남한강 ",
+              "모래사장을 그린 작품이다. ",
+              "작가는 실제 모래를 사용해 질감을 살려냈다. ",
+              "지금은 없는 장소를 ",
+              "작가의 기억에 기대어 화면으로 끌어올린 셈이다."
+            ],
+            [
+              "같은 주제의 <그리운 얼굴>은 ",
+              "아홉 명의 작가가 그린 ",
+              "초상화 아홉 점이 하나의 작품을 이룬다. ",
+              "손으로 만져 본 감각만으로 만들어지고 ",
+              "기억된 남편과 아내의 얼굴처럼, ",
+              "마음속에 깊이 간직된 ",
+              "소중한 얼굴들을 그려낸 것이다."
+            ],
+            [
+              "둘째 주제인 「풍경과 흔적」에는 ",
+              "상상이나 기억 속에 자리한 계절의 풍경을 담은 ",
+              "<가을을 오르다>, <겨울> 등 일곱 점이 놓인다. ",
+              "오일파스텔로 그린 작품 위에 ",
+              "실제 나뭇잎을 아크릴물감으로 찍어내 ",
+              "모양과 결을 살리는 등 ",
+              "표현 방법도 저마다 다르다. ",
+              "셋째 주제 「어울림과 한마음」은 ",
+              "서로 다름은 존중되어야 하고 ",
+              "이 세상은 각기 다름이 하나가 되어 ",
+              "이루어진다는 메시지를 던진다."
+            ],
+            [
+              "전시장 가운데에는 ",
+              "촉각 미술 체험 공간이 있다. ",
+              "관람객은 눈을 가리고 ",
+              "오일파스텔로 사물의 형태 안에 ",
+              "색을 채워 넣어 보며 ",
+              "작가들의 작업 과정을 ",
+              "더 깊이 이해할 수 있다. ",
+              "전시는 기간 내 오전 9시부터 오후 5시까지 ",
+              "누구나 관람할 수 있고, 월요일은 쉰다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "주최",
+              "easy": "어떤 행사를 책임지고 여는 일.",
+              "hanja": "主(주인 주)催(재촉할 최)"
+            },
+            {
+              "word": "질감",
+              "easy": "만졌을 때 느껴지는 표면의 느낌.",
+              "hanja": "質(바탕 질)感(느낄 감)"
+            },
+            {
+              "word": "초상화",
+              "easy": "사람의 얼굴이나 모습을 그린 그림.",
+              "hanja": "肖(닮을 초)像(모양 상)畫(그림 화)"
+            },
+            {
+              "word": "흔적",
+              "easy": "무엇이 지나가거나 있었던 뒤에 남은 자국.",
+              "hanja": "痕(흉터 흔)跡(자취 적)"
+            },
+            {
+              "word": "촉각",
+              "easy": "살갗이 닿아서 느끼는 감각.",
+              "hanja": "觸(닿을 촉)覺(깨달을 각)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 알맞은 것은?",
+              "choices": [
+                "여주 남한강 모래사장의 복원 계획",
+                "시각장애인 작가들이 감각과 기억을 작품으로 옮긴 전시의 짜임",
+                "오일파스텔과 아크릴물감의 가격 차이",
+                "세종대왕역사문화관의 건축 양식"
+              ],
+              "answer": 1,
+              "explain": "글은 전시의 개요와 세 주제를 차례로 따라가며 작품들을 소개한다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "「풍경과 흔적」 주제에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "초상화 아홉 점이 하나의 작품을 이룬다",
+                "계절의 풍경을 담은 일곱 점이 놓인다",
+                "실제 모래로 질감을 살린 작품 하나만 있다",
+                "관람 시간을 안내하는 자리다"
+              ],
+              "answer": 1,
+              "explain": "넷째 문단에서 「풍경과 흔적」에는 계절의 풍경을 담은 <가을을 오르다>, <겨울> 등 일곱 점이 놓인다고 했다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "vocab",
+              "q": "「주최」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "행사를 책임지고 여는 일",
+                "작품을 사들이는 일",
+                "전시를 보러 가는 일",
+                "그림을 고쳐 주는 일"
+              ],
+              "answer": 0,
+              "explain": "주최는 어떤 행사를 책임지고 여는 일이다. 이 전시는 세종대왕유적관리소와 공감더하기, 여주시가 함께 주최한다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "infer",
+              "q": "<금은모래>를 두고 「지금은 없는 장소를 작가의 기억에 기대어 화면으로 끌어올린 셈」이라고 한 까닭은?",
+              "choices": [
+                "작가가 사진을 보고 그렸기 때문",
+                "그 모래사장은 이미 사라졌고, 작가의 기억 속 장면이 그림의 바탕이기 때문",
+                "모래값이 비싸기 때문",
+                "전시장이 강가에 있기 때문"
+              ],
+              "answer": 1,
+              "explain": "그 모래사장은 지금은 사라졌다. 남은 것은 작가의 기억 속 장면이고, 작가는 실제 모래를 사용해 질감을 살려냈다.",
+              "evidencePara": 1
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "세 주제 가운데 「어울림과 한마음」이 전시 전체에서 하는 구실로 가장 알맞은 것은?",
+              "choices": [
+                "작품의 값을 매긴다",
+                "앞의 두 주제에서 본 저마다 다른 감각을 서로 다름의 존중이라는 메시지로 묶는다",
+                "관람 시간을 안내한다",
+                "작가의 이름을 소개한다"
+              ],
+              "answer": 1,
+              "explain": "「기억」과 「풍경과 흔적」이 작가마다 다른 감각과 표현을 보여 주었다면, 셋째 주제는 그 다름이 하나가 되어 세상을 이룬다는 메시지로 전시를 맺는다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "apply",
+              "q": "이 전시를 친구에게 소개하는 문장으로 글의 내용에 가장 알맞은 것은?",
+              "choices": [
+                "「그림을 싸게 파는 전시래」",
+                "「시각장애인 작가들이 그린 그림을 세 주제로 모은 전시래」",
+                "「눈으로만 봐야 하는 전시래」",
+                "「작가가 한 사람뿐인 전시래」"
+              ],
+              "answer": 1,
+              "explain": "전시는 시각장애인 작가들의 작품 열일곱 점을 「기억」, 「풍경과 흔적」, 「어울림과 한마음」 세 주제로 나누어 보여 준다.",
+              "evidencePara": 1
+            }
+          ],
+          "enseg": [
+            [
+              "From October 20 to November 22, ",
+              "a painting exhibition by visually impaired artists, ",
+              "Meeting the World with Fingertips, ",
+              "opens at the Sejong Daewang History and Culture Museum ",
+              "in Yeoju, Gyeonggi Province. ",
+              "It is hosted together by the Sejong Daewang Historic Site Management Office (세종대왕유적관리소) ",
+              "of the Korea Heritage Service, ",
+              "Gonggam Deohagi, a group that supports art activity by visually impaired people, ",
+              "and the city of Yeoju. ",
+              "Seventeen works hang on the walls."
+            ],
+            [
+              "The works are divided into three themes. ",
+              "The first is Memory. ",
+              "Geumeun-morae (Gold and Silver Sand) paints a sandy bank of the Namhan River in Yeoju ",
+              "that has since disappeared ",
+              "and now lives in the artist’s memory. ",
+              "Real sand was used ",
+              "to bring out its texture. ",
+              "A place that no longer exists ",
+              "was lifted onto the picture out of the artist’s memory."
+            ],
+            [
+              "Under the same theme, ",
+              "Faces I Miss is a single work ",
+              "formed by nine portraits painted by nine artists. ",
+              "The faces of a husband or a wife, ",
+              "made and remembered only through the sense of touch, ",
+              "are precious faces kept deep in the heart."
+            ],
+            [
+              "The second theme, Scenery and Traces, ",
+              "holds seven works such as Climbing Autumn and Winter, ",
+              "which carry seasons found in imagination or memory. ",
+              "Real leaves were pressed onto oil pastel paintings with acrylic paint ",
+              "so that shape and grain would show, ",
+              "and each artist’s method is different. ",
+              "The third theme, Harmony and One Heart, ",
+              "carries the message that difference must be respected ",
+              "and that this world is made ",
+              "when many different things become one."
+            ],
+            [
+              "A space for touch art stands at the center of the hall. ",
+              "People cover their eyes ",
+              "and fill the shape of an object with oil pastel, ",
+              "which helps them understand the artists’ process more deeply. ",
+              "The exhibition is open to anyone ",
+              "from 9 a.m. to 5 p.m. during the period, ",
+              "and it closes on Mondays."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "exhibition",
+              "ko": "전시, 전시회 (명사)",
+              "base": "exhibition [ˌeksɪˈbɪʃn]"
+            },
+            {
+              "word": "texture",
+              "ko": "질감 (명사)",
+              "base": "texture [ˈtekstʃər]"
+            },
+            {
+              "word": "portraits",
+              "ko": "초상화 (명사)",
+              "base": "portrait [ˈpɔːrtrət]"
+            },
+            {
+              "word": "memory",
+              "ko": "기억 (명사)",
+              "base": "memory [ˈmeməri]"
+            },
+            {
+              "word": "respected",
+              "ko": "존중받는 (동사 respect의 과거분사)",
+              "base": "respect [rɪˈspekt]"
+            },
+            {
+              "word": "grain",
+              "ko": "결, 무늬 (명사)",
+              "base": "grain [ɡreɪn]"
+            }
+          ],
+          "en": [
+            "From October 20 to November 22, a painting exhibition by visually impaired artists, Meeting the World with Fingertips, opens at the Sejong Daewang History and Culture Museum in Yeoju, Gyeonggi Province. It is hosted together by the Sejong Daewang Historic Site Management Office (세종대왕유적관리소) of the Korea Heritage Service, Gonggam Deohagi, a group that supports art activity by visually impaired people, and the city of Yeoju. Seventeen works hang on the walls.",
+            "The works are divided into three themes. The first is Memory. Geumeun-morae (Gold and Silver Sand) paints a sandy bank of the Namhan River in Yeoju that has since disappeared and now lives in the artist’s memory. Real sand was used to bring out its texture. A place that no longer exists was lifted onto the picture out of the artist’s memory.",
+            "Under the same theme, Faces I Miss is a single work formed by nine portraits painted by nine artists. The faces of a husband or a wife, made and remembered only through the sense of touch, are precious faces kept deep in the heart.",
+            "The second theme, Scenery and Traces, holds seven works such as Climbing Autumn and Winter, which carry seasons found in imagination or memory. Real leaves were pressed onto oil pastel paintings with acrylic paint so that shape and grain would show, and each artist’s method is different. The third theme, Harmony and One Heart, carries the message that difference must be respected and that this world is made when many different things become one.",
+            "A space for touch art stands at the center of the hall. People cover their eyes and fill the shape of an object with oil pastel, which helps them understand the artists’ process more deeply. The exhibition is open to anyone from 9 a.m. to 5 p.m. during the period, and it closes on Mondays."
+          ]
+        },
+        "L4": {
+          "title": "새로운 예술의 가능성을 제시하다",
+          "minutes": 8,
+          "paragraphs": [
+            [
+              "10월 20일부터 11월 22일까지 ",
+              "경기 여주시 세종대왕역사문화관에서 ",
+              "시각장애인 작가 회화작품전 「손끝으로 만나는 세상」이 열린다. ",
+              "이 전시는 새로운 예술의 가능성을 제시한다. ",
+              "전시는 기간 내 오전 9시부터 오후 5시까지 ",
+              "누구나 관람할 수 있고, 월요일은 휴관일이다."
+            ],
+            [
+              "전시는 국가유산청 궁능유적본부 세종대왕유적관리소와 ",
+              "시각장애인 예술 활동 지원 단체 공감더하기, ",
+              "여주시가 공동으로 주최한다. ",
+              "이번 전시에서는 모든 사람이 사람답게 살아가는 ",
+              "세상을 염원했던 세종대왕의 인간애를 ",
+              "시각장애인 작가들의 작품 열일곱 점으로 선보인다."
+            ],
+            [
+              "작품은 세 주제로 나뉜다. ",
+              "「기억」에 놓인 <금은모래>는 지금은 사라진, ",
+              "작가의 기억 속 여주 남한강 모래사장을 ",
+              "그린 작품이다. ",
+              "실제 모래를 사용해 질감을 살려냈다. ",
+              "같은 주제의 <그리운 얼굴>은 ",
+              "아홉 명의 작가가 그린 초상화 아홉 점이 ",
+              "하나의 작품을 이룬다. ",
+              "손으로 만져 본 감각만으로 만들어지고 ",
+              "기억된 남편과 아내의 얼굴 등, ",
+              "마음속에 깊이 간직된 소중한 얼굴들을 ",
+              "그려낸 것이다."
+            ],
+            [
+              "「풍경과 흔적」에는 상상이나 기억 속에 자리한 ",
+              "계절의 풍경을 담은 ",
+              "<가을을 오르다>, <겨울> 등 일곱 점이 전시된다. ",
+              "오일파스텔로 그린 작품 위에 ",
+              "실제 나뭇잎을 아크릴물감으로 찍어내 ",
+              "모양과 결을 살리는 등, ",
+              "생생함을 더하려는 표현 방법이 작품마다 다르다."
+            ],
+            [
+              "「어울림과 한마음」은 ",
+              "서로 다름은 존중되어야 하고, ",
+              "이 세상은 각기 다름이 하나가 되어 ",
+              "이루어진다는 메시지를 던진다. ",
+              "다양한 색깔과 형태의 사과들로 채운 <5월의 아오리>, ",
+              "각기 다른 과일들로 하나의 목걸이를 그린 <어울림>, ",
+              "서로 다른 감각과 방식으로 세상을 살아가는 사람들이 ",
+              "결국 하나의 마음으로 이어질 수 있음을 ",
+              "보여 주는 <한마음>이 걸린다."
+            ],
+            [
+              "전시장 가운데 촉각 미술 체험 공간에서는 ",
+              "관람객이 직접 눈을 가리고 ",
+              "오일파스텔로 사물의 형태 안에 ",
+              "색을 채워 넣어 본다. ",
+              "관람객은 이렇게 하며 작가들의 작업 과정을 ",
+              "더 깊이 이해할 수 있다. ",
+              "전시되는 작품들은 형상과 관념의 경계를 넘어 ",
+              "작가 고유의 순수한 감각을 담아낸 것이 특징이다. ",
+              "이를 통해 시각장애인의 미술이 ",
+              "새로운 예술적 영역으로 자리매김할 가능성을 ",
+              "보여 줄 것으로 기대된다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "인간애",
+              "easy": "사람을 사람으로서 아끼고 사랑하는 마음.",
+              "hanja": "人(사람 인)間(사이 간)愛(사랑 애)"
+            },
+            {
+              "word": "염원",
+              "easy": "마음속으로 간절히 바람. 또는 그런 바람.",
+              "hanja": "念(생각 념)願(원할 원)"
+            },
+            {
+              "word": "형상",
+              "easy": "사물의 생긴 모양.",
+              "hanja": "形(모양 형)象(코끼리 상)"
+            },
+            {
+              "word": "관념",
+              "easy": "머릿속에 품고 있는 생각이나 개념.",
+              "hanja": "觀(볼 관)念(생각 념)"
+            },
+            {
+              "word": "자리매김",
+              "easy": "어떤 자리나 위치를 뚜렷하게 차지하게 됨.",
+              "hanja": null
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 알맞은 것은?",
+              "choices": [
+                "세종대왕의 인간애를 시각장애인 작가들의 작품 열일곱 점으로 선보이는 전시와 그 작품들",
+                "세종대왕역사문화관의 운영 시간 변경",
+                "오일파스텔을 만드는 공정",
+                "여주시를 찾는 관광객 수의 변화"
+              ],
+              "answer": 0,
+              "explain": "글은 전시의 개요와 주최, 세 주제로 나뉜 작품, 촉각 미술 체험 공간을 차례로 소개한다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "이 전시를 공동으로 주최한 곳으로 글에 나오지 않은 것은?",
+              "choices": [
+                "세종대왕유적관리소",
+                "공감더하기",
+                "여주시",
+                "국립현대미술관"
+              ],
+              "answer": 3,
+              "explain": "둘째 문단은 세종대왕유적관리소와 공감더하기, 여주시가 공동으로 주최한다고 적었다. 국립현대미술관은 나오지 않는다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「형상과 관념의 경계를 넘어」에서 「관념」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "눈에 보이는 사물의 모양",
+                "머릿속에 품고 있는 생각",
+                "작품에 매긴 값",
+                "전시장의 넓이"
+              ],
+              "answer": 1,
+              "explain": "관념은 머릿속에 품고 있는 생각이나 개념이다. 눈에 보이는 모양인 형상과 짝을 이루어 쓰였다.",
+              "evidencePara": 5
+            },
+            {
+              "type": "infer",
+              "q": "<금은모래>가 「기억」 주제에 놓인 까닭으로 가장 알맞은 것은?",
+              "choices": [
+                "작품을 그린 때가 가장 오래되었기 때문",
+                "그 모래사장은 지금은 사라졌고, 작가의 기억 속 장면을 그렸기 때문",
+                "실제 모래를 구하기 어려웠기 때문",
+                "작품의 크기가 가장 크기 때문"
+              ],
+              "answer": 1,
+              "explain": "셋째 문단은 <금은모래>가 지금은 사라진, 작가의 기억 속 여주 남한강 모래사장을 그린 작품이라고 밝힌다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "critical",
+              "q": "글의 내용에 비추어 이 전시를 평가한 것으로 가장 타당한 것은?",
+              "choices": [
+                "작가마다 표현 방법이 달라, 시각장애인 미술의 새로운 가능성을 보여 주는 자리로 볼 수 있다",
+                "작품 수가 적어 전시라고 보기 어렵다",
+                "모든 작품이 같은 방법으로 그려져 변화가 없다",
+                "촉각 체험이 없어 관람객은 참여할 수 없다"
+              ],
+              "answer": 0,
+              "explain": "글은 모래·나뭇잎처럼 작품마다 다른 표현 방법을 들고, 마지막에 시각장애인의 미술이 새로운 예술적 영역으로 자리매김할 가능성을 적는다.",
+              "evidencePara": 5
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "전시가 세종대왕의 인간애를 작가들의 작품 열일곱 점으로 선보인다는 데서 읽을 수 있는 것은?",
+              "choices": [
+                "작품의 값을 높이려 했다는 것",
+                "「모든 사람이 사람답게」라는 뜻을 작가들이 그린 작품으로 드러내려 했다는 것",
+                "세종대왕의 생애를 연표로 정리하려 했다는 것",
+                "관람객 수를 늘리려고 작품 수를 맞췄다는 것"
+              ],
+              "answer": 1,
+              "explain": "기획의 뿌리에 있는 세종대왕의 인간애를, 시각장애인 작가들이 그린 작품 열일곱 점으로 선보이는 전시다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "critical",
+              "q": "「시각장애인의 미술이 새로운 예술적 영역으로 자리매김할 가능성」이라는 기대를 따져 볼 때, 글이 그 근거로 드는 것은?",
+              "choices": [
+                "관람객 수가 많다는 점",
+                "작품이 형상과 관념의 경계를 넘어 작가 고유의 순수한 감각을 담아냈다는 점",
+                "전시장이 넓다는 점",
+                "전시 기간이 길다는 점"
+              ],
+              "answer": 1,
+              "explain": "마지막 문단은 작품의 특징을 먼저 들고 그 뒤에 기대를 적는다. 근거는 관람 환경이 아니라 작품이 담아낸 감각이다.",
+              "evidencePara": 5
+            }
+          ],
+          "enseg": [
+            [
+              "From October 20 to November 22, ",
+              "a painting exhibition by visually impaired artists called Meeting the World with Fingertips ",
+              "opens at the Sejong Daewang History and Culture Museum in Yeoju, Gyeonggi Province. ",
+              "The exhibition presents a new possibility for art. ",
+              "Anyone may visit from 9 a.m. to 5 p.m. during the period, ",
+              "and it closes on Mondays."
+            ],
+            [
+              "The show is hosted together by the Sejong Daewang Historic Site Management Office (세종대왕유적관리소) ",
+              "of the Korea Heritage Service, ",
+              "Gonggam Deohagi, a group that supports art activity by visually impaired people, ",
+              "and the city of Yeoju. ",
+              "It presents the love for people held by King Sejong, ",
+              "who wished for a world where everyone could live as a human being, ",
+              "through seventeen works by visually impaired artists."
+            ],
+            [
+              "The works are divided into three themes. ",
+              "Geumeun-morae (Gold and Silver Sand), placed under Memory, ",
+              "paints a sandy bank of the Namhan River in Yeoju ",
+              "that has since disappeared and now lives in the artist’s memory. ",
+              "Real sand was used to bring out its texture. ",
+              "Under the same theme, ",
+              "Faces I Miss is a single work ",
+              "formed by nine portraits painted by nine artists. ",
+              "They drew precious faces kept deep in the heart, ",
+              "such as a husband or a wife ",
+              "made and remembered only through the sense of touch."
+            ],
+            [
+              "Scenery and Traces holds seven works ",
+              "such as Climbing Autumn and Winter, ",
+              "which carry seasons found in imagination or memory. ",
+              "Real leaves were pressed onto oil pastel paintings with acrylic paint ",
+              "so that shape and grain would show, ",
+              "and the methods that add life differ from work to work."
+            ],
+            [
+              "Harmony and One Heart carries the message ",
+              "that difference must be respected ",
+              "and that this world is made when many different things become one. ",
+              "May Aori, filled with apples of many colors and forms, ",
+              "Harmony, a necklace drawn from many different fruits, ",
+              "and One Heart, which shows that people ",
+              "who live through different senses and ways ",
+              "can still be joined by a single heart, ",
+              "hang in this section."
+            ],
+            [
+              "At the touch art space in the center of the hall, ",
+              "visitors cover their own eyes ",
+              "and fill the shape of an object with oil pastel, ",
+              "and in this way they can understand the artists’ process more deeply. ",
+              "The works shown here cross the border between form and idea ",
+              "and hold the pure sense that belongs to each artist. ",
+              "This is expected to show that art by visually impaired people ",
+              "can take its place as a new field of art."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "exhibition",
+              "ko": "전시, 전시회 (명사)",
+              "base": "exhibition [ˌeksɪˈbɪʃn]"
+            },
+            {
+              "word": "texture",
+              "ko": "질감 (명사)",
+              "base": "texture [ˈtekstʃər]"
+            },
+            {
+              "word": "portraits",
+              "ko": "초상화 (명사)",
+              "base": "portrait [ˈpɔːrtrət]"
+            },
+            {
+              "word": "imagination",
+              "ko": "상상, 상상력 (명사)",
+              "base": "imagination [ɪˌmædʒɪˈneɪʃn]"
+            },
+            {
+              "word": "respected",
+              "ko": "존중받는 (동사 respect의 과거분사)",
+              "base": "respect [rɪˈspekt]"
+            },
+            {
+              "word": "idea",
+              "ko": "관념, 생각 (명사)",
+              "base": "idea [aɪˈdiːə]"
+            }
+          ],
+          "en": [
+            "From October 20 to November 22, a painting exhibition by visually impaired artists called Meeting the World with Fingertips opens at the Sejong Daewang History and Culture Museum in Yeoju, Gyeonggi Province. The exhibition presents a new possibility for art. Anyone may visit from 9 a.m. to 5 p.m. during the period, and it closes on Mondays.",
+            "The show is hosted together by the Sejong Daewang Historic Site Management Office (세종대왕유적관리소) of the Korea Heritage Service, Gonggam Deohagi, a group that supports art activity by visually impaired people, and the city of Yeoju. It presents the love for people held by King Sejong, who wished for a world where everyone could live as a human being, through seventeen works by visually impaired artists.",
+            "The works are divided into three themes. Geumeun-morae (Gold and Silver Sand), placed under Memory, paints a sandy bank of the Namhan River in Yeoju that has since disappeared and now lives in the artist’s memory. Real sand was used to bring out its texture. Under the same theme, Faces I Miss is a single work formed by nine portraits painted by nine artists. They drew precious faces kept deep in the heart, such as a husband or a wife made and remembered only through the sense of touch.",
+            "Scenery and Traces holds seven works such as Climbing Autumn and Winter, which carry seasons found in imagination or memory. Real leaves were pressed onto oil pastel paintings with acrylic paint so that shape and grain would show, and the methods that add life differ from work to work.",
+            "Harmony and One Heart carries the message that difference must be respected and that this world is made when many different things become one. May Aori, filled with apples of many colors and forms, Harmony, a necklace drawn from many different fruits, and One Heart, which shows that people who live through different senses and ways can still be joined by a single heart, hang in this section.",
+            "At the touch art space in the center of the hall, visitors cover their own eyes and fill the shape of an object with oil pastel, and in this way they can understand the artists’ process more deeply. The works shown here cross the border between form and idea and hold the pure sense that belongs to each artist. This is expected to show that art by visually impaired people can take its place as a new field of art."
+          ]
+        }
+      }
+    },
+    {
+      "id": "pseudotachylite",
+      "category": "science",
+      "careers": [
+        "nat",
+        "eng",
+        "edu"
+      ],
+      "issue": true,
+      "publishedAt": "2026-10-19",
+      "status": "published",
+      "sources": [
+        {
+          "title": "국가유산청 보도자료 — 「경주 봉길리 슈도타킬라이트」 천연기념물 지정 예고 (2026.10.15)",
+          "url": "https://www.khs.go.kr/newsBbz/selectNewsBbzView.do?newsItemId=155706425&sectionId=b_sec_1&mn=NS_01_02"
+        }
+      ],
+      "levels": {
+        "L1": {
+          "title": "돌에 남은 지진 자국",
+          "minutes": 3,
+          "paragraphs": [
+            [
+              "지진이 날 때에는 ",
+              "땅의 갈라진 면이 ",
+              "서로 아주 빠르게 미끄러져요."
+            ],
+            [
+              "갈라진 면끼리 빠르게 스치면 ",
+              "열이 나요. ",
+              "두 손을 비빌 때처럼요. ",
+              "열이 아주 세지면 ",
+              "돌이 녹기도 해요."
+            ],
+            [
+              "녹은 돌은 ",
+              "좁은 틈을 따라 스며들어요. ",
+              "그러다 금세 식어서 ",
+              "다시 단단하게 굳어요. ",
+              "굳은 자국은 지금도 ",
+              "그대로 남아 있어요."
+            ],
+            [
+              "경주 바닷가 바위에서 ",
+              "이런 자국을 찾았어요. ",
+              "돌이 옛날 일을 ",
+              "적어 둔 셈이에요. ",
+              "나라에서는 이 돌을 ",
+              "오래 지키려고 해요."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "지진",
+              "easy": "땅이 흔들리는 일이에요.",
+              "hanja": null
+            },
+            {
+              "word": "틈",
+              "easy": "갈라져서 생긴 좁은 사이예요.",
+              "hanja": null
+            },
+            {
+              "word": "자국",
+              "easy": "무엇이 지나가거나 닿은 뒤에 남은 흔적이에요.",
+              "hanja": null
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글은 무엇에 대한 이야기인가요?",
+              "choices": [
+                "땅이 흔들릴 때 돌이 녹았다가 굳어 남은 자국 이야기",
+                "바닷가에서 조개를 줍는 이야기",
+                "돌을 쌓아 탑을 만드는 이야기",
+                "바위에 그림을 그리는 이야기"
+              ],
+              "answer": 0,
+              "explain": "갈라진 면끼리 빠르게 스쳐 녹았다가 식어 굳은 자국이 지금도 남아 있다는 이야기예요.",
+              "evidencePara": 2
+            },
+            {
+              "type": "detail",
+              "q": "돌이 녹을 만큼 뜨거워지는 까닭은 무엇인가요?",
+              "choices": [
+                "햇빛이 아주 뜨거워서요",
+                "갈라진 면끼리 아주 빠르게 스치기 때문이에요",
+                "누가 불을 피웠기 때문이에요",
+                "바닷물이 끓었기 때문이에요"
+              ],
+              "answer": 1,
+              "explain": "갈라진 면끼리 빠르게 스치면 열이 나고, 열이 아주 세지면 돌이 녹아요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「자국」은 무슨 뜻인가요?",
+              "choices": [
+                "무엇이 지나가거나 닿은 뒤에 남은 흔적이에요",
+                "아주 큰 바위예요",
+                "바다에 사는 물고기예요",
+                "땅을 파는 도구예요"
+              ],
+              "answer": 0,
+              "explain": "굳은 자국이 지금도 남아 있다고 했어요. 자국은 남은 흔적이에요.",
+              "evidencePara": 2
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "녹았던 돌이 다시 단단해진 까닭은 무엇일까요?",
+              "choices": [
+                "물에 젖었기 때문이에요",
+                "더 뜨거워졌기 때문이에요",
+                "식었기 때문이에요",
+                "색이 바뀌었기 때문이에요"
+              ],
+              "answer": 2,
+              "explain": "녹은 돌이 금세 식어서 다시 단단하게 굳었다고 했어요.",
+              "evidencePara": 2
+            },
+            {
+              "type": "apply",
+              "q": "아주 옛날에 지진이 있었는지 알아보려면 무엇을 살펴보면 좋을까요?",
+              "choices": [
+                "바위에 남은 굳은 자국",
+                "오늘의 날씨",
+                "바다에 사는 물고기 수",
+                "하늘의 구름 모양"
+              ],
+              "answer": 0,
+              "explain": "경주 바닷가 바위에서 그런 자국을 찾았어요. 돌이 옛날 일을 알려 줘요.",
+              "evidencePara": 3
+            }
+          ]
+        },
+        "L2": {
+          "title": "녹았다가 굳은 돌",
+          "minutes": 4,
+          "paragraphs": [
+            [
+              "지진이 일어날 때 ",
+              "단층은 매우 빠르게 미끄러진다. ",
+              "이렇게 빠르게 미끄러지는 동안 ",
+              "마찰열이 생긴다. ",
+              "손바닥을 비빌 때 ",
+              "따뜻해지는 것을 떠올리면 쉽다."
+            ],
+            [
+              "마찰열이 아주 세지면 ",
+              "둘레의 암석이 녹는다. ",
+              "녹은 물질은 단층면과 ",
+              "주변의 갈라진 틈을 따라 흘러 들어간다. ",
+              "그러고는 급격하게 식어서 ",
+              "단단하게 굳는다. ",
+              "이렇게 만들어진 돌을 슈도타킬라이트라고 부른다."
+            ],
+            [
+              "지진은 순간에 지나가지만 ",
+              "이 돌은 남는다. ",
+              "지진이 일어난 바로 그 순간에 ",
+              "녹았다가 굳은 자리이기 때문이다. ",
+              "그래서 이 돌은 ",
+              "과거에 일어난 지진과 단층운동의 흔적을 ",
+              "직접 보여 주는 기록이 된다. ",
+              "사람이 적어 두지 않아도 ",
+              "돌이 스스로 남긴 기록인 셈이다."
+            ],
+            [
+              "국가유산청은 경상북도 경주시 ",
+              "문무대왕면 봉길리 해안에 있는 ",
+              "이런 돌을 천연기념물로 ",
+              "지정 예고했다. ",
+              "아직 지정된 것은 아니다. ",
+              "30일 동안 국민의 의견을 들은 뒤, ",
+              "국가유산위원회의 심의를 거쳐 ",
+              "지정할 예정이다. ",
+              "국가유산청은 앞으로도 ",
+              "학술적 가치가 높은 지질유산을 찾아내 ",
+              "지역사회와 협력해 보존과 활용이 조화를 이루도록 하겠다고 밝혔다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "단층",
+              "easy": "암석이 갈라져 서로 어긋나 있는 면",
+              "hanja": "斷(끊을 단)+層(층 층)"
+            },
+            {
+              "word": "마찰열",
+              "easy": "두 물체가 서로 스칠 때 생기는 열",
+              "hanja": "摩(갈 마)+擦(문지를 찰)+熱(더울 열)"
+            },
+            {
+              "word": "흔적",
+              "easy": "무엇이 남긴 자국이나 자취",
+              "hanja": "痕(흉터 흔)+跡(자취 적)"
+            },
+            {
+              "word": "지질유산",
+              "easy": "땅의 역사를 알려 주어 지킬 가치가 있는 자연물",
+              "hanja": "地(땅 지)+質(바탕 질)+遺(남길 유)+産(낳을 산)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 알맞은 것은?",
+              "choices": [
+                "지진의 순간에 녹았다가 굳은 돌이 과거 지진의 기록으로 남아 천연기념물 지정 예고를 받았다",
+                "경주 바닷가에서 새로운 화산이 발견되었다",
+                "지진을 미리 알려 주는 기계가 개발되었다",
+                "단층을 메워 지진을 막는 공사가 시작되었다"
+              ],
+              "answer": 0,
+              "explain": "마찰열에 녹았다가 굳은 돌이 과거 지진의 기록이 되며, 천연기념물로 지정 예고되었다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "detail",
+              "q": "마찰열이 생기는 때는 언제인가?",
+              "choices": [
+                "비가 많이 내릴 때",
+                "단층이 매우 빠르게 미끄러질 때",
+                "돌이 물에 잠길 때",
+                "바닷물이 얼 때"
+              ],
+              "answer": 1,
+              "explain": "단층이 매우 빠르게 미끄러지는 동안 마찰열이 생긴다고 했다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "vocab",
+              "q": "「흔적」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "앞으로 일어날 일에 대한 예상",
+                "무엇이 남긴 자국이나 자취",
+                "아주 깊은 바다",
+                "돌을 다듬는 도구"
+              ],
+              "answer": 1,
+              "explain": "이 돌은 과거 지진과 단층운동의 흔적, 곧 남겨진 자취를 보여 준다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "infer",
+              "q": "이 돌을 「기록」이라고 부르는 까닭은?",
+              "choices": [
+                "사람이 돌에 글자를 새겨 두었기 때문에",
+                "지진이 일어난 순간의 변화가 돌에 그대로 남아 있기 때문에",
+                "돌의 무게를 재어 적어 두었기 때문에",
+                "돌이 해마다 조금씩 자라기 때문에"
+              ],
+              "answer": 1,
+              "explain": "지진이 일어난 바로 그 순간에 녹았다가 굳은 자리가 그대로 남아 있기 때문이다.",
+              "evidencePara": 2
+            }
+          ],
+          "challenge": [
+            {
+              "type": "detail",
+              "q": "「아직 지정된 것은 아니다」라고 한 까닭은?",
+              "choices": [
+                "국민 의견 수렴과 국가유산위원회 심의가 남아 있어서",
+                "돌의 크기가 너무 작아서",
+                "돌이 있는 곳의 주소를 몰라서",
+                "다른 나라가 먼저 가져가서"
+              ],
+              "answer": 0,
+              "explain": "30일 동안 의견을 들은 뒤 국가유산위원회의 심의를 거쳐 지정할 예정이라고 했다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "apply",
+              "q": "친구에게 이 돌을 한 문장으로 설명한다면 가장 알맞은 말은?",
+              "choices": [
+                "지진이 지나간 순간을 그대로 간직한 돌이야",
+                "바닷물이 굳어서 생긴 돌이야",
+                "사람이 불에 구워 만든 돌이야",
+                "나무가 오래되어 변한 돌이야"
+              ],
+              "answer": 0,
+              "explain": "마찰열에 녹았다가 급격히 식어 굳은, 그 순간이 남아 있는 돌이다.",
+              "evidencePara": 1
+            }
+          ],
+          "enseg": [
+            [
+              "When an earthquake happens, ",
+              "a fault slips very fast. ",
+              "As it slips so fast, ",
+              "friction heat builds up. ",
+              "Think of how your palms warm ",
+              "when you rub them together."
+            ],
+            [
+              "When the heat is strong enough, ",
+              "the rock around the fault melts. ",
+              "The melt flows into the fault surface ",
+              "and into cracks nearby. ",
+              "Then it cools very fast and hardens. ",
+              "A rock made this way ",
+              "is called pseudotachylyte."
+            ],
+            [
+              "An earthquake passes in a moment, ",
+              "but this rock stays. ",
+              "It hardened at the very moment ",
+              "the earthquake happened. ",
+              "So it shows the traces ",
+              "of a past earthquake and fault movement. ",
+              "Nobody wrote it down. ",
+              "The stone kept the record by itself."
+            ],
+            [
+              "The Korea Heritage Service has given notice ",
+              "that a rock like this, ",
+              "on the shore of Bonggil-ri in Gyeongju, ",
+              "will become a natural monument. ",
+              "It is notice, not a decision yet. ",
+              "After thirty days of public comment ",
+              "and a review by the national heritage committee, ",
+              "it will be designated."
+            ]
+          ],
+          "en": [
+            "When an earthquake happens, a fault slips very fast. As it slips so fast, friction heat builds up. Think of how your palms warm when you rub them together.",
+            "When the heat is strong enough, the rock around the fault melts. The melt flows into the fault surface and into cracks nearby. Then it cools very fast and hardens. A rock made this way is called pseudotachylyte.",
+            "An earthquake passes in a moment, but this rock stays. It hardened at the very moment the earthquake happened. So it shows the traces of a past earthquake and fault movement. Nobody wrote it down. The stone kept the record by itself.",
+            "The Korea Heritage Service has given notice that a rock like this, on the shore of Bonggil-ri in Gyeongju, will become a natural monument. It is notice, not a decision yet. After thirty days of public comment and a review by the national heritage committee, it will be designated."
+          ],
+          "envocab": [
+            {
+              "word": "earthquake",
+              "ko": "지진 (명사)",
+              "base": "earthquake [ˈɜːrθkweɪk]"
+            },
+            {
+              "word": "fault",
+              "ko": "단층 (명사)",
+              "base": "fault [fɔːlt]"
+            },
+            {
+              "word": "friction",
+              "ko": "마찰 (명사)",
+              "base": "friction [ˈfrɪkʃn]"
+            },
+            {
+              "word": "melts",
+              "ko": "녹다 (동사 melt의 3인칭 단수형)",
+              "base": "melt [melt]"
+            },
+            {
+              "word": "hardens",
+              "ko": "굳다, 단단해지다 (동사 harden의 3인칭 단수형)",
+              "base": "harden [ˈhɑːrdn]"
+            },
+            {
+              "word": "monument",
+              "ko": "기념물 (명사)",
+              "base": "monument [ˈmɑːnjumənt]"
+            }
+          ]
+        },
+        "L3": {
+          "title": "한곳에 모인 여러 모습",
+          "minutes": 6,
+          "paragraphs": [
+            [
+              "경상북도 경주시 문무대왕면 봉길리 해안에는 ",
+              "조금 특별한 바위가 드러나 있다. ",
+              "그 안에는 과거에 지진이 ",
+              "일어나던 순간이 그대로 굳어 있다. ",
+              "국가유산청은 이곳의 「경주 봉길리 슈도타킬라이트」를 ",
+              "국가지정자연유산 천연기념물로 지정 예고했다."
+            ],
+            [
+              "지진이 발생할 때 ",
+              "단층은 매우 빠르게 미끄러진다. ",
+              "이때 생긴 마찰열에 암석이 녹고, ",
+              "그 용융물은 단층면과 주변 균열을 따라 ",
+              "이동한 뒤 급격하게 식어 굳는다. ",
+              "슈도타킬라이트는 이렇게 만들어진 단층암이며, ",
+              "과거에 발생한 지진과 단층운동의 ",
+              "흔적을 직접 보여 주는 ",
+              "중요한 지질학적 기록이다."
+            ],
+            [
+              "봉길리의 슈도타킬라이트는 국내에서 ",
+              "이 암석이 어떤 모습으로 나타나는지, ",
+              "어떤 짜임과 성분을 지녔는지가 규명되어 ",
+              "학술적으로 보고된 최초의 사례다. ",
+              "암석이 처음 생긴 것이 아니라, ",
+              "그것을 학술적으로 읽어 낸 기록이 ",
+              "처음 생긴 것이다."
+            ],
+            [
+              "또 하나의 특징은 ",
+              "여러 형태가 한곳에 모여 있다는 점이다. ",
+              "단층을 따라 비교적 큰 암맥 형태로 ",
+              "나타나는 것이 단일암맥형이고, ",
+              "단층면을 따라 가느다란 세맥 형태로 ",
+              "나타나는 것이 단층세맥형이다. ",
+              "암석이 깨져 여러 모양으로 각진 것은 ",
+              "각력형이라고 한다. ",
+              "봉길리에서는 이 셋을 비롯한 ",
+              "여러 형태가 한곳에서 관찰된다."
+            ],
+            [
+              "여러 형태가 한자리에 있다는 것은 ",
+              "지진이 암석을 바꾸어 놓은 ",
+              "여러 단계를 한꺼번에 ",
+              "볼 수 있다는 뜻이다. ",
+              "암석이 부서지는 파쇄, ",
+              "마찰로 녹는 마찰용융, ",
+              "용융물이 이동하고 주입되는 과정, ",
+              "그리고 식어서 굳는 고결까지 ",
+              "종합적으로 살펴볼 수 있다. ",
+              "학술적 가치가 높다고 평가되는 까닭이다."
+            ],
+            [
+              "다만 지정 예고는 지정이 아니다. ",
+              "국가유산청은 30일 동안 ",
+              "지정 예고를 하고 ",
+              "국민의 의견을 수렴한다. ",
+              "그 뒤 국가유산위원회의 심의를 거쳐야 ",
+              "비로소 천연기념물로 지정된다. ",
+              "예고는 이렇게 정하려 한다고 ",
+              "미리 알리고 묻는 절차이고, ",
+              "지정은 그 절차를 마친 뒤의 결정이다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "단층암",
+              "easy": "단층이 움직이는 과정에서 만들어진 암석",
+              "hanja": "斷(끊을 단)+層(층 층)+岩(바위 암)"
+            },
+            {
+              "word": "용융물",
+              "easy": "열에 녹아 액체처럼 된 물질",
+              "hanja": "熔(녹일 용)+融(녹을 융)+物(물건 물)"
+            },
+            {
+              "word": "규명",
+              "easy": "확실하지 않던 것을 따져 밝혀냄",
+              "hanja": "糾(살필 규)+明(밝을 명)"
+            },
+            {
+              "word": "각력형",
+              "easy": "암석이 깨져 여러 모양으로 각지게 나타나는 형태",
+              "hanja": "角(뿔 각)+礫(조약돌 력)+形(모양 형)"
+            },
+            {
+              "word": "심의",
+              "easy": "안건을 자세히 살펴보고 논의함",
+              "hanja": "審(살필 심)+議(의논할 의)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 알맞은 것은?",
+              "choices": [
+                "지진의 순간 마찰열로 녹았다 굳은 단층암이 경주 봉길리에서 여러 형태로 관찰되어 천연기념물 지정 예고를 받았다",
+                "경주 봉길리 해안에 새 단층이 생겨 곧 지진이 일어날 것이다",
+                "슈도타킬라이트를 공장에서 만드는 기술이 개발되었다",
+                "국가유산위원회가 천연기념물 제도를 없애기로 했다"
+              ],
+              "answer": 0,
+              "explain": "마찰열에 녹았다 굳은 단층암이 여러 형태로 한곳에서 관찰되어 지정 예고되었다는 내용이다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "봉길리 슈도타킬라이트가 국내 최초라고 평가되는 지점은?",
+              "choices": [
+                "세계에서 가장 먼저 발견된 슈도타킬라이트라는 점",
+                "나타나는 모습과 암석의 짜임·성분이 규명되어 학술적으로 보고된 최초 사례라는 점",
+                "국내에서 가장 오래된 암석이라는 점",
+                "국내에서 단층이 있는 유일한 곳이라는 점"
+              ],
+              "answer": 1,
+              "explain": "암석이 처음 생긴 것이 아니라, 학술적으로 읽어 낸 보고가 처음이라는 뜻이다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "vocab",
+              "q": "「용융물」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "열에 녹아 액체처럼 된 물질",
+                "바닷물이 증발하고 남은 소금",
+                "암석 위에 쌓인 고운 모래",
+                "지진의 세기를 재는 기계"
+              ],
+              "answer": 0,
+              "explain": "마찰열에 녹은 암석이 용융물이 되어 단층면과 주변 균열을 따라 이동한다고 했다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "infer",
+              "q": "여러 형태가 한곳에서 관찰된다는 점이 중요한 까닭은?",
+              "choices": [
+                "암석의 색이 다양해 보기 좋아서",
+                "파쇄와 마찰용융, 이동·주입, 고결까지 여러 단계를 한자리에서 살펴볼 수 있어서",
+                "여러 형태를 모두 모으면 지진을 막을 수 있어서",
+                "형태가 많을수록 암석이 단단해져서"
+              ],
+              "answer": 1,
+              "explain": "여러 형태는 지진이 암석을 바꾸어 놓은 여러 단계를 한꺼번에 보여 준다.",
+              "evidencePara": 4
+            }
+          ],
+          "challenge": [
+            {
+              "type": "apply",
+              "q": "지정 예고 기간에 시민이 할 수 있는 일로 알맞은 것은?",
+              "choices": [
+                "암석을 떼어 가 집에 보관하는 일",
+                "국가유산위원회의 심의를 대신하는 일",
+                "예고 기간에 의견을 내는 일",
+                "천연기념물 지정을 혼자 결정하는 일"
+              ],
+              "answer": 2,
+              "explain": "국가유산청은 30일 동안 지정 예고를 하고 국민의 의견을 수렴한다.",
+              "evidencePara": 5
+            },
+            {
+              "type": "infer",
+              "q": "이 암석이 「기록」으로 남으려면 반드시 필요한 조건은?",
+              "choices": [
+                "녹았다가 굳은 상태가 흩어지지 않고 그대로 남아 있어야 한다",
+                "암석이 지금도 계속 녹아 있어야 한다",
+                "사람이 암석에 글자를 새겨야 한다",
+                "해마다 새 지진이 일어나야 한다"
+              ],
+              "answer": 0,
+              "explain": "용융물이 식어 굳은 자리가 그대로 남았기 때문에 흔적을 직접 보여 줄 수 있다.",
+              "evidencePara": 1
+            }
+          ],
+          "enseg": [
+            [
+              "On the shore of Bonggil-ri in Gyeongju, ",
+              "North Gyeongsang Province, ",
+              "an unusual rock is exposed. ",
+              "Inside it, the moment of a past earthquake ",
+              "is frozen in place. ",
+              "The Korea Heritage Service has given advance notice ",
+              "that it will become a natural monument."
+            ],
+            [
+              "During an earthquake a fault slips very fast. ",
+              "Friction heat melts the rock, ",
+              "and the melt moves along the fault plane ",
+              "and nearby fractures. ",
+              "Then it cools quickly and hardens. ",
+              "Pseudotachylyte is the fault rock made this way, ",
+              "and it shows the traces ",
+              "of past earthquakes and fault movement directly."
+            ],
+            [
+              "The Bonggil-ri rock is the first case in Korea ",
+              "where the way this rock appears, ",
+              "its texture and its chemistry ",
+              "have all been studied and reported. ",
+              "The rock itself is not new. ",
+              "What is new is the record ",
+              "that people finally read out of it."
+            ],
+            [
+              "Another feature is that several forms ",
+              "sit in one place. ",
+              "A thick vein runs along the fault. ",
+              "A thin vein runs along the fault plane. ",
+              "A third form is broken rock ",
+              "with angular pieces. ",
+              "At Bonggil-ri these three ",
+              "and other forms can be seen together."
+            ],
+            [
+              "Several forms in one place ",
+              "means several stages can be read at once: ",
+              "the crushing of the rock, ",
+              "the melting by friction, ",
+              "the movement of the melt into cracks, ",
+              "and the final hardening. ",
+              "That is why its academic value is high."
+            ],
+            [
+              "Still, advance notice is not designation. ",
+              "The service takes public opinion for thirty days. ",
+              "Only after a review by the national heritage committee ",
+              "does the rock become a natural monument. ",
+              "Notice asks; designation decides."
+            ]
+          ],
+          "en": [
+            "On the shore of Bonggil-ri in Gyeongju, North Gyeongsang Province, an unusual rock is exposed. Inside it, the moment of a past earthquake is frozen in place. The Korea Heritage Service has given advance notice that it will become a natural monument.",
+            "During an earthquake a fault slips very fast. Friction heat melts the rock, and the melt moves along the fault plane and nearby fractures. Then it cools quickly and hardens. Pseudotachylyte is the fault rock made this way, and it shows the traces of past earthquakes and fault movement directly.",
+            "The Bonggil-ri rock is the first case in Korea where the way this rock appears, its texture and its chemistry have all been studied and reported. The rock itself is not new. What is new is the record that people finally read out of it.",
+            "Another feature is that several forms sit in one place. A thick vein runs along the fault. A thin vein runs along the fault plane. A third form is broken rock with angular pieces. At Bonggil-ri these three and other forms can be seen together.",
+            "Several forms in one place means several stages can be read at once: the crushing of the rock, the melting by friction, the movement of the melt into cracks, and the final hardening. That is why its academic value is high.",
+            "Still, advance notice is not designation. The service takes public opinion for thirty days. Only after a review by the national heritage committee does the rock become a natural monument. Notice asks; designation decides."
+          ],
+          "envocab": [
+            {
+              "word": "fault",
+              "ko": "단층 (명사)",
+              "base": "fault [fɔːlt]"
+            },
+            {
+              "word": "fractures",
+              "ko": "균열, 갈라진 틈 (명사 fracture의 복수)",
+              "base": "fracture [ˈfræktʃər]"
+            },
+            {
+              "word": "texture",
+              "ko": "짜임, 조직 (명사)",
+              "base": "texture [ˈtekstʃər]"
+            },
+            {
+              "word": "vein",
+              "ko": "맥, 암맥 (명사)",
+              "base": "vein [veɪn]"
+            },
+            {
+              "word": "angular",
+              "ko": "각진 (형용사)",
+              "base": "angular [ˈæŋɡjələr]"
+            },
+            {
+              "word": "designation",
+              "ko": "지정 (명사)",
+              "base": "designation [ˌdezɪɡˈneɪʃn]"
+            }
+          ]
+        },
+        "L4": {
+          "title": "지진이 스스로 남긴 기록",
+          "minutes": 8,
+          "paragraphs": [
+            [
+              "기록은 보통 사람이 남긴다. ",
+              "그러나 사람이 아무것도 적지 않아도 ",
+              "사건이 스스로 남는 경우가 있다. ",
+              "경상북도 경주시 문무대왕면 봉길리 해안의 ",
+              "암석이 그런 경우다. ",
+              "국가유산청은 이곳의 「경주 봉길리 슈도타킬라이트」를 ",
+              "국가지정자연유산 천연기념물로 지정 예고했다."
+            ],
+            [
+              "슈도타킬라이트는 지진이 발생할 때 ",
+              "단층이 매우 빠르게 미끄러지면서 ",
+              "생긴 마찰열에 암석이 녹고, ",
+              "그 용융물이 단층면과 주변 균열을 따라 ",
+              "이동한 이후 급격하게 식어 굳어져 만들어진 단층암이다. ",
+              "녹은 물질이 흐르다 급격히 식었기 때문에, ",
+              "그 순간의 상태가 암석 안에 그대로 남는다. ",
+              "그래서 이 암석은 ",
+              "과거에 발생한 지진과 단층운동의 흔적을 ",
+              "직접 보여 주는 중요한 지질학적 기록이 된다."
+            ],
+            [
+              "기록이 성립하는 조건을 생각해 보면 이해가 쉽다. ",
+              "사건이 물질을 바꾸어 놓아야 하고, ",
+              "바뀐 상태가 흩어지지 않고 남아야 하며, ",
+              "뒷사람이 그것을 읽어 낼 수 있어야 한다. ",
+              "마찰열에 녹은 암석은 ",
+              "첫 번째 조건을, ",
+              "급격한 냉각과 고결은 ",
+              "두 번째 조건을 채운다. ",
+              "남은 하나는 사람의 몫이다."
+            ],
+            [
+              "봉길리의 암석은 ",
+              "바로 그 세 번째 조건이 채워진 자리다. ",
+              "국내에서 슈도타킬라이트의 산출 양상과 ",
+              "암석기재학적·지화학적 특징이 규명되어 ",
+              "학술적으로 보고된 최초의 사례이며, ",
+              "단일암맥형과 단층세맥형, 각력형 등 ",
+              "다양한 형태가 한곳에서 관찰된다. ",
+              "이를 통해 지진성 단층운동에 따른 ",
+              "암석의 파쇄와 마찰용융, ",
+              "용융물의 이동과 주입, 고결 과정을 ",
+              "종합적으로 살펴볼 수 있다."
+            ],
+            [
+              "규모도 눈에 띈다. ",
+              "이곳의 단일암맥형 슈도타킬라이트는 ",
+              "평균 약 21센티미터, 최대 40센티미터의 두께로 ",
+              "세계적으로도 매우 두꺼운 편이다. ",
+              "이러한 두께는 단층이 미끄러지는 과정에서 ",
+              "발생한 마찰열과 에너지의 영향을 받아 ",
+              "형성된 것으로 해석된다. ",
+              "또한 과거 한반도 남동부에서 발생한 ",
+              "대규모 지진성 단층운동의 특성과 ",
+              "단층작용 과정을 연구하는 데 ",
+              "중요한 자료로 평가된다."
+            ],
+            [
+              "보도자료는 이 암석을 두고 ",
+              "학술적 가치가 높고, ",
+              "지질유산으로서 보존 가치도 높다고 적었다. ",
+              "두 평가가 나란히 놓인 것을 보면, ",
+              "밝혀진 가치가 곧 보호의 근거가 된다고 ",
+              "읽을 수 있다. ",
+              "국가유산청은 30일 동안 지정 예고를 하여 ",
+              "국민의 의견을 수렴한 뒤, ",
+              "국가유산위원회의 심의를 거쳐 ",
+              "천연기념물로 지정할 예정이다. ",
+              "예고는 아직 지정이 아니며, ",
+              "그 사이에 놓인 의견 수렴과 심의가 ",
+              "결정의 절차다. ",
+              "국가유산청은 앞으로도 학술적 가치가 높은 ",
+              "지질유산을 발굴해 지역사회와 함께 ",
+              "보존해 나가겠다고 밝혔다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "파쇄",
+              "easy": "암석 등이 깨져 잘게 부서짐",
+              "hanja": "破(깨뜨릴 파)+碎(부술 쇄)"
+            },
+            {
+              "word": "고결",
+              "easy": "무르거나 녹았던 것이 굳어 단단해짐",
+              "hanja": "固(굳을 고)+結(맺을 결)"
+            },
+            {
+              "word": "산출",
+              "easy": "어떤 물질이 자연에서 나타나거나 나옴",
+              "hanja": "産(낳을 산)+出(날 출)"
+            },
+            {
+              "word": "근거",
+              "easy": "어떤 주장이나 결정을 뒷받침하는 까닭",
+              "hanja": "根(뿌리 근)+據(의거할 거)"
+            },
+            {
+              "word": "보존",
+              "easy": "잘 지켜 상하지 않게 남겨 둠",
+              "hanja": "保(지킬 보)+存(있을 존)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 가장 알맞은 것은?",
+              "choices": [
+                "지진의 순간이 암석에 기록되는 방식과, 그 학술적 가치가 밝혀져 천연기념물 지정 절차로 이어지는 과정",
+                "지진을 예측하는 새 장비의 개발 과정",
+                "경주 해안의 관광지 개발 계획",
+                "한반도 남동부에서 지진이 사라진 이유"
+              ],
+              "answer": 0,
+              "explain": "암석이 사건을 기록하는 방식과, 가치가 규명되어 지정 예고로 이어진 과정을 함께 다룬다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "봉길리 단일암맥형 슈도타킬라이트의 두께에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "평균 약 21센티미터, 최대 40센티미터로 세계적으로도 매우 두꺼운 편이다",
+                "평균 약 40센티미터, 최대 21센티미터다",
+                "어디서나 두께가 똑같이 21센티미터다",
+                "세계에서 가장 얇은 축에 든다"
+              ],
+              "answer": 0,
+              "explain": "평균 약 21센티미터, 최대 40센티미터의 두께로 세계적으로도 매우 두꺼운 편이라고 했다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "vocab",
+              "q": "「고결」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "무르거나 녹았던 것이 굳어 단단해지는 일",
+                "암석이 잘게 부서지는 일",
+                "돌이 물에 녹아 사라지는 일",
+                "열이 점점 올라가는 일"
+              ],
+              "answer": 0,
+              "explain": "용융물이 식어 굳는 과정을 고결이라고 한다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "infer",
+              "q": "「남은 하나는 사람의 몫이다」라는 문장의 뜻으로 알맞은 것은?",
+              "choices": [
+                "암석을 사람이 직접 녹여야 한다는 뜻",
+                "남아 있는 상태를 읽어 내어 보고하는 일은 연구하는 사람의 일이라는 뜻",
+                "암석을 사람이 다른 곳으로 옮겨야 한다는 뜻",
+                "지진을 사람이 일으킨다는 뜻"
+              ],
+              "answer": 1,
+              "explain": "기록의 세 조건 가운데 「뒷사람이 읽어 낼 수 있어야 한다」가 사람의 몫이다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "critical",
+              "q": "「밝혀진 가치가 곧 보호의 근거가 된다」는 읽기에 대한 평가로 가장 적절한 것은?",
+              "choices": [
+                "가치가 규명되어야 제도가 움직인다는 점에서 수긍할 만하지만, 아직 규명되지 않은 것도 보호가 필요할 수 있다",
+                "가치가 밝혀지지 않은 것은 보호할 필요가 전혀 없으므로 완전히 옳다",
+                "학술 연구는 보호와 아무 관련이 없으므로 완전히 틀렸다",
+                "천연기념물은 심의 없이 정해지므로 근거가 필요 없다"
+              ],
+              "answer": 0,
+              "explain": "글은 보도자료의 두 평가를 나란히 놓고 그렇게 읽었을 뿐이며, 미규명 대상의 보호가 필요 없다는 뜻은 아니다.",
+              "evidencePara": 5
+            }
+          ],
+          "challenge": [
+            {
+              "type": "apply",
+              "q": "다른 지역에서 비슷한 암석을 찾았을 때 이 글에 따라 가장 먼저 할 일은?",
+              "choices": [
+                "산출 양상과 암석의 짜임·성분을 조사해 학술적으로 보고하는 일",
+                "곧바로 기념품으로 만들어 파는 일",
+                "암석을 부수어 두께를 줄이는 일",
+                "지진이 다시 일어날 날짜를 발표하는 일"
+              ],
+              "answer": 0,
+              "explain": "봉길리도 산출 양상과 특징이 규명되어 학술적으로 보고되면서 가치가 드러났다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "critical",
+              "q": "「지정 예고」를 「지정」이라고 전하면 생기는 문제로 알맞은 것은?",
+              "choices": [
+                "의견 수렴과 심의라는 남은 절차를 없는 것처럼 만든다",
+                "암석의 두께가 달라진다",
+                "단층이 더 빨리 미끄러진다",
+                "마찰열이 사라진다"
+              ],
+              "answer": 0,
+              "explain": "예고 뒤에는 30일 의견 수렴과 국가유산위원회 심의가 남아 있다.",
+              "evidencePara": 5
+            }
+          ],
+          "enseg": [
+            [
+              "A record is usually left by a person. ",
+              "But sometimes an event leaves itself behind, ",
+              "with nobody writing anything down. ",
+              "The rock on the shore of Bonggil-ri, ",
+              "in Gyeongju, is like that. ",
+              "The Korea Heritage Service has given advance notice ",
+              "that it will become a natural monument."
+            ],
+            [
+              "Pseudotachylyte forms when a fault slips very fast ",
+              "during an earthquake. ",
+              "The friction heat melts the rock. ",
+              "The melt travels along the fault plane ",
+              "and the fractures around it, ",
+              "then cools suddenly and hardens ",
+              "into a fault rock."
+            ],
+            [
+              "Think about what a record needs. ",
+              "An event must change matter. ",
+              "The change must survive instead of scattering. ",
+              "And someone later must be able to read it. ",
+              "Melting meets the first condition, ",
+              "quick cooling meets the second. ",
+              "The third one is left to people."
+            ],
+            [
+              "Bonggil-ri is where that third condition was met. ",
+              "It is the first case in Korea ",
+              "in which the forms, the texture ",
+              "and the chemistry of pseudotachylyte ",
+              "were studied and reported. ",
+              "Thick veins, thin veins, angular broken rock ",
+              "and other forms appear in one place, ",
+              "so the crushing, the melting, ",
+              "the movement of the melt ",
+              "and the hardening can all be studied together."
+            ],
+            [
+              "The scale is striking too. ",
+              "The thick vein type here is about 21 centimeters ",
+              "on average and up to 40 centimeters, ",
+              "very thick even by world standards. ",
+              "The thickness is interpreted as a result ",
+              "of the friction heat and energy ",
+              "produced while the fault slipped. ",
+              "It is valued as important material ",
+              "for studying the character of past ",
+              "large-scale seismic fault movement ",
+              "in the southeast of the Korean Peninsula ",
+              "and the process of faulting."
+            ],
+            [
+              "The release calls the academic value of this rock high, ",
+              "and its value as geological heritage high as well. ",
+              "Set side by side, ",
+              "the two judgments can be read this way: ",
+              "a value that has been shown ",
+              "becomes a reason to protect. ",
+              "The service will take public opinion for thirty days, ",
+              "then a committee will review the case ",
+              "before the rock is designated. ",
+              "Notice is not designation yet."
+            ]
+          ],
+          "en": [
+            "A record is usually left by a person. But sometimes an event leaves itself behind, with nobody writing anything down. The rock on the shore of Bonggil-ri, in Gyeongju, is like that. The Korea Heritage Service has given advance notice that it will become a natural monument.",
+            "Pseudotachylyte forms when a fault slips very fast during an earthquake. The friction heat melts the rock. The melt travels along the fault plane and the fractures around it, then cools suddenly and hardens into a fault rock.",
+            "Think about what a record needs. An event must change matter. The change must survive instead of scattering. And someone later must be able to read it. Melting meets the first condition, quick cooling meets the second. The third one is left to people.",
+            "Bonggil-ri is where that third condition was met. It is the first case in Korea in which the forms, the texture and the chemistry of pseudotachylyte were studied and reported. Thick veins, thin veins, angular broken rock and other forms appear in one place, so the crushing, the melting, the movement of the melt and the hardening can all be studied together.",
+            "The scale is striking too. The thick vein type here is about 21 centimeters on average and up to 40 centimeters, very thick even by world standards. The thickness is interpreted as a result of the friction heat and energy produced while the fault slipped. It is valued as important material for studying the character of past large-scale seismic fault movement in the southeast of the Korean Peninsula and the process of faulting.",
+            "The release calls the academic value of this rock high, and its value as geological heritage high as well. Set side by side, the two judgments can be read this way: a value that has been shown becomes a reason to protect. The service will take public opinion for thirty days, then a committee will review the case before the rock is designated. Notice is not designation yet."
+          ],
+          "envocab": [
+            {
+              "word": "friction",
+              "ko": "마찰 (명사)",
+              "base": "friction [ˈfrɪkʃn]"
+            },
+            {
+              "word": "fractures",
+              "ko": "균열, 갈라진 틈 (명사 fracture의 복수)",
+              "base": "fracture [ˈfræktʃər]"
+            },
+            {
+              "word": "condition",
+              "ko": "조건 (명사)",
+              "base": "condition [kənˈdɪʃn]"
+            },
+            {
+              "word": "texture",
+              "ko": "짜임, 조직 (명사)",
+              "base": "texture [ˈtekstʃər]"
+            },
+            {
+              "word": "thickness",
+              "ko": "두께 (명사)",
+              "base": "thickness [ˈθɪknəs]"
+            },
+            {
+              "word": "designated",
+              "ko": "지정된 (동사 designate의 과거분사)",
+              "base": "designate [ˈdezɪɡneɪt]"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "cpr-four-minutes",
+      "category": "society",
+      "careers": [
+        "med",
+        "media"
+      ],
+      "issue": true,
+      "publishedAt": "2026-10-19",
+      "status": "published",
+      "sources": [
+        {
+          "title": "질병관리청 보도참고자료 — 생명을 살리는 골든타임을 아시나요 질병청「가슴 뛰게 하는 4분」 캠페인 시작 (2026.10.16)",
+          "url": "https://www.kdca.go.kr/bbs/kdca/42/312963/artclView.do"
+        }
+      ],
+      "levels": {
+        "L1": {
+          "title": "내가 먼저",
+          "minutes": 3,
+          "paragraphs": [
+            [
+              "우리 가슴 속에는 ",
+              "심장이 있어요. ",
+              "심장은 쉬지 않고 콩콩 뛰어요. ",
+              "그 덕분에 우리는 ",
+              "뛰어놀 수 있어요."
+            ],
+            [
+              "그런데 심장이 갑자기 ",
+              "멈출 때가 있어요. ",
+              "그때는 옆에 있던 사람이 ",
+              "바로 도와주어야 해요. ",
+              "도와주는 방법을 심폐소생술이라고 해요. ",
+              "처음 4분이 아주 중요해요."
+            ],
+            [
+              "그런데 많은 사람이 ",
+              "도와주지 못해요. ",
+              "「내가 해도 될까」 하고 ",
+              "겁이 나서 못 하기도 해요. ",
+              "이것을 망설임이라고 해요. ",
+              "「누군가 하겠지」 하고 기다리기도 해요."
+            ],
+            [
+              "나라에서는 「가슴 뛰게 하는 4분」이라는 ",
+              "이름으로 이 이야기를 ",
+              "알려 주고 있어요. ",
+              "「누군가 하겠지」보다 「내가 먼저」가 ",
+              "사람을 살려요."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "심장",
+              "easy": "가슴 속에서 쉬지 않고 뛰면서 온몸으로 피를 보내 주는 곳이에요.",
+              "hanja": null
+            },
+            {
+              "word": "심폐소생술",
+              "easy": "심장이 멈춘 사람을 곁에 있던 사람이 바로 도와주는 방법이에요.",
+              "hanja": null
+            },
+            {
+              "word": "망설임",
+              "easy": "할까 말까 하면서 바로 하지 못하고 머뭇거리는 마음이에요.",
+              "hanja": null
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글이 가장 하고 싶은 말은 무엇인가요?",
+              "choices": [
+                "「누군가 하겠지」 하고 기다리는 것이 좋다는 말",
+                "「내가 먼저」 도와주는 것이 사람을 살린다는 말",
+                "심장은 가끔 쉬어야 한다는 말",
+                "4분 동안은 아무것도 하지 않아야 한다는 말"
+              ],
+              "answer": 1,
+              "explain": "마지막 문단에서 「누군가 하겠지」보다 「내가 먼저」가 사람을 살린다고 했어요.",
+              "evidencePara": 3
+            },
+            {
+              "type": "detail",
+              "q": "많은 사람이 도와주지 못하는 까닭으로 글에 나온 것은 무엇인가요?",
+              "choices": [
+                "심장이 작아서",
+                "「내가 해도 될까」 하고 겁이 나서",
+                "시간이 많아서",
+                "친구가 없어서"
+              ],
+              "answer": 1,
+              "explain": "「내가 해도 될까」 하고 겁이 나서 못 하기도 한다고 했어요. 그 마음을 망설임이라고 해요.",
+              "evidencePara": 2
+            },
+            {
+              "type": "vocab",
+              "q": "「망설임」은 어떤 마음인가요?",
+              "choices": [
+                "아주 기쁜 마음",
+                "배가 고픈 마음",
+                "할까 말까 하며 머뭇거리는 마음",
+                "빨리 자고 싶은 마음"
+              ],
+              "answer": 2,
+              "explain": "할까 말까 하면서 바로 하지 못하고 머뭇거리는 마음이 망설임이에요.",
+              "evidencePara": 2
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "글에서 「처음 4분이 아주 중요해요」라고 한 까닭은 무엇일까요?",
+              "choices": [
+                "4분이 지나면 배가 고파서",
+                "그 짧은 동안에 곁에 있던 사람이 도와주어야 해서",
+                "4분마다 종이 울려서",
+                "4분 동안 잠을 자야 해서"
+              ],
+              "answer": 1,
+              "explain": "심장이 멈추면 옆에 있던 사람이 바로 도와주어야 한다고 했어요. 그래서 처음 4분이 중요하다고 생각해 볼 수 있어요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "apply",
+              "q": "친구가 「나는 무서워서 못 하겠어」라고 해요. 이 글에 맞는 말은 무엇일까요?",
+              "choices": [
+                "「그럼 아무 말도 하지 마」",
+                "「무서운 마음이 망설임이야. 그래도 내가 먼저 하면 사람을 살릴 수 있어」",
+                "「4분은 너무 길어」",
+                "「심장은 멈추지 않아」"
+              ],
+              "answer": 1,
+              "explain": "겁이 나는 마음이 망설임이고, 「내가 먼저」가 사람을 살린다고 했어요.",
+              "evidencePara": 3
+            }
+          ]
+        },
+        "L2": {
+          "title": "4분을 가진 사람",
+          "minutes": 4,
+          "paragraphs": [
+            [
+              "심장이 갑자기 멈추는 일을 ",
+              "심정지라고 한다. ",
+              "이때 곁에 있는 사람이 바로 하는 ",
+              "응급처치가 심폐소생술이다. ",
+              "질병관리청은 세계 심장소생의 날인 ",
+              "10월 16일에 맞추어 ",
+              "「가슴 뛰게 하는 4분」 캠페인을 ",
+              "한 달 동안 벌이기로 했다."
+            ],
+            [
+              "이름에 들어간 4분은 ",
+              "골든타임을 가리킨다. ",
+              "캠페인은 골든타임 4분의 중요성과, ",
+              "멈춘 심장을 다시 뛰게 한다는 뜻을 ",
+              "함께 담았다. ",
+              "임승관 질병관리청장은 ",
+              "현장에 있는 사람의 ",
+              "신속한 행동이 무엇보다 중요하다고 했다. ",
+              "그렇다면 4분 안에 닿을 수 있는 ",
+              "사람은 이미 그 자리에 ",
+              "있던 사람이라고 볼 수 있다."
+            ],
+            [
+              "그런데 실제 현장에서는 ",
+              "그 손이 잘 나오지 않는다. ",
+              "질병관리청은 시행에 대한 ",
+              "두려움과 망설임 때문에 ",
+              "신속한 초기 대응이 이루어지지 못하는 경우가 ",
+              "있다고 했다."
+            ],
+            [
+              "그래서 캠페인은 망설임을 겨눈다. ",
+              "길거리 인터뷰는 ",
+              "사람들에게 망설이는 까닭을 묻고, ",
+              "「만약 쓰러진 사람이 당신의 가족이라면?」이라고 되묻는다. ",
+              "심폐소생술 다짐 챌린지는 ",
+              "먼저 행동하겠다는 다짐을 모으고, ",
+              "인플루언서들은 「4분의 기적」 릴레이를 잇는다."
+            ],
+            [
+              "캠페인 영상에는 ",
+              "코미디언 김수용 씨가 나온다. ",
+              "그는 실제로 심정지를 겪은 뒤 ",
+              "주변 사람의 심폐소생술로 ",
+              "생명을 되찾았다. ",
+              "그는 자신이 ",
+              "다시 살아갈 수 있었던 것은 ",
+              "누군가 망설이지 않고 ",
+              "행동해 준 덕분이라고 말했다. ",
+              "「누군가 하겠지」보다 「내가 먼저」, ",
+              "그것이 이 캠페인이 하고 싶은 말이다."
+            ]
+          ],
+          "en": [
+            "A heart that suddenly stops is called cardiac arrest. The first aid that a person standing nearby gives at that moment is CPR. The Korea Disease Control and Prevention Agency will run a campaign called “Four Minutes That Make the Heart Beat” for one month, starting on October 16, the day Korea calls 세계 심장소생의 날 (the world day for heart resuscitation).",
+            "The four minutes in the name points to the golden time. The campaign holds together the importance of those four minutes and the meaning of making a stopped heart beat again. Commissioner Lim Seung-kwan said that the quick action of the person on the spot matters more than anything. That suggests that the person who can reach the spot within four minutes is the one who was already standing there.",
+            "Yet in the real field that hand often does not appear. The agency said that fear and hesitation about doing CPR sometimes keep a quick first response from happening.",
+            "So the campaign aims at the hesitation. Street interviews ask people why they hesitate, and ask back, “What if the person who collapsed were your family?” A CPR pledge challenge gathers promises to act first, and influencers carry on a “Miracle of Four Minutes” relay.",
+            "The campaign video features the comedian Kim Su-yong. He went through cardiac arrest himself and got his life back through CPR given by people around him. He said that he was able to live again because someone acted without hesitating. “I will go first,” rather than “someone else will” — that is what this campaign wants to say."
+          ],
+          "enseg": [
+            [
+              "A heart that suddenly stops ",
+              "is called cardiac arrest. ",
+              "The first aid ",
+              "that a person standing nearby gives ",
+              "at that moment ",
+              "is CPR. ",
+              "The Korea Disease Control and Prevention Agency ",
+              "will run a campaign ",
+              "called “Four Minutes That Make the Heart Beat” ",
+              "for one month, ",
+              "starting on October 16, ",
+              "the day Korea calls 세계 심장소생의 날 ",
+              "(the world day for heart resuscitation)."
+            ],
+            [
+              "The four minutes in the name ",
+              "points to the golden time. ",
+              "The campaign holds together ",
+              "the importance of those four minutes ",
+              "and the meaning of making ",
+              "a stopped heart beat again. ",
+              "Commissioner Lim Seung-kwan said ",
+              "that the quick action of the person on the spot ",
+              "matters more than anything. ",
+              "That suggests that the person ",
+              "who can reach the spot within four minutes ",
+              "is the one who was already standing there."
+            ],
+            [
+              "Yet in the real field ",
+              "that hand often does not appear. ",
+              "The agency said that fear and hesitation ",
+              "about doing CPR ",
+              "sometimes keep a quick first response ",
+              "from happening."
+            ],
+            [
+              "So the campaign aims at the hesitation. ",
+              "Street interviews ask people ",
+              "why they hesitate, ",
+              "and ask back, ",
+              "“What if the person who collapsed ",
+              "were your family?” ",
+              "A CPR pledge challenge ",
+              "gathers promises to act first, ",
+              "and influencers carry on ",
+              "a “Miracle of Four Minutes” relay."
+            ],
+            [
+              "The campaign video features ",
+              "the comedian Kim Su-yong. ",
+              "He went through cardiac arrest himself ",
+              "and got his life back ",
+              "through CPR given by people around him. ",
+              "He said that he was able to live again ",
+              "because someone acted without hesitating. ",
+              "“I will go first,” ",
+              "rather than “someone else will” — ",
+              "that is what this campaign wants to say."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "arrest",
+              "ko": "(심장) 정지, 멈춤 (명사)",
+              "base": "arrest [əˈrest]"
+            },
+            {
+              "word": "hesitation",
+              "ko": "망설임 (명사)",
+              "base": "hesitation [ˌhezɪˈteɪʃn]"
+            },
+            {
+              "word": "pledge",
+              "ko": "다짐, 서약 (명사)",
+              "base": "pledge [pledʒ]"
+            },
+            {
+              "word": "relay",
+              "ko": "이어 가기, 릴레이 (명사)",
+              "base": "relay [ˈriːleɪ]"
+            },
+            {
+              "word": "collapsed",
+              "ko": "쓰러진 (동사 collapse의 과거형)",
+              "base": "collapse [kəˈlæps]"
+            },
+            {
+              "word": "response",
+              "ko": "대응, 반응 (명사)",
+              "base": "response [rɪˈspɑːns]"
+            }
+          ],
+          "vocab": [
+            {
+              "word": "심정지",
+              "easy": "뛰고 있던 심장이 갑자기 멈추는 일",
+              "hanja": "心(마음 심)+停(머무를 정)+止(그칠 지)"
+            },
+            {
+              "word": "응급처치",
+              "easy": "병원에 가기 전에 그 자리에서 급하게 하는 처치",
+              "hanja": "應(응할 응)+急(급할 급)+處(곳 처)+置(둘 치)"
+            },
+            {
+              "word": "골든타임",
+              "easy": "그 안에 손을 쓰면 결과가 크게 달라지는, 처음의 짧은 시간",
+              "hanja": null
+            },
+            {
+              "word": "망설임",
+              "easy": "할지 말지 마음을 정하지 못하고 머뭇거리는 것",
+              "hanja": null
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 가장 알맞은 것은 무엇인가?",
+              "choices": [
+                "심폐소생술을 하는 방법을 자세히 알려 주는 글이다",
+                "캠페인이 겨누는 것은 망설임이라는 글이다",
+                "유튜브 채널을 소개하는 글이다",
+                "병원을 더 짓자고 주장하는 글이다"
+              ],
+              "answer": 1,
+              "explain": "질병관리청은 시행에 대한 두려움과 망설임 때문에 신속한 초기 대응이 이루어지지 못하는 경우가 있다고 했고, 캠페인은 그 망설임을 겨눈다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "detail",
+              "q": "「가슴 뛰게 하는 4분」 캠페인에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "세계 심장소생의 날인 10월 16일에 맞추어 한 달 동안 한다",
+                "1년 내내 쉬지 않고 한다",
+                "10월 16일 하루만 한다",
+                "날짜는 아직 정해지지 않았다"
+              ],
+              "answer": 0,
+              "explain": "질병관리청이 세계 심장소생의 날인 10월 16일에 맞추어 한 달 동안 벌이기로 했다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "vocab",
+              "q": "「골든타임」의 뜻으로 가장 알맞은 것은?",
+              "choices": [
+                "금으로 만든 시계",
+                "하루 가운데 가장 더운 때",
+                "그 안에 손을 쓰면 결과가 크게 달라지는 처음의 짧은 시간",
+                "방송이 가장 많이 나가는 시간"
+              ],
+              "answer": 2,
+              "explain": "캠페인의 4분은 골든타임을 가리키고, 그 짧은 시간 안의 행동이 결과를 가른다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "infer",
+              "q": "글이 「4분 안에 닿을 수 있는 사람은 이미 그 자리에 있던 사람」이라고 본 까닭은?",
+              "choices": [
+                "멀리 있는 사람은 힘이 약해서",
+                "골든타임이 4분이라서 멀리서 오는 사람은 그 안에 닿기 어려워서",
+                "그 자리에 있던 사람이 더 잘 배워서",
+                "멀리 있는 사람은 부르면 화를 내서"
+              ],
+              "answer": 1,
+              "explain": "캠페인은 골든타임 4분의 중요성을 담았고, 임승관 청장은 현장에 있는 사람의 신속한 행동이 무엇보다 중요하다고 했다. 글은 그 둘에서 이 생각을 끌어냈다.",
+              "evidencePara": 1
+            }
+          ],
+          "challenge": [
+            {
+              "type": "apply",
+              "q": "길거리 인터뷰가 「만약 쓰러진 사람이 당신의 가족이라면?」이라고 되묻는 것은 무엇을 하려는 것인가?",
+              "choices": [
+                "가족 관계를 조사하려고",
+                "망설이던 마음을 내 일로 바꾸어 행동 쪽으로 밀어 주려고",
+                "인터뷰 시간을 늘리려고",
+                "가족이 없는 사람을 찾으려고"
+              ],
+              "answer": 1,
+              "explain": "캠페인은 망설임을 겨눈다. 남의 일이던 장면을 내 가족의 일로 옮겨 놓는 질문이다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "infer",
+              "q": "김수용 씨를 캠페인 영상에 세운 까닭으로 가장 알맞은 것은?",
+              "choices": [
+                "유명해서 사람을 많이 모으려고",
+                "망설이지 않은 누군가 덕분에 살아난 사람이라서 그 말에 힘이 실려서",
+                "코미디언이라 웃기려고",
+                "심폐소생술을 가르칠 수 있어서"
+              ],
+              "answer": 1,
+              "explain": "그는 주변 사람의 심폐소생술로 생명을 되찾았고, 누군가 망설이지 않고 행동해 준 덕분이라고 말했다.",
+              "evidencePara": 4
+            }
+          ]
+        },
+        "L3": {
+          "title": "32.9%와 2.7배",
+          "minutes": 5,
+          "paragraphs": [
+            [
+              "질병관리청(청장 임승관)이 ",
+              "세계 심장소생의 날인 10월 16일부터 ",
+              "한 달간 「가슴 뛰게 하는 4분」 캠페인을 ",
+              "추진한다고 밝혔다. ",
+              "심정지가 일어났을 때 ",
+              "곁에 있는 사람이 주저하지 않고 ",
+              "심폐소생술에 나서도록 이끄는 것이 목표다."
+            ],
+            [
+              "이 캠페인을 읽으려면 숫자를 ",
+              "두 갈래로 나누어 보아야 한다. ",
+              "하나는 얼마나 하고 있는가다. ",
+              "2025년 상반기 급성심장정지조사에 따르면 ",
+              "일반인 심폐소생술 시행률은 ",
+              "32.9%로 4,500건이었다. ",
+              "전년 같은 기간의 30.2%보다 2.7%p 올랐지만, ",
+              "질병관리청은 여전히 낮은 수준이라고 보았다. ",
+              "32.9%는 살아난 비율이 아니라, ",
+              "곁에 있던 사람이 ",
+              "심폐소생술을 시행한 비율이다."
+            ],
+            [
+              "다른 하나는 했을 때 무엇이 달라지는가다. ",
+              "일반인이 심폐소생술을 시행한 경우 ",
+              "생존율은 15.3%, ",
+              "뇌기능회복률은 11.5%였다. ",
+              "시행하지 않은 경우는 ",
+              "각각 5.6%와 3.3%였다. ",
+              "약 2.7배와 3.5배 차이다. ",
+              "앞 문단의 2.7%p와 여기의 2.7배는 ",
+              "전혀 다른 수다. ",
+              "하나는 한 해 사이에 오른 폭이고, ",
+              "다른 하나는 두 경우를 견준 비율이다."
+            ],
+            [
+              "그렇다면 남는 물음은 하나다. ",
+              "왜 하지 않는가. ",
+              "질병관리청은 심폐소생술이 ",
+              "생존 가능성을 높이는 중요한 응급처치인데도, ",
+              "실제 현장에서는 시행에 대한 두려움과 망설임 때문에 ",
+              "신속한 초기 대응이 이루어지지 못하는 경우가 ",
+              "있다고 짚었다. ",
+              "캠페인이 겨눈 과녁도 바로 그 망설임이다."
+            ],
+            [
+              "그래서 프로그램은 ",
+              "마음 쪽과 손 쪽에 나란히 놓였다. ",
+              "길거리 인터뷰는 망설이는 까닭을 묻고, ",
+              "다짐 챌린지는 ",
+              "먼저 행동하겠다는 다짐을 모은다. ",
+              "분야별 인플루언서와 함께하는 ",
+              "「4분의 기적」 릴레이는 ",
+              "심폐소생술의 중요성과 올바른 시행 방법을 알린다. ",
+              "교육영상은 2025년 개정된 심폐소생술 가이드라인을 바탕으로 ",
+              "여성과 영유아 등 대상별 ",
+              "시행 방법과 주의 사항을 안내한다. ",
+              "방송사 협업 프로그램은 ",
+              "일반인 시행률이 상대적으로 낮은 지역을 찾아가 ",
+              "자동심장충격기 찾기 같은 미션을 수행한다."
+            ]
+          ],
+          "en": [
+            "The Korea Disease Control and Prevention Agency (Commissioner Lim Seung-kwan) announced that it will run the “Four Minutes That Make the Heart Beat” campaign for one month from October 16, the day Korea calls 세계 심장소생의 날 (the world day for heart resuscitation). The aim is to lead the person standing nearby, when cardiac arrest happens, to begin CPR without hesitating.",
+            "To read this campaign you have to sort the numbers into two kinds. The first is how much it is being done. According to the survey of acute cardiac arrest for the first half of 2025, the rate at which ordinary people performed CPR was 32.9 percent, or 4,500 cases. That is 2.7 percentage points higher than the 30.2 percent of the same period a year earlier, but the agency still called it low. The 32.9 percent is not the share of people who survived; it is the share of cases in which a person nearby performed CPR.",
+            "The second is what changes when it is done. Where an ordinary person performed CPR, the survival rate was 15.3 percent and the rate of recovery of brain function was 11.5 percent. Where no one did, the figures were 5.6 percent and 3.3 percent. That is about 2.7 times and 3.5 times. The 2.7 percentage points in the paragraph above and the 2.7 times here are entirely different numbers. One is how much the rate rose in a year; the other is a ratio between two cases.",
+            "Then one question is left. Why do people not do it? The agency pointed out that, although CPR is an important first aid that raises the chance of survival, in the real field fear and hesitation about performing it sometimes keep a quick first response from happening. The target the campaign aims at is exactly that hesitation.",
+            "So the programs are laid out on the side of the mind and the side of the hands alike. Street interviews ask why people hesitate, and the pledge challenge gathers promises to act first. The “Miracle of Four Minutes” relay, carried on with influencers in various fields, explains why CPR matters and how to perform it correctly. The teaching video, based on the CPR guidelines revised in 2025, explains how to perform CPR for women, infants and other groups, and what to be careful about. A program made with a broadcaster visits regions where the rate among ordinary people is relatively low and carries out missions such as finding an automated external defibrillator."
+          ],
+          "enseg": [
+            [
+              "The Korea Disease Control and Prevention Agency ",
+              "(Commissioner Lim Seung-kwan) ",
+              "announced that it will run ",
+              "the “Four Minutes That Make the Heart Beat” campaign ",
+              "for one month from October 16, ",
+              "the day Korea calls 세계 심장소생의 날 ",
+              "(the world day for heart resuscitation). ",
+              "The aim is to lead the person standing nearby, ",
+              "when cardiac arrest happens, ",
+              "to begin CPR without hesitating."
+            ],
+            [
+              "To read this campaign ",
+              "you have to sort the numbers into two kinds. ",
+              "The first is how much it is being done. ",
+              "According to the survey of acute cardiac arrest ",
+              "for the first half of 2025, ",
+              "the rate at which ordinary people performed CPR ",
+              "was 32.9 percent, or 4,500 cases. ",
+              "That is 2.7 percentage points higher ",
+              "than the 30.2 percent of the same period a year earlier, ",
+              "but the agency still called it low. ",
+              "The 32.9 percent is not the share of people who survived; ",
+              "it is the share of cases ",
+              "in which a person nearby performed CPR."
+            ],
+            [
+              "The second is what changes when it is done. ",
+              "Where an ordinary person performed CPR, ",
+              "the survival rate was 15.3 percent ",
+              "and the rate of recovery of brain function was 11.5 percent. ",
+              "Where no one did, ",
+              "the figures were 5.6 percent and 3.3 percent. ",
+              "That is about 2.7 times and 3.5 times. ",
+              "The 2.7 percentage points in the paragraph above ",
+              "and the 2.7 times here ",
+              "are entirely different numbers. ",
+              "One is how much the rate rose in a year; ",
+              "the other is a ratio between two cases."
+            ],
+            [
+              "Then one question is left. ",
+              "Why do people not do it? ",
+              "The agency pointed out that, ",
+              "although CPR is an important first aid ",
+              "that raises the chance of survival, ",
+              "in the real field fear and hesitation about performing it ",
+              "sometimes keep a quick first response from happening. ",
+              "The target the campaign aims at ",
+              "is exactly that hesitation."
+            ],
+            [
+              "So the programs are laid out ",
+              "on the side of the mind ",
+              "and the side of the hands alike. ",
+              "Street interviews ask why people hesitate, ",
+              "and the pledge challenge ",
+              "gathers promises to act first. ",
+              "The “Miracle of Four Minutes” relay, ",
+              "carried on with influencers in various fields, ",
+              "explains why CPR matters ",
+              "and how to perform it correctly. ",
+              "The teaching video, ",
+              "based on the CPR guidelines revised in 2025, ",
+              "explains how to perform CPR ",
+              "for women, infants and other groups, ",
+              "and what to be careful about. ",
+              "A program made with a broadcaster ",
+              "visits regions where the rate among ordinary people is relatively low ",
+              "and carries out missions ",
+              "such as finding an automated external defibrillator."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "survival",
+              "ko": "생존 (명사)",
+              "base": "survival [sərˈvaɪvl]"
+            },
+            {
+              "word": "hesitation",
+              "ko": "망설임 (명사)",
+              "base": "hesitation [ˌhezɪˈteɪʃn]"
+            },
+            {
+              "word": "ratio",
+              "ko": "비, 비율 (명사)",
+              "base": "ratio [ˈreɪʃioʊ]"
+            },
+            {
+              "word": "percentage",
+              "ko": "백분율 (명사) — percentage point 는 %p",
+              "base": "percentage [pərˈsentɪdʒ]"
+            },
+            {
+              "word": "guidelines",
+              "ko": "지침, 가이드라인 (명사)",
+              "base": "guideline [ˈɡaɪdlaɪn]"
+            },
+            {
+              "word": "defibrillator",
+              "ko": "제세동기, 심장충격기 (명사)",
+              "base": "defibrillator [diːˈfɪbrɪleɪtər]"
+            }
+          ],
+          "vocab": [
+            {
+              "word": "심정지",
+              "easy": "뛰고 있던 심장이 갑자기 멈추는 일",
+              "hanja": "心(마음 심)+停(머무를 정)+止(그칠 지)"
+            },
+            {
+              "word": "시행률",
+              "easy": "그 일을 실제로 한 경우가 전체 가운데 얼마나 되는지를 나타낸 비율",
+              "hanja": "施(베풀 시)+行(다닐 행)+率(비율 률)"
+            },
+            {
+              "word": "생존율",
+              "easy": "살아난 사람이 전체 가운데 얼마나 되는지를 나타낸 비율",
+              "hanja": "生(날 생)+存(있을 존)+率(비율 률)"
+            },
+            {
+              "word": "뇌기능회복률",
+              "easy": "살아난 데에서 한 걸음 더 들어가, 뇌의 기능까지 돌아온 경우의 비율",
+              "hanja": "腦(뇌 뇌)+機(틀 기)+能(능할 능)+回(돌아올 회)+復(회복할 복)+率(비율 률)"
+            },
+            {
+              "word": "응급처치",
+              "easy": "병원으로 옮기기 전에 그 자리에서 급히 하는 처치",
+              "hanja": "應(응할 응)+急(급할 급)+處(곳 처)+置(둘 치)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 생각으로 가장 알맞은 것은?",
+              "choices": [
+                "심폐소생술 시행률이 이미 충분히 높다",
+                "숫자는 얼마나 하고 있는가와 했을 때 무엇이 달라지는가로 나누어 읽어야 하고, 캠페인이 겨눈 것은 망설임이다",
+                "캠페인은 병원 수를 늘리려는 것이다",
+                "자동심장충격기만 있으면 된다"
+              ],
+              "answer": 1,
+              "explain": "글은 숫자를 두 갈래로 나누어 읽고, 캠페인이 겨눈 과녁은 망설임이라고 밝힌다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "detail",
+              "q": "2025년 상반기 급성심장정지조사에 나온 일반인 심폐소생술 시행률은?",
+              "choices": [
+                "32.9%",
+                "30.2%",
+                "15.3%",
+                "11.5%"
+              ],
+              "answer": 0,
+              "explain": "시행률은 32.9%로 4,500건이었고, 전년 같은 기간은 30.2%였다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "글에서 말한 「시행률 32.9%」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "살아난 사람의 비율",
+                "곁에 있던 사람이 심폐소생술을 시행한 비율",
+                "한 해 사이에 오른 폭",
+                "병원에 도착한 사람의 비율"
+              ],
+              "answer": 1,
+              "explain": "32.9%는 살아난 비율이 아니라, 곁에 있던 사람이 심폐소생술을 시행한 비율이다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "infer",
+              "q": "2.7%p와 2.7배를 섞어 쓰면 안 되는 까닭은?",
+              "choices": [
+                "둘 다 같은 뜻이라 번갈아 써도 되기 때문",
+                "2.7%p가 2.7배보다 항상 크기 때문",
+                "하나는 한 해 사이에 오른 폭이고 다른 하나는 두 경우를 견준 비율이라 뜻이 다르기 때문",
+                "배수는 숫자가 아니기 때문"
+              ],
+              "answer": 2,
+              "explain": "2.7%p는 30.2%에서 32.9%로 오른 폭이고, 2.7배는 시행했을 때와 하지 않았을 때의 생존율을 견준 비율이다.",
+              "evidencePara": 2
+            }
+          ],
+          "challenge": [
+            {
+              "type": "apply",
+              "q": "「심폐소생술을 하면 생존율이 32.9%가 된다」는 문장을 읽었다. 이 글에 비추어 어디가 틀렸는가?",
+              "choices": [
+                "32.9%는 시행률이고, 시행했을 때 생존율은 15.3%다",
+                "32.9%는 뇌기능회복률이다",
+                "생존율은 30.2%다",
+                "틀린 곳이 없다"
+              ],
+              "answer": 0,
+              "explain": "32.9%는 시행률이다. 시행한 경우 생존율은 15.3%, 시행하지 않은 경우는 5.6%였다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "infer",
+              "q": "교육영상과 길거리 인터뷰가 함께 들어간 까닭으로 가장 알맞은 것은?",
+              "choices": [
+                "영상 시간을 채우려고",
+                "방법을 알리는 일과 망설임을 줄이는 일을 함께 겨냥하기 때문",
+                "인터뷰가 더 재미있어서",
+                "가이드라인을 팔기 위해서"
+              ],
+              "answer": 1,
+              "explain": "교육영상과 「4분의 기적」 릴레이는 시행 방법을 안내하고, 길거리 인터뷰와 다짐 챌린지는 망설임을 다룬다.",
+              "evidencePara": 4
+            }
+          ]
+        },
+        "L4": {
+          "title": "아는 것과 하는 것 사이",
+          "minutes": 7,
+          "paragraphs": [
+            [
+              "어떤 지식은 알고 있다는 것만으로는 ",
+              "아무 일도 하지 않는다. ",
+              "심폐소생술이 그렇다. ",
+              "질병관리청(청장 임승관)이 세계 심장소생의 날인 10월 16일부터 ",
+              "한 달간 추진하는 ",
+              "「가슴 뛰게 하는 4분」 캠페인은, ",
+              "바로 그 「아는 것」과 「하는 것」 사이의 ",
+              "간격을 겨냥한다."
+            ],
+            [
+              "시행이 얼마나 이루어지는지는 조사로 드러난다. ",
+              "2025년 상반기 급성심장정지조사에서 ",
+              "일반인 심폐소생술 시행률은 32.9%, ",
+              "건수로는 4,500건이었다. ",
+              "전년 동기 30.2%보다 2.7%p 오른 수치이지만 ",
+              "질병관리청은 여전히 낮은 수준이라고 적었다. ",
+              "읽을 때 주의할 것이 있다. ",
+              "32.9%는 살아난 사람의 비율이 아니라 ",
+              "곁에 있던 사람이 손을 내민 비율이고, ",
+              "2.7%p는 그 비율이 ",
+              "한 해 사이에 움직인 폭이다."
+            ],
+            [
+              "손을 내밀었을 때 무엇이 갈리는지는 ",
+              "다른 숫자가 보여 준다. ",
+              "일반인 심폐소생술을 시행한 경우 ",
+              "생존율은 15.3%, 뇌기능회복률은 11.5%였고, ",
+              "시행하지 않은 경우는 각각 5.6%와 3.3%였다. ",
+              "약 2.7배와 3.5배다. ",
+              "눈여겨볼 것은 두 배수가 같지 않다는 점이다. ",
+              "배수로 보면 뇌기능회복률 쪽이 더 크다. ",
+              "뇌기능회복률은 이름 그대로 ",
+              "뇌의 기능이 돌아온 경우의 비율이다."
+            ],
+            [
+              "캠페인은 방법 교육과 함께 ",
+              "망설임 자체를 겨냥한다. ",
+              "질병관리청은 심폐소생술이 ",
+              "심정지 환자의 생존 가능성을 높이는 ",
+              "중요한 응급처치이지만, ",
+              "실제 현장에서는 시행에 대한 두려움과 망설임으로 ",
+              "신속한 초기 대응이 이루어지지 못하는 경우가 있다고 진단했다. ",
+              "모르는 것이 문제라면 교육을 늘리면 된다. ",
+              "주저하는 것이 문제라면 ",
+              "겨눌 자리는 다른 곳이다."
+            ],
+            [
+              "그래서 프로그램은 망설임을 정면으로 다룬다. ",
+              "길거리 인터뷰는 ",
+              "사람들에게 망설이는 까닭을 직접 묻고 ",
+              "「만약 쓰러진 사람이 당신의 가족이라면?」이라고 되묻는다. ",
+              "심폐소생술 다짐 챌린지는 ",
+              "먼저 행동하겠다는 다짐을 모으고, ",
+              "분야별 인플루언서와 함께하는 「4분의 기적」 릴레이는 ",
+              "심폐소생술의 중요성과 올바른 시행 방법을 알린다. ",
+              "캠페인 영상에는 ",
+              "실제 심정지 후 주변 사람의 심폐소생술로 생명을 되찾은 ",
+              "코미디언 김수용 씨가 출연해, ",
+              "자신이 다시 살아갈 수 있었던 것은 ",
+              "누군가 망설이지 않고 행동해 준 덕분이라고 말한다. ",
+              "「누군가 하겠지」보다 「내가 먼저」라는 것이다."
+            ],
+            [
+              "물론 방법도 함께 간다. ",
+              "교육영상은 2025년 개정된 심폐소생술 가이드라인을 바탕으로 ",
+              "여성과 영유아 등 대상별 ",
+              "시행 방법과 주의 사항을 안내하고, ",
+              "방송사 협업 프로그램은 ",
+              "일반인 시행률이 상대적으로 낮은 지역을 찾아가 ",
+              "자동심장충격기 찾기 같은 미션을 수행한다. ",
+              "임승관 청장은 ",
+              "심정지 환자의 생명을 살리려면 ",
+              "현장에 있는 사람의 신속한 행동이 ",
+              "무엇보다 중요하다며, ",
+              "이번 캠페인으로 심폐소생술에 대한 두려움과 망설임을 줄이고 ",
+              "누구나 소중한 생명을 살리는 ",
+              "첫 행동에 나서는 계기가 되기를 바란다고 밝혔다. ",
+              "골든타임이 4분이라면, ",
+              "그 안에 닿을 수 있는 사람은 ",
+              "이미 그 자리에 있던 사람이라고 볼 수 있다."
+            ]
+          ],
+          "en": [
+            "Some knowledge does nothing by being known. CPR is like that. The “Four Minutes That Make the Heart Beat” campaign, which the Korea Disease Control and Prevention Agency (Commissioner Lim Seung-kwan) runs for one month from October 16, the day Korea calls 세계 심장소생의 날 (the world day for heart resuscitation), aims at exactly that gap between knowing and doing.",
+            "The size of the gap shows up in a survey. In the survey of acute cardiac arrest for the first half of 2025, the rate at which ordinary people performed CPR was 32.9 percent, or 4,500 cases. That is 2.7 percentage points above the 30.2 percent of the same period a year earlier, yet the agency wrote that it is still low. One thing needs care in the reading. The 32.9 percent is not the share of people who survived but the share of cases in which someone nearby put out a hand, and the 2.7 percentage points is how far that share moved in a year.",
+            "What divides once a hand is put out is shown by other numbers. Where ordinary people performed CPR, the survival rate was 15.3 percent and the rate of recovery of brain function 11.5 percent; where they did not, the figures were 5.6 percent and 3.3 percent. That is about 2.7 times and 3.5 times. What deserves attention is that the two multiples are not the same. Measured as a multiple, the figure for recovery of brain function is the larger. Recovery of brain function is, as the name says, the share of cases in which brain function came back.",
+            "The campaign aims at the hesitation itself, alongside teaching the method. The agency diagnosed that, although CPR is an important first aid raising a patient’s chance of survival, in the real field fear and hesitation about performing it sometimes keep a quick first response from happening. If the problem were not knowing, more teaching would answer it. If the problem is holding back, the place to aim is elsewhere.",
+            "So the programs face the hesitation head-on. Street interviews ask people directly why they hesitate and ask back, “What if the person who collapsed were your family?” The CPR pledge challenge gathers promises to act first, and a “Miracle of Four Minutes” relay carried on with influencers in various fields explains why CPR matters and how to perform it correctly. In the campaign video the comedian Kim Su-yong, who went through cardiac arrest and got his life back through CPR from people around him, says that he was able to live again because someone acted without hesitating. “I will go first,” rather than “someone else will.”",
+            "The method travels along too. The teaching video, based on the CPR guidelines revised in 2025, explains how to perform CPR for women, infants and other groups and what to be careful about, and a program made with a broadcaster visits regions where the rate among ordinary people is relatively low and carries out missions such as finding an automated external defibrillator. Commissioner Lim said that to save the life of a patient in cardiac arrest the quick action of the person on the spot matters more than anything, and that he hopes the campaign will reduce fear and hesitation about CPR so that anyone may take the first step toward saving a precious life. If the golden time is four minutes, the person who can reach the spot within it can be taken to be the one who was already standing there."
+          ],
+          "enseg": [
+            [
+              "Some knowledge does nothing ",
+              "by being known. ",
+              "CPR is like that. ",
+              "The “Four Minutes That Make the Heart Beat” campaign, ",
+              "which the Korea Disease Control and Prevention Agency ",
+              "(Commissioner Lim Seung-kwan) runs ",
+              "for one month from October 16, ",
+              "the day Korea calls 세계 심장소생의 날 ",
+              "(the world day for heart resuscitation), ",
+              "aims at exactly that gap ",
+              "between knowing and doing."
+            ],
+            [
+              "The size of the gap shows up in a survey. ",
+              "In the survey of acute cardiac arrest ",
+              "for the first half of 2025, ",
+              "the rate at which ordinary people performed CPR ",
+              "was 32.9 percent, or 4,500 cases. ",
+              "That is 2.7 percentage points above ",
+              "the 30.2 percent of the same period a year earlier, ",
+              "yet the agency wrote that it is still low. ",
+              "One thing needs care in the reading. ",
+              "The 32.9 percent is not the share of people who survived ",
+              "but the share of cases in which someone nearby put out a hand, ",
+              "and the 2.7 percentage points ",
+              "is how far that share moved in a year."
+            ],
+            [
+              "What divides once a hand is put out ",
+              "is shown by other numbers. ",
+              "Where ordinary people performed CPR, ",
+              "the survival rate was 15.3 percent ",
+              "and the rate of recovery of brain function 11.5 percent; ",
+              "where they did not, ",
+              "the figures were 5.6 percent and 3.3 percent. ",
+              "That is about 2.7 times and 3.5 times. ",
+              "What deserves attention ",
+              "is that the two multiples are not the same. ",
+              "Measured as a multiple, ",
+              "the figure for recovery of brain function is the larger. ",
+              "Recovery of brain function is, as the name says, ",
+              "the share of cases in which brain function came back."
+            ],
+            [
+              "The campaign aims at the hesitation itself, ",
+              "alongside teaching the method. ",
+              "The agency diagnosed that, ",
+              "although CPR is an important first aid ",
+              "raising a patient’s chance of survival, ",
+              "in the real field fear and hesitation about performing it ",
+              "sometimes keep a quick first response from happening. ",
+              "If the problem were not knowing, ",
+              "more teaching would answer it. ",
+              "If the problem is holding back, ",
+              "the place to aim is elsewhere."
+            ],
+            [
+              "So the programs face the hesitation head-on. ",
+              "Street interviews ask people directly ",
+              "why they hesitate ",
+              "and ask back, ",
+              "“What if the person who collapsed were your family?” ",
+              "The CPR pledge challenge gathers promises to act first, ",
+              "and a “Miracle of Four Minutes” relay ",
+              "carried on with influencers in various fields ",
+              "explains why CPR matters and how to perform it correctly. ",
+              "In the campaign video ",
+              "the comedian Kim Su-yong, ",
+              "who went through cardiac arrest ",
+              "and got his life back through CPR from people around him, ",
+              "says that he was able to live again ",
+              "because someone acted without hesitating. ",
+              "“I will go first,” ",
+              "rather than “someone else will.”"
+            ],
+            [
+              "The method travels along too. ",
+              "The teaching video, ",
+              "based on the CPR guidelines revised in 2025, ",
+              "explains how to perform CPR ",
+              "for women, infants and other groups ",
+              "and what to be careful about, ",
+              "and a program made with a broadcaster ",
+              "visits regions where the rate among ordinary people is relatively low ",
+              "and carries out missions ",
+              "such as finding an automated external defibrillator. ",
+              "Commissioner Lim said ",
+              "that to save the life of a patient in cardiac arrest ",
+              "the quick action of the person on the spot ",
+              "matters more than anything, ",
+              "and that he hopes the campaign ",
+              "will reduce fear and hesitation about CPR ",
+              "so that anyone may take the first step ",
+              "toward saving a precious life. ",
+              "If the golden time is four minutes, ",
+              "the person who can reach the spot within it ",
+              "can be taken to be the one who was already standing there."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "gap",
+              "ko": "간격, 틈 (명사)",
+              "base": "gap [ɡæp]"
+            },
+            {
+              "word": "multiples",
+              "ko": "배수 (명사 multiple의 복수형)",
+              "base": "multiple [ˈmʌltɪpl]"
+            },
+            {
+              "word": "diagnosed",
+              "ko": "진단했다 (동사 diagnose의 과거형)",
+              "base": "diagnose [ˌdaɪəɡˈnoʊs]"
+            },
+            {
+              "word": "hesitation",
+              "ko": "망설임 (명사)",
+              "base": "hesitation [ˌhezɪˈteɪʃn]"
+            },
+            {
+              "word": "survival",
+              "ko": "생존 (명사)",
+              "base": "survival [sərˈvaɪvl]"
+            },
+            {
+              "word": "defibrillator",
+              "ko": "제세동기, 심장충격기 (명사)",
+              "base": "defibrillator [diːˈfɪbrɪleɪtər]"
+            }
+          ],
+          "vocab": [
+            {
+              "word": "심정지",
+              "easy": "뛰고 있던 심장이 갑자기 멈추는 일",
+              "hanja": "心(마음 심)+停(머무를 정)+止(그칠 지)"
+            },
+            {
+              "word": "시행률",
+              "easy": "그 일을 실제로 한 경우가 전체 가운데 차지하는 비율",
+              "hanja": "施(베풀 시)+行(다닐 행)+率(비율 률)"
+            },
+            {
+              "word": "뇌기능회복률",
+              "easy": "살아난 데에서 한 걸음 더 들어가, 뇌의 기능까지 돌아온 경우의 비율",
+              "hanja": "腦(뇌 뇌)+機(틀 기)+能(능할 능)+回(돌아올 회)+復(회복할 복)+率(비율 률)"
+            },
+            {
+              "word": "진단",
+              "easy": "무엇이 문제인지 살펴 원인을 가려내는 것",
+              "hanja": "診(볼 진)+斷(끊을 단)"
+            },
+            {
+              "word": "자동심장충격기",
+              "easy": "급한 상황에서 심장을 돕는 응급 기기. 출처에는 이름(AED)만 나온다",
+              "hanja": "自(스스로 자)+動(움직일 동)+心(마음 심)+臟(오장 장)+衝(찌를 충)+擊(칠 격)+器(그릇 기)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 핵심 주장은 무엇인가?",
+              "choices": [
+                "심폐소생술 교육을 지금보다 몇 배로 늘려야 한다",
+                "캠페인은 아는 것과 하는 것 사이의 망설임을 겨눈다",
+                "자동심장충격기를 모든 집에 두어야 한다",
+                "조사 수치가 잘못 집계되었다"
+              ],
+              "answer": 1,
+              "explain": "글은 캠페인이 「아는 것」과 「하는 것」 사이의 간격, 곧 두려움과 망설임을 겨냥한다고 본다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "detail",
+              "q": "일반인이 심폐소생술을 시행하지 않은 경우의 생존율과 뇌기능회복률은?",
+              "choices": [
+                "15.3%와 11.5%",
+                "5.6%와 3.3%",
+                "32.9%와 30.2%",
+                "2.7%와 3.5%"
+              ],
+              "answer": 1,
+              "explain": "시행한 경우는 15.3%와 11.5%, 시행하지 않은 경우는 각각 5.6%와 3.3%였다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "vocab",
+              "q": "글에서 쓰인 「진단」의 뜻으로 가장 알맞은 것은?",
+              "choices": [
+                "병을 고치는 치료",
+                "무엇이 문제인지 살펴 원인을 가려내는 것",
+                "숫자를 다시 세는 일",
+                "약을 처방하는 일"
+              ],
+              "answer": 1,
+              "explain": "질병관리청은 현장에서 대응이 늦는 원인을 두려움과 망설임으로 가려냈다. 그것이 진단이다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "infer",
+              "q": "「두 배수가 같지 않다」는 말이 가리키는 것은?",
+              "choices": [
+                "배수로 보면 생존율 약 2.7배보다 뇌기능회복률 약 3.5배가 더 크다는 것",
+                "두 수치가 모두 틀렸다는 것",
+                "2.7배가 3.5배보다 크다는 것",
+                "배수는 비교에 쓸 수 없다는 것"
+              ],
+              "answer": 0,
+              "explain": "시행 여부에 따라 생존율은 약 2.7배, 뇌기능회복률은 약 3.5배였다. 배수로 보면 뒤쪽이 더 크다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "critical",
+              "q": "「모르는 것이 문제라면 교육을 늘리면 된다. 주저하는 것이 문제라면 겨눌 자리는 다른 곳이다」라는 글쓴이의 논리를 평가한 것으로 가장 알맞은 것은?",
+              "choices": [
+                "문제의 원인에 따라 해법이 달라진다는 점을 짚었지만, 글도 교육영상이 함께 간다고 적어 둘이 배타적이지는 않다",
+                "원인과 해법은 아무 관계가 없으므로 틀린 논리다",
+                "교육은 어떤 경우에도 효과가 없다는 뜻이다",
+                "망설임은 측정할 수 없으므로 다룰 수 없다는 뜻이다"
+              ],
+              "answer": 0,
+              "explain": "글은 겨눌 자리가 다르다고 말하면서도 마지막 문단에서 교육영상과 대상별 안내가 함께 간다고 적는다. 둘 중 하나를 버리자는 주장이 아니다.",
+              "evidencePara": 5
+            }
+          ],
+          "challenge": [
+            {
+              "type": "apply",
+              "q": "어느 지역의 일반인 시행률이 유난히 낮다. 이 글의 진단을 그대로 적용한다면 가장 먼저 확인할 것은?",
+              "choices": [
+                "그 지역 사람들이 방법을 아는지, 알면서도 망설이는지",
+                "그 지역의 인구수",
+                "그 지역 병원의 이름",
+                "그 지역의 날씨"
+              ],
+              "answer": 0,
+              "explain": "글의 진단은 모르는 것과 주저하는 것을 가른다. 어느 쪽인지에 따라 겨눌 자리가 달라진다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "critical",
+              "q": "「골든타임이 4분이라면, 그 안에 닿을 수 있는 사람은 이미 그 자리에 있던 사람이라고 볼 수 있다」라는 마지막 문장의 역할로 가장 알맞은 것은?",
+              "choices": [
+                "캠페인 일정을 다시 알려 주는 문장이다",
+                "골든타임 4분이라는 조건에서 행동의 몫이 곁에 있던 사람에게 돌아온다는 점을, 글쓴이가 끌어낸 생각으로 한 문장에 모은 것이다",
+                "통계가 틀렸음을 지적하는 문장이다",
+                "교육영상의 내용을 요약한 문장이다"
+              ],
+              "answer": 1,
+              "explain": "임승관 청장은 현장에 있는 사람의 신속한 행동이 무엇보다 중요하다고 했다. 마지막 문장은 거기에 골든타임 4분이라는 조건을 겹쳐 글쓴이가 끌어낸 추론이다.",
+              "evidencePara": 5
             }
           ]
         }
