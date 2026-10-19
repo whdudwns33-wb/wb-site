@@ -1276,14 +1276,19 @@
   .quick-attendance { padding: 14px; }
   .quick-attendance summary { cursor: pointer; font-weight: 800; }
   .quick-attendance summary small { display: block; font-weight: 400; margin-top: 6px; }
-  .quick-att-row { display: grid; grid-template-columns: 28px minmax(110px,1fr) auto; align-items: center; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--line); }
+  .quick-att-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,max(330px,calc((100% - 20px)/2))),1fr)); column-gap: 20px; }
+  .quick-att-row { display: grid; grid-template-columns: 24px minmax(0,1fr) auto; align-items: center; gap: 6px; padding: 6px 0; border-bottom: 1px solid var(--line); min-width: 0; }
+  .quick-att-name { display: flex; align-items: center; flex-wrap: wrap; gap: 5px; }
+  .quick-att-name b { overflow-wrap: anywhere; }
+  .quick-att-name .tag { margin: 0; white-space: nowrap; }
   .quick-att-row input { width: 20px; height: 20px; }
   .quick-att-actions { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
   .quick-att-actions button, .quick-att-actions summary { min-height: 42px; padding: 9px; }
   .quick-att-actions details { position: relative; }
   .quick-att-actions details[open] > div { position: absolute; right: 0; z-index: 3; background: white; border: 1px solid var(--line); padding: 8px; width: 150px; box-shadow: 0 4px 16px #0002; }
   .quick-att-error { grid-column: 2 / -1; color: #b42318; font-size: 12px; }
-  .quick-att-time { margin-top: 12px; background: #edf3fa; padding: 6px 10px; border-radius: 8px; font-weight: 700; }
+  .quick-att-error:empty { display: none; }
+  .quick-att-time { grid-column: 1 / -1; margin-top: 8px; background: #edf3fa; padding: 4px 10px; border-radius: 8px; font-weight: 700; }
   @media(max-width:480px) { .quick-att-row { grid-template-columns: 24px minmax(0,1fr); } .quick-att-actions { grid-column: 2; } }
   .center-chat-item.is-presence { border-color: #C9E4D9; background: #F4FBF8; }
   .center-chat-item-meta { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; color: var(--mid-gray); font-size: 11px; }
@@ -1375,17 +1380,17 @@
   </section>
 </div>
 
-<script src="./lesson-form-core.js?v=2026-10-19.3"></script>
-<script src="./task-push-client.js?v=2026-10-19.3"></script>
-<script src="./schedule-board-core.js?v=2026-10-19.3"></script>
-<script src="./asset-core.js?v=2026-10-19.3"></script>
-<script src="./qr-core.js?v=2026-10-19.3"></script>
-<script src="./acaflow-import-core.js?v=2026-10-19.3"></script>
-<script src="./feedback-subject-catalog.js?v=2026-10-19.3"></script>
-<script src="./sync-recovery-core.js?v=2026-10-19.3"></script>
-<script src="./staff-work-session-core.js?v=2026-10-19.3"></script>
-<script src="./staff-attendance-history-core.js?v=2026-10-19.3"></script>
-<script src="./makeup-recovery-core.js?v=2026-10-19.3"></script>
+<script src="./lesson-form-core.js?v=2026-10-19.4"></script>
+<script src="./task-push-client.js?v=2026-10-19.4"></script>
+<script src="./schedule-board-core.js?v=2026-10-19.4"></script>
+<script src="./asset-core.js?v=2026-10-19.4"></script>
+<script src="./qr-core.js?v=2026-10-19.4"></script>
+<script src="./acaflow-import-core.js?v=2026-10-19.4"></script>
+<script src="./feedback-subject-catalog.js?v=2026-10-19.4"></script>
+<script src="./sync-recovery-core.js?v=2026-10-19.4"></script>
+<script src="./staff-work-session-core.js?v=2026-10-19.4"></script>
+<script src="./staff-attendance-history-core.js?v=2026-10-19.4"></script>
+<script src="./makeup-recovery-core.js?v=2026-10-19.4"></script>
 <script>
 "use strict";
 
@@ -5972,7 +5977,7 @@ function quickAttendanceHtml(staffId, date) {
     '<small>출석 ' + counts.P + ' · 결석 ' + counts.A + ' · 지각 ' + counts.L + ' · 조퇴 ' + counts.E + ' · 미입력 ' + counts.pending + '</small></summary>' +
     '<div class="small muted mt8">선택한 날짜의 본인 수업만 표시합니다. 체크한 미입력 수업만 일괄 출석 처리합니다.</div>' +
     '<button class="btn btn-sm btn-primary mt8" data-act="quickattbulk"' + (quickAttendance.busy ? ' disabled' : '') + '>선택 학생 출석 처리</button>' +
-    rows.map(row => {
+    '<div class="quick-att-grid">' + rows.map(row => {
       const t = row.task, disabled = quickAttendance.busy || !!row.issue;
       const group = row.time !== lastTime ? '<div class="quick-att-time">' + esc(row.time) + '</div>' : '';
       lastTime = row.time;
@@ -5983,14 +5988,15 @@ function quickAttendanceHtml(staffId, date) {
       return group + '<div class="quick-att-row"><input type="checkbox" data-act="quickattselect" data-id="' + esc(t.id) + '" aria-label="' +
         esc((student && student.name || t.studentName || studentOf(t)) + ' 출석 처리 선택') + '"' +
         (quickAttendance.selected.has(t.id) && !row.att ? ' checked' : '') + (disabled || row.att ? ' disabled' : '') + '>' +
-        '<div><b>' + esc(student && student.name || t.studentName || studentOf(t)) + '</b><div class="small">' + esc(t.subject || '') + ' · ' +
-        (isScheduledMakeupTask(t) ? '보강' : isFlexibleWeekendLesson(t, date) || isSubscriptionSessionTask(t) ? '비정기' : '정규') + '</div>' +
-        '<span class="tag ' + (ATT_LABEL[row.att] ? ATT_LABEL[row.att][1] : 'blk') + '">' + (ATT_LABEL[row.att] ? ATT_LABEL[row.att][0] : '미입력') + '</span>' +
+        '<div><div class="quick-att-name"><b>' + esc(student && student.name || t.studentName || studentOf(t)) + '</b>' +
+        '<span class="tag ' + (ATT_LABEL[row.att] ? ATT_LABEL[row.att][1] : 'blk') + '">' + (ATT_LABEL[row.att] ? ATT_LABEL[row.att][0] : '미입력') + '</span></div>' +
+        '<div class="small">' + esc(t.subject || '') +
+        (isScheduledMakeupTask(t) ? ' · 보강' : isFlexibleWeekendLesson(t, date) || isSubscriptionSessionTask(t) ? ' · 비정기' : '') + '</div>' +
         (row.recordDate && row.recordDate !== date ? '<div class="small">실제 기록일 ' + esc(row.recordDate) + '</div>' : '') + '</div>' +
         '<div class="quick-att-actions">' + button('P', '출석') + button('A', '결석') +
         '<details><summary>기타</summary><div>' + button('L', '지각') + button('E', '조퇴') + '</div></details></div>' +
         '<div class="quick-att-error" role="status">' + esc(row.issue || quickAttendance.errors.get(t.id) || '') + '</div></div>';
-    }).join('') + '</details>';
+    }).join('') + '</div></details>';
 }
 async function saveQuickAttendanceBatch() {
   const me = currentStaff();
@@ -26092,7 +26098,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-10-19.3';
+const APP_VER = '2026-10-19.4';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
