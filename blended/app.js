@@ -6,7 +6,7 @@
   const statuses = {draft:'초안',review:'검토 대기',published:'발행',withdrawn:'철회'};
   const labels = {studentVoice:'학생 의견',facts:'함께 확인한 점',strengths:'잘한 점',guidance:'다음 지도 방향',home:'가정 협조 사항',nextGoal:'다음 실천 목표',due:'실천 기한',nextCheck:'다음 확인일'};
   let runtime = {mode:'production',ready:false};
-  let state = null, tab = 'learning', selected = '', day = '', editing = null, busy = false;
+  let state = null, tab = location.hash.slice(2) || 'learning', selected = new URLSearchParams(location.search).get('student') || '', day = '', editing = null, busy = false;
   const dialog = $('#editor'), retries = new WeakMap();
   const isStaff = () => ['owner','admin','teacher'].includes(state?.me.role);
   const isAdmin = () => ['owner','admin'].includes(state?.me.role);
@@ -35,6 +35,7 @@
   }
   async function refresh() {
     state = await api('state');
+    if(!location.hash && state.me.role !== 'guardian') {location.replace('/blended/planner/'+(selected?'?student='+encodeURIComponent(selected):''));return;}
     day ||= state.today;
     if (!state.students.some(s => s.id === selected)) selected = state.students[0]?.id || '';
     if (editing?.student_id && !state.students.some(s => s.id === editing.student_id)) { closeEditor(); notice('담당 또는 열람 권한이 변경되어 편집을 닫았습니다.',true); }
@@ -45,7 +46,7 @@
       ? [['learning','담당 학습'],['consultations','상담·약속'],['reports','리포트'],...(isAdmin() ? [['management','강사·담당 관리']] : []),['account','내 계정']]
       : [['learning','오늘 학습'],['week','이번 주'],['reports','상담·리포트'],['account','내 계정']];
     if (!items.some(i => i[0] === tab)) tab = items[0][0];
-    return `<nav class="tabs" aria-label="주 메뉴">${items.map(([key,label]) => `<button type="button" data-tab="${key}" ${tab === key ? 'aria-current="page"' : ''}>${label}</button>`).join('')}</nav>`;
+    return `<nav class="tabs" aria-label="주 메뉴">${state.me.role !== 'guardian' ? '<a href="/blended/planner/?student='+encodeURIComponent(selected)+'">전체 플래너</a>' : ''}${items.map(([key,label]) => `<button type="button" data-tab="${key}" ${tab === key ? 'aria-current="page"' : ''}>${label}</button>`).join('')}</nav>`;
   }
   function filters(withDate = false) {
     return `<div class="filters"><label>${state.me.role === 'student' ? '내 플래너' : '학생 선택'}<select id="student-filter">${options(state.students.map(s => [s.id,s.name]),selected)}</select></label>${withDate ? `<label>학습 날짜<input id="day-filter" type="date" value="${esc(day)}"></label>` : ''}${button('refresh','최신 내용 확인')}</div>`;
@@ -59,6 +60,10 @@
     $('#main').innerHTML = `<div class="intro"><div><h1>${titles[tab]}</h1><p>${descriptions[tab]}</p></div><div class="date-label">${esc(state.today)}</div></div>${navigation}<div id="view"></div>`;
     const views = {learning:learningView,week:learningView,consultations:consultationsView,reports:reportsView,management:managementView,account:accountView};
     $('#view').innerHTML = views[tab]();
+    if(tab==='reports') {
+      const periods=(state.periodReports || []).filter(r=>r.snapshot.student.id===selected);
+      if(periods.length)$('#view').innerHTML+=`<section class="sheet"><h2>주간·월간 학습 리포트</h2>${periods.map(r=>`<article class="report"><h3>${esc(r.title)}</h3><p>${pill('v'+r.reportRevision)} ${button('period-report','공개 학습 리포트 보기',r.id)}</p></article>`).join('')}</section>`;
+    }
   }
   function learningView() {
     const rows = state.learning.filter(l => l.student_id === selected);
@@ -83,7 +88,7 @@
     const selectedConsults = state.consultations.filter(c => c.student_id === selected);
     const reports = state.reports.filter(r => r.snapshot?.student.id === selected || selectedConsults.some(c => c.id === r.consultation_id));
     const pending = selectedConsults.filter(c => c.report_status === 'review');
-    return `${filters()}<section class="sheet"><div class="sheet-head"><h2>${isStaff() ? '검토와 발행 이력' : '공개된 상담 리포트'}</h2>${pill('알림 미발송','amber')}</div>${pending.map(c => `<article class="report"><div class="pills">${pill('검토 대기','amber')}${pill(c.subject)}</div><h3>${esc(c.held_at.slice(0,10))} 상담 공개본</h3><p class="hint">내부 메모는 미리보기와 리포트에 포함되지 않습니다.</p><div class="actions">${button('preview','공개 내용 미리보기',c.id)}${state.me.role === 'owner' ? button('publish','발행 검토',c.id,'small') : pill('원장 최종 발행 대기')}</div></article>`).join('')}${reports.map(r => `<article class="report"><div class="row-top"><div><div class="pills">${pill(`v${r.version}`)}${pill(statuses[r.status],r.status === 'published' ? 'green' : 'red')}</div><h3>${r.snapshot ? esc(r.snapshot.heldAt.slice(0,10))+' 상담 리포트' : '리포트 철회 이력'}</h3><p class="hint">${esc(r.created_at.slice(0,16).replace('T',' '))} UTC${r.reason ? ' / '+esc(r.reason) : ''}</p></div><div class="actions">${r.snapshot ? button('report','공개본 보기',r.id) : ''}${state.me.role === 'owner' && isLatest(r) && r.status === 'published' ? button('withdraw','철회',r.consultation_id,'danger small') : ''}</div></div></article>`).join('')}${!pending.length && !reports.length ? empty('현재 열람할 수 있는 발행 리포트가 없습니다.') : ''}<p class="hint spacer">발행본은 당시 내용을 보존합니다. 수정본은 새 버전으로 발행하며, 학생·보호자는 최신 유효본만 봅니다.</p></section>`;
+    return `${filters()}<section class="sheet"><div class="sheet-head"><h2>${isStaff() ? '검토와 발행 이력' : '공개된 상담 리포트'}</h2>${pill('알림 미발송','amber')}</div>${pending.map(c => `<article class="report"><div class="pills">${pill('검토 대기','amber')}${pill(c.subject)}</div><h3>${esc(c.held_at.slice(0,10))} 상담 공개본</h3><p class="hint">내부 메모는 미리보기와 리포트에 포함되지 않습니다.</p><div class="actions">${button('preview','공개 내용 미리보기',c.id)}${state.me.role === 'owner' ? button('publish','발행 검토',c.id,'small') : pill('원장 최종 발행 대기')}</div></article>`).join('')}${reports.map(r => `<article class="report"><div class="row-top"><div><div class="pills">${pill(`v${r.version}`)}${pill(statuses[r.status],r.status === 'published' ? 'green' : 'red')}</div><h3>${r.snapshot ? esc(r.snapshot.heldAt.slice(0,10))+' 상담 리포트' : '리포트 철회 이력'}</h3><p class="hint">${esc(r.created_at.slice(0,16).replace('T',' '))} UTC${r.reason ? ' / '+esc(r.reason) : ''}</p></div><div class="actions">${r.snapshot ? button('report','공개본 보기',r.id) : ''}${state.me.role === 'owner' && isLatest(r) && r.status === 'published' ? button('withdraw','철회',r.consultation_id,'danger small') : ''}</div></div></article>`).join('')}${!pending.length && !reports.length && !(state.periodReports || []).some(r=>r.snapshot.student.id===selected) ? empty('현재 열람할 수 있는 발행 리포트가 없습니다.') : ''}<p class="hint spacer">발행본은 당시 내용을 보존합니다. 수정본은 새 버전으로 발행하며, 학생·보호자는 최신 유효본만 봅니다.</p></section>`;
   }
   function isLatest(r) { return !state.reports.some(other => other.consultation_id === r.consultation_id && other.version > r.version); }
   function managementView() {
@@ -99,7 +104,7 @@
   }
   function closeEditor() { dialog.close(); $('#dialog-content').innerHTML = ''; editing = null; }
   function studentSubjectFields(record) {
-    const subjects = state.me.role === 'teacher' ? [...new Set(state.assignments.filter(a => a.student_id === selected && a.active && a.starts <= state.today && a.ends >= state.today).map(a => a.subject))] : ['수학','영어','국어','기타'];
+    const subjects = state.me.role === 'teacher' ? [...new Set(state.assignments.filter(a => a.student_id === selected && a.active && a.starts <= state.today && a.ends >= state.today).map(a => a.subject))] : ['수학','영어','국어','사회','과학','기타'];
     return `<div class="form-grid">${input('studentLabel','학생',name(record?.student_id || selected),'text','disabled')}<label>과목<select name="subject" ${record ? 'disabled' : ''}>${options(subjects.map(s => [s,s]),record?.subject || subjects[0])}</select></label></div>`;
   }
   function summaryHTML(s) { return `<div class="summary"><span><strong>${s.total}</strong>배정</span><span><strong>${s.selfDone}</strong>학생 완료</span><span><strong>${s.checked}</strong>강사 확인</span></div><p class="hint">${esc(s.source)} / ${esc(s.periodStart)} ~ ${esc(s.periodEnd)}<br>갱신 ${esc(s.asOf)} / 외부 성적 ${esc(s.external)}${!s.hasRecords ? '<br>기록 없음 · 미수행이나 0점으로 해석하지 않습니다.' : ''}</p>`; }
@@ -110,6 +115,11 @@
     $('textarea[name=internalNote]').maxLength = 4000;
   }
   async function act(action,id) {
+    if(action==='period-report') {
+      const r=(await api('planner_reports')).reports.find(r=>r.id===id);if(!r)throw new Error('현재 열람할 수 있는 발행본이 아닙니다.');
+      const s=r.snapshot;
+      return openEditor('공개 학습 리포트',`<h2>${esc(s.student.name)} · ${esc(r.title)}</h2><p>${esc(s.periodStart)} ~ ${esc(s.periodEnd)}</p><p>배정 ${esc(s.summary.total)} · 학생 완료 ${esc(s.summary.done)} · 순공시간 ${Math.round((s.summary.studySecs || 0)/60)}분</p><dl class="report-body"><dt>학생 회고</dt><dd>${esc(s.reflection)}</dd><dt>공개 지도 의견</dt><dd>${esc(s.directorNote)}</dd><dt>다음 집중 목표</dt><dd>${esc(s.nextFocus)}</dd></dl>`);
+    }
     if (action === 'close') return closeEditor();
     if (action === 'refresh') { await refresh(); notice('최신 내용을 확인했습니다.'); return; }
     if (action === 'logout') { await api('logout'); state=null; selected=''; closeEditor(); notice(); loginView(); return; }
@@ -155,7 +165,7 @@
   }
   document.addEventListener('click',async e => {
     const navButton=e.target.closest('[data-tab]');
-    if (navButton) {tab=navButton.dataset.tab; render(); return;}
+    if (navButton) {tab=navButton.dataset.tab;history.replaceState(null,'','#/'+tab); render(); return;}
     const b=e.target.closest('[data-action]'); if (!b || busy) return;
     busy=true; b.disabled=true;
     try { await act(b.dataset.action,b.dataset.id); }

@@ -5,6 +5,11 @@
 원장 아이디는 `whdudwns33`, 전용 주소는 `https://blended.wbcowork.com/blended/`다.
 배포 실행 결과와 검증 내역은 [완료 보고](./RESULTS.md)에 기록한다.
 
+후속 요청은 **원본 기능 최대한 유지 + 블렌디드 권한·상담 추가**, **학사관리와 일정을 ‘일정·학사’로 통합**이다.
+로그인하면 `/blended/planner/`에서 원본 오늘·주간·로드맵·인강·학습 화면을 연다.
+상담·리포트와 강사·학생 관리는 같은 로그인으로 이어지며 선택한 학생을 유지한다.
+월간 달력과 시험·수행평가·자료 요청은 한 메뉴 안의 두 보기다.
+
 ## 구현 범위와 원본 보존
 
 - 조사 기준/개발 시작점: `60df731b489603cf4afe296e6f384e6284b1289c`.
@@ -12,7 +17,7 @@
 - 브랜치: `codex/blended-planner-local-20261019`.
 - 기존 작업본 `C:\Users\wb\Projects\wb-site`의 consult·task 미커밋 변경은 읽기만 했다. 해당 작업본의 체크아웃/reset/수정을 하지 않았다.
 - `consult/`, `sync/`, `parent/`, 학원 원본 앱, 기존 DB/R2/시크릿은 변경하지 않는다. 공통 모듈을 광범위하게 분리하지 않는다.
-- 재사용: `shared/external-links.js`의 승인된 학생용 링크, `scripts/check.mjs`의 시험 검색/실행. 기존 consult의 공개 필드 선택·기간/출처 표시·불변 버전 추가·철회 패턴을 상담 단위에 적용했다. 기존 HTML 전체를 복사하지 않았다.
+- 재사용: `consult/index.html`을 빌드 때 읽어 원본 CSS·학습 로직을 조립한다. 원본 파일은 수정하지 않고 `planner-build.mjs`에서 초기화·통신 연결만 교체한다. `planner-adapter.js`가 전용 로그인·저장·통합 메뉴·강사 확인을 연결한다. 생성물은 커밋하지 않는다. 원본 연결 지점이 달라지면 빌드가 실패한다.
 - 영향 범위: 새 화면·API·로컬/클라우드 DB·가상 자료·시험·배포 설정·보호자 읽기 화면·공개 리포트 응답. 기존 호출부/내보내기/Worker 설정은 변경하지 않는다. 루트 `AGENTS.md`와 `CLAUDE.md` 지도에 동일한 앱 설명 한 줄을 추가했다.
 - 설계: 남색 `#17364a`, 청록 `#136b68`, 밝은 배경 `#f4f7fa`, 보조 배경 `#e9f4f2`, 경계 `#ccd8df`. 기기 기본 한국어 글꼴, 좌측 학습 목록/우측 실제 순서 안내, 모바일 세로 전환. 외부 브랜드/유료 콘텐츠를 복제하지 않았다.
 
@@ -85,7 +90,7 @@ python blended/first-setup.py
 - 비밀번호: 개별 salt + scrypt. 실패 제한은 DB에 남아 실행 인스턴스가 교체되어도 유지된다.
 - 같은 origin + 전용 요청 헤더 + JSON만 API에 허용. 전용 호스트만 허용하며 no-store/CSP/frame 차단을 적용한다.
 - localStorage, IndexedDB, 서비스워커를 사용하지 않는다. 열린 폼의 입력만 메모리에 보존한다. 저장 실패/409에서 조용히 덮어쓰거나 자동 재시도하지 않는다.
-- 첨부 파일 업로드/공개 파일 보관은 이번 범위에 없다. 정적 자산 4개만 배포한다. 소스·DB·문서·시험·계정 파일은 제공하지 않는다.
+- 정적 화면 자산만 허용 목록으로 제공한다. API/DB/문서/시험/계정 파일은 제공하지 않는다. 사진·PDF 파일 저장은 미연동이며 텍스트 질문과 주간·월간 리포트 인쇄를 지원한다.
 - 단일 기관용 SQLite Object다. 다수 기관/대규모 동시 사용이 필요하면 기관별 분리와 성능 검증이 필요하다.
 
 ```powershell
@@ -102,6 +107,7 @@ wrangler deploy --config blended/wrangler.toml
 
 ```powershell
 node --test blended/api.test.mjs
+node --test blended/planner.test.mjs
 node blended/first-setup.test.cjs
 node scripts/check.mjs
 ```
@@ -112,6 +118,8 @@ node scripts/check.mjs
 $env:PLAYWRIGHT_MODULE='C:\Users\wb\AppData\Local\npm-cache\_npx\e41f203b7505f1fb\node_modules\playwright'
 $env:PLAYWRIGHT_CHROMIUM_EXECUTABLE='C:\Users\wb\.cache\ms-playwright\chromium-1248\chrome-win64\chrome.exe'
 node blended/browser-check.cjs
+$env:NODE_PATH='C:\Users\wb\AppData\Local\npm-cache\_npx\e41f203b7505f1fb\node_modules'
+node blended/planner-browser.cjs
 ```
 
 경로는 이번 PC에서 확인한 설치 위치다. 다른 PC에서는 실제 설치 경로를 지정한다.
@@ -128,7 +136,23 @@ Cloudflare 실행 환경은 로컬 Worker를 먼저 띄운 뒤 `node blended/wor
 [학원 앱 기능 요청·연결 계약](./ACADEMY_REQUEST.md)을 별도 보관한다. 담당 세션에는 전달하지 않았다.
 학생/강사 원본 가져오기, 보호자 관계·번호·동의 확인, SOLAPI/카카오/문자/이메일 발송, 외부 성적 수집은 없다.
 `delivery-contract.mjs`는 발송 준비 조건·멱등 키·접수/전달/결과 불명 구분의 계약 시험용이며 실제 발송 코드가 아니다.
-월간 리포트, 오프라인 저장, 자동 초대, 파일 첨부는 후순위다. 주간 화면은 같은 날짜 있는 학습 기록을 집계한다.
+월간·주간 리포트는 원본의 발행·철회·인쇄를 사용하며 최신 공개본은 확인된 보호자 계정에서도 열람한다.
+오프라인 저장, 자동 초대, 사진·PDF 첨부, 목차 사진 인식·URL 자동 수집, 기프트 카드 교환은 미연동이다.
+목차 직접 입력·붙여넣기, 학습 포인트·스탬프, 텍스트 질문·답변은 사용할 수 있다.
+
+## 원본 자료와 상담 연결
+
+`planner_records`는 원본 `staff/tasks/checks` 자료 형식과 행별 revision을 저장한다. 기존 컨설팅 서버의 자료는 읽거나 가져오지 않는다.
+`planner_save`는 변경 묶음을 하나의 트랜잭션으로 저장하며, 충돌 시 전체 취소한다. 같은 requestId의 통신 재시도는 중복 생성하지 않는다.
+화면은 저장 실패 시 수정 내용을 유지하고 재저장·수정본 내려받기·명시적 최신 내용 불러오기를 제공한다. 탭을 닫으면 미저장 내용은 소실될 수 있다.
+
+상담 약속은 기존 `learning` 행을 원본 체크리스트에 투영하므로 두 벌로 복제하지 않는다. 원본에서 수행하면 상담 화면에도 반영되고 그 반대도 동일하다.
+상담 집계는 기존 약속 + 원본 과제 + 인강의 배정·학생 수행을 포함한다. 외부 서비스 성적이 아니라 이 앱에서 직접 기록한 결과다.
+주간·월간 계획의 지도 의견은 공개용이다. 비공개 상담 메모는 반드시 **상담·리포트의 내부 메모**에 작성한다.
+
+강사는 담당 학생·과목의 과제/로드맵/인강/오답·회독만 받는다. 혼합 과목 자료를 저장해도 다른 과목 부분은 서버에서 보존한다.
+공통 인강 가능 시간은 계획 수립에 사용한다. 전체 마감·포인트·최종 발행은 학생·원장 화면에서 확인한다.
+주간·월간 발행본은 원장만 새 버전으로 만들며 기존 행 수정은 거부한다. 보호자에게는 동의가 유효한 자녀의 최신 공개본만 제공한다.
 
 운영 데이터 도입 전에는 학원 원본/보관·삭제 책임/보호자 수신 정책을 확정한다. 기존 자료를 자동 복제하지 않는다.
 향후 버전 변경 전 Cloudflare 배포 버전과 Object의 PITR bookmark를 기록하고, 별도 시험 Object로 복원 검증한다.

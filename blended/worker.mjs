@@ -24,9 +24,10 @@ export class BlendedPlanner extends DurableObject {
     try {
       let size=0;const chunks=[],reader=request.body?.getReader();
       if(!reader)return json(400,{code:'INPUT',error:'요청 내용을 확인해 주세요.'});
-      while(true){const {value,done}=await reader.read();if(done)break;size+=value.byteLength;if(size>32768){await reader.cancel();return json(413,{code:'SIZE',error:'입력 크기를 줄여 주세요.'});}chunks.push(value);}
+      while(true){const {value,done}=await reader.read();if(done)break;size+=value.byteLength;if(size>1048576){await reader.cancel();return json(413,{code:'SIZE',error:'입력 크기를 줄여 주세요.'});}chunks.push(value);}
       let body;
       try{body=JSON.parse(await new Blob(chunks).text());}catch{return json(400,{code:'JSON',error:'요청 형식을 확인해 주세요.'});}
+      if(size>32768 && body.action!=='planner_save')return json(413,{code:'SIZE',error:'입력 크기를 줄여 주세요.'});
       const token=/(?:^|;\s*)__Host-wb_blended=([a-f0-9]{64})(?:;|$)/.exec(request.headers.get('Cookie')||'')?.[1]||'';
       const result=this.api.handle(body,token,request.headers.get('CF-Connecting-IP')||'unknown'),extra={};
       if(result.sessionToken){extra['Set-Cookie']=sessionCookie(result.sessionToken);delete result.sessionToken;}
@@ -44,10 +45,13 @@ export default {
       if(request.method!=='POST'||request.headers.get('Origin')!==origin||request.headers.get('X-Blended-Request')!=='1'||!request.headers.get('Content-Type')?.startsWith('application/json'))return json(403,{code:'ORIGIN',error:'허용되지 않은 요청입니다.'});
       return env.PLANNER.get(env.PLANNER.idFromName('blended-production-v1')).fetch(request);
     }
-    if(!['GET','HEAD'].includes(request.method)||!['/blended/','/blended/guardian/','/blended/app.js','/blended/style.css','/blended/external-links.js'].includes(url.pathname))return json(404,{code:'NOT_FOUND'});
+    if(!['GET','HEAD'].includes(request.method)||!['/blended/','/blended/guardian/','/blended/app.js','/blended/style.css','/blended/external-links.js','/blended/planner/','/blended/planner/planner.js','/blended/planner/planner.css','/blended/planner/qr.js'].includes(url.pathname))return json(404,{code:'NOT_FOUND'});
+    const isPlanner=url.pathname.startsWith('/blended/planner/');
+    if(url.pathname==='/blended/planner/')url.pathname='/blended/planner/index.html';
     if(url.pathname==='/blended/'||url.pathname==='/blended/guardian/')url.pathname='/blended/index.html';
     const asset=await env.ASSETS.fetch(new Request(url,{method:request.method}));
     const headers=new Headers(asset.headers);for(const [key,value]of Object.entries(security))headers.set(key,value);
+    if(isPlanner)headers.set('Content-Security-Policy',security['Content-Security-Policy'].replace("style-src 'self'","style-src 'self' 'unsafe-inline'"));
     return new Response(asset.body,{status:asset.status,headers});
   }
 };

@@ -20,7 +20,7 @@ const {pathToFileURL}=require('node:url');
     const context=await browser.newContext({viewport:size});
     await context.route('**/*',route=>route.request().url().startsWith(origin)?route.continue():route.abort());
     const page=await context.newPage();page.on('pageerror',e=>errors.push(e.message));
-    await page.goto(origin+'/blended/');
+    await page.goto(origin+'/blended/#/learning');
     await page.getByLabel('아이디',{exact:true}).fill(id);await page.getByLabel('비밀번호',{exact:true}).fill(`Demo-${id}-2026!`);
     await page.getByRole('button',{name:'로그인',exact:true}).click();
     await page.waitForSelector('#identity button');return page;

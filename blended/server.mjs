@@ -4,6 +4,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
 import { createApi } from './api.mjs';
 import { openDatabase, seedDemo } from './local-db.mjs';
+import { plannerAssets } from './planner-build.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const files = new Map([
@@ -14,6 +15,7 @@ const files = new Map([
 const cookie = (token = '') => `wb_blended_local=${token}; Path=/blended/; HttpOnly; SameSite=Strict; Max-Age=${token ? 28800 : 0}`;
 export function createLocalServer(db) {
   const api = createApi(db);
+  const planner=plannerAssets();
   const server = http.createServer(async (req,res) => {
     const origin = `http://127.0.0.1:${server.address().port}`;
     const headers = {
@@ -24,6 +26,12 @@ export function createLocalServer(db) {
     try {
       if (req.headers.host !== new URL(origin).host) return send(403,{code:'HOST',error:'로컬 전용 주소로 접속해 주세요.'});
       const url = new URL(req.url,origin);
+      if(url.pathname.startsWith('/blended/planner/')) {
+        const name=url.pathname.slice('/blended/planner/'.length) || 'index.html';
+        if(!Object.hasOwn(planner,name) || !['GET','HEAD'].includes(req.method))return send(404,{code:'NOT_FOUND'});
+        const type=name.endsWith('.js')?'text/javascript':name.endsWith('.css')?'text/css':'text/html';
+        res.writeHead(200,{...headers,'Content-Type':type+'; charset=utf-8','Content-Security-Policy':headers['Content-Security-Policy'].replace("style-src 'self'","style-src 'self' 'unsafe-inline'")});return res.end(req.method==='HEAD'?undefined:planner[name]);
+      }
       if (url.pathname === '/' || url.pathname === '/blended') return send(302,'',{Location:'/blended/'});
       if (url.pathname !== '/blended/api') {
         const asset = files.get(url.pathname);
@@ -35,12 +43,13 @@ export function createLocalServer(db) {
       let size = 0; const chunks = [];
       for await (const chunk of req) {
         size += chunk.length;
-        if (size > 32768) { send(413,{code:'SIZE',error:'입력 크기를 줄여 주세요.'}); req.resume(); return; }
+        if (size > 1048576) { send(413,{code:'SIZE',error:'입력 크기를 줄여 주세요.'}); req.resume(); return; }
         chunks.push(chunk);
       }
       let body;
       try { body = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
       catch { return send(400,{code:'JSON',error:'요청 형식을 확인해 주세요.'}); }
+      if(size>32768 && body.action!=='planner_save')return send(413,{code:'SIZE',error:'입력 크기를 줄여 주세요.'});
       const token = /(?:^|;\s*)wb_blended_local=([a-f0-9]{64})(?:;|$)/.exec(req.headers.cookie || '')?.[1] || '';
       const result = api.handle(body,token), extra = {};
       if (result.sessionToken) { extra['Set-Cookie'] = cookie(result.sessionToken); delete result.sessionToken; }

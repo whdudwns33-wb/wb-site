@@ -60,3 +60,14 @@ CREATE TABLE IF NOT EXISTS receipts (
 CREATE TABLE IF NOT EXISTS audit (
  id INTEGER PRIMARY KEY, actor TEXT NOT NULL, action TEXT NOT NULL, object_id TEXT NOT NULL, at TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS planner_records (
+ kind TEXT NOT NULL CHECK(kind IN ('staff','tasks','checks')), key TEXT NOT NULL,
+ student_id TEXT NOT NULL REFERENCES students(id), data TEXT NOT NULL,
+ revision INTEGER NOT NULL DEFAULT 1, actor TEXT NOT NULL REFERENCES users(id),
+ PRIMARY KEY(kind,key)
+);
+CREATE INDEX IF NOT EXISTS planner_student ON planner_records(student_id);
+CREATE TABLE IF NOT EXISTS planner_questions (
+ id TEXT PRIMARY KEY, student_id TEXT NOT NULL REFERENCES students(id), subject TEXT NOT NULL,
+ data TEXT NOT NULL, revision INTEGER NOT NULL DEFAULT 1
+);
