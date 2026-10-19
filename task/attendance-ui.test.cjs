@@ -26,10 +26,11 @@ test('lesson attendance offers present, late, absent, and early leave', () => {
   assert.match(html, /E: \['조퇴', 'doing'\]/);
 });
 
-test('every attendance choice asks for confirmation and cancellation does not save', () => {
+test('only quick first-time present skips confirmation; corrections and absences confirm', () => {
   const click = block("case 'latt':", "case 'fbtext':");
   assert.match(click, /if \(!attendanceLabel \|\| !\['P', 'L', 'A', 'E'\]\.includes\(v\)\) break;/);
-  assert.match(click, /if \(!confirm\(attendanceLabel \+ '으로 저장하겠습니까\?'\)\) break;/);
+  assert.match(click, /quick && v === 'P' && !\(getCheck\(id, date\) \|\| \{\}\)\.att/);
+  assert.match(click, /&& !confirm\(attendanceLabel \+ '으로 저장하겠습니까\?'\)\) break;/);
   assert.match(click, /const next = v;/);
   assert.doesNotMatch(click, /c && c\.att === v/);
 });
