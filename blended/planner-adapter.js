@@ -8,7 +8,7 @@ async function blendedApi(action,payload={},requestId) {
   catch {throw new Error('연결하지 못했습니다. 변경 내용은 이 화면에 남아 있습니다. 다시 저장해 주세요.');}
   const data=await response.json();
   if(!response.ok) {
-    if(response.status===401) {blendedMe=null;$('#view').innerHTML='<div class="card">로그인 시간이 지났습니다. <a href="/blended/">다시 로그인</a></div>';}
+    if(response.status===401) {blendedMe=null;$('#view').innerHTML='<div class="card">로그인 시간이 지났습니다. <a href="/blended/?student='+encodeURIComponent(viewStaff || new URLSearchParams(location.search).get('student') || '')+'">다시 로그인</a></div>';}
     throw Object.assign(new Error(data.error || '저장하지 못했습니다.'),{status:response.status,code:data.code});
   }
   return data;
@@ -137,6 +137,7 @@ render=function() {
   if(!blendedLoaded)return;
   if(['settings','staff','results'].includes(route)) {location.href='/blended/#/'+(route==='staff'?'management':route==='results'?'reports':'account');return;}
   const unassignedRoadmap=route==='roadmap' && session.isStaffLink && !studyRoadmapAvailable(currentStaff());
+  if(viewStaff && !state.staff.some(s=>s.id===viewStaff)) {$('#view').innerHTML='<div class="card" role="alert"><h2>요청한 학생을 열 수 없습니다.</h2><p>학생 연결이나 담당 권한이 변경되었습니다. 학원에서 연결을 확인해 주세요.</p><a href="/blended/planner/">내 플래너 목록으로</a></div>';return;}
   originalRender();
   if(unassignedRoadmap){route='roadmap';renderTabs();$('#view').innerHTML=viewRoadmap();}
   if(session.isAdmin && currentStaff()) {
@@ -243,7 +244,7 @@ async function startBlendedPlanner() {
     render();setInterval(()=>sync.run(),45000);
     if(session.isStaffLink){await ensureCloseoutActivation(false);renderAfterSync();}
   } catch(error) {
-    if(error.status===401 || error.status===403)location.replace('/blended/');
+    if(error.status===401)location.replace('/blended/'+(new URLSearchParams(location.search).get('student')?'?student='+encodeURIComponent(new URLSearchParams(location.search).get('student')):''));
     else $('#view').innerHTML='<div class="card">'+esc(error.message)+'<br><a href="/blended/planner/">다시 열기</a></div>';
   }
 }

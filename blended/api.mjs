@@ -317,5 +317,16 @@ export function createApi(db, options = {}) {
       return result;
     });
   }
-  return { handle };
+  // 학원 서버 전용 읽기 계약: 학생 식별자·이름만 제공하고 세션/권한을 발급하지 않는다.
+  function academy(body, key) {
+    requireThat(/^[a-f0-9]{64}$/.test(options.academyBridgeKey || '') && typeof key==='string' && key.length<=128 && timingSafeEqual(Buffer.from(hash(key)),Buffer.from(hash(options.academyBridgeKey))),403,'BRIDGE_AUTH','학원 연결을 인증하지 못했습니다.');
+    requireThat(body && typeof body==='object' && !Array.isArray(body),400,'INPUT','요청 형식을 확인해 주세요.');
+    const students=all('SELECT s.id,s.name FROM students s JOIN users u ON u.id=s.id WHERE s.active=1 AND u.active=1 ORDER BY s.name,s.id');
+    if(body.action==='students')return {students};
+    requireThat(body.action==='student',400,'ACTION','지원하지 않는 학원 연결 요청입니다.');
+    const student=students.find(s=>s.id===text(body.studentId,100,true));
+    requireThat(student,404,'STUDENT','현재 이용 중인 플래너 학생을 찾지 못했습니다.');
+    return {student};
+  }
+  return { handle, academy };
 }
