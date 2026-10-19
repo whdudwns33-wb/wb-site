@@ -1,5 +1,5 @@
-:root{--blended-accent:#6d28d9;--blended-ink:#1b3a5c;--teal:var(--blended-accent);--ink:var(--blended-ink);--pale:#f0ebf8;--paper:#f7f7fa;--line:#d5d3df}
-body{color:var(--blended-ink);font-family:"Malgun Gothic","Apple SD Gothic Neo",sans-serif;background:#f7f7fa}
+:root{--f-ui:"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;--t-display:26px;--t-heading:18px;--t-body:16px;--t-control:15px;--t-meta:14px;--blended-accent:#6d28d9;--blended-ink:#1b3a5c;--teal:var(--blended-accent);--ink:var(--blended-ink);--pale:#f0ebf8;--paper:#f7f7fa;--line:#d5d3df}
+body{color:var(--blended-ink);font-family:var(--f-ui);font-size:var(--t-body);line-height:1.6;background:#f7f7fa}
 .blended-navigation{margin:16px 0;color:var(--blended-ink);font-size:15px}
 .blended-primary{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;align-items:start}
 .blended-navigation a,.blended-navigation button,.blended-navigation summary{display:flex;align-items:center;justify-content:center;min-height:44px;padding:10px 8px;box-sizing:border-box;border:1px solid #d5d3df;background:#fff;border-radius:8px;color:inherit;font:inherit;text-decoration:none;cursor:pointer;text-align:center}
@@ -17,9 +17,33 @@ body{color:var(--blended-ink);font-family:"Malgun Gothic","Apple SD Gothic Neo",
 #editor{padding:0;max-height:90dvh}#dialog-content>h2{padding:20px 24px 12px;margin:0;background:white;position:sticky;top:0;z-index:1}
 .editor-fields{padding:0 24px 16px}.editor-actions{position:sticky;bottom:0;background:white;border-top:1px solid #d5d3df;padding:12px 24px;display:flex;gap:12px;flex-wrap:wrap}.editor-actions .error-box{flex-basis:100%}.editor-actions .error-box:empty{display:none}
 #editor fieldset{min-width:0;margin:16px 0;padding:16px;border:1px solid #d5d3df;border-radius:8px}#editor legend{font-size:16px;font-weight:700;padding:0 6px}#discard-editor{max-width:420px;padding:24px}
-.small,.hint,.fl,.tag,.study-timeline-hour,.study-timeline-minutes,.study-paper-col-title,.study-timer-note{font-size:14px!important;line-height:1.5}
+.small:not(button),.hint,.fl,.tag,.study-timeline-hour,.study-timeline-minutes,.study-paper-col-title,.study-timer-note{font-size:14px!important;line-height:1.5}
 .planner-task-actions .btn,.study-timer-subjects .chip,.navbtn,.btn-sm{min-height:44px!important;min-width:44px!important;height:auto!important}.planner-check{width:44px!important;height:44px!important;min-width:44px}
 .planner-task-row{min-height:54px}.study-timeline-row{grid-template-columns:38px repeat(6,minmax(0,1fr))}.study-timeline-minutes{letter-spacing:-.04em}
 .planner-list-head,.planner-task-row{grid-template-columns:54px minmax(0,1fr) 48px!important}.planner-task-actions .btn,.study-timer-subjects .chip,.planner-task-desc,.planner-task-subject,.learning-status,.daily-close-step span,.daily-close-step b{font-size:14px}.planner-task-title{font-size:16px;overflow-wrap:anywhere;word-break:normal}.study-timeline-hour{color:#4b5563}.study-timeline-minutes{color:#4b5563}.blended-workflow{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}.blended-workflow .btn{min-height:44px}#studyPlanner,#blendedTimer,#dailyCloseCard{scroll-margin-top:95px}.tabs:not(:has(.blended-navigation)){flex-wrap:wrap;overflow:visible}.blended-navigation .blended-menu-items{white-space:normal}.blended-primary button{width:100%}
 .blended-quick-label{display:block;font-size:14px;font-weight:700;margin:12px 0 6px}
 @media(max-width:650px){.blended-primary{grid-template-columns:repeat(2,minmax(0,1fr))}.blended-menu{grid-column:1/-1}.blended-menu-items{grid-template-columns:repeat(2,minmax(0,1fr))}.blended-navigation{font-size:15px}input,select,textarea{font-size:16px!important}.top{padding:16px;gap:12px;flex-wrap:wrap}#dialog-content>h2{padding:16px}.editor-fields{padding:0 16px 12px}.editor-actions{padding:12px 16px}.study-paper-title{font-size:14px}.study-paper-total span{font-size:12px}.planner-task-actions{flex-wrap:wrap}.blended-review small{font-size:14px}}
+
+/* 같은 역할은 플래너·상담·학원 직원 화면에서 같은 크기와 굵기를 쓴다. */
+html{font-family:var(--f-ui);font-size:16px;line-height:1.6}
+button,input,select,textarea{font-family:var(--f-ui)}
+.top .brand,.topbar .brand{font-size:20px;font-weight:700;line-height:1.4;letter-spacing:-.01em}
+.top .brand-small{font-size:20px;font-weight:700}
+.blended-navigation,.btn,.btn-sm,button.small,.chip,.in{font-size:var(--t-control)}
+.blended-navigation button,.blended-navigation a,.blended-navigation summary{font-weight:700;line-height:1.5}
+.card-title,.sheet h2,#dialog-content>h2{font-size:var(--t-heading);font-weight:700;line-height:1.4;letter-spacing:-.01em}
+body:has(#editor) h1{font-size:var(--t-display);font-weight:700;line-height:1.3;letter-spacing:-.01em}
+.card-sub,.hint,.fl,.tag,.pill,label,.planner-task-desc,.today-next-copy span,.today-flow,.optional-study-links summary,.study-total-label{font-size:var(--t-meta);line-height:1.6}
+.today-next-copy b,.planner-task-title,.sheet h3,.learning p{font-size:var(--t-body);line-height:1.6;word-break:keep-all;overflow-wrap:anywhere}
+.card-title,.datenav .d,.planner-task-subject,.study-paper-col-title,.study-paper-title,.study-paper-date,.today-next-copy b,.today-flow,.daily-close-step b,.daily-close-step span{font-weight:700}
+.study-total-hero b,.study-paper-total b,.study-time-total{font-weight:700;font-variant-numeric:tabular-nums}
+.hint,.card-sub,.intro p{max-width:44em}
+#identity,.whoami{font-size:var(--t-meta);font-weight:500}
+#identity button{font-size:var(--t-control)}
+input,select,textarea,.in{font-size:var(--t-body)}
+.planner-task-actions .btn,.study-timer-subjects .chip{font-size:var(--t-control)}
+.topbar .wrap{flex-wrap:wrap}
+.today-next-head>.tag{flex-shrink:0;white-space:nowrap}
+.study-paper-title{font-size:var(--t-heading)}
+.planner-list-head,.study-paper-col-title span,.study-paper-total span,.study-paper-date em{font-size:var(--t-meta)}
+.today-next-copy span,.optional-study-links summary,.study-total-label{font-weight:500}
