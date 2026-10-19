@@ -161,11 +161,11 @@ test('개인 인증이나 관리자 점검 identity가 바뀌면 숨은 DOM과 �
 });
 
 // 실제 화면의 함수와 이스케이프를 실행해 문자열 검사만으로 놓칠 수 있는 삽입을 확인한다.
-const chatRender = new Function('centerChat',
+const chatRender = new Function('centerChat', 'sync',
   functionBlock('esc') + functionBlock('centerChatStatusLabel') +
   functionBlock('centerChatBodyHtml') + functionBlock('centerChatItemHtml') +
   '\nfunction centerChatCreatedAt() { return { text: "12:34" }; }' +
-  '\nreturn { body: centerChatBodyHtml, item: centerChatItemHtml };')({ students: [] });
+  '\nreturn { body: centerChatBodyHtml, item: centerChatItemHtml };')({ students: [] }, { auth: () => ({id:'synthetic-teacher'}) });
 const link = url => '<a href="' + url + '" target="_blank" rel="noopener noreferrer">' + url + '</a>';
 
 test('일반 메시지는 URL 없음·한글·개행을 보존하고 HTTP(S) 여러 주소를 연다', () => {
