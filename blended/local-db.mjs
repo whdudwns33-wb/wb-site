@@ -29,4 +29,3 @@ export function seedDemo(db) {
     db.exec('COMMIT');
   } catch (error) { db.exec('ROLLBACK'); throw error; }
 }
-
