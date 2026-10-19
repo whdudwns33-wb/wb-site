@@ -124,11 +124,7 @@ saveVisibleReportNotes=(...args)=>blendedMe?.role==='teacher'?undefined:original
 const originalRoadmap=viewRoadmap;
 viewRoadmap=()=>session.isStaffLink && !studyRoadmapAvailable(currentStaff())?'<div class="card">아직 배정된 교재 로드맵이 없습니다. 담당 선생님에게 목표와 교재 계획을 확인해 주세요.</div>':originalRoadmap();
 renderTabs=function() {
-  const staff=session.isAdmin;
-  const tabs=[['today','오늘'],['guide','사용 안내'],['week','주간'],['roadmap','로드맵'],['month','일정·학사'],['ingang','인강'],['study','학습'],...(staff?[['write','학습 배부'],['board','학생 현황']]:[])];
-  $('#tabs').innerHTML=tabs.map(([k,label])=>'<button class="tab '+((route===k || k==='month' && route==='academic')?'on':'')+'" data-go="'+k+'">'+label+'</button>').join('')+
-    '<a class="tab" href="/blended/?student='+encodeURIComponent(currentStaff()?.id || '')+'#/'+(staff?'consultations':'reports')+'">상담·리포트</a>'+
-    (['owner','admin'].includes(blendedMe?.role)?'<a class="tab" href="/blended/#/management">강사·학생 관리</a>':'');
+  $('#tabs').innerHTML=blendedNavigation(blendedMe.role,currentStaff()?.id,route,true);
 };
 const originalMonth=viewMonth,originalAcademic=viewAcademic;
 const scheduleSections=()=>'<div class="blended-sections" aria-label="일정·학사 보기"><button class="btn '+(route==='month'?'btn-primary':'btn-ghost')+'" data-go="month">월간 일정·계획</button><button class="btn '+(route==='academic'?'btn-primary':'btn-ghost')+'" data-go="academic">시험·수행평가·자료 요청</button></div>';
@@ -147,14 +143,31 @@ render=function() {
     const sid=currentStaff().id;
     if(route==='today' || route==='board') {
       const items=tasksFor(sid,cursor);
-      const section=document.createElement('section');section.className='card';section.innerHTML='<div class="card-title">강사 학습 확인</div><p class="hint">학생 완료 표시와 강사 확인을 따로 기록합니다.</p>'+items.map(t=>{const c=getCheck(t.id,cursor)||{};return '<div class="blended-review"><span>'+esc(t.title)+'<small>'+(c.done?'학생 완료':'학생 수행 전')+' · '+(c.checked?'강사 확인 완료':'확인 대기')+'</small></span><button class="btn btn-sm" data-blended="check" data-id="'+esc(t.id)+'">확인·피드백</button></div>';}).join('');$('#view').append(section);
+      const section=document.createElement('section');section.className='card blended-review-card';section.innerHTML='<div class="card-title">강사 학습 확인</div><p class="hint">학생 완료 표시와 강사 확인을 따로 기록합니다.</p>'+items.map(t=>{const c=getCheck(t.id,cursor)||{};return '<div class="blended-review"><span>'+esc(t.title)+'<small>'+(c.done?'학생 완료':'학생 수행 전')+' · '+(c.checked?'강사 확인 완료':'확인 대기')+'</small></span><button class="btn btn-sm" data-blended="check" data-id="'+esc(t.id)+'">확인·피드백</button></div>';}).join('');$('#view').prepend(section);
     }
   }
   if(blendedMe?.role==='teacher') {
     $('#view').insertAdjacentHTML('afterbegin','<p class="hint mt14">담당 과목의 자료만 표시합니다. 전체 마감·포인트·최종 발행은 학생·원장 화면에서 확인합니다.</p>');
     for(const el of document.querySelectorAll('[data-act="reportpublish"],[data-act="reportwithdraw"],[data-act="weekclosesave"],[data-act="monthclosesave"]')) {el.disabled=true;el.title='최종 발행·전체 마감은 원장이 확인합니다.';}
   }
-  if(session.isAdmin) for(const el of document.querySelectorAll('[data-act="toggle"],[data-act="step"],[data-act="sttask"],[data-act="sttoggle"],[data-act="ingcheck"]')) {el.disabled=true;el.title='학생 계정에서 수행을 기록합니다. 강사는 아래 확인·피드백을 사용해 주세요.';}
+  if(session.isAdmin) for(const el of document.querySelectorAll('[data-act="toggle"],[data-act="step"],[data-act="sttask"],[data-act="sttoggle"],[data-act="ingcheck"]')) {el.disabled=true;el.title='학생 계정에서 수행을 기록합니다. 강사는 위쪽 확인·피드백을 사용해 주세요.';}
+  const view=$('#view'), next=$('#todayNextAction'), planner=$('#studyPlanner');
+  if(next) {
+    const rewards=[...next.querySelectorAll('.engagement-mini')];
+    const gauge=next.querySelector('[class*="point-gauge"]');if(gauge)rewards.unshift(gauge);
+    if(rewards.length) {const details=document.createElement('details');details.className='blended-rewards card';details.innerHTML='<summary>포인트·스탬프 보기</summary>';for(const node of rewards)details.append(node);view.append(details);}
+    for(const button of next.querySelectorAll('[data-act="todayjump"]'))if(button.textContent.includes('공부 시작'))button.textContent='체크리스트 보기';
+  }
+  if(planner && next && !session.isAdmin) {
+    next.after(planner);
+    next.insertAdjacentHTML('beforebegin','<div class="blended-workflow" aria-label="오늘 학습 바로가기"><button class="btn" data-blended="jump" data-target="studyPlanner">체크리스트</button><button class="btn" data-blended="jump" data-target="blendedTimer">순공 타이머</button><button class="btn" data-blended="jump" data-target="dailyCloseCard">오늘 마무리</button></div>');
+  }
+  const timer=view.querySelector('.study-planner-pane[aria-label="과목별 순공시간"]');if(timer)timer.id='blendedTimer';
+  if(currentStaff())view.insertAdjacentHTML('afterbegin','<p class="blended-student-context">'+(session.isAdmin?'선택한 학생: ':'내 플래너: ')+esc(currentStaff().name)+(session.isAdmin?' · 수행 기록은 학생이 작성하고, 강사는 확인·피드백을 남깁니다.':' · 기록 → 타이머 → 오늘 마무리')+'</p>');
+  for(const button of view.querySelectorAll('[data-act="day"]'))button.setAttribute('aria-label',Number(button.dataset.n)<0?'이전 날짜':'다음 날짜');
+  for(const [action,label] of Object.entries({stgoal:'하루 순공 목표 설정',stedit:'순공시간 수정'}))for(const button of view.querySelectorAll('[data-act="'+action+'"]'))button.setAttribute('aria-label',label);
+  for(const button of view.querySelectorAll('.navbtn:not([aria-label])'))button.setAttribute('aria-label',button.textContent.trim()==='‹'?'이전 기간':'다음 기간');
+  const quick=$('#qAdd');if(quick && !view.querySelector('label[for="qAdd"]'))quick.parentElement.insertAdjacentHTML('beforebegin','<label class="blended-quick-label" for="qAdd">오늘 할 공부 추가</label>');
   blendedScopeControls();
 };
 function blendedScopeControls() {
@@ -164,9 +177,16 @@ function blendedScopeControls() {
   for(const input of document.querySelectorAll('[data-weekgoal],[data-monthgoal]'))if(!allowed.includes(input.dataset.weekgoal || input.dataset.monthgoal))input.disabled=true;
   for(const button of document.querySelectorAll('[data-act]'))if(/^(weekclose|monthclose|dailyclose|monthevent|weekmove)|^st(goal|edit|save|subjadd)$/.test(button.dataset.act)) {button.disabled=true;button.title='학생 전체 일정·마감 설정은 학생 또는 원장이 관리합니다.';}
 }
+let blendedFeedbackBaseline='';
+const blendedFeedbackDirty=()=>!!$('#blendedFeedback') && $('#blendedFeedback').value!==blendedFeedbackBaseline;
+const originalCloseModal=closeModal;
+closeModal=function() {
+  if(blendedFeedbackDirty() && !confirm('아직 저장하지 않은 피드백을 버리고 닫을까요?'))return false;
+  return originalCloseModal();
+};
 const originalModal=modal;
 modal=function(...args) {
-  originalModal(...args);blendedScopeControls();
+  originalModal(...args);blendedFeedbackBaseline=$('#blendedFeedback')?.value || '';blendedScopeControls();
   for(const id of ['ingImages']) {const input=document.getElementById(id);if(input) {input.disabled=true;input.title='자동 수집 연결 대기 · 아래 목차를 직접 입력해 주세요.';}}
   for(const button of document.querySelectorAll('[data-act="ingimage"],[data-act="ingfetchurl"]')) {button.disabled=true;button.textContent+=' · 연결 대기';}
 };
@@ -194,6 +214,7 @@ document.addEventListener('click',async e=>{
   if(original && ['reportpublish','reportwithdraw'].includes(original.dataset.act) && blendedMe?.role!=='owner') {e.preventDefault();e.stopImmediatePropagation();toast('최종 발행은 원장이 진행합니다.');return;}
   if(!button)return;e.preventDefault();e.stopImmediatePropagation();
   const action=button.dataset.blended;
+  if(action==='jump'){const target=document.getElementById(button.dataset.target);if(target){target.scrollIntoView({block:'start'});target.tabIndex=-1;target.focus({preventScroll:true});}else toast('오늘 마무리는 해당 날짜의 학습 기록이 있을 때 열립니다.');return;}
   if(action==='account'){location.href='/blended/#/account';return;}
   if(action==='retry'){await sync.run();return;}
   if(action==='download') {
@@ -210,10 +231,10 @@ document.addEventListener('click',async e=>{
   }
   if(action==='checksave') {
     const feedback=$('#blendedFeedback').value.trim();if(!feedback)return toast('확인 내용을 입력해 주세요.');
-    setCheck(button.dataset.id,button.dataset.date,{checked:true,feedback});await sync.run();if(!sync.err){closeModal();render();toast('강사 확인을 저장했습니다.');}
+    setCheck(button.dataset.id,button.dataset.date,{checked:true,feedback});await sync.run();if(!sync.err){blendedFeedbackBaseline=$('#blendedFeedback').value;closeModal();render();toast('강사 확인을 저장했습니다.');}
   }
 },true);
-window.addEventListener('beforeunload',e=>{if(sync.dirty || blendedPending){e.preventDefault();e.returnValue='';}});
+window.addEventListener('beforeunload',e=>{if(sync.dirty || blendedPending || blendedFeedbackDirty()){e.preventDefault();e.returnValue='';}});
 async function startBlendedPlanner() {
   try {
     const remote=await blendedApi('planner_state');blendedApply(remote);blendedLoaded=true;

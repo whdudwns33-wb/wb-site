@@ -5,15 +5,17 @@
   <meta name="robots" content="noindex, nofollow"><meta name="theme-color" content="#17364a">
   <title>블렌디드 플래너</title>
   <link rel="stylesheet" href="/blended/style.css">
+  <link rel="stylesheet" href="/blended/ui.css"><script src="/blended/navigation.js" defer></script>
   <script src="/blended/external-links.js" defer></script><script src="/blended/app.js" defer></script>
 </head>
 <body>
   <a class="skip" href="#main">본문으로 이동</a>
   <div class="demo-bar" id="environment">연결 확인 중 <span>학원 연결 대기 · 실제 발송 비활성</span></div>
-  <header class="top"><a href="/blended/" class="brand"><span class="mark" aria-hidden="true">b</span>블렌디드 <span class="brand-small">플래너</span></a><div id="identity"></div></header>
+  <header class="top"><a href="/blended/" class="brand"><span class="mark" aria-hidden="true">WB</span>블렌디드 <span class="brand-small">플래너</span></a><div id="identity"></div></header>
   <div id="notice" role="status" aria-live="polite"></div>
   <main id="main" tabindex="-1"><p>계정을 확인하고 있습니다.</p></main>
   <footer>배정부터 다음 약속까지, 학습의 흐름을 이어갑니다.<br><small>외부 사이트의 성적·진도는 연동되지 않습니다.</small></footer>
-  <dialog id="editor" aria-labelledby="dialog-title"><div id="dialog-content"></div><button type="button" class="quiet close" data-action="close">닫기</button></dialog>
+  <dialog id="editor" aria-labelledby="dialog-title"><div id="dialog-content"></div></dialog>
+<dialog id="discard-editor" aria-labelledby="discard-title"><h2 id="discard-title">변경 내용을 버릴까요?</h2><p>아직 저장하지 않은 입력이 있습니다.</p><div class="actions"><button type="button" data-action="keep-editing">계속 작성</button><button type="button" class="quiet" data-action="discard-editing">변경 버리고 닫기</button></div></dialog>
 </body>
 </html>

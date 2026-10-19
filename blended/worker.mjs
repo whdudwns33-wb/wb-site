@@ -45,7 +45,7 @@ export default {
       if(request.method!=='POST'||request.headers.get('Origin')!==origin||request.headers.get('X-Blended-Request')!=='1'||!request.headers.get('Content-Type')?.startsWith('application/json'))return json(403,{code:'ORIGIN',error:'허용되지 않은 요청입니다.'});
       return env.PLANNER.get(env.PLANNER.idFromName('blended-production-v1')).fetch(request);
     }
-    if(!['GET','HEAD'].includes(request.method)||!['/blended/','/blended/guardian/','/blended/app.js','/blended/style.css','/blended/external-links.js','/blended/planner/','/blended/planner/planner.js','/blended/planner/planner.css','/blended/planner/qr.js'].includes(url.pathname))return json(404,{code:'NOT_FOUND'});
+    if(!['GET','HEAD'].includes(request.method)||!['/blended/','/blended/guardian/','/blended/app.js','/blended/style.css','/blended/ui.css','/blended/navigation.js','/blended/external-links.js','/blended/planner/','/blended/planner/planner.js','/blended/planner/planner.css','/blended/planner/qr.js'].includes(url.pathname))return json(404,{code:'NOT_FOUND'});
     const isPlanner=url.pathname.startsWith('/blended/planner/');
     if(url.pathname==='/blended/planner/')url.pathname='/blended/planner/index.html';
     if(url.pathname==='/blended/'||url.pathname==='/blended/guardian/')url.pathname='/blended/index.html';

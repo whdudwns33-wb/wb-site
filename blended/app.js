@@ -7,6 +7,8 @@
   const labels = {studentVoice:'학생 의견',facts:'함께 확인한 점',strengths:'잘한 점',guidance:'다음 지도 방향',home:'가정 협조 사항',nextGoal:'다음 실천 목표',due:'실천 기한',nextCheck:'다음 확인일'};
   let runtime = {mode:'production',ready:false};
   let state = null, tab = location.hash.slice(2) || 'learning', selected = new URLSearchParams(location.search).get('student') || '', day = '', editing = null, busy = false;
+  let editorBaseline = '';
+  const discardDialog = $('#discard-editor');
   const dialog = $('#editor'), retries = new WeakMap();
   const isStaff = () => ['owner','admin','teacher'].includes(state?.me.role);
   const isAdmin = () => ['owner','admin'].includes(state?.me.role);
@@ -24,7 +26,7 @@
     catch { throw new Error('연결하지 못했습니다. 입력은 이 화면에 남아 있습니다. 화면을 닫지 말고 다시 시도해 주세요.'); }
     const result = await response.json();
     if (!response.ok) {
-      if (response.status === 401 && action !== 'login') { state = null; closeEditor(); loginView(); }
+      if (response.status === 401 && action !== 'login') { state = null; closeEditor(true); loginView(); }
       throw Object.assign(new Error(result.error || '요청을 처리하지 못했습니다.'),{code:result.code});
     }
     return result;
@@ -38,7 +40,7 @@
     if(!location.hash && state.me.role !== 'guardian') {location.replace('/blended/planner/'+(selected?'?student='+encodeURIComponent(selected):''));return;}
     day ||= state.today;
     if (!state.students.some(s => s.id === selected)) selected = state.students[0]?.id || '';
-    if (editing?.student_id && !state.students.some(s => s.id === editing.student_id)) { closeEditor(); notice('담당 또는 열람 권한이 변경되어 편집을 닫았습니다.',true); }
+    if (editing?.student_id && !state.students.some(s => s.id === editing.student_id)) { closeEditor(true); notice('담당 또는 열람 권한이 변경되어 편집을 닫았습니다.',true); }
     render();
   }
   function nav() {
@@ -46,7 +48,7 @@
       ? [['learning','담당 학습'],['consultations','상담·약속'],['reports','리포트'],...(isAdmin() ? [['management','강사·담당 관리']] : []),['account','내 계정']]
       : [['learning','오늘 학습'],['week','이번 주'],['reports','상담·리포트'],['account','내 계정']];
     if (!items.some(i => i[0] === tab)) tab = items[0][0];
-    return `<nav class="tabs" aria-label="주 메뉴">${state.me.role !== 'guardian' ? '<a href="/blended/planner/?student='+encodeURIComponent(selected)+'">전체 플래너</a>' : ''}${items.map(([key,label]) => `<button type="button" data-tab="${key}" ${tab === key ? 'aria-current="page"' : ''}>${label}</button>`).join('')}</nav>`;
+    return `<nav class="tabs" aria-label="주 메뉴">${items.map(([key,label]) => `<button type="button" data-tab="${key}" ${tab === key ? 'aria-current="page"' : ''}>${label}</button>`).join('')}</nav>`;
   }
   function filters(withDate = false) {
     return `<div class="filters"><label>${state.me.role === 'student' ? '내 플래너' : '학생 선택'}<select id="student-filter">${options(state.students.map(s => [s.id,s.name]),selected)}</select></label>${withDate ? `<label>학습 날짜<input id="day-filter" type="date" value="${esc(day)}"></label>` : ''}${button('refresh','최신 내용 확인')}</div>`;
@@ -57,7 +59,7 @@
     const navigation = nav();
     const titles = {learning:isStaff() ? '학습의 다음 단계를 살펴보세요.' : '오늘, 한 가지씩 해봐요.',week:'이번 주의 학습과 약속',consultations:'배운 것을 돌아보고, 다음을 정해요.',reports:'함께 확인하는 성장 기록',management:'강사와 담당 학생 연결',account:'내 계정과 연결 상태'};
     const descriptions = {learning:'학생의 완료 표시와 강사의 학습 확인을 구분합니다.',week:'기한이 지난 학습은 날짜를 바꾸지 않고 남겨둡니다.',consultations:'지난 약속과 학습 기록을 바탕으로 상담을 준비합니다.',reports:'공개 내용만 검토해 발행합니다. 실제 알림은 발송되지 않습니다.',management:'개별 계정에 과목과 기간을 정해 담당 권한을 부여합니다.',account:'현재 로그인과 서비스 연결 상태를 확인합니다.'};
-    $('#main').innerHTML = `<div class="intro"><div><h1>${titles[tab]}</h1><p>${descriptions[tab]}</p></div><div class="date-label">${esc(state.today)}</div></div>${navigation}<div id="view"></div>`;
+    $('#main').innerHTML = `${blendedNavigation(state.me.role,selected,tab)}<div class="intro"><div><h1>${titles[tab]}</h1><p>${descriptions[tab]}</p></div><div class="date-label">${esc(state.today)}</div></div>${navigation}<div id="view"></div>`;
     const views = {learning:learningView,week:learningView,consultations:consultationsView,reports:reportsView,management:managementView,account:accountView};
     $('#view').innerHTML = views[tab]();
     if(tab==='reports') {
@@ -97,12 +99,19 @@
   function accountView() {
     return `<section class="sheet"><h2>${esc(state.me.name)}</h2><p>${roles[state.me.role]} / ${esc(state.me.login)} / 활성 계정</p><div class="actions">${button('password','비밀번호 변경')}</div><h3 class="spacer">로그인 연결</h3>${state.sessions.map(s => `<p class="hint">로그인 ${esc(s.created_at)}<br>만료 ${esc(new Date(s.expires).toISOString())}</p>`).join('')}<p class="hint">각 브라우저의 로그인은 따로 발급됩니다. 비활성화하면 연결이 해제됩니다.</p></section><section class="sheet"><h2>연결 상태</h2><p>학원 원본: 연결 대기<br>외부 학습 서비스: 성적·진도 미연동<br>보호자 알림: 비활성</p><p class="hint">${state.mode === 'synthetic-local' ? '현재 화면의 모든 학생·강사·보호자는 가상 자료입니다.' : '블렌디드 전용 계정과 저장소를 사용합니다. 학원 원본 연동은 대기 중입니다.'}</p></section>`;
   }
+  function editorValue() { const form=$('#editor form'); return form ? JSON.stringify([...new FormData(form)]) : ''; }
+  function editorDirty() { return dialog.open && editorValue() !== editorBaseline; }
   function openEditor(title,content,form = '',record = null) {
     editing = record;
-    $('#dialog-content').innerHTML = `<h2 id="dialog-title">${title}</h2>${form ? `<form data-form="${form}">${content}<div class="error-box" role="alert"></div><button type="submit">${form === 'publish' ? '공개본 발행' : form === 'withdraw' ? '리포트 철회' : '저장'}</button></form>` : content}`;
+    const close = button('close','닫기');
+    $('#dialog-content').innerHTML = `<h2 id="dialog-title">${title}</h2>${form ? `<form data-form="${form}"><div class="editor-fields">${content}</div><div class="editor-actions"><div class="error-box" role="alert"></div><button type="submit">${form === 'publish' ? '공개본 발행' : form === 'withdraw' ? '리포트 철회' : '저장'}</button>${close}</div></form>` : `<div class="editor-fields">${content}</div><div class="editor-actions">${close}</div>`}`;
+    editorBaseline = editorValue();
     dialog.showModal();
   }
-  function closeEditor() { dialog.close(); $('#dialog-content').innerHTML = ''; editing = null; }
+  function closeEditor(force = false) {
+    if(!force && editorDirty()) { if(!discardDialog.open) discardDialog.showModal(); return; }
+    discardDialog.close(); dialog.close(); $('#dialog-content').innerHTML = ''; editing = null; editorBaseline = '';
+  }
   function studentSubjectFields(record) {
     const subjects = state.me.role === 'teacher' ? [...new Set(state.assignments.filter(a => a.student_id === selected && a.active && a.starts <= state.today && a.ends >= state.today).map(a => a.subject))] : ['수학','영어','국어','사회','과학','기타'];
     return `<div class="form-grid">${input('studentLabel','학생',name(record?.student_id || selected),'text','disabled')}<label>과목<select name="subject" ${record ? 'disabled' : ''}>${options(subjects.map(s => [s,s]),record?.subject || subjects[0])}</select></label></div>`;
@@ -111,7 +120,7 @@
   function publicHTML(data) { return `<dl class="report-body">${Object.entries(labels).filter(([key]) => data[key]).map(([key,label]) => `<dt>${label}</dt><dd>${esc(data[key])}</dd>`).join('')}</dl>`; }
   async function consultEditor(c) {
     const data = c?.public || {}, internal = c ? (await api('consult_get',{id:c.id})).internalNote : '';
-    openEditor(c ? '상담 기록' : '상담 준비',`${studentSubjectFields(c)}<div class="form-grid">${input('heldAt','상담 일시',c ? c.held_at.slice(0,16) : day+'T16:00','datetime-local','required')}${input('nextCheck','다음 확인일',data.nextCheck || '','date')}${input('periodStart','집계 시작일',c?.period_start || day,'date','required')}${input('periodEnd','집계 종료일',c?.period_end || day,'date','required')}</div>${button('summary','학습 사실 불러오기')}<div id="summary-preview"></div><div class="private">${area('internalNote','내부 메모 · 강사와 운영 담당만 열람',internal)}<p class="hint">아래 공개 내용과 분리 저장됩니다. 공개본에 자동 복사되지 않습니다.</p></div><div class="public"><h3>학생·보호자 공개 내용</h3>${area('studentVoice',labels.studentVoice,data.studentVoice)}${area('facts',labels.facts,data.facts,true)}${area('strengths',labels.strengths,data.strengths)}${area('guidance',labels.guidance,data.guidance,true)}${area('home',labels.home,data.home)}${input('nextGoal',labels.nextGoal,data.nextGoal || '','text','required maxlength="200" '+(c?.status === 'complete' ? 'readonly' : ''))}${input('due',labels.due,data.due || day,'date','required '+(c?.status === 'complete' ? 'readonly' : ''))}</div><p class="hint">저장은 초안만 갱신합니다. 완료·검토 요청·발행은 각각 진행해 주세요.</p>`,'consult',c);
+    openEditor(c ? '상담 기록' : '상담 준비',`<fieldset><legend>상담 기본 정보</legend>${studentSubjectFields(c)}<div class="form-grid">${input('heldAt','상담 일시',c ? c.held_at.slice(0,16) : day+'T16:00','datetime-local','required')}${input('nextCheck','다음 확인일',data.nextCheck || '','date')}${input('periodStart','집계 시작일',c?.period_start || day,'date','required')}${input('periodEnd','집계 종료일',c?.period_end || day,'date','required')}</div>${button('summary','학습 사실 불러오기')}<div id="summary-preview"></div></fieldset><fieldset class="private"><legend>내부 기록 · 담당자 전용</legend>${area('internalNote','내부 메모 · 강사와 운영 담당만 열람',internal)}<p class="hint">아래 공개 내용과 분리 저장됩니다. 공개본에 자동 복사되지 않습니다.</p></fieldset><fieldset class="public"><legend>학생·보호자 공개 내용</legend>${area('studentVoice',labels.studentVoice,data.studentVoice)}${area('facts',labels.facts,data.facts,true)}${area('strengths',labels.strengths,data.strengths)}${area('guidance',labels.guidance,data.guidance,true)}${area('home',labels.home,data.home)}${input('nextGoal',labels.nextGoal,data.nextGoal || '','text','required maxlength="200" '+(c?.status === 'complete' ? 'readonly' : ''))}${input('due',labels.due,data.due || day,'date','required '+(c?.status === 'complete' ? 'readonly' : ''))}</fieldset><p class="hint">저장은 초안만 갱신합니다. 완료·검토 요청·발행은 각각 진행해 주세요.</p>`,'consult',c);
     $('textarea[name=internalNote]').maxLength = 4000;
   }
   async function act(action,id) {
@@ -121,8 +130,10 @@
       return openEditor('공개 학습 리포트',`<h2>${esc(s.student.name)} · ${esc(r.title)}</h2><p>${esc(s.periodStart)} ~ ${esc(s.periodEnd)}</p><p>배정 ${esc(s.summary.total)} · 학생 완료 ${esc(s.summary.done)} · 순공시간 ${Math.round((s.summary.studySecs || 0)/60)}분</p><dl class="report-body"><dt>학생 회고</dt><dd>${esc(s.reflection)}</dd><dt>공개 지도 의견</dt><dd>${esc(s.directorNote)}</dd><dt>다음 집중 목표</dt><dd>${esc(s.nextFocus)}</dd></dl>`);
     }
     if (action === 'close') return closeEditor();
+    if (action === 'keep-editing') return discardDialog.close();
+    if (action === 'discard-editing') return closeEditor(true);
     if (action === 'refresh') { await refresh(); notice('최신 내용을 확인했습니다.'); return; }
-    if (action === 'logout') { await api('logout'); state=null; selected=''; closeEditor(); notice(); loginView(); return; }
+    if (action === 'logout') { await api('logout'); state=null; selected=''; closeEditor(true); notice(); loginView(); return; }
     if (action === 'password') return openEditor('비밀번호 변경',`${input('currentPassword','현재 비밀번호','','password','required autocomplete="current-password"')}${input('password','새 비밀번호','','password','required minlength="12" maxlength="128" autocomplete="new-password"')}`,'password');
     if (action === 'new-student') return openEditor('학생 계정 추가',`${input('name','학생 표시 이름','','text','required maxlength="80"')}${input('login','학생 아이디','','text','required pattern="[a-z0-9][a-z0-9._-]{2,59}"')}${input('password','학생 비밀번호','','password','required minlength="12" maxlength="128" autocomplete="new-password"')}<p class="hint">학원 원본에서 가져오지 않고 새 플래너 계정을 만듭니다.</p>`,'student');
     if (action === 'new-learning') return openEditor('학습 배정',`${studentSubjectFields()}${input('title','교재·범위·해야 할 일','','text','required maxlength="200"')}${input('due','학습 날짜',day,'date','required')}<label>온라인 학습 바로가기<select name="linkKey">${options([['','오프라인 / 링크 없음'],['metamath_student','메타수학 학생홈'],['leaders_eye','리더스아이'],['nelt_student','넬트 학생 응시']],'')}</select></label><p class="hint">바로가기 클릭은 외부 서비스의 성적·진도 확인이 아닙니다.</p>`,'learning');
@@ -193,15 +204,15 @@
     const signature=JSON.stringify({action,payload}),previous=retries.get(form);
     const requestId=previous?.signature===signature?previous.requestId:crypto.randomUUID(); retries.set(form,{signature,requestId});
     busy=true;const submit=form.querySelector('[type=submit]');submit.disabled=true;form.querySelector('.error-box').textContent='';
-    try {await api(action,payload,requestId);if(kind==='password'){closeEditor();state=null;loginView();notice('비밀번호가 변경되었습니다. 다시 로그인해 주세요.');return;}await refresh();closeEditor();notice(kind==='login'?'로그인했습니다.':kind==='publish'?'공개본을 발행했습니다. 알림은 발송하지 않았습니다.':'저장했습니다.');}
+    try {await api(action,payload,requestId);if(kind==='password'){closeEditor(true);state=null;loginView();notice('비밀번호가 변경되었습니다. 다시 로그인해 주세요.');return;}await refresh();closeEditor(true);notice(kind==='login'?'로그인했습니다.':kind==='publish'?'공개본을 발행했습니다. 알림은 발송하지 않았습니다.':'저장했습니다.');}
     catch(error) {
       const box=form.querySelector('.error-box'); if(box) {box.textContent=error.message; if(error.code==='CONFLICT') box.innerHTML+=`<div class="actions">${button('refresh','입력 유지하고 최신 목록 확인')}</div>`;}
-      if(error.code==='SCOPE') {closeEditor();await refresh().catch(()=>{});notice(error.message,true);}
+      if(error.code==='SCOPE') {closeEditor(true);await refresh().catch(()=>{});notice(error.message,true);}
     } finally {busy=false;submit.disabled=false;}
   });
   dialog.addEventListener('cancel',e=>{e.preventDefault();closeEditor();});
   // shortcut: 초안은 열린 화면의 메모리에만 유지, 오프라인 편집 요구가 생기면 계정별 암호화 보관을 검토한다.
-  window.addEventListener('beforeunload',e=>{if(dialog.open && $('#editor form')){e.preventDefault();e.returnValue='';}});
+  window.addEventListener('beforeunload',e=>{if(editorDirty()){e.preventDefault();e.returnValue='';}});
   setInterval(()=>{if(state && !busy && !dialog.open) refresh().catch(error=>notice(error.message,true));},30000);
   document.addEventListener('visibilitychange',()=>{if(!document.hidden && state && !busy && !dialog.open) refresh().catch(error=>notice(error.message,true));});
   api('runtime').then(result=>{runtime=result;$('#environment').innerHTML=runtime.mode==='synthetic-local'?'로컬 체험 <span>가상 자료만 사용합니다. 학원 연결 대기 · 실제 발송 비활성</span>':'블렌디드 플래너 <span>학원 연결 대기 · 실제 메시지 발송 비활성</span>';return refresh();}).catch(error=>{loginView();if(error.code!=='AUTH')notice(error.message,true);});

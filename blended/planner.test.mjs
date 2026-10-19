@@ -13,7 +13,7 @@ test('원본 화면을 재사용하며 기존 저장소·인증 초기화를 실
   assert.ok(!assets['planner.js'].includes('https://wb-sync.whdudwns33.workers.dev'));
   assert.ok(!assets['planner.js'].includes('\nload();\n'));
   assert.ok(!assets['index.html'].includes('<script>'));
-  assert.ok(assets['planner.js'].includes("['month','일정·학사']"));
+  assert.ok(assets['index.html'].includes('/blended/navigation.js'));
 });
 
 test('플래너 저장·권한·연결·충돌·리포트·질문 경계를 가상 자료로 확인',async t=>{
