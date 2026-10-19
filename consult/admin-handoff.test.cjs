@@ -8,18 +8,54 @@ const html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
 test('consult creates a short-lived admin device link without secrets or passwords', () => {
   const block = html.match(/case 'adminlink':[\s\S]*?\n\s*break;/)?.[0] || '';
   assert.match(block, /issueAdminHandoff\(\)/);
-  assert.match(block, /#admin=/);
+  assert.match(block, /adminDeviceConnectLink\(d\.code\)/);
   assert.doesNotMatch(block, /syncSecret|adminPin|\?s=/);
+});
+
+test('director creates a local one-time admin QR for a trusted teacher tablet', () => {
+  const settings = html.match(/function viewSettings\(\)[\s\S]*?\n}/)?.[0] || '';
+  const link = html.match(/function adminDeviceConnectLink\(code\)[\s\S]*?\n}/)?.[0] || '';
+  const qrModal = html.match(/function adminDeviceQrModal\(link\)[\s\S]*?\n}/)?.[0] || '';
+  const action = html.match(/case 'adminqr':[\s\S]*?\n\s*break;/)?.[0] || '';
+
+  assert.match(settings, /data-act="adminqr"[^>]*>관리자 QR 만들기<\/button>/);
+  assert.match(link, /#admin=/);
+  assert.match(action, /session\.isAdmin[\s\S]*?issueAdminHandoff\(\)[\s\S]*?adminDeviceQrModal\(adminDeviceConnectLink\(d\.code\)\)/);
+  assert.match(qrModal, /WBQR\.svg\(link, \{ size: 280 \}\)/);
+  assert.match(qrModal, /전체 관리자 권한[\s\S]*?10분 안에 한 기기에서 한 번만[\s\S]*?최대 5대/);
+  assert.doesNotMatch(qrModal, /google|qrserver|chart\.api/i);
 });
 
 test('new admin device exchanges the code once and stores only its device token', () => {
   const connect = html.match(/async function connectAdminDevice\(\)[\s\S]*?\n}/)?.[0] || '';
+  assert.ok(connect.indexOf('if (!save())') < connect.indexOf('await sync.exchangeAdmin(code)'),
+    '패드가 저장할 수 있는지 확인한 뒤에만 1회 코드를 소비한다');
   assert.match(connect, /exchangeAdmin\(code\)/);
   assert.match(connect, /state\.settings\.adminToken = d\.token/);
   assert.match(connect, /state\.settings\.syncSecret = ''/);
   assert.match(connect, /state\.settings\.pullAt = 0/);
   assert.match(connect, /state\.settings\.pushAt = 0/);
   assert.match(connect, /session\.unlock\(\)/);
+});
+
+test('admin handoff never uploads a previous student cache with admin authority', () => {
+  const reset = html.match(/function resetAdminDeviceCache\(token\)[\s\S]*?\n}/)?.[0] || '';
+  const connect = html.match(/async function connectAdminDevice\(\)[\s\S]*?\n}/)?.[0] || '';
+  const studentReset = html.match(/function resetStudentLinkCache\(token\)[\s\S]*?\n}/)?.[0] || '';
+  const run = html.match(/async run\(duringStudentConnect\)[\s\S]*?\n  },/)?.[0] || '';
+
+  assert.match(run, /if \(pendingAdminCode\) return;[\s\S]*?const auth = this\.auth\(\)/,
+    'QR 교환 중에는 기존 관리자 자격으로 일반 동기화를 시작하지 않는다');
+  assert.match(connect, /replacingStudentCache[\s\S]*?adminToken = ''[\s\S]*?syncSecret = ''[\s\S]*?session\.lock\(\)/);
+  assert.match(connect, /sync\.collect\([\s\S]*?return;[\s\S]*?exchangeAdmin\(code\)/);
+  assert.match(connect, /resetAdminDeviceCache\(d\.token\)/);
+  assert.ok(connect.indexOf('resetAdminDeviceCache(d.token)') < connect.indexOf('await sync.run()'),
+    '학생 캐시를 비운 뒤 첫 관리자 동기화를 시작한다');
+  assert.match(reset, /staff: \[\], tasks: \[\], checks: \{\}/);
+  assert.match(reset, /myToken: ''/);
+  assert.match(reset, /localLearningLogins: \{\}/);
+  assert.match(studentReset, /adminToken: '', syncSecret: ''/,
+    '학생 전환 시 이전 관리자 자격을 남기지 않는다');
 });
 
 test('temporary admin handoff failures keep only a volatile retry code', () => {
