@@ -175,6 +175,22 @@ test('generic sync locks session4 attendance after 23:50 but permits a same-att 
   assert.equal(beforeConfiguredStart.status, 200, JSON.stringify(beforeConfiguredStart.body));
 });
 
+test('subject scope locks only its subject; pending cycle leaves attendance editable', async t => {
+  const db = new TestD1(); t.after(() => db.close()); seedAuth(db);
+  const scoped = { ...student('subject-student'), sessionBillingSubject: '독해사고력' };
+  saveRoster(db, [scoped]);
+  saveTask(db, 'scope-math', scoped.id, { subject: '사고력수학' });
+  saveTask(db, 'scope-reading', scoped.id, { subject: '독해사고력' });
+  let result = await sync(db, [change('scope-math', PAST_DATE, 'P', 2)]);
+  assert.equal(result.status, 200, JSON.stringify(result.body));
+  result = await sync(db, [change('scope-math', PAST_DATE, 'A', 3)]);
+  assert.equal(result.status, 200, JSON.stringify(result.body));
+  assert.throws(() => saveExistingCheck(db, 'scope-reading', PAST_DATE), /SESSION4_ATTENDANCE_LOCKED/);
+  saveRoster(db, [{ ...scoped, sessionCycleStartDate: '' }]);
+  result = await sync(db, [change('scope-reading', PAST_DATE, 'P', 4)]);
+  assert.equal(result.status, 200, JSON.stringify(result.body));
+});
+
 test('23:49 remains editable and the same date becomes immutable at 23:50 KST', async t => {
   const db = new TestD1(); t.after(() => db.close()); seedAuth(db);
   const date = '2099-01-05';

@@ -395,6 +395,20 @@ test('session4 absence skips automatic legacy creation but still allows an expli
   assert.equal(manual.body.case.history[0].creationMode, 'manual');
 });
 
+test('pending session4 start suppresses only the scoped subject automatic makeup', async () => {
+  for (const scope of ['영어', '독해사고력']) {
+    const db = new TestD1(); seed(db);
+    const document = roster();
+    Object.assign(document.roster.students[0], { billingMode: 'session4', sessionCycleStartDate: '', sessionBillingSubject: scope });
+    db.prepare("UPDATE private_rosters SET data=? WHERE app='task'").bind(JSON.stringify(document)).run();
+    const result = await call(db, own('teacher-a'), {
+      action: 'create_from_absence', sourceTaskId: 'lesson-a', sourceDate: '2026-08-10', creationMode: 'automatic'
+    });
+    assert.equal(result.status, scope === '영어' ? 409 : 200, JSON.stringify(result.body));
+    if (scope === '영어') assert.equal(result.body.code, 'SESSION4_AUTOMATIC_MAKEUP_DISABLED');
+  }
+});
+
 test('session4 automatic makeup keeps the prior policy for absences before the configured cycle start', async () => {
   const db = new TestD1(); seed(db);
   const document = roster();

@@ -1113,6 +1113,8 @@ async function inspectLockedSession4AttendanceChanges(env, app, entries, now) {
 
   const lockedCandidates = lessonCandidates.filter(item => {
     const task = tasks.get(item.identity.taskId);
+    const student = students.find(row => row.id === String(task && task.data.studentId || ''));
+    if (student && student.sessionBillingSubject && task.data.subject !== student.sessionBillingSubject) return false;
     const start = sessionStarts.get(String(task && task.data.studentId || ''));
     return start && item.identity.date >= start && session4AttendanceLockedAt(item.identity.date, now);
   });
