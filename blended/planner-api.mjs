@@ -1,3 +1,4 @@
+import {reportPreset} from './report-layout.mjs';
 // 원본의 학습 자료 형식을 유지하되 인증·범위·충돌 검사는 블렌디드 저장 경계에서 수행한다.
 const subjects = {math:'수학',english:'영어',korean:'국어',social:'사회',science:'과학',other:'기타'};
 export const subjectKey = value => Object.keys(subjects).find(k => k === value || subjects[k] === value) || (value === '탐구' || value === 'explore' ? 'social' : 'other');
@@ -12,7 +13,7 @@ const writableStudentKinds = new Set(['','mgoal','material_request','lecture_req
 const metadata = ['taskId','date','done','note','steps','count','blocked','updatedAt'];
 const pick=(obj,keys)=>Object.fromEntries(keys.filter(k=>obj && k in obj).map(k=>[k,obj[k]]));
 function publicSnapshot(s) {
-  return {...pick(s,['schemaVersion','periodType','periodKey','periodStart','periodEnd','asOf','isPartial','elapsedDays','dailyGoalMin','reflection','directorNote','nextFocus','layout']),
+  return {...pick(s,['schemaVersion','periodType','periodKey','periodStart','periodEnd','asOf','isPartial','elapsedDays','dailyGoalMin','reflection','directorNote','nextFocus','layout','reportPreset']),
     student:pick(s.student,['id','name']),summary:pick(s.summary,['done','total','pct','blocked','studySecs','goalDays']),
     subjects:Object.fromEntries(Object.keys(subjects).filter(k=>s.subjects?.[k]).map(k=>[k,pick(s.subjects[k],['done','total','studySecs'])])),
     rows:(s.rows || []).map(r=>pick(r,['taskId','date','title','subject','origin','status'])),days:(s.days || []).map(r=>pick(r,['date','done','total','studySecs']))};
@@ -157,7 +158,7 @@ export function createPlanner({one,all,run,access,canAccess,requireThat,revision
       guard(['week','month'].includes(data.reportType) && ['published','withdrawn'].includes(data.reportStatus));
       guard(data.seriesKey===data.reportType+':'+data.staffId+':'+data.periodKey);
       guard(data.reportStatus==='published'?data.snapshot?.student?.id===data.staffId:data.snapshot===null);
-      if(data.snapshot) {guard((!data.snapshot.rows || Array.isArray(data.snapshot.rows)) && (!data.snapshot.days || Array.isArray(data.snapshot.days)));data.snapshot=publicSnapshot(data.snapshot);data.snapshot.layout=reportLayout();}
+      if(data.snapshot) {guard((!data.snapshot.rows || Array.isArray(data.snapshot.rows)) && (!data.snapshot.days || Array.isArray(data.snapshot.days)));data.snapshot=publicSnapshot(data.snapshot);data.snapshot.reportPreset=reportPreset(data.snapshot.reportPreset);data.snapshot.layout=reportLayout(data.snapshot.reportPreset);}
     }
   }
   function save(u,p) {

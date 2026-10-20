@@ -263,3 +263,19 @@ Aside 사용자 지정 세션75Iu7ZZT1MC7VD9b(옵시디언 구상 정리)에 라
 실행: npm ci --ignore-scripts --prefix blended → node blended/build.mjs → node blended/server.mjs. 기존 README Playwright 환경변수를 지정하고 node blended/reports-browser.cjs 또는 REPORT_SAMPLE_DIR 지정 후 node blended/report-variants.cjs. 검사 node --test blended/reports.test.mjs, 전체 node scripts/check.mjs --serial. 폰트 첫 빌드만 공식 저장소 다운로드가 필요하고 이후 고정 해시 캐시를 재사용한다. 배포는 기존 전용 Wrangler 설정만 사용한다.
 
 미확인: 실제 학생/사용자 종단 시험·실기기/낭독기·느린 이동통신 성능. 양식 편집기는 첫 로드 용량이 크며 휴대폰에서는 편집 영역을 좌우로 이동한다. 기존 자동 로그인30분/동시 로그아웃 미연동 한계와 실제 발송 미연동은 그대로다.
+
+### 리포트 3종 앱 선택·운영 배포 (2026-10-20 후속)
+
+작업 경로 C:/Users/wb/Projects/wb-site-blended-reports-20261020, 별도 브랜치 codex/blended-report-presets-20261020. 원본 consult 파일/학원 앱/운영 자료는 수정하지 않았다. 앞 절의 비교 시안에 이어 이번 요청으로 실제 앱의 선택 기능을 추가했다.
+
+상담 발행 검토와 미리보기에 요약형/상담형/상세형 선택을 추가했다. 기존 원장 저장 양식을 네 번째 항목으로 보존했다. 선택한 형식 미리보기는 새 탭에서 열며 발행 검토 선택을 유지한다. 독립 미리보기의 선택은 비교용이고 최종 선택은 발행 검토에서 지정한다. 주간·월간 플래너도 원본 대신 어댑터에 선택을 연결했다. 요약은 핵심 기록·목표, 상담은 의견·지도 방향의 두 열 배치, 상세는 개별 수행 기록을 포함한 두 쪽 기본 배치다. 내용이 길면 자동으로 쪽수가 늘어난다. 주간·월간 수행 상태는 한국어로 표시한다.
+
+서버에서 형식 이름을 허용 목록으로 검사하고 양식을 생성해 발행 스냅샷에 저장한다. 클라이언트가 보낸 임의 양식은 무시한다. 기존 발행본·접근권한·원장 전용 최종 발행·내부 메모 분리는 유지했다. 이미 발행된 리포트는 URL의 preset을 바꿔도 변하지 않는다. DB 스키마 추가 변경은 없다.
+
+변경 파일: api.mjs, app.js, planner-adapter.js, planner-api.mjs, report-layout.mjs, report-model.mjs, reports-page.js, reports.css와 해당 테스트(planner.test.mjs/planner-browser.cjs/reports.test.mjs/reports-browser.cjs/worker-check.mjs), README.md/RESULTS.md. 새 의존성 없음.
+
+검증: API·플래너·리포트 관련 27/27 통과. 이후 최종 플래너/리포트11/11 및 양식2/2 재확인. 실제 가상 브라우저에서 세 형식 선택→미리보기→PDF→앱 발행→형식 고정, 한국어 PDF 추출/내부 메모 제외/기한·다음 확인일 포함, 1365px/390px 넘침0, 편집기/권한 회귀 통과. 요약1쪽/상담1쪽/상세2쪽 PDF와 화면 캡처는 blended/evidence/report-upgrade/preset-* 에 있으며 PDF를 이미지로 렌더해 확인했다. 원본6화면/일정·학사/로드맵/인강/주간 발행·보호자 열람 브라우저 회귀 통과. Cloudflare 로컬 엔진에서 형식 미리보기·잘못된 형식400·상세형 발행·기존 SSO/동의·담당 해제 경계 통과. Impeccable 기계 검사0건. 이번 범위에서 저장소 전체 검사를 다시 실행하지는 않았다.
+
+운영 Worker wb-blended 배포 버전 b565ec16-120c-49bf-b640-835148173974, 직전 버전78ac0900-2f24-48ca-a1af-81e4834f6fe6. 외부 운영 app.js/planner.js/reports-page.js/reports.css SHA256이 최종 로컬 빌드와 일치하고 익명 report_preview는401이다. 인증정보 변경/실제 학생 자료로 발행/실제 메시지/공유 저장소push 없음.
+
+실행: node blended/build.mjs → node blended/server.mjs. 검사는 node --test blended/reports.test.mjs blended/planner.test.mjs blended/api.test.mjs, 기존 Playwright 환경 설정 후 node blended/reports-browser.cjs 및 node blended/planner-browser.cjs. 로컬 Worker는 별도 evidence/worker-presets와 합성 키만 사용하고 종료했다. 사용자 문구가 긴 리포트의 쪽수는 고정하지 않는다.

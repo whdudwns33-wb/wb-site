@@ -4,3 +4,7 @@
 @media print{body,:root{background:white}.report-top,.page-head,.skip,.status,.editor-toolbar,.editor-help,.designer-scroll{display:none}main{padding:0}.report-paper{max-width:none;padding:0;border:0}.report-section{break-inside:avoid;margin-top:20px}.report-chart{height:180px}.report-footer{font-size:12px}}
 
 .status:empty{display:none}@media(max-width:600px){.page-head .actions{width:100%}.actions button{flex:1 0 auto;white-space:nowrap}}
+
+.preset-picker{display:flex;align-items:center;gap:16px;max-width:880px;margin:0 auto 24px;font-weight:700}.preset-picker select{min-height:44px;max-width:100%;padding:8px 12px;border:1px solid #d5d3df;border-radius:8px;color:#1b3a5c;background:white}.preset-consultation .report-sections{display:grid;grid-template-columns:1fr 1fr;gap:0 28px}.preset-consultation .report-section.goal{grid-column:1/-1;background:#f0ebf8;padding:20px;border-radius:8px;border:0}.record-scroll{overflow:auto}.report-records th,.report-records td{text-align:left;vertical-align:top;overflow-wrap:anywhere}.report-records table{min-width:420px}.preset-summary .report-chart{height:190px}
+@media(max-width:600px){.preset-picker{align-items:start;flex-direction:column;gap:8px}.preset-picker select{width:100%}.preset-consultation .report-sections{grid-template-columns:1fr}}
+@media print{.preset-picker{display:none}.report-records{break-before:page}}

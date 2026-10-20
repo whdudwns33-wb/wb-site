@@ -75,7 +75,7 @@ const {chromium}=require('playwright');
     await student.locator('details').filter({has:student.locator('[data-act="submissionquestion"]')}).locator('summary').click();
     await click(student,'submissionquestion');await student.locator('#submissionSubject').selectOption('math');await student.locator('#submissionText').fill('가상 수학 질문입니다.');await click(student,'submissionsubmit');
     await student.getByText('가상 수학 질문입니다.',{exact:false}).first().waitFor();
-    await owner.reload();await owner.locator('#tabs button').first().waitFor();await owner.getByRole('button',{name:'주간',exact:true}).click();await click(owner,'reportpublish');await synced(owner);
+    await owner.reload();await owner.locator('#tabs button').first().waitFor();await owner.getByRole('button',{name:'주간',exact:true}).click();await owner.locator('[data-report-preset]').first().selectOption('detail');await click(owner,'reportpreview');assert.ok((await owner.locator('#modalHost').innerText()).includes('상세형'));await owner.evaluate(()=>closeModal());await click(owner,'reportpublish');await synced(owner);assert.equal(await owner.evaluate(()=>state.tasks.find(t=>t.kind==='report_snapshot'&&t.reportStatus==='published')?.snapshot.reportPreset),'detail');
     const guardianContext=await browser.newContext();const guardian=await guardianContext.newPage();await guardian.goto(origin+'/blended/');
     await guardian.getByLabel('아이디',{exact:true}).fill('guardian-a');await guardian.getByLabel('비밀번호',{exact:true}).fill('Demo-guardian-a-2026!');await guardian.getByRole('button',{name:'로그인',exact:true}).click();
     await guardian.getByRole('button',{name:'공개 학습 리포트 보기'}).click();await guardian.getByRole('heading',{name:'공개 학습 리포트',exact:true}).waitFor();
