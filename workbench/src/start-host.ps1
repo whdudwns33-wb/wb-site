@@ -1,4 +1,4 @@
-param([Parameter(Mandatory=$true)][ValidateSet('server','tunnel')][string]$Component)
+param([Parameter(Mandatory=$true)][ValidateSet('server','tunnel','sync')][string]$Component)
 $ErrorActionPreference = 'Stop'
 $runtimeRoot = $PSScriptRoot
 
@@ -61,9 +61,19 @@ public static class WorkbenchChildJob {
 
 if ($Component -eq 'server') {
     $env:WB_WORKBENCH_DIR = Join-Path $runtimeRoot 'public'
+    $pointer = Join-Path $runtimeRoot 'protected\current-release.json'
+    if (Test-Path -LiteralPath $pointer) {
+        $release = (Get-Content -LiteralPath $pointer -Raw | ConvertFrom-Json).commit
+        if ($release -cnotmatch '^[a-f0-9]{40}$') { throw 'Invalid release pointer.' }
+        $env:WB_WORKBENCH_DIR = Join-Path $runtimeRoot "releases\$release"
+    }
     $env:PORT = '18960'
     $executable = 'C:\Program Files\nodejs\node.exe'
     $arguments = @((Join-Path $runtimeRoot 'serve.mjs'))
+} elseif ($Component -eq 'sync') {
+    $env:WB_WORKBENCH_RUNTIME = $runtimeRoot
+    $executable = 'C:\Program Files\nodejs\node.exe'
+    $arguments = @((Join-Path $runtimeRoot 'sync-host.mjs'))
 } else {
     $executable = 'C:\Users\wb\cloudflared\cloudflared.exe'
     $arguments = @('tunnel','--config',(Join-Path $runtimeRoot 'protected\tunnel.yml'),'--no-autoupdate','run')
