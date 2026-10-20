@@ -27,6 +27,7 @@ import { isTaskWriteCasConflict, taskWriteCasGuardStatement } from './task-write
 import { isMakeupLifecycleConflict, prepareMakeupLifecycleCleanup } from './makeup-lifecycle.js';
 import {
   assertStudentLessonScheduleAvailable,
+  sameStudentLessonSchedule,
   studentScheduleConflictPayload
 } from './student-schedule-conflict.js';
 import {
@@ -515,7 +516,11 @@ export async function handleLessonChangeReview(env, app, body, origin, auth, jso
         updatedAt,
         lastEditBy: actorRole
       });
-      try { await assertStudentLessonScheduleAvailable(env, app, merged); }
+      try {
+        if (!sameStudentLessonSchedule(taskData, merged)) {
+          await assertStudentLessonScheduleAvailable(env, app, merged);
+        }
+      }
       catch (error) {
         const payload = studentScheduleConflictPayload(error);
         if (payload) return json(payload, 409, origin);
