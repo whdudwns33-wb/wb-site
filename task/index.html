@@ -1253,6 +1253,20 @@
   .center-chat-shortcuts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
   .center-chat-shortcuts .btn { min-height: 44px; max-width: 100%; white-space: normal; text-align: center; }
   .center-chat-access-note { margin: 7px 0 0; color: var(--mid-gray); font-size: 12px; line-height: 1.4; }
+  .private-chat-shell { position: fixed; inset: 0; z-index: 5000; display: flex; justify-content: flex-end; background: rgba(17,40,61,.5); }
+  .private-chat-shell[hidden], #privateChatOpen[hidden] { display: none; }
+  .private-chat-panel { display: flex; flex-direction: column; gap: 8px; width: min(620px,100%); height: 100%; min-width: 0; padding: 16px; background: #F5F8FA; overflow: hidden; }
+  .private-chat-panel header { flex-wrap: wrap; gap: 8px; }
+  .private-chat-controls { max-height: 32vh; overflow: auto; flex-shrink: 0; }
+  .private-chat-rooms { display: flex; flex-wrap: wrap; gap: 6px; }
+  .private-chat-panel .btn { min-height: 44px; max-width: 100%; white-space: normal; }
+  .private-chat-panel .in { min-width: 0; width: 100%; }
+  .private-chat-panel form { display: grid; gap: 8px; }
+  .private-chat-panel :focus-visible { outline: 3px solid var(--navy); outline-offset: 2px; }
+  .private-chat-log { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; }
+  .private-chat-message { width: fit-content; max-width: 92%; margin: 8px 0; padding: 10px; border-radius: 12px; background: #fff; overflow-wrap: anywhere; }
+  .private-chat-message.is-mine { margin-left: auto; background: #DFF0FB; }
+  .private-chat-message a { text-decoration: underline; }
   .center-chat-panel a:focus-visible { outline: 3px solid var(--navy); outline-offset: 2px; }
   .center-chat-item-body a { color: var(--navy); text-decoration: underline; text-underline-offset: 2px; }
   .center-chat-summary { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 7px; margin-top: 12px; }
@@ -1316,6 +1330,10 @@
   .pill.warn { background: #FFF7ED; color: var(--amber); }
   .pill.bad { background: #FEF2F2; color: var(--coral); }
   .sect { font-size: 12px; font-weight: 900; color: var(--mid-gray); letter-spacing: .04em; margin: 18px 0 8px; }
+  .self-identity-dialog { width: min(520px,calc(100% - 32px)); max-height: 85dvh; margin: auto; overflow: auto; border: 1px solid var(--line); border-radius: 14px; padding: 20px; color: var(--navy); }
+  .self-identity-dialog::backdrop { background: #11283d88; }
+  .self-identity-dialog dd { margin: 4px 0 14px; overflow-wrap: anywhere; }
+  .self-identity-dialog h2 { font-size: 20px; }
 </style>
 <script src="tab-scroll.js" defer></script>
 </head>
@@ -1330,6 +1348,7 @@
 
 <nav class="tabs" aria-label="업무 메뉴"><div class="wrap tab-shell"><button type="button" class="tab-scroll-button" id="tabScrollLeft" aria-label="왼쪽 메뉴 보기" aria-controls="tabs" hidden>◀</button><div id="tabs"></div><button type="button" class="tab-scroll-button" id="tabScrollRight" aria-label="오른쪽 메뉴 보기" aria-controls="tabs" hidden>▶</button></div></nav>
 <section class="wrap" id="staffWorkControls" hidden></section>
+<section class="wrap"><button type="button" class="btn btn-sm btn-ghost" id="selfIdentityOpen">본인 계정 확인(읽기 전용)</button></section>
 <section class="wrap" id="taskPushPanel" hidden>
   <details class="card"><summary>기기 요청 알림 설정</summary>
     <p class="small muted">화면이 꺼졌을 때 받는 알림입니다. 학생 정보는 표시하지 않습니다. 화면 자동 점등은 기기 설정에 따라 다릅니다.</p>
@@ -1361,6 +1380,7 @@
         <a class="btn btn-sm btn-ghost" href="https://whdudwns33-wb.github.io/wb-site/consult/" target="_blank" rel="noopener noreferrer">컨설팅 플래너</a>
       </nav>
       <p class="center-chat-access-note">각 앱의 이용 권한으로 접속합니다</p>
+      <button type="button" class="btn btn-sm btn-ghost" id="privateChatOpen" hidden>개인대화</button>
     </header>
     <p class="center-chat-state" id="centerChatState" role="status" aria-live="polite"></p>
     <div id="centerChatMissing" aria-label="미등원 학생 목록"></div>
@@ -1389,6 +1409,8 @@
 <script src="./feedback-subject-catalog.js?v=2026-10-19.4"></script>
 <script src="./sync-recovery-core.js?v=2026-10-19.4"></script>
 <script src="./staff-work-session-core.js?v=2026-10-19.4"></script>
+<script src="./private-chat.js?v=2026-10-19.4"></script>
+<script src="./self-identity.js?v=2026-10-19.4"></script>
 <script src="./staff-attendance-history-core.js?v=2026-10-19.4"></script>
 <script src="./makeup-recovery-core.js?v=2026-10-19.4"></script>
 <script>
@@ -2324,7 +2346,8 @@ const sync = {
     return n;
   },
 
-  async post(path, body) {
+  async post(path, body, isCurrent) {
+    const privateRequestAuth = ['/private-chat', '/self-identity'].includes(path) ? JSON.stringify(body && body.auth) : null;
     if (body && body.auth && body.auth.mode === 'person' && !['/staff-work-session', '/manager-inspection-session', '/exchange'].includes(path) && shouldGateStaffWork()) {
       const error = new Error('출근 로그인이 필요합니다. 비밀번호를 입력해 주세요');
       error.status = 409; error.code = 'STAFF_WORK_LOGIN_REQUIRED';
@@ -2339,6 +2362,12 @@ const sync = {
         body: JSON.stringify(body), ...(controller ? { signal: controller.signal } : {})
       });
       const d = await res.json().catch(() => null);
+      // 닫기·재열기·만료로 끝난 본인 조회는 같은 인증이어도 업무 상태를 정리하면 안 된다.
+      if (path === '/self-identity' && isCurrent && !isCurrent()) {
+        const stale = new Error('본인 계정 조회가 종료되었습니다');
+        stale.code = 'IDENTITY_REQUEST_STALE';
+        throw stale;
+      }
       if (!d || d.ok !== true) {
         const error = new Error((d && (d.error || d.message)) || ('HTTP ' + res.status));
         error.status = res.status;
@@ -2346,11 +2375,17 @@ const sync = {
         error.current = d && d.current || null;
         error.dataGeneration = d && d.dataGeneration;
         error.apiResponse = !!d;
+        // 늦은 개인대화 오류는 새 직원의 업무 인증을 정리하기 전에 폐기한다.
+        if (privateRequestAuth !== null && privateRequestAuth !== JSON.stringify(this.auth())) throw error;
         const personRequest = body && body.auth && body.auth.mode === 'person';
+        if (path === '/private-chat' && d && d.authScope === 'private_chat' && error.code.startsWith('PRIVATE_CHAT_')) throw error;
+        if (path === '/self-identity' && d && d.authScope === 'identity_check' && error.code.startsWith('IDENTITY_')) throw error;
         if (personRequest && staffWorkCore && staffWorkCore.isLoginRequired(error)) {
           lockStaffWork(error.message);
           throw error;
         }
+        if (path === '/self-identity' && error.code !== 'PERSON_AUTH_REJECTED' &&
+            (res.status === 401 || res.status === 403)) throw error;
         if (path !== '/sync' && session.isStaffLink && personRequest &&
             (res.status === 401 || res.status === 403)) {
           handlePersonAuthRejection(error, false);
@@ -3022,6 +3057,8 @@ const centerChat = {
 };
 
 function resetCenterChatState() {
+  if (window.WBPrivateChat) window.WBPrivateChat.lock();
+  if (window.WBSelfIdentity) window.WBSelfIdentity.clear();
   centerChat.requestSequence += 1;
   centerChat.identityEpoch += 1;
   Object.assign(centerChat, {
@@ -3134,6 +3171,7 @@ function centerChatItemHtml(item) {
 }
 
 function renderCenterChatChrome() {
+  if (window.WBPrivateChat) window.WBPrivateChat.refreshAccess();
   const launcher = $('#centerChatLauncher');
   if (!launcher) return;
   const show = centerChatCanShow();
@@ -26055,6 +26093,16 @@ async function startSyncSession() {
   }
   return verified;
 }
+window.WBSelfIdentity.init({
+  entry: $('#selfIdentityOpen'), auth: () => sync.auth(),
+  allowed: () => !!sync.auth() && !shouldGateStaffWork(), post: (path, body, isCurrent) => sync.post(path, body, isCurrent)
+});
+window.WBPrivateChat.init({
+  entry: $('#privateChatOpen'), returnFocus: $('#centerChatLauncher'),
+  beforeOpen: () => closeCenterChat(false), auth: () => sync.auth(),
+  allowed: () => centerChatCanRequest(), post: (path, body) => sync.post(path, body),
+  esc, bodyHtml: centerChatBodyHtml
+});
 startSyncSession();
 setInterval(() => {
   if (document.visibilityState === 'visible' && centerChatCanRequest()) loadCenterChat(false);

@@ -7,6 +7,46 @@
 미확정 시간표는 기존 충돌 검사를 유지한다. CAS·회차권 이관·출결 원문 보존은 그대로 적용한다.
 스키마 변경 없이 wb-sync Worker만 배포한다.
 
+## 개인대화 단계1 — 로컬 제안 / 기본 비활성
+
+`087_private_chat.sql`과 `schema.sql`의 새 private_chat 테이블은 합성 메모리 SQLite에서만 검증한 제안이다.
+이번 작업에서는 운영 DB·계정·설정·배포를 변경하지 않는다.
+
+- `POST /private-chat`: 기존 person 인증과 업무 근무 gate를 유지한다. 공용 admin·inspection·consult 인증은 거부한다.
+- 서버 신뢰 설정 `WB_PRIVATE_CHAT_ENABLED`가 정확히 `true`이고 `WB_PRIVATE_CHAT_ORGANIZATION_ID` 및
+  `WB_PRIVATE_CHAT_STAFF_IDS`가 유효해야 한다. 값이 없으면 비활성/미구성으로 차단한다. 요청 body의 소속값은 사용하지 않는다.
+- v0.2의 별도 서버 후보 설정 `WB_PRIVATE_CHAT_ADMIN_STAFF_IDS`는 검증된 task 개인 ID의 쉼표 목록이다.
+  누락·빈 항목·잘못된 ID·중복은 미구성으로 거부한다. 업무 관리자/all scope/근무 대상에서 대체하지 않는다.
+  이 목록은 기존 허용 직원·활성·PIN·기기·근무 보호를 넓히지 않는다. 실제 설정/ID 확인은 미실시다.
+  상대 목록·방 열기/재사용·목록·본문·전송·읽음·미확인 수에 같은 쌍 판정을 적용한다.
+  두 참여자 중 한 명 이상이 명시 메신저 관리자여야 하며 교사끼리의 옛 방은 삭제 없이 숨긴다.
+  역할 목록도 개인 세션 구성 해시에 포함하므로 변경 후 기존 세션은 다시 본인 확인해야 한다.
+- `confirm`은 검증된 person ID의 기존 private profile PIN 해시만 검증한다. 다른 관리자의 PIN을 순회하지 않으며,
+  출퇴근 처리·근무 세션 생성·기존 업무 PIN 실패 횟수를 변경하지 않는다. 별도 개인대화 시도 원장으로 5회/5분 제한한다.
+- 추가 개인 세션은 기기·개인·현재 staff·credential revision·데이터 세대·서버 조직/디렉터리에 결합한다.
+  유휴 10분/절대 8시간이며 확인 가능한 상위 bearer/근무 세션 만료가 빠르면 그 시각을 따른다. 레거시 bearer에 임의 TTL을 붙이지 않는다.
+  발급 당시 근무 세션이 있었다면 원본 해시를 저장하고, 이후 원본의 폐기·개인·기기·세대·자격·근무일·열린 출근을 쓰기 직전에도 검증한다. 생략/S2 교체로 재사용하지 못한다.
+  처음부터 근무 세션 없이 허용된 개인+PIN 경로는 별도 출근을 만들거나 요구하지 않는다.
+- `status`, `directory`, `rooms`, `unread`, `open(recipientId)`, `messages(roomId,before)`,
+  `send(roomId,requestId,body)`, `read(roomId,sequences)`, `touch`, `logout`이 있다.
+  confirm/status 잠금 안내 외 모든 동작은 추가 privateSession을 요구한다. 폴링은 유휴 시간을 갱신하지 않는다.
+- 방은 서버 조직과 정렬된 두 참여자 조합에 유일하다. all scope인 관리자도 비참여 방에는 접근할 수 없다.
+  전송 요청 ID는 발신자·방·본문이 같아야 재사용되며 다른 수신자로 옮기면 409다.
+- 읽음은 실제 화면에 보인 메시지 sequence들만 본인 이름으로 append-only 저장한다. 최신 cursor 하나로
+  화면 밖의 과거 메시지까지 읽음으로 만들지 않는다. 전송 성공은 서버 저장이며 상대 열람과 구분한다.
+- 실제 원장/직원의 person 기기·PIN 구성 및 WB 전용 조직/허용 디렉터리 확인은 운영 활성화 전 선결조건이다.
+  이 코드가 실제 계정을 만들거나 외부 앱 계정을 자동 매핑하지 않는다.
+
+합성 검사: `node sync/private-chat.test.mjs`, `node task/private-chat.test.cjs`.
+
+## 본인 계정 확인 — 단계3 합성 후보
+
+`POST /self-identity`는 task 자기 정보의 최소 투영만 반환한다. 기존 bearer/활성 직원·근무 gate와
+서버 조직 설정(`WB_PRIVATE_CHAT_ORGANIZATION_ID`, 해당 DB에 결합)을 요구하며 client target/조직 선택을 받지 않는다.
+공용 admin/inspection에는 개인 이름·번호를 반환하지 않는다. 프로필 목록 API를 사용하지 않는다.
+기존 구조/프로필이 없으면 확인 불가로 끝나며 schema 생성·기본행·revision·세션 touch·읽음 쓰기는 없다.
+신규 schema/config 변경은 필요하지 않다. 운영 설정을 조회하거나 적용하지 않은 로컬 합성 후보다.
+
 ## 과목 한정 회차제 / 시작일 대기
 
 운영 백업·복원 검증 → `086_session_subject_scope.sql` → Worker → Pages → 원생 설정 변경.
