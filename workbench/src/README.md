@@ -1,11 +1,33 @@
 # WB 컨설팅 워크벤치 — 소스
 
 원장 전용 컨설팅 관리 웹앱. 배포본은 비밀번호로 암호화되어 `/workbench/index.html` 로 서비스된다.
-배포 주소: `https://whdudwns33-wb.github.io/wb-site/workbench/` (공개 URL — 비밀번호 로그인)
+배포 주소: https://workbench.wbcowork.com/workbench/ (Cloudflare → WB1 PC, 비밀번호 로그인)
+이전 주소: https://whdudwns33-wb.github.io/wb-site/workbench/ (기존 기록 이전·복구용으로 유지)
 
 **현재 라이브: v40 후속 · 빌드 `77342aa6` (2026-10-16).** 원장 배포 지시 후 [PR #467](https://github.com/whdudwns33-wb/wb-site/pull/467)로 암호화 산출물 두 파일만 스쿼시 병합했다(`c9fc2fd3e3e730fcfa2b3e8048b9acf5176c8426`). 소스는 작업 브랜치 `8723ade`에 보관했다. 워크벤치 137개 테스트·최신 main 전체 312개 파일 검증·PR checks 두 건과 Pages 배포를 통과했다. 병합 후 17:22:49 KST에 라이브 `index.html`·`bulk.enc.json?v=77342aa6`의 SHA-256이 검증한 로컬 파일과 모두 일치했다. 기존 상담 저장 구조와 비공개 원본은 유지했다. 실제 학생 화면 확인을 대신 수행하거나 스크린샷을 만들지는 않았다.
 
 아래 구현 절의 미배포·화면 확인 대기는 각 개발 단계 당시의 기록이다. 최신 배포 상태는 이 문단과 `../HANDOFF.md`를 따른다.
+
+## PC 서버와 Cloudflare (2026-10-20)
+
+- 실행 폴더: `C:\Users\wb\wb-workbench-runtime`. `public`에는 검증한 `index.html`·`bulk.enc.json` 두 파일만 둔다. 학생 백업, 소스, 비밀번호를 넣지 않는다.
+- `serve.mjs`는 Node 기본 HTTP 서버이며 `WB_WORKBENCH_DIR` 필수, `PORT` 기본 18960이다. `127.0.0.1`에만 바인딩한다. `/`·`/workbench`는 `/workbench/`로 이동하며 암호화 두 파일과 `/healthz` 외에는 404, GET/HEAD 외에는 405다.
+- 두 파일을 시작 시 메모리에 고정한다. 응답은 `no-store, no-transform`으로 전달한다. [Cloudflare 공식 설명](https://developers.cloudflare.com/web-analytics/faq/)의 `no-transform` 규칙으로 분석 스크립트 자동 삽입을 막아 원본 해시를 유지한다.
+- `start-host.ps1`을 런타임의 `start.ps1`로 복사해 사용한다. `WB_Workbench_Server`·`WB_Workbench_Tunnel` 작업이 PowerShell 7에서 이를 숨김 실행한다. 현재 실행기는 Codex에 설치된 PowerShell 7 경로이며, 위치가 바뀌면 작업의 실행 경로도 갱신해야 한다. 터널 설정·인증 파일은 런타임 `protected` 폴더에 두며 사용자·관리자·SYSTEM만 접근한다.
+- 작업은 wb 로그인 시 시작하고 실패 시 1분 간격으로 3회 재시도한다. Windows 로그인 전·로그아웃 후 자동 실행이나 PC 재부팅 자체는 검증하지 않았다. PC 전원·인터넷·로그인을 유지해야 한다.
+
+암호화본 갱신은 기존 승인된 빌드·PR 절차를 따른 후 진행한다. 실행 중인 서버는 이전 두 파일을 메모리에서 계속 제공하므로 두 파일을 모두 복사하고 알려진 SHA-256 쌍과 대조한 **다음에** 서버 작업을 중지·시작한다. 하나라도 다르면 재시작하지 않는다. PC 폴더 갱신은 현재 수동이며 GitHub 아침 자동 배포와 자동 연동하지 않는다.
+
+```powershell
+# 검증된 두 파일을 public에 모두 복사·해시 대조한 다음 실행
+Stop-ScheduledTask -TaskName WB_Workbench_Server
+Start-ScheduledTask -TaskName WB_Workbench_Server
+# 공개 /workbench/index.html 및 /workbench/bulk.enc.json?v=<빌드 태그> 해시 재확인
+```
+
+새 주소에서는 처음 비밀번호를 입력하고 「이 기기에서 기억하기」를 다시 선택한다. **기록은 여전히 각 브라우저에 저장되며 서버 간 자동 동기화가 아니다.** 기존 주소의 「백업 내보내기」 → 새 주소의 「가져오기 (시드)」 → 「전체 복원」으로 학생·어디가·수동 DB를 모두 옮긴다. 전체 복원은 새 주소 데이터를 교체하므로 이미 새로 입력했다면 그쪽 백업도 먼저 보관한다. 기존 주소의 기록은 남는다. 평문 백업을 공개 서버에 두거나 에이전트가 내용을 출력하지 않는다.
+
+호스팅 회귀: `node --test workbench/src/serve.test.mjs` 3개, PowerShell 7에서 `& .\workbench\src\start-host.test.ps1` 3개 통과. 실행 도우미는 Windows Job Object로 자식을 관리해 작업 중지 시 서버·터널 프로세스도 정리한다. 운영 작업 각각의 중지·재시작과 HTTPS 두 파일 해시 일치, 비공개 경로 7개 404를 확인했다. 앱 자체를 바꾸지 않고 검증된 암호화 바이트를 제공하므로 호스팅 변경만으로 재빌드하지 않는다.
 
 ## 진학통·어디가 벤치마킹 후속 (2026-10-16 · 배포 완료)
 
@@ -76,6 +98,7 @@ node workbench/src/build.mjs   # "복호화 검증: 일치 ✓" 확인
 2. 최신 `origin/main`을 가져와 별도 배포 브랜치(worktree 사용 권장)를 만든다. 빌드 산출물 **두 파일만** 복사하고 PR의 변경 파일도 두 개뿐인지 확인한다.
 3. PR을 열어 checks가 모두 통과하면 스쿼시 병합한다. **main에 직접 푸시하지 않는다.** 병합 권한이 없으면 PR 주소만 보고한다.
 4. 병합 1~2분 뒤 라이브 `index.html`과 `bulk.enc.json?v=<빌드 태그>`의 SHA-256을 로컬 두 파일과 대조한다. 둘 다 일치해야 배포 완료다.
+5. PC 운영 주소에도 위 「PC 서버와 Cloudflare」 절차로 같은 두 파일을 반영하고 해시를 대조한다. GitHub 배포만으로 PC 제공 파일이 바뀌지는 않는다.
 
 ## 원장 백업 자동 반영 (Drive → 시드 → 재배포)
 

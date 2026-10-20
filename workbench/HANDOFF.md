@@ -1,6 +1,6 @@
 # 워크벤치 인수인계서 — Claude Code → Codex
 
-> 기준일 **2026-10-16** · 라이브 **v40** · 작업 브랜치 `claude/agent-performance-optimization-rj8ql6`
+> 기준일 **2026-10-20** · 라이브 **v40** · 작업 브랜치 `claude/agent-performance-optimization-rj8ql6`
 > 이 문서는 **공개 저장소**에 있다. 비밀번호·학생 실명·Drive 파일 ID를 여기에 적지 말 것.
 > 규칙의 정본은 루트 `AGENTS.md`, 빌드 절차의 정본은 `workbench/src/README.md`다. 이 문서는 그 둘을 읽기 전에 보는 지도다.
 
@@ -9,12 +9,19 @@
 ## 0. 30초 요약
 
 **무엇** — WB 웩슬러브레인센터 원장 전용 고교 컨설팅 웹앱. 단일 HTML(`workbench/src/app.html`)을
-비밀번호로 암호화해 GitHub Pages로 서비스한다. https://whdudwns33-wb.github.io/wb-site/workbench/
+비밀번호로 암호화해 WB1 PC 서버에서 Cloudflare Tunnel을 통해 서비스한다. https://workbench.wbcowork.com/workbench/
+기존 GitHub Pages 주소는 기록 이전과 복구를 위해 유지한다. https://whdudwns33-wb.github.io/wb-site/workbench/
 
 **지금 상태** — v40 후속 라이브 (2026-10-16 · 학교 성취도 539개교 + 수시·정시 비교 개선 + 통합 보고서 + 기기 기억 유지)
 - `index.html` sha256 `5337962fee34c7c29afa677e42ddb9fc6e78c0ddfff4ecae98f7b14d854aef56`
 - `bulk.enc.json` sha256 `8d1b5d5e3ac50de60deb9f408a566b9084d16391395249317cfd08fc7c61da26` · 빌드 태그 `77342aa6`
 - 학생 14명 · 입결 46,656행(어디가 5개년) · 학교 3,951곳 · 학교 성취도 539개교(고 210·중 329, 병합 36,507행)
+
+**PC 호스팅 전환(2026-10-20)** — 원장 요청으로 위 빌드의 암호화 두 파일을 `C:\Users\wb\wb-workbench-runtime\public`에 복사했다. `src/serve.mjs`는 두 파일을 메모리에 고정해 `127.0.0.1:18960`에서 제공하며, `workbench.wbcowork.com`의 전용 Cloudflare Tunnel이 연결된다. 앱·비공개 원본·상담 저장 구조는 바꾸지 않는다. 서버는 허용한 파일과 상태 확인 경로만 제공하고 `no-store, no-transform`으로 캐시와 Cloudflare의 분석 스크립트 삽입을 방지한다. 실제 HTTPS 주소에서 두 파일의 SHA-256이 위 값과 모두 일치했다. 서버 회귀 3개·숨김 실행 도우미 회귀 3개를 통과했고, 운영 서버·터널 작업을 각각 중지했을 때 자식 프로세스와 포트가 사라진 뒤 정상 재시작됨을 확인했다. 비공개·소스·백업 경로 7개는 모두 404였다.
+
+`WB_Workbench_Server`·`WB_Workbench_Tunnel` 작업은 wb의 Windows 로그인 시 숨김 실행하며 실패 시 재시도한다. PC 전원·인터넷·Windows 로그인 유지가 필요하다. **새 주소의 브라우저 저장소는 기존 주소와 별개**다. 기존 주소에서 「백업 내보내기」 → 새 주소 로그인 → 「가져오기 (시드)」 → 「전체 복원」으로 옮긴다. 새 주소에 이미 추가한 기록이 있다면 먼저 그쪽 백업도 보관한다. 기기 기억도 새 주소에서 한 번 설정하며, 기기 간 자동 동기화는 추가하지 않았다.
+
+이후 승인 배포 시 GitHub의 PR 절차에 더해 **PC의 암호화 두 파일도 함께 갱신하고 서버를 재시작**해야 한다. 아침 GitHub 자동 배포를 PC 제공 폴더로 자동 복사하는 기능은 연결하지 않았다. 실행·갱신·복구 절차는 `src/README.md`의 「PC 서버와 Cloudflare」를 따른다.
 
 2026-10-16 원장 배포 지시 후 [PR #467](https://github.com/whdudwns33-wb/wb-site/pull/467)로 암호화 산출물 두 파일만 스쿼시 병합했다(`c9fc2fd3e3e730fcfa2b3e8048b9acf5176c8426`, 17:20:39 KST). 소스는 작업 브랜치 `8723ade`에 보관했다. 워크벤치 137개 테스트·최신 main 전체 312개 파일 검증·PR checks 두 건을 통과했고 [Pages 배포](https://github.com/whdudwns33-wb/wb-site/actions/runs/38873056396)도 성공했다. 17:22:49 KST에 라이브 `index.html`·`bulk.enc.json?v=77342aa6`의 SHA-256이 검증한 로컬 파일과 모두 일치했다. 기존 상담 저장 구조와 비공개 원본은 유지했다. 실제 학생 화면 확인을 대신 수행하거나 스크린샷을 만들지는 않았다.
 
