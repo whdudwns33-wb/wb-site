@@ -850,6 +850,24 @@ test('teacher transfer ignores a stale deterministic target id occupied by a dif
   assert.equal(db.tasks.size, 2);
 });
 
+test('teacher-only transfer tolerates existing completed makeup overlap, changed times remain checked', async () => {
+  const db = new FakeDB();
+  const created = await call(db, {staffId:'teacher-1',lesson:assignedLesson()}, {scope:'all'});
+  db.makeups.push({case_id:'historical-makeup',student_id:'student-a',status:'completed',
+    confirmed_start_at:'2026-08-09T12:30:00+09:00',confirmed_end_at:'2026-08-09T13:30:00+09:00'});
+  const moved = await call(db, {staffId:'teacher-2',sourceTaskId:created.data.task.id,
+    expectedUpdatedAt:created.data.task.updatedAt,lesson:assignedLesson()}, {scope:'all'});
+  assert.equal(moved.response.status,200);
+  assert.equal(moved.data.task.id,created.data.task.id);
+  assert.deepEqual(moved.data.task.scheduleSlots,created.data.task.scheduleSlots);
+  const blocked = await call(db, {staffId:'teacher-1',sourceTaskId:moved.data.task.id,
+    expectedUpdatedAt:moved.data.task.updatedAt,lesson:assignedLesson({scheduleSlots:[
+      {days:[0],startTime:'12:15',endTime:'14:00'}
+    ]})}, {scope:'all'});
+  assert.equal(blocked.response.status,409);
+  assert.equal(blocked.data.code,'STUDENT_MAKEUP_CONFLICT');
+});
+
 test('new lesson insert fails closed when a different assignment occupies its deterministic id', async () => {
   const db = new FakeDB();
   const candidate = await buildLessonTask(assignedLesson(), 'teacher-1', 'manager', 100);
