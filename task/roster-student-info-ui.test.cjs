@@ -20,7 +20,7 @@ function escapeHtml(value) {
 
 test('관리자 기본 정보 목록과 선생님 내 학생 목록의 이름이 정보 팝업을 연다', () => {
   const view = block('function viewRoster()', '/* ── 직원 관리');
-  assert.equal((view.match(/data-act="rosterstudentinfo"/g) || []).length, 2);
+  assert.equal((view.match(/data-act="rosterstudentinfo"/g) || []).length, 3);
   assert.match(view, /managed\.map\(student =>[\s\S]*data-act="rosterstudentinfo" data-id="' \+ esc\(student\.id\)/);
   assert.match(view, /mineActive\.map\(s =>[\s\S]*data-act="rosterstudentinfo" data-id="' \+ esc\(s\.id\)/);
   assert.match(view, /aria-label="' \+ esc\(student\.name\) \+ ' 학생 정보 보기"/);
@@ -31,7 +31,7 @@ test('관리자 기본 정보 목록과 선생님 내 학생 목록의 이름이
 test('학생 정보 팝업은 학교·연락처·등록일을 포함하고 모든 값을 escape한다', () => {
   const code = block('function rosterStudentTransition(', 'function showRosterStudentInfo(');
   const render = new Function('today', 'esc', 'state', 'isLesson', 'isRegularLessonTask', 'staffById', 'staffStudentCompactLabel',
-    'SUBSCRIPTION_PROGRAMS', 'lessonRegistrationIsoDate', 'isSubscriptionSessionTask', 'session', `${code}\nreturn rosterStudentInfoHtml;`)(
+    'SUBSCRIPTION_PROGRAMS', 'lessonRegistrationIsoDate', 'isSubscriptionSessionTask', 'session', `const readLessonTasks=()=>state.tasks; ${code}\nreturn rosterStudentInfoHtml;`)(
     () => '2026-08-18', escapeHtml, { tasks: [] }, () => true, () => true, () => null,
     student => [student && student.name, student && student.grade].filter(Boolean).join(' '),
     [{ type: 'assessment', label: '검사구독' }, { type: 'studyforce', label: '스터디포스구독' }],
@@ -227,7 +227,7 @@ test('관리자는 학생 정보 아래에서 stable studentId의 기존 수업�
   const staff = { 'teacher-a': { name: '김남기' }, 'teacher-b': { name: '김혜지' } };
   const helpers = new Function('state', 'isLesson', 'isRegularLessonTask', 'staffById', 'lessonAssignmentScheduleText', 'lessonHoursValue', 'canEditLessonTask', 'esc',
     'weekendFlexibleSettingsSummary', 'taskHasWeekendSchedule', 'isFlexibleWeekendLesson', 'session',
-    'const today = () => "2026-10-16";\n' + block('function lessonCurrentScheduleText(', 'async function submitLessonAssignmentRequest(') +
+    'const readLessonTasks=()=>state.tasks; const today = () => "2026-10-16";\n' + block('function lessonCurrentScheduleText(', 'async function submitLessonAssignmentRequest(') +
     `${code}\nreturn { rosterStudentLessonTasks, rosterStudentLessonsHtml };`)(
       { tasks }, task => !!task.lessonFormVersion, task => !!task.lessonFormVersion && !task.deleted && task.lessonInstanceType !== 'makeup' && !task.makeupCaseId, id => staff[id] || null,
       (slots, fallback) => (slots || []).map(slot => slot.days.join('·') + ' ' + slot.startTime + '-' + slot.endTime + ' · ' + (slot.lessonHours || fallback || '')).join(' / '),
@@ -265,7 +265,7 @@ test('학생 공통 담당 대신 활성 수업의 과목별 task.staffId를 묶
   ];
   const staff = { 'teacher-a': { name: '김덕재' }, 'teacher-b': { name: '서윤지' }, 'teacher-old': { name: '이전담당' } };
   const helpers = new Function('state', 'isLesson', 'isRegularLessonTask', 'staffById', 'today',
-    `${code}\nreturn { rosterStudentSubjectTeacherAssignments, rosterStudentSubjectTeacherText };`)(
+    `const readLessonTasks=()=>state.tasks; ${code}\nreturn { rosterStudentSubjectTeacherAssignments, rosterStudentSubjectTeacherText };`)(
       { tasks }, task => !!task.lessonFormVersion, task => !!task.lessonFormVersion && !task.deleted && task.lessonInstanceType !== 'makeup' && !task.makeupCaseId,
       id => staff[id] || null, () => '2026-08-27'
     );

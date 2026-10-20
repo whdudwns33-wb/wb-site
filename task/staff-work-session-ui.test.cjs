@@ -23,7 +23,7 @@ function runtime(options = {}) {
     if (!nodes.has(id)) nodes.set(id, { value: '', hidden: true, inert: false, innerHTML: '' });
     return nodes.get(id);
   };
-  const context = vm.createContext({ window: { WBStaffWorkSessionCore: core },
+  const context = vm.createContext({ operationsSnapshot:null, operationsLoadedAt:0, rosterDb:null, rosterLoadGeneration:0, window: { WBStaffWorkSessionCore: core },
     document: { querySelectorAll: () => [] }, sessionStorage: {
       getItem: key => storage.get(key) || null, setItem: (key, value) => storage.set(key, value), removeItem: key => storage.delete(key)
     }, setTimeout, clearTimeout, Date, $: get, esc: String,

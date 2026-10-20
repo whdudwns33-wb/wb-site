@@ -1317,6 +1317,8 @@
   .pill.bad { background: #FEF2F2; color: var(--coral); }
   .sect { font-size: 12px; font-weight: 900; color: var(--mid-gray); letter-spacing: .04em; margin: 18px 0 8px; }
 </style>
+<link rel="stylesheet" href="readability.css?v=2026-10-20.1">
+<script src="roster-search-core.js?v=2026-10-20.1"></script>
 <script src="tab-scroll.js" defer></script>
 </head>
 <body>
@@ -1380,17 +1382,17 @@
   </section>
 </div>
 
-<script src="./lesson-form-core.js?v=2026-10-19.4"></script>
-<script src="./task-push-client.js?v=2026-10-19.4"></script>
-<script src="./schedule-board-core.js?v=2026-10-19.4"></script>
-<script src="./asset-core.js?v=2026-10-19.4"></script>
-<script src="./qr-core.js?v=2026-10-19.4"></script>
-<script src="./acaflow-import-core.js?v=2026-10-19.4"></script>
-<script src="./feedback-subject-catalog.js?v=2026-10-19.4"></script>
-<script src="./sync-recovery-core.js?v=2026-10-19.4"></script>
-<script src="./staff-work-session-core.js?v=2026-10-19.4"></script>
-<script src="./staff-attendance-history-core.js?v=2026-10-19.4"></script>
-<script src="./makeup-recovery-core.js?v=2026-10-19.4"></script>
+<script src="./lesson-form-core.js?v=2026-10-20.1"></script>
+<script src="./task-push-client.js?v=2026-10-20.1"></script>
+<script src="./schedule-board-core.js?v=2026-10-20.1"></script>
+<script src="./asset-core.js?v=2026-10-20.1"></script>
+<script src="./qr-core.js?v=2026-10-20.1"></script>
+<script src="./acaflow-import-core.js?v=2026-10-20.1"></script>
+<script src="./feedback-subject-catalog.js?v=2026-10-20.1"></script>
+<script src="./sync-recovery-core.js?v=2026-10-20.1"></script>
+<script src="./staff-work-session-core.js?v=2026-10-20.1"></script>
+<script src="./staff-attendance-history-core.js?v=2026-10-20.1"></script>
+<script src="./makeup-recovery-core.js?v=2026-10-20.1"></script>
 <script>
 "use strict";
 
@@ -1518,7 +1520,8 @@ const liveStaff = () => state.staff.filter(s => !s.deleted);
 /** 통계에 넣을 사람 — 대표는 제외한다. 대표 업무가 섞이면 직원 수행률이 흐려진다. */
 const teamStaff = () => liveStaff().filter(s => !s.owner);
 const owners = () => liveStaff().filter(s => s.owner);
-const staffById = id => state.staff.find(s => s.id === id);
+const staffById = id => state.staff.find(s => s.id === id) ||
+  (canReadOperations() && operationsSnapshot && operationsSnapshot.staff.find(s => s.id === id));
 const staffByName = n => liveStaff().find(s => s.name === String(n || '').trim());
 
 // 오늘·주간·직원 관리 화면은 같은 수업 목록을 여러 번 조회한다. 저장 시 무효화하는
@@ -2045,6 +2048,7 @@ function shouldGateStaffWork() {
 }
 function lockStaffWork(message) {
   resetCenterChatState();
+  operationsSnapshot = null; operationsLoadedAt = 0; rosterDb = null; rosterLoadGeneration++;
   staffWork.serial++; staffWorkStatusPromise = null;
   staffWork.checked = true; staffWork.required = true; staffWork.active = false;
   staffWork.error = String(message || '출근 로그인이 필요합니다. 비밀번호를 입력해 주세요.');
@@ -2387,6 +2391,7 @@ const sync = {
     }
     if (this.busy) return false;
     const previousAccessRole = this.accessRole;
+    const previousOperationsRead = this.operationsRead;
     let nextAccessRole = '';
     this.busy = true; paintStatus();
     let recoveryOriginal = [];
@@ -2447,6 +2452,11 @@ const sync = {
           return false;
         }
         nextAccessRole = responseAccessRole;
+        if (this.operationsRead !== (d.operationsRead === true)) {
+          this.operationsRead = d.operationsRead === true;
+          operationsSnapshot = null; operationsLoadedAt = 0; rosterLoadGeneration++;
+          rosterDb = null;
+        }
         refreshBookOrders = refreshBookOrders || (d.changes || []).some(change => change && change.table === 'tasks' &&
           change.data && ['scheduled_batch_v1', 'manual_online_v1', 'bound_print_v1', 'internal_book_v1'].includes(change.data.orderDelivery));
         applied += this.apply(d.changes);
@@ -2482,7 +2492,7 @@ const sync = {
         if (route === 'books') await loadBookIssues(true);
       }
       if (previousAccessRole === 'manager' && this.accessRole !== 'manager') render();
-      else if (applied || needsAccessRender || accessRoleChanged) renderAfterSync();
+      else if (applied || needsAccessRender || accessRoleChanged || previousOperationsRead !== this.operationsRead) renderAfterSync();
       return true;
     } catch (e) {
       console.warn('sync failed', String(e && e.code || 'SYNC_FAILED'));
@@ -3503,6 +3513,7 @@ let linkExchangeBusy = false;
 
 /** 관리 권한이 끝날 때 전체 캐시를 버린다. token을 넘기면 본인 범위 재동기화에만 보존한다. */
 function resetPersonCache(token) {
+  operationsSnapshot = null; operationsLoadedAt = 0; sync.operationsRead = false; rosterDb = null;
   resetCenterChatState();
   const keepToken = String(token || '');
   if (!keepToken || (staffWork.identity && staffWork.identity.token !== keepToken)) {
@@ -4232,6 +4243,30 @@ function renderMarkupFingerprint(value) {
 /* ══════════════════════════════════════════════════════
    7. 뷰
    ══════════════════════════════════════════════════════ */
+let operationsSnapshot = null, operationsLoading = false, operationsError = '', operationsLoadedAt = 0;
+function canReadOperations() { return session.isAdmin || (sync.personVerified && sync.operationsRead === true); }
+function readLessonTasks() {
+  return !session.isAdmin && canReadOperations() && operationsSnapshot ? operationsSnapshot.tasks : state.tasks;
+}
+async function loadOperationsSnapshot() {
+  if (session.isAdmin || !canReadOperations() || operationsLoading) return;
+  operationsLoading = true;
+  const authKey = JSON.stringify(sync.auth());
+  try {
+    const from = mondayOf(cursor);
+    const result = await sync.post('/operations-read', {app:SYNC_APP,auth:sync.auth(),action:'snapshot',from:from,to:addDays(from,6)});
+    if (authKey !== JSON.stringify(sync.auth()) || !canReadOperations()) return;
+    operationsSnapshot = result;
+    operationsError = '';
+  } catch (error) {
+    operationsError = '전체 수업 조회에 실패했습니다. 잠시 후 다시 시도해 주세요.';
+    operationsSnapshot = null;
+  } finally {
+    operationsLoadedAt = Date.now();
+    operationsLoading = false;
+    if (['schedule','roster'].includes(route)) render();
+  }
+}
 function render() {
   if (window.WBTaskPush) window.WBTaskPush.refresh();
   if (sync.recovering && !shouldGateStaffWork()) { renderSyncRecoveryNotice(); return; }
@@ -4276,11 +4311,15 @@ function render() {
       allowed.push('question_bank');
       allowed.push('sessions');
       allowed.push('makeup');
+      if (canReadOperations()) allowed.push('schedule');
       if (!allowed.includes(route)) route = 'today';
     }
   }
 
   const map = { schedule: viewSchedule, onboarding: viewOnboarding, today: viewToday, question_bank: viewQuestionBank, week: viewWeek, write: viewWrite, lesson: viewLessonEntry, feedback: viewFeedbackReview, makeup: viewMakeups, sessions: viewSessionPacks, board: viewBoard, staff: viewStaffAdmin, settings: viewSettings, books: viewBooks, transport: viewTransport, roster: viewRoster, devices: viewDevices, driver_transport: viewDriverTransport, facility: viewFacility };
+  if (!session.isAdmin && canReadOperations() && ['schedule','roster'].includes(route) &&
+      !operationsLoading && (Date.now() - operationsLoadedAt > 30000 ||
+        (operationsSnapshot && operationsSnapshot.from !== mondayOf(cursor)))) loadOperationsSnapshot();
   replaceView(v, (map[route] || viewToday)());
   if (route === 'question_bank') loadQuestionBank();
   if (route === 'schedule') requestAnimationFrame(() => {
@@ -4318,6 +4357,7 @@ function renderTabs() {
       ? [['schedule', '현황판', managerRequestInboxCount()], ['onboarding', '신규 학생', onboardingAttentionCount()], ['today', '오늘'], ['question_bank', '문제은행'], ['week', '주간 플래너'], ['write', '지시서 작성'],
          ['lesson', '수업 등록 및 변경'], ['feedback', '피드백 검토'], ['makeup', '보강', makeupAttentionCount()], ['sessions', '회차', sessionPackAttentionCount()], ['board', '직원 현황', a.total], ['staff', '직원 관리'], ['books', '교재'], ['transport', '차량'], ['roster', '원생'], ['devices', '기기', deviceAlertCount()], ['settings', '설정']]
       : [];
+  if (!session.isAdmin && canReadOperations()) tabs.unshift(['schedule','현황판']);
   $('#tabs').innerHTML = tabs.map(([k, t, n]) =>
     '<button class="tab ' + (route === k ? 'on' : '') + '" data-go="' + k + '">' + t +
     (n ? '<span class="badge">' + n + '</span>' : '') + '</button>').join('');
@@ -4849,7 +4889,7 @@ function visibleWeekendVisitScopes() {
     if (!staff) return [];
     const mon = mondayOf(cursor);
     Array.from({ length: 7 }, (_, index) => addDays(mon, index)).forEach(date => add(date, staff.id, false));
-  } else if (route === 'schedule' && session.isAdmin) {
+  } else if (route === 'schedule' && canReadOperations()) {
     const dates = scheduleView === 'day'
       ? [cursor]
       : Array.from({ length: 7 }, (_, index) => addDays(mondayOf(cursor), index));
@@ -6121,7 +6161,7 @@ function viewToday() {
   }
   if (session.isStaffLink && hasVerifiedPersonAuth()) {
     h += '<button class="btn btn-ghost btn-block mt8" data-act="retryexistingauth">이 기기의 기존 연결 상태 확인</button>' +
-      '<button class="btn btn-ghost btn-block mt8" data-act="handoff">다른 브라우저에서 열 링크 복사</button>' +
+      '<button class="btn btn-ghost btn-block mt8" data-act="handoff">내 기기 추가·재연결</button>' +
       '<div class="hint" style="text-align:center;margin-top:10px">체크는 자동 저장됩니다.<br>' +
       '위 링크는 10분 안에 최종 브라우저에서 한 번 열고 <b>이 기기에 연결</b>을 눌러 주세요.</div>';
   } else if (session.isStaffLink) {
@@ -13379,7 +13419,7 @@ function dailyLessonSchedule(date) {
     return { entries: entries, issues: issues };
   }
   const dow = dowOf(date);
-  state.tasks.filter(t => !t.deleted && isLesson(t)).forEach(t => {
+  readLessonTasks().filter(t => !t.deleted && isLesson(t)).forEach(t => {
     const staff = staffById(t.staffId);
     const studentName = String(t.studentName || studentOf(t) || '학생 미입력');
     const grade = lessonGradeOf(t);
@@ -13417,7 +13457,9 @@ function dailyLessonSchedule(date) {
 }
 
 function scheduleAttendance(entry, date) {
-  const value = ((getCheck(entry.task.id, date) || {}).att) || '';
+  const record = !session.isAdmin && canReadOperations() && operationsSnapshot
+    ? operationsSnapshot.checks[entry.task.id + '|' + date] : getCheck(entry.task.id, date);
+  const value = (record || {}).att || '';
   if (value === 'P') return { value: value, label: '출석', cls: '' };
   if (value === 'L') return { value: value, label: '지각', cls: 'warn' };
   if (value === 'A') return { value: value, label: '결석', cls: 'bad' };
@@ -13683,7 +13725,7 @@ function scheduleTimelineModal(entries, date) {
         '<span class="pill ' + att.cls + '">' + esc(att.label) + '</span></span></div>' +
         details.map(row => '<div class="schedule-info-row"><b>' + esc(row[0]) + '</b>' + esc(row[1]) + '</div>').join('') + '</div></div>';
     }).join('');
-  const foot = first.staffId ? '<button class="btn btn-ghost btn-block mt14" data-act="openstaff" data-id="' + esc(first.staffId) + '">선생님 업무 보기</button>' : '';
+  const foot = first.staffId && session.isAdmin ? '<button class="btn btn-ghost btn-block mt14" data-act="openstaff" data-id="' + esc(first.staffId) + '">선생님 업무 보기</button>' : '';
   modal(first.teacherName + ' 선생님 · ' + first.slot.label, body, foot);
 }
 
@@ -13949,7 +13991,7 @@ function scheduleIssuesHtml(issues) {
       const task = item.task || {};
       const action = canEditLessonTask(task)
         ? '<button class="btn btn-sm btn-ghost" data-act="lessonedit" data-id="' + esc(task.id) + '">수업 수정</button>'
-        : (item.staffId ? '<button class="btn btn-sm btn-ghost" data-act="openstaff" data-id="' + esc(item.staffId) + '">담당 업무</button>' : '');
+        : (session.isAdmin && item.staffId ? '<button class="btn btn-sm btn-ghost" data-act="openstaff" data-id="' + esc(item.staffId) + '">담당 업무</button>' : '');
       return '<div class="schedule-issue"><div class="between">' +
       '<div><b>' + esc(item.teacherName) + ' · ' + esc(item.studentName) + '</b>' +
         '<div class="small muted">' + esc(item.message) + '</div>' +
@@ -14226,6 +14268,7 @@ async function loadManagerRequestInbox(force) {
 
 function managerRequestInboxHtml() {
   if (!session.isAdmin) return '';
+  if (!session.isAdmin) return '';
   const rows = managerRequestInboxRows();
   const errors = managerRequestInboxErrors();
   let h = '<section class="card lesson-review" data-manager-inbox><div class="between"><div><div class="card-title">📥 관리담당 통합 요청함</div>' +
@@ -14255,13 +14298,14 @@ function managerRequestInboxHtml() {
 }
 
 function viewSchedule() {
-  if (!session.isAdmin) return viewToday();
+  if (!canReadOperations()) return viewToday();
+  if (!session.isAdmin && (!operationsSnapshot || operationsSnapshot.from !== mondayOf(cursor))) return '<div class="card">' + esc(operationsError || '전체 수업 현황을 불러오는 중입니다.') + '</div>';
   const core = window.WBScheduleCore;
   if (!core) return '<div class="card"><div class="empty"><b>⚠️</b>수업 현황을 불러오지 못했습니다.<br>새로고침해 주세요.</div></div>';
   const sessionModeReferenceDate = scheduleView === 'day' ? cursor : addDays(mondayOf(cursor), 6);
   ensureSessionModeData(state.tasks, sessionModeReferenceDate);
   if (!rosterDb && !rosterErr) loadRoster();
-  if (!managerRequestInboxReady() && !managerInboxLoading && !makeupLoading) {
+  if (session.isAdmin && !managerRequestInboxReady() && !managerInboxLoading && !makeupLoading) {
     setTimeout(() => loadManagerRequestInbox(false), 0);
   }
 
@@ -19962,7 +20006,7 @@ function studentLessonReferenceItems(studentId) {
 function rosterStudentLessonTasks(studentId) {
   const stableId = String(studentId || '');
   if (!stableId) return [];
-  return (state.tasks || []).filter(task => isRegularLessonTask(task) &&
+  return (readLessonTasks() || []).filter(task => isRegularLessonTask(task) &&
     String(task.studentId || '') === stableId).slice().sort((a, b) => {
       const teacherA = (staffById(a.staffId) || {}).name || '';
       const teacherB = (staffById(b.staffId) || {}).name || '';
@@ -20145,7 +20189,7 @@ function rosterStudentLessonsHtml(student) {
       '<div class="student-info-field"><b>담당 선생님</b><span>' + esc((teacher && teacher.name) || '미지정') + '</span></div>' +
       '<div class="student-info-field wide"><b>주말 등원 방식</b><span>' + esc(weekendFlexibleSettingsSummary(task)) + '</span></div></div>' +
       (canEditLessonTask(task) ? '<button class="btn btn-primary btn-block mt14" data-act="lessonedit" data-id="' + esc(task.id) + '">이 수업 정보 수정</button>' :
-        '<div class="hint mt14">이 수업은 현재 형식으로 다시 등록한 뒤 수정할 수 있습니다.</div>') +
+        (session.isAdmin ? '<div class="hint mt14">이 수업은 현재 형식으로 다시 등록한 뒤 수정할 수 있습니다.</div>' : '')) +
       (session.isAdmin && (taskHasWeekendSchedule(task) || isFlexibleWeekendLesson(task))
         ? '<button class="btn btn-ghost btn-block mt8" data-act="weekendflexsettings" data-id="' + esc(task.id) + '">비정기 수업 설정</button>'
         : session.isAdmin ? '<div class="hint mt8">비정기 주말 수업은 먼저 토·일 참고 시간표를 저장한 뒤 설정할 수 있습니다.</div>' : '') + '</section>';
@@ -20243,14 +20287,17 @@ function showRosterStudentInfo(studentId) {
     actions.push('<button class="btn btn-primary btn-block mt14" data-act="rosterstudentedit" data-id="' + esc(student.id) + '">기본 정보 수정</button>');
     actions.push('<button class="btn btn-ghost btn-block mt8" data-act="rosterstudentlessons" data-id="' + esc(student.id) + '">수업 정보 확인 및 수정</button>');
   }
-  else if (requestTask) actions.push('<button class="btn btn-ghost btn-block mt14" data-act="studentinforequest" data-id="' + esc(requestTask.id) + '" data-student-id="' + esc(student.id) + '">정보수정요청</button>');
+  else {
+    if (canReadOperations()) actions.push('<button class="btn btn-ghost btn-block mt8" data-act="rosterstudentlessons" data-id="' + esc(student.id) + '">수업 정보 보기</button>');
+    if (requestTask) actions.push('<button class="btn btn-ghost btn-block mt14" data-act="studentinforequest" data-id="' + esc(requestTask.id) + '" data-student-id="' + esc(student.id) + '">정보수정요청</button>');
+  }
   if (pendingStudentChanges(student.id).length) actions.push('<button class="btn btn-primary btn-block mt14" data-act="studentchangeack" data-student-id="' + esc(student.id) + '">수정내용확인</button>');
   modal(student.name + ' 학생 정보', rosterStudentInfoHtml(student, studentLessonReferenceItems(student.id)), actions.join(''));
   loadStudentAttendance(student.id, today().slice(0, 7));
 }
 
 function showRosterStudentLessons(studentId) {
-  if (!session.isAdmin) return toast('관리자만 수업 정보를 수정할 수 있습니다');
+  if (!canReadOperations()) return toast('전체 수업 조회 권한이 필요합니다');
   const student = rosterDb && Array.isArray(rosterDb.students) &&
     rosterDb.students.find(item => String(item.id) === String(studentId));
   if (!student) return toast('원생 명단을 새로고침한 뒤 다시 선택해 주세요');
@@ -21306,6 +21353,15 @@ function viewAcaflowImport() {
       '번호 변경 항목은 기본 선택하지 않습니다.<br><b>담당자 자동 변경 없음</b> — 아카플로우의 5개 처리 계정과 실제 WB 수업 담당자는 별개입니다.</div></div></details>';
 }
 
+let rosterSearchQuery = '';
+function rosterSearchResultsHtml() {
+  if (!rosterSearchQuery.trim()) return '<div class="hint">이름의 일부를 입력하면 학생 정보가 바로 표시됩니다.</div>';
+  const matches = window.WBRosterSearch.search(rosterDb && rosterDb.students, rosterSearchQuery);
+  return '<div class="small muted">검색 결과 ' + matches.length + '명</div>' + (matches.map(student =>
+    '<button class="roster-search-result" data-act="rosterstudentinfo" data-id="' + esc(student.id) + '">' +
+    '<b>' + esc(student.name) + '</b><span>' + esc(studentSchoolGradeDetailLabel(student) || '학교·학년 미입력') +
+    ' · ' + esc(rosterStudentInfoStatus(student)[0]) + '</span></button>').join('') || '<div class="hint">검색 결과가 없습니다.</div>');
+}
 function viewRoster() {
   const acaflowImport = viewAcaflowImport();
   if (!rosterDb && !rosterErr) { loadRoster(); return acaflowImport + '<div class="card"><div class="empty"><b>📈</b>원생 데이터를 불러오는 중…</div></div>'; }
@@ -21318,7 +21374,19 @@ function viewRoster() {
   const curActive = activeIn(cur).filter(student => !rosterStudentTransition(student));
   ensureSessionModeData(state.tasks, today());
 
-  let h = acaflowImport;
+  let h = '<section class="card"><div class="card-title">학생 이름 검색</div>' +
+    '<input class="in" type="search" data-roster-search aria-label="학생 이름 검색" placeholder="학생 이름 입력" value="' +
+    esc(rosterSearchQuery) + '"><div class="roster-search-results" aria-live="polite">' +
+    rosterSearchResultsHtml() + '</div></section>' + acaflowImport;
+
+  if (!session.isAdmin && canReadOperations()) {
+    return h + '<section class="card"><div class="card-title">전체 원생 · 조회 전용</div>' +
+      '<details><summary>전체 명단 펼치기</summary>' +
+      rosterDb.students.slice().sort((a,b) => String(a.name).localeCompare(String(b.name),'ko')).map(s =>
+        '<button class="roster-search-result" data-act="rosterstudentinfo" data-id="' + esc(s.id) + '">' +
+        '<b>' + esc(s.name) + '</b><span>' + esc(studentSchoolGradeDetailLabel(s)) + ' · ' +
+        esc(rosterStudentInfoStatus(s)[0]) + '</span></button>').join('') + '</details></section>';
+  }
 
   if (session.isAdmin) {
     const hasAssignedLesson = student => (state.tasks || []).some(task => isRegularLessonTask(task) &&
@@ -21334,7 +21402,7 @@ function viewRoster() {
       '<details class="mt14"><summary><b>재원생 ' + managed.length + '명 · 기본 정보 수정</b></summary><div class="mt8">' +
         managed.map(student => {
           const assigned = hasAssignedLesson(student);
-          return '<div class="between small" style="padding:5px 0"><span>· <button type="button" class="student-info-name" data-act="rosterstudentinfo" data-id="' + esc(student.id) + '" aria-label="' + esc(student.name) + ' 학생 정보 보기">' + esc(student.name) + '</button> ' +
+          return '<div class="between roster-primary-row" style="padding:5px 0"><span>· <button type="button" class="student-info-name" data-act="rosterstudentinfo" data-id="' + esc(student.id) + '" aria-label="' + esc(student.name) + ' 학생 정보 보기">' + esc(student.name) + '</button> ' +
             (!assigned ? '<span class="tag warn">수업 미지정</span> ' : '') + '<span class="muted">(' +
             esc([studentSchoolGradeDetailLabel(student) || '학교·학년 미입력', rosterStudentSubjectTeacherText(student.id)].join(' · ')) +
             rosterParentContactSuffix(student) + ')</span></span>' +
@@ -21376,7 +21444,7 @@ function viewRoster() {
       h += '<div class="card"><div class="between mb8">' +
         '<div class="card-title">🧑‍🏫 내 학생</div>' +
         '<div class="pill">재원 ' + mineActive.length + '명</div></div>' +
-        mineActive.map(s => '<div class="between small" style="padding:4px 0">' +
+        mineActive.map(s => '<div class="between roster-primary-row" style="padding:4px 0">' +
           '<span>· <button type="button" class="student-info-name" data-act="rosterstudentinfo" data-id="' + esc(s.id) + '" aria-label="' + esc(s.name) + ' 학생 정보 보기">' + esc(s.name) + '</button> <span class="muted">(' +
           esc(studentSchoolGradeDetailLabel(s) || '학교·학년 미입력') + rosterParentContactSuffix(s) + ')</span></span></div>').join('');
       h += '</div>';
@@ -23118,6 +23186,20 @@ async function createVerifiedHandoffLink(asQr) {
   }
 }
 
+async function openPersonalDevices() {
+  try {
+    const data = await sync.post('/personal-devices',{app:SYNC_APP,auth:sync.auth(),action:'list'});
+    modal('내 기기 추가·재연결',
+      '<p>휴대폰·태블릿·PC를 최대 세 대까지 연결합니다. 출퇴근 로그아웃으로 연결이 끊기지 않습니다.</p>' +
+      '<p class="small muted">브라우저 데이터를 지우거나 관리자가 연결을 해제한 경우에는 다시 연결해야 합니다. 연결 날짜를 보고 사용하지 않는 기기만 해제해 주세요.</p>' +
+      data.devices.map((d,i) => '<div class="card"><b>기기 ' + (i+1) + (d.current?' · 현재 기기':'') +
+        '</b><div>연결: ' + esc(new Date(d.connectedAt).toLocaleString('ko-KR')) + '</div>' +
+        (!d.current?'<button class="btn btn-ghost" data-act="personaldevicerevoke" data-id="'+esc(d.id)+'">이 연결 해제</button>':'') + '</div>').join(''),
+      data.devices.length < data.limit ? '<button class="btn btn-primary btn-block" data-act="personaldeviceqr">새 기기 연결 QR 만들기</button>' :
+        '<p>세 대가 연결되어 있습니다. 교체할 기기를 먼저 해제해 주세요. 다른 기기는 자동으로 해제되지 않습니다.</p>');
+  } catch(error) { toast(error.message || '기기 목록을 확인하지 못했습니다'); }
+}
+
 function showText(title, text, editable) {
   modal(title,
     '<textarea class="in" rows="13" id="mText"' + (editable ? '' : ' readonly') + '>' + esc(text) + '</textarea>',
@@ -23822,14 +23904,14 @@ document.addEventListener('click', async ev => {
     case 'todaydate': cursor = today(); cursorPinned = false; render(); break;
     case 'week': cursor = addDays(cursor, Number(el.dataset.n) * 7); cursorPinned = (mondayOf(cursor) !== mondayOf(today())); render(); break;
     case 'scheduleview': {
-      if (!session.isAdmin || !SCHEDULE_VIEWS.some(item => item[0] === el.dataset.v)) break;
+      if (!canReadOperations() || !SCHEDULE_VIEWS.some(item => item[0] === el.dataset.v)) break;
       scheduleView = el.dataset.v;
       render();
       break;
     }
     case 'scheduletoday': cursor = today(); cursorPinned = false; render(); break;
     case 'scheduleblock': {
-      if (!session.isAdmin) break;
+      if (!canReadOperations()) break;
       const startMinute = Number(el.dataset.start), endMinute = Number(el.dataset.end);
       const teacherKey = String(el.dataset.teacher || '');
       const lessonIdentity = String(el.dataset.lesson || '');
@@ -24886,11 +24968,19 @@ document.addEventListener('click', async ev => {
       break;
     }
     case 'handoff': {
-      createVerifiedHandoffLink();
+      openPersonalDevices();
       break;
     }
     case 'handoffqr': {
-      createVerifiedHandoffLink(true);
+      openPersonalDevices();
+      break;
+    }
+    case 'personaldeviceqr': createVerifiedHandoffLink(true); break;
+    case 'personaldevicerevoke': {
+      if (!confirm('선택한 기기의 연결을 해제하시겠습니까? 해당 기기는 새 QR로 다시 연결해야 합니다. 현재 기기는 유지됩니다.')) break;
+      el.disabled = true;
+      sync.post('/personal-devices',{app:SYNC_APP,auth:sync.auth(),action:'revoke',deviceId:id})
+        .then(openPersonalDevices).catch(error => {el.disabled=false;toast(error.message);});
       break;
     }
     case 'orderText':
@@ -25404,6 +25494,12 @@ function captureTransportDraftFromEvent(target) {
 /* 메모 · 수량 직접 입력 */
 let inputTimer = null;
 document.addEventListener('input', ev => {
+  if (ev.target.matches('[data-roster-search]')) {
+    rosterSearchQuery = ev.target.value;
+    const results = document.querySelector('.roster-search-results');
+    if (results) results.innerHTML = rosterSearchResultsHtml();
+    return;
+  }
   const centerChatDraft = ev.target.closest('[data-center-chat-draft]');
   if (centerChatDraft) {
     const value = String(centerChatDraft.value || '').slice(0, 1000);
@@ -26098,7 +26194,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-10-19.4';
+const APP_VER = '2026-10-20.1';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
@@ -26129,7 +26225,7 @@ function checkVersion() {
 checkVersion();
 setInterval(checkVersion, 10 * 60 * 1000);
 setInterval(() => {
-  if (route === 'schedule' && scheduleView === 'day' && session.isAdmin && cursor === seoulNowParts().date) renderAfterSync();
+  if (route === 'schedule' && scheduleView === 'day' && canReadOperations() && cursor === seoulNowParts().date) renderAfterSync();
 }, 60 * 1000);
 
 </script>
