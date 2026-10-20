@@ -169,3 +169,32 @@ crm/
 **HubSpot 중복 쓰기 보호**: 연결한 CRM 고객은 연락처·딜·노트 전송을 보류한다. 기존 큐는 삭제하지 않고 실행 시 `PORTAL_LINKED`로 남는다. 조회된 원본에 연결된 연락처·딜과 겹치는 전송도 차단한다. 가져오기는 연결 고객 및 조회된 원본 연락처를 `portalSkipped`로 건너뛴다. 아직 연결·조회하지 않은 고객까지 자동 판별하지는 못하므로 전체 가져오기/전송 확대 전에 기존 연결을 대조한다. 진행 중인 반영과 고객번호 연결은 함께 실행하지 않으며, 외부 요청 시간 초과의 실제 반영 여부는 별도로 확인해야 한다.
 
 검증: `node scripts/check.mjs --only crm`. `app-portal.test.cjs`는 입력 보존·조회 실패·동시 변경·세션 종료를, `crm-api.test.mjs`는 인증·형제 구분·원본 필드 제한·오류 보존·HubSpot 전송 보호를 가상 데이터로 확인한다.
+
+## 12. PC 접속 서버와 외부 주소
+
+2026-10-20 원장 선택: **PC에서 화면·접속 제공, 기존 클라우드 고객 데이터 유지**.
+외부 주소는 `https://salesdesk.wbcowork.com/`, PC 프로세스는 `crm/gateway-server.mjs`, 전용 Cloudflare Tunnel은 `wb-salesdesk-wb1`이다. PC는 127.0.0.1:18962에만 바인딩한다. 공유기의 포트 개방은 하지 않는다.
+
+- 화면은 `node crm/build.mjs`로 조립한 `crm/dist`의 허용된 파일만 제공한다. 서버 소스·SQLite·설정 파일은 제공하지 않는다.
+- `/api/*`는 고정 `https://wb-crm.whdudwns33.workers.dev`로만 중계한다. 리다이렉트는 거부하고 Bearer·Content-Type·Accept만 전달한다. 브라우저 쿠키와 Cloudflare 키는 중계하지 않는다.
+- `CRM_PUBLIC_HOST`는 새 공개 호스트, `CRM_ADMIN_USERNAME`은 PC 주소에서 요구할 원장 아이디다. **비밀번호는 PC에 저장하거나 새로 만들지 않고 기존 Worker에서 검증한다.** 아이디 확인은 PC 주소에만 추가되며 기존 Worker 주소의 비밀번호 로그인은 유지한다. 비밀번호 변경이 필요하면 원장이 기존 앱 관리 화면에서 직접 변경한다(다른 원장 세션도 만료될 수 있다).
+- health의 `usernameRequired:true`에 따라 아이디 칸을 표시한다. 직원·파트너 링크는 기존 방식이다. 고객 자료·연결·HubSpot 키·15분 예약 동기화는 기존 Worker/D1 한 곳에 있다. PC에 DB나 크론을 추가하지 않는다.
+- 호스트/쓰기 Origin 검사, 로그인 IP별 5분당 10회 상한(Worker 자체 계정 잠금도 유지), 요청 본문 16MiB 상한, 원본 응답 120초 제한, noindex·보안 헤더·no-store를 적용한다. 통신 오류에는 원문/키를 반환하지 않는다.
+
+수동 실행(PowerShell, 비밀 값은 없음):
+
+```powershell
+node crm/build.mjs
+$env:CRM_PUBLIC_HOST = 'salesdesk.wbcowork.com'
+$env:CRM_ADMIN_USERNAME = '<원장이 정한 아이디>'
+$env:PORT = '18962'
+node crm/gateway-server.mjs
+```
+
+운영 사본은 Git 작업 폴더와 분리된 사용자 폴더 `wb-salesdesk-runtime` 아래에 둔다. `releases/<커밋>/crm/dist`, `crm/gateway-server.mjs`, `reading-server/sec-headers.mjs`, `reading/_headers`가 필요하다. `protected/current-release.json`은 커밋 포인터이며 터널 자격증명과 설정도 protected 아래에 둔다. 이 폴더는 현재 사용자·SYSTEM만 접근하게 하고 Git·클라우드 동기화에 두지 않는다. 비밀번호·HubSpot 키는 복사하지 않는다.
+
+Windows 작업 `WB_Salesdesk_Server`·`WB_Salesdesk_Tunnel`은 사용자 로그인 때 시작하며 실패 시 재시작한다. 서버·터널을 함께 중지하면 새 주소만 중지되고 기존 Worker·자동 동기화는 계속된다. 릴리스 변경 전에는 기존 포인터/실행 파일을 백업하고, 복구는 이전 커밋 포인터로 되돌려 서버 작업을 재시작한다. 터널의 ingress는 해당 호스트 → localhost:18962, 나머지는 404다. 다른 앱의 터널은 건드리지 않는다.
+
+검증: `node scripts/check.mjs --only crm` 및 전체 검사. 가상 API 테스트는 아이디 누락/오류·원본 비밀번호 거절·Bearer 전달·쿠키 제외·고정 원본·호스트/Origin·파일 차단·본문 상한·실패 메시지·시도 제한을 확인한다. 실제 공개 후 HTTPS 화면/health와 비인증 고객 조회 401을 확인한다. 성공 로그인은 원장이 화면에서 직접 입력해 확인한다. PC 전원·인터넷·Windows 사용자 로그인이 필요하며 PC가 꺼져도 기존 Worker 주소는 쓸 수 있다.
+
+Cloudflare 설정 근거: [공식 로컬 터널 생성 가이드](https://developers.cloudflare.com/tunnel/features/locally-managed-tunnels/create-local-tunnel/), [ingress 설정](https://developers.cloudflare.com/tunnel/features/locally-managed-tunnels/configuration-file/).
