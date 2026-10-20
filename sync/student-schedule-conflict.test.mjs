@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   assertStudentScheduleSnapshot,
+  sameStudentLessonSchedule,
   isRegularLessonScheduleTask,
   studentScheduleConflictPayload
 } from './student-schedule-conflict.js';
@@ -20,6 +21,18 @@ function lesson(overrides = {}) {
 function stored(task) {
   return { id: task.id, owner: task.staffId, data: JSON.stringify(task) };
 }
+
+test('teacher-only changes preserve occupancy but student, dates, times and uncertainty do not', () => {
+  const before = lesson();
+  assert.equal(sameStudentLessonSchedule(before, {...before, staffId:'teacher-b'}), true);
+  for (const patch of [
+    {studentId:'student-b'}, {id:'new'}, {start:'2026-09-02'}, {end:'2026-09-30'},
+    {repeat:'once'}, {scheduleStatus:'needs_review'}, {weekendAttendanceMode:'flexible'},
+    {scheduleSlots:[{days:[1],startTime:'16:30',endTime:'17:30',validFrom:'2026-09-01'}]},
+    {scheduleSlots:[{days:[2],startTime:'16:00',endTime:'17:00',validFrom:'2026-09-01'}]},
+    {scheduleSlots:[{days:[1],startTime:'16:00',endTime:'17:00',validFrom:'2026-09-02'}]}
+  ]) assert.equal(sameStudentLessonSchedule(before, {...before,...patch}), false, JSON.stringify(patch));
+});
 
 function makeup(overrides = {}) {
   return {
