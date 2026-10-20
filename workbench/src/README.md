@@ -10,24 +10,29 @@
 
 ## PC 서버와 Cloudflare (2026-10-20)
 
-- 실행 폴더: `C:\Users\wb\wb-workbench-runtime`. `public`에는 검증한 `index.html`·`bulk.enc.json` 두 파일만 둔다. 학생 백업, 소스, 비밀번호를 넣지 않는다.
+- 실행 폴더: `C:\Users\wb\wb-workbench-runtime`. 최초 검증본은 `public`에 보존하고 이후 검증본은 `releases/<main 커밋>/`에 두 암호화 파일씩 보관한다. `protected/current-release.json` 포인터가 있으면 서버는 해당 릴리스를 제공하며, 없으면 최초 `public`을 제공한다. 학생 백업·소스·비밀번호를 제공 폴더에 넣지 않는다.
 - `serve.mjs`는 Node 기본 HTTP 서버이며 `WB_WORKBENCH_DIR` 필수, `PORT` 기본 18960이다. `127.0.0.1`에만 바인딩한다. `/`·`/workbench`는 `/workbench/`로 이동하며 암호화 두 파일과 `/healthz` 외에는 404, GET/HEAD 외에는 405다.
 - 두 파일을 시작 시 메모리에 고정한다. 응답은 `no-store, no-transform`으로 전달한다. [Cloudflare 공식 설명](https://developers.cloudflare.com/web-analytics/faq/)의 `no-transform` 규칙으로 분석 스크립트 자동 삽입을 막아 원본 해시를 유지한다.
-- `start-host.ps1`을 런타임의 `start.ps1`로 복사해 사용한다. `WB_Workbench_Server`·`WB_Workbench_Tunnel` 작업이 PowerShell 7에서 이를 숨김 실행한다. 현재 실행기는 Codex에 설치된 PowerShell 7 경로이며, 위치가 바뀌면 작업의 실행 경로도 갱신해야 한다. 터널 설정·인증 파일은 런타임 `protected` 폴더에 두며 사용자·관리자·SYSTEM만 접근한다.
+- `start-host.ps1`을 런타임의 `start.ps1`로 복사해 사용한다. `WB_Workbench_Server`·`WB_Workbench_Tunnel`·`WB_Workbench_Sync` 작업이 PowerShell 7에서 이를 숨김 실행한다. 현재 실행기는 Codex에 설치된 PowerShell 7 경로이며, 위치가 바뀌면 작업의 실행 경로도 갱신해야 한다. 터널 설정·인증 파일·활성 포인터·동기화 상태는 런타임 `protected` 폴더에 두며 사용자·관리자·SYSTEM만 접근한다.
 - 작업은 wb 로그인 시 시작하고 실패 시 1분 간격으로 3회 재시도한다. Windows 로그인 전·로그아웃 후 자동 실행이나 PC 재부팅 자체는 검증하지 않았다. PC 전원·인터넷·로그인을 유지해야 한다.
 
-암호화본 갱신은 기존 승인된 빌드·PR 절차를 따른 후 진행한다. 실행 중인 서버는 이전 두 파일을 메모리에서 계속 제공하므로 두 파일을 모두 복사하고 알려진 SHA-256 쌍과 대조한 **다음에** 서버 작업을 중지·시작한다. 하나라도 다르면 재시작하지 않는다. PC 폴더 갱신은 현재 수동이며 GitHub 아침 자동 배포와 자동 연동하지 않는다.
+**PC 자동 동기화:** 사용자 승인으로 `WB_Workbench_Sync`를 매일 08:20 KST부터 15분 간격·2시간 동안, Windows 로그인 30초 후에도 실행하도록 연결했다. 실행 기회를 놓쳤으면 다음 사용 가능 시 시작하며 중복 실행은 막는다. 실패 시 1분 간격으로 3회 재시도한다. 기존 Claude의 아침 Drive → 시드 → PR 배포를 대체하는 작업은 아니며, 그 배포가 완료된 결과를 PC 서버에 반영한다.
+
+`sync-host.mjs`는 하나의 main 커밋을 먼저 고정한 뒤 같은 커밋의 두 파일을 다운로드한다. 암호화 형식을 확인하고 GitHub Pages의 실제 두 파일 해시도 일치해야 활성화한다. 아직 배포 중이면 기존 버전을 유지하고 다음 예약 때 확인한다. 두 파일을 새 불변 폴더에 먼저 저장한 뒤 활성 포인터를 원자적으로 바꾸므로 실행 중인 서버가 반쪽짜리 쌍을 읽지 않는다. 서버 재시작 후 HTTP 해시가 다르거나 시작에 실패하면 이전 포인터·서버로 복구한다. 원본 `public`과 이전 릴리스들은 삭제하지 않으며 같은 파일이면 재시작하지 않는다. 상태는 `protected/sync-status.json`, 로그는 `logs/sync.stdout.log`·`sync.stderr.log`다.
 
 ```powershell
-# 검증된 두 파일을 public에 모두 복사·해시 대조한 다음 실행
-Stop-ScheduledTask -TaskName WB_Workbench_Server
-Start-ScheduledTask -TaskName WB_Workbench_Server
+# 승인된 PR의 GitHub Pages 배포가 완료된 후 즉시 동기화하려면
+Start-ScheduledTask -TaskName WB_Workbench_Sync
 # 공개 /workbench/index.html 및 /workbench/bulk.enc.json?v=<빌드 태그> 해시 재확인
 ```
 
 새 주소에서는 처음 비밀번호를 입력하고 「이 기기에서 기억하기」를 다시 선택한다. **기록은 여전히 각 브라우저에 저장되며 서버 간 자동 동기화가 아니다.** 기존 주소의 「백업 내보내기」 → 새 주소의 「가져오기 (시드)」 → 「전체 복원」으로 학생·어디가·수동 DB를 모두 옮긴다. 전체 복원은 새 주소 데이터를 교체하므로 이미 새로 입력했다면 그쪽 백업도 먼저 보관한다. 기존 주소의 기록은 남는다. 평문 백업을 공개 서버에 두거나 에이전트가 내용을 출력하지 않는다.
 
+2026-10-20 연결된 Aside 브라우저의 기록 이전은 완료했다. 새 주소가 비어 있음을 확인하고 원본을 보호된 로컬 폴더에 백업한 뒤 저장 자료를 바이트 단위로 이전했다. 원본과 목적지의 지문 일치·새로고침 후 보존을 확인했으며 기존 주소 자료도 유지했다. 비밀번호·기기 기억 키는 복사하지 않았으므로 새 주소 로그인은 사용자가 진행한다. 세부 검증 메타데이터와 원본 사본은 `protected/migration-20261020/`에만 두며 공개 인계서에 기록 내용을 싣지 않는다. 자동 반영도 브라우저 저장 자료를 읽거나 덮어쓰지 않으며 Drive 자동 업로드를 추가하지 않았다.
+
 호스팅 회귀: `node --test workbench/src/serve.test.mjs` 3개, PowerShell 7에서 `& .\workbench\src\start-host.test.ps1` 3개 통과. 실행 도우미는 Windows Job Object로 자식을 관리해 작업 중지 시 서버·터널 프로세스도 정리한다. 운영 작업 각각의 중지·재시작과 HTTPS 두 파일 해시 일치, 비공개 경로 7개 404를 확인했다. 앱 자체를 바꾸지 않고 검증된 암호화 바이트를 제공하므로 호스팅 변경만으로 재빌드하지 않는다.
+
+자동 반영 회귀 `node --test workbench/src/sync-host.test.mjs` 7개도 통과했다. 단일 커밋 고정, 변경 없음, Pages 반쪽 배포 대기, 포인터 유무별 시작 실패 복구, 잘못된 파일·네트워크 실패 거절, 복구 실패 상태를 검증한다. 실제 `WB_Workbench_Sync`의 첫 활성화와 재실행 시 불필요한 서버 재시작 생략도 확인했다. 다음 날 실제 예약 시각 실행과 PC 재부팅 검증은 아직 수행하지 않았다.
 
 ## 진학통·어디가 벤치마킹 후속 (2026-10-16 · 배포 완료)
 
@@ -98,7 +103,7 @@ node workbench/src/build.mjs   # "복호화 검증: 일치 ✓" 확인
 2. 최신 `origin/main`을 가져와 별도 배포 브랜치(worktree 사용 권장)를 만든다. 빌드 산출물 **두 파일만** 복사하고 PR의 변경 파일도 두 개뿐인지 확인한다.
 3. PR을 열어 checks가 모두 통과하면 스쿼시 병합한다. **main에 직접 푸시하지 않는다.** 병합 권한이 없으면 PR 주소만 보고한다.
 4. 병합 1~2분 뒤 라이브 `index.html`과 `bulk.enc.json?v=<빌드 태그>`의 SHA-256을 로컬 두 파일과 대조한다. 둘 다 일치해야 배포 완료다.
-5. PC 운영 주소에도 위 「PC 서버와 Cloudflare」 절차로 같은 두 파일을 반영하고 해시를 대조한다. GitHub 배포만으로 PC 제공 파일이 바뀌지는 않는다.
+5. PC 운영 주소는 `WB_Workbench_Sync`가 위 「PC 서버와 Cloudflare」 절차로 같은 두 파일을 반영한다. 즉시 반영하려면 예약 작업을 실행하고 해시를 대조한다. GitHub와 PC 동기화는 별도 실행이므로 `sync-status.json`도 확인한다.
 
 ## 원장 백업 자동 반영 (Drive → 시드 → 재배포)
 
