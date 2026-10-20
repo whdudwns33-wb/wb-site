@@ -439,7 +439,7 @@ test('Kim Deokjae real-data samples produce the expected current student counts'
 
 test('dashboard is admin-only, mobile responsive, and keeps multi-teacher tasks separate', () => {
   assert.match(html, /const map = \{ schedule: viewSchedule,/);
-  assert.match(html, /function viewSchedule\(\) \{\s*if \(!session\.isAdmin\) return viewToday\(\);/);
+  assert.match(html, /function viewSchedule\(\) \{\s*if \(!canReadOperations\(\)\) return viewToday\(\);/);
   assert.match(html, /const allowed = \['today', 'week', 'lesson', 'feedback', 'books', 'transport', 'roster'\]/);
   assert.match(html, /key: String\(t\.id\) \+ '\|' \+ String\(slot\.slotId \|\| index\)/);
   assert.match(html, /weeklyTeacherSummary\(weekly\.entries\)/);
@@ -532,7 +532,7 @@ test('schedule UI prioritizes warnings and collapses secondary detail without br
   assert.match(html, /전체 지표는 유지됩니다 · ' \+ shown \+ '개 카드가 검색되었습니다\./);
   assert.match(html, /data-act="lessonedit" data-id="' \+ esc\(task\.id\)/);
   assert.match(html, /\[pendingCount \+ ' · ' \+ conflictCount, '미확정 · 학생 겹침'/);
-  assert.match(html, /scheduleView === 'day' && session\.isAdmin && cursor === seoulNowParts\(\)\.date/);
+  assert.match(html, /scheduleView === 'day' && canReadOperations\(\) && cursor === seoulNowParts\(\)\.date/);
 });
 
 test('student warning priority uses the actual warning count', () => {

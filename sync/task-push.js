@@ -1,4 +1,5 @@
 // 요청 본문을 푸시 서비스로 보내지 않는다. 기기에는 일반 알림만 표시한다.
+import { deviceCutoff } from './device-policy.js';
 const DAY = 86400000;
 export async function digest(value) {
   return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))), b => b.toString(16).padStart(2, '0')).join('');
@@ -85,7 +86,7 @@ async function authorized(env, sub, now) {
     .bind(sub.staff_id).all();
   for (const token of tokens.results || []) {
     if (token.token.startsWith('sha256:')) {
-      if (token.token === 'sha256:' + sub.auth_hash && token.created_at >= now - 90 * DAY) return true;
+      if (token.token === 'sha256:' + sub.auth_hash && token.created_at >= deviceCutoff(env,'task',now)) return true;
     } else if (await digest(token.token) === sub.auth_hash) return true;
   }
   return false;

@@ -481,7 +481,7 @@ function withoutRosterTeacher(item) {
 }
 
 async function rosterStudentIdsForAuth(env, app, document, auth, activeLessonIds) {
-  if (auth.scope === 'all') return new Set(document.roster.students.map(student => String(student.id)));
+  if (auth.scope === 'all' || auth.operationsRead === true) return new Set(document.roster.students.map(student => String(student.id)));
   const allowed = new Set(activeLessonIds);
   if (auth.scope !== 'own' || !SAFE_ID.test(String(auth.id || ''))) return allowed;
   const transitioned = new Map(document.roster.students.map(student => [String(student.id), rosterTransition(student)])

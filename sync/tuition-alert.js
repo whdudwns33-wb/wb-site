@@ -1330,7 +1330,7 @@ async function confirmAlert(env, body, origin, auth, json) {
 }
 
 async function assignedStudentIds(env, auth, sourceDate) {
-  if (auth && auth.scope === 'all') return null;
+  if (auth && (auth.scope === 'all' || auth.operationsRead === true)) return null;
   if (!auth || auth.scope !== 'own' || !SAFE_ID.test(String(auth.id || ''))) return new Set();
   const result = await env.DB.prepare(
     "SELECT id,owner,data FROM tasks WHERE app='task' AND owner=?"

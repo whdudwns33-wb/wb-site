@@ -66,6 +66,7 @@ function runtime(options = {}) {
   const cacheKey = scopeId ? 'wb_taskboard_person_v1_' + scopeId : 'wb_taskboard_v1';
   storage.set(cacheKey, JSON.stringify(seed));
   const context = vm.createContext({
+    operationsSnapshot:null, operationsLoadedAt:0, rosterDb:null, rosterLoadGeneration:0,
     __initialJSON: JSON.stringify(seed), __scopeId: scopeId, __cacheKey: cacheKey,
     __accessRole: options.accessRole || '', __verified: !!options.verified,
     __getElement(selector) {
