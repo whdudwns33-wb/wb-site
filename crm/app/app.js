@@ -316,15 +316,17 @@ async function loadHealth() {
 }
 async function doLogin(btn) {
   const pw = val('f-pw');
+  const username = boot.health && boot.health.usernameRequired ? val('f-username').trim() : '';
+  if (boot.health && boot.health.usernameRequired && !username) return toast('아이디를 입력하세요');
   if (!pw) return toast('비밀번호를 입력하세요');
   if (boot.busy) return;
   boot.busy = true; if (btn) btn.disabled = true;
   try {
-    const r = await api('/api/login', { password: pw }, { noAuth: true });
+    const r = await api('/api/login', Object.assign({ password: pw }, username ? { username } : {}), { noAuth: true });
     setToken(r.token); await afterAuth(); toast('환영합니다');
   } catch (e) {
     if (e.code === 'NOT_SETUP') { boot.health = Object.assign({}, boot.health, { setup: false }); render(); }
-    toast(e.code === 'AUTH' ? '로그인 실패 — 비밀번호가 맞지 않습니다' : '로그인 실패 — ' + e.message);
+    toast(e.code === 'AUTH' ? '로그인 실패 — ' + (boot.health && boot.health.usernameRequired ? '아이디 또는 비밀번호가 맞지 않습니다' : '비밀번호가 맞지 않습니다') : '로그인 실패 — ' + e.message);
   } finally { boot.busy = false; if (btn) btn.disabled = false; }
 }
 async function doSetup(btn) {
@@ -411,6 +413,7 @@ function viewLogin() {
         '<div class="field"><input class="in" id="f-pw2" type="password" autocomplete="new-password" placeholder="비밀번호 확인" data-enter="setup"></div>' +
         '<button class="btn btn-primary btn-block" data-act="setup">만들고 시작</button>'
       : '<div class="card-title">원장 로그인</div><div class="card-sub mb8">직원은 원장이 보낸 개인 링크를 열면 바로 연결됩니다.</div>' +
+        (h && h.usernameRequired ? '<div class="field"><label for="f-username">아이디</label><input class="in" id="f-username" autocomplete="username" maxlength="64" placeholder="아이디" data-enter="login"></div>' : '') +
         '<div class="field"><input class="in" id="f-pw" type="password" autocomplete="current-password" placeholder="비밀번호" data-enter="login"></div>' +
         '<button class="btn btn-primary btn-block" data-act="login">로그인</button>') + '</div></div>';
 }
