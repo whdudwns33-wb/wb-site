@@ -33,9 +33,10 @@ await call('perform',{id:learning.id,revision:1,done:true,question:'가상 질�
 cookie=teacherCookie;await call('check',{id:learning.id,revision:2,feedback:'가상 확인'});
 const c=await call('consult_save',{studentId:student.id,subject:'수학',heldAt:'2026-10-19T16:00:00+09:00',periodStart:'2026-10-19',periodEnd:'2026-10-19',internalNote:'PRIVATE_RUNTIME',public:{facts:'가상 사실',guidance:'가상 안내',nextGoal:'다음 실천',due:'2026-10-20'}});
 await call('consult_complete',{id:c.id,revision:1});await call('review',{id:c.id,revision:2});
-cookie=ownerCookie;await call('publish',{id:c.id,revision:3});
+assert.equal((await call('report_preview',{id:c.id,reportPreset:'detail'})).snapshot.layout.schemas.length,2);await call('report_preview',{id:c.id,reportPreset:'bad'},400);
+cookie=ownerCookie;await call('publish',{id:c.id,revision:3,reportPreset:'detail'});
 await call('login',{login:'s-'+suffix,password:'Synthetic-student-password!'});
-const reports=await call('report_get',{id:c.id});assert.equal(reports.reports.length,1);assert.doesNotMatch(JSON.stringify(reports),/PRIVATE_RUNTIME/);
+const reports=await call('report_get',{id:c.id});assert.equal(reports.reports.length,1);assert.equal(reports.reports[0].snapshot.reportPreset,'detail');assert.doesNotMatch(JSON.stringify(reports),/PRIVATE_RUNTIME/);
 assert.equal(reports.reports[0].snapshot.summary.total,2);
 assert.ok((await call('planner_state')).rows.some(r=>r.data._blendedId));
 const start=await fetch(base+'/blended/academy-start?academyStudent=synthetic',{redirect:'manual'});assert.equal(start.status,302);assert.match(start.headers.get('set-cookie'),/Secure; HttpOnly/);

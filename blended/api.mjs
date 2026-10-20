@@ -1,7 +1,7 @@
 import { randomBytes, randomUUID, scryptSync, timingSafeEqual, createHash } from 'node:crypto';
 import links from '../shared/external-links.js';
 import { createPlanner } from './planner-api.mjs';
-import {defaultLayout,validateLayout} from './report-layout.mjs';
+import {defaultLayout,validateLayout,reportPreset,presetLayout} from './report-layout.mjs';
 
 export const APP = 'blended';
 const staffRoles = ['owner', 'admin', 'teacher'];
@@ -60,9 +60,9 @@ export function createApi(db, options = {}) {
     return user.role === 'teacher' && !!one('SELECT 1 FROM assignments WHERE teacher_id=? AND student_id=? AND active=1 AND starts<=? AND ends>=? AND (?=\'\' OR subject=?)',user.id,studentId,today(),today(),subject,subject);
   }
   const access = (user, studentId, subject = '') => requireThat(canAccess(user,studentId,subject),403,'SCOPE','현재 담당 또는 열람 범위에 포함되지 않습니다.');
-  const planner = createPlanner({one,all,run,access,canAccess,requireThat,revision,today,reportLayout:()=>layout().template});
+  const planner = createPlanner({one,all,run,access,canAccess,requireThat,revision,today,reportLayout:preset=>preset==='custom'?layout().template:presetLayout(preset)});
   const layout=()=>{const row=one("SELECT * FROM report_layout WHERE id='academy'");return {template:row?JSON.parse(row.template):defaultLayout(),revision:row?.revision || 0};};
-  const reportSnapshot=(row,user,at=now())=>({app:APP,type:'consultation',consultationId:row.id,student:one('SELECT id,name FROM students WHERE id=?',row.student_id),subject:row.subject,heldAt:row.held_at,author:one('SELECT id,name FROM users WHERE id=?',row.author),public:publicData(JSON.parse(row.public_json)),summary:summary(user,row.student_id,row.subject,row.period_start,row.period_end),layout:layout().template,publishedAt:at});
+  const reportSnapshot=(row,user,at=now(),preset='custom')=>({reportPreset:reportPreset(preset),app:APP,type:'consultation',consultationId:row.id,student:one('SELECT id,name FROM students WHERE id=?',row.student_id),subject:row.subject,heldAt:row.held_at,author:one('SELECT id,name FROM users WHERE id=?',row.author),public:publicData(JSON.parse(row.public_json)),summary:summary(user,row.student_id,row.subject,row.period_start,row.period_end),layout:preset==='custom'?layout().template:presetLayout(preset),publishedAt:at});
   function object(table, id, user, roles) {
     role(user,roles);
     const row = one(`SELECT * FROM ${table} WHERE id=?`,text(id,100,true));
@@ -241,7 +241,7 @@ export function createApi(db, options = {}) {
         const reason = text(p.reason || '',500,!!previous || action === 'withdraw');
         const id = randomUUID(), at = now();
         // 공개 필드만 선택하며 내부 메모 표는 발행 과정에서 읽지 않는다.
-        const snapshot = action === 'withdraw' ? null : JSON.stringify(reportSnapshot(row,user,at));
+        const snapshot = action === 'withdraw' ? null : JSON.stringify(reportSnapshot(row,user,at,reportPreset(p.reportPreset)));
         run('INSERT INTO report_versions VALUES(?,?,?,?,?,?,?,?)',id,row.id,(previous?.version || 0)+1,action === 'publish' ? 'published' : 'withdrawn',snapshot,reason,user.id,at);
         run('UPDATE consultations SET report_status=?,revision=revision+1,updated_at=? WHERE id=?',action === 'publish' ? 'published' : 'withdrawn',at,row.id);
         return {id, consultationId:row.id, version:(previous?.version || 0)+1};
@@ -285,7 +285,7 @@ export function createApi(db, options = {}) {
     }
     const user = userFor(token);
     if(action==='report_layout')return {me:{id:user.id,name:user.name,role:user.role},...layout()};
-    if(action==='report_preview') {const row=object('consultations',p.id,user,staffRoles);return {snapshot:reportSnapshot(row,user)};}
+    if(action==='report_preview') {const row=object('consultations',p.id,user,staffRoles);return {snapshot:reportSnapshot(row,user,now(),reportPreset(p.reportPreset))};}
     if (action === 'logout') { run('DELETE FROM sessions WHERE hash=?',hash(token)); return {loggedOut:true}; }
     if (action === 'state') return overview(user);
     if (action === 'planner_state') return planner.state(user);

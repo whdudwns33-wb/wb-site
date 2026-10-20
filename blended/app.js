@@ -123,6 +123,7 @@
     return `<div class="form-grid">${input('studentLabel','학생',name(record?.student_id || selected),'text','disabled')}<label>과목<select name="subject" ${record ? 'disabled' : ''}>${options(subjects.map(s => [s,s]),record?.subject || subjects[0])}</select></label></div>`;
   }
   function summaryHTML(s) { return `<div class="summary"><span><strong>${s.total}</strong>배정</span><span><strong>${s.selfDone}</strong>학생 완료</span><span><strong>${s.checked}</strong>강사 확인</span></div><p class="hint">${esc(s.source)} / ${esc(s.periodStart)} ~ ${esc(s.periodEnd)}<br>갱신 ${esc(s.asOf)} / 외부 성적 ${esc(s.external)}${!s.hasRecords ? '<br>기록 없음 · 미수행이나 0점으로 해석하지 않습니다.' : ''}</p>`; }
+  function reportFormatField(id) {return '<label>리포트 형식<select name="reportPreset" aria-label="리포트 형식"><option value="summary">요약형 · 핵심 기록과 다음 목표</option><option value="consultation" selected>상담형 · 학생 의견과 지도 방향</option><option value="detail">상세형 · 개별 학습 기록 포함</option><option value="custom">원장 저장 양식</option></select></label><p class="hint">선택한 형식은 발행본에 보존됩니다. 긴 내용은 여러 쪽으로 이어집니다.</p><a id="format-preview" target="_blank" rel="noopener" href="/blended/reports/?kind=preview&amp;id='+encodeURIComponent(id)+'&amp;preset=consultation">선택한 형식 미리보기</a>'; }
   function publicHTML(data) { return `<dl class="report-body">${Object.entries(labels).filter(([key]) => data[key]).map(([key,label]) => `<dt>${label}</dt><dd>${esc(data[key])}</dd>`).join('')}</dl>`; }
   async function consultEditor(c) {
     const data = c?.public || {}, internal = c ? (await api('consult_get',{id:c.id})).internalNote : '';
@@ -160,7 +161,7 @@
       const c = state.consultations.find(c => c.id === id);
       const s = await api('summary',{studentId:c.student_id,subject:c.subject,start:c.period_start,end:c.period_end});
       const preview = `<div class="report-sheet"><h2>${esc(name(c.student_id))} 상담 리포트</h2><p>${esc(c.subject)} / ${esc(c.held_at.slice(0,10))}</p>${summaryHTML(s.summary)}${publicHTML(c.public)}</div>`;
-      return openEditor(action === 'publish' ? '발행 전 공개본 확인' : '공개 내용 미리보기',preview+(action === 'publish' ? `${input('reason','발행·수정 사유','','text','maxlength="500" '+(state.reports.some(r => r.consultation_id === id) ? 'required' : ''))}<p class="hint">발행은 알림 발송과 다릅니다. 현재 내용이 보존됩니다.</p>` : ''),action === 'publish' ? 'publish' : '',c);
+      return openEditor(action === 'publish' ? '발행 전 공개본 확인' : '공개 내용 미리보기',preview+reportFormatField(id)+(action === 'publish' ? `${input('reason','발행·수정 사유','','text','maxlength="500" '+(state.reports.some(r => r.consultation_id === id) ? 'required' : ''))}<p class="hint">발행은 알림 발송과 다릅니다. 현재 내용이 보존됩니다.</p>` : ''),action === 'publish' ? 'publish' : '',c);
     }
     if (action === 'report') {
       const r = state.reports.find(r=>r.id===id);
@@ -190,6 +191,7 @@
     finally {busy=false;b.disabled=false;}
   });
   document.addEventListener('change',e => {
+    if(e.target.name==='reportPreset' && $('#format-preview')) {const link=$('#format-preview'),url=new URL(link.href);url.searchParams.set('preset',e.target.value);link.href=url.href;}
     if (e.target.id==='student-filter') {selected=e.target.value; render();}
     if (e.target.id==='day-filter') {day=e.target.value || state.today;render();}
   });
@@ -206,7 +208,7 @@
     if(kind==='password') {action='password_change';payload=f;}
     if(kind==='assignment') {action='assign';payload=f;}
     if(kind==='consult') {action='consult_save';payload={id:editing?.id,revision:editing?.revision,studentId:selected,subject:editing?.subject || f.subject,heldAt:f.heldAt+':00+09:00',periodStart:f.periodStart,periodEnd:f.periodEnd,internalNote:f.internalNote,public:Object.fromEntries(Object.keys(labels).map(key=>[key,f[key] || '']))};}
-    if(kind==='publish' || kind==='withdraw') {action=kind;payload={id:editing.id,revision:editing.revision,reason:f.reason};}
+    if(kind==='publish' || kind==='withdraw') {action=kind;payload={id:editing.id,revision:editing.revision,reason:f.reason,...(kind==='publish'?{reportPreset:f.reportPreset}:{})};}
     const signature=JSON.stringify({action,payload}),previous=retries.get(form);
     const requestId=previous?.signature===signature?previous.requestId:crypto.randomUUID(); retries.set(form,{signature,requestId});
     busy=true;const submit=form.querySelector('[type=submit]');submit.disabled=true;form.querySelector('.error-box').textContent='';

@@ -65,9 +65,9 @@ test('플래너 저장·권한·연결·충돌·리포트·질문 경계를 가�
     assert.equal(find('owner','staff','student-a').data.studyRoadmap.items.length,1);
   });
   await t.test('주간·월간 발행본은 원장만 새 버전으로 저장',()=>{
-    const r=task('period-report');Object.assign(r.data,{kind:'report_snapshot',reportType:'week',periodKey:today(),seriesKey:'week:student-a:'+today(),reportRevision:1,reportStatus:'published',snapshot:{student:{id:'student-a'},summary:{total:1,internalNote:'PRIVATE_IN_SNAPSHOT'},internalNote:'PRIVATE_IN_SNAPSHOT'}});
+    const r=task('period-report');Object.assign(r.data,{kind:'report_snapshot',reportType:'week',periodKey:today(),seriesKey:'week:student-a:'+today(),reportRevision:1,reportStatus:'published',snapshot:{reportPreset:'detail',layout:{forged:true},student:{id:'student-a'},summary:{total:1,internalNote:'PRIVATE_IN_SNAPSHOT'},internalNote:'PRIVATE_IN_SNAPSHOT'}});
     rejects(()=>save('teacher-a',[r]),'ROLE');save('owner',[r]);
-    let stored=find('owner','tasks','period-report');stored.data.title='변조';rejects(()=>save('owner',[stored]),'IMMUTABLE');
+    let stored=find('owner','tasks','period-report');assert.equal(stored.data.snapshot.reportPreset,'detail');assert.equal(stored.data.snapshot.layout.schemas.length,2);stored.data.title='변조';rejects(()=>save('owner',[stored]),'IMMUTABLE');
     assert.ok(!find('teacher-a','tasks','period-report'));assert.ok(find('student-a','tasks','period-report'));
     assert.equal(call('guardian-a','planner_reports').reports.length,1);assert.doesNotMatch(JSON.stringify(call('guardian-a','planner_reports')),/PRIVATE_IN_SNAPSHOT/);
     assert.equal(call('student-b','planner_reports').reports.length,0);

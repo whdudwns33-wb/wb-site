@@ -254,3 +254,22 @@ async function startBlendedPlanner() {
   }
 }
 startBlendedPlanner();
+
+// 원본 파일을 바꾸지 않고 블렌디드 발행 경계에 형식 선택을 연결한다.
+const blendedOriginalReportPanel=reportPanel;
+reportPanel=function(type,student,key){
+ const html=blendedOriginalReportPanel(type,student,key);if(!student || blendedMe?.role!=='owner')return html;
+ const latest=reportSnapshotsFor(student.id,type,key)[0],preset=latest?.snapshot?.reportPreset || 'consultation';
+ return html.replace('<div class="report-actions">','<label class="mt14">리포트 형식<select data-report-preset data-type="'+esc(type)+'" data-key="'+esc(key)+'">'+Object.entries({summary:'요약형 · 핵심과 목표',consultation:'상담형 · 회고와 지도 의견',detail:'상세형 · 개별 기록 포함',custom:'원장 저장 양식'}).map(([value,label])=>'<option value="'+value+'"'+(preset===value?' selected':'')+'>'+label+'</option>').join('')+'</select></label><div class="report-actions">');
+};
+const blendedOriginalBuildReport=buildReportSnapshot;
+buildReportSnapshot=function(sid,type,key,at){const snapshot=blendedOriginalBuildReport(sid,type,key,at);if(snapshot)snapshot.reportPreset=document.querySelector('[data-report-preset][data-type="'+type+'"][data-key="'+key+'"]')?.value || 'consultation';return snapshot;};
+const blendedOriginalReportHtml=reportPrintHtml;
+reportPrintHtml=function(snapshot){
+ const host=document.createElement('div');host.innerHTML=blendedOriginalReportHtml(snapshot);const preset=snapshot?.reportPreset;
+ if(preset && preset!=='custom'){
+  const names={summary:'요약형',consultation:'상담형',detail:'상세형'};host.querySelector('.report-sheet-head p')?.append(' · '+(names[preset] || ''));
+  if(preset!=='detail')for(const section of host.querySelectorAll('.report-section')){const title=section.querySelector('h3')?.textContent;if(['과목별 학습','공부 수행 내역'].includes(title) || preset==='summary' && ['학생 회고','공개 지도 의견','원장 피드백'].includes(title))section.remove();}
+ }
+ return host.innerHTML;
+};
