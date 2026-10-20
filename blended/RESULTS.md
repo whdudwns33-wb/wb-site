@@ -217,3 +217,23 @@ SOLAPI 키는 가져오거나 복사하지 않았다. 향후에도 사용자 지
 - 운영 명부가 비어 있어 실제 학생/계정/연결은 만들지 않았다. 기존 브라우저 직원 세션은 만료되어 로그인 화면 표시를 확인했다. 사용자 비밀번호를 읽거나 재설정하지 않았다.
 
 미연동: SSO, 상담·리포트 요약 수신, 강사 자동 배정/계정 복제, 메시지 발송. 실데이터 종단 시험·실기기/낭독기·재부팅 복구는 미검증. 공유 저장소 push/PR0.
+
+## 2026-10-20 후속: 학원 직원 자동 로그인·관리자·리포트 샘플
+
+사용자가 별도 로그인 없는 진입과 기존 강사 권한 유지를 요청했다. 새 C:/Users/wb/Projects/wb-site-blended-sso-20261020 및 C:/Users/wb/CodexWork/wb-ops-blended-sso-20261020, 각 codex/blended-sso-20261020에서 구현했다. 이전 작업본은 보존했다. 사용자는 관리자 계정을 나중에 등록한다고 답해 실제 계정 생성/초대는 하지 않았다.
+
+사용법: 학원 원장→직원 화면의 직원 자동 로그인 연결→본인 학원 직원과 같은 역할의 기존 플래너 계정 연결(한 번). 학생 상세의 플래너 열기→학원 세션으로 같은 학생에게 자동 진입. 원장급↔owner, 관리자(실장)↔admin, 강사↔teacher만 허용하며 데스크/회계/학생/보호자는 직원 SSO 대상이 아니다. 이름 자동 매칭/계정 복제/담당 학생·과목 확대 없음. 플래너 관리자 추가 버튼은 원장에게만 보이고 기존 API도 원장만 관리자를 만들 수 있다. 학원은 기존 직원 등록에서 역할 관리자를 선택한다.
+
+학생 ID·이름 읽기 키는 그대로 두고 별도 ACADEMY_AUTH_KEY와 protected/planner-auth.key를 추가했다. /academy-start의90초 상태 쿠키→학원 현재 직원/학생 재검사→60초 일회용 티켓→/academy-entry/#ticket→같은 Origin의 /academy-exchange로 교환한다. 쿠키는 Secure/HttpOnly/SameSite=Strict/Host 전용, 티켓은 해시 저장·한 번만 사용·브라우저 상태 결합이다. entry는 fragment를 즉시 지운다. 학원 request_receipts에는 티켓 대신 재시도 안내만 저장한다. 활성/역할/담당을 교환 때도 다시 확인한다. 다른 사용자의 원장 세션이 있어도 해당 강사 본인의 세션으로 교체한다. 기존 개별 로그인은 유지한다.
+
+변경 파일: api.mjs, schema.sql(academy_tickets 추가만), worker.mjs, server.mjs, app.js, academy-handoff.mjs. 검사: academy-auth.test.mjs, academy-sso-browser.cjs, worker-check.mjs, browser-check.cjs. 가상 공개본 생성기 report-sample.cjs는 실제 상담 발행→보호자 공개 템플릿에서 HTML/PNG/PDF를 만든다. 내부 메모 제외·16px 본문·390px 넘침0을 검사하고 A4 1쪽 PDF를 렌더링 확인했다.
+
+검증 결과: 플래너 API27/27, 전체323/323(직렬295.9초), 기존 원본6화면/일정통합/과제/로드맵/목차/리포트·동의철회/키보드/PC·820·390 회귀 통과. 두 앱 실제 가상 HTTP 브라우저에서 원장/관리자/강사 비밀번호 재입력0·정확한 학생·원장→강사 세션 교체·담당 외/회수 거부·브라우저 오류0. 학원 test/planner-sso.mjs는 계정·역할 조작/중복409·미연결/대기 중 역할 변경·티켓 보관 금지를 검사한다. 학원 배포 검사+추출본 검사 통과. Cloudflare 실제 로컬 엔진도 별도 키/상태 쿠키/세션 쿠키/재사용 거부 통과.
+
+배포 Worker 0000c117-b811-4f99-abcb-21eeac7f2474(이전4bddba84-0988-4de4-b39d-3958b83016a3), 학원 aec02fca20accd4b9b9d51c4b05cfebbb9d0a53ec04e88cbf68a294fedcc6bac(이전61c0491ffbe3562f887377001eaabcb73fe27c77377cb82170eb8d9242cfabe5 보존). dedicated launcher에 WB_OPS_PLANNER_AUTH_KEY_FILE만 추가하고 해당 서버만 전환했다. 보호 키·data-v2·터널·다른 앱/예약 설정은 보존했다. 외부 SSO 경로200/302·잘못된 키/Origin/상태403·세 키 자산 SHA256·health200·직원 익명401·학생 직원404 확인. 실계정·실학생·학생매핑 변경0, 실발송0, 공유push/PR0.
+
+실행: 기존 node blended/server.mjs는 가상 개별 로그인 서버. 양쪽 SSO 검증은 README Playwright 경로를 설정하고 ACADEMY_SOURCE를 새 학원 작업본으로 지정한 뒤 node blended/academy-sso-browser.cjs. node --test blended/academy-auth.test.mjs 및 학원 node test/planner-sso.mjs. 로컬 Worker는 기존 합성 설정에 ACADEMY_AUTH_KEY=c 64개 추가 후 node blended/worker-check.mjs. 샘플은 REPORT_SAMPLE_DIR을 지정하고 node blended/report-sample.cjs.
+
+샘플 산출물: C:/Users/wb/.codex/.chatgpt-projects/g-p-6ad5f0507c6481919d57c4a566f69099/artifacts/report-sample-20261020/report-sample.html, report-sample.png, report-sample-phone.png, report-sample.pdf. 모두 가상 자료다.
+
+한계: SSO 세션은30분이며 플래너 역할/담당/활성은 매 요청 재검사한다. 학원 로그아웃/중지와 이미 발급한 플래너 세션의 동시 종료는 미구현(최대30분), 새 SSO는 학원 현재 상태로 차단한다. 실사용자 종단 로그인·실기기/낭독기·재부팅 복구는 미검증. 상담/리포트 자동 수신과 메시지 발송은 여전히 미연동이다.

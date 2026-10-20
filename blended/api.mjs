@@ -328,5 +328,35 @@ export function createApi(db, options = {}) {
     requireThat(student,404,'STUDENT','현재 이용 중인 플래너 학생을 찾지 못했습니다.');
     return {student};
   }
-  return { handle, academy };
+  const authKey=key=>requireThat(/^[a-f0-9]{64}$/.test(options.academyAuthKey || '') && typeof key==='string' && key.length<=128 && timingSafeEqual(Buffer.from(hash(key)),Buffer.from(hash(options.academyAuthKey))),403,'BRIDGE_AUTH','학원 로그인 연결을 인증하지 못했습니다.');
+  const sameRole=(academyRole,userRole)=>({'원장급':['owner'],'실장':['admin'],'강사':['teacher']}[academyRole] || []).includes(userRole);
+  function academyAuth(body,key) {
+    authKey(key);
+    requireThat(body && typeof body==='object' && !Array.isArray(body),400,'INPUT','요청 형식을 확인해 주세요.');
+    if(body.action==='accounts')return {accounts:all("SELECT id,name,login,role FROM users WHERE active=1 AND role IN ('owner','admin','teacher') ORDER BY name,id")};
+    requireThat(['account','ticket'].includes(body.action),400,'ACTION','지원하지 않는 로그인 요청입니다.');
+    const user=one('SELECT * FROM users WHERE id=? AND active=1',text(body.userId,100,true));
+    requireThat(user && sameRole(body.role,user.role),403,'SSO_ROLE','두 앱의 직원 계정과 역할 연결을 원장님께 확인해 주세요.');
+    if(body.action==='account')return {account:{id:user.id,name:user.name,role:user.role}};
+    const studentId=text(body.studentId,100,true);access(user,studentId);
+    requireThat(/^[a-f0-9]{64}$/.test(body.state || ''),400,'SSO_STATE','학원에서 플래너 열기를 다시 눌러 주세요.');
+    const ticket=randomBytes(32).toString('hex'),at=(options.authNow || Date.now)();
+    run('DELETE FROM academy_tickets WHERE expires<=?',at);
+    run('INSERT INTO academy_tickets VALUES(?,?,?,?,?,?)',hash(ticket),hash(body.state),user.id,studentId,user.role,at+60000);
+    return {ticket};
+  }
+  function exchange(ticket,nonce) {
+    requireThat(/^[a-f0-9]{64}$/.test(ticket || '') && /^[a-f0-9]{64}$/.test(nonce || ''),403,'SSO_STATE','학원에서 플래너 열기를 다시 눌러 주세요.');
+    return transaction(()=>{
+      const at=(options.authNow || Date.now)(),entry=one('SELECT * FROM academy_tickets WHERE hash=?',hash(ticket));
+      requireThat(entry && entry.expires>at && entry.nonce===hash(nonce),403,'SSO_TICKET','로그인 연결이 만료되었어요. 학원에서 플래너를 다시 열어 주세요.');
+      const user=one('SELECT * FROM users WHERE id=? AND active=1',entry.user_id);
+      requireThat(user && user.role===entry.role,403,'SSO_ROLE','직원 권한이 변경되었어요. 원장님께 확인해 주세요.');access(user,entry.student_id);
+      run('DELETE FROM academy_tickets WHERE hash=?',hash(ticket));
+      const raw=randomBytes(32).toString('hex');run('INSERT INTO sessions VALUES(?,?,?,?)',hash(raw),user.id,at+30*60000,now());
+      run('INSERT INTO audit(actor,action,object_id,at) VALUES(?,?,?,?)',user.id,'academy_login',entry.student_id,now());
+      return {sessionToken:raw,studentId:entry.student_id};
+    });
+  }
+  return { handle, academy, academyAuth, exchange };
 }
