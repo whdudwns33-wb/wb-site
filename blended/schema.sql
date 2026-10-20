@@ -71,6 +71,10 @@ CREATE TABLE IF NOT EXISTS academy_tickets (
  hash TEXT PRIMARY KEY, nonce TEXT NOT NULL, user_id TEXT NOT NULL REFERENCES users(id),
  student_id TEXT NOT NULL REFERENCES students(id), role TEXT NOT NULL, expires INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS report_layout (
+ id TEXT PRIMARY KEY CHECK(id='academy'), template TEXT NOT NULL, revision INTEGER NOT NULL,
+ actor TEXT NOT NULL REFERENCES users(id), updated_at TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS planner_questions (
  id TEXT PRIMARY KEY, student_id TEXT NOT NULL REFERENCES students(id), subject TEXT NOT NULL,
  data TEXT NOT NULL, revision INTEGER NOT NULL DEFAULT 1

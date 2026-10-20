@@ -1,0 +1,41 @@
+import {defaultLayout,designerLayout} from './report-layout.mjs';
+import {reportModel,sampleSnapshot,pdfInputs} from './report-model.mjs';
+import {drawChart,drawTrend,chartImage} from './report-charts.js';
+const $=s=>document.querySelector(s),esc=v=>String(v ?? '').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const query=new URLSearchParams(location.search);let snapshotVersion='',me,layout,model,designer,dirty=false,cleanups=[],refreshTimer;
+async function api(action,payload={}) {const response=await fetch('/blended/api',{method:'POST',headers:{'Content-Type':'application/json','X-Blended-Request':'1'},body:JSON.stringify({app:'blended',action,payload,requestId:crypto.randomUUID()})});const data=await response.json();if(!response.ok)throw Object.assign(Error(data.error || '연결하지 못했어요. 다시 시도해 주세요.'),{status:response.status,code:data.code});return data;}
+const status=(message,error=false)=>{const el=$('#tool-status');if(el){el.classList.toggle('error',error);el.textContent=message;}};
+function clear() {for(const dispose of cleanups)dispose();cleanups=[];designer?.destroy();designer=null;}
+function head(title,description,buttons) {return '<div class="page-head"><div><h1>'+esc(title)+'</h1><p>'+esc(description)+'</p></div><div class="actions">'+buttons+'</div></div><p id="tool-status" class="status" role="status" aria-live="polite"></p>';}
+function renderReport() {
+ clear();$('#report-main').innerHTML=head('공개 리포트',query.get('kind')==='preview'?'발행 전 미리보기예요. 학생·보호자에게는 아직 보이지 않아요.':'발행 당시의 학습 기록과 공개 내용이에요.','<button id="pdf-download">PDF 저장</button><button class="secondary" id="print-report">인쇄</button>'+(me.role==='owner'?'<button class="secondary" id="edit-layout">양식 편집</button>':''))+
+ '<article class="report-paper"><h1>'+esc(model.title)+'</h1><p class="report-meta">'+esc(model.meta)+'</p><section class="report-section" aria-labelledby="learning-h"><h2 id="learning-h">학습의 진행</h2>'+(model.hasRecords?'<div id="progress-chart" class="report-chart" role="img" aria-label="'+esc(model.metrics.map(m=>m.label+' '+m.value+'건').join(', '))+'"></div>':'<p class="empty">이 기간의 학습 기록이 없어요. 미수행이나 0점을 뜻하지 않아요.</p>')+'<table class="metric-table"><caption class="hint">'+esc(model.note)+'</caption><tbody>'+model.metrics.map(m=>'<tr><th scope="row">'+esc(m.label)+'</th><td>'+ (model.hasRecords?m.value+'건':'기록 없음')+'</td></tr>').join('')+'</tbody></table></section>'+
+ (model.days.length>1?'<section class="report-section"><h2>날짜별 기록</h2><p class="hint">실선은 학생 완료, 점선은 학습 배정이에요. 기록이 있는 날짜만 표시해요.</p><div id="trend-chart" class="report-chart" role="img" aria-label="날짜별 배정과 학생 완료 추이"></div><details><summary>날짜별 수치 보기</summary><table class="metric-table"><thead><tr><th>날짜</th><th>배정</th><th>학생 완료</th></tr></thead><tbody>'+model.days.map(d=>'<tr><th>'+esc(d.date)+'</th><td>'+d.total+'</td><td>'+d.done+'</td></tr>').join('')+'</tbody></table></details></section>':'')+
+ (model.subjects.length?'<section class="report-section"><h2>과목별 학습</h2><table class="metric-table"><thead><tr><th>과목</th><th>배정</th><th>학생 완료</th></tr></thead><tbody>'+model.subjects.map(s=>'<tr><th>'+esc(s.name)+'</th><td>'+s.total+'</td><td>'+s.done+'</td></tr>').join('')+'</tbody></table></section>':'')+
+ model.sections.map(s=>'<section class="report-section'+(s.title==='다음 실천 목표'?' goal':'')+'"><h2>'+esc(s.title)+'</h2><p>'+esc(s.body)+'</p></section>').join('')+'<p class="report-footer">학생·보호자 공개 리포트 · 내부 상담 메모는 포함하지 않아요. 외부 성적과 실제 메시지 발송은 연동하지 않았어요.</p></article>';
+ if(model.hasRecords)cleanups.push(drawChart($('#progress-chart'),model));if(model.days.length>1)cleanups.push(drawTrend($('#trend-chart'),model));
+ $('#pdf-download').onclick=()=>exportPdf(model.layout || defaultLayout(),model);$('#print-report').onclick=()=>window.print();if($('#edit-layout'))$('#edit-layout').onclick=()=>openDesigner();
+}
+async function exportPdf(template,report) {const button=$('#pdf-download') || $('#sample-pdf');button.disabled=true;status('한글 글꼴과 공개 리포트를 준비하고 있어요…');try{await assertAccess();const {downloadPdf}=await import('./report-pdf.js');await downloadPdf(template,pdfInputs(report,chartImage(report)),report.title,()=>assertAccess());status('PDF를 저장했어요. 실제 발송은 하지 않았어요.');}catch(e){status(e.message,true);}finally{button.disabled=false;}}
+async function assertAccess() {if(query.get('id'))await readSnapshot();else if((await api('report_layout')).me.role!=='owner')throw Error('양식 편집은 원장만 할 수 있어요.');}
+async function openDesigner() {
+ if(me.role!=='owner')return;clear();
+ $('#report-main').innerHTML=head('PDF 양식 편집','원장 전용 · 가상 자료로 배치를 확인해요. 변경은 다음 발행부터 적용돼요.','<button id="layout-save" disabled>양식 저장</button><button id="sample-pdf" class="secondary" disabled>샘플 PDF 저장</button>')+'<p class="editor-help">제목·기간·학습 요약·차트·공개 내용을 이동하고 글자 크기와 색을 바꿀 수 있어요. 필수 항목 이름은 유지해 주세요. 추가 문구와 로고는 편집기의 텍스트·이미지 도구로 넣어 주세요. 작은 화면에서는 편집 영역을 좌우로 움직일 수 있어요.</p><div class="actions editor-toolbar"><button id="layout-reset" class="secondary" disabled>기본 양식 불러오기</button><a href="/blended/#/reports">리포트 목록으로</a></div><div class="designer-scroll" tabindex="0" aria-label="PDF 양식 편집 영역"><div id="pdf-designer" class="designer-host"></div></div>';
+ status('한글 양식 편집기를 불러오고 있어요…');
+ try{layout=await api('report_layout');if(layout.me.role!=='owner')throw Error('원장 권한이 필요해요.');const {createDesigner}=await import('./report-designer.js');const preview=structuredClone(layout.template);for(const page of preview.schemas)for(const field of page)if(field.name==='chart')field.content=chartImage(reportModel(sampleSnapshot()));designer=await createDesigner($('#pdf-designer'),preview);designer.onChangeTemplate(()=>{dirty=true;status('아직 저장하지 않은 변경이 있어요.');});
+  $('#layout-save').disabled=false;$('#sample-pdf').disabled=false;$('#layout-reset').disabled=false;status('양식은 발행 자료와 별도로 저장해요. 기존 발행본은 바뀌지 않아요.');
+  $('#layout-save').onclick=async()=>{const button=$('#layout-save');button.disabled=true;try{const template=designerLayout(designer.getTemplate());for(const page of template.schemas)for(const field of page){const sample=defaultLayout().schemas.flat().find(s=>s.name===field.name);if(sample)field.content=sample.content;}
+   const result=await api('report_layout_save',{template,revision:layout.revision});layout={...layout,template,revision:result.revision};dirty=false;status('양식을 저장했어요. 다음 발행본부터 적용해요.');}catch(e){status(e.message,true);}finally{button.disabled=false;}};
+  $('#sample-pdf').onclick=()=>exportPdf(designerLayout(designer.getTemplate()),reportModel(sampleSnapshot()));$('#layout-reset').onclick=()=>{designer.updateTemplate(defaultLayout());dirty=true;status('기본 양식을 불러왔어요. 양식 저장을 누르면 적용돼요.');};
+ }catch(e){status(e.message,true);}
+}
+async function readSnapshot() {
+ const kind=query.get('kind'),id=query.get('id');
+ if(kind==='preview')return (await api('report_preview',{id})).snapshot;
+ if(kind==='planner'){const row=(await api('planner_reports')).reports.find(r=>r.id===id);if(!row)throw Error('이 리포트는 철회되었거나 현재 열람 권한이 없어요.');snapshotVersion=row.reportRevision;return row.snapshot;}
+ const rows=(await api('report_get',{id})).reports,row=rows.find(r=>r.id===query.get('version')) || (!query.get('version')?rows[0]:null);if(!row?.snapshot||row.status!=='published')throw Error('이 리포트는 철회되었거나 현재 열람 권한이 없어요.');snapshotVersion=row.version;return row.snapshot;
+}
+window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='';}});
+(async()=>{try{layout=await api('report_layout');me=layout.me;$('#identity').textContent=me.name+' · '+({owner:'원장',admin:'관리자',teacher:'강사',student:'학생',guardian:'보호자'}[me.role]);if(query.get('mode')==='designer'&&!query.get('id')){if(me.role!=='owner')throw Error('양식 편집은 원장만 할 수 있어요.');await openDesigner();}else{const snapshot=await readSnapshot();model=reportModel(snapshot,query.get('kind')==='planner'?'planner':'consultation',query.get('kind')==='preview'?'':snapshotVersion);renderReport();}
+ refreshTimer=setInterval(async()=>{try{await assertAccess();}catch(e){clear();clearInterval(refreshTimer);$('#report-main').innerHTML='<h1>리포트를 더 이상 열 수 없어요.</h1><p>'+esc(e.message)+'</p><a href="/blended/#/reports">리포트 목록으로</a>';}},30000);
+ }catch(e){$('#report-main').innerHTML='<h1>리포트를 열 수 없어요.</h1><p>'+esc(e.message)+'</p><a href="/blended/?student=">로그인·리포트 목록으로</a>';}})();

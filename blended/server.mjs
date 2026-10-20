@@ -1,5 +1,5 @@
 import http from 'node:http';
-import { readFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, mkdirSync,existsSync } from 'node:fs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import path from 'node:path';
 import { createApi } from './api.mjs';
@@ -33,6 +33,13 @@ export function createLocalServer(db,options = {}) {
         return send(302,'',{Location:start.location,'Set-Cookie':start.cookie});
       }
       if(url.pathname==='/blended/academy-entry/')url.pathname='/blended/';
+      if(url.pathname==='/blended/reports/'||/^\/blended\/reports\/(?:[A-Za-z0-9_.-]+\.(?:js|css|ttf|txt)|vendor\/pdfium\.esm\.wasm)$/.test(url.pathname)) {
+        if(!['GET','HEAD'].includes(req.method))return send(404,{code:'NOT_FOUND'});
+        const name=url.pathname.slice('/blended/reports/'.length)||'index.html',file=path.join(here,'dist/blended/reports',name);
+        if(!existsSync(file))return send(404,{code:'NOT_FOUND'});
+        const type=name.endsWith('.js')?'text/javascript':name.endsWith('.css')?'text/css':name.endsWith('.ttf')?'font/ttf':name.endsWith('.wasm')?'application/wasm':name.endsWith('.txt')?'text/plain':'text/html';
+        res.writeHead(200,{...headers,'Content-Type':type,'Content-Security-Policy':headers['Content-Security-Policy'].replace("style-src 'self'","style-src 'self' 'unsafe-inline'; font-src 'self' data: blob:").replace("script-src 'self'","script-src 'self' 'wasm-unsafe-eval'")});return res.end(req.method==='HEAD'?undefined:readFileSync(file));
+      }
       if(url.pathname.startsWith('/blended/planner/')) {
         const name=url.pathname.slice('/blended/planner/'.length) || 'index.html';
         if(!Object.hasOwn(planner,name) || !['GET','HEAD'].includes(req.method))return send(404,{code:'NOT_FOUND'});
@@ -68,7 +75,8 @@ export function createLocalServer(db,options = {}) {
       let body;
       try { body = JSON.parse(Buffer.concat(chunks).toString('utf8')); }
       catch { return send(400,{code:'JSON',error:'요청 형식을 확인해 주세요.'}); }
-      if(size>32768 && body.action!=='planner_save')return send(413,{code:'SIZE',error:'입력 크기를 줄여 주세요.'});
+      if(body.action==='report_layout_save' && size>262144)return send(413,{code:'SIZE'});
+      if(size>32768 && !['planner_save','report_layout_save'].includes(body.action))return send(413,{code:'SIZE',error:'입력 크기를 줄여 주세요.'});
       const token = /(?:^|;\s*)wb_blended_local=([a-f0-9]{64})(?:;|$)/.exec(req.headers.cookie || '')?.[1] || '';
       const result = api.handle(body,token), extra = {};
       if (result.sessionToken) { extra['Set-Cookie'] = cookie(result.sessionToken); delete result.sessionToken; }

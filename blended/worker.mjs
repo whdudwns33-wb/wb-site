@@ -28,7 +28,8 @@ export class BlendedPlanner extends DurableObject {
       while(true){const {value,done}=await reader.read();if(done)break;size+=value.byteLength;if(size>1048576){await reader.cancel();return json(413,{code:'SIZE',error:'입력 크기를 줄여 주세요.'});}chunks.push(value);}
       let body;
       try{body=JSON.parse(await new Blob(chunks).text());}catch{return json(400,{code:'JSON',error:'요청 형식을 확인해 주세요.'});}
-      if(size>32768 && body.action!=='planner_save')return json(413,{code:'SIZE',error:'입력 크기를 줄여 주세요.'});
+      if(body.action==='report_layout_save' && size>262144)return json(413,{code:'SIZE'});
+      if(size>32768 && !['planner_save','report_layout_save'].includes(body.action))return json(413,{code:'SIZE',error:'입력 크기를 줄여 주세요.'});
       if(new URL(request.url).pathname==='/blended/academy-api') {if(size>4096)return json(413,{code:'SIZE'});return json(200,{ok:true,...this.api.academy(body,request.headers.get('Authorization')?.replace(/^Bearer /,''))});}
       if(new URL(request.url).pathname==='/blended/academy-auth') {if(size>4096)return json(413,{code:'SIZE'});return json(200,this.api.academyAuth(body,request.headers.get('Authorization')?.replace(/^Bearer /,'')));}
       if(new URL(request.url).pathname==='/blended/academy-exchange') {
@@ -62,6 +63,14 @@ export default {
       return env.PLANNER.get(env.PLANNER.idFromName('blended-production-v1')).fetch(request);
     }
     if(url.pathname==='/blended/academy-entry/')url.pathname='/blended/';
+    if(url.pathname==='/blended/reports/'||/^\/blended\/reports\/(?:[A-Za-z0-9_.-]+\.(?:js|css|ttf|txt)|vendor\/pdfium\.esm\.wasm)$/.test(url.pathname)) {
+      if(!['GET','HEAD'].includes(request.method))return json(404,{code:'NOT_FOUND'});
+      if(url.pathname==='/blended/reports/')url.pathname+='index.html';
+      const asset=await env.ASSETS.fetch(new Request(url,{method:request.method})),headers=new Headers(asset.headers);for(const [key,value]of Object.entries(security))headers.set(key,value);
+      headers.set('Content-Security-Policy',security['Content-Security-Policy'].replace("style-src 'self'","style-src 'self' 'unsafe-inline'; font-src 'self' data: blob:").replace("script-src 'self'","script-src 'self' 'wasm-unsafe-eval'"));
+      if(url.pathname.endsWith('.ttf'))headers.set('Cache-Control','public, max-age=31536000, immutable');
+      return new Response(asset.body,{status:asset.status,headers});
+    }
     if(!['GET','HEAD'].includes(request.method)||!['/blended/','/blended/guardian/','/blended/app.js','/blended/style.css','/blended/ui.css','/blended/navigation.js','/blended/external-links.js','/blended/planner/','/blended/planner/planner.js','/blended/planner/planner.css','/blended/planner/qr.js'].includes(url.pathname))return json(404,{code:'NOT_FOUND'});
     const isPlanner=url.pathname.startsWith('/blended/planner/');
     if(url.pathname==='/blended/planner/')url.pathname='/blended/planner/index.html';

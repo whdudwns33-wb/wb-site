@@ -178,6 +178,11 @@ function blendedScopeControls() {
   for(const input of document.querySelectorAll('[data-weekgoal],[data-monthgoal]'))if(!allowed.includes(input.dataset.weekgoal || input.dataset.monthgoal))input.disabled=true;
   for(const button of document.querySelectorAll('[data-act]'))if(/^(weekclose|monthclose|dailyclose|monthevent|weekmove)|^st(goal|edit|save|subjadd)$/.test(button.dataset.act)) {button.disabled=true;button.title='학생 전체 일정·마감 설정은 학생 또는 원장이 관리합니다.';}
 }
+const blendedOriginalReportSnapshot=showReportSnapshot;
+showReportSnapshot=function(task,snapshot,preview){
+ blendedOriginalReportSnapshot(task,snapshot,preview);
+ if(task && !preview && blendedMe?.role!=='teacher')document.querySelector('#modalHost .modal-box')?.insertAdjacentHTML('beforeend','<a class="btn btn-ghost" href="/blended/reports/?kind=planner&id='+encodeURIComponent(task.id)+'">차트·PDF 보기</a>');
+};
 let blendedFeedbackBaseline='';
 const blendedFeedbackDirty=()=>!!$('#blendedFeedback') && $('#blendedFeedback').value!==blendedFeedbackBaseline;
 const originalCloseModal=closeModal;
