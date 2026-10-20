@@ -5,6 +5,7 @@ import path from 'node:path';
 import { createApi } from './api.mjs';
 import { openDatabase, seedDemo } from './local-db.mjs';
 import { plannerAssets } from './planner-build.mjs';
+import {startHandoff,handoffCookie,handoffNonce} from './academy-handoff.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const files = new Map([
@@ -27,6 +28,11 @@ export function createLocalServer(db,options = {}) {
     try {
       if (req.headers.host !== new URL(origin).host) return send(403,{code:'HOST',error:'로컬 전용 주소로 접속해 주세요.'});
       const url = new URL(req.url,origin);
+      if(url.pathname==='/blended/academy-start'&&req.method==='GET') {
+        const start=startHandoff(url,options.academyOrigin || 'http://localhost:8904',false);if(!start)return send(400,{code:'SSO_STATE'});
+        return send(302,'',{Location:start.location,'Set-Cookie':start.cookie});
+      }
+      if(url.pathname==='/blended/academy-entry/')url.pathname='/blended/';
       if(url.pathname.startsWith('/blended/planner/')) {
         const name=url.pathname.slice('/blended/planner/'.length) || 'index.html';
         if(!Object.hasOwn(planner,name) || !['GET','HEAD'].includes(req.method))return send(404,{code:'NOT_FOUND'});
@@ -34,11 +40,17 @@ export function createLocalServer(db,options = {}) {
         res.writeHead(200,{...headers,'Content-Type':type+'; charset=utf-8','Content-Security-Policy':headers['Content-Security-Policy'].replace("style-src 'self'","style-src 'self' 'unsafe-inline'")});return res.end(req.method==='HEAD'?undefined:planner[name]);
       }
       if (url.pathname === '/' || url.pathname === '/blended') return send(302,'',{Location:'/blended/'});
-      if(url.pathname==='/blended/academy-api') {
+      if(['/blended/academy-api','/blended/academy-auth','/blended/academy-exchange'].includes(url.pathname)) {
+        if(url.pathname==='/blended/academy-exchange') {
+          if(req.method!=='POST'||req.headers.origin!==origin||req.headers['x-blended-request']!=='1'||!String(req.headers['content-type']).startsWith('application/json'))return send(403,{code:'ORIGIN'});
+          let input='';for await(const chunk of req){input+=chunk;if(Buffer.byteLength(input)>4096)return send(413,{code:'SIZE'});}
+          const result=api.exchange(JSON.parse(input).ticket,handoffNonce(req.headers.cookie || '',false));
+          return send(200,{studentId:result.studentId},{'Set-Cookie':[cookie(result.sessionToken),handoffCookie('',false)]});
+        }
         if(req.method!=='POST'||req.headers.origin||!String(req.headers['content-type']).startsWith('application/json'))return send(403,{code:'BRIDGE_ORIGIN'});
         let input='';for await(const chunk of req){input+=chunk;if(Buffer.byteLength(input)>4096)return send(413,{code:'SIZE'});}
         let data;try{data=JSON.parse(input);}catch{return send(400,{code:'JSON'});}
-        return send(200,{ok:true,...api.academy(data,req.headers.authorization?.replace(/^Bearer /,''))});
+        return send(200,{ok:true,...api[url.pathname.endsWith('academy-auth')?'academyAuth':'academy'](data,req.headers.authorization?.replace(/^Bearer /,''))});
       }
       if (url.pathname !== '/blended/api') {
         const asset = files.get(url.pathname);

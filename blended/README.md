@@ -171,3 +171,7 @@ Cloudflare 실행 환경은 로컬 Worker를 먼저 띄운 뒤 `node blended/wor
 ### 학원 연결 시험 추가 (2026-10-20)
 
 실제 학생 바로가기는 RESULTS.md 최신 절을 따른다. 두 앱 가상 브라우저 시험은 ACADEMY_SOURCE를 별도 학원 작업본으로 지정하고 `node blended/academy-browser.cjs` 실행. 로컬 Worker의 worker-check.mjs는 기존 설정에 ACADEMY_BRIDGE_KEY를 합성값 `a` 64개로 추가한다. 운영 키를 개발 환경에 복사하지 않는다. 학원에는 기존 플래너 계정을 원장이 직접 연결하며 로그인/담당 검사는 플래너가 수행한다.
+
+### 학원 자동 로그인·샘플 (2026-10-20 후속)
+
+RESULTS.md 마지막 절이 최신이다. 원장/관리자/강사 본인 계정을 학원 직원 화면에서 같은 역할로 연결한 뒤 학생 상세 바로가기를 사용한다. 학생/직원/담당 자동 생성은 없다. 로컬 Worker의 합성 설정은 ACADEMY_AUTH_KEY=c 64개를 추가하고 기존 읽기 키 a 64개와 분리한다. node blended/academy-sso-browser.cjs는 ACADEMY_SOURCE를 새 SSO 학원 작업본으로 지정한다. node blended/report-sample.cjs는 실제 공개 템플릿의 가상 HTML/PNG/PDF를 REPORT_SAMPLE_DIR에 생성한다. 운영 키/자료는 개발 환경에 넣지 않는다.
