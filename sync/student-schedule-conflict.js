@@ -225,6 +225,22 @@ export function assertStudentScheduleSnapshot(candidates, existingTasks, makeupR
   }
 }
 
+// 담당자만 바뀌면 기존 시간 충돌을 새 충돌로 취급하지 않는다.
+// 학생·수업 정체성과 기간/시간표가 모두 같아야 하며 미확정 시간표는 예외를 주지 않는다.
+export function sameStudentLessonSchedule(before, after) {
+  if (!isRegularLessonScheduleTask(before) || !isRegularLessonScheduleTask(after) ||
+      !before.id || before.id !== after.id || !before.studentId || before.studentId !== after.studentId) return false;
+  const keys = ['start', 'end', 'startDate', 'endDate', 'repeat', 'scheduleStatus',
+    'weekendAttendanceMode', 'weekendAllowedDays', 'weekendFlexibleFrom', 'lessonInstanceType'];
+  if (keys.some(key => JSON.stringify(before[key] ?? null) !== JSON.stringify(after[key] ?? null))) return false;
+  const left = scheduleForTask(before), right = scheduleForTask(after);
+  if (!left.confirmed || !right.confirmed || !left.slots.length || !right.slots.length) return false;
+  const signature = schedule => JSON.stringify(schedule.slots.map(slot => ({
+    days: [...slot.days].sort(), startTime: slot.startTime, endTime: slot.endTime, window: slot.window
+  })).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))));
+  return signature(left) === signature(right);
+}
+
 export async function assertStudentLessonScheduleAvailable(env, app, candidates) {
   const lessons = (Array.isArray(candidates) ? candidates : [candidates])
     .filter(isRegularLessonScheduleTask)

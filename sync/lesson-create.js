@@ -8,6 +8,7 @@ import {
 import { isTaskWriteCasConflict, taskWriteCasGuardStatement } from './task-write-cas.js';
 import {
   assertStudentLessonScheduleAvailable,
+  sameStudentLessonSchedule,
   studentScheduleConflictPayload
 } from './student-schedule-conflict.js';
 import {
@@ -755,7 +756,9 @@ export async function handleLessonCreate(env, app, body, origin, auth, json) {
     const scheduleRevision = await readStudentScheduleRevisionSnapshot(env, app,
       [String(current.studentId || ''), String(corrected.studentId || '')].filter(Boolean));
     try {
-      await assertStudentLessonScheduleAvailable(env, app, corrected);
+      if (!(teacherTransferred && sameStudentLessonSchedule(current, corrected))) {
+        await assertStudentLessonScheduleAvailable(env, app, corrected);
+      }
     } catch (error) {
       const response = scheduleConflictResponse(json, origin, error);
       if (response) return response;
