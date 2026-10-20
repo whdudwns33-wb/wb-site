@@ -44,6 +44,7 @@ const mint=async key=>fetch(base+'/blended/academy-auth',{method:'POST',headers:
 assert.equal((await mint('a'.repeat(64))).status,403);const issued=await mint('c'.repeat(64));assert.equal(issued.status,200);const {ticket}=await issued.json();
 const exchange=async cookies=>fetch(base+'/blended/academy-exchange',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json','X-Blended-Request':'1',Cookie:cookies},body:JSON.stringify({ticket})});
 assert.equal((await exchange('')).status,403);const accepted=await exchange(handoff);assert.equal(accepted.status,200);assert.equal((await accepted.json()).studentId,student.id);assert.equal(accepted.headers.getSetCookie().length,2);assert.equal((await exchange(handoff)).status,403);
+cookie=ownerCookie;const layout=await call('report_layout');assert.equal(layout.template.basePdf.width,210);const savedLayout=await call('report_layout_save',{template:layout.template,revision:layout.revision});assert.equal(savedLayout.revision,layout.revision+1);cookie=teacherCookie;await call('report_layout_save',{template:layout.template,revision:savedLayout.revision},403);
 cookie=ownerCookie;await call('unassign',{id:assignment.id,revision:1});cookie=teacherCookie;
 await call('consult_get',{id:c.id},403);
 console.log('PASS Cloudflare local runtime: secure login, scoped workflow, SSO separate key / browser cookie / replay denial / session cookies, private-note exclusion, revocation');

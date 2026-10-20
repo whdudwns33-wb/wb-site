@@ -12,14 +12,14 @@ const writableStudentKinds = new Set(['','mgoal','material_request','lecture_req
 const metadata = ['taskId','date','done','note','steps','count','blocked','updatedAt'];
 const pick=(obj,keys)=>Object.fromEntries(keys.filter(k=>obj && k in obj).map(k=>[k,obj[k]]));
 function publicSnapshot(s) {
-  return {...pick(s,['schemaVersion','periodType','periodKey','periodStart','periodEnd','asOf','isPartial','elapsedDays','dailyGoalMin','reflection','directorNote','nextFocus']),
+  return {...pick(s,['schemaVersion','periodType','periodKey','periodStart','periodEnd','asOf','isPartial','elapsedDays','dailyGoalMin','reflection','directorNote','nextFocus','layout']),
     student:pick(s.student,['id','name']),summary:pick(s.summary,['done','total','pct','blocked','studySecs','goalDays']),
     subjects:Object.fromEntries(Object.keys(subjects).filter(k=>s.subjects?.[k]).map(k=>[k,pick(s.subjects[k],['done','total','studySecs'])])),
     rows:(s.rows || []).map(r=>pick(r,['taskId','date','title','subject','origin','status'])),days:(s.days || []).map(r=>pick(r,['date','done','total','studySecs']))};
 }
 const stamp = () => Date.now();
 const validDate=value=>typeof value==='string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString().slice(0,10)===value;
-export function createPlanner({one,all,run,access,canAccess,requireThat,revision,today}) {
+export function createPlanner({one,all,run,access,canAccess,requireThat,revision,today,reportLayout=()=>null}) {
   const guard = (condition,code='INPUT',message='플래너 자료의 형식이나 권한을 확인해 주세요.',status=400) => requireThat(condition,status,code,message);
   const records = () => all('SELECT * FROM planner_records').map(r => ({...r,data:JSON.parse(r.data)}));
   const row = (kind,key) => {const r=one('SELECT * FROM planner_records WHERE kind=? AND key=?',kind,key);return r?{...r,data:JSON.parse(r.data)}:null;};
@@ -157,7 +157,7 @@ export function createPlanner({one,all,run,access,canAccess,requireThat,revision
       guard(['week','month'].includes(data.reportType) && ['published','withdrawn'].includes(data.reportStatus));
       guard(data.seriesKey===data.reportType+':'+data.staffId+':'+data.periodKey);
       guard(data.reportStatus==='published'?data.snapshot?.student?.id===data.staffId:data.snapshot===null);
-      if(data.snapshot) {guard((!data.snapshot.rows || Array.isArray(data.snapshot.rows)) && (!data.snapshot.days || Array.isArray(data.snapshot.days)));data.snapshot=publicSnapshot(data.snapshot);}
+      if(data.snapshot) {guard((!data.snapshot.rows || Array.isArray(data.snapshot.rows)) && (!data.snapshot.days || Array.isArray(data.snapshot.days)));data.snapshot=publicSnapshot(data.snapshot);data.snapshot.layout=reportLayout();}
     }
   }
   function save(u,p) {

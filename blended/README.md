@@ -175,3 +175,9 @@ Cloudflare 실행 환경은 로컬 Worker를 먼저 띄운 뒤 `node blended/wor
 ### 학원 자동 로그인·샘플 (2026-10-20 후속)
 
 RESULTS.md 마지막 절이 최신이다. 원장/관리자/강사 본인 계정을 학원 직원 화면에서 같은 역할로 연결한 뒤 학생 상세 바로가기를 사용한다. 학생/직원/담당 자동 생성은 없다. 로컬 Worker의 합성 설정은 ACADEMY_AUTH_KEY=c 64개를 추가하고 기존 읽기 키 a 64개와 분리한다. node blended/academy-sso-browser.cjs는 ACADEMY_SOURCE를 새 SSO 학원 작업본으로 지정한다. node blended/report-sample.cjs는 실제 공개 템플릿의 가상 HTML/PNG/PDF를 REPORT_SAMPLE_DIR에 생성한다. 운영 키/자료는 개발 환경에 넣지 않는다.
+
+### 리포트 차트·PDF 양식 (2026-10-20)
+
+리포트 목록의 차트·PDF 보기/미리보기와 원장 PDF 양식 편집을 사용한다. ECharts6.1.0, pdfme6.2.6은 앱 개발 라이브러리이며 AI 스킬이 아니다. 설치는 npm ci --ignore-scripts --prefix blended, 조립은 node blended/build.mjs. 첫 빌드는 고정 해시의 Noto Sans KR을 공식 저장소에서 받아 .cache에 보관한다. 원장은 배치/글자/문구/로고를 수정하고 서버에 저장할 수 있다. 변경 양식은 다음 발행부터 적용되며 기존 발행본은 보존한다. 진입 권한/양식 저장 권한은 API에서 확인한다.
+
+새 검증: node --test blended/reports.test.mjs, Playwright 경로 설정 후 node blended/reports-browser.cjs. 가상 디자인 시안은 REPORT_SAMPLE_DIR을 지정해 node blended/report-variants.cjs. 세 비교 시안은 운영 프리셋이 아니며 완료 보고의 HTML/PNG/PDF 링크로 확인한다. 한글 글꼴과 편집 모듈은 첫 사용 때 로딩이 크고 이후 글꼴은 캐시된다. 자세한 변경·시험·배포·위험은 RESULTS.md 최신 절을 따른다.

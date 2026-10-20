@@ -237,3 +237,29 @@ SOLAPI 키는 가져오거나 복사하지 않았다. 향후에도 사용자 지
 샘플 산출물: C:/Users/wb/.codex/.chatgpt-projects/g-p-6ad5f0507c6481919d57c4a566f69099/artifacts/report-sample-20261020/report-sample.html, report-sample.png, report-sample-phone.png, report-sample.pdf. 모두 가상 자료다.
 
 한계: SSO 세션은30분이며 플래너 역할/담당/활성은 매 요청 재검사한다. 학원 로그아웃/중지와 이미 발급한 플래너 세션의 동시 종료는 미구현(최대30분), 새 SSO는 학원 현재 상태로 차단한다. 실사용자 종단 로그인·실기기/낭독기·재부팅 복구는 미검증. 상담/리포트 자동 수신과 메시지 발송은 여전히 미연동이다.
+
+## 2026-10-20 ECharts·pdfme 리포트 개선과 비교 샘플
+
+사용자의 두 라이브러리 도입 요청과 버전별 샘플 요청을 구현했다. 새 작업본 C:/Users/wb/Projects/wb-site-blended-reports-20261020, codex/blended-reports-20261020. 기존 consult 및 학원 앱/다른 작업본은 수정하지 않았다.
+
+ECharts6.1.0(Apache-2.0)과 pdfme6.2.6(MIT)의 common/generator/schemas/ui, 빌드 도구 esbuild0.28.2를 blended/package.json·package-lock.json에 고정했다. 설치 npm audit 취약점0. 신규 AI 스킬 설치가 아니라 앱 개발 라이브러리다. Ponytail full과 Impeccable은 기존 스킬을 읽고 적용했다.
+
+리포트 목록의 ‘차트·PDF 보기’, 발행 대기의 ‘차트·PDF 미리보기’, 원장의 ‘PDF 양식 편집’을 추가했다. 기존 공개본 보기/발행/철회/인쇄는 유지한다. 기존 주간·월간 발행본에도 바로가기를 연결했다. 상담은 배정/학생 완료/강사 확인을 독립 막대로 표시하고, 주간·월간은 기록이 있는 날짜별 추이와 과목별 수치를 보여준다. 없는 기록은 미수행/0점으로 추정하지 않는다. 차트에는 수치 표를 함께 제공한다.
+
+pdfme 편집기는 원장만 서버 저장/수정할 수 있다. 위치·글자 크기/색·문구/로고 편집, 샘플 PDF, 양식 저장, 기본 양식 불러오기(저장 전 미반영)가 가능하다. 필수 공개 필드와 한글 글꼴/A4/이미지/크기/형식·외부 URL을 검증하며 수정 충돌409를 반환한다. 새 report_layout 표만 추가했고 기존 데이터는 유지했다. 새 상담 및 주간/월간 발행본에 당시 양식을 고정한다. 양식 변경으로 이전 발행 내용과 양식을 덮어쓰지 않는다. 공개 데이터만 PDF 입력으로 만들며 내부 메모를 읽지 않는다. PDF 저장 직전에 현재 열람 권한을 재확인한다. 기존 발행본에 양식이 없으면 고정 기본 양식을 사용한다.
+
+Noto Sans KR은 공식 Google Fonts의 고정 커밋·SHA256/OFL로 검증해 제공한다. 글꼴/라이브러리/편집기는 모두 앱 자산으로 제공하며 학생 자료를 외부 PDF 사이트로 보내지 않는다. 무거운 pdfme 편집/생성 모듈은 필요할 때 불러온다. 약10.4MB 한글 글꼴은 첫 PDF/편집 때 로드하고 해시 파일명으로 캐시한다. 인쇄 자동 확장으로 내용이 길면 여러 장이 될 수 있다. CSP의 인라인 스타일·WASM 허용은 보고서 도구 경로에만 적용하고 다른 앱의 정책은 유지했다. 직접 패키지 라이선스와 번들 법적 고지, PDFium 고지와 폰트 OFL을 함께 배포했다.
+
+주요 변경: api.mjs·schema.sql·planner-api.mjs(공개 미리보기/양식·고정 발행), report-layout.mjs·report-model.mjs(검증/공개 데이터), reports-page.js·reports.html·reports.css, report-charts.js·report-pdf.js·report-designer.js, app.js·planner-adapter.js(진입점), build.mjs·worker.mjs·server.mjs(빌드/정적 경로). 신규 검증 reports.test.mjs·reports-browser.cjs, 샘플 생성 report-variants.cjs, Worker 검증 worker-check.mjs.
+
+검증: 저장소 전체324/324(직렬226.6초), 기존 학습→상담→발행→동의 철회/등록·배정/충돌·입력 보존·키보드/원본6화면·일정 통합·로드맵/목차·공개 리포트 회귀 통과. 새 단위 검사는 원장 전용/불법 양식/외부 이미지·폰트/필수 필드/409/발행 양식 보존/공개 정보만 PDF에 사용/추가 문구 정규화를 검사했다. 실제 가상 브라우저에서 ECharts SVG, 한글 PDF 텍스트 추출, 비공개 메모 제외, pdfme 한국어 편집기·실제 X위치 변경 저장·기본 양식 저장, PC/390px 넘침0, 학생 편집 차단, 외부 요청0/예상 초기401 외 콘솔 오류0을 확인했다. Cloudflare 로컬 엔진에서 양식 읽기/저장·강사403 및 기존 SSO 계약 통과. Impeccable 기계 검사0건이며 도구가 절대 URL CSS를 해석하지 못한 경고는 실제 브라우저의 CSS/글꼴/반응형 측정으로 확인했다.
+
+현재 Worker 78ac0900-2f24-48ca-a1af-81e4834f6fe6. 직전 기준0000c117-b811-4f99-abcb-21eeac7f2474 보존. 외부 /blended/reports/·reports-page.js·reports.css 해시 일치, 익명 report_layout401 확인. 배포 시 실제 계정·학생·양식·발행 자료에 시험 쓰기 없음. 학원 runtime·키·터널·실제 발송·공유 push/PR 변경0.
+
+샘플: C:/Users/wb/.codex/.chatgpt-projects/g-p-6ad5f0507c6481919d57c4a566f69099/artifacts/report-variants-20261020. 동일한 가상 발행 자료 5배정/4학생 완료/3강사 확인을 V1 요약형(v1-summary, A4 1쪽), V2 상담형(v2-consultation, A4 1쪽), V3 상세형(v3-detail, A4 2쪽)으로 각각 HTML/PNG/PDF 생성했다. index.html·comparison.png는 비교 보기다. PNG/PDF 페이지 렌더를 확인했고 390px 넘침0이다. 세 디자인은 비교 시안이며 앱의 세 가지 선택형 프리셋으로 등록한 것은 아니다. 운영 양식은 원장이 별도 편집·저장한다.
+
+Aside 사용자 지정 세션75Iu7ZZT1MC7VD9b(옵시디언 구상 정리)에 라이브러리/스킬 구분·설치/검증/배포 진행 상태를 기록하고 완료 갱신을 전달했다. 기존 REA 설치는10월14일 이력이며 오늘 설치로 합치지 않았다.
+
+실행: npm ci --ignore-scripts --prefix blended → node blended/build.mjs → node blended/server.mjs. 기존 README Playwright 환경변수를 지정하고 node blended/reports-browser.cjs 또는 REPORT_SAMPLE_DIR 지정 후 node blended/report-variants.cjs. 검사 node --test blended/reports.test.mjs, 전체 node scripts/check.mjs --serial. 폰트 첫 빌드만 공식 저장소 다운로드가 필요하고 이후 고정 해시 캐시를 재사용한다. 배포는 기존 전용 Wrangler 설정만 사용한다.
+
+미확인: 실제 학생/사용자 종단 시험·실기기/낭독기·느린 이동통신 성능. 양식 편집기는 첫 로드 용량이 크며 휴대폰에서는 편집 영역을 좌우로 이동한다. 기존 자동 로그인30분/동시 로그아웃 미연동 한계와 실제 발송 미연동은 그대로다.
