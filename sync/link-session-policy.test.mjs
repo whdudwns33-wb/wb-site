@@ -121,6 +121,50 @@ async function post(database, path, body, envOverrides = {}) {
 
 const admin = { mode: 'admin', secret: 'admin-secret' };
 
+test('operations reader can read center lessons but cannot gain admin or mutate another teacher', async () => {
+  const db = new TestD1();
+  db.seedStaff(); db.seedStaff('teacher-2');
+  const now = Date.now();
+  db.prepare('INSERT INTO tokens VALUES(?,?,?,?,0)').bind('task','reader-token','teacher-1',now).run();
+  const auth = {mode:'person',id:'teacher-1',token:'reader-token'};
+  const env = {TASK_OPERATIONS_READER_IDS:'teacher-1'};
+  const lesson = {id:'lesson-other',staffId:'teacher-2',title:'[수업] 예시 수학',studentId:'student-example'};
+  for (const task of [lesson,{id:'private-work',staffId:'teacher-2',title:'내부 업무'}]) {
+    db.prepare('INSERT INTO tasks VALUES(?,?,?,?,?,?)').bind('task',task.id,task.staffId,JSON.stringify(task),now,now).run();
+  }
+  db.prepare('INSERT INTO checks VALUES(?,?,?,?,?,?)').bind('task','lesson-other|2026-10-20',
+    'teacher-2',JSON.stringify({att:'P',note:'private note'}),now,now).run();
+  const request = {auth,action:'snapshot',from:'2026-10-19',to:'2026-10-25'};
+  assert.equal((await post(db,'/operations-read',request)).status,403);
+  const result = await post(db,'/operations-read',request,env);
+  assert.equal(result.status,200);
+  assert.deepEqual(result.body.tasks.map(t=>t.id),['lesson-other']);
+  assert.equal(result.body.checks['lesson-other|2026-10-20'].att,'P');
+  assert.ok(!JSON.stringify(result.body).includes('private note'));
+  assert.equal((await post(db,'/operations-read',{...request,action:'write'},env)).status,403);
+  assert.equal((await post(db,'/bootstrap',{auth,staffId:'teacher-2'},env)).status,401);
+  const synced = await post(db,'/sync',{auth,since:now,changes:[]},env);
+  assert.equal(synced.body.operationsRead,true);
+  assert.notEqual(synced.body.authRole,'manager');
+  const denied = await post(db,'/sync',{auth,since:now,changes:[
+    {table:'tasks',id:lesson.id,data:{...lesson,title:'변경 시도',updatedAt:now+1},updatedAt:now+1}
+  ]},env);
+  assert.ok(denied.status>=400);
+  assert.equal(JSON.parse(db.database.prepare('SELECT data FROM tasks WHERE id=?').get(lesson.id).data).title,lesson.title);
+});
+
+test('persistent task connections preserve valid devices but not already expired or revoked tokens', async () => {
+  const db = new TestD1(); db.seedStaff();
+  const cutoff = 1700000000000;
+  const env = {TASK_DEVICE_PERSISTENT_AFTER:String(cutoff)};
+  for (const [raw,created,revoked] of [['valid-device',cutoff+1,0],['expired-device',cutoff-1,0],['revoked-device',cutoff+1,1]]) {
+    db.prepare('INSERT INTO tokens VALUES(?,?,?,?,?)')
+      .bind('task',await hashForStorage(raw),'teacher-1',created,revoked).run();
+    const response = await post(db,'/personal-devices',{auth:{mode:'person',id:'teacher-1',token:raw},action:'list'},env);
+    assert.equal(response.status,raw==='valid-device'?200:403);
+  }
+});
+
 async function bootstrap(database, staffId = 'teacher-1') {
   return post(database, '/bootstrap', { auth: admin, staffId });
 }
@@ -306,7 +350,7 @@ test('only the three newest unused links remain valid', async () => {
   }
 });
 
-test('four device exchanges keep the newest three bearer sessions', async () => {
+test('fourth device is rejected without silently evicting an existing device', async () => {
   const db = new TestD1();
   db.seedStaff();
   const originalNow = Date.now;
@@ -314,7 +358,7 @@ test('four device exchanges keep the newest three bearer sessions', async () => 
   Date.now = () => now;
   try {
     const sessions = [];
-    for (let index = 0; index < 4; index += 1) {
+    for (let index = 0; index < 3; index += 1) {
       const issued = await bootstrap(db);
       now += 1_000;
       const result = await exchange(db, issued.body.code);
@@ -323,6 +367,16 @@ test('four device exchanges keep the newest three bearer sessions', async () => 
       sessions.push(result.body.token);
       now += 1_000;
     }
+    const fourth = await bootstrap(db);
+    const rejected = await exchange(db, fourth.body.code);
+    assert.equal(rejected.status,409);
+    assert.equal(rejected.body.code,'DEVICE_LIMIT');
+    const auth = {mode:'person',id:'teacher-1',token:sessions[0]};
+    const listing = await post(db,'/personal-devices',{auth,action:'list'});
+    assert.equal(listing.body.devices.length,3);
+    assert.ok(!JSON.stringify(listing.body).includes(sessions[0]));
+    assert.equal((await post(db,'/personal-devices',{auth,action:'revoke',
+      deviceId:listing.body.devices.find(d=>d.current).id})).status,409);
 
     assert.equal(db.count(
       'SELECT count(*) AS n FROM tokens WHERE app=? AND staff_id=? AND revoked=0',
@@ -331,7 +385,7 @@ test('four device exchanges keep the newest three bearer sessions', async () => 
     assert.equal(db.count(
       'SELECT count(*) AS n FROM tokens WHERE app=? AND staff_id=? AND revoked=1',
       'task', 'teacher-1'
-    ), 1);
+    ), 0);
 
     const firstSync = await post(db, '/sync', {
       auth: { mode: 'person', id: 'teacher-1', token: sessions[0] }, since: now, changes: []
@@ -339,8 +393,11 @@ test('four device exchanges keep the newest three bearer sessions', async () => 
     const secondSync = await post(db, '/sync', {
       auth: { mode: 'person', id: 'teacher-1', token: sessions[1] }, since: now, changes: []
     });
-    assert.equal(firstSync.status, 401);
+    assert.equal(firstSync.status, 200);
     assert.equal(secondSync.status, 200);
+    assert.equal((await post(db,'/personal-devices',{auth,action:'revoke',
+      deviceId:listing.body.devices.find(d=>!d.current).id})).status,200);
+    assert.equal((await exchange(db,fourth.body.code)).status,200,'capacity refusal does not consume code');
   } finally {
     Date.now = originalNow;
   }

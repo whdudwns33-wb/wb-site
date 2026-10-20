@@ -38,7 +38,7 @@ test('only quick first-time present skips confirmation; corrections and absences
 test('schedule attendance uses early leave and the exact incomplete label', () => {
   const source = block('function scheduleAttendance(entry, date)', 'const SCHEDULE_VIEWS');
   const getCheck = (_id, date) => date === 'early' ? { att: 'E' } : null;
-  const scheduleAttendance = new Function('getCheck', source + '; return scheduleAttendance;')(getCheck);
+  const scheduleAttendance = new Function('getCheck', 'const session={isAdmin:true};' + source + '; return scheduleAttendance;')(getCheck);
   assert.deepEqual(scheduleAttendance({ task: { id: 'lesson-a' } }, 'early'), {
     value: 'E', label: '조퇴', cls: 'warn'
   });
@@ -50,7 +50,7 @@ test('schedule attendance uses early leave and the exact incomplete label', () =
 test('teacher flow keeps student-by-student attendance while the redundant overview stays hidden', () => {
   const source = block('function scheduleAttendance(entry, date)', 'const SCHEDULE_VIEWS');
   const checks = { present: { att: 'P' }, late: { att: 'L' }, absent: { att: 'A' }, early: { att: 'E' } };
-  const helpers = new Function('getCheck', 'esc', 'rosterDb', studentLabelHelperSource() + source +
+  const helpers = new Function('getCheck', 'esc', 'rosterDb', 'const session={isAdmin:true};' + studentLabelHelperSource() + source +
     '; return { scheduleAttendanceOverviewHtml, scheduleAttendanceSummaryText };')(
     taskId => checks[taskId] || null, String, { students: [] }
   );
