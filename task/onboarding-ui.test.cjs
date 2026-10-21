@@ -213,7 +213,7 @@ test('checking an item keeps its stage open and restores keyboard focus', () => 
 
 test('the latest request applies a lower-timestamp server 409 to repair forged local state', async () => {
   const source = block('function applyOnboardingRecord(studentId, record)', 'function onboardingProgress(record)');
-  const post = block('async post(path, body)', 'async run()');
+  const post = block('async post(path, body, isCurrent)', 'async run()');
   const latest = { studentId: 'student-1', taskId: '__onboarding__student-1', date: 'all',
     firstClassDate: '2026-08-15', items: { guardian: 321 }, updatedAt: 456, casVersion: 1 };
   const forged = { ...latest, items: { forged: 999 }, updatedAt: 999 };
@@ -281,7 +281,7 @@ test('a delayed older 409 cannot overwrite a newer success', async () => {
 });
 
 test('new Pages reload reconciles forged CAS state even when normal collect and pull cursors skip it', () => {
-  const source = block('collect(since) {', 'async post(path, body)');
+  const source = block('collect(since) {', 'async post(path, body, isCurrent)');
   const reconcileSource = block('function onboardingReconcileChanges()', '/** 권한 근거가 아니라');
   const run = block('async run() {', '/** 장기 bearer 대신');
   const key = '__onboarding__student-1|all';

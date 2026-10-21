@@ -164,7 +164,7 @@ test('new work lock keeps recovery and lesson data, hides popups, and never revo
   assert.equal(app.eval('stats.centerChatResets'), 1);
 });
 test('all business requests carry the work token, daily lock precedes generic conflict recovery, and private profiles are separate', () => {
-  const post = html.slice(html.indexOf('  async post(path, body)'), html.indexOf('  async run()'));
+  const post = html.slice(html.indexOf('  async post(path, body, isCurrent)'), html.indexOf('  async run()'));
   assert.match(post, /lockStaffWork\(error.message\)/);
   assert.match(post, /STAFF_WORK_LOGIN_REQUIRED/);
   assert.match(post, /body.auth.workSession/);
