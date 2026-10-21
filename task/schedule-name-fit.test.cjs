@@ -1,0 +1,18 @@
+'use strict';
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const html = fs.readFileSync(__dirname + '/index.html', 'utf8');
+const css = fs.readFileSync(__dirname + '/readability.css', 'utf8');
+const source = html.slice(html.indexOf('function scheduleAttendanceBlockHeight('), html.indexOf('function scheduleTimelineHtml('));
+const context = vm.createContext({});
+vm.runInContext(source, context);
+const height = context.scheduleAttendanceBlockHeight;
+const rows = [{name: '가상학생', label: '미완료'}];
+assert.ok(height(rows, 56, '') > height(rows, 100, ''));
+assert.ok(height(rows, 38, '보강 · ') > height(rows, 56, ''));
+assert.ok(height([...rows, ...rows], 56, '') > height(rows, 56, '') * 1.5);
+assert.ok(height([{name: '아주긴가상학생이름', label: '출석'}], 56, '') > height(rows, 56, ''));
+assert.match(css, /\.schedule-flow-attendance b \{[^}]*font-size: 12px;[^}]*line-height: 16px;[^}]*white-space: normal;[^}]*word-break: break-all;/);
+assert.match(html, /height: scheduleAttendanceBlockHeight\(attendanceRows, width, prefix\)/);
+console.log('schedule name wrapping and lane height: passed');

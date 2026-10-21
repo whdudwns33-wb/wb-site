@@ -78,7 +78,7 @@ test('teacher flow keeps student-by-student attendance while the redundant overv
   assert.doesNotMatch(timeline, /scheduleAttendanceOverviewHtml\(timeline, date\)/);
   assert.match(timeline, /scheduleSessionAttendanceRows\(session, date\)/);
   assert.match(timeline, /visual\.attendanceRows\.map/);
-  assert.match(timeline, /attendanceRows\.length \* 32 \+ 10/);
+  assert.match(timeline, /scheduleAttendanceBlockHeight\(attendanceRows, width, prefix\)/);
   assert.match(html, /\.schedule-flow-attendance \{[^}]*display: grid;[^}]*grid-template-columns: minmax\(0, 1fr\);/);
   assert.match(html, /\.schedule-flow-attendance b \{[^}]*overflow: visible;[^}]*text-overflow: clip;[^}]*white-space: nowrap;/);
   assert.match(html, /\.schedule-flow-attendance i \{[^}]*display: block;[^}]*white-space: nowrap;/);

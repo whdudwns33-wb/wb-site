@@ -19,7 +19,9 @@
 .schedule-timeline-teacher b,
 html.person-mobile .schedule-timeline-teacher b { font-size: 14px; }
 .schedule-timeline-block strong { font-size: 14px; line-height: 1.45; }
-.schedule-flow-attendance b { font-size: 13px; line-height: 18px; }
+.schedule-timeline-block { padding: 5px 4px; }
+.schedule-flow-attendance b { font-size: 12px; line-height: 16px; white-space: normal; word-break: break-all; overflow-wrap: anywhere; }
+.schedule-flow-attendance i { white-space: normal; word-break: break-all; overflow-wrap: anywhere; }
 .schedule-list-time, .schedule-list-main { font-size: 15px; }
 .book-order-student, .book-order-picker-option, .book-order-money,
 .internal-book-option, .bound-book-option { font-size: 16px; }
