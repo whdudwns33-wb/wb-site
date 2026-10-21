@@ -91,6 +91,8 @@ import { handleStudentChange } from './student-change.js';
 import { handleAdminDirective } from './admin-directive.js';
 import { handleTeacherLiveRequest } from './teacher-live-request.js';
 import { handleCenterChat } from './center-chat.js';
+import { handlePrivateChat } from './private-chat.js';
+import { handleSelfIdentity } from './self-identity.js';
 import { handleTaskPush, dispatchTaskPush } from './task-push.js';
 import { handleTuitionAlert, handleStudentAttendance } from './tuition-alert.js';
 import { handleBookIssue } from './book-issue.js';
@@ -3182,6 +3184,22 @@ export default {
     if (typeof body.app !== 'string' || !APPS.includes(app)) return json({ ok: false, error: 'app은 task 또는 consult' }, 400, okOrigin);
 
     try {
+      if (url.pathname === '/self-identity') {
+        const fail = (code, error, status) => json({ ok: false, authScope: 'identity_check', code, error }, status, okOrigin);
+        if (app !== 'task' || Object.keys(body).some(key => !['app', 'auth'].includes(key))) {
+          return fail('IDENTITY_REQUEST_INVALID', '본인 계정 조회 요청을 확인해 주세요.', 400);
+        }
+        try {
+          const auth = await resolveAuth(env, app, body.auth);
+          if (!auth) return json({ ok: false, code: 'PERSON_AUTH_REJECTED', error: '개인 인증을 다시 확인해 주세요.' }, 401, okOrigin);
+          const denied = body.auth && body.auth.mode === 'person'
+            ? await guardStaffWorkAccess(env, body, auth, url.pathname, okOrigin, json) : null;
+          if (denied) return denied;
+          return await handleSelfIdentity(env, body, auth, okOrigin, json);
+        } catch {
+          return fail('IDENTITY_UNAVAILABLE', '계정 정보를 확인할 수 없습니다. 관리자에게 문의해 주세요.', 503);
+        }
+      }
       if (url.pathname === '/staff-work-session' || url.pathname === '/staff-profile') {
         const auth = await resolveAuth(env, app, body.auth);
         if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
@@ -3334,6 +3352,11 @@ export default {
           ctx.waitUntil(dispatchTaskPush(env).catch(() => {}));
         }
         return response;
+      }
+      if (url.pathname === '/private-chat') {
+        const auth = await resolveAuth(env, app, body.auth);
+        if (!auth) return json({ ok: false, code: 'PERSON_AUTH_REJECTED', error: '개인 인증이 필요합니다' }, 401, okOrigin);
+        return await handlePrivateChat(env, app, body, okOrigin, auth, json);
       }
       if (url.pathname === '/center-chat') {
         const auth = await resolveAuth(env, app, body.auth);

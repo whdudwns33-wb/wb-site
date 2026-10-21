@@ -13,7 +13,7 @@ function block(from, to) {
 }
 
 function syncApply(state) {
-  const methods = block('collect(since) {', 'async post(path, body)');
+  const methods = block('collect(since) {', 'async post(path, body, isCurrent)');
   return new Function('state', `
     const ownerOfCheck = () => null;
     const isContactCheckKey = () => false;

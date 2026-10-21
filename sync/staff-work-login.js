@@ -43,7 +43,7 @@ function unavailable(json, origin) {
 }
 function parsed(row) { try { return JSON.parse(row.data); } catch { return null; } }
 function role(auth) { return auth.scope === 'all' ? (auth.id ? 'manager' : 'admin') : 'teacher'; }
-function isRequired(env, auth, profile) {
+export function isRequired(env, auth, profile) {
   // 관리자 권한과 근무 로그인 대상은 별개다. 기존 관리자는 설정에 없으면 종전대로 유지한다.
   const managerLoginIds = String(env.TASK_WORK_LOGIN_MANAGER_IDS_CONFIG || '').split(',').map(id => id.trim());
   return staffWorkLoginEnabled(env) && !!auth.id &&

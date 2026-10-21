@@ -223,7 +223,7 @@ test('manager downgrade and auth rejection purge the full person cache', () => {
 });
 
 test('direct personal API 401/403 purges sensitive UI once, while sync, root admin, and 5xx keep their paths', () => {
-  const post = html.match(/async post\(path, body\) \{[\s\S]*?\n  \},/)?.[0] || '';
+  const post = html.match(/async post\(path, body, isCurrent\) \{[\s\S]*?\n  \},/)?.[0] || '';
   const rejection = html.match(/function handlePersonAuthRejection\(error, managerRoleSeen, knownProblem\) \{[\s\S]*?\n}/)?.[0] || '';
   const handoff = html.match(/async function createVerifiedHandoffLink\(asQr\)[\s\S]*?\n}/)?.[0] || '';
   assert.match(post, /body && body\.auth && body\.auth\.mode === 'person'/);
