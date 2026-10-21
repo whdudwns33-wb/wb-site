@@ -20448,7 +20448,7 @@ function rosterStudentEditorHtml(student, assignment) {
     '<label class="field" data-rse-cycle-start-wrap' + (billingMode === 'session4' ? '' : ' hidden') + '><span class="fl">회차 시작일 · 나중에 입력 가능</span>' +
       '<input class="in" type="date" data-rse-session-cycle-start' +
       ' value="' + esc(student.sessionCycleStartDate || '') + '"></label></div>' +
-    '<label class="field"><span class="fl">첫 결제 회차</span><select class="in" data-rse-initial-cycle-size><option value="4"' + (Number(student.sessionInitialCycleSize) !== 12 ? ' selected' : '') + '>4회</option><option value="12"' + (Number(student.sessionInitialCycleSize) === 12 ? ' selected' : '') + '>첫 12회 선납 · 이후 4회</option></select></label>' +
+    '<label class="field" data-rse-cycle-size-wrap' + (billingMode === 'session4' ? '' : ' hidden') + '><span class="fl">첫 결제 회차</span><select class="in" data-rse-initial-cycle-size><option value="4"' + (Number(student.sessionInitialCycleSize) !== 12 ? ' selected' : '') + '>4회</option><option value="12"' + (Number(student.sessionInitialCycleSize) === 12 ? ' selected' : '') + '>첫 12회 선납 · 이후 4회</option></select></label>' +
     '<div class="small muted mb14">회차 대상: ' + esc(student.sessionBillingSubject || '전체 과목') + ' · 시작일 미입력 시 회차 계산과 수강료 안내는 대기합니다. 출석·지각·조퇴를 합산하며 마지막 1회가 남으면 수강료 안내가 생성됩니다. 첫 12회 선납이면 11회, 이후에는 3회 확정 시 안내합니다. 결제 사실을 자동 등록하지 않습니다.</div>' +
     (isNew ? '' : '<label class="field"><span class="fl">명단 기준 시작월</span><input class="in" type="month" data-rse-start value="' + esc(student.start || today().slice(0, 7)) + '"></label>' +
     '<input type="hidden" data-rse-end value="' + esc(student.end || '') + '"><input type="hidden" data-rse-reason value="' + esc(student.reason || '') + '">' +
@@ -20468,6 +20468,8 @@ function updateRosterBillingFields(selectElement) {
   const wrap = input && input.closest('[data-rse-cycle-start-wrap], [data-roster-cycle-start-wrap]');
   const sessionMode = select.value === 'session4';
   if (wrap) wrap.hidden = !sessionMode;
+  const sizeWrap = root.querySelector('[data-rse-cycle-size-wrap]');
+  if (sizeWrap) sizeWrap.hidden = !sessionMode;
   if (input) {
     input.required = false;
     input.setAttribute('aria-required', 'false');
