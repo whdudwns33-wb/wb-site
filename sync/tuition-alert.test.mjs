@@ -194,6 +194,66 @@ async function attendanceApi(db, body, auth = { scope: 'all' }, now = CUTOFF) {
   }
 }
 
+test('initial prepaid twelve holds 0..12 then returns to four; only attendances 11 and 15 alert', async () => {
+  for (const generations of [false, true]) {
+    const db = new TestD1(true, generations);
+    seedRoster(db, [rosterStudent('student-a', '합성학생', { sessionInitialCycleSize: 12 })]);
+    seedTask(db, 'lesson-a', 'student-a');
+    for (let count = 0; count <= 16; count++) {
+      if (count) seedCheck(db, 'lesson-a', '2026-08-' + String(count).padStart(2, '0'), 'P');
+      const result = await handleScheduledTuitionAlerts({ DB: db }, CUTOFF);
+      assert.equal(result.ok, true);
+      assert.equal(result.failed, 0);
+      const detail = await attendanceApi(db, { studentId: 'student-a', month: '2026-08' });
+      assert.equal(detail.status, 200);
+      assert.equal(detail.body.cycleSize, count <= 12 ? 12 : 4);
+      assert.equal(detail.body.attendanceCount, count <= 12 ? count : count - 12);
+      assert.equal(detail.body.cycleStartDate, count <= 12 ? '2026-08-01' : '2026-08-13');
+      assert.equal(detail.body.cycleComplete, count === 12 || count === 16);
+      const list = await attendanceApi(db, { action: 'list' });
+      assert.equal(list.body.students[0].attendanceCount, detail.body.attendanceCount);
+      const alerts = await api(db, { action: 'list' });
+      assert.equal(alerts.body.alerts.length, count >= 15 ? 2 : count >= 11 ? 1 : 0);
+      if (count === 11) {
+        assert.equal(alerts.body.alerts[0].cycleSize, 12);
+        assert.equal(alerts.body.alerts[0].attendanceCount, 11);
+        assert.equal(alerts.body.alerts[0].cycleStartDate, '2026-08-01');
+        assert.equal(alerts.body.alerts[0].triggerDate, '2026-08-11');
+      }
+      if (count > 12) {
+        assert.equal(detail.body.cycles[0].cycleSize, 12);
+        assert.equal(detail.body.cycles[0].entries.length, 12);
+      }
+    }
+    assert.equal(db.database.prepare('SELECT count(*) AS n FROM checks').get().n, 16);
+    db.database.close();
+  }
+});
+
+test('prepaid reconciliation uses the same eleven-session reminder and preserves prior generations', async () => {
+  const db = new TestD1(true, true);
+  seedRoster(db, [rosterStudent('student-a', '합성학생', { sessionInitialCycleSize: 12 })]);
+  seedTask(db, 'lesson-a', 'student-a');
+  await syncStudentSessionLedgers({ DB: db }, CUTOFF);
+  const result = await reconcileStudentSessionLedger({ DB: db }, {
+    studentId: 'student-a', configuredStartDate: '2026-08-01',
+    sourceCutoffDate: '2026-08-20', expectedGeneration: 1,
+    reasonCode: 'verified_attendance_dates', actor: 'director', now: CUTOFF,
+    entries: Array.from({ length: 11 }, (_, i) => ({
+      taskId: 'lesson-a', date: '2026-08-' + String(i + 1).padStart(2, '0'), status: 'P'
+    }))
+  });
+  assert.equal(result.ok, true);
+  const alerts = await api(db, { action: 'list' });
+  assert.equal(alerts.body.alerts.length, 1);
+  assert.equal(alerts.body.alerts[0].attendanceCount, 11);
+  assert.equal(alerts.body.alerts[0].cycleSize, 12);
+  assert.equal((await api(db, { action: 'confirm', alertId: alerts.body.alerts[0].alertId })).status, 200);
+  assert.equal((await api(db, { action: 'list' })).body.alerts.length, 0);
+  assert.equal(db.database.prepare('SELECT count(*) n FROM student_session_ledger_generations').get().n, 2);
+  db.database.close();
+});
+
 test('23:50 aggregation counts only final P/L/E across subjects and creates the third-attendance alert once', async () => {
   const db = new TestD1();
   seedRoster(db, [rosterStudent('student-a', '김학생')]);

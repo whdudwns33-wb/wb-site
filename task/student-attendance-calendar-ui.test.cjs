@@ -18,6 +18,19 @@ function escapeHtml(value) {
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
+test('첫12회 원장의 지난 회차도 12회 크기를 보존한다', () => {
+  const source = block('function session4LedgerCycles(summary)', 'function session4LedgerCardHtml(student)');
+  const api = new Function('esc', 'session4LedgerAttendanceHtml', source + '\nreturn { session4LedgerHistoryHtml };')(
+    escapeHtml, () => '출결');
+  const rendered = api.session4LedgerHistoryHtml({ studentId: 'example', cycles: [
+    { cycleStartDate: '2026-08-01', cycleSize: 12, attendanceCount: 12, status: 'complete', entries: [] },
+    { cycleStartDate: '2026-09-01', cycleSize: 4, attendanceCount: 1, status: 'open', entries: [] }
+  ] });
+  assert.match(rendered, /12회 중 12회 출석/);
+  assert.match(html, /data-rse-initial-cycle-size/);
+  assert.match(html, /첫 12회 \/ 이후 4회/);
+});
+
 test('회차제 학생 정보는 동적 시작일 다음에 현재 4회 중 출석 횟수를 표시한다', () => {
   const source = block('function rosterStudentInfoHtml(student, lessonReferences, taskId)', 'function rosterTransitionListsHtml(');
   const start = source.indexOf('data-student-cycle-start');
