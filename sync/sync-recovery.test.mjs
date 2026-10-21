@@ -177,6 +177,90 @@ test('exactly 2000 rows and empty snapshots finish without a false overflow', as
   assert.equal(full.body.recoveryPull.complete, true);
 });
 
+test('normal pull advances by the earliest truncated table boundary without cross-table omissions', async t => {
+  const db = new ReadOnlyD1(t);
+  const expectedTasks = new Set();
+  db.database.exec('BEGIN');
+  for (let index = 0; index < 2001; index += 1) {
+    const key = 'task-' + String(index).padStart(5, '0');
+    seedRow(db, 'tasks', key, 'teacher-a', index + 1);
+    expectedTasks.add(key);
+  }
+  seedRow(db, 'checks', 'later-check', 'teacher-a', 10000);
+  db.database.exec('COMMIT');
+
+  const receivedTasks = new Set();
+  let since = 0;
+  let pages = 0;
+  let sawLaterCheck = false;
+  while (pages++ < 3) {
+    const response = await sync(db, admin, { recoveryPull: undefined, since });
+    assert.equal(response.status, 200);
+    response.body.changes.forEach(row => {
+      if (row.table === 'tasks') receivedTasks.add(row.key);
+      if (row.table === 'checks' && row.key === 'later-check') sawLaterCheck = true;
+    });
+    if (!response.body.more) break;
+    assert.ok(response.body.now > since, 'pagination cursor must advance');
+    assert.ok(response.body.now < 10000, 'a later non-truncated table must not skip the task remainder');
+    since = response.body.now;
+  }
+  assert.ok(pages <= 3);
+  assert.equal(sawLaterCheck, true);
+  assert.deepEqual(receivedTasks, expectedTasks);
+});
+
+test('normal pull never advances through the middle of an equal-timestamp write batch', async t => {
+  const db = new ReadOnlyD1(t);
+  const expectedTasks = new Set();
+  db.database.exec('BEGIN');
+  for (let index = 0; index < 1900; index += 1) {
+    const key = 'older-' + String(index).padStart(5, '0');
+    seedRow(db, 'tasks', key, 'teacher-a', index + 1);
+    expectedTasks.add(key);
+  }
+  for (let index = 0; index < 500; index += 1) {
+    const key = 'batch-' + String(index).padStart(5, '0');
+    seedRow(db, 'tasks', key, 'teacher-a', 2000);
+    expectedTasks.add(key);
+  }
+  db.database.exec('COMMIT');
+
+  const received = new Set();
+  let since = 0;
+  for (let page = 0; page < 3; page += 1) {
+    const response = await sync(db, admin, { recoveryPull: undefined, since });
+    assert.equal(response.status, 200);
+    response.body.changes.filter(row => row.table === 'tasks')
+      .forEach(row => received.add(row.key));
+    if (!response.body.more) break;
+    assert.ok(response.body.now > since, 'pagination cursor must advance');
+    if (page === 0) assert.equal(response.body.now, 1900, 'the shared timestamp batch stays intact');
+    since = response.body.now;
+  }
+  assert.deepEqual(received, expectedTasks);
+});
+
+test('normal pull returns an oversized equal-timestamp group once instead of stalling or dropping rows', async t => {
+  const db = new ReadOnlyD1(t);
+  db.database.exec('BEGIN');
+  for (let index = 0; index < 2001; index += 1) {
+    seedRow(db, 'tasks', 'same-' + String(index).padStart(5, '0'), 'teacher-a', 100);
+  }
+  db.database.exec('COMMIT');
+
+  const first = await sync(db, admin, { recoveryPull: undefined, since: 0 });
+  assert.equal(first.status, 200);
+  assert.equal(first.body.more, true);
+  assert.equal(first.body.now, 100);
+  assert.equal(first.body.changes.filter(row => row.table === 'tasks').length, 2001);
+
+  const second = await sync(db, admin, { recoveryPull: undefined, since: first.body.now });
+  assert.equal(second.status, 200);
+  assert.equal(second.body.more, false);
+  assert.equal(second.body.changes.filter(row => row.table === 'tasks').length, 0);
+});
+
 test('recovery rejects changes before the normal write validation and cannot alter server records', async t => {
   const db = new ReadOnlyD1(t);
   seedAuth(db, ['teacher-a']);

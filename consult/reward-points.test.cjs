@@ -366,7 +366,7 @@ test('rewardPointEvents preserves September v1 and switches daily, weekly and mo
 
 test('point exchange decisions use the server CAS ledger and never become learning activity', () => {
   const action = functionSource('runPointExchangeAdminAction');
-  assert.match(action, /session\.isAdmin/);
+  assert.match(action, /session\.isDirector/);
   assert.match(action, /sync\.post\('\/consult-reward'/);
   assert.match(action, /ownedRequests/);
   assert.match(action, /recoveryRequests/);
@@ -401,7 +401,7 @@ test('existing processing can be fulfilled or cancelled after the student is del
       }
     };
     const actionFn = build(
-      { isAdmin: true, isStaffLink: false }, pointExchangeUi, () => student, { settings: { adminToken: 'device-token' } },
+      { isAdmin: true, isDirector: true, isStaffLink: false }, pointExchangeUi, () => student, { settings: { adminToken: 'device-token' } },
       sync, message => toasts.push(message),
       () => ({ pending: { id: 'request_1234' }, processing: { updatedAt: 1, takenOverAt: 0 },
         deficit: balance < 0 ? -balance : 0, balance: Math.max(0, balance) }),
@@ -439,7 +439,7 @@ test('same-device owner recovery is tracked only as a non-secret request key and
         takenOverAt: 0, updatedAt: 2, claimed: true, owned: true, resumed })
     };
     const actionFn = build(
-      { isAdmin: true, isStaffLink: false }, pointExchangeUi, () => ({ id: 's1' }),
+      { isAdmin: true, isDirector: true, isStaffLink: false }, pointExchangeUi, () => ({ id: 's1' }),
       { settings: { adminToken: 'device-token' } }, sync, () => {},
       () => ({ pending: { id: 'request_1234' }, processing, deficit: 0, balance: 5000 }),
       () => '2026-09-01', 5000, (staffId, requestId) => staffId + '|' + requestId,

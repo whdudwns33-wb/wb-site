@@ -261,6 +261,10 @@ npx wrangler d1 execute wb-sync --remote --file=./migrations/080_book_order_acad
 npx wrangler d1 execute wb-sync --remote --file=./migrations/082_task_live_push.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/083_book_order_stage2_cancellation.sql
 npx wrangler d1 execute wb-sync --remote --file=./migrations/084_center_chat.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/085_center_chat_missing.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/086_session_subject_scope.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/087_private_chat.sql
+npx wrangler d1 execute wb-sync --remote --file=./migrations/088_consult_manager_accounts.sql
 ```
 
 운영 DB에는 **미적용 파일만** 백업·복원 확인 후 위 순서로 적용한다. `081` 파일은 없으며 번호를
@@ -356,6 +360,15 @@ consult 원장 계정 로그인을 추가하는 배포는 `033_consult_admin_acc
 운영 D1에 적용한 뒤 Worker, Pages 순서로 배포한다. 기존 `task` 인증과 데이터는
 변경하지 않는다. 기존 consult 원장 기기의 설정에서 아이디·비밀번호를 한 번
 저장하면 최대 5대의 기기가 각각 90일간 자동 로그인한다.
+
+consult 관리 선생님별 계정은 `088_consult_manager_accounts.sql`을 운영 D1에 먼저 적용한 뒤
+Worker, consult Pages 순서로 배포한다. 원장이 consult 설정의 **관리 선생님 계정**에서
+선생님별 이름·아이디·비밀번호를 등록하며, 비밀번호는 PBKDF2 100,000회 해시만 저장한다.
+관리 선생님 기기는 계정별 최대 5대, 90일이고 비밀번호·아이디 변경이나 사용 중지 시 해당
+계정의 기기만 해제한다. `manager_device`는 `app:'consult'`와 `scope:'manager'`에만 유효하며,
+학습 운영 화면·배부·제출함 검토만 허용한다. 결과지, 학생·구독·연락처/링크, 기프트 카드,
+백업·원장 QR·원장/선생님 계정 관리는 계속 원장 전체 권한만 허용한다. 기존 task 인증과
+데이터에는 이 역할을 사용하지 않는다.
 
 consult 인증사진·질문 제출함은 `041_consult_submissions.sql` 적용과 private
 `wb-consult-private` R2 버킷 준비를 마친 뒤 보호자·직원 Worker와 consult Pages 순서로

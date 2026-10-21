@@ -28,6 +28,7 @@ function functionSource(name) {
 function renderTabsHtml(sessionValue, manager, hasRoadmap = false) {
   const target = { innerHTML: '' };
   const source = functionSource('renderTabs');
+  sessionValue = Object.assign({ isDirector: false, isManagerAccount: false }, sessionValue);
   new Function(
     'session', 'isManager', 'alertsToday', '$', 'requestAnimationFrame', 'route', 'teamStaff', 'currentStaff', 'studyRoadmapAvailable',
     source + '; renderTabs();'
@@ -49,7 +50,7 @@ test('usage guide tab is available in the regular student and admin screens', ()
   const student = renderTabsHtml({ isStaffLink: true, isAdmin: false }, false);
   const studentWithRoadmap = renderTabsHtml({ isStaffLink: true, isAdmin: false }, false, true);
   const manager = renderTabsHtml({ isStaffLink: true, isAdmin: false }, true);
-  const admin = renderTabsHtml({ isStaffLink: false, isAdmin: true }, false);
+  const admin = renderTabsHtml({ isStaffLink: false, isAdmin: true, isDirector: true }, false);
 
   assert.match(student, /data-go="guide"[^>]*>사용 안내/);
   assert.doesNotMatch(manager, /data-go="guide"/);
@@ -62,7 +63,7 @@ test('usage guide tab is available in the regular student and admin screens', ()
   const render = functionSource('render');
   assert.match(render, /:\s*\['guide', 'today', 'week', 'roadmap', 'month', 'academic', 'ingang', 'study'\]/);
   assert.match(render, /guide:\s*viewStudentGuide/);
-  assert.match(render, /session\.isAdmin && !session\.isStaffLink/);
+  assert.match(render, /session\.isDirector && !session\.isStaffLink/);
 
   const guide = functionSource('viewStudentGuide');
   assert.match(guide, /adminPreview/);

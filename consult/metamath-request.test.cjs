@@ -201,7 +201,7 @@ test('assignment creates one admin MetaMath math response linked to the request'
   assert.match(seed, /staffId:\s*req\.staffId/);
   assert.match(assign, /source:\s*'metamath'/);
   assert.match(assign, /studySubject:\s*'math'/);
-  assert.match(seed, /origin:\s*'admin'/);
+  assert.match(seed, /origin:\s*actor\(\)/);
   assert.match(assign, /status:\s*'assigned'/);
   assert.match(assign, /repeat:\s*'once'/);
   assert.match(assign, /start:/);
@@ -223,12 +223,12 @@ test('only the deterministic admin response is trusted and assignment follows pr
 
   assert.match(response, /task\.id === 'metamath-response-' \+ requestId/);
   assert.match(response, /task\.staffId === request\.staffId/);
-  assert.match(response, /task\.origin === 'admin'/);
+  assert.match(response, /\['admin', 'manager'\]\.includes\(task\.origin\)/);
   assert.match(status, /response\.requestRevision[^\n]*<[^\n]*req\.requestRevision/);
   assert.match(status, /return 'changed'/);
   assert.match(occurs, /metamathResponseFor\(request\.id\) !== task/);
   assert.match(occurs, /task\.requestRevision[^\n]*<[^\n]*request\.requestRevision/);
-  assert.match(card, /admin && status === 'preparing'/);
+  assert.match(card, /canRespond && status === 'preparing'/);
   assert.match(card, /data-act="daypick" data-date=/);
   assert.match(card, /response\.start/);
   assert.match(modal, /metamathRequestStatus\(request\) !== 'preparing'/);

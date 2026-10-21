@@ -73,7 +73,7 @@ test('local save failure is persistent, non-destructive, and clears only after s
 });
 
 test('sync keeps all local changes, exposes retry, and does not erase active forms', () => {
-  const run = between('  async run(duringStudentConnect) {', '  /** 학생 기기에 한 번만 연결할 짧은 코드 발급');
+  const run = between('  async run(duringStudentConnect, duringAdminConnect) {', '  /** 학생 기기에 한 번만 연결할 짧은 코드 발급');
   assert.match(run, /while \(pending\.length \|\| more\)/);
   assert.doesNotMatch(run, /guard\+\+ < 60/);
   assert.ok(run.indexOf('if (!pending.length && !localCursorSaved)') < run.indexOf('state.settings.pushAt = t0'),

@@ -8,7 +8,7 @@ const version = JSON.parse(fs.readFileSync(__dirname + '/version.json', 'utf8'))
 
 test('director gets a dedicated PDF result tab while student links stay excluded', () => {
   assert.match(consult, /\['results', '결과지'\]/);
-  assert.match(consult, /function viewResults\(\) \{\s*if \(!session\.isAdmin \|\| session\.isStaffLink\) return '';/);
+  assert.match(consult, /function viewResults\(\) \{\s*if \(!session\.isDirector\) return '';/);
   assert.match(consult, /accept="application\/pdf,\.pdf"/);
   assert.match(consult, /PDF 파일 · 최대 10MB/);
   assert.doesNotMatch(consult.match(/const allowed = isManager\(\)[\s\S]*?if \(!allowed\.includes\(route\)\)/)[0], /results/);

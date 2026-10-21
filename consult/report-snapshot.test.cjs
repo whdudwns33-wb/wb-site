@@ -85,6 +85,7 @@ function reportApi() {
     globalThis.__reportApi = {
       buildReportSnapshot: typeof buildReportSnapshot === 'function' ? buildReportSnapshot : null,
       publishReportSnapshot: typeof publishReportSnapshot === 'function' ? publishReportSnapshot : null,
+      withdrawReportSnapshot: typeof withdrawReportSnapshot === 'function' ? withdrawReportSnapshot : null,
       reportSnapshotsFor: typeof reportSnapshotsFor === 'function' ? reportSnapshotsFor : null,
       reportPrintHtml: typeof reportPrintHtml === 'function' ? reportPrintHtml : null,
       printReportSnapshot: typeof printReportSnapshot === 'function' ? printReportSnapshot : null,
@@ -95,6 +96,11 @@ function reportApi() {
         location.search = search || '';
         sessionStorage.clear();
         if (admin) sessionStorage.setItem('wb_consult_admin', '1');
+      },
+      setManagerSession() {
+        location.search = '';
+        sessionStorage.clear();
+        state.settings.managerToken = 'manager-token';
       },
       setCursor(value) { cursor = value; ymCursor = String(value).slice(0, 7); agendaDate = value; },
       setViewStaff(value) { viewStaff = value; }
@@ -253,6 +259,28 @@ test('student mode is read-only and scoped to the signed-in student', () => {
   const adminHtml = api.viewWeek();
   assert.match(adminHtml, /data-act="reportpublish"/);
   assert.match(adminHtml, /다시 발행/);
+});
+
+test('manager can preview director reports but cannot publish or withdraw them', () => {
+  const api = reportApi();
+  const state = fixture();
+  api.setState(state);
+  api.setSession('', true);
+  const published = api.publishReportSnapshot('student-a', 'week', '2026-08-17',
+    new Date('2026-08-20T20:00:00+09:00').getTime());
+  assert.ok(published);
+  const before = state.tasks.length;
+
+  api.setManagerSession();
+  assert.equal(api.publishReportSnapshot('student-a', 'week', '2026-08-17', Date.now()), null);
+  assert.equal(api.withdrawReportSnapshot('student-a', 'week', '2026-08-17', Date.now()), null);
+  assert.equal(state.tasks.length, before);
+  api.setCursor('2026-08-20');
+  api.setViewStaff('student-a');
+  const managerHtml = api.viewWeek();
+  assert.match(managerHtml, /현재 기록 미리보기/);
+  assert.match(managerHtml, /발행본 보기/);
+  assert.doesNotMatch(managerHtml, /data-act="reportpublish"|data-act="reportwithdraw"|다시 발행/);
 });
 
 test('print/PDF HTML is a same-page native print view with no credential, id, or URL leakage', () => {

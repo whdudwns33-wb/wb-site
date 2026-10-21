@@ -185,7 +185,7 @@ test('providing one safe link creates one protected exam-material response witho
   assert.match(provide, /materialRequestId:\s*req\.id/);
   assert.match(provide, /requestSnapshot/);
   assert.match(provide, /resourceUrl:\s*resourceUrl/);
-  assert.match(provide, /origin:\s*'admin'/);
+  assert.match(provide, /origin:\s*actor\(\)/);
   assert.match(provide, /repeat:\s*'once'/);
   assert.match(provide, /LEARNING_SOURCES\.exam_material\.steps/);
   assert.match(provide, /status:\s*'provided'/);
