@@ -85,6 +85,8 @@ import {
 } from './parent-feedback-send.js';
 import { handleFeedbackPolish } from './feedback-polish.js';
 import { handleRoster } from './roster.js';
+import { isOperationsReader, handleOperationsRead } from './operations-reader.js';
+import { deviceCutoff, handlePersonalDevices } from './device-policy.js';
 import { handleStudentChange } from './student-change.js';
 import { handleAdminDirective } from './admin-directive.js';
 import { handleTeacherLiveRequest } from './teacher-live-request.js';
@@ -260,7 +262,7 @@ async function resolveAuth(env, app, auth) {
     const token = String(auth.token || '');
     if (!token || token.length > 256 || token.startsWith(TOKEN_HASH_PREFIX)) return null;
     const tokenHash = tokenStorageValue(await sha256Hex(token));
-    const createdAfter = Date.now() - TOKEN_TTL_MS;
+    const createdAfter = deviceCutoff(env, app);
     const row = await env.DB.prepare(
       'SELECT staff_id FROM tokens WHERE app=? AND token IN (?,?) AND revoked=0 ' +
       'AND (token=? OR created_at>=?) LIMIT 1'
@@ -278,7 +280,7 @@ async function resolveAuth(env, app, auth) {
     const token = String(auth.token || '');
     if (!SAFE_ID.test(id) || !token || token.length > 256 || token.startsWith(TOKEN_HASH_PREFIX)) return null;
     const tokenHash = tokenStorageValue(await sha256Hex(token));
-    const createdAfter = Date.now() - TOKEN_TTL_MS;
+    const createdAfter = deviceCutoff(env, app);
     const row = await env.DB.prepare(
       'SELECT staff_id FROM tokens WHERE app=? AND token IN (?,?) AND revoked=0 ' +
       'AND (token=? OR created_at>=?) LIMIT 1'
@@ -287,7 +289,9 @@ async function resolveAuth(env, app, auth) {
     if (!row || row.staff_id !== id || !staff) return null;
     // 수정 가능한 staff 메타데이터가 아니라 배포 환경의 명시적 allowlist만 task 관리 권한을 준다.
     if (app === 'task' && taskManagerIds(env).has(id)) return { scope: 'all', id: id, role: 'manager' };
-    return { scope: 'own', id: id };
+    const ownAuth = { scope: 'own', id: id };
+    if (isOperationsReader(env, app, ownAuth)) ownAuth.operationsRead = true;
+    return ownAuth;
   }
   return null;
 }
@@ -1973,7 +1977,8 @@ async function handleSync(env, app, body, origin) {
   // more일 때는 받은 것 중 가장 오래된 srv_at까지만 확정해야 빠지는 행이 없다
   const nextSince = more ? Math.max(since, ...out.map(r => r.srv_at)) : now;
   const authRole = auth.role === 'manager' ? 'manager' : (auth.scope === 'all' ? 'admin' : 'staff');
-  const payload = { ok: true, now: nextSince, more: more, changes: out, authRole, dataGeneration };
+  const payload = { ok: true, now: nextSince, more: more, changes: out, authRole, dataGeneration,
+    operationsRead: auth.operationsRead === true };
   if (wantsTaskRevocations) {
     payload.taskRevocations = await pullTaskRevocations(
       env, app, dataGeneration, auth, requestedTaskRevocationCursor
@@ -2090,6 +2095,7 @@ async function handleExchange(env, app, body, origin) {
   }
 
   const consumedAt = Date.now();
+  const cutoff = deviceCutoff(env, app, consumedAt);
   const markerBytes = new Uint32Array(1);
   crypto.getRandomValues(markerBytes);
   const consumeMarker = -(consumedAt * 1000 + (markerBytes[0] % 1000));
@@ -2098,8 +2104,10 @@ async function handleExchange(env, app, body, origin) {
   const results = await env.DB.batch([
     env.DB.prepare(
       'UPDATE bootstrap_codes SET consumed_at=? ' +
-      'WHERE app=? AND code_hash=? AND staff_id=? AND revoked=0 AND consumed_at IS NULL AND expires_at>=?'
-    ).bind(consumeMarker, app, codeHash, staffId, consumedAt),
+      'WHERE app=? AND code_hash=? AND staff_id=? AND revoked=0 AND consumed_at IS NULL AND expires_at>=? ' +
+      'AND (?<>? OR (SELECT COUNT(*) FROM tokens WHERE app=? AND staff_id=? AND revoked=0 ' +
+      'AND (created_at>=? OR substr(token,1,7)<>?))<3)'
+    ).bind(consumeMarker, app, codeHash, staffId, consumedAt, app, 'task', app, staffId, cutoff, 'sha256:'),
     env.DB.prepare(
       'INSERT INTO tokens(app,token,staff_id,created_at,revoked) ' +
       'SELECT ?,?,?,?,0 WHERE EXISTS (' +
@@ -2109,12 +2117,12 @@ async function handleExchange(env, app, body, origin) {
       'UPDATE tokens SET revoked=1 ' +
       'WHERE app=? AND staff_id=? AND revoked=0 AND created_at<? AND EXISTS (' +
       'SELECT 1 FROM bootstrap_codes WHERE app=? AND code_hash=? AND staff_id=? AND consumed_at=?)'
-    ).bind(app, staffId, consumedAt - TOKEN_TTL_MS, app, codeHash, staffId, consumeMarker),
+    ).bind(app, staffId, cutoff, app, codeHash, staffId, consumeMarker),
     // 새 기기를 포함해 최근 세 세션만 유지한다. 새 연결 자체는 반드시 남기고,
     // 나머지 중 생성 시각이 가장 최근인 두 세션만 보존한다.
     env.DB.prepare(
       'UPDATE tokens SET revoked=1 ' +
-      'WHERE app=? AND staff_id=? AND revoked=0 AND token<>? AND token NOT IN (' +
+      "WHERE app=? AND app<>'task' AND staff_id=? AND revoked=0 AND token<>? AND token NOT IN (" +
       'SELECT token FROM tokens WHERE app=? AND staff_id=? AND revoked=0 AND token<>? ' +
       'ORDER BY created_at DESC, token DESC LIMIT ' + (activeSessionLimit - 1) + ') AND EXISTS (' +
       'SELECT 1 FROM bootstrap_codes WHERE app=? AND code_hash=? AND staff_id=? AND consumed_at=?)'
@@ -2139,6 +2147,8 @@ async function handleExchange(env, app, body, origin) {
     if (Number(row.revoked)) {
       return json({ ok: false, code: 'LINK_REPLACED', error: '더 최근에 발급된 링크를 사용해 주세요' }, 410, origin);
     }
+    if (app === 'task') return json({ok:false,code:'DEVICE_LIMIT',
+      error:'이미 세 기기가 연결되어 있습니다. 기존 기기의 내 기기 관리에서 사용하지 않는 연결을 해제한 뒤 다시 연결해 주세요.'},409,origin);
     return json({ ok: false, code: 'LINK_USED', error: '다른 화면에서 먼저 사용된 개인 링크입니다' }, 409, origin);
   }
   return json({ ok: true, token, staffId, expiresAt: consumedAt + TOKEN_TTL_MS,
@@ -3229,6 +3239,10 @@ export default {
       if (url.pathname === '/bootstrap') return await handleBootstrap(env, app, body, okOrigin);
       if (url.pathname === '/exchange') return await handleExchange(env, app, body, okOrigin);
       if (url.pathname === '/handoff') return await handleHandoff(env, app, body, okOrigin);
+      if (url.pathname === '/personal-devices') {
+        const auth = await resolveAuth(env, app, body.auth);
+        return await handlePersonalDevices(env, app, body, okOrigin, auth, json, sha256Hex);
+      }
       if (url.pathname === '/admin-handoff') return await handleAdminHandoff(env, app, body, okOrigin);
       if (url.pathname === '/admin-account') return await handleAdminAccount(env, app, body, okOrigin);
       if (url.pathname === '/admin-login') return await handleAdminLogin(env, app, body, okOrigin);
@@ -3305,6 +3319,11 @@ export default {
         const auth = await resolveAuth(env, app, body.auth);
         if (!auth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
         return await handleRoster(env, app, body, okOrigin, auth, json);
+      }
+      if (url.pathname === '/operations-read') {
+        const auth = await resolveAuth(env, app, body.auth);
+        if (!auth) return json({ok:false,error:'인증 실패'},401,okOrigin);
+        return await handleOperationsRead(env, app, body, okOrigin, auth, json);
       }
       if (url.pathname === '/student-change') {
         const auth = await resolveAuth(env, app, body.auth);

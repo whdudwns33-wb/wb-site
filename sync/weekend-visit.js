@@ -296,7 +296,7 @@ async function appendUpdate(env, app, current, values, eventType, reason, auth, 
 async function listVisits(env, app, body, auth, json, origin) {
   const visitDate = String(body.visitDate || '');
   if (!validDate(visitDate)) return json({ ok: false, error: '조회할 날짜를 확인해 주세요' }, 422, origin);
-  let staffId = auth.scope === 'own' ? String(auth.id || '') : String(body.staffId || '');
+  let staffId = auth.scope === 'own' && !auth.operationsRead ? String(auth.id || '') : String(body.staffId || '');
   if (staffId && !SAFE_ID.test(staffId)) return json({ ok: false, error: '담당자 정보를 확인해 주세요' }, 422, origin);
   const result = await env.DB.prepare(
     "SELECT * FROM weekend_actual_visits WHERE app=? AND visit_date=? AND status<>'cancelled' " +

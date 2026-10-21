@@ -19,7 +19,8 @@ test('only the task environment allowlist elevates personal auth', () => {
   assert.match(worker, /\.flatMap\(value => String\(value \|\| ''\)\.split\(','\)\)/);
   assert.match(worker, /app === 'task' && taskManagerIds\(env\)\.has\(id\)/);
   assert.match(worker, /return \{ scope: 'all', id: id, role: 'manager' \}/);
-  assert.match(worker, /return \{ scope: 'own', id: id \};/);
+  assert.match(worker, /const ownAuth = \{ scope: 'own', id: id \};/);
+  assert.match(worker, /return ownAuth;/);
   assert.doesNotMatch(worker, /staff\.manager\s*===\s*true/);
   assert.doesNotMatch(worker, /app === 'consult'[^\n]*scope: 'all'/);
 });

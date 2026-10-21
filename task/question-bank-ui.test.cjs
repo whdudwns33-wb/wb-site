@@ -9,7 +9,7 @@ function tabs(session, driver = false, gated = false) {
   const source = html.slice(html.indexOf('function renderTabs()'), html.indexOf('/* ── 링크로 들어온 지시서 확인'));
   Function('session', 'alertsToday', 'shouldGatePersonAccess', 'shouldGateStaffWork', 'isDriverFacilityStaff',
     'managerRequestInboxCount', 'onboardingAttentionCount', 'makeupAttentionCount', 'sessionPackAttentionCount',
-    'deviceAlertCount', '$', 'route', source + ';renderTabs();')(
+    'deviceAlertCount', '$', 'route', 'const canReadOperations=()=>false;' + source + ';renderTabs();')(
     session, () => ({ total: 0 }), () => gated, () => false, () => driver,
     () => 0, () => 0, () => 0, () => 0, () => 0, () => element, 'question_bank');
   return [...element.innerHTML.matchAll(/data-go="([^"]+)"/g)].map(match => match[1]);
