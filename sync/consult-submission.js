@@ -454,7 +454,7 @@ async function changeStatus(env, body, origin, auth, json, action) {
   if (action === 'cancel') {
     if (auth.scope !== 'own' || row.owner !== auth.id) throw new PublicError(403, '학생 본인의 제출만 취소할 수 있습니다');
   } else {
-    if (auth.scope !== 'all') throw new PublicError(403, '원장만 검토할 수 있습니다');
+    if (auth.scope !== 'all' && auth.role !== 'manager') throw new PublicError(403, '원장 또는 관리 선생님만 검토할 수 있습니다');
     if (action === 'approve' && row.kind !== 'proof') throw new PublicError(409, '인증사진만 승인할 수 있습니다');
     if (action === 'answer' && row.kind !== 'question') throw new PublicError(409, '질문에만 답변할 수 있습니다');
   }

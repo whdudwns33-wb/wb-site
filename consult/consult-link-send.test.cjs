@@ -201,7 +201,7 @@ test('새 학생 링크는 fragment 1회코드를 교환하고 기존 query 토�
   assert.match(connect, /await sync\.run\(true\)/);
   assert.match(connect, /route = 'today'/);
   assert.doesNotMatch(connect, /go\('guide'\)|pendingStudentWelcome/);
-  assert.match(html, /async run\(duringStudentConnect\)[\s\S]*?studentConnectBusy && !duringStudentConnect/);
+  assert.match(html, /async run\(duringStudentConnect, duringAdminConnect\)[\s\S]*?studentConnectBusy && !duringStudentConnect/);
   assert.match(html, /if \(pendingStudentCode\) \{\s*connectStudentLink\(\);\s*\} else if \(sync\.enabled\(\) && !studentConnectError\)/);
   const render = between('function render() {', '\nfunction renderTabs()');
   assert.match(render, /if \(pendingStudentCode \|\| \(session\.isStaffLink/,

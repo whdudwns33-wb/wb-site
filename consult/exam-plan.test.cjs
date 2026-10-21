@@ -236,6 +236,7 @@ test('confirmation replaces only future incomplete generated tasks and keeps nor
     function isDone(id) { return id === 'done'; }
     function uid() { return 'new-' + (++serial); }
     function now() { return 123456; }
+    function actor() { return 'admin'; }
     function save() { saves++; }
     function queueSync() { syncs++; }
     ${replaceable}

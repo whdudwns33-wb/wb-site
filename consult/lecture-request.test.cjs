@@ -68,7 +68,8 @@ function harness({ tasks = [], role = 'student', selected = 'student-a' } = {}) 
     staff: [{ id: 'student-a', name: '가학생' }, { id: 'student-b', name: '나학생' }],
     tasks: structuredClone(tasks), checks: {}, settings: {}
   };
-  const session = { isAdmin: role === 'admin', isStaffLink: role !== 'admin', staffId: 'student-a' };
+  const session = { isAdmin: role === 'admin', isDirector: role === 'admin',
+    isManagerAccount: role === 'manager-account', isStaffLink: role !== 'admin', staffId: 'student-a' };
   const effects = { saved: 0, synced: 0, rendered: 0, closed: 0, toasts: [], modals: [] };
   const names = [...html.matchAll(/function ((?:lecture\w+|isLectureRequestTask|buildLectureRequestSummary|setLectureResponse))\(/g)].map(match => match[1]);
   const constants = [...html.matchAll(/const LECTURE_[A-Z_]+\s*=\s*[\s\S]*?;/g)].map(match => match[0]).join('\n');
@@ -88,6 +89,7 @@ function harness({ tasks = [], role = 'student', selected = 'student-a' } = {}) 
     const today = () => TODAY;
     const now = () => ++counter;
     const uid = () => 'generated-' + (++counter);
+    const actor = () => role === 'manager-account' ? 'manager' : 'admin';
     const isManager = () => role === 'manager';
     const staffById = id => state.staff.find(staff => staff.id === id);
     const currentStaff = () => staffById(selected);

@@ -169,15 +169,15 @@ test('a same-day Leaders Eye result becomes the recurring schedule without losin
   const run = Function(
     'session', 'currentStaff', 'el', 'CHECKLIST_ONLINE_SOURCE_DEFAULTS', 'LEARNING_SOURCES', '$', 'document',
     'learningChecklistScheduleFor', 'learningChecklistPatternLocked', 'today', 'occursOn', 'dailyLearningRecordTask', 'uid', 'now', 'state',
-    'LEARNING_DAILY_LOG_KIND', 'getCheck', 'save', 'queueSync', 'closeModal', 'render', 'toast',
-    `return function () { switch ('learningchecklistsave') { ${handler} } };`
+    'LEARNING_DAILY_LOG_KIND', 'getCheck', 'canEditTask', 'save', 'queueSync', 'closeModal', 'render', 'toast',
+    `const actor = () => 'admin'; return function () { switch ('learningchecklistsave') { ${handler} } };`
   )(
     { isAdmin: true }, () => ({ id: 'student-a', name: '학생' }), { dataset: { source: 'leaders_eye' } },
     { leaders_eye: { title: '리더스아이 오늘 학습', subject: 'english', minutes: 20 } },
     { leaders_eye: { label: '리더스아이', detail: '오늘 학습', guide: '', steps: ['학습하기'] } },
     selector => ({ value: values[selector] || '' }), { querySelectorAll: () => [] }, () => null, () => false, () => date,
     () => true, () => log, () => 'new-id', () => 1234, state, 'learning_daily_log',
-    (taskId, day) => state.checks[taskId + '|' + day] || null, () => true,
+    (taskId, day) => state.checks[taskId + '|' + day] || null, () => true, () => true,
     () => {}, () => {}, () => {}, () => {}
   );
 
@@ -326,7 +326,7 @@ test('learning tasks stay student-scoped and only the director can send them', (
   assert.match(save, /state\.tasks\.push\(/);
   assert.match(save, /staffId: me\.id/);
   assert.match(save, /source: sourceKey/);
-  assert.match(save, /origin: 'admin'/);
+  assert.match(save, /origin: actor\(\)/);
   assert.match(save, /repeat: 'once'/);
   assert.match(save, /studySubject: subjectKey/);
   assert.match(save, /dueDate: due/);

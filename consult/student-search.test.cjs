@@ -88,7 +88,7 @@ test('typing filters existing cards immediately and exposes a no-result state', 
 
 test('search input and clear action stay director-only and do not disturb form state', () => {
   const input = between("document.addEventListener('input', ev => {", "document.addEventListener('change', ev => {");
-  const change = between("document.addEventListener('change', ev => {\n  if (ev.target.id === 'staffSearch')", '/* 모달 키보드 이동');
+  const change = between("document.addEventListener('change', ev => {\n  if (authSwitchBusy) { ev.preventDefault(); ev.stopImmediatePropagation(); return; }\n  if (ev.target.id === 'staffSearch')", '/* 모달 키보드 이동');
   const clear = between("case 'staffsearchclear':", "case 'linkcontactsretry':");
   assert.match(input, /ev\.target\.id === 'staffSearch'/);
   assert.match(input, /applyStaffSearchFilter\(ev\.target\.value\); return/);
