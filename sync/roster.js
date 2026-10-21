@@ -263,6 +263,7 @@ function studentParentIdentityKey(value) {
 }
 
 function comparableStudentChangeField(student, key) {
+  if (key === 'sessionInitialCycleSize') return Number(student && student.sessionInitialCycleSize) === 12 ? 12 : 4;
   const row = student || {};
   if (key === 'billingMode') return String(row.billingMode || 'monthly') === 'session4' ? 'session4' : 'monthly';
   if (key === 'sessionCycleStartDate') {
@@ -342,7 +343,7 @@ function rosterStudent(value, index) {
     ['id', 'name', 'grade', 'subject', 'start', 'end', 'reason'],
     ['memo', 'entryType', 'school', 'phoneSelf', 'phoneFather', 'phoneMother',
       'registrationDate', 'firstClassDate', 'subjects', 'teacher', 'teacherIds',
-      'billingMode', 'sessionCycleStartDate', 'sessionBillingSubject', 'subscriptions'], path);
+      'billingMode', 'sessionCycleStartDate', 'sessionBillingSubject', 'sessionInitialCycleSize', 'subscriptions'], path);
   const start = month(value.start, path + '.start', false);
   const end = month(value.end, path + '.end', true);
   if (end && end < start) fail(path + '.end', '시작월보다 빠를 수 없습니다');
@@ -398,6 +399,10 @@ function rosterStudent(value, index) {
     const scope = String(value.sessionBillingSubject || '');
     if (scope && !ROSTER_SUBJECTS.has(scope)) fail(path + '.sessionBillingSubject', '등록된 과목을 선택해 주세요');
     result.sessionBillingSubject = result.billingMode === 'session4' ? scope : '';
+  }
+  if (Object.prototype.hasOwnProperty.call(value, 'sessionInitialCycleSize')) {
+    if (![4, 12].includes(value.sessionInitialCycleSize)) fail(path + '.sessionInitialCycleSize', '4 또는 12를 선택해 주세요');
+    result.sessionInitialCycleSize = value.sessionInitialCycleSize;
   }
   return result;
 }
@@ -1050,7 +1055,7 @@ export async function handleRoster(env, app, body, origin, auth, json) {
         const storedStudent = document.roster.students.find(item => item.id === inputId);
         if (storedStudent) {
           input = { ...input };
-          for (const key of ['billingMode', 'sessionCycleStartDate', 'sessionBillingSubject', 'subscriptions']) {
+          for (const key of ['billingMode', 'sessionCycleStartDate', 'sessionBillingSubject', 'sessionInitialCycleSize', 'subscriptions']) {
             if (!Object.prototype.hasOwnProperty.call(input, key) && Object.prototype.hasOwnProperty.call(storedStudent, key)) {
               input[key] = storedStudent[key];
             }
@@ -1140,7 +1145,7 @@ export async function handleRoster(env, app, body, origin, auth, json) {
     if (action === 'student_update' && previousStudent) {
       const fields = ['name', 'school', 'grade', 'phoneSelf', 'phoneFather', 'phoneMother',
         'registrationDate', 'firstClassDate', 'subject', 'subjects', 'start', 'end', 'reason', 'memo',
-        'billingMode', 'sessionCycleStartDate', 'sessionBillingSubject', 'subscriptions'];
+        'billingMode', 'sessionCycleStartDate', 'sessionBillingSubject', 'sessionInitialCycleSize', 'subscriptions'];
       const changedFields = changedStudentFields(previousStudent, nextStudent, fields);
       if (changedFields.length) {
         const eventId = await studentChangeEventId('roster\n' + nextStudent.id + '\n' + expectedUpdatedAt + '\n' + updatedAt);

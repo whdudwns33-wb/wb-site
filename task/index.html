@@ -1335,8 +1335,8 @@
   .self-identity-dialog dd { margin: 4px 0 14px; overflow-wrap: anywhere; }
   .self-identity-dialog h2 { font-size: 20px; }
 </style>
-<link rel="stylesheet" href="readability.css?v=2026-10-21.1">
-<script src="roster-search-core.js?v=2026-10-21.1"></script>
+<link rel="stylesheet" href="readability.css?v=2026-10-21.2">
+<script src="roster-search-core.js?v=2026-10-21.2"></script>
 <script src="tab-scroll.js" defer></script>
 </head>
 <body>
@@ -1402,19 +1402,19 @@
   </section>
 </div>
 
-<script src="./lesson-form-core.js?v=2026-10-21.1"></script>
-<script src="./task-push-client.js?v=2026-10-21.1"></script>
-<script src="./schedule-board-core.js?v=2026-10-21.1"></script>
-<script src="./asset-core.js?v=2026-10-21.1"></script>
-<script src="./qr-core.js?v=2026-10-21.1"></script>
-<script src="./acaflow-import-core.js?v=2026-10-21.1"></script>
-<script src="./feedback-subject-catalog.js?v=2026-10-21.1"></script>
-<script src="./sync-recovery-core.js?v=2026-10-21.1"></script>
-<script src="./staff-work-session-core.js?v=2026-10-21.1"></script>
-<script src="./private-chat.js?v=2026-10-21.1"></script>
-<script src="./self-identity.js?v=2026-10-21.1"></script>
-<script src="./staff-attendance-history-core.js?v=2026-10-21.1"></script>
-<script src="./makeup-recovery-core.js?v=2026-10-21.1"></script>
+<script src="./lesson-form-core.js?v=2026-10-21.2"></script>
+<script src="./task-push-client.js?v=2026-10-21.2"></script>
+<script src="./schedule-board-core.js?v=2026-10-21.2"></script>
+<script src="./asset-core.js?v=2026-10-21.2"></script>
+<script src="./qr-core.js?v=2026-10-21.2"></script>
+<script src="./acaflow-import-core.js?v=2026-10-21.2"></script>
+<script src="./feedback-subject-catalog.js?v=2026-10-21.2"></script>
+<script src="./sync-recovery-core.js?v=2026-10-21.2"></script>
+<script src="./staff-work-session-core.js?v=2026-10-21.2"></script>
+<script src="./private-chat.js?v=2026-10-21.2"></script>
+<script src="./self-identity.js?v=2026-10-21.2"></script>
+<script src="./staff-attendance-history-core.js?v=2026-10-21.2"></script>
+<script src="./makeup-recovery-core.js?v=2026-10-21.2"></script>
 <script>
 "use strict";
 
@@ -11425,7 +11425,7 @@ function sessionModeBadgeDescriptor(task, referenceDate) {
       const size = Number(summary.cycleSize) || 4;
       const count = Math.max(0, Math.min(size, Number(summary.attendanceCount) || 0));
       return { text: '회차제 · ' + count + '/' + size + '회', cls: 'is-session',
-        title: '학생 단위 4회제 · 출석·지각·조퇴 합산' };
+        title: '학생 단위 회차제 · 출석·지각·조퇴 합산' };
     }
     if (session4LedgerLoading) return { text: '회차제 · 회차 확인 중', cls: 'is-session' };
     if (session4LedgerError) return { text: '회차제 · 회차 확인 필요', cls: 'is-session is-error' };
@@ -11710,6 +11710,7 @@ function session4LedgerCycles(summary) {
   const raw = Array.isArray(summary && summary.cycles) ? summary.cycles
     : Array.isArray(summary && summary.history) ? summary.history : [];
   if (raw.length) return raw.map(cycle => ({
+    cycleSize: Number(cycle.cycleSize) || 4,
     startDate: String(cycle.startDate || cycle.cycleStartDate || ''),
     endDate: String(cycle.endDate || cycle.completedDate || cycle.completedAt || ''),
     attendanceCount: Math.max(0, Number(cycle.attendanceCount != null ? cycle.attendanceCount : cycle.count) || 0),
@@ -11735,7 +11736,7 @@ function session4LedgerHistoryHtml(summary) {
   if (!past.length) return '';
   return '<details class="session4-ledger-history" data-persist-key="session4-history|' + esc(summary.studentId) + '"><summary>완료된 지난 회차 ' +
     past.length + '개 보기</summary>' + past.map(cycle => '<div class="session4-ledger-cycle"><b>' + esc(cycle.startDate || '시작일 확인 필요') +
-      (cycle.endDate ? ' ~ ' + esc(cycle.endDate) : '') + '</b><div class="small muted">4회 중 ' + Math.min(4, Math.max(0, cycle.attendanceCount)) +
+      (cycle.endDate ? ' ~ ' + esc(cycle.endDate) : '') + '</b><div class="small muted">' + (cycle.cycleSize || 4) + '회 중 ' + Math.min(cycle.cycleSize || 4, Math.max(0, cycle.attendanceCount)) +
       '회 출석</div>' + session4LedgerAttendanceHtml(cycle.attendance) + '</div>').join('') + '</details>';
 }
 
@@ -11755,7 +11756,7 @@ function session4LedgerCardHtml(student) {
   const currentAttendance = currentCycle ? currentCycle.attendance : (summary.attendance || []).filter(row => !currentStart || String(row.date || '') >= currentStart);
   return '<article class="card session4-ledger-card" data-session4-student="' + esc(student.id) + '"><div class="between"><div><div class="card-title">' +
     esc(student.name || '학생') + '</div><div class="card-sub">' + esc(studentSchoolGradeDetailLabel(student) || '학교·학년 미지정') +
-    '</div></div><span class="pill ' + (count >= size ? 'ok' : count >= 3 ? 'warn' : '') + '">' + count + '/' + size + '회</span></div>' +
+    '</div></div><span class="pill ' + (count >= size ? 'ok' : count >= size - 1 ? 'warn' : '') + '">' + count + '/' + size + '회</span></div>' +
     '<div class="session4-ledger-balance"><span><b>' + esc(currentStart || '미지정') + '</b>현재 회차 시작일</span><span><b>' + count + '회</b>현재 ' +
     size + '회 중 출석</span></div>' + session4LedgerAttendanceHtml(currentAttendance) + session4LedgerHistoryHtml(summary) + '</article>';
 }
@@ -14247,7 +14248,7 @@ function managerRequestInboxRows() {
   tuitionInboxRows.forEach(row => {
     rows.push({
       kind: '수강료 생성필요', title: row.studentLabel,
-      detail: '회차제 ' + row.attendanceCount + '/4회 · 23:50 출결 확정', requester: '자동 알림',
+      detail: '회차제 ' + row.attendanceCount + '/' + (row.cycleSize || 4) + '회 · 23:50 출결 확정', requester: '자동 알림',
       route: '', updatedAt: row.createdAt, priority: -5, tuitionAlertId: row.alertId
     });
   });
@@ -19436,6 +19437,7 @@ function normalizeTuitionAlert(row) {
   return {
     alertId: alertId, studentId: String(row.studentId || ''), studentLabel: studentLabel,
     cycleStartDate: String(row.cycleStartDate || ''), attendanceCount: Number(row.attendanceCount) || 3,
+    cycleSize: Number(row.cycleSize) === 12 ? 12 : 4,
     triggerDate: String(row.triggerDate || ''), createdAt: Number(row.createdAt) || 0
   };
 }
@@ -19474,8 +19476,8 @@ async function loadTuitionAlerts(force, allowPopup) {
 function tuitionAlertCardHtml(row, popup) {
   return '<div class="admin-directive-card is-important"><div class="between"><b>' + esc(row.studentLabel) +
     '</b><span class="tag high">수강료 생성필요</span></div>' +
-    '<div class="admin-directive-body">회차제 출석이 ' + esc(String(row.attendanceCount)) + '/4회 확정되었습니다.</div>' +
-    '<div class="small muted mt8">회차 시작일 ' + esc(row.cycleStartDate) + ' · 3회째 확정일 ' + esc(row.triggerDate) + '</div>' +
+    '<div class="admin-directive-body">회차제 출석이 ' + esc(String(row.attendanceCount)) + '/' + (row.cycleSize || 4) + '회 확정되었습니다.</div>' +
+    '<div class="small muted mt8">회차 시작일 ' + esc(row.cycleStartDate) + ' · ' + esc(String(row.attendanceCount)) + '회째 확정일 ' + esc(row.triggerDate) + '</div>' +
     (!popup ? '<button class="btn btn-sm btn-primary mt8" data-act="tuitionAlertConfirm" data-alert="' + esc(row.alertId) + '">확인</button>' : '') + '</div>';
 }
 
@@ -19483,7 +19485,7 @@ function tuitionAlertManagerHtml() {
   if (!session.isAdmin) return '';
   if (!tuitionAlertsLoaded && !tuitionAlertsLoading) setTimeout(() => loadTuitionAlerts(false, false), 0);
   return '<details class="card admin-collapsible"><summary><span><b>💳 수강료 생성필요</b>' +
-    '<span class="card-sub">회차제는 매일 23:50에 출결을 확정하며 3회 완료 시 알립니다.</span></span>' +
+    '<span class="card-sub">매일 23:50 출결 확정 · 마지막 1회가 남으면 안내합니다(4회제 3회, 첫 12회 선납 11회).</span></span>' +
     '<span class="pill ' + (tuitionAlertRows.length ? 'warn' : '') + '">' + tuitionAlertRows.length + '건</span></summary>' +
     '<div class="admin-collapsible-body">' +
     (tuitionAlertsError ? '<div class="hint mb14" role="alert">' + esc(tuitionAlertsError) + '</div>' : '') +
@@ -19497,7 +19499,7 @@ function showPendingTuitionAlertPopup() {
   const shownKey = 'wb_tuition_alert_popup_' + String(teacherLiveRequestViewerAdminId || session.staffId || 'director') + '_' + row.alertId;
   if (sessionStorage.getItem(shownKey)) return;
   sessionStorage.setItem(shownKey, '1');
-  modal('수강료 생성필요', '<div class="hint mb14">' + esc(row.studentLabel) + ' 학생의 회차제 출석이 3회 확정되었습니다.</div>' +
+  modal('수강료 생성필요', '<div class="hint mb14">' + esc(row.studentLabel) + ' 학생의 회차제 출석이 ' + esc(String(row.attendanceCount)) + '회 확정되었습니다.</div>' +
     tuitionAlertCardHtml(row, true), '<button class="btn btn-primary btn-block mt14" data-act="tuitionAlertConfirm" data-alert="' +
     esc(row.alertId) + '">확인</button>');
 }
@@ -20276,7 +20278,8 @@ function rosterStudentInfoHtml(student, lessonReferences, taskId) {
   const field = (label, value, wide, keys) => '<div class="student-info-field' + (wide ? ' wide' : '') + '"><b>' +
     esc(label) + ((keys || []).some(key => changed.has(key)) ? marker(label) : '') + '</b><span>' + esc(value || '미지정') + '</span></div>';
   const period = (student.start || '시작월 미지정') + ' ~ ' + (student.end || '현재');
-  const billingMode = String(student.billingMode || 'monthly') === 'session4' ? '회차제 · 4회' : '월결제';
+  const billingMode = String(student.billingMode || 'monthly') === 'session4'
+    ? (Number(student.sessionInitialCycleSize) === 12 ? '회차제 · 첫 12회 / 이후 4회' : '회차제 · 4회') : '월결제';
   const references = Array.isArray(lessonReferences) ? lessonReferences : [];
   return '<div class="between mb14"><div><div class="card-title">' + esc(staffStudentCompactLabel(student)) +
     (changed.has('name') ? marker('이름') : '') + '</div>' +
@@ -20445,7 +20448,8 @@ function rosterStudentEditorHtml(student, assignment) {
     '<label class="field" data-rse-cycle-start-wrap' + (billingMode === 'session4' ? '' : ' hidden') + '><span class="fl">회차 시작일 · 나중에 입력 가능</span>' +
       '<input class="in" type="date" data-rse-session-cycle-start' +
       ' value="' + esc(student.sessionCycleStartDate || '') + '"></label></div>' +
-    '<div class="small muted mb14">회차 대상: ' + esc(student.sessionBillingSubject || '전체 과목') + ' · 시작일 미입력 시 회차 계산과 수강료 안내는 대기합니다. 시작일부터 출석·지각·조퇴를 합산하고, 3회 확정 시 관리자에게 수강료 생성 알림을 보냅니다.</div>' +
+    '<label class="field" data-rse-cycle-size-wrap' + (billingMode === 'session4' ? '' : ' hidden') + '><span class="fl">첫 결제 회차</span><select class="in" data-rse-initial-cycle-size><option value="4"' + (Number(student.sessionInitialCycleSize) !== 12 ? ' selected' : '') + '>4회</option><option value="12"' + (Number(student.sessionInitialCycleSize) === 12 ? ' selected' : '') + '>첫 12회 선납 · 이후 4회</option></select></label>' +
+    '<div class="small muted mb14">회차 대상: ' + esc(student.sessionBillingSubject || '전체 과목') + ' · 시작일 미입력 시 회차 계산과 수강료 안내는 대기합니다. 출석·지각·조퇴를 합산하며 마지막 1회가 남으면 수강료 안내가 생성됩니다. 첫 12회 선납이면 11회, 이후에는 3회 확정 시 안내합니다. 결제 사실을 자동 등록하지 않습니다.</div>' +
     (isNew ? '' : '<label class="field"><span class="fl">명단 기준 시작월</span><input class="in" type="month" data-rse-start value="' + esc(student.start || today().slice(0, 7)) + '"></label>' +
     '<input type="hidden" data-rse-end value="' + esc(student.end || '') + '"><input type="hidden" data-rse-reason value="' + esc(student.reason || '') + '">' +
     (student._editing ? '<div class="hint mb14">현재 상태: <b>' + esc(transition ? transition.label + ' · ' + transition.effectiveDate : '재원') +
@@ -20464,6 +20468,8 @@ function updateRosterBillingFields(selectElement) {
   const wrap = input && input.closest('[data-rse-cycle-start-wrap], [data-roster-cycle-start-wrap]');
   const sessionMode = select.value === 'session4';
   if (wrap) wrap.hidden = !sessionMode;
+  const sizeWrap = root.querySelector('[data-rse-cycle-size-wrap]');
+  if (sizeWrap) sizeWrap.hidden = !sessionMode;
   if (input) {
     input.required = false;
     input.setAttribute('aria-required', 'false');
@@ -20647,6 +20653,7 @@ async function saveRosterStudent(button) {
     start: isNew ? (registrationDate.slice(0, 7) || today().slice(0, 7)) : value('[data-rse-start]'),
     end: isNew ? '' : value('[data-rse-end]'), reason: isNew ? '' : value('[data-rse-reason]'),
     memo: value('[data-rse-memo]'), billingMode: billingMode, sessionCycleStartDate: sessionCycleStartDate,
+    sessionInitialCycleSize: Number(value('[data-rse-initial-cycle-size]')) || 4,
     subscriptions: subscriptions
   };
   if (editor.student.entryType) student.entryType = editor.student.entryType;
@@ -26251,7 +26258,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-10-21.1';
+const APP_VER = '2026-10-21.2';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
