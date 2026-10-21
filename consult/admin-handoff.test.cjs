@@ -31,7 +31,7 @@ test('new admin device exchanges the code once and stores only its device token'
   const connect = html.match(/async function connectAdminDevice\(\)[\s\S]*?\n}/)?.[0] || '';
   assert.ok(connect.indexOf('if (!save())') < connect.indexOf('await sync.exchangeAdmin(code)'),
     '패드가 저장할 수 있는지 확인한 뒤에만 1회 코드를 소비한다');
-  assert.match(connect, /await prepareAuthSwitch\(true\)/);
+  assert.match(connect, /await runAuthSwitch\(async \(\) => \{[\s\S]*await prepareAuthSwitch\(true\)/);
   assert.match(connect, /exchangeAdmin\(code\)/);
   assert.match(connect, /resetAdminDeviceCache\(d\.token\)/);
   assert.match(connect, /session\.unlock\(\)/);

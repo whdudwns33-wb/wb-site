@@ -2049,19 +2049,36 @@ async function handleSync(env, app, body, origin) {
   for (const t of ['staff', 'tasks', 'checks']) {
     const idCol = t === 'checks' ? 'k' : 'id';
     const managerReadGuard = consultManagerCheckReadGuard(app, auth, t, idCol);
+    const scopeSql = managerReadGuard.sql + (auth.scope === 'own' ? ' AND owner=?' : '');
     const sql = 'SELECT ' + idCol + ' AS key, owner, data, updated_at, srv_at FROM ' + t +
-      ' WHERE app=? AND srv_at > ?' + managerReadGuard.sql +
-      (auth.scope === 'own' ? ' AND owner=?' : '') +
-      ' ORDER BY srv_at LIMIT ' + (MAX_PULL + 1);
+      ' WHERE app=? AND srv_at > ?' + scopeSql +
+      ' ORDER BY srv_at,' + idCol + ' LIMIT ' + (MAX_PULL + 1);
     const args = [app, since, ...managerReadGuard.args];
     if (auth.scope === 'own') args.push(auth.id);
     const st = env.DB.prepare(sql).bind(...args);
     const res = await st.all();
-    const rows = (res.results || []);
+    let rows = (res.results || []);
     if (rows.length > MAX_PULL) {
       more = true;
-      rows.length = MAX_PULL;
-      pageCursors.push(Number(rows[rows.length - 1].srv_at));
+      const boundaryAt = Number(rows[MAX_PULL].srv_at);
+      const completeTimestampRows = rows.slice(0, MAX_PULL)
+        .filter(row => Number(row.srv_at) < boundaryAt);
+      if (completeTimestampRows.length) {
+        // 숫자 since 커서가 같은 srv_at 묶음의 중간을 가리키면 다음 페이지에서 나머지가 빠진다.
+        // 경계 시각 묶음을 통째로 다음 페이지로 넘겨 항상 완전한 시각까지만 확정한다.
+        rows = completeTimestampRows;
+        pageCursors.push(Number(rows[rows.length - 1].srv_at));
+      } else {
+        // 한 시각 묶음 자체가 MAX_PULL보다 큰 드문 경우에는 응답 상한보다 정확성을 우선한다.
+        // 이 묶음을 한 번에 모두 내려야 숫자 since 커서도 안전하게 전진할 수 있다.
+        const boundarySql = 'SELECT ' + idCol + ' AS key, owner, data, updated_at, srv_at FROM ' + t +
+          ' WHERE app=? AND srv_at=?' + scopeSql + ' ORDER BY ' + idCol;
+        const boundaryArgs = [app, boundaryAt, ...managerReadGuard.args];
+        if (auth.scope === 'own') boundaryArgs.push(auth.id);
+        const boundaryResult = await env.DB.prepare(boundarySql).bind(...boundaryArgs).all();
+        rows = boundaryResult.results || [];
+        pageCursors.push(boundaryAt);
+      }
     }
     for (const r of rows) {
       if (forcedKeys.has(t + '\n' + String(r.key))) continue;

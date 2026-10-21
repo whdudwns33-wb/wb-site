@@ -10,7 +10,7 @@ test('consult admin account recovery verifies the consult sync secret', () => {
   assert.match(html, /data-act="recoverpin"/);
 
   const recovery = html.match(/case 'recoverpinsave':[\s\S]*?\n\s*break;/)?.[0] || '';
-  assert.match(recovery, /prepareAuthSwitch\(\)/);
+  assert.match(recovery, /runAuthSwitch\(async \(\) => \{[\s\S]*prepareAuthSwitch\(\)/);
   assert.match(recovery, /saveAdminAccount\(loginId, pin/);
   assert.match(recovery, /\{ mode: 'admin', secret: secret \}/);
   assert.match(recovery, /resetAdminDeviceCache\(d\.token\)/);

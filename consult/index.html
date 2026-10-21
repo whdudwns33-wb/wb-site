@@ -2193,6 +2193,9 @@ function unb64(s) { return decodeURIComponent(escape(atob(String(s).replace(/-/g
 let pendingAdd = null;   // 링크로 들어온 지시서 — 확인 후 등록
 let pendingAdminCode = ''; // 새 원장 기기에서 한 번만 교환할 연결 코드
 let adminConnectBusy = false;
+let authSwitchBusy = false;
+let inputTimer = null;
+const AUTH_SWITCH_BUSY_MESSAGE = '관리자 계정을 전환하고 있습니다. 잠시만 기다려 주세요';
 let pendingStudentCode = ''; // 학생 링크의 1회용 교환 코드는 저장하지 않고 URL에만 둔다
 let studentConnectBusy = false;
 let studentConnectError = '';
@@ -2357,6 +2360,18 @@ async function prepareAuthSwitch(duringAdminConnect) {
   }
 }
 
+async function runAuthSwitch(work) {
+  if (authSwitchBusy) throw new Error(AUTH_SWITCH_BUSY_MESSAGE);
+  authSwitchBusy = true;
+  clearTimeout(inputTimer);
+  inputTimer = null;
+  try {
+    return await work();
+  } finally {
+    authSwitchBusy = false;
+  }
+}
+
 /** 마감 완료는 서버 정본에 반영된 뒤에만 성공으로 처리한다. */
 async function saveStudentCloseout(taskId, date, nextClose, previousClose, label) {
   clearTimeout(sync.timer);
@@ -2512,35 +2527,37 @@ async function connectAdminDevice() {
   adminConnectBusy = true;
   toast('관리자 기기 연결 중…');
   try {
-    const replacingStudentCache = !!state.settings.myToken;
-    if (replacingStudentCache) {
-      clearTimeout(sync.timer);
-      sync.timer = null;
-      if (sync.busy && !(await waitForSyncIdle(20000))) {
-        throw new Error('기존 동기화가 끝난 뒤 다시 연결해 주세요');
+    await runAuthSwitch(async () => {
+      const replacingStudentCache = !!state.settings.myToken;
+      if (replacingStudentCache) {
+        clearTimeout(sync.timer);
+        sync.timer = null;
+        if (sync.busy && !(await waitForSyncIdle(20000))) {
+          throw new Error('기존 동기화가 끝난 뒤 다시 연결해 주세요');
+        }
+        if (sync.collect(Number(state.settings.pushAt) || 0).length) {
+          toast('이 패드에 아직 전송되지 않은 학생 기록이 있습니다. 기존 학생 링크에서 동기화한 뒤 같은 QR을 다시 스캔해 주세요.');
+          return;
+        }
+        // 과거 버전에서 함께 남았을 수 있는 관리자 자격이 학생 캐시를 전송하지 못하게 먼저 격리한다.
+        state.settings.adminToken = '';
+        state.settings.managerToken = '';
+        state.settings.syncSecret = '';
+        session.lock();
       }
-      if (sync.collect(Number(state.settings.pushAt) || 0).length) {
-        toast('이 패드에 아직 전송되지 않은 학생 기록이 있습니다. 기존 학생 링크에서 동기화한 뒤 같은 QR을 다시 스캔해 주세요.');
+      if (!save()) {
+        toast('이 브라우저에 관리자 연결 정보를 저장할 수 없습니다. Safari 또는 Chrome의 일반 탭에서 QR을 다시 열어 주세요.');
         return;
       }
-      // 과거 버전에서 함께 남았을 수 있는 관리자 자격이 학생 캐시를 전송하지 못하게 먼저 격리한다.
-      state.settings.adminToken = '';
-      state.settings.managerToken = '';
-      state.settings.syncSecret = '';
-      session.lock();
-    }
-    if (!save()) {
-      toast('이 브라우저에 관리자 연결 정보를 저장할 수 없습니다. Safari 또는 Chrome의 일반 탭에서 QR을 다시 열어 주세요.');
-      return;
-    }
-    await prepareAuthSwitch(true);
-    const d = await sync.exchangeAdmin(code);
-    pendingAdminCode = '';
-    if (!resetAdminDeviceCache(d.token)) { session.unlock(); render(); return; }
-    session.unlock(); render();
-    sync.loud = true;
-    await sync.run();
-    toast('관리자 기기 연결 완료');
+      await prepareAuthSwitch(true);
+      const d = await sync.exchangeAdmin(code);
+      pendingAdminCode = '';
+      if (!resetAdminDeviceCache(d.token)) { session.unlock(); render(); return; }
+      session.unlock(); render();
+      sync.loud = true;
+      await sync.run();
+      toast('관리자 기기 연결 완료');
+    });
   } catch (e) {
     const terminal = [400, 401, 403, 404, 409, 410, 422].includes(Number(e && e.status));
     if (terminal) pendingAdminCode = '';
@@ -11853,6 +11870,12 @@ const DIRECTOR_ONLY_ACTIONS = new Set([
 ]);
 
 document.addEventListener('click', async ev => {
+  if (authSwitchBusy) {
+    ev.preventDefault();
+    ev.stopImmediatePropagation();
+    toast(AUTH_SWITCH_BUSY_MESSAGE);
+    return;
+  }
   const goEl = ev.target.closest('[data-go]');
   if (goEl) { go(goEl.dataset.go); return; }
 
@@ -11938,7 +11961,9 @@ document.addEventListener('click', async ev => {
       const password = $('#pin').value || '';
       if (!loginId || !password) return toast('아이디와 비밀번호를 입력해 주세요');
       toast('로그인 중…');
-      prepareAuthSwitch().then(() => sync.loginAdmin(loginId, password)).then(async d => {
+      runAuthSwitch(async () => {
+        await prepareAuthSwitch();
+        const d = await sync.loginAdmin(loginId, password);
         if (d.authRole === 'manager') {
           if (!resetManagerDeviceCache(d)) return;
         } else {
@@ -11975,7 +12000,9 @@ document.addEventListener('click', async ev => {
       if (!secret) return toast('원장 비밀키를 입력해 주세요');
       if (!loginId) return toast('새 아이디를 입력해 주세요');
       if (pin.length < 8) return toast('새 비밀번호를 8자리 이상 입력해 주세요');
-      prepareAuthSwitch().then(() => sync.saveAdminAccount(loginId, pin, { mode: 'admin', secret: secret })).then(async d => {
+      runAuthSwitch(async () => {
+        await prepareAuthSwitch();
+        const d = await sync.saveAdminAccount(loginId, pin, { mode: 'admin', secret: secret });
         if (!resetAdminDeviceCache(d.token)) return;
         state.settings.adminLoginId = d.loginId;
         state.settings.adminPin = '';
@@ -11995,7 +12022,9 @@ document.addEventListener('click', async ev => {
       if (!loginId) return toast('아이디를 입력해 주세요');
       if (password.length < 8) return toast('비밀번호를 8자리 이상 입력해 주세요');
       toast('로그인 계정 저장 중…');
-      prepareAuthSwitch().then(() => sync.saveAdminAccount(loginId, password)).then(async d => {
+      runAuthSwitch(async () => {
+        await prepareAuthSwitch();
+        const d = await sync.saveAdminAccount(loginId, password);
         if (!resetAdminDeviceCache(d.token)) return;
         state.settings.adminLoginId = d.loginId;
         state.settings.adminPin = '';
@@ -15041,6 +15070,7 @@ document.addEventListener('click', async ev => {
 });
 
 document.addEventListener('change', ev => {
+  if (authSwitchBusy) { ev.preventDefault(); ev.stopImmediatePropagation(); return; }
   if (ev.target.id === 'staffSwitcher') {
     const student = staffById(ev.target.value);
     if (!student) return;
@@ -15070,8 +15100,8 @@ document.addEventListener('change', ev => {
 });
 
 /* 메모 · 수량 직접 입력 */
-let inputTimer = null;
 document.addEventListener('input', ev => {
+  if (authSwitchBusy) { ev.preventDefault(); ev.stopImmediatePropagation(); return; }
   if (ev.target.id === 'staffSearch') { applyStaffSearchFilter(ev.target.value); return; }
   if (ev.target.closest && ev.target.closest('#view') && ev.target.matches('input, textarea, select, [contenteditable="true"]')) {
     viewInputDirty = true;
@@ -15128,6 +15158,7 @@ document.addEventListener('input', ev => {
 });
 
 document.addEventListener('change', ev => {
+  if (authSwitchBusy) { ev.preventDefault(); ev.stopImmediatePropagation(); return; }
   if (ev.target.id === 'staffSearch') return;
   if (ev.target.id === 'staffSwitcher') return;
   if (ev.target.closest && ev.target.closest('#view') && ev.target.matches('input, textarea, select')) viewInputDirty = true;
@@ -15135,6 +15166,7 @@ document.addEventListener('change', ev => {
 
 /* 모달 키보드 이동 · 엔터 제출 */
 document.addEventListener('keydown', ev => {
+  if (authSwitchBusy) { ev.preventDefault(); ev.stopImmediatePropagation(); return; }
   const box = document.querySelector('#modalHost .modal-box');
   if (box) {
     if (ev.key === 'Escape') { ev.preventDefault(); closeModal(); return; }
