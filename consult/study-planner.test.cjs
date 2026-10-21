@@ -150,7 +150,7 @@ test('learning distribution replaces the legacy employee form with a focused stu
   assert.match(draft, /data-act="wedit"/);
   assert.match(draft, /data-act="wcopy"/);
   assert.match(publish, /estimatedMin: estimatedMin/);
-  assert.match(publish, /origin: session\.isStaffLink \? 'manager' : 'admin'/);
+  assert.match(publish, /origin: actor\(\)/);
   assert.match(publish, /requiresClaim: true/);
   assert.match(publish, /writePublishedResult\(published\)/);
   assert.match(permissions, /isManager\(\).*t\.origin === 'manager'/);
@@ -771,7 +771,7 @@ test('legacy admin-origin carry tasks are repaired without touching ordinary adm
 test('director-issued carried study stays read-only for the student after sync normalization', () => {
   const source = html.match(/function canEditTask\(t\) \{[\s\S]*?\n\}/)?.[0] || '';
   assert.ok(source, 'canEditTask function must exist');
-  const linkSession = { isStaffLink: true, isAdmin: false, staffId: 'student-a' };
+  const linkSession = { isStaffLink: true, isAdmin: false, isDirector: false, isManagerAccount: false, staffId: 'student-a' };
   const canEditTask = Function('isLectureRequestTask', 'isPointTransactionTask', 'STUDY_ROADMAP_AUTO', 'session', 'isManager',
     source + '\nreturn canEditTask;')(() => false, () => false, 'study-roadmap-v1',
     linkSession, () => false);
@@ -780,6 +780,7 @@ test('director-issued carried study stays read-only for the student after sync n
   assert.equal(canEditTask({ staffId: 'student-a', origin: 'staff', dailyCarryFrom: 'task-b|2026-09-09', carrySourceOrigin: 'staff' }), true);
   linkSession.isStaffLink = false;
   linkSession.isAdmin = true;
+  linkSession.isDirector = true;
   assert.equal(canEditTask({ staffId: 'student-a', origin: 'staff', dailyCarryFrom: 'task-a|2026-09-09', carrySourceOrigin: 'admin' }), true);
 });
 

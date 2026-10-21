@@ -42,6 +42,13 @@ class TestD1 {
         password_iterations INTEGER NOT NULL, failed_attempts INTEGER NOT NULL DEFAULT 0,
         locked_until INTEGER NOT NULL DEFAULT 0, updated_at INTEGER NOT NULL
       );
+      CREATE TABLE consult_manager_accounts (
+        account_id TEXT NOT NULL PRIMARY KEY, login_id TEXT NOT NULL UNIQUE COLLATE NOCASE,
+        display_name TEXT NOT NULL, password_salt TEXT NOT NULL, password_hash TEXT NOT NULL,
+        password_iterations INTEGER NOT NULL, failed_attempts INTEGER NOT NULL DEFAULT 0,
+        locked_until INTEGER NOT NULL DEFAULT 0, active INTEGER NOT NULL DEFAULT 1,
+        last_login_at INTEGER, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+      );
     `);
   }
   prepare(sql) { return new Statement(this.database, sql); }

@@ -177,6 +177,39 @@ test('exactly 2000 rows and empty snapshots finish without a false overflow', as
   assert.equal(full.body.recoveryPull.complete, true);
 });
 
+test('normal pull advances by the earliest truncated table boundary without cross-table omissions', async t => {
+  const db = new ReadOnlyD1(t);
+  const expectedTasks = new Set();
+  db.database.exec('BEGIN');
+  for (let index = 0; index < 2001; index += 1) {
+    const key = 'task-' + String(index).padStart(5, '0');
+    seedRow(db, 'tasks', key, 'teacher-a', index + 1);
+    expectedTasks.add(key);
+  }
+  seedRow(db, 'checks', 'later-check', 'teacher-a', 10000);
+  db.database.exec('COMMIT');
+
+  const receivedTasks = new Set();
+  let since = 0;
+  let pages = 0;
+  let sawLaterCheck = false;
+  while (pages++ < 3) {
+    const response = await sync(db, admin, { recoveryPull: undefined, since });
+    assert.equal(response.status, 200);
+    response.body.changes.forEach(row => {
+      if (row.table === 'tasks') receivedTasks.add(row.key);
+      if (row.table === 'checks' && row.key === 'later-check') sawLaterCheck = true;
+    });
+    if (!response.body.more) break;
+    assert.ok(response.body.now > since, 'pagination cursor must advance');
+    assert.ok(response.body.now < 10000, 'a later non-truncated table must not skip the task remainder');
+    since = response.body.now;
+  }
+  assert.ok(pages <= 3);
+  assert.equal(sawLaterCheck, true);
+  assert.deepEqual(receivedTasks, expectedTasks);
+});
+
 test('recovery rejects changes before the normal write validation and cannot alter server records', async t => {
   const db = new ReadOnlyD1(t);
   seedAuth(db, ['teacher-a']);

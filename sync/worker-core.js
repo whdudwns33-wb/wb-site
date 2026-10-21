@@ -18,7 +18,8 @@
  *   POST /handoff   { app, auth(person) }         → { ok, code }    본인 새 브라우저 이동
  *   POST /admin-handoff { app:'consult', auth(admin) } → { ok, code } 원장 새 기기 연결
  *   POST /admin-account { app:'consult', auth(admin), action:'set', loginId, password } 원장 계정 설정
- *   POST /admin-login { app:'consult', loginId, password } → { ok, token } 원장 기기 로그인
+ *   POST /manager-account { app:'consult', auth(admin), action, ... } 관리 선생님 계정 관리
+ *   POST /admin-login { app:'consult', loginId, password } → { ok, token, authRole } 관리자 로그인
  *   POST /lesson-create { app, auth, staffId?, lesson } → 수업 1건 등록·수정
  *   POST /lesson-create-batch { app, auth, batchKind, lessons } → 한 학생의 여러 수업 또는 같은 수업의 여러 학생 원자적 등록
  *   POST /contact-log { app, auth, sourceTaskId, type, note } → 담당 수업 학생 연락 기록
@@ -63,6 +64,7 @@
  * 인증
  *   auth = { mode:'admin',  secret }            → 전체 접근
  *   auth = { mode:'admin_device', token }       → 연결된 원장 기기
+ *   auth = { mode:'manager_device', token }     → 관리 선생님 기기
  *   auth = { mode:'person', id, token }         → 본인 범위(task allowlist 관리 담당은 전체)
  */
 
@@ -142,14 +144,17 @@ const HANDOFF_TTL_MS = 10 * 60 * 1000;
 const MAX_PENDING_BOOTSTRAPS = 3;
 const MAX_ACTIVE_PERSON_SESSIONS = 3;
 const MAX_ACTIVE_ADMIN_SESSIONS = 5;
+const MAX_ACTIVE_MANAGER_SESSIONS = 5;
 const SAFE_BOOTSTRAP_CODE = /^[a-f0-9]{48}$/i;
 const ADMIN_DEVICE_ID = '__admin__';
+const MANAGER_DEVICE_PREFIX = '__cm__';
 const SAFE_ADMIN_LOGIN_ID = /^[A-Za-z0-9._@-]{3,64}$/;
 const ADMIN_PASSWORD_MIN_LENGTH = 8;
 const ADMIN_PASSWORD_MAX_LENGTH = 128;
 const ADMIN_PASSWORD_ITERATIONS = 100000;
 const ADMIN_LOGIN_MAX_FAILURES = 5;
 const ADMIN_LOGIN_LOCK_MS = 5 * 60 * 1000;
+const CONSULT_MANAGER_ENDPOINTS = new Set(['/sync', '/consult-submission', '/consult-curriculum-url']);
 
 const json = (obj, status, origin) => new Response(JSON.stringify(obj), {
   status: status || 200,
@@ -272,6 +277,18 @@ async function resolveAuth(env, app, auth) {
         rewardActorHash: await consultRewardActorHash('admin_device', tokenHash) }
       : null;
   }
+  if (auth.mode === 'manager_device' && app === 'consult') {
+    const token = String(auth.token || '');
+    if (!token || token.length > 256 || token.startsWith(TOKEN_HASH_PREFIX)) return null;
+    const tokenHash = tokenStorageValue(await sha256Hex(token));
+    const row = await env.DB.prepare(
+      'SELECT a.account_id,a.display_name,a.login_id FROM tokens t ' +
+      'JOIN consult_manager_accounts a ON t.staff_id=(? || a.account_id) ' +
+      'WHERE t.app=? AND t.token=? AND t.revoked=0 AND t.created_at>=? AND a.active=1 LIMIT 1'
+    ).bind(MANAGER_DEVICE_PREFIX, app, tokenHash, deviceCutoff(env, app)).first();
+    return row ? { scope: 'manager', role: 'manager', id: row.account_id,
+      name: row.display_name, loginId: row.login_id } : null;
+  }
   if (auth.mode === 'manager_inspection') {
     return await resolveManagerInspectionAuth(env, app, auth, taskManagerIds(env));
   }
@@ -316,7 +333,7 @@ export async function guardWrappedStaffWorkRequest(request, env) {
 }
 
 /** 들어온 변경을 테이블별 upsert 문으로. updated_at이 더 최신일 때만 덮는다 (LWW) */
-function upsertStmt(env, table, app, c, now, ownScope, managerTask) {
+function upsertStmt(env, table, app, c, now, ownScope, managerTask, managerId, managerName) {
   const idCol = table === 'checks' ? 'k' : 'id';
   const key = table === 'checks' ? c.k : c.id;
   const ownGuard = ownScope
@@ -324,7 +341,8 @@ function upsertStmt(env, table, app, c, now, ownScope, managerTask) {
       (table === 'tasks' ? " AND json_extract(tasks.data,'$.origin')='staff'" : ''))
     : '';
   const insertData = managerTask
-    ? "json_set(?, '$.origin', 'manager', '$.lastEditBy', 'manager')"
+    ? "json_set(?, '$.origin', 'manager', '$.lastEditBy', 'manager', " +
+      "'$.lastEditByManagerId', ?, '$.lastEditByManagerName', ?)"
     : '?';
   const updateData = managerTask
     ? "json_set(excluded.data, '$.origin', COALESCE(json_extract(tasks.data,'$.origin'),'manager'), '$.lastEditBy', 'manager')"
@@ -350,15 +368,24 @@ function upsertStmt(env, table, app, c, now, ownScope, managerTask) {
     ? " AND COALESCE(CAST(json_extract(tasks.data,'$.lessonInstanceType') AS TEXT),'')<>'makeup'" +
       " AND COALESCE(CAST(json_extract(tasks.data,'$.makeupCaseId') AS TEXT),'')=''"
     : '';
-  return env.DB.prepare(
+  // 검사 직후 원장 업무가 같은 id로 생겨도 관리 선생님 쓰기가 덮지 못하게 저장 시점에 다시 확인한다.
+  const managerTaskGuard = managerTask && app === 'consult'
+    ? " AND json_extract(tasks.data,'$.origin')='manager'"
+    : '';
+  const statement = env.DB.prepare(
     'INSERT INTO ' + table + ' (app, ' + idCol + ', owner, data, updated_at, srv_at) ' +
     'VALUES (?, ?, ?, ' + insertData + ', ?, ?) ' +
     'ON CONFLICT(app, ' + idCol + ') DO UPDATE SET ' +
     '  owner=excluded.owner, data=' + updateData + ', ' +
     '  updated_at=excluded.updated_at, srv_at=excluded.srv_at ' +
     'WHERE excluded.updated_at > ' + table + '.updated_at' + ownGuard + onboardingGuard +
-      staffAttendanceGuard + makeupTaskGuard
-  ).bind(app, key, c.owner || null, JSON.stringify(c.data), Number(c.updated_at) || 0, now);
+      staffAttendanceGuard + makeupTaskGuard + managerTaskGuard
+  );
+  const data = JSON.stringify(c.data);
+  return managerTask
+    ? statement.bind(app, key, c.owner || null, data, String(managerId || ''), String(managerName || ''),
+      Number(c.updated_at) || 0, now)
+    : statement.bind(app, key, c.owner || null, data, Number(c.updated_at) || 0, now);
 }
 
 async function canonicalOnboardingChanges(env, app, keys) {
@@ -1665,12 +1692,13 @@ async function pullSyncRecovery(env, app, auth, position) {
   let complete = true;
   for (const table of ['staff', 'tasks', 'checks']) {
     const idCol = table === 'checks' ? 'k' : 'id';
+    const managerReadGuard = consultManagerCheckReadGuard(app, auth, table, idCol);
     // 테이블별 키를 이어 받아야 같은 srv_at이 2000개를 넘거나 테이블별 시각이 달라도 빠지지 않는다.
     const sql = 'SELECT ' + idCol + ' AS key, owner, data, updated_at, srv_at FROM ' + table +
       ' WHERE app=? AND srv_at<=? AND ' + idCol + '>?' +
-      (auth.scope === 'own' ? ' AND owner=?' : '') +
+      managerReadGuard.sql + (auth.scope === 'own' ? ' AND owner=?' : '') +
       ' ORDER BY ' + idCol + ' LIMIT ' + (MAX_PULL + 1);
-    const args = [app, position.snapshotAt, cursors[table]];
+    const args = [app, position.snapshotAt, cursors[table], ...managerReadGuard.args];
     if (auth.scope === 'own') args.push(auth.id);
     const result = await env.DB.prepare(sql).bind(...args).all();
     const rows = result.results || [];
@@ -1690,6 +1718,65 @@ async function pullSyncRecovery(env, app, auth, position) {
     if (rows.length) cursors[table] = String(rows[rows.length - 1].key);
   }
   return { changes, recoveryPull: { snapshotAt: position.snapshotAt, cursors, complete } };
+}
+
+const CONSULT_MANAGER_BLOCKED_CHECK_PREFIXES = Object.freeze([
+  '__subscription__', '__subscriptionpayment__', '__pointrequest__', '__rewardtx__'
+]);
+
+function consultManagerBlockedCheck(key) {
+  return CONSULT_MANAGER_BLOCKED_CHECK_PREFIXES.some(prefix => String(key || '').startsWith(prefix));
+}
+
+function consultManagerCheckReadGuard(app, auth, table, idCol) {
+  if (app !== 'consult' || !auth || auth.role !== 'manager' || table !== 'checks') {
+    return { sql: '', args: [] };
+  }
+  const args = [];
+  const clauses = CONSULT_MANAGER_BLOCKED_CHECK_PREFIXES.map(prefix => {
+    args.push(prefix.length, prefix);
+    return 'substr(' + idCol + ',1,?)<>?';
+  });
+  return { sql: ' AND ' + clauses.join(' AND '), args };
+}
+
+async function inspectConsultManagerChanges(env, app, auth, changes) {
+  if (app !== 'consult' || auth.role !== 'manager') return '';
+  const taskIds = [];
+  for (const entry of changes) {
+    const c = entry.change || {};
+    if (entry.table === 'staff') return '관리 선생님은 학생 정보를 등록하거나 변경할 수 없습니다';
+    if (entry.table === 'checks' && consultManagerBlockedCheck(c.k)) {
+      return '구독·기프트 카드 기록은 원장만 변경할 수 있습니다';
+    }
+    if (entry.table !== 'tasks') continue;
+    const data = c.data;
+    if (!SAFE_ID.test(String(c.id || '')) || !SAFE_ID.test(String(c.owner || '')) ||
+        !data || typeof data !== 'object' || Array.isArray(data) ||
+        String(data.id || '') !== String(c.id) || String(data.staffId || '') !== String(c.owner)) {
+      return '업무의 id와 학생 정보가 일치하지 않습니다';
+    }
+    if (data.kind === 'report_snapshot') {
+      return '학생·보호자 리포트 발행과 철회는 원장만 할 수 있습니다';
+    }
+    taskIds.push(String(c.id));
+  }
+  const unique = [...new Set(taskIds)];
+  for (let offset = 0; offset < unique.length; offset += 80) {
+    const ids = unique.slice(offset, offset + 80);
+    const placeholders = ids.map(() => '?').join(',');
+    const rows = await env.DB.prepare(
+      'SELECT id,data FROM tasks WHERE app=? AND id IN (' + placeholders + ')'
+    ).bind(app, ...ids).all();
+    for (const row of rows.results || []) {
+      let data;
+      try { data = JSON.parse(row.data); } catch { return '기존 업무 정보를 확인할 수 없습니다'; }
+      if (!data || data.origin !== 'manager') {
+        return '원장이 배부한 공부는 관리 선생님 계정에서 수정할 수 없습니다';
+      }
+    }
+  }
+  return '';
 }
 
 async function handleSync(env, app, body, origin) {
@@ -1768,6 +1855,10 @@ async function handleSync(env, app, body, origin) {
     // 기프트 카드 교환 원장은 /consult-reward의 선점·CAS만이 쓸 수 있다.
     // 관리 화면이 내려받은 행을 generic LWW로 재전송해도 덮어쓰지 않는다.
     if (t === 'checks' && app === 'consult' && String(c.k || '').startsWith(CONSULT_REWARD_PREFIX)) {
+      if (auth.role === 'manager') {
+        return json({ ok: false, code: 'MANAGER_WRITE_FORBIDDEN',
+          error: '구독·기프트 카드 기록은 원장만 변경할 수 있습니다' }, 403, origin);
+      }
       if (auth.scope === 'own') {
         return json({ ok: false, code: 'REWARD_TX_ENDPOINT_REQUIRED',
           error: '보상 교환 기록은 전용 원장에서만 변경할 수 있습니다' }, 403, origin);
@@ -1806,6 +1897,8 @@ async function handleSync(env, app, body, origin) {
     accepted.push({ table: t, change: c });
   }
   if (forbidden) return json({ ok: false, error: '개인 링크에서는 본인 업무만 저장할 수 있습니다' }, 403, origin);
+  const managerError = await inspectConsultManagerChanges(env, app, auth, accepted);
+  if (managerError) return json({ ok: false, code: 'MANAGER_WRITE_FORBIDDEN', error: managerError }, 403, origin);
   let skipped = await revokedSyncEntries(env, app, dataGeneration, accepted);
   const makeupInspection = await inspectScheduledMakeupTaskChanges(
     env, app, accepted.filter(entry => !skipped.has(entry))
@@ -1908,7 +2001,7 @@ async function handleSync(env, app, body, origin) {
     : [];
   const stmts = genericScheduleGuards.concat(writeEntries
     .map(entry => upsertStmt(env, entry.table, app, entry.change, now, auth.scope === 'own',
-      auth.role === 'manager' && entry.table === 'tasks')));
+      auth.role === 'manager' && entry.table === 'tasks', auth.id, auth.name)));
   if (stmts.length) {
     try { await env.DB.batch(stmts); }
     catch (error) {
@@ -1952,17 +2045,24 @@ async function handleSync(env, app, body, origin) {
   // ── 내려받기 (since 이후)
   const out = forcedRows.slice();
   let more = false;
+  const pageCursors = [];
   for (const t of ['staff', 'tasks', 'checks']) {
     const idCol = t === 'checks' ? 'k' : 'id';
+    const managerReadGuard = consultManagerCheckReadGuard(app, auth, t, idCol);
     const sql = 'SELECT ' + idCol + ' AS key, owner, data, updated_at, srv_at FROM ' + t +
-      ' WHERE app=? AND srv_at > ?' + (auth.scope === 'own' ? ' AND owner=?' : '') +
+      ' WHERE app=? AND srv_at > ?' + managerReadGuard.sql +
+      (auth.scope === 'own' ? ' AND owner=?' : '') +
       ' ORDER BY srv_at LIMIT ' + (MAX_PULL + 1);
-    const st = auth.scope === 'own'
-      ? env.DB.prepare(sql).bind(app, since, auth.id)
-      : env.DB.prepare(sql).bind(app, since);
+    const args = [app, since, ...managerReadGuard.args];
+    if (auth.scope === 'own') args.push(auth.id);
+    const st = env.DB.prepare(sql).bind(...args);
     const res = await st.all();
     const rows = (res.results || []);
-    if (rows.length > MAX_PULL) { more = true; rows.length = MAX_PULL; }
+    if (rows.length > MAX_PULL) {
+      more = true;
+      rows.length = MAX_PULL;
+      pageCursors.push(Number(rows[rows.length - 1].srv_at));
+    }
     for (const r of rows) {
       if (forcedKeys.has(t + '\n' + String(r.key))) continue;
       const data = JSON.parse(r.data);
@@ -1975,7 +2075,7 @@ async function handleSync(env, app, body, origin) {
   }
 
   // more일 때는 받은 것 중 가장 오래된 srv_at까지만 확정해야 빠지는 행이 없다
-  const nextSince = more ? Math.max(since, ...out.map(r => r.srv_at)) : now;
+  const nextSince = more ? Math.max(since, Math.min(...pageCursors)) : now;
   const authRole = auth.role === 'manager' ? 'manager' : (auth.scope === 'all' ? 'admin' : 'staff');
   const payload = { ok: true, now: nextSince, more: more, changes: out, authRole, dataGeneration,
     operationsRead: auth.operationsRead === true };
@@ -2177,28 +2277,106 @@ async function handleAdminHandoff(env, app, body, origin) {
   return json({ ok: true, code: issued.code, expiresAt: issued.expiresAt }, 200, origin);
 }
 
-async function issueAdminDeviceToken(env) {
+async function issueAdminDeviceToken(env, account) {
   const token = randomOpaqueValue();
   const storedHash = tokenStorageValue(await sha256Hex(token));
   const createdAt = Date.now();
-  await env.DB.batch([
+  const results = await env.DB.batch([
     env.DB.prepare(
-      'INSERT INTO tokens(app,token,staff_id,created_at,revoked) VALUES(?,?,?,?,0)'
-    ).bind('consult', storedHash, ADMIN_DEVICE_ID, createdAt),
+      'INSERT INTO tokens(app,token,staff_id,created_at,revoked) ' +
+      'SELECT ?,?,?,?,0 WHERE EXISTS (' +
+      'SELECT 1 FROM admin_accounts WHERE app=? AND login_id=? AND password_hash=? ' +
+      'AND password_iterations=? AND updated_at=? AND locked_until<=?)'
+    ).bind('consult', storedHash, ADMIN_DEVICE_ID, createdAt, 'consult', account.login_id,
+      account.password_hash, Number(account.password_iterations), Number(account.updated_at), createdAt),
     env.DB.prepare(
-      'UPDATE tokens SET revoked=1 WHERE app=? AND staff_id=? AND revoked=0 AND created_at<?'
-    ).bind('consult', ADMIN_DEVICE_ID, createdAt - TOKEN_TTL_MS),
+      'UPDATE admin_accounts SET failed_attempts=0,locked_until=0 WHERE app=? AND EXISTS (' +
+      'SELECT 1 FROM tokens WHERE app=? AND token=? AND staff_id=? AND revoked=0)'
+    ).bind('consult', 'consult', storedHash, ADMIN_DEVICE_ID),
+    env.DB.prepare(
+      'UPDATE tokens SET revoked=1 WHERE app=? AND staff_id=? AND revoked=0 AND created_at<? AND EXISTS (' +
+      'SELECT 1 FROM tokens WHERE app=? AND token=? AND staff_id=? AND revoked=0)'
+    ).bind('consult', ADMIN_DEVICE_ID, createdAt - TOKEN_TTL_MS,
+      'consult', storedHash, ADMIN_DEVICE_ID),
     env.DB.prepare(
       'UPDATE tokens SET revoked=1 WHERE app=? AND staff_id=? AND revoked=0 AND token<>? AND token NOT IN (' +
       'SELECT token FROM tokens WHERE app=? AND staff_id=? AND revoked=0 AND token<>? ' +
-      'ORDER BY created_at DESC, token DESC LIMIT ' + (MAX_ACTIVE_ADMIN_SESSIONS - 1) + ')'
-    ).bind('consult', ADMIN_DEVICE_ID, storedHash, 'consult', ADMIN_DEVICE_ID, storedHash)
+      'ORDER BY created_at DESC, token DESC LIMIT ' + (MAX_ACTIVE_ADMIN_SESSIONS - 1) + ') AND EXISTS (' +
+      'SELECT 1 FROM tokens WHERE app=? AND token=? AND staff_id=? AND revoked=0)'
+    ).bind('consult', ADMIN_DEVICE_ID, storedHash, 'consult', ADMIN_DEVICE_ID, storedHash,
+      'consult', storedHash, ADMIN_DEVICE_ID)
   ]);
-  return { token, expiresAt: createdAt + TOKEN_TTL_MS };
+  return Number(results[0] && results[0].meta && results[0].meta.changes || 0) === 1
+    ? { token, expiresAt: createdAt + TOKEN_TTL_MS } : null;
+}
+
+function managerDeviceId(accountId) {
+  return MANAGER_DEVICE_PREFIX + String(accountId || '');
+}
+
+async function issueManagerDeviceToken(env, account) {
+  const token = randomOpaqueValue();
+  const storedHash = tokenStorageValue(await sha256Hex(token));
+  const staffId = managerDeviceId(account.account_id);
+  const createdAt = Date.now();
+  const results = await env.DB.batch([
+    env.DB.prepare(
+      'INSERT INTO tokens(app,token,staff_id,created_at,revoked) ' +
+      'SELECT ?,?,?,?,0 WHERE EXISTS (' +
+      'SELECT 1 FROM consult_manager_accounts WHERE account_id=? AND login_id=? AND password_hash=? ' +
+      'AND password_iterations=? AND updated_at=? AND active=1 AND locked_until<=?)'
+    ).bind('consult', storedHash, staffId, createdAt, account.account_id, account.login_id,
+      account.password_hash, Number(account.password_iterations), Number(account.updated_at), createdAt),
+    env.DB.prepare(
+      'UPDATE consult_manager_accounts SET failed_attempts=0,locked_until=0,last_login_at=? ' +
+      'WHERE account_id=? AND EXISTS (' +
+      'SELECT 1 FROM tokens WHERE app=? AND token=? AND staff_id=? AND revoked=0)'
+    ).bind(createdAt, account.account_id, 'consult', storedHash, staffId),
+    env.DB.prepare(
+      'UPDATE tokens SET revoked=1 WHERE app=? AND staff_id=? AND revoked=0 AND created_at<? AND EXISTS (' +
+      'SELECT 1 FROM tokens WHERE app=? AND token=? AND staff_id=? AND revoked=0)'
+    ).bind('consult', staffId, createdAt - TOKEN_TTL_MS, 'consult', storedHash, staffId),
+    env.DB.prepare(
+      'UPDATE tokens SET revoked=1 WHERE app=? AND staff_id=? AND revoked=0 AND token<>? AND token NOT IN (' +
+      'SELECT token FROM tokens WHERE app=? AND staff_id=? AND revoked=0 AND token<>? ' +
+      'ORDER BY created_at DESC, token DESC LIMIT ' + (MAX_ACTIVE_MANAGER_SESSIONS - 1) + ') AND EXISTS (' +
+      'SELECT 1 FROM tokens WHERE app=? AND token=? AND staff_id=? AND revoked=0)'
+    ).bind('consult', staffId, storedHash, 'consult', staffId, storedHash,
+      'consult', storedHash, staffId)
+  ]);
+  return Number(results[0] && results[0].meta && results[0].meta.changes || 0) === 1
+    ? { token, expiresAt: createdAt + TOKEN_TTL_MS } : null;
+}
+
+async function recordAdminLoginFailure(env, row, manager, now) {
+  const threshold = ADMIN_LOGIN_MAX_FAILURES - 1;
+  const lockUntil = now + ADMIN_LOGIN_LOCK_MS;
+  const sql = manager
+    ? 'UPDATE consult_manager_accounts SET ' +
+      'locked_until=CASE WHEN failed_attempts>=? THEN ? ELSE 0 END,' +
+      'failed_attempts=CASE WHEN failed_attempts>=? THEN 0 ELSE failed_attempts+1 END ' +
+      'WHERE account_id=? AND login_id=? AND password_hash=? AND password_iterations=? AND updated_at=? ' +
+      'AND active=1 AND locked_until<=?'
+    : 'UPDATE admin_accounts SET ' +
+      'locked_until=CASE WHEN failed_attempts>=? THEN ? ELSE 0 END,' +
+      'failed_attempts=CASE WHEN failed_attempts>=? THEN 0 ELSE failed_attempts+1 END ' +
+      'WHERE app=? AND login_id=? AND password_hash=? AND password_iterations=? AND updated_at=? ' +
+      'AND locked_until<=?';
+  const identity = manager ? row.account_id : 'consult';
+  await env.DB.prepare(sql).bind(threshold, lockUntil, threshold, identity, row.login_id,
+    row.password_hash, Number(row.password_iterations), Number(row.updated_at), now).run();
 }
 
 function adminLoginId(value) {
   return String(value || '').trim().toLowerCase();
+}
+
+function managerDisplayName(value) {
+  return String(value || '').trim().replace(/\s+/g, ' ');
+}
+
+function isConsultDirectorAuth(auth) {
+  return !!(auth && auth.scope === 'all' && auth.role !== 'manager');
 }
 
 async function handleAdminAccount(env, app, body, origin) {
@@ -2206,7 +2384,7 @@ async function handleAdminAccount(env, app, body, origin) {
     return json({ ok: false, error: '원장 로그인 계정은 consult 앱에서만 사용할 수 있습니다' }, 400, origin);
   }
   const auth = await resolveAuth(env, app, body.auth);
-  if (!auth || auth.scope !== 'all') {
+  if (!isConsultDirectorAuth(auth)) {
     return json({ ok: false, code: 'AUTH_REQUIRED', error: '원장 인증이 필요합니다' }, 401, origin);
   }
   const action = String(body.action || 'get');
@@ -2226,6 +2404,10 @@ async function handleAdminAccount(env, app, body, origin) {
   if (password.length < ADMIN_PASSWORD_MIN_LENGTH || password.length > ADMIN_PASSWORD_MAX_LENGTH) {
     return json({ ok: false, error: '비밀번호는 8~128자로 입력해 주세요' }, 400, origin);
   }
+  const managerCollision = await env.DB.prepare(
+    'SELECT account_id FROM consult_manager_accounts WHERE login_id=? LIMIT 1'
+  ).bind(loginId).first();
+  if (managerCollision) return json({ ok: false, code: 'LOGIN_ID_TAKEN', error: '이미 사용 중인 아이디입니다' }, 409, origin);
   const salt = randomOpaqueValue();
   const hash = await passwordHash(password, salt, ADMIN_PASSWORD_ITERATIONS);
   const updatedAt = Date.now();
@@ -2240,47 +2422,186 @@ async function handleAdminAccount(env, app, body, origin) {
     env.DB.prepare('UPDATE tokens SET revoked=1 WHERE app=? AND staff_id=? AND revoked=0')
       .bind('consult', ADMIN_DEVICE_ID)
   ]);
-  const issued = await issueAdminDeviceToken(env);
+  const issued = await issueAdminDeviceToken(env, {
+    login_id: loginId, password_hash: hash,
+    password_iterations: ADMIN_PASSWORD_ITERATIONS, updated_at: updatedAt
+  });
+  if (!issued) {
+    return json({ ok: false, code: 'LOGIN_RETRY',
+      error: '로그인 계정이 변경되었습니다. 다시 로그인해 주세요' }, 409, origin);
+  }
   return json({ ok: true, loginId, token: issued.token, expiresAt: issued.expiresAt,
     activeSessionLimit: MAX_ACTIVE_ADMIN_SESSIONS }, 200, origin);
+}
+
+async function handleManagerAccount(env, app, body, origin) {
+  if (app !== 'consult') {
+    return json({ ok: false, error: '관리 선생님 계정은 consult 앱에서만 사용할 수 있습니다' }, 400, origin);
+  }
+  const auth = await resolveAuth(env, app, body.auth);
+  if (!isConsultDirectorAuth(auth)) {
+    return json({ ok: false, code: 'AUTH_REQUIRED', error: '원장 인증이 필요합니다' }, 403, origin);
+  }
+  const action = String(body.action || 'list');
+  if (action === 'list') {
+    const cutoff = deviceCutoff(env, 'consult');
+    const rows = await env.DB.prepare(
+      'SELECT a.account_id,a.login_id,a.display_name,a.active,a.last_login_at,a.created_at,a.updated_at,' +
+      'COUNT(t.token) AS device_count FROM consult_manager_accounts a LEFT JOIN tokens t ON ' +
+      't.app=? AND t.staff_id=(? || a.account_id) AND t.revoked=0 AND t.created_at>=? ' +
+      'GROUP BY a.account_id,a.login_id,a.display_name,a.active,a.last_login_at,a.created_at,a.updated_at ' +
+      'ORDER BY a.active DESC,a.display_name COLLATE NOCASE,a.login_id COLLATE NOCASE'
+    ).bind('consult', MANAGER_DEVICE_PREFIX, cutoff).all();
+    return json({ ok: true, accounts: (rows.results || []).map(row => ({
+      accountId: row.account_id, loginId: row.login_id, displayName: row.display_name,
+      active: Number(row.active) === 1, lastLoginAt: row.last_login_at,
+      createdAt: row.created_at, updatedAt: row.updated_at, deviceCount: Number(row.device_count || 0)
+    })), activeSessionLimit: MAX_ACTIVE_MANAGER_SESSIONS }, 200, origin);
+  }
+
+  const accountId = String(body.accountId || '');
+  if (action === 'save') {
+    const existing = accountId && SAFE_ID.test(accountId)
+      ? await env.DB.prepare('SELECT * FROM consult_manager_accounts WHERE account_id=? LIMIT 1').bind(accountId).first()
+      : null;
+    if (accountId && !existing) return json({ ok: false, error: '관리 선생님 계정을 찾을 수 없습니다' }, 404, origin);
+    const loginId = adminLoginId(body.loginId);
+    const displayName = managerDisplayName(body.displayName);
+    const password = String(body.password || '');
+    if (!SAFE_ADMIN_LOGIN_ID.test(loginId)) {
+      return json({ ok: false, error: '아이디는 영문·숫자·._@- 조합 3~64자로 입력해 주세요' }, 400, origin);
+    }
+    if (!displayName || displayName.length > 40) {
+      return json({ ok: false, error: '선생님 이름은 1~40자로 입력해 주세요' }, 400, origin);
+    }
+    if ((!existing && !password) || password.length > ADMIN_PASSWORD_MAX_LENGTH ||
+        (password && password.length < ADMIN_PASSWORD_MIN_LENGTH)) {
+      return json({ ok: false, error: '비밀번호는 8~128자로 입력해 주세요' }, 400, origin);
+    }
+    const directorCollision = await env.DB.prepare(
+      'SELECT app FROM admin_accounts WHERE login_id=? LIMIT 1'
+    ).bind(loginId).first();
+    const managerCollision = await env.DB.prepare(
+      'SELECT account_id FROM consult_manager_accounts WHERE login_id=? AND account_id<>? LIMIT 1'
+    ).bind(loginId, existing ? existing.account_id : '').first();
+    if (directorCollision || managerCollision) {
+      return json({ ok: false, code: 'LOGIN_ID_TAKEN', error: '이미 사용 중인 아이디입니다' }, 409, origin);
+    }
+    const updatedAt = Date.now();
+    if (!existing) {
+      const newId = randomOpaqueValue();
+      const salt = randomOpaqueValue();
+      const hash = await passwordHash(password, salt, ADMIN_PASSWORD_ITERATIONS);
+      await env.DB.prepare(
+        'INSERT INTO consult_manager_accounts(account_id,login_id,display_name,password_salt,password_hash,' +
+        'password_iterations,failed_attempts,locked_until,active,last_login_at,created_at,updated_at) ' +
+        'VALUES(?,?,?,?,?,?,0,0,1,NULL,?,?)'
+      ).bind(newId, loginId, displayName, salt, hash, ADMIN_PASSWORD_ITERATIONS, updatedAt, updatedAt).run();
+      return json({ ok: true, accountId: newId }, 200, origin);
+    }
+    const revoke = password || loginId !== existing.login_id;
+    if (password) {
+      const salt = randomOpaqueValue();
+      const hash = await passwordHash(password, salt, ADMIN_PASSWORD_ITERATIONS);
+      await env.DB.batch([
+        env.DB.prepare(
+          'UPDATE consult_manager_accounts SET login_id=?,display_name=?,password_salt=?,password_hash=?,' +
+          'password_iterations=?,failed_attempts=0,locked_until=0,updated_at=? WHERE account_id=?'
+        ).bind(loginId, displayName, salt, hash, ADMIN_PASSWORD_ITERATIONS, updatedAt, existing.account_id),
+        env.DB.prepare('UPDATE tokens SET revoked=1 WHERE app=? AND staff_id=? AND revoked=0')
+          .bind('consult', managerDeviceId(existing.account_id))
+      ]);
+    } else if (revoke) {
+      await env.DB.batch([
+        env.DB.prepare(
+          'UPDATE consult_manager_accounts SET login_id=?,display_name=?,failed_attempts=0,locked_until=0,updated_at=? WHERE account_id=?'
+        ).bind(loginId, displayName, updatedAt, existing.account_id),
+        env.DB.prepare('UPDATE tokens SET revoked=1 WHERE app=? AND staff_id=? AND revoked=0')
+          .bind('consult', managerDeviceId(existing.account_id))
+      ]);
+    } else {
+      await env.DB.prepare(
+        'UPDATE consult_manager_accounts SET display_name=?,updated_at=? WHERE account_id=?'
+      ).bind(displayName, updatedAt, existing.account_id).run();
+    }
+    return json({ ok: true, accountId: existing.account_id, devicesRevoked: !!revoke }, 200, origin);
+  }
+
+  if (!SAFE_ID.test(accountId)) return json({ ok: false, error: '관리 선생님 계정을 다시 선택해 주세요' }, 400, origin);
+  const existing = await env.DB.prepare(
+    'SELECT account_id,active FROM consult_manager_accounts WHERE account_id=? LIMIT 1'
+  ).bind(accountId).first();
+  if (!existing) return json({ ok: false, error: '관리 선생님 계정을 찾을 수 없습니다' }, 404, origin);
+  if (action === 'set_active') {
+    if (typeof body.active !== 'boolean') return json({ ok: false, error: '사용 상태를 확인해 주세요' }, 400, origin);
+    const updatedAt = Date.now();
+    const statements = [env.DB.prepare(
+      'UPDATE consult_manager_accounts SET active=?,failed_attempts=0,locked_until=0,updated_at=? WHERE account_id=?'
+    ).bind(body.active ? 1 : 0, updatedAt, accountId)];
+    if (!body.active) statements.push(env.DB.prepare(
+      'UPDATE tokens SET revoked=1 WHERE app=? AND staff_id=? AND revoked=0'
+    ).bind('consult', managerDeviceId(accountId)));
+    await env.DB.batch(statements);
+    return json({ ok: true }, 200, origin);
+  }
+  if (action === 'revoke_devices') {
+    await env.DB.prepare('UPDATE tokens SET revoked=1 WHERE app=? AND staff_id=? AND revoked=0')
+      .bind('consult', managerDeviceId(accountId)).run();
+    return json({ ok: true }, 200, origin);
+  }
+  return json({ ok: false, error: '올바른 action이 필요합니다' }, 400, origin);
 }
 
 async function handleAdminLogin(env, app, body, origin) {
   if (app !== 'consult') {
     return json({ ok: false, error: '원장 로그인은 consult 앱에서만 사용할 수 있습니다' }, 400, origin);
   }
-  const row = await env.DB.prepare(
-    'SELECT login_id,password_salt,password_hash,password_iterations,failed_attempts,locked_until ' +
-    'FROM admin_accounts WHERE app=? LIMIT 1'
-  ).bind('consult').first();
-  if (!row) {
-    return json({ ok: false, code: 'ACCOUNT_NOT_CONFIGURED',
-      error: '기존 원장 기기의 설정에서 로그인 계정을 먼저 만들어 주세요' }, 409, origin);
-  }
-  const now = Date.now();
-  if (Number(row.locked_until || 0) > now) {
-    return json({ ok: false, code: 'LOGIN_LOCKED', error: '시도 횟수가 많습니다. 5분 후 다시 시도해 주세요' }, 429, origin);
-  }
   const loginId = adminLoginId(body.loginId);
   const password = String(body.password || '');
   if (loginId.length > 64 || password.length > ADMIN_PASSWORD_MAX_LENGTH) {
     return json({ ok: false, code: 'LOGIN_FAILED', error: '아이디 또는 비밀번호가 맞지 않습니다' }, 401, origin);
   }
-  const hash = await passwordHash(password, row.password_salt, Number(row.password_iterations));
-  const valid = safeEqual(loginId, row.login_id) && safeEqual(hash, row.password_hash);
-  if (!valid) {
-    const failures = Number(row.failed_attempts || 0) + 1;
-    const lockedUntil = failures >= ADMIN_LOGIN_MAX_FAILURES ? now + ADMIN_LOGIN_LOCK_MS : 0;
-    await env.DB.prepare(
-      'UPDATE admin_accounts SET failed_attempts=?,locked_until=? WHERE app=?'
-    ).bind(failures >= ADMIN_LOGIN_MAX_FAILURES ? 0 : failures, lockedUntil, 'consult').run();
+  const adminRow = await env.DB.prepare(
+    'SELECT login_id,password_salt,password_hash,password_iterations,failed_attempts,locked_until,updated_at ' +
+    'FROM admin_accounts WHERE app=? AND login_id=? LIMIT 1'
+  ).bind('consult', loginId).first();
+  const managerRow = adminRow ? null : await env.DB.prepare(
+    'SELECT account_id,login_id,display_name,password_salt,password_hash,password_iterations,' +
+    'failed_attempts,locked_until,active,updated_at FROM consult_manager_accounts WHERE login_id=? LIMIT 1'
+  ).bind(loginId).first();
+  const row = adminRow || managerRow;
+  const manager = !!managerRow;
+  if (!row || (manager && Number(row.active) !== 1)) {
+    await passwordHash(password, '000000000000000000000000000000000000000000000000', ADMIN_PASSWORD_ITERATIONS);
     return json({ ok: false, code: 'LOGIN_FAILED', error: '아이디 또는 비밀번호가 맞지 않습니다' }, 401, origin);
   }
-  await env.DB.prepare('UPDATE admin_accounts SET failed_attempts=0,locked_until=0 WHERE app=?')
-    .bind('consult').run();
-  const issued = await issueAdminDeviceToken(env);
-  return json({ ok: true, loginId: row.login_id, token: issued.token, expiresAt: issued.expiresAt,
-    activeSessionLimit: MAX_ACTIVE_ADMIN_SESSIONS }, 200, origin);
+  const now = Date.now();
+  if (Number(row.locked_until || 0) > now) {
+    return json({ ok: false, code: 'LOGIN_LOCKED', error: '시도 횟수가 많습니다. 5분 후 다시 시도해 주세요' }, 429, origin);
+  }
+  const hash = await passwordHash(password, row.password_salt, Number(row.password_iterations));
+  const valid = safeEqual(hash, row.password_hash);
+  if (!valid) {
+    await recordAdminLoginFailure(env, row, manager, now);
+    return json({ ok: false, code: 'LOGIN_FAILED', error: '아이디 또는 비밀번호가 맞지 않습니다' }, 401, origin);
+  }
+  if (manager) {
+    const issued = await issueManagerDeviceToken(env, row);
+    if (!issued) {
+      return json({ ok: false, code: 'LOGIN_RETRY',
+        error: '로그인 계정이 변경되었습니다. 다시 로그인해 주세요' }, 409, origin);
+    }
+    return json({ ok: true, authRole: 'manager', accountId: row.account_id,
+      displayName: row.display_name, loginId: row.login_id, token: issued.token,
+      expiresAt: issued.expiresAt, activeSessionLimit: MAX_ACTIVE_MANAGER_SESSIONS }, 200, origin);
+  }
+  const issued = await issueAdminDeviceToken(env, row);
+  if (!issued) {
+    return json({ ok: false, code: 'LOGIN_RETRY',
+      error: '로그인 계정이 변경되었습니다. 다시 로그인해 주세요' }, 409, origin);
+  }
+  return json({ ok: true, authRole: 'admin', loginId: row.login_id, token: issued.token,
+    expiresAt: issued.expiresAt, activeSessionLimit: MAX_ACTIVE_ADMIN_SESSIONS }, 200, origin);
 }
 
 async function handleRevoke(env, app, body, origin) {
@@ -3183,6 +3504,13 @@ export default {
     const app = String(body.app || '');
     if (typeof body.app !== 'string' || !APPS.includes(app)) return json({ ok: false, error: 'app은 task 또는 consult' }, 400, okOrigin);
 
+    if (app === 'consult' && body.auth && body.auth.mode === 'manager_device' &&
+        !CONSULT_MANAGER_ENDPOINTS.has(url.pathname)) {
+      const managerAuth = await resolveAuth(env, app, body.auth);
+      if (!managerAuth) return json({ ok: false, error: '인증 실패' }, 401, okOrigin);
+      return json({ ok: false, code: 'DIRECTOR_REQUIRED', error: '이 기능은 원장 계정에서만 사용할 수 있습니다' }, 403, okOrigin);
+    }
+
     try {
       if (url.pathname === '/self-identity') {
         const fail = (code, error, status) => json({ ok: false, authScope: 'identity_check', code, error }, status, okOrigin);
@@ -3245,6 +3573,7 @@ export default {
       }
       if (url.pathname === '/admin-handoff') return await handleAdminHandoff(env, app, body, okOrigin);
       if (url.pathname === '/admin-account') return await handleAdminAccount(env, app, body, okOrigin);
+      if (url.pathname === '/manager-account') return await handleManagerAccount(env, app, body, okOrigin);
       if (url.pathname === '/admin-login') return await handleAdminLogin(env, app, body, okOrigin);
       if (url.pathname === '/revoke') return await handleRevoke(env, app, body, okOrigin);
       if (url.pathname === '/staff-deactivate') return await handleStaffDeactivate(env, app, body, okOrigin);

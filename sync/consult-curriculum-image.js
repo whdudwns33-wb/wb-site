@@ -34,6 +34,7 @@ export function normalizeCurriculumImageText(value) {
 
 export async function isConsultDirectorOrManager(env, auth) {
   if (auth.scope === 'all') return true;
+  if (auth.role === 'manager' && auth.scope === 'manager' && auth.id) return true;
   if (auth.scope !== 'own' || !auth.id) return false;
   const row = await env.DB.prepare('SELECT data FROM staff WHERE app=? AND id=? LIMIT 1')
     .bind('consult', auth.id).first();

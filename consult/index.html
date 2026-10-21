@@ -1357,12 +1357,15 @@ function blankState() {
     staff: [],
     tasks: [],
     checks: {},
-    settings: { adminPin: '', adminLoginId: '', syncUrl: '', syncSecret: '', adminToken: '', centerName: 'WB 웩슬러브레인센터', dataGeneration: 0, localLearningLogins: {} }
+    settings: { adminPin: '', adminLoginId: '', syncUrl: '', syncSecret: '', adminToken: '',
+      managerToken: '', managerAccountId: '', managerLoginId: '', managerName: '',
+      centerName: 'WB 웩슬러브레인센터', dataGeneration: 0, localLearningLogins: {} }
   };
 }
 
 const LOCAL_AUTH_SETTINGS = Object.freeze([
-  'adminPin', 'adminLoginId', 'syncSecret', 'adminToken', 'myToken', 'syncUrl', 'pullAt', 'pushAt', 'dataGeneration', 'localLearningLogins'
+  'adminPin', 'adminLoginId', 'syncSecret', 'adminToken', 'managerToken', 'managerAccountId',
+  'managerLoginId', 'managerName', 'myToken', 'syncUrl', 'pullAt', 'pushAt', 'dataGeneration', 'localLearningLogins'
 ]);
 function sanitizedBackupState(source) {
   const copy = JSON.parse(JSON.stringify(source || blankState()));
@@ -1872,7 +1875,16 @@ function restoreRewardProcessingLock(staffRows, rewardRows) {
 
 const sync = {
   busy: false, dirty: false, last: null, timer: null, loud: false, err: '', pendingRender: false,
-  confirmed: new Map(),
+  confirmed: new Map(), authEpoch: 0,
+
+  invalidateAuthSession() {
+    this.authEpoch += 1;
+    clearTimeout(this.timer);
+    this.timer = null;
+    this.confirmed = new Map();
+    this.dirty = false;
+    this.err = '';
+  },
 
   url() { return SYNC_URL; },
 
@@ -1882,6 +1894,8 @@ const sync = {
       const t = state.settings.myToken || '';
       return t ? { mode: 'person', id: session.staffId, token: t } : null;
     }
+    const managerToken = state.settings.managerToken || '';
+    if (managerToken) return { mode: 'manager_device', token: managerToken };
     const t = state.settings.adminToken || '';
     if (t) return { mode: 'admin_device', token: t };
     const k = state.settings.syncSecret || '';
@@ -1893,14 +1907,19 @@ const sync = {
    *  저장 지점마다 표시를 남기지 않아도 변경분을 정확히 골라낼 수 있다. */
   collect(since) {
     const out = [];
+    // 잠금 화면에서도 실제 전송 자격은 저장된 bearer를 따른다.
+    const managerMode = !!state.settings.managerToken;
     (state.staff || []).forEach(s => {
+      if (managerMode) return;
       if ((s.updatedAt || 0) > since) out.push({ table: 'staff', id: s.id, owner: s.id, data: s, updated_at: s.updatedAt || 0 });
     });
     (state.tasks || []).forEach(t => {
+      if (managerMode && t.origin !== 'manager') return;
       if ((t.updatedAt || 0) > since) out.push({ table: 'tasks', id: t.id, owner: t.staffId || null, data: t, updated_at: t.updatedAt || 0 });
     });
     Object.keys(state.checks || {}).forEach(k => {
       if (String(k).startsWith('__rewardtx__')) return; // 서버 확정 포인트 원장은 전용 경로만 수정한다
+      if (managerMode && ['__subscription__', '__subscriptionpayment__', '__pointrequest__'].some(prefix => String(k).startsWith(prefix))) return;
       const c = state.checks[k];
       if (c && (c.updatedAt || 0) > since) out.push({ table: 'checks', k: k, owner: ownerOfCheck(k), data: c, updated_at: c.updatedAt || 0 });
     });
@@ -1959,10 +1978,11 @@ const sync = {
     return d;
   },
 
-  async run(duringStudentConnect) {
-    if (pendingAdminCode) return;
+  async run(duringStudentConnect, duringAdminConnect) {
+    if (pendingAdminCode && !duringAdminConnect) return;
     const auth = this.auth();
     if (!auth || this.busy || (studentConnectBusy && !duringStudentConnect)) return;
+    const runEpoch = this.authEpoch;
     this.confirmed = new Map();
     this.busy = true; paintStatus();
     try {
@@ -1981,6 +2001,7 @@ const sync = {
           since: Number(state.settings.pullAt) || 0,
           changes: batch
         });
+        if (runEpoch !== this.authEpoch) return;
         (d.changes || []).forEach(change => {
           const key = String(change.table || '') + '\n' + String(change.key || '');
           const wanted = expected.get(key);
@@ -2013,6 +2034,7 @@ const sync = {
       if (applied) renderAfterSync();
       if (this.dirty) queueSync();
     } catch (e) {
+      if (runEpoch !== this.authEpoch) return;
       console.warn('sync', e);
       if (e && e.code === 'DATA_GENERATION_MISMATCH' && Number.isSafeInteger(Number(e.dataGeneration))) {
         state.staff = [];
@@ -2039,18 +2061,25 @@ const sync = {
           return;
         }
       }
-      if (auth.mode === 'admin_device' && e.status === 401) {
+      if ((auth.mode === 'admin_device' || auth.mode === 'manager_device') && e.status === 401) {
+        const managerExpired = auth.mode === 'manager_device';
         state.settings.adminToken = '';
+        state.settings.managerToken = '';
+        state.settings.managerAccountId = '';
+        state.settings.managerLoginId = '';
+        state.settings.managerName = '';
         clearConsultLinkContacts();
         save(); session.lock(); render();
-        toast('로그인 기간이 끝났습니다 · 다시 로그인해 주세요');
+        toast((managerExpired ? '관리 선생님' : '원장') + ' 로그인 기간이 끝났습니다 · 다시 로그인해 주세요');
       } else if (auth.mode === 'person' && e.status === 401) {
         toast('학생 연결 인증이 만료되었거나 이 기기 인증이 해제되었습니다 · 원장님께 새 개인 링크를 요청해 주세요');
       }
       this.dirty = true; this.err = String(e && e.message || e);
       if (this.loud) toast('동기화 실패 — ' + this.err);
     } finally {
+      const staleAuth = runEpoch !== this.authEpoch;
       this.busy = false; this.loud = false; paintStatus();
+      if (staleAuth && this.enabled()) queueSync();
     }
   },
 
@@ -2085,6 +2114,12 @@ const sync = {
     return await this.post('/admin-account', {
       app: SYNC_APP, auth: auth || this.auth(), action: 'set', loginId: loginId, password: password
     });
+  },
+
+  async managerAccounts(action, values) {
+    return await this.post('/manager-account', Object.assign({
+      app: SYNC_APP, auth: this.auth(), action: action
+    }, values || {}));
   }
 };
 
@@ -2101,9 +2136,16 @@ function queueSync() {
 const session = {
   get staffId() { return new URLSearchParams(location.search).get('u') || ''; },
   get isStaffLink() { return !!this.staffId; },
+  get isDirector() {
+    return !this.isStaffLink && !state.settings.managerToken && sessionStorage.getItem('wb_consult_admin_locked') !== '1' &&
+      (sessionStorage.getItem('wb_consult_admin') === '1' || !!state.settings.adminToken || !!state.settings.syncSecret);
+  },
+  get isManagerAccount() {
+    return !this.isStaffLink && !!state.settings.managerToken &&
+      sessionStorage.getItem('wb_consult_admin_locked') !== '1';
+  },
   get isAdmin() {
-    return !this.isStaffLink && sessionStorage.getItem('wb_consult_admin_locked') !== '1' &&
-      (sessionStorage.getItem('wb_consult_admin') === '1' || !!state.settings.adminToken);
+    return this.isDirector || this.isManagerAccount;
   },
   unlock() {
     sessionStorage.removeItem('wb_consult_admin_locked');
@@ -2164,11 +2206,13 @@ function clearStudentCodeHash() {
 
 /** 원장·다른 학생 캐시를 새 학생 권한으로 올리지 않도록 운영 데이터만 비운다. */
 function resetStudentLinkCache(token) {
+  sync.invalidateAuthSession();
   const staffId = session.staffId;
   const savedLogins = state.settings.localLearningLogins || {};
   const localLearningLogins = staffId && savedLogins[staffId] ? { [staffId]: savedLogins[staffId] } : {};
   const settings = Object.assign({}, state.settings || {}, {
-    adminToken: '', syncSecret: '', myToken: String(token || ''), pullAt: 0, pushAt: 0,
+    adminToken: '', syncSecret: '', managerToken: '', managerAccountId: '', managerLoginId: '', managerName: '',
+    myToken: String(token || ''), pullAt: 0, pushAt: 0,
     localLearningLogins: localLearningLogins
   });
   state = Object.assign(blankState(), { staff: [], tasks: [], checks: {}, settings: settings });
@@ -2180,8 +2224,25 @@ function resetStudentLinkCache(token) {
 
 /** 학생으로 쓰던 패드를 관리자로 전환할 때 학생 캐시를 관리자 권한으로 다시 올리지 않는다. */
 function resetAdminDeviceCache(token) {
+  sync.invalidateAuthSession();
   const settings = Object.assign({}, state.settings || {}, {
-    adminToken: String(token || ''), syncSecret: '', myToken: '', pullAt: 0, pushAt: 0,
+    adminToken: String(token || ''), syncSecret: '', managerToken: '', managerAccountId: '',
+    managerLoginId: '', managerName: '', myToken: '', pullAt: 0, pushAt: 0,
+    localLearningLogins: {}
+  });
+  state = Object.assign(blankState(), { staff: [], tasks: [], checks: {}, settings: settings });
+  viewStaff = '';
+  clearConsultLinkContacts();
+  clearStudentPhoneUi();
+  return save();
+}
+
+function resetManagerDeviceCache(login) {
+  sync.invalidateAuthSession();
+  const settings = Object.assign({}, state.settings || {}, {
+    adminToken: '', syncSecret: '', myToken: '', pullAt: 0, pushAt: 0,
+    managerToken: String(login.token || ''), managerAccountId: String(login.accountId || ''),
+    managerLoginId: String(login.loginId || ''), managerName: String(login.displayName || ''),
     localLearningLogins: {}
   });
   state = Object.assign(blankState(), { staff: [], tasks: [], checks: {}, settings: settings });
@@ -2280,6 +2341,20 @@ async function waitForSyncIdle(timeoutMs) {
   const until = now() + (Number(timeoutMs) || 20000);
   while (sync.busy && now() < until) await new Promise(resolve => setTimeout(resolve, 100));
   return !sync.busy;
+}
+
+async function prepareAuthSwitch(duringAdminConnect) {
+  clearTimeout(sync.timer);
+  sync.timer = null;
+  if (sync.busy && !(await waitForSyncIdle(20000))) {
+    throw new Error('기존 동기화가 끝난 뒤 다시 로그인해 주세요');
+  }
+  if (!sync.collect(Number(state.settings.pushAt) || 0).length) return;
+  sync.loud = true;
+  await sync.run(false, !!duringAdminConnect);
+  if (sync.err || sync.collect(Number(state.settings.pushAt) || 0).length) {
+    throw new Error('이 기기의 변경사항을 먼저 동기화한 뒤 계정을 바꿔 주세요');
+  }
 }
 
 /** 마감 완료는 서버 정본에 반영된 뒤에만 성공으로 처리한다. */
@@ -2439,8 +2514,18 @@ async function connectAdminDevice() {
   try {
     const replacingStudentCache = !!state.settings.myToken;
     if (replacingStudentCache) {
+      clearTimeout(sync.timer);
+      sync.timer = null;
+      if (sync.busy && !(await waitForSyncIdle(20000))) {
+        throw new Error('기존 동기화가 끝난 뒤 다시 연결해 주세요');
+      }
+      if (sync.collect(Number(state.settings.pushAt) || 0).length) {
+        toast('이 패드에 아직 전송되지 않은 학생 기록이 있습니다. 기존 학생 링크에서 동기화한 뒤 같은 QR을 다시 스캔해 주세요.');
+        return;
+      }
       // 과거 버전에서 함께 남았을 수 있는 관리자 자격이 학생 캐시를 전송하지 못하게 먼저 격리한다.
       state.settings.adminToken = '';
+      state.settings.managerToken = '';
       state.settings.syncSecret = '';
       session.lock();
     }
@@ -2448,22 +2533,10 @@ async function connectAdminDevice() {
       toast('이 브라우저에 관리자 연결 정보를 저장할 수 없습니다. Safari 또는 Chrome의 일반 탭에서 QR을 다시 열어 주세요.');
       return;
     }
-    if (replacingStudentCache && sync.collect(Number(state.settings.pushAt) || 0).length) {
-      toast('이 패드에 아직 전송되지 않은 학생 기록이 있습니다. 기존 학생 링크에서 동기화한 뒤 같은 QR을 다시 스캔해 주세요.');
-      return;
-    }
+    await prepareAuthSwitch(true);
     const d = await sync.exchangeAdmin(code);
     pendingAdminCode = '';
-    if (replacingStudentCache) {
-      if (!resetAdminDeviceCache(d.token)) { session.unlock(); render(); return; }
-    } else {
-      state.settings.adminToken = d.token;
-      state.settings.syncSecret = '';
-      state.settings.myToken = '';
-      state.settings.pullAt = 0;
-      state.settings.pushAt = 0; // 기존 관리자 기기의 미전송 데이터도 서버 LWW로 안전하게 다시 비교한다
-      if (!save()) { session.unlock(); render(); return; }
-    }
+    if (!resetAdminDeviceCache(d.token)) { session.unlock(); render(); return; }
     session.unlock(); render();
     sync.loud = true;
     await sync.run();
@@ -2514,20 +2587,25 @@ function repeatLabel(t) {
 const initials = name => String(name || '?').trim().slice(0, 2);
 
 /** 지금 조작하는 사람 */
-const actor = () => session.isStaffLink ? 'staff' : 'admin';
+const actor = () => session.isManagerAccount || (session.isStaffLink && isManager())
+  ? 'manager' : session.isStaffLink ? 'staff' : 'admin';
 
 /** 관리자 — 원장이 학생 관리에서 지정한다 (선생님 계정용).
  *  본인 개인 링크로 들어오면 학생 현황·플래너 발행까지 열린다.
  *  설정·학생 등록/삭제·항목 수정은 계속 원장 전용이다. */
 const meStaff = () => session.isStaffLink ? staffById(session.staffId) : null;
-const isManager = () => { const m = meStaff(); return !!(m && m.manager && !m.deleted); };
+const isManager = () => {
+  if (session.isManagerAccount) return true;
+  const m = meStaff(); return !!(m && m.manager && !m.deleted);
+};
 
 /** 누가 만들고 누가 고쳤는지 — 원장 화면에서만 표시한다 */
 function originTags(t) {
   if (session.isStaffLink) return '';
   let h = '';
   if (t.origin === 'staff') h += '<span class="tag add">학생 추가</span>';
-  else if (t.origin === 'manager') h += '<span class="tag edit">관리자 발행</span>';
+  else if (t.origin === 'manager') h += '<span class="tag edit">관리 선생님 발행' +
+    (t.lastEditByManagerName ? ' · ' + esc(t.lastEditByManagerName) : '') + '</span>';
   else if (t.lastEditBy === 'staff') h += '<span class="tag edit">학생 수정</span>';
   return h;
 }
@@ -2541,7 +2619,7 @@ function canEditTask(t) {
   if (t && t.auto === STUDY_ROADMAP_AUTO) return false;
   if (session.isStaffLink && t && (t.dailyCarryFrom || String(t.groupId || '').startsWith('month-carry-')) &&
       ['admin', 'manager'].includes(t.carrySourceOrigin)) return false;
-  if (!session.isStaffLink) return session.isAdmin;
+  if (!session.isStaffLink) return session.isDirector || (session.isManagerAccount && t && t.origin === 'manager');
   if (isManager()) return t.origin === 'manager';
   return t.origin === 'staff' && t.staffId === session.staffId;
 }
@@ -2551,7 +2629,8 @@ function paintStatus() {
   const me = currentStaff();
   let text, on = false;
   if (session.isStaffLink) { text = me ? me.name + (isManager() ? ' · 관리자' : ' 학생') : '알 수 없는 링크'; on = !!me; }
-  else if (session.isAdmin) { text = '원장 모드'; on = true; }
+  else if (session.isManagerAccount) { text = (state.settings.managerName || '관리 선생님') + ' · 관리 선생님'; on = true; }
+  else if (session.isDirector) { text = '원장 모드'; on = true; }
   else { text = '잠김'; }
   if (sync.busy) text += ' · 동기화중';
   else if (storageError) text += ' · 저장 실패';
@@ -2589,7 +2668,7 @@ function currentStaff() {
 function render() {
   sync.pendingRender = false;
   viewInputDirty = false;
-  if (route === 'guide' && !((session.isStaffLink && !isManager()) || (session.isAdmin && !session.isStaffLink))) route = 'today';
+  if (route === 'guide' && !((session.isStaffLink && !isManager()) || (session.isDirector && !session.isStaffLink))) route = 'today';
   if (route === 'roadmap' && session.isStaffLink && !studyRoadmapAvailable(currentStaff())) route = 'today';
   paintStatus();
   renderTabs();
@@ -2621,10 +2700,13 @@ function render() {
     const allowed = isManager() ? ['today', 'week', 'roadmap', 'month', 'academic', 'ingang', 'study', 'write', 'board'] : ['guide', 'today', 'week', 'roadmap', 'month', 'academic', 'ingang', 'study'];
     if (!allowed.includes(route)) route = 'today';
   }
+  if (session.isManagerAccount && !['today', 'week', 'roadmap', 'month', 'academic', 'ingang', 'study', 'write', 'board'].includes(route)) {
+    route = 'today';
+  }
 
   const map = { guide: viewStudentGuide, today: viewToday, week: viewWeek, roadmap: viewRoadmap, month: viewMonth, academic: viewAcademic, ingang: viewIngang, study: viewStudy, write: viewWrite, results: viewResults, board: viewBoard, staff: viewStaffAdmin, settings: viewSettings };
   v.innerHTML = (map[route] || viewToday)();
-  if (route === 'staff' && session.isAdmin && !session.isStaffLink) loadConsultLinkContacts();
+  if (route === 'staff' && session.isDirector && !session.isStaffLink) loadConsultLinkContacts();
 }
 
 function renderTabs() {
@@ -2636,7 +2718,9 @@ function renderTabs() {
     ? (isManager()
         ? [['today', '오늘'], ['week', '주간'], ...roadmapTab, ['month', '일정'], ['academic', '학사관리'], ['ingang', '인강'], ['study', '학습'], ['write', '학습 배부'], ['board', '학생 현황', a.total]]
         : [['today', '오늘 할 일'], ['guide', '사용 안내'], ['week', '주간 플래너'], ...roadmapTab, ['month', '일정'], ['academic', '학사관리'], ['ingang', '인강'], ['study', '학습']])
-    : session.isAdmin
+    : session.isManagerAccount
+      ? [['today', '오늘'], ['week', '주간'], ...roadmapTab, ['month', '일정'], ['academic', '학사관리'], ['ingang', '인강', lecturePending], ['study', '학습'], ['write', '학습 배부'], ['board', '학생 현황', a.total]]
+    : session.isDirector
       ? [['today', '오늘'], ['guide', '사용 안내'], ['week', '주간'], ...roadmapTab, ['month', '일정'], ['academic', '학사관리'], ['ingang', '인강', lecturePending], ['study', '학습'], ['write', '학습 배부'], ['results', '결과지'],
          ['board', '학생 현황', a.total], ['staff', '학생 관리'], ['settings', '설정']]
       : [];
@@ -2690,14 +2774,14 @@ function viewLock() {
     '<div class="card-sub mb14">인터넷 연결을 확인한 뒤 같은 연결 링크로 다시 시도할 수 있습니다.</div>' +
     '<button class="btn btn-primary btn-block" data-act="adminretry"' + (adminConnectBusy ? ' disabled' : '') + '>기기 연결 다시 시도</button></div>' : '') +
   '<div class="card mt14">' +
-    '<div class="card-title">원장 로그인</div>' +
-    '<div class="card-sub mb14">처음 한 번만 로그인하면 이 기기에서 90일간 자동으로 연결됩니다.</div>' +
-    '<div class="field"><input class="in" id="loginId" inputmode="text" placeholder="아이디" autocomplete="username" autocapitalize="none" spellcheck="false" value="' + esc(state.settings.adminLoginId || '') + '"></div>' +
+    '<div class="card-title">관리자 로그인</div>' +
+    '<div class="card-sub mb14">원장 또는 관리 선생님 아이디로 로그인하세요. 처음 한 번만 로그인하면 이 기기에서 90일간 자동으로 연결됩니다.</div>' +
+    '<div class="field"><input class="in" id="loginId" inputmode="text" placeholder="아이디" autocomplete="username" autocapitalize="none" spellcheck="false" value="' + esc(state.settings.managerLoginId || state.settings.adminLoginId || '') + '"></div>' +
     '<div class="field"><input class="in" id="pin" type="password" inputmode="text" placeholder="비밀번호" autocomplete="current-password" autocapitalize="none" spellcheck="false"></div>' +
     '<button class="btn btn-primary btn-block" data-act="login">로그인</button>' +
-    '<button class="btn btn-ghost btn-block mt14" data-act="recoverpin">로그인 계정 재설정</button>' +
+    '<button class="btn btn-ghost btn-block mt14" data-act="recoverpin">원장 로그인 계정 재설정</button>' +
     '<hr class="sep">' +
-    '<div class="hint">최대 5대의 컴퓨터·태블릿에서 자동 로그인할 수 있습니다.</div>' +
+    '<div class="hint">계정마다 최대 5대의 컴퓨터·태블릿에서 자동 로그인할 수 있습니다.</div>' +
   '</div>';
 }
 
@@ -4904,7 +4988,7 @@ function lectureRequestById(id) {
 function lectureResponseFor(id) {
   const req = lectureRequestById(id);
   return req ? state.tasks.find(task => !task.deleted && task.id === 'lecture-response-' + id &&
-    task.kind === 'lecture_response' && task.lectureRequestId === id && task.staffId === req.staffId && task.origin === 'admin') || null : null;
+    task.kind === 'lecture_response' && task.lectureRequestId === id && task.staffId === req.staffId && ['admin', 'manager'].includes(task.origin)) || null : null;
 }
 function lectureRequestStatus(req) {
   if (!req || req.cancelledAt) return 'cancelled';
@@ -4927,9 +5011,10 @@ function setLectureResponse(req, status, note) {
   if (!session.isAdmin || session.isStaffLink || !req || req.cancelledAt || !['reviewing', 'answered'].includes(status)) return null;
   const responseId = 'lecture-response-' + req.id;
   let response = state.tasks.find(task => task.id === responseId);
+  if (response && !session.isDirector && !(session.isManagerAccount && response.origin === 'manager')) return null;
   if (!response) { response = { id: responseId, createdAt: now() }; state.tasks.push(response); }
   Object.assign(response, {
-    groupId: responseId, kind: 'lecture_response', lectureRequestId: req.id, staffId: req.staffId, origin: 'admin',
+    groupId: responseId, kind: 'lecture_response', lectureRequestId: req.id, staffId: req.staffId, origin: actor(),
     title: '인강 요청 답변 · ' + req.courseName, status: status, responseNote: note,
     requestRevision: req.requestRevision || 1, requestSnapshot: buildLectureRequestSummary(req),
     repeat: 'request', source: '', start: '', end: '', days: [], steps: [], carry: false, deleted: false, updatedAt: now()
@@ -4941,6 +5026,8 @@ function lectureRequestCard(req, admin) {
   const status = lectureRequestStatus(req), response = lectureResponseFor(req.id);
   const student = staffById(req.staffId);
   const canEdit = session.isStaffLink && !isManager() && req.staffId === session.staffId && ['requested', 'changed'].includes(status);
+  const canRespond = admin && !req.cancelledAt && (!response || session.isDirector ||
+    (session.isManagerAccount && response.origin === 'manager'));
   return '<div class="material-request"><div class="request-queue-head"><b>' +
     esc(admin && student ? student.name + ' · ' : '') + esc(req.courseName) + '</b>' +
     '<span class="pill ' + (lectureRequestActive(req) ? 'warn' : '') + '">' + esc(LECTURE_REQUEST_STATUS[status]) + '</span></div>' +
@@ -4952,7 +5039,7 @@ function lectureRequestCard(req, admin) {
     '<div class="academic-actions">' +
       (canEdit ? '<button class="btn btn-sm btn-ghost" data-act="lecturerequestopen" data-id="' + esc(req.id) + '">요청 수정</button>' +
         '<button class="btn btn-sm btn-danger" data-act="lecturerequestcancel" data-id="' + esc(req.id) + '" data-revision="' + Number(req.requestRevision || 1) + '">취소</button>' : '') +
-      (admin && !req.cancelledAt ? '<button class="btn btn-sm btn-primary" data-act="lectureresponseopen" data-id="' + esc(req.id) + '">확인·답변</button>' +
+      (canRespond ? '<button class="btn btn-sm btn-primary" data-act="lectureresponseopen" data-id="' + esc(req.id) + '">확인·답변</button>' +
         '<button class="btn btn-sm btn-ghost" data-act="lecturerequestregister" data-id="' + esc(req.id) + '">강좌 등록 열기</button>' : '') +
     '</div></div>';
 }
@@ -5486,7 +5573,7 @@ function studyRoadmapCard(student) {
   return '<div class="card study-roadmap-card" id="studyRoadmap"><div class="study-roadmap-goal"><div>' +
     '<div class="card-sub">🎯 목표 학교</div><div class="study-roadmap-school">' + esc(roadmap.targetSchool) + '</div>' +
     '<div class="card-sub mt8">교재별 남은 분량을 학습 요일에 자동으로 나눈 계획입니다.</div></div>' +
-    (session.isAdmin && !session.isStaffLink ? '<button class="btn btn-sm btn-ghost" data-act="roadmapopen" data-id="' + esc(student.id) + '">로드맵 설정</button>' :
+    (session.isDirector && !session.isStaffLink ? '<button class="btn btn-sm btn-ghost" data-act="roadmapopen" data-id="' + esc(student.id) + '">로드맵 설정</button>' :
       '<span class="pill">전체 ' + pct + '%</span>') + '</div>' +
     '<div class="study-roadmap-list">' + summaries.map(row => {
       const item = row.item, progress = row.progress;
@@ -5517,7 +5604,7 @@ function studyRoutineRoadmapCard(student) {
     '<div class="card-sub">🧭 장기 학습 계획</div><div class="study-roadmap-school">' + esc(student.name) + ' 맞춤 학습</div>' +
     '<div class="card-sub mt8">' + esc(from.replace(/-/g, '.')) + ' ~ ' + esc(to.replace(/-/g, '.')) +
       ' · 오늘 체크리스트와 연결된 반복 학습입니다.</div></div>' +
-    (session.isAdmin && !session.isStaffLink && !studyRoadmapActive(student)
+    (session.isDirector && !session.isStaffLink && !studyRoadmapActive(student)
       ? '<button class="btn btn-sm btn-ghost" data-act="roadmapopen" data-id="' + esc(student.id) + '">교재 계획 추가</button>'
       : '<span class="pill">' + tasks.length + '개 계획</span>') + '</div>' +
     '<div class="study-roadmap-list">' + tasks.map(task =>
@@ -5556,14 +5643,14 @@ function viewRoadmap() {
   if (!me) return emptyStaffCard();
   const h = session.isStaffLink ? '' : staffSwitcher(me.id);
   if (!studyRoadmapAvailable(me)) return h + '<div class="card"><div class="empty"><b>🧭</b><strong>' + esc(me.name) + ' 학생에게 배정된 로드맵이 없습니다.</strong><br>목표 학교와 교재 계획을 등록하면 이 탭에 표시됩니다.</div>' +
-    (!me.owner && !me.manager ? '<button class="btn btn-primary btn-block" data-act="roadmapopen" data-id="' + esc(me.id) + '">교재 로드맵 추가</button>' : '') + '</div>';
+    (session.isDirector && !me.owner && !me.manager ? '<button class="btn btn-primary btn-block" data-act="roadmapopen" data-id="' + esc(me.id) + '">교재 로드맵 추가</button>' : '') + '</div>';
   const mon = mondayOf(today());
   const days = Array.from({ length: 7 }, (_, index) => addDays(mon, index));
   return h + studyRoadmapCard(me) + studyRoutineRoadmapCard(me) + studyRoadmapWeekCard(me, mon, days);
 }
 
 function studyRoadmapModal(staffId) {
-  if (!session.isAdmin || session.isStaffLink) return;
+  if (!session.isDirector || session.isStaffLink) return;
   const student = staffById(staffId);
   if (!student || student.deleted || student.owner || student.manager) return toast('학생을 다시 선택해 주세요');
   const roadmap = studyRoadmapOf(student);
@@ -6205,7 +6292,7 @@ function metamathResponseFor(requestId) {
   if (!request) return null;
   return state.tasks.find(task => !task.deleted && task.id === 'metamath-response-' + requestId &&
     task.kind === 'metamath_response' && task.metamathRequestId === requestId &&
-    task.staffId === request.staffId && task.origin === 'admin') || null;
+    task.staffId === request.staffId && ['admin', 'manager'].includes(task.origin)) || null;
 }
 
 function ensureMetamathResponse(req) {
@@ -6217,7 +6304,7 @@ function ensureMetamathResponse(req) {
   };
   Object.assign(response, {
     id: responseId, groupId: responseId, kind: 'metamath_response', metamathRequestId: req.id,
-    staffId: req.staffId, origin: 'admin', deleted: false
+    staffId: req.staffId, origin: actor(), deleted: false
   });
   if (!state.tasks.includes(response)) state.tasks.push(response);
   return response;
@@ -6244,6 +6331,8 @@ function buildMetamathRequestSummary(req) {
 }
 
 function setMetamathResponse(req, status, note) {
+  const current = metamathResponseFor(req.id);
+  if (current && !canEditTask(current)) return null;
   const response = ensureMetamathResponse(req);
   Object.assign(response, {
     status: status, source: '', resourceUrl: '', studySubject: 'math',
@@ -6259,6 +6348,7 @@ function setMetamathResponse(req, status, note) {
 function assignMetamathRequest(req, fields) {
   const assigned = metamathResponseFor(req.id);
   if (assigned && assigned.status === 'assigned' && assigned.source === 'metamath') return assigned;
+  if (assigned && !canEditTask(assigned)) return null;
   const task = ensureMetamathResponse(req);
   Object.assign(task, {
     status: 'assigned', source: 'metamath', resourceUrl: fields.resourceUrl || '',
@@ -6282,6 +6372,7 @@ function metamathRequestCard(req, admin) {
   const active = status === 'requested' || status === 'changed' || status === 'preparing';
   const overdue = active && req.processingDate && req.processingDate < today();
   const canEdit = session.isStaffLink && !isManager() && req.staffId === session.staffId && status === 'requested';
+  const canRespond = admin && (!response || canEditTask(response));
   return '<div class="material-request ' + status + (overdue ? ' overdue' : '') + '"><div class="request-queue-head"><div>' +
     '<div class="row wraprow" style="gap:6px"><b>' + esc(admin && staff ? staff.name + ' · ' : '') + esc(req.unit || '단원 미입력') + '</b>' +
       '<span class="pill ' + (status === 'assigned' ? '' : overdue ? 'bad' : 'warn') + '">' + esc(overdue ? '처리 지연' : METAMATH_REQUEST_STATUS[status]) + '</span></div>' +
@@ -6294,9 +6385,9 @@ function metamathRequestCard(req, admin) {
       (canEdit ? '<button class="btn btn-sm btn-ghost" data-act="metamathrequestopen" data-id="' + esc(req.id) + '">수정</button>' +
         '<button class="btn btn-sm btn-danger" data-act="metamathrequestcancel" data-id="' + esc(req.id) + '">취소</button>' : '') +
       (admin && active ? '<a class="btn btn-sm btn-ghost" href="' + esc(METAMATH_CENTER_URL) + '" target="_blank" rel="noopener noreferrer">교실홈 열기 ↗</a>' : '') +
-      (admin && (status === 'requested' || status === 'changed') ? '<button class="btn btn-sm" data-act="metamathrequeststatus" data-id="' + esc(req.id) + '" data-status="preparing">' +
+      (canRespond && (status === 'requested' || status === 'changed') ? '<button class="btn btn-sm" data-act="metamathrequeststatus" data-id="' + esc(req.id) + '" data-status="preparing">' +
         (status === 'changed' ? '변경 확인 후 제작' : '제작 시작') + '</button>' : '') +
-      (admin && status === 'preparing' ? '<button class="btn btn-sm btn-primary" data-act="metamathrequestassign" data-id="' + esc(req.id) + '">문제지 배정하기</button>' : '') +
+      (canRespond && status === 'preparing' ? '<button class="btn btn-sm btn-primary" data-act="metamathrequestassign" data-id="' + esc(req.id) + '">문제지 배정하기</button>' : '') +
       (status === 'assigned' && response && response.start ? '<button class="btn btn-sm btn-primary" data-act="daypick" data-date="' +
         esc(response.start) + '">학습일 보기 · ' + esc(shortDate(response.start)) + '</button>' : '') +
     '</div></div>';
@@ -7812,7 +7903,7 @@ function cachePointExchangeResponse(staffId, requestId, response) {
 }
 
 async function runPointExchangeAdminAction(staffId, requestId, action) {
-  if (!session.isAdmin || session.isStaffLink || !['claim', 'reject', 'takeover', 'fulfill', 'cancel'].includes(action) || pointExchangeUi.busy) return null;
+  if (!session.isDirector || session.isStaffLink || !['claim', 'reject', 'takeover', 'fulfill', 'cancel'].includes(action) || pointExchangeUi.busy) return null;
   const student = staffById(staffId);
   if (!state.settings.adminToken) {
     toast('기프트 카드 처리는 원장 기기 로그인을 다시 연결한 뒤 이용해 주세요');
@@ -7921,7 +8012,7 @@ function pointHistoryModal(staffId) {
   const student = staffById(staffId);
   if (!student || student.owner || student.manager) return;
   const ownStudent = session.isStaffLink && !isManager() && session.staffId === staffId;
-  const director = session.isAdmin && !session.isStaffLink;
+  const director = session.isDirector && !session.isStaffLink;
   if (!ownStudent && !director) return;
   const account = pointAccount(staffId, today());
   const rule = pointRuleFor(today());
@@ -8319,7 +8410,7 @@ function currentReportSnapshot(staffId, periodType, periodKey) {
 }
 
 function publishReportSnapshot(staffId, periodType, periodKey, asOf) {
-  if (!session.isAdmin) return null;
+  if (!session.isDirector) return null;
   const at = Number(asOf == null ? now() : asOf);
   const snapshot = buildReportSnapshot(staffId, periodType, periodKey, at);
   if (!snapshot || snapshot.periodStart > ymd(new Date(at))) return null;
@@ -8334,7 +8425,7 @@ function publishReportSnapshot(staffId, periodType, periodKey, asOf) {
     seriesKey: periodType + ':' + staffId + ':' + periodKey,
     supersedesId: previous ? previous.id : '', action: 'publish',
     snapshot: JSON.parse(JSON.stringify(snapshot)), publishedAt: at,
-    origin: 'admin', repeat: 'none', days: [], start: '', end: '', carry: false,
+    origin: actor(), repeat: 'none', days: [], start: '', end: '', carry: false,
     createdAt: at, updatedAt: at, deleted: false
   };
   state.tasks.push(task); save(); queueSync();
@@ -8342,7 +8433,7 @@ function publishReportSnapshot(staffId, periodType, periodKey, asOf) {
 }
 
 function withdrawReportSnapshot(staffId, periodType, periodKey, at) {
-  if (!session.isAdmin) return null;
+  if (!session.isDirector) return null;
   const previous = reportSnapshotsFor(staffId, periodType, periodKey)[0] || null;
   if (!previous || previous.reportStatus !== 'published') return null;
   const time = Number(at == null ? now() : at);
@@ -8354,7 +8445,7 @@ function withdrawReportSnapshot(staffId, periodType, periodKey, at) {
     reportStatus: 'withdrawn', reportRevision: (Number(previous.reportRevision) || 0) + 1,
     seriesKey: previous.seriesKey || (periodType + ':' + staffId + ':' + periodKey),
     supersedesId: previous.id, action: 'revoke', snapshot: null, withdrawnAt: time,
-    origin: 'admin', repeat: 'none', days: [], start: '', end: '', carry: false,
+    origin: actor(), repeat: 'none', days: [], start: '', end: '', carry: false,
     createdAt: time, updatedAt: time, deleted: false
   };
   state.tasks.push(task); save(); queueSync();
@@ -8425,13 +8516,17 @@ function reportPanel(periodType, student, periodKey) {
   if (published) status = '<span class="pill">발행 ' + (Number(latest.reportRevision) || 1) + '차</span>';
   else if (latest && latest.reportStatus === 'withdrawn') status = '<span class="pill bad">철회됨</span>';
   let actions = '';
-  if (session.isAdmin) {
+  if (session.isDirector) {
     actions = '<button class="btn btn-ghost" data-act="reportpreview" data-type="' + periodType + '" data-key="' + periodKey + '">현재 기록 미리보기</button>' +
       '<button class="btn btn-primary" data-act="reportpublish" data-type="' + periodType + '" data-key="' + periodKey + '">' +
         (published ? '최신 데이터로 다시 발행' : '리포트 발행하기') + '</button>' +
       (published ? '<button class="btn btn-ghost" data-act="reportopen" data-id="' + latest.id + '">발행본 보기</button>' +
         '<button class="btn btn-ghost" data-act="reportprint" data-id="' + latest.id + '">인쇄 / PDF 저장</button>' +
         '<button class="btn btn-danger" data-act="reportwithdraw" data-type="' + periodType + '" data-key="' + periodKey + '">발행 철회</button>' : '');
+  } else if (session.isManagerAccount) {
+    actions = '<button class="btn btn-ghost" data-act="reportpreview" data-type="' + periodType + '" data-key="' + periodKey + '">현재 기록 미리보기</button>' +
+      (published ? '<button class="btn btn-primary" data-act="reportopen" data-id="' + latest.id + '">발행본 보기</button>' +
+        '<button class="btn btn-ghost" data-act="reportprint" data-id="' + latest.id + '">인쇄 / PDF 저장</button>' : '');
   } else if (published) {
     actions = '<button class="btn btn-primary" data-act="reportopen" data-id="' + latest.id + '">발행본 보기</button>' +
       '<button class="btn btn-ghost" data-act="reportprint" data-id="' + latest.id + '">인쇄 / PDF 저장</button>';
@@ -9184,7 +9279,7 @@ function commitExamPlan(staffId, exam, draft) {
       steps: (item.steps || []).map((label, index) => ({ id: item.planItemKey + '-step-' + (index + 1), label: label })),
       target: 0, unit: '회', time: item.s || '', priority: 'high',
       repeat: 'once', days: [], start: item.date, end: '', carry: true,
-      origin: 'admin', requiresClaim: false, createdAt: existing ? existing.createdAt : stamp, updatedAt: stamp, deleted: false
+      origin: actor(), requiresClaim: false, createdAt: existing ? existing.createdAt : stamp, updatedAt: stamp, deleted: false
     };
     if (existing) Object.assign(existing, next);
     else state.tasks.push(next);
@@ -9370,11 +9465,12 @@ function materialRequestModal(exam, existing) {
 
 function setMaterialResponse(req, status, note) {
   let response = materialResponseFor(req.id);
+  if (response && !canEditTask(response)) return null;
   if (!response) {
     response = {
       id: 'material-response-' + req.id, groupId: 'material-response-' + req.id,
       kind: 'material_response', materialRequestId: req.id, staffId: req.staffId,
-      title: '자료요청 처리 · ' + (req.subject || ''), origin: 'admin',
+      title: '자료요청 처리 · ' + (req.subject || ''), origin: actor(),
       repeat: 'once', days: [], start: req.neededBy || today(), end: '', carry: false,
       createdAt: now(), deleted: false
     };
@@ -9393,11 +9489,12 @@ function provideMaterialRequest(req, resourceUrl, due) {
   const existing = materialProvidedTask(req.id);
   if (existing) return existing;
   let task = materialResponseFor(req.id);
+  if (task && !canEditTask(task)) return null;
   if (!task) {
     task = {
       id: 'material-response-' + req.id, groupId: 'material-response-' + req.id,
       kind: 'material_response', materialRequestId: req.id,
-      staffId: req.staffId, origin: 'admin', createdAt: now(), deleted: false
+      staffId: req.staffId, origin: actor(), createdAt: now(), deleted: false
     };
     state.tasks.push(task);
   }
@@ -9443,6 +9540,7 @@ function materialRequestCard(req, admin) {
   const response = materialResponseFor(req.id);
   const provided = materialProvidedTask(req.id);
   const canEdit = session.isStaffLink && !isManager() && req.staffId === session.staffId && (status === 'requested' || status === 'needs_info' || status === 'resubmitted');
+  const canRespond = admin && (!response || canEditTask(response));
   return '<div class="material-request ' + status + '"><div class="request-queue-head"><div><div class="row wraprow" style="gap:6px"><b>' +
       esc(admin && staff ? staff.name + ' · ' : '') + esc(req.subject || '과목 미지정') + '</b><span class="pill ' +
       (status === 'provided' ? '' : status === 'needs_info' || status === 'unavailable' ? 'bad' : 'warn') + '">' + esc(MATERIAL_STATUS[status] || status) + '</span></div>' +
@@ -9454,7 +9552,7 @@ function materialRequestCard(req, admin) {
       (canEdit ? '<button class="btn btn-sm btn-ghost" data-act="matrequestopen" data-id="' + req.id + '">요청 보완</button>' : '') +
       (canEdit && !response ? '<button class="btn btn-sm btn-danger" data-act="matrequestcancel" data-id="' + req.id + '">취소</button>' : '') +
       (provided ? '<button class="btn btn-sm btn-primary" data-go="study">자료 학습하기</button>' : '') +
-      (admin && status !== 'provided' ? '<button class="btn btn-sm btn-ghost" data-act="matrequeststatus" data-id="' + req.id + '" data-status="needs_info">보완 요청</button>' +
+      (canRespond && status !== 'provided' ? '<button class="btn btn-sm btn-ghost" data-act="matrequeststatus" data-id="' + req.id + '" data-status="needs_info">보완 요청</button>' +
         '<button class="btn btn-sm" data-act="matrequeststatus" data-id="' + req.id + '" data-status="preparing">자료 찾는 중</button>' +
         '<button class="btn btn-sm btn-primary" data-act="matrequeststatus" data-id="' + req.id + '" data-status="provide">자료 제공</button>' +
         '<button class="btn btn-sm btn-danger" data-act="matrequeststatus" data-id="' + req.id + '" data-status="unavailable">제공 어려움</button>' : '') +
@@ -9475,6 +9573,7 @@ function academicItemCard(item, studentCanRequest) {
   const performanceSubmission = performanceReady ? performanceSubmissionFor(item) : null;
   const canAddPerformanceInfo = isPerformance && studentCanRequest && item.staffId === session.staffId &&
     (!performanceSubmission || performanceSubmission.status === 'rejected' || performanceSubmission.status === 'answered');
+  const operatorCanEdit = session.isAdmin && canEditTask(item);
   return '<div class="academic-item"><div class="academic-item-head"><div class="academic-icon">' + type.icon + '</div><div>' +
     '<div class="row wraprow" style="gap:6px"><b>' + esc(item.title) + '</b>' + taskStudySubjectTag(item) + '<span class="pill warn">' + esc(monthDday(date)) + '</span></div>' +
     '<div class="small muted">' + esc(date) + (isExam && item.grade ? ' · ' + esc(item.grade) : '') + (isExam && item.semester ? ' · ' + esc(item.semester) : '') + '</div>' +
@@ -9486,7 +9585,7 @@ function academicItemCard(item, studentCanRequest) {
     (isExam && item.range ? '<div class="material-summary">' + esc(item.range) + '</div>' : '') +
     (plan && plan.total ? '<div class="hint mt8"><b>시험플랜 ' + plan.done + '/' + plan.total + '회 완료</b>' +
       (plan.finishDate ? ' · ' + shortDate(plan.finishDate) + '까지 계획' : '') + '</div>' : '') + '</div>' +
-    (session.isAdmin ? '<button class="btn btn-sm btn-danger" data-act="academicdelete" data-id="' + item.id + '">삭제</button>' : '') + '</div>' +
+    (operatorCanEdit ? '<button class="btn btn-sm btn-danger" data-act="academicdelete" data-id="' + item.id + '">삭제</button>' : '') + '</div>' +
     (isExam && (item.steps || []).length ? '<div style="margin-top:10px"><div class="bar mini"><i style="width:' + prog.pct + '%"></i></div>' +
       item.steps.map((step, index) => '<div class="step ' + (check && check.steps && check.steps[step.id] ? 'on' : '') + '"><button class="sbox" ' +
         (canCheck ? 'data-act="step" data-id="' + item.id + '" data-date="' + date + '" data-step="' + step.id + '"' : 'disabled') + '>✓</button><span>' + (index + 1) + '. ' + esc(step.label) + '</span></div>').join('') + '</div>' : '') +
@@ -9499,7 +9598,7 @@ function academicItemCard(item, studentCanRequest) {
       (canAddPerformanceInfo ? '<button class="btn btn-primary btn-block mt14" data-act="performanceinstruction" data-id="' + item.id + '">' +
         (performanceSubmission ? '안내 다시 적기 · 사진 올리기' : '직접 적기 · 사진 올리기') + '</button>' : '') + '</div>' : '') +
     '<div class="academic-actions">' +
-      (session.isAdmin && isExam ? '<button class="btn btn-navy" data-act="examplanopen" data-id="' + item.id + '">' +
+      (operatorCanEdit && isExam ? '<button class="btn btn-navy" data-act="examplanopen" data-id="' + item.id + '">' +
         (plan && plan.total ? '시험플랜 재계획' : '시험대비 플랜 만들기') + '</button>' : '') +
       (studentCanRequest && isExam ? '<button class="btn btn-primary" data-act="matrequestopen" data-exam="' + item.id + '">시험대비 자료 요청</button>' : '') +
     '</div></div>';
@@ -9944,6 +10043,7 @@ function resultSheetCard(item) {
 }
 
 function viewResults() {
+  if (!session.isDirector) return '';
   if (!session.isAdmin || session.isStaffLink) return '';
   const me = currentStaff();
   if (!me) return emptyStaffCard();
@@ -10922,6 +11022,7 @@ function staffAccessPanels(student) {
 }
 
 function viewStaffAdmin() {
+  if (!session.isDirector) return '';
   if (!session.isAdmin || session.isStaffLink) return '';
   const list = liveStaff().slice().sort(studentNameCompare);
   const normalizedQuery = normalizeStudentSearch(staffSearchQuery);
@@ -11007,22 +11108,82 @@ function viewStaffAdmin() {
 }
 
 /* ── 설정 ── */
+const managerAccountsUi = { accounts: [], loaded: false, loading: false, error: '' };
+
+async function loadManagerAccounts(force) {
+  if (!session.isDirector || managerAccountsUi.loading || (managerAccountsUi.loaded && !force)) return;
+  managerAccountsUi.loading = true;
+  managerAccountsUi.error = '';
+  try {
+    const data = await sync.managerAccounts('list');
+    managerAccountsUi.accounts = Array.isArray(data.accounts) ? data.accounts : [];
+    managerAccountsUi.loaded = true;
+  } catch (error) {
+    managerAccountsUi.error = String(error && error.message || error);
+    managerAccountsUi.loaded = true;
+  } finally {
+    managerAccountsUi.loading = false;
+    if (route === 'settings' && session.isDirector) renderAfterSync();
+  }
+}
+
+function managerAccountsCard() {
+  const rows = managerAccountsUi.accounts || [];
+  let body = '';
+  if (!managerAccountsUi.loaded || managerAccountsUi.loading) {
+    body = '<div class="small muted">계정 목록을 불러오는 중입니다…</div>';
+  } else if (managerAccountsUi.error) {
+    body = '<div class="hint bad">' + esc(managerAccountsUi.error) + '</div>' +
+      '<button class="btn btn-ghost mt14" data-act="manageraccountsretry">다시 불러오기</button>';
+  } else if (!rows.length) {
+    body = '<div class="empty" style="padding:22px 8px"><b>👩‍🏫</b>아직 등록한 관리 선생님 계정이 없습니다.</div>';
+  } else {
+    body = rows.map(account => '<div class="task"><div class="task-body"><div class="task-t">' +
+      esc(account.displayName) + ' <span class="tag ' + (account.active ? 'ok' : 'high') + '">' +
+      (account.active ? '사용 중' : '사용 중지') + '</span></div><div class="meta"><span class="tag">아이디 ' +
+      esc(account.loginId) + '</span><span class="tag">연결 기기 ' + Number(account.deviceCount || 0) + '/5</span>' +
+      (account.lastLoginAt ? '<span class="tag time">최근 로그인 ' + esc(new Date(account.lastLoginAt).toLocaleDateString('ko-KR')) + '</span>' : '') +
+      '</div><div class="row wraprow mt8" style="gap:8px"><button class="btn btn-sm btn-ghost" data-act="manageraccountedit" data-id="' + esc(account.accountId) + '">수정·비밀번호 재설정</button>' +
+      '<button class="btn btn-sm ' + (account.active ? 'btn-danger' : 'btn-primary') + '" data-act="manageraccountactive" data-id="' + esc(account.accountId) + '" data-v="' + (account.active ? '0' : '1') + '">' +
+      (account.active ? '사용 중지' : '다시 사용') + '</button>' +
+      (account.deviceCount ? '<button class="btn btn-sm btn-ghost" data-act="manageraccountrevoke" data-id="' + esc(account.accountId) + '">기기 인증 해제</button>' : '') +
+      '</div></div></div>').join('');
+  }
+  return '<div class="card"><div class="between"><div><div class="card-title">관리 선생님 계정</div>' +
+    '<div class="card-sub">선생님별 아이디·비밀번호를 만들고 사용 상태를 관리합니다. 선생님은 플래너 운영·학습 배부·요청 처리를 이용하며 원장 전용 정보에는 접근할 수 없습니다.</div></div>' +
+    '<button class="btn btn-primary" data-act="manageraccountnew">＋ 계정 추가</button></div><div class="mt14">' + body + '</div>' +
+    '<div class="hint mt14">비밀번호 변경·사용 중지·기기 인증 해제 시 해당 선생님 기기만 다시 로그인해야 합니다.</div></div>';
+}
+
+function managerAccountModal(account) {
+  if (!session.isDirector) return;
+  const editing = !!account;
+  modal(editing ? '관리 선생님 계정 수정' : '관리 선생님 계정 추가',
+    '<div class="field"><label class="fl">선생님 이름</label><input class="in" id="managerName" maxlength="40" autocomplete="name" placeholder="예: 홍길동" value="' + esc(account ? account.displayName : '') + '"></div>' +
+    '<div class="field"><label class="fl">로그인 아이디</label><input class="in" id="managerLoginId" maxlength="64" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="영문·숫자 3자 이상" value="' + esc(account ? account.loginId : '') + '"></div>' +
+    '<div class="field"><label class="fl">' + (editing ? '새 비밀번호 (변경할 때만)' : '최초 비밀번호') + '</label><input class="in" id="managerPassword" type="password" maxlength="128" autocomplete="new-password" autocapitalize="none" spellcheck="false" placeholder="8자 이상"></div>' +
+    '<div class="hint">비밀번호는 서버에 원문으로 저장되지 않습니다. 변경하면 이 선생님의 기존 기기 인증만 해제됩니다.</div>',
+    '<button class="btn btn-primary" data-act="manageraccountsave" data-id="' + esc(account ? account.accountId : '') + '">저장</button>' +
+    '<button class="btn btn-ghost" data-act="closemodal">취소</button>');
+}
+
 function viewSettings() {
+  if (!session.isDirector) return '';
   const s = state.settings;
   const lastTxt = sync.last ? new Date(sync.last).toLocaleString('ko-KR') : '아직 없음';
   const connected = !!(s.adminToken || s.syncSecret);
+  if (!managerAccountsUi.loaded && !managerAccountsUi.loading) setTimeout(() => loadManagerAccounts(false), 0);
   return '<div class="card">' +
-    '<div class="card-title">관리자 기기 연결</div>' +
-    '<div class="card-sub mb14">관리 선생님이 사용할 패드에서는 QR을 스캔하고, 컴퓨터에서는 연결 링크를 한 번 열면 됩니다. ' +
-      '비밀번호나 원장 비밀키를 전달할 필요가 없습니다.</div>' +
+    '<div class="card-title">원장 기기 연결</div>' +
+    '<div class="card-sub mb14">원장용 패드에서는 QR을 스캔하고, 컴퓨터에서는 연결 링크를 한 번 열면 됩니다. 관리 선생님은 아래의 개인 계정으로 로그인합니다.</div>' +
     (connected
-      ? '<div class="row wraprow" style="gap:8px"><button class="btn btn-navy" data-act="adminqr">관리자 QR 만들기</button>' +
+      ? '<div class="row wraprow" style="gap:8px"><button class="btn btn-navy" data-act="adminqr">원장 기기 QR 만들기</button>' +
         '<button class="btn btn-ghost" data-act="adminlink">연결 링크 복사</button>' +
         '<button class="btn btn-ghost" data-act="syncnow">지금 동기화</button></div>'
       : '<div class="hint" style="color:var(--coral)">이 기기의 동기화 연결을 먼저 복구해야 합니다.</div>') +
     '<div class="small muted mt14">마지막 동기화: ' + esc(lastTxt) +
       (sync.err ? ' · <span style="color:var(--coral)">' + esc(sync.err) + '</span>' : '') + '</div>' +
-    (connected ? '<div class="hint mt14">✓ 연결됨 · QR과 링크는 10분 동안 한 기기에서 한 번만 사용할 수 있습니다. 연결된 패드는 원장 모드 전체 권한을 가지며, 관리자 기기는 최대 5대입니다.</div>' : '') +
+    (connected ? '<div class="hint mt14">✓ 연결됨 · QR과 링크는 10분 동안 한 기기에서 한 번만 사용할 수 있습니다. 연결된 패드는 원장 모드 전체 권한을 가지며, 원장 기기는 최대 5대입니다.</div>' : '') +
     '<details class="mt14"><summary class="small muted">비밀키로 긴급 연결</summary>' +
       '<div class="field mt14"><label class="fl">CONSULT_ADMIN_SECRET</label>' +
       '<input class="in" id="cfgSecret" type="password" value="' + esc(s.syncSecret) + '"></div>' +
@@ -11045,7 +11206,7 @@ function viewSettings() {
     '<div class="row" style="gap:8px">' +
       '<button class="btn btn-primary" data-act="saveadminaccount">계정 저장</button>' +
       '<button class="btn btn-ghost" data-act="logout">잠그기</button></div>' +
-  '</div>';
+  '</div>' + managerAccountsCard();
 }
 
 /* ══════════════════════════════════════════════════════
@@ -11139,11 +11300,11 @@ function studentQrModal(staffId, link) {
 function adminDeviceQrModal(link) {
   if (typeof WBQR === 'undefined') throw new Error('QR 모듈을 불러오지 못했습니다');
   const qr = WBQR.svg(link, { size: 280 });
-  modal('관리자 기기 연결 QR',
+  modal('원장 기기 연결 QR',
     '<div class="student-link-qr">' + qr + '</div>' +
-    '<div class="guide mt14"><b>패드 연결 방법</b>관리 선생님이 사용할 패드의 카메라로 QR을 스캔하면 비밀번호 입력 없이 원장 모드로 연결됩니다.</div>' +
-    '<div class="guide bad mt14"><b>전체 관리자 권한</b>연결된 패드는 학생 정보·결과지·설정·계정 변경을 포함한 원장 모드 전체 기능을 사용할 수 있습니다. 신뢰하는 관리 선생님 기기에만 연결하고 QR을 촬영·전달하거나 단체방에 공유하지 마세요.</div>' +
-    '<div class="hint mt14">이 QR은 10분 안에 한 기기에서 한 번만 사용할 수 있습니다. 관리자 기기는 원장 기기를 포함해 최대 5대이며, 여섯 번째 기기를 연결하면 가장 오래된 기기 인증이 해제됩니다.</div>',
+    '<div class="guide mt14"><b>패드 연결 방법</b>원장이 사용할 패드의 카메라로 QR을 스캔하면 비밀번호 입력 없이 원장 모드로 연결됩니다.</div>' +
+    '<div class="guide bad mt14"><b>원장 전체 권한</b>연결된 패드는 학생 정보·결과지·설정·계정 변경을 포함한 원장 모드 전체 기능을 사용할 수 있습니다. 원장 본인 기기에만 연결하고 QR을 촬영·전달하거나 단체방에 공유하지 마세요.</div>' +
+    '<div class="hint mt14">이 QR은 10분 안에 한 기기에서 한 번만 사용할 수 있습니다. 원장 기기는 최대 5대이며, 여섯 번째 기기를 연결하면 가장 오래된 기기 인증이 해제됩니다.</div>',
     '<button class="btn btn-primary btn-block mt14" data-act="closemodal">확인</button>');
 }
 
@@ -11398,7 +11559,7 @@ function saveEditedTask() {
     if (!canEditTask(t)) { closeModal(); return toast('원장님이 내린 지시는 수정할 수 없습니다'); }
     if (t.source === 'exam_material' && resourceEl && !resourceUrl) return toast('시험대비자료의 보기 전용 링크를 넣어주세요');
     if (actor() === 'staff') t.lastEditBy = 'staff';
-    else if (t.origin !== 'staff') t.lastEditBy = 'admin';
+    else if (t.origin !== 'staff') t.lastEditBy = actor();
   }
 
   const learningTask = LEARNING_SOURCES[t.source] || null;
@@ -11677,6 +11838,20 @@ function applyAssignments(input, preConfirmed) {
 /* ══════════════════════════════════════════════════════
    10. 이벤트
    ══════════════════════════════════════════════════════ */
+const DIRECTOR_ONLY_ACTIONS = new Set([
+  'saveadminaccount', 'manageraccountsretry', 'manageraccountnew', 'manageraccountedit',
+  'manageraccountsave', 'manageraccountactive', 'manageraccountrevoke',
+  'adminlink', 'adminqr', 'savecfg', 'export', 'import',
+  'copylink', 'studentqr', 'alllinks', 'addstaff', 'delstaff', 'toggleowner', 'togglemanager',
+  'subscriptionopen', 'subscriptionsave', 'subscriptionend', 'subscriptionpaytoggle',
+  'linkcontactsretry', 'linkcontactopen', 'linkcontactsave', 'linkcontactclear', 'linksend',
+  'resultupload', 'resultrefresh', 'resultview', 'resultarchive',
+  'guardianopen', 'guardianretry', 'guardianenable', 'guardiandisable', 'guardianinvite', 'guardianpreview', 'guardiancopy',
+  'pointclaim', 'pointownercheck', 'pointtakeover', 'pointreject', 'pointfulfill', 'pointadmincancel',
+  'reportpublish', 'reportwithdraw',
+  'roadmapopen', 'roadmaptargetsave', 'roadmapbookadd', 'roadmapbookedit', 'roadmapbooksave', 'roadmapbookdelete', 'roadmapstop'
+]);
+
 document.addEventListener('click', async ev => {
   const goEl = ev.target.closest('[data-go]');
   if (goEl) { go(goEl.dataset.go); return; }
@@ -11688,6 +11863,10 @@ document.addEventListener('click', async ev => {
       && !ev.target.closest('button[data-act="closemodal"]')) return;
 
   const act = el.dataset.act;
+  if (DIRECTOR_ONLY_ACTIONS.has(act) && !session.isDirector) {
+    toast('이 기능은 원장 계정에서만 사용할 수 있습니다');
+    return;
+  }
   const storageSafeActions = ['closemodal', 'storageretry', 'syncretry', 'syncnow', 'storagehelp', 'export'];
   if (storageError && !storageSafeActions.includes(act)) {
     paintStorageAlert();
@@ -11759,15 +11938,18 @@ document.addEventListener('click', async ev => {
       const password = $('#pin').value || '';
       if (!loginId || !password) return toast('아이디와 비밀번호를 입력해 주세요');
       toast('로그인 중…');
-      sync.loginAdmin(loginId, password).then(async d => {
-        state.settings.adminToken = d.token;
-        state.settings.adminLoginId = d.loginId || loginId;
-        state.settings.syncSecret = '';
-        state.settings.adminPin = '';
-        state.settings.pullAt = 0;
-        save(); session.unlock(); render();
+      prepareAuthSwitch().then(() => sync.loginAdmin(loginId, password)).then(async d => {
+        if (d.authRole === 'manager') {
+          if (!resetManagerDeviceCache(d)) return;
+        } else {
+          if (!resetAdminDeviceCache(d.token)) return;
+          state.settings.adminLoginId = d.loginId || loginId;
+          state.settings.adminPin = '';
+          save();
+        }
+        session.unlock(); route = 'today'; location.hash = '#/today'; render();
         await sync.run();
-        toast('환영합니다 · 이 기기는 자동 로그인됩니다');
+        toast((d.authRole === 'manager' && d.displayName ? d.displayName + ' 선생님, ' : '') + '환영합니다 · 이 기기는 자동 로그인됩니다');
       }).catch(e => toast(e.message));
       break;
     }
@@ -11793,30 +11975,102 @@ document.addEventListener('click', async ev => {
       if (!secret) return toast('원장 비밀키를 입력해 주세요');
       if (!loginId) return toast('새 아이디를 입력해 주세요');
       if (pin.length < 8) return toast('새 비밀번호를 8자리 이상 입력해 주세요');
-      sync.saveAdminAccount(loginId, pin, { mode: 'admin', secret: secret }).then(d => {
-        state.settings.adminToken = d.token;
+      prepareAuthSwitch().then(() => sync.saveAdminAccount(loginId, pin, { mode: 'admin', secret: secret })).then(async d => {
+        if (!resetAdminDeviceCache(d.token)) return;
         state.settings.adminLoginId = d.loginId;
-        state.settings.syncSecret = '';
         state.settings.adminPin = '';
-        save(); session.unlock(); closeModal(); render(); toast('로그인 계정을 재설정했습니다');
+        save(); session.unlock(); closeModal();
+        sync.loud = true;
+        await sync.run();
+        render();
+        toast(sync.err ? '로그인 계정 재설정 완료 · 데이터 동기화를 다시 시도해 주세요' : '로그인 계정을 재설정했습니다');
       }).catch(e => toast(e.message));
       break;
     }
     case 'logout': clearConsultLinkContacts(); session.lock(); render(); break;
     case 'saveadminaccount': {
+      if (!session.isDirector) break;
       const loginId = ($('#newLoginId').value || '').trim();
       const password = $('#newPin').value || '';
       if (!loginId) return toast('아이디를 입력해 주세요');
       if (password.length < 8) return toast('비밀번호를 8자리 이상 입력해 주세요');
       toast('로그인 계정 저장 중…');
-      sync.saveAdminAccount(loginId, password).then(d => {
-        state.settings.adminToken = d.token;
+      prepareAuthSwitch().then(() => sync.saveAdminAccount(loginId, password)).then(async d => {
+        if (!resetAdminDeviceCache(d.token)) return;
         state.settings.adminLoginId = d.loginId;
-        state.settings.syncSecret = '';
         state.settings.adminPin = '';
-        save(); session.unlock(); render();
-        toast('계정을 저장했습니다 · 기존 기기는 다시 로그인해 주세요');
+        save(); session.unlock();
+        sync.loud = true;
+        await sync.run();
+        render();
+        toast(sync.err ? '계정 저장 완료 · 데이터 동기화를 다시 시도해 주세요' : '계정을 저장했습니다 · 기존 기기는 다시 로그인해 주세요');
       }).catch(e => toast(e.message));
+      break;
+    }
+    case 'manageraccountsretry': {
+      if (!session.isDirector) break;
+      managerAccountsUi.loaded = false;
+      loadManagerAccounts(true);
+      break;
+    }
+    case 'manageraccountnew': {
+      if (!session.isDirector) break;
+      managerAccountModal(null);
+      break;
+    }
+    case 'manageraccountedit': {
+      if (!session.isDirector) break;
+      const account = managerAccountsUi.accounts.find(row => row.accountId === id);
+      if (!account) return toast('선생님 계정을 다시 선택해 주세요');
+      managerAccountModal(account);
+      break;
+    }
+    case 'manageraccountsave': {
+      if (!session.isDirector) break;
+      const displayName = (($('#managerName') && $('#managerName').value) || '').trim();
+      const loginId = (($('#managerLoginId') && $('#managerLoginId').value) || '').trim();
+      const password = (($('#managerPassword') && $('#managerPassword').value) || '');
+      if (!displayName) return toast('선생님 이름을 입력해 주세요');
+      if (!loginId) return toast('로그인 아이디를 입력해 주세요');
+      if ((!id && password.length < 8) || (password && password.length < 8)) return toast('비밀번호를 8자리 이상 입력해 주세요');
+      el.disabled = true;
+      try {
+        await sync.managerAccounts('save', { accountId: id || '', displayName: displayName, loginId: loginId, password: password });
+        closeModal();
+        managerAccountsUi.loaded = false;
+        await loadManagerAccounts(true);
+        toast(id ? '선생님 계정을 수정했습니다' : '선생님 계정을 만들었습니다');
+      } catch (error) {
+        el.disabled = false;
+        toast(String(error && error.message || error));
+      }
+      break;
+    }
+    case 'manageraccountactive': {
+      if (!session.isDirector) break;
+      const account = managerAccountsUi.accounts.find(row => row.accountId === id);
+      const active = el.dataset.v === '1';
+      if (!account) return toast('선생님 계정을 다시 선택해 주세요');
+      if (!confirm(account.displayName + ' 선생님 계정을 ' + (active ? '다시 사용' : '사용 중지') + '할까요?' +
+          (active ? '' : '\n현재 로그인된 기기도 모두 해제됩니다.'))) break;
+      try {
+        await sync.managerAccounts('set_active', { accountId: id, active: active });
+        managerAccountsUi.loaded = false;
+        await loadManagerAccounts(true);
+        toast(active ? '계정을 다시 사용할 수 있습니다' : '계정 사용을 중지했습니다');
+      } catch (error) { toast(String(error && error.message || error)); }
+      break;
+    }
+    case 'manageraccountrevoke': {
+      if (!session.isDirector) break;
+      const account = managerAccountsUi.accounts.find(row => row.accountId === id);
+      if (!account || !confirm(account.displayName + ' 선생님의 연결 기기 인증을 모두 해제할까요?')) break;
+      try {
+        await sync.managerAccounts('revoke_devices', { accountId: id });
+        managerAccountsUi.loaded = false;
+        await loadManagerAccounts(true);
+        toast('연결 기기 인증을 해제했습니다');
+      } catch (error) { toast(String(error && error.message || error)); }
       break;
     }
 
@@ -11962,7 +12216,9 @@ document.addEventListener('click', async ev => {
       if (!req || req.cancelledAt || status !== 'preparing' || !['requested', 'changed'].includes(metamathRequestStatus(req))) {
         return toast('제작을 시작할 요청을 찾지 못했습니다');
       }
-      setMetamathResponse(req, 'preparing', '선생님이 문제지를 제작하고 있습니다');
+      if (!setMetamathResponse(req, 'preparing', '선생님이 문제지를 제작하고 있습니다')) {
+        return toast('원장이 처리한 요청은 관리 선생님 계정에서 수정할 수 없습니다');
+      }
       render(); toast('제작 중으로 표시했습니다');
       break;
     }
@@ -11972,6 +12228,8 @@ document.addEventListener('click', async ev => {
       if (!req || req.cancelledAt || metamathRequestStatus(req) !== 'preparing') {
         return toast('배정할 요청을 찾지 못했습니다');
       }
+      const response = metamathResponseFor(req.id);
+      if (response && !canEditTask(response)) return toast('원장이 처리한 요청은 관리 선생님 계정에서 수정할 수 없습니다');
       if (!staffById(req.staffId)) return toast('학생 정보를 찾지 못했습니다');
       viewStaff = req.staffId;
       learningTaskModal('metamath', req.id);
@@ -11990,6 +12248,7 @@ document.addEventListener('click', async ev => {
       const source = LEARNING_SOURCES[sourceKey];
       if (!me || !defaults || !source) return toast('학생과 학습 종류를 다시 선택해 주세요');
       let task = learningChecklistScheduleFor(me.id, sourceKey);
+      if (task && !canEditTask(task)) return toast('원장이 설정한 학습은 관리 선생님 계정에서 수정할 수 없습니다');
       const patternLocked = learningChecklistPatternLocked(task);
       const repeat = patternLocked ? task.repeat : (($('#learningChecklistRepeat') && $('#learningChecklistRepeat').value) || '');
       const days = patternLocked && Array.isArray(task.days) ? task.days.slice() :
@@ -12009,6 +12268,7 @@ document.addEventListener('click', async ev => {
           occursOn({ repeat: repeat, days: days, start: start, end: end, deleted: false }, start)
           ? dailyLearningRecordTask(me.id, sourceKey, start) : null;
         reusedDailyRecord = !!task;
+        if (reusedDailyRecord && !canEditTask(task)) return toast('학생이 기록한 오늘 학습은 관리 선생님 계정에서 변경할 수 없습니다');
         if (!task) {
           task = { id: uid(), groupId: 'learning-checklist-' + now(), staffId: me.id, createdAt: now() };
           state.tasks.push(task);
@@ -12022,7 +12282,7 @@ document.addEventListener('click', async ev => {
         target: 0, unit: '건', time: '', priority: 'normal', estimatedMin: minutes,
         repeat: repeat, days: repeat === 'days' ? days.sort((a, b) => a - b) : [], start: start, end: end,
         dueDate: '', carry: false, requiresClaim: false, resourceUrl: '', evidenceMode: '',
-        origin: 'admin', updatedAt: now(), deleted: false
+        origin: actor(), updatedAt: now(), deleted: false
       });
       if (reusedDailyRecord) {
         const check = getCheck(task.id, start);
@@ -12075,10 +12335,11 @@ document.addEventListener('click', async ev => {
       if (rawUrl && !resourceUrl) return toast('자료 링크는 https://로 시작하는 안전한 주소만 쓸 수 있어요');
       if (sourceKey === 'exam_material' && !resourceUrl) return toast('시험대비자료의 보기 전용 링크를 넣어주세요');
       if (request) {
-        assignMetamathRequest(request, {
+        const assigned = assignMetamathRequest(request, {
           title: title, resourceUrl: resourceUrl, planned: planned, due: due,
           estimatedMin: estimatedMin, evidenceMode: evidenceMode
         });
+        if (!assigned) return toast('원장이 처리한 요청은 관리 선생님 계정에서 수정할 수 없습니다');
         closeModal(); render(); toast(me.name + ' — 메타수학 문제지를 배정했습니다');
         break;
       }
@@ -12091,7 +12352,7 @@ document.addEventListener('click', async ev => {
         steps: source.steps.map(label => ({ id: uid(), label: label })),
         target: 0, unit: '건', time: '', priority: 'normal',
         repeat: 'once', days: [], start: planned, end: '', carry: true,
-        origin: 'admin', createdAt: now(), updatedAt: now(), deleted: false
+        origin: actor(), createdAt: now(), updatedAt: now(), deleted: false
       });
       save(); queueSync(); closeModal(); render();
       toast(me.name + ' — ' + source.label + ' 과제를 보냈습니다');
@@ -12137,7 +12398,7 @@ document.addEventListener('click', async ev => {
         submissionFormat: !isExam ? ((($('#academicFormat') || {}).value) || '').trim() : '',
         detail: range, guide: '', steps: steps, target: 0, time: '', priority: 'high',
         repeat: 'once', days: [], start: periodStart, end: '', carry: false,
-        origin: 'admin', createdAt: now(), updatedAt: now(), deleted: false
+        origin: actor(), createdAt: now(), updatedAt: now(), deleted: false
       });
       save(); queueSync(); closeModal(); render(); toast(ACADEMIC_TYPES[type].label + '를 등록했습니다');
       break;
@@ -12145,7 +12406,8 @@ document.addEventListener('click', async ev => {
     case 'academicdelete': {
       if (!session.isAdmin) break;
       const item = state.tasks.find(t => t.id === id && t.kind === 'academic_event' && !t.deleted);
-      if (!item || !confirm(item.title + ' 일정을 삭제할까요? 기존 자료 요청 기록은 남습니다.')) break;
+      if (!item || !canEditTask(item)) return toast('원장이 등록한 일정은 관리 선생님 계정에서 수정할 수 없습니다');
+      if (!confirm(item.title + ' 일정을 삭제할까요? 기존 자료 요청 기록은 남습니다.')) break;
       const stamp = now();
       item.deleted = true; item.updatedAt = stamp;
       state.tasks.forEach(task => {
@@ -12160,6 +12422,7 @@ document.addEventListener('click', async ev => {
       if (!session.isAdmin) break;
       const exam = state.tasks.find(task => !task.deleted && task.id === id && task.kind === 'academic_event' && task.academicType === 'exam');
       if (!exam) return toast('시험 일정을 찾지 못했습니다');
+      if (!canEditTask(exam)) return toast('원장이 등록한 시험은 관리 선생님 계정에서 재계획할 수 없습니다');
       examPlanModal(exam);
       break;
     }
@@ -12182,6 +12445,7 @@ document.addEventListener('click', async ev => {
       const exam = state.tasks.find(task => !task.deleted && task.id === id && task.kind === 'academic_event' && task.academicType === 'exam');
       const shown = examPlanDraft;
       if (!exam || !shown || shown.examId !== exam.id || shown.staffId !== exam.staffId) return toast('계획을 다시 계산해 주세요');
+      if (!canEditTask(exam)) return toast('원장이 등록한 시험은 관리 선생님 계정에서 재계획할 수 없습니다');
       const fresh = examPlanPreview(exam.staffId, exam, shown.settings || {});
       const planKey = plan => JSON.stringify({ complete: plan.complete, remaining: plan.remaining,
         items: (plan.items || []).map(item => [item.planItemKey, item.date, item.s, item.e]) });
@@ -12276,7 +12540,7 @@ document.addEventListener('click', async ev => {
       if (!req || req.cancelledAt) return toast('처리할 요청을 찾지 못했습니다');
       if (!resourceUrl) return toast('자료 링크는 https://로 시작하는 안전한 주소만 쓸 수 있어요');
       if (!/^\d{4}-\d{2}-\d{2}$/.test(due) || due < today() || (req.examDate && due > req.examDate)) return toast('학습 마감일은 오늘부터 시험일 사이로 선택해 주세요');
-      provideMaterialRequest(req, resourceUrl, due);
+      if (!provideMaterialRequest(req, resourceUrl, due)) return toast('원장이 처리한 요청은 관리 선생님 계정에서 수정할 수 없습니다');
       closeModal(); render(); toast('자료를 보내고 학습 과제를 만들었습니다');
       break;
     }
@@ -12287,7 +12551,9 @@ document.addEventListener('click', async ev => {
       if (!req || req.cancelledAt || materialProvidedTask(req.id)) return toast('처리할 요청을 찾지 못했습니다');
       if (status === 'provide') return materialProvideModal(req);
       if (status === 'preparing') {
-        setMaterialResponse(req, 'preparing', '요청하신 자료를 찾고 있습니다');
+        if (!setMaterialResponse(req, 'preparing', '요청하신 자료를 찾고 있습니다')) {
+          return toast('원장이 처리한 요청은 관리 선생님 계정에서 수정할 수 없습니다');
+        }
         render(); toast('자료 찾는 중으로 표시했습니다');
         break;
       }
@@ -12301,7 +12567,7 @@ document.addEventListener('click', async ev => {
       const note = (($('#materialStatusNote') && $('#materialStatusNote').value) || '').trim();
       if (!req || !['needs_info', 'unavailable'].includes(status)) break;
       if (!note) return toast('학생에게 안내할 내용을 입력해 주세요');
-      setMaterialResponse(req, status, note);
+      if (!setMaterialResponse(req, status, note)) return toast('원장이 처리한 요청은 관리 선생님 계정에서 수정할 수 없습니다');
       closeModal(); render(); toast(MATERIAL_STATUS[status] + ' 상태로 저장했습니다');
       break;
     }
@@ -12628,7 +12894,9 @@ document.addEventListener('click', async ev => {
       if (!['reviewing', 'answered'].includes(status)) return toast('처리 상태를 다시 선택해 주세요');
       if (note.length > 500) return toast('답변은 500자 이내로 입력해 주세요');
       if (status === 'answered' && !note) return toast('학생에게 전달할 답변을 입력해 주세요');
-      setLectureResponse(req, status, note || '선생님이 요청을 확인하고 있습니다.');
+      if (!setLectureResponse(req, status, note || '선생님이 요청을 확인하고 있습니다.')) {
+        return toast('원장이 답변한 요청은 관리 선생님 계정에서 수정할 수 없습니다');
+      }
       closeModal(); render(); toast('답변을 저장했습니다 · 동기화 후 학생에게 표시됩니다');
       break;
     }
@@ -13372,7 +13640,7 @@ document.addEventListener('click', async ev => {
       break;
     }
     case 'reportpublish': {
-      if (!session.isAdmin) break;
+      if (!session.isDirector) break;
       const me = currentStaff(); if (!me) break;
       const type = el.dataset.type, key = el.dataset.key;
       saveVisibleReportNotes(me.id, type, key);
@@ -13395,7 +13663,7 @@ document.addEventListener('click', async ev => {
       break;
     }
     case 'reportwithdraw': {
-      if (!session.isAdmin) break;
+      if (!session.isDirector) break;
       const me = currentStaff(); if (!me) break;
       if (!confirm('현재 공개된 리포트를 철회할까요? 이전 발행 이력은 보존됩니다.')) return;
       const withdrawn = withdrawReportSnapshot(me.id, el.dataset.type, el.dataset.key, now());
@@ -14274,8 +14542,12 @@ document.addEventListener('click', async ev => {
     case 'wordertext': {
       const date = act === 'wordertext' ? (el.dataset.date || today()) : cursor;
       const title = act === 'wordertext' ? '학생 안내 문자' : '카카오톡 지시서 문구';
-      createStudentLink(id).then(link => showText(title, orderText(id, date, link)))
-        .catch(e => toast('학생 링크를 만들지 못했습니다 — ' + e.message));
+      if (session.isDirector) {
+        createStudentLink(id).then(link => showText(title, orderText(id, date, link)))
+          .catch(e => toast('학생 링크를 만들지 못했습니다 — ' + e.message));
+      } else {
+        showText(title, orderText(id, date, ''));
+      }
       break;
     }
     case 'dailycloseopen': {
@@ -14444,10 +14716,12 @@ document.addEventListener('click', async ev => {
       state.tasks.push(t);
       save(); queueSync(); render();
       toast(me.name + (t.requiresClaim ? ' — 오늘 공부를 배부했습니다' : ' — 체크리스트에 추가했습니다'));
-      if (!session.isStaffLink) {
+      if (session.isDirector) {
         setTimeout(() => createStudentLink(t.staffId)
           .then(link => showText('카톡으로 보낼 문구', quickText(t, link)))
           .catch(e => toast('학생 링크를 만들지 못했습니다 — ' + e.message)), 300);
+      } else if (session.isManagerAccount) {
+        setTimeout(() => showText('학생에게 전달할 문구', quickText(t, '')), 300);
       }
       break;
     }
@@ -14648,7 +14922,7 @@ document.addEventListener('click', async ev => {
           time: d.time, priority: d.priority,
           repeat: d.repeat, days: d.days, start: d.start, end: d.end, carry: d.carry,
           evidenceMode: d.evidenceMode || '',
-          origin: session.isStaffLink ? 'manager' : 'admin', requiresClaim: true,
+          origin: actor(), requiresClaim: true,
           createdAt: now(), updatedAt: now(), deleted: false
         };
         state.tasks.push(task);
@@ -14957,7 +15231,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-10-19.2';
+const APP_VER = '2026-10-21.1';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)

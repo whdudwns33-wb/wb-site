@@ -10,18 +10,21 @@ test('consult admin account recovery verifies the consult sync secret', () => {
   assert.match(html, /data-act="recoverpin"/);
 
   const recovery = html.match(/case 'recoverpinsave':[\s\S]*?\n\s*break;/)?.[0] || '';
+  assert.match(recovery, /prepareAuthSwitch\(\)/);
   assert.match(recovery, /saveAdminAccount\(loginId, pin/);
   assert.match(recovery, /\{ mode: 'admin', secret: secret \}/);
-  assert.match(recovery, /state\.settings\.adminToken = d\.token/);
+  assert.match(recovery, /resetAdminDeviceCache\(d\.token\)/);
   assert.match(recovery, /state\.settings\.adminLoginId = d\.loginId/);
-  assert.match(recovery, /save\(\); session\.unlock\(\)/);
+  assert.match(recovery, /save\(\); session\.unlock\(\);[\s\S]*await sync\.run\(\)/);
 });
 
 test('consult login uses server credentials and stores the returned device token', () => {
   const login = html.match(/case 'login':[\s\S]*?\n\s*break;/)?.[0] || '';
   assert.match(login, /sync\.loginAdmin\(loginId, password\)/);
-  assert.match(login, /state\.settings\.adminToken = d\.token/);
-  assert.match(login, /state\.settings\.syncSecret = ''/);
+  assert.match(login, /d\.authRole === 'manager'/);
+  assert.match(login, /resetManagerDeviceCache\(d\)/);
+  assert.match(login, /resetAdminDeviceCache\(d\.token\)/);
+  assert.match(login, /state\.settings\.adminLoginId = d\.loginId \|\| loginId/);
   assert.match(html, /MAX|90일간/);
 });
 
