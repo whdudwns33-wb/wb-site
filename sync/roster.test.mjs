@@ -360,7 +360,7 @@ test('student billing mode is validated, legacy updates preserve it, and monthly
     auth: admin, action: 'student_create', expectedUpdatedAt: current.body.updatedAt,
     student: {
       id: 'client-id', name: '회차학생', grade: '', subject: '', start: '2026-08', end: '', reason: '',
-      billingMode: 'session4', sessionCycleStartDate: '2026-08-28', sessionBillingSubject: '독해사고력'
+      billingMode: 'session4', sessionCycleStartDate: '2026-08-28', sessionBillingSubject: '독해사고력', sessionInitialCycleSize: 12
     }
   });
   assert.equal(created.status, 200);
@@ -371,6 +371,7 @@ test('student billing mode is validated, legacy updates preserve it, and monthly
   delete legacyPayload.billingMode;
   delete legacyPayload.sessionCycleStartDate;
   delete legacyPayload.sessionBillingSubject;
+  delete legacyPayload.sessionInitialCycleSize;
   const preserved = await call(db, {
     auth: admin, action: 'student_update', expectedUpdatedAt: created.body.updatedAt, student: legacyPayload
   });
@@ -378,6 +379,7 @@ test('student billing mode is validated, legacy updates preserve it, and monthly
   assert.equal(preserved.body.student.billingMode, 'session4');
   assert.equal(preserved.body.student.sessionCycleStartDate, '2026-08-28');
   assert.equal(preserved.body.student.sessionBillingSubject, '독해사고력');
+  assert.equal(preserved.body.student.sessionInitialCycleSize, 12);
 
   const monthly = await call(db, {
     auth: admin, action: 'student_update', expectedUpdatedAt: preserved.body.updatedAt,

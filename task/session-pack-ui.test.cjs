@@ -91,8 +91,10 @@ test('lesson mode badges default to monthly only after the scoped pack list succ
 
   assert.deepEqual(make(false, 'temporary', [], true)(lesson), { text: '회차제 · 4회', cls: 'is-session' });
   assert.deepEqual(make(true, '', [], true, new Map([['student-1', { attendanceCount: 3, cycleSize: 4 }]]))(lesson), {
-    text: '회차제 · 3/4회', cls: 'is-session', title: '학생 단위 4회제 · 출석·지각·조퇴 합산'
+    text: '회차제 · 3/4회', cls: 'is-session', title: '학생 단위 회차제 · 출석·지각·조퇴 합산'
   });
+  assert.equal(make(true, '', [], true, new Map([['student-1', { attendanceCount: 11, cycleSize: 12 }]]))(lesson).text,
+    '회차제 · 11/12회');
 });
 
 test('학생 단위 4회제는 결석 차감 드롭다운 없이 P/L/E 1회·결석 0회와 자동보강 없음만 안내한다', () => {

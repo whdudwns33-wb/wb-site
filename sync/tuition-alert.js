@@ -1,4 +1,5 @@
 import { weekendAttendancePolicyOn } from './weekend-flex.js';
+import { initialSessionSize, tuitionCycleEligible, billingCycleView } from './session-billing-cycle.js';
 
 const SAFE_ID = /^[A-Za-z0-9_-]{1,160}$/;
 const ALERT_ID = /^tga_[a-f0-9]{52}$/;
@@ -79,6 +80,7 @@ function billingStudents(document, sourceDate, includeInactive = false) {
     if (result.has(studentId)) continue;
     result.set(studentId, {
       studentId, active,
+      sessionInitialCycleSize: initialSessionSize(student),
       cycleStartDate, sessionBillingSubject: String(student.sessionBillingSubject || ''),
       name: String(student && student.name || '').slice(0, 80),
       school: String(student && student.school || '').slice(0, 100),
@@ -872,6 +874,7 @@ async function reconcileStudentSessionLedgerInput(env, input) {
 
   const activeAlerts = [];
   for (const cycle of materialized) {
+    if (!tuitionCycleEligible(student, cycle)) continue;
     if (cycle.entries.length < ATTENDANCE_THRESHOLD) continue;
     const trigger = cycle.entries[ATTENDANCE_THRESHOLD - 1];
     activeAlerts.push({
@@ -1197,6 +1200,7 @@ export async function handleScheduledTuitionAlerts(env, scheduledTime) {
     const cycles = ledger.cycles;
     summary.qualifyingAttendances += cycles.reduce((count, cycle) => count + cycle.entries.length, 0);
     for (const cycle of cycles) {
+      if (!tuitionCycleEligible(student, cycle)) continue;
       if (cycle.entries.length < ATTENDANCE_THRESHOLD) continue;
       try {
         const result = ledger.storage === 'generation' && ledger.generation && statesReady
@@ -1226,6 +1230,31 @@ function alertView(row, student) {
     createdAt: Number(row.created_at), confirmedAt: Number(row.confirmed_at || 0) || null,
     status: row.confirmed_at == null ? 'open' : 'confirmed'
   };
+}
+
+async function billingAlertViews(env, rows, roster) {
+  const ledgers = new Map();
+  const views = [];
+  for (const row of rows) {
+    const studentId = String(row.student_id || '');
+    const student = roster.students.get(studentId);
+    const view = alertView(row, roster.identities.get(studentId));
+    view.cycleSize = 4;
+    if (initialSessionSize(student) === 12) {
+      if (!ledgers.has(studentId)) ledgers.set(studentId,
+        await ledgerCycles(env, studentId, student.cycleStartDate));
+      const cycle = ledgers.get(studentId).find(item => item.cycleStartDate === row.cycle_start_date);
+      // 선납 범위의 이전 안내는 조회에서도 숨긴다. 원본 알림·확인 이력은 삭제하지 않는다.
+      if (cycle && !tuitionCycleEligible(student, cycle)) continue;
+      if (cycle && cycle.cycleNo === 3) {
+        view.cycleStartDate = student.cycleStartDate;
+        view.attendanceCount = 11;
+        view.cycleSize = 12;
+      }
+    }
+    views.push(view);
+  }
+  return views;
 }
 
 async function listAlerts(env, body, origin, auth, json) {
@@ -1269,8 +1298,7 @@ async function listAlerts(env, body, origin, auth, json) {
         return { ...row, trigger_task_id: state.triggerTaskId, trigger_date: state.triggerDate };
       }).filter(Boolean);
     }
-    return reply(json, origin, { ok: true, alerts: rows.map(row =>
-      alertView(row, roster.identities.get(String(row.student_id || '')) || null)) });
+    return reply(json, origin, { ok: true, alerts: await billingAlertViews(env, rows, roster) });
   } catch (error) {
     if (/no such table.*tuition_generation_alert/i.test(String(error && error.message || error))) {
       return reply(json, origin, { ok: false, code: 'TUITION_ALERT_LEDGER_NOT_READY',
@@ -1288,9 +1316,14 @@ async function confirmAlert(env, body, origin, auth, json) {
   if (!ALERT_ID.test(id)) return reply(json, origin, { ok: false, error: '알림을 다시 선택해 주세요' }, 400);
   try {
     const alert = await env.DB.prepare(
-      "SELECT alert_id FROM tuition_generation_alerts WHERE app='task' AND alert_id=? LIMIT 1"
+      "SELECT * FROM tuition_generation_alerts WHERE app='task' AND alert_id=? LIMIT 1"
     ).bind(id).first();
     if (!alert) return reply(json, origin, { ok: false, error: '알림을 찾을 수 없습니다' }, 404);
+    const roster = await loadRoster(env);
+    if (roster.error || !(await billingAlertViews(env, [alert], roster)).length) {
+      return reply(json, origin, { ok: false, code: 'TUITION_ALERT_NOT_EFFECTIVE',
+        error: '현재 결제 회차에서 유효하지 않은 수강료 알림입니다' }, 409);
+    }
     if (await alertStatesAvailable(env)) {
       const state = await latestGlobalAlertState(env, id);
       if (state && !currentActiveAlertState(state)) {
@@ -1349,13 +1382,14 @@ async function assignedStudentIds(env, auth, sourceDate) {
   return ids;
 }
 
-function cycleSummary(studentId, configuredCycleStartDate, cycles) {
+function cycleSummary(studentId, configuredCycleStartDate, cycles, student) {
+  cycles = billingCycleView(cycles, student);
   const current = cycles.at(-1) || null;
   return {
     studentId, billingMode: SESSION_MODE, configuredCycleStartDate,
     cycleStartDate: current ? current.cycleStartDate : configuredCycleStartDate,
     attendanceCount: current ? current.attendanceCount : 0,
-    cycleSize: SESSION_SIZE, cycleComplete: !!(current && current.status === 'complete'), cycles
+    cycleSize: current && current.cycleSize || initialSessionSize(student), cycleComplete: !!(current && current.status === 'complete'), cycles
   };
 }
 
@@ -1402,7 +1436,7 @@ export async function handleStudentAttendance(env, app, body, origin, auth, json
         if (allowedStudentIds && (!student.active || !allowedStudentIds.has(student.studentId))) continue;
         await ensureInitialLedgerCycle(env, student, Date.now());
         const cycles = await ledgerCycles(env, student.studentId, student.cycleStartDate);
-        summaries.push(cycleSummary(student.studentId, student.cycleStartDate, cycles));
+        summaries.push(cycleSummary(student.studentId, student.cycleStartDate, cycles, student));
       }
     } catch (error) {
       if (ledgerUnavailable(error)) return reply(json, origin, { ok: false,
@@ -1478,7 +1512,7 @@ export async function handleStudentAttendance(env, app, body, origin, auth, json
   const attendance = effectiveEvidence.filter(item => item.date.slice(0, 7) === month)
     .map(item => ({ date: item.date, status: item.status, taskId: item.taskId }));
   return reply(json, origin, { ok: true, month, attendance,
-    ...cycleSummary(studentId, configuredCycleStartDate, state.cycles) });
+    ...cycleSummary(studentId, configuredCycleStartDate, state.cycles, student) });
 }
 
 export async function handleTuitionAlert(env, app, body, origin, auth, json) {
