@@ -1334,9 +1334,28 @@
   .self-identity-dialog::backdrop { background: #11283d88; }
   .self-identity-dialog dd { margin: 4px 0 14px; overflow-wrap: anywhere; }
   .self-identity-dialog h2 { font-size: 20px; }
+  .week-time-scroll { overflow:auto; max-width:100%; border:1px solid #ccd7e0; border-radius:10px; }
+  .week-time-table { width:100%; min-width:1020px; table-layout:fixed; border-collapse:separate; border-spacing:0; }
+  .week-time-table th,.week-time-table td { padding:8px; border-right:1px solid #dde5ec; border-bottom:1px solid #dde5ec; vertical-align:top; }
+  .week-time-table th { background:#edf3f8; font-size:14px; text-align:center; }
+  .week-time-table th:first-child { width:64px; position:sticky; left:0; z-index:1; }
+  .week-time-table th.is-today { background:#d2ecfa; color:#085d85; }
+  .week-time-lesson { display:flex; flex-direction:column; gap:4px; padding:9px; margin-bottom:7px; border:1px solid #9bc6e0; border-radius:8px; background:#eff8ff; color:#173f5a; overflow-wrap:anywhere; }
+  .week-time-lesson strong { font-size:14px; line-height:1.5; }
+  .week-time-lesson span { font-size:13px; line-height:1.5; }
+  .week-time-lesson .week-time-clock { font-size:12px; white-space:nowrap; }
+  .week-time-lesson small { font-size:12px; font-weight:800; }
+  .week-time-lesson.is-makeup,.week-time-legend .is-makeup { background:#fff0da; border-color:#ed9f37; color:#743c05; }
+  .week-time-lesson.is-first,.week-time-legend .is-first { background:#ffdfeb; border-color:#cf2455; color:#8a1237; }
+  .week-time-lesson.is-subscription,.week-time-legend .is-subscription { background:#efe8ff; border-color:#b298e5; color:#51367b; }
+  .week-time-empty { display:block; text-align:center; color:#a6b2bd; }
+  .week-time-legend { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px; }
+  .week-time-legend span { padding:5px 10px; border:1px solid #9bc6e0; border-radius:6px; background:#eff8ff; font-size:13px; }
+  .week-time-teacher summary { cursor:pointer; font-size:17px; font-weight:800; padding:5px 0; }
+  .week-time-teacher[open] summary { margin-bottom:14px; }
 </style>
-<link rel="stylesheet" href="readability.css?v=2026-10-21.2">
-<script src="roster-search-core.js?v=2026-10-21.2"></script>
+<link rel="stylesheet" href="readability.css?v=2026-10-22.1">
+<script src="roster-search-core.js?v=2026-10-22.1"></script>
 <script src="tab-scroll.js" defer></script>
 </head>
 <body>
@@ -1402,19 +1421,20 @@
   </section>
 </div>
 
-<script src="./lesson-form-core.js?v=2026-10-21.2"></script>
-<script src="./task-push-client.js?v=2026-10-21.2"></script>
-<script src="./schedule-board-core.js?v=2026-10-21.2"></script>
-<script src="./asset-core.js?v=2026-10-21.2"></script>
-<script src="./qr-core.js?v=2026-10-21.2"></script>
-<script src="./acaflow-import-core.js?v=2026-10-21.2"></script>
-<script src="./feedback-subject-catalog.js?v=2026-10-21.2"></script>
-<script src="./sync-recovery-core.js?v=2026-10-21.2"></script>
-<script src="./staff-work-session-core.js?v=2026-10-21.2"></script>
-<script src="./private-chat.js?v=2026-10-21.2"></script>
-<script src="./self-identity.js?v=2026-10-21.2"></script>
-<script src="./staff-attendance-history-core.js?v=2026-10-21.2"></script>
-<script src="./makeup-recovery-core.js?v=2026-10-21.2"></script>
+<script src="./lesson-form-core.js?v=2026-10-22.1"></script>
+<script src="./task-push-client.js?v=2026-10-22.1"></script>
+<script src="./schedule-board-core.js?v=2026-10-22.1"></script>
+<script src="./week-timetable.js?v=2026-10-22.1"></script>
+<script src="./asset-core.js?v=2026-10-22.1"></script>
+<script src="./qr-core.js?v=2026-10-22.1"></script>
+<script src="./acaflow-import-core.js?v=2026-10-22.1"></script>
+<script src="./feedback-subject-catalog.js?v=2026-10-22.1"></script>
+<script src="./sync-recovery-core.js?v=2026-10-22.1"></script>
+<script src="./staff-work-session-core.js?v=2026-10-22.1"></script>
+<script src="./private-chat.js?v=2026-10-22.1"></script>
+<script src="./self-identity.js?v=2026-10-22.1"></script>
+<script src="./staff-attendance-history-core.js?v=2026-10-22.1"></script>
+<script src="./makeup-recovery-core.js?v=2026-10-22.1"></script>
 <script>
 "use strict";
 
@@ -13283,7 +13303,37 @@ async function submitMakeupLink(button) {
 }
 
 /* ── 주간 플래너 ── */
+let weekPlannerMode = 'timetable', weekPlannerAll = false;
 function viewWeek() {
+  const me = currentStaff();
+  if (!me) return emptyStaffCard();
+  let h = '<div class="chips mb14">' + [['timetable','주간 시간표'],['checklist','업무 완료 체크표']].map(([value,title]) =>
+    '<button class="chip ' + (weekPlannerMode === value ? 'on' : '') + '" data-act="weekplannermode" data-v="' + value + '">' + title + '</button>').join('') + '</div>';
+  if (weekPlannerMode === 'checklist') return h + viewWeekChecklist();
+  const mon = mondayOf(cursor), days = Array.from({length:7}, (_,i) => addDays(mon,i));
+  const all = session.isAdmin && weekPlannerAll;
+  if (session.isAdmin) h += staffSwitcher(me.id) + '<button class="btn btn-ghost mb14" data-act="weekplannerall">' + (all ? '선택한 선생님만 보기' : '전체 선생님 보기') + '</button>';
+  h += '<div class="datenav"><button class="navbtn" data-act="week" data-n="-1" aria-label="이전 주">‹</button>' +
+    '<div class="d">' + esc(mon + ' ~ ' + days[6]) + '</div><button class="navbtn" data-act="week" data-n="1" aria-label="다음 주">›</button></div>' +
+    '<button class="btn btn-sm btn-ghost mb14" data-act="todaydate">이번 주</button>' +
+    '<div class="week-time-legend"><span class="is-regular">정규수업</span><span class="is-makeup">보강</span><span class="is-first">첫수업</span><span class="is-subscription">구독</span></div>' +
+    '<div class="hint mb14">시작 시간순 표입니다. 빈 시간은 생략하며 수업 길이는 각 칸의 시작·종료 시간을 확인하세요. 좁은 화면에서는 표를 좌우로 밀어 보세요.</div>';
+  ensureWeekendVisitScheduleDates(days, all ? '' : me.id);
+  const weekly = weeklyLessonSchedule(cursor);
+  const teachers = all ? todayStaffList() : [me];
+  teachers.forEach(staff => {
+    const entries = weekly.entries.filter(entry => entry.staffId === staff.id).map(entry => Object.assign({},entry, {
+      displayName: staffStudentCompactLabelById(entry.studentId,entry.studentName,entry.grade)
+    }));
+    const issues = weekly.issues.filter(issue => issue.staffId === staff.id && issue.dates.length);
+    const title = esc(staff.name) + ' 선생님 · ' + entries.length + '건';
+    const body = WBWeekTimetable.render(entries,days,staff.id,today()) + (issues.length ? '<div class="hint">시간 확인 필요: ' + issues.map(issue => esc(issue.studentName + ' · ' + issue.message)).join(' / ') + '</div>' : '');
+    h += all ? '<details class="card week-time-teacher" data-persist-key="week-time-' + esc(staff.id) + '"><summary>' + title + '</summary>' + body + '</details>' : '<section class="card"><div class="card-title mb14">' + title + '</div>' + body + '</section>';
+  });
+  return h;
+}
+
+function viewWeekChecklist() {
   const me = currentStaff();
   if (!me) return emptyStaffCard();
   const mon = mondayOf(cursor);
@@ -23957,6 +24007,8 @@ document.addEventListener('click', async ev => {
     case 'day':  cursor = addDays(cursor, Number(el.dataset.n)); cursorPinned = (cursor !== today()); render(); break;
     case 'todaydate': cursor = today(); cursorPinned = false; render(); break;
     case 'week': cursor = addDays(cursor, Number(el.dataset.n) * 7); cursorPinned = (mondayOf(cursor) !== mondayOf(today())); render(); break;
+    case 'weekplannermode': if (['timetable','checklist'].includes(el.dataset.v)) { weekPlannerMode = el.dataset.v; render(); } break;
+    case 'weekplannerall': if (session.isAdmin) { weekPlannerAll = !weekPlannerAll; render(); } break;
     case 'scheduleview': {
       if (!canReadOperations() || !SCHEDULE_VIEWS.some(item => item[0] === el.dataset.v)) break;
       scheduleView = el.dataset.v;
@@ -24277,7 +24329,7 @@ document.addEventListener('click', async ev => {
       break;
     }
     /* 직원 */
-    case 'pickstaff': viewStaff = id; render(); break;
+    case 'pickstaff': viewStaff = id; if (route === 'week') weekPlannerAll = false; render(); break;
     case 'openstaff': closeModal(); viewStaff = id; go('today'); break;
     case 'addstaff': {
       const name = ($('#sName').value || '').trim();
@@ -26258,7 +26310,7 @@ setInterval(() => {
 /* ── 새 버전 감지 ──
  * 단일 HTML이라 브라우저가 예전 파일을 계속 물고 있는 일이 잦다.
  * version.json을 주기적으로 확인해 새 버전이 올라오면 알려주고 한 번에 새로고침한다. */
-const APP_VER = '2026-10-21.2';
+const APP_VER = '2026-10-22.1';
 const VERSION_RELOAD_KEY = 'wb_task_version_reload';
 function reloadVersion(version) {
   const next = new URL(location.href);
