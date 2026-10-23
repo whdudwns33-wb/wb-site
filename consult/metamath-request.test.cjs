@@ -137,12 +137,13 @@ test('students manage only their own open request while director-only actions ch
   }
 });
 
-test('the worksheet form guides grade, semester, unit and difficulty in order and bounds free text', () => {
+test('the worksheet form guides grade, MetaMath period, unit and difficulty in order and bounds free text', () => {
   const modal = functionSource('metamathRequestModal');
   const save = eventCase('metamathrequestsave');
 
   assert.match(modal, /id="metamathGrade"/);
   assert.match(modal, /id="metamathSemester"/);
+  assert.match(modal, /id="metamathSemesterLabel"/);
   assert.match(modal, /id="metamathDifficulty"/);
   assert.match(html, /const METAMATH_DIFFICULTIES = Object\.freeze\(\['기본', '발전', '심화'\]\)/);
   assert.match(modal, /<select class="in" id="metamathUnit"/);
@@ -155,7 +156,7 @@ test('the worksheet form guides grade, semester, unit and difficulty in order an
   assert.match(modal, /for="metamathSemester"/);
   assert.match(modal, /for="metamathUnit"/);
   assert.match(modal, /학년/);
-  assert.match(modal, /학기/);
+  assert.match(modal, /초·중등은 학기, 고등은 과목/);
   assert.match(modal, /난이도/);
   assert.match(modal, /단원/);
   assert.match(modal, /기타[^<]*(?:메모|선택)/);
@@ -163,36 +164,72 @@ test('the worksheet form guides grade, semester, unit and difficulty in order an
   assert.match(save, /!grade\s*\|\|\s*!semester\s*\|\|\s*!difficulty\s*\|\|\s*!unitChoice\s*\|\|\s*!unit/);
   assert.match(save, /METAMATH_DIFFICULTIES\.includes\(difficulty\)/);
   assert.match(save, /unitChoice === METAMATH_CUSTOM_UNIT \? customUnit : unitChoice/);
+  assert.match(save, /metamathPeriodsFor\(grade\)\.includes\(semester\)/);
   assert.match(save, /metamathUnitsFor\(grade, semester\)\.includes\(unitChoice\)/);
   assert.match(save, /difficulty:\s*difficulty/);
   assert.match(save, /grade\.length\s*>\s*20/);
-  assert.match(save, /semester\.length\s*>\s*20/);
+  assert.match(save, /semester\.length\s*>\s*40/);
   assert.match(save, /unit\.length\s*>\s*160/);
   assert.match(save, /note\.length\s*>\s*500/);
 });
 
-test('the MetaMath curriculum catalog covers every grade and preserves unmatched legacy units', () => {
+test('the MetaMath curriculum catalog matches the live subject and major-unit tree', () => {
   const start = html.indexOf('const METAMATH_GRADES =');
   const end = html.indexOf('function metamathRequestProcessingDate', start);
   assert.ok(start >= 0 && end > start, 'MetaMath curriculum helpers must be defined together');
   const catalog = Function('esc', html.slice(start, end) + '\nreturn {' +
-    'METAMATH_GRADES, METAMATH_SEMESTERS, METAMATH_CUSTOM_UNIT, metamathUnitsFor, metamathUnitSelection, metamathUnitOptions};')(
+    'METAMATH_GRADES, METAMATH_CUSTOM_UNIT, metamathPeriodsFor, metamathPeriodLabel, metamathSubjectFor, metamathUnitsFor, metamathUnitSelection, metamathPeriodOptions, metamathUnitOptions};')(
     value => String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;')
   );
 
   for (const grade of catalog.METAMATH_GRADES) {
-    for (const semester of catalog.METAMATH_SEMESTERS) {
-      assert.ok(catalog.metamathUnitsFor(grade, semester).length > 0, grade + ' ' + semester);
+    const periods = catalog.metamathPeriodsFor(grade);
+    assert.ok(periods.length > 0, grade + ' periods');
+    for (const period of periods) {
+      assert.ok(catalog.metamathSubjectFor(grade, period), grade + ' ' + period + ' subject');
+      assert.ok(catalog.metamathUnitsFor(grade, period).length > 0, grade + ' ' + period);
     }
   }
+  assert.deepEqual(catalog.metamathPeriodsFor('초6'), ['1학기', '2학기']);
+  assert.deepEqual(catalog.metamathPeriodsFor('고1'), ['공통수학1(22개정)', '공통수학2(22개정)']);
+  assert.deepEqual(catalog.metamathPeriodsFor('고2'), ['대수(22개정)', '미적분Ⅰ(22개정)']);
+  assert.deepEqual(catalog.metamathPeriodsFor('고3'), ['확률과 통계', '미적분', '기하']);
+  assert.equal(catalog.metamathPeriodLabel('중3'), '학기');
+  assert.equal(catalog.metamathPeriodLabel('고2'), '과목');
+  assert.equal(catalog.metamathSubjectFor('초4', '2학기'), '초 4-2(22개정)');
   assert.deepEqual(catalog.metamathUnitsFor('중1', '1학기'), [
     '1. 소인수분해', '2. 정수와 유리수', '3. 문자의 사용과 식', '4. 일차방정식', '5. 좌표평면과 그래프'
   ]);
-  assert.match(catalog.metamathUnitsFor('고2', '1학기').join('\n'), /대수\(수학Ⅰ\)|미적분Ⅰ\(수학Ⅱ\)|확률과 통계/);
+  assert.deepEqual(catalog.metamathUnitsFor('초5', '2학기'), [
+    '1. 수의 범위와 올림, 버림, 반올림', '2. 분수의 곱셈', '3. 합동과 대칭',
+    '4. 소수의 곱셈', '5. 직육면체와 정육면체', '6. 평균과 가능성'
+  ]);
+  assert.deepEqual(catalog.metamathUnitsFor('초6', '2학기'), [
+    '1. 분수의 나눗셈', '2. 공간과 입체', '3. 소수의 나눗셈',
+    '4. 비례식과 비례배분', '5. 원의 둘레와 넓이', '6. 원기둥, 원뿔, 구'
+  ]);
+  assert.deepEqual(catalog.metamathUnitsFor('중2', '2학기'), [
+    '1. 삼각형의 성질', '2. 사각형의 성질', '3. 도형의 닮음', '4. 피타고라스 정리', '5. 확률'
+  ]);
+  assert.deepEqual(catalog.metamathUnitsFor('중3', '1학기'), [
+    '1. 제곱근과 실수', '2. 근호를 포함한 식의 계산', '3. 곱셈공식과 인수분해', '4. 이차방정식', '5. 이차함수'
+  ]);
+  assert.deepEqual(catalog.metamathUnitsFor('고1', '공통수학1(22개정)'), [
+    '1. 다항식의 연산', '2. 나머지정리와 인수분해', '3. 복소수와 이차방정식', '4. 이차방정식과 이차함수',
+    '5. 여러 가지 방정식과 부등식', '6. 순열', '7. 조합', '8. 행렬'
+  ]);
+  assert.deepEqual(catalog.metamathUnitsFor('고2', '미적분Ⅰ(22개정)'), [
+    '1. 함수의 극한과 연속', '2. 다항함수의 미분법', '3. 다항함수의 적분법'
+  ]);
+  assert.deepEqual(catalog.metamathUnitsFor('고3', '미적분'), [
+    '1. 수열의 극한', '2. 여러 가지 함수의 미분', '3. 미분법', '4. 적분법'
+  ]);
   assert.equal(catalog.metamathUnitSelection('중1', '1학기', '4. 일차방정식'), '4. 일차방정식');
   assert.equal(catalog.metamathUnitSelection('중1', '1학기', '학교별 진도 단원'), catalog.METAMATH_CUSTOM_UNIT);
   assert.match(catalog.metamathUnitOptions('중1', '1학기', '학교별 진도 단원'),
     /value="__custom__" selected>목록에 없음 · 직접 입력/);
+  assert.match(catalog.metamathPeriodOptions('고2', '대수(22개정)'),
+    /value="대수\(22개정\)" selected>대수\(22개정\)/);
 });
 
 test('changing grade, semester or unit refreshes the dependent MetaMath fields', () => {
@@ -204,8 +241,10 @@ test('changing grade, semester or unit refreshes the dependent MetaMath fields',
   assert.match(listener, /refreshMetamathCurriculumFields\(ev\.target\.id\)/);
   const refresh = functionSource('refreshMetamathCurriculumFields');
   assert.match(refresh, /changedId === 'metamathGrade'/);
+  assert.match(refresh, /semesterEl\.innerHTML = metamathPeriodOptions/);
   assert.match(refresh, /semesterEl\.value = ''/);
   assert.match(refresh, /unitEl\.innerHTML = metamathUnitOptions/);
+  assert.match(refresh, /semesterLabelEl\.textContent = metamathPeriodLabel/);
   assert.match(refresh, /semesterEl\.disabled = !gradeEl\.value/);
   assert.match(refresh, /unitEl\.disabled = !gradeEl\.value \|\| !semesterEl\.value/);
   assert.match(refresh, /unitEl\.value === METAMATH_CUSTOM_UNIT/);
@@ -219,6 +258,7 @@ test('dependent MetaMath fields enable step by step and expose custom input only
   const fields = {
     '#metamathGrade': { value: '중1' },
     '#metamathSemester': { value: '2학기', disabled: true },
+    '#metamathSemesterLabel': { textContent: '' },
     '#metamathUnit': { value: '', disabled: true, innerHTML: '' },
     '#metamathCustomUnitField': { hidden: false },
     '#metamathCustomUnit': { value: '이전 입력', disabled: false }
@@ -232,6 +272,7 @@ test('dependent MetaMath fields enable step by step and expose custom input only
   api.refreshMetamathCurriculumFields('metamathGrade');
   assert.equal(fields['#metamathSemester'].value, '');
   assert.equal(fields['#metamathSemester'].disabled, false);
+  assert.equal(fields['#metamathSemesterLabel'].textContent, '학기');
   assert.equal(fields['#metamathUnit'].disabled, true);
   assert.equal(fields['#metamathCustomUnit'].value, '');
   assert.equal(fields['#metamathCustomUnitField'].hidden, true);
@@ -242,6 +283,14 @@ test('dependent MetaMath fields enable step by step and expose custom input only
   assert.equal(fields['#metamathUnit'].disabled, false);
   assert.match(fields['#metamathUnit'].innerHTML, /1\. 소인수분해/);
   assert.match(fields['#metamathUnit'].innerHTML, /목록에 없음 · 직접 입력/);
+
+  fields['#metamathGrade'].value = '고2';
+  api.refreshMetamathCurriculumFields('metamathGrade');
+  assert.equal(fields['#metamathSemesterLabel'].textContent, '과목');
+  assert.match(fields['#metamathSemester'].innerHTML, /대수\(22개정\)/);
+  fields['#metamathSemester'].value = '미적분Ⅰ(22개정)';
+  api.refreshMetamathCurriculumFields('metamathSemester');
+  assert.match(fields['#metamathUnit'].innerHTML, /다항함수의 미분법/);
 
   fields['#metamathUnit'].value = api.METAMATH_CUSTOM_UNIT;
   api.refreshMetamathCurriculumFields('metamathUnit');
@@ -325,9 +374,9 @@ test('only the deterministic admin response is trusted and assignment follows pr
 
 test('request cards escape student text before inserting it into HTML', () => {
   const card = functionSource('metamathRequestCard');
-  for (const field of ['grade', 'semester', 'unit']) {
-    assert.match(card, new RegExp('esc\\([^)]*req\\.' + field));
-  }
+  assert.match(card, /esc\(req\.unit/);
+  assert.match(card, /\[req\.grade, req\.semester,[^\]]+\][\s\S]*\.map\(value => esc\(value\)\)/,
+    'grade, period and exact MetaMath subject path must be escaped');
   assert.match(card, /esc\(buildMetamathRequestSummary\(req\)\)/,
     'the summary containing the optional note must be escaped as one string');
   assert.doesNotMatch(card, /innerHTML\s*=\s*req\.|\+\s*req\.(?:grade|semester|unit|note)\s*\+/);
