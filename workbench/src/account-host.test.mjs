@@ -73,6 +73,9 @@ test('first-login change is mandatory for both equal administrators; sessions, C
   assert.equal((await f.call('/api/summary', {bearer: issued.data.token})).status, 401);
   const changedTeacher = await f.change(teacher);
   assert.equal((await f.call('/api/admin/users', changedTeacher)).data.items.length, 2);
+  const spec = (await f.call('/api/openapi.json', changedTeacher)).data;
+  assert.equal(spec.paths['/api/students/{id}'].parameters[0].required, true);
+  assert.deepEqual(spec.paths['/api/workspace'].put.requestBody.content['application/json'].schema.required, ['revision', 'data']);
   assert.equal((await f.call('/api/auth/logout', {...changedTeacher, method: 'POST'})).status, 200);
   assert.equal((await f.call('/api/workspace', changedTeacher)).status, 401);
 });
