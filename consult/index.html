@@ -6281,63 +6281,91 @@ const METAMATH_REQUEST_STATUS = Object.freeze({
   requested: '오후 6시 제작 대기', changed: '변경 내용 확인', preparing: '제작 중', assigned: '배정 완료', cancelled: '취소됨'
 });
 const METAMATH_GRADES = Object.freeze(['초1', '초2', '초3', '초4', '초5', '초6', '중1', '중2', '중3', '고1', '고2', '고3']);
-const METAMATH_SEMESTERS = Object.freeze(['1학기', '2학기']);
 const METAMATH_DIFFICULTIES = Object.freeze(['기본', '발전', '심화']);
-const METAMATH_UPPER_HIGH_UNITS = Object.freeze([
-  '대수(수학Ⅰ) · 지수함수와 로그함수', '대수(수학Ⅰ) · 삼각함수', '대수(수학Ⅰ) · 수열',
-  '미적분Ⅰ(수학Ⅱ) · 함수의 극한과 연속', '미적분Ⅰ(수학Ⅱ) · 미분', '미적분Ⅰ(수학Ⅱ) · 적분',
-  '확률과 통계 · 경우의 수', '확률과 통계 · 확률', '확률과 통계 · 통계',
-  '미적분Ⅱ(미적분) · 수열의 극한', '미적분Ⅱ(미적분) · 미분법', '미적분Ⅱ(미적분) · 적분법',
-  '기하 · 이차곡선', '기하 · 공간도형과 공간좌표', '기하 · 벡터'
-]);
-const METAMATH_UNITS = Object.freeze({
+// shortcut: 메타수학 대단원 트리를 2026-10-23 기준으로 고정, 교육과정이 바뀌면 교실홈 목록과 함께 갱신
+const METAMATH_CATALOG = Object.freeze({
   '초1': {
-    '1학기': ['1. 9까지의 수', '2. 여러 가지 모양', '3. 덧셈과 뺄셈', '4. 비교하기', '5. 50까지의 수'],
-    '2학기': ['1. 100까지의 수', '2. 덧셈과 뺄셈 (1)', '3. 모양과 시각', '4. 덧셈과 뺄셈 (2)', '5. 규칙 찾기', '6. 덧셈과 뺄셈 (3)']
+    '1학기': { subject: '초 1-1(22개정)', units: ['1. 9까지의 수', '2. 여러 가지 모양', '3. 덧셈과 뺄셈', '4. 비교하기', '5. 50까지의 수'] },
+    '2학기': { subject: '초 1-2(22개정)', units: ['1. 100까지의 수', '2. 덧셈과 뺄셈(1)', '3. 모양과 시각', '4. 덧셈과 뺄셈(2)', '5. 규칙 찾기', '6. 덧셈과 뺄셈(3)'] }
   },
   '초2': {
-    '1학기': ['1. 세 자리 수', '2. 여러 가지 도형', '3. 덧셈과 뺄셈', '4. 길이 재기', '5. 분류하기', '6. 곱셈'],
-    '2학기': ['1. 네 자리 수', '2. 곱셈구구', '3. 길이 재기', '4. 시각과 시간', '5. 표와 그래프', '6. 규칙 찾기']
+    '1학기': { subject: '초 2-1(22개정)', units: ['1. 세 자리 수', '2. 여러 가지 도형', '3. 덧셈과 뺄셈', '4. 길이 재기', '5. 분류하기', '6. 곱셈'] },
+    '2학기': { subject: '초 2-2(22개정)', units: ['1. 네 자리 수', '2. 곱셈구구', '3. 길이 재기', '4. 시각과 시간', '5. 표와 그래프', '6. 규칙 찾기'] }
   },
   '초3': {
-    '1학기': ['1. 덧셈과 뺄셈', '2. 평면도형', '3. 나눗셈', '4. 곱셈', '5. 길이와 시간', '6. 분수와 소수'],
-    '2학기': ['1. 곱셈', '2. 나눗셈', '3. 원', '4. 분수', '5. 들이와 무게', '6. 그림그래프 (자료의 정리)']
+    '1학기': { subject: '초 3-1(22개정)', units: ['1. 덧셈과 뺄셈', '2. 평면도형', '3. 나눗셈', '4. 곱셈', '5. 길이와 시간', '6. 분수와 소수'] },
+    '2학기': { subject: '초 3-2(22개정)', units: ['1. 곱셈', '2. 나눗셈', '3. 원', '4. 분수', '5. 들이와 무게', '6. 그림그래프'] }
   },
   '초4': {
-    '1학기': ['1. 큰 수', '2. 각도', '3. 곱셈과 나눗셈', '4. 평면도형의 이동', '5. 막대그래프', '6. 규칙 찾기'],
-    '2학기': ['1. 분수의 덧셈과 뺄셈', '2. 삼각형', '3. 소수의 덧셈과 뺄셈', '4. 사각형', '5. 꺾은선그래프', '6. 다각형']
+    '1학기': { subject: '초 4-1(22개정)', units: ['1. 큰 수', '2. 각도', '3. 곱셈과 나눗셈', '4. 평면도형의 이동', '5. 막대그래프', '6. 규칙 찾기'] },
+    '2학기': { subject: '초 4-2(22개정)', units: ['1. 분수의 덧셈과 뺄셈', '2. 삼각형', '3. 소수의 덧셈과 뺄셈', '4. 사각형', '5. 꺾은선그래프', '6. 다각형'] }
   },
   '초5': {
-    '1학기': ['1. 자연수의 혼합 계산', '2. 약수와 배수', '3. 대응 관계 (규칙과 대응)', '4. 약분과 통분', '5. 분수의 덧셈과 뺄셈', '6. 다각형의 둘레와 넓이'],
-    '2학기': ['1. 수의 범위와 어림하기', '2. 분수의 곱셈', '3. 합동과 대칭', '4. 소수의 곱셈', '5. 직육면체', '6. 평균과 가능성']
+    '1학기': { subject: '초 5-1(22개정)', units: ['1. 자연수의 혼합 계산', '2. 약수와 배수', '3. 대응 관계', '4. 약분과 통분', '5. 분수의 덧셈과 뺄셈', '6. 다각형의 둘레와 넓이'] },
+    '2학기': { subject: '초 5-2(22개정)', units: ['1. 수의 범위와 올림, 버림, 반올림', '2. 분수의 곱셈', '3. 합동과 대칭', '4. 소수의 곱셈', '5. 직육면체와 정육면체', '6. 평균과 가능성'] }
   },
   '초6': {
-    '1학기': ['1. 분수의 나눗셈', '2. 각기둥과 각뿔', '3. 소수의 나눗셈', '4. 비와 비율', '5. 여러 가지 그래프', '6. 직육면체의 겉넓이와 부피'],
-    '2학기': ['1. 분수의 나눗셈', '2. 소수의 나눗셈', '3. 공간과 입체', '4. 비례식과 비례배분', '5. 원의 둘레와 넓이', '6. 원기둥·원뿔·구']
+    '1학기': { subject: '초 6-1(22개정)', units: ['1. 분수의 나눗셈', '2. 각기둥과 각뿔', '3. 소수의 나눗셈', '4. 비와 비율', '5. 여러 가지 그래프', '6. 직육면체의 겉넓이와 부피'] },
+    '2학기': { subject: '초 6-2(22개정)', units: ['1. 분수의 나눗셈', '2. 공간과 입체', '3. 소수의 나눗셈', '4. 비례식과 비례배분', '5. 원의 둘레와 넓이', '6. 원기둥, 원뿔, 구'] }
   },
   '중1': {
-    '1학기': ['1. 소인수분해', '2. 정수와 유리수', '3. 문자의 사용과 식', '4. 일차방정식', '5. 좌표평면과 그래프'],
-    '2학기': ['1. 기본 도형', '2. 작도와 합동', '3. 평면도형의 성질', '4. 입체도형의 성질', '5. 자료의 정리와 해석']
+    '1학기': { subject: '중 1-1(22개정)', units: ['1. 소인수분해', '2. 정수와 유리수', '3. 문자의 사용과 식', '4. 일차방정식', '5. 좌표평면과 그래프'] },
+    '2학기': { subject: '중 1-2(22개정)', units: ['1. 기본 도형', '2. 작도와 합동', '3. 평면도형의 성질', '4. 입체도형의 성질', '5. 통계'] }
   },
   '중2': {
-    '1학기': ['1. 유리수와 순환소수', '2. 식의 계산', '3. 일차부등식', '4. 연립일차방정식', '5. 일차함수'],
-    '2학기': ['1. 삼각형의 성질', '2. 사각형의 성질', '3. 도형의 닮음', '4. 피타고라스 정리', '5. 경우의 수', '6. 확률']
+    '1학기': { subject: '중 2-1(22개정)', units: ['1. 유리수와 순환소수', '2. 식의 계산', '3. 일차부등식', '4. 연립방정식', '5. 일차함수'] },
+    '2학기': { subject: '중 2-2(22개정)', units: ['1. 삼각형의 성질', '2. 사각형의 성질', '3. 도형의 닮음', '4. 피타고라스 정리', '5. 확률'] }
   },
   '중3': {
-    '1학기': ['1. 제곱근과 실수', '2. 다항식의 곱셈과 인수분해', '3. 이차방정식', '4. 이차함수'],
-    '2학기': ['1. 삼각비', '2. 원의 성질', '3. 통계']
+    '1학기': { subject: '중 3-1', units: ['1. 제곱근과 실수', '2. 근호를 포함한 식의 계산', '3. 곱셈공식과 인수분해', '4. 이차방정식', '5. 이차함수'] },
+    '2학기': { subject: '중 3-2', units: ['1. 삼각비', '2. 원의 성질', '3. 통계'] }
   },
   '고1': {
-    '1학기': ['공통수학1(고등수학 상) · 다항식', '공통수학1(고등수학 상) · 방정식과 부등식', '공통수학1(고등수학 상) · 경우의 수', '공통수학1 · 행렬'],
-    '2학기': ['공통수학2(고등수학 하) · 도형의 방정식', '공통수학2(고등수학 하) · 집합과 명제', '공통수학2(고등수학 하) · 함수', '공통수학2 · 순열과 조합']
+    '공통수학1(22개정)': { subject: '공통수학1(22개정)', units: ['1. 다항식의 연산', '2. 나머지정리와 인수분해', '3. 복소수와 이차방정식', '4. 이차방정식과 이차함수', '5. 여러 가지 방정식과 부등식', '6. 순열', '7. 조합', '8. 행렬'] },
+    '공통수학2(22개정)': { subject: '공통수학2(22개정)', units: ['1. 평면좌표', '2. 직선의 방정식', '3. 원의 방정식', '4. 도형의 이동', '5. 집합', '6. 명제', '7. 함수', '8. 유리함수와 무리함수'] }
   },
-  '고2': { '1학기': METAMATH_UPPER_HIGH_UNITS, '2학기': METAMATH_UPPER_HIGH_UNITS },
-  '고3': { '1학기': METAMATH_UPPER_HIGH_UNITS, '2학기': METAMATH_UPPER_HIGH_UNITS }
+  '고2': {
+    '대수(22개정)': { subject: '대수(22개정)', units: ['1. 지수함수와 로그함수', '2. 삼각함수', '3. 수열'] },
+    '미적분Ⅰ(22개정)': { subject: '미적분Ⅰ(22개정)', units: ['1. 함수의 극한과 연속', '2. 다항함수의 미분법', '3. 다항함수의 적분법'] }
+  },
+  '고3': {
+    '확률과 통계': { subject: '확률과 통계', units: ['1. 경우의 수', '2. 확률', '3. 통계'] },
+    '미적분': { subject: '미적분', units: ['1. 수열의 극한', '2. 여러 가지 함수의 미분', '3. 미분법', '4. 적분법'] },
+    '기하': { subject: '기하', units: ['1. 이차곡선', '2. 벡터', '3. 공간도형'] }
+  }
 });
 const METAMATH_CUSTOM_UNIT = '__custom__';
 
+function metamathPeriodsFor(grade) {
+  return Object.keys(METAMATH_CATALOG[grade] || {});
+}
+
+function metamathPeriodLabel(grade) {
+  return String(grade || '').startsWith('고') ? '과목' : (grade ? '학기' : '학기/과목');
+}
+
+function metamathCatalogEntry(grade, semester) {
+  return (METAMATH_CATALOG[grade] && METAMATH_CATALOG[grade][semester]) || null;
+}
+
+function metamathSubjectFor(grade, semester) {
+  const entry = metamathCatalogEntry(grade, semester);
+  return entry ? entry.subject : '';
+}
+
 function metamathUnitsFor(grade, semester) {
-  return (METAMATH_UNITS[grade] && METAMATH_UNITS[grade][semester]) || [];
+  const entry = metamathCatalogEntry(grade, semester);
+  return entry ? entry.units : [];
+}
+
+function metamathPeriodOptions(grade, selectedPeriod) {
+  const periods = metamathPeriodsFor(grade);
+  const label = metamathPeriodLabel(grade);
+  return '<option value="">' + label + ' 선택</option>' + periods.map(value => {
+    const subject = metamathSubjectFor(grade, value);
+    const text = subject && subject !== value ? value + ' · ' + subject : value;
+    return '<option value="' + esc(value) + '"' + (selectedPeriod === value ? ' selected' : '') + '>' + esc(text) + '</option>';
+  }).join('');
 }
 
 function metamathUnitSelection(grade, semester, unit) {
@@ -6358,11 +6386,13 @@ function metamathUnitOptions(grade, semester, selectedUnit) {
 function refreshMetamathCurriculumFields(changedId) {
   const gradeEl = $('#metamathGrade');
   const semesterEl = $('#metamathSemester');
+  const semesterLabelEl = $('#metamathSemesterLabel');
   const unitEl = $('#metamathUnit');
   const customField = $('#metamathCustomUnitField');
   const customEl = $('#metamathCustomUnit');
-  if (!gradeEl || !semesterEl || !unitEl || !customField || !customEl) return;
+  if (!gradeEl || !semesterEl || !semesterLabelEl || !unitEl || !customField || !customEl) return;
   if (changedId === 'metamathGrade') {
+    semesterEl.innerHTML = metamathPeriodOptions(gradeEl.value, '');
     semesterEl.value = '';
     customEl.value = '';
   }
@@ -6370,6 +6400,7 @@ function refreshMetamathCurriculumFields(changedId) {
     unitEl.innerHTML = metamathUnitOptions(gradeEl.value, semesterEl.value, '');
     customEl.value = '';
   }
+  semesterLabelEl.textContent = metamathPeriodLabel(gradeEl.value);
   semesterEl.disabled = !gradeEl.value;
   unitEl.disabled = !gradeEl.value || !semesterEl.value;
   const custom = !unitEl.disabled && unitEl.value === METAMATH_CUSTOM_UNIT;
@@ -6479,6 +6510,7 @@ function metamathRequestCard(req, admin) {
   const staff = staffById(req.staffId);
   const status = metamathRequestStatus(req);
   const response = metamathResponseFor(req.id);
+  const subject = metamathSubjectFor(req.grade, req.semester);
   const active = status === 'requested' || status === 'changed' || status === 'preparing';
   const overdue = active && req.processingDate && req.processingDate < today();
   const canEdit = session.isStaffLink && !isManager() && req.staffId === session.staffId && status === 'requested';
@@ -6486,7 +6518,8 @@ function metamathRequestCard(req, admin) {
   return '<div class="material-request ' + status + (overdue ? ' overdue' : '') + '"><div class="request-queue-head"><div>' +
     '<div class="row wraprow" style="gap:6px"><b>' + esc(admin && staff ? staff.name + ' · ' : '') + esc(req.unit || '단원 미입력') + '</b>' +
       '<span class="pill ' + (status === 'assigned' ? '' : overdue ? 'bad' : 'warn') + '">' + esc(overdue ? '처리 지연' : METAMATH_REQUEST_STATUS[status]) + '</span></div>' +
-    '<div class="small muted">' + esc(req.grade || '') + ' · ' + esc(req.semester || '') + ' · 제작 예정 ' + esc(req.processingDate ? label(req.processingDate) + ' 오후 6시' : '미정') + '</div></div>' +
+    '<div class="small muted">' + [req.grade, req.semester, subject && subject !== req.semester ? subject : ''].filter(Boolean).map(value => esc(value)).join(' · ') +
+      ' · 제작 예정 ' + esc(req.processingDate ? label(req.processingDate) + ' 오후 6시' : '미정') + '</div></div>' +
     '<span class="pill">수학</span></div>' +
     '<div class="material-summary">' + esc(buildMetamathRequestSummary(req)) + '</div>' +
     (overdue ? '<div class="small muted mt8">제작 예정일이 지나 최신 처리 상태를 확인해 주세요.</div>' : '') +
@@ -6541,8 +6574,8 @@ function metamathRequestModal(existing) {
   const processingDate = metamathRequestProcessingDate(now());
   const gradeOptions = '<option value="">학년 선택</option>' + METAMATH_GRADES.map(value =>
     '<option value="' + value + '"' + (req.grade === value ? ' selected' : '') + '>' + value + '</option>').join('');
-  const semesterOptions = '<option value="">학기 선택</option>' + METAMATH_SEMESTERS.map(value =>
-    '<option value="' + value + '"' + (req.semester === value ? ' selected' : '') + '>' + value + '</option>').join('');
+  const periodLabel = metamathPeriodLabel(req.grade);
+  const semesterOptions = metamathPeriodOptions(req.grade, req.semester);
   const difficultyOptions = '<option value="">난이도 선택</option>' + METAMATH_DIFFICULTIES.map(value =>
     '<option value="' + value + '"' + (req.difficulty === value ? ' selected' : '') + '>' + value + '</option>').join('');
   const unitSelection = metamathUnitSelection(req.grade, req.semester, req.unit);
@@ -6551,9 +6584,9 @@ function metamathRequestModal(existing) {
   modal('🧮 메타수학 문제지 요청',
     '<input type="hidden" id="metamathRequestId" value="' + esc(req.id || '') + '">' +
     '<div class="guide mb14"><b>제작 예정: ' + esc(label(processingDate)) + ' 오후 6시</b><br>매일 오후 6시에 요청 내용을 확인해 선생님이 직접 문제지를 만들어 배정합니다. 오후 6시 전에 접수하면 당일, 오후 6시부터 접수하면 다음 날 처리됩니다.</div>' +
-    '<div class="guide mb14" id="metamathCurriculumHelp">학년을 고른 뒤 학기를 선택하면 해당 단원명이 나타납니다. 목록에 없을 때만 <b>목록에 없음 · 직접 입력</b>을 선택해 주세요.</div>' +
+    '<div class="guide mb14" id="metamathCurriculumHelp">메타수학과 같은 순서로 선택합니다. 초·중등은 학기, 고등은 과목을 고르면 해당 대단원명이 나타납니다. 목록에 없을 때만 <b>목록에 없음 · 직접 입력</b>을 선택해 주세요.</div>' +
     '<div class="grid2"><div class="field"><label class="fl" for="metamathGrade">학년</label><select class="in" id="metamathGrade" required aria-describedby="metamathCurriculumHelp">' + gradeOptions + '</select></div>' +
-      '<div class="field"><label class="fl" for="metamathSemester">학기</label><select class="in" id="metamathSemester" required' + (!req.grade ? ' disabled' : '') + '>' + semesterOptions + '</select></div></div>' +
+      '<div class="field"><label class="fl" id="metamathSemesterLabel" for="metamathSemester">' + periodLabel + '</label><select class="in" id="metamathSemester" required' + (!req.grade ? ' disabled' : '') + '>' + semesterOptions + '</select></div></div>' +
     '<div class="field"><label class="fl" for="metamathUnit">단원</label><select class="in" id="metamathUnit" required' + (!req.grade || !req.semester ? ' disabled' : '') + '>' + unitOptions + '</select></div>' +
     '<div class="field" id="metamathCustomUnitField"' + (unitSelection === METAMATH_CUSTOM_UNIT ? '' : ' hidden') + '><label class="fl" for="metamathCustomUnit">단원 직접 입력</label>' +
       '<input class="in" id="metamathCustomUnit" maxlength="160" value="' + esc(customUnit) + '" placeholder="메타수학에 표시된 단원명을 적어주세요"' + (unitSelection === METAMATH_CUSTOM_UNIT ? '' : ' disabled') + '></div>' +
@@ -12291,9 +12324,10 @@ document.addEventListener('click', async ev => {
       const customUnit = (($('#metamathCustomUnit') && $('#metamathCustomUnit').value) || '').trim();
       const unit = unitChoice === METAMATH_CUSTOM_UNIT ? customUnit : unitChoice;
       const note = (($('#metamathNote') && $('#metamathNote').value) || '').trim();
-      if (!grade || !semester || !difficulty || !unitChoice || !unit) return toast('학년·학기·단원·난이도를 모두 선택해 주세요');
+      const periodLabel = metamathPeriodLabel(grade);
+      if (!grade || !semester || !difficulty || !unitChoice || !unit) return toast('학년·' + periodLabel + '·단원·난이도를 모두 선택해 주세요');
       if (!METAMATH_GRADES.includes(grade) || grade.length > 20) return toast('학년을 다시 선택해 주세요');
-      if (!METAMATH_SEMESTERS.includes(semester) || semester.length > 20) return toast('학기를 다시 선택해 주세요');
+      if (!metamathPeriodsFor(grade).includes(semester) || semester.length > 40) return toast(periodLabel + '을 다시 선택해 주세요');
       if (!METAMATH_DIFFICULTIES.includes(difficulty)) return toast('난이도를 다시 선택해 주세요');
       if (unitChoice !== METAMATH_CUSTOM_UNIT && !metamathUnitsFor(grade, semester).includes(unitChoice)) return toast('단원을 다시 선택해 주세요');
       if (unit.length > 160) return toast('단원은 160자 이내로 입력해 주세요');
@@ -15369,7 +15403,7 @@ setInterval(() => {
 
 /* ── 새 버전 감지 ──
  * consult 배포가 task 앱의 캐시 버전을 건드리지 않도록 전용 파일을 쓴다. */
-const APP_VER = '2026-10-21.3';
+const APP_VER = '2026-10-23.1';
 function checkVersion() {
   fetch('./version.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
