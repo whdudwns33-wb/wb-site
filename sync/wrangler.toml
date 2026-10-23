@@ -65,6 +65,7 @@ binding = "AI"
 
 # 비밀값은 이 파일에 쓰지 않는다. 아래 명령으로 따로 넣는다.
 #   npx wrangler secret put TASK_ADMIN_SECRET
+#   npx wrangler secret put TASK_MCP_READ_SECRET --config sync/wrangler.toml
 #   npx wrangler secret put CONSULT_ADMIN_SECRET
 #   npx wrangler secret put TASK_MANAGER_STAFF_IDS
 #   npx wrangler secret put SOLAPI_KAKAO_DIRECTOR_REPORT_TEMPLATE_ID

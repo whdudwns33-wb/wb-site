@@ -48,6 +48,7 @@
  *   POST /session-pack { app, auth, action, ... }    → 지정 수업의 회차권·사용 원장
  *   POST /teacher-live-request { app, auth, action, ... } → 담당 선생님→모든 관리자 실시간 요청
  *   POST /center-chat { app:'task', auth, action, ... } → 전 직원 센터 소통·당일 등원 현황
+ *   POST /task-export { app:'task', action:'list_work_orders', ... } → 전용 Bearer로 일반 업무지시서만 읽기
  *   POST /tuition-alert { app, auth(admin), action, ... } → 학생 단위 4회제 3회 확정 알림
  *   POST /student-attendance { app, auth, studentId, month? } → 담당 학생 출결 달력·현재 4회 진행
  *   POST /student-next-lesson { app, auth, taskId, lessonDate } → 같은 학생의 해당 날짜 다음 수업 1건(최소 정보)
@@ -93,6 +94,7 @@ import { handleStudentChange } from './student-change.js';
 import { handleAdminDirective } from './admin-directive.js';
 import { handleTeacherLiveRequest } from './teacher-live-request.js';
 import { handleCenterChat } from './center-chat.js';
+import { handleTaskExport } from './task-export.js';
 import { handlePrivateChat } from './private-chat.js';
 import { handleSelfIdentity } from './self-identity.js';
 import { handleTaskPush, dispatchTaskPush } from './task-push.js';
@@ -3485,6 +3487,11 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     const origin = request.headers.get('Origin') || '';
+
+    // 브라우저용 관리자·개인 인증과 분리된 서버 간 읽기 전용 경로다.
+    // Origin/CORS 허용보다 먼저 분기하되, handler가 Origin 부재와 전용 Bearer를 모두 검증한다.
+    if (url.pathname === '/task-export') return await handleTaskExport(request, env);
+
     const allowed = (env.ALLOW_ORIGIN || '').split(',').map(s => s.trim()).filter(Boolean);
     const parentSameOrigin = url.pathname === '/parent-portal' && origin === url.origin;
     const consultGuardianSameOrigin = url.pathname === '/consult-guardian' && origin === url.origin;
