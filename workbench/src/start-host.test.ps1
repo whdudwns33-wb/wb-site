@@ -11,7 +11,7 @@ function Assert-Probe($condition, $message) { if (!$condition) { throw $message 
 try {
     [void](New-Item -ItemType Directory -Path (Join-Path $probeRoot 'logs'))
     $script = Join-Path $probeRoot 'start.ps1'
-    $fixture = Join-Path $probeRoot 'serve.mjs'
+    $fixture = Join-Path $probeRoot 'account-host.mjs'
     $pidFile = Join-Path $probeRoot 'probe.pid'
     Set-Content -LiteralPath $script -Value $source -Encoding utf8NoBOM
     $sleepChild = "import fs from 'node:fs';fs.writeFileSync('probe.pid',String(process.pid));setInterval(()=>{},1000);"

@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Read-only evaluation against a fresh account-host.test.mjs synthetic fixture, before write tests. Never run on real student records. -->
+<evaluation>
+  <qa_pair><question>List students, identify the synthetic fixture, then inspect its complete profile. What stable student identifier should subsequent counseling queries use?</question><answer>fake-1</answer></qa_pair>
+  <qa_pair><question>Compare the workspace summary with the student search results. How many students are in the fresh fixture?</question><answer>1</answer></qa_pair>
+  <qa_pair><question>Find the fixture student, inspect actual score inputs and regular exam inputs, and count all saved exams.</question><answer>0</answer></qa_pair>
+  <qa_pair><question>Find the student and compare susi support cards with the summary's regular plan count. How many support plans are saved?</question><answer>0</answer></qa_pair>
+  <qa_pair><question>Inspect both the workspace summary and this student's reports. How many integrated reports are available?</question><answer>0</answer></qa_pair>
+  <qa_pair><question>Inspect the full student and compare its plans section. How many saved regular plan change-history entries exist?</question><answer>0</answer></qa_pair>
+  <qa_pair><question>Inspect profile and scores without inventing missing inputs. Is a school name present for the fresh synthetic student? Answer true or false.</question><answer>false</answer></qa_pair>
+  <qa_pair><question>Read the student's full counseling record and compare its report list. How many ordinary record entries remain independently of integrated reports?</question><answer>1</answer></qa_pair>
+  <qa_pair><question>Compare summary and student-query versions before making changes. What revision is required to conditionally save this freshly initialized workspace?</question><answer>1</answer></qa_pair>
+  <qa_pair><question>Page through a one-item student search and reconcile it with the workspace total. Is another page available? Answer true or false.</question><answer>false</answer></qa_pair>
+</evaluation>

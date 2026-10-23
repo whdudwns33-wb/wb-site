@@ -60,6 +60,7 @@ public static class WorkbenchChildJob {
 '@
 
 if ($Component -eq 'server') {
+    $env:WB_WORKBENCH_RUNTIME = $runtimeRoot
     $env:WB_WORKBENCH_DIR = Join-Path $runtimeRoot 'public'
     $pointer = Join-Path $runtimeRoot 'protected\current-release.json'
     if (Test-Path -LiteralPath $pointer) {
@@ -69,7 +70,7 @@ if ($Component -eq 'server') {
     }
     $env:PORT = '18960'
     $executable = 'C:\Program Files\nodejs\node.exe'
-    $arguments = @((Join-Path $runtimeRoot 'serve.mjs'))
+    $arguments = @((Join-Path $runtimeRoot 'account-host.mjs'))
 } elseif ($Component -eq 'sync') {
     $env:WB_WORKBENCH_RUNTIME = $runtimeRoot
     $executable = 'C:\Program Files\nodejs\node.exe'

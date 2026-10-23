@@ -5,6 +5,7 @@ import {tmpdir} from 'node:os';
 import {join, dirname, basename, resolve} from 'node:path';
 import {request} from 'node:http';
 import {createWorkbenchServer, parsePort} from './serve.mjs';
+import {createHash} from 'node:crypto';
 
 function fixture(t) {
   const directory = mkdtempSync(join(tmpdir(), 'wb-serve-test-'));
@@ -60,7 +61,7 @@ test('serves only the encrypted pair, supports HEAD/query and retains the startu
     }
   }
   const health = await get('/healthz');
-  assert.deepEqual(JSON.parse(health.body), {ok: true, build: '0123abcd'});
+  assert.deepEqual(JSON.parse(health.body), {ok: true, build: '0123abcd', hashes: {'index.html': createHash('sha256').update(f.index).digest('hex'), 'bulk.enc.json': createHash('sha256').update(f.bulk).digest('hex')}});
   assert.equal((await get('/healthz', 'HEAD')).body.length, 0);
 });
 
