@@ -1,32 +1,74 @@
 # WB 컨설팅 워크벤치 — 소스
 
-원장 전용 컨설팅 관리 웹앱. 배포본은 비밀번호로 암호화되어 `/workbench/index.html` 로 서비스된다.
-배포 주소: https://workbench.wbcowork.com/workbench/ (Cloudflare → WB1 PC, 비밀번호 로그인)
+원장·관리자용 컨설팅 관리 웹앱. PC 운영본은 아이디 로그인 뒤 공용 상담 자료를 제공하며 암호화 배포본은 그대로 보존한다.
+배포 주소: https://workbench.wbcowork.com/workbench/ (Cloudflare → WB1 PC, 관리자 계정 로그인)
 이전 주소: https://whdudwns33-wb.github.io/wb-site/workbench/ (기존 기록 이전·복구용으로 유지)
 
 **현재 라이브: v40 후속 · 빌드 `77342aa6` (2026-10-16).** 원장 배포 지시 후 [PR #467](https://github.com/whdudwns33-wb/wb-site/pull/467)로 암호화 산출물 두 파일만 스쿼시 병합했다(`c9fc2fd3e3e730fcfa2b3e8048b9acf5176c8426`). 소스는 작업 브랜치 `8723ade`에 보관했다. 워크벤치 137개 테스트·최신 main 전체 312개 파일 검증·PR checks 두 건과 Pages 배포를 통과했다. 병합 후 17:22:49 KST에 라이브 `index.html`·`bulk.enc.json?v=77342aa6`의 SHA-256이 검증한 로컬 파일과 모두 일치했다. 기존 상담 저장 구조와 비공개 원본은 유지했다. 실제 학생 화면 확인을 대신 수행하거나 스크린샷을 만들지는 않았다.
 
 아래 구현 절의 미배포·화면 확인 대기는 각 개발 단계 당시의 기록이다. 최신 배포 상태는 이 문단과 `../HANDOFF.md`를 따른다.
 
+## 계정 로그인·공용 상담 저장·API·MCP (2026-10-23)
+
+사용자 요청으로 동등한 관리자 계정 두 개를 초기화했다. 계정 식별자·임시 비밀번호·학생 자료는 공개 소스나 인계서에 넣지 않는다. 최초 로그인은 비밀번호 변경·로그아웃만 허용하며, 기존과 다른 12~128자 비밀번호로 변경해야 앱과 API/MCP를 사용할 수 있다. 계정 화면 `/account`에서 비밀번호 변경·로그아웃·연결 키 발급/해제·관리자 목록을 제공한다.
+
+- `account-host.mjs`가 실제 PC 서버다. `serve.mjs`는 암호화 형식 검사·합성 테스트용이고 직접 실행은 명시적 테스트 환경변수 없이는 거절한다. 암호화 두 파일은 갱신하지 않았고 계정 인증 후에만 메모리에서 복호화해 앱을 제공한다. 최초 비밀번호와 별개인 원래 앱 복호화 키는 Windows DPAPI CurrentUser로 보호한 `protected/app-key.dpapi`에 둔다. 다른 Windows 사용자로 파일만 복사해서는 복호화할 수 없다.
+- `host-store.mjs`는 Node 기본 SQLite를 사용한다. `protected/accounts.sqlite`에 계정·세션·API 키 지문과 상담 버전들을 저장한다. 비밀번호는 [OWASP 권고](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html)의 scrypt(N=2^17, r=8, p=1)와 계정별 무작위 salt로 해시하며 평문을 저장하지 않는다. 상담 스냅샷은 HKDF로 구분한 AES-256-GCM 키와 매번 새 IV로 암호화한다. 로그인 실패 잠금과 동시 KDF 수 제한을 적용한다.
+- 세션은 8시간 유효한 Secure·HttpOnly·SameSite=Strict 호스트 쿠키다. Host/Origin·JSON·CSRF를 검사한다. 비밀번호 변경은 기존 세션과 API 연결 키를 모두 해제한다. API/MCP 키는 30일 유효하고 최초 발급 응답에서만 원문을 보여 준다. 로그·URL·공개 파일에 키를 적지 않는다.
+- 두 관리자는 같은 서버 상담 자료를 조회·수정한다. `shared-client.js`가 기존 동기식 저장/실패 계약에 맞춰 서버가 저장을 확정한 뒤 기기 사본을 갱신한다. revision 조건부 저장으로 다른 관리자의 변경을 덮어쓰지 않는다. 학생 단건 API/MCP 수정도 기존 전체 필드를 보존해야 한다. 변경 전후 스냅샷은 삭제하지 않는다.
+- 기존 브라우저 원본과 보호된 이전 백업을 보존한 채 공용 저장 자료의 전체 구조 일치를 확인했다. 기기 자료가 서버와 다르고 최초 서버 연결인 경우 별도 기기 사본을 보관하고 어느 자료를 사용할지 선택하도록 중단한다. 사용자 확인 없이 서로 다른 기기 자료를 덮어쓰지 않는다. 기기 저장은 백업 캐시이며 공용 정본은 PC 서버다. GitHub Pages의 예전 주소는 기존 기기 저장 방식으로 남는다.
+- 기존 암호화 앱의 두 저장 지점만 실행 시 검증해서 공용 저장에 연결한다. 다음 빌드에서 이 저장 계약이 바뀌면 시작을 거절하고 자동 동기화가 이전 릴리스로 복구한다. 이 경우 어댑터를 수정·검증한 뒤 새 빌드를 적용한다. 서버 코드와 npm 잠금 파일은 작업 브랜치에서 관리하고 PC 런타임에 함께 반영한다. 프런트엔드 프레임워크는 추가하지 않았다.
+
+### API 계약
+
+아래 자료 API는 로그인 완료 세션 또는 `Authorization: Bearer <개인 연결 키>`가 필요하다. 쿠키를 사용하는 변경 요청은 같은 Origin과 `/api/auth/me`의 CSRF 값을 `X-CSRF-Token`으로 전달한다. 연결 키로 계정 비밀번호나 다른 연결 키를 관리할 수는 없다.
+
+| 요청 | 기능 |
+|---|---|
+| `POST /api/auth/login` | `{username,password}` 로그인, 세션 쿠키와 변경 필요 여부 반환 |
+| `GET /api/auth/me` | 현재 계정과 CSRF 확인 |
+| `POST /api/auth/password` | `{currentPassword,nextPassword}` 변경, 기존 세션·API 키 해제 |
+| `POST /api/auth/logout` | 현재 세션 해제 |
+| `GET /api/summary` | 현재 revision·학생·보고서·정시 지원안 건수 |
+| `GET /api/workspace` | `{revision,sha256,data}` 공용 자료 전체 조회 |
+| `PUT /api/workspace` | `{revision,data}` 전체 저장, 버전이 다르면 409 |
+| `GET /api/students?query=&offset=0&limit=20` | 학생 검색·페이지 조회, 최대 100명 |
+| `GET /api/students/{id}?section=all` | profile/scores/plans/reports/all 구분 조회 |
+| `PUT /api/students/{id}` | `{revision,data}` 기존 필드를 유지한 학생 전체 자료 저장 |
+| `GET/POST /api/account/tokens` | 브라우저 계정에서 연결 키 목록·발급, POST는 `{name}` |
+| `DELETE /api/account/tokens/{id}` | 본인 연결 키 해제 |
+| `GET /api/admin/users` | 동등한 관리자 목록 |
+| `GET /api/openapi.json` | 인증된 API 기본 명세 |
+
+### MCP 연결
+
+공식 SDK의 [Streamable HTTP](https://ts.sdk.modelcontextprotocol.io/server)를 사용한 주소는 `https://workbench.wbcowork.com/mcp`다. 비밀번호 변경 후 `/account`에서 발급한 개인 연결 키를 Bearer 헤더로 넣는다. 임시 비밀번호나 기존 암호화 비밀번호를 MCP 설정에 쓰지 않는다. 현재는 직접 Bearer 설정이 가능한 클라이언트와 stdio를 지원하며 OAuth 자동 로그인·앱 등록 흐름은 구현하지 않았다.
+
+제공 도구는 `workbench_get_summary`, `workbench_list_students`, `workbench_get_student`, `workbench_save_student`다. 실제 성적·지원안·이력·보고서를 조회하며 별도 합격 예측 계산을 추가하지 않는다. 수정 도구는 조회한 학생 전체 자료와 `expected_revision`이 필요하다.
+
+stdio 클라이언트는 `node C:\Users\wb\wb-workbench-runtime\host-mcp.mjs`로 실행한다. 실행하는 클라이언트 프로세스의 `WB_WORKBENCH_API_TOKEN` 환경변수에 개인 키를 전달하고, 필요하면 `WB_WORKBENCH_URL`을 지정한다. 토큰을 명령줄·공개 설정 파일에 직접 쓰지 않는다. 실제 키를 이 문서나 채팅에 넣지 않는다.
+
+검증: `node --test workbench/src/account-host.test.mjs workbench/src/serve.test.mjs workbench/src/sync-host.test.mjs`와 `start-host.test.ps1`. 공식 SDK 클라이언트로 도구 검색·조회·조건부 저장·충돌·키 해제를 확인했고, 별도 브라우저/DB에서 첫 비밀번호 변경 → 기존 앱 → bulk 로딩 → 서버 저장을 확인했다. 실제 계정의 새 비밀번호는 대신 정하지 않았고 임시 계정 로그인·변경 전 차단만 검사했다. `host-mcp.eval.xml`은 실제 개인정보 대신 합성 fixture에서만 사용하는 읽기 전용 평가다.
+
 ## PC 서버와 Cloudflare (2026-10-20)
 
 - 실행 폴더: `C:\Users\wb\wb-workbench-runtime`. 최초 검증본은 `public`에 보존하고 이후 검증본은 `releases/<main 커밋>/`에 두 암호화 파일씩 보관한다. `protected/current-release.json` 포인터가 있으면 서버는 해당 릴리스를 제공하며, 없으면 최초 `public`을 제공한다. 학생 백업·소스·비밀번호를 제공 폴더에 넣지 않는다.
-- `serve.mjs`는 Node 기본 HTTP 서버이며 `WB_WORKBENCH_DIR` 필수, `PORT` 기본 18960이다. `127.0.0.1`에만 바인딩한다. `/`·`/workbench`는 `/workbench/`로 이동하며 암호화 두 파일과 `/healthz` 외에는 404, GET/HEAD 외에는 405다.
+- 현재 `account-host.mjs`가 Node 기본 HTTP 서버이며 `WB_WORKBENCH_RUNTIME`·`WB_WORKBENCH_DIR` 필수, `PORT` 기본 18960이다. `127.0.0.1`에만 바인딩한다. `/healthz`는 공개 상태와 원본 암호화 두 파일의 지문만 반환한다. 앱·자료·API·MCP는 위 계정 규칙을 적용하며 보호 폴더와 임의 파일은 제공하지 않는다.
 - 두 파일을 시작 시 메모리에 고정한다. 응답은 `no-store, no-transform`으로 전달한다. [Cloudflare 공식 설명](https://developers.cloudflare.com/web-analytics/faq/)의 `no-transform` 규칙으로 분석 스크립트 자동 삽입을 막아 원본 해시를 유지한다.
 - `start-host.ps1`을 런타임의 `start.ps1`로 복사해 사용한다. `WB_Workbench_Server`·`WB_Workbench_Tunnel`·`WB_Workbench_Sync` 작업이 PowerShell 7에서 이를 숨김 실행한다. 현재 실행기는 Codex에 설치된 PowerShell 7 경로이며, 위치가 바뀌면 작업의 실행 경로도 갱신해야 한다. 터널 설정·인증 파일·활성 포인터·동기화 상태는 런타임 `protected` 폴더에 두며 사용자·관리자·SYSTEM만 접근한다.
 - 작업은 wb 로그인 시 시작하고 실패 시 1분 간격으로 3회 재시도한다. Windows 로그인 전·로그아웃 후 자동 실행이나 PC 재부팅 자체는 검증하지 않았다. PC 전원·인터넷·로그인을 유지해야 한다.
 
 **PC 자동 동기화:** 사용자 승인으로 `WB_Workbench_Sync`를 매일 08:20 KST부터 15분 간격·2시간 동안, Windows 로그인 30초 후에도 실행하도록 연결했다. 실행 기회를 놓쳤으면 다음 사용 가능 시 시작하며 중복 실행은 막는다. 실패 시 1분 간격으로 3회 재시도한다. 기존 Claude의 아침 Drive → 시드 → PR 배포를 대체하는 작업은 아니며, 그 배포가 완료된 결과를 PC 서버에 반영한다.
 
-`sync-host.mjs`는 하나의 main 커밋을 먼저 고정한 뒤 같은 커밋의 두 파일을 다운로드한다. 암호화 형식을 확인하고 GitHub Pages의 실제 두 파일 해시도 일치해야 활성화한다. 아직 배포 중이면 기존 버전을 유지하고 다음 예약 때 확인한다. 두 파일을 새 불변 폴더에 먼저 저장한 뒤 활성 포인터를 원자적으로 바꾸므로 실행 중인 서버가 반쪽짜리 쌍을 읽지 않는다. 서버 재시작 후 HTTP 해시가 다르거나 시작에 실패하면 이전 포인터·서버로 복구한다. 원본 `public`과 이전 릴리스들은 삭제하지 않으며 같은 파일이면 재시작하지 않는다. 상태는 `protected/sync-status.json`, 로그는 `logs/sync.stdout.log`·`sync.stderr.log`다.
+`sync-host.mjs`는 하나의 main 커밋을 먼저 고정한 뒤 같은 커밋의 두 파일을 다운로드한다. 암호화 형식을 확인하고 GitHub Pages의 실제 두 파일 해시도 일치해야 활성화한다. 아직 배포 중이면 기존 버전을 유지하고 다음 예약 때 확인한다. 두 파일을 새 불변 폴더에 먼저 저장한 뒤 활성 포인터를 원자적으로 바꾸므로 실행 중인 서버가 반쪽짜리 쌍을 읽지 않는다. 서버 재시작 후 `/healthz`의 메모리 고정 원본 두 파일 지문이 다르거나 시작에 실패하면 이전 포인터·서버로 복구한다. 원본 `public`과 이전 릴리스들은 삭제하지 않으며 같은 파일이면 재시작하지 않는다. 계정 DB와 공용 상담 자료는 릴리스 교체 대상에 포함하지 않는다. 상태는 `protected/sync-status.json`, 로그는 `logs/sync.stdout.log`·`sync.stderr.log`다.
 
 ```powershell
 # 승인된 PR의 GitHub Pages 배포가 완료된 후 즉시 동기화하려면
 Start-ScheduledTask -TaskName WB_Workbench_Sync
-# 공개 /workbench/index.html 및 /workbench/bulk.enc.json?v=<빌드 태그> 해시 재확인
+# /healthz의 hashes가 두 암호화 원본과 일치하는지 확인 (앱 원문은 로그인 뒤 제공)
 ```
 
-새 주소에서는 처음 비밀번호를 입력하고 「이 기기에서 기억하기」를 다시 선택한다. **기록은 여전히 각 브라우저에 저장되며 서버 간 자동 동기화가 아니다.** 기존 주소의 「백업 내보내기」 → 새 주소의 「가져오기 (시드)」 → 「전체 복원」으로 학생·어디가·수동 DB를 모두 옮긴다. 전체 복원은 새 주소 데이터를 교체하므로 이미 새로 입력했다면 그쪽 백업도 먼저 보관한다. 기존 주소의 기록은 남는다. 평문 백업을 공개 서버에 두거나 에이전트가 내용을 출력하지 않는다.
+2026-10-20 당시 새 주소는 기존 암호화 비밀번호와 기기별 저장을 사용했다. 2026-10-23부터 PC 주소는 위 계정 로그인과 공용 저장을 사용한다. 예전 주소·기기에서 추가 기록을 가져올 때에는 먼저 양쪽 백업을 보관하고 버전 충돌을 확인한다. 공용 저장의 전체 복원은 다른 관리자에게도 적용되므로 사용자 확인 없이 자동 실행하지 않는다. 평문 백업을 공개 서버에 두거나 에이전트가 내용을 출력하지 않는다.
 
 2026-10-20 연결된 Aside 브라우저의 기록 이전은 완료했다. 새 주소가 비어 있음을 확인하고 원본을 보호된 로컬 폴더에 백업한 뒤 저장 자료를 바이트 단위로 이전했다. 원본과 목적지의 지문 일치·새로고침 후 보존을 확인했으며 기존 주소 자료도 유지했다. 비밀번호·기기 기억 키는 복사하지 않았으므로 새 주소 로그인은 사용자가 진행한다. 세부 검증 메타데이터와 원본 사본은 `protected/migration-20261020/`에만 두며 공개 인계서에 기록 내용을 싣지 않는다. 자동 반영도 브라우저 저장 자료를 읽거나 덮어쓰지 않으며 Drive 자동 업로드를 추가하지 않았다.
 

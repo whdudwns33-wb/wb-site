@@ -1,13 +1,14 @@
 import {createServer} from 'node:http';
 import {readFileSync} from 'node:fs';
 import {pathToFileURL} from 'node:url';
+import {createHash} from 'node:crypto';
 
 export function parsePort(value = '18960') {
   if (!/^[1-9]\d{0,4}$/.test(value) || Number(value) > 65535) throw Error('PORT must be an integer from 1 to 65535.');
   return Number(value);
 }
 
-export function createWorkbenchServer(directory) {
+export function readWorkbenchRelease(directory) {
   if (typeof directory !== 'string' || !directory.trim()) throw Error('WB_WORKBENCH_DIR is required.');
   let index, bulk, envelope;
   try {
@@ -26,8 +27,12 @@ export function createWorkbenchServer(directory) {
   } catch {
     throw Error('The encrypted index.html and bulk.enc.json files are missing or invalid.');
   }
+  return {index, bulk, envelope};
+}
+export function createWorkbenchServer(directory) {
+  const {index, bulk, envelope} = readWorkbenchRelease(directory);
   // shortcut: check pair hashes at deploy time until both build tags are public.
-  const health = Buffer.from(JSON.stringify({ok: true, build: envelope.t}));
+  const health = Buffer.from(JSON.stringify({ok: true, build: envelope.t, hashes: Object.fromEntries([['index.html', index], ['bulk.enc.json', bulk]].map(([name, value]) => [name, createHash('sha256').update(value).digest('hex')]))}));
   const files = new Map([
     ['/workbench/', [index, 'text/html; charset=utf-8']],
     ['/workbench/index.html', [index, 'text/html; charset=utf-8']],
@@ -55,6 +60,10 @@ export function createWorkbenchServer(directory) {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  if (process.env.WB_ALLOW_UNAUTHENTICATED_TEST !== '1') {
+    console.error('Use account-host.mjs for the authenticated workbench service.');
+    process.exit(1);
+  }
   try {
     const port = parsePort(process.env.PORT);
     const server = createWorkbenchServer(process.env.WB_WORKBENCH_DIR);

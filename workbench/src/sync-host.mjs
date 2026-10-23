@@ -44,12 +44,10 @@ async function verifyWorkbench(expected, fetcher) {
   const until = Date.now() + 45000;
   do {
     try {
-      const actual = Object.fromEntries(await Promise.all(files.map(async file => {
-        const response = await fetcher('http://127.0.0.1:18960/workbench/' + file, {signal: AbortSignal.timeout(3000)});
-        if (!response.ok) throw Error('Server not ready.');
-        return [file, digest(Buffer.from(await response.arrayBuffer()))];
-      })));
-      if (same(actual, expected)) return;
+      const response = await fetcher('http://127.0.0.1:18960/healthz', {signal: AbortSignal.timeout(3000)});
+      if (!response.ok) throw Error('Server not ready.');
+      const actual = await response.json();
+      if (actual.ok && actual.hashes && same(actual.hashes, expected)) return;
     } catch {}
     await delay(500);
   } while (Date.now() < until);
