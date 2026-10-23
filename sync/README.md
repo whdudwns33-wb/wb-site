@@ -1,5 +1,40 @@
 # WB 동기화 백엔드 (Cloudflare Workers + D1)
 
+## 업무지시서 읽기 전용 API·MCP
+
+- `POST /task-export`는 서버 간 연결 전용이다. `Origin`이 없는 요청에서만 동작하며,
+  `Authorization: Bearer ...`의 별도 Worker secret `TASK_MCP_READ_SECRET`을 확인한다.
+- 본문은 `{ "app":"task", "action":"list_work_orders" }`를 기본으로 하고 `date`,
+  `staffId`, `cursor`, `limit(1~200)`만 선택적으로 받는다. `app`은 항상 `task`다.
+- 응답은 관리자 화면의 `wb-task-transfer-v1`과 같은 허용 필드만 쓴다. 삭제 업무·수업·
+  교재 주문·보강·체크·학생·연락처·설정·인증정보는 반환하지 않는다. 자유 입력 제목·상세·
+  안내에는 개인정보를 적지 않고, 다른 프로그램에 반영하기 전에 사람이 확인한다.
+- `scripts/task-mcp-server.mjs`는 이 API만 호출하는 무의존성 stdio MCP다. 쓰기 도구나
+  임의 `/sync` 프록시는 제공하지 않는다. 클라이언트에는 비밀값을 직접 적지 않고
+  `WB_TASK_MCP_READ_TOKEN` 환경변수로 주입한다.
+
+Windows Codex 설치 예시:
+
+```powershell
+codex mcp add wb-task -- node "C:\절대경로\wb-site\scripts\task-mcp-server.mjs"
+codex mcp list
+```
+
+`~/.codex/config.toml`의 생성된 항목에는 민감 환경변수가 보안 필터에서 빠지지 않도록
+이름만 명시한다. 값 자체는 설정 파일에 쓰지 않는다.
+
+```toml
+[mcp_servers.wb-task]
+command = "node"
+args = ['C:\절대경로\wb-site\scripts\task-mcp-server.mjs']
+env_vars = ["WB_TASK_MCP_READ_TOKEN"]
+tool_timeout_sec = 30
+```
+
+운영 순서는 새 secret 등록 → Worker 배포 → 로컬 환경변수·MCP 등록 → `tools/list`와
+읽기 1건 점검이다. D1 마이그레이션과 Pages 배포는 필요하지 않다. 기존
+`TASK_ADMIN_SECRET`, 관리자·직원 개인 링크 토큰을 이 연결에 재사용하지 않는다.
+
 ## 첫 결제 12회 선납
 
 `sessionInitialCycleSize:12`이면 첫 세 개의 4회 불변 원장을 결제 회차 하나(12회)로 투영한다.
