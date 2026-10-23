@@ -1,7 +1,8 @@
 'use strict';
 /* WB 진로독서 백엔드 — 학생 동기화 API + 관리 웹 + 학생 앱 서빙 (Node 22 무의존성)
    실행: node reading-server/server.mjs   (기본 http://localhost:8890)
-   환경: PORT, ADMIN_PIN 또는 ADMIN_ID·ADMIN_PASSWORD(관리 로그인 — 둘 다 없으면 뜨지 않는다), DATA_DIR,
+   환경: PORT, HOST(묶을 주소 — 비우면 관리 전용은 127.0.0.1, 원내 모드는 모든 주소),
+         ADMIN_PIN 또는 ADMIN_ID·ADMIN_PASSWORD(관리 로그인 — 둘 다 없으면 뜨지 않는다), DATA_DIR,
          GEMINI_API_KEY(브레인레터 AI 삽화, 선택) */
 import http from 'node:http';
 import fs from 'node:fs';
@@ -55,7 +56,11 @@ const TOKEN_TTL = 1000 * 60 * 60 * 24 * 30;            // 30일
    이전 원내 모드에서 받은 학생 토큰·가족 링크도 이 모드에서는 사용할 수 없다.
    관리 로그인과 관리 화면이 쓰는 공용 모듈(/naesin/gen.js 등)은 그대로 둔다 — 막으면 관리 웹이 깨진다. */
 const ADMIN_ONLY = /^(1|true|yes|on)$/i.test(process.env.WB_ADMIN_ONLY || '');
-const HOST = process.env.HOST || (ADMIN_ONLY ? '127.0.0.1' : '0.0.0.0');
+/* 묶을 주소. 관리 전용이면 기본이 127.0.0.1 이다 — 터널로 외부에 열 때 유일한 손님이 같은 PC 의
+   cloudflared 라서, 모든 주소에 묶으면 터널·Access 를 거치지 않는 LAN 입구가 하나 더 생긴다
+   (docs/로컬-서버-외부공개-터널.md §1.5 경계). 원내 모드는 예전처럼 모든 주소(LAN 의 다른 기기가
+   http://<PC>:8890 으로 연다). 공백만 든 값은 비운 것으로 본다. */
+const HOST = (process.env.HOST || '').trim() || (ADMIN_ONLY ? '127.0.0.1' : '0.0.0.0');
 
 load();
 const db = getDb();
@@ -1090,7 +1095,9 @@ setInterval(async () => {
 }, 60000).unref();
 
 server.listen(PORT, HOST, () => {
-  console.log(`WB 진로독서 서버 http://localhost:${PORT}`);
+  /* 묶은 주소를 그대로 찍는다 — Windows 에서 localhost 는 ::1 로 먼저 풀려 127.0.0.1 에만 묶인 서버와
+     어긋날 수 있다. 터널 경로(Service URL)에도 이 줄의 주소를 그대로 쓴다. */
+  console.log(`WB 진로독서 서버 http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`);
   console.log(`  학생 앱: /   워드브레인: /vocab/   관리 웹: /admin   연상 검수함: /admin/vocab-review.html`);
   /* 어느 모드로 떴는지 한 줄로 알린다 — 터널을 붙인 뒤 이 줄을 보고 확인한다. */
   if (ADMIN_ONLY) console.log('  [관리 전용] WB_ADMIN_ONLY=on — 학생 로그인·기존 학생 토큰·가족 API를 허용하지 않습니다');
