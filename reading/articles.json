@@ -1,5 +1,5 @@
 {
-  "version": "2026-10-19.1",
+  "version": "2026-10-26.1",
   "articles": [
     {
       "id": "nuri-space",
@@ -58591,6 +58591,4084 @@
               "explain": "임승관 청장은 현장에 있는 사람의 신속한 행동이 무엇보다 중요하다고 했다. 마지막 문장은 거기에 골든타임 4분이라는 조건을 겹쳐 글쓴이가 끌어낸 추론이다.",
               "evidencePara": 5
             }
+          ]
+        }
+      }
+    },
+    {
+      "id": "gyeongguk-code",
+      "category": "history",
+      "careers": [
+        "law",
+        "hum"
+      ],
+      "issue": false,
+      "publishedAt": "2026-10-26",
+      "status": "published",
+      "sources": [
+        {
+          "title": "우리역사넷 한국사 연대기 — 조선 시대 국가 운영의 근간이 된 만세성법(萬世成法)",
+          "url": "https://contents.history.go.kr/mobile/kc/view.do?levelId=kc_r300100&code=kc_age_30"
+        }
+      ],
+      "levels": {
+        "L1": {
+          "title": "오래 지킬 것과 잠깐 쓸 것",
+          "minutes": 3,
+          "paragraphs": [
+            [
+              "아주 먼 옛날 조선에서는 ",
+              "임금이 명령을 내렸어요. ",
+              "사람들은 그 명령을 ",
+              "글로 적어 두었어요. ",
+              "적어 둔 글이 ",
+              "나라의 법이 되었어요."
+            ],
+            [
+              "명령은 자꾸자꾸 쌓였어요. ",
+              "그 가운데에는 ",
+              "오래오래 지킬 것도 있고, ",
+              "그때만 쓰고 마는 것도 있었어요. ",
+              "그래서 둘을 갈라놓았어요. ",
+              "오래 지킬 것을 담은 법전은 ",
+              "‘전’이라고 했어요. ",
+              "잠깐 쓸 것을 담은 법전은 ",
+              "‘록’이라고 했어요."
+            ],
+            [
+              "법전은 나라의 법을 ",
+              "모아 적어 둔 책이에요. ",
+              "법전을 만드는 일은 ",
+              "새 법을 지어내는 일이 아니었어요. ",
+              "이미 내려진 명령 가운데 ",
+              "남길 것을 고르고, ",
+              "한데 모으는 일이었어요."
+            ],
+            [
+              "조선은 흩어져 있던 것을 ",
+              "모두 모아 ",
+              "하나로 묶기로 했어요. ",
+              "그 법전의 이름을 ",
+              "경국대전이라고 정했어요."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "법전",
+              "easy": "나라의 법을 한데 모아 적어 둔 책이에요."
+            },
+            {
+              "word": "명령",
+              "easy": "윗사람이 ‘이렇게 하여라’ 하고 시키는 말이에요."
+            },
+            {
+              "word": "경국대전",
+              "easy": "조선이 오래 지키려고 하나로 모아 만든 법전의 이름이에요."
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글은 무엇에 대한 이야기인가요?",
+              "choices": [
+                "임금의 명령을 골라 모아 법전을 만든 이야기",
+                "바다를 건너는 배를 만든 이야기",
+                "임금이 새 글자를 만든 이야기",
+                "성을 쌓고 지킨 이야기"
+              ],
+              "answer": 0,
+              "explain": "법전을 만드는 일은 이미 내려진 명령 가운데 남길 것을 고르고 한데 모으는 일이었어요.",
+              "evidencePara": 2
+            },
+            {
+              "type": "detail",
+              "q": "오래오래 지킬 것을 담은 법전을 무엇이라고 했나요?",
+              "choices": [
+                "‘록’",
+                "‘전’",
+                "‘책’",
+                "‘글’"
+              ],
+              "answer": 1,
+              "explain": "오래 지킬 것을 담은 법전은 ‘전’이라고 했어요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「법전」은 무엇인가요?",
+              "choices": [
+                "나라의 법을 한데 모아 적어 둔 책",
+                "임금이 사는 큰 집",
+                "글씨를 연습하는 공책",
+                "나라의 땅을 그린 그림"
+              ],
+              "answer": 0,
+              "explain": "나라의 법을 한데 모아 적어 둔 책이 법전이에요.",
+              "evidencePara": 2
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "‘전’과 ‘록’을 가른 기준은 무엇인가요?",
+              "choices": [
+                "글씨가 예쁜가 아닌가",
+                "얼마나 오래 지킬 것인가",
+                "누가 먼저 적었는가",
+                "책이 얼마나 두꺼운가"
+              ],
+              "answer": 1,
+              "explain": "오래 지킬 것과 그때만 쓰고 마는 것을 갈라놓았어요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "apply",
+              "q": "우리 반 규칙을 적어 둘 때 이 글처럼 하려면 어떻게 할까요?",
+              "choices": [
+                "규칙을 모두 지우고 새로 만들어요",
+                "한 해 내내 지킬 규칙과 그날만 쓰는 규칙을 나누어 적어요",
+                "규칙을 아주 길게 늘여 써요",
+                "규칙을 한 사람만 알게 해요"
+              ],
+              "answer": 1,
+              "explain": "오래 지킬 것과 잠깐 쓸 것을 갈라 두었어요.",
+              "evidencePara": 1
+            }
+          ]
+        },
+        "L2": {
+          "title": "지어내지 않고 골라 모으다",
+          "minutes": 4,
+          "paragraphs": [
+            [
+              "규칙을 적은 종이가 ",
+              "한 장씩 늘어난다고 생각해 보자. ",
+              "어떤 규칙은 몇 해가 지나도 ",
+              "그대로 쓰고, ",
+              "어떤 규칙은 그해에만 쓰고 끝난다. ",
+              "조선의 법전은 ",
+              "바로 이 둘을 갈라 두었다."
+            ],
+            [
+              "조선의 법령은 대체로 임금이 내린 명령을 ",
+              "글로 적어 둔 것이었다. ",
+              "그래서 법전을 엮는 일은 ",
+              "새 법을 지어내는 일이 아니었다. ",
+              "이미 내려진 명령과 조례 가운데 ",
+              "남길 것을 고르고 정리해 ",
+              "하나로 모으는 일, ",
+              "곧 집록이었다."
+            ],
+            [
+              "조선의 법전은 내용에 따라 ",
+              "‘전’과 ‘록’으로 나뉘었다. ",
+              "‘전’은 영구히 보존하고 ",
+              "지켜야 할 근본 법규를 가리켰다. ",
+              "경제육전과 경국대전과 속대전 등이 여기에 든다. ",
+              "‘록’은 한때만 쓰이는 ",
+              "곁가지 규정을 가리켰다. ",
+              "속등록과 대전속록과 수교집록 등이 여기에 든다."
+            ],
+            [
+              "조선 최초의 법전은 ",
+              "1397년에 조준이 주관해 엮은 경제육전이다. ",
+              "그 뒤에 내려진 수교와 조례는 ",
+              "따로 모아 속육전으로 엮었다. ",
+              "속육전은 한 번으로 끝나지 않고 ",
+              "태종 대와 세종 대에 ",
+              "거듭 다시 편찬되었다."
+            ],
+            [
+              "이 방식에는 문제가 있었다. ",
+              "속육전 편찬을 끝없이 ",
+              "되풀이해야 한다는 점이었다. ",
+              "세조 대에 이르러 ",
+              "종래의 편찬 방식을 바꾸어야 한다는 ",
+              "필요성이 제기되었다. ",
+              "그동안의 법전과 등록과 교령을 모두 종합해 ",
+              "통일된 하나의 법전을 ",
+              "만들자는 것이었다. ",
+              "이것이 만세성법이다."
+            ],
+            [
+              "1455년 세조는 양성지의 건의에 따라 ",
+              "육전상정소를 설치했다. ",
+              "1460년에 「호전」이 완성되었고, ",
+              "「호전」이 완성되었을 때 ",
+              "새 법전의 이름을 경국대전으로 확정했다."
+            ]
+          ],
+          "en": [
+            "Imagine a pile of written rules growing one sheet at a time. Some rules still hold years later; others are used once and finished. The law codes of Joseon kept these two kinds apart.",
+            "The statutes of Joseon were in principle royal commands put into writing. Compiling a law code, therefore, was not a matter of inventing new law. It meant choosing what to keep from commands and ordinances already issued, arranging them, and gathering them into one code.",
+            "By content the codes were divided into jeon and rok. A jeon held fundamental rules to be preserved and kept forever, such as Gyeongje yukjeon, Gyeongguk daejeon and Sok daejeon. A rok held minor rules applied only for a time, such as Sok deungnok, Daejeon songnok and Sugyo jimnok.",
+            "The first law code of Joseon was Gyeongje yukjeon, compiled in 1397 under Jo Jun. Commands and ordinances issued after it were gathered separately into Sok yukjeon. That work was not done once: it was carried out again in the reigns of Taejong and Sejong.",
+            "This way of working had a problem. The compiling of Sok yukjeon would have to be repeated without end. Under Sejo the need arose to change the old method. The earlier codes, the registers and the royal orders would be brought together into one unified code. This was the manse seongbeop.",
+            "In 1455 Sejo set up the Yukjeon sangjeongso on the proposal of Yang Seong-ji. The Hojeon was completed in 1460, and at that point the new code was given the name Gyeongguk daejeon."
+          ],
+          "enseg": [
+            [
+              "Imagine a pile of written rules ",
+              "growing one sheet at a time. ",
+              "Some rules still hold years later; ",
+              "others are used once and finished. ",
+              "The law codes of Joseon ",
+              "kept these two kinds apart."
+            ],
+            [
+              "The statutes of Joseon ",
+              "were in principle royal commands put into writing. ",
+              "Compiling a law code, therefore, ",
+              "was not a matter of inventing new law. ",
+              "It meant choosing what to keep ",
+              "from commands and ordinances already issued, ",
+              "arranging them, ",
+              "and gathering them into one code."
+            ],
+            [
+              "By content the codes ",
+              "were divided into jeon and rok. ",
+              "A jeon held fundamental rules ",
+              "to be preserved and kept forever, ",
+              "such as Gyeongje yukjeon, Gyeongguk daejeon and Sok daejeon. ",
+              "A rok held minor rules ",
+              "applied only for a time, ",
+              "such as Sok deungnok, Daejeon songnok and Sugyo jimnok."
+            ],
+            [
+              "The first law code of Joseon ",
+              "was Gyeongje yukjeon, ",
+              "compiled in 1397 under Jo Jun. ",
+              "Commands and ordinances issued after it ",
+              "were gathered separately into Sok yukjeon. ",
+              "That work was not done once: ",
+              "it was carried out again ",
+              "in the reigns of Taejong and Sejong."
+            ],
+            [
+              "This way of working had a problem. ",
+              "The compiling of Sok yukjeon ",
+              "would have to be repeated without end. ",
+              "Under Sejo the need arose ",
+              "to change the old method. ",
+              "The earlier codes, the registers ",
+              "and the royal orders ",
+              "would be brought together ",
+              "into one unified code. ",
+              "This was the manse seongbeop."
+            ],
+            [
+              "In 1455 Sejo set up the Yukjeon sangjeongso ",
+              "on the proposal of Yang Seong-ji. ",
+              "The Hojeon was completed in 1460, ",
+              "and at that point the new code ",
+              "was given the name Gyeongguk daejeon."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "statutes",
+              "ko": "법령 (명사)",
+              "base": "statute [ˈstætʃuːt]"
+            },
+            {
+              "word": "ordinances",
+              "ko": "조례 (명사)",
+              "base": "ordinance [ˈɔːrdɪnəns]"
+            },
+            {
+              "word": "Compiling",
+              "ko": "엮어 펴냄 (동명사)",
+              "base": "compile [kəmˈpaɪl]"
+            },
+            {
+              "word": "fundamental",
+              "ko": "근본적인 (형용사)",
+              "base": "fundamental [ˌfʌndəˈmentl]"
+            },
+            {
+              "word": "preserved",
+              "ko": "보존된 (과거분사)",
+              "base": "preserve [prɪˈzɜːrv]"
+            },
+            {
+              "word": "unified",
+              "ko": "통일된 (형용사)",
+              "base": "unify [ˈjuːnɪfaɪ]"
+            }
+          ],
+          "vocab": [
+            {
+              "word": "법령",
+              "easy": "나라가 정해 놓고 지키게 하는 법과 명령",
+              "hanja": "法(법 법)+令(하여금 령)"
+            },
+            {
+              "word": "조례",
+              "easy": "임금의 명령을 법 조문의 꼴로 정리해 둔 것",
+              "hanja": "條(가지 조)+例(법식 례)"
+            },
+            {
+              "word": "집록",
+              "easy": "흩어져 있는 것을 모아 하나로 엮어 적는 일",
+              "hanja": "輯(모을 집)+錄(적을 록)"
+            },
+            {
+              "word": "편찬",
+              "easy": "자료를 모아 책으로 엮어 내는 일",
+              "hanja": "編(엮을 편)+纂(모을 찬)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글이 말하는 ‘법전을 엮는 일’은 무엇인가?",
+              "choices": [
+                "세상에 없던 규칙을 새로 지어내는 일",
+                "이미 내려진 명령과 조례 가운데 남길 것을 골라 하나로 모으는 일",
+                "임금의 명령을 백성에게 소리 내어 읽어 주는 일",
+                "법을 어긴 사람을 가려내어 벌하는 일"
+              ],
+              "answer": 1,
+              "explain": "법전을 엮는 일은 새 법을 지어내는 일이 아니라 남길 것을 고르고 정리해 하나로 모으는 집록이었다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "‘전’에 해당하는 것으로 글이 든 법전은?",
+              "choices": [
+                "속등록",
+                "대전속록",
+                "경국대전",
+                "수교집록"
+              ],
+              "answer": 2,
+              "explain": "경제육전과 경국대전과 속대전이 ‘전’에 든다고 했다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "vocab",
+              "q": "「집록」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "흩어져 있는 것을 모아 하나로 엮어 적는 일",
+                "없던 것을 새로 지어내는 일",
+                "글을 소리 내어 읽는 일",
+                "잘못을 가려내어 벌하는 일"
+              ],
+              "answer": 0,
+              "explain": "남길 것을 고르고 정리해 하나로 모으는 일을 집록이라고 했다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "infer",
+              "q": "속육전을 거듭 엮는 방식이 안고 있던 문제는?",
+              "choices": [
+                "법전이 점점 얇아진다는 것",
+                "편찬을 끝없이 되풀이해야 한다는 것",
+                "임금의 명령이 줄어든다는 것",
+                "백성이 글을 읽지 못한다는 것"
+              ],
+              "answer": 1,
+              "explain": "속육전 편찬을 끝없이 되풀이해야 한다는 점이 문제였다.",
+              "evidencePara": 4
+            }
+          ],
+          "challenge": [
+            {
+              "type": "detail",
+              "q": "새 법전의 이름을 경국대전으로 확정한 때는 언제인가?",
+              "choices": [
+                "육전상정소를 설치했을 때",
+                "「호전」이 완성되었을 때",
+                "속육전을 처음 엮었을 때",
+                "경제육전을 엮었을 때"
+              ],
+              "answer": 1,
+              "explain": "「호전」이 완성되었을 때 새 법전의 이름을 경국대전으로 확정했다.",
+              "evidencePara": 5
+            },
+            {
+              "type": "apply",
+              "q": "학급 문집을 엮는다고 할 때 이 글의 방식에 가장 가까운 것은?",
+              "choices": [
+                "글을 모두 새로 써서 채운다",
+                "이미 쓴 글 가운데 남길 것을 고르고 갈래를 나누어 한 권으로 묶는다",
+                "가장 긴 글만 골라 싣는다",
+                "글을 쓴 차례대로 하나도 빼지 않고 싣는다"
+              ],
+              "answer": 1,
+              "explain": "이미 있는 것 가운데 남길 것을 고르고 정리해 하나로 모으는 것이 집록이다.",
+              "evidencePara": 1
+            }
+          ]
+        },
+        "L3": {
+          "title": "집록 — 법전을 엮는 방식",
+          "minutes": 6,
+          "paragraphs": [
+            [
+              "법을 만든다고 하면 ",
+              "없던 규칙을 새로 짓는 장면이 떠오른다. ",
+              "조선의 법전 편찬은 그렇지 않았다. ",
+              "조선의 법령은 대체로 국왕이 내린 명령을 ",
+              "글로 옮겨 적은 것이었고, ",
+              "법전을 엮는 일은 ",
+              "새로운 법을 창제하는 일이 아니라 ",
+              "이미 내려진 수교와 수판, ",
+              "그것을 법조문으로 다듬은 조례들을 ",
+              "정리하고 취사선택해 ",
+              "하나로 집록하는 작업이었다."
+            ],
+            [
+              "그러니 편찬자 앞에 놓인 일은 ",
+              "무엇을 새로 지을지가 아니라, ",
+              "무엇을 남기고 무엇을 덜어 낼지 ",
+              "가리는 일이었다."
+            ],
+            [
+              "오래 둘 것과 ",
+              "한때만 쓸 것의 구분은 ",
+              "법전의 갈래에 들어 있었다. ",
+              "조선의 법전은 내용에 따라 ",
+              "‘전’과 ‘록’의 두 단계로 구분되었다. ",
+              "‘전’은 영구히 보존하고 준수해야 할 ",
+              "항구적이고 근본적인 법규로, ",
+              "경제육전·경국대전·속대전 등이 여기에 해당한다. ",
+              "‘록’은 일시적이며 지엽적으로 시행되는 규정으로, ",
+              "속등록·대전속록·수교집록 등이 이에 해당한다."
+            ],
+            [
+              "법전 편찬은 개국 초부터 시작되었다. ",
+              "1397년 조준이 주관해, ",
+              "위화도회군 이후부터 당시까지 시행된 ",
+              "수판과 정령 가운데 ",
+              "앞으로 계속 준행해야 할 조례를 골라 ",
+              "육전 체재에 따라 분류해 엮었다. ",
+              "이것이 조선 최초의 법전인 경제육전, 곧 원육전이다."
+            ],
+            [
+              "경제육전이 나온 뒤에 내려진 ",
+              "수교와 조례는 따로 모아 ",
+              "속육전으로 엮었다. ",
+              "태종 대에는 하륜이, ",
+              "세종 대에는 이직과 이원 등이 주관했다. ",
+              "문종 대에도 같은 작업을 계획했으나 ",
+              "문종이 갑자기 서거해 ",
+              "완성을 보지 못했다."
+            ],
+            [
+              "이 방식은 태조 대의 원육전을 ",
+              "조종성헌으로 준수하면서 ",
+              "그 뒤의 교령을 증보한 속육전을 ",
+              "잇달아 내는 것이었다. ",
+              "그런데 여기에는 속육전 편찬이 ",
+              "무한히 반복되어야 하는 문제점이 있었다. ",
+              "세조 대에 들어 ",
+              "종래의 방식을 바꾸어야 할 필요성이 제기되었고, ",
+              "그 결과 원육전과 속육전과 등록과 교령을 ",
+              "모두 종합한 하나의 ‘만세성법’ 편찬이 추진되었다."
+            ],
+            [
+              "1455년 세조는 양성지의 건의에 따라 ",
+              "육전상정소를 설치했다. ",
+              "실생활에 직접 관계되는 부문부터 ",
+              "먼저 엮게 한 결과 ",
+              "1460년에 「호전」이 완성되자 ",
+              "새 법전의 이름을 ",
+              "‘경국대전’으로 확정했고, ",
+              "1461년에 「형전」이 완성되었다. ",
+              "1467년에는 신숙주와 한명회 등이 ",
+              "나머지 네 전을 감수하고 교정했다."
+            ]
+          ],
+          "en": [
+            "To make a law sounds like inventing a rule that did not exist. Compilation in Joseon did not work that way. The statutes of Joseon were in principle the king's commands set down in writing, and putting a code together was not the creation of new law. It was the work of arranging the sugyo and supan already issued, and the ordinances drawn from them, selecting some and setting others aside, and gathering the result into one body.",
+            "So the task before a compiler was not deciding what to invent, but deciding what to keep and what to leave out.",
+            "That division ran through the codes themselves. By content, a code was placed in one of two ranks, jeon or rok. A jeon carried permanent and fundamental rules to be preserved and observed forever, such as Gyeongje yukjeon, Gyeongguk daejeon and Sok daejeon. A rok carried provisional and minor rules, such as Sok deungnok, Daejeon songnok and Sugyo jimnok.",
+            "Compilation began early in the dynasty. In 1397, under Jo Jun, the ordinances still to be observed were picked out of the supan and government decrees in force since the return from Wihwado, and classified according to the six-board framework. This was Gyeongje yukjeon, the first law code of Joseon, abbreviated as Won yukjeon.",
+            "Commands and ordinances issued after it were gathered separately into Sok yukjeon. Ha Ryun directed the work under Taejong; Yi Jik, Yi Won and others directed it under Sejong. The same work was planned under Munjong, but Munjong died suddenly and it was never finished.",
+            "The method was to observe the Won yukjeon of Taejo as ancestral law, and to issue one Sok yukjeon after another enlarging it with later royal orders. This carried a problem: the compiling of Sok yukjeon would have to be repeated without end. Under Sejo the need to change the old method was raised, and a single manse seongbeop was undertaken, bringing the earlier codes, the registers and the royal orders together.",
+            "In 1455 Sejo set up the Yukjeon sangjeongso on the proposal of Yang Seong-ji. The sections touching daily life were compiled first, so the Hojeon was finished in 1460, and at that point the new code was named Gyeongguk daejeon; the Hyeongjeon was finished in 1461. In 1467 Sin Suk-ju, Han Myeong-hoe and others supervised and corrected the remaining four jeon."
+          ],
+          "enseg": [
+            [
+              "To make a law ",
+              "sounds like inventing a rule that did not exist. ",
+              "Compilation in Joseon did not work that way. ",
+              "The statutes of Joseon ",
+              "were in principle the king's commands set down in writing, ",
+              "and putting a code together ",
+              "was not the creation of new law. ",
+              "It was the work of arranging ",
+              "the sugyo and supan already issued, ",
+              "and the ordinances drawn from them, ",
+              "selecting some and setting others aside, ",
+              "and gathering the result into one body."
+            ],
+            [
+              "So the task before a compiler ",
+              "was not deciding what to invent, ",
+              "but deciding what to keep ",
+              "and what to leave out."
+            ],
+            [
+              "That division ran through the codes themselves. ",
+              "By content, a code was placed ",
+              "in one of two ranks, jeon or rok. ",
+              "A jeon carried permanent and fundamental rules ",
+              "to be preserved and observed forever, ",
+              "such as Gyeongje yukjeon, Gyeongguk daejeon and Sok daejeon. ",
+              "A rok carried provisional and minor rules, ",
+              "such as Sok deungnok, Daejeon songnok and Sugyo jimnok."
+            ],
+            [
+              "Compilation began early in the dynasty. ",
+              "In 1397, under Jo Jun, ",
+              "the ordinances still to be observed ",
+              "were picked out of the supan and government decrees ",
+              "in force since the return from Wihwado, ",
+              "and classified according to the six-board framework. ",
+              "This was Gyeongje yukjeon, ",
+              "the first law code of Joseon, ",
+              "abbreviated as Won yukjeon."
+            ],
+            [
+              "Commands and ordinances issued after it ",
+              "were gathered separately into Sok yukjeon. ",
+              "Ha Ryun directed the work under Taejong; ",
+              "Yi Jik, Yi Won and others directed it under Sejong. ",
+              "The same work was planned under Munjong, ",
+              "but Munjong died suddenly ",
+              "and it was never finished."
+            ],
+            [
+              "The method was to observe the Won yukjeon of Taejo ",
+              "as ancestral law, ",
+              "and to issue one Sok yukjeon after another ",
+              "enlarging it with later royal orders. ",
+              "This carried a problem: ",
+              "the compiling of Sok yukjeon ",
+              "would have to be repeated without end. ",
+              "Under Sejo the need to change the old method was raised, ",
+              "and a single manse seongbeop was undertaken, ",
+              "bringing the earlier codes, the registers ",
+              "and the royal orders together."
+            ],
+            [
+              "In 1455 Sejo set up the Yukjeon sangjeongso ",
+              "on the proposal of Yang Seong-ji. ",
+              "The sections touching daily life were compiled first, ",
+              "so the Hojeon was finished in 1460, ",
+              "and at that point the new code ",
+              "was named Gyeongguk daejeon; ",
+              "the Hyeongjeon was finished in 1461. ",
+              "In 1467 Sin Suk-ju, Han Myeong-hoe and others ",
+              "supervised and corrected the remaining four jeon."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "Compilation",
+              "ko": "편찬 (명사)",
+              "base": "compilation [ˌkɑːmpɪˈleɪʃn]"
+            },
+            {
+              "word": "permanent",
+              "ko": "항구적인 (형용사)",
+              "base": "permanent [ˈpɜːrmənənt]"
+            },
+            {
+              "word": "provisional",
+              "ko": "일시적인, 임시의 (형용사)",
+              "base": "provisional [prəˈvɪʒənl]"
+            },
+            {
+              "word": "selecting",
+              "ko": "가려 뽑음 (동명사)",
+              "base": "select [sɪˈlekt]"
+            },
+            {
+              "word": "classified",
+              "ko": "분류된 (과거분사)",
+              "base": "classify [ˈklæsɪfaɪ]"
+            },
+            {
+              "word": "supervised",
+              "ko": "감수한, 감독한 (과거형)",
+              "base": "supervise [ˈsuːpərvaɪz]"
+            }
+          ],
+          "vocab": [
+            {
+              "word": "집록",
+              "easy": "흩어져 있는 것을 모아 하나로 엮어 적는 일",
+              "hanja": "輯(모을 집)+錄(적을 록)"
+            },
+            {
+              "word": "취사선택",
+              "easy": "쓸 것은 취하고 버릴 것은 버려 가려내는 일",
+              "hanja": "取(가질 취)+捨(버릴 사)+選(가릴 선)+擇(가릴 택)"
+            },
+            {
+              "word": "항구적",
+              "easy": "오래도록 변하지 않고 이어지는",
+              "hanja": "恒(항상 항)+久(오랠 구)+的(과녁 적)"
+            },
+            {
+              "word": "지엽적",
+              "easy": "중심이 아니라 곁가지에 해당하는",
+              "hanja": "枝(가지 지)+葉(잎 엽)+的(과녁 적)"
+            },
+            {
+              "word": "체재",
+              "easy": "내용을 담는 짜임새나 갖추어진 틀",
+              "hanja": "體(몸 체)+裁(마를 재)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글이 밝히는 조선 법전 편찬의 성격으로 알맞은 것은?",
+              "choices": [
+                "없던 법을 새로 창제해 세상에 내놓는 일",
+                "이미 내려진 수교·수판과 조례를 정리하고 취사선택해 하나로 집록하는 일",
+                "다른 나라의 법을 그대로 들여와 베끼는 일",
+                "법을 어긴 사람을 심판하는 절차를 정하는 일"
+              ],
+              "answer": 1,
+              "explain": "법전을 엮는 일은 창제가 아니라 이미 내려진 것을 정리하고 취사선택해 집록하는 작업이었다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "‘록’에 해당하는 것으로 글이 든 것은?",
+              "choices": [
+                "속대전",
+                "경제육전",
+                "수교집록",
+                "경국대전"
+              ],
+              "answer": 2,
+              "explain": "속등록·대전속록·수교집록이 ‘록’에 해당한다고 했다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "vocab",
+              "q": "「항구적」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "오래도록 변하지 않고 이어지는",
+                "한때만 잠깐 쓰이는",
+                "중심에서 벗어나 곁가지에 해당하는",
+                "처음으로 만들어진"
+              ],
+              "answer": 0,
+              "explain": "‘전’은 영구히 보존하고 준수해야 할 항구적인 법규라고 했다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "infer",
+              "q": "세조 대에 편찬 방식을 바꾸려 한 까닭으로 글에 나온 것은?",
+              "choices": [
+                "원육전이 사라졌기 때문",
+                "속육전 편찬이 무한히 반복되어야 했기 때문",
+                "조례가 육전 체재에 맞지 않았기 때문",
+                "조례가 더는 내려오지 않았기 때문"
+              ],
+              "answer": 1,
+              "explain": "덧붙이는 방식은 속육전 편찬이 무한히 반복되어야 하는 문제점을 안고 있었다.",
+              "evidencePara": 5
+            }
+          ],
+          "challenge": [
+            {
+              "type": "critical",
+              "q": "이 글을 근거로 말할 수 있는 것은?",
+              "choices": [
+                "경제육전은 하륜이 주관해 엮었다",
+                "「호전」이 완성되었을 때 새 법전의 이름이 경국대전으로 정해졌다",
+                "조선의 법전은 ‘전’ 한 갈래로만 이루어져 있었다",
+                "속육전은 태종 대에 한 번만 엮였다"
+              ],
+              "answer": 1,
+              "explain": "1460년 「호전」이 완성되었을 때 이름을 ‘경국대전’으로 확정했다고 적혀 있다.",
+              "evidencePara": 6
+            },
+            {
+              "type": "apply",
+              "q": "해마다 쌓이는 동아리 공지를 정리한다고 할 때, 세조 대에 방식을 바꾼 까닭과 가장 가까운 것은?",
+              "choices": [
+                "처음 회칙은 그대로 두고 새 공지를 덧붙인 묶음을 해마다 새로 만든다",
+                "덧붙인 묶음이 끝없이 늘어나니, 처음 회칙과 공지를 한데 모아 하나로 다시 엮는다",
+                "공지는 적지 않고 말로만 전한다",
+                "해마다 회칙을 버리고 처음부터 새로 쓴다"
+              ],
+              "answer": 1,
+              "explain": "원육전을 조종성헌으로 두고 속육전을 잇달아 내는 방식에는 속육전 편찬이 무한히 반복되어야 하는 문제가 있었고, 그래서 모두 종합한 하나의 법전을 엮기로 했다.",
+              "evidencePara": 5
+            }
+          ]
+        },
+        "L4": {
+          "title": "무한히 반복되는 편찬과 만세성법",
+          "minutes": 7,
+          "paragraphs": [
+            [
+              "제도를 만든다는 말은 흔히 ",
+              "없던 규칙을 새로 세우는 일로 읽힌다. ",
+              "조선의 법전 편찬은 반대쪽에서 출발한다. ",
+              "조선의 법령은 기본적으로 ",
+              "국왕이 내린 명령을 성문화한 것이었고, ",
+              "법전의 편찬은 새로운 법을 창제하는 일이 아니라 ",
+              "기왕에 내려진 수교와 수판, ",
+              "이것을 법조문으로 옮긴 조례들을 ",
+              "정리하고 취사선택해 ",
+              "하나의 법전으로 집록하는 작업이었다. ",
+              "편찬자 앞에 놓인 일은 ",
+              "짓는 일이 아니라 고르는 일이었다."
+            ],
+            [
+              "고르려면 기준이 필요하다. ",
+              "조선의 법전은 내용에 따라 ",
+              "‘전’과 ‘록’의 두 단계로 구분되었다. ",
+              "‘전’은 영구히 보존·준수할 항구적이고 ",
+              "근본적인 법규로, ",
+              "경제육전·경국대전·속대전 등이 여기에 해당한다. ",
+              "‘록’은 일시적이며 지엽적인 규정으로, ",
+              "속등록·대전속록·수교집록 등이 이에 해당한다. ",
+              "항구적인지 일시적인지가 ‘전’과 ‘록’을 갈랐다."
+            ],
+            [
+              "편찬은 개국 초부터 시작되었다. ",
+              "1397년 조준이 주관해, ",
+              "위화도회군 이후 시행된 수판과 정령 가운데 ",
+              "앞으로 계속 준행할 조례를 선별하고 ",
+              "육전 체재에 따라 분류해 엮은 것이 ",
+              "조선 최초의 법전 경제육전, 곧 원육전이다. ",
+              "법조문의 이해를 돕기 위해 ",
+              "이두로 토를 붙여 ",
+              "이두육전이라고도 하였다."
+            ],
+            [
+              "경제육전 이후의 수교와 조례를 모아 ",
+              "속전, 곧 속편을 만드는 일이 이어졌다. ",
+              "태종 대에는 하륜이 속육전을 주관했고, ",
+              "세종 대에는 이직과 이원 등이 ",
+              "속육전과 등록을 함께 냈다. ",
+              "문종 대에도 같은 찬수를 추진했으나 ",
+              "문종이 갑자기 서거해 ",
+              "완성을 보지 못했다."
+            ],
+            [
+              "이 방식의 뼈대는 ",
+              "태조 대의 원육전을 조종성헌으로 준수하면서 ",
+              "이후의 교령을 분류해 증보한 ",
+              "속육전을 내는 것이었다. ",
+              "문제는 분명했다. ",
+              "속육전 편찬이 무한히 반복되어야 했다. ",
+              "세조 대에 들어 ",
+              "종래의 편찬 방식을 바꾸어야 할 필요성이 제기되었고, ",
+              "그 결과 원육전과 속육전, 등록과 교령을 종합한 ",
+              "조직적이고 통일된 하나의 ‘만세성법’ 편찬이 추진되었다."
+            ],
+            [
+              "1455년 세조는 양성지의 건의로 ",
+              "육전상정소를 세웠다. ",
+              "1458년 상정관의 보고를 직접 검토하고 ",
+              "이듬해 최항 등에게 찬수를 지시했다. ",
+              "실생활에 관계된 부문부터 먼저 엮게 해 ",
+              "1460년 「호전」이 완성되자 ",
+              "새 법전 이름을 ‘경국대전’으로 확정했고, ",
+              "1461년 「형전」이 완성되었다. ",
+              "1467년 신숙주·한명회 등이 ",
+              "남은 네 전을 감수·교정했고, ",
+              "세조의 심의와 종친·대신 논의를 거쳐 ",
+              "12월 완성되었다. ",
+              "그러나 1468년 세조가 서거해 ",
+              "반포되지 못했다. ",
+              "성종 대의 거듭된 교정을 거쳐 ",
+              "1485년 최종 확정된 경국대전이 반포되었다."
+            ],
+            [
+              "고른다는 것은 버린다는 것이기도 하다. ",
+              "경국대전이 만세성법이 된 뒤에도 ",
+              "수교 형식으로 법령이 계속 공포되었고, ",
+              "정부는 일정 기간마다 이를 ",
+              "속록으로 정리해 경국대전을 보완했다. ",
+              "영조 대에는 만세성법이 될 만한 조항을 ",
+              "선별·정리해 속대전을 엮었고, ",
+              "정조 대 대전통편은 경국대전의 조문을 ‘원’, ",
+              "속대전의 것을 ‘속’, ",
+              "뒤에 증보된 것을 ‘증’으로 구별해 ",
+              "함께 적었다. ",
+              "무엇을 남길지 가리고 ",
+              "어디서 왔는지까지 적어 두는 일, ",
+              "조선의 법전 편찬은 그런 일이었다."
+            ]
+          ],
+          "en": [
+            "Building an institution is usually imagined as setting up rules that did not exist. Compilation in Joseon starts from the other side. The statutes of Joseon were in principle royal commands put into writing, and compiling a code was not the creation of new law but the work of arranging the sugyo and supan already issued, and the ordinances drawn from them, taking some and discarding others, and gathering the result into a single code. What lay before the compiler was not making but choosing.",
+            "Choosing calls for a standard. By content, a code was placed in one of two ranks, jeon or rok. A jeon held permanent and fundamental rules to be preserved and observed forever, such as Gyeongje yukjeon, Gyeongguk daejeon and Sok daejeon. A rok held provisional and minor rules, such as Sok deungnok, Daejeon songnok and Sugyo jimnok. Whether a rule was permanent or provisional decided which of the two it entered.",
+            "Compilation began early in the dynasty. In 1397, under Jo Jun, the ordinances still to be observed were selected from the supan and government decrees in force since the return from Wihwado, and classified by the six-board framework. This was Gyeongje yukjeon, the first law code of Joseon, abbreviated as Won yukjeon. Because Idu glosses were added to make the articles easier to follow, it was also called Idu yukjeon.",
+            "Commands and ordinances issued after Gyeongje yukjeon were gathered into a sequel, the Sok yukjeon. Ha Ryun directed the work under Taejong. Under Sejong, Yi Jik and Yi Won and others produced a Sok yukjeon together with a register of provisional rules. The same compilation was pursued under Munjong, but Munjong died suddenly and it was never completed.",
+            "The frame of this method was to observe Taejo's Won yukjeon as ancestral law and to issue a Sok yukjeon that classified and enlarged the royal orders coming after it. The problem was plain. Compiling the Sok yukjeon would have to be repeated without end. Under Sejo the need to change the old method was raised, and the outcome was a single ordered and unified manse seongbeop, bringing together the Won yukjeon and the Sok yukjeon, the registers and the other royal orders.",
+            "In 1455 Sejo set up the Yukjeon sangjeongso on the proposal of Yang Seong-ji. In 1458 he examined in person the articles his officials had reported, and the next year he ordered Choe Hang and others to compile. The sections touching daily life were compiled first, so the Hojeon was finished in 1460, and at that point the new code was named Gyeongguk daejeon; the Hyeongjeon was finished in 1461. In 1467 Sin Suk-ju, Han Myeong-hoe and others supervised and corrected the remaining four jeon, and after Sejo's review article by article and discussion with royal kinsmen and ministers, it was completed in the twelfth month of that year. It was never promulgated, however, for Sejo died in 1468. After repeated corrections under Seongjong, the final Gyeongguk daejeon was promulgated in 1485.",
+            "To choose is also to discard. After Gyeongguk daejeon took its place as the manse seongbeop, statutes went on being proclaimed in the form of sugyo, and at intervals the government arranged them as a songnok and used them to supplement the code. Under Yeongjo, articles fit to become manse seongbeop were selected and arranged as Sok daejeon. Under Jeongjo, Daejeon tongpyeon marked the articles of Gyeongguk daejeon as won, those of Sok daejeon as sok, and later additions as jeung, writing them side by side. Choosing what to keep, and marking where it came from: that is what making a law code meant in Joseon."
+          ],
+          "enseg": [
+            [
+              "Building an institution ",
+              "is usually imagined as setting up rules that did not exist. ",
+              "Compilation in Joseon starts from the other side. ",
+              "The statutes of Joseon ",
+              "were in principle royal commands put into writing, ",
+              "and compiling a code ",
+              "was not the creation of new law ",
+              "but the work of arranging ",
+              "the sugyo and supan already issued, ",
+              "and the ordinances drawn from them, ",
+              "taking some and discarding others, ",
+              "and gathering the result into a single code. ",
+              "What lay before the compiler ",
+              "was not making but choosing."
+            ],
+            [
+              "Choosing calls for a standard. ",
+              "By content, a code was placed ",
+              "in one of two ranks, jeon or rok. ",
+              "A jeon held permanent and fundamental rules ",
+              "to be preserved and observed forever, ",
+              "such as Gyeongje yukjeon, Gyeongguk daejeon and Sok daejeon. ",
+              "A rok held provisional and minor rules, ",
+              "such as Sok deungnok, Daejeon songnok and Sugyo jimnok. ",
+              "Whether a rule was permanent or provisional ",
+              "decided which of the two it entered."
+            ],
+            [
+              "Compilation began early in the dynasty. ",
+              "In 1397, under Jo Jun, ",
+              "the ordinances still to be observed ",
+              "were selected from the supan and government decrees ",
+              "in force since the return from Wihwado, ",
+              "and classified by the six-board framework. ",
+              "This was Gyeongje yukjeon, ",
+              "the first law code of Joseon, ",
+              "abbreviated as Won yukjeon. ",
+              "Because Idu glosses were added ",
+              "to make the articles easier to follow, ",
+              "it was also called Idu yukjeon."
+            ],
+            [
+              "Commands and ordinances issued after Gyeongje yukjeon ",
+              "were gathered into a sequel, the Sok yukjeon. ",
+              "Ha Ryun directed the work under Taejong. ",
+              "Under Sejong, Yi Jik and Yi Won and others ",
+              "produced a Sok yukjeon ",
+              "together with a register of provisional rules. ",
+              "The same compilation was pursued under Munjong, ",
+              "but Munjong died suddenly ",
+              "and it was never completed."
+            ],
+            [
+              "The frame of this method ",
+              "was to observe Taejo's Won yukjeon as ancestral law ",
+              "and to issue a Sok yukjeon ",
+              "that classified and enlarged the royal orders coming after it. ",
+              "The problem was plain. ",
+              "Compiling the Sok yukjeon ",
+              "would have to be repeated without end. ",
+              "Under Sejo the need to change the old method was raised, ",
+              "and the outcome was a single ordered and unified manse seongbeop, ",
+              "bringing together the Won yukjeon and the Sok yukjeon, ",
+              "the registers and the other royal orders."
+            ],
+            [
+              "In 1455 Sejo set up the Yukjeon sangjeongso ",
+              "on the proposal of Yang Seong-ji. ",
+              "In 1458 he examined in person ",
+              "the articles his officials had reported, ",
+              "and the next year he ordered Choe Hang and others to compile. ",
+              "The sections touching daily life were compiled first, ",
+              "so the Hojeon was finished in 1460, ",
+              "and at that point the new code was named Gyeongguk daejeon; ",
+              "the Hyeongjeon was finished in 1461. ",
+              "In 1467 Sin Suk-ju, Han Myeong-hoe and others ",
+              "supervised and corrected the remaining four jeon, ",
+              "and after Sejo's review article by article ",
+              "and discussion with royal kinsmen and ministers, ",
+              "it was completed in the twelfth month of that year. ",
+              "It was never promulgated, however, ",
+              "for Sejo died in 1468. ",
+              "After repeated corrections under Seongjong, ",
+              "the final Gyeongguk daejeon was promulgated in 1485."
+            ],
+            [
+              "To choose is also to discard. ",
+              "After Gyeongguk daejeon took its place as the manse seongbeop, ",
+              "statutes went on being proclaimed in the form of sugyo, ",
+              "and at intervals the government arranged them ",
+              "as a songnok and used them to supplement the code. ",
+              "Under Yeongjo, articles fit to become manse seongbeop ",
+              "were selected and arranged as Sok daejeon. ",
+              "Under Jeongjo, Daejeon tongpyeon marked ",
+              "the articles of Gyeongguk daejeon as won, ",
+              "those of Sok daejeon as sok, ",
+              "and later additions as jeung, ",
+              "writing them side by side. ",
+              "Choosing what to keep, ",
+              "and marking where it came from: ",
+              "that is what making a law code meant in Joseon."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "compiling",
+              "ko": "엮어 펴냄 (동명사)",
+              "base": "compile [kəmˈpaɪl]"
+            },
+            {
+              "word": "discarding",
+              "ko": "버림 (동명사)",
+              "base": "discard [dɪsˈkɑːrd]"
+            },
+            {
+              "word": "provisional",
+              "ko": "일시적인, 임시의 (형용사)",
+              "base": "provisional [prəˈvɪʒənl]"
+            },
+            {
+              "word": "selected",
+              "ko": "가려 뽑힌 (과거분사)",
+              "base": "select [sɪˈlekt]"
+            },
+            {
+              "word": "supplement",
+              "ko": "보완하다 (동사)",
+              "base": "supplement [ˈsʌplɪment]"
+            },
+            {
+              "word": "unified",
+              "ko": "통일된 (형용사)",
+              "base": "unify [ˈjuːnɪfaɪ]"
+            }
+          ],
+          "vocab": [
+            {
+              "word": "성문화",
+              "easy": "말이나 관례로만 있던 것을 글로 적어 두는 일",
+              "hanja": "成(이룰 성)+文(글월 문)+化(될 화)"
+            },
+            {
+              "word": "취사선택",
+              "easy": "쓸 것은 취하고 버릴 것은 버려 가려내는 일",
+              "hanja": "取(가질 취)+捨(버릴 사)+選(가릴 선)+擇(가릴 택)"
+            },
+            {
+              "word": "집록",
+              "easy": "흩어져 있는 것을 모아 하나로 엮어 적는 일",
+              "hanja": "輯(모을 집)+錄(적을 록)"
+            },
+            {
+              "word": "증보",
+              "easy": "모자란 데를 더하고 보태어 채우는 일",
+              "hanja": "增(더할 증)+補(기울 보)"
+            },
+            {
+              "word": "감수",
+              "easy": "엮은 것을 맡아 살펴보고 감독하는 일",
+              "hanja": "監(볼 감)+修(닦을 수)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "글쓴이가 「편찬자 앞에 놓인 일은 짓는 일이 아니라 고르는 일이었다」고 한 뜻으로 알맞은 것은?",
+              "choices": [
+                "편찬자에게는 아무 권한이 없어 하는 일이 없었다는 뜻",
+                "이미 내려진 명령과 조례를 정리하고 취사선택해 하나로 집록하는 것이 편찬이었다는 뜻",
+                "편찬자가 임금의 명령을 제 뜻대로 고쳤다는 뜻",
+                "법전은 외국의 법을 골라 옮긴 것이라는 뜻"
+              ],
+              "answer": 1,
+              "explain": "법전 편찬은 창제가 아니라 기왕에 내려진 것을 정리하고 취사선택해 집록하는 작업이었다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "‘전’과 ‘록’에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "‘전’은 일시적·지엽적 규정이고 ‘록’은 항구적 법규다",
+                "‘전’은 항구적·근본적 법규이고 ‘록’은 일시적·지엽적 규정이다",
+                "둘 다 한때만 쓰이는 규정이다",
+                "둘의 구분은 조문의 글자 수에 따른 것이다"
+              ],
+              "answer": 1,
+              "explain": "‘전’은 영구히 보존·준수할 항구적이고 근본적인 법규, ‘록’은 일시적이며 지엽적인 규정이다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「증보」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "모자란 데를 더하고 보태어 채우는 일",
+                "있던 것을 모두 없애는 일",
+                "글을 소리 내어 읽는 일",
+                "잘못을 가려내어 벌하는 일"
+              ],
+              "answer": 0,
+              "explain": "속육전은 이후 내려진 교령을 분류하여 증보한 법전이었다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "infer",
+              "q": "대전통편이 조문마다 ‘원’·‘속’·‘증’을 구별해 적은 뜻을 이 글에서 읽어 내면?",
+              "choices": [
+                "조문을 더 길어 보이게 하려고",
+                "어느 법전에서 온 조문인지 함께 드러내려고",
+                "조문의 수를 줄이려고",
+                "임금의 이름을 감추려고"
+              ],
+              "answer": 1,
+              "explain": "무엇을 남길지 가리고 그것이 어디에서 왔는지까지 적어 두는 방식이다.",
+              "evidencePara": 6
+            },
+            {
+              "type": "critical",
+              "q": "이 글의 논지에 비추어 가장 조심해야 할 해석은?",
+              "choices": [
+                "법전 편찬은 이미 내려진 명령을 정리하고 가려 뽑는 작업이었다",
+                "‘전’과 ‘록’의 구분은 그 규정을 얼마나 오래 지킬 것인가와 맞물려 있다",
+                "세조 대에 경국대전이라는 이름이 정해졌으니 그때로 법전 정비는 끝나고 더 손댈 일이 없었다",
+                "경국대전 이후에도 수교가 계속 나와 속록 형태로 정리되었다"
+              ],
+              "answer": 2,
+              "explain": "글은 경국대전 이후에도 속록·속대전·대전통편으로 보완이 이어졌다고 적는다.",
+              "evidencePara": 6
+            }
+          ],
+          "challenge": [
+            {
+              "type": "critical",
+              "q": "「문제는 분명했다. 속육전 편찬이 무한히 반복되어야 했다」가 이 글에서 하는 일은?",
+              "choices": [
+                "앞에서 설명한 편찬 방식이 처음부터 틀렸다고 뒤집는다",
+                "덧붙이는 방식의 한계를 짚어, 종합한 하나의 법전을 추진한 까닭으로 이어 준다",
+                "조선에 법전이 없었음을 알린다",
+                "이두로 토를 단 까닭을 설명한다"
+              ],
+              "answer": 1,
+              "explain": "이 문장 뒤에 종래 방식을 바꿀 필요성과 ‘만세성법’ 편찬이 이어진다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "apply",
+              "q": "이 글의 틀을 빌리면, 해마다 쌓이는 학교 규정을 다루는 방법으로 가장 가까운 것은?",
+              "choices": [
+                "해마다 새 규정을 지어 덧붙이기만 한다",
+                "오래 지킬 것과 한때만 쓸 것을 갈라, 오래 지킬 것은 한 권으로 종합하고 나머지는 따로 정리해 둔다",
+                "규정을 모두 없애고 그때그때 정한다",
+                "규정을 적지 않고 기억에만 둔다"
+              ],
+              "answer": 1,
+              "explain": "‘전’과 ‘록’을 가르고 흩어진 것을 하나로 종합한 것이 이 글의 방식이다.",
+              "evidencePara": 1
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "infodemic-factcheck",
+      "category": "society",
+      "careers": [
+        "med",
+        "bio"
+      ],
+      "issue": true,
+      "publishedAt": "2026-10-26",
+      "status": "published",
+      "sources": [
+        {
+          "title": "질병관리청 보도참고자료 — 질병관리청-대한예방의학회, 감염병 인포데믹 관리를 위한 업무협약 체결 (2026.10.23)",
+          "url": "https://www.kdca.go.kr/bbs/kdca/42/313024/artclView.do"
+        }
+      ],
+      "levels": {
+        "L1": {
+          "title": "열 명쯤 모여 살펴봐요",
+          "minutes": 3,
+          "paragraphs": [
+            [
+              "감염병에 대한 이야기를 ",
+              "들을 때가 있어요. ",
+              "그 가운데에는 ",
+              "사실인지 아직 확인되지 않은 ",
+              "이야기도 있어요."
+            ],
+            [
+              "질병관리청과 대한예방의학회가 ",
+              "그런 이야기를 함께 살펴보기로 했어요. ",
+              "10월 23일에 같이 일하기로 했다고 알렸어요."
+            ],
+            [
+              "사실인지 아닌지 따져 보는 일을 ",
+              "팩트체크라고 해요. ",
+              "병을 잘 아는 전문가들이 ",
+              "모여서 살펴보기로 했어요. ",
+              "살펴본 결과는 사람들에게 알려 주기로 했어요."
+            ],
+            [
+              "살펴볼 이야기에 따라 ",
+              "그 이야기를 잘 아는 전문가 ",
+              "열 명쯤이 모여요."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "감염병",
+              "easy": "다른 사람에게 옮을 수 있는 병이에요.",
+              "hanja": null
+            },
+            {
+              "word": "팩트체크",
+              "easy": "어떤 이야기가 사실인지 아닌지 따져 보는 일이에요.",
+              "hanja": null
+            },
+            {
+              "word": "전문가",
+              "easy": "한 가지를 오래 공부해서 아주 잘 아는 사람이에요.",
+              "hanja": null
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글이 가장 하고 싶은 말은 무엇인가요?",
+              "choices": [
+                "감염병 이야기는 모두 사실이라는 말",
+                "사실인지 확인해 보는 일이 중요하다는 말",
+                "이야기는 아예 듣지 말아야 한다는 말",
+                "전문가만 이야기를 할 수 있다는 말"
+              ],
+              "answer": 1,
+              "explain": "글은 사실인지 아직 확인되지 않은 이야기가 있다고 하고, 전문가들이 그것을 살펴본다고 했어요. 살펴본 결과는 사람들에게 알려 주기로 했어요.",
+              "evidencePara": 2
+            },
+            {
+              "type": "detail",
+              "q": "질병관리청과 함께 이야기를 살펴보기로 한 곳은 어디인가요?",
+              "choices": [
+                "학교",
+                "방송국",
+                "대한예방의학회",
+                "도서관"
+              ],
+              "answer": 2,
+              "explain": "질병관리청과 대한예방의학회가 10월 23일에 같이 일하기로 했다고 알렸어요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「팩트체크」는 무엇을 하는 일인가요?",
+              "choices": [
+                "사실인지 아닌지 따져 보는 일",
+                "빠르게 달리는 일",
+                "이야기를 더 많이 만드는 일",
+                "책을 정리하는 일"
+              ],
+              "answer": 0,
+              "explain": "사실인지 아닌지 따져 보는 일을 팩트체크라고 해요.",
+              "evidencePara": 2
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "같은 전문가들이 모든 이야기를 다 살펴볼까요?",
+              "choices": [
+                "이야기에 따라 살펴보는 전문가가 달라져요",
+                "언제나 같은 사람들이 살펴봐요",
+                "전문가 혼자서 살펴봐요",
+                "아무나 살펴볼 수 있어요"
+              ],
+              "answer": 0,
+              "explain": "살펴볼 이야기에 따라 그 이야기를 잘 아는 전문가 열 명쯤이 모인다고 했어요.",
+              "evidencePara": 3
+            },
+            {
+              "type": "apply",
+              "q": "친구가 감염병에 대해 들은 이야기를 전해 주었어요. 이 글에 맞는 행동은 무엇일까요?",
+              "choices": [
+                "바로 다른 친구에게 그대로 전한다",
+                "들은 이야기는 무조건 믿지 않는다",
+                "사실인지 확인해 보고 나서 믿는다",
+                "아무 말도 하지 않는다"
+              ],
+              "answer": 2,
+              "explain": "글은 사실인지 아직 확인되지 않은 이야기가 있다고 했어요. 전문가들도 사실인지 따져 본 뒤에 알려 주기로 했어요.",
+              "evidencePara": 2
+            }
+          ]
+        },
+        "L2": {
+          "title": "맞는지 누가 보나",
+          "minutes": 4,
+          "paragraphs": [
+            [
+              "감염병에 대한 정보 가운데에는 ",
+              "사실 여부가 확인되지 않은 것이 있다. ",
+              "질병관리청과 대한예방의학회는 ",
+              "그런 정보의 과학적 근거를 ",
+              "검증하기로 했다. ",
+              "두 기관은 10월 23일 ",
+              "감염병 정보 팩트체크 협력을 위한 ",
+              "업무협약을 맺는다고 밝혔다."
+            ],
+            [
+              "두 기관은 확인을 ",
+              "전문가 여럿이 모인 협의체에 맡기기로 했다. ",
+              "의과학 전문가가 참여하는 ",
+              "감염병 정보 팩트체크 협의체다. ",
+              "협의체는 검증할 주제에 따라 ",
+              "관련 분야 전문가 ",
+              "10인 내외로 꾸린다."
+            ],
+            [
+              "두 기관이 할 일은 나뉘어 있다. ",
+              "질병관리청은 공중보건상 검토가 필요한 ",
+              "안건을 제안하고, ",
+              "관련 자료를 공유하며 ",
+              "국민 소통을 지원한다. ",
+              "대한예방의학회는 관련 학회의 추천을 받아 ",
+              "다학제 전문가 검증 패널을 독립적으로 구성하고, ",
+              "과학적 근거를 검증해 ",
+              "그 결과를 학술적으로 설명하는 데 협력한다."
+            ],
+            [
+              "검증한 결과는 국민에게 간다. ",
+              "자료에는 그 결과를 바탕으로 ",
+              "정확하고 신뢰할 수 있는 정보를 ",
+              "제공한다는 내용이 담겼다. ",
+              "임승관 질병관리청장은 ",
+              "의과학 전문가의 검증 결과를 ",
+              "국민이 이해하기 쉽게, ",
+              "신속하게 전달하는 데 힘쓰겠다고 말했다."
+            ]
+          ],
+          "en": [
+            "Among the information about infectious diseases, there is some whose truth has not been confirmed. 질병관리청, the Korean government agency for disease control and prevention, and 대한예방의학회, the Korean academic society of preventive medicine, decided to verify the scientific grounds of such information. The two organizations said they would sign, on October 23, a work agreement for cooperation on fact-checking infectious disease information.",
+            "The two organizations decided to leave the checking to a council of several experts. It is a fact-checking council for infectious disease information, joined by medical science experts. For each topic to be verified, the council is made up of about ten experts from the related field.",
+            "The work of the two organizations is divided. The agency proposes items that need review for public health, shares related material, and supports communication with the public. The society receives recommendations from related academic societies, forms a multidisciplinary panel of expert reviewers independently, verifies the scientific grounds, and helps explain the result in academic terms.",
+            "The verified result goes to the public. The agency's press material says that, based on that result, accurate and trustworthy information will be provided. Commissioner 임승관 of the agency said he would work to deliver the experts' verification results to the public quickly and in a way that is easy to understand."
+          ],
+          "enseg": [
+            [
+              "Among the information about infectious diseases, ",
+              "there is some ",
+              "whose truth has not been confirmed. ",
+              "질병관리청, the Korean government agency for disease control and prevention, ",
+              "and 대한예방의학회, ",
+              "the Korean academic society of preventive medicine, ",
+              "decided to verify the scientific grounds ",
+              "of such information. ",
+              "The two organizations said ",
+              "they would sign, on October 23, ",
+              "a work agreement for cooperation on fact-checking ",
+              "infectious disease information."
+            ],
+            [
+              "The two organizations decided to leave the checking ",
+              "to a council of several experts. ",
+              "It is a fact-checking council ",
+              "for infectious disease information, ",
+              "joined by medical science experts. ",
+              "For each topic to be verified, ",
+              "the council is made up ",
+              "of about ten experts ",
+              "from the related field."
+            ],
+            [
+              "The work of the two organizations is divided. ",
+              "The agency proposes items ",
+              "that need review for public health, ",
+              "shares related material, ",
+              "and supports communication with the public. ",
+              "The society receives recommendations ",
+              "from related academic societies, ",
+              "forms a multidisciplinary panel of expert reviewers independently, ",
+              "verifies the scientific grounds, ",
+              "and helps explain the result in academic terms."
+            ],
+            [
+              "The verified result goes to the public. ",
+              "The agency's press material says that, ",
+              "based on that result, ",
+              "accurate and trustworthy information ",
+              "will be provided. ",
+              "Commissioner 임승관 of the agency said ",
+              "he would work to deliver ",
+              "the experts' verification results to the public ",
+              "quickly and in a way that is easy to understand."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "감염병",
+              "easy": "사람에게 옮을 수 있는 병",
+              "hanja": "感(느낄 감)+染(물들 염)+病(병 병)"
+            },
+            {
+              "word": "검증",
+              "easy": "근거를 따져 맞는지 가려내는 일",
+              "hanja": "檢(검사할 검)+證(증거 증)"
+            },
+            {
+              "word": "협의체",
+              "easy": "여러 사람이 모여 의논하는 모임",
+              "hanja": "協(화합할 협)+議(의논할 의)+體(몸 체)"
+            },
+            {
+              "word": "업무협약",
+              "easy": "두 기관이 함께 일하기로 글로 남겨 맺는 약속",
+              "hanja": "業(업 업)+務(힘쓸 무)+協(화합할 협)+約(맺을 약)"
+            },
+            {
+              "word": "다학제",
+              "easy": "여러 학문 분야가 함께 참여하는 것",
+              "hanja": "多(많을 다)+學(배울 학)+際(사이 제)"
+            }
+          ],
+          "envocab": [
+            {
+              "word": "confirmed",
+              "ko": "확인된 (동사 confirm의 과거분사)",
+              "base": "confirm [kənˈfɜːrm]"
+            },
+            {
+              "word": "verify",
+              "ko": "검증하다, 사실인지 확인하다 (동사)",
+              "base": "verify [ˈverɪfaɪ]"
+            },
+            {
+              "word": "council",
+              "ko": "협의체, 협의회 (명사)",
+              "base": "council [ˈkaʊnsl]"
+            },
+            {
+              "word": "grounds",
+              "ko": "근거 (명사 ground의 복수형)",
+              "base": "ground [ɡraʊnd]"
+            },
+            {
+              "word": "panel",
+              "ko": "(전문가) 패널, 심사단 (명사)",
+              "base": "panel [ˈpænl]"
+            },
+            {
+              "word": "trustworthy",
+              "ko": "신뢰할 수 있는 (형용사)",
+              "base": "trustworthy [ˈtrʌstwɜːrði]"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 가장 알맞은 것은?",
+              "choices": [
+                "감염병을 치료하는 새 약이 나왔다는 글이다",
+                "사실 여부가 확인되지 않은 감염병 정보를 전문가들이 모여 검증하기로 했다는 글이다",
+                "감염병 환자 수가 늘었다는 글이다",
+                "질병관리청이 새 건물을 지었다는 글이다"
+              ],
+              "answer": 1,
+              "explain": "두 기관은 사실 여부가 확인되지 않은 정보의 과학적 근거를 검증하기로 했고, 그 일을 맡을 협의체를 구성해 운영하기로 했다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "감염병 정보 팩트체크 협의체에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "검증할 주제에 따라 관련 분야 전문가 10인 내외로 꾸린다",
+                "질병관리청이 검증 패널을 직접 구성한다",
+                "학생들이 모여서 만든다",
+                "해마다 100명씩 뽑는다"
+              ],
+              "answer": 0,
+              "explain": "협의체는 검증할 주제에 따라 관련 분야 전문가 10인 내외로 꾸린다고 했다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「검증」의 뜻으로 가장 알맞은 것은?",
+              "choices": [
+                "많은 사람에게 널리 알리는 일",
+                "빠르게 옮기는 일",
+                "근거를 따져 맞는지 가려내는 일",
+                "새로 만들어 내는 일"
+              ],
+              "answer": 2,
+              "explain": "두 기관은 확인되지 않은 정보의 과학적 근거를 검증하기로 했다. 근거를 따져 맞는지 가려내는 일이다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "infer",
+              "q": "이 글을 읽고 알 수 있는 것으로 가장 알맞은 것은?",
+              "choices": [
+                "확인되지 않은 정보는 모두 거짓이다",
+                "확인되지 않았다는 것은 아직 맞는지 가려지지 않았다는 뜻이다",
+                "안건을 제안하는 일과 검증하는 일을 한 기관이 모두 맡는다",
+                "검증 결과는 국민에게 알리지 않는다"
+              ],
+              "answer": 1,
+              "explain": "글은 사실 여부가 확인되지 않은 정보를 두고 과학적 근거를 검증하기로 했다고 했다. 검증을 앞둔 상태이지 거짓이라고 정해 둔 것이 아니다.",
+              "evidencePara": 0
+            }
+          ],
+          "challenge": [
+            {
+              "type": "apply",
+              "q": "감염병에 대한 소문을 들었을 때 이 글의 방식에 가장 가까운 행동은?",
+              "choices": [
+                "소문을 들은 즉시 여러 사람에게 전한다",
+                "근거가 무엇인지 따져 확인한 뒤에 받아들인다",
+                "소문은 무조건 무시한다",
+                "소문을 들은 사람 수를 센다"
+              ],
+              "answer": 1,
+              "explain": "두 기관이 하기로 한 일이 바로 과학적 근거를 검증하는 것이다. 근거를 따지는 것이 이 글의 방식이다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "infer",
+              "q": "협의체를 검증할 주제에 따라 그 분야 전문가로 꾸리는 것은 무엇을 위한 것으로 볼 수 있는가?",
+              "choices": [
+                "주제마다 필요한 전문 지식이 달라서 그 분야를 아는 사람이 보게 하려는 것",
+                "전문가 수를 늘리려는 것",
+                "회의 시간을 길게 하려는 것",
+                "같은 사람이 계속 맡게 하려는 것"
+              ],
+              "answer": 0,
+              "explain": "협의체는 고정된 사람들이 아니라 검증할 주제에 따라 관련 분야 전문가로 꾸린다고 했다.",
+              "evidencePara": 1
+            }
+          ]
+        },
+        "L3": {
+          "title": "판정은 밖에서",
+          "minutes": 6,
+          "paragraphs": [
+            [
+              "감염병에 대한 정보 가운데에는 ",
+              "사실 여부가 확인되지 않은 것이 있다. ",
+              "이런 정보는 누가 확인할 것인가. ",
+              "질병관리청과 대한예방의학회는 10월 23일 ",
+              "감염병 정보 팩트체크 협력을 위한 ",
+              "업무협약을 맺는다고 밝혔다. ",
+              "자료는 이 협약을 ",
+              "신뢰할 수 있는 감염병 정보 제공과 ",
+              "국민의 건강 증진을 위해 ",
+              "맺는 것이라고 적었다."
+            ],
+            [
+              "자료가 주요 협력 내용으로 ",
+              "맨 앞에 든 것은 협의체다. ",
+              "두 기관은 의과학 전문가가 참여하는 ",
+              "감염병 정보 팩트체크 협의체를 ",
+              "구성해 운영하기로 했다. ",
+              "협의체는 검증할 주제에 따라 ",
+              "관련 분야 전문가 10인 내외로 꾸려지고, ",
+              "전문가 평가를 신속히 진행해 ",
+              "합의와 이견을 도출하는 ",
+              "신속 델파이로 움직인다."
+            ],
+            [
+              "두 기관의 자리는 나뉘어 있다. ",
+              "질병관리청은 공중보건상 검토가 필요한 안건을 제안하고 ",
+              "관련 자료를 공유하며 ",
+              "국민 소통을 지원한다. ",
+              "대한예방의학회는 관련 학회의 추천을 받아 ",
+              "다학제 전문가 검증 패널을 독립적으로 구성하고, ",
+              "과학적 근거를 검증해 ",
+              "그 결과를 학술적으로 설명하는 데 협력한다."
+            ],
+            [
+              "팩트체크 협의체는 ",
+              "정부기관인 질병관리청과 판정 주체를 분리한다. ",
+              "보도참고자료는 이렇게 해서 ",
+              "과학적 판단의 객관성과 독립성을 확보하고, ",
+              "학계의 전문적 판단을 통해 ",
+              "국민이 균형 잡힌 시각에서 ",
+              "건강 정보를 판단할 수 있도록 ",
+              "도울 방침이라고 적었다."
+            ],
+            [
+              "협력 내용에는 ",
+              "감염병 관련 과학적 근거와 전문지식 교류, ",
+              "전문가와 언론의 소통을 통한 ",
+              "정확한 정보 제공, ",
+              "팩트체크 역량 강화를 위한 연구와 교육, ",
+              "학술 교류도 들어 있다. ",
+              "두 기관은 연말까지 실무 협의를 거쳐 ",
+              "협의체 운영 방식과 ",
+              "세부 협력 내용을 마련할 예정이다. ",
+              "윤석준 대한예방의학회 이사장은 ",
+              "과학적 판단은 독립적이어야 하고, ",
+              "근거와 그 한계까지 투명하게 밝혀야 ",
+              "신뢰를 얻을 수 있다고 말했다."
+            ]
+          ],
+          "en": [
+            "Among the information about infectious diseases, there is some whose truth has not been confirmed. Who will check such information? 질병관리청, the Korean government agency for disease control and prevention, and 대한예방의학회, the Korean academic society of preventive medicine, said they would sign, on October 23, a work agreement for cooperation on fact-checking infectious disease information. The agency's press material wrote that the agreement is made for providing infectious disease information people can trust and for improving public health.",
+            "The first item of cooperation the material lists is a council. The two organizations decided to form and run a fact-checking council for infectious disease information, joined by medical science experts. For each topic to be verified, the council is built from about ten experts in the related field, and it works by a rapid Delphi method that moves expert assessment along quickly and draws out both agreement and disagreement.",
+            "The places the two organizations stand are separate. The agency proposes items that need review for public health, shares related material, and supports communication with the public. The society receives recommendations from related academic societies, forms a multidisciplinary panel of expert reviewers independently, verifies the scientific grounds, and helps explain the result in academic terms.",
+            "The fact-checking council keeps the government agency and the body that makes the judgment apart. The material wrote that this secures the objectivity and independence of scientific judgment, and that the professional judgment of the academic world will help people weigh health information from a balanced point of view.",
+            "The cooperation also covers exchange of scientific grounds and expert knowledge related to infectious diseases, accurate information given through communication between experts and the press, and research, education and academic exchange to strengthen fact-checking capacity. By the end of the year the two organizations plan to work out, through practical talks, how the council will run and what the detailed cooperation will be. 윤석준, the chair of the society, said that scientific judgment must be independent, and that trust comes only when the grounds and their limits are both disclosed transparently."
+          ],
+          "enseg": [
+            [
+              "Among the information about infectious diseases, ",
+              "there is some whose truth has not been confirmed. ",
+              "Who will check such information? ",
+              "질병관리청, the Korean government agency for disease control and prevention, ",
+              "and 대한예방의학회, the Korean academic society of preventive medicine, ",
+              "said they would sign, on October 23, ",
+              "a work agreement for cooperation on fact-checking infectious disease information. ",
+              "The agency's press material wrote that the agreement is made ",
+              "for providing infectious disease information people can trust ",
+              "and for improving public health."
+            ],
+            [
+              "The first item of cooperation the material lists is a council. ",
+              "The two organizations decided to form and run ",
+              "a fact-checking council for infectious disease information, ",
+              "joined by medical science experts. ",
+              "For each topic to be verified, ",
+              "the council is built from about ten experts ",
+              "in the related field, ",
+              "and it works by a rapid Delphi method ",
+              "that moves expert assessment along quickly ",
+              "and draws out both agreement and disagreement."
+            ],
+            [
+              "The places the two organizations stand are separate. ",
+              "The agency proposes items that need review for public health, ",
+              "shares related material, ",
+              "and supports communication with the public. ",
+              "The society receives recommendations from related academic societies, ",
+              "forms a multidisciplinary panel of expert reviewers independently, ",
+              "verifies the scientific grounds, ",
+              "and helps explain the result in academic terms."
+            ],
+            [
+              "The fact-checking council keeps the government agency ",
+              "and the body that makes the judgment apart. ",
+              "The material wrote that this secures ",
+              "the objectivity and independence of scientific judgment, ",
+              "and that the professional judgment of the academic world ",
+              "will help people weigh health information ",
+              "from a balanced point of view."
+            ],
+            [
+              "The cooperation also covers exchange of scientific grounds and expert knowledge related to infectious diseases, ",
+              "accurate information given through communication ",
+              "between experts and the press, ",
+              "and research, education and academic exchange ",
+              "to strengthen fact-checking capacity. ",
+              "By the end of the year the two organizations plan to work out, ",
+              "through practical talks, ",
+              "how the council will run ",
+              "and what the detailed cooperation will be. ",
+              "윤석준, the chair of the society, ",
+              "said that scientific judgment must be independent, ",
+              "and that trust comes only when the grounds and their limits ",
+              "are both disclosed transparently."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "협의체",
+              "easy": "여러 사람이 모여 의논하는 모임",
+              "hanja": "協(화합할 협)+議(의논할 의)+體(몸 체)"
+            },
+            {
+              "word": "판정",
+              "easy": "맞는지 아닌지를 가려서 정하는 일",
+              "hanja": "判(판단할 판)+定(정할 정)"
+            },
+            {
+              "word": "객관성",
+              "easy": "누가 보아도 달라지지 않는 성질",
+              "hanja": "客(손 객)+觀(볼 관)+性(성품 성)"
+            },
+            {
+              "word": "다학제",
+              "easy": "여러 학문 분야가 함께 참여하는 것",
+              "hanja": "多(많을 다)+學(배울 학)+際(사이 제)"
+            },
+            {
+              "word": "증진",
+              "easy": "더 좋아지도록 늘리고 북돋우는 일",
+              "hanja": "增(더할 증)+進(나아갈 진)"
+            }
+          ],
+          "envocab": [
+            {
+              "word": "council",
+              "ko": "협의체, 협의회 (명사)",
+              "base": "council [ˈkaʊnsl]"
+            },
+            {
+              "word": "verified",
+              "ko": "검증된 (동사 verify의 과거분사)",
+              "base": "verify [ˈverɪfaɪ]"
+            },
+            {
+              "word": "multidisciplinary",
+              "ko": "다학제의, 여러 학문 분야가 참여하는 (형용사)",
+              "base": "multidisciplinary [ˌmʌltiˈdɪsəplɪneri]"
+            },
+            {
+              "word": "objectivity",
+              "ko": "객관성 (명사)",
+              "base": "objectivity [ˌɑːbdʒekˈtɪvəti]"
+            },
+            {
+              "word": "independence",
+              "ko": "독립성 (명사)",
+              "base": "independence [ˌɪndɪˈpendəns]"
+            },
+            {
+              "word": "transparently",
+              "ko": "투명하게 (부사)",
+              "base": "transparent [trænsˈpærənt]"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 가장 알맞은 것은?",
+              "choices": [
+                "감염병 정보를 확인하는 일을 두 기관의 협약과 협의체라는 틀로 만들었다",
+                "감염병 치료법을 새로 찾아냈다",
+                "언론사가 새 신문을 만들기로 했다",
+                "전문가 수를 줄이기로 했다"
+              ],
+              "answer": 0,
+              "explain": "두 기관은 업무협약을 맺고, 그 중심에 의과학 전문가가 참여하는 팩트체크 협의체를 두기로 했다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "협의체가 움직이는 방식으로 글에 나온 것은?",
+              "choices": [
+                "전원이 같은 의견을 낼 때까지 회의를 이어 간다",
+                "전문가 평가를 신속히 진행해 합의와 이견을 도출한다",
+                "투표로 다수의 의견만 남긴다",
+                "한 사람이 결론을 정해 알린다"
+              ],
+              "answer": 1,
+              "explain": "협의체는 전문가 평가를 신속히 진행해 합의와 이견을 도출하는 신속 델파이로 움직인다고 했다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「다학제」의 뜻으로 가장 알맞은 것은?",
+              "choices": [
+                "학교를 여러 곳 세우는 것",
+                "학기를 여러 번 나누는 것",
+                "여러 학문 분야가 함께 참여하는 것",
+                "학생이 많이 모이는 것"
+              ],
+              "answer": 2,
+              "explain": "대한예방의학회는 관련 학회의 추천을 받아 다학제 전문가 검증 패널을 구성한다. 여러 학문 분야가 함께 참여한다는 뜻이다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "infer",
+              "q": "팩트체크 협의체가 정부기관과 판정 주체를 분리한다는 것은 무슨 뜻으로 읽을 수 있는가?",
+              "choices": [
+                "질병관리청이 안건을 내더라도 사실인지 가리는 판정은 학계가 맡는다는 뜻",
+                "질병관리청이 협의체에서 빠진다는 뜻",
+                "학회가 안건을 고른다는 뜻",
+                "판정을 국민 투표로 한다는 뜻"
+              ],
+              "answer": 0,
+              "explain": "질병관리청은 검토가 필요한 안건을 제안하고, 대한예방의학회는 검증 패널을 독립적으로 구성해 근거를 검증한다. 안건을 내는 자리와 판정하는 자리가 나뉘어 있다.",
+              "evidencePara": 2
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "보도참고자료가 「객관성과 독립성」을 함께 든 까닭을 글에서 어떻게 짐작할 수 있는가?",
+              "choices": [
+                "두 말은 뜻이 같아서 한 번 더 적은 것이다",
+                "판정을 맡은 쪽이 안건을 낸 쪽에 매이지 않아야 판단이 서기 때문이다",
+                "전문가 수를 늘리기 위해서다",
+                "회의를 자주 열기 위해서다"
+              ],
+              "answer": 1,
+              "explain": "협의체는 정부기관과 판정 주체를 분리해 과학적 판단의 객관성과 독립성을 확보한다고 했다. 패널도 독립적으로 구성한다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "apply",
+              "q": "윤석준 이사장의 말을 우리 공부에 옮긴다면 가장 가까운 것은?",
+              "choices": [
+                "답만 정확히 적으면 된다",
+                "근거와 함께 그 근거가 어디까지 말해 주는지도 밝힌다",
+                "어려운 말을 많이 쓴다",
+                "남의 의견을 먼저 따른다"
+              ],
+              "answer": 1,
+              "explain": "그는 과학적 판단은 독립적이어야 하고, 근거와 그 한계까지 투명하게 밝혀야 신뢰를 얻을 수 있다고 말했다.",
+              "evidencePara": 4
+            }
+          ]
+        },
+        "L4": {
+          "title": "확인되지 않았다는 말",
+          "minutes": 8,
+          "paragraphs": [
+            [
+              "질병관리청이 10월 23일 낸 보도참고자료의 제목에는 ",
+              "감염병 인포데믹 관리라는 말이 들어 있다. ",
+              "자료 본문은 이 말의 뜻을 ",
+              "따로 풀지 않는다. ",
+              "대신 무엇을 하겠다는 것인지는 또렷하다. ",
+              "사실 여부가 확인되지 않은 감염병 정보의 ",
+              "과학적 근거를 검증하고, ",
+              "그 결과를 바탕으로 국민에게 ",
+              "정확하고 신뢰할 수 있는 정보를 ",
+              "제공하겠다는 것이다. ",
+              "자료는 이번 협약을 ",
+              "신뢰할 수 있는 감염병 정보 제공과 ",
+              "국민의 건강 증진을 위해 ",
+              "맺는 것이라고 밝혔다."
+            ],
+            [
+              "눈여겨볼 것은 ",
+              "확인되지 않았다는 표현이다. ",
+              "자료는 검증 대상을 ",
+              "사실 여부가 확인되지 않은 감염병 정보라고 적었다. ",
+              "틀렸다고 못 박은 말이 아니라, ",
+              "아직 가려지지 않았다는 말이다. ",
+              "감염병 관련 부정확 정보에 대한 ",
+              "사실 검증이 이루어질 것으로 기대된다는 대목도 있다. ",
+              "자료는 두 표현을 모두 쓰지만 ",
+              "둘의 관계는 밝히지 않았다."
+            ],
+            [
+              "그렇다면 가리는 절차는 어떻게 생겼는가. ",
+              "검증할 주제에 따라 ",
+              "관련 분야 전문가 10인 내외로 ",
+              "협의체를 꾸린다. ",
+              "전문가 평가를 신속히 진행해 ",
+              "합의와 이견을 도출하는 신속 델파이다. ",
+              "합의만이 아니라 이견도 함께 도출한다고 ",
+              "적혀 있다는 점을 눈여겨볼 만하다. ",
+              "팩트체크 역량을 기르기 위한 연구와 교육, ",
+              "학술 교류도 협력 내용에 들어 있다."
+            ],
+            [
+              "맡은 자리도 나뉘어 있다. ",
+              "질병관리청은 공중보건상 검토가 필요한 안건을 제안하고, ",
+              "관련 자료를 공유하며 국민 소통을 지원한다. ",
+              "대한예방의학회는 관련 학회의 추천을 받아 ",
+              "다학제 전문가 검증 패널을 독립적으로 구성하고, ",
+              "과학적 근거를 검증해 ",
+              "그 결과를 학술적으로 설명하는 데 협력한다. ",
+              "팩트체크 협의체는 정부기관인 질병관리청과 ",
+              "판정 주체를 분리해 ",
+              "과학적 판단의 객관성과 독립성을 확보한다는 것이 ",
+              "자료의 설명이다."
+            ],
+            [
+              "윤석준 대한예방의학회 이사장은 ",
+              "과학적 판단은 독립적이어야 하고, ",
+              "근거와 그 한계까지 투명하게 밝혀야 ",
+              "신뢰를 얻을 수 있다고 말했다. ",
+              "임승관 질병관리청장은 ",
+              "감염병 위기 상황에서 ",
+              "국민이 신뢰할 수 있는 ",
+              "과학적 검증에 기반한 사실 정보는 ",
+              "국민의 건강과 피해를 줄이는 중요한 기반이라며, ",
+              "검증 결과를 국민이 이해하기 쉽게 ",
+              "신속하게 전달하는 데 힘쓰겠다고 밝혔다. ",
+              "두 기관은 연말까지 실무 협의를 거쳐 ",
+              "협의체 운영 방식과 세부 협력 내용을 ",
+              "마련할 예정이다."
+            ]
+          ],
+          "en": [
+            "The title of the press material that 질병관리청, the Korean government agency for disease control and prevention, put out on October 23 contains the phrase 감염병 인포데믹 관리, the management of an infectious disease infodemic. The body of the material does not spell out what that phrase means. What it says it will do, though, is clear. It will verify the scientific grounds of infectious disease information whose truth has not been confirmed, and on the basis of that result provide the public with accurate and trustworthy information. The agreement, the material said, is made for providing infectious disease information people can trust and for improving public health.",
+            "The phrase worth looking at is “has not been confirmed”. The material described what will be checked as infectious disease information whose truth has not been confirmed. That is not a sentence declaring it wrong; it says the matter has not been settled yet. There is also a passage saying that fact-checking of inaccurate information about infectious diseases is expected to take place. The material uses both expressions, but it does not state how the two are related.",
+            "What, then, does the sorting process look like? For each topic to be verified, a council of about ten experts from the related field is formed. It is a rapid Delphi that moves expert assessment along quickly and draws out both agreement and disagreement. It is worth noticing that the material says disagreement, not only agreement, is drawn out. Research, education and academic exchange to build fact-checking capacity are part of the cooperation as well.",
+            "The roles are divided too. The agency proposes items that need review for public health, shares related material, and supports communication with the public. The society receives recommendations from related academic societies, forms a multidisciplinary panel of expert reviewers independently, verifies the scientific grounds, and helps explain the result in academic terms. The fact-checking council, the material explains, keeps the government agency apart from the body that makes the judgment, and so secures the objectivity and independence of scientific judgment.",
+            "윤석준, the chair of the society, said that scientific judgment must be independent, and that trust comes only when the grounds and their limits are both disclosed transparently. 임승관, the commissioner of the agency, said that in an infectious disease crisis, factual information based on scientific verification that the public can trust is an important foundation for health and for reducing harm, and that he would work to deliver verification results to the public quickly and in a way that is easy to understand. By the end of the year the two organizations plan to work out, through practical talks, how the council will run and what the detailed cooperation will be."
+          ],
+          "enseg": [
+            [
+              "The title of the press material ",
+              "that 질병관리청, the Korean government agency for disease control and prevention, put out on October 23 ",
+              "contains the phrase 감염병 인포데믹 관리, ",
+              "the management of an infectious disease infodemic. ",
+              "The body of the material does not spell out what that phrase means. ",
+              "What it says it will do, though, is clear. ",
+              "It will verify the scientific grounds ",
+              "of infectious disease information whose truth has not been confirmed, ",
+              "and on the basis of that result ",
+              "provide the public with accurate and trustworthy information. ",
+              "The agreement, the material said, is made ",
+              "for providing infectious disease information people can trust ",
+              "and for improving public health."
+            ],
+            [
+              "The phrase worth looking at is “has not been confirmed”. ",
+              "The material described what will be checked ",
+              "as infectious disease information whose truth has not been confirmed. ",
+              "That is not a sentence declaring it wrong; ",
+              "it says the matter has not been settled yet. ",
+              "There is also a passage saying ",
+              "that fact-checking of inaccurate information ",
+              "about infectious diseases is expected to take place. ",
+              "The material uses both expressions, ",
+              "but it does not state how the two are related."
+            ],
+            [
+              "What, then, does the sorting process look like? ",
+              "For each topic to be verified, ",
+              "a council of about ten experts from the related field is formed. ",
+              "It is a rapid Delphi ",
+              "that moves expert assessment along quickly ",
+              "and draws out both agreement and disagreement. ",
+              "It is worth noticing that the material says ",
+              "disagreement, not only agreement, is drawn out. ",
+              "Research, education and academic exchange ",
+              "to build fact-checking capacity ",
+              "are part of the cooperation as well."
+            ],
+            [
+              "The roles are divided too. ",
+              "The agency proposes items that need review for public health, ",
+              "shares related material, ",
+              "and supports communication with the public. ",
+              "The society receives recommendations from related academic societies, ",
+              "forms a multidisciplinary panel of expert reviewers independently, ",
+              "verifies the scientific grounds, ",
+              "and helps explain the result in academic terms. ",
+              "The fact-checking council, the material explains, ",
+              "keeps the government agency apart ",
+              "from the body that makes the judgment, ",
+              "and so secures the objectivity and independence of scientific judgment."
+            ],
+            [
+              "윤석준, the chair of the society, ",
+              "said that scientific judgment must be independent, ",
+              "and that trust comes only when the grounds and their limits ",
+              "are both disclosed transparently. ",
+              "임승관, the commissioner of the agency, said ",
+              "that in an infectious disease crisis, ",
+              "factual information based on scientific verification ",
+              "that the public can trust ",
+              "is an important foundation ",
+              "for health and for reducing harm, ",
+              "and that he would work to deliver verification results ",
+              "to the public quickly and in a way that is easy to understand. ",
+              "By the end of the year the two organizations plan to work out, ",
+              "through practical talks, ",
+              "how the council will run ",
+              "and what the detailed cooperation will be."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "검증",
+              "easy": "근거를 따져 사실인지 가려내는 일",
+              "hanja": "檢(검사할 검)+證(증거 증)"
+            },
+            {
+              "word": "부정확",
+              "easy": "정확하지 않음",
+              "hanja": "不(아닐 불)+正(바를 정)+確(굳을 확)"
+            },
+            {
+              "word": "독립성",
+              "easy": "다른 것에 매이지 않고 스스로 서는 성질",
+              "hanja": "獨(홀로 독)+立(설 립)+性(성품 성)"
+            },
+            {
+              "word": "역량",
+              "easy": "어떤 일을 해낼 수 있는 힘",
+              "hanja": "力(힘 력)+量(헤아릴 량)"
+            },
+            {
+              "word": "다학제",
+              "easy": "여러 학문 분야가 함께 참여하는 것",
+              "hanja": "多(많을 다)+學(배울 학)+際(사이 제)"
+            }
+          ],
+          "envocab": [
+            {
+              "word": "confirmed",
+              "ko": "확인된 (동사 confirm의 과거분사)",
+              "base": "confirm [kənˈfɜːrm]"
+            },
+            {
+              "word": "inaccurate",
+              "ko": "부정확한 (형용사)",
+              "base": "inaccurate [ɪnˈækjərət]"
+            },
+            {
+              "word": "verification",
+              "ko": "검증 (명사)",
+              "base": "verification [ˌverɪfɪˈkeɪʃn]"
+            },
+            {
+              "word": "multidisciplinary",
+              "ko": "다학제의, 여러 학문 분야가 참여하는 (형용사)",
+              "base": "multidisciplinary [ˌmʌltiˈdɪsəplɪneri]"
+            },
+            {
+              "word": "objectivity",
+              "ko": "객관성 (명사)",
+              "base": "objectivity [ˌɑːbdʒekˈtɪvəti]"
+            },
+            {
+              "word": "foundation",
+              "ko": "기반, 토대 (명사)",
+              "base": "foundation [faʊnˈdeɪʃn]"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글이 가장 힘주어 다루는 것은 무엇인가?",
+              "choices": [
+                "감염병의 증상과 치료법",
+                "「확인되지 않은 정보」라는 말의 뜻과, 그것을 가리는 절차",
+                "언론사별 보도량 비교",
+                "전문가 한 사람의 생애"
+              ],
+              "answer": 1,
+              "explain": "글은 자료가 쓴 「사실 여부가 확인되지 않은」이라는 표현을 짚고, 협의체 구성과 신속 델파이, 역할 분리로 이어지는 검증 절차를 따라간다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "검증 절차에 대한 설명으로 자료에 나온 것은?",
+              "choices": [
+                "검증할 주제에 따라 관련 분야 전문가 10인 내외로 협의체를 꾸린다",
+                "전문가는 해마다 한 번만 모인다",
+                "협의체는 언론사가 구성한다",
+                "검증에는 기한을 두지 않는다"
+              ],
+              "answer": 0,
+              "explain": "검증할 주제에 따라 관련 분야 전문가 10인 내외로 협의체를 꾸리고, 전문가 평가를 신속히 진행하는 신속 델파이로 움직인다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "vocab",
+              "q": "글에 쓰인 「역량」의 뜻으로 가장 알맞은 것은?",
+              "choices": [
+                "맡은 자리의 이름",
+                "어떤 일을 해낼 수 있는 힘",
+                "일에 드는 비용",
+                "일하는 사람의 수"
+              ],
+              "answer": 1,
+              "explain": "팩트체크 역량을 기르기 위한 연구와 교육, 학술 교류가 협력 내용에 들어 있다. 검증을 해낼 수 있는 힘을 기른다는 뜻이다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "infer",
+              "q": "자료가 검증 대상을 「사실 여부가 확인되지 않은」 정보라고 적은 데서 알 수 있는 것은?",
+              "choices": [
+                "맞는지 아직 가려지지 않은 상태를 가리킨 것이다",
+                "이미 거짓으로 판정한 정보만 가리킨 것이다",
+                "검증을 마친 정보만 가리킨 것이다",
+                "언론이 보도한 정보만 가리킨 것이다"
+              ],
+              "answer": 0,
+              "explain": "틀렸다고 못 박은 말이 아니라 아직 가려지지 않았다는 말이다. 그래서 과학적 근거를 검증하겠다고 한 것이다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "critical",
+              "q": "협의체가 합의만이 아니라 이견도 함께 도출한다고 적힌 것을 어떻게 읽는 것이 가장 알맞은가?",
+              "choices": [
+                "검증이 실패했다는 뜻으로 읽는다",
+                "검증이 늘 하나의 답으로 끝나지는 않는다는 것을 미리 밝혀 둔 것으로 읽는다",
+                "전문가들이 사이가 나쁘다는 뜻으로 읽는다",
+                "이견이 나오면 결과를 내지 않는다는 뜻으로 읽는다"
+              ],
+              "answer": 1,
+              "explain": "자료는 신속 델파이가 합의와 이견을 도출한다고 적었다. 윤석준 이사장도 근거와 그 한계까지 투명하게 밝혀야 신뢰를 얻는다고 말했다.",
+              "evidencePara": 2
+            }
+          ],
+          "challenge": [
+            {
+              "type": "critical",
+              "q": "이 글이 「인포데믹」의 뜻을 설명하지 않은 것은 자료의 어떤 점과 맞닿아 있는가?",
+              "choices": [
+                "자료가 그 말을 제목에 쓰지 않았다",
+                "자료 본문에 그 말의 뜻풀이가 없다",
+                "자료 본문이 그 말의 뜻을 여러 가지로 풀었다",
+                "자료 본문이 그 말을 영어로만 적었다"
+              ],
+              "answer": 1,
+              "explain": "자료는 제목에 그 말을 쓰면서도 본문에서는 뜻을 따로 풀지 않았다. 글도 자료 본문에 없는 설명은 덧붙이지 않았다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "apply",
+              "q": "학급에서 떠도는 이야기를 가리는 모임을 만든다면, 이 글의 방식을 따른 것은?",
+              "choices": [
+                "이야기를 처음 꺼낸 사람이 직접 판정한다",
+                "주제에 따라 그 일을 잘 아는 사람들을 모으고, 판정은 이야기를 꺼낸 쪽과 분리한다",
+                "가장 목소리가 큰 사람의 말을 따른다",
+                "판정 결과는 알리지 않는다"
+              ],
+              "answer": 1,
+              "explain": "협의체는 검증할 주제에 따라 관련 분야 전문가로 꾸려지고, 정부기관과 판정 주체를 분리해 객관성과 독립성을 확보한다.",
+              "evidencePara": 3
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "argument-writing",
+      "category": "humanities",
+      "careers": [
+        "edu",
+        "media"
+      ],
+      "issue": true,
+      "publishedAt": "2026-10-26",
+      "status": "published",
+      "sources": [
+        {
+          "title": "국립국어원 보도자료 — 국립국어원, ‘2026년 전국 논증적 글쓰기 대회’ 시상식 개최",
+          "url": "https://www.korean.go.kr/front/board/boardStandardView.do?board_id=6&mn_id=183&b_seq=1074"
+        }
+      ],
+      "levels": {
+        "L1": {
+          "title": "잘 쓴 글은 어떻게 알까요",
+          "minutes": 3,
+          "paragraphs": [
+            [
+              "글을 잘 썼는지는 어떻게 알까요? ",
+              "느낌으로만 정하면 ",
+              "사람마다 말이 달라질 수 있어요. ",
+              "그래서 함께 보는 기준을 ",
+              "미리 정해 두기도 해요."
+            ],
+            [
+              "국립국어원이 글쓰기 대회를 열었어요. ",
+              "여기에서도 기준을 두고 ",
+              "글을 읽었어요. ",
+              "무엇이 문제인지 밝혔는지, ",
+              "그렇게 생각한 까닭을 들었는지, ",
+              "나와 다른 생각도 살펴보았는지를 보아요."
+            ],
+            [
+              "글 전체가 잘 짜였는지, ",
+              "낱말을 알맞게 쓰고 ",
+              "바르게 적었는지도 보아요. ",
+              "가장 큰 상을 받은 사람은 ",
+              "앞에서 말한 것들을 두루 갖춰 ",
+              "가장 높은 점수를 받았어요. ",
+              "상을 받은 사람은 ",
+              "모두 열세 명이에요."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "기준",
+              "easy": "무엇을 보고 판단할지 미리 정해 놓은 잣대예요.",
+              "hanja": null
+            },
+            {
+              "word": "까닭",
+              "easy": "그렇게 생각하거나 그렇게 한 이유예요.",
+              "hanja": null
+            },
+            {
+              "word": "대회",
+              "easy": "여러 사람이 모여 실력을 겨루는 자리예요.",
+              "hanja": null
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글은 무엇에 대해 알려 주나요?",
+              "choices": [
+                "글씨를 예쁘게 쓰는 방법",
+                "글을 잘 썼는지 보는 기준",
+                "상을 많이 받는 방법",
+                "대회에서 입을 옷"
+              ],
+              "answer": 1,
+              "explain": "느낌으로만 정하지 않으려고 함께 보는 기준을 정해 둔다는 이야기예요.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "글쓰기 대회에서 글을 읽을 때 본 것이 아닌 것은 무엇인가요?",
+              "choices": [
+                "무엇이 문제인지 밝혔는지",
+                "그렇게 생각한 까닭을 들었는지",
+                "나와 다른 생각도 살펴보았는지",
+                "글을 몇 분 만에 썼는지"
+              ],
+              "answer": 3,
+              "explain": "글을 쓴 시간은 글에 나오지 않아요. 문제, 까닭, 다른 생각, 글의 짜임새, 낱말 같은 것들을 보았어요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「기준」은 무엇인가요?",
+              "choices": [
+                "무엇을 보고 판단할지 미리 정해 놓은 잣대",
+                "상을 주는 사람",
+                "글을 쓰는 종이",
+                "글을 읽는 시간"
+              ],
+              "answer": 0,
+              "explain": "기준은 무엇을 보고 판단할지 미리 정해 놓은 잣대예요.",
+              "evidencePara": 0
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "이 글에서는 기준을 미리 정해 두는 까닭을 무엇이라고 했나요?",
+              "choices": [
+                "느낌으로만 정하면 사람마다 말이 달라지기 때문에",
+                "글을 빨리 쓰게 하려고",
+                "상을 적게 주려고",
+                "글을 짧게 쓰게 하려고"
+              ],
+              "answer": 0,
+              "explain": "느낌으로만 정하면 사람마다 말이 달라져요. 그래서 함께 보는 기준을 정해 둔다고 했어요.",
+              "evidencePara": 0
+            },
+            {
+              "type": "apply",
+              "q": "친구 글을 읽고 도움말을 해 주려고 해요. 이 글에 나온 기준과 가장 가까운 말은 무엇인가요?",
+              "choices": [
+                "글씨가 참 예쁘다",
+                "왜 그렇게 생각했는지 까닭을 더 써 보자",
+                "종이를 바꿔 보자",
+                "더 큰 소리로 읽어 보자"
+              ],
+              "answer": 1,
+              "explain": "그렇게 생각한 까닭을 들었는지를 본다고 했어요.",
+              "evidencePara": 1
+            }
+          ]
+        },
+        "L2": {
+          "title": "잘 쓴 글을 가리는 기준",
+          "minutes": 4,
+          "paragraphs": [
+            [
+              "글 한 편을 놓고 ",
+              "「잘 썼다」고 말하려면 ",
+              "무엇을 보아야 할까? ",
+              "무엇을 볼지 정해 두지 않으면 ",
+              "사람마다 답이 갈리기 쉽다. ",
+              "국립국어원이 주최한 ",
+              "「2026년 전국 논증적 글쓰기 대회」는 ",
+              "미리 정해 둔 ",
+              "기준에 따라 글을 읽었다."
+            ],
+            [
+              "기준은 이런 것들을 비롯한 항목을 묻는다. ",
+              "무엇이 문제인지 제시했는가. ",
+              "그렇게 주장하는 이유와 근거가 알맞은가. ",
+              "나와 다른 생각, ",
+              "곧 반론을 살펴보고 대응했는가. ",
+              "글 전체의 짜임새가 있는가. ",
+              "낱말을 알맞게 쓰고 어문규범을 지켰는가."
+            ],
+            [
+              "이런 기준들은 ",
+              "국립국어원이 2025년에 발표한 ",
+              "《논증적 글쓰기 능력 진단 기준안》에 ",
+              "적혀 있다. ",
+              "대회 심사는 ",
+              "이 기준안에 따라 이루어졌다."
+            ],
+            [
+              "대회는 두 단계로 치러졌다. ",
+              "지난 8월 온라인 예선에 ",
+              "1,523명이 참가했고, ",
+              "그 가운데 100명이 본선에 올랐다. ",
+              "본선에 오른 100명은 ",
+              "10월 10일 국립중앙박물관에 모여 ",
+              "글쓰기 실력을 겨뤘다. ",
+              "여기에서 수상자 13명이 뽑혔다."
+            ],
+            [
+              "대상을 받은 김동연 씨는 ",
+              "이 기준들을 두루 충족해 ",
+              "가장 높은 점수를 받았다. ",
+              "10월 16일 보도자료에 따르면 ",
+              "시상식은 10월 17일 토요일 ",
+              "오후 2시 국립중앙박물관 교육관에서 ",
+              "열기로 했다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "기준",
+              "easy": "무엇을 보고 판단할지 미리 정해 둔 잣대",
+              "hanja": "基(터 기)+準(준할 준)"
+            },
+            {
+              "word": "근거",
+              "easy": "어떤 말이나 판단이 기댈 수 있는 바탕",
+              "hanja": "根(뿌리 근)+據(의거할 거)"
+            },
+            {
+              "word": "반론",
+              "easy": "상대의 주장에 맞서 내놓는 반대 의견",
+              "hanja": "反(돌이킬 반)+論(논할 론)"
+            },
+            {
+              "word": "예선",
+              "easy": "본선에 나갈 사람을 미리 가려내는 단계",
+              "hanja": "豫(미리 예)+選(가릴 선)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 가장 알맞은 것은?",
+              "choices": [
+                "대회에서 상을 받는 방법",
+                "글을 잘 썼는지 가리는 기준",
+                "국립중앙박물관을 구경하는 방법",
+                "온라인으로 글을 보내는 방법"
+              ],
+              "answer": 1,
+              "explain": "글은 대회 심사가 쓴 기준을 하나씩 풀어 설명한다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "대회에 대한 설명으로 알맞지 않은 것은?",
+              "choices": [
+                "8월 온라인 예선에 1,523명이 참가했다",
+                "본선에 100명이 올랐다",
+                "본선은 10월 10일 국립중앙박물관에서 치러졌다",
+                "수상자는 모두 100명이다"
+              ],
+              "answer": 3,
+              "explain": "본선에 오른 사람이 100명이고, 수상자는 13명이다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "vocab",
+              "q": "「반론」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "상대의 주장에 맞서 내놓는 반대 의견",
+                "글을 쓰는 차례",
+                "상의 이름",
+                "글의 길이"
+              ],
+              "answer": 0,
+              "explain": "글에서도 「나와 다른 생각, 곧 반론」이라고 풀어 적었다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "infer",
+              "q": "기준 가운데 반론에 관한 항목이 요구하는 것은?",
+              "choices": [
+                "자기 주장만 길게 쓰는 것",
+                "나와 다른 생각을 살펴보고 대응하는 것",
+                "낱말을 어렵게 쓰는 것",
+                "글을 짧게 줄이는 것"
+              ],
+              "answer": 1,
+              "explain": "기준에는 나와 다른 생각, 곧 반론을 살펴보고 대응했는가가 들어 있다.",
+              "evidencePara": 1
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "심사가 「미리 정해 둔 기준에 따라」 이루어졌다는 것은 어떤 뜻인가?",
+              "choices": [
+                "심사위원이 그날 마음에 드는 글을 골랐다는 뜻",
+                "무엇을 보고 점수를 줄지 글을 읽기 전에 정해 두었다는 뜻",
+                "글을 읽지 않고 점수를 주었다는 뜻",
+                "참가자가 스스로 점수를 매겼다는 뜻"
+              ],
+              "answer": 1,
+              "explain": "기준을 먼저 정해 두고 그 기준에 따라 글을 읽었다는 말이다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "apply",
+              "q": "학급 글쓰기를 이 대회처럼 해 보려 한다. 글에 나온 방식과 가장 가까운 것은?",
+              "choices": [
+                "읽고 나서 느낌만으로 순위를 정한다",
+                "무엇을 볼지 먼저 적어 두고 그대로 읽는다",
+                "글이 긴 순서대로 줄을 세운다",
+                "글씨가 예쁜 글을 고른다"
+              ],
+              "answer": 1,
+              "explain": "대회 심사는 2025년에 발표한 기준안에 따라 이루어졌다.",
+              "evidencePara": 2
+            }
+          ],
+          "en": [
+            "What should you look at before saying that an essay is well written? Without deciding what to look at, each reader can land on a different answer. The 2026 National Argumentative Writing Contest, hosted by the National Institute of Korean Language, read the essays against standards set in advance.",
+            "The standards ask for such things as these. Does the essay show what the problem is? Are the reasons and evidence for the claim fitting? Does it look at other views, that is, counterarguments, and answer them? Is the whole piece well organized? Are the words well chosen and the rules of writing kept?",
+            "These are set out in the standards for diagnosing argumentative writing ability, published by the National Institute of Korean Language in 2025. The judging followed those standards.",
+            "The contest ran in two rounds. In an online preliminary round last August, 1,523 people took part, and 100 of them went through to the final. Those 100 gathered at the National Museum of Korea on October 10 and competed in writing. Thirteen winners came out of it.",
+            "The writer who took the grand prize met the standards all round and received the highest score. According to the press release of October 16, the award ceremony was set to be held at the education hall of the National Museum of Korea at 2 p.m. on Saturday, October 17."
+          ],
+          "enseg": [
+            [
+              "What should you look at ",
+              "before saying that an essay is well written? ",
+              "Without deciding what to look at, ",
+              "each reader can land on a different answer. ",
+              "The 2026 National Argumentative Writing Contest, ",
+              "hosted by the National Institute of Korean Language, ",
+              "read the essays against standards set in advance."
+            ],
+            [
+              "The standards ask for such things as these. ",
+              "Does the essay show what the problem is? ",
+              "Are the reasons and evidence ",
+              "for the claim fitting? ",
+              "Does it look at other views, ",
+              "that is, counterarguments, and answer them? ",
+              "Is the whole piece well organized? ",
+              "Are the words well chosen ",
+              "and the rules of writing kept?"
+            ],
+            [
+              "These are set out in the standards ",
+              "for diagnosing argumentative writing ability, ",
+              "published by the National Institute of Korean Language in 2025. ",
+              "The judging followed those standards."
+            ],
+            [
+              "The contest ran in two rounds. ",
+              "In an online preliminary round last August, ",
+              "1,523 people took part, ",
+              "and 100 of them went through to the final. ",
+              "Those 100 gathered at the National Museum of Korea ",
+              "on October 10 and competed in writing. ",
+              "Thirteen winners came out of it."
+            ],
+            [
+              "The writer who took the grand prize ",
+              "met the standards all round ",
+              "and received the highest score. ",
+              "According to the press release of October 16, ",
+              "the award ceremony was set to be held ",
+              "at the education hall of the National Museum of Korea ",
+              "at 2 p.m. on Saturday, October 17."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "standards",
+              "ko": "기준들 (명사 standard의 복수)",
+              "base": "standard [ˈstændərd]"
+            },
+            {
+              "word": "evidence",
+              "ko": "근거, 증거 (명사)",
+              "base": "evidence [ˈevɪdəns]"
+            },
+            {
+              "word": "counterarguments",
+              "ko": "반론들 (명사 counterargument의 복수)",
+              "base": "counterargument [ˈkaʊntərɑːrɡjumənt]"
+            },
+            {
+              "word": "organized",
+              "ko": "짜임새 있게 조직된 (동사 organize의 과거분사)",
+              "base": "organize [ˈɔːrɡənaɪz]"
+            },
+            {
+              "word": "preliminary",
+              "ko": "예선의, 예비의 (형용사)",
+              "base": "preliminary [prɪˈlɪmɪneri]"
+            },
+            {
+              "word": "ceremony",
+              "ko": "의식, 식 (명사)",
+              "base": "ceremony [ˈserəmoʊni]"
+            }
+          ]
+        },
+        "L3": {
+          "title": "반론까지 보는 기준",
+          "minutes": 6,
+          "paragraphs": [
+            [
+              "글을 평가한다는 말은 애매하게 들린다. ",
+              "「설득력 있다」거나 「논리적이다」라는 말은 ",
+              "읽는 사람의 인상에 기대기 쉽다. ",
+              "국립국어원이 주최한 ",
+              "「2026년 전국 논증적 글쓰기 대회」는 ",
+              "항목으로 나누어 적어 둔 ",
+              "기준에 따라 심사했다."
+            ],
+            [
+              "대회 방식은 이렇다. ",
+              "사회적 쟁점과 관련된 ",
+              "논제 가운데 하나를 골라, ",
+              "1,200자 내외로 자신의 주장을 ",
+              "얼마나 논리적으로 잘 펼쳤는지를 평가했다. ",
+              "본선에 출제된 문항은 ",
+              "인공지능 활용 표시 범위에 대한 찬반, ",
+              "그리고 역사문화환경 보존지역의 ",
+              "건축 규제에 대한 찬반이었다."
+            ],
+            [
+              "심사는 국립국어원이 2025년에 발표한 ",
+              "《논증적 글쓰기 능력 진단 기준안》에 ",
+              "따라 이루어졌다. ",
+              "기준에는 문제 상황 제시, ",
+              "이유와 근거의 적절성, ",
+              "반론 고려 및 대응, ",
+              "글 전체 조직의 짜임새, ",
+              "어휘 사용과 어문규범 준수 등이 있다."
+            ],
+            [
+              "이 가운데 ",
+              "「반론 고려 및 대응」은 ",
+              "반론을 살펴보고 대응했는지를 보는 항목이다. ",
+              "이 글은 이 항목을 이렇게 읽는다 ",
+              "— 찬반을 묻는 논제에서는 ",
+              "반대편의 주장이 이미 자리를 잡고 있고, ",
+              "그것을 모른 체하고 ",
+              "자기 쪽 근거만 쌓은 글은 ",
+              "읽는 사람이 곧바로 떠올릴 ",
+              "반대 의견에 아무 답도 ",
+              "내놓지 못한다는 것이다."
+            ],
+            [
+              "글은 1,200자 내외로 썼다. ",
+              "이 글은 그 분량과 ",
+              "기준의 항목을 함께 놓고 본다 ",
+              "— 문제 상황을 밝히고, ",
+              "근거를 들고, 반론에 답하고, ",
+              "글 전체를 짜는 일을 ",
+              "1,200자 내외 안에서 해내려면 ",
+              "어디에 몇 줄을 쓸지 ",
+              "정해야 한다는 것이다."
+            ],
+            [
+              "대회에는 지난 8월 온라인 예선에 ",
+              "1,523명이 참가했고 ",
+              "100명이 본선에 올랐다. ",
+              "수상자는 13명이며, ",
+              "대상을 받은 김동연 씨는 ",
+              "이 기준들을 두루 충족해 ",
+              "가장 높은 점수를 받았다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "쟁점",
+              "easy": "의견이 갈려 서로 다투게 되는 지점",
+              "hanja": "爭(다툴 쟁)+點(점 점)"
+            },
+            {
+              "word": "논제",
+              "easy": "글이나 토론에서 다루기로 정한 문제",
+              "hanja": "論(논할 론)+題(제목 제)"
+            },
+            {
+              "word": "반론",
+              "easy": "상대의 주장에 맞서 내놓는 반대 의견",
+              "hanja": "反(돌이킬 반)+論(논할 론)"
+            },
+            {
+              "word": "규제",
+              "easy": "규칙을 정해 함부로 하지 못하게 막는 것",
+              "hanja": "規(법 규)+制(절제할 제)"
+            },
+            {
+              "word": "준수",
+              "easy": "정해진 규칙이나 법을 그대로 지킴",
+              "hanja": "遵(좇을 준)+守(지킬 수)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글이 말하려는 바로 가장 알맞은 것은?",
+              "choices": [
+                "글 평가는 읽는 사람의 인상에 맡기는 편이 낫다",
+                "대회 심사는 항목으로 나누어 적어 둔 기준에 따라 이루어졌다",
+                "논제는 정답이 하나로 정해져 있어야 한다",
+                "글은 길수록 좋은 평가를 받는다"
+              ],
+              "answer": 1,
+              "explain": "항목으로 나누어 적어 둔 기준으로 심사했다는 것이 글의 뼈대다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "본선에 출제된 문항으로 알맞은 것은?",
+              "choices": [
+                "학교 급식 메뉴에 대한 찬반",
+                "교복 자율화에 대한 찬반",
+                "인공지능 활용 표시 범위에 대한 찬반",
+                "도서관 개관 시간에 대한 찬반"
+              ],
+              "answer": 2,
+              "explain": "본선 문항은 인공지능 활용 표시 범위와 역사문화환경 보존지역의 건축 규제에 대한 찬반이었다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「쟁점」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "의견이 갈려 서로 다투게 되는 지점",
+                "모두가 같은 답을 내는 문제",
+                "글의 마지막 문단",
+                "상을 주는 차례"
+              ],
+              "answer": 0,
+              "explain": "사회적 쟁점과 관련된 논제란 의견이 갈리는 문제를 가리킨다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "infer",
+              "q": "이 글은 「반론 고려 및 대응」이 기준에 들어 있는 까닭을 무엇이라고 보는가?",
+              "choices": [
+                "반대편 주장을 적으면 글이 길어지기 때문",
+                "심사위원이 반대편 주장을 좋아하기 때문",
+                "찬성과 반대를 모두 쓰면 분량을 채울 수 있기 때문",
+                "반대편 주장이 이미 자리를 잡고 있어, 답하지 않으면 읽는 사람의 의문이 남기 때문"
+              ],
+              "answer": 3,
+              "explain": "찬반을 묻는 논제에서는 반대편 주장이 이미 있고, 그것을 모른 체한 글은 읽는 사람이 곧바로 떠올릴 반대 의견에 답하지 못한다고 했다.",
+              "evidencePara": 3
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "1,200자 내외라는 분량에 대한 이 글의 설명으로 가장 알맞은 것은?",
+              "choices": [
+                "분량이 많을수록 높은 점수를 받는다는 뜻",
+                "1,200자 내외 안에서 어디에 몇 줄을 쓸지 정해야 한다는 뜻",
+                "글자 수를 세는 일이 심사의 전부라는 뜻",
+                "기준의 항목 가운데 하나만 쓰면 된다는 뜻"
+              ],
+              "answer": 1,
+              "explain": "이 글은 1,200자 내외 안에서 항목을 채우려면 어디에 몇 줄을 쓸지 정해야 한다고 했다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "apply",
+              "q": "찬반이 갈리는 논제로 글을 쓸 때, 이 글의 기준에 가장 맞는 방법은?",
+              "choices": [
+                "내 쪽 근거만 모아 길게 늘인다",
+                "반대편에서 나올 주장을 글 안에 적고 그에 답한다",
+                "반대편 이야기는 빼고 결론만 강하게 쓴다",
+                "어려운 낱말을 되도록 많이 넣는다"
+              ],
+              "answer": 1,
+              "explain": "이 글은 반대편 주장을 모른 체한 글이 읽는 사람의 반대 의견에 답하지 못한다고 했다.",
+              "evidencePara": 3
+            }
+          ],
+          "en": [
+            "Saying that we judge a piece of writing sounds vague. Words like convincing or logical lean easily on the reader's impression. The 2026 National Argumentative Writing Contest, hosted by the National Institute of Korean Language, judged the essays by items written down in advance.",
+            "The contest worked like this. Each writer chose one topic among questions tied to a social issue and set out a claim in about 1,200 characters, and the judges looked at how logically it was argued. The questions set in the final round were for or against the scope of labelling for the use of artificial intelligence, and for or against building restrictions in areas that preserve a historic and cultural environment.",
+            "The judging followed the standards for diagnosing argumentative writing ability, published by the National Institute of Korean Language in 2025. The standards include presenting the problem situation, the fitness of reasons and evidence, considering and answering counterarguments, the organization of the whole piece, and the use of words and the keeping of language norms.",
+            "Among them, considering and answering counterarguments is the item that looks at whether counterarguments were taken up and answered. This essay reads the item this way: on a for-or-against topic the other side's claim is already in place, and an essay that passes over it and piles up only its own evidence gives no answer to the objection a reader will think of at once.",
+            "Essays ran to about 1,200 characters. This essay reads the length of about 1,200 characters together with the items: to cover them, the essay says, a writer has to decide how many lines go where. On its reading, showing the problem, giving evidence, answering counterarguments and ordering the whole piece all have to happen inside about 1,200 characters.",
+            "In the online preliminary round last August 1,523 people took part, and 100 went through to the final. There are thirteen winners, and the one who took the grand prize met the standards all round and received the highest score."
+          ],
+          "enseg": [
+            [
+              "Saying that we judge a piece of writing sounds vague. ",
+              "Words like convincing or logical ",
+              "lean easily on the reader's impression. ",
+              "The 2026 National Argumentative Writing Contest, ",
+              "hosted by the National Institute of Korean Language, ",
+              "judged the essays by items written down in advance."
+            ],
+            [
+              "The contest worked like this. ",
+              "Each writer chose one topic ",
+              "among questions tied to a social issue ",
+              "and set out a claim in about 1,200 characters, ",
+              "and the judges looked at how logically it was argued. ",
+              "The questions set in the final round ",
+              "were for or against the scope of labelling ",
+              "for the use of artificial intelligence, ",
+              "and for or against building restrictions ",
+              "in areas that preserve a historic and cultural environment."
+            ],
+            [
+              "The judging followed the standards ",
+              "for diagnosing argumentative writing ability, ",
+              "published by the National Institute of Korean Language in 2025. ",
+              "The standards include presenting the problem situation, ",
+              "the fitness of reasons and evidence, ",
+              "considering and answering counterarguments, ",
+              "the organization of the whole piece, ",
+              "and the use of words and the keeping of language norms."
+            ],
+            [
+              "Among them, ",
+              "considering and answering counterarguments ",
+              "is the item that looks at ",
+              "whether counterarguments were taken up and answered. ",
+              "This essay reads the item this way: ",
+              "on a for-or-against topic ",
+              "the other side's claim is already in place, ",
+              "and an essay that passes over it ",
+              "and piles up only its own evidence ",
+              "gives no answer to the objection ",
+              "a reader will think of at once."
+            ],
+            [
+              "Essays ran to about 1,200 characters. ",
+              "This essay reads the length of about 1,200 characters ",
+              "together with the items: ",
+              "to cover them, the essay says, ",
+              "a writer has to decide how many lines go where. ",
+              "On its reading, showing the problem, ",
+              "giving evidence, ",
+              "answering counterarguments and ordering the whole piece ",
+              "all have to happen inside about 1,200 characters."
+            ],
+            [
+              "In the online preliminary round last August ",
+              "1,523 people took part, ",
+              "and 100 went through to the final. ",
+              "There are thirteen winners, ",
+              "and the one who took the grand prize ",
+              "met the standards all round and received the highest score."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "impression",
+              "ko": "인상, 느낌 (명사)",
+              "base": "impression [ɪmˈpreʃn]"
+            },
+            {
+              "word": "claim",
+              "ko": "주장 (명사)",
+              "base": "claim [kleɪm]"
+            },
+            {
+              "word": "evidence",
+              "ko": "근거, 증거 (명사)",
+              "base": "evidence [ˈevɪdəns]"
+            },
+            {
+              "word": "counterarguments",
+              "ko": "반론들 (명사 counterargument의 복수)",
+              "base": "counterargument [ˈkaʊntərɑːrɡjumənt]"
+            },
+            {
+              "word": "restrictions",
+              "ko": "규제들 (명사 restriction의 복수)",
+              "base": "restriction [rɪˈstrɪkʃn]"
+            },
+            {
+              "word": "objection",
+              "ko": "반대 의견, 이의 (명사)",
+              "base": "objection [əbˈdʒekʃn]"
+            }
+          ]
+        },
+        "L4": {
+          "title": "「잘 썼다」를 항목으로 쪼개면",
+          "minutes": 8,
+          "paragraphs": [
+            [
+              "국립국어원이 주최하고 서울대학교 국어교육연구소가 주관한 ",
+              "「2026년 전국 논증적 글쓰기 대회」는, ",
+              "인공지능 시대에 들어서면서 그 중요성이 부각되고 있는 ",
+              "글쓰기 능력에 대한 사회적 공감대를 ",
+              "넓히기 위하여 기획되었다."
+            ],
+            [
+              "참가자는 사회적 쟁점과 관련된 ",
+              "논제 가운데 하나를 골라 ",
+              "1,200자 내외로 글을 썼고, ",
+              "심사는 그 주장을 얼마나 ",
+              "논리적으로 잘 펼쳤는지를 보았다. ",
+              "본선에 출제된 문항은 ",
+              "인공지능 활용 표시 범위에 대한 찬반, ",
+              "그리고 역사문화환경 보존지역의 ",
+              "건축 규제에 대한 찬반이었다."
+            ],
+            [
+              "심사는 국립국어원이 2025년에 발표한 ",
+              "《논증적 글쓰기 능력 진단 기준안》에 따라 이루어졌다. ",
+              "기준안이 요구한 항목에는 ",
+              "문제 상황 제시, 이유와 근거의 적절성, ",
+              "반론 고려 및 대응, ",
+              "글 전체 조직의 짜임새, ",
+              "어휘 사용과 어문규범 준수 등이 있다. ",
+              "대상을 받은 김동연 씨는 ",
+              "이 기준들을 두루 충족해 ",
+              "심사위원들에게서 가장 높은 점수를 받았다."
+            ],
+            [
+              "이 글은 공통의 기준이 ",
+              "미리 발표되어 있다는 점을 눈여겨본다. ",
+              "「잘 썼다」는 한마디를 ",
+              "여러 항목의 물음으로 쪼개면 ",
+              "평가하는 쪽은 어느 항목에서 ",
+              "점수가 갈렸는지 말할 수 있어야 한다는 것이, ",
+              "이 글이 보는 이 방식의 뜻이다. ",
+              "쓰는 쪽에도 같은 일이 일어난다고 이 글은 본다. ",
+              "기준안은 심사표이면서 점검표로도 쓸 수 있고, ",
+              "무엇을 갖춰야 하는지가 적혀 있으므로 ",
+              "제출하기 전에 스스로 확인할 자리가 생긴다는 것이다."
+            ],
+            [
+              "기준 가운데 「반론 고려 및 대응」은 ",
+              "반론을 살펴보고 대응했는지를 본다."
+            ],
+            [
+              "대회는 지난 8월 온라인 예선에서 ",
+              "1,523명이 겨뤄 100명이 본선에 올랐고, ",
+              "본선은 10월 10일 국립중앙박물관에서 치러졌다. ",
+              "수상자는 13명이다. ",
+              "10월 16일 보도자료에 따르면 ",
+              "대상 1명에게는 문화체육관광부 장관상과 상금 300만 원을, ",
+              "최우수상 2명과 ",
+              "우수상·장려상 각 5명에게는 ",
+              "국립국어원장상과 소정의 상금을 수여하기로 했다. ",
+              "시상식은 10월 17일 토요일 ",
+              "오후 2시 국립중앙박물관 교육관에서 ",
+              "열기로 했고, ",
+              "서울대학교 나민애 교수의 ",
+              "특별 강연도 함께 진행하기로 했다. ",
+              "이관규 국립국어원장은 예선과 본선 참가자들에게 ",
+              "감사한 마음을 전하면서 ",
+              "「글쓰기 능력을 비롯한 국민의 국어능력 증진을 위해 ",
+              "국립국어원이 제 역할을 다할 수 있도록 ",
+              "연구와 지원을 아끼지 않겠다」라고 말했다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "논증",
+              "easy": "근거를 들어 주장이 옳음을 밝히는 일",
+              "hanja": "論(논할 론)+證(증거 증)"
+            },
+            {
+              "word": "쟁점",
+              "easy": "의견이 갈려 서로 다투게 되는 지점",
+              "hanja": "爭(다툴 쟁)+點(점 점)"
+            },
+            {
+              "word": "반론",
+              "easy": "상대의 주장에 맞서 내놓는 반대 의견",
+              "hanja": "反(돌이킬 반)+論(논할 론)"
+            },
+            {
+              "word": "준수",
+              "easy": "정해진 규칙이나 법을 그대로 지킴",
+              "hanja": "遵(좇을 준)+守(지킬 수)"
+            },
+            {
+              "word": "증진",
+              "easy": "능력이나 기운 따위를 더 늘려 나아지게 함",
+              "hanja": "增(더할 증)+進(나아갈 진)"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 가장 알맞은 것은?",
+              "choices": [
+                "대회 상금의 규모",
+                "미리 발표된 기준이 글쓰기 평가에서 하는 일",
+                "국립중앙박물관의 역사",
+                "인공지능이 글을 쓰는 방법"
+              ],
+              "answer": 1,
+              "explain": "글은 미리 공개된 기준안이 심사하는 쪽과 쓰는 쪽에 각각 무엇을 하게 하는지를 설명한다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "detail",
+              "q": "대회에 대한 설명으로 알맞지 않은 것은?",
+              "choices": [
+                "국립국어원이 주최하고 서울대학교 국어교육연구소가 주관했다",
+                "참가자는 1,200자 내외로 글을 썼다",
+                "8월 온라인 예선에 1,523명이 참가했다",
+                "대상 수상자가 13명이다"
+              ],
+              "answer": 3,
+              "explain": "수상자가 모두 13명이고, 대상은 그 가운데 1명이다.",
+              "evidencePara": 5
+            },
+            {
+              "type": "vocab",
+              "q": "「준수」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "정해진 규칙을 그대로 지킴",
+                "규칙을 새로 만듦",
+                "규칙을 어김",
+                "규칙을 남에게 알림"
+              ],
+              "answer": 0,
+              "explain": "어문규범 준수란 정해진 규범을 그대로 지켰는지를 가리킨다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "infer",
+              "q": "이 글은 기준안이 「심사표이면서 점검표로도 쓸 수 있다」고 본다. 그 말의 뜻으로 가장 알맞은 것은?",
+              "choices": [
+                "심사위원만 볼 수 있는 문서라는 뜻",
+                "채점에 쓰이는 항목이 쓰는 사람에게는 스스로 확인할 목록이 된다는 뜻",
+                "점검이 끝나면 심사를 다시 한다는 뜻",
+                "표를 두 번 작성해야 한다는 뜻"
+              ],
+              "answer": 1,
+              "explain": "무엇을 갖춰야 하는지가 적혀 있으므로 제출하기 전에 스스로 확인할 자리가 생긴다고 했다.",
+              "evidencePara": 3
+            },
+            {
+              "type": "critical",
+              "q": "이 글은 미리 발표된 기준이 평가를 항목으로 나눈다고 본다. 이 글의 관점에서 볼 때 가장 비판받을 만한 태도는?",
+              "choices": [
+                "평가 항목을 미리 발표하고 그대로 적용한다",
+                "찬반이 갈리는 논제에서 반대편 주장을 글 안에 다루고 답한다",
+                "어느 항목에서 점수가 갈렸는지 밝히지 않고 「그냥 잘 썼다」고만 말한다",
+                "정해진 분량 안에서 넣을 것과 뺄 것을 고른다"
+              ],
+              "answer": 2,
+              "explain": "이 글은 「잘 썼다」는 한마디가 여러 항목의 물음으로 쪼개지면 어느 항목에서 점수가 갈렸는지 말할 수 있어야 한다고 본다.",
+              "evidencePara": 3
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "기준안이 요구한 항목 가운데 「반론 고려 및 대응」이 있다. 이 항목이 요구하는 것으로 가장 알맞은 것은?",
+              "choices": [
+                "반론을 적어 두기만 하면 된다",
+                "반론을 살펴보고 그에 대한 답까지 써야 한다",
+                "반론은 심사에서 보지 않는다",
+                "반론을 쓰면 분량이 줄어든다"
+              ],
+              "answer": 1,
+              "explain": "살펴보는 데서 그치지 않고 대응했는지까지 보는 항목이라고 했다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "apply",
+              "q": "이 글은 기준을 미리 발표하는 방식을 눈여겨본다. 학교에서 논술 평가표를 만든다면 이 글이 보여 준 방식에 가장 가까운 것은?",
+              "choices": [
+                "평가가 끝난 뒤에 기준을 정해 알린다",
+                "무엇을 볼지 항목으로 나누어 미리 발표하고 그대로 채점한다",
+                "기준은 채점하는 사람만 알고 있는다",
+                "제출된 글의 분량만 견준다"
+              ],
+              "answer": 1,
+              "explain": "이 글은 공통의 기준이 미리 발표되어 있다는 점을 눈여겨본다고 했다.",
+              "evidencePara": 3
+            }
+          ],
+          "en": [
+            "The 2026 National Argumentative Writing Contest, hosted by the National Institute of Korean Language and run by the Korean language education research institute at Seoul National University, was planned to widen public understanding of writing ability, whose importance has been coming to the fore as the age of artificial intelligence sets in.",
+            "Each entrant chose one topic among questions tied to a social issue and wrote about 1,200 characters, and the judging looked at how logically the claim was argued. The questions set in the final round were for or against the scope of labelling for the use of artificial intelligence, and for or against building restrictions in areas that preserve a historic and cultural environment.",
+            "The judging followed the standards for diagnosing argumentative writing ability, published by the National Institute of Korean Language in 2025. The standards ask for such things as presenting the problem situation, the fitness of reasons and evidence, considering and answering counterarguments, the organization of the whole piece, and the use of words and the keeping of language norms. The writer who took the grand prize met these standards all round and received the highest score from the judges.",
+            "This essay takes note of the fact that a shared standard is published in advance. On its reading, once \"well written\" is broken into separate questions, the side doing the assessment ought to be able to say which item made the difference. The same thing, it says, happens on the writing side: the standards are a score sheet and can serve as a checklist too, and because what is required is written down, there is somewhere to check one's own work before handing it in.",
+            "Among the standards, considering and answering counterarguments looks at whether the writer took up counterarguments and answered them.",
+            "In the online preliminary round last August 1,523 people competed and 100 went through to the final, which was held at the National Museum of Korea on October 10. There are thirteen winners. According to the press release of October 16, the one grand prize was set to carry an award from the Minister of Culture, Sports and Tourism and a prize of three million won, while two top excellence winners and five each of the excellence and encouragement winners were set to receive an award from the director of the National Institute of Korean Language and a modest prize. The ceremony was set to be held at the education hall of the National Museum of Korea at 2 p.m. on Saturday, October 17, and a special lecture by a Seoul National University professor was set to be given alongside it. The director of the National Institute of Korean Language thanked those who took part in the preliminary and final rounds and said that the institute would spare no research or support so that it can play its part in improving the nation's Korean language ability, writing included."
+          ],
+          "enseg": [
+            [
+              "The 2026 National Argumentative Writing Contest, ",
+              "hosted by the National Institute of Korean Language ",
+              "and run by the Korean language education research institute at Seoul National University, ",
+              "was planned to widen public understanding of writing ability, ",
+              "whose importance has been coming to the fore ",
+              "as the age of artificial intelligence sets in."
+            ],
+            [
+              "Each entrant chose one topic ",
+              "among questions tied to a social issue ",
+              "and wrote about 1,200 characters, ",
+              "and the judging looked at how logically the claim was argued. ",
+              "The questions set in the final round ",
+              "were for or against the scope of labelling ",
+              "for the use of artificial intelligence, ",
+              "and for or against building restrictions ",
+              "in areas that preserve a historic and cultural environment."
+            ],
+            [
+              "The judging followed the standards ",
+              "for diagnosing argumentative writing ability, ",
+              "published by the National Institute of Korean Language in 2025. ",
+              "The standards ask for such things as ",
+              "presenting the problem situation, ",
+              "the fitness of reasons and evidence, ",
+              "considering and answering counterarguments, ",
+              "the organization of the whole piece, ",
+              "and the use of words and the keeping of language norms. ",
+              "The writer who took the grand prize ",
+              "met these standards all round ",
+              "and received the highest score from the judges."
+            ],
+            [
+              "This essay takes note of the fact ",
+              "that a shared standard is published in advance. ",
+              "On its reading, ",
+              "once \"well written\" is broken into separate questions, ",
+              "the side doing the assessment ",
+              "ought to be able to say which item made the difference. ",
+              "The same thing, it says, happens on the writing side: ",
+              "the standards are a score sheet ",
+              "and can serve as a checklist too, ",
+              "and because what is required is written down, ",
+              "there is somewhere to check one's own work before handing it in."
+            ],
+            [
+              "Among the standards, ",
+              "considering and answering counterarguments ",
+              "looks at whether the writer took up counterarguments and answered them."
+            ],
+            [
+              "In the online preliminary round last August ",
+              "1,523 people competed and 100 went through to the final, ",
+              "which was held at the National Museum of Korea on October 10. ",
+              "There are thirteen winners. ",
+              "According to the press release of October 16, ",
+              "the one grand prize was set to carry an award from the Minister of Culture, Sports and Tourism ",
+              "and a prize of three million won, ",
+              "while two top excellence winners ",
+              "and five each of the excellence and encouragement winners ",
+              "were set to receive an award from the director of the National Institute of Korean Language ",
+              "and a modest prize. ",
+              "The ceremony was set to be held at the education hall of the National Museum of Korea ",
+              "at 2 p.m. on Saturday, October 17, ",
+              "and a special lecture by a Seoul National University professor was set to be given alongside it. ",
+              "The director of the National Institute of Korean Language ",
+              "thanked those who took part in the preliminary and final rounds ",
+              "and said that the institute would spare no research or support ",
+              "so that it can play its part ",
+              "in improving the nation's Korean language ability, writing included."
+            ]
+          ],
+          "envocab": [
+            {
+              "word": "assessment",
+              "ko": "평가 (명사)",
+              "base": "assessment [əˈsesmənt]"
+            },
+            {
+              "word": "entrant",
+              "ko": "참가자 (명사)",
+              "base": "entrant [ˈentrənt]"
+            },
+            {
+              "word": "labelling",
+              "ko": "표시하기 (동사 label의 동명사)",
+              "base": "label [ˈleɪbl]"
+            },
+            {
+              "word": "checklist",
+              "ko": "점검표 (명사)",
+              "base": "checklist [ˈtʃeklɪst]"
+            },
+            {
+              "word": "norms",
+              "ko": "규범들 (명사 norm의 복수)",
+              "base": "norm [nɔːrm]"
+            },
+            {
+              "word": "lecture",
+              "ko": "강연, 강의 (명사)",
+              "base": "lecture [ˈlektʃər]"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "grid-sunlight-income",
+      "category": "environment",
+      "careers": [
+        "law",
+        "env"
+      ],
+      "issue": true,
+      "publishedAt": "2026-10-26",
+      "status": "published",
+      "sources": [
+        {
+          "title": "기후에너지환경부 보도자료 — 송전망 주변마을의 햇빛소득을 지원하고, 입지선정 과정의 주민참여를 넓힌다 (2026.10.21)",
+          "url": "https://www.mcee.go.kr/home/web/board/read.do?menuId=10598&boardMasterId=939&boardId=1901120"
+        }
+      ],
+      "levels": {
+        "L1": {
+          "title": "마을이 나눠 갖는 햇빛",
+          "minutes": 3,
+          "paragraphs": [
+            [
+              "전기를 멀리 보내는 ",
+              "큰 선로가 있어요. ",
+              "이것을 송전망이라고 해요. ",
+              "송전망은 마을 옆을 지나가기도 해요."
+            ],
+            [
+              "정부가 그런 마을을 돕는 ",
+              "방법을 새로 내놓았어요. ",
+              "마을이 햇빛으로 전기를 만드는 거예요. ",
+              "이것을 태양광이라고 해요. ",
+              "마을 사람들이 함께 참여하면 ",
+              "전기를 만들어 번 돈을 ",
+              "나눌 수 있어요."
+            ],
+            [
+              "정부는 이런 마을을 ",
+              "함께 찾아볼 거예요. ",
+              "규정은 아직 정해지지 않았어요. ",
+              "10월 22일부터 사람들의 ",
+              "의견을 먼저 들어요. ",
+              "우리 동네에도 ",
+              "큰 선로가 지나가는지 찾아보아요."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "송전망",
+              "easy": "전기를 멀리 보내는 큰 선로예요."
+            },
+            {
+              "word": "태양광",
+              "easy": "햇빛으로 전기를 만드는 방법이에요."
+            },
+            {
+              "word": "의견",
+              "easy": "어떤 일에 대해 내는 생각이에요."
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글은 무엇에 대한 이야기인가요?",
+              "choices": [
+                "바람으로 전기를 만드는 방법",
+                "송전망이 지나가는 마을이 햇빛으로 돈을 벌도록 돕는 일",
+                "전기를 아껴 쓰는 방법",
+                "마을에 새 길을 내는 일"
+              ],
+              "answer": 1,
+              "explain": "정부가 송전망이 지나가는 마을을 돕는 방법을 새로 내놓았다는 이야기예요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "마을 사람들이 함께 참여하면 무엇을 할 수 있나요?",
+              "choices": [
+                "전기를 공짜로 쓸 수 있어요",
+                "선로를 다른 곳으로 옮길 수 있어요",
+                "전기를 만들어 번 돈을 나눌 수 있어요",
+                "새 학교를 지을 수 있어요"
+              ],
+              "answer": 2,
+              "explain": "마을 사람들이 함께 참여하면 전기를 만들어 번 돈을 나눌 수 있다고 했어요.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「태양광」은 무엇인가요?",
+              "choices": [
+                "바람으로 전기를 만드는 방법",
+                "물로 전기를 만드는 방법",
+                "전기를 멀리 보내는 큰 선로",
+                "햇빛으로 전기를 만드는 방법"
+              ],
+              "answer": 3,
+              "explain": "마을이 햇빛으로 전기를 만드는 것을 태양광이라고 해요.",
+              "evidencePara": 1
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "정부가 10월 22일부터 의견을 받는 까닭으로 알맞은 것은?",
+              "choices": [
+                "전기가 모자라기 때문이에요",
+                "아직 정하는 중이라 사람들의 생각을 먼저 듣는 거예요",
+                "마을이 멀리 있기 때문이에요",
+                "햇빛이 약해졌기 때문이에요"
+              ],
+              "answer": 1,
+              "explain": "규정이 아직 정해지지 않았고, 10월 22일부터 사람들의 의견을 먼저 듣는다고 했어요.",
+              "evidencePara": 2
+            },
+            {
+              "type": "apply",
+              "q": "우리 동네에도 큰 선로가 지나간다면 해 볼 수 있는 일은?",
+              "choices": [
+                "아무 말도 하지 않아요",
+                "선로를 몰래 가려요",
+                "어디로 지나가는지 찾아보고 생각을 말해요",
+                "혼자서 자리를 정해요"
+              ],
+              "answer": 2,
+              "explain": "글은 우리 동네에도 큰 선로가 지나가는지 찾아보라고 했고, 정부는 사람들의 의견을 듣는다고 했어요.",
+              "evidencePara": 2
+            }
+          ]
+        },
+        "L2": {
+          "title": "송전망 마을의 햇빛 소득",
+          "minutes": 4,
+          "paragraphs": [
+            [
+              "기후에너지환경부가 송전망이 지나가는 ",
+              "마을을 돕는 규정의 개정안을 내놓았다. ",
+              "송전망은 전기를 멀리 보내는 큰 선로다. ",
+              "개정안의 한 축은 ",
+              "그 마을의 태양광 사업이다. ",
+              "주민에게 지속적인 소득이 돌아가게 하려는 것이다."
+            ],
+            [
+              "방법은 돈이 흐르는 길을 바꾸는 것이다. ",
+              "특별법에 따라 ",
+              "송전망이 지나가는 지방정부에는 ",
+              "지원금이 주어진다. ",
+              "가공선로 1킬로미터당 20억 원이다. ",
+              "개정안은 이 지원금의 ",
+              "3분의 2 이내를 ",
+              "송·변전설비 주변지역에 배분하도록 했다. ",
+              "그 마을이 태양광 사업을 하면 ",
+              "설치비용을 먼저 반영하도록 했다."
+            ],
+            [
+              "이를 통해 주민들이 ",
+              "마을 태양광 사업에 참여해 ",
+              "발전수익을 함께 나눌 수 있도록 지원한다는 것이다. ",
+              "기후에너지환경부는 지방정부·한국전력공사와 협력해 ",
+              "계통햇빛소득마을 선도사업을 발굴할 계획이다. ",
+              "주민이 참여할 뜻이 있고 ",
+              "부지와 계통접속 같은 여건을 ",
+              "갖춘 마을을 찾는다. ",
+              "제도개선이 실제 주민 소득으로 ",
+              "이어지게 하려는 것이다."
+            ],
+            [
+              "이 규정은 아직 확정되지 않았다. ",
+              "10월 22일부터 12월 1일까지 ",
+              "입법예고를 한다. ",
+              "예고 기간에는 주민과 지방정부 등 ",
+              "각계의 의견을 받는다. ",
+              "그 뒤 법제처 심사 같은 절차를 거쳐 ",
+              "개정을 마칠 계획이다. ",
+              "규정이 정해지기 전에 ",
+              "의견을 낼 수 있는 기간이다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "송전망",
+              "easy": "전기를 멀리 보내는 큰 선로",
+              "hanja": "送(보낼 송)+電(번개 전)+網(그물 망)"
+            },
+            {
+              "word": "지원금",
+              "easy": "어떤 일을 도우려고 주는 돈",
+              "hanja": "支(지탱할 지)+援(도울 원)+金(쇠 금)"
+            },
+            {
+              "word": "발전수익",
+              "easy": "전기를 만들어 생기는 수익",
+              "hanja": "發(필 발)+電(번개 전)+收(거둘 수)+益(더할 익)"
+            },
+            {
+              "word": "입법예고",
+              "easy": "법이나 규정을 고치기 전에 미리 알리고 의견을 받는 일",
+              "hanja": "立(설 립)+法(법 법)+豫(미리 예)+告(알릴 고)"
+            }
+          ],
+          "en": [
+            "The Ministry of Climate, Energy and Environment has announced proposed amendments to the rules that help villages the transmission network passes through. A transmission network is a set of large lines that carry electricity over long distances. One strand of the proposal is solar power projects in those villages. The aim is for residents to receive continuing income.",
+            "The method is to change the path that money travels along. Under the special act, local governments that the lines pass through are given support funds. The amount is two billion won for each kilometer of overhead line. The proposal would have up to two-thirds of these funds distributed to the areas around transmission and substation facilities. If the village carries out a solar power project, the installation cost would be reflected first.",
+            "Residents are to be supported in taking part in a village solar power project and sharing the generation income together. The Ministry of Climate, Energy and Environment plans to work with local governments and 한국전력공사 (the power corporation) to find pilot projects for grid sunlight income villages. It will look for villages where residents are willing to take part and where conditions such as land and grid connection are in place. The aim is for the rule change to turn into real income for residents.",
+            "These rules are not final yet. From October 22 to December 1 there is a period of advance legislative notice. During the notice period, opinions are collected from residents, local governments and others. After that, the ministry plans to complete the amendment through steps such as a review by 법제처 (the government legislation office). It is a period for sending in opinions before the rules are settled."
+          ],
+          "envocab": [
+            {
+              "word": "transmission",
+              "ko": "송전, 전기를 보내는 일 (명사)",
+              "base": "transmission [trænzˈmɪʃn]"
+            },
+            {
+              "word": "overhead line",
+              "ko": "가공선로, 공중에 걸린 전선 (명사구)",
+              "base": "overhead [ˌoʊvərˈhed] + line [laɪn]"
+            },
+            {
+              "word": "two-thirds",
+              "ko": "3분의 2 (명사)",
+              "base": "two-thirds [ˌtuː ˈθɜːrdz]"
+            },
+            {
+              "word": "resident",
+              "ko": "주민 (명사)",
+              "base": "resident [ˈrezɪdənt]"
+            },
+            {
+              "word": "notice",
+              "ko": "예고, 미리 알림 (명사)",
+              "base": "notice [ˈnoʊtɪs]"
+            },
+            {
+              "word": "amendment",
+              "ko": "개정, 개정안 (명사)",
+              "base": "amendment [əˈmendmənt]"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 알맞은 것은?",
+              "choices": [
+                "송전망이 지나가는 마을의 태양광 사업으로 주민에게 소득이 돌아가게 하려는 개정안이 나왔다",
+                "송전망을 모두 땅속에 묻기로 했다",
+                "태양광 발전을 그만두기로 했다",
+                "지방정부 지원금을 없애기로 했다"
+              ],
+              "answer": 0,
+              "explain": "개정안의 한 축은 송전망이 지나가는 마을의 태양광 사업이고, 주민에게 지속적인 소득이 돌아가게 하려는 것이다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "글에 나온 지원금의 규모는?",
+              "choices": [
+                "가공선로 1킬로미터당 2억 원",
+                "가공선로 1킬로미터당 200억 원",
+                "가공선로 1킬로미터당 20억 원",
+                "마을 한 곳당 20억 원"
+              ],
+              "answer": 2,
+              "explain": "글은 가공선로 1킬로미터당 20억 원이라고 했다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "개정안이 지원금을 두고 새로 정한 내용은?",
+              "choices": [
+                "지원금을 모두 나라가 거두어들인다",
+                "지원금의 3분의 2 이내를 송·변전설비 주변지역에 배분한다",
+                "지원금을 전기 요금을 낮추는 데만 쓴다",
+                "지원금을 마을이 아니라 발전 회사에 준다"
+              ],
+              "answer": 1,
+              "explain": "개정안은 지원금의 3분의 2 이내를 송·변전설비 주변지역에 배분하도록 했다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "vocab",
+              "q": "「입법예고」에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "법을 어긴 사람을 알리는 일",
+                "법을 만드는 사람을 뽑는 일",
+                "이미 정해진 법을 그대로 지키는 일",
+                "규정을 고치기 전에 미리 알리고 의견을 받는 일"
+              ],
+              "answer": 3,
+              "explain": "10월 22일부터 12월 1일까지 입법예고를 하고, 그 기간에 각계의 의견을 받는다고 했다.",
+              "evidencePara": 3
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "「돈이 흐르는 길을 바꾸는 것」이 가리키는 내용으로 알맞은 것은?",
+              "choices": [
+                "지방정부에 가던 지원금의 일부를 설비 주변지역에 배분하는 것",
+                "주민이 전기 요금을 더 많이 내는 것",
+                "발전 회사가 지원금을 받는 것",
+                "마을이 지원금을 돌려주는 것"
+              ],
+              "answer": 0,
+              "explain": "바로 뒤 문장이 지원금의 3분의 2 이내를 송·변전설비 주변지역에 배분하는 내용을 설명한다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "apply",
+              "q": "글에 따를 때, 지금 주민이 할 수 있는 일은?",
+              "choices": [
+                "개정이 끝났으니 기다리기만 한다",
+                "예고 기간에 의견을 낸다",
+                "태양광 설비를 당장 설치해야 한다",
+                "지원금을 직접 받으러 간다"
+              ],
+              "answer": 1,
+              "explain": "규정이 정해지기 전에 의견을 낼 수 있는 기간이라고 했다.",
+              "evidencePara": 3
+            }
+          ],
+          "enseg": [
+            [
+              "The Ministry of Climate, Energy and Environment ",
+              "has announced proposed amendments ",
+              "to the rules that help villages ",
+              "the transmission network passes through. ",
+              "A transmission network is ",
+              "a set of large lines ",
+              "that carry electricity over long distances. ",
+              "One strand of the proposal ",
+              "is solar power projects in those villages. ",
+              "The aim is for residents ",
+              "to receive continuing income."
+            ],
+            [
+              "The method is to change ",
+              "the path that money travels along. ",
+              "Under the special act, ",
+              "local governments that the lines pass through ",
+              "are given support funds. ",
+              "The amount is two billion won ",
+              "for each kilometer of overhead line. ",
+              "The proposal would have ",
+              "up to two-thirds of these funds ",
+              "distributed to the areas ",
+              "around transmission and substation facilities. ",
+              "If the village carries out ",
+              "a solar power project, ",
+              "the installation cost would be reflected first."
+            ],
+            [
+              "Residents are to be supported ",
+              "in taking part in a village solar power project ",
+              "and sharing the generation income together. ",
+              "The Ministry of Climate, Energy and Environment ",
+              "plans to work with local governments ",
+              "and 한국전력공사 (the power corporation) ",
+              "to find pilot projects ",
+              "for grid sunlight income villages. ",
+              "It will look for villages ",
+              "where residents are willing to take part ",
+              "and where conditions such as land ",
+              "and grid connection are in place. ",
+              "The aim is for the rule change ",
+              "to turn into real income for residents."
+            ],
+            [
+              "These rules are not final yet. ",
+              "From October 22 to December 1 ",
+              "there is a period ",
+              "of advance legislative notice. ",
+              "During the notice period, ",
+              "opinions are collected from residents, ",
+              "local governments and others. ",
+              "After that, the ministry plans ",
+              "to complete the amendment ",
+              "through steps such as a review ",
+              "by 법제처 (the government legislation office). ",
+              "It is a period ",
+              "for sending in opinions ",
+              "before the rules are settled."
+            ]
+          ]
+        },
+        "L3": {
+          "title": "지원금이 마을로 내려가는 길",
+          "minutes": 5,
+          "paragraphs": [
+            [
+              "기후에너지환경부가 송전망 주변 마을을 위한 ",
+              "개정안을 내놓았다. ",
+              "‘국가기간 전력망 확충 특별법 시행령’과 ",
+              "관련 고시 2건, ",
+              "‘송·변전설비 입지선정위원회 구성 및 운영 기준’ 일부개정안이다. ",
+              "9월 15일 국무회의에 보고한 ",
+              "‘송전망 건설 수용성 제고방안’의 후속조치다. ",
+              "그간 송전망 주변지역 주민대표 간담회와 ",
+              "대전·금산·안성 등 현장 방문으로 ",
+              "주민 건의를 들어 왔고, ",
+              "이번 개정안에 그 의견을 반영했다."
+            ],
+            [
+              "바뀌는 것은 돈이 흐르는 길이다. ",
+              "특별법에 따라 선로가 지나가는 지방정부에는 ",
+              "지원금이 주어진다. ",
+              "가공선로 1킬로미터당 20억 원이다. ",
+              "개정안은 이 지원금의 3분의 2 이내를 ",
+              "송·변전설비 주변지역에 배분하도록 했다. ",
+              "해당 마을이 태양광 사업을 시행하는 경우에는 ",
+              "설치비용을 우선 반영하도록 했다. ",
+              "주민들이 마을 태양광 사업에 참여해 ",
+              "발전수익을 함께 나눌 수 있게 하려는 것이다."
+            ],
+            [
+              "두 번째는 마을을 직접 찾아 나서는 일이다. ",
+              "기후에너지환경부는 지방정부·한국전력공사와 협력해 ",
+              "‘계통햇빛소득마을’ 선도사업을 발굴할 계획이다. ",
+              "주민의 참여 의향, ",
+              "부지와 계통접속 같은 사업 여건을 ",
+              "갖춘 마을이 대상이다. ",
+              "후보 마을의 사업화 가능성과 ",
+              "예상 수익을 검토하고, ",
+              "사업 구상과 참여 절차 안내를 지원한다. ",
+              "제도개선이 실제 주민 소득으로 ",
+              "이어지게 하려는 것이다."
+            ],
+            [
+              "개정안에는 입지선정 과정을 ",
+              "여는 내용도 함께 담겼다. ",
+              "입지선정위원회를 구성하기 전에 ",
+              "시군구 단위 주민 설명회를 열도록 해, ",
+              "설명회를 두 차례에서 세 차례로 늘리도록 했다. ",
+              "주민의 위원회 참관을 원칙적으로 허용하고, ",
+              "회의자료도 개인정보 등을 제외하고 공개하도록 했다."
+            ],
+            [
+              "다만 이 내용은 아직 예고 단계다. ",
+              "입법예고는 10월 22일부터 ",
+              "12월 1일까지다(행정예고의 경우 11월 11일). ",
+              "이 기간에 주민과 지방정부 등 ",
+              "각계의 의견을 모은 뒤, ",
+              "법제처 심사 같은 절차를 거쳐 ",
+              "개정을 완료할 계획이다. ",
+              "규정이 정해지기 전에 의견을 ",
+              "낼 자리가 열려 있는 기간이다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "후속조치",
+              "easy": "앞서 정한 방안을 실제로 이어 가는 조치",
+              "hanja": "後(뒤 후)+續(이을 속)+措(둘 조)+置(둘 치)"
+            },
+            {
+              "word": "배분",
+              "easy": "몫을 나누어 주는 일",
+              "hanja": "配(나눌 배)+分(나눌 분)"
+            },
+            {
+              "word": "계통접속",
+              "easy": "만든 전기를 전력망에 이어 보내는 일",
+              "hanja": "系(맬 계)+統(거느릴 통)+接(이을 접)+續(이을 속)"
+            },
+            {
+              "word": "참관",
+              "easy": "회의 같은 자리에 가서 지켜보는 일",
+              "hanja": "參(참여할 참)+觀(볼 관)"
+            },
+            {
+              "word": "입법예고",
+              "easy": "법이나 규정을 고치기 전에 미리 알리고 의견을 받는 절차",
+              "hanja": "立(설 립)+法(법 법)+豫(미리 예)+告(알릴 고)"
+            }
+          ],
+          "en": [
+            "The Ministry of Climate, Energy and Environment has announced proposed amendments for villages around transmission networks. They are a proposed amendment to the enforcement decree of 국가기간 전력망 확충 특별법 (the special act on expanding the national core power grid), amendments to two related notifications, and a partial amendment to 송·변전설비 입지선정위원회 구성 및 운영 기준 (the standards for the composition and operation of site selection committees). They are a follow-up measure to 송전망 건설 수용성 제고방안 (the plan to improve public acceptance of transmission network construction), which was reported to 국무회의 (the cabinet meeting) on September 15. The ministry has been hearing requests from residents through meetings with resident representatives from areas around transmission networks and through site visits to Daejeon, Geumsan, Anseong and other places, and it reflected those opinions in this proposal.",
+            "What changes is the path that money travels along. Under the special act, local governments that the lines pass through are given support funds. The amount is two billion won for each kilometer of overhead line. The proposal would have up to two-thirds of these funds distributed to the areas around transmission and substation facilities. If the village in question carries out a solar power project, the installation cost would be reflected first. The aim is for residents to take part in a village solar power project and share the generation income together.",
+            "The second part is going out to find villages directly. The Ministry of Climate, Energy and Environment plans to work with local governments and 한국전력공사 (the power corporation) to find pilot projects for grid sunlight income villages. The targets are villages where residents are willing to take part and where business conditions such as land and grid connection are in place. The ministry will review how feasible a project would be in each candidate village and how much income it might bring, and it will support project planning and guidance on how to take part. The aim is for the rule change to lead to real income for residents.",
+            "The proposal also contains measures that open up the site selection process. Before a site selection committee is formed, a briefing session for residents is to be held at the city, county and district level, so briefing sessions would increase from two to three. Residents would in principle be allowed to observe the committee, and meeting materials would also be disclosed, with personal information and the like left out.",
+            "Still, all of this is at the notice stage. The advance legislative notice runs from October 22 to December 1 (November 11 for the administrative notice). During this period the ministry plans to gather opinions from residents, local governments and others, and then complete the amendment through steps such as a review by 법제처 (the government legislation office). It is a period in which there is room to send in opinions before the rules are settled."
+          ],
+          "envocab": [
+            {
+              "word": "follow-up measure",
+              "ko": "후속조치 (명사구)",
+              "base": "follow-up [ˈfɑːloʊ ʌp] + measure [ˈmeʒər]"
+            },
+            {
+              "word": "distribute",
+              "ko": "배분하다, 나누어 주다 (동사)",
+              "base": "distribute [dɪˈstrɪbjuːt]"
+            },
+            {
+              "word": "grid connection",
+              "ko": "계통접속 (명사구)",
+              "base": "grid [ɡrɪd] + connection [kəˈnekʃn]"
+            },
+            {
+              "word": "observe",
+              "ko": "참관하다, 지켜보다 (동사)",
+              "base": "observe [əbˈzɜːrv]"
+            },
+            {
+              "word": "disclose",
+              "ko": "공개하다 (동사)",
+              "base": "disclose [dɪsˈkloʊz]"
+            },
+            {
+              "word": "candidate",
+              "ko": "후보의, 후보 (명사·형용사)",
+              "base": "candidate [ˈkændɪdeɪt]"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 가장 알맞은 것은?",
+              "choices": [
+                "송전망 건설을 멈추기로 했다",
+                "송전망 주변 마을에 지원금과 태양광 수익이 돌아가도록 제도를 고치는 개정안이 예고됐다",
+                "입지선정위원회를 없애기로 했다",
+                "전기 요금을 올리기로 했다"
+              ],
+              "answer": 1,
+              "explain": "개정안은 지원금의 3분의 2 이내를 송·변전설비 주변지역에 배분하고 마을이 태양광 사업을 하면 설치비용을 우선 반영하도록 해, 주민이 발전수익을 함께 나눌 수 있게 하려는 것이다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "개정안이 지원금에 대해 정한 내용으로 알맞은 것은?",
+              "choices": [
+                "지원금 전액을 주변지역에 배분한다",
+                "지원금의 3분의 1을 주변지역에 배분한다",
+                "지원금의 3분의 2 이내를 송·변전설비 주변지역에 배분한다",
+                "지원금을 한국전력공사에 배분한다"
+              ],
+              "answer": 2,
+              "explain": "개정안은 지원금의 3분의 2 이내를 송·변전설비 주변지역에 배분하도록 했다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "detail",
+              "q": "‘계통햇빛소득마을’ 선도사업에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "기후에너지환경부가 지방정부·한국전력공사와 협력해 발굴할 계획이다",
+                "이미 선정이 끝나 마을 이름이 공개됐다",
+                "주민 참여 의향과 상관없이 정부가 지정한다",
+                "태양광이 아니라 풍력 사업이다"
+              ],
+              "answer": 0,
+              "explain": "글은 기후에너지환경부가 지방정부·한국전력공사와 협력해 선도사업을 발굴할 계획이라고 했다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "vocab",
+              "q": "「배분」의 뜻으로 알맞은 것은?",
+              "choices": [
+                "남김없이 거두어들이는 일",
+                "몫을 나누어 주는 일",
+                "값을 새로 매기는 일",
+                "한곳에 모아 두는 일"
+              ],
+              "answer": 1,
+              "explain": "지원금의 일부를 주변지역에 나누어 주는 것을 배분이라고 한다.",
+              "evidencePara": 1
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "설치비용을 「우선 반영」하도록 한 조항이 노리는 바로 알맞은 것은?",
+              "choices": [
+                "지원금을 되도록 적게 쓰게 하려는 것",
+                "마을이 태양광 사업을 하면 그 설치비용을 배분에서 먼저 헤아리려는 것",
+                "지원금을 지방정부가 자유롭게 쓰도록 하려는 것",
+                "태양광 대신 다른 설비를 세우게 하려는 것"
+              ],
+              "answer": 1,
+              "explain": "해당 마을이 태양광 사업을 시행하는 경우 설치비용을 우선 반영하도록 하고, 주민이 발전수익을 나누게 하려는 것이라고 했다.",
+              "evidencePara": 1
+            },
+            {
+              "type": "apply",
+              "q": "이 글의 설명을 다른 일에 옮겨 볼 때 알맞은 것은?",
+              "choices": [
+                "예고 기간이 끝난 뒤에 의견을 내면 개정에 반영된다",
+                "규정을 바로 시행한 뒤 문제가 생기면 그때 고친다",
+                "규정을 고치기 전에 기간을 두고 의견을 받은 뒤 절차를 거쳐 확정한다",
+                "의견을 받지 않아도 결과는 같다"
+              ],
+              "answer": 2,
+              "explain": "입법예고는 10월 22일부터 12월 1일까지이고, 그 기간에 의견을 모은 뒤 법제처 심사 같은 절차를 거쳐 개정을 완료할 계획이다.",
+              "evidencePara": 4
+            }
+          ],
+          "enseg": [
+            [
+              "The Ministry of Climate, Energy and Environment ",
+              "has announced proposed amendments ",
+              "for villages around transmission networks. ",
+              "They are a proposed amendment ",
+              "to the enforcement decree of 국가기간 전력망 확충 특별법 ",
+              "(the special act on expanding the national core power grid), ",
+              "amendments to two related notifications, ",
+              "and a partial amendment to 송·변전설비 입지선정위원회 구성 및 운영 기준 ",
+              "(the standards for the composition and operation ",
+              "of site selection committees). ",
+              "They are a follow-up measure ",
+              "to 송전망 건설 수용성 제고방안 ",
+              "(the plan to improve public acceptance ",
+              "of transmission network construction), ",
+              "which was reported to 국무회의 (the cabinet meeting) ",
+              "on September 15. ",
+              "The ministry has been hearing requests from residents ",
+              "through meetings with resident representatives ",
+              "from areas around transmission networks ",
+              "and through site visits to Daejeon, ",
+              "Geumsan, Anseong and other places, ",
+              "and it reflected those opinions ",
+              "in this proposal."
+            ],
+            [
+              "What changes is the path ",
+              "that money travels along. ",
+              "Under the special act, ",
+              "local governments that the lines pass through ",
+              "are given support funds. ",
+              "The amount is two billion won ",
+              "for each kilometer of overhead line. ",
+              "The proposal would have ",
+              "up to two-thirds of these funds ",
+              "distributed to the areas ",
+              "around transmission and substation facilities. ",
+              "If the village in question ",
+              "carries out a solar power project, ",
+              "the installation cost would be reflected first. ",
+              "The aim is for residents ",
+              "to take part in a village solar power project ",
+              "and share the generation income together."
+            ],
+            [
+              "The second part is ",
+              "going out to find villages directly. ",
+              "The Ministry of Climate, Energy and Environment ",
+              "plans to work with local governments ",
+              "and 한국전력공사 (the power corporation) ",
+              "to find pilot projects ",
+              "for grid sunlight income villages. ",
+              "The targets are villages ",
+              "where residents are willing to take part ",
+              "and where business conditions ",
+              "such as land and grid connection ",
+              "are in place. ",
+              "The ministry will review ",
+              "how feasible a project would be ",
+              "in each candidate village ",
+              "and how much income it might bring, ",
+              "and it will support project planning ",
+              "and guidance on how to take part. ",
+              "The aim is for the rule change ",
+              "to lead to real income for residents."
+            ],
+            [
+              "The proposal also contains measures ",
+              "that open up the site selection process. ",
+              "Before a site selection committee is formed, ",
+              "a briefing session for residents ",
+              "is to be held ",
+              "at the city, county and district level, ",
+              "so briefing sessions would increase from two to three. ",
+              "Residents would in principle be allowed ",
+              "to observe the committee, ",
+              "and meeting materials would also be disclosed, ",
+              "with personal information and the like left out."
+            ],
+            [
+              "Still, all of this ",
+              "is at the notice stage. ",
+              "The advance legislative notice runs ",
+              "from October 22 to December 1 ",
+              "(November 11 for the administrative notice). ",
+              "During this period the ministry plans ",
+              "to gather opinions from residents, ",
+              "local governments and others, ",
+              "and then complete the amendment ",
+              "through steps such as a review ",
+              "by 법제처 (the government legislation office). ",
+              "It is a period ",
+              "in which there is room ",
+              "to send in opinions ",
+              "before the rules are settled."
+            ]
+          ]
+        },
+        "L4": {
+          "title": "마을 소득과 입지선정, 두 갈래 개정안",
+          "minutes": 6,
+          "paragraphs": [
+            [
+              "기후에너지환경부는 9월 15일 국무회의에 ",
+              "‘송전망 건설 수용성 제고방안’을 보고했다. ",
+              "그 후속조치로 ‘국가기간 전력망 확충 특별법 시행령’과 ",
+              "관련 고시 2건, ",
+              "‘송·변전설비 입지선정위원회 구성 및 운영 기준’ ",
+              "일부개정안을 마련해 ",
+              "10월 22일부터 12월 1일까지 ",
+              "입법예고(행정예고의 경우 11월 11일)한다고 밝혔다. ",
+              "개정안의 중점은 두 가지다. ",
+              "송전망 건설 주변 마을의 태양광 사업으로 ",
+              "주민에게 지속적인 소득이 돌아가도록 ",
+              "지원체계를 정비하는 것, ",
+              "그리고 입지선정 초기부터 ",
+              "주민의 참여와 정보 접근을 확대하는 것이다."
+            ],
+            [
+              "그간 기후에너지환경부는 ",
+              "송전망 주변지역 주민대표 간담회와 ",
+              "대전·금산·안성 등 현장 방문으로 ",
+              "주민 건의를 들어 왔다. ",
+              "이번 개정안에는 현장에서 제기된 ",
+              "주민 의견을 반영했다."
+            ],
+            [
+              "앞의 것은 돈이 흐르는 길을 ",
+              "다시 그리는 일이다. ",
+              "‘국가기간 전력망 확충 특별법’에 따라 ",
+              "선로가 지나가는 지방정부에는 지원금이 주어진다. ",
+              "가공선로 1킬로미터당 20억 원이다. ",
+              "개정안은 이 지원금의 3분의 2 이내를 ",
+              "송·변전설비 주변지역에 배분하도록 하고, ",
+              "해당 마을이 태양광 사업을 시행하는 경우 ",
+              "설치비용을 우선 반영하도록 했다."
+            ],
+            [
+              "개정안의 취지로 내세운 말은 ‘지속적인 소득’이다. ",
+              "주민들이 마을 태양광 사업에 참여해 ",
+              "발전수익을 함께 나눌 수 있도록 지원한다는 것이다. ",
+              "기후에너지환경부는 제도개선이 ",
+              "실제 주민 소득으로 이어지도록 ",
+              "선도사업도 함께 추진한다. ",
+              "지방정부·한국전력공사와 협력해 ",
+              "주민 참여 의향과 부지·계통접속 등 ",
+              "사업 여건을 갖춘 ",
+              "‘계통햇빛소득마을’ 후보를 발굴하고, ",
+              "사업화 가능성과 예상 수익을 검토하며, ",
+              "사업 구상과 참여 절차 안내를 지원할 계획이다."
+            ],
+            [
+              "입지선정 쪽 변화도 함께 담겼다. ",
+              "입지선정위원회 구성 전에 ",
+              "시군구 단위 설명회를 열도록 해 ",
+              "설명회를 두 차례에서 세 차례로 늘리고, ",
+              "주민 참관을 원칙적으로 허용하며, ",
+              "회의자료는 개인정보 등을 제외하고 공개하도록 했다. ",
+              "후보 입지는 원칙적으로 ",
+              "두 곳 이상을 도출해 비교·검토하고, ",
+              "주민이 서면으로 제안한 경과지나 부지도 ",
+              "위원회의 심의·의결을 거쳐 ",
+              "후보 입지가 될 수 있다. ",
+              "후보 경과지를 검토할 때 ",
+              "기존 선로나 다른 신설선로와 철탑을 ",
+              "함께 쓰는 방안을 우선 검토할 수 있도록 ",
+              "명문화한 조항도 들어갔다."
+            ],
+            [
+              "이 모든 것은 아직 예고 단계다. ",
+              "예고는 바꾸려는 규정을 미리 알리고 ",
+              "의견을 받는 기간이다. ",
+              "기후에너지환경부는 이 기간에 ",
+              "주민·지방정부 등 각계 의견을 수렴하고 ",
+              "법제처 심사 등 필요한 절차를 거쳐 ",
+              "하위법령과 고시 개정을 완료할 계획이다. ",
+              "이재식 기후에너지환경부 전력망정책관은 ",
+              "“…전력망이 지역과 상생하는 시설로 ",
+              "자리 잡을 수 있도록 ",
+              "제도적 지원과 현장 소통에 힘쓰겠다”라고 밝혔다."
+            ]
+          ],
+          "vocab": [
+            {
+              "word": "수용성",
+              "easy": "어떤 시설이나 정책을 지역이 받아들이는 정도",
+              "hanja": "受(받을 수)+容(얼굴 용)+性(성품 성)"
+            },
+            {
+              "word": "지원체계",
+              "easy": "돕는 일이 흩어지지 않게 짜 둔 틀",
+              "hanja": "支(지탱할 지)+援(도울 원)+體(몸 체)+系(맬 계)"
+            },
+            {
+              "word": "경과지",
+              "easy": "선로가 지나가는 자리",
+              "hanja": "經(지날 경)+過(지날 과)+地(땅 지)"
+            },
+            {
+              "word": "명문화",
+              "easy": "글로 분명히 적어 두는 일",
+              "hanja": "明(밝을 명)+文(글월 문)+化(될 화)"
+            },
+            {
+              "word": "하위법령",
+              "easy": "법률 아래에서 그 내용을 자세히 정하는 시행령·규칙",
+              "hanja": "下(아래 하)+位(자리 위)+法(법 법)+令(하여금 령)"
+            }
+          ],
+          "en": [
+            "On September 15 the Ministry of Climate, Energy and Environment reported 송전망 건설 수용성 제고방안 (the plan to improve public acceptance of transmission network construction) to 국무회의 (the cabinet meeting). As a follow-up measure, it said it had prepared a proposed amendment to the enforcement decree of 국가기간 전력망 확충 특별법 (the special act on expanding the national core power grid), amendments to two related notifications, and a partial amendment to 송·변전설비 입지선정위원회 구성 및 운영 기준 (the standards for the composition and operation of site selection committees), and that advance legislative notice would run from October 22 to December 1 (November 11 for the administrative notice). The proposal has two points of emphasis: putting the support system in order so that solar power projects in villages around transmission construction bring residents continuing income, and widening residents’ participation and access to information from the early stage of site selection.",
+            "The ministry has been hearing requests from residents through meetings with resident representatives from areas around transmission networks and through site visits to Daejeon, Geumsan, Anseong and other places. Opinions raised at those sites are reflected in this proposal.",
+            "The first point redraws the path that money travels along. Under 국가기간 전력망 확충 특별법 (the special act on expanding the national core power grid), local governments that the lines pass through are given support funds. The amount is two billion won for each kilometer of overhead line. The proposal would have up to two-thirds of these funds distributed to the areas around transmission and substation facilities, and, where the village in question carries out a solar power project, the installation cost would be reflected first.",
+            "The ministry says the aim is “continuing income.” Residents are to be supported in taking part in a village solar power project and sharing the generation income together. So that the rule change leads to real income for residents, the Ministry of Climate, Energy and Environment is also pushing ahead with pilot projects. Working with local governments and 한국전력공사 (the power corporation), it plans to find candidates for grid sunlight income villages where residents are willing to take part and where business conditions such as land and grid connection are in place, to review how feasible a project would be and how much income it might bring, and to support project planning and guidance on how to take part.",
+            "Changes on the site selection side are included as well. Before a site selection committee is formed, a briefing session is to be held at the city, county and district level, so briefing sessions would increase from two to three; residents would in principle be allowed to observe; and meeting materials would be disclosed with personal information and the like left out. Candidate sites are in principle to be drawn up in sets of two or more and compared, and a route or plot that residents propose in writing can also become a candidate site through the committee’s deliberation and resolution. A clause was also added stating in writing that, when candidate routes are reviewed, sharing towers with an existing line or another new line can be examined first.",
+            "All of this is still at the notice stage. A notice is a period in which the rules to be changed are announced in advance and opinions are received. The Ministry of Climate, Energy and Environment plans to gather opinions from residents, local governments and others during this period and, after steps such as a review by 법제처 (the government legislation office), to complete the amendment of the subordinate decree and the notifications. 이재식, 전력망정책관 (power grid policy official) at the Ministry of Climate, Energy and Environment, said the ministry would “… work on institutional support and on-site communication so that the power grid can settle in as a facility that thrives together with the region.”"
+          ],
+          "envocab": [
+            {
+              "word": "emphasis",
+              "ko": "중점, 강조 (명사)",
+              "base": "emphasis [ˈemfəsɪs]"
+            },
+            {
+              "word": "support system",
+              "ko": "지원체계 (명사구)",
+              "base": "support [səˈpɔːrt] + system [ˈsɪstəm]"
+            },
+            {
+              "word": "route",
+              "ko": "경과지, 지나가는 길 (명사)",
+              "base": "route [ruːt]"
+            },
+            {
+              "word": "in writing",
+              "ko": "글로, 서면으로 (부사구)",
+              "base": "writing [ˈraɪtɪŋ]"
+            },
+            {
+              "word": "subordinate decree",
+              "ko": "하위법령 (명사구)",
+              "base": "subordinate [səˈbɔːrdɪnət] + decree [dɪˈkriː]"
+            },
+            {
+              "word": "deliberation",
+              "ko": "심의 (명사)",
+              "base": "deliberation [dɪˌlɪbəˈreɪʃn]"
+            }
+          ],
+          "questions": [
+            {
+              "type": "main",
+              "q": "이 글의 중심 내용으로 가장 알맞은 것은?",
+              "choices": [
+                "송전망 건설을 중단하고 태양광으로 바꾸기로 했다",
+                "입지선정위원회를 주민 투표로 대체하기로 했다",
+                "송전망 주변 마을로 지원금과 발전수익이 흐르도록 지원체계를 고치는 개정안이 예고됐다",
+                "전력망 확충 특별법이 폐지됐다"
+              ],
+              "answer": 2,
+              "explain": "개정안의 중점 가운데 하나가 주변 마을의 태양광 사업으로 주민에게 지속적인 소득이 돌아가도록 지원체계를 정비하는 것이며, 아직 예고 단계다.",
+              "evidencePara": 0
+            },
+            {
+              "type": "detail",
+              "q": "지원금과 관련해 개정안이 정한 내용으로 알맞은 것은?",
+              "choices": [
+                "지원금의 3분의 2 이내를 송·변전설비 주변지역에 배분하고, 마을이 태양광 사업을 하면 설치비용을 우선 반영한다",
+                "지원금을 전액 국고로 돌린다",
+                "지원금을 한국전력공사가 직접 집행한다",
+                "지원금을 가공선로 1킬로미터당 2억 원으로 낮춘다"
+              ],
+              "answer": 0,
+              "explain": "셋째 문단이 배분 비율과 설치비용 우선 반영을 함께 적고 있다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "detail",
+              "q": "입지선정과 관련해 개정안에 담긴 내용이 아닌 것은?",
+              "choices": [
+                "설명회를 두 차례에서 세 차례로 늘린다",
+                "주민 참관을 원칙적으로 허용한다",
+                "후보 입지를 원칙적으로 두 곳 이상 도출한다",
+                "주민 투표로 후보 입지를 최종 결정한다"
+              ],
+              "answer": 3,
+              "explain": "주민이 서면으로 제안한 경과지나 부지는 위원회의 심의·의결을 거쳐 후보가 될 수 있다고 했을 뿐, 주민 투표로 결정한다는 내용은 없다.",
+              "evidencePara": 4
+            },
+            {
+              "type": "vocab",
+              "q": "「하위법령」에 대한 설명으로 알맞은 것은?",
+              "choices": [
+                "법률보다 먼저 만들어지는 규칙",
+                "법률 아래에서 그 내용을 자세히 정하는 시행령·규칙",
+                "지방정부가 혼자 정하는 조례",
+                "법원이 내리는 판결"
+              ],
+              "answer": 1,
+              "explain": "글은 시행령과 고시 개정을 하위법령과 고시 개정이라고 묶어 적고 있다.",
+              "evidencePara": 5
+            },
+            {
+              "type": "critical",
+              "q": "이 글의 내용을 바탕으로 할 때, 알맞게 말한 사람은?",
+              "choices": [
+                "민수: 개정안이 확정돼 11월부터 지원금이 마을로 배분된다",
+                "서연: 계통햇빛소득마을 선도사업 대상지가 이미 모두 정해졌다",
+                "지호: 개정안은 예고 단계이고, 의견 수렴과 법제처 심사 같은 절차가 남아 있다",
+                "다은: 입법예고와 행정예고의 기간이 같다"
+              ],
+              "answer": 2,
+              "explain": "개정안은 아직 예고 단계이고, 주민·지방정부 등 각계 의견을 수렴하고 법제처 심사 등 필요한 절차를 거쳐 개정을 완료할 계획이라고 했다.",
+              "evidencePara": 5
+            }
+          ],
+          "challenge": [
+            {
+              "type": "infer",
+              "q": "「가공선로 1킬로미터당 20억 원」과 「3분의 2 이내」를 함께 놓고 볼 때 알 수 있는 것은?",
+              "choices": [
+                "주변지역에 돌아가는 몫이 마을마다 똑같이 정해져 있다",
+                "주변지역에 돌아가는 몫이 선로 길이에 따라 달라진다",
+                "지원금 전액이 주변지역으로 배분된다",
+                "선로가 길수록 주변지역 몫은 줄어든다"
+              ],
+              "answer": 1,
+              "explain": "지원금은 가공선로 1킬로미터당 20억 원으로 정해지고, 그 가운데 3분의 2 이내가 주변지역에 배분된다. 선로가 길면 지원금이 늘고 주변지역 몫도 함께 늘어난다.",
+              "evidencePara": 2
+            },
+            {
+              "type": "apply",
+              "q": "다른 지역에 비슷한 제도를 만든다고 할 때, 이 개정안의 입지선정 방식을 그대로 옮긴 것은?",
+              "choices": [
+                "후보 자리를 한 곳만 정해 두고 주민에게는 결정한 뒤에 알린다",
+                "후보 자리를 두 곳 이상 뽑아 견주고, 주민이 글로 낸 제안도 위원회 심의를 거쳐 후보에 넣는다",
+                "주민이 글로 낸 제안은 위원회에 올리지 않고 담당 부서가 거른다",
+                "사업이 끝난 뒤에 주민 의견을 한 번 듣는다"
+              ],
+              "answer": 1,
+              "explain": "개정안은 후보 입지를 원칙적으로 두 곳 이상 도출해 비교·검토하고, 주민이 서면으로 제안한 경과지나 부지도 위원회의 심의·의결을 거쳐 후보가 될 수 있게 했다.",
+              "evidencePara": 4
+            }
+          ],
+          "enseg": [
+            [
+              "On September 15 ",
+              "the Ministry of Climate, Energy and Environment ",
+              "reported 송전망 건설 수용성 제고방안 ",
+              "(the plan to improve public acceptance ",
+              "of transmission network construction) ",
+              "to 국무회의 (the cabinet meeting). ",
+              "As a follow-up measure, it said ",
+              "it had prepared a proposed amendment ",
+              "to the enforcement decree of 국가기간 전력망 확충 특별법 ",
+              "(the special act on expanding the national core power grid), ",
+              "amendments to two related notifications, ",
+              "and a partial amendment to 송·변전설비 입지선정위원회 구성 및 운영 기준 ",
+              "(the standards for the composition and operation ",
+              "of site selection committees), ",
+              "and that advance legislative notice would run ",
+              "from October 22 to December 1 ",
+              "(November 11 for the administrative notice). ",
+              "The proposal has two points of emphasis: ",
+              "putting the support system in order ",
+              "so that solar power projects ",
+              "in villages around transmission construction ",
+              "bring residents continuing income, ",
+              "and widening residents’ participation ",
+              "and access to information ",
+              "from the early stage of site selection."
+            ],
+            [
+              "The ministry has been hearing requests from residents ",
+              "through meetings with resident representatives ",
+              "from areas around transmission networks ",
+              "and through site visits to Daejeon, ",
+              "Geumsan, Anseong and other places. ",
+              "Opinions raised at those sites ",
+              "are reflected in this proposal."
+            ],
+            [
+              "The first point redraws ",
+              "the path that money travels along. ",
+              "Under 국가기간 전력망 확충 특별법 ",
+              "(the special act on expanding the national core power grid), ",
+              "local governments that the lines pass through ",
+              "are given support funds. ",
+              "The amount is two billion won ",
+              "for each kilometer of overhead line. ",
+              "The proposal would have ",
+              "up to two-thirds of these funds ",
+              "distributed to the areas ",
+              "around transmission and substation facilities, ",
+              "and, where the village in question ",
+              "carries out a solar power project, ",
+              "the installation cost would be reflected first."
+            ],
+            [
+              "The ministry says the aim ",
+              "is “continuing income.” ",
+              "Residents are to be supported ",
+              "in taking part in a village solar power project ",
+              "and sharing the generation income together. ",
+              "So that the rule change ",
+              "leads to real income for residents, ",
+              "the Ministry of Climate, Energy and Environment ",
+              "is also pushing ahead with pilot projects. ",
+              "Working with local governments ",
+              "and 한국전력공사 (the power corporation), ",
+              "it plans to find candidates ",
+              "for grid sunlight income villages ",
+              "where residents are willing to take part ",
+              "and where business conditions ",
+              "such as land and grid connection ",
+              "are in place, ",
+              "to review how feasible a project would be ",
+              "and how much income it might bring, ",
+              "and to support project planning ",
+              "and guidance on how to take part."
+            ],
+            [
+              "Changes on the site selection side ",
+              "are included as well. ",
+              "Before a site selection committee is formed, ",
+              "a briefing session is to be held ",
+              "at the city, county and district level, ",
+              "so briefing sessions would increase from two to three; ",
+              "residents would in principle be allowed to observe; ",
+              "and meeting materials would be disclosed ",
+              "with personal information and the like left out. ",
+              "Candidate sites are in principle ",
+              "to be drawn up in sets of two or more ",
+              "and compared, ",
+              "and a route or plot ",
+              "that residents propose in writing ",
+              "can also become a candidate site ",
+              "through the committee’s deliberation and resolution. ",
+              "A clause was also added ",
+              "stating in writing that, ",
+              "when candidate routes are reviewed, ",
+              "sharing towers with an existing line ",
+              "or another new line ",
+              "can be examined first."
+            ],
+            [
+              "All of this is still at the notice stage. ",
+              "A notice is a period ",
+              "in which the rules to be changed ",
+              "are announced in advance ",
+              "and opinions are received. ",
+              "The Ministry of Climate, Energy and Environment plans ",
+              "to gather opinions from residents, ",
+              "local governments and others during this period ",
+              "and, after steps such as a review ",
+              "by 법제처 (the government legislation office), ",
+              "to complete the amendment ",
+              "of the subordinate decree and the notifications. ",
+              "이재식, 전력망정책관 (power grid policy official) ",
+              "at the Ministry of Climate, Energy and Environment, ",
+              "said the ministry would ",
+              "“… work on institutional support ",
+              "and on-site communication ",
+              "so that the power grid can settle in ",
+              "as a facility that thrives together with the region.”"
+            ]
           ]
         }
       }
