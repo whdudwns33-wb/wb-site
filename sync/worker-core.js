@@ -260,7 +260,8 @@ async function consultRewardActorHash(kind, credentialHash) {
 async function resolveAuth(env, app, auth) {
   if (!auth || typeof auth !== 'object') return null;
   if (auth.mode === 'task_director' && app === 'task') {
-    return await taskDirectorSession(env, auth.token) ? { scope: 'all' } : null;
+    const account=await taskDirectorSession(env, auth.token);
+    return account ? {scope:'all',...(account.manager_id ? {id:account.manager_id,role:'manager'} : {})} : null;
   }
   if (auth.mode === 'admin') {
     const want = app === 'task' ? env.TASK_ADMIN_SECRET : env.CONSULT_ADMIN_SECRET;

@@ -34,7 +34,7 @@ TASK_DEVICE_PERSISTENT_AFTER = "1784678400000"
 # npx wrangler secret put WB_PARENT_FEEDBACK_SEND_ENABLED --config sync/wrangler.toml
 # 감사 가능한 배포 설정의 관리 담당. 기존 비밀 allowlist와 합쳐 적용한다.
 # 등록된 관리 담당자는 QR 발급을 포함해 동일한 task 관리 권한을 가진다.
-TASK_MANAGER_STAFF_IDS_CONFIG = "84349fea-f2f0-4fc3-b32a-aaef1e466d54,ef0af47e-f9d2-4dfc-bd95-887991ee9479,40b5bce0-da8b-40d6-a3e7-f08993c1c840"
+TASK_MANAGER_STAFF_IDS_CONFIG = "84349fea-f2f0-4fc3-b32a-aaef1e466d54,ef0af47e-f9d2-4dfc-bd95-887991ee9479,40b5bce0-da8b-40d6-a3e7-f08993c1c840,c2320856-e8a4-4c48-aff2-63f9779a0df0"
 # 관리 권한은 동일하지만 출퇴근 로그인을 적용할 직원의 stable ID.
 TASK_WORK_LOGIN_MANAGER_IDS_CONFIG = "40b5bce0-da8b-40d6-a3e7-f08993c1c840"
 

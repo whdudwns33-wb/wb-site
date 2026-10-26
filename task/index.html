@@ -2734,7 +2734,8 @@ async function recoverSyncConflict(auth, error, originalChanges, context) {
       }
       const role = response.authRole;
       if ((auth.mode === 'person' && !['staff', 'manager'].includes(role)) ||
-          (['admin', 'task_director'].includes(auth.mode) && role !== 'admin') || (accessRole && accessRole !== role)) {
+          (auth.mode === 'admin' && role !== 'admin') ||
+          (auth.mode === 'task_director' && !['admin','manager'].includes(role)) || (accessRole && accessRole !== role)) {
         throw Object.assign(new Error('개인 권한을 확인하지 못했습니다'), { status: 403, code: 'AUTH_REQUIRED' });
       }
       if (auth.mode === 'person' && previousRole === 'manager' && role !== 'manager') {
@@ -2965,6 +2966,7 @@ const session = {
   get staffId() { return SAFE_SCOPE_ID; },
   get isStaffLink() { return !!this.staffId; },
   get isManager() {
+    if (!this.isStaffLink && sessionStorage.getItem('wb_task_director')) return sessionStorage.getItem('wb_task_account_role') === 'manager';
     const auth = this.isStaffLink && sync.auth();
     return !!(auth && auth.mode === 'person' && auth.id === this.staffId &&
       sync.personVerified && sync.accessRole === 'manager');
@@ -2976,6 +2978,7 @@ const session = {
     sessionStorage.removeItem('wb_admin');
     const directorToken = sessionStorage.getItem('wb_task_director');
     sessionStorage.removeItem('wb_task_director');
+    sessionStorage.removeItem('wb_task_account_role');
     if (directorToken) directorRequest({ action: 'logout' }, directorToken).catch(() => {});
     sync.accessRole = '';
     resetLessonHandoffs();
@@ -4531,7 +4534,7 @@ function directorPasswordFields() {
     '<button class="btn btn-primary btn-block" data-act="directorpassword">비밀번호 변경</button>';
 }
 function directorLockHtml() {
-  return '<div class="card mt14"><div class="card-title">원장 로그인</div>' +
+  return '<div class="card mt14"><div class="card-title">관리자 로그인</div>' +
     (directorInitialToken ? '<p class="card-sub">초기 비밀번호를 변경해야 업무 화면을 사용할 수 있습니다.</p>' + directorPasswordFields() :
       '<label class="field"><span class="fl">아이디</span><input class="in" id="directorId" autocomplete="username" autocapitalize="none" spellcheck="false"></label>' +
       '<label class="field"><span class="fl">비밀번호</span><input class="in" id="directorPassword" type="password" autocomplete="current-password" maxlength="128"></label>' +
@@ -4545,6 +4548,7 @@ async function directorAction(action, button) {
       const data = await directorRequest({action:'login',loginId:$('#directorId').value.trim(),password:$('#directorPassword').value});
       if (data.mustChange) { directorInitialToken = data.token; render(); return; }
       sessionStorage.setItem('wb_task_director',data.token);
+      sessionStorage.setItem('wb_task_account_role',data.authRole || 'admin');
       directorInitialToken = '';
       session.unlock(); render(); startSyncSession();
     } else if (action === 'directorpassword') {
@@ -4570,7 +4574,7 @@ async function directorAction(action, button) {
   } finally { button.disabled = false; }
 }
 function directorSettingsHtml() {
-  return '<div class="card"><div class="card-title">원장 계정</div><p class="card-sub">비밀번호를 변경하면 기존 로그인과 모든 API 키가 해제됩니다.</p>' + directorPasswordFields() +
+  return '<div class="card"><div class="card-title">관리자 계정</div><p class="card-sub">비밀번호를 변경하면 이 계정의 기존 로그인과 API 키가 해제됩니다.</p>' + directorPasswordFields() +
     '<p id="directorError" role="alert" class="hint"></p><button class="btn btn-ghost btn-block mt14" data-act="logout">로그아웃</button></div>' +
     '<div class="card"><div class="card-title">API · MCP 연결</div><p class="card-sub">업무지시서 원장 권한으로 조회·수정·삭제·발송할 수 있습니다. 키는 90일 후 만료됩니다.</p>' +
     '<p>API: <code>' + esc(SYNC_URL + '/task-api') + '</code><br>MCP: <code>' + esc(SYNC_URL + '/task-mcp') + '</code></p>' +
