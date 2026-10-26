@@ -49,7 +49,7 @@ test('migration is additive, idempotent, and schema mirrors it',()=>{
 test('director account push subscription uses a revocable hashed session without storing its token',async()=>{
   const e=await env(), token='d'.repeat(64), tokenHash=await digest(token);
   e.DB.prepare("INSERT INTO task_director_account(id,login_id,salt,password_hash,must_change) VALUES(1,'synthetic','salt','hash',0)").run();
-  e.DB.prepare("INSERT INTO task_director_sessions VALUES(?,'session','synthetic',1,?,0)").bind(tokenHash,Date.now()+60000).run();
+  e.DB.prepare("INSERT INTO task_director_sessions(token_hash,kind,label,revision,expires_at,revoked) VALUES(?,'session','synthetic',1,?,0)").bind(tokenHash,Date.now()+60000).run();
   const result=await handleTaskPush(e,'task',{auth:{mode:'task_director',token},action:'subscribe',endpoint:endpoint('director-account')},'',{scope:'all'},response);
   assert.equal(result.status,200);
   const stored=e.DB.prepare('SELECT * FROM task_push_subscriptions WHERE staff_id=?').bind('director').first();

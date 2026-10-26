@@ -16,9 +16,30 @@ function equal(a, b) {
 }
 export async function taskDirectorSession(env, token, allowInitial = false) {
   if (typeof token !== 'string' || !/^[a-f0-9]{64}$/.test(token)) return null;
-  const row = await env.DB.prepare('SELECT s.*,a.must_change,a.revision AS current_revision FROM task_director_sessions s JOIN task_director_account a ON a.id=1 WHERE s.token_hash=? AND s.expires_at>? AND s.revoked=0 AND s.revision=a.revision')
-    .bind(await digest(token), Date.now()).first();
-  return row && (allowInitial || !row.must_change) ? row : null;
+  return taskDirectorSessionByHash(env,await digest(token),allowInitial);
+}
+async function managerEligible(env, id) {
+  const ids = new Set([env.TASK_MANAGER_STAFF_IDS,env.TASK_MANAGER_STAFF_IDS_CONFIG].flatMap(value=>String(value || '').split(',').map(x=>x.trim())));
+  if (!ids.has(id)) return false;
+  const row=await env.DB.prepare("SELECT data FROM staff WHERE app='task' AND id=?").bind(id).first();
+  if (!row) return false;
+  try {const staff=JSON.parse(row.data);return !!staff.name && !staff.deleted && (!staff.id || staff.id===id) && (!staff.owner || staff.owner===id);} catch {return false;}
+}
+function accountTarget(managerId) {
+  return managerId ? {table:'task_manager_accounts',column:'staff_id',id:managerId} : {table:'task_director_account',column:'id',id:1};
+}
+async function accountForSession(env,session) {
+  const target=accountTarget(session.manager_id);
+  return env.DB.prepare(`SELECT * FROM ${target.table} WHERE ${target.column}=?`).bind(target.id).first();
+}
+export async function taskDirectorSessionByHash(env, hash, allowInitial=false, now=Date.now()) {
+  if (!/^[a-f0-9]{64}$/.test(hash)) return null;
+  const session=await env.DB.prepare('SELECT * FROM task_director_sessions WHERE token_hash=? AND expires_at>? AND revoked=0').bind(hash,now).first();
+  if (!session) return null;
+  const account=await accountForSession(env,session);
+  if (!account || session.revision!==account.revision || (!allowInitial && account.must_change)) return null;
+  if (session.manager_id && (!account.active || !await managerEligible(env,session.manager_id))) return null;
+  return {...session,must_change:account.must_change,login_id:account.login_id};
 }
 const bearer = request => (request.headers.get('Authorization') || '').replace(/^Bearer /, '');
 export async function handleTaskDirector(request, env, invoke) {
@@ -40,18 +61,22 @@ export async function handleTaskDirector(request, env, invoke) {
   try {
     if (path === '/task-account' && body.action === 'login') {
       if (typeof body.password !== 'string' || body.password.length > 128 || typeof body.loginId !== 'string' || body.loginId.length > 64) return reply({ok:false,error:'로그인 정보를 확인해 주세요'},400);
-      const account = await env.DB.prepare('SELECT * FROM task_director_account WHERE id=1').first();
-      if (!account) return reply({ok:false,error:'원장 계정 설치가 필요합니다'},503);
+      const loginId=body.loginId.trim().normalize('NFC').toLowerCase();
+      let account = await env.DB.prepare('SELECT * FROM task_director_account WHERE id=1').first();
+      if (!account || account.login_id!==loginId) account=await env.DB.prepare('SELECT * FROM task_manager_accounts WHERE login_id=?').bind(loginId).first();
+      if (!account) { await hashPassword(body.password,'unknown-task-account'); return reply({ok:false,error:'아이디 또는 비밀번호가 다릅니다'},401); }
+      const target=accountTarget(account.staff_id);
       if (account.locked_until > Date.now()) return reply({ok:false,error:'5분 후 다시 시도해 주세요'},429);
       const hashed = await hashPassword(body.password, account.salt);
-      if (!equal(hashed,account.password_hash) || body.loginId.trim().toLowerCase() !== account.login_id) {
-        await env.DB.prepare('UPDATE task_director_account SET failures=failures+1,locked_until=CASE WHEN failures>=4 THEN ? ELSE 0 END WHERE id=1 AND revision=?').bind(Date.now()+300000,account.revision).run();
+      if (!equal(hashed,account.password_hash)) {
+        await env.DB.prepare(`UPDATE ${target.table} SET failures=failures+1,locked_until=CASE WHEN failures>=4 THEN ? ELSE 0 END WHERE ${target.column}=? AND revision=?`).bind(Date.now()+300000,target.id,account.revision).run();
         return reply({ok:false,error:'아이디 또는 비밀번호가 다릅니다'},401);
       }
-      await env.DB.prepare('UPDATE task_director_account SET failures=0,locked_until=0 WHERE id=1 AND revision=?').bind(account.revision).run();
+      if (account.staff_id && (!account.active || !await managerEligible(env,account.staff_id))) return reply({ok:false,error:'아이디 또는 비밀번호가 다릅니다'},401);
+      await env.DB.prepare(`UPDATE ${target.table} SET failures=0,locked_until=0 WHERE ${target.column}=? AND revision=?`).bind(target.id,account.revision).run();
       const token=random(), expiresAt=Date.now()+43200000;
-      await env.DB.prepare("INSERT INTO task_director_sessions(token_hash,kind,label,revision,expires_at,revoked) SELECT ?,'session','브라우저',revision,?,0 FROM task_director_account WHERE id=1 AND revision=? AND password_hash=?").bind(await digest(token),expiresAt,account.revision,hashed).run();
-      return reply({ok:true,token,expiresAt,mustChange:!!account.must_change});
+      await env.DB.prepare(`INSERT INTO task_director_sessions(token_hash,kind,label,revision,expires_at,revoked,manager_id) SELECT ?,'session','브라우저',revision,?,0,? FROM ${target.table} WHERE ${target.column}=? AND revision=? AND password_hash=?`).bind(await digest(token),expiresAt,account.staff_id || null,target.id,account.revision,hashed).run();
+      return reply({ok:true,token,expiresAt,mustChange:!!account.must_change,authRole:account.staff_id?'manager':'admin',loginId:account.login_id});
     }
     const token=bearer(request), session=await taskDirectorSession(env,token,path==='/task-account');
     if (!session) return reply({ok:false,error:'로그인이 필요합니다'},401);
@@ -63,24 +88,24 @@ export async function handleTaskDirector(request, env, invoke) {
       }
       if (body.action === 'password') {
         if (typeof body.password !== 'string' || body.password.length<8 || body.password.length>128 || typeof body.currentPassword !== 'string' || body.currentPassword.length>128) return reply({ok:false,error:'새 비밀번호는 8~128자로 입력해 주세요'},400);
-        const account=await env.DB.prepare('SELECT * FROM task_director_account WHERE id=1').first();
+        const account=await accountForSession(env,session), target=accountTarget(session.manager_id);
         if (!equal(await hashPassword(body.currentPassword,account.salt),account.password_hash)) return reply({ok:false,error:'현재 비밀번호가 다릅니다'},401);
         if (body.password === body.currentPassword) return reply({ok:false,error:'다른 비밀번호를 정해 주세요'},400);
         const salt=random(), hashed=await hashPassword(body.password,salt);
-        const result=await env.DB.prepare('UPDATE task_director_account SET salt=?,password_hash=?,must_change=0,revision=revision+1,failures=0,locked_until=0 WHERE id=1 AND revision=?').bind(salt,hashed,session.revision).run();
+        const result=await env.DB.prepare(`UPDATE ${target.table} SET salt=?,password_hash=?,must_change=0,revision=revision+1,failures=0,locked_until=0 WHERE ${target.column}=? AND revision=?`).bind(salt,hashed,target.id,session.revision).run();
         if (!result.meta.changes) return reply({ok:false,error:'계정이 변경되었습니다. 다시 로그인해 주세요'},409);
         return reply({ok:true,loginRequired:true});
       }
       if (session.must_change) return reply({ok:false,error:'먼저 초기 비밀번호를 변경해 주세요'},403);
-      if (body.action === 'keys') return reply({ok:true,keys:(await env.DB.prepare("SELECT token_hash,label,expires_at,revoked FROM task_director_sessions WHERE kind='api' AND revision=? ORDER BY expires_at DESC LIMIT 100").bind(session.revision).all()).results});
+      if (body.action === 'keys') return reply({ok:true,keys:(await env.DB.prepare("SELECT token_hash,label,expires_at,revoked FROM task_director_sessions WHERE kind='api' AND revision=? AND manager_id IS ? ORDER BY expires_at DESC LIMIT 100").bind(session.revision,session.manager_id || null).all()).results});
       if (body.action === 'issue_key') {
         if (typeof body.label !== 'string' || !body.label.trim() || body.label.length>80) return reply({ok:false,error:'키 이름은 1~80자로 입력해 주세요'},400);
         const key=random(), expiresAt=Date.now()+7776000000;
-        await env.DB.prepare("INSERT INTO task_director_sessions VALUES (?,'api',?,?,?,0)").bind(await digest(key),body.label.trim(),session.revision,expiresAt).run();
+        await env.DB.prepare("INSERT INTO task_director_sessions(token_hash,kind,label,revision,expires_at,revoked,manager_id) VALUES (?,'api',?,?,?,0,?)").bind(await digest(key),body.label.trim(),session.revision,expiresAt,session.manager_id || null).run();
         return reply({ok:true,token:key,expiresAt});
       }
       if (body.action === 'revoke_key' && /^[a-f0-9]{64}$/.test(body.tokenHash || '')) {
-        await env.DB.prepare("UPDATE task_director_sessions SET revoked=1 WHERE kind='api' AND token_hash=?").bind(body.tokenHash).run();
+        await env.DB.prepare("UPDATE task_director_sessions SET revoked=1 WHERE kind='api' AND token_hash=? AND manager_id IS ?").bind(body.tokenHash,session.manager_id || null).run();
         return reply({ok:true});
       }
       return reply({ok:false,error:'지원하지 않는 동작'},400);
