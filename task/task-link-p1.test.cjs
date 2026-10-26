@@ -364,7 +364,7 @@ test('managers remain employees for payroll while owners are excluded', () => {
 test('admin screens include staff QR and approval actions', () => {
   assert.match(html, /data-act="qrlink"/);
   assert.match(html, /case 'qrlink'/);
-  assert.match(html, /auth\.mode !== 'admin' && !session\.isManager/);
+  assert.match(html, /!\['admin', 'task_director'\]\.includes\(auth\.mode\) && !session\.isManager/);
   for (const action of ['fbreviewapprove', 'lcreviewapprove', 'bareviewapprove', 'bereviewapprove']) {
     assert.match(html, new RegExp(`case '${action}'`), action);
   }

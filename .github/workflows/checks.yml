@@ -34,6 +34,15 @@ jobs:
       - name: 전체 테스트
         run: node scripts/check.mjs
 
+      - name: 업무지시서·보호자 Worker 번들 점검 (dry-run)
+        run: |
+          node sync/build-task-assets.mjs
+          npx --yes --prefer-offline $WRANGLER deploy --config sync/wrangler.toml --dry-run --outdir=/tmp/wb-sync-bundle
+          if grep -l 'node:' /tmp/wb-sync-bundle/*.js; then
+            echo "::error::업무지시서 Worker 번들에 Node 모듈이 남아 있습니다"
+            exit 1
+          fi
+
       # 배포와 같은 자산을 만든 뒤 번들한다. dry-run 은 시크릿·원격 DB 없이 돈다.
       - name: 진로독서 워커 번들 점검 (dry-run)
         working-directory: reading-server

@@ -6566,3 +6566,16 @@ CREATE TRIGGER IF NOT EXISTS private_chat_read_immutable BEFORE UPDATE ON privat
 BEGIN SELECT RAISE(ABORT,'PRIVATE_CHAT_READ_IMMUTABLE'); END;
 CREATE TRIGGER IF NOT EXISTS private_chat_read_no_delete BEFORE DELETE ON private_chat_reads
 BEGIN SELECT RAISE(ABORT,'PRIVATE_CHAT_READ_IMMUTABLE'); END;
+
+-- 업무지시서 원장 계정: 초기 비밀번호·API 키 원문은 저장하지 않는다.
+CREATE TABLE IF NOT EXISTS task_director_account (
+  id INTEGER PRIMARY KEY CHECK(id=1), login_id TEXT NOT NULL UNIQUE,
+  salt TEXT NOT NULL, password_hash TEXT NOT NULL,
+  must_change INTEGER NOT NULL DEFAULT 1, revision INTEGER NOT NULL DEFAULT 1,
+  failures INTEGER NOT NULL DEFAULT 0, locked_until INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS task_director_sessions (
+  token_hash TEXT PRIMARY KEY, kind TEXT NOT NULL CHECK(kind IN ('session','api')),
+  label TEXT NOT NULL, revision INTEGER NOT NULL, expires_at INTEGER NOT NULL,
+  revoked INTEGER NOT NULL DEFAULT 0
+);

@@ -2020,7 +2020,7 @@ function applyTaskRevocationPage(page, auth, accessRole) {
   }
   const cursor = Number(page.cursor);
   if (page.more && cursor <= previousCursor) throw new Error('TASK_REVOCATION_CURSOR_STALLED');
-  const allScope = !!(auth && auth.mode === 'admin') || accessRole === 'manager';
+  const allScope = !!(auth && ['admin', 'task_director'].includes(auth.mode)) || accessRole === 'manager';
   const removedTaskIds = new Set();
   let removed = 0;
   const rows = page.rows.map(row => {
@@ -2300,6 +2300,8 @@ const sync = {
       const workSession = staffWorkToken();
       return t ? { mode: 'person', id: session.staffId, token: t, ...(workSession ? { workSession } : {}) } : null;
     }
+    const directorToken = sessionStorage.getItem('wb_task_director') || '';
+    if (directorToken) return { mode: 'task_director', token: directorToken };
     const k = state.settings.syncSecret || '';
     return k ? { mode: 'admin', secret: k } : null;
   },
@@ -2393,6 +2395,11 @@ const sync = {
         throw stale;
       }
       if (!d || d.ok !== true) {
+        if (res.status === 401 && body?.auth?.mode === 'task_director') {
+          sessionStorage.removeItem('wb_task_director');
+          sessionStorage.removeItem('wb_admin');
+          render();
+        }
         const error = new Error((d && (d.error || d.message)) || ('HTTP ' + res.status));
         error.status = res.status;
         error.code = String(d && (d.code || d.errorCode || d.reason) || '');
@@ -2470,7 +2477,7 @@ const sync = {
         if (rows.length) pending.push(...rows);
         else state.settings.onboardingCasReconcileVersion = 1;
       };
-      queueOnboardingReconcile(auth.mode === 'admin' || session.isManager);
+      queueOnboardingReconcile(['admin', 'task_director'].includes(auth.mode) || session.isManager);
       let guard = 0, again = true;
       while (again && guard++ < 60) {
         const batch = pending.splice(0, 400);
@@ -2523,7 +2530,7 @@ const sync = {
           reconcileOutstanding = Math.max(0, reconcileOutstanding - batchReconcileCount);
           if (!reconcileOutstanding) state.settings.onboardingCasReconcileVersion = 1;
         }
-        queueOnboardingReconcile(auth.mode === 'admin' || responseAccessRole === 'manager');
+        queueOnboardingReconcile(['admin', 'task_director'].includes(auth.mode) || responseAccessRole === 'manager');
         again = !!d.more || revoked.more || pending.length > 0;
       }
       // 요청 도중에 바뀐 것은 updatedAt이 t0보다 크므로 다음 회차에 올라간다
@@ -2604,7 +2611,7 @@ const sync = {
   /** 장기 bearer 대신 24시간 안에 한 번만 교환할 링크 code를 발급한다. */
   async issueBootstrap(staffId) {
     const auth = this.auth();
-    if (!auth || (auth.mode !== 'admin' && !session.isManager)) throw new Error('관리자 화면에서만 발급할 수 있습니다');
+    if (!auth || (!['admin', 'task_director'].includes(auth.mode) && !session.isManager)) throw new Error('관리자 화면에서만 발급할 수 있습니다');
     return await this.post('/bootstrap', { app: SYNC_APP, auth: auth, staffId: staffId });
   },
 
@@ -2620,7 +2627,7 @@ const sync = {
 
   async revokeAccess(staffId) {
     const auth = this.auth();
-    if (!auth || (auth.mode !== 'admin' && !session.isManager)) throw new Error('관리자 화면에서만 해지할 수 있습니다');
+    if (!auth || (!['admin', 'task_director'].includes(auth.mode) && !session.isManager)) throw new Error('관리자 화면에서만 해지할 수 있습니다');
     return await this.post('/revoke', { app: SYNC_APP, auth: auth, staffId: staffId });
   }
 };
@@ -2689,7 +2696,7 @@ async function recoverSyncConflict(auth, error, originalChanges, context) {
     throw Object.assign(new Error('접속 정보가 바뀌었습니다'), { code: 'SYNC_RECOVERY_AUTH_CHANGED' });
   }
   const previousRole = context ? context.role : currentRole;
-  const archiveRole = auth.mode === 'admin' ? 'admin' : previousRole;
+  const archiveRole = ['admin', 'task_director'].includes(auth.mode) ? 'admin' : previousRole;
   const changes = originalChanges.concat(syncRecoveryLocalChanges());
   const preserve = pending => {
     if (!pending.length) return;
@@ -2727,7 +2734,7 @@ async function recoverSyncConflict(auth, error, originalChanges, context) {
       }
       const role = response.authRole;
       if ((auth.mode === 'person' && !['staff', 'manager'].includes(role)) ||
-          (auth.mode === 'admin' && role !== 'admin') || (accessRole && accessRole !== role)) {
+          (['admin', 'task_director'].includes(auth.mode) && role !== 'admin') || (accessRole && accessRole !== role)) {
         throw Object.assign(new Error('개인 권한을 확인하지 못했습니다'), { status: 403, code: 'AUTH_REQUIRED' });
       }
       if (auth.mode === 'person' && previousRole === 'manager' && role !== 'manager') {
@@ -2967,6 +2974,9 @@ const session = {
   lock() {
     if (managerInspectionActive()) { clearManagerInspection(); return true; }
     sessionStorage.removeItem('wb_admin');
+    const directorToken = sessionStorage.getItem('wb_task_director');
+    sessionStorage.removeItem('wb_task_director');
+    if (directorToken) directorRequest({ action: 'logout' }, directorToken).catch(() => {});
     sync.accessRole = '';
     resetLessonHandoffs();
     if (!this.isStaffLink) return false;
@@ -4504,7 +4514,74 @@ function viewPendingAdd() {
 }
 
 /* ── 잠금 ── */
+let directorInitialToken = '';
+async function directorRequest(body, token = sessionStorage.getItem('wb_task_director') || directorInitialToken) {
+  const response = await fetch(SYNC_URL + '/task-account', {
+    method: 'POST', headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) },
+    body: JSON.stringify(body), signal: AbortSignal.timeout(20000)
+  });
+  const data = await response.json();
+  if (!response.ok || !data.ok) throw new Error(data.error || '계정 요청에 실패했습니다');
+  return data;
+}
+function directorPasswordFields() {
+  return '<label class="field"><span class="fl">현재 비밀번호</span><input class="in" id="directorCurrent" type="password" autocomplete="current-password" maxlength="128"></label>' +
+    '<label class="field"><span class="fl">새 비밀번호 (8자 이상)</span><input class="in" id="directorNew" type="password" autocomplete="new-password" minlength="8" maxlength="128"></label>' +
+    '<label class="field"><span class="fl">새 비밀번호 확인</span><input class="in" id="directorConfirm" type="password" autocomplete="new-password" maxlength="128"></label>' +
+    '<button class="btn btn-primary btn-block" data-act="directorpassword">비밀번호 변경</button>';
+}
+function directorLockHtml() {
+  return '<div class="card mt14"><div class="card-title">원장 로그인</div>' +
+    (directorInitialToken ? '<p class="card-sub">초기 비밀번호를 변경해야 업무 화면을 사용할 수 있습니다.</p>' + directorPasswordFields() :
+      '<label class="field"><span class="fl">아이디</span><input class="in" id="directorId" autocomplete="username" autocapitalize="none" spellcheck="false"></label>' +
+      '<label class="field"><span class="fl">비밀번호</span><input class="in" id="directorPassword" type="password" autocomplete="current-password" maxlength="128"></label>' +
+      '<button class="btn btn-primary btn-block" data-act="directorlogin">로그인</button>') +
+    '<p id="directorError" role="alert" class="hint"></p></div>';
+}
+async function directorAction(action, button) {
+  button.disabled = true;
+  try {
+    if (action === 'directorlogin') {
+      const data = await directorRequest({action:'login',loginId:$('#directorId').value.trim(),password:$('#directorPassword').value});
+      if (data.mustChange) { directorInitialToken = data.token; render(); return; }
+      sessionStorage.setItem('wb_task_director',data.token);
+      directorInitialToken = '';
+      session.unlock(); render(); startSyncSession();
+    } else if (action === 'directorpassword') {
+      if ($('#directorNew').value !== $('#directorConfirm').value) throw new Error('새 비밀번호 확인이 일치하지 않습니다');
+      await directorRequest({action:'password',currentPassword:$('#directorCurrent').value,password:$('#directorNew').value});
+      directorInitialToken = ''; session.lock(); render(); toast('비밀번호가 변경되었습니다. 다시 로그인해 주세요');
+    } else if (action === 'directorkey') {
+      const label = $('#directorKeyLabel').value.trim();
+      const data = await directorRequest({action:'issue_key',label});
+      const output = $('#directorKeyOutput');
+      output.textContent = '한 번만 표시됩니다. 암호 관리자에 보관하세요.\n' + data.token;
+      output.hidden = false;
+    } else if (action === 'directorkeys') {
+      const data = await directorRequest({action:'keys'});
+      $('#directorKeyList').innerHTML = data.keys.filter(key => !key.revoked).map(key => '<div class="row mt8">' + esc(key.label) + ' · ' + esc(new Date(key.expires_at).toLocaleDateString('ko-KR')) + '<button class="btn btn-ghost" data-act="directorrevoke" data-token-hash="' + esc(key.token_hash) + '">해지</button></div>').join('') || '발급된 키가 없습니다.';
+    } else if (action === 'directorrevoke') {
+      await directorRequest({action:'revoke_key',tokenHash:button.dataset.tokenHash});
+      button.parentElement.remove(); toast('키를 해지했습니다');
+    }
+  } catch (error) {
+    const target = $('#directorError');
+    if (target) target.textContent = error.message; else toast(error.message);
+  } finally { button.disabled = false; }
+}
+function directorSettingsHtml() {
+  return '<div class="card"><div class="card-title">원장 계정</div><p class="card-sub">비밀번호를 변경하면 기존 로그인과 모든 API 키가 해제됩니다.</p>' + directorPasswordFields() +
+    '<p id="directorError" role="alert" class="hint"></p><button class="btn btn-ghost btn-block mt14" data-act="logout">로그아웃</button></div>' +
+    '<div class="card"><div class="card-title">API · MCP 연결</div><p class="card-sub">업무지시서 원장 권한으로 조회·수정·삭제·발송할 수 있습니다. 키는 90일 후 만료됩니다.</p>' +
+    '<p>API: <code>' + esc(SYNC_URL + '/task-api') + '</code><br>MCP: <code>' + esc(SYNC_URL + '/task-mcp') + '</code></p>' +
+    '<label class="field"><span class="fl">연결 이름</span><input class="in" id="directorKeyLabel" maxlength="80" placeholder="예: 원장 개인 자동화"></label>' +
+    '<button class="btn btn-primary" data-act="directorkey">키 발급</button> <button class="btn btn-ghost" data-act="directorkeys">발급 목록</button>' +
+    '<pre id="directorKeyOutput" hidden style="white-space:pre-wrap;overflow-wrap:anywhere"></pre><div id="directorKeyList" class="mt14"></div></div>';
+}
 function viewLock() {
+  return directorLockHtml();
+}
+function viewLegacyLock() {
   const first = !state.settings.adminPin;
   return '<div class="card mt14">' +
     '<div class="card-title">' + (first ? '처음 오셨네요 · 관리 비밀번호 설정' : '원장 모드') + '</div>' +
@@ -22858,6 +22935,9 @@ function viewSettings() {
       '<b>자유 입력 내용에 학생 개인정보가 없는지 전달 전에 확인하세요.</b></div>' +
     '<button class="btn btn-navy btn-block" data-act="taskjsonexport">업무지시서 JSON 받기</button>' +
   '</div>';
+  if (!session.isStaffLink && sessionStorage.getItem('wb_task_director')) {
+    return directorSettingsHtml() + backupCard + guardianAnnouncementsHtml() + viewGuardianContactPanel() + viewStudentPortalPanel();
+  }
   if (session.isManager) {
     return '<div class="card">' +
       '<div class="card-title">관리 담당 개인 연결</div>' +
@@ -23874,6 +23954,8 @@ document.addEventListener('click', async ev => {
     case 'acksyncrecovery': acknowledgeSyncRecoveryArchives(); break;
 
     /* 잠금 */
+    case 'directorlogin': case 'directorpassword': case 'directorkey': case 'directorkeys': case 'directorrevoke':
+      directorAction(act, el); break;
     case 'setpin': {
       const v = ($('#pin').value || '').trim();
       if (v.length < 4) return toast('4자리 이상 입력해 주세요');
@@ -26173,6 +26255,8 @@ document.addEventListener('keydown', ev => {
   if (ev.key !== 'Enter') return;
   const t = ev.target;
   if (t.id === 'pin')   document.querySelector('[data-act="setpin"],[data-act="login"]')?.click();
+  if (t.id === 'directorId' || t.id === 'directorPassword') document.querySelector('[data-act="directorlogin"]')?.click();
+  if (t.id === 'directorConfirm') document.querySelector('[data-act="directorpassword"]')?.click();
   if (t.id === 'staffWorkPin') document.querySelector('[data-act="staffworklogin"]')?.click();
   if (t.id === 'managerInspectionPin') document.querySelector('[data-act="managerinspectsubmit"]')?.click();
   if (t.id === 'sName') document.querySelector('[data-act="addstaff"]')?.click();
