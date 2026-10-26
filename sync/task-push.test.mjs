@@ -46,6 +46,22 @@ test('migration is additive, idempotent, and schema mirrors it',()=>{
   assert.doesNotMatch(migration,/DROP|DELETE FROM|UPDATE staff/i);
   const db=new DB();db.sql.exec(migration);db.sql.exec(migration);db.sql.close();
 });
+test('director account push subscription uses a revocable hashed session without storing its token',async()=>{
+  const e=await env(), token='d'.repeat(64), tokenHash=await digest(token);
+  e.DB.prepare("INSERT INTO task_director_account(id,login_id,salt,password_hash,must_change) VALUES(1,'synthetic','salt','hash',0)").run();
+  e.DB.prepare("INSERT INTO task_director_sessions VALUES(?,'session','synthetic',1,?,0)").bind(tokenHash,Date.now()+60000).run();
+  const result=await handleTaskPush(e,'task',{auth:{mode:'task_director',token},action:'subscribe',endpoint:endpoint('director-account')},'',{scope:'all'},response);
+  assert.equal(result.status,200);
+  const stored=e.DB.prepare('SELECT * FROM task_push_subscriptions WHERE staff_id=?').bind('director').first();
+  assert.equal(stored.auth_kind,'admin');assert.equal(stored.auth_hash,'director:'+tokenHash);
+  assert.ok(!JSON.stringify(stored).includes(token));
+  e.DB.prepare('UPDATE task_director_sessions SET revoked=1').run();
+  teacherRequest(e);
+  const originalFetch=globalThis.fetch;
+  globalThis.fetch=()=>{throw new Error('revoked session must not receive push');};
+  try { assert.equal((await dispatchTaskPush(e,Date.now())).accepted,0); }
+  finally {globalThis.fetch=originalFetch;}
+});
 test('push endpoint allows only known HTTPS providers, not redirects or local services',()=>{
   for(const value of ['http://fcm.googleapis.com/wp/a','https://localhost/wp/a','https://fcm.googleapis.com.evil.test/wp/a','https://u:p@fcm.googleapis.com/wp/a','https://fcm.googleapis.com:444/wp/a','https://fcm.googleapis.com/wp/a#x']) assert.equal(safeEndpoint(value),false,value);
   assert.equal(safeEndpoint(endpoint('abc')),true);

@@ -1,0 +1,10 @@
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { hashPassword } from './task-director.js';
+const password=process.env.TASK_INITIAL_PASSWORD;
+if (!password || password.length<4 || password.length>128) throw new Error('TASK_INITIAL_PASSWORD 환경변수가 필요합니다 (4~128자)');
+const salt=crypto.randomUUID(), hash=await hashPassword(password,salt);
+const migration=await readFile(new URL('./migrations/089_task_director.sql',import.meta.url),'utf8');
+await mkdir(new URL('../.private/',import.meta.url),{recursive:true});
+const sql=migration+`\nINSERT OR IGNORE INTO task_director_account(id,login_id,salt,password_hash) VALUES(1,'whdudwns33','${salt}','${hash}');\n`;
+await writeFile(new URL('../.private/task-director-seed.sql',import.meta.url),sql,{mode:0o600});
+console.log('초기 설치 SQL: .private/task-director-seed.sql (기존 계정은 변경하지 않습니다)');

@@ -39,12 +39,13 @@ export async function vapid(env, endpoint, now) {
   return 'vapid t=' + header + '.' + payload + '.' + b64(sig) + ', k=' + env.TASK_PUSH_PUBLIC_KEY;
 }
 export async function handleTaskPush(env, app, body, origin, auth, json) {
-  if (app !== 'task' || !['person','admin'].includes(body.auth?.mode)) {
+  if (app !== 'task' || !['person','admin','task_director'].includes(body.auth?.mode)) {
     return json({ok:false, error:'본인 기기 또는 원장 인증으로 알림을 설정해 주세요'},403,origin);
   }
   if (!await ready(env)) return json({ok:false,error:'요청 알림 서버 준비 중입니다'},503,origin);
-  const staffId = auth.id || 'director', authKind = body.auth.mode;
-  const authHash = await digest(authKind === 'admin' ? body.auth.secret : body.auth.token);
+  const staffId = auth.id || 'director', authKind = body.auth.mode === 'task_director' ? 'admin' : body.auth.mode;
+  const authHash = body.auth.mode === 'task_director' ? 'director:' + await digest(body.auth.token)
+    : await digest(authKind === 'admin' ? body.auth.secret : body.auth.token);
   if (body.action === 'key') return json({ok:true,available:configured(env),
     publicKey:configured(env) ? env.TASK_PUSH_PUBLIC_KEY : ''},200,origin);
   const endpoint = body.endpoint;
@@ -77,6 +78,10 @@ export async function handleTaskPush(env, app, body, origin, auth, json) {
 }
 async function authorized(env, sub, now) {
   if (!sub.active) return false;
+  if (sub.auth_kind === 'admin' && sub.auth_hash.startsWith('director:')) {
+    return !!await env.DB.prepare('SELECT 1 FROM task_director_sessions s JOIN task_director_account a ON a.id=1 WHERE s.token_hash=? AND s.expires_at>? AND s.revoked=0 AND s.revision=a.revision AND a.must_change=0')
+      .bind(sub.auth_hash.slice(9),now).first();
+  }
   if (sub.auth_kind === 'admin') return !!env.TASK_ADMIN_SECRET && sub.auth_hash === await digest(env.TASK_ADMIN_SECRET);
   const staff = await env.DB.prepare("SELECT data FROM staff WHERE app='task' AND id=?").bind(sub.staff_id).first();
   if (!staff) return false;
