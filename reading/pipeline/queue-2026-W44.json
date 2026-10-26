@@ -1,8 +1,8 @@
 {
   "week": "2026-W44",
-  "scannedAt": null,
+  "scannedAt": "2026-10-26",
   "preparedAt": "2026-10-19",
-  "method": "부처 게시판 직접 열람(루틴 v1.9 표) — 퍼플렉시티 쿼터가 두 주째 소진 상태다",
+  "method": "부처 게시판 직접 열람(루틴 v1.9 표) — 퍼플렉시티 쿼터가 **세 주째** 소진 상태다(401 insufficient_quota). 국가유산청(khs.go.kr)·옛 cha.go.kr·산림청(forest.go.kr)은 이 주 내내 응답이 없어(6회 재시도 모두 000) 역사 소재는 우리역사넷으로 돌렸다.",
   "note": "월요일 세션은 기억이 없다. prep 의 절차를 그대로 밟고, 숫자는 실행일에 다시 센다.",
   "prep": {
     "관측": "2026-10-19 W43 머지 직후 직접 셈 — 분야 history 11 · science/society/environment/humanities 각 12. 진로 law 13 / bio·med·env 14 / eng·nat·it·media·biz·hum·edu·art 15. 시사 30/59 = 51%. W43 선정 분야: environment·humanities·science·society. (그날의 관측이지 지침이 아니다 — W44 실행일에 반드시 다시 센다.)",
@@ -25,6 +25,66 @@
   },
   "items": [
     {
+      "id": "gyeongguk-code",
+      "title": "경국대전 — 조선의 만세성법",
+      "category": "history",
+      "careers": [
+        "law",
+        "hum"
+      ],
+      "summary": "원육전·속육전을 거쳐 하나의 통일 법전으로. 전(典)과 록(錄)의 두 단계.",
+      "announced": "우리역사넷 한국사 연대기",
+      "source": "https://contents.history.go.kr/mobile/kc/view.do?levelId=kc_r300100&code=kc_age_30",
+      "status": "written",
+      "selected": true,
+      "note": "history 가 혼자 얇아 1순위였고 law 도 함께 채웠다. khs.go.kr 이 죽어 우리역사넷으로 갔다. levelId 는 검색으로 찾아 curl 로 제목을 확인했다(짐작한 E0002465 는 경북대학교였다)."
+    },
+    {
+      "id": "infodemic-factcheck",
+      "title": "질병관리청–대한예방의학회 감염병 정보 팩트체크 협약",
+      "category": "society",
+      "careers": [
+        "med",
+        "bio"
+      ],
+      "summary": "사실 여부가 확인되지 않은 감염병 정보를 전문가 10인 내외 협의체가 신속 델파이로 검증.",
+      "announced": "질병관리청 보도참고자료 2026-10-23",
+      "source": "https://www.kdca.go.kr/bbs/kdca/42/313024/artclView.do",
+      "status": "written",
+      "selected": true,
+      "note": "문서 종류는 보도자료가 아니라 **보도참고자료**다(붙임 파일명). W43 cpr 과 같은 자리의 오류라 ④-3 에서 다시 잡혔다."
+    },
+    {
+      "id": "argument-writing",
+      "title": "2026년 전국 논증적 글쓰기 대회 시상식",
+      "category": "humanities",
+      "careers": [
+        "edu",
+        "media"
+      ],
+      "summary": "예선 1,523명 중 본선 100명, 수상 13명. 심사는 2025년 발표 <논증적 글쓰기 능력 진단 기준안>에 따랐다.",
+      "announced": "국립국어원 보도자료 2026-10-16 (시상식 10.17)",
+      "source": "https://www.korean.go.kr/front/board/boardStandardView.do?board_id=6&mn_id=183&b_seq=1074",
+      "status": "written",
+      "selected": true,
+      "note": "브리프에 「출처에 심사 기준 다섯 가지가 그대로 적혀 있다」고 잘못 적어 지문 전체에 「다섯」이 23번 들어갔다. 출처는 「… 등의 기준」이고 그나마 대상 수상자 한 명이 충족한 기준을 드는 문장이다 — 루틴 v2.1 로 적었다."
+    },
+    {
+      "id": "grid-sunlight-income",
+      "title": "송전망 주변마을 햇빛소득 — 특별법 시행령 개정안 입법예고",
+      "category": "environment",
+      "careers": [
+        "law",
+        "env"
+      ],
+      "summary": "지방정부 지원금의 3분의 2 이내를 주변지역에 배분, 마을 태양광이면 설치비용 우선 반영. 입지선정 주민참여 확대.",
+      "announced": "기후에너지환경부 보도자료 2026-10-21 (입법예고 10.22~12.1, 행정예고 11.11)",
+      "source": "https://www.mcee.go.kr/home/web/board/read.do?menuId=10598&boardMasterId=939&boardId=1901120",
+      "status": "written",
+      "selected": true,
+      "note": "보도자료 날짜는 게시판 등록일자가 2026-10-21 이다(붙임도 「전력망 10.21」). 10월 22일은 입법예고가 시작되는 날이지 자료 날짜가 아니다."
+    },
+    {
       "id": "content-industry-stats",
       "title": "콘텐츠산업 매출·수출 통계 (KOCCA)",
       "category": "humanities",
@@ -37,7 +97,7 @@
       "source": "",
       "status": "carryover",
       "note": "W35 이월 — humanities 부족 해소용 다음 주 우선 승격, 수치 원문 확인 필요 · W36 이월 · W37 이월 · W38 이월 · W40 도 미사용(8월 말 자료 — 최신성 확인 필요)",
-      "메모": " · W41 정리: 날짜에 매이지 않아 남김 · W41 미사용 · W42 미사용 · W43 미사용"
+      "메모": "· W41 정리: 날짜에 매이지 않아 남김 · W41 미사용 · W42 미사용 · W43 미사용 · W44 미사용"
     },
     {
       "id": "geological-map-100y",
@@ -49,7 +109,7 @@
       "source": "",
       "status": "carryover",
       "note": "다음 주 후보 — 역사·과학 교차, 진로 nat·eng · W37 이월 · W38 이월 · W40 도 미사용(8월 말 자료 — 최신성 확인 필요)",
-      "메모": " · W41 정리: 날짜에 매이지 않아 남김 · W41 미사용 · W42 미사용 · W43 미사용"
+      "메모": "· W41 정리: 날짜에 매이지 않아 남김 · W41 미사용 · W42 미사용 · W43 미사용 · W44 미사용"
     },
     {
       "id": "baekje-record",
@@ -61,7 +121,7 @@
       "source": "",
       "status": "carryover",
       "note": "다음 주 후보 — 이번 주는 humanities 를 라메세움으로 채움 · W37 이월 · W38 이월 · W40 도 미사용(8월 말 자료 — 최신성 확인 필요)",
-      "메모": " · W41 정리: 날짜에 매이지 않아 남김 · W41 미사용 · W42 미사용 · W43 미사용"
+      "메모": "· W41 정리: 날짜에 매이지 않아 남김 · W41 미사용 · W42 미사용 · W43 미사용 · W44 미사용"
     },
     {
       "id": "salt-plants",
@@ -76,7 +136,7 @@
       "source": "https://www.mcee.go.kr/home/web/board/read.do?menuId=10598&boardMasterId=939&boardId=1890320",
       "status": "carryover",
       "note": "다음 주 후보. 보도자료는 전시 안내 위주라 염생식물의 내염 기전은 따로 근거를 찾아야 한다 · W38 이월 · W40 도 미사용(8월 말 자료 — 최신성 확인 필요)",
-      "메모": " · W41 정리: 날짜에 매이지 않아 남김 · W41 미사용 · W42 미사용 · W43 미사용"
+      "메모": "· W41 정리: 날짜에 매이지 않아 남김 · W41 미사용 · W42 미사용 · W43 미사용 · W44 미사용"
     },
     {
       "id": "t1d-siblings",
@@ -91,7 +151,7 @@
       "source": "",
       "status": "hold",
       "note": "보류 — 형제자매 위험 10배라는 결과를 L1(7세~초2)에 실으면 겁을 준다. 다루려면 학년대를 L3·L4로 제한하는 판단이 먼저 필요하다 · W38 이월 · W40 도 미사용(8월 말 자료 — 최신성 확인 필요)",
-      "메모": " · W41 미사용 · W42 미사용 · W43 미사용"
+      "메모": "· W41 미사용 · W42 미사용 · W43 미사용 · W44 미사용"
     },
     {
       "id": "solar-committee",
@@ -107,7 +167,7 @@
       "source": "",
       "status": "hold",
       "note": "보류 — W37 해상풍력발전위원회와 「에너지 위원회 출범」 구조가 겹친다. 한 주 걸러 쓴다 · W38 이월 · W40 도 미사용(8월 말 자료 — 최신성 확인 필요)",
-      "메모": " · W41 미사용 · W42 미사용 · W43 미사용"
+      "메모": "· W41 미사용 · W42 미사용 · W43 미사용 · W44 미사용"
     },
     {
       "id": "jeonseung-craft",
@@ -121,7 +181,7 @@
       "status": "hold",
       "source": "https://www.khs.go.kr/newsBbz/selectNewsBbzView.do?newsItemId=155706377&sectionId=b_sec_1&mn=NS_01_02",
       "note": "W40 스캔에서 본 후보 — 주소는 목록에서 뽑았을 뿐 본문 미확인",
-      "메모": " · W41 미사용 · W42 미사용 · W42 stone-knot-master(석장·매듭장 보유자 인정)로 전승공예 주제를 다뤘다 — 각도를 새로 잡지 않으면 쓰지 않는다 · W43 미사용"
+      "메모": "· W41 미사용 · W42 미사용 · W42 stone-knot-master(석장·매듭장 보유자 인정)로 전승공예 주제를 다뤘다 — 각도를 새로 잡지 않으면 쓰지 않는다 · W43 미사용 · W44 미사용"
     },
     {
       "id": "hoeamsa-symposium",
@@ -134,7 +194,7 @@
       "announced": "국립문화유산연구원·양주시립회암사지박물관 2026-09-18",
       "status": "carryover",
       "note": "한 유적을 세 학문의 틀로 본다는 각도가 좋다. 주소 미확인",
-      "메모": " · W41 미사용 · W42 미사용 · W43 미사용"
+      "메모": "· W41 미사용 · W42 미사용 · W43 미사용 · W44 미사용"
     },
     {
       "id": "household-chem-survey",
@@ -149,7 +209,7 @@
       "status": "carryover",
       "source": "https://www.mcee.go.kr/home/web/board/read.do?menuId=10598&boardMasterId=939&boardId=1894070",
       "note": "생활 밀착 소재. 겁주지 않게 쓰는 것이 관건",
-      "메모": " · W41 미사용 · W42 미사용 · W43 미사용"
+      "메모": "· W41 미사용 · W42 미사용 · W43 미사용 · W44 미사용"
     },
     {
       "id": "dcm-genome",
@@ -163,7 +223,7 @@
       "announced": "질병관리청 2026-09-22",
       "status": "carryover",
       "note": "tb-genome(9-07)과 유전체 각도가 겹칠 수 있다 — 쓰려면 다르게 잡을 것",
-      "메모": " · W41 미사용 · W42 미사용 · W43 미사용"
+      "메모": "· W41 미사용 · W42 미사용 · W43 미사용 · W44 미사용"
     }
   ]
 }
