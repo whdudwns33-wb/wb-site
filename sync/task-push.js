@@ -1,5 +1,6 @@
 // 요청 본문을 푸시 서비스로 보내지 않는다. 기기에는 일반 알림만 표시한다.
 import { deviceCutoff } from './device-policy.js';
+import { taskDirectorSessionByHash } from './task-director.js';
 const DAY = 86400000;
 export async function digest(value) {
   return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))), b => b.toString(16).padStart(2, '0')).join('');
@@ -79,8 +80,7 @@ export async function handleTaskPush(env, app, body, origin, auth, json) {
 async function authorized(env, sub, now) {
   if (!sub.active) return false;
   if (sub.auth_kind === 'admin' && sub.auth_hash.startsWith('director:')) {
-    return !!await env.DB.prepare('SELECT 1 FROM task_director_sessions s JOIN task_director_account a ON a.id=1 WHERE s.token_hash=? AND s.expires_at>? AND s.revoked=0 AND s.revision=a.revision AND a.must_change=0')
-      .bind(sub.auth_hash.slice(9),now).first();
+    return !!await taskDirectorSessionByHash(env,sub.auth_hash.slice(9),false,now);
   }
   if (sub.auth_kind === 'admin') return !!env.TASK_ADMIN_SECRET && sub.auth_hash === await digest(env.TASK_ADMIN_SECRET);
   const staff = await env.DB.prepare("SELECT data FROM staff WHERE app='task' AND id=?").bind(sub.staff_id).first();
