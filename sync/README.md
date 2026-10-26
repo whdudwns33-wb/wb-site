@@ -1,5 +1,9 @@
 # WB 동기화 백엔드 (Cloudflare Workers + D1)
 
+원장 로그인·업무지시서 Cloudflare 자산·관리용 API/MCP는
+[`TASK_DIRECTOR_RUNBOOK.md`](TASK_DIRECTOR_RUNBOOK.md)를 따른다.
+배포 전 `node sync/build-task-assets.mjs`로 기존 parent 자산과 task 자산을 조립한다.
+
 ## 업무지시서 읽기 전용 API·MCP
 
 - `POST /task-export`는 서버 간 연결 전용이다. `Origin`이 없는 요청에서만 동작하며,

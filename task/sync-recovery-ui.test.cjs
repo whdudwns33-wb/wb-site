@@ -101,6 +101,8 @@ function runtime(options = {}) {
     ${recoveryCore}
     const window = { WBSyncRecoveryCore, addEventListener: __addListener, removeEventListener: __removeListener };
     const localStorage = __storage, LS_KEY = __cacheKey;
+    const sessionValues = new Map();
+    const sessionStorage = { getItem: key => sessionValues.get(key) || null, setItem: (key, value) => sessionValues.set(key, String(value)), removeItem: key => sessionValues.delete(key) };
     const SYNC_APP = 'task', SYNC_URL = '/test-api';
     let state = JSON.parse(__initialJSON);
     const now = () => 1000;
