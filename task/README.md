@@ -1,5 +1,12 @@
 # WB 업무지시서 (Work Order & Check)
 
+## Cloudflare · 원장 계정 · 관리용 연결
+
+Cloudflare `/task/` 화면, 서버에서 검증하는 원장 아이디·비밀번호,
+초기 비밀번호 변경, 12시간 로그인과 해지 가능한 90일 API·MCP 키를 추가했다.
+기존 직원 개인 연결과 읽기 전용 MCP는 유지한다.
+설치·배포·사용법: [`sync/TASK_DIRECTOR_RUNBOOK.md`](../sync/TASK_DIRECTOR_RUNBOOK.md).
+
 ## 주간 시간표 (2026-10-22)
 
 주간 플래너는 기본으로 시작 시간순 월~일 표를 표시한다. 기존 업무 완료 체크표는 별도 보기로 유지한다.

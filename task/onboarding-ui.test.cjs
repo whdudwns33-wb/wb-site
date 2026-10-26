@@ -311,7 +311,7 @@ test('new Pages reload reconciles forged CAS state even when normal collect and 
   assert.equal(api.apply([{ table: 'checks', key, data: canonical, authoritative: true }]), 0,
     '이미 확인된 최신 endpoint 응답을 늦은 reconcile 응답으로 되돌리면 안 된다');
   assert.equal(state.checks[key].classroom, 'C');
-  assert.match(run, /queueOnboardingReconcile\(auth\.mode === 'admin' \|\| session\.isManager\)/);
+  assert.match(run, /queueOnboardingReconcile\(\['admin', 'task_director'\]\.includes\(auth\.mode\) \|\| session\.isManager\)/);
   assert.match(run, /state\.settings\.onboardingCasReconcileVersion = 1/);
 });
 

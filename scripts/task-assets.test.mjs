@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { readFileSync, readdirSync, existsSync } from 'node:fs';
+execFileSync(process.execPath,['sync/build-task-assets.mjs']);
+assert.equal(readFileSync('sync/dist/index.html','utf8'),readFileSync('parent/index.html','utf8'));
+assert.equal(readFileSync('sync/dist/_headers','utf8'),readFileSync('parent/_headers','utf8'));
+assert.equal(readFileSync('sync/dist/task/index.html','utf8'),readFileSync('task/index.html','utf8'));
+assert.ok(existsSync('sync/dist/task/request-sw.js'));
+for(const file of readdirSync('sync/dist',{recursive:true})) assert.doesNotMatch(file,/(?:\.test\.|\.mjs$|\.cjs$|\.sql$|\.toml$|README|AGENTS|private-names|\.private|\.git)/);
+console.log('task assets: parent preserved, task runtime present, source/test/private files excluded');

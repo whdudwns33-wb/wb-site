@@ -95,6 +95,7 @@ import { handleAdminDirective } from './admin-directive.js';
 import { handleTeacherLiveRequest } from './teacher-live-request.js';
 import { handleCenterChat } from './center-chat.js';
 import { handleTaskExport } from './task-export.js';
+import { taskDirectorSession } from './task-director.js';
 import { handlePrivateChat } from './private-chat.js';
 import { handleSelfIdentity } from './self-identity.js';
 import { handleTaskPush, dispatchTaskPush } from './task-push.js';
@@ -258,6 +259,9 @@ async function consultRewardActorHash(kind, credentialHash) {
 
 async function resolveAuth(env, app, auth) {
   if (!auth || typeof auth !== 'object') return null;
+  if (auth.mode === 'task_director' && app === 'task') {
+    return await taskDirectorSession(env, auth.token) ? { scope: 'all' } : null;
+  }
   if (auth.mode === 'admin') {
     const want = app === 'task' ? env.TASK_ADMIN_SECRET : env.CONSULT_ADMIN_SECRET;
     if (!want || !safeEqual(auth.secret, want)) return null;

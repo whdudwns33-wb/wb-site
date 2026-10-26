@@ -248,7 +248,9 @@ test('직원 앱은 알림톡과 별도 웹앱 동의를 받고 1회 초대 링�
 });
 
 test('보호자 정적 자산은 Worker 별도 origin과 실제 응답 보안 헤더를 사용한다', () => {
-  assert.match(wrangler, /\[assets\][\s\S]*directory\s*=\s*"\.\.\/parent"/);
+  assert.match(wrangler, /\[assets\][\s\S]*directory\s*=\s*"dist"/);
+  const taskBuild = fs.readFileSync(path.join(__dirname, '../sync/build-task-assets.mjs'), 'utf8');
+  assert.match(taskBuild, /copy\(path\.join\(root,'parent'\),out\)/);
   assert.match(wrangler, /binding\s*=\s*"ASSETS"/);
   assert.match(wrangler, /run_worker_first\s*=\s*true/);
   assert.match(headers, /frame-ancestors 'none'/);
