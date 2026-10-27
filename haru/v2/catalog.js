@@ -54,6 +54,7 @@
     for (const school of data.schoolGuides) {
       if (!data.directory.some(d => d.id === school.id) || school.year !== data.educationYear || !sources.has(school.source) || school.notices.some(id => !sources.has(id))) throw new Error('학교별 안내 출처 오류');
       if (!school.tracks.length || school.tracks.some(t => !t.name || !t.target || !t.documents) || !school.preparation.length) throw new Error('학교별 준비 안내 오류');
+      if (!Array.isArray(school.followup) || !school.followup.length || school.followup.some(s => !s.title || !s.text || !sources.has(s.source))) throw new Error('등록·예비소집 출처 오류');
       for (const e of school.events) if (instant(e.end) < instant(e.start)) throw new Error('학교별 일정 오류');
     }
     if (!/^0\d{1,2}-\d{3,4}-\d{4}$/.test(data.contact.phone)) throw new Error('상담 전화 오류');
