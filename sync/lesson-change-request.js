@@ -450,6 +450,12 @@ export async function handleLessonChangeReview(env, app, body, origin, auth, jso
       const patch = {};
       LESSON_CHANGE_FIELDS.forEach(key => { if (Object.prototype.hasOwnProperty.call(changes, key)) patch[key] = changes[key]; });
       changedFields = Object.keys(patch).filter(key => JSON.stringify(taskData[key] || '') !== JSON.stringify(patch[key] || ''));
+      if (changedFields.some(key => ['days','time','repeat'].includes(key))) {
+        const records = await env.DB.prepare('SELECT k FROM checks WHERE app=? AND substr(k,1,?)=? LIMIT 1')
+          .bind(app, current.task_id.length + 1, current.task_id + '|').all();
+        if (records.results?.length) return json({ ok: false, code: 'LESSON_HISTORY_PROTECTED',
+          error: '저장된 수업 기록이 있습니다. 수업 등록 및 변경에서 변경 적용일을 지정해 시간표를 수정해 주세요' }, 409, origin);
+      }
       details = {
         before: Object.fromEntries(changedFields.map(key => [key, taskData[key] == null ? '' : taskData[key]])),
         after: Object.fromEntries(changedFields.map(key => [key, patch[key] == null ? '' : patch[key]]))

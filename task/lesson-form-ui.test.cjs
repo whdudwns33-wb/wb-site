@@ -63,7 +63,8 @@ test('guardian publication editor activates only for an allowed assigned stable-
 test('lesson edits send sourceTaskId as top-level optimistic-update metadata', () => {
   assert.match(html, /_sourceTaskId: t\.id, _sourceUpdatedAt: Number\(t\.updatedAt \|\| 0\)/);
   assert.match(html,
-    /sync\.post\('\/lesson-create', \{[\s\S]{0,220}sourceTaskId: draft\._sourceTaskId \|\| undefined,[\s\S]{0,180}expectedUpdatedAt:[\s\S]{0,120}lesson: lessonPreviewPayload/);
+    /sync\.post\('\/lesson-create', \{[\s\S]{0,220}sourceTaskId: draft\._sourceTaskId \|\| undefined,[\s\S]{0,180}expectedUpdatedAt:[\s\S]{0,240}lesson: draft\._sourceTaskId \? Object\.assign\(\{\}, lessonPreviewPayload/);
+  assert.match(html, /scheduleSlots: \(lessonPreviewPayload\.scheduleSlots \|\| \[\]\)\.filter\(slot => !slot\.validTo \|\| slot\.validTo >= draft\.effectiveDate\)/);
   const previewStart = html.indexOf('function previewLessonRegistration()');
   const previewEnd = html.indexOf('function applyCreatedLesson(', previewStart);
   const preview = html.slice(previewStart, previewEnd);
