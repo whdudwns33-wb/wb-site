@@ -1,0 +1,8 @@
+name = "wb-haru-api"
+main = "haru-staff-worker.mjs"
+compatibility_date = "2026-08-01"
+workers_dev = true
+
+[[kv_namespaces]]
+binding = "DB"
+id = "7c7f971952b449fdadf616ef94ef73d1"
