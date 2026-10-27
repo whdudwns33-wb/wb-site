@@ -140,10 +140,27 @@ jobs:
           fi
           printf '%s' "$PORTAL_READ_KEY" | npx --yes --prefer-offline $WRANGLER secret put WB_SALESDESK_READ_KEY
 
+      - name: 통합 고객 카드 읽기 키 등록 (있을 때만)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          ACADEMY_KEY: ${{ secrets.WB_ACADEMY_READ_KEY }}
+          CS_KEY: ${{ secrets.WB_CS_READ_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -n "${ACADEMY_KEY:-}" ]; then
+            [[ "$ACADEMY_KEY" =~ ^[A-Za-z0-9_-]{43,128}$ ]] || { echo '::error::학원 읽기 키 형식을 확인하세요.'; exit 1; }
+            printf '%s' "$ACADEMY_KEY" | npx --yes --prefer-offline $WRANGLER secret put WB_ACADEMY_READ_KEY
+          fi
+          if [ -n "${CS_KEY:-}" ]; then
+            [[ "$CS_KEY" =~ ^[A-Za-z0-9_-]{43,128}$ ]] || { echo '::error::CS 읽기 키 형식을 확인하세요.'; exit 1; }
+            printf '%s' "$CS_KEY" | npx --yes --prefer-offline $WRANGLER secret put WB_CS_READ_KEY
+          fi
+
       - name: 상태 확인
         run: |
           set -euo pipefail
           sleep 5
           curl -fsS https://wb-crm.whdudwns33.workers.dev/api/health
           echo
-          echo "배포 완료 — https://wb-crm.whdudwns33.workers.dev/ 에서 관리자 비밀번호를 만들면 시작됩니다."
+          echo "배포 완료 — 기존 원장 로그인으로 확인합니다."

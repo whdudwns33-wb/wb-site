@@ -24,7 +24,7 @@ const ui = {
   pipe: 'inspection', q: '', status: 'open', channel: '', owner: '', phoneShown: {}, ym: C.ymOf(C.ymdOf(new Date())),
   listPipeline: '', listStage: '', listFollowup: '', listSort: 'newest', listView: 'open', listPage: 1, listPageSize: 25,
   hs: { status: null, pipelines: null, suggested: null, props: null, queue: [], counts: null, busy: '', err: '', filter: 'pending', map: null },
-  leadQueue: {}, portal: {}, leadConflicts: {}, linkBusy: false, detect: null,
+  leadQueue: {}, portal: {}, customerCards: {}, leadConflicts: {}, linkBusy: false, detect: null,
   relationships: { tab: 'friend', q: '', month: C.ymOf(C.ymdOf(new Date())), status: '' }
 };
 const boot = { health: null, err: '', busy: false };
@@ -142,7 +142,7 @@ async function api(path, body, opts) {
 function onAuthLost() {
   if (!session && !getToken()) return;
   closeModal(true);
-  ui.portal = {}; ui.leadConflicts = {}; setLeadView('open');
+  ui.portal = {}; ui.customerCards = {}; ui.leadConflicts = {}; setLeadView('open');
   resetHubspotUi();
   setToken(''); session = null; stopPolling(); outbox.clear(); state = C.emptyState(); route = 'login'; render(); toast('다시 로그인해 주세요');
 }
@@ -263,10 +263,11 @@ async function afterAuth() {
   session = makeSession(me); boot.err = '';
   await loadAll();
   startPolling();
+  if (customerSourceReference(location.hash)) { await openCustomerSource(); return; }
   applyRoute(C.routeOf(location.hash));
   render();
   if (route === 'hubspot') loadHubspotPanel();
-  if (route === 'lead' && leadId) loadPortalLink(leadId);
+  if (route === 'lead' && leadId) { loadPortalLink(leadId); loadCustomerCard(leadId); }
 }
 function applyRoute(r) {
   route = r.route === 'login' ? 'today' : r.route;
@@ -285,9 +286,10 @@ function onHash() {
   const r = C.routeOf(location.hash);
   if (r.code) { linkExchange(r.code); return; }
   if (!session) { route = 'login'; render(); return; }
+  if (customerSourceReference(location.hash)) { openCustomerSource(); return; }
   applyRoute(r);
   if (route === 'hubspot') loadHubspotPanel();
-  if (route === 'lead' && leadId) { loadLeadQueue(leadId); loadPortalLink(leadId); }
+  if (route === 'lead' && leadId) { loadLeadQueue(leadId); loadPortalLink(leadId); loadCustomerCard(leadId); }
   render();
 }
 async function linkExchange(code) {
@@ -344,7 +346,7 @@ async function doLogout() {
   if (unsaved && !confirm('저장되지 않은 변경 ' + unsaved + '건이 있습니다. 그래도 로그아웃할까요?')) return;
   try { await api('/api/logout', {}); } catch (e) { /* 토큰은 버린다 */ }
   setToken(''); session = null; stopPolling(); outbox.clear(); state = C.emptyState();
-  ui.portal = {}; ui.leadConflicts = {}; setLeadView('open');
+  ui.portal = {}; ui.customerCards = {}; ui.leadConflicts = {}; setLeadView('open');
   resetHubspotUi();
   await loadHealth(); route = 'login'; history.replaceState(null, '', '#/login'); render();
 }
@@ -576,6 +578,7 @@ function viewLead(id) {
   const hs = l.hubspot || {};
   const dis = C.daysInStage(l, t);
   let h = '<div class="row mb8"><button class="btn btn-sm btn-ghost" data-act="back">‹ 뒤로</button></div>';
+  if (session.canApprove) h += '<section class="card customer-card mb8" id="customer-card" aria-label="통합 고객 카드">' + customerCardHtml(id) + '</section>';
   h += '<div class="lead-layout"><section class="card lead-profile" aria-label="고객 정보"><div class="between wraprow"><div><h1 class="page">' + esc(l.name) + ' <span class="muted small">' + esc(C.RELATION_HONORIFIC[l.relation] || '') + '</span></h1>' + (l.child && l.child.name ? '<p class="card-sub">' + esc(l.child.name) + (l.child.grade ? ' · ' + esc(l.child.grade) : '') + '</p>' : '') +
     '<div class="row wraprow mt8">' + (l.hot && l.status === 'open' ? '<span class="pill hot">HOT</span>' : '') + '<span class="pill acc">' + esc(C.PIPELINE_LABEL[l.pipeline]) + '</span><span class="pill">' + esc(C.stageLabel(l.pipeline, l.stage)) + (dis !== null ? ' · ' + dis + '일' : '') + '</span>' + statusPill(l) + '<span class="tag">' + esc(l.channel) + (l.channelNote ? ' · ' + esc(l.channelNote) : '') + '</span></div></div>' +
     '<div class="row wraprow"><button class="btn btn-sm btn-ghost" data-act="edit-lead" data-id="' + esc(id) + '">정보 수정</button></div></div>';
@@ -642,6 +645,137 @@ function viewLead(id) {
   h += '</section>' + nextHtml + '</aside></div>';
   if (session.canApprove) h += '<div class="right"><button class="btn btn-sm btn-danger" data-act="delete-lead" data-id="' + esc(id) + '">고객 삭제</button></div>';
   return h;
+}
+const CUSTOMER_RESOURCE_LABELS = {attendance:'출결',checkins:'등하원',charges:'청구',payments:'수납',lessons:'수업'};
+const CUSTOMER_CS_STAGE_LABELS = {new:'접수',inProgress:'처리 중',waiting:'고객 확인 대기',resolved:'해결',closed:'종료',unknown:'미확인'};
+function customerRecordStatus(value) {
+  return {in:'등원',out:'하원',present:'출석',attended:'출석',absent:'결석',late:'지각',excused:'공결',active:'재원',inactive:'비활성',enrolled:'재원',withdrawn:'퇴원',paid:'수납 완료',pending:'대기',cancelled:'취소',canceled:'취소',draft:'초안',unpaid:'미수납',completed:'완료',scheduled:'예정'}[value] || value || '상태 미제공';
+}
+function customerSourceReference(hash) {
+  const m = /^#\/source\/(manager|blended|thinking|english|reading|center)\/([A-Za-z0-9_-]{1,160})$/.exec(hash || '');
+  return m ? {appId:m[1],sourceId:m[2]} : null;
+}
+async function openCustomerSource() {
+  const ref = customerSourceReference(location.hash), who = session, expectedHash = location.hash;
+  if (!ref || !who) return;
+  try {
+    if (!who.canApprove) throw new Error('통합 고객 카드는 원장 전용입니다');
+    const r = await api('/api/customer-card/resolve?appId=' + ref.appId + '&sourceId=' + encodeURIComponent(ref.sourceId));
+    if (session !== who || location.hash !== expectedHash) return;
+    applyRoute({route:'lead',id:r.leadId}); render(); loadLeadQueue(r.leadId); loadPortalLink(r.leadId); loadCustomerCard(r.leadId);
+  } catch(e) { if (session === who && location.hash === expectedHash) { applyRoute({route:'leads'}); render(); toast(e.message); } }
+}
+const CUSTOMER_STATUS_LABELS = {connected:'원본 확인',unavailable:'조회 실패 · 미확인',not_configured:'인증 연결 대기',unlinked:'고객 연결 없음',disconnected:'연결 해제'};
+function customerCardHtml(id) {
+  const p = ui.customerCards[id] || {}, d = p.data, preview = p.preview || {};
+  let h = '<div class="between wraprow"><h2 class="card-title">통합 고객 카드</h2><button class="btn btn-sm btn-ghost" data-act="customer-load" data-id="' + esc(id) + '"' + (p.busy ? ' disabled' : '') + '>다시 조회</button></div><p class="hint">보호자와 자녀별 학원·센터·CS 원본을 한곳에서 확인합니다. 원본은 각 앱에 유지하며 총괄·하위의 인원과 금액을 합산하지 않습니다.</p>';
+  if (p.err) h += '<p class="banner bad" role="alert">' + esc(p.err) + (d ? ' 이전 조회 내용을 표시합니다.' : '') + '</p>';
+  if (!d) return h + '<p role="status">' + (p.busy ? '연결과 원본을 조회하고 있습니다.' : '아직 조회하지 않았습니다.') + '</p>';
+  h += '<p class="small">확인 시각 ' + esc(new Date(d.checkedAt).toLocaleString('ko-KR')) + ' · 원장 전용</p>';
+  h += '<p>' + esc(leadById(id)?.name || '현재 고객') + ' · 가족 대상 ' + d.members.length + '명 · 원본 연결 ' + d.sources.filter(s=>s.active).length + '개</p><div class="customer-members">';
+  d.members.forEach(function(m) {
+    h += '<section class="customer-member"><h3>' + esc(m.name) + ' <span class="small muted">' + (m.kind === 'child' ? '자녀' : '성인') + '</span></h3>';
+    const sources = d.sources.filter(s => s.memberId === m.id);
+    if (!sources.length) h += '<p class="hint">연결된 원본이 없습니다. 이름으로 자동 병합하지 않습니다.</p>';
+    sources.forEach(function(s) {
+      h += '<div class="customer-source"><h4>' + esc(d.apps[s.appId].name) + '</h4><p><span class="tag">' + esc(CUSTOMER_STATUS_LABELS[s.status] || '미확인') + '</span> ' + (s.student ? esc(s.student.name + ' · ' + s.student.grade + ' · ' + customerRecordStatus(s.student.status)) : '') + '</p>';
+      if (s.status === 'connected' && s.records) Object.keys(s.records).forEach(function(kind) {
+        const r = s.records[kind];
+        h += '<details><summary>' + esc(CUSTOMER_RESOURCE_LABELS[kind] || kind) + ' · ' + (r.status === 'connected' ? r.total + '건' : '미확인') + '</summary>';
+        if (r.items) h += '<ul>' + r.items.map(v => '<li>' + esc(v.date || v.receivedDate || v.createdAt || '일시 미제공') + ' · ' + esc(customerRecordStatus(v.status || v.state || v.direction)) + ((v.amount !== undefined || v.total !== undefined) ? ' · ' + esc(fmtWon(v.amount === undefined ? v.total : v.amount)) : '') + '</li>').join('') + '</ul>' + (r.more ? '<p class="hint">원본 ID순 최대 20건 요약입니다. 나머지는 원본 앱에서 확인하세요.</p>' : '');
+        h += '</details>';
+      });
+      if (s.summary) h += '<p class="small">친구맺기 ' + esc(PORTAL_FRIEND_LABEL[s.summary.membership.friend] || '미확인') + ' · 서포터즈 ' + esc(PORTAL_SUPPORTER_LABEL[s.summary.membership.supporter] || '미확인') + ' · 센터 후속 미완료 ' + s.summary.cs.pendingCount + '건 · 브런치 참석 ' + s.summary.brunch.attendedCount + '회</p>';
+      h += '<p><a href="' + esc(s.url || d.apps[s.appId].url) + '" target="_blank" rel="noopener noreferrer">원본 앱에서 확인</a></p><details><summary>연결 정보</summary><p>원본 ID ' + esc(s.sourceId) + '</p>';
+      if (s.active) h += '<button class="btn btn-sm btn-ghost" data-act="customer-unlink" data-id="' + esc(id) + '" data-link="' + esc(s.id) + '">조회 연결 해제</button>';
+      h += '</details></div>';
+    });
+    h += '</section>';
+  });
+  h += '</div>';
+  const cs = d.cs;
+  h += '<section><h3>보호자 기준 CS</h3><p class="hint">같은 보호자의 문의이며 자녀가 확정되지 않은 건을 특정 자녀 이력으로 합치지 않습니다.</p>';
+  if (cs.status === 'connected') h += '<p>앱에 등록된 CS ' + cs.total + '건' + (cs.more ? ' · 최대 20건 표시' : '') + '</p><ul>' + cs.items.map(r => '<li><a href="' + esc(r.url) + '" target="_blank" rel="noopener noreferrer">' + esc(r.category + ' · ' + (CUSTOMER_CS_STAGE_LABELS[r.stage] || '단계 미확인') + ' · ' + (d.apps[r.organization]?.name || '기관 미지정')) + '</a> · ' + esc(r.assigneeName || '미배정') + ' · ' + esc({urgent:'긴급',high:'높음',normal:'보통',low:'낮음'}[r.priority] || '미확인') + (r.dueDate ? ' · 기한 ' + esc(r.dueDate) : '') + ' · ' + esc(new Date(r.createdAt).toLocaleDateString('ko-KR')) + '</li>').join('') + '</ul>';
+  else h += '<p role="status">' + esc(CUSTOMER_STATUS_LABELS[cs.status] || '미확인') + '</p>';
+  h += '<a href="https://cs.wbcowork.com/institutions" target="_blank" rel="noopener noreferrer">메인 CS 열기</a></section>';
+  const events = customerCardEvents(id, d);
+  h += '<details class="mt8"><summary>통합 이력 · 조회된 기록 ' + events.length + '건</summary><p class="hint">원본별 조회 묶음을 시간순으로 모은 최대 100건입니다. 전체 이력은 각 원본에서 확인하세요. 업무일·생성·수정 시각을 구분하고 원본이 없는 시각을 추정하지 않습니다.</p><ol>' + events.map(e => '<li><strong>' + esc(e.dateLabel) + '</strong> · ' + esc(e.source + ' · ' + e.person + ' · ' + e.label) + '</li>').join('') + '</ol></details>';
+  h += '<details><summary>가족 대상 추가 · 원본 연결 관리</summary><p class="hint">대상 이름은 이 카드의 구분용입니다. 원본 고객 정보를 수정하지 않습니다.</p><div class="row wraprow"><label>대상 이름<input id="cc-member-name" maxlength="40" autocomplete="off"></label><label>구분<select id="cc-member-kind"><option value="child">자녀</option><option value="adult">성인</option></select></label><button class="btn btn-sm" data-act="customer-member" data-id="' + esc(id) + '">가족 대상 추가</button></div>';
+  if (d.members.length) {
+    h += '<div class="row wraprow mt8"><label>연결 대상<select id="cc-member">' + d.members.map(m => '<option value="' + esc(m.id) + '"' + (m.id === preview.memberId ? ' selected' : '') + '>' + esc(m.name) + '</option>').join('') + '</select></label><label>원본 앱<select id="cc-app">' + Object.keys(d.apps).map(k => '<option value="' + esc(k) + '"' + (k === preview.appId ? ' selected' : '') + '>' + esc(d.apps[k].name) + '</option>').join('') + '</select></label><label>원본 학생·고객 ID<input id="cc-source" maxlength="160" autocomplete="off" value="' + esc(preview.sourceId || '') + '"></label><button class="btn btn-sm" data-act="customer-preview" data-id="' + esc(id) + '">원본 먼저 조회</button></div>';
+    if (p.preview) {
+      const v = p.preview;
+      h += '<div class="banner mt8"><p>연결 전: 미연결 → 연결 후: ' + esc(v.memberName + ' / ' + d.apps[v.appId].name + ' / ' + v.sourceId) + '</p><p>원본: ' + esc(v.source.student ? v.source.student.name + ' · ' + v.source.student.grade : '센터 고객번호 ' + v.sourceId + ' · 원본 화면에서 신원을 직접 확인해야 합니다') + '</p><a href="' + esc(v.source.url) + '" target="_blank" rel="noopener noreferrer">원본 화면 확인</a><label class="row"><input type="checkbox" id="cc-confirm">대상과 원본이 같은 사람인지 직접 확인했습니다</label><button class="btn btn-sm" data-act="customer-link" data-id="' + esc(id) + '">확인한 조회 연결 저장</button></div>';
+    }
+  }
+  return h + '</details>';
+}
+function customerCardEvents(id, data) {
+  const events = [], seen = new Set();
+  const add = (key, date, basis, source, person, label) => {
+    if (seen.has(key)) return; seen.add(key);
+    const time = typeof date === 'number' && Number.isSafeInteger(date) && date >= 0 ? date : date && Number.isFinite(Date.parse(date)) ? Date.parse(date) : 0;
+    const dateLabel = !time ? '일시 미제공' : /^\d{4}-\d{2}-\d{2}$/.test(date) ? date + ' · ' + basis : new Date(time).toLocaleString('ko-KR',{timeZone:'Asia/Seoul'}) + ' · ' + basis;
+    events.push({key,time,dateLabel,source,person,label});
+  };
+  activitiesOf(id).forEach(a => add('crm:'+a.id,a.at,'기록일','영업 CRM','현재 고객',C.ACTIVITY_LABEL && C.ACTIVITY_LABEL[a.type] || a.type || '기록'));
+  data.sources.filter(s=>s.status==='connected').forEach(s=>{
+    const person=data.members.find(m=>m.id===s.memberId)?.name||'대상 미확인';
+    Object.entries(s.records||{}).forEach(([kind,r])=>(r.items||[]).forEach(e=>{
+      const key=s.appId+':'+(s.appId==='english'&&['checkins','attendance'].includes(kind)?'front':kind)+':'+e.id;
+      const date=e.date||e.receivedDate||e.createdAt||e.updatedAt;
+      add(key,date,e.date||e.receivedDate?'업무일':e.createdAt?'생성 시각':e.updatedAt?'수정 시각':'미제공',data.apps[s.appId].name,person,(CUSTOMER_RESOURCE_LABELS[kind]||kind)+' · '+customerRecordStatus(e.status||e.state||e.direction));
+    }));
+  });
+  (data.cs.items||[]).forEach(e=>add('cs:'+e.id,new Date(e.createdAt).toISOString(),'접수 시각','CS','보호자 기준',e.category+' · '+(CUSTOMER_CS_STAGE_LABELS[e.stage]||'단계 미확인')));
+  return events.sort((a,b)=>b.time-a.time||a.key.localeCompare(b.key)).slice(0,100);
+}
+function patchCustomerCard(id) {
+  if (!session || !session.canApprove || route !== 'lead' || leadId !== id) return;
+  const el = $('#customer-card'); if (el) el.innerHTML = customerCardHtml(id);
+}
+async function loadCustomerCard(id) {
+  if (!session || !session.canApprove || route !== 'lead' || leadId !== id) return;
+  const p = ui.customerCards[id] || (ui.customerCards[id] = {}), who = session;
+  if (p.busy) return; p.busy = true; p.err = ''; if (!p.data) patchCustomerCard(id);
+  try { const r = await api('/api/customer-card?leadId=' + encodeURIComponent(id)); if (session === who && ui.customerCards[id] === p) p.data = r; }
+  catch (e) { if (session === who && ui.customerCards[id] === p) p.err = e.message; }
+  finally { p.busy = false; if (session === who && ui.customerCards[id] === p) patchCustomerCard(id); }
+}
+async function customerCardCommand(id, action, linkId) {
+  const p = ui.customerCards[id], who = session;
+  if (!who || !who.canApprove || !p || !p.data || p.busy) return;
+  let path, body, requestKey;
+  try {
+    if (action === 'member') {
+      const name = val('cc-member-name'), kind = val('cc-member-kind');
+      if (!name) throw new Error('대상 이름을 입력해 주세요');
+      requestKey = JSON.stringify([name, kind]);
+      if (!p.memberRequest || p.memberRequest.key !== requestKey) p.memberRequest = { key: requestKey, id: uid('member') };
+      path = '/member'; body = { leadId:id, name, kind, requestId:p.memberRequest.id };
+    } else if (action === 'preview') {
+      const appId = val('cc-app'), sourceId = val('cc-source'), memberId = val('cc-member');
+      p.busy = true;
+      const result = await api('/api/customer-card/source?leadId=' + encodeURIComponent(id) + '&appId=' + encodeURIComponent(appId) + '&sourceId=' + encodeURIComponent(sourceId));
+      if (session !== who || ui.customerCards[id] !== p) return;
+      p.preview = { appId, sourceId, memberId, memberName:p.data.members.find(m => m.id === memberId).name, source:result.source };
+      p.err = ''; return;
+    } else if (action === 'link') {
+      const v = p.preview;
+      if (!v || !checked('cc-confirm')) throw new Error('표시한 대상과 원본을 확인하고 체크해 주세요');
+      if (val('cc-member') !== v.memberId || val('cc-app') !== v.appId || val('cc-source') !== v.sourceId) throw new Error('연결 대상을 바꾸었습니다. 원본을 다시 조회하고 확인해 주세요');
+      const previous = p.data.sources.find(s => s.appId === v.appId && s.sourceId === v.sourceId);
+      if (previous && previous.active) throw new Error('이미 연결된 원본입니다. 다시 조회해 주세요');
+      path = '/link'; body = { leadId:id, memberId:v.memberId, appId:v.appId, sourceId:v.sourceId, expectedUpdatedAt:previous ? previous.updatedAt : 0, identityConfirmed:true, active:true, identityFingerprint:v.source.identityFingerprint };
+    } else {
+      const v = p.data.sources.find(s => s.id === linkId);
+      if (!v || !confirm('이 카드의 조회 연결만 해제합니다. 원본 기록은 유지합니다. 해제할까요?')) return;
+      path = '/link'; body = { leadId:id, memberId:v.memberId, appId:v.appId, sourceId:v.sourceId, expectedUpdatedAt:v.updatedAt, identityConfirmed:true, active:false };
+    }
+    p.busy = true; await api('/api/customer-card' + path, body);
+    if (session === who && ui.customerCards[id] === p) { p.preview = null; p.memberRequest = null; p.busy = false; await loadCustomerCard(id); }
+  } catch (e) { if (session === who && ui.customerCards[id] === p) p.err = e.message + ' 저장 결과가 불확실하면 먼저 다시 조회해 주세요.'; }
+  finally { p.busy = false; if (session === who && ui.customerCards[id] === p) patchCustomerCard(id); }
 }
 function leadQueueHtml(id) {
   const items = ui.leadQueue[id];
@@ -1637,6 +1771,11 @@ document.addEventListener('click', async e => {
     case 'open-lead': e.stopPropagation(); return go('lead', id);
     case 'new-lead': return openLeadForm('');
     case 'edit-lead': return openLeadForm(id);
+    case 'customer-load': return loadCustomerCard(id);
+    case 'customer-member': return customerCardCommand(id, 'member');
+    case 'customer-preview': return customerCardCommand(id, 'preview');
+    case 'customer-link': return customerCardCommand(id, 'link');
+    case 'customer-unlink': return customerCardCommand(id, 'unlink', el.dataset.link);
     case 'lead-save': return saveLeadForm(id);
     case 'lead-conflict': return openLeadConflict(id);
     case 'lead-conflict-save': return resolveLeadConflict(id, true);

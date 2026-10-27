@@ -7,6 +7,7 @@
 //   자동 모드가 꺼져 있으면 빠른 입력 자동 승인 설정·딜 단계 수동 승인 규칙을 따른다.
 //   HubSpot 토큰은 env.HUBSPOT_ACCESS_TOKEN(워커 시크릿)으로만 들어온다 — 응답·로그·문서에 넣지 않는다.
 import CORE from './crm-core.js';
+import {handleCustomerCard} from './customer-card.mjs';
 import { createClient, contactProperties, contactPatchProperties, leadFromContact, applyDealsToLead, dealName, noteBody, HubSpotError } from './hubspot.mjs';
 import { SYSTEM_ID, SETTINGS_ID, DOC_ID, PII_ALLOWED_PATHS, json, fail, hasPii, isPlainObject, absent, parseJson, byteLength, changesOf, kstToday, readJson,
   safeEqual, hex, hexBytes, sha256Hex, passwordHash, randomOpaqueValue, randomSlug, loadDoc, loadCollection, loadSettings, writeDocRaw, patchDocFields, enqueueFor, same, findPii, LINK_CODE, CODE_TTL_MS } from './crm-shared.mjs';
@@ -1044,6 +1045,8 @@ async function exportAll(env) {
   const queue = await env.DB.prepare('SELECT * FROM crm_sync_queue ORDER BY created_at').all();
   const links = await env.DB.prepare('SELECT contact_id,lead_id,linked_at FROM crm_hs_links').all();
   const portalLinks = await env.DB.prepare('SELECT lead_id,family_id,snapshot,checked_at,updated_at,updated_by FROM crm_portal_links ORDER BY lead_id').all();
+  const customerMembers = await env.DB.prepare('SELECT * FROM crm_customer_members ORDER BY lead_id,id').all();
+  const customerSources = await env.DB.prepare('SELECT * FROM crm_customer_sources ORDER BY lead_id,id').all();
   const partnerCodes = await env.DB.prepare('SELECT partner_id, COUNT(*) AS n FROM crm_partner_tokens WHERE revoked=0 GROUP BY partner_id').all();
   const now = Date.now();
   return json({
@@ -1051,6 +1054,7 @@ async function exportAll(env) {
     staff: (staff.results || []).map(r => Object.assign(staffView(r), { createdAt: Number(r.created_at), updatedAt: Number(r.updated_at) })),
     queue: (queue.results || []).map(queueView), links: (links.results || []).map(r => ({ contactId: String(r.contact_id), leadId: String(r.lead_id), linkedAt: Number(r.linked_at) })),
     portalLinks: (portalLinks.results || []).map(r => ({ leadId: r.lead_id, familyId: r.family_id, snapshot: r.snapshot ? parseJson(r.snapshot) : null, checkedAt: r.checked_at, updatedAt: r.updated_at, updatedBy: r.updated_by })),
+    customerMembers: customerMembers.results || [], customerSources: customerSources.results || [],
     partnerDevices: (partnerCodes.results || []).map(r => ({ partnerId: String(r.partner_id), devices: Number(r.n) }))
   }, 200, { 'Content-Disposition': 'attachment; filename="wb-crm-export-' + new Date(now).toISOString().slice(0, 10) + '.json"' });
 }
@@ -1075,6 +1079,7 @@ export async function handleApi(request, env, ctx) {
 
     const auth = await resolveAuth(request, env);
     if (!auth) return fail('AUTH', '로그인이 필요합니다', 401);
+    if (path === '/api/customer-card' || path.startsWith('/api/customer-card/')) return handleCustomerCard(request, env, auth);
 
     if (path.startsWith('/api/portal/')) return handlePortalApi(request, env, auth);
 
