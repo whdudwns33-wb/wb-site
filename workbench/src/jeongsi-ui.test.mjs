@@ -177,3 +177,15 @@ test("malicious labels and memo values are escaped across exam, rule, candidates
   for(const rendered of outputs){assert.ok(!rendered.includes("<img"));assert.ok(!rendered.includes("<script>bad()"));
     assert.ok(rendered.includes("&lt;img"));assert.ok(rendered.includes("&amp;"));}
 });
+test("JBNU rule draft exposes unpublished-table state, survives navigation and requires renewed scope confirmation",()=>{
+  const n=rule({univ:"전북대학교",url:"https://enter.jbnu.ac.kr/"}),{c,s,main}=fixture([n]);c.jSaveExam(s,exam());c.renderJeongsi();c.jOpenRule(0);
+  const before=JSON.stringify(c.db);c.jDraftRuleField("mode","jbnu2027","regular");
+  assert.match(main(),/전북대 2027학년도 수능 환산/);assert.match(main(),/미발표·미확인 — 계산 보류/);
+  c.jDraftJbnuField("profile","natural");c.jDraftJbnuField("unitConfirmed",true);
+  c.jDraftJbnuField("rows","화학Ⅰ,과학,80,60",true);c.jDraftJbnuField("source","입력 중인 변환표",true);
+  c.view.jTab="plans";c.render();c.view.jTab="candidates";c.render();
+  assert.match(main(),/화학Ⅰ,과학,80,60/);assert.match(main(),/입력 중인 변환표/);assert.equal(c.view.jRuleDraft.regular.unitConfirmed,true);
+  c.jDraftJbnuField("profile","medical");assert.equal(c.view.jRuleDraft.regular.unitConfirmed,false);
+  c.jDraftJbnuField("unitConfirmed",true);c.jDraftRuleField("major","다른 학과");assert.equal(c.view.jRuleDraft.regular.unitConfirmed,false);
+  assert.equal(JSON.stringify(c.db),before);assert.equal(c.saveCount,0);
+});
