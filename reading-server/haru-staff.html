@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex,nofollow"><title>개인 로그인 · 삼육중 및 영재원 대비</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f5f3ee;color:#22302a;font-family:"Malgun Gothic",sans-serif;line-height:1.7;word-break:keep-all}main{max-width:660px;margin:40px auto;padding:20px}section{background:white;border:1px solid #d9e1dc;border-radius:14px;padding:24px;margin:20px 0}h1{font-size:24px}h2{font-size:20px}label{display:block;margin:14px 0}input{display:block;width:100%;min-height:44px;padding:10px;font:inherit;border:1px solid #75877c;border-radius:8px}button,.button{display:inline-block;min-height:44px;background:#2b4c3f;color:white;padding:9px 16px;border:0;border-radius:8px;font:inherit;cursor:pointer}a{color:#285d80}code,pre{white-space:pre-wrap;overflow-wrap:anywhere}#message{min-height:2em;color:#8a3d0b}[hidden]{display:none!important}li{margin:12px 0}small{display:block}
+</style></head><body><main>
+<a href="/haru/v2/">준비 안내로 돌아가기</a><h1>삼육중 및 영재원 대비</h1><p>교사·관리자 개인 로그인</p>
+<p id="message" role="status" aria-live="polite"></p>
+<section id="loginSection"><h2>로그인</h2><form id="login">
+<label>아이디<input name="id" autocomplete="username" required maxlength="64"></label>
+<label>비밀번호<input name="password" type="password" autocomplete="current-password" required maxlength="256"></label>
+<button>로그인</button></form><p>초기 비밀번호 변경은 학원 서버 PC에서 진행합니다. 변경 후에는 외부에서도 로그인할 수 있습니다.</p></section>
+<section id="accountSection" hidden><h2 id="identity"></h2><p>권한: 대비 앱 관리자 — 학생·자료·플랜·현황·내보내기·파기</p><a class="button" href="/admin/haru-admin.html" id="board">관리 화면 열기</a> <button id="logout">로그아웃</button>
+<h2>비밀번호 변경</h2><p id="firstChange" hidden>첫 로그인입니다. 새 비밀번호를 설정해 주세요.</p><form id="password">
+<label>현재 비밀번호<input name="currentPassword" type="password" autocomplete="current-password" required maxlength="256"></label>
+<label>새 비밀번호 (8자 이상)<input name="password" type="password" autocomplete="new-password" required minlength="8" maxlength="256"></label>
+<label>새 비밀번호 확인<input name="confirmPassword" type="password" autocomplete="new-password" required minlength="8" maxlength="256"></label>
+<button>비밀번호 변경</button></form><small>변경하면 기존 로그인과 API 키가 모두 해제됩니다.</small></section>
+<section id="keysSection" hidden><h2>API · MCP 연결</h2><p>개인 API 키는 대비 앱 관리자 기능에만 사용할 수 있으며 90일 뒤 만료됩니다. 키는 발급할 때 한 번만 표시됩니다.</p>
+<form id="newKey"><label>연결 이름<input name="label" maxlength="60" placeholder="예: 내 MCP 연결" required></label><button>개인 API 키 발급</button></form>
+<pre id="newToken" hidden></pre><ul id="keys"></ul><p>API 기본 주소: <code id="apiAddress"></code><br>MCP 주소: <code id="mcpAddress"></code></p><p>인증: <code>Authorization: Bearer 개인_API_키</code></p><p>MCP는 Streamable HTTP 방식입니다. 클라이언트가 Bearer 헤더를 지원해야 합니다. 자동 OAuth 로그인은 제공하지 않습니다.</p><p>API와 MCP로 학생 정보를 조회·수정할 수 있습니다. 외부 도구에 키를 넣을 때 연결 대상과 요청 내용을 확인해 주세요.</p>
+</section></main><script>
+const $=s=>document.querySelector(s);let token=localStorage.getItem('wbr.admin.token')||'',mustChange=false;
+const message=s=>{$('#message').textContent=s;};
+async function request(path,method='GET',data){const r=await fetch('/api/haru/staff/'+path,{method,headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},...(data?{body:JSON.stringify(data)}:{})});const b=await r.json();if(!r.ok)throw Error(b.error||'처리하지 못했습니다.');return b;}
+function clear(){token='';mustChange=false;localStorage.removeItem('wbr.admin.token');$('#loginSection').hidden=false;$('#accountSection').hidden=true;$('#keysSection').hidden=true;$('#newToken').textContent='';$('#newToken').hidden=true;}
+async function display(u){$('#identity').textContent=u.name+' · '+u.id;$('#loginSection').hidden=true;$('#accountSection').hidden=false;$('#keysSection').hidden=mustChange;$('#board').hidden=mustChange;$('#logout').hidden=mustChange;$('#firstChange').hidden=!mustChange;if(!mustChange)await listKeys();}
+async function listKeys(){const b=await request('keys');$('#keys').replaceChildren();b.keys.forEach(k=>{const li=document.createElement('li'),btn=document.createElement('button');li.append(document.createTextNode(k.label+' · 만료 '+new Date(k.expires).toLocaleDateString('ko-KR')+' '));btn.textContent='폐기';btn.onclick=async()=>{try{await request('keys','DELETE',{id:k.id});await listKeys();message('키를 폐기했습니다.');}catch(e){message(e.message);}};li.append(btn);$('#keys').append(li);});}
+async function run(form,fn){const button=form.querySelector('button');button.disabled=true;message('');try{await fn(Object.fromEntries(new FormData(form)));}catch(e){message(e.message);}finally{button.disabled=false;}}
+$('#login').onsubmit=e=>{e.preventDefault();run(e.target,async b=>{const u=await request('login','POST',b);token=u.token;mustChange=u.mustChange;if(!mustChange)localStorage.setItem('wbr.admin.token',token);e.target.reset();await display(u);});};
+$('#password').onsubmit=e=>{e.preventDefault();run(e.target,async b=>{if(b.password!==b.confirmPassword)throw Error('새 비밀번호 확인이 다릅니다.');const out=await request('password','POST',b);clear();e.target.reset();message(out.message);});};
+$('#logout').onclick=async()=>{try{await request('logout','POST',{});}finally{clear();}};
+$('#newKey').onsubmit=e=>{e.preventDefault();run(e.target,async b=>{const k=await request('keys','POST',b);$('#newToken').hidden=false;$('#newToken').textContent='개인 키 (다시 표시되지 않음)\n'+k.token+'\n만료: '+new Date(k.expires).toLocaleString('ko-KR');await listKeys();});};
+$('#apiAddress').textContent=location.origin+'/api/haru/admin/';$('#mcpAddress').textContent=location.origin+'/mcp';
+if(token)request('me').then(display).catch(()=>clear());
+</script></body></html>

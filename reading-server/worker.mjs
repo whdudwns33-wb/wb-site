@@ -282,7 +282,7 @@ function naesinKoStore(env) {
 
 /* 하루브레인 저장소 어댑터 — haru: 접두 키만 (설계안 §7-5). 학생 기록은 쓰기 주체별 3키(state·mock·paper).
    퇴원·파기는 정확 접두 4계열만 지운다 — haru:paperkey:* 는 원장의 대응표라 와일드카드로 삼키면 안 된다. */
-function haruStore(env) {
+export function haruStore(env) {
   const get = (k) => env.DB.get(k, 'json');
   const put = (k, v) => env.DB.put(k, JSON.stringify(v));
   const del = (k) => env.DB.delete(k);
