@@ -119,6 +119,9 @@ class FakeDB {
         throw new Error('unexpected first SQL: ' + sql);
       },
       async all() {
+        if (sql.startsWith('SELECT k,data,updated_at FROM checks')) {
+          return { results: [...db.checks.entries()].filter(([k]) => k.startsWith(this.args[2])).map(([k,r]) => ({ k, data:r.data, updated_at:r.updatedAt || 0 })) };
+        }
         if (sql.startsWith('SELECT student_id,revision FROM student_schedule_revisions')) {
           return { results: this.args.slice(1).filter(id => db.scheduleRevisions.has(String(id))).map(id => ({
             student_id: String(id), revision: db.scheduleRevisions.get(String(id)).revision
@@ -185,6 +188,11 @@ class FakeDB {
           return { meta: { changes: 1 } };
         }
         if (sql.startsWith('INSERT INTO task_write_cas_guards')) {
+          if (sql.includes('lesson_history_records')) {
+            const rows=[...db.checks.entries()].filter(([k])=>k.startsWith(this.args[7]));
+            if(rows.length!==this.args[2] || rows.reduce((n,[,r])=>n+Number(r.updatedAt||0),0)!==this.args[3]) throw new Error('TASK_WRITE_CAS_CONFLICT');
+            db.lastChanges=1;return {meta:{changes:1}};
+          }
           if (db.lastChanges !== 1) throw new Error('TASK_WRITE_CAS_CONFLICT');
           db.lastChanges = 1;
           return { meta: { changes: 1 } };
@@ -282,6 +290,7 @@ class FakeDB {
 }
 
 async function call(db, body, auth) {
+  if (body.effectiveDate === undefined && (body.sourceTaskId || body.expectedRevision || body.expectedUpdatedAt)) body = { effectiveDate: body.lesson?.start, ...body };
   const response = await handleLessonCreate({ DB: db }, 'task', body, '*', auth, json);
   return { response, data: await response.json() };
 }
@@ -1436,6 +1445,45 @@ test('invalid, overlapping, and excessive structured slots are rejected', async 
     }), 'teacher-1', 'staff', 1),
     /최대 20개/
   );
+});
+
+test('effective-date correction retains old start, timetable and notes', async () => {
+  const db = new FakeDB();
+  const source = await seedOwnLesson(db);
+  const key = source.id + '|2026-08-10';
+  const check = {owner:'teacher-1',data:JSON.stringify({note:'기존 수업 메모'}),updatedAt:101,srvAt:101};
+  db.checks.set(key, check);
+  const result = await call(db, {
+    staffId:'teacher-1', sourceTaskId:source.id, expectedUpdatedAt:source.updatedAt,
+    effectiveDate:'2026-10-25', lesson:assignedLesson({start:'2026-10-25',scheduleSlots:[{days:[2],startTime:'10:00',endTime:'10:50'}]})
+  }, {scope:'all',role:'admin'});
+  assert.equal(result.response.status,200,JSON.stringify(result.data));
+  assert.equal(result.data.task.start,source.start);
+  assert.ok(result.data.task.scheduleSlots.some(s=>s.validTo==='2026-10-24'));
+  assert.ok(result.data.task.scheduleSlots.some(s=>s.validFrom==='2026-10-25'));
+  assert.deepEqual(db.checks.get(key),check);
+});
+
+test('an old client without an effective date cannot overwrite history', async () => {
+  const db=new FakeDB(), source=await seedOwnLesson(db);
+  const result=await call(db,{staffId:'teacher-1',sourceTaskId:source.id,expectedUpdatedAt:source.updatedAt,
+    effectiveDate:null,lesson:assignedLesson({start:'2026-10-25',scheduleSlots:[{days:[2],startTime:'10:00',endTime:'10:50'}]})},
+    {scope:'all',role:'admin'});
+  assert.equal(result.response.status,409);
+  assert.equal(result.data.code,'LESSON_HISTORY_PROTECTED');
+  assert.equal(JSON.parse(db.tasks.get(source.id).data).start,source.start);
+});
+
+test('a concurrent note write rolls back the timetable update', async () => {
+  const db=new FakeDB(), source=await seedOwnLesson(db);
+  db.beforeBatch=current=>current.checks.set(source.id+'|2026-08-10',{
+    owner:'teacher-1',data:JSON.stringify({note:'다른 기기에서 저장'}),updatedAt:102,srvAt:102});
+  const result=await call(db,{staffId:'teacher-1',sourceTaskId:source.id,expectedUpdatedAt:source.updatedAt,
+    effectiveDate:'2026-10-25',lesson:assignedLesson({scheduleSlots:[{days:[2],startTime:'10:00',endTime:'10:50'}]})},
+    {scope:'all',role:'admin'});
+  assert.equal(result.response.status,409);
+  assert.deepEqual(JSON.parse(db.tasks.get(source.id).data).scheduleSlots,source.scheduleSlots);
+  assert.equal(JSON.parse(db.checks.get(source.id+'|2026-08-10').data).note,'다른 기기에서 저장');
 });
 
 test('route is wired and no Solapi send code is introduced', () => {

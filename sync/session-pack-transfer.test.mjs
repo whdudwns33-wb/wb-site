@@ -124,7 +124,7 @@ test('direct lesson transfer moves the active pack and preserves its ledger, bal
   const beforeUsage = usageRows(db, beforePack.packId);
 
   const response = await handleLessonCreate({ DB: db }, 'task', {
-    staffId: 'teacher-b', sourceTaskId: task.id, expectedRevision: 1, lesson: rawLesson()
+    staffId: 'teacher-b', sourceTaskId: task.id, expectedRevision: 1, effectiveDate: '2026-10-01', lesson: rawLesson()
   }, '*', admin, json);
   assert.equal(response.status, 200);
   const result = await response.json();
