@@ -2225,6 +2225,87 @@ function jTable(value,label,required){
   return values.map(v=>{const n=jNumber(v,label,-Number.MAX_SAFE_INTEGER,Number.MAX_SAFE_INTEGER);
     if(n==="")throw Error(label+"의 빈 등급 가감점을 채우세요.");return n;});
 }
+const J_JBNU_PROFILES={
+  humanities:{label:"인문·생활과학·환경생명자원·융합자율",weights:[40,30,30],total:500,selection:500,bonus:false},
+  natural:{label:"자연·공학·농업생명과학",weights:[30,40,30],total:500,selection:500,bonus:true},
+  mathEducation:{label:"수학교육과",weights:[30,50,20],total:500,selection:500,bonus:true,math:true},
+  scienceEducation:{label:"과학교육학부",weights:[20,40,40],total:500,selection:500,bonus:true,science:true},
+  medical:{label:"수의·약학·의예·치의예 (지역의사 제외)",weights:[30,40,30],total:500,selection:500,bonus:true,math:true,science:true},
+  regionalMedical:{label:"의예과 지역의사선발",weights:[30,40,30],total:500,selection:500,bonus:true,science:true},
+  physicalEducation:{label:"체육교육과 수능 단계",weights:[40,30,30],total:1000,selection:1000,bonus:false,group:"나"},
+  sports:{label:"스포츠과학과 수능 부분",weights:[60,0,40],total:800,selection:1000,bonus:false,group:"나"}
+};
+function jJbnuInquiryKind(subject){
+  const key=adigaText(subject).normalize("NFKC").replace(/\s/g,"").replace(/II$/,"2").replace(/I$/,"1");
+  if(["생활과윤리","윤리와사상","한국지리","세계지리","동아시아사","세계사","경제","정치와법","사회문화","사회·문화"].includes(key))return "사회";
+  return /^(물리학|화학|생명과학|지구과학)[12]$/.test(key)?"과학":"";
+}
+function jJbnuOfficialUrl(value){try{const u=new URL(value);return u.protocol==="https:"&&u.hostname==="enter.jbnu.ac.kr"&&!u.username&&!u.password;}catch{return false;}}
+function jJbnuRule(note,input){
+  if(!["전북대","전북대학교"].includes(adigaText(note.univ))||String(note.admissionYear)!=="2027"||!["가","나"].includes(input.group))throw Error("전북대 2027학년도 가·나군 근거에만 이 산식을 적용하세요.");
+  const profile=adigaText(input.profile);if(!Object.hasOwn(J_JBNU_PROFILES,profile))throw Error("전북대 모집단위 산식 유형을 선택하세요.");
+  if(J_JBNU_PROFILES[profile].group&&input.group!==J_JBNU_PROFILES[profile].group)throw Error("체육교육과·스포츠과학과 수능 산식은 나군에서 확인하세요.");
+  const original=input.conversion||{},table={};
+  for(const k of ["status","admissionYear","published","source","url","checked"])table[k]=adigaText(original[k]);
+  table.status=table.status||"unpublished";if(!["unpublished","official"].includes(table.status))throw Error("변환표 확인 상태를 선택하세요.");
+  if(original.bonusApplied!=null&&typeof original.bonusApplied!=="boolean")throw Error("변환표의 과탐 가산점 포함 여부를 선택하세요.");
+  table.bonusApplied=typeof original.bonusApplied==="boolean"?original.bonusApplied:null;
+  const rows=Array.isArray(original.rows)?original.rows:adigaText(original.rows).split(/\r?\n/).filter(x=>x.trim()).map(line=>{
+    const cells=line.split(",").map(x=>x.trim());if(cells.length!==4)throw Error("변환표는 과목명,사회/과학,백분위,변환점수 순서로 입력하세요.");
+    return {subject:cells[0],kind:cells[1],percentile:cells[2],value:cells[3]};
+  });
+  if(rows.length>2000)throw Error("변환표 입력은 2,000행 이내로 확인하세요.");
+  const seen=new Set();table.rows=Array.from(rows).map(row=>{
+    if(!row||typeof row!=="object"||Array.isArray(row))throw Error("변환표 행 형식을 확인하세요.");
+    const subject=adigaText(row.subject),kind=adigaText(row.kind),percentile=jNumber(row.percentile,"변환표 백분위",0,100),value=jNumber(row.value,"탐구 변환점수",0,1000);
+    if(!subject||!["사회","과학"].includes(kind)||percentile===""||value==="")throw Error("변환표의 과목명·사회/과학 구분·백분위·변환점수를 확인하세요.");
+    if(jJbnuInquiryKind(subject)!==kind)throw Error("탐구 과목명과 사회/과학 구분이 일치하는지 확인하세요.");
+    const key=JSON.stringify([subject,percentile]);if(seen.has(key))throw Error("변환표의 같은 과목·백분위가 중복됐습니다.");seen.add(key);
+    return {subject,kind,percentile,value};
+  });
+  return {group:input.group,mode:"jbnu2027",version:"jbnu-2027-v1",profile,unitConfirmed:input.unitConfirmed===true,conversion:table,unsupported:adigaText(input.unsupported)};
+}
+function jCalcJbnu(e,n,result){
+  const r=n.regular,p=J_JBNU_PROFILES[r.profile],t=r.conversion,missing=result.missing;
+  result.method="jbnu2027";
+  result.limitations=["전북대 2027 모집요강의 수능 환산식 참고 결과이며 합격을 보장하지 않습니다.","모집단위·전형·군별 적용 확인이 필요합니다. 지원자격·학교폭력 조치·면접·실기 및 최종 전형총점은 별도 확인하세요.","탐구 원래 표준점수와 대학 변환표준점수는 별개입니다. 다른 학년도 표나 미확인 값을 대입하지 않습니다."];
+  if(e.status==="가채점")result.limitations.push("가채점 성적입니다. 확정 성적으로 다시 확인하세요.");
+  if(e.type!=="수능")result.limitations.push(e.type+" 성적을 대입한 참고값이며 실제 수능 결과가 아닙니다.");
+  if(!r.unitConfirmed)missing.push("모집단위·전형·모집군과 산식 유형의 원문 일치 미확인");
+  if(r.unsupported)missing.push("지원하지 않는 반영 조건: "+r.unsupported);
+  const current=today();
+  if(!jJbnuOfficialUrl(n.url)||n.checked>current)missing.push("전북대 공식 모집요강 원문·확인일을 확인하세요.");
+  if(t.status!=="official"||t.admissionYear!=="2027"||!t.source||!jJbnuOfficialUrl(t.url)||!adigaDate(t.published)||t.published<"2026-12-11"||t.published>current||!adigaDate(t.checked)||t.checked<t.published||t.checked>current){
+    missing.push("2027학년도 공식 탐구 변환표 미발표·미확인 — 계산 보류 (2026-12-11 성적 발표 이후 원문 확인 필요)");
+  }
+  if(t.bonusApplied&&!p.bonus)missing.push("이 산식 유형은 과탐 가산점 미적용: 가산 전 변환표를 사용하세요.");
+  if(t.bonusApplied==null)missing.push("변환점수의 과탐 가산점 포함 여부 미확인");
+  for(const k of ["kor",...(p.weights[1]?["math"]:[])]){
+    if(!e.scores[k].subject||e.scores[k].standard==="")missing.push(J_SUBJECTS[k]+" 과목명·표준점수 미입력");
+  }
+  const math=e.scores.math.subject.replace(/\s/g,"");
+  if(p.weights[1]&&!(p.math?["미적분","기하"]:["확률과통계","미적분","기하"]).includes(math))missing.push(p.math?"수학은 미적분 또는 기하 응시 필요":"수학 선택과목 확인 필요");
+  for(const k of ["eng","hist"])if(!e.scores[k].subject||e.scores[k].grade==="")missing.push(J_SUBJECTS[k]+" 필수 응시·등급 미확인");
+  const converted=[];
+  for(const k of ["inq1","inq2"]){
+    const s=e.scores[k],row=t.rows.find(x=>x.subject===s.subject&&x.percentile===s.percentile);
+    if(!s.subject||s.percentile===""||!row){missing.push(J_SUBJECTS[k]+" 과목·백분위에 맞는 공식 변환점수 없음");continue;}
+    if(p.science&&row.kind!=="과학")missing.push("이 모집단위는 과학탐구 2과목 응시 필요");
+    converted.push({...row,adjusted:row.value*(p.bonus&&row.kind==="과학"&&!t.bonusApplied?1.1:1)});
+  }
+  if(e.scores.inq1.subject&&e.scores.inq1.subject===e.scores.inq2.subject)missing.push("탐구 1·2는 서로 다른 과목이어야 합니다.");
+  const [wk,wm,wt]=p.weights.map((w,i)=>p.total*w/(i===2?10000:20000)),ratio=p.total/p.selection;
+  result.formula=`전북대 2027 · ${p.label}: 국어 표준×${wk} + 수학 표준×${wm} + 탐구 변환점수(과탐 가산 후 2과목 평균)×${wt} + (영어·한국사 등급 가산점)×${ratio}, 최종 소수 둘째 자리 반올림`;
+  if(missing.length)return result;
+  const english=[30,27,24,18,12,9,6,3,0][e.scores.eng.grade-1]*ratio,history=[5,5,5,5,5,4,3,2,1][e.scores.hist.grade-1]*ratio;
+  const kor=e.scores.kor.standard*wk,mathScore=wm?e.scores.math.standard*wm:0,inq=(converted[0].adjusted+converted[1].adjusted)/2*wt;
+  result.score=Math.round((kor+mathScore+inq+english+history+Number.EPSILON)*100)/100;
+  result.parts=[`국어 ${e.scores.kor.standard}×${wk} = ${kor}`,`수학 ${wm?e.scores.math.standard:0}×${wm} = ${mathScore}`,
+    ...converted.map(x=>`${x.subject} (${x.kind}) 백분위 ${x.percentile} → 변환 ${x.value} → 가산 후 ${x.adjusted}`),
+    `탐구 환산 ${inq}`,`영어 ${e.scores.eng.grade}등급 ${english} / 한국사 ${e.scores.hist.grade}등급 ${history}`,
+    `변환표 ${t.admissionYear}학년도 · ${t.source} · 발표 ${t.published} · 확인 ${t.checked} · ${t.url}`,`변환표 과탐 가산점 ${t.bonusApplied?"이미 포함 (중복 가산 안 함)":"가산 전"}`];
+  return result;
+}
 function jRule(note){
   if(!note||typeof note!=="object"||Array.isArray(note))throw Error("대학 반영 근거를 입력하세요.");
   const base=adigaNote({},note);if(base.error)throw Error(base.error);
@@ -2233,7 +2314,8 @@ function jRule(note){
   const input=note.regular||{},regular={};
   regular.group=adigaText(input.group);regular.mode=adigaText(input.mode);
   if(!["가","나","다"].includes(regular.group))throw Error("모집군을 가·나·다 중 선택하세요.");
-  if(!["manual","weighted"].includes(regular.mode))throw Error("반영방법 확인 상태를 선택하세요.");
+  if(!["manual","weighted","jbnu2027"].includes(regular.mode))throw Error("반영방법 확인 상태를 선택하세요.");
+  if(regular.mode==="jbnu2027")return {...note,...base.note,regular:jJbnuRule(note,input)};
   regular.metric=adigaText(input.metric)||(regular.mode==="manual"?"percentile":"");
   regular.inquiry=adigaText(input.inquiry)||(regular.mode==="manual"?"mean2":"");
   if(!["percentile","standard"].includes(regular.metric))throw Error("백분위 또는 표준점수 중 하나를 선택하세요.");
@@ -2266,6 +2348,7 @@ function jCalc(exam,note){
   if(!adigaText(n.source))result.missing.push("대학 반영 근거 출처 미확인");
   if(!adigaUrl(n.url))result.missing.push("대학 반영 근거 원문 주소 미확인");
   if(!adigaDate(n.checked))result.missing.push("대학 반영 근거 확인일 미확인");
+  if(r.mode==="jbnu2027")return jCalcJbnu(e,n,result);
   if(r.mode!=="weighted")result.missing.push("반영방법 수동 확인 중: 점수를 계산하지 않습니다.");
   if(r.unsupported)result.missing.push("지원하지 않는 반영 조건: "+r.unsupported);
   if(e.status==="가채점")result.limitations.push("가채점 성적입니다. 확정 성적 입력 후 다시 확인하세요.");
@@ -2463,6 +2546,11 @@ function jSubmitRule(){
   for(const k of ["univ","major","track","admissionYear","resultYear","source","checked","url","content"])d[k]=$("#jr_"+k).value;
   for(const k of ["group","mode","metric","inquiry","englishMode","historyMode","englishTable","historyTable","unsupported"])d.regular[k]=$("#jr_"+k).value;
   for(const k of ["kor","math","inq"])d.regular.weights[k]=$("#jr_w_"+k).value;
+  if(d.regular.mode==="jbnu2027"){
+    d.regular.profile=$("#jr_jb_profile").value;d.regular.unitConfirmed=$("#jr_jb_confirmed").checked;
+    d.regular.conversion={};for(const k of ["status","admissionYear","published","source","url","checked","rows"])d.regular.conversion[k]=$("#jr_jb_"+k).value;
+    d.regular.conversion.bonusApplied=$("#jr_jb_bonus").value==="included"?true:$("#jr_jb_bonus").value==="base"?false:null;
+  }
   view.jRuleDraft=d;
   try{
     const note=jRule(d);db.adiga=db.adiga||[];
@@ -2492,10 +2580,11 @@ function jRecalculate(index){
   try{jRefreshPlan(s,p.id,jRuleFor(p),$("#jp_reason_"+index).value.trim());save();view.jError="";render();toast("최신 시험·반영방법으로 갱신했습니다. 군별 지원안을 다시 확인하세요.");}
   catch(e){view.jError=e.message;$("#j_error").textContent=e.message;toast(e.message);}
 }
-function jScoreText(result){return Number.isFinite(result?.score)?`${+result.score.toFixed(4)} · 입력 반영식 참고점수`:"계산 보류";}
+function jScoreText(result){return Number.isFinite(result?.score)?`${+result.score.toFixed(4)} · ${result.method==="jbnu2027"?"전북대 2027 수능환산 참고점수":"입력 반영식 참고점수"}`:"계산 보류";}
 function jExamText(e){return e?`${e.label} · ${e.type} · ${e.status} · ${e.date} · ${e.admissionYear}학년도`:"시험 미선택";}
 function jScoreRows(e){const value=v=>String(v??"").trim()===""?"미입력":v;return Object.entries(J_SUBJECTS).map(([k,label])=>{const r=e?.scores?.[k]||{};return `${label} ${r.subject||"과목 미입력"}: 원점수 ${value(r.raw)} / 표준 ${value(r.standard)} / 백분위 ${value(r.percentile)} / 등급 ${value(r.grade)}`;}).join("\n");}
 function jRuleText(note){const r=note?.regular;if(!r)return "반영 설정 미확인";
+  if(r.mode==="jbnu2027"){const t=r.conversion||{};return `전북대 2027 공식 수능 산식 · ${J_JBNU_PROFILES[r.profile]?.label||"유형 미확인"}\n모집단위 원문 일치: ${r.unitConfirmed?"확인":"미확인"}\n탐구 변환표: ${t.status==="official"?"공식 표 입력 (학년도·발표일 검증 필요)":"미발표·미확인 — 계산 보류"} · ${t.admissionYear||"학년도 미확인"}\n출처: ${t.source||"미확인"} · 발표일: ${t.published||"미확인"} · 확인일: ${t.checked||"미확인"}\n변환표 원문: ${adigaUrl(t.url)||"미확인"}\n과탐 가산점: ${t.bonusApplied==null?"포함 여부 미확인":t.bonusApplied?"변환값에 이미 포함":"모집유형에 따라 가산 전 값에 적용"}\n미지원 요소: ${r.unsupported||"기록 없음"}`;}
   const mode=v=>({none:"미반영 확인",unknown:"미확인",table:"등급별 가감점"}[v]||"미확인");
   return `${r.mode==="weighted"?"입력 비율 가중합":"산식 미지원"} · ${r.metric==="standard"?"표준점수":"백분위"}\n국어 ${r.weights?.kor??"미확인"}% / 수학 ${r.weights?.math??"미확인"}% / 탐구 ${r.weights?.inq??"미확인"}% · ${r.inquiry==="best1"?"상위 1과목":"2과목 평균"}\n영어: ${mode(r.englishMode)} / 1~9등급 가감점: ${(r.englishTable||[]).join(", ")||"미입력"}\n한국사: ${mode(r.historyMode)} / 1~9등급 가감점: ${(r.historyTable||[]).join(", ")||"미입력"}\n미지원 요소: ${r.unsupported||"기록 없음"}`;
 }
@@ -2528,8 +2617,26 @@ function jRenderExam(s,e){
 }
 function jDraftRuleField(key,value,area){
   const draft=view.jRuleDraft;if(!draft)return;
-  if(area){draft.regular=draft.regular||{};if(area==="weights"){draft.regular.weights=draft.regular.weights||{};draft.regular.weights[key]=value;}else draft.regular[key]=value;}
+  if(draft.regular?.mode==="jbnu2027"&&["univ","major","track","admissionYear","group"].includes(key)&&(area?draft.regular[key]:draft[key])!==value){draft.regular.unitConfirmed=false;const field=$("#jr_jb_confirmed");if(field)field.checked=false;}
+  if(area){draft.regular=draft.regular||{};if(area==="weights"){draft.regular.weights=draft.regular.weights||{};draft.regular.weights[key]=value;}else{const before=draft.regular[key];draft.regular[key]=value;if(key==="mode"&&(value==="jbnu2027"||before==="jbnu2027"))render();}}
   else draft[key]=value;
+}
+function jDraftJbnuField(key,value,table=false){
+  const r=view.jRuleDraft?.regular;if(!r)return;
+  if(!table&&key==="profile"&&r.profile!==value){r.unitConfirmed=false;const field=$("#jr_jb_confirmed");if(field)field.checked=false;}
+  if(table){r.conversion=r.conversion||{};r.conversion[key]=value;}else r[key]=value;
+}
+function jRenderJbnu(r){
+  const t=r.conversion||{},input=(key,label,type="text")=>`<div class="frow"><label for="jr_jb_${key}">${label}</label><input id="jr_jb_${key}" type="${type}" value="${esc(t[key]??(key==="admissionYear"?"2027":""))}" oninput="jDraftJbnuField('${key}',this.value,true)"></div>`;
+  const rows=Array.isArray(t.rows)?t.rows.map(x=>[x.subject,x.kind,x.percentile,x.value].join(",")).join("\n"):t.rows||"";
+  return `<section class="sec"><h3>전북대 2027학년도 수능 환산</h3><p class="aplnote">모집요강 38·40~46쪽의 수능 부분만 계산합니다. 면접·실기·학교폭력 감점·지원자격은 별도 확인하세요. 유형은 학과 이름으로 자동 추정하지 않습니다.</p>
+    <div class="frow"><label for="jr_jb_profile">모집단위 산식 유형</label><select id="jr_jb_profile" onchange="jDraftJbnuField('profile',this.value)"><option value="">선택</option>${Object.entries(J_JBNU_PROFILES).map(([k,p])=>`<option value="${k}" ${r.profile===k?"selected":""}>${esc(p.label)} · 수능 ${p.total}점</option>`).join("")}</select></div>
+    <label for="jr_jb_confirmed"><input id="jr_jb_confirmed" type="checkbox" ${r.unitConfirmed?"checked":""} onchange="jDraftJbnuField('unitConfirmed',this.checked)"> 이 학과·전형·모집군에 선택한 산식이 적용됨을 원문에서 확인했습니다.</label>
+    <p class="aplnote">2027학년도 탐구 변환표는 수능 성적 발표(2026-12-11) 이후 공지 예정입니다. 요강 예시의 2026학년도 표나 실제 탐구 표준점수로 대신 계산하지 않습니다.</p>
+    <div class="formgrid"><div class="frow"><label for="jr_jb_status">변환표 상태</label><select id="jr_jb_status" onchange="jDraftJbnuField('status',this.value,true)"><option value="unpublished" ${t.status!=="official"?"selected":""}>미발표·미확인 — 계산 보류</option><option value="official" ${t.status==="official"?"selected":""}>2027학년도 공식 표 원문 확인</option></select></div>
+    ${input("admissionYear","변환표 모집학년도","number")}${input("published","변환표 공식 발표일","date")}${input("checked","변환표 원문 확인일","date")}${input("source","변환표 출처")}${input("url","전북대 입학처 변환표 원문 URL","url")}
+    <div class="frow"><label for="jr_jb_bonus">입력한 변환점수의 과탐 가산 상태</label><select id="jr_jb_bonus" onchange="jDraftJbnuField('bonusApplied',this.value==='included'?true:this.value==='base'?false:null,true)"><option value="" ${t.bonusApplied==null?"selected":""}>미확인 — 계산 보류</option><option value="base" ${t.bonusApplied===false?"selected":""}>가산 전 — 해당 유형은 과학 과목에 10% 적용</option><option value="included" ${t.bonusApplied===true?"selected":""}>원문 값에 가산 포함 — 중복 가산하지 않음</option></select></div></div>
+    <div class="frow"><label for="jr_jb_rows">공식 표에서 확인한 탐구 변환값</label><textarea id="jr_jb_rows" rows="5" placeholder="과목명,사회 또는 과학,백분위,가산 상태에 맞는 변환점수" oninput="jDraftJbnuField('rows',this.value,true)">${esc(rows)}</textarea></div><p class="aplnote">한 줄에 한 값씩 입력합니다. 성적표 과목명·백분위가 정확히 일치해야 하며 없는 값은 추정하거나 보간하지 않습니다. 원래 시험 성적은 수정하지 않습니다.</p></section>`;
 }
 function jRenderRule(){
   const n=view.jRuleDraft;if(!n)return "";const r=n.regular||{},w=r.weights||{};
@@ -2537,12 +2644,13 @@ function jRenderRule(){
   const select=(k,label,opts)=>`<div class="frow"><label for="jr_${k}">${label}</label><select id="jr_${k}" onchange="jDraftRuleField('${k}',this.value,'regular')">${opts.map(([v,t])=>`<option value="${v}" ${r[k]===v?"selected":""}>${t}</option>`).join("")}</select></div>`;
   return `<form class="sec" onsubmit="event.preventDefault();jSubmitRule()"><h2>대학별 반영방법 · 기존 어디가 노트에 저장</h2><div class="formgrid">${input("univ","대학")}${input("major","학과·모집단위")}${input("track","전형명")}${input("admissionYear","모집학년도","number")}${select("group","모집군",[["","선택"],["가","가군"],["나","나군"],["다","다군"]])}${input("resultYear","참고 결과학년도","number")}${input("source","출처")}${input("checked","원문 확인일","date")}${input("url","공식 원문 URL","url")}</div>
     <div class="frow"><label for="jr_content">공식 반영방법·자격·조건 확인 메모</label><textarea id="jr_content" rows="3" oninput="jDraftRuleField('content',this.value)">${esc(n.content||"")}</textarea></div>
-    <div class="formgrid">${select("mode","계산 방식",[["manual","산식 미지원 · 원문 참고만"],["weighted","입력 비율 가중합"]])}${select("metric","국어·수학·탐구 지표",[["percentile","백분위"],["standard","표준점수"]])}
+    <div class="formgrid">${select("mode","계산 방식",[["manual","산식 미지원 · 원문 참고만"],["weighted","입력 비율 가중합"],["jbnu2027","전북대 2027 공식 수능 환산식"]])}</div>
+    ${r.mode==="jbnu2027"?jRenderJbnu(r):""}<div ${r.mode==="jbnu2027"?"hidden":""}><div class="formgrid">${select("metric","국어·수학·탐구 지표",[["percentile","백분위"],["standard","표준점수"]])}
     ${["kor","math","inq"].map((k,i)=>`<div class="frow"><label for="jr_w_${k}">${["국어","수학","탐구"][i]} 반영비율 (%)</label><input id="jr_w_${k}" inputmode="decimal" value="${esc(w[k]??"")}" oninput="jDraftRuleField('${k}',this.value,'weights')"></div>`).join("")}
     ${select("inquiry","탐구 처리",[["mean2","2과목 평균"],["best1","2과목 중 상위 1과목"]])}
     ${select("englishMode","영어 반영",[["unknown","미확인"],["none","미반영 확인"],["table","등급별 가감점"]])}${select("historyMode","한국사 반영",[["unknown","미확인"],["none","미반영 확인"],["table","등급별 가감점"]])}</div>
     ${["englishTable","historyTable"].map((k,i)=>`<div class="frow"><label for="jr_${k}">${i?"한국사":"영어"} 1~9등급 가감점 (쉼표로 9개)</label><input id="jr_${k}" value="${esc(Array.isArray(r[k])?r[k].join(", "):r[k]||"")}" placeholder="예: 0, 0, -1, -2, -3, -4, -5, -6, -7" oninput="jDraftRuleField('${k}',this.value,'regular')"></div>`).join("")}
-    <p class="aplnote">지원하는 식: (국어×비율 + 수학×비율 + 탐구×비율) ÷ 100 + 영어·한국사 가감점. 국어·수학·탐구 비율 합계는 100%입니다. 대학별 총점·변환표·가산점이 이 식과 다르면 미지원 요소에 적고 계산을 보류하세요.</p>
+    <p class="aplnote">지원하는 식: (국어×비율 + 수학×비율 + 탐구×비율) ÷ 100 + 영어·한국사 가감점. 국어·수학·탐구 비율 합계는 100%입니다. 대학별 총점·변환표·가산점이 이 식과 다르면 미지원 요소에 적고 계산을 보류하세요.</p></div>
     <div class="frow"><label for="jr_unsupported">적용하지 못하는 요소</label><textarea id="jr_unsupported" rows="2" placeholder="예: 탐구 변환표준점수, 선택과목 가산점, 별도 환산총점" oninput="jDraftRuleField('unsupported',this.value,'regular')">${esc(r.unsupported||"")}</textarea></div>
     <button class="btn pri" type="submit">반영방법 저장</button> <button class="btn" type="button" onclick="view.jRuleDraft=null;view.jRuleOriginal=null;view.jError='';render()">닫기</button></form>`;
 }
