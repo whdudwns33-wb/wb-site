@@ -91,6 +91,8 @@ const env = { DB: new LocalD1(openDatabase()) };
 if (process.env.HUBSPOT_ACCESS_TOKEN) env.HUBSPOT_ACCESS_TOKEN = process.env.HUBSPOT_ACCESS_TOKEN;
 if (process.env.HUBSPOT_API_BASE) env.HUBSPOT_API_BASE = process.env.HUBSPOT_API_BASE;
 if (process.env.WB_SALESDESK_READ_KEY) env.WB_SALESDESK_READ_KEY = process.env.WB_SALESDESK_READ_KEY;
+if (process.env.WB_ACADEMY_READ_KEY) env.WB_ACADEMY_READ_KEY = process.env.WB_ACADEMY_READ_KEY;
+if (process.env.WB_CS_READ_KEY) env.WB_CS_READ_KEY = process.env.WB_CS_READ_KEY;
 const server = http.createServer((req, res) => {
   const pathname = String(req.url || '/').split('?')[0];
   // /partner 는 /partner/ 로 — 상대 경로(./partner.js)가 /partner.js 로 풀리지 않게(운영 자산 바인딩도 같은 리다이렉트를 한다)
