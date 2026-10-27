@@ -28,6 +28,7 @@
     unique(data.courses); unique(data.admissions); unique(data.directory);
     const official = new Set(['samyook.jge.ms.kr', 'gice.gen.go.kr', 'ai.jge.go.kr', 'gifted.gnue.ac.kr', 'csge.jnu.ac.kr', 'school.jbedu.kr', 'office.jbedu.kr', 'posef.or.kr', 'changpyeong.hs.jne.kr', 'www.jnei.go.kr', 'gifted.mokpo.ac.kr', 'www.scnu.ac.kr', 'select.gifted.ac.kr', 'ged.kedi.re.kr', 'kunsan.gidea.co.kr', 'kentech.ac.kr', 'kj-gart.jge.ms.kr', 'dream.mokpo.ac.kr', 'talented.kaist.ac.kr', 'mped.jge.go.kr', 'ysed.jge.go.kr', 'njed.jne.go.kr', 'jge.go.kr', 'www.jbe.go.kr', 'jhed.jge.go.kr', 'junior.kaist.ac.kr', 'dyed.jge.go.kr', 'gjed.jge.go.kr', 'gsed.jge.go.kr', 'gyed.jge.go.kr', 'hned.jge.go.kr', 'hped.jge.go.kr', 'hsed.jge.go.kr', 'jsed.jge.go.kr', 'kred.jge.go.kr', 'maed.jge.go.kr', 'njed.jge.go.kr', 'saed.jge.go.kr', 'wded.jge.go.kr', 'yaed.jge.go.kr', 'yged.jge.go.kr']);
     official.add('yongjeong.ms.jne.kr');
+    official.add('jnucsge.gidea.co.kr');
     for (const source of data.sources) {
       const url = new URL(source.url);
       if (url.protocol !== 'https:' || !official.has(url.hostname) || url.username || url.password) throw new Error('공식 출처 주소 오류');
@@ -43,6 +44,7 @@
     for (const admission of data.admissions) {
       if (!institutions.has(admission.institution) || admission.year !== data.educationYear) throw new Error('전형 학년도 오류');
       if (admission.tracks && (!Array.isArray(admission.tracks) || admission.tracks.some(t => !t.name || !t.target || !t.documents))) throw new Error('전형별 안내 오류');
+      if (admission.tracks?.some(t => t.source && !sources.has(t.source))) throw new Error('전형별 출처 오류');
       if (admission.subjects && ['kor','math','eng','bible'].some(key => !admission.subjects[key])) throw new Error('교과 범위 오류');
     }
     for (const event of data.events) if (!institutions.has(event.institution) || instant(event.end) < instant(event.start)) throw new Error('일정 연결·순서 오류');
