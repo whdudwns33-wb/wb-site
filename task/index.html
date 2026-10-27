@@ -9372,7 +9372,7 @@ function lessonDraftFromTask(t) {
     homework: t.homework || '', studentTraits: t.studentTraits || '', goal: t.goal || '',
     parentRequest: t.parentRequest || '', adminRequest: t.adminRequest || '없음', start: t.start || today(),
     firstClassDate: lessonRegistrationIsoDate(t.firstClassDate),
-    _sourceTaskId: t.id, _sourceUpdatedAt: Number(t.updatedAt || 0)
+    effectiveDate: today(), _sourceTaskId: t.id, _sourceUpdatedAt: Number(t.updatedAt || 0)
   };
 }
 
@@ -9617,7 +9617,8 @@ function viewLessonEntry() {
         '<div class="hint mb8">확정 시간마다 요일·시작·종료·수업시수를 입력해 주세요. 표시용 문장은 확정 시간표에서 자동으로 만들어집니다.</div>' +
         (draft.scheduleSlots || []).map(lessonSlotHtml).join('') +
         '<button class="btn btn-sm btn-ghost mb14" data-act="lessonslotadd">＋ 다른 시간대 추가</button>' +
-      '<div class="grid2"><label class="field"><span class="fl">적용 시작일</span><input class="in" type="date" data-lesson-field="start" value="' + esc(draft.start || today()) + '"></label>' +
+      '<div class="grid2"><label class="field"><span class="fl">' + (draft._sourceTaskId ? '변경 적용일 (필수)' : '적용 시작일') + '</span><input class="in" type="date" required data-lesson-field="' + (draft._sourceTaskId ? 'effectiveDate' : 'start') + '" value="' + esc(draft._sourceTaskId ? (draft.effectiveDate || '') : (draft.start || today())) + '">' +
+        (draft._sourceTaskId ? '<div class="hint mt8">최초 시작일 ' + esc(draft.start || '미지정') + '은 유지됩니다. 변경 적용일 이전 시간표·메모·출결은 보존됩니다.</div>' : '') + '</label>' +
       '<label class="field"><span class="fl">과목별 첫 수업일 (선택)</span><input class="in" type="date" data-lesson-field="firstClassDate" value="' + esc(draft.firstClassDate || '') + '">' +
         '<div class="hint mt8">비워도 수업을 생성할 수 있습니다.</div></label></div>' +
       '<button class="btn btn-primary btn-block mt14" data-act="lessonpreview">' + (draft._sourceTaskId ? '수정 내용 미리보기' : '등록 내용 미리보기') + '</button>'));
@@ -9890,6 +9891,7 @@ function previewLessonRegistration() {
   lessonPreviewExpectedUpdatedAt = existing ? Number(existing.updatedAt || draft._sourceUpdatedAt || 0) : 0;
   modal(existing ? '수업 정보 수정 미리보기' : '수업 등록 미리보기',
     '<div class="guide"><b>' + esc(taskBody.title) + '</b>' +
+      (draft._sourceTaskId ? '<div class="hint">변경 적용일: ' + esc(draft.effectiveDate || '선택 필요') + ' · 이전 시간표와 기록은 유지됩니다.</div>' : '') +
       (lessonPreviewRosterStudent ? '<b>원생 기본 정보</b>' + esc([lessonPreviewRosterStudent.school, lessonPreviewRosterStudent.grade,
         lessonPreviewRosterStudent.subject, lessonPreviewRosterStudent.registrationDate, lessonPreviewRosterStudent.firstClassDate].filter(Boolean).join(' · ')) + '<br><br>' : '') +
       '<b>1. 학생</b><br>' + previewValue(staffStudentCompactLabel(selected, taskBody.studentName, taskBody.grade)) + '<br><br>' +
@@ -9936,11 +9938,16 @@ async function saveLessonRegistration(button) {
         rosterSaved = true;
       }
     }
+    if (draft._sourceTaskId && !lessonRegistrationIsoDate(draft.effectiveDate)) throw new Error('변경 적용일을 선택해 주세요');
     const result = await sync.post('/lesson-create', {
       app: SYNC_APP, auth: auth, staffId: targetStaffId,
       sourceTaskId: draft._sourceTaskId || undefined,
+      effectiveDate: draft._sourceTaskId ? draft.effectiveDate : undefined,
       expectedUpdatedAt: lessonPreviewExpectedUpdatedAt || undefined,
-      lesson: lessonPreviewPayload
+      // 적용일 이전 시간표는 서버 원본에서 보존한다. 읽기 전용 과거 행을 재입력하지 않는다.
+      lesson: draft._sourceTaskId ? Object.assign({}, lessonPreviewPayload, {
+        scheduleSlots: (lessonPreviewPayload.scheduleSlots || []).filter(slot => !slot.validTo || slot.validTo >= draft.effectiveDate)
+      }) : lessonPreviewPayload
     });
     applyCreatedLesson(result.task);
     if (result.updated && session.isAdmin) { studentChangeLoaded = false; loadStudentChanges(true); }

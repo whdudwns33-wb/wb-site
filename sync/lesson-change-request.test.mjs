@@ -120,6 +120,17 @@ test('staff can propose a change and it does not touch the live task until appro
   assert.equal(liveTask.days.join(','), '1,3,5', '승인 전에는 실제 지시서가 그대로다');
 });
 
+test('legacy approval cannot hide stored notes by changing weekdays', async () => {
+  const db=new TestD1();seed(db);
+  db.prepare("INSERT INTO checks(app,k,owner,data,updated_at,srv_at) VALUES ('task','task-1|2026-08-03','S-kim',?,100,100)")
+    .bind(JSON.stringify({note:'기존 기록'})).run();
+  const submit=await call(db,'/lesson-change-request',{auth:person('S-kim','tok-kim'),action:'submit',taskId:'task-1',changes:{days:[2,4]}});
+  const approve=await call(db,'/lesson-change-review',{auth:admin,action:'approve',requestKey:submit.body.request.requestKey,revision:1});
+  assert.equal(approve.status,409);
+  assert.equal(approve.body.code,'LESSON_HISTORY_PROTECTED');
+  assert.deepEqual(JSON.parse(db.prepare("SELECT data FROM tasks WHERE id='task-1'").first().data).days,[1,3,5]);
+});
+
 test('submitting for a missing task 404s, and for someone else\'s task 403s', async () => {
   const db = new TestD1(); seed(db);
   const missing = await call(db, '/lesson-change-request', {

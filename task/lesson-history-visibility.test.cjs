@@ -23,3 +23,5 @@ assert.equal(occurs({ ...task, repeat: 'once', start: '2026-10-24' }, '2026-10-2
 assert.equal(occurs({ ...task, repeat: 'once', start: '2026-10-24' }, '2026-10-25'), false);
 assert.equal(occurs({ ...task, repeat: 'daily' }, '2026-10-18'), true);
 console.log('lesson history visibility: passed');
+assert.match(html, /변경 적용일 \(필수\)/);
+assert.match(html, /effectiveDate: draft\._sourceTaskId \? draft\.effectiveDate/);

@@ -104,9 +104,9 @@ function normalizeWords(value) {
   return String(value || '').normalize('NFKC').toLowerCase().replace(/[‐‑‒–—―−~～]/g, '-').replace(/\s+/g, ' ').trim();
 }
 
-function normalizeSlots(rawSlots, validFrom, lessonRole, fallbackLessonHours) {
+function normalizeSlots(rawSlots, validFrom, lessonRole, fallbackLessonHours, limit = MAX_SCHEDULE_SLOTS) {
   if (!Array.isArray(rawSlots)) return [];
-  if (rawSlots.length > MAX_SCHEDULE_SLOTS) throw new Error('확정 시간은 최대 20개까지 입력할 수 있습니다');
+  if (rawSlots.length > limit) throw new Error('확정 시간은 최대 20개까지 입력할 수 있습니다');
 
   const normalized = rawSlots.map((raw, index) => {
     const days = [...new Set((Array.isArray(raw && raw.days) ? raw.days : [])
@@ -247,6 +247,8 @@ function lessonGuide(input) {
     '■ 관리자 요청사항\n' + input.adminRequest
   ].join('\n\n');
 }
+
+import { preserveLessonHistory, assertLessonRecordsVisible } from './lesson-history.js';
 
 export async function buildLessonTask(raw, staffId, origin, serverNow) {
   raw = raw && typeof raw === 'object' ? raw : {};
@@ -534,7 +536,8 @@ async function contentHashForTask(task) {
   }
   try {
     const role = task.lessonRole || task.className || task.subject;
-    const slots = normalizeSlots(task.scheduleSlots || [], task.start, role, task.lessonHours);
+    // 서버가 누적한 과거 이력은 신규 입력의 20개 제한에 포함하지 않는다.
+    const slots = normalizeSlots(task.scheduleSlots || [], task.start, role, task.lessonHours, Infinity);
     const status = slots.length ? 'confirmed' : 'needs_review';
     const reason = status === 'needs_review'
       ? (task.scheduleReviewReason || '구조화된 요일·시작·종료 시간이 아직 확정되지 않았습니다') : '';
@@ -752,12 +755,30 @@ export async function handleLessonCreate(env, app, body, origin, auth, json) {
       return revisionConflict(json, origin, current);
     }
 
-    const corrected = correctedTask(task, current, Date.now(), taskOrigin);
+    let corrected = correctedTask(task, current, Date.now(), taskOrigin);
+    const recordRows = (await env.DB.prepare(
+      'SELECT k,data,updated_at FROM checks WHERE app=? AND substr(k,1,?)=?'
+    ).bind(app, current.id.length + 1, current.id + '|').all()).results || [];
+    try {
+      corrected = preserveLessonHistory(current, corrected, body.effectiveDate, { allowLegacyConversion: recordRows.length === 0 });
+      if (teacherTransferred && body.effectiveDate > batchRosterKstDate(Date.now())) {
+        return json({ ok: false, code: 'LESSON_HISTORY_PROTECTED', error: '담당 선생님 변경은 오늘 또는 지난 날짜로 적용해 주세요. 미래 담당 변경 예약은 지원하지 않습니다' }, 409, origin);
+      }
+      assertLessonRecordsVisible(current, corrected, recordRows);
+    } catch (error) {
+      if (error.code === 'LESSON_HISTORY_PROTECTED') return json({ ok: false, code: error.code, error: error.message }, 409, origin);
+      throw error;
+    }
+    delete corrected.lessonContentHash;
+    corrected.lessonContentHash = await contentHashForTask(corrected);
     const scheduleRevision = await readStudentScheduleRevisionSnapshot(env, app,
       [String(current.studentId || ''), String(corrected.studentId || '')].filter(Boolean));
     try {
       if (!(teacherTransferred && sameStudentLessonSchedule(current, corrected))) {
-        await assertStudentLessonScheduleAvailable(env, app, corrected);
+        // 과거 슬롯은 서버가 그대로 보존했으므로 변경 적용일 이후만 새 충돌로 검사한다.
+        await assertStudentLessonScheduleAvailable(env, app, body.effectiveDate
+          ? { ...corrected, start: body.effectiveDate > corrected.start ? body.effectiveDate : corrected.start }
+          : corrected);
       }
     } catch (error) {
       const response = scheduleConflictResponse(json, origin, error);
@@ -769,6 +790,13 @@ export async function handleLessonCreate(env, app, body, origin, auth, json) {
       source: [current.id, revisionOf(current), corrected.lessonRevision].join('\n'),
       updatedAt: corrected.updatedAt
     });
+    // 조회 이후 다른 기기에서 메모를 저장했으면 시간표 저장도 다시 검토한다.
+    scheduleGuards.push(env.DB.prepare(
+      "INSERT INTO task_write_cas_guards(app,guard_id,operation,previous_changes,created_at) " +
+      "SELECT ?,?,'lesson_history_records',CASE WHEN COUNT(*)=? AND COALESCE(SUM(updated_at),0)=? THEN 1 ELSE 0 END,? " +
+      'FROM checks WHERE app=? AND substr(k,1,?)=?'
+    ).bind(app, 'twcg_history_' + crypto.randomUUID(), recordRows.length,
+      recordRows.reduce((n,r) => n + Number(r.updated_at || 0), 0), corrected.updatedAt, app, current.id.length + 1, current.id + '|'));
     const databaseUpdatedAt = Number.isFinite(row.updatedAt) ? row.updatedAt : Number(current.updatedAt);
     let result;
     if (teacherTransferred) {
@@ -799,7 +827,7 @@ export async function handleLessonCreate(env, app, body, origin, auth, json) {
       statements.push(lessonCheckOwnerTransferStatement(
         env, app, current.id, sourceOwner, staffId, corrected.updatedAt
       ));
-      const effectiveDate = batchRosterKstDate(corrected.updatedAt);
+      const effectiveDate = body.effectiveDate || batchRosterKstDate(corrected.updatedAt);
       const eventId = await studentChangeEventId('lesson-create-teacher\n' + corrected.id + '\n' + corrected.lessonRevision);
       statements.push(studentChangeEventStatement(env, app, {
         eventId, studentId: String(corrected.studentId), taskId: corrected.id,
@@ -876,7 +904,7 @@ export async function handleLessonCreate(env, app, body, origin, auth, json) {
             before: Object.fromEntries(changedFields.map(key => [key, current[key] == null ? '' : current[key]])),
             after: Object.fromEntries(changedFields.map(key => [key, corrected[key] == null ? '' : corrected[key]]))
           },
-          audienceStaffIds: [staffId], requiresAck: true, changedAt: corrected.updatedAt,
+          audienceStaffIds: [staffId], effectiveDate: body.effectiveDate || null, requiresAck: true, changedAt: corrected.updatedAt,
           changedBy: studentChangeActorKey(auth)
         }).run();
       }
