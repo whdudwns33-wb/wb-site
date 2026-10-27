@@ -82,7 +82,7 @@ fs.mkdirSync(path.join(DIST, 'haru'), { recursive: true });
 const HARU_FILES = ['index.html', 'parent.html', 'guide.html', 'strings.js', 'plan.js', 'mastery.js', 'srs.js', 'cause.js', 'probe.js', 'preview.js', 'atoms.json', 'sw.js', 'manifest.webmanifest', 'icon.svg'];
 for (const f of HARU_FILES) fs.copyFileSync(path.join(HARU, f), path.join(DIST, 'haru', f));
 /* 읽기 안내만 복사한다. 생성기·검사·학생 데이터는 공개하지 않는다. */
-const HARU_PUBLIC_FILES = ['v2/index.html', 'v2/samyook/index.html', 'v2/gwangju-gifted/index.html', 'v2/style.css', 'v2/catalog.js', 'v2/public.js', 'v2/catalog.json'];
+const HARU_PUBLIC_FILES = ['v2/index.html', 'v2/samyook/index.html', 'v2/gwangju-gifted/index.html', 'v2/middle-schools/index.html', 'v2/style.css', 'v2/catalog.js', 'v2/public.js', 'v2/catalog.json'];
 for (const f of HARU_PUBLIC_FILES) {
   const target = path.join(DIST, 'haru', f);
   fs.mkdirSync(path.dirname(target), { recursive: true });
@@ -224,7 +224,7 @@ function verifyRefs(htmlPath) {
 const broken = [];
 for (const f of ['index.html', 'vocab/index.html', 'vocab-age/index.html', 'admin/index.html',
   'admin/metrics.html', 'admin/vocab-review.html', 'review.html', 'parent.html',
-  'naesin/index.html', 'haru/index.html', 'haru/parent.html', 'haru/guide.html', 'haru/v2/index.html', 'haru/v2/samyook/index.html', 'haru/v2/gwangju-gifted/index.html', 'admin/haru-admin.html', 'admin/naesin-admin.html',
+  'naesin/index.html', 'haru/index.html', 'haru/parent.html', 'haru/guide.html', 'haru/v2/index.html', 'haru/v2/samyook/index.html', 'haru/v2/gwangju-gifted/index.html', 'haru/v2/middle-schools/index.html', 'admin/haru-admin.html', 'admin/naesin-admin.html',
   'hanja/index.html', 'admin/hanja-admin.html', 'admin/hanja-print.html',
   'chunk/index.html', 'chunk/print.html', 'chunk/class.html', 'admin/chunk-admin.html',
   'letter/index.html', 'admin/letter-admin.html']) {
