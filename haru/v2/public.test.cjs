@@ -355,5 +355,29 @@ async function test(name, fn) { await fn(); console.log('통과:', name); count+
       const copy=structuredClone(data);mutate(copy);assert.throws(()=>catalog.validate(copy));
     }
   });
+  await test('등록·예비소집 후속과 약도·안전관리는 확인 범위와 대상이 분리됨', async () => {
+    const [hs,ys,yj]=data.schoolGuides;
+    assert.match(hs.followup[0].text,/2건.*2026학년도/);
+    assert.match(hs.followup[1].text,/2027\/2\/13 10:00.*5건.*2\/7/);
+    assert.match(ys.followup[0].text,/후보.*개별 통보.*기한.*따로/);
+    assert.match(ys.followup[1].text,/무시험 배정원서 마감 이전.*오리엔테이션.*12건/);
+    assert.match(yj.followup[1].text,/중앙현관.*10\/17~18.*최종 합격자 등록 장소/);
+    assert.match(yj.followup[2].text,/이미 종료된.*학교 안내.*당시 유증상.*PAPS 기록.*공통서류.*아니며/);
+    assert.match(yj.unknown,/약도 이미지와 안전관리 첨부 전문은 확인 완료/);
+    assert.doesNotMatch(yj.unknown,/미검수/);
+    assert(!yj.notices.includes('yj-stage2-1027'));
+    for(const s of data.schoolGuides)for(const row of s.followup){
+      const src=data.sources.find(x=>x.id===row.source);assert(src);assert.equal(src.checkedAt,'2026-10-27');
+    }
+    const bad=structuredClone(data);bad.schoolGuides[0].followup[0].source='없음';
+    assert.throws(()=>catalog.validate(bad));
+    const {outputs}=await import(pathToFileURL(path.join(__dirname,'build.mjs')).href);
+    const html=outputs['middle-schools/index.html'];
+    assert.match(html,/면접 당일 약도 확인 완료/);
+    assert.match(html,/등록·예비소집과 추가 확인/);
+    assert.match(html,/건강기록·동의서를 수집하지 않습니다/);
+    assert.match(html,/수업 시간·횟수·수강료·담당자·개설일은 모두 미정/);
+    assert.doesNotMatch(html,/약도 이미지·안전관리 첨부 전문은 미검수/);
+  });
   console.log('새 공개 안내:', count, '개 통과');
 })().catch(error => { console.error(error); process.exitCode = 1; });
