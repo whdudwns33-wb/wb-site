@@ -1607,6 +1607,17 @@ function plannedOccursOn(task, date) {
   if (task.deleted) return false;
   if (task.start && date < task.start) return false;
   if (task.end && date > task.end) return false;
+  // 요일 변경 전 기록도 해당 날짜의 시간표로 열어야 메모가 가려지지 않는다.
+  // 단발 보강·일반 업무의 반복 규칙은 바꾸지 않는다.
+  if (task.repeat === 'days' && Array.isArray(task.scheduleSlots) && task.scheduleSlots.length) {
+    return task.scheduleSlots.some(slot => {
+      if (!slot) return false;
+      const from = String(slot.validFrom || slot.startDate || '');
+      const to = String(slot.validTo || slot.endDate || '');
+      return (!from || from <= date) && (!to || date <= to) &&
+        Array.isArray(slot.days) && slot.days.map(Number).includes(dowOf(date));
+    });
+  }
   switch (task.repeat) {
     case 'once':    return date === task.start;
     case 'daily':   return true;
