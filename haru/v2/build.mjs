@@ -102,6 +102,7 @@ const schoolArticles = data.schoolGuides.map(s => `<article class="institution" 
 <h3>전형별 자격·추천·증빙</h3>${s.tracks.map(t=>`<details><summary>${esc(t.name)}</summary><div><p>${esc(t.target)}</p><p>${esc(t.documents)}</p></div></details>`).join('')}
 <h3>공식 일정 · 2027학년도</h3>${schedule(s.events)}${source(s.source)}
 <details><summary>정정·추가 안내와 확인 범위</summary><div>${s.notices.map(source).join('')}</div></details>
+<h3>등록·예비소집과 추가 확인</h3>${s.followup.map(step=>`<section><h4>${esc(step.title)}</h4><p>${esc(step.text)}</p>${source(step.source)}</section>`).join('')}
 <h3>WB 준비 제안 · 공식 필수 과제 아님</h3><ul>${s.preparation.map(p=>`<li>${esc(p)}</li>`).join('')}</ul><h3>추가로 확인할 것</h3><p class="status">${esc(s.unknown)}</p>
 <a href="#consult">${esc(s.name)} 준비 상담 방법</a></article>`).join('');
 const middleSchools = page('화산·영선·용정중 준비','middle-schools/',intro('화산·영선·용정중 준비','학교마다 지원 자격·선발 방식·서류가 다릅니다. 2027학년도 공식 요강과 추가 공지를 대조하고, 다음 학년도 준비 활동을 구분합니다.')+contents([['hs','화산중'],['ys','영선중'],['yj','용정중'],['grades','학년별 준비'],['schedule','올해·다음 모집'],['faq','질문'],['consult','상담']])+`
