@@ -13,7 +13,7 @@ async function test(name, fn) { await fn(); console.log('통과:', name); count+
   await test('입학연도·현재학년·출처 버전과 이전 확인 이력 보존', () => {
     catalog.validate(data);
     assert.equal(data.sources.find(s => s.id === 'gnue-2027-1007').checkedAt, '2026-10-07');
-    const changes = [d => d.educationYear = 2028, d => d.sources[0].url = 'javascript:alert(1)', d => d.sources[0].checkedAt = '2026-10-14', d => d.sources[0].checkedAt = '2026-02-30', d => d.institutions[0].source = '없는 출처', d => d.courses[0].grades = [7], d => d.courses.push(d.courses[0]), d => d.events[0].end = '2026-10-01', d => d.admissions[0].year = 2026];
+    const changes = [d => d.educationYear = 2028, d => d.sources[0].url = 'javascript:alert(1)', d => d.sources[0].checkedAt = new Date(catalog.instant(d.referenceDate)+2*86400000).toISOString().slice(0,10), d => d.sources[0].checkedAt = '2026-02-30', d => d.institutions[0].source = '없는 출처', d => d.courses[0].grades = [7], d => d.courses.push(d.courses[0]), d => d.events[0].end = '2026-10-01', d => d.admissions[0].year = 2026];
     for (const mutate of changes) { const copy = structuredClone(data); mutate(copy); assert.throws(() => catalog.validate(copy)); }
   });
   await test('한국시간 접수 시작·마감 경계와 미확정 마감 시각', () => {
@@ -198,7 +198,7 @@ async function test(name, fn) { await fn(); console.log('통과:', name); count+
       assert.equal(new URL(source.url).searchParams.get('stndYear'), '2025');
       assert.equal(source.status, '전년도 참고');
     }
-    assert.equal(data.directory.length, 68);
+    assert.equal(data.directory.length, 69);
     assert.equal(data.courses.length, 21);
     for (const id of ['jn-cyber', 'jb-cyber']) {
       const entry = data.directory.find(e => e.id === id);
@@ -321,6 +321,38 @@ async function test(name, fn) { await fn(); console.log('통과:', name); count+
         if (fs.statSync(target).isDirectory()) target = path.join(target, 'index.html');
         assert.ok(fs.readFileSync(target, 'utf8').includes('id="' + id + '"'), file + ' 앵커 누락: ' + link);
       }
+    }
+  });
+  await test('세 중학교의 자격·부수·소인/도착 기준·평가를 학교별로 구분', async () => {
+    assert.deepEqual(data.schoolGuides.map(s=>s.id), ['hs','ys','yj']);
+    const [hs,ys,yj] = data.schoolGuides;
+    assert.match(hs.assessment, /500명.*각 20점.*60점/);
+    assert.match(hs.application, /우편만.*10\/6.*10\/15.*소인/);
+    assert.match(hs.documents, /담임교사.*가리지 않은.*1부.*도말.*1부/);
+    assert.match(ys.application, /방문.*우편.*17:00.*도착/);
+    assert.match(ys.documents, /각각 원본 1부.*사본 2부.*총 3부/);
+    assert.match(ys.curriculum, /교과 지필고사.*교과 지식.*하지 않는/);
+    assert.match(ys.tracks.find(t=>t.name==='정원 외').target, /고창군.*지원 불가/);
+    assert.match(yj.assessment, /3배수.*55%.*30%.*15%/);
+    assert.match(yj.documents, /담임 출력본이 아닌.*행정실.*면접 당일/);
+    assert.match(yj.tracks.find(t=>t.name==='전남지역 인재').target, /보성군을 제외.*초등학교/);
+    const deadline=yj.events.find(e=>e.kind==='추가합격 등록 마감');
+    assert.equal(deadline.start,deadline.end);
+    for(const s of data.schoolGuides){
+      assert.equal(data.directory.find(d=>d.id===s.id).source,s.source);
+      assert.equal(data.sources.find(x=>x.id===s.source).checkedAt,'2026-10-27');
+      assert.match(s.current,/종료/); assert.match(s.unknown,/2028/);
+    }
+    const {outputs}=await import(pathToFileURL(path.join(__dirname,'build.mjs')).href);
+    const html=outputs['middle-schools/index.html'];
+    for(const s of data.schoolGuides) assert.ok(html.includes('id="'+s.id+'"'));
+    assert.match(outputs['index.html'],/세 학교 준비 비교/);
+    assert.match(html,/WB 준비 제안 · 공식 필수 과제 아님/);
+    assert.match(html,/수업 시간·횟수·수강료·담당자·개설일은 모두 미정/);
+    assert.match(html,/증빙 실물을 수집하지 않습니다/);
+    assert.match(read('../../reading-server/build-dist.mjs'),/v2\/middle-schools\/index.html/);
+    for(const mutate of [d=>d.schoolGuides[0].source='없음',d=>d.schoolGuides[0].notices=['없음'],d=>d.schoolGuides[0].events[0].end='2026-01-01',d=>d.schoolGuides.push(d.schoolGuides[0])]){
+      const copy=structuredClone(data);mutate(copy);assert.throws(()=>catalog.validate(copy));
     }
   });
   console.log('새 공개 안내:', count, '개 통과');
