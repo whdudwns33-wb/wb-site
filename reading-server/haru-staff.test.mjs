@@ -1,0 +1,98 @@
+import assert from 'node:assert/strict';
+import { mkdtemp, rm, readFile } from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import vm from 'node:vm';
+import http from 'node:http';
+import { createStaffServer } from './haru-staff-server.mjs';
+import { allowedStaffRoute } from './haru-staff-routes.mjs';
+
+const dir = await mkdtemp(path.join(os.tmpdir(), 'haru-staff-'));
+const calls = [];
+const config = { privateDir: dir, port: 0, publicOrigin: 'https://haru.example.test', backend: 'https://backend.example.test', secret: 'test-gateway-secret',
+  fetch: async (url, options) => { calls.push({ url: String(url), options }); return Response.json({ ok: true }); } };
+const app = await createStaffServer(config);
+await new Promise(resolve => app.server.listen(0, '127.0.0.1', resolve));
+config.port = app.server.address().port;
+const origin = 'http://127.0.0.1:' + config.port;
+let checks = 0;
+function equal(a, b) { assert.deepEqual(a, b); checks++; }
+async function request(p, method = 'GET', data, token, headers = {}) {
+  const r = await fetch(origin + p, { method, headers: { ...(data ? { 'Content-Type': 'application/json' } : {}), ...(token ? { Authorization: 'Bearer ' + token } : {}), ...headers }, ...(data ? { body: JSON.stringify(data) } : {}), redirect: 'manual' });
+  return { status: r.status, body: (r.headers.get('content-type') || '').includes('json') ? await r.json() : await r.text() };
+}
+try {
+  app.seed('wb테스트', '가상 교사', '0000');
+  app.seed('wb테스트', '덮어쓰기 금지', '다른비밀번호');
+  app.seed('wb다른교사', '다른 가상 교사', '0000');
+  equal(app.db.prepare('SELECT name FROM users WHERE id=?').get('wb테스트').name, '가상 교사');
+  equal((await request('/api/haru/admin/students')).status, 401);
+  equal((await request('/api/haru/staff/login', 'POST', { id: 'wb테스트', password: '틀림' })).status, 401);
+  equal((await request('/api/haru/staff/login', 'POST', { id: 'wb테스트', password: '0000' }, null, { 'CF-Connecting-IP': '198.51.100.1' })).status, 403);
+  const first = await request('/api/haru/staff/login', 'POST', { id: 'wb테스트', password: '0000' });
+  equal(first.body.mustChange, true);
+  equal((await request('/api/haru/admin/students', 'GET', null, first.body.token)).status, 403);
+  equal((await request('/api/haru/staff/keys', 'POST', { label: '막아야 함' }, first.body.token)).status, 403);
+  equal((await request('/api/haru/staff/password', 'POST', { currentPassword: '0000', password: '짧음' }, first.body.token)).status, 400);
+  equal((await request('/api/haru/staff/password', 'POST', { currentPassword: '0000', password: '새비밀번호1234' }, first.body.token, { 'CF-Ray': 'test-tunnel' })).status, 403);
+  equal((await request('/api/haru/staff/password', 'POST', { currentPassword: '0000', password: '새비밀번호1234' }, first.body.token)).status, 200);
+  equal((await request('/api/haru/staff/me', 'GET', null, first.body.token)).status, 401);
+  const login = await request('/api/haru/staff/login', 'POST', { id: 'wb테스트', password: '새비밀번호1234' }, null, { 'CF-Connecting-IP': '198.51.100.1' });
+  const session = login.body.token;
+  equal(login.body.mustChange, false);
+  equal((await request('/api/haru/admin/students', 'GET', null, session)).status, 200);
+  equal(calls.at(-1).options.headers.Authorization, 'Bearer ' + config.secret);
+  equal((await request('/api/admin/students', 'GET', null, session)).status, 403);
+  equal((await request('/api/haru/state', 'GET', null, session)).status, 403);
+  equal((await request('/api/haru/staff/me', 'GET', null, session, { Origin: 'https://evil.example' })).status, 403);
+  const badHost = await new Promise(resolve => http.get(origin + '/healthz', { headers: { Host: 'evil.example' } }, response => { response.resume(); resolve(response.statusCode); }));
+  equal(badHost, 403);
+  const issued = await request('/api/haru/staff/keys', 'POST', { label: '테스트 연결' }, session);
+  const key = issued.body.token;
+  equal(issued.status, 200);
+  equal((await request('/api/haru/admin/plans', 'GET', null, key)).status, 200);
+  equal((await request('/api/haru/staff/keys', 'POST', { label: '키 재발급 금지' }, key)).status, 403);
+  equal((await request('/api/haru/staff/password', 'POST', { currentPassword: '새비밀번호1234', password: '변경금지1234' }, key)).status, 403);
+  const mcp = (method, params) => request('/mcp', 'POST', { jsonrpc: '2.0', id: 1, method, params }, key);
+  equal((await mcp('initialize', { protocolVersion: '2025-11-25' })).body.result.protocolVersion, '2025-11-25');
+  equal((await mcp('tools/list')).body.result.tools[0].name, 'haru_admin_request');
+  equal((await mcp('tools/call', { name: 'haru_admin_request', arguments: { method: 'GET', path: '/api/haru/admin/plans' } })).body.result.isError, false);
+  const before = calls.length;
+  equal((await mcp('tools/call', { name: 'haru_admin_request', arguments: { method: 'GET', path: 'https://evil.example/api/haru/admin/plans' } })).body.result.isError, true);
+  equal(calls.length, before);
+  equal((await mcp('tools/call', { name: 'haru_admin_request', arguments: { method: '__proto__', path: '/api/haru/admin/plans' } })).body.result.isError, true);
+  equal((await mcp('없는메서드')).body.error.code, -32601);
+  equal((await request('/api/haru/staff/login', 'POST', { id: [], password: '0000' })).status, 400);
+  equal((await request('/api/haru/staff/login', 'POST', { id: 'a'.repeat(9000), password: '0000' })).status, 413);
+  const listed = await request('/api/haru/staff/keys', 'GET', null, session);
+  equal(listed.body.keys.length, 1);
+  assert(!JSON.stringify(listed.body).includes(key)); checks++;
+  equal((await request('/api/haru/staff/keys', 'DELETE', { id: listed.body.keys[0].id }, session)).status, 200);
+  equal((await request('/api/haru/admin/plans', 'GET', null, key)).status, 401);
+  const again = (await request('/api/haru/staff/keys', 'POST', { label: '동시 폐기' }, session)).body.token;
+  equal((await request('/api/haru/staff/password', 'POST', { currentPassword: '새비밀번호1234', password: '다음비밀번호5678' }, session)).status, 200);
+  equal((await request('/api/haru/admin/plans', 'GET', null, again)).status, 401);
+  equal((await request('/api/haru/staff/me', 'GET', null, session)).status, 401);
+  for (let i = 0; i < 5; i++) await request('/api/haru/staff/login', 'POST', { id: 'wb다른교사', password: '실패' });
+  equal((await request('/api/haru/staff/login', 'POST', { id: 'wb다른교사', password: '0000' })).status, 429);
+  equal((await request('/.private/accounts.sqlite')).status, 404);
+  equal((await request('/reading-server/haru-staff-server.mjs')).status, 404);
+  const html = await request('/haru/staff/');
+  equal(html.status, 200);
+  new vm.Script(html.body.match(/<script>([\s\S]+)<\/script>/)[1]); checks++;
+  const admin = await request('/admin/haru-admin.html');
+  new vm.Script([...admin.body.matchAll(/<script(?: [^>]*)?>([\s\S]*?)<\/script>/g)].at(-1)[1]); checks++;
+  assert(admin.body.includes("location.replace('/haru/staff/')")); checks++;
+  equal((await request('/haru/v2/')).status, 200);
+  equal((await request('/haru/?preview=1')).status, 302);
+  equal(allowedStaffRoute('GET', '/api/haru/admin/plans/'), false);
+  equal(allowedStaffRoute('POST', '/api/haru/admin/purge'), true);
+  const stored = app.db.prepare('SELECT * FROM users').all();
+  assert(stored.every(u => /^[a-f0-9]{64}$/.test(u.hash) && u.hash !== '0000')); checks++;
+  assert(app.db.prepare('SELECT count(*) AS n FROM audit').get().n > 0); checks++;
+  console.log('개인 계정·권한·API·MCP·공개 경로 ' + checks + '개 검사 통과');
+} finally {
+  await new Promise(resolve => app.server.close(resolve));
+  app.db.close();
+  await rm(dir, { recursive: true, force: true });
+}

@@ -100,7 +100,8 @@ function serviceWorker(file = 'sw.js', offline = false) {
     for (const file of workers) {
       const { request, calls } = serviceWorker(file, true);
       for (const route of ['/haru/guide', '/haru/guide/', '/haru/guide.html', '/haru/guide.html/',
-        '/haru/guide?from=preview', '/haru/guide.html?from=parent#gift']) {
+        '/haru/guide?from=preview', '/haru/guide.html?from=parent#gift', '/haru/v2', '/haru/v2/',
+        '/haru/v2/samyook/', '/haru/v2/gwangju-gifted/?from=home', '/haru/v2/style.css', '/haru/v2/public.js', '/haru/v2/catalog.json']) {
         for (const mode of ['navigate', 'cors']) assert.equal(request(route, { mode }), undefined, file + ': ' + route);
       }
       assert.deepEqual(calls, { fetch: [], match: [], put: [] });
