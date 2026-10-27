@@ -67,7 +67,7 @@ export function portalSummary(raw, familyId) {
     cs: { pendingCount: count(cs.pendingCount), nextContactDate: cs.nextContactDate }, brunch: { attendedCount: count(brunch.attendedCount) } };
 }
 
-async function fetchSummary(env, familyId) {
+export async function fetchSummary(env, familyId) {
   // 테스트에서만 fetch를 주입한다. 운영 주소/헤더를 클라이언트가 정할 수 없고 리다이렉트로 키를 보내지 않는다.
   const fetchImpl = typeof env.PORTAL_FETCH === 'function' ? env.PORTAL_FETCH : globalThis.fetch;
   let phase = 'request', code = 'PORTAL_UNAVAILABLE', upstreamStatus;

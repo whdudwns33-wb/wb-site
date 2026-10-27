@@ -303,7 +303,7 @@ test('목록은 이름·학생·담당자 HTML을 escape하고 전화는 가린 
 
 test('고객 상세 왕복은 목록 조건·정렬·페이지를 유지하고 고객이나 저장 큐를 수정하지 않는다', async () => {
   const h = harness(many(70));
-  h.run('loadLeadQueue = async () => {}; loadPortalLink = async () => {};');
+  h.run('loadLeadQueue = async () => {}; loadPortalLink = async () => {}; loadCustomerCard = async () => {};');
   h.change('f-list-sort', 'name');
   h.change('f-channel', '맘카페');
   h.search('가상');
@@ -338,7 +338,7 @@ test('한글 조합 중에는 입력을 다시 만들지 않고 검색 후 커�
 
 test('검색 지연 중 상세로 이동하면 늦은 목록 렌더가 상세 화면을 덮지 않는다', () => {
   const h = harness(fixture());
-  h.run('loadLeadQueue = async () => {}; loadPortalLink = async () => {};');
+  h.run('loadLeadQueue = async () => {}; loadPortalLink = async () => {}; loadCustomerCard = async () => {};');
   h.input('가상 a');
   h.navigate('#/lead/a');
   const detail = h.html;
