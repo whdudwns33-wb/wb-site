@@ -1336,6 +1336,7 @@
   .self-identity-dialog h2 { font-size: 20px; }
   .week-time-scroll { overflow:auto; max-width:100%; border:1px solid #ccd7e0; border-radius:10px; }
   .week-time-table { width:100%; min-width:1020px; table-layout:fixed; border-collapse:separate; border-spacing:0; }
+  .week-time-table.is-weekend-only { min-width:320px; }
   .week-time-table th,.week-time-table td { padding:8px; border-right:1px solid #dde5ec; border-bottom:1px solid #dde5ec; vertical-align:top; }
   .week-time-table th { background:#edf3f8; font-size:14px; text-align:center; }
   .week-time-table th:first-child { width:64px; position:sticky; left:0; z-index:1; }
@@ -1424,7 +1425,7 @@
 <script src="./lesson-form-core.js?v=2026-10-22.1"></script>
 <script src="./task-push-client.js?v=2026-10-22.1"></script>
 <script src="./schedule-board-core.js?v=2026-10-22.1"></script>
-<script src="./week-timetable.js?v=2026-10-22.1"></script>
+<script src="./week-timetable.js?v=2026-10-22.1&patch=weekend-20261028"></script>
 <script src="./asset-core.js?v=2026-10-22.1"></script>
 <script src="./qr-core.js?v=2026-10-22.1"></script>
 <script src="./acaflow-import-core.js?v=2026-10-22.1"></script>
@@ -13406,6 +13407,10 @@ async function submitMakeupLink(button) {
 
 /* ── 주간 플래너 ── */
 let weekPlannerMode = 'timetable', weekPlannerAll = false;
+function weekPlannerDates(mon) {
+  const weekendOnly = !session.isAdmin && currentStaff()?.weekPlannerWeekendOnly === true;
+  return (weekendOnly ? [5,6] : [0,1,2,3,4,5,6]).map(i => addDays(mon,i));
+}
 let peerWeek = {key:'',staff:[],entries:[],target:'',loading:false,error:''};
 function peerWeekKey() { return JSON.stringify(sync.auth()) + '|' + mondayOf(cursor) + '|' + peerWeek.target; }
 async function loadPeerWeek() {
@@ -13439,7 +13444,7 @@ function viewWeek() {
   let h = '<div class="chips mb14">' + [['timetable','주간 시간표'],['checklist','업무 완료 체크표']].map(([value,title]) =>
     '<button class="chip ' + (weekPlannerMode === value ? 'on' : '') + '" data-act="weekplannermode" data-v="' + value + '">' + title + '</button>').join('') + '</div>';
   if (weekPlannerMode === 'checklist') return h + viewWeekChecklist();
-  const mon = mondayOf(cursor), days = Array.from({length:7}, (_,i) => addDays(mon,i));
+  const mon = mondayOf(cursor), days = weekPlannerDates(mon);
   const all = session.isAdmin && weekPlannerAll;
   const peerEnabled = !session.isAdmin && sync.personVerified && sync.peerLessonRead;
   if (peerEnabled) {
@@ -13448,7 +13453,7 @@ function viewWeek() {
   }
   if (session.isAdmin) h += staffSwitcher(me.id) + '<button class="btn btn-ghost mb14" data-act="weekplannerall">' + (all ? '선택한 선생님만 보기' : '전체 선생님 보기') + '</button>';
   h += '<div class="datenav"><button class="navbtn" data-act="week" data-n="-1" aria-label="이전 주">‹</button>' +
-    '<div class="d">' + esc(mon + ' ~ ' + days[6]) + '</div><button class="navbtn" data-act="week" data-n="1" aria-label="다음 주">›</button></div>' +
+    '<div class="d">' + esc(days[0] + ' ~ ' + days[days.length-1]) + '</div><button class="navbtn" data-act="week" data-n="1" aria-label="다음 주">›</button></div>' +
     '<button class="btn btn-sm btn-ghost mb14" data-act="todaydate">이번 주</button>' +
     '<div class="week-time-legend"><span class="is-regular">정규수업</span><span class="is-makeup">보강</span><span class="is-first">첫수업</span><span class="is-subscription">구독</span></div>' +
     '<div class="hint mb14">시작 시간순 표입니다. 빈 시간은 생략하며 수업 길이는 각 칸의 시작·종료 시간을 확인하세요. 좁은 화면에서는 표를 좌우로 밀어 보세요.</div>';
@@ -13456,17 +13461,18 @@ function viewWeek() {
     h += '<div class="hint mb14">동료 수업 읽기 전용 · 출결과 수업 기록을 수정할 수 없습니다.</div>';
     if (peerWeek.loading) return h + '<div class="card">수업 기록을 불러오는 중입니다.</div>';
     if (peerWeek.error) return h + '<div class="card">' + esc(peerWeek.error) + '</div>';
-    return h + WBWeekTimetable.render(peerWeek.entries,days,peerWeek.target,today()) + peerWeekProgress(peerWeek.entries);
+    const visible = peerWeek.entries.filter(entry => days.includes(entry.date));
+    return h + WBWeekTimetable.render(visible,days,peerWeek.target,today()) + peerWeekProgress(visible);
   }
   if (peerEnabled && peerWeek.error) h += '<div class="hint">' + esc(peerWeek.error) + '</div>';
   ensureWeekendVisitScheduleDates(days, all ? '' : me.id);
   const weekly = weeklyLessonSchedule(cursor);
   const teachers = all ? todayStaffList() : [me];
   teachers.forEach(staff => {
-    const entries = weekly.entries.filter(entry => entry.staffId === staff.id).map(entry => Object.assign({},entry, {
+    const entries = weekly.entries.filter(entry => entry.staffId === staff.id && days.includes(entry.date)).map(entry => Object.assign({},entry, {
       displayName: staffStudentCompactLabelById(entry.studentId,entry.studentName,entry.grade)
     }));
-    const issues = weekly.issues.filter(issue => issue.staffId === staff.id && issue.dates.length);
+    const issues = weekly.issues.filter(issue => issue.staffId === staff.id && issue.dates.some(date => days.includes(date)));
     const title = esc(staff.name) + ' 선생님 · ' + entries.length + '건';
     const body = WBWeekTimetable.render(entries,days,staff.id,today()) + (issues.length ? '<div class="hint">시간 확인 필요: ' + issues.map(issue => esc(issue.studentName + ' · ' + issue.message)).join(' / ') + '</div>' : '');
     h += all ? '<details class="card week-time-teacher" data-persist-key="week-time-' + esc(staff.id) + '"><summary>' + title + '</summary>' + body + '</details>' : '<section class="card"><div class="card-title mb14">' + title + '</div>' + body + '</section>';
@@ -13478,7 +13484,7 @@ function viewWeekChecklist() {
   const me = currentStaff();
   if (!me) return emptyStaffCard();
   const mon = mondayOf(cursor);
-  const days = Array.from({ length: 7 }, (_, i) => addDays(mon, i));
+  const days = weekPlannerDates(mon);
   ensureWeekendVisitScheduleDates(days, me.id);
   const rows = {};
   days.forEach(d => teacherTaskCardsFor(me.id, d).forEach(t => { rows[t.id] = t; }));
@@ -13491,7 +13497,7 @@ function viewWeekChecklist() {
 
   h += '<div class="datenav">' +
     '<button class="navbtn" data-act="week" data-n="-1">‹</button>' +
-    '<div class="d">' + shortDate(mon) + ' ~ ' + shortDate(days[6]) + '</div>' +
+    '<div class="d">' + shortDate(days[0]) + ' ~ ' + shortDate(days[days.length-1]) + '</div>' +
     '<button class="navbtn" data-act="week" data-n="1">›</button></div>';
 
   h += '<div class="card"><div class="between mb8">' +
