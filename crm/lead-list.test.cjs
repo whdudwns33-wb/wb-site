@@ -89,6 +89,16 @@ test('다음 일정 동률은 최신·이름·ID 순이며 입력 배열의 순�
   assert.deepEqual(ids(records, { sort: 'name' }), ['b', 'c', 'd', 'a']);
 });
 
+test('이름순은 보호자 이름이 없으면 목록에 표시되는 학생 이름으로 정렬한다', () => {
+  const records = [
+    lead('last', { name: undefined, child: { name: '다학생' }, createdAt: '2026-10-03' }),
+    lead('middle', { name: '나보호자', child: { name: '가학생' }, createdAt: '2026-10-02' }),
+    lead('first', { name: '', child: { name: '가학생' }, createdAt: '2026-10-01' })
+  ];
+  assert.deepEqual(ids(records, { sort: 'name' }), ['first', 'middle', 'last']);
+  assert.deepEqual(ids(records.slice().reverse(), { sort: 'name' }), ['first', 'middle', 'last']);
+});
+
 test('알 수 없거나 비정상인 조건은 전체 결과로 조용히 넓히지 않는다', () => {
   for (const filters of [{ status: '__proto__' }, { pipeline: '__proto__' }, { stage: '__proto__' }, { channel: '없는 채널' },
     { followup: 'tomorrow' }, { q: {} }, { owner: [] }, { stage: { toString: null } }]) {

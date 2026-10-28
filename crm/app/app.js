@@ -396,7 +396,7 @@ function syncBanner() {
   const n = outbox.size();
   const conflicts = Object.values(ui.leadConflicts);
   return '<div id="syncBar">' + (syncErr ? '<div class="banner bad">저장 보류 ' + n + '건 — ' + esc(syncErr) + ' <button class="btn btn-sm btn-ghost" data-act="retry-sync">다시 시도</button></div>' : '') +
-    conflicts.map(c => '<div class="banner warn">' + esc(c.draft.name || '고객') + ' — 다른 곳의 수정과 겹쳐 내 입력을 보관 중입니다. 새로고침 전에 확인해 주세요. <button class="btn btn-sm btn-ghost" data-act="lead-conflict" data-id="' + esc(c.id) + '">내 입력 검토</button></div>').join('') + '</div>';
+    conflicts.map(c => '<div class="banner warn">' + esc(C.leadLabel(c.draft)) + ' — 다른 곳의 수정과 겹쳐 내 입력을 보관 중입니다. 새로고침 전에 확인해 주세요. <button class="btn btn-sm btn-ghost" data-act="lead-conflict" data-id="' + esc(c.id) + '">내 입력 검토</button></div>').join('') + '</div>';
 }
 function patchSyncBar() { const bar = $('#syncBar'); if (!bar) return; const tmp = document.createElement('div'); tmp.innerHTML = syncBanner(); bar.replaceWith(tmp.firstChild); updateTabs(); }
 
@@ -421,7 +421,7 @@ function viewLogin() {
 /* ── 화면: 오늘 ─────────────────────────────────────── */
 function leadRow(l, extraHtml, actsHtml) {
   const dis = C.daysInStage(l, today());
-  return '<div class="lead" data-act="open-lead" data-id="' + esc(l.id) + '"><div class="avatar' + (l.hot && l.status === 'open' ? ' hot' : l.status === 'won' ? ' ok' : '') + '">' + esc(initial(l.name)) + '</div><div class="grow"><div class="lead-name">' + esc(C.leadLabel(l)) +
+  return '<div class="lead" data-act="open-lead" data-id="' + esc(l.id) + '"><div class="avatar' + (l.hot && l.status === 'open' ? ' hot' : l.status === 'won' ? ' ok' : '') + '">' + esc(initial(l.name || l.child && l.child.name)) + '</div><div class="grow"><div class="lead-name">' + esc(C.leadLabel(l)) +
     (l.hot && l.status === 'open' ? '<span class="pill hot">HOT</span>' : '') + statusPill(l) + '</div>' +
     '<div class="lead-sub"><span class="tag">' + esc(l.channel || '기타') + (l.partnerId && partnerById(l.partnerId) ? ' · ' + esc(partnerById(l.partnerId).name) : '') + '</span><span>' + esc(C.PIPELINE_LABEL[l.pipeline] || '') + ' · ' + esc(C.stageLabel(l.pipeline, l.stage)) + (dis !== null ? ' ' + dis + '일' : '') + '</span>' +
     (l.owner ? '<span>· ' + esc(staffName(l.owner)) + '</span>' : '') + (extraHtml || '') + '</div></div>' + (actsHtml ? '<div class="acts">' + actsHtml + '</div>' : '') + '</div>';
@@ -551,8 +551,8 @@ function viewLeads() {
     const recent = activitiesOf(l.id)[0];
     const next = C.nextLeadFollowup(l);
     const late = next ? C.daysBetween(next.due, today()) : 0;
-    return '<tr><td class="customer-name"><a href="#/lead/' + esc(l.id) + '">' + esc(l.name) + '</a>' + (l.hot && l.status === 'open' ? ' <span class="pill hot">HOT</span>' : '') +
-      '<div class="small muted">' + esc(l.child && l.child.name || '학생 미입력') + (l.child && l.child.grade ? ' · ' + esc(l.child.grade) : '') + '</div>' + (l.phone ? '<div class="small muted">' + esc(C.maskPhone(l.phone)) + '</div>' : '') + '</td>' +
+    return '<tr><td class="customer-name"><a href="#/lead/' + esc(l.id) + '">' + esc(l.name || C.leadLabel(l)) + '</a>' + (l.hot && l.status === 'open' ? ' <span class="pill hot">HOT</span>' : '') +
+      '<div class="small muted">' + esc([l.name ? l.child && l.child.name || '학생 미입력' : '', l.child && l.child.grade].filter(Boolean).join(' · ')) + '</div>' + (l.phone ? '<div class="small muted">' + esc(C.maskPhone(l.phone)) + '</div>' : '') + '</td>' +
       '<td data-label="상담 단계"><span>' + esc(C.stageLabel(l.pipeline, l.stage)) + '</span> ' + statusPill(l) + '<div class="small muted">' + esc(C.PIPELINE_LABEL[l.pipeline]) + '</div></td>' +
       '<td data-label="유입 채널">' + esc(l.channel || '기타') + '</td><td data-label="담당자">' + esc(staffName(l.owner)) + '</td>' +
       '<td data-label="최근 기록">' + (recent ? esc(recent.at) + '<div class="small muted">' + esc(C.ACTIVITY_LABEL[recent.type] || recent.type) + '</div>' : '<span class="muted">기록 없음</span>') + '</td>' +
@@ -575,8 +575,9 @@ function viewLead(id) {
   const portal = hsSettings().portal || {};
   const hs = l.hubspot || {};
   const dis = C.daysInStage(l, t);
+  const studentSummary = [l.name && l.child && l.child.name, l.child && l.child.grade].filter(Boolean).join(' · ');
   let h = '<div class="row mb8"><button class="btn btn-sm btn-ghost" data-act="back">‹ 뒤로</button></div>';
-  h += '<div class="lead-layout"><section class="card lead-profile" aria-label="고객 정보"><div class="between wraprow"><div><h1 class="page">' + esc(l.name) + ' <span class="muted small">' + esc(C.RELATION_HONORIFIC[l.relation] || '') + '</span></h1>' + (l.child && l.child.name ? '<p class="card-sub">' + esc(l.child.name) + (l.child.grade ? ' · ' + esc(l.child.grade) : '') + '</p>' : '') +
+  h += '<div class="lead-layout"><section class="card lead-profile" aria-label="고객 정보"><div class="between wraprow"><div><h1 class="page">' + esc(l.name || C.leadLabel(l)) + (l.name ? ' <span class="muted small">' + esc(C.RELATION_HONORIFIC[l.relation] || '') + '</span>' : '') + '</h1>' + (studentSummary ? '<p class="card-sub">' + esc(studentSummary) + '</p>' : '') +
     '<div class="row wraprow mt8">' + (l.hot && l.status === 'open' ? '<span class="pill hot">HOT</span>' : '') + '<span class="pill acc">' + esc(C.PIPELINE_LABEL[l.pipeline]) + '</span><span class="pill">' + esc(C.stageLabel(l.pipeline, l.stage)) + (dis !== null ? ' · ' + dis + '일' : '') + '</span>' + statusPill(l) + '<span class="tag">' + esc(l.channel) + (l.channelNote ? ' · ' + esc(l.channelNote) : '') + '</span></div></div>' +
     '<div class="row wraprow"><button class="btn btn-sm btn-ghost" data-act="edit-lead" data-id="' + esc(id) + '">정보 수정</button></div></div>';
   h += '<div class="row wraprow mt14"><label class="fl" style="margin:0" for="f-stage">단계</label><select class="in" id="f-stage" data-id="' + esc(id) + '" style="width:auto">' + stages.map(s => '<option value="' + s + '"' + (s === l.stage ? ' selected' : '') + '>' + esc(C.stageLabel(l.pipeline, s)) + (legacy && s === l.stage ? ' (이전 상태 · 영업 단계 확인 필요)' : '') + '</option>').join('') +
@@ -1319,11 +1320,12 @@ function leadFormHtml(l) {
   const academyStatus = C.academyStatusOf(L);
   const academyOptions = C.ACADEMY_STATUS.includes(academyStatus) || !academyStatus ? C.ACADEMY_STATUS : C.ACADEMY_STATUS.concat(academyStatus);
   const refOptions = state.leads.filter(x => !l || x.id !== l.id).sort((a, b) => String(a.name).localeCompare(String(b.name)));
-  return '<div class="grid2"><div class="field"><label class="fl" for="f-name">보호자 이름 *</label><input class="in" id="f-name" value="' + esc(L.name || '') + '" maxlength="40"></div>' +
+  return '<div class="grid2"><div class="field"><label class="fl" for="f-name">보호자 이름 (선택)</label><input class="in" id="f-name" value="' + esc(L.name || '') + '" maxlength="40"></div>' +
     '<div class="field"><label class="fl" for="f-rel">관계</label><select class="in" id="f-rel">' + opt(C.RELATIONS, L.relation, r => r + ' (' + C.RELATION_HONORIFIC[r] + ')') + '</select></div></div>' +
     '<div class="grid2"><div class="field"><label class="fl" for="f-phone">전화</label><input class="in" id="f-phone" inputmode="tel" value="' + esc(L.phone || '') + '" placeholder="010-0000-0000"></div>' +
     '<div class="field"><label class="fl" for="f-email">이메일</label><input class="in" id="f-email" inputmode="email" value="' + esc(L.email || '') + '"></div></div>' +
-    '<div class="grid2"><div class="field"><label class="fl" for="f-child">아이 이름</label><input class="in" id="f-child" value="' + esc(L.child && L.child.name || '') + '" maxlength="40"></div>' +
+    '<p class="hint">보호자 이름 없이 저장할 수 있습니다. HubSpot에 새 연락처를 만들 때는 보호자 이름 또는 이메일이 필요합니다.</p>' +
+    '<div class="grid2"><div class="field"><label class="fl" for="f-child">학생 이름 *</label><input class="in" id="f-child" value="' + esc(L.child && L.child.name || '') + '" maxlength="40" required aria-required="true"></div>' +
     '<div class="field"><label class="fl" for="f-birth">생년월일</label><input class="in" id="f-birth" type="date" value="' + esc(L.child && L.child.birth || '') + '"></div></div>' +
     '<div class="grid2"><div class="field"><label class="fl" for="f-grade">학년</label><input class="in" id="f-grade" value="' + esc(L.child && L.child.grade || '') + '" placeholder="초3 / 중1"></div>' +
     '<div class="field"><label class="fl" for="f-school">학교</label><input class="in" id="f-school" value="' + esc(L.child && L.child.school || '') + '"></div></div>' +
@@ -1360,7 +1362,7 @@ function onSourceInput() {
 function togglePartnerField() { const w = $('#f-partner-wrap'); if (w) w.hidden = val('f-channel2') !== '파트너'; }
 const LEAD_EDIT_FIELDS = {
   name: '보호자 이름', relation: '관계', phone: '전화', email: '이메일',
-  'child.name': '아이 이름', 'child.birth': '생년월일', 'child.grade': '학년', 'child.school': '학교',
+  'child.name': '학생 이름', 'child.birth': '생년월일', 'child.grade': '학년', 'child.school': '학교',
   channel: '유입 채널', channelNote: '채널 메모', referrerLeadId: '소개자', partnerId: '파트너',
   interests: '관심', hot: '핫 리드', memo: '메모', owner: '담당', source: '문의 원문',
   'inspection.type': '검사 종류', 'inspection.date': '검사일', consultedAt: '상담 완료일',
@@ -1546,8 +1548,6 @@ function saveActivityForm(id) {
   const fuDay = Number(val('f-fuday')) || 0;
   if (fuDay && !result) return toast('팔로업 결과(연락됨·답장·부재중)를 골라 주세요');
   if (C.findPii({ text, strength: val('f-strength2') })) return toast('기록·강점에 전화번호·이메일을 적을 수 없습니다 — 전화는 리드의 전화 칸에만');
-  const actId = addActivity(id, { type: fuDay ? 'followup' : type, result, text, at, followupDay: fuDay });
-  if (!actId) return;
   const patch = {};
   if (fuDay) patch.followups = C.markFollowup(l.followups, fuDay, { status: 'done', doneAt: at, result, note: text.slice(0, 80) });
   if (C.ANCHOR_TYPES.includes(type)) {
@@ -1556,9 +1556,18 @@ function saveActivityForm(id) {
     if (itype || idate) { patch.inspection = { type: itype || (l.inspection && l.inspection.type) || '', date: idate || (l.inspection && l.inspection.date) || '' }; patch.retestDue = C.retestDue(patch.inspection.date, patch.inspection.type); }
     if (checked('f-startfu')) { patch.consultedAt = at; patch.followups = C.scheduleFollowups(at, settings().followupOffsets); }
     else if (!l.consultedAt) patch.consultedAt = at;
-    if (checked('f-tointerp') && l.pipeline === 'inspection') { patch.stage = 'interpreted'; patch.stageAt = today(); addActivity(id, { type: 'stage', from: l.stage, to: 'interpreted', at }); }
+    if (checked('f-tointerp') && l.pipeline === 'inspection') { patch.stage = 'interpreted'; patch.stageAt = today(); }
   }
-  if (Object.keys(patch).length) updateLead(id, patch);
+  const changesLead = Object.keys(patch).length > 0;
+  // 리드가 거절되면 상담·단계 이력만 남지 않도록, 관련 쓰기 전에 완성된 변경을 검사한다.
+  if (changesLead) {
+    const v = C.validateLead(Object.assign({}, l, patch), { today: today() });
+    if (!v.ok) return toast(v.error);
+  }
+  const actId = addActivity(id, { type: fuDay ? 'followup' : type, result, text, at, followupDay: fuDay });
+  if (!actId) return;
+  if (changesLead && !updateLead(id, patch)) return;
+  if (patch.stage) addActivity(id, { type: 'stage', from: l.stage, to: patch.stage, at });
   closeModal(true); toast('기록했습니다' + (patch.followups && !fuDay ? ' — 팔로업 일정이 잡혔습니다' : '')); render();
 }
 function skipFollowup(id, day) {

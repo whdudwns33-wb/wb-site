@@ -603,12 +603,12 @@ async function availableProperties(env, client, force) {
 }
 function hsError(error) {
   const code = error?.code || (error?.status === 401 || error?.status === 403 ? 'HUBSPOT_AUTH' : error?.status === 429 ? 'HUBSPOT_RATE' : 'HUBSPOT');
-  const known = ['PORTAL_LINKED', 'UNMAPPED', 'LEGACY_STAGE', 'LINKED', 'REMOTE_CONFLICT', 'REMOTE_BASELINE', 'SYNC_BUSY', 'UNCERTAIN'];
+  const known = ['PORTAL_LINKED', 'UNMAPPED', 'LEGACY_STAGE', 'LINKED', 'REMOTE_CONFLICT', 'REMOTE_BASELINE', 'CONTACT_IDENTITY_REQUIRED', 'SYNC_BUSY', 'UNCERTAIN'];
   const prefix = known.find(k => String(error?.message || '').startsWith(k));
   const safe = prefix || code;
   const messages = { HUBSPOT_AUTH: 'HubSpot 연결 권한을 확인해 주세요', HUBSPOT_RATE: 'HubSpot 호출 한도로 다음 주기에 다시 확인합니다',
     PORTAL_LINKED: PORTAL_HOLD, UNMAPPED: '단계 매핑을 확인해 주세요', LEGACY_STAGE: '이전 학원 상태입니다. 고객의 영업 단계와 기존 전송을 확인해 주세요', LINKED: '다른 고객에 연결된 연락처입니다', REMOTE_CONFLICT: 'HubSpot에도 변경이 있습니다. 원본을 대조해 주세요',
-    REMOTE_BASELINE: '동기화 기준이 없습니다. 기존 큐 검토 후 먼저 가져오기를 실행해 주세요', SYNC_BUSY: '동기화가 이미 진행 중입니다', UNCERTAIN: '외부 반영 결과가 미확정입니다. 원본 확인이 필요합니다' };
+    REMOTE_BASELINE: '동기화 기준이 없습니다. 기존 큐 검토 후 먼저 가져오기를 실행해 주세요', CONTACT_IDENTITY_REQUIRED: '새 HubSpot 연락처를 만들려면 보호자 이름 또는 이메일을 입력한 뒤 다시 시도해 주세요', SYNC_BUSY: '동기화가 이미 진행 중입니다', UNCERTAIN: '외부 반영 결과가 미확정입니다. 원본 확인이 필요합니다' };
   return { code: safe, error: messages[safe] || 'HubSpot 요청을 완료하지 못했습니다', status: Number(error?.status) || 0 };
 }
 
@@ -714,7 +714,10 @@ async function ensureContact(env, client, lead, available) {
     contactId = found.id;
     patch.nameParts = { firstname: String(found.properties.firstname || ''), lastname: String(found.properties.lastname || '') };
   } else {
-    const made = await client.createContact(contactProperties(lead, await contactExtra(env, lead), available));
+    const properties = contactProperties(lead, await contactExtra(env, lead), available);
+    // HubSpot 신규 연락처는 이름 또는 이메일이 필요하다. 기존 연락처 연결은 위에서 먼저 확인한다.
+    if (![properties.firstname, properties.lastname, properties.email].some(value => String(value || '').trim())) throw new Error('CONTACT_IDENTITY_REQUIRED');
+    const made = await client.createContact(properties);
     contactId = made.id;
     created = true;
   }
@@ -902,7 +905,8 @@ async function pullContactsLocked(env, body) {
         if (busy || (linkedContact && linkedContact !== contact.id)) { retry.add(contact.id); return 'conflict'; }
         let lead = applyDealsToLead(leadFromContact(contact, existing, { today }), deals, settings.hubspot.map);
         lead.hubspot = { ...lead.hubspot, ...await fingerprints(contact, deals) };
-        const v = CORE.validateLead({ ...lead, id: leadId }, { today });
+        // 학생 이름이 없는 기존 HubSpot 연락처도 보존한다. 직원·파트너의 저장에는 이 예외를 주지 않는다.
+        const v = CORE.validateLead({ ...lead, id: leadId }, { today, allowMissingChildName: true });
         if (!v.ok || findPii(v.data, '', LEAD_PII_SKIP)) { retry.add(contact.id); return 'invalid'; }
         const data = v.data;
         if (!data.owner) data.owner = existing?.owner || ADMIN_ID;
