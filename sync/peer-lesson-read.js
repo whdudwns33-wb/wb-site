@@ -3,6 +3,8 @@ import { weekendAttendancePolicyOn } from './weekend-flex.js';
 
 const parse = value => { try { return JSON.parse(value); } catch { return null; } };
 const group = env => String(env.TASK_PEER_LESSON_STAFF_IDS || '').split(',').map(s => s.trim()).filter(Boolean);
+const visitClock = stamp => Number(stamp) > 0 ? new Date(Number(stamp) + 9*3600000).toISOString().slice(11,16) : '';
+const minuteClock = n => String(Math.floor(n/60)).padStart(2,'0') + ':' + String(n%60).padStart(2,'0');
 export function isPeerLessonReader(env, app, auth) {
   return app === 'task' && auth?.scope === 'own' && !!auth.id && group(env).includes(auth.id);
 }
@@ -17,7 +19,15 @@ export function peerLessonEntries(tasks, checks, cases, visits, from, to) {
       const policy = weekendAttendancePolicyOn(t, date);
       if (policy === 'invalid' || (policy === 'flexible' && !visit)) continue;
       const sourceDate = visit?.source_date || date;
-      const slots = lessonOccurrencesOnDate(t, sourceDate, cases);
+      let slots = lessonOccurrencesOnDate(t, sourceDate, cases);
+      if (policy === 'flexible' && visit) {
+        const startTime = visitClock(visit.check_in_at), start = clockMinute(startTime);
+        let end = clockMinute(visitClock(visit.check_out_at));
+        const reference = (t.scheduleSlots || []).find(s => clockMinute(s.endTime) > clockMinute(s.startTime));
+        if (start == null) continue;
+        if (end == null || end <= start) end = Math.min(1439,start + (reference ? clockMinute(reference.endTime)-clockMinute(reference.startTime) : 50));
+        slots = [{slotId:String(visit.visit_id),startTime,endTime:minuteClock(end)}];
+      }
       // 실제 방문으로 다른 날에 이동한 정규 수업은 원래 날짜에 중복 표시하지 않는다.
       if (!visit && visits.some(v => v.lesson_task_id === t.id && v.source_date === date && v.visit_date !== date && v.status !== 'cancelled')) continue;
       const check = checks[t.id + '|' + date] || {};
@@ -28,7 +38,7 @@ export function peerLessonEntries(tasks, checks, cases, visits, from, to) {
         entries.push({ key:t.id + '|' + date + '|' + slot.slotId, date, staffId:t.staffId,
           studentName:String(t.studentName || ''),
           slot:{startMinute,endMinute},
-          task:{subject:String(t.subject || ''),lessonInstanceType:String(t.lessonInstanceType || ''),firstClassDate:String(t.firstClassDate || '')},
+          task:{subject:String(t.subject || ''),lessonInstanceType:t.makeupCaseId ? 'makeup' : String(t.lessonInstanceType || ''),firstClassDate:String(t.firstClassDate || '')},
           progress:{att:String(check.att || ''), done:!!check.done,
             contentProgress:String(memo.contentProgress || (!check.lessonMemo ? check.note || '' : '')),
             homework:String(memo.homework || ''),otherNotes:String(memo.otherNotes || '')}
