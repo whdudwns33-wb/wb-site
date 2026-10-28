@@ -44,6 +44,10 @@ function writeWindow(date, now = Date.now()) {
   if (current.minute >= CUTOFF_MINUTE) return fail('HANDOFF_CUTOFF', '당일 23:50 이후에는 인계 내용을 변경할 수 없습니다');
   return null;
 }
+function creationWindow(date, now = Date.now()) {
+  const current = kst(now);
+  return date > current.date ? null : writeWindow(date, now);
+}
 
 function halfUnits(value) {
   if (typeof value !== 'string' || !/^(?:0\.5|[1-6](?:\.5)?)T$/.test(value)) return null;
@@ -104,7 +108,7 @@ function selectSlot(task, date, slotId) {
   const matched = slotId ? slots.filter(slot => String(slot.slotId || '') === slotId) : slots;
   if (matched.length !== 1) return fail('HANDOFF_SLOT_INVALID', '선택한 원 수업 시간대를 확인할 수 없습니다', 422);
   const slot = matched[0], totalUnits = halfUnits(slot.lessonHours);
-  if (!totalUnits || totalUnits < 2 || minute(slot.startTime) == null || minute(slot.endTime) == null ||
+  if (!totalUnits || minute(slot.startTime) == null || minute(slot.endTime) == null ||
       minute(slot.endTime) <= minute(slot.startTime) || (slot.slotId && !SAFE_ID.test(String(slot.slotId)))) {
     return fail('HANDOFF_HOURS_INVALID', '확정 시간표의 수업시수를 확인해 주세요. 시간으로 시수를 추정하지 않습니다', 422);
   }
@@ -244,12 +248,13 @@ async function verifiedContext(env, app, input) {
   const checkKey = input.lessonTaskId + '|' + input.recordDate;
   const checkRow = await env.DB.prepare('SELECT owner,data FROM checks WHERE app=? AND k=? LIMIT 1').bind(app, checkKey).first();
   const check = checkRow && parseJson(checkRow.data);
-  if (!check || String(checkRow.owner || '') !== owner || String(check.taskId || '') !== input.lessonTaskId ||
-      String(check.date || '') !== input.recordDate || !['P', 'L'].includes(check.att)) {
+  if ((checkRow && (!check || String(checkRow.owner || '') !== owner || String(check.taskId || '') !== input.lessonTaskId ||
+      String(check.date || '') !== input.recordDate)) || (!input.simple && (!check || !['P', 'L'].includes(check.att)))) {
     return fail('HANDOFF_ATTENDANCE_REQUIRED', '원 수업의 출석 또는 지각을 먼저 저장해 주세요', 422);
   }
   return { ...loaded, ...selected, student, source, recipient, rosterData: String(rosterRow.data),
-    check, checkKey, checkData: String(checkRow.data), visits, visit, visitPair, sourceCheckData };
+    check: check || { taskId: input.lessonTaskId, date: input.recordDate }, checkKey,
+    checkData: checkRow ? String(checkRow.data) : null, visits, visit, visitPair, sourceCheckData };
 }
 
 function contextGuard(app, context, generation) {
@@ -257,8 +262,13 @@ function contextGuard(app, context, generation) {
   const clauses = [guard.sql], args = [...guard.args];
   clauses.push('EXISTS (SELECT 1 FROM tasks t WHERE t.app=? AND t.id=? AND t.owner=? AND t.data=?)');
   args.push(app, context.task.id, context.owner, context.taskData);
-  clauses.push('EXISTS (SELECT 1 FROM checks c WHERE c.app=? AND c.k=? AND c.owner=? AND c.data=?)');
-  args.push(app, context.checkKey, context.owner, context.checkData);
+  if (context.checkData == null) {
+    clauses.push('NOT EXISTS (SELECT 1 FROM checks c WHERE c.app=? AND c.k=?)');
+    args.push(app, context.checkKey);
+  } else {
+    clauses.push('EXISTS (SELECT 1 FROM checks c WHERE c.app=? AND c.k=? AND c.owner=? AND c.data=?)');
+    args.push(app, context.checkKey, context.owner, context.checkData);
+  }
   clauses.push('EXISTS (SELECT 1 FROM private_rosters r WHERE r.app=? AND r.data=?)');
   args.push(app, context.rosterData);
   for (const staff of [context.source, context.recipient]) {
@@ -298,6 +308,8 @@ function baseView(row) {
     cancelReason: String(row.cancel_reason || ''), memo: sourceMemo({ lessonMemo: parseJson(row.memo_json) }),
     sourceMemo: sourceMemo({ lessonMemo: parseJson(row.source_memo_json) }),
     student: { id: String(row.student_id), name: String(student.name || ''), school: String(student.school || ''), grade: String(student.grade || '') },
+    simple: lesson.simple === true, mode: lesson.mode || 'partial',
+    endTime: String(lesson.identity && lesson.identity.slot && lesson.identity.slot.endTime || ''),
     lesson: { title: String(lesson.title || ''), subject: String(lesson.subject || '') }
   };
 }
@@ -323,13 +335,23 @@ async function view(env, app, row, auth) {
     }
   }
   const receiver = admin(auth) || actor(auth) === String(row.recipient_staff_id);
-  const ready = sameRowContext(row, context) && ['P', 'L'].includes(result.attendance.att);
+  const ready = sameRowContext(row, context) && (result.simple || ['P', 'L'].includes(result.attendance.att));
+  if (ready && result.simple) {
+    result.feedbackTask = { id: row.lesson_task_id, staffId: row.source_staff_id, studentId: row.student_id,
+      studentName: result.student.name, subject: result.lesson.subject, title: result.lesson.title,
+      taskKind: 'lesson_instruction' };
+    result.check = { taskId: row.lesson_task_id, date: row.record_date, att: result.attendance.att,
+      lessonMemo: sourceMemo(context.check) };
+  }
   result.editable = {
     accept: ready && receiver && inWindow && row.status === 'pending',
     save: ready && receiver && inWindow && ['accepted', 'completed'].includes(row.status),
     complete: ready && receiver && inWindow && current.minute >= minute(row.start_time) && row.status === 'accepted',
+    attendance: ready && result.simple && receiver && inWindow && row.status === 'accepted',
+    feedback: ready && result.simple && receiver && inWindow && ['accepted', 'completed'].includes(row.status) && ['P', 'L'].includes(result.attendance.att),
     cancel: row.status !== 'cancelled' && (admin(auth) ||
-      (actor(auth) === String(row.source_staff_id) && inWindow && row.status === 'pending'))
+      (actor(auth) === String(row.source_staff_id) && !creationWindow(row.record_date) &&
+        (row.status === 'pending' || (result.simple && row.status === 'accepted' && Number(row.revision) === 1))))
   };
   return result;
 }
@@ -337,10 +359,12 @@ async function view(env, app, row, auth) {
 function rowInput(row) {
   return { lessonTaskId: String(row.lesson_task_id), studentId: String(row.student_id),
     sourceStaffId: String(row.source_staff_id), recipientStaffId: String(row.recipient_staff_id),
-    sourceDate: String(row.source_date), recordDate: String(row.record_date), slotId: String(row.slot_id || '') };
+    sourceDate: String(row.source_date), recordDate: String(row.record_date), slotId: String(row.slot_id || ''),
+    simple: (parseJson(row.lesson_snapshot_json) || {}).simple === true };
 }
 function sameCreation(row, input, context, generation) {
   return !!row && Number(row.data_generation) === generation.generation &&
+    rowInput(row).simple === input.simple && (!input.simple || (parseJson(row.lesson_snapshot_json) || {}).mode === input.mode) &&
     ['lessonTaskId', 'studentId', 'sourceDate', 'recordDate', 'recipientStaffId'].every(key => rowInput(row)[key] === input[key]) &&
     String(row.source_staff_id) === context.owner && String(row.slot_id || '') === context.slotId &&
     String(row.start_time) === input.startTime && String(row.note) === input.note &&
@@ -352,10 +376,10 @@ function eventStatement(env, app, handoffId, revision, type, before, after, auth
     '(app,event_id,handoff_id,revision,event_type,event_data,actor_id,created_at) VALUES(?,?,?,?,?,?,?,?)')
     .bind(app, eventId, handoffId, revision, type, JSON.stringify({ version: 1, before, after }), actor(auth), at);
 }
-async function batchWrite(env, app, first, id, revision, type, before, after, auth, at) {
+async function batchWrite(env, app, first, id, revision, type, before, after, auth, at, extra = []) {
   const eventId = randomId('lhe_');
   const guard = await taskWriteCasGuardStatement(env, app, 'lesson_handoff_' + type, [id, revision, eventId].join('\n'), at);
-  await env.DB.batch([first, guard, eventStatement(env, app, id, revision, type, before, after, auth, at, eventId)]);
+  await env.DB.batch([first, guard, eventStatement(env, app, id, revision, type, before, after, auth, at, eventId), ...extra]);
 }
 
 async function list(env, app, body, origin, auth, json, generation) {
@@ -383,24 +407,33 @@ async function create(env, app, body, origin, auth, json, generation) {
     sourceDate: String(body.sourceDate || ''), recordDate: String(body.recordDate || ''),
     slotId: String(body.slotId || ''), recipientStaffId: String(body.recipientStaffId || ''),
     startTime: String(body.startTime || ''), completedUnits: halfUnits(body.completedHours),
-    remainingUnits: halfUnits(body.remainingHours), note: cleanText(body.note, 2000)
+    remainingUnits: halfUnits(body.remainingHours), note: cleanText(body.note, 2000),
+    simple: body.simple === true, mode: body.mode === 'partial' ? 'partial' : 'whole'
   };
   const id = String(body.handoffId || '');
   if (!HANDOFF_ID.test(id) || !SAFE_ID.test(input.lessonTaskId) || !SAFE_ID.test(input.studentId) ||
       !SAFE_ID.test(input.recipientStaffId) || (input.slotId && !SAFE_ID.test(input.slotId)) ||
       !validDate(input.sourceDate) || !validDate(input.recordDate) || minute(input.startTime) == null ||
-      minute(input.startTime) >= CUTOFF_MINUTE || !input.completedUnits || !input.remainingUnits || input.note == null) {
+      minute(input.startTime) >= CUTOFF_MINUTE || (!input.simple && (!input.completedUnits || !input.remainingUnits)) || input.note == null) {
     return json({ ok: false, code: 'HANDOFF_INPUT_INVALID', error: '학생·원 수업·날짜·인계 시간·수업시수를 확인해 주세요' }, 422, origin);
   }
-  const now = Date.now(), closed = writeWindow(input.recordDate, now);
+  const now = Date.now(), closed = input.simple ? creationWindow(input.recordDate, now) : writeWindow(input.recordDate, now);
   if (closed) return json({ ok: false, code: closed.code, error: closed.error }, closed.status, origin);
   const context = await verifiedContext(env, app, input);
   if (context.error) return json({ ok: false, code: context.code, error: context.error }, context.status, origin);
+  if (input.simple) {
+    if (input.mode === 'whole') input.startTime = context.slot.startTime;
+    if (minute(input.startTime) < minute(context.slot.startTime) || minute(input.startTime) >= minute(context.slot.endTime)) {
+      return json({ ok: false, code: 'HANDOFF_START_INVALID', error: '인계 시작 시간을 해당 수업의 시작·종료 사이로 선택해 주세요' }, 422, origin);
+    }
+    // 인계 시각은 별도 보존한다. 수업 시수·회차는 쪼개거나 시간으로 재계산하지 않는다.
+    input.completedUnits = 0; input.remainingUnits = context.totalUnits;
+  }
   if (own(auth) && actor(auth) !== context.owner) return json({ ok: false, code: 'HANDOFF_FORBIDDEN', error: '원 담당 교사만 남은 수업을 인계할 수 있습니다' }, 403, origin);
   if (context.totalUnits !== input.completedUnits + input.remainingUnits) {
     return json({ ok: false, code: 'HANDOFF_HOURS_MISMATCH', error: '완료 시수와 남은 시수의 합이 원 수업의 확정 시수와 같아야 합니다' }, 422, origin);
   }
-  if (context.visit && minute(input.startTime) < kst(Number(context.visit.check_in_at)).minute) {
+  if (!input.simple && context.visit && minute(input.startTime) < kst(Number(context.visit.check_in_at)).minute) {
     return json({ ok: false, code: 'HANDOFF_START_BEFORE_ARRIVAL', error: '인계 시작은 실제 등원 이후로 선택해 주세요' }, 422, origin);
   }
   const existing = await findHandoff(env, app, id);
@@ -414,19 +447,21 @@ async function create(env, app, body, origin, auth, json, generation) {
   context.inputSourceDate = input.sourceDate;
   const guard = contextGuard(app, context, generation);
   const student = { id: input.studentId, name: String(context.student.name || ''), school: String(context.student.school || ''), grade: String(context.student.grade || '') };
-  const lesson = { title: String(context.task.title || ''), subject: String(context.task.subject || ''), identity: lessonIdentity(context) };
+  const lesson = { title: String(context.task.title || ''), subject: String(context.task.subject || ''), identity: lessonIdentity(context),
+    simple: input.simple, mode: input.mode };
+  const status = input.simple ? 'accepted' : 'pending';
   const insert = env.DB.prepare('INSERT INTO lesson_handoffs ' +
     '(app,handoff_id,data_generation,lesson_task_id,student_id,source_date,record_date,slot_id,source_staff_id,recipient_staff_id,visit_id,' +
     'start_time,total_half_units,completed_half_units,remaining_half_units,note,source_memo_json,memo_json,student_snapshot_json,lesson_snapshot_json,' +
-    'status,revision,created_at,updated_at,created_by,updated_by) ' +
-    "SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'pending',1,?,?,?,? WHERE " + guard.sql)
+    'status,revision,created_at,updated_at,created_by,updated_by,accepted_at) ' +
+    'SELECT ?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,?,?,?,?,? WHERE ' + guard.sql)
     .bind(app, id, generation.generation, input.lessonTaskId, input.studentId, input.sourceDate, input.recordDate, context.slotId,
       context.owner, input.recipientStaffId, context.visit ? String(context.visit.visit_id) : null, input.startTime, context.totalUnits,
       input.completedUnits, input.remainingUnits, input.note, JSON.stringify(sourceMemo(context.check)), JSON.stringify(emptyMemo()),
-      JSON.stringify(student), JSON.stringify(lesson), now, now, actor(auth), actor(auth), ...guard.args);
+      JSON.stringify(student), JSON.stringify(lesson), status, now, now, actor(auth), actor(auth), input.simple ? now : null, ...guard.args);
   try {
     await batchWrite(env, app, insert, id, 1, 'create', null,
-      { status: 'pending', startTime: input.startTime, completedHours: hours(input.completedUnits), remainingHours: hours(input.remainingUnits) }, auth, now);
+      { status, startTime: input.startTime, completedHours: hours(input.completedUnits), remainingHours: hours(input.remainingUnits) }, auth, now);
   } catch (error) {
     const raced = await findHandoff(env, app, id);
     if (sameCreation(raced, input, context, generation)) {
@@ -452,13 +487,15 @@ async function change(env, app, body, origin, auth, json, generation) {
   }
   if (Number(row.data_generation) !== generation.generation) return json({ ok: false, code: 'DATA_GENERATION_MISMATCH', dataGeneration: generation.generation, error: '새 운영 데이터로 다시 동기화해 주세요' }, 409, origin);
   if (Number(row.revision) !== revision) return json({ ok: false, code: 'HANDOFF_REVISION_CONFLICT', error: '다른 기기에서 인계 기록이 먼저 변경되었습니다' }, 409, origin);
-  const now = Date.now(), closed = action === 'cancel' && admin(auth) ? null : writeWindow(String(row.record_date), now);
+  const simple = rowInput(row).simple;
+  const now = Date.now(), closed = action === 'cancel' ? (admin(auth) ? null : creationWindow(String(row.record_date), now)) : writeWindow(String(row.record_date), now);
   if (closed) return json({ ok: false, code: closed.code, error: closed.error }, closed.status, origin);
   const recipient = admin(auth) || actor(auth) === String(row.recipient_staff_id);
   const source = admin(auth) || actor(auth) === String(row.source_staff_id);
-  if ((action === 'cancel' && (!source || (!admin(auth) && row.status !== 'pending'))) ||
+  if ((action === 'cancel' && (!source || (!admin(auth) && row.status !== 'pending' && !(simple && row.status === 'accepted' && Number(row.revision) === 1)))) ||
       (action !== 'cancel' && !recipient)) return json({ ok: false, code: 'HANDOFF_FORBIDDEN', error: '이 인계 작업을 변경할 권한이 없습니다' }, 403, origin);
   let guard = generationGuard(app, generation);
+  let recordContext = null;
   if (action !== 'cancel') {
     const input = rowInput(row), context = await verifiedContext(env, app, input);
     if (context.error) return json({ ok: false, code: context.code, error: context.error }, context.status, origin);
@@ -467,6 +504,7 @@ async function change(env, app, body, origin, auth, json, generation) {
     }
     context.inputSourceDate = input.sourceDate;
     guard = contextGuard(app, context, generation);
+    recordContext = context;
   } else if (own(auth)) {
     const current = await currentTask(env, app, String(row.lesson_task_id), String(row.student_id), String(row.source_staff_id));
     if (!current) return json({ ok: false, code: 'HANDOFF_LESSON_IDENTITY', error: '원 수업 담당자가 변경되어 관리자 확인이 필요합니다' }, 409, origin);
@@ -496,7 +534,7 @@ async function change(env, app, body, origin, auth, json, generation) {
         return json({ ok: true, idempotent: true, handoff: await view(env, app, row, auth), dataGeneration: generation.generation }, 200, origin);
       }
       status = 'completed'; completedAt = now;
-    } else if (JSON.stringify(memo) === JSON.stringify(beforeMemo)) {
+    } else if (JSON.stringify(memo) === JSON.stringify(beforeMemo) && !Object.prototype.hasOwnProperty.call(body, 'att')) {
       return json({ ok: true, idempotent: true, handoff: await view(env, app, row, auth), dataGeneration: generation.generation }, 200, origin);
     }
   } else {
@@ -509,13 +547,57 @@ async function change(env, app, body, origin, auth, json, generation) {
     status = 'cancelled'; cancelledAt = now;
   }
   const updatedAt = Math.max(now, Number(row.updated_at) + 1);
+  const extra = [];
+  if (simple && action === 'save' && recordContext) {
+    const check = { ...recordContext.check };
+    if (Object.prototype.hasOwnProperty.call(body, 'att')) {
+      if (!['P', 'L', 'A', 'E'].includes(body.att)) return json({ ok: false, error: '출결 상태를 확인해 주세요' }, 422, origin);
+      check.att = body.att;
+      check.absenceType = '';
+    }
+    const merged = sourceMemo(check);
+    for (const key of MEMO_KEYS) {
+      const previous = String(beforeMemo[key] || '').trim(), next = String(memo[key] || '').trim();
+      let base = String(merged[key] || '').trim();
+      if (previous && base === previous) base = '';
+      else if (previous && base.endsWith('\n\n' + previous)) base = base.slice(0, -previous.length - 2);
+      merged[key] = next && base !== next ? [base, next].filter(Boolean).join('\n\n') : base || next;
+    }
+    check.lessonMemo = merged;
+    check.taskId = row.lesson_task_id; check.date = row.record_date;
+    check.lessonHandoffId = id;
+    const canonical = recordContext.checkData == null
+      ? env.DB.prepare('INSERT INTO checks(app,k,owner,data,updated_at,srv_at) VALUES(?,?,?,?,?,?)')
+        .bind(app, recordContext.checkKey, row.source_staff_id, JSON.stringify(check), updatedAt, updatedAt)
+      : env.DB.prepare('UPDATE checks SET data=?,updated_at=?,srv_at=? WHERE app=? AND k=? AND owner=? AND data=?')
+        .bind(JSON.stringify(check), updatedAt, updatedAt, app, recordContext.checkKey, row.source_staff_id, recordContext.checkData);
+    extra.push(canonical, await taskWriteCasGuardStatement(env, app, 'lesson_handoff_record', id + ':' + revision, updatedAt));
+  }
   const update = env.DB.prepare('UPDATE lesson_handoffs SET status=?,memo_json=?,accepted_at=?,completed_at=?,cancelled_at=?,cancel_reason=?,' +
     'revision=revision+1,updated_at=?,updated_by=? WHERE app=? AND handoff_id=? AND revision=? AND data_generation=? AND ' + guard.sql)
     .bind(status, JSON.stringify(memo), acceptedAt, completedAt, cancelledAt, reason, updatedAt, actor(auth),
       app, id, revision, generation.generation, ...guard.args);
   await batchWrite(env, app, update, id, revision + 1, action,
-    { status: row.status, memo: beforeMemo }, { status, memo, reason }, auth, updatedAt);
+    { status: row.status, memo: beforeMemo, att: recordContext && recordContext.check.att },
+    { status, memo, reason, att: body.att }, auth, updatedAt, extra);
   return json({ ok: true, handoff: await view(env, app, await findHandoff(env, app, id), auth), dataGeneration: generation.generation }, 200, origin);
+}
+
+/** Only the designated recipient on this exact lesson date may compose/send feedback. */
+export async function lessonHandoffFeedbackGrant(env, app, auth, taskId, date) {
+  if (app !== 'task' || !own(auth) || !SAFE_ID.test(String(taskId || '')) || !validDate(date) || writeWindow(date)) return null;
+  const generation = await generationContext(env, app);
+  let row;
+  try {
+    row = await env.DB.prepare("SELECT * FROM lesson_handoffs WHERE app=? AND data_generation=? AND lesson_task_id=? AND record_date=? AND recipient_staff_id=? AND status IN ('accepted','completed') LIMIT 1")
+      .bind(app, generation.generation, taskId, date, actor(auth)).first();
+  } catch (error) {
+    if (/no such table.*lesson_handoffs/i.test(String(error.message))) return null;
+    throw error;
+  }
+  if (!row || !rowInput(row).simple) return null;
+  const context = await verifiedContext(env, app, rowInput(row));
+  return sameRowContext(row, context) && ['P', 'L'].includes(context.check.att) ? { handoffId: row.handoff_id } : null;
 }
 
 /** A narrow physical-checkout grant; this never authorizes generic task/check writes. */
