@@ -89,6 +89,7 @@ import {
 import { handleFeedbackPolish } from './feedback-polish.js';
 import { handleRoster } from './roster.js';
 import { isOperationsReader, handleOperationsRead } from './operations-reader.js';
+import { isPeerLessonReader, handlePeerLessonRead } from './peer-lesson-read.js';
 import { deviceCutoff, handlePersonalDevices } from './device-policy.js';
 import { handleStudentChange } from './student-change.js';
 import { handleAdminDirective } from './admin-directive.js';
@@ -2102,7 +2103,7 @@ async function handleSync(env, app, body, origin) {
   const nextSince = more ? Math.max(since, Math.min(...pageCursors)) : now;
   const authRole = auth.role === 'manager' ? 'manager' : (auth.scope === 'all' ? 'admin' : 'staff');
   const payload = { ok: true, now: nextSince, more: more, changes: out, authRole, dataGeneration,
-    operationsRead: auth.operationsRead === true };
+    operationsRead: auth.operationsRead === true, peerLessonRead: isPeerLessonReader(env, app, auth) };
   if (wantsTaskRevocations) {
     payload.taskRevocations = await pullTaskRevocations(
       env, app, dataGeneration, auth, requestedTaskRevocationCursor
@@ -3682,6 +3683,11 @@ export default {
         const auth = await resolveAuth(env, app, body.auth);
         if (!auth) return json({ok:false,error:'인증 실패'},401,okOrigin);
         return await handleOperationsRead(env, app, body, okOrigin, auth, json);
+      }
+      if (url.pathname === '/peer-lesson-read') {
+        const auth = await resolveAuth(env, app, body.auth);
+        if (!auth) return json({ok:false,error:'인증 실패'},401,okOrigin);
+        return await handlePeerLessonRead(env,app,body,okOrigin,auth,json);
       }
       if (url.pathname === '/student-change') {
         const auth = await resolveAuth(env, app, body.auth);

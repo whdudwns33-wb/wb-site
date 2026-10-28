@@ -25,7 +25,7 @@ assert.ok(page.includes('WBWeekTimetable.render'));
 assert.ok(page.includes("if (session.isAdmin) { weekPlannerAll"));
 console.log('week timetable: ordering, duplicates, teacher isolation, colors, escaping and integration OK');
 const vm = require('node:vm');
-const context = {WBWeekTimetable:core, session:{isAdmin:false}, cursor:days[0],
+const context = {WBWeekTimetable:core, session:{isAdmin:false}, sync:{personVerified:false,peerLessonRead:false}, cursor:days[0],
   currentStaff:()=>({id:'staff-a',name:'가상교사'}), mondayOf:()=>days[0],
   addDays:(_,i)=>days[i], today:()=>days[0], esc:v=>core.render ? String(v) : '',
   staffSwitcher:()=>'<div>직원 선택</div>', todayStaffList:()=>[{id:'staff-a',name:'가상교사'},{id:'staff-b',name:'다른교사'}],
@@ -43,3 +43,17 @@ assert.ok(vm.runInContext('viewWeek()',context).includes('other'));
 context.viewWeekChecklist=()=>'<p>기존 체크표</p>';
 vm.runInContext("weekPlannerMode = 'checklist'",context);
 assert.ok(vm.runInContext('viewWeek()',context).includes('기존 체크표'));
+// 동료 시간표는 독립 데이터로 그리며 기존 체크표/편집 액션을 만들지 않는다.
+context.session.isAdmin=false;
+context.sync={personVerified:true,peerLessonRead:true,auth:()=>({id:'staff-a'}),post:async()=>({staff:[],entries:[]})};
+context.route='week'; context.render=()=>{};
+vm.runInContext("weekPlannerMode='timetable'; peerWeek.target='staff-b'; peerWeek.key=peerWeekKey(); peerWeek.staff=[{id:'staff-b',name:'동료'}];",context);
+context.peerEntries=[{...entry('동료 학생',900,days[0],'staff-b'),progress:{att:'P',done:true,contentProgress:'진도',homework:'과제',otherNotes:'<script>bad</script>'}}];
+vm.runInContext('peerWeek.entries=peerEntries',context);
+const peerHtml=vm.runInContext('viewWeek()',context);
+assert.ok(peerHtml.includes('동료 수업 읽기 전용'));
+assert.ok(peerHtml.includes('출석'));
+assert.ok(peerHtml.includes('동료 학생'));
+assert.ok(!/data-act="(?:toggle|latt|memo|edit)/.test(peerHtml));
+context.sync.peerLessonRead=false;
+assert.ok(!vm.runInContext('viewWeek()',context).includes('동료 학생'),'revoked capability hides cached peer records');

@@ -137,7 +137,7 @@ test('zero-change background sync does not collapse open dashboard details', () 
   const run = html.match(/async run\(\) \{[\s\S]*?\n  \},/)?.[0] || '';
   assert.match(run, /let applied = 0/);
   assert.match(run, /applied \+= this\.apply\(d\.changes\)/);
-  assert.match(run, /if \(applied \|\| needsAccessRender \|\| accessRoleChanged \|\| previousOperationsRead !== this.operationsRead\) renderAfterSync\(\)/);
+  assert.match(run, /if \(applied \|\| needsAccessRender \|\| accessRoleChanged \|\| previousOperationsRead !== this.operationsRead \|\| previousPeerLessonRead !== this.peerLessonRead\) renderAfterSync\(\)/);
 });
 
 test('staff deactivation is one authoritative CAS operation with link revocation', () => {
