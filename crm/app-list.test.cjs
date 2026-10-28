@@ -19,7 +19,7 @@ function attributes(tag) {
 
 function harness(leads = [], canApprove = true) {
   const handlers = {}, fields = new Map(), timers = new Map(), storageWrites = [], errors = [];
-  let timerId = 0;
+  let timerId = 0, renderCount = 0;
   const view = { innerHTML: '', focus() {} }, host = { hidden: true };
   const document = {
     body: { classList: { toggle() {} } },
@@ -47,7 +47,7 @@ function harness(leads = [], canApprove = true) {
     }
   };
   let html = '';
-  Object.defineProperty(view, 'innerHTML', { get() { return html; }, set(value) { html = value; fields.clear(); } });
+  Object.defineProperty(view, 'innerHTML', { get() { return html; }, set(value) { html = value; renderCount++; fields.clear(); } });
   const location = { hash: '#/leads' };
   const history = { length: 1, replaceState(_state, _title, hash) { location.hash = hash; } };
   const context = vm.createContext({
@@ -67,6 +67,8 @@ function harness(leads = [], canApprove = true) {
   return {
     context, run, storageWrites, document,
     get html() { checkRender(); return html; },
+    get renderCount() { return renderCount; },
+    get pendingTimers() { return timers.size; },
     read(code) { return JSON.parse(run('JSON.stringify(' + code + ')')); },
     render() { run('render()'); checkRender(); },
     rows() { return [...(this.html.match(/<tbody>([\s\S]*?)<\/tbody>/) || ['', ''])[1].matchAll(/href="#\/lead\/([^"]+)"/g)].map(m => decode(m[1])); },
@@ -93,6 +95,11 @@ function harness(leads = [], canApprove = true) {
       assert.ok(field);
       field.value = value; field.selectionStart = value.length; field.selectionEnd = value.length;
       handlers.input({ target: field, isComposing });
+    },
+    enter(options = {}) {
+      let prevented = false;
+      handlers.keydown({ key: 'Enter', target: document.querySelector('#f-q'), ...options, preventDefault() { prevented = true; } });
+      checkRender(); return prevented;
     },
     flushTimers() {
       for (const [id, fn] of [...timers]) { timers.delete(id); fn(); }
@@ -334,6 +341,59 @@ test('한글 조합 중에는 입력을 다시 만들지 않고 검색 후 커�
   assert.equal(h.document.activeElement.id, 'f-q');
   assert.equal(h.document.activeElement.selectionStart, 2);
   assert.equal(h.document.activeElement.selectionEnd, 2);
+});
+
+test('검색 버튼·Enter는 최신 학생·보호자 입력을 즉시 적용하고 조건을 유지하며 중복 예약을 취소한다', async () => {
+  for (const action of ['button', 'enter']) {
+    const leads = many(70);
+    leads[60].name = '가상 김부모'; leads[60].child.name = '가상 한학생';
+    const h = harness(leads);
+    h.change('f-channel', '맘카페'); h.change('f-owner', 'admin');
+    h.change('f-list-pipeline', 'inspection'); h.change('f-list-stage', 'interpreted');
+    h.change('f-list-sort', 'oldest');
+    await h.click('lead-page', { page: 2 });
+    const filters = h.read('[ui.status,ui.channel,ui.owner,ui.listPipeline,ui.listStage,ui.listFollowup,ui.listSort,ui.listPageSize]');
+    const beforeState = h.read('state');
+    h.input('이전 검색어');
+    assert.equal(h.pendingTimers, 1);
+    // 자동 완성 등 input 이벤트보다 먼저 반영된 최신 값도 명시적 검색에 사용한다.
+    const query = action === 'button' ? '가상 한학생' : '가상 김부모';
+    h.document.querySelector('#f-q').value = query;
+    h.run('ui.listPage=2;');
+    const count = h.renderCount;
+    if (action === 'button') {
+      assert.match(h.html, /data-act="lead-search">검색<\/button>/);
+      await h.click('lead-search');
+    } else assert.equal(h.enter(), true);
+    assert.equal(h.renderCount, count + 1, action);
+    assert.equal(h.pendingTimers, 0, action);
+    assert.deepEqual(h.rows(), ['qa_061']);
+    assert.equal(h.read('ui.q'), query);
+    assert.equal(h.read('ui.listPage'), 1);
+    assert.equal(h.document.activeElement.id, 'f-q');
+    assert.deepEqual(h.read('[ui.status,ui.channel,ui.owner,ui.listPipeline,ui.listStage,ui.listFollowup,ui.listSort,ui.listPageSize]'), filters);
+    h.flushTimers();
+    assert.equal(h.renderCount, count + 1, '늦은 자동 검색으로 다시 그리지 않는다');
+    assert.deepEqual(h.read('state'), beforeState);
+    assert.equal(h.run('outbox.size()'), 0);
+    assert.deepEqual(h.storageWrites, []);
+  }
+});
+
+test('한글 조합 Enter와 keyCode 229는 즉시 검색하지 않고 조합 완료 뒤 Enter만 적용한다', () => {
+  for (const options of [{ isComposing: true }, { keyCode: 229 }]) {
+    const h = harness([lead('ga', { child: { name: '가상 가나다' } }), lead('na', { child: { name: '가상 나다라' } })]);
+    h.input('가나', true);
+    const count = h.renderCount, before = h.html;
+    assert.equal(h.enter(options), false);
+    h.flushTimers();
+    assert.equal(h.renderCount, count);
+    assert.equal(h.html, before);
+    h.input('가나');
+    assert.equal(h.enter(), true);
+    assert.deepEqual(h.rows(), ['ga']);
+    assert.equal(h.pendingTimers, 0);
+  }
 });
 
 test('검색 지연 중 상세로 이동하면 늦은 목록 렌더가 상세 화면을 덮지 않는다', () => {

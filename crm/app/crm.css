@@ -207,6 +207,9 @@ details > summary { cursor: pointer; }
 .customer-filter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
 .customer-filter-grid .field { margin: 0; min-width: 0; }
 .customer-search { grid-column: span 2; }
+.customer-search-control { display: flex; gap: 8px; min-width: 0; }
+.customer-search-control .in { flex: 1; min-width: 0; }
+.customer-search-control .btn { flex-shrink: 0; white-space: nowrap; min-height: 44px; }
 .customer-status { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin-top: 16px; }
 .customer-status > .fl { margin: 0; }
 .customer-active-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
