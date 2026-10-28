@@ -11,6 +11,10 @@ assert.equal(entries.length,1); assert.equal(entries[0].progress.homework,'2쪽'
 assert.equal(JSON.stringify(entries).includes('secret'),false);
 assert.equal(peerLessonEntries([{...task,deleted:true}],{},[],[],'2026-10-26','2026-11-01').length,0);
 assert.equal(peerLessonEntries([{...task,weekendAttendanceMode:'flexible',weekendAllowedDays:[0,6],weekendFlexibleFrom:'2026-10-01'}],{},[],[],'2026-10-26','2026-11-01').length,0);
+const flex = {...task,weekendAttendanceMode:'flexible',weekendAllowedDays:[0,6],weekendFlexibleFrom:'2026-10-01'};
+const visit = {lesson_task_id:task.id,student_id:task.studentId,visit_date:'2026-10-31',status:'completed',check_in_at:Date.parse('2026-10-31T13:00:00+09:00'),check_out_at:Date.parse('2026-10-31T14:00:00+09:00')};
+const flexible = peerLessonEntries([flex],{},[],[visit],'2026-10-26','2026-11-01');
+assert.equal(flexible.length,1);assert.equal(flexible[0].slot.startMinute,780);
 const json = (body,status) => ({body,status});
 assert.equal((await handlePeerLessonRead(env,'task',{action:'write'},'',{scope:'own',id:'one'},json)).status,403);
 env.DB = {prepare(sql) { return {bind() { return {async all() { return {results:sql.includes('FROM staff') ? ['one','two','three','other'].map(id => ({id,data:JSON.stringify({id,name:id})})) : []}; }}; }}; }};
