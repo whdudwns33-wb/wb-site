@@ -2465,6 +2465,7 @@ const sync = {
     if (this.busy) return false;
     const previousAccessRole = this.accessRole;
     const previousOperationsRead = this.operationsRead;
+    const previousPeerLessonRead = this.peerLessonRead;
     let nextAccessRole = '';
     this.busy = true; paintStatus();
     let recoveryOriginal = [];
@@ -2525,6 +2526,7 @@ const sync = {
           return false;
         }
         nextAccessRole = responseAccessRole;
+        this.peerLessonRead = d.peerLessonRead === true;
         if (this.operationsRead !== (d.operationsRead === true)) {
           this.operationsRead = d.operationsRead === true;
           operationsSnapshot = null; operationsLoadedAt = 0; rosterLoadGeneration++;
@@ -2565,7 +2567,7 @@ const sync = {
         if (route === 'books') await loadBookIssues(true);
       }
       if (previousAccessRole === 'manager' && this.accessRole !== 'manager') render();
-      else if (applied || needsAccessRender || accessRoleChanged || previousOperationsRead !== this.operationsRead) renderAfterSync();
+      else if (applied || needsAccessRender || accessRoleChanged || previousOperationsRead !== this.operationsRead || previousPeerLessonRead !== this.peerLessonRead) renderAfterSync();
       return true;
     } catch (e) {
       console.warn('sync failed', String(e && e.code || 'SYNC_FAILED'));
@@ -3596,6 +3598,7 @@ let linkExchangeBusy = false;
 /** 관리 권한이 끝날 때 전체 캐시를 버린다. token을 넘기면 본인 범위 재동기화에만 보존한다. */
 function resetPersonCache(token) {
   operationsSnapshot = null; operationsLoadedAt = 0; sync.operationsRead = false; rosterDb = null;
+  sync.peerLessonRead = false; peerWeek = {key:'',staff:[],entries:[],target:'',loading:false,error:''};
   resetCenterChatState();
   const keepToken = String(token || '');
   if (!keepToken || (staffWork.identity && staffWork.identity.token !== keepToken)) {
@@ -13403,6 +13406,33 @@ async function submitMakeupLink(button) {
 
 /* ── 주간 플래너 ── */
 let weekPlannerMode = 'timetable', weekPlannerAll = false;
+let peerWeek = {key:'',staff:[],entries:[],target:'',loading:false,error:''};
+function peerWeekKey() { return JSON.stringify(sync.auth()) + '|' + mondayOf(cursor) + '|' + peerWeek.target; }
+async function loadPeerWeek() {
+  if (!sync.personVerified || !sync.peerLessonRead || session.isAdmin) return;
+  const key = peerWeekKey(), authKey = JSON.stringify(sync.auth()), target = peerWeek.target;
+  if (peerWeek.key === key) return;
+  peerWeek.key = key; peerWeek.entries = []; peerWeek.loading = true; peerWeek.error = '';
+  try {
+    const from = mondayOf(cursor);
+    const result = await sync.post('/peer-lesson-read',{app:SYNC_APP,auth:sync.auth(),action:target ? 'week' : 'list',staffId:target,from,to:addDays(from,6)});
+    if (key !== peerWeekKey() || authKey !== JSON.stringify(sync.auth()) || !sync.peerLessonRead) return;
+    peerWeek.staff = result.staff || []; peerWeek.entries = result.entries || [];
+  } catch (error) {
+    if (key !== peerWeekKey()) return;
+    peerWeek.staff = []; peerWeek.entries = []; peerWeek.error = '동료 수업 조회에 실패했습니다. 새로고침해 주세요.';
+  } finally {
+    if (key === peerWeekKey()) { peerWeek.loading = false; if (route === 'week') render(); }
+  }
+}
+function peerWeekProgress(entries) {
+  return entries.map(entry => {
+    const p = entry.progress || {}, clock = n => String(Math.floor(n/60)).padStart(2,'0') + ':' + String(n%60).padStart(2,'0');
+    const attendance = ({P:'출석',A:'결석',L:'지각',E:'조퇴'})[p.att] || '출결 미입력';
+    return '<details class="card"><summary>' + esc(entry.date + ' · ' + clock(entry.slot.startMinute) + '–' + clock(entry.slot.endMinute) + ' · ' + entry.studentName + ' · ' + entry.task.subject + ' · ' + attendance) + '</summary>' +
+      [['수업 진행',p.done ? '완료' : '미완료'],['수업내용 · 진도',p.contentProgress],['과제',p.homework],['수업 메모',p.otherNotes]].map(([label,value]) => '<div class="mb14"><b>' + esc(label) + '</b><div style="white-space:pre-wrap">' + esc(value || '미입력') + '</div></div>').join('') + '</details>';
+  }).join('');
+}
 function viewWeek() {
   const me = currentStaff();
   if (!me) return emptyStaffCard();
@@ -13411,12 +13441,24 @@ function viewWeek() {
   if (weekPlannerMode === 'checklist') return h + viewWeekChecklist();
   const mon = mondayOf(cursor), days = Array.from({length:7}, (_,i) => addDays(mon,i));
   const all = session.isAdmin && weekPlannerAll;
+  const peerEnabled = !session.isAdmin && sync.personVerified && sync.peerLessonRead;
+  if (peerEnabled) {
+    loadPeerWeek();
+    h += '<div class="chips mb14"><button class="chip ' + (!peerWeek.target ? 'on' : '') + '" data-act="peerweek" data-id="">내 시간표</button>' + peerWeek.staff.filter(s => s.id !== me.id).map(s => '<button class="chip ' + (peerWeek.target === s.id ? 'on' : '') + '" data-act="peerweek" data-id="' + esc(s.id) + '">' + esc(s.name) + '</button>').join('') + '<button class="btn btn-sm" data-act="peerweekrefresh">새로고침</button></div>';
+  }
   if (session.isAdmin) h += staffSwitcher(me.id) + '<button class="btn btn-ghost mb14" data-act="weekplannerall">' + (all ? '선택한 선생님만 보기' : '전체 선생님 보기') + '</button>';
   h += '<div class="datenav"><button class="navbtn" data-act="week" data-n="-1" aria-label="이전 주">‹</button>' +
     '<div class="d">' + esc(mon + ' ~ ' + days[6]) + '</div><button class="navbtn" data-act="week" data-n="1" aria-label="다음 주">›</button></div>' +
     '<button class="btn btn-sm btn-ghost mb14" data-act="todaydate">이번 주</button>' +
     '<div class="week-time-legend"><span class="is-regular">정규수업</span><span class="is-makeup">보강</span><span class="is-first">첫수업</span><span class="is-subscription">구독</span></div>' +
     '<div class="hint mb14">시작 시간순 표입니다. 빈 시간은 생략하며 수업 길이는 각 칸의 시작·종료 시간을 확인하세요. 좁은 화면에서는 표를 좌우로 밀어 보세요.</div>';
+  if (peerEnabled && peerWeek.target) {
+    h += '<div class="hint mb14">동료 수업 읽기 전용 · 출결과 수업 기록을 수정할 수 없습니다.</div>';
+    if (peerWeek.loading) return h + '<div class="card">수업 기록을 불러오는 중입니다.</div>';
+    if (peerWeek.error) return h + '<div class="card">' + esc(peerWeek.error) + '</div>';
+    return h + WBWeekTimetable.render(peerWeek.entries,days,peerWeek.target,today()) + peerWeekProgress(peerWeek.entries);
+  }
+  if (peerEnabled && peerWeek.error) h += '<div class="hint">' + esc(peerWeek.error) + '</div>';
   ensureWeekendVisitScheduleDates(days, all ? '' : me.id);
   const weekly = weeklyLessonSchedule(cursor);
   const teachers = all ? todayStaffList() : [me];
@@ -24111,6 +24153,10 @@ document.addEventListener('click', async ev => {
     case 'day':  cursor = addDays(cursor, Number(el.dataset.n)); cursorPinned = (cursor !== today()); render(); break;
     case 'todaydate': cursor = today(); cursorPinned = false; render(); break;
     case 'week': cursor = addDays(cursor, Number(el.dataset.n) * 7); cursorPinned = (mondayOf(cursor) !== mondayOf(today())); render(); break;
+    case 'peerweek':
+      if (sync.peerLessonRead && !session.isAdmin && (!id || peerWeek.staff.some(s => s.id === id))) { peerWeek.target = id || ''; peerWeek.key = ''; peerWeek.entries = []; render(); }
+      break;
+    case 'peerweekrefresh': peerWeek.key = ''; peerWeek.entries = []; render(); break;
     case 'weekplannermode': if (['timetable','checklist'].includes(el.dataset.v)) { weekPlannerMode = el.dataset.v; render(); } break;
     case 'weekplannerall': if (session.isAdmin) { weekPlannerAll = !weekPlannerAll; render(); } break;
     case 'scheduleview': {
