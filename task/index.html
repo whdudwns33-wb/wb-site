@@ -5730,13 +5730,13 @@ function lessonHandoffCardHtml(row, mode) {
     ' · ' + esc(lessonHandoffStatusText(row)) + '</span></div>' +
     '<div class="hint">원 수업 출결: <b>' + esc(ATT_LABEL[att] ? ATT_LABEL[att][0] : '미기록') +
     '</b>' + (row.simple ? '' : ' (읽기 전용)') + ' · 출결·회차는 원 수업 1건을 그대로 사용합니다.<br>담당 교체만으로 하원·재등원하지 않습니다. 정규 담당과 시간표는 유지됩니다.</div>' +
-    lessonHandoffReadOnlyMemo(row.sourceMemo, sourceName + '의 인계 당시 원 수업 메모 · ' + row.completedHours) +
+    lessonHandoffReadOnlyMemo(row.sourceMemo, sourceName + '의 인계 당시 원 수업 메모' + (row.simple ? '' : ' · ' + row.completedHours)) +
     '<div class="guide lesson-handoff-note"><b>' + esc(sourceName) + '의 전달 메모</b><br>' + esc(row.note || '전달 메모 없음') + '</div>';
   if (!popup && lessonHandoffCanAct(row, 'attendance')) body += '<div class="lesson-handoff-actions">' +
     [['P', '출석'], ['L', '지각'], ['A', '결석'], ['E', '조퇴']].map(item => '<button class="btn ' + (att === item[0] ? 'btn-primary' : 'btn-ghost') +
       '" data-act="lessonHandoffAttendance" data-att="' + item[0] + '"' + attrs + '>' + item[1] + '</button>').join('') + '</div>';
   if (memoEditable) {
-    body += '<div class="lesson-handoff-memo"><div class="fl">' + esc(recipientName) + '의 인계 수업 메모 · ' + esc(row.remainingHours) + '</div>' +
+    body += '<div class="lesson-handoff-memo"><div class="fl">' + esc(recipientName) + '의 인계 수업 메모' + (row.simple ? '' : ' · ' + esc(row.remainingHours)) + '</div>' +
       '<div class="lesson-memo-grid">' + LESSON_MEMO_FIELDS.map(field => '<label class="lesson-memo-field"><span class="fl">' + esc(field.label) + '</span>' +
         '<textarea class="note" rows="3" maxlength="4000" data-lesson-handoff-memo="' + field.key + '" data-handoff="' + esc(row.handoffId) + '">' +
         esc(draft.memo[field.key]) + '</textarea></label>').join('') + '</div>' +
@@ -5751,7 +5751,7 @@ function lessonHandoffCardHtml(row, mode) {
   const error = lessonHandoffErrors.get(row.handoffId);
   if (error) body += '<div class="hint" role="alert">' + esc(error) + '</div>';
   if (row.status === 'cancelled') body += '<div class="hint">취소 사유: ' + esc(row.cancelReason || row.reason || '기록 확인 필요') + '</div>';
-  if (!lessonHandoffCanEditDate(row.recordDate)) body += '<div class="hint">지난 날짜·23:50 이후 수락·메모·완료는 읽기 전용입니다.' +
+  if (!lessonHandoffCanEditDate(row.recordDate)) body += '<div class="hint">' + (row.recordDate > seoulNowParts().date ? '예약된 인계입니다. 출결·메모·피드백은 수업 당일에 처리할 수 있습니다.' : '지난 날짜·23:50 이후 수락·메모·완료는 읽기 전용입니다.') +
     (lessonHandoffCanAct(row, 'cancel') ? ' 관리자 인계 취소는 사유와 함께 이력에 남습니다.' : '') + '</div>';
   body += '<div class="lesson-handoff-actions">' +
     (!popup && row.editable && row.editable.feedback ? '<button class="btn btn-primary" data-act="lessonHandoffFeedback"' + attrs + '>수업 피드백</button>' : '') +
@@ -5801,8 +5801,8 @@ function lessonHandoffSourcePanelHtml(task, date, check, editable, recordContext
     esc(lessonHandoffTeacherName(row.sourceStaffId, date)) + ' → ' + esc(lessonHandoffTeacherName(row.recipientStaffId, date)) + ' · 시작 ' + esc(row.startTime) +
     '<div class="lesson-handoff-note small mt8">전달 메모: ' + esc(row.note || '없음') + '</div>' +
     (row.status === 'cancelled' ? '<div class="small mt8">취소 사유: ' + esc(row.cancelReason || row.reason || '기록 확인 필요') + '</div>' : '') +
-    lessonHandoffReadOnlyMemo(row.sourceMemo, lessonHandoffTeacherName(row.sourceStaffId, date) + '의 인계 당시 메모 · ' + row.completedHours) +
-    lessonHandoffReadOnlyMemo(row.memo, lessonHandoffTeacherName(row.recipientStaffId, date) + '의 인계 수업 메모 · ' + row.remainingHours) +
+    lessonHandoffReadOnlyMemo(row.sourceMemo, lessonHandoffTeacherName(row.sourceStaffId, date) + '의 인계 당시 메모' + (row.simple ? '' : ' · ' + row.completedHours)) +
+    lessonHandoffReadOnlyMemo(row.memo, lessonHandoffTeacherName(row.recipientStaffId, date) + '의 인계 수업 메모' + (row.simple ? '' : ' · ' + row.remainingHours)) +
     (lessonHandoffCanAct(row, 'cancel') ? '<button class="btn btn-sm btn-ghost mt8" data-act="lessonHandoffCancel" data-handoff="' + esc(row.handoffId) +
       '" data-rev="' + row.revision + '">인계 취소</button>' : '') + '</div>').join('');
   if (canCreate) {
