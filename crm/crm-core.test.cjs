@@ -260,6 +260,28 @@ t('검색·라벨·전화 가림', () => {
   assert.equal(C.normalizePhone('02-123-4567'), '02-123-4567');
 });
 
+t('화면 이름 — 학생 우선, 확인된 보호자 접미사만 분리하고 원본 이름은 보존', () => {
+  const cases = [
+    [{ name: '가상보호', child: { name: '  명시학생  ' } }, { student: '명시학생', guardian: '가상보호' }],
+    [{ name: '옛학생보호자', child: { name: '명시학생' } }, { student: '명시학생', guardian: '' }],
+    [{ name: '  가상학생\t 보호자  ', child: { name: ' \t ' } }, { student: '가상학생', guardian: '' }],
+    [{ name: '가보호자' }, { student: '가', guardian: '' }],
+    [{ name: ' 보호자 ' }, { student: '', guardian: '보호자' }],
+    [{ name: '보호자 가상' }, { student: '', guardian: '보호자 가상' }],
+    [{ name: '가상보호자님' }, { student: '', guardian: '가상보호자님' }],
+    [{ name: ' 가상보호 ' }, { student: '', guardian: '가상보호' }],
+    [{ name: '', child: { name: ' Ａ\t 학생 ' } }, { student: 'A 학생', guardian: '' }],
+    [null, { student: '', guardian: '' }],
+    [{ name: ' \t ', child: {} }, { student: '', guardian: '' }]
+  ];
+  for (const [lead, expected] of cases) assert.deepEqual(C.leadNames(lead), expected);
+  const raw = Object.freeze({ name: ' 가상학생 보호자 ', child: Object.freeze({ name: ' 명시학생 ' }) });
+  const before = JSON.stringify(raw);
+  assert.deepEqual(C.leadNames(raw), { student: '명시학생', guardian: '' });
+  assert.equal(JSON.stringify(raw), before);
+  assert.equal(C.leadLabel(raw), '가상학생 보호자 · 명시학생', '전송에도 쓰는 기존 라벨 계약은 그대로 유지');
+});
+
 t('문서 병합·되돌리기·변경 큐(desk 와 같은 계약)', () => {
   let st = C.emptyState();
   const r = C.mergeDocs(st, [

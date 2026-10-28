@@ -88,18 +88,89 @@ test('직원 신규·수정 저장은 빈칸·공백 학생 이름을 막고 초
   }
 });
 
-test('보호자가 없으면 고객 목록·상세·카드 제목에 학생을 표시하고 어머니 호칭을 붙이지 않는다', () => {
+test('보호자가 없으면 고객 목록·상세·카드에 학생을 표시하고 학생 제목에 어머니 호칭을 붙이지 않는다', () => {
   const h = harness(); h.context.fixture = lead({ name: '', child: { name: '<가상 학생>', grade: '초3' } });
   h.run('state.leads=[fixture];');
   const list = h.run('viewLeads()');
   assert.match(list, /href="#\/lead\/qa_student">&lt;가상 학생&gt;<\/a>/);
   const detail = h.run("viewLead('qa_student')");
-  assert.match(detail, /<h1 class="page">&lt;가상 학생&gt;<\/h1>/);
-  assert.match(detail, /<p class="card-sub">초3<\/p>/);
+  assert.match(detail, /<h1 class="page student-name">&lt;가상 학생&gt;<\/h1>/);
+  assert.match(detail, /<p class="card-sub student-grade">초3<\/p>/);
   assert.ok(!detail.includes('<가상 학생>'));
   assert.ok(!detail.includes('가상 학생&gt; <span class="muted small">어머니'));
   assert.match(h.run('leadRow(fixture)'), /class="lead-name">&lt;가상 학생&gt;/);
   assert.equal(h.context.fixture.name, '');
+});
+
+test('고객 목록·상세는 실제 학생을 먼저 표시하고 보호자·관계·가린 연락처를 분리한다', () => {
+  const h = harness();
+  h.context.fixture = lead({ name: '<가상 김부모>', child: { name: '<가상 이학생>', grade: '초3' }, phone: '010-0000-0000' });
+  h.run('state.leads=[fixture];');
+  const before = h.run('JSON.stringify(state.leads[0])');
+  const list = h.run('viewLeads()');
+  assert.match(list, /<a class="student-name" href="#\/lead\/qa_student">&lt;가상 이학생&gt;<\/a>/);
+  assert.match(list, /class="guardian-info">보호자 &lt;가상 김부모&gt; · 어머니 · /);
+  assert.match(list, /class="student-grade small muted">초3<\/div>/);
+  assert.ok(list.includes(C.maskPhone('010-0000-0000')));
+  const detail = h.run("viewLead('qa_student')");
+  assert.match(detail, /<h1 class="page student-name">&lt;가상 이학생&gt;<\/h1>/);
+  assert.match(detail, /class="guardian-info">보호자 &lt;가상 김부모&gt; · 어머니<\/p>/);
+  for (const html of [list, detail]) {
+    assert.ok(!html.includes('<가상 이학생>') && !html.includes('<가상 김부모>'));
+    assert.ok(!html.includes('010-0000-0000'));
+  }
+  assert.equal(h.run('JSON.stringify(state.leads[0])'), before, '화면 조회로 원본을 쓰지 않는다');
+});
+
+test('학생명+보호자 별칭은 학생으로 표시하고 실제 학생 이름이 있으면 우선하며 일반 보호자를 학생으로 바꾸지 않는다', () => {
+  const examples = [
+    { name: '가상 한학생 보호자', child: {}, student: '가상 한학생', guardian: '보호자 이름 미입력' },
+    { name: '가상 한학생보호자', child: { name: '다른 가상학생' }, student: '다른 가상학생', guardian: '보호자 이름 미입력' },
+    { name: '가상 김부모', child: {}, student: '학생 이름 미입력', guardian: '보호자 가상 김부모' }
+  ];
+  for (const item of examples) {
+    const h = harness(); h.context.fixture = lead(item); h.run('state.leads=[fixture];');
+    const list = h.run('viewLeads()');
+    assert.ok(list.includes('href="#/lead/qa_student">' + item.student + '</a>'));
+    assert.ok(list.includes('class="guardian-info">' + item.guardian));
+    const detail = h.run("viewLead('qa_student')");
+    assert.ok(detail.includes('<h1 class="page student-name">' + item.student + '</h1>'));
+    const row = h.run('leadRow(fixture)');
+    assert.ok(row.includes('<div class="avatar">' + (item.student === '학생 이름 미입력' ? '?' : item.student.slice(0, 1)) + '</div>'));
+    assert.ok(row.includes('<div class="lead-name">' + item.student));
+    assert.equal(h.run('outbox.size()'), 0);
+  }
+});
+
+function formValue(html, id) {
+  const match = html.match(new RegExp('id="' + id + '"[^>]*value="([^"]*)"'));
+  assert.ok(match, '렌더된 입력 값: ' + id);
+  return match[1].replace(/&(?:amp|lt|gt|quot|#39);/g, entity => ({ '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"', '&#39;': "'" }[entity]));
+}
+
+test('별칭 고객 수정 폼은 학생을 먼저 채우고 실제 저장할 때만 학생·보호자 필드를 정리한다', () => {
+  for (const child of [{ grade: '초3' }, { name: '가상 이학생', grade: '초3' }]) {
+    const h = harness();
+    h.context.fixture = lead({ name: '가상 한학생 보호자', child, hubspot: { contactId: 'qa_contact' } });
+    h.run("state.leads=[fixture]; openLeadForm('qa_student');");
+    const html = h.host.innerHTML;
+    assert.ok(html.indexOf('for="f-child"') < html.indexOf('for="f-name"'));
+    assert.equal(formValue(html, 'f-child'), child.name || '가상 한학생');
+    assert.equal(formValue(html, 'f-name'), '');
+    assert.equal(h.run('state.leads[0].name'), '가상 한학생 보호자');
+    assert.equal(h.writes.length, 0);
+    for (const id of ['f-child', 'f-name', 'f-grade', 'f-phone', 'f-email']) h.field(id, formValue(html, id));
+    h.run("saveLeadForm('qa_student')");
+    assert.equal(h.writes.length, 1);
+    assert.equal(h.writes[0][2].name, '');
+    assert.equal(h.writes[0][2].child.name, child.name || '가상 한학생');
+    assert.equal(h.writes[0][2].child.grade, '초3');
+    assert.equal(h.writes[0][2].hubspot.contactId, 'qa_contact');
+  }
+  const h = harness(); h.context.fixture = lead({ name: '가상 김부모', child: {} });
+  const html = h.run('leadFormHtml(fixture)');
+  assert.equal(formValue(html, 'f-name'), '가상 김부모');
+  assert.equal(formValue(html, 'f-child'), '', '일반 보호자 이름에서 학생을 추측하지 않는다');
 });
 
 test('학생 이름 없는 기존 HubSpot 고객은 학생을 입력한 뒤에만 수동 수정할 수 있다', () => {
