@@ -133,12 +133,43 @@ function deferred() {
   return { promise, resolve, reject };
 }
 
+test('future whole lesson needs no attendance, uses one confirm, and partial mode alone reveals time input', async () => {
+  const env = harness();
+  env.clock.date = '2026-08-28';
+  env.state.checks = {};
+  await env.api.openLessonHandoff('lesson-a', '2026-08-29');
+  assert.equal(env.api.draft.mode, 'whole');
+  assert.match(env.modals.at(-1).foot, /data-act="lessonHandoffCreate">확인/);
+  env.api.captureLessonHandoffInput(input({ lessonHandoffField: 'mode' }, 'partial', '[data-lesson-handoff-field]'));
+  assert.match(env.modals.at(-1).body, /인계 시작 시간/);
+  env.api.captureLessonHandoffInput(input({ lessonHandoffField: 'mode' }, 'whole', '[data-lesson-handoff-field]'));
+  env.api.captureLessonHandoffInput(input({ lessonHandoffField: 'recipientStaffId' }, 'teacher-b', '[data-lesson-handoff-field]'));
+  const sentId = env.api.draft.handoffId;
+  env.responder = (_, body) => body.action === 'create'
+    ? { dataGeneration: 3, handoff: handoff({ handoffId: sentId, simple: true, status: 'accepted' }) }
+    : env.respondList([]);
+  await env.api.createLessonHandoff();
+  assert.ok(env.calls.some(call => call.body && call.body.action === 'create'));
+  assert.ok(!env.calls.some(call => call.type === 'setCheck'));
+});
+
+test('simple recipient has attendance and feedback actions without separate accept/complete, source completion is not blocked', () => {
+  const env = harness(); env.asRecipient();
+  const row = handoff({ simple: true, status: 'accepted', mode: 'whole', endTime: '16:00', editable: { save: true, attendance: true, feedback: true } });
+  env.seed([row]);
+  const markup = env.api.lessonHandoffCardHtml(row, 'recipient');
+  assert.match(markup, /lessonHandoffAttendance/);
+  assert.match(markup, /lessonHandoffFeedback/);
+  assert.doesNotMatch(markup, /lessonHandoffAccept|lessonHandoffComplete/);
+  assert.equal(env.api.lessonHandoffOutstanding(env.state.tasks[0], row.recordDate), false);
+});
+
 test('handoffs use their dedicated API and do not synthesize recipient task, check, or session-pack records', () => {
   const helpers = block('function resetLessonHandoffs(', '/* 오늘 수업 화면 */');
   assert.doesNotMatch(helpers, /state\.tasks\.(?:push|splice)|\.staffId\s*=(?!=)|session-pack|action:\s*'check_in'/);
   for (const name of ['submitLessonHandoffAction', 'checkOutLessonHandoff']) assert.doesNotMatch(fn(name), /setCheck\(|queueSync\(|state\.checks/);
   assert.match(fn('createLessonHandoff'), /await settleSync\(\);[\s\S]*sync\.post\('\/lesson-handoff'/);
-  assert.match(fn('createLessonHandoff'), /note: lessonMemoText\(draft\.sourceMemo\) \|\| String\(check\.note \|\| ''\)/);
+  assert.match(fn('createLessonHandoff'), /note: lessonMemoText\(draft\.sourceMemo\) \|\| String\(check && check\.note \|\| ''\)/);
   assert.match(fn('loadLessonHandoffs'), /dataGeneration: context\.generation/);
 });
 
@@ -175,14 +206,14 @@ test('cross-day original panel loads actual recordDate and keeps sourceDate as s
   assert.ok(!env.api.scopes.has(row.sourceDate));
 });
 
-test('source create button requires original P/L and is restricted to current own/admin record', () => {
+test('source create button accepts unmarked attendance and is restricted to own/admin date', () => {
   const env = harness();
   env.api.lessonHandoffContext();
   env.api.scopes.set('2026-08-30', { rows: [], recipients: env.recipients, fetchedAt: Date.now(), error: '' });
   const context = { sourceDate: '2026-08-29', recordDate: '2026-08-30', inputEnabled: true };
   const panel = att => env.api.lessonHandoffSourcePanelHtml(env.state.tasks[0], '2026-08-30', { att }, true, context);
-  assert.match(panel('L'), /data-act="lessonHandoffOpen"[^>]*data-source-date="2026-08-29"[^>]*>남은 수업 인계/);
-  assert.match(panel('A'), /data-act="lessonHandoffOpen"[^>]* disabled/);
+  assert.match(panel('L'), /data-act="lessonHandoffOpen"[^>]*data-source-date="2026-08-29"[^>]*>수업 인계/);
+  assert.doesNotMatch(panel('A'), /data-act="lessonHandoffOpen"[^>]* disabled/);
   env.clock.minute = 23 * 60 + 50;
   assert.doesNotMatch(panel('L'), /data-act="lessonHandoffOpen"/);
   env.clock.minute = 16 * 60;
@@ -224,7 +255,8 @@ test('creating a handoff saves typed original memo, settles sync, then submits s
   env.sourceFields = [input({ id: 'lesson-a', date: '2026-08-30', lessonMemoField: 'homework' }, '2쪽 과제', '[data-lesson-memo-field]')];
   await env.api.openLessonHandoff('lesson-a', '2026-08-29');
   assert.ok(env.api.draft);
-  assert.match(env.modals.at(-1).body, /인계 시작 시간/);
+  assert.match(env.modals.at(-1).body, /전체 수업/);
+  assert.doesNotMatch(env.modals.at(-1).body, /인계 시작 시간|진행 시수|남은 시수/);
   Object.assign(env.api.draft, { recipientStaffId: 'teacher-b', completedHours: '1', remainingHours: '1', startTime: '15:00', note: '나머지 1T 요청', confirmed: true });
   const sentId = env.api.draft.handoffId;
   env.responder = (endpoint, body) => body.action === 'create'
@@ -242,8 +274,9 @@ test('creating a handoff saves typed original memo, settles sync, then submits s
   assert.equal(body.recordDate, '2026-08-30');
   assert.equal(body.lessonTaskId, 'lesson-a');
   assert.equal(body.slotId, 'slot-sat');
-  assert.equal(body.completedHours, '1T');
-  assert.equal(body.remainingHours, '1T');
+  assert.equal(body.simple, true);
+  assert.equal(body.mode, 'whole');
+  assert.equal(body.startTime, '13:00');
   assert.equal(body.dataGeneration, 3);
   assert.ok(!Object.hasOwn(body, 'totalHours'));
   assert.equal(env.state.tasks[0].staffId, 'teacher-a');
@@ -263,12 +296,12 @@ test('failed source sync leaves draft and original memo intact and never creates
   assert.ok(!env.calls.some(call => call.type === 'setCheck'), 'an unchanged source memo produces no generic write');
 });
 
-test('creation validates half-T totals and ambiguous slot ids before persisting source memo', async () => {
+test('creation validates partial time and ambiguous slot ids before persisting source memo', async () => {
   const env = harness();
   await env.api.openLessonHandoff('lesson-a', '2026-08-29');
-  Object.assign(env.api.draft, { recipientStaffId: 'teacher-b', completedHours: '1.5', remainingHours: '1', confirmed: true });
-  assert.throws(() => env.api.validateLessonHandoffDraft(), /합을 맞춰/);
-  env.api.draft.completedHours = '1';
+  Object.assign(env.api.draft, { recipientStaffId: 'teacher-b', mode: 'partial', startTime: '15:00', confirmed: true });
+  assert.throws(() => env.api.validateLessonHandoffDraft(), /시작·종료 사이/);
+  env.api.draft.startTime = '14:00';
   env.state.tasks[0].scheduleSlots.push({ days: [6], startTime: '16:00', endTime: '16:40', lessonHours: '2T' });
   env.api.draft.slotIndex = '1';
   assert.throws(() => env.api.validateLessonHandoffDraft(), /시간대/);

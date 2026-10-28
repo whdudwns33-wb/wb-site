@@ -1,3 +1,4 @@
+import { lessonHandoffFeedbackGrant } from './lesson-handoff.js';
 import {
   MAX_PARENT_FEEDBACK_COMMENT_CHARS,
   parentFeedbackV2CommentBudget,
@@ -902,7 +903,8 @@ export async function handleFeedbackPolish(env, app, body, origin, auth, json) {
     503, origin);
   }
   if (!row) return json({ ok: false, error: '수업 정보를 찾을 수 없습니다' }, 404, origin);
-  if (auth.scope === 'own' && String(row.owner || '') !== String(auth.id || '')) {
+  if (auth.scope === 'own' && String(row.owner || '') !== String(auth.id || '') &&
+      !await lessonHandoffFeedbackGrant(env, 'task', auth, taskId, body.feedbackDate)) {
     return json({ ok: false, error: '본인 수업의 피드백만 다듬을 수 있습니다' }, 403, origin);
   }
   let task;
