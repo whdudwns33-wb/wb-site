@@ -350,7 +350,6 @@
     const o = isObj(raw) ? raw : {};
     const c = isObj(ctx) ? ctx : {};
     const name = clean(o.name, MAX_NAME);
-    if (!name) return invalid('보호자 이름을 입력해 주세요');
     const pipeline = PIPELINES.includes(o.pipeline) ? o.pipeline : 'inspection';
     const legacy = pipeline === 'academy' && isLegacyAcademyStage(o.stage);
     const stage = stagesOf(pipeline).includes(o.stage) || legacy ? o.stage : stagesOf(pipeline)[0];
@@ -360,6 +359,8 @@
     if (email && !validEmail(email)) return invalid('이메일 형식이 올바르지 않습니다');
     const channel = CHANNELS.includes(o.channel) ? o.channel : '기타';
     const child = isObj(o.child) ? o.child : {};
+    const childName = clean(child.name, MAX_NAME);
+    if (!childName && c.allowMissingChildName !== true) return invalid('학생 이름을 입력해 주세요');
     if (child.birth && !validYmd(child.birth)) return invalid('아이 생년월일은 YYYY-MM-DD 로 적어 주세요');
     const ins = isObj(o.inspection) ? o.inspection : {};
     if (ins.date && !validYmd(ins.date)) return invalid('검사일은 YYYY-MM-DD 로 적어 주세요');
@@ -381,7 +382,7 @@
     const retest = validYmd(o.retestDue) ? o.retestDue : retestDue(ins.date, ins.type);
     const data = {
       name: name, relation: relation, phone: phone, email: email,
-      child: { name: clean(child.name, MAX_NAME), birth: validYmd(child.birth) ? child.birth : '', grade: clean(child.grade, 20), school: clean(child.school, 40) },
+      child: { name: childName, birth: validYmd(child.birth) ? child.birth : '', grade: clean(child.grade, 20), school: clean(child.school, 40) },
       channel: channel, channelNote: clean(o.channelNote, 120), hot: !!o.hot,
       interests: interests, source: cleanMulti(o.source, MAX_TEXT), memo: cleanMulti(o.memo, MAX_TEXT), strength: clean(o.strength, 120),
       pipeline: pipeline, stage: stage, stageAt: validYmd(str(o.stageAt).slice(0, 10)) ? str(o.stageAt).slice(0, 10) : (c.today || ymdOf(new Date())),
@@ -734,7 +735,7 @@
     ).map(l => ({ lead: l, next: nextLeadFollowup(l) })).filter(row => !followup ||
       (row.next && (followup === 'today' ? row.next.due === today : row.next.due < today)));
     const newest = (a, b) => str(b.createdAt).localeCompare(str(a.createdAt));
-    const byName = (a, b) => str(a.name).localeCompare(str(b.name), 'ko');
+    const byName = (a, b) => str(a.name || (a.child && a.child.name)).localeCompare(str(b.name || (b.child && b.child.name)), 'ko');
     rows.sort((a, b) => {
       let order = 0;
       if (sort === 'oldest') order = -newest(a.lead, b.lead);
@@ -747,7 +748,7 @@
   function leadLabel(lead) {
     const l = isObj(lead) ? lead : {};
     const child = isObj(l.child) ? clean(l.child.name, MAX_NAME) : '';
-    return clean(l.name, MAX_NAME) + (child ? ' · ' + child : '');
+    return [clean(l.name, MAX_NAME), child].filter(Boolean).join(' · ') || '이름 미입력';
   }
 
   /* ── 문서 병합·변경 큐(desk-core 와 같은 계약) ───── */

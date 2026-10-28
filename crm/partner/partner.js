@@ -74,15 +74,15 @@ function render() {
   h += '<div class="chips mb14">' + [['send', '소개 보내기'], ['inbound', '보내 주신 소개 ' + data.inbound.length], ['outbound', '받은 소개 ' + data.outbound.length]].map(([k, l]) => '<button class="chip' + (tab === k ? ' on' : '') + '" data-act="tab" data-t="' + k + '">' + esc(l) + '</button>').join('') + '</div>';
   if (tab === 'send') {
     h += '<div class="card"><div class="card-title">소개 보내기</div><div class="card-sub mb8">보호자께 센터 검사 안내와 연락 동의를 받은 뒤 보내 주세요. 센터가 하루 안에 연락드립니다.</div>' +
-      '<div class="grid2"><div class="field"><label class="fl" for="f-name">보호자 이름 *</label><input class="in" id="f-name" maxlength="40"></div><div class="field"><label class="fl" for="f-rel">관계</label><select class="in" id="f-rel"><option value="모">어머니</option><option value="부">아버님</option><option value="기타">보호자</option></select></div></div>' +
+      '<div class="grid2"><div class="field"><label class="fl" for="f-name">보호자 이름 (선택)</label><input class="in" id="f-name" maxlength="40"></div><div class="field"><label class="fl" for="f-rel">관계</label><select class="in" id="f-rel"><option value="모">어머니</option><option value="부">아버님</option><option value="기타">보호자</option></select></div></div>' +
       '<div class="field"><label class="fl" for="f-phone">보호자 전화 *</label><input class="in" id="f-phone" inputmode="tel" placeholder="010-0000-0000"></div>' +
-      '<div class="grid2"><div class="field"><label class="fl" for="f-child">아이 이름</label><input class="in" id="f-child" maxlength="40"></div><div class="field"><label class="fl" for="f-grade">학년</label><input class="in" id="f-grade" placeholder="초3 / 중1"></div></div>' +
+      '<div class="grid2"><div class="field"><label class="fl" for="f-child">학생 이름 *</label><input class="in" id="f-child" maxlength="40" required aria-required="true"></div><div class="field"><label class="fl" for="f-grade">학년</label><input class="in" id="f-grade" placeholder="초3 / 중1"></div></div>' +
       '<div class="field"><label class="fl" for="f-memo">메모(아이의 상황, 검사 희망 시기)</label><textarea class="in" id="f-memo" rows="3" maxlength="300"></textarea><div class="hint">전화번호는 전화 칸에만 적어 주세요 — 메모에 번호가 있으면 접수되지 않습니다.</div></div>' +
       '<label class="check"><input type="checkbox" id="f-consent"> 보호자께 센터 연락 동의를 받았습니다</label>' +
       '<button class="btn btn-primary btn-block mt8" data-act="send"' + (busy ? ' disabled' : '') + '>보내기</button></div>';
   } else if (tab === 'inbound') {
     h += '<div class="card"><div class="card-title">보내 주신 소개</div><div class="card-sub mb8">접수 → 예약 → 검사 완료 → 등록/종료. 자세한 진행은 센터에 문의해 주세요.</div>';
-    h += data.inbound.length ? data.inbound.map(r => '<div class="fu"><div class="grow"><b>' + esc(r.name) + '</b>' + (r.childName ? ' · ' + esc(r.childName) : '') + (r.grade ? ' <span class="muted small">' + esc(r.grade) + '</span>' : '') + '<div class="small muted">' + esc(r.createdAt) + '</div></div><span class="pill' + (r.stage === '등록' ? ' ok' : r.stage === '종료' ? '' : ' acc') + '">' + esc(r.stage) + '</span></div>').join('') : '<div class="empty small">아직 보내 주신 소개가 없습니다</div>';
+    h += data.inbound.length ? data.inbound.map(r => '<div class="fu"><div class="grow"><b>' + esc(r.name || r.childName || '이름 미입력') + '</b>' + (r.name && r.childName ? ' · ' + esc(r.childName) : '') + (r.grade ? ' <span class="muted small">' + esc(r.grade) + '</span>' : '') + '<div class="small muted">' + esc(r.createdAt) + '</div></div><span class="pill' + (r.stage === '등록' ? ' ok' : r.stage === '종료' ? '' : ' acc') + '">' + esc(r.stage) + '</span></div>').join('') : '<div class="empty small">아직 보내 주신 소개가 없습니다</div>';
     h += '</div>';
   } else {
     h += '<div class="card"><div class="card-title">센터가 소개한 가정</div><div class="card-sub mb8">가정이 연락해 오면 상태를 표시해 주세요 — 월 정산의 근거가 됩니다.</div>';
@@ -99,7 +99,7 @@ function render() {
 async function send(btn) {
   if (busy) return;
   const body = { name: val('f-name'), relation: val('f-rel'), phone: val('f-phone'), childName: val('f-child'), grade: val('f-grade'), memo: val('f-memo'), consent: !!($('#f-consent') && $('#f-consent').checked) };
-  if (!body.name) return toast('보호자 이름을 입력해 주세요');
+  if (!body.childName) return toast('학생 이름을 입력해 주세요');
   if (!body.phone) return toast('보호자 전화를 입력해 주세요');
   if (!body.consent) return toast('보호자 동의 확인을 체크해 주세요');
   busy = true; if (btn) btn.disabled = true;

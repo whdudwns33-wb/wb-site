@@ -190,7 +190,7 @@ test('센터앱이 맡은 전송 대기는 실제 실패·완료와 별도로 �
   assert.ok(!html.includes('센터앱 관리 대기'));
 });
 
-const lead = { id: 'qa_parent', name: '가상 보호자', phone: '', pipeline: 'inspection', stage: 'inquiry', status: 'open', memo: '기존 메모' };
+const lead = { id: 'qa_parent', name: '가상 보호자', child: { name: '가상 학생' }, phone: '', pipeline: 'inspection', stage: 'inquiry', status: 'open', memo: '기존 메모' };
 function prepareLead(h) {
   h.context.leadFixture = lead;
   h.run("applyDocs([{c:'leads',id:leadFixture.id,data:{...leadFixture},updatedAt:12}],12); route='lead'; leadId=leadFixture.id;");
@@ -245,7 +245,7 @@ test('등록 후 관리 선택지는 기존 사용자 값을 보존하며 다른
   assert.ok(option, '알려지지 않은 기존 값도 선택된 선택지로 남긴다');
   assert.ok(html.includes('<option value="이탈위험">이탈위험</option>'));
   assert.ok(html.includes('등록 후 관리 상태') && html.includes('영업 단계와 별도로 관리'));
-  h.field('f-name', lead.name); h.field('f-acad', option[1]); h.field('f-memo', '관계 메모만 수정');
+  h.field('f-name', lead.name); h.field('f-child', lead.child.name); h.field('f-acad', option[1]); h.field('f-memo', '관계 메모만 수정');
   h.run('openLeadForm(leadFixture.id); saveLeadForm(leadFixture.id);');
   assert.equal(h.run('leadById(leadFixture.id).academyStatus'), '휴원 상담중');
   assert.equal(h.run('leadById(leadFixture.id).stage'), 'won');
@@ -256,7 +256,7 @@ test('등록 후 관리 선택지는 기존 사용자 값을 보존하며 다른
 test('이탈위험 관리 상태를 바꿔도 등록 성사와 판정일은 유지한다', () => {
   const h = harness(); prepareLead(h);
   h.run("state.leads[0]={...state.leads[0],pipeline:'academy',stage:'won',status:'won',outcome:{status:'won',at:'2026-09-01'},academyStatus:'재원'};");
-  h.field('f-name', lead.name); h.field('f-acad', '이탈위험');
+  h.field('f-name', lead.name); h.field('f-child', lead.child.name); h.field('f-acad', '이탈위험');
   h.run('openLeadForm(leadFixture.id); saveLeadForm(leadFixture.id);');
   assert.equal(h.run('leadById(leadFixture.id).academyStatus'), '이탈위험');
   assert.equal(h.run('leadById(leadFixture.id).stage'), 'won');
@@ -329,7 +329,7 @@ test('일시적 서버 작업 충돌과 통신 실패는 입력과 최초 버전
 
 test('고객 폼을 작성하는 동안 받은 원격 변경을 오래된 폼 값으로 덮지 않는다', () => {
   const h = harness(); prepareLead(h);
-  h.field('f-name', lead.name); h.field('f-memo', lead.memo);
+  h.field('f-name', lead.name); h.field('f-child', lead.child.name); h.field('f-memo', lead.memo);
   h.run('openLeadForm(leadFixture.id)');
   h.fields.get('f-memo').value = '폼에서 작성한 메모';
   h.run("applyDocs([{c:'leads',id:leadFixture.id,data:{...leadFixture,name:'원격에서 변경한 이름'},updatedAt:30}],30); saveLeadForm(leadFixture.id);");
