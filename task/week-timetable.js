@@ -28,8 +28,8 @@ var WBWeekTimetable = (function () {
   function render(entries, days, staffId, today) {
     var list = rows(entries, days, staffId);
     if (!list.length) return '<div class="empty">이번 주 등록된 수업이 없습니다.</div>';
-    return '<div class="week-time-scroll" role="region" aria-label="주간 수업 시간표" tabindex="0"><table class="week-time-table"><thead><tr><th scope="col">시작</th>' +
-      days.map(function (date, i) { return '<th scope="col"' + (date === today ? ' class="is-today"' : '') + '>' + ['월','화','수','목','금','토','일'][i] + '<br>' + esc(date.slice(5).replace('-', '/')) + '</th>'; }).join('') + '</tr></thead><tbody>' +
+    return '<div class="week-time-scroll" role="region" aria-label="주간 수업 시간표" tabindex="0"><table class="week-time-table' + (days.length === 2 ? ' is-weekend-only' : '') + '"><thead><tr><th scope="col">시작</th>' +
+      days.map(function (date) { return '<th scope="col"' + (date === today ? ' class="is-today"' : '') + '>' + ['일','월','화','수','목','금','토'][new Date(date + 'T12:00:00Z').getUTCDay()] + '<br>' + esc(date.slice(5).replace('-', '/')) + '</th>'; }).join('') + '</tr></thead><tbody>' +
       list.map(function (row) {
         return '<tr><th scope="row">' + clock(row.start) + '</th>' + row.cells.map(function (cell) {
           return '<td>' + (cell.length ? cell.map(function (entry) {
