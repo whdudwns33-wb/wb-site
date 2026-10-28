@@ -2,11 +2,12 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
 import { DatabaseSync } from 'node:sqlite';
-import { handleLessonHandoff, lessonHandoffCheckoutGrant, lessonHandoffInternals } from './lesson-handoff.js';
+import { handleLessonHandoff, lessonHandoffCheckoutGrant, lessonHandoffFeedbackGrant, lessonHandoffInternals } from './lesson-handoff.js';
 
 const schema = fs.readFileSync(new URL('./schema.sql', import.meta.url), 'utf8');
 const migration = fs.readFileSync(new URL('./migrations/060_lesson_handoffs.sql', import.meta.url), 'utf8');
 const moduleSource = fs.readFileSync(new URL('./lesson-handoff.js', import.meta.url), 'utf8');
+const simpleMigration = fs.readFileSync(new URL('./migrations/091_simple_lesson_handoffs.sql', import.meta.url), 'utf8');
 const source = { scope: 'own', id: 'teacher-a' };
 const recipient = { scope: 'own', id: 'teacher-b' };
 const stranger = { scope: 'own', id: 'teacher-c' };
@@ -108,6 +109,63 @@ function createBody(changes = {}) {
     sourceDate: date, recordDate: date, slotId: 'slot-a', recipientStaffId: 'teacher-b',
     startTime: '15:00', completedHours: '1T', remainingHours: '1T', note: '15시부터 이어서 수업', ...changes };
 }
+
+test('091 preserves existing handoffs and events, foreign keys and immutability', async t => {
+  const db = fixture(t); await createOk(db); await acceptOk(db);
+  const before = db.sqlite.prepare('SELECT * FROM lesson_handoffs').all();
+  const events = db.sqlite.prepare('SELECT * FROM lesson_handoff_events').all();
+  db.sqlite.exec('BEGIN'); db.sqlite.exec(simpleMigration); db.sqlite.exec('COMMIT');
+  assert.deepEqual(db.sqlite.prepare('SELECT * FROM lesson_handoffs').all(), before);
+  assert.deepEqual(db.sqlite.prepare('SELECT * FROM lesson_handoff_events').all(), events);
+  assert.deepEqual(db.sqlite.prepare('PRAGMA foreign_key_check').all(), []);
+  assert.throws(() => db.sqlite.exec('DELETE FROM lesson_handoffs'), /LESSON_HANDOFF_NO_DELETE/);
+});
+
+test('whole lesson can be booked ahead without attendance; acceptance is automatic and dates stay scoped', async t => {
+  const db = fixture(t, { physical: false });
+  db.sqlite.exec('DELETE FROM checks');
+  const body = createBody({ simple: true, mode: 'whole', startTime: '13:00' });
+  const future = await call(db, body, source, at('12:00', '2026-08-29'));
+  assert.equal(future.status, 200, JSON.stringify(future.body));
+  assert.equal(future.body.handoff.status, 'accepted');
+  assert.equal(future.body.handoff.completedHours, '0T');
+  assert.equal(db.count('checks'), 0);
+  assert.equal((await call(db, { action: 'save', handoffId: id, revision: 1, memo: blankMemo(), att: 'P' }, recipient, at('12:00', '2026-08-29'))).status, 409);
+  const save = await call(db, { action: 'save', handoffId: id, revision: 1, memo: { contentProgress: '대체 수업 진도' }, att: 'P' }, recipient);
+  assert.equal(save.status, 200, JSON.stringify(save.body));
+  const check = db.sqlite.prepare('SELECT owner,data FROM checks').get();
+  assert.equal(check.owner, source.id); assert.equal(JSON.parse(check.data).att, 'P');
+  assert.equal(JSON.parse(check.data).lessonMemo.contentProgress, '대체 수업 진도');
+  assert.equal(db.count('checks'), 1); assert.equal(db.count('tasks'), 1);
+  await atNow(at('15:00'), async () => {
+    assert.ok(await lessonHandoffFeedbackGrant({ DB: db }, 'task', recipient, 'lesson-a', date));
+    assert.equal(await lessonHandoffFeedbackGrant({ DB: db }, 'task', stranger, 'lesson-a', date), null);
+    assert.equal(await lessonHandoffFeedbackGrant({ DB: db }, 'task', recipient, 'lesson-a', '2026-08-31'), null);
+  });
+});
+
+test('simple partial handoff preserves source memo and does not duplicate receiver text on repeated saves', async t => {
+  const db = fixture(t, { physical: false });
+  const result = await call(db, createBody({ simple: true, mode: 'partial', startTime: '14:00' }));
+  assert.equal(result.status, 200, JSON.stringify(result.body));
+  for (const [revision, text] of [[1, '후반 진도'], [2, '후반 진도 수정']]) {
+    const saved = await call(db, { action: 'save', handoffId: id, revision, memo: { contentProgress: text } }, recipient);
+    assert.equal(saved.status, 200, JSON.stringify(saved.body));
+  }
+  const check = JSON.parse(db.sqlite.prepare('SELECT data FROM checks').get().data);
+  assert.equal(check.lessonMemo.contentProgress, '원 교사 진도\n\n후반 진도 수정');
+  assert.equal(check.lessonMemo.homework, '원 교사 과제');
+  assert.equal((await call(db, { action: 'save', handoffId: id, revision: 3, memo: blankMemo(), att: 'A' }, stranger)).status, 404);
+});
+
+test('simple creation validates partial time and CAS protects an absent attendance row', async t => {
+  const db = fixture(t, { physical: false });
+  assert.equal((await call(db, createBody({ simple: true, mode: 'partial', startTime: '15:00' }))).status, 422);
+  db.sqlite.exec('DELETE FROM checks');
+  db.beforeBatch = () => db.check({ att: 'A' });
+  assert.equal((await call(db, createBody({ simple: true, startTime: '13:00' }))).status, 409);
+  assert.equal(db.count('lesson_handoffs'), 0);
+});
 async function atNow(time, callback) {
   const original = Date.now; Date.now = () => time;
   try { return await callback(); } finally { Date.now = original; }
@@ -133,9 +191,9 @@ async function grant(db, auth = recipient, time = at('15:10'), physical = db.phy
 test('060 is additive, idempotent, mirrored in schema, and never mutates canonical lesson/attendance/pack rows', () => {
   const normalizedSchema = schema.replace(/\r\n/g, '\n');
   const normalizedMigration = migration.replace(/\r\n/g, '\n').trim();
-  assert.ok(normalizedSchema.includes(normalizedMigration));
+  assert.ok(normalizedSchema.includes(normalizedMigration.replace('total_half_units BETWEEN 2 AND 12', 'total_half_units BETWEEN 1 AND 12').replace('completed_half_units >= 1', 'completed_half_units >= 0')));
   assert.doesNotMatch(migration, /DROP TABLE|DELETE FROM|UPDATE (?:tasks|checks|session_packs|session_pack_usage)\b/i);
-  assert.doesNotMatch(moduleSource, /(?:INSERT(?: OR \w+)? INTO|UPDATE|DELETE FROM)\s+(?:tasks|checks|session_packs|session_pack_usage|weekend_actual_visits)\b/i);
+  assert.doesNotMatch(moduleSource, /(?:INSERT(?: OR \w+)? INTO|UPDATE|DELETE FROM)\s+(?:tasks|session_packs|session_pack_usage|weekend_actual_visits)\b/i);
   const db = new DatabaseSync(':memory:');
   try { db.exec(migration); db.exec(migration); assert.deepEqual(db.prepare('PRAGMA foreign_key_check').all(), []); }
   finally { db.close(); }

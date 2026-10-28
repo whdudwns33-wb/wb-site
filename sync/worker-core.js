@@ -118,7 +118,7 @@ import {
   resolveManagerInspectionAuth, handleManagerInspectionSession
 } from './staff-work-login.js';
 import { handleWeekendVisit } from './weekend-visit.js';
-import { handleLessonHandoff } from './lesson-handoff.js';
+import { handleLessonHandoff, lessonHandoffFeedbackGrant } from './lesson-handoff.js';
 import { findNextStudentLesson, findPreviousStudentLesson, projectNextStudentLesson, validDate } from './student-next-schedule.js';
 import { studentScheduleConflictPayload } from './student-schedule-conflict.js';
 import { isTaskWriteCasConflict } from './task-write-cas.js';
@@ -3011,7 +3011,8 @@ async function taskForFeedback(env, identity, auth, origin) {
   if (!task.owner || !SAFE_ID.test(String(task.owner))) {
     return { response: json({ ok: false, error: '담당자가 지정된 업무만 요청할 수 있습니다' }, 409, origin) };
   }
-  if (auth.scope === 'own' && task.owner !== auth.id) {
+  if (auth.scope === 'own' && task.owner !== auth.id &&
+      !await lessonHandoffFeedbackGrant(env, 'task', auth, identity.taskId, identity.feedbackDate)) {
     return { response: json({ ok: false, error: '본인 업무의 피드백만 요청할 수 있습니다' }, 403, origin) };
   }
   let taskData;
