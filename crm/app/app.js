@@ -523,6 +523,13 @@ function renderLeadList(focus) {
   const target = $(focus || '#lead-list-count');
   if (target) target.focus();
 }
+function searchLeads() {
+  const input = $('#f-q');
+  if (!session || route !== 'leads' || !input) return;
+  clearTimeout(render._q);
+  ui.q = input.value; ui.listPage = 1; ui.listView = '';
+  renderLeadList('#f-q');
+}
 function changeLeadFilter(key, value, focus) {
   clearTimeout(render._q);
   ui[key] = value; ui.listPage = 1; ui.listView = '';
@@ -545,7 +552,7 @@ function viewLeads() {
   ].filter(item => item[2]);
   let h = '<div class="between page-tools"><div><h1 class="page">고객 <small class="muted">' + list.length + '명</small></h1><p class="card-sub">상담 진행 상황과 다음 연락 일정을 확인하세요.</p></div><button class="btn btn-primary" data-act="new-lead">새 문의</button></div>';
   h += '<div class="card customer-list"><div class="customer-views" role="group" aria-label="고객 빠른 보기">' + [['all', '전체 고객'], ['open', '진행·보류'], ['mine', '내 담당'], ['today', '오늘 팔로업'], ['overdue', '지연 팔로업']].map(([key, label]) => '<button class="customer-view' + (ui.listView === key ? ' on' : '') + '" data-act="lead-view" data-view="' + key + '" aria-pressed="' + (ui.listView === key) + '">' + label + '</button>').join('') + '</div>';
-  h += '<div class="customer-filters"><div class="customer-filter-grid"><div class="field customer-search"><label class="fl" for="f-q">고객 검색</label><input class="in" id="f-q" type="search" placeholder="학생·보호자·학교·전화 검색" value="' + esc(q) + '"></div>' +
+  h += '<div class="customer-filters"><div class="customer-filter-grid"><div class="field customer-search"><label class="fl" for="f-q">고객 검색</label><div class="customer-search-control"><input class="in" id="f-q" type="search" placeholder="학생·보호자·학교·전화 검색" value="' + esc(q) + '"><button class="btn btn-primary" type="button" data-act="lead-search">검색</button></div></div>' +
     '<div class="field"><label class="fl" for="f-channel">유입 채널</label><select class="in" id="f-channel"><option value="">채널 전체</option>' + opt(C.CHANNELS, ui.channel) + '</select></div>' +
     (session.canApprove ? '<div class="field"><label class="fl" for="f-owner">담당자</label><select class="in" id="f-owner"><option value="">담당 전체</option><option value="admin"' + (ui.owner === 'admin' ? ' selected' : '') + '>원장</option>' + liveStaff().map(s => '<option value="' + esc(s.id) + '"' + (ui.owner === String(s.id) ? ' selected' : '') + '>' + esc(s.name) + '</option>').join('') + '</select></div>' : '') +
     '<div class="field"><label class="fl" for="f-list-pipeline">파이프라인</label><select class="in" id="f-list-pipeline"><option value="">파이프라인 전체</option>' + opt(C.PIPELINES, ui.listPipeline, p => C.PIPELINE_LABEL[p]) + '</select></div>' +
@@ -1663,6 +1670,7 @@ document.addEventListener('click', async e => {
     case 'show-phone': ui.phoneShown[id] = true; return render();
     case 'pipe': ui.pipe = el.dataset.p; return render();
     case 'status-filter': return changeLeadFilter('status', el.dataset.s, '[data-act="status-filter"][data-s="' + el.dataset.s + '"]');
+    case 'lead-search': return searchLeads();
     case 'lead-view': {
       const view = el.dataset.view;
       if (!['all', 'open', 'mine', 'today', 'overdue'].includes(view)) return;
@@ -1798,6 +1806,10 @@ document.addEventListener('input', e => {
 });
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape' && !$('#modalHost').hidden) return closeModal();
+  if (e.key === 'Enter' && e.target && e.target.id === 'f-q') {
+    if (e.isComposing || e.keyCode === 229) return;
+    e.preventDefault(); return searchLeads();
+  }
   if (e.key !== 'Enter' || !e.target || !e.target.dataset || !e.target.dataset.enter) return;
   const btn = document.querySelector('[data-act="' + e.target.dataset.enter + '"]');
   if (btn) { e.preventDefault(); btn.click(); }
