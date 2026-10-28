@@ -61,6 +61,10 @@ function partnerById(id) { return state.partners.find(p => p && String(p.id) ===
 function activePartners() { return state.partners.filter(p => p && p.status === 'active').sort((a, b) => String(a.name).localeCompare(String(b.name))); }
 function referralsOf(id) { return state.referrals.filter(r => r && r.leadId === id).sort((a, b) => String(b.at).localeCompare(String(a.at))); }
 function initial(name) { const n = String(name || '').trim(); return n ? n.slice(0, 1) : '?'; }
+function guardianSummary(l, names, withPhone) {
+  const relation = C.RELATION_HONORIFIC[l.relation];
+  return ['보호자 ' + (names.guardian || '이름 미입력'), relation !== '보호자' && relation, withPhone && l.phone && C.maskPhone(l.phone)].filter(Boolean).join(' · ');
+}
 function activitiesOf(id) { return state.activities.filter(a => a && a.leadId === id).sort((a, b) => String(b.at).localeCompare(String(a.at)) || (b.ts || 0) - (a.ts || 0)); }
 function creditsOf(id) { return state.credits.filter(c => c && c.leadId === id).sort((a, b) => String(b.at).localeCompare(String(a.at))); }
 
@@ -421,8 +425,10 @@ function viewLogin() {
 /* ── 화면: 오늘 ─────────────────────────────────────── */
 function leadRow(l, extraHtml, actsHtml) {
   const dis = C.daysInStage(l, today());
-  return '<div class="lead" data-act="open-lead" data-id="' + esc(l.id) + '"><div class="avatar' + (l.hot && l.status === 'open' ? ' hot' : l.status === 'won' ? ' ok' : '') + '">' + esc(initial(l.name || l.child && l.child.name)) + '</div><div class="grow"><div class="lead-name">' + esc(C.leadLabel(l)) +
+  const names = C.leadNames(l);
+  return '<div class="lead" data-act="open-lead" data-id="' + esc(l.id) + '"><div class="avatar' + (l.hot && l.status === 'open' ? ' hot' : l.status === 'won' ? ' ok' : '') + '">' + esc(initial(names.student)) + '</div><div class="grow"><div class="lead-name">' + esc(names.student || '학생 이름 미입력') +
     (l.hot && l.status === 'open' ? '<span class="pill hot">HOT</span>' : '') + statusPill(l) + '</div>' +
+    '<div class="small muted">' + esc(guardianSummary(l, names, true)) + '</div>' +
     '<div class="lead-sub"><span class="tag">' + esc(l.channel || '기타') + (l.partnerId && partnerById(l.partnerId) ? ' · ' + esc(partnerById(l.partnerId).name) : '') + '</span><span>' + esc(C.PIPELINE_LABEL[l.pipeline] || '') + ' · ' + esc(C.stageLabel(l.pipeline, l.stage)) + (dis !== null ? ' ' + dis + '일' : '') + '</span>' +
     (l.owner ? '<span>· ' + esc(staffName(l.owner)) + '</span>' : '') + (extraHtml || '') + '</div></div>' + (actsHtml ? '<div class="acts">' + actsHtml + '</div>' : '') + '</div>';
 }
@@ -492,7 +498,8 @@ function viewPipeline() {
       cards.map(l => {
         const d = C.daysInStage(l, t);
         const stale = !closed && d !== null && d >= 14;
-        return '<div class="kcard' + (l.hot && !closed ? ' hot' : '') + (stale ? ' stale' : '') + (closed ? ' closed' : '') + '" data-act="open-lead" data-id="' + esc(l.id) + '"><div class="kcard-name">' + esc(C.leadLabel(l)) + '</div>' +
+        const names = C.leadNames(l);
+        return '<div class="kcard' + (l.hot && !closed ? ' hot' : '') + (stale ? ' stale' : '') + (closed ? ' closed' : '') + '" data-act="open-lead" data-id="' + esc(l.id) + '"><div class="kcard-name">' + esc(names.student || '학생 이름 미입력') + '</div><div class="small muted">' + esc(guardianSummary(l, names)) + '</div>' +
           '<div class="kcard-sub"><span>' + esc(l.channel || '') + '</span>' + (d !== null ? '<span>' + d + '일</span>' : '') + (l.status === 'hold' ? '<span class="tag warn">보류</span>' : '') +
           (l.hubspot && l.hubspot.contactId ? '<span class="dot ok" title="HubSpot 연결됨"></span>' : '') + '</div></div>';
       }).join('') + (closed && cards.length > 5 ? '</details>' : '') + '</div>';
@@ -538,7 +545,7 @@ function viewLeads() {
   ].filter(item => item[2]);
   let h = '<div class="between page-tools"><div><h1 class="page">고객 <small class="muted">' + list.length + '명</small></h1><p class="card-sub">상담 진행 상황과 다음 연락 일정을 확인하세요.</p></div><button class="btn btn-primary" data-act="new-lead">새 문의</button></div>';
   h += '<div class="card customer-list"><div class="customer-views" role="group" aria-label="고객 빠른 보기">' + [['all', '전체 고객'], ['open', '진행·보류'], ['mine', '내 담당'], ['today', '오늘 팔로업'], ['overdue', '지연 팔로업']].map(([key, label]) => '<button class="customer-view' + (ui.listView === key ? ' on' : '') + '" data-act="lead-view" data-view="' + key + '" aria-pressed="' + (ui.listView === key) + '">' + label + '</button>').join('') + '</div>';
-  h += '<div class="customer-filters"><div class="customer-filter-grid"><div class="field customer-search"><label class="fl" for="f-q">고객 검색</label><input class="in" id="f-q" type="search" placeholder="이름·아이·학교·전화 검색" value="' + esc(q) + '"></div>' +
+  h += '<div class="customer-filters"><div class="customer-filter-grid"><div class="field customer-search"><label class="fl" for="f-q">고객 검색</label><input class="in" id="f-q" type="search" placeholder="학생·보호자·학교·전화 검색" value="' + esc(q) + '"></div>' +
     '<div class="field"><label class="fl" for="f-channel">유입 채널</label><select class="in" id="f-channel"><option value="">채널 전체</option>' + opt(C.CHANNELS, ui.channel) + '</select></div>' +
     (session.canApprove ? '<div class="field"><label class="fl" for="f-owner">담당자</label><select class="in" id="f-owner"><option value="">담당 전체</option><option value="admin"' + (ui.owner === 'admin' ? ' selected' : '') + '>원장</option>' + liveStaff().map(s => '<option value="' + esc(s.id) + '"' + (ui.owner === String(s.id) ? ' selected' : '') + '>' + esc(s.name) + '</option>').join('') + '</select></div>' : '') +
     '<div class="field"><label class="fl" for="f-list-pipeline">파이프라인</label><select class="in" id="f-list-pipeline"><option value="">파이프라인 전체</option>' + opt(C.PIPELINES, ui.listPipeline, p => C.PIPELINE_LABEL[p]) + '</select></div>' +
@@ -547,12 +554,13 @@ function viewLeads() {
     '<div class="customer-status"><span class="fl">상태</span><div class="chips" role="group" aria-label="고객 상태">' + [['open', '진행·보류'], ['won', '등록'], ['lost', ui.listPipeline === 'academy' ? '미등록·이탈' : '이탈'], ['all', '전체']].map(([k, l]) => '<button class="chip' + (ui.status === k ? ' on' : '') + '" aria-pressed="' + (ui.status === k) + '" data-act="status-filter" data-s="' + k + '">' + l + '</button>').join('') + '</div></div>';
   if (active.length) h += '<div class="customer-active-filters" role="group" aria-label="적용한 조건">' + active.map(([key, label, value]) => '<button class="customer-filter-chip" data-act="lead-filter-clear" data-filter="' + key + '" aria-label="' + esc(label + ': ' + value + ' 조건 해제') + '"><span>' + esc(label + ': ' + value) + '</span><span class="customer-filter-remove" aria-hidden="true">해제</span></button>').join('') + '<button class="btn btn-sm btn-ghost" data-act="lead-filters-reset">전체 초기화</button></div>';
   h += '</div><div class="customer-results"><p id="lead-list-count" tabindex="-1" role="status" aria-live="polite" aria-atomic="true">' + (list.length ? '전체 ' + list.length + '명 중 ' + (start + 1) + '–' + end + '명' : '조건에 맞는 고객 0명') + '</p><div class="row"><label class="small muted" for="f-list-sort">정렬</label><select class="in" id="f-list-sort">' + opt(['newest', 'oldest', 'name', 'next'], ui.listSort, s => ({ newest: '최신 등록순', oldest: '오래된 등록순', name: '이름순', next: '다음 팔로업순' }[s])) + '</select></div></div>';
-  h += list.length ? '<div class="customer-table-scroll"><table class="customer-table"><caption class="sr-only">고객별 상담 단계와 다음 연락 일정</caption><thead><tr>' + ['고객 · 학생', '상담 단계', '유입 채널', '담당자', '최근 기록', '다음 연락'].map(label => '<th scope="col">' + label + '</th>').join('') + '</tr></thead><tbody>' + list.slice(start, end).map(l => {
+  h += list.length ? '<div class="customer-table-scroll"><table class="customer-table"><caption class="sr-only">학생별 상담 단계와 다음 연락 일정</caption><thead><tr>' + ['학생 · 보호자', '상담 단계', '유입 채널', '담당자', '최근 기록', '다음 연락'].map(label => '<th scope="col">' + label + '</th>').join('') + '</tr></thead><tbody>' + list.slice(start, end).map(l => {
     const recent = activitiesOf(l.id)[0];
     const next = C.nextLeadFollowup(l);
     const late = next ? C.daysBetween(next.due, today()) : 0;
-    return '<tr><td class="customer-name"><a href="#/lead/' + esc(l.id) + '">' + esc(l.name || C.leadLabel(l)) + '</a>' + (l.hot && l.status === 'open' ? ' <span class="pill hot">HOT</span>' : '') +
-      '<div class="small muted">' + esc([l.name ? l.child && l.child.name || '학생 미입력' : '', l.child && l.child.grade].filter(Boolean).join(' · ')) + '</div>' + (l.phone ? '<div class="small muted">' + esc(C.maskPhone(l.phone)) + '</div>' : '') + '</td>' +
+    const names = C.leadNames(l);
+    return '<tr><td class="customer-name"><a class="student-name" href="#/lead/' + esc(l.id) + '">' + esc(names.student || '학생 이름 미입력') + '</a>' + (l.hot && l.status === 'open' ? ' <span class="pill hot">HOT</span>' : '') +
+      (l.child && l.child.grade ? '<div class="student-grade small muted">' + esc(l.child.grade) + '</div>' : '') + '<div class="guardian-info">' + esc(guardianSummary(l, names, true)) + '</div></td>' +
       '<td data-label="상담 단계"><span>' + esc(C.stageLabel(l.pipeline, l.stage)) + '</span> ' + statusPill(l) + '<div class="small muted">' + esc(C.PIPELINE_LABEL[l.pipeline]) + '</div></td>' +
       '<td data-label="유입 채널">' + esc(l.channel || '기타') + '</td><td data-label="담당자">' + esc(staffName(l.owner)) + '</td>' +
       '<td data-label="최근 기록">' + (recent ? esc(recent.at) + '<div class="small muted">' + esc(C.ACTIVITY_LABEL[recent.type] || recent.type) + '</div>' : '<span class="muted">기록 없음</span>') + '</td>' +
@@ -575,9 +583,9 @@ function viewLead(id) {
   const portal = hsSettings().portal || {};
   const hs = l.hubspot || {};
   const dis = C.daysInStage(l, t);
-  const studentSummary = [l.name && l.child && l.child.name, l.child && l.child.grade].filter(Boolean).join(' · ');
+  const names = C.leadNames(l);
   let h = '<div class="row mb8"><button class="btn btn-sm btn-ghost" data-act="back">‹ 뒤로</button></div>';
-  h += '<div class="lead-layout"><section class="card lead-profile" aria-label="고객 정보"><div class="between wraprow"><div><h1 class="page">' + esc(l.name || C.leadLabel(l)) + (l.name ? ' <span class="muted small">' + esc(C.RELATION_HONORIFIC[l.relation] || '') + '</span>' : '') + '</h1>' + (studentSummary ? '<p class="card-sub">' + esc(studentSummary) + '</p>' : '') +
+  h += '<div class="lead-layout"><section class="card lead-profile" aria-label="고객 정보"><div class="between wraprow"><div><h1 class="page student-name">' + esc(names.student || '학생 이름 미입력') + '</h1>' + (l.child && l.child.grade ? '<p class="card-sub student-grade">' + esc(l.child.grade) + '</p>' : '') + '<p class="guardian-info">' + esc(guardianSummary(l, names)) + '</p>' +
     '<div class="row wraprow mt8">' + (l.hot && l.status === 'open' ? '<span class="pill hot">HOT</span>' : '') + '<span class="pill acc">' + esc(C.PIPELINE_LABEL[l.pipeline]) + '</span><span class="pill">' + esc(C.stageLabel(l.pipeline, l.stage)) + (dis !== null ? ' · ' + dis + '일' : '') + '</span>' + statusPill(l) + '<span class="tag">' + esc(l.channel) + (l.channelNote ? ' · ' + esc(l.channelNote) : '') + '</span></div></div>' +
     '<div class="row wraprow"><button class="btn btn-sm btn-ghost" data-act="edit-lead" data-id="' + esc(id) + '">정보 수정</button></div></div>';
   h += '<div class="row wraprow mt14"><label class="fl" style="margin:0" for="f-stage">단계</label><select class="in" id="f-stage" data-id="' + esc(id) + '" style="width:auto">' + stages.map(s => '<option value="' + s + '"' + (s === l.stage ? ' selected' : '') + '>' + esc(C.stageLabel(l.pipeline, s)) + (legacy && s === l.stage ? ' (이전 상태 · 영업 단계 확인 필요)' : '') + '</option>').join('') +
@@ -1316,19 +1324,20 @@ async function doExport() {
 /* ── 리드 폼 ───────────────────────────────────────── */
 function leadFormHtml(l) {
   const L = l || { relation: '모', channel: '기타', child: {}, inspection: {}, interests: [] };
+  const names = C.leadNames(L);
   const isNew = !l;
   const academyStatus = C.academyStatusOf(L);
   const academyOptions = C.ACADEMY_STATUS.includes(academyStatus) || !academyStatus ? C.ACADEMY_STATUS : C.ACADEMY_STATUS.concat(academyStatus);
   const refOptions = state.leads.filter(x => !l || x.id !== l.id).sort((a, b) => String(a.name).localeCompare(String(b.name)));
-  return '<div class="grid2"><div class="field"><label class="fl" for="f-name">보호자 이름 (선택)</label><input class="in" id="f-name" value="' + esc(L.name || '') + '" maxlength="40"></div>' +
+  return '<div class="grid2"><div class="field"><label class="fl" for="f-child">학생 이름 *</label><input class="in" id="f-child" value="' + esc(names.student) + '" maxlength="40" required aria-required="true"></div>' +
+    '<div class="field"><label class="fl" for="f-birth">생년월일</label><input class="in" id="f-birth" type="date" value="' + esc(L.child && L.child.birth || '') + '"></div></div>' +
+    '<div class="grid2"><div class="field"><label class="fl" for="f-grade">학년</label><input class="in" id="f-grade" value="' + esc(L.child && L.child.grade || '') + '" placeholder="초3 / 중1"></div>' +
+    '<div class="field"><label class="fl" for="f-school">학교</label><input class="in" id="f-school" value="' + esc(L.child && L.child.school || '') + '"></div></div>' +
+    '<div class="grid2"><div class="field"><label class="fl" for="f-name">보호자 이름 (선택)</label><input class="in" id="f-name" value="' + esc(names.guardian) + '" maxlength="40"></div>' +
     '<div class="field"><label class="fl" for="f-rel">관계</label><select class="in" id="f-rel">' + opt(C.RELATIONS, L.relation, r => r + ' (' + C.RELATION_HONORIFIC[r] + ')') + '</select></div></div>' +
     '<div class="grid2"><div class="field"><label class="fl" for="f-phone">전화</label><input class="in" id="f-phone" inputmode="tel" value="' + esc(L.phone || '') + '" placeholder="010-0000-0000"></div>' +
     '<div class="field"><label class="fl" for="f-email">이메일</label><input class="in" id="f-email" inputmode="email" value="' + esc(L.email || '') + '"></div></div>' +
     '<p class="hint">보호자 이름 없이 저장할 수 있습니다. HubSpot에 새 연락처를 만들 때는 보호자 이름 또는 이메일이 필요합니다.</p>' +
-    '<div class="grid2"><div class="field"><label class="fl" for="f-child">학생 이름 *</label><input class="in" id="f-child" value="' + esc(L.child && L.child.name || '') + '" maxlength="40" required aria-required="true"></div>' +
-    '<div class="field"><label class="fl" for="f-birth">생년월일</label><input class="in" id="f-birth" type="date" value="' + esc(L.child && L.child.birth || '') + '"></div></div>' +
-    '<div class="grid2"><div class="field"><label class="fl" for="f-grade">학년</label><input class="in" id="f-grade" value="' + esc(L.child && L.child.grade || '') + '" placeholder="초3 / 중1"></div>' +
-    '<div class="field"><label class="fl" for="f-school">학교</label><input class="in" id="f-school" value="' + esc(L.child && L.child.school || '') + '"></div></div>' +
     (isNew ? '<div class="field"><label class="fl" for="f-source">문의 원문(카톡·전화 메모를 그대로)</label><textarea class="in" id="f-source" rows="3" placeholder="예: 판교맘카페에서 보고 연락드려요. 초3 아이 웩슬러 검사 내일 가능한가요?"></textarea><div class="hint" id="f-detect"></div></div>' : '') +
     '<div class="grid2"><div class="field"><label class="fl" for="f-channel2">유입 채널</label><select class="in" id="f-channel2">' + opt(C.CHANNELS, L.channel) + '</select></div>' +
     '<div class="field"><label class="fl" for="f-chnote">채널 메모</label><input class="in" id="f-chnote" value="' + esc(L.channelNote || '') + '" placeholder="어느 카페 / 누구 소개" maxlength="120"></div></div>' +
