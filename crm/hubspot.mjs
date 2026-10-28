@@ -333,7 +333,7 @@ export function contactPatchProperties(lead, extra, available, fields) {
   return Object.fromEntries(Object.entries(properties).filter(([key]) => keys.has(key)));
 }
 
-/** 연락처 → 리드 필드. existing 이 있으면 그 위에 HubSpot 값이 이긴다(연락처·wb_* 만). 기록·팔로업·메모는 건드리지 않는다. */
+/** 연락처 → 리드 필드. HubSpot 값이 이기되 빈 학생 이름은 기존 값을 보존한다. 기록·팔로업·메모는 건드리지 않는다. */
 export function leadFromContact(contact, existing, ctx) {
   const c = normalizeObject(contact);
   const p = c.properties;
@@ -353,7 +353,10 @@ export function leadFromContact(contact, existing, ctx) {
   if (CORE.CHANNELS.includes(p.wb_source_channel)) lead.channel = p.wb_source_channel;
   else if (!lead.channel) lead.channel = '기타';
   lead.child = Object.assign({ name: '', birth: '', grade: '', school: '' }, isObj(lead.child) ? lead.child : {});
-  if ('wb_child_name' in p) lead.child.name = str(p.wb_child_name).slice(0, 40);
+  const childName = str(p.wb_child_name).trim();
+  // 원격 미입력으로 보완한 학생 이름을 지우지 않는다. 둘 다 없을 때만 확인된 보호자 표기에서 채운다.
+  if (childName) lead.child.name = childName.slice(0, 40);
+  else if (!str(lead.child.name).trim()) lead.child.name = CORE.leadNames(lead).student;
   if ('wb_child_birth' in p) lead.child.birth = hsDate(p.wb_child_birth);
   if ('wb_child_grade' in p) lead.child.grade = str(p.wb_child_grade).slice(0, 20);
   lead.inspection = Object.assign({ type: '', date: '' }, isObj(lead.inspection) ? lead.inspection : {});
