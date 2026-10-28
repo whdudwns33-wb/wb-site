@@ -261,11 +261,11 @@ test('조건 전체 해제는 검색 필터만 초기화하고 정렬·표시 �
   assert.equal(h.read('ui.listPageSize'), 50);
 });
 
-test('정렬 선택은 등록일·이름·다음 연락 순서를 실제 표에 반영한다', () => {
+test('정렬 선택은 등록일·학생 이름·다음 연락 순서를 실제 표에 반영한다', () => {
   const h = harness([
-    lead('third', { name: '가상 다', createdAt: '2026-10-03', followups: [] }),
-    lead('first', { name: '가상 나', createdAt: '2026-10-01', followups: due('2026-10-17') }),
-    lead('second', { name: '가상 가', createdAt: '2026-10-02', followups: due('2026-10-15') })
+    lead('third', { name: '가상 가부모', child: { name: '가상 다학생' }, createdAt: '2026-10-03', followups: [] }),
+    lead('first', { name: '가상 나부모', child: { name: '가상 나학생' }, createdAt: '2026-10-01', followups: due('2026-10-17') }),
+    lead('second', { name: '가상 다부모', child: { name: '가상 가학생' }, createdAt: '2026-10-02', followups: due('2026-10-15') })
   ]);
   assert.deepEqual(h.rows(), ['third', 'second', 'first']);
   h.change('f-list-sort', 'oldest');

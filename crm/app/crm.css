@@ -230,6 +230,9 @@ details > summary { cursor: pointer; }
 .customer-name { min-width: 180px; overflow-wrap: anywhere; }
 .customer-name a { display: inline-block; padding: 3px 0; font-size: 14px; font-weight: 700; text-decoration: none; }
 .customer-name a:hover { text-decoration: underline; }
+.student-name, h1.page.student-name { color: var(--accent); }
+.guardian-info { margin-top: 4px; color: var(--muted); font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.student-grade { margin-top: 1px; }
 .customer-list > .hint { padding: 0 18px 14px; }
 .overdue { color: var(--bad); font-weight: 500; }
 .lead-layout { display: grid; gap: 16px; align-items: start; grid-template-areas: 'profile' 'history' 'next'; }

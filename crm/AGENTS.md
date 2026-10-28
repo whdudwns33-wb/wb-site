@@ -11,7 +11,7 @@
 - 학생 이름이 없는 기존 HubSpot 연락처는 내부 가져오기만 `allowMissingChildName: true`로 보존한다. 요청 본문으로 예외를 켜거나 수동 저장에 예외를 넘기지 않는다.
 - 빈 보호자 이름은 `contactProperties`에서 `firstname`·`lastname`을 모두 생략한다. 학생 이름·표시용 문구로 대신 보내지 않는다. 실제 원격 이름은 다시 가져올 수 있다.
 - 기존 연락처가 없고 보호자 이름·이메일도 없으면 로컬 저장은 허용하되 HubSpot 생성은 `CONTACT_IDENTITY_REQUIRED`로 보류한다. 실제 값을 보완한 뒤 재시도한다.
-- 이름 없는 표시에는 `leadLabel`의 학생 이름/미입력 표시를 쓰고, 기존 데이터나 과거 임시 이름을 일괄 변환하지 않는다.
+- 고객 표시·이름순 정렬은 학생 우선이다. `leadNames`는 명시한 `child.name`을 우선하며, 없을 때 원장이 확인한 `학생명 보호자` 접미 형식에서만 학생 이름을 읽는다. 해당 연락처명은 보호자 실명으로 표시하지 않는다. 편집 폼의 미리 채우기 외에 원본을 일괄 변환하지 않으며, HubSpot 딜 이름에 쓰이는 `leadLabel`의 계약은 유지한다.
 
 ```
 node scripts/check.mjs --only crm        # crm 하위의 순수 로직·API·화면 검사 전부

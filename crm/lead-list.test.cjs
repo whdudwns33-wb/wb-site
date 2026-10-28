@@ -81,22 +81,31 @@ test('정렬은 최신·오래된·이름·다음 일정 순서와 미예정 마
 });
 
 test('다음 일정 동률은 최신·이름·ID 순이며 입력 배열의 순서에 의존하지 않는다', () => {
-  const records = [lead('d', { name: '나', followups: [pending(TODAY)] }),
-    lead('c', { name: '가', followups: [pending(TODAY)] }), lead('b', { name: '가', followups: [pending(TODAY)] }),
-    lead('a', { name: '다', createdAt: '2026-10-02', followups: [pending(TODAY)] })];
+  const records = [lead('d', { name: '나', child: { name: '나학생' }, followups: [pending(TODAY)] }),
+    lead('c', { name: '가', child: { name: '가학생' }, followups: [pending(TODAY)] }), lead('b', { name: '가', child: { name: '가학생' }, followups: [pending(TODAY)] }),
+    lead('a', { name: '다', child: { name: '다학생' }, createdAt: '2026-10-02', followups: [pending(TODAY)] })];
   assert.deepEqual(ids(records, { sort: 'next' }), ['a', 'b', 'c', 'd']);
   assert.deepEqual(ids(records.slice().reverse(), { sort: 'next' }), ['a', 'b', 'c', 'd']);
   assert.deepEqual(ids(records, { sort: 'name' }), ['b', 'c', 'd', 'a']);
 });
 
-test('이름순은 보호자 이름이 없으면 목록에 표시되는 학생 이름으로 정렬한다', () => {
+test('이름순은 보호자보다 학생 이름을 먼저 비교하고 기존 보호자 표기에서도 학생을 찾는다', () => {
   const records = [
-    lead('last', { name: undefined, child: { name: '다학생' }, createdAt: '2026-10-03' }),
-    lead('middle', { name: '나보호자', child: { name: '가학생' }, createdAt: '2026-10-02' }),
-    lead('first', { name: '', child: { name: '가학생' }, createdAt: '2026-10-01' })
+    lead('last', { name: '가상보호', child: { name: '다학생' }, createdAt: '2026-10-03' }),
+    lead('middle', { name: ' 나학생 보호자 ', child: {}, createdAt: '2026-10-02' }),
+    lead('first', { name: '다상보호', child: { name: '가학생' }, createdAt: '2026-10-01' })
   ];
   assert.deepEqual(ids(records, { sort: 'name' }), ['first', 'middle', 'last']);
   assert.deepEqual(ids(records.slice().reverse(), { sort: 'name' }), ['first', 'middle', 'last']);
+});
+
+test('이름순에서 보호자는 같은 학생 이름의 동률 또는 학생 정보가 없을 때만 비교한다', () => {
+  const records = [
+    lead('same-b', { name: '다상보호', child: { name: '가학생' }, createdAt: '2026-10-03' }),
+    lead('guardian-only', { name: '나상보호', child: {} }),
+    lead('same-a', { name: '가상보호', child: { name: '가학생' }, createdAt: '2026-10-01' })
+  ];
+  assert.deepEqual(ids(records, { sort: 'name' }), ['same-a', 'same-b', 'guardian-only']);
 });
 
 test('알 수 없거나 비정상인 조건은 전체 결과로 조용히 넓히지 않는다', () => {
