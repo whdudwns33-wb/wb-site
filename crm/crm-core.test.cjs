@@ -95,16 +95,36 @@ t('validateLead — 정규화·필수값·날짜·상태 유도·outcome 보정'
   assert.deepEqual(v.data.interests, ['학원']);
   assert.equal(v.data.followups.length, 3);
   assert.equal(v.data.stageAt, TODAY);
-  const lost = C.validateLead({ name: 'B', pipeline: 'inspection', stage: 'lost', outcome: { reason: 'P', at: '2026-10-05', note: '비쌈' } }, { today: TODAY });
+  const lost = C.validateLead({ name: 'B', child: { name: '학생' }, pipeline: 'inspection', stage: 'lost', outcome: { reason: 'P', at: '2026-10-05', note: '비쌈' } }, { today: TODAY });
   assert.deepEqual([lost.data.status, lost.data.outcome.reason, lost.data.outcome.at], ['lost', 'P', '2026-10-05']);
-  const lostNoReason = C.validateLead({ name: 'B', stage: 'lost' }, { today: TODAY });
+  const lostNoReason = C.validateLead({ name: 'B', child: { name: '학생' }, stage: 'lost' }, { today: TODAY });
   assert.equal(lostNoReason.data.outcome.reason, 'U');
-  assert.equal(C.validateLead({ name: 'B', pipeline: 'academy', stage: 'inquiry' }).data.stage, 'inquiry');
-  assert.equal(C.validateLead({ name: 'B', phone: 'abc' }).ok, false);
-  assert.equal(C.validateLead({ name: 'B', email: 'nope' }).ok, false);
-  assert.equal(C.validateLead({ name: 'B', child: { birth: '2017-13-01' } }).ok, false);
-  assert.equal(C.validateLead({ name: 'B', channel: '없는채널' }).data.channel, '기타');
-  assert.equal(C.validateLead({ name: 'B', stage: 'tested' }).data.outcome, null);
+  assert.equal(C.validateLead({ name: 'B', child: { name: '학생' }, pipeline: 'academy', stage: 'inquiry' }).data.stage, 'inquiry');
+  assert.equal(C.validateLead({ name: 'B', child: { name: '학생' }, phone: 'abc' }).ok, false);
+  assert.equal(C.validateLead({ name: 'B', child: { name: '학생' }, email: 'nope' }).ok, false);
+  assert.equal(C.validateLead({ name: 'B', child: { name: '학생', birth: '2017-13-01' } }).ok, false);
+  assert.equal(C.validateLead({ name: 'B', child: { name: '학생' }, channel: '없는채널' }).data.channel, '기타');
+  assert.equal(C.validateLead({ name: 'B', child: { name: '학생' }, stage: 'tested' }).data.outcome, null);
+});
+
+t('학생 이름 필수·보호자 이름 선택 — 공백 검사와 외부 가져오기 예외', () => {
+  for (const child of [undefined, {}, { name: '' }, { name: ' \t\n ' }]) {
+    assert.deepEqual(C.validateLead({ name: '보호자', child }), { ok: false, error: '학생 이름을 입력해 주세요' });
+  }
+  for (const name of [undefined, '', ' \t ']) {
+    const result = C.validateLead({ name, child: { name: ' 학생A ' } });
+    assert.ok(result.ok, result.error);
+    assert.equal(result.data.name, '');
+    assert.equal(result.data.child.name, '학생A');
+    assert.equal(C.leadLabel(result.data), '학생A');
+  }
+  assert.equal(C.validateLead({ name: '보호자', allowMissingChildName: true }).ok, false, '본문의 우회 플래그는 무시');
+  const imported = C.validateLead({}, { allowMissingChildName: true });
+  assert.ok(imported.ok);
+  assert.equal(imported.data.name, '');
+  assert.equal(imported.data.child.name, '');
+  assert.equal(C.leadLabel(imported.data), '이름 미입력');
+  assert.equal(C.validateLead(imported.data).ok, false, '가져온 연락처도 직접 저장할 때는 학생 이름 필요');
 });
 
 t('validateActivity·validateCredit — 내용 없는 메모는 거절, 단계 변경은 내용 없이도 됨, 크레딧 부호 검사', () => {
@@ -168,14 +188,14 @@ t('학원 영업 단계와 등록 후 상태 — 이전 단계·판정·KPI는 �
   assert.equal(C.stageLabel('inspection', 'inquiry'), '신규문의');
   assert.equal(C.stageLabel('academy', 'at_risk'), '이탈위험');
   assert.ok(C.ACADEMY_STATUS.includes('이탈위험'));
-  const old = ['active', 'at_risk', 'churned'].map(stage => ({ name: '이전 고객', pipeline: 'academy', stage, stageAt: '2026-09-01', status: C.statusOf(stage), consultedAt: '2026-09-01', createdAt: '2026-09-01', outcome: stage === 'churned' ? { status: 'lost', at: '2026-09-04', reason: 'P', note: '과거 판정' } : null }));
+  const old = ['active', 'at_risk', 'churned'].map(stage => ({ name: '이전 고객', child: { name: '학생' }, pipeline: 'academy', stage, stageAt: '2026-09-01', status: C.statusOf(stage), consultedAt: '2026-09-01', createdAt: '2026-09-01', outcome: stage === 'churned' ? { status: 'lost', at: '2026-09-04', reason: 'P', note: '과거 판정' } : null }));
   const after = old.map(l => C.validateLead(l, { today: TODAY }).data);
   assert.deepEqual(after.map(l => l.academyStatus), ['재원', '이탈위험', '이탈']);
   old.forEach((l, i) => ['stage', 'stageAt', 'status', 'outcome'].forEach(k => assert.deepEqual(after[i][k], l[k])));
   assert.deepEqual(C.kpi(after, [], '2026-09', TODAY), C.kpi(old, [], '2026-09', TODAY));
   after.forEach(l => assert.deepEqual(C.validateLead(l, { today: TODAY }).data, l));
   assert.equal(C.academyStatusOf({ pipeline: 'academy', stage: 'at_risk', academyStatus: '퇴원' }), '퇴원');
-  assert.equal(C.validateLead({ name: '날짜 없음', pipeline: 'academy', stage: 'churned', status: 'lost', outcome: null }, { today: TODAY }).data.outcome, null);
+  assert.equal(C.validateLead({ name: '날짜 없음', child: { name: '학생' }, pipeline: 'academy', stage: 'churned', status: 'lost', outcome: null }, { today: TODAY }).data.outcome, null);
 });
 
 t('동기화 트랙 — 딜 단계 전이만 review, 그 외는 quick', () => {
@@ -301,8 +321,8 @@ t('파트너 연계 — 채널 감지(파트너가 소개보다 먼저), 파트�
   const r = C.validateReferral({ leadId: 'l1', partnerId: 'p1', status: 'nope', note: '수학 보강 필요' }, { today: TODAY });
   assert.deepEqual([r.data.direction, r.data.status, r.data.at], ['out', 'sent', TODAY]);
   // 리드의 partnerId 는 채널이 파트너일 때만 남는다
-  assert.equal(C.validateLead({ name: 'A', channel: '파트너', partnerId: 'p1' }).data.partnerId, 'p1');
-  assert.equal(C.validateLead({ name: 'A', channel: '맘카페', partnerId: 'p1' }).data.partnerId, '');
+  assert.equal(C.validateLead({ name: 'A', child: { name: '학생' }, channel: '파트너', partnerId: 'p1' }).data.partnerId, 'p1');
+  assert.equal(C.validateLead({ name: 'A', child: { name: '학생' }, channel: '맘카페', partnerId: 'p1' }).data.partnerId, '');
   assert.deepEqual([C.coarseStage({ stage: 'upsell' }), C.coarseStage({ stage: 'trial' }), C.coarseStage({ stage: 'lost' }), C.coarseStage({})], ['검사 완료', '등록', '종료', '접수']);
   const leads = [
     { id: 'a', partnerId: 'p1', createdAt: '2026-10-01', consultedAt: '2026-10-03', status: 'won' },

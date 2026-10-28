@@ -297,7 +297,8 @@ export function contactProperties(lead, extra, available) {
   const props = {};
   const parts = isObj(hs.nameParts) ? hs.nameParts : null;
   const combined = parts ? (str(parts.lastname) + str(parts.firstname)).replace(/\s+/g, '') : '';
-  if (!parts || combined !== str(L.name).replace(/\s+/g, '')) { props.firstname = str(L.name); props.lastname = ''; }
+  // 보호자 이름 미입력은 원격 이름 삭제가 아니다. 학생 이름도 연락처 이름으로 대신 쓰지 않는다.
+  if (str(L.name).trim() && (!parts || combined !== str(L.name).replace(/\s+/g, ''))) { props.firstname = str(L.name); props.lastname = ''; }
   props[hs.phoneSource === 'mobilephone' ? 'mobilephone' : 'phone'] = CORE.normalizePhone(L.phone);
   props.email = str(L.email).toLowerCase();
   const wb = {
@@ -344,7 +345,7 @@ export function leadFromContact(contact, existing, ctx) {
   const first = str(p.firstname).trim(), last = str(p.lastname).trim();
   const name = (last && first ? last + first : (first || last)).trim();
   if (name) lead.name = name.slice(0, 40);
-  else if (!lead.name) lead.name = ('HubSpot 연락처 ' + c.id).slice(0, 40);   // 이메일·전화를 이름에 넣으면 PII 규칙이 그 리드의 저장을 막는다
+  else if (!lead.name) lead.name = '';
   const phoneSource = ['phone', 'mobilephone'].includes(E?.hubspot?.phoneSource) ? E.hubspot.phoneSource : p.phone ? 'phone' : p.mobilephone ? 'mobilephone' : 'phone';
   const phone = CORE.normalizePhone(p[phoneSource]);
   if ('phone' in p || 'mobilephone' in p) lead.phone = phone;

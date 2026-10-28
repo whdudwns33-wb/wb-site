@@ -1,7 +1,7 @@
 // node --test crm/hubspot.test.mjs — HubSpot 클라이언트를 가짜 fetch 위에서 돌린다(망 안 탐). 토큰·실명은 자리표시.
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createClient, contactProperties, leadFromContact, applyDealsToLead, noteBody, dealName, hsDate, HubSpotError, WB_PROPERTY_NAMES, WB_PROPERTIES } from './hubspot.mjs';
+import { createClient, contactProperties, contactPatchProperties, leadFromContact, applyDealsToLead, noteBody, dealName, hsDate, HubSpotError, WB_PROPERTY_NAMES, WB_PROPERTIES } from './hubspot.mjs';
 
 /** 경로 → 응답 함수 표. 요청은 calls 에 쌓인다. */
 function fakeFetch(routes) {
@@ -174,6 +174,33 @@ test('contactProperties — 이름은 HubSpot 성·이름 합친 것과 같으�
   assert.equal(contactProperties({ name: 'x' }, {}, null).wb_partner, undefined);
 });
 
+test('보호자 이름 미입력 — 새 연락처·기존 연락처에 이름을 보내지 않고 전화 수정은 유지', async () => {
+  const remote = { firstname: '가상보호', lastname: '김', phone: '010-0000-0000' };
+  const f = fakeFetch({
+    'POST /crm/v3/objects/contacts': call => ({ id: 'new', properties: call.body.properties }),
+    'PATCH /crm/v3/objects/contacts/linked': call => ({ id: 'linked', properties: Object.assign(remote, call.body.properties) })
+  });
+  const hs = createClient({ token: 'pat-test', fetch: f.fetchImpl });
+  for (const name of ['', ' \t\n ', undefined, null]) {
+    const lead = { name, email: 'guardian@example.test', phone: '01000001234', child: { name: '가상학생' } };
+    const created = await hs.createContact(contactProperties(lead));
+    assert.equal(Object.hasOwn(created.properties, 'firstname'), false);
+    assert.equal(Object.hasOwn(created.properties, 'lastname'), false);
+    assert.equal(created.properties.email, 'guardian@example.test', '보호자 이름 없는 신규 연락처는 이메일로 생성한다');
+    assert.equal(created.properties.wb_child_name, '가상학생');
+    lead.hubspot = { contactId: 'linked', nameParts: { firstname: '가상보호', lastname: '김' } };
+    for (const fields of [['name'], ['phone'], ['name', 'phone']]) {
+      const patch = contactPatchProperties(lead, {}, null, fields);
+      assert.deepEqual(patch, fields.includes('phone') ? { phone: '010-0000-1234' } : {});
+      const updated = await hs.updateContact('linked', patch);
+      assert.deepEqual([updated.properties.firstname, updated.properties.lastname], ['가상보호', '김']);
+    }
+    assert.equal(remote.phone, '010-0000-1234');
+  }
+  const renamed = contactPatchProperties({ name: '이가상', phone: '01000005678', hubspot: { nameParts: { firstname: '가상보호', lastname: '김' } } }, {}, null, ['name']);
+  assert.deepEqual(renamed, { firstname: '이가상', lastname: '' }, '실제로 입력한 보호자 이름 변경은 계속 반영한다');
+});
+
 test('leadFromContact — 성+이름, 전화 정규화, 날짜 두 형식, 기존 리드의 기록·메모는 보존', () => {
   const contact = { id: '77', updatedAt: '2026-10-01T00:00:00Z', properties: {
     firstname: '보호', lastname: '김', mobilephone: '01000000000', email: 'A@B.CO', wb_source_channel: '블로그', wb_child_birth: '1500000000000',
@@ -191,8 +218,26 @@ test('leadFromContact — 성+이름, 전화 정규화, 날짜 두 형식, 기�
   assert.deepEqual([merged.name, merged.memo, merged.followups.length, merged.channel, merged.hubspot.deals.inspection.dealId], ['A', '중요 메모', 1, '맘카페', '1']);
   assert.equal(existing.memo, '중요 메모', '원본을 바꾸지 않는다');
   const nameless = leadFromContact({ id: '9', properties: { email: 'x@y.z' } }, null);
-  assert.equal(nameless.name, 'HubSpot 연락처 9', '이메일을 이름으로 쓰면 PII 규칙에 걸린다');
+  assert.equal(nameless.name, '', '보호자 이름에 연락처 표시명이나 이메일을 대신 넣지 않는다');
   assert.equal(hsDate('garbage'), '');
+});
+
+test('이름 없는 HubSpot 가져오기 — 빈 보호자 이름을 유지하고 실제 원격 이름만 채운다', () => {
+  const contact = { id: 'nameless', properties: { firstname: '', lastname: '', wb_child_name: '가상학생' } };
+  const blank = leadFromContact(contact, { name: '', memo: '보존', child: { name: '가상학생' } });
+  assert.equal(blank.name, '');
+  const outbound = contactProperties(blank);
+  assert.equal(Object.hasOwn(outbound, 'firstname'), false);
+  assert.equal(Object.hasOwn(outbound, 'lastname'), false);
+  assert.equal(outbound.wb_child_name, '가상학생');
+  const named = leadFromContact({ ...contact, properties: { ...contact.properties, firstname: '가상보호', lastname: '김' } }, blank);
+  assert.equal(named.name, '김가상보호');
+  assert.equal(named.memo, '보존');
+  assert.equal(blank.name, '', '기존 리드 객체를 수정하지 않는다');
+  assert.deepEqual(contactPatchProperties(named, {}, null, ['name']), {}, '가져온 성·이름은 다시 덮어쓰지 않는다');
+  for (const name of ['기존보호자', 'HubSpot 연락처 nameless']) {
+    assert.equal(leadFromContact(contact, { name }).name, name, '기존 이름을 추측해 지우거나 일괄 변환하지 않는다');
+  }
 });
 
 test('applyDealsToLead — 매핑된 파이프라인의 최신 딜로 단계를 정하고, 학원 등록 딜이 있으면 그쪽이 현재', () => {

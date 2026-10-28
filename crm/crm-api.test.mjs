@@ -342,7 +342,8 @@ test('리드 문서 — 검증·정규화, 전화는 전화 칸에만(PII), hubs
   const pii = await putDoc(env, staff.token, 'leads', 'l1', lead({ memo: '엄마 번호 010-1234-5678' }));
   assert.deepEqual([pii.status, pii.body.code], [400, 'PII']);
   assert.equal((await putDoc(env, staff.token, 'leads', 'l1', lead({ hubspot: { contactId: '1234561234567', deals: { inspection: { dealId: '9012341234567' } } } }))).status, 200, '서버 소유 hubspot 필드의 숫자열은 PII 검사 대상이 아니다');
-  assert.equal((await putDoc(env, staff.token, 'leads', 'l1', lead({ name: '' }))).body.code, 'INVALID');
+  assert.equal((await putDoc(env, staff.token, 'leads', 'l1', lead({ name: '' }))).status, 200);
+  assert.equal((await putDoc(env, staff.token, 'leads', 'l1', lead({ child: { name: ' ' } }))).body.error, '학생 이름을 입력해 주세요');
   assert.equal((await putDoc(env, staff.token, 'leads', 'l1', {}, { deleted: true })).status, 403);
   assert.equal((await putDoc(env, admin, 'leads', 'l1', {}, { deleted: true })).status, 200);
   assert.equal((await putDoc(env, admin, 'leads', 'bad id!', lead())).body.code, 'INVALID');
@@ -367,6 +368,34 @@ test('단계가 바뀌면 stageAt 은 서버가 오늘로 찍고, 안 바뀌면 
   d = (await call(env, 'GET', '/api/docs', { token: admin })).body.docs.find(x => x.id === 'l1').data;
   assert.match(d.stageAt, /^\d{4}-\d{2}-\d{2}$/);
   assert.notEqual(d.stageAt, '2025-01-01');
+});
+
+test('직원·파트너 저장 — 학생 이름 필수, 보호자 이름 선택, 가져오기 예외는 요청으로 켤 수 없다', async () => {
+  const env = envFor(), admin = await setupAdmin(env), staff = await makeStaff(env, admin, '가상직원');
+  for (const child of [undefined, {}, { name: '' }, { name: ' \t ' }]) {
+    const rejected = await putDoc(env, staff.token, 'leads', 'student-required', lead({ child, allowMissingChildName: true }), { allowMissingChildName: true });
+    assert.equal(rejected.status, 400);
+    assert.equal(rejected.body.error, '학생 이름을 입력해 주세요');
+  }
+  assert.equal(await storedLead(env, 'student-required'), null);
+  const saved = await putDoc(env, staff.token, 'leads', 'student-required', lead({ name: ' ', child: { name: ' 가상학생 ' } }));
+  assert.equal(saved.status, 200, JSON.stringify(saved.body));
+  const before = await storedLead(env, 'student-required');
+  assert.equal(JSON.parse(before.data).name, '');
+  assert.equal(JSON.parse(before.data).child.name, '가상학생');
+  assert.equal((await putDoc(env, admin, 'leads', 'student-required', lead({ child: {} }), { expectedUpdatedAt: before.updated_at })).status, 400);
+  assert.deepEqual(await storedLead(env, 'student-required'), before, '거절된 편집은 기존 문서·버전을 보존');
+
+  const partner = await makePartner(env, admin, '가상파트너');
+  for (const childName of ['', ' \t ']) {
+    const rejected = await call(env, 'POST', '/api/partner/referrals', { token: partner.token, body: { name: '보호자', childName, consent: true, allowMissingChildName: true } });
+    assert.equal(rejected.status, 400);
+    assert.equal(rejected.body.error, '학생 이름을 입력해 주세요');
+  }
+  const referred = await call(env, 'POST', '/api/partner/referrals', { token: partner.token, body: { childName: '가상학생B', consent: true } });
+  assert.equal(referred.status, 200, JSON.stringify(referred.body));
+  assert.equal(referred.body.referral.name, '');
+  assert.equal(referred.body.referral.childName, '가상학생B');
 });
 
 test('기록·크레딧은 append-only, 크레딧·설정은 원장만, 설정은 정규화된다', async () => {
@@ -677,6 +706,49 @@ test('push — 매핑 없는 딜은 failed(UNMAPPED), 재시도(retry)는 approv
   assert.deepEqual([none.ok, none.code], [false, 'HUBSPOT_NO_TOKEN']);
 });
 
+test('보호자 없는 신규 연락처 — 이름·이메일 없이 외부 생성하지 않고 이메일 보완 후 재시도', async () => {
+  const hs = fakeHubspot(), env = envFor(hs), admin = await setupAdmin(env);
+  await saveMapping(env, admin, hs);
+  assert.equal((await putDoc(env, admin, 'leads', 'nameless-new', lead({ name: '', email: '' }))).status, 200);
+  await call(env, 'POST', '/api/hubspot/queue', { token: admin, body: { op: 'approveAll' } });
+  const held = await flushQueue(env, 5);
+  assert.equal(held.done, 0);
+  assert.equal(held.results[0].code, 'CONTACT_IDENTITY_REQUIRED');
+  const failed = (await queue(env, admin, '?leadId=nameless-new')).items.filter(i => i.status === 'failed');
+  assert.equal(failed.length, 1);
+  assert.match(failed[0].error, /보호자 이름 또는 이메일/);
+  assert.equal(hs.calls.filter(c => c.method === 'POST' && c.path === '/crm/v3/objects/contacts').length, 0);
+  assert.equal(JSON.parse((await storedLead(env, 'nameless-new')).data).name, '');
+  assert.equal((await putDoc(env, admin, 'leads', 'nameless-new', lead({ name: '', email: 'sample@example.test' }))).status, 200);
+  assert.equal((await call(env, 'POST', '/api/hubspot/queue', { token: admin, body: { op: 'retry', ids: [failed[0].id] } })).status, 200);
+  await call(env, 'POST', '/api/hubspot/queue', { token: admin, body: { op: 'approveAll' } });
+  const sent = await flushQueue(env, 5);
+  assert.equal(sent.failed, 0, JSON.stringify(sent));
+  const created = hs.calls.filter(c => c.method === 'POST' && c.path === '/crm/v3/objects/contacts');
+  assert.equal(created.length, 1);
+  assert.equal(created[0].body.properties.email, 'sample@example.test');
+  assert.equal(Object.hasOwn(created[0].body.properties, 'firstname'), false);
+  assert.equal(Object.hasOwn(created[0].body.properties, 'lastname'), false);
+});
+
+test('보호자 없는 수동 반영 — 전화로 찾은 기존 연락처는 이름·이메일 없이도 연결하고 이름은 보존', async () => {
+  const hs = fakeHubspot(), env = envFor(hs), admin = await setupAdmin(env);
+  await saveMapping(env, admin, hs);
+  const remote = { id: 'matched', properties: { firstname: '가상보호', lastname: '김', phone: '010-0000-0000' } };
+  hs.routes['POST /crm/v3/objects/contacts/search'] = () => ({ total: 1, results: [remote] });
+  hs.routes['PATCH /crm/v3/objects/contacts/matched'] = c => { Object.assign(remote.properties, c.body.properties); return remote; };
+  await putDoc(env, admin, 'leads', 'nameless-match', lead({ name: '', email: '' }));
+  await call(env, 'POST', '/api/hubspot/queue', { token: admin, body: { op: 'approveAll' } });
+  const sent = await flushQueue(env, 5);
+  assert.equal(sent.failed, 0, JSON.stringify(sent));
+  assert.equal(sent.done, 2);
+  assert.equal(hs.calls.filter(c => c.method === 'POST' && c.path === '/crm/v3/objects/contacts').length, 0);
+  assert.deepEqual([remote.properties.firstname, remote.properties.lastname], ['가상보호', '김']);
+  const stored = JSON.parse((await storedLead(env, 'nameless-match')).data);
+  assert.equal(stored.name, '');
+  assert.equal(stored.hubspot.contactId, 'matched');
+});
+
 test('pull — 변경분 연락처를 리드로 들여오고(딜 → 단계), 미반영 큐가 있는 리드는 건너뛰고, 커서가 남는다', async () => {
   const hs = fakeHubspot({
     'POST /crm/v3/objects/contacts/search': c => {
@@ -773,7 +845,7 @@ test('파트너 포털 — 소개 보내기 → 센터 리드(채널 파트너)�
   assert.deepEqual([noConsent.status, noConsent.body.code], [400, 'CONSENT']);
   assert.equal((await call(env, 'POST', '/api/partner/referrals', { token: partner.token, body: { name: '보호자B', consent: true, memo: '연락 010-1111-2222' } })).body.code, 'PII');
   assert.equal((await call(env, 'POST', '/api/partner/referrals', { token: partner.token, body: { consent: true } })).body.code, 'INVALID');
-  assert.equal((await call(env, 'POST', '/api/partner/referrals', { token: partner.token, body: { name: '김엄마 010-1234-5678', consent: true } })).body.code, 'PII');
+  assert.equal((await call(env, 'POST', '/api/partner/referrals', { token: partner.token, body: { name: '김엄마 010-1234-5678', childName: '아이', consent: true } })).body.code, 'PII');
   const made = await call(env, 'POST', '/api/partner/referrals', { token: partner.token, body: { name: '보호자B', phone: '01000001234', childName: '아이', grade: '초4', memo: '독해가 약해요', consent: true } });
   assert.equal(made.status, 200, JSON.stringify(made.body));
   assert.deepEqual([made.body.referral.name, made.body.referral.stage, made.body.referral.childName], ['보호자B', '접수', '아이']);
@@ -791,8 +863,8 @@ test('파트너 포털 — 소개 보내기 → 센터 리드(채널 파트너)�
   await putDoc(env, admin, 'leads', lead.id, Object.assign({}, lead.data, { stage: 'upsell' }));
   assert.equal((await call(env, 'GET', '/api/partner/referrals', { token: partner.token })).body.inbound[0].stage, '검사 완료');
   // 하루 상한
-  for (let i = 0; i < 19; i++) await call(env, 'POST', '/api/partner/referrals', { token: partner.token, body: { name: '보호자' + i, consent: true } });
-  assert.equal((await call(env, 'POST', '/api/partner/referrals', { token: partner.token, body: { name: '보호자Z', consent: true } })).status, 429);
+  for (let i = 0; i < 19; i++) await call(env, 'POST', '/api/partner/referrals', { token: partner.token, body: { name: '보호자' + i, childName: '아이' + i, consent: true } });
+  assert.equal((await call(env, 'POST', '/api/partner/referrals', { token: partner.token, body: { name: '보호자Z', childName: '아이Z', consent: true } })).status, 429);
   // 일시 중지 → 토큰이 있어도 막힌다
   const pdoc = docs.find(d => d.c === 'partners' && d.id === partner.id).data;
   await putDoc(env, admin, 'partners', partner.id, Object.assign({}, pdoc, { status: 'paused' }));
@@ -1002,6 +1074,47 @@ async function syncSetup() {
 const syncCall = (env, token, body) => call(env, 'POST', '/api/hubspot/sync', { token, body });
 async function storedLead(env, id) { return (await env.DB.prepare("SELECT data,updated_at FROM crm_documents WHERE collection='leads' AND id=?").bind(id).first()); }
 
+test('빈 보호자 이름 저장·자동 반영은 HubSpot의 기존 성·이름을 지우지 않는다', async () => {
+  const { env, admin, contacts, hs } = await syncSetup();
+  contacts.set('guardian', { id: 'guardian', properties: { firstname: '가상보호', lastname: '김', wb_child_name: '가상학생', phone: '01000001234', lastmodifieddate: '1234' } });
+  assert.equal((await syncCall(env, admin, { enabled: true, run: true })).body.ok, true);
+  const row = await storedLead(env, 'hs_guardian');
+  const saved = await putDoc(env, admin, 'leads', 'hs_guardian', { ...JSON.parse(row.data), name: ' ', phone: '010-0000-5678' }, { expectedUpdatedAt: row.updated_at });
+  assert.equal(saved.status, 200, JSON.stringify(saved.body));
+  assert.equal(JSON.parse((await storedLead(env, 'hs_guardian')).data).name, '');
+  assert.equal((await runHubspotSync(env)).ok, true);
+  const updated = contacts.get('guardian').properties;
+  assert.deepEqual([updated.firstname, updated.lastname, updated.phone], ['가상보호', '김', '010-0000-5678']);
+  const patches = hs.calls.filter(c => c.method === 'PATCH' && c.path === '/crm/v3/objects/contacts/guardian');
+  assert.equal(patches.length, 1);
+  assert.equal(Object.hasOwn(patches[0].body.properties, 'firstname'), false);
+  assert.equal(Object.hasOwn(patches[0].body.properties, 'lastname'), false);
+  assert.equal((await runHubspotSync(env)).ok, true, '다음 가져오기도 충돌 없이 진행');
+  assert.equal(JSON.parse((await storedLead(env, 'hs_guardian')).data).name, '김가상보호', '원격 실제 이름은 다시 조회할 수 있다');
+});
+
+test('이름 없는 기존 HubSpot 연락처는 가져오되 직원 저장에는 학생 이름 보완이 필요하다', async () => {
+  const { env, admin, contacts, hs } = await syncSetup();
+  contacts.set('incomplete', { id: 'incomplete', properties: { email: 'sample@example.test', lastmodifieddate: '1234' } });
+  assert.equal((await syncCall(env, admin, { enabled: true, run: true })).body.ok, true);
+  const row = await storedLead(env, 'hs_incomplete'), data = JSON.parse(row.data);
+  assert.equal(data.name, '');
+  assert.equal(data.child.name, '');
+  const rejected = await putDoc(env, admin, 'leads', 'hs_incomplete', { ...data, memo: '수정', allowMissingChildName: true }, { expectedUpdatedAt: row.updated_at });
+  assert.equal(rejected.status, 400);
+  assert.equal(rejected.body.error, '학생 이름을 입력해 주세요');
+  assert.deepEqual(await storedLead(env, 'hs_incomplete'), row);
+  const completed = await putDoc(env, admin, 'leads', 'hs_incomplete', { ...data, child: { ...data.child, name: '가상학생' } }, { expectedUpdatedAt: row.updated_at });
+  assert.equal(completed.status, 200, JSON.stringify(completed.body));
+  assert.equal(JSON.parse((await storedLead(env, 'hs_incomplete')).data).name, '');
+  assert.equal((await runHubspotSync(env)).ok, true);
+  const patches = hs.calls.filter(c => c.method === 'PATCH' && c.path === '/crm/v3/objects/contacts/incomplete');
+  for (const patch of patches) {
+    assert.equal(Object.hasOwn(patch.body.properties, 'firstname'), false);
+    assert.equal(Object.hasOwn(patch.body.properties, 'lastname'), false);
+  }
+});
+
 test('자동 동기화 설정 — 관리자·토큰·완전 매핑, 새 변경 자동 승인과 기존 대기 보존, 필수 고객 버전', async () => {
   const { env, admin, hs } = await syncSetup(), staff = await makeStaff(env, admin, '가상직원');
   assert.equal((await syncCall(env, staff.token, { enabled: true })).status, 403);
@@ -1068,7 +1181,7 @@ test('자동 동기화 상태 — 센터앱 관리 대기는 별도 집계하고
 
 test('자동 양방향 — 연락처·딜 단계 가져오기, 로컬 수정 전송, 딜만 수정해도 순환 읽기, 노트 단방향', async () => {
   const { env, admin, contacts, deals, hs } = await syncSetup();
-  contacts.set('920', { id: '920', properties: { firstname: '가상보호자', phone: '01000009020', wb_source_channel: '맘카페', wb_credit_balance: '15000', wb_partner: '외부파트너', lastmodifieddate: '1234' } });
+  contacts.set('920', { id: '920', properties: { firstname: '가상보호자', wb_child_name: '가상학생', phone: '01000009020', wb_source_channel: '맘카페', wb_credit_balance: '15000', wb_partner: '외부파트너', lastmodifieddate: '1234' } });
   deals.set('d920', { id: 'd920', contactId: '920', properties: { pipeline: 'default', dealstage: 'appointmentscheduled', hs_lastmodifieddate: '1234' } });
   assert.equal((await syncCall(env, admin, { enabled: true, run: true })).body.ok, true);
   let stored = await storedLead(env, 'hs_920'), data = JSON.parse(stored.data);
@@ -1112,7 +1225,7 @@ test('연락처 생성 뒤 수정 시각만 바뀌어도 같은 실행의 딜 �
 
 test('원격 수정 시각만 바뀌면 연락처·딜 전송을 허용하고 실제 원격 내용 변경은 계속 막는다', async () => {
   const { env, admin, contacts, deals } = await syncSetup();
-  contacts.set('metadata', { id: 'metadata', properties: { firstname: '가상기준', lastmodifieddate: '1234' } });
+  contacts.set('metadata', { id: 'metadata', properties: { firstname: '가상기준', wb_child_name: '가상학생', lastmodifieddate: '1234' } });
   deals.set('dmetadata', { id: 'dmetadata', contactId: 'metadata', properties: { pipeline: 'default', dealstage: 'appointmentscheduled', hs_lastmodifieddate: '1234' } });
   await syncCall(env, admin, { enabled: true, run: true });
   const stored = await storedLead(env, 'hs_metadata');
@@ -1134,11 +1247,11 @@ test('원격 수정 시각만 바뀌면 연락처·딜 전송을 허용하고 �
 
 test('기존 v1 비교 기준은 그대로 검증한 뒤 정상 전송 후에만 v2로 갱신한다', async () => {
   const { env, admin, contacts } = await syncSetup();
-  contacts.set('legacyfp', { id: 'legacyfp', properties: { firstname: '이전기준', lastmodifieddate: '1234' } });
+  contacts.set('legacyfp', { id: 'legacyfp', properties: { firstname: '이전기준', wb_child_name: '가상학생', lastmodifieddate: '1234' } });
   await syncCall(env, admin, { enabled: true, run: true });
   const stored = await storedLead(env, 'hs_legacyfp'), data = JSON.parse(stored.data);
   delete data.hubspot.fingerprintVersion;
-  data.hubspot.contactFingerprint = await sha256Hex('{"firstname":"이전기준","lastmodifieddate":"1234"}');
+  data.hubspot.contactFingerprint = await sha256Hex('{"firstname":"이전기준","lastmodifieddate":"1234","wb_child_name":"가상학생"}');
   data.hubspot.dealsFingerprint = await sha256Hex('[]');
   env.DB.database.prepare("UPDATE crm_documents SET data=? WHERE collection='leads' AND id='hs_legacyfp'").run(JSON.stringify(data));
   await putDoc(env, admin, 'leads', 'hs_legacyfp', { ...data, name: '정상수정' }, { expectedUpdatedAt: stored.updated_at });
@@ -1149,7 +1262,7 @@ test('기존 v1 비교 기준은 그대로 검증한 뒤 정상 전송 후에만
 
 test('양쪽 동시 수정은 실패 보류하며 확인 후 취소로만 가져오기 재개, 원격 오류 PII 없음', async () => {
   const { env, admin, contacts, hs } = await syncSetup();
-  contacts.set('921', { id: '921', properties: { firstname: '가상보호자', lastmodifieddate: '1234' } });
+  contacts.set('921', { id: '921', properties: { firstname: '가상보호자', wb_child_name: '가상학생', lastmodifieddate: '1234' } });
   await syncCall(env, admin, { enabled: true, run: true });
   const stored = await storedLead(env, 'hs_921');
   await putDoc(env, admin, 'leads', 'hs_921', { ...JSON.parse(stored.data), name: '로컬수정' }, { expectedUpdatedAt: stored.updated_at });
@@ -1234,7 +1347,7 @@ test('노트 생성 성공 뒤 상태 재조회 429도 미확정 보류하여 �
 
 test('전체25·변경분10·연결 재조회20·재시도10·전송2로 제한하고 paid D1 호출 예산 안에서 이어간다', async t => {
   const { env, admin, contacts, hs } = await syncSetup();
-  const remoteRows = Array.from({ length: 120 }, (_, index) => ({ id: String(10000 + index), properties: { firstname: '가상가족' + index, lastmodifieddate: '1234' } }));
+  const remoteRows = Array.from({ length: 120 }, (_, index) => ({ id: String(10000 + index), properties: { firstname: '가상가족' + index, wb_child_name: '가상학생', lastmodifieddate: '1234' } }));
   remoteRows.forEach(row => contacts.set(row.id, row));
   hs.routes['POST /crm/v3/objects/contacts/search'] = c => {
     const offset = Number(c.body.after) || 0, limit = c.body.limit, results = remoteRows.slice(offset, offset + limit);
