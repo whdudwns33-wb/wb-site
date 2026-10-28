@@ -240,6 +240,47 @@ test('이름 없는 HubSpot 가져오기 — 빈 보호자 이름을 유지하�
   }
 });
 
+test('빈 원격 학생 이름 — 기존 학생을 보존하고 없을 때만 확인된 보호자 표기에서 채운다', () => {
+  const blanks = [{}, { wb_child_name: '' }, { wb_child_name: null }, { wb_child_name: undefined }, { wb_child_name: ' \t\n ' }];
+  const alias = '가상 한학생 보호자';
+  const existing = Object.freeze({ name: alias, child: Object.freeze({ name: '가상 실제학생', birth: '2015-01-01', grade: '초5', school: '가상학교' }), memo: '기존 기록' });
+  const before = JSON.stringify(existing);
+  for (const blank of blanks) {
+    const contact = { id: 'qa_alias', properties: { firstname: alias, lastname: '', ...blank } };
+    const fresh = leadFromContact(contact, null);
+    assert.equal(fresh.child.name, '가상 한학생');
+    assert.equal(fresh.name, alias, '연락처 이름은 학생 이름으로 바꾸지 않는다');
+    assert.deepEqual(fresh.hubspot.nameParts, { firstname: alias, lastname: '' });
+    assert.deepEqual(contactPatchProperties(fresh, {}, null, ['name']), {}, '기존 HubSpot 이름을 다시 쓰지 않는다');
+    const merged = leadFromContact(contact, existing);
+    assert.deepEqual(merged.child, existing.child, '명시된 학생 이름·생년월일·학년·학교가 별칭보다 우선한다');
+    assert.equal(merged.memo, existing.memo);
+    assert.equal(leadFromContact(contact, { child: { name: ' \t ' } }).child.name, '가상 한학생');
+  }
+  assert.equal(JSON.stringify(existing), before, '가져오기 함수는 기존 객체를 수정하지 않는다');
+  for (const name of ['', '보호자', ' 보호자 ', '가상 김부모', '보호자 가상학생', '가상학생 보호자님']) {
+    assert.equal(leadFromContact({ id: 'qa_other', properties: { firstname: name, wb_child_name: '' } }, null).child.name, '', '학생 이름을 추측하지 않는 표기: ' + name);
+  }
+});
+
+test('반복 가져오기 — 보완된 학생을 유지하고 명시된 원격 학생 이름만 우선 반영한다', () => {
+  const contact = { id: 'qa_repeat', properties: { firstname: '가상 한학생보호자', wb_child_name: '' } };
+  let lead = leadFromContact(contact, null);
+  assert.equal(lead.child.name, '가상 한학생');
+  const renamedAlias = { ...contact, properties: { firstname: '가상 다른학생 보호자', wb_child_name: null } };
+  for (let i = 0; i < 3; i++) {
+    lead = leadFromContact(renamedAlias, lead);
+    assert.equal(lead.child.name, '가상 한학생', '이미 채운 학생은 별칭 변경으로 바꾸지 않는다');
+  }
+  lead = leadFromContact({ ...renamedAlias, properties: { ...renamedAlias.properties, wb_child_name: '  가상 원격학생  ' } }, lead);
+  assert.equal(lead.child.name, '가상 원격학생');
+  for (const blank of ['', null, undefined, ' \t ']) {
+    lead = leadFromContact({ ...renamedAlias, properties: { ...renamedAlias.properties, wb_child_name: blank } }, lead);
+    assert.equal(lead.child.name, '가상 원격학생');
+    assert.equal(lead.name, '가상 다른학생 보호자');
+  }
+});
+
 test('applyDealsToLead — 매핑된 파이프라인의 최신 딜로 단계를 정하고, 학원 등록 딜이 있으면 그쪽이 현재', () => {
   const map = { inspection: { pipelineId: 'default', stageMap: { tested: 'decisionmakerboughtin', won: 'closedwon' } }, academy: { pipelineId: '22', stageMap: { trial: 'a1' } } };
   const lead = { pipeline: 'inspection', stage: 'inquiry', status: 'open', hubspot: { contactId: '1' } };
@@ -289,7 +330,7 @@ test('양방향 빈값과 이름 변경 — 선택한 전화 원본만 지우고
   assert.equal(outbound.phone, ''); assert.equal(outbound.email, '');
   assert.equal(outbound.mobilephone, undefined, '별도의 보조 전화는 지우지 않는다');
   const cleared = leadFromContact({ id: 'test', properties: { phone: '', mobilephone: '01000005678', email: '', wb_child_name: '', wb_child_birth: '', wb_inspection_date: '' } }, initial, { today: '2026-10-16' });
-  assert.deepEqual([cleared.phone, cleared.email, cleared.child.name, cleared.child.birth, cleared.inspection.date], ['', '', '', '', '']);
+  assert.deepEqual([cleared.phone, cleared.email, cleared.child.name, cleared.child.birth, cleared.inspection.date], ['', '', '아이', '', ''], '학생 이름만 원격 미입력으로 지우지 않는다');
   const mobile = leadFromContact({ id: 'mobile', properties: { mobilephone: '01000005678' } }, null, { today: '2026-10-16' });
   mobile.phone = '';
   assert.equal(contactProperties(mobile).mobilephone, ''); assert.equal(contactProperties(mobile).phone, undefined);
