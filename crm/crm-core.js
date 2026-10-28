@@ -735,7 +735,10 @@
     ).map(l => ({ lead: l, next: nextLeadFollowup(l) })).filter(row => !followup ||
       (row.next && (followup === 'today' ? row.next.due === today : row.next.due < today)));
     const newest = (a, b) => str(b.createdAt).localeCompare(str(a.createdAt));
-    const byName = (a, b) => str(a.name || (a.child && a.child.name)).localeCompare(str(b.name || (b.child && b.child.name)), 'ko');
+    const byName = (a, b) => {
+      const left = leadNames(a), right = leadNames(b);
+      return (left.student || left.guardian).localeCompare(right.student || right.guardian, 'ko') || left.guardian.localeCompare(right.guardian, 'ko');
+    };
     rows.sort((a, b) => {
       let order = 0;
       if (sort === 'oldest') order = -newest(a.lead, b.lead);
@@ -744,6 +747,14 @@
       return order || newest(a.lead, b.lead) || byName(a.lead, b.lead) || str(a.lead.id).localeCompare(str(b.lead.id));
     });
     return rows.map(row => row.lead);
+  }
+  function leadNames(lead) {
+    const l = isObj(lead) ? lead : {};
+    const name = clean(l.name, MAX_NAME);
+    const child = isObj(l.child) ? clean(l.child.name, MAX_NAME) : '';
+    // 확인된 '<학생>보호자' 표기는 화면에서만 분리하고 저장·전송용 원본은 바꾸지 않는다.
+    const legacyStudent = name.endsWith('보호자') ? name.slice(0, -3).trim() : '';
+    return { student: child || legacyStudent, guardian: legacyStudent ? '' : name };
   }
   function leadLabel(lead) {
     const l = isObj(lead) ? lead : {};
@@ -896,7 +907,7 @@
     stagesOf: stagesOf, isClosed: isClosed, statusOf: statusOf, daysInStage: daysInStage,
     validateLead: validateLead, validateActivity: validateActivity, validateCredit: validateCredit, creditBalance: creditBalance, creditEligibility: creditEligibility,
     autoMapPipeline: autoMapPipeline, localStageFor: localStageFor, syncTrack: syncTrack,
-    todayBoard: todayBoard, kpi: kpi, lastActivityAt: lastActivityAt, leadMatches: leadMatches, nextLeadFollowup: nextLeadFollowup, queryLeads: queryLeads, leadLabel: leadLabel,
+    todayBoard: todayBoard, kpi: kpi, lastActivityAt: lastActivityAt, leadMatches: leadMatches, nextLeadFollowup: nextLeadFollowup, queryLeads: queryLeads, leadNames: leadNames, leadLabel: leadLabel,
     docKey: docKey, emptyState: emptyState, mergeDocs: mergeDocs, revertDoc: revertDoc, createOutbox: createOutbox,
     routeOf: routeOf, inviteLink: inviteLink, hubspotRecordUrl: hubspotRecordUrl
   };
