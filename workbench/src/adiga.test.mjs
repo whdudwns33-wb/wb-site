@@ -16,7 +16,7 @@ const source=[html.match(/^const esc=.*$/m)[0],html.match(/^function uniNorm.*$/
   section("function copyAdmStrategy(){","function renderLab(){")].join("\n");
 function fixture(notes=[],student={}){
   const elements=new Map(),ctx={URL,db:{adiga:notes,students:[]},view:{},saved:0,copied:"",
-    today:()=>"2026-10-15",stu:()=>student,stuContext:()=>"합성 학생 정보",
+    allIpRows:()=>[],today:()=>"2026-10-15",stu:()=>student,stuContext:()=>"합성 학생 정보",
     susiSummaryText:()=>"내신: 9등급제 2.3 / 근거: 합성 성적표 / 지원안 상태: 준비",
     toast:()=>{},save:()=>ctx.saved++,copy:text=>ctx.copied=text,go:p=>ctx.view.page=p,
     susiStudent:()=>ctx.db.students.find(s=>s.id===ctx.view.ipsiStu),
@@ -157,4 +157,16 @@ test("strategy with no selected admission year does not pick dated or undated no
     {name:"합성 학생",grade:"고3",univs:[{univ:"가상대",major:"가상학과",track:"가상전형"}]});
   c.copyAdmStrategy();assert.ok(c.copied.includes("모집학년도 미설정"));
   assert.ok(!c.copied.includes("연도있는자동메모"));assert.ok(!c.copied.includes("연도없는자동메모"));
+});
+
+
+test("coverage separates result year, missing percentile and exact-year single-note evidence without writes",()=>{
+ const c=fixture([note({seats:"0",eligibility:"원문 확인",evaluation:"서류",minimum:"없음",gradeScale:"9"})]);
+ const rows=[{univ:"가상대학교",major:"가상학과",track:"가상전형",year:"2025",pct:0},{univ:"가상대",major:"가상학과",track:"다른전형",year:"2026",pct:88}];
+ const before=JSON.stringify(c.db),v=c.admissionsCoverage(target,rows);assert.equal(v.rows,1);assert.equal(v.percentile,1);assert.equal(v.years[0],"2025");assert.equal(v.missing.length,0);
+ assert.ok(c.admissionsCoverage({...target,admissionYear:"2028"},rows).missing.includes("지원자격"));
+ c.db.adiga.push(note({checked:"2026-10-15",seats:"2"}));assert.ok(c.admissionsCoverage(target,rows).missing.includes("지원자격"));
+ c.db.adiga.pop();assert.equal(JSON.stringify(c.db),before);assert.equal(c.saved,0);
+ const pending=c.admissionsCoverage({univ:"전북대",admissionYear:"2027"},[]);assert.match(pending.calculation,/계산 보류/);assert.match(c.admissionsCoverageHtml(target),/자료 충족도/);
+ c.db.adiga[0].checked="2026-12-01";assert.ok(c.admissionsCoverage(target,rows).missing.includes("원문·출처·확인일"));
 });
