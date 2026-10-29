@@ -1251,6 +1251,18 @@ function cpSavePlan(s,p){
  const next=JSON.parse(JSON.stringify(db)),target=next.students.find(x=>String(x.id)===String(s.id));
  if(!target)throw Error("학생을 찾을 수 없습니다.");target.consult=target.consult||{};target.consult.coursePlans=[...(history||[]),saved];save(next);return saved;
 }
+function cpMergePlans(current=[],incoming=[]){
+ if(!Array.isArray(current)||!Array.isArray(incoming))throw Error("과목 설계 이력 형식을 확인하세요.");
+ for(const p of [...current,...incoming])cpValidate(p,true);
+ const result=JSON.parse(JSON.stringify(current));
+ const content=p=>{const q={...p};delete q.id;delete q.importedFromId;return jSerial(q);};
+ for(const p of incoming){
+  const origin=p.importedFromId||p.id,same=result.find(x=>p.id&&x.id===p.id);
+  if(result.some(x=>(x.importedFromId||x.id)===origin&&content(x)===content(p)))continue;
+  const q=JSON.parse(JSON.stringify(p));if(same){q.id=uid();q.importedFromId=origin;}else if(!q.id)q.id=uid();result.push(q);
+ }
+ return result;
+}
 // COURSE_PLAN_CORE_END
 const cpDrafts=new Map(),cpCatalogView={group:"전체",query:"",type:"진로 선택"};
 function cpDraft(){const s=stu();if(!cpDrafts.has(s.id))cpDrafts.set(s.id,cpBlank(s));return cpDrafts.get(s.id);}
@@ -5166,6 +5178,7 @@ function mergeSusiStudent(existing,incoming){
   if(current.susiDecisions||added.susiDecisions)consult.susiDecisions={...(added.susiDecisions||{}),...(current.susiDecisions||{})};
   if(current.jeongsi||added.jeongsi)consult.jeongsi=jMergeState(current.jeongsi||{},added.jeongsi||{});
   if(current.reports!=null||added.reports!=null)consult.reports=rptMergeReports(current.reports??[],added.reports??[]);
+  if(current.coursePlans!=null||added.coursePlans!=null)consult.coursePlans=cpMergePlans(current.coursePlans??[],added.coursePlans??[]);
   const apply=[...(existing.apply||[])];
   for(const a of incoming.apply||[])if(!apply.some(b=>(a.id&&a.id===b.id)||aplSame(a,b)))apply.push(a);
   return{consult,apply};

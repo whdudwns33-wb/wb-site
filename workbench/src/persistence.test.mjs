@@ -7,6 +7,7 @@ import vm from 'node:vm';
 const html=readFileSync(new URL('./app.html',import.meta.url),'utf8');
 function section(start,end){const a=html.indexOf(start),b=html.indexOf(end,a);assert.ok(a>=0&&b>a);return html.slice(a,b);}
 const source=[section('function load(){','function stu(){'),
+  section('// COURSE_PLAN_CORE_START','// COURSE_PLAN_CORE_END'),
   section('// JEONGSI_CORE_START','// JEONGSI_CORE_END'),section('// JEONGSI_STORE_START','// JEONGSI_STORE_END'),
   section('// REPORT_STORE_START','// REPORT_STORE_END'),section('const ADIGA_FIELDS=','function renderAdiga(){'),
   section('function exportJson(){','/* ═══════════ 렌더 루트'),section('function allIpRows(){','/* 대학·학과·전형 그룹')].join('\n');
@@ -28,6 +29,16 @@ test('failed writes restore the last persisted records and retry does not retain
   assert.throws(()=>c.save(),/기기 저장/);assert.equal(c.stored,before);assert.equal(JSON.stringify(c.db),before);
   c.db.students[0].consult.susi.gradeAverage='4';c.fail=false;c.save();
   assert.equal(JSON.parse(c.stored).students[0].consult.susi.gradeAverage,'4');assert.equal(c._savedDb,c.stored);
+});
+
+test('real backup merge preserves both course-plan histories and repeated conflicts do not duplicate',()=>{
+ const c=fixture(),student=c.db.students[0],old={...c.cpBlank(student),id:'plan-one',reportText:'기존 설계'};
+ student.consult.coursePlans=[old];c.save();const first=JSON.stringify(old);
+ const incoming=clone(student);incoming.consult.coursePlans=[{...old,reportText:'다른 기기 설계'},{...old,id:'plan-two',reportText:'신규 설계'}];
+ c.imported=JSON.stringify({students:[incoming]});c.doImport();
+ const rows=c.db.students[0].consult.coursePlans;assert.equal(rows.length,3);assert.equal(JSON.stringify(rows[0]),first);assert.equal(rows[1].importedFromId,'plan-one');
+ c.doImport();assert.equal(c.db.students[0].consult.coursePlans.length,3);
+ const before=c.stored;c.fail=true;incoming.consult.coursePlans.push({...old,id:'plan-three'});c.imported=JSON.stringify({students:[incoming]});c.doImport();assert.equal(c.stored,before);assert.equal(JSON.stringify(c.db),before);
 });
 test('failed real exam and support writes preserve records and history across a retry',()=>{
   const c=fixture();
