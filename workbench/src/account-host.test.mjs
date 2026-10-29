@@ -140,3 +140,42 @@ test('login failure lockout is persisted and account bootstrap never overwrites 
   assert.equal((await f.call('/api/auth/login', {method: 'POST', body: {username: 'owner-test', password: initial}})).status, 429);
   assert.equal(f.store.snapshot().data.students.length, 1);
 });
+
+test('administrator reset requires reauthentication, revokes only the target and preserves all counseling data', async t => {
+  const f = await fixture(t), owner = await f.change(await f.login('owner-test')), teacher = await f.change(await f.login('wb테스트'));
+  const users = (await f.call('/api/admin/users', owner)).data.items, target = users.find(u => u.username === 'wb테스트'), actor = users.find(u => u.username === 'owner-test');
+  const route = '/api/admin/users/' + target.id + '/reset-password', body = {currentPassword: next, temporaryPassword: 'temp'};
+  const before = f.store.snapshot(), targetToken = (await f.call('/api/account/tokens', {...teacher, method: 'POST', body: {name: 'target'}})).data.token;
+  const actorToken = (await f.call('/api/account/tokens', {...owner, method: 'POST', body: {name: 'actor'}})).data.token;
+  assert.equal((await f.call(route, {method: 'POST', body})).status, 401);
+  assert.equal((await f.call(route, {bearer: actorToken, method: 'POST', body})).status, 403);
+  assert.equal((await f.call(route, {...owner, csrf: 'wrong', method: 'POST', body})).status, 403);
+  assert.equal((await f.call(route, {...owner, requestOrigin: 'https://attacker.invalid', method: 'POST', body})).status, 403);
+  assert.equal((await f.call('/api/admin/users/' + actor.id + '/reset-password', {...owner, method: 'POST', body})).status, 400);
+  assert.equal((await f.call(route, {...owner, method: 'POST', body: {...body, temporaryPassword: 'abc'}})).status, 400);
+  assert.equal((await f.call(route, {...owner, method: 'POST', body: {...body, currentPassword: 'wrong-fixture'}})).status, 401);
+  assert.deepEqual(f.store.snapshot(), before);
+  const reset = await f.call(route, {...owner, method: 'POST', body});
+  assert.equal(reset.status, 200);assert.equal(reset.data.user.mustChangePassword, true);assert.equal(reset.data.temporaryPassword, undefined);
+  assert.equal((await f.call('/api/auth/me', teacher)).status, 401);
+  assert.equal((await f.call('/api/summary', {bearer: targetToken})).status, 401);
+  assert.equal((await f.call('/api/summary', {bearer: actorToken})).status, 200);
+  assert.equal((await f.call('/api/auth/login', {method: 'POST', body: {username: target.username, password: next}})).status, 401);
+  const login = await f.call('/api/auth/login', {method: 'POST', body: {username: target.username, password: body.temporaryPassword}});
+  assert.equal(login.status, 200);assert.equal(login.data.user.mustChangePassword, true);
+  const resetAuth = {cookie: login.headers.get('set-cookie').split(';')[0], csrf: login.data.csrf};
+  assert.equal((await f.call('/api/workspace', resetAuth)).status, 428);
+  assert.equal((await f.call('/api/admin/users/' + actor.id + '/reset-password', {...resetAuth, method: 'POST', body})).status, 428);
+  assert.equal((await f.call('/api/auth/password', {...resetAuth, method: 'POST', body: {currentPassword: body.temporaryPassword, nextPassword: 'new-after-reset-fixture'}})).status, 200);
+  assert.deepEqual(f.store.snapshot(), before);
+});
+
+test('reset password checks persistently lock after repeated failures without changing the target', async t => {
+  const f = await fixture(t), owner = await f.change(await f.login('owner-test'));
+  const target = (await f.call('/api/admin/users', owner)).data.items.find(u => u.username === 'wb테스트'), route = '/api/admin/users/' + target.id + '/reset-password';
+  const before = f.store.snapshot();
+  for (let i = 0; i < 5; i++) assert.equal((await f.call(route, {...owner, method: 'POST', body: {currentPassword: 'wrong-fixture', temporaryPassword: 'temp-fixture'}})).status, 401);
+  assert.equal((await f.call(route, {...owner, method: 'POST', body: {currentPassword: next, temporaryPassword: 'temp-fixture'}})).status, 429);
+  assert.equal((await f.call('/api/auth/login', {method: 'POST', body: {username: target.username, password: initial}})).status, 200);
+  assert.deepEqual(f.store.snapshot(), before);
+});

@@ -126,6 +126,8 @@ export function createAccountHost({directory, appKey, store, publicOrigin = 'htt
       const body = await jsonBody(request); session = principal();
       if (session.user.mustChangePassword) throw new HttpError(428, '임시 비밀번호를 먼저 변경하세요.');
       if (!session.bearer && (incomingOrigin !== origin.origin || !store.checkCsrf(session, request.headers['x-csrf-token']))) throw new HttpError(403, '요청 확인에 실패했습니다.');
+      const resetTarget = path.match(/^\/api\/admin\/users\/([a-f0-9-]{36})\/reset-password$/)?.[1];
+      if (resetTarget && method === 'POST') return send(200, await store.resetPassword(session, resetTarget, body.currentPassword, body.temporaryPassword));
       if (path === '/api/workspace' && method === 'PUT') return send(200, store.saveSnapshot(body.data, body.revision, session.user.id));
       if (path.startsWith('/api/students/') && method === 'PUT') return send(200, store.saveStudent(decodeURIComponent(path.slice('/api/students/'.length)), body.data, body.revision, session.user.id));
       if (path === '/api/account/tokens' && method === 'POST') return send(201, store.issueToken(session, body.name));

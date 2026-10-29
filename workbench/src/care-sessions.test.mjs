@@ -20,6 +20,21 @@ function setup(){
 const session=c=>({...c.csBlank(),title:'정기 합성 상담',status:'완료',summary:'확인된 요약',followUp:'학생: 다음 주 계획 확인'});
 const policy=c=>({...c.csPolicyBlank(),monthlyRegular:'1',weeklyMeet:'2',weeklyPlanner:'2',monthlyDesign:'1'});
 
+test('care board filters and prioritizes without changing records; missing targets differ from zero',()=>{
+ const x=setup();x.c.csSavePolicy(x.s,{...policy(x.c),weeklyMeet:'0'});
+ x.c.csSaveSession(x.s,{...session(x.c),status:'예정',date:'2026-10-28'});
+ x.c.csSaveSession(x.s,{...session(x.c),status:'예정',date:'2026-11-01',time:'10:00'});
+ x.c.db.students.push({id:'withdrawn',name:'퇴원 합성',enrollmentStatus:'withdrawn'},{id:'broken',name:'형식 합성',consult:{care:{sessions:null}}});
+ const before=JSON.stringify(x.c.db),rows=x.c.csBoardRows('2026-10-29');
+ assert.equal(rows.length,3);assert.equal(rows[0].attention,true);assert.equal(rows.find(r=>r.s.id==='student-a').next.date,'2026-11-01');
+ assert.equal(x.c.csBoardRows('2026-10-29','','attention').length,2);
+ assert.equal(x.c.csBoardRows('2026-10-29','','unconfigured').length,1);
+ assert.equal(x.c.csBoardRows('2026-10-29',' 합성 a ')[0].s.id,'student-a');assert.equal(x.c.csBoardRows('2026-10-29','일치없음').length,0);
+ assert.match(x.c.csMetric(rows.find(r=>r.s.id==='student-a').p,'weeklyMeet'),/목표 0회/);
+ x.c.renderCare();const rendered=x.c.$('#main').innerHTML;assert.match(rendered,/기록 확인 필요/);assert.match(rendered,/관리 목표 설정/);assert.match(rendered,/data-label="월간 관리"/);
+ assert.equal(JSON.stringify(x.c.db),before);
+});
+
 test('existing records and every saved version remain independent; editing does not double-count',()=>{
  const x=setup(),before=plain(x.s),draft=session(x.c),first=x.c.csSaveSession(x.s,draft);draft.summary='초안 수정';
  assert.equal(first.summary,'확인된 요약');assert.deepEqual(x.s.records,before.records);assert.deepEqual(x.s.planners,before.planners);assert.deepEqual(x.s.consult.reports,before.consult.reports);assert.deepEqual(x.s.consult.coursePlans,before.consult.coursePlans);

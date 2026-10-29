@@ -102,6 +102,42 @@ a.btn{text-decoration:none;color:var(--ink)}
 .stucard{cursor:pointer;transition:border-color .15s}
 .stucard:hover{border-color:var(--accent)}
 .stucard h3{font-size:var(--fs-lg);display:flex;align-items:center;gap:7px}
+/* 상담 현황은 학생 행 안에서 월간·주간 기준을 함께 읽는다. */
+.care-toolbar{display:grid;grid-template-columns:minmax(160px,1fr) minmax(0,2fr) minmax(160px,1fr);gap:var(--sp-4);align-items:end}
+.care-toolbar label{display:grid;gap:var(--sp-2);font-size:var(--fs-sm);font-weight:600}
+.care-toolbar input,.care-toolbar select,.care-board .btn{min-height:calc(var(--sp-6) + var(--sp-3))}
+.care-count{margin:var(--sp-5) 0 var(--sp-2);font-weight:600}
+.care-table{width:100%;table-layout:fixed;border-collapse:collapse;text-align:left}
+.care-table caption{text-align:left;font-size:var(--fs-sm);color:var(--ink2);padding:var(--sp-2) 0}
+.care-table th,.care-table td{padding:var(--sp-3) var(--sp-2);vertical-align:top;border-bottom:1px solid var(--line);overflow-wrap:anywhere;white-space:normal}
+.care-table thead th{font-size:var(--fs-sm);color:var(--ink2);font-weight:600}
+.care-table tbody th{font-weight:400}
+.care-table .btn{text-align:left;justify-content:flex-start}
+.care-student-meta{display:block;color:var(--ink2);font-size:var(--fs-sm);margin-top:var(--sp-1)}
+.care-metric+.care-metric{margin-top:var(--sp-3)}
+.care-metric span{display:block;color:var(--ink2);font-size:var(--fs-sm)}
+.care-metric b,.care-metrics dd{font-variant-numeric:tabular-nums}
+.care-attention{color:var(--danger);font-size:var(--fs-sm);margin:var(--sp-2) 0}
+.care-guide{margin-top:var(--sp-4);font-size:var(--fs-sm);color:var(--ink2)}
+.care-guide summary{cursor:pointer;padding:var(--sp-2) 0}
+.care-guide p{max-width:70ch}
+.care-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--sp-4);margin:var(--sp-4) 0}
+.care-metrics>div{border-bottom:1px solid var(--line);padding-bottom:var(--sp-3)}
+.care-metrics dt{font-size:var(--fs-sm);color:var(--ink2)}
+.care-metrics dd{margin:var(--sp-1) 0 0;font-size:var(--fs-md);font-weight:600}
+@media(max-width:900px){
+ .care-toolbar{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .care-toolbar label:nth-child(2){grid-column:1 / -1;grid-row:2}
+ .care-table,.care-table tbody,.care-table tr,.care-table th,.care-table td{display:block;width:100%}
+ .care-table thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+ .care-table tr{padding:var(--sp-4) 0;border-bottom:1px solid var(--line)}
+ .care-table th,.care-table td{border:0;padding:var(--sp-2) 0}
+ .care-table td[data-label]::before{content:attr(data-label);display:block;font-size:var(--fs-sm);font-weight:700;margin-bottom:var(--sp-2)}
+ .care-table td[data-label]{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--sp-1) var(--sp-3)}
+ .care-table td[data-label]::before,.care-table td:last-child>*{grid-column:1 / -1}
+ .care-metric+.care-metric{margin:0}
+ .care-table .btn{width:100%}
+}
 /* ── 입시 검색 A안 (디렉터리) ── */
 .ugrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(225px,1fr));gap:10px}
 .ucard{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:13px;cursor:pointer;text-align:left;font-family:inherit;color:var(--ink);transition:border-color .15s,box-shadow .15s}
@@ -1484,6 +1520,12 @@ function csProgress(s,date){
  const counts={monthlyRegular:done.filter(r=>month(r)&&r.kind==="월 정규 상담").length,weeklyMeet:done.filter(r=>week(r)&&r.kind==="주간 미트 상담").length,weeklyPlanner:done.filter(r=>week(r)&&r.plannerCheck==="확인").length,monthlyDesign:done.filter(r=>month(r)&&r.plannerDesign==="설계 완료").length};
  return {period,policy:csPolicy(s,date),counts,planned:rows.filter(r=>r.status==="예정"&&month(r)).length,overdue:rows.filter(r=>r.status==="예정"&&r.date<csToday()).length,missingNotes:done.filter(r=>month(r)&&(!r.summary.trim()||!r.followUp.trim())).length,rows};
 }
+function csBoardRows(date,query="",filter="all"){
+ csPeriod(date);const q=query.trim().toLocaleLowerCase();
+ return db.students.map((s,i)=>{try{const p=csProgress(s,date),next=p.rows.filter(r=>r.status==="예정"&&r.date>=date).sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time))[0];return {s,i,p,next,attention:!!(p.overdue||p.missingNotes),unconfigured:!p.policy};}catch{return {s,i,error:true,attention:true,unconfigured:false};}})
+ .filter(r=>r.s.enrollmentStatus!=="withdrawn"&&[r.s.name,r.s.grade,r.s.school].some(v=>String(v||"").toLocaleLowerCase().includes(q))&&(filter==="all"||filter==="attention"&&r.attention||filter==="unconfigured"&&r.unconfigured))
+ .sort((a,b)=>Number(b.attention)-Number(a.attention)||Number(b.unconfigured)-Number(a.unconfigured)||String(a.s.name).localeCompare(String(b.s.name),'ko'));
+}
 function csValidatePolicy(p){
  if(!p||typeof p!=="object"||Array.isArray(p)||!adigaDate(p.effectiveFrom))throw Error("관리 기준 적용일을 확인하세요.");
  for(const [key,,max]of CS_TARGETS)if(typeof p[key]!=="string"||!/^\d{1,2}$/.test(p[key])||+p[key]>max)throw Error("상담·플래너 목표 횟수를 입력하세요. 진행하지 않는 항목은 0회입니다.");
@@ -1535,11 +1577,11 @@ function csMergeCare(current,incoming){
 function csText(s,r){return `${s.name} · ${r.title}\n${r.date} ${r.time} / ${r.kind} / ${r.mode} / ${r.status}\n플래너 확인: ${r.plannerCheck} / 설계: ${r.plannerDesign}\n대상·변경: ${r.plannerRef||"미기록"}\n\n상담 전 아젠다\n${r.agenda||"미기록"}\n\n확인된 요약\n${r.summary||"미기록"}\n\n결정 사항\n${r.decisions||"미기록"}\n\n후속 조치\n${r.followUp||"미기록"}\n확인일: ${r.followUpDate||"미정"}\n\n출처: ${r.source} / 녹음 ID: ${r.sourceId||"미입력"} / ${r.sourceUrl||"원문 링크 없음"}\n가져온 파일: ${r.importedFiles.map(f=>f.name).join(", ")||"없음"}\n\n전사 원문\n${r.transcript||"첨부 없음"}`;}
 // CARE_CORE_END
 
-const csDrafts=new Map(),csPolicies=new Map();let csBoardDate=csToday();
+const csDrafts=new Map(),csPolicies=new Map();let csBoardDate=csToday(),csBoardQuery="",csBoardFilter="all";
 function csDraft(){const s=stu();if(!csDrafts.has(s.id))csDrafts.set(s.id,{...csBlank(),meetUrl:csPolicy(s,csToday())?.meetUrl||""});return csDrafts.get(s.id);}
 function csPolicyDraft(){const s=stu();if(!csPolicies.has(s.id))csPolicies.set(s.id,{...csPolicyBlank(),...(csPolicy(s,csToday())||{}),effectiveFrom:csToday()});return csPolicies.get(s.id);}
 function csSet(k,v){const p=csDraft();p[k]=v;if(["summary","transcript","source","sourceId"].includes(k)){p.summaryReviewed=false;if($("#cs_reviewed"))$("#cs_reviewed").checked=false;}if(k==="kind"&&v==="주간 미트 상담"){p.mode="Google Meet";if($("#cs_mode"))$("#cs_mode").value=p.mode;}}
-function csOpen(index){const s=db.students[index];if(!s)return;openStu(s.id);view.tab="sessions";render();}
+function csOpen(index,targets=false){const s=db.students[index];if(!s)return;openStu(s.id);view.tab="sessions";render();if(targets){$("#cs_targets").open=true;$("#cs_policy_monthlyRegular").focus();}}
 function csNew(){if(confirm("미저장 상담 초안을 새 회차로 바꿀까요? 저장된 상담 이력은 유지됩니다.")){csDrafts.delete(stu().id);tabSessions();}}
 function csEdit(index){const r=csLatest(stu())[index];if(r&&confirm("이 회차의 최신 기록을 편집할까요? 기존 버전은 유지됩니다.")){csDrafts.set(stu().id,{...jCopy(r),previousId:r.id});tabSessions();}}
 function csSave(){try{const r=csSaveSession(stu(),csDraft());csDrafts.set(stu().id,{...jCopy(r),previousId:r.id});render();toast("상담을 새 버전으로 저장했습니다.");}catch(e){toast(e.message);}}
@@ -1556,16 +1598,21 @@ async function csReadFile(file,kind){
   next.importedFiles.push({kind,name:file.name.slice(0,200),size:file.size,importedAt:new Date().toISOString()});csDrafts.set(s.id,next);tabSessions();toast("초안에 읽었습니다. 학생·날짜·내용을 확인한 뒤 저장하세요.");
  }catch(e){toast("가져오기 실패: "+e.message);}
 }
-function csMetrics(s,date){const p=csProgress(s,date);return `<p class="aplnote">월 ${esc(p.period.month)} · 주 ${esc(p.period.start)}~${esc(p.period.end)} (월~일, 한국시간)</p><div class="grid cols2">${CS_TARGETS.map(([k,label])=>`<div class="card"><b>${label}</b><p>${p.counts[k]}회 완료 / 목표 ${p.policy?esc(p.policy[k])+"회":"미설정"}</p></div>`).join("")}</div><p>이번 달 예정 ${p.planned}회 · 날짜가 지난 예정 ${p.overdue}회 · 요약/후속 조치 미기록 ${p.missingNotes}회</p>`;}
+function csMetric(p,key){return p.policy?(+p.policy[key]===0?`${p.counts[key]}회 완료 · 목표 0회`:`${p.counts[key]} / ${esc(p.policy[key])}회`):`${p.counts[key]}회 완료 · 목표 미설정`;}
+function csMetrics(s,date){const p=csProgress(s,date);return `<p class="aplnote">월 ${esc(p.period.month)} · 주 ${esc(p.period.start)}~${esc(p.period.end)} (월~일, 한국시간)</p><dl class="care-metrics">${CS_TARGETS.map(([k,label])=>`<div><dt>${label}</dt><dd>${csMetric(p,k)}</dd></div>`).join("")}</dl><p class="aplnote">이번 달 예정 ${p.planned}회 · 오늘 이전 예정 ${p.overdue}회 · 이번 달 요약/후속 조치 미기록 ${p.missingNotes}회</p>`;}
+function csBoardHtml(){
+ const all=csBoardRows(csBoardDate),rows=csBoardRows(csBoardDate,csBoardQuery,csBoardFilter),period=csPeriod(csBoardDate),metric=(p,key)=>`<div class="care-metric"><span>${CS_TARGETS.find(x=>x[0]===key)[1]}</span><b>${csMetric(p,key)}</b></div>`;
+ return `<p class="care-count" role="status" aria-live="polite">${rows.length}명 표시 / 재원 ${all.length}명 · 확인 필요 ${all.filter(r=>r.attention).length}명 · 목표 미설정 ${all.filter(r=>r.unconfigured).length}명</p><p class="aplnote">월간 ${esc(period.month)} · 주간 ${esc(period.start)}~${esc(period.end)} · 완료 / 목표 횟수</p>${rows.length?`<table class="care-table"><caption>학생별 상담·플래너 진행 현황</caption><thead><tr><th scope="col">학생</th><th scope="col">월간 관리</th><th scope="col">주간 관리</th><th scope="col">다음 상담·확인할 일</th></tr></thead><tbody>${rows.map(({s,i,p,next,error,attention,unconfigured})=>`<tr><th scope="row"><button class="btn" onclick="csOpen(${i})">${esc(s.name)} 상담 열기</button><span class="care-student-meta">${esc(s.grade||"학년 미입력")} · ${esc(s.school||"학교 미입력")}</span></th>${error?'<td colspan="3"><span class="chip danger">기록 확인 필요</span><p>기록 형식을 확인해 주세요. 원본은 유지됩니다.</p></td>':`<td data-label="월간 관리">${metric(p,"monthlyRegular")}${metric(p,"monthlyDesign")}</td><td data-label="주간 관리">${metric(p,"weeklyMeet")}${metric(p,"weeklyPlanner")}</td><td data-label="다음 상담·확인할 일">${next?`<b>${esc(next.date)} ${esc(next.time||"시간 미정")}</b><span class="care-student-meta">${esc(next.kind)}</span>`:'<span class="care-student-meta">기준일 이후 예정 없음</span>'}${attention?`<p class="care-attention">${p.overdue?`지난 예정 ${p.overdue}회 확인`:""}${p.overdue&&p.missingNotes?" · ":""}${p.missingNotes?`요약/후속 조치 ${p.missingNotes}회 보완`:""}</p>`:""}${unconfigured?`<button class="btn sm" onclick="csOpen(${i},true)">관리 목표 설정</button>`:""}</td>`}</tr>`).join("")}</tbody></table>`:`<div class="empty"><h2>${all.length?"조건에 맞는 학생이 없습니다":"등록된 재원 학생이 없습니다"}</h2><p>${all.length?"검색어를 줄이거나 확인 상태를 전체로 바꿔 보세요.":"학생을 등록한 뒤 상담 횟수와 회차를 관리할 수 있습니다. 퇴원 학생의 기록은 학생 목록에서 확인하세요."}</p>${all.length?'<button class="btn" onclick="csBoardQuery=\'\';csBoardFilter=\'all\';renderCare()">검색 조건 지우기</button>':""}</div>`}`;
+}
+function csRefreshBoard(){ $("#cs_board_results").innerHTML=csBoardHtml(); }
 function renderCare(){
- const rows=db.students.map((s,i)=>({s,i})).filter(({s})=>s.enrollmentStatus!=="withdrawn");
- $("#main").innerHTML=`<div class="ph"><h1>상담 현황</h1><p>학생별 정규 상담·미트 상담·플래너 관리. 완료로 저장한 최신 회차만 집계합니다.</p></div><div class="card"><label for="cs_boardDate">집계 기준일</label><input id="cs_boardDate" type="date" value="${esc(csBoardDate)}" onchange="if(adigaDate(this.value)){csBoardDate=this.value;renderCare()}"><p class="aplnote">주간 목표는 기준일이 속한 월~일, 월간 목표는 해당 달 기준입니다. 과거 상담 관리 기록은 별도 보존하며 자동으로 완료 횟수에 넣지 않습니다.</p><div style="overflow:auto"><table><caption>학생별 관리 진행 현황</caption><thead><tr><th>학생</th>${CS_TARGETS.map(([,label])=>`<th>${label}<br>완료/목표</th>`).join("")}<th>지연·미정리</th></tr></thead><tbody>${rows.map(({s,i})=>{try{const p=csProgress(s,csBoardDate);return `<tr><td><button class="btn sm" onclick="csOpen(${i})">${esc(s.name)}</button><br>${esc(s.grade||"")}</td>${CS_TARGETS.map(([k])=>`<td>${p.counts[k]} / ${p.policy?esc(p.policy[k]):"미설정"}</td>`).join("")}<td>지난 예정 ${p.overdue}<br>미정리 ${p.missingNotes}</td></tr>`;}catch{return `<tr><td>${esc(s.name)}</td><td colspan="5">기록 형식 확인 필요 — 원본은 유지됩니다.</td></tr>`;}}).join("")||'<tr><td colspan="6">재원 학생이 없습니다.</td></tr>'}</tbody></table></div></div>`;
+ $("#main").innerHTML=`<div class="pagehead"><div><h1>상담 현황</h1><p class="sub">상담·미트·플래너 진행을 확인하고 필요한 학생의 상담을 여세요.</p></div></div><section class="card care-board" aria-label="학생별 상담 현황"><div class="care-toolbar"><label for="cs_boardDate">집계 기준일<input id="cs_boardDate" type="date" value="${esc(csBoardDate)}" onchange="if(adigaDate(this.value)){csBoardDate=this.value;csRefreshBoard()}"></label><label for="cs_boardQuery">학생 찾기<input id="cs_boardQuery" type="search" placeholder="이름·학년·학교" value="${esc(csBoardQuery)}" oninput="csBoardQuery=this.value;csRefreshBoard()"></label><label for="cs_boardFilter">확인 상태<select id="cs_boardFilter" onchange="csBoardFilter=this.value;csRefreshBoard()">${[["all","전체 학생"],["attention","확인 필요"],["unconfigured","목표 미설정"]].map(([v,l])=>`<option value="${v}" ${csBoardFilter===v?'selected':''}>${l}</option>`).join("")}</select></label></div><div id="cs_board_results">${csBoardHtml()}</div><details class="care-guide"><summary>집계 기준 안내</summary><p>완료로 저장한 최신 회차만 셉니다. 주간 목표는 기준일이 속한 월~일, 월간 목표는 해당 달 기준입니다. 지난 예정은 오늘 이전의 예정 회차, 요약/후속 조치 보완은 해당 달 완료 회차입니다. 과거 상담 관리 기록은 별도 보존하며 완료 횟수에 자동으로 넣지 않습니다. 목표 0회는 해당 관리를 진행하지 않는다는 뜻입니다.</p></details></section>`;
 }
 function tabSessions(){
  const s=stu();try{
  const p=csDraft(),policy=csPolicyDraft(),state=csState(s),rows=csLatest(s),field=(key,label,type="text",value=p[key])=>`<div class="frow"><label for="cs_${key}">${label}</label><input id="cs_${key}" type="${type}" value="${esc(value||"")}" oninput="csSet('${key}',this.value)"></div>`,area=(key,label,lines=3)=>`<div class="frow"><label for="cs_${key}">${label}</label><textarea id="cs_${key}" rows="${lines}" oninput="csSet('${key}',this.value)">${esc(p[key])}</textarea></div>`,select=(key,label,values)=>`<div class="frow"><label for="cs_${key}">${label}</label><select id="cs_${key}" onchange="csSet('${key}',this.value)">${values.map(v=>`<option ${v===p[key]?'selected':''}>${esc(v)}</option>`).join("")}</select></div>`;
  $("#tabbody").innerHTML=`<div class="card"><h2>상담 세션</h2><p>학생별 진행 상황을 확인하고 회차마다 전사문·요약·결정·후속 조치를 정리합니다.</p>${csMetrics(s,csToday())}<button class="btn sm" onclick="go('care')">전체 학생 현황</button> <button class="btn sm" onclick="view.tab='records';render()">기존 상담 관리</button></div>
- <details class="acc2"><summary>학생별 관리 횟수와 미트 주소</summary><p>목표 횟수는 학생마다 정합니다. 하지 않는 항목은 0회로 저장하세요. 이전 관리 기준은 보존됩니다.</p><div class="formgrid">${[["effectiveFrom","적용 시작일","date"],...CS_TARGETS.map(([k,label])=>[k,label+" 목표 횟수","number"]),["meetUrl","기본 Google Meet 주소","url"],["note","관리 기준 메모","text"]].map(([k,label,type])=>`<div class="frow"><label for="cs_policy_${k}">${label}</label><input id="cs_policy_${k}" type="${type}" ${type==="number"?`min="0" max="${CS_TARGETS.find(x=>x[0]===k)[2]}"`:""} value="${esc(policy[k]||"")}" oninput="csPolicyDraft()['${k}']=this.value"></div>`).join("")}</div><button class="btn" onclick="csSaveTargets()">관리 기준 저장</button><details><summary>기준 변경 이력 ${state.policies.length}개</summary>${state.policies.map(x=>`<p>${esc(x.effectiveFrom)}부터 · ${CS_TARGETS.map(([k,label])=>`${label} ${esc(x[k])}회`).join(" / ")}</p>`).join("")}</details></details>
+ <details id="cs_targets" class="acc2"><summary>학생별 관리 횟수와 미트 주소</summary><p>목표 횟수는 학생마다 정합니다. 하지 않는 항목은 0회로 저장하세요. 이전 관리 기준은 보존됩니다.</p><div class="formgrid">${[["effectiveFrom","적용 시작일","date"],...CS_TARGETS.map(([k,label])=>[k,label+" 목표 횟수","number"]),["meetUrl","기본 Google Meet 주소","url"],["note","관리 기준 메모","text"]].map(([k,label,type])=>`<div class="frow"><label for="cs_policy_${k}">${label}</label><input id="cs_policy_${k}" type="${type}" ${type==="number"?`min="0" max="${CS_TARGETS.find(x=>x[0]===k)[2]}"`:""} value="${esc(policy[k]||"")}" oninput="csPolicyDraft()['${k}']=this.value"></div>`).join("")}</div><button class="btn" onclick="csSaveTargets()">관리 기준 저장</button><details><summary>기준 변경 이력 ${state.policies.length}개</summary>${state.policies.map(x=>`<p>${esc(x.effectiveFrom)}부터 · ${CS_TARGETS.map(([k,label])=>`${label} ${esc(x[k])}회`).join(" / ")}</p>`).join("")}</details></details>
  <div class="card"><h2>${p.sessionId?"상담 회차 수정":"새 상담 회차"}</h2><p class="aplnote">편집 후 저장하면 새 버전을 추가합니다. 이전 버전과 전사 원문은 이력에 남습니다.</p><div class="formgrid">${field("title","상담 제목")}${field("date","상담일","date")}${field("time","시간","time")}${select("kind","회차 유형",CS_KINDS)}${select("mode","진행 방식",["대면","Google Meet","전화","자료 검토","기타"])}${select("status","회차 상태",CS_STATUS)}${field("meetUrl","이 회차 Google Meet 주소","url")}</div>${csMeet(p.meetUrl)?`<p><a href="${esc(csMeet(p.meetUrl))}" target="_blank" rel="noopener noreferrer">Google Meet 열기</a></p>`:""}
  ${area("agenda","상담 전 확인할 내용")}
  <h3>플래너 확인·설계</h3><div class="formgrid">${select("plannerCheck","플래너 확인",["미확인","확인","해당없음"])}${select("plannerDesign","플래너 설계",["미진행","설계 완료","해당없음"])}</div>${area("plannerRef","확인한 플래너·설계 변경 내용")}<p class="aplnote">한 회차에서 확인·설계를 마쳐도 상담 횟수는 한 번만 셉니다. 기존 월간 계획과 진로·과목 설계는 각각 유지됩니다.</p><button class="btn sm" onclick="view.tab='plan';render()">월간 계획 열기 (${(s.planners||[]).length})</button> <button class="btn sm" onclick="view.tab='course';render()">진로·과목 설계 열기</button>
