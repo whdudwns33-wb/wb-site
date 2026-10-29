@@ -23,7 +23,7 @@ const plain = value => JSON.parse(JSON.stringify(value));
 function setup() {
   let id = 0;
   const elements = new Map();
-  const c = vm.createContext({
+  const c = vm.createContext({jbnuCounselHtml:()=>"",
     URL, db: { students: [{ id: "one", name: "SYNTHETIC_STUDENT", grade: "고3", apply: [],
       consult: { susi: { admissionYear: "2027", gradeScale: "9", gradeAverage: "3", gradeLabel: "합성 학기" } } }], meta: {}, adiga: [] },
     view: { stuId: "one", ipsiStu: "one", aplYear: "2027" },
